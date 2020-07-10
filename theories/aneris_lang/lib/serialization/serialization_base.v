@@ -1,7 +1,7 @@
 From stdpp Require Import base pretty.
 From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import coq_tactics tactics.
-From aneris Require Import lang lifting tactics proofmode notation network.
+From aneris.aneris_lang Require Import lang lifting tactics proofmode notation network.
 
 Set Default Proof Using "Type".
 

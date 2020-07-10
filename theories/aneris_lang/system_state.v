@@ -3,7 +3,7 @@ From iris.base_logic Require Export gen_heap.
 From iris.base_logic.lib Require Export own.
 From iris.base_logic.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
-From aneris Require Export lang network.
+From aneris.aneris_lang Require Export lang network.
 Set Default Proof Using "Type".
 Import uPred.
 Import Network.

@@ -1,6 +1,6 @@
 From stdpp Require Export strings list pretty gmap.
 From iris.proofmode Require Import tactics.
-From aneris Require Import lang network notation tactics proofmode lifting.
+From aneris.aneris_lang Require Import lang network notation tactics proofmode lifting.
 From aneris.aneris_lang.lib Require Import list.
 
 Module dict.

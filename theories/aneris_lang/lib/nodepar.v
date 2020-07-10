@@ -1,7 +1,7 @@
 From iris.base_logic.lib Require Export invariants.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import excl.
-From aneris Require Export lang lifting network notation tactics proofmode.
+From aneris.aneris_lang Require Export lang lifting network notation tactics proofmode.
 Set Default Proof Using "Type".
 
 Notation "( n1 ; ip1 ; e1 ) ||| ( n2 ; ip2 ; e2 )" :=

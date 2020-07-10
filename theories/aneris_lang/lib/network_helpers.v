@@ -1,6 +1,6 @@
 From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import tactics.
-From aneris Require Import lang lifting tactics proofmode notation.
+From aneris.aneris_lang Require Import lang lifting tactics proofmode notation.
 From aneris.aneris_lang.lib Require Import assert.
 
 Section code.

@@ -3,7 +3,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Export invariants.
 From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import coq_tactics reduction.
-From aneris Require Import lang lifting tactics proofmode notation.
+From aneris.aneris_lang Require Import lang lifting tactics proofmode notation.
 From aneris.aneris_lang.lib Require Import lock.
 
 Definition newbag : ground_lang.val :=
