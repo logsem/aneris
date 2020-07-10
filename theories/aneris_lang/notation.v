@@ -39,7 +39,6 @@ Coercion ground_lang.of_val : ground_lang.val >-> ground_lang.expr.
 
 Coercion Var : string >-> ground_lang.expr.
 
-(* TODO: come up with something better... *)
 (* Note that the scope for expressions and values are NOT the same:
    Expressions have brackets that comes from the sequence \<, with name
    MATHEMATICAL LEFT ANGLE BRACKET where as values has brackets

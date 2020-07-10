@@ -147,7 +147,6 @@ Section strings.
 
 End strings.
 
-(* @Amin TODO : (de)serialisation of write events *)
 Section library.
   Context `{dG : distG Σ}.
 

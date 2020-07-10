@@ -35,6 +35,7 @@ nra.cache
 Makefile.coq.conf
 CoqMakefile.conf
 Makefile.coq
+build-dep/
 
 ### Emacs ###
 # -*- mode: gitignore; -*-
