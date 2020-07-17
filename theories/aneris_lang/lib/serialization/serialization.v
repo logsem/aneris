@@ -220,6 +220,11 @@ Section prod_serialization.
        DBS_ser_spec := @prod_ser_spec;
        DBS_deser_spec := @prod_deser_spec; |}.
 
+Global Instance:
+  ∀ v1 v2, Serializable A v1 → Serializable B v2 →
+           Serializable prod_serialization (v1, v2).
+Proof. rewrite /Serializable /= /prod_valid_val /=; eauto. Qed.
+
 End prod_serialization.
 
 Section sum_serialization.
@@ -325,5 +330,13 @@ Section sum_serialization.
        DBS_is_ser := sum_is_ser;
        DBS_ser_spec := @sum_ser_spec;
        DBS_deser_spec := @sum_deser_spec; |}.
+
+Global Instance:
+  ∀ v, Serializable A v → Serializable sum_serialization (InjLV v).
+Proof. rewrite /Serializable /= /sum_valid_val /=; eauto. Qed.
+
+Global Instance:
+  ∀ v, Serializable B v → Serializable sum_serialization (InjRV v).
+Proof. rewrite /Serializable /= /sum_valid_val /=; eauto. Qed.
 
 End sum_serialization.
