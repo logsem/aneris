@@ -68,6 +68,47 @@ Definition int_serialization : serialization :=
 Global Instance: ∀ i : Z, Serializable int_serialization #i.
 Proof. intros i; exists i; done. Qed.
 
+Definition unit_valid_val (v : ground_lang.val) := v = #().
+
+Definition unit_ser : ground_lang.val := λ: "v", #"".
+
+Definition unit_deser : ground_lang.val := λ: "v", #().
+
+Definition unit_is_ser (v : ground_lang.val) (s : string) := v = #() ∧ s = "".
+
+Lemma unit_ser_spec `{!distG Σ} n v :
+  {{{ ⌜unit_valid_val v⌝ }}}
+    ⟨n; unit_ser v⟩
+  {{{ (s : string), RET 〈n; #s〉; ⌜unit_is_ser v s⌝ }}}.
+Proof.
+  iIntros (Φ ->) "HΦ".
+  rewrite /unit_ser /unit_is_ser.
+  wp_pures.
+  iApply "HΦ"; eauto.
+Qed.
+
+Lemma unit_deser_spec `{!distG Σ} n v s :
+  {{{ ⌜unit_is_ser v s⌝ }}}
+    ⟨n; unit_deser #s⟩
+  {{{ RET 〈n; v〉; True }}}.
+Proof.
+  iIntros (Φ [-> ->]) "HΦ".
+  rewrite /unit_deser /unit_is_ser.
+  wp_pures.
+  iApply "HΦ"; done.
+Qed.
+
+Definition unit_serialization : serialization :=
+  {| DBS_valid_val := unit_valid_val;
+     DBS_ser := unit_ser;
+     DBS_deser := unit_deser;
+     DBS_is_ser := unit_is_ser;
+     DBS_ser_spec := @unit_ser_spec;
+     DBS_deser_spec := @unit_deser_spec; |}.
+
+Global Instance: Serializable unit_serialization #().
+Proof. done. Qed.
+
 Definition string_valid_val (v : ground_lang.val) := ∃ (s : string), v = #s.
 
 Definition string_ser : ground_lang.val := λ: "v", "v".
