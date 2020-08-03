@@ -3,7 +3,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Export invariants.
 From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import coq_tactics reduction.
-From aneris.aneris_lang Require Import lang lifting tactics proofmode notation.
+From aneris.aneris_lang Require Import lang tactics proofmode notation.
 From aneris.aneris_lang.lib Require Import lock.
 
 Definition newbag : ground_lang.val :=
@@ -41,53 +41,59 @@ Section spec.
     | _ => ⌜False⌝%I
     end.
 
-  Definition isBag (n : Network.ip_address) (v : ground_lang.val) (Ψ : ground_lang.val → iProp) :=
-    (∃ (l : loc) v' γ, ⌜v = PairV #l v'⌝ ∗ is_lock N n γ v' (∃ u, l ↦[n] u ∗ bagList Ψ u))%I.
+  Definition isBag (n : Network.ip_address)
+             (v : ground_lang.val) (Ψ : ground_lang.val → iProp) :=
+    (∃ (l : loc) v' γ, ⌜v = PairV #l v'⌝ ∗
+      is_lock N n γ v' (∃ u, l ↦[n] u ∗ bagList Ψ u))%I.
 
   Global Instance bag_persistent n v Ψ: Persistent (isBag n v Ψ).
   Proof. apply _. Qed.
 
-  Lemma newbag_spec n Ψ :
-     {{{ IsNode n }}} ⟨n; newbag #()⟩ {{{ v, RET 〈n;v〉; isBag n v Ψ }}}.
+  Lemma newbag_spec ip Ψ :
+     {{{ True }}} newbag #() @[ip] {{{ v, RET v; isBag ip v Ψ }}}.
   Proof.
     iIntros (Φ) "Hn HΦ".
     wp_lam; wp_alloc ℓ as "Hℓ"; wp_let.
     wp_bind (newlock _)%E.
-    iApply ((newlock_spec N n (∃ u, ℓ ↦[n] u ∗ bagList Ψ u)%I) with "[Hn Hℓ]").
+    iApply ((newlock_spec N ip (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u)%I) with "[Hn Hℓ]").
     - iFrame. iExists NONEV. iFrame.
     - iNext. iIntros (v γ) "IL". wp_pures.
       iApply "HΦ". iExists ℓ, v, γ. iSplit; auto.
   Qed.
 
-  Lemma bag_insert_spec n v Ψ e:
-    {{{ isBag n v Ψ ∗ Ψ e }}} ⟨n; insert v e⟩ {{{ v, RET 〈n;v〉; True }}}.
+  Lemma bag_insert_spec ip v Ψ e:
+    {{{ isBag ip v Ψ ∗ Ψ e }}} insert v e @[ip] {{{ RET #(); True }}}.
   Proof.
     iIntros (Φ) "[#HC HΨ] HΦ".
     iDestruct "HC" as (ℓ u γ) "[% #HLock]"; subst.
     wp_lam. wp_pures. wp_bind (acquire _)%E.
-    iApply (acquire_spec _ _ _ _ (∃ u0, ℓ ↦[n] u0 ∗ bagList Ψ u0))%I; first by iFrame "#".
+    iApply (acquire_spec _ _ _ _ (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u))%I;
+      first by iFrame "#".
     iNext. iIntros (v) "(-> & HLocked &  HInv)".
     iDestruct "HInv" as (u') "[Hpt Hisbag]".
-    wp_pures. wp_load; wp_store; wp_seq.
-    iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[n] u0 ∗ bagList Ψ u0)
+    wp_pures. wp_load. wp_store.
+    iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
               with "[-HΦ]")%I.
     - iFrame; iFrame "#". iExists (SOMEV (e, u')) ; iFrame.
     - iNext. iIntros (?) "->". by iApply "HΦ".
   Qed.
 
-  Lemma bag_remove_spec n v Ψ:
-    {{{ isBag n v Ψ }}} ⟨n; remove v⟩ {{{ v, RET 〈n;v〉; ⌜v = NONEV⌝ ∨ ∃ x, ⌜v = SOMEV x⌝ ∗ Ψ x }}}.
+  Lemma bag_remove_spec ip v Ψ:
+    {{{ isBag ip v Ψ }}}
+      remove v @[ip]
+    {{{ v, RET v; ⌜v = NONEV⌝ ∨ ∃ x, ⌜v = SOMEV x⌝ ∗ Ψ x }}}.
   Proof.
     iIntros (Φ) "HC HΦ".
     iDestruct "HC" as (ℓ u γ) "[% #HLock]"; subst.
     wp_lam. wp_pures. wp_bind (acquire _)%E.
-    iApply (acquire_spec _ _ _ _ (∃ u0, ℓ ↦[n] u0 ∗ bagList Ψ u0))%I; first by iFrame "#".
+    iApply (acquire_spec _ _ _ _ (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u))%I;
+      first by iFrame "#".
     iNext. iIntros (v) "(-> & HLocked &  HInv)".
     iDestruct "HInv" as (u') "[Hpt Hisbag]".
     wp_pures. wp_load. wp_pures.
     destruct u'; try (iDestruct "Hisbag" as "%" ; contradiction).
     - wp_pures. wp_bind (release _)%E.
-      iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[n] u0 ∗ bagList Ψ u0)
+      iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
                 with "[-HΦ]")%I; iFrame "#"; iFrame.
       + iExists (InjLV u') ; iFrame.
       + iNext. iIntros (v) "-> /=". wp_pures.
@@ -96,7 +102,7 @@ Section spec.
       destruct u'; try (iDestruct "Hisbag" as "%" ; contradiction).
       wp_pures; wp_store; wp_pures. wp_bind (release _)%E.
       iDestruct "Hisbag" as "[HΨ Hisbag]".
-      iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[n] u0 ∗ bagList Ψ u0)
+      iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
                 with "[HLocked Hisbag Hpt]")%I; iFrame "#"; iFrame.
       + iExists u'2. iFrame.
       + iNext. iIntros (?) "-> /=". wp_pures.

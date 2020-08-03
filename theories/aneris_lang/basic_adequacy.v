@@ -70,9 +70,10 @@ Proof.
 Qed.
 
 Theorem dist_adequacy `{distPreG Σ} IPs A s e σ φ :
-  (∀ `{distG Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
-                    Fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
-                     ([∗ set] ip ∈ IPs, FreeIP ip) -∗ WP e @ s; ⊤ {{v, ⌜φ v⌝ }}) →
+  (∀ `{distG Σ},
+      ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
+        Fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
+        ([∗ set] ip ∈ IPs, FreeIP ip) -∗ WP e @ s; ⊤ {{v, ⌜φ v⌝ }}) →
   dom (gset ip_address) (state_ports_in_use σ) = IPs →
   (∀ i, i ∈ IPs → state_ports_in_use σ !! i = Some ∅) →
   (∀ i, i ∈ A → ip_of_address i ∈ IPs) →
@@ -81,17 +82,19 @@ Theorem dist_adequacy `{distPreG Σ} IPs A s e σ φ :
   state_ms σ = ∅ →
   @adequate aneris_lang s e σ (λ v _, φ v).
 Proof.
-  intros Hwp Hipdom Hpiiu Hfixdom Hste Hsce  Hmse;
+  intros Hwp Hipdom Hpiiu Hfixdom Hste Hsce Hmse;
     eapply (wp_adequacy _ _); iIntros (?); simpl.
   iMod (own_alloc (● (to_agree <$> ∅) : authR system_state_mapUR)) as
-      (γmp) "Hmp"; first by rewrite auth_auth_valid fmap_empty.
+      (γmp) "Hmp".
+  { rewrite auth_auth_valid;  done. }
   iMod (own_alloc (● ∅ ⋅ ◯ ∅: socket_interpR)) as (γsi) "[Hsi Hsi']".
   { apply auth_both_valid; split; done. }
   iMod (own_alloc (to_agree A : agreeR (gsetUR socket_address)))
     as (γsif) "#Hsif"; first done.
   iMod (FreeIps_alloc IPs) as (γips) "[HIPsCtx HIPs]".
-  iMod (own_alloc (● (∅: gmap ip_address (gset_disjUR port)))) as (γpiu) "HPiu";
-    first by apply auth_auth_valid.
+  iMod (own_alloc (● (∅ : gmap ip_address (gset_disjUR port))))
+    as (γpiu) "HPiu".
+  { apply auth_auth_valid; done. }
   set (dg :=
          {|
            dist_map_name := γmp;
@@ -134,7 +137,7 @@ Proof.
         by rewrite dom_fmap. }
       iModIntro.
       iExists (<[a:= γ]> M).
-      rewrite fmap_insert; iFrame.
+      rewrite !fmap_insert; iFrame.
       rewrite big_sepM_insert;
         last by apply (not_elem_of_dom (D := gset socket_address)).
       iFrame. iPureIntro.
@@ -166,22 +169,23 @@ Proof.
     iSplitL "HM".
     { rewrite /socket_interp_coherence. iExists _; iFrame.
       iExists _; iFrame; iFrame "#".
-      rewrite -!Hdmsi dom_fmap_L. rewrite -Hdmsi -Hipdom in Hfixdom.
-      iSplit; first done.
+      rewrite -!Hdmsi dom_fmap_L.
+      iSplit; first by iPureIntro; set_solver.
       iSplit; last by iApply (@big_sepS_mono with "[$Hsa']"); simpl; auto.
-      iPureIntro. intros b. split; first by auto.
+      iPureIntro. intros b Hbips. split; first by auto.
       intros [Hb | [Hb HP]]; first done.
-      rewrite -Hipdom in Hpiiu. specialize (Hpiiu _ H0).
+      rewrite -Hipdom in Hpiiu. specialize (Hpiiu _ Hbips).
       specialize (HP _ Hpiiu). done. }
     iSplitR.
-    { by rewrite big_sepM_empty. }
+    { rewrite big_sepM_empty; done. }
     iSplitL "HIPsCtx HPiu".
     { iExists _, _; iFrame.
-      iPureIntro; repeat split; trivial.
-      - by rewrite dom_empty.
-      - rewrite Hste. by rewrite lookup_empty.
-      - rewrite Hsce. by rewrite lookup_empty.
-      - intros ? ?; by rewrite lookup_empty. }
+      iPureIntro; split_and!; trivial.
+      - rewrite dom_empty. set_solver.
+      - intros ip ?.
+        rewrite Hste Hsce. set_solver.
+      - intros ip P.
+        set_solver. }
     iSplit. iPureIntro. rewrite Hsce Hmse. repeat split; eauto; try set_solver.
     rewrite /network_messages_coherence.
     rewrite Hmse Hsce. done.

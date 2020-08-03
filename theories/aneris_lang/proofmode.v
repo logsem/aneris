@@ -1,7 +1,8 @@
-From iris.program_logic Require Export weakestpre total_weakestpre.
 From iris.proofmode Require Import coq_tactics reduction.
 From iris.proofmode Require Export tactics.
-From aneris.aneris_lang Require Export tactics lifting network.
+From aneris.aneris_lang Require Import tactics network.
+From aneris.aneris_lang.program_logic Require Export aneris_lifting.
+
 Set Default Proof Using "Type".
 Import uPred.
 
@@ -17,21 +18,23 @@ Tactic Notation "wp_expr_eval" tactic(t) :=
       [let x := fresh in intros x; t; unfold x; reflexivity
       |]).
 
-Lemma tac_wp_pure `{!distG Σ} Δ Δ' s E e1 e2 φ n Φ :
-  PureExec φ n e1 e2 →
+Lemma tac_wp_pure `{!distG Σ} Δ Δ' ip E e1 e2 φ n Φ :
+  PureExec φ n {| expr_n := ip; expr_e := e1 |}
+           {| expr_n := ip; expr_e := e2 |} →
   φ →
   MaybeIntoLaterNEnvs n Δ Δ' →
-  envs_entails Δ' (WP e2 @ s; E {{ Φ }}) →
-  envs_entails Δ (WP e1 @ s; E {{ Φ }}).
+  envs_entails Δ' (WP e2 @[ip] E {{ Φ }}) →
+  envs_entails Δ (WP e1 @[ip] E {{ Φ }}).
 Proof.
   rewrite envs_entails_eq=> ??? HΔ'. rewrite into_laterN_env_sound /=.
-  rewrite HΔ' -lifting.wp_pure_step_later //.
+  rewrite HΔ' -aneris_wp_pure_step_later //.
 Qed.
 
-Lemma tac_wp_value `{!distG Σ} Δ s E Φ v n :
-  envs_entails Δ (Φ 〈n; v〉) → envs_entails Δ (WP ⟨n; Val v⟩ @ s; E {{ Φ }}).
+Lemma tac_wp_value `{!distG Σ} Δ ip E Φ v :
+  envs_entails Δ (Φ v) →
+  envs_entails Δ (WP (Val v) @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_eq=> ->. by apply wp_value.
+  rewrite envs_entails_eq=> ->. by apply aneris_wp_value.
 Qed.
 
 Ltac wp_expr_simpl := wp_expr_eval simpl.
@@ -61,11 +64,11 @@ The use of [open_constr] in this tactic is essential. It will convert all holes
 Tactic Notation "wp_pure" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) =>
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     let e := eval simpl in e in
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
-      eapply (tac_wp_pure _ _ _ _ (fill K ⟨n;e'⟩));
+      eapply (tac_wp_pure _ _ _ _ (@fill ground_ectxi_lang K e'));
       [iSolveTC                       (* PureExec *)
       |try solve_vals_compare_safe    (* The pure condition for PureExec *)
       |iSolveTC                       (* IntoLaters *)
@@ -112,11 +115,11 @@ Tactic Notation "wp_find_from" := wp_pure (FindFrom _ _ _ ).
 Tactic Notation "wp_substring" := wp_pure (Substring _ _ _).
 Tactic Notation "wp_makeaddress" := wp_pure (MakeAddress _ _).
 
-Lemma tac_wp_bind `{distG Σ} K Δ s E Φ n (e : ground_lang.expr) f :
+Lemma tac_wp_bind `{distG Σ} K Δ ip E Φ (e : ground_lang.expr) f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (WP ⟨n;e⟩ @ s; E {{ v, WP f (of_val v) @ s; E {{ Φ }} }})%I →
-  envs_entails Δ (WP fill K ⟨n;e⟩ @ s; E {{ Φ }}).
-Proof. rewrite envs_entails_eq=> -> ->. apply: wp_bind. Qed.
+  envs_entails Δ (WP e @ ip; E {{ v, WP f (of_val v) @ ip; E {{ Φ }} }})%I →
+  envs_entails Δ (WP fill K e @ ip; E {{ Φ }}).
+Proof. rewrite envs_entails_eq=> -> ->. apply: aneris_wp_bind. Qed.
 
 Ltac wp_bind_core K :=
   lazymatch eval hnf in K with
@@ -131,7 +134,7 @@ Ltac wp_bind_core K :=
 Tactic Notation "wp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ⟨_;?e⟩ ?Q) =>
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     reshape_expr e ltac:(fun K e' => unify e' efoc; wp_bind_core K)
     || fail "wp_bind: cannot find" efoc "in" e
   end.
@@ -144,166 +147,103 @@ Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
 Implicit Types z : Z.
 
-Lemma tac_wp_alloc b Δ Δ' s E i j K n v Φ :
+Lemma tac_wp_alloc Δ Δ' ip E j K v Φ :
   MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (b, IsNode n)%I →
   (∀ l, ∃ Δ'',
-    envs_app false (Esnoc Enil j (l ↦[n] v)) Δ' = Some Δ'' ∧
-    envs_entails Δ'' (WP fill K ⟨n; Val $ LitV $ LitLoc l⟩ @ s; E {{ Φ }})) →
-  envs_entails Δ (WP fill K ⟨n;Alloc (Val v)⟩ @ s; E {{ Φ }}).
+    envs_app false (Esnoc Enil j (l ↦[ip] v)) Δ' = Some Δ'' ∧
+    envs_entails Δ'' (WP fill K (Val $ LitV $ LitLoc l)
+                         @[ip] E {{ Φ }})) →
+  envs_entails Δ (WP fill K (Alloc (Val v)) @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_eq => ? Hn HΔ. rewrite -wp_bind.
+  rewrite envs_entails_eq => ? HΔ. rewrite -aneris_wp_bind.
   iIntros "H". rewrite into_laterN_env_sound /=.
-  iDestruct (envs_lookup_split _ _  with "H") as "[Hn H]"; eauto.
-  simpl. iDestruct (intuitionistically_if_elim with "Hn") as "#Hn'".
-  iApply (wp_alloc with "Hn'").
+  iApply aneris_wp_alloc; first done.
   iNext. iIntros (l) "Hl". destruct (HΔ l) as (Δ''&?&HΔ').
   rewrite envs_app_sound //; simpl. rewrite right_id HΔ'.
-  iApply "H"; last done.
-  by iApply intuitionistically_intuitionistically_if.
+  iApply "H"; done.
 Qed.
 
-Lemma tac_wp_load Δ Δ' s E i K n l q v Φ :
+Lemma tac_wp_load Δ Δ' E i K ip l q v Φ :
   MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦[n]{q} v)%I →
-  envs_entails Δ' (WP fill K (of_val 〈n;v〉) @ s; E {{ Φ }}) →
-  envs_entails Δ (WP fill K ⟨n;Load (LitV (LitLoc l))⟩ @ s; E {{ Φ }}).
+  envs_lookup i Δ' = Some (false, l ↦[ip]{q} v)%I →
+  envs_entails Δ' (WP fill K (of_val v) @[ip] E {{ Φ }}) →
+  envs_entails Δ (WP fill K (Load (LitV (LitLoc l))) @[ip] E {{ Φ }}).
 Proof.
   rewrite envs_entails_eq=> ???.
-  rewrite -wp_bind. eapply wand_apply; first exact: wp_load.
+  rewrite -aneris_wp_bind. eapply wand_apply; first exact: aneris_wp_load.
   rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
   by apply later_mono, sep_mono_r, wand_mono.
 Qed.
 
-Lemma tac_wp_store Δ Δ' Δ'' s E i K n l v v' Φ :
+Lemma tac_wp_store Δ Δ' Δ'' E i K ip l v v' Φ :
   MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦[n] v)%I →
-  envs_simple_replace i false (Esnoc Enil i (l ↦[n] v')) Δ' = Some Δ'' →
-  envs_entails Δ'' (WP fill K ⟨n;LitV LitUnit⟩ @ s; E {{ Φ }}) →
-  envs_entails Δ (WP fill K ⟨n;Store (LitV (LitLoc l)) (Val v')⟩ @ s; E {{ Φ }}).
+  envs_lookup i Δ' = Some (false, l ↦[ip] v)%I →
+  envs_simple_replace i false (Esnoc Enil i (l ↦[ip] v')) Δ' = Some Δ'' →
+  envs_entails Δ'' (WP fill K (of_val $ LitV LitUnit) @[ip] E {{ Φ }}) →
+  envs_entails Δ (WP fill K (Store (LitV (LitLoc l)) (Val v'))
+                     @[ip] E {{ Φ }}).
 Proof.
   rewrite envs_entails_eq=> ????.
-  rewrite -wp_bind. eapply wand_apply; first by eapply wp_store.
+  rewrite -aneris_wp_bind. eapply wand_apply; first by eapply aneris_wp_store.
   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono.
 Qed.
 
-(* Lemma tac_wp_cas_fail Δ Δ' s E i K l q v e1 v1 e2 Φ : *)
-(*   IntoVal e1 v1 → AsVal e2 → *)
-(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
-(*   envs_lookup i Δ' = Some (false, l ↦{q} v)%I → v ≠ v1 → *)
-(*   envs_entails Δ' (WP fill K (Lit (LitBool false)) @ s; E {{ Φ }}) → *)
-(*   envs_entails Δ (WP fill K (CAS (Lit (LitLoc l)) e1 e2) @ s; E {{ Φ }}). *)
-(* Proof. *)
-(*   rewrite /envs_entails=> ??????. *)
-(*   rewrite -wp_bind. eapply wand_apply; first exact: wp_cas_fail. *)
-(*   rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl. *)
-(*   by apply later_mono, sep_mono_r, wand_mono. *)
-(* Qed. *)
-
-(* Lemma tac_wp_cas_suc Δ Δ' Δ'' s E i K l v e1 v1 e2 v2 Φ : *)
-(*   IntoVal e1 v1 → IntoVal e2 v2 → *)
-(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
-(*   envs_lookup i Δ' = Some (false, l ↦ v)%I → v = v1 → *)
-(*   envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ' = Some Δ'' → *)
-(*   envs_entails Δ'' (WP fill K (Lit (LitBool true)) @ s; E {{ Φ }}) → *)
-(*   envs_entails Δ (WP fill K (CAS (Lit (LitLoc l)) e1 e2) @ s; E {{ Φ }}). *)
-(* Proof. *)
-(*   rewrite /envs_entails=> ???????; subst. *)
-(*   rewrite -wp_bind. eapply wand_apply; first exact: wp_cas_suc. *)
-(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
-(*   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono. *)
-(* Qed. *)
-
-(* Lemma tac_wp_faa Δ Δ' Δ'' s E i K l i1 e2 i2 Φ : *)
-(*   IntoVal e2 (LitV (LitInt i2)) → *)
-(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
-(*   envs_lookup i Δ' = Some (false, l ↦ LitV (LitInt i1))%I → *)
-(*   envs_simple_replace i false (Esnoc Enil i (l ↦ LitV (LitInt (i1 + i2)))) Δ' = Some Δ'' → *)
-(*   envs_entails Δ'' (WP fill K (Lit (LitInt i1)) @ s; E {{ Φ }}) → *)
-(*   envs_entails Δ (WP fill K (FAA (Lit (LitLoc l)) e2) @ s; E {{ Φ }}). *)
-(* Proof. *)
-(*   rewrite /envs_entails=> ?????; subst. *)
-(*   rewrite -wp_bind. eapply wand_apply; first exact: (wp_faa _ _ _ i1 _ i2). *)
-(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
-(*   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono. *)
-(* Qed. *)
-
-Lemma tac_wp_socket b Δ Δ' s E i j K n v1 v2 v3 Φ :
+Lemma tac_wp_cas_fail Δ Δ' E i K ip l q v e1 v1 e2 Φ :
+  IntoVal e1 v1 → AsVal e2 →
   MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (b, IsNode n)%I →
-  (∀ h, ∃ Δ'',
-        envs_app false (Esnoc Enil j (h s↦[n]{1/2} ({|
-                                          Network.sfamily := v1;
-                                          Network.stype := v2;
-                                          Network.sprotocol := v3;
-                                          Network.saddress := None |}, ∅, ∅)))
-                 Δ' = Some Δ'' ∧
-        envs_entails Δ'' (WP fill K ⟨n; LitV (LitSocket h)⟩ @ s; E {{ Φ }})) →
-  envs_entails Δ (WP fill K ⟨n;NewSocket (Val $ LitV $ LitAddressFamily v1)
-                                         (Val $ LitV $ LitSocketType v2)
-                                         (Val $ LitV $ LitProtocol v3)⟩ @ s; E {{ Φ }}).
+  envs_lookup i Δ' = Some (false, l ↦[ip]{q} v)%I → v ≠ v1 →
+  envs_entails Δ' (WP fill K (of_val $ LitV (LitBool false)) @[ip] E {{ Φ }}) →
+  envs_entails Δ (WP fill K (CAS (LitV (LitLoc l)) e1 e2) @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_eq=> ? Hn HΔ. rewrite -wp_bind.
+  rewrite envs_entails_eq=> <- [? <-] ????.
+  rewrite -aneris_wp_bind. eapply wand_apply; first exact: aneris_wp_cas_fail.
+  rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
+  by apply later_mono, sep_mono_r, wand_mono.
+Qed.
+
+Lemma tac_wp_cas_suc Δ Δ' Δ'' E i K ip l v e1 v1 e2 v2 Φ :
+  IntoVal e1 v1 → IntoVal e2 v2 →
+  MaybeIntoLaterNEnvs 1 Δ Δ' →
+  envs_lookup i Δ' = Some (false, l ↦[ip] v)%I → v = v1 →
+  envs_simple_replace i false (Esnoc Enil i (l ↦[ip] v2)) Δ' = Some Δ'' →
+  envs_entails Δ'' (WP fill K (of_val $ LitV (LitBool true)) @[ip] E {{ Φ }}) →
+  envs_entails Δ (WP fill K (CAS (LitV (LitLoc l)) e1 e2) @[ip] E {{ Φ }}).
+Proof.
+  rewrite envs_entails_eq=> <- <- ?????; subst.
+  rewrite -aneris_wp_bind. eapply wand_apply; first exact: aneris_wp_cas_suc.
+  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
+  rewrite right_id. by apply later_mono, sep_mono_r, wand_mono.
+Qed.
+
+Lemma tac_wp_socket Δ Δ' E j K ip v1 v2 v3 Φ :
+  MaybeIntoLaterNEnvs 1 Δ Δ' →
+  (∀ h,
+    ∃ Δ'',
+      envs_app
+        false
+        (Esnoc Enil j
+          (h s↦[ip]{1/2}
+             ({|
+                 Network.sfamily := v1;
+                 Network.stype := v2;
+                 Network.sprotocol := v3;
+                 Network.saddress := None |}, ∅, ∅)))
+        Δ' = Some Δ'' ∧
+      envs_entails
+        Δ'' (WP fill K (of_val $ LitV (LitSocket h)) @[ip] E {{ Φ }})) →
+  envs_entails Δ (WP fill K (NewSocket
+                               (Val $ LitV $ LitAddressFamily v1)
+                               (Val $ LitV $ LitSocketType v2)
+                               (Val $ LitV $ LitProtocol v3)) @[ip] E {{ Φ }}).
+Proof.
+  rewrite envs_entails_eq=> ? HΔ. rewrite -aneris_wp_bind.
   iIntros "H". rewrite into_laterN_env_sound /=.
-  iDestruct (envs_lookup_split with "H") as "[Hn H]"; eauto.
-  simpl. iDestruct (intuitionistically_if_elim with "Hn") as "#Hn'".
-  iApply (wp_new_socket with "Hn'").
+  iApply aneris_wp_new_socket; first done.
   iNext. iIntros (sh) "Hsh". destruct (HΔ sh) as (Δ''&?&HΔ').
   rewrite envs_app_sound //; simpl. rewrite right_id HΔ'.
   iApply "H"; last done.
-  by iApply intuitionistically_intuitionistically_if.
 Qed.
-
-(* Lemma tac_wp_socket_bind_suc Δ Δ' Δ'' s E i i' i'' j K n (P : coPset) *)
-(*       layout sh v e v' Φ : *)
-(*   IntoVal ⟨n;e⟩ 〈n;#(LitSocketAddress v')〉 → *)
-(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
-(*   Network.saddress v = None → *)
-(*   layout !! n = Some (Network.ip_of_address v') → *)
-(*   Network.port_of_address v' ∈ P → *)
-(*   envs_lookup i Δ' = Some (false, ownN dist_layout_name layout) → *)
-(*   envs_lookup i' Δ' = Some (false, p↦[n] P) → *)
-(*   envs_lookup i'' Δ' = Some (false, sh s↦[n] v)%I → *)
-(*   envs_simple_replace i' false *)
-(*                       (Esnoc Enil i' (p↦[ n] (P ∖ {[Network.port_of_address v']})))                 Δ' = Some Δ'' → *)
-(*   envs_simple_replace i'' false (Esnoc Enil i'' (sh s↦[n] {| *)
-(*                                           Network.sfamily := Network.sfamily v; *)
-(*                                           Network.stype := Network.stype v; *)
-(*                                           Network.sprotocol := Network.sprotocol v; *)
-(*                                           Network.saddress := Some v' |})) *)
-(*                       Δ' = Some Δ'' → *)
-(*   envs_app false (Esnoc Enil j (v' l↦ n)) Δ' = Some Δ'' →  *)
-(*   envs_entails Δ'' (WP fill K ⟨n;Lit $ LitInt 0⟩ @ s; E {{ Φ }}) → *)
-(*   envs_entails Δ (WP fill K ⟨n;SocketBind (Lit (LitSocket sh)) e⟩ @ s; E {{ Φ }}). *)
-(* Proof. *)
-(*   rewrite /envs_entails=> ????????????. *)
-(*   rewrite -wp_bind. eapply wand_apply. by eapply wp_bind_socket_suc.  *)
-(*   rewrite !into_laterN_env_sound -!later_sep. *)
-(*   rewrite envs_simple_replace_sound //; simpl. *)
-(*   rewrite (envs_simple_replace_sound _ _ i'). *)
-(*   rewrite right_id. apply later_mono. *)
-(*   iIntros "(H1 & Hrest)". iFrame.  *)
-(*   iFrame "H1". *)
-(* apply sep_mono_r.   *)
-
-(*   _Hyp_ : IntoVal ⟨ n; e ⟩ 〈 n; v' 〉 *)
-(*   _Hyp1_ : MaybeIntoLaterNEnvs 1 Δ Δ' *)
-(*   _Hyp2_ : envs_lookup i Δ' = Some (false, (l ↦[ n] v)%I) *)
-(*   _Hyp3_ : envs_simple_replace i false (Esnoc  i (l ↦[ n] v')) Δ' = Some Δ'' *)
-(*   _Hyp4_ : of_envs Δ'' -∗ WP fill K ⟨ n; #() ⟩ @ s; E {{ v, Φ v }} *)
-(*   ============================ *)
-(*   l ↦[ n] v ∗ (l ↦[ n] v' -∗ of_envs Δ'') -∗ *)
-(*   l ↦[ n] ?v' ∗ (l ↦[ n] v' -∗ WP fill K 〈 n; LitV () 〉 @ s; E {{ v, Φ v }}) *)
-
-(*   apply wand_mono. *)
-(*   iIntros "(Hsh & Hvs)". *)
-(*   apply sep_mono_r. wand_mono. *)
-
-(*   rewrite right_id. apply later_mono. *)
-
-(*     by apply later_mono, sep_mono_r, wand_mono. *)
-(* Admitted. *)
 
 End state.
 
@@ -315,7 +255,7 @@ Tactic Notation "wp_apply_core" open_constr(lem) tactic(tac) :=
   wp_pures;
   iPoseProofCore lem as false (fun H =>
     lazymatch goal with
-    | |- envs_entails _ (wp ?s ?E ⟨_;?e⟩ ?Q) =>
+    | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
       reshape_expr e ltac:(fun K e' =>
         wp_bind_core K; tac H) ||
       lazymatch iTypeOf H with
@@ -327,13 +267,6 @@ Tactic Notation "wp_apply" open_constr(lem) :=
   wp_apply_core lem (fun H => iApplyHyp H; try iNext; try wp_expr_simpl).
 
 Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
-  let solve_node _ :=
-      let n :=
-          match goal with
-          | |- _ = Some (_, (IsNode ?n)%I) => n
-          | |- ?foo => idtac foo
-          end in
-      iAssumptionCore || fail "wp_alloc: cannot find 'IsNode ?'" in
   let Htmp := iFresh in
   let finish _ :=
       first [intros l | fail 1 "wp_alloc:" l "not fresh"];
@@ -342,13 +275,12 @@ Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
       |iDestructHyp Htmp as H; wp_finish] in
   wp_pures;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) =>
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     let process_single _ :=
         first [
-            reshape_expr e ltac:(fun K e' => eapply (tac_wp_alloc _ _ _ _ _ _ Htmp K n))
+            reshape_expr e ltac:(fun K e' => eapply (tac_wp_alloc _ _ ip _ Htmp K))
            |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
         [iSolveTC
-        |solve_node ()
         |finish()]
     in (process_single ())
   | _ => fail "wp_alloc: not a 'wp'"
@@ -358,147 +290,76 @@ Tactic Notation "wp_alloc" ident(l) :=
   let H := iFresh in wp_alloc l as H.
 
 Tactic Notation "wp_load" :=
-  let solve_mapsto n _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦[n]{_} _)%I) => l end in
+  let solve_mapsto ip :=
+    let l := match goal with |- _ = Some (_, (?l ↦[ip]{_} _)%I) => l end in
     iAssumptionCore || fail "wp_load: cannot find" l "↦ ?" in
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) =>
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_load _ _ _ _ _ K))
+      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_load _ _ _ _ K))
       |fail 1 "wp_load: cannot find 'Load' in" e];
     [apply _
-    |solve_mapsto n ()
+    |solve_mapsto ip
     |wp_expr_simpl; try wp_value_head]
   | _ => fail "wp_load: not a 'wp'"
   end.
 
 Tactic Notation "wp_store" :=
-  let solve_mapsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦[_]{_} _)%I) => l end in
+  let solve_mapsto ip :=
+    let l := match goal with |- _ = Some (_, (?l ↦[ip]{_} _)%I) => l end in
     iAssumptionCore || fail "wp_store: cannot find" l "↦ ?" in
   wp_pures;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) =>
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_store _ _ _ _ _ _ K))
+      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_store _ _ _ _ _ K))
       |fail 1 "wp_store: cannot find 'Store' in" e];
     [iSolveTC
-    |solve_mapsto ()
+    |solve_mapsto ip
     |pm_reflexivity
     |first [wp_seq|wp_finish]]
   | _ => fail "wp_store: not a 'wp'"
   end.
 
-(* Tactic Notation "wp_store" := *)
-(*   let solve_mapsto _ := *)
-(*     let l := match goal with |- _ = Some (_, (?l ↦[_]{_} _)%I) => l end in *)
-(*     iAssumptionCore || fail "wp_store: cannot find" l "↦ ?" in *)
-(*   let finish _ := *)
-(*     wp_expr_simpl; try first [wp_pure (Seq (LitV LitUnit) _)|wp_value_head] in *)
-(*   iStartProof; *)
-(*   lazymatch goal with *)
-(*   | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_wp_store _ _ _ _ _ _ K); [apply _|..]) *)
-(*       |fail 1 "wp_store: cannot find 'Store' in" e]; *)
-(*     [apply _ *)
-(*     |solve_mapsto () *)
-(*     |pm_reflexivity *)
-(*     |finish ()] *)
-(*   | _ => fail "wp_store: not a 'wp'" *)
-(*   end. *)
+Tactic Notation "wp_cas_fail" :=
+  let solve_mapsto ip :=
+    let l := match goal with |- _ = Some (_, (?l ↦[ip]{_} _)%I) => l end in
+    iAssumptionCore || fail "wp_cas_fail: cannot find" l "↦ ?" in
+  iStartProof;
+  lazymatch goal with
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
+    first
+      [reshape_expr e ltac:(fun K e' =>
+         eapply (tac_wp_cas_fail _ _ _ _ K); [apply _|apply _|..])
+      |fail 1 "wp_cas_fail: cannot find 'CAS' in" e];
+    [apply _
+    |solve_mapsto ip
+    |try congruence
+    |simpl; try wp_value_head]
+  | _ => fail "wp_cas_fail: not a 'wp'"
+  end.
 
-(* Tactic Notation "wp_cas_fail" := *)
-(*   let solve_mapsto _ := *)
-(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
-(*     iAssumptionCore || fail "wp_cas_fail: cannot find" l "↦ ?" in *)
-(*   iStartProof; *)
-(*   lazymatch goal with *)
-(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_wp_cas_fail _ _ _ _ _ K); [apply _|apply _|..]) *)
-(*       |fail 1 "wp_cas_fail: cannot find 'CAS' in" e]; *)
-(*     [apply _ *)
-(*     |solve_mapsto () *)
-(*     |try congruence *)
-(*     |simpl; try wp_value_head] *)
-(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_twp_cas_fail _ _ _ _ K); [apply _|apply _|..]) *)
-(*       |fail 1 "wp_cas_fail: cannot find 'CAS' in" e]; *)
-(*     [solve_mapsto () *)
-(*     |try congruence *)
-(*     |wp_expr_simpl; try wp_value_head] *)
-(*   | _ => fail "wp_cas_fail: not a 'wp'" *)
-(*   end. *)
-
-(* Tactic Notation "wp_cas_suc" := *)
-(*   let solve_mapsto _ := *)
-(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
-(*     iAssumptionCore || fail "wp_cas_suc: cannot find" l "↦ ?" in *)
-(*   iStartProof; *)
-(*   lazymatch goal with *)
-(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_wp_cas_suc _ _ _ _ _ _ K); [apply _|apply _|..]) *)
-(*       |fail 1 "wp_cas_suc: cannot find 'CAS' in" e]; *)
-(*     [apply _ *)
-(*     |solve_mapsto () *)
-(*     |try congruence *)
-(*     |env_cbv; reflexivity *)
-(*     |simpl; try wp_value_head] *)
-(*   | |- envs_entails _ (twp ?E ?e ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_twp_cas_suc _ _ _ _ _ K); [apply _|apply _|..]) *)
-(*       |fail 1 "wp_cas_suc: cannot find 'CAS' in" e]; *)
-(*     [solve_mapsto () *)
-(*     |try congruence *)
-(*     |env_cbv; reflexivity *)
-(*     |wp_expr_simpl; try wp_value_head] *)
-(*   | _ => fail "wp_cas_suc: not a 'wp'" *)
-(*   end. *)
-
-(* Tactic Notation "wp_faa" := *)
-(*   let solve_mapsto _ := *)
-(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
-(*     iAssumptionCore || fail "wp_cas_suc: cannot find" l "↦ ?" in *)
-(*   iStartProof; *)
-(*   lazymatch goal with *)
-(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_wp_faa _ _ _ _ _ _ K); [apply _|..]) *)
-(*       |fail 1 "wp_faa: cannot find 'CAS' in" e]; *)
-(*     [apply _ *)
-(*     |solve_mapsto () *)
-(*     |env_cbv; reflexivity *)
-(*     |wp_expr_simpl; try wp_value_head] *)
-(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_twp_faa _ _ _ _ _ K); [apply _|..]) *)
-(*       |fail 1 "wp_faa: cannot find 'CAS' in" e]; *)
-(*     [solve_mapsto () *)
-(*     |env_cbv; reflexivity *)
-(*     |wp_expr_simpl; try wp_value_head] *)
-(*   | _ => fail "wp_faa: not a 'wp'" *)
-(*   end. *)
-
+Tactic Notation "wp_cas_suc" :=
+  let solve_mapsto ip :=
+    let l := match goal with |- _ = Some (_, (?l ↦[ip]{_} _)%I) => l end in
+    iAssumptionCore || fail "wp_cas_suc: cannot find" l "↦ ?" in
+  iStartProof;
+  lazymatch goal with
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
+    first
+      [reshape_expr e ltac:(fun K e' =>
+         eapply (tac_wp_cas_suc _ _ _ _ _ K); [apply _|apply _|..])
+      |fail 1 "wp_cas_suc: cannot find 'CAS' in" e];
+    [apply _
+    |solve_mapsto ip
+    |try congruence
+    |reflexivity
+    |simpl; try wp_value_head]
+  | _ => fail "wp_cas_suc: not a 'wp'"
+  end.
 
 Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
-  let solve_node _ :=
-      let n :=
-          match goal with
-          | |- _ = Some (_, (IsNode ?n)%I) => n
-          | |- ?foo => idtac foo
-          end in
-      iAssumptionCore || fail "wp_socket: cannot find 'IsNode ?'" in
   let Htmp := iFresh in
   let finish _ :=
       first [intros l | fail 1 "wp_socket:" l "not fresh"];
@@ -507,34 +368,13 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
       |iDestructHyp Htmp as H; wp_finish] in
   wp_pures;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) =>
+  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     let process_single _ :=
         first [
-            reshape_expr e ltac:(fun K e' => eapply (tac_wp_socket _ _ _ _ _ Htmp K n))
+            reshape_expr e ltac:(fun K e' => eapply (tac_wp_socket _ _ _ Htmp K ip))
            |fail 1 "wp_socket: cannot find 'NewSocket' in" e];
         [iSolveTC
-        |solve_node ()
         |finish()]
     in (process_single ())
   | _ => fail "wp_socket: not a 'wp'"
   end.
-
-(* Tactic Notation "wp_socket_bind_suc" := *)
-(*   let solve_mapsto _ := *)
-(*     let h := match goal with |- _ = Some (_, (?h s↦[_]{_} _)%I) => h end in *)
-(*     iAssumptionCore || fail "wp_store: cannot find" h "↦ ?" in *)
-(*   let finish _ := *)
-(*     wp_expr_simpl; try first [wp_pure (Seq (Lit (LitInt _)) _)|wp_value_head] in *)
-(*   iStartProof; *)
-(*   lazymatch goal with *)
-(*   | |- envs_entails _ (wp ?s ?E ⟨?n;?e⟩ ?Q) => *)
-(*     first *)
-(*       [reshape_expr e ltac:(fun K e' => *)
-(*          eapply (tac_wp_socket_bind_suc _ _ _ _ _ _ K); [apply _|..]) *)
-(*       |fail 1 "wp_store: cannot find 'Store' in" e]; *)
-(*     [apply _ *)
-(*     |solve_mapsto () *)
-(*     |env_cbv; reflexivity *)
-(*     |finish ()] *)
-(*   | _ => fail "wp_store: not a 'wp'" *)
-(*   end. *)

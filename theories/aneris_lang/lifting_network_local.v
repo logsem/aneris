@@ -2,10 +2,11 @@ From iris.algebra Require Import auth gmap frac agree coPset gset frac_auth ofe.
 From iris.base_logic Require Export own gen_heap.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import viewshifts saved_prop gen_heap.
-From iris.program_logic Require Export weakestpre.
+From iris.program_logic Require Import weakestpre.
 From iris.program_logic Require Import ectx_lifting total_ectx_lifting.
 From iris.proofmode Require Import tactics.
-From aneris.aneris_lang Require Export helpers lang notation tactics network resources_lemmas.
+From aneris.aneris_lang Require Export
+     helpers lang notation tactics network resources_lemmas.
 From stdpp Require Import fin_maps gmap.
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
@@ -22,7 +23,7 @@ lemmas. *)
 Ltac inv_head_step :=
   repeat match goal with
   | _ => progress simplify_map_eq/= (* simplify memory stuff *)
-  | H : to_val _ = Some _ |- _ => apply to_base_val in H
+  | H : aneris_to_val _ = Some _ |- _ => apply to_base_aneris_val in H
   | H : ground_lang.head_step ?e _ _ _ _ _ |- _ =>
      try (is_var e; fail 1); (* inversion yields many goals if [e] is a variable
      and can thus better be avoided. *)
@@ -46,15 +47,16 @@ Local Ltac solve_exec_puredet :=
   simpl; intros; inv_head_step;
   first (by repeat match goal with
                    | H: _ ∧ _ |- _ => destruct H as [??]; simplify_eq
-                   | H : ground_lang.to_val _ = Some _ |- _ =>
-                     rewrite ground_lang.to_of_val in H; simplify_eq
+                   | H : to_val _ = Some _ |- _ =>
+                     rewrite to_of_val in H; simplify_eq
                    end);
   try by match goal with
          | H : socket_step _ _ _ _ _ _ _ _ _ |- _ =>
            inversion H
          end.
 Local Ltac solve_pure_exec :=
-  simplify_eq; rewrite /PureExec; intros; apply nsteps_once, pure_head_step_pure_step;
+  simplify_eq; rewrite /PureExec; intros;
+  apply nsteps_once, pure_head_step_pure_step;
   constructor; [solve_exec_safe | solve_exec_puredet].
 
 Local Hint Constructors head_step : core.
@@ -65,8 +67,8 @@ Section lifting_network_local.
   Context `{distG Σ}.
 
   Implicit Types P Q : iProp Σ.
-  Implicit Types Φ : val → iProp Σ.
-  Implicit Types efs : list expr.
+  Implicit Types Φ : aneris_val → iProp Σ.
+  Implicit Types efs : list aneris_expr.
   Implicit Types σ : state.
 
   Local Transparent IsNode.
@@ -75,7 +77,8 @@ Section lifting_network_local.
 
 (** Fork *)
   Lemma wp_fork n k E e Φ :
-    ▷ Φ 〈n; #()〉 ∗ ▷ WP ⟨n;e⟩ @ k; ⊤ {{ _, True }} ⊢ WP ⟨n;Fork e⟩ @ k; E {{ Φ }}.
+    ▷ Φ (mkVal n #()) ∗ ▷ WP (mkExpr n e) @ k; ⊤ {{ _, True }} ⊢
+    WP (mkExpr n (Fork e)) @ k; E {{ Φ }}.
   Proof.
     iIntros "[HΦ He]". iApply wp_lift_atomic_head_step; [done|].
     iIntros (σ1 κ κs m) "Hσ !>". iSplit.
@@ -85,7 +88,8 @@ Section lifting_network_local.
 
 (** Heap *)
 Lemma wp_alloc n k E v :
-  {{{ ▷ IsNode n }}} ⟨n; Alloc (Val v)⟩ @ k; E {{{ l, RET 〈n; #l〉; l ↦[n] v }}}.
+  {{{ ▷ IsNode n }}} (mkExpr n (Alloc (Val v))) @ k; E
+  {{{ l, RET (mkVal n #l); l ↦[n] v }}}.
 Proof.
   iIntros (Φ) ">Hn HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -125,8 +129,8 @@ Qed.
 
 Lemma wp_load n k E l q v :
   {{{ ▷ l ↦[n]{q} v }}}
-    ⟨n; Load #l⟩ @ k; E
-  {{{ RET 〈n;v〉; l ↦[n]{q} v }}}.
+    (mkExpr n (Load #l)) @ k; E
+  {{{ RET (mkVal n v); l ↦[n]{q} v }}}.
 Proof.
   iIntros (Φ) ">Hl HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -161,8 +165,8 @@ Qed.
 
 Lemma wp_store n k E l v' v :
   {{{ ▷ l ↦[n] v' }}}
-    ⟨n; Store #l (Val v)⟩ @ k; E
-  {{{ RET 〈n; #()〉; l ↦[n] v }}}.
+    (mkExpr n (Store #l (Val v))) @ k; E
+  {{{ RET (mkVal n #()); l ↦[n] v }}}.
 Proof.
   iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (σ1 κ κs n') "Hσ !>".
@@ -204,8 +208,8 @@ Qed.
 Lemma wp_cas_fail n k E l q v' v1 v2 :
   v' ≠ v1 →
   {{{ ▷ l ↦[n]{q} v' }}}
-    ⟨n;CAS #l (Val v1) (Val v2)⟩ @ k; E
-  {{{ RET 〈n; #false〉; l ↦[n]{q} v' }}}.
+    (mkExpr n (CAS #l (Val v1) (Val v2))) @ k; E
+  {{{ RET (mkVal n #false); l ↦[n]{q} v' }}}.
 Proof.
   iIntros (Heq Φ) ">Hl HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -239,8 +243,8 @@ Qed.
 
 Lemma wp_cas_suc n k E l v1 v2 :
   {{{ ▷ l ↦[n] v1 }}}
-    ⟨n;CAS #l (Val v1) (Val v2)⟩ @ k; E
-  {{{ RET 〈n; #true〉; l ↦[n] v2 }}}.
+    (mkExpr n (CAS #l (Val v1) (Val v2))) @ k; E
+  {{{ RET (mkVal n #true); l ↦[n] v2 }}}.
 Proof.
   iIntros (Φ) ">Hl HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.

@@ -1,5 +1,5 @@
 From stdpp Require Export base list.
-From aneris.aneris_lang Require Import lang lifting tactics proofmode notation adequacy.
+From aneris.aneris_lang Require Import lang tactics proofmode notation.
 From aneris.aneris_lang.lib Require Export util network_helpers list.
 From aneris.aneris_lang.lib.serialization Require Export serialization.
 From aneris.aneris_lang.lib.vector_clock Require Export time.
@@ -95,10 +95,10 @@ Section vect_specs.
     intros [? [-> ?]]; erewrite IHt; done.
   Qed.
 
-  Lemma vect_make_spec n len (init : nat):
+  Lemma vect_make_spec ip len (init : nat):
     {{{ True }}}
-      ⟨n; vect_make #len #init⟩
-    {{{ v, RET 〈n;v〉; ⌜is_vc v (replicate len init)⌝ }}}.
+      vect_make #len #init @[ip]
+    {{{ v, RET v; ⌜is_vc v (replicate len init)⌝ }}}.
   Proof.
     revert len. iLöb as "IH". iIntros (len Φ) "_ HΦ".
     wp_rec. wp_pures. case_bool_decide; wp_if.
@@ -119,11 +119,11 @@ Section vect_specs.
       by assert (m = (len - 1)%nat) as -> by lia.
   Qed.
 
-  Lemma vect_nth_spec n v (i : nat) t :
+  Lemma vect_nth_spec ip v (i : nat) t :
     i < length t →
     {{{ ⌜is_vc v t⌝ }}}
-      ⟨n; vect_nth v #i⟩
-    {{{ v, RET 〈n;v〉; ⌜∃ (j : nat), v = #j ∧ t !! i = Some j⌝ }}}.
+      vect_nth v #i @[ip]
+    {{{ v, RET v; ⌜∃ (j : nat), v = #j ∧ t !! i = Some j⌝ }}}.
   Proof.
     iIntros (Hlen Φ Hcoh) "HΦ".
     wp_rec. wp_pures. wp_bind (list_nth _ _).
@@ -138,11 +138,11 @@ Section vect_specs.
     by apply map_lookup_Some in H.
   Qed.
 
-  Lemma vect_update_spec n v t (i j : nat) :
+  Lemma vect_update_spec ip v t (i j : nat) :
     i < length t →
     {{{ ⌜is_vc v t⌝ }}}
-      ⟨n; vect_update v #i #j⟩
-    {{{ v, RET 〈n;v〉; ⌜is_vc v (<[i := j]> t)⌝ }}}.
+      vect_update v #i #j @[ip]
+    {{{ v, RET v; ⌜is_vc v (<[i := j]> t)⌝ }}}.
   Proof.
     iLöb as "IH" forall (v t i).
     iIntros (Hi Φ Hcoh) "HΦ".
@@ -172,12 +172,12 @@ Section vect_specs.
         by iApply "HΦ".
   Qed.
 
-  Lemma vect_inc_spec n v t (i j : nat) :
+  Lemma vect_inc_spec ip v t (i j : nat) :
     i < length t →
     t !! i = Some j →
     {{{ ⌜is_vc v t⌝ }}}
-      ⟨n; vect_inc v #i⟩
-    {{{ v, RET 〈n;v〉; ⌜is_vc v (incr_time t i)⌝ }}}.
+      vect_inc v #i @[ip]
+    {{{ v, RET v; ⌜is_vc v (incr_time t i)⌝ }}}.
   Proof.
     iIntros (Hi Hj Φ Hcoh) "HΦ".
     wp_rec. wp_pures. wp_bind (vect_nth _ _).
@@ -188,10 +188,10 @@ Section vect_specs.
     iApply vect_update_spec; eauto.
   Qed.
 
-  Lemma vect_leq_spec n v1 v2 (l1 l2 : list nat) :
+  Lemma vect_leq_spec ip v1 v2 (l1 l2 : list nat) :
     {{{ ⌜is_vc v1 l1⌝ ∗ ⌜is_vc v2 l2⌝ }}}
-      ⟨n; vect_leq v1 v2⟩
-    {{{ v, RET 〈n;#v〉; ⌜v = bool_decide (vector_clock_le l1 l2)⌝ }}}.
+      vect_leq v1 v2 @[ip]
+    {{{ v, RET #v; ⌜v = bool_decide (vector_clock_le l1 l2)⌝ }}}.
   Proof.
     iLöb as "IH" forall (v1 v2 l1 l2).
     iIntros (Φ [Hl1 Hl2]) "HΦ".
@@ -235,10 +235,10 @@ Section vect_specs.
           inversion 1; simplify_eq. lia.
   Qed.
 
-  Lemma vect_applicable_spec n v1 v2 (l1 l2 : list nat) (i : nat) :
+  Lemma vect_applicable_spec ip v1 v2 (l1 l2 : list nat) (i : nat) :
     {{{ ⌜is_vc v1 l1⌝ ∗ ⌜is_vc v2 l2⌝ }}}
-      ⟨n; vect_applicable v1 v2 #i⟩
-    {{{ (b : bool), RET 〈n;#b〉;
+      vect_applicable v1 v2 #i @[ip]
+    {{{ (b : bool), RET #b;
         if b then
           ⌜length l1 = length l2⌝ ∧
           ⌜option_Forall2 (λ x1 x2, x1 = x2 + 1)%nat (l1 !! i) (l2 !! i)⌝ ∧
@@ -262,9 +262,9 @@ Section vect_specs.
     replace #0 with #j; last first.
     { rewrite Hj0; f_equal. }
     clearbody j.
-    set (Ψ := (λ a, ⌜a.(val_n) = n⌝ ∗
+    set (Ψ := (λ a,
                 ∃ b : bool,
-                  ⌜a.(val_e) = #b⌝ ∧
+                  ⌜a = #b⌝ ∧
                   (if b
                    then
                      ⌜length l1 = length l2⌝
@@ -273,10 +273,10 @@ Section vect_specs.
                            (l1 !! (i - j)) (l2 !! (i - j))⌝
                      ∧ ⌜∀ k x1 x2 : nat, (i - j ≠ k ∨ j > i) → l1 !! k = Some x1 → l2 !! k =
                          Some x2 → x1 ≤ x2⌝
-                   else True))%I : aneris_lang.val → iProp Σ).
-    iApply (wp_wand _ _ _ Ψ with "[] [HΦ]")%I; last first.
-    { iIntros ([]); rewrite /Ψ /=.
-      iIntros "[-> Hb]".
+                   else True))%I : ground_lang.val → iProp Σ).
+    iApply (aneris_wp_wand _ _ _ Ψ with "[] [HΦ]")%I; last first.
+    { iIntros (v); rewrite /Ψ /=.
+      iIntros "Hb".
       iDestruct "Hb" as (b) "[-> Hb]".
       iApply "HΦ".
       destruct b; auto with lia.
@@ -292,7 +292,6 @@ Section vect_specs.
       wp_pures.
       iApply list_is_empty_spec; first done.
       iNext. iIntros (? ->).
-      iSplit; first done.
       destruct l2; simpl; last by iExists false.
       iExists true.
       repeat iSplit; iPureIntro; [done|done| |].
@@ -302,7 +301,6 @@ Section vect_specs.
     wp_pures.
     destruct l2 as [|x2 l2].
     { rewrite Hl2; wp_pures.
-      iSplit; first done.
       iExists false; iSplit; done. }
     destruct Hl2 as (v2'&->&?).
     wp_pures.
@@ -312,17 +310,15 @@ Section vect_specs.
       destruct (decide (x1 = x2 + 1)) as [->|]; last first.
       { rewrite bool_decide_eq_false_2; last lia.
         wp_pures.
-        iSplit; first done.
         iExists false; iSplit; done. }
       rewrite bool_decide_eq_true_2; last lia.
       wp_if.
       do 2 wp_proj.
       wp_op.
       replace (i + 1)%Z with ((i + 1)%nat : Z); last lia.
-      iApply wp_mono; last iApply "IHl1"; [|done|done].
-      iIntros (v) "[-> Hb]".
+      iApply aneris_wp_mono; last iApply "IHl1"; [|done|done].
+      iIntros (v) "Hb".
       iDestruct "Hb" as (b) "[-> Hb]".
-      iSplit; first done.
       iExists b; iSplit; first done.
       destruct b; last done.
       iDestruct "Hb" as "(Hb1 & Hb2 & Hb3)".
@@ -347,10 +343,9 @@ Section vect_specs.
       do 2 wp_proj.
       wp_op.
       replace (j + 1)%Z with ((j + 1)%nat : Z); last lia.
-      iApply wp_mono; last iApply "IHl1"; [|done|done].
-      iIntros (v) "[-> Hb]".
+      iApply aneris_wp_mono; last iApply "IHl1"; [|done|done].
+      iIntros (v) "Hb".
       iDestruct "Hb" as (b) "[-> Hb]".
-      iSplit; first done.
       iExists b; iSplit; first done.
       destruct b; last done.
       iDestruct "Hb" as "(Hb1 & Hb2 & Hb3)".
@@ -369,7 +364,6 @@ Section vect_specs.
         apply Hb3; lia. }
     rewrite bool_decide_eq_false_2; last lia.
     wp_pures.
-    iSplit; first done.
     iExists false; done.
   Qed.
 
@@ -390,10 +384,10 @@ Definition vc_valid_val (v : ground_lang.val) :=
 Definition vc_is_ser (v : ground_lang.val) (s : string) :=
   ∃ l, is_vc v l ∧ s = vc_to_string l.
 
-Definition vect_serialize_spec `{!distG Σ} n v:
+Definition vect_serialize_spec `{!distG Σ} ip v:
   {{{ ⌜vc_valid_val v⌝ }}}
-    ⟨n; vect_serialize v⟩
-  {{{ s, RET 〈n; #s〉; ⌜vc_is_ser v s⌝ }}}.
+    vect_serialize v @[ip]
+  {{{ s, RET #s; ⌜vc_is_ser v s⌝ }}}.
 Proof.
   iIntros (Φ) "Hv HΦ". iLöb as "IH" forall (Φ v).
   wp_rec. iDestruct "Hv" as %[l Hv].
@@ -413,10 +407,10 @@ Proof.
     iPureIntro; eexists (_ :: _); simpl; split; first eexists _; eauto.
 Qed.
 
-Definition vect_deserialize_spec `{!distG Σ} n v s:
+Definition vect_deserialize_spec `{!distG Σ} ip v s:
   {{{ ⌜vc_is_ser v s⌝ }}}
-    ⟨n; vect_deserialize #s⟩
-  {{{ RET 〈n;v〉; True }}}.
+    vect_deserialize #s @[ip]
+  {{{ RET v; True }}}.
 Proof.
   iIntros (Φ) "Hs HΦ". iLöb as "IH" forall (Φ v s).
   wp_rec. iDestruct "Hs" as %(l&Hl&->).

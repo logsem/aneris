@@ -1,6 +1,6 @@
-From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import tactics.
-From aneris.aneris_lang Require Import lang lifting tactics proofmode notation.
+From aneris.aneris_lang Require Import lang tactics proofmode.
+From aneris.aneris_lang.program_logic Require Import aneris_lifting.
 
 Section code.
 
@@ -14,11 +14,12 @@ Notation "'assert:' e" := (assert (λ: <>, e))%E (at level 99) : expr_scope.
 Section library.
   Context `{dG : distG Σ}.
 
-  Lemma wp_assert n E (Φ : val → iProp Σ) e :
-    WP ⟨n;e⟩ @ E {{ v, ⌜v = 〈n;#true〉⌝ ∧ ▷ Φ 〈n;#()〉 }} -∗ WP ⟨n;assert: e⟩ @ E {{ Φ }}.
+  Lemma wp_assert ip E (Φ : val → iProp Σ) e :
+    WP e @[ip] E {{ v, ⌜v = #true⌝ ∧ ▷ Φ #() }} -∗ WP assert: e @[ip] E {{ Φ }}.
   Proof.
-    iIntros "HΦ". rewrite /assert /=. wp_pures.
-    wp_apply (wp_wand with "HΦ").
+    iIntros "HΦ". rewrite /assert /=.
+    wp_pures.
+    wp_apply (aneris_wp_wand with "HΦ").
     iIntros (v) "[% H]"; subst. by wp_if.
   Qed.
 

@@ -35,7 +35,7 @@ Coercion LitString : string >-> base_lit.
 
 Coercion App : ground_lang.expr >-> Funclass.
 Coercion of_val : val >-> expr.
-Coercion ground_lang.of_val : ground_lang.val >-> ground_lang.expr.
+Coercion aneris_of_val : aneris_val >-> aneris_expr.
 
 Coercion Var : string >-> ground_lang.expr.
 
@@ -43,9 +43,8 @@ Coercion Var : string >-> ground_lang.expr.
    Expressions have brackets that comes from the sequence \<, with name
    MATHEMATICAL LEFT ANGLE BRACKET where as values has brackets
    that come from \〈 (name: LEFT-POINTING ANGLE BRACKET) *)
-Notation "⟨ n ; e ⟩" := (mkExpr n e)
-                      (at level 0, right associativity).
-Notation "〈 n ; v 〉" := (mkVal n v%V).
+(* Notation "⟨ n ; e ⟩" := (mkExpr n e) (at level 0, right associativity). *)
+(* Notation "〈 n ; v 〉" := (mkVal n v%V). *)
 
 (* No scope for the values, does not conflict and scope is often not inferred
 properly. *)
@@ -178,7 +177,8 @@ Notation "'letrec:' f x := e1 'in' e2" :=
   : expr_scope.
 
 Notation "'letrec:' f x y .. z := e1 'in' e2" :=
-  (Lam f%binder e2%E (Rec f%binder x%binder (Lam y%binder .. (Lam z%binder e1%E) ..)))
+  (Lam f%binder e2%E
+     (Rec f%binder x%binder (Lam y%binder .. (Lam z%binder e1%E) ..)))
   (at level 200, f at level 1, x,y,z at level 1, e1, e2 at level 200,
    format "'[' 'letrec:'  f  x y .. z :=  '/  ' '[' e1 ']'  'in'  '/' e2 ']'")
   : expr_scope.

@@ -141,29 +141,29 @@ Section list_spec.
   Context `{dG : distG Σ}.
 
 
-  Lemma list_make_spec n :
+  Lemma list_make_spec ip :
     {{{ True }}}
-      ⟨n; list_make #()⟩
-      {{{ v, RET 〈n;v〉; ⌜list_coh [] v⌝}}}.
+      list_make #() @[ip]
+    {{{ v, RET v; ⌜list_coh [] v⌝}}}.
   Proof.
     iIntros (Φ) "H HΦ". rewrite /list_make /=.
     wp_pures. by iApply "HΦ".
   Qed.
 
-  Lemma list_cons_spec n a lv l :
+  Lemma list_cons_spec ip a lv l :
     {{{ ⌜list_coh l lv⌝ }}}
-      ⟨n;list_cons (Val a) (Val lv)⟩
-      {{{ v, RET 〈n;v〉; ⌜list_coh (a::l) v⌝}}}.
+      list_cons (Val a) (Val lv) @[ip]
+    {{{ v, RET v; ⌜list_coh (a::l) v⌝}}}.
   Proof.
     iIntros (Φ) "% HΦ".
     wp_lam. wp_pures. iApply "HΦ".
     iPureIntro. by exists lv.
   Qed.
 
-  Lemma list_head_spec n lv l :
+  Lemma list_head_spec ip lv l :
     {{{ ⌜list_coh l lv⌝ }}}
-      ⟨n;list_head (Val lv)⟩
-      {{{ v, RET 〈n;v〉; ⌜(l = [] ∧ v = NONEV) ∨
+      list_head (Val lv) @[ip]
+    {{{ v, RET v; ⌜(l = [] ∧ v = NONEV) ∨
                           (∃ v' l', l = v' :: l' ∧ v = SOMEV v')⌝}}}.
   Proof.
     iIntros (Φ) "% HΦ".
@@ -173,10 +173,10 @@ Section list_spec.
     wp_pures. iApply "HΦ". iPureIntro. right. by exists v,l.
 Qed.
 
-  Lemma list_tail_spec n lv l :
+  Lemma list_tail_spec ip lv l :
     {{{ ⌜list_coh l lv⌝ }}}
-      ⟨n;list_tail (Val lv)⟩
-      {{{ v, RET 〈n;v〉; ⌜list_coh (tail l) v⌝}}}.
+      list_tail (Val lv) @[ip]
+    {{{ v, RET v; ⌜list_coh (tail l) v⌝}}}.
   Proof.
     iIntros (Φ) "% HΦ".
     wp_lam. destruct l; simpl in *; subst.
@@ -185,10 +185,10 @@ Qed.
       wp_match. wp_proj. by iApply "HΦ".
   Qed.
 
-Lemma list_length_spec n l lv :
+Lemma list_length_spec ip l lv :
   {{{ ⌜list_coh l lv⌝ }}}
-    ⟨n;list_length (Val lv)⟩
-  {{{ v, RET 〈n;#v〉; ⌜v = List.length l⌝ }}}.
+    list_length (Val lv) @[ip]
+  {{{ v, RET #v; ⌜v = List.length l⌝ }}}.
 Proof.
   iIntros (Φ) "Ha HΦ".
   iInduction l as [|a l'] "IH" forall (lv Φ);
@@ -201,15 +201,15 @@ Proof.
     rewrite Nat2Z.inj_add. iApply "HΦ"; by auto.
 Qed.
 
-Lemma list_iter_spec {A} n (l : list A) lv handler P Φ Ψ
+Lemma list_iter_spec {A} ip (l : list A) lv handler P Φ Ψ
       (toval : A -> ground_lang.val) :
   (∀ (a : A),
   {{{ ⌜a ∈ l⌝ ∗ P ∗ Φ a }}}
-     ⟨n; (Val handler) (toval a)⟩
-  {{{v, RET 〈n;v〉; P ∗ Ψ a }}}) -∗
+     (Val handler) (toval a) @[ip]
+  {{{v, RET v; P ∗ Ψ a }}}) -∗
   {{{ ⌜list_coh (map (λ a, toval a) l) lv⌝ ∗ P ∗ [∗ list] a∈l, Φ a }}}
-    ⟨n;list_iter (Val handler) lv⟩
-  {{{ RET 〈n;#()〉; P ∗ [∗ list] a∈l, Ψ a }}}.
+    list_iter (Val handler) lv @[ip]
+  {{{ RET #(); P ∗ [∗ list] a∈l, Ψ a }}}.
 Proof.
   rewrite /list_iter.
   iInduction l as [|a l'] "IH" forall (lv);
@@ -231,15 +231,15 @@ Proof.
     iNext. iIntros "(HP & Hl)". iApply "HΦ". iFrame.
 Qed.
 
-Lemma list_fold_spec {A} n handler (l : list A)  acc lv P Φ Ψ
+Lemma list_fold_spec {A} ip handler (l : list A)  acc lv P Φ Ψ
       (toval : A -> ground_lang.val) :
   (∀ (a : A) acc lacc lrem,
   {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc ∗ Φ a }}}
-     ⟨n; (Val handler) (Val acc) (toval a)⟩
-  {{{v, RET 〈n;v〉; P (lacc ++ [a]) v ∗ Ψ a }}}) -∗
+     (Val handler) (Val acc) (toval a) @[ip]
+  {{{v, RET v; P (lacc ++ [a]) v ∗ Ψ a }}}) -∗
   {{{ ⌜list_coh (map (λ a, toval a) l) lv⌝ ∗ P [] acc ∗ [∗ list] a∈l, Φ a }}}
-    ⟨n; list_fold handler acc lv⟩
-  {{{v, RET 〈n;v〉; P l v ∗ [∗ list] a∈l, Ψ a }}}.
+    list_fold handler acc lv @[ip]
+  {{{v, RET v; P l v ∗ [∗ list] a∈l, Ψ a }}}.
 Proof.
   iIntros "#Hcl". iIntros (Ξ) "!# (Hl & Hacc & HΦ) HΞ".
   change l with ([] ++ l) at 1 4.
@@ -260,16 +260,16 @@ Proof.
     iApply "HΞ"; iFrame.
 Qed.
 
-Lemma list_fold_spec'_generalized {A} n handler (l lp : list A) acc lv P Φ Ψ
+Lemma list_fold_spec'_generalized {A} ip handler (l lp : list A) acc lv P Φ Ψ
       (toval : A -> ground_lang.val) :
   □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
   (∀ (a : A) acc lacc lrem,
   {{{ ⌜lp ++ l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
-     ⟨n;(Val handler) (Val acc) (toval a)⟩
-  {{{v, RET 〈n;v〉; P (lacc ++ [a]) v None lrem ∗ Ψ a }}}) -∗
+     (Val handler) (Val acc) (toval a) @[ip]
+  {{{v, RET v; P (lacc ++ [a]) v None lrem ∗ Ψ a }}}) -∗
   {{{ ⌜list_coh (map (λ a, toval a) l) lv⌝ ∗ P lp acc None l ∗ [∗ list] a∈l, Φ a }}}
-    ⟨n; list_fold (Val handler) (Val acc) (Val lv)⟩
-  {{{v, RET 〈n;v〉; P (lp ++ l) v None [] ∗ [∗ list] a∈l, Ψ a }}}.
+    list_fold (Val handler) (Val acc) (Val lv) @[ip]
+  {{{v, RET v; P (lp ++ l) v None [] ∗ [∗ list] a∈l, Ψ a }}}.
 Proof.
   iIntros "#Hvs #Hcl". iIntros (Ξ) "!# (Hl & Hacc & HΦ) HΞ".
   iInduction l as [|x l] "IHl" forall (Ξ lp acc lv) "Hacc Hl HΞ".
@@ -289,25 +289,25 @@ Proof.
     iApply "HΞ"; iFrame.
 Qed.
 
-Lemma list_fold_spec' {A} n handler (l : list A) acc lv P Φ Ψ
+Lemma list_fold_spec' {A} ip handler (l : list A) acc lv P Φ Ψ
       (toval : A -> ground_lang.val) :
   □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
   (∀ (a : A) acc lacc lrem,
   {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
-     ⟨n;(Val handler) (Val acc) (toval a)⟩
-  {{{v, RET 〈n;v〉; P (lacc ++ [a]) v None lrem ∗ Ψ a }}}) -∗
+     (Val handler) (Val acc) (toval a) @[ip]
+  {{{v, RET v; P (lacc ++ [a]) v None lrem ∗ Ψ a }}}) -∗
   {{{ ⌜list_coh (map (λ a, toval a) l) lv⌝ ∗ P [] acc None l ∗ [∗ list] a∈l, Φ a }}}
-    ⟨n; list_fold (Val handler) (Val acc) lv⟩
-  {{{v, RET 〈n;v〉; P l v None [] ∗ [∗ list] a∈l, Ψ a }}}.
+    list_fold (Val handler) (Val acc) lv @[ip]
+  {{{v, RET v; P l v None [] ∗ [∗ list] a∈l, Ψ a }}}.
 Proof.
   iIntros "#Hvs #Hcl".
   iApply (list_fold_spec'_generalized _ handler l [] with "[-]"); eauto.
 Qed.
 
- Lemma list_sub_spec n k l lv  :
+ Lemma list_sub_spec ip k l lv  :
      {{{ ⌜list_coh l lv⌝ }}}
-       ⟨n; list_sub #k lv⟩
-       {{{ v, RET 〈n;v〉; ⌜list_coh (take k l) v ⌝}}}.
+       list_sub #k lv @[ip]
+     {{{ v, RET v; ⌜list_coh (take k l) v ⌝}}}.
  Proof.
    iIntros (Φ) "Hcoh HΦ".
    iInduction l as [|a l'] "IH" forall (k lv Φ);
@@ -325,10 +325,10 @@ Qed.
       by wp_apply (list_cons_spec).
  Qed.
 
- Lemma list_nth_spec n (i: nat) l lv  :
+ Lemma list_nth_spec ip (i: nat) l lv  :
   {{{ ⌜list_coh l lv⌝ }}}
-    ⟨n; list_nth (Val lv) #i⟩
-    {{{ v, RET 〈n;v〉; (⌜v = NONEV⌝ ∧ ⌜List.length l <= i⌝) ∨
+    list_nth (Val lv) #i @[ip]
+  {{{ v, RET v; (⌜v = NONEV⌝ ∧ ⌜List.length l <= i⌝) ∨
                      ⌜∃ r, v = SOMEV r ∧ List.nth_error l i = Some r⌝ }}}.
   Proof.
     iIntros (Φ) "Ha HΦ".
@@ -347,10 +347,10 @@ Qed.
         * iApply "HΦ"; try eauto with lia.
   Qed.
 
-  Lemma list_nth_spec_some n (i: nat) l lv  :
+  Lemma list_nth_spec_some ip (i: nat) l lv  :
   {{{  ⌜list_coh l lv ∧ i < List.length l⌝  }}}
-    ⟨n; list_nth (Val lv) #i⟩
-    {{{ v, RET 〈n;v〉; ⌜∃ r, v = SOMEV r ∧ List.nth_error l i = Some r⌝ }}}.
+    list_nth (Val lv) #i @[ip]
+  {{{ v, RET v; ⌜∃ r, v = SOMEV r ∧ List.nth_error l i = Some r⌝ }}}.
   Proof.
     iIntros (Φ (Hcoh & Hi)) "HΦ".
     iApply (list_nth_spec $! Hcoh).
@@ -358,15 +358,15 @@ Qed.
     by iApply "HΦ".
   Qed.
 
-  Lemma list_find_remove_spec {A} n (l : list A) lv (Ψ : A → iProp Σ)
+  Lemma list_find_remove_spec {A} ip (l : list A) lv (Ψ : A → iProp Σ)
         (fv : ground_lang.val) (toval : A → ground_lang.val) :
     (∀ (a : A) av,
       {{{ ⌜av = toval a⌝ }}}
-        ⟨n; fv av⟩
-      {{{ (b : bool), RET 〈n; #b〉; if b then Ψ a else True }}}) -∗
+        fv av @[ip]
+      {{{ (b : bool), RET #b; if b then Ψ a else True }}}) -∗
     {{{ ⌜list_coh (map (λ a, toval a) l) lv⌝ }}}
-      ⟨n; list_find_remove fv lv⟩
-    {{{ v, RET 〈n; v〉; ⌜v = NONEV⌝ ∨
+      list_find_remove fv lv @[ip]
+    {{{ v, RET v; ⌜v = NONEV⌝ ∨
                        ∃ e lv' l1 l2,
                          ⌜l = l1 ++ e :: l2 ∧
                          v = SOMEV (toval e, lv') ∧
@@ -400,10 +400,10 @@ Qed.
     iExists _, _, (_ :: _), _; eauto.
   Qed.
 
- Lemma list_rev_aux_spec n l lM r rM:
+ Lemma list_rev_aux_spec ip l lM r rM:
   {{{ ⌜list_coh lM l ∧ list_coh rM r⌝ }}}
-    ⟨n; list_rev_aux (Val l) (Val r)⟩
-    {{{ v, RET 〈n ; v〉; ⌜list_coh (rev_append lM rM) v⌝ }}}.
+    list_rev_aux (Val l) (Val r) @[ip]
+  {{{ v, RET v; ⌜list_coh (rev_append lM rM) v⌝ }}}.
  Proof.
    iIntros (? [Hl Hr]) "H".
    iInduction lM as [|a lM] "IH" forall (l r rM Hl Hr).
@@ -419,19 +419,19 @@ Qed.
      by iApply "IH".
  Qed.
 
- Lemma list_rev_spec n l lM :
+ Lemma list_rev_spec ip l lM :
   {{{ ⌜list_coh lM l⌝ }}}
-    ⟨n; list_rev (Val l)⟩
-    {{{ v, RET 〈n ; v〉; ⌜list_coh (reverse lM) v⌝ }}}.
+    list_rev (Val l) @[ip]
+  {{{ v, RET v; ⌜list_coh (reverse lM) v⌝ }}}.
  Proof.
    iIntros (??) "H". rewrite /list_rev. wp_pures.
      by iApply (list_rev_aux_spec _ _ _ NONEV []).
  Qed.
 
- Lemma list_is_empty_spec n l v :
+ Lemma list_is_empty_spec ip l v :
   {{{ ⌜list_coh l v⌝ }}}
-    ⟨n; list_is_empty v⟩
-    {{{ v, RET 〈n ; #v〉;
+    list_is_empty v @[ip]
+  {{{ v, RET #v;
         ⌜v = match l with [] => true | _ => false end⌝ }}}.
  Proof.
    iIntros (Φ Hl) "HΦ". wp_rec. destruct l.

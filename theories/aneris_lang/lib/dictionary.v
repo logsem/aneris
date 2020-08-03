@@ -1,6 +1,6 @@
 From stdpp Require Export strings list pretty gmap.
 From iris.proofmode Require Import tactics.
-From aneris.aneris_lang Require Import lang network notation tactics proofmode lifting.
+From aneris.aneris_lang Require Import lang network notation tactics proofmode.
 From aneris.aneris_lang.lib Require Import list.
 
 Module dict.
@@ -48,10 +48,10 @@ Section dict_spec.
              (m : gmap  ground_lang.val  ground_lang.val) : Prop :=
     ∃ l, m = list_to_map l ∧ d = embed_list l ∧ NoDup (fmap fst l).
 
-  Lemma empty_spec n :
+  Lemma empty_spec ip :
     {{{ True }}}
-      ⟨n; dict.empty #()⟩
-    {{{ v, RET 〈 n ; v 〉; ⌜is_dictionary v ∅⌝}}}.
+      dict.empty #() @[ip]
+    {{{ v, RET v; ⌜is_dictionary v ∅⌝}}}.
   Proof.
     iIntros (Φ) "_ HΦ".
     do 2 wp_rec. wp_pures. iApply "HΦ".
@@ -73,10 +73,10 @@ Section dict_spec.
     - destruct l; reflexivity.
   Qed.
 
-  Lemma remove_spec n (k d : ground_lang.val) m :
+  Lemma remove_spec ip (k d : ground_lang.val) m :
       {{{ ⌜is_dictionary d m⌝ }}}
-        ⟨n; dict.remove (Val k) (Val d)⟩
-      {{{ d', RET 〈 n ; d' 〉; ⌜is_dictionary d' (delete k m)⌝ }}}.
+        dict.remove (Val k) (Val d) @[ip]
+      {{{ d', RET d'; ⌜is_dictionary d' (delete k m)⌝ }}}.
   Proof.
     iIntros (Φ Hm) "HΦ".
     wp_rec. wp_closure. iLöb as "IH" forall (Φ d m Hm). wp_rec.
@@ -105,10 +105,10 @@ Section dict_spec.
              ++ eauto with *.
   Qed.
 
-  Lemma insert_spec n k v d m :
+  Lemma insert_spec ip k v d m :
       {{{ ⌜is_dictionary d m⌝ }}}
-        ⟨n; dict.insert (Val k) (Val v) (Val d)⟩
-      {{{ d', RET 〈 n; d' 〉; ⌜is_dictionary d' (insert k v m)⌝ }}}.
+        dict.insert (Val k) (Val v) (Val d) @[ip]
+      {{{ d', RET d'; ⌜is_dictionary d' (insert k v m)⌝ }}}.
   Proof.
     iIntros (Φ) "Hdict HΦ".
     wp_rec. wp_pures. wp_bind (dict.remove k d).
@@ -123,10 +123,10 @@ Section dict_spec.
       ++ eauto with *.
   Qed.
 
-  Lemma lookup_spec n k d m :
+  Lemma lookup_spec ip k d m :
       {{{ ⌜is_dictionary d m⌝ }}}
-        ⟨n; dict.lookup (Val k) (Val d)⟩
-      {{{ v, RET  〈 n; v 〉;
+        dict.lookup (Val k) (Val d) @[ip]
+      {{{ v, RET v;
           ⌜match m !! k  with
              None => v = NONEV
            | Some p => v = SOMEV p
@@ -164,10 +164,10 @@ Section dict_str_spec.
              (m : gmap string ground_lang.val) : Prop :=
     ∃ l, m = list_to_map l ∧ d = embed_list_str l ∧ NoDup (fmap fst l).
 
-  Lemma empty_str_spec n :
+  Lemma empty_str_spec ip :
     {{{ True }}}
-      ⟨n; dict.empty #()⟩
-    {{{ v, RET 〈 n ; v 〉; ⌜is_dictionary_str v ∅⌝}}}.
+      dict.empty #() @[ip]
+    {{{ v, RET v; ⌜is_dictionary_str v ∅⌝}}}.
   Proof.
     iIntros (Φ) "_ HΦ".
     do 2 wp_rec. wp_pures. iApply "HΦ".
@@ -175,10 +175,10 @@ Section dict_str_spec.
     iPureIntro. constructor.
   Qed.
 
-  Lemma remove_str_spec n (k: string) (d : ground_lang.val) m :
+  Lemma remove_str_spec ip (k: string) (d : ground_lang.val) m :
       {{{ ⌜is_dictionary_str d m⌝ }}}
-        ⟨n; dict.remove (Val #k) (Val d)⟩
-      {{{ d', RET 〈 n ; d' 〉; ⌜is_dictionary_str d' (delete k m)⌝ }}}.
+        dict.remove (Val #k) (Val d) @[ip]
+      {{{ d', RET d'; ⌜is_dictionary_str d' (delete k m)⌝ }}}.
   Proof.
     iIntros (Φ Hm) "HΦ".
     wp_rec. wp_closure. iLöb as "IH" forall (Φ d m Hm). wp_rec.
@@ -209,10 +209,10 @@ Section dict_str_spec.
              ++ eauto with *.
   Qed.
 
-  Lemma insert_str_spec n (k : string) v d m :
+  Lemma insert_str_spec ip (k : string) v d m :
       {{{ ⌜is_dictionary_str d m⌝ }}}
-        ⟨n; dict.insert #k (Val v) (Val d)⟩
-      {{{ d', RET 〈 n; d' 〉; ⌜is_dictionary_str d' (insert k v m)⌝ }}}.
+        dict.insert #k (Val v) (Val d) @[ip]
+      {{{ d', RET d'; ⌜is_dictionary_str d' (insert k v m)⌝ }}}.
   Proof.
     iIntros (Φ) "Hdict HΦ".
     wp_rec. wp_pures. wp_bind (dict.remove #k d).
@@ -228,10 +228,10 @@ Section dict_str_spec.
       ++ eauto with *.
   Qed.
 
-  Lemma lookup_str_spec n (k : string) d m :
+  Lemma lookup_str_spec ip (k : string) d m :
       {{{ ⌜is_dictionary_str d m⌝ }}}
-        ⟨n; dict.lookup #k (Val d)⟩
-      {{{ v, RET  〈 n; v 〉;
+        dict.lookup #k (Val d) @[ip]
+      {{{ v, RET v;
           ⌜match m !! k  with
              None => v = NONEV
            | Some p => v = SOMEV p

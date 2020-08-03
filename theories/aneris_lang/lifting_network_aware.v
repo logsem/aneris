@@ -2,10 +2,11 @@ From iris.algebra Require Import auth gmap frac agree coPset gset frac_auth ofe.
 From iris.base_logic Require Export own gen_heap.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import viewshifts saved_prop gen_heap.
-From iris.program_logic Require Export weakestpre.
+From iris.program_logic Require Import weakestpre.
 From iris.program_logic Require Import ectx_lifting total_ectx_lifting.
 From iris.proofmode Require Import tactics.
-From aneris.aneris_lang Require Export helpers lang notation tactics network resources_lemmas.
+From aneris.aneris_lang Require Export
+     helpers lang notation tactics network resources_lemmas.
 From stdpp Require Import fin_maps gmap.
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
@@ -22,7 +23,7 @@ lemmas. *)
 Ltac inv_head_step :=
   repeat match goal with
   | _ => progress simplify_map_eq/= (* simplify memory stuff *)
-  | H : to_val _ = Some _ |- _ => apply to_base_val in H
+  | H : aneris_to_val _ = Some _ |- _ => apply to_base_aneris_val in H
   | H : ground_lang.head_step ?e _ _ _ _ _ |- _ =>
      try (is_var e; fail 1); (* inversion yields many goals if [e] is a variable
      and can thus better be avoided. *)
@@ -43,8 +44,8 @@ Section lifting.
   Context `{distG Σ}.
 
   Implicit Types P Q : iProp Σ.
-  Implicit Types Φ : val → iProp Σ.
-  Implicit Types efs : list expr.
+  Implicit Types Φ : aneris_val → iProp Σ.
+  Implicit Types efs : list aneris_expr.
   Implicit Types σ : state.
 
   Local Transparent IsNode.
@@ -55,9 +56,9 @@ Section lifting.
   Lemma wp_start ip ports k E e Φ :
     ip ≠ "system" →
     ▷ FreeIP ip ∗
-    ▷ Φ 〈"system"; #()〉 ∗
-    ▷ (IsNode ip -∗ FreePorts ip ports -∗ WP ⟨ip; e⟩ @ k; ⊤ {{ _, True }}) ⊢
-    WP ⟨"system"; Start (LitString ip) e⟩ @ k; E {{ Φ }}.
+    ▷ Φ (mkVal "system" #()) ∗
+    ▷ (IsNode ip -∗ FreePorts ip ports -∗ WP (mkExpr ip e) @ k; ⊤ {{ _, True }}) ⊢
+    WP (mkExpr "system" (Start (LitString ip) e)) @ k; E {{ Φ }}.
   Proof.
     iIntros (Hneq) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
@@ -120,10 +121,10 @@ Section lifting.
 
   Lemma wp_new_socket n s E v1 v2 v3 :
   {{{ ▷ IsNode n }}}
-    ⟨n;NewSocket (Val $ LitV $ LitAddressFamily v1)
+    (mkExpr n (NewSocket (Val $ LitV $ LitAddressFamily v1)
                  (Val $ LitV $ LitSocketType v2)
-                 (Val $ LitV $ LitProtocol v3)⟩ @ s; E
-  {{{ h, RET 〈n;LitV (LitSocket h)〉;
+                 (Val $ LitV $ LitProtocol v3))) @ s; E
+  {{{ h, RET (mkVal n (LitV (LitSocket h)));
       h s↦[n]{1/2} ({| sfamily := v1;
                      stype := v2;
                      sprotocol := v3;
@@ -142,7 +143,8 @@ Proof.
   { iPureIntro; do 4 eexists; apply SocketStepS with (S := S) ; try auto; subst.
     apply newsocket_fresh; by eauto. }
   iIntros (v2' σ2 efs Hstep); inv_head_step.
-  set (socket := {| sfamily := v1; stype := v2; sprotocol := v3; saddress := None |}).
+  set (socket := {| sfamily := v1; stype := v2; sprotocol := v3;
+                    saddress := None |}).
   destruct γ's as [γh γs]; iSplitR; auto; iFrame.
   iDestruct "Hs" as (h' S'' Hh Hs) "(#Hn' & Hheap & Hsockets & Hzs)";
     simplify_eq; simpl. iModIntro.
@@ -161,14 +163,18 @@ Proof.
       simpl in *. iFrame. iSplit; try done.
       iFrame "#". iPureIntro.
       by rewrite lookup_insert. }
-    iFrame. rewrite /gnames_coherence (dom_insert_Some (D:=gset ip_address) _ _ S) /= //.
+    iFrame.
+    rewrite /gnames_coherence (dom_insert_Some (D:=gset ip_address) _ _ S) /= //.
     iDestruct "Hrest" as "(HFP & Hmsg)".
-    iFrame. iSplit; first done. iSplitL "HFP". iDestruct "HFP" as (Fiu Piu) "((% & % & % & %) & HFP)".
+    iFrame. iSplit; first done. iSplitL "HFP".
+    iDestruct "HFP" as (Fiu Piu) "((% & % & % & %) & HFP)".
     iExists Fiu, Piu. simpl. iFrame. iPureIntro.
     repeat split; try eauto with set_solver. set_solver.
-    destruct (decide (ip = n)); subst; first by set_solver. rewrite lookup_insert_ne; set_solver.
+    destruct (decide (ip = n)); subst; first by set_solver.
+    rewrite lookup_insert_ne; set_solver.
     iApply (network_coherence_insert_new with "[Hmsg]"); try done.
-    iDestruct "Hmsg" as "[? Hmsg]". iDestruct (network_messages_sepM_later with "Hmsg") as "Hmsg".
+    iDestruct "Hmsg" as "[? Hmsg]".
+    iDestruct (network_messages_sepM_later with "Hmsg") as "Hmsg".
     by iFrame.
   + by iApply "HΦ".
 Qed.
@@ -182,9 +188,9 @@ Lemma wp_socketbind_static s A E sh skt a:
       ▷ FreePorts ip {[(port_of_address a)]} ∗
       ▷ sh s↦[ip]{1/2} (skt, ∅, ∅)
   }}}
-    ⟨ip; SocketBind (Val $ LitV $ LitSocket sh)
-                   (Val $ LitV $ LitSocketAddress a)⟩ @ s; E
-  {{{ RET 〈ip; #0〉;
+    (mkExpr ip (SocketBind (Val $ LitV $ LitSocket sh)
+                   (Val $ LitV $ LitSocketAddress a))) @ s; E
+  {{{ RET (mkVal ip  #0);
       sh s↦[ip]{1/2} (skt <| saddress := Some a |>, ∅, ∅) ∗
       ∃ φ, a ⤇ φ }}}.
 Proof.
@@ -245,24 +251,24 @@ Proof.
     iDestruct (network_coherence_insert_bind with "HmsgCoh") as "H4"; eauto.
     Qed.
 
-Lemma wp_socketbind_static_2 k A E sh s a :
-  let ip := ip_of_address a in
-  saddress s = None →
-  a ∈ A →
-  {{{ Fixed A ∗
-      ▷ FreePorts (ip_of_address a) {[(port_of_address a)]} ∗
-      ▷ sh s↦[ip]{1/2} (s, ∅, ∅)
-  }}}
-    ⟨ip; SocketBind (Val $ LitV $ LitSocket sh)
-                   (Val $ LitV $ LitSocketAddress a)⟩ @ k; E
-  {{{ RET 〈ip; #0〉;
-      sh s↦[ip]{1/2} (s <| saddress := Some a |>, ∅, ∅) }}}.
-  Proof.
-    iIntros (? ? ? ?) "(#HA & Hports & Hsock) HΦ".
-    iApply (wp_socketbind_static with "[$HA Hports $Hsock]"); try auto.
-    iNext. iDestruct 1 as "(HM & Hψ)".
-    iDestruct "Hψ" as (Ψ) "#HΨ". iApply "HΦ". iFrame.
-  Qed.
+(* Lemma wp_socketbind_static_2 k A E sh s a : *)
+(*   let ip := ip_of_address a in *)
+(*   saddress s = None → *)
+(*   a ∈ A → *)
+(*   {{{ Fixed A ∗ *)
+(*       ▷ FreePorts (ip_of_address a) {[(port_of_address a)]} ∗ *)
+(*       ▷ sh s↦[ip]{1/2} (s, ∅, ∅) *)
+(*   }}} *)
+(*     (mkExpr ip (SocketBind (Val $ LitV $ LitSocket sh) *)
+(*                    (Val $ LitV $ LitSocketAddress a))) @ k; E *)
+(*   {{{ RET (mkVal ip #0); *)
+(*       sh s↦[ip]{1/2} (s <| saddress := Some a |>, ∅, ∅) }}}. *)
+(*   Proof. *)
+(*     iIntros (? ? ? ?) "(#HA & Hports & Hsock) HΦ". *)
+(*     iApply (wp_socketbind_static with "[$HA Hports $Hsock]"); try auto. *)
+(*     iNext. iDestruct 1 as "(HM & Hψ)". *)
+(*     iDestruct "Hψ" as (Ψ) "#HΨ". iApply "HΦ". iFrame. *)
+(*   Qed. *)
 
 
   Lemma wp_socketbind_dynamic s A E sh k a φ :
@@ -272,9 +278,9 @@ Lemma wp_socketbind_static_2 k A E sh s a :
   {{{ ▷ Fixed A ∗
       ▷ FreePorts (ip_of_address a) {[port_of_address a]} ∗
       ▷ sh s↦[ip]{1/2} (s, ∅, ∅) }}}
-    ⟨ip; SocketBind (Val $ LitV $ LitSocket sh)
-                   (Val $ LitV $ LitSocketAddress a)⟩ @ k; E
-  {{{ RET 〈ip; #0〉;
+    (mkExpr ip (SocketBind (Val $ LitV $ LitSocket sh)
+                   (Val $ LitV $ LitSocketAddress a))) @ k; E
+  {{{ RET (mkVal ip #0);
       sh s↦[ip]{1/2} (s <| saddress := Some a |>, ∅, ∅) ∗ a ⤇ φ
     }}}.
   Proof.
@@ -419,8 +425,8 @@ Lemma wp_socketbind_static_2 k A E sh s a :
           m_body := m;
         |} in
     {{{ ▷ sh s↦[ip]{1/2} (s, R, T) ∗ a ⤇ φ ∗ φ msg }}}
-      ⟨ip; SendTo (Val $ LitV $ LitSocket sh) #m #a⟩ @ k; E
-    {{{ RET 〈ip; #(String.length m)〉;
+      (mkExpr ip (SendTo (Val $ LitV $ LitSocket sh) #m #a)) @ k; E
+    {{{ RET (mkVal ip (#(String.length m)));
         sh s↦[ip]{1/2} (s, R, {[ msg ]} ∪ T)
     }}}.
   Proof.
@@ -480,8 +486,8 @@ Qed.
         |} in
     msg ∈ T →
     {{{ ▷ sh s↦[ip]{1/2} (s, R, T) }}}
-      ⟨ip; SendTo (Val $ LitV $ LitSocket sh) #m #a⟩ @ k; E
-    {{{ RET 〈ip; #(String.length m)〉;
+      (mkExpr ip (SendTo (Val $ LitV $ LitSocket sh) #m #a)) @ k; E
+    {{{ RET (mkVal ip #(String.length m));
         sh s↦[ip]{1/2} (s, R, T)
     }}}.
    Proof.
@@ -556,22 +562,23 @@ Qed.
       assert (T = {[msg]} ∪ T) as <- by set_solver. iFrame.
    Qed.
 
-   Lemma wp_receive_from k a E h s R T :
+   Lemma wp_receive_from_gen (Ψo : option (socket_interp Σ)) k a E h s R T :
     let ip := ip_of_address a in
     saddress s = Some a →
-    {{{ ▷ h s↦[ip]{1/2} (s, R, T) }}}
-      ⟨ip; ReceiveFrom (Val $ LitV $ LitSocket h)⟩ @ k; E
-    {{{ r, RET 〈ip;r〉;
+    {{{ ▷ h s↦[ip]{1/2} (s, R, T) ∗ match Ψo with Some Ψ => a ⤇ Ψ | _ => True end }}}
+      (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
+    {{{ r, RET (mkVal ip r);
         ((⌜r = NONEV⌝ ∗ h s↦[ip]{1/2} (s, R, T)) ∨
         (∃ msg,
           ⌜m_destination msg = a⌝ ∗
           ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
                   (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ h s↦[ip]{1/2} (s, {[ msg ]} ∪ R, T) ∗ ∃ φ, a ⤇ φ ∗ φ msg) ∨
+          ((⌜msg ∉ R⌝ ∗ h s↦[ip]{1/2} (s, {[ msg ]} ∪ R, T) ∗
+             match Ψo with Some Ψ => Ψ msg | _ => ∃ φ, a ⤇ φ ∗ φ msg end) ∨
             ⌜msg ∈ R⌝ ∗ h s↦[ip]{1/2} (s, R, T))))
     }}}.
    Proof.
-     iIntros (ip Hla Φ) ">Hh HΦ".
+    iIntros (ip Hla Φ) "[>Hh #HΨ] HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (σ1 κ κs n) "Hσ !>".
     iDestruct "Hσ" as (γmap HγmapCoh) "(Hsi & HownS & HlocS & HipsCtx & HnetCoh & HsiCoh)".
@@ -582,8 +589,9 @@ Qed.
     iDestruct "Hloc" as (hp ? Hheap ?) "(_ & HhCtx & HsCtx & Hsockets)". simplify_eq /=.
     iDestruct (@gen_heap_valid with "HsCtx Hs") as %HSnh. iSplitR.
     { by iPureIntro; do 4 eexists; eapply SocketStepS; eauto; eapply ReceiveFromNoneS. }
-    iNext; iIntros (v2' σ2 efs Hstep); inv_head_step; iSplitR; auto; subst; last first.
-    - iModIntro. iSplitR "HΦ Hs Hn".
+    iIntros (v2' σ2 efs Hstep); inv_head_step; iSplitR; auto; subst; last first.
+    - iNext.
+      iModIntro. iSplitR "HΦ Hs Hn".
       + iExists γmap. iFrame. iSplitR.
         { rewrite /gnames_coherence (dom_insert_Some (D:=gset ip_address) _ _ S') /= //. }
         iDestruct (map_local_state_i_update_sockets _ _ S' with "HlocS") as "HlocS".
@@ -609,7 +617,8 @@ Qed.
       apply elem_of_filter in H3 as (Heq & Hin).
       (* iDestruct "HnetCoh" as (HipsCoh HsktsCoh) "HsiCoh". *)
        destruct (decide (m ∈ R)).
-       + iModIntro.
+       + iNext.
+         iModIntro.
          assert ({[m]} ∪ R = R) as -> by set_solver.
          assert (<[h:=(s, R, T)]> Sn = Sn) as ->. by apply insert_id.
          assert (<[ip:=Sn]> (state_sockets σ1) = (state_sockets σ1)) as ->. by apply insert_id.
@@ -629,60 +638,74 @@ Qed.
           iAssert (h s↦[ip]{1/2} (s, R, T)) with "[Hs Hn]" as "HshHalf1".
           { iExists _. iFrame "#". iFrame. }
           iExists m. do 2 (iSplit; first done). iRight. by iFrame.
-       +  iPoseProof (big_sepS_delete _ _ m with "HsiCoh") as "[[ Hmsi | Hrd ] HsiCoh]"; first done.
+       +  iPoseProof (big_sepS_delete _ _ m with "HsiCoh") as
+             "[[ Hmsi | Hrd ] HsiCoh]"; first done.
          (* case: fresh message *)
-          * iDestruct (mapsto_s_update (s, R, T) (s, {[ m ]} ∪ R, T) _ _ _ _ _ HSnh
+          * iDestruct "Hmsi" as (Ψ) "[#Hψ Hm]".
+            iAssert (▷ match Ψo with
+                       Some Ψ => Ψ m
+                     | _ => ∃ φ, m_destination m ⤇ φ ∗ φ m
+                     end)%I with "[Hm]" as "Hm".
+            { destruct Ψo as [ψ|]; last by eauto.
+              rewrite Heq.
+              iDestruct (si_pred_agree _ _ _ m with "HΨ Hψ") as "Hsiagree".
+              iNext.
+              iRewrite "Hsiagree"; done. }
+            iNext.
+            iDestruct (mapsto_s_update (s, R, T) (s, {[ m ]} ∪ R, T) _ _ _ _ _ HSnh
                          with "[$Hn $Hs $HsCtx $Hsockets]") as ">(Hsockets & Hshs & Hs)".
-            iModIntro. iSplitR "HΦ Hs Hn Hmsi".
+            iModIntro. iSplitR "HΦ Hs Hn Hm".
             -- iExists γmap. iFrame. iSplitR.
                { rewrite /gnames_coherence (dom_insert_Some (D:=gset ip_address) _ _ Sn) /= //. }
                iDestruct (map_local_state_i_update_sockets _ _ (<[h:=(s, {[m]} ∪ R, T)]> Sn)
                              with "HlocS") as "HlocS".
                iSplitL "Hn HhCtx Hsockets HlocS Hshs"; auto.
-               --- iDestruct (node_local_state_rev with "[Hn HhCtx Hsockets Hshs] HlocS")
+               ++ iDestruct (node_local_state_rev with "[Hn HhCtx Hsockets Hshs] HlocS")
                    as "HlocS"; first done; simpl; last by iFrame.
-                   iExists _, (<[h:=_]> Sn). iFrame. iSplit; try done. iFrame "#".
-                   iPureIntro. simpl. by rewrite lookup_insert.
-               ---   iSplitL "HipsCtx".
-                     ----  iDestruct "HipsCtx" as (Fiu Piu) "((% & % & % & %) & HFP)".
-                           iExists Fiu, Piu. simpl. iFrame. iPureIntro. repeat split; try eauto. set_solver.
-                           ddeq ip0 ip; set_solver.
-                     ---- rewrite /network_coherence.
-                          iDestruct "HnetCoh" as %HnetCoh.
-                          iAssert
-                            (([∗ set] y ∈ (state_ms σ1 ∖ {[m]}), (∃ x : socket_interp Σ,
-                                                   m_destination y ⤇ x ∗ x y)
-                                                ∨ ⌜message_received (state_sockets σ1) y⌝) -∗
+                  iExists _, (<[h:=_]> Sn). iFrame. iSplit; try done. iFrame "#".
+                  iPureIntro. simpl. by rewrite lookup_insert.
+               ++ iSplitL "HipsCtx".
+                  ** iDestruct "HipsCtx" as (Fiu Piu) "((% & % & % & %) & HFP)".
+                     iExists Fiu, Piu. simpl. iFrame. iPureIntro. repeat split; try eauto. set_solver.
+                     ddeq ip0 ip; set_solver.
+                  ** rewrite /network_coherence.
+                     iDestruct "HnetCoh" as %HnetCoh.
+                     iAssert
+                       (([∗ set] y ∈ (state_ms σ1 ∖ {[m]}),
+                         (∃ x : socket_interp Σ,
+                             m_destination y ⤇ x ∗ x y) ∨
+                          ⌜message_received (state_sockets σ1) y⌝) -∗
                               network_messages_coherence
-                              (<[ip:=<[h:=(s, {[m]} ∪ R, T)]> Sn]> (state_sockets σ1)) (state_ms σ1))%I as "H".
-                          { iIntros "H". rewrite /network_messages_coherence.
-                            rewrite (big_sepS_delete _ (state_ms σ1) m) // /=.
-                            iSplitR.
-                            iRight. iPureIntro.
-                            exists a, (<[h:=(s, {[m]} ∪ R, T)]> Sn), h, s, ({[m]} ∪ R), T.
-                            repeat split; try rewrite lookup_insert; eauto with set_solver.
-                            iApply (big_sepS_mono with "H ").
-                            iIntros (m' Hm') "[ H | H ]". iLeft.
-                            iDestruct "H" as (x0) "(H1 & H2)". iExists x0. iFrame.
-                            iRight. ddeq m' m; first by set_solver.
-                            iDestruct "H" as %(a'&Sn'&h'&s'&R'&T'&HSn'&Hs'&Hsa'&HinR').
-                            iPureIntro.
-                            ddeq (ip_of_address a') ip.
-                            - rewrite e in HSn'.  assert (Sn' = Sn) by set_solver. subst.
-                              assert (m' ∈ state_ms σ1) by set_solver.
-                              destruct (HnetCoh ip Sn)
-                                as (HBpCoh & HshCoh & HsmCoh & HsaCoh); first done.
-                              ddeq a' (m_destination m).
-                              -- assert (h' = h). eapply HshCoh; eauto. by rewrite Hla. subst.
-                                 rewrite Hs' in HSnh. simplify_eq /=.
-                                 exists (m_destination m), (<[h:=(s, {[m]} ∪ R, T)]> Sn), h, s, ({[m]} ∪ R), T.
-                                 repeat split; eauto with set_solver; try rewrite !lookup_insert; done.
-                              -- assert (h' ≠ h). intro. subst. rewrite Hs' in HSnh. set_solver.
-                                 exists a', (<[h:=(s, {[m]} ∪ R, T)]> Sn), h', s', R', T'.
-                                 repeat split; try done. rewrite e.
-                                   by rewrite lookup_insert. by rewrite !lookup_insert_ne; last done.
-                            - exists a', Sn', h', s', R', T'.
-                              repeat split; eauto. by rewrite lookup_insert_ne. }
+                              (<[ip:=<[h:=(s, {[m]} ∪ R, T)]> Sn]>
+                               (state_sockets σ1)) (state_ms σ1))%I as "H".
+                     { iIntros "H". rewrite /network_messages_coherence.
+                       rewrite (big_sepS_delete _ (state_ms σ1) m) // /=.
+                       iSplitR.
+                       iRight. iPureIntro.
+                       exists a, (<[h:=(s, {[m]} ∪ R, T)]> Sn), h, s, ({[m]} ∪ R), T.
+                       repeat split; try rewrite lookup_insert; eauto with set_solver.
+                       iApply (big_sepS_mono with "H ").
+                       iIntros (m' Hm') "[ H | H ]". iLeft.
+                       iDestruct "H" as (x0) "(H1 & H2)". iExists x0. iFrame.
+                       iRight. ddeq m' m; first by set_solver.
+                       iDestruct "H" as %(a'&Sn'&h'&s'&R'&T'&HSn'&Hs'&Hsa'&HinR').
+                       iPureIntro.
+                       ddeq (ip_of_address a') ip.
+                       - rewrite e in HSn'.  assert (Sn' = Sn) by set_solver. subst.
+                         assert (m' ∈ state_ms σ1) by set_solver.
+                         destruct (HnetCoh ip Sn)
+                           as (HBpCoh & HshCoh & HsmCoh & HsaCoh); first done.
+                         ddeq a' (m_destination m).
+                         + assert (h' = h). eapply HshCoh; eauto. by rewrite Hla. subst.
+                           rewrite Hs' in HSnh. simplify_eq /=.
+                           exists (m_destination m), (<[h:=(s, {[m]} ∪ R, T)]> Sn), h, s, ({[m]} ∪ R), T.
+                           repeat split; eauto with set_solver; try rewrite !lookup_insert; done.
+                         + assert (h' ≠ h). intro. subst. rewrite Hs' in HSnh. set_solver.
+                           exists a', (<[h:=(s, {[m]} ∪ R, T)]> Sn), h', s', R', T'.
+                           repeat split; try done. rewrite e.
+                             by rewrite lookup_insert. by rewrite !lookup_insert_ne; last done.
+                       - exists a', Sn', h', s', R', T'.
+                         repeat split; eauto. by rewrite lookup_insert_ne. }
                           iSpecialize ("H" with "HsiCoh").
                           iFrame.
                           iPureIntro. intros ip0 Sn0 Hip0.
@@ -720,33 +743,50 @@ Qed.
             set_solver.
    Qed.
 
+   Lemma wp_receive_from k a E h s R T :
+    let ip := ip_of_address a in
+    saddress s = Some a →
+    {{{ ▷ h s↦[ip]{1/2} (s, R, T) }}}
+      (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
+    {{{ r, RET (mkVal ip r);
+        ((⌜r = NONEV⌝ ∗ h s↦[ip]{1/2} (s, R, T)) ∨
+        (∃ msg,
+          ⌜m_destination msg = a⌝ ∗
+          ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
+                  (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
+          ((⌜msg ∉ R⌝ ∗ h s↦[ip]{1/2} (s, {[ msg ]} ∪ R, T) ∗ ∃ φ, a ⤇ φ ∗ φ msg) ∨
+            ⌜msg ∈ R⌝ ∗ h s↦[ip]{1/2} (s, R, T))))
+    }}}.
+   Proof.
+     simpl.
+     iIntros (Hs Φ) "Hsh HΦ".
+     iApply (wp_receive_from_gen None with "[$]"); first done.
+     iNext.
+     iIntros (r) "Hr".
+     iApply "HΦ"; eauto.
+   Qed.
+
   Lemma wp_receive_from_2 k a E sh s R T φ :
     let ip := ip_of_address a in
     saddress s = Some a →
-    {{{ ▷ sh s↦[ip]{1/2} (s, R, T) ∗ ▷ a ⤇ φ }}}
-      ⟨ip; ReceiveFrom (Val $ LitV $ LitSocket sh)⟩ @ k; E
-    {{{ r, RET 〈ip;r〉;
+    {{{ ▷ sh s↦[ip]{1/2} (s, R, T) ∗ a ⤇ φ }}}
+      (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket sh))) @ k; E
+    {{{ r, RET (mkVal ip r);
         (⌜r = NONEV⌝ ∗ sh s↦[ip]{1/2} (s, R, T)) ∨
         ∃ msg,
           ⌜m_destination msg = a⌝ ∗
           ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
                   (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ sh s↦[ip]{1/2} (s, {[ msg ]} ∪ R, T) ∗ a ⤇ φ ∗ ▷ φ msg) ∨
+          ((⌜msg ∉ R⌝ ∗ sh s↦[ip]{1/2} (s, {[ msg ]} ∪ R, T) ∗ φ msg) ∨
             ⌜msg ∈ R⌝ ∗ sh s↦[ip]{1/2} (s, R, T))
     }}}.
    Proof.
-    iIntros (ip Hbound Φ) "(>Hs & #Hsi) HΦ".
-    iApply (wp_receive_from with "[$Hs]"); first done.
-    iNext. iIntros (r) "H". iSpecialize ("HΦ" $! r).
-    iApply "HΦ".
-    iDestruct "H" as "[H | H]".
-     - iLeft. iFrame.
-     - iRight. iDestruct "H" as (msg Hdest Hr) "[(% & Hs & Hex)|H]";
-                 iExists msg; do 2 (iSplit; first done).
-       + iLeft. iDestruct "Hex" as (φ') "(#Hsi' & Hphi)".
-         iDestruct (si_pred_agree _ _ _ msg with "Hsi Hsi'") as "Hsiagree".
-          iSplit; first done. iFrame. iFrame "#". iNext. by iRewrite "Hsiagree".
-       + iRight. iFrame.
+     simpl.
+     iIntros (Hs Φ) "Hsh HΦ".
+     iApply (wp_receive_from_gen (Some φ) with "[$]"); first done.
+     iNext.
+     iIntros (r) "Hr".
+     iApply "HΦ"; eauto.
    Qed.
 
 End lifting.

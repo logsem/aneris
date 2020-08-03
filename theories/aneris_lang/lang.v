@@ -854,29 +854,29 @@ Import ground_lang.
 Import Network.
 Import RecordSetNotations.
 
-Record expr := mkExpr { expr_n : ip_address;
+Record aneris_expr := mkExpr { expr_n : ip_address;
                         expr_e : ground_lang.expr }.
 
-Record val := mkVal { val_n : ip_address;
+Record aneris_val := mkVal { val_n : ip_address;
                       val_e : ground_lang.val }.
 
-Global Instance expr_inhabited : Inhabited expr :=
+Global Instance expr_inhabited : Inhabited aneris_expr :=
   populate {| expr_n := "";
               expr_e := Val inhabitant |}.
-Global Instance val_inhabited : Inhabited val :=
+Global Instance val_inhabited : Inhabited aneris_val :=
   populate {| val_n := "";
               val_e := inhabitant |}.
 
-Notation fill_item Ki e :=
+Definition aneris_fill_item Ki e :=
   {| expr_n := expr_n e;
      expr_e := (ground_lang.fill_item Ki (expr_e e)) |}.
 
-Definition of_val v : expr :=
+Definition aneris_of_val v : aneris_expr :=
   {| expr_n := val_n v;
      expr_e := ground_lang.of_val (val_e v) |}.
-Arguments of_val !v.
+Arguments aneris_of_val !v.
 
-Definition to_val e : option val :=
+Definition aneris_to_val e : option aneris_val :=
   (λ v, {| val_n := expr_n e; val_e := v |}) <$> ground_lang.to_val (expr_e e).
 
 (** For each node of the network, its local state is defined as a triple
@@ -1007,7 +1007,8 @@ Fixpoint is_head_step_pure (e : ground_lang.expr) : bool :=
   | _ => true
   end.
 
-Inductive head_step : expr → state → list observation → expr → state → list (expr) → Prop :=
+Inductive head_step : aneris_expr → state → list observation →
+                      aneris_expr → state → list aneris_expr → Prop :=
 | LocalStepPureS n h e e' ef κ σ
                  (is_pure : is_head_step_pure e = true)
                  (BaseStep : ground_lang.head_step e h κ e' h ef)
@@ -1054,34 +1055,36 @@ Inductive head_step : expr → state → list observation → expr → state →
                  state_ports_in_use := P';
                  state_ms := M'; |} [].
 
-Lemma to_of_val v : to_val (of_val v) = Some v.
+Lemma aneris_to_of_val v : aneris_to_val (aneris_of_val v) = Some v.
 Proof. by destruct v. Qed.
 
-Lemma of_to_val e v : to_val e = Some v → of_val v = e.
+Lemma aneris_of_to_val e v : aneris_to_val e = Some v → aneris_of_val v = e.
 Proof.
   case e, v. cbv. rewrite -/(ground_lang.to_val expr_e0).
   case C: (ground_lang.to_val expr_e0) =>//. move=> [<- <-].
   f_equal. exact: ground_lang.of_to_val.
 Qed.
 
-Lemma to_base_val e v:
-  to_val e = Some v → ground_lang.to_val (expr_e e) = Some (val_e v).
+Lemma to_base_aneris_val e v:
+  aneris_to_val e = Some v → to_val (expr_e e) = Some (val_e v).
 Proof. destruct e, v. cbv -[ground_lang.to_val]. case_match; naive_solver. Qed.
 
-Lemma to_base_val' n e v:
-  to_val {| expr_n := n ; expr_e := e |} = Some {| val_n := n ; val_e := v |} →
+Lemma to_base_aneris_val' n e v:
+  aneris_to_val {| expr_n := n ; expr_e := e |} =
+  Some {| val_n := n ; val_e := v |} →
   ground_lang.to_val e = Some v.
 Proof. cbv -[ground_lang.to_val]. case_match; naive_solver. Qed.
 
-Lemma to_base_val_inv e v n:
-  ground_lang.to_val e = Some v → to_val (mkExpr n e) = Some (mkVal n v).
+Lemma to_base_aneris_val_inv e v n:
+  ground_lang.to_val e = Some v → aneris_to_val (mkExpr n e) = Some (mkVal n v).
 Proof. cbv -[ground_lang.to_val]. by move => ->. Qed.
 
-Lemma of_base_val e v:
-  of_val v = e → ground_lang.of_val (val_e v) = (expr_e e).
+Lemma of_base_aneris_val e v:
+  aneris_of_val v = e → ground_lang.of_val (val_e v) = (expr_e e).
 Proof. destruct e,v. by inversion 1. Qed.
 
-Lemma val_head_stuck σ1 e1 κ σ2 e2 ef : head_step e1 σ1 κ e2 σ2 ef → to_val e1 = None.
+Lemma aneris_val_head_stuck σ1 e1 κ σ2 e2 ef :
+  head_step e1 σ1 κ e2 σ2 ef → aneris_to_val e1 = None.
 Proof.
   inversion 1; subst; last inversion SocketStep; subst;
     try (cbv -[ground_lang.to_val];
@@ -1089,23 +1092,23 @@ Proof.
     eauto.
 Qed.
 
-Lemma fill_item_val Ki e :
-  is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
+Lemma fill_item_aneris_val Ki e :
+  is_Some (aneris_to_val (aneris_fill_item Ki e)) → is_Some (aneris_to_val e).
 Proof.
   move/fmap_is_Some/ground_lang.fill_item_val => H.
   exact/fmap_is_Some.
 Qed.
 
-Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
-  to_val e1 = None → to_val e2 = None →
-  fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
+Lemma fill_item_no_aneris_val_inj Ki1 Ki2 e1 e2 :
+  aneris_to_val e1 = None → aneris_to_val e2 = None →
+  aneris_fill_item Ki1 e1 = aneris_fill_item Ki2 e2 → Ki1 = Ki2.
 Proof.
   move => /fmap_None H1 /fmap_None H2 [] H3 H4.
   exact: ground_lang.fill_item_no_val_inj H1 H2 H4.
 Qed.
 
-Lemma head_ctx_step_val Ki e σ κ e2 σ2 ef :
-  head_step (fill_item Ki e) σ κ e2 σ2 ef → is_Some (to_val e).
+Lemma head_ctx_step_aneris_val Ki e σ κ e2 σ2 ef :
+  head_step (aneris_fill_item Ki e) σ κ e2 σ2 ef → is_Some (aneris_to_val e).
 Proof.
   inversion 1; subst; last inversion SocketStep; subst; simplify_option_eq;
     try
@@ -1115,17 +1118,19 @@ Proof.
       inversion H0; subst; by eauto.
 Qed.
 
-Instance of_val_inj : Inj (=) (=) of_val.
-Proof. by intros ?? Hv; apply (inj Some); rewrite -!to_of_val Hv. Qed.
+Instance of_aneris_val_inj : Inj (=) (=) aneris_of_val.
+Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 
-Instance fill_item_inj Ki : Inj (=) (=) (λ e, fill_item Ki e).
+Instance fill_item_inj Ki : Inj (=) (=) (λ e, aneris_fill_item Ki e).
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
                               simplify_eq/=; auto with f_equal. Qed.
 
-Lemma aneris_lang_mixin : EctxiLanguageMixin of_val to_val (λ Ki e, fill_item Ki e) head_step.
+Lemma aneris_lang_mixin :
+  EctxiLanguageMixin aneris_of_val aneris_to_val aneris_fill_item head_step.
 Proof.
-  split; apply _ || eauto using to_of_val, of_to_val, val_head_stuck,
-         fill_item_val, fill_item_no_val_inj, head_ctx_step_val.
+  split; apply _ || eauto using aneris_to_of_val, aneris_of_to_val,
+         aneris_val_head_stuck, fill_item_aneris_val,
+         fill_item_no_aneris_val_inj, head_ctx_step_aneris_val.
 Qed.
 
 Global Instance state_inhabited : Inhabited state.
@@ -1159,11 +1164,8 @@ Qed.
 
 End aneris_lang.
 
-(** Language *)
-Canonical Structure dist_ectxi_lang := EctxiLanguage aneris_lang.aneris_lang_mixin.
-Canonical Structure dist_ectx_lang := EctxLanguageOfEctxi dist_ectxi_lang.
-Canonical Structure aneris_lang := LanguageOfEctx dist_ectx_lang.
-
 (* Prefer base names over ectx_language names. *)
 Export ground_lang.
 Export aneris_lang.
+
+Global Arguments aneris_fill_item /_ _.

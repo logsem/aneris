@@ -1,5 +1,5 @@
 From iris.program_logic Require Import weakestpre.
-From aneris.aneris_lang Require Import lang notation lifting proofmode.
+From aneris.aneris_lang Require Import lang notation proofmode.
 From aneris.aneris_lang.lib Require Import util.
 From iris.algebra Require Import gmap.
 From aneris.aneris_lang.lib Require Export serialization_base.
@@ -11,15 +11,15 @@ Record serialization := {
   DBS_deser : ground_lang.val;
   DBS_is_ser : ground_lang.val → string → Prop;
   DBS_ser_spec :
-    ∀ `{!distG Σ} n v,
+    ∀ `{!distG Σ} ip v,
     {{{ ⌜DBS_valid_val v⌝ }}}
-      ⟨n; DBS_ser v⟩
-    {{{ (s : string), RET 〈n; #s〉; ⌜DBS_is_ser v s⌝ }}};
+      DBS_ser v @[ip]
+    {{{ (s : string), RET #s; ⌜DBS_is_ser v s⌝ }}};
   DBS_deser_spec :
-    ∀ `{!distG Σ} n v s,
+    ∀ `{!distG Σ} ip v s,
     {{{ ⌜DBS_is_ser v s⌝ }}}
-      ⟨n; DBS_deser #s⟩
-    {{{ RET 〈n; v〉; True }}}; }.
+      DBS_deser #s @[ip]
+    {{{ RET v; True }}}; }.
 
 Class Serializable (s : serialization) (v : ground_lang.val) :=
   serializable : DBS_valid_val s v.
@@ -33,10 +33,10 @@ Definition int_deser : ground_lang.val := λ: "v", unSOME (s2i "v").
 Definition int_is_ser (v : ground_lang.val) (s : string) :=
   ∃ (i : Z), v = #i ∧ s = StringOfZ i.
 
-Lemma int_ser_spec `{!distG Σ} n v :
+Lemma int_ser_spec `{!distG Σ} ip v :
   {{{ ⌜int_valid_val v⌝ }}}
-    ⟨n; int_ser v⟩
-  {{{ (s : string), RET 〈n; #s〉; ⌜int_is_ser v s⌝ }}}.
+    int_ser v @[ip]
+  {{{ (s : string), RET #s; ⌜int_is_ser v s⌝ }}}.
 Proof.
   iIntros (Φ [i ->]) "HΦ".
   rewrite /int_ser /int_is_ser.
@@ -44,10 +44,10 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma int_deser_spec `{!distG Σ} n v s :
+Lemma int_deser_spec `{!distG Σ} ip v s :
   {{{ ⌜int_is_ser v s⌝ }}}
-    ⟨n; int_deser #s⟩
-  {{{ RET 〈n; v〉; True }}}.
+    int_deser #s @[ip]
+  {{{ RET v; True }}}.
 Proof.
   iIntros (Φ [i [-> ->]]) "HΦ".
   rewrite /int_deser /int_is_ser.
@@ -76,10 +76,10 @@ Definition unit_deser : ground_lang.val := λ: "v", #().
 
 Definition unit_is_ser (v : ground_lang.val) (s : string) := v = #() ∧ s = "".
 
-Lemma unit_ser_spec `{!distG Σ} n v :
+Lemma unit_ser_spec `{!distG Σ} ip v :
   {{{ ⌜unit_valid_val v⌝ }}}
-    ⟨n; unit_ser v⟩
-  {{{ (s : string), RET 〈n; #s〉; ⌜unit_is_ser v s⌝ }}}.
+    unit_ser v @[ip]
+  {{{ (s : string), RET #s; ⌜unit_is_ser v s⌝ }}}.
 Proof.
   iIntros (Φ ->) "HΦ".
   rewrite /unit_ser /unit_is_ser.
@@ -87,10 +87,10 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma unit_deser_spec `{!distG Σ} n v s :
+Lemma unit_deser_spec `{!distG Σ} ip v s :
   {{{ ⌜unit_is_ser v s⌝ }}}
-    ⟨n; unit_deser #s⟩
-  {{{ RET 〈n; v〉; True }}}.
+    unit_deser #s @[ip]
+  {{{ RET v; True }}}.
 Proof.
   iIntros (Φ [-> ->]) "HΦ".
   rewrite /unit_deser /unit_is_ser.
@@ -117,10 +117,10 @@ Definition string_deser : ground_lang.val := λ: "v", "v".
 
 Definition string_is_ser (v : ground_lang.val) (s : string) := v = #s.
 
-Lemma string_ser_spec `{!distG Σ} n v:
+Lemma string_ser_spec `{!distG Σ} ip v:
   {{{ ⌜string_valid_val v⌝ }}}
-    ⟨n; string_ser v⟩
-  {{{ (s : string), RET 〈n; #s〉; ⌜string_is_ser v s⌝ }}}.
+    string_ser v @[ip]
+  {{{ (s : string), RET #s; ⌜string_is_ser v s⌝ }}}.
 Proof.
   iIntros (Φ [i ->]) "HΦ".
   rewrite /string_ser /string_is_ser.
@@ -128,10 +128,10 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma string_deser_spec `{!distG Σ} n v s:
+Lemma string_deser_spec `{!distG Σ} ip v s:
   {{{ ⌜string_is_ser v s⌝ }}}
-    ⟨n; string_deser #s⟩
-  {{{ RET 〈n; v〉; True }}}.
+    string_deser #s @[ip]
+  {{{ RET v; True }}}.
 Proof.
   iIntros (Φ ->) "HΦ".
   rewrite /string_deser /string_is_ser.
@@ -182,10 +182,10 @@ Section prod_serialization.
       v = (v1, v2)%V ∧ DBS_is_ser A v1 s1 ∧ DBS_is_ser B v2 s2 ∧
       s = StringOfZ (String.length s1) +:+ "_" +:+ s1 +:+ s2.
 
-  Lemma prod_ser_spec `{!distG Σ} n v:
+  Lemma prod_ser_spec `{!distG Σ} ip v:
     {{{ ⌜prod_valid_val v⌝ }}}
-      ⟨n; prod_ser (DBS_ser A) (DBS_ser B) v⟩
-    {{{ (s : string), RET 〈n; #s〉; ⌜prod_is_ser v s⌝ }}}.
+      prod_ser (DBS_ser A) (DBS_ser B) v @[ip]
+    {{{ (s : string), RET #s; ⌜prod_is_ser v s⌝ }}}.
   Proof.
     iIntros (Φ (v1&v2&->&?&?)) "HΦ".
     rewrite /prod_ser /prod_is_ser.
@@ -202,10 +202,10 @@ Section prod_serialization.
     rewrite !assoc; done.
   Qed.
 
-  Lemma prod_deser_spec `{!distG Σ} n v s:
+  Lemma prod_deser_spec `{!distG Σ} ip v s:
     {{{ ⌜prod_is_ser v s⌝ }}}
-      ⟨n; prod_deser (DBS_deser A) (DBS_deser B) #s⟩
-    {{{ RET 〈n; v〉; True }}}.
+      prod_deser (DBS_deser A) (DBS_deser B) #s @[ip]
+    {{{ RET v; True }}}.
   Proof.
     iIntros (Φ (v1 & v2 & s1 & s2 & -> & Hv1 & Hv2 & ->)) "HΦ".
     rewrite /prod_deser /prod_is_ser.
@@ -300,10 +300,10 @@ Section sum_serialization.
       (v = InjLV w ∧ DBS_is_ser A w s' ∧ s = "L_" +:+ s') ∨
       (v = InjRV w ∧ DBS_is_ser B w s' ∧ s = "R_" +:+ s').
 
-  Lemma sum_ser_spec `{!distG Σ} n v:
+  Lemma sum_ser_spec `{!distG Σ} ip v:
     {{{ ⌜sum_valid_val v⌝ }}}
-      ⟨n; sum_ser (DBS_ser A) (DBS_ser B) v⟩
-    {{{ (s : string), RET 〈n; #s〉; ⌜sum_is_ser v s⌝ }}}.
+      sum_ser (DBS_ser A) (DBS_ser B) v @[ip]
+    {{{ (s : string), RET #s; ⌜sum_is_ser v s⌝ }}}.
   Proof.
     iIntros (Φ [w Hw]) "HΦ".
     rewrite /sum_ser /sum_is_ser.
@@ -319,10 +319,10 @@ Section sum_serialization.
       iApply "HΦ"; eauto 10.
   Qed.
 
-  Lemma sum_deser_spec `{!distG Σ} n v s:
+  Lemma sum_deser_spec `{!distG Σ} ip v s:
     {{{ ⌜sum_is_ser v s⌝ }}}
-      ⟨n; sum_deser (DBS_deser A) (DBS_deser B) #s⟩
-    {{{ RET 〈n; v〉; True }}}.
+      sum_deser (DBS_deser A) (DBS_deser B) #s @[ip]
+    {{{ RET v; True }}}.
   Proof.
     iIntros (Φ (w & s' & Hw)) "HΦ".
     rewrite /sum_deser /sum_is_ser.

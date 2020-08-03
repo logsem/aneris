@@ -5,7 +5,7 @@ From iris.base_logic.lib Require Import viewshifts saved_prop gen_heap.
 From iris.program_logic Require Export weakestpre.
 From iris.program_logic Require Import ectx_lifting total_ectx_lifting.
 From iris.proofmode Require Import tactics.
-From aneris.aneris_lang Require Export helpers lang notation tactics network.
+From aneris.aneris_lang Require Export helpers aneris_lang notation tactics network.
 From stdpp Require Import fin_maps gmap.
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
@@ -100,10 +100,12 @@ Open Scope uPred_scope.
 (** Heaps n↦ *)
 Notation "l ↦[ n ]{ q } v" := (mapsto_l n l q v)
   (at level 20, q at level 50, format "l  ↦[ n ]{ q }  v") : uPred_scope.
-Notation "l ↦[ n ] v" := (l ↦[n]{1} v) (at level 20) : uPred_scope.
+Notation "l ↦[ n ] v" := (l ↦[n]{1} v)
+  (at level 20, format "l  ↦[ n ]  v") : uPred_scope.
 Notation "l ↦[ n ]{ q } -" := (∃ v, l ↦[n]{q} v)%I
   (at level 20, q at level 50, format "l  ↦[ n ]{ q }  -") : uPred_scope.
-Notation "l ↦[ n ] -" := (l ↦[n]{1} -)%I (at level 20) : uPred_scope.
+Notation "l ↦[ n ] -" := (l ↦[n]{1} -)%I
+  (at level 20, format "l  ↦[ n ]  -") : uPred_scope.
 
 (** Sockets s↦ *)
 Notation "h s↦[ n ]{ q } z" := (mapsto_s n h q z)

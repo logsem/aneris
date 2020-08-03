@@ -1,7 +1,7 @@
 From stdpp Require Import base pretty.
 From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import coq_tactics tactics.
-From aneris.aneris_lang Require Import lang lifting tactics proofmode notation network.
+From aneris.aneris_lang Require Import lang tactics proofmode notation network.
 
 Set Default Proof Using "Type".
 
@@ -196,11 +196,11 @@ Section library.
       by rewrite valid_tag_pretty_Npos.
   Qed.
 
-  Lemma tag_of_message_spec n (s : string) t v:
+  Lemma tag_of_message_spec ip (s : string) t v:
     valid_tag t →
     {{{ ⌜s = t +:+ "_" +:+ v⌝ }}}
-      ⟨n;tag_of_message #s⟩
-    {{{ v, RET 〈n;#v〉; ⌜v = t⌝ }}}.
+      tag_of_message #s @[ip]
+    {{{ v, RET #v; ⌜v = t⌝ }}}.
   Proof.
     iIntros (Htag Φ HP) "HΦ". rewrite /tag_of_message.
     wp_pures. wp_find_from.
@@ -211,11 +211,11 @@ Section library.
     rewrite substring_0_length_append. by iApply "HΦ".
   Qed.
 
-  Lemma value_of_message_spec n (s : string) t v :
+  Lemma value_of_message_spec ip (s : string) t v :
     valid_tag t →
     {{{ ⌜s = t +:+ "_" +:+ v⌝ }}}
-      ⟨n;value_of_message #s⟩
-    {{{ r, RET 〈n;#r〉; ⌜r = v⌝ }}}.
+      value_of_message #s @[ip]
+    {{{ r, RET #r; ⌜r = v⌝ }}}.
   Proof.
     iIntros (Htag Φ HP) "HΦ". rewrite /value_of_message.
     wp_pures. wp_find_from.

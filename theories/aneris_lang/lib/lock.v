@@ -3,7 +3,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Export invariants.
 From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import coq_tactics reduction.
-From aneris.aneris_lang Require Import lang lifting tactics proofmode notation.
+From aneris.aneris_lang Require Import lang tactics proofmode notation.
 
 Definition newlock : ground_lang.val := λ: <>, ref #false.
 Definition try_acquire : ground_lang.val := λ: "l", CAS "l" #false #true.
@@ -43,37 +43,39 @@ Section proof.
   Global Instance locked_timeless γ : Timeless (locked γ).
   Proof. apply _. Qed.
 
-  Lemma newlock_spec n (R : iProp Σ):
-    {{{ IsNode n ∗ R }}} ⟨n; newlock #()⟩ {{{ lk γ, RET 〈n;lk〉; is_lock n γ lk R }}}.
+  Lemma newlock_spec ip (R : iProp Σ):
+    {{{ R }}} newlock #() @[ip] {{{ lk γ, RET lk; is_lock ip γ lk R }}}.
   Proof.
-    iIntros (Φ) "[Hn HR] HΦ". rewrite -wp_fupd /newlock /=.
+    iIntros (Φ) "HR HΦ". rewrite -aneris_wp_fupd /newlock /=.
     wp_lam. wp_alloc l as "Hl".
     iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
-    iMod (inv_alloc N _ (lock_inv n γ l R) with "[-HΦ]") as "#?".
+    iMod (inv_alloc N _ (lock_inv ip γ l R) with "[-HΦ]") as "#?".
     { iIntros "!>". iExists false. by iFrame. }
     iModIntro. iApply "HΦ". iExists l. eauto.
   Qed.
 
-  Lemma try_acquire_spec n γ lk R :
-    {{{ is_lock n γ lk R }}}
-      ⟨n; try_acquire lk⟩
-    {{{ b, RET 〈n;#b〉; if b is true then locked γ ∗ R else True }}}.
+  Lemma try_acquire_spec ip γ lk R :
+    {{{ is_lock ip γ lk R }}}
+      try_acquire lk @[ip]
+    {{{ b, RET #b; if b is true then locked γ ∗ R else True }}}.
   Proof.
     iIntros (Φ) "#Hl HΦ". iDestruct "Hl" as (l ->) "#Hinv".
-    wp_rec. wp_apply wp_atomic.
+    wp_rec. wp_apply aneris_wp_atomic.
     iInv N as ([]) "[>Hl HR]" "Hclose".
-    - iModIntro. wp_apply (wp_cas_fail with "Hl"); first done. iIntros "Hl".
+    - iModIntro.
+      wp_cas_fail.
       iMod ("Hclose" with "[Hl]") as "_".
       { iNext. iExists _. iFrame. }
       iModIntro. by iApply "HΦ".
-    - iModIntro. wp_apply (wp_cas_suc with "Hl"). iIntros "Hl".
+    - iModIntro.
+      wp_cas_suc.
       iMod ("Hclose" with "[Hl]") as "_".
       { iNext. iExists _. iFrame. }
       by iApply "HΦ".
   Qed.
 
-  Lemma acquire_spec n γ lk R :
-    {{{ is_lock n γ lk R }}} ⟨n; acquire lk⟩ {{{ v, RET 〈n;v〉; ⌜v = #()⌝ ∗ locked γ ∗ R }}}.
+  Lemma acquire_spec ip γ lk R :
+    {{{ is_lock ip γ lk R }}} acquire lk @[ip] {{{ v, RET v; ⌜v = #()⌝ ∗ locked γ ∗ R }}}.
   Proof.
     iIntros (Φ) "#Hl HΦ". iLöb as "IH". wp_rec.
     wp_apply (try_acquire_spec with "Hl"). iIntros ([]).
@@ -81,13 +83,13 @@ Section proof.
     - iIntros "_". wp_if. iApply ("IH" with "[HΦ]"). auto.
   Qed.
 
-  Lemma release_spec n γ lk R :
-    {{{ is_lock n γ lk R ∗ locked γ ∗ R }}} ⟨n; release lk⟩ {{{ v, RET 〈n;v〉; ⌜v = #()⌝ }}}.
+  Lemma release_spec ip γ lk R :
+    {{{ is_lock ip γ lk R ∗ locked γ ∗ R }}} release lk @[ip] {{{ v, RET v; ⌜v = #()⌝ }}}.
   Proof.
     iIntros (Φ) "(Hlock & Hlocked & HR) HΦ".
     iDestruct "Hlock" as (l ->) "#Hinv".
     rewrite /release /=. wp_lam.
-    wp_apply wp_atomic.
+    wp_apply aneris_wp_atomic.
     iInv N as (b) "[>Hl _]" "Hclose". iModIntro.
     wp_store.
     iMod ("Hclose" with "[Hl Hlocked HR]") as "_".
