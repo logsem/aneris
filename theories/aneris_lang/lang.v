@@ -994,7 +994,7 @@ Inductive socket_step (node : ip_address) :
       (* reduces to *)
       (Val $ InjLV (LitV LitUnit)) S P M.
 
-Fixpoint is_head_step_pure (e : ground_lang.expr) : bool :=
+Definition is_head_step_pure (e : ground_lang.expr) : bool :=
   match e with
   | Alloc _
   | Load _

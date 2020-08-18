@@ -311,7 +311,7 @@ Section GhostStateLemmas.
         * rewrite /IPs dom_insert elem_of_union.
           intros Hb. rewrite Hdms; last first.
         { destruct (decide (a = b)); subst; first by apply Hfx.
-          destruct Hb as [Hb|]; last done. apply elem_of_singleton in Hb.
+          destruct Hb as [Hb|]; last done. apply elem_of_singleton_1 in Hb.
           rewrite Hb. by apply Hfx. }
          split; intros [|[Hnb Hdm]]; auto; right; (split; first done).
           ** destruct (decide (ip_of_address a = ip_of_address b)) as [Heq|].
@@ -325,7 +325,7 @@ Section GhostStateLemmas.
                    specialize (Hdm ({[port_of_address a]} ∪ P) eq_refl)
                  end.
                  apply elem_of_union in Hdm. destruct Hdm as [Hdm | Hdm].
-          ++ apply elem_of_singleton in Hdm. destruct a, b. simpl in *; by subst.
+          ++ apply elem_of_singleton_1 in Hdm. destruct a, b. simpl in *; by subst.
           ++ rewrite -Heq. by intros; simplify_eq.
              *** rewrite lookup_insert_ne in Hdm; done.
   Qed.

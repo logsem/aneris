@@ -7,7 +7,6 @@
 -arg -w -arg -undeclared-scope
 -arg -w -arg -ambiguous-paths
 
-
 theories/aneris_lang/helpers.v
 theories/aneris_lang/network.v
 theories/aneris_lang/lang.v
@@ -28,7 +27,6 @@ theories/aneris_lang/program_logic/aneris_hoare.v
 theories/aneris_lang/program_logic/aneris_lifting.v
 theories/aneris_lang/program_logic/aneris_weakestpre.v
 
-#theories/aneris_lang/lib/frac_auth.v
 theories/aneris_lang/lib/assert.v
 theories/aneris_lang/lib/network_helpers.v
 theories/aneris_lang/lib/util.v

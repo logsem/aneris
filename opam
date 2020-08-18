@@ -9,8 +9,8 @@ bug-reports: "https://bitbucket.org/logsem/aneris/issues"
 build: [make "-j%{jobs}%"]
 install: [make "install"]
 depends: [
-  "coq" { (= "8.11.2") | (= "dev") }
-  "coq-iris" { (= "3.3.0") | (= "dev") }
-  "coq-stdpp" { (= "1.4.0") | (= "dev") }
+  "coq" { (= "8.12.0") | (= "dev") }
+  "coq-iris" { (= "dev.2020-08-07.2.b2b558ac") | (= "dev") }
+  "coq-stdpp" { (= "dev.2020-08-07.0.67db2f24") | (= "dev") }
   "coq-iris-string-ident" { (= "dev") | (= "dev") }
 ]

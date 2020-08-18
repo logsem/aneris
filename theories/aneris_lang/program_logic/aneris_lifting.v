@@ -24,7 +24,7 @@ Section lifting_pure_exec.
   Lemma aneris_wp_pure_step_fupd ip E E' e1 e2 φ n Φ :
     PureExec φ n (mkExpr ip e1) (mkExpr ip e2) →
     φ →
-    (|={E,E'}▷=>^n WP e2 @[ip] E {{ Φ }}) ⊢ WP e1 @[ip] E {{ Φ }}.
+    (|={E}[E']▷=>^n WP e2 @[ip] E {{ Φ }}) ⊢ WP e1 @[ip] E {{ Φ }}.
   Proof.
     rewrite (aneris_wp_unfold _ _ e1) /aneris_wp_def.
     iIntros (Hexec Hφ) "Hwp #Hin".

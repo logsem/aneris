@@ -115,7 +115,7 @@ Qed.
 
 Lemma aneris_wp_step_fupd ip E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  (|={E1,E2}▷=> P) -∗ WP e @ ip; E2 {{ v, P ={E1}=∗ Φ v }} -∗ WP e @ ip; E1 {{ Φ }}.
+  (|={E1}[E2]▷=> P) -∗ WP e @ ip; E2 {{ v, P ={E1}=∗ Φ v }} -∗ WP e @ ip; E1 {{ Φ }}.
 Proof.
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iIntros (He HE) "HP Hwp Hin".
@@ -229,14 +229,14 @@ Qed.
 
 Lemma aneris_wp_frame_step_l ip E1 E2 e Φ R :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  (|={E1,E2}▷=> R) ∗ WP e @ ip; E2 {{ Φ }} ⊢ WP e @ ip; E1 {{ v, R ∗ Φ v }}.
+  (|={E1}[E2]▷=> R) ∗ WP e @ ip; E2 {{ Φ }} ⊢ WP e @ ip; E1 {{ v, R ∗ Φ v }}.
 Proof.
   iIntros (??) "[Hu Hwp]". iApply (aneris_wp_step_fupd with "Hu"); try done.
   iApply (aneris_wp_mono with "Hwp"). by iIntros (?) "$$".
 Qed.
 Lemma aneris_wp_frame_step_r ip E1 E2 e Φ R :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  WP e @ ip; E2 {{ Φ }} ∗ (|={E1,E2}▷=> R) ⊢ WP e @ ip; E1 {{ v, Φ v ∗ R }}.
+  WP e @ ip; E2 {{ Φ }} ∗ (|={E1}[E2]▷=> R) ⊢ WP e @ ip; E1 {{ v, Φ v ∗ R }}.
 Proof.
   rewrite [(WP _ @ _; _ {{ _ }} ∗ _)%I]comm; setoid_rewrite (comm _ _ R).
   apply aneris_wp_frame_step_l.

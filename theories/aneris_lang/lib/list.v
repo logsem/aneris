@@ -166,19 +166,19 @@ Section list_spec.
     {{{ v, RET v; ⌜(l = [] ∧ v = NONEV) ∨
                           (∃ v' l', l = v' :: l' ∧ v = SOMEV v')⌝}}}.
   Proof.
-    iIntros (Φ) "% HΦ".
+    iIntros (Φ a) "HΦ".
     wp_lam. destruct l; simpl in *; subst.
     - wp_pures. iApply "HΦ". iPureIntro. by left.
-  - destruct a as [lv' [Hhead Htail]] eqn:Heq; subst.
-    wp_pures. iApply "HΦ". iPureIntro. right. by exists v,l.
-Qed.
+    - destruct a as [lv' [Hhead Htail]] eqn:Heq; subst.
+      wp_pures. iApply "HΦ". iPureIntro. right. by exists v,l.
+  Qed.
 
   Lemma list_tail_spec ip lv l :
     {{{ ⌜list_coh l lv⌝ }}}
       list_tail (Val lv) @[ip]
     {{{ v, RET v; ⌜list_coh (tail l) v⌝}}}.
   Proof.
-    iIntros (Φ) "% HΦ".
+    iIntros (Φ a) "HΦ".
     wp_lam. destruct l; simpl in *; subst.
     - wp_match. wp_inj. by iApply "HΦ".
     - destruct a as [lv' [Hhead Htail]] eqn:Heq; subst.

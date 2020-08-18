@@ -369,7 +369,7 @@ Proof.
                 specialize (Hdom ({[port_of_address a]} ∪ P) eq_refl)
               end.
               apply elem_of_union in Hdom. destruct Hdom as [Hdom | Hport].
-              * apply elem_of_singleton in Hdom. destruct a,b; simpl in *; simplify_eq.
+              * apply elem_of_singleton_1 in Hdom. destruct a,b; simpl in *; simplify_eq.
               * intros.
                 match goal with
                 | HP: state_ports_in_use σ1 !! ip_of_address b = Some P |- _ =>

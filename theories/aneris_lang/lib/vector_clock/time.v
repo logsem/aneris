@@ -1,6 +1,6 @@
 (** Realisation of the time using vector clocs. *)
 
-From stdpp Require Import list.
+From stdpp Require Import list sets.
 From aneris.aneris_lang Require Import lang notation.
 From aneris.aneris_lang.lib Require Import util.
 
@@ -193,13 +193,13 @@ Section Compute_Maximals.
     destruct (decide (vector_clock_lt (f z) (f x))).
     - right; split; first done.
       apply elem_of_compute_maximals_as_list2; first set_solver.
-      intros y [Hy%elem_of_singleton|Hy]%elem_of_union; first subst.
-      + intros ?; eapply vector_clock_lt_exclusion; eauto.
+      intros y [Hy%elem_of_singleton_1|Hy]%elem_of_union; first subst.
+      + apply vector_clock_lt_irreflexive.
       + intros ?; apply (Hz2 y); first done.
         etrans; eauto.
     - left.
       apply elem_of_compute_maximals_as_list2; first set_solver.
-      intros y [?%elem_of_singleton|]%elem_of_union; first subst; auto.
+      intros y [?%elem_of_singleton_1|]%elem_of_union; first subst; auto.
   Qed.
 
   Lemma find_one_maximal_in_maximals x g :

@@ -93,7 +93,7 @@ Section dict_spec.
       + wp_if. wp_proj. unfold list_cons.
         wp_bind (App _ (embed_list tail))%E. iApply "IH".
         * inversion Hnodup. subst. by iExists tail.
-        * iIntros. simpl. wp_pures. iApply "HΦ".
+        * iIntros (? a). simpl. wp_pures. iApply "HΦ".
           simpl. destruct a as (tail' & Hdelete & Himbed & Hnodup').
           iExists ((key, v) :: tail'). repeat iSplit; iPureIntro.
           -- rewrite delete_insert_ne; auto. simpl. congruence.
@@ -102,7 +102,7 @@ Section dict_spec.
              unshelve eapply not_elem_of_list_to_map_2; last first.
              ++ rewrite <-Hdelete. rewrite ->lookup_delete_ne by auto.
                 inversion Hnodup; subst. apply not_elem_of_list_to_map_1; done.
-             ++ eauto with *.
+             ++ apply _.
   Qed.
 
   Lemma insert_spec ip k v d m :
@@ -120,7 +120,7 @@ Section dict_spec.
     - by subst.
     - constructor; last done. unshelve eapply not_elem_of_list_to_map_2; last first.
       ++ rewrite <-H. by rewrite ->lookup_delete.
-      ++ eauto with *.
+      ++ apply _.
   Qed.
 
   Lemma lookup_spec ip k d m :
@@ -197,7 +197,7 @@ Section dict_str_spec.
         assert (key ≠ k). { intro. apply H. by subst. }
         wp_bind (App _ (embed_list_str tail))%E. iApply "IH".
         * inversion Hnodup. subst. by iExists tail.
-        * iIntros. simpl. wp_pures. iApply "HΦ".
+        * iIntros (? a). simpl. wp_pures. iApply "HΦ".
           simpl. destruct a as (tail' & Hdelete & Himbed & Hnodup').
           iExists ((key, v) :: tail'). repeat iSplit; iPureIntro.
           -- rewrite delete_insert_ne; auto. simpl. congruence.
@@ -206,7 +206,7 @@ Section dict_str_spec.
              unshelve eapply not_elem_of_list_to_map_2; last first.
              ++ rewrite <-Hdelete. rewrite ->lookup_delete_ne by auto.
                 inversion Hnodup; subst. apply not_elem_of_list_to_map_1; done.
-             ++ eauto with *.
+             ++ apply _.
   Qed.
 
   Lemma insert_str_spec ip (k : string) v d m :
@@ -225,7 +225,7 @@ Section dict_str_spec.
     - constructor; last done.
       unshelve eapply not_elem_of_list_to_map_2; last first.
       ++ rewrite <-H. by rewrite ->lookup_delete.
-      ++ eauto with *.
+      ++ apply _.
   Qed.
 
   Lemma lookup_str_spec ip (k : string) d m :

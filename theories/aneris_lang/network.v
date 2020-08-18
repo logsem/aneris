@@ -26,11 +26,11 @@ Module Network.
   Inductive socket_address :=
   | SocketAddressInet (address : ip_address) (port : positive).
 
-  Fixpoint ip_of_address (sa : socket_address) : ip_address :=
+  Definition ip_of_address (sa : socket_address) : ip_address :=
     match sa with
     | SocketAddressInet ip _ => ip
     end.
-  Fixpoint port_of_address (sa : socket_address) : positive :=
+  Definition port_of_address (sa : socket_address) : positive :=
     match sa with
     | SocketAddressInet _ p => p
     end.
