@@ -8,7 +8,7 @@ Definition vector_clock := list nat.
 
 (** Alternatively the specs in vector_clock.v can use
     the following instead of the is_vc predicate. *)
-Fixpoint vector_clock_to_val (t : vector_clock) : ground_lang.val :=
+Fixpoint vector_clock_to_val (t : vector_clock) : base_lang.val :=
   match t with
   | [] => NONEV
   | a :: t' => SOMEV (#a, vector_clock_to_val t')

@@ -35,14 +35,14 @@ Module Network.
     | SocketAddressInet _ p => p
     end.
 
-  Record socket := Socket {
+  Record socket := mkSocket {
     sfamily : address_family;
     stype : socket_type;
     sprotocol : protocol;
     saddress : option socket_address
   }.
 
-  Global Instance etaSocket : Settable _ := settable! Socket <sfamily; stype; sprotocol; saddress>.
+  Global Instance etaSocket : Settable _ := settable! mkSocket <sfamily; stype; sprotocol; saddress>.
 
   Definition socket_handle := positive.
 
@@ -116,14 +116,14 @@ Module Network.
   (** Messages *)
   Definition message_body := string.
 
-  Record message := Message {
+  Record message := mkMessage {
     m_sender : socket_address;
     m_destination : socket_address;
     m_protocol : protocol;
     m_body : message_body;
   }.
 
-  Instance etaMessage : Settable _ := settable! Message <m_sender; m_destination; m_protocol; m_body>.
+  Instance etaMessage : Settable _ := settable! mkMessage <m_sender; m_destination; m_protocol; m_body>.
 
   Global Instance message_decidable : EqDecision message.
   Proof. solve_decision. Defined.

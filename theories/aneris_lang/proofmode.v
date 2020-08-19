@@ -1,12 +1,12 @@
 From iris.proofmode Require Import coq_tactics reduction.
 From iris.proofmode Require Export tactics.
-From aneris.aneris_lang Require Import tactics network.
+From aneris.aneris_lang Require Import tactics network lifting.
 From aneris.aneris_lang.program_logic Require Export aneris_lifting.
 
 Set Default Proof Using "Type".
 Import uPred.
 
-Lemma tac_wp_expr_eval `{distG Σ} Δ s E Φ e e' :
+Lemma tac_wp_expr_eval `{anerisG Σ} Δ s E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ s; E {{ Φ }}) → envs_entails Δ (WP e @ s; E {{ Φ }}).
 Proof. by intros ->. Qed.
@@ -18,7 +18,7 @@ Tactic Notation "wp_expr_eval" tactic(t) :=
       [let x := fresh in intros x; t; unfold x; reflexivity
       |]).
 
-Lemma tac_wp_pure `{!distG Σ} Δ Δ' ip E e1 e2 φ n Φ :
+Lemma tac_wp_pure `{!anerisG Σ} Δ Δ' ip E e1 e2 φ n Φ :
   PureExec φ n {| expr_n := ip; expr_e := e1 |}
            {| expr_n := ip; expr_e := e2 |} →
   φ →
@@ -30,7 +30,7 @@ Proof.
   rewrite HΔ' -aneris_wp_pure_step_later //.
 Qed.
 
-Lemma tac_wp_value `{!distG Σ} Δ ip E Φ v :
+Lemma tac_wp_value `{!anerisG Σ} Δ ip E Φ v :
   envs_entails Δ (Φ v) →
   envs_entails Δ (WP (Val v) @[ip] E {{ Φ }}).
 Proof.
@@ -68,7 +68,7 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
     let e := eval simpl in e in
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
-      eapply (tac_wp_pure _ _ _ _ (@fill ground_ectxi_lang K e'));
+      eapply (tac_wp_pure _ _ _ _ (@fill base_ectxi_lang K e'));
       [iSolveTC                       (* PureExec *)
       |try solve_vals_compare_safe    (* The pure condition for PureExec *)
       |iSolveTC                       (* IntoLaters *)
@@ -115,7 +115,7 @@ Tactic Notation "wp_find_from" := wp_pure (FindFrom _ _ _ ).
 Tactic Notation "wp_substring" := wp_pure (Substring _ _ _).
 Tactic Notation "wp_makeaddress" := wp_pure (MakeAddress _ _).
 
-Lemma tac_wp_bind `{distG Σ} K Δ ip E Φ (e : ground_lang.expr) f :
+Lemma tac_wp_bind `{anerisG Σ} K Δ ip E Φ (e : base_lang.expr) f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ ip; E {{ v, WP f (of_val v) @ ip; E {{ Φ }} }})%I →
   envs_entails Δ (WP fill K e @ ip; E {{ Φ }}).
@@ -141,7 +141,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
 (** Heap and socket tactics *)
 Section state.
-Context `{distG Σ}.
+Context `{anerisG Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
@@ -223,7 +223,7 @@ Lemma tac_wp_socket Δ Δ' E j K ip v1 v2 v3 Φ :
       envs_app
         false
         (Esnoc Enil j
-          (h s↦[ip]{1/2}
+          (h ↪[ip]
              ({|
                  Network.sfamily := v1;
                  Network.stype := v2;

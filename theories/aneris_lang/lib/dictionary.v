@@ -5,10 +5,10 @@ From aneris.aneris_lang.lib Require Import list.
 
 Module dict.
 
-  Definition empty : ground_lang.val :=
+  Definition empty : base_lang.val :=
     (λ: <>, list_make #())%V.
 
-  Definition remove : ground_lang.val :=
+  Definition remove : base_lang.val :=
     (λ: "key",
      (rec: "loop" "dict" :=
         match: "dict" with
@@ -18,11 +18,11 @@ Module dict.
                        else (list_cons (Fst "p") ("loop" (Snd "p"))))
         end))%V.
 
-  Definition insert : ground_lang.val :=
+  Definition insert : base_lang.val :=
     (λ: "key" "val" "dict",
      (list_cons ("key", "val") (remove "key" "dict")))%V.
 
-  Definition lookup : ground_lang.val :=
+  Definition lookup : base_lang.val :=
     (λ: "key",
      (rec: "loop" "dict" :=
         match: "dict" with
@@ -35,17 +35,17 @@ Module dict.
 End dict.
 
 Section dict_spec.
-  Context `{dG : distG Σ}.
+  Context `{dG : anerisG Σ}.
 
   Fixpoint embed_list
-           (l : list (ground_lang.val * ground_lang.val)) : ground_lang.val :=
+           (l : list (base_lang.val * base_lang.val)) : base_lang.val :=
     match l with
     | [] => InjLV #()
     | (k, v) :: ps => InjRV ((k, v), (embed_list ps))
     end.
 
-  Definition is_dictionary (d :  ground_lang.val)
-             (m : gmap  ground_lang.val  ground_lang.val) : Prop :=
+  Definition is_dictionary (d :  base_lang.val)
+             (m : gmap  base_lang.val  base_lang.val) : Prop :=
     ∃ l, m = list_to_map l ∧ d = embed_list l ∧ NoDup (fmap fst l).
 
   Lemma empty_spec ip :
@@ -73,7 +73,7 @@ Section dict_spec.
     - destruct l; reflexivity.
   Qed.
 
-  Lemma remove_spec ip (k d : ground_lang.val) m :
+  Lemma remove_spec ip (k d : base_lang.val) m :
       {{{ ⌜is_dictionary d m⌝ }}}
         dict.remove (Val k) (Val d) @[ip]
       {{{ d', RET d'; ⌜is_dictionary d' (delete k m)⌝ }}}.
@@ -150,18 +150,18 @@ Section dict_spec.
 End dict_spec.
 
 Section dict_str_spec.
-  Context `{dG : distG Σ}.
+  Context `{dG : anerisG Σ}.
 
 
   Fixpoint embed_list_str
-           (l : list (string * ground_lang.val)) : ground_lang.val :=
+           (l : list (string * base_lang.val)) : base_lang.val :=
     match l with
     | [] => InjLV #()
     | (k, v) :: ps => InjRV ((#k, v), (embed_list_str ps))
     end.
 
-  Definition is_dictionary_str (d :  ground_lang.val)
-             (m : gmap string ground_lang.val) : Prop :=
+  Definition is_dictionary_str (d :  base_lang.val)
+             (m : gmap string base_lang.val) : Prop :=
     ∃ l, m = list_to_map l ∧ d = embed_list_str l ∧ NoDup (fmap fst l).
 
   Lemma empty_str_spec ip :
@@ -175,7 +175,7 @@ Section dict_str_spec.
     iPureIntro. constructor.
   Qed.
 
-  Lemma remove_str_spec ip (k: string) (d : ground_lang.val) m :
+  Lemma remove_str_spec ip (k: string) (d : base_lang.val) m :
       {{{ ⌜is_dictionary_str d m⌝ }}}
         dict.remove (Val #k) (Val d) @[ip]
       {{{ d', RET d'; ⌜is_dictionary_str d' (delete k m)⌝ }}}.

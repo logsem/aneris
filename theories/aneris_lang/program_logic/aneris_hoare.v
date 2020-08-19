@@ -5,7 +5,7 @@ Set Default Proof Using "Type".
 
 Import Network.
 
-Definition aht `{!distG Σ} (ip : ip_address) (E : coPset) (P : iProp Σ)
+Definition aht `{!anerisG Σ} (ip : ip_address) (E : coPset) (P : iProp Σ)
     (e : expr) (Φ : val → iProp Σ) : iProp Σ :=
   (□ (P -∗ WP e @[ip] E {{ Φ }}))%I.
 Instance: Params (@aht) 5 := {}.
@@ -19,7 +19,7 @@ Notation "{{ P } } e '@[' ip ] E {{ v , Q } }" := (aht ip E P%I e%E (λ v, Q)%I)
    format "{{  P  } }  e  @[ ip ]  E  {{  v ,  Q  } }") : stdpp_scope.
 
 Section hoare.
-Context `{!distG Σ}.
+Context `{!anerisG Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ Ψ : val → iProp Σ.

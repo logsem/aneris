@@ -5,11 +5,11 @@ From iris.program_logic Require Export weakestpre.
 From iris.proofmode Require Import coq_tactics reduction.
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
 
-Definition newlock : ground_lang.val := λ: <>, ref #false.
-Definition try_acquire : ground_lang.val := λ: "l", CAS "l" #false #true.
-Definition acquire : ground_lang.val :=
+Definition newlock : base_lang.val := λ: <>, ref #false.
+Definition try_acquire : base_lang.val := λ: "l", CAS "l" #false #true.
+Definition acquire : base_lang.val :=
   rec: "acquire" "l" := if: try_acquire "l" then #() else "acquire" "l".
-Definition release : ground_lang.val := λ: "l", "l" <- #false.
+Definition release : base_lang.val := λ: "l", "l" <- #false.
 
 (** The CMRA we need. *)
 Class lockG Σ := LockG { lock_tokG :> inG Σ (exclR unitO) }.
@@ -19,12 +19,12 @@ Instance subG_lockΣ {Σ} : subG lockΣ Σ → lockG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!distG Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Σ, !lockG Σ} (N : namespace).
 
   Definition lock_inv (n : Network.ip_address) (γ : gname) (l : loc) (R : iProp Σ) : iProp Σ :=
     (∃ b : bool, l ↦[n] #b ∗ if b then True else own γ (Excl ()) ∗ R)%I.
 
-  Definition is_lock (n : Network.ip_address) (γ : gname) (lk : ground_lang.val) (R : iProp Σ) : iProp Σ :=
+  Definition is_lock (n : Network.ip_address) (γ : gname) (lk : base_lang.val) (R : iProp Σ) : iProp Σ :=
     (∃ l: loc, ⌜lk = #l⌝ ∧ inv N (lock_inv n γ l R))%I.
 
   Definition locked (γ : gname) : iProp Σ := own γ (Excl ()).

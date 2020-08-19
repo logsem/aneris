@@ -33,11 +33,11 @@ Coercion LitProtocol : protocol >-> base_lit.
 Coercion LitSocketAddress : socket_address >-> base_lit.
 Coercion LitString : string >-> base_lit.
 
-Coercion App : ground_lang.expr >-> Funclass.
+Coercion App : base_lang.expr >-> Funclass.
 Coercion of_val : val >-> expr.
 Coercion aneris_of_val : aneris_val >-> aneris_expr.
 
-Coercion Var : string >-> ground_lang.expr.
+Coercion Var : string >-> base_lang.expr.
 
 (* Note that the scope for expressions and values are NOT the same:
    Expressions have brackets that comes from the sequence \<, with name

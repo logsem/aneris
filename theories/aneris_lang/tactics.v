@@ -1,7 +1,7 @@
 From aneris.aneris_lang Require Export lang notation.
 Set Default Proof Using "Type".
 Import Network.
-Import ground_lang.
+Import base_lang.
 
 (** The tactic [reshape_expr e tac] decomposes the expression [e] into an
 evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']

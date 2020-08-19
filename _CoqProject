@@ -6,26 +6,24 @@
 -arg -w -arg -convert_concl_no_check
 -arg -w -arg -undeclared-scope
 -arg -w -arg -ambiguous-paths
+-arg -w -arg -ssr-search-moved
 
-theories/aneris_lang/helpers.v
+theories/program_logic/gen_heap_light.v
+
 theories/aneris_lang/network.v
 theories/aneris_lang/lang.v
+theories/aneris_lang/base_lang.v
 theories/aneris_lang/aneris_lang.v
-theories/aneris_lang/ground_lang.v
 theories/aneris_lang/notation.v
 theories/aneris_lang/tactics.v
 theories/aneris_lang/resources.v
-theories/aneris_lang/resources_lemmas.v
-theories/aneris_lang/lifting_pure.v
-theories/aneris_lang/lifting_network_local.v
-theories/aneris_lang/lifting_network_aware.v
-theories/aneris_lang/basic_lifting.v
-theories/aneris_lang/proofmode.v
-theories/aneris_lang/basic_adequacy.v
-
+theories/aneris_lang/state_interp.v
+theories/aneris_lang/lifting.v
+theories/aneris_lang/adequacy.v
 theories/aneris_lang/program_logic/aneris_hoare.v
 theories/aneris_lang/program_logic/aneris_lifting.v
 theories/aneris_lang/program_logic/aneris_weakestpre.v
+theories/aneris_lang/proofmode.v
 
 theories/aneris_lang/lib/assert.v
 theories/aneris_lang/lib/network_helpers.v
@@ -36,5 +34,6 @@ theories/aneris_lang/lib/list.v
 theories/aneris_lang/lib/dictionary.v
 theories/aneris_lang/lib/lock.v
 theories/aneris_lang/lib/bag.v
+theories/aneris_lang/lib/nodepar.v
 theories/aneris_lang/lib/vector_clock/time.v
 theories/aneris_lang/lib/vector_clock/vector_clock.v

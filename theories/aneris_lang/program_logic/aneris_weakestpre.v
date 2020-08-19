@@ -1,7 +1,8 @@
 From iris.proofmode Require Import base tactics classes.
-From aneris.aneris_lang Require Import basic_lifting.
+From iris.program_logic Require Export weakestpre.
+From aneris.aneris_lang Require Import lifting.
 From aneris.aneris_lang Require Export resources.
-From aneris.aneris_lang Require Export network ground_lang.
+From aneris.aneris_lang Require Export network base_lang.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From iris.bi Require Import weakestpre.
@@ -9,19 +10,19 @@ Set Default Proof Using "Type".
 
 Import Network.
 
-Definition aneris_wp_def `{!distG Σ} (ip : ip_address) (E : coPset)
+Definition aneris_wp_def `{!anerisG Σ} (ip : ip_address) (E : coPset)
            (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
-  (IsNode ip -∗ wp NotStuck E (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
+  (is_node ip -∗ wp NotStuck E (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!distG Σ} : seal (@aneris_wp_def Σ _).
+Definition aneris_wp_aux `{!anerisG Σ} : seal (@aneris_wp_def Σ _).
 Proof. by eexists. Qed.
-Instance aneris_wp `{!distG Σ} : Wp ground_lang (iProp Σ) ip_address :=
+Instance aneris_wp `{!anerisG Σ} : Wp base_lang (iProp Σ) ip_address :=
   aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!distG Σ} : aneris_wp = @aneris_wp_def Σ _ :=
+Definition aneris_wp_eq `{!anerisG Σ} : aneris_wp = @aneris_wp_def Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Section aneris_wp.
-Context `{!distG Σ}.
+Context `{!anerisG Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -63,7 +64,7 @@ Proof.
   iApply wp_value; eauto.
  Qed.
 Lemma aneris_wp_value_inv' ip E Φ v :
-  IsNode ip -∗ WP of_val v @ ip; E {{ Φ }} ={E}=∗ Φ v.
+  is_node ip -∗ WP of_val v @ ip; E {{ Φ }} ={E}=∗ Φ v.
 Proof.
   rewrite aneris_wp_unfold /aneris_wp_def.
   iIntros "Hin Hwp".
@@ -72,8 +73,8 @@ Proof.
   iDestruct "HΦ" as (w) "[% ?]"; simplify_eq; done.
  Qed.
 
-Lemma aneris_wp_IsNode ip E Φ e :
-  (IsNode ip -∗ WP e @ ip; E {{ Φ }}) ⊢ WP e @ ip; E {{ Φ }}.
+Lemma aneris_wp_is_node ip E Φ e :
+  (is_node ip -∗ WP e @ ip; E {{ Φ }}) ⊢ WP e @ ip; E {{ Φ }}.
 Proof.
   rewrite aneris_wp_unfold /aneris_wp_def.
   iIntros "Hwp #Hin".
@@ -132,12 +133,12 @@ Lemma aneris_wp_bind K ip E e Φ :
 Proof.
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iIntros "Hwp #Hin".
-  rewrite aneris_ground_fill.
+  rewrite aneris_base_fill.
   iApply wp_bind; simpl.
   iApply wp_wand_r; iSplitL; first by iApply "Hwp".
   iIntros (v); iDestruct 1 as (w) "[-> Hw]".
   rewrite !aneris_wp_unfold /aneris_wp_def.
-  rewrite -aneris_ground_fill /=.
+  rewrite -aneris_base_fill /=.
   iApply "Hw"; done.
 Qed.
 
@@ -157,8 +158,8 @@ Proof.
   assert (∃ e2', e2 = mkExpr ip e2') as [e2' ->].
   { inversion Hpstp as [? e1' ? He1' ? Hhstp]; simplify_eq/=.
     destruct e1'.
-    rewrite -aneris_ground_fill in He1'; simplify_eq/=.
-    inversion Hhstp; simplify_eq; rewrite -aneris_ground_fill; eauto. }
+    rewrite -aneris_base_fill in He1'; simplify_eq/=.
+    inversion Hhstp; simplify_eq; rewrite -aneris_base_fill; eauto. }
   iMod ("Hstp" $! (mkExpr ip e2') σ2 efs with "[//]") as "Hstp".
   iModIntro; iNext.
   iMod "Hstp" as "(Hsi & Hwp & Hefs)".
@@ -172,14 +173,14 @@ Lemma aneris_wp_bind_inv K ip E e Φ :
 Proof.
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iIntros "Hwp Hin".
-  rewrite aneris_ground_fill.
+  rewrite aneris_base_fill.
   iApply wp_wand_r; iSplitL.
   { iApply wp_preserves_node.
     iApply (wp_bind_inv (fill (Λ := aneris_ectxi_lang) K)).
     iApply "Hwp"; done. }
   iIntros (v) "Hv"; simpl. iDestruct "Hv" as (w) "[-> Hw]".
   iExists w; iSplit; first done.
-  rewrite -aneris_ground_fill /=.
+  rewrite -aneris_base_fill /=.
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iIntros "Hin"; done.
 Qed.
@@ -213,7 +214,7 @@ Lemma aneris_wp_value_fupd ip E Φ e v `{!IntoVal e v} :
   (|={E}=> Φ v) ⊢ WP e @ ip; E {{ Φ }}.
 Proof. intros. rewrite -aneris_wp_fupd -aneris_wp_value //. Qed.
 Lemma aneris_wp_value_inv ip E Φ e v :
-  IntoVal e v → IsNode ip -∗ WP e @ ip; E {{ Φ }} ={E}=∗ Φ v.
+  IntoVal e v → is_node ip -∗ WP e @ ip; E {{ Φ }} ={E}=∗ Φ v.
 Proof. intros <-. apply aneris_wp_value_inv'. Qed.
 
 Lemma aneris_wp_frame_l ip E e Φ R :
@@ -277,7 +278,7 @@ End aneris_wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!distG Σ}.
+  Context `{!anerisG Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 

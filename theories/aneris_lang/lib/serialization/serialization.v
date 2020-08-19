@@ -6,34 +6,34 @@ From aneris.aneris_lang.lib Require Export serialization_base.
 From aneris.aneris_lang.lib Require Import network_helpers assert.
 
 Record serialization := {
-  DBS_valid_val : ground_lang.val → Prop;
-  DBS_ser : ground_lang.val;
-  DBS_deser : ground_lang.val;
-  DBS_is_ser : ground_lang.val → string → Prop;
+  DBS_valid_val : base_lang.val → Prop;
+  DBS_ser : base_lang.val;
+  DBS_deser : base_lang.val;
+  DBS_is_ser : base_lang.val → string → Prop;
   DBS_ser_spec :
-    ∀ `{!distG Σ} ip v,
+    ∀ `{!anerisG Σ} ip v,
     {{{ ⌜DBS_valid_val v⌝ }}}
       DBS_ser v @[ip]
     {{{ (s : string), RET #s; ⌜DBS_is_ser v s⌝ }}};
   DBS_deser_spec :
-    ∀ `{!distG Σ} ip v s,
+    ∀ `{!anerisG Σ} ip v s,
     {{{ ⌜DBS_is_ser v s⌝ }}}
       DBS_deser #s @[ip]
     {{{ RET v; True }}}; }.
 
-Class Serializable (s : serialization) (v : ground_lang.val) :=
+Class Serializable (s : serialization) (v : base_lang.val) :=
   serializable : DBS_valid_val s v.
 
-Definition int_valid_val (v : ground_lang.val) := ∃ (i : Z), v = #i.
+Definition int_valid_val (v : base_lang.val) := ∃ (i : Z), v = #i.
 
-Definition int_ser : ground_lang.val := λ: "v", i2s "v".
+Definition int_ser : base_lang.val := λ: "v", i2s "v".
 
-Definition int_deser : ground_lang.val := λ: "v", unSOME (s2i "v").
+Definition int_deser : base_lang.val := λ: "v", unSOME (s2i "v").
 
-Definition int_is_ser (v : ground_lang.val) (s : string) :=
+Definition int_is_ser (v : base_lang.val) (s : string) :=
   ∃ (i : Z), v = #i ∧ s = StringOfZ i.
 
-Lemma int_ser_spec `{!distG Σ} ip v :
+Lemma int_ser_spec `{!anerisG Σ} ip v :
   {{{ ⌜int_valid_val v⌝ }}}
     int_ser v @[ip]
   {{{ (s : string), RET #s; ⌜int_is_ser v s⌝ }}}.
@@ -44,7 +44,7 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma int_deser_spec `{!distG Σ} ip v s :
+Lemma int_deser_spec `{!anerisG Σ} ip v s :
   {{{ ⌜int_is_ser v s⌝ }}}
     int_deser #s @[ip]
   {{{ RET v; True }}}.
@@ -68,15 +68,15 @@ Definition int_serialization : serialization :=
 Global Instance: ∀ i : Z, Serializable int_serialization #i.
 Proof. intros i; exists i; done. Qed.
 
-Definition unit_valid_val (v : ground_lang.val) := v = #().
+Definition unit_valid_val (v : base_lang.val) := v = #().
 
-Definition unit_ser : ground_lang.val := λ: "v", #"".
+Definition unit_ser : base_lang.val := λ: "v", #"".
 
-Definition unit_deser : ground_lang.val := λ: "v", #().
+Definition unit_deser : base_lang.val := λ: "v", #().
 
-Definition unit_is_ser (v : ground_lang.val) (s : string) := v = #() ∧ s = "".
+Definition unit_is_ser (v : base_lang.val) (s : string) := v = #() ∧ s = "".
 
-Lemma unit_ser_spec `{!distG Σ} ip v :
+Lemma unit_ser_spec `{!anerisG Σ} ip v :
   {{{ ⌜unit_valid_val v⌝ }}}
     unit_ser v @[ip]
   {{{ (s : string), RET #s; ⌜unit_is_ser v s⌝ }}}.
@@ -87,7 +87,7 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma unit_deser_spec `{!distG Σ} ip v s :
+Lemma unit_deser_spec `{!anerisG Σ} ip v s :
   {{{ ⌜unit_is_ser v s⌝ }}}
     unit_deser #s @[ip]
   {{{ RET v; True }}}.
@@ -109,15 +109,15 @@ Definition unit_serialization : serialization :=
 Global Instance: Serializable unit_serialization #().
 Proof. done. Qed.
 
-Definition string_valid_val (v : ground_lang.val) := ∃ (s : string), v = #s.
+Definition string_valid_val (v : base_lang.val) := ∃ (s : string), v = #s.
 
-Definition string_ser : ground_lang.val := λ: "v", "v".
+Definition string_ser : base_lang.val := λ: "v", "v".
 
-Definition string_deser : ground_lang.val := λ: "v", "v".
+Definition string_deser : base_lang.val := λ: "v", "v".
 
-Definition string_is_ser (v : ground_lang.val) (s : string) := v = #s.
+Definition string_is_ser (v : base_lang.val) (s : string) := v = #s.
 
-Lemma string_ser_spec `{!distG Σ} ip v:
+Lemma string_ser_spec `{!anerisG Σ} ip v:
   {{{ ⌜string_valid_val v⌝ }}}
     string_ser v @[ip]
   {{{ (s : string), RET #s; ⌜string_is_ser v s⌝ }}}.
@@ -128,7 +128,7 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma string_deser_spec `{!distG Σ} ip v s:
+Lemma string_deser_spec `{!anerisG Σ} ip v s:
   {{{ ⌜string_is_ser v s⌝ }}}
     string_deser #s @[ip]
   {{{ RET v; True }}}.
@@ -152,13 +152,13 @@ Proof. intros s; exists s; done. Qed.
 
 Section prod_serialization.
 
-  Definition prod_ser (serA serB : ground_lang.val) : ground_lang.val :=
+  Definition prod_ser (serA serB : base_lang.val) : base_lang.val :=
     λ: "v",
     let: "s1" := serA (Fst "v") in
     let: "s2" := serB (Snd "v") in
     i2s (strlen "s1") ^^ #"_" ^^ "s1" ^^ "s2".
 
-  Definition prod_deser (deserA deserB : ground_lang.val) : ground_lang.val :=
+  Definition prod_deser (deserA deserB : base_lang.val) : base_lang.val :=
     λ: "s",
     match: FindFrom "s" #0 #"_" with
       SOME "i" =>
@@ -174,15 +174,15 @@ Section prod_serialization.
 
   Context (A B : serialization).
 
-  Definition prod_valid_val (v : ground_lang.val) :=
+  Definition prod_valid_val (v : base_lang.val) :=
     ∃ v1 v2, v = (v1, v2)%V ∧ DBS_valid_val A v1 ∧ DBS_valid_val B v2.
 
-  Definition prod_is_ser (v : ground_lang.val) (s : string) :=
+  Definition prod_is_ser (v : base_lang.val) (s : string) :=
     ∃ v1 v2 s1 s2,
       v = (v1, v2)%V ∧ DBS_is_ser A v1 s1 ∧ DBS_is_ser B v2 s2 ∧
       s = StringOfZ (String.length s1) +:+ "_" +:+ s1 +:+ s2.
 
-  Lemma prod_ser_spec `{!distG Σ} ip v:
+  Lemma prod_ser_spec `{!anerisG Σ} ip v:
     {{{ ⌜prod_valid_val v⌝ }}}
       prod_ser (DBS_ser A) (DBS_ser B) v @[ip]
     {{{ (s : string), RET #s; ⌜prod_is_ser v s⌝ }}}.
@@ -202,7 +202,7 @@ Section prod_serialization.
     rewrite !assoc; done.
   Qed.
 
-  Lemma prod_deser_spec `{!distG Σ} ip v s:
+  Lemma prod_deser_spec `{!anerisG Σ} ip v s:
     {{{ ⌜prod_is_ser v s⌝ }}}
       prod_deser (DBS_deser A) (DBS_deser B) #s @[ip]
     {{{ RET v; True }}}.
@@ -270,14 +270,14 @@ End prod_serialization.
 
 Section sum_serialization.
 
-  Definition sum_ser (serA serB : ground_lang.val) : ground_lang.val :=
+  Definition sum_ser (serA serB : base_lang.val) : base_lang.val :=
     λ: "v",
     match: "v" with
       InjL "x" => #"L" ^^ #"_" ^^ serA "x"
     | InjR "x" => #"R" ^^ #"_" ^^ serB "x"
     end.
 
-  Definition sum_deser (deserA deserB : ground_lang.val) : ground_lang.val :=
+  Definition sum_deser (deserA deserB : base_lang.val) : base_lang.val :=
     λ: "s",
     let: "tag" := Substring "s" #0 #2 in
     let: "rest" := Substring "s" #2 (strlen "s" - #2) in
@@ -291,16 +291,16 @@ Section sum_serialization.
 
   Context (A B : serialization).
 
-  Definition sum_valid_val (v : ground_lang.val) :=
+  Definition sum_valid_val (v : base_lang.val) :=
     ∃ w, (v = InjLV w ∧ DBS_valid_val A w) ∨
          (v = InjRV w ∧ DBS_valid_val B w).
 
-  Definition sum_is_ser (v : ground_lang.val) (s : string) :=
+  Definition sum_is_ser (v : base_lang.val) (s : string) :=
     ∃ w s',
       (v = InjLV w ∧ DBS_is_ser A w s' ∧ s = "L_" +:+ s') ∨
       (v = InjRV w ∧ DBS_is_ser B w s' ∧ s = "R_" +:+ s').
 
-  Lemma sum_ser_spec `{!distG Σ} ip v:
+  Lemma sum_ser_spec `{!anerisG Σ} ip v:
     {{{ ⌜sum_valid_val v⌝ }}}
       sum_ser (DBS_ser A) (DBS_ser B) v @[ip]
     {{{ (s : string), RET #s; ⌜sum_is_ser v s⌝ }}}.
@@ -319,7 +319,7 @@ Section sum_serialization.
       iApply "HΦ"; eauto 10.
   Qed.
 
-  Lemma sum_deser_spec `{!distG Σ} ip v s:
+  Lemma sum_deser_spec `{!anerisG Σ} ip v s:
     {{{ ⌜sum_is_ser v s⌝ }}}
       sum_deser (DBS_deser A) (DBS_deser B) #s @[ip]
     {{{ RET v; True }}}.

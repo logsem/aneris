@@ -6,15 +6,15 @@ From aneris.aneris_lang.lib.vector_clock Require Export time.
 
 Section vect_code.
 
-  Definition vect_make : ground_lang.val :=
+  Definition vect_make : base_lang.val :=
     rec: "vect_make" "len" "init" :=
       if: "len" = #0 then list_make #()
       else list_cons "init" ("vect_make" ("len" - #1) "init").
 
-  Definition vect_nth : ground_lang.val :=
+  Definition vect_nth : base_lang.val :=
     λ: "vec" "i", unSOME (list_nth "vec" "i").
 
-  Definition vect_update : ground_lang.val :=
+  Definition vect_update : base_lang.val :=
     rec: "vect_update" "vec" "i" "v" :=
       match: "vec" with
         SOME "a" =>
@@ -23,12 +23,12 @@ Section vect_code.
         | NONE => NONE
       end.
 
-  Definition vect_inc : ground_lang.val :=
+  Definition vect_inc : base_lang.val :=
     λ: "vec" "i",
       let: "v" := (vect_nth "vec" "i") + #1
       in vect_update "vec" "i" "v".
 
-  Definition vect_leq : ground_lang.val :=
+  Definition vect_leq : base_lang.val :=
     rec: "vect_leq" "v1" "v2" :=
       match: "v1" with
         SOME "a1" => match: "v2" with
@@ -39,7 +39,7 @@ Section vect_code.
       | NONE => list_is_empty "v2"
       end.
 
-  Definition vect_applicable : ground_lang.val :=
+  Definition vect_applicable : base_lang.val :=
     λ: "v1" "v2" "i",
     (rec: "vect_applicable" "j" "v1" "v2" :=
        match: "v1" with
@@ -55,14 +55,14 @@ Section vect_code.
        | NONE => list_is_empty "v2"
        end) #0 "v1" "v2".
 
-  Definition vect_serialize : ground_lang.val :=
+  Definition vect_serialize : base_lang.val :=
     rec: "vect_serialize" "v" :=
       match: "v" with
         SOME "a" => i2s (Fst "a") ^^ #"_" ^^ "vect_serialize" (Snd "a")
       | NONE => #""
       end.
 
-  Definition vect_deserialize : ground_lang.val :=
+  Definition vect_deserialize : base_lang.val :=
     rec: "vect_deserialize" "s" :=
       match: FindFrom "s" #0 #"_" with
         SOME "i" =>
@@ -78,9 +78,9 @@ Section vect_code.
 End vect_code.
 
 Section vect_specs.
-  Context `{!distG Σ}.
+  Context `{!anerisG Σ}.
 
-  Definition is_vc (v : ground_lang.val) (t : vector_clock) :=
+  Definition is_vc (v : base_lang.val) (t : vector_clock) :=
     list_coh (map (λ (n : nat), #n) t) v.
 
   Lemma vector_clock_to_val_is_vc t : is_vc (vector_clock_to_val t) t.
@@ -273,7 +273,7 @@ Section vect_specs.
                            (l1 !! (i - j)) (l2 !! (i - j))⌝
                      ∧ ⌜∀ k x1 x2 : nat, (i - j ≠ k ∨ j > i) → l1 !! k = Some x1 → l2 !! k =
                          Some x2 → x1 ≤ x2⌝
-                   else True))%I : ground_lang.val → iProp Σ).
+                   else True))%I : base_lang.val → iProp Σ).
     iApply (aneris_wp_wand _ _ _ Ψ with "[] [HΦ]")%I; last first.
     { iIntros (v); rewrite /Ψ /=.
       iIntros "Hb".
@@ -378,13 +378,13 @@ Fixpoint vc_to_string (l : vector_clock) : string :=
   | a::l' => StringOfZ a +:+ "_" ++ vc_to_string l'
   end.
 
-Definition vc_valid_val (v : ground_lang.val) :=
+Definition vc_valid_val (v : base_lang.val) :=
   ∃ l, is_vc v l.
 
-Definition vc_is_ser (v : ground_lang.val) (s : string) :=
+Definition vc_is_ser (v : base_lang.val) (s : string) :=
   ∃ l, is_vc v l ∧ s = vc_to_string l.
 
-Definition vect_serialize_spec `{!distG Σ} ip v:
+Definition vect_serialize_spec `{!anerisG Σ} ip v:
   {{{ ⌜vc_valid_val v⌝ }}}
     vect_serialize v @[ip]
   {{{ s, RET #s; ⌜vc_is_ser v s⌝ }}}.
@@ -407,7 +407,7 @@ Proof.
     iPureIntro; eexists (_ :: _); simpl; split; first eexists _; eauto.
 Qed.
 
-Definition vect_deserialize_spec `{!distG Σ} ip v s:
+Definition vect_deserialize_spec `{!anerisG Σ} ip v s:
   {{{ ⌜vc_is_ser v s⌝ }}}
     vect_deserialize #s @[ip]
   {{{ RET v; True }}}.

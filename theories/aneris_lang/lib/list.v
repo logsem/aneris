@@ -15,25 +15,25 @@ Import uPred.
 
 Section list_code.
 
-  Definition list_make : ground_lang.val :=
+  Definition list_make : base_lang.val :=
     λ: <>, NONE.
 
-  Definition list_cons : ground_lang.val :=
+  Definition list_cons : base_lang.val :=
     λ: "elem" "list", SOME (Pair "elem" "list").
 
-  Definition list_head : ground_lang.val :=
+  Definition list_head : base_lang.val :=
     λ: "l", match: "l" with
               SOME "a" => SOME (Fst "a")
             | NONE => NONE
             end.
 
-  Definition list_tail : ground_lang.val :=
+  Definition list_tail : base_lang.val :=
     λ: "l", match: "l" with
               SOME "a" => (Snd "a")
             | NONE => NONE
             end.
 
-  Definition list_fold : ground_lang.val :=
+  Definition list_fold : base_lang.val :=
     rec: "fold" "handler" "acc" "l" :=
       match: "l" with
         SOME "a" => let: "fst" := Fst "a" in
@@ -43,7 +43,7 @@ Section list_code.
       | NONE => "acc"
       end.
 
-  Definition list_iter : ground_lang.val :=
+  Definition list_iter : base_lang.val :=
     rec: "iter" "handler" "l" :=
       match: "l" with
         SOME "a" =>
@@ -53,14 +53,14 @@ Section list_code.
       | NONE => #()
       end.
 
-  Definition list_length : ground_lang.val :=
+  Definition list_length : base_lang.val :=
     rec: "length" "l" :=
       match: "l" with
         SOME "a" => #1 + "length" (Snd "a")
       | NONE => #0
       end.
 
-  Definition list_nth : ground_lang.val :=
+  Definition list_nth : base_lang.val :=
     (rec: "nth" "l" "i" :=
       match: "l" with
         SOME "a" =>
@@ -69,7 +69,7 @@ Section list_code.
       | NONE => NONE
       end)%V.
 
-  Definition list_find_remove : ground_lang.val :=
+  Definition list_find_remove : base_lang.val :=
     (rec: "find" "f" "l" :=
        match: "l" with
          SOME "a" =>
@@ -88,7 +88,7 @@ Section list_code.
        | NONE => NONE
        end).
 
-  Definition list_sub : ground_lang.val :=
+  Definition list_sub : base_lang.val :=
     rec: "sub" "i" "l" :=
       if: "i" = #0 then NONEV
       else
@@ -97,7 +97,7 @@ Section list_code.
         | NONE => NONEV
         end.
 
-  Definition list_rev_aux : ground_lang.val :=
+  Definition list_rev_aux : base_lang.val :=
   rec: "rev_aux" "l" "acc" :=
     match: "l" with
       NONE => "acc"
@@ -108,10 +108,10 @@ Section list_code.
        "rev_aux" "t" "acc'"
     end.
 
-  Definition list_rev : ground_lang.val :=
+  Definition list_rev : base_lang.val :=
     λ: "l", list_rev_aux "l" NONE.
 
-  Definition list_append : ground_lang.val :=
+  Definition list_append : base_lang.val :=
     (rec: "append" "l" "r" :=
       match: "l" with
       NONE => "r"
@@ -121,7 +121,7 @@ Section list_code.
        list_cons "h" ("append" "t" "r")
     end)%V.
 
-  Definition list_is_empty : ground_lang.val :=
+  Definition list_is_empty : base_lang.val :=
     λ: "l", match: "l" with
               NONE => #true
             | SOME "x" => #false
@@ -130,7 +130,7 @@ Section list_code.
   Fixpoint list_coh l v :=
     match l with
     | [] => v = NONEV
-    | a::l' => ∃ lv : ground_lang.val, v = SOMEV (a,lv) ∧ list_coh l' lv
+    | a::l' => ∃ lv : base_lang.val, v = SOMEV (a,lv) ∧ list_coh l' lv
   end.
 
 End list_code.
@@ -138,7 +138,7 @@ End list_code.
 (* ---------------------------------------------------------------------- *)
 
 Section list_spec.
-  Context `{dG : distG Σ}.
+  Context `{dG : anerisG Σ}.
 
 
   Lemma list_make_spec ip :
@@ -202,7 +202,7 @@ Proof.
 Qed.
 
 Lemma list_iter_spec {A} ip (l : list A) lv handler P Φ Ψ
-      (toval : A -> ground_lang.val) :
+      (toval : A -> base_lang.val) :
   (∀ (a : A),
   {{{ ⌜a ∈ l⌝ ∗ P ∗ Φ a }}}
      (Val handler) (toval a) @[ip]
@@ -232,7 +232,7 @@ Proof.
 Qed.
 
 Lemma list_fold_spec {A} ip handler (l : list A)  acc lv P Φ Ψ
-      (toval : A -> ground_lang.val) :
+      (toval : A -> base_lang.val) :
   (∀ (a : A) acc lacc lrem,
   {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc ∗ Φ a }}}
      (Val handler) (Val acc) (toval a) @[ip]
@@ -261,7 +261,7 @@ Proof.
 Qed.
 
 Lemma list_fold_spec'_generalized {A} ip handler (l lp : list A) acc lv P Φ Ψ
-      (toval : A -> ground_lang.val) :
+      (toval : A -> base_lang.val) :
   □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
   (∀ (a : A) acc lacc lrem,
   {{{ ⌜lp ++ l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
@@ -290,7 +290,7 @@ Proof.
 Qed.
 
 Lemma list_fold_spec' {A} ip handler (l : list A) acc lv P Φ Ψ
-      (toval : A -> ground_lang.val) :
+      (toval : A -> base_lang.val) :
   □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
   (∀ (a : A) acc lacc lrem,
   {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
@@ -359,7 +359,7 @@ Qed.
   Qed.
 
   Lemma list_find_remove_spec {A} ip (l : list A) lv (Ψ : A → iProp Σ)
-        (fv : ground_lang.val) (toval : A → ground_lang.val) :
+        (fv : base_lang.val) (toval : A → base_lang.val) :
     (∀ (a : A) av,
       {{{ ⌜av = toval a⌝ }}}
         fv av @[ip]
@@ -479,7 +479,7 @@ Qed.
  Lemma list_coh_app lM x : ∃ lv, list_coh (lM ++ [x]) lv.
  Proof.  induction lM; naive_solver eauto. Qed.
 
- Definition list_str_val (l : list string) : list ground_lang.val :=
+ Definition list_str_val (l : list string) : list base_lang.val :=
    map (λ (str : string), #str) l.
 
 End list_spec.
@@ -489,16 +489,16 @@ Section list_string_spec.
   Fixpoint list_str_coh (l: list string) v :=
     match l with
     | [] => v = NONEV
-    | a::l' => ∃ lv : ground_lang.val, v = SOMEV (#a,lv) ∧ list_str_coh l' lv
+    | a::l' => ∃ lv : base_lang.val, v = SOMEV (#a,lv) ∧ list_str_coh l' lv
   end.
 
-  Lemma list_str_coh_spec (l: list string) (v: ground_lang.val) :
+  Lemma list_str_coh_spec (l: list string) (v: base_lang.val) :
     list_str_coh l v → list_coh (map (λ (s: string), #s) l) v.
   Proof.
     revert v; induction l as [|]; intros []; try naive_solver eauto with f_equal.
   Qed.
 
-  Lemma list_str_coh_spec_inv (l: list string) (v: ground_lang.val) :
+  Lemma list_str_coh_spec_inv (l: list string) (v: base_lang.val) :
     list_coh (map (λ (s: string), #s) l) v → list_str_coh l v.
   Proof.
     revert v; induction l as [|]; intros []; try naive_solver eauto with f_equal.

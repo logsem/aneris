@@ -1,7 +1,7 @@
+Require Import Coq.Strings.Ascii.
 From aneris.aneris_lang Require Export network.
 From iris.program_logic Require Export language ectx_language ectxi_language.
 From iris.algebra Require Export ofe gset.
-Require Import Coq.Strings.Ascii.
 From stdpp Require Export strings.
 From stdpp Require Import gmap fin pretty binders.
 From RecordUpdate Require Import RecordSet.
@@ -10,7 +10,7 @@ Set Default Proof Using "Type".
 Delimit Scope expr_scope with E.
 Delimit Scope val_scope with V.
 
-Module ground_lang.
+Module base_lang.
 Open Scope Z_scope.
 
 Import Network.
@@ -744,7 +744,8 @@ Definition option_nat_to_val (v : option nat) :=
 
 Definition observation : Set := ().
 
-Inductive head_step : expr → state → list observation → expr → state → list expr → Prop :=
+Inductive head_step
+  : expr → state → list observation → expr → state → list expr → Prop :=
   | RecS f x e σ :
      head_step (Rec f x e) σ [] (Val $ RecV f x e) σ []
   | PairS v1 v2 σ :
@@ -767,7 +768,10 @@ Inductive head_step : expr → state → list observation → expr → state →
   | IfFalseS e1 e2 σ :
       head_step (If (Val $ LitV $ LitBool false) e1 e2) σ [] e2 σ []
   | FindFromS v0 v1 v2 σ :
-      head_step (FindFrom (Val $ LitV $ LitString v0) (Val $ LitV $ LitInt (Z.of_nat v1)) (Val $ LitV $ LitString v2)) σ
+      head_step (FindFrom
+                   (Val $ LitV $ LitString v0)
+                   (Val $ LitV $ LitInt (Z.of_nat v1))
+                   (Val $ LitV $ LitString v2)) σ
                 []
                 (of_val (option_nat_to_val (index v1 v2 v0))) σ
                 []
@@ -846,19 +850,19 @@ Proof.
          fill_item_val, fill_item_no_val_inj, head_ctx_step_val.
 Qed.
 
-End ground_lang.
+End base_lang.
 
 (** The network-aware layer of the language *)
 Module aneris_lang.
-Import ground_lang.
+Import base_lang.
 Import Network.
 Import RecordSetNotations.
 
 Record aneris_expr := mkExpr { expr_n : ip_address;
-                        expr_e : ground_lang.expr }.
+                        expr_e : base_lang.expr }.
 
 Record aneris_val := mkVal { val_n : ip_address;
-                      val_e : ground_lang.val }.
+                      val_e : base_lang.val }.
 
 Global Instance expr_inhabited : Inhabited aneris_expr :=
   populate {| expr_n := "";
@@ -869,27 +873,27 @@ Global Instance val_inhabited : Inhabited aneris_val :=
 
 Definition aneris_fill_item Ki e :=
   {| expr_n := expr_n e;
-     expr_e := (ground_lang.fill_item Ki (expr_e e)) |}.
+     expr_e := (base_lang.fill_item Ki (expr_e e)) |}.
 
 Definition aneris_of_val v : aneris_expr :=
   {| expr_n := val_n v;
-     expr_e := ground_lang.of_val (val_e v) |}.
+     expr_e := base_lang.of_val (val_e v) |}.
 Arguments aneris_of_val !v.
 
 Definition aneris_to_val e : option aneris_val :=
-  (λ v, {| val_n := expr_n e; val_e := v |}) <$> ground_lang.to_val (expr_e e).
+  (λ v, {| val_n := expr_n e; val_e := v |}) <$> base_lang.to_val (expr_e e).
 
 (** For each node of the network, its local state is defined as a triple
-   - a heap that maps pointers to values,
-   - a map associating each socket handler with a pair a socket and
-     the messages received on the socket, and
-   - a map describing for each ip address what are ports in use. *)
-Definition heap := gmap ground_lang.loc ground_lang.val.
+   - a map [H] that maps pointers to values,
+   - a map [Sn] associating each socket handler with a tuple of a socket and
+     the messages received and send on the socket, and
+   - a map [P] tracking for each ip address the ports in use on the ip. *)
+Definition heap := gmap base_lang.loc base_lang.val.
 Definition sockets := gmap socket_handle (socket * message_soup * message_soup).
 Definition ports_in_use := gmap ip_address (gset port).
 
 (** The global state of the system
-   - maps each node of the system to it local state (H, S, P, L)
+   - maps each node of the system to it local state (H, S, P)
    - keeps track of all messages that has been sent throught the network *)
 Record state := mkState {
   state_heaps : gmap ip_address heap;
@@ -911,90 +915,97 @@ Definition option_socket_address_to_val (sa : option socket_address) :=
   | Some addr => InjRV (LitV $ LitSocketAddress addr)
   end.
 
+Implicit Types σ : state.
+Implicit Types h : heap.
+Implicit Types H : gmap ip_address heap.
+Implicit Types S : gmap ip_address sockets.
+Implicit Types Sn : sockets .
+Implicit Types P : ports_in_use.
+Implicit Types ps : gset port.
+Implicit Types M R T : message_soup.
+Implicit Types A B : gset socket_address.
+Implicit Types sis : gmap socket_address gname.
+Implicit Types a : socket_address.
+Implicit Types ip : ip_address.
+Implicit Types sh : socket_handle.
+Implicit Types skt : socket.
+
 (* The network-aware reduction step relation for a given node *)
-Inductive socket_step (node : ip_address) :
-  ground_lang.expr -> sockets -> ports_in_use -> message_soup ->
-  ground_lang.expr -> sockets -> ports_in_use -> message_soup ->
+Inductive socket_step ip :
+  base_lang.expr -> sockets -> ports_in_use -> message_soup ->
+  base_lang.expr -> sockets -> ports_in_use -> message_soup ->
   Prop :=
-| NewSocketS f s p handle S P M :
+| NewSocketS f p sh s Sn P M :
     (* The socket handle is fresh *)
-    S !! handle = None →
+    Sn !! sh = None →
     socket_step
-      node
+      ip
       (NewSocket (Val $ LitV $ LitAddressFamily f)
                  (Val $ LitV $ LitSocketType s)
                  (Val $ LitV $ LitProtocol p))
-      S P M
+      Sn P M
       (* reduces to *)
-      (Val $ LitV $ LitSocket handle)
-      (<[handle:=(Socket f s p None, ∅, ∅)]>S) P M
-| SocketBindSucS handle a R T s S P P' M  :
+      (Val $ LitV $ LitSocket sh)
+      (<[sh:=(mkSocket f s p None, ∅, ∅)]>Sn) P M
+| SocketBindSucS sh a R T skt Sn P ps M  :
     (* The socket handle is bound to a socket. *)
-    S !! handle = Some (s, R, T) →
+    Sn !! sh = Some (skt, R, T) →
     (* The socket has no assigned address. *)
-    saddress s = None →
+    saddress skt = None →
     (* The port is not in use *)
-    P !! (ip_of_address a) = Some P' →
-    (port_of_address a) ∉ P' →
+    P !! ip_of_address a = Some ps →
+    port_of_address a ∉ ps →
     socket_step
-      node
+      ip
       (SocketBind
-         (Val $ LitV $ LitSocket handle)
+         (Val $ LitV $ LitSocket sh)
          (Val $ LitV $ LitSocketAddress a))
-      S P M
+      Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt 0)
-      (<[handle:=((s <| saddress := Some a |>), R, T)]>S)
-      (<[(ip_of_address a):={[ port_of_address a ]} ∪ P']> P)
+      (<[sh:=((skt <| saddress := Some a |>), R, T)]>Sn)
+      (<[ip_of_address a:={[ port_of_address a ]} ∪ ps]> P)
       M
-| SendToBoundS handle a mbody R T s S P M f  :
-    (* There is a socket that has been allocated for the handle. *)
-    S !! handle = Some (s, R, T) →
+| SendToBoundS sh a mbody R T skt Sn P M f :
+    (* There is a socket that has been allocated for the handle *)
+    Sn !! sh = Some (skt, R, T) →
     (* The socket has an assigned address *)
-    saddress s = Some f ->
-    (* (*Maybe this is needed later for lifting or adequacy: *)
-        L !! node = Some ips → (ip_of_addres f ∈ ips) → *)
-    let: new_message := {| m_sender := f;
-                           m_destination := a;
-                           m_protocol := (sprotocol s);
-                           m_body := mbody;
-                        |} in
+    saddress skt = Some f ->
+    let: new_message := mkMessage f a (sprotocol skt) mbody in
     socket_step
-      node
-      (SendTo (Val $ LitV $ LitSocket handle)
+      ip
+      (SendTo (Val $ LitV $ LitSocket sh)
               (Val $ LitV $ LitString mbody)
               (Val $ LitV $ LitSocketAddress a))
-      S P M
+      Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
-      (<[handle:=(s, R, ({[new_message]} ∪ T))]>S) P ({[ new_message ]} ∪ M)
-| ReceiveFromSomeS handle R T s a m S P M :
+      (<[sh:=(skt, R, ({[new_message]} ∪ T))]>Sn) P ({[ new_message ]} ∪ M)
+| ReceiveFromSomeS sh R T skt a m Sn P M :
     (* The socket handle is bound to a socket *)
-    S !! handle = Some (s, R, T) →
+    Sn !! sh = Some (skt, R, T) →
     (* The socket has an assigned address *)
-    saddress s = Some a →
-    (* (*Maybe this is needed later for lifting or adequacy: *)
-        L !! node = Some ips → (ip_of_addres a ∈ ips) → *)
-      (* There is a message to receive *)
+    saddress skt = Some a →
+    (* There is a message to receive *)
     m ∈ (messages_to_receive_at a M) →
     socket_step
-      node
-      (ReceiveFrom (Val $ LitV $ LitSocket handle))
-      S P M
+      ip
+      (ReceiveFrom (Val $ LitV $ LitSocket sh))
+      Sn P M
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
-      (<[handle:=(s, {[ m ]} ∪ R, T)]>S) P M
-| ReceiveFromNoneS handle srt S P M :
-    (* The socket handle is bound to a socket *)
-    S !! handle = Some srt →
+      (<[sh:=(skt, {[ m ]} ∪ R, T)]>Sn) P M
+| ReceiveFromNoneS sh srt Sn P M :
+    (* The socket handle is bound to some socket *)
+    Sn !! sh = Some srt →
     socket_step
-      node
-      (ReceiveFrom (Val $ LitV $ LitSocket handle)) S P M
+      ip
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
       (* reduces to *)
-      (Val $ InjLV (LitV LitUnit)) S P M.
+      (Val $ InjLV (LitV LitUnit)) Sn P M.
 
-Definition is_head_step_pure (e : ground_lang.expr) : bool :=
+Definition is_head_step_pure (e : base_lang.expr) : bool :=
   match e with
   | Alloc _
   | Load _
@@ -1011,91 +1022,88 @@ Inductive head_step : aneris_expr → state → list observation →
                       aneris_expr → state → list aneris_expr → Prop :=
 | LocalStepPureS n h e e' ef κ σ
                  (is_pure : is_head_step_pure e = true)
-                 (BaseStep : ground_lang.head_step e h κ e' h ef)
-  : head_step {| expr_n := n; expr_e := e |} σ
+                 (BaseStep : base_lang.head_step e h κ e' h ef)
+  : head_step (mkExpr n e) σ
               κ
-              {| expr_n := n; expr_e := e' |} σ
-              (map (fun e => {| expr_n := n; expr_e := e |}) ef)
+              (mkExpr n e') σ
+              (map (mkExpr n) ef)
 | LocalStepS n h h' e e' ef κ σ
              (is_pure : is_head_step_pure e = false)
-             (BaseStep : ground_lang.head_step e h κ e' h' ef)
+             (BaseStep : base_lang.head_step e h κ e' h' ef)
   : state_heaps σ !! n = Some h →
-    head_step {| expr_n := n; expr_e := e |} σ
+    head_step (mkExpr n e ) σ
               κ
-              {| expr_n := n; expr_e := e' |}
-              (σ <| state_heaps := <[n:=h']>(state_heaps σ) |>)
-              (map (fun e => {| expr_n := n; expr_e := e |}) ef)
-| AssignNewIpStepS ip e σ :
+              (mkExpr n e') (σ <| state_heaps := <[n:=h']>(state_heaps σ) |>)
+              (map (mkExpr n) ef)
+| AssignNewIpStepS ip e κ σ :
     ip ≠ "system" →
     state_heaps σ !! ip = None →
     state_sockets σ !! ip = None →
     is_Some (state_ports_in_use σ !! ip) →
-    head_step {| expr_n := "system";
-                 expr_e := Start (LitString ip) e |} σ
-              []
-              {| expr_n := "system";
-                 expr_e := Val $ LitV $ LitUnit |}
+    head_step (mkExpr "system" (Start (LitString ip) e)) σ
+              κ
+              (mkExpr "system" (Val $ LitV $ LitUnit))
               {|
                 state_heaps := <[ip:=∅]>(state_heaps σ);
                 state_sockets := <[ip:=∅]>(state_sockets σ);
                 state_ports_in_use := state_ports_in_use σ;
                 state_ms := state_ms σ |}
-              [{| expr_n := ip;
-                  expr_e := e |}]
-| SocketStepS n e e' S S' P' M'  σ
+              [mkExpr ip e]
+| SocketStepS n e e' Sn Sn' P' M' σ κ
     (SocketStep : socket_step n
-        e  S (state_ports_in_use σ) (state_ms σ)
-        e' S' P' M')
-  : state_sockets σ !! n = Some S ->
-    head_step {| expr_n := n; expr_e := e |} σ
-              []
-              {| expr_n := n; expr_e := e' |}
+        e  Sn (state_ports_in_use σ) (state_ms σ)
+        e' Sn' P' M')
+  : state_sockets σ !! n = Some Sn ->
+    head_step (mkExpr n e) σ
+              κ
+              (mkExpr n e')
               {| state_heaps := state_heaps σ;
-                 state_sockets := <[n:=S']>(state_sockets σ);
+                 state_sockets := <[n:=Sn']>(state_sockets σ);
                  state_ports_in_use := P';
-                 state_ms := M'; |} [].
+                 state_ms := M'; |}
+              [].
 
 Lemma aneris_to_of_val v : aneris_to_val (aneris_of_val v) = Some v.
 Proof. by destruct v. Qed.
 
 Lemma aneris_of_to_val e v : aneris_to_val e = Some v → aneris_of_val v = e.
 Proof.
-  case e, v. cbv. rewrite -/(ground_lang.to_val expr_e0).
-  case C: (ground_lang.to_val expr_e0) =>//. move=> [<- <-].
-  f_equal. exact: ground_lang.of_to_val.
+  case e, v. cbv. rewrite -/(base_lang.to_val expr_e0).
+  case C: (base_lang.to_val expr_e0) =>//. move=> [<- <-].
+  f_equal. exact: base_lang.of_to_val.
 Qed.
 
 Lemma to_base_aneris_val e v:
   aneris_to_val e = Some v → to_val (expr_e e) = Some (val_e v).
-Proof. destruct e, v. cbv -[ground_lang.to_val]. case_match; naive_solver. Qed.
+Proof. destruct e, v. cbv -[base_lang.to_val]. case_match; naive_solver. Qed.
 
 Lemma to_base_aneris_val' n e v:
   aneris_to_val {| expr_n := n ; expr_e := e |} =
   Some {| val_n := n ; val_e := v |} →
-  ground_lang.to_val e = Some v.
-Proof. cbv -[ground_lang.to_val]. case_match; naive_solver. Qed.
+  base_lang.to_val e = Some v.
+Proof. cbv -[base_lang.to_val]. case_match; naive_solver. Qed.
 
 Lemma to_base_aneris_val_inv e v n:
-  ground_lang.to_val e = Some v → aneris_to_val (mkExpr n e) = Some (mkVal n v).
-Proof. cbv -[ground_lang.to_val]. by move => ->. Qed.
+  base_lang.to_val e = Some v → aneris_to_val (mkExpr n e) = Some (mkVal n v).
+Proof. cbv -[base_lang.to_val]. by move => ->. Qed.
 
 Lemma of_base_aneris_val e v:
-  aneris_of_val v = e → ground_lang.of_val (val_e v) = (expr_e e).
+  aneris_of_val v = e → base_lang.of_val (val_e v) = (expr_e e).
 Proof. destruct e,v. by inversion 1. Qed.
 
 Lemma aneris_val_head_stuck σ1 e1 κ σ2 e2 ef :
   head_step e1 σ1 κ e2 σ2 ef → aneris_to_val e1 = None.
 Proof.
   inversion 1; subst; last inversion SocketStep; subst;
-    try (cbv -[ground_lang.to_val];
-           by erewrite ground_lang.val_head_stuck; last eassumption);
+    try (cbv -[base_lang.to_val];
+           by erewrite base_lang.val_head_stuck; last eassumption);
     eauto.
 Qed.
 
 Lemma fill_item_aneris_val Ki e :
   is_Some (aneris_to_val (aneris_fill_item Ki e)) → is_Some (aneris_to_val e).
 Proof.
-  move/fmap_is_Some/ground_lang.fill_item_val => H.
+  move/fmap_is_Some/base_lang.fill_item_val => H.
   exact/fmap_is_Some.
 Qed.
 
@@ -1104,7 +1112,7 @@ Lemma fill_item_no_aneris_val_inj Ki1 Ki2 e1 e2 :
   aneris_fill_item Ki1 e1 = aneris_fill_item Ki2 e2 → Ki1 = Ki2.
 Proof.
   move => /fmap_None H1 /fmap_None H2 [] H3 H4.
-  exact: ground_lang.fill_item_no_val_inj H1 H2 H4.
+  exact: base_lang.fill_item_no_val_inj H1 H2 H4.
 Qed.
 
 Lemma head_ctx_step_aneris_val Ki e σ κ e2 σ2 ef :
@@ -1112,7 +1120,7 @@ Lemma head_ctx_step_aneris_val Ki e σ κ e2 σ2 ef :
 Proof.
   inversion 1; subst; last inversion SocketStep; subst; simplify_option_eq;
     try
-      (apply/fmap_is_Some; exact: ground_lang.head_ctx_step_val);
+      (apply/fmap_is_Some; exact: base_lang.head_ctx_step_val);
     apply/fmap_is_Some.
     all: destruct Ki; try (by eauto);
       inversion H0; subst; by eauto.
@@ -1146,26 +1154,23 @@ Proof.
     |}.
 Qed.
 
-Lemma newsocket_fresh n S P M v1 v2 v3 :
-  let h := fresh (dom (gset socket_handle) S) in
+Lemma newsocket_fresh n Sn P M v1 v2 v3 :
+  let h := fresh (dom (gset socket_handle) Sn) in
   socket_step n
               (NewSocket (Val $ LitV $ LitAddressFamily v1)
                          (Val $ LitV $ LitSocketType v2)
-                         (Val $ LitV $ LitProtocol v3)) S P M
-              (Val $ LitV (LitSocket h)) (<[h:=({|
-                                             sfamily := v1;
-                                             stype := v2;
-                                             sprotocol := v3;
-                                             saddress := None
-                                        |}, ∅, ∅)]>S) P M.
-Proof. intros; apply NewSocketS; try done.
-       apply (not_elem_of_dom (D:=gset loc)), is_fresh.
+                         (Val $ LitV $ LitProtocol v3)) Sn P M
+              (Val $ LitV (LitSocket h))
+              (<[h:=(mkSocket v1 v2 v3 None, ∅, ∅)]>Sn) P M.
+Proof.
+  intros; apply NewSocketS.
+  apply (not_elem_of_dom (D:=gset loc)), is_fresh.
 Qed.
 
 End aneris_lang.
 
 (* Prefer base names over ectx_language names. *)
-Export ground_lang.
+Export base_lang.
 Export aneris_lang.
 
 Global Arguments aneris_fill_item /_ _.

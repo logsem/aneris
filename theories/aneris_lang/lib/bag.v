@@ -6,18 +6,18 @@ From iris.proofmode Require Import coq_tactics reduction.
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
 From aneris.aneris_lang.lib Require Import lock.
 
-Definition newbag : ground_lang.val :=
+Definition newbag : base_lang.val :=
   λ: <>, let: "ℓ" := ref NONE in
          let: "v" := newlock #() in ("ℓ", "v").
 
-Definition insert : ground_lang.val :=
+Definition insert : base_lang.val :=
   λ: "x", λ: "e", let: "ℓ" := Fst "x" in
                   let: "lock" := Snd "x" in
                   acquire "lock" ;;
                     "ℓ" <- SOME ("e", !"ℓ") ;;
                   release "lock".
 
-Definition remove : ground_lang.val :=
+Definition remove : base_lang.val :=
   λ: "x", let: "ℓ" := Fst "x" in
           let: "lock" := Snd "x" in
           (acquire "lock" ;;
@@ -30,11 +30,11 @@ Definition remove : ground_lang.val :=
            (release "lock" ;; "res")).
 
 Section spec.
-  Context `{!distG Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Σ, !lockG Σ} (N : namespace).
 
   Local Notation iProp := (iProp Σ).
 
-  Fixpoint bagList (Ψ : ground_lang.val → iProp) (v : ground_lang.val) : iProp :=
+  Fixpoint bagList (Ψ : base_lang.val → iProp) (v : base_lang.val) : iProp :=
     match v with
     | NONEV => ⌜True⌝%I
     | SOMEV (x, r) => (Ψ x ∗ bagList Ψ r)%I
@@ -42,7 +42,7 @@ Section spec.
     end.
 
   Definition isBag (n : Network.ip_address)
-             (v : ground_lang.val) (Ψ : ground_lang.val → iProp) :=
+             (v : base_lang.val) (Ψ : base_lang.val → iProp) :=
     (∃ (l : loc) v' γ, ⌜v = PairV #l v'⌝ ∗
       is_lock N n γ v' (∃ u, l ↦[n] u ∗ bagList Ψ u))%I.
 

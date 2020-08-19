@@ -1,4 +1,4 @@
-# Aneris Logic
+# Aneris
 
 Aneris is a program logic build on the Iris program logic framework for
 developing and verifying distributed systems.
@@ -7,7 +7,7 @@ developing and verifying distributed systems.
 
 The development is known to compile with
 
-- `coq`: version `8.11.2`
+- `coq`: see the `opam` file
 - `coq-iris` : see the `opam` file
 - `coq-stdpp` : see the `opam` file
 - `coq-iris-string-ident`
@@ -24,11 +24,26 @@ Next, clone external submodule dependencies using
 
     git submodule update --init --recursive
 
+Alternatively, clone the repository using the `--recurse-submodules` flag.
+
 Run `make -jN` to build the full development, where `N` is the number of your
 CPU cores.
 
-## Directory Structure
+## Updating dependencies
+
+By default, the `git pull` command recursively fetches submodule
+changes. However, it does not apply the changes. To apply the submodule updates
+you need to run
+
+    git submodule update --init --recursive
+
+or alternatively run `git pull` with the `--recurse-submodules` flag to automate
+the process. Remember to commit submodule updates to the repository.
+
+## Directory structure
+
+TODO
 
 ## Case studies
 
-- Causally-consistent distributed database
+See [aneris-examples](https://bitbucket.org/logsem/aneris-examples).

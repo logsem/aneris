@@ -11,7 +11,7 @@ Import uPred.
 
 Section code.
 
-  Definition tag_of_message : ground_lang.val :=
+  Definition tag_of_message : base_lang.val :=
     (
       λ: "msg",
       match: FindFrom "msg" #(0 : Z) #"_" with
@@ -20,7 +20,7 @@ Section code.
       end
     )%V.
 
-  Definition value_of_message : ground_lang.val :=
+  Definition value_of_message : base_lang.val :=
     (
       λ: "msg",
       match: FindFrom "msg" #(0 : Z) #"_" with
@@ -56,19 +56,19 @@ Section strings.
   Qed.
 
   Lemma length_Sn a s :
-    length (String a s) = S (length s).
+    String.length (String a s) = S (String.length s).
   Proof. by cbn. Qed.
 
   Lemma length_app s1 :
-    ∀ s2, length (s1 +:+ s2) = (length s1 + length s2)%nat.
+    ∀ s2, String.length (s1 +:+ s2) = (String.length s1 + String.length s2)%nat.
   Proof.
    induction s1; intros.
     - by rewrite append_nil_l.
     - by rewrite -append_cons !length_Sn IHs1.
   Qed.
-
+  Import String.
   Lemma prefix_empty_true s :
-    prefix "" s = true.
+    String.prefix "" s = true.
   Proof. destruct s; cbn; auto. Qed.
 
   Lemma index_0_empty s :
@@ -77,12 +77,12 @@ Section strings.
 
   Lemma index_prefix_true s s' :
     index 0 s s' = Some 0%nat →
-    prefix s s' = true.
+    String.prefix s s' = true.
   Proof.
     destruct s,s'; simpl; cbn; auto.
     - intro; inversion H.
     - intro; destruct ascii_dec.
-      + destruct (prefix s s'); auto; destruct (index 0 _ s'); inversion H.
+      + destruct (String.prefix s s'); auto; destruct (index 0 _ s'); inversion H.
       + destruct (index 0 _ s'); inversion H.
   Qed.
 
@@ -91,7 +91,7 @@ Section strings.
   Proof.
     intros Hindex.
     cbn. destruct ascii_dec.
-    - assert (Hprefix: prefix s s' = true).
+    - assert (Hprefix: String.prefix s s' = true).
       { by apply index_prefix_true. }
         by rewrite Hprefix.
     - by destruct n.
@@ -109,7 +109,7 @@ Section strings.
   Lemma index_0_append_char a t v s :
     s = String a "" →
     index 0 s t = None →
-    index 0 s (t +:+ s +:+ v) = Some (length t).
+    index 0 s (t +:+ s +:+ v) = Some (String.length t).
   Proof.
     induction t; intros.
     - rewrite append_nil_l. apply index_append_here.
@@ -122,7 +122,7 @@ Section strings.
   Qed.
 
   Lemma substring_0_length s :
-    substring 0 (length s) s = s.
+    substring 0 (String.length s) s = s.
   Proof. induction s; simpl; auto. by rewrite IHs. Qed.
 
   Lemma substring_Sn a n m s :
@@ -130,15 +130,15 @@ Section strings.
   Proof. induction s; destruct n,m; simpl; auto. Qed.
 
   Lemma substring_add_length_app n m s1 :
-    ∀ s2, substring (length s1 + n) m (s1 +:+ s2) = substring n m s2.
+    ∀ s2, substring (String.length s1 + n) m (s1 +:+ s2) = substring n m s2.
   Proof. induction s1; destruct n,m; simpl; auto. Qed.
 
   Lemma substring_0_length_append s1 s2 :
-    substring 0 (length s1) (s1 +:+ s2) = s1.
+    substring 0 (String.length s1) (s1 +:+ s2) = s1.
   Proof. apply prefix_correct, index_prefix_true, index_append_here. Qed.
 
   Lemma substring_length_append s1 :
-    ∀ s2, substring (length s1) (length s2) (s1 +:+ s2) = s2.
+    ∀ s2, substring (String.length s1) (String.length s2) (s1 +:+ s2) = s2.
   Proof.
     induction s1; intros s2.
     - rewrite append_nil_l. apply substring_0_length.
@@ -148,7 +148,7 @@ Section strings.
 End strings.
 
 Section library.
-  Context `{dG : distG Σ}.
+  Context `{dG : anerisG Σ}.
 
   Definition valid_tag t := index 0 "_" t = None.
 
@@ -224,8 +224,8 @@ Section library.
     wp_pures.
     wp_substring.
     { repeat split; eauto.
-      instantiate (1:=(length t + 1)%nat). apply Nat2Z.inj_add.
-      instantiate (1:=(length v)%nat).
+      instantiate (1:=(String.length t + 1)%nat). apply Nat2Z.inj_add.
+      instantiate (1:=(String.length v)%nat).
       rewrite !length_app plus_assoc length_Sn /= !Nat2Z.inj_add. ring. }
     rewrite substring_add_length_app substring_Sn substring_0_length.
       by iApply "HΦ".

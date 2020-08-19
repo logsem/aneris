@@ -4,7 +4,7 @@ From aneris.aneris_lang.program_logic Require Import aneris_lifting.
 
 Section code.
 
-  Definition assert : ground_lang.val :=
+  Definition assert : base_lang.val :=
     λ: "v", if: "v" #() then #() else #0 #0. (* #0 #0 is unsafe *)
 
 End code.
@@ -12,7 +12,7 @@ End code.
 Notation "'assert:' e" := (assert (λ: <>, e))%E (at level 99) : expr_scope.
 
 Section library.
-  Context `{dG : distG Σ}.
+  Context `{dG : anerisG Σ}.
 
   Lemma wp_assert ip E (Φ : val → iProp Σ) e :
     WP e @[ip] E {{ v, ⌜v = #true⌝ ∧ ▷ Φ #() }} -∗ WP assert: e @[ip] E {{ Φ }}.
