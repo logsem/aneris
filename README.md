@@ -31,9 +31,12 @@ CPU cores.
 
 ## Updating dependencies
 
+To pull the latest submodules dependencies as committed to the repository, run
+
+    git submodule update --recursive
+
 By default, the `git pull` command recursively fetches submodule
-changes. However, it does not apply the changes. To apply the submodule updates
-you need to run
+changes. However, it does not apply the changes. To update the dependencies run
 
     git submodule update --recursive --remote
 

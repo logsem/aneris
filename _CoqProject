@@ -23,6 +23,7 @@ theories/aneris_lang/adequacy.v
 theories/aneris_lang/program_logic/aneris_hoare.v
 theories/aneris_lang/program_logic/aneris_lifting.v
 theories/aneris_lang/program_logic/aneris_weakestpre.v
+theories/aneris_lang/program_logic/aneris_adequacy.v
 theories/aneris_lang/proofmode.v
 
 theories/aneris_lang/lib/assert.v
