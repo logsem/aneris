@@ -35,10 +35,9 @@ By default, the `git pull` command recursively fetches submodule
 changes. However, it does not apply the changes. To apply the submodule updates
 you need to run
 
-    git submodule update --init --recursive
+    git submodule update --recursive --remote
 
-or alternatively run `git pull` with the `--recurse-submodules` flag to automate
-the process. Remember to commit submodule updates to the repository.
+Remember to commit submodule updates to the repository.
 
 ## Directory structure
 
