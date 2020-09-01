@@ -200,7 +200,7 @@ Section lifting_network.
     ip_of_address a = ip →
     saddress skt = None →
     a ∈ A →
-    {{{ fixed A ∗
+    {{{ ▷ fixed A ∗
         ▷ free_ports ip {[(port_of_address a)]} ∗
         ▷ sh ↪[ip] (skt, ∅, ∅) }}}
       SocketBind
@@ -209,7 +209,7 @@ Section lifting_network.
     {{{ RET #0;
         sh ↪[ip] (skt <| saddress := Some a |>, ∅, ∅) ∗ ∃ φ, a ⤇ φ }}}.
   Proof.
-    iIntros (Hip Hskt Ha Φ) "(HA & Hfp & Hsh) HΦ".
+    iIntros (Hip Hskt Ha Φ) "(>HA & Hfp & Hsh) HΦ".
     rewrite !aneris_wp_unfold /aneris_wp_def.
     iIntros "#Hin".
     rewrite -Hip.
@@ -252,7 +252,7 @@ Section lifting_network.
           m_protocol := sprotocol s;
           m_body := m;
         |} in
-    {{{ ▷ sh ↪[ip] (s, R, T) ∗ a ⤇ φ ∗ φ msg }}}
+    {{{ ▷ sh ↪[ip] (s, R, T) ∗ ▷ a ⤇ φ ∗ ▷ φ msg }}}
       SendTo (Val $ LitV $ LitSocket sh) #m #a @[ip] E
     {{{ RET #(String.length m); sh ↪[ip] (s, R, {[ msg ]} ∪ T) }}}.
   Proof.

@@ -477,7 +477,7 @@ Section primitive_laws.
    Lemma wp_receivefrom_gen (Ψo : option (socket_interp Σ)) k a E sh skt R T :
     saddress skt = Some a →
     {{{ ▷ sh ↪[ip_of_address a] (skt, R, T) ∗
-          match Ψo with Some Ψ => a ⤇ Ψ | _ => True end }}}
+        match Ψo with Some Ψ => a ⤇ Ψ | _ => True end }}}
       (mkExpr (ip_of_address a)
               (ReceiveFrom (Val $ LitV $ LitSocket sh))) @ k; E
     {{{ r, RET (mkVal (ip_of_address a) r);

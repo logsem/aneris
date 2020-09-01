@@ -1174,3 +1174,4 @@ Export base_lang.
 Export aneris_lang.
 
 Global Arguments aneris_fill_item /_ _.
+Global Arguments set {_ _} _ {_} /.

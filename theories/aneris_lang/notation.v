@@ -182,3 +182,6 @@ Notation "'letrec:' f x y .. z := e1 'in' e2" :=
   (at level 200, f at level 1, x,y,z at level 1, e1, e2 at level 200,
    format "'[' 'letrec:'  f  x y .. z :=  '/  ' '[' e1 ']'  'in'  '/' e2 ']'")
   : expr_scope.
+
+Notation udp_socket a :=
+  {| sfamily := PF_INET; stype := SOCK_DGRAM; sprotocol := IPPROTO_UDP; saddress := a |}.
