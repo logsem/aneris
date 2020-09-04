@@ -1,4 +1,5 @@
 # Aneris
+[![Build Status](https://travis-ci.com/logsem/aneris.svg?token=rjT7z1yqWrMesq694bBy&branch=master)](https://travis-ci.com/logsem/aneris)
 
 Aneris is a programming language and a higher-order distributed concurrent
 separation logic for developing and verifying distributed systems with

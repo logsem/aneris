@@ -13,7 +13,5 @@ COPY --chown=coq:coq . /coq
 WORKDIR /coq
 ENV OPAMYES true
 
-RUN git submodule update --recursive \
-    && make build-dep
-RUN make clean \
-    && make -j ${NJOBS}
+RUN make build-dep
+RUN make -j ${NJOBS}
