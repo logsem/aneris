@@ -14,10 +14,10 @@ Makefile.coq: _CoqProject
 	+make -f Makefile.coq $@
 
 # Install build-dependencies
-build-dep/opam: opam Makefile
+build-dep/opam: aneris.opam Makefile
 	@echo "# Creating build-dep package."
 	@mkdir -p build-dep
-	@sed <opam -E 's/^(build|install|remove):.*/\1: []/; s/^name: *"(.*)" */name: "\1-builddep"/' >build-dep/opam
+	@sed <aneris.opam -E 's/^(build|install|remove):.*/\1: []/; s/^name: *"(.*)" */name: "\1-builddep"/' >build-dep/opam
 	@fgrep builddep build-dep/opam >/dev/null || (echo "sed failed to fix the package name" && exit 1) # sanity check
 
 build-dep: build-dep/opam phony
@@ -38,6 +38,6 @@ build-dep: build-dep/opam phony
 # Some files that do *not* need to be forwarded to Makefile.coq
 Makefile: ;
 _CoqProject: ;
-opam: ;
+aneris.opam: ;
 
 .PHONY: all clean phony
