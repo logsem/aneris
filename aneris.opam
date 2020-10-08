@@ -11,7 +11,7 @@ build: [make "-j%{jobs}%"]
 install: [make "install"]
 depends: [
   "coq" { (= "8.12.0") | (= "dev") }
-  "coq-iris" { (= "dev.2020-09-03.2.26739725") | (= "dev") }
-  "coq-stdpp" { (= "dev.2020-09-02.0.897b954e") | (= "dev") }
+  "coq-iris" { (= "dev.2020-10-04.0.a36f8a23") | (= "dev") }
+  "coq-stdpp" { (= "dev.2020-10-02.0.7ae77142") | (= "dev") }
   "coq-iris-string-ident" { (= "dev")  }
 ]

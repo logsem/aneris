@@ -59,7 +59,7 @@ Section gen_heap_light.
     apply wand_intro_r.
     rewrite lmapsto_eq /lmapsto_def -own_op -auth_frag_op own_valid discrete_valid.
     f_equiv. rewrite auth_frag_valid singleton_op singleton_valid -pair_op.
-    by intros [_ ?%agree_op_invL'].
+    by intros [_ ?%to_agree_op_inv_L].
   Qed.
 
   Lemma lmapsto_combine l γ q1 q2 v1 v2 :
@@ -134,7 +134,7 @@ Section gen_heap_light.
     iIntros "Hσ Hl".
     rewrite /gen_heap_light_ctx lmapsto_eq /lmapsto_def.
     iDestruct (own_valid_2 with "Hσ Hl")
-      as %[Hl%gen_heap_singleton_included _]%auth_both_valid; auto.
+      as %[?%gen_heap_singleton_included _]%auth_both_valid_discrete; auto.
   Qed.
 
   Lemma gen_heap_light_update γ σ l v1 v2 :
@@ -143,7 +143,7 @@ Section gen_heap_light.
   Proof.
     iIntros "Hσ Hl". rewrite /gen_heap_light_ctx lmapsto_eq /lmapsto_def.
     iDestruct (own_valid_2 with "Hσ Hl")
-      as %[Hl%gen_heap_singleton_included _]%auth_both_valid.
+      as %[Hl%gen_heap_singleton_included _]%auth_both_valid_discrete.
     iMod (own_update_2 with "Hσ Hl") as "[Hσ Hl]".
     { eapply auth_update, singleton_local_update,
         (exclusive_local_update _ (1%Qp, to_agree (v2:leibnizO _)))=> //.

@@ -268,8 +268,8 @@ Section resource_lemmas.
   Proof.
     apply wand_intro_r.
     rewrite /node_gnames_auth mapsto_node_eq -own_op own_valid discrete_valid.
-    f_equiv=> /auth_frag_proj_valid /=. rewrite singleton_op singleton_valid.
-    apply (agree_op_invL' (A := node_gnamesO)).
+    f_equiv=> /auth_frag_valid /=. rewrite singleton_op singleton_valid.
+    apply (to_agree_op_inv_L (A := node_gnamesO)).
   Qed.
 
   Lemma node_gnames_valid ip γn m :
@@ -280,7 +280,7 @@ Section resource_lemmas.
     rewrite /node_gnames_auth mapsto_node_eq -own_op own_valid.
     iDestruct "H" as %HvalidR. iPureIntro.
     revert HvalidR.
-    rewrite comm auth_both_valid.
+    rewrite comm auth_both_valid_discrete.
     rewrite singleton_included_l=> -[[y [Hlookup Hless]] Hvalid].
     assert (Hvalidy := lookup_valid_Some _ ip y Hvalid Hlookup).
     revert Hlookup.
@@ -360,7 +360,7 @@ Section resource_lemmas.
   Lemma fixed_agree A B : fixed A -∗ fixed B -∗ ⌜A = B⌝.
   Proof.
     iIntros "HA HB".
-    by iDestruct (own_valid_2 with "HA HB") as %?%agree_op_invL'.
+    by iDestruct (own_valid_2 with "HA HB") as %?%to_agree_op_inv_L.
   Qed.
 
   Global Instance saved_pred_proper `{savedPredG Σ A} n γ:
@@ -410,7 +410,7 @@ Section resource_lemmas.
   Proof.
     iIntros "HP Hip"; rewrite /free_ports_auth /free_ports.
     iDestruct (own_valid_2 with "HP Hip") as
-        %[[y [Hy1%leibniz_equiv Hy2]]%singleton_included_l Hv]%auth_both_valid.
+        %[[y [Hy1%leibniz_equiv Hy2]]%singleton_included_l Hv]%auth_both_valid_discrete.
     iPureIntro.
     revert Hy2; rewrite Some_included_total.
     destruct y as [ports'|].
@@ -483,7 +483,7 @@ Section resource_lemmas.
     iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
     rewrite -auth_frag_op singleton_op in Hvalid.
     apply singleton_valid in Hvalid.
-    apply (agree_op_invL' γ γ') in Hvalid.
+    apply (to_agree_op_inv_L γ γ') in Hvalid.
     rewrite Hvalid.
     iDestruct (saved_pred_agree _ _ _ x with "H1' H2'") as "H".
     iExact "H".
@@ -498,7 +498,7 @@ Section resource_lemmas.
     iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
     rewrite -auth_frag_op singleton_op in Hvalid.
     apply singleton_valid in Hvalid.
-    apply (agree_op_invL' γ γ') in Hvalid.
+    apply (to_agree_op_inv_L γ γ') in Hvalid.
     rewrite Hvalid discrete_fun_equivI. iIntros (?).
     by iDestruct (saved_pred_agree with "H1' H2'") as "H".
   Qed.
