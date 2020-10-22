@@ -12,6 +12,6 @@ install: [make "install"]
 depends: [
   "coq" { (= "8.12.0") | (= "dev") }
   "coq-iris" { (= "dev.2020-10-22.1.cfbdb375") | (= "dev") }
-  "coq-stdpp" { (= "dev.2020-10-21.0.b0b60193") | (= "dev") }
+  "coq-stdpp" { (= "dev.2020-10-15.0.c6e5d0be") | (= "dev") }
   "coq-iris-string-ident" { (= "dev")  }
 ]
