@@ -410,7 +410,8 @@ Section resource_lemmas.
   Proof.
     iIntros "HP Hip"; rewrite /free_ports_auth /free_ports.
     iDestruct (own_valid_2 with "HP Hip") as
-        %[[y [Hy1%leibniz_equiv Hy2]]%singleton_included_l Hv]%auth_both_valid_discrete.
+        %[[y [Hy1%leibniz_equiv Hy2]]%singleton_included_l Hv]
+         %auth_both_valid_discrete.
     iPureIntro.
     revert Hy2; rewrite Some_included_total.
     destruct y as [ports'|].
@@ -482,7 +483,7 @@ Section resource_lemmas.
     iDestruct "H2" as (γ') "[H2 H2']".
     iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
     rewrite -auth_frag_op singleton_op in Hvalid.
-    apply singleton_valid in Hvalid.
+    apply auth_frag_valid_1, singleton_valid in Hvalid.
     apply (to_agree_op_inv_L γ γ') in Hvalid.
     rewrite Hvalid.
     iDestruct (saved_pred_agree _ _ _ x with "H1' H2'") as "H".
@@ -497,7 +498,7 @@ Section resource_lemmas.
     iDestruct "H2" as (γ') "[H2 H2']".
     iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
     rewrite -auth_frag_op singleton_op in Hvalid.
-    apply singleton_valid in Hvalid.
+    apply auth_frag_valid_1, singleton_valid in Hvalid.
     apply (to_agree_op_inv_L γ γ') in Hvalid.
     rewrite Hvalid discrete_fun_equivI. iIntros (?).
     by iDestruct (saved_pred_agree with "H1' H2'") as "H".

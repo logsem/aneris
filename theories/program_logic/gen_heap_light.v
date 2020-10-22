@@ -6,11 +6,44 @@ From iris.base_logic.lib Require Export own.
 Set Default Proof Using "Type".
 Import uPred.
 
+
 Section definitions.
+
+  Definition gen_heapUR L `{!EqDecision L} `{!Countable L} V :=
+    gmapUR L (prodR fracR (agreeR (leibnizO V))).
+
   Context `{Countable L, hG : !inG Σ (authR (gen_heapUR L V))}.
 
+  Definition to_gen_heap (σ : gmap L V) : gmap L (frac * (agree (leibnizO V))) :=
+    (λ v, (1%Qp, to_agree v)) <$> σ.
+
+  Lemma lookup_to_gen_heap_None σ l :
+    σ !! l = None → to_gen_heap σ !! l = None.
+  Proof. rewrite /to_gen_heap lookup_fmap => ->//. Qed.
+
+  Lemma to_gen_heap_insert σ l v :
+    to_gen_heap (<[l := v]>σ) = <[ l := (1%Qp, to_agree v)]>(to_gen_heap σ).
+  Proof. rewrite /to_gen_heap fmap_insert //. Qed.
+
+  Lemma to_gen_heap_valid σ : ✓ (to_gen_heap σ).
+  Proof. intros i; rewrite lookup_fmap; destruct (σ !! i); done. Qed.
+
+  Lemma gen_heap_singleton_included σ l q v :
+    {[ l := (q, to_agree v)]} ≼ to_gen_heap σ → σ !! l = Some v.
+  Proof.
+    rewrite singleton_included_l; intros (w & Hw1 & Hw2).
+    revert Hw2; rewrite -Hw1; clear Hw1.
+    rewrite /to_gen_heap lookup_fmap; clear w.
+    intros [|(w & w' & Hw1 & Hw2 & Hw3)]%option_included; first done.
+    destruct (σ !! l); last by inversion Hw2.
+    simplify_eq/=.
+    destruct Hw3 as [[_ ->%(@to_agree_inj)%leibniz_equiv]|Hw3]; first done.
+    apply prod_included in Hw3 as [_ ->%(@to_agree_included)%leibniz_equiv];
+      done.
+  Qed.
+
   Definition gen_heap_light_ctx (γ : gname) (σ : gmap L V) : iProp Σ :=
-    own γ (● (to_gen_heap σ)).
+    @own _ _ hG γ (● (to_gen_heap σ)).
 
   Definition lmapsto_def (γ : gname) (l : L) (q : Qp) (v: V) : iProp Σ :=
     own γ (◯ {[ l := (q, to_agree (v : leibnizO V)) ]}).
@@ -59,7 +92,7 @@ Section gen_heap_light.
     apply wand_intro_r.
     rewrite lmapsto_eq /lmapsto_def -own_op -auth_frag_op own_valid discrete_valid.
     f_equiv. rewrite auth_frag_valid singleton_op singleton_valid -pair_op.
-    by intros [_ ?%to_agree_op_inv_L].
+    intros [_ ?%to_agree_op_inv_L]; done.
   Qed.
 
   Lemma lmapsto_combine l γ q1 q2 v1 v2 :
@@ -82,8 +115,8 @@ Section gen_heap_light.
 
   Lemma lmapsto_valid l γ q v : l ; γ ↦{q} v -∗ ✓ q.
   Proof.
-    rewrite lmapsto_eq /lmapsto_def own_valid !discrete_valid -auth_frag_valid.
-    by apply pure_mono=> /singleton_valid [??].
+    rewrite lmapsto_eq /lmapsto_def own_valid !discrete_valid auth_frag_valid.
+    apply pure_mono=> /singleton_valid [??]; done.
   Qed.
   Lemma lmapsto_valid_2 l γ q1 q2 v1 v2 :
     l ; γ ↦{q1} v1 -∗ l ; γ ↦{q2} v2 -∗ ✓ (q1 + q2)%Qp.
