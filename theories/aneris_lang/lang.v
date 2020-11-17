@@ -597,6 +597,7 @@ Proof.
   replace (S n) with (N.to_nat m); last first.
   { by rewrite Heqm positive_N_nat SuccNat2Pos.id_succ. }
   assert (Hmlt : (0 < m)%N) by lia.
+  rewrite decide_False; [|lia].
   clear dependent n.
   induction (lt_acc m) as [? ? IH].
   rewrite pretty_N_go_step; last done.
@@ -670,7 +671,7 @@ Proof.
     rewrite positive_nat_Z in HZSi.
     rewrite HZSi nat_N_Z positive_nat_Z.
     destruct a as [[] [] [] [] [] [] [] []]; auto.
-    exfalso; eapply pretty_N_go_pos_nneg; eauto; lia.
+    by rewrite Heq in HZSi.
   - simpl in Heq.
     assert (0 < 1)%nat as Hneq by lia.
     pose proof (append_correct1 "-" (pretty (N.pos p)) 0 Hneq) as Hf;
