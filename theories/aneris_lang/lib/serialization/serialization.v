@@ -381,3 +381,50 @@ Global Instance:
 Proof. rewrite /Serializable /= /sum_valid_val /=; eauto. Qed.
 
 End sum_serialization.
+
+Section option_serialization.
+
+  Definition option_ser (ser : base_lang.val) : base_lang.val :=
+    sum_ser unit_ser ser.
+
+  Definition option_deser (deser : base_lang.val) : base_lang.val :=
+    sum_deser unit_deser deser.
+
+  Context (T : serialization).
+
+  Definition option_valid_val := @sum_valid_val unit_serialization T.
+  Definition option_is_ser := @sum_is_ser unit_serialization T.
+
+  Lemma option_ser_spec `{!anerisG Σ} ip v:
+    {{{ ⌜option_valid_val v⌝ }}}
+      option_ser (DBS_ser T) v @[ip]
+    {{{ (s : string), RET #s; ⌜option_is_ser v s⌝ }}}.
+  Proof.
+    iIntros (Φ Hw) "HΦ".
+    iApply (@sum_ser_spec unit_serialization); done.
+  Qed.
+
+  Lemma option_deser_spec `{!anerisG Σ} ip v s:
+    {{{ ⌜option_is_ser v s⌝ }}}
+      option_deser (DBS_deser T) #s @[ip]
+    {{{ RET v; True }}}.
+  Proof.
+    iIntros (Φ Hw) "HΦ".
+    iApply (@sum_deser_spec unit_serialization); done.
+  Qed.
+
+  Definition option_serialization : serialization :=
+    {| DBS_valid_val := option_valid_val;
+       DBS_ser := option_ser (DBS_ser T);
+       DBS_deser := option_deser (DBS_deser T);
+       DBS_is_ser := option_is_ser;
+       DBS_ser_spec := @option_ser_spec;
+       DBS_deser_spec := @option_deser_spec; |}.
+
+  Global Instance:
+    ∀ v, Serializable T v → Serializable option_serialization (InjRV v).
+  Proof.
+    rewrite /Serializable /= /option_valid_val /sum_valid_val /=; eauto.
+  Qed.
+
+End option_serialization.
