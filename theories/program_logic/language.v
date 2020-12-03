@@ -1,5 +1,4 @@
 From iris.algebra Require Export ofe.
-From iris.prelude Require Import options.
 
 Section language_mixin.
   Context {expr val state observation : Type}.
@@ -38,7 +37,7 @@ Declare Scope val_scope.
 Delimit Scope val_scope with V.
 Bind Scope val_scope with val.
 
-Arguments Language {_ _ _ _ _ _ _} _.
+Arguments Language {_ _ _ _ _ _ _} _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments prim_step {_} _ _ _ _ _ _.
@@ -321,14 +320,15 @@ Section language.
     (∃ i e efs e' κ,
       t1 !! i = Some e ∧ t3 !! i = Some e ∧
       t2 = <[i:=e']>t1 ++ efs ∧
-      prim_step e σ1 κ e' σ2 efs).
+      prim_step e σ1 κ e' σ2 efs) ∨
+    (∃ κ, config_step σ1 κ σ2).
   Proof.
     intros Ht Hps.
     inversion Ht as [κ [e σ e' σ' efs t11 t12 ?? Hstep|]]; simplify_eq/=.
     -  apply Forall2_app_inv_l in Hps
         as (t31&?&Hpsteps&(e''&t32&Hps&?&->)%Forall2_cons_inv_l&->).
        destruct Hps as [e|e1 e2 e3 [_ Hprs]].
-       + right.
+       + right; left.
          exists (length t11), e, efs, e', κ; split_and!; last done.
          * by rewrite lookup_app_r // Nat.sub_diag.
          * apply Forall2_length in Hpsteps.
@@ -338,9 +338,8 @@ Section language.
          left; split; first done.
          rewrite right_id_L.
          eauto using Forall2_app.
-    - admit.
-  Admitted.
-
+    - right; right; eauto.
+  Qed.
 
 End language.
 

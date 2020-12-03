@@ -8,7 +8,17 @@
 -arg -w -arg -ambiguous-paths
 -arg -w -arg -ssr-search-moved
 
+theories/bi/weakestpre.v
+
 theories/program_logic/gen_heap_light.v
+theories/program_logic/adequacy.v
+theories/program_logic/ectx_language.v
+theories/program_logic/ectx_lifting.v
+theories/program_logic/ectxi_language.v
+theories/program_logic/hoare.v
+theories/program_logic/language.v
+theories/program_logic/lifting.v
+theories/program_logic/weakestpre.v
 
 theories/aneris_lang/network.v
 theories/aneris_lang/lang.v
@@ -37,3 +47,4 @@ theories/aneris_lang/lib/bag.v
 theories/aneris_lang/lib/nodepar.v
 theories/aneris_lang/lib/vector_clock/time.v
 theories/aneris_lang/lib/vector_clock/vector_clock.v
+
