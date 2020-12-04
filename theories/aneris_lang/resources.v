@@ -26,6 +26,7 @@ Definition local_socketsUR : ucmra :=
   gen_heapUR socket_handle (socket * bool * message_soup * message_soup).
 Definition socket_interpUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO gname)).
+Definition message_soup_interpUR : ucmraT := gsetUR message.
 
 Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames)) :=
   (∅ : gmap ip_address (agree node_gnames)).
@@ -57,6 +58,9 @@ Class anerisG Σ := AnerisG {
   (* socket addresses with fixed socket interpretations *)
   aneris_fixedG :> inG Σ (agreeR (gsetUR socket_address));
   aneris_fixed_name : gname;
+  (* message soup *)
+  aneris_message_soupG :> inG Σ message_soup_interpUR;
+  aneris_message_soup_name : gname;
 }.
 
 Class anerisPreG Σ := AnerisPreG {
@@ -69,6 +73,7 @@ Class anerisPreG Σ := AnerisPreG {
   anerisPre_siG :> inG Σ (authR socket_interpUR);
   anerisPre_savedPredG :> savedPredG Σ message;
   anerisPre_fixedG :> inG Σ (agreeR (gsetUR socket_address));
+  anerisPre_message_soupG :> inG Σ message_soup_interpUR;
 }.
 
 Definition anerisΣ : gFunctors :=
@@ -80,7 +85,8 @@ Definition anerisΣ : gFunctors :=
    GFunctor (authUR (gmapUR ip_address (gset_disjUR port)));
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
-   GFunctor (agreeR (gsetUR socket_address))].
+   GFunctor (agreeR (gsetUR socket_address));
+   GFunctor message_soup_interpUR].
 
 Global Instance subG_anerisPreG {Σ} : subG anerisΣ Σ → anerisPreG Σ.
 Proof. constructor; solve_inG. Qed.
@@ -146,6 +152,10 @@ Section definitions.
 
   Definition free_ports (ip : ip_address) (ports : gset port) :=
     own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
+
+  (* message soup *)
+  Definition message_soup (M : gset message) : iProp Σ :=
+    own aneris_message_soup_name M.
 
 End definitions.
 
@@ -500,5 +510,8 @@ Section resource_lemmas.
     rewrite Hvalid discrete_fun_equivI. iIntros (?).
     by iDestruct (saved_pred_agree with "H1' H2'") as "H".
   Qed.
+
+  Lemma message_soup_add m M : message_soup M ==∗ message_soup (M ∪ {[m]}).
+  Proof. iIntros "H"; iApply own_update; first apply gset_update; done. Qed.
 
 End resource_lemmas.
