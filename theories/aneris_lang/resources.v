@@ -2,9 +2,8 @@ From stdpp Require Import fin_maps gmap.
 From iris.algebra Require Import auth gmap frac agree coPset gset frac_auth ofe.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop.
-From iris.program_logic Require Import ectx_lifting.
 From iris.proofmode Require Import tactics.
-From aneris.program_logic Require Import gen_heap_light.
+From aneris.program_logic Require Import ectx_lifting gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network.
 Set Default Proof Using "Type".
 
@@ -24,7 +23,7 @@ Definition node_gnames_mapUR : ucmra :=
 Definition local_heapUR : ucmra :=
   gen_heapUR loc base_lang.val.
 Definition local_socketsUR : ucmra :=
-  gen_heapUR socket_handle (socket * message_soup * message_soup).
+  gen_heapUR socket_handle (socket * bool * message_soup * message_soup).
 Definition socket_interpUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO gname)).
 
@@ -112,11 +111,11 @@ Section definitions.
 
   (** Sockets *)
   Definition sockets_ctx (γn : node_gnames)
-             (s : gmap socket_handle (socket * message_soup * message_soup)) :=
+    (s : gmap socket_handle (socket * bool * message_soup * message_soup)) :=
     gen_heap_light_ctx (sockets_name γn) s.
 
   Definition mapsto_socket (ip : ip_address) (z : socket_handle) (q : Qp)
-             (s: socket * message_soup * message_soup) :=
+             (s: socket * bool * message_soup * message_soup) :=
     (∃ γn, mapsto_node ip γn ∗ lmapsto (sockets_name γn) z q s)%I.
 
   (** Ghost names of saved socket interpretations *)

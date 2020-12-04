@@ -1,10 +1,10 @@
 From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
-From iris.program_logic Require Export weakestpre.
-From iris.program_logic Require Import ectx_lifting total_ectx_lifting.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
+From aneris.program_logic Require Export weakestpre.
+From aneris.program_logic Require Import ectx_lifting (* total_ectx_lifting *).
 From aneris.program_logic Require Export gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network resources.
 From RecordUpdate Require Import RecordSet.
@@ -80,9 +80,14 @@ Section definitions.
                  a ∈ A ∨ (a ∉ A ∧ ∀ ps, P !! ip_of_address a = Some ps →
                                         port_of_address a ∈ ps))⌝)%I.
 
+  Definition sktHist : Type := socket * bool * message_soup * message_soup.
+  Definition socketsHist := gmap socket_handle sktHist.
+
+
+
   (* The local state of the node at [ip] is coherent with [σ] and [γs] *)
   Definition local_state_coh σ ip γs :=
-    (∃ h Sn ,
+    (∃ h Sn SnHst,
         (* there should be a heap *)
         ⌜state_heaps σ !! ip = Some h⌝ ∗
         (* there should be a socket map *)

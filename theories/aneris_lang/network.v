@@ -158,4 +158,7 @@ Module Network.
   Definition messages_to_receive_at (sa : socket_address) (M : message_soup) :=
     filter (λ (m : message), m_destination m = sa) M.
 
+  Definition messages_sent_from (sa : socket_address) (M : message_soup) :=
+    filter (λ (m : message), m_sender m = sa) M.
+
 End Network.
