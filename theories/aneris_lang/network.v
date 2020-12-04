@@ -42,7 +42,8 @@ Module Network.
     saddress : option socket_address
   }.
 
-  Global Instance etaSocket : Settable _ := settable! mkSocket <sfamily; stype; sprotocol; saddress>.
+  Global Instance etaSocket : Settable _ :=
+    settable! mkSocket <sfamily; stype; sprotocol; saddress>.
 
   Definition socket_handle := positive.
 
@@ -123,7 +124,8 @@ Module Network.
     m_body : message_body;
   }.
 
-  Instance etaMessage : Settable _ := settable! mkMessage <m_sender; m_destination; m_protocol; m_body>.
+  Instance etaMessage : Settable _ :=
+    settable! mkMessage <m_sender; m_destination; m_protocol; m_body>.
 
   Global Instance message_decidable : EqDecision message.
   Proof. solve_decision. Defined.

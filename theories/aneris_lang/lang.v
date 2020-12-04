@@ -1,6 +1,6 @@
 Require Import Coq.Strings.Ascii.
 From aneris.aneris_lang Require Export network.
-From iris.program_logic Require Export language ectx_language ectxi_language.
+From aneris.program_logic Require Export language ectx_language ectxi_language.
 From iris.algebra Require Export ofe gset.
 From stdpp Require Export strings.
 From stdpp Require Import gmap fin pretty binders.
@@ -67,7 +67,9 @@ Inductive expr :=
 | SocketBind (e1 : expr) (e2 : expr)
 | SendTo (e1 : expr) (e2 : expr) (e3 : expr)
 | ReceiveFrom (e1 : expr)
+| SetReceiveTimeout (e1 : expr) (e2 e3 : expr)
 | Start (ip : base_lit) (e : expr)
+
 with val :=
 | LitV (l : base_lit)
 | RecV (f x : binder) (e : expr)
@@ -114,16 +116,20 @@ Proof.
         | Var x, Var x' => cast_if (decide (x = x'))
         | Rec f x e, Rec f' x' e' =>
           cast_if_and3 (decide (f = f')) (decide (x = x')) (decide (e = e'))
-        | App e1 e2, App e1' e2' => cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
+        | App e1 e2, App e1' e2' =>
+          cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | UnOp o e, UnOp o' e' => cast_if_and (decide (o = o')) (decide (e = e'))
         | BinOp o e1 e2, BinOp o' e1' e2' =>
           cast_if_and3 (decide (o = o')) (decide (e1 = e1')) (decide (e2 = e2'))
         | If e0 e1 e2, If e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | FindFrom e0 e1 e2, FindFrom e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | Substring e0 e1 e2, Substring e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | Pair e1 e2, Pair e1' e2' =>
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | Fst e, Fst e' => cast_if (decide (e = e'))
@@ -131,23 +137,30 @@ Proof.
         | InjL e, InjL e' => cast_if (decide (e = e'))
         | InjR e, InjR e' => cast_if (decide (e = e'))
         | Case e0 e1 e2, Case e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | Fork e, Fork e' => cast_if (decide (e = e'))
         | Alloc e, Alloc e' => cast_if (decide (e = e'))
         | Load e, Load e' => cast_if (decide (e = e'))
         | Store e1 e2, Store e1' e2' =>
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | CAS e0 e1 e2, CAS e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | MakeAddress e1 e2, MakeAddress e1' e2' =>
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | NewSocket e0 e1 e2, NewSocket e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | SocketBind e1 e2, SocketBind e1' e2' =>
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | SendTo e0 e1 e2, SendTo e0' e1' e2' =>
-          cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | ReceiveFrom e, ReceiveFrom e' => cast_if (decide (e = e'))
+        | SetReceiveTimeout e0 e1 e2,  SetReceiveTimeout e0' e1' e2' =>
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | Start e0 e1, Start e0' e1' =>
           cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
         | _, _ => right _
@@ -260,7 +273,8 @@ Proof.
      match e with
      | Val v => GenNode 0 [gov v]
      | Var x => GenLeaf (inl (inl x))
-     | Rec f x e => GenNode 1 [GenLeaf (inl (inr f)); GenLeaf (inl (inr x)); go e]
+     | Rec f x e =>
+       GenNode 1 [GenLeaf (inl (inr f)); GenLeaf (inl (inr x)); go e]
      | App e1 e2 => GenNode 2 [go e1; go e2]
      | UnOp op e => GenNode 3 [GenLeaf (inr (inr (inl op))); go e]
      | BinOp op e1 e2 => GenNode 4 [GenLeaf (inr (inr (inr op))); go e1; go e2]
@@ -280,12 +294,13 @@ Proof.
      | SocketBind e1 e2 => GenNode 18 [go e1; go e2]
      | SendTo e1 e2 e3 => GenNode 19 [go e1; go e2; go e3]
      | ReceiveFrom e => GenNode 20 [go e]
-     | Start i e => GenNode 21 [
+     | SetReceiveTimeout e1 e2 e3 => GenNode 21 [go e1; go e2; go e3]
+     | Start i e => GenNode 22 [
                                   GenLeaf(inr (inl i));
                                   go e]
-     | FindFrom e1 e2 e3 => GenNode 22 [go e1; go e2; go e3]
-     | Substring e1 e2 e3 => GenNode 23 [go e1; go e2; go e3]
-     | CAS e1 e2 e3 => GenNode 24 [go e1; go e2; go e3]
+     | FindFrom e1 e2 e3 => GenNode 23 [go e1; go e2; go e3]
+     | Substring e1 e2 e3 => GenNode 24 [go e1; go e2; go e3]
+     | CAS e1 e2 e3 => GenNode 25 [go e1; go e2; go e3]
      end
    with gov v :=
      match v with
@@ -302,10 +317,12 @@ Proof.
      match e with
      | GenNode 0 [v] => Val (gov v)
      | GenLeaf (inl (inl x)) => Var x
-     | GenNode 1 [GenLeaf (inl (inr f)); GenLeaf (inl (inr x)); e] => Rec f x (go e)
+     | GenNode
+         1 [GenLeaf (inl (inr f)); GenLeaf (inl (inr x)); e] => Rec f x (go e)
      | GenNode 2 [e1; e2] => App (go e1) (go e2)
      | GenNode 3 [GenLeaf (inr (inr (inl op))); e] => UnOp op (go e)
-     | GenNode 4 [GenLeaf (inr (inr (inr op))); e1; e2] => BinOp op (go e1) (go e2)
+     | GenNode
+         4 [GenLeaf (inr (inr (inr op))); e1; e2] => BinOp op (go e1) (go e2)
      | GenNode 5 [e0; e1; e2] => If (go e0) (go e1) (go e2)
      | GenNode 6 [e1; e2] => Pair (go e1) (go e2)
      | GenNode 7 [e] => Fst (go e)
@@ -322,17 +339,19 @@ Proof.
      | GenNode 18 [e1; e2] => SocketBind (go e1) (go e2)
      | GenNode 19 [e1; e2; e3] => SendTo (go e1) (go e2) (go e3)
      | GenNode 20 [e] => ReceiveFrom (go e)
-     | GenNode 21 [
+     | GenNode 21 [e1; e2; e3] => SetReceiveTimeout (go e1) (go e2) (go e3)
+     | GenNode 22 [
                    GenLeaf (inr (inl i)); e2] => Start i (go e2)
-     | GenNode 22 [e1; e2; e3] => FindFrom (go e1) (go e2) (go e3)
-     | GenNode 23 [e1; e2; e3] => Substring (go e1) (go e2) (go e3)
-     | GenNode 24 [e1; e2; e3] => CAS (go e1) (go e2) (go e3)
+     | GenNode 23 [e1; e2; e3] => FindFrom (go e1) (go e2) (go e3)
+     | GenNode 24 [e1; e2; e3] => Substring (go e1) (go e2) (go e3)
+     | GenNode 25 [e1; e2; e3] => CAS (go e1) (go e2) (go e3)
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
      match v with
      | GenLeaf (inr (inl l)) => LitV l
-     | GenNode 0 [GenLeaf (inl (inr f)); GenLeaf (inl (inr x)); e] => RecV f x (go e)
+     | GenNode
+         0 [GenLeaf (inl (inr f)); GenLeaf (inl (inr x)); e] => RecV f x (go e)
      | GenNode 1 [v1; v2] => PairV (gov v1) (gov v2)
      | GenNode 2 [v] => InjLV (gov v)
      | GenNode 3 [v] => InjRV (gov v)
@@ -340,7 +359,8 @@ Proof.
      end
    for go).
  refine (inj_countable' enc dec _).
- refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
+ refine (fix go (e : expr) {struct e}
+         := _ with gov (v : val) {struct v} := _ for go).
  - destruct e; simpl; f_equal; [exact (gov _) | done..].
  - destruct v; by f_equal.
 Qed.
@@ -393,8 +413,10 @@ Inductive ectx_item :=
 | SendToLCtx (v1 v2 : val)
 | SendToMCtx (e0 : expr) (v2 : val)
 | SendToRCtx (e0 e1 : expr)
-| ReceiveFromCtx
-.
+| SetReceiveTimeoutLCtx (v1 v2 : val)
+| SetReceiveTimeoutMCtx (e0 : expr) (v2 : val)
+| SetReceiveTimeoutRCtx (e0 e1 : expr)
+| ReceiveFromCtx.
 
 Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
@@ -434,6 +456,9 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | SendToLCtx v1 v2 => SendTo e (Val v1) (Val v2)
   | SendToMCtx e0 v2 => SendTo e0 e (Val v2)
   | SendToRCtx e0 e1 => SendTo e0 e1 e
+  | SetReceiveTimeoutLCtx v1 v2 => SetReceiveTimeout e (Val v1) (Val v2)
+  | SetReceiveTimeoutMCtx e0 v2 => SetReceiveTimeout e0 e (Val v2)
+  | SetReceiveTimeoutRCtx e0 e1 => SetReceiveTimeout e0 e1 e
   | ReceiveFromCtx => ReceiveFrom e
   end.
 
@@ -466,6 +491,8 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
     NewSocket (subst x v e0) (subst x v e1) (subst x v e2)
   | SocketBind e1 e2 => SocketBind (subst x v e1) (subst x v e2)
   | SendTo e0 e1 e2 => SendTo (subst x v e0) (subst x v e1) (subst x v e2)
+  | SetReceiveTimeout e0 e1 e2 =>
+    SetReceiveTimeout (subst x v e0) (subst x v e1) (subst x v e2)
   | ReceiveFrom e => ReceiveFrom (subst x v e)
   | Start i e => Start i (subst x v e)
   end.
@@ -731,11 +758,14 @@ Definition bin_op_eval_bool (op : bin_op) (b1 b2 : bool) : option base_lit :=
 
 Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
   match v1, v2, op with
-  | LitV (LitInt n1), LitV (LitInt n2), op => Some $ LitV $ bin_op_eval_int op n1 n2
-  | LitV (LitBool b1), LitV (LitBool b2), op => LitV <$> bin_op_eval_bool op b1 b2
+  | LitV (LitInt n1), LitV (LitInt n2), op =>
+    Some $ LitV $ bin_op_eval_int op n1 n2
+  | LitV (LitBool b1), LitV (LitBool b2), op =>
+    LitV <$> bin_op_eval_bool op b1 b2
   | LitV (LitString s1), LitV (LitString s2), StringApp =>
     Some $ LitV $ LitString (String.append s1 s2)
-  | v1, v2, op => guard (op = EqOp); Some $ LitV $ LitBool $ bool_decide (v1 = v2)
+  | v1, v2, op =>
+    guard (op = EqOp); Some $ LitV $ LitBool $ bool_decide (v1 = v2)
   end.
 
 Definition option_nat_to_val (v : option nat) :=
@@ -778,7 +808,9 @@ Inductive head_step
                 (of_val (option_nat_to_val (index v1 v2 v0))) σ
                 []
   | SubstringS v0 v1 v2 σ :
-      head_step (Substring (Val (LitV $ LitString v0)) (Val (LitV $ LitInt (Z.of_nat v1))) (Val (LitV $ LitInt (Z.of_nat v2)))) σ
+      head_step (Substring (Val (LitV $ LitString v0))
+                           (Val (LitV $ LitInt (Z.of_nat v1)))
+                           (Val (LitV $ LitInt (Z.of_nat v2)))) σ
                 []
                 (Val $ LitV $ LitString (substring v1 v2 v0)) σ
                 []
@@ -816,9 +848,12 @@ Inductive head_step
                 (Val $ LitV $ LitBool true) (<[l:=v2]>σ)
                 []
   | MakeAddressS s p σ :
-      head_step (MakeAddress (Val $ LitV $ (LitString s)) (Val $ LitV $ (LitInt p))) σ
+      head_step (MakeAddress
+                   (Val $ LitV $ (LitString s))
+                   (Val $ LitV $ (LitInt p))) σ
                 []
-                (Val $ LitV $ LitSocketAddress (SocketAddressInet s (Z.to_pos p))) σ
+                (Val $ LitV $ LitSocketAddress
+                     (SocketAddressInet s (Z.to_pos p))) σ
                 [].
 
 (** Basic properties about the language *)
@@ -829,7 +864,8 @@ Lemma fill_item_val Ki e :
   is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
 Proof. intros [v ?]. destruct Ki; simplify_option_eq; eauto. Qed.
 
-Lemma val_head_stuck e1 σ1 κ e2 σ2 efs : head_step e1 σ1 κ e2 σ2 efs → to_val e1 = None.
+Lemma val_head_stuck e1 σ1 κ e2 σ2 efs :
+  head_step e1 σ1 κ e2 σ2 efs → to_val e1 = None.
 Proof. destruct 1; naive_solver. Qed.
 
 Lemma head_ctx_step_val Ki e σ1 κ e2 σ2 efs :
@@ -846,6 +882,9 @@ Lemma alloc_fresh v σ :
   head_step (Alloc (Val v)) σ [] (Val $ LitV (LitLoc l)) (<[l:=v]>σ) [].
 Proof. by intros; apply AllocS, (not_elem_of_dom (D:=gset loc)), is_fresh. Qed.
 
+Inductive base_config_step : state -> list observation -> state -> Prop :=
+| ConfigIdStep σ κ : base_config_step σ κ σ.
+
 Lemma base_mixin : EctxiLanguageMixin of_val to_val fill_item head_step.
 Proof.
   split; apply _ || eauto using to_of_val, of_to_val, val_head_stuck,
@@ -861,10 +900,10 @@ Import Network.
 Import RecordSetNotations.
 
 Record aneris_expr := mkExpr { expr_n : ip_address;
-                        expr_e : base_lang.expr }.
+                               expr_e : base_lang.expr }.
 
 Record aneris_val := mkVal { val_n : ip_address;
-                      val_e : base_lang.val }.
+                             val_e : base_lang.val }.
 
 Global Instance expr_inhabited : Inhabited aneris_expr :=
   populate {| expr_n := "";
@@ -888,10 +927,10 @@ Definition aneris_to_val e : option aneris_val :=
 (** For each node of the network, its local state is defined as a triple
    - a map [H] that maps pointers to values,
    - a map [Sn] associating each socket handler with a tuple of a socket and
-     the messages received and send on the socket, and
+     the receive buffer, and
    - a map [P] tracking for each ip address the ports in use on the ip. *)
 Definition heap := gmap base_lang.loc base_lang.val.
-Definition sockets := gmap socket_handle (socket * message_soup * message_soup).
+Definition sockets := gmap socket_handle (socket * bool * message_soup).
 Definition ports_in_use := gmap ip_address (gset port).
 
 (** The global state of the system
@@ -924,7 +963,7 @@ Implicit Types S : gmap ip_address sockets.
 Implicit Types Sn : sockets .
 Implicit Types P : ports_in_use.
 Implicit Types ps : gset port.
-Implicit Types M R T : message_soup.
+Implicit Types M R : message_soup.
 Implicit Types A B : gset socket_address.
 Implicit Types sis : gmap socket_address gname.
 Implicit Types a : socket_address.
@@ -948,10 +987,10 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitSocket sh)
-      (<[sh:=(mkSocket f s p None, ∅, ∅)]>Sn) P M
-| SocketBindSucS sh a R T skt Sn P ps M  :
+      (<[sh:=(mkSocket f s p None, true, ∅)]>Sn) P M
+| SocketBindS sh a R skt Sn P ps M  :
     (* The socket handle is bound to a socket. *)
-    Sn !! sh = Some (skt, R, T) →
+    Sn !! sh = Some (skt, true, R) →
     (* The socket has no assigned address. *)
     saddress skt = None →
     (* The port is not in use *)
@@ -965,12 +1004,12 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt 0)
-      (<[sh:=((skt <| saddress := Some a |>), R, T)]>Sn)
+      (<[sh:=((skt <| saddress := Some a |>), true, R)]>Sn)
       (<[ip_of_address a:={[ port_of_address a ]} ∪ ps]> P)
       M
-| SendToBoundS sh a mbody R T skt Sn P M f :
+| SendToS sh a mbody R skt Sn P M f b :
     (* There is a socket that has been allocated for the handle *)
-    Sn !! sh = Some (skt, R, T) →
+    Sn !! sh = Some (skt, b, R) →
     (* The socket has an assigned address *)
     saddress skt = Some f ->
     let: new_message := mkMessage f a (sprotocol skt) mbody in
@@ -982,14 +1021,14 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
-      (<[sh:=(skt, R, ({[new_message]} ∪ T))]>Sn) P ({[ new_message ]} ∪ M)
-| ReceiveFromSomeS sh R T skt a m Sn P M :
+      (<[sh:=(skt, b, R)]>Sn) P ({[ new_message ]} ∪ M)
+| ReceiveFromSomeS sh R skt a m Sn P M b:
     (* The socket handle is bound to a socket *)
-    Sn !! sh = Some (skt, R, T) →
+    Sn !! sh = Some (skt, b, R) →
     (* The socket has an assigned address *)
     saddress skt = Some a →
-    (* There is a message to receive *)
-    m ∈ (messages_to_receive_at a M) →
+    (* There is a message to receive on the buffer *)
+    m ∈ R →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh))
@@ -997,15 +1036,54 @@ Inductive socket_step ip :
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
-      (<[sh:=(skt, {[ m ]} ∪ R, T)]>Sn) P M
-| ReceiveFromNoneS sh srt Sn P M :
-    (* The socket handle is bound to some socket *)
-    Sn !! sh = Some srt →
+      (<[sh:=(skt, b, R ∖ {[m]})]>Sn) P M
+| ReceiveFromNoneS sh skt Sn P M :
+    (* The socket handle is bound to some socket
+       and there is nothing to receive
+       and the operation should not block forever
+       (a positive timeout was set). *)
+    Sn !! sh = Some (skt, false, ∅) →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
       (* reduces to *)
-      (Val $ InjLV (LitV LitUnit)) Sn P M.
+      (Val $ InjLV (LitV LitUnit)) Sn P M
+| ReceiveFromBlockS sh skt Sn P M :
+    (* The socket handle is bound to some socket
+       and there is nothing to receive
+       and the operation should block
+       (either no timeout, or timeout 0.0 was set). *)
+    Sn !! sh = Some (skt, true, ∅) →
+    socket_step
+      ip
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
+      (* reduces to *)
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
+| SetReceiveTimeoutPositiveS sh skt R Sn P M b m n:
+    Sn !! sh = Some (skt, b, R) →
+    0 <= m →
+    0 < n →
+    socket_step
+      ip
+      (SetReceiveTimeout
+         (Val $ LitV $ LitSocket sh)
+         (Val $ LitV $ LitInt m)
+         (Val $ LitV $ LitInt n)) Sn P M
+      (* reduces to *)
+      (Val $ (LitV LitUnit))
+      (<[sh:=(skt, false, R)]>Sn) P M
+| SetReceiveTimeoutZeroS sh skt R Sn P M b:
+    Sn !! sh = Some (skt, b, R) →
+    socket_step
+      ip
+      (SetReceiveTimeout
+         (Val $ LitV $ LitSocket sh)
+         (Val $ LitV $ LitInt 0)
+         (Val $ LitV $ LitInt 0)) Sn P M
+      (* reduces to *)
+      (Val $ (LitV LitUnit))
+      (<[sh:=(skt, false, R)]>Sn) P M.
+
 
 Definition is_head_step_pure (e : base_lang.expr) : bool :=
   match e with
@@ -1016,7 +1094,8 @@ Definition is_head_step_pure (e : base_lang.expr) : bool :=
   | NewSocket _ _ _
   | SocketBind _ _
   | SendTo _ _ _
-  | ReceiveFrom _ => false
+  | ReceiveFrom _
+  | SetReceiveTimeout _ _ _ => false
   | _ => true
   end.
 
@@ -1064,6 +1143,7 @@ Inductive head_step : aneris_expr → state → list observation →
                  state_ports_in_use := P';
                  state_ms := M'; |}
               [].
+
 
 Lemma aneris_to_of_val v : aneris_to_val (aneris_of_val v) = Some v.
 Proof. by destruct v. Qed.
@@ -1133,7 +1213,28 @@ Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 
 Instance fill_item_inj Ki : Inj (=) (=) (λ e, aneris_fill_item Ki e).
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
-                              simplify_eq/=; auto with f_equal. Qed.
+                             simplify_eq/=; auto with f_equal. Qed.
+
+Inductive config_step :
+  state -> list observation → state -> Prop :=
+| MessageDeliverStep n σ κ Sn Sn' sh a skt b R m:
+    m ∈ (messages_to_receive_at a (state_ms σ)) →
+    state_sockets σ !! n = Some Sn ->
+    Sn !! sh = Some (skt, b, R) →
+    Sn' = <[sh := (skt, b, R ∪ {[m]})]>Sn →
+    saddress skt = Some a →
+    config_step σ κ
+                {| state_heaps := state_heaps σ;
+                   state_sockets := <[n:=Sn']>(state_sockets σ);
+                   state_ports_in_use := state_ports_in_use σ;
+                   state_ms := state_ms σ; |}
+| MessageDropStep σ m κ :
+    m ∈ state_ms σ →
+    config_step σ κ
+                 {| state_heaps := state_heaps σ;
+                   state_sockets := state_sockets σ;
+                   state_ports_in_use := state_ports_in_use σ;
+                   state_ms := state_ms σ ∖ {[m]}; |}.
 
 Lemma aneris_lang_mixin :
   EctxiLanguageMixin aneris_of_val aneris_to_val aneris_fill_item head_step.
@@ -1163,11 +1264,13 @@ Lemma newsocket_fresh n Sn P M v1 v2 v3 :
                          (Val $ LitV $ LitSocketType v2)
                          (Val $ LitV $ LitProtocol v3)) Sn P M
               (Val $ LitV (LitSocket h))
-              (<[h:=(mkSocket v1 v2 v3 None, ∅, ∅)]>Sn) P M.
+              (<[h:=(mkSocket v1 v2 v3 None, true, ∅)]>Sn) P M.
 Proof.
   intros; apply NewSocketS.
   apply (not_elem_of_dom (D:=gset loc)), is_fresh.
 Qed.
+
+
 
 End aneris_lang.
 
