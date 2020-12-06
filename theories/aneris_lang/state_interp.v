@@ -7,6 +7,8 @@ From aneris.program_logic Require Export weakestpre.
 From aneris.program_logic Require Import ectx_lifting (* total_ectx_lifting *).
 From aneris.program_logic Require Export gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network resources.
+From aneris.aneris_lang.lib Require Import util.
+
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
@@ -25,7 +27,8 @@ Ltac ddeq k1 k2 :=
   repeat
     match goal with
     | Hyp : context[ (<[_:=_]>_) !! _ ] |- _ =>
-      rewrite lookup_insert in Hyp || (rewrite lookup_insert_ne in Hyp; last done);
+      rewrite lookup_insert in
+          Hyp || (rewrite lookup_insert_ne in Hyp; last done);
       simplify_eq /=
     | Hyp : is_Some _ |- _ => destruct Hyp
     | |- context[ (<[_:=_]>_) !! _ ] =>
@@ -43,11 +46,12 @@ Section definitions.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
   Implicit Types S : gmap ip_address sockets.
-  Implicit Types Sn : sockets .
+  Implicit Types Sn : sockets.
   Implicit Types P : ports_in_use.
   Implicit Types ps : gset port.
   Implicit Types ips : gset ip_address.
   Implicit Types M R T : message_soup.
+  Implicit Types Mhst : gmap socket_address (message_soup * message_soup).
   Implicit Types m : message.
   Implicit Types A B : gset socket_address.
   Implicit Types sis : gmap socket_address gname.
@@ -58,16 +62,20 @@ Section definitions.
   Implicit Types γm : gmap ip_address node_gnames.
 
   (* The domains of heaps and sockets coincide with the gname map [γm] *)
-  Definition gnames_coh γm H S :=
+  Definition gset_ipofsa := gset_map ip_of_address.
+
+  Definition gnames_coh γm H S Mhst  :=
     dom (gset ip_address) γm = dom (gset ip_address) H ∧
-    dom (gset ip_address) γm = dom (gset ip_address) S.
+    dom (gset ip_address) γm = dom (gset ip_address) S ∧
+    dom (gset ip_address) γm = gset_ipofsa (dom (gset socket_address) Mhst).
 
   (* Addresses with socket interpretations are bound *)
   Definition socket_interp_coh P :=
     (∃ sis A,
         (* [A] is the set of addresses with fixed interpretations *)
         fixed A ∗
-        (* [si] is the map from addresses to name of saved socket interpretations *)
+        (* [si] is the map from addresses to name of
+           saved socket interpretations *)
         saved_si_auth sis ∗
         (* there exists a socket interpretation for all addresses in this map *)
         ([∗ set] s ∈ (dom (gset socket_address) sis), ∃ φ, s ⤇ φ) ∗
@@ -80,64 +88,86 @@ Section definitions.
                  a ∈ A ∨ (a ∉ A ∧ ∀ ps, P !! ip_of_address a = Some ps →
                                         port_of_address a ∈ ps))⌝)%I.
 
-  Definition sktHist : Type := socket * bool * message_soup * message_soup.
-  Definition socketsHist := gmap socket_handle sktHist.
+  (* Free ips have no bound ports, no heap, and no sockets  *)
+  Definition free_ips_coh σ :=
+    (∃ free_ips free_ports,
+        (* the domains of [free_ips] and [free_ports] are disjoint *)
+        (⌜dom (gset _) free_ports ## free_ips ∧
+         (* if the ip [ip] is free, no ports have been bound  *)
+         (∀ ip, ip ∈ free_ips → state_ports_in_use σ !! ip = Some ∅) ∧
+         (* if the ip [ip] is free, neither a heap nor a socket map has been
+            allocated *)
+         (∀ ip, ip ∈ free_ips →
+                state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None) ∧
+         (* free ports and bound ports are disjoint *)
+         (∀ ip ps, free_ports !! ip = Some (GSet ps) →
+             ∃ bound_ports,
+               (state_ports_in_use σ) !! ip = Some bound_ports ∧
+               ps ## bound_ports )⌝) ∗
+         (* we have the auth parts of the resources for free ips and ports *)
+         free_ips_auth free_ips ∗
+         free_ports_auth free_ports)%I.
 
+(* TODO  ... ---> *)
 
+  Definition message_history SnH MH :=
+    ∀ m,
+      m ∈ MH ↔
+        ∃ sh skt b R T,
+          SnH !! sh = Some (skt, b, R, T) ∧
+          (m ∈ R ∧ saddress skt = Some (m_destination m)) ∨
+          (m ∈ T ∧ saddress skt = Some (m_sender m)).
 
-  (* The local state of the node at [ip] is coherent with [σ] and [γs] *)
-  Definition local_state_coh σ ip γs :=
-    (∃ h Sn SnHst,
-        (* there should be a heap *)
-        ⌜state_heaps σ !! ip = Some h⌝ ∗
-        (* there should be a socket map *)
-        ⌜state_sockets σ !! ip = Some Sn⌝ ∗
-        (* it's a valid node *)
-        mapsto_node ip γs ∗
-        (* we own the authoritative part of the heap and sockets *)
-        heap_ctx γs h ∗
-        sockets_ctx γs Sn)%I.
-
-  (* The ports of all bound addresses in [Sn] are also in [P] *)
-  Definition bound_ports_coh Sn P :=
-    ∀ sh skt a ps R T,
-      Sn !! sh = Some (skt, R, T) →
+   (* The ports of all bound addresses in [Sn] are also in [P] *)
+  Definition bound_ports_coh SnH P :=
+    ∀ sh skt a ps b R T,
+      SnH !! sh = Some (skt, b, R, T) →
       saddress skt = Some a →
       P !! ip_of_address a = Some ps →
       (port_of_address a) ∈ ps.
 
   (* All sockets in [Sn] with the same address have the same handler *)
-  Definition socket_handlers_coh Sn  :=
-    ∀ sh sh' skt skt' R R' T T',
-      Sn !! sh = Some (skt, R, T) →
-      Sn !! sh' = Some (skt', R', T') →
+  Definition socket_handlers_coh SnH  :=
+    ∀ sh sh' skt skt' b b' R R' T T',
+      SnH !! sh = Some (skt, b, R, T) →
+      SnH !! sh' = Some (skt', b', R', T') →
       is_Some (saddress skt) →
       saddress skt = saddress skt' →
       sh = sh'.
 
   (* Sent and received messages at all socket in [Sn] are in [M] *)
-  Definition socket_messages_coh Sn M :=
-    ∀ sh skt R T a,
-      Sn !! sh = Some (skt, R, T) →
+  Definition socket_messages_coh SnH :=
+    ∀ sh skt b R T a,
+      SnH !! sh = Some (skt, b, R, T) →
       saddress skt = Some a →
-      (∀ m, m ∈ R → m_destination m = a ∧ m ∈ M) ∧
-      (∀ m, m ∈ T → m_sender m = a ∧ m ∈ M).
+      (∀ m, m ∈ R → m_destination m = a) ∧
+      (∀ m, m ∈ T → m_sender m = a).
 
   (* all sockets in [Sn] are bound to ip address [ip] *)
-  Definition socket_addresses_coh Sn ip :=
-    ∀ sh skt R T a,
-      Sn !! sh = Some (skt, R, T) →
+  Definition socket_addresses_coh SnH ip :=
+    ∀ sh skt b R T a,
+      SnH !! sh = Some (skt, b, R, T) →
       saddress skt = Some a →
       ip_of_address a = ip.
 
+  Definition sockets_coh Sn SnH :=
+    ∀ sh skt b r sa,
+      Sn !! sh = Some (skt, b, r) →
+      saddress skt = Some sa →
+      ∃ R T, SnH !! sh = Some (skt, b, R, T)
+             ∧ r ⊆ messages_sent_from  sa MH
+             ∧ R ⊆ messages_to_receive_at sa MH
+             ∧ T ⊆ messages_sent_from sa MH.
+
   (* The sockets, ports, and message in [S], [M], and [P] are coherent *)
   Definition network_sockets_coh S M P :=
-    ∀ ip Sn,
+    ∀ ip SnH,
       S !! ip = Some Sn →
-      bound_ports_coh Sn P ∧
-      socket_handlers_coh Sn ∧
-      socket_messages_coh Sn M ∧
-      socket_addresses_coh Sn ip.
+      sockets_coh Sn SnH ∧
+      bound_ports_coh SnH P ∧
+      socket_handlers_coh SnH ∧
+      socket_messages_coh SnH ∧
+      socket_addresses_coh SnH ip.
 
   (* [m] has been received *)
   Definition message_received S m :=
@@ -159,25 +189,27 @@ Section definitions.
   Definition network_coh S M P :=
     (⌜network_sockets_coh S M P⌝ ∗ network_messages_coh S M)%I.
 
-  (* Free ips have no bound ports, no heap, and no sockets  *)
-  Definition free_ips_coh σ :=
-    (∃ free_ips free_ports,
-        (* the domains of [free_ips] and [free_ports] are disjoint *)
-        (⌜dom (gset _) free_ports ## free_ips ∧
-         (* if the ip [ip] is free, no ports have been bound  *)
-         (∀ ip, ip ∈ free_ips → state_ports_in_use σ !! ip = Some ∅) ∧
-         (* if the ip [ip] is free, neither a heap nor a socket map has been
-            allocated *)
-         (∀ ip, ip ∈ free_ips →
-                state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None) ∧
-         (* free ports and bound ports are disjoint *)
-         (∀ ip ps, free_ports !! ip = Some (GSet ps) →
-             ∃ bound_ports,
-               (state_ports_in_use σ) !! ip = Some bound_ports ∧
-               ps ## bound_ports )⌝) ∗
-         (* we have the auth parts of the resources for free ips and ports *)
-         free_ips_auth free_ips ∗
-         free_ports_auth free_ports)%I.
+
+
+  Definition messages_coh M MH := M ⊆ MH.
+
+  (* The local state of the node at [ip] is coherent with [σ] and [γs] *)
+  Definition local_state_coh σ ip γs :=
+    (∃ h Sn M SnH MH,
+        ⌜state_ms σ !! ip = Some M⌝ ∗
+        (* there should be a heap *)
+        ⌜state_heaps σ !! ip = Some h⌝ ∗
+        (* there should be a socket map *)
+        ⌜state_sockets σ !! ip = Some Sn⌝ ∗
+        (* it's a valid node *)
+        mapsto_node ip γs ∗
+        (* we own the authoritative part of the heap and sockets *)
+        heap_ctx γs h ∗
+        message_soup_res MH ∗
+        sockets_ctx γs SnH ∗
+        ⌜messages_coh M MH⌝ ∗
+        ⌜sockets_coh Sn SnH MH⌝ ∗
+        ⌜history_coh Sn SnH MH⌝ )%I.
 
   Definition aneris_state_interp σ :=
     (∃ γm,
