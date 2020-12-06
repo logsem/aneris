@@ -1,7 +1,7 @@
 From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
-From iris.program_logic Require Export weakestpre lifting.
-From iris.program_logic Require Import ectx_lifting total_ectx_lifting.
+From aneris.program_logic Require Export weakestpre lifting.
+From aneris.program_logic Require Import ectx_lifting.
 From iris.proofmode Require Import tactics.
 From aneris.aneris_lang Require Import aneris_lang base_lang state_interp.
 From RecordUpdate Require Import RecordSet.
@@ -127,8 +127,11 @@ Proof. solve_atomic. Qed.
 Instance sendto_atomic n v0 v1 v2 s :
   Atomic s (mkExpr n (SendTo (Val v0) (Val v1) (Val v2))).
 Proof. solve_atomic. Qed.
-Instance receivefrom_atomic n v s : Atomic s (mkExpr n (ReceiveFrom (Val v))).
-Proof. solve_atomic. Qed.
+
+(* NB: receive is not atomic any more! *)
+(* Instance receivefrom_atomic n v s :
+ Atomic s (mkExpr n (ReceiveFrom (Val v))).
+Proof. solve_atomic. Qed.*)
 
 Class AsRecV (v : val) (f x : binder) (erec : expr) :=
   as_recv : v = RecV f x erec.
@@ -326,6 +329,7 @@ Section primitive_laws.
     iModIntro. iSplit; [done|]. iFrame. by iApply "HΦ".
   Qed.
 
+  (* TODO from here ----> *)
   Lemma wp_start ip ports k E e Φ :
     ip ≠ "system" →
     ▷ free_ip ip ∗
@@ -337,8 +341,9 @@ Section primitive_laws.
     iIntros (?) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ κ κs n) "Hσ".
-    iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
-    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip") as "(% & % & %)".
+    iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
+    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
+      as "(% & % & %)".
     iModIntro; iSplit.
     { iPureIntro. do 4 eexists. apply (AssignNewIpStepS _ _ []); eauto. }
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".

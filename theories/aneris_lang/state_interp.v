@@ -51,23 +51,25 @@ Section definitions.
   Implicit Types ps : gset port.
   Implicit Types ips : gset ip_address.
   Implicit Types M R T : message_soup.
-  Implicit Types Mhst : gmap socket_address (message_soup * message_soup).
   Implicit Types m : message.
-  Implicit Types A B : gset socket_address.
-  Implicit Types sis : gmap socket_address gname.
   Implicit Types a : socket_address.
   Implicit Types ip : ip_address.
   Implicit Types sh : socket_handle.
   Implicit Types skt : socket.
+  Implicit Types A B : gset socket_address.
+  Implicit Types Sγ : gmap socket_handle (socket * bool).
+  Implicit Types Mγ : gmap socket_address (message_soup * message_soup).
   Implicit Types γm : gmap ip_address node_gnames.
+  Implicit Types sis : gmap socket_address gname.
+
 
   (* The domains of heaps and sockets coincide with the gname map [γm] *)
   Definition gset_ipofsa := gset_map ip_of_address.
 
-  Definition gnames_coh γm H S Mhst  :=
+  Definition gnames_coh γm H S Mγ  :=
     dom (gset ip_address) γm = dom (gset ip_address) H ∧
     dom (gset ip_address) γm = dom (gset ip_address) S ∧
-    dom (gset ip_address) γm = gset_ipofsa (dom (gset socket_address) Mhst).
+    gset_ipofsa (dom (gset socket_address) Mγ) ⊆ dom (gset ip_address) γm.
 
   (* Addresses with socket interpretations are bound *)
   Definition socket_interp_coh P :=
@@ -108,120 +110,116 @@ Section definitions.
          free_ips_auth free_ips ∗
          free_ports_auth free_ports)%I.
 
-(* TODO  ... ---> *)
 
-  Definition message_history SnH MH :=
-    ∀ m,
-      m ∈ MH ↔
-        ∃ sh skt b R T,
-          SnH !! sh = Some (skt, b, R, T) ∧
-          (m ∈ R ∧ saddress skt = Some (m_destination m)) ∨
-          (m ∈ T ∧ saddress skt = Some (m_sender m)).
+  (* Received messages *)
+  Definition messages_received Mγ :=
+    map_fold (fun k rt acc => rt.1 ∪ acc) ∅ Mγ.
+
+  (* Sent messages *)
+  Definition messages_sent Mγ :=
+    map_fold (fun k rt acc => rt.2 ∪ acc) ∅ Mγ.
+
+  (* [m] has been received *)
+  Definition message_received m Mγ := m ∈ (messages_received Mγ).
+
+
+ (* For all messages [m] in [M], either the network owns the resources [Φ m]
+     described by some socket protocol [Φ] or it has been delivered *)
+  Definition network_resources_messages_coh Mγ :=
+    ([∗ set] m ∈ messages_sent Mγ,
+     (* either [m] is governed by a protocol and
+        the network owns the resources *)
+     (∃ (Φ : socket_interp Σ), (m_destination m) ⤇ Φ ∗ ▷ Φ m) ∨
+     (* or [m] has been delivered somewhere *)
+     ⌜message_received m Mγ⌝)%I.
+
+  Definition sockets_coh Sn Sγ :=
+    ∀ sh skt b r, Sn !! sh = Some (skt, b, r) → Sγ !! sh = Some (skt, b).
+
+  Definition receive_buffer_coh Sn Mγ :=
+    ∀ sh skt b r m,
+      Sn !! sh = Some (skt, b, r) → m ∈ r →
+      ∃ R T, Mγ !! (m_sender m) = Some (R, T) ∧ m ∈ T.
+
+  Definition transit_messages_coh M Mγ :=
+    ∀ m, m ∈ M → ∃ R T,  Mγ !! (m_sender m) = Some (R, T) ∧ m ∈ T.
+
+
+  (* The local state of the node at [ip] is coherent with [σ] and [γs] *)
+  Definition local_state_coh σ ip γs :=
+    (∃ h Sn M Sγ Mγ,
+         (* 1. The physical state is: *)
+        ⌜state_ms σ = M⌝ ∗
+        ⌜state_heaps σ !! ip = Some h⌝ ∗
+        ⌜state_sockets σ !! ip = Some Sn⌝ ∗
+        (* 2. The logical state has the authoritative part of
+           the heap, sockets, and message history*)
+        mapsto_node ip γs ∗
+        heap_ctx γs h ∗
+        sockets_ctx γs Sγ ∗
+        network_messages_ctx γs Mγ ∗
+        (* 3. The physical state is coherent with logical state *)
+        ⌜sockets_coh Sn Sγ⌝ ∗
+        ⌜transit_messages_coh M Mγ⌝ ∗
+        ⌜receive_buffer_coh Sn Mγ⌝)%I.
 
    (* The ports of all bound addresses in [Sn] are also in [P] *)
-  Definition bound_ports_coh SnH P :=
-    ∀ sh skt a ps b R T,
-      SnH !! sh = Some (skt, b, R, T) →
+   Definition bound_ports_coh Sn P :=
+    ∀ sh skt a ps b r,
+      Sn !! sh = Some (skt, b, r) →
       saddress skt = Some a →
       P !! ip_of_address a = Some ps →
       (port_of_address a) ∈ ps.
 
   (* All sockets in [Sn] with the same address have the same handler *)
-  Definition socket_handlers_coh SnH  :=
-    ∀ sh sh' skt skt' b b' R R' T T',
-      SnH !! sh = Some (skt, b, R, T) →
-      SnH !! sh' = Some (skt', b', R', T') →
+  Definition socket_handlers_coh Sn :=
+    ∀ sh sh' skt skt' b b' r r',
+      Sn !! sh = Some (skt, b, r) →
+      Sn !! sh' = Some (skt', b', r') →
       is_Some (saddress skt) →
       saddress skt = saddress skt' →
       sh = sh'.
 
   (* Sent and received messages at all socket in [Sn] are in [M] *)
-  Definition socket_messages_coh SnH :=
-    ∀ sh skt b R T a,
-      SnH !! sh = Some (skt, b, R, T) →
+  Definition socket_messages_coh Sn :=
+    ∀ sh skt b r a,
+      Sn !! sh = Some (skt, b, r) →
       saddress skt = Some a →
-      (∀ m, m ∈ R → m_destination m = a) ∧
-      (∀ m, m ∈ T → m_sender m = a).
+      (∀ m, m ∈ r → m_destination m = a).
 
   (* all sockets in [Sn] are bound to ip address [ip] *)
-  Definition socket_addresses_coh SnH ip :=
-    ∀ sh skt b R T a,
-      SnH !! sh = Some (skt, b, R, T) →
+  Definition socket_addresses_coh Sn ip :=
+    ∀ sh skt b r a,
+      Sn !! sh = Some (skt, b, r) →
       saddress skt = Some a →
       ip_of_address a = ip.
 
-  Definition sockets_coh Sn SnH :=
-    ∀ sh skt b r sa,
-      Sn !! sh = Some (skt, b, r) →
-      saddress skt = Some sa →
-      ∃ R T, SnH !! sh = Some (skt, b, R, T)
-             ∧ r ⊆ messages_sent_from  sa MH
-             ∧ R ⊆ messages_to_receive_at sa MH
-             ∧ T ⊆ messages_sent_from sa MH.
-
   (* The sockets, ports, and message in [S], [M], and [P] are coherent *)
-  Definition network_sockets_coh S M P :=
-    ∀ ip SnH,
+  Definition ip_sockets_coh S M P :=
+    ∀ ip Sn,
       S !! ip = Some Sn →
-      sockets_coh Sn SnH ∧
-      bound_ports_coh SnH P ∧
-      socket_handlers_coh SnH ∧
-      socket_messages_coh SnH ∧
-      socket_addresses_coh SnH ip.
+      bound_ports_coh Sn P ∧
+      socket_handlers_coh Sn ∧
+      socket_messages_coh Sn ∧
+      socket_addresses_coh Sn ip.
 
-  (* [m] has been received *)
-  Definition message_received S m :=
-    ∃ Sn sh skt a R T,
-      S !! ip_of_address a = Some Sn ∧
-      Sn !! sh = Some (skt, R, T) ∧
-      saddress skt = Some a ∧
-      m ∈ R.
+  Definition network_messages_coh Mγ :=
+    ∀ a R T, Mγ !! a = Some (R,T) →
+             (∀ m, m ∈ R → m_destination m = a) ∧
+             (∀ m, m ∈ T → m_sender m = a).
 
-  (* For all messages [m] in [M], either the network owns the resources [Φ m]
-     described by some socket protocol [Φ] or it has been delivered *)
-  Definition network_messages_coh S M :=
-    ([∗ set] m ∈ M,
-     (* either [m] is governed by a protocol and the network owns the resources *)
-     (∃ (Φ : socket_interp Σ), (m_destination m) ⤇ Φ ∗ ▷ Φ m) ∨
-     (* or [m] has been delivered somewhere *)
-     ⌜message_received S m⌝)%I.
-
-  Definition network_coh S M P :=
-    (⌜network_sockets_coh S M P⌝ ∗ network_messages_coh S M)%I.
-
-
-
-  Definition messages_coh M MH := M ⊆ MH.
-
-  (* The local state of the node at [ip] is coherent with [σ] and [γs] *)
-  Definition local_state_coh σ ip γs :=
-    (∃ h Sn M SnH MH,
-        ⌜state_ms σ !! ip = Some M⌝ ∗
-        (* there should be a heap *)
-        ⌜state_heaps σ !! ip = Some h⌝ ∗
-        (* there should be a socket map *)
-        ⌜state_sockets σ !! ip = Some Sn⌝ ∗
-        (* it's a valid node *)
-        mapsto_node ip γs ∗
-        (* we own the authoritative part of the heap and sockets *)
-        heap_ctx γs h ∗
-        message_soup_res MH ∗
-        sockets_ctx γs SnH ∗
-        ⌜messages_coh M MH⌝ ∗
-        ⌜sockets_coh Sn SnH MH⌝ ∗
-        ⌜history_coh Sn SnH MH⌝ )%I.
-
-  Definition aneris_state_interp σ :=
-    (∃ γm,
+   Definition aneris_state_interp σ :=
+    (∃ γm Mγ,
         node_gnames_auth γm ∗
-        ⌜gnames_coh γm (state_heaps σ) (state_sockets σ)⌝ ∗
+        ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) Mγ⌝ ∗
         socket_interp_coh (state_ports_in_use σ) ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        network_coh (state_sockets σ) (state_ms σ) (state_ports_in_use σ)
-    )%I.
+        ⌜ip_sockets_coh (state_sockets σ) (state_ms σ) (state_ports_in_use σ)⌝ ∗
+        ⌜network_messages_coh Mγ⌝)%I.
 
 End definitions.
+
 
 Global Instance anerisG_irisG `{!anerisG Σ} : irisG aneris_lang Σ := {
   iris_invG := _;
@@ -242,9 +240,10 @@ Section state_interpretation.
   Proof.
     iIntros (?) "Hmap".
     iDestruct (big_sepM_lookup with "Hmap") as "Hl"; [done|].
-    iDestruct "Hl" as (???) "(% & _)"; eauto.
+    iDestruct "Hl" as (????????) "_"; eauto.
   Qed.
 
+(*
   Lemma local_state_coh_sockets n γs γm σ :
     γm !! n = Some γs →
     ([∗ map] n' ↦ γs ∈ γm, local_state_coh σ n' γs) -∗
@@ -254,6 +253,7 @@ Section state_interpretation.
     iDestruct (big_sepM_lookup with "Hmap") as "Hl"; [done|].
     iDestruct "Hl" as (??) "(_ & % & _)"; eauto.
   Qed.
+ *)
 
   Lemma local_state_coh_alloc_heap σ n γs l v h :
     let σ' := σ <| state_heaps := <[n:=<[l:=v]> h]> (state_heaps σ) |> in
@@ -263,13 +263,13 @@ Section state_interpretation.
     local_state_coh σ n γs ==∗ local_state_coh σ' n γs ∗ l ↦[n] v.
   Proof.
     simpl. iIntros (??) "Hn Hstate". iDestruct "Hn" as (?) "#Hn".
-    iDestruct "Hstate" as (h' S Hh Hs) "(Hn' & Hheap & ?)".
+    iDestruct "Hstate" as (h' S M Sn Mγ Hm Hh Hs) "(Hn' & Hheap & ?)".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
     simplify_eq.
     iMod (gen_heap_light_alloc with "Hheap") as "[Hheap Hl]"; [done|].
     iModIntro. iFrame.
     iSplitR "Hl"; [| iExists _; eauto].
-    iExists _, _. iFrame.
+    iExists _, _, _, _, _. iFrame.
     rewrite lookup_insert //.
   Qed.
 
@@ -278,12 +278,13 @@ Section state_interpretation.
     l ↦[n]{q} v -∗
     ∃ h, ⌜state_heaps σ !! n = Some h ∧ h !! l = Some v⌝.
   Proof.
-    iDestruct 1 as (h' S Hh Hs) "(Hn & Hheap & ?)".
+    iDestruct 1 as (h' S M Sn Mγ Hm Hh Hs) "(Hn & Hheap & ?)".
     iDestruct 1 as (γs') "[Hn' Hl]".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
     iDestruct (gen_heap_light_valid with "Hheap Hl") as "%".
     iExists _. iPureIntro; eauto.
   Qed.
+
 
   Lemma local_state_coh_update_heap σ1 n γs h l v1 v2 :
     let σ2 := (σ1 <| state_heaps := <[n:=<[l:=v2]> h]> (state_heaps σ1) |>) in
@@ -291,17 +292,18 @@ Section state_interpretation.
     local_state_coh σ1 n γs ∗ l ↦[n] v1 ==∗ local_state_coh σ2 n γs ∗ l ↦[n] v2.
   Proof.
     simpl. iIntros (?) "[Hstate Hl]".
-    iDestruct "Hstate" as (h' S Hh Hs) "(#Hn & Hheap & ?)".
+    iDestruct "Hstate" as (h' S M Sn Mγ Hm Hh Hs) "(#Hn & Hheap & ?)".
     iDestruct "Hl" as (γs') "[Hn' Hl]".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
     simplify_eq.
     iMod (gen_heap_light_update with "Hheap Hl") as "[Hheap' Hl]".
     iModIntro. iFrame.
     iSplitR "Hl"; [| iExists _; eauto].
-    iExists _, _. iFrame.
+    iExists _, _, _, _, _. iFrame.
     rewrite lookup_insert /set /=; eauto.
   Qed.
 
+(*
   Lemma local_state_coh_valid_sockets σ ip γs sh q skt R T :
     local_state_coh σ ip γs -∗
     sh ↪[ip]{q} (skt, R, T) -∗
@@ -376,7 +378,7 @@ Section state_interpretation.
     iModIntro. iFrame. iSplitR "Hsh".
     { iExists _, _. iFrame. rewrite lookup_insert //. }
     iExists _; eauto.
-  Qed.
+  Qed.*)
 
   (** big_sepM_local_state_coh *)
   Lemma big_sepM_local_state_coh_insert n γs γm σ :
@@ -398,6 +400,7 @@ Section state_interpretation.
     [∗ map] n' ↦ x ∈ delete n γm, local_state_coh σ n' x.
   Proof. iIntros (?) "?"; rewrite -big_sepM_delete //. Qed.
 
+  (*
   Lemma big_sepM_local_state_coh_alloc_node n γm σ :
     γm !! n = None →
     ([∗ map] n' ↦ x ∈ γm, local_state_coh σ n' x) -∗
@@ -410,7 +413,7 @@ Section state_interpretation.
     intros n' x Hdel.
     destruct (decide (n = n')); simplify_eq.
     rewrite /local_state_coh !lookup_insert_ne //.
-  Qed.
+  Qed. *)
 
   Lemma big_sepM_local_state_coh_update_heap_notin n γm σ1 h :
     let σ2 := (σ1 <| state_heaps := <[n:=h]>(state_heaps σ1) |>) in
@@ -425,6 +428,7 @@ Section state_interpretation.
     rewrite /local_state_coh lookup_insert_ne //.
   Qed.
 
+  (*
   Lemma big_sepM_local_state_coh_update_socket_notin n γm Sn σ1 :
     let σ2 := (σ1 <| state_sockets := <[n:=Sn]>(state_sockets σ1) |>) in
     γm !! n = None →
@@ -436,38 +440,43 @@ Section state_interpretation.
     intros n' x Hdel.
     destruct (decide (n = n')); simplify_eq.
     rewrite /local_state_coh lookup_insert_ne //.
-  Qed.
+  Qed. *)
 
   (** gnames_coh *)
-  Lemma gnames_coh_singleton ip γs h Sn :
-    gnames_coh {[ip:=γs]} {[ip:=h]} {[ip:=Sn]}.
-  Proof. rewrite /gnames_coh !dom_singleton_L //. Qed.
+  Lemma gnames_coh_singleton ip γs h Sn p R T:
+    gnames_coh {[ip:=γs]} {[ip:=h]} {[ip:=Sn]}
+               {[(SocketAddressInet ip p):=(R,T)]}.
+  Proof. rewrite
+           /gnames_coh !dom_singleton_L /gset_ipofsa gset_map_singleton //.
+  Qed.
 
-  Lemma gnames_coh_valid γm H S ip :
+  Lemma gnames_coh_valid γm H S ip Mγ :
     H !! ip = None →
-    gnames_coh γm H S →
+    gnames_coh γm H S Mγ →
     γm !! ip = None.
   Proof. rewrite -!not_elem_of_dom => _ [-> _] //. Qed.
 
-  Lemma gnames_coh_alloc_node γm H S ip γn :
-    gnames_coh γm H S →
-    gnames_coh (<[ip:=γn]> γm) (<[ip:=∅]> H) (<[ip:=∅]> S).
-  Proof. rewrite /gnames_coh !dom_insert_L. move=> [-> ->] //=. Qed.
+  Lemma gnames_coh_alloc_node γm H S ip γn Mγ:
+    gnames_coh γm H S Mγ →
+    gnames_coh (<[ip:=γn]> γm) (<[ip:=∅]> H) (<[ip:=∅]> S) Mγ.
+  Proof. rewrite /gnames_coh !dom_insert_L /gset_ipofsa /gset_map_singleton //.
+         move=> [->] [->] //=. set_solver.
+  Qed.
 
-  Lemma gnames_coh_update_heap n γm H S h h' :
+  Lemma gnames_coh_update_heap n γm H S h h' Mγ:
     H !! n = Some h →
-    gnames_coh γm H S →
-    gnames_coh γm (<[n:=h']> H) S.
+    gnames_coh γm H S Mγ →
+    gnames_coh γm (<[n:=h']> H) S Mγ.
   Proof.
     intros ?%elem_of_dom_2 [? ?].
     rewrite /gnames_coh dom_insert_L subseteq_union_1_L //=.
     set_solver.
   Qed.
 
-  Lemma gnames_coh_update_sockets n γm H S Sn Sn' :
+  Lemma gnames_coh_update_sockets n γm H S Sn Sn' Mγ :
     S !! n = Some Sn →
-    gnames_coh γm H S →
-    gnames_coh γm H (<[n:=Sn']> S).
+    gnames_coh γm H S Mγ →
+    gnames_coh γm H (<[n:=Sn']> S) Mγ.
   Proof.
     intros ?%elem_of_dom_2 [? ?].
     rewrite /gnames_coh dom_insert_L subseteq_union_1_L //=.
@@ -494,6 +503,7 @@ Section state_interpretation.
     assert (ip ≠ ip') by set_solver.
     rewrite !lookup_insert_ne //.
   Qed.
+
 
   Lemma free_ips_coh_free_ports_valid σ a :
     free_ips_coh σ -∗
@@ -545,7 +555,8 @@ Section state_interpretation.
   Qed.
 
   Lemma free_ips_coh_alloc_socket σ ip Sn sh sock :
-    let σ' := σ <| state_sockets := <[ip:=<[sh:=sock]> Sn]> (state_sockets σ) |> in
+    let σ' :=
+        σ <| state_sockets := <[ip:=<[sh:=sock]> Sn]> (state_sockets σ) |> in
     state_sockets σ !! ip = Some Sn →
     Sn !! sh = None →
     free_ips_coh σ -∗ free_ips_coh σ'.
@@ -560,9 +571,10 @@ Section state_interpretation.
     by apply HFip2.
   Qed.
 
-  Lemma free_ips_coh_dealloc σ1 a sh skt Sn ps :
+  Lemma free_ips_coh_dealloc σ1 a sh skt Sn ps b :
     let ip := ip_of_address a in
-    let S' := <[ip := <[sh:=(skt<| saddress := Some a |>, ∅, ∅)]> Sn]> (state_sockets σ1) in
+    let S' := <[ip := <[sh:=(skt<| saddress := Some a |>, b, ∅)]> Sn]>
+              (state_sockets σ1) in
     let P' := <[ip := {[port_of_address a]} ∪ ps]> (state_ports_in_use σ1) in
     let σ2 := σ1 <| state_sockets := S' |> <| state_ports_in_use := P' |> in
     state_sockets σ1 !! ip = Some Sn →
@@ -593,6 +605,7 @@ Section state_interpretation.
     - rewrite lookup_insert_ne //. set_solver.
   Qed.
 
+  (*
   Lemma free_ips_coh_update_msg sh a skt Sn R T R' T' M' σ1 :
     let ip := ip_of_address a in
     let S' := <[ip := <[sh:=(skt, R', T')]> Sn]> (state_sockets σ1) in
@@ -1311,7 +1324,7 @@ Section state_interpretation.
           destruct a,b; simpl in *; simplify_eq.
         * intros. destruct Heq; simplify_eq; eauto.
       + intros. apply Hdom. rewrite lookup_insert_ne //.
-  Qed.
+  Qed. *)
 
   (** aneris_state_interp *)
   Lemma mapsto_node_heap_valid n γs σ :
@@ -1319,7 +1332,7 @@ Section state_interpretation.
     mapsto_node n γs -∗
     ∃ h, ⌜state_heaps σ !! n = Some h⌝.
   Proof.
-    iDestruct 1 as (m) "(Hnauth & _ & _ & Hlcoh & _)".
+    iDestruct 1 as (m Mγ) "(Hnauth & _ & _ & Hlcoh & _)".
     iIntros "Hn".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %Hninm.
     iDestruct (local_state_coh_heaps with "Hlcoh") as (h) "%"; [done|].
@@ -1335,6 +1348,7 @@ Section state_interpretation.
     iApply (mapsto_node_heap_valid with "[$] [$]").
   Qed.
 
+  (*
   Lemma mapsto_node_valid_sockets n γs σ :
     aneris_state_interp σ -∗
     mapsto_node n γs -∗
@@ -1392,6 +1406,7 @@ Section state_interpretation.
     { by iApply (free_ips_coh_init with "[$]"). }
     by iApply network_coh_init.
   Qed.
+   *)
 
   Lemma aneris_state_interp_free_ip_valid σ ip :
     aneris_state_interp σ -∗
@@ -1400,12 +1415,14 @@ Section state_interpretation.
      state_sockets σ !! ip = None ∧
      is_Some (state_ports_in_use σ !! ip)⌝.
   Proof.
-    iDestruct 1 as (m) "(? & % & ? & ? & Hfreeips & ?)". iIntros "Hfip".
-    iDestruct "Hfreeips" as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
+    iDestruct 1 as (m Mγ) "(? & % & ? & ? & Hfreeips & ?)". iIntros "Hfip".
+    iDestruct "Hfreeips"
+      as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
     iDestruct (free_ip_included with "HfCtx Hfip") as %Hin.
     iPureIntro. destruct (HFip2 _ Hin) as [??]. eauto.
   Qed.
 
+  (*
   Lemma aneris_state_interp_free_ports_valid σ a :
     aneris_state_interp σ -∗
     free_ports (ip_of_address a) {[port_of_address a]} -∗
@@ -1423,25 +1440,33 @@ Section state_interpretation.
                            <| state_sockets := <[ip:=∅]> (state_sockets σ) |>).
   Proof.
     iIntros "[Hσ Hfip]".
-    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip") as "(% & % & %)".
-    iDestruct "Hσ" as (m) "(Hnauth & % & Hsock & Hlcoh & HFip & Hnet)".
+    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
+      as "(% & % & %)".
+    iDestruct "Hσ" as (m Mγ)
+                        "(Hnauth & % & Hsock & Hlcoh & HFip & %Hnet & %Hncoh)".
     iMod (free_ips_coh_alloc_node with "HFip Hfip") as "[HFip Hports]".
-    iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
+    iMod (node_ctx_init ∅ ∅) as (γn) "(Hh & Hs & Hnm)".
     assert (m !! ip = None) by eapply gnames_coh_valid=>//.
     iMod (node_gnames_alloc γn with "Hnauth") as "[Hnauth #Hγn]"; [done|].
     set σ' := (σ <| state_heaps   := <[ip:=∅]> (state_heaps σ)|>
                  <| state_sockets := <[ip:=∅]> (state_sockets σ) |>).
     iModIntro. iSplitR.
     { iExists _; eauto. }
-    iFrame. iExists _. iFrame. iSplitR.
+    iFrame. iExists _, _. iFrame. iSplitR.
     { iPureIntro. by eapply gnames_coh_alloc_node. }
-    iSplitR "Hnet".
-    { iApply (big_sepM_local_state_coh_insert ip γn with "[Hh Hs] [Hlcoh]").
+    iSplitR.
+    { iApply (big_sepM_local_state_coh_insert ip γn
+                with "[Hh Hs Hnm] [Hlcoh]").
       - rewrite lookup_insert //.
-      - iExists _, _. iFrame. iFrame "#". rewrite !lookup_insert. eauto.
-      - rewrite delete_insert //. by iApply big_sepM_local_state_coh_alloc_node. }
+      - iExists _, _, (state_ms σ), ∅, Mγ.
+        iFrame. iFrame "#". rewrite !lookup_insert.
+        repeat iSplit; eauto.
+        admit.
+      - rewrite delete_insert //.
+          by iApply big_sepM_local_state_coh_alloc_node. }
     by iApply network_coh_alloc_node.
   Qed.
+*)
 
   Lemma aneris_state_interp_heap_valid σ l n q v :
     aneris_state_interp σ -∗
@@ -1450,7 +1475,7 @@ Section state_interpretation.
   Proof.
     iIntros "Hσ Hl". iDestruct "Hl" as (?) "[#Hn Hl]".
     iDestruct (mapsto_node_heap_valid with "Hσ Hn") as (h) "%".
-    iDestruct "Hσ" as (m) "(Hnauth & % & ? & Hlcoh & Hfreeips & ?)".
+    iDestruct "Hσ" as (m Mγ) "(Hnauth & % & ? & Hlcoh & Hfreeips & ?)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
       as "(Hstate & Hlcoh)"; [done|].
@@ -1467,21 +1492,24 @@ Section state_interpretation.
   Proof.
     simpl. iIntros (??) "Hn Hσ".
     iDestruct "Hn" as (γs) "Hn".
-    iDestruct "Hσ" as (m) "(Hnauth & % & ? & Hlcoh & Hfreeips & ?)".
+    iDestruct "Hσ" as (m Mγ) "(Hnauth & % & ? & Hlcoh & Hfreeips & ?)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
       as "(Hstate & Hlcoh)"; [done|].
     iMod (local_state_coh_alloc_heap with "[Hn] Hstate") as "[Hstate' Hl]";
       [done|done|..].
     { by iExists _. }
-    iDestruct (big_sepM_local_state_coh_update_heap_notin n with "Hlcoh") as "Hlcoh".
+    iDestruct (big_sepM_local_state_coh_update_heap_notin n with "Hlcoh")
+      as "Hlcoh".
     { apply lookup_delete. }
-    iDestruct (big_sepM_local_state_coh_insert with "[$] Hlcoh") as "HX"; [done|].
-    iModIntro. iFrame. iExists _. iFrame.
+    iDestruct (big_sepM_local_state_coh_insert with "[$] Hlcoh")
+      as "HX"; [done|].
+    iModIntro. iFrame. iExists _, _. iFrame. simplify_eq /=.
     iSplitR.
     { iPureIntro. by eapply gnames_coh_update_heap. }
     by iApply free_ips_coh_update_heap.
   Qed.
+
 
   Lemma aneris_state_interp_heap_update σ1 n h l v1 v2 :
     let σ2 := (σ1 <| state_heaps := <[n:=<[l:=v2]> h]> (state_heaps σ1) |>) in
@@ -1490,7 +1518,7 @@ Section state_interpretation.
   Proof.
     simpl. iIntros (?) "[Hσ Hl]".
     iDestruct "Hl" as (?) "[#Hn Hl]".
-    iDestruct "Hσ" as (m) "(Hnauth & % & ? & Hlcoh & Hfreeips & ?)".
+    iDestruct "Hσ" as (m Mγ) "(Hnauth & % & ? & Hlcoh & Hfreeips & ?)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
       as "(Hstate & Hlcoh)"; [done|].
@@ -1501,12 +1529,13 @@ Section state_interpretation.
     { apply lookup_delete. }
     iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh") as "HX";
       [done|].
-    iModIntro. iFrame. iExists _. iFrame.
+    iModIntro. iFrame. iExists _, _. iFrame.
     iSplitR.
     { iPureIntro. by eapply gnames_coh_update_heap. }
     by iApply free_ips_coh_update_heap.
   Qed.
 
+(*
   Lemma aneris_state_interp_socket_valid σ sh ip q skt R T:
     aneris_state_interp σ -∗
     sh ↪[ip]{q} (skt, R, T) -∗
@@ -1738,7 +1767,7 @@ Section state_interpretation.
       iExists _; simpl. iFrame.
       iSplit; [|by iApply free_ips_coh_update_msg].
       iPureIntro; by eapply gnames_coh_update_sockets.
-   Qed.
+   Qed.*)
 
 End state_interpretation.
 

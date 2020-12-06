@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth.
 From iris.proofmode Require Import tactics.
-From iris.program_logic Require Export weakestpre adequacy.
+From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.aneris_lang Require Export lang resources state_interp network.
 Set Default Proof Using "Type".
 

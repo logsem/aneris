@@ -274,6 +274,8 @@ Proof.
   rewrite -!elem_of_elements -elem_of_list_permutation_proper; eauto.
 Qed.
 
+(* TODO: Lemma network_messages_init `{anerisPreG Σ} : ... *)
+
 Section resource_lemmas.
   Context `{aG : !anerisG Σ}.
 
