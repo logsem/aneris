@@ -39,11 +39,12 @@ Module Network.
     sfamily : address_family;
     stype : socket_type;
     sprotocol : protocol;
-    saddress : option socket_address
+    saddress : option socket_address;
+    sblock : bool;
   }.
 
   Global Instance etaSocket : Settable _ :=
-    settable! mkSocket <sfamily; stype; sprotocol; saddress>.
+    settable! mkSocket <sfamily; stype; sprotocol; saddress; sblock>.
 
   Definition socket_handle := positive.
 
@@ -61,8 +62,9 @@ Module Network.
 
   Global Instance socket_eq_dec : EqDecision socket.
   Proof.
-    intros [[] [] [] o] [[] [] [] o'];
+    intros [[] [] [] o b] [[] [] [] o' b'];
       destruct (decide (o = o'));
+      destruct (decide (b = b'));
       subst; first (by left);
         by (right; intros Heq; inversion Heq; auto).
   Qed.

@@ -930,7 +930,7 @@ Definition aneris_to_val e : option aneris_val :=
      the receive buffer, and
    - a map [P] tracking for each ip address the ports in use on the ip. *)
 Definition heap := gmap base_lang.loc base_lang.val.
-Definition sockets := gmap socket_handle (socket * bool * message_soup).
+Definition sockets := gmap socket_handle (socket * message_soup).
 Definition ports_in_use := gmap ip_address (gset port).
 
 (** The global state of the system
@@ -987,10 +987,10 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitSocket sh)
-      (<[sh:=(mkSocket f s p None, true, ∅)]>Sn) P M
+      (<[sh:=(mkSocket f s p None true, ∅)]>Sn) P M
 | SocketBindS sh a R skt Sn P ps M  :
     (* The socket handle is bound to a socket. *)
-    Sn !! sh = Some (skt, true, R) →
+    Sn !! sh = Some (skt, R) →
     (* The socket has no assigned address. *)
     saddress skt = None →
     (* The port is not in use *)
@@ -1004,12 +1004,12 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt 0)
-      (<[sh:=((skt <| saddress := Some a |>), true, R)]>Sn)
+      (<[sh:=((skt <| saddress := Some a |>), R)]>Sn)
       (<[ip_of_address a:={[ port_of_address a ]} ∪ ps]> P)
       M
-| SendToS sh a mbody R skt Sn P M f b :
+| SendToS sh a mbody R skt Sn P M f :
     (* There is a socket that has been allocated for the handle *)
-    Sn !! sh = Some (skt, b, R) →
+    Sn !! sh = Some (skt, R) →
     (* The socket has an assigned address *)
     saddress skt = Some f ->
     let: new_message := mkMessage f a (sprotocol skt) mbody in
@@ -1021,10 +1021,10 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
-      (<[sh:=(skt, b, R)]>Sn) P ({[ new_message ]} ∪ M)
-| ReceiveFromSomeS sh R skt a m Sn P M b:
+      (<[sh:=(skt, R)]>Sn) P ({[ new_message ]} ∪ M)
+| ReceiveFromSomeS sh R skt a m Sn P M :
     (* The socket handle is bound to a socket *)
-    Sn !! sh = Some (skt, b, R) →
+    Sn !! sh = Some (skt, R) →
     (* The socket has an assigned address *)
     saddress skt = Some a →
     (* There is a message to receive on the buffer *)
@@ -1036,13 +1036,14 @@ Inductive socket_step ip :
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
-      (<[sh:=(skt, b, R ∖ {[m]})]>Sn) P M
+      (<[sh:=(skt, R ∖ {[m]})]>Sn) P M
 | ReceiveFromNoneS sh skt Sn P M :
     (* The socket handle is bound to some socket
        and there is nothing to receive
        and the operation should not block forever
        (a positive timeout was set). *)
-    Sn !! sh = Some (skt, false, ∅) →
+    Sn !! sh = Some (skt, ∅) →
+    sblock skt = false →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
@@ -1053,14 +1054,15 @@ Inductive socket_step ip :
        and there is nothing to receive
        and the operation should block
        (either no timeout, or timeout 0.0 was set). *)
-    Sn !! sh = Some (skt, true, ∅) →
+    Sn !! sh = Some (skt, ∅) →
+    sblock skt = true →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
       (* reduces to *)
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
-| SetReceiveTimeoutPositiveS sh skt R Sn P M b m n:
-    Sn !! sh = Some (skt, b, R) →
+| SetReceiveTimeoutPositiveS sh skt R Sn P M m n :
+    Sn !! sh = Some (skt, R) →
     0 <= m →
     0 < n →
     socket_step
@@ -1071,9 +1073,9 @@ Inductive socket_step ip :
          (Val $ LitV $ LitInt n)) Sn P M
       (* reduces to *)
       (Val $ (LitV LitUnit))
-      (<[sh:=(skt, false, R)]>Sn) P M
-| SetReceiveTimeoutZeroS sh skt R Sn P M b:
-    Sn !! sh = Some (skt, b, R) →
+      (<[sh:=((skt<|sblock := false|>), R)]>Sn) P M
+| SetReceiveTimeoutZeroS sh skt R Sn P M :
+    Sn !! sh = Some (skt, R) →
     socket_step
       ip
       (SetReceiveTimeout
@@ -1082,7 +1084,7 @@ Inductive socket_step ip :
          (Val $ LitV $ LitInt 0)) Sn P M
       (* reduces to *)
       (Val $ (LitV LitUnit))
-      (<[sh:=(skt, false, R)]>Sn) P M.
+      (<[sh:=(skt<|sblock := true|>, R)]>Sn) P M.
 
 
 Definition is_head_step_pure (e : base_lang.expr) : bool :=
@@ -1217,11 +1219,11 @@ Proof. destruct Ki; move => [? ?] [? ?] [? ?];
 
 Inductive config_step :
   state -> list observation → state -> Prop :=
-| MessageDeliverStep n σ κ Sn Sn' sh a skt b R m:
+| MessageDeliverStep n σ κ Sn Sn' sh a skt R m:
     m ∈ (messages_to_receive_at a (state_ms σ)) →
     state_sockets σ !! n = Some Sn ->
-    Sn !! sh = Some (skt, b, R) →
-    Sn' = <[sh := (skt, b, R ∪ {[m]})]>Sn →
+    Sn !! sh = Some (skt, R) →
+    Sn' = <[sh := (skt, R ∪ {[m]})]>Sn →
     saddress skt = Some a →
     config_step σ κ
                 {| state_heaps := state_heaps σ;
@@ -1264,7 +1266,7 @@ Lemma newsocket_fresh n Sn P M v1 v2 v3 :
                          (Val $ LitV $ LitSocketType v2)
                          (Val $ LitV $ LitProtocol v3)) Sn P M
               (Val $ LitV (LitSocket h))
-              (<[h:=(mkSocket v1 v2 v3 None, true, ∅)]>Sn) P M.
+              (<[h:=(mkSocket v1 v2 v3 None true, ∅)]>Sn) P M.
 Proof.
   intros; apply NewSocketS.
   apply (not_elem_of_dom (D:=gset loc)), is_fresh.

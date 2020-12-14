@@ -28,8 +28,8 @@ theories/aneris_lang/notation.v
 theories/aneris_lang/tactics.v
 theories/aneris_lang/resources.v
 theories/aneris_lang/state_interp.v
-theories/aneris_lang/lifting.v
 theories/aneris_lang/adequacy.v
+theories/aneris_lang/lifting.v
 theories/aneris_lang/program_logic/aneris_lifting.v
 theories/aneris_lang/program_logic/aneris_weakestpre.v
 theories/aneris_lang/program_logic/aneris_adequacy.v
@@ -47,4 +47,3 @@ theories/aneris_lang/lib/bag.v
 theories/aneris_lang/lib/nodepar.v
 theories/aneris_lang/lib/vector_clock/time.v
 theories/aneris_lang/lib/vector_clock/vector_clock.v
-

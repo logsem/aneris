@@ -13,10 +13,8 @@ Import Network.
 Record node_gnames := Node_gname {
   heap_name : gname;
   sockets_name : gname;
-  messages_name : gname;
 }.
 
-(** CMRA shorthands *)
 Definition node_gnamesO :=
   leibnizO node_gnames.
 Definition node_gnames_mapUR : ucmra :=
@@ -24,14 +22,21 @@ Definition node_gnames_mapUR : ucmra :=
 Definition local_heapUR : ucmra :=
   gen_heapUR loc base_lang.val.
 Definition local_socketsUR : ucmra :=
-  gen_heapUR socket_handle (socket * bool).
-Definition network_messagesUR : ucmra :=
-  gen_heapUR socket_address (message_soup * message_soup).
+  gen_heapUR socket_handle (socket * message_soup).
+Definition free_ipsUR : ucmra :=
+  (gset_disjUR ip_address).
+Definition free_portsUR : ucmra :=
+  gmapUR ip_address (gset_disjUR port).
 Definition socket_interpUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO gname)).
+Definition fixedUR : ucmra :=
+  gsetUR socket_address.
+Definition message_soupR : cmra := agreeR (leibnizO message_soup).
+Definition messagesUR : ucmra :=
+  gen_heapUR ip_address (gmap port (message_soup * message_soup)).
 
-Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames)) :=
-  (∅ : gmap ip_address (agree node_gnames)).
+Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames))
+  := (∅ : gmap ip_address (agree node_gnames)).
 Global Instance system_state_core_id (x : node_gnames_mapUR) : CoreId x.
 Proof. apply _. Qed.
 
@@ -40,29 +45,29 @@ Definition socket_interp Σ := message -d> iPropO Σ.
 (** The system CMRA *)
 Class anerisG Σ := AnerisG {
   aneris_invG :> invG Σ;
-  (* global tracking of the ghost names of node-local heaps *)
+  (** global tracking of the ghost names of node-local heaps *)
   aneris_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
   aneris_node_gnames_name : gname;
-  (* local heap *)
+  (** local heap *)
   aneris_heapG :> inG Σ (authR local_heapUR);
-  (* local sockets *)
+  (** local sockets *)
   aneris_socketG :> inG Σ (authR local_socketsUR);
-  (* message soup as union of received and transmitted messages *)
-  aneris_network_messagesG :> inG Σ (authR network_messagesUR);
-  aneris_network_messages_name : gname;
-  (* free ips *)
-  aneris_freeipsG :> inG Σ (authUR (gset_disjUR ip_address));
+  (** free ips *)
+  aneris_freeipsG :> inG Σ (authUR free_ipsUR);
   aneris_freeips_name : gname;
-  (* free ports  *)
-  aneris_freeportsG :> inG Σ (authUR (gmapUR ip_address (gset_disjUR port)));
+  (** free ports  *)
+  aneris_freeportsG :> inG Σ (authUR free_portsUR);
   aneris_freeports_name : gname;
-  (* socket interpretations *)
+  (** socket interpretations *)
   aneris_siG :> inG Σ (authR socket_interpUR);
   aneris_savedPredG :> savedPredG Σ message;
   aneris_si_name : gname;
-  (* socket addresses with fixed socket interpretations *)
-  aneris_fixedG :> inG Σ (agreeR (gsetUR socket_address));
+  (** socket addresses with fixed socket interpretations *)
+  aneris_fixedG :> inG Σ (agreeR fixedUR);
   aneris_fixed_name : gname;
+  (** message history *)
+  aneris_messagesG :> inG Σ (authR messagesUR);
+  aneris_messages_name : gname;
 }.
 
 Class anerisPreG Σ := AnerisPreG {
@@ -70,12 +75,12 @@ Class anerisPreG Σ := AnerisPreG {
   anerisPre_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
   anerisPre_heapG :> inG Σ (authR local_heapUR);
   anerisPre_socketG :> inG Σ (authR local_socketsUR);
-  anerisPre_network_messagesG :> inG Σ (authR network_messagesUR);
-  anerisPre_freeipsG :> inG Σ (authUR (gset_disjUR ip_address));
-  anerisPre_freeportsG :> inG Σ (authUR (gmapUR ip_address (gset_disjUR port)));
+  anerisPre_freeipsG :> inG Σ (authUR free_ipsUR);
+  anerisPre_freeportsG :> inG Σ (authUR free_portsUR);
   anerisPre_siG :> inG Σ (authR socket_interpUR);
   anerisPre_savedPredG :> savedPredG Σ message;
-  anerisPre_fixedG :> inG Σ (agreeR (gsetUR socket_address));
+  anerisPre_fixedG :> inG Σ (agreeR fixedUR);
+  anerisPre_messagesG :> inG Σ (authR messagesUR);
 }.
 
 Definition anerisΣ : gFunctors :=
@@ -83,12 +88,13 @@ Definition anerisΣ : gFunctors :=
    GFunctor (authR node_gnames_mapUR);
    GFunctor (authR local_heapUR);
    GFunctor (authR local_socketsUR);
-   GFunctor (authR network_messagesUR);
-   GFunctor (authUR (gset_disjUR ip_address));
-   GFunctor (authUR (gmapUR ip_address (gset_disjUR port)));
+   GFunctor (authUR free_ipsUR);
+   GFunctor (authUR free_portsUR);
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
-   GFunctor (agreeR (gsetUR socket_address))].
+   GFunctor (agreeR fixedUR);
+   GFunctor (authR messagesUR)
+].
 
 Global Instance subG_anerisPreG {Σ} : subG anerisΣ Σ → anerisPreG Σ.
 Proof. constructor; solve_inG. Qed.
@@ -96,11 +102,12 @@ Proof. constructor; solve_inG. Qed.
 Section definitions.
   Context `{aG : !anerisG Σ}.
 
-  (** Ghost names for node-local heaps *)
+  (** Authoritative view of the system ghost names *)
   Definition node_gnames_auth (m : gmap ip_address node_gnames) :=
     own (A := authR node_gnames_mapUR)
         aneris_node_gnames_name (● (to_agree <$> m)).
 
+  (** Fragmental view of the system ghost names. *)
   Definition mapsto_node_def (ip : ip_address) (γn : node_gnames) :=
     own (aneris_node_gnames_name) (◯ {[ ip := to_agree γn ]}).
   Definition mapsto_node_aux : seal (@mapsto_node_def). by eexists. Qed.
@@ -110,7 +117,7 @@ Section definitions.
 
   Definition is_node (ip : ip_address) := (∃ γn, mapsto_node ip γn)%I.
 
-  (** Node-local heap *)
+  (** Local heap *)
   Definition heap_ctx (γn : node_gnames) (h : gmap loc base_lang.val) :=
     gen_heap_light_ctx (heap_name γn) h.
 
@@ -118,24 +125,33 @@ Section definitions.
              (l : loc) (q : Qp) (v : base_lang.val) :=
     (∃ γn, mapsto_node ip γn ∗ lmapsto (heap_name γn) l q v)%I.
 
-  (** Sockets *)
+  (** Local sockets *)
   Definition sockets_ctx (γn : node_gnames)
-    (s : gmap socket_handle (socket * bool)) :=
+    (s : gmap socket_handle (socket * message_soup)) :=
     gen_heap_light_ctx (sockets_name γn) s.
 
-  Definition mapsto_socket (ip : ip_address)
-             (z : socket_handle) (q : Qp) (s: socket * bool) :=
-    (∃ γn, mapsto_node ip γn ∗ lmapsto (sockets_name γn) z q s)%I.
+  Definition mapsto_socket_def (ip : ip_address) (z : socket_handle)
+             (q : Qp) (s: socket) :=
+    (∃ γn r, mapsto_node ip γn ∗ lmapsto (sockets_name γn) z q (s, r))%I.
 
-  (** Messages *)
-  Definition network_messages_ctx (γn : node_gnames)
-    (s : gmap socket_address (message_soup * message_soup)) :=
-    gen_heap_light_ctx (messages_name γn) s.
+  Definition mapsto_socket_aux : seal (@mapsto_socket_def). by eexists. Qed.
+  Definition mapsto_socket := unseal mapsto_socket_aux.
+  Definition mapsto_socket_eq : @mapsto_socket = @mapsto_socket_def :=
+    seal_eq mapsto_socket_aux.
 
-  Definition mapsto_messages
-    (sa : socket_address) (q : Qp) (msgs : message_soup * message_soup) :=
-    (∃ γn, mapsto_node (ip_of_address sa) γn ∗
-           lmapsto (messages_name γn) sa q msgs)%I.
+  (** Free ip addresses *)
+  Definition free_ips_auth (A : gset ip_address) :=
+    own aneris_freeips_name (● GSet A).
+
+  Definition free_ip (ip : ip_address) :=
+    own aneris_freeips_name (◯ GSet {[ ip ]}).
+
+  (** Free ports *)
+  Definition free_ports_auth (P : gmap ip_address (gset_disjUR port)) :=
+    own aneris_freeports_name (● P).
+
+  Definition free_ports (ip : ip_address) (ports : gset port) :=
+    own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
 
   (** Ghost names of saved socket interpretations *)
   Definition saved_si_auth (sis : gmap socket_address gname) :=
@@ -152,19 +168,17 @@ Section definitions.
   Definition fixed (A : gset socket_address) :=
     own aneris_fixed_name (to_agree A).
 
-  (** Free ip addresses *)
-  Definition free_ips_auth (A : gset ip_address) :=
-    own aneris_freeips_name (● GSet A).
+   (** Messages *)
 
-  Definition free_ip (ip : ip_address) :=
-    own aneris_freeips_name (◯ GSet {[ ip ]}).
+  Definition messages_ctx
+    (s : gmap ip_address (gmap port (message_soup * message_soup))) :=
+    gen_heap_light_ctx (aneris_messages_name) s.
 
-  (** Free ports *)
-  Definition free_ports_auth (P : gmap ip_address (gset_disjUR port)) :=
-    own aneris_freeports_name (● P).
-
-  Definition free_ports (ip : ip_address) (ports : gset port) :=
-    own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
+  Definition mapsto_messages
+    (sa : socket_address) q (msgs : message_soup * message_soup) :=
+    (∃ γn, mapsto_node (ip_of_address sa) γn ∗
+                       lmapsto aneris_messages_name (ip_of_address sa) q
+                       {[port_of_address sa := msgs]})%I.
 
 End definitions.
 
@@ -274,8 +288,6 @@ Proof.
   rewrite -!elem_of_elements -elem_of_list_permutation_proper; eauto.
 Qed.
 
-(* TODO: Lemma network_messages_init `{anerisPreG Σ} : ... *)
-
 Section resource_lemmas.
   Context `{aG : !anerisG Σ}.
 
@@ -353,26 +365,28 @@ Section resource_lemmas.
   Global Instance mapsto_socket_timeless z ip q s :
     Timeless (z ↪[ ip ]{ q } s).
   Proof.
-    rewrite /mapsto_socket /Timeless.
-    iIntros ">H". iDestruct "H" as (γn) "[H1 H2]".
-    iExists _. iFrame.
+    rewrite mapsto_socket_eq /Timeless /mapsto_socket_def.
+    iIntros ">H". iDestruct "H" as (γn r) "[H1 H2]".
+    iExists _, _. iFrame.
   Qed.
+
   Global Instance mapsto_socket_fractional z ip s :
     Fractional (λ q, z ↪[ip]{q} s)%I.
   Proof.
-    rewrite /mapsto_socket /Fractional=> p q. iSplit.
-    - iDestruct 1 as (?) "[#? [H1 H2]]".
-      iSplitL "H1"; iExists _; eauto.
+    rewrite mapsto_socket_eq /mapsto_socket_def /Fractional=> p q. iSplit.
+    - iDestruct 1 as (? ?) "[#? [H1 H2]]".
+      iSplitL "H1"; iExists _, _; eauto.
     - iDestruct 1 as "[H1 H2]".
-      iDestruct "H1" as (?) "[Hn1 Hp]".
-      iDestruct "H2" as (?) "[Hn2 Hq]".
+      iDestruct "H1" as (? ?) "[Hn1 Hp]".
+      iDestruct "H2" as (? ?) "[Hn2 Hq]".
       iDestruct (mapsto_node_agree with "Hn1 Hn2") as %->.
-      iExists _. iFrame.
+      iDestruct (lmapsto_agree with "Hp Hq") as %->.
+      iExists _, _. iFrame.
   Qed.
+
   Global Instance mapsto_socket_as_fractional z ip q s :
     AsFractional (z ↦[ip]{q} s) (λ q, z ↦[ip]{q} s)%I q.
   Proof. split; [done|]. apply _. Qed.
-
 
   Global Instance mapsto_messages_timeless a q s :
     Timeless (a ⤳{ q } s).
@@ -381,6 +395,7 @@ Section resource_lemmas.
     iIntros ">H". iDestruct "H" as (γn) "[H1 H2]".
     iExists _. iFrame.
   Qed.
+
   Global Instance mapsto_messages_fractional a s :
     Fractional (λ q, a ⤳{q} s)%I.
   Proof.
@@ -393,18 +408,17 @@ Section resource_lemmas.
       iDestruct (mapsto_node_agree with "Hn1 Hn2") as %->.
       iExists _. iFrame.
   Qed.
+
   Global Instance mapsto_messages_as_fractional a q s :
     AsFractional (a ⤳{q} s) (λ q, a ⤳{q} s)%I q.
   Proof. split; [done|]. apply _. Qed.
 
-  Lemma node_ctx_init σ s m :
-    ⊢ |==> ∃ (γn : node_gnames),
-        heap_ctx γn σ ∗ sockets_ctx γn s ∗ network_messages_ctx γn m.
+  Lemma node_ctx_init σ s :
+    ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
   Proof.
     iMod (gen_heap_light_init σ) as (γh) "Hh".
     iMod (gen_heap_light_init s) as (γs) "Hs".
-    iMod (gen_heap_light_init m) as (γm) "Hm".
-    iExists {| heap_name := γh; sockets_name := γs; messages_name := γm |}.
+    iExists {| heap_name := γh; sockets_name := γs |}.
     iModIntro. iFrame.
   Qed.
 

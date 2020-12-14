@@ -27,6 +27,7 @@ Proof.
   iMod (fixed_init A) as (γsif) "#Hsif".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
   iMod free_ports_auth_init as (γpiu) "HPiu".
+  iMod (gen_heap_light_init {[ip := ∅]}) as (γms) "Hms".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -34,6 +35,7 @@ Proof.
            aneris_fixed_name := γsif;
            aneris_freeips_name := γips;
            aneris_freeports_name := γpiu;
+           aneris_messages_name := γms
          |}).
   iMod (Hwp dg) as (f) "Hwp".
   iMod (saved_si_update A with "[$Hsi $Hsi']") as (M HMfs) "[HM #Hsa]".
@@ -52,10 +54,11 @@ Proof.
   { iExists _. eauto. }
   iModIntro.
   iExists (λ σ _, aneris_state_interp σ), (λ _, True)%I.
+  iSplitR; last first.
   iSplitR "Hwp HIPs"; last first.
   { iApply ("Hwp" with "Hsif Hsa' HIPs Hn"). }
-  by iApply (@aneris_state_interp_init _ dg
-            with "Hmp Hγn Hh Hs Hsif HM Hsa' HIPsCtx HPiu").
+  iApply (@aneris_state_interp_init _ dg with "[Hmp] [] [Hh] [Hs] [Hms] [] [HM] [] [HIPsCtx]  [HPiu]"); try eauto.
+  iApply config_wp_correct.
 Qed.
 
 Definition safe e σ := @adequate aneris_lang NotStuck e σ (λ _ _, True).
