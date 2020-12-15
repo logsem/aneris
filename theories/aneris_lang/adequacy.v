@@ -57,7 +57,8 @@ Proof.
   iSplitR; last first.
   iSplitR "Hwp HIPs"; last first.
   { iApply ("Hwp" with "Hsif Hsa' HIPs Hn"). }
-  iApply (@aneris_state_interp_init _ dg with "[Hmp] [] [Hh] [Hs] [Hms] [] [HM] [] [HIPsCtx]  [HPiu]"); try eauto.
+  iApply (@aneris_state_interp_init _ dg with
+              "[Hmp] [] [Hh] [Hs] [Hms] [] [HM] [] [HIPsCtx]  [HPiu]"); eauto.
   iApply config_wp_correct.
 Qed.
 
@@ -80,7 +81,9 @@ Proof. apply adequacy. Qed.
 
 Theorem adequacy_hoare `{anerisPreG Σ} IPs A e σ φ ip :
   (∀ `{anerisG Σ}, ⊢ ∃ (f : socket_address → socket_interp Σ),
-      {{{ fixed A ∗ ([∗ set] a ∈ A, a ⤇ (f a)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) ∗ is_node ip }}}
+          {{{ fixed A
+            ∗ ([∗ set] a ∈ A, a ⤇ (f a))
+            ∗ ([∗ set] ip ∈ IPs, free_ip ip) ∗ is_node ip }}}
           (mkExpr ip e)
       {{{ v, RET v; ⌜φ v⌝ }}}) →
   ip ∉ IPs →
