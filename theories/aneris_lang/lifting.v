@@ -12,10 +12,10 @@ Import Network.
 Import RecordSetNotations.
 
 (** The tactic [inv_head_step] performs inversion on hypotheses of the shape
-    [head_step]. The tactic will discharge head-reductions starting from values, and
-    simplifies hypothesis related to conversions from and to values, and finite map
-    operations. This tactic is slightly ad-hoc and tuned for proving our lifting
-    lemmas. *)
+    [head_step]. The tactic will discharge head-reductions starting from values,
+    and simplifies hypothesis related to conversions from and to values, and
+    finite map operations. This tactic is slightly ad-hoc and tuned for proving
+    our lifting lemmas. *)
 Ltac inv_head_step :=
   repeat
     match goal with
@@ -329,12 +329,12 @@ Section primitive_laws.
     iModIntro. iSplit; [done|]. iFrame. by iApply "HΦ".
   Qed.
 
-  (* TODO from here ----> *)
   Lemma wp_start ip ports k E e Φ :
     ip ≠ "system" →
     ▷ free_ip ip ∗
     ▷ Φ (mkVal "system" #()) ∗
     ▷ (is_node ip -∗ free_ports ip ports -∗
+              ([∗ set] p ∈ ports, (SocketAddressInet ip p) ⤳ (∅, ∅)) -∗
                WP (mkExpr ip e) @ k; ⊤ {{ _, True }})
     ⊢ WP (mkExpr "system" (Start (LitString ip) e)) @ k; E {{ Φ }}.
   Proof.
@@ -342,13 +342,14 @@ Section primitive_laws.
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ κ κs n) "Hσ".
     iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
-    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
+        iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & % & %)".
     iModIntro; iSplit.
     { iPureIntro. do 4 eexists. apply (AssignNewIpStepS _ _ []); eauto. }
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".
     inv_head_step.
-    iMod (aneris_state_interp_alloc_node with "[$]") as "(Hn & Hports & Hσ)".
+    iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
+      as "(Hn & Hports & Hms & Hσ)".
     iModIntro. iFrame.
     iSplitL "HΦ"; [by iApply wp_value|].
     iSplitL; [|done].
@@ -361,9 +362,9 @@ Section primitive_laws.
                             (Val $ LitV $ LitSocketType t)
                             (Val $ LitV $ LitProtocol p))) @ s; E
     {{{ sh, RET (mkVal ip (LitV (LitSocket sh)));
-          sh ↪[ip] ((mkSocket f t p None), ∅, ∅) }}}.
+          sh ↪[ip] (mkSocket f t p None true) }}}.
   Proof.
-    iIntros (Φ) ">Hn HΦ".
+    (*   iIntros (Φ) ">Hn HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ κ κs n) "Hσ !> /=".
     iDestruct (is_node_valid_sockets with "Hσ Hn") as (?) "%".
@@ -374,22 +375,26 @@ Section primitive_laws.
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_alloc_socket sock with "Hn Hσ") as "[Hσ Hsh]"; try done.
     iModIntro. iFrame. iSplitR; [done|]. by iApply "HΦ".
-  Qed.
+  Qed. *)
+  Admitted.
 
-  Lemma wp_socketbind_static s A E sh skt a:
+  Lemma wp_socketbind_static A E sh skt k a R T:
     saddress skt = None →
     a ∈ A →
-    {{{ fixed A ∗
+    {{{ ▷ fixed A ∗
         ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ sh ↪[ip_of_address a] (skt, ∅, ∅) }}}
+        ▷ sh ↪[ip_of_address a] skt ∗
+        ▷ a ⤳ (R, T) }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
-                          (Val $ LitV $ LitSocketAddress a))) @ s; E
+                          (Val $ LitV $ LitSocketAddress a))) @ k; E
    {{{ RET (mkVal (ip_of_address a) #0);
-         sh ↪[ip_of_address a] (skt<| saddress := Some a |>, ∅, ∅) ∗
-         ∃ φ, a ⤇ φ }}}.
+       sh ↪[ip_of_address a] (skt<| saddress := Some a |>) ∗
+       a ⤳ (R, T) ∗
+       ∃ φ, a ⤇ φ }}}.
   Proof.
-    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
+  Admitted.
+(*    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ κ κs n) "Hσ /=".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
@@ -402,22 +407,26 @@ Section primitive_laws.
       as "(Hσ & Hsh & Hφ)"; [done..|].
     iModIntro. iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
-  Qed.
+  Qed. *)
 
-  Lemma wp_socketbind_dynamic skt A E sh k a φ :
+  Lemma wp_socketbind_dynamic skt A E sh k a φ R T:
     saddress skt = None →
     a ∉ A →
     {{{ ▷ fixed A ∗
         ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ sh ↪[ip_of_address a] (skt, ∅, ∅) }}}
+        ▷ sh ↪[ip_of_address a] skt ∗
+        ▷ a ⤳ (R, T)
+    }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress a))) @ k; E
     {{{ RET (mkVal (ip_of_address a) #0);
-          sh ↪[ip_of_address a] (skt <| saddress := Some a |>, ∅, ∅) ∗
-          a ⤇ φ }}}.
+        sh ↪[ip_of_address a] (skt <| saddress := Some a |>) ∗
+        a ⤳ (R, T) ∗
+        a ⤇ φ }}}.
   Proof.
-    iIntros (?? Φ) "(#>Hfixed & >Hp & >Hsh) HΦ".
+  Admitted.
+(*    iIntros (?? Φ) "(#>Hfixed & >Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ κ κs n) "Hσ /=".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
@@ -430,20 +439,23 @@ Section primitive_laws.
       as "(Hσ & Hsh & Hφ)"; [done..|].
     iModIntro. iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
-  Qed.
+  Qed. *)
 
   Lemma wp_send φ mbody sh skt a to k E R T:
     let msg := mkMessage a to (sprotocol skt) mbody  in
     saddress skt = Some a ->
-    {{{ ▷ sh ↪[ip_of_address a] (skt, R, T) ∗
+    {{{ ▷ sh ↪[ip_of_address a] skt ∗
+        ▷ a ⤳ (R, T) ∗
         ▷ to ⤇ φ ∗
         ▷ φ msg }}}
       (mkExpr (ip_of_address a)
               (SendTo (Val $ LitV $ LitSocket sh) #mbody #to)) @ k; E
     {{{ RET (mkVal (ip_of_address a) #(String.length mbody));
-          sh ↪[ip_of_address a] (skt, R, {[ msg ]} ∪ T) }}}.
+        sh ↪[ip_of_address a] skt ∗
+        a ⤳ (R, {[ msg ]} ∪ T) }}}.
   Proof.
-    iIntros (? Hsome Φ) "(>Hsh & #Hφ & Hm) HΦ".
+  Admitted.
+  (*    iIntros (? Hsome Φ) "(>Hsh & #Hφ & Hm) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (σ κ κs n) "Hσ !>".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
@@ -454,18 +466,22 @@ Section primitive_laws.
     iMod (aneris_state_interp_send with "Hsh Hφ Hm Hσ") as "[Hσ Hsh]";
       [done..|].
     iModIntro. iSplitR; [done|]. iFrame. by iApply "HΦ".
-  Qed.
+  Qed. *)
 
   Lemma wp_send_duplicate mbody sh skt a to k E R T:
     let msg := mkMessage a to (sprotocol skt) mbody in
     saddress skt = Some a ->
     msg ∈ T →
-    {{{ ▷ sh ↪[ip_of_address a] (skt, R, T) }}}
+    {{{  ▷ sh ↪[ip_of_address a] skt ∗
+         ▷ a ⤳ (R, T) }}}
       (mkExpr (ip_of_address a)
               (SendTo (Val $ LitV $ LitSocket sh) #mbody #to)) @ k; E
     {{{ RET (mkVal (ip_of_address a) #(String.length mbody));
-        sh ↪[ip_of_address a] (skt, R, T) }}}.
-   Proof.
+        sh ↪[ip_of_address a] skt ∗
+        a ⤳ (R, T) }}}.
+  Proof.
+  Admitted.
+  (*
     iIntros (msg Hsome Hmsg Φ) ">Hsh HΦ /=".
     iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (σ κ κs n) "Hσ !>".
@@ -478,24 +494,29 @@ Section primitive_laws.
       [done..|].
     iModIntro. iSplitR; [done|]. iFrame. by iApply "HΦ".
    Qed.
+   *)
 
-   Lemma wp_receivefrom_gen (Ψo : option (socket_interp Σ)) k a E sh skt R T :
+  Lemma wp_receivefrom_nb_gen
+        (Ψo : option (socket_interp Σ)) k a E sh skt R T :
     saddress skt = Some a →
-    {{{ ▷ sh ↪[ip_of_address a] (skt, R, T) ∗
+    sblock skt = false →
+    {{{ ▷ sh ↪[ip_of_address a] skt ∗
+        ▷ a ⤳ (R, T) ∗
         match Ψo with Some Ψ => a ⤇ Ψ | _ => True end }}}
       (mkExpr (ip_of_address a)
               (ReceiveFrom (Val $ LitV $ LitSocket sh))) @ k; E
     {{{ r, RET (mkVal (ip_of_address a) r);
-        ((⌜r = NONEV⌝ ∗ sh ↪[ip_of_address a] (skt, R, T)) ∨
+        ((⌜r = NONEV⌝ ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R, T) ∨
         (∃ msg,
           ⌜m_destination msg = a⌝ ∗
           ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
                   (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ sh ↪[ip_of_address a] (skt, {[ msg ]} ∪ R, T) ∗
+          ((⌜msg ∉ R⌝ ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ ({[ msg ]} ∪ R, T) ∗
              match Ψo with Some Ψ => Ψ msg | _ => ∃ φ, a ⤇ φ ∗ φ msg end) ∨
-            ⌜msg ∈ R⌝ ∗ sh ↪[ip_of_address a] (skt, R, T)))) }}}.
+            ⌜msg ∈ R⌝ ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R, T))))) }}}.
   Proof.
-    iIntros (Hsome Φ) "[>Hsh #HΨ] HΦ /=".
+  Admitted.
+(*    iIntros (Hsome Φ) "[>Hsh #HΨ] HΦ /=".
     iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (σ κ κs n) "Hσ !>".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
@@ -517,47 +538,153 @@ Section primitive_laws.
       iDestruct "Hsi" as "[(% & -> & ?) | (% & ->) ]"; [|eauto].
       iLeft. by iFrame.
     - (* did not receive a message *)
-      assert (<[ip_of_address a:=Sn']> (state_sockets σ) = state_sockets σ) as ->.
+      assert
+      (<[ip_of_address a:=Sn']> (state_sockets σ) = state_sockets σ) as ->.
       { by apply insert_id. }
       iModIntro. iFrame. iApply "HΦ"; auto.
-  Qed.
+  Qed. *)
 
-  Lemma wp_receivefrom k a E sh skt R T :
+  Lemma wp_receivefrom_nb k a E sh skt R T :
     let ip := ip_of_address a in
     saddress skt = Some a →
-    {{{ ▷ sh ↪[ip] (skt, R, T) }}}
+    sblock skt = false →
+    {{{ ▷ sh ↪[ip] skt ∗ ▷ a ⤳ (R, T) }}}
       (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket sh))) @ k; E
     {{{ r, RET (mkVal ip r);
-        ((⌜r = NONEV⌝ ∗ sh ↪[ip] (skt, R, T)) ∨
+        ((⌜r = NONEV⌝ ∗ sh ↪[ip] skt ∗ a ⤳ (R, T))) ∨
         (∃ msg,
           ⌜m_destination msg = a⌝ ∗
           ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
                   (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ sh ↪[ip] (skt, {[ msg ]} ∪ R, T) ∗ ∃ φ, a ⤇ φ ∗ φ msg) ∨
-            ⌜msg ∈ R⌝ ∗ sh ↪[ip] (skt, R, T)))) }}}.
+          ((⌜msg ∉ R⌝ ∗ sh ↪[ip] skt ∗ a ⤳ ({[ msg ]} ∪ R, T) ∗
+             ∃ φ, a ⤇ φ ∗ φ msg) ∨
+           ⌜msg ∈ R⌝ ∗ sh ↪[ip] skt ∗ a ⤳ (R, T))) }}}.
    Proof.
-     iIntros (? Hs Φ) "Hsh HΦ".
-     iApply (wp_receivefrom_gen None with "[$]"); [done|].
+     iIntros (? ? Hs Φ) "(Hsh & Hsa) HΦ".
+     iApply (wp_receivefrom_nb_gen None with "[$]"); [done|done|].
      iNext. iIntros (r) "Hr". iApply "HΦ"; eauto.
    Qed.
 
-  Lemma wp_receivefrom_alt k a E sh skt R T φ :
+  Lemma wp_receivefrom_nb_alt k a E sh skt R T φ :
     let ip := ip_of_address a in
     saddress skt = Some a →
-    {{{ ▷ sh ↪[ip] (skt, R, T) ∗ a ⤇ φ }}}
+    sblock skt = false →
+    {{{ ▷ sh ↪[ip] skt ∗ ▷ a ⤳ (R, T) ∗ a ⤇ φ }}}
       (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket sh))) @ k; E
     {{{ r, RET (mkVal ip r);
-        (⌜r = NONEV⌝ ∗ sh ↪[ip] (skt, R, T)) ∨
+        (⌜r = NONEV⌝ ∗ sh ↪[ip] skt ∗ a ⤳ (R, T)) ∨
         ∃ msg,
           ⌜m_destination msg = a⌝ ∗
           ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
                   (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ sh ↪[ip] (skt, {[ msg ]} ∪ R, T) ∗ φ msg) ∨
-            ⌜msg ∈ R⌝ ∗ sh ↪[ip] (skt, R, T)) }}}.
+          ((⌜msg ∉ R⌝ ∗ sh ↪[ip] skt ∗ a ⤳ ({[ msg ]} ∪ R, T) ∗ φ msg) ∨
+            ⌜msg ∈ R⌝ ∗ sh ↪[ip] skt ∗ a ⤳ (R, T)) }}}.
    Proof.
-     iIntros (? Hs Φ) "Hsh HΦ".
-     iApply (wp_receivefrom_gen (Some φ) with "[$]"); [done|].
+     iIntros (? ? Hs Φ) "(Hsh & Hsa) HΦ".
+     iApply (wp_receivefrom_nb_gen (Some φ) with "[$]"); [done|done|].
      iNext. iIntros (r) "Hr". iApply "HΦ"; eauto.
    Qed.
+
+
+   Lemma wp_receivefrom_hocap k a E h s R T φ
+         (P : iProp Σ) (Q__new Q__old : message -> iProp Σ) :
+     let ip := ip_of_address a in
+     saddress s = Some a →
+     sblock s = true →
+    □ (P ={⊤, E}=∗
+            h ↪[ip] s ∗ a ⤳ (R, T) ∗
+           (h ↪[ip] s ∗ a ⤳ (R, T) ={E, ⊤}=∗ P) ∧
+      (∀ m, h ↪[ip] s ∗ a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m ={E, ⊤}=∗ Q__new m) ∧
+      (∀ m, h ↪[ip] s ∗ a ⤳ (R, T) ∗ ⌜m ∈ R⌝ ={E, ⊤}=∗ Q__old m)) -∗
+  {{{ P ∗ a ⤇ φ}}}
+    (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
+  {{{ m, RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m))));
+      (⌜m ∉ R⌝ ∗ Q__new m ∨
+       ⌜m ∈ R⌝ ∗ Q__old m)
+  }}}.
+  Proof.
+  Admitted.
+  (* iIntros (n Haddr) "#Hpreds".
+    iModIntro. iIntros (Φ) "(HP & #Hsi) HΦ".
+    iLöb as "IH". wp_rec.
+    wp_bind (ReceiveFrom _).
+    iMod ("Hpreds" with "HP") as "(Hs & Hall)".
+    wp_apply (aneris_wp_receivefrom_alt with "[$Hs]");
+      [done|done|by iFrame "#"|].
+    iIntros (r)  "[(-> & Hs) | Hrd ]".
+    - (* No message *)
+      iDestruct "Hall" as "[Hempty _]".
+      iMod ("Hempty" with "Hs") as "HP".
+      iModIntro; wp_pures.
+      by iApply ("IH" with "HP HΦ").
+    - iDestruct "Hrd" as (m Hdst ->) "[ (% & Hs & Hφ) | (% & Hs) ]".
+      + (* New message *)
+        iDestruct "Hall" as "(_ & Hnew & _)".
+        iMod ("Hnew" $! m with "[Hs Hφ]") as "Qnew".
+        { eauto with iFrame. }
+        iModIntro; wp_pures.
+        iApply "HΦ". iLeft. eauto with iFrame.
+      + (* Old message *)
+        iDestruct "Hall" as "(_ & _ & Hold)".
+        iMod ("Hold" $! m with "[Hs]") as "Qold".
+        { eauto with iFrame. }
+        iModIntro; wp_pures.
+        iApply "HΦ". iRight. eauto with iFrame.
+  Qed.
+   *)
+
+  Lemma wp_receivefrom k a E h s R T φ P :
+     let ip := ip_of_address a in
+     saddress s = Some a →
+     sblock s = true →
+  {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) ∗ a ⤇ φ}}}
+    (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
+  {{{ m, RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m))));
+      ((⌜m ∉ R⌝ ∗ h ↪[ip] s ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m) ∨
+        ⌜m ∈ R⌝ ∗ h ↪[ip] s ∗ a ⤳ (R, T))
+  }}}.
+  Proof.
+  Admitted.
+(*  iIntros (n Haddr Φ) "(Hs & #Hsi) HΦ".
+    wp_apply (listen_wait_hocap_spec _ _ _ _ _ _
+          φ (h ↪[ip] (s, R, T))
+                     (λ m, h ↪[ip] (s, {[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m)
+                                     (λ m, h ↪[ip] (s, R, T))
+                                     ⊤ with "[] [$Hs]")%I; eauto.
+    iModIntro. iIntros "Hs".
+    iModIntro; iFrame.
+    repeat iSplit; eauto with iFrame.
+    - iIntros (?) "(? & ? & ?)"; eauto with iFrame.
+    - iIntros (?) "(? & ?)"; eauto with iFrame.
+  Qed.
+*)
+
+  Lemma wp_rcvtimeo_unblock k a E h s R T P n1 n2 :
+     let ip := ip_of_address a in
+     saddress s = Some a →
+     0 <= n1 →
+     0 < n2 →
+    {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) }}}
+    (mkExpr ip (SetReceiveTimeout
+                  (Val $ LitV $ LitSocket h)
+                  (Val $ LitV $ LitInt n1)
+                  (Val $ LitV $ LitInt n2))) @ k; E
+     {{{ RET (mkVal ip #());
+          h ↪[ip] s<|sblock := false|> ∗ a ⤳ (R, T) }}}.
+  Proof.
+  Admitted.
+
+  Lemma wp_rcvtimeo_block k a E h s R T P :
+     let ip := ip_of_address a in
+     saddress s = Some a →
+     {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) }}}
+    (mkExpr ip (SetReceiveTimeout
+                  (Val $ LitV $ LitSocket h)
+                  (Val $ LitV $ LitInt 0)
+                  (Val $ LitV $ LitInt 0))) @ k; E
+     {{{ RET (mkVal ip #());
+          h ↪[ip] s<|sblock := true|> ∗ a ⤳ (R, T) }}}.
+  Proof.
+  Admitted.
 
 End primitive_laws.

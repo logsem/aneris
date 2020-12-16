@@ -1,18 +1,19 @@
 From iris.proofmode Require Import base tactics classes.
-From iris.program_logic Require Export weakestpre.
+From aneris.program_logic Require Export weakestpre.
 From aneris.aneris_lang Require Import lifting.
 From aneris.aneris_lang Require Export resources.
 From aneris.aneris_lang Require Export network base_lang.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
-From iris.bi Require Import weakestpre.
+(* From iris.bi Require Import weakestpre. *)
 Set Default Proof Using "Type".
 
 Import Network.
 
 Definition aneris_wp_def `{!anerisG Σ} (ip : ip_address) (E : coPset)
            (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
-  (is_node ip -∗ wp NotStuck E (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
+  (is_node ip -∗
+   wp NotStuck E (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
 Definition aneris_wp_aux `{!anerisG Σ} : seal (@aneris_wp_def Σ _).
 Proof. by eexists. Qed.
@@ -142,7 +143,7 @@ Proof.
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /=.
   destruct (to_val e); simpl; first by iMod "Hwp"; eauto.
   iIntros (σ1 κ _ _) "Hsi".
-  iMod ("Hwp" $! σ1 κ [] 0 with "Hsi") as "[% Hstp]".
+  iMod ("Hwp" $! σ1 κ [] 0%nat with "Hsi") as "[% Hstp]".
   iModIntro.
   iSplit; first done.
   iIntros (e2 σ2 efs Hpstp).

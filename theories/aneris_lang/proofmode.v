@@ -231,7 +231,8 @@ Lemma tac_wp_socket Δ Δ' E j K ip v1 v2 v3 Φ :
                  Network.sfamily := v1;
                  Network.stype := v2;
                  Network.sprotocol := v3;
-                 Network.saddress := None |}, ∅, ∅)))
+                 Network.saddress := None;
+                 Network.sblock := true|})))
         Δ' = Some Δ'' ∧
       envs_entails
         Δ'' (WP fill K (of_val $ LitV (LitSocket h)) @[ip] E {{ Φ }})) →
@@ -248,6 +249,7 @@ Proof.
   iApply "H"; last done.
 Qed.
 
+(*
 Lemma tac_wp_socketbind_static Δ Δ1 Δ2 Δ3 E i j k K ip skt sh a A Φ :
   ip_of_address a = ip →
   a ∈ A →
@@ -256,7 +258,7 @@ Lemma tac_wp_socketbind_static Δ Δ1 Δ2 Δ3 E i j k K ip skt sh a A Φ :
   envs_lookup j Δ1 = Some (true, fixed A)%I →
   envs_lookup_delete false k Δ1 =
     Some (false, free_ports ip {[port_of_address a]}, Δ2) →
-  envs_lookup i Δ2 = Some (false, sh ↪[ip] (skt, ∅, ∅))%I →
+  envs_lookup i Δ2 = Some (false, sh ↪[ip] skt, ∅, ∅))%I →
   envs_simple_replace i false (Esnoc Enil i
     (sh ↪[ip] (skt <| saddress := Some a |>, ∅, ∅))) Δ2 = Some Δ3 →
   envs_entails Δ3 (WP fill K (of_val $ LitV $ LitInt 0) @[ip] E {{ Φ }}) →
@@ -415,6 +417,7 @@ Proof.
     iCombine "Hsh HΔ" as "HΔ".
     rewrite /of_envs_del_Δ (envs_lookup_sound_2 _ _ false) //.
 Qed.
+ *)
 
 End state.
 
@@ -550,6 +553,7 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
   | _ => fail "wp_socket: not a 'wp'"
   end.
 
+(*
 Tactic Notation "wp_socketbind_static" :=
   let solve_fixed ip :=
       let A := match goal with |- _ = Some (_, fixed ?A%I) => A end in
@@ -699,3 +703,4 @@ Tactic Notation "wp_receive" ident(msg) "as" constr(H) :=
   let Ha := fresh "H" in
   let Hb := fresh "H" in
   wp_receive msg Ha Hb as H.
+*)
