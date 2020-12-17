@@ -30,9 +30,9 @@ build-dep: build-dep/opam phony
 	  if opam --version | grep "^1\." -q; then \
 	    BUILD_DEP_PACKAGE="$$(egrep "^name:" build-dep/opam | sed 's/^name: *"\(.*\)" */\1/')" && \
 	    opam pin add -k path $(OPAMFLAGS) "$$BUILD_DEP_PACKAGE".dev build-dep && \
-	    opam reinstall --verbose $(OPAMFLAGS) "$$BUILD_DEP_PACKAGE"; \
+	    opam reinstall -j 2 --verbose $(OPAMFLAGS) "$$BUILD_DEP_PACKAGE"; \
 	  else \
-	    opam install --verbose $(OPAMFLAGS) build-dep/; \
+	    opam install -j 2 --verbose $(OPAMFLAGS) build-dep/; \
 	  fi
 
 # Some files that do *not* need to be forwarded to Makefile.coq
