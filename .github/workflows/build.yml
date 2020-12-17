@@ -7,6 +7,8 @@ on:
     branches:
       - master
   pull_request:
+  schedule:
+  - cron: 0 0 1 * * # once a month
 
 jobs:
   build:
@@ -15,39 +17,15 @@ jobs:
       matrix:
         coq_version:
           # - dev
-          - '8.12'
+          - '8.12.1'
       max-parallel: 4
       # don't cancel all in-progress jobs if one matrix job fails:
       fail-fast: false
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
+    - name: Check out code
+      uses: actions/checkout@v2
       with:
         submodules: true
-    - uses: coq-community/docker-coq-action@v1
-      with:
-        opam_file: 'aneris.opam'
-        coq_version: ${{ matrix.coq_version }}
-        ocaml_version: '4.11-flambda'
-        before_install: |
-          startGroup "Add repositories and print opam config"
-            eval $(opam env --switch=${COMPILER_EDGE} --set-switch) \
-            opam repository add --all-switches --set-default iris-dev https://gitlab.mpi-sws.org/iris/opam.git \
-            && opam update -y -u \
-            && opam config list && opam repo list && opam list \
-            && opam clean -a -c -s --logs
-          endGroup
-        before_script: |
-          sudo chown -R coq:coq . # workaround a permission issue
-        script: |
-          startGroup Build
-            make -j2 
-          endGroup
-        uninstall: |
-          make clean
-    - name: Revert permissions
-      # to avoid a warning at cleanup time
-      if: ${{ always() }}
-      run: sudo chown -R 1001:116 .
+    - name: Build docker image
+      run: docker build --build-arg=coq_image="coqorg/coq:${{matrix.coq_version}}" --pull -t aneris .
