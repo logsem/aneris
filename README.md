@@ -1,5 +1,4 @@
 # Aneris
-[![Build Status](https://travis-ci.com/logsem/aneris.svg?token=rjT7z1yqWrMesq694bBy&branch=master)](https://travis-ci.com/logsem/aneris)
 [![CI](https://github.com/logsem/aneris/workflows/CI/badge.svg?branch=master)](https://github.com/logsem/aneris/actions?query=workflow%3ACI)
 
 Aneris is a programming language and a higher-order distributed concurrent
