@@ -362,21 +362,27 @@ Section primitive_laws.
                             (Val $ LitV $ LitSocketType t)
                             (Val $ LitV $ LitProtocol p))) @ s; E
     {{{ sh, RET (mkVal ip (LitV (LitSocket sh)));
-          sh ↪[ip] (mkSocket f t p None true) }}}.
+        sh ↪[ip] (mkSocket f t p None true) }}}.
   Proof.
-    (*   iIntros (Φ) ">Hn HΦ".
+    iIntros (Φ) ">Hn HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ κ κs n) "Hσ !> /=".
     iDestruct (is_node_valid_sockets with "Hσ Hn") as (?) "%".
     iSplitR.
-    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+    { iPureIntro; do 4 eexists.
+      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
       apply newsocket_fresh. }
-    set (sock := {| sfamily := f; stype := t; sprotocol := p; saddress := None |}).
+    set (sock := {| sfamily := f;
+                    stype := t;
+                    sprotocol := p;
+                    saddress := None;
+                    sblock := true |}).
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
-    iMod (aneris_state_interp_alloc_socket sock with "Hn Hσ") as "[Hσ Hsh]"; try done.
+    iMod (aneris_state_interp_alloc_socket sock with "Hn Hσ")
+      as "[Hσ Hsh]"; try done.
     iModIntro. iFrame. iSplitR; [done|]. by iApply "HΦ".
-  Qed. *)
-  Admitted.
+  Qed.
+
 
   Lemma wp_socketbind_static A E sh skt k a R T:
     saddress skt = None →
