@@ -988,9 +988,9 @@ Inductive socket_step ip :
       (* reduces to *)
       (Val $ LitV $ LitSocket sh)
       (<[sh:=(mkSocket f s p None true, ∅)]>Sn) P M
-| SocketBindS sh a R skt Sn P ps M  :
+| SocketBindS sh a skt Sn P ps M  :
     (* The socket handle is bound to a socket. *)
-    Sn !! sh = Some (skt, R) →
+    Sn !! sh = Some (skt, ∅) →
     (* The socket has no assigned address. *)
     saddress skt = None →
     (* The port is not in use *)
@@ -1004,7 +1004,7 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt 0)
-      (<[sh:=((skt <| saddress := Some a |>), R)]>Sn)
+      (<[sh:=((skt <| saddress := Some a |>), ∅)]>Sn)
       (<[ip_of_address a:={[ port_of_address a ]} ∪ ps]> P)
       M
 | SendToS sh a mbody R skt Sn P M f :
@@ -1063,8 +1063,7 @@ Inductive socket_step ip :
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
 | SetReceiveTimeoutPositiveS sh skt R Sn P M m n :
     Sn !! sh = Some (skt, R) →
-    0 <= m →
-    0 < n →
+    (0 < m ∨ 0 < n) →
     socket_step
       ip
       (SetReceiveTimeout

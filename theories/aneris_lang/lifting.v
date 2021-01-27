@@ -383,7 +383,6 @@ Section primitive_laws.
     iModIntro. iFrame. iSplitR; [done|]. by iApply "HΦ".
   Qed.
 
-
   Lemma wp_socketbind_static A E sh skt k a R T:
     saddress skt = None →
     a ∈ A →
@@ -399,21 +398,23 @@ Section primitive_laws.
        a ⤳ (R, T) ∗
        ∃ φ, a ⤇ φ }}}.
   Proof.
-  Admitted.
-(*    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
+    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ κ κs n) "Hσ /=".
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as (?) "[% %]".
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
+      as (?) "[% %]".
     iModIntro. iSplitR.
-    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
-      by econstructor. }
+    { iPureIntro; do 4 eexists.
+      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_socketbind_static with "Hσ Hfixed Hsh Hp")
       as "(Hσ & Hsh & Hφ)"; [done..|].
     iModIntro. iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
-  Qed. *)
+  Qed.
 
   Lemma wp_socketbind_dynamic skt A E sh k a φ R T:
     saddress skt = None →
@@ -431,21 +432,22 @@ Section primitive_laws.
         a ⤳ (R, T) ∗
         a ⤇ φ }}}.
   Proof.
-  Admitted.
-(*    iIntros (?? Φ) "(#>Hfixed & >Hp & >Hsh) HΦ".
+    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ κ κs n) "Hσ /=".
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as (?) "[% %]".
+     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
+      as (?) "[% %]".
     iModIntro. iSplitR.
     { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
-      by econstructor. }
+      by econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_socketbind_dynamic with "Hσ Hfixed Hsh Hp")
       as "(Hσ & Hsh & Hφ)"; [done..|].
     iModIntro. iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
-  Qed. *)
+  Qed.
 
   Lemma wp_send φ mbody sh skt a to k E R T:
     let msg := mkMessage a to (sprotocol skt) mbody  in
