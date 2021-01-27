@@ -65,10 +65,4 @@ Section state_interpretation.
     set_solver.
   Qed.
 
-  Lemma gnames_coh_deliver_message γm mhγ H S Sn Sn' ip:
-    S !! ip = Some Sn →
-    gnames_coh γm H S mhγ →
-    gnames_coh γm H (<[ip:=Sn']> S) mhγ.
-  Proof. Admitted.
-
 End state_interpretation.

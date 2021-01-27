@@ -47,7 +47,7 @@ Section state_interpretation.
     destruct Hstep as
         [ ip σ k Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ]; simpl.
     { iFrame "Hsi".
-      iSplitR; [eauto using gnames_coh_deliver_message|].
+      iSplitR; [eauto using gnames_coh_update_sockets|].
       iSplitR; [eauto using network_sockets_coh_deliver_message|].
       iSplitR; [eauto using messages_history_coh_deliver_message|].
       iSplitL "Hlcoh".

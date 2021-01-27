@@ -64,7 +64,18 @@ Section state_interpretation.
     saddress skt = Some a →
     messages_history_coh M S mhγ →
     messages_history_coh M (<[ip:=Sn']> S) mhγ.
-  Proof. Admitted.
+  Proof.
+    rewrite /messages_history_coh.
+    intros Hm HSn Hsh HSn' Hskt (Hmcoh & Hrcoh & Hacoh).
+    split; eauto.
+    split; last eauto.
+    intros ip0 Sn0 sh0 skt0 r0 m0 HSn0 Hskt0 Hm0.
+    ddeq ip ip0.
+    - ddeq sh sh0.
+      + admit.
+      + naive_solver.
+    - naive_solver.
+  Admitted.
 
   Lemma messages_history_drop_message σ mhγ m :
     messages_history_coh (state_ms σ) (state_sockets σ) mhγ →
