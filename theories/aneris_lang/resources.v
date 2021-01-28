@@ -422,6 +422,15 @@ Section resource_lemmas.
     iModIntro. iFrame.
   Qed.
 
+  Lemma socket_ctx_update γn σ s :
+    ⊢ |==> ∃ , sockets_ctx γn s.
+  Proof.
+    iMod (gen_heap_light_init σ) as (γh) "Hh".
+    iMod (gen_heap_light_init s) as (γs) "Hs".
+    iExists {| heap_name := γh; sockets_name := γs |}.
+    iModIntro. iFrame.
+  Qed.
+
   Lemma fixed_agree A B : fixed A -∗ fixed B -∗ ⌜A = B⌝.
   Proof.
     iIntros "HA HB".

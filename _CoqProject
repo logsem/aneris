@@ -28,16 +28,16 @@ theories/aneris_lang/notation.v
 theories/aneris_lang/tactics.v
 theories/aneris_lang/resources.v
 
-theories/aneris_lang/state_interp_def.v
-theories/aneris_lang/state_interp_local_coh.v
-theories/aneris_lang/state_interp_gnames_coh.v
-theories/aneris_lang/state_interp_free_ips_coh.v
-theories/aneris_lang/state_interp_socket_interp_coh.v
-theories/aneris_lang/state_interp_network_sockets_coh.v
-theories/aneris_lang/state_interp_messages_resource_coh.v
-theories/aneris_lang/state_interp_messages_history_coh.v
-theories/aneris_lang/state_interp_config_wp.v
-theories/aneris_lang/state_interp.v
+theories/aneris_lang/state_interp/state_interp_def.v
+theories/aneris_lang/state_interp/state_interp_local_coh.v
+theories/aneris_lang/state_interp/state_interp_gnames_coh.v
+theories/aneris_lang/state_interp/state_interp_free_ips_coh.v
+theories/aneris_lang/state_interp/state_interp_socket_interp_coh.v
+theories/aneris_lang/state_interp/state_interp_network_sockets_coh.v
+theories/aneris_lang/state_interp/state_interp_messages_resource_coh.v
+theories/aneris_lang/state_interp/state_interp_messages_history_coh.v
+theories/aneris_lang/state_interp/state_interp_config_wp.v
+theories/aneris_lang/state_interp/state_interp.v
 
 theories/aneris_lang/adequacy.v
 theories/aneris_lang/lifting.v

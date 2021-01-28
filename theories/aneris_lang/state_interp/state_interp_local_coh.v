@@ -239,13 +239,27 @@ Section state_interpretation.
     Sn !! sh = Some (skt, R) →
     Sn' = <[sh:=(skt, R ∪ {[m]})]> Sn →
     saddress skt = Some a →
-    ([∗ map] ip0↦γs ∈ γm, local_state_coh σ ip0 γs) -∗
+    ([∗ map] ip0↦γs ∈ γm, local_state_coh σ ip0 γs) ==∗
     [∗ map] ip0↦γs ∈ γm, local_state_coh
                          {|
                          state_heaps := state_heaps σ;
                          state_sockets := <[ip:=Sn']> (state_sockets σ);
                          state_ports_in_use := state_ports_in_use σ;
                          state_ms := state_ms σ |} ip0 γs.
-  Proof. Admitted.
+  Proof.
+    iIntros (HM Hσ Hsh -> Hskt) "Hγm".
+    rewrite -big_sepM_bupd.
+    iApply big_sepM_mono; last done.
+    iIntros (ip' γ Hγ) "Hx".
+    iDestruct "Hx" as (h Sn' Hip' Hσip') "(Hγ1 & Hγ2 & Hγ3)".
+    destruct (decide (ip = ip')) as [->|].
+    - simplify_eq.
+      rewrite /local_state_coh /= lookup_insert.
+      (<[sh:=(skt, R ∪ {[m]})]> Sn)
+      iExists _, _; rewrite /= lookup_insert;
+        repeat iSplit; eauto with iFrame.
+
+
+  Qed.
 
 End state_interpretation.

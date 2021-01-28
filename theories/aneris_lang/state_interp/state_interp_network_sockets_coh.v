@@ -84,7 +84,12 @@ Section state_interpretation.
     bound_ports_coh Sn P →
     bound_ports_coh (<[sh:=(skt, R ∪ {[m]})]> Sn) P.
   Proof.
-  Admitted.
+    rewrite /bound_ports_coh; intros HM HSh Hskt HSn.
+    intros sh' skt' a' ps r Hsh' Hskt' HP.
+    destruct (decide (sh = sh')) as [->|].
+    - rewrite lookup_insert in Hsh'; simplify_eq; eauto.
+    - rewrite lookup_insert_ne in Hsh'; last done. simplify_eq; eauto.
+  Qed.
 
   (** socket_handlers_coh *)
   Lemma socket_handlers_coh_alloc_socket Sn sh s :
@@ -130,7 +135,19 @@ Section state_interpretation.
     socket_handlers_coh Sn  →
     socket_handlers_coh (<[sh:=(skt, R ∪ {[m]})]> Sn).
   Proof.
-  Admitted.
+    intros HM Hsh Hskt HSn sh1 sh2 skt1 skt2 r1 r2 Hsh1 Hsh2 Hskt1 Hskt12.
+    destruct (decide (sh1 = sh)) as [->|];
+      destruct (decide (sh2 = sh)) as [->|]; simplify_eq; eauto.
+    - rewrite lookup_insert in Hsh1; rewrite lookup_insert_ne in Hsh2;
+        last done.
+      eapply HSn; eauto; naive_solver.
+    - rewrite lookup_insert_ne in Hsh1; last done;
+        rewrite lookup_insert in Hsh2.
+      eapply HSn; eauto; naive_solver.
+    - rewrite lookup_insert_ne in Hsh1; last done;
+        rewrite lookup_insert_ne in Hsh2; last done.
+      eapply HSn; eauto; naive_solver.
+  Qed.
 
   (** socket_messages_coh *)
   Lemma socket_messages_coh_update_socket Sn sh skt :
@@ -161,7 +178,14 @@ Section state_interpretation.
     socket_messages_coh Sn →
     socket_messages_coh (<[sh:=(skt, R ∪ {[m]})]> Sn).
   Proof.
-  Admitted.
+    intros HM Hsh Hskt HSn sh' kt' r' a' Hsh' Hskt'.
+    destruct (decide (sh = sh')); simplify_eq; last first.
+    { rewrite lookup_insert_ne // in Hsh'. by eapply HSn. }
+    rewrite lookup_insert in Hsh'; simplify_eq.
+    intros m' [HR | ?%elem_of_singleton_1]%elem_of_union; subst.
+    - by eapply HSn.
+    - apply elem_of_filter in HM as [? ?]; done.
+  Qed.
 
   (** socket_addresses_coh *)
   Lemma socket_addresses_coh_alloc_socket Sn sh skt n :
@@ -176,10 +200,10 @@ Section state_interpretation.
     socket_addresses_coh (<[sh:=(skt <| saddress := Some a |>, ∅)]> Sn) (ip_of_address a).
   Proof. intros ? ? sh' **; ddeq sh sh'; eauto. Qed.
 
-  Lemma socket_addresses_coh_insert_received sh a skt m r Sn :
+  Lemma socket_addresses_coh_insert_received sh a skt m R Sn :
     saddress skt = Some a →
     socket_addresses_coh Sn (ip_of_address a) →
-    socket_addresses_coh (<[sh:=(skt, {[m]} ∪ r)]> Sn) (ip_of_address a).
+    socket_addresses_coh (<[sh:=(skt, R ∪ {[m]})]> Sn) (ip_of_address a).
   Proof. intros ?? sh' **; ddeq sh sh'; eauto. Qed.
 
   (* TODO: 0 *)
@@ -190,17 +214,40 @@ Section state_interpretation.
     socket_addresses_coh Sn ip →
     socket_addresses_coh (<[sh:=(skt, R ∪ {[m]})]> Sn) ip.
   Proof.
-  Admitted.
+    intros HM Hsh Hskt HSn sh' skt' R' sa Hsh' Hskt'.
+    destruct (decide (sh = sh')) as [->|].
+    - rewrite lookup_insert in Hsh'; simplify_eq.
+      eapply HSn; eauto.
+    - rewrite lookup_insert_ne in Hsh'; last done.
+      eapply HSn; eauto.
+  Qed.
 
   (** socket_unbound_empty_buf_coh *)
   (* TODO: 0 *)
   Lemma socket_unbound_empty_buf_coh_alloc_socket Sn sh ip skt:
-    Sn !! sh = None →
     saddress skt = None →
     socket_unbound_empty_buf_coh Sn ip →
     socket_unbound_empty_buf_coh (<[sh:=(skt, ∅)]> Sn) ip.
   Proof.
-  Admitted.
+    intros Hskt HSn sh' skt' R Hsh' Hskt'.
+    destruct (decide (sh = sh')) as [->|].
+    - rewrite lookup_insert in Hsh'; simplify_eq; done.
+    - rewrite lookup_insert_ne in Hsh'; last done.
+      eapply HSn; eauto.
+  Qed.
+
+  Lemma socket_unbound_empty_buf_coh_socketbind Sn sh skt a:
+    saddress skt = None →
+    socket_unbound_empty_buf_coh Sn (ip_of_address a) →
+    socket_unbound_empty_buf_coh
+      (<[sh:=(skt <|saddress := Some a|> , ∅)]> Sn) (ip_of_address a).
+  Proof.
+    intros Hskt HSn sh' skt' R Hsh' Hskt'.
+    destruct (decide (sh = sh')) as [->|].
+    - rewrite lookup_insert in Hsh'; simplify_eq; done.
+    - rewrite lookup_insert_ne in Hsh'; last done.
+      eapply HSn; eauto.
+  Qed.
 
   (* TODO: 0 *)
   Lemma socket_unbound_empty_buf_coh_deliver_message M Sn sh ip skt a R m :
@@ -210,7 +257,12 @@ Section state_interpretation.
     socket_unbound_empty_buf_coh Sn ip →
     socket_unbound_empty_buf_coh (<[sh:=(skt, R ∪ {[m]})]> Sn) ip.
   Proof.
-  Admitted.
+    intros HM Hsh Hskt HSn sh' skt' R' Hsh' Hskt'.
+    destruct (decide (sh = sh')) as [->|].
+    - rewrite lookup_insert in Hsh'; simplify_eq; done.
+    - rewrite lookup_insert_ne in Hsh'; last done.
+      eapply HSn; eauto.
+  Qed.
 
   (** network_sockets_coh *)
   Lemma network_sockets_coh_alloc_node Sn ps ip :
@@ -291,7 +343,7 @@ Section state_interpretation.
       split; [by eapply socket_handlers_coh_socketbind|].
       split; [by eapply socket_messages_coh_update_socket|].
       split; [by eapply socket_addresses_coh_socketbind |].
-      admit.
+      apply socket_unbound_empty_buf_coh_socketbind; done.
     - destruct (Hncoh ip Sn') as (HBpCoh & HshCoh & HmrCoh & HsaCoh); [done|].
       split; [|done].
       intros ? skt' a' ???? Hps.
@@ -299,7 +351,7 @@ Section state_interpretation.
       { eapply HsaCoh; eauto. }
       simplify_eq /=. rewrite lookup_insert_ne in Hps; [|done].
         by eapply HBpCoh.
-  Admitted.
+  Qed.
 
   Lemma network_sockets_coh_deliver_message M P S Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →

@@ -161,7 +161,7 @@ Section definitions.
 
   (* Receive buffers of unbound sockets are empty. *)
   Definition socket_unbound_empty_buf_coh Sn ip :=
-    ∀ sh skt r a,
+    ∀ sh skt r,
       Sn !! sh = Some (skt, r) →
       saddress skt = None →
       r = ∅.

@@ -69,18 +69,27 @@ Section state_interpretation.
     intros Hm HSn Hsh HSn' Hskt (Hmcoh & Hrcoh & Hacoh).
     split; eauto.
     split; last eauto.
-    intros ip0 Sn0 sh0 skt0 r0 m0 HSn0 Hskt0 Hm0.
-    ddeq ip ip0.
-    - ddeq sh sh0.
-      + admit.
-      + naive_solver.
-    - naive_solver.
-  Admitted.
+    intros ip1 Sn1 sh1 skt1 r1 m1 HSn1 Hskt1 Hm1.
+    destruct (decide (ip = ip1)) as [->|].
+    - rewrite lookup_insert in HSn1.
+      simplify_eq.
+      destruct (decide (sh = sh1)) as [->|].
+      + rewrite lookup_insert in Hskt1; simplify_eq.
+        apply elem_of_union in Hm1 as [Hm1| ->%elem_of_singleton].
+        * eapply Hrcoh; eauto.
+        * apply Hmcoh. set_solver.
+      + rewrite lookup_insert_ne in Hskt1; eauto.
+    - by rewrite lookup_insert_ne in HSn1; eauto.
+  Qed.
 
   Lemma messages_history_drop_message σ mhγ m :
     messages_history_coh (state_ms σ) (state_sockets σ) mhγ →
     messages_history_coh (state_ms σ ∖ {[m]}) (state_sockets σ) mhγ.
-  Proof. Admitted.
-
+  Proof.
+    unfold messages_history_coh.
+    intros (Hmsh & Hrb & Hmac).
+    split_and!; [|done|done].
+    intros ? ?; eapply Hmsh; set_solver.
+  Qed.
 
 End state_interpretation.

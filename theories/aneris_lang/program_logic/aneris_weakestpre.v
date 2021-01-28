@@ -328,7 +328,6 @@ Section proofmode_classes.
             α β γ (WP e @ ip; E {{ Φ }})
             (λ x, WP e @ ip; E {{ v, |={E}=> β x ∗ (γ x -∗? Φ v) }})%I.
   Proof.
-    rewrite /ElimAcc.
     iIntros (_) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply aneris_wp_fupd.
     iApply (aneris_wp_wand with "(Hinner Hα)").
