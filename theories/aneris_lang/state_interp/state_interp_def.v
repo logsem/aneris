@@ -16,6 +16,45 @@ Import uPred.
 Import Network.
 Import RecordSetNotations.
 
+
+(* Move these definitions somewhere else *)
+Section collect.
+  Context {K} `{!EqDecision K} `{Countable K} {A : Type}
+          {B : Type} `{!EqDecision B} `{Countable B}
+          (f : A → gset B).
+
+  Definition collect (g : gmap K A) : gset B :=
+    map_fold (λ _ a acc, (f a) ∪ acc) ∅ g.
+
+  Lemma elem_of_collect g :
+    ∀ m, m ∈ collect g ↔ ∃ k a, g !! k = Some a ∧ m ∈ f a.
+  Proof.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+      simpl; apply (map_fold_ind (M := gmap _) (λ y, λ x, P))
+    end.
+    - intros m; split; first done.
+      intros (?&?&?&?); done.
+    - intros k a g' M Hk IHM m.
+      split.
+      + intros [Hm|Hm]%elem_of_union.
+        * exists k, a; rewrite lookup_insert; done.
+        * apply IHM in Hm as (k' & a' & Hk' & Hm).
+          exists k', a'.
+          rewrite lookup_insert_ne; first done.
+          set_solver.
+      + intros (k' & a' & Hk' & Hm).
+        destruct (decide (k' = k)) as [->|].
+        * rewrite lookup_insert in Hk'; simplify_eq.
+          set_solver.
+        * rewrite lookup_insert_ne in Hk'; last done.
+          apply elem_of_union; right.
+          apply IHM; eauto.
+  Qed.
+
+End collect.
+
 Section definitions.
   Context `{anerisG Σ}.
   Implicit Types σ : state.
@@ -38,16 +77,48 @@ Section definitions.
   Implicit Types γm : gmap ip_address node_gnames.
   Implicit Types sis : gmap socket_address gname.
 
+
   (** Definitions for the message history *)
 
   (* The set of all received messages *)
-  Definition messages_received mhγ :=
-    map_fold (fun ip pms acc0 =>
-                map_fold (fun p rt acc1 => rt.1 ∪ acc1) acc0 pms) ∅ mhγ.
+  Definition messages_received
+      (mh : gmap ip_address (gmap port (message_soup * message_soup))) :=
+    collect (λ pms, collect (λ rt, rt.1) pms) mh.
+
+  Lemma elem_of_messages_received mh :
+    ∀ m, m ∈ messages_received mh ↔
+      ∃ ip Mp port (M : message_soup * message_soup),
+        mh !! ip = Some Mp ∧ Mp !! port = Some M ∧ m ∈ M.1.
+  Proof.
+    intros m; split.
+    - intros Hm.
+      apply elem_of_collect in Hm as (ip & Mp & HMp1 & HMp2).
+      apply elem_of_collect in HMp2 as (port & M & HM1 & HM2); eauto 10.
+    - intros (ip & Mp & port & M & HM1 & HM2 & Hm).
+      apply elem_of_collect.
+      eexists _, _; split; first done.
+      apply elem_of_collect; eauto.
+  Qed.
+
   (* The set of all transmitted messages *)
-  Definition messages_sent mhγ :=
-    map_fold (fun ip pms acc0 =>
-                map_fold (fun p rt acc1 => rt.2 ∪ acc1) acc0 pms) ∅ mhγ.
+  Definition messages_sent
+             (mh : gmap ip_address (gmap port (message_soup * message_soup))) :=
+    collect (λ pms, collect (λ rt, rt.2) pms) mh.
+
+  Lemma elem_of_messages_sent mh :
+    ∀ m, m ∈ messages_sent mh ↔
+      ∃ ip Mp port (M : message_soup * message_soup),
+        mh !! ip = Some Mp ∧ Mp !! port = Some M ∧ m ∈ M.2.
+  Proof.
+    intros m; split.
+    - intros Hm.
+      apply elem_of_collect in Hm as (ip & Mp & HMp1 & HMp2).
+      apply elem_of_collect in HMp2 as (port & M & HM1 & HM2); eauto 10.
+    - intros (ip & Mp & port & M & HM1 & HM2 & Hm).
+      apply elem_of_collect.
+      eexists _, _; split; first done.
+      apply elem_of_collect; eauto.
+  Qed.
 
   (* [m] has been received *)
   Definition message_received m mhγ := m ∈ (messages_received mhγ).
