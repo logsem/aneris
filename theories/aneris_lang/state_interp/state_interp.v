@@ -133,7 +133,8 @@ Section state_interpretation.
     iSplitL "Hh Hs".
     (* local_state_coh *)
     { rewrite big_sepM_singleton /local_state_coh Hste Hsce !lookup_singleton.
-      iExists _, _. iFrame; iFrame "#"; eauto. }
+      iExists ∅, ∅.
+      rewrite fmap_empty. iFrame; iFrame "#"; eauto. }
     iSplitL "HipsCtx HPiu".
     (* free_ips_coh *)
     { by iApply (free_ips_coh_init with "[$]"). }
@@ -213,8 +214,8 @@ Section state_interpretation.
     { iApply (big_sepM_local_state_coh_insert ip γn
                 with "[Hh Hs] [Hlcoh]").
       - rewrite lookup_insert //.
-      - iExists _, _.
-        iFrame. iFrame "#". rewrite !lookup_insert.
+      - iExists ∅, ∅.
+        iFrame. iFrame "#". rewrite !lookup_insert fmap_empty.
         repeat iSplit; eauto.
       - rewrite delete_insert //.
           by iApply big_sepM_local_state_coh_alloc_node. }

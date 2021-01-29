@@ -44,16 +44,31 @@ Section state_interpretation.
     ddeq ip (ip_of_address a); by simplify_map_eq /=.
   Qed.
 
+  Lemma messages_received_empty ip:
+    messages_received {[ip := ∅]} = ∅.
+  Proof.
+  Admitted.
+
+  Lemma messages_sent_empty ip :
+    messages_sent {[ip := ∅]} = ∅.
+  Proof.
+  Admitted.
+
   (** messages_history_coh *)
   Lemma messages_history_coh_init ip :
     messages_history_coh ∅ {[ip := ∅]} {[ip := ∅]}.
   Proof.
     rewrite /messages_history_coh
-            /message_soup_coh /receive_buffers_coh /messages_addresses_coh.
+            /message_soup_coh
+            /receive_buffers_coh
+            /messages_addresses_coh
+            /messages_received_coh.
     split; first set_solver.
     split; first by intros; simplify_map_eq.
-    intros ? ? ? Hgam.
-    split; rewrite get_message_history_empty in Hgam; set_solver.
+    split.
+    - intros ? ? ? Hgam.
+      split; rewrite get_message_history_empty in Hgam; set_solver.
+    - by rewrite messages_sent_empty messages_received_empty.
   Qed.
 
   Lemma messages_history_coh_deliver_message mhγ M S Sn Sn' ip sh skt a R m :
@@ -87,8 +102,8 @@ Section state_interpretation.
     messages_history_coh (state_ms σ ∖ {[m]}) (state_sockets σ) mhγ.
   Proof.
     unfold messages_history_coh.
-    intros (Hmsh & Hrb & Hmac).
-    split_and!; [|done|done].
+    intros (Hmsh & Hrb & Hmac & Hmr).
+    split_and!; [|done..].
     intros ? ?; eapply Hmsh; set_solver.
   Qed.
 

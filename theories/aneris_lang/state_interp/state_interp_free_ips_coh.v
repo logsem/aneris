@@ -147,7 +147,6 @@ Section state_interpretation.
     let S' := <[ip := <[sh:=(skt, r')]> Sn]> (state_sockets σ1) in
     let σ2 := σ1 <| state_sockets := S' |> in
     state_sockets σ1 !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, r') →
     free_ips_coh σ1 -∗ free_ips_coh σ2.
   Proof.
     rewrite /free_ips_coh /=.
@@ -160,7 +159,7 @@ Section state_interpretation.
     by apply HFip2.
   Qed.
 
- Lemma free_ips_coh_deliver_message σ M Sn Sn' ip sh skt a R m :
+  Lemma free_ips_coh_deliver_message σ M Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →
     (state_sockets σ) !! ip = Some Sn →
     Sn !! sh = Some (skt, R) →
@@ -173,6 +172,17 @@ Section state_interpretation.
     state_sockets := <[ip:=Sn']> (state_sockets σ);
     state_ports_in_use := state_ports_in_use σ;
     state_ms := state_ms σ |}.
- Proof. Admitted.
+ Proof.
+   rewrite /free_ips_coh /=.
+   iDestruct 1 as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
+   iExists _, _. simpl. iFrame. iPureIntro.
+   do 2 (split; [auto|]).
+   split; [|done].
+   intros ip' ?. split; [set_solver|].
+   ddeq ip ip'.
+   - naive_solver.
+   - destruct (decide (ip' = ip_of_address a)); simplify_map_eq; [set_solver|].
+     by apply HFip2.
+ Qed.
 
 End state_interpretation.

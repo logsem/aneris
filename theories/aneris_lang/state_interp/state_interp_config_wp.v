@@ -58,8 +58,6 @@ Section state_interpretation.
     iSplitR; first done.
     iPureIntro. by eapply messages_history_drop_message.
   Qed.
-  (* TODO: The only subtle point will be to show that receive_buffers_coh is
-     preserved for delivery config step. *)
-
 
 End state_interpretation.
+(* Print Assumptions config_wp_correct. *)

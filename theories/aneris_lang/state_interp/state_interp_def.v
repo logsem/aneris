@@ -198,11 +198,15 @@ Section definitions.
              (∀ m, m ∈ R → m_destination m = a) ∧
              (∀ m, m ∈ T → m_sender m = a).
 
+  Definition messages_received_coh mhγ :=
+    messages_received mhγ ⊆ messages_sent mhγ.
+
   (* Message history is coherent w.r.t. message soup, socket map, and itself. *)
   Definition messages_history_coh M S mhγ :=
     message_soup_coh M mhγ ∧
     receive_buffers_coh S mhγ ∧
-    messages_addresses_coh mhγ.
+    messages_addresses_coh mhγ ∧
+    messages_received_coh mhγ.
 
  (* For all messages [m] in [M], either the network owns the resources [Φ m]
      described by some socket protocol [Φ] or it has been delivered. *)
