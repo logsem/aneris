@@ -21,8 +21,7 @@ Definition node_gnames_mapUR : ucmra :=
   gmapUR ip_address (agreeR node_gnamesO).
 Definition local_heapUR : ucmra :=
   gen_heapUR loc base_lang.val.
-Definition local_socketsUR : ucmra :=
-  gen_heapUR socket_handle (socket * message_soup).
+Definition local_socketsUR : ucmra := gen_heapUR socket_handle socket.
 Definition free_ipsUR : ucmra :=
   (gset_disjUR ip_address).
 Definition free_portsUR : ucmra :=
@@ -31,7 +30,6 @@ Definition socket_interpUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO gname)).
 Definition fixedUR : ucmra :=
   gsetUR socket_address.
-Definition message_soupR : cmra := agreeR (leibnizO message_soup).
 Definition messagesUR : ucmra :=
   gen_heapUR ip_address (gmap port (message_soup * message_soup)).
 
@@ -127,17 +125,11 @@ Section definitions.
 
   (** Local sockets *)
   Definition sockets_ctx (γn : node_gnames)
-    (s : gmap socket_handle (socket * message_soup)) :=
-    gen_heap_light_ctx (sockets_name γn) s.
+    (s : gmap socket_handle socket) := gen_heap_light_ctx (sockets_name γn) s.
 
-  Definition mapsto_socket_def (ip : ip_address) (z : socket_handle)
+  Definition mapsto_socket (ip : ip_address) (z : socket_handle)
              (q : Qp) (s: socket) :=
-    (∃ γn r, mapsto_node ip γn ∗ lmapsto (sockets_name γn) z q (s, r))%I.
-
-  Definition mapsto_socket_aux : seal (@mapsto_socket_def). by eexists. Qed.
-  Definition mapsto_socket := unseal mapsto_socket_aux.
-  Definition mapsto_socket_eq : @mapsto_socket = @mapsto_socket_def :=
-    seal_eq mapsto_socket_aux.
+    (∃ γn, mapsto_node ip γn ∗ lmapsto (sockets_name γn) z q s)%I.
 
   (** Free ip addresses *)
   Definition free_ips_auth (A : gset ip_address) :=
@@ -364,24 +356,19 @@ Section resource_lemmas.
 
   Global Instance mapsto_socket_timeless z ip q s :
     Timeless (z ↪[ ip ]{ q } s).
-  Proof.
-    rewrite mapsto_socket_eq /Timeless /mapsto_socket_def.
-    iIntros ">H". iDestruct "H" as (γn r) "[H1 H2]".
-    iExists _, _. iFrame.
-  Qed.
+  Proof. apply _. Qed.
 
   Global Instance mapsto_socket_fractional z ip s :
     Fractional (λ q, z ↪[ip]{q} s)%I.
   Proof.
-    rewrite mapsto_socket_eq /mapsto_socket_def /Fractional=> p q. iSplit.
-    - iDestruct 1 as (? ?) "[#? [H1 H2]]".
-      iSplitL "H1"; iExists _, _; eauto.
+    rewrite /Fractional=> p q. iSplit.
+    - iDestruct 1 as (?) "[#? [H1 H2]]".
+      iSplitL "H1"; iExists _; eauto.
     - iDestruct 1 as "[H1 H2]".
-      iDestruct "H1" as (? ?) "[Hn1 Hp]".
-      iDestruct "H2" as (? ?) "[Hn2 Hq]".
+      iDestruct "H1" as (?) "[Hn1 Hp]".
+      iDestruct "H2" as (?) "[Hn2 Hq]".
       iDestruct (mapsto_node_agree with "Hn1 Hn2") as %->.
-      iDestruct (lmapsto_agree with "Hp Hq") as %->.
-      iExists _, _. iFrame.
+      iExists _. iFrame.
   Qed.
 
   Global Instance mapsto_socket_as_fractional z ip q s :
@@ -390,11 +377,7 @@ Section resource_lemmas.
 
   Global Instance mapsto_messages_timeless a q s :
     Timeless (a ⤳{ q } s).
-  Proof.
-    rewrite /mapsto_messages /Timeless.
-    iIntros ">H". iDestruct "H" as (γn) "[H1 H2]".
-    iExists _. iFrame.
-  Qed.
+  Proof. apply _. Qed.
 
   Global Instance mapsto_messages_fractional a s :
     Fractional (λ q, a ⤳{q} s)%I.
@@ -415,15 +398,6 @@ Section resource_lemmas.
 
   Lemma node_ctx_init σ s :
     ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
-  Proof.
-    iMod (gen_heap_light_init σ) as (γh) "Hh".
-    iMod (gen_heap_light_init s) as (γs) "Hs".
-    iExists {| heap_name := γh; sockets_name := γs |}.
-    iModIntro. iFrame.
-  Qed.
-
-  Lemma socket_ctx_update γn σ s :
-    ⊢ |==> ∃ , sockets_ctx γn s.
   Proof.
     iMod (gen_heap_light_init σ) as (γh) "Hh".
     iMod (gen_heap_light_init s) as (γs) "Hs".
@@ -572,14 +546,8 @@ Section resource_lemmas.
     a ⤇ Φ -∗ a ⤇ Ψ -∗ ▷ (Φ ≡ Ψ).
   Proof.
     iIntros "#H1 #H2".
-    iDestruct "H1" as (γ) "[H1 H1']".
-    iDestruct "H2" as (γ') "[H2 H2']".
-    iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
-    rewrite -auth_frag_op singleton_op in Hvalid.
-    apply auth_frag_valid_1, singleton_valid in Hvalid.
-    apply (to_agree_op_inv_L γ γ') in Hvalid.
-    rewrite Hvalid discrete_fun_equivI. iIntros (?).
-    by iDestruct (saved_pred_agree with "H1' H2'") as "H".
+    rewrite discrete_fun_equivI; iIntros (?).
+    iApply socket_interp_agree; eauto.
   Qed.
 
 End resource_lemmas.

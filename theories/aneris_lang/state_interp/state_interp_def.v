@@ -77,7 +77,7 @@ Section definitions.
         ⌜state_sockets σ !! ip = Some Sn⌝ ∗
         mapsto_node ip γs ∗
         heap_ctx γs h ∗
-        sockets_ctx γs Sn)%I.
+        sockets_ctx γs ((λ x, x.1) <$> Sn))%I.
 
   (** The domains of heaps and sockets coincide with the gname map [γm] *)
   Definition gnames_coh γm H S mhγ :=

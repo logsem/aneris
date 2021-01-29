@@ -94,11 +94,12 @@ Section state_interpretation.
     ∃ Sn r, ⌜state_sockets σ !! ip = Some Sn ∧ Sn !! sh = Some (skt, r)⌝.
   Proof.
     iDestruct 1 as (h' Sn Hh Hs) "(Hn & Hh & Hs)".
-    rewrite mapsto_socket_eq.
-    iDestruct 1 as (γs' r) "[Hn' Hsh]".
+    iDestruct 1 as (γs') "[Hn' Hsh]".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
     iDestruct (gen_heap_light_valid with "Hs Hsh") as "%Hfd".
-    iExists _, _. iPureIntro; eauto.
+    rewrite lookup_fmap in Hfd.
+    destruct (@lookup _ _ (gmap _ _) _ sh Sn) as [[skt' r]|] eqn:Hskteq;
+      simplify_eq/=; eauto.
   Qed.
 
   Lemma local_state_coh_alloc_socket σ ip γs sh Sn skt:
@@ -110,16 +111,18 @@ Section state_interpretation.
     local_state_coh σ ip γs ==∗
     local_state_coh σ' ip γs ∗ sh ↪[ip] skt.
   Proof.
-    simpl. iIntros (??) "Hn Hstate". iDestruct "Hn" as (?) "#Hn".
+    simpl. iIntros (? HSn) "Hn Hstate". iDestruct "Hn" as (?) "#Hn".
     iDestruct "Hstate" as (h' Sn' Hh Hs) "(Hn' & Hh & Hs)".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
     simplify_eq.
-    iMod (gen_heap_light_alloc _ sh _ _  with "Hs") as "[Hsock Hsh]"; [done|].
+    iMod (gen_heap_light_alloc _ sh _ ((skt, ∅ : message_soup).1)  with "Hs")
+      as "[Hsock Hsh]".
+    { rewrite lookup_fmap HSn //. }
     iModIntro. iFrame.
-    rewrite mapsto_socket_eq.
-    iSplitR "Hsh"; [|iExists _, _; eauto].
-    iExists _, _; eauto. iFrame.
-      rewrite lookup_insert //.
+    iSplitR "Hsh"; [|iExists _; eauto].
+    iExists _, (<[sh:=(skt, ∅)]> Sn).
+    rewrite lookup_insert fmap_insert.
+    eauto with iFrame.
   Qed.
 
   Lemma local_state_coh_socketbind σ1 γs sh skt a Sn ps r :
@@ -138,39 +141,38 @@ Section state_interpretation.
   Proof.
     simpl. iIntros (????) "[Hlcoh Hsh]".
     iDestruct "Hlcoh" as (h' S Hh Hs) "(#Hn & ? & Hsock)".
-    rewrite mapsto_socket_eq.
-    iDestruct "Hsh" as (γs' r') "[Hn' Hsh]".
+    iDestruct "Hsh" as (γs') "[Hn' Hsh]".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %<-.
     simplify_eq.
-    iMod (gen_heap_light_update _ _ _ _ (skt<| saddress := Some a |>, r)
+    iMod (gen_heap_light_update _ _ _ _ ((skt<| saddress := Some a |>, r).1)
             with "Hsock Hsh") as "[Hsock' Hsh]".
+    rewrite -fmap_insert /=.
     iModIntro. iFrame.
     iSplitR "Hsh"; [| iExists _; eauto].
-    iExists _, _. iFrame.
-    rewrite lookup_insert /set /=; eauto.
+    iExists _, _; iFrame.
+    rewrite lookup_insert /=; eauto.
   Qed.
 
-  Lemma local_state_coh_update_rb a sh skt σ1 γs Sn r r' :
-    let ip := ip_of_address a in
-    let S' := <[ip := <[sh:=(skt, r')]> Sn]> (state_sockets σ1) in
-    let σ2 := σ1 <| state_sockets := S' |> in
-    state_sockets σ1 !! ip = Some Sn →
-    Sn !! sh = Some (skt, r) →
-    local_state_coh σ1 ip γs ∗ sh ↪[ip] skt ==∗
-    local_state_coh σ2 ip γs ∗ sh ↪[ip] skt.
-  Proof.
-    iIntros (?????) "[Hstate Hsh]".
-    iDestruct "Hstate" as (h' S Hh Hs) "(#Hn & ? & Hsock)".
-    rewrite mapsto_socket_eq.
-    iDestruct "Hsh" as (γs' r0) "[Hn' Hsh]".
-    iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
-    simplify_eq.
-    iMod (gen_heap_light_update _ _ _ _ (skt, r')
-            with "Hsock Hsh") as "[Hsock' Hsh]".
-    iModIntro. iFrame. iSplitR "Hsh".
-    { iExists _, _. iFrame. rewrite lookup_insert //. }
-    iExists _; eauto.
-  Qed.
+  (* Lemma local_state_coh_update_rb a sh skt σ1 γs Sn r r' : *)
+  (*   let ip := ip_of_address a in *)
+  (*   let S' := <[ip := <[sh:=(skt, r')]> Sn]> (state_sockets σ1) in *)
+  (*   let σ2 := σ1 <| state_sockets := S' |> in *)
+  (*   state_sockets σ1 !! ip = Some Sn → *)
+  (*   Sn !! sh = Some (skt, r) → *)
+  (*   local_state_coh σ1 ip γs ∗ sh ↪[ip] skt ==∗ *)
+  (*   local_state_coh σ2 ip γs ∗ sh ↪[ip] skt. *)
+  (* Proof. *)
+  (*   iIntros (?????) "[Hstate Hsh]". *)
+  (*   iDestruct "Hstate" as (h' S Hh Hs) "(#Hn & ? & Hsock)". *)
+  (*   iDestruct "Hsh" as (γs') "[Hn' Hsh]". *)
+  (*   iDestruct (mapsto_node_agree with "Hn Hn'") as %->. *)
+  (*   simplify_eq. *)
+  (*   iMod (gen_heap_light_update _ _ _ _ ((skt, r').1) *)
+  (*           with "Hsock Hsh") as "[Hsock' Hsh]". *)
+  (*   iModIntro. iFrame. iSplitR "Hsh". *)
+  (*   { iExists _, _. iFrame. rewrite lookup_insert //. } *)
+  (*   iExists _; eauto. *)
+  (* Qed. *)
 
   Lemma big_sepM_local_state_coh_insert n γs γm σ :
     γm !! n = Some γs →
@@ -239,7 +241,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, R) →
     Sn' = <[sh:=(skt, R ∪ {[m]})]> Sn →
     saddress skt = Some a →
-    ([∗ map] ip0↦γs ∈ γm, local_state_coh σ ip0 γs) ==∗
+    ([∗ map] ip0↦γs ∈ γm, local_state_coh σ ip0 γs) -∗
     [∗ map] ip0↦γs ∈ γm, local_state_coh
                          {|
                          state_heaps := state_heaps σ;
@@ -248,18 +250,20 @@ Section state_interpretation.
                          state_ms := state_ms σ |} ip0 γs.
   Proof.
     iIntros (HM Hσ Hsh -> Hskt) "Hγm".
-    rewrite -big_sepM_bupd.
     iApply big_sepM_mono; last done.
     iIntros (ip' γ Hγ) "Hx".
     iDestruct "Hx" as (h Sn' Hip' Hσip') "(Hγ1 & Hγ2 & Hγ3)".
     destruct (decide (ip = ip')) as [->|].
     - simplify_eq.
       rewrite /local_state_coh /= lookup_insert.
-      (<[sh:=(skt, R ∪ {[m]})]> Sn)
-      iExists _, _; rewrite /= lookup_insert;
-        repeat iSplit; eauto with iFrame.
-
-
+      iExists _, _.
+      iSplit; first done.
+      iSplit; first done.
+      rewrite fmap_insert /=.
+      rewrite insert_id; first by iFrame.
+      rewrite lookup_fmap Hsh //=.
+    - rewrite /local_state_coh /= lookup_insert_ne //=.
+      iExists _, _; eauto with iFrame.
   Qed.
 
 End state_interpretation.
