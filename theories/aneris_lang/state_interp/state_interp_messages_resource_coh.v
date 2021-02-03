@@ -24,6 +24,8 @@ Section state_interpretation.
   (** messages_sent *)
   Lemma messages_sent_empty ip : messages_sent {[ip:=∅]} = ∅.
   Proof.
+    rewrite /messages_sent.
+    rewrite /collect.
     rewrite -insert_empty.
     rewrite -insert_delete.
     rewrite /messages_sent map_fold_insert_L; [set_solver | | set_solver].

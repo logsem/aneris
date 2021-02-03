@@ -73,7 +73,12 @@ Section definitions.
   Implicit Types skt : socket.
   Implicit Types A B : gset socket_address.
   Implicit Types pms : gmap port (message_soup * message_soup).
-  Implicit Types mhγ : gmap ip_address (gmap port (message_soup * message_soup)).
+  Implicit Types mhst :
+    gmap ip_address (gmap port (message_soup * message_soup)).
+  (* fixme: rename me into mhst *)
+  Implicit Types mhγ :
+    gmap ip_address (gmap port (message_soup * message_soup)).
+
   Implicit Types γm : gmap ip_address node_gnames.
   Implicit Types sis : gmap socket_address gname.
 
@@ -269,15 +274,51 @@ Section definitions.
              (∀ m, m ∈ R → m_destination m = a) ∧
              (∀ m, m ∈ T → m_sender m = a).
 
-  Definition messages_received_coh mhγ :=
-    messages_received mhγ ⊆ messages_sent mhγ.
+  Definition messages_received_from_sent_coh mhst :=
+    messages_received mhst ⊆ messages_sent mhst.
 
-  (* Message history is coherent w.r.t. message soup, socket map, and itself. *)
+  Definition messages_received_from_sent_coh_aux mhst :=
+    ∀ Mp RT m,
+      mhst !! (ip_of_address (m_destination m)) = Some Mp →
+      Mp !! (port_of_address (m_destination m)) = Some RT →
+      m ∈ RT.1 →
+      ∃ Mp' RT',
+        mhst !! ip_of_address (m_sender m) = Some Mp' ∧
+        Mp' !! port_of_address (m_sender m) = Some RT' ∧
+        m ∈ RT'.2.
+
+  Lemma messages_received_from_sent_corrolary_coh mhst :
+    messages_addresses_coh mhst →
+    messages_received_from_sent_coh mhst →
+    messages_received_from_sent_coh_aux mhst.
+  Proof.
+    intros Hacoh Hrcoh.
+    intros Mp RT m HMp HRT Hm.
+    assert (m ∈ messages_received mhst) as Hmr.
+    { apply elem_of_collect.
+      exists (ip_of_address (m_destination m)), Mp.
+      split; first done.
+      apply elem_of_collect. eauto. }
+    apply Hrcoh, elem_of_collect in Hmr as (ip & Mp' & HMp' & Hmt).
+    apply elem_of_collect in Hmt as (p & RT' & Hmport & HmRT').
+    assert (get_address_messages mhst (SocketAddressInet ip p) =
+            (RT'.1, RT'.2)) as Hgas.
+    { rewrite /get_address_messages //=. rewrite HMp' Hmport.
+      by destruct RT'. }
+    specialize
+    (Hacoh (SocketAddressInet ip p) RT'.1  RT'.2 Hgas) as (Hc1 & Hc2).
+    specialize (Hc2 m HmRT').
+    exists Mp', RT'.
+      by rewrite Hc2.
+  Qed.
+
+    (* Message history is coherent w.r.t.
+       message soup, socket map, and itself. *)
   Definition messages_history_coh M S mhγ :=
     message_soup_coh M mhγ ∧
     receive_buffers_coh S mhγ ∧
     messages_addresses_coh mhγ ∧
-    messages_received_coh mhγ.
+    messages_received_from_sent_coh mhγ.
 
  (* For all messages [m] in [M], either the network owns the resources [Φ m]
      described by some socket protocol [Φ] or it has been delivered. *)

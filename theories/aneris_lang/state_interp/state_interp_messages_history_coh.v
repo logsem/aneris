@@ -62,7 +62,7 @@ Section state_interpretation.
             /message_soup_coh
             /receive_buffers_coh
             /messages_addresses_coh
-            /messages_received_coh.
+            /messages_received_from_sent_coh.
     split; first set_solver.
     split; first by intros; simplify_map_eq.
     split.
