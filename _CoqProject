@@ -8,6 +8,10 @@
 -arg -w -arg -ambiguous-paths
 -arg -w -arg -ssr-search-moved
 
+theories/prelude/classical.v
+theories/prelude/quantifiers.v
+theories/prelude/iris_extraction.v
+
 theories/bi/weakestpre.v
 
 theories/program_logic/gen_heap_light.v
