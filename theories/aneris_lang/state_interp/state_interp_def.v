@@ -5,7 +5,7 @@ From iris.base_logic.lib Require Import viewshifts saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
-From aneris.program_logic Require Export gen_heap_light.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network resources.
 From aneris.aneris_lang.lib Require Import util.
 
@@ -345,10 +345,20 @@ Section definitions.
 
 End definitions.
 
+Program Definition aneris_AS : AuxState aneris_lang :=
+{| aux_state := unit;
+   valid_state_evolution σ1 δ1 κ σ2 δ2 := δ1 = δ2; |}.
+Next Obligation.
+Proof. done. Qed.
 
-Global Instance anerisG_irisG `{!anerisG Σ} : irisG aneris_lang Σ := {
+Lemma aneris_AS_valid_state_evolution_finitary :
+  valid_state_evolution_finitary aneris_AS.
+Proof.
+Admitted.
+
+Global Instance anerisG_irisG `{!anerisG Σ} : irisG aneris_lang aneris_AS Σ := {
   iris_invG := _;
-  state_interp σ κ _ := aneris_state_interp σ;
+  state_interp σ _ _ _ := aneris_state_interp σ;
   fork_post _ := True%I;
 }.
 

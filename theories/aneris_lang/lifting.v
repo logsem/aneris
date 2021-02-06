@@ -241,9 +241,11 @@ Section primitive_laws.
     WP (mkExpr n (Fork e)) @ k; E {{ Φ }}.
   Proof.
     iIntros "[HΦ He]". iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1 κ κs m) "Hσ !>". iSplit.
+    iIntros (σ1 δ κ κs m) "Hσ !>". iSplit.
     - iPureIntro. eexists; solve_exec_safe.
-    - iIntros (? ? ? ?). inv_head_step. iFrame. done.
+    - iIntros (? ? ? ?).
+      inv_head_step.
+      eauto with iFrame.
   Qed.
 
   Lemma wp_alloc n k E v :
@@ -253,14 +255,16 @@ Section primitive_laws.
   Proof.
     iIntros (Φ) ">Hn HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ ? ? ?) "Hσ !> /=".
+    iIntros (σ δ ? ? ?) "Hσ !> /=".
     iDestruct (is_node_heap_valid with "Hσ Hn") as (h) "%".
     iSplitR.
     { iPureIntro. do 4 eexists. eapply LocalStepS; eauto. }
     iIntros (v2 σ2 efs Hstep); inv_head_step.
+    iExists δ.
     iSplitR; [done|]. iModIntro.
     iMod (aneris_state_interp_alloc_heap with "Hn Hσ") as "[Hσ Hl]"; [done..|].
     iModIntro. iFrame.
+    iSplit; first done.
     by iApply "HΦ".
   Qed.
 
@@ -271,13 +275,15 @@ Section primitive_laws.
   Proof.
     iIntros (Φ) ">Hl HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ κ κs n') "Hσ !> /=".
+    iIntros (σ δ κ κs n') "Hσ !> /=".
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
     { iPureIntro. do 4 eexists. eapply LocalStepS; eauto. eapply LoadS; eauto. }
     iIntros (e2 σ2 efs Hstep). inv_head_step.
     rewrite insert_id //. destruct σ; iFrame.
-    do 2 iModIntro. iSplit; [done|]. by iApply "HΦ".
+    do 2 iModIntro.
+    iExists δ; iSplit; first done.
+    iSplit; [done|]. by iApply "HΦ".
   Qed.
 
   Lemma wp_store n k E l v1 v2 :
@@ -286,14 +292,16 @@ Section primitive_laws.
     {{{ RET (mkVal n #()); l ↦[n] v2 }}}.
   Proof.
     iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ κ κs n') "Hσ !>".
+    iIntros (σ δ κ κs n') "Hσ !>".
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
     { iPureIntro; do 4 eexists. eapply LocalStepS; eauto. econstructor. }
     iIntros (????); inv_head_step. iModIntro.
     iMod (aneris_state_interp_heap_update with "[$Hσ $Hl]") as "[Hσ Hl]";
       [done|].
-    iModIntro. iSplit; [done|]. iFrame. by iApply "HΦ".
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iSplit; [done|]. iFrame. by iApply "HΦ".
   Qed.
 
   Lemma wp_cas_fail n k E l q v v1 v2 :
@@ -304,13 +312,15 @@ Section primitive_laws.
   Proof.
     iIntros (Heq Φ) ">Hl HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ κ κs n') "Hσ !>".
+    iIntros (σ δ κ κs n') "Hσ !>".
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
     { iPureIntro; do 4 eexists. eapply LocalStepS; eauto. by econstructor. }
     iIntros (????); inv_head_step. iModIntro.
     rewrite insert_id //. destruct σ; iFrame.
-    iModIntro. iSplit; [done|]. by iApply "HΦ".
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iSplit; [done|]. by iApply "HΦ".
   Qed.
 
   Lemma wp_cas_suc n k E l v1 v2 :
@@ -319,14 +329,16 @@ Section primitive_laws.
     {{{ RET (mkVal n #true); l ↦[n] v2 }}}.
   Proof.
     iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ κ κs n') "Hσ !>".
+    iIntros (σ δ κ κs n') "Hσ !>".
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
     { iPureIntro; do 4 eexists. eapply LocalStepS; eauto. by econstructor. }
     iIntros (????); inv_head_step. iModIntro.
     iMod (aneris_state_interp_heap_update with "[$Hσ $Hl]") as "[Hσ Hl]";
       [done|].
-    iModIntro. iSplit; [done|]. iFrame. by iApply "HΦ".
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iSplit; [done|]. iFrame. by iApply "HΦ".
   Qed.
 
   Lemma wp_start ip ports k E e Φ :
@@ -340,7 +352,7 @@ Section primitive_laws.
   Proof.
     iIntros (?) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
-    iIntros (σ κ κs n) "Hσ".
+    iIntros (σ δ κ κs n) "Hσ".
     iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
         iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & % & %)".
@@ -350,7 +362,9 @@ Section primitive_laws.
     inv_head_step.
     iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
       as "(Hn & Hports & Hms & Hσ)".
-    iModIntro. iFrame.
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iFrame.
     iSplitL "HΦ"; [by iApply wp_value|].
     iSplitL; [|done].
     by iApply ("Hwp" with "[$] [$]").
@@ -366,7 +380,7 @@ Section primitive_laws.
   Proof.
     iIntros (Φ) ">Hn HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (σ κ κs n) "Hσ !> /=".
+    iIntros (σ δ κ κs n) "Hσ !> /=".
     iDestruct (is_node_valid_sockets with "Hσ Hn") as (?) "%".
     iSplitR.
     { iPureIntro; do 4 eexists.
@@ -380,7 +394,9 @@ Section primitive_laws.
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_alloc_socket sock with "Hn Hσ")
       as "[Hσ Hsh]"; try done.
-    iModIntro. iFrame. iSplitR; [done|]. by iApply "HΦ".
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iFrame. iSplitR; [done|]. by iApply "HΦ".
   Qed.
 
   Lemma wp_socketbind_static A E sh skt k a R T:
@@ -400,7 +416,7 @@ Section primitive_laws.
   Proof.
     iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (σ κ κs n) "Hσ /=".
+    iIntros (σ δ κ κs n) "Hσ /=".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
     iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
@@ -412,7 +428,9 @@ Section primitive_laws.
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_socketbind_static with "Hσ Hfixed Hsh Hp")
       as "(Hσ & Hsh & Hφ)"; [done..|].
-    iModIntro. iSplitR; [done|]. iFrame.
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
   Qed.
 
@@ -434,7 +452,7 @@ Section primitive_laws.
   Proof.
     iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (σ κ κs n) "Hσ /=".
+    iIntros (σ δ κ κs n) "Hσ /=".
      iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
     iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
@@ -445,7 +463,9 @@ Section primitive_laws.
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_socketbind_dynamic with "Hσ Hfixed Hsh Hp")
       as "(Hσ & Hsh & Hφ)"; [done..|].
-    iModIntro. iSplitR; [done|]. iFrame.
+    iModIntro.
+    iExists δ; iSplit; first done.
+    iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
   Qed.
 

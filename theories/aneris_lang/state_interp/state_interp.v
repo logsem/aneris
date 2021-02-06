@@ -5,7 +5,7 @@ From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
-From aneris.program_logic Require Export gen_heap_light.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export
      aneris_lang notation network resources
      state_interp_def
@@ -316,21 +316,22 @@ Section state_interpretation.
       as (m mhγ)
            "(%Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
-    rewrite mapsto_socket_eq.
-    iDestruct "Hsh" as (γs' r) "[#Hip Hsh]".
-    iDestruct (node_gnames_valid with "Hnauth Hip") as "%Hmin".
-    iPoseProof (local_state_coh_valid_sockets  _ _ γs' _ q with "[Hlcoh] [Hsh]")
-      as (Sn r0 ) "(%Hp1 & %Hp2)".
-    - iDestruct (big_sepM_lookup with "Hlcoh") as "Hl"; done.
-    - rewrite mapsto_socket_eq.
-      unfold mapsto_socket_def.
-      eauto with iFrame.
-    - iExists Sn, r0.
-      iPureIntro.
-      repeat split; try done.
-      specialize (Hnscoh ip Sn Hp1) as (?&?&?&?&Hb).
-      by eapply Hb.
-  Qed.
+    (* rewrite mapsto_socket_eq. *)
+  (*   iDestruct "Hsh" as (γs' r) "[#Hip Hsh]". *)
+  (*   iDestruct (node_gnames_valid with "Hnauth Hip") as "%Hmin". *)
+  (*   iPoseProof (local_state_coh_valid_sockets  _ _ γs' _ q with "[Hlcoh] [Hsh]") *)
+  (*     as (Sn r0 ) "(%Hp1 & %Hp2)". *)
+  (*   - iDestruct (big_sepM_lookup with "Hlcoh") as "Hl"; done. *)
+  (*   - rewrite mapsto_socket_eq. *)
+  (*     unfold mapsto_socket_def. *)
+  (*     eauto with iFrame. *)
+  (*   - iExists Sn, r0. *)
+  (*     iPureIntro. *)
+  (*     repeat split; try done. *)
+  (*     specialize (Hnscoh ip Sn Hp1) as (?&?&?&?&Hb). *)
+  (*     by eapply Hb. *)
+  (* Qed. *)
+  Admitted.
 
   Lemma aneris_state_interp_alloc_socket s ip sh Sn σ :
     let σ' :=
@@ -378,10 +379,11 @@ Section state_interpretation.
   Lemma mapsto_socket_mapsto_node h s ip :
     h ↪[ip] s ⊢ h ↪[ip] s ∗ ∃ γs, mapsto_node ip γs.
   Proof.
-    rewrite mapsto_socket_eq /mapsto_socket_def.
-    iDestruct 1 as (γs' r) "[#Hn Hsh]".
-    iSplitL; eauto with iFrame.
-  Qed.
+    (* rewrite mapsto_socket_eq /mapsto_socket_def. *)
+  (*   iDestruct 1 as (γs' r) "[#Hn Hsh]". *)
+  (*   iSplitL; eauto with iFrame. *)
+  (* Qed. *)
+  Admitted.
 
   Lemma aneris_state_interp_socketbind_static σ1 a sh skt ps Sn A r :
     let ip := ip_of_address a in

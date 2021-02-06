@@ -1,6 +1,7 @@
 From iris.algebra Require Import auth.
 From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Export weakestpre adequacy.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export lang resources state_interp network.
 Set Default Proof Using "Type".
 
@@ -21,7 +22,9 @@ Theorem adequacy `{anerisPreG Σ} IPs A s e ip σ φ :
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
-  eapply (wp_adequacy _ _); iIntros (??) "/=".
+  eapply (wp_adequacy _ aneris_AS _ _ _ _ ());
+    first apply aneris_AS_valid_state_evolution_finitary.
+  iIntros (?) "/=".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (fixed_init A) as (γsif) "#Hsif".
@@ -53,7 +56,7 @@ Proof.
   iAssert (is_node ip) as "Hn".
   { iExists _. eauto. }
   iModIntro.
-  iExists (λ σ _, aneris_state_interp σ), (λ _, True)%I.
+  iExists (λ σ _ _, aneris_state_interp σ), (λ _, True)%I.
   iSplitR; last first.
   iSplitR "Hwp HIPs"; last first.
   { iApply ("Hwp" with "Hsif Hsa' HIPs Hn"). }

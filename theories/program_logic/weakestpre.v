@@ -15,18 +15,12 @@ Record AuxState Λ : Type := {
     state Λ → aux_state → list (observation Λ) → state Λ → aux_state → Prop;
 
   (** We can always take a valid step in the auxiliary state *)
-  default_aux_step :
-    state Λ → aux_state → list (observation Λ) → state Λ → aux_state;
-
-  (** We can always take a valid step in the auxiliary state *)
-  default_aux_step_valid σ1 δ1 κ σ2 :
-    valid_state_evolution σ1 δ1 κ σ2 (default_aux_step σ1 δ1 κ σ2);
+  pure_step_evolution_valid σ1 δ1 : valid_state_evolution σ1 δ1 [] σ1 δ1;
 }.
 
 Arguments aux_state {_} _.
 Arguments valid_state_evolution {_} _.
-Arguments default_aux_step {_} _.
-Arguments default_aux_step_valid {_} _.
+Arguments pure_step_evolution_valid {_} _.
 
 Class irisG (Λ : language) (AS : AuxState Λ) (Σ : gFunctors) := IrisG {
   iris_invG :> invG Σ;

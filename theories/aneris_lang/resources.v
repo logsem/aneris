@@ -3,7 +3,8 @@ From iris.algebra Require Import auth gmap frac agree coPset gset frac_auth ofe.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop.
 From iris.proofmode Require Import tactics.
-From aneris.program_logic Require Import ectx_lifting gen_heap_light.
+From aneris.program_logic Require Import ectx_lifting.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network.
 Set Default Proof Using "Type".
 

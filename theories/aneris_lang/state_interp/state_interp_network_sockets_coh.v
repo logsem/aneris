@@ -5,7 +5,7 @@ From iris.base_logic.lib Require Import viewshifts saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
-From aneris.program_logic Require Export gen_heap_light.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export
      aneris_lang notation network resources
      state_interp_def.

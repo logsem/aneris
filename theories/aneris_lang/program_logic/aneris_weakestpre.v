@@ -142,8 +142,8 @@ Proof.
   iLöb as "IH" forall (E ip e Ψ).
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /=.
   destruct (to_val e); simpl; first by iMod "Hwp"; eauto.
-  iIntros (σ1 κ _ _) "Hsi".
-  iMod ("Hwp" $! σ1 κ [] 0%nat with "Hsi") as "[% Hstp]".
+  iIntros (σ1 δ κ _ _) "Hsi".
+  iMod ("Hwp" $! σ1 δ κ [] 0%nat with "Hsi") as "[% Hstp]".
   iModIntro.
   iSplit; first done.
   iIntros (e2 σ2 efs Hpstp).
@@ -154,8 +154,9 @@ Proof.
     inversion Hhstp; simplify_eq; rewrite -aneris_base_fill; eauto. }
   iMod ("Hstp" $! (mkExpr ip e2') σ2 efs with "[//]") as "Hstp".
   iModIntro; iNext.
-  iMod "Hstp" as "(Hsi & Hwp & Hefs)".
+  iMod "Hstp" as (δ') "(-> & Hsi & Hwp & Hefs)".
   iModIntro; iFrame.
+  iExists _; iSplit; first done.
   iApply "IH"; done.
 Qed.
 

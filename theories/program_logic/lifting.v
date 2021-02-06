@@ -3,13 +3,16 @@ semantics to the program logic. *)
 
 From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Export weakestpre.
+Set Default Proof Using "Type".
 
 Section lifting.
-Context `{!irisG Λ Σ}.
+Context `{!irisG Λ AS Σ}.
 Implicit Types s : stuckness.
 Implicit Types v : val Λ.
 Implicit Types e : expr Λ.
 Implicit Types σ : state Λ.
+Implicit Types δ : aux_state AS.
+Implicit Types κ κs : list (observation Λ).
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 
@@ -17,10 +20,11 @@ Hint Resolve reducible_no_obs_reducible : core.
 
 Lemma wp_lift_step_fupd s E Φ e1 :
   to_val e1 = None →
-  (∀ σ1 κ κs n, state_interp σ1 (κ ++ κs) n ={E,∅}=∗
+  (∀ σ1 δ1 κ κs n, state_interp σ1 δ1 κs n ={E,∅}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
-      state_interp σ2 κs (length efs + n) ∗
+      ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
+      state_interp σ2 δ2 (κs ++ κ) (length efs + n) ∗
       WP e2 @ s; E {{ Φ }} ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
@@ -28,10 +32,10 @@ Proof. by rewrite wp_unfold /wp_pre=>->. Qed.
 
 Lemma wp_lift_stuck E Φ e :
   to_val e = None →
-  (∀ σ κs n, state_interp σ κs n ={E,∅}=∗ ⌜stuck e σ⌝)
+  (∀ σ δ κs n, state_interp σ δ κs n ={E,∅}=∗ ⌜stuck e σ⌝)
   ⊢ WP e @ E ?{{ Φ }}.
 Proof.
-  rewrite wp_unfold /wp_pre=>->. iIntros "H" (σ1 κ κs n) "Hσ".
+  rewrite wp_unfold /wp_pre=>->. iIntros "H" (σ1 δ1 κ κs n) "Hσ".
   iMod ("H" with "Hσ") as %[? Hirr]. iModIntro. iSplit; first done.
   iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
 Qed.
@@ -39,15 +43,16 @@ Qed.
 (** Derived lifting lemmas. *)
 Lemma wp_lift_step s E Φ e1 :
   to_val e1 = None →
-  (∀ σ1 κ κs n, state_interp σ1 (κ ++ κs) n ={E,∅}=∗
+  (∀ σ1 δ1 κ κs n, state_interp σ1 δ1 κs n ={E,∅}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ ={∅,E}=∗
-      state_interp σ2 κs (length efs + n) ∗
+      ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
+      state_interp σ2 δ2 (κs ++ κ) (length efs + n) ∗
       WP e2 @ s; E {{ Φ }} ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
-  iIntros (?) "H". iApply wp_lift_step_fupd; [done|]. iIntros (????) "Hσ".
+  iIntros (?) "H". iApply wp_lift_step_fupd; [done|]. iIntros (?????) "Hσ".
   iMod ("H" with "Hσ") as "[$ H]". iIntros "!> * % !> !>". by iApply "H".
 Qed.
 
@@ -59,13 +64,18 @@ Lemma wp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s E E' Φ e1 :
 Proof.
   iIntros (Hsafe Hstep) "H". iApply wp_lift_step.
   { specialize (Hsafe inhabitant). destruct s; eauto using reducible_not_val. }
-  iIntros (σ1 κ κs n) "Hσ". iMod "H".
-  iMod fupd_intro_mask' as "Hclose"; last iModIntro; first by set_solver. iSplit.
+  iIntros (σ1 δ1 κ κs n) "Hσ". iMod "H".
+  iMod fupd_intro_mask' as "Hclose"; last iModIntro; first by set_solver.
+  iSplit.
   { iPureIntro. destruct s; done. }
   iNext. iIntros (e2 σ2 efs ?).
   destruct (Hstep κ σ1 e2 σ2 efs) as (-> & <- & ->); auto.
   iMod "Hclose" as "_". iMod "H". iModIntro.
-  iDestruct ("H" with "[//]") as "H". simpl. iFrame.
+  iDestruct ("H" with "[//]") as "H".
+  rewrite /= app_nil_r.
+  iFrame.
+  iExists _; iSplit; last done.
+  iPureIntro; apply pure_step_evolution_valid.
 Qed.
 
 Lemma wp_lift_pure_stuck `{!Inhabited (state Λ)} E Φ e :
@@ -75,45 +85,50 @@ Proof.
   iIntros (Hstuck) "_". iApply wp_lift_stuck.
   - destruct(to_val e) as [v|] eqn:He; last done.
     rewrite -He. by case: (Hstuck inhabitant).
-  - iIntros (σ κs n) "_". by iMod (fupd_intro_mask' E ∅) as "_"; first set_solver.
+  - iIntros (σ κs n st) "_".
+    iMod (fupd_intro_mask' E ∅) as "_"; first set_solver; done.
 Qed.
 
 (* Atomic steps don't need any mask-changing business here, one can
    use the generic lemmas here. *)
 Lemma wp_lift_atomic_step_fupd {s E1 E2 Φ} e1 :
   to_val e1 = None →
-  (∀ σ1 κ κs n, state_interp σ1 (κ ++ κs) n ={E1}=∗
+  (∀ σ1 δ1 κ κs n, state_interp σ1 δ1 κs n ={E1}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ ={E1}[E2]▷=∗
-      state_interp σ2 κs (length efs + n) ∗
+      ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
+      state_interp σ2 δ2 (κs ++ κ) (length efs + n) ∗
       from_option Φ False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E1 {{ Φ }}.
 Proof.
   iIntros (?) "H".
-  iApply (wp_lift_step_fupd s E1 _ e1)=>//; iIntros (σ1 κ κs n) "Hσ1".
+  iApply (wp_lift_step_fupd s E1 _ e1)=>//; iIntros (σ1 κ κs n st) "Hσ1".
   iMod ("H" $! σ1 with "Hσ1") as "[$ H]".
   iMod (fupd_intro_mask' E1 ∅) as "Hclose"; first set_solver.
   iIntros "!>" (e2 σ2 efs ?). iMod "Hclose" as "_".
   iMod ("H" $! e2 σ2 efs with "[#]") as "H"; [done|].
   iMod (fupd_intro_mask' E2 ∅) as "Hclose"; [set_solver|]. iIntros "!> !>".
-  iMod "Hclose" as "_". iMod "H" as "($ & HQ & $)".
+  iMod "Hclose" as "_". iMod "H" as (st') "(% & ? & HQ & $)".
   destruct (to_val e2) eqn:?; last by iExFalso.
+  iModIntro; iExists _; iSplit; first done.
+  iFrame.
   iApply wp_value; last done. by apply of_to_val.
 Qed.
 
 Lemma wp_lift_atomic_step {s E Φ} e1 :
   to_val e1 = None →
-  (∀ σ1 κ κs n, state_interp σ1 (κ ++ κs) n ={E}=∗
+  (∀ σ1 δ1 κ κs n, state_interp σ1 δ1 κs n ={E}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ ={E}=∗
-      state_interp σ2 κs (length efs + n) ∗
+      ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
+      state_interp σ2 δ2 (κs ++ κ) (length efs + n) ∗
       from_option Φ False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_atomic_step_fupd; [done|].
-  iIntros (????) "?". iMod ("H" with "[$]") as "[$ H]".
+  iIntros (?????) "?". iMod ("H" with "[$]") as "[$ H]".
   iIntros "!> *". iIntros (Hstep) "!> !>".
   by iApply "H".
 Qed.
