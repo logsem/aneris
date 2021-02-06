@@ -6,28 +6,37 @@ From aneris.program_logic Require Export language.
 From aneris.bi Require Export weakestpre.
 Import uPred.
 
-Class irisG (Λ : language) (Σ : gFunctors) := IrisG {
-  iris_invG :> invG Σ;
-
+Record AuxState Λ : Type := {
   (** Auxiliary state tracked along the physical state. *)
   aux_state : Type;
 
   (** The relation between the state before and after every step. *)
-  valid_state_evolution : state Λ → aux_state → state Λ → aux_state → Prop;
+  valid_state_evolution :
+    state Λ → aux_state → list (observation Λ) → state Λ → aux_state → Prop;
 
   (** We can always take a valid step in the auxiliary state *)
-  default_aux_step : state Λ → aux_state → state Λ → aux_state;
+  default_aux_step :
+    state Λ → aux_state → list (observation Λ) → state Λ → aux_state;
 
   (** We can always take a valid step in the auxiliary state *)
-  default_aux_step_valid σ1 δ1 σ2 :
-    valid_state_evolution σ1 δ1 σ2 (default_aux_step σ1 δ1 σ2);
+  default_aux_step_valid σ1 δ1 κ σ2 :
+    valid_state_evolution σ1 δ1 κ σ2 (default_aux_step σ1 δ1 κ σ2);
+}.
+
+Arguments aux_state {_} _.
+Arguments valid_state_evolution {_} _.
+Arguments default_aux_step {_} _.
+Arguments default_aux_step_valid {_} _.
+
+Class irisG (Λ : language) (AS : AuxState Λ) (Σ : gFunctors) := IrisG {
+  iris_invG :> invG Σ;
 
   (** The state interpretation is an invariant that should hold in between each
   step of reduction. Here [Λstate] is the global state, [list Λobservation] are
   the remaining observations, and [nat] is the number of forked-off threads
   (not the total number of threads, which is one higher because there is always
   a main thread). *)
-  state_interp : state Λ → aux_state → list (observation Λ) → nat → iProp Σ;
+  state_interp : state Λ → aux_state AS → list (observation Λ) → nat → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -37,7 +46,7 @@ Class irisG (Λ : language) (Σ : gFunctors) := IrisG {
 }.
 Global Opaque iris_invG.
 
-Definition wp_pre `{!irisG Λ Σ} (s : stuckness)
+Definition wp_pre `{!irisG Λ AS Σ} (s : stuckness)
     (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
     coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
   match to_val e1 with
@@ -46,29 +55,29 @@ Definition wp_pre `{!irisG Λ Σ} (s : stuckness)
      state_interp σ1 δ1 κs n ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
        ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
-         ∃ δ2, ⌜valid_state_evolution σ1 δ1 σ2 δ2⌝ ∗
+         ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
            state_interp σ2 δ2 (κs ++ κ) (length efs + n) ∗
            wp E e2 Φ ∗
            [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end%I.
 
-Local Instance wp_pre_contractive `{!irisG Λ Σ} s : Contractive (wp_pre s).
+Local Instance wp_pre_contractive `{!irisG Λ AS Σ} s : Contractive (wp_pre s).
 Proof.
   rewrite /wp_pre=> n wp wp' Hwp E e1 Φ.
   repeat (f_contractive || f_equiv); apply Hwp.
 Qed.
 
-Definition wp_def `{!irisG Λ Σ} : Wp Λ (iProp Σ) stuckness :=
+Definition wp_def `{!irisG Λ AS Σ} : Wp Λ (iProp Σ) stuckness :=
   λ s : stuckness, fixpoint (wp_pre s).
 Definition wp_aux : seal (@wp_def). Proof. by eexists. Qed.
 Definition wp' := wp_aux.(unseal).
-Arguments wp' {Λ Σ _}.
+Arguments wp' {Λ AS Σ _}.
 Existing Instance wp'.
-Lemma wp_eq `{!irisG Λ Σ} : wp = @wp_def Λ Σ _.
+Lemma wp_eq `{!irisG Λ AS Σ} : wp = @wp_def Λ AS Σ _.
 Proof. rewrite -wp_aux.(seal_eq) //. Qed.
 
 Section wp.
-Context `{!irisG Λ Σ}.
+Context `{!irisG Λ AS Σ}.
 Implicit Types s : stuckness.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
@@ -172,8 +181,8 @@ Lemma wp_atomic_take_step
        state_interp σ1 δ1 κs n ∗
        (∀ σ2 δ3 κ n',
            state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
-           ⌜valid_state_evolution σ1 δ' σ2 δ3⌝ ∗ Q ={E2}=∗
-             ⌜valid_state_evolution σ1 δ1 σ2 δ3⌝) ∗
+           ⌜valid_state_evolution AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
+             ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ3⌝) ∗
        (∀ σ δ κs n, state_interp σ δ κs n ={E2}=∗
          state_interp σ δ' κs n ∗ Q) ∗
    WP e @ s; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
@@ -190,7 +199,7 @@ Proof.
   iMod ("H" with "[//]") as "H". iIntros "!>!>".
   iMod "H" as (δ3) "(Hδ3 & Hσ & H & Hefs)".
   iAssert (|={E2}=> state_interp σ2 δ3 (κs ++ κ) (length efs + n) ∗
-             Q ∗ ⌜valid_state_evolution σ1 δ1 σ2 δ3⌝)%I
+             Q ∗ ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ3⌝)%I
     with "[Hfixed Hδ3 Hσ HQ]" as ">(Hσ & HQ & ?)".
   { rewrite assoc. iApply fupd_plain_keep_r; iFrame.
     iIntros "[? ?]"; iApply "Hfixed"; iFrame. }
@@ -336,7 +345,7 @@ End wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!irisG Λ Σ}.
+  Context `{!irisG Λ AS Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
