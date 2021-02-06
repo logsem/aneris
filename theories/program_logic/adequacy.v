@@ -249,7 +249,7 @@ End adequacy_helper_lemmas.
 
 Theorem wp_strong_adequacy_helper Σ Λ AS `{!invPreG Σ}
         (s: stuckness) (φ : execution_trace Λ → auxiliary_trace AS → Prop)
-        e1 σ1 κs δ :
+        e1 σ1 δ :
   (∀ `{Hinv : !invG Σ},
     ⊢ |={⊤}=> ∃
          (stateI : state Λ → (aux_state AS) → list (observation Λ) → nat →
@@ -257,9 +257,9 @@ Theorem wp_strong_adequacy_helper Σ Λ AS `{!invPreG Σ}
          (Φ fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI σ1 δ κs 1 ∗
+       stateI σ1 δ [] 1 ∗
        WP e1 @ s; ⊤ {{ Φ }} ∗
-       □ (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
             δ' c κs,
          ⌜valid_system_trace AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([e1], σ1)⌝ -∗
@@ -280,10 +280,10 @@ Proof.
   rewrite uPred_fupd_eq /uPred_fupd_def.
   iMod ("Hwp" with "[$Hw $HE]") as ">[Hw [HE Hwp']]".
   iClear "Hwp".
-  iDestruct "Hwp'" as (stateI Φ fork_post) "(#config_wp & HSI & Hwp & #Hstep)".
+  iDestruct "Hwp'" as (stateI Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
   clear Hwp.
   set (IrisG Λ AS Σ Hinv stateI fork_post).
-  iAssert (∃ ex atr c1 δ1,
+  iAssert (∃ ex atr c1 δ1 κs,
               ⌜singleton_exec ([e1], σ1) = ex⌝ ∗
               ⌜singleton_auxtr δ = atr⌝ ∗
               ⌜([e1], σ1) = c1⌝ ∗
@@ -294,7 +294,7 @@ Proof.
     with "[HSI Hwp]" as "Hex".
   { iExists (singleton_exec ([e1], σ1)), (singleton_auxtr δ), ([e1], σ1), δ;
       simpl; auto 10 with iFrame. }
-  iDestruct "Hex" as (ex atr c1 δ1 Hexsing Hatrsing Hc1 Hδ1 Hlen) "[HSI Htp]".
+  iDestruct "Hex" as (ex atr c1 δ1 κs Hexsing Hatrsing Hc1 Hδ1 Hlen) "[HSI Htp]".
   assert
     (valid_system_trace AS ex atr ∧
      exec_starts_in ex ([e1], σ1) ∧
@@ -352,7 +352,7 @@ Proof.
   iDestruct ("Hback" with "Hpost") as "Htp".
   iNext.
   iExists _; iSplit; first done.
-  iApply ("IH" with "[] [] Hw HE HSI"); [|iPureIntro; lia|by iFrame].
+  iApply ("IH" with "[] [] Hw HE Hstep HSI"); [|iPureIntro; lia|by iFrame].
   iPureIntro; split_and!.
   - eapply valid_system_trace_extend; eauto.
   - eapply exec_extend_starts_in; eauto.
@@ -437,7 +437,7 @@ Definition valid_state_evolution_finitary {Λ} (AS : AuxState Λ) :=
 Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
         (s: stuckness)
         (φ : execution_trace Λ → auxiliary_trace AS → Prop)
-        e1 σ1 κs δ :
+        e1 σ1 δ :
   valid_state_evolution_finitary AS →
   (∀ `{Hinv : !invG Σ},
     ⊢ |={⊤}=> ∃
@@ -445,9 +445,9 @@ Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
          (Φ fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI σ1 δ κs 1 ∗
+       stateI σ1 δ [] 1 ∗
        WP e1 @ s; ⊤ {{ Φ }} ∗
-       □ (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
             δ' c κs,
          ⌜valid_system_trace AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([e1], σ1)⌝ -∗
@@ -500,12 +500,19 @@ Lemma simulation_simulates {Λ AS} e σ δ φ :
   simulation
     (Λ := Λ) (AS := AS) φ (singleton_exec ([e], σ)) (singleton_auxtr δ) →
   ∀ ex, exec_starts_in ex ([e], σ) → valid_exec ex →
-    ∃ atr, valid_system_trace AS ex atr ∧ simulation φ ex atr.
+    ∃ atr, simulation φ ex atr.
 Proof.
   intros Hsm ex Hexstr Hex.
-  induction Hex.
-  - 
-  - 
+  induction Hex as [|? ? ? ? ? ? ? IHex].
+  - apply singleton_exec_starts_in_inv in Hexstr as ->.
+    exists (singleton_auxtr δ); eauto using valid_system_trace_singletons.
+  - destruct IHex as [atr Hsim].
+    { eapply exec_extend_starts_in_inv; eauto. }
+    rewrite -> simulation_unfold in Hsim.
+    destruct Hsim as (Hvlt & Hφ & Hsim).
+    edestruct @valid_system_trace_ends_in as (_& δ' &_&?); eauto.
+    edestruct Hsim as (?&?&?); eauto.
+Qed.
 
 (** Since the full adequacy statement is quite a mouthful, we prove some more
 intuitive and simpler corollaries. These lemmas are morover stated in terms of
@@ -556,14 +563,13 @@ Proof.
   right; exists (t2' ++ e3 :: t2'' ++ efs), σ3, κ; econstructor; eauto.
 Qed.
 
-Definition wp_adequacy_relation Λ AS s (φ : val Λ → Prop)
-           (ex : execution_trace Λ) (atr : auxiliary_trace AS) : Prop :=
-  valid_system_trace AS ex atr ∧
+Local Definition wp_adequacy_relation Λ AS s (φ : val Λ → Prop)
+           (ex : execution_trace Λ) (atr : @auxiliary_trace Λ AS) : Prop :=
   ∀ c, exec_ends_in ex c →
        (∀ v2 t2', c.1 = of_val v2 :: t2' → φ v2) ∧
        (∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2).
 
-Lemma wp_adequacy_relation_adequacy {Λ AS} s e σ δ φ :
+Local Lemma wp_adequacy_relation_adequacy {Λ AS} s e σ δ φ :
   simulation
     (wp_adequacy_relation Λ AS s φ)
     (singleton_exec ([e], σ))
@@ -571,55 +577,91 @@ Lemma wp_adequacy_relation_adequacy {Λ AS} s e σ δ φ :
   adequate s e σ (λ v _, φ v).
 Proof.
   intros Hsm; apply adequate_alt.
-  intros ex t2 σ2 Hex; revert t2 σ2.
-  induction Hex.
-  - inversion 1; inversion 1; simplify_eq/=.
-    revert Hsm; rewrite simulation_unfold; intros Hsm.
-    destruct Hsm as (Hvlt & [? Hψ] & Hsm).
-    apply (Hψ ([e], σ2)); done.
-  - 
-
-
+  intros ex t2 σ2 Hex Hexstr Hexend.
+  eapply simulation_simulates in Hex as [atr Hatr]; eauto.
+  rewrite -> simulation_unfold in Hatr.
+  destruct Hatr as (Hvlt & Hψ & Hatr).
+  apply (Hψ (t2, σ2)); done.
+Qed.
 
 Corollary wp_adequacy Λ AS Σ `{!invPreG Σ} s e σ δ φ :
-  (∀ `{Hinv : !invG Σ} κs,
+  valid_state_evolution_finitary AS →
+  (∀ `{Hinv : !invG Σ},
      ⊢ |={⊤}=> ∃
          (stateI : state Λ → aux_state AS → list (observation Λ) → iProp Σ)
          (fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ :=
            IrisG _ _ _ Hinv (λ σ δ κs _, stateI σ δ κs) fork_post in
-       config_wp ∗ stateI σ δ κs ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) →
+       config_wp ∗ stateI σ δ [] ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) →
   adequate s e σ (λ v _, φ v).
 Proof.
-  intros Hwp. apply adequate_alt; intros ex t2 σ2 Hex1 Hex2.
-  eapply (wp_strong_adequacy Σ _); [|done]=> ?.
-  iMod Hwp as (stateI fork_post) "(Hcfgwp & Hσ & Hwp)".
-  iExists s, (λ σ κs _, stateI σ κs), [(λ v, ⌜φ v⌝%I)], fork_post => /=.
-  iIntros "{$Hcfgwp $Hσ $Hwp} !>" (e2 t2' -> ? ?) "_ H _".
-  iApply fupd_mask_weaken; [done|]. iSplit; [|done].
-  iDestruct (big_sepL2_cons_inv_r with "H") as (e' ? ->) "[Hwp H]".
-  iDestruct (big_sepL2_nil_inv_r with "H") as %->.
-  iIntros (v2 t2'' [= -> <-]). by rewrite to_of_val.
+  intros ? Hwp; apply (wp_adequacy_relation_adequacy (AS := AS) _ _ _ δ).
+  apply (wp_strong_adequacy Λ AS Σ s); first done.
+  iIntros (?) "".
+  iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp)".
+  iModIntro; iExists _, _, _; iFrame.
+  iIntros (ex atr δ' c κs Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
+  iApply fupd_mask_weaken; first done.
+  iIntros (c' Hc').
+  assert (c' = c) as -> by by eapply exec_ends_in_inj.
+  iSplit; last done.
+  iIntros (v2 t2 ->); rewrite /= to_of_val /=.
+  iDestruct "Hposts" as "[% ?]"; done.
 Qed.
 
-Corollary wp_invariance Σ Λ `{!invPreG Σ} s e1 σ1 t2 σ2 φ :
-  (∀ `{Hinv : !invG Σ} κs,
-     ⊢ |={⊤}=> ∃
-         (stateI : state Λ → list (observation Λ) → nat → iProp Σ)
-         (fork_post : val Λ → iProp Σ),
-       let _ : irisG Λ Σ := IrisG _ _ Hinv stateI fork_post in
-       config_wp ∗ stateI σ1 κs 0 ∗ WP e1 @ s; ⊤ {{ _, True }} ∗
-       (stateI σ2 [] (pred (length t2)) -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) →
-  rtc erased_step ([e1], σ1) (t2, σ2) →
-  φ.
+Local Definition wp_invariance_relation Λ AS e1 σ1 t2 σ2 (φ : Prop)
+           (ex : execution_trace Λ) (atr : @auxiliary_trace Λ AS) : Prop :=
+  exec_starts_in ex ([e1], σ1) → exec_ends_in ex (t2, σ2) → φ.
+
+Local Lemma wp_invariance_relation_invariance {Λ AS} e1 σ1 δ1 t2 σ2 φ :
+  simulation
+    (wp_invariance_relation Λ AS e1 σ1 t2 σ2 φ)
+    (singleton_exec ([e1], σ1))
+    (singleton_auxtr δ1) →
+  ∀ ex,
+    valid_exec ex →
+    exec_starts_in ex ([e1], σ1) →
+    exec_ends_in ex (t2, σ2) →
+    φ.
 Proof.
-  intros Hwp [n [κs ?]]%erased_steps_nsteps.
-  eapply (wp_strong_adequacy Σ _); [|done]=> ?.
-  iMod (Hwp _ κs) as (stateI fork_post) "(Hcfgwp & Hσ & Hwp & Hφ)".
-  iExists s, stateI, [(λ _, True)%I], fork_post => /=.
-  iIntros "{$Hcfgwp $Hσ $Hwp} !>" (e2 t2' -> _ _) "Hσ H _ /=".
-  iDestruct (big_sepL2_cons_inv_r with "H") as (? ? ->) "[_ H]".
-  iDestruct (big_sepL2_nil_inv_r with "H") as %->.
-  iDestruct ("Hφ" with "Hσ") as (E) ">Hφ".
-  by iApply fupd_mask_weaken; first set_solver.
+  intros Hsm ex Hex Hexstr Hexend.
+  eapply simulation_simulates in Hsm as [atr Hatr]; eauto.
+  rewrite -> simulation_unfold in Hatr.
+  destruct Hatr as (Hvlt & Hψ & Hatr).
+  apply Hψ; done.
+Qed.
+
+Corollary wp_invariance Λ AS Σ `{!invPreG Σ} s e1 σ1 δ1 t2 σ2 φ :
+  valid_state_evolution_finitary AS →
+  (∀ `{Hinv : !invG Σ},
+     ⊢ |={⊤}=> ∃
+         (stateI : state Λ → aux_state AS → list (observation Λ) → nat → iProp Σ)
+         (fork_post : val Λ → iProp Σ),
+       let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
+       config_wp ∗ stateI σ1 δ1 [] 1 ∗ WP e1 @ s; ⊤ {{ _, True }} ∗
+       (∀ δ2 κs, stateI σ2 δ2 κs (length t2) -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) →
+  ∀ ex,
+    valid_exec ex →
+    exec_starts_in ex ([e1], σ1) →
+    exec_ends_in ex (t2, σ2) →
+    φ.
+Proof.
+  intros ? Hwp.
+  apply (wp_invariance_relation_invariance _ _ δ1).
+  apply (wp_strong_adequacy Λ AS Σ s); first done.
+  iIntros (?) "".
+  iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp & Hφ)".
+  iModIntro; iExists _, _, _; iFrame.
+  iIntros (ex atr δ' c κs Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
+  rewrite /wp_invariance_relation.
+  iAssert ((∀ _ : exec_starts_in ex ([e1], σ1) ∧ exec_ends_in ex (t2, σ2),
+                 |={⊤}=> ⌜φ⌝)%I) with "[HSI Hφ]" as "H".
+  { iIntros ([? ?]).
+    assert (c = (t2, σ2)) as -> by by eapply exec_ends_in_inj.
+    iDestruct ("Hφ" with "HSI") as (E) "Hφ".
+    iDestruct (fupd_plain_mask with "Hφ") as ">Hφ"; done. }
+  rewrite -fupd_plain_forall'.
+  iMod "H".
+  iApply fupd_mask_weaken; first done.
+  iIntros (Hexs' Hexe'); iApply "H"; done.
 Qed.

@@ -23,6 +23,9 @@ Qed.
 Section execution_trace.
   Context {Λ : language}.
 
+  Implicit Types c : cfg Λ.
+  Implicit Types κ : list (observation Λ).
+
   Definition singleton_exec (c : cfg Λ) : execution_trace Λ :=
     {| extr_confs := [c]; extr_obs := []; |}.
 
@@ -35,8 +38,16 @@ Section execution_trace.
   Lemma singleton_exec_starts_in c : exec_starts_in (singleton_exec c) c.
   Proof. done. Qed.
 
+  Lemma singleton_exec_starts_in_inv c c' :
+    exec_starts_in (singleton_exec c') c → c' = c.
+  Proof. by inversion 1. Qed.
+
   Lemma singleton_exec_ends_in c : exec_ends_in (singleton_exec c) c.
   Proof. done. Qed.
+
+  Lemma singleton_exec_ends_in_inv c c' :
+    exec_ends_in (singleton_exec c') c → c' = c.
+  Proof. by inversion 1. Qed.
 
   Lemma exec_ends_in_inj ex c c' :
     exec_ends_in ex c → exec_ends_in ex c' → c = c'.
@@ -74,20 +85,42 @@ Section execution_trace.
       valid_exec ex →
       valid_exec (exec_extend ex κ c').
 
+  Local Lemma valid_exec_non_empty ex :
+    valid_exec ex → extr_confs ex ≠ [].
+  Proof.
+    inversion 1; simplify_eq; simpl in *.
+    - intros ?; simplify_eq.
+    - intros [? ?]%app_nil; simplify_eq.
+  Qed.
+
   Lemma valid_singleton_exec c : valid_exec (singleton_exec c).
   Proof. constructor. Qed.
 
   Lemma exec_extend_starts_in ex c' c κ :
-    exec_starts_in ex c' → exec_starts_in (exec_extend ex c κ) c'.
+    exec_starts_in ex c' → exec_starts_in (exec_extend ex κ c) c'.
   Proof.
     rewrite /exec_starts_in /exec_extend /=; intros Hec'.
     assert (extr_confs ex = c' :: tail (extr_confs ex)) as ->
         by by apply hd_error_tl_repr.
     done.
   Qed.
+  Lemma exec_extend_starts_in_inv ex c' c κ :
+    valid_exec ex →
+    exec_starts_in (exec_extend ex κ c) c' →
+    exec_starts_in ex c'.
+  Proof.
+    intros ?%valid_exec_non_empty.
+    destruct ex as [[] obs]; simplify_eq;
+      rewrite /exec_starts_in /exec_extend /=; done.
+  Qed.
 
   Lemma exec_extend_ends_in ex c κ : exec_ends_in (exec_extend ex κ c) c.
   Proof. apply last_snoc. Qed.
+
+  Lemma valid_exec_ends_in ex : valid_exec ex → ∃ c, exec_ends_in ex c.
+  Proof.
+    inversion 1; eauto using exec_extend_ends_in, singleton_exec_ends_in.
+  Qed.
 
   Lemma extend_valid_exec ex c κ c':
     valid_exec ex →
@@ -121,8 +154,16 @@ Section auxiliary_trace.
   Lemma singleton_auxtr_starts_in δ : auxtr_starts_in (singleton_auxtr δ) δ.
   Proof. done. Qed.
 
+  Lemma singleton_auxtr_starts_in_inv δ δ' :
+    auxtr_starts_in (singleton_auxtr δ') δ → δ' = δ.
+  Proof. by inversion 1. Qed.
+
   Lemma singleton_auxtr_ends_in δ : auxtr_ends_in (singleton_auxtr δ) δ.
   Proof. done. Qed.
+
+  Lemma singleton_auxtr_ends_in_inv δ δ' :
+    auxtr_ends_in (singleton_auxtr δ') δ → δ' = δ.
+  Proof. by inversion 1. Qed.
 
   Lemma auxtr_ends_in_inj atr δ δ' :
     auxtr_ends_in atr δ → auxtr_ends_in atr δ' → δ = δ'.
@@ -186,6 +227,14 @@ Section system_trace.
     - intros; econstructor; [done|done|done|done|constructor].
     - intros; econstructor; [done|done|done|done|].
       eapply IHeatr; eauto.
+  Qed.
+
+  Lemma valid_system_trace_ends_in ex atr :
+    valid_system_trace ex atr → ∃ c δ, exec_ends_in ex c ∧ auxtr_ends_in atr δ.
+  Proof.
+    inversion 1;
+      eauto using exec_extend_ends_in, singleton_exec_ends_in,
+      auxtr_extend_ends_in, singleton_auxtr_ends_in.
   Qed.
 
 End system_trace.
