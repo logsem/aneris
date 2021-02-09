@@ -6,8 +6,8 @@ From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export
-     aneris_lang notation network resources state_interp_def.
+From aneris.aneris_lang Require Export aneris_lang notation network resources.
+From aneris.aneris_lang.state_interp Require Export state_interp_def.
 From aneris.aneris_lang.lib Require Import util.
 
 From RecordUpdate Require Import RecordSet.

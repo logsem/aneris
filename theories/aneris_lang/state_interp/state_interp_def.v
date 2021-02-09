@@ -72,13 +72,8 @@ Section definitions.
   Implicit Types sh : socket_handle.
   Implicit Types skt : socket.
   Implicit Types A B : gset socket_address.
-  Implicit Types pms : gmap port (message_soup * message_soup).
-  Implicit Types mhst :
-    gmap ip_address (gmap port (message_soup * message_soup)).
-  (* fixme: rename me into mhst *)
-  Implicit Types mhγ :
-    gmap ip_address (gmap port (message_soup * message_soup)).
-
+  Implicit Types mh : gmap socket_address (message_soup * message_soup).
+  Implicit Types rt : message_soup * message_soup.
   Implicit Types γm : gmap ip_address node_gnames.
   Implicit Types sis : gmap socket_address gname.
 
@@ -86,62 +81,80 @@ Section definitions.
   (** Definitions for the message history *)
 
   (* The set of all received messages *)
-  Definition messages_received
-      (mh : gmap ip_address (gmap port (message_soup * message_soup))) :=
-    collect (λ pms, collect (λ rt, rt.1) pms) mh.
+  Definition messages_received mh := collect (λ rt, rt.1)  mh.
 
   Lemma elem_of_messages_received mh :
     ∀ m, m ∈ messages_received mh ↔
-      ∃ ip Mp port (M : message_soup * message_soup),
-        mh !! ip = Some Mp ∧ Mp !! port = Some M ∧ m ∈ M.1.
-  Proof.
-    intros m; split.
-    - intros Hm.
-      apply elem_of_collect in Hm as (ip & Mp & HMp1 & HMp2).
-      apply elem_of_collect in HMp2 as (port & M & HM1 & HM2); eauto 10.
-    - intros (ip & Mp & port & M & HM1 & HM2 & Hm).
-      apply elem_of_collect.
-      eexists _, _; split; first done.
-      apply elem_of_collect; eauto.
-  Qed.
+      ∃ sa rt, mh !! sa = Some rt ∧ m ∈ rt.1.
+  Proof. by apply elem_of_collect; eauto. Qed.
 
   (* The set of all transmitted messages *)
-  Definition messages_sent
-             (mh : gmap ip_address (gmap port (message_soup * message_soup))) :=
-    collect (λ pms, collect (λ rt, rt.2) pms) mh.
+  Definition messages_sent mh := collect (λ rt, rt.2) mh.
 
   Lemma elem_of_messages_sent mh :
     ∀ m, m ∈ messages_sent mh ↔
-      ∃ ip Mp port (M : message_soup * message_soup),
-        mh !! ip = Some Mp ∧ Mp !! port = Some M ∧ m ∈ M.2.
-  Proof.
-    intros m; split.
-    - intros Hm.
-      apply elem_of_collect in Hm as (ip & Mp & HMp1 & HMp2).
-      apply elem_of_collect in HMp2 as (port & M & HM1 & HM2); eauto 10.
-    - intros (ip & Mp & port & M & HM1 & HM2 & Hm).
-      apply elem_of_collect.
-      eexists _, _; split; first done.
-      apply elem_of_collect; eauto.
-  Qed.
+      ∃ sa rt, mh !! sa = Some rt ∧ m ∈ rt.2.
+  Proof. by apply elem_of_collect; eauto. Qed.
 
   (* [m] has been received *)
-  Definition message_received m mhγ := m ∈ (messages_received mhγ).
+  Definition message_received m mh := m ∈ (messages_received mh).
 
   (* Initialization of message history from a given set of ports *)
-  Definition messages_init (ports : gset port) :=
-    set_fold (fun p macc => <[p := (∅, ∅)]>macc)
-             (∅: gmap port (message_soup * message_soup)) ports.
+  Definition history_init ip ports :
+    gmap socket_address (message_soup * message_soup) :=
+    gset_to_gmap (∅, ∅) (gset_map (λ p, SocketAddressInet ip p) ports).
 
-  Definition get_address_messages mhγ sa :=
-    match (mhγ !! (ip_of_address sa)) with
-    | None => (∅, ∅)
-    | Some mps =>
-      match mps !! (port_of_address sa) with
-      | None => (∅, ∅)
-      | Some (R,T) => (R,T)
-      end
-    end.
+   Lemma history_init_dom ip ports :
+    ports ≠ ∅ →
+    gset_map
+      ip_of_address
+      (gset_map (λ p : positive, SocketAddressInet ip p) ports) =
+   {[ip]}.
+  Proof.
+    induction ports as [| p ports Hp IH] using set_ind_L; first done.
+    intros Hu.
+    destruct (decide (ports = ∅)) as [->| Hports].
+    - rewrite right_id_L.
+      assert (ip = ip_of_address (SocketAddressInet ip p)) as -> by done.
+        by rewrite !gset_map_singleton.
+    - rewrite !gset_map_union. rewrite IH; last done.
+      assert (ip = ip_of_address (SocketAddressInet ip p)) as -> by done.
+      rewrite !gset_map_singleton. set_solver.
+  Qed.
+
+  Lemma history_init_empty ip ports :
+    ∀ a r t, history_init ip ports !! a = Some (r, t) ↔
+            ip_of_address a = ip ∧ port_of_address a ∈ ports ∧ (r,t) = (∅, ∅).
+  Proof.
+    intros.
+    split.
+    - intros Hinit.
+      apply lookup_gset_to_gmap_Some in Hinit as (Ha & ->).
+      apply gset_map_correct2 in Ha. set_solver.
+    - intros (<- & Hp & ->).
+      rewrite lookup_gset_to_gmap_Some.
+      split; last done.
+      induction ports using set_ind_L; first done.
+      rewrite gset_map_union.
+      destruct (decide (port_of_address a = x)) as [<- | Hneq].
+      + rewrite gset_map_singleton.
+        apply elem_of_union_l, elem_of_singleton.
+        by destruct a.
+      + apply elem_of_union_r. set_solver.
+  Qed.
+
+  Lemma history_init_sent ip ports :
+    messages_sent (history_init ip ports) = ∅.
+  Proof.
+    rewrite /messages_sent /history_init.
+    induction ports using set_ind_L.
+    done.
+    rewrite gset_map_union.
+  Admitted.
+
+  Lemma history_init_received ip ports :
+    messages_received (history_init ip ports) = ∅.
+  Proof. Admitted.
 
   (** Local state coherence *)
 
@@ -155,11 +168,13 @@ Section definitions.
         heap_ctx γs h ∗
         sockets_ctx γs ((λ x, x.1) <$> Sn))%I.
 
+
   (** The domains of heaps and sockets coincide with the gname map [γm] *)
-  Definition gnames_coh γm H S mhγ :=
+  Definition gnames_coh γm H S mh :=
     dom (gset ip_address) γm = dom (gset ip_address) H ∧
     dom (gset ip_address) γm = dom (gset ip_address) S ∧
-    dom (gset ip_address) γm = dom (gset ip_address) mhγ.
+    dom (gset ip_address) γm =
+    gset_map ip_of_address (dom (gset socket_address) mh).
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
@@ -254,94 +269,79 @@ Section definitions.
   (** Message history map coherence *)
   (* Every message present in the message soup has been
      recorded in the logic as sent from the node of its origin. *)
-  Definition message_soup_coh M mhγ :=
-    ∀ m, m ∈ M →
-         ∃ R T, get_address_messages mhγ (m_sender m) = (R, T) ∧ m ∈ T.
+  Definition message_soup_coh M mh :=
+    ∀ m, m ∈ M → ∃ R T, mh !! (m_sender m) = Some (R, T) ∧ m ∈ T.
 
   (* Every message in the receive buffer has been recorded in
      the logic as sent from the node of its origin. *)
-  Definition receive_buffers_coh S mhγ :=
+  Definition receive_buffers_coh S mh :=
     ∀ ip Sn sh skt r m,
       S !! ip = Some Sn →
       Sn !! sh = Some (skt, r) →
       m ∈ r →
-      ∃ R T, get_address_messages mhγ (m_sender m) = (R, T) ∧ m ∈ T.
+      ∃ R T, mh !! (m_sender m) = Some (R, T) ∧ m ∈ T.
 
   (* The messages in the logical map mhγ, that tracks
      received and transmitted messages, have coherent addresses. *)
-  Definition messages_addresses_coh mhγ :=
-    ∀ a R T, get_address_messages mhγ a = (R, T) →
+  Definition messages_addresses_coh mh :=
+    ∀ a R T, mh !! a = Some (R, T) →
              (∀ m, m ∈ R → m_destination m = a) ∧
              (∀ m, m ∈ T → m_sender m = a).
 
-  Definition messages_received_from_sent_coh mhst :=
-    messages_received mhst ⊆ messages_sent mhst.
+  Definition messages_received_from_sent_coh mh :=
+    messages_received mh ⊆ messages_sent mh.
 
-  Definition messages_received_from_sent_coh_aux mhst :=
-    ∀ Mp RT m,
-      mhst !! (ip_of_address (m_destination m)) = Some Mp →
-      Mp !! (port_of_address (m_destination m)) = Some RT →
-      m ∈ RT.1 →
-      ∃ Mp' RT',
-        mhst !! ip_of_address (m_sender m) = Some Mp' ∧
-        Mp' !! port_of_address (m_sender m) = Some RT' ∧
-        m ∈ RT'.2.
+  Definition messages_received_from_sent_coh_aux mh :=
+    ∀ rt m,
+      mh !! (m_destination m) = Some rt →
+      m ∈ rt.1 →
+      ∃ rt', mh !! (m_sender m) = Some rt' ∧ m ∈ rt'.2.
 
-  Lemma messages_received_from_sent_corrolary_coh mhst :
-    messages_addresses_coh mhst →
-    messages_received_from_sent_coh mhst →
-    messages_received_from_sent_coh_aux mhst.
+  Lemma messages_received_from_sent_corrolary_coh mh :
+    messages_addresses_coh mh →
+    messages_received_from_sent_coh mh →
+    messages_received_from_sent_coh_aux mh.
   Proof.
     intros Hacoh Hrcoh.
-    intros Mp RT m HMp HRT Hm.
-    assert (m ∈ messages_received mhst) as Hmr.
-    { apply elem_of_collect.
-      exists (ip_of_address (m_destination m)), Mp.
-      split; first done.
-      apply elem_of_collect. eauto. }
-    apply Hrcoh, elem_of_collect in Hmr as (ip & Mp' & HMp' & Hmt).
-    apply elem_of_collect in Hmt as (p & RT' & Hmport & HmRT').
-    assert (get_address_messages mhst (SocketAddressInet ip p) =
-            (RT'.1, RT'.2)) as Hgas.
-    { rewrite /get_address_messages //=. rewrite HMp' Hmport.
-      by destruct RT'. }
-    specialize
-    (Hacoh (SocketAddressInet ip p) RT'.1  RT'.2 Hgas) as (Hc1 & Hc2).
-    specialize (Hc2 m HmRT').
-    exists Mp', RT'.
-      by rewrite Hc2.
+    intros rt m Hrt Hm.
+    assert (m ∈ messages_received mh) as Hmr.
+    { by apply elem_of_collect; eauto. }
+    apply Hrcoh, elem_of_collect in Hmr as (sa & rt' & Hrt' & Hmt).
+    assert (mh !! sa = Some (rt'.1, rt'.2)) as Hgas by by destruct rt'.
+    specialize (Hacoh sa rt'.1  rt'.2 Hgas) as (Hc1 & Hc2).
+    specialize (Hc2 m Hmt). set_solver.
   Qed.
 
     (* Message history is coherent w.r.t.
        message soup, socket map, and itself. *)
-  Definition messages_history_coh M S mhγ :=
-    message_soup_coh M mhγ ∧
-    receive_buffers_coh S mhγ ∧
-    messages_addresses_coh mhγ ∧
-    messages_received_from_sent_coh mhγ.
+  Definition messages_history_coh M S mh :=
+    message_soup_coh M mh ∧
+    receive_buffers_coh S mh ∧
+    messages_addresses_coh mh ∧
+    messages_received_from_sent_coh mh.
 
  (* For all messages [m] in [M], either the network owns the resources [Φ m]
      described by some socket protocol [Φ] or it has been delivered. *)
-  Definition messages_resource_coh mhγ :=
-    ([∗ set] m ∈ messages_sent mhγ,
+  Definition messages_resource_coh mh :=
+    ([∗ set] m ∈ messages_sent mh,
      (* either [m] is governed by a protocol and
         the network owns the resources *)
      (∃ (Φ : socket_interp Σ), (m_destination m) ⤇ Φ ∗ ▷ Φ m) ∨
      (* or [m] has been delivered somewhere *)
-     ⌜message_received m mhγ⌝)%I.
+     ⌜message_received m mh⌝)%I.
 
   (** State interpretation *)
   Definition aneris_state_interp σ :=
-    (∃ γm mhγ,
-        ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) mhγ⌝ ∗
+    (∃ γm mh,
+        ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) mh⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
-        ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhγ⌝ ∗
+        ⌜messages_history_coh (state_ms σ) (state_sockets σ) mh⌝ ∗
         node_gnames_auth γm ∗
         socket_interp_coh (state_ports_in_use σ) ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        messages_ctx mhγ ∗
-        messages_resource_coh mhγ)%I.
+        messages_ctx mh ∗
+        messages_resource_coh mh)%I.
 
 End definitions.
 

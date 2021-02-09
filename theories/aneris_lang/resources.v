@@ -32,7 +32,7 @@ Definition socket_interpUR : ucmra :=
 Definition fixedUR : ucmra :=
   gsetUR socket_address.
 Definition messagesUR : ucmra :=
-  gen_heapUR ip_address (gmap port (message_soup * message_soup)).
+  gen_heapUR socket_address (message_soup * message_soup).
 
 Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames))
   := (∅ : gmap ip_address (agree node_gnames)).
@@ -164,14 +164,13 @@ Section definitions.
    (** Messages *)
 
   Definition messages_ctx
-    (s : gmap ip_address (gmap port (message_soup * message_soup))) :=
+    (s : gmap socket_address (message_soup * message_soup)) :=
     gen_heap_light_ctx (aneris_messages_name) s.
 
   Definition mapsto_messages
-    (sa : socket_address) q (msgs : message_soup * message_soup) :=
+    (sa : socket_address) q (mh : message_soup * message_soup) :=
     (∃ γn, mapsto_node (ip_of_address sa) γn ∗
-                       lmapsto aneris_messages_name (ip_of_address sa) q
-                       {[port_of_address sa := msgs]})%I.
+                       lmapsto aneris_messages_name sa q mh)%I.
 
 End definitions.
 

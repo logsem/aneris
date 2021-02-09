@@ -6,8 +6,9 @@ From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export
-     aneris_lang notation network resources
+From aneris.aneris_lang Require Import
+     aneris_lang notation network resources.
+From aneris.aneris_lang.state_interp Require Import
      state_interp_def.
 From aneris.aneris_lang.lib Require Import util.
 
@@ -21,31 +22,10 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Σ}.
 
-  (** messages_sent *)
-  Lemma messages_sent_empty ip : messages_sent {[ip:=∅]} = ∅.
+  Lemma messages_resource_coh_init ip ports :
+    ⊢ messages_resource_coh (history_init ip ports).
   Proof.
-    rewrite /messages_sent.
-    rewrite /collect.
-    rewrite -insert_empty.
-    rewrite -insert_delete.
-    rewrite /messages_sent map_fold_insert_L; [set_solver | | set_solver].
-    intros j j' z z' m Hneq Hj Hj'.
-    assert (z = ∅) as ->.
-    { rewrite insert_delete insert_empty in Hj Hj'.
-      ddeq j ip.
-      - rewrite lookup_insert in Hj. set_solver.
-      - rewrite lookup_insert_ne in Hj; set_solver. }
-    assert (z' = ∅) as ->.
-     { rewrite insert_delete insert_empty in Hj Hj'.
-      ddeq j' ip.
-      - rewrite lookup_insert in Hj'. set_solver.
-      - rewrite lookup_insert_ne in Hj'; set_solver. }
-    done.
-  Qed.
-
-  Lemma messages_resource_coh_init ip : ⊢ messages_resource_coh {[ip := ∅]}.
-  Proof.
-    iIntros. by rewrite /messages_resource_coh messages_sent_empty.
+    iIntros. by rewrite /messages_resource_coh history_init_sent.
   Qed.
 
 

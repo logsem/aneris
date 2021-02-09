@@ -6,8 +6,9 @@ From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export
-     aneris_lang notation network resources
+From aneris.aneris_lang Require Import
+     aneris_lang notation network resources.
+From aneris.aneris_lang.state_interp Require Import
      state_interp_def.
 From aneris.aneris_lang.lib Require Import util.
 
@@ -23,12 +24,9 @@ Section state_interpretation.
 
   (** gnames_coh *)
   (* TODO: check whether this works out. *)
-  Lemma gnames_coh_singleton_empty ip γs :
-    gnames_coh {[ip:=γs]} {[ip:=∅]} {[ip:=∅]} {[ip:=∅]}.
-  Proof. rewrite /gnames_coh !dom_singleton_L //. Qed.
-
-  Lemma gnames_coh_singleton ip γs h Sn p R T:
-    gnames_coh {[ip:=γs]} {[ip:=h]} {[ip:=Sn]} {[ip:= {[p:=(R,T)]} ]}.
+  Lemma gnames_coh_singleton ip γs h Sn mh:
+    gset_map ip_of_address (dom (gset socket_address) mh) = {[ ip ]} →
+    gnames_coh {[ip:=γs]} {[ip:=h]} {[ip:=Sn]} mh.
   Proof. rewrite /gnames_coh !dom_singleton_L //. Qed.
 
   Lemma gnames_coh_valid γm H S ip Mγ :
@@ -37,12 +35,17 @@ Section state_interpretation.
     γm !! ip = None.
   Proof. rewrite -!not_elem_of_dom => _ [-> _] //. Qed.
 
-  Lemma gnames_coh_alloc_node γm H S ip γn mhγ ports:
-    gnames_coh γm H S mhγ →
+  Lemma gnames_coh_alloc_node γm H S ip γn mh ports:
+    ports ≠ ∅ →
+    gnames_coh γm H S mh →
     gnames_coh (<[ip:=γn]> γm) (<[ip:=∅]> H) (<[ip:=∅]> S)
-               (<[ip:= messages_init ports]> mhγ).
+               (history_init ip ports ∪ mh).
   Proof. rewrite /gnames_coh !dom_insert_L.
-         move=> [->] //=. set_solver.
+         intro Hports.
+         move=> [->] [->] [->] //=.
+         split_and!; [ set_solver | set_solver |].
+           by rewrite dom_union_L gset_map_union
+                      dom_gset_to_gmap history_init_dom.
   Qed.
 
   Lemma gnames_coh_update_heap n γm H S h h' Mγ:

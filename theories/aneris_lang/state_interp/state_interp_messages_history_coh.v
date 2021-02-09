@@ -6,8 +6,9 @@ From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export
-     aneris_lang notation network resources
+From aneris.aneris_lang Require Import
+     aneris_lang notation network resources.
+From aneris.aneris_lang.state_interp Require Import
      state_interp_def.
 
 From aneris.aneris_lang.lib Require Import util.
@@ -36,27 +37,9 @@ Section state_interpretation.
     - by eapply Hrbcoh.
   Qed.
 
-  (** get_message_history *)
-  Lemma get_message_history_empty ip a :
-    get_address_messages {[ip := ∅]} a = (∅, ∅).
-  Proof.
-    rewrite /get_address_messages.
-    ddeq ip (ip_of_address a); by simplify_map_eq /=.
-  Qed.
-
-  Lemma messages_received_empty ip:
-    messages_received {[ip := ∅]} = ∅.
-  Proof.
-  Admitted.
-
-  Lemma messages_sent_empty ip :
-    messages_sent {[ip := ∅]} = ∅.
-  Proof.
-  Admitted.
-
-  (** messages_history_coh *)
-  Lemma messages_history_coh_init ip :
-    messages_history_coh ∅ {[ip := ∅]} {[ip := ∅]}.
+   (** messages_history_coh *)
+  Lemma messages_history_coh_init ip ports :
+    messages_history_coh ∅ {[ip := ∅]} (history_init ip ports).
   Proof.
     rewrite /messages_history_coh
             /message_soup_coh
@@ -67,8 +50,9 @@ Section state_interpretation.
     split; first by intros; simplify_map_eq.
     split.
     - intros ? ? ? Hgam.
-      split; rewrite get_message_history_empty in Hgam; set_solver.
-    - by rewrite messages_sent_empty messages_received_empty.
+      apply history_init_empty in Hgam as (?&?&Hrt).
+      set_solver.
+    - by rewrite history_init_received history_init_sent.
   Qed.
 
   Lemma messages_history_coh_deliver_message mhγ M S Sn Sn' ip sh skt a R m :

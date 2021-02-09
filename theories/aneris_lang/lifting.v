@@ -3,7 +3,10 @@ From iris.bi.lib Require Import fractional.
 From aneris.program_logic Require Export weakestpre lifting.
 From aneris.program_logic Require Import ectx_lifting.
 From iris.proofmode Require Import tactics.
-From aneris.aneris_lang Require Import aneris_lang base_lang state_interp.
+From aneris.aneris_lang Require Import aneris_lang base_lang.
+From aneris.aneris_lang.state_interp
+     Require Import state_interp.
+
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
@@ -90,7 +93,7 @@ Proof.
 Qed.
 
 Instance aneris_pure_exec_fill
-         (K : list ectx_item) ip (φ : Prop) (n : nat) (e1 e2 : expr) :
+         (K : list ectx_item) ip (φ : Prop) (n : nat) e1 e2 :
   PureExec φ n (mkExpr ip e1) (mkExpr ip e2) →
   @PureExec aneris_lang φ n
             (mkExpr ip (@fill base_ectxi_lang K e1))
@@ -133,7 +136,7 @@ Proof. solve_atomic. Qed.
  Atomic s (mkExpr n (ReceiveFrom (Val v))).
 Proof. solve_atomic. Qed.*)
 
-Class AsRecV (v : val) (f x : binder) (erec : expr) :=
+Class AsRecV (v : base_lang.val) (f x : binder) (erec : base_lang.expr) :=
   as_recv : v = RecV f x erec.
 Global Hint Mode AsRecV ! - - - : typeclass_instances.
 Definition AsRecV_recv f x e : AsRecV (RecV f x e) f x e := eq_refl.
@@ -144,7 +147,8 @@ Instance pure_rec n f x (erec : expr) :
   PureExec True 1 (mkExpr n (Rec f x erec)) (mkExpr n (Val $ RecV f x erec)).
 Proof. solve_pure_exec. Qed.
 Instance pure_pairc n (v1 v2 : val):
-  PureExec True 1 (mkExpr n (Pair (Val v1) (Val v2))) (mkExpr n (Val $ PairV v1 v2)).
+  PureExec True 1 (mkExpr n (Pair (Val v1) (Val v2)))
+           (mkExpr n (Val $ PairV v1 v2)).
 Proof. solve_pure_exec. Qed.
 Instance pure_injlc n (v : val) :
   PureExec True 1 (mkExpr n (InjL $ Val v)) (mkExpr n (Val $ InjLV v)).
@@ -225,9 +229,9 @@ Section primitive_laws.
 
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : aneris_val → iProp Σ.
-  Implicit Types v : val.
-  Implicit Types e : expr.
-  Implicit Types σ : state.
+  Implicit Types v : base_lang.val.
+  Implicit Types e : base_lang.expr.
+  Implicit Types σ : base_lang.state.
   Implicit Types M R T : message_soup.
   Implicit Types m : message.
   Implicit Types A B : gset socket_address.
@@ -343,6 +347,7 @@ Section primitive_laws.
 
   Lemma wp_start ip ports k E e Φ :
     ip ≠ "system" →
+    ports ≠ ∅ →
     ▷ free_ip ip ∗
     ▷ Φ (mkVal "system" #()) ∗
     ▷ (is_node ip -∗ free_ports ip ports -∗
@@ -350,7 +355,7 @@ Section primitive_laws.
                WP (mkExpr ip e) @ k; ⊤ {{ _, True }})
     ⊢ WP (mkExpr "system" (Start (LitString ip) e)) @ k; E {{ Φ }}.
   Proof.
-    iIntros (?) "(>Hfip & HΦ & Hwp)".
+    iIntros (??) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ δ κ κs n) "Hσ".
     iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
@@ -361,7 +366,7 @@ Section primitive_laws.
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".
     inv_head_step.
     iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
-      as "(Hn & Hports & Hms & Hσ)".
+      as "(Hn & Hports & Hms & Hσ)"; first done.
     iModIntro.
     iExists δ; iSplit; first done.
     iFrame.

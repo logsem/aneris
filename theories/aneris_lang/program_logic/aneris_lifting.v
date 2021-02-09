@@ -158,18 +158,19 @@ Section lifting_network.
   Implicit Types e : expr.
 
   (** Network *)
-  Lemma aneris_wp_start ip ports E e Ψ :
+  Lemma aneris_wp_start ip E e Ψ ports :
     ip ≠ "system" →
+    ports ≠ ∅ →
     ▷ free_ip ip ∗ ▷ Ψ #() ∗
       ▷ (free_ports ip ports -∗
         ([∗ set] p ∈ ports, SocketAddressInet ip p ⤳ (∅, ∅)) -∗
         WP e @[ip] ⊤ {{ _, True }}) ⊢
     WP (Start (LitString ip) e) @["system"] E {{ Ψ }}.
   Proof.
-    iIntros (Hip) "(Hip & HΦ & He)".
+    iIntros (Hip Hp) "(Hip & HΦ & He)".
     rewrite !aneris_wp_unfold /aneris_wp_def.
     iIntros "#Hin".
-    iApply wp_start; first done.
+    iApply wp_start; [done|done|].
     iFrame.
     iSplitL "HΦ".
     { iNext. iExists _. eauto. }

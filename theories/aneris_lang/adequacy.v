@@ -2,16 +2,18 @@ From iris.algebra Require Import auth.
 From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export lang resources state_interp network.
+From aneris.aneris_lang Require Export lang resources network.
+From aneris.aneris_lang.state_interp Require Export state_interp.
 Set Default Proof Using "Type".
 
 Import Network.
 
-Theorem adequacy `{anerisPreG Σ} IPs A s e ip σ φ :
+Theorem adequacy `{anerisPreG Σ} IPs A s e ip σ φ (ports : gset port) :
   (∀ `{anerisG Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
      WP (mkExpr ip e) @ s; ⊤ {{v, ⌜φ v⌝ }}) →
+  ports ≠ ∅ →
   ip ∉ IPs →
   dom (gset ip_address) (state_ports_in_use σ) = IPs →
   (∀ ip, ip ∈ IPs → state_ports_in_use σ !! ip = Some ∅) →
@@ -21,7 +23,7 @@ Theorem adequacy `{anerisPreG Σ} IPs A s e ip σ φ :
   state_ms σ = ∅ →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
+  intros Hwp Hps Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
   eapply (wp_adequacy _ aneris_AS _ _ _ _ ());
     first apply aneris_AS_valid_state_evolution_finitary.
   iIntros (?) "/=".
@@ -30,7 +32,7 @@ Proof.
   iMod (fixed_init A) as (γsif) "#Hsif".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
   iMod free_ports_auth_init as (γpiu) "HPiu".
-  iMod (gen_heap_light_init {[ip := ∅]}) as (γms) "Hms".
+  iMod (gen_heap_light_init (history_init ip ports)) as (γms) "Hms".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -67,11 +69,12 @@ Qed.
 
 Definition safe e σ := @adequate aneris_lang NotStuck e σ (λ _ _, True).
 
-Theorem adequacy_safe `{anerisPreG Σ} IPs A e ip σ :
+Theorem adequacy_safe `{anerisPreG Σ} IPs A e ip σ (ports : gset port):
   (∀ `{anerisG Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
      WP (mkExpr ip e) {{v, True }}) →
+  ports ≠ ∅ →
   ip ∉ IPs →
   dom (gset ip_address) (state_ports_in_use σ) = IPs →
   (∀ ip, ip ∈ IPs → state_ports_in_use σ !! ip = Some ∅) →
@@ -82,13 +85,14 @@ Theorem adequacy_safe `{anerisPreG Σ} IPs A e ip σ :
   safe (mkExpr ip e) σ.
 Proof. apply adequacy. Qed.
 
-Theorem adequacy_hoare `{anerisPreG Σ} IPs A e σ φ ip :
+Theorem adequacy_hoare `{anerisPreG Σ} IPs A e σ φ ip (ports : gset port):
   (∀ `{anerisG Σ}, ⊢ ∃ (f : socket_address → socket_interp Σ),
           {{{ fixed A
             ∗ ([∗ set] a ∈ A, a ⤇ (f a))
             ∗ ([∗ set] ip ∈ IPs, free_ip ip) ∗ is_node ip }}}
           (mkExpr ip e)
-      {{{ v, RET v; ⌜φ v⌝ }}}) →
+          {{{ v, RET v; ⌜φ v⌝ }}}) →
+  ports ≠ ∅ →
   ip ∉ IPs →
   dom (gset ip_address) (state_ports_in_use σ) = IPs →
   (∀ i, i ∈ IPs → state_ports_in_use σ !! i = Some ∅) →
@@ -98,7 +102,7 @@ Theorem adequacy_hoare `{anerisPreG Σ} IPs A e σ φ ip :
   state_ms σ = ∅ →
   adequate NotStuck (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros Hwp ???????.
+  intros Hwp ????????.
   eapply adequacy; [|done..].
   intros ?. iModIntro.
   iDestruct Hwp as (f) "#Hwp".
