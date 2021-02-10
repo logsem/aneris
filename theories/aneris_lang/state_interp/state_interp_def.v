@@ -26,6 +26,25 @@ Section collect.
   Definition collect (g : gmap K A) : gset B :=
     map_fold (λ _ a acc, (f a) ∪ acc) ∅ g.
 
+  Lemma collect_empty_f g :
+    (forall k a, g !! k = Some a → f a = ∅) → collect g = ∅.
+  Proof.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+      simpl; apply (map_fold_ind (M := gmap _) (λ y, λ x, P))
+    end.
+    - done.
+    - intros k a g' M Hk IHM IHMi.
+      rewrite empty_union_L; split.
+      + specialize (IHMi k a). apply IHMi.
+          by rewrite lookup_insert.
+      + apply IHM. intros k' a' Hka'.
+        specialize (IHMi k' a').
+        apply IHMi.
+        destruct (decide (k = k')) as [<-|Hneq]; by simplify_map_eq.
+  Qed.
+
   Lemma elem_of_collect g :
     ∀ m, m ∈ collect g ↔ ∃ k a, g !! k = Some a ∧ m ∈ f a.
   Proof.
@@ -147,14 +166,21 @@ Section definitions.
     messages_sent (history_init ip ports) = ∅.
   Proof.
     rewrite /messages_sent /history_init.
-    induction ports using set_ind_L.
-    done.
-    rewrite gset_map_union.
-  Admitted.
+    apply collect_empty_f.
+    intros k a Hka.
+    erewrite lookup_gset_to_gmap_Some in Hka.
+      by  destruct Hka as (? & <-).
+  Qed.
 
   Lemma history_init_received ip ports :
     messages_received (history_init ip ports) = ∅.
-  Proof. Admitted.
+  Proof.
+    rewrite /messages_received /history_init.
+    apply collect_empty_f.
+    intros k a Hka.
+    erewrite lookup_gset_to_gmap_Some in Hka.
+      by  destruct Hka as (? & <-).
+  Qed.
 
   (** Local state coherence *)
 
