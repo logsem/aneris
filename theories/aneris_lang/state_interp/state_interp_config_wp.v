@@ -32,19 +32,21 @@ Section state_interpretation.
 
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
-  (*   rewrite /config_wp.
+    rewrite /config_wp.
     iIntros.
     iModIntro.
-    iIntros (σ1 k σ2 ks nt Hstep) "Hst".
+    iIntros (σ1 δ k σ2 ks nt Hstep) "Hst".
     rewrite /state_interp; simplify_eq /=.
     iDestruct "Hst"
-      as (γm mhγ)
+      as (γm mh)
            "(%Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iApply step_fupd_fupd; iApply step_fupd_intro; first done.
-    iExists γm, mhγ.
-    iFrame.
+    iExists δ.
     iIntros "!> !>".
+    iSplit; first done.
+    iExists γm, mh.
+    iFrame.
     destruct Hstep as
         [ ip σ k Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ]; simpl.
     { iFrame "Hsi".
@@ -53,13 +55,20 @@ Section state_interpretation.
       iSplitR; [eauto using messages_history_coh_deliver_message|].
       iSplitL "Hlcoh".
       - by iApply (local_state_coh_deliver_message with "[Hlcoh]").
-      - by iApply free_ips_coh_deliver_message. }
+      - iSplitL "Hfreeips".
+        + by iApply free_ips_coh_deliver_message.
+        + rewrite /messages_resource_coh.
+          iApply (big_sepS_mono with "Hmres").
+          iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame.
+          iLeft. iDestruct "Hmr" as (phi) "(Hphi & Hphi2)". eauto with iFrame. }
     iFrame.
     iSplitR; first done.
     iSplitR; first done.
-    iPureIntro. by eapply messages_history_drop_message.
-  Qed. *)
-  Admitted.
+    iSplitR. iPureIntro. by eapply messages_history_drop_message.
+    rewrite /messages_resource_coh.
+    iApply (big_sepS_mono with "Hmres").
+    iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame.
+    iLeft. iDestruct "Hmr" as (phi) "(Hphi & Hphi2)". eauto with iFrame.
+  Qed.
 
 End state_interpretation.
-(* Print Assumptions config_wp_correct. *)
