@@ -162,6 +162,45 @@ Section definitions.
       + apply elem_of_union_r. set_solver.
   Qed.
 
+  Lemma gset_to_gmap_singleton (v: message_soup * message_soup)
+        (a : socket_address) : gset_to_gmap v {[ a ]} = {[a := v]}.
+  Proof.
+    assert ({[a]} = {[a]} ∪ (∅: gset socket_address)) as -> by by set_solver.
+      by rewrite (gset_to_gmap_union_singleton v a ∅) gset_to_gmap_empty.
+  Qed.
+
+  Lemma history_init_disj ip ports mh :
+    (∀ p : positive, mh !! SocketAddressInet ip p = None) →
+    history_init ip ports ##ₘ mh.
+  Proof.
+    intros Hips.
+    rewrite map_disjoint_spec.
+    intros sa rt rt' Hi Hmh.
+    destruct rt as (r,t).
+    erewrite history_init_empty in Hi.
+    specialize (Hips (port_of_address sa)).
+    destruct Hi as (<- & Hps & ?).
+    assert
+      (sa = SocketAddressInet (ip_of_address sa) (port_of_address sa))
+      as Hsa.
+      by destruct sa.
+      rewrite -Hsa in Hips. naive_solver.
+  Qed.
+
+  Lemma not_elem_of_dom_history ip p
+        (mh : gmap socket_address (message_soup * message_soup)) :
+    ip ∉ gset_map ip_of_address (dom (gset socket_address) mh) →
+    SocketAddressInet ip p ∉ dom (gset socket_address) mh.
+  Proof.
+    intros Hip Habs.
+    apply Hip. clear Hip.
+    assert (ip = ip_of_address (SocketAddressInet ip p)) as -> by done.
+    rewrite /gset_map.
+    apply elem_of_list_to_set.
+    apply elem_of_list_fmap_1.
+    by apply elem_of_elements.
+  Qed.
+
   Lemma history_init_sent ip ports :
     messages_sent (history_init ip ports) = ∅.
   Proof.

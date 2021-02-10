@@ -29,6 +29,13 @@ Section state_interpretation.
   Qed.
 
 
+  Lemma messages_resource_coh_alloc_node mh ip ports :
+    history_init ip ports ##ₘ mh →
+    messages_resource_coh mh -∗
+    messages_resource_coh (history_init ip ports ∪ mh).
+  Proof.
+  Admitted.
+
   (** message_received *)
   (* TODO: FIXME *)
   (*

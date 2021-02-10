@@ -55,6 +55,42 @@ Section state_interpretation.
     - by rewrite history_init_received history_init_sent.
   Qed.
 
+  Lemma messages_history_coh_alloc_node M S mh ip ports :
+    history_init ip ports ##ₘ mh →
+    messages_history_coh M S mh →
+    messages_history_coh M (<[ip:=∅]>S) (history_init ip ports ∪ mh).
+  Proof.
+    intros Hdisj Hcoh.
+  Admitted.
+    (*
+    generalize dependent mh.
+    induction ports as [|p Hp Hpp IH] using set_ind_L.
+    - rewrite /history_init gset_map_empty gset_to_gmap_empty.
+      intros mh ?. rewrite left_id_L.
+       rewrite /messages_history_coh
+            /message_soup_coh
+            /receive_buffers_coh
+            /messages_addresses_coh
+            /messages_received_from_sent_coh.
+       intros (?&?&?&?).
+       split_and!; [ set_solver | | | set_solver ].
+      + admit.
+      + admit.
+    - intros mh'.
+      assert ((history_init ip ({[p]} ∪ Hp) ∪ mh') =
+              ((history_init ip Hp) ∪ ((history_init ip {[p]}) ∪ mh')))
+        as ->.
+      { assert ( history_init ip ({[p]} ∪ Hp) =
+               history_init ip Hp ∪ (history_init ip {[p]})) as ->.
+      { admit. }
+          by rewrite map_union_assoc. }
+      intros.
+      apply IH.
+      admit.
+      (Hmcoh & Hrcoh & Hacoh & Hrscoh).
+    split. Search "union" "gmap".
+  Admitted.  *)
+
   Lemma messages_history_coh_deliver_message mhγ M S Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →
     S !! ip = Some Sn →

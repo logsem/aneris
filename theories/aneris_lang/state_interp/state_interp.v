@@ -74,25 +74,43 @@ Section state_interpretation.
     iApply (mapsto_node_valid_sockets with "[$] [$]").
   Qed.
 
-   Lemma messages_ctx_alloc_node ip γn ports mh :
-     ip ∉ (gset_map ip_of_address (dom (gset socket_address) mh)) →
-     mapsto_node ip γn -∗
-     messages_ctx mh ==∗
-                  messages_ctx ((history_init ip ports) ∪ mh) ∗
-                  ([∗ set] p ∈ ports, SocketAddressInet ip p ⤳ (∅, ∅)).
-  Proof.
-  (*   revert σ;
-       induction σ' as [| l v σ' Hl IH] using map_ind; iIntros (σ Hdisj) "Hσ".
-    { rewrite left_id_L. auto. }
-    iMod (IH with "Hσ") as "[Hσ'σ Hσ']"; first by eapply map_disjoint_insert_l.
-    decompose_map_disjoint.
-    rewrite !big_opM_insert // -insert_union_l //.
-    by iMod (gen_heap_light_alloc with "Hσ'σ") as "($ & $ & $)";
-      first by apply lookup_union_None.
-  Qed. *)
-  Admitted.
 
+  Lemma messages_ctx_alloc_node ip γn ports mh :
+    ports ≠ ∅ →
+    (∀ p, mh !! (SocketAddressInet ip p) = None) →
+    mapsto_node ip γn -∗
+    messages_ctx mh ==∗
+    messages_ctx ((history_init ip ports) ∪ mh) ∗
+    ([∗ set] p ∈ ports, SocketAddressInet ip p ⤳ (∅, ∅)).
+    Proof.
 
+    iIntros (Hports Hpis) "#Hn Hmctx".
+    rewrite /messages_ctx.
+    iMod (gen_heap_light_alloc_gen
+            _ (history_init ip ports) with "Hmctx") as "(? & Hfrag)".
+    { by apply history_init_disj. }
+    iFrame.
+    iModIntro.
+    iInduction ports as [| p ps Hps] "IH"  using set_ind_L; first done.
+    destruct (decide (ps = ∅)) as [->|].
+    - rewrite right_id_L.
+      rewrite{2} /history_init.
+      rewrite gset_map_singleton gset_to_gmap_singleton.
+      rewrite big_opS_singleton big_opM_singleton.
+      iExists _; iFrame "#".
+      iFrame.
+    - iApply big_opS_union; first by set_solver.
+      rewrite{2} /history_init.
+      rewrite gset_map_union  gset_map_singleton.
+      rewrite gset_to_gmap_union_singleton.
+      rewrite big_opM_insert; last first.
+      { rewrite lookup_gset_to_gmap_None. set_solver. }
+      iDestruct "Hfrag" as "(Hp & Hps)".
+      iSplitL "Hp".
+      { rewrite big_opS_singleton. iExists _; iFrame "#". iFrame. }
+      iApply "IH"; first done.
+      iFrame.
+    Qed.
 
     (* aneris_state_interp *)
   Lemma aneris_state_interp_init ips A σ f M ip ports γs :
@@ -196,11 +214,18 @@ Section state_interpretation.
     set σ' := (σ <| state_heaps   := <[ip:=∅]> (state_heaps σ)|>
                  <| state_sockets := <[ip:=∅]> (state_sockets σ) |>).
     set mh' := history_init ip ports ∪ mh.
+    assert (∀ p : positive, mh !! SocketAddressInet ip p = None) as HmhNone.
+    { intro p.
+      apply not_elem_of_dom.
+      assert (ip ∉ gset_map ip_of_address (dom (gset socket_address) mh))
+        as Hnip.
+      { rewrite /gnames_coh in Hgcoh.
+        destruct Hgcoh as (?&?&Hcoh).
+        apply not_elem_of_dom in Hnone.
+        set_solver. }
+        by apply not_elem_of_dom_history. }
     iPoseProof (messages_ctx_alloc_node ip γn ports with "Hγn Hmctx")
-      as ">(Hmctx & Hmto)".
-    { destruct Hgcoh as (? & ? & Hdom).
-      apply not_elem_of_dom in Hnone.
-      by rewrite Hdom in Hnone. }
+      as ">(Hmctx & Hmto)"; [done | done |].
     iModIntro. iSplitR.
     { iExists _; eauto. }
     iFrame "Hports Hmto".
@@ -213,8 +238,8 @@ Section state_interpretation.
       by apply network_sockets_coh_alloc_node. }
     iSplitR.
     { iPureIntro.
-      (* apply messages_history_coh_alloc_node. *)
-      admit. }
+      apply messages_history_coh_alloc_node; intuition.
+        by apply history_init_disj. }
     iSplitL "Hh Hs Hlcoh".
     { iApply (big_sepM_local_state_coh_insert ip γn
                 with "[Hh Hs] [Hlcoh]").
@@ -224,8 +249,9 @@ Section state_interpretation.
         repeat iSplit; eauto.
       - rewrite delete_insert //.
           by iApply big_sepM_local_state_coh_alloc_node. }
-    admit.
-  Admitted.
+    iApply (messages_resource_coh_alloc_node with "Hmres").
+      by apply history_init_disj.
+  Qed.
 
   Lemma aneris_state_interp_heap_valid σ l n q v :
     aneris_state_interp σ -∗
