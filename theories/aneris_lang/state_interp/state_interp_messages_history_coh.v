@@ -91,6 +91,17 @@ Section state_interpretation.
     split. Search "union" "gmap".
   Admitted.  *)
 
+  Lemma messages_history_coh_socketbind M S Sn mh sh skt a:
+    let ip := ip_of_address a in
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, ∅) →
+    saddress skt = None →
+    messages_history_coh M S mh →
+    messages_history_coh
+      M (<[ip:=(<[sh:=((skt <| saddress := Some a |>), ∅)]>Sn)]> S) mh.
+  Proof.
+  Admitted.
+
   Lemma messages_history_coh_deliver_message mhγ M S Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →
     S !! ip = Some Sn →

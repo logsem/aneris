@@ -198,7 +198,8 @@ Section state_interpretation.
   Lemma socket_addresses_coh_socketbind Sn sh skt a :
     saddress skt = None →
     socket_addresses_coh Sn (ip_of_address a) →
-    socket_addresses_coh (<[sh:=(skt <| saddress := Some a |>, ∅)]> Sn) (ip_of_address a).
+    socket_addresses_coh
+      (<[sh:=(skt <| saddress := Some a |>, ∅)]> Sn) (ip_of_address a).
   Proof. intros ? ? sh' **; ddeq sh sh'; eauto. Qed.
 
   Lemma socket_addresses_coh_insert_received sh a skt m R Sn :
@@ -224,7 +225,6 @@ Section state_interpretation.
   Qed.
 
   (** socket_unbound_empty_buf_coh *)
-  (* TODO: 0 *)
   Lemma socket_unbound_empty_buf_coh_alloc_socket Sn sh ip skt:
     saddress skt = None →
     socket_unbound_empty_buf_coh Sn ip →
