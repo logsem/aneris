@@ -65,7 +65,7 @@ Section state_interpretation.
             /messages_addresses_coh
             /messages_received_from_sent_coh.
     intros (H1 & H2 & H3 & H4).
-     split; first set_solver.
+    split; first set_solver.
     split.
     intros ip0 ???????.
     ddeq ip ip0. set_solver.
@@ -77,7 +77,45 @@ Section state_interpretation.
     messages_history_coh M S mh →
     messages_history_coh M S (history_init ip {[p]} ∪ mh).
   Proof.
-  Admitted.
+    rewrite history_init_singleton.
+    intros Hdisj Hcoh.
+    rewrite -insert_union_singleton_l.
+    revert Hcoh.
+    rewrite /messages_history_coh
+            /message_soup_coh
+            /receive_buffers_coh
+            /messages_addresses_coh
+            /messages_received_from_sent_coh.
+    intros (H1 & H2 & H3 & H4).
+    split_and!.
+    - intros m Hm.
+      apply H1 in Hm as (R & T & Hmh & Hmt).
+      destruct (decide ((m_sender m) = (SocketAddressInet ip p))) as [Heq|Hneq].
+      + rewrite Heq. rewrite lookup_insert.
+        rewrite -Heq in Hdisj.
+        decompose_map_disjoint.
+        naive_solver.
+      + rewrite lookup_insert_ne; last done. set_solver.
+    -  intros ip0 Sn sh skt r m HS HSn Hmr.
+       destruct (decide ((m_sender m) = (SocketAddressInet ip p))) as [Heq|Hneq].
+       + rewrite Heq lookup_insert.
+         specialize (H2 ip0 Sn sh skt r m HS HSn Hmr) as (R & T & Hmh & ?).
+         simplify_map_eq. rewrite Heq in Hmh. set_solver.
+       + rewrite lookup_insert_ne; last done. set_solver.
+    -  intros a ???.
+       ddeq a (SocketAddressInet ip p); set_solver.
+    - apply elem_of_subseteq.
+      intros m. rewrite !elem_of_collect.
+      intros (a & RT & Hlk & Hm).
+      ddeq a (SocketAddressInet ip p); first done.
+      assert (m ∈ messages_received mh).
+      { apply elem_of_messages_received. set_solver. }
+      assert (m ∈ messages_sent mh) as Hms by by set_solver.
+      apply elem_of_messages_sent in Hms as (sa & rt & Hrt & Hmrt).
+      exists sa, rt.
+      ddeq sa (SocketAddressInet ip p); last done.
+      simplify_map_eq.
+  Qed.
 
   Lemma messages_history_coh_alloc_node M S mh ip ports :
     history_init ip ports ##ₘ mh →
@@ -85,24 +123,33 @@ Section state_interpretation.
     messages_history_coh M (<[ip:=∅]>S) (history_init ip ports ∪ mh).
   Proof.
     generalize dependent mh.
-    induction ports as [|p Hp Hpp IH] using set_ind_L.
+    induction ports as [|p ps Hpp IH] using set_ind_L.
     - rewrite /history_init gset_map_empty gset_to_gmap_empty.
       intros mh ?. rewrite left_id_L.
       apply messages_history_coh_alloc_node_aux.
     - intros mh'.
-      assert ((history_init ip ({[p]} ∪ Hp) ∪ mh') =
-              ((history_init ip Hp) ∪ ((history_init ip {[p]}) ∪ mh')))
+      assert ((history_init ip ({[p]} ∪ ps) ∪ mh') =
+              ((history_init ip ps) ∪ ((history_init ip {[p]}) ∪ mh')))
         as ->.
-      { assert ( history_init ip ({[p]} ∪ Hp) =
-               history_init ip Hp ∪ (history_init ip {[p]})) as ->.
-      { admit. }
+      { assert ( history_init ip ({[p]} ∪ ps) =
+               history_init ip ps ∪ (history_init ip {[p]})) as ->.
+      { by apply history_init_singleton_union. }
           by rewrite map_union_assoc. }
-      intros.
+      intros Hdisj Hcoh.
+      rewrite history_init_singleton_union in Hdisj; last done.
+        apply map_disjoint_union_l in Hdisj as [Hd1 Hd2].
       apply IH.
-      admit.
-      apply messages_history_coh_alloc_node_aux_2; last done.
-      admit.
-  Admitted.
+      { apply map_disjoint_union_r.
+        split_and!; eauto.
+        apply map_disjoint_dom_2.
+        rewrite{2} /history_init.
+        rewrite gset_map_singleton.
+        rewrite gset_to_gmap_singleton.
+        rewrite dom_singleton_L.
+        rewrite dom_gset_to_gmap.
+        set_solver. }
+      by apply messages_history_coh_alloc_node_aux_2.
+  Qed.
 
   Lemma messages_history_coh_socketbind M S Sn mh sh skt a:
     let ip := ip_of_address a in

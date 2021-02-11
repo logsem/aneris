@@ -201,6 +201,32 @@ Section definitions.
     by apply elem_of_elements.
   Qed.
 
+  Lemma history_init_singleton ip p :
+    history_init ip {[p]} = {[ SocketAddressInet ip p := (∅,∅) ]}.
+  Proof. by rewrite /history_init gset_map_singleton gset_to_gmap_singleton. Qed.
+
+  Lemma history_init_emptyset ip :
+    history_init ip ∅ = ∅.
+  Proof. by rewrite /history_init gset_map_empty gset_to_gmap_empty. Qed.
+
+  Lemma history_init_singleton_union ip p ps :
+    p ∉ ps →
+    history_init ip ({[p]} ∪ ps) = history_init ip ps ∪ history_init ip {[p]}.
+  Proof.
+    intro Hp.
+    rewrite /history_init.
+    rewrite gset_map_union.
+    rewrite gset_map_singleton.
+    rewrite gset_to_gmap_singleton.
+    rewrite gset_to_gmap_union_singleton.
+    rewrite insert_union_singleton_l.
+    apply map_union_comm.
+    apply map_disjoint_dom_2.
+    rewrite dom_singleton_L.
+    rewrite dom_gset_to_gmap.
+    set_solver.
+  Qed.
+
   Lemma history_init_sent ip ports :
     messages_sent (history_init ip ports) = ∅.
   Proof.
