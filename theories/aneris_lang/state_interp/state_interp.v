@@ -519,70 +519,89 @@ Section state_interpretation.
     iFrame.
   Qed.
 
-(*
-  Lemma aneris_state_interp_send sh a skt Sn R T φ to mbody σ1 :
+  Lemma aneris_state_interp_send sh a skt Sn r R T φ to mbody σ1 :
     let ip := ip_of_address a in
     let msg := mkMessage a to (sprotocol skt) mbody in
-    let S' := <[ip := <[sh:=(skt, R, {[msg]} ∪ T)]> Sn]> (state_sockets σ1) in
     let M' := {[msg]} ∪ state_ms σ1 in
-    let σ2 := σ1 <| state_sockets := S' |> <| state_ms := M' |> in
+    let σ2 := σ1 <| state_ms := M' |> in
     state_sockets σ1 !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
+    Sn !! sh = Some (skt, r) →
     saddress skt = Some a →
-    sh ↪[ip_of_address a] (skt, R, T) -∗
+    sh ↪[ip_of_address a] skt -∗
+    a ⤳ (R, T) -∗
     to ⤇ φ -∗
     φ msg -∗
     aneris_state_interp σ1 ==∗
-    aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] (skt, R, {[msg]} ∪ T).
+    aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] skt ∗
+    a ⤳ (R, {[msg]} ∪ T).
   Proof.
-    iIntros (????????) "Hsh #Hφ Hmsg Hσ".
-    iDestruct "Hσ" as (m) "(Hnauth & % & Hsock & Hlcoh & Hfreeips & Hnet)".
-    iDestruct "Hsh" as (?) "[#Hn Hsh]".
+    simpl.
+    iIntros (HS HSn Hskt) "Hsh Hrt #Hφ Hmsg Hσ".
+    iDestruct "Hσ"
+      as (m mh)
+           "(%Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
-    iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
-      as "(Hstate & Hlcoh)"; [done|].
-    iMod (local_state_coh_update_ms with "[$Hstate Hsh]") as "[Hstate' Hsh]";
-      [done|done|..].
-    { iExists _; eauto. }
-    iDestruct (big_sepM_local_state_coh_update_socket_notin with "Hlcoh") as "Hlcoh".
-    { apply lookup_delete. }
-    iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh") as "Hlcoh"; [done|].
-    iModIntro. iFrame. iExists _. iFrame. simpl.
+    set (msg := {|
+               m_sender := a;
+               m_destination := to;
+               m_protocol := sprotocol skt;
+               m_body := mbody |}).
+    iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %?.
+    iMod (messages_mapsto_update a R T R ({[msg]} ∪ T) mh
+            with "[$Hrt $Hmctx]") as "[Hmctx Hrt]".
+    iFrame. iModIntro. iExists m, (<[a:=(R, {[msg]} ∪ T)]> mh). iFrame.
+    simpl.
     iSplit.
-    { iPureIntro; by eapply gnames_coh_update_sockets. }
-    iSplitL "Hfreeips".
-    { by iApply (free_ips_coh_update_msg with "Hfreeips"). }
-    rewrite /msg.
-    by iApply (network_coh_insert_sent with "Hφ Hmsg Hnet").
+    { iPureIntro. by eapply gnames_coh_update_history. }
+    iSplit; first done.
+    iSplit.
+    { iPureIntro. by eapply messages_history_coh_send. }
+    iApply
+    (messages_resource_coh_send _ _ _ _ _ φ with "[Hφ] [$Hmres] [$Hmsg]"); eauto.
   Qed.
 
-  Lemma aneris_state_interp_send_duplicate sh a skt Sn R T to mbody σ1 :
+  Lemma aneris_state_interp_send_duplicate sh a skt Sn r R T to mbody σ1 :
     let ip := ip_of_address a in
     let msg := mkMessage a to (sprotocol skt) mbody in
-    let S' := <[ip := <[sh:=(skt, R, {[msg]} ∪ T)]> Sn]> (state_sockets σ1) in
     let M' := {[msg]} ∪ state_ms σ1 in
-    let σ2 := σ1 <| state_sockets := S' |> <| state_ms := M' |> in
+    let σ2 := σ1 <| state_ms := M' |> in
     state_sockets σ1 !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
+    Sn !! sh = Some (skt, r) →
     saddress skt = Some a →
     msg ∈ T →
-    sh ↪[ip_of_address a] (skt, R, T) -∗
+    sh ↪[ip_of_address a] skt -∗
+    a ⤳ (R, T) -∗
     aneris_state_interp σ1 ==∗
-    aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] (skt, R, T).
+    aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] skt ∗
+    a ⤳ (R, T).
   Proof.
-    iIntros (????? HSn ???) "Hsh Hσ".
-    iDestruct "Hσ" as (m) "(Hnauth & % & Hsock & Hlcoh & Hfreeips & Hnet)".
-    iDestruct "Hsh" as (?) "[#Hn Hsh]".
-    iDestruct (network_coh_sent_valid with "Hnet") as "%"; [done..|].
-    iModIntro. rewrite /σ2 /M' /S' /ip.
+    simpl. iIntros (HS HSn Hskt Hmsg) "Hsh Hrt Hσ".
+    iDestruct "Hσ"
+      as (m mh)
+           "(%Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
+    iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
+    set (msg := {|
+                 m_sender := a;
+                 m_destination := to;
+                 m_protocol := sprotocol skt;
+                 m_body := mbody |}).
+     iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %?.
+     iFrame. iModIntro.
+     iExists m,  (<[a:=(R, {[msg]} ∪ T)]> mh).
+     simpl.
+    iSplit.
+    { iPureIntro. by eapply gnames_coh_update_history. }
+    iSplit; first done.
+    iSplit.
+    { iPureIntro. by eapply messages_history_coh_send. }
     assert (T = {[msg]} ∪ T) as <- by set_solver.
-    assert ({[msg]} ∪ state_ms σ1 = state_ms σ1) as -> by set_solver.
-    assert (<[ip_of_address a := <[sh:=(skt, R, T)]> Sn]> (state_sockets σ1) =
-            state_sockets σ1) as -> by rewrite !insert_id //.
-    iSplitR "Hsh"; [|iExists _; eauto].
-    iExists _; iFrame; eauto.
+    rewrite insert_id; last done.
+    iFrame.
   Qed.
-*)
 
   Lemma aneris_state_interp_receive a sh skt msg
         (Ψo : option (socket_interp Σ))  σ1 Sn r R T :

@@ -396,6 +396,27 @@ Section resource_lemmas.
     AsFractional (a ⤳{q} s) (λ q, a ⤳{q} s)%I q.
   Proof. split; [done|]. apply _. Qed.
 
+  Lemma messages_mapsto_update a R T R' T' mh :
+    a ⤳ (R, T) ∗ messages_ctx mh ==∗
+    a ⤳ (R', T') ∗ messages_ctx (<[a := (R',T')]>mh).
+  Proof.
+    iIntros "(Hf & Ha)".
+    iDestruct "Hf" as (γ) "(#Hn & Hl)".
+    rewrite /mapsto_messages.
+    iMod (gen_heap_light_update _ _ a (R,T) (R', T')
+            with "Ha Hl") as "[Ha Hf]".
+    eauto with iFrame.
+  Qed.
+
+ Lemma messages_mapsto_valid a R T mh :
+   a ⤳ (R, T) -∗ messages_ctx mh -∗ ⌜mh !! a = Some (R,T)⌝.
+ Proof.
+   iIntros "Hf Ha".
+   iApply (gen_heap_light_valid with "[Ha] [Hf]").
+   - iFrame.
+   - iDestruct "Hf" as (?) "(Hn & Hf)". eauto with iFrame.
+ Qed.
+
   Lemma node_ctx_init σ s :
     ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
   Proof.

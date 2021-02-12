@@ -169,14 +169,25 @@ Section state_interpretation.
     ddeq ip ip1; ddeq sh sh1; eauto.
   Qed.
 
-  Lemma messages_history_coh_deliver_message mhγ M S Sn Sn' ip sh skt a R m :
+ Lemma messages_history_coh_send mh M S Sn ip sh skt a r m R T :
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    saddress skt = Some a →
+    m_sender m = a →
+    mh !! a = Some (R, T) →
+    messages_history_coh M S mh →
+    messages_history_coh ({[m]} ∪ M) S (<[a:=(R, {[m]} ∪ T)]> mh).
+  Proof.
+  Admitted.
+
+  Lemma messages_history_coh_deliver_message mh M S Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →
     S !! ip = Some Sn →
     Sn !! sh = Some (skt, R) →
     Sn' = <[sh:=(skt, R ∪ {[m]})]> Sn →
     saddress skt = Some a →
-    messages_history_coh M S mhγ →
-    messages_history_coh M (<[ip:=Sn']> S) mhγ.
+    messages_history_coh M S mh →
+    messages_history_coh M (<[ip:=Sn']> S) mh.
   Proof.
     rewrite /messages_history_coh.
     intros Hm HSn Hsh HSn' Hskt (Hmcoh & Hrcoh & Hacoh).

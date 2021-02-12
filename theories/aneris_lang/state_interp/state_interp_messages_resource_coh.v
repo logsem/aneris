@@ -28,13 +28,30 @@ Section state_interpretation.
     iIntros. by rewrite /messages_resource_coh history_init_sent.
   Qed.
 
-
   Lemma messages_resource_coh_alloc_node mh ip ports :
     history_init ip ports ##ₘ mh →
     messages_resource_coh mh -∗
     messages_resource_coh (history_init ip ports ∪ mh).
   Proof.
+    rewrite /messages_resource_coh /=.
+    iIntros (?) "Hsent".
+    rewrite messages_sent_init; last done.
+    rewrite big_sepS_mono; first done.
+    iIntros (??) "[? | %]"; [by iLeft|].
+    iRight. iPureIntro.
+      by apply message_received_init.
+  Qed.
+
+  Lemma  messages_resource_coh_send mh a R T msg ϕ :
+    mh !! a = Some (R, T) →
+    m_destination msg ⤇ ϕ -∗
+    messages_resource_coh mh -∗
+    ϕ msg -∗
+    messages_resource_coh (<[a:=(R, {[msg]} ∪ T)]> mh).
+  Proof.
   Admitted.
+
+
 
   (** message_received *)
   (* TODO: FIXME *)

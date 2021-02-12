@@ -26,6 +26,40 @@ Section collect.
   Definition collect (g : gmap K A) : gset B :=
     map_fold (λ _ a acc, (f a) ∪ acc) ∅ g.
 
+  Lemma collect_disjoint_union g h :
+    g ##ₘ h →
+    collect (g ∪ h) = collect g ∪ collect h.
+  Proof.
+    intros Hdisj.
+    generalize dependent h.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+    simpl; apply (map_fold_ind (M := gmap _) (λ y, λ x, P))
+    end.
+    - intros. by rewrite !left_id_L.
+    - intros k a g' acc Hk IHM h' Hdisj.
+      assert (f a ∪ acc ∪ collect h' =
+              acc ∪ (f a ∪ collect h')) as -> by set_solver.
+      rewrite insert_union_singleton_l.
+      assert ({[k := a]} ∪ g' ∪ h' =  g' ∪ ({[k := a]} ∪ h')) as ->.
+      { rewrite (map_union_comm {[k := a]} g').
+          by rewrite map_union_assoc.
+          by apply map_disjoint_singleton_l_2. }
+      rewrite IHM.
+      + rewrite -insert_union_singleton_l.
+        assert (collect (<[k:=a]> h') = (f a ∪ collect h')) as ->.
+        rewrite /collect.
+        rewrite map_fold_insert_L.
+        * done.
+        * set_solver.
+        * simplify_map_eq; set_solver.
+        * done.
+      + apply map_disjoint_union_r_2.
+        * by apply map_disjoint_singleton_r_2.
+        * simplify_map_eq. set_solver.
+  Qed.
+
   Lemma collect_empty_f g :
     (forall k a, g !! k = Some a → f a = ∅) → collect g = ∅.
   Proof.
@@ -245,6 +279,29 @@ Section definitions.
     intros k a Hka.
     erewrite lookup_gset_to_gmap_Some in Hka.
       by  destruct Hka as (? & <-).
+  Qed.
+
+Lemma messages_sent_init ip ports mh :
+    history_init ip ports ##ₘ mh →
+    messages_sent (history_init ip ports ∪ mh) =
+    messages_sent mh.
+  Proof.
+    intros Hdisj.
+    rewrite /messages_sent.
+    rewrite collect_disjoint_union; last done.
+    erewrite history_init_sent.
+      by rewrite left_id_L.
+  Qed.
+
+  Lemma message_received_init m ip ports mh :
+    history_init ip ports ##ₘ mh →
+    message_received m mh →
+    message_received m (history_init ip ports ∪ mh).
+  Proof.
+    intros Hdij Hmsg.
+    rewrite /message_received /messages_received.
+    erewrite collect_disjoint_union; last done.
+    set_solver.
   Qed.
 
   (** Local state coherence *)

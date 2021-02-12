@@ -48,24 +48,38 @@ Section state_interpretation.
                       dom_gset_to_gmap history_init_dom.
   Qed.
 
-  Lemma gnames_coh_update_heap n γm H S h h' Mγ:
+  Lemma gnames_coh_update_heap n γm H S h h' mh:
     H !! n = Some h →
-    gnames_coh γm H S Mγ →
-    gnames_coh γm (<[n:=h']> H) S Mγ.
+    gnames_coh γm H S mh →
+    gnames_coh γm (<[n:=h']> H) S mh.
   Proof.
     intros ?%elem_of_dom_2 [? ?].
     rewrite /gnames_coh dom_insert_L subseteq_union_1_L //=.
     set_solver.
   Qed.
 
-  Lemma gnames_coh_update_sockets n γm H S Sn Sn' Mγ :
+  Lemma gnames_coh_update_sockets n γm H S Sn Sn' mh :
     S !! n = Some Sn →
-    gnames_coh γm H S Mγ →
-    gnames_coh γm H (<[n:=Sn']> S) Mγ.
+    gnames_coh γm H S mh →
+    gnames_coh γm H (<[n:=Sn']> S) mh.
   Proof.
     intros ?%elem_of_dom_2 [? ?].
     rewrite /gnames_coh dom_insert_L subseteq_union_1_L //=.
     set_solver.
   Qed.
+
+  Lemma gnames_coh_update_history m a γs H S mh v:
+    m !! ip_of_address a = Some γs →
+    gnames_coh m H S mh →
+    gnames_coh m H S (<[a:=v]> mh).
+  Proof.
+    intros ?%elem_of_dom_2 [? [? Hdmh]].
+    rewrite /gnames_coh dom_insert_L //=.
+    split_and!; eauto.
+    rewrite Hdmh.
+    rewrite gset_map_union gset_map_singleton.
+    set_solver.
+  Qed.
+
 
 End state_interpretation.
