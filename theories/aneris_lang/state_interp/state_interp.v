@@ -549,17 +549,29 @@ Section state_interpretation.
                m_protocol := sprotocol skt;
                m_body := mbody |}).
     iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %?.
-    iMod (messages_mapsto_update a R T R ({[msg]} ∪ T) mh
+    destruct (decide (msg ∈ T)).
+    -  assert (T = {[msg]} ∪ T) as <- by set_solver.
+       iFrame. iModIntro. iExists m, mh. iFrame.
+       simpl.
+       iSplit; eauto.
+       iSplit; eauto.
+       iPureIntro.
+       assert (mh = <[a := (R, {[msg]} ∪ T)]> mh) as ->.
+       assert (T = {[msg]} ∪ T) as <- by set_solver.
+       by rewrite insert_id.
+        by eapply messages_history_coh_send.
+    - iMod (messages_mapsto_update a R T R ({[msg]} ∪ T) mh
             with "[$Hrt $Hmctx]") as "[Hmctx Hrt]".
-    iFrame. iModIntro. iExists m, (<[a:=(R, {[msg]} ∪ T)]> mh). iFrame.
-    simpl.
-    iSplit.
-    { iPureIntro. by eapply gnames_coh_update_history. }
-    iSplit; first done.
-    iSplit.
-    { iPureIntro. by eapply messages_history_coh_send. }
-    iApply
-    (messages_resource_coh_send _ _ _ _ _ φ with "[Hφ] [$Hmres] [$Hmsg]"); eauto.
+       iFrame. iModIntro. iExists m, (<[a:=(R, {[msg]} ∪ T)]> mh). iFrame.
+       simpl.
+       iSplit.
+       { iPureIntro. by eapply gnames_coh_update_history. }
+       iSplit; first done.
+       iSplit.
+       { iPureIntro. by eapply messages_history_coh_send. }
+       iApply
+       (messages_resource_coh_send _ _ _ _ _ φ with "[Hφ] [$Hmres] [$Hmsg]"); eauto.
+         by destruct Hmhcoh; intuition.
   Qed.
 
   Lemma aneris_state_interp_send_duplicate sh a skt Sn r R T to mbody σ1 :

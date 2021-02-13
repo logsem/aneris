@@ -42,13 +42,68 @@ Section state_interpretation.
       by apply message_received_init.
   Qed.
 
-  Lemma  messages_resource_coh_send mh a R T msg ϕ :
+
+  Lemma messages_sent_insert a R T mh :
+    messages_sent (<[a:=(R, T)]> mh) = T ∪ messages_sent mh.
+  Proof.
+    rewrite /messages_sent.
+  Admitted.
+
+  Lemma messages_sent_split a R T mh :
     mh !! a = Some (R, T) →
+    messages_sent mh =
+    T ∪ messages_sent (delete a mh).
+  Proof.
+  Admitted.
+
+  Lemma message_received_insert a msg R T mh :
+    message_received msg (<[a:=(R, T)]> mh) ↔
+    msg ∈ T ∨ message_received msg mh.
+  Proof.
+  Admitted.
+
+  Lemma  messages_resource_coh_send mh a R T msg ϕ :
+    msg ∉ T →
+    mh !! a = Some (R, T) →
+    m_sender msg = a →
+    messages_addresses_coh mh →
     m_destination msg ⤇ ϕ -∗
     messages_resource_coh mh -∗
     ϕ msg -∗
     messages_resource_coh (<[a:=(R, {[msg]} ∪ T)]> mh).
   Proof.
+    rewrite /messages_resource_coh /=.
+    iIntros (Hmt Hsrc Hmh Hmcoh) "#Hϕ Hcoh Hm".
+    rewrite -(insert_delete mh a).
+    rewrite messages_sent_insert.
+    rewrite {1} (messages_sent_split a R T); last done.
+    rewrite !big_sepS_union.
+    - rewrite big_sepS_singleton.
+      iDestruct "Hcoh" as "(HcohT & Hcoh)".
+      iSplitL "Hm HcohT".
+      + iSplitL "Hm".
+        * iLeft. eauto.
+        * rewrite big_sepS_mono; first done.
+           iIntros (msg' Hmsg') "[Htt | %Hrd]"; first by iLeft.
+           iRight. iPureIntro.
+           rewrite (insert_delete mh a).
+           apply message_received_insert.
+           set_solver.
+      + eauto with iFrame.
+        rewrite big_sepS_mono; first done.
+        iIntros (msg' Hmsg') "[Htt | %Hrd]"; first by iLeft.
+        iRight. iPureIntro.
+        rewrite insert_delete.
+        apply message_received_insert. eauto.
+       (* rewrite /message_received.
+        rewrite elem_of_messages_received.
+        apply elem_of_messages_received in Hrd as (sa & rt & Hsa & Hr).
+        ddeq sa a.
+        * exists a, (R,{[msg]} ∪ T). rewrite lookup_insert. set_solver.
+        * exists sa, rt. rewrite lookup_insert_ne; last done. set_solver. *)
+    - set_solver.
+    - admit.
+    - admit.
   Admitted.
 
 
