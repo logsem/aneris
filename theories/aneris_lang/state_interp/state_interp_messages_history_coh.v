@@ -169,7 +169,7 @@ Section state_interpretation.
     ddeq ip ip1; ddeq sh sh1; eauto.
   Qed.
 
- Lemma messages_history_coh_send mh M S Sn ip sh skt a r m R T :
+  Lemma messages_history_coh_send mh M S Sn ip sh skt a r m R T :
     S !! ip = Some Sn →
     Sn !! sh = Some (skt, r) →
     saddress skt = Some a →
@@ -178,7 +178,53 @@ Section state_interpretation.
     messages_history_coh M S mh →
     messages_history_coh ({[m]} ∪ M) S (<[a:=(R, {[m]} ∪ T)]> mh).
   Proof.
-  Admitted.
+     rewrite /messages_history_coh
+             /message_soup_coh
+             /receive_buffers_coh
+             /messages_addresses_coh
+             /messages_received_from_sent_coh.
+     intros HSn Hsh Hskt Hma Hmh (Hmcoh & Hrcoh & Hacoh & Hsrcoh).
+     split_and!.
+     - intros m' [->%elem_of_singleton|]%elem_of_union.
+       + subst. rewrite lookup_insert.
+         exists R, ({[m]} ∪ T). set_solver.
+       + destruct (decide (a = m_sender m')) as [->|].
+         * rewrite lookup_insert. eauto with set_solver.
+         * rewrite lookup_insert_ne; last done. eauto with set_solver.
+     - intros ip1 Sn1 sh1 skt1 r1 m1 HSn1 Hskt1 Hm1.
+       destruct (decide (a = m_sender m1)) as [->|].
+       + subst. rewrite lookup_insert. eauto with set_solver.
+       + rewrite lookup_insert_ne; last done. by eapply Hrcoh.
+     - intros a' ???.
+       ddeq a a'; set_solver.
+     - apply elem_of_subseteq.
+       intros m'.
+       rewrite !elem_of_collect.
+       intros (a' & (R',T') & Hlk & Hm).
+       destruct (decide (a = a')) as [->|].
+       + rewrite lookup_insert in Hlk.
+         simplify_map_eq.
+         assert (m' ∈ messages_received mh).
+         { apply elem_of_messages_received. set_solver. }
+         assert (m' ∈ messages_sent mh) as Hms by by set_solver.
+         apply elem_of_messages_sent in Hms as (sa & rt & Hrt & Hmrt).
+         ddeq sa (m_sender m).
+         * exists (m_sender m), (R', {[m]} ∪ T).
+           rewrite lookup_insert. set_solver.
+         * exists sa, rt. rewrite lookup_insert_ne; last done.
+           set_solver.
+       + rewrite lookup_insert_ne in Hlk; last done.
+         simplify_map_eq.
+          assert (m' ∈ messages_received mh).
+         { apply elem_of_messages_received. set_solver. }
+         assert (m' ∈ messages_sent mh) as Hms by by set_solver.
+         apply elem_of_messages_sent in Hms as (sa & rt & Hrt & Hmrt).
+         destruct (decide (sa = m_sender m)) as [->|].
+         * exists (m_sender m), (R, {[m]} ∪ T).
+           rewrite lookup_insert. set_solver.
+         * exists sa, rt. rewrite lookup_insert_ne; last done.
+           set_solver.
+  Qed.
 
   Lemma messages_history_coh_deliver_message mh M S Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →

@@ -487,19 +487,24 @@ Section primitive_laws.
         sh ↪[ip_of_address a] skt ∗
         a ⤳ (R, {[ msg ]} ∪ T) }}}.
   Proof.
-  Admitted.
-  (*    iIntros (? Hsome Φ) "(>Hsh & #Hφ & Hm) HΦ".
+    iIntros (msg Hskt Φ) "(>Hsh & >Hrt & #Hφ & Hm) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ κ κs n) "Hσ !>".
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
-    iSplitR.
-    { iPureIntro; do 4 eexists; eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
-        by econstructor. }
-    iIntros (????) "!>"; inv_head_step; rewrite -/msg.
-    iMod (aneris_state_interp_send with "Hsh Hφ Hm Hσ") as "[Hσ Hsh]";
-      [done..|].
-    iModIntro. iSplitR; [done|]. iFrame. by iApply "HΦ".
-  Qed. *)
+    iIntros (σ δ κ κs n) "Hσ /=".
+     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iModIntro. iSplitR.
+    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+        by econstructor; naive_solver. }
+    iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
+    iMod (aneris_state_interp_send sh a skt
+            with "[$Hsh] [$Hrt] [$Hφ] [$Hm] [$Hσ]")
+      as "(Hσ & Hsh & Hrt)"; [done..|].
+    iModIntro.
+    iExists δ; iSplit; first done.
+    rewrite !insert_id; [ | eauto | eauto ].
+    iSplitR; [done|]. iFrame.
+    iApply ("HΦ" with "[$]").
+  Qed.
 
   Lemma wp_send_duplicate mbody sh skt a to k E R T:
     let msg := mkMessage a to (sprotocol skt) mbody in
@@ -513,21 +518,24 @@ Section primitive_laws.
         sh ↪[ip_of_address a] skt ∗
         a ⤳ (R, T) }}}.
   Proof.
-  Admitted.
-  (*
-    iIntros (msg Hsome Hmsg Φ) ">Hsh HΦ /=".
+    iIntros (msg Hskt Hin Φ) "(>Hsh & >Hrt) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ κ κs n) "Hσ !>".
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh") as (?) "[% %]".
-    iSplitR.
-    { iPureIntro; do 4 eexists; eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
-        by econstructor. }
-    iIntros (????) "!>"; inv_head_step; rewrite -/msg.
-    iMod (aneris_state_interp_send_duplicate with "Hsh Hσ") as "[Hσ Hsh]";
-      [done..|].
-    iModIntro. iSplitR; [done|]. iFrame. by iApply "HΦ".
-   Qed.
-   *)
+    iIntros (σ δ κ κs n) "Hσ /=".
+     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iModIntro. iSplitR.
+    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+        by econstructor; naive_solver. }
+    iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
+    iMod (aneris_state_interp_send_duplicate
+            with "[$Hsh] [$Hrt] [$Hσ]")
+      as "(Hσ & Hsh & Hrt)"; [done..|].
+    iModIntro.
+    iExists δ; iSplit; first done.
+    rewrite !insert_id; [ | eauto | eauto ].
+    iSplitR; [done|]. iFrame.
+    iApply ("HΦ" with "[$]").
+  Qed.
 
   Lemma wp_receivefrom_nb_gen
         (Ψo : option (socket_interp Σ)) k a E sh skt R T :

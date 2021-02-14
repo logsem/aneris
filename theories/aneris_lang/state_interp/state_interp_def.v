@@ -26,6 +26,53 @@ Section collect.
   Definition collect (g : gmap K A) : gset B :=
     map_fold (λ _ a acc, (f a) ∪ acc) ∅ g.
 
+  Lemma collect_singleton k a :
+    collect {[k := a]} = f a.
+  Proof.
+    rewrite /collect.
+    rewrite map_fold_insert_L.
+    - rewrite map_fold_empty; set_solver.
+    - set_solver.
+    - done.
+  Qed.
+
+  Lemma collect_empty :
+    collect ∅ = ∅.
+  Proof. by rewrite /collect.
+  Qed.
+
+  Lemma collect_insert k a g :
+    collect (<[k:=a]> g) = f a ∪ collect (delete k g).
+  Proof.
+    generalize dependent a.
+    generalize dependent k.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+      simpl; apply (map_fold_ind (M := gmap _) (B := gset B) (λ y, λ x, P))
+    end; [ done | exact ∅ | |].
+    - intros. rewrite collect_singleton; set_solver.
+    - intros k' a' h acc Hk' IH k a.
+      destruct (decide (k = k')) as [-> | Hneq].
+      + rewrite insert_insert delete_insert_delete.
+        set_solver.
+      + rewrite delete_insert_ne; last done.
+        assert ((<[k:=a]>(<[k':=a']> h)) = (<[k':=a']>(<[k:=a]> h))) as ->.
+        { by rewrite insert_commute; last done. }
+        rewrite /collect.
+        rewrite {1} map_fold_insert_L.
+        specialize (IH k a).
+        rewrite /collect in IH.
+        rewrite IH.
+        rewrite {1} map_fold_insert_L.
+        * set_solver.
+        * set_solver.
+        * by rewrite lookup_delete_ne.
+        * set_solver.
+        * by rewrite lookup_insert_ne; last done.
+  Qed.
+
+
   Lemma collect_disjoint_union g h :
     g ##ₘ h →
     collect (g ∪ h) = collect g ∪ collect h.
@@ -48,13 +95,10 @@ Section collect.
           by apply map_disjoint_singleton_l_2. }
       rewrite IHM.
       + rewrite -insert_union_singleton_l.
-        assert (collect (<[k:=a]> h') = (f a ∪ collect h')) as ->.
-        rewrite /collect.
-        rewrite map_fold_insert_L.
-        * done.
-        * set_solver.
-        * simplify_map_eq; set_solver.
-        * done.
+        rewrite collect_insert.
+        simplify_map_eq.
+        rewrite delete_notin; last done.
+        done.
       + apply map_disjoint_union_r_2.
         * by apply map_disjoint_singleton_r_2.
         * simplify_map_eq. set_solver.
@@ -304,6 +348,32 @@ Lemma messages_sent_init ip ports mh :
     set_solver.
   Qed.
 
+   Lemma messages_sent_insert a R T mh :
+    messages_sent (<[a:=(R, T)]> mh) = T ∪ messages_sent (delete a mh).
+  Proof.
+    rewrite /messages_sent.
+    apply collect_insert.
+  Qed.
+
+  Lemma message_received_insert a msg R T mh :
+    message_received msg (<[a:=(R, T)]> mh) ↔
+    msg ∈ R ∨ message_received msg (delete a mh).
+  Proof.
+    rewrite /message_received /messages_received.
+    rewrite collect_insert //= elem_of_union //.
+  Qed.
+
+  Lemma messages_sent_split a R T mh :
+    mh !! a = Some (R, T) →
+    messages_sent mh =
+    T ∪ messages_sent (delete a mh).
+  Proof.
+    intros.
+    assert (mh = <[a := (R,T)]>mh) as Heq by by rewrite insert_id.
+    rewrite {1} Heq.
+    apply collect_insert.
+  Qed.
+
   (** Local state coherence *)
 
   (* The local state of the node at [ip] is coherent
@@ -468,7 +538,7 @@ Lemma messages_sent_init ip ports mh :
     messages_addresses_coh mh ∧
     messages_received_from_sent_coh mh.
 
- (* For all messages [m] in [M], either the network owns the resources [Φ m]
+  (* For all messages [m] in [M], either the network owns the resources [Φ m]
      described by some socket protocol [Φ] or it has been delivered. *)
   Definition messages_resource_coh mh :=
     ([∗ set] m ∈ messages_sent mh,
@@ -517,7 +587,6 @@ Local Hint Constructors head_step : core.
 Local Hint Resolve alloc_fresh : core.
 Local Hint Resolve to_of_val : core.
 
-(* TODO: come up with something more reliable *)
 Ltac ddeq k1 k2 :=
   destruct (decide (k1 = k2)); subst;
   repeat
@@ -535,3 +604,23 @@ Ltac ddeq k1 k2 :=
     | Hdel : context[ delete ?n ?m !! ?n = _] |- _ =>
       rewrite lookup_delete in Hdel; simplify_eq /=
     end.
+
+Lemma messages_sent_dijsoint a R T mh :
+    mh !! a = Some (R, T) →
+    messages_addresses_coh mh →
+    T ## messages_sent (delete a mh).
+  Proof.
+    intros Ha Hmcoh.
+    apply elem_of_disjoint.
+    intros m HmT Hms.
+    apply elem_of_collect in Hms as (a' & (R',T') & Ha' & Ht).
+    simplify_map_eq.
+    destruct (Hmcoh a R T Ha) as (_ & HT).
+    specialize (HT m HmT).
+    rewrite -HT in Ha'.
+    ddeq a' (m_sender m).
+    rewrite lookup_delete_ne in Ha'; last done.
+    destruct (Hmcoh a' R' T' Ha') as (_ & HT').
+    specialize (HT' m Ht).
+    done.
+  Qed.
