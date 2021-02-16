@@ -556,6 +556,59 @@ Section primitive_laws.
              match Ψo with Some Ψ => Ψ msg | _ => ∃ φ, a ⤇ φ ∗ φ msg end) ∨
             ⌜msg ∈ R⌝ ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R, T))))) }}}.
   Proof.
+    (*
+    iIntros (Hskt Hblk Φ) "(>Hsh & >Hrt & #HΨ) HΦ /=".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (σ δ κ κs n) "Hσ /=".
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iModIntro. iSplitR.
+    { assert (r = ∅ ∨ ∃ m, m ∈ r) as [Hempty| (m & Hm)].
+      { admit. }
+      - iPureIntro; do 4 eexists.
+        + eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+          by econstructor; naive_solver.
+      - iPureIntro; do 4 eexists.
+        eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+          by econstructor; naive_solver. }
+    iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
+    - iMod (aneris_state_interp_receive_some _ _ _ _
+            with "[HΨ] [$Hσ] [$Hsh] [$Hrt] ")
+        as (r') "(Hr & Hσ & Hskt & Hrd)"; [done..|].
+      +
+        iModIntro.
+        iExists δ; iSplit; first done.
+        iFrame.
+        iSplitR; [done|].
+        iPoseProof ("HΦ" $! (InjRV (#(m_body m), #(m_sender m)))) as "HΦ".
+        iApply "HΦ".
+        iDestruct "Hr" as "[(% & -> & Ds)|(% & ->)]".
+        *  iRight.
+           iExists m.
+           iSplit.
+           { admit. }
+           iSplit; first done.
+           iLeft.
+           iSplit; first done.
+           iFrame.
+           admit.
+        *  iRight.
+           iExists m.
+           iSplit.
+           { admit. }
+           iSplit; first done.
+           iRight.
+           eauto with iFrame.
+    - iModIntro.
+      iExists δ; iSplit; first done.
+      iFrame.
+      iSplitR; [done|].
+      rewrite insert_id; last done.
+      iFrame.
+      iPoseProof ("HΦ" $! (InjLV #())) as "HΦ".
+      iApply "HΦ".
+      iLeft. eauto with iFrame.
+    - by rewrite Hblk in H2. *)
   Admitted.
 (*    iIntros (Hsome Φ) "[>Hsh #HΨ] HΦ /=".
     iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -626,53 +679,67 @@ Section primitive_laws.
      iNext. iIntros (r) "Hr". iApply "HΦ"; eauto.
    Qed.
 
-
-   Lemma wp_receivefrom_hocap k a E h s R T φ
+   Lemma wp_receivefrom_hocap k a E E' h s R T φ
          (P : iProp Σ) (Q__new Q__old : message -> iProp Σ) :
      let ip := ip_of_address a in
      saddress s = Some a →
      sblock s = true →
-    □ (P ={⊤, E}=∗
+    □ (P ={E, E'}=∗
             h ↪[ip] s ∗ a ⤳ (R, T) ∗
-           (h ↪[ip] s ∗ a ⤳ (R, T) ={E, ⊤}=∗ P) ∧
-      (∀ m, h ↪[ip] s ∗ a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m ={E, ⊤}=∗ Q__new m) ∧
-      (∀ m, h ↪[ip] s ∗ a ⤳ (R, T) ∗ ⌜m ∈ R⌝ ={E, ⊤}=∗ Q__old m)) -∗
+           (h ↪[ip] s ∗ a ⤳ (R, T) ={E', E}=∗ P) ∧
+      (∀ m, h ↪[ip] s ∗ a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m ={E',E}=∗ Q__new m) ∧
+      (∀ m, h ↪[ip] s ∗ a ⤳ (R, T) ∗ ⌜m ∈ R⌝ ={E', E}=∗ Q__old m)) -∗
   {{{ P ∗ a ⤇ φ}}}
     (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
   {{{ m, RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m))));
       (⌜m ∉ R⌝ ∗ Q__new m ∨
        ⌜m ∈ R⌝ ∗ Q__old m)
   }}}.
-  Proof.
-  Admitted.
-  (* iIntros (n Haddr) "#Hpreds".
-    iModIntro. iIntros (Φ) "(HP & #Hsi) HΦ".
-    iLöb as "IH". wp_rec.
-    wp_bind (ReceiveFrom _).
-    iMod ("Hpreds" with "HP") as "(Hs & Hall)".
-    wp_apply (aneris_wp_receivefrom_alt with "[$Hs]");
-      [done|done|by iFrame "#"|].
-    iIntros (r)  "[(-> & Hs) | Hrd ]".
-    - (* No message *)
-      iDestruct "Hall" as "[Hempty _]".
-      iMod ("Hempty" with "Hs") as "HP".
-      iModIntro; wp_pures.
-      by iApply ("IH" with "HP HΦ").
-    - iDestruct "Hrd" as (m Hdst ->) "[ (% & Hs & Hφ) | (% & Hs) ]".
-      + (* New message *)
-        iDestruct "Hall" as "(_ & Hnew & _)".
-        iMod ("Hnew" $! m with "[Hs Hφ]") as "Qnew".
-        { eauto with iFrame. }
-        iModIntro; wp_pures.
-        iApply "HΦ". iLeft. eauto with iFrame.
-      + (* Old message *)
-        iDestruct "Hall" as "(_ & _ & Hold)".
-        iMod ("Hold" $! m with "[Hs]") as "Qold".
-        { eauto with iFrame. }
-        iModIntro; wp_pures.
-        iApply "HΦ". iRight. eauto with iFrame.
-  Qed.
-   *)
+   Proof.
+     iIntros (ip Haddr Hblk ) "#Hpreds !>".
+     iIntros (Φ) "(HP & #Hsi) HΦ". iLöb as "IH".
+     iApply (wp_lift_head_step with "[-]"); first auto.
+     iIntros (σ1 δ1 κ κs n) "Hσ".
+     iMod ("Hpreds" with "HP") as "(Hsh & Ha & Hr)".
+     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+       as (Sn r) "[%HSn (%Hr & %Hreset)]".
+     iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk";
+       first set_solver; auto.
+     iModIntro; iSplit.
+     { iPureIntro.
+       assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
+         [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
+             eauto; econstructor..].
+       destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
+     iIntros (???) "%Hprim".
+     inv_head_step.
+     - destruct (decide (m ∈ R)) as [Hin | Hni ].
+       + iNext. iMod "Hmk".
+         iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
+            with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
+           as (R') "(Hrt & >(Hσ & Hsh & Ha))"; [done..|].
+         iDestruct "Hrt" as "[ ( % & _ & _ ) | (% & ->) ]"; first done.
+         iDestruct "Hr" as "(_ & (_ & Hr))".
+         iDestruct ("Hr" $! m with "[$Hsh $Ha //]") as ">Hr".
+         iModIntro. iExists δ1; iSplit; first done. iFrame.
+         iApply wp_value. iApply "HΦ". iRight; eauto.
+       + iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
+            with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
+           as (R') "(Hrt & Hrest)"; [done..|].
+         iDestruct "Hrt" as "[ ( % & -> & Hres ) | (% & %) ]"; last done.
+         iNext. iMod "Hmk". iDestruct "Hr" as "(_ & (Hr & _))".
+         iMod "Hrest" as "(Hσ & Hsh & Ha)".
+         iDestruct ("Hr" $! m with "[$Hsh $Ha $Hres //]") as ">Hr".
+         iModIntro. iExists δ1; iSplit; first done. iFrame.
+         iApply wp_value. iApply "HΦ". iLeft; eauto.
+     - by rewrite Hblk in H2.
+     - iDestruct "Hr" as "(Hr & _)".
+       iNext. iMod "Hmk". iPoseProof ("Hr" with "[$Ha $Hsh]") as ">Hr".
+       iModIntro. iExists δ1; iSplit; first done.
+       rewrite insert_id; last done ; iFrame.
+       iApply ("IH" with "Hr HΦ").
+   Qed.
+
 
   Lemma wp_receivefrom k a E h s R T φ P :
      let ip := ip_of_address a in
@@ -686,7 +753,7 @@ Section primitive_laws.
   }}}.
   Proof.
   Admitted.
-(*  iIntros (n Haddr Φ) "(Hs & #Hsi) HΦ".
+  (*  iIntros (n Haddr Φ) "(Hs & #Hsi) HΦ".
     wp_apply (listen_wait_hocap_spec _ _ _ _ _ _
           φ (h ↪[ip] (s, R, T))
                      (λ m, h ↪[ip] (s, {[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m)

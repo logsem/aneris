@@ -570,7 +570,7 @@ Section state_interpretation.
        iSplit.
        { iPureIntro. by eapply messages_history_coh_send. }
        iApply
-       (messages_resource_coh_send _ _ _ _ _ φ with "[Hφ] [$Hmres] [$Hmsg]"); eauto.
+       (messages_resource_coh_send with "[Hφ] [$Hmres] [Hmsg]"); eauto.
          by destruct Hmhcoh; intuition.
   Qed.
 
@@ -615,23 +615,29 @@ Section state_interpretation.
     iFrame.
   Qed.
 
-  Lemma aneris_state_interp_receive a sh skt msg
-        (Ψo : option (socket_interp Σ))  σ1 Sn r R T :
-    let ip := ip_of_address a in
-    let S' := <[ip :=<[sh:=(skt, {[msg]} ∪ r)]> Sn]> (state_sockets σ1) in
-    let σ2 := σ1 <| state_sockets := S' |> in
-    sblock skt = false →
-    state_sockets σ1 !! ip = Some Sn →
-    Sn !! sh = Some (skt, r) →
-    saddress skt = Some a →
+
+   Lemma aneris_state_interp_receive_some a sh skt
+        (Ψo : option (socket_interp Σ))  σ1 Sn r R T m :
+     let ip := ip_of_address a in
+     let S' := <[ip :=<[sh:=(skt, r ∖ {[m]})]> Sn]> (state_sockets σ1) in
+     let σ2 := σ1 <| state_sockets := S' |> in
+     state_sockets σ1 !! ip = Some Sn →
+     Sn !! sh = Some (skt, r) →
+     saddress skt = Some a →
+     m ∈ r →
     match Ψo with Some Ψ => a ⤇ Ψ | _ => True end -∗
-    aneris_state_interp σ1 ∗ sh ↪[ip] skt ∗ a ⤳ (R, T) -∗ ∃ R' ,
-    ((⌜msg ∉ R⌝ ∗ ⌜R' = {[ msg ]} ∪ R⌝ ∗
-         ▷ match Ψo with Some Ψ => Ψ msg | _ => ∃ φ, a ⤇ φ ∗ φ msg end) ∨
-     ⌜msg ∈ R⌝ ∗ ⌜R' = R⌝) ∗
-     |==> aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R', T).
-  Proof. Admitted.
-  (* iIntros (ip S' σ2 ??? [<- ?]%elem_of_filter) "HΨ [Hσ Hsh]". rewrite /σ2 /S'.
+    aneris_state_interp σ1 -∗
+    sh ↪[ip] skt -∗
+    a ⤳ (R, T) -∗
+    ∃ R',
+      ((⌜m ∉ R⌝ ∗
+        ⌜R' = {[ m ]} ∪ R⌝ ∗
+         ▷ match Ψo with Some Ψ => Ψ m | _ => ∃ φ, a ⤇ φ ∗ φ m end)
+       ∨
+       ⌜m ∈ R⌝ ∗ ⌜R' = R⌝)
+     ∗ |==> aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R', T).
+   Proof. Admitted.
+ (* iIntros (ip S' σ2 ??? [<- ?]%elem_of_filter) "HΨ [Hσ Hsh]". rewrite /σ2 /S'.
     destruct (decide (msg ∈ R)).
     - assert ({[msg]} ∪ R = R) as -> by set_solver.
       assert (<[sh:=(skt, R, T)]> Sn = Sn) as -> by apply insert_id=>//.
