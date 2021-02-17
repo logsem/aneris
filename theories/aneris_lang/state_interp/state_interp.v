@@ -616,6 +616,7 @@ Section state_interpretation.
   Qed.
 
 
+
    Lemma aneris_state_interp_receive_some a sh skt
         (Ψo : option (socket_interp Σ))  σ1 Sn r R T m :
      let ip := ip_of_address a in
@@ -630,6 +631,7 @@ Section state_interpretation.
     sh ↪[ip] skt -∗
     a ⤳ (R, T) -∗
     ∃ R',
+       ⌜m_destination m = a⌝ ∗
       ((⌜m ∉ R⌝ ∗
         ⌜R' = {[ m ]} ∪ R⌝ ∗
          ▷ match Ψo with Some Ψ => Ψ m | _ => ∃ φ, a ⤇ φ ∗ φ m end)
