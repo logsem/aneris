@@ -615,9 +615,7 @@ Section state_interpretation.
     iFrame.
   Qed.
 
-
-
-   Lemma aneris_state_interp_receive_some a sh skt
+  Lemma aneris_state_interp_receive_some a sh skt
         (Ψo : option (socket_interp Σ))  σ1 Sn r R T m :
      let ip := ip_of_address a in
      let S' := <[ip :=<[sh:=(skt, r ∖ {[m]})]> Sn]> (state_sockets σ1) in
@@ -638,7 +636,45 @@ Section state_interpretation.
        ∨
        ⌜m ∈ R⌝ ∗ ⌜R' = R⌝)
      ∗ |==> aneris_state_interp σ2 ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R', T).
-   Proof. Admitted.
+   Proof.
+     simpl. iIntros (HS HSn Hskt Hmsg) "#Hproto Hσ Hsh Ha".
+     iDestruct "Hσ"
+       as (γm mh)
+           "(%Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
+    iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
+    destruct (Hnscoh (ip_of_address a) Sn) as (Hbcoh&Hshcoh&Hsmcoh&Hsacoh&Hsucoh);
+      first done.
+    assert (m_destination m = a) as Hma by by eapply Hsmcoh.
+    destruct (decide (m ∈ R)).
+     - iExists R. iSplit; first done. iSplitR. eauto. iModIntro. iFrame.
+       iExists γm, mh. iFrame. simpl. iSplit; eauto. iPureIntro.
+       destruct Hgcoh as (?&Hgcoh&?). split_and!; [set_solver| |set_solver].
+       rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
+       iSplit. iPureIntro. admit.
+       iSplit. iPureIntro. admit.
+       iSplitR "Hfreeips". admit.
+       admit.
+     - iExists ({[m]} ∪ R). iSplit; first done.
+       iPoseProof
+         (messages_resource_coh_receive with "Hmres") as "(Hmres & Hres)";
+         [done | done |  |  | done | done |  |].
+       admit.
+       admit.
+       admit.
+       iSplitL "Hres". iLeft. iSplit; eauto.
+       iSplit; eauto. destruct Ψo as [ψ|]; [|iNext].
+       iDestruct "Hres" as (φ) "(Hφ & Hres)". rewrite Hma. admit. rewrite Hma. iFrame.
+       iModIntro. iFrame.
+       admit.
+       (* iExists γm, mh. iFrame. simpl. iSplit; eauto. iPureIntro.
+       destruct Hgcoh as (?&Hgcoh&?). split_and!; [set_solver| |set_solver].
+       rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
+       iSplit. iPureIntro. admit.
+       iSplit. iPureIntro. admit.
+       iSplitR "Hfreeips". admit. *)
+   Admitted.
  (* iIntros (ip S' σ2 ??? [<- ?]%elem_of_filter) "HΨ [Hσ Hsh]". rewrite /σ2 /S'.
     destruct (decide (msg ∈ R)).
     - assert ({[msg]} ∪ R = R) as -> by set_solver.
@@ -674,13 +710,3 @@ Section state_interpretation.
 End state_interpretation.
 
 Global Opaque aneris_state_interp.
-
-
-  (*Definition gset_ipofsa := gset_map ip_of_address.
-
-  Definition messages_history_new_node ip ps mh :=
-   set_fold (fun p acc => <[(SocketAddressInet ip p):=(∅, ∅)]> acc) mh ps.*)
-
-
-  (* Definition get_message_history mh sa := *)
-  (*   pms ← (mh !! (ip_of_address sa)); pms !! (port_of_address sa). *)

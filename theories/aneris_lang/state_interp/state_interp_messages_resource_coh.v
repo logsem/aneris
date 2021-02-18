@@ -60,7 +60,7 @@ Section state_interpretation.
     exists a', (R',T'). by simplify_map_eq.
   Qed.
 
-  Lemma  messages_resource_coh_send mh a R T msg ϕ :
+  Lemma messages_resource_coh_send mh a R T msg ϕ :
     msg ∉ T →
     mh !! a = Some (R, T) →
     m_sender msg = a →
@@ -110,35 +110,54 @@ Section state_interpretation.
       done.
   Qed.
 
-(*  Lemma network_coh_receive a R T m mh :
-    let ip := ip_of_address a in
+  Lemma messages_resource_coh_receive a b R T R' T' m mh :
     m_destination m = a →
-    m ∉ R →
+    m_sender m = b →
     mh !! a = Some (R, T) →
+    mh !! b = Some (R',T') →
+    m ∉ R  →
+    m ∈ T' →
+    messages_addresses_coh mh →
     messages_resource_coh mh -∗
     messages_resource_coh (<[a:=({[m]} ∪ R, T)]> mh) ∗
     ∃ φ, m_destination m ⤇ φ ∗ ▷ φ m.
   Proof.
-    simpl. iIntros (??????) "[%Hsock Hmcoh]".
-    rewrite /network_coh.
-    iDestruct (network_sockets_messages_coh_insert_received with "Hmcoh")
-      as "[Hmcoh Hφ]"; [done..|].
-    iFrame. iPureIntro.
-    by apply network_sockets_coh_insert_received.
-   Qed. *)
+    iIntros (Hmd Hms Hmha Hmhb HmR HmT' Hmacoh).
+    iIntros "Hrcoh". rewrite /messages_resource_coh.
+    assert (messages_sent mh = messages_sent (<[a:=(R, T)]>mh)) as Heq.
+    { apply insert_id in Hmha as Heq. by rewrite {1} Heq. }
+    rewrite {1} Heq.
+    assert ((messages_sent (<[a:=(R, T)]> mh) ∖ {[m]}) =
+            (messages_sent (<[a:=({[m]} ∪ R, T)]> mh) ∖ {[m]})) as Hdelm.
+    { by rewrite !messages_sent_insert. }
+    assert (m ∈ messages_sent (<[a:=(R, T)]> mh)) as Hsent.
+    { rewrite -Heq. apply elem_of_messages_sent. set_solver. }
+    assert (m ∈ messages_sent (<[a:=({[m]} ∪ R, T)]> mh)) as Hsent2.
+    { rewrite messages_sent_insert. by rewrite messages_sent_insert in Hsent. }
+    assert (message_received m (<[a:=({[m]} ∪ R, T)]> mh) ) as Hrcd.
+    { rewrite message_received_insert. left. set_solver. }
+    assert (m ∉ messages_received mh) as Hnotrcd.
+    { intro Habs. apply elem_of_messages_received in Habs
+        as (sa & (R0, T0) & Hmh & Hm). simplify_map_eq.
+      specialize (Hmacoh sa R0 T0) as (H1 & H2); first done.
+      specialize (H1 m Hm). set_solver. }
+    iPoseProof (big_opS_delete
+                  (fun m0 => ((∃ Φ, m_destination m0 ⤇ Φ ∗ ▷ Φ m0)
+                           ∨ ⌜message_received m0 mh⌝))%I
+                  (messages_sent (<[a:=(R, T)]> mh)) m) as "Hdel"; first done.
+    iPoseProof ("Hdel" with "Hrcoh") as "([Hr|%Hr] & Hrcoh)"; last done.
+    iPoseProof (big_opS_delete
+                  (fun m0 => ((∃ Φ, m_destination m0 ⤇ Φ ∗ ▷ Φ m0)
+                     ∨ ⌜message_received m0 (<[a:=({[m]} ∪ R, T)]> mh)⌝))%I
+                  (messages_sent (<[a:=({[m]} ∪ R, T)]> mh)) m) as "Hdel2";
+      first done. iFrame. rewrite {2} Hdelm. iApply "Hdel2". iSplitR; eauto.
+    iApply (big_sepS_mono with "Hrcoh"). iIntros (msg Hmsg) "[Hm|%Hm]".
+    - iLeft. iFrame.
+    - iRight. iPureIntro. apply insert_id in Hmha. rewrite -Hmha in Hm.
+      erewrite message_received_insert in Hm. rewrite message_received_insert.
+      destruct Hm as [?|Hm]; set_solver.
+  Qed.
 
-(*    iIntros (S' ???????) "Hmcoh".
-    rewrite /network_messages_coh big_sepS_delete //.
-    iDestruct "Hmcoh" as "[[Hm | %Hr] Hmsgs]";
-      [|exfalso; by eapply network_sockets_coh_not_received].
-    iFrame.
-    assert (message_received S' m) as Hr.
-    { by eapply message_received_receive. }
-    rewrite (big_sepS_delete _ M m) //. iFrame "%".
-    iApply big_sepS_mono; [|done].
-    iIntros (??) "[? | %Hr']"; [eauto|].
-    iRight. iPureIntro.
-    by eapply message_received_insert. *)
 
 
   (** message_received *)
