@@ -110,7 +110,35 @@ Section state_interpretation.
       done.
   Qed.
 
+(*  Lemma network_coh_receive a R T m mh :
+    let ip := ip_of_address a in
+    m_destination m = a →
+    m ∉ R →
+    mh !! a = Some (R, T) →
+    messages_resource_coh mh -∗
+    messages_resource_coh (<[a:=({[m]} ∪ R, T)]> mh) ∗
+    ∃ φ, m_destination m ⤇ φ ∗ ▷ φ m.
+  Proof.
+    simpl. iIntros (??????) "[%Hsock Hmcoh]".
+    rewrite /network_coh.
+    iDestruct (network_sockets_messages_coh_insert_received with "Hmcoh")
+      as "[Hmcoh Hφ]"; [done..|].
+    iFrame. iPureIntro.
+    by apply network_sockets_coh_insert_received.
+   Qed. *)
 
+(*    iIntros (S' ???????) "Hmcoh".
+    rewrite /network_messages_coh big_sepS_delete //.
+    iDestruct "Hmcoh" as "[[Hm | %Hr] Hmsgs]";
+      [|exfalso; by eapply network_sockets_coh_not_received].
+    iFrame.
+    assert (message_received S' m) as Hr.
+    { by eapply message_received_receive. }
+    rewrite (big_sepS_delete _ M m) //. iFrame "%".
+    iApply big_sepS_mono; [|done].
+    iIntros (??) "[? | %Hr']"; [eauto|].
+    iRight. iPureIntro.
+    by eapply message_received_insert. *)
 
 
   (** message_received *)

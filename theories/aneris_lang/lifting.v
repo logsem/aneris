@@ -720,28 +720,27 @@ Section primitive_laws.
   Lemma wp_rcvtimeo_unblock k a E h s R T P n1 n2 :
      let ip := ip_of_address a in
      saddress s = Some a →
-     0 <= n1 →
-     0 < n2 →
-    {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) }}}
+     (0 <= n1 ∧ 0 <= n2 ∧ (n1 + n2) < 0) →
+    {{{ ▷ h ↪[ip] s }}}
     (mkExpr ip (SetReceiveTimeout
                   (Val $ LitV $ LitSocket h)
                   (Val $ LitV $ LitInt n1)
                   (Val $ LitV $ LitInt n2))) @ k; E
      {{{ RET (mkVal ip #());
-          h ↪[ip] s<|sblock := false|> ∗ a ⤳ (R, T) }}}.
+          h ↪[ip] s<|sblock := false|> }}}.
   Proof.
   Admitted.
 
   Lemma wp_rcvtimeo_block k a E h s R T P :
      let ip := ip_of_address a in
      saddress s = Some a →
-     {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) }}}
+     {{{ ▷ h ↪[ip] s }}}
     (mkExpr ip (SetReceiveTimeout
                   (Val $ LitV $ LitSocket h)
                   (Val $ LitV $ LitInt 0)
                   (Val $ LitV $ LitInt 0))) @ k; E
      {{{ RET (mkVal ip #());
-          h ↪[ip] s<|sblock := true|> ∗ a ⤳ (R, T) }}}.
+          h ↪[ip] s<|sblock := true|> }}}.
   Proof.
   Admitted.
 
