@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From aneris.aneris_lang Require Import network adequacy.
-From aneris.aneris_lang.program_logic Require Export aneris_weakestpre aneris_hoare.
+From aneris.aneris_lang.program_logic Require Export aneris_weakestpre.
 
 Import Network.
 

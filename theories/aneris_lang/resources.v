@@ -1,17 +1,15 @@
 From stdpp Require Import fin_maps gmap.
 From iris.algebra Require Import auth gmap frac agree coPset gset frac_auth ofe.
 From iris.bi.lib Require Import fractional.
-From iris.base_logic.lib Require Import viewshifts saved_prop.
+From iris.base_logic.lib Require Import saved_prop.
 From iris.program_logic Require Import ectx_lifting.
 From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Import gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network.
-From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
 Import uPred.
 Import Network.
-Import RecordSetNotations.
 
 Record node_gnames := Node_gname {
   heap_name : gname;
@@ -21,13 +19,13 @@ Record node_gnames := Node_gname {
 (** CMRA shorthands *)
 Definition node_gnamesO :=
   leibnizO node_gnames.
-Definition node_gnames_mapUR : ucmraT :=
+Definition node_gnames_mapUR : ucmra :=
   gmapUR ip_address (agreeR node_gnamesO).
-Definition local_heapUR : ucmraT :=
+Definition local_heapUR : ucmra :=
   gen_heapUR loc base_lang.val.
-Definition local_socketsUR : ucmraT :=
+Definition local_socketsUR : ucmra :=
   gen_heapUR socket_handle (socket * message_soup * message_soup).
-Definition socket_interpUR : ucmraT :=
+Definition socket_interpUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO gname)).
 
 Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames)) :=
@@ -176,7 +174,7 @@ Proof. apply own_alloc. by apply auth_auth_valid. Qed.
 
 Lemma saved_si_init `{anerisPreG Σ} :
   ⊢ |==> ∃ γ, own (A := authR socket_interpUR) γ (● (to_agree <$> ∅) ⋅ ◯ (to_agree <$> ∅)).
-Proof. apply own_alloc. by apply auth_both_valid. Qed.
+Proof. apply own_alloc. by apply auth_both_valid_discrete. Qed.
 
 Lemma saved_si_update `{anerisG Σ} (A : gset socket_address) γsi f :
   ⊢ own (A := authR socket_interpUR) γsi (● (to_agree <$> ∅)) ∗
@@ -202,7 +200,7 @@ Lemma saved_si_update `{anerisG Σ} (A : gset socket_address) γsi f :
                       (● (<[a := to_agree γ]>(to_agree <$> M)) ⋅
                          (◯ ({[a := to_agree γ]}))) with "HM") as "[HM Hγ']".
      { apply auth_update_alloc. rewrite -insert_empty.
-       rewrite /ε /= /gmap_unit. apply alloc_local_update; [|done].
+       rewrite /ε /=. apply alloc_local_update; [|done].
        apply not_elem_of_dom. by rewrite dom_fmap. }
      iModIntro.
      iExists (<[a:= γ]> M).
@@ -248,7 +246,7 @@ Proof.
       rewrite big_sepS_insert //. iFrame. }
   iMod "HF" as (M HMF) "[? ?]".
   replace M with A; first by iModIntro; iExists _; iFrame.
-  apply elem_of_equiv_L => x.
+  apply set_eq => x.
   rewrite -!elem_of_elements -elem_of_list_permutation_proper; eauto.
 Qed.
 

@@ -513,7 +513,8 @@ Definition ZOfString (x : string) : option Z:=
     | Some z => Some (- (Z.of_N z))
     | None => None
     end
-  | String c x' =>
+  | String _
+ _ =>
     match (ZOfString' x 0) with
     | Some z => Some (Z.of_N z)
     | None => None

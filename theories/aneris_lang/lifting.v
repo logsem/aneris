@@ -132,57 +132,57 @@ Proof. solve_atomic. Qed.
 
 Class AsRecV (v : val) (f x : binder) (erec : expr) :=
   as_recv : v = RecV f x erec.
-Hint Mode AsRecV ! - - - : typeclass_instances.
+Global Hint Mode AsRecV ! - - - : typeclass_instances.
 Definition AsRecV_recv f x e : AsRecV (RecV f x e) f x e := eq_refl.
-Hint Extern 0 (AsRecV (RecV _ _ _) _ _ _) =>
+Global Hint Extern 0 (AsRecV (RecV _ _ _) _ _ _) =>
   apply AsRecV_recv : typeclass_instances.
 
-Instance pure_rec f x (erec : expr) :
+Instance pure_rec n f x (erec : expr) :
   PureExec True 1 (mkExpr n (Rec f x erec)) (mkExpr n (Val $ RecV f x erec)).
 Proof. solve_pure_exec. Qed.
-Instance pure_pairc (v1 v2 : val) :
+Instance pure_pairc n (v1 v2 : val):
   PureExec True 1 (mkExpr n (Pair (Val v1) (Val v2))) (mkExpr n (Val $ PairV v1 v2)).
 Proof. solve_pure_exec. Qed.
-Instance pure_injlc (v : val) :
+Instance pure_injlc n (v : val) :
   PureExec True 1 (mkExpr n (InjL $ Val v)) (mkExpr n (Val $ InjLV v)).
 Proof. solve_pure_exec. Qed.
-Instance pure_injrc (v : val) :
+Instance pure_injrc n (v : val) :
   PureExec True 1 (mkExpr n (InjR $ Val v)) (mkExpr n (Val $ InjRV v)).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_beta f x erec (v1 v2 : val) `{!AsRecV v1 f x erec} :
+Instance pure_beta n f x erec (v1 v2 : val) `{!AsRecV v1 f x erec} :
   PureExec True 1 (mkExpr n (App (Val v1) (Val v2)))
            (mkExpr n (subst' x v2 (subst' f v1 erec))).
 Proof. unfold AsRecV in *. solve_pure_exec. Qed.
 
-Instance pure_unop op v v' :
+Instance pure_unop n op v v' :
   PureExec (un_op_eval op v = Some v') 1 (mkExpr n (UnOp op (Val v)))
            (mkExpr n (of_val v')).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_binop op v1 v2 v' :
+Instance pure_binop n op v1 v2 v' :
   PureExec (bin_op_eval op v1 v2 = Some v') 1
            (mkExpr n (BinOp op (Val v1) (Val v2))) (mkExpr n (of_val v')).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_if_true e1 e2 :
+Instance pure_if_true n e1 e2 :
   PureExec True 1 (mkExpr n (If (Val $ LitV $ LitBool true) e1 e2)) (mkExpr n e1).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_if_false e1 e2 :
+Instance pure_if_false n e1 e2 :
   PureExec True 1 (mkExpr n (If (Val $ LitV $ LitBool false) e1 e2))
            (mkExpr n e2).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_fst v1 v2  :
+Instance pure_fst n v1 v2 :
   PureExec True 1 (mkExpr n (Fst (PairV v1 v2))) (mkExpr n (Val v1)).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_snd v1 v2  :
+Instance pure_snd n v1 v2  :
   PureExec True 1 (mkExpr n (Snd (PairV v1 v2))) (mkExpr n (Val v2)).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_find_from v0 v1 n1 v2 v' :
+Instance pure_find_from n v0 v1 n1 v2 v' :
   PureExec (index n1 v2 v0 = v' ∧ Z.of_nat n1 = v1) 1
            (mkExpr n (FindFrom (Val $ LitV $ LitString v0)
                        (Val $ LitV $ LitInt v1)
@@ -190,7 +190,7 @@ Instance pure_find_from v0 v1 n1 v2 v' :
            (mkExpr n (base_lang.of_val (option_nat_to_val v'))).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_substring v0 v1 n1 v2 n2 v' :
+Instance pure_substring n v0 v1 n1 v2 n2 v' :
   PureExec (substring n1 n2 v0 = v' ∧ Z.of_nat n1 = v1 ∧ Z.of_nat n2 = v2) 1
            (mkExpr
               n (Substring
@@ -198,17 +198,17 @@ Instance pure_substring v0 v1 n1 v2 n2 v' :
            (mkExpr n (base_lang.of_val (LitV $ LitString v'))).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_case_inl v e1 e2  :
+Instance pure_case_inl n v e1 e2  :
   PureExec True 1 (mkExpr n (Case (Val $ InjLV v) e1 e2))
            (mkExpr n (App e1 (Val v))).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_case_inr v e1 e2 :
+Instance pure_case_inr n v e1 e2 :
   PureExec True 1 (mkExpr n (Case (Val $ InjRV v) e1 e2))
            (mkExpr n (App e2 (Val v))).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_make_address v1 v2 :
+Instance pure_make_address n v1 v2 :
   PureExec True 1
            (mkExpr n (MakeAddress (LitV (LitString v1)) (LitV (LitInt (v2)))))
            (mkExpr
@@ -337,7 +337,7 @@ Section primitive_laws.
     iIntros (?) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ κ κs n) "Hσ".
-    iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
+    iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip") as "(% & % & %)".
     iModIntro; iSplit.
     { iPureIntro. do 4 eexists. apply (AssignNewIpStepS _ _ []); eauto. }

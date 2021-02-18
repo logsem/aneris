@@ -192,7 +192,7 @@ Section dict_str_spec.
         simplify_eq.
         rewrite delete_insert. inversion Hnodup; subst.
         * by iExists tail.
-        * apply not_elem_of_list_to_map. by apply NoDup_cons_11.
+        * apply not_elem_of_list_to_map. by apply NoDup_cons_1_1.
       + wp_if. wp_proj. unfold list_cons.
         assert (key ≠ k). { intro. apply H. by subst. }
         wp_bind (App _ (embed_list_str tail))%E. iApply "IH".
