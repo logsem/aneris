@@ -38,7 +38,7 @@ Proof.
   iMod (Hwp dg) as (f) "Hwp".
   iMod (saved_si_update A with "[$Hsi $Hsi']") as (M HMfs) "[HM #Hsa]".
   assert (dom (gset _) M = A) as Hdmsi.
-  { apply elem_of_equiv_L => ?.
+  { apply set_eq => ?.
     split; intros ?%elem_of_elements;
       apply elem_of_elements; [by rewrite -HMfs|].
     by rewrite HMfs. }

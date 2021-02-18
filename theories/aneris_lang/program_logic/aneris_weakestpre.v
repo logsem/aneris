@@ -63,15 +63,6 @@ Proof.
   iIntros "Hin".
   iApply wp_value; eauto.
  Qed.
-Lemma aneris_wp_value_inv' ip E Φ v :
-  is_node ip -∗ WP of_val v @ ip; E {{ Φ }} ={E}=∗ Φ v.
-Proof.
-  rewrite aneris_wp_unfold /aneris_wp_def.
-  iIntros "Hin Hwp".
-  iMod (wp_value_inv' _ _ _ (mkVal _ _) with "[Hin Hwp]") as "HΦ";
-    first by iApply "Hwp".
-  iDestruct "HΦ" as (w) "[% ?]"; simplify_eq; done.
- Qed.
 
 Lemma aneris_wp_is_node ip E Φ e :
   (is_node ip -∗ WP e @ ip; E {{ Φ }}) ⊢ WP e @ ip; E {{ Φ }}.
@@ -207,15 +198,12 @@ Proof. by intros Φ Φ' ?; apply aneris_wp_mono. Qed.
 
 Lemma aneris_wp_value ip E Φ e v : IntoVal e v → Φ v ⊢ WP e @ ip; E {{ Φ }}.
 Proof. intros <-. by apply aneris_wp_value'. Qed.
-Lemma aneris_wp_value_fupd' ip E Φ v :
+Lemma aneris_wp_value_fupd ip E Φ v :
   (|={E}=> Φ v) ⊢ WP of_val v @ ip; E {{ Φ }}.
 Proof. intros. by rewrite -aneris_wp_fupd -aneris_wp_value'. Qed.
-Lemma aneris_wp_value_fupd ip E Φ e v `{!IntoVal e v} :
+Lemma aneris_wp_value_fupd' ip E Φ e v `{!IntoVal e v} :
   (|={E}=> Φ v) ⊢ WP e @ ip; E {{ Φ }}.
 Proof. intros. rewrite -aneris_wp_fupd -aneris_wp_value //. Qed.
-Lemma aneris_wp_value_inv ip E Φ e v :
-  IntoVal e v → is_node ip -∗ WP e @ ip; E {{ Φ }} ={E}=∗ Φ v.
-Proof. intros <-. apply aneris_wp_value_inv'. Qed.
 
 Lemma aneris_wp_frame_l ip E e Φ R :
   R ∗ WP e @ ip; E {{ Φ }} ⊢ WP e @ ip; E {{ v, R ∗ Φ v }}.
@@ -324,23 +312,23 @@ Section proofmode_classes.
 
   Global Instance elim_acc_wp {X} E1 E2 α β γ e ip Φ :
     Atomic (WeaklyAtomic) (mkExpr ip e) →
-    ElimAcc (X:=X) (fupd E1 E2) (fupd E2 E1)
+    ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1)
             α β γ (WP e @ ip; E1 {{ Φ }})
             (λ x, WP e @ ip; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.
   Proof.
-    intros ?. rewrite /ElimAcc.
+    intros ? _. rewrite /ElimAcc.
     iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply (aneris_wp_wand with "(Hinner Hα)").
     iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
   Qed.
 
   Global Instance elim_acc_wp_nonatomic {X} E α β γ e ip Φ :
-    ElimAcc (X:=X) (fupd E E) (fupd E E)
+    ElimAcc (X:=X) True (fupd E E) (fupd E E)
             α β γ (WP e @ ip; E {{ Φ }})
             (λ x, WP e @ ip; E {{ v, |={E}=> β x ∗ (γ x -∗? Φ v) }})%I.
   Proof.
     rewrite /ElimAcc.
-    iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
+    iIntros (_) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply aneris_wp_fupd.
     iApply (aneris_wp_wand with "(Hinner Hα)").
     iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
