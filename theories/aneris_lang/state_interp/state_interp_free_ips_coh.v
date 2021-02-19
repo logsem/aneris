@@ -186,4 +186,21 @@ Section state_interpretation.
      by apply HFip2.
  Qed.
 
+ Lemma free_ips_coh_update_sblock σ1 a Sn sh skt b r :
+    let ip := ip_of_address a in
+    let S := <[ip := <[sh:= (skt<| sblock := b|>, r)]> Sn]>(state_sockets σ1) in
+    let σ2 := σ1 <| state_sockets := S |> in
+    state_sockets σ1 !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    free_ips_coh σ1 ==∗ free_ips_coh σ2.
+  Proof.
+     iIntros (?).
+    iDestruct 1 as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
+    iExists _, _. simpl. iFrame. iPureIntro.
+    do 3 (split; auto).
+    intros ip' Hip'.
+    simplify_map_eq. subst S.
+    ddeq ip ip'; set_solver.
+  Qed.
+
 End state_interpretation.

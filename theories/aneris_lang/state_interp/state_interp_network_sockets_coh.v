@@ -75,6 +75,24 @@ Section state_interpretation.
     ddeq sh sh'; eapply HbpsCoh; eauto.
   Qed.
 
+  Lemma bound_ports_coh_update_sblock σ Sn ip sh skt r b :
+    state_sockets σ !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    bound_ports_coh Sn (state_ports_in_use σ) →
+    bound_ports_coh
+      (<[sh:=({|
+                       sfamily := sfamily skt;
+                       stype := stype skt;
+                       sprotocol := sprotocol skt;
+                       saddress := saddress skt;
+                       sblock := b |}, r)]> Sn)
+      (state_ports_in_use σ).
+  Proof.
+    rewrite /bound_ports_coh /=.
+    intros HS HSn HbpsCoh sh' skt' a' P' r' Hsh' Hskt' HP'.
+    ddeq sh sh'; eapply HbpsCoh; eauto.
+  Qed.
+
   Lemma bound_ports_coh_deliver_message M P Sn sh skt a R m :
     m ∈ messages_to_receive_at a M →
     Sn !! sh = Some (skt, R) →
@@ -147,6 +165,25 @@ Section state_interpretation.
      eapply HSn; eauto; naive_solver.
  Qed.
 
+  Lemma socket_handlers_coh_update_sblock σ Sn ip sh skt r b :
+    state_sockets σ !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    socket_handlers_coh Sn  →
+    socket_handlers_coh
+      (<[sh:=({|
+                       sfamily := sfamily skt;
+                       stype := stype skt;
+                       sprotocol := sprotocol skt;
+                       saddress := saddress skt;
+                       sblock := b |}, r)]> Sn).
+  Proof.
+  intros ?? Hscoh sh1 sh2 skt1 skt2 ????? Heq.
+   ddeq sh1 sh; ddeq sh2 sh; simplify_eq=>//.
+   - eapply Hscoh; eauto. by rewrite Heq in H1.
+   - eapply Hscoh; eauto. rewrite Heq. eauto.
+   - eapply Hscoh; eauto. rewrite Heq. naive_solver.
+  Qed.
+
  (** socket_messages_coh *)
  Lemma socket_messages_coh_update_socket Sn sh skt :
    socket_messages_coh Sn →
@@ -195,6 +232,20 @@ Section state_interpretation.
     ddeq m m'; set_solver.
   Qed.
 
+Lemma socket_messages_coh_update_sblock Sn sh skt r b:
+  Sn !! sh = Some (skt, r) →
+    socket_messages_coh Sn →
+    socket_messages_coh   (<[sh:=({|
+             sfamily := sfamily skt;
+             stype := stype skt;
+             sprotocol := sprotocol skt;
+             saddress := saddress skt;
+             sblock := b |}, r)]> Sn).
+  Proof.
+    intros HSn Hcoh sh' kt' r' a' Hsh' Hskt' m' Hm'.
+    ddeq sh sh'; eapply Hcoh; eauto.
+  Qed.
+
   (** socket_addresses_coh *)
   Lemma socket_addresses_coh_alloc_socket Sn sh skt n :
     saddress skt = None →
@@ -235,6 +286,21 @@ Section state_interpretation.
     socket_addresses_coh Sn ip →
     socket_addresses_coh (<[sh:=(skt, r ∖ {[m]})]> Sn) ip.
   Proof. intros Hsn Hcoh sh' skt' r' sa Hsh' Hskt'. ddeq sh sh'; eauto. Qed.
+
+
+  Lemma socket_addresses_coh_update_sblock Sn sh skt r b ip:
+    Sn !! sh = Some (skt, r) →
+    socket_addresses_coh Sn ip →
+    socket_addresses_coh (<[sh:=({|
+             sfamily := sfamily skt;
+             stype := stype skt;
+             sprotocol := sprotocol skt;
+             saddress := saddress skt;
+             sblock := b |}, r)]> Sn) ip.
+  Proof.
+    intros HSn Hcoh sh' kt' r' a' Hsh' Hskt'.
+    ddeq sh sh'; eapply Hcoh; eauto.
+  Qed.
 
   (** socket_unbound_empty_buf_coh *)
   Lemma socket_unbound_empty_buf_coh_alloc_socket Sn sh ip skt:
@@ -284,6 +350,19 @@ Section state_interpretation.
          specialize (Hcoh sh' skt' r Hsn Hskt'). set_solver.
   Qed.
 
+ Lemma socket_unbound_empty_buf_coh_update_sblock Sn sh skt r b ip:
+    Sn !! sh = Some (skt, r) →
+    socket_unbound_empty_buf_coh Sn ip →
+    socket_unbound_empty_buf_coh (<[sh:=({|
+             sfamily := sfamily skt;
+             stype := stype skt;
+             sprotocol := sprotocol skt;
+             saddress := saddress skt;
+             sblock := b |}, r)]> Sn) ip.
+  Proof.
+   intros Hsn Hcoh sh' skt' r' Hsh' Hskt'. ddeq sh sh'; eauto.
+  Qed.
+
   (** network_sockets_coh *)
   Lemma network_sockets_coh_alloc_node Sn ps ip :
     Sn !! ip = None →
@@ -310,6 +389,29 @@ Section state_interpretation.
               /socket_addresses_coh
               /socket_unbound_empty_buf_coh;
       set_solver.
+  Qed.
+
+  Lemma network_sockets_coh_update_sblock σ sh skt r ip Sn b :
+    state_sockets σ !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    network_sockets_coh (state_sockets σ) (state_ports_in_use σ) →
+    network_sockets_coh
+      (<[ip:=<[sh:=({|
+                               sfamily := sfamily skt;
+                               stype := stype skt;
+                               sprotocol := sprotocol skt;
+                               saddress := saddress skt;
+                               sblock := b |}, r)]> Sn]> (state_sockets σ))
+      (state_ports_in_use σ).
+  Proof.
+    rewrite /network_sockets_coh.
+    intros ?? Hnets ip' Sn' HSn. ddeq ip' ip; [|eauto].
+    destruct (Hnets ip Sn) as (?&?&?&?&?); [done|].
+    split; [by eapply bound_ports_coh_update_sblock|].
+    split; [by eapply socket_handlers_coh_update_sblock|].
+    split; [by eapply socket_messages_coh_update_sblock|].
+    split; [by eapply socket_addresses_coh_update_sblock |
+              by eapply socket_unbound_empty_buf_coh_update_sblock].
   Qed.
 
   Lemma network_sockets_coh_alloc_socket S Sn P n sh skt :
@@ -412,229 +514,5 @@ Section state_interpretation.
     split; [by eapply socket_addresses_coh_deliver_message |].
       by eapply socket_unbound_empty_buf_coh_deliver_message.
   Qed.
-
-(*
-  Lemma network_sockets_coh_insert_sent S P M Sn sh skt a to m R T :
-    let ip := ip_of_address a in
-    let msg := mkMessage a to (sprotocol skt) m in
-    saddress skt = Some a →
-    S !! ip = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    network_sockets_coh S M P →
-    network_sockets_coh (<[ip:=<[sh:=(skt, R, {[msg]} ∪ T)]> Sn]> S) ({[msg]} ∪ M) P.
-  Proof.
-    intros ip msg Hsa Hsi Hh HnetCoh ip' Sn' Hip'.
-    ddeq ip' ip.
-    - destruct (HnetCoh ip Sn Hsi) as (HBpCoh & HshCoh & HsmCoh & HsaCoh).
-      split.
-      { intros sh' skt' **. ddeq sh' sh; eauto using HBpCoh. }
-      split.
-      { intros sh1 sh2 skt1 skt2 ???? Hsh1 Hsh2 Hskt1 Hsaddr.
-        ddeq sh1 sh; ddeq sh2 sh; simplify_eq /=;
-          eapply HshCoh; eauto; eapply mk_is_Some; rewrite Hsaddr //. }
-      split.
-      { intros sh' **; ddeq sh' sh; split; intros;
-          edestruct HsmCoh; set_solver. }
-      intros sh' **; ddeq sh' sh; eauto.
-    - destruct (HnetCoh ip' Sn' Hip') as (HBpCoh & HshCoh & HsmCoh & HsaCoh).
-      split; eauto. split; eauto. split; last done.
-      intros sh' **. edestruct HsmCoh; eauto.
-      split; intros ??; set_solver.
-  Qed.
-
-  Lemma network_sockets_coh_not_received a skt sh S Sn P M R T m :
-    S !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    saddress skt = Some a →
-    m_destination m = a →
-    m ∈ M →
-    m ∉ R →
-    network_sockets_coh S M P →
-    ¬ message_received S m.
-  Proof.
-    intros HS HSn Hskt Hd HM HR Hsock Hr.
-    destruct Hr as (Sn' & sh' & skt' & a' & R' & T' & HS' & HSn' & Hs' & Hm).
-    destruct (decide (a = a')) as [ | Ha]; simplify_eq.
-    - assert (sh = sh') as <-.
-      { eapply Hsock; eauto. rewrite Hs' //. }
-      by simplify_eq.
-    - destruct (Hsock (ip_of_address a') Sn')
-        as (?&Hhandlers'&Hmsg'&?); [done|].
-      destruct (Hmsg' _ _ _ _ a' HSn') as [HR' ?]; [done|].
-      by destruct (HR' _ Hm) as [? ?].
-  Qed.
-
-  Lemma network_sockets_coh_insert_received a skt sh S Sn P M R T m :
-    let S' := (<[ip_of_address a:=<[sh:=(skt, {[m]} ∪ R, T)]> Sn]> S) in
-    S !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    saddress skt = Some a →
-    m_destination m = a →
-    m ∈ M →
-    m ∉ R →
-    network_sockets_coh S M P →
-    network_sockets_coh S' M P.
-  Proof.
-    rewrite /network_sockets_coh.
-    intros HS HSn ???? Hnet ip' Sn' HSn'.
-    destruct (decide (ip_of_address a = ip'));
-      simplify_map_eq; [|by eapply Hnet].
-    destruct (Hnet _ _ HS) as (?&?&?&?).
-    split; [by eapply bound_ports_coh_insert_received|].
-    split; [by eapply socket_handlers_coh_insert_received|].
-    split; [by eapply socket_messages_coh_insert_received|].
-    by eapply socket_addresses_coh_insert_received.
-  Qed.
-
-  Lemma network_sockets_messages_coh_insert_received a skt sh S Sn P M R T m :
-    let S' := (<[ip_of_address a:=<[sh:=(skt, {[m]} ∪ R, T)]> Sn]> S) in
-    S !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    saddress skt = Some a →
-    m_destination m = a →
-    m ∈ M →
-    m ∉ R →
-    network_sockets_coh S M P →
-    network_messages_coh S M -∗
-    network_messages_coh S' M ∗
-      ∃ φ : socket_interp Σ, m_destination m ⤇ φ ∗ ▷ φ m.
-  Proof.
-    iIntros (S' ???????) "Hmcoh".
-    rewrite /network_messages_coh big_sepS_delete //.
-    iDestruct "Hmcoh" as "[[Hm | %Hr] Hmsgs]";
-      [|exfalso; by eapply network_sockets_coh_not_received].
-    iFrame.
-    assert (message_received S' m) as Hr.
-    { by eapply message_received_receive. }
-    rewrite (big_sepS_delete _ M m) //. iFrame "%".
-    iApply big_sepS_mono; [|done].
-    iIntros (??) "[? | %Hr']"; [eauto|].
-    iRight. iPureIntro.
-    by eapply message_received_insert.
-  Qed.
- *)
-
-(*
-  (** network_coh **)
-  Lemma network_coh_init ip ips P :
-    dom (gset ip_address) P = ips →
-    (∀ ip, ip ∈ ips → P !! ip = Some ∅) →
-    ⊢ network_sockets_coh {[ip:=∅]} ∅ P.
-  Proof.
-    intros ??. rewrite /network_coh /network_messages_coh.
-    iSplit; [|done].
-    iPureIntro. rewrite /network_sockets_coh.
-    intros ?? [<- <-]%lookup_singleton_Some.
-    rewrite /bound_ports_coh /socket_handlers_coh
-            /socket_messages_coh /socket_addresses_coh.
-    set_solver.
-  Qed.
-
- *)
-
-(*
-  Lemma network_coh_sent_valid m sh a skt S Sn M P R T :
-    S !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    saddress skt = Some a →
-    m ∈ T →
-    network_coh S M P -∗ ⌜m ∈ M⌝.
-  Proof.
-    iIntros (Hs HSn Ha Hm) "(%Hscoh & _)". iPureIntro.
-    destruct (Hscoh _ Sn Hs) as (?&?& Hmsgs &?).
-    edestruct (Hmsgs sh) as [? HT]; [done..|].
-    by apply HT.
-  Qed.
-
-  Lemma network_coh_received_valid m sh a skt S Sn M P R T :
-    S !! ip_of_address a = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    saddress skt = Some a →
-    m ∈ R →
-    network_coh S M P -∗ ⌜m ∈ M⌝.
-  Proof.
-    iIntros (Hs HSn Ha Hm) "(%Hscoh & _)". iPureIntro.
-    destruct (Hscoh _ Sn Hs) as (?&?& Hmsgs &?).
-    edestruct (Hmsgs sh) as [HR ?]; [done..|].
-    by apply HR.
-  Qed.
-
-  Lemma network_coh_alloc_node Sn M ps ip :
-    Sn !! ip = None →
-    network_coh Sn M ps -∗
-    network_coh (<[ip:=∅]>Sn) M ps.
-  Proof.
-    iIntros (Hnone) "[% Hmsg]".
-    rewrite /network_coh.
-    iSplitR; last first.
-    { by iApply network_messages_coh_alloc_node. }
-    iPureIntro.
-    by apply network_sockets_coh_alloc_node.
-  Qed.
-
-  Lemma network_coh_alloc_socket S M P Sn n sh skt :
-    S !! n = Some Sn →
-    Sn !! sh = None →
-    saddress skt = None →
-    network_coh S M P -∗
-    network_coh (<[n:=<[sh:=(skt, ∅, ∅)]> Sn]> S) M P.
-  Proof.
-    iIntros (? ? ?) "(% & Hmsg)". iSplitR.
-    - iPureIntro. by apply network_sockets_coh_alloc_socket.
-    - by iApply network_messages_coh_alloc_socket.
-  Qed.
-
-  Lemma network_coh_socketbind S P M Sn ps sh skt a :
-    let ip := ip_of_address a in
-    S !! ip = Some Sn →
-    Sn !! sh = Some (skt, ∅, ∅) →
-    P !! ip = Some ps →
-    saddress skt = None →
-    port_of_address a ∉ ps →
-    network_coh S M P -∗
-    network_coh
-    (<[ip:=<[sh:=(skt <| saddress := Some a |>, ∅, ∅)]> Sn]> S) M
-    (<[ip:= {[port_of_address a]} ∪ ps]> P).
-  Proof.
-    iIntros (??????) "(% & Hmsg)". iSplit.
-    - iPureIntro; by apply network_sockets_coh_socketbind.
-    - by iDestruct (network_messages_coh_socketbind with "Hmsg") as "Hmsg".
-  Qed.
-
-  Lemma network_coh_insert_sent S P M Sn sh skt a to m (φ : socket_interp Σ) R T :
-    let ip := ip_of_address a in
-    let msg := mkMessage a to (sprotocol skt) m in
-    let S' := <[ip := <[sh:=(skt, R, {[msg]} ∪ T)]> Sn]> S in
-    let M' := {[msg]} ∪ M in
-    saddress skt = Some a →
-    S !! ip = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    to ⤇ φ -∗
-    φ msg -∗
-    network_coh S M P -∗ network_coh S' M' P.
-  Proof.
-    iIntros (???????) "Hpred Hr [% Hmsg]". iSplit.
-    - iPureIntro. by apply network_sockets_coh_insert_sent.
-    - by iApply (network_messages_coh_insert_sent with "Hpred Hr Hmsg").
-  Qed.
-
-  Lemma network_coh_receive a sh skt S Sn M P R T m :
-    let ip := ip_of_address a in
-    let S' := (<[ip:=<[sh:=(skt, {[m]} ∪ R, T)]> Sn]> S) in
-    saddress skt = Some a →
-    S !! ip = Some Sn →
-    Sn !! sh = Some (skt, R, T) →
-    m_destination m = a →
-    m ∈ M →
-    m ∉ R →
-    network_coh S M P -∗ network_coh S' M P ∗ ∃ φ, m_destination m ⤇ φ ∗ ▷ φ m.
-  Proof.
-    simpl. iIntros (??????) "[%Hsock Hmcoh]".
-    rewrite /network_coh.
-    iDestruct (network_sockets_messages_coh_insert_received with "Hmcoh")
-      as "[Hmcoh Hφ]"; [done..|].
-    iFrame. iPureIntro.
-    by apply network_sockets_coh_insert_received.
-   Qed.*)
 
 End state_interpretation.

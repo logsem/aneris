@@ -734,12 +734,15 @@ Section primitive_laws.
     iIntros (σ δ κ κs n) "Hσ /=".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iMod (aneris_state_interp_sblock_update with "Hσ Hsh") as "(Hσ&Hsh)"; eauto.
     iModIntro. iSplitR.
     { iPureIntro; do 4 eexists.
       eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step; last by lia.
-  Admitted.
+    iModIntro. iPoseProof ("HΦ" with "Hsh") as "HΦ". eauto with iFrame.
+  Qed.
+
 
   Lemma wp_rcvtimeo_block k a E h s :
      let ip := ip_of_address a in
@@ -757,11 +760,13 @@ Section primitive_laws.
     iIntros (σ δ κ κs n) "Hσ /=".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iMod (aneris_state_interp_sblock_update with "Hσ Hsh") as "(Hσ&Hsh)"; eauto.
     iModIntro. iSplitR.
     { iPureIntro; do 4 eexists.
       eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step; first by lia.
-  Admitted.
+    iModIntro. iPoseProof ("HΦ" with "Hsh") as "HΦ". eauto with iFrame.
+  Qed.
 
 End primitive_laws.

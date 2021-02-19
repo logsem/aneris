@@ -23,7 +23,6 @@ Section state_interpretation.
   Context `{!anerisG Σ}.
 
   (** gnames_coh *)
-  (* TODO: check whether this works out. *)
   Lemma gnames_coh_singleton ip γs h Sn mh:
     gset_map ip_of_address (dom (gset socket_address) mh) = {[ ip ]} →
     gnames_coh {[ip:=γs]} {[ip:=h]} {[ip:=Sn]} mh.
@@ -80,6 +79,5 @@ Section state_interpretation.
     rewrite gset_map_union gset_map_singleton.
     set_solver.
   Qed.
-
 
 End state_interpretation.

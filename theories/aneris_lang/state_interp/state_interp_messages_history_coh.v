@@ -23,17 +23,35 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Σ}.
 
-   (* receive_buffers_coh *)
-  Lemma receive_buffers_coh_alloc_socket σ mhγ s sh ip Sn :
+  (* receive_buffers_coh *)
+  Lemma receive_buffers_coh_alloc_socket σ mh s sh ip Sn :
     state_sockets σ !! ip = Some Sn →
     Sn !! sh = None →
-    receive_buffers_coh (state_sockets σ) mhγ →
-    receive_buffers_coh (<[ip:=<[sh:=(s, ∅)]> Sn]> (state_sockets σ)) mhγ.
+    receive_buffers_coh (state_sockets σ) mh →
+    receive_buffers_coh (<[ip:=<[sh:=(s, ∅)]> Sn]> (state_sockets σ)) mh.
   Proof.
     rewrite /receive_buffers_coh.
     intros HSn HNone Hrbcoh ip' Sn' sh' skt' r' m' HSn' Hskt' Hm'.
     ddeq ip ip'.
     - ddeq sh sh'; [ done | by eapply Hrbcoh ].
+    - by eapply Hrbcoh.
+  Qed.
+
+  Lemma receive_buffers_coh_update_sblock σ mh sh skt r ip Sn b :
+    state_sockets σ !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    receive_buffers_coh (state_sockets σ) mh →
+    receive_buffers_coh
+      (<[ip:=<[sh:=({| sfamily := sfamily skt;
+                       stype := stype skt;
+                       sprotocol := sprotocol skt;
+                       saddress := saddress skt;
+                       sblock := b |}, r)]> Sn]> (state_sockets σ)) mh.
+  Proof.
+    rewrite /receive_buffers_coh.
+    intros HSn HNone Hrbcoh ip' Sn' sh' skt' r' m' HSn' Hskt' Hm'.
+    ddeq ip ip'.
+    - ddeq sh sh'; [ eauto | by eapply Hrbcoh ].
     - by eapply Hrbcoh.
   Qed.
 

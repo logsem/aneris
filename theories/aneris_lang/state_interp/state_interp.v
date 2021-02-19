@@ -368,6 +368,43 @@ Section state_interpretation.
       by eapply Hb.
   Qed.
 
+  Lemma aneris_state_interp_sblock_update σ1 a b sh skt Sn r:
+    let ip := ip_of_address a in
+    let S := <[ip := <[sh:= (skt<| sblock := b|>, r)]> Sn]>(state_sockets σ1) in
+    let σ2 := σ1 <| state_sockets := S |> in
+    state_sockets σ1 !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    aneris_state_interp σ1 -∗
+    sh ↪[ip_of_address a] skt ==∗
+    aneris_state_interp σ2 ∗ sh ↪[ip] (skt<| sblock := b |>).
+  Proof.
+    simpl. iIntros (HS HSn) "Hσ Hsh".
+    iDestruct "Hσ"
+      as (m mh)
+           "(%Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
+    iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
+    iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
+      as "(Hstate & Hlcoh)"; [done|].
+    iMod (local_state_coh_update_sblock with "[$Hstate Hsh]") as
+        "[Hstate' $]"; try done.
+    iDestruct
+      (big_sepM_local_state_coh_update_socket_notin with "Hlcoh")
+      as "Hlcoh".
+    { apply lookup_delete. }
+    iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh")
+      as "Hlcoh"; [done|].
+    iMod (free_ips_coh_update_sblock with "Hfreeips") as "Hfreeips"; eauto.
+    iModIntro. iExists m, mh. iFrame. rewrite /set /=.
+    iSplit.
+    { iPureIntro; by eapply gnames_coh_update_sockets. }
+    iSplitR.
+    { iPureIntro. by apply network_sockets_coh_update_sblock. }
+    iPureIntro. destruct Hmhcoh as (Hc1&Hc2&Hc3&Hc4). split_and!; eauto.
+    by apply receive_buffers_coh_update_sblock.
+  Qed.
+
   Lemma aneris_state_interp_alloc_socket s ip sh Sn σ :
     let σ' :=
         σ <| state_sockets :=

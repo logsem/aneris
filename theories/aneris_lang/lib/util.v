@@ -38,6 +38,141 @@ Section gset_map.
 
 End gset_map.
 
+
+Section collect.
+  Context {K} `{!EqDecision K} `{Countable K} {A : Type}
+          {B : Type} `{!EqDecision B} `{Countable B}
+          (f : A → gset B).
+
+  Definition collect (g : gmap K A) : gset B :=
+    map_fold (λ _ a acc, (f a) ∪ acc) ∅ g.
+
+  Lemma collect_singleton k a :
+    collect {[k := a]} = f a.
+  Proof.
+    rewrite /collect.
+    rewrite map_fold_insert_L.
+    - rewrite map_fold_empty; set_solver.
+    - set_solver.
+    - done.
+  Qed.
+
+  Lemma collect_empty :
+    collect ∅ = ∅.
+  Proof. by rewrite /collect.
+  Qed.
+
+  Lemma collect_insert k a g :
+    collect (<[k:=a]> g) = f a ∪ collect (delete k g).
+  Proof.
+    generalize dependent a.
+    generalize dependent k.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+      simpl; apply (map_fold_ind (M := gmap _) (B := gset B) (λ y, λ x, P))
+    end; [ done | exact ∅ | |].
+    - intros. rewrite collect_singleton; set_solver.
+    - intros k' a' h acc Hk' IH k a.
+      destruct (decide (k = k')) as [-> | Hneq].
+      + rewrite insert_insert delete_insert_delete.
+        set_solver.
+      + rewrite delete_insert_ne; last done.
+        assert ((<[k:=a]>(<[k':=a']> h)) = (<[k':=a']>(<[k:=a]> h))) as ->.
+        { by rewrite insert_commute; last done. }
+        rewrite /collect.
+        rewrite {1} map_fold_insert_L.
+        specialize (IH k a).
+        rewrite /collect in IH.
+        rewrite IH.
+        rewrite {1} map_fold_insert_L.
+        * set_solver.
+        * set_solver.
+        * by rewrite lookup_delete_ne.
+        * set_solver.
+        * by rewrite lookup_insert_ne; last done.
+  Qed.
+
+
+  Lemma collect_disjoint_union g h :
+    g ##ₘ h →
+    collect (g ∪ h) = collect g ∪ collect h.
+  Proof.
+    intros Hdisj.
+    generalize dependent h.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+    simpl; apply (map_fold_ind (M := gmap _) (λ y, λ x, P))
+    end.
+    - intros. by rewrite !left_id_L.
+    - intros k a g' acc Hk IHM h' Hdisj.
+      assert (f a ∪ acc ∪ collect h' =
+              acc ∪ (f a ∪ collect h')) as -> by set_solver.
+      rewrite insert_union_singleton_l.
+      assert ({[k := a]} ∪ g' ∪ h' =  g' ∪ ({[k := a]} ∪ h')) as ->.
+      { rewrite (map_union_comm {[k := a]} g').
+          by rewrite map_union_assoc.
+          by apply map_disjoint_singleton_l_2. }
+      rewrite IHM.
+      + rewrite -insert_union_singleton_l.
+        rewrite collect_insert.
+        simplify_map_eq.
+        rewrite delete_notin; last done.
+        done.
+      + apply map_disjoint_union_r_2.
+        * by apply map_disjoint_singleton_r_2.
+        * simplify_map_eq. set_solver.
+  Qed.
+
+  Lemma collect_empty_f g :
+    (forall k a, g !! k = Some a → f a = ∅) → collect g = ∅.
+  Proof.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+      simpl; apply (map_fold_ind (M := gmap _) (λ y, λ x, P))
+    end.
+    - done.
+    - intros k a g' M Hk IHM IHMi.
+      rewrite empty_union_L; split.
+      + specialize (IHMi k a). apply IHMi.
+          by rewrite lookup_insert.
+      + apply IHM. intros k' a' Hka'.
+        specialize (IHMi k' a').
+        apply IHMi.
+        destruct (decide (k = k')) as [<-|Hneq]; by simplify_map_eq.
+  Qed.
+
+  Lemma elem_of_collect g :
+    ∀ m, m ∈ collect g ↔ ∃ k a, g !! k = Some a ∧ m ∈ f a.
+  Proof.
+    pattern (collect g); pattern g.
+    match goal with
+    |- (λ x, (λ y, ?P) _) _ =>
+      simpl; apply (map_fold_ind (M := gmap _) (λ y, λ x, P))
+    end.
+    - intros m; split; first done.
+      intros (?&?&?&?); done.
+    - intros k a g' M Hk IHM m.
+      split.
+      + intros [Hm|Hm]%elem_of_union.
+        * exists k, a; rewrite lookup_insert; done.
+        * apply IHM in Hm as (k' & a' & Hk' & Hm).
+          exists k', a'.
+          rewrite lookup_insert_ne; first done.
+          set_solver.
+      + intros (k' & a' & Hk' & Hm).
+        destruct (decide (k' = k)) as [->|].
+        * rewrite lookup_insert in Hk'; simplify_eq.
+          set_solver.
+        * rewrite lookup_insert_ne in Hk'; last done.
+          apply elem_of_union; right.
+          apply IHM; eauto.
+  Qed.
+
+End collect.
+
 Section find_one_maximal.
   Context {A B : Type} (f : A → B)
           (R : relation B) `{!RelDecision R} `{!Transitive R}
