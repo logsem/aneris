@@ -644,7 +644,8 @@ Section state_interpretation.
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
-    destruct (Hnscoh (ip_of_address a) Sn) as (Hbcoh&Hshcoh&Hsmcoh&Hsacoh&Hsucoh);
+    destruct (Hnscoh (ip_of_address a) Sn)
+      as (Hbcoh & Hshcoh & Hsmcoh & Hsacoh & Hsucoh);
       first done.
     assert (m_destination m = a) as Hma by by eapply Hsmcoh.
     destruct (decide (m ∈ R)).
@@ -652,7 +653,7 @@ Section state_interpretation.
        iExists γm, mh. iFrame. simpl. iSplit; eauto. iPureIntro.
        destruct Hgcoh as (?&Hgcoh&?). split_and!; [set_solver| |set_solver].
        rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
-       iSplit. iPureIntro. admit.
+       iSplit. iPureIntro. by eapply network_sockets_coh_receive.
        iSplit. iPureIntro. admit.
        iSplitR "Hfreeips". admit.
        admit.
