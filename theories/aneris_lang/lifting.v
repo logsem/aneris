@@ -717,10 +717,10 @@ Section primitive_laws.
     - iIntros (?) "(? & ? & ?) !>"; eauto with iFrame.
   Qed.
 
-  Lemma wp_rcvtimeo_unblock k a E h s R T P n1 n2 :
+  Lemma wp_rcvtimeo_unblock k a E h s n1 n2 :
      let ip := ip_of_address a in
      saddress s = Some a →
-     (0 <= n1 ∧ 0 <= n2 ∧ (n1 + n2) < 0) →
+     (0 ≤ n1 ∧ 0 <= n2 ∧ 0 < n1 + n2)%Z →
     {{{ ▷ h ↪[ip] s }}}
     (mkExpr ip (SetReceiveTimeout
                   (Val $ LitV $ LitSocket h)
@@ -729,9 +729,19 @@ Section primitive_laws.
      {{{ RET (mkVal ip #());
           h ↪[ip] s<|sblock := false|> }}}.
   Proof.
+    iIntros (??? Φ) ">Hsh HΦ".
+    iApply wp_lift_atomic_head_step_no_fork; first auto.
+    iIntros (σ δ κ κs n) "Hσ /=".
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iModIntro. iSplitR.
+    { iPureIntro; do 4 eexists.
+      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      econstructor; naive_solver. }
+    iIntros (v2' ? ? Hstep) "!>"; inv_head_step; last by lia.
   Admitted.
 
-  Lemma wp_rcvtimeo_block k a E h s R T P :
+  Lemma wp_rcvtimeo_block k a E h s :
      let ip := ip_of_address a in
      saddress s = Some a →
      {{{ ▷ h ↪[ip] s }}}
@@ -742,6 +752,16 @@ Section primitive_laws.
      {{{ RET (mkVal ip #());
           h ↪[ip] s<|sblock := true|> }}}.
   Proof.
+    iIntros (?? Φ) ">Hsh HΦ".
+    iApply wp_lift_atomic_head_step_no_fork; first auto.
+    iIntros (σ δ κ κs n) "Hσ /=".
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iModIntro. iSplitR.
+    { iPureIntro; do 4 eexists.
+      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      econstructor; naive_solver. }
+    iIntros (v2' ? ? Hstep) "!>"; inv_head_step; first by lia.
   Admitted.
 
 End primitive_laws.

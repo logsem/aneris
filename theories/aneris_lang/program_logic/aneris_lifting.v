@@ -418,7 +418,7 @@ Section lifting_network.
   Lemma aneris_wp_rcvtimeo_unblock ip a E h s n1 n2 :
     ip_of_address a = ip →
     saddress s = Some a →
-    (0 <= n1 ∧ 0 <= n2 ∧ (n1 + n2) < 0) →
+    (0 <= n1 ∧ 0 <= n2 ∧ 0 < n1 + n2)%Z →
     {{{ ▷ h ↪[ip] s }}}
     SetReceiveTimeout
                   (Val $ LitV $ LitSocket h)
@@ -427,7 +427,13 @@ Section lifting_network.
      {{{ RET #();
           h ↪[ip] s<|sblock := false|> }}}.
   Proof.
-  Admitted.
+    iIntros (Hip Hskt Hcnd Φ) "Hsh HΦ".
+    rewrite !aneris_wp_unfold /aneris_wp_def.
+    iIntros "#Hin".
+    rewrite -Hip.
+    iApply (wp_rcvtimeo_unblock _ a E h s n1 n2 with "[$Hsh]"); [done|done|].
+    iNext. iIntros "Hsh". iExists _; iSplit; first done. iApply "HΦ"; iFrame.
+  Qed.
 
   Lemma aneris_wp_rcvtimeo_block ip a E h s :
     ip_of_address a = ip →
@@ -440,6 +446,12 @@ Section lifting_network.
      {{{ RET #();
           h ↪[ip] s<|sblock := true|> }}}.
   Proof.
-  Admitted.
+    iIntros (Hip Hskt Φ) "Hsh HΦ".
+    rewrite !aneris_wp_unfold /aneris_wp_def.
+    iIntros "#Hin".
+    rewrite -Hip.
+    iApply (wp_rcvtimeo_block _ a E h s with "[$Hsh]"); [done|].
+    iNext. iIntros "Hsh". iExists _; iSplit; first done. iApply "HΦ"; iFrame.
+  Qed.
 
 End lifting_network.

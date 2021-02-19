@@ -1063,7 +1063,7 @@ Inductive socket_step ip :
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
 | SetReceiveTimeoutPositiveS sh skt R Sn P M m n :
     Sn !! sh = Some (skt, R) →
-    (0 <= m ∧ 0 <= n ∧ (m+n) < n) →
+    (0 <= m ∧ 0 <= n ∧ 0 < (m+n)) →
     socket_step
       ip
       (SetReceiveTimeout
