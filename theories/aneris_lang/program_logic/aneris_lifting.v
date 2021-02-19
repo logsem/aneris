@@ -415,30 +415,30 @@ Section lifting_network.
     - iIntros (?) "(? & ? & ?) !>"; eauto with iFrame.
     Qed.
 
-  Lemma aneris_wp_rcvtimeo_unblock ip a E h s R T P n1 n2 :
+  Lemma aneris_wp_rcvtimeo_unblock ip a E h s n1 n2 :
     ip_of_address a = ip →
     saddress s = Some a →
     (0 <= n1 ∧ 0 <= n2 ∧ (n1 + n2) < 0) →
-    {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) }}}
+    {{{ ▷ h ↪[ip] s }}}
     SetReceiveTimeout
                   (Val $ LitV $ LitSocket h)
                   (Val $ LitV $ LitInt n1)
                   (Val $ LitV $ LitInt n2) @[ip] E
      {{{ RET #();
-          h ↪[ip] s<|sblock := false|> ∗ a ⤳ (R, T) }}}.
+          h ↪[ip] s<|sblock := false|> }}}.
   Proof.
   Admitted.
 
-  Lemma aneris_wp_rcvtimeo_block ip a E h s R T P :
+  Lemma aneris_wp_rcvtimeo_block ip a E h s :
     ip_of_address a = ip →
     saddress s = Some a →
-    {{{ ▷ h ↪[ip] s ∗ ▷ a ⤳ (R, T) }}}
+    {{{ ▷ h ↪[ip] s }}}
       SetReceiveTimeout
                   (Val $ LitV $ LitSocket h)
                   (Val $ LitV $ LitInt 0)
                   (Val $ LitV $ LitInt 0) @[ip] E
      {{{ RET #();
-          h ↪[ip] s<|sblock := true|> ∗ a ⤳ (R, T) }}}.
+          h ↪[ip] s<|sblock := true|> }}}.
   Proof.
   Admitted.
 

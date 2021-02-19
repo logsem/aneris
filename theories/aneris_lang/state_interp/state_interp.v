@@ -647,66 +647,64 @@ Section state_interpretation.
     destruct (Hnscoh (ip_of_address a) Sn)
       as (Hbcoh & Hshcoh & Hsmcoh & Hsacoh & Hsucoh);
       first done.
+    iDestruct (messages_mapsto_valid with "[$Ha] [$Hmctx]") as %Hmha.
     assert (m_destination m = a) as Hma by by eapply Hsmcoh.
+    iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
+      as "(Hstate & Hlcoh)"; [done|].
+    iDestruct (local_state_coh_update_rb a sh skt σ1 γs Sn r (r ∖ {[m]})
+                 with "[$Hstate $Hsh]") as "Hstate"; eauto.
     destruct (decide (m ∈ R)).
-     - iExists R. iSplit; first done. iSplitR. eauto. iModIntro. iFrame.
+     - iExists R. iSplit; first done. iSplitR. eauto.
+       iMod "Hstate" as "(Hstate & Hsh)".
+       iDestruct (big_sepM_local_state_coh_insert
+                    with "[$Hstate] [Hlcoh]") as "Hlcoh"; eauto.
+       { iApply (big_sepM_mono with "Hlcoh").
+         iIntros (ip' γs' Hdel) "Hlcoh".
+         ddeq ip' (ip_of_address a).
+         rewrite lookup_delete_ne in Hdel; last done.
+         iDestruct "Hlcoh" as (h' s') "Hlcoh".
+         iExists h', s'. rewrite !lookup_insert_ne; eauto. }
+       iModIntro. iFrame.
        iExists γm, mh. iFrame. simpl. iSplit; eauto. iPureIntro.
        destruct Hgcoh as (?&Hgcoh&?). split_and!; [set_solver| |set_solver].
        rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
        iSplit. iPureIntro. by eapply network_sockets_coh_receive.
-       iSplit. iPureIntro. admit.
-       iSplitR "Hfreeips". admit.
-       admit.
+       iSplit. iPureIntro. eapply messages_history_coh_receive; eauto.
+         by iApply free_ips_coh_update_msg.
      - iExists ({[m]} ∪ R). iSplit; first done.
+       destruct Hmhcoh as (?&Hrcoh&?&?).
+       assert ( ∃ R T, mh !! m_sender m = Some (R, T) ∧ m ∈ T) as Hrcoh2.
+       { destruct (Hrcoh (ip_of_address a) Sn sh skt r m HS HSn Hmsg).
+         eauto. } destruct Hrcoh2 as (R'&T'&Hmh&Hm).
        iPoseProof
-         (messages_resource_coh_receive with "Hmres") as "(Hmres & Hres)";
-         [done | done |  |  | done | done |  |].
-       admit.
-       admit.
-       admit.
-       iSplitL "Hres". iLeft. iSplit; eauto.
-       iSplit; eauto. destruct Ψo as [ψ|]; [|iNext].
-       iDestruct "Hres" as (φ) "(Hφ & Hres)". rewrite Hma. admit. rewrite Hma. iFrame.
+         (messages_resource_coh_receive with "Hmres") as "(Hmres & Hres)"; eauto.
+       iSplitL "Hres".
+       { iLeft. iSplit; eauto. iSplit; eauto. destruct Ψo as [ψ|]; [|iNext].
+         iDestruct "Hres" as (φ) "(Hφ & Hres)". rewrite Hma.
+         iPoseProof (socket_interp_agree _ _ _ m  with "Hproto Hφ") as "Heq".
+         iNext. by iRewrite "Heq". rewrite Hma. iFrame. }
+       iMod "Hstate" as "(Hstate & Hsh)".
+       iDestruct (big_sepM_local_state_coh_insert
+                    with "[$Hstate] [Hlcoh]") as "Hlcoh"; eauto.
+       { iApply (big_sepM_mono with "Hlcoh").
+         iIntros (ip' γs' Hdel) "Hlcoh".
+         ddeq ip' (ip_of_address a).
+         rewrite lookup_delete_ne in Hdel; last done.
+         iDestruct "Hlcoh" as (h' s') "Hlcoh".
+         iExists h', s'. rewrite !lookup_insert_ne; eauto. }
+       iMod (messages_mapsto_update a R T ({[m]} ∪ R) T mh
+            with "[$Ha $Hmctx]") as "[Hmctx Ha]".
        iModIntro. iFrame.
-       admit.
-       (* iExists γm, mh. iFrame. simpl. iSplit; eauto. iPureIntro.
-       destruct Hgcoh as (?&Hgcoh&?). split_and!; [set_solver| |set_solver].
-       rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
-       iSplit. iPureIntro. admit.
-       iSplit. iPureIntro. admit.
-       iSplitR "Hfreeips". admit. *)
-   Admitted.
- (* iIntros (ip S' σ2 ??? [<- ?]%elem_of_filter) "HΨ [Hσ Hsh]". rewrite /σ2 /S'.
-    destruct (decide (msg ∈ R)).
-    - assert ({[msg]} ∪ R = R) as -> by set_solver.
-      assert (<[sh:=(skt, R, T)]> Sn = Sn) as -> by apply insert_id=>//.
-      assert (<[ip:=Sn]> (state_sockets σ1) = (state_sockets σ1))
-        as -> by apply insert_id=>//.
-      iExists R. iSplitR; eauto.
-      iModIntro. iFrame; eauto.
-    - iDestruct "Hσ" as (m) "(Hnauth & % & Hsock & Hlcoh & Hfreeips & Hnet)".
-      iDestruct "Hsh" as (?) "[#Hn Hsh]".
-      iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
-      iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
-        as "(Hstate & Hlcoh)"; [done|].
-      iDestruct (network_coh_receive with "Hnet") as "[Hnet Hφ]"; [done..|].
-      iExists ({[msg]} ∪ R). iSplitL "Hφ HΨ".
-      { iLeft. do 2 (iSplitR; [done|]).
-        destruct Ψo as [ψ|]; [|iNext; done].
-        iDestruct "Hφ" as (φ) "[Hφ Hmsg]".
-        iDestruct (socket_interp_agree _ _ _ msg with "HΨ Hφ") as "H".
-        iNext. by iRewrite "H". }
-      iMod (local_state_coh_update_ms with "[$Hstate Hsh]") as "[Hstate' Hsh]";
-        [done|done|..].
-      { iExists _; eauto. }
-      iDestruct (big_sepM_local_state_coh_update_socket_notin with "Hlcoh") as "Hlcoh".
-      { apply lookup_delete. }
-      iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh") as "Hlcoh"; [done|].
-      iModIntro. iFrame.
-      iExists _; simpl. iFrame.
-      iSplit; [|by iApply free_ips_coh_update_msg].
-      iPureIntro; by eapply gnames_coh_update_sockets.
-   Qed.  *)
+       iExists γm,  (<[a:=({[m]} ∪ R, T)]> mh). iFrame. simpl. iSplit; eauto.
+       iPureIntro. destruct Hgcoh as (?&Hgcoh&Hgcoh2).
+       split_and!; [set_solver| |].
+       + rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
+       + rewrite Hgcoh2. apply insert_id in Hmha. symmetry in Hmha.
+         rewrite{1} Hmha. by rewrite !dom_insert_L.
+       + iSplit. iPureIntro. by eapply network_sockets_coh_receive.
+         iSplit. iPureIntro. by eapply messages_history_coh_receive_2; eauto.
+           by iApply free_ips_coh_update_msg.
+   Qed.
 
 End state_interpretation.
 

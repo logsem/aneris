@@ -153,26 +153,28 @@ Section state_interpretation.
     rewrite lookup_insert /=; eauto.
   Qed.
 
-  (* Lemma local_state_coh_update_rb a sh skt σ1 γs Sn r r' : *)
-  (*   let ip := ip_of_address a in *)
-  (*   let S' := <[ip := <[sh:=(skt, r')]> Sn]> (state_sockets σ1) in *)
-  (*   let σ2 := σ1 <| state_sockets := S' |> in *)
-  (*   state_sockets σ1 !! ip = Some Sn → *)
-  (*   Sn !! sh = Some (skt, r) → *)
-  (*   local_state_coh σ1 ip γs ∗ sh ↪[ip] skt ==∗ *)
-  (*   local_state_coh σ2 ip γs ∗ sh ↪[ip] skt. *)
-  (* Proof. *)
-  (*   iIntros (?????) "[Hstate Hsh]". *)
-  (*   iDestruct "Hstate" as (h' S Hh Hs) "(#Hn & ? & Hsock)". *)
-  (*   iDestruct "Hsh" as (γs') "[Hn' Hsh]". *)
-  (*   iDestruct (mapsto_node_agree with "Hn Hn'") as %->. *)
-  (*   simplify_eq. *)
-  (*   iMod (gen_heap_light_update _ _ _ _ ((skt, r').1) *)
-  (*           with "Hsock Hsh") as "[Hsock' Hsh]". *)
-  (*   iModIntro. iFrame. iSplitR "Hsh". *)
-  (*   { iExists _, _. iFrame. rewrite lookup_insert //. } *)
-  (*   iExists _; eauto. *)
-  (* Qed. *)
+  Lemma local_state_coh_update_rb a sh skt σ1 γs Sn r r' :
+    let ip := ip_of_address a in
+    let S' := <[ip := <[sh:=(skt, r')]> Sn]> (state_sockets σ1) in
+    let σ2 := σ1 <| state_sockets := S' |> in
+    state_sockets σ1 !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    local_state_coh σ1 ip γs ∗ sh ↪[ip] skt ==∗
+    local_state_coh σ2 ip γs ∗ sh ↪[ip] skt.
+  Proof.
+    iIntros (?????) "[Hstate Hsh]".
+    iDestruct "Hstate" as (h' S Hh Hs) "(#Hn & ? & Hsock)".
+    iDestruct "Hsh" as (γs') "[Hn' Hsh]".
+    iDestruct (mapsto_node_agree with "Hn Hn'") as %->.
+    simplify_eq.
+    iMod (gen_heap_light_update _ _ _ _ ((skt, r').1)
+            with "Hsock Hsh") as "[Hsock' Hsh]".
+    iModIntro. iFrame. iSplitR "Hsh".
+    { iExists _, _. iFrame. rewrite lookup_insert //.
+      iSplit; first done. iSplit; first done.
+      rewrite fmap_insert /=. eauto with iFrame. }
+    iExists _; eauto.
+  Qed.
 
   Lemma big_sepM_local_state_coh_insert n γs γm σ :
     γm !! n = Some γs →
