@@ -7,7 +7,7 @@ Import uPred.
 Local Arguments uPred_holds _ !_.
 
 Section extraction.
-  Context {M : ucmraT}.
+  Context {M : ucmra}.
 
   Lemma extract_forall {A} (Φ : A → uPred M) : (⊢ ∀ x, Φ x) ↔ (∀ x, ⊢ Φ x).
   Proof.
@@ -19,12 +19,14 @@ Section extraction.
     - iIntros (x); iApply HP.
   Qed.
 
+  Local Coercion uPred_holds : uPred >-> Funclass.
+
   Lemma extract_exists {A} (Φ : A → uPred M) :
     smaller_card A nat → (⊢ ∃ x, Φ x) ↔ (∃ x, ⊢ Φ x).
   Proof.
     intros Hcard.
     split; intros HP.
-    - destruct HP as [HP]; revert HP; unseal; intros HP.
+    - destruct HP as [HP]; revert HP; unseal; intros HP.      
       assert (∀ n, ∃ x, Φ x n ε) as HP'.
       { intros; apply HP; eauto using ucmra_unit_validN. }
       apply (forall_exists_swap _ le) in HP' as [x Hx];
@@ -149,7 +151,7 @@ Section extraction.
     - iModIntro; iApply HP.
   Qed.
 
-  Lemma extract_internal_eq (A : ofeT) (x y : A) : (⊢@{uPredI M} x ≡ y) ↔ (x ≡ y).
+  Lemma extract_internal_eq (A : ofe) (x y : A) : (⊢@{uPredI M} x ≡ y) ↔ (x ≡ y).
   Proof.
     split; intros Hxy.
     - destruct Hxy as [Hxy]; revert Hxy; unseal; intros Hxy.
@@ -182,7 +184,7 @@ Section extraction.
         auto using ucmra_unit_leastN.
   Qed.
 
-  Lemma extract_valid {A : ucmraT} (x : A) : (⊢@{uPredI M} ✓ x) ↔ ✓ x.
+  Lemma extract_valid {A : ucmra} (x : A) : (⊢@{uPredI M} ✓ x) ↔ ✓ x.
   Proof.
     split; intros Hx.
     - destruct Hx as [Hx]; revert Hx; unseal; intros Hx.

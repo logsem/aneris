@@ -1,7 +1,7 @@
 From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
-From iris.base_logic.lib Require Import viewshifts saved_prop gen_heap.
+From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
@@ -41,7 +41,7 @@ Section state_interpretation.
                (history_init ip ports ∪ mh).
   Proof. rewrite /gnames_coh !dom_insert_L.
          intro Hports.
-         move=> [->] [->] [->] //=.
+         move=> [->] [->] -> //=.
          split_and!; [ set_solver | set_solver |].
            by rewrite dom_union_L gset_map_union
                       dom_gset_to_gmap history_init_dom.

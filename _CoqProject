@@ -22,7 +22,6 @@ theories/program_logic/adequacy.v
 theories/program_logic/ectx_language.v
 theories/program_logic/ectx_lifting.v
 theories/program_logic/ectxi_language.v
-theories/program_logic/hoare.v
 theories/program_logic/language.v
 theories/program_logic/lifting.v
 

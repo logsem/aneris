@@ -67,7 +67,7 @@ Lemma wp_lift_pure_head_stuck E Φ e :
   ⊢ WP e @ E ?{{ Φ }}.
 Proof using Hinh.
   iIntros (?? Hstuck). iApply wp_lift_head_stuck; [done|done|].
-  iIntros (σ κs n st) "_". iMod (fupd_intro_mask' E ∅) as "_"; first set_solver.
+  iIntros (σ κs n st) "_". iMod (fupd_mask_subseteq ∅) as "_"; first set_solver.
   auto; done.
 Qed.
 

@@ -601,9 +601,9 @@ Proof.
   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp)".
   iModIntro; iExists _, _, _; iFrame.
   iIntros (ex atr δ' c κs Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
-  iApply fupd_mask_weaken; first done.
+  iApply fupd_mask_intro_discard; first done.
   iIntros (c' Hc').
-  assert (c' = c) as -> by by eapply exec_ends_in_inj.
+  assert (c' = c) as -> by by eapply exec_ends_in_inj. 
   iSplit; last done.
   iIntros (v2 t2 ->); rewrite /= to_of_val /=.
   iDestruct "Hposts" as "[% ?]"; done.
@@ -662,6 +662,6 @@ Proof.
     iDestruct (fupd_plain_mask with "Hφ") as ">Hφ"; done. }
   rewrite -fupd_plain_forall'.
   iMod "H".
-  iApply fupd_mask_weaken; first done.
+  iApply fupd_mask_intro_discard; first done.
   iIntros (Hexs' Hexe'); iApply "H"; done.
 Qed.

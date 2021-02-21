@@ -131,11 +131,6 @@ Instance sendto_atomic n v0 v1 v2 s :
   Atomic s (mkExpr n (SendTo (Val v0) (Val v1) (Val v2))).
 Proof. solve_atomic. Qed.
 
-(* NB: receive is not atomic any more! *)
-(* Instance receivefrom_atomic n v s :
- Atomic s (mkExpr n (ReceiveFrom (Val v))).
-Proof. solve_atomic. Qed.*)
-
 Class AsRecV (v : base_lang.val) (f x : binder) (erec : base_lang.expr) :=
   as_recv : v = RecV f x erec.
 Global Hint Mode AsRecV ! - - - : typeclass_instances.
@@ -143,21 +138,21 @@ Definition AsRecV_recv f x e : AsRecV (RecV f x e) f x e := eq_refl.
 Global Hint Extern 0 (AsRecV (RecV _ _ _) _ _ _) =>
   apply AsRecV_recv : typeclass_instances.
 
-Instance pure_rec n f x (erec : expr) :
+Instance pure_rec n f x erec :
   PureExec True 1 (mkExpr n (Rec f x erec)) (mkExpr n (Val $ RecV f x erec)).
 Proof. solve_pure_exec. Qed.
-Instance pure_pairc n (v1 v2 : val):
+Instance pure_pairc n v1 v2:
   PureExec True 1 (mkExpr n (Pair (Val v1) (Val v2)))
            (mkExpr n (Val $ PairV v1 v2)).
 Proof. solve_pure_exec. Qed.
-Instance pure_injlc n (v : val) :
+Instance pure_injlc n v :
   PureExec True 1 (mkExpr n (InjL $ Val v)) (mkExpr n (Val $ InjLV v)).
 Proof. solve_pure_exec. Qed.
-Instance pure_injrc n (v : val) :
+Instance pure_injrc n v :
   PureExec True 1 (mkExpr n (InjR $ Val v)) (mkExpr n (Val $ InjRV v)).
 Proof. solve_pure_exec. Qed.
 
-Instance pure_beta n f x erec (v1 v2 : val) `{!AsRecV v1 f x erec} :
+Instance pure_beta n f x erec v1 v2 `{!AsRecV v1 f x erec} :
   PureExec True 1 (mkExpr n (App (Val v1) (Val v2)))
            (mkExpr n (subst' x v2 (subst' f v1 erec))).
 Proof. unfold AsRecV in *. solve_pure_exec. Qed.
@@ -358,8 +353,9 @@ Section primitive_laws.
     iIntros (??) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ δ κ κs n) "Hσ".
-    iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk"; first set_solver; auto.
-        iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
+    iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
+      first set_solver; auto.
+    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & % & %)".
     iModIntro; iSplit.
     { iPureIntro. do 4 eexists. apply (AssignNewIpStepS _ _ []); eauto. }
@@ -416,7 +412,7 @@ Section primitive_laws.
                           (Val $ LitV $ LitSocketAddress a))) @ k; E
    {{{ RET (mkVal (ip_of_address a) #0);
        sh ↪[ip_of_address a] (skt<| saddress := Some a |>) ∗
-       a ⤳ (R, T) ∗
+       a ⤳ (R, T) ∗ 
        ∃ φ, a ⤇ φ }}}.
   Proof.
     iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
@@ -656,7 +652,7 @@ Section primitive_laws.
      iMod ("Hpreds" with "HP") as "(Hsh & Ha & Hr)".
      iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
        as (Sn r) "[%HSn (%Hr & %Hreset)]".
-     iMod (fupd_intro_mask _ ∅ True%I with "[]") as "Hmk";
+     iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
        first set_solver; auto.
      iModIntro; iSplit.
      { iPureIntro.
