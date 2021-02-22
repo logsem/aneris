@@ -207,24 +207,38 @@ Section Aneris_AS.
 
   Record aneris_aux_state := AnerisAuxState {
     aneris_AS_mhist : messages_history;
-    aneris_AS_model : model_state Mdl}.
+    aneris_AS_model : model_state Mdl }.
 
   (* Definition sent_messages_evolution *)
   (*            (M1 M2 : message_soup) (mh1 mh2 : messages_history) := True. *)
     (* mh2 !! sa = (,(mh1 !! sa).1 ∪ filter_orig sa M2)*)
 
-  Search "imap" "map".
-  (* Definition history_evolution mh1 mh2 sa M1 M2 r1 r2 := *)
-  (* (S1 S2 : gmap ip_address sockets) (mh1 mh2 : messages_soup) :=  *)
-  (*    mh2 !! sa = (mh1 !! sa ∪ (r1 ∖ r2), (mh1 !! sa).1 ∪ filter_orig sa M2)) *)
-  (*   ∀ (ip : ip_address) (Sn : sockets) (r : message_soup) *)
-  (*     (sh : socket_handle) (skt : socket) m, *)
-  (*     S1 !! ip = Some Sn → *)
-  (*     Sn !! sh = Some (skt, r) → *)
-  (*     m ∈ r → *)
-  (*     S2 = <[ip := (<[sh := (skt, r ∖ {[m]}) ]> Sn)]> S1 → *)
-  (*     ∃ R T, mh1 !! (m_destination m) = Some (R, T) ∧ *)
-  (*            mh2 = <[(m_destination m) := (R ∪ {[m]}, T)]> mh1. *)
+  (* Search "imap" "map". *)
+
+  Definition get_buffer (S : gmap ip_address sockets) (sa : socket_address)
+    : option message_soup :=
+    (S !! (ip_of_address sa)) ≫=
+    (λ h, (λ x, x.2.2) <$>
+       ((find (λ hsr, bool_decide (saddress hsr.2.1 = Some sa)))
+          (map_to_list h))).
+
+  (* Lemma get_buffer_correc S sa : *)
+  (*   get_buffer S sa = Some M *)
+
+  Definition sent_received_at_evolution (M2 : message_soup)
+             (S1 S2 : gmap ip_address sockets)
+             (sa : socket_address) (RT : message_soup * message_soup)
+    : message_soup * message_soup :=
+    default RT
+    (get_buffer S1 sa ≫=
+     (λ r1, get_buffer S2 sa ≫=
+       (λ r2, Some (RT.1 ∪ (r1 ∖ r2), RT.2 ∪ (messages_sent_from sa M2))))).
+
+
+Definition message_history_evolution (M2 : message_soup)
+             (S1 S2 : gmap ip_address sockets) (mh1 : messages_history)
+  : messages_history :=
+  map_imap (λ sa RT, Some (sent_received_at_evolution M2 S1 S2 sa RT)) mh1.
 
   Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
     mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2.
@@ -232,24 +246,17 @@ Section Aneris_AS.
 Program Definition aneris_AS : AuxState aneris_lang :=
   {| aux_state := aneris_aux_state ;
      valid_state_evolution σ1 δ1 κ σ2 δ2 :=
-       (* sent_messages_evolution *)
-       (*   (state_ms σ1) (state_ms σ2) *)
-       (*   (aneris_AS_mhist δ1) (aneris_AS_mhist δ2) ∧ *)
-       (* received_messages_evolution *)
-       (*   (state_sockets σ1) (state_sockets σ2) *)
-       (*   (aneris_AS_mhist δ1) (aneris_AS_mhist δ2) ∧ *)
+       aneris_AS_mhist δ2 =
+       message_history_evolution
+         (state_ms σ2)
+         (state_sockets σ1) (state_sockets σ2) (aneris_AS_mhist δ1) ∧
        user_model_evolution
          (aneris_AS_model δ1)
          (aneris_AS_model δ2) |}.
-
-
-
-     (* if rbuf in sigma2 = rbuf in sigma1 minus some message,
-        then this message goes to receive history.
-        if the msoup gets new message, then the sent history after gets
-           the message *)
 Next Obligation.
-Proof. simpl. intros. Admitted.
+Proof.
+  simpl; intros ??; split.
+Admitted.
 
 (* TODO: Prove me with histories of sent and received messages. *)
 Lemma aneris_AS_valid_state_evolution_finitary :
