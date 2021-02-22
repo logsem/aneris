@@ -183,8 +183,8 @@ Section definitions.
      ⌜message_received m mh⌝)%I.
 
   (** State interpretation *)
-  Definition aneris_state_interp σ :=
-    (∃ γm mh,
+  Definition aneris_state_interp σ mh :=
+    (∃ γm,
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) mh⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mh⌝ ∗
@@ -197,32 +197,76 @@ Section definitions.
 
 End definitions.
 
-(* TODO: Define me with histories of sent and received messages. *)
+Record Model := model {
+  model_state : Type;
+  model_rel : model_state → model_state → Prop
+}.
+
+Section Aneris_AS.
+  Context `{Mdl : Model}.
+
+  Record aneris_aux_state := AnerisAuxState {
+    aneris_AS_mhist : messages_history;
+    aneris_AS_model : model_state Mdl}.
+
+  (* Definition sent_messages_evolution *)
+  (*            (M1 M2 : message_soup) (mh1 mh2 : messages_history) := True. *)
+    (* mh2 !! sa = (,(mh1 !! sa).1 ∪ filter_orig sa M2)*)
+
+  Search "imap" "map".
+  (* Definition history_evolution mh1 mh2 sa M1 M2 r1 r2 := *)
+  (* (S1 S2 : gmap ip_address sockets) (mh1 mh2 : messages_soup) :=  *)
+  (*    mh2 !! sa = (mh1 !! sa ∪ (r1 ∖ r2), (mh1 !! sa).1 ∪ filter_orig sa M2)) *)
+  (*   ∀ (ip : ip_address) (Sn : sockets) (r : message_soup) *)
+  (*     (sh : socket_handle) (skt : socket) m, *)
+  (*     S1 !! ip = Some Sn → *)
+  (*     Sn !! sh = Some (skt, r) → *)
+  (*     m ∈ r → *)
+  (*     S2 = <[ip := (<[sh := (skt, r ∖ {[m]}) ]> Sn)]> S1 → *)
+  (*     ∃ R T, mh1 !! (m_destination m) = Some (R, T) ∧ *)
+  (*            mh2 = <[(m_destination m) := (R ∪ {[m]}, T)]> mh1. *)
+
+  Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
+    mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2.
+
 Program Definition aneris_AS : AuxState aneris_lang :=
-  {| aux_state := () ;
-   valid_state_evolution σ1 δ1 κ σ2 δ2 := δ1 = δ2 |}.
+  {| aux_state := aneris_aux_state ;
+     valid_state_evolution σ1 δ1 κ σ2 δ2 :=
+       (* sent_messages_evolution *)
+       (*   (state_ms σ1) (state_ms σ2) *)
+       (*   (aneris_AS_mhist δ1) (aneris_AS_mhist δ2) ∧ *)
+       (* received_messages_evolution *)
+       (*   (state_sockets σ1) (state_sockets σ2) *)
+       (*   (aneris_AS_mhist δ1) (aneris_AS_mhist δ2) ∧ *)
+       user_model_evolution
+         (aneris_AS_model δ1)
+         (aneris_AS_model δ2) |}.
+
+
+
      (* if rbuf in sigma2 = rbuf in sigma1 minus some message,
         then this message goes to receive history.
         if the msoup gets new message, then the sent history after gets
            the message *)
 Next Obligation.
-Proof. done. Qed.
+Proof. simpl. intros. Admitted.
 
 (* TODO: Prove me with histories of sent and received messages. *)
 Lemma aneris_AS_valid_state_evolution_finitary :
   valid_state_evolution_finitary aneris_AS.
 Proof.
-  intros ???.
-  rewrite /valid_state_evolution. simplify_eq /=.
-  intros ?.
-  apply quantifiers.finite_smaller_card_nat.
-  apply finite.sig_finite; last by apply finite.unit_finite.
-  solve_decision.
-Qed.
+Admitted.
+  (* intros ???. *)
+(*   rewrite /valid_state_evolution. simplify_eq /=. *)
+(*   intros ?. *)
+(*   apply quantifiers.finite_smaller_card_nat. *)
+(*   apply finite.sig_finite; last by apply finite.unit_finite. *)
+(*   solve_decision. *)
+(* Qed. *)
 
 Global Instance anerisG_irisG `{!anerisG Σ} : irisG aneris_lang aneris_AS Σ := {
   iris_invG := _;
-  state_interp σ δ _ _ := aneris_state_interp σ;
+  state_interp σ δ _ _ := aneris_state_interp σ (aneris_AS_mhist δ);
   fork_post _ := True%I;
 }.
 
