@@ -209,12 +209,6 @@ Section Aneris_AS.
     aneris_AS_mhist : messages_history;
     aneris_AS_model : model_state Mdl }.
 
-  (* Definition sent_messages_evolution *)
-  (*            (M1 M2 : message_soup) (mh1 mh2 : messages_history) := True. *)
-    (* mh2 !! sa = (,(mh1 !! sa).1 ∪ filter_orig sa M2)*)
-
-  (* Search "imap" "map". *)
-
   Definition get_buffer (S : gmap ip_address sockets) (sa : socket_address)
     : option message_soup :=
     (S !! (ip_of_address sa)) ≫=
@@ -276,6 +270,8 @@ Global Instance anerisG_irisG `{!anerisG Σ} : irisG aneris_lang aneris_AS Σ :=
   state_interp σ δ _ _ := aneris_state_interp σ (aneris_AS_mhist δ);
   fork_post _ := True%I;
 }.
+
+End Aneris_AS.
 
 Global Opaque iris_invG.
 
