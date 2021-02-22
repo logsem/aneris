@@ -249,7 +249,6 @@ Proof.
   iApply "H"; last done.
 Qed.
 
-(*
 Lemma tac_wp_socketbind_static Δ Δ1 Δ2 Δ3 E i j k K ip skt sh a A Φ :
   ip_of_address a = ip →
   a ∈ A →
@@ -258,22 +257,23 @@ Lemma tac_wp_socketbind_static Δ Δ1 Δ2 Δ3 E i j k K ip skt sh a A Φ :
   envs_lookup j Δ1 = Some (true, fixed A)%I →
   envs_lookup_delete false k Δ1 =
     Some (false, free_ports ip {[port_of_address a]}, Δ2) →
-  envs_lookup i Δ2 = Some (false, sh ↪[ip] skt, ∅, ∅))%I →
+  envs_lookup i Δ2 = Some (false, sh ↪[ip] skt)%I →
   envs_simple_replace i false (Esnoc Enil i
-    (sh ↪[ip] (skt <| saddress := Some a |>, ∅, ∅))) Δ2 = Some Δ3 →
+    (sh ↪[ip] (skt <| saddress := Some a |>))) Δ2 = Some Δ3 →
   envs_entails Δ3 (WP fill K (of_val $ LitV $ LitInt 0) @[ip] E {{ Φ }}) →
-  envs_entails Δ (WP fill K (SocketBind
-                               (Val $ LitV $ LitSocket sh)
-                               (Val $ LitV $ LitSocketAddress a))
-                     @[ip] E {{ Φ }}).
+  envs_entails Δ
+               (WP fill K (SocketBind
+                             (Val $ LitV $ LitSocket sh)
+                             (Val $ LitV $ LitSocketAddress a))
+                   @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_eq=> ?????????. rewrite -aneris_wp_bind.
+  rewrite envs_entails_eq=> <- ????????. rewrite -aneris_wp_bind.
   eapply wand_apply; first by eapply aneris_wp_socketbind_static.
   rewrite into_laterN_env_sound -!later_sep; simpl.
   rewrite envs_lookup_intuitionistic_sound //; simpl.
   rewrite (envs_lookup_delete_sound _ _ _ k) //; simpl.
-  rewrite (envs_simple_replace_sound _ _ i) //; simpl.
-  rewrite intuitionistically_elim right_id.
+  rewrite (envs_simple_replace_singleton_sound _ _ i) //; simpl.
+  rewrite intuitionistically_elim.
   rewrite !assoc. apply later_mono, sep_mono_r.
   rewrite sep_elim_l. by apply wand_mono.
 Qed.
@@ -286,9 +286,9 @@ Lemma tac_wp_socketbind_dynamic Δ Δ1 Δ2 Δ3 E i j k l K φ ip skt sh a A Φ :
   envs_lookup j Δ1 = Some (true, fixed A)%I →
   envs_lookup_delete false k Δ1 =
     Some (false, free_ports ip {[port_of_address a]}, Δ2) →
-  envs_lookup i Δ2 = Some (false, sh ↪[ip] (skt, ∅, ∅))%I →
+  envs_lookup i Δ2 = Some (false, sh ↪[ip] skt)%I →
   envs_simple_replace i false (Esnoc Enil i
-    (sh ↪[ip] (skt <| saddress := Some a |>, ∅, ∅))) Δ2 = Some Δ3 →
+    (sh ↪[ip] (skt <| saddress := Some a |>))) Δ2 = Some Δ3 →
   (∃ Δ', envs_app false (Esnoc Enil l (a ⤇ φ)) Δ3 = Some Δ' ∧
      envs_entails Δ' (WP fill K (of_val $ LitV $ LitInt 0) @[ip] E {{ Φ }})) →
   envs_entails Δ (WP fill K (SocketBind
@@ -302,8 +302,8 @@ Proof.
   rewrite into_laterN_env_sound -!later_sep; simpl.
   rewrite envs_lookup_intuitionistic_sound //; simpl.
   rewrite (envs_lookup_delete_sound _ _ _ k) //; simpl.
-  rewrite (envs_simple_replace_sound _ _ i) //; simpl.
-  rewrite intuitionistically_elim right_id.
+  rewrite (envs_simple_replace_singleton_sound _ _ i) //; simpl.
+  rewrite intuitionistically_elim.
   rewrite !assoc. apply later_mono, sep_mono_r.
   apply wand_intro_r.
   rewrite assoc wand_elim_l //.
@@ -312,112 +312,120 @@ Proof.
   rewrite right_id wand_elim_l //.
 Qed.
 
-Lemma tac_wp_send Δ Δ1 Δ2 Δ3 Δ4 E i j K φ R T f ip m skt sh a Φ :
+Lemma tac_wp_send Δ Δ1 Δ2 Δ3 Δ3' Δ4 E i j k K φ R T f ip m skt sh a Φ :
   let msg := (mkMessage f a (sprotocol skt) m) in
   ip_of_address f = ip →
   saddress skt = Some f →
   MaybeIntoLaterNEnvs 1 Δ Δ1 →
   envs_lookup i Δ1 = Some (true, a ⤇ φ)%I →
-  envs_lookup j Δ3 = Some (false, sh ↪[ip] (skt, R, T))%I →
+  envs_lookup_delete false j Δ3 = Some (false, sh ↪[ip] skt, Δ3')%I →
+  envs_lookup k Δ3' = Some (false, f ⤳ (R, T))%I →
   (of_envs Δ1 ⊢ of_envs Δ2 ∗ of_envs Δ3) →
-  envs_simple_replace j false (Esnoc Enil j
-                                     (sh ↪[ip] (skt, R, {[ msg ]} ∪ T))) Δ3 = Some Δ4 →
+  envs_simple_replace k false
+    (Esnoc (Esnoc Enil j (sh ↪[ip] skt)) k (f ⤳ (R, {[ msg ]} ∪ T))) Δ3' = Some Δ4 →
   envs_entails Δ2 (φ msg) →
   envs_entails Δ4 (WP fill K (of_val $ LitV $ LitInt (String.length m)) @[ip] E {{ Φ }}) →
-  envs_entails Δ (WP fill K (SendTo (Val $ LitV $ LitSocket sh) #m #a)
-                     @[ip] E {{ Φ }}).
+  envs_entails Δ (WP fill K (SendTo (Val $ LitV $ LitSocket sh) #m #a) @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_eq=> /= <-???? Hsplit ? Hφ Hcont. rewrite -aneris_wp_bind.
+  rewrite envs_entails_eq=>/= <-????? Hsplit ? Hφ Hcont.
+  rewrite -aneris_wp_bind.
   eapply wand_apply; first by eapply aneris_wp_send.
   rewrite into_laterN_env_sound -!later_sep; simpl.
   rewrite envs_lookup_intuitionistic_sound //; simpl.
   rewrite intuitionistically_elim.
   apply later_mono.
   rewrite Hsplit.
-  rewrite (sep_comm (of_envs Δ2)).
-  rewrite (envs_simple_replace_sound _ _ j) //; simpl.
+  rewrite (envs_lookup_delete_sound Δ3 _ _ _ false) =>//=.
+  rewrite (envs_simple_replace_sound Δ3' _ k) //; simpl.
   rewrite right_id.
-  iIntros "[#? [[Hsh HΔ4] HΔ2]]". iFrame "#".
-  iSplitL "Hsh HΔ2".
+  iIntros "(#? & HΔ2 & Hsh & Hf & HΔ4)". iFrame "#".
+  iSplitL "Hsh Hf HΔ2".
   { iFrame. by iApply Hφ. }
-  iIntros "Hsh". iApply Hcont. by iApply "HΔ4".
+  iIntros "[Hsh Hf]". iApply Hcont. iApply "HΔ4". iFrame.
 Qed.
 
-Lemma tac_wp_send_duplicate Δ Δ' E i K R T f ip m skt sh a Φ :
+Lemma tac_wp_send_duplicate Δ Δ1 Δ1' Δ2 E i j K R T f ip m skt sh a Φ :
   let msg := (mkMessage f a (sprotocol skt) m) in
   ip_of_address f = ip →
   saddress skt = Some f →
   msg ∈ T →
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, sh ↪[ip] (skt, R, T))%I →
-  envs_entails Δ' (WP fill K (of_val $ LitV $ LitInt (String.length m)) @[ip] E {{ Φ }}) →
-  envs_entails Δ (WP fill K (SendTo (Val $ LitV $ LitSocket sh) #m #a)
-                     @[ip] E {{ Φ }}).
+  MaybeIntoLaterNEnvs 1 Δ Δ1 →
+  envs_lookup i Δ1 = Some (false, sh ↪[ip] skt)%I →
+  envs_lookup_delete false i Δ1 = Some (false, sh ↪[ip] skt, Δ1')%I →
+  envs_lookup j Δ1' = Some (false, f ⤳ (R, T))%I →
+  envs_simple_replace j false
+    (Esnoc (Esnoc Enil i (sh ↪[ip] skt)) j (f ⤳ (R, T))) Δ1' = Some Δ2 →
+  envs_entails Δ2 (WP fill K (of_val $ LitV $ LitInt (String.length m)) @[ip] E {{ Φ }}) →
+  envs_entails Δ (WP fill K (SendTo (Val $ LitV $ LitSocket sh) #m #a) @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_eq=> /= <-?????. rewrite -aneris_wp_bind.
+  rewrite envs_entails_eq=> /= <-??????? Hcont. rewrite -aneris_wp_bind.
   eapply wand_apply; first by eapply aneris_wp_send_duplicate.
   rewrite into_laterN_env_sound -!later_sep; simpl.
-  rewrite envs_lookup_split //; simpl.
-  by apply later_mono, sep_mono_r, wand_mono.
+  rewrite (envs_lookup_delete_sound _ _ _ _ false) =>//=.
+  rewrite envs_simple_replace_sound //; simpl.
+  rewrite right_id.
+  apply later_mono.
+  iIntros "(?&?& HΔ2)". iFrame.
+  iIntros "(?&?)". iApply Hcont.
+  iApply "HΔ2". iFrame.
 Qed.
 
-(* TODO: move somewhere else? *)
-Lemma of_envs_wf Δ :
-  ⊢ of_envs Δ → ⌜envs_wf Δ⌝.
-Proof. by iIntros "[% _]". Qed.
+(* (* TODO: move somewhere else? *) *)
+(* Lemma of_envs_wf Δ : *)
+(*   ⊢ of_envs Δ → ⌜envs_wf Δ⌝. *)
+(* Proof. by iIntros "[% _]". Qed. *)
 
-Lemma tac_wp_receivefrom Δ E i j k K φ R T ip skt sh a Φ :
-  ip_of_address a = ip →
-  saddress skt = Some a →
-  envs_lookup i Δ = Some (true, a ⤇ φ)%I →
-  envs_lookup j Δ = Some (false, sh ↪[ip] (skt, R, T))%I →
-  envs_entails Δ (WP fill K (of_val $ NONEV) @[ip] E {{ Φ }}) →
-  (∀ msg,
-      m_destination msg = a →
-      ((msg ∉ R →
-        ∃ Δ' Δ'',
-          envs_simple_replace j false
-            (Esnoc Enil j (sh ↪[ip] (skt, {[ msg ]} ∪ R, T))) Δ = Some Δ' ∧
-          envs_app false (Esnoc Enil k (φ msg)) Δ' = Some Δ'' ∧
-          envs_entails Δ'' (WP fill K
-            (of_val $ SOMEV (PairV (LitV $ LitString (m_body msg))
-                                   (LitV $ LitSocketAddress (m_sender msg)))) @[ip] E {{ Φ }}))
-       ∧ (msg ∈ R →
-          envs_entails Δ (WP fill K
-            (of_val $ SOMEV (PairV (LitV $ LitString (m_body msg))
-                                   (LitV $ LitSocketAddress (m_sender msg)))) @[ip] E {{ Φ }})))) →
-  envs_entails Δ (WP fill K (ReceiveFrom (Val $ LitV $ LitSocket sh))
-                     @[ip] E {{ Φ }}).
-Proof.
-  rewrite envs_entails_eq=> <- ??? Hnone Hsome. rewrite -aneris_wp_bind.
-  eapply wand_apply; first by eapply aneris_wp_receivefrom_alt.
-  rewrite envs_lookup_intuitionistic_sound //; simpl.
-  rewrite intuitionistically_elim.
-  iIntros "[? HΔ]".
-  iDestruct (of_envs_wf with "HΔ") as "%".
-  rewrite envs_lookup_sound //.
-  set of_envs_del_Δ := (of_envs (envs_delete _ _ _ _)).
-  iDestruct "HΔ" as "[H HΔ]".
-  iFrame. iModIntro.
-  iIntros (r) "[[-> Hsh] | Hr]".
-  { iApply Hnone.
-    iCombine "Hsh HΔ" as "HΔ".
-    rewrite /of_envs_del_Δ (envs_lookup_sound_2 _ _ false) //. }
-  iDestruct "Hr" as (msg) "(% & -> & [(%HR & ? & ?)  | (%HR & Hsh)])".
-  - edestruct (Hsome msg) as [Hr ?]; [done|].
-    edestruct (Hr HR) as (? & ? & ? & ? & Hcont).
-    iApply Hcont.
-    rewrite /of_envs_del_Δ.
-    rewrite envs_simple_replace_sound' //; simpl.
-    rewrite envs_app_sound //; simpl.
-    rewrite 2!right_id.
-    by iApply ("HΔ" with "[$]").
-  - edestruct (Hsome msg) as [? Hr]; [done|].
-    iApply Hr; [done|].
-    iCombine "Hsh HΔ" as "HΔ".
-    rewrite /of_envs_del_Δ (envs_lookup_sound_2 _ _ false) //.
-Qed.
- *)
+(* Lemma tac_wp_receivefrom Δ E i j k K φ R T ip skt sh a Φ : *)
+(*   ip_of_address a = ip → *)
+(*   saddress skt = Some a → *)
+(*   envs_lookup i Δ = Some (true, a ⤇ φ)%I → *)
+(*   envs_lookup j Δ = Some (false, sh ↪[ip] (skt, R, T))%I → *)
+(*   envs_entails Δ (WP fill K (of_val $ NONEV) @[ip] E {{ Φ }}) → *)
+(*   (∀ msg, *)
+(*       m_destination msg = a → *)
+(*       ((msg ∉ R → *)
+(*         ∃ Δ' Δ'', *)
+(*           envs_simple_replace j false *)
+(*             (Esnoc Enil j (sh ↪[ip] (skt, {[ msg ]} ∪ R, T))) Δ = Some Δ' ∧ *)
+(*           envs_app false (Esnoc Enil k (φ msg)) Δ' = Some Δ'' ∧ *)
+(*           envs_entails Δ'' (WP fill K *)
+(*             (of_val $ SOMEV (PairV (LitV $ LitString (m_body msg)) *)
+(*                                    (LitV $ LitSocketAddress (m_sender msg)))) @[ip] E {{ Φ }})) *)
+(*        ∧ (msg ∈ R → *)
+(*           envs_entails Δ (WP fill K *)
+(*             (of_val $ SOMEV (PairV (LitV $ LitString (m_body msg)) *)
+(*                                    (LitV $ LitSocketAddress (m_sender msg)))) @[ip] E {{ Φ }})))) → *)
+(*   envs_entails Δ (WP fill K (ReceiveFrom (Val $ LitV $ LitSocket sh)) *)
+(*                      @[ip] E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_eq=> <- ??? Hnone Hsome. rewrite -aneris_wp_bind. *)
+(*   eapply wand_apply; first by eapply aneris_wp_receivefrom_alt. *)
+(*   rewrite envs_lookup_intuitionistic_sound //; simpl. *)
+(*   rewrite intuitionistically_elim. *)
+(*   iIntros "[? HΔ]". *)
+(*   iDestruct (of_envs_wf with "HΔ") as "%". *)
+(*   rewrite envs_lookup_sound //. *)
+(*   set of_envs_del_Δ := (of_envs (envs_delete _ _ _ _)). *)
+(*   iDestruct "HΔ" as "[H HΔ]". *)
+(*   iFrame. iModIntro. *)
+(*   iIntros (r) "[[-> Hsh] | Hr]". *)
+(*   { iApply Hnone. *)
+(*     iCombine "Hsh HΔ" as "HΔ". *)
+(*     rewrite /of_envs_del_Δ (envs_lookup_sound_2 _ _ false) //. } *)
+(*   iDestruct "Hr" as (msg) "(% & -> & [(%HR & ? & ?)  | (%HR & Hsh)])". *)
+(*   - edestruct (Hsome msg) as [Hr ?]; [done|]. *)
+(*     edestruct (Hr HR) as (? & ? & ? & ? & Hcont). *)
+(*     iApply Hcont. *)
+(*     rewrite /of_envs_del_Δ. *)
+(*     rewrite envs_simple_replace_sound' //; simpl. *)
+(*     rewrite envs_app_sound //; simpl. *)
+(*     rewrite 2!right_id. *)
+(*     by iApply ("HΔ" with "[$]"). *)
+(*   - edestruct (Hsome msg) as [? Hr]; [done|]. *)
+(*     iApply Hr; [done|]. *)
+(*     iCombine "Hsh HΔ" as "HΔ". *)
+(*     rewrite /of_envs_del_Δ (envs_lookup_sound_2 _ _ false) //. *)
+(* Qed. *)
 
 End state.
 
@@ -553,7 +561,6 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
   | _ => fail "wp_socket: not a 'wp'"
   end.
 
-(*
 Tactic Notation "wp_socketbind_static" :=
   let solve_fixed ip :=
       let A := match goal with |- _ = Some (_, fixed ?A%I) => A end in
@@ -561,7 +568,7 @@ Tactic Notation "wp_socketbind_static" :=
   let solve_fixed_addr :=
       done || fail "wp_socketbind_static: cannot show address is static" in
   let solve_unbound :=
-      reflexivity || fail "wp_socketbind_static: socket is already bound" in
+      done || fail "wp_socketbind_static: socket is already bound" in
   let solve_free_port ip :=
       let p := match goal with |- _ = Some (_, free_ports ip ?p%I, _) => p end in
       iAssumptionCore || fail "wp_socketbind_static: cannot find free_ports " ip " {[ " p " ]}" in
@@ -597,7 +604,7 @@ Tactic Notation "wp_socketbind_dynamic" open_constr(φ) "as" constr(H) :=
   let solve_fixed_addr :=
       done || fail "wp_socketbind_dynamic: cannot show address is dynamic" in
   let solve_unbound :=
-      reflexivity || fail "wp_socketbind_dynamic: socket is already bound" in
+      done || fail "wp_socketbind_dynamic: socket is already bound" in
   let solve_free_port ip :=
       let p := match goal with |- _ = Some (_, free_ports ip ?p%I, _) => p end in
       iAssumptionCore || fail "wp_socketbind_dynamic: cannot find free_ports " ip " {[ " p " ]}" in
@@ -625,8 +632,11 @@ Tactic Notation "wp_socketbind_dynamic" open_constr(φ) "as" constr(H) :=
 
 Tactic Notation "wp_send" constr(Hs) :=
   let solve_socket_mapsto ip :=
-      let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in
+      let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I, _) => sh end in
       iAssumptionCore || fail "wp_send: cannot find" sh "↪ ?" in
+  let solve_message_mapsto _ :=
+      let a := match goal with |- _ = Some (_, (?a ⤳ _)%I) => a end in
+      iAssumptionCore || fail "wp_send: cannot find" a "⤳ ?" in
   let solve_socket_interp _ :=
       let _ := match goal with |- _ = Some (_, (_ ⤇ _)%I) => idtac end in
       iAssumptionCore || fail "wp_send: cannot find socket protocol" in
@@ -637,17 +647,18 @@ Tactic Notation "wp_send" constr(Hs) :=
   lazymatch goal with
   | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send _ _ _ _ _ _ _ _ K))
-      |fail 1 "foo: cannot find 'SendTo' in" e];
-    [reflexivity
-    |
-    |iSolveTC
-    |solve_socket_interp() | |solve_split () |..];
-    [|solve_socket_mapsto ip
-     |pm_reflexivity| ..];
-    [reflexivity
-    |rewrite /envs_clear_spatial
-    |wp_finish]; simpl
+      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send _ _ _ _ _ _ _ _ _ _ K))
+      |fail 1 "wp_send: cannot find 'SendTo' in" e];
+      [done|done|iSolveTC
+       |solve_socket_interp()
+       | (* socket_mapsto *)
+       | (* message_mapsto *)
+       | solve_split ()|..]
+      ; [solve_socket_mapsto ip
+        |solve_message_mapsto()
+        |pm_reflexivity
+        |pm_reduce; wp_finish
+        |pm_reduce; wp_finish]
   | _ => fail "wp_send: not a 'wp'"
   end.
 
@@ -657,50 +668,137 @@ Tactic Notation "wp_send_duplicate" :=
   let solve_socket_mapsto ip :=
       let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in
       iAssumptionCore || fail "wp_send_duplicate: cannot find" sh "↪ ?" in
+  let solve_message_mapsto _ :=
+      let a := match goal with |- _ = Some (_, (?a ⤳ _)%I) => a end in
+      iAssumptionCore || fail "wp_send_duplicate: cannot find" a "⤳ ?" in  
+  let solve_msg_send _ :=
+      let m := match goal with |- ?m ∈ _ => m end in
+      done || fail "wp_send_duplicate: cannot find" m "∈ ?" in  
   lazymatch goal with
   | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
     first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send_duplicate _ _ _ _ K))
-      |fail 1 "foo: cannot find 'SendTo' in" e];
-    [ | |
+      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send_duplicate _ _ _ _ _ _ _ K))
+      |fail 1 "wp_send_duplicate: cannot find 'SendTo' in" e];
+      [done|done
+      |solve_msg_send ()
       |iSolveTC
-      |solve_socket_mapsto ip| ..];
-    [reflexivity
-    |reflexivity
-    |
-    |wp_finish]; simpl
+      |solve_socket_mapsto ip
+      |iAssumptionCore
+      |solve_message_mapsto ()
+      |pm_reflexivity|
+      |..]; wp_finish
   | _ => fail "wp_send_duplicate: not a 'wp'"
   end.
 
-Tactic Notation "wp_receive" ident(msg) ident(Hdest) ident(Hin) "as" constr(H) :=
-  let Htmp := iFresh in
-  let finish _ :=
-      intros msg Hdest; split; intros Hin;
-      [do 2 eexists; repeat split;
-       iDestructHyp Htmp as H|]; wp_finish in
-  let solve_socket_mapsto ip :=
-      let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in
-      iAssumptionCore || fail "wp_send: cannot find" sh "↪ ?" in
-  let solve_socket_interp _ :=
-      let _ := match goal with |- _ = Some (_, (_ ⤇ _)%I) => idtac end in
-      iAssumptionCore || fail "wp_send: cannot find socket protocol" in
-  lazymatch goal with
-  | |- envs_entails _ (wp ?ip ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_receivefrom _ _ _ _ Htmp K))
-      |fail 1 "foo: cannot find 'SendTo' in" e];
-    [|
-     |solve_socket_interp ()
-     |solve_socket_mapsto ip |..];
-    [reflexivity
-    |reflexivity
-    |wp_finish
-    |finish ()]
-  | _ => fail "wp_send: not a 'wp'"
-  end.
+(* Tactic Notation "wp_receive" ident(msg) ident(Hdest) ident(Hin) "as" constr(H) := *)
+(*   let Htmp := iFresh in *)
+(*   let finish _ := *)
+(*       intros msg Hdest; split; intros Hin; *)
+(*       [do 2 eexists; repeat split; *)
+(*        iDestructHyp Htmp as H|]; wp_finish in *)
+(*   let solve_socket_mapsto ip := *)
+(*       let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in *)
+(*       iAssumptionCore || fail "wp_send: cannot find" sh "↪ ?" in *)
+(*   let solve_socket_interp _ := *)
+(*       let _ := match goal with |- _ = Some (_, (_ ⤇ _)%I) => idtac end in *)
+(*       iAssumptionCore || fail "wp_send: cannot find socket protocol" in *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?ip ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_receivefrom _ _ _ _ Htmp K)) *)
+(*       |fail 1 "foo: cannot find 'SendTo' in" e]; *)
+(*     [| *)
+(*      |solve_socket_interp () *)
+(*      |solve_socket_mapsto ip |..]; *)
+(*     [reflexivity *)
+(*     |reflexivity *)
+(*     |wp_finish *)
+(*     |finish ()] *)
+(*   | _ => fail "wp_send: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "wp_receive" ident(msg) "as" constr(H) :=
-  let Ha := fresh "H" in
-  let Hb := fresh "H" in
-  wp_receive msg Ha Hb as H.
-*)
+(* Tactic Notation "wp_receive" ident(msg) "as" constr(H) := *)
+(*   let Ha := fresh "H" in *)
+(*   let Hb := fresh "H" in *)
+(*   wp_receive msg Ha Hb as H. *)
+
+Local Lemma tac_socket_test `{anerisG Σ} ip E v1 v2 v3 :
+  {{{ True }}}
+    NewSocket
+    (Val $ LitV $ LitAddressFamily v1)
+    (Val $ LitV $ LitSocketType v2)
+    (Val $ LitV $ LitProtocol v3) @[ip] E
+  {{{ h, RET (LitV (LitSocket h));
+      h ↪[ip] (mkSocket v1 v2 v3 None true) }}}.
+Proof.
+  iIntros (?) "_ H".
+  wp_socket sh as "Hsh".
+  by iApply "H".
+Qed.
+
+Local Lemma tac_socketbind_static_test `{anerisG Σ} A E h s a :
+  saddress s = None →
+  a ∈ A →
+  {{{ ▷ fixed A ∗
+      ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+      ▷ h ↪[ip_of_address a] s }}}
+    SocketBind
+      (Val $ LitV $ LitSocket h)
+      (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E
+  {{{ RET #0;
+      h ↪[ip_of_address a] (s<| saddress := Some a |>) }}}.
+Proof.
+  iIntros (???) "(#? & >? & >?) H".
+  wp_socketbind_static.
+  by iApply "H".
+Qed.
+
+Local Lemma tac_socketbind_dynamic_test `{anerisG Σ} s A E h a φ :
+  saddress s = None →
+  a ∉ A →
+  {{{ ▷ fixed A ∗
+      ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+      ▷ h ↪[ip_of_address a] s }}}
+    SocketBind
+    (Val $ LitV $ LitSocket h)
+    (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E
+  {{{ RET #0;
+      h ↪[ip_of_address a] (s <| saddress := Some a |>) ∗ a ⤇ φ }}}.
+Proof.
+  iIntros (???) "(#? & >? & >?) H".
+  wp_socketbind_dynamic φ as "#Hφ".
+  iApply ("H" with "[$]").
+Qed.
+
+Local Lemma tac_send_test `{anerisG Σ} ip φ m h a f E s R T :
+  ip_of_address f = ip →
+  saddress s = Some f ->
+  let msg := {|
+        m_sender := f;
+        m_destination := a;
+        m_protocol := sprotocol s;
+        m_body := m;
+      |} in
+  {{{ ▷ h ↪[ip] s ∗ ▷ f ⤳ (R, T) ∗ ▷ a ⤇ φ ∗ ▷ φ msg }}}
+    SendTo (# (LitSocket h)) #m #a @[ip] E
+  {{{ RET #(String.length m);
+      h ↪[ip] s ∗ f ⤳ (R, {[ msg ]} ∪ T) }}}.
+Proof.
+  iIntros (????) "(? & ? & #? & Hφ) H".
+  wp_send "Hφ"; [done|].
+  iApply "H". iFrame.
+Qed.
+
+Local Lemma tac_send_duplicate_test `{anerisG Σ} ip m h a f E s R T :
+  ip_of_address f = ip →
+  saddress s = Some f ->
+  let msg := mkMessage f a (sprotocol s) m in
+  msg ∈ T →
+  {{{ ▷ h ↪[ip] s ∗ ▷ f ⤳ (R, T) }}}
+    SendTo (Val $ LitV $ LitSocket h) #m #a @[ip] E
+  {{{ RET #(String.length m); h ↪[ip] s ∗ f ⤳ (R, T) }}}.  
+Proof.
+  iIntros (?????) "[? ?] H".
+  wp_send_duplicate.
+  iApply "H". iFrame.
+Qed. 

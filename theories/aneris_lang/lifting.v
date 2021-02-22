@@ -400,22 +400,20 @@ Section primitive_laws.
     iFrame. iSplitR; [done|]. by iApply "HΦ".
   Qed.
 
-  Lemma wp_socketbind_static A E sh skt k a R T:
+  Lemma wp_socketbind_static A E sh skt k a :
     saddress skt = None →
     a ∈ A →
     {{{ ▷ fixed A ∗
         ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ sh ↪[ip_of_address a] skt ∗
-        ▷ a ⤳ (R, T) }}}
+        ▷ sh ↪[ip_of_address a] skt }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress a))) @ k; E
    {{{ RET (mkVal (ip_of_address a) #0);
        sh ↪[ip_of_address a] (skt<| saddress := Some a |>) ∗
-       a ⤳ (R, T) ∗ 
        ∃ φ, a ⤇ φ }}}.
   Proof.
-    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
+    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ δ κ κs n) "Hσ /=".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -435,23 +433,21 @@ Section primitive_laws.
     iApply ("HΦ" with "[$]").
   Qed.
 
-  Lemma wp_socketbind_dynamic skt A E sh k a φ R T:
+  Lemma wp_socketbind_dynamic skt A E sh k a φ :
     saddress skt = None →
     a ∉ A →
     {{{ ▷ fixed A ∗
         ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ sh ↪[ip_of_address a] skt ∗
-        ▷ a ⤳ (R, T)
+        ▷ sh ↪[ip_of_address a] skt
     }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress a))) @ k; E
     {{{ RET (mkVal (ip_of_address a) #0);
         sh ↪[ip_of_address a] (skt <| saddress := Some a |>) ∗
-        a ⤳ (R, T) ∗
         a ⤇ φ }}}.
   Proof.
-    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh & >Hrt) HΦ".
+    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (σ δ κ κs n) "Hσ /=".
      iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
