@@ -57,7 +57,8 @@ Section state_interpretation.
     ddeq a' a.
     simplify_map_eq.
     right. apply elem_of_collect.
-    exists a', (R',T'). by simplify_map_eq.
+    exists a', (R',T'). simplify_map_eq.
+    rewrite lookup_delete_ne; eauto.
   Qed.
 
   Lemma messages_resource_coh_send mh a R T msg ϕ :

@@ -33,6 +33,7 @@ theories/aneris_lang/notation.v
 theories/aneris_lang/tactics.v
 theories/aneris_lang/resources.v
 
+theories/aneris_lang/state_interp/messages_history.v
 theories/aneris_lang/state_interp/state_interp_def.v
 theories/aneris_lang/state_interp/state_interp_local_coh.v
 theories/aneris_lang/state_interp/state_interp_gnames_coh.v

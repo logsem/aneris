@@ -91,13 +91,13 @@ Section state_interpretation.
     - intros m Hm. apply H1 in Hm as (R & T & Hmh & Hmt).
       destruct (decide ((m_sender m) = (SocketAddressInet ip p))) as [Heq|Hneq].
       + rewrite Heq. rewrite lookup_insert. rewrite -Heq in Hdisj.
-        decompose_map_disjoint. naive_solver.
+        decompose_map_disjoint. by rewrite Hdisj in Hmh.
       + rewrite lookup_insert_ne; last done. set_solver.
     -  intros ip0 Sn sh skt r m HS HSn Hmr.
        destruct (decide ((m_sender m) = (SocketAddressInet ip p))) as [Heq|Hneq].
        + rewrite Heq lookup_insert.
          specialize (H2 ip0 Sn sh skt r m HS HSn Hmr) as (R & T & Hmh & ?).
-         simplify_map_eq. rewrite Heq in Hmh. set_solver.
+         simplify_map_eq. rewrite Heq in Hmh. by rewrite Hdisj in Hmh.
        + rewrite lookup_insert_ne; last done. set_solver.
     -  intros a ???. ddeq a (SocketAddressInet ip p); set_solver.
     - apply elem_of_subseteq.
