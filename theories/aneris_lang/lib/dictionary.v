@@ -35,7 +35,7 @@ Module dict.
 End dict.
 
 Section dict_spec.
-  Context `{dG : anerisG Σ}.
+  Context `{dG : anerisG Mdl Σ}.
 
   Fixpoint embed_list
            (l : list (base_lang.val * base_lang.val)) : base_lang.val :=
@@ -150,7 +150,7 @@ Section dict_spec.
 End dict_spec.
 
 Section dict_str_spec.
-  Context `{dG : anerisG Σ}.
+  Context `{dG : anerisG Mdl Σ}.
 
 
   Fixpoint embed_list_str

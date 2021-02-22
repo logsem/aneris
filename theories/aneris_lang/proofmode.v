@@ -9,7 +9,7 @@ Import uPred.
 Import Network.
 Import RecordSetNotations.
 
-Lemma tac_wp_expr_eval `{anerisG Σ} Δ s E Φ e e' :
+Lemma tac_wp_expr_eval `{anerisG Mdl Σ} Δ s E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ s; E {{ Φ }}) → envs_entails Δ (WP e @ s; E {{ Φ }}).
 Proof. by intros ->. Qed.
@@ -21,7 +21,7 @@ Tactic Notation "wp_expr_eval" tactic(t) :=
       [let x := fresh in intros x; t; unfold x; reflexivity
       |]).
 
-Lemma tac_wp_pure `{!anerisG Σ} Δ Δ' ip E e1 e2 φ n Φ :
+Lemma tac_wp_pure `{!anerisG Mdl Σ} Δ Δ' ip E e1 e2 φ n Φ :
   PureExec φ n {| expr_n := ip; expr_e := e1 |}
            {| expr_n := ip; expr_e := e2 |} →
   φ →
@@ -33,7 +33,7 @@ Proof.
   rewrite HΔ' -aneris_wp_pure_step_later //.
 Qed.
 
-Lemma tac_wp_value `{!anerisG Σ} Δ ip E Φ v :
+Lemma tac_wp_value `{!anerisG Mdl Σ} Δ ip E Φ v :
   envs_entails Δ (Φ v) →
   envs_entails Δ (WP (Val v) @[ip] E {{ Φ }}).
 Proof.
@@ -118,7 +118,7 @@ Tactic Notation "wp_find_from" := wp_pure (FindFrom _ _ _ ).
 Tactic Notation "wp_substring" := wp_pure (Substring _ _ _).
 Tactic Notation "wp_makeaddress" := wp_pure (MakeAddress _ _).
 
-Lemma tac_wp_bind `{anerisG Σ} K Δ ip E Φ (e : base_lang.expr) f :
+Lemma tac_wp_bind `{anerisG Mdl Σ} K Δ ip E Φ (e : base_lang.expr) f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ ip; E {{ v, WP f (of_val v) @ ip; E {{ Φ }} }})%I →
   envs_entails Δ (WP fill K e @ ip; E {{ Φ }}).
@@ -144,7 +144,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
 (** Heap and socket tactics *)
 Section state.
-Context `{anerisG Σ}.
+Context `{anerisG Mdl Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
@@ -722,7 +722,7 @@ Tactic Notation "wp_send_duplicate" :=
 (*   let Hb := fresh "H" in *)
 (*   wp_receive msg Ha Hb as H. *)
 
-Local Lemma tac_socket_test `{anerisG Σ} ip E v1 v2 v3 :
+Local Lemma tac_socket_test `{anerisG Mdl Σ} ip E v1 v2 v3 :
   {{{ True }}}
     NewSocket
     (Val $ LitV $ LitAddressFamily v1)
@@ -736,7 +736,7 @@ Proof.
   by iApply "H".
 Qed.
 
-Local Lemma tac_socketbind_static_test `{anerisG Σ} A E h s a :
+Local Lemma tac_socketbind_static_test `{anerisG Mdl Σ} A E h s a :
   saddress s = None →
   a ∈ A →
   {{{ ▷ fixed A ∗
@@ -753,7 +753,7 @@ Proof.
   by iApply "H".
 Qed.
 
-Local Lemma tac_socketbind_dynamic_test `{anerisG Σ} s A E h a φ :
+Local Lemma tac_socketbind_dynamic_test `{anerisG Mdl Σ} s A E h a φ :
   saddress s = None →
   a ∉ A →
   {{{ ▷ fixed A ∗
@@ -770,7 +770,7 @@ Proof.
   iApply ("H" with "[$]").
 Qed.
 
-Local Lemma tac_send_test `{anerisG Σ} ip φ m h a f E s R T :
+Local Lemma tac_send_test `{anerisG Mdl Σ} ip φ m h a f E s R T :
   ip_of_address f = ip →
   saddress s = Some f ->
   let msg := {|
@@ -789,7 +789,7 @@ Proof.
   iApply "H". iFrame.
 Qed.
 
-Local Lemma tac_send_duplicate_test `{anerisG Σ} ip m h a f E s R T :
+Local Lemma tac_send_duplicate_test `{anerisG Mdl Σ} ip m h a f E s R T :
   ip_of_address f = ip →
   saddress s = Some f ->
   let msg := mkMessage f a (sprotocol s) m in

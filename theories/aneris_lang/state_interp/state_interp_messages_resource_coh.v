@@ -20,7 +20,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   Lemma messages_resource_coh_init ip ports :
     ⊢ messages_resource_coh (history_init ip ports).

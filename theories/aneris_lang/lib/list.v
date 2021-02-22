@@ -138,7 +138,7 @@ End list_code.
 (* ---------------------------------------------------------------------- *)
 
 Section list_spec.
-  Context `{dG : anerisG Σ}.
+  Context `{dG : anerisG Mdl Σ}.
 
 
   Lemma list_make_spec ip :

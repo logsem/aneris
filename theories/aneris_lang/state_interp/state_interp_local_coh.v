@@ -18,7 +18,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   (** local_state_coh *)
   Lemma local_state_coh_heaps n γs γm σ :

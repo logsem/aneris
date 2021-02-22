@@ -148,7 +148,7 @@ Section strings.
 End strings.
 
 Section library.
-  Context `{dG : anerisG Σ}.
+  Context `{dG : anerisG Mdl Σ}.
 
   Definition valid_tag t := index 0 "_" t = None.
 

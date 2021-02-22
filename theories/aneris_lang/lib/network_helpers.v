@@ -40,7 +40,7 @@ Import uPred.
 
 
 Section library.
-  Context `{dG : anerisG Σ}.
+  Context `{dG : anerisG Mdl Σ}.
 
   Lemma unSOME_spec ip v v' :
     {{{ ⌜v = SOMEV v'⌝ }}} unSOME (Val v) @[ip] {{{ RET v'; True }}}.

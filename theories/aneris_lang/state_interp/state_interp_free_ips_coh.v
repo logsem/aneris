@@ -20,7 +20,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   (** free_ips_coh *)
   Lemma free_ips_coh_init ip ips σ :

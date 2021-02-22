@@ -20,7 +20,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   (** socket_interp_coh *)
   Lemma socket_interp_coh_init ips A M σ f :

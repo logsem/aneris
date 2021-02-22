@@ -19,7 +19,7 @@ Instance subG_lockΣ {Σ} : subG lockΣ Σ → lockG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!anerisG Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Mdl Σ, !lockG Σ} (N : namespace).
 
   Definition lock_inv (n : Network.ip_address) (γ : gname) (l : loc) (R : iProp Σ) : iProp Σ :=
     (∃ b : bool, l ↦[n] #b ∗ if b then True else own γ (Excl ()) ∗ R)%I.

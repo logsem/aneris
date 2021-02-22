@@ -28,7 +28,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
@@ -38,37 +38,40 @@ Section state_interpretation.
     iIntros (σ1 δ k σ2 ks nt Hstep) "Hst".
     rewrite /state_interp; simplify_eq /=.
     iDestruct "Hst"
-      as (γm mh)
+      as (γm)
            "(%Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iApply step_fupd_fupd; iApply step_fupd_intro; first done.
-    iExists δ.
-    iIntros "!> !>".
-    iSplit; first done.
-    iExists γm, mh.
-    iFrame.
     destruct Hstep as
         [ ip σ k Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ]; simpl.
-    { iFrame "Hsi".
-      iSplitR; [eauto using gnames_coh_update_sockets|].
-      iSplitR; [eauto using network_sockets_coh_deliver_message|].
-      iSplitR; [eauto using messages_history_coh_deliver_message|].
-      iSplitL "Hlcoh".
-      - by iApply (local_state_coh_deliver_message with "[Hlcoh]").
-      - iSplitL "Hfreeips".
-        + by iApply free_ips_coh_deliver_message.
-        + rewrite /messages_resource_coh.
-          iApply (big_sepS_mono with "Hmres").
-          iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame.
-          iLeft. iDestruct "Hmr" as (phi) "(Hphi & Hphi2)". eauto with iFrame. }
-    iFrame.
+    { iExists δ. iIntros "!> !>". iSplit.
+      - iPureIntro. split_and!; last by left.
+        simplify_eq. admit.
+      - iExists γm. iFrame "Hsi".
+        iSplitR; [eauto using gnames_coh_update_sockets|].
+        iSplitR; [eauto using network_sockets_coh_deliver_message|].
+        iSplitR; [eauto using messages_history_coh_deliver_message|].
+        iFrame.
+        iSplitL "Hlcoh".
+        + by iApply (local_state_coh_deliver_message with "[Hlcoh]").
+        + iSplitL "Hfreeips".
+            by iApply free_ips_coh_deliver_message.
+            rewrite /messages_resource_coh.
+            iApply (big_sepS_mono with "Hmres").
+            iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame.
+            iLeft. iDestruct "Hmr" as (phi) "(Hphi & Hphi2)".
+            eauto with iFrame. }
+    iExists δ. iIntros "!> !>". iSplit.
+    iPureIntro. split_and!; last by left.
+    simplify_eq. admit.
+    iExists γm. iFrame.
     iSplitR; first done.
     iSplitR; first done.
-    iSplitR. iPureIntro. by eapply messages_history_drop_message.
+    iSplitR. iPureIntro. simpl. by eapply messages_history_drop_message.
     rewrite /messages_resource_coh.
     iApply (big_sepS_mono with "Hmres").
     iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame.
     iLeft. iDestruct "Hmr" as (phi) "(Hphi & Hphi2)". eauto with iFrame.
-  Qed.
+    Admitted.
 
 End state_interpretation.

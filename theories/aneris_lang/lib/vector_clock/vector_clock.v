@@ -78,7 +78,7 @@ Section vect_code.
 End vect_code.
 
 Section vect_specs.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   Definition is_vc (v : base_lang.val) (t : vector_clock) :=
     list_coh (map (λ (n : nat), #n) t) v.
@@ -384,7 +384,7 @@ Definition vc_valid_val (v : base_lang.val) :=
 Definition vc_is_ser (v : base_lang.val) (s : string) :=
   ∃ l, is_vc v l ∧ s = vc_to_string l.
 
-Definition vect_serialize_spec `{!anerisG Σ} ip v:
+Definition vect_serialize_spec `{!anerisG Mdl Σ} ip v:
   {{{ ⌜vc_valid_val v⌝ }}}
     vect_serialize v @[ip]
   {{{ s, RET #s; ⌜vc_is_ser v s⌝ }}}.
@@ -407,7 +407,7 @@ Proof.
     iPureIntro; eexists (_ :: _); simpl; split; first eexists _; eauto.
 Qed.
 
-Definition vect_deserialize_spec `{!anerisG Σ} ip v s:
+Definition vect_deserialize_spec `{!anerisG Mdl Σ} ip v s:
   {{{ ⌜vc_is_ser v s⌝ }}}
     vect_deserialize #s @[ip]
   {{{ RET v; True }}}.

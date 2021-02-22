@@ -1,5 +1,6 @@
 From stdpp Require Import fin_maps gmap.
-From iris.algebra Require Import auth gmap frac agree coPset gset frac_auth ofe.
+From iris.algebra Require Import auth gmap frac agree coPset
+     gset frac_auth ofe excl.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop.
 From iris.proofmode Require Import tactics.
@@ -10,6 +11,12 @@ Set Default Proof Using "Type".
 
 Import uPred.
 Import Network.
+
+
+Record Model := model {
+  model_state :> Type;
+  model_rel :> model_state → model_state → Prop
+}.
 
 Record node_gnames := Node_gname {
   heap_name : gname;
@@ -41,8 +48,11 @@ Proof. apply _. Qed.
 
 Definition socket_interp Σ := message -d> iPropO Σ.
 
+Canonical Structure ModelO (Mdl : Model) := leibnizO Mdl.
+
+
 (** The system CMRA *)
-Class anerisG Σ := AnerisG {
+Class anerisG (Mdl : Model) Σ := AnerisG {
   aneris_invG :> invG Σ;
   (** global tracking of the ghost names of node-local heaps *)
   aneris_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
@@ -67,9 +77,12 @@ Class anerisG Σ := AnerisG {
   (** message history *)
   aneris_messagesG :> inG Σ (authR messagesUR);
   aneris_messages_name : gname;
+  (** model *)
+  anerisG_model_name : gname;
+  anerisG_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
 }.
 
-Class anerisPreG Σ := AnerisPreG {
+Class anerisPreG Σ (Mdl : Model) := AnerisPreG {
   anerisPre_invG :> invPreG Σ;
   anerisPre_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
   anerisPre_heapG :> inG Σ (authR local_heapUR);
@@ -80,9 +93,10 @@ Class anerisPreG Σ := AnerisPreG {
   anerisPre_savedPredG :> savedPredG Σ message;
   anerisPre_fixedG :> inG Σ (agreeR fixedUR);
   anerisPre_messagesG :> inG Σ (authR messagesUR);
+  anerisPre_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
 }.
 
-Definition anerisΣ : gFunctors :=
+Definition anerisΣ (Mdl : Model) : gFunctors :=
   #[invΣ;
    GFunctor (authR node_gnames_mapUR);
    GFunctor (authR local_heapUR);
@@ -92,14 +106,19 @@ Definition anerisΣ : gFunctors :=
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
    GFunctor (agreeR fixedUR);
-   GFunctor (authR messagesUR)
+   GFunctor (authR messagesUR);
+   GFunctor (authUR (optionUR (exclR (ModelO Mdl))))
 ].
 
-Global Instance subG_anerisPreG {Σ} : subG anerisΣ Σ → anerisPreG Σ.
+Global Instance subG_anerisPreG {Σ Mdl} :
+  subG (anerisΣ Mdl) Σ → anerisPreG Σ Mdl.
 Proof. constructor; solve_inG. Qed.
 
 Section definitions.
-  Context `{aG : !anerisG Σ}.
+  Context `{aG : !anerisG Mdl Σ}.
+
+  Definition auth_st (st : Mdl) := own anerisG_model_name (● Excl' st).
+  Definition frag_st (st : Mdl) := own anerisG_model_name (◯ Excl' st).
 
   (** Authoritative view of the system ghost names *)
   Definition node_gnames_auth (m : gmap ip_address node_gnames) :=
@@ -197,15 +216,15 @@ Notation "a ⤳ s" := (a ⤳{ 1 } s)%I (at level 20) : bi_scope.
 (** Socket inteerpretation (LaTeX: [\Mapsto]) *)
 Notation "a ⤇ Φ" := (si_pred a Φ) (at level 20).
 
-Lemma node_gnames_auth_init `{anerisPreG Σ} :
+Lemma node_gnames_auth_init `{anerisPreG Σ Mdl} :
   ⊢ |==> ∃ γ, own (A:=authR node_gnames_mapUR) γ (● (to_agree <$> ∅)).
 Proof. apply own_alloc. by apply auth_auth_valid. Qed.
 
-Lemma saved_si_init `{anerisPreG Σ} :
+Lemma saved_si_init `{anerisPreG Σ Mdl} :
   ⊢ |==> ∃ γ, own (A := authR socket_interpUR) γ (● (to_agree <$> ∅) ⋅ ◯ (to_agree <$> ∅)).
 Proof. apply own_alloc. by apply auth_both_valid_discrete. Qed.
 
-Lemma saved_si_update `{anerisG Σ} (A : gset socket_address) γsi f :
+Lemma saved_si_update `{anerisG Mdl Σ} (A : gset socket_address) γsi f :
   ⊢ own (A := authR socket_interpUR) γsi (● (to_agree <$> ∅)) ∗
     own (A := authR socket_interpUR) γsi (◯ (to_agree <$> ∅)) ==∗
     ∃ M : gmap socket_address gname,
@@ -239,16 +258,16 @@ Lemma saved_si_update `{anerisG Σ} (A : gset socket_address) γsi f :
      rewrite dom_insert_L elements_union_singleton //. auto.
 Qed.
 
-Lemma fixed_init `{anerisPreG Σ} A :
+Lemma fixed_init `{anerisPreG Σ Mdl} A :
   ⊢ |==> ∃ γ, own (A := agreeR (gsetUR socket_address)) γ (to_agree A).
 Proof. by apply own_alloc. Qed.
 
 (** Free ports lemmas *)
-Lemma free_ports_auth_init `{anerisPreG Σ} :
+Lemma free_ports_auth_init `{anerisPreG Σ Mdl} :
   ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● ∅).
 Proof. apply own_alloc. by apply auth_auth_valid. Qed.
 
-Lemma free_ips_init `{anerisPreG Σ} A :
+Lemma free_ips_init `{anerisPreG Σ Mdl} A :
   ⊢ |==> ∃ γ, own γ (● GSet A) ∗ [∗ set] ip ∈ A, own γ (◯ GSet {[ ip ]}).
 Proof.
   iMod (own_alloc (● GSet ∅)) as (γ) "HM"; [by apply auth_auth_valid|].
@@ -280,8 +299,16 @@ Proof.
   rewrite -!elem_of_elements -elem_of_list_permutation_proper; eauto.
 Qed.
 
+Lemma model_init `{anerisPreG Σ Mdl} (st : Mdl) :
+  ⊢ |==> ∃ γ, own γ (● Excl' st) ∗ own γ (◯ Excl' st).
+Proof.
+  iMod (own_alloc (● Excl' st ⋅ ◯ Excl' st)) as (γ) "[Hfl Hfr]".
+  { by apply auth_both_valid_2. }
+  iExists _. by iFrame.
+Qed.
+
 Section resource_lemmas.
-  Context `{aG : !anerisG Σ}.
+  Context `{aG : !anerisG Mdl Σ}.
 
   Global Instance mapsto_node_persistent ip γn : Persistent (mapsto_node ip γn).
   Proof. rewrite mapsto_node_eq /mapsto_node_def. apply _. Qed.
@@ -444,7 +471,8 @@ Section resource_lemmas.
     Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ
                           : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof. solve_proper. Qed.
-  Global Instance si_pred_prop `{anerisG Σ} a : Proper ((≡) ==> (≡)) (si_pred a).
+  Global Instance si_pred_prop `{anerisG Mdl Σ} a :
+    Proper ((≡) ==> (≡)) (si_pred a).
   Proof. solve_proper. Qed.
 
   Lemma free_ip_included A ip :

@@ -18,7 +18,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section definitions.
-  Context `{anerisG Σ}.
+  Context `{anerisG Mdl Σ}.
   Implicit Types σ : state.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
@@ -197,13 +197,9 @@ Section definitions.
 
 End definitions.
 
-Record Model := model {
-  model_state : Type;
-  model_rel : model_state → model_state → Prop
-}.
-
 Section Aneris_AS.
-  Context `{Mdl : Model}.
+  Context `{aG : !anerisG Mdl Σ}.
+
 
   Record aneris_aux_state := AnerisAuxState {
     aneris_AS_mhist : messages_history;
@@ -252,7 +248,6 @@ Proof.
   simpl; intros ??; split.
 Admitted.
 
-(* TODO: Prove me with histories of sent and received messages. *)
 Lemma aneris_AS_valid_state_evolution_finitary :
   valid_state_evolution_finitary aneris_AS.
 Proof.
@@ -265,7 +260,8 @@ Admitted.
 (*   solve_decision. *)
 (* Qed. *)
 
-Global Instance anerisG_irisG `{!anerisG Σ} : irisG aneris_lang aneris_AS Σ := {
+Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
+  irisG aneris_lang aneris_AS Σ := {
   iris_invG := _;
   state_interp σ δ _ _ := aneris_state_interp σ (aneris_AS_mhist δ);
   fork_post _ := True%I;

@@ -11,12 +11,12 @@ Record serialization := {
   DBS_deser : base_lang.val;
   DBS_is_ser : base_lang.val → string → Prop;
   DBS_ser_spec :
-    ∀ `{!anerisG Σ} ip v,
+    ∀ `{!anerisG Mdl Σ} ip v,
     {{{ ⌜DBS_valid_val v⌝ }}}
       DBS_ser v @[ip]
     {{{ (s : string), RET #s; ⌜DBS_is_ser v s⌝ }}};
   DBS_deser_spec :
-    ∀ `{!anerisG Σ} ip v s,
+    ∀ `{!anerisG Mdl Σ} ip v s,
     {{{ ⌜DBS_is_ser v s⌝ }}}
       DBS_deser #s @[ip]
     {{{ RET v; True }}}; }.
@@ -33,7 +33,7 @@ Definition int_deser : base_lang.val := λ: "v", unSOME (s2i "v").
 Definition int_is_ser (v : base_lang.val) (s : string) :=
   ∃ (i : Z), v = #i ∧ s = StringOfZ i.
 
-Lemma int_ser_spec `{!anerisG Σ} ip v :
+Lemma int_ser_spec `{!anerisG Mdl Σ} ip v :
   {{{ ⌜int_valid_val v⌝ }}}
     int_ser v @[ip]
   {{{ (s : string), RET #s; ⌜int_is_ser v s⌝ }}}.
@@ -44,7 +44,7 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma int_deser_spec `{!anerisG Σ} ip v s :
+Lemma int_deser_spec `{!anerisG Mdl Σ} ip v s :
   {{{ ⌜int_is_ser v s⌝ }}}
     int_deser #s @[ip]
   {{{ RET v; True }}}.
@@ -76,7 +76,7 @@ Definition unit_deser : base_lang.val := λ: "v", #().
 
 Definition unit_is_ser (v : base_lang.val) (s : string) := v = #() ∧ s = "".
 
-Lemma unit_ser_spec `{!anerisG Σ} ip v :
+Lemma unit_ser_spec `{!anerisG Mdl Σ} ip v :
   {{{ ⌜unit_valid_val v⌝ }}}
     unit_ser v @[ip]
   {{{ (s : string), RET #s; ⌜unit_is_ser v s⌝ }}}.
@@ -87,7 +87,7 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma unit_deser_spec `{!anerisG Σ} ip v s :
+Lemma unit_deser_spec `{!anerisG Mdl Σ} ip v s :
   {{{ ⌜unit_is_ser v s⌝ }}}
     unit_deser #s @[ip]
   {{{ RET v; True }}}.
@@ -117,7 +117,7 @@ Definition string_deser : base_lang.val := λ: "v", "v".
 
 Definition string_is_ser (v : base_lang.val) (s : string) := v = #s.
 
-Lemma string_ser_spec `{!anerisG Σ} ip v:
+Lemma string_ser_spec `{!anerisG Mdl Σ} ip v:
   {{{ ⌜string_valid_val v⌝ }}}
     string_ser v @[ip]
   {{{ (s : string), RET #s; ⌜string_is_ser v s⌝ }}}.
@@ -128,7 +128,7 @@ Proof.
   iApply "HΦ"; eauto.
 Qed.
 
-Lemma string_deser_spec `{!anerisG Σ} ip v s:
+Lemma string_deser_spec `{!anerisG Mdl Σ} ip v s:
   {{{ ⌜string_is_ser v s⌝ }}}
     string_deser #s @[ip]
   {{{ RET v; True }}}.
@@ -182,7 +182,7 @@ Section prod_serialization.
       v = (v1, v2)%V ∧ DBS_is_ser A v1 s1 ∧ DBS_is_ser B v2 s2 ∧
       s = StringOfZ (String.length s1) +:+ "_" +:+ s1 +:+ s2.
 
-  Lemma prod_ser_spec `{!anerisG Σ} ip v:
+  Lemma prod_ser_spec `{!anerisG Mdl Σ} ip v:
     {{{ ⌜prod_valid_val v⌝ }}}
       prod_ser (DBS_ser A) (DBS_ser B) v @[ip]
     {{{ (s : string), RET #s; ⌜prod_is_ser v s⌝ }}}.
@@ -202,7 +202,7 @@ Section prod_serialization.
     rewrite !assoc; done.
   Qed.
 
-  Lemma prod_deser_spec `{!anerisG Σ} ip v s:
+  Lemma prod_deser_spec `{!anerisG Mdl Σ} ip v s:
     {{{ ⌜prod_is_ser v s⌝ }}}
       prod_deser (DBS_deser A) (DBS_deser B) #s @[ip]
     {{{ RET v; True }}}.
@@ -300,7 +300,7 @@ Section sum_serialization.
       (v = InjLV w ∧ DBS_is_ser A w s' ∧ s = "L_" +:+ s') ∨
       (v = InjRV w ∧ DBS_is_ser B w s' ∧ s = "R_" +:+ s').
 
-  Lemma sum_ser_spec `{!anerisG Σ} ip v:
+  Lemma sum_ser_spec `{!anerisG Mdl Σ} ip v:
     {{{ ⌜sum_valid_val v⌝ }}}
       sum_ser (DBS_ser A) (DBS_ser B) v @[ip]
     {{{ (s : string), RET #s; ⌜sum_is_ser v s⌝ }}}.
@@ -319,7 +319,7 @@ Section sum_serialization.
       iApply "HΦ"; eauto 10.
   Qed.
 
-  Lemma sum_deser_spec `{!anerisG Σ} ip v s:
+  Lemma sum_deser_spec `{!anerisG Mdl Σ} ip v s:
     {{{ ⌜sum_is_ser v s⌝ }}}
       sum_deser (DBS_deser A) (DBS_deser B) #s @[ip]
     {{{ RET v; True }}}.
@@ -395,7 +395,7 @@ Section option_serialization.
   Definition option_valid_val := @sum_valid_val unit_serialization T.
   Definition option_is_ser := @sum_is_ser unit_serialization T.
 
-  Lemma option_ser_spec `{!anerisG Σ} ip v:
+  Lemma option_ser_spec `{!anerisG Mdl Σ} ip v:
     {{{ ⌜option_valid_val v⌝ }}}
       option_ser (DBS_ser T) v @[ip]
     {{{ (s : string), RET #s; ⌜option_is_ser v s⌝ }}}.
@@ -404,7 +404,7 @@ Section option_serialization.
     iApply (@sum_ser_spec unit_serialization); done.
   Qed.
 
-  Lemma option_deser_spec `{!anerisG Σ} ip v s:
+  Lemma option_deser_spec `{!anerisG Mdl Σ} ip v s:
     {{{ ⌜option_is_ser v s⌝ }}}
       option_deser (DBS_deser T) #s @[ip]
     {{{ RET v; True }}}.

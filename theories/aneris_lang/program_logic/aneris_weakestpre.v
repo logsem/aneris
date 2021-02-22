@@ -10,20 +10,20 @@ Set Default Proof Using "Type".
 
 Import Network.
 
-Definition aneris_wp_def `{!anerisG Σ} (ip : ip_address) (E : coPset)
+Definition aneris_wp_def `{!anerisG Mdl Σ} (ip : ip_address) (E : coPset)
            (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
   (is_node ip -∗
    wp NotStuck E (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!anerisG Σ} : seal (@aneris_wp_def Σ _).
+Definition aneris_wp_aux `{!anerisG Mdl Σ} : seal (@aneris_wp_def Σ _).
 Proof. by eexists. Qed.
-Instance aneris_wp `{!anerisG Σ} : Wp base_lang (iProp Σ) ip_address :=
+Instance aneris_wp `{!anerisG Mdl Σ} : Wp base_lang (iProp Σ) ip_address :=
   aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!anerisG Σ} : aneris_wp = @aneris_wp_def Σ _ :=
+Definition aneris_wp_eq `{!anerisG Mdl Σ} : aneris_wp = @aneris_wp_def Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Section aneris_wp.
-Context `{!anerisG Σ}.
+Context `{!anerisG Mdl Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -268,7 +268,7 @@ End aneris_wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 

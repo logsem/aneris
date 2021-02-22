@@ -30,7 +30,7 @@ Definition remove : base_lang.val :=
            (release "lock" ;; "res")).
 
 Section spec.
-  Context `{!anerisG Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Mdl Σ, !lockG Σ} (N : namespace).
 
   Local Notation iProp := (iProp Σ).
 

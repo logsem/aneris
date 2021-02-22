@@ -12,7 +12,7 @@ End code.
 Notation "'assert:' e" := (assert (λ: <>, e))%E (at level 99) : expr_scope.
 
 Section library.
-  Context `{dG : anerisG Σ}.
+  Context `{dG : anerisG Mdl Σ}.
 
   Lemma wp_assert ip E (Φ : val → iProp Σ) e :
     WP e @[ip] E {{ v, ⌜v = #true⌝ ∧ ▷ Φ #() }} -∗ WP assert: e @[ip] E {{ Φ }}.

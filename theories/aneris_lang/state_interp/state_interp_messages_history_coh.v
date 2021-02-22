@@ -21,7 +21,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   (* receive_buffers_coh *)
   Lemma receive_buffers_coh_alloc_socket σ mh s sh ip Sn :

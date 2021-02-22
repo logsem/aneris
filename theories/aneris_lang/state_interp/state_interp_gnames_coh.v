@@ -20,7 +20,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Σ}.
+  Context `{!anerisG Mdl Σ}.
 
   (** gnames_coh *)
   Lemma gnames_coh_singleton ip γs h Sn mh:

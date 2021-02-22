@@ -8,7 +8,7 @@ Notation "( ip1 ; e1 )  ||| ( ip2 ; e2 )" :=
   (Start ip2 e2, Start ip1 e1)%E.
 
 Section proof.
-  Context `{dG : !anerisG Σ}.
+  Context `{dG : !anerisG Mdl Σ}.
 
   Lemma par_spec Φ1 Φ2 P1 P2 ip1 ip2 e1 e2 :
     P1 ≠ ∅ ∧ P2 ≠ ∅ →

@@ -12,7 +12,7 @@ Import Network.
 Import RecordSetNotations.
 
 Section lifting_pure_exec.
-  Context `{anerisG Σ}.
+  Context `{anerisG Mdl Σ}.
 
   Implicit Types ip : ip_address.
   Implicit Types P : iProp Σ.
@@ -48,7 +48,7 @@ Section lifting_pure_exec.
 End lifting_pure_exec.
 
 Section lifting_node_local.
-  Context `{anerisG Σ}.
+  Context `{anerisG Mdl Σ}.
 
   Implicit Types ip : ip_address.
   Implicit Types P : iProp Σ.
@@ -150,7 +150,7 @@ Section lifting_node_local.
 End lifting_node_local.
 
 Section lifting_network.
-  Context `{anerisG Σ}.
+  Context `{anerisG Mdl Σ}.
 
   Implicit Types ip : ip_address.
   Implicit Types P : iProp Σ.
