@@ -220,7 +220,20 @@ Section Aneris_AS.
     saddress skt = Some a →
     get_buffer S a = Some r.
   Proof.
-  Admitted.
+    intros Hskcoh HS HSn Hskt.
+    rewrite /get_buffer HS /=.
+    destruct (find _ _) as [[sh' [skt' r']]|] eqn:Hf; simpl in *; last first.
+    { apply elem_of_map_to_list, elem_of_list_In in HSn.
+      eapply find_none in Hf; last done.
+      rewrite bool_decide_eq_true_2 in Hf; done. }
+    apply find_some in Hf as [Hf1 Hf2%bool_decide_eq_true].
+    apply elem_of_list_In, elem_of_map_to_list' in Hf1.
+    simpl in *.
+    assert (sh' = sh) as ->.
+    { apply (Hskcoh sh' sh skt' skt r' r); eauto.
+      rewrite Hskt Hf2; done. }
+    rewrite Hf1 in HSn; simplify_eq; done.
+  Qed.
 
   Lemma get_buffer_some r r' ip sh skt Sn S a :
     socket_handlers_coh Sn →
