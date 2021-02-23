@@ -1,4 +1,5 @@
-From stdpp Require Import fin_maps gmap.
+From stdpp Require Import fin_maps gmap option.
+From aneris.prelude Require Import quantifiers.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
@@ -212,25 +213,169 @@ Section Aneris_AS.
        ((find (λ hsr, bool_decide (saddress hsr.2.1 = Some sa)))
           (map_to_list h))).
 
-  (* Lemma get_buffer_correc S sa : *)
-  (*   get_buffer S sa = Some M *)
+  Lemma get_buffer_some r r' ip sh skt Sn S a :
+    socket_handlers_coh Sn →
+    ip_of_address a = ip →
+    saddress skt = Some a →
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    get_buffer S a = Some r' →
+    r = r'.
+  Proof.
+    rewrite /get_buffer bind_Some. intros Hshcoh -> Haddr Hsh HSn.
+    intros
+      (Skts & HSkts
+       & (hsr & (Hb2 & Hb3%bool_decide_eq_true)%find_some & Hb4)%fmap_Some_1).
+    apply elem_of_list_In in Hb2.
+    destruct hsr as (h & (s & r0)).
+    eapply elem_of_map_to_list in Hb2.
+    destruct (decide (sh = h)) as [->|].
+    - simplify_eq /=. rewrite HSn in Hb2. naive_solver.
+    - simplify_eq /=.
+      assert (sh = h).
+      { eapply Hshcoh; eauto. simplify_eq. simpl in Hb3. by rewrite Hb3. }
+      done.
+  Qed.
 
-  Definition sent_received_at_evolution (M2 : message_soup)
+ Lemma get_buffer_some2 ip sh skt r r0 Sn S a buf :
+    socket_handlers_coh Sn →
+    ip_of_address a = ip →
+    saddress skt = Some a →
+    Sn !! sh = Some (skt, r0) →
+    get_buffer (<[ip:=<[sh:=(skt, r)]> Sn]> S) a = Some buf → r = buf.
+  Proof.
+     rewrite /get_buffer.
+     rewrite bind_Some.
+     intros
+       Hshcoh -> Haddr Hsh
+       (Skts & HSkts
+        & (hsr & (Hb2 & Hb3%bool_decide_eq_true)%find_some & Hb4)%fmap_Some_1).
+     rewrite lookup_insert in HSkts.
+     apply elem_of_list_In in Hb2.
+     destruct hsr as (h & (s & r')).
+     eapply elem_of_map_to_list in Hb2.
+     destruct (decide (sh = h)) as [->|].
+     - simplify_eq. rewrite lookup_insert in Hb2. by simplify_eq.
+     - inversion HSkts. rewrite -H0 in Hb2.
+       rewrite lookup_insert_ne in Hb2; last done.
+       assert (sh = h).
+       { eapply Hshcoh; eauto. simplify_eq. simpl in Hb3. by rewrite Hb3. }
+       done.
+  Qed.
+
+  Definition sent_received_at_evolution (M1 M2 : message_soup)
              (S1 S2 : gmap ip_address sockets)
              (sa : socket_address) (RT : message_soup * message_soup)
     : message_soup * message_soup :=
     default RT
     (get_buffer S1 sa ≫=
      (λ r1, get_buffer S2 sa ≫=
-       (λ r2, Some (RT.1 ∪ (r1 ∖ r2), RT.2 ∪ (messages_sent_from sa M2))))).
+       (λ r2, Some (RT.1 ∪ (r1 ∖ r2),
+                    RT.2 ∪ (messages_sent_from sa (M2 ∖ M1)))))).
 
+  Lemma sent_received_at_evolution_drop_message
+        m M S a RT (mh : messages_history):
+    m ∈ M →
+    mh !! a = Some RT →
+    RT = sent_received_at_evolution M (M ∖ {[m]}) S S a RT.
+  Proof.
+    intros Hm Hmha. rewrite /sent_received_at_evolution.
+    match goal with |-  _ = default _ ?x => destruct x eqn:Heq end; last done.
+    destruct (get_buffer S a) eqn:Hbeq; last done.
+    simpl in Heq. rewrite difference_diag_L right_id_L in Heq.
+    assert (M ∖ {[m]} ∖ M = ∅) as Hest by set_solver. rewrite Hest in Heq.
+    rewrite /messages_sent_from filter_empty_L right_id_L in Heq.
+    rewrite -Heq. simpl. by destruct RT.
+  Qed.
 
-Definition message_history_evolution (M2 : message_soup)
+  Lemma sent_received_at_evolution_deliver_message ip Sn sh a skt r m S M RT :
+    m ∈ messages_to_receive_at a M →
+    socket_handlers_coh Sn →
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    ip = ip_of_address a →
+    saddress skt = Some a →
+    RT = sent_received_at_evolution
+           M M S (<[ip:=<[sh:=(skt, r ∪ {[m]})]> Sn]> S) a RT.
+  Proof.
+    intros ??????.
+    rewrite /sent_received_at_evolution.
+    match goal with |-  _ = default _ ?x => destruct x eqn:Heq end; last done.
+    destruct (get_buffer S a) eqn:Hbeq; last done.
+    simpl in Heq. rewrite difference_diag_L in Heq.
+    rewrite /messages_sent_from filter_empty_L right_id_L in Heq.
+    destruct
+      (get_buffer (<[ip:=<[sh:=(skt, r ∪ {[m]})]> Sn]> S) a) eqn:Heq2; last done.
+    simpl in *.
+    eapply get_buffer_some2 in Heq2; eauto.
+    rewrite -Heq2 in Heq.
+    simplify_eq. eapply get_buffer_some in Hbeq; eauto.
+    inversion Hbeq. subst.
+    assert (m0 ∖ (m0 ∪ {[m]}) = ∅) as -> by set_solver.
+    rewrite right_id_L. intuition.
+  Qed.
+
+  Lemma sent_received_at_evolution_ne
+        ip a a' sh skt (mh : messages_history) p Sn M S r:
+    mh !! a' = Some p →
+    saddress skt = Some a →
+    a' ≠ a →
+    p = sent_received_at_evolution M M S (<[ip:=<[sh:=(skt, r)]> Sn]> S) a' p.
+  Proof.
+    intros ???.
+    rewrite /sent_received_at_evolution.
+    match goal with |-  _ = default _ ?x => destruct x eqn:Heq end; last done.
+    destruct (get_buffer S a') eqn:Hbeq; last done.
+    simpl in Heq. rewrite difference_diag_L in Heq.
+    rewrite /messages_sent_from filter_empty_L right_id_L in Heq.
+    destruct
+      (get_buffer (<[ip:=<[sh:=(skt, r)]> Sn]> S) a') eqn:Heq2; last done.
+    simpl in *.
+    assert (Some m0 = Some m) as Heq3.
+    { simplify_eq. rewrite -Hbeq -Heq2. admit. }
+    simplify_eq. rewrite difference_diag_L right_id_L.
+    by destruct p.
+  Admitted.
+
+  Definition message_history_evolution (M1 M2 : message_soup)
              (S1 S2 : gmap ip_address sockets) (mh1 : messages_history)
   : messages_history :=
-  map_imap (λ sa RT, Some (sent_received_at_evolution M2 S1 S2 sa RT)) mh1.
+  map_imap (λ sa RT, Some (sent_received_at_evolution M1 M2 S1 S2 sa RT)) mh1.
 
-  Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
+  Lemma message_history_evolution_deliver_message ip Sn sh a skt r m S M mh :
+    m ∈ messages_to_receive_at a M →
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    ip = ip_of_address a →
+    saddress skt = Some a →
+    socket_handlers_coh Sn →
+    mh = message_history_evolution M M S (<[ip:=<[sh:=(skt, r ∪ {[m]})]> Sn]> S) mh.
+  Proof.
+  intros ??????.
+  rewrite-{1}(map_imap_Some mh).
+  rewrite /message_history_evolution.
+  apply map_imap_ext.
+  intros a'.
+  destruct (mh !! a') eqn:Hmh; rewrite Hmh; last done; simpl.
+  do 2 f_equal.
+  destruct (decide (a' = a)) as [->|Hneq].
+  - by eapply sent_received_at_evolution_deliver_message.
+  - rewrite /sent_received_at_evolution.
+      by eapply sent_received_at_evolution_ne.
+  Qed.
+
+Lemma message_history_evolution_drop_message m S M mh :
+  m ∈ M →
+  messages_history_coh M S mh →
+  mh = message_history_evolution M (M ∖ {[m]}) S S mh.
+Proof.
+  intros ??. rewrite-{1}(map_imap_Some mh).
+  rewrite /message_history_evolution. apply map_imap_ext.
+  intros a'. destruct (mh !! a') eqn:Hmh; rewrite Hmh; last done; simpl.
+  do 2 f_equal. by eapply sent_received_at_evolution_drop_message.
+Qed.
+
+Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
     mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2.
 
 Program Definition aneris_AS : AuxState aneris_lang :=
@@ -238,6 +383,7 @@ Program Definition aneris_AS : AuxState aneris_lang :=
      valid_state_evolution σ1 δ1 κ σ2 δ2 :=
        aneris_AS_mhist δ2 =
        message_history_evolution
+         (state_ms σ1)
          (state_ms σ2)
          (state_sockets σ1) (state_sockets σ2) (aneris_AS_mhist δ1) ∧
        user_model_evolution
