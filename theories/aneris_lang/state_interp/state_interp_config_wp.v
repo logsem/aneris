@@ -16,7 +16,8 @@ From aneris.aneris_lang.state_interp Require Import
      state_interp_network_sockets_coh
      state_interp_socket_interp_coh
      state_interp_messages_resource_coh
-     state_interp_messages_history_coh.
+     state_interp_messages_history_coh
+     auxiliary_state.
 
 From aneris.aneris_lang.lib Require Import util.
 
@@ -42,8 +43,10 @@ Section state_interpretation.
         [ ip σ k Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ]; simpl.
     { iExists δ. iIntros "!> !>". iSplit.
       - iPureIntro. split_and!; last by left.
-        simplify_eq. eapply message_history_evolution_deliver_message; eauto.
-        edestruct Hnscoh as (?&?&?&Hac&?); first done. by symmetry; eapply Hac.
+        simplify_eq. eapply message_history_evolution_deliver_message; eauto;
+        edestruct Hnscoh as (?&?&?&Hac&?); first done; eauto.
+          by symmetry; eapply Hac.
+          intros ???; edestruct Hnscoh as (?&?&?&?&?); eauto.
       - iExists γm. iFrame "Hsi".
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].

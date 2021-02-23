@@ -42,6 +42,7 @@ theories/aneris_lang/state_interp/state_interp_socket_interp_coh.v
 theories/aneris_lang/state_interp/state_interp_network_sockets_coh.v
 theories/aneris_lang/state_interp/state_interp_messages_resource_coh.v
 theories/aneris_lang/state_interp/state_interp_messages_history_coh.v
+theories/aneris_lang/state_interp/auxiliary_state.v
 theories/aneris_lang/state_interp/state_interp_config_wp.v
 theories/aneris_lang/state_interp/state_interp.v
 

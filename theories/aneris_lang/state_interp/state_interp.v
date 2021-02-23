@@ -17,7 +17,8 @@ From aneris.aneris_lang.state_interp Require Export
      state_interp_socket_interp_coh
      state_interp_messages_resource_coh
      state_interp_messages_history_coh
-     state_interp_config_wp.
+     state_interp_config_wp
+     auxiliary_state.
 
 From aneris.aneris_lang.lib Require Import util.
 
@@ -27,6 +28,7 @@ Set Default Proof Using "Type".
 Import uPred.
 Import Network.
 Import RecordSetNotations.
+
 
 Section state_interpretation.
   Context `{!anerisG Mdl Σ}.
