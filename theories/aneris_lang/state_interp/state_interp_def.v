@@ -213,6 +213,15 @@ Section Aneris_AS.
        ((find (λ hsr, bool_decide (saddress hsr.2.1 = Some sa)))
           (map_to_list h))).
 
+  Lemma get_buffer_inv r sh skt Sn S a :
+    socket_handlers_coh Sn →
+    S !! (ip_of_address a) = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    saddress skt = Some a →
+    get_buffer S a = Some r.
+  Proof.
+  Admitted.
+
   Lemma get_buffer_some r r' ip sh skt Sn S a :
     socket_handlers_coh Sn →
     ip_of_address a = ip →
