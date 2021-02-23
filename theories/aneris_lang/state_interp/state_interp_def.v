@@ -235,56 +235,6 @@ Section Aneris_AS.
     rewrite Hf1 in HSn; simplify_eq; done.
   Qed.
 
-  Lemma get_buffer_some r r' ip sh skt Sn S a :
-    socket_handlers_coh Sn →
-    ip_of_address a = ip →
-    saddress skt = Some a →
-    S !! ip = Some Sn →
-    Sn !! sh = Some (skt, r) →
-    get_buffer S a = Some r' →
-    r = r'.
-  Proof.
-    rewrite /get_buffer bind_Some. intros Hshcoh -> Haddr Hsh HSn.
-    intros
-      (Skts & HSkts
-       & (hsr & (Hb2 & Hb3%bool_decide_eq_true)%find_some & Hb4)%fmap_Some_1).
-    apply elem_of_list_In in Hb2.
-    destruct hsr as (h & (s & r0)).
-    eapply elem_of_map_to_list in Hb2.
-    destruct (decide (sh = h)) as [->|].
-    - simplify_eq /=. rewrite HSn in Hb2. naive_solver.
-    - simplify_eq /=.
-      assert (sh = h).
-      { eapply Hshcoh; eauto. simplify_eq. simpl in Hb3. by rewrite Hb3. }
-      done.
-  Qed.
-
- Lemma get_buffer_some2 ip sh skt r r0 Sn S a buf :
-    socket_handlers_coh Sn →
-    ip_of_address a = ip →
-    saddress skt = Some a →
-    Sn !! sh = Some (skt, r0) →
-    get_buffer (<[ip:=<[sh:=(skt, r)]> Sn]> S) a = Some buf → r = buf.
-  Proof.
-     rewrite /get_buffer.
-     rewrite bind_Some.
-     intros
-       Hshcoh -> Haddr Hsh
-       (Skts & HSkts
-        & (hsr & (Hb2 & Hb3%bool_decide_eq_true)%find_some & Hb4)%fmap_Some_1).
-     rewrite lookup_insert in HSkts.
-     apply elem_of_list_In in Hb2.
-     destruct hsr as (h & (s & r')).
-     eapply elem_of_map_to_list in Hb2.
-     destruct (decide (sh = h)) as [->|].
-     - simplify_eq. rewrite lookup_insert in Hb2. by simplify_eq.
-     - inversion HSkts. rewrite -H0 in Hb2.
-       rewrite lookup_insert_ne in Hb2; last done.
-       assert (sh = h).
-       { eapply Hshcoh; eauto. simplify_eq. simpl in Hb3. by rewrite Hb3. }
-       done.
-  Qed.
-
   Definition sent_received_at_evolution (M1 M2 : message_soup)
              (S1 S2 : gmap ip_address sockets)
              (sa : socket_address) (RT : message_soup * message_soup)
@@ -329,13 +279,14 @@ Section Aneris_AS.
     destruct
       (get_buffer (<[ip:=<[sh:=(skt, r ∪ {[m]})]> Sn]> S) a) eqn:Heq2; last done.
     simpl in *.
-    eapply get_buffer_some2 in Heq2; eauto.
-    rewrite -Heq2 in Heq.
-    simplify_eq. eapply get_buffer_some in Hbeq; eauto.
-    inversion Hbeq. subst.
-    assert (m0 ∖ (m0 ∪ {[m]}) = ∅) as -> by set_solver.
-    rewrite right_id_L. intuition.
-  Qed.
+    erewrite (get_buffer_inv _ _ _ (<[_ := _]> Sn)) in Heq2; eauto.
+    (* eapply get_buffer_some2 in Heq2; eauto. *)
+    (* rewrite -Heq2 in Heq. *)
+    (* simplify_eq. eapply get_buffer_some in Hbeq; eauto. *)
+    (* inversion Hbeq. subst. *)
+    (* assert (m0 ∖ (m0 ∪ {[m]}) = ∅) as -> by set_solver. *)
+    (* rewrite right_id_L. intuition. *)
+  Admitted.
 
   Lemma sent_received_at_evolution_ne
         ip a a' sh skt (mh : messages_history) p Sn M S r:
