@@ -199,7 +199,8 @@ Section state_interpretation.
          apply elem_of_messages_sent in Hms as (sa & rt & Hrt & Hmrt).
          destruct (decide (sa = m_sender m)) as [->|].
          * exists (m_sender m), (R, {[m]} ∪ T).
-           rewrite lookup_insert. set_solver.
+           rewrite lookup_insert. split; first done.
+           destruct rt. simpl in *. simplify_map_eq /=. set_solver.
          * exists sa, rt. rewrite lookup_insert_ne; last done.
            set_solver.
   Qed.

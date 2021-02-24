@@ -42,13 +42,13 @@ End gset_map.
 Section collect.
   Context {K} `{!EqDecision K} `{Countable K} {A : Type}
           {B : Type} `{!EqDecision B} `{Countable B}
-          (f : A → gset B).
+          (f : K → A → gset B).
 
   Definition collect (g : gmap K A) : gset B :=
-    map_fold (λ _ a acc, (f a) ∪ acc) ∅ g.
+    map_fold (λ k a acc, (f k a) ∪ acc) ∅ g.
 
   Lemma collect_singleton k a :
-    collect {[k := a]} = f a.
+    collect {[k := a]} = f k a.
   Proof.
     rewrite /collect.
     rewrite map_fold_insert_L.
@@ -63,7 +63,7 @@ Section collect.
   Qed.
 
   Lemma collect_insert k a g :
-    collect (<[k:=a]> g) = f a ∪ collect (delete k g).
+    collect (<[k:=a]> g) = f k a ∪ collect (delete k g).
   Proof.
     generalize dependent a.
     generalize dependent k.
@@ -107,8 +107,8 @@ Section collect.
     end.
     - intros. by rewrite !left_id_L.
     - intros k a g' acc Hk IHM h' Hdisj.
-      assert (f a ∪ acc ∪ collect h' =
-              acc ∪ (f a ∪ collect h')) as -> by set_solver.
+      assert (f k a ∪ acc ∪ collect h' =
+              acc ∪ (f k a ∪ collect h')) as -> by set_solver.
       rewrite insert_union_singleton_l.
       assert ({[k := a]} ∪ g' ∪ h' =  g' ∪ ({[k := a]} ∪ h')) as ->.
       { rewrite (map_union_comm {[k := a]} g').
@@ -126,7 +126,7 @@ Section collect.
   Qed.
 
   Lemma collect_empty_f g :
-    (forall k a, g !! k = Some a → f a = ∅) → collect g = ∅.
+    (forall k a, g !! k = Some a → f k a = ∅) → collect g = ∅.
   Proof.
     pattern (collect g); pattern g.
     match goal with
@@ -145,7 +145,7 @@ Section collect.
   Qed.
 
   Lemma elem_of_collect g :
-    ∀ m, m ∈ collect g ↔ ∃ k a, g !! k = Some a ∧ m ∈ f a.
+    ∀ m, m ∈ collect g ↔ ∃ k a, g !! k = Some a ∧ m ∈ f k a.
   Proof.
     pattern (collect g); pattern g.
     match goal with

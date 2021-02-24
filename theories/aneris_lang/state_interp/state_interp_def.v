@@ -35,7 +35,7 @@ Section definitions.
   Implicit Types sh : socket_handle.
   Implicit Types skt : socket.
   Implicit Types A B : gset socket_address.
-  Implicit Types mh : messages_history.
+  Implicit Types mh : messages_history_map.
   Implicit Types rt : message_soup * message_soup.
   Implicit Types γm : gmap ip_address node_gnames.
   Implicit Types sis : gmap socket_address gname.
@@ -184,8 +184,10 @@ Section definitions.
      ⌜message_received m mh⌝)%I.
 
   (** State interpretation *)
-  Definition aneris_state_interp σ mh :=
-    (∃ γm,
+  Definition aneris_state_interp σ δh :=
+    (∃ γm mh,
+        ⌜messages_received_sent mh = messages_received_sent δh⌝ ∗
+        ⌜dom (gset socket_address) δh ⊆ dom (gset socket_address) mh⌝ ∗
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) mh⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mh⌝ ∗
@@ -202,7 +204,7 @@ Section Aneris_AS.
   Context `{aG : !anerisG Mdl Σ}.
 
   Record aneris_aux_state := AnerisAuxState {
-    aneris_AS_mhist : messages_history;
+    aneris_AS_mhist : messages_history_map;
     aneris_AS_model : model_state Mdl }.
 
   Definition get_buffer (S : gmap ip_address sockets) (sa : socket_address)
@@ -226,8 +228,8 @@ Section Aneris_AS.
   Definition message_history_evolution
              (M1 M2 : message_soup)
              (S1 S2 : gmap ip_address sockets)
-             (mh1 : messages_history)
-    : messages_history :=
+             (mh1 : messages_history_map)
+    : messages_history_map :=
     map_imap (λ sa RT, Some (sent_received_at_evolution M1 M2 S1 S2 sa RT)) mh1.
 
   Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=

@@ -141,7 +141,7 @@ Section state_interpretation.
     { intro Habs. apply elem_of_messages_received in Habs
         as (sa & (R0, T0) & Hmh & Hm). simplify_map_eq.
       specialize (Hmacoh sa R0 T0) as (H1 & H2); first done.
-      specialize (H1 m Hm). set_solver. }
+      specialize (H1 m Hm). simplify_map_eq /=. set_solver. }
     iPoseProof (big_opS_delete
                   (fun m0 => ((∃ Φ, m_destination m0 ⤇ Φ ∗ ▷ Φ m0)
                            ∨ ⌜message_received m0 mh⌝))%I
@@ -156,7 +156,7 @@ Section state_interpretation.
     - iLeft. iFrame.
     - iRight. iPureIntro. apply insert_id in Hmha. rewrite -Hmha in Hm.
       erewrite message_received_insert in Hm. rewrite message_received_insert.
-      destruct Hm as [?|Hm]; set_solver.
+      destruct Hm as [?|Hm]; simplify_map_eq /=; set_solver.
   Qed.
 
 End state_interpretation.

@@ -35,8 +35,8 @@ Section state_interpretation.
   Proof.
     rewrite /config_wp. iIntros. iModIntro. iIntros (σ1 δ k σ2 ks nt Hstep) "Hσ".
     rewrite /state_interp; simplify_eq /=.
-    iDestruct "Hσ" as (γm)
-           "(%Hgcoh & %Hnscoh & %Hmhcoh
+    iDestruct "Hσ" as (γm mh)
+           "(%Hhist & %Hhdomn & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iApply step_fupd_fupd; iApply step_fupd_intro; first done.
     destruct Hstep as
@@ -47,7 +47,9 @@ Section state_interpretation.
         edestruct Hnscoh as (?&?&?&Hac&?); first done; eauto.
           by symmetry; eapply Hac.
           intros ???; edestruct Hnscoh as (?&?&?&?&?); eauto.
-      - iExists γm. iFrame "Hsi".
+      - iExists γm, mh. iFrame "Hsi".
+        iSplitR; [ eauto |].
+        iSplitR; [ eauto |].
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].
         iSplitR; [eauto using messages_history_coh_deliver_message|].
@@ -58,8 +60,10 @@ Section state_interpretation.
           iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame. iLeft.
           iDestruct "Hmr" as (phi) "(Hphi & Hphi2)". eauto with iFrame. }
     iExists δ. iIntros "!> !>". iSplit. iPureIntro. split_and!; last by left.
-    simplify_eq. by eapply message_history_evolution_drop_message.
-    iExists γm. iFrame. iSplitR; first done. iSplitR; first done.
+    by eapply message_history_evolution_drop_message.
+    iExists γm, mh. iFrame. iSplitR; first done. iSplitR; first done.
+    iSplitR. iPureIntro. simpl. eauto.
+    iSplitR. iPureIntro. simpl. eauto.
     iSplitR. iPureIntro. simpl. by eapply messages_history_drop_message.
     rewrite /messages_resource_coh. iApply (big_sepS_mono with "Hmres").
     iIntros (??) "[Hmr|%Hmr]"; last eauto with iFrame. iLeft.

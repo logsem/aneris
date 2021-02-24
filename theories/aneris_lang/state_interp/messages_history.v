@@ -16,14 +16,17 @@ Import uPred.
 Import Network.
 Import RecordSetNotations.
 
-Definition messages_history := gmap socket_address (message_soup * message_soup).
+Definition messages_history := prod message_soup message_soup.
 
-Implicit Types mh : messages_history.
+Definition messages_history_map := gmap socket_address messages_history.
 
-(** Definitions for the message history *)
+
+Implicit Types mh : messages_history_map.
+Implicit Types rt : messages_history.
+
 
 (* The set of all received messages *)
-Definition messages_received mh := collect (λ rt, rt.1) mh.
+Definition messages_received mh := collect (λ _ rt, rt.1) mh.
 
 Lemma elem_of_messages_received mh :
   ∀ m, m ∈ messages_received mh ↔
@@ -31,12 +34,17 @@ Lemma elem_of_messages_received mh :
 Proof. by apply elem_of_collect; eauto. Qed.
 
 (* The set of all transmitted messages *)
-Definition messages_sent mh := collect (λ rt, rt.2) mh.
+Definition messages_sent mh := collect (λ _ rt, rt.2) mh.
 
 Lemma elem_of_messages_sent mh :
   ∀ m, m ∈ messages_sent mh ↔
          ∃ sa rt, mh !! sa = Some rt ∧ m ∈ rt.2.
 Proof. by apply elem_of_collect; eauto. Qed.
+
+
+(** Definitions for the message history *)
+Definition messages_received_sent mh : messages_history :=
+  (messages_received mh, messages_sent mh).
 
 (* [m] has been received *)
 Definition message_received m mh := m ∈ (messages_received mh).
@@ -190,6 +198,18 @@ Proof.
   intros Hdij Hmsg.
   rewrite /message_received /messages_received.
   erewrite collect_disjoint_union; last done.
+  set_solver.
+Qed.
+
+Lemma messages_received_init ip ports mh :
+  history_init ip ports ##ₘ mh →
+  messages_received (history_init ip ports ∪ mh) =
+  messages_received mh.
+Proof.
+  intros Hdij.
+  rewrite /message_received /messages_received.
+  erewrite collect_disjoint_union; last done.
+  erewrite history_init_received.
   set_solver.
 Qed.
 
