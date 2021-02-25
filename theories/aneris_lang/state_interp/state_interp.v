@@ -194,11 +194,11 @@ Section state_interpretation.
       by iApply free_ips_coh_free_ports_valid.
   Qed.
 
-
   Lemma aneris_state_interp_alloc_node σ ip ports mh0 :
     ports ≠ ∅ →
     aneris_state_interp σ mh0 ∗ free_ip ip ==∗
     ⌜history_init ip ports ##ₘ mh0⌝ ∗
+    ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
     is_node ip ∗ free_ports ip ports ∗
     ([∗ set] p ∈ ports, (SocketAddressInet ip p) ⤳ (∅, ∅)) ∗
     aneris_state_interp
@@ -243,8 +243,7 @@ Section state_interpretation.
          as Habs by by set_solver.
        specialize (HmhNone p).
        by apply not_elem_of_dom in HmhNone. }
-     iModIntro.
-     iSplit; first done.
+     iModIntro. iSplit; first done.  iSplit; first done.
      iSplitR.
     { iExists _; eauto. }
     iFrame "Hports Hmto".

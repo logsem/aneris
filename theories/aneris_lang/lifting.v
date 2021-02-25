@@ -356,12 +356,14 @@ Section primitive_laws.
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".
     inv_head_step.
     iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
-      as "(%Hdisj & Hn & Hports & Hms & Hσ)"; first done.
+      as "(%Hdisj  & %Hcoh & Hn & Hports & Hms & Hσ)"; first done.
     iModIntro.
     simplify_eq /=.
     iExists δ.
+
     iSplit; [ iPureIntro; split; last by left |].
-    + simplify_eq /=. by eapply message_history_evolution_new_ip.
+    + simplify_eq /=. eapply message_history_evolution_new_ip; eauto.
+      intros; edestruct Hcoh; eauto. naive_solver.
     + iSplitL "Hσ".
         by iApply aneris_state_interp_history_init_forget.
       iSplitL "HΦ"; [by iApply wp_value|].
@@ -495,14 +497,13 @@ Section primitive_laws.
             with "[$Hsh] [$Hrt] [$Hφ] [$Hm] [$Hσ]")
       as "(Hσ & Hsh & Hrt)"; [done..|].
     iModIntro.
-    rewrite insert_id; last first.
-    { by rewrite insert_id. }
     iExists (AnerisAuxState
                (<[a := (R, {[msg]} ∪ T)]>(aneris_AS_mhist δ))
                (aneris_AS_model δ)).
     iSplit. iPureIntro. split; last by left. simpl. rewrite - /msg.
     admit.
-    iSplitR; [done|]. iFrame.
+    iSplitR; [done|]. simplify_eq /=. rewrite -/msg.
+    rewrite insert_id; last done. iFrame.
     iApply ("HΦ" with "[$]").
   Admitted.
 
@@ -530,8 +531,7 @@ Section primitive_laws.
     iMod (aneris_state_interp_send_duplicate
             with "[$Hsh] [$Hrt] [$Hσ]")
       as "(Hσ & Hsh & Hrt)"; [done..|]. rewrite - /msg.
-       rewrite insert_id; last first.
-       { by rewrite insert_id. }
+       rewrite insert_id; last done.
        iModIntro.
        iExists δ.
        assert ((aneris_AS_mhist δ) !! a = Some (R,T)) as Hrt.

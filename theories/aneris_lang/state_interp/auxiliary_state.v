@@ -58,13 +58,85 @@ Section Aneris_AS.
     apply elem_of_list_In, elem_of_map_to_list' in Hin. simpl in *. eauto 9.
   Qed.
 
+  Lemma get_buffer_none S a  :
+    S !! ip_of_address a = None →
+    get_buffer S a = None.
+  Proof.
+    intros Hip.
+    destruct (get_buffer S a) eqn:Heq1; last done.
+    apply get_buffer_inv in Heq1 as (sh0 & skt0 & Sn0 & HS0 & HSn0 & Hskt0).
+    naive_solver.
+  Qed.
+
+   Lemma get_buffer_none_2 S a  :
+    S !! ip_of_address a = Some ∅ →
+    get_buffer S a = None.
+  Proof.
+    intros Hip.
+    destruct (get_buffer S a) eqn:Heq1; last done.
+    apply get_buffer_inv in Heq1 as (sh0 & skt0 & Sn0 & HS0 & HSn0 & Hskt0).
+    naive_solver.
+  Qed.
+
+   Lemma get_buffer_none_3 S a  :
+    S !! ip_of_address a = None →
+    get_buffer (<[ip_of_address a := ∅]> S) a = None.
+  Proof.
+    intros Hip.
+    eapply get_buffer_none_2.
+    rewrite lookup_insert. naive_solver.
+  Qed.
+
+  Lemma get_buffer_none_inv S a  :
+     get_buffer S a = None →
+     S !! ip_of_address a = Some ∅ ∨
+     (∃ Sn, S !! ip_of_address a = Some Sn ∧
+            (forall sh skt r, Sn !! sh = Some (skt, r) →
+                         saddress skt ≠ Some a)) ∨
+     S !! ip_of_address a = None.
+   Proof.
+     intros Hbuf. rewrite /get_buffer in Hbuf.
+     apply bind_None in Hbuf as [|Hbuf]; first by naive_solver.
+     destruct Hbuf as (Sn & HSn & Hfind).
+     apply fmap_None in Hfind.
+     destruct (decide (Sn = ∅)) as [->|Hneq].
+     - by left.
+     - right. left.
+       exists Sn. split; first done.
+       intros.
+       apply find_none with (x:=(sh,(skt,r))) in Hfind.
+       + simpl in Hfind. by case_bool_decide.
+       + apply elem_of_list_In.
+         by apply elem_of_map_to_list.
+   Qed.
 
   Lemma get_buffer_new_ip S a ip :
+    (∀ ip Sn, S !! ip = Some Sn → socket_handlers_coh Sn) →
     S !! ip = None →
     get_buffer S a = get_buffer (<[ip:=∅]> S) a.
   Proof.
-  Admitted.
-
+    intros Hcoh Hs.
+    ddeq (ip_of_address a) ip.
+    - erewrite get_buffer_none, get_buffer_none_3; eauto.
+    - destruct (get_buffer S a) eqn:Heq1;
+        destruct (get_buffer (<[ip:=∅]> S) a) eqn:Heq2; last done.
+      + apply get_buffer_inv in Heq1 as (sh0 & skt0 & Sn0 & HS0 & HSn0 & Hskt0).
+        apply get_buffer_inv in Heq2 as (sh1 & skt1 & Sn1 & HS1 & HSn1 & Hskt1).
+        rewrite lookup_insert_ne in HS1; last done.
+        rewrite HS0 in HS1. simplify_eq /=.
+        assert (sh0 = sh1) as ->.
+        { eapply (Hcoh (ip_of_address a) Sn1 HS0); eauto.
+            by rewrite Hskt0 Hskt1. }
+        naive_solver.
+      + apply get_buffer_none_inv in Heq2.
+        rewrite lookup_insert_ne in Heq2; last done.
+        apply get_buffer_inv in Heq1 as (sh0 & skt0 & Sn0 & HS0 & HSn0 & Hskt0).
+        naive_solver.
+      + apply get_buffer_none_inv in Heq1.
+        apply get_buffer_inv in Heq2 as (sh0 & skt0 & Sn0 & HS0 & HSn0 & Hskt0).
+        rewrite lookup_insert_ne in HS0; last done.
+        naive_solver.
+  Qed.
 
   Lemma get_buffer_deliver_message S M Sn sh skt a r m :
     let S' := (<[ip_of_address a := (<[sh:=(skt, r ∪ {[m]})]> Sn) ]> S) in
@@ -169,11 +241,12 @@ Section Aneris_AS.
 
   Lemma  sent_received_at_evolution_new_ip
          S ip M (mh : messages_history_map) a rt:
+    (∀ ip Sn, S !! ip = Some Sn → socket_handlers_coh Sn) →
     S !! ip = None →
     mh !! a = Some rt →
     rt = sent_received_at_evolution M M S (<[ip:=∅]> S) a rt.
   Proof.
-    intros ??.
+    intros ???.
     rewrite /sent_received_at_evolution.
     match goal with |-  _ = default _ ?x => destruct x eqn:Heq end; last done.
     destruct (get_buffer S a) eqn:Hbeq; last done.
@@ -182,7 +255,7 @@ Section Aneris_AS.
     simpl in Heq. rewrite !difference_diag_L in Heq.
     simplify_eq /=.
     rewrite /messages_sent_from filter_empty_L  !difference_diag_L !right_id_L.
-    simplify_eq. by destruct rt.
+    simplify_eq. by destruct rt. done.
   Qed.
 
   Lemma message_history_evolution_deliver_message ip Sn sh a skt r m S M mh :
@@ -228,10 +301,11 @@ Section Aneris_AS.
   Qed.
 
   Lemma message_history_evolution_new_ip S ip M mh :
+    (∀ ip Sn, S !! ip = Some Sn → socket_handlers_coh Sn) →
     S !! ip = None →
     mh = message_history_evolution M M S (<[ip := ∅]>S) mh.
   Proof.
-    intros ?. rewrite-{1}(map_imap_Some mh) /message_history_evolution.
+    intros ??. rewrite-{1}(map_imap_Some mh) /message_history_evolution.
     apply map_imap_ext. intros a'.
     destruct (mh !! a') eqn:Hmh; rewrite Hmh; last done; simpl.
     do 2 f_equal. by eapply sent_received_at_evolution_new_ip.
