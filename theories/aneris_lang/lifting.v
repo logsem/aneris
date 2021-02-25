@@ -1,7 +1,6 @@
 From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
-From aneris.program_logic Require Export weakestpre lifting.
-From aneris.program_logic Require Import ectx_lifting.
+From aneris.program_logic Require Export weakestpre lifting ectx_lifting atomic.
 From iris.proofmode Require Import tactics.
 From aneris.aneris_lang Require Import aneris_lang base_lang.
 From aneris.aneris_lang.state_interp
@@ -800,7 +799,6 @@ Section primitive_laws.
        iApply ("IH" with "Hr HΦ").
    Qed.
 
-
   Lemma wp_receivefrom k a E h s R T φ :
      let ip := ip_of_address a in
      saddress s = Some a →
@@ -823,6 +821,70 @@ Section primitive_laws.
     iFrame. repeat iSplit; eauto with iFrame.
     - iIntros (?) "(? & ? & ? & ?) !>"; eauto with iFrame.
     - iIntros (?) "(? & ? & ?) !>"; eauto with iFrame.
+  Qed.
+
+  Lemma awp_receivefrom ip a h s R T φ :
+    ip_of_address a = ip →
+    saddress s = Some a →
+    sblock s = true →
+    ⊢ <<< h ↪[ip] s ∗ a ⤳ (R, T) ∗ a ⤇ φ >>>
+       (mkExpr ip (ReceiveFrom (# (LitSocket h)))) @ ⊤
+      <<< ∃ m, h ↪[ip] s ∗
+                 ((⌜m ∉ R⌝ ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m) ∨
+                  ⌜m ∈ R⌝ ∗ a ⤳ (R, T)),
+      RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m)))) >>>.
+  Proof.
+    iIntros (??? Φ) "AU". iLöb as "IH".
+    iApply (wp_lift_head_step with "[-]"); first auto.
+    iIntros (σ1 δ1 κ κs n) "Hσ".
+    iMod "AU" as "[(Hsh & Ha & #Hsi) Hclose]".
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iModIntro; iSplit.
+    { iPureIntro.
+      assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
+        [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
+            eauto; econstructor..].
+      destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
+    iIntros (???) "%Hprim".
+    inv_head_step.
+    - destruct (decide (m ∈ R)) as [Hin | Hni ].
+      + iNext.
+        iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
+            with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
+          as (R') "(% & %Hhst & Hrt & >(Hσ & Hsh & Ha))"; [done..|].
+        iDestruct "Hrt" as "[ ( % & _ & _ ) | (% & ->) ]"; [done|].
+        iFrame.
+        iMod ("Hclose" with "[$Hsh Ha]") as "HΦ"; [auto|].
+        iModIntro.
+        iExists
+          (AnerisAuxState
+             (R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2)  _).
+        iSplit.
+        { iPureIntro. simpl. split; [|by left]. eauto. }
+        iFrame. iSplit; [|done].
+        iApply wp_value. iApply "HΦ".
+      + iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
+            with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
+           as (R') "(% & %Hst & Hrt & Hrest)"; [done..|].
+        iDestruct "Hrt" as "[ ( % & -> & Hres ) | (% & %) ]"; last done.
+        iNext. iMod "Hrest" as "(Hσ & Hsh & Ha)".
+        iMod ("Hclose" with "[$Hsh Ha Hres]") as "HΦ".
+        { iLeft. iFrame. eauto. }
+        iModIntro.
+        iExists (AnerisAuxState
+                   ({[m]} ∪ R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2) _).
+        iSplit.
+        { iPureIntro. simpl. split; [|by left]. eauto. }
+        iFrame. iSplit; [|done].
+        iApply wp_value. iApply "HΦ".
+     - destruct s; simpl in *; simplify_eq.
+     - iNext. iDestruct "Hclose" as "[Hclose _]".
+       iMod ("Hclose" with "[$Hsh $Ha $Hsi]") as "HAU".
+       iModIntro. iExists δ1; iSplit.
+       { iPureIntro. rewrite insert_id //. eapply valid_state_evolution_id. }
+       rewrite insert_id //; iFrame. iSplit; [|done].
+       iApply ("IH" with "HAU").
   Qed.
 
   Lemma wp_rcvtimeo_unblock k a E h s n1 n2 :

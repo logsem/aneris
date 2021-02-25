@@ -24,6 +24,7 @@ theories/program_logic/ectx_lifting.v
 theories/program_logic/ectxi_language.v
 theories/program_logic/language.v
 theories/program_logic/lifting.v
+theories/program_logic/atomic.v
 
 theories/aneris_lang/network.v
 theories/aneris_lang/lang.v
@@ -48,6 +49,7 @@ theories/aneris_lang/state_interp/state_interp.v
 
 theories/aneris_lang/adequacy.v
 theories/aneris_lang/lifting.v
+theories/aneris_lang/program_logic/atomic.v
 theories/aneris_lang/program_logic/aneris_lifting.v
 theories/aneris_lang/program_logic/aneris_weakestpre.v
 theories/aneris_lang/program_logic/aneris_adequacy.v

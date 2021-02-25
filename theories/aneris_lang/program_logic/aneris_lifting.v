@@ -1,8 +1,7 @@
 From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Export weakestpre lifting.
-From aneris.aneris_lang Require Import lang lifting.
-From aneris.aneris_lang Require Export base_lang.
-From aneris.aneris_lang.program_logic Require Export aneris_weakestpre.
+From aneris.aneris_lang Require Import lang base_lang lifting.
+From aneris.aneris_lang.program_logic Require Export aneris_weakestpre atomic.
 From RecordUpdate Require Import RecordSet.
 
 Set Default Proof Using "Type".
@@ -436,6 +435,28 @@ Section lifting_network.
      iFrame. repeat iSplit; eauto with iFrame.
      - iIntros (?) "(? & ? & ? & ?) !>"; eauto with iFrame.
      - iIntros (?) "(? & ? & ?) !>"; eauto with iFrame.
+   Qed.
+
+   Lemma aneris_awp_receivefrom ip a h s R T φ :
+     ip_of_address a = ip →
+     saddress s = Some a →
+     sblock s = true →
+     ⊢ <<< h ↪[ip] s ∗ a ⤳ (R, T) ∗ a ⤇ φ >>>
+         ReceiveFrom (# (LitSocket h)) @[ip] ⊤
+       <<< ∃ m, h ↪[ip] s ∗
+                  ((⌜m ∉ R⌝ ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m) ∨
+                    ⌜m ∈ R⌝ ∗ a ⤳ (R, T)),
+       RET SOMEV (PairV #(m_body m) #(m_sender m)) >>>.
+   Proof.
+     iIntros (??? Φ) "AU".
+     rewrite !aneris_wp_unfold /aneris_wp_def. iIntros "#Hin".
+     iApply (awp_receivefrom ip a h s R T φ); [done..|].
+     iAuIntro. iApply (aacc_aupd with "AU"); [done|].
+     iIntros "(Hsh & Ha & #Hφ)".
+     iAaccIntro with "[$Hsh $Ha $Hφ]".
+     { iIntros "(Hsh & Ha & ?) !#". iFrame; auto. }
+     iIntros (m) "(Hsh & Hr) !#".
+     iFrame. iRight. iExists _. iFrame. eauto.
    Qed.
 
    Lemma aneris_wp_rcvtimeo_unblock ip a E h s n1 n2 :
