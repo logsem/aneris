@@ -25,7 +25,7 @@ Theorem adequacy `{anerisPreG Σ Mdl} IPs A s e ip σ φ (ports : gset port)
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros Hwp Hps Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
-  set (δ := @AnerisAuxState Mdl (history_init ip ports) st0).
+  set (δ := @AnerisAuxState Mdl (∅,∅) st0).
   eapply (wp_adequacy _ (@aneris_AS Mdl) _ _ _ _  (δ  : aux_state aneris_AS));
     first apply aneris_AS_valid_state_evolution_finitary.
   iIntros (?) "/=".

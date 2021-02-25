@@ -228,6 +228,13 @@ Proof.
   rewrite collect_insert //= elem_of_union //.
 Qed.
 
+ Lemma messages_received_insert  a R T mh :
+   messages_received (<[a:=(R, T)]> mh) = R ∪ messages_received (delete a mh).
+ Proof.
+   rewrite /messages_received.
+   apply collect_insert.
+ Qed.
+
 Lemma messages_sent_split a R T mh :
   mh !! a = Some (R, T) →
   messages_sent mh =

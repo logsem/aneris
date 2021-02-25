@@ -25,7 +25,102 @@ Import RecordSetNotations.
 Section Aneris_AS.
   Context `{aG : !anerisG Mdl Σ}.
 
-  Lemma get_buffer_some r sh skt Sn S a :
+ Lemma buffers_subseteq S ip Sn skt r r' sh :
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    r ⊆ r' →
+    buffers S ⊆ buffers (<[ip:=<[sh:=(skt, r')]> Sn]> S).
+  Proof.
+    intros.
+    intros m Hm.
+    apply elem_of_collect in Hm as (ip1 & Sip1 & HSip1 & Hm).
+    ddeq ip ip1.
+    - apply elem_of_collect in Hm as (h1 & (s1, r1) & Hhsr1 & Hm).
+      apply elem_of_collect.
+      ddeq sh h1.
+      + exists ip1, (<[h1:=(skt, r')]> Sn). rewrite lookup_insert; eauto.
+        split; first done.
+        apply elem_of_collect.
+        exists h1, (skt,r'). split; last set_solver.
+        rewrite lookup_insert. eauto.
+      + exists ip1, (<[sh:=(skt, r')]> Sn). rewrite lookup_insert.
+         split; first done.
+         apply elem_of_collect.
+         exists h1, (s1,r1).
+         rewrite lookup_insert_ne; eauto.
+    - apply elem_of_collect in Hm as (h1 & (s1, r1) & Hhsr1 & Hm).
+      apply elem_of_collect.
+      exists ip1, Sip1. rewrite lookup_insert_ne; eauto.
+      split; first done.
+      apply elem_of_collect.
+      set_solver.
+  Qed.
+
+  Lemma buffers_subseteq_new_ip S ip :
+    S !! ip = None →
+    buffers S ⊆ buffers (<[ip:=∅]> S).
+  Proof.
+    intros Hnone.
+    rewrite /buffers.
+    rewrite insert_union_singleton_l.
+    rewrite collect_disjoint_union.
+    set_solver.
+    by apply map_disjoint_singleton_l_2.
+  Qed.
+
+  Lemma message_history_evolution_deliver_message ip Sn sh skt r r' S M rt :
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    r ⊆ r' →
+    rt = message_history_evolution
+           M M S (<[ip:=<[sh:=(skt, r')]> Sn]> S) rt.
+  Proof.
+    intros ???.
+    rewrite /message_history_evolution.
+    destruct rt as (R, T).
+    simplify_eq /=.
+    rewrite !difference_diag_L left_id_L. f_equal.
+    rewrite subseteq_empty_difference_L; first set_solver.
+    by eapply buffers_subseteq.
+  Qed.
+
+  Lemma message_history_evolution_drop_message S M M' rt :
+    M' ⊆ M →
+    rt = message_history_evolution M M' S S rt.
+  Proof.
+    intros ?.
+    rewrite /message_history_evolution.
+    destruct rt as (R, T).
+    rewrite !difference_diag_L left_id_L. f_equal.
+    rewrite subseteq_empty_difference_L; eauto.
+    set_solver.
+  Qed.
+
+  Lemma message_history_evolution_new_ip S ip M mh :
+    S !! ip = None →
+    mh = message_history_evolution M M S (<[ip := ∅]>S) mh.
+  Proof.
+    intros ?. rewrite /message_history_evolution.
+    destruct mh as (r,t).
+    rewrite !difference_diag_L !left_id_L. f_equal.
+    rewrite subseteq_empty_difference_L; first set_solver.
+    rewrite /buffers. simplify_eq /=. by eapply buffers_subseteq_new_ip.
+  Qed.
+
+   Lemma valid_state_evolution_id σ  (δ : Mdl) mh :
+    mh = message_history_evolution
+           (state_ms σ) (state_ms σ) (state_sockets σ)
+           (state_sockets σ) mh
+    ∧ user_model_evolution δ δ.
+    Proof. split; last by left; eauto.
+           rewrite /message_history_evolution.
+           rewrite !difference_diag_L !left_id_L.
+             by destruct mh.
+    Qed.
+
+
+
+ (* Lemma get_buffer_some r sh skt Sn S a :
     socket_handlers_coh Sn →
     S !! (ip_of_address a) = Some Sn →
     Sn !! sh = Some (skt, r) →
@@ -319,5 +414,6 @@ Section Aneris_AS.
     ∧ user_model_evolution δ δ.
   Proof. split; last by left; eauto. eapply message_history_evolution_id. Qed.
 
+  *)
 
 End Aneris_AS.

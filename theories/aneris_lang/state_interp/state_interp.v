@@ -39,7 +39,7 @@ Section state_interpretation.
     mapsto_node n γs -∗
     ∃ h, ⌜state_heaps σ !! n = Some h⌝.
   Proof.
-    iDestruct 1 as (Mγ ??????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
+    iDestruct 1 as (Mγ ?????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
     iIntros "Hn".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %Hninm.
     iDestruct (local_state_coh_heaps with "Hlcoh") as (h) "%"; [done|].
@@ -60,7 +60,7 @@ Section state_interpretation.
     mapsto_node n γs -∗
     ∃ Sn, ⌜state_sockets σ !! n = Some Sn⌝.
   Proof.
-    iDestruct 1 as (Mγ ??????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
+    iDestruct 1 as (Mγ ?????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
     iIntros "Hn".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %Hninm.
     iDestruct (local_state_coh_sockets with "Hlcoh") as (h) "%"; [done|].
@@ -135,13 +135,14 @@ Section state_interpretation.
     ([∗ set] a ∈ A, a ⤇ (f a)) -∗
     free_ips_auth ips -∗
     free_ports_auth ∅ -∗
-    aneris_state_interp σ (history_init ip ports).
+    aneris_state_interp σ (∅, ∅).
   Proof.
     iIntros (Hnports HMdom Hipdom Hpiiu Hfixdom Hste Hsce Hmse Hip)
             "Hmp #Hn Hh Hs Hm #Hsif HM #Hsa HipsCtx HPiu".
     iExists _, _; iFrame.
     rewrite !Hste !Hsce !Hmse.
-    iSplit; first done.
+    rewrite /messages_received_sent.
+    rewrite history_init_received history_init_sent.
     iSplit; first done.
     iSplit.
     (* gnames_coh *)
@@ -176,7 +177,7 @@ Section state_interpretation.
      state_sockets σ !! ip = None ∧
      is_Some (state_ports_in_use σ !! ip)⌝.
   Proof.
-    iDestruct 1 as (mγ mn) "(?&?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ?)".
+    iDestruct 1 as (mγ mn) "(?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ?)".
     iIntros "Hfip".
     iDestruct "Hfreeips"
       as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
@@ -197,21 +198,20 @@ Section state_interpretation.
   Lemma aneris_state_interp_alloc_node σ ip ports mh0 :
     ports ≠ ∅ →
     aneris_state_interp σ mh0 ∗ free_ip ip ==∗
-    ⌜history_init ip ports ##ₘ mh0⌝ ∗
     ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
     is_node ip ∗ free_ports ip ports ∗
     ([∗ set] p ∈ ports, (SocketAddressInet ip p) ⤳ (∅, ∅)) ∗
     aneris_state_interp
       (σ <| state_heaps   := <[ip:=∅]> (state_heaps σ)|>
          <| state_sockets := <[ip:=∅]> (state_sockets σ) |>)
-      (history_init ip ports ∪ mh0).
+      mh0.
   Proof.
    iIntros (Hnp) "[Hσ Hfip]".
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & % & %)".
     iDestruct "Hσ"
       as (mγ mh)
-           "(%Hhst & %Hhdom & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & HFip & Hmctx & Hmres)".
     iMod (free_ips_coh_alloc_node _ _ ports with "HFip Hfip")
       as "[HFip Hports]".
@@ -235,15 +235,7 @@ Section state_interpretation.
       as ">(Hmctx & Hmto)"; [done | done |].
       assert (history_init ip ports ##ₘ mh) as Hdisj.
      { by apply history_init_disj. }
-    assert (history_init ip ports ##ₘ mh0) as Hdisj0.
-     { apply history_init_disj.
-       intro p. destruct (mh0 !! SocketAddressInet ip p) eqn:Hp; last done.
-       apply elem_of_dom_2 in Hp.
-       assert (SocketAddressInet ip p ∈ dom (gset socket_address) mh)
-         as Habs by by set_solver.
-       specialize (HmhNone p).
-       by apply not_elem_of_dom in HmhNone. }
-     iModIntro. iSplit; first done.  iSplit; first done.
+     iModIntro. iSplit; first done.
      iSplitR.
     { iExists _; eauto. }
     iFrame "Hports Hmto".
@@ -254,8 +246,6 @@ Section state_interpretation.
       rewrite /messages_received_sent in Hhst.
       rewrite !messages_sent_init; eauto.
       rewrite !messages_received_init; eauto. }
-    iSplit.
-    { iPureIntro. set_solver. }
     iSplitR.
     { iPureIntro. subst σ' mh'; simpl. by apply gnames_coh_alloc_node. }
     iSplitR.
@@ -286,7 +276,7 @@ Section state_interpretation.
     iDestruct (mapsto_node_heap_valid with "Hσ Hn") as (h) "%".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
@@ -306,7 +296,7 @@ Section state_interpretation.
     iDestruct "Hn" as (γs) "Hn".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
@@ -338,7 +328,7 @@ Section state_interpretation.
     iDestruct "Hl" as (?) "[#Hn Hl]".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
@@ -379,7 +369,7 @@ Section state_interpretation.
     iIntros "Hσ Hsh".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iPoseProof (mapsto_socket_node with "Hsh") as (γn) "(#Hip & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hip") as "%Hmin".
@@ -391,41 +381,6 @@ Section state_interpretation.
       repeat split; try done.
       specialize (Hnscoh ip Sn Hp1) as (?&?&?&?&Hb).
       by eapply Hb.
-  Qed.
-
-  Lemma aneris_state_interp_history_init_forget
-        ip ports (σ : state) (mh : messages_history_map) :
-    history_init ip ports ##ₘ mh →
-    ports ≠ ∅ →
-    (state_sockets σ) !! ip = None →
-    aneris_state_interp
-           {|
-             state_heaps := <[ip:=∅]> (state_heaps σ);
-             state_sockets := <[ip:=∅]> (state_sockets σ);
-             state_ports_in_use := state_ports_in_use σ;
-             state_ms := state_ms σ
-           |} (history_init ip ports ∪ mh) -∗
-  aneris_state_interp
-    {|
-      state_heaps := <[ip:=∅]> (state_heaps σ);
-      state_sockets := <[ip:=∅]> (state_sockets σ);
-      state_ports_in_use := state_ports_in_use σ;
-      state_ms := state_ms σ
-    |} mh.
-  Proof.
-    iIntros (Hdisj Hnp Hip) "Hσ".
-    iDestruct "Hσ"
-      as (mγ mh0)
-           "(%Hhst & %Hhdom & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & HFip & Hmctx & Hmres)".
-    rewrite /aneris_state_interp. iExists mγ, mh0. iFrame.
-    iPureIntro. split_and!; eauto.
-    - rewrite Hhst.  simplify_eq /=.
-      rewrite /messages_received_sent.
-      rewrite /messages_received_sent in Hhst.
-      rewrite !messages_sent_init; eauto.
-      rewrite !messages_received_init; eauto.
-    - set_solver.
   Qed.
 
   Lemma aneris_state_interp_sblock_update σ1 a b sh skt Sn r mh :
@@ -441,7 +396,7 @@ Section state_interpretation.
     simpl. iIntros (HS HSn) "Hσ Hsh".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? &  %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
@@ -479,7 +434,7 @@ Section state_interpretation.
     iDestruct "Hn" as (γs) "Hn".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
@@ -529,7 +484,7 @@ Section state_interpretation.
     simpl. iIntros (?????) "Hσ #HA Hsh Hp".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
@@ -584,7 +539,7 @@ Section state_interpretation.
       simpl. iIntros (?????) "Hσ #HA Hsh Hp".
     iDestruct "Hσ"
       as (mγ mn)
-           "(? & ? & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
@@ -616,6 +571,8 @@ Section state_interpretation.
     iFrame.
   Qed.
 
+
+
   Lemma aneris_state_interp_send sh a skt Sn r R T φ to mbody σ1 mh:
     let ip := ip_of_address a in
     let msg := mkMessage a to (sprotocol skt) mbody in
@@ -629,7 +586,7 @@ Section state_interpretation.
     to ⤇ φ -∗
     φ msg -∗
     aneris_state_interp σ1 mh ==∗
-    aneris_state_interp σ2 (<[a := (R, {[msg]} ∪ T)]>mh) ∗
+    aneris_state_interp σ2 (mh.1, {[msg]} ∪ mh.2) ∗
     sh ↪[ip_of_address a] skt ∗
     a ⤳ (R, {[msg]} ∪ T).
   Proof.
@@ -637,7 +594,7 @@ Section state_interpretation.
     iIntros (HS HSn Hskt) "Hsh Hrt #Hφ Hmsg Hσ".
     iDestruct "Hσ"
       as (mγ mh')
-           "(%Hhst & %Hhdom & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
@@ -646,25 +603,39 @@ Section state_interpretation.
                m_destination := to;
                m_protocol := sprotocol skt;
                m_body := mbody |}).
-    iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %?.
+    iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %Hma.
     destruct (decide (msg ∈ T)).
     -  assert (T = {[msg]} ∪ T) as <- by set_solver.
        iFrame. iModIntro. iExists mγ, (<[a:=(R, T)]> mh'). iFrame.
        simpl.
-       rewrite !insert_id; last eauto. iFrame.
+       rewrite {3 4 5} (insert_id mh'); eauto.
+       iFrame.
        iPureIntro; split_and!; eauto.
-       assert (mh' = <[a := (R, {[msg]} ∪ T)]> mh') as ->.
-       assert (T = {[msg]} ∪ T) as <- by set_solver.
-         by rewrite insert_id.
-           by eapply messages_history_coh_send. admit.
+       + rewrite /messages_received_sent.
+         rewrite /messages_received_sent in Hhst.
+         apply insert_id in Hma. simplify_eq /=.
+         rewrite - {3 4} Hma.
+         rewrite !messages_sent_insert.
+         rewrite !messages_received_insert.
+         assert (T = {[msg]} ∪ T) as Ht by set_solver.
+         rewrite {1} Ht. f_equal; set_solver.
+       + by eapply gnames_coh_update_history.
+       + assert (mh' = <[a := (R, {[msg]} ∪ T)]> mh') as ->.
+         assert (T = {[msg]} ∪ T) as <- by set_solver.
+           by rewrite insert_id. by eapply messages_history_coh_send.
     - iMod (messages_mapsto_update a R T R ({[msg]} ∪ T) mh'
             with "[$Hrt $Hmctx]") as "[Hmctx Hrt]".
        iFrame. iModIntro. iExists mγ, (<[a:=(R, {[msg]} ∪ T)]> mh'). iFrame.
        simpl.
        iSplit.
-       { iPureIntro. admit. }
-       iSplit.
-       { iPureIntro. admit. }
+       { iPureIntro.
+         rewrite /messages_received_sent.
+         rewrite /messages_received_sent in Hhst.
+         apply insert_id in Hma. simplify_eq /=.
+         rewrite - {3 4} Hma.
+         rewrite !messages_sent_insert.
+         rewrite !messages_received_insert.
+         f_equal; set_solver. }
        iSplit.
        { iPureIntro. by eapply gnames_coh_update_history. }
        iSplit; first done.
@@ -673,7 +644,7 @@ Section state_interpretation.
        iApply
        (messages_resource_coh_send with "[Hφ] [$Hmres] [Hmsg]"); eauto.
          by destruct Hmhcoh; intuition.
-  Admitted.
+  Qed.
 
   Lemma aneris_state_interp_send_duplicate sh a skt Sn r R T to mbody σ1 mh :
     let ip := ip_of_address a in
@@ -693,7 +664,7 @@ Section state_interpretation.
     simpl. iIntros (HS HSn Hskt Hmsg) "Hsh Hrt Hσ".
     iDestruct "Hσ"
       as (mγ mh')
-           "(%Hhst & %Hhdom & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
@@ -710,6 +681,8 @@ Section state_interpretation.
      assert (T = {[msg]} ∪ T) as <- by set_solver.
        by rewrite insert_id. by eapply messages_history_coh_send.
   Qed.
+
+
 
   Lemma aneris_state_interp_receive_some a sh skt
         (Ψo : option (socket_interp Σ))  σ1 Sn r R T m mh :
@@ -731,13 +704,13 @@ Section state_interpretation.
          ▷ match Ψo with Some Ψ => Ψ m | _ => ∃ φ, a ⤇ φ ∗ φ m end)
        ∨
        ⌜m ∈ R⌝ ∗ ⌜R' = R⌝)
-      ∗ |==> aneris_state_interp σ2 (<[a := (R', T)]>mh)
+      ∗ |==> aneris_state_interp σ2 (R' ∪ mh.1, mh.2)
       ∗ sh ↪[ip_of_address a] skt ∗ a ⤳ (R', T).
    Proof.
      simpl. iIntros (HS HSn Hskt Hmsg) "#Hproto Hσ Hsh Ha".
      iDestruct "Hσ"
        as (mγ mh')
-           "(%Hhst & %Hhdom & %Hgcoh & %Hnscoh & %Hmhcoh
+           "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
@@ -762,18 +735,22 @@ Section state_interpretation.
          iDestruct "Hlcoh" as (h' s') "Hlcoh".
          iExists h', s'. rewrite !lookup_insert_ne; eauto. }
        iModIntro. iFrame.
-       iExists mγ, _. simpl. iFrame. simpl. iSplit; eauto. iPureIntro.
-       rewrite (insert_id mh); [done | admit].
-       iSplit.
-       { iPureIntro.
-          rewrite (insert_id mh); [done | admit]. }
+       iExists mγ, mh'. simpl. iFrame. simpl. iSplit; eauto. iPureIntro.
+       { rewrite /messages_received_sent.
+         rewrite /messages_received_sent in Hhst.
+         destruct mh. simplify_eq /=.
+         f_equal.
+         assert (R ⊆ messages_received mh').
+         apply insert_id in Hmha. rewrite -Hmha.
+         rewrite messages_received_insert. set_solver.
+         set_solver. }
        destruct Hgcoh as (?&Hgcoh&?).
        iPoseProof
          (free_ips_coh_update_msg with "Hfreeips") as "Hfreeips"; eauto.
        iFrame. iPureIntro.
        split_and!; [| |].
        + split_and!; [set_solver | | set_solver ].
-         rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
+       rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
        + by eapply network_sockets_coh_receive.
        + by eapply messages_history_coh_receive; eauto.
      - iExists ({[m]} ∪ R). iSplit; first done.
@@ -802,8 +779,17 @@ Section state_interpretation.
             with "[$Ha $Hmctx]") as "[Hmctx Ha]".
        iModIntro. iFrame.
        iExists mγ, (<[a:=({[m]} ∪ R, T)]> mh').
-       iFrame. simpl. iSplitR. admit.
-       iSplitR. admit.
+       iFrame. simpl. iSplitR.
+       { iPureIntro.
+         rewrite /messages_received_sent.
+         rewrite /messages_received_sent in Hhst.
+         destruct mh. simplify_eq /=.
+         apply insert_id in Hmha. rewrite - {4} Hmha.
+         rewrite !messages_sent_insert.
+         f_equal.
+         rewrite - {2} Hmha.
+         rewrite !messages_received_insert.
+         set_solver. }
        iSplit. iPureIntro. destruct Hgcoh as (?&Hgcoh&Hgcoh2).
        split_and!; [set_solver| |].
        + rewrite Hgcoh. by rewrite dom_insert_lookup_L; eauto.
@@ -812,7 +798,7 @@ Section state_interpretation.
        + iSplit. iPureIntro. by eapply network_sockets_coh_receive.
          iSplit. iPureIntro. by eapply messages_history_coh_receive_2; eauto.
            by iApply free_ips_coh_update_msg.
-   Admitted.
+Qed.
 
 End state_interpretation.
 

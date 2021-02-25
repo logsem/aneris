@@ -184,10 +184,9 @@ Section definitions.
      ⌜message_received m mh⌝)%I.
 
   (** State interpretation *)
-  Definition aneris_state_interp σ δh :=
+  Definition aneris_state_interp σ (rt : messages_history) :=
     (∃ γm mh,
-        ⌜messages_received_sent mh = messages_received_sent δh⌝ ∗
-        ⌜dom (gset socket_address) δh ⊆ dom (gset socket_address) mh⌝ ∗
+        ⌜messages_received_sent mh = rt⌝ ∗
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) mh⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mh⌝ ∗
@@ -204,33 +203,19 @@ Section Aneris_AS.
   Context `{aG : !anerisG Mdl Σ}.
 
   Record aneris_aux_state := AnerisAuxState {
-    aneris_AS_mhist : messages_history_map;
+    aneris_AS_mhist : messages_history;
     aneris_AS_model : model_state Mdl }.
 
-  Definition get_buffer (S : gmap ip_address sockets) (sa : socket_address)
-    : option message_soup :=
-    (S !! (ip_of_address sa)) ≫=
-    (λ h, (λ hsr, hsr.2.2) <$>
-       ((find (λ hsr, bool_decide (saddress hsr.2.1 = Some sa)))
-          (map_to_list h))).
-
-  Definition sent_received_at_evolution
-             (M1 M2 : message_soup)
-             (S1 S2 : gmap ip_address sockets)
-             (sa : socket_address) (RT : message_soup * message_soup)
-    : message_soup * message_soup :=
-    default RT
-    (get_buffer S1 sa ≫=
-     (λ r1, get_buffer S2 sa ≫=
-       (λ r2, Some (RT.1 ∪ (r1 ∖ r2),
-                    RT.2 ∪ (messages_sent_from sa (M2 ∖ M1)))))).
+   Definition buffers
+             (S : gmap ip_address sockets) : message_soup :=
+    (collect (λ ip Sn, collect (λ sh sr, sr.2) Sn) S).
 
   Definition message_history_evolution
              (M1 M2 : message_soup)
              (S1 S2 : gmap ip_address sockets)
-             (mh1 : messages_history_map)
-    : messages_history_map :=
-    map_imap (λ sa RT, Some (sent_received_at_evolution M1 M2 S1 S2 sa RT)) mh1.
+             (mh : messages_history)
+    : messages_history :=
+    ((buffers S1 ∖ buffers S2) ∪ mh.1, (M2 ∖ M1) ∪ mh.2).
 
   Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
     mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2.
@@ -262,6 +247,24 @@ Admitted.
 (*   apply finite.sig_finite; last by apply finite.unit_finite. *)
 (*   solve_decision. *)
 (* Qed. *)
+
+(* Definition get_buffer (S : gmap ip_address sockets) (sa : socket_address)
+    : option message_soup :=
+    (S !! (ip_of_address sa)) ≫=
+    (λ h, (λ hsr, hsr.2.2) <$>
+       ((find (λ hsr, bool_decide (saddress hsr.2.1 = Some sa)))
+          (map_to_list h))).
+
+  Definition sent_received_at_evolution
+             (M1 M2 : message_soup)
+             (S1 S2 : gmap ip_address sockets)
+             (sa : socket_address) (RT : message_soup * message_soup)
+    : message_soup * message_soup :=
+    default RT
+    (get_buffer S1 sa ≫=
+     (λ r1, get_buffer S2 sa ≫=
+       (λ r2, Some (RT.1 ∪ (r1 ∖ r2),
+                    RT.2 ∪ (messages_sent_from sa (M2 ∖ M1)))))). *)
 
 Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
   irisG aneris_lang aneris_AS Σ := {

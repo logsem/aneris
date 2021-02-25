@@ -234,7 +234,7 @@ Section primitive_laws.
   Implicit Types ip : ip_address.
   Implicit Types sh : socket_handle.
   Implicit Types skt : socket.
-  Implicit Types mh : messages_history_map.
+  Implicit Types mh : messages_history.
 
   Lemma wp_fork n k E e Φ :
     ▷ Φ (mkVal n #()) ∗ ▷ WP (mkExpr n e) @ k; ⊤ {{ _, True }} ⊢
@@ -333,7 +333,6 @@ Section primitive_laws.
     iFrame. by iApply "HΦ".
   Qed.
 
-
   Lemma wp_start ip ports k E e Φ :
     ip ≠ "system" →
     ports ≠ ∅ →
@@ -356,17 +355,14 @@ Section primitive_laws.
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".
     inv_head_step.
     iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
-      as "(%Hdisj  & %Hcoh & Hn & Hports & Hms & Hσ)"; first done.
+      as "(%Hcoh & Hn & Hports & Hms & Hσ)"; first done.
     iModIntro.
     simplify_eq /=.
     iExists δ.
-
     iSplit; [ iPureIntro; split; last by left |].
-    + simplify_eq /=. eapply message_history_evolution_new_ip; eauto.
-      intros; edestruct Hcoh; eauto. naive_solver.
-    + iSplitL "Hσ".
-        by iApply aneris_state_interp_history_init_forget.
-      iSplitL "HΦ"; [by iApply wp_value|].
+    + simplify_eq /=.
+      eapply message_history_evolution_new_ip; eauto.
+    + iFrame.  iSplitL "HΦ"; [by iApply wp_value|].
       iSplitL; [|done]. by iApply ("Hwp" with "[$] [$]").
   Qed.
 
@@ -496,14 +492,12 @@ Section primitive_laws.
     iMod (aneris_state_interp_send sh a skt
             with "[$Hsh] [$Hrt] [$Hφ] [$Hm] [$Hσ]")
       as "(Hσ & Hsh & Hrt)"; [done..|].
+    rewrite (insert_id  (state_sockets σ)); last done.
     iModIntro.
-    iExists (AnerisAuxState
-               (<[a := (R, {[msg]} ∪ T)]>(aneris_AS_mhist δ))
-               (aneris_AS_model δ)).
+    iExists _.
     iSplit. iPureIntro. split; last by left. simpl. rewrite - /msg.
     admit.
-    iSplitR; [done|]. simplify_eq /=. rewrite -/msg.
-    rewrite insert_id; last done. iFrame.
+    iSplitR; [done|]. iSplitL "Hσ". simplify_eq /=. admit.
     iApply ("HΦ" with "[$]").
   Admitted.
 
@@ -534,14 +528,11 @@ Section primitive_laws.
        rewrite insert_id; last done.
        iModIntro.
        iExists δ.
-       assert ((aneris_AS_mhist δ) !! a = Some (R,T)) as Hrt.
-       { admit. }
-       iSplit. iPureIntro. split; last by left. simpl. rewrite - /msg.
-    admit.
-    iSplitR; [done|].
-    simplify_eq /=.
-    iFrame.
-    iApply ("HΦ" with "[$]").
+       iSplit. iPureIntro. admit.
+       iSplitR; [done|].
+       simplify_eq /=.
+       iFrame.
+       iApply ("HΦ" with "[$]").
   Admitted.
 
   Lemma wp_receivefrom_nb_gen
