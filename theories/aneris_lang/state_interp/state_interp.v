@@ -198,6 +198,7 @@ Section state_interpretation.
   Lemma aneris_state_interp_alloc_node σ ip ports mh0 :
     ports ≠ ∅ →
     aneris_state_interp σ mh0 ∗ free_ip ip ==∗
+    ⌜history_init ip ports ##ₘ mh0⌝ ∗
     is_node ip ∗ free_ports ip ports ∗
     ([∗ set] p ∈ ports, (SocketAddressInet ip p) ⤳ (∅, ∅)) ∗
     aneris_state_interp
@@ -232,11 +233,7 @@ Section state_interpretation.
         by apply not_elem_of_dom_history. }
     iPoseProof (messages_ctx_alloc_node ip γn ports with "Hγn Hmctx")
       as ">(Hmctx & Hmto)"; [done | done |].
-    iModIntro. iSplitR.
-    { iExists _; eauto. }
-    iFrame "Hports Hmto".
-    iExists _, _. iFrame.
-    assert (history_init ip ports ##ₘ mh) as Hdisj.
+      assert (history_init ip ports ##ₘ mh) as Hdisj.
      { by apply history_init_disj. }
     assert (history_init ip ports ##ₘ mh0) as Hdisj0.
      { apply history_init_disj.
@@ -246,6 +243,12 @@ Section state_interpretation.
          as Habs by by set_solver.
        specialize (HmhNone p).
        by apply not_elem_of_dom in HmhNone. }
+     iModIntro.
+     iSplit; first done.
+     iSplitR.
+    { iExists _; eauto. }
+    iFrame "Hports Hmto".
+    iExists _, _. iFrame.
     iSplit.
     { iPureIntro.
       rewrite /messages_received_sent.
@@ -389,6 +392,41 @@ Section state_interpretation.
       repeat split; try done.
       specialize (Hnscoh ip Sn Hp1) as (?&?&?&?&Hb).
       by eapply Hb.
+  Qed.
+
+  Lemma aneris_state_interp_history_init_forget
+        ip ports (σ : state) (mh : messages_history_map) :
+    history_init ip ports ##ₘ mh →
+    ports ≠ ∅ →
+    (state_sockets σ) !! ip = None →
+    aneris_state_interp
+           {|
+             state_heaps := <[ip:=∅]> (state_heaps σ);
+             state_sockets := <[ip:=∅]> (state_sockets σ);
+             state_ports_in_use := state_ports_in_use σ;
+             state_ms := state_ms σ
+           |} (history_init ip ports ∪ mh) -∗
+  aneris_state_interp
+    {|
+      state_heaps := <[ip:=∅]> (state_heaps σ);
+      state_sockets := <[ip:=∅]> (state_sockets σ);
+      state_ports_in_use := state_ports_in_use σ;
+      state_ms := state_ms σ
+    |} mh.
+  Proof.
+    iIntros (Hdisj Hnp Hip) "Hσ".
+    iDestruct "Hσ"
+      as (mγ mh0)
+           "(%Hhst & %Hhdom & %Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & HFip & Hmctx & Hmres)".
+    rewrite /aneris_state_interp. iExists mγ, mh0. iFrame.
+    iPureIntro. split_and!; eauto.
+    - rewrite Hhst.  simplify_eq /=.
+      rewrite /messages_received_sent.
+      rewrite /messages_received_sent in Hhst.
+      rewrite !messages_sent_init; eauto.
+      rewrite !messages_received_init; eauto.
+    - set_solver.
   Qed.
 
   Lemma aneris_state_interp_sblock_update σ1 a b sh skt Sn r mh :

@@ -59,6 +59,13 @@ Section Aneris_AS.
   Qed.
 
 
+  Lemma get_buffer_new_ip S a ip :
+    S !! ip = None →
+    get_buffer S a = get_buffer (<[ip:=∅]> S) a.
+  Proof.
+  Admitted.
+
+
   Lemma get_buffer_deliver_message S M Sn sh skt a r m :
     let S' := (<[ip_of_address a := (<[sh:=(skt, r ∪ {[m]})]> Sn) ]> S) in
     m ∈ messages_to_receive_at a M →
@@ -160,6 +167,24 @@ Section Aneris_AS.
         by destruct p.
   Qed.
 
+  Lemma  sent_received_at_evolution_new_ip
+         S ip M (mh : messages_history_map) a rt:
+    S !! ip = None →
+    mh !! a = Some rt →
+    rt = sent_received_at_evolution M M S (<[ip:=∅]> S) a rt.
+  Proof.
+    intros ??.
+    rewrite /sent_received_at_evolution.
+    match goal with |-  _ = default _ ?x => destruct x eqn:Heq end; last done.
+    destruct (get_buffer S a) eqn:Hbeq; last done.
+    destruct (get_buffer (<[ip := ∅]>S) a) eqn:Hbeq'; last done.
+    rewrite -get_buffer_new_ip in Hbeq'; last done.
+    simpl in Heq. rewrite !difference_diag_L in Heq.
+    simplify_eq /=.
+    rewrite /messages_sent_from filter_empty_L  !difference_diag_L !right_id_L.
+    simplify_eq. by destruct rt.
+  Qed.
+
   Lemma message_history_evolution_deliver_message ip Sn sh a skt r m S M mh :
     m ∈ messages_to_receive_at a M →
     S !! ip = Some Sn →
@@ -200,6 +225,16 @@ Section Aneris_AS.
     rewrite-{1}(map_imap_Some mh) /message_history_evolution. apply map_imap_ext.
     intros a'. destruct (mh !! a') eqn:Hmh; rewrite Hmh; last done; simpl.
     do 2 f_equal. by eapply sent_received_at_evolution_id.
+  Qed.
+
+  Lemma message_history_evolution_new_ip S ip M mh :
+    S !! ip = None →
+    mh = message_history_evolution M M S (<[ip := ∅]>S) mh.
+  Proof.
+    intros ?. rewrite-{1}(map_imap_Some mh) /message_history_evolution.
+    apply map_imap_ext. intros a'.
+    destruct (mh !! a') eqn:Hmh; rewrite Hmh; last done; simpl.
+    do 2 f_equal. by eapply sent_received_at_evolution_new_ip.
   Qed.
 
 
