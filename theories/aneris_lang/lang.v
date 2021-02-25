@@ -1007,9 +1007,9 @@ Inductive socket_step ip :
       (<[sh:=((skt <| saddress := Some a |>), ∅)]>Sn)
       (<[ip_of_address a:={[ port_of_address a ]} ∪ ps]> P)
       M
-| SendToS sh a mbody R skt Sn P M f :
+| SendToS sh a mbody r skt Sn P M f :
     (* There is a socket that has been allocated for the handle *)
-    Sn !! sh = Some (skt, R) →
+    Sn !! sh = Some (skt, r) →
     (* The socket has an assigned address *)
     saddress skt = Some f ->
     let: new_message := mkMessage f a (sprotocol skt) mbody in
@@ -1021,14 +1021,14 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
-      (<[sh:=(skt, R)]>Sn) P ({[ new_message ]} ∪ M)
-| ReceiveFromSomeS sh R skt a m Sn P M :
+      Sn P ({[ new_message ]} ∪ M)
+| ReceiveFromSomeS sh r skt a m Sn P M :
     (* The socket handle is bound to a socket *)
-    Sn !! sh = Some (skt, R) →
+    Sn !! sh = Some (skt, r) →
     (* The socket has an assigned address *)
     saddress skt = Some a →
     (* There is a message to receive on the buffer *)
-    m ∈ R →
+    m ∈ r →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh))
@@ -1036,7 +1036,7 @@ Inductive socket_step ip :
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
-      (<[sh:=(skt, R ∖ {[m]})]>Sn) P M
+      (<[sh:=(skt, r ∖ {[m]})]>Sn) P M
 | ReceiveFromNoneS sh skt Sn P M :
     (* The socket handle is bound to some socket
        and there is nothing to receive
@@ -1218,11 +1218,11 @@ Proof. destruct Ki; move => [? ?] [? ?] [? ?];
 
 Inductive config_step :
   state -> list observation → state -> Prop :=
-| MessageDeliverStep n σ κ Sn Sn' sh a skt R m:
+| MessageDeliverStep n σ κ Sn Sn' sh a skt r m:
     m ∈ (messages_to_receive_at a (state_ms σ)) →
     state_sockets σ !! n = Some Sn ->
-    Sn !! sh = Some (skt, R) →
-    Sn' = <[sh := (skt, R ∪ {[m]})]>Sn →
+    Sn !! sh = Some (skt, r) →
+    Sn' = <[sh := (skt, r ∪ {[m]})]>Sn →
     saddress skt = Some a →
     config_step σ κ
                 {| state_heaps := state_heaps σ;
