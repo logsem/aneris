@@ -91,20 +91,16 @@ Section Aneris_AS.
     r' ⊆ r →
     r' = buffers S ∖ buffers (<[ip:=<[sh:=(skt, r ∖ r')]> Sn]> S).
   Proof.
-    intros Hcoh Hip HSn Hsub.
-    apply insert_id in Hip as Heq1.
-    apply insert_id in HSn as Heq2.
-    rewrite -Heq2 in Heq1.
-    rewrite -{1}Heq1. rewrite /buffers.
-    rewrite !collect_insert //=.
+    intros Hcoh Hip HSn Hsub. apply insert_id in Hip as Heq1.
+    apply insert_id in HSn as Heq2. rewrite -Heq2 in Heq1. rewrite -{1}Heq1.
+    rewrite /buffers. rewrite !collect_insert //=.
     assert
       (r ## collect
          (λ (_ : socket_handle)
             (sr : socket * gset message), sr.2) (delete sh Sn)) as Hdisj1.
     { apply elem_of_disjoint. intros m Hmr Hmc.
       apply elem_of_collect in Hmc as (sh1 & (skt1, r1) & Hsh1 & Hm1).
-      ddeq sh sh1.
-      assert (is_Some (saddress skt)) as (s & HsktS).
+      ddeq sh sh1. assert (is_Some (saddress skt)) as (s & HsktS).
       { destruct (saddress skt) eqn:Hskt; first by naive_solver.
         assert (r = ∅); last set_solver.
         destruct (Hcoh ip Sn Hip) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
@@ -112,20 +108,19 @@ Section Aneris_AS.
       assert (is_Some (saddress skt1)) as (s1 & HsktS1).
       { destruct (saddress skt1) eqn:Hskt; first by naive_solver.
         assert (r1 = ∅); last set_solver.
-         destruct (Hcoh ip Sn Hip) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
-         apply (Hrcoh sh1 skt1 r1); eauto.
-         rewrite -Hsh1. symmetry. by eapply lookup_delete_ne. }
+        destruct (Hcoh ip Sn Hip) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+        apply (Hrcoh sh1 skt1 r1); eauto.
+        rewrite -Hsh1. symmetry. by eapply lookup_delete_ne. }
       assert (sh = sh1); last done.
       destruct (Hcoh ip Sn Hip) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
       destruct (saddress skt) eqn:Hskt;
         destruct (saddress skt1) eqn:Hskt1; [| simplify_eq /=; eauto ..].
       eapply (Hhcoh sh sh1 skt skt1 r r1); eauto.
-        rewrite -Hsh1. symmetry. by eapply lookup_delete_ne.
-        transitivity (Some (m_destination m)).
-        rewrite Hskt. f_equal. symmetry. by eapply (Hmcoh sh skt r s0 HSn).
-        rewrite Hskt1. f_equal. eapply (Hmcoh sh1 skt1 r1 s2); last done.
-        rewrite -Hsh1. symmetry. by eapply lookup_delete_ne; last done.
-        done. }
+      rewrite -Hsh1. symmetry. by eapply lookup_delete_ne.
+      transitivity (Some (m_destination m)).
+      rewrite Hskt. f_equal. symmetry. by eapply (Hmcoh sh skt r s0 HSn).
+      rewrite Hskt1. f_equal. eapply (Hmcoh sh1 skt1 r1 s2); last done.
+      rewrite -Hsh1. symmetry. by eapply lookup_delete_ne; last done.  done. }
     assert (r ## collect
               (λ (_ : ip_address)
                  (Sn0 : gmap socket_handle (socket * gset message)),
@@ -135,15 +130,25 @@ Section Aneris_AS.
     {  apply elem_of_disjoint. intros m Hmr Hmc.
        apply elem_of_collect in Hmc as (ip1 & Sn1 & HSn1 & Hmc).
        apply elem_of_collect in Hmc as (sh1 & (skt1, r1) & Hsh1 & Hm1).
-       simplify_eq /=.
-       ddeq ip ip1.
-       rewrite lookup_delete_ne in HSn1; last done.
-       admit.
-(*       edestruct (Hoch _ Sn HSn) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
-           assert (ip_of_address (m_destination m) = ip); last done.
-           eapply Hacoh; eauto.
-           f_equal; symmetry. *)
-       }
+       simplify_eq /=. ddeq ip ip1. rewrite lookup_delete_ne in HSn1; last done.
+       assert (ip = ip1); last done.
+       assert (is_Some (saddress skt)) as (s & HsktS).
+       { destruct (saddress skt) eqn:Hskt; first by naive_solver.
+         assert (r = ∅); last set_solver.
+         destruct (Hcoh ip Sn Hip) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+         apply (Hrcoh sh skt r HSn); eauto. }
+       assert (is_Some (saddress skt1)) as (s1 & HsktS1).
+       { destruct (saddress skt1) eqn:Hskt; first by naive_solver.
+         assert (r1 = ∅); last set_solver.
+         destruct (Hcoh ip1 Sn1 HSn1) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+         apply (Hrcoh sh1 skt1 r1); eauto. }
+       transitivity (ip_of_address (m_destination m)).
+       + edestruct (Hcoh ip Sn Hip ) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+         symmetry. eapply Hacoh; eauto. rewrite HsktS. f_equal.
+         symmetry. by eapply (Hmcoh sh skt r s HSn).
+       + edestruct (Hcoh ip1 Sn1 HSn1 ) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+         eapply Hacoh; eauto. rewrite HsktS1. f_equal. symmetry.
+         eapply (Hmcoh sh1 skt1 r1 s1); last done. rewrite -Hsh1; eauto. done. }
     assert (collect
               (λ (_ : socket_handle)
                  (sr : socket * gset message), sr.2) (delete sh Sn)
@@ -153,13 +158,37 @@ Section Aneris_AS.
                collect
                  (λ (_ : socket_handle) (sr : socket * gset message), sr.2) Sn0)
               (delete ip S)) as Hdisj3.
-    { admit. }
+    { apply elem_of_disjoint.
+      intros m Hmr Hmc.
+      apply elem_of_collect in Hmc as (ip1 & Sn1 & HSn1 & Hmc).
+      apply elem_of_collect in Hmc as (sh1 & (skt1, r1) & Hsh1 & Hm1).
+      apply elem_of_collect in Hmr as (sh2 & (skt2, r2) & Hsh2 & Hm2).
+      simpl in *. ddeq ip ip1. rewrite lookup_delete_ne in HSn1; last done.
+      ddeq sh sh2. rewrite lookup_delete_ne in Hsh2; last done.
+      assert (is_Some (saddress skt1)) as (s & HsktS1).
+      { destruct (saddress skt1) eqn:Hskt; first by naive_solver.
+        assert (r1 = ∅); last set_solver.
+        destruct (Hcoh ip1 Sn1 HSn1) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+        apply (Hrcoh sh1 skt1 r1); eauto. }
+      assert (is_Some (saddress skt2)) as (s1 & HsktS2).
+      { destruct (saddress skt2) eqn:Hskt; first by naive_solver.
+        assert (r2 = ∅); last set_solver.
+        destruct (Hcoh ip Sn Hip) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+        apply (Hrcoh sh2 skt2 r2); eauto. }
+      assert (ip = ip1); last done.
+      transitivity (ip_of_address (m_destination m)).
+      + edestruct (Hcoh ip Sn Hip ) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+        symmetry. eapply Hacoh; eauto. rewrite HsktS2. f_equal.
+        symmetry. by eapply Hmcoh.
+      + edestruct (Hcoh ip1 Sn1 HSn1 ) as (Hhcoh & Hacoh & Hmcoh & Hrcoh).
+        eapply Hacoh; eauto. rewrite HsktS1. f_equal.
+        symmetry. eapply Hmcoh; eauto. }
     rewrite !set_diff_distr; eauto with set_solver.
     - rewrite set_eq_subseteq; split; set_solver.
     - set_solver.
     - by apply disjoint_union_l.
     - by apply disjoint_union_l; set_solver.
-  Admitted.
+  Qed.
 
   Lemma buffers_subseteq_new_ip S ip :
     S !! ip = None →
@@ -170,7 +199,7 @@ Section Aneris_AS.
     rewrite insert_union_singleton_l.
     rewrite collect_disjoint_union.
     set_solver.
-    by apply map_disjoint_singleton_l_2.
+      by apply map_disjoint_singleton_l_2.
   Qed.
 
   Lemma buffers_subseteq_new_socket S Sn ip sh f t p:

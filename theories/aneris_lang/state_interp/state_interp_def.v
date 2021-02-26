@@ -233,38 +233,17 @@ Program Definition aneris_AS : AuxState aneris_lang :=
          (aneris_AS_model δ2) |}.
 Next Obligation.
 Proof.
-  simpl; intros ??; split.
-Admitted.
+  simpl. split.
+  - rewrite /message_history_evolution !difference_diag_L !left_id_L.
+    destruct (aneris_AS_mhist δ1); eauto.
+  - by left.
+Qed.
 
 Lemma aneris_AS_valid_state_evolution_finitary :
   valid_state_evolution_finitary aneris_AS.
 Proof.
 Admitted.
-  (* intros ???. *)
-(*   rewrite /valid_state_evolution. simplify_eq /=. *)
-(*   intros ?. *)
-(*   apply quantifiers.finite_smaller_card_nat. *)
-(*   apply finite.sig_finite; last by apply finite.unit_finite. *)
-(*   solve_decision. *)
-(* Qed. *)
 
-(* Definition get_buffer (S : gmap ip_address sockets) (sa : socket_address)
-    : option message_soup :=
-    (S !! (ip_of_address sa)) ≫=
-    (λ h, (λ hsr, hsr.2.2) <$>
-       ((find (λ hsr, bool_decide (saddress hsr.2.1 = Some sa)))
-          (map_to_list h))).
-
-  Definition sent_received_at_evolution
-             (M1 M2 : message_soup)
-             (S1 S2 : gmap ip_address sockets)
-             (sa : socket_address) (RT : message_soup * message_soup)
-    : message_soup * message_soup :=
-    default RT
-    (get_buffer S1 sa ≫=
-     (λ r1, get_buffer S2 sa ≫=
-       (λ r2, Some (RT.1 ∪ (r1 ∖ r2),
-                    RT.2 ∪ (messages_sent_from sa (M2 ∖ M1)))))). *)
 
 Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
   irisG aneris_lang aneris_AS Σ := {

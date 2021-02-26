@@ -49,7 +49,7 @@ Section library.
     wp_lam. wp_match. by iApply "HΦ".
   Qed.
 
-  Lemma listen_spec ip P Q h s R T a handler φ:
+(*  Lemma listen_spec ip P Q h s R T a handler φ:
     ip = ip_of_address a →
     saddress s = Some a →
     (∀ m,
@@ -71,9 +71,9 @@ Section library.
      - wp_pures. iApply ("IH" with "[-HΦ]"); by iFrame.
      - iDestruct "Hrd" as (m Hdst ->) "[ (% & Hs & Hφ) | (% & Hs) ]"; wp_pures;
          wp_apply ("Hhandler" with "[-HΦ] [HΦ]"); eauto with iFrame.
-  Qed.
+  Qed. *)
 
-  Lemma listen_wait_spec ip h s R T a φ :
+  (* Lemma listen_wait_spec ip h s R T a φ :
     ip = ip_of_address a →
     saddress s = Some a →
   {{{ h ↪[ip] (s, R, T) ∗ a ⤇ φ}}}
@@ -92,6 +92,6 @@ Section library.
     - iDestruct "Hrd" as (m Hdst ->) "[ (% & Hs & Hφ) | (% & Hs) ]"; wp_pures.
       + iApply "HΦ". iLeft. eauto with iFrame.
       + iApply "HΦ". iRight. eauto with iFrame.
-  Qed.
+  Qed. *)
 
 End library.
