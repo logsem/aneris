@@ -718,24 +718,6 @@ Section state_interpretation.
        by rewrite insert_id. by eapply messages_history_coh_send.
   Qed.
 
-
-
-  (* TODO: received:
-  H3 : m ∈ r
-  Hin : m ∈ R
-
- (R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2) =
- message_history_evolution (state_ms σ) (state_ms σ) (state_sockets σ)
-   (<[ip_of_address (m_destination m):=<[sh:=(skt, r ∖ {[m]})]> Sn]> (state_sockets σ))
-   (aneris_AS_mhist δ)
-subgoal 2 (ID 19758) is:
- ({[m]} ∪ R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2) =
- message_history_evolution (state_ms σ) (state_ms σ) (state_sockets σ)
-   (<[ip_of_address a:=<[sh:=(skt, r ∖ {[m]})]> Sn]> (state_sockets σ))
-   (aneris_AS_mhist δ)
-
-*)
-
   Lemma aneris_state_interp_receive_some a sh skt
         (Ψo : option (socket_interp Σ))  σ1 Sn r R T m mh :
      let ip := ip_of_address a in
@@ -750,7 +732,10 @@ subgoal 2 (ID 19758) is:
     sh ↪[ip] skt -∗
     a ⤳ (R, T) -∗
     ∃ R',
-       ⌜m_destination m = a⌝ ∗
+      ⌜m_destination m = a⌝ ∗
+      ⌜(R' ∪ mh.1, mh.2) =
+      message_history_evolution
+        (state_ms σ1) (state_ms σ1) (state_sockets σ1) S'  mh⌝ ∗
       ((⌜m ∉ R⌝ ∗
         ⌜R' = {[ m ]} ∪ R⌝ ∗
          ▷ match Ψo with Some Ψ => Ψ m | _ => ∃ φ, a ⤇ φ ∗ φ m end)
@@ -776,7 +761,21 @@ subgoal 2 (ID 19758) is:
     iDestruct (local_state_coh_update_rb a sh skt σ1 γs Sn r (r ∖ {[m]})
                  with "[$Hstate $Hsh]") as "Hstate"; eauto.
     destruct (decide (m ∈ R)).
-     - iExists R. iSplit; first done. iSplitR. eauto.
+     - iExists R.  iSplit; first done. iSplitR.
+       assert (R = {[m]} ∪ R) as -> by set_solver.
+       iPureIntro.
+       destruct Hmhcoh as (? & Hrscoh & Hacoh & Hrsbcoh).
+       eapply message_history_evolution_receive; eauto.
+       rewrite /messages_received_sent in Hhst.
+       inversion Hhst as [[ Hrcvd Hsent ]].
+       simplify_eq /=.
+       intros m0 Hm0.
+       apply elem_of_messages_received.
+       exists (m_destination m0), (R,T); split; last done.
+       assert (m_destination m0 = m_destination m) as ->; last done.
+       specialize (Hacoh (m_destination m) _ _ Hmha) as (Hacoh & _).
+       eauto.
+       iSplitR; eauto.
        iMod "Hstate" as "(Hstate & Hsh)".
        iDestruct (big_sepM_local_state_coh_insert
                     with "[$Hstate] [Hlcoh]") as "Hlcoh"; eauto.
@@ -806,13 +805,25 @@ subgoal 2 (ID 19758) is:
        + by eapply network_sockets_coh_receive.
        + by eapply messages_history_coh_receive; eauto.
      - iExists ({[m]} ∪ R). iSplit; first done.
-       destruct Hmhcoh as (?&Hrcoh&?&?).
+       destruct Hmhcoh as (? & Hrscoh & Hacoh & Hrsbcoh).
        assert ( ∃ R T, mh' !! m_sender m = Some (R, T) ∧ m ∈ T) as Hrcoh2.
-       { destruct (Hrcoh (ip_of_address a) Sn sh skt r m HS HSn Hmsg).
+       { destruct (Hrscoh (ip_of_address a) Sn sh skt r m HS HSn Hmsg).
          eauto. } destruct Hrcoh2 as (R'&T'&Hmh&Hm).
        iPoseProof
          (messages_resource_coh_receive with "Hmres")
          as "(Hmres & Hres)"; eauto.
+       iSplitR.
+       iPureIntro.
+       eapply message_history_evolution_receive; eauto.
+       rewrite /messages_received_sent in Hhst.
+       inversion Hhst as [[ Hrcvd Hsent ]].
+       simplify_eq /=.
+       intros m0 Hm0.
+       apply elem_of_messages_received.
+       exists (m_destination m0), (R,T); split; last done.
+       assert (m_destination m0 = m_destination m) as ->; last done.
+       specialize (Hacoh (m_destination m) _ _ Hmha) as (Hacoh & _).
+       eauto.
        iSplitL "Hres".
        { iLeft. iSplit; eauto. iSplit; eauto. destruct Ψo as [ψ|]; [|iNext].
          iDestruct "Hres" as (φ) "(Hφ & Hres)". rewrite Hma.

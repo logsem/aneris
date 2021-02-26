@@ -56,6 +56,18 @@ Section Aneris_AS.
       set_solver.
   Qed.
 
+  (* Lemma tes (r r' : message_soup) : *)
+  (*   r' ⊆ r → *)
+  (*   r ∖ (r ∖ r') = r'.   *)
+  (* Proof. rewrite set_eq_subseteq; split; set_solver. Qed. *)
+
+  Lemma buffers_retreive S ip Sn skt r r' sh :
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    r' ⊆ r →
+    r' = buffers S ∖ buffers (<[ip:=<[sh:=(skt, r ∖ r')]> Sn]> S).
+  Proof. Admitted.
+
   Lemma buffers_subseteq_new_ip S ip :
     S !! ip = None →
     buffers S ⊆ buffers (<[ip:=∅]> S).
@@ -183,6 +195,23 @@ Section Aneris_AS.
     set_solver.
   Qed.
 
+  Lemma message_history_evolution_receive ip S Sn M sh skt r R mh m:
+    m ∈ r →
+    R ⊆ mh.1 →
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    ({[ m ]} ∪ R ∪ mh.1, mh.2) =
+    message_history_evolution
+      M M S  (<[ip :=<[sh:=(skt, r ∖ {[m]})]> Sn]> S) mh.
+  Proof.
+    intros Hmr HR HS HSn.
+    rewrite /message_history_evolution.
+    rewrite !difference_diag_L !left_id_L.
+    f_equal. assert ({[m]} ∪ mh.1 =  {[m]} ∪ R ∪ mh.1) as Heq by set_solver.
+    rewrite -Heq. f_equal.
+    eapply buffers_retreive; set_solver; eauto.
+  Qed.
+
   Lemma message_history_evolution_send_message S M msg mh :
     M ⊆ mh.2 →
     (mh.1, {[msg]} ∪ mh.2) = message_history_evolution M ({[msg]} ∪ M) S S mh.
@@ -237,7 +266,8 @@ Section Aneris_AS.
 
 
 
- (* Lemma get_buffer_some r sh skt Sn S a :
+
+(* Lemma get_buffer_some r sh skt Sn S a :
     socket_handlers_coh Sn →
     S !! (ip_of_address a) = Some Sn →
     Sn !! sh = Some (skt, r) →
