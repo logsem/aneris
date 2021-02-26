@@ -68,6 +68,93 @@ Section Aneris_AS.
     by apply map_disjoint_singleton_l_2.
   Qed.
 
+  Lemma buffers_subseteq_new_socket S Sn ip sh f t p:
+    S !! ip = Some Sn →
+    Sn !! sh = None →
+    buffers S ⊆ buffers (<[ip:=<[sh:=(mkSocket f t p None true, ∅)]> Sn]> S).
+  Proof.
+    intros Hip Hnone.
+    rewrite /buffers.
+    intros m Hm.
+    apply elem_of_collect in Hm as (ip1 & Sip1 & HSip1 & Hm).
+    ddeq ip ip1.
+    - apply elem_of_collect in Hm as (h1 & (s1, r1) & Hhsr1 & Hm).
+      apply elem_of_collect.
+      ddeq sh h1.
+      + exists ip1, (<[sh:=(mkSocket f t p None true, ∅)]> Sn).
+        rewrite lookup_insert; eauto.
+        split; first done.
+        apply elem_of_collect.
+        exists h1. eexists. split; last set_solver.
+          by rewrite lookup_insert_ne.
+    - apply elem_of_collect in Hm as (h1 & (s1, r1) & Hhsr1 & Hm).
+      apply elem_of_collect.
+      exists ip1, Sip1. rewrite lookup_insert_ne; eauto.
+      split; first done.
+      apply elem_of_collect.
+      set_solver.
+  Qed.
+
+  Lemma buffers_subseteq_update_socket S Sn ip sh sa skt r:
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    buffers S ⊆ buffers (<[ip:=<[sh:=(skt<| saddress := sa |>, r)]> Sn]> S).
+  Proof.
+    intros.
+    intros m Hm.
+    apply elem_of_collect in Hm as (ip1 & Sip1 & HSip1 & Hm).
+    ddeq ip ip1.
+    - apply elem_of_collect in Hm as (h1 & (s1, r1) & Hhsr1 & Hm).
+      apply elem_of_collect.
+      ddeq sh h1.
+      + exists ip1, (<[h1:=(skt<| saddress := sa |>, r)]> Sn).
+        rewrite lookup_insert; eauto.
+        split; first done.
+        apply elem_of_collect.
+        exists h1, (skt<| saddress := sa |>, r). split; last set_solver.
+        rewrite lookup_insert. eauto.
+      + exists ip1, (<[sh:=(skt<| saddress := sa |>, r)]> Sn).
+        rewrite lookup_insert.
+        split. f_equal.
+        apply elem_of_collect.
+        exists h1, (s1,r1).
+        rewrite lookup_insert_ne; eauto.
+    - apply elem_of_collect in Hm as (h1 & (s1, r1) & Hhsr1 & Hm).
+      apply elem_of_collect.
+      exists ip1, Sip1. rewrite lookup_insert_ne; eauto.
+      split; first done.
+      apply elem_of_collect.
+      set_solver.
+  Qed.
+
+  Lemma message_history_evolution_new_socket S Sn ip M mh sh f t p:
+    S !! ip = Some Sn →
+    Sn !! sh = None →
+    mh = message_history_evolution
+         M M S (<[ip:=<[sh:=(mkSocket f t p None true, ∅)]> Sn]> S) mh.
+ Proof.
+    intros ??. rewrite /message_history_evolution.
+    destruct mh as (R,T).
+    rewrite !difference_diag_L !left_id_L. f_equal.
+    rewrite subseteq_empty_difference_L; first set_solver.
+    rewrite /buffers. simplify_eq /=.
+    by eapply buffers_subseteq_new_socket.
+ Qed.
+
+ Lemma message_history_evolution_socketbind S Sn ip M mh sh skt r sa:
+    S !! ip = Some Sn →
+    Sn !! sh = Some (skt, r) →
+    mh = message_history_evolution
+         M M S (<[ip:=<[sh:=(skt<| saddress := sa |>, r)]> Sn]> S) mh.
+ Proof.
+    intros ??. rewrite /message_history_evolution.
+    destruct mh as (R,T).
+    rewrite !difference_diag_L !left_id_L. f_equal.
+    rewrite subseteq_empty_difference_L; first set_solver.
+    rewrite /buffers. simplify_eq /=.
+    by eapply buffers_subseteq_update_socket.
+ Qed.
+
   Lemma message_history_evolution_deliver_message ip Sn sh skt r r' S M rt :
     S !! ip = Some Sn →
     Sn !! sh = Some (skt, r) →
@@ -94,6 +181,36 @@ Section Aneris_AS.
     rewrite !difference_diag_L left_id_L. f_equal.
     rewrite subseteq_empty_difference_L; eauto.
     set_solver.
+  Qed.
+
+  Lemma message_history_evolution_send_message S M msg mh :
+    M ⊆ mh.2 →
+    (mh.1, {[msg]} ∪ mh.2) = message_history_evolution M ({[msg]} ∪ M) S S mh.
+  Proof.
+    intro Hms. rewrite /message_history_evolution.
+    destruct mh as (R,T).
+    rewrite !difference_diag_L !left_id_L.
+    f_equal. simpl.
+    destruct (decide (msg ∈ M)) as [Hin | Hnotin].
+    - rewrite difference_union_distr_l_L.
+      rewrite subseteq_empty_difference_L; last set_solver.
+      rewrite !difference_diag_L !left_id_L. set_solver.
+    - set_solver.
+  Qed.
+
+  Lemma message_history_evolution_send_duplicate_message S M msg mh :
+    msg ∈ mh.2 →
+    (mh.1, mh.2) = message_history_evolution M ({[msg]} ∪ M) S S mh.
+  Proof.
+    intro Hms. rewrite /message_history_evolution.
+    destruct mh as (R,T).
+    rewrite !difference_diag_L !left_id_L.
+    f_equal. simpl.
+    destruct (decide (msg ∈ M)) as [Hin | Hnotin].
+    - rewrite difference_union_distr_l_L.
+      rewrite subseteq_empty_difference_L; last set_solver.
+      rewrite !difference_diag_L !left_id_L. set_solver.
+    - set_solver.
   Qed.
 
   Lemma message_history_evolution_new_ip S ip M mh :

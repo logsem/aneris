@@ -571,8 +571,6 @@ Section state_interpretation.
     iFrame.
   Qed.
 
-
-
   Lemma aneris_state_interp_send sh a skt Sn r R T φ to mbody σ1 mh:
     let ip := ip_of_address a in
     let msg := mkMessage a to (sprotocol skt) mbody in
@@ -586,6 +584,9 @@ Section state_interpretation.
     to ⤇ φ -∗
     φ msg -∗
     aneris_state_interp σ1 mh ==∗
+    ⌜(mh.1, {[msg]} ∪ mh.2) =
+    message_history_evolution
+      (state_ms σ1) M' (state_sockets σ1) (state_sockets σ1) mh⌝ ∗
     aneris_state_interp σ2 (mh.1, {[msg]} ∪ mh.2) ∗
     sh ↪[ip_of_address a] skt ∗
     a ⤳ (R, {[msg]} ∪ T).
@@ -606,7 +607,18 @@ Section state_interpretation.
     iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %Hma.
     destruct (decide (msg ∈ T)).
     -  assert (T = {[msg]} ∪ T) as <- by set_solver.
-       iFrame. iModIntro. iExists mγ, (<[a:=(R, T)]> mh'). iFrame.
+       iFrame. iModIntro.
+       iSplit. iPureIntro.
+       destruct Hmhcoh as (Hmscoh & ? & ? & ?).
+       eapply message_history_evolution_send_message.
+       rewrite /messages_received_sent in Hhst.
+       inversion Hhst as [[ Hrcvd Hsent ]].
+       simplify_eq /=.
+       intros m0 Hm0.
+       apply elem_of_messages_sent.
+       apply Hmscoh in Hm0 as (R0 & T0 & ?).
+       exists (m_sender m0), (R0,T0). set_solver.
+       iExists mγ, (<[a:=(R, T)]> mh'). iFrame.
        simpl.
        rewrite {3 4 5} (insert_id mh'); eauto.
        iFrame.
@@ -625,7 +637,18 @@ Section state_interpretation.
            by rewrite insert_id. by eapply messages_history_coh_send.
     - iMod (messages_mapsto_update a R T R ({[msg]} ∪ T) mh'
             with "[$Hrt $Hmctx]") as "[Hmctx Hrt]".
-       iFrame. iModIntro. iExists mγ, (<[a:=(R, {[msg]} ∪ T)]> mh'). iFrame.
+      iFrame. iModIntro.
+      iSplit. iPureIntro.
+      destruct Hmhcoh as (Hmscoh & ? & ? & ?).
+      eapply  message_history_evolution_send_message.
+        rewrite /messages_received_sent in Hhst.
+       inversion Hhst as [[ Hrcvd Hsent ]].
+       simplify_eq /=.
+       intros m0 Hm0.
+       apply elem_of_messages_sent.
+       apply Hmscoh in Hm0 as (R0 & T0 & ?).
+       exists (m_sender m0), (R0,T0). set_solver.
+      iExists mγ, (<[a:=(R, {[msg]} ∪ T)]> mh'). iFrame.
        simpl.
        iSplit.
        { iPureIntro.
@@ -658,6 +681,9 @@ Section state_interpretation.
     sh ↪[ip_of_address a] skt -∗
     a ⤳ (R, T) -∗
     aneris_state_interp σ1 mh ==∗
+     ⌜(mh.1, mh.2) =
+    message_history_evolution
+      (state_ms σ1) M' (state_sockets σ1) (state_sockets σ1) mh⌝ ∗
     aneris_state_interp σ2 mh ∗ sh ↪[ip_of_address a] skt ∗
     a ⤳ (R, T).
   Proof.
@@ -674,7 +700,17 @@ Section state_interpretation.
                  m_protocol := sprotocol skt;
                  m_body := mbody |}).
      iDestruct (messages_mapsto_valid with "Hrt Hmctx") as %?.
-     iFrame. iModIntro. iExists mγ, mh'. simpl. iSplit.
+     iFrame. iModIntro.
+     iSplit. rewrite - /msg in Hmsg.
+     iPureIntro.
+     destruct Hmhcoh as (Hmscoh & ? & ? & ?).
+     eapply message_history_evolution_send_duplicate_message.
+     rewrite /messages_received_sent in Hhst.
+     inversion Hhst as [[ Hrcvd Hsent ]].
+     simplify_eq /=.
+     apply elem_of_messages_sent.
+     exists (m_sender msg), (R,T). set_solver.
+     iExists mγ, mh'. simpl. iSplit.
      { iPureIntro. eauto. } iFrame.
      iPureIntro; split_and!; eauto.
      assert (mh' = (<[a:=(R, {[msg]} ∪ T)]> mh')) as ->.
@@ -683,6 +719,22 @@ Section state_interpretation.
   Qed.
 
 
+
+  (* TODO: received:
+  H3 : m ∈ r
+  Hin : m ∈ R
+
+ (R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2) =
+ message_history_evolution (state_ms σ) (state_ms σ) (state_sockets σ)
+   (<[ip_of_address (m_destination m):=<[sh:=(skt, r ∖ {[m]})]> Sn]> (state_sockets σ))
+   (aneris_AS_mhist δ)
+subgoal 2 (ID 19758) is:
+ ({[m]} ∪ R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2) =
+ message_history_evolution (state_ms σ) (state_ms σ) (state_sockets σ)
+   (<[ip_of_address a:=<[sh:=(skt, r ∖ {[m]})]> Sn]> (state_sockets σ))
+   (aneris_AS_mhist δ)
+
+*)
 
   Lemma aneris_state_interp_receive_some a sh skt
         (Ψo : option (socket_interp Σ))  σ1 Sn r R T m mh :

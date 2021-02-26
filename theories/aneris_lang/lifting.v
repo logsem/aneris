@@ -392,12 +392,13 @@ Section primitive_laws.
       as "[Hσ Hsh]"; try done.
     iModIntro.
     iExists δ; iSplit. iPureIntro; split; last by left.
-    admit.
+    by eapply message_history_evolution_new_socket.
     iSplitR; first done.
     iFrame. by iApply "HΦ".
-  Admitted.
+  Qed.
 
-  Lemma wp_socketbind_static A E sh skt k a :
+
+ Lemma wp_socketbind_static A E sh skt k a :
     saddress skt = None →
     a ∈ A →
     {{{ ▷ fixed A ∗
@@ -427,10 +428,10 @@ Section primitive_laws.
     iModIntro.
     iExists δ; iSplit.
     iPureIntro; split; last by left.
-    admit.
-    iSplitR; [done|]. iFrame.
+      by eapply message_history_evolution_socketbind.
+      iSplitR; [done|]. iFrame.
     iApply ("HΦ" with "[$]").
-  Admitted.
+  Qed.
 
   Lemma wp_socketbind_dynamic skt A E sh k a φ :
     saddress skt = None →
@@ -462,10 +463,10 @@ Section primitive_laws.
     iModIntro.
     iExists δ; iSplit.
      iPureIntro; split; last by left.
-    admit.
-    iSplitR; [done|]. iFrame.
-    iApply ("HΦ" with "[$]").
-  Admitted.
+     by eapply message_history_evolution_socketbind.
+      iSplitR; [done|]. iFrame.
+      iApply ("HΦ" with "[$]").
+  Qed.
 
   Lemma wp_send φ mbody sh skt a to k E R T:
     let msg := mkMessage a to (sprotocol skt) mbody  in
@@ -491,15 +492,16 @@ Section primitive_laws.
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_send sh a skt
             with "[$Hsh] [$Hrt] [$Hφ] [$Hm] [$Hσ]")
-      as "(Hσ & Hsh & Hrt)"; [done..|].
+      as "(%Hmhe & Hσ & Hsh & Hrt)"; [done..|].
     rewrite (insert_id  (state_sockets σ)); last done.
-    iModIntro.
-    iExists _.
-    iSplit. iPureIntro. split; last by left. simpl. rewrite - /msg.
-    admit.
-    iSplitR; [done|]. iSplitL "Hσ". simplify_eq /=. admit.
+    iModIntro. rewrite - /msg.
+    iExists (AnerisAuxState
+               ((aneris_AS_mhist δ).1, {[msg]} ∪ (aneris_AS_mhist δ).2)  _).
+    iSplit. iPureIntro. split; last by left. simpl.
+    eapply Hmhe. iFrame.
+    iSplitR; [done|].
     iApply ("HΦ" with "[$]").
-  Admitted.
+  Qed.
 
   Lemma wp_send_duplicate mbody sh skt a to k E R T:
     let msg := mkMessage a to (sprotocol skt) mbody in
@@ -524,16 +526,18 @@ Section primitive_laws.
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_send_duplicate
             with "[$Hsh] [$Hrt] [$Hσ]")
-      as "(Hσ & Hsh & Hrt)"; [done..|]. rewrite - /msg.
+      as "(%Hmhe & Hσ & Hsh & Hrt)"; [done..|]. rewrite - /msg.
        rewrite insert_id; last done.
        iModIntro.
        iExists δ.
-       iSplit. iPureIntro. admit.
+       iSplit. iPureIntro. split; last by left. simpl.
+       destruct (aneris_AS_mhist δ).
+       eapply Hmhe. iFrame.
        iSplitR; [done|].
        simplify_eq /=.
        iFrame.
        iApply ("HΦ" with "[$]").
-  Admitted.
+  Qed.
 
   Lemma wp_receivefrom_nb_gen
         (Ψo : option (socket_interp Σ)) k a E sh skt R T :
@@ -572,7 +576,11 @@ Section primitive_laws.
           as (R') "(% & Hrt & Hrest)"; [done..|].
         iNext. iDestruct "Hrt" as "[ (% & % & Hrt) | (_ & ->)]"; first done.
         iMod "Hrest" as "(Hσ & Hsh & Ha)".
-        iModIntro. iExists δ; iSplit; first done.
+        iModIntro.
+        iExists (AnerisAuxState
+                    (R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2)  _).
+        iSplit. simpl. iPureIntro. split; last by left.
+        simplify_eq /=. admit.
         iSplit; first done. iFrame. iApply "HΦ". iRight; eauto.
         iExists m. eauto with iFrame.
       + iPoseProof (aneris_state_interp_receive_some
@@ -580,14 +588,22 @@ Section primitive_laws.
           as (R') "(% & Hrt & Hrest)"; [done..|].
         iNext. iDestruct "Hrt" as "[ (% & -> & Hrt) | (% & %)]"; last done.
         iMod "Hrest" as "(Hσ & Hsh & Ha)".
-        iModIntro. iExists δ; iSplit; first done. iFrame. iSplitR; [done|].
+        iModIntro.
+        iExists (AnerisAuxState
+                   ({[m]} ∪ R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2)
+                   _).
+        iSplit. iPureIntro. simpl. split; last by left.
+        admit.
+        iFrame. iSplitR; [done|].
         iFrame. iApply "HΦ". iRight. iExists m. eauto with iFrame.
-    - iNext; iModIntro. iExists δ; iSplit; first done.
-      iFrame. iSplitR; [done|]. rewrite insert_id; last done.
+    - iNext; iModIntro.
+      rewrite insert_id; last done.
+      iExists δ; iSplit. iPureIntro. eapply valid_state_evolution_id.
+      iFrame. iSplitR; [done|].
       iFrame. iPoseProof ("HΦ" $! (InjLV #())) as "HΦ".
       iApply "HΦ". iLeft. eauto with iFrame.
     - by rewrite Hblk in H2.
-  Qed.
+      Admitted.
 
   Lemma wp_receivefrom_nb k a E sh skt R T :
     let ip := ip_of_address a in
