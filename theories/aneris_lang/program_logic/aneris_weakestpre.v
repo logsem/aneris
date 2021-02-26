@@ -15,11 +15,11 @@ Definition aneris_wp_def `{!anerisG Mdl Σ} (ip : ip_address) (E : coPset)
   (is_node ip -∗
    wp NotStuck E (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!anerisG Mdl Σ} : seal (@aneris_wp_def Σ _).
+Definition aneris_wp_aux `{!anerisG Mdl Σ} : seal (@aneris_wp_def Mdl Σ _).
 Proof. by eexists. Qed.
 Instance aneris_wp `{!anerisG Mdl Σ} : Wp base_lang (iProp Σ) ip_address :=
   aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!anerisG Mdl Σ} : aneris_wp = @aneris_wp_def Σ _ :=
+Definition aneris_wp_eq `{!anerisG Mdl Σ} : aneris_wp = @aneris_wp_def Mdl Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Section aneris_wp.
@@ -154,10 +154,10 @@ Proof.
     inversion Hhstp; simplify_eq; rewrite -aneris_base_fill; eauto. }
   iMod ("Hstp" $! (mkExpr ip e2') σ2 efs with "[//]") as "Hstp".
   iModIntro; iNext.
-  iMod "Hstp" as (δ') "(-> & Hsi & Hwp & Hefs)".
+  iMod "Hstp" as (δ') "(% & Hsi & Hwp & Hefs)".
   iModIntro; iFrame.
   iExists _; iSplit; first done.
-  iApply "IH"; done.
+  iFrame. iApply "IH"; done.
 Qed.
 
 Lemma aneris_wp_bind_inv K ip E e Φ :

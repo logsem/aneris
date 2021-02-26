@@ -573,19 +573,19 @@ Section primitive_laws.
     - destruct (decide (m ∈ R)) as [Hin | Hni ].
       + iPoseProof (aneris_state_interp_receive_some
                       with "[HΨ] [$Hσ] [$Hsh] [$Hrt]")
-          as (R') "(% & Hrt & Hrest)"; [done..|].
+          as (R') "(% & %Hhist & Hrt & Hrest)"; [done..|].
         iNext. iDestruct "Hrt" as "[ (% & % & Hrt) | (_ & ->)]"; first done.
         iMod "Hrest" as "(Hσ & Hsh & Ha)".
         iModIntro.
         iExists (AnerisAuxState
                     (R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2)  _).
         iSplit. simpl. iPureIntro. split; last by left.
-        simplify_eq /=. admit.
+        simplify_eq /=. eauto.
         iSplit; first done. iFrame. iApply "HΦ". iRight; eauto.
         iExists m. eauto with iFrame.
       + iPoseProof (aneris_state_interp_receive_some
                       with "[HΨ] [$Hσ] [$Hsh] [$Hrt]")
-          as (R') "(% & Hrt & Hrest)"; [done..|].
+          as (R') "(% & %Hhst &  Hrt & Hrest)"; [done..|].
         iNext. iDestruct "Hrt" as "[ (% & -> & Hrt) | (% & %)]"; last done.
         iMod "Hrest" as "(Hσ & Hsh & Ha)".
         iModIntro.
@@ -593,7 +593,7 @@ Section primitive_laws.
                    ({[m]} ∪ R ∪ (aneris_AS_mhist δ).1, (aneris_AS_mhist δ).2)
                    _).
         iSplit. iPureIntro. simpl. split; last by left.
-        admit.
+        eauto.
         iFrame. iSplitR; [done|].
         iFrame. iApply "HΦ". iRight. iExists m. eauto with iFrame.
     - iNext; iModIntro.
@@ -603,7 +603,7 @@ Section primitive_laws.
       iFrame. iPoseProof ("HΦ" $! (InjLV #())) as "HΦ".
       iApply "HΦ". iLeft. eauto with iFrame.
     - by rewrite Hblk in H2.
-      Admitted.
+  Qed.
 
   Lemma wp_receivefrom_nb k a E sh skt R T :
     let ip := ip_of_address a in
@@ -684,25 +684,39 @@ Section primitive_laws.
        + iNext. iMod "Hmk".
          iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
             with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
-           as (R') "(% & Hrt & >(Hσ & Hsh & Ha))"; [done..|].
+           as (R') "(% & %Hhst & Hrt & >(Hσ & Hsh & Ha))"; [done..|].
          iDestruct "Hrt" as "[ ( % & _ & _ ) | (% & ->) ]"; first done.
          iDestruct "Hr" as "(_ & (_ & Hr))".
          iDestruct ("Hr" $! m with "[$Hsh $Ha //]") as ">Hr".
-         iModIntro. iExists δ1; iSplit; first done. iFrame.
+         iModIntro.
+         iExists
+           (AnerisAuxState
+              (R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2)  _).
+         iSplit. iPureIntro. simpl. split; last by left.
+         simplify_eq /=. subst ip. eauto.
+         iFrame.
          iApply wp_value. iApply "HΦ". iRight; eauto.
        + iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
             with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
-           as (R') "(% & Hrt & Hrest)"; [done..|].
+           as (R') "(% & %Hst & Hrt & Hrest)"; [done..|].
          iDestruct "Hrt" as "[ ( % & -> & Hres ) | (% & %) ]"; last done.
          iNext. iMod "Hmk". iDestruct "Hr" as "(_ & (Hr & _))".
          iMod "Hrest" as "(Hσ & Hsh & Ha)".
          iDestruct ("Hr" $! m with "[$Hsh $Ha $Hres //]") as ">Hr".
-         iModIntro. iExists δ1; iSplit; first done. iFrame.
-         iApply wp_value. iApply "HΦ". iLeft; eauto.
+         iModIntro.
+         iExists (AnerisAuxState
+                   ({[m]} ∪ R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2)
+                   _).
+        iSplit. iPureIntro. simpl. split; last by left.
+        eauto.
+        iFrame.
+        iApply wp_value. iApply "HΦ". iLeft; eauto.
      - by rewrite Hblk in H2.
      - iDestruct "Hr" as "(Hr & _)".
        iNext. iMod "Hmk". iPoseProof ("Hr" with "[$Ha $Hsh]") as ">Hr".
-       iModIntro. iExists δ1; iSplit; first done.
+       iModIntro. iExists δ1; iSplit.
+       iPureIntro. rewrite insert_id; last done.
+       eapply valid_state_evolution_id.
        rewrite insert_id; last done ; iFrame.
        iApply ("IH" with "Hr HΦ").
    Qed.
@@ -754,7 +768,11 @@ Section primitive_laws.
       eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step; last by lia.
-    iModIntro. iPoseProof ("HΦ" with "Hsh") as "HΦ". eauto with iFrame.
+    iModIntro.
+    iExists δ. iSplit. iPureIntro; split; last by left.
+      by eapply message_history_evolution_update_sblock.
+      iSplitR; [done|]. iFrame.
+      iApply ("HΦ" with "[$]").
   Qed.
 
 
@@ -780,7 +798,11 @@ Section primitive_laws.
       eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step; first by lia.
-    iModIntro. iPoseProof ("HΦ" with "Hsh") as "HΦ". eauto with iFrame.
+    iModIntro.
+     iExists δ. iSplit. iPureIntro; split; last by left.
+      by eapply message_history_evolution_update_sblock.
+      iSplitR; [done|]. iFrame.
+      iApply ("HΦ" with "[$]").
   Qed.
 
 End primitive_laws.

@@ -8,7 +8,8 @@ Definition aneris_adequate (e : base_lang.expr) (ip : ip_address) (σ : state)
            (φ : base_lang.val → Prop) :=
   adequate NotStuck (mkExpr ip e) σ (λ v _, ∃ w, v = mkVal ip w ∧ φ w).
 
-Theorem adequacy `{anerisPreG Σ Mdl} IPs A e ip σ φ (ports : gset port) :
+Theorem adequacy `{anerisPreG Σ Mdl}
+        (st0 : Mdl) IPs A e ip σ φ (ports : gset port) :
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
@@ -24,7 +25,7 @@ Theorem adequacy `{anerisPreG Σ Mdl} IPs A e ip σ φ (ports : gset port) :
   aneris_adequate e ip σ φ.
 Proof.
   intros Hwp Hps Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
-  eapply adequacy; [|done..].
+  eapply adequacy; eauto.
   intros dg.
   iMod (Hwp dg) as (f) "Hwp".
   iModIntro. iExists _. iIntros "???? /=".
@@ -34,7 +35,8 @@ Proof.
   eauto.
 Qed.
 
-Theorem adequacy_hoare `{anerisPreG Σ Mdl} IPs A e σ φ ip (ports : gset port) :
+Theorem adequacy_hoare `{anerisPreG Σ Mdl}
+        (st0 : Mdl) IPs A e σ φ ip (ports : gset port) :
   (∀ `{anerisG Mdl Σ}, ⊢ ∃ (f : socket_address → socket_interp Σ),
       {{{ fixed A ∗ ([∗ set] a ∈ A, a ⤇ (f a)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}}
           e @[ip]
@@ -50,7 +52,7 @@ Theorem adequacy_hoare `{anerisPreG Σ Mdl} IPs A e σ φ ip (ports : gset port)
   aneris_adequate e ip σ φ.
 Proof.
   intros Hwp ????????.
-  eapply adequacy; [|done..].
+  eapply adequacy; eauto.
   intros ?. iModIntro.
   iDestruct Hwp as (f) "#Hwp".
   iExists f. iIntros "???".

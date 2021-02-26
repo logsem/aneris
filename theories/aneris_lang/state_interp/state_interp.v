@@ -751,6 +751,8 @@ Section state_interpretation.
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
+    assert ( network_sockets_coh (state_sockets σ1) (state_ports_in_use σ1))
+           as Hnscoh2 by eauto.
     destruct (Hnscoh (ip_of_address a) Sn)
       as (Hbcoh & Hshcoh & Hsmcoh & Hsacoh & Hsucoh);
       first done.
@@ -766,6 +768,7 @@ Section state_interpretation.
        iPureIntro.
        destruct Hmhcoh as (? & Hrscoh & Hacoh & Hrsbcoh).
        eapply message_history_evolution_receive; eauto.
+       intros ???. destruct (Hnscoh2 ip Sn0); eauto. naive_solver.
        rewrite /messages_received_sent in Hhst.
        inversion Hhst as [[ Hrcvd Hsent ]].
        simplify_eq /=.
@@ -815,6 +818,7 @@ Section state_interpretation.
        iSplitR.
        iPureIntro.
        eapply message_history_evolution_receive; eauto.
+       intros ???. destruct (Hnscoh2 ip Sn0); eauto. naive_solver.
        rewrite /messages_received_sent in Hhst.
        inversion Hhst as [[ Hrcvd Hsent ]].
        simplify_eq /=.
