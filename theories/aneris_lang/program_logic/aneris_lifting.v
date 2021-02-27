@@ -416,7 +416,7 @@ Section lifting_network.
        iApply "HΦ"; iFrame.
    Qed.
 
-   Lemma aneris_wp_receivefrom ip a E h s R T φ P :
+   Lemma aneris_wp_receivefrom ip a E h s R T φ :
      ip_of_address a = ip →
      saddress s = Some a →
      sblock s = true →

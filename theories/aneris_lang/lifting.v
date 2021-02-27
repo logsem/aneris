@@ -801,7 +801,7 @@ Section primitive_laws.
    Qed.
 
 
-  Lemma wp_receivefrom k a E h s R T φ P :
+  Lemma wp_receivefrom k a E h s R T φ :
      let ip := ip_of_address a in
      saddress s = Some a →
      sblock s = true →
