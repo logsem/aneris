@@ -307,8 +307,7 @@ Section sum_serialization.
   Proof.
     iIntros (Φ [w Hw]) "HΦ".
     rewrite /sum_ser /sum_is_ser.
-    wp_pures.
-    destruct Hw as [[-> Hw]|[-> Hw]].
+    destruct Hw as [[-> Hw]|[-> Hw]]; wp_pures.
     - wp_apply (DBS_ser_spec A); first done.
       iIntros (s Hs); simpl.
       wp_pures.
