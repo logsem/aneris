@@ -396,22 +396,21 @@ Section lifting_network.
      sblock s = true →
      □ (P ={E, E'}=∗
           ∃ R T,
-           a ⤳ (R, T) ∗
-           (a ⤳ (R, T) ={E', E}=∗ P) ∧
-              (∀ m, a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m
+           h ↪[ip] s ∗ a ⤳ (R, T) ∗
+           (h ↪[ip] s ∗ a ⤳ (R, T) ={E', E}=∗ P) ∧
+              (∀ m, h ↪[ip] s ∗ a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m
                     ={E',E}=∗ Q__new m R T) ∧
-              (∀ m, a ⤳ (R, T) ∗ ⌜m ∈ R⌝
+              (∀ m,h ↪[ip] s ∗  a ⤳ (R, T) ∗ ⌜m ∈ R⌝
                     ={E', E}=∗ Q__old m R T)) -∗
-  {{{ h ↪[ip] s ∗ P ∗ a ⤇ φ}}}
+  {{{ P ∗ a ⤇ φ}}}
      ReceiveFrom (Val $ LitV $ LitSocket h) @[ip] E
   {{{ m, RET (SOMEV (PairV #(m_body m) #(m_sender m)));
-      h ↪[ip] s ∗ ∃ R T, (⌜m ∉ R⌝ ∗ Q__new m R T ∨ ⌜m ∈ R⌝ ∗ Q__old m R T)
+      ∃ R T, (⌜m ∉ R⌝ ∗ Q__new m R T ∨ ⌜m ∈ R⌝ ∗ Q__old m R T)
   }}}.
      iIntros (Hip Haddr Hblk) "#Hpreds !>".
-     iIntros (Φ) "(Hsh & HP & #Hsi) HΦ".
+     iIntros (Φ) "(HP & #Hsi) HΦ".
      rewrite !aneris_wp_unfold /aneris_wp_def. iIntros "#Hin". rewrite -Hip.
-     iApply (wp_receivefrom_hocap_gen with "[] [Hsh HP Hsi] [HΦ]"); eauto.
-     - eauto with iFrame.
+     iApply (wp_receivefrom_hocap_gen with "[] [HP Hsi] [HΦ]"); eauto.
      - iNext. iIntros (m) "Hm". iExists _; iSplit; first done.
        iApply "HΦ"; iFrame.
    Qed.

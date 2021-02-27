@@ -729,23 +729,23 @@ Section primitive_laws.
      sblock s = true →
      □ (P ={E, E'}=∗
           ∃ R T,
-           a ⤳ (R, T) ∗
-           (a ⤳ (R, T) ={E', E}=∗ P) ∧
-              (∀ m, a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m
+           h ↪[ip] s ∗ a ⤳ (R, T) ∗
+           (h ↪[ip] s ∗ a ⤳ (R, T) ={E', E}=∗ P) ∧
+              (∀ m, h ↪[ip] s ∗ a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m
                     ={E',E}=∗ Q__new m R T) ∧
-              (∀ m, a ⤳ (R, T) ∗ ⌜m ∈ R⌝
+              (∀ m, h ↪[ip] s ∗ a ⤳ (R, T) ∗ ⌜m ∈ R⌝
                     ={E', E}=∗ Q__old m R T)) -∗
-  {{{ h ↪[ip] s ∗ P ∗ a ⤇ φ}}}
+  {{{ P ∗ a ⤇ φ}}}
     (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
   {{{ m, RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m))));
-      h ↪[ip] s ∗ ∃ R T, (⌜m ∉ R⌝ ∗ Q__new m R T ∨ ⌜m ∈ R⌝ ∗ Q__old m R T)
+      ∃ R T, (⌜m ∉ R⌝ ∗ Q__new m R T ∨ ⌜m ∈ R⌝ ∗ Q__old m R T)
   }}}.
    Proof.
      iIntros (ip Haddr Hblk) "#Hpreds !>".
-     iIntros (Φ) "(Hsh & HP & #Hsi) HΦ". iLöb as "IH".
+     iIntros (Φ) "(HP & #Hsi) HΦ". iLöb as "IH".
      iApply (wp_lift_head_step with "[-]"); first auto.
      iIntros (σ1 δ1 κ κs n) "Hσ".
-     iMod ("Hpreds" with "HP") as (R T) "(Ha & Hr)".
+     iMod ("Hpreds" with "HP") as (R T) "(Hsh & Ha & Hr)".
      iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
        as (Sn r) "[%HSn (%Hr & %Hreset)]".
      iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
@@ -765,7 +765,7 @@ Section primitive_laws.
            as (R') "(% & %Hhst & Hrt & >(Hσ & Hsh & Ha))"; [done..|].
          iDestruct "Hrt" as "[ ( % & _ & _ ) | (% & ->) ]"; first done.
          iDestruct "Hr" as "(_ & (_ & Hr))".
-         iDestruct ("Hr" $! m with "[$Ha //]") as ">Hr".
+         iDestruct ("Hr" $! m with "[$Hsh $Ha //]") as ">Hr".
          iModIntro.
          iExists
            (AnerisAuxState
@@ -780,7 +780,7 @@ Section primitive_laws.
          iDestruct "Hrt" as "[ ( % & -> & Hres ) | (% & %) ]"; last done.
          iNext. iMod "Hmk". iDestruct "Hr" as "(_ & (Hr & _))".
          iMod "Hrest" as "(Hσ & Hsh & Ha)".
-         iDestruct ("Hr" $! m with "[$Ha $Hres //]") as ">Hr".
+         iDestruct ("Hr" $! m with "[$Hsh $Ha $Hres //]") as ">Hr".
          iModIntro.
          iExists (AnerisAuxState
                    ({[m]} ∪ R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2)
@@ -792,12 +792,12 @@ Section primitive_laws.
         iExists _, _ . iLeft; eauto with iFrame.
      - by rewrite Hblk in H2.
      - iDestruct "Hr" as "(Hr & _)".
-       iNext. iMod "Hmk". iPoseProof ("Hr" with "[$Ha]") as ">Hr".
+       iNext. iMod "Hmk". iPoseProof ("Hr" with "[$Hsh $Ha]") as ">Hr".
        iModIntro. iExists δ1; iSplit.
        iPureIntro. rewrite insert_id; last done.
        eapply valid_state_evolution_id.
        rewrite insert_id; last done ; iFrame.
-       iApply ("IH" with "Hsh Hr HΦ").
+       iApply ("IH" with "Hr HΦ").
    Qed.
 
 
