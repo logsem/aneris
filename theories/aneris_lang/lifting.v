@@ -721,6 +721,86 @@ Section primitive_laws.
        iApply ("IH" with "Hr HΦ").
    Qed.
 
+   Lemma wp_receivefrom_hocap_gen k a E E' h s φ
+         (P : iProp Σ)
+         (Q__new Q__old : message -> message_soup → message_soup → iProp Σ) :
+     let ip := ip_of_address a in
+     saddress s = Some a →
+     sblock s = true →
+     □ (P ={E, E'}=∗
+          ∃ R T,
+           a ⤳ (R, T) ∗
+           (a ⤳ (R, T) ={E', E}=∗ P) ∧
+              (∀ m, a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m
+                    ={E',E}=∗ Q__new m R T) ∧
+              (∀ m, a ⤳ (R, T) ∗ ⌜m ∈ R⌝
+                    ={E', E}=∗ Q__old m R T)) -∗
+  {{{ h ↪[ip] s ∗ P ∗ a ⤇ φ}}}
+    (mkExpr ip (ReceiveFrom (Val $ LitV $ LitSocket h))) @ k; E
+  {{{ m, RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m))));
+      h ↪[ip] s ∗ ∃ R T, (⌜m ∉ R⌝ ∗ Q__new m R T ∨ ⌜m ∈ R⌝ ∗ Q__old m R T)
+  }}}.
+   Proof.
+     iIntros (ip Haddr Hblk) "#Hpreds !>".
+     iIntros (Φ) "(Hsh & HP & #Hsi) HΦ". iLöb as "IH".
+     iApply (wp_lift_head_step with "[-]"); first auto.
+     iIntros (σ1 δ1 κ κs n) "Hσ".
+     iMod ("Hpreds" with "HP") as (R T) "(Ha & Hr)".
+     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+       as (Sn r) "[%HSn (%Hr & %Hreset)]".
+     iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
+       first set_solver; auto.
+     iModIntro; iSplit.
+     { iPureIntro.
+       assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
+         [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
+             eauto; econstructor..].
+       destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
+     iIntros (???) "%Hprim".
+     inv_head_step.
+     - destruct (decide (m ∈ R)) as [Hin | Hni ].
+       + iNext. iMod "Hmk".
+         iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
+            with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
+           as (R') "(% & %Hhst & Hrt & >(Hσ & Hsh & Ha))"; [done..|].
+         iDestruct "Hrt" as "[ ( % & _ & _ ) | (% & ->) ]"; first done.
+         iDestruct "Hr" as "(_ & (_ & Hr))".
+         iDestruct ("Hr" $! m with "[$Ha //]") as ">Hr".
+         iModIntro.
+         iExists
+           (AnerisAuxState
+              (R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2)  _).
+         iSplit. iPureIntro. simpl. split; last by left.
+         simplify_eq /=. subst ip. eauto.
+         iFrame.
+         iApply wp_value. iApply "HΦ". iFrame. iExists _, _. iRight; eauto.
+       + iPoseProof (aneris_state_interp_receive_some _ _ _ (Some φ)
+            with "[Hsi] [$Hσ] [$Hsh] [$Ha] ")
+           as (R') "(% & %Hst & Hrt & Hrest)"; [done..|].
+         iDestruct "Hrt" as "[ ( % & -> & Hres ) | (% & %) ]"; last done.
+         iNext. iMod "Hmk". iDestruct "Hr" as "(_ & (Hr & _))".
+         iMod "Hrest" as "(Hσ & Hsh & Ha)".
+         iDestruct ("Hr" $! m with "[$Ha $Hres //]") as ">Hr".
+         iModIntro.
+         iExists (AnerisAuxState
+                   ({[m]} ∪ R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2)
+                   _).
+        iSplit. iPureIntro. simpl. split; last by left.
+        eauto.
+        iFrame.
+        iApply wp_value. iApply "HΦ". iFrame.
+        iExists _, _ . iLeft; eauto with iFrame.
+     - by rewrite Hblk in H2.
+     - iDestruct "Hr" as "(Hr & _)".
+       iNext. iMod "Hmk". iPoseProof ("Hr" with "[$Ha]") as ">Hr".
+       iModIntro. iExists δ1; iSplit.
+       iPureIntro. rewrite insert_id; last done.
+       eapply valid_state_evolution_id.
+       rewrite insert_id; last done ; iFrame.
+       iApply ("IH" with "Hsh Hr HΦ").
+   Qed.
+
+
   Lemma wp_receivefrom k a E h s R T φ P :
      let ip := ip_of_address a in
      saddress s = Some a →

@@ -230,13 +230,13 @@ Section lifting_network.
     a ∉ A →
     {{{ ▷ fixed A ∗
         ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ h ↪[ip_of_address a] s 
+        ▷ h ↪[ip_of_address a] s
     }}}
       SocketBind
       (Val $ LitV $ LitSocket h)
       (Val $ LitV $ LitSocketAddress a) @[ip] E
     {{{ RET #0;
-        h ↪[ip_of_address a] (s <| saddress := Some a |>) ∗ 
+        h ↪[ip_of_address a] (s <| saddress := Some a |>) ∗
         a ⤇ φ }}}.
   Proof.
     iIntros (Hip Hskt Ha Φ) "(HA & Hfp & Hsh) HΦ".
@@ -384,6 +384,34 @@ Section lifting_network.
      iIntros (Hip Haddr Hblk) "#Hpreds !>". iIntros (Φ) "(HP & #Hsi) HΦ".
      rewrite !aneris_wp_unfold /aneris_wp_def. iIntros "#Hin". rewrite -Hip.
      iApply (wp_receivefrom_hocap with "[] [HP Hsi] [HΦ]"); eauto.
+     - iNext. iIntros (m) "Hm". iExists _; iSplit; first done.
+       iApply "HΦ"; iFrame.
+   Qed.
+
+   Lemma  aneris_wp_receivefrom_hocap_gen ip a E E' h s φ
+         (P : iProp Σ)
+         (Q__new Q__old : message -> message_soup → message_soup → iProp Σ) :
+     ip_of_address a = ip →
+     saddress s = Some a →
+     sblock s = true →
+     □ (P ={E, E'}=∗
+          ∃ R T,
+           a ⤳ (R, T) ∗
+           (a ⤳ (R, T) ={E', E}=∗ P) ∧
+              (∀ m, a ⤳ ({[m]} ∪ R, T) ∗ ⌜m ∉ R⌝ ∗ φ m
+                    ={E',E}=∗ Q__new m R T) ∧
+              (∀ m, a ⤳ (R, T) ∗ ⌜m ∈ R⌝
+                    ={E', E}=∗ Q__old m R T)) -∗
+  {{{ h ↪[ip] s ∗ P ∗ a ⤇ φ}}}
+     ReceiveFrom (Val $ LitV $ LitSocket h) @[ip] E
+  {{{ m, RET (SOMEV (PairV #(m_body m) #(m_sender m)));
+      h ↪[ip] s ∗ ∃ R T, (⌜m ∉ R⌝ ∗ Q__new m R T ∨ ⌜m ∈ R⌝ ∗ Q__old m R T)
+  }}}.
+     iIntros (Hip Haddr Hblk) "#Hpreds !>".
+     iIntros (Φ) "(Hsh & HP & #Hsi) HΦ".
+     rewrite !aneris_wp_unfold /aneris_wp_def. iIntros "#Hin". rewrite -Hip.
+     iApply (wp_receivefrom_hocap_gen with "[] [Hsh HP Hsi] [HΦ]"); eauto.
+     - eauto with iFrame.
      - iNext. iIntros (m) "Hm". iExists _; iSplit; first done.
        iApply "HΦ"; iFrame.
    Qed.
