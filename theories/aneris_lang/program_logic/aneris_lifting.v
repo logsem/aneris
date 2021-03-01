@@ -437,26 +437,29 @@ Section lifting_network.
      - iIntros (?) "(? & ? & ?) !>"; eauto with iFrame.
    Qed.
 
-   Lemma aneris_awp_receivefrom ip a h s R T φ :
+   Lemma aneris_awp_receivefrom ip a h s φ :
      ip_of_address a = ip →
      saddress s = Some a →
      sblock s = true →
-     ⊢ <<< h ↪[ip] s ∗ a ⤳ (R, T) ∗ a ⤇ φ >>>
-         ReceiveFrom (# (LitSocket h)) @[ip] ⊤
-       <<< ∃ m, h ↪[ip] s ∗
-                  ((⌜m ∉ R⌝ ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m) ∨
-                    ⌜m ∈ R⌝ ∗ a ⤳ (R, T)),
+     a ⤇ φ -∗
+     <<< ∀ R T, h ↪[ip] s ∗ a ⤳ (R, T) >>>
+       ReceiveFrom (# (LitSocket h)) @[ip] ⊤
+     <<< ∃ m, h ↪[ip] s ∗
+              ((⌜m ∉ R⌝ ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ φ m) ∨
+                ⌜m ∈ R⌝ ∗ a ⤳ (R, T)),
        RET SOMEV (PairV #(m_body m) #(m_sender m)) >>>.
    Proof.
-     iIntros (??? Φ) "AU".
+     iIntros (???) "Hφ". iIntros (Φ) "AU". 
      rewrite !aneris_wp_unfold /aneris_wp_def. iIntros "#Hin".
-     iApply (awp_receivefrom ip a h s R T φ); [done..|].
+     iApply (awp_receivefrom with "Hφ"); [done..|].
      iAuIntro. iApply (aacc_aupd with "AU"); [done|].
-     iIntros "(Hsh & Ha & #Hφ)".
-     iAaccIntro with "[$Hsh $Ha $Hφ]".
-     { iIntros "(Hsh & Ha & ?) !#". iFrame; auto. }
+     iIntros (R T) "(Hsh & Ha)".
+     rewrite /atomic_acc /=. 
+     iModIntro. iExists R, T.
+     iFrame "Hsh Ha". iSplit.     
+     { iIntros "(Hsh & Ha) !#". iFrame; auto. }
      iIntros (m) "(Hsh & Hr) !#".
-     iFrame. iRight. iExists _. iFrame. eauto.
+     iFrame. iRight. iExists m. iFrame. eauto.
    Qed.
 
    Lemma aneris_wp_rcvtimeo_unblock ip a E h s n1 n2 :

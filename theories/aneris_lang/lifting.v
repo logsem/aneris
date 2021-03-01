@@ -823,21 +823,23 @@ Section primitive_laws.
     - iIntros (?) "(? & ? & ?) !>"; eauto with iFrame.
   Qed.
 
-  Lemma awp_receivefrom ip a h s R T φ :
+  Lemma awp_receivefrom ip a s h φ :
     ip_of_address a = ip →
     saddress s = Some a →
     sblock s = true →
-    ⊢ <<< h ↪[ip] s ∗ a ⤳ (R, T) ∗ a ⤇ φ >>>
-       (mkExpr ip (ReceiveFrom (# (LitSocket h)))) @ ⊤
-      <<< ∃ m, h ↪[ip] s ∗
-                 ((⌜m ∉ R⌝ ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ a ⤇ φ ∗ φ m) ∨
-                  ⌜m ∈ R⌝ ∗ a ⤳ (R, T)),
+    a ⤇ φ -∗
+    <<< ∀ R T, h ↪[ip] s ∗ a ⤳ (R, T) >>>
+     (mkExpr ip (ReceiveFrom (# (LitSocket h)))) @ ⊤
+    <<< ∃ m, h ↪[ip] s ∗
+            ((⌜m ∉ R⌝ ∗ a ⤳ ({[ m ]} ∪ R, T) ∗ φ m) ∨
+              ⌜m ∈ R⌝ ∗ a ⤳ (R, T)),
       RET (mkVal ip (SOMEV (PairV #(m_body m) #(m_sender m)))) >>>.
   Proof.
-    iIntros (??? Φ) "AU". iLöb as "IH".
+    iIntros (???) "#Hsi". iIntros (Φ) "AU".
+    iLöb as "IH".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ1 δ1 κ κs n) "Hσ".
-    iMod "AU" as "[(Hsh & Ha & #Hsi) Hclose]".
+    iMod "AU" as (R T) "[(Hsh & Ha) Hclose]".
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
     iModIntro; iSplit.
@@ -873,7 +875,7 @@ Section primitive_laws.
         { iLeft. iFrame. eauto. }
         iModIntro.
         iExists (AnerisAuxState
-                   ({[m]} ∪ R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2) _).
+          ({[m]} ∪ R ∪ (aneris_AS_mhist δ1).1, (aneris_AS_mhist δ1).2) _).
         iSplit.
         { iPureIntro. simpl. split; [|by left]. eauto. }
         iFrame. iSplit; [|done].
