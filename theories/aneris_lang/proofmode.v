@@ -679,16 +679,16 @@ Tactic Notation "wp_send" constr(Hs) :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send _ _ _ _ _ _ _ _ _ _ K))
       |fail 1 "wp_send: cannot find 'SendTo' in" e];
-      [done|done|iSolveTC
-       |solve_socket_interp()
-       | (* socket_mapsto *)
-       | (* message_mapsto *)
-       | solve_split ()|..]
-      ; [solve_socket_mapsto ip
-        |solve_message_mapsto()
-        |pm_reflexivity
-        |pm_reduce; wp_finish
-        |pm_reduce; wp_finish]
+    [done| |iSolveTC |solve_socket_interp()
+     | (* socket_mapsto *)
+     | (* message_mapsto *)
+     | solve_split () |..];
+    [|solve_socket_mapsto ip
+     |solve_message_mapsto()
+     |pm_reflexivity|..];
+    [done
+    |pm_reduce; wp_finish
+    |pm_reduce; wp_finish]
   | _ => fail "wp_send: not a 'wp'"
   end.
 
