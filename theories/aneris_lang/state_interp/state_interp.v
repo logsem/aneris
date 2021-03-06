@@ -817,6 +817,18 @@ Section state_interpretation.
      by apply Excl_included in H.
    Qed.
 
+   Definition messages_sent_from (a: socket_address) (rt: messages_history):
+     message_soup :=
+     filter (fun m => m.(m_sender) = a) rt.2.
+
+   Lemma aneris_state_interp_sent_mapsto_agree a R T δ σ κs n:
+     a ⤳ (R, T) -∗ state_interp σ δ κs n -∗
+       ⌜ messages_sent_from a δ.(aneris_AS_mhist) = T ⌝.
+   Proof.
+     iIntros "Hlt Hsi".
+   Admitted.
+
+
 End state_interpretation.
 
 Global Opaque aneris_state_interp.

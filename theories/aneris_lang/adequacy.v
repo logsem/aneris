@@ -147,15 +147,14 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
-      ⊢ |={⊤}=> (* Having the fragmental model on hand *)
-        state_interp σ1 δ [] 1 ∗
+      ⊢ |={⊤}=>
         (* There exists a postcondition and a socket interpretation function *)
         ∃ Φ (f : socket_address → socket_interp Σ),
           (* Given resources reflecting initial configuration, we need *)
   (*            to prove two goals *)
           fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
           ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗
-          ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗ frag_st st -∗
+          ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗ frag_st st ={⊤}=∗
           WP (mkExpr ip e1) @ s; ⊤ {{ Φ }} ∗
           □ (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace aneris_AS)
             δ' c κs,
@@ -201,7 +200,7 @@ Proof.
            aneris_messages_name := γms;
            anerisG_model_name := γm;
          |}).
-  iMod (Hwp distG) as "[Hsti Hwp]". iDestruct "Hwp" as (Φ f) "Himpl".
+  iMod (Hwp distG) as "Hwp". iDestruct "Hwp" as (Φ f) "Himpl".
   iMod (saved_si_update A with "[$Hsi $Hsi']") as (M HMfs) "[HM #Hsa]".
   assert (dom (gset _) M = A) as Hdmsi.
   { apply set_eq => ?.
@@ -216,9 +215,12 @@ Proof.
   iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp #Hγn]"; [done|].
   iAssert (is_node ip) as "Hn".
   { iExists _. eauto. }
-  iModIntro. iExists state_interp, Φ, fork_post. iFrame.
-  iSplitL ""; first by iApply config_wp_correct.
   subst δ.
-  iDestruct ("Himpl" with "[$] [$] [$] [$] [$] [$]") as "[Hwp #Himpl]".
+  iMod ("Himpl" with "[$] [$] [$] [$] [$] [$]") as "[Hwp #Himpl]".
+  iModIntro. iExists state_interp, Φ, fork_post.
+  iSplitL ""; first by iApply config_wp_correct.
   iFrame "#Hwp".
+  iPoseProof (@aneris_state_interp_init _ _ distG IPs _ _ _ _ _
+                with "[Hmp] [] [Hh] [Hs] [Hms] [] [HM] [] [HIPsCtx] [HPiu] ")
+    as "Hsi"; eauto; iFrame.
 Qed.

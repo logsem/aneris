@@ -2,6 +2,7 @@ From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Export weakestpre lifting.
 From aneris.aneris_lang Require Import lang base_lang lifting state_interp.
 From aneris.aneris_lang.program_logic Require Export aneris_weakestpre atomic.
+From aneris.aneris_lang.state_interp Require Import state_interp_def.
 From RecordUpdate Require Import RecordSet.
 
 Set Default Proof Using "Type".

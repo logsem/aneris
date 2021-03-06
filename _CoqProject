@@ -76,3 +76,6 @@ theories/aneris_lang/lib/nodepar.v
 theories/aneris_lang/lib/vector_clock/time.v
 theories/aneris_lang/lib/vector_clock/vector_clock.v
 theories/aneris_lang/lib/coin_flip.v
+
+theories/examples/iterated_ping_pong/code.v
+#theories/examples/iterated_ping_pong/proof.v
