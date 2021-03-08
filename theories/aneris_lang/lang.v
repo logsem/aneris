@@ -768,6 +768,17 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
     guard (op = EqOp); Some $ LitV $ LitBool $ bool_decide (v1 = v2)
   end.
 
+Lemma bin_op_eval_eq_val k k' :
+  bin_op_eval EqOp k' k = Some (LitV $ LitBool $ bool_decide (k' = k)).
+Proof.
+  destruct k, k'; cbn; try reflexivity; try (destruct l; reflexivity).
+  destruct l,  l0; try reflexivity; repeat f_equal.
+  { rewrite /bool_decide.
+    case (decide_rel _ _ n), (decide_rel _ _ (LitV $ LitInt n)); congruence. }
+  { rewrite /bool_decide.
+    case (decide_rel _ _ b), (decide_rel _ _ (LitV $ LitBool b)); congruence. }
+Qed.
+
 Definition option_nat_to_val (v : option nat) :=
   match v with
   | None => InjLV (LitV LitUnit)

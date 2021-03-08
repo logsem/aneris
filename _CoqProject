@@ -56,14 +56,15 @@ theories/aneris_lang/program_logic/aneris_adequacy.v
 theories/aneris_lang/proofmode.v
 
 theories/aneris_lang/lib/assert.v
-theories/aneris_lang/lib/network_helpers.v
+theories/aneris_lang/lib/network.v
 theories/aneris_lang/lib/util.v
 theories/aneris_lang/lib/serialization/serialization_base.v
 theories/aneris_lang/lib/serialization/serialization.v
 theories/aneris_lang/lib/list.v
-theories/aneris_lang/lib/dictionary.v
+theories/aneris_lang/lib/map.v
 theories/aneris_lang/lib/lock.v
 theories/aneris_lang/lib/bag.v
 theories/aneris_lang/lib/nodepar.v
 theories/aneris_lang/lib/vector_clock/time.v
 theories/aneris_lang/lib/vector_clock/vector_clock.v
+theories/aneris_lang/lib/coin_flip.v

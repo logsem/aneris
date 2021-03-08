@@ -315,3 +315,41 @@ Qed.
 
 Lemma nat_sup_of_nil : nat_sup [] = 0.
 Proof. apply sup_of_nil. Qed.
+
+Lemma inj_neq `{EqDecision A} {B} (x y : A) (f : A → B) `{!Inj (=) (=) f} :
+  f x ≠ f y → x ≠ y.
+Proof.
+  intros Hf.
+  destruct (bool_decide (x = y)) eqn:Heq.
+  - apply bool_decide_eq_true_1 in Heq. simplify_eq.
+  - by apply bool_decide_eq_false_1 in Heq.
+Qed.
+
+Lemma nth_error_lookup {A} (l : list A) (i : nat) x :
+  nth_error l i  = Some x → l !! i = Some x.
+Proof.
+  revert i. induction l as [|?? IHl]; destruct i; auto.
+    by apply IHl.
+Qed.
+
+Lemma take_S_r_nth `{A : Type}:
+  ∀  (l : list A) (n : nat) (x : A),
+    nth_error l n = Some x →  take (n + 1) l = take n l ++ [x].
+Proof. induction l; intros []; naive_solver eauto with f_equal. Qed.
+
+Lemma map_nth_error_inv { A B}: forall n (l: list A) d (f: A → B),
+    (∀ x y, f x = f y → x = y) →
+    nth_error (map f l) n = Some (f d) → nth_error l n = Some d.
+Proof.
+  induction n; intros [|] ??? H; simpl in *; inversion H; eauto using f_equal.
+Qed.
+
+Lemma map_lookup_Some {A B} (f : A → B) (l : list A) (i : nat) (k : B) :
+  map f l !! i = Some k →
+  ∃ a, k = f a ∧ l !! i = Some a.
+Proof.
+  revert i. induction l; [done|].
+  intros [] Hmap.
+  - eexists. by inversion Hmap.
+  - by apply IHl in Hmap.
+Qed.

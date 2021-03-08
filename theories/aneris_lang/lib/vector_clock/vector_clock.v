@@ -1,6 +1,6 @@
 From stdpp Require Export base list.
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
-From aneris.aneris_lang.lib Require Export util network_helpers list.
+From aneris.aneris_lang.lib Require Export util network list.
 From aneris.aneris_lang.lib.serialization Require Export serialization.
 From aneris.aneris_lang.lib.vector_clock Require Export time.
 
@@ -8,18 +8,18 @@ Section vect_code.
 
   Definition vect_make : base_lang.val :=
     rec: "vect_make" "len" "init" :=
-      if: "len" = #0 then list_make #()
-      else list_cons "init" ("vect_make" ("len" - #1) "init").
+      if: "len" = #0 then List.nil
+      else List.cons "init" ("vect_make" ("len" - #1) "init").
 
   Definition vect_nth : base_lang.val :=
-    λ: "vec" "i", unSOME (list_nth "vec" "i").
+    λ: "vec" "i", unSOME (List.nth "vec" "i").
 
   Definition vect_update : base_lang.val :=
     rec: "vect_update" "vec" "i" "v" :=
       match: "vec" with
         SOME "a" =>
-           if: "i" = #0 then list_cons "v" (list_tail "vec")
-           else list_cons (Fst "a") ("vect_update" (Snd "a") ("i" - #1) "v")
+           if: "i" = #0 then List.cons "v" (List.tail "vec")
+           else List.cons (Fst "a") ("vect_update" (Snd "a") ("i" - #1) "v")
         | NONE => NONE
       end.
 
@@ -36,7 +36,7 @@ Section vect_code.
                        (Fst "a1" ≤ Fst "a2") && "vect_leq" (Snd "a1") (Snd "a2")
                      | NONE => #false
                      end
-      | NONE => list_is_empty "v2"
+      | NONE => List.is_empty "v2"
       end.
 
   Definition vect_applicable : base_lang.val :=
@@ -52,7 +52,7 @@ Section vect_code.
                        && "vect_applicable" ("j" + #1) (Snd "a1") (Snd "a2")
                      | NONE => #false
                      end
-       | NONE => list_is_empty "v2"
+       | NONE => List.is_empty "v2"
        end) #0 "v1" "v2".
 
   Definition vect_serialize : base_lang.val :=
@@ -71,8 +71,8 @@ Section vect_code.
             let: "length" := UnOp StringLength "s" in
             let: "start" := "i" + #1 in
             "vect_deserialize" (Substring "s" "start" ("length" - "start")) in
-          list_cons "x" "tail"
-      | NONE => list_make #()
+          List.cons "x" "tail"
+      | NONE => List.nil
       end.
 
 End vect_code.
@@ -81,7 +81,7 @@ Section vect_specs.
   Context `{!anerisG Mdl Σ}.
 
   Definition is_vc (v : base_lang.val) (t : vector_clock) :=
-    list_coh (map (λ (n : nat), #n) t) v.
+    is_List (map (λ (n : nat), #n) t) v.
 
   Lemma vector_clock_to_val_is_vc t : is_vc (vector_clock_to_val t) t.
   Proof.
@@ -102,7 +102,7 @@ Section vect_specs.
   Proof.
     revert len. iLöb as "IH". iIntros (len Φ) "_ HΦ".
     wp_rec. wp_pures. case_bool_decide; wp_if.
-    - iApply list_make_spec; [done|].
+    - iApply list_nil_spec; [done|].
       iNext; iIntros (v) "%".
       iApply "HΦ".
       assert (len = 0%nat) by lia; simplify_eq. done.
@@ -126,7 +126,7 @@ Section vect_specs.
     {{{ v, RET v; ⌜∃ (j : nat), v = #j ∧ t !! i = Some j⌝ }}}.
   Proof.
     iIntros (Hlen Φ Hcoh) "HΦ".
-    wp_rec. wp_pures. wp_bind (list_nth _ _).
+    wp_rec. wp_pures. wp_bind (List.nth _ _).
     iApply (list_nth_spec_some).
     { iPureIntro. split; eauto.
       rewrite map_length. lia. }
@@ -150,7 +150,7 @@ Section vect_specs.
     - rewrite Hcoh. wp_pures. by iApply "HΦ".
     - destruct Hcoh as [k [H' Hl']].
       rewrite H'. wp_pures. case_bool_decide; wp_pures.
-      + wp_bind (list_tail _).
+      + wp_bind (List.tail _).
         iApply (list_tail_spec _ _ (#x :: (map (λ n : nat, #n) t))).
         { iPureIntro. eexists; eauto. }
         iNext. iIntros (tm Htm) "/=".
@@ -418,8 +418,6 @@ Proof.
   - rewrite Hl.
     wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
     wp_pures.
-    iApply list_make_spec; first done.
-    iNext. iIntros (?) "->".
     iApply "HΦ"; done.
   - destruct Hl as [w [-> Hl]].
     wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
@@ -447,7 +445,7 @@ Proof.
     iIntros "_ /=". wp_pures.
     wp_apply list_cons_spec; first done.
     iIntros (? [u [-> Hu]]).
-    rewrite (list_coh_eq _ _ _ Hl Hu).
+    rewrite (is_List_eq _ _ _ Hl Hu).
     iApply "HΦ"; done.
 Qed.
 
