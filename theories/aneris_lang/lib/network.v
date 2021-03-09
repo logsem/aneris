@@ -1,5 +1,5 @@
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
-From aneris.aneris_lang.lib Require Import assert map list.
+From aneris.aneris_lang.lib Require Import assert list.
 Set Default Proof Using "Type".
 
 Definition unSOME : base_lang.val :=
@@ -35,7 +35,7 @@ Import uPred.
 Section library.
   Context `{dG : anerisG Mdl Σ}.
 
-  Lemma unSOME_spec ip v v' :
+  Lemma wp_unSOME ip v v' :
     {{{ ⌜v = SOMEV v'⌝ }}} unSOME (Val v) @[ip] {{{ RET v'; True }}}.
   Proof.
     iIntros (Φ ->) "HΦ".

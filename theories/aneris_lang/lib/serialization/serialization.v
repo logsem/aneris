@@ -54,7 +54,7 @@ Proof.
   assert (un_op_eval IntOfString #(StringOfZ i) = Some (InjRV #i)).
   { rewrite /= ZOfString_inv //=. }
   wp_pures.
-  iApply unSOME_spec; done.
+  iApply wp_unSOME; done.
 Qed.
 
 Definition int_serialization : serialization :=
@@ -218,7 +218,7 @@ Section prod_serialization.
     rewrite substring_0_length_append.
     wp_pure _.
     { rewrite /= ZOfString_inv //. }
-    wp_apply unSOME_spec; first done.
+    wp_apply wp_unSOME; first done.
     iIntros "_"; simpl.
     wp_pures.
     wp_substring; first by split_and!; [|by apply nat_Z_eq; first lia|done].

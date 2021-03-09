@@ -3,47 +3,43 @@ From aneris.prelude Require Import quantifiers.
 From aneris.aneris_lang Require Import lang network notation tactics proofmode.
 From aneris.aneris_lang.lib Require Import list util.
 
-Module Map.
+Definition map_empty : val :=
+  λ: <>, [].
 
-  Definition empty : val :=
-    λ: <>, List.nil.
+Definition map_remove : val :=
+  λ: "key",
+  (rec: "loop" "m" :=
+     match: "m" with
+       NONE => NONE
+     | SOME "p" =>
+       if: Fst (Fst "p") = "key"
+       then Snd "p"
+       else Fst "p" :: "loop" (Snd "p")
+     end).
 
-  Definition remove : val :=
-    λ: "key",
-    (rec: "loop" "m" :=
-       match: "m" with
-         NONE => NONE
-       | SOME "p" =>
-         if: Fst (Fst "p") = "key"
-         then Snd "p"
-         else Fst "p" :: "loop" (Snd "p")
-       end).
+Definition map_insert : val :=
+  λ: "key" "val" "m", ("key", "val") :: map_remove "key" "m".
 
-  Definition insert : val :=
-    λ: "key" "val" "m", ("key", "val") :: remove "key" "m".
+Definition map_lookup : val :=
+  λ: "key",
+  (rec: "loop" "m" :=
+     match: "m" with
+       NONE => NONE
+     | SOME "p" => if: Fst (Fst "p") = "key"
+                   then SOME (Snd (Fst "p"))
+                   else "loop" (Snd "p")
+     end).
 
-  Definition lookup : val :=
-    λ: "key",
-    (rec: "loop" "m" :=
-       match: "m" with
-         NONE => NONE
-       | SOME "p" => if: Fst (Fst "p") = "key"
-                     then SOME (Snd (Fst "p"))
-                     else "loop" (Snd "p")
-       end).
+Definition map_mem : val :=
+  λ: "key" "m",
+  match: map_lookup "key" "mem" with
+    NONE => #false
+  | SOME "p" => #true
+  end.
 
-  Definition mem : val :=
-    λ: "key" "m",
-    match: lookup "key" "mem" with
-      NONE => #false
-    | SOME "p" => #true
-    end.
-End Map.
-
-Section Map_specs.
+Section map_specs.
   Context `{anerisG Mdl Σ}.
   Context `{Countable K} (f : K → val) `{!Inj (=) (=) f}.
-  Import Map.
 
   Fixpoint embed_list (l : list (K * val)) : val :=
     match l with
@@ -51,13 +47,13 @@ Section Map_specs.
     | (k, v) :: ps => InjRV ((f k, v), embed_list ps)
     end.
 
-  Definition is_Map (d : val) (m : gmap K val) : Prop :=
+  Definition is_map (d : val) (m : gmap K val) : Prop :=
     ∃ l, m = list_to_map l ∧ d = embed_list l ∧ NoDup (fmap fst l).
 
-  Lemma empty_spec  ip :
+  Lemma wp_map_empty  ip :
     {{{ True }}}
-      empty #() @[ip]
-    {{{ v, RET v; ⌜is_Map v ∅⌝}}}.
+      map_empty #() @[ip]
+    {{{ v, RET v; ⌜is_map v ∅⌝}}}.
   Proof.
     iIntros (Φ) "_ HΦ".
     wp_rec. wp_pures. iApply "HΦ".
@@ -65,10 +61,10 @@ Section Map_specs.
     iPureIntro. constructor.
   Qed.
 
-  Lemma remove_spec ip k d m :
-    {{{ ⌜is_Map d m⌝ }}}
-      remove (Val (f k)) (Val d) @[ip]
-    {{{ d', RET d'; ⌜is_Map d' (delete k m)⌝ }}}.
+  Lemma wp_map_remove ip k d m :
+    {{{ ⌜is_map d m⌝ }}}
+      map_remove (Val (f k)) (Val d) @[ip]
+    {{{ d', RET d'; ⌜is_map d' (delete k m)⌝ }}}.
   Proof.
     iIntros (Φ Hm) "HΦ".
     wp_rec. wp_closure. iLöb as "IH" forall (Φ d m Hm). wp_rec.
@@ -85,7 +81,8 @@ Section Map_specs.
         wp_bind (App _ (embed_list tail))%E. iApply "IH".
         { inversion Hnodup. subst. by iExists tail.  }
         iIntros (? a).
-        rewrite /List.cons. wp_pures.
+        rewrite /list_cons.
+        wp_pures.
         iApply "HΦ". destruct a as (tail' & Hdelete & Himbed & Hnodup').
         iExists ((key, v) :: tail').
         repeat iSplit; iPureIntro.
@@ -97,16 +94,16 @@ Section Map_specs.
           inversion Hnodup; subst. apply not_elem_of_list_to_map_1; done.
   Qed.
 
-  Lemma insert_spec ip k v d m :
-    {{{ ⌜is_Map d m⌝ }}}
-      insert (Val (f k)) (Val v) (Val d) @[ip]
-    {{{ d', RET d'; ⌜is_Map d' (<[ k := v ]> m)⌝ }}}.
+  Lemma wp_map_insert ip k v d m :
+    {{{ ⌜is_map d m⌝ }}}
+      map_insert (Val (f k)) (Val v) (Val d) @[ip]
+    {{{ d', RET d'; ⌜is_map d' (<[ k := v ]> m)⌝ }}}.
   Proof.
     iIntros (Φ) "Hm HΦ".
-    wp_rec. wp_pures. wp_bind (Map.remove _ _).
-    iApply (remove_spec with "Hm").
+    wp_rec. wp_pures. wp_bind (map_remove _ _).
+    iApply (wp_map_remove with "Hm").
     iNext. iIntros (d' Hm).
-    rewrite /List.cons. wp_pures. iApply "HΦ".
+    rewrite /list_cons. wp_pures. iApply "HΦ".
     iPureIntro. destruct Hm as (l & Hdel & ? & ?). exists ((k, v) :: l).
     repeat split; simpl.
     - rewrite -Hdel insert_delete //.
@@ -116,9 +113,9 @@ Section Map_specs.
       rewrite -Hdel lookup_delete //.
   Qed.
 
-  Lemma lookup_spec ip k d m :
-    {{{ ⌜is_Map d m⌝ }}}
-      lookup (Val (f k)) (Val d) @[ip]
+  Lemma wp_map_lookup ip k d m :
+    {{{ ⌜is_map d m⌝ }}}
+      map_lookup (Val (f k)) (Val d) @[ip]
     {{{ v, RET v;
         ⌜match m !! k  with
            None => v = NONEV
@@ -142,4 +139,4 @@ Section Map_specs.
           iPureIntro. by rewrite lookup_insert_ne.
   Qed.
 
-End Map_specs.
+End map_specs.
