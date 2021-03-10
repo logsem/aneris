@@ -3,6 +3,7 @@ From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
+From iris.algebra Require Import auth excl.
 From aneris.program_logic Require Export weakestpre adequacy.
 From aneris.program_logic Require Import ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
@@ -865,8 +866,39 @@ Section state_interpretation.
        + iSplit. iPureIntro. by eapply network_sockets_coh_receive.
          iSplit. iPureIntro. by eapply messages_history_coh_receive_2; eauto.
            by iApply free_ips_coh_update_msg.
-Qed.
+   Qed.
 
+   
+   Lemma aneris_state_interp_model m1 m2 σ (δ1: aneris_aux_state) κs n:
+     state_interp σ δ1 κs n -∗ frag_st m1 ==∗
+     state_interp σ
+     ({| aneris_AS_mhist := aneris_AS_mhist δ1; aneris_AS_model := m2 |}: aux_state aneris_AS)
+     κs n ∗
+     frag_st m2.
+   Proof.
+     iIntros "[? Hauth] Hfrag".
+     iMod ((own_update _
+                       (● (Excl' (aneris_AS_model δ1)) ⋅ ◯ (Excl' m1))
+                       (● (Excl' m2) ⋅ ◯ (Excl' m2))
+           ) with "[Hauth Hfrag]") as "[??]".
+     { apply auth_update. apply option_local_update.
+       eapply exclusive_local_update. by vm_compute. }
+     { by iCombine "Hauth Hfrag" as "H". }
+     iModIntro. iFrame.
+   Qed.
+
+   
+   Lemma aneris_state_interp_model_agree m σ (δ: aneris_aux_state) κs n:
+     state_interp σ δ κs n -∗ frag_st m -∗
+                  ⌜ δ.(aneris_AS_model) = m ⌝.
+   Proof.
+     iIntros "[_ Ha] Hf". iDestruct (own_valid_2 with "Ha Hf") as "%H".
+     iPureIntro. apply leibniz_equiv.
+     apply auth_both_valid_discrete in H as [H Hval].
+     by apply Excl_included in H.
+   Qed.
+
+     
 End state_interpretation.
 
 Global Opaque aneris_state_interp.

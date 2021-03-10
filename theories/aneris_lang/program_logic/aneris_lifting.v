@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From aneris.program_logic Require Export weakestpre lifting.
-From aneris.aneris_lang Require Import lang base_lang lifting.
+From aneris.aneris_lang Require Import lang base_lang lifting state_interp.
 From aneris.aneris_lang.program_logic Require Export aneris_weakestpre atomic.
 From RecordUpdate Require Import RecordSet.
 
@@ -44,6 +44,67 @@ Section lifting_pure_exec.
     induction n as [|n IH]; by rewrite //= -step_fupd_intro // IH.
   Qed.
 
+  Lemma aneris_wp_atomic_take_step
+     ip E1 E2 e Φ `{!Atomic (stuckness_to_atomicity NotStuck) {| expr_n := ip; expr_e := e |}} :
+  TCEq (aneris_to_val {| expr_n := ip; expr_e := e |}) None →
+  (|={E1,E2}=>
+   ∀ σ1 κs n δ1, state_interp σ1 δ1 κs n ={E2}=∗
+     ∃ δ' Q,
+       state_interp σ1 δ1 κs n ∗
+       (∀ σ2 δ3 κ n',
+           state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
+           ⌜valid_state_evolution aneris_AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
+             ⌜valid_state_evolution aneris_AS σ1 δ1 κ σ2 δ3⌝) ∗
+       (state_interp σ1 δ1 κs n ={E2}=∗ state_interp σ1 δ' κs n ∗ Q) ∗
+   WP e @[ip] E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @[ip] E1 {{ Φ }}.
+  Proof.
+    rewrite (aneris_wp_unfold _ _ e) /aneris_wp_def.
+    iIntros "% Hwp Hisnode".
+    iApply (wp_atomic_take_step _ _ E2).
+    iMod "Hwp". iModIntro.
+    iIntros (σ ks n st) "Hsi".
+    iDestruct ("Hwp" with "Hsi") as "> Hwp".
+    iDestruct "Hwp" as (st' Q) "(Hsi & H1 & H2 & Hwp)".
+    iModIntro.
+    iExists _, _; iFrame.
+    rewrite (aneris_wp_unfold _ _ e) /aneris_wp_def.
+    iDestruct ("Hwp" with "Hisnode") as "Hwp".
+    iApply wp_wand_r; iFrame.
+    iIntros (v) "H". iDestruct "H" as (w) "[-> HQimp]".
+    iIntros "HQ".
+    iMod ("HQimp" with "HQ").
+    iModIntro; iExists _; iFrame; done.
+  Qed.
+  
+  Lemma aneris_wp_atomic_take_step_model ip Φ e E1 E2 `{!Atomic (stuckness_to_atomicity NotStuck) {| expr_n := ip; expr_e := e |}} :
+    TCEq (aneris_to_val {| expr_n := ip; expr_e := e |}) None →
+    (|={E1,E2}=>
+      |={E2}=>
+        ∃ m m', ⌜ Mdl m m' ⌝ ∗ frag_st m ∗
+    WP e @[ip] E2 {{ v,  frag_st m' ={E2,E1}=∗ Φ v }}) ⊢ WP e @[ip] E1 {{ Φ }}.
+  Proof.
+    iIntros (Htceq) "H".
+    iApply (aneris_wp_atomic_take_step ip E1 E2).
+    iMod "H" as "H".
+    iModIntro. iIntros (σ1 κs n δ1) "Hsi".
+    iMod "H" as (m m') "(%Htrans&Hm&Hwp)".
+    iDestruct (aneris_state_interp_model_agree with "Hsi Hm") as "%Heq".
+    iModIntro. iExists ({| aneris_AS_mhist := δ1.(aneris_AS_mhist);
+                           aneris_AS_model := m' |}).
+    iExists (frag_st m')%I.
+    iFrame "Hsi".
+    iSplitR "Hwp Hm".
+    - iIntros (σ2 δ3 κ n') "(Hsi&%Hval&Hst)".
+      iDestruct (aneris_state_interp_model_agree with "Hsi Hst") as "%Heq'".
+      unfold valid_state_evolution in *. simpl in *.
+      destruct Hval as [Hvalh Hvalm].
+      iModIntro. iPureIntro. split; eauto.
+      rewrite Heq Heq'. right; done.
+    - iFrame "Hwp". iIntros "Hsi".
+      iMod (aneris_state_interp_model with "Hsi Hm").
+      iModIntro. iFrame.
+  Qed.
+      
 End lifting_pure_exec.
 
 Section lifting_node_local.

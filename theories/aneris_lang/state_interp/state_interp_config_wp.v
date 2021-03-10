@@ -33,7 +33,7 @@ Section state_interpretation.
 
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
-    rewrite /config_wp. iIntros. iModIntro. iIntros (σ1 δ k σ2 ks nt Hstep) "Hσ".
+    rewrite /config_wp. iIntros. iModIntro. iIntros (σ1 δ k σ2 ks nt Hstep) "[Hσ Hm]".
     rewrite /state_interp; simplify_eq /=.
     iDestruct "Hσ" as (γm mh)
            "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh
@@ -44,7 +44,7 @@ Section state_interpretation.
     { iExists δ. iIntros "!> !>". iSplit.
       - iPureIntro. split_and!; last by left. simplify_eq.
         eapply message_history_evolution_deliver_message; set_solver.
-      - iExists γm, mh. iFrame "Hsi".
+      - iFrame "Hm". iExists γm, mh. iFrame "Hsi".
         iSplitR; first done.
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].
@@ -59,7 +59,7 @@ Section state_interpretation.
     split_and!; last by left.
     eapply message_history_evolution_drop_message; set_solver.
     (* by eapply message_history_evolution_drop_message. *)
-    iExists γm, mh. iFrame. iSplitR; first done. iSplitR; first done.
+    iFrame "Hm". iExists γm, mh. iFrame. iSplitR; first done. iSplitR; first done.
     iSplitR. iPureIntro. simpl. eauto.
     iSplitR. iPureIntro. simpl. by eapply messages_history_drop_message.
     rewrite /messages_resource_coh. iApply (big_sepS_mono with "Hmres").

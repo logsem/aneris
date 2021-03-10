@@ -105,40 +105,6 @@ Proof.
   iIntros (v); iDestruct 1 as (w) "[-> >Hw]"; eauto.
 Qed.
 
-Lemma aneris_wp_atomic_take_step ip E1 E2 e Φ
-      `{!Atomic WeaklyAtomic (mkExpr ip e)} :
-  TCEq (to_val e) None →
-  (|={E1,E2}=>
-   ∀ σ1 κs n δ1, state_interp σ1 δ1 κs n ={E2}=∗
-     ∃ δ' Q,
-       state_interp σ1 δ1 κs n ∗
-       (∀ σ2 δ3 κ n',
-           state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
-           ⌜valid_state_evolution aneris_AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
-             ⌜valid_state_evolution aneris_AS σ1 δ1 κ σ2 δ3⌝) ∗
-       (∀ σ δ κs n, state_interp σ δ κs n ={E2}=∗
-         state_interp σ δ' κs n ∗ Q) ∗
-   WP e @ ip; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ ip ; E1 {{ Φ }}.
-Proof.
-  rewrite !aneris_wp_unfold /aneris_wp_def.
-  iIntros (He) "Hwp Hisnode".
-  iApply (wp_atomic_take_step _ _ E2).
-  { rewrite /= /aneris_to_val He //. }
-  iMod "Hwp". iModIntro.
-  iIntros (σ ks n st) "Hsi".
-  iDestruct ("Hwp" with "Hsi") as "> Hwp".
-  iDestruct "Hwp" as (st' Q) "(Hsi & H1 & H2 & Hwp)".
-  iModIntro.
-  iExists _, _; iFrame.
-  rewrite !aneris_wp_unfold /aneris_wp_def.
-  iDestruct ("Hwp" with "Hisnode") as "Hwp".
-  iApply wp_wand_r; iFrame.
-  iIntros (v) "H". iDestruct "H" as (w) "[-> HQimp]".
-  iIntros "HQ".
-  iMod ("HQimp" with "HQ").
-  iModIntro; iExists _; iFrame; done.
-Qed.
-
 Lemma aneris_wp_step_fupd ip E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
   (|={E1}[E2]▷=> P) -∗ WP e @ ip; E2 {{ v, P ={E1}=∗ Φ v }} -∗ WP e @ ip; E1 {{ Φ }}.

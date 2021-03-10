@@ -177,8 +177,7 @@ Lemma wp_atomic_take_step
            state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
            ⌜valid_state_evolution AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
              ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ3⌝) ∗
-       (∀ σ δ κs n, state_interp σ δ κs n ={E2}=∗
-         state_interp σ δ' κs n ∗ Q) ∗
+       (state_interp σ1 δ1 κs n ={E2}=∗ state_interp σ1 δ' κs n ∗ Q) ∗
    WP e @ s; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
 Proof.
   iIntros (He) "H".

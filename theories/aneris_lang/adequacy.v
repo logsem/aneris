@@ -35,7 +35,7 @@ Proof.
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
   iMod free_ports_auth_init as (γpiu) "HPiu".
   iMod (gen_heap_light_init (history_init ip ports)) as (γms) "Hms".
-  iMod (model_init st0) as (γm) "Hmdl".
+  iMod (model_init st0) as (γm) "[??]".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -62,14 +62,15 @@ Proof.
   iAssert (is_node ip) as "Hn".
   { iExists _. eauto. }
   iModIntro.
-  iExists  (λ σ δ _, aneris_state_interp σ _), (λ _, True)%I.
+  iExists  (λ σ δ _, aneris_state_interp σ _ ∗ auth_st _)%I, (λ _, True)%I.
   iSplitR; last first.
   iSplitR "Hwp HIPs"; last first.
-  { iApply ("Hwp" with "Hsif Hsa' HIPs Hn"). }
+  { iSpecialize ("Hwp" with "Hsif Hsa' HIPs Hn").
+    iClear "#". iRevert "Hwp". eauto. }
   iPoseProof (@aneris_state_interp_init _ _ dg IPs _ _ _ _ _ ports
                 with "[Hmp] [] [Hh] [Hs] [Hms] [] [HM] [] [HIPsCtx] [HPiu] ")
-    as "Hsi"; eauto.
-    iApply config_wp_correct.
+    as "Hsi"; eauto; iFrame.
+  iApply config_wp_correct.
 Qed.
 
 Definition safe e σ := @adequate aneris_lang NotStuck e σ (λ _ _, True).

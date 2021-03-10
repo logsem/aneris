@@ -248,7 +248,7 @@ Admitted.
 Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
   irisG aneris_lang aneris_AS Σ := {
   iris_invG := _;
-  state_interp σ δ _ _ := aneris_state_interp σ (aneris_AS_mhist δ);
+  state_interp σ δ _ _ := (aneris_state_interp σ (aneris_AS_mhist δ) ∗ auth_st (aneris_AS_model δ))%I;
   fork_post _ := True%I;
 }.
 
