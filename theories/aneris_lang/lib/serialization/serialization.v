@@ -2,8 +2,7 @@ From iris.program_logic Require Import weakestpre.
 From aneris.aneris_lang Require Import lang notation proofmode.
 From aneris.aneris_lang.lib Require Import util.
 From iris.algebra Require Import gmap.
-From aneris.aneris_lang.lib Require Export serialization_base.
-From aneris.aneris_lang.lib Require Import network assert.
+From aneris.aneris_lang.lib Require Export serialization_base network_util assert.
 
 Record serialization := {
   DBS_valid_val : base_lang.val → Prop;

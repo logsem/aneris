@@ -2,7 +2,7 @@ From stdpp Require Export strings list pretty gmap.
 From aneris.prelude Require Import quantifiers.
 From aneris.aneris_lang Require Import lang network notation tactics proofmode.
 From aneris.aneris_lang.lib Require Import
-     map lock util list serialization assert.
+     network_util map lock util list serialization assert.
 
 (* An implementation sketch for at-most-once (amo) send and receive operations.
 

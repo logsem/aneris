@@ -1,6 +1,6 @@
 From stdpp Require Export base list.
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
-From aneris.aneris_lang.lib Require Export util network list.
+From aneris.aneris_lang.lib Require Export util network_util list.
 From aneris.aneris_lang.lib.serialization Require Export serialization.
 From aneris.aneris_lang.lib.vector_clock Require Export time.
 

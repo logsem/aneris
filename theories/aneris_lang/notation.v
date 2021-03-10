@@ -190,3 +190,10 @@ Notation udp_socket a b :=
      sprotocol :=
        IPPROTO_UDP;
      saddress := a |}.
+
+Notation udp_msg s d b :=
+  {| m_sender := s;
+     m_destination := d;
+     m_protocol := IPPROTO_UDP;
+     m_body := b |}.
+

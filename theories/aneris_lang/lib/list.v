@@ -180,13 +180,13 @@ Section list_specs.
       rewrite Nat2Z.inj_add. iApply "HΦ"; by auto.
   Qed.
 
-  Lemma wp_list_iter {A} ip (l : list A) lv handler P Φ Ψ
+  Lemma wp_list_iter {A} Φ Ψ P ip (l : list A) lv handler
         (toval : A -> base_lang.val) :
     (∀ (a : A),
         {{{ ⌜a ∈ l⌝ ∗ P ∗ Φ a }}}
           (Val handler) (toval a) @[ip]
         {{{v, RET v; P ∗ Ψ a }}}) -∗
-    {{{ ⌜is_list (map (λ a, toval a) l) lv⌝ ∗ P ∗ [∗ list] a∈l, Φ a }}}
+    {{{ ⌜is_list (map toval l) lv⌝ ∗ P ∗ [∗ list] a∈l, Φ a }}}
       list_iter (Val handler) lv @[ip]
     {{{ RET #(); P ∗ [∗ list] a ∈ l, Ψ a }}}.
   Proof.
@@ -215,7 +215,7 @@ Section list_specs.
         {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc ∗ Φ a }}}
           (Val handler) (Val acc) (toval a) @[ip]
         {{{v, RET v; P (lacc ++ [a]) v ∗ Ψ a }}}) -∗
-    {{{ ⌜is_list (map (λ a, toval a) l) lv⌝ ∗ P [] acc ∗ [∗ list] a∈l, Φ a }}}
+    {{{ ⌜is_list (map toval l) lv⌝ ∗ P [] acc ∗ [∗ list] a∈l, Φ a }}}
       list_fold handler acc lv @[ip]
     {{{v, RET v; P l v ∗ [∗ list] a∈l, Ψ a }}}.
   Proof.
@@ -245,7 +245,7 @@ Section list_specs.
           {{{ ⌜lp ++ l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
             (Val handler) (Val acc) (toval a) @[ip]
           {{{v, RET v; P (lacc ++ [a]) v None lrem ∗ Ψ a }}}) -∗
-    {{{ ⌜is_list (map (λ a, toval a) l) lv⌝ ∗ P lp acc None l ∗ [∗ list] a∈l, Φ a }}}
+    {{{ ⌜is_list (map toval l) lv⌝ ∗ P lp acc None l ∗ [∗ list] a∈l, Φ a }}}
       list_fold (Val handler) (Val acc) (Val lv) @[ip]
     {{{v, RET v; P (lp ++ l) v None [] ∗ [∗ list] a∈l, Ψ a }}}.
   Proof.
@@ -267,14 +267,14 @@ Section list_specs.
       iApply "HΞ"; iFrame.
   Qed.
 
-  Lemma wo_list_fold' {A} ip handler (l : list A) acc lv P Φ Ψ
+  Lemma wp_list_fold' {A} ip handler (l : list A) acc lv P Φ Ψ
         (toval : A -> base_lang.val) :
     □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
       (∀ (a : A) acc lacc lrem,
           {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
             (Val handler) (Val acc) (toval a) @[ip]
           {{{v, RET v; P (lacc ++ [a]) v None lrem ∗ Ψ a }}}) -∗
-    {{{ ⌜is_list (map (λ a, toval a) l) lv⌝ ∗ P [] acc None l ∗ [∗ list] a∈l, Φ a }}}
+    {{{ ⌜is_list (map toval l) lv⌝ ∗ P [] acc None l ∗ [∗ list] a∈l, Φ a }}}
       list_fold (Val handler) (Val acc) lv @[ip]
     {{{v, RET v; P l v None [] ∗ [∗ list] a∈l, Ψ a }}}.
   Proof.
@@ -341,13 +341,13 @@ Section list_specs.
         {{{ ⌜av = toval a⌝ }}}
           fv av @[ip]
         {{{ (b : bool), RET #b; if b then Ψ a else True }}}) -∗
-    {{{ ⌜is_list (map (λ a, toval a) l) lv⌝ }}}
+    {{{ ⌜is_list (map toval l) lv⌝ }}}
       list_find_remove fv lv @[ip]
     {{{ v, RET v; ⌜v = NONEV⌝ ∨
                        ∃ e lv' l1 l2,
                          ⌜l = l1 ++ e :: l2 ∧
                          v = SOMEV (toval e, lv') ∧
-                         is_list (map (λ a, toval a) (l1 ++ l2)) lv'⌝
+                         is_list (map toval (l1 ++ l2)) lv'⌝
                          ∗ Ψ e}}}.
   Proof.
     iIntros "#Hf" (Φ).
