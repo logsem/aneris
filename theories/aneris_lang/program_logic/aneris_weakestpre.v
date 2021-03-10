@@ -1,10 +1,10 @@
 From iris.proofmode Require Import base tactics classes.
 From aneris.program_logic Require Export weakestpre.
+From aneris.aneris_lang Require Import lifting.
+From aneris.aneris_lang Require Export resources network base_lang.
+From aneris.aneris_lang.state_interp Require Import state_interp_def.
 From aneris.aneris_lang Require Import lifting resources network base_lang.
 From aneris.aneris_lang.state_interp Require Import state_interp_def.
-(* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
-   get pretty-printed correctly. *)
-(* From iris.bi Require Import weakestpre. *)
 Set Default Proof Using "Type".
 
 Import Network.
