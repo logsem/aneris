@@ -435,14 +435,24 @@ Section resource_lemmas.
     eauto with iFrame.
   Qed.
 
- Lemma messages_mapsto_valid a R T mh :
-   a ⤳ (R, T) -∗ messages_ctx mh -∗ ⌜mh !! a = Some (R,T)⌝.
- Proof.
-   iIntros "Hf Ha".
-   iApply (gen_heap_light_valid with "[Ha] [Hf]").
-   - iFrame.
-   - iDestruct "Hf" as (?) "(Hn & Hf)". eauto with iFrame.
- Qed.
+  Lemma messages_mapsto_valid a R T mh :
+    a ⤳ (R, T) -∗ messages_ctx mh -∗ ⌜mh !! a = Some (R,T)⌝.
+  Proof.
+    iIntros "Hf Ha".
+    iApply (gen_heap_light_valid with "[Ha] [Hf]").
+    - iFrame.
+    - iDestruct "Hf" as (?) "(Hn & Hf)". eauto with iFrame.
+  Qed.
+
+  Lemma messages_mapsto_agree a R T R' T' q1 q2 :
+    a ⤳{q1} (R, T) -∗ a ⤳{q2} (R', T') -∗ ⌜R = R' ∧ T = T'⌝.
+  Proof.
+    iDestruct 1 as (γ) "(Hn & Ha)".
+    iDestruct 1 as (γ') "(Hn' & Ha')".
+    iDestruct (mapsto_node_agree with "Hn Hn'") as %<-.
+    iDestruct (lmapsto_agree with "Ha Ha'") as %?.
+    by simplify_eq.
+  Qed.
 
   Lemma node_ctx_init σ s :
     ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
