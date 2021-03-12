@@ -130,6 +130,27 @@ Instance sendto_atomic n v0 v1 v2 s :
   Atomic s (mkExpr n (SendTo (Val v0) (Val v1) (Val v2))).
 Proof. solve_atomic. Qed.
 
+Instance setreceivetimeout_atomic n v0 v1 v2 s:
+    Atomic s (mkExpr n (SetReceiveTimeout (Val v0) (Val v1) (Val v2))).
+Proof. solve_atomic. Qed.
+
+Instance receive_from_stutteringatomic n sh s :
+  StutteringAtomic s (mkExpr n (ReceiveFrom (Val $ LitV $ sh))).
+Proof.
+  apply strongly_stutteringatomic_stutteringatomic,
+    ectx_language_stutteringatomic.
+  - inversion 1; inv_head_step; try naive_solver; [].
+    rewrite insert_id; last done.
+    match goal with
+      |- context [state_heaps ?st] => by destruct st; eauto
+    end.
+  - apply ectxi_language_sub_redexes_are_values; intros [] **; inv_head_step;
+      rewrite /aneris_to_val /is_Some /=; eexists; by
+          match goal with
+          | H: _ = _ |- _ => rewrite -H
+          end.
+Qed.
+
 Class AsRecV (v : base_lang.val) (f x : binder) (erec : base_lang.expr) :=
   as_recv : v = RecV f x erec.
 Global Hint Mode AsRecV ! - - - : typeclass_instances.
@@ -350,7 +371,7 @@ Section primitive_laws.
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & % & %)".
     iModIntro; iSplit.
-    { iPureIntro. do 4 eexists. apply (AssignNewIpStepS _ _ []); eauto. }
+    { iPureIntro. do 4 eexists. apply AssignNewIpStepS; eauto. }
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".
     inv_head_step.
     iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
@@ -379,7 +400,7 @@ Section primitive_laws.
     iDestruct (is_node_valid_sockets with "Hσ Hn") as (?) "%".
     iSplitR.
     { iPureIntro; do 4 eexists.
-      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      eapply SocketStepS; eauto.
       apply newsocket_fresh. }
     set (sock := {| sfamily := f;
                     stype := t;
@@ -419,7 +440,7 @@ Section primitive_laws.
       as (?) "[% %]".
     iModIntro. iSplitR.
     { iPureIntro; do 4 eexists.
-      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      eapply SocketStepS; eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_socketbind_static with "Hσ Hfixed Hsh Hp")
@@ -454,7 +475,7 @@ Section primitive_laws.
     iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
       as (?) "[% %]".
     iModIntro. iSplitR.
-    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+    { iPureIntro; do 4 eexists. eapply SocketStepS; eauto.
       by econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_socketbind_dynamic with "Hσ Hfixed Hsh Hp")
@@ -486,7 +507,7 @@ Section primitive_laws.
      iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
     iModIntro. iSplitR.
-    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+    { iPureIntro; do 4 eexists. eapply SocketStepS; eauto.
         by econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_send sh a skt
@@ -520,7 +541,7 @@ Section primitive_laws.
      iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
     iModIntro. iSplitR.
-    { iPureIntro; do 4 eexists. eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+    { iPureIntro; do 4 eexists. eapply SocketStepS; eauto.
         by econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step.
     iMod (aneris_state_interp_send_duplicate
@@ -565,8 +586,7 @@ Section primitive_laws.
     iModIntro. iSplitR.
      { iPureIntro.
        assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
-         [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
-             eauto; econstructor..].
+         [ | do 4 eexists; by eapply SocketStepS; eauto; econstructor..].
        destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
      iIntros (v2' ? ? Hstep); inv_head_step.
     - destruct (decide (m ∈ R)) as [Hin | Hni ].
@@ -674,8 +694,7 @@ Section primitive_laws.
      iModIntro; iSplit.
      { iPureIntro.
        assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
-         [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
-             eauto; econstructor..].
+         [ | do 4 eexists; by eapply SocketStepS; eauto; econstructor..].
        destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
      iIntros (???) "%Hprim".
      inv_head_step.
@@ -752,8 +771,7 @@ Section primitive_laws.
      iModIntro; iSplit.
      { iPureIntro.
        assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
-         [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
-             eauto; econstructor..].
+         [ | do 4 eexists; by eapply SocketStepS; eauto; econstructor..].
        destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
      iIntros (???) "%Hprim".
      inv_head_step.
@@ -845,8 +863,7 @@ Section primitive_laws.
     iModIntro; iSplit.
     { iPureIntro.
       assert (r = ∅ ∨ ∃ m, m ∈ r) as [->| (m & Hm)];
-        [ | do 4 eexists; by eapply (SocketStepS _ _ _  _ _ _ _  _ []);
-            eauto; econstructor..].
+        [ | do 4 eexists; by eapply SocketStepS; eauto; econstructor..].
       destruct (decide (r = ∅)); [ set_solver | by right; apply set_choose_L]. }
     iIntros (???) "%Hprim".
     inv_head_step.
@@ -909,7 +926,7 @@ Section primitive_laws.
     iMod (aneris_state_interp_sblock_update with "Hσ Hsh") as "(Hσ&Hsh)"; eauto.
     iModIntro. iSplitR.
     { iPureIntro; do 4 eexists.
-      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      eapply SocketStepS; eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step; last by lia.
     iModIntro.
@@ -939,7 +956,7 @@ Section primitive_laws.
     iMod (aneris_state_interp_sblock_update with "Hσ Hsh") as "(Hσ&Hsh)"; eauto.
     iModIntro. iSplitR.
     { iPureIntro; do 4 eexists.
-      eapply (SocketStepS _ _ _ _ _ _ _ _ []); eauto.
+      eapply SocketStepS; eauto.
       econstructor; naive_solver. }
     iIntros (v2' ? ? Hstep) "!>"; inv_head_step; first by lia.
     iModIntro.

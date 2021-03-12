@@ -1128,13 +1128,13 @@ Inductive head_step : aneris_expr → state → list observation →
               κ
               (mkExpr n e') (σ <| state_heaps := <[n:=h']>(state_heaps σ) |>)
               (map (mkExpr n) ef)
-| AssignNewIpStepS ip e κ σ :
+| AssignNewIpStepS ip e σ :
     ip ≠ "system" →
     state_heaps σ !! ip = None →
     state_sockets σ !! ip = None →
     is_Some (state_ports_in_use σ !! ip) →
     head_step (mkExpr "system" (Start (LitString ip) e)) σ
-              κ
+              []
               (mkExpr "system" (Val $ LitV $ LitUnit))
               {|
                 state_heaps := <[ip:=∅]>(state_heaps σ);
@@ -1142,13 +1142,13 @@ Inductive head_step : aneris_expr → state → list observation →
                 state_ports_in_use := state_ports_in_use σ;
                 state_ms := state_ms σ |}
               [mkExpr ip e]
-| SocketStepS n e e' Sn Sn' P' M' σ κ
+| SocketStepS n e e' Sn Sn' P' M' σ
     (SocketStep : socket_step n
         e  Sn (state_ports_in_use σ) (state_ms σ)
         e' Sn' P' M')
   : state_sockets σ !! n = Some Sn ->
     head_step (mkExpr n e) σ
-              κ
+              []
               (mkExpr n e')
               {| state_heaps := state_heaps σ;
                  state_sockets := <[n:=Sn']>(state_sockets σ);

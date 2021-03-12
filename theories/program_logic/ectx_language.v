@@ -150,6 +150,13 @@ Section ectx_language.
       head_step e σ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
 
+  Definition head_stutteringatomic (a : atomicity) (e : expr Λ) : Prop :=
+    ∀ σ κ e' σ' efs,
+      head_step e σ κ e' σ' efs →
+      (e' = e ∧ σ' = σ ∧ efs = [] ∧ κ = [])
+      ∨
+      if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
+
   (** * Some lemmas about this language *)
   Lemma fill_not_val K e : to_val e = None → to_val (fill K e) = None.
   Proof. rewrite !eq_None_not_Some. eauto using fill_val. Qed.
@@ -244,6 +251,15 @@ Section ectx_language.
     intros Hatomic_step Hatomic_fill σ κ e' σ' efs [K e1' e2' -> -> Hstep].
     assert (K = empty_ectx) as -> by eauto 10 using val_head_stuck.
     rewrite fill_empty. eapply Hatomic_step. by rewrite fill_empty.
+  Qed.
+
+  Lemma ectx_language_stutteringatomic a e :
+    head_stutteringatomic a e → sub_redexes_are_values e → StutteringAtomic a e.
+  Proof.
+    intros Hatomic_step Hatomic_fill σ κ e' σ' efs [K e1' e2' -> -> Hstep].
+    assert (K = empty_ectx) as -> by eauto 10 using val_head_stuck.
+    revert Hatomic_step; rewrite !fill_empty; intros Hatomic_step.
+    eapply Hatomic_step; done.
   Qed.
 
   Lemma head_reducible_prim_step_ctx K e1 σ1 κ e2 σ2 efs :

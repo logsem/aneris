@@ -105,6 +105,12 @@ Section language.
       prim_step e σ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
 
+  Class StutteringAtomic (a : atomicity) (e : expr Λ) : Prop :=
+    stutteringatomic σ e' κ σ' efs :
+      prim_step e σ κ e' σ' efs →
+      (e' = e ∧ σ' = σ ∧ efs = [] ∧ κ = [])
+      ∨
+      if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
 
 
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
@@ -164,6 +170,14 @@ Section language.
   Lemma strongly_atomic_atomic e a :
     Atomic StronglyAtomic e → Atomic a e.
   Proof. unfold Atomic. destruct a; eauto using val_irreducible. Qed.
+
+  Lemma strongly_stutteringatomic_stutteringatomic e a :
+    StutteringAtomic StronglyAtomic e → StutteringAtomic a e.
+  Proof.
+    unfold StutteringAtomic.
+    destruct a; intros Hat; first tauto.
+    intros ? ? ? ? ? [|]%Hat; auto using val_irreducible.
+  Qed.
 
   Lemma reducible_fill `{!@LanguageCtx Λ K} e σ :
     reducible e σ → reducible (K e) σ.
