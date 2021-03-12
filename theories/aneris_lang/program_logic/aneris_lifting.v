@@ -190,7 +190,7 @@ Section lifting_network.
   Implicit Types e : expr.
 
   (** Network *)
-  Lemma aneris_wp_start ip E e Ψ ports :
+  Lemma aneris_wp_start ports ip E e Ψ :
     ip ≠ "system" →
     ports ≠ ∅ →
     ▷ free_ip ip ∗ ▷ Ψ #() ∗
