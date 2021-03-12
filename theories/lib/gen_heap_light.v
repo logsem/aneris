@@ -3,9 +3,8 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap frac agree.
 From iris.base_logic.lib Require Import gen_heap.
 From iris.base_logic.lib Require Export own.
-Set Default Proof Using "Type".
+From iris.prelude Require Import options.
 Import uPred.
-
 
 Section definitions.
 
