@@ -139,6 +139,20 @@ Proof.
   iModIntro; iExists _; iFrame; done.
 Qed.
 
+Lemma aneris_wp_stuttering_atomic ip E1 E2 e Φ
+      `{!StutteringAtomic WeaklyAtomic (mkExpr ip e)} :
+  (|={E1,E2}=> WP e @ ip; E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ ip; E1 {{ Φ }}.
+Proof.
+  rewrite !aneris_wp_unfold /aneris_wp_def.
+  iIntros "He Hn".
+  iApply wp_stuttering_atomic.
+  iMod "He". iModIntro.
+  iApply wp_wand_r; iSplitL.
+  { iApply ("He" with "Hn"). }
+  iIntros (?). iDestruct 1 as (?) "[% HΦ]".
+  iMod "HΦ". iModIntro. eauto.
+Qed.
+
 Lemma aneris_wp_step_fupd ip E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
   (|={E1}[E2]▷=> P) -∗ WP e @ ip; E2 {{ v, P ={E1}=∗ Φ v }} -∗
@@ -342,6 +356,15 @@ Section proofmode_classes.
       fupd_frame_r bi.wand_elim_r aneris_wp_atomic.
   Qed.
 
+  Global Instance elim_modal_fupd_wp_stutteringatomic p ip E1 E2 e P Φ :
+    StutteringAtomic WeaklyAtomic (mkExpr ip e) →
+    ElimModal True p false (|={E1,E2}=> P) P
+            (WP e @ ip; E1 {{ Φ }}) (WP e @ ip; E2 {{ v, |={E2,E1}=> Φ v }})%I.
+  Proof.
+    intros. by rewrite /ElimModal bi.intuitionistically_if_elim
+      fupd_frame_r bi.wand_elim_r aneris_wp_stuttering_atomic.
+  Qed.
+
   Global Instance add_modal_fupd_wp ip E e P Φ :
     AddModal (|={E}=> P) P (WP e @ ip; E {{ Φ }}).
   Proof. by rewrite /AddModal fupd_frame_r bi.wand_elim_r fupd_aneris_wp. Qed.
@@ -353,6 +376,18 @@ Section proofmode_classes.
             (λ x, WP e @ ip; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.
   Proof.
     intros ? _. rewrite /ElimAcc.
+    iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
+    iApply (aneris_wp_wand with "(Hinner Hα)").
+    iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
+  Qed.
+
+  Global Instance elim_acc_wp_stuttering {X} E1 E2 α β γ e ip Φ :
+    StutteringAtomic WeaklyAtomic (mkExpr ip e) →
+    ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1)
+            α β γ (WP e @ ip; E1 {{ Φ }})
+            (λ x, WP e @ ip; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.
+  Proof.
+    intros ? _.
     iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply (aneris_wp_wand with "(Hinner Hα)").
     iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
