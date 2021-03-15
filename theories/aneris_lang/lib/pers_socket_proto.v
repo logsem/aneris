@@ -49,11 +49,11 @@ Section pers_messages_lemmas.
     rewrite big_sepS_empty //.
   Qed.
 
-  Lemma aneris_wp_receivefrom_nodup_gen a ip s h φ R T :
+  Lemma aneris_wp_receivefrom_nodup_gen E a ip s h φ R T :
     ip_of_address a = ip →
     saddress s = Some a →
     {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T) ∗ a ⤇ φ }}}
-      ReceiveFrom #(LitSocket h) @[ip]
+      ReceiveFrom #(LitSocket h) @[ip] E
     {{{ r, RET r;
         (⌜r = NONEV⌝ ∗ h ↪[ip] s ∗ a ⤳ (R, T)) ∨
         (∃ m, ⌜r = SOMEV (#(m_body m), #(m_sender m))⌝ ∗ ⌜m_destination m = a⌝ ∗
@@ -80,12 +80,12 @@ Section pers_messages_lemmas.
       by iApply big_sepS_elem_of.
   Qed.
 
-  Lemma aneris_wp_receivefrom_nodup a ip s h φ R T :
+  Lemma aneris_wp_receivefrom_nodup E a ip s h φ R T :
     ip_of_address a = ip →
     saddress s = Some a →
     sblock s = true →
     {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T) ∗ a ⤇ φ }}}
-      ReceiveFrom #(LitSocket h) @[ip]
+      ReceiveFrom #(LitSocket h) @[ip] E
     {{{ m, RET SOMEV (#(m_body m), #(m_sender m));
           h ↪[ip] s ∗ a @ φ ⤳# ({[m]} ∪ R, T) ∗ φ m }}}.
   Proof.
