@@ -6,7 +6,7 @@ Section def.
   Context `{!anerisG mdl Σ}.
 
   Definition mapsto_messages_pers_def a φ q s : iProp Σ :=
-    ⌜∀ m, Persistent (φ m)⌝ ∗ a ⤳{q} s ∗ a ⤇ φ ∗ [∗ set] m ∈ s.1, φ m.
+    ⌜∀ m, Persistent (φ m)⌝ ∗ a ⤳{q} s ∗ [∗ set] m ∈ s.1, φ m.
   Definition mapsto_messages_pers_aux : seal mapsto_messages_pers_def. by eexists. Qed.
   Definition mapsto_messages_pers := mapsto_messages_pers_aux.(unseal).
   Definition mapsto_messages_pers_eq :
@@ -22,41 +22,46 @@ Notation "a @ φ ⤳# s" := (a @ φ ⤳#{ 1 } s)%I (at level 20) : bi_scope.
 Section pers_messages_lemmas.
   Context `{!anerisG mdl Σ}.
 
+  Global Instance mapsto_messages_pers_timeless a φ q s :
+    (∀ m, Timeless (φ m)) →
+    Timeless (a @ φ ⤳#{ q } s).
+  Proof.
+    rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def; apply _.
+  Qed.
+
   Lemma mapsto_messages_pers_alloc a φ R T :
     (∀ m, Persistent (φ m)) →
     a ⤳ (R, T) -∗
-    a ⤇ φ -∗
     ([∗ set] m ∈ R, φ m) -∗
     a @ φ ⤳# (R, T).
   Proof.
     rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def.
-    iIntros (?) "???". by iFrame.
+    iIntros (?) "??". by iFrame.
   Qed.
 
   Lemma mapsto_messages_pers_alloc_empty a φ T :
     (∀ m, Persistent (φ m)) →
     a ⤳ (∅, T) -∗
-    a ⤇ φ -∗
     a @ φ ⤳# (∅, T).
   Proof.
-    iIntros (?) "Hm Hφ".
-    iApply (mapsto_messages_pers_alloc with "Hm Hφ").
+    iIntros (?) "Hm".
+    iApply (mapsto_messages_pers_alloc with "Hm").
     rewrite big_sepS_empty //.
   Qed.
 
   Lemma aneris_wp_receivefrom_nodup_gen a ip s h φ R T :
     ip_of_address a = ip →
     saddress s = Some a →
-    {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T)}}}
+    {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T) ∗ a ⤇ φ }}}
       ReceiveFrom #(LitSocket h) @[ip]
     {{{ r, RET r;
         (⌜r = NONEV⌝ ∗ h ↪[ip] s ∗ a ⤳ (R, T)) ∨
         (∃ m, ⌜r = SOMEV (#(m_body m), #(m_sender m))⌝ ∗ ⌜m_destination m = a⌝ ∗
           h ↪[ip] s ∗ a @ φ ⤳# ({[m]} ∪ R, T) ∗ φ m )}}}.
   Proof.
-    iIntros (<- ? Φ) "[Hh Ha] HΦ".
+    iIntros (<- ? Φ) "(Hh & Ha & #Hφ) HΦ".
     rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def.
-    iDestruct "Ha" as "(% & Ha & #Hφ & #HR) /=".
+    iDestruct "Ha" as "(% & Ha & #HR) /=".
     wp_apply (aneris_wp_receivefrom_gen with "[$]"); [done..|].
     iIntros (?) "[(% & Hh & Ha) | H]"; subst.
     { iApply "HΦ". iLeft. by iFrame. }
@@ -79,14 +84,14 @@ Section pers_messages_lemmas.
     ip_of_address a = ip →
     saddress s = Some a →
     sblock s = true →
-    {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T)}}}
+    {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T) ∗ a ⤇ φ }}}
       ReceiveFrom #(LitSocket h) @[ip]
     {{{ m, RET SOMEV (#(m_body m), #(m_sender m));
           h ↪[ip] s ∗ a @ φ ⤳# ({[m]} ∪ R, T) ∗ φ m }}}.
   Proof.
-    iIntros (<- ?? Φ) "[Hh Ha] HΦ".
+    iIntros (<- ?? Φ) "(Hh & Ha & #Hφ) HΦ".
     rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def.
-    iDestruct "Ha" as "(% & Ha & #Hφ & #HR) /=".
+    iDestruct "Ha" as "(% & Ha & #HR) /=".
     wp_apply (aneris_wp_receivefrom with "[$]"); [done..|].
     iIntros (?) "[% [(% & Hh & Ha & _ & #Hm) | (% & Hh & Ha)]]".
     { iApply "HΦ". iFrame.
@@ -110,7 +115,7 @@ Section pers_messages_lemmas.
   Proof.
     iIntros (Hip Hskt msg Φ) "(Hsh & Hf & #Hproto & Hmsg) HΦ".
     rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def.
-    iDestruct "Hf" as "(>% & Hf & #Hψ & #HR) /=".
+    iDestruct "Hf" as "(>% & Hf & #HR) /=".
     wp_send "Hmsg"; [done|].
     iApply "HΦ". iFrame. iFrame "% #".
   Qed.
@@ -126,7 +131,7 @@ Section pers_messages_lemmas.
   Proof.
     iIntros (Hip Hskt msg Hmsg Φ) "(Hsh & Hf) HΦ".
     rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def.
-    iDestruct "Hf" as "(>% & Hf & #Hψ & #HR) /=".
+    iDestruct "Hf" as "(>% & Hf & #HR) /=".
     wp_send_duplicate.
     iApply "HΦ". iFrame. iFrame "% #".
   Qed.
