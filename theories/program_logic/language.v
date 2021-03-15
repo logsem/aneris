@@ -112,6 +112,12 @@ Section language.
       ∨
       if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
 
+  Global Instance atomic_stutteringatomic a e :
+    Atomic a e → StutteringAtomic a e.
+  Proof.
+    rewrite /Atomic /StutteringAtomic.
+    intros Hat ??????; right; eapply Hat; eauto.
+  Qed.
 
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
     | step_atomic e1 σ1 e2 σ2 efs t1 t2 :
