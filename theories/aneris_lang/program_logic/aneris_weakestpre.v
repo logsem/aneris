@@ -91,6 +91,7 @@ Proof.
   iApply fupd_wp; iMod "Hwp"; iModIntro.
   iApply "Hwp"; done.
 Qed.
+
 Lemma aneris_wp_fupd ip E e Φ :
   WP e @ ip; E {{ v, |={E}=> Φ v }} ⊢ WP e @ ip; E {{ Φ }}.
 Proof. iIntros "H". iApply (aneris_wp_strong_mono ip E with "H"); auto. Qed.
@@ -100,14 +101,14 @@ Lemma aneris_wp_atomic ip E1 E2 e Φ `{!Atomic WeaklyAtomic (mkExpr ip e)} :
 Proof.
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iIntros "Hwp Hin".
-  iApply wp_atomic.
+  iApply wp_atomic. simpl.
   iMod "Hwp"; iModIntro.
   iApply wp_mono; last by iApply "Hwp".
   iIntros (v); iDestruct 1 as (w) "[-> >Hw]"; eauto.
 Qed.
 
-Lemma aneris_wp_atomic_take_step
-      ip E1 E2 e Φ `{!Atomic WeaklyAtomic (mkExpr ip e)} :
+Lemma aneris_wp_atomic_take_step ip E1 E2 e Φ
+      `{!Atomic WeaklyAtomic (mkExpr ip e)} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
    ∀ σ1 κs n δ1, state_interp σ1 δ1 κs n ={E2}=∗
@@ -347,15 +348,6 @@ Section proofmode_classes.
       fupd_frame_r bi.wand_elim_r fupd_aneris_wp.
   Qed.
 
-  Global Instance elim_modal_fupd_wp_atomic p ip E1 E2 e P Φ :
-    Atomic (WeaklyAtomic) (mkExpr ip e) →
-    ElimModal True p false (|={E1,E2}=> P) P
-            (WP e @ ip; E1 {{ Φ }}) (WP e @ ip; E2 {{ v, |={E2,E1}=> Φ v }})%I.
-  Proof.
-    intros. by rewrite /ElimModal bi.intuitionistically_if_elim
-      fupd_frame_r bi.wand_elim_r aneris_wp_atomic.
-  Qed.
-
   Global Instance elim_modal_fupd_wp_stutteringatomic p ip E1 E2 e P Φ :
     StutteringAtomic WeaklyAtomic (mkExpr ip e) →
     ElimModal True p false (|={E1,E2}=> P) P
@@ -368,18 +360,6 @@ Section proofmode_classes.
   Global Instance add_modal_fupd_wp ip E e P Φ :
     AddModal (|={E}=> P) P (WP e @ ip; E {{ Φ }}).
   Proof. by rewrite /AddModal fupd_frame_r bi.wand_elim_r fupd_aneris_wp. Qed.
-
-  Global Instance elim_acc_wp {X} E1 E2 α β γ e ip Φ :
-    Atomic (WeaklyAtomic) (mkExpr ip e) →
-    ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1)
-            α β γ (WP e @ ip; E1 {{ Φ }})
-            (λ x, WP e @ ip; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.
-  Proof.
-    intros ? _. rewrite /ElimAcc.
-    iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
-    iApply (aneris_wp_wand with "(Hinner Hα)").
-    iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
-  Qed.
 
   Global Instance elim_acc_wp_stuttering {X} E1 E2 α β γ e ip Φ :
     StutteringAtomic WeaklyAtomic (mkExpr ip e) →
