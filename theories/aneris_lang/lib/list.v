@@ -1,27 +1,28 @@
 From iris.base_logic.lib Require Export invariants.
 From aneris.aneris_lang Require Import lang proofmode notation.
+From iris_string_ident Require Import ltac2_string_ident.
 Set Default Proof Using "Type".
 
 Import Network.
 
-Definition list_nil : base_lang.expr := NONE.
+Definition list_nil : val := NONEV.
 
-Definition list_cons : base_lang.val :=
+Definition list_cons : val :=
   λ: "elem" "list", SOME (Pair "elem" "list").
 
-Definition list_head : base_lang.val :=
+Definition list_head : val :=
   λ: "l", match: "l" with
             SOME "a" => SOME (Fst "a")
           | NONE => NONE
           end.
 
-Definition list_tail : base_lang.val :=
+Definition list_tail : val :=
   λ: "l", match: "l" with
             SOME "a" => (Snd "a")
           | NONE => NONE
           end.
 
-Definition list_fold : base_lang.val :=
+Definition list_fold : val :=
   rec: "fold" "handler" "acc" "l" :=
     match: "l" with
       SOME "a" => let: "fst" := Fst "a" in
@@ -31,7 +32,7 @@ Definition list_fold : base_lang.val :=
     | NONE => "acc"
     end.
 
-Definition list_iter : base_lang.val :=
+Definition list_iter : val :=
   rec: "iter" "handler" "l" :=
     match: "l" with
       SOME "a" =>
@@ -41,14 +42,14 @@ Definition list_iter : base_lang.val :=
     | NONE => #()
     end.
 
-Definition list_length : base_lang.val :=
+Definition list_length : val :=
   rec: "length" "l" :=
     match: "l" with
       SOME "a" => #1 + "length" (Snd "a")
     | NONE => #0
     end.
 
-Definition list_nth : base_lang.val :=
+Definition list_nth : val :=
   (rec: "nth" "l" "i" :=
      match: "l" with
        SOME "a" =>
@@ -57,7 +58,7 @@ Definition list_nth : base_lang.val :=
      | NONE => NONE
      end)%V.
 
-Definition list_find_remove : base_lang.val :=
+Definition list_find_remove : val :=
   (rec: "find" "f" "l" :=
      match: "l" with
        SOME "a" =>
@@ -76,7 +77,7 @@ Definition list_find_remove : base_lang.val :=
      | NONE => NONE
      end).
 
-Definition list_sub : base_lang.val :=
+Definition list_sub : val :=
   rec: "sub" "i" "l" :=
     if: "i" = #0 then NONEV
     else
@@ -85,7 +86,7 @@ Definition list_sub : base_lang.val :=
       | NONE => NONEV
       end.
 
-Definition list_rev_aux : base_lang.val :=
+Definition list_rev_aux : val :=
   rec: "rev_aux" "l" "acc" :=
     match: "l" with
       NONE => "acc"
@@ -96,24 +97,34 @@ Definition list_rev_aux : base_lang.val :=
       "rev_aux" "t" "acc'"
     end.
 
-Definition list_rev : base_lang.val :=
+Definition list_rev : val :=
   λ: "l", list_rev_aux "l" NONE.
 
-Definition list_append : base_lang.val :=
-  (rec: "append" "l" "r" :=
-     match: "l" with
-       NONE => "r"
-     | SOME "p" =>
-       let: "h" := Fst "p" in
-       let: "t" := Snd "p" in
-       list_cons "h" ("append" "t" "r")
-     end)%V.
+Definition list_append : val :=
+  rec: "append" "l" "r" :=
+    match: "l" with
+      NONE => "r"
+    | SOME "p" =>
+      let: "h" := Fst "p" in
+      let: "t" := Snd "p" in
+      list_cons "h" ("append" "t" "r")
+    end.
 
-Definition list_is_empty : base_lang.val :=
+Definition list_is_empty : val :=
   λ: "l", match: "l" with
             NONE => #true
           | SOME "x" => #false
           end.
+
+Definition list_forall : val :=
+  rec: "forall" "test" "l" :=
+    match: "l" with
+      NONE => #true
+    | SOME "p" =>
+      let: "h" := Fst "p" in
+      let: "t" := Snd "p" in
+      "test" "h" && "forall" "test" "t"
+    end.
 
 Section list_specs.
   Context `{dG : anerisG Mdl Σ}.
@@ -121,14 +132,12 @@ Section list_specs.
   Fixpoint is_list l v :=
     match l with
     | [] => v = NONEV
-    | a::l' => ∃ lv : base_lang.val, v = SOMEV (a,lv) ∧ is_list l' lv
+    | a::l' => ∃ lv : val, v = SOMEV (a,lv) ∧ is_list l' lv
   end.
 
-  Lemma wp_list_nil ip :
-    {{{ True }}}
-      list_nil @[ip]
-    {{{ v, RET v; ⌜is_list [] v⌝}}}.
-  Proof. iIntros (Φ) "_ HΦ". wp_pures. by iApply "HΦ". Qed.
+  Lemma is_list_nil :
+    is_list [] list_nil.
+  Proof. done. Qed.
 
   Lemma wp_list_cons l lv ip a :
     {{{ ⌜is_list l lv⌝ }}}
@@ -137,6 +146,17 @@ Section list_specs.
   Proof.
     iIntros (Φ) "% HΦ". wp_lam. wp_pures.
     iApply "HΦ". iPureIntro; by eexists.
+  Qed.
+
+  Lemma wp_list_singleton ip a :
+    {{{ True }}}
+      list_cons (Val a) list_nil @[ip]
+    {{{ v, RET v; ⌜is_list [a] v⌝ }}}.
+  Proof.
+    iIntros (Φ) "_ HΦ".
+    wp_apply (wp_list_cons []); [done|].
+    iIntros (v' Hv').
+    by iApply "HΦ".
   Qed.
 
   Lemma wp_list_head ip lv l :
@@ -181,7 +201,7 @@ Section list_specs.
   Qed.
 
   Lemma wp_list_iter {A} Φ Ψ P ip (l : list A) lv handler
-        (toval : A -> base_lang.val) :
+        (toval : A -> val) :
     (∀ (a : A),
         {{{ ⌜a ∈ l⌝ ∗ P ∗ Φ a }}}
           (Val handler) (toval a) @[ip]
@@ -209,8 +229,8 @@ Section list_specs.
     iNext. iIntros "(HP & Hl)". iApply "HΦ". iFrame.
   Qed.
 
-  Lemma wp_list_fold {A} ip handler (l : list A)  acc lv P Φ Ψ
-        (toval : A -> base_lang.val) :
+  Lemma wp_list_fold {A} P Φ Ψ ip handler (l : list A) acc lv
+        (toval : A -> val) :
     (∀ (a : A) acc lacc lrem,
         {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc ∗ Φ a }}}
           (Val handler) (Val acc) (toval a) @[ip]
@@ -239,7 +259,7 @@ Section list_specs.
   Qed.
 
   Lemma wp_list_fold_generalized' {A} ip handler (l lp : list A) acc lv P Φ Ψ
-        (toval : A -> base_lang.val) :
+        (toval : A -> val) :
     □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
       (∀ (a : A) acc lacc lrem,
           {{{ ⌜lp ++ l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
@@ -268,7 +288,7 @@ Section list_specs.
   Qed.
 
   Lemma wp_list_fold' {A} ip handler (l : list A) acc lv P Φ Ψ
-        (toval : A -> base_lang.val) :
+        (toval : A -> val) :
     □ (∀ (a : A) acc lacc lrem, (P lacc acc None (a::lrem) -∗ P lacc acc (Some a) lrem))%I -∗
       (∀ (a : A) acc lacc lrem,
           {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc (Some a) lrem ∗ Φ a }}}
@@ -336,7 +356,7 @@ Section list_specs.
   Qed.
 
   Lemma wp_find_remove {A} ip (l : list A) lv (Ψ : A → iProp Σ)
-        (fv : base_lang.val) (toval : A → base_lang.val) :
+        (fv : val) (toval : A → val) :
     (∀ (a : A) av,
         {{{ ⌜av = toval a⌝ }}}
           fv av @[ip]
@@ -401,6 +421,50 @@ Section list_specs.
     by iApply (wp_list_rev_aux _ _ _ NONEV []).
   Qed.
 
+  Lemma wp_list_append ip l lM r rM :
+    {{{ ⌜is_list lM l⌝ ∗ ⌜is_list rM r⌝}}}
+      list_append (Val l) (Val r) @[ip]
+    {{{ v, RET v; ⌜is_list (lM ++ rM) v⌝ }}}.
+  Proof.
+    iIntros (Φ) "[%Hl %Hr] HΦ". rewrite /list_append.
+    iInduction lM as [|a lM] "IH" forall (l r Hl Hr Φ).
+    - simpl in Hl; subst. wp_pures. by iApply "HΦ".
+    - destruct Hl as [l' [Hl'eq Hl']]; subst.
+      do 12 wp_pure _.
+      wp_bind (((rec: "append" _ _:= _)%V _ _)).
+      iApply "IH"; [done..|].
+      iIntros "!>" (v Hv).
+      by wp_apply wp_list_cons.
+  Qed.
+
+  Lemma wp_list_forall {A} Φ Ψ ip (l : list A) lv (fv : val) (toval : A → val) :
+    (∀ (a : A) av,
+        {{{ ⌜av = toval a⌝ }}}
+          fv av @[ip]
+        {{{ (b : bool), RET #b; if b then Φ a else Ψ a }}}) -∗
+    {{{ ⌜is_list (map toval l) lv⌝ }}}
+      list_forall fv lv @[ip]
+    {{{ (b : bool), RET #b; if b then [∗ list] a ∈ l, Φ a else ∃ a, ⌜a ∈ l⌝ ∗ Ψ a }}}.
+  Proof.
+    rewrite /list_forall.
+    iInduction l as [|a l'] "IH" forall (lv);
+      iIntros "#Hfv" (Ξ) "!# %Hl HΞ".
+    - simpl in Hl; subst. wp_pures. iApply "HΞ"; auto.
+    - destruct Hl as [l'' [Hl'eq Hl']]; subst.
+      wp_pures.
+      wp_apply "Hfv"; [done|].
+      iIntros ([]) "Hb".
+      + wp_if. iApply ("IH"); [done..|].
+        iIntros "!>" ([]).
+        * iIntros "Ha". iApply "HΞ".
+          rewrite big_sepL_cons. iFrame.
+        * iDestruct 1 as (a') "[% ?]".
+          iApply "HΞ". iExists _. iFrame.
+          iPureIntro. apply elem_of_cons. by right.
+      + wp_if. iApply "HΞ". iExists _. iFrame.
+        iPureIntro. apply elem_of_cons. by left.
+  Qed.
+
   Lemma wp_list_is_empty l v ip :
     {{{ ⌜is_list l v⌝ }}}
       list_is_empty v @[ip]
@@ -423,12 +487,13 @@ Section list_specs.
   Lemma is_list_snoc lM x : ∃ lv, is_list (lM ++ [x]) lv.
   Proof. induction lM; naive_solver eauto. Qed.
 
-  Definition str_val (l : list string) : list base_lang.val :=
+  Definition str_val (l : list string) : list val :=
     map (λ (str : string), #str) l.
 
 End list_specs.
 
-Notation "[ ]" := list_nil (format "[ ]") : expr_scope.
+Notation "[ ]" := list_nil (format "[ ]") : val_scope.
+Notation "[ ]" := (Val list_nil) (format "[ ]") : expr_scope.
+Notation "[ x ]" := (list_cons x (list_nil)) (format "[ x ]") : expr_scope.
 Infix "::" := list_cons (at level 60, right associativity) : expr_scope.
-Notation "[ x ; y ; .. ; z ]" := (list_cons x (list_cons y .. (list_cons z nil) ..)) : expr_scope.
-
+Notation "[ x ; y ; .. ; z ]" := (list_cons x (list_cons y .. (list_cons z list_nil) ..)) : expr_scope.

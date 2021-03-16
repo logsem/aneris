@@ -1,5 +1,4 @@
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
-From aneris.aneris_lang.lib Require Import network_util.
 Import Network.
 
 Section def.

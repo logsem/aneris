@@ -2,6 +2,7 @@ From stdpp Require Export strings list pretty gmap.
 From aneris.prelude Require Import quantifiers.
 From aneris.aneris_lang Require Import lang notation tactics proofmode.
 From aneris.aneris_lang.lib Require Import list util.
+From iris_string_ident Require Import ltac2_string_ident.
 
 Definition map_empty : val :=
   λ: <>, [].
@@ -32,10 +33,13 @@ Definition map_lookup : val :=
 
 Definition map_mem : val :=
   λ: "key" "m",
-  match: map_lookup "key" "mem" with
+  match: map_lookup "key" "m" with
     NONE => #false
   | SOME "p" => #true
   end.
+
+Definition map_dom_list_included : val :=
+  λ: "l" "m", list_fold (λ: "acc" "x", map_mem "x" "m" && "acc") #true "l".
 
 Section map_specs.
   Context `{anerisG Mdl Σ}.
@@ -137,6 +141,47 @@ Section map_specs.
         * iPureIntro. exists l. inversion Hdup. by subst.
         * iIntros (v' Hres). iApply "HΦ".
           iPureIntro. by rewrite lookup_insert_ne.
+  Qed.
+
+  Lemma wp_map_mem ip k d m :
+    {{{ ⌜is_map d m⌝ }}}
+      map_mem (Val (f k)) (Val d) @[ip]
+    {{{ (b : bool), RET #b; if b then ⌜∃ v, m !! k = Some v⌝ else True }}}.
+  Proof.
+    iIntros (Φ Hm) "HΦ".
+    rewrite /map_mem. wp_pures.
+    wp_apply wp_map_lookup; [done|].
+    destruct (m !! k) eqn:Heq; iIntros (? ->);
+      wp_pures; iApply "HΦ"; eauto.
+  Qed.
+
+  Lemma wp_map_dom_list_included ip (l : list K) lv d (m : gmap K val) :
+    {{{ ⌜is_list (map f l) lv⌝ ∗ ⌜is_map d m⌝ }}}
+      map_dom_list_included lv (Val d) @[ip]
+    {{{ (b : bool), RET #b;
+        if b then [∗ list] x ∈ l, ⌜∃ v, m !! x = Some v⌝ else True }}}.
+  Proof.
+    iIntros (Φ) "[%Hl %Hd] HΦ". rewrite /map_dom_list_included.
+    wp_pures.
+    wp_apply (wp_list_fold (λ (xs : list K) (acc : val), ∃ (b : bool),
+                               ⌜acc = #b⌝ ∗
+                                       if b then [∗ list] x ∈ xs, ⌜∃ v, m !! x = Some v⌝ else True)%I
+                           (λ n, True)%I (λ n, True)%I
+                           _ _ l #true
+                with "[] []"); last first.
+    { iIntros (?) "[Hb _]". iDestruct "Hb" as (?) "[-> Hb]". by iApply "HΦ". }
+    { iFrame "%".
+      rewrite big_sepL_emp. iSplit; [|done].
+      iExists true. rewrite big_sepL_nil //. }
+    iIntros (a acc lacc lrem Ψ) "!# (% & Hb & _) HΨ".
+    iDestruct "Hb" as (?) "[-> Hb]".
+    wp_pures. wp_apply wp_map_mem; [done|].
+    iIntros ([]) "Hb'"; wp_if.
+    - iApply "HΨ". iSplit; [|done].
+      iExists b. iSplit; [done|].
+      destruct b; [|done].
+      rewrite big_sepL_app big_sepL_singleton; auto.
+    - iApply "HΨ"; eauto.
   Qed.
 
 End map_specs.
