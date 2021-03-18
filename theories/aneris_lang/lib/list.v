@@ -5,7 +5,8 @@ Set Default Proof Using "Type".
 
 Import Network.
 
-Definition list_nil : val := NONEV.
+Definition list_nil : expr := NONE.
+Definition list_nilV : val := NONEV.
 
 Definition list_cons : val :=
   λ: "elem" "list", SOME (Pair "elem" "list").
@@ -135,9 +136,11 @@ Section list_specs.
     | a::l' => ∃ lv : val, v = SOMEV (a,lv) ∧ is_list l' lv
   end.
 
-  Lemma is_list_nil :
-    is_list [] list_nil.
-  Proof. done. Qed.
+  Lemma wp_list_nil ip :
+    {{{ True }}}
+      list_nil @[ip]
+    {{{ v, RET v; ⌜is_list [] v⌝}}}.
+  Proof. iIntros (Φ) "_ HΦ". wp_pures. by iApply "HΦ". Qed.
 
   Lemma wp_list_cons l lv ip a :
     {{{ ⌜is_list l lv⌝ }}}
@@ -150,7 +153,7 @@ Section list_specs.
 
   Lemma wp_list_singleton ip a :
     {{{ True }}}
-      list_cons (Val a) list_nil @[ip]
+      list_cons (Val a) list_nilV @[ip]
     {{{ v, RET v; ⌜is_list [a] v⌝ }}}.
   Proof.
     iIntros (Φ) "_ HΦ".
@@ -492,8 +495,8 @@ Section list_specs.
 
 End list_specs.
 
-Notation "[ ]" := list_nil (format "[ ]") : val_scope.
-Notation "[ ]" := (Val list_nil) (format "[ ]") : expr_scope.
-Notation "[ x ]" := (list_cons x (list_nil)) (format "[ x ]") : expr_scope.
+Notation "[ ]" := (list_nil) (format "[ ]") : expr_scope.
+Notation "[ ]" := (list_nilV) (format "[ ]") : val_scope.
+Notation "[ x ]" := (list_cons x (list_nilV)) (format "[ x ]") : expr_scope.
 Infix "::" := list_cons (at level 60, right associativity) : expr_scope.
 Notation "[ x ; y ; .. ; z ]" := (list_cons x (list_cons y .. (list_cons z list_nil) ..)) : expr_scope.

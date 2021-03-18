@@ -173,7 +173,7 @@ Section map_specs.
     { iFrame "%".
       rewrite big_sepL_emp. iSplit; [|done].
       iExists true. rewrite big_sepL_nil //. }
-    iIntros (a acc lacc lrem Ψ) "!# (% & Hb & _) HΨ".
+    iIntros (a accv lacc lrem Ψ) "!# (% & Hb & _) HΨ".
     iDestruct "Hb" as (?) "[-> Hb]".
     wp_pures. wp_apply wp_map_mem; [done|].
     iIntros ([]) "Hb'"; wp_if.

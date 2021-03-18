@@ -74,7 +74,7 @@ Section library.
                       ⌜length nodes' = length msgs⌝ ∗
                       [∗ list] i↦n ∈ nodes', (∃ m, ⌜msgs !! i = Some m⌝ ∗
                                                    ⌜m_sender m = n⌝ ∗ φ m))%I
-                (λ n, True)%I (λ n, True)%I _ _ nodes [] with "[] [$Hns Hh Ha]").
+                (λ n, True)%I (λ n, True)%I _ _ nodes NONEV with "[] [$Hns Hh Ha]").
     - iIntros (n acc lacc lrem Ψ) "!# (% & Hmsgs & _) HΨ".
       do 3 wp_pure _.
       wp_bind (((rec: "recv" _ := _)%V _))%E.
