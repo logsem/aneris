@@ -49,7 +49,7 @@ Section library.
     wp_lam. wp_match. by iApply "HΦ".
   Qed.
 
-  Lemma wp_receivefrom_all nodes φ ns h s ip a R T :
+  Lemma wp_pers_receivefrom_all nodes φ ns h s ip a R T :
     ip = ip_of_address a →
     saddress s = Some a →
     sblock s = true →
@@ -81,7 +81,7 @@ Section library.
       iLöb as "IH".
       wp_pures.
       iDestruct "Hmsgs" as (msgs R') "(Hh & Ha & %Hacc & %Hlength & Hnodes)".
-      wp_apply (aneris_wp_receivefrom_nodup with "[$Hh $Ha $Hφ]"); [done..|].
+      wp_apply (aneris_wp_pers_receivefrom with "[$Hh $Ha $Hφ]"); [done..|].
       iIntros (m) "(Hh & Ha & Hm)".
       wp_apply wp_unSOME; [done|]; iIntros "_".
       wp_pures.
@@ -124,7 +124,7 @@ Section library.
       iApply "HΦ". by iFrame.
   Qed.
 
-  Lemma wp_wait_receivefrom_all Ψ nodes φ ns h s ip a R T (fv : val) :
+  Lemma wp_pers_wait_receivefrom_all Ψ nodes φ ns h s ip a R T (fv : val) :
     ip = ip_of_address a →
     saddress s = Some a →
     sblock s = true →
@@ -162,7 +162,7 @@ Section library.
       iLöb as "IH".
       wp_pures.
       iDestruct "Hmsgs" as (msgs R') "(Hh & Ha & %Hacc & %Hlength & Hnodes)".
-      wp_apply (aneris_wp_receivefrom_nodup with "[$Hh $Ha $Hφ]"); [done..|].
+      wp_apply (aneris_wp_pers_receivefrom with "[$Hh $Ha $Hφ]"); [done..|].
       iIntros (m) "(Hh & Ha & Hm)".
       wp_apply wp_unSOME; [done|]; iIntros "_".
       wp_pures.
@@ -237,7 +237,7 @@ Section library.
     iApply "HΦ". iFrame.
   Qed.
 
-  Lemma wp_sendto_all_nodup f m a h s R T ns nodes Ψ :
+  Lemma wp_pers_sendto_all f m a h s R T ns nodes Ψ :
     let ip := ip_of_address a in
     let msg n := mkMessage a n (sprotocol s) m in
     saddress s = Some a →
@@ -255,7 +255,7 @@ Section library.
                             (h ↪[ip] s ∗ ∃ T, a @ Ψ ⤳# (R, T)) with "[] [$Hnodes $Hh Ha]")%I); [|eauto|].
     { iIntros (n ?)" !# (%Hn & [Hh Ha] & #Hφ & Hmsg) H". iDestruct "Ha" as (T') "Ha".
       wp_pures.
-      wp_apply (aneris_wp_send_nodup with "[$Hh $Ha $Hφ Hmsg]"); [done..|].
+      wp_apply (aneris_wp_pers_send with "[$Hh $Ha $Hφ Hmsg]"); [done..|].
       iIntros "(Hh & Ha)".
       iApply "H". iFrame. eauto. }
     iIntros "([Hh Ha] & _)".

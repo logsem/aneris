@@ -1,6 +1,7 @@
 From iris.base_logic.lib Require Export invariants.
 From aneris.aneris_lang Require Import lang proofmode notation.
 From iris_string_ident Require Import ltac2_string_ident.
+From aneris.aneris_lang.lib Require Import util.
 Set Default Proof Using "Type".
 
 Import Network.
@@ -59,15 +60,25 @@ Definition list_nth : val :=
      | NONE => NONE
      end)%V.
 
+Definition list_mem : val :=
+  (rec: "find" "x" "l" :=
+     match: "l" with
+       SOME "a" =>
+         let: "head" := Fst "a" in
+         let: "tail" := Snd "a" in
+         ("x" = "head") || "find" "x" "tail"
+     | NONE => #false
+     end).
+
 Definition list_find_remove : val :=
-  (rec: "find" "f" "l" :=
+  (rec: "find_remove" "f" "l" :=
      match: "l" with
        SOME "a" =>
        let: "head" := Fst "a" in
        let: "tail" := Snd "a" in
        if: "f" "head" then SOME ("head", "tail")
        else
-         let: "r" := "find" "f" "tail" in
+         let: "r" := "find_remove" "f" "tail" in
          match: "r" with
            SOME "b" =>
            let: "head'" := Fst "b" in
@@ -356,6 +367,31 @@ Section list_specs.
     iApply (wp_list_nth $! Hcoh).
     iIntros (v [H | H]); first eauto with lia.
     by iApply "HΦ".
+  Qed.
+
+  Lemma wp_list_mem `{!EqDecision A} ip (l : list A) lv (av : val) a
+        (toval : A → val) `{!Inj (=) (=) toval}:
+    av = toval a →
+    {{{ ⌜is_list (map toval l) lv⌝ }}}
+      list_mem av lv @[ip]
+    {{{ (b : bool), RET #b; if b then ⌜a ∈ l⌝ else ⌜a ∉ l ∨ l = nil⌝ }}}.
+  Proof.
+    iIntros (Htval Φ).
+    iInduction l as [|a' l'] "IH" forall (lv Φ);
+      iIntros (Hl) "HΦ"; wp_rec; wp_pures.
+    - rewrite Hl. wp_pures. iApply "HΦ". auto.
+    - destruct Hl as [lv' [-> Hl']]. wp_pures.
+      wp_op; first apply bin_op_eval_eq_val.
+      case_bool_decide as Heq; wp_if.
+      { simplify_eq. iApply "HΦ". iPureIntro; set_solver. }
+      iApply ("IH" with "[//]").
+      iIntros "!>" ([] Ha).
+      { iApply "HΦ". iPureIntro; set_solver. }
+      iApply "HΦ".
+      iPureIntro. left.
+      simplify_eq.
+      apply inj_neq in Heq; [|apply _].
+      destruct Ha; set_solver.
   Qed.
 
   Lemma wp_find_remove {A} ip (l : list A) lv (Ψ : A → iProp Σ)

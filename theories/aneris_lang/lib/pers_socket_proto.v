@@ -48,7 +48,7 @@ Section pers_messages_lemmas.
     rewrite big_sepS_empty //.
   Qed.
 
-  Lemma aneris_wp_receivefrom_nodup_gen E a ip s h φ R T :
+  Lemma aneris_wp_pers_receivefrom_gen E a ip s h φ R T :
     ip_of_address a = ip →
     saddress s = Some a →
     {{{ h ↪[ip] s ∗ a @ φ ⤳# (R, T) ∗ a ⤇ φ }}}
@@ -56,7 +56,7 @@ Section pers_messages_lemmas.
     {{{ r, RET r;
         (⌜r = NONEV⌝ ∗ h ↪[ip] s ∗ a ⤳ (R, T)) ∨
         (∃ m, ⌜r = SOMEV (#(m_body m), #(m_sender m))⌝ ∗ ⌜m_destination m = a⌝ ∗
-          h ↪[ip] s ∗ a @ φ ⤳# ({[m]} ∪ R, T) ∗ φ m )}}}.
+              h ↪[ip] s ∗ a @ φ ⤳# ({[m]} ∪ R, T) ∗ φ m )}}}.
   Proof.
     iIntros (<- ? Φ) "(Hh & Ha & #Hφ) HΦ".
     rewrite mapsto_messages_pers_eq /mapsto_messages_pers_def.
@@ -79,7 +79,7 @@ Section pers_messages_lemmas.
       by iApply big_sepS_elem_of.
   Qed.
 
-  Lemma aneris_wp_receivefrom_nodup E a ip s h φ R T :
+  Lemma aneris_wp_pers_receivefrom E a ip s h φ R T :
     ip_of_address a = ip →
     saddress s = Some a →
     sblock s = true →
@@ -104,7 +104,7 @@ Section pers_messages_lemmas.
     by iApply "HR".
   Qed.
 
-  Lemma aneris_wp_send_nodup ip φ ψ m h a f E s R T :
+  Lemma aneris_wp_pers_send ip φ ψ m h a f E s R T :
     ip_of_address f = ip →
     saddress s = Some f ->
     let msg := mkMessage f a (sprotocol s) m in
@@ -119,7 +119,7 @@ Section pers_messages_lemmas.
     iApply "HΦ". iFrame. iFrame "% #".
   Qed.
 
-  Lemma aneris_wp_send_duplicate_nodup ψ ip m h a f E s R T:
+  Lemma aneris_wp_send_pers_duplicate ψ ip m h a f E s R T:
     ip_of_address f = ip →
     saddress s = Some f ->
     let msg := mkMessage f a (sprotocol s) m in

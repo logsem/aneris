@@ -24,6 +24,13 @@ Section gset_map.
     match goal with |- ?F g => simpl; apply (set_ind_L F) end; set_solver.
   Qed.
 
+  Lemma gset_map_not_elem_of f g `{!Inj (=) (=) f} :
+    ∀ a, a ∉ g → (f a) ∉ gset_map f g.
+  Proof.
+    pattern g.
+    match goal with |- ?F g => simpl; apply (set_ind_L F) end; set_solver.
+  Qed.
+
   Lemma gset_map_correct1 f g : ∀ a, a ∈ g → (f a) ∈ gset_map f g.
   Proof.
     pattern g.

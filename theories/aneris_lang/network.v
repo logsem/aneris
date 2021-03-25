@@ -149,6 +149,16 @@ Module Network.
     by intros []; rewrite decode_encode.
   Qed.
 
+  Lemma message_inv m1 m2 :
+    m_sender m1 = m_sender m2 →
+    m_destination m1 = m_destination m2 →
+    m_body m1 = m_body m2 →
+    m1 = m2.
+  Proof.
+    destruct m1, m2. simpl. intros -> -> ->.
+    by destruct m_protocol0, m_protocol1.
+  Qed.
+
   Definition message_soup := gset message.
 
   Global Instance message_soup_decidable : EqDecision message_soup.
