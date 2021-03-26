@@ -1,5 +1,5 @@
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
-From aneris.aneris_lang.lib Require Import assert list map pers_socket_proto.
+From aneris.aneris_lang.lib Require Import assert list map set pers_socket_proto.
 From iris_string_ident Require Import ltac2_string_ident.
 
 Set Default Proof Using "Type".
@@ -17,6 +17,10 @@ Definition wait_receivefrom : base_lang.val :=
 Definition sendto_all : base_lang.val :=
   λ: "socket" "ns" "msg",
   list_iter (λ: "n", SendTo "socket" "msg" "n") "ns".
+
+Definition sendto_all_set : base_lang.val :=
+  λ: "socket" "X" "msg",
+  set_iter (λ: "n", SendTo "socket" "msg" "n") "X".
 
 Definition receivefrom_all : val :=
   λ: "socket" "nodes",
@@ -257,6 +261,32 @@ Section library.
       wp_pures.
       wp_apply (aneris_wp_pers_send with "[$Hh $Ha $Hφ Hmsg]"); [done..|].
       iIntros "(Hh & Ha)".
+      iApply "H". iFrame. eauto. }
+    iIntros "([Hh Ha] & _)".
+    iDestruct "Ha" as (?) "Ha".
+    iApply "HΦ". iFrame.
+  Qed.
+
+  Lemma wp_sendto_all_set f m ip a h s R T ns nodes :
+    let msg n := mkMessage a n (sprotocol s) m in
+    ip = ip_of_address a →
+    saddress s = Some a →
+    {{{ h ↪[ip] s
+          ∗ a ⤳ (R, T)
+          ∗ ⌜is_set (LitV ∘ LitSocketAddress) nodes ns⌝
+          ∗ [∗ set] n ∈ nodes, (n ⤇ f n ∗ f n (msg n)) }}}
+      sendto_all_set #(LitSocket h) ns #m @[ip]
+    {{{ T', RET #(); h ↪[ip] s ∗ a ⤳ (R, T') }}}.
+  Proof.
+    iIntros (??? Φ) "(Hh & Ha & %Hns & Hnodes) HΦ".
+    rewrite /sendto_all_set. wp_pures.
+    wp_apply (wp_set_iter (LitV ∘ LitSocketAddress)
+                          (λ n, n ⤇ f n ∗ f n (msg n))%I
+                          (λ n, True)%I
+                          (h ↪[ip] s ∗ ∃ T, a ⤳ (R, T))%I with "[] [$Hh $Hnodes Ha]"); [|eauto|].
+    { iIntros (n Ψ)" !# (%Hn & [Hh Ha] & #Hφ & Hmsg) H". iDestruct "Ha" as (T') "Ha".
+      wp_pures.
+      wp_send "Hmsg"; [rewrite /msg //|].
       iApply "H". iFrame. eauto. }
     iIntros "([Hh Ha] & _)".
     iDestruct "Ha" as (?) "Ha".
