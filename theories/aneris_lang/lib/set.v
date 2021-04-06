@@ -146,3 +146,8 @@ Section set_specs.
   Qed.
 
 End set_specs.
+
+Notation "{[ x ]}" :=
+  (set_add x (set_empty #())) (at level 1, format "{[ x ]}") : expr_scope.
+Notation "{[ x ; y ; .. ; z ]}" :=
+  (set_add x (set_add y .. (set_add z (set_empty #())) ..)) : expr_scope.
