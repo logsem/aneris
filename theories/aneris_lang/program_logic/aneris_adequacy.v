@@ -9,12 +9,12 @@ Definition aneris_adequate (e : base_lang.expr) (ip : ip_address) (σ : state)
   adequate NotStuck (mkExpr ip e) σ (λ v _, ∃ w, v = mkVal ip w ∧ φ w).
 
 Theorem adequacy `{anerisPreG Σ Mdl}
-        (st0 : Mdl) IPs A e ip σ φ (ports : gset port) :
+        (st0 : Mdl) IPs A B e ip σ φ :
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
+     ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗ frag_st st0 -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
      WP e @[ip] ⊤ {{ v, ⌜φ v⌝ }}) →
-  ports ≠ ∅ →
   ip ∉ IPs →
   dom (gset ip_address) (state_ports_in_use σ) = IPs →
   (∀ ip, ip ∈ IPs → state_ports_in_use σ !! ip = Some ∅) →
@@ -24,25 +24,28 @@ Theorem adequacy `{anerisPreG Σ Mdl}
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros Hwp Hps Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
-  eapply adequacy; eauto.
+  intros Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
+  eapply adequacy; try done.
   intros dg.
   iMod (Hwp dg) as (f) "Hwp".
-  iModIntro. iExists _. iIntros "???? /=".
+  iModIntro. iExists _. iIntros "?????? /=".
   rewrite !aneris_wp_unfold /aneris_wp_def.
-  iSpecialize ("Hwp" with "[$] [$] [$] [$]").
+  iSpecialize ("Hwp" with "[$] [$] [$] [$] [$] [$]").
   iApply (wp_wand with "Hwp").
   eauto.
 Qed.
 
 Theorem adequacy_hoare `{anerisPreG Σ Mdl}
-        (st0 : Mdl) IPs A e σ φ ip (ports : gset port) :
+        (st0 : Mdl) IPs A B e σ φ ip :
   (∀ `{anerisG Mdl Σ}, ⊢ ∃ (f : socket_address → socket_interp Σ),
-      {{{ fixed A ∗ ([∗ set] a ∈ A, a ⤇ (f a)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}}
+          {{{ fixed A ∗
+              ([∗ set] a ∈ A, a ⤇ (f a)) ∗
+              ([∗ set] b ∈ B, b ⤳ (∅, ∅)) ∗
+              frag_st st0 ∗
+              ([∗ set] ip ∈ IPs, free_ip ip) }}}
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →
   ip ∉ IPs →
-  ports ≠ ∅ →
   dom (gset ip_address) (state_ports_in_use σ) = IPs →
   (∀ i, i ∈ IPs → state_ports_in_use σ !! i = Some ∅) →
   (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
@@ -51,10 +54,10 @@ Theorem adequacy_hoare `{anerisPreG Σ Mdl}
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros Hwp ????????.
+  intros Hwp ???????.
   eapply adequacy; eauto.
   intros ?. iModIntro.
   iDestruct Hwp as (f) "#Hwp".
-  iExists f. iIntros "???".
+  iExists f. iIntros "?????".
   iApply ("Hwp" with "[$]"); auto.
 Qed.

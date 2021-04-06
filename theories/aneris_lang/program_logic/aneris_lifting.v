@@ -192,23 +192,20 @@ Section lifting_network.
   (** Network *)
   Lemma aneris_wp_start ports ip E e Ψ :
     ip ≠ "system" →
-    ports ≠ ∅ →
     ▷ free_ip ip ∗ ▷ Ψ #() ∗
-    ▷ (free_ports ip ports -∗
-       ([∗ set] p ∈ ports, SocketAddressInet ip p ⤳ (∅, ∅)) -∗
-       WP e @[ip] ⊤ {{ _, True }}) ⊢
+    ▷ (free_ports ip ports -∗ WP e @[ip] ⊤ {{ _, True }}) ⊢
     WP (Start (LitString ip) e) @["system"] E {{ Ψ }}.
   Proof.
-    iIntros (Hip Hp) "(Hip & HΦ & He)".
+    iIntros (Hip) "(Hip & HΦ & He)".
     rewrite !aneris_wp_unfold /aneris_wp_def.
     iIntros "#Hin".
-    iApply wp_start; [done|done|].
+    iApply wp_start; [done|].
     iFrame.
     iSplitL "HΦ".
     { iNext. iExists _. eauto. }
     iNext.
-    iIntros "Hin' Hfp Hms".
-    iApply wp_wand_r; iSplitL; first iApply ("He" with "Hfp Hms Hin'").
+    iIntros "Hin' Hfp".
+    iApply wp_wand_r; iSplitL; first iApply ("He" with "Hfp Hin'").
     done.
   Qed.
 
@@ -219,7 +216,7 @@ Section lifting_network.
       (Val $ LitV $ LitSocketType v2)
       (Val $ LitV $ LitProtocol v3) @[ip] E
     {{{ h, RET (LitV (LitSocket h));
-        h ↪[ip] (mkSocket v1 v2 v3 None true) }}}.
+          h ↪[ip] (mkSocket v1 v2 v3 None true) }}}.
   Proof.
     iIntros (Φ) "Hl HΦ".
     rewrite !aneris_wp_unfold /aneris_wp_def.

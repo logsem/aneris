@@ -1,11 +1,7 @@
-From stdpp Require Import fin_maps gmap.
-From iris.bi.lib Require Import fractional.
-From aneris.program_logic Require Export weakestpre lifting ectx_lifting atomic.
 From iris.proofmode Require Import tactics.
+From aneris.program_logic Require Export weakestpre lifting ectx_lifting atomic.
 From aneris.aneris_lang Require Import aneris_lang base_lang.
-From aneris.aneris_lang.state_interp
-     Require Import state_interp.
-
+From aneris.aneris_lang.state_interp Require Import state_interp.
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
@@ -355,15 +351,12 @@ Section primitive_laws.
 
   Lemma wp_start ip ports k E e Φ :
     ip ≠ "system" →
-    ports ≠ ∅ →
     ▷ free_ip ip ∗
     ▷ Φ (mkVal "system" #()) ∗
-    ▷ (is_node ip -∗ free_ports ip ports -∗
-              ([∗ set] p ∈ ports, (SocketAddressInet ip p) ⤳ (∅, ∅)) -∗
-               WP (mkExpr ip e) @ k; ⊤ {{ _, True }})
-    ⊢ WP (mkExpr "system" (Start (LitString ip) e)) @ k; E {{ Φ }}.
+    ▷ (is_node ip -∗ free_ports ip ports -∗ WP mkExpr ip e @ k; ⊤ {{ _, True }})
+    ⊢ WP mkExpr "system" (Start (LitString ip) e) @ k; E {{ Φ }}.
   Proof.
-    iIntros (??) "(>Hfip & HΦ & Hwp)".
+    iIntros (?) "(>Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (σ δ κ κs n) "[Hσ Hm]".
     iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
@@ -375,7 +368,7 @@ Section primitive_laws.
     iNext. iIntros (e2 σ2 efs Hrd). iMod "Hmk" as "_".
     inv_head_step.
     iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
-      as "(%Hcoh & Hn & Hports & Hms & Hσ)"; first done.
+      as "(%Hcoh & Hn & Hports & Hσ)".
     iModIntro.
     simplify_eq /=.
     iExists δ.

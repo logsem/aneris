@@ -1,17 +1,9 @@
 From stdpp Require Import fin_maps gmap.
-From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
-From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
-From aneris.program_logic Require Export weakestpre adequacy.
-From aneris.program_logic Require Import ectx_lifting.
-From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Import
-     aneris_lang notation network resources.
-From aneris.aneris_lang.state_interp Require Import
-     state_interp_def.
+From aneris.aneris_lang Require Import aneris_lang notation network resources.
+From aneris.aneris_lang.state_interp Require Import state_interp_def.
 From aneris.aneris_lang.lib Require Import util.
-
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
@@ -22,24 +14,11 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Mdl Σ}.
 
-  Lemma messages_resource_coh_init ip ports :
-    ⊢ messages_resource_coh (history_init ip ports).
+  Lemma messages_resource_coh_init B :
+    ⊢ messages_resource_coh (gset_to_gmap (∅, ∅) B).
   Proof.
-    iIntros. by rewrite /messages_resource_coh history_init_sent.
-  Qed.
-
-  Lemma messages_resource_coh_alloc_node mh ip ports :
-    history_init ip ports ##ₘ mh →
-    messages_resource_coh mh -∗
-    messages_resource_coh (history_init ip ports ∪ mh).
-  Proof.
-    rewrite /messages_resource_coh /=.
-    iIntros (?) "Hsent".
-    rewrite messages_sent_init; last done.
-    rewrite big_sepS_mono; first done.
-    iIntros (??) "[? | %]"; [by iLeft|].
-    iRight. iPureIntro.
-      by apply message_received_init.
+    rewrite /messages_resource_coh messages_sent_init.
+    by iApply big_sepS_empty.
   Qed.
 
   Lemma message_received_insert_sent_message a msg msg' R T mh :
@@ -147,10 +126,8 @@ Section state_interpretation.
                            ∨ ⌜message_received m0 mh⌝))%I
                   (messages_sent (<[a:=(R, T)]> mh)) m) as "Hdel"; first done.
     iPoseProof ("Hdel" with "Hrcoh") as "([Hr|%Hr] & Hrcoh)"; last done.
-    iPoseProof (big_opS_delete
-                  (fun m0 => ((∃ Φ, m_destination m0 ⤇ Φ ∗ ▷ Φ m0)
-                     ∨ ⌜message_received m0 (<[a:=({[m]} ∪ R, T)]> mh)⌝))%I
-                  (messages_sent (<[a:=({[m]} ∪ R, T)]> mh)) m) as "Hdel2";
+    iPoseProof (big_opS_delete _
+                 (messages_sent (<[a:=({[m]} ∪ R, T)]> mh)) m) as "Hdel2";
       first done. iFrame. rewrite {2} Hdelm. iApply "Hdel2". iSplitR; eauto.
     iApply (big_sepS_mono with "Hrcoh"). iIntros (msg Hmsg) "[Hm|%Hm]".
     - iLeft. iFrame.

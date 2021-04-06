@@ -12,7 +12,6 @@ Set Default Proof Using "Type".
 Import uPred.
 Import Network.
 
-
 Record Model := model {
   model_state :> Type;
   model_rel :> model_state → model_state → Prop
@@ -49,7 +48,6 @@ Proof. apply _. Qed.
 Definition socket_interp Σ := message -d> iPropO Σ.
 
 Canonical Structure ModelO (Mdl : Model) := leibnizO Mdl.
-
 
 (** The system CMRA *)
 Class anerisG (Mdl : Model) Σ := AnerisG {
@@ -181,15 +179,13 @@ Section definitions.
     own aneris_fixed_name (to_agree A).
 
    (** Messages *)
-
   Definition messages_ctx
-    (s : gmap socket_address (message_soup * message_soup)) :=
+             (s : gmap socket_address (message_soup * message_soup)) :=
     gen_heap_light_ctx (aneris_messages_name) s.
 
-  Definition mapsto_messages
-    (sa : socket_address) q (mh : message_soup * message_soup) :=
-    (∃ γn, mapsto_node (ip_of_address sa) γn ∗
-                       lmapsto aneris_messages_name sa q mh)%I.
+  Definition mapsto_messages (sa : socket_address) q
+             (mh : message_soup * message_soup) :=
+    lmapsto aneris_messages_name sa q mh.
 
 End definitions.
 
@@ -297,6 +293,30 @@ Proof.
   replace M with A; first by iModIntro; iExists _; iFrame.
   apply set_eq => x.
   rewrite -!elem_of_elements -elem_of_list_permutation_proper; eauto.
+Qed.
+
+Lemma messages_ctx_init `{anerisPreG Σ Mdl} (B : gset socket_address) :
+  ⊢ |==> ∃ γ,
+      gen_heap_light_ctx
+        γ (gset_to_gmap ((∅, ∅) : message_soup * message_soup) B) ∗
+        [∗ set] b ∈ B, lmapsto γ b 1 (∅, ∅).
+Proof.
+  iMod (gen_heap_light_init
+          (∅ : gmap socket_address (message_soup * message_soup))) as (γ) "Hctx".
+  set σ' := (gset_to_gmap ((∅, ∅) : message_soup * message_soup) B).
+  iMod (gen_heap_light_alloc_gen _ σ' with "Hctx") as "[Hctx HB]".
+  { apply map_disjoint_empty_r. }
+  rewrite map_union_empty.
+  iModIntro. iExists _. iFrame.
+  subst σ'. iStopProof.
+  induction B using set_ind_L; [auto|].
+  iIntros "HB".
+  rewrite big_sepS_union ?big_sepS_singleton; [|set_solver].
+  rewrite gset_to_gmap_union_singleton.
+  rewrite big_sepM_insert; last first.
+  { by apply lookup_gset_to_gmap_None. }
+  iDestruct "HB" as "[? ?]". iFrame.
+  by iApply IHB.
 Qed.
 
 Lemma model_init `{anerisPreG Σ Mdl} (st : Mdl) :
@@ -408,27 +428,17 @@ Section resource_lemmas.
 
   Global Instance mapsto_messages_fractional a s :
     Fractional (λ q, a ⤳{q} s)%I.
-  Proof.
-    rewrite /mapsto_messages /Fractional=> p q. iSplit.
-    - iDestruct 1 as (?) "[#? [H1 H2]]".
-      iSplitL "H1"; iExists _; eauto.
-    - iDestruct 1 as "[H1 H2]".
-      iDestruct "H1" as (?) "[Hn1 Hp]".
-      iDestruct "H2" as (?) "[Hn2 Hq]".
-      iDestruct (mapsto_node_agree with "Hn1 Hn2") as %->.
-      iExists _. iFrame.
-  Qed.
+  Proof. apply _. Qed.
 
   Global Instance mapsto_messages_as_fractional a q s :
     AsFractional (a ⤳{q} s) (λ q, a ⤳{q} s)%I q.
-  Proof. split; [done|]. apply _. Qed.
+  Proof. apply _. Qed.
 
   Lemma messages_mapsto_update a R T R' T' mh :
     a ⤳ (R, T) ∗ messages_ctx mh ==∗
     a ⤳ (R', T') ∗ messages_ctx (<[a := (R',T')]>mh).
   Proof.
-    iIntros "(Hf & Ha)".
-    iDestruct "Hf" as (γ) "(#Hn & Hl)".
+    iIntros "(Hl & Ha)".
     rewrite /mapsto_messages.
     iMod (gen_heap_light_update _ _ a (R,T) (R', T')
             with "Ha Hl") as "[Ha Hf]".
@@ -438,18 +448,13 @@ Section resource_lemmas.
   Lemma messages_mapsto_valid a R T mh :
     a ⤳ (R, T) -∗ messages_ctx mh -∗ ⌜mh !! a = Some (R,T)⌝.
   Proof.
-    iIntros "Hf Ha".
-    iApply (gen_heap_light_valid with "[Ha] [Hf]").
-    - iFrame.
-    - iDestruct "Hf" as (?) "(Hn & Hf)". eauto with iFrame.
+    iIntros "Hf Ha". by iApply (gen_heap_light_valid with "Ha Hf").
   Qed.
 
   Lemma messages_mapsto_agree a R T R' T' q1 q2 :
     a ⤳{q1} (R, T) -∗ a ⤳{q2} (R', T') -∗ ⌜R = R' ∧ T = T'⌝.
   Proof.
-    iDestruct 1 as (γ) "(Hn & Ha)".
-    iDestruct 1 as (γ') "(Hn' & Ha')".
-    iDestruct (mapsto_node_agree with "Hn Hn'") as %<-.
+    iIntros "Ha Ha'".
     iDestruct (lmapsto_agree with "Ha Ha'") as %?.
     by simplify_eq.
   Qed.

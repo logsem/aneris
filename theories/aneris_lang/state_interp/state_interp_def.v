@@ -52,13 +52,10 @@ Section definitions.
         heap_ctx γs h ∗
         sockets_ctx γs ((λ x, x.1) <$> Sn))%I.
 
-
   (** The domains of heaps and sockets coincide with the gname map [γm] *)
-  Definition gnames_coh γm H S mh :=
+  Definition gnames_coh γm H S :=
     dom (gset ip_address) γm = dom (gset ip_address) H ∧
-    dom (gset ip_address) γm = dom (gset ip_address) S ∧
-    dom (gset ip_address) γm =
-    gset_map ip_of_address (dom (gset socket_address) mh).
+    dom (gset ip_address) γm = dom (gset ip_address) S.
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
@@ -109,7 +106,7 @@ Section definitions.
       Sn !! sh = Some (skt, r) →
       saddress skt = Some a →
       P !! ip_of_address a = Some ps →
-      (port_of_address a) ∈ ps.
+      port_of_address a ∈ ps.
 
   (* All sockets in [Sn] with the same address have the same handler *)
   Definition socket_handlers_coh Sn :=
@@ -150,14 +147,13 @@ Section definitions.
       socket_addresses_coh Sn ip ∧
       socket_unbound_empty_buf_coh Sn ip.
 
-  (** Message history map coherence *)
-  (* Every message present in the message soup has been
-     recorded in the logic as sent from the node of its origin. *)
+  (* Every message present in the message soup [M] has been recorded in the
+     message history [mh] as sent from the node of its origin. *)
   Definition message_soup_coh M mh :=
     ∀ m, m ∈ M → ∃ R T, mh !! (m_sender m) = Some (R, T) ∧ m ∈ T.
 
-  (* Every message in the receive buffer has been recorded in
-     the logic as sent from the node of its origin. *)
+  (* Every message in the receive buffers of [S] has been recorded in the
+     message history [mh] as sent from the node of its origin. *)
   Definition receive_buffers_coh S mh :=
     ∀ ip Sn sh skt r m,
       S !! ip = Some Sn →
@@ -165,8 +161,6 @@ Section definitions.
       m ∈ r →
       ∃ R T, mh !! (m_sender m) = Some (R, T) ∧ m ∈ T.
 
-  (* Message history is coherent w.r.t.
-       message soup, socket map, and itself. *)
   Definition messages_history_coh M S mh :=
     message_soup_coh M mh ∧
     receive_buffers_coh S mh ∧
@@ -177,8 +171,8 @@ Section definitions.
      described by some socket protocol [Φ] or it has been delivered. *)
   Definition messages_resource_coh mh :=
     ([∗ set] m ∈ messages_sent mh,
-     (* either [m] is governed by a protocol and
-        the network owns the resources *)
+     (* either [m] is governed by a protocol [Φ] and the network owns the
+        resources specified by the protocol *)
      (∃ (Φ : socket_interp Σ), (m_destination m) ⤇ Φ ∗ ▷ Φ m) ∨
      (* or [m] has been delivered somewhere *)
      ⌜message_received m mh⌝)%I.
@@ -187,7 +181,7 @@ Section definitions.
   Definition aneris_state_interp σ (rt : messages_history) :=
     (∃ γm mh,
         ⌜messages_received_sent mh = rt⌝ ∗
-        ⌜gnames_coh γm (state_heaps σ) (state_sockets σ) mh⌝ ∗
+        ⌜gnames_coh γm (state_heaps σ) (state_sockets σ)⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mh⌝ ∗
         node_gnames_auth γm ∗
