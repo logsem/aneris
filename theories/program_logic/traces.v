@@ -35,6 +35,9 @@ Section execution_trace.
   Definition exec_ends_in (ex : execution_trace Λ) (c : cfg Λ) : Prop :=
     last (extr_confs ex) = Some c.
 
+  Definition exec_last_obs (ex : execution_trace Λ) (κs : list (observation Λ))
+    : Prop := last (extr_obs ex) = Some κs.
+
   Lemma singleton_exec_starts_in c : exec_starts_in (singleton_exec c) c.
   Proof. done. Qed.
 
@@ -52,6 +55,10 @@ Section execution_trace.
   Lemma exec_ends_in_inj ex c c' :
     exec_ends_in ex c → exec_ends_in ex c' → c = c'.
   Proof. rewrite /exec_ends_in; intros ->; congruence. Qed.
+
+  Lemma exec_last_obs_inj ex κs κs' :
+    exec_last_obs ex κs → exec_last_obs ex κs' → κs = κs'.
+  Proof. rewrite /exec_last_obs; intros ->; congruence. Qed.
 
   Definition exec_extend (ex : execution_trace Λ)
              (κ : list (observation Λ)) (c : cfg Λ) :=
@@ -115,6 +122,9 @@ Section execution_trace.
   Qed.
 
   Lemma exec_extend_ends_in ex c κ : exec_ends_in (exec_extend ex κ c) c.
+  Proof. apply last_snoc. Qed.
+
+  Lemma exec_extend_last_obs ex c κ : exec_last_obs (exec_extend ex κ c) κ.
   Proof. apply last_snoc. Qed.
 
   Lemma valid_exec_ends_in ex : valid_exec ex → ∃ c, exec_ends_in ex c.

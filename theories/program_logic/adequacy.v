@@ -267,7 +267,12 @@ Theorem wp_strong_adequacy_helper Σ Λ AS `{!invPreG Σ}
          ⌜exec_ends_in ex c⌝ -∗
          ⌜auxtr_ends_in atr δ'⌝ -∗
          ⌜∀ ex' atr',
-            exec_contract ex ex' → auxtr_contract atr atr' → φ ex' atr'⌝ -∗
+          exec_contract ex ex' → auxtr_contract atr atr' →
+          φ ex' atr' ∧
+          ∀ δ4 c4 κs4,
+            exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
+            exec_last_obs ex κs4 →
+            valid_state_evolution AS c4.2 δ4 κs4 c.2 δ'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          stateI c.2 δ' κs (length c.1) -∗
          posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
@@ -302,7 +307,12 @@ Proof.
      auxtr_starts_in atr δ ∧
      auxtr_ends_in atr δ1 ∧
      (∀ ex' atr',
-            exec_contract ex ex' → auxtr_contract atr atr' → φ ex' atr'))
+         exec_contract ex ex' → auxtr_contract atr atr' →
+         φ ex' atr' ∧
+         ∀ δ4 c4 κs4,
+           exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
+           exec_last_obs ex κs4 →
+           valid_state_evolution AS c4.2 δ4 κs4 c1.2 δ1))
     as Hextras.
   { rewrite -Hexsing -Hatrsing -Hc1 -Hδ1.
     split; first apply valid_system_trace_singletons.
@@ -347,7 +357,14 @@ Proof.
     - eapply auxtr_extend_starts_in; eauto.
     - eapply exec_extend_ends_in; eauto.
     - eapply auxtr_extend_ends_in; eauto.
-    - intros ? ? ->%exec_contract_of_extend ->%auxtr_contract_of_extend; done.
+    - intros ? ? ->%exec_contract_of_extend ->%auxtr_contract_of_extend.
+      split; first done.
+      intros δ4 c4 κs4 Hc4 Hδ4 Hκs4.
+      eapply (exec_ends_in_inj _ c1) in Hc4 as <-; last done.
+      eapply (auxtr_ends_in_inj _ δ') in Hδ4 as <-; last done.
+      eapply (exec_last_obs_inj _ κ) in Hκs4 as <-;
+        last apply exec_extend_last_obs.
+      done.
     - done. }
   iDestruct ("Hback" with "Hpost") as "Htp".
   iNext.
@@ -359,7 +376,14 @@ Proof.
   - eapply exec_extend_ends_in; eauto.
   - eapply auxtr_extend_starts_in; eauto.
   - eapply auxtr_extend_ends_in; eauto.
-  - intros ? ? ->%exec_contract_of_extend ->%auxtr_contract_of_extend; done.
+  - intros ? ? ->%exec_contract_of_extend ->%auxtr_contract_of_extend.
+    split; first done.
+    intros δ4 c4 κs4 Hc4 Hδ4 Hκs4.
+    eapply (exec_ends_in_inj _ c1) in Hc4 as <-; last done.
+    eapply (auxtr_ends_in_inj _ δ') in Hδ4 as <-; last done.
+    eapply (exec_last_obs_inj _ κ) in Hκs4 as <-;
+      last apply exec_extend_last_obs.
+    done.
 Qed.
 
 Definition monotone {A} (Ψ : (A → Prop) → (A → Prop)) :=
@@ -455,7 +479,12 @@ Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
          ⌜exec_ends_in ex c⌝ -∗
          ⌜auxtr_ends_in atr δ'⌝ -∗
          ⌜∀ ex' atr',
-            exec_contract ex ex' → auxtr_contract atr atr' → φ ex' atr'⌝ -∗
+          exec_contract ex ex' → auxtr_contract atr atr' →
+          φ ex' atr' ∧
+          ∀ δ4 c4 κs4,
+           exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
+           exec_last_obs ex κs4 →
+           valid_state_evolution AS c4.2 δ4 κs4 c.2 δ'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          stateI c.2 δ' κs (length c.1) -∗
          posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
