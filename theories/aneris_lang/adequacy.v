@@ -121,3 +121,98 @@ Proof.
   iExists f. iIntros "??????".
   iApply ("Hwp" with "[$]"); auto.
 Qed.
+
+Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
+           (IPs: gset ip_address)
+           (A B: gset socket_address)
+           (ξ: execution_trace aneris_lang → auxiliary_trace aneris_AS → Prop)
+           ip e1 σ1 st (δ: aux_state (@aneris_AS Mdl)):
+  δ = {| aneris_AS_mhist := (∅,∅); aneris_AS_model := st |} ->
+  (* The model has finite branching *)
+  valid_state_evolution_finitary (@aneris_AS Mdl) →
+  (* The initial configuration satisfies certain properties *)
+  ip ∉ IPs →
+  dom (gset ip_address) (state_ports_in_use σ1) = IPs →
+  (∀ ip, ip ∈ IPs → state_ports_in_use σ1 !! ip = Some ∅) →
+  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
+  state_heaps σ1 = {[ip:=∅]} →
+  state_sockets σ1 = {[ip:=∅]} →
+  state_ms σ1 = ∅ →
+  (* A big implication, and we get back a Coq proposition *)
+  (* For any proper Aneris resources *)
+  (∀ `{!anerisG Mdl Σ},
+      ⊢ |={⊤}=> (* Having the fragmental model on hand *)
+        state_interp σ1 δ [] 1 ∗
+        (* There exists a postcondition and a socket interpretation function *)
+        ∃ Φ (f : socket_address → socket_interp Σ),
+          (* Given resources reflecting initial configuration, we need *)
+  (*            to prove two goals *)
+          fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
+          ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗
+          ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗ frag_st st -∗
+          WP (mkExpr ip e1) @ s; ⊤ {{ Φ }} ∗
+          □ (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace aneris_AS)
+            δ' c κs,
+         ⌜valid_system_trace aneris_AS ex atr⌝ -∗
+         ⌜exec_starts_in ex ([mkExpr ip e1], σ1)⌝ -∗
+         ⌜auxtr_starts_in atr δ⌝ -∗
+         ⌜exec_ends_in ex c⌝ -∗
+         ⌜auxtr_ends_in atr δ'⌝ -∗
+         ⌜∀ ex' atr',
+            exec_contract ex ex' → auxtr_contract atr atr' →
+            ξ ex' atr' ∧ ∀ δ4 c4 κs4,
+             exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
+             exec_last_obs ex κs4 →
+             valid_state_evolution aneris_AS c4.2 δ4 κs4 c.2 δ'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         state_interp c.2 δ' κs (length c.1) -∗
+         posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
+         |={⊤, ∅}=> ⌜ξ ex atr⌝)) →
+  (* The coinductive pure coq proposition given by adequacy *)
+  simulation
+    ξ
+    (singleton_exec ([(mkExpr ip e1)], σ1))
+    (singleton_auxtr δ).
+Proof.
+  intros Hδ Hsc Hips Hdom Hports Hsa Hheaps Hsockets Hms Hwp.
+  eapply (wp_strong_adequacy aneris_lang aneris_AS Σ s ξ); first done.
+  iIntros (?) "".
+  iMod node_gnames_auth_init as (γmp) "Hmp".
+  iMod saved_si_init as (γsi) "[Hsi Hsi']".
+  iMod (fixed_init A) as (γsif) "#Hsif".
+  iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
+  iMod free_ports_auth_init as (γpiu) "HPiu".
+  iMod (messages_ctx_init B) as (γms) "[Hms HB]".
+  iMod (model_init δ.(aneris_AS_model)) as (γm) "[Hmdl_auth Hmdl_frag]".
+  set (distG :=
+         {|
+           aneris_node_gnames_name := γmp;
+           aneris_si_name := γsi;
+           aneris_fixed_name := γsif;
+           aneris_freeips_name := γips;
+           aneris_freeports_name := γpiu;
+           aneris_messages_name := γms;
+           anerisG_model_name := γm;
+         |}).
+  iMod (Hwp distG) as "[Hsti Hwp]". iDestruct "Hwp" as (Φ f) "Himpl".
+  iMod (saved_si_update A with "[$Hsi $Hsi']") as (M HMfs) "[HM #Hsa]".
+  assert (dom (gset _) M = A) as Hdmsi.
+  { apply set_eq => ?.
+    split; intros ?%elem_of_elements;
+      apply elem_of_elements; [by rewrite -HMfs|].
+    by rewrite HMfs. }
+  iAssert ([∗ set] s ∈ A, s ⤇ f s)%I as "#Hsa'".
+  { rewrite -Hdmsi -!big_sepM_dom.
+    iApply (big_sepM_mono with "[$Hsa]"); simpl; auto.
+    iIntros (? ? Hx) "[? ?]"; iExists _; iFrame. }
+  iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
+  iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp #Hγn]"; [done|].
+  iAssert (is_node ip) as "Hn".
+  { iExists _. eauto. }
+  iModIntro. iExists state_interp, Φ, fork_post. iFrame.
+  iSplitL ""; first by iApply config_wp_correct.
+  subst δ.
+  iDestruct ("Himpl" with "[$] [$] [$] [$] [$] [$]") as "[Hwp #Himpl]".
+  iFrame "#Hwp".
+Qed.
+
