@@ -376,10 +376,9 @@ Section simulation.
       exists (singleton_auxtr δ); eauto using valid_system_trace_singletons.
     - destruct IHex as [atr Hsim].
       { eapply exec_extend_starts_in_inv; eauto. }
-      rewrite -> continued_simulation_unfold in Hsim.
-      destruct Hsim as (Hvlt & Hφ & Hsim).
-      edestruct @valid_system_trace_ends_in as (_& δ' &_&?); eauto.
-      edestruct Hsim as (?&?); eauto.
+      destruct (continued_simulation_next_aux_state_exists φ ex atr c' κ);
+        [done| |by eauto].
+      econstructor; eauto.
   Qed.
 
 End simulation.
