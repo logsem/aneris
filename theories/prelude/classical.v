@@ -18,6 +18,15 @@ Qed.
 Axiom Choice :
   ∀ A B (R : A → B → Prop), (∀ x, ∃ y, R x y) → {f : A → B | ∀ x, R x (f x)}.
 
+Definition epsilon {A : Type} {P : A → Prop} (Hex : ∃ x, P x) : A :=
+  proj1_sig (Choice unit A (λ _ x, P x) (λ _, Hex)) tt.
+
+Lemma epsilon_correct {A : Type} (P : A → Prop) (Hex : ∃ x, P x) :
+  P (epsilon Hex).
+Proof.
+  exact (proj2_sig (Choice unit A (λ _ x, P x) (λ _, Hex)) tt).
+Qed.
+
 Lemma ExcludedMiddle (P : Prop) : P ∨ ¬ P.
 Proof.
   set (PA b := b = true ∨ P).

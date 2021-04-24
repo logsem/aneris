@@ -11,6 +11,7 @@
 theories/prelude/classical.v
 theories/prelude/quantifiers.v
 theories/prelude/iris_extraction.v
+theories/prelude/fixpoint.v
 
 theories/bi/weakestpre.v
 
@@ -18,6 +19,7 @@ theories/lib/gen_heap_light.v
 
 theories/program_logic/weakestpre.v
 theories/program_logic/traces.v
+theories/program_logic/infinite_traces.v
 theories/program_logic/adequacy.v
 theories/program_logic/ectx_language.v
 theories/program_logic/ectx_lifting.v

@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.base_logic.lib Require Import wsat.
 From aneris.prelude Require Import quantifiers iris_extraction.
-From aneris.program_logic Require Export weakestpre traces.
+From aneris.program_logic Require Export weakestpre traces infinite_traces.
 
 Set Default Proof Using "Type".
 Import uPred.
@@ -386,74 +386,6 @@ Proof.
     done.
 Qed.
 
-Definition monotone {A} (Ψ : (A → Prop) → (A → Prop)) :=
-  ∀ (P Q : A → Prop), (∀ x, P x → Q x) → ∀ x, Ψ P x → Ψ Q x.
-
-Definition GFX {A} (Ψ : (A → Prop) → (A → Prop)) : A → Prop :=
-  λ x, ∃ P, P x ∧ (∀ x, P x → Ψ P x).
-
-Lemma GFX_post_fixpoint {A} (Ψ : (A → Prop) → (A → Prop)) :
-  monotone Ψ → ∀ x, GFX Ψ x → Ψ (GFX Ψ) x.
-Proof.
-  intros Hmono x (P & HP & HΨP).
-  eapply Hmono; [|by apply HΨP].
-  intros; exists P; split; auto.
-Qed.
-
-Lemma GFX_fixpoint {A} (Ψ : (A → Prop) → (A → Prop)) :
-  monotone Ψ → ∀ x, Ψ (GFX Ψ) x ↔ GFX Ψ x.
-Proof.
-  intros Hmono x; split.
-  - intros HΨ.
-    exists (Ψ (GFX Ψ)); split; first done.
-    intros ? ?; eapply Hmono; last done.
-    apply GFX_post_fixpoint; done.
-  - apply GFX_post_fixpoint; done.
-Qed.
-
-Definition simulation_pre {Λ AS}
-           (φ : execution_trace Λ → auxiliary_trace AS → Prop)
-           (pure_wptp : execution_trace Λ → auxiliary_trace AS → Prop) :
-  execution_trace Λ → auxiliary_trace AS → Prop :=
-  λ ex atr,
-  valid_system_trace AS ex atr ∧
-  φ ex atr ∧
-  ∀ c c' κ δ,
-    exec_ends_in ex c →
-    auxtr_ends_in atr δ →
-    step c κ c' →
-    ∃ δ', valid_state_evolution AS c.2 δ κ c'.2 δ' ∧
-           pure_wptp (exec_extend ex κ c') (auxtr_extend atr δ').
-
-Local Definition simulation_pre_curried {Λ AS}
-      (φ : execution_trace Λ → auxiliary_trace AS → Prop) :
-  (execution_trace Λ * auxiliary_trace AS → Prop) →
-  (execution_trace Λ * auxiliary_trace AS → Prop) :=
-  λ ψ (exatr : execution_trace Λ * auxiliary_trace AS),
-  (simulation_pre φ (λ ex atr, ψ (ex, atr)) exatr.1 exatr.2).
-
-Lemma simulation_pre_curried_mono {Λ AS}
-      (φ : execution_trace Λ → auxiliary_trace AS → Prop) :
-  monotone (simulation_pre_curried φ).
-Proof.
-  intros P Q HPQ [ex atr] (?&?&HP); repeat (split; first done).
-  intros ? ? ? ? ? ? ?.
-  edestruct HP as (?&?&?); eauto.
-Qed.
-
-Definition simulation {Λ AS}
-           (φ : execution_trace Λ → auxiliary_trace AS → Prop) :=
-  λ ex atr, GFX (simulation_pre_curried φ) (ex, atr).
-
-Lemma simulation_unfold {Λ AS}
-      (φ : execution_trace Λ → auxiliary_trace AS → Prop) ex atr :
-  simulation φ ex atr ↔ simulation_pre φ (simulation φ) ex atr.
-Proof.
-  symmetry; rewrite /simulation /=.
-  apply (λ H, GFX_fixpoint (simulation_pre_curried φ) H (_, _)).
-  apply simulation_pre_curried_mono.
-Qed.
-
 Definition valid_state_evolution_finitary {Λ} (AS : AuxState Λ) :=
   ∀ c δ κ c',
     smaller_card (sig (λ δ', valid_state_evolution AS c δ κ c' δ')) nat.
@@ -489,7 +421,7 @@ Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
          stateI c.2 δ' κs (length c.1) -∗
          posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜φ ex atr⌝)) →
-  simulation φ (singleton_exec ([e1], σ1)) (singleton_auxtr δ).
+  continued_simulation φ (singleton_exec ([e1], σ1)) (singleton_auxtr δ).
 Proof.
   intros Hsc Hwptp%wp_strong_adequacy_helper; last done.
   exists (λ exatr, ⊢ Gsim Σ AS s φ exatr.1 exatr.2); split; first done.
@@ -522,25 +454,7 @@ Proof.
   exists δ''.
   revert Hgsim.
   rewrite !extract_and.
-  rewrite !extract_pure; done.
-Qed.
-
-Lemma simulation_simulates {Λ AS} e σ δ φ :
-  simulation
-    (Λ := Λ) (AS := AS) φ (singleton_exec ([e], σ)) (singleton_auxtr δ) →
-  ∀ ex, exec_starts_in ex ([e], σ) → valid_exec ex →
-    ∃ atr, simulation φ ex atr.
-Proof.
-  intros Hsm ex Hexstr Hex.
-  induction Hex as [|? ? ? ? ? ? ? IHex].
-  - apply singleton_exec_starts_in_inv in Hexstr as ->.
-    exists (singleton_auxtr δ); eauto using valid_system_trace_singletons.
-  - destruct IHex as [atr Hsim].
-    { eapply exec_extend_starts_in_inv; eauto. }
-    rewrite -> simulation_unfold in Hsim.
-    destruct Hsim as (Hvlt & Hφ & Hsim).
-    edestruct @valid_system_trace_ends_in as (_& δ' &_&?); eauto.
-    edestruct Hsim as (?&?&?); eauto.
+  intros [? ?]; done.
 Qed.
 
 (** Since the full adequacy statement is quite a mouthful, we prove some more
@@ -599,7 +513,7 @@ Local Definition wp_adequacy_relation Λ AS s (φ : val Λ → Prop)
        (∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2).
 
 Local Lemma wp_adequacy_relation_adequacy {Λ AS} s e σ δ φ :
-  simulation
+  continued_simulation
     (wp_adequacy_relation Λ AS s φ)
     (singleton_exec ([e], σ))
     (singleton_auxtr δ) →
@@ -607,8 +521,8 @@ Local Lemma wp_adequacy_relation_adequacy {Λ AS} s e σ δ φ :
 Proof.
   intros Hsm; apply adequate_alt.
   intros ex t2 σ2 Hex Hexstr Hexend.
-  eapply simulation_simulates in Hex as [atr Hatr]; eauto.
-  rewrite -> simulation_unfold in Hatr.
+  eapply simulation_does_continue in Hex as [atr Hatr]; eauto.
+  rewrite -> continued_simulation_unfold in Hatr.
   destruct Hatr as (Hvlt & Hψ & Hatr).
   apply (Hψ (t2, σ2)); done.
 Qed.
@@ -643,7 +557,7 @@ Local Definition wp_invariance_relation Λ AS e1 σ1 t2 σ2 (φ : Prop)
   exec_starts_in ex ([e1], σ1) → exec_ends_in ex (t2, σ2) → φ.
 
 Local Lemma wp_invariance_relation_invariance {Λ AS} e1 σ1 δ1 t2 σ2 φ :
-  simulation
+  continued_simulation
     (wp_invariance_relation Λ AS e1 σ1 t2 σ2 φ)
     (singleton_exec ([e1], σ1))
     (singleton_auxtr δ1) →
@@ -654,8 +568,8 @@ Local Lemma wp_invariance_relation_invariance {Λ AS} e1 σ1 δ1 t2 σ2 φ :
     φ.
 Proof.
   intros Hsm ex Hex Hexstr Hexend.
-  eapply simulation_simulates in Hsm as [atr Hatr]; eauto.
-  rewrite -> simulation_unfold in Hatr.
+  eapply simulation_does_continue in Hsm as [atr Hatr]; eauto.
+  rewrite -> continued_simulation_unfold in Hatr.
   destruct Hatr as (Hvlt & Hψ & Hatr).
   apply Hψ; done.
 Qed.

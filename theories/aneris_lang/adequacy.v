@@ -169,7 +169,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
          posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜ξ ex atr⌝)) →
   (* The coinductive pure coq proposition given by adequacy *)
-  simulation
+  continued_simulation
     ξ
     (singleton_exec ([(mkExpr ip e1)], σ1))
     (singleton_auxtr δ).
@@ -215,4 +215,3 @@ Proof.
   iDestruct ("Himpl" with "[$] [$] [$] [$] [$] [$]") as "[Hwp #Himpl]".
   iFrame "#Hwp".
 Qed.
-
