@@ -65,10 +65,6 @@ Section execution_trace.
     {| extr_confs := extr_confs ex ++ [c];
        extr_obs := extr_obs ex ++ [κ]; |}.
 
-    (* Definition exec_prepend (κ : list (observation Λ)) (c : cfg Λ) *)
-    (*          (ex : execution_trace Λ):= *)
-    (* {| extr_confs := c :: (extr_confs ex); extr_obs := κ :: (extr_obs ex); |}. *)
-
   Definition exec_contract (ex ex' : execution_trace Λ) : Prop :=
     ∃ c κ, ex = exec_extend ex' κ c.
 
