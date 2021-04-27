@@ -8,7 +8,11 @@ Set Default Proof Using "Type".
 
 Import Network.
 
+Definition aneris_model_rel_finitary (Mdl : Model) :=
+  ∀ mdl : Mdl, quantifiers.smaller_card {mdl' : Mdl | Mdl mdl mdl'} nat.
+
 Theorem adequacy `{anerisPreG Σ Mdl} IPs A B s e ip σ φ (st0 : Mdl) :
+  aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗
      ([∗ set] a ∈ A, a ⤇ (f a)) -∗
@@ -26,10 +30,10 @@ Theorem adequacy `{anerisPreG Σ Mdl} IPs A B s e ip σ φ (st0 : Mdl) :
   state_ms σ = ∅ →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
+  intros HMdlfin Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
   set (δ := @AnerisAuxState Mdl (∅,∅) st0).
-  eapply (wp_adequacy _ (@aneris_AS Mdl) _ _ _ _  (δ  : aux_state aneris_AS));
-    first apply aneris_AS_valid_state_evolution_finitary.
+  eapply (wp_adequacy _ (@aneris_AS Mdl) _ _ _ _  (δ  : aux_state aneris_AS)).
+  { apply aneris_AS_valid_state_evolution_finitary; auto. }
   iIntros (?) "/=".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
@@ -77,6 +81,7 @@ Definition safe e σ := @adequate aneris_lang NotStuck e σ (λ _ _, True).
 
 Theorem adequacy_safe `{anerisPreG Σ Mdl} IPs A B e ip σ (ports : gset port)
         (st0 : Mdl):
+  aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗
      ([∗ set] a ∈ A, a ⤇ (f a)) -∗
@@ -96,6 +101,7 @@ Theorem adequacy_safe `{anerisPreG Σ Mdl} IPs A B e ip σ (ports : gset port)
 Proof. by apply adequacy. Qed.
 
 Theorem adequacy_hoare `{anerisPreG Σ Mdl} IPs A B e σ φ ip (st0 : Mdl) :
+  aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ ∃ (f : socket_address → socket_interp Σ),
           {{{ fixed A ∗
               ([∗ set] a ∈ A, a ⤇ (f a)) ∗
@@ -114,7 +120,7 @@ Theorem adequacy_hoare `{anerisPreG Σ Mdl} IPs A B e σ φ ip (st0 : Mdl) :
   state_ms σ = ∅ →
   adequate NotStuck (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros Hwp ???????.
+  intros ? Hwp ???????.
   eapply (adequacy _ _ _ _ _ _ _ _ st0); try eauto.
   intros ?. iModIntro.
   iDestruct Hwp as (f) "#Hwp".
@@ -129,7 +135,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
            ip e1 σ1 st (δ: aux_state (@aneris_AS Mdl)):
   δ = {| aneris_AS_mhist := (∅,∅); aneris_AS_model := st |} ->
   (* The model has finite branching *)
-  valid_state_evolution_finitary (@aneris_AS Mdl) →
+  aneris_model_rel_finitary Mdl →
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
   dom (gset ip_address) (state_ports_in_use σ1) = IPs →
@@ -175,7 +181,8 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
     (singleton_auxtr δ).
 Proof.
   intros Hδ Hsc Hips Hdom Hports Hsa Hheaps Hsockets Hms Hwp.
-  eapply (wp_strong_adequacy aneris_lang aneris_AS Σ s ξ); first done.
+  eapply (wp_strong_adequacy aneris_lang aneris_AS Σ s ξ).
+  { apply aneris_AS_valid_state_evolution_finitary; auto. }
   iIntros (?) "".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".

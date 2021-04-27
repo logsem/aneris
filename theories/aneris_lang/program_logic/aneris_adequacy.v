@@ -10,6 +10,7 @@ Definition aneris_adequate (e : base_lang.expr) (ip : ip_address) (σ : state)
 
 Theorem adequacy `{anerisPreG Σ Mdl}
         (st0 : Mdl) IPs A B e ip σ φ :
+  aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=> ∃ (f : socket_address → socket_interp Σ),
      fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
      ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗ frag_st st0 -∗
@@ -24,8 +25,8 @@ Theorem adequacy `{anerisPreG Σ Mdl}
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
-  eapply adequacy; try done.
+  intros HMdlfin Hwp Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
+  eapply adequacy; [done| |done|done|done|done|done|done|done].
   intros dg.
   iMod (Hwp dg) as (f) "Hwp".
   iModIntro. iExists _. iIntros "?????? /=".
@@ -37,6 +38,7 @@ Qed.
 
 Theorem adequacy_hoare `{anerisPreG Σ Mdl}
         (st0 : Mdl) IPs A B e σ φ ip :
+  aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ ∃ (f : socket_address → socket_interp Σ),
           {{{ fixed A ∗
               ([∗ set] a ∈ A, a ⤇ (f a)) ∗
@@ -54,7 +56,7 @@ Theorem adequacy_hoare `{anerisPreG Σ Mdl}
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros Hwp ???????.
+  intros ? Hwp ???????.
   eapply adequacy; eauto.
   intros ?. iModIntro.
   iDestruct Hwp as (f) "#Hwp".

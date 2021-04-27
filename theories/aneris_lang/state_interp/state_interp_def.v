@@ -1,5 +1,5 @@
-From stdpp Require Import fin_maps gmap option.
-From aneris.prelude Require Import quantifiers.
+From stdpp Require Import fin_maps gmap option finite.
+From aneris.prelude Require Import quantifiers finitary.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
@@ -200,7 +200,15 @@ Section Aneris_AS.
     aneris_AS_mhist : messages_history;
     aneris_AS_model : model_state Mdl }.
 
-   Definition buffers
+  Instance aneris_aux_state_eq_dec : EqDecision aneris_aux_state.
+  Proof.
+    assert (EqDecision messages_history) by apply _.
+    assert (EqDecision (model_state Mdl)) by apply _.
+    unfold EqDecision, Decision in *.
+    intros ? ?; unfold Decision; decide equality; auto.
+  Qed.
+
+  Definition buffers
              (S : gmap ip_address sockets) : message_soup :=
     (collect (λ ip Sn, collect (λ sh sr, sr.2) Sn) S).
 
@@ -214,35 +222,42 @@ Section Aneris_AS.
   Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
     mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2.
 
-Program Definition aneris_AS : AuxState aneris_lang :=
-  {| aux_state := aneris_aux_state ;
-     valid_state_evolution σ1 δ1 κ σ2 δ2 :=
-       aneris_AS_mhist δ2 =
-       message_history_evolution
-         (state_ms σ1)
-         (state_ms σ2)
-         (state_sockets σ1) (state_sockets σ2) (aneris_AS_mhist δ1) ∧
-       user_model_evolution
-         (aneris_AS_model δ1)
-         (aneris_AS_model δ2) |}.
-Next Obligation.
-Proof.
-  simpl. split.
-  - rewrite /message_history_evolution !difference_diag_L !left_id_L.
-    destruct (aneris_AS_mhist δ1); eauto.
-  - by left.
-Qed.
+  Program Definition aneris_AS : AuxState aneris_lang :=
+    {| aux_state := aneris_aux_state ;
+       valid_state_evolution σ1 δ1 κ σ2 δ2 :=
+         aneris_AS_mhist δ2 =
+         message_history_evolution
+           (state_ms σ1)
+           (state_ms σ2)
+           (state_sockets σ1) (state_sockets σ2) (aneris_AS_mhist δ1) ∧
+         user_model_evolution
+           (aneris_AS_model δ1)
+           (aneris_AS_model δ2) |}.
+  Next Obligation.
+  Proof.
+    simpl. split.
+    - rewrite /message_history_evolution !difference_diag_L !left_id_L.
+      destruct (aneris_AS_mhist δ1); eauto.
+    - by left.
+  Qed.
 
-Lemma aneris_AS_valid_state_evolution_finitary :
-  valid_state_evolution_finitary aneris_AS.
-Proof.
-Admitted.
+  Instance valid_state_evolution_proof_irrel c δ κ c' δ':
+    ProofIrrel (valid_state_evolution aneris_AS c δ κ c' δ').
+  Proof. intros ? ?; apply ProofIrrelevance. Qed.
 
+  Lemma aneris_AS_valid_state_evolution_finitary :
+    (∀ mdl, smaller_card (sig (λ mdl', model_rel Mdl mdl mdl')) nat) →
+    valid_state_evolution_finitary aneris_AS.
+  Proof.
+    intros ?????.
+    eapply finite_smaller_card_nat.
+  Admitted.
 
 Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
   irisG aneris_lang aneris_AS Σ := {
   iris_invG := _;
-  state_interp σ δ _ _ := (aneris_state_interp σ (aneris_AS_mhist δ) ∗ auth_st (aneris_AS_model δ))%I;
+  state_interp σ δ _ _ :=
+    (aneris_state_interp σ (aneris_AS_mhist δ) ∗ auth_st (aneris_AS_model δ))%I;
   fork_post _ := True%I;
 }.
 

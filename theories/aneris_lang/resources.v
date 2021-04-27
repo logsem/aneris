@@ -14,8 +14,12 @@ Import Network.
 
 Record Model := model {
   model_state :> Type;
-  model_rel :> model_state → model_state → Prop
+  model_rel :> model_state → model_state → Prop;
+  model_state_eq_dec : EqDecision model_state;
+  model_rel_proof_irrel : ∀ m m', ProofIrrel (model_rel m m');
 }.
+
+Existing Instances model_state_eq_dec model_rel_proof_irrel.
 
 Record node_gnames := Node_gname {
   heap_name : gname;
