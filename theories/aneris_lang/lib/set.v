@@ -1,5 +1,5 @@
 From aneris.aneris_lang Require Import proofmode.
-From aneris.aneris_lang.lib Require Import list.
+From aneris.aneris_lang.lib Require Import util list.
 From iris_string_ident Require Import ltac2_string_ident.
 Set Default Proof Using "Type".
 
@@ -14,7 +14,11 @@ Definition set_mem : val := list_mem.
 
 Definition set_iter : val := list_iter.
 
+Definition set_foldl : val := list_fold.
+
 Definition set_forall : val := list_forall.
+
+Definition set_cardinal : val := list_length.
 
 Definition set_subseteq : val :=
   λ: "X" "Y",
@@ -93,6 +97,27 @@ Section set_specs.
     iPureIntro; set_solver.
   Qed.
 
+  Lemma wp_set_foldl P Φ Ψ ip handler (X : gset A) acc v :
+    (∀ (a : A) acc Xacc,
+        {{{ P Xacc acc ∗ Φ a }}}
+          (Val handler) (Val acc) (toval a) @[ip]
+        {{{v, RET v; P (Xacc ∪ {[a]}) v ∗ Ψ a }}}) -∗
+    {{{ ⌜is_set X v⌝ ∗ P ∅ acc ∗ [∗ set] a ∈ X, Φ a }}}
+      set_foldl handler acc v @[ip]
+    {{{v, RET v; P X v ∗ [∗ set] a ∈ X, Ψ a }}}.
+  Proof.
+    iIntros "#Hhandler !#" (Ξ) "(%HX & HP & HΦ) HΞ".
+    destruct HX as (l & ? & -> & Hdup).
+    rewrite !big_sepS_list_to_set // /set_fold.
+    wp_apply (wp_list_fold (λ l v, P (list_to_set l) v) Φ Ψ with "[] [$HP $HΦ //]").
+    { iIntros (????) "!#". iIntros (Ξ') "(% & HP & HΦ) HΞ'".
+      wp_apply ("Hhandler" with "[$HP $HΦ]").
+      rewrite list_to_set_app_L /= union_empty_r_L //. }
+    iIntros (?) "[? ?]".
+    iApply "HΞ". iFrame.
+    rewrite big_sepS_list_to_set //.
+  Qed.
+
   Lemma wp_set_subseteq `{!Inj (=) (=) toval} ip X Y xv yv:
     {{{ ⌜is_set X xv⌝ ∗ ⌜is_set Y yv⌝}}}
       set_subseteq (Val xv) (Val yv) @[ip]
@@ -143,6 +168,19 @@ Section set_specs.
     { rewrite  big_sepS_list_to_set //. }
     iDestruct "Hb" as (?) "[% ?]".
     iExists _. rewrite elem_of_list_to_set. eauto.
+  Qed.
+
+  Lemma wp_set_cardinal ip X xv  :
+    {{{ ⌜is_set X xv⌝ }}}
+      set_cardinal xv @[ip]
+    {{{ RET #(size X); True }}}.
+  Proof.
+    iIntros (Φ (?&?&->&?)) "HΦ".
+    rewrite /set_cardinal.
+    wp_apply wp_list_length; [done|].
+    iIntros (n ->).
+    rewrite map_length list_to_set_size //.
+    by iApply "HΦ".
   Qed.
 
 End set_specs.

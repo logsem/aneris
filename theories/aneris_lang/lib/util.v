@@ -360,3 +360,13 @@ Proof.
   - eexists. by inversion Hmap.
   - by apply IHl in Hmap.
 Qed.
+
+Lemma list_to_set_size `{EqDecision A, !Countable A} l :
+  NoDup l →
+  size (list_to_set l : gset A) = length l.
+Proof.
+  induction l; [done|].
+  rewrite NoDup_cons /=; intros [? ?].
+  rewrite size_union ?size_singleton ?IHl //.
+  set_solver.
+Qed.
