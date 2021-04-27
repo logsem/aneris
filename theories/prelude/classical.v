@@ -96,12 +96,3 @@ Proof.
   intros x; apply NNP_P; revert x.
   apply not_exists_forall_not; trivial.
 Qed.
-
-Lemma sig_eq {A} (P : A → Prop) (x y : sig P) :
-  proj1_sig x = proj1_sig y → x = y.
-Proof.
-  destruct x as [x Px]; simpl.
-  destruct y as [y Py]; simpl.
-  intros ->.
-  rewrite (ProofIrrelevance _ Px Py); trivial.
-Qed.

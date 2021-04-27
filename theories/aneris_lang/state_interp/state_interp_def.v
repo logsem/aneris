@@ -1,11 +1,11 @@
 From stdpp Require Import fin_maps gmap option finite.
-From aneris.prelude Require Import quantifiers finitary.
+From aneris.prelude Require Import quantifiers finitary sigma.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris_string_ident Require Import ltac2_string_ident.
 From aneris.program_logic Require Export weakestpre adequacy.
-From aneris.program_logic Require Import ectx_lifting.
+From aneris.program_logic Require Import language ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network resources.
 From aneris.aneris_lang.lib Require Import util.
@@ -241,9 +241,43 @@ Section Aneris_AS.
     - by left.
   Qed.
 
-  Instance valid_state_evolution_proof_irrel c δ κ c' δ':
-    ProofIrrel (valid_state_evolution aneris_AS c δ κ c' δ').
+  Instance valid_state_evolution_proof_irrel m1 m2:
+    ProofIrrel (user_model_evolution m1 m2).
   Proof. intros ? ?; apply ProofIrrelevance. Qed.
+
+  Let fin_type c δ κ c' :=
+    {δ' : aux_state aneris_AS | valid_state_evolution aneris_AS c δ κ c' δ'}.
+
+  Let P c δ c' u := u = message_history_evolution
+              (state_ms c) (state_ms c') (state_sockets c)
+              (state_sockets c') (aneris_AS_mhist δ).
+
+  Instance: ∀ c δ c' x, Decision (P c δ c' x).
+  Proof.
+    unfold P.
+    intros.
+    destruct
+      (decide (x = message_history_evolution
+                     (state_ms c) (state_ms c') (state_sockets c)
+                     (state_sockets c') (aneris_AS_mhist δ))) as [->|].
+    - left; done.
+    - right; done.
+  Qed.
+
+  Let Q δ u := user_model_evolution (aneris_AS_model δ) u.
+
+  Instance: ∀ δ, Inhabited {x | Q δ x}.
+  Proof. intros. refine (populate (_ ↾ or_introl eq_refl)). Qed.
+
+  Let fin_type' c δ c' :=
+    {x : messages_history * model_state Mdl | P c δ c' x.1 ∧ Q δ x.2 }.
+
+  Let fun_forward c δ κ c' (x : fin_type' c δ c') : fin_type c δ κ c' :=
+    {|aneris_AS_mhist := (proj1_sig x).1;
+      aneris_AS_model := (proj1_sig x).2|} ↾ (proj2_sig x).
+
+  Let fun_back c δ κ c' (x : fin_type c δ κ c') : fin_type' c δ c' :=
+    (aneris_AS_mhist (proj1_sig x),aneris_AS_model (proj1_sig x)) ↾ (proj2_sig x).
 
   Lemma aneris_AS_valid_state_evolution_finitary :
     (∀ mdl, smaller_card (sig (λ mdl', model_rel Mdl mdl mdl')) nat) →
@@ -251,7 +285,22 @@ Section Aneris_AS.
   Proof.
     intros ?????.
     eapply finite_smaller_card_nat.
-  Admitted.
+    unshelve eapply (bijective_finite (fun_forward _ _ _ _) (fun_back _ _ _ _)).
+    - apply _.
+    - unfold fin_type'.
+      pose proof (sig_finite_and (P c δ c') (Q δ)) as Hcnv.
+      apply Hcnv.
+      + apply sig_finite_eq1.
+      + eapply finite_eq_dec_irrel.
+        apply (sig_finite_or
+                 (λ x, (aneris_AS_model δ) = x)
+                 (λ x, Mdl (aneris_AS_model δ) x)).
+        * apply sig_finite_eq2.
+        * eapply smaller_card_nat_finite; done.
+    - intros [[] ] [[] ] ?; simplify_eq/=.
+      eapply sig_eq; done.
+    - intros [[] ]; simpl; done.
+  Qed.
 
 Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
   irisG aneris_lang aneris_AS Σ := {

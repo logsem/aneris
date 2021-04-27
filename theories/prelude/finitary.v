@@ -1,6 +1,6 @@
 From Coq.Unicode Require Import Utf8.
 From Coq.micromega Require Import Lia.
-From aneris.prelude Require Import classical quantifiers.
+From aneris.prelude Require Import classical quantifiers sigma.
 From stdpp Require Import finite fin_sets.
 
 Section finite_smaller_card_nat.
@@ -58,74 +58,74 @@ End finite_smaller_card_nat.
 Definition surjective {A B} (f : A → B) := ∀ y, ∃ x, f x = y.
 
 Section smaller_card_nat_finite.
-  Context {A} `{!Inhabited A} `{!EqDecision A}.
+  Context {A} `{!EqDecision A}.
 
-  Section no_surj_inj.
-    Context (Hnj : ∀ h : nat → A, ¬ surjective h).
+  Section no_fin_inj.
+    Context (Hnfin : Finite A → False).
 
-    Lemma nosurj_new_elem_exist (l : list A) : ∃ x, x ∉ l.
+    Lemma no_fin_new_elem_exist (l : list A) : ∃ x, x ∉ l.
     Proof.
-      specialize (Hnj (λ n, nth n l inhabitant)).
-      apply not_forall_exists_not in Hnj as [x Hx].
-      exists x.
-      intros [n Hn]%elem_of_list_lookup_1.
-      apply (nth_lookup_Some _ _ inhabitant) in Hn.
-      eapply not_exists_forall_not in Hx; eauto.
+      destruct (ExcludedMiddle (∀ x : A, x ∈ l)); last first.
+      { apply not_forall_exists_not; done. }
+      exfalso; apply Hnfin.
+      refine {| enum := remove_dups l |}.
+      - apply NoDup_remove_dups.
+      - intros; apply elem_of_remove_dups; done.
     Qed.
 
-    Fixpoint nosurj_make_list (l : list A) (n : nat) : list A :=
+    Fixpoint no_fin_make_list (l : list A) (n : nat) : list A :=
       match n with
       | 0 => l
       | S n' =>
-        nosurj_make_list l n' ++
-        [epsilon (nosurj_new_elem_exist (nosurj_make_list l n'))]
+        no_fin_make_list l n' ++
+        [epsilon (no_fin_new_elem_exist (no_fin_make_list l n'))]
       end.
 
-    Lemma nosurj_make_list_length l n :
-      length (nosurj_make_list l n) = length l + n.
+    Lemma no_fin_make_list_length l n :
+      length (no_fin_make_list l n) = length l + n.
     Proof.
       induction n as [|n IHn]; [simpl; lia|].
       simpl; rewrite app_length, IHn; simpl; lia.
     Qed.
 
-    Lemma nosurj_make_list_prefix l n1 n2 :
-      n1 ≤ n2 → (nosurj_make_list l n1) `prefix_of` (nosurj_make_list l n2).
+    Lemma no_fin_make_list_prefix l n1 n2 :
+      n1 ≤ n2 → (no_fin_make_list l n1) `prefix_of` (no_fin_make_list l n2).
     Proof.
       induction 1 as [|n2 IHn12]; [done|].
       simpl; apply prefix_app_r; done.
     Qed.
 
-    Lemma nosurj_make_list_NoDup l n : NoDup l → NoDup (nosurj_make_list l n).
+    Lemma no_fin_make_list_NoDup l n : NoDup l → NoDup (no_fin_make_list l n).
     Proof.
       revert l; induction n; intros l Hl; [done|].
       simpl.
       apply NoDup_app; split; [auto; done|].
       split; [|apply NoDup_singleton].
       intros x Hx ->%elem_of_list_singleton.
-      apply (epsilon_correct _ (nosurj_new_elem_exist (nosurj_make_list l n)));
+      apply (epsilon_correct _ (no_fin_new_elem_exist (no_fin_make_list l n)));
         done.
     Qed.
 
-    Definition nosurj_make_inj_fun (n : nat) : A :=
-      default inhabitant (nosurj_make_list [] (S n) !! n).
+    Definition no_fin_make_inj_fun (n : nat) : A :=
+      default (epsilon (no_fin_new_elem_exist [])) (no_fin_make_list [] (S n) !! n).
 
-    Lemma nosurj_make_inj_fun_inj : injective nosurj_make_inj_fun.
+    Lemma no_fin_make_inj_fun_inj : injective no_fin_make_inj_fun.
     Proof.
-      assert (∀ n m, n ≤ m → nosurj_make_inj_fun n = nosurj_make_inj_fun m → n = m)
+      assert (∀ n m, n ≤ m → no_fin_make_inj_fun n = no_fin_make_inj_fun m → n = m)
         as Hnm.
       { intros n m Hnm Hfnm.
-        unfold nosurj_make_inj_fun in Hfnm.
-        pose proof (lookup_lt_is_Some_2 (nosurj_make_list [] (S n)) n) as [k Hk].
-        { rewrite nosurj_make_list_length; lia. }
-        pose proof (lookup_lt_is_Some_2 (nosurj_make_list [] (S m)) m) as [l Hl].
-        { rewrite nosurj_make_list_length; lia. }
+        unfold no_fin_make_inj_fun in Hfnm.
+        pose proof (lookup_lt_is_Some_2 (no_fin_make_list [] (S n)) n) as [k Hk].
+        { rewrite no_fin_make_list_length; lia. }
+        pose proof (lookup_lt_is_Some_2 (no_fin_make_list [] (S m)) m) as [l Hl].
+        { rewrite no_fin_make_list_length; lia. }
         rewrite Hk, Hl in Hfnm; simpl in Hfnm; simplify_eq.
-        apply (NoDup_lookup (nosurj_make_list [] (S m)) n m l); [| |done].
-        - apply nosurj_make_list_NoDup, NoDup_nil_2.
+        apply (NoDup_lookup (no_fin_make_list [] (S m)) n m l); [| |done].
+        - apply no_fin_make_list_NoDup, NoDup_nil_2.
         - apply  (prefix_lookup
-                    (nosurj_make_list [] (S n)) (nosurj_make_list [] (S m)) n l);
+                    (no_fin_make_list [] (S n)) (no_fin_make_list [] (S m)) n l);
             [done|].
-          apply nosurj_make_list_prefix; lia.
+          apply no_fin_make_list_prefix; lia.
       }
       intros n m.
       destruct (decide (n < m)).
@@ -133,75 +133,117 @@ Section smaller_card_nat_finite.
       - intros; symmetry; apply Hnm; [lia|done].
     Qed.
 
-  End no_surj_inj.
+  End no_fin_inj.
 
-  Definition least_domain_subset_including (h : nat → A) (x : A) : subset nat :=
-    λ k, ∀ n, (∃ m, m ≤ n ∧ h m = x) → k ≤ n.
-
-  Lemma least_domain_subset_including_all_not_cofinal (h : nat → A) :
-    surjective h → ∀ x, ¬ cofinal nat le (least_domain_subset_including h x).
-  Proof.
-    intros Hh x Hcf.
-    destruct (Hh x) as [k Hk].
-    destruct (Hcf (S k)) as [l [Hl1 Hl2]].
-    specialize (Hl1 k).
-    assert (l ≤ k); [eauto|lia].
-  Qed.
-
-  Lemma serjective_pre_image_bounded (h : nat → A) (Hhsurj : surjective h) :
-    smaller_card A nat → ∃ n, ∀ a, ∃ i, i ≤ n ∧ h i = a.
-  Proof.
-    intros Hsmc.
-    assert (¬ cofinal
-              nat le (quantifiers.union _ (least_domain_subset_including h)))
-      as Hncf.
-    { intros [x Hx]%regular_union_biger; auto using nat_regular with lia.
-      apply least_domain_subset_including_all_not_cofinal in Hx; done. }
-    apply not_forall_exists_not in Hncf as [n Hncf].
-    exists n; intros a.
-    destruct (dec_inh_nat_subset_has_unique_least_element (λ n, h n = a))
-      as [i [[Hi1 Hi2] Hi3]]; [|apply Hhsurj; done|].
-    { intros k; destruct (decide (h k = a)); eauto. }
-    exists i; split; [|done].
-    destruct (decide (i < n)); [lia|].
-    exfalso; apply Hncf.
-    exists i; split; [|lia].
-    exists a; intros m [j [Hj1 Hj2]].
-    etrans; [apply Hi2; apply Hj2|lia].
-  Qed.
-
-  Lemma smaller_card_nat_finite `{!EqDecision A} :
-    smaller_card A nat → Finite A.
+  Lemma smaller_card_nat_finite : smaller_card A nat → Finite A.
   Proof.
     intros HA.
     apply (epsilon (P := λ _, True)).
-    destruct (ExcludedMiddle (∃ h : nat → A, surjective h)) as [[h Hh]|Hnsurj].
-    - destruct (serjective_pre_image_bounded h) as [n Hn]; [done|done|].
-      unshelve eexists {| enum := remove_dups (list_generated_by h n) |};
-        [| |done].
-      + apply NoDup_remove_dups.
-      + intros a; apply elem_of_remove_dups.
-        destruct (Hn a) as [i [Hi1 Hi2]].
-        apply elem_of_list_generated_by; eauto.
-    - assert (∀ h : nat → A, ¬ surjective h) as Hnsurj'.
-      { apply not_exists_forall_not; done. }
-      specialize (HA (nosurj_make_inj_fun Hnsurj')).
-      exfalso; apply HA.
-      apply nosurj_make_inj_fun_inj.
+    destruct (ExcludedMiddle (∃ _ : Finite A, True)); [done|].
+    assert (∀ x : Finite A, False) as Hnfin.
+    { cut (∀ x : Finite A, ¬ True); [tauto|].
+      eapply not_exists_forall_not; done. }
+    exfalso.
+    apply (HA (no_fin_make_inj_fun Hnfin)).
+    apply no_fin_make_inj_fun_inj.
   Qed.
 
 End smaller_card_nat_finite.
 
+(* move *)
+
+Lemma NoDup_list_prod {A B} (l : list A) (l' : list B) :
+  NoDup l → NoDup l' → NoDup (list_prod l l').
+Proof.
+  revert l'; induction l as [|a l]; intros l' Hl Hl'.
+  { apply NoDup_nil_2. }
+  inversion Hl; simplify_eq.
+  simpl.
+  apply NoDup_app; split; [|split].
+  - apply NoDup_fmap; [|done].
+    intros ? ?; inversion 1; trivial.
+  - intros [x y] [z [Hz1 Hz2]]%elem_of_list_fmap; simplify_eq.
+    intros Hin%elem_of_list_In.
+    apply in_prod_iff in Hin as [Hin1%elem_of_list_In Hin2]; done.
+  - apply IHl; done.
+Qed.
+
 Section finite_lemmas.
   Context `{!EqDecision A} `{!EqDecision B}.
 
-  Lemma sig_finite_and (P : A → Prop) (Q : B → Prop)
+  Program Instance sig_finite_and (P : A → Prop) (Q : B → Prop)
         `{!∀ x, Decision (P x)} `{!∀ x, ProofIrrel (P x)}
-        `{!∀ x, Decision (Q x)} `{!∀ x, ProofIrrel (Q x)} :
-    Finite {x : A | P x} →
-    Finite {x : B | Q x} →
-    Finite {x : A * B | P (fst x) ∧ (Q (snd x))}.
+        `{!∀ x, Decision (Q x)} `{!∀ x, ProofIrrel (Q x)}
+        (HfP : Finite {x : A | P x})
+        (HfQ : Finite {x : B | Q x}) :
+    Finite {x : A * B | P (fst x) ∧ (Q (snd x))} :=
+    {| enum :=
+         (λ x, sig_prod_and x.1 x.2)
+           <$> (list_prod (@enum _ _ HfP) (@enum _ _ HfQ)) |}.
+  Next Obligation.
   Proof.
-  Admitted.
+    intros.
+    apply NoDup_fmap.
+    { intros [[] []] [[] []].
+      unfold sig_prod_and; simpl; inversion 1; simplify_eq.
+      f_equal; apply sig_eq; done. }
+    apply NoDup_list_prod; apply NoDup_enum.
+  Qed.
+  Next Obligation.
+  Proof.
+    intros ? ? ? ? ? ? ? ? [[a b] [Ha Hb]].
+    apply elem_of_list_fmap.
+    exists (a ↾ Ha, b ↾ Hb); split.
+    { apply sig_eq; done. }
+    apply elem_of_list_In, in_prod_iff.
+    split; apply elem_of_list_In, elem_of_enum.
+  Qed.
+
+  Program Instance sig_finite_eq1 (a : A) : Finite {x : A | x = a} :=
+    {| enum := [a ↾ eq_refl] |}.
+  Next Obligation.
+  Proof. intros; apply NoDup_singleton. Qed.
+  Next Obligation.
+  Proof. intros ? [? ?]; apply elem_of_list_singleton; apply sig_eq; done. Qed.
+
+  Program Instance sig_finite_eq2 (a : A) : Finite {x : A | a = x} :=
+    {| enum := [a ↾ eq_refl] |}.
+  Next Obligation.
+  Proof. intros; apply NoDup_singleton. Qed.
+  Next Obligation.
+  Proof. intros ? [? ?]; apply elem_of_list_singleton; apply sig_eq; done. Qed.
+
+  Program Instance sig_finite_or (P : A → Prop) (Q : A → Prop)
+          `{!∀ x, Decision (P x)} `{!∀ x, ProofIrrel (P x)}
+          `{!∀ x, Decision (Q x)} `{!∀ x, ProofIrrel (Q x)}
+          (HfP : Finite {x : A | P x})
+          (HfQ : Finite {x : A | Q x}) :
+    Finite {x : A | P x ∨ Q x} :=
+    {| enum :=
+         remove_dups ((sig_prod_or_l <$> (@enum _ _ HfP))
+            ++ (sig_prod_or_r <$> (@enum _ _ HfQ))) |}.
+  Next Obligation.
+  Proof. intros; apply NoDup_remove_dups. Qed.
+  Next Obligation.
+  Proof.
+    intros ? ? ? ? ? ? ? ? [a [Ha|Ha]].
+    - pose proof (@elem_of_enum _ _ HfP (a ↾ Ha)).
+      apply elem_of_remove_dups.
+      apply elem_of_app.
+      left.
+      apply elem_of_list_fmap; eexists; split; last done; done.
+    - pose proof (@elem_of_enum _ _ HfQ (a ↾ Ha)).
+      apply elem_of_remove_dups.
+      apply elem_of_app.
+      right.
+      apply elem_of_list_fmap; eexists; split; last done; done.
+  Qed.
 
 End finite_lemmas.
+
+Lemma finite_eq_dec_irrel {A} (HA HA' : EqDecision A) :
+  @Finite _ HA → @Finite _ HA'.
+Proof.
+  intros [e HeND Heall].
+  refine {| enum := e |}; [done|done].
+Qed.

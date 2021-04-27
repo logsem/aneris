@@ -1,6 +1,6 @@
 From Coq.Unicode Require Import Utf8.
 From Coq.micromega Require Import Lia.
-From aneris.prelude Require Import classical.
+From aneris.prelude Require Import classical sigma.
 
 Definition injective {A B} (f : A → B) := ∀ x y, f x = f y → x = y.
 

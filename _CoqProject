@@ -10,6 +10,7 @@
 
 theories/prelude/classical.v
 theories/prelude/quantifiers.v
+theories/prelude/sigma.v
 theories/prelude/finitary.v
 theories/prelude/iris_extraction.v
 theories/prelude/fixpoint.v
