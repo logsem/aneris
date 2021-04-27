@@ -42,8 +42,6 @@ Definition receivefrom_nodup_set : val :=
      if: set_equal !"sndrs" "addrs" then !"msgs" else
      let: "msg" := "rcv" "socket" in
      let: "sndr" := Snd "msg" in
-     (* if: set_mem "sndr" !"sndrs" then "loop" #() *)
-     (* else *)
      "sndrs" <- set_add "sndr" !"sndrs";;
      "msgs"  <- set_add "msg"  !"msgs";;
      "loop" #()) #().
