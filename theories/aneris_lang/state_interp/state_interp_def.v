@@ -253,21 +253,9 @@ Section Aneris_AS.
               (state_sockets c') (aneris_AS_mhist δ).
 
   Instance: ∀ c δ c' x, Decision (P c δ c' x).
-  Proof.
-    unfold P.
-    intros.
-    destruct
-      (decide (x = message_history_evolution
-                     (state_ms c) (state_ms c') (state_sockets c)
-                     (state_sockets c') (aneris_AS_mhist δ))) as [->|].
-    - left; done.
-    - right; done.
-  Qed.
+  Proof. unfold P; apply _. Qed.
 
   Let Q δ u := user_model_evolution (aneris_AS_model δ) u.
-
-  Instance: ∀ δ, Inhabited {x | Q δ x}.
-  Proof. intros. refine (populate (_ ↾ or_introl eq_refl)). Qed.
 
   Let fin_type' c δ c' :=
     {x : messages_history * model_state Mdl | P c δ c' x.1 ∧ Q δ x.2 }.
@@ -285,8 +273,9 @@ Section Aneris_AS.
   Proof.
     intros ?????.
     eapply finite_smaller_card_nat.
-    unshelve eapply (bijective_finite (fun_forward _ _ _ _) (fun_back _ _ _ _)).
-    - apply _.
+    eapply (λ H1 H2,
+            @bijective_finite
+              _ _ H1 _ H2 (fun_forward _ _ _ _) (fun_back _ _ _ _)).
     - unfold fin_type'.
       pose proof (sig_finite_and (P c δ c') (Q δ)) as Hcnv.
       apply Hcnv.
