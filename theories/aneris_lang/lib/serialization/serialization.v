@@ -29,8 +29,10 @@ Definition int_ser : base_lang.val := λ: "v", i2s "v".
 
 Definition int_deser : base_lang.val := λ: "v", unSOME (s2i "v").
 
+Definition int_ser_str (i : Z) : string := StringOfZ i.
+
 Definition int_is_ser (v : base_lang.val) (s : string) :=
-  ∃ (i : Z), v = #i ∧ s = StringOfZ i.
+  ∃ (i : Z), v = #i ∧ s = int_ser_str i.
 
 Lemma int_ser_spec `{!anerisG Mdl Σ} ip v :
   {{{ ⌜int_valid_val v⌝ }}}
@@ -176,10 +178,13 @@ Section prod_serialization.
   Definition prod_valid_val (v : base_lang.val) :=
     ∃ v1 v2, v = (v1, v2)%V ∧ DBS_valid_val A v1 ∧ DBS_valid_val B v2.
 
+  Definition prod_ser_str (s1 s2 : string) :=
+    StringOfZ (String.length s1) +:+ "_" +:+ s1 +:+ s2.
+
   Definition prod_is_ser (v : base_lang.val) (s : string) :=
     ∃ v1 v2 s1 s2,
       v = (v1, v2)%V ∧ DBS_is_ser A v1 s1 ∧ DBS_is_ser B v2 s2 ∧
-      s = StringOfZ (String.length s1) +:+ "_" +:+ s1 +:+ s2.
+      s = prod_ser_str s1 s2.
 
   Lemma prod_ser_spec `{!anerisG Mdl Σ} ip v:
     {{{ ⌜prod_valid_val v⌝ }}}
@@ -198,7 +203,7 @@ Section prod_serialization.
     iApply "HΦ".
     iPureIntro.
     exists v1, v2, s1, s2; split_and!; auto.
-    rewrite !assoc; done.
+    rewrite /prod_ser_str !assoc; done.
   Qed.
 
   Lemma prod_deser_spec `{!anerisG Mdl Σ} ip v s:
@@ -207,7 +212,7 @@ Section prod_serialization.
     {{{ RET v; True }}}.
   Proof.
     iIntros (Φ (v1 & v2 & s1 & s2 & -> & Hv1 & Hv2 & ->)) "HΦ".
-    rewrite /prod_deser /prod_is_ser.
+    rewrite /prod_deser /prod_is_ser /prod_ser_str.
     wp_pures.
     wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
     erewrite (index_0_append_char ); auto; last first.
@@ -294,10 +299,13 @@ Section sum_serialization.
     ∃ w, (v = InjLV w ∧ DBS_valid_val A w) ∨
          (v = InjRV w ∧ DBS_valid_val B w).
 
+  Definition inl_ser_str (s : string) := "L_" +:+ s.
+  Definition inr_ser_str (s : string) := "R_" +:+ s.
+
   Definition sum_is_ser (v : base_lang.val) (s : string) :=
     ∃ w s',
-      (v = InjLV w ∧ DBS_is_ser A w s' ∧ s = "L_" +:+ s') ∨
-      (v = InjRV w ∧ DBS_is_ser B w s' ∧ s = "R_" +:+ s').
+      (v = InjLV w ∧ DBS_is_ser A w s' ∧ s = inl_ser_str s') ∨
+      (v = InjRV w ∧ DBS_is_ser B w s' ∧ s = inr_ser_str s').
 
   Lemma sum_ser_spec `{!anerisG Mdl Σ} ip v:
     {{{ ⌜sum_valid_val v⌝ }}}
@@ -391,6 +399,10 @@ Section option_serialization.
   Context (T : serialization).
 
   Definition option_valid_val := @sum_valid_val unit_serialization T.
+
+  Definition option_None_ser_str := inl_ser_str "".
+  Definition option_Some_ser_str (s : string) := inr_ser_str s.
+
   Definition option_is_ser := @sum_is_ser unit_serialization T.
 
   Lemma option_ser_spec `{!anerisG Mdl Σ} ip v:
