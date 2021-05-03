@@ -293,4 +293,57 @@ Section library.
     iApply "HΦ". iFrame.
   Qed.
 
+  Lemma wp_sendto_all_vs P Q E m ip a h s ns nodes R :
+    let msg n := mkMessage a n (sprotocol s) m in
+    ip = ip_of_address a →
+    saddress s = Some a →
+    is_set (LitV ∘ LitSocketAddress) nodes ns →
+    □ (∀ n,
+          P ∗ ⌜n ∈ nodes⌝ ={⊤, E}=∗
+          ∃ T φ, a ⤳ (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
+          (a ⤳ (R, {[msg n]} ∪ T) ={E, ⊤}=∗ P ∗ Q n)) -∗
+    {{{ P ∗ h ↪[ip] s }}}
+      sendto_all_set #(LitSocket h) ns #m @[ip]
+    {{{ RET #(); P ∗ h ↪[ip] s ∗ [∗ set] n ∈ nodes, Q n }}}.
+  Proof.
+    iIntros (????) "#Hvs". iIntros (Φ) "!# [HP Hh] HΦ".
+    rewrite /sendto_all_set. wp_pures.
+    wp_apply (wp_set_iter (LitV ∘ LitSocketAddress)
+                          (λ n, True)%I Q (P ∗ h ↪[ip] s)%I _ nodes
+                with "[] [$HP $Hh]").
+    { iIntros (n Ψ) "!# (% & [HP Hh] & _) HΨ".
+      wp_pures.
+      iMod ("Hvs" with "[$HP //]") as (T φ) "(Ha & #Hn & Hf & Hclose)".
+      wp_send "Hf"; [done|].
+      iMod ("Hclose" with "Ha") as "[HP HQ]".
+      iModIntro. iApply "HΨ". iFrame. }
+    { iFrame "%". by iApply big_sepS_intuitionistically_forall. }
+    rewrite -bi.sep_assoc //.
+  Qed.
+
+  Lemma wp_pers_sendto_all_vs P Q E m ip a h s ns nodes R :
+    let msg n := mkMessage a n (sprotocol s) m in
+    ip = ip_of_address a →
+    saddress s = Some a →
+    is_set (LitV ∘ LitSocketAddress) nodes ns →
+    □ (∀ n,
+          P ∗ ⌜n ∈ nodes⌝ ={⊤, E}=∗
+          ∃ T φ ψ, a @ ψ ⤳# (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
+          (a @ ψ ⤳# (R, {[msg n]} ∪ T) ={E, ⊤}=∗ P ∗ Q n)) -∗
+    {{{ P ∗ h ↪[ip] s }}}
+      sendto_all_set #(LitSocket h) ns #m @[ip]
+    {{{ RET #(); P ∗ h ↪[ip] s ∗ [∗ set] n ∈ nodes, Q n }}}.
+  Proof.
+    iIntros (????) "#Hvs".
+    iApply wp_sendto_all_vs; [done..|].
+    iIntros "!#" (?) "[HP %]".
+    iMod ("Hvs" with "[$HP //]") as (T φ ψ) "(Ha & Hsi & Hφ & Hclose)".
+    rewrite {3 4}mapsto_messages_pers_eq /mapsto_messages_pers_def.
+    iDestruct "Ha" as "(% & Ha & HR)".
+    iModIntro. iExists _, _. do 2 iFrame.
+    iIntros "Ha /=".
+    iMod ("Hclose" with "[Ha HR]"); [|eauto].
+    by iFrame.
+  Qed.
+
 End library.
