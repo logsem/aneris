@@ -5,6 +5,13 @@ From iris.prelude Require Import options.
 
 Definition dfrac_oneshotR (A : ofe) := csumR dfracR (agreeR A).
 
+Definition dfrac_oneshotΣ A : gFunctors :=
+    #[GFunctor (dfrac_oneshotR A)].
+
+Global Instance subG_dfrac_oneshotG {Σ} (A : ofe) :
+  subG (dfrac_oneshotΣ A) Σ → inG Σ (dfrac_oneshotR A).
+Proof. solve_inG. Qed.
+
 Section def.
   Context `{!inG Σ (dfrac_oneshotR A)}.
 
