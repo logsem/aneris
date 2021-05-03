@@ -1,3 +1,4 @@
+From iris.bi.lib Require Import fractional.
 From iris.algebra Require Import dfrac agree csum.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Export own.
@@ -53,6 +54,16 @@ Section dfrac_oneshot_lemmas.
   Global Instance pending_timeless γ q : Timeless (pending γ q).
   Proof. rewrite pending_eq /pending_def. apply _. Qed.
 
+  Global Instance pending_fractional γ : Fractional (λ q, pending γ q).
+  Proof.
+    intros ??.
+    rewrite pending_eq /pending_def -own_op -Cinl_op dfrac_op_own; auto.
+  Qed.
+
+  Global Instance pending_as_fractional γ q :
+    AsFractional (pending γ q) (λ q, pending γ q)%I q.
+  Proof. split; [done|]. apply _. Qed.
+
   Global Instance pending_discared_timeless γ : Timeless (pending_discarded γ).
   Proof.
     rewrite /pending_discarded pending_discarded_aux.(seal_eq). apply _.
@@ -70,12 +81,6 @@ Section dfrac_oneshot_lemmas.
 
   Global Instance shot_persistent γ a : Persistent (shot γ a).
   Proof. rewrite shot_eq /shot_def. apply _. Qed.
-
-  Lemma pending_split γ p1 p2 :
-    pending γ (p1 + p2) ⊣⊢ pending γ p1 ∗ pending γ p2.
-  Proof.
-    rewrite pending_eq /pending_def -own_op -Cinl_op dfrac_op_own; auto.
-  Qed.
 
   Definition nat_to_Qp n := pos_to_Qp (Pos.of_nat n).
 
