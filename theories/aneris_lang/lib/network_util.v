@@ -293,14 +293,14 @@ Section library.
     iApply "HΦ". iFrame.
   Qed.
 
-  Lemma wp_sendto_all_vs P Q E m ip a h s ns nodes R :
+  Lemma wp_sendto_all_vs P Q E m ip a h s ns nodes :
     let msg n := mkMessage a n (sprotocol s) m in
     ip = ip_of_address a →
     saddress s = Some a →
     is_set (LitV ∘ LitSocketAddress) nodes ns →
     □ (∀ n,
           P ∗ ⌜n ∈ nodes⌝ ={⊤, E}=∗
-          ∃ T φ, a ⤳ (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
+          ∃ R T φ, a ⤳ (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
           (a ⤳ (R, {[msg n]} ∪ T) ={E, ⊤}=∗ P ∗ Q n)) -∗
     {{{ P ∗ h ↪[ip] s }}}
       sendto_all_set #(LitSocket h) ns #m @[ip]
@@ -313,7 +313,7 @@ Section library.
                 with "[] [$HP $Hh]").
     { iIntros (n Ψ) "!# (% & [HP Hh] & _) HΨ".
       wp_pures.
-      iMod ("Hvs" with "[$HP //]") as (T φ) "(Ha & #Hn & Hf & Hclose)".
+      iMod ("Hvs" with "[$HP //]") as (R T φ) "(Ha & #Hn & Hf & Hclose)".
       wp_send "Hf"; [done|].
       iMod ("Hclose" with "Ha") as "[HP HQ]".
       iModIntro. iApply "HΨ". iFrame. }
@@ -321,14 +321,48 @@ Section library.
     rewrite -bi.sep_assoc //.
   Qed.
 
-  Lemma wp_pers_sendto_all_vs P Q E m ip a h s ns nodes R :
+  Lemma wp_sendto_all_take_step P Q E m ip a h s ns nodes :
     let msg n := mkMessage a n (sprotocol s) m in
     ip = ip_of_address a →
     saddress s = Some a →
     is_set (LitV ∘ LitSocketAddress) nodes ns →
     □ (∀ n,
           P ∗ ⌜n ∈ nodes⌝ ={⊤, E}=∗
-          ∃ T φ ψ, a @ ψ ⤳# (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
+          ∃ R T φ δ δ',
+            ⌜Mdl δ δ'⌝ ∗ frag_st δ ∗
+             a ⤳ (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
+             (a ⤳ (R, {[msg n]} ∪ T) ∗ frag_st δ' ={E, ⊤}=∗ P ∗ Q n)) -∗
+    {{{ P ∗ h ↪[ip] s }}}
+      sendto_all_set #(LitSocket h) ns #m @[ip]
+    {{{ RET #(); P ∗ h ↪[ip] s ∗ [∗ set] n ∈ nodes, Q n }}}.
+  Proof.
+    iIntros (????) "#Hvs". iIntros (Φ) "!# [HP Hh] HΦ".
+    rewrite /sendto_all_set. wp_pures.
+    wp_apply (wp_set_iter (LitV ∘ LitSocketAddress)
+                          (λ n, True)%I Q (P ∗ h ↪[ip] s)%I _ nodes
+                with "[] [$HP $Hh]").
+    { iIntros (n Ψ) "!# (% & [HP Hh] & _) HΨ".
+      wp_pures.
+      wp_apply aneris_wp_atomic_take_step_model.
+      iMod ("Hvs" with "[$HP //]")
+        as (R T φ δ δ') "(% & Hfrag & Ha & #Hn & Hφ & Hclose)".
+      iModIntro. iExists _, _. iFrame "%"; iFrame.
+      wp_send "Hφ"; [done|].
+      iIntros "Hfrag".
+      iMod ("Hclose" with "[$Ha $Hfrag]") as "[HP HQ]".
+      iModIntro. iApply "HΨ". iFrame. }
+    { iFrame "%". by iApply big_sepS_intuitionistically_forall. }
+    rewrite -bi.sep_assoc //.
+  Qed.
+
+  Lemma wp_pers_sendto_all_vs P Q E m ip a h s ns nodes :
+    let msg n := mkMessage a n (sprotocol s) m in
+    ip = ip_of_address a →
+    saddress s = Some a →
+    is_set (LitV ∘ LitSocketAddress) nodes ns →
+    □ (∀ n,
+          P ∗ ⌜n ∈ nodes⌝ ={⊤, E}=∗
+          ∃ R T φ ψ, a @ ψ ⤳# (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
           (a @ ψ ⤳# (R, {[msg n]} ∪ T) ={E, ⊤}=∗ P ∗ Q n)) -∗
     {{{ P ∗ h ↪[ip] s }}}
       sendto_all_set #(LitSocket h) ns #m @[ip]
@@ -337,13 +371,39 @@ Section library.
     iIntros (????) "#Hvs".
     iApply wp_sendto_all_vs; [done..|].
     iIntros "!#" (?) "[HP %]".
-    iMod ("Hvs" with "[$HP //]") as (T φ ψ) "(Ha & Hsi & Hφ & Hclose)".
+    iMod ("Hvs" with "[$HP //]") as (R T φ ψ) "(Ha & Hsi & Hφ & Hclose)".
     rewrite {3 4}mapsto_messages_pers_eq /mapsto_messages_pers_def.
     iDestruct "Ha" as "(% & Ha & HR)".
-    iModIntro. iExists _, _. do 2 iFrame.
+    iModIntro. iExists _, _, _. do 2 iFrame.
     iIntros "Ha /=".
-    iMod ("Hclose" with "[Ha HR]"); [|eauto].
-    by iFrame.
+    iMod ("Hclose" with "[$Ha $HR]"); eauto.
+  Qed.
+
+  Lemma wp_pers_sendto_all_take_step P Q E m ip a h s ns nodes :
+    let msg n := mkMessage a n (sprotocol s) m in
+    ip = ip_of_address a →
+    saddress s = Some a →
+    is_set (LitV ∘ LitSocketAddress) nodes ns →
+    □ (∀ n,
+          P ∗ ⌜n ∈ nodes⌝ ={⊤, E}=∗
+          ∃ R T φ ψ δ δ',
+            ⌜Mdl δ δ'⌝ ∗ frag_st δ ∗
+            a @ ψ ⤳# (R, T) ∗ n ⤇ φ ∗ φ (msg n) ∗
+            (a @ ψ ⤳# (R, {[msg n]} ∪ T) ∗ frag_st δ' ={E, ⊤}=∗ P ∗ Q n)) -∗
+    {{{ P ∗ h ↪[ip] s }}}
+      sendto_all_set #(LitSocket h) ns #m @[ip]
+    {{{ RET #(); P ∗ h ↪[ip] s ∗ [∗ set] n ∈ nodes, Q n }}}.
+  Proof.
+    iIntros (????) "#Hvs".
+    iApply wp_sendto_all_take_step; [done..|].
+    iIntros "!#" (?) "[HP %]".
+    iMod ("Hvs" with "[$HP //]")
+      as (R T φ ψ δ δ') "(% & Hfrag & Ha & Hsi & Hφ & Hclose)".
+    rewrite {3 4}mapsto_messages_pers_eq /mapsto_messages_pers_def.
+    iDestruct "Ha" as "(% & Ha & HR)".
+    iModIntro. iExists _, _, _, _, _. iFrame "%"; do 2 iFrame.
+    iIntros "[Ha Hfrag] /=".
+    iMod ("Hclose" with "[$Ha $Hfrag $HR]"); eauto.
   Qed.
 
 End library.
