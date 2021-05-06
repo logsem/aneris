@@ -1,6 +1,5 @@
 From aneris.aneris_lang Require Import proofmode notation.
 From aneris.aneris_lang.lib Require Import util set list network_util.
-From iris_string_ident Require Import ltac2_string_ident.
 Set Default Proof Using "Type".
 Import Network.
 

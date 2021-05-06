@@ -1,6 +1,5 @@
 From aneris.aneris_lang Require Import lang tactics proofmode notation.
 From aneris.aneris_lang.lib Require Import assert list map set pers_socket_proto.
-From iris_string_ident Require Import ltac2_string_ident.
 
 Set Default Proof Using "Type".
 

@@ -3,7 +3,6 @@ From iris.algebra Require Import auth excl cmra gmap gset auth.
 From aneris.aneris_lang Require Import lifting tactics proofmode notation resources network state_interp.
 From aneris.aneris_lang.program_logic Require Import aneris_weakestpre
      aneris_adequacy.
-From iris_string_ident Require Import ltac2_string_ident.
 From aneris.examples.iterated_ping_pong Require Export code.
 From RecordUpdate Require Import RecordSet.
 

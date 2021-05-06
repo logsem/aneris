@@ -1,6 +1,5 @@
 From aneris.aneris_lang Require Import proofmode.
 From aneris.aneris_lang.lib Require Import util list.
-From iris_string_ident Require Import ltac2_string_ident.
 Set Default Proof Using "Type".
 
 Definition set_empty : val := λ: <>, [].

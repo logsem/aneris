@@ -1,6 +1,5 @@
 From stdpp Require Import fin_maps gmap.
 From iris.proofmode Require Import tactics.
-From iris_string_ident Require Import ltac2_string_ident.
 From aneris.aneris_lang Require Import aneris_lang notation network resources.
 From aneris.aneris_lang.state_interp Require Import state_interp_def.
 From aneris.aneris_lang.lib Require Import util.

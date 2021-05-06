@@ -3,8 +3,7 @@ From aneris.prelude Require Import quantifiers finitary sigma.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
-From iris_string_ident Require Import ltac2_string_ident.
-From aneris.program_logic Require Export weakestpre adequacy.
+
 From aneris.program_logic Require Import language ectx_lifting.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang notation network resources.
@@ -286,9 +285,8 @@ Section Aneris_AS.
                  (λ x, Mdl (aneris_AS_model δ) x)).
         * apply sig_finite_eq2.
         * eapply smaller_card_nat_finite; done.
-    - intros [[] ] [[] ] ?; simplify_eq/=.
+    - intros [[] ]; simplify_eq/=.
       eapply sig_eq; done.
-    - intros [[] ]; simpl; done.
   Qed.
 
 Global Instance anerisG_irisG `{!anerisG Mdl Σ} :

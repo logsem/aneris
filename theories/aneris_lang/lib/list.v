@@ -1,6 +1,5 @@
 From iris.base_logic.lib Require Export invariants.
 From aneris.aneris_lang Require Import lang proofmode notation.
-From iris_string_ident Require Import ltac2_string_ident.
 From aneris.aneris_lang.lib Require Import util.
 Set Default Proof Using "Type".
 

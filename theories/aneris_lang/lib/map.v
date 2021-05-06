@@ -2,7 +2,6 @@ From stdpp Require Export strings list pretty gmap.
 From aneris.prelude Require Import quantifiers.
 From aneris.aneris_lang Require Import lang notation tactics proofmode.
 From aneris.aneris_lang.lib Require Import list util.
-From iris_string_ident Require Import ltac2_string_ident.
 
 Definition map_empty : val :=
   λ: <>, [].
