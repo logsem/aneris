@@ -16,7 +16,7 @@ theories/prelude/iris_extraction.v
 theories/prelude/fixpoint.v
 
 theories/bi/weakestpre.v
-
+theories/lib/dfrac_oneshot.v
 theories/lib/gen_heap_light.v
 
 theories/program_logic/weakestpre.v
