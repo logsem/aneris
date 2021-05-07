@@ -390,10 +390,15 @@ Definition valid_state_evolution_finitary {Λ} (AS : AuxState Λ) :=
   ∀ c δ κ c',
     smaller_card (sig (λ δ', valid_state_evolution AS c δ κ c' δ')) nat.
 
+(* Notations on executions
+ * |-----------ex'-------|
+ * |-----------ex-----------|
+ * x1 ----------------- x2 x3
+ *)
 Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
         (s: stuckness)
         (φ : execution_trace Λ → auxiliary_trace AS → Prop)
-        e1 σ1 δ :
+        e1 σ1 δ1 :
   valid_state_evolution_finitary AS →
   (∀ `{Hinv : !invG Σ},
     ⊢ |={⊤}=> ∃
@@ -401,27 +406,27 @@ Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
          (Φ fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI σ1 δ [] 1 ∗
+       stateI σ1 δ1 [] 1 ∗
        WP e1 @ s; ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
-            δ' c κs,
+            δ3 c3 κs,
          ⌜valid_system_trace AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜auxtr_starts_in atr δ⌝ -∗
-         ⌜exec_ends_in ex c⌝ -∗
-         ⌜auxtr_ends_in atr δ'⌝ -∗
+         ⌜auxtr_starts_in atr δ1⌝ -∗
+         ⌜exec_ends_in ex c3⌝ -∗
+         ⌜auxtr_ends_in atr δ3⌝ -∗
          ⌜∀ ex' atr',
           exec_contract ex ex' → auxtr_contract atr atr' →
           φ ex' atr' ∧
-          ∀ δ4 c4 κs4,
-           exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
-           exec_last_obs ex κs4 →
-           valid_state_evolution AS c4.2 δ4 κs4 c.2 δ'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         stateI c.2 δ' κs (length c.1) -∗
-         posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
+          ∀ δ2 c2 κs2,
+           exec_ends_in ex' c2 → auxtr_ends_in atr' δ2 →
+           exec_last_obs ex κs2 →
+           valid_state_evolution AS c2.2 δ2 κs2 c3.2 δ3⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c3.1 → not_stuck e2 c3.2⌝ -∗
+         stateI c3.2 δ3 κs (length c3.1) -∗
+         posts_of c3.1 (Φ :: replicate (length c3.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜φ ex atr⌝)) →
-  continued_simulation φ (singleton_exec ([e1], σ1)) (singleton_auxtr δ).
+  continued_simulation φ (singleton_exec ([e1], σ1)) (singleton_auxtr δ1).
 Proof.
   intros Hsc Hwptp%wp_strong_adequacy_helper; last done.
   exists (λ exatr, ⊢ Gsim Σ AS s φ exatr.1 exatr.2); split; first done.
@@ -546,7 +551,7 @@ Proof.
   iIntros (ex atr δ' c κs Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
   iApply fupd_mask_intro_discard; first done.
   iIntros (c' Hc').
-  assert (c' = c) as -> by by eapply exec_ends_in_inj. 
+  assert (c' = c) as -> by by eapply exec_ends_in_inj.
   iSplit; last done.
   iIntros (v2 t2 ->); rewrite /= to_of_val /=.
   iDestruct "Hposts" as "[% ?]"; done.

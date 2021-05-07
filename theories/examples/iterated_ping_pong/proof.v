@@ -1,9 +1,13 @@
 From iris.base_logic.lib Require Import invariants.
 From iris.algebra Require Import auth excl cmra gmap gset auth.
-From aneris.aneris_lang Require Import lifting tactics proofmode notation resources network state_interp.
+From aneris.aneris_lang Require Import
+     lifting tactics proofmode notation resources network
+     state_interp adequacy.
 From aneris.aneris_lang.program_logic Require Import aneris_weakestpre
      aneris_adequacy.
 From aneris.examples.iterated_ping_pong Require Export code.
+From stdpp Require Import sets fin_sets.
+
 From RecordUpdate Require Import RecordSet.
 
 Import Network.
@@ -60,16 +64,16 @@ Section model.
   Inductive next : msg_trace -> msg_trace -> Prop :=
   | next_ping msgs dest :
       (* if we haven't already pinged the client *)
-      not (In (mkPing dest) msgs) ->
+      (mkPing dest) ∉ msgs ->
       (* and the client address is valid *)
       dest ∈ n_clients ->
       (* then we can ping *)
       next msgs (msgs ++_m (mkPing dest))
   | next_pong msgs sender :
       (* if we have already pinged the client that's responding *)
-      (In (mkPing sender) msgs) ->
+      (mkPing sender) ∈ msgs ->
       (* and the client hasn't already responded *)
-      not (In (mkPong sender) msgs) ->
+      (mkPong sender) ∉ msgs ->
       (* then the client can send a pong back *)
       next msgs (msgs ++_m (mkPong sender)).
 
@@ -80,8 +84,10 @@ Section model.
     model_rel := next
   |}.
   Next Obligation.
+    (* Proof irrelevance *)
   Admitted.
   Next Obligation.
+    (* next is decidable *)
   Admitted.
 End model.
 
@@ -294,7 +300,7 @@ Section inv.
       generic_inv mdl_st ∗
       (* If we have a ping token we can know that the corresponding ping
          message has been recorded in the model trace *)
-      ([∗ set] a ∈ n_clients, ((ping_tok a) ∨ ⌜In (mkPing a) mdl_st⌝)%I).
+      ([∗ set] a ∈ n_clients, ((ping_tok a) ∨ ⌜(mkPing a) ∈ mdl_st⌝)%I).
 
   (* User-level resource indicating that the given address is free *)
   Definition ufree (a : socket_address) : iProp Σ :=
@@ -519,9 +525,9 @@ Section inv.
                          (mdl : msg_trace) :
     ⌜a ∈ n_clients⌝ -∗
     ping_tok a -∗
-    ([∗ set] a ∈ n_clients, ping_tok a ∨ ⌜In (mkPing a) mdl⌝) -∗
-    (([∗ set] a ∈ n_clients, ping_tok a ∨ ⌜In (mkPing a) mdl⌝) ∗
-     ⌜In (mkPing a) mdl⌝).
+    ([∗ set] a ∈ n_clients, ping_tok a ∨ ⌜(mkPing a) ∈ mdl⌝) -∗
+    (([∗ set] a ∈ n_clients, ping_tok a ∨ ⌜(mkPing a) ∈ mdl⌝) ∗
+     ⌜(mkPing a) ∈ mdl⌝).
   Proof.
     iIntros "%Hin Htok Hall".
     iDestruct (big_sepS_elem_of_acc _ _ a with "Hall") as
@@ -577,13 +583,8 @@ Section inv.
   Qed.
 
   Lemma in_subseteq (m : message) (mdl : msg_trace) :
-    In m mdl -> {[m]} ⊆ trace_to_gset mdl.
-  Proof.
-    intros Hin.
-    rewrite -elem_of_subseteq_singleton
-             elem_of_list_to_set
-             elem_of_list_In; done.
-  Qed.
+    m ∈ mdl -> {[m]} ⊆ trace_to_gset mdl.
+  Proof. intros Hin. set_solver. Qed.
 
   Lemma recv_consistent_after_receive (handles : handle_map)
                                       (a : socket_address)
@@ -593,7 +594,7 @@ Section inv.
     recv_consistent mdl  handles ->
     handles !! a = Some st ->
     st.(recv) ∪ {[m]} = st'.(recv) ->
-    In m mdl ->
+    m ∈ mdl ->
     recv_consistent mdl (<[a := st']> handles).
   Proof.
     rewrite /recv_consistent.
@@ -673,9 +674,6 @@ Section inv.
     inversion Hsome'; auto.
   Qed.
 
-  From aneris Require Import lib.util.
-
-  From aneris Require Import program_logic.adequacy.
   (* Lemma socket_state_same_one σ κs k *)
   (*       (δ: aux_state (@aneris_AS ping_pong_model)) a hst: *)
   (*      state_interp σ δ κs k -∗ *)
@@ -874,7 +872,7 @@ Section client.
 
     iFrame; iSplit.
     { iPureIntro. rewrite Heqmdl'.
-      apply next_pong; rewrite <- elem_of_list_In; assumption. }
+      apply next_pong; set_solver. }
 
     (* Pick out socket protocol and apply wp_send *)
     iDestruct (uhandle_handle with "Huhandle Hauth_handles Hmapsto") as
@@ -918,8 +916,7 @@ Section client.
       { iApply (big_sepS_impl with "Htoks").
         iModIntro.
         iIntros (x) "_ [Htok | %Hin']"; [iLeft; iFrame |].
-        iRight; iPureIntro.
-        apply in_or_app; auto. }
+        iRight; iPureIntro. set_solver. }
       iExists  (dom (gset socket_address) handles),
                F,
                (<[client_addr:=st']> handles).
@@ -957,7 +954,7 @@ Section server.
   Context `{distG : !anerisG ping_pong_model Σ}.
 
   Definition server_si : socket_interp Σ :=
-    (λ msg, ∃ a, ⌜a ∈ n_clients /\ msg = mkPing a⌝)%I.
+    (λ msg, ∃ a, ⌜a ∈ n_clients /\ msg = mkPong a⌝)%I.
 
   Definition set_match_list (addrs : gset socket_address) (addrs': list socket_address): Prop :=
     list_to_set addrs' = addrs.
@@ -970,15 +967,181 @@ Section server.
 
   Lemma server_spec (ip : ip_address) l l':
     (set_match_list n_clients l') ->
+    (NoDup l') ->
     (is_list (map (LitV ∘ LitSocketAddress) l') l) ->
     ip = ip_of_address n_server ->
     {{{ inv inv_ns ping_pong_inv ∗
         fixed n_all ∗
+        free_ports (ip_of_address n_server) {[ port_of_address n_server ]} ∗
         ufree n_server ∗
-        n_server ⤇ server_si }}}
+        n_server ⤇ server_si ∗
+        ([∗ set] a ∈ n_clients, a ⤇ client_si a) ∗
+        n_server ⤳ (∅, ∅)
+    }}}
       server #n_server l  @[ip]
     {{{ v, RET v; True }}}.
-  Proof. Admitted.
+  Proof.
+    iIntros (Hml Hnd Hislist -> Φ) "(#Hinv&#Hfixed&Hfp&Hfree&#Hprot&#Hcprots&Hlt) Hkont".
+    rewrite /server. wp_pures.
+    wp_bind (NewSocket _ _ _)%E.
+    wp_socket sh as "Hsh". wp_pures.
+    wp_bind (SocketBind _ _)%E.
+    iInv inv_ns as (mdl) "> (Hgen & Htoks)" "Hclose".
+    iDestruct "Hgen" as (P F handles) "(%Hdisj & Hfree_auth &
+              %Hdom & Hauth_handles & #Haddrs_match & Hmapsto & Hrest)".
+    assert (Hin_all: n_server ∈ n_all) by set_solver.
+    iDestruct (ufree_free with "Hfree Hfree_auth") as
+        "(Hufree & %Helem & Hfree_auth)".
+    wp_socketbind_static.
+    (* Now close the invariant *)
+    iMod (ufree_delete with "Hfree_auth Hufree") as "Hfree_auth".
+    iMod (uhandle_alloc with "[] Hauth_handles Hmapsto Hsh Hlt") as
+        "(Huhandle & Hauth_handles' & Hmapsto')".
+    { iPureIntro; subst ; set_solver. }
+    iMod ("Hclose" with "[Htoks Hfree_auth Hrest Hauth_handles' Hmapsto']") as "_".
+    { iNext. iExists mdl.
+      iFrame.
+      iExists (P ∪ {[ n_server ]}), (F ∖ {[ n_server ]}), _.
+      iDestruct "Hrest" as "(Hfrag & %Hsent & %Hrecv)".
+      iFrame.
+      repeat iSplit; try iPureIntro.
+      - set_solver.
+      - set_solver.
+      - unfold handle_addrs_match.
+        iApply big_sepM_insert.
+        { apply not_elem_of_dom; set_solver. }
+        iFrame "#".
+        repeat iSplit; eauto.
+      - unfold sent_consistent.
+        rewrite handles_big_union_insert_new;
+          (try apply not_elem_of_dom); set_solver.
+      - unfold recv_consistent.
+        rewrite handles_big_union_insert_new;
+          (try apply not_elem_of_dom); set_solver.
+    }
+    iModIntro; wp_pures.
+    wp_apply (wp_list_iter_invariant
+                (λ a, a ⤇ client_si a)
+                (λ a, True%I)
+                (λ lx, n_server ↪h (sh, udp_socket (Some n_server) true, ∅, list_to_set (map mkPing lx)))%I
+                True%I _ l' l
+                with "[] [Huhandle Hprot] [Hkont]"); eauto; last first.
+    { iIntros "!> ?". by iApply "Hkont". }
+    { iSplit;eauto. iFrame "#∗".
+      unfold set_match_list in *. subst.
+      iApply big_sepS_list_to_set; eauto.
+      rewrite -Hml. eauto.
+    }
+    iIntros (a lind Ψ) "!# (%Hin&_&Hsock&#Hcprot) Hk".
+
+    iClear "Haddrs_match". clear mdl Hdisj Hdom Helem P F handles.
+    wp_pures.
+
+    iApply (aneris_wp_atomic_take_step_model) =>//.
+    iInv inv_ns as (mdl) "> (Hgen & Htoks)" "Hclose"; iModIntro.
+    iDestruct "Hgen" as (P F handles) "(%Hdisj & Hfree_auth & %Hdom & Hauth_handles & #Haddrs_match & Hmapsto & Hfrag_mdl & %Hscons & %Hrcons)".
+    remember (mdl ++_m (mkPing a)) as mdl'.
+    iExists mdl, mdl'.
+
+    iDestruct (uhandle_handles_some with "Hsock Hauth_handles") as "%Hsome".
+    (* Show that (mkPong client_addr) ∉ mdl' *)
+    iAssert (⌜(mkPing a) ∉ mdl⌝%I) as "%Hpong_notin".
+    { assert (Hanotin: a ∉ lind).
+      { destruct Hin as [b Hin]. subst.
+        apply NoDup_app in Hnd as (?&Hnotin&?).
+        intro Hcontra. have:= Hnotin _ Hcontra. set_solver. }
+      iIntros (contra).
+      iDestruct (sent_consistent_elem with "[] [] [] [] Haddrs_match")
+        as "%Hpong_in"; eauto with iFrame.
+      set_solver. }
+
+    assert (Hain: a ∈ n_clients).
+    { destruct Hin as [??]; subst. set_solver. }
+
+
+    iDestruct (big_sepS_delete _ _ a with "Htoks") as "[[Htoka|%Hcontra] Htoks]";
+      eauto; last first.
+    { exfalso. by apply Hpong_notin. }
+
+    iFrame; iSplit.
+    { iPureIntro. rewrite Heqmdl'.
+      by apply next_ping. }
+
+    iDestruct (uhandle_handle with "Hsock Hauth_handles Hmapsto") as
+          "(Huhandle & Hauth_handles & [Hmapstoph Hmapstolog] & Hmapsto_rest & _)".
+    rewrite /handle_addrs_match.
+
+    wp_apply (aneris_wp_send _ (client_si a) _ _ _ _ _
+                             (udp_socket (Some n_server) true)
+                with "[Hmapstolog Hmapstoph Htoka]"); eauto.
+    unfold handle_st_to_mapsto.
+    +  iFrame "∗#". iModIntro. simpl.
+       unfold client_si.
+       iSplit;eauto. iExists server_si. simpl. iFrame "#".
+       iIntros (m Hm). rewrite /server_si. subst.
+       iExists a. iPureIntro. split;eauto.
+    + iIntros "[Hshph Hshlog] Hfrag".
+      simpl.
+      remember (mkHandleSt sh
+                           (udp_socket (Some n_server) true)
+                           ∅
+                           ({[udp_msg n_server a "PING"]} ∪ list_to_set (map mkPing lind))) as st' eqn:Heq.
+      iMod (uhandle_update _ _ _ st' with
+                "[//] Hauth_handles Huhandle") as "[Hauth_handles' Huhandle']".
+      iMod ("Hclose" with "[-Hk Huhandle']") as "_"; last first.
+      { iModIntro. iApply "Hk". iSplitR; eauto. iSplitL; eauto.
+        subst.
+        assert (Heq: list_to_set (map mkPing (lind ++ [a])) ≡
+                     {[udp_msg n_server a "PING"]} ∪
+                        ((list_to_set (map mkPing lind)):gset _)).
+        { rewrite map_app. rewrite list_to_set_app. set_solver. }
+        assert (Hequiv: n_server ↪h (sh, udp_socket (Some n_server) true, ∅,
+                {[udp_msg n_server a "PING"]} ∪ list_to_set (map mkPing lind))
+                          ≡
+                          (n_server ↪h (sh, udp_socket (Some n_server) true, ∅,
+                                       list_to_set (map mkPing (lind ++ [a]))))).
+        { f_equiv. f_equiv. set_solver. }
+        by rewrite Hequiv. }
+
+      iModIntro.
+      rewrite /ping_pong_inv /generic_inv.
+      iExists (mdl ++_m mkPing a).
+      iSplitR "Htoks"; last first.
+      { iApply (big_sepS_delete _ _ a); eauto. iFrame. iSplitL "".
+        - iRight. iPureIntro. set_solver.
+        - iApply (big_sepS_impl with "Htoks").
+          iIntros "!#" (x Hxin) "[H|%Hxin2]";
+            [by iLeft | iRight; iPureIntro; set_solver ]. }
+
+      iExists  (dom (gset socket_address) handles),
+               F,
+               (<[n_server:=st']> handles).
+      iFrame; iFrame "#".
+      iSplitL ""; [iPureIntro; set_solver |].
+      iSplitL ""; [iPureIntro |].
+      { rewrite dom_insert_L.
+        rewrite subseteq_union_1_L; [reflexivity |].
+        rewrite -elem_of_subseteq_singleton elem_of_dom; eauto. }
+      iSplitL "Haddrs_match".
+      { rewrite /handle_addrs_match.
+        rewrite -insert_delete big_sepM_insert; [ | apply lookup_delete].
+        iSplitL "".
+        - rewrite /handle_addr_match Heq; simpl.
+          iSplitL; [done |].
+          iSplitL; [done |].
+          iApply big_sepS_forall. iIntros (x Hxin); iPureIntro.
+          set_solver.
+        - iDestruct (big_sepM_delete with "Haddrs_match") as
+              "[_ ?]"; [eauto | done].
+      }
+
+      iDestruct (mapsto_reconstitute_new with "Hshph Hshlog Hmapsto_rest") as "Hmapsto".
+
+      subst; iFrame.
+      iSplit; iPureIntro.
+      { eapply sent_consistent_after_send; eauto. simpl. set_solver. }
+      { eapply recv_consistent_after_send; eauto. }
+  Qed.
 
 End server.
 
@@ -1000,7 +1163,6 @@ Section alloc.
   Context `{!inG Σ handlesUR}.
   Context `{!inG Σ pingTokR}.
 
-  From iris Require Import algebra.auth.
 
   Definition ping_tok' (f: gmap socket_address gname) (a : socket_address) : iProp Σ :=
     match (f !! a) with
@@ -1100,7 +1262,7 @@ Section runner.
       runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(Hserver & Hprotos & #Hfixed & Hips & Hlts & Hufrees & #Hinv) Hkont". rewrite /runner.
+    iIntros (Φ) "(Hserver&#Hprotos&#Hfixed&Hips&Hlts&Hufrees&#Hinv) Hkont". rewrite /runner.
     rewrite /n_clients /ping_pong_topo.
     iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.1") with "Hips") as "[Hn1 Hips]"; first set_solver.
     iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.2") with "Hips") as "[Hn2 Hips]"; first set_solver.
@@ -1112,8 +1274,8 @@ Section runner.
     iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.3") with "Hlts") as "[Hlt3 Hlts]"; first set_solver.
     iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.99") with "Hlts") as "[Hlts _]"; first set_solver.
 
-    iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.1") with "Hprotos") as "[Hp1 Hprotos]"; first set_solver.
-    iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.2") with "Hprotos") as "[Hp2 Hprotos]"; first set_solver.
+    iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.1") with "Hprotos") as "[Hp1 _]"; first set_solver.
+    iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.2") with "Hprotos") as "[Hp2 _]"; first set_solver.
     iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.3") with "Hprotos") as "[Hp3 _]"; first set_solver.
 
     iDestruct (big_sepS_delete _ _ (mkAddr "0.0.0.1") with "Hufrees") as "[Hu1 Hufrees]"; first set_solver.
@@ -1161,9 +1323,11 @@ Section runner.
     wp_apply (aneris_wp_start {[80%positive]} with "[-]"); auto. iFrame.
 
     iSplitL "Hkont"; first by iApply "Hkont".
-    iModIntro. iIntros "_".
+    iModIntro. iIntros "?".
     iApply (server_spec _ _ [mkAddr "0.0.0.1"; mkAddr "0.0.0.2"; mkAddr "0.0.0.3"] with "[-]"); eauto.
     { set_solver. }
+    { do 4 (econstructor; try set_solver). }
+    iFrame "∗#".
   Qed.
 
 End runner.
@@ -1208,7 +1372,7 @@ Section simulation.
   Definition n_all_piu: ports_in_use :=
     list_to_map [ mkAddrPair "0.0.0.1"; mkAddrPair "0.0.0.2"; mkAddrPair "0.0.0.3"; mkAddrPair "0.0.0.99" ].
 
-  Definition initial_state: state aneris_lang := {|
+  Definition initial_state: state := {|
     state_heaps := {["system" := ∅]};
     state_sockets := {["system" := ∅]};
     state_ports_in_use := n_all_piu;
@@ -1248,16 +1412,8 @@ Section simulation.
               (forall m, m ∈ hst.(sent) -> (m.(m_sender) = a ∧ m ∈ mh.2))
       end.
 
-  Definition runner_expr: expr aneris_lang := mkExpr "system" runner.
+  Definition runner_expr: aneris_expr := mkExpr "system" runner.
 
-
-  From stdpp Require Import sets.
-  From aneris Require Import lib.util.
-
-  (* Lemma big_sepS_gset_map Φ Ψ X f g: *)
-  (*  forall x, f (g x) = x *)
-  (*   ([∗ set] x ∈ X, Φ x) -∗ *)
-  (*   [∗ set] x ∈ (gset_map f X), Ψ (g x). *)
 
   Class ppG Σ := { free_ur_inG:> inG Σ freeUR
                  ; handles_inG:> inG Σ handlesUR
@@ -1270,12 +1426,6 @@ Section simulation.
 
   Instance subG_ppΣ {Σ}: subG myΣ Σ -> ppG Σ.
   Proof. solve_inG. Qed.
-
-  (* Instance whatamidoing: anerisG myΣ ping_pong_model. *)
-  (* Proof. Admitted. *)
-
-  From stdpp Require Import fin_sets.
-  From aneris.aneris_lang Require Import adequacy.
 
   Theorem ping_pong_simulation :
     continued_simulation

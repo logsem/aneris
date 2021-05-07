@@ -213,6 +213,52 @@ Section list_specs.
       rewrite Nat2Z.inj_add. iApply "HΦ"; by auto.
   Qed.
 
+  Lemma wp_list_iter_invariant' {A} Φ1 Φ2 (Ψ: list A -> iProp Σ) P ip (l : list A) lv handler
+        (toval : A -> val) lrest:
+    (∀ (a : A) l',
+        {{{ ⌜exists b, lrest++l = l' ++ a :: b⌝ ∗ P ∗ Ψ l' ∗ Φ1 a }}}
+          (Val handler) (toval a) @[ip]
+        {{{v, RET v; P ∗ Ψ (l' ++ [a]) ∗ Φ2 a }}}) -∗
+    {{{ ⌜is_list (map toval l) lv⌝ ∗ P ∗ Ψ lrest ∗ [∗ list] a∈l, Φ1 a}}}
+      list_iter (Val handler) lv @[ip]
+    {{{ RET #(); P ∗ Ψ (lrest++l) ∗ [∗ list] a∈l, Φ2 a }}}.
+  Proof.
+    rewrite /list_iter.
+    iInduction l as [|a l'] "IH" forall (lv lrest);
+    iIntros "#Helem"; iIntros (Φ') "!# (Ha & HP & Hl & HΦ) Hk";
+    iDestruct "Ha" as %Ha; simpl in Ha; subst; wp_pures.
+    - rewrite app_nil_r. iApply "Hk"; iFrame. done.
+    - assert (Helemof: a ∈ a :: l').
+      { constructor. }
+      destruct Ha as [lv' [Hlv Hlcoh]]; subst.
+      wp_pures.
+      iDestruct (big_sepL_cons with "HΦ") as "[Ha Hl']".
+      wp_apply ("Helem" with "[HP Hl Ha]"); iFrame; eauto.
+      iIntros (v) "(HP & Ha & HΦ)". simpl. wp_seq.
+      iApply ("IH" $! lv' (lrest ++ [a]) with "[] [$HP Ha Hl']"); eauto.
+      { iIntros (a' lrest' HΦ'') "!# (%Hin'&HP&Hlrest'&HΦ) Hk".
+        wp_apply ("Helem" with "[HP Hlrest' HΦ]"); iFrame.
+        iPureIntro. destruct Hin' as [b Hin']. exists b.
+        by rewrite -app_assoc in Hin'. }
+      { iSplit; eauto. iFrame. }
+      iNext. iIntros "(HP & Hl)". iApply "Hk". iFrame.
+        by rewrite -app_assoc /=.
+  Qed.
+
+  Lemma wp_list_iter_invariant {A} Φ1 Φ2 (Ψ: list A -> iProp Σ) P ip (l : list A) lv handler
+        (toval : A -> val):
+    (∀ (a : A) l',
+        {{{ ⌜exists b, l = l' ++ a :: b⌝ ∗ P ∗ Ψ l' ∗ Φ1 a }}}
+          (Val handler) (toval a) @[ip]
+        {{{v, RET v; P ∗ Ψ (l' ++ [a]) ∗ Φ2 a }}}) -∗
+    {{{ ⌜is_list (map toval l) lv⌝ ∗ P ∗ Ψ [] ∗ [∗ list] a∈l, Φ1 a}}}
+      list_iter (Val handler) lv @[ip]
+    {{{ RET #(); P ∗ Ψ l ∗ [∗ list] a∈l, Φ2 a}}}.
+  Proof.
+    replace l with ([]++l); last by apply app_nil_l.
+    iApply wp_list_iter_invariant'.
+  Qed.
+
   Lemma wp_list_iter {A} Φ Ψ P ip (l : list A) lv handler
         (toval : A -> val) :
     (∀ (a : A),

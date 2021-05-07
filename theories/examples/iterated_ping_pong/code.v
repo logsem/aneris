@@ -23,7 +23,7 @@ Definition server : base_lang.val :=
                              #Network.IPPROTO_UDP in
   SocketBind "socket" "my_addr";;
   list_iter (λ: "client_addr",
-              SendTo "socket" #"PING" #"client_addr")
+              SendTo "socket" #"PING" "client_addr")
             "client_addrs".
 
 (* Client code. The client waits for a "PING" message and
@@ -83,4 +83,3 @@ Definition start_clients : base_lang.val :=
                    (client (Snd "ip_addr_pair")))
             "ip_addr_pairs".
 *)
-

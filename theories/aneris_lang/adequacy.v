@@ -128,12 +128,18 @@ Proof.
   iApply ("Hwp" with "[$]"); auto.
 Qed.
 
+
+(* Notations on executions
+ * |-----------ex'-------|
+ * |-----------ex-----------|
+ * x1 ----------------- x2 x3
+ *)
 Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
            (IPs: gset ip_address)
            (A B: gset socket_address)
            (ξ: execution_trace aneris_lang → auxiliary_trace aneris_AS → Prop)
-           ip e1 σ1 st (δ: aux_state (@aneris_AS Mdl)):
-  δ = {| aneris_AS_mhist := (∅,∅); aneris_AS_model := st |} ->
+           ip e1 σ1 st1 (δ1: aux_state (@aneris_AS Mdl)):
+  δ1 = {| aneris_AS_mhist := (∅,∅); aneris_AS_model := st1 |} ->
   (* The model has finite branching *)
   aneris_model_rel_finitary Mdl →
   (* The initial configuration satisfies certain properties *)
@@ -154,30 +160,30 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
   (*            to prove two goals *)
           fixed A -∗ ([∗ set] a ∈ A, a ⤇ (f a)) -∗
           ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗
-          ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗ frag_st st ={⊤}=∗
+          ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗ frag_st st1 ={⊤}=∗
           WP (mkExpr ip e1) @ s; ⊤ {{ Φ }} ∗
           □ (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace aneris_AS)
-            δ' c κs,
+            δ3 c3 κs3,
          ⌜valid_system_trace aneris_AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([mkExpr ip e1], σ1)⌝ -∗
-         ⌜auxtr_starts_in atr δ⌝ -∗
-         ⌜exec_ends_in ex c⌝ -∗
-         ⌜auxtr_ends_in atr δ'⌝ -∗
+         ⌜auxtr_starts_in atr δ1⌝ -∗
+         ⌜exec_ends_in ex c3⌝ -∗
+         ⌜auxtr_ends_in atr δ3⌝ -∗
          ⌜∀ ex' atr',
             exec_contract ex ex' → auxtr_contract atr atr' →
-            ξ ex' atr' ∧ ∀ δ4 c4 κs4,
-             exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
-             exec_last_obs ex κs4 →
-             valid_state_evolution aneris_AS c4.2 δ4 κs4 c.2 δ'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         state_interp c.2 δ' κs (length c.1) -∗
-         posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
+            ξ ex' atr' ∧ ∀ δ2 c2 κs2,
+             exec_ends_in ex' c2 → auxtr_ends_in atr' δ2 →
+             exec_last_obs ex κs2 →
+             valid_state_evolution aneris_AS c2.2 δ2 κs2 c3.2 δ3⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c3.1 → not_stuck e2 c3.2⌝ -∗
+         state_interp c3.2 δ3 κs3 (length c3.1) -∗
+         posts_of c3.1 (Φ :: replicate (length c3.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜ξ ex atr⌝)) →
   (* The coinductive pure coq proposition given by adequacy *)
   continued_simulation
     ξ
     (singleton_exec ([(mkExpr ip e1)], σ1))
-    (singleton_auxtr δ).
+    (singleton_auxtr δ1).
 Proof.
   intros Hδ Hsc Hips Hdom Hports Hsa Hheaps Hsockets Hms Hwp.
   eapply (wp_strong_adequacy aneris_lang aneris_AS Σ s ξ).
@@ -189,7 +195,7 @@ Proof.
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
   iMod free_ports_auth_init as (γpiu) "HPiu".
   iMod (messages_ctx_init B) as (γms) "[Hms HB]".
-  iMod (model_init δ.(aneris_AS_model)) as (γm) "[Hmdl_auth Hmdl_frag]".
+  iMod (model_init δ1.(aneris_AS_model)) as (γm) "[Hmdl_auth Hmdl_frag]".
   set (distG :=
          {|
            aneris_node_gnames_name := γmp;
@@ -215,7 +221,7 @@ Proof.
   iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp #Hγn]"; [done|].
   iAssert (is_node ip) as "Hn".
   { iExists _. eauto. }
-  subst δ.
+  subst δ1.
   iMod ("Himpl" with "[$] [$] [$] [$] [$] [$]") as "[Hwp #Himpl]".
   iModIntro. iExists state_interp, Φ, fork_post.
   iSplitL ""; first by iApply config_wp_correct.
