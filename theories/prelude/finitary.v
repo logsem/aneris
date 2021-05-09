@@ -1,7 +1,7 @@
 From Coq.Unicode Require Import Utf8.
 From Coq.micromega Require Import Lia.
-From aneris.prelude Require Import classical quantifiers sigma.
-From stdpp Require Import finite fin_sets.
+From aneris.prelude Require Import classical quantifiers sigma classical_instances.
+From stdpp Require Import finite fin_sets gmap.
 
 Section finite_smaller_card_nat.
   Context {A} `{!EqDecision A}.
@@ -247,3 +247,66 @@ Proof.
   intros [e HeND Heall].
   refine {| enum := e |}; [done|done].
 Qed.
+
+Section in_gset_finite.
+  Context `{!EqDecision A, !Countable A}.
+  Context {P : A → Prop} `{!∀ x : A, ProofIrrel (P x)}.
+
+  Local Instance: ∀ x, Decision (P x).
+  Proof. intros ?; apply make_decision. Qed.
+
+  Program Fixpoint Forall_to_sig (l : list A) : Forall P l → list (sig P) :=
+    match l as u return Forall P u → list (sig P) with
+    | [] => λ _, []
+    | a :: l' => λ Hal, (exist P a _) :: Forall_to_sig l' _
+    end.
+  Next Obligation.
+  Proof. intros ?; inversion 1; simplify_eq; done. Qed.
+  Next Obligation.
+  Proof. intros ?; inversion 1; simplify_eq; done. Qed.
+
+  Lemma elem_of_Forall_to_sig_1 l HPl x : x ∈ Forall_to_sig l HPl → `x ∈ l.
+  Proof.
+    revert HPl; induction l as [|a l IHl]; simpl; intros HPl Hx.
+    - by apply elem_of_nil in Hx.
+    - apply elem_of_cons; apply elem_of_cons in Hx as [->|]; simpl in *; eauto.
+  Qed.
+
+  Lemma elem_of_Forall_to_sig_2 l HPl x :
+    x ∈ l → ∃ Hx, x ↾ Hx ∈ Forall_to_sig l HPl.
+  Proof.
+    revert HPl; induction l as [|a l IHl]; simpl; intros HPl Hx.
+    - by apply elem_of_nil in Hx.
+    - inversion HPl as [|? ? Ha HPl']; simplify_eq.
+      apply elem_of_cons in Hx as [->|]; simpl in *.
+      + exists Ha; apply elem_of_cons; left; apply sig_eq; done.
+      + edestruct IHl as [Hx Hxl]; first done.
+        exists Hx; apply elem_of_cons; eauto.
+  Qed.
+
+  Lemma Forall_to_sig_NoDup l HPl : NoDup l → NoDup (Forall_to_sig l HPl).
+  Proof.
+    revert HPl; induction l as [|a l IHl]; simpl;
+      intros HPl; first by constructor.
+    inversion 1; inversion HPl; simplify_eq.
+    constructor; last by apply IHl.
+    intros ?%elem_of_Forall_to_sig_1; done.
+  Qed.
+
+  Lemma in_gset_finite (g : gset A) : (∀ x, P x → x ∈ g) → Finite {x : A | P x}.
+  Proof.
+    intros Hg.
+    assert (Forall P (filter P (elements g))) as Hels.
+    { apply Forall_forall.
+      intros ?; rewrite elem_of_list_filter; tauto. }
+    refine {| enum := Forall_to_sig (filter P (elements g)) Hels |}.
+    - apply Forall_to_sig_NoDup. apply NoDup_filter. apply NoDup_elements.
+    - intros x.
+      edestruct (elem_of_Forall_to_sig_2 _ Hels) as [Hx' ?].
+      { apply elem_of_list_filter; split; first apply (proj2_sig x).
+        apply elem_of_elements, Hg; apply (proj2_sig x). }
+      replace x with (`x ↾ Hx'); last by apply sig_eq.
+      done.
+  Qed.
+
+End in_gset_finite.

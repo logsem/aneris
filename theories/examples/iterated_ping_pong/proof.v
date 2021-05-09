@@ -7,6 +7,7 @@ From aneris.aneris_lang.program_logic Require Import aneris_weakestpre
      aneris_adequacy.
 From aneris.examples.iterated_ping_pong Require Export code.
 From stdpp Require Import sets fin_sets.
+From aneris.prelude Require Import finitary classical_instances.
 
 From RecordUpdate Require Import RecordSet.
 
@@ -83,12 +84,37 @@ Section model.
     model_state := msg_trace;
     model_rel := next
   |}.
-  Next Obligation.
-    (* Proof irrelevance *)
-  Admitted.
-  Next Obligation.
-    (* next is decidable *)
-  Admitted.
+
+  Local Instance: ∀ x y, ProofIrrel (ping_pong_model x y).
+  Proof. intros; apply make_proof_irrel. Qed.
+
+  Lemma ping_pong_model_finitary : aneris_model_rel_finitary ping_pong_model.
+  Proof.
+    intros x.
+    apply finite_smaller_card_nat.
+    simpl in *.
+    set (list_to_set
+           (C := gset msg_trace)
+           ((λ dest : socket_address, x ++_m (mkPing dest))
+              <$> elements n_clients)) as g1.
+    set (list_to_set
+           (C := gset msg_trace)
+           ((λ sender, (x ++_m (mkPong sender))) <$> (m_destination <$> x)))
+      as g2.
+    apply (in_gset_finite (P := λ z, ping_pong_model x z) (g1 ∪ g2)).
+    rewrite /g1 /g2; clear g1 g2; simpl.
+    intros m; inversion 1; simplify_eq.
+    - apply elem_of_union; left.
+      apply elem_of_list_to_set, elem_of_list_fmap.
+      eexists; split; first done.
+      apply elem_of_elements; done.
+    - apply elem_of_union; right.
+      apply elem_of_list_to_set, elem_of_list_fmap.
+      eexists; split; first done.
+      apply elem_of_list_fmap.
+      eexists; split; last done; done.
+  Qed.
+
 End model.
 
 Notation "msgs ++_m m" := (app_msg msgs m) (at level 90, left associativity).
@@ -223,8 +249,6 @@ Section ghost.
     (* The name of the global protocol invariant *)
     inv_ns : namespace
   }.
-
-
 
 End ghost.
 
@@ -1440,7 +1464,7 @@ Section simulation.
               {[ "0.0.0.1"; "0.0.0.2"; "0.0.0.3"; "0.0.0.99" ]}
               n_all);
       eauto; try set_solver.
-    { admit. (* finite branching *) }
+    { apply ping_pong_model_finitary. }
     { move => a Ha. unfold n_all, n_clients in Ha. set_solver. }
     move=> Haneris. iStartProof.
     iMod alloc_gnames as (?) "(Hufrees&Hfreeall&Hah&Hfh&Htok)".
@@ -1486,7 +1510,7 @@ Section simulation.
       { unfold mkAddr, n_all, n_clients, ping_pong_topo, n_server. set_solver. }
       rewrite Heq. iExact "H".
     - do 2 iModIntro.
-      iIntros (ex atr δ' c' κs' Hval Hexst Hauxst Hexend Hauxend).
+      iIntros (ex atr δ' c' Hval Hexst Hauxst Hexend Hauxend).
       iIntros (Hsim Hnotstuck) "Hsi Hposts".
       iInv inv_ns as "> Hgi" "Hclose".
 
@@ -1537,6 +1561,6 @@ Section simulation.
       destruct c'.2.
       eexists _, F, handles.
       do 4 (split; eauto).
-  Admitted.
+  Qed.
 
 End simulation.

@@ -12,10 +12,10 @@ Record AuxState Λ : Type := {
 
   (** The relation between the state before and after every step. *)
   valid_state_evolution :
-    state Λ → aux_state → list (observation Λ) → state Λ → aux_state → Prop;
+    state Λ → aux_state → state Λ → aux_state → Prop;
 
   (** We can always take a valid step in the auxiliary state *)
-  pure_step_evolution_valid σ1 δ1 : valid_state_evolution σ1 δ1 [] σ1 δ1;
+  pure_step_evolution_valid σ1 δ1 : valid_state_evolution σ1 δ1 σ1 δ1;
 }.
 
 Arguments aux_state {_} _.
@@ -30,7 +30,7 @@ Class irisG (Λ : language) (AS : AuxState Λ) (Σ : gFunctors) := IrisG {
   the remaining observations, and [nat] is the number of forked-off threads
   (not the total number of threads, which is one higher because there is always
   a main thread). *)
-  state_interp : state Λ → aux_state AS → list (observation Λ) → nat → iProp Σ;
+  state_interp : state Λ → aux_state AS → nat → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -45,12 +45,12 @@ Definition wp_pre `{!irisG Λ AS Σ} (s : stuckness)
     coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
   match to_val e1 with
   | Some v => |={E}=> Φ v
-  | None => ∀ σ1 δ1 κ κs n,
-     state_interp σ1 δ1 κs n ={E,∅}=∗
+  | None => ∀ σ1 δ1 n,
+     state_interp σ1 δ1 n ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
-       ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
-         ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
-           state_interp σ2 δ2 (κs ++ κ) (length efs + n) ∗
+       ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
+         ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 σ2 δ2⌝ ∗
+           state_interp σ2 δ2 (length efs + n) ∗
            wp E e2 Φ ∗
            [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end%I.
@@ -120,7 +120,7 @@ Proof.
   rewrite !wp_unfold /wp_pre.
   destruct (to_val e) as [v|] eqn:?.
   { iApply ("HΦ" with "[> -]"). by iApply (fupd_mask_mono E1 _). }
-  iIntros (σ1 δ1 κ κs n) "Hσ".
+  iIntros (σ1 δ1 n) "Hσ".
   iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
   iMod ("H" with "[$]") as "[% H]".
   iModIntro. iSplit; [by destruct s1, s2|]. iIntros (e2 σ2 efs Hstep).
@@ -138,7 +138,7 @@ Lemma fupd_wp s E e Φ : (|={E}=> WP e @ s; E {{ Φ }}) ⊢ WP e @ s; E {{ Φ }}
 Proof.
   rewrite wp_unfold /wp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?.
   { by iMod "H". }
-  iIntros (σ1 δ1 κ κs n) "Hσ1". iMod "H". by iApply "H".
+  iIntros (σ1 δ1 n) "Hσ1". iMod "H". by iApply "H".
 Qed.
 Lemma wp_fupd s E e Φ : WP e @ s; E {{ v, |={E}=> Φ v }} ⊢ WP e @ s; E {{ Φ }}.
 Proof. iIntros "H". iApply (wp_strong_mono s s E with "H"); auto. Qed.
@@ -153,19 +153,19 @@ Proof.
   rewrite !(wp_unfold s E2 e) /wp_pre.
   destruct (to_val e) as [v|] eqn:He.
   { by iDestruct "H" as ">>> $". }
-  iIntros (σ1 δ1 κ κs n) "Hσ".
+  iIntros (σ1 δ1 n) "Hσ".
   iAssert ((|={E1}=> ⌜match s with
                       | NotStuck => reducible e σ1
                       | MaybeStuck => True
                       end⌝ ∗
-            state_interp σ1 δ1 κs n ∗ _)%I) with "[H Hσ]" as
+            state_interp σ1 δ1 n ∗ _)%I) with "[H Hσ]" as
       ">(Hnstuck & Hσ & H)".
   { iApply fupd_plain_keep_l.
     iSplitR; last (iFrame "Hσ"; iExact "H").
     iIntros "[Hσ H]".
     iApply fupd_plain_mask.
     iMod "H".
-    iMod ("H" $! _ _ [] with "Hσ") as "[? _]".
+    iMod ("H" with "Hσ") as "[? _]".
     iModIntro; done. }
   iPoseProof (fupd_mask_intro_subseteq E1 ∅ True%I with "[]") as "Hmsk";
     [set_solver|done|].
@@ -173,9 +173,8 @@ Proof.
   iModIntro.
   iSplitL "Hnstuck"; first done.
   iIntros (e2 σ2 efs Hstep).
-  destruct (stutteringatomic _ _ _ _ _ Hstep) as [(?&?&?&?)|Hs]; simplify_eq/=.
-  - rewrite app_nil_r.
-    iModIntro; iNext.
+  destruct (stutteringatomic _ _ _ _ Hstep) as [(?&?&?)|Hs]; simplify_eq/=.
+  - iModIntro; iNext.
     iMod "Hmsk" as "_"; iModIntro.
     iExists δ1; iFrame "Hσ".
     iSplitR; first (iPureIntro; apply pure_step_evolution_valid).
@@ -191,8 +190,8 @@ Proof.
         iModIntro; iExists _; iSplitR; first done.
         iFrame.
         rewrite !wp_unfold /wp_pre He2; done.
-      * iMod ("H" $! _ _ [] with "[$]") as "[H _]".
-        iDestruct "H" as %(? & ? & ? & ? & ?%Hs); done.
+      * iMod ("H" with "[$]") as "[H _]".
+        iDestruct "H" as %(? & ? & ? & ?%Hs); done.
     + destruct Hs as [v <-%of_to_val].
       rewrite !wp_unfold /wp_pre to_of_val.
       iMod "H" as ">H"; iModIntro.
@@ -205,25 +204,25 @@ Lemma wp_stutteringatomic_take_step
       s E1 E2 e Φ `{!StutteringAtomic (stuckness_to_atomicity s) e} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ σ1 κs n δ1, state_interp σ1 δ1 κs n ={E2}=∗
+   ∀ σ1 n δ1, state_interp σ1 δ1 n ={E2}=∗
      ∃ δ' Q,
-       state_interp σ1 δ1 κs n ∗
-       (∀ σ2 δ3 κ n',
-           state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
-           ⌜valid_state_evolution AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
-             ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ3⌝) ∗
-       (state_interp σ1 δ1 κs n ={E2}=∗ state_interp σ1 δ' κs n ∗ Q) ∗
+       state_interp σ1 δ1 n ∗
+       (∀ σ2 δ3 n',
+           state_interp σ2 δ3 (n' + n) ∗
+           ⌜valid_state_evolution AS σ1 δ' σ2 δ3⌝ ∗ Q ={E2}=∗
+             ⌜valid_state_evolution AS σ1 δ1 σ2 δ3⌝) ∗
+       (state_interp σ1 δ1 n ={E2}=∗ state_interp σ1 δ' n ∗ Q) ∗
    WP e @ s; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
 Proof.
   iIntros (He) "H".
   iLöb as "IH".
   rewrite {2}wp_unfold /wp_pre He.
-  iIntros (σ1 δ1 κ κs n) "Hσ".
+  iIntros (σ1 δ1 n) "Hσ".
   iAssert ((|={E1}=> ⌜match s with
                       | NotStuck => reducible e σ1
                       | MaybeStuck => True
                       end⌝ ∗
-            state_interp σ1 δ1 κs n ∗ _)%I) with "[H Hσ]" as
+            state_interp σ1 δ1 n ∗ _)%I) with "[H Hσ]" as
       ">(% & Hσ & H)".
   { iApply fupd_plain_keep_l.
     iSplitR; last (iFrame "Hσ"; iExact "H").
@@ -232,16 +231,15 @@ Proof.
     iMod "H".
     iMod ("H" with "Hσ") as (δ' Q) "[Hσ (_&_&H)]".
     rewrite !wp_unfold /wp_pre He.
-    iMod ("H" $! _ _ [] with "Hσ") as "[? _]"; done. }
+    iMod ("H" with "Hσ") as "[? _]"; done. }
   iMod (fupd_mask_intro_subseteq E1 ∅ True%I with "[]") as "Hmsk";
     [set_solver|done|].
   iModIntro.
   iSplit; first done.
   iIntros (e2 σ2 efs Hstep).
-  pose proof Hstep as  [(?&?&?&?)|HSA]%stutteringatomic; simplify_eq/=.
+  pose proof Hstep as  [(?&?&?)|HSA]%stutteringatomic; simplify_eq/=.
   - iModIntro; iNext.
     iMod "Hmsk" as "_"; iModIntro.
-    rewrite app_nil_r.
     iExists δ1; iFrame "Hσ".
     iSplitR; first (iPureIntro; apply pure_step_evolution_valid).
     iSplitL; last done.
@@ -254,8 +252,8 @@ Proof.
     iMod ("H" $! σ1 with "Hσ") as "[_ H]".
     iMod ("H" with "[//]") as "H". iIntros "!>!>".
     iMod "H" as (δ3) "(Hδ3 & Hσ & H & Hefs)".
-    iAssert (|={E2}=> state_interp σ2 δ3 (κs ++ κ) (length efs + n) ∗
-               Q ∗ ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ3⌝)%I
+    iAssert (|={E2}=> state_interp σ2 δ3 (length efs + n) ∗
+               Q ∗ ⌜valid_state_evolution AS σ1 δ1 σ2 δ3⌝)%I
       with "[Hfixed Hδ3 Hσ HQ]" as ">(Hσ & HQ & ?)".
     { rewrite assoc. iApply fupd_plain_keep_r; iFrame.
       iIntros "[? ?]"; iApply "Hfixed"; iFrame. }
@@ -265,7 +263,7 @@ Proof.
       * iDestruct ("H" with "HQ") as ">> H".
         iModIntro; iExists _; iFrame.
         rewrite -(of_to_val _ _ He2) -wp_value'; done.
-      * iMod ("H" $! _ _ [] with "Hσ") as "[% _]".
+      * iMod ("H" with "Hσ") as "[% _]".
         exfalso; simpl in *; eapply not_reducible; eauto.
     + simpl in *.
       destruct HSA as [v <-%of_to_val].
@@ -282,14 +280,14 @@ Lemma wp_atomic_take_step
       s E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ σ1 κs n δ1, state_interp σ1 δ1 κs n ={E2}=∗
+   ∀ σ1 n δ1, state_interp σ1 δ1 n ={E2}=∗
      ∃ δ' Q,
-       state_interp σ1 δ1 κs n ∗
-       (∀ σ2 δ3 κ n',
-           state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
-           ⌜valid_state_evolution AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
-             ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ3⌝) ∗
-       (state_interp σ1 δ1 κs n ={E2}=∗ state_interp σ1 δ' κs n ∗ Q) ∗
+       state_interp σ1 δ1 n ∗
+       (∀ σ2 δ3 n',
+           state_interp σ2 δ3 (n' + n) ∗
+           ⌜valid_state_evolution AS σ1 δ' σ2 δ3⌝ ∗ Q ={E2}=∗
+             ⌜valid_state_evolution AS σ1 δ1 σ2 δ3⌝) ∗
+       (state_interp σ1 δ1 n ={E2}=∗ state_interp σ1 δ' n ∗ Q) ∗
    WP e @ s; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
 Proof. apply wp_stutteringatomic_take_step; apply _. Qed.
 
@@ -298,7 +296,7 @@ Lemma wp_step_fupd s E1 E2 e P Φ :
   (|={E1}[E2]▷=> P) -∗ WP e @ s; E2 {{ v, P ={E1}=∗ Φ v }} -∗ WP e @ s; E1 {{ Φ }}.
 Proof.
   rewrite !wp_unfold /wp_pre. iIntros (-> ?) "HR H".
-  iIntros (σ1 δ1 κ κs n) "Hσ". iMod "HR". iMod ("H" with "[$]") as "[$ H]".
+  iIntros (σ1 δ1 n) "Hσ". iMod "HR". iMod ("H" with "[$]") as "[$ H]".
   iIntros "!>" (e2 σ2 efs Hstep). iMod ("H" $! e2 σ2 efs with "[% //]") as "H".
   iIntros "!>!>". iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
   iMod "HR". iModIntro; iExists δ2; iSplit; first done. iFrame "Hσ Hefs".
@@ -313,11 +311,11 @@ Proof.
   destruct (to_val e) as [v|] eqn:He.
   { apply of_to_val in He as <-. by iApply fupd_wp. }
   rewrite wp_unfold /wp_pre fill_not_val //.
-  iIntros (σ1 δ1 κ κs n) "Hσ".
+  iIntros (σ1 δ1 n) "Hσ".
   iMod ("H" with "[$]") as "[% H]". iModIntro; iSplit.
   { destruct s; eauto using reducible_fill. }
   iIntros (e2 σ2 efs Hstep).
-  destruct (fill_step_inv e σ1 κ e2 σ2 efs) as (e2'&->&?); auto.
+  destruct (fill_step_inv e σ1 e2 σ2 efs) as (e2'&->&?); auto.
   iMod ("H" $! e2' σ2 efs with "[//]") as "H". iIntros "!>!>".
   iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
   iModIntro; iExists δ2; iSplit; first done.
@@ -331,7 +329,7 @@ Proof.
   destruct (to_val e) as [v|] eqn:He.
   { apply of_to_val in He as <-. by rewrite !wp_unfold /wp_pre. }
   rewrite fill_not_val //.
-  iIntros (σ1 δ1 κ κs n) "Hσ". iMod ("H" with "[$]") as "[% H]".
+  iIntros (σ1 δ1 n) "Hσ". iMod ("H" with "[$]") as "[% H]".
   iModIntro; iSplit.
   { destruct s; eauto using reducible_fill_inv. }
   iIntros (e2 σ2 efs Hstep).

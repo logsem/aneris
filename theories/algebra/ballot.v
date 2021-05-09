@@ -81,10 +81,64 @@ Section ra.
     f_equiv. intros ?. by destruct (x =? b).
   Qed.
 
+  Local Instance func_proper:
+    ∀ (b : nat), Proper ((≡) ==> (≡)) (λ h : ballot_oneshotUR A, h b).
+  Proof. intros b f g Hfg; apply Hfg. Qed.
+
+  Local Lemma filter_class (b N : nat) :
+    N ≠ 0 →
+    filter (λ y : nat, b `mod` N = y ∧ y ≤ b) (set_seq 0 N) =
+    {[b `mod` N]} :> gset nat.
+  Proof.
+    intros HN.
+    apply set_eq_subseteq; split.
+    - intros x.
+      rewrite elem_of_filter elem_of_set_seq elem_of_singleton /=;
+              intros [[? ?] ?]; lia.
+    - intros x; rewrite elem_of_filter elem_of_set_seq elem_of_singleton /=.
+      intros ->; split_and!; [done| |lia|lia].
+      apply Nat.mod_le; done.
+  Qed.
+
   Lemma pending_all_split_classes N :
     N ≠ 0 →
     pending_all ≡ [^op set] x ∈ set_seq 0 N, pending_class x N 0.
-  Proof. Admitted.
+  Proof.
+    intros HNnz.
+    intros b.
+    setoid_replace (([^op set] x ∈ set_seq 0 N, pending_class x N 0) b) with
+        ([^op set] x ∈ set_seq 0 N, pending_class x N 0 b); last first.
+    { clear.
+      generalize N at 1 3 as M.
+      induction N as [|N IHN]; intros M.
+      - rewrite /= !big_opS_empty; done.
+      - rewrite set_seq_S_end_union_L.
+        etrans;
+          first by (apply func_proper; rewrite big_opS_union;
+                    [|by apply set_seq_S_end_disjoint];
+                    rewrite big_opS_singleton).
+        rewrite big_opS_union; last by apply set_seq_S_end_disjoint.
+        rewrite big_opS_singleton.
+        rewrite /= -IHN; done. }
+    rewrite /pending_all.
+    rewrite (big_opS_proper _ (λ x, if decide ((b `mod` N = x) ∧ (x <= b)) then
+                 Some (Cinl (Excl ())) else None)); last first.
+    { intros x Hx.
+      rewrite /pending_class.
+      destruct decide as [[? ?]|].
+      - erewrite (proj2 (Nat.eqb_eq _ _)); last done.
+        erewrite (proj2 (Nat.leb_le _ _)); done.
+      - destruct (decide (b `mod` N = x)); destruct (decide (x ≤ b)).
+        + lia.
+        + erewrite (proj2 (Nat.eqb_eq _ _)); last done.
+          erewrite (proj2 (Nat.leb_nle _ _)); done.
+        + erewrite (proj2 (Nat.eqb_neq _ _)); last done.
+          erewrite (proj2 (Nat.leb_le _ _)); done.
+        + erewrite (proj2 (Nat.eqb_neq _ _)); last done.
+          erewrite (proj2 (Nat.leb_nle _ _)); done. }
+    rewrite -big_opS_filter' filter_class; last done.
+    rewrite big_opS_singleton; done.
+  Qed.
 
   Lemma pending_set_split i N b :
     N ≠ 0 →

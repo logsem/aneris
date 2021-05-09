@@ -56,7 +56,7 @@ Proof.
       destruct HPAf; [congruence| trivial]. }
   pose proof (Hf A) as HfA.
   pose proof (Hf B) as HfB.
-                             simpl in *.
+  simpl in *.
   destruct (f A) eqn:Aeq.
   - destruct (f B) eqn:Beq.
     + destruct HfB; [congruence| auto].

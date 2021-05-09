@@ -32,14 +32,14 @@ Section state_interpretation.
 
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
-    rewrite /config_wp. iIntros. iModIntro. iIntros (σ1 δ k σ2 ks nt Hstep) "[Hσ Hm]".
+    rewrite /config_wp. iIntros. iModIntro. iIntros (σ1 δ σ2 nt Hstep) "[Hσ Hm]".
     rewrite /state_interp; simplify_eq /=.
     iDestruct "Hσ" as (γm mh)
            "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iApply step_fupd_fupd; iApply step_fupd_intro; first done.
     destruct Hstep as
-        [ ip σ k Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ]; simpl.
+        [ ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ]; simpl.
     { iExists δ. iIntros "!> !>". iSplit.
       - iPureIntro. split_and!; last by left. simplify_eq.
         eapply message_history_evolution_deliver_message; set_solver.

@@ -68,7 +68,7 @@ Proof.
   iAssert (is_node ip) as "Hn".
   { iExists _. eauto. }
   iModIntro.
-  iExists  (λ σ δ _, aneris_state_interp σ _ ∗ auth_st _)%I, (λ _, True)%I.
+  iExists  (λ σ δ, aneris_state_interp σ _ ∗ auth_st _)%I, (λ _, True)%I.
   iSplitR; [iApply config_wp_correct|].
   iSplitR "Hwp HIPs HB Hfrag"; last first.
   { iApply ("Hwp" with "Hsif Hsa' HB Hfrag HIPs Hn"). }
@@ -163,7 +163,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
           ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗ frag_st st1 ={⊤}=∗
           WP (mkExpr ip e1) @ s; ⊤ {{ Φ }} ∗
           □ (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace aneris_AS)
-            δ3 c3 κs3,
+            δ3 c3,
          ⌜valid_system_trace aneris_AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([mkExpr ip e1], σ1)⌝ -∗
          ⌜auxtr_starts_in atr δ1⌝ -∗
@@ -171,12 +171,11 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} (s: stuckness)
          ⌜auxtr_ends_in atr δ3⌝ -∗
          ⌜∀ ex' atr',
             exec_contract ex ex' → auxtr_contract atr atr' →
-            ξ ex' atr' ∧ ∀ δ2 c2 κs2,
+            ξ ex' atr' ∧ ∀ δ2 c2,
              exec_ends_in ex' c2 → auxtr_ends_in atr' δ2 →
-             exec_last_obs ex κs2 →
-             valid_state_evolution aneris_AS c2.2 δ2 κs2 c3.2 δ3⌝ -∗
+             valid_state_evolution aneris_AS c2.2 δ2 c3.2 δ3⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c3.1 → not_stuck e2 c3.2⌝ -∗
-         state_interp c3.2 δ3 κs3 (length c3.1) -∗
+         state_interp c3.2 δ3 (length c3.1) -∗
          posts_of c3.1 (Φ :: replicate (length c3.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜ξ ex atr⌝)) →
   (* The coinductive pure coq proposition given by adequacy *)

@@ -111,14 +111,14 @@ Lemma aneris_wp_atomic_take_step ip E1 E2 e Φ
       `{!Atomic WeaklyAtomic (mkExpr ip e)} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ σ1 κs n δ1, state_interp σ1 δ1 κs n ={E2}=∗
+   ∀ σ1 n δ1, state_interp σ1 δ1 n ={E2}=∗
      ∃ δ' Q,
-       state_interp σ1 δ1 κs n ∗
-       (∀ σ2 δ3 κ n',
-          state_interp σ2 δ3 (κs ++ κ) (n' + n) ∗
-          ⌜valid_state_evolution aneris_AS σ1 δ' κ σ2 δ3⌝ ∗ Q ={E2}=∗
-            ⌜valid_state_evolution aneris_AS σ1 δ1 κ σ2 δ3⌝) ∗
-       (state_interp σ1 δ1 κs n ={E2}=∗ state_interp σ1 δ' κs n ∗ Q) ∗
+       state_interp σ1 δ1 n ∗
+       (∀ σ2 δ3 n',
+          state_interp σ2 δ3 (n' + n) ∗
+          ⌜valid_state_evolution aneris_AS σ1 δ' σ2 δ3⌝ ∗ Q ={E2}=∗
+            ⌜valid_state_evolution aneris_AS σ1 δ1 σ2 δ3⌝) ∗
+       (state_interp σ1 δ1 n ={E2}=∗ state_interp σ1 δ' n ∗ Q) ∗
    WP e @ ip; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ ip; E1 {{ Φ }}.
 Proof.
   rewrite !aneris_wp_unfold /aneris_wp_def.
@@ -126,7 +126,7 @@ Proof.
   iApply (wp_atomic_take_step _ _ E2).
   { rewrite /= /aneris_to_val He //. }
   iMod "Hwp". iModIntro.
-  iIntros (σ ks n st) "Hsi".
+  iIntros (σ n st) "Hsi".
   iDestruct ("Hwp" with "Hsi") as "> Hwp".
   iDestruct "Hwp" as (st' Q) "(Hsi & H1 & H2 & Hwp)".
   iModIntro.
@@ -191,8 +191,8 @@ Proof.
   iLöb as "IH" forall (E ip e Ψ).
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /=.
   destruct (to_val e); simpl; first by iMod "Hwp"; eauto.
-  iIntros (σ1 δ κ _ _) "Hsi".
-  iMod ("Hwp" $! σ1 δ κ [] 0%nat with "Hsi") as "[% Hstp]".
+  iIntros (σ1 δ _) "Hsi".
+  iMod ("Hwp" $! σ1 δ 0%nat with "Hsi") as "[% Hstp]".
   iModIntro.
   iSplit; first done.
   iIntros (e2 σ2 efs Hpstp).

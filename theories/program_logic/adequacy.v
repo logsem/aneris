@@ -8,8 +8,8 @@ Set Default Proof Using "Type".
 Import uPred.
 
 (* move *)
-Lemma step_tp_length {Λ} c κ c' :
-  step (Λ := Λ) c κ c' → length c.1 ≤ length c'.1.
+Lemma step_tp_length {Λ} c c' :
+  step (Λ := Λ) c c' → length c.1 ≤ length c'.1.
 Proof.
   inversion 1; simplify_eq; last done.
   rewrite !app_length /= !app_length; lia.
@@ -22,11 +22,11 @@ Notation posts_of t Φs :=
           (zip_with (λ x y, (x, y)) t Φs)), vΦ.2 vΦ.1)%I.
 
 Definition config_wp `{!irisG Λ AS Σ} : iProp Σ :=
-  □ ∀ σ1 δ1 κ σ2 κs nt,
-        ⌜config_step σ1 κ σ2⌝ →
-        state_interp σ1 δ1 κs nt ={⊤}[∅]▷=∗
-          ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 κ σ2 δ2⌝ ∗
-                 state_interp σ2 δ2 (κs ++ κ) nt.
+  □ ∀ σ1 δ1 σ2 nt,
+        ⌜config_step σ1 σ2⌝ →
+        state_interp σ1 δ1 nt ={⊤}[∅]▷=∗
+          ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 σ2 δ2⌝ ∗
+                 state_interp σ2 δ2 nt.
 
 Instance config_wp_persistent `{!irisG Λ AS Σ} : Persistent config_wp.
 Proof. apply _. Qed.
@@ -41,12 +41,12 @@ Definition Gsim_pre Σ {Λ} (AS : AuxState Λ) (s : stuckness)
   (λ ex atr,
    ▷ (⌜valid_system_trace AS ex atr⌝ ∧
       ⌜φ ex atr⌝ ∧
-      ∀ c c' κ δ,
+      ∀ c c' δ,
         ⌜exec_ends_in ex c⌝ →
         ⌜auxtr_ends_in atr δ⌝ →
-        ⌜step c κ c'⌝ →
-        ▷ ▷ (∃ δ', ⌜valid_state_evolution AS c.2 δ κ c'.2 δ'⌝ ∧
-                 gsim (exec_extend ex κ c') (auxtr_extend atr δ'))))%I.
+        ⌜step c c'⌝ →
+        ▷ ▷ (∃ δ', ⌜valid_state_evolution AS c.2 δ c'.2 δ'⌝ ∧
+                 gsim (exec_extend ex c') (auxtr_extend atr δ'))))%I.
 
 Local Instance Gsim_pre_contractive Σ M Λ s φ :
   Contractive (@Gsim_pre Σ M Λ s φ).
@@ -80,7 +80,7 @@ Proof.
   iDestruct "H" as "(#H1 & #H2 & H)".
   iSplit; first (iClear "IH H"; iModIntro; done).
   iSplit; first (iClear "IH H"; iModIntro; done).
-  iIntros (c ? ? ? ? ? ?).
+  iIntros (c ? ? ? ? ?).
   iDestruct ("H" with "[] [] []") as "H"; [done|done|done|].
   do 2 (iApply later_plainly_1; iNext).
   iDestruct "H" as (δ') "(#Hst' & H)".
@@ -92,12 +92,12 @@ Qed.
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ AS Σ}.
 
-  Lemma wp_take_step s n δ Φ e1 σ1 κ e2 σ2 efs κs :
-    prim_step e1 σ1 κ e2 σ2 efs →
-    state_interp σ1 δ κs n -∗
+  Lemma wp_take_step s n δ Φ e1 σ1 e2 σ2 efs :
+    prim_step e1 σ1 e2 σ2 efs →
+    state_interp σ1 δ n -∗
     WP e1 @ s; ⊤ {{ v, Φ v } } ={⊤}[∅]▷=∗
-    ∃ δ', ⌜valid_state_evolution AS σ1 δ κ σ2 δ'⌝ ∗
-      state_interp σ2 δ' (κs ++ κ) (length efs + n) ∗
+    ∃ δ', ⌜valid_state_evolution AS σ1 δ σ2 δ'⌝ ∗
+      state_interp σ2 δ' (length efs + n) ∗
       WP e2 @ s; ⊤ {{ v, Φ v } } ∗
       ([∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }}).
   Proof.
@@ -112,10 +112,10 @@ Section adequacy_helper_lemmas.
     iModIntro; iExists _; iFrame; done.
   Qed.
 
-  Lemma wp_not_stuck e σ κs s Φ n δ :
-    state_interp σ δ κs n -∗
+  Lemma wp_not_stuck e σ s Φ n δ :
+    state_interp σ δ n -∗
     WP e @ s; ⊤ {{ v, Φ v }} ={⊤}=∗
-    state_interp σ δ κs n ∗
+    state_interp σ δ n ∗
     WP e @ s; ⊤ {{ v, Φ v }} ∗
     ⌜s = NotStuck → not_stuck e σ⌝.
   Proof.
@@ -127,13 +127,13 @@ Section adequacy_helper_lemmas.
     destruct (to_val e) eqn:He.
     - iModIntro; iPureIntro; eauto.
     - iApply fupd_plain_mask.
-      iMod ("Hwp" $! _ _ [] with "HSI") as "[Hs Hwp]".
+      iMod ("Hwp" with "HSI") as "[Hs Hwp]".
       iModIntro; destruct s; [iDestruct "Hs" as %?|]; eauto.
   Qed.
 
-  Lemma wptp_not_stuck t σ κs s Φs n δ :
-    state_interp σ δ κs n -∗ wptp s t Φs ={⊤}=∗
-    state_interp σ δ κs n ∗ wptp s t Φs ∗
+  Lemma wptp_not_stuck t σ s Φs n δ :
+    state_interp σ δ n -∗ wptp s t Φs ={⊤}=∗
+    state_interp σ δ n ∗ wptp s t Φs ∗
     ⌜∀ e, e ∈ t → s = NotStuck → not_stuck e σ⌝.
   Proof.
     iIntros "HSI Ht".
@@ -190,14 +190,14 @@ Section adequacy_helper_lemmas.
       iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done.
   Qed.
 
-  Lemma take_step s Φs c κ c' κs δ :
-    step c κ c' →
+  Lemma take_step s Φs c c' δ :
+    step c c' →
     config_wp -∗
-    state_interp c.2 δ κs (length c.1) -∗
+    state_interp c.2 δ (length c.1) -∗
     wptp s c.1 Φs  ={⊤}[∅]▷=∗
     ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
-    ∃ δ', ⌜valid_state_evolution AS c.2 δ κ c'.2 δ'⌝ ∗
-      state_interp c'.2 δ' (κs ++ κ) (length c'.1) ∗
+    ∃ δ', ⌜valid_state_evolution AS c.2 δ c'.2 δ'⌝ ∗
+      state_interp c'.2 δ' (length c'.1) ∗
       posts_of c'.1 (Φs ++ replicate (length c'.1 - length c.1) fork_post) ∗
       (posts_of c'.1 (Φs ++ replicate (length c'.1 - length c.1) fork_post) -∗
         wptp s c'.1 (Φs ++ replicate (length c'.1 - length c.1) fork_post)).
@@ -252,15 +252,15 @@ Theorem wp_strong_adequacy_helper Σ Λ AS `{!invPreG Σ}
         e1 σ1 δ :
   (∀ `{Hinv : !invG Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : state Λ → (aux_state AS) → list (observation Λ) → nat →
+         (stateI : state Λ → (aux_state AS) → nat →
                    iProp Σ)
          (Φ fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI σ1 δ [] 1 ∗
+       stateI σ1 δ 1 ∗
        WP e1 @ s; ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
-            δ' c κs,
+            δ' c,
          ⌜valid_system_trace AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([e1], σ1)⌝ -∗
          ⌜auxtr_starts_in atr δ⌝ -∗
@@ -269,12 +269,11 @@ Theorem wp_strong_adequacy_helper Σ Λ AS `{!invPreG Σ}
          ⌜∀ ex' atr',
           exec_contract ex ex' → auxtr_contract atr atr' →
           φ ex' atr' ∧
-          ∀ δ4 c4 κs4,
+          ∀ δ4 c4,
             exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
-            exec_last_obs ex κs4 →
-            valid_state_evolution AS c4.2 δ4 κs4 c.2 δ'⌝ -∗
+            valid_state_evolution AS c4.2 δ4 c.2 δ'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         stateI c.2 δ' κs (length c.1) -∗
+         stateI c.2 δ' (length c.1) -∗
          posts_of c.1 (Φ :: replicate (length c.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜φ ex atr⌝)) →
   ⊢ Gsim Σ AS s φ (singleton_exec ([e1], σ1)) (singleton_auxtr δ).
@@ -288,18 +287,18 @@ Proof.
   iDestruct "Hwp'" as (stateI Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
   clear Hwp.
   set (IrisG Λ AS Σ Hinv stateI fork_post).
-  iAssert (∃ ex atr c1 δ1 κs,
+  iAssert (∃ ex atr c1 δ1,
               ⌜singleton_exec ([e1], σ1) = ex⌝ ∗
               ⌜singleton_auxtr δ = atr⌝ ∗
               ⌜([e1], σ1) = c1⌝ ∗
               ⌜δ = δ1⌝ ∗
               ⌜length c1.1 ≥ 1⌝ ∗
-              stateI c1.2 δ1 κs (length c1.1) ∗
+              stateI c1.2 δ1 (length c1.1) ∗
               wptp s c1.1 (Φ :: replicate (length c1.1 - 1) fork_post))%I
     with "[HSI Hwp]" as "Hex".
   { iExists (singleton_exec ([e1], σ1)), (singleton_auxtr δ), ([e1], σ1), δ;
       simpl; auto 10 with iFrame. }
-  iDestruct "Hex" as (ex atr c1 δ1 κs Hexsing Hatrsing Hc1 Hδ1 Hlen) "[HSI Htp]".
+  iDestruct "Hex" as (ex atr c1 δ1 Hexsing Hatrsing Hc1 Hδ1 Hlen) "[HSI Htp]".
   assert
     (valid_system_trace AS ex atr ∧
      exec_starts_in ex ([e1], σ1) ∧
@@ -309,10 +308,9 @@ Proof.
      (∀ ex' atr',
          exec_contract ex ex' → auxtr_contract atr atr' →
          φ ex' atr' ∧
-         ∀ δ4 c4 κs4,
+         ∀ δ4 c4,
            exec_ends_in ex' c4 → auxtr_ends_in atr' δ4 →
-           exec_last_obs ex κs4 →
-           valid_state_evolution AS c4.2 δ4 κs4 c1.2 δ1))
+           valid_state_evolution AS c4.2 δ4 c1.2 δ1))
     as Hextras.
   { rewrite -Hexsing -Hatrsing -Hc1 -Hδ1.
     split; first apply valid_system_trace_singletons.
@@ -320,7 +318,7 @@ Proof.
     intros ? ? ?%not_exec_contract_singleton; done. }
   clear Hc1 Hδ1.
   rewrite Hexsing Hatrsing; clear Hexsing Hatrsing.
-  iLöb as "IH" forall (ex atr c1 δ1 κs Hextras Hlen) "HSI Htp".
+  iLöb as "IH" forall (ex atr c1 δ1 Hextras Hlen) "HSI Htp".
   destruct Hextras as (Hexatr & Hex & Hc1 & Hatr & Hδ1 & Hφ).
   rewrite {2}/Gsim (fixpoint_unfold (Gsim_pre _ _ _ _) _ _).
   iSplit; first done.
@@ -336,7 +334,7 @@ Proof.
   iDestruct ("Hback" with "Hpost") as "Htp".
   iNext; iSplit; first done.
   iDestruct "Hφ" as %Hφ'.
-  iIntros (c c' κ δ' Hc Hδ' Hstep).
+  iIntros (c c' δ' Hc Hδ' Hstep).
   pose proof (exec_ends_in_inj ex c c1 Hc Hc1); simplify_eq.
   pose proof (auxtr_ends_in_inj atr δ1 δ' Hδ1 Hδ'); simplify_eq.
   iPoseProof (take_step with "config_wp HSI Htp") as "Hstp"; first done.
@@ -346,10 +344,10 @@ Proof.
   iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & % & H)".
   iDestruct "H" as (δ'') "(% & HSI & Hpost & Hback)"; simpl in *.
   rewrite -!replicate_plus.
-  pose proof (step_tp_length _ _ _ Hstep).
+  pose proof (step_tp_length _ _ Hstep).
   replace (length c1.1 - 1 + (length c'.1 - length c1.1)) with
       (length c'.1 - 1); last lia.
-  iAssert (▷ ⌜φ (exec_extend ex κ c') (auxtr_extend atr δ'')⌝)%I as "#Hextend'".
+  iAssert (▷ ⌜φ (exec_extend ex c') (auxtr_extend atr δ'')⌝)%I as "#Hextend'".
   { iMod ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost [$Hw $HE]")
       as ">(Hw & HE & %)"; iPureIntro; last done.
     - eapply valid_system_trace_extend; eauto.
@@ -359,12 +357,9 @@ Proof.
     - eapply auxtr_extend_ends_in; eauto.
     - intros ? ? ->%exec_contract_of_extend ->%auxtr_contract_of_extend.
       split; first done.
-      intros δ4 c4 κs4 Hc4 Hδ4 Hκs4.
+      intros δ4 c4 Hc4 Hδ4.
       eapply (exec_ends_in_inj _ c1) in Hc4 as <-; last done.
-      eapply (auxtr_ends_in_inj _ δ') in Hδ4 as <-; last done.
-      eapply (exec_last_obs_inj _ κ) in Hκs4 as <-;
-        last apply exec_extend_last_obs.
-      done.
+      eapply (auxtr_ends_in_inj _ δ') in Hδ4 as <-; done.
     - done. }
   iDestruct ("Hback" with "Hpost") as "Htp".
   iNext.
@@ -378,17 +373,15 @@ Proof.
   - eapply auxtr_extend_ends_in; eauto.
   - intros ? ? ->%exec_contract_of_extend ->%auxtr_contract_of_extend.
     split; first done.
-    intros δ4 c4 κs4 Hc4 Hδ4 Hκs4.
+    intros δ4 c4 Hc4 Hδ4.
     eapply (exec_ends_in_inj _ c1) in Hc4 as <-; last done.
     eapply (auxtr_ends_in_inj _ δ') in Hδ4 as <-; last done.
-    eapply (exec_last_obs_inj _ κ) in Hκs4 as <-;
-      last apply exec_extend_last_obs.
     done.
 Qed.
 
 Definition valid_state_evolution_finitary {Λ} (AS : AuxState Λ) :=
-  ∀ c δ κ c',
-    smaller_card (sig (λ δ', valid_state_evolution AS c δ κ c' δ')) nat.
+  ∀ c δ c',
+    smaller_card (sig (λ δ', valid_state_evolution AS c δ c' δ')) nat.
 
 (* Notations on executions
  * |-----------ex'-------|
@@ -402,14 +395,14 @@ Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
   valid_state_evolution_finitary AS →
   (∀ `{Hinv : !invG Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : state Λ → aux_state AS → list (observation Λ) → nat → iProp Σ)
+         (stateI : state Λ → aux_state AS → nat → iProp Σ)
          (Φ fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI σ1 δ1 [] 1 ∗
+       stateI σ1 δ1 1 ∗
        WP e1 @ s; ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace AS)
-            δ3 c3 κs,
+            δ3 c3,
          ⌜valid_system_trace AS ex atr⌝ -∗
          ⌜exec_starts_in ex ([e1], σ1)⌝ -∗
          ⌜auxtr_starts_in atr δ1⌝ -∗
@@ -418,12 +411,11 @@ Theorem wp_strong_adequacy Λ AS Σ `{!invPreG Σ}
          ⌜∀ ex' atr',
           exec_contract ex ex' → auxtr_contract atr atr' →
           φ ex' atr' ∧
-          ∀ δ2 c2 κs2,
+          ∀ δ2 c2,
            exec_ends_in ex' c2 → auxtr_ends_in atr' δ2 →
-           exec_last_obs ex κs2 →
-           valid_state_evolution AS c2.2 δ2 κs2 c3.2 δ3⌝ -∗
+           valid_state_evolution AS c2.2 δ2 c3.2 δ3⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c3.1 → not_stuck e2 c3.2⌝ -∗
-         stateI c3.2 δ3 κs (length c3.1) -∗
+         stateI c3.2 δ3 (length c3.1) -∗
          posts_of c3.1 (Φ :: replicate (length c3.1 - 1) fork_post) -∗
          |={⊤, ∅}=> ⌜φ ex atr⌝)) →
   continued_simulation φ (singleton_exec ([e1], σ1)) (singleton_auxtr δ1).
@@ -442,13 +434,11 @@ Proof.
   apply extract_and in Hgsim as [Hφ Hgsim].
   revert Hφ; rewrite extract_pure; intros Hφ.
   split; first done.
-  intros c c' κ δ' Hsmends Hsimends Hstep.
+  intros c c' δ' Hsmends Hsimends Hstep.
   revert Hgsim; rewrite extract_forall; intros Hgsim.
   specialize (Hgsim c).
   revert Hgsim; rewrite extract_forall; intros Hgsim.
   specialize (Hgsim c').
-  revert Hgsim; rewrite extract_forall; intros Hgsim.
-  specialize (Hgsim κ).
   revert Hgsim; rewrite extract_forall; intros Hgsim.
   specialize (Hgsim δ').
   apply (extract_impl ⌜_⌝) in Hgsim; last by apply extract_pure.
@@ -498,17 +488,17 @@ Theorem adequate_tp_safe {Λ} (e1 : expr Λ) ex t2 σ1 σ2 φ :
   valid_exec ex →
   exec_starts_in ex ([e1], σ1) →
    exec_ends_in ex (t2, σ2) →
-  Forall (λ e, is_Some (to_val e)) t2 ∨ ∃ t3 σ3, erased_step (t2, σ2) (t3, σ3).
+  Forall (λ e, is_Some (to_val e)) t2 ∨ ∃ t3 σ3, step (t2, σ2) (t3, σ3).
 Proof.
   intros Had ? ? ?.
   destruct (decide (Forall (λ e, is_Some (to_val e)) t2)) as [|Ht2]; [by left|].
   apply (not_Forall_Exists _), Exists_exists in Ht2; destruct Ht2 as (e2&?&He2).
   destruct (adequate_not_stuck NotStuck e1 σ1 φ Had ex t2 σ2 e2)
-    as [?|(κ&e3&σ3&efs&?)];
+    as [?|(e3&σ3&efs&?)];
     rewrite ?eq_None_not_Some; auto.
   { exfalso. eauto. }
   destruct (elem_of_list_split t2 e2) as (t2'&t2''&->); auto.
-  right; exists (t2' ++ e3 :: t2'' ++ efs), σ3, κ; econstructor; eauto.
+  right; exists (t2' ++ e3 :: t2'' ++ efs), σ3; econstructor; eauto.
 Qed.
 
 Local Definition wp_adequacy_relation Λ AS s (φ : val Λ → Prop)
@@ -536,11 +526,11 @@ Corollary wp_adequacy Λ AS Σ `{!invPreG Σ} s e σ δ φ :
   valid_state_evolution_finitary AS →
   (∀ `{Hinv : !invG Σ},
      ⊢ |={⊤}=> ∃
-         (stateI : state Λ → aux_state AS → list (observation Λ) → iProp Σ)
+         (stateI : state Λ → aux_state AS → iProp Σ)
          (fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ :=
-           IrisG _ _ _ Hinv (λ σ δ κs _, stateI σ δ κs) fork_post in
-       config_wp ∗ stateI σ δ [] ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) →
+           IrisG _ _ _ Hinv (λ σ δ _, stateI σ δ) fork_post in
+       config_wp ∗ stateI σ δ ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) →
   adequate s e σ (λ v _, φ v).
 Proof.
   intros ? Hwp; apply (wp_adequacy_relation_adequacy (AS := AS) _ _ _ δ).
@@ -548,7 +538,7 @@ Proof.
   iIntros (?) "".
   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp)".
   iModIntro; iExists _, _, _; iFrame.
-  iIntros (ex atr δ' c κs Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
+  iIntros (ex atr δ' c Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
   iApply fupd_mask_intro_discard; first done.
   iIntros (c' Hc').
   assert (c' = c) as -> by by eapply exec_ends_in_inj.
@@ -583,11 +573,11 @@ Corollary wp_invariance Λ AS Σ `{!invPreG Σ} s e1 σ1 δ1 t2 σ2 φ :
   valid_state_evolution_finitary AS →
   (∀ `{Hinv : !invG Σ},
      ⊢ |={⊤}=> ∃
-         (stateI : state Λ → aux_state AS → list (observation Λ) → nat → iProp Σ)
+         (stateI : state Λ → aux_state AS → nat → iProp Σ)
          (fork_post : val Λ → iProp Σ),
        let _ : irisG Λ AS Σ := IrisG _ _ _ Hinv stateI fork_post in
-       config_wp ∗ stateI σ1 δ1 [] 1 ∗ WP e1 @ s; ⊤ {{ _, True }} ∗
-       (∀ δ2 κs, stateI σ2 δ2 κs (length t2) -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) →
+       config_wp ∗ stateI σ1 δ1 1 ∗ WP e1 @ s; ⊤ {{ _, True }} ∗
+       (∀ δ2, stateI σ2 δ2 (length t2) -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) →
   ∀ ex,
     valid_exec ex →
     exec_starts_in ex ([e1], σ1) →
@@ -600,7 +590,7 @@ Proof.
   iIntros (?) "".
   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp & Hφ)".
   iModIntro; iExists _, _, _; iFrame.
-  iIntros (ex atr δ' c κs Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
+  iIntros (ex atr δ' c Hvlt Hexs Hatrs Hexe Hatre Hψ Hnst) "HSI Hposts".
   rewrite /wp_invariance_relation.
   iAssert ((∀ _ : exec_starts_in ex ([e1], σ1) ∧ exec_ends_in ex (t2, σ2),
                  |={⊤}=> ⌜φ⌝)%I) with "[HSI Hφ]" as "H".

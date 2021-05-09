@@ -59,7 +59,7 @@ Section lifting_mdl.
     iIntros (He) "H".
     iApply (aneris_wp_atomic_take_step ip E1 E2).
     iMod "H" as "H".
-    iModIntro. iIntros (σ1 κs n δ1) "Hsi".
+    iModIntro. iIntros (σ1 n δ1) "Hsi".
     iDestruct "H" as (m m') "(%Htrans&Hm&Hwp)".
     iDestruct (aneris_state_interp_model_agree with "Hsi Hm") as "%Heq".
     iModIntro. iExists ({| aneris_AS_mhist := δ1.(aneris_AS_mhist);
@@ -67,7 +67,7 @@ Section lifting_mdl.
     iExists (frag_st m')%I.
     iFrame "Hsi".
     iSplitR "Hwp Hm".
-    - iIntros (σ2 δ3 κ n') "(Hsi&%Hval&Hst)".
+    - iIntros (σ2 δ3 n') "(Hsi&%Hval&Hst)".
       iDestruct (aneris_state_interp_model_agree with "Hsi Hst") as "%Heq'".
       unfold valid_state_evolution in *. simpl in *.
       destruct Hval as [Hvalh Hvalm].

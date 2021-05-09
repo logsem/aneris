@@ -9,6 +9,7 @@
 -arg -w -arg -ssr-search-moved
 
 theories/prelude/classical.v
+theories/prelude/classical_instances.v
 theories/prelude/quantifiers.v
 theories/prelude/sigma.v
 theories/prelude/finitary.v

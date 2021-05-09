@@ -789,11 +789,11 @@ Section state_interpretation.
       by iApply free_ips_coh_update_msg.
    Qed.
 
-   Lemma aneris_state_interp_model m1 m2 σ (δ1: aneris_aux_state) κs n:
-     state_interp σ δ1 κs n -∗ frag_st m1 ==∗
+   Lemma aneris_state_interp_model m1 m2 σ (δ1: aneris_aux_state) n:
+     state_interp σ δ1 n -∗ frag_st m1 ==∗
      state_interp σ
      ({| aneris_AS_mhist := aneris_AS_mhist δ1; aneris_AS_model := m2 |}: aux_state aneris_AS)
-     κs n ∗
+     n ∗
      frag_st m2.
    Proof.
      iIntros "[? Hauth] Hfrag".
@@ -807,8 +807,8 @@ Section state_interpretation.
      iModIntro. iFrame.
    Qed.
 
-   Lemma aneris_state_interp_model_agree m σ (δ: aneris_aux_state) κs n:
-     state_interp σ δ κs n -∗ frag_st m -∗ ⌜ δ.(aneris_AS_model) = m ⌝.
+   Lemma aneris_state_interp_model_agree m σ (δ: aneris_aux_state) n:
+     state_interp σ δ n -∗ frag_st m -∗ ⌜ δ.(aneris_AS_model) = m ⌝.
    Proof.
      iIntros "[_ Ha] Hf". iDestruct (own_valid_2 with "Ha Hf") as "%H".
      iPureIntro. apply leibniz_equiv.
@@ -820,12 +820,30 @@ Section state_interpretation.
      message_soup :=
      filter (fun m => m.(m_sender) = a) rt.2.
 
-   Lemma aneris_state_interp_sent_mapsto_agree a R T δ σ κs n:
-     a ⤳ (R, T) -∗ state_interp σ δ κs n -∗
+   Lemma aneris_state_interp_sent_mapsto_agree a R T δ σ n:
+     a ⤳ (R, T) -∗ state_interp σ δ n -∗
        ⌜ messages_sent_from a δ.(aneris_AS_mhist) = T ⌝.
    Proof.
      iIntros "Hlt Hsi".
-   Admitted.
+     rewrite /state_interp /= /aneris_state_interp /messages_sent_from.
+     iDestruct "Hsi" as "[Hsi Hauth]".
+     iDestruct "Hsi" as (γm mh Hmh Hgnms Hnetsock Hhistcoh) "(?&?&?&?& Hctx &?)".
+     rewrite -Hmh /=.
+     iDestruct (messages_mapsto_valid with "Hlt Hctx") as %Hma.
+     iPureIntro.
+     rewrite /messages_sent.
+     destruct Hhistcoh as (Hmspcoh&?&Haddrcoh&?).
+     apply set_eq_subseteq; split.
+     - intros m; rewrite elem_of_filter elem_of_collect.
+       intros [? (a'&[R' T']& Hma' & HmT')]; simpl in *.
+       destruct (Haddrcoh _ _ _ Hma') as [Hma'1 Hma'2].
+       pose proof (Hma'2 _ HmT'); simplify_eq /=.
+       rewrite Hma in Hma'; simplify_eq; done.
+     - intros m; rewrite elem_of_filter elem_of_collect.
+       intros HmT.
+       destruct (Haddrcoh _ _ _ Hma) as [Hma1 Hma2].
+       pose proof (Hma2 _ HmT); eauto.
+   Qed.
 
 
 End state_interpretation.

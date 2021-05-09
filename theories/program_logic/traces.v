@@ -3,40 +3,48 @@ From aneris.program_logic Require Export weakestpre.
 
 Set Default Proof Using "Type".
 
-Record execution_trace Λ := {
-  extr_confs : list (cfg Λ);
-  extr_obs : list (list (observation Λ)); }.
+Inductive finite_trace (A : Type) : Type :=
+| trace_singleton (a : A)
+| trace_extend (ft : finite_trace A) (a : A).
 
-Arguments extr_confs {_} _.
-Arguments extr_obs {_} _.
+Global Arguments trace_singleton {_} _.
+Global Arguments trace_extend {_} _ _.
 
-Lemma app_singleton_inv {A} (e e' : list A) (x x' : A) :
-  e ++ [x] = e' ++ [x'] → e = e' ∧ x = x'.
-Proof.
-  rewrite -(reverse_involutive (e ++ [x])).
-  rewrite -(reverse_involutive (e' ++ [x'])).
-  intros Heq.
-  eapply (inj (R := (=))) in Heq; last apply _.
-  rewrite !reverse_app /= in Heq; simplify_eq; done.
-Qed.
+Section finite_trace_lib.
+  Context {A : Type}.
+
+  Implicit Types a : A.
+  Implicit Types ft : finite_trace A.
+
+  Fixpoint trace_first (ft : finite_trace A) : A :=
+    match ft with
+    | trace_singleton a => a
+    | trace_extend ft' _ => trace_first ft'
+    end.
+
+  Definition trace_last (ft : finite_trace A) : A :=
+    match ft with
+    | trace_singleton a => a
+    | trace_extend _ a => a
+    end.
+
+End finite_trace_lib.
+
+Definition execution_trace Λ := finite_trace (cfg Λ).
 
 Section execution_trace.
   Context {Λ : language}.
 
   Implicit Types c : cfg Λ.
-  Implicit Types κ : list (observation Λ).
 
   Definition singleton_exec (c : cfg Λ) : execution_trace Λ :=
-    {| extr_confs := [c]; extr_obs := []; |}.
+    trace_singleton c.
 
   Definition exec_starts_in (ex : execution_trace Λ) (c : cfg Λ) : Prop :=
-    hd_error (extr_confs ex) = Some c.
+    trace_first ex = c.
 
   Definition exec_ends_in (ex : execution_trace Λ) (c : cfg Λ) : Prop :=
-    last (extr_confs ex) = Some c.
-
-  Definition exec_last_obs (ex : execution_trace Λ) (κs : list (observation Λ))
-    : Prop := last (extr_obs ex) = Some κs.
+    trace_last ex = c.
 
   Lemma singleton_exec_starts_in c : exec_starts_in (singleton_exec c) c.
   Proof. done. Qed.
@@ -56,25 +64,17 @@ Section execution_trace.
     exec_ends_in ex c → exec_ends_in ex c' → c = c'.
   Proof. rewrite /exec_ends_in; intros ->; congruence. Qed.
 
-  Lemma exec_last_obs_inj ex κs κs' :
-    exec_last_obs ex κs → exec_last_obs ex κs' → κs = κs'.
-  Proof. rewrite /exec_last_obs; intros ->; congruence. Qed.
-
-  Definition exec_extend (ex : execution_trace Λ)
-             (κ : list (observation Λ)) (c : cfg Λ) :=
-    {| extr_confs := extr_confs ex ++ [c];
-       extr_obs := extr_obs ex ++ [κ]; |}.
+  Definition exec_extend (ex : execution_trace Λ) (c : cfg Λ) :=
+    trace_extend ex c.
 
   Definition exec_contract (ex ex' : execution_trace Λ) : Prop :=
-    ∃ c κ, ex = exec_extend ex' κ c.
+    ∃ c, ex = exec_extend ex' c.
 
-  Lemma exec_contract_of_extend ex κ c ex' :
-    exec_contract (exec_extend ex κ c) ex' → ex' = ex.
+  Lemma exec_contract_of_extend ex c ex' :
+    exec_contract (exec_extend ex c) ex' → ex' = ex.
   Proof.
     rewrite /exec_contract /exec_extend.
-    destruct ex as [confs obs].
-    destruct ex' as [confs' obs'].
-    intros (? & ? & Heq); simplify_eq.
+    intros (? & Heq); simplify_eq.
     repeat match goal with
              Heq : _ |- _ => apply app_singleton_inv in Heq as [? ?]
            end; simplify_eq; done.
@@ -82,99 +82,66 @@ Section execution_trace.
 
   Lemma not_exec_contract_singleton c ex :
     ¬ exec_contract (singleton_exec c) ex.
-  Proof. intros (?&?&?); destruct ex as [? []]; simplify_eq. Qed.
+  Proof. intros (?&?); destruct ex; simplify_eq/=. Qed.
 
   Inductive valid_exec : execution_trace Λ → Prop :=
   | valid_exec_singleton c : valid_exec (singleton_exec c)
-  | valid_exec_step ex c κ c' :
+  | valid_exec_step ex c c' :
       exec_ends_in ex c →
-      step c κ c' →
+      step c c' →
       valid_exec ex →
-      valid_exec (exec_extend ex κ c').
-
-  Lemma valid_exec_non_empty ex :
-    valid_exec ex → extr_confs ex ≠ [].
-  Proof.
-    inversion 1; simplify_eq; simpl in *.
-    - intros ?; simplify_eq.
-    - intros [? ?]%app_nil; simplify_eq.
-  Qed.
+      valid_exec (exec_extend ex c').
 
   Lemma valid_singleton_exec c : valid_exec (singleton_exec c).
   Proof. constructor. Qed.
 
-  Lemma exec_extend_starts_in ex c' c κ :
-    exec_starts_in ex c' → exec_starts_in (exec_extend ex κ c) c'.
-  Proof.
-    rewrite /exec_starts_in /exec_extend /=; intros Hec'.
-    assert (extr_confs ex = c' :: tail (extr_confs ex)) as ->
-        by by apply hd_error_tl_repr.
-    done.
-  Qed.
+  Lemma exec_extend_starts_in ex c' c :
+    exec_starts_in ex c' → exec_starts_in (exec_extend ex c) c'.
+  Proof. induction ex; auto. Qed.
 
-  Lemma exec_extend_starts_in_inv ex c' c κ :
-    valid_exec ex →
-    exec_starts_in (exec_extend ex κ c) c' →
+  Lemma exec_extend_starts_in_inv ex c' c :
+    exec_starts_in (exec_extend ex c) c' →
     exec_starts_in ex c'.
-  Proof.
-    intros ?%valid_exec_non_empty.
-    destruct ex as [[] obs]; simplify_eq;
-      rewrite /exec_starts_in /exec_extend /=; done.
-  Qed.
+  Proof. induction ex; auto. Qed.
 
-  Lemma exec_extend_ends_in ex c κ : exec_ends_in (exec_extend ex κ c) c.
-  Proof. apply last_snoc. Qed.
+  Lemma exec_extend_ends_in ex c : exec_ends_in (exec_extend ex c) c.
+  Proof. done. Qed.
 
-  Lemma exec_extend_last_obs ex c κ : exec_last_obs (exec_extend ex κ c) κ.
-  Proof. apply last_snoc. Qed.
+  Lemma valid_exec_ends_in ex : ∃ c, exec_ends_in ex c.
+  Proof. destruct ex; rewrite /exec_ends_in; eauto. Qed.
 
-  Lemma valid_exec_ends_in ex : valid_exec ex → ∃ c, exec_ends_in ex c.
-  Proof.
-    inversion 1; eauto using exec_extend_ends_in, singleton_exec_ends_in.
-  Qed.
-
-  Lemma extend_valid_exec ex c κ c':
+  Lemma extend_valid_exec ex c c':
     valid_exec ex →
     exec_ends_in ex c →
-    step c κ c' →
-    valid_exec (exec_extend ex κ c').
+    step c c' →
+    valid_exec (exec_extend ex c').
   Proof.
-    intros He; revert c κ c'.
-    induction He as [|? ? ? ? ? ? ? IHe]; intros c1 κ' c2.
-    - intros; econstructor; [done|done|constructor].
-    - intros; econstructor; [done|done|].
-      eapply IHe; eauto.
+    intros He; revert c c'.
+    induction ex; econstructor; eauto.
   Qed.
 
-  Lemma valid_exec_exec_extend_inv  ex κ c':
-    valid_exec (exec_extend ex κ c') →
+  Lemma valid_exec_exec_extend_inv ex c':
+    valid_exec (exec_extend ex c') →
     valid_exec ex ∧
-    ∃ c, exec_ends_in ex c ∧ step c κ c'.
-  Proof.
-    inversion 1 as [? [Heq Heq']|ex' ? ? ? ? ? ? [Heq Heq']].
-    - symmetry in Heq'; apply app_eq_nil in Heq' as [? ?]; done.
-    - apply app_singleton_inv in Heq as [? ?].
-      apply app_singleton_inv in Heq' as [? ?].
-      simplify_eq.
-      destruct ex as [cs κs]; destruct ex' as [cs' κs']; simplify_eq/=.
-      eauto.
-  Qed.
+    ∃ c, exec_ends_in ex c ∧ step c c'.
+  Proof. inversion 1; eauto. Qed.
 
 End execution_trace.
 
-Definition auxiliary_trace {Λ} (AS : AuxState Λ) := list (aux_state AS).
+Definition auxiliary_trace {Λ} (AS : AuxState Λ) := finite_trace (aux_state AS).
 
 Section auxiliary_trace.
   Context `{AS : AuxState Λ}.
 
-  Definition singleton_auxtr (δ : aux_state AS) : auxiliary_trace AS := [δ].
+  Definition singleton_auxtr (δ : aux_state AS) : auxiliary_trace AS :=
+    trace_singleton δ.
 
   Definition auxtr_starts_in
              (atr : auxiliary_trace AS) (δ : aux_state AS) : Prop :=
-    hd_error atr = Some δ.
+    trace_first atr = δ.
 
   Definition auxtr_ends_in (atr : auxiliary_trace AS) (δ : aux_state AS)
-    : Prop := last atr = Some δ.
+    : Prop := trace_last atr = δ.
 
   Lemma singleton_auxtr_starts_in δ : auxtr_starts_in (singleton_auxtr δ) δ.
   Proof. done. Qed.
@@ -195,25 +162,21 @@ Section auxiliary_trace.
   Proof. rewrite /auxtr_ends_in; intros ->; congruence. Qed.
 
   Definition auxtr_extend (atr : auxiliary_trace AS) (δ : aux_state AS) :=
-    atr ++ [δ].
+    trace_extend atr δ.
 
   Definition auxtr_contract (atr atr' : auxiliary_trace AS) : Prop :=
     ∃ δ, atr = auxtr_extend atr' δ.
 
   Lemma auxtr_contract_of_extend atr δ atr' :
     auxtr_contract (auxtr_extend atr δ) atr' → atr' = atr.
-  Proof. intros [? [? ?]%app_singleton_inv]; done. Qed.
+  Proof. intros [? ?]; simplify_eq; done. Qed.
 
   Lemma auxtr_extend_starts_in atr δ' δ :
     auxtr_starts_in atr δ' → auxtr_starts_in (auxtr_extend atr δ) δ'.
-  Proof.
-    rewrite /auxtr_starts_in /auxtr_extend /=; intros Hec'.
-    assert (atr = δ' :: tail atr) as -> by by apply hd_error_tl_repr.
-    done.
-  Qed.
+  Proof. induction atr; auto. Qed.
 
   Lemma auxtr_extend_ends_in atr δ : auxtr_ends_in (auxtr_extend atr δ) δ.
-  Proof. apply last_snoc. Qed.
+  Proof. done. Qed.
 
 End auxiliary_trace.
 
@@ -223,13 +186,13 @@ Section system_trace.
   Inductive valid_system_trace : execution_trace Λ → auxiliary_trace AS → Prop :=
   | valid_system_trace_singleton c δ :
       valid_system_trace (singleton_exec c) (singleton_auxtr δ)
-  | valid_system_trace_step ex atr c κ c' δ δ' :
+  | valid_system_trace_step ex atr c c' δ δ' :
       exec_ends_in ex c →
-      step c κ c' →
+      step c c' →
       auxtr_ends_in atr δ →
-      valid_state_evolution AS c.2 δ κ c'.2 δ' →
+      valid_state_evolution AS c.2 δ c'.2 δ' →
       valid_system_trace ex atr →
-      valid_system_trace (exec_extend ex κ c') (auxtr_extend atr δ').
+      valid_system_trace (exec_extend ex c') (auxtr_extend atr δ').
 
   Lemma valid_system_trace_valid_exec_trace ex atr :
     valid_system_trace ex atr → valid_exec ex.
@@ -239,38 +202,27 @@ Section system_trace.
     valid_system_trace (singleton_exec c) (singleton_auxtr δ).
   Proof. constructor. Qed.
 
-  Lemma valid_system_trace_extend ex atr c κ c' δ δ' :
+  Lemma valid_system_trace_extend ex atr c c' δ δ' :
     valid_system_trace ex atr →
     exec_ends_in ex c →
-    step c κ c' →
+    step c c' →
     auxtr_ends_in atr δ →
-    valid_state_evolution AS c.2 δ κ c'.2 δ' →
-    valid_system_trace (exec_extend ex κ c') (auxtr_extend atr δ').
+    valid_state_evolution AS c.2 δ c'.2 δ' →
+    valid_system_trace (exec_extend ex c') (auxtr_extend atr δ').
   Proof.
-    intros Heatr; revert c κ c' δ δ'.
-    induction Heatr as [|? ? ? ? ? ? ? ? ? ? ? ? IHeatr]; intros c1 κ' c2.
-    - intros; econstructor; [done|done|done|done|constructor].
-    - intros; econstructor; [done|done|done|done|].
-      eapply IHeatr; eauto.
+    intros Heatr; revert c c' δ δ'.
+    induction ex; econstructor; eauto.
   Qed.
 
-  Lemma valid_system_trace_extend_inv ex atr κ c' δ' :
-    valid_system_trace (exec_extend ex κ c') (auxtr_extend atr δ') →
+  Lemma valid_system_trace_extend_inv ex atr c' δ' :
+    valid_system_trace (exec_extend ex c') (auxtr_extend atr δ') →
     ∃ c δ,
       valid_system_trace ex atr ∧
       exec_ends_in ex c ∧
-      step c κ c' ∧
+      step c c' ∧
       auxtr_ends_in atr δ ∧
-      valid_state_evolution AS c.2 δ κ c'.2 δ'.
-  Proof.
-    inversion 1 as [?? [Heq1 Heq2]|ex' ??????????? [Heq1 Heq2] Heq3].
-    - symmetry in Heq2; apply app_eq_nil in Heq2 as [? ?]; done.
-    - apply app_inj_tail in Heq1 as [? ?].
-      apply app_inj_tail in Heq2 as [? ?].
-      apply app_inj_tail in Heq3 as [? ?].
-      destruct ex as [cs κs]; destruct ex' as [cs' κs']; simplify_eq/=.
-      eauto 10.
-  Qed.
+      valid_state_evolution AS c.2 δ c'.2 δ'.
+  Proof. inversion 1; eauto 10. Qed.
 
   Lemma valid_system_trace_ends_in ex atr :
     valid_system_trace ex atr → ∃ c δ, exec_ends_in ex c ∧ auxtr_ends_in atr δ.
@@ -296,11 +248,11 @@ Section simulation.
     λ ex atr,
     valid_system_trace AS ex atr ∧
     φ ex atr ∧
-    ∀ c c' κ δ,
+    ∀ c c' δ,
       exec_ends_in ex c →
       auxtr_ends_in atr δ →
-      step c κ c' →
-      ∃ δ', continued_simulation (exec_extend ex κ c') (auxtr_extend atr δ').
+      step c c' →
+      ∃ δ', continued_simulation (exec_extend ex c') (auxtr_extend atr δ').
 
   Local Definition continued_simulation_pre_curried
         (φ : execution_trace Λ → auxiliary_trace AS → Prop) :
@@ -314,7 +266,7 @@ Section simulation.
     monotone (continued_simulation_pre_curried φ).
   Proof.
     intros P Q HPQ [ex atr] (?&?&HP); repeat (split; first done).
-    intros ? ? ? ? ? ? ?.
+    intros ? ? ? ? ? ?.
     edestruct HP as (?&?); eauto.
   Qed.
 
@@ -347,11 +299,11 @@ Section simulation.
   Lemma continued_simulation_next_aux_state_exists
              (φ : execution_trace Λ → auxiliary_trace AS → Prop)
              (ex : execution_trace Λ) (atr : auxiliary_trace AS)
-             (c : cfg Λ) (κ : list (observation Λ)) :
+             (c : cfg Λ) :
     continued_simulation φ ex atr →
-    valid_exec (exec_extend ex κ c) →
+    valid_exec (exec_extend ex c) →
     ∃ δ : aux_state AS,
-      continued_simulation φ (exec_extend ex κ c) (auxtr_extend atr δ).
+      continued_simulation φ (exec_extend ex c) (auxtr_extend atr δ).
   Proof.
     rewrite continued_simulation_unfold /continued_simulation_pre.
     intros (Hvst & HΦ & Hext) Hvex.
@@ -367,12 +319,12 @@ Section simulation.
           ∃ atr, continued_simulation φ ex atr.
   Proof.
     intros Hsm ex Hexstr Hex.
-    induction Hex as [|? ? ? ? ? ? ? IHex].
+    induction Hex as [|? ? ? ? ? ? IHex].
     - apply singleton_exec_starts_in_inv in Hexstr as ->.
       exists (singleton_auxtr δ); eauto using valid_system_trace_singletons.
     - destruct IHex as [atr Hsim].
       { eapply exec_extend_starts_in_inv; eauto. }
-      destruct (continued_simulation_next_aux_state_exists φ ex atr c' κ);
+      destruct (continued_simulation_next_aux_state_exists φ ex atr c');
         [done| |by eauto].
       econstructor; eauto.
   Qed.
