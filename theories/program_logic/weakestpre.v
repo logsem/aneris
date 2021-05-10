@@ -1,26 +1,9 @@
 From iris.proofmode Require Import base tactics classes.
 From iris.base_logic.lib Require Export fancy_updates.
-From aneris.program_logic Require Export language.
+From aneris.program_logic Require Export language traces.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From aneris.bi Require Export weakestpre.
-Import uPred.
-
-Record AuxState Λ : Type := {
-  (** Auxiliary state tracked along the physical state. *)
-  aux_state : Type;
-
-  (** The relation between the state before and after every step. *)
-  valid_state_evolution :
-    state Λ → aux_state → state Λ → aux_state → Prop;
-
-  (** We can always take a valid step in the auxiliary state *)
-  pure_step_evolution_valid σ1 δ1 : valid_state_evolution σ1 δ1 σ1 δ1;
-}.
-
-Arguments aux_state {_} _.
-Arguments valid_state_evolution {_} _.
-Arguments pure_step_evolution_valid {_} _.
 
 Class irisG (Λ : language) (AS : AuxState Λ) (Σ : gFunctors) := IrisG {
   iris_invG :> invG Σ;
@@ -30,7 +13,7 @@ Class irisG (Λ : language) (AS : AuxState Λ) (Σ : gFunctors) := IrisG {
   the remaining observations, and [nat] is the number of forked-off threads
   (not the total number of threads, which is one higher because there is always
   a main thread). *)
-  state_interp : state Λ → aux_state AS → nat → iProp Σ;
+  state_interp : execution_trace Λ → auxiliary_trace AS → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -45,19 +28,27 @@ Definition wp_pre `{!irisG Λ AS Σ} (s : stuckness)
     coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
   match to_val e1 with
   | Some v => |={E}=> Φ v
-  | None => ∀ σ1 δ1 n,
-     state_interp σ1 δ1 n ={E,∅}=∗
+  | None => ∀ extr atr tp σ1 δ1,
+      ⌜trace_ends_in extr (tp, σ1)⌝ -∗
+      ⌜trace_ends_in atr δ1⌝ -∗
+      state_interp extr atr ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
-       ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
-         ∃ δ2, ⌜valid_state_evolution AS σ1 δ1 σ2 δ2⌝ ∗
-           state_interp σ2 δ2 (length efs + n) ∗
+       ∀ e2 σ2 efs K `{!LanguageCtx K} tp1 tp2,
+         ⌜tp = tp1 ++ K e1 :: tp2⌝ -∗
+         ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
+         ∃ δ2, ⌜valid_state_evolution extr atr (tp1 ++ K e2 :: tp2, σ2) δ2⌝ ∗
+           state_interp
+             (trace_extend extr (tp1 ++ K e2 :: tp2, σ2))
+             (trace_extend atr δ2) ∗
            wp E e2 Φ ∗
            [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end%I.
 
 Local Instance wp_pre_contractive `{!irisG Λ AS Σ} s : Contractive (wp_pre s).
 Proof.
-  rewrite /wp_pre=> n wp wp' Hwp E e1 Φ.
+  rewrite /wp_pre=> n wp wp' Hwp E e1 Φ /=.
+  destruct to_val; first done.
+  repeat apply bi.forall_ne =>?.
   repeat (f_contractive || f_equiv); apply Hwp.
 Qed.
 
@@ -88,10 +79,9 @@ Global Instance wp_ne s E e n :
 Proof.
   revert e. induction (lt_wf n) as [n _ IH]=> e Φ Ψ HΦ.
   rewrite !wp_unfold /wp_pre.
-  (* FIXME: figure out a way to properly automate this proof *)
-  (* FIXME: reflexivity, as being called many times by f_equiv and f_contractive
-  is very slow here *)
-  repeat ((f_contractive || f_equiv); try apply IH); first lia.
+  destruct to_val; first by f_equiv; apply HΦ.
+  repeat apply bi.forall_ne =>?.
+  repeat ((f_contractive || f_equiv); try apply IH); eauto.
   eapply dist_le; eauto with lia.
 Qed.
 Global Instance wp_proper s E e :
@@ -104,6 +94,7 @@ Global Instance wp_contractive s E e n :
   Proper (pointwise_relation _ (dist_later n) ==> dist n) (wp (PROP:=iProp Σ) s E e).
 Proof.
   intros He Φ Ψ HΦ. rewrite !wp_unfold /wp_pre He.
+  repeat apply bi.forall_ne =>?.
   by repeat (f_contractive || f_equiv).
 Qed.
 
@@ -120,11 +111,12 @@ Proof.
   rewrite !wp_unfold /wp_pre.
   destruct (to_val e) as [v|] eqn:?.
   { iApply ("HΦ" with "[> -]"). by iApply (fupd_mask_mono E1 _). }
-  iIntros (σ1 δ1 n) "Hσ".
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi".
   iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
-  iMod ("H" with "[$]") as "[% H]".
-  iModIntro. iSplit; [by destruct s1, s2|]. iIntros (e2 σ2 efs Hstep).
-  iMod ("H" with "[//]") as "H". iIntros "!> !>".
+  iMod ("H" with "[//] [//] [$]") as "[% H]".
+  iModIntro. iSplit; [by iPureIntro; destruct s1, s2|].
+  iIntros (e2 σ2 efs K ? tp1 tp2 -> Hstep).
+  iMod ("H" with "[//] [//] [//]") as "H". iIntros "!> !>".
   iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
   iMod "Hclose" as "_". iModIntro.
   iExists δ2. iSplit; first done.
@@ -138,12 +130,22 @@ Lemma fupd_wp s E e Φ : (|={E}=> WP e @ s; E {{ Φ }}) ⊢ WP e @ s; E {{ Φ }}
 Proof.
   rewrite wp_unfold /wp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?.
   { by iMod "H". }
-  iIntros (σ1 δ1 n) "Hσ1". iMod "H". by iApply "H".
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi". iMod "H".
+  iApply ("H" with "[] [] Hsi"); done.
 Qed.
 Lemma wp_fupd s E e Φ : WP e @ s; E {{ v, |={E}=> Φ v }} ⊢ WP e @ s; E {{ Φ }}.
 Proof. iIntros "H". iApply (wp_strong_mono s s E with "H"); auto. Qed.
 
+Class AllowsStuttering :=
+  allows_stuttering :
+    ∀ extr atr c δ,
+      trace_ends_in extr c →
+      trace_ends_in atr δ →
+      state_interp extr atr ==∗
+      state_interp (trace_extend extr c) (trace_extend atr δ).
+
 Lemma wp_stuttering_atomic s E1 E2 e Φ
+      `{!AllowsStuttering}
       `{!StutteringAtomic (stuckness_to_atomicity s) e} :
   (|={E1,E2}=> WP e @ s; E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
 Proof.
@@ -153,44 +155,45 @@ Proof.
   rewrite !(wp_unfold s E2 e) /wp_pre.
   destruct (to_val e) as [v|] eqn:He.
   { by iDestruct "H" as ">>> $". }
-  iIntros (σ1 δ1 n) "Hσ".
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi".
   iAssert ((|={E1}=> ⌜match s with
                       | NotStuck => reducible e σ1
                       | MaybeStuck => True
                       end⌝ ∗
-            state_interp σ1 δ1 n ∗ _)%I) with "[H Hσ]" as
-      ">(Hnstuck & Hσ & H)".
+            state_interp extr atr ∗ _)%I) with "[H Hsi]" as
+      ">(Hnstuck & Hsi & H)".
   { iApply fupd_plain_keep_l.
-    iSplitR; last (iFrame "Hσ"; iExact "H").
-    iIntros "[Hσ H]".
+    iSplitR; last (iFrame "Hsi"; iExact "H").
+    iIntros "[Hsi H]".
     iApply fupd_plain_mask.
     iMod "H".
-    iMod ("H" with "Hσ") as "[? _]".
+    iMod ("H" with "[//] [//] Hsi") as "[? _]".
     iModIntro; done. }
   iPoseProof (fupd_mask_intro_subseteq E1 ∅ True%I with "[]") as "Hmsk";
     [set_solver|done|].
   iMod "Hmsk".
   iModIntro.
   iSplitL "Hnstuck"; first done.
-  iIntros (e2 σ2 efs Hstep).
+  iIntros (e2 σ2 efs  K ? tp1 tp2 ->Hstep).
   destruct (stutteringatomic _ _ _ _ Hstep) as [(?&?&?)|Hs]; simplify_eq/=.
   - iModIntro; iNext.
+    iMod (allows_stuttering with "Hsi") as "Hsi"; [done|done|].
     iMod "Hmsk" as "_"; iModIntro.
-    iExists δ1; iFrame "Hσ".
-    iSplitR; first (iPureIntro; apply pure_step_evolution_valid).
+    iExists δ1; iFrame "Hsi".
+    iSplitR; first by iPureIntro; apply pure_step_evolution_valid.
     iSplitL; last done.
     iApply "IH"; done.
   - iClear "IH".
     iMod "Hmsk" as "_".
-    iMod "H". iMod ("H" $! σ1 with "Hσ") as "[_ H]".
-    iMod ("H" with "[//]") as "H". iIntros "!>!>".
+    iMod "H". iMod ("H" with "[//] [//] Hsi") as "[_ H]".
+    iMod ("H" with "[//] [//] [//]") as "H". iIntros "!>!>".
     iMod "H" as (δ2) "(% & Hσ & H & Hefs)". destruct s.
     + rewrite !wp_unfold /wp_pre. destruct (to_val e2) as [v2|] eqn:He2.
       * iDestruct "H" as ">> H".
         iModIntro; iExists _; iSplitR; first done.
         iFrame.
         rewrite !wp_unfold /wp_pre He2; done.
-      * iMod ("H" with "[$]") as "[H _]".
+      * iMod ("H" with "[] [] [$]") as "[H _]"; [done|done|].
         iDestruct "H" as %(? & ? & ? & ?%Hs); done.
     + destruct Hs as [v <-%of_to_val].
       rewrite !wp_unfold /wp_pre to_of_val.
@@ -201,103 +204,179 @@ Proof.
 Qed.
 
 Lemma wp_stutteringatomic_take_step
-      s E1 E2 e Φ `{!StutteringAtomic (stuckness_to_atomicity s) e} :
+      s E1 E2 e Φ
+      `{!AllowsStuttering}
+      `{!StutteringAtomic (stuckness_to_atomicity s) e} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ σ1 n δ1, state_interp σ1 δ1 n ={E2}=∗
-     ∃ δ' Q,
-       state_interp σ1 δ1 n ∗
-       (∀ σ2 δ3 n',
-           state_interp σ2 δ3 (n' + n) ∗
-           ⌜valid_state_evolution AS σ1 δ' σ2 δ3⌝ ∗ Q ={E2}=∗
-             ⌜valid_state_evolution AS σ1 δ1 σ2 δ3⌝) ∗
-       (state_interp σ1 δ1 n ={E2}=∗ state_interp σ1 δ' n ∗ Q) ∗
-   WP e @ s; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
+   ∀ extr atr c1 δ1,
+     ⌜trace_ends_in extr c1⌝ -∗
+     ⌜trace_ends_in atr δ1⌝ -∗
+     state_interp extr atr ={E2}=∗
+     ∃ δ' Q R,
+       state_interp extr atr ∗
+       (∀ c2 δ2,
+           state_interp
+             (trace_extend extr c2)
+             (trace_extend atr δ2) ∗
+           ⌜valid_state_evolution extr atr c2 δ2⌝ ∗ Q ={E2}=∗
+             ⌜valid_state_evolution extr atr c2 δ'⌝ ∗
+             state_interp
+               (trace_extend extr c2)
+               (trace_extend atr δ') ∗ R) ∗
+       (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
+   WP e @ s; E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
 Proof.
   iIntros (He) "H".
   iLöb as "IH".
   rewrite {2}wp_unfold /wp_pre He.
-  iIntros (σ1 δ1 n) "Hσ".
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi".
   iAssert ((|={E1}=> ⌜match s with
                       | NotStuck => reducible e σ1
                       | MaybeStuck => True
                       end⌝ ∗
-            state_interp σ1 δ1 n ∗ _)%I) with "[H Hσ]" as
-      ">(% & Hσ & H)".
+            state_interp extr atr ∗ _)%I) with "[H Hsi]" as
+      ">(Hnstuck & Hsi & H)".
   { iApply fupd_plain_keep_l.
-    iSplitR; last (iFrame "Hσ"; iExact "H").
-    iIntros "[Hσ H]".
+    iSplitR; last (iFrame "Hsi"; iExact "H").
+    iIntros "[Hsi H]".
     iApply fupd_plain_mask.
     iMod "H".
-    iMod ("H" with "Hσ") as (δ' Q) "[Hσ (_&_&H)]".
+    iMod ("H" with "[//] [//] Hsi") as (δ' Q R) "[Hsi (_&_&H)]".
     rewrite !wp_unfold /wp_pre He.
-    iMod ("H" with "Hσ") as "[? _]"; done. }
+    iMod ("H" with "[] [] Hsi") as "[? _]"; done. }
   iMod (fupd_mask_intro_subseteq E1 ∅ True%I with "[]") as "Hmsk";
     [set_solver|done|].
   iModIntro.
   iSplit; first done.
-  iIntros (e2 σ2 efs Hstep).
+  iIntros (e2 σ2 efs K ? tp1 tp2 -> Hstep).
   pose proof Hstep as  [(?&?&?)|HSA]%stutteringatomic; simplify_eq/=.
   - iModIntro; iNext.
+    iMod (allows_stuttering with "Hsi") as "Hsi"; [done|done|].
     iMod "Hmsk" as "_"; iModIntro.
-    iExists δ1; iFrame "Hσ".
-    iSplitR; first (iPureIntro; apply pure_step_evolution_valid).
+    iExists δ1; iFrame "Hsi".
+    iSplitR; first by iPureIntro; apply pure_step_evolution_valid.
     iSplitL; last done.
     iApply "IH"; done.
   - iMod "Hmsk" as "_".
-    iMod ("H" with "Hσ") as ">H".
-    iDestruct "H" as (δ' Q) "(Hσ & Hfixed & Htrans & H)".
+    iMod ("H" with "[//] [//] Hsi") as ">H".
+    iDestruct "H" as (δ' Q R) "(Hsi & Hupdate & Htrans & H)".
     rewrite (wp_unfold s E2 e) /wp_pre He.
-    iMod ("Htrans" with "Hσ") as "(Hσ & HQ)".
-    iMod ("H" $! σ1 with "Hσ") as "[_ H]".
-    iMod ("H" with "[//]") as "H". iIntros "!>!>".
-    iMod "H" as (δ3) "(Hδ3 & Hσ & H & Hefs)".
-    iAssert (|={E2}=> state_interp σ2 δ3 (length efs + n) ∗
-               Q ∗ ⌜valid_state_evolution AS σ1 δ1 σ2 δ3⌝)%I
-      with "[Hfixed Hδ3 Hσ HQ]" as ">(Hσ & HQ & ?)".
-    { rewrite assoc. iApply fupd_plain_keep_r; iFrame.
-      iIntros "[? ?]"; iApply "Hfixed"; iFrame. }
+    iMod ("Htrans" with "Hsi") as "(Hsi & HQ)".
+    iMod ("H" with "[//] [//] Hsi") as "[_ H]".
+    iMod ("H" with "[//] [//] [//]") as "H". iIntros "!>!>".
+    iMod "H" as (δ3) "(Hδ3 & Hsi & H & Hefs)".
+    iMod ("Hupdate" with "[$HQ $Hsi $Hδ3]") as "(Hδ2 & Hsi & HR)".
     destruct s.
     + rewrite (wp_unfold _ E2 e2); rewrite /wp_pre.
       destruct (to_val e2) as [v2|] eqn:He2.
-      * iDestruct ("H" with "HQ") as ">> H".
+      * iDestruct ("H" with "HR") as ">> H".
         iModIntro; iExists _; iFrame.
         rewrite -(of_to_val _ _ He2) -wp_value'; done.
-      * iMod ("H" with "Hσ") as "[% _]".
+      * iMod ("H" with "[] [] Hsi") as "[% _]"; [done|done|].
         exfalso; simpl in *; eapply not_reducible; eauto.
     + simpl in *.
       destruct HSA as [v <-%of_to_val].
-      iMod (wp_value_inv' with "H HQ") as ">H".
+      iMod (wp_value_inv' with "H HR") as ">H".
       iModIntro. iExists _; iSplit; first done.
-      iFrame "Hσ Hefs". by iApply wp_value'.
+      iFrame "Hsi Hefs". by iApply wp_value'.
 Qed.
 
-Lemma wp_atomic s E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
+Lemma wp_atomic s E1 E2 e Φ
+      `{!Atomic (stuckness_to_atomicity s) e} :
   (|={E1,E2}=> WP e @ s; E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
-Proof. apply wp_stuttering_atomic; apply _. Qed.
+Proof.
+  iIntros "H".
+  rewrite (wp_unfold s E1 e) /wp_pre.
+  rewrite !(wp_unfold s E2 e) /wp_pre.
+  destruct (to_val e) as [v|] eqn:He.
+  { by iDestruct "H" as ">>> $". }
+  iIntros (extr atr tp σ1 δ1 exe Hatre) "Hsi".
+  iMod "H".
+  iMod ("H" with "[//] [//] Hsi") as "[% H]".
+  iModIntro.
+  iSplit; first by iPureIntro.
+  iIntros (e2 σ2 efs K ? tp1 tp2 -> Hstep).
+  pose proof (atomic _ _ _ _ Hstep) as Hs; simplify_eq/=.
+  iMod ("H" with "[//] [//] [//]") as "H". iIntros "!>!>".
+  iMod "H" as (δ2) "(% & Hσ & H & Hefs)". destruct s.
+  - rewrite !wp_unfold /wp_pre. destruct (to_val e2) as [v2|] eqn:He2.
+    + iDestruct "H" as ">> H".
+      iModIntro; iExists _; iSplitR; first done.
+      iFrame.
+      rewrite !wp_unfold /wp_pre He2; done.
+    + iMod ("H" with "[] [] [$]") as "[H _]"; [done|done|].
+      iDestruct "H" as %(? & ? & ? & ?%Hs); done.
+  - destruct Hs as [v <-%of_to_val].
+    rewrite !wp_unfold /wp_pre to_of_val.
+    iMod "H" as ">H"; iModIntro.
+    iExists _; iSplitR; first done.
+    rewrite !wp_unfold /wp_pre to_of_val.
+    eauto with iFrame.
+Qed.
 
 Lemma wp_atomic_take_step
-      s E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
+      s E1 E2 e Φ
+      `{!Atomic (stuckness_to_atomicity s) e} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ σ1 n δ1, state_interp σ1 δ1 n ={E2}=∗
-     ∃ δ' Q,
-       state_interp σ1 δ1 n ∗
-       (∀ σ2 δ3 n',
-           state_interp σ2 δ3 (n' + n) ∗
-           ⌜valid_state_evolution AS σ1 δ' σ2 δ3⌝ ∗ Q ={E2}=∗
-             ⌜valid_state_evolution AS σ1 δ1 σ2 δ3⌝) ∗
-       (state_interp σ1 δ1 n ={E2}=∗ state_interp σ1 δ' n ∗ Q) ∗
-   WP e @ s; E2 {{ v, Q ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
-Proof. apply wp_stutteringatomic_take_step; apply _. Qed.
+   ∀ extr atr c1 δ1,
+     ⌜trace_ends_in extr c1⌝ -∗
+     ⌜trace_ends_in atr δ1⌝ -∗
+     state_interp extr atr ={E2}=∗
+     ∃ δ' Q R,
+       state_interp extr atr ∗
+       (∀ c2 δ2,
+           state_interp
+             (trace_extend extr c2)
+             (trace_extend atr δ2) ∗
+           ⌜valid_state_evolution extr atr c2 δ2⌝ ∗ Q ={E2}=∗
+             ⌜valid_state_evolution extr atr c2 δ'⌝ ∗
+             state_interp
+               (trace_extend extr c2)
+               (trace_extend atr δ') ∗ R) ∗
+       (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
+   WP e @ s; E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
+Proof.
+  iIntros (He) "H".
+  rewrite wp_unfold /wp_pre He.
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi".
+  iMod ("H" with "[//] [//] Hsi") as ">H".
+  iDestruct "H" as (δ' Q R) "(Hsi & Hupdate & Htrans & H)".
+  rewrite (wp_unfold s E2 e) /wp_pre He.
+  iMod ("Htrans" with "Hsi") as "(Hsi & HQ)".
+  iMod ("H" with "[//] [//] Hsi") as "[% H]".
+  iModIntro.
+  iSplit; first by iPureIntro.
+  iIntros (e2 σ2 efs K ? tp1 tp2 -> Hstep).
+  pose proof (atomic _ _ _ _ Hstep) as Hs; simplify_eq/=.
+  iMod ("H" with "[//] [//] [//]") as "H". iIntros "!>!>".
+  iMod "H" as (δ3) "(Hδ3 & Hsi & H & Hefs)".
+  iMod ("Hupdate" with "[$HQ $Hsi $Hδ3]") as "(Hδ2 & Hsi & HR)".
+  destruct s.
+  - rewrite (wp_unfold _ E2 e2); rewrite /wp_pre.
+    destruct (to_val e2) as [v2|] eqn:He2.
+    + iDestruct ("H" with "HR") as ">> H".
+      iModIntro; iExists _; iFrame.
+      rewrite -(of_to_val _ _ He2) -wp_value'; done.
+    + iMod ("H" with "[] [] Hsi") as "[% _]"; [done|done|].
+      exfalso; simpl in *; eapply not_reducible; eauto.
+  - simpl in *.
+    destruct Hs as [v <-%of_to_val].
+    iMod (wp_value_inv' with "H HR") as ">H".
+    iModIntro. iExists _; iSplit; first done.
+    iFrame "Hsi Hefs". by iApply wp_value'.
+Qed.
 
 Lemma wp_step_fupd s E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
   (|={E1}[E2]▷=> P) -∗ WP e @ s; E2 {{ v, P ={E1}=∗ Φ v }} -∗ WP e @ s; E1 {{ Φ }}.
 Proof.
   rewrite !wp_unfold /wp_pre. iIntros (-> ?) "HR H".
-  iIntros (σ1 δ1 n) "Hσ". iMod "HR". iMod ("H" with "[$]") as "[$ H]".
-  iIntros "!>" (e2 σ2 efs Hstep). iMod ("H" $! e2 σ2 efs with "[% //]") as "H".
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi".
+  iMod "HR". iMod ("H" with "[//] [//] [$]") as "[$ H]".
+  iIntros "!>" (e2 σ2 efs K ? tp1 tp2 -> Hstep).
+  iMod ("H" $! e2 σ2 efs with "[//] [//] [% //]") as "H".
   iIntros "!>!>". iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
   iMod "HR". iModIntro; iExists δ2; iSplit; first done. iFrame "Hσ Hefs".
   iApply (wp_strong_mono s s E2 with "H"); [done..|].
@@ -310,31 +389,17 @@ Proof.
   iIntros "H". iLöb as "IH" forall (E e Φ). rewrite wp_unfold /wp_pre.
   destruct (to_val e) as [v|] eqn:He.
   { apply of_to_val in He as <-. by iApply fupd_wp. }
-  rewrite wp_unfold /wp_pre fill_not_val //.
-  iIntros (σ1 δ1 n) "Hσ".
-  iMod ("H" with "[$]") as "[% H]". iModIntro; iSplit.
-  { destruct s; eauto using reducible_fill. }
-  iIntros (e2 σ2 efs Hstep).
-  destruct (fill_step_inv e σ1 e2 σ2 efs) as (e2'&->&?); auto.
-  iMod ("H" $! e2' σ2 efs with "[//]") as "H". iIntros "!>!>".
-  iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
-  iModIntro; iExists δ2; iSplit; first done.
-  iFrame "Hσ Hefs". by iApply "IH".
-Qed.
-
-Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
-  WP K e @ s; E {{ Φ }} ⊢ WP e @ s; E {{ v, WP K (of_val v) @ s; E {{ Φ }} }}.
-Proof.
-  iIntros "H". iLöb as "IH" forall (E e Φ). rewrite !wp_unfold /wp_pre.
-  destruct (to_val e) as [v|] eqn:He.
-  { apply of_to_val in He as <-. by rewrite !wp_unfold /wp_pre. }
-  rewrite fill_not_val //.
-  iIntros (σ1 δ1 n) "Hσ". iMod ("H" with "[$]") as "[% H]".
+  rewrite wp_unfold /wp_pre fill_not_val; last done.
+  iIntros (extr atr tp σ1 δ1 Hexe Hatre) "Hsi".
+  iMod ("H" with "[//] [//] [$]") as "[% H]".
   iModIntro; iSplit.
-  { destruct s; eauto using reducible_fill_inv. }
-  iIntros (e2 σ2 efs Hstep).
-  iMod ("H" $! (K e2) σ2 efs with "[]") as "H"; [by eauto using fill_step|].
-  iIntros "!>!>". iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
+  { iPureIntro. destruct s; first apply reducible_fill; done. }
+  iIntros (e2 σ2 efs K' ? tp1 tp2 -> Hstep).
+  destruct (fill_step_inv (K := K) e σ1 e2 σ2 efs) as (e2'&->&?); [done|done|].
+  iMod ("H" $! e2' σ2 efs (λ e, K' (K e)) with "[] [//] [//]") as "H".
+  { iPureIntro; apply _. }
+  iIntros "!>!>".
+  iMod "H" as (δ2) "(Hsv & Hσ & H & Hefs)".
   iModIntro; iExists δ2; iSplit; first done.
   iFrame "Hσ Hefs". by iApply "IH".
 Qed.
@@ -417,6 +482,8 @@ Qed.
 
 End wp.
 
+Global Arguments AllowsStuttering {_} _ _ {_}.
+
 (** Proofmode class instances *)
 Section proofmode_classes.
   Context `{!irisG Λ AS Σ}.
@@ -434,32 +501,55 @@ Section proofmode_classes.
   Global Instance elim_modal_bupd_wp p s E e P Φ :
     ElimModal True p false (|==> P) P (WP e @ s; E {{ Φ }}) (WP e @ s; E {{ Φ }}).
   Proof.
-    by rewrite /ElimModal intuitionistically_if_elim
-      (bupd_fupd E) fupd_frame_r wand_elim_r fupd_wp.
+    by rewrite /ElimModal bi.intuitionistically_if_elim
+      (bupd_fupd E) fupd_frame_r bi.wand_elim_r fupd_wp.
   Qed.
 
   Global Instance elim_modal_fupd_wp p s E e P Φ :
     ElimModal True p false (|={E}=> P) P (WP e @ s; E {{ Φ }}) (WP e @ s; E {{ Φ }}).
   Proof.
-    by rewrite /ElimModal intuitionistically_if_elim
-      fupd_frame_r wand_elim_r fupd_wp.
+    by rewrite /ElimModal bi.intuitionistically_if_elim
+      fupd_frame_r bi.wand_elim_r fupd_wp.
   Qed.
 
   Global Instance elim_modal_fupd_wp_stutteringatomic p s E1 E2 e P Φ :
+    AllowsStuttering AS Σ →
     StutteringAtomic (stuckness_to_atomicity s) e →
     ElimModal True p false (|={E1,E2}=> P) P
             (WP e @ s; E1 {{ Φ }}) (WP e @ s; E2 {{ v, |={E2,E1}=> Φ v }})%I.
   Proof.
-    intros. by rewrite /ElimModal intuitionistically_if_elim
-      fupd_frame_r wand_elim_r wp_stuttering_atomic.
+    intros. by rewrite /ElimModal bi.intuitionistically_if_elim
+      fupd_frame_r bi.wand_elim_r wp_stuttering_atomic.
   Qed.
 
   Global Instance add_modal_fupd_wp s E e P Φ :
     AddModal (|={E}=> P) P (WP e @ s; E {{ Φ }}).
-  Proof. by rewrite /AddModal fupd_frame_r wand_elim_r fupd_wp. Qed.
+  Proof. by rewrite /AddModal fupd_frame_r bi.wand_elim_r fupd_wp. Qed.
 
   Global Instance elim_acc_wp_stuttering {X} E1 E2 α β γ e s Φ :
+    AllowsStuttering AS Σ →
     StutteringAtomic (stuckness_to_atomicity s) e →
+    ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1)
+            α β γ (WP e @ s; E1 {{ Φ }})
+            (λ x, WP e @ s; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.
+  Proof.
+    intros ? ? _.
+    iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
+    iApply (wp_wand with "(Hinner Hα)").
+    iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
+  Qed.
+
+  Global Instance elim_modal_fupd_wp_atomic p s E1 E2 e P Φ :
+    Atomic (stuckness_to_atomicity s) e →
+    ElimModal True p false (|={E1,E2}=> P) P
+            (WP e @ s; E1 {{ Φ }}) (WP e @ s; E2 {{ v, |={E2,E1}=> Φ v }})%I.
+  Proof.
+    intros. by rewrite /ElimModal bi.intuitionistically_if_elim
+      fupd_frame_r bi.wand_elim_r wp_atomic.
+  Qed.
+
+  Global Instance elim_acc_wp_atomic {X} E1 E2 α β γ e s Φ :
+    Atomic (stuckness_to_atomicity s) e →
     ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1)
             α β γ (WP e @ s; E1 {{ Φ }})
             (λ x, WP e @ s; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.

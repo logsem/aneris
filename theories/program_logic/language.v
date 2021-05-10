@@ -59,8 +59,20 @@ Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
     ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 e2' σ2 efs
 }.
 
-Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
+Global Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
 Proof. constructor; naive_solver. Qed.
+
+Global Instance language_ctx_comp Λ K K' `{!@LanguageCtx Λ K, !@LanguageCtx Λ K'} :
+  @LanguageCtx Λ (λ e, K (K' e)).
+Proof.
+  constructor.
+  - intros ??; do 2 apply fill_not_val; done.
+  - intros ??????. do 2 apply fill_step; done.
+  - intros ?????? Hpstep.
+    apply fill_step_inv in Hpstep as (e2'' & -> & He2'');
+      last by apply fill_not_val.
+    apply fill_step_inv in He2'' as (e2' & -> & He2'); eauto.
+Qed.
 
 Inductive atomicity := StronglyAtomic | WeaklyAtomic.
 

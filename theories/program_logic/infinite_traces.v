@@ -1,4 +1,4 @@
-From aneris.program_logic Require Export weakestpre traces.
+From aneris.program_logic Require Export language auxstate traces.
 
 Set Default Proof Using "Type".
 
