@@ -81,10 +81,6 @@ Section ra.
     f_equiv. intros ?. by destruct (x =? b).
   Qed.
 
-  Local Instance func_proper:
-    ∀ (b : nat), Proper ((≡) ==> (≡)) (λ h : ballot_oneshotUR A, h b).
-  Proof. intros b f g Hfg; apply Hfg. Qed.
-
   Local Lemma filter_class (b N : nat) :
     N ≠ 0 →
     filter (λ y : nat, b `mod` N = y ∧ y ≤ b) (set_seq 0 N) =
@@ -100,26 +96,30 @@ Section ra.
       apply Nat.mod_le; done.
   Qed.
 
+  Lemma big_opS_apply (g : gset nat) (f : nat → ballot_oneshotUR A) (b : nat) :
+    ([^op set] x ∈ g, f x) b ≡ [^op set] x ∈ g, f x b.
+  Proof.
+    induction g as [|z g' Hz IHg'] using set_ind_L.
+    - rewrite !big_opS_empty; done.
+    - assert (∀ g1 g2 : ballot_oneshotUR A, ∀ x, g1 ≡ g2 → g1 x ≡ g2 x) as Hconv.
+      { intros ??? Hequiv; apply Hequiv. }
+      transitivity ((f z ⋅ [^op set] x ∈ g', f x) b).
+      { apply Hconv.
+        rewrite big_opS_union; last set_solver.
+        rewrite big_opS_singleton; done. }
+      rewrite big_opS_union; last set_solver.
+      rewrite big_opS_singleton.
+      rewrite discrete_fun_lookup_op.
+      f_equiv; done.
+  Qed.
+
   Lemma pending_all_split_classes N :
     N ≠ 0 →
     pending_all ≡ [^op set] x ∈ set_seq 0 N, pending_class x N 0.
   Proof.
     intros HNnz.
     intros b.
-    setoid_replace (([^op set] x ∈ set_seq 0 N, pending_class x N 0) b) with
-        ([^op set] x ∈ set_seq 0 N, pending_class x N 0 b); last first.
-    { clear.
-      generalize N at 1 3 as M.
-      induction N as [|N IHN]; intros M.
-      - rewrite /= !big_opS_empty; done.
-      - rewrite set_seq_S_end_union_L.
-        etrans;
-          first by (apply func_proper; rewrite big_opS_union;
-                    [|by apply set_seq_S_end_disjoint];
-                    rewrite big_opS_singleton).
-        rewrite big_opS_union; last by apply set_seq_S_end_disjoint.
-        rewrite big_opS_singleton.
-        rewrite /= -IHN; done. }
+    rewrite big_opS_apply.
     rewrite /pending_all.
     rewrite (big_opS_proper _ (λ x, if decide ((b `mod` N = x) ∧ (x <= b)) then
                  Some (Cinl (Excl ())) else None)); last first.
