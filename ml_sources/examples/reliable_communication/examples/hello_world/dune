@@ -1,0 +1,4 @@
+(executable
+  (name hello_world_code)
+  (flags :standard -rectypes)
+  (libraries client_server_code aneris))

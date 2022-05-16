@@ -1,0 +1,4 @@
+(executable
+  (name counter_runner)
+  (flags :standard -rectypes)
+  (libraries statelib_code aneris))

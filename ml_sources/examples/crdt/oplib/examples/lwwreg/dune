@@ -1,0 +1,5 @@
+(library
+  (wrapped false)
+  (name lwwreg_code)
+  (flags :standard -rectypes)
+  (libraries oplib_code aneris))

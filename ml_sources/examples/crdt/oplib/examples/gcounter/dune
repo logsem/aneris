@@ -1,0 +1,4 @@
+(executable
+  (name gcounter_code)
+  (flags :standard -rectypes)
+  (libraries oplib_code aneris))

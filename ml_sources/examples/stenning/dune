@@ -1,0 +1,4 @@
+(executable
+  (name stenning_code)
+  (flags :standard -rectypes)
+  (libraries aneris))

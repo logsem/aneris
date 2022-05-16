@@ -1,0 +1,4 @@
+(executable
+  (name messages_in_order_runner)
+  (flags :standard -rectypes)
+  (libraries client_server_code aneris))

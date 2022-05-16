@@ -1,0 +1,7 @@
+(include_subdirs unqualified)
+
+(library
+  (wrapped false)
+  (name aneris)
+  (flags :standard -rectypes)
+  (libraries unix threads ocaml-compiler-libs.common domainslib))

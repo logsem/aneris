@@ -1,0 +1,4 @@
+(library
+  (name client_server_code)
+  (flags :standard -rectypes)
+  (libraries aneris))

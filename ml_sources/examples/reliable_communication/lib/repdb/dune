@@ -1,0 +1,4 @@
+ (library
+  (name repdb_code)
+  (flags :standard -rectypes)
+  (libraries aneris client_server_code))

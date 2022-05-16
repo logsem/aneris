@@ -1,0 +1,4 @@
+(library
+  (name two_p_set_code)
+  (flags :standard -rectypes)
+  (libraries oplib_code aneris))

@@ -1,0 +1,4 @@
+(library
+  (name dune_code)
+  (flags :standard -rectypes)
+  (libraries aneris))

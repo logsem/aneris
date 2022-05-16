@@ -1,5 +1,16 @@
--Q theories aneris
--Q vendor/record-update/src RecordUpdate
+-Q trillium trillium
+-Q aneris aneris
+-Q fairness trillium.fairness
+
+-Q external/stdpp/theories stdpp
+-Q external/iris/iris iris
+-Q external/record-update/src RecordUpdate
+-Q external/paco/src Paco
+-Q external/actris/theories actris
+
+-Q external/iris/iris_deprecated iris.deprecated
+-Q external/iris/iris_staging iris.staging
+-Q external/iris/iris_heap_lang iris.heap_lang
 
 -arg -w -arg -notation-overridden
 -arg -w -arg -redundant-canonical-projection
@@ -7,33 +18,6 @@
 -arg -w -arg -undeclared-scope
 -arg -w -arg -ambiguous-paths
 -arg -w -arg -ssr-search-moved
-
-theories/program_logic/gen_heap_light.v
-
-theories/aneris_lang/network.v
-theories/aneris_lang/lang.v
-theories/aneris_lang/base_lang.v
-theories/aneris_lang/aneris_lang.v
-theories/aneris_lang/notation.v
-theories/aneris_lang/tactics.v
-theories/aneris_lang/resources.v
-theories/aneris_lang/state_interp.v
-theories/aneris_lang/lifting.v
-theories/aneris_lang/adequacy.v
-theories/aneris_lang/program_logic/aneris_lifting.v
-theories/aneris_lang/program_logic/aneris_weakestpre.v
-theories/aneris_lang/program_logic/aneris_adequacy.v
-theories/aneris_lang/proofmode.v
-
-theories/aneris_lang/lib/assert.v
-theories/aneris_lang/lib/network_helpers.v
-theories/aneris_lang/lib/util.v
-theories/aneris_lang/lib/serialization/serialization_base.v
-theories/aneris_lang/lib/serialization/serialization.v
-theories/aneris_lang/lib/list.v
-theories/aneris_lang/lib/dictionary.v
-theories/aneris_lang/lib/lock.v
-theories/aneris_lang/lib/bag.v
-theories/aneris_lang/lib/nodepar.v
-theories/aneris_lang/lib/vector_clock/time.v
-theories/aneris_lang/lib/vector_clock/vector_clock.v
+-arg -w -arg -deprecated-hint-without-locality
+-arg -w -arg -deprecated-instance-without-locality
+-arg -w -arg -deprecated-typeclasses-transparency-without-locality

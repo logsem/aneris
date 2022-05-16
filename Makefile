@@ -1,43 +1,72 @@
-all: Makefile.coq
-	cd vendor/record-update && $(MAKE)
-	+make -f Makefile.coq all
+TRILLIUM_DIR := 'trillium'
+ANERIS_DIR := 'aneris'
+FAIRNESS_DIR := 'fairness'
+LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(ANERIS_DIR) $(FAIRNESS_DIR)
+SRC_DIRS := $(LOCAL_SRC_DIRS) 'external'
 
-clean: Makefile.coq
-	cd vendor/record-update && $(MAKE) clean
-	+make -f Makefile.coq clean
-	rm -f Makefile.coq
+ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
+VFILES := $(shell find $(LOCAL_SRC_DIRS) -name "*.v")
+TRILLIUM_VFILES := $(shell find $(TRILLIUM_DIR) -name "*.v")
+FAIRNESS_VFILES := $(shell find $(FAIRNESS_DIR) -name "*.v")
+ANERIS_VFILES := $(shell find $(ANERIS_DIR) -name "*.v")
 
-Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.coq
+COQC := coqc
+Q:=@
 
-%: Makefile.coq
-	+make -f Makefile.coq $@
+# extract global arguments for Coq from _CoqProject
+COQPROJECT_ARGS := $(shell sed -E -e '/^\#/d' -e 's/-arg ([^ ]*)/\1/g' _CoqProject)
 
-# Install build-dependencies
-build-dep/opam: aneris.opam Makefile
-	@echo "# Creating build-dep package."
-	@mkdir -p build-dep
-	@sed <aneris.opam -E 's/^(build|install|remove):.*/\1: []/; s/^name: *"(.*)" */name: "\1-builddep"/' >build-dep/opam
-	@fgrep builddep build-dep/opam >/dev/null || (echo "sed failed to fix the package name" && exit 1) # sanity check
+all: $(VFILES:.v=.vo)
 
-build-dep: build-dep/opam phony
-	@# We want opam to not just instal the build-deps now, but to also keep satisfying these
-	@# constraints.  Otherwise, `opam upgrade` may well update some packages to versions
-	@# that are incompatible with our build requirements.
-	@# To achieve this, we create a fake opam package that has our build-dependencies as
-	@# dependencies, but does not actually install anything itself.
-	@echo "# Pinning build-dep package." && \
-	  if opam --version | grep "^1\." -q; then \
-	    BUILD_DEP_PACKAGE="$$(egrep "^name:" build-dep/opam | sed 's/^name: *"\(.*\)" */\1/')" && \
-	    opam pin add -k path $(OPAMFLAGS) "$$BUILD_DEP_PACKAGE".dev build-dep && \
-	    opam reinstall -j 2 --verbose $(OPAMFLAGS) "$$BUILD_DEP_PACKAGE"; \
-	  else \
-	    opam install -j 2 --verbose $(OPAMFLAGS) build-dep/; \
-	  fi
+.coqdeps.d: $(ALL_VFILES) _CoqProject
+	@echo "COQDEP $@"
+	$(Q)coqdep -vos -f _CoqProject $(ALL_VFILES) > $@
 
-# Some files that do *not* need to be forwarded to Makefile.coq
-Makefile: ;
-_CoqProject: ;
-aneris.opam: ;
+# do not try to build dependencies if cleaning or just building _CoqProject
+ifeq ($(filter clean,$(MAKECMDGOALS)),)
+include .coqdeps.d
+endif
 
-.PHONY: all clean phony
+%.vo: %.v _CoqProject | .coqdeps.d
+	@echo "COQC $<"
+	$(Q)$(COQC) $(COQPROJECT_ARGS) $(COQ_ARGS) -o $@ $<
+
+%.vos: %.v _CoqProject | .coqdeps.d
+	@echo "COQC -vos $<"
+	$(Q)$(COQC) $(COQPROJECT_ARGS) -vos $(COQ_ARGS) $< -o $@
+
+%.vok: %.v _CoqProject | .coqdeps.d
+	@echo "COQC -vok $<"
+	$(Q)$(COQC) $(COQPROJECT_ARGS) -vok $(COQ_ARGS) $< -o $@
+
+clean:
+	@echo "CLEAN vo glob aux"
+	$(Q)find $(SRC_DIRS) \( -name "*.vo" -o -name "*.vo[sk]" \
+		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
+	$(Q)rm -f .lia.cache
+	rm -f .coqdeps.d
+
+# project-specific targets
+.PHONY: clean-trillium clean-fairness clean-aneris trillium fairness aneris
+
+clean-trillium:
+	@echo "CLEAN vo glob aux"
+	$(Q)find  $(TRILLIUM_DIR) \( -name "*.vo" -o -name "*.vo[sk]" \
+		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
+clean-fairness:
+	@echo "CLEAN vo glob aux"
+	$(Q)find  $(FAIRNESS_DIR) \( -name "*.vo" -o -name "*.vo[sk]" \
+		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
+
+clean-aneris:
+	@echo "CLEAN vo glob aux"
+	$(Q)find $(ANERIS_DIR) \( -name "*.vo" -o -name "*.vo[sk]" \
+		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
+
+trillium: $(TRILLIUM_VFILES:.v=.vo)
+
+fairness: $(FAIRNESS_VFILES:.v=.vo)
+
+aneris: $(ANERIS_VFILES:.v=.vo)
+
+.PHONY: default

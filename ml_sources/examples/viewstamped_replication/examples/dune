@@ -1,0 +1,4 @@
+(executable
+  (name observe_par_sc2)
+  (flags :standard -rectypes)
+  (libraries vr aneris))

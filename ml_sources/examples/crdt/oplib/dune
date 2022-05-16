@@ -1,0 +1,5 @@
+(library
+ (wrapped false)
+ (name oplib_code)
+ (flags :standard -rectypes)
+ (libraries aneris rcb_code))

@@ -1,0 +1,5 @@
+(library
+ (wrapped false)
+ (name statelib_code)
+ (flags :standard -rectypes)
+ (libraries aneris))

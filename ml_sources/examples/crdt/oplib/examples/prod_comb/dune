@@ -1,0 +1,4 @@
+(library
+  (name prod_comb)
+  (flags :standard -rectypes)
+  (libraries oplib_code aneris))

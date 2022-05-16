@@ -1,0 +1,87 @@
+OUTPUT_ROOT:
+	ml_sources aneris
+
+IMPORT_PATH_PREFIX:
+
+	ml_sources aneris
+
+ML_SOURCES:
+
+	aneris_lang/lib/network_util_code.ml
+	aneris_lang/lib/list_code.ml
+        aneris_lang/lib/queue_code.ml
+	aneris_lang/lib/set_code.ml
+	aneris_lang/lib/map_code.ml
+	aneris_lang/lib/bag_code.ml
+	aneris_lang/lib/nodup_code.ml
+	aneris_lang/lib/coin_flip_code.ml
+	aneris_lang/lib/serialization/serialization_code.ml
+	aneris_lang/lib/vector_clock/vector_clock_code.ml
+	aneris_lang/lib/spawn_code.ml
+	aneris_lang/lib/par_code.ml
+	examples/ccddb/ccddb_code.ml
+	examples/consensus/paxos_code.ml
+	examples/transaction_commit/two_phase_code.ml
+	examples/viewstamped_replication/vr_serialization_code.ml
+	examples/viewstamped_replication/vr_network_code.ml
+	examples/viewstamped_replication/vr_replica_code.ml
+	examples/viewstamped_replication/vr_client_proxy_code.ml
+	examples/rcb/rcb_code.ml
+	examples/crdt/oplib/oplib_code.ml
+	examples/crdt/oplib/examples/pncounter/pncounter_code.ml
+	examples/crdt/oplib/examples/gcounter/gcounter_code.ml
+	examples/crdt/oplib/examples/prod_comb/prod_comb_code.ml
+	examples/crdt/oplib/examples/mvreg/mvreg_code.ml
+	examples/crdt/oplib/examples/lwwreg/lwwreg_code.ml
+	examples/crdt/oplib/examples/map_comb/map_comb_code.ml
+	examples/crdt/oplib/examples/grow_only_set/grow_only_set_code.ml
+	examples/crdt/oplib/examples/two_p_set/two_p_set_code.ml
+	examples/crdt/oplib/examples/add_wins_set/add_wins_set_code.ml
+	examples/crdt/oplib/examples/remove_wins_set/remove_wins_set_code.ml
+	examples/crdt/oplib/examples/table_of_counters/table_of_counters_code.ml
+	examples/crdt/oplib/examples/table_of_lwwregs/table_of_lwwregs_code.ml
+	examples/crdt/statelib/statelib_code.ml
+	examples/crdt/statelib/examples/pncounter/counter_code.ml
+	examples/ping_pong/ping_pong_done_code.ml
+	examples/dscm/implementations/one_server/one_server_serialization_code.ml
+	examples/dscm/implementations/one_server/one_server_client_proxy_code.ml
+	examples/dscm/implementations/one_server/one_server_network_code.ml
+	examples/dscm/implementations/one_server/one_server_server_code.ml
+	examples/reliable_communication/client_server_printing.ml
+	examples/reliable_communication/client_server_code.ml
+	examples/reliable_communication/examples/hello_world/hello_world_code.ml
+	examples/reliable_communication/examples/hello_world_2/hello_world_2_code.ml
+	examples/reliable_communication/examples/messages_in_order/messages_in_order_code.ml
+	examples/reliable_communication/examples/messages_in_order_loop/messages_in_order_loop_code.ml
+  	examples/reliable_communication/examples/dlm_db_example/dlm_db_example_code.ml
+  	examples/reliable_communication/lib/dlm/dlm_code.ml
+	examples/reliable_communication/lib/ddb/ddb_serialization_code.ml
+	examples/reliable_communication/lib/ddb/ddb_code.ml
+	examples/reliable_communication/lib/repdb/repdb_code.ml        
+
+ML_DEPENDENCIES:
+
+        aneris_lang
+	aneris_lang/lib
+        aneris_lang/lib/serialization
+	aneris_lang/lib/vector_clock
+	examples/dscm/implementations/one_server/
+	examples/viewstamped_replication/
+	examples/rcb/
+	examples/crdt/oplib/
+	examples/crdt/oplib/examples/
+        examples/crdt/oplib/examples/map_comb/
+        examples/crdt/oplib/examples/pncounter/
+        examples/crdt/oplib/examples/lwwreg/
+	examples/crdt/statelib/
+	examples/crdt/statelib/examples/
+	examples/ccddb/
+	examples/stenning/
+	examples/distributed_lock_service/
+	examples/distributed_lock_service/dynamic
+	examples/distributed_lock_service/examples
+	examples/reliable_communication/
+	examples/reliable_communication/lib/
+	examples/reliable_communication/lib/dlm/
+	examples/reliable_communication/lib/ddb/
+	examples/simple_database/        
