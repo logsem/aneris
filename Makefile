@@ -6,9 +6,6 @@ SRC_DIRS := $(LOCAL_SRC_DIRS) 'external'
 
 ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
 VFILES := $(shell find $(LOCAL_SRC_DIRS) -name "*.v")
-TRILLIUM_VFILES := $(shell find $(TRILLIUM_DIR) -name "*.v")
-FAIRNESS_VFILES := $(shell find $(FAIRNESS_DIR) -name "*.v")
-ANERIS_VFILES := $(shell find $(ANERIS_DIR) -name "*.v")
 
 COQC := coqc
 Q:=@
@@ -47,26 +44,32 @@ clean:
 	rm -f .coqdeps.d
 
 # project-specific targets
-.PHONY: clean-trillium clean-fairness clean-aneris trillium fairness aneris
+.PHONY: build clean-trillium clean-fairness clean-aneris trillium fairness aneris
+
+VPATH= $(TRILLIUM_DIR) $(ANERIS_DIR) $(FAIRNESS_DIR)
+VPATH_FILES := $(shell find $(VPATH) -name "*.v")
+
+build: $(VPATH_FILES:.v=.vo)
+
+fairness :
+	@$(MAKE) build VPATH=$(FAIRNESS_DIR)
+
+trillium :
+	@$(MAKE) build VPATH=$(TRILLIUM_DIR)
+
+aneris :
+	@$(MAKE) build VPATH=$(ANERIS_DIR)
+
+clean-local:
+	@echo "CLEAN vo glob aux"
+	$(Q)find $(LOCAL_SRC_DIRS) \( -name "*.vo" -o -name "*.vo[sk]" \
+		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
 
 clean-trillium:
-	@echo "CLEAN vo glob aux"
-	$(Q)find  $(TRILLIUM_DIR) \( -name "*.vo" -o -name "*.vo[sk]" \
-		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
-clean-fairness:
-	@echo "CLEAN vo glob aux"
-	$(Q)find  $(FAIRNESS_DIR) \( -name "*.vo" -o -name "*.vo[sk]" \
-		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
+	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(TRILLIUM_DIR)
 
 clean-aneris:
-	@echo "CLEAN vo glob aux"
-	$(Q)find $(ANERIS_DIR) \( -name "*.vo" -o -name "*.vo[sk]" \
-		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
+	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(ANERIS_DIR)
 
-trillium: $(TRILLIUM_VFILES:.v=.vo)
-
-fairness: $(FAIRNESS_VFILES:.v=.vo)
-
-aneris: $(ANERIS_VFILES:.v=.vo)
-
-.PHONY: default
+clean-fairness:
+	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(FAIRNESS_DIR)
