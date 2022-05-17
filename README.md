@@ -41,8 +41,8 @@ changes. However, it does not apply the changes. To update the dependencies run
   about fair termination of concurrent programs.
   
 - [`ml_sources/`](ml_sources/): The Multicore OCaml source files 
-  * [`aneris_lang/`](ml_sources/aneris_lang/): for the [`aneris/`](aneris/) OCaml shim and lib files
-  * [`examples/`](ml_sources/examples/): for the implementaiton of examples 
+  * [`aneris_lang/`](ml_sources/aneris_lang/): for the shim and the implementation of libraries related to the [`aneris/`](aneris/) folder
+  * [`examples/`](ml_sources/examples/): for the implementaiton of examples related to the [`examples/`](aneris/examples/) folder
 
 ## Compiling from OCaml sources
 
