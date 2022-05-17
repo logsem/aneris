@@ -39,6 +39,32 @@ changes. However, it does not apply the changes. To update the dependencies run
 
 - [`fairness/`](fairness/): A HeapLang instantiation of Trillium for reasoning
   about fair termination of concurrent programs.
+  
+- [`ml_sources/`](ml_sources/): The Multicore OCaml source files for the [`aneris/`](aneris/) and [`examples/`](examples/).
+
+## Compiling from OCaml sources
+
+To automatically generate AnerisLang programs from Ocaml source files, pin the `ocaml2lang` package:
+
+    opam pin git+https://github.com/leon-gondelman/ocaml2lang#multicore
+
+
+This will produce an executable `o2a`. After installation succeeds, you can try `o2a` by doing
+
+    o2a --h
+
+    
+You can now run at the root of the repository
+
+    o2a --rewrite
+    
+to generate Coq files just for the examples.
+
+To compile ocaml sources, just run 
+
+    dune build 
+    
+at the root of the repository.
 
 ## Publications
 
