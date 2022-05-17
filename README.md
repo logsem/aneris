@@ -40,7 +40,9 @@ changes. However, it does not apply the changes. To update the dependencies run
 - [`fairness/`](fairness/): A HeapLang instantiation of Trillium for reasoning
   about fair termination of concurrent programs.
   
-- [`ml_sources/`](ml_sources/): The Multicore OCaml source files for the [`aneris/`](aneris/) and [`examples/`](examples/).
+- [`ml_sources/`](ml_sources/): The Multicore OCaml source files 
+  * [`aneris_lang/`](ml_sources/aneris_lang/): for the [`aneris/`](aneris/) OCaml shim and lib files
+  * [`examples/`](ml_sources/examples/): for the implementaiton of examples 
 
 ## Compiling from OCaml sources
 
