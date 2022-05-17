@@ -2,14 +2,11 @@
 <repository_root>/ml_sources/examples/reliable_communication/lib/repdb/repdb_code.ml *)
 
 From aneris.aneris_lang Require Import ast.
-From aneris.aneris_lang.lib Require Import list_code.
-From aneris.aneris_lang.lib Require Import queue_code.
 From aneris.aneris_lang.lib Require Import map_code.
 From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
+From aneris.examples.reliable_communication.lib.repdb Require Import log_code.
 From aneris.examples.reliable_communication Require Import client_server_code.
-
-(**  Serializers  *)
 
 Definition write_serializer val_ser :=
   prod_serializer string_serializer val_ser.
@@ -31,259 +28,103 @@ Definition req_c2f_ser := read_serializer.
 
 Definition rep_f2c_ser val_ser := option_serializer val_ser.
 
-(**  Type definitions  *)
-
-(**  Monitored containers  *)
-
-Definition mcell_create : val :=
-  λ: <>,
-  let: "mon" := new_monitor #() in
-  let: "cell" := ref NONE in
-  ("mon", "cell").
-
-Definition mcell_wait_some : val :=
-  λ: "mc",
-  let: "m" := Fst "mc" in
-  let: "c" := Snd "mc" in
-  letrec: "aux" <> :=
-    match: ! "c" with
-      NONE => monitor_wait "m";;
-              "aux" #()
-    | SOME "_v" => #()
-    end in
-    "aux" #().
-
-Definition mcell_wait_none : val :=
-  λ: "mc",
-  let: "m" := Fst "mc" in
-  let: "c" := Snd "mc" in
-  letrec: "aux" <> :=
-    match: ! "c" with
-      NONE => #()
-    | SOME "_v" => monitor_wait "m";;
-                   "aux" #()
-    end in
-    "aux" #().
-
-Definition mcell_set : val :=
-  λ: "mc" "x",
-  let: "m" := Fst "mc" in
-  let: "c" := Snd "mc" in
-  monitor_acquire "m";;
-  mcell_wait_none "mc";;
-  "c" <- (SOME "x");;
-  monitor_signal "m";;
-  monitor_release "m".
-
-Definition mcell_fetch : val :=
-  λ: "mc",
-  let: "m" := Fst "mc" in
-  let: "c" := Snd "mc" in
-  monitor_acquire "m";;
-  mcell_wait_some "mc";;
-  let: "rep" := unSOME ! "c" in
-  "c" <- NONE;;
-  #();;
-  monitor_signal "m";;
-  monitor_release "m";;
-  "rep".
-
-Definition mqueue_create : val :=
-  λ: <>,
-  let: "mon" := new_monitor #() in
-  let: "que" := ref (queue_empty #()) in
-  ("mon", "que").
-
-Definition mqueue_wait : val :=
-  λ: "mq",
-  let: "m" := Fst "mq" in
-  let: "q" := Snd "mq" in
-  letrec: "aux" <> :=
-    (if: queue_is_empty ! "q"
-     then  monitor_wait "m";;
-           "aux" #()
-     else  #()) in
-    "aux" #().
-
-Definition mqueue_fetch : val :=
-  λ: "mq",
-  let: "m" := Fst "mq" in
-  let: "q" := Snd "mq" in
-  monitor_acquire "m";;
-  mqueue_wait "mq";;
-  let: "tmp" := ! "q" in
-  let: "qu" := unSOME (queue_take_opt "tmp") in
-  let: "hd" := Fst "qu" in
-  let: "tl" := Snd "qu" in
-  "q" <- "tl";;
-  #();;
-  monitor_release "m";;
-  "hd".
-
-Definition mqueue_add : val :=
-  λ: "mq" "x",
-  let: "m" := Fst "mq" in
-  let: "q" := Snd "mq" in
-  monitor_acquire "m";;
-  "q" <- (queue_add "x" ! "q");;
-  monitor_broadcast "m";;
-  monitor_release "m".
-
-(**  Generic server library  *)
-
-Definition request : val :=
-  λ: "ch" "lk" "req",
-  acquire "lk";;
-  send "ch" "req";;
-  let: "msg" := recv "ch" in
-  release "lk";;
-  "msg".
-
-Definition requests_handler_loop : val :=
-  λ: "request_handler" "ev_q",
-  letrec: "loop" <> :=
-    let: "req_ev" := mqueue_fetch "ev_q" in
-    "request_handler" "req_ev";;
-    "loop" #() in
-    "loop" #().
+(**  Generic methods for multi-threaded server with monitored requests.  *)
 
 Definition service_loop : val :=
-  λ: "c" "mc" "ev_q",
+  λ: "c" "mon" "request_handler" <>,
   letrec: "loop" <> :=
     let: "req" := recv "c" in
-    mqueue_add "ev_q" ("req", "mc");;
-    let: "rep" := mcell_fetch "mc" in
+    monitor_acquire "mon";;
+    let: "rep" := "request_handler" "mon" "req" in
+    monitor_release "mon";;
     send "c" "rep";;
     "loop" #() in
     "loop" #().
 
 Definition accept_new_connections_loop : val :=
-  λ: "skt" "ev_q",
+  λ: "skt" "mon" "request_handler" <>,
   letrec: "loop" <> :=
     let: "new_conn" := accept "skt" in
-    let: "chan" := Fst "new_conn" in
-    let: "_addr" := Snd "new_conn" in
-    let: "cell" := mcell_create #() in
-    Fork (service_loop "chan" "cell" "ev_q");;
+    let: "c" := Fst "new_conn" in
+    let: "_a" := Snd "new_conn" in
+    Fork (service_loop "c" "mon" "request_handler" #());;
     "loop" #() in
     "loop" #().
 
 Definition run_server ser deser : val :=
-  λ: "addr" "request_handler",
+  λ: "addr" "mon" "request_handler",
   let: "skt" := make_server_skt ser deser "addr" in
   server_listen "skt";;
-  let: "evq" := mqueue_create #() in
-  Fork (accept_new_connections_loop "skt" "evq");;
-  Fork (requests_handler_loop "request_handler" "evq").
-
-(**  Operations on log of requests  *)
-
-Definition log_create : val := λ: <>, ref ([], #0).
-
-Definition log_add_entry : val :=
-  λ: "log" "req",
-  let: "lp" := ! "log" in
-  let: "data" := Fst "lp" in
-  let: "next" := Snd "lp" in
-  let: "data'" := list_append "data" [("req", "next")] in
-  "log" <- ("data'", ("next" + #1)).
-
-Definition log_next : val := λ: "log", Snd ! "log".
-
-Definition log_length : val := λ: "log", Snd ! "log".
-
-Definition log_get : val := λ: "log" "i", list_nth (Fst ! "log") "i".
-
-(**  Monitored Log of write requests.  *)
-
-Definition mlog_create : val :=
-  λ: <>,
-  let: "mon" := new_monitor #() in
-  let: "cell" := log_create #() in
-  ("mon", "cell").
-
-Definition mlog_add_entry : val :=
-  λ: "ml" "req",
-  let: "m" := Fst "ml" in
-  let: "log" := Snd "ml" in
-  monitor_acquire "m";;
-  log_add_entry "log" "req";;
-  monitor_signal "m";;
-  monitor_release "m".
-
-Definition mlog_get_next : val :=
-  λ: "ml" "i",
-  let: "m" := Fst "ml" in
-  let: "log" := Snd "ml" in
-  monitor_acquire "m";;
-  letrec: "aux" <> :=
-    let: "n" := log_next "log" in
-    (if: "n" = "i"
-     then  monitor_wait "m";;
-           "aux" #()
-     else  monitor_release "m";;
-           unSOME (log_get "log" "i")) in
-    (if: ("i" < #0) || ((log_next "log") < "i")
-     then  assert: #false
-     else  "aux" #()).
+  Fork (accept_new_connections_loop "skt" "mon" "request_handler" #()).
 
 (**  Leader  *)
 
 Definition follower_request_handler : val :=
-  λ: "mlog" "req_ev",
-  let: "i" := Fst "req_ev" in
-  let: "mc" := Snd "req_ev" in
-  let: "rep" := mlog_get_next "mlog" "i" in
-  mcell_set "mc" "rep".
+  λ: "log" "mon" "req",
+  log_wait_until "log" "mon" "req";;
+  unSOME (log_get "log" "req").
 
 Definition client_request_handler_at_leader : val :=
-  λ: "db" "log" "req_ev",
-  let: "req" := Fst "req_ev" in
-  let: "mc" := Snd "req_ev" in
-  let: "rep" := match: "req" with
+  λ: "db" "log" "mon" "req",
+  match: "req" with
     InjL "p" =>
     let: "k" := Fst "p" in
     let: "v" := Snd "p" in
     "db" <- (map_insert "k" "v" ! "db");;
-    mlog_add_entry "log" ("k", "v");;
+    log_add_entry "log" ("k", "v");;
+    monitor_signal "mon";;
     InjL #()
   | InjR "k" => InjR (map_lookup "k" ! "db")
-  end in
-  mcell_set "mc" "rep".
+  end.
+
+Definition update_log_copy_loop : val :=
+  λ: "logC" "monC" "logF" "monF" <>,
+  letrec: "loop" "i" :=
+    monitor_acquire "monC";;
+    log_wait_until "logC" "monC" "i";;
+    let: "logC_copy" := ! "logC" in
+    monitor_release "monC";;
+    monitor_acquire "monF";;
+    "logF" <- "logC_copy";;
+    monitor_broadcast "monF";;
+    monitor_release "monF";;
+    #() (* unsafe (fun () -> Unix.sleepf 3.0); *);;
+    "loop" (Snd "logC_copy") in
+    "loop" #0.
 
 Definition start_leader_processing_clients ser : val :=
-  λ: "addr" "mlog",
-  let: "db" := ref (map_empty #()) in
-  run_server (rep_l2c_ser ser) (req_c2l_ser ser) "addr"
-  (client_request_handler_at_leader "db" "mlog").
+  λ: "addr" "db" "log" "mon" <>,
+  run_server (rep_l2c_ser ser) (req_c2l_ser ser) "addr" "mon"
+  (client_request_handler_at_leader "db" "log").
 
 Definition start_leader_processing_followers ser : val :=
-  λ: "addr" "log",
-  run_server (rep_l2f_ser ser) req_f2l_ser "addr"
+  λ: "addr" "log" "mon" <>,
+  run_server (rep_l2f_ser ser) req_f2l_ser "addr" "mon"
   (follower_request_handler "log").
 
 Definition init_leader ser : val :=
   λ: "addr0" "addr1",
-  let: "mlog" := mlog_create #() in
-  Fork (start_leader_processing_clients ser "addr0" "mlog");;
-  Fork (start_leader_processing_followers ser "addr1" "mlog").
+  let: "logC" := log_create #() in
+  let: "logF" := log_create #() in
+  let: "db" := ref (map_empty #()) in
+  let: "monC" := new_monitor #() in
+  let: "monF" := new_monitor #() in
+  Fork (start_leader_processing_clients ser "addr0" "db" "logC" "monC" #());;
+  Fork (start_leader_processing_followers ser "addr1" "logF" "monF" #());;
+  Fork (update_log_copy_loop "logC" "monC" "logF" "monF" #()).
 
 (**  Follower.  *)
 
 Definition client_request_handler_at_follower : val :=
-  λ: "db" "req_ev",
-  let: "k" := Fst "req_ev" in
-  let: "mc" := Snd "req_ev" in
-  let: "rep" := map_lookup "k" ! "db" in
-  mcell_set "mc" "rep".
+  λ: "db" "_mon" "req_k", map_lookup "req_k" ! "db".
 
 Definition start_follower_processing_clients ser : val :=
-  λ: "addr" "db",
-  run_server (rep_f2c_ser ser) req_c2f_ser "addr"
+  λ: "addr" "db" "mon",
+  run_server (rep_f2c_ser ser) req_c2f_ser "addr" "mon"
   (client_request_handler_at_follower "db").
 
 Definition sync_loop : val :=
-  λ: "ch" "db" "log",
+  λ: "ch" "db" "log" "mon",
   letrec: "aux" <> :=
     let: "i" := log_next "log" in
     send "ch" "i";;
@@ -292,25 +133,36 @@ Definition sync_loop : val :=
     let: "v" := Snd (Fst "rep") in
     let: "j" := Snd "rep" in
     assert: ("i" = "j");;
+    monitor_acquire "mon";;
     log_add_entry "log" ("k", "v");;
     "db" <- (map_insert "k" "v" ! "db");;
+    monitor_release "mon";;
     "aux" #() in
     "aux" #().
 
 Definition sync_with_server ser : val :=
-  λ: "l_addr" "f2l_addr" "db" "log",
+  λ: "l_addr" "f2l_addr" "db" "log" "mon",
   let: "skt" := make_client_skt req_f2l_ser (rep_l2f_ser ser) "f2l_addr" in
   let: "ch" := connect "skt" "l_addr" in
-  sync_loop "ch" "db" "log".
+  sync_loop "ch" "db" "log" "mon".
 
 Definition init_follower ser : val :=
   λ: "l_addr" "f2l_addr" "f_addr",
   let: "db" := ref (map_empty #()) in
   let: "log" := log_create #() in
-  sync_with_server ser "l_addr" "f2l_addr" "db" "log";;
-  start_follower_processing_clients ser "f_addr" "db".
+  let: "mon" := new_monitor #() in
+  sync_with_server ser "l_addr" "f2l_addr" "db" "log" "mon";;
+  start_follower_processing_clients ser "f_addr" "db" "mon".
 
-(**  Client Proxy Implementation.  *)
+(**  Client Proxies.  *)
+
+Definition request : val :=
+  λ: "ch" "lk" "req",
+  acquire "lk";;
+  send "ch" "req";;
+  let: "msg" := recv "ch" in
+  release "lk";;
+  "msg".
 
 Definition init_client_leader_proxy ser : val :=
   λ: "clt_addr" "srv_addr",

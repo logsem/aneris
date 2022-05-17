@@ -57,7 +57,8 @@ ML_SOURCES:
   	examples/reliable_communication/lib/dlm/dlm_code.ml
 	examples/reliable_communication/lib/ddb/ddb_serialization_code.ml
 	examples/reliable_communication/lib/ddb/ddb_code.ml
-	examples/reliable_communication/lib/repdb/repdb_code.ml        
+	examples/reliable_communication/lib/repdb/log_code.ml
+	examples/reliable_communication/lib/repdb/repdb_code.ml
 
 ML_DEPENDENCIES:
 
@@ -84,4 +85,5 @@ ML_DEPENDENCIES:
 	examples/reliable_communication/lib/
 	examples/reliable_communication/lib/dlm/
 	examples/reliable_communication/lib/ddb/
-	examples/simple_database/        
+	examples/reliable_communication/lib/repdb/
+	examples/simple_database/
