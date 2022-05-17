@@ -12,7 +12,7 @@ From aneris.aneris_lang Require Import proofmode.
 From aneris.examples.reliable_communication Require Import user_params client_server_code.
 From aneris.examples.reliable_communication.resources Require Import
      chan_endpoints_resources socket_interp.
-From aneris.examples.reliable_communication.proof Require Import
+From aneris.examples.reliable_communication.proof.common_protocol Require Import
      proof_of_recv_on_chan.
 
 Section Proof_of_client_recv_loop.

@@ -191,7 +191,7 @@ Section proof.
        { iNext.
          iExists _, _; iFrame "Hh Hmsgs"; done. }
        iModIntro.
-       do 3 wp_pure _.
+       do 5 wp_pure _.
        iApply "IH"; auto with lia. }
      iIntros (?) "Hsnd".
      wp_pures.

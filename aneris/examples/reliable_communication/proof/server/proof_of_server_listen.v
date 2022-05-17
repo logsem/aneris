@@ -10,7 +10,7 @@ From aneris.examples.reliable_communication Require Import user_params client_se
 From aneris.examples.reliable_communication.resources Require Import
      chan_endpoints_resources
      socket_interp.
-From aneris.examples.reliable_communication.proof Require Import
+From aneris.examples.reliable_communication.proof.common_protocol Require Import
      proof_of_send_from_chan_loop.
 From aneris.examples.reliable_communication.proof.server Require Import
      server_resources

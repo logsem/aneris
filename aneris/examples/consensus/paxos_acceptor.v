@@ -234,7 +234,7 @@ Section paxos_acceptor.
         iIntros (s Hser).
         wp_apply (acceptor_send_1b bal with "[$Hinv $Hproposers $Hh $Hmb $Hmv $Hm1]");
           simpl; [done|lia|].
-        iIntros "(Hh & Hmv & Hmb & #Hm2)". wp_seq.
+        iIntros "(Hh & Hmv & Hmb & #Hm2)". do 2 wp_seq.
         iApply ("IH" with "Hh"). iExists _, _. by iFrame.
       + (* [maxBal] uninitialized, no messages received before *)
         wp_pures.
@@ -244,7 +244,7 @@ Section paxos_acceptor.
         iIntros (s Hser).
         wp_apply (acceptor_send_1b bal with "[$Hinv $Hproposers $Hh $Hmb $Hmv $Hm1]");
           [done|done|].
-        iIntros "(Hh & Hmv & Hmb & Hm2)". wp_seq.
+        iIntros "(Hh & Hmv & Hmb & Hm2)". do 2 wp_seq.
         iApply ("IH" with "Hh"). iExists _, _. by iFrame.
     - (* phase 2a message was received *)
       wp_apply (s_deser_spec acceptor_serialization); [done|]; iIntros "_".
@@ -265,7 +265,7 @@ Section paxos_acceptor.
         wp_apply (acceptor_send_2b bal with "[$Hinv $Hlearners $Hh $Hmb $Hmv $Hm1]");
           simpl; [done|done|lia|].
         iIntros "(Hh & Hmv & Hmb & #Hm2)".
-        wp_seq.
+        do 2 wp_seq.
         iApply ("IH" with "Hh"). iExists _, _. by iFrame.
       + (* [maxBal] uninitialized, no messages received before *)
         wp_pures.
@@ -276,7 +276,7 @@ Section paxos_acceptor.
         wp_apply (acceptor_send_2b bal with "[$Hinv $Hlearners $Hh $Hmb $Hmv $Hm1]");
           simpl; [done|done|lia|].
         iIntros "(Hh & Hmv & Hmb & #Hm2)".
-        wp_seq.
+        do 2 wp_seq.
         iApply ("IH" with "Hh"). iExists _, _. by iFrame.
   Qed.
 

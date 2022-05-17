@@ -127,7 +127,7 @@ Section proof.
     iModIntro; wp_pures.
     wp_send "HΦ Hγpong'".
     { iApply "HΦ". iFrame. done. }
-    wp_seq; wp_closure; wp_let.
+    wp_seq; wp_closure; wp_lam. wp_closure. wp_let.
     iLöb as "IH".
     wp_pures.
     wp_apply (aneris_wp_receivefrom with "[$Hsi $Hh $Ha]"); [done.. | ].
@@ -210,7 +210,7 @@ Section proof.
       iFrame.
       done.
     }
-    done.
+   wp_seq. done.
   Qed.
 
   Definition pong_addr := SocketAddressInet "0.0.0.0" 80.

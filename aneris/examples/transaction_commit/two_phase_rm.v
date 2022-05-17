@@ -180,7 +180,7 @@ Section resource_manager.
         iApply (big_sepS_impl with "HrmI").
         iIntros "!#" (rm' ?).
         rewrite lookup_insert_ne; [eauto |set_solver]. }
-      iModIntro. do 2 wp_pure _.
+      iModIntro. do 4 wp_pure _.
       wp_apply (wp_rm_wait_commit_abort_receivefrom
                        with "[$Hinv $Hrmsi $Hh]"); [done..|].
       iIntros (v).
