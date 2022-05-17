@@ -1,9 +1,9 @@
 [submodule "stdpp"]
 	path = external/stdpp
-	url = git-rts@gitlab.mpi-sws.org:iris/stdpp.git
+	url = https://gitlab.mpi-sws.org/iris/stdpp.git
 [submodule "iris"]
 	path = external/iris
-	url = git-rts@gitlab.mpi-sws.org:iris/iris.git
+	url = https://gitlab.mpi-sws.org/iris/iris.git
 [submodule "record-update"]
 	path = external/record-update
 	url = git@github.com:tchajed/coq-record-update.git
@@ -12,4 +12,4 @@
 	url = git@github.com:snu-sf/paco.git
 [submodule "actris"]
 	path = external/actris
-	url = git-rts@gitlab.mpi-sws.org:iris/actris.git
+	url = https://gitlab.mpi-sws.org/iris/actris.git
