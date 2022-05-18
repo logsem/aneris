@@ -10,7 +10,7 @@ mechanized in the [Coq proof assistant](https://coq.inria.fr/).
 ## Compiling
 
 The project maintains compatibility with Coq 8.15 and relies on `coqc` being
-available in your shell. Next, clone the external submodule dependencies using
+available in your shell. Clone the external git submodule dependencies using
 
     git submodule update --init --recursive
 
@@ -19,53 +19,67 @@ Alternatively, clone the repository using the `--recurse-submodules` flag.
 Run `make -jN` to build the full development, where `N` is the number of your
 CPU cores.
 
-## Updating git submodule dependencies
-
-To pull the latest git submodule dependencies as committed to the repository, run
-
-    git submodule update --recursive
-
-By default, the `git pull` command recursively fetches submodule
-changes. However, it does not apply the changes. To update the dependencies run
-
-    git submodule update --recursive --remote
-
 ## Directory Structure
 
 - [`trillium/`](trillium/): The Trillium program logic framework
 
 - [`aneris/`](aneris/): The Aneris instantiation of Trillium
-  * [`examples/`](aneris/examples/): example uses and verification case studies
+  * [`examples/`](aneris/examples/): examples and case studies
 
 - [`fairness/`](fairness/): A HeapLang instantiation of Trillium for reasoning
   about fair termination of concurrent programs.
-  
-- [`ml_sources/`](ml_sources/): The Multicore OCaml source files 
-  * [`aneris_lang/`](ml_sources/aneris_lang/): for the shim and the implementation of libraries related to the [`aneris/`](aneris/) folder
-  * [`examples/`](ml_sources/examples/): for the implementaiton of examples related to the [`examples/`](aneris/examples/) folder
+
+- [`ml_sources/`](ml_sources/): The Multicore OCaml source files
+  * [`aneris_lang/`](ml_sources/aneris_lang/): shim and aneris libraries
+  * [`examples/`](ml_sources/examples/): examples and case studies
+
+## Git submodule dependencies
+
+This project uses git submodules to manage dependencies with other Coq
+libraries. By default, when working with a repository that uses submodules, the
+submodules will *not* be populated and updated automatically, and it is often
+necessary to invoke `git submodule update --init --recursive` or use the
+`--recurse-submodules` flag. However, this can be automated by setting the
+`submodule.recurse` setting to `true` in your git config by running
+
+    git config --global submodule.recurse true
+
+This will make `git clone`, `git checkout`, `git pull`, etc. work as you would
+expect and it should rarely be necessary to invoke any `git submodule update`
+commands.
+
+A git submodule is pinned to a particular commit of an external (remote)
+repository. If new commits have been pushed to the remote repository and you
+wish to integrate these in to the development, invoke
+
+    git submodule update --remote
+
+to fetch the new commits and apply them to your local repository. This changes
+which commit your *local* submodule is pinned to. Remember to commit and push
+the submodule update to make it visible to other users of the repository.
+
+Read more about git submodules in [this
+tutorial](https://git-scm.com/book/en/v2/Git-Tools-Submodules).
 
 ## Compiling from OCaml sources
 
-To automatically generate AnerisLang programs from Ocaml source files, pin the `ocaml2lang` package:
+To generate AnerisLang programs from OCaml source files, pin the `ocaml2lang` package:
 
     opam pin git+https://github.com/leon-gondelman/ocaml2lang#multicore
-
 
 This will produce an executable `o2a`. After installation succeeds, you can try `o2a` by doing
 
     o2a --h
 
-    
-You can now run at the root of the repository
+You can now run
 
     o2a --rewrite
-    
-to generate Coq files just for the examples.
 
-To compile ocaml sources, just run 
+at the root of the repository to generate Coq files from the OCaml sources in
+[`ml_sources`](/ml_sources). To compile the source files, run
 
-    dune build 
-    
+    dune build
+
 at the root of the repository.
 
 ## Publications
