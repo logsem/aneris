@@ -12,10 +12,60 @@ Section API_spec.
   Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !Maximals_Computing,
             !DB_events, !DB_resources Mdl Σ}.
 
-  Definition write_spec (wr : val) (sa : socket_address)
+  Definition write_spec
+      (wr : val) (sa : socket_address) : iProp Σ :=
+    Eval simpl in
+    □ (∀ (E : coPset) (k : Key) (v : SerializableVal)
+         (P : iProp Σ) (Q : we → ghst → ghst → iProp Σ),
+        ⌜↑DB_InvName ⊆ E⌝ -∗
+        ⌜k ∈ DB_keys⌝ -∗
+        □ (P
+            ={⊤, E}=∗
+              ∃ (h : ghst) (a_old: option we),
+                ⌜at_key k h = a_old⌝ ∗
+                k ↦ₖ a_old ∗
+                Obs DB_addr h ∗
+                  ▷ (∀ (hf : ghst) (a_new : we),
+                  ⌜at_key k hf = None⌝ ∗
+                  ⌜WE_key a_new = k⌝ ∗
+                  ⌜WE_val a_new = v⌝ ∗
+                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
+                  k ↦ₖ Some a_new ∗
+                  Obs DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
+        {{{ P }}}
+          wr #k v @[ip_of_address sa]
+        {{{ RET #();
+           ∃ (h hf : ghst) (a: we), Q a h hf }}})%I.
+
+ (* Definition read_spec
+      (rd : val) (sa : socket_address)  : iProp Σ :=
+    Eval simpl in
+    □ (∀ (E : coPset) (k : Key)
+         (P : iProp Σ)
+         (Q1 : option we → ghst → iProp Σ)
+         (Q2 : we → ghst → iProp Σ),
+        ⌜↑DB_InvName ⊆ E⌝ -∗
+        ⌜k ∈ DB_keys⌝ -∗
+        □ (P ={⊤, E}=∗
+           ∃ (h : ghst) (q : Qp) (ao: option we),
+               ⌜at_key k h = ao⌝ ∗
+               Obs DB_addr h ∗
+               k ↦ₖ{q} ao ∗
+               ▷ ((⌜ao = None⌝ ∗ (k ↦ₖ{q} None) ={E,⊤}=∗ Q1 ao h) ∧
+                  (∀ a, ⌜ao = Some a⌝ ∗ (k ↦ₖ{q} Some a) ={E,⊤}=∗ Q2 a h))) -∗
+        {{{ P }}}
+          rd #k @[ip_of_address sa]
+          {{{ vo, RET vo;
+            ∃ (h : ghst) (eo: option we),
+              (⌜vo = NONEV⌝ ∗ ⌜eo = None⌝ ∗ Q1 eo h) ∨
+              (∃ v e, ⌜vo = SOMEV v⌝ ∗ ⌜eo = Some e⌝ ∗ ⌜WE_val e = v⌝ ∗ Q2 e h)
+         }}})%I.
+  *)
+
+   Definition simplified_write_spec (wr : val) (sa : socket_address)
       (k : Key) (v : SerializableVal) (h : ghst) : iProp Σ :=
     ⌜k ∈ DB_keys⌝ -∗
-    {{{ k ↦ₖ at_key k h ∗ Obs DB_addr h }}}
+    {{{ ∃ wo : option we, k ↦ₖ wo ∗ Obs DB_addr h ∗ ⌜at_key k h = wo⌝ }}}
        wr #k v @[ip_of_address sa]
     {{{ RET #();
         ∃ (hf : ghst) (a: we), ⌜WE_key a = k⌝ ∗ ⌜WE_val a = v⌝ ∗
@@ -23,14 +73,15 @@ Section API_spec.
           k ↦ₖ Some a
     }}}%I.
 
-  Definition read_spec (rd : val) (sa : socket_address) (k : Key) (q : Qp)
-             (w : option we) : iProp Σ :=
+  Definition read_spec
+    (rd : val) (sa : socket_address) (k : Key) (q : Qp)
+    (wo : option we) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗
-    {{{ k ↦ₖ{q} w }}}
+    {{{ k ↦ₖ{q} wo }}}
       rd #k @[ip_of_address sa]
     {{{vo, RET vo;
-         k ↦ₖ{q} w ∗ (⌜vo = NONEV⌝ ∗ ⌜w = None⌝) ∨
-         (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜w = Some a⌝)
+         k ↦ₖ{q} wo ∗ (⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
+         (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜wo = Some a⌝)
     }}}%I.
 
   Definition read_at_follower_spec
@@ -43,6 +94,16 @@ Section API_spec.
          (⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
          (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)
     }}}%I.
+
+  Lemma get_simplified_write_spec wr sa :
+    write_spec wr sa ⊢ ∀ k v h, simplified_write_spec wr sa k v h.
+  Proof.
+  Admitted.
+
+  (* Lemma get_simplified_read_spec wr sa :
+    read_spec wr sa ⊢ ∀ k q h, simplified_read_spec wr sa k q h.
+  Proof.
+  Admitted. *)
 
   Definition init_leader_spec A : iProp Σ :=
        ⌜DB_addr ∈ A⌝ →
@@ -88,8 +149,8 @@ Section API_spec.
           init_client_leader_proxy (s_serializer DB_serialization)
             #sa #DB_addr @[ip_of_address sa]
         {{{ rd wr, RET (rd, wr);
-            (∀ k q w, read_spec rd sa k q w) ∗
-            (∀ k v h, write_spec wr sa k v h) }}}.
+            (∀ k q h, read_spec rd sa k q h) ∗
+            write_spec wr sa }}}.
 
   Definition init_client_proxy_follower_spec
              (A : gset socket_address) (sa fa : socket_address) : iProp Σ :=

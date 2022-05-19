@@ -79,6 +79,7 @@ Section Predicates.
     (* TODO: Delete after we change *)
     OwnMemKey_some_obs_we k q we E :
       nclose DB_InvName ⊆ E →
+      GlobalInv ⊢
       k ↦ₖ{ q } Some we ={E}=∗
       k ↦ₖ{ q } Some we ∗
         ∃ h, Obs DB_addr h ∗ ⌜at_key k h = Some we⌝;

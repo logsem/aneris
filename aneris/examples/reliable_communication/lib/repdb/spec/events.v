@@ -14,7 +14,6 @@ Section Events.
       WE_key : we -> Key;
       WE_val : we → val;
       WE_timed :> Timed we;
-      WE_origin : we -> socket_address;
       WE_EqDecision :> EqDecision we;
       WE_Countable :> Countable we;
     }.
@@ -32,12 +31,6 @@ Section Events_lemmas.
 
   Definition at_key (k : Key) (h : ghst) : option we :=
     last (hist_at_key k h).
-
-  Definition hist_at_origin (sa : socket_address) (h : ghst) : ghst :=
-    filter (λ x, (WE_origin x) = sa) h.
-
-  Definition at_origin (sa : socket_address) (h : ghst) : option we :=
-    last (hist_at_origin sa h).
 
   Lemma last_snoc_inv {A:Type} (l : list A) e:
     last l = Some e → ∃ l', l = l' ++ [e].
@@ -264,35 +257,11 @@ Section Events_lemmas.
     by rewrite /hist_at_key filter_cons_False.
   Qed.
 
-  Lemma at_origin_hist_at_origin_inv sa h e :
-    at_origin sa h = Some e →
-    ∃ hl hr, h = hl ++ [e] ++ hr ∧ hist_at_origin sa hr = [].
-  Proof.
-    intros Hk.
-    rewrite /at_key /hist_at_key in Hk.
-    apply last_filter_postfix in Hk.
-    destruct Hk as (ys & zs & -> & Hk).
-    exists ys, zs.
-    split; [done|].
-    induction zs as [|z zs IHzs]; [done|].
-    apply Forall_cons in Hk.
-    destruct Hk as [Hz Hk].
-    specialize (IHzs Hk).
-    by rewrite /hist_at_origin filter_cons_False.
-  Qed.
-
   Lemma at_key_has_key k h we :
     at_key k h = Some we → WE_key we = k.
   Proof.
     intros Hatkey. apply last_Some_elem_of, elem_of_list_filter in Hatkey.
     by destruct Hatkey as [Hatkey _].
-  Qed.
-
-  Lemma at_origin_has_origin sa h we :
-    at_origin sa h = Some we → WE_origin we = sa.
-  Proof.
-    intros Hatorigin. apply last_Some_elem_of, elem_of_list_filter in Hatorigin.
-    by destruct Hatorigin as [Hatorigin _].
   Qed.
 
 End Events_lemmas.
