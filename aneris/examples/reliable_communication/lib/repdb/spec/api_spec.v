@@ -6,7 +6,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.repdb
      Require Import repdb_code.
 From aneris.examples.reliable_communication.lib.repdb.spec
-     Require Import db_params time events resources.
+     Require Import db_params time events resources ras.
 
 Section API_spec.
   Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !Maximals_Computing,
@@ -105,24 +105,6 @@ Section API_spec.
             Obs fa [] ∗ (∀ k h, read_at_follower_spec rd k sa fa h) }}}.
 
 End API_spec.
-
-Class DBG `{!DB_time, !DB_events} Σ :=
-  {
-    DBG_Global_mem_excl :>
-      inG Σ (authUR (gmapUR Key (prodR fracR (agreeR (optionO (leibnizO we))))));
-    DBG_Global_history_mono :>
-      inG Σ (authUR (monotoneUR (@prefix (leibnizO we))));
-    DBG_lockG :>
-      lockG Σ;
-}.
-
-Definition DBΣ `{!DB_time, !DB_events} : gFunctors :=
-  #[GFunctor (authUR (gmapUR Key (prodR fracR (agreeR (optionO (leibnizO we))))));
-    GFunctor (authUR (monotoneUR (@prefix (leibnizO we))));
-    lockΣ].
-
-Instance subG_DBΣ `{!DB_time, !DB_events, !lockG Σ} : subG DBΣ Σ → DBG Σ.
-Proof. solve_inG. Qed.
 
 Section Init.
   Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !Maximals_Computing,
