@@ -18,8 +18,7 @@ Section with_Σ.
   Proof.
     iIntros (HE Heq Hneq) "#HGinv #Hobs Hk".
     iMod (OwnMemKey_key with "Hk") as "[Hk %Hkey]"; [solve_ndisj|].
-    iMod (OwnMemKey_some_obs_we with "Hk") as "[Hk (%h' & #Hobs' & %Hatkey)]";
-      [solve_ndisj|].
+    iMod (OwnMemKey_some_obs_we with "[$HGinv][$Hk]") as "[Hk (%h' & #Hobs' & %Hatkey)]"; [solve_ndisj|].
     iMod (Obs_compare with "HGinv Hobs Hobs'") as %Hle; [solve_ndisj|].
     destruct Hle as [Hle | Hle]; last first.
     { (* Solve contradiction *)
