@@ -35,7 +35,7 @@ Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } :=
     MTS_handler_post : val → MTS_req_data → MTS_rep_data → iProp Σ;
     MTS_handler_spec :
     (∀ reqv reqd,
-       {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
+    {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
            locked MTS_mγ ∗ MTS_mR ∗
            MTS_handler_pre reqv reqd }}}
          MTS_handler MTS_mv reqv @[ip_of_address MTS_saddr]
