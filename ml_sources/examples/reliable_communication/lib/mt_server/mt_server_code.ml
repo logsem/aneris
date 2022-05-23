@@ -43,5 +43,4 @@ let init_client_proxy
   let skt = make_client_skt ser deser clt_addr in
   let ch = connect skt srv_addr in
   let lk = newlock () in
-  let mk_request req = make_request ch lk req in
-  mk_request
+  make_request ch lk
