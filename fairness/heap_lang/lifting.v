@@ -130,7 +130,7 @@ Theorem simulation_adequacy Σ {Mdl: FairModel} `{!heapGpreS Σ Mdl} (s: stuckne
   (∀ `{!heapGS Σ Mdl},
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
-         has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -164,7 +164,7 @@ Proof.
     - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
       rewrite -big_opS_own //. iApply (own_proper with "Hfuelf").
       rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
-    - iSplit; first by (iPureIntro; rewrite dom_gset_to_gmap).
+    - rewrite dom_gset_to_gmap. iFrame.
       iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
       iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
   iMod "Hwp". iModIntro.
@@ -254,7 +254,7 @@ Theorem simulation_adequacy_inftraces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl} 
   (∀ `{!heapGS Σ Mdl},
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
-         has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -302,7 +302,7 @@ Theorem simulation_adequacy_traces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl} (s:
   (∀ `{!heapGS Σ Mdl},
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
-         has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -345,7 +345,7 @@ Theorem simulation_adequacy_model_trace Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl
   (∀ `{!heapGS Σ Mdl},
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
-         has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -373,7 +373,7 @@ Theorem simulation_adequacy_terminate Σ Mdl `{!heapGpreS Σ Mdl} (s: stuckness)
   (∀ `{!heapGS Σ Mdl},
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
-         has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -404,7 +404,7 @@ Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl} `{!heap
   (∀ `{!heapGS Σ Mdl},
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
-         has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -605,11 +605,11 @@ Implicit Types l : loc.
 Implicit Types tid : nat.
 
 
-Lemma wp_lift_pure_step_no_fork tid E E' Φ e1 e2 fs R ϕ:
-  R ≠ ∅ ->
+Lemma wp_lift_pure_step_no_fork tid E E' Φ e1 e2 fs ϕ:
+  fs ≠ ∅ ->
   PureExec ϕ 1 e1 e2 ->
   ϕ ->
-  (|={E}[E']▷=> has_fuels_S tid R fs ∗ ((has_fuels tid R fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof.
   intros NnO Hpe Hϕ.
@@ -626,6 +626,7 @@ Proof.
   rewrite !app_nil_r.
   iDestruct "Hsi" as "(%&Hgh&Hmi)".
   iMod (update_no_step_enough_fuel with "Hfuels Hmi") as "H"; eauto.
+  { by intros X%dom_empty_inv_L. }
   { econstructor =>//. by apply fill_step. }
   iModIntro.
   iDestruct ("H") as (δ2 ℓ [Hlabels Hvse]) "[Hfuels Hmi]".
@@ -648,10 +649,10 @@ Qed.
 (*   ⊢ WP e1 @ tid; E {{ Φ }}. *)
 (* Proof. *)
 
-Lemma wp_lift_pure_step_no_fork' fs R tid E E' Φ e1 e2:
-  R ≠ ∅ ->
+Lemma wp_lift_pure_step_no_fork' fs tid E E' Φ e1 e2:
+  fs ≠ ∅ ->
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> has_fuels_S tid R fs ∗ ((has_fuels tid R fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof.
   intros. by iApply wp_lift_pure_step_no_fork.
@@ -664,15 +665,15 @@ Lemma wp_lift_pure_step_no_fork_singlerole tid E E' Φ e1 e2 ρ f φ:
 Proof.
   iIntros (??) "H". rewrite has_fuel_fuels_S.
   iApply (wp_lift_pure_step_no_fork {[ ρ := f ]} {[ρ]}); eauto; last first.
-  rewrite has_fuel_fuels //. set_solver.
+  rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
 Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' fs1 fs2 Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
   valid_new_fuelmap fs1 fs2 s1 s2 ρ ->
   Mdl.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> frag_model_is s1 ∗ has_fuels tid (dom fs1) fs1 ∗
-    (frag_model_is s2 -∗ (has_fuels tid (dom fs2) fs2 -∗ WP e2 @ tid; E {{ Φ }})))
+  (|={E}[E']▷=> frag_model_is s1 ∗ has_fuels tid fs1 ∗
+    (frag_model_is s2 -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof.
   iIntros (Hpe Hφ Hval Htrans).
@@ -700,11 +701,11 @@ Proof.
   { rewrite Hmeq. apply Hval. }
   iModIntro. iDestruct "H" as (δ2 ℓ [Hlabels Hvse]) "(Hfuels&Hmod&Hmi)".
   iExists δ2, ℓ.
-  rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".  
-  repeat iSplit; last done. 
+  rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".
+  repeat iSplit; last done.
   - iPureIntro. destruct ℓ =>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//. 
+  - iPureIntro. destruct Hvse as (?&?&? )=>//.
   - by iSpecialize ("Hkont" with "Hmod Hfuels").
 Qed.
 
@@ -720,7 +721,6 @@ Proof.
   iIntros (Hpe Hφ Hroles Hfl Hmdl).
   rewrite has_fuel_fuels.
   iIntros "H".
-  replace ({[ρ]}) with (dom ({[ρ := f1]}: gmap _ _)); last by set_solver.
   iApply (wp_lift_pure_step_no_fork_take_step _ _ _ _ _ {[ρ := f1]}
          (if decide (ρ ∈ live_roles Mdl s2) then {[ρ := f2]} else ∅)  with "[H]"); eauto.
   - repeat split.
@@ -732,7 +732,7 @@ Proof.
   - iMod "H". do 2 iModIntro. iMod "H" as "(Hmod&Hfuels&Hkont)". iModIntro.
     iFrame "Hmod Hfuels". iIntros "Hmod Hfuels". iApply ("Hkont" with "Hmod [Hfuels]").
     destruct (decide (ρ ∈ live_roles Mdl s2)).
-    + rewrite dom_singleton_L. rewrite -has_fuel_fuels //.
+    + rewrite -has_fuel_fuels //.
     + iDestruct "Hfuels" as "[Hf _]". rewrite dom_empty_L //.
 Qed.
 
@@ -743,16 +743,17 @@ Lemma wp_lift_pure_step_no_fork_singlerole' tid E E' Φ e1 e2 ρ f:
 Proof.
   iIntros (?) "H". rewrite has_fuel_fuels_S.
   iApply (wp_lift_pure_step_no_fork' {[ ρ := f ]} {[ρ]}); last first.
-  rewrite has_fuel_fuels //. set_solver.
+  rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma wp_fork_nostep s tid E e Φ R1 R2 fs (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
-  (∀ tid', ▷ (has_fuels tid' R2 (fs ⇂ R2) -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅ }})) -∗
-     ▷ (has_fuels tid R1 (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
-     has_fuels_S tid (R1 ∪ R2) fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
+  R1 ∪ R2 = dom fs ->
+  (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅ }})) -∗
+     ▷ (has_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
+     has_fuels_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
 Proof.
-  iIntros "He HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
+  iIntros (Hunioneq) "He HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iMod (update_fork_split R1 R2 _
        (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "Htid Hmi") as
@@ -808,11 +809,11 @@ Qed.
 
 (* TODO *)
 
-Lemma wp_allocN_seq_nostep s tid E v n R fs:
-  R ≠ ∅ ->
+Lemma wp_allocN_seq_nostep s tid E v n fs:
+  fs ≠ ∅ ->
   0 < n →
-  {{{ has_fuels_S tid R fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
-  {{{ l, RET LitV (LitLoc l); has_fuels tid R fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
+  {{{ has_fuels_S tid fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
+  {{{ l, RET LitV (LitLoc l); has_fuels tid fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (HnO Hn Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -825,6 +826,7 @@ Proof.
   { apply heap_array_map_disjoint.
     rewrite replicate_length Z2Nat.id ?Hexend; auto with lia. }
   iMod (update_no_step_enough_fuel _ _ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
+  { by intros ?%dom_empty_inv_L. }
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists δ2, ℓ.
   rewrite Hexend //=. iFrame "Hmi Hsi".
@@ -834,17 +836,17 @@ Proof.
   + iApply (heap_array_to_seq_meta with "Hm"). by rewrite replicate_length.
 Qed.
 
-Lemma wp_alloc_nostep s tid E v R fs :
-  R ≠ ∅ ->
-  {{{ has_fuels_S tid R fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid R fs }}}.
+Lemma wp_alloc_nostep s tid E v fs :
+  fs ≠ ∅ ->
+  {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "HfuelS HΦ". iApply (wp_allocN_seq_nostep with "HfuelS"); auto with lia.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
 Qed.
 
-Lemma wp_load_nostep s tid E l q v R fs:
-  R ≠ ∅ ->
-  {{{ ▷ l ↦{q} v ∗ has_fuels_S tid R fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid R fs }}}.
+Lemma wp_load_nostep s tid E l q v fs:
+  fs ≠ ∅ ->
+  {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "[>Hl HfuelS] HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
@@ -852,6 +854,7 @@ Proof.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
   iMod (update_no_step_enough_fuel with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  { by intros ?%dom_empty_inv_L. }
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists _,_.
   rewrite Hexend //=. iFrame "Hsi Hmod".
@@ -859,10 +862,10 @@ Proof.
   iApply "HΦ". iFrame.
 Qed.
 
-Lemma wp_store_nostep s tid E l v' v R fs:
-  R ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ has_fuels_S tid R fs }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
-  {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid R fs }}}.
+Lemma wp_store_nostep s tid E l v' v fs:
+  fs ≠ ∅ ->
+  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
+  {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "[>Hl HfuelS] HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -872,11 +875,12 @@ Proof.
   rewrite Hexend in Hheap. inv_head_step.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   iMod (update_no_step_enough_fuel with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  { by intros ?%dom_empty_inv_L. }
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists _,_.
   rewrite Hexend //=. iFrame "Hsi Hmod".
   do 2 (iSplit=>//).
-  iApply "HΦ". iFrame.  
+  iApply "HΦ". iFrame.
 Qed.
 
 Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) s1 s2 E l q v' v1 v2:
@@ -911,7 +915,7 @@ Proof.
     { iPureIntro. simpl in *. split =>//. }
     iFrame. iSplit; first done. iApply "HΦ". iFrame.
     destruct (decide (ρ ∈ live_roles Mdl s2)).
-    + rewrite has_fuel_fuels dom_singleton_L //.
+    + rewrite has_fuel_fuels //.
     + iDestruct "Hfuel" as "[?_]". rewrite dom_empty_L //.
 Qed.
 
@@ -949,7 +953,7 @@ Proof.
     { iPureIntro. simpl in *. split =>//. }
     iFrame. iSplit; first done. iApply "HΦ". iFrame.
     destruct (decide (ρ ∈ live_roles Mdl s2)).
-    + rewrite has_fuel_fuels dom_singleton_L //.
+    + rewrite has_fuel_fuels //.
     + iDestruct "Hfuel" as "[?_]". rewrite dom_empty_L //.
 Qed.
 
