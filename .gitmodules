@@ -6,10 +6,10 @@
 	url = https://gitlab.mpi-sws.org/iris/iris.git
 [submodule "record-update"]
 	path = external/record-update
-	url = git@github.com:tchajed/coq-record-update.git
+	url = https://github.com/tchajed/coq-record-update
 [submodule "paco"]
 	path = external/paco
-	url = git@github.com:snu-sf/paco.git
+	url = https://github.com/snu-sf/paco.git
 [submodule "actris"]
 	path = external/actris
 	url = https://gitlab.mpi-sws.org/iris/actris.git
