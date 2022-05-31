@@ -573,3 +573,58 @@ Section finite_range_gmap.
   Qed.
 
 End finite_range_gmap.
+
+
+Section enumerate_gsets.
+  Context {A : Type}.
+  Context `{!EqDecision A, !Countable A}.
+
+  Fixpoint enumerate_dom_gsets (D: list A) : list (gset A) :=
+    match D with
+    | [] => [ ∅ ]
+    | k::ks =>
+        s_wo ← enumerate_dom_gsets ks;
+        b ← [ true; false];
+        if (b : bool) then mret s_wo else mret $ {[ k ]} ∪ s_wo
+  end.
+
+  Definition enumerate_dom_gsets' (D: gset A) : list (gset A) :=
+    enumerate_dom_gsets (elements D).
+
+  Local Instance all_the_range_instances' B (P: B -> Prop) : ∀ x, Decision (P x).
+  Proof. intros ?; apply make_decision. Qed.
+
+  Lemma enumerate_gsets_spec D l m :
+    elements D ≡ₚ l ∧ m ⊆ D → m ∈ enumerate_dom_gsets l.
+  Proof.
+    revert l D m.
+    induction l; intros D m.
+
+    { simpl. intros (Hel&Hl). eapply list.Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
+      rewrite leibniz_equiv_iff in Hel. rewrite Hel in *. assert (m = ∅); set_solver. }
+    simpl. intros (Hel & Hl).
+
+    assert (Hdecomp: ∃ m1 m2, m = m1 ∪ m2 ∧ m1 ⊆ {[a]} ∧ m2 ⊆ list_to_set l).
+    { assert (list_to_set (elements D) = (list_to_set (a :: l): gset _)).
+      { by rewrite Hel. }
+      rewrite list_to_set_elements_L in H. simpl in H. exists (m ∩ {[a]}), (m ∩ list_to_set l).
+      split; last split; [set_solver|set_solver|set_solver]. }
+
+    destruct Hdecomp as (m1&m2&Hunion&Hdom1&Hdom2). rewrite Hunion in *.
+    assert (Hanotin: a ∉ m2).
+    { intros contra. eapply elem_of_subseteq in contra; eauto. rewrite elem_of_list_to_set in contra.
+      assert (a ∉ l); last done. apply NoDup_cons_1_1. rewrite <-Hel. apply NoDup_elements. }
+    apply elem_of_list_bind. exists m2; split; last first.
+    - apply (IHl (list_to_set l)). split; last set_solver. apply elements_list_to_set.
+      eapply (NoDup_cons_1_2 a). rewrite <-Hel. apply NoDup_elements.
+    - destruct (decide (a ∈ m1)).
+      + assert (m1 = {[a]}) by set_solver. simplify_eq. set_solver.
+      + assert (m1 = ∅) by set_solver. simplify_eq. rewrite union_empty_l_L. set_solver.
+  Qed.
+
+  Lemma enumerate_dom_gsets'_spec D s:
+    s ⊆ D → s ∈ enumerate_dom_gsets' D.
+  Proof.
+    intros H. unfold enumerate_dom_gsets'. eapply (enumerate_gsets_spec D). split; set_solver.
+  Qed.
+End enumerate_gsets.

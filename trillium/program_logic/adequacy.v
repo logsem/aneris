@@ -291,6 +291,128 @@ Section locales_helpers.
 
 End locales_helpers.
 
+Section from_locale.
+  Context {Λ: language}.
+  Context `{ EqDecision (locale Λ)}.
+
+  Fixpoint from_locale_from tp0 tp ζ :=
+    match tp with
+    | [] => None
+    | e::tp' => if decide (locale_of tp0 e = ζ) then Some e else from_locale_from (tp0 ++ [e]) tp' ζ
+    end.
+
+  Definition from_locale tp ζ := from_locale_from [] tp ζ.
+
+  (* Other possibility is:
+  Definition from_locale tp ζ := list_find (λ '(tp, e), locale_of tp e = ζ) (prefixes tp).*)
+
+  Lemma from_locale_from_Some_app tp0 tp tp' ζ e :
+    from_locale_from tp0 tp ζ = Some e ->
+    from_locale_from tp0 (tp ++ tp') ζ = Some e.
+  Proof.
+    revert tp0 tp'. induction tp as [|e' tp IH]; first by list_simplifier.
+    simpl. intros tp0 tp' Hfl.
+    destruct (decide (locale_of tp0 e' = ζ)) =>//.
+    apply IH =>//.
+  Qed.
+
+  Lemma from_locale_from_is_Some_app tp0 tp tp' ζ :
+    is_Some (from_locale_from tp0 tp ζ) ->
+    is_Some (from_locale_from tp0 (tp ++ tp') ζ).
+  Proof.
+    intros [? HS]. eapply from_locale_from_Some_app in HS. eauto.
+  Qed.
+
+  Lemma from_locale_from_equiv tp0 tp0' tp tp' ζ :
+    locales_equiv tp0 tp0' ->
+    locales_equiv_from tp0 tp0' tp tp' ->
+    is_Some (from_locale_from tp0 tp ζ) ->
+    is_Some (from_locale_from tp0' tp' ζ).
+  Proof.
+    revert tp0 tp0' tp'. induction tp as [|e tp IH]; intros tp0 tp0' tp' Heq0 Heq [eζ Heζ];
+      destruct tp' as [|e' tp']; try by apply Forall2_length in Heq.
+    simpl in *.
+    destruct (decide (locale_of tp0 e' = ζ)).
+    - rewrite decide_True //; eauto. erewrite <-locale_equiv =>//.
+    - rewrite decide_False; last by erewrite <-locale_equiv.
+      apply Forall2_cons_1 in Heq as [Hlocs ?].
+      rewrite decide_False // in Heζ; last by erewrite Hlocs, <-locale_equiv =>//.
+      apply (IH (tp0 ++ [e])); eauto.
+      apply locales_equiv_snoc =>//. constructor.
+  Qed.
+
+  Lemma from_locale_step tp1 tp2 ζ oζ σ1 σ2 :
+    locale_step (tp1, σ1) oζ (tp2, σ2) →
+    is_Some(from_locale tp1 ζ) →
+    is_Some(from_locale tp2 ζ).
+  Proof.
+    intros Hstep. inversion Hstep; simplify_eq=>//.
+    intros HiS. replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs);
+                  last by list_simplifier.
+    apply from_locale_from_is_Some_app.
+    eapply from_locale_from_equiv; eauto; [constructor|].
+    apply locales_equiv_from_middle. list_simplifier. by eapply locale_step_preserve.
+  Qed.
+
+  Lemma from_locale_from_Some tp0 tp1 tp e :
+    (tp, e) ∈ prefixes_from tp0 tp1 →
+    from_locale_from tp0 tp1 (locale_of tp e) = Some e.
+  Proof.
+    revert tp0 tp e; induction tp1 as [| e1 tp1 IH]; intros tp0 tp e Hin; first set_solver.
+    apply elem_of_cons in Hin as [Heq|Hin].
+    { simplify_eq. rewrite /= decide_True //. }
+    rewrite /= decide_False; first by apply IH.
+    fold (prefixes_from (A := expr Λ)) in Hin.
+    by eapply locale_injective.
+  Qed.
+
+End from_locale.
+
+Section locales_utils.
+  Context {Λ: language}.
+
+  Definition locales_of_list_from tp0 (tp: list $ expr Λ): list $ locale Λ :=
+    (λ '(t, e), locale_of t e) <$> (prefixes_from tp0 tp).
+  Notation locales_of_list tp := (locales_of_list_from [] tp).
+
+  Lemma locales_of_list_equiv tp0 tp0' tp1 tp2:
+    locales_equiv_from tp0 tp0' tp1 tp2 →
+    locales_of_list_from tp0 tp1 = locales_of_list_from tp0' tp2.
+  Proof.
+    revert tp0 tp0' tp1. induction tp2; intros tp0 tp0' tp1 H;
+    destruct tp1 as [|e1 tp1]; try by apply Forall2_length in H.
+    unfold locales_of_list_from. simpl.
+    simpl in H. apply Forall2_cons_1 in H as [??]. f_equal =>//.
+    apply IHtp2 =>//.
+  Qed.
+
+  Lemma locales_of_list_step_incl σ1 σ2 oζ tp1 tp2 :
+      locale_step (tp1, σ1) oζ (tp2, σ2) ->
+      locales_of_list tp1 ⊆ locales_of_list tp2.
+  Proof.
+    intros H. inversion H; simplify_eq=>//.
+    replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs); last by list_simplifier.
+    rewrite /locales_of_list_from. rewrite [in X in _ ⊆ X]prefixes_from_app /= fmap_app.
+    assert ((λ '(t, e), locale_of t e) <$> prefixes (t1 ++ e1 :: t2) = (λ '(t, e), locale_of t e) <$> prefixes (t1 ++ e2 :: t2))
+      as ->; last set_solver.
+    apply locales_of_list_equiv, locales_equiv_middle. by eapply locale_step_preserve.
+  Qed.
+
+  Lemma locales_of_list_from_locale_from `{EqDecision (locale Λ)} tp0 tp1 ζ:
+    is_Some (from_locale_from tp0 tp1 ζ) ->
+    ζ ∈ locales_of_list_from tp0 tp1.
+  Proof.
+    revert tp0; induction tp1 as [|e1 tp1 IH]; intros tp0.
+    { simpl. intros H. inversion H. congruence. }
+    simpl. intros [e Hsome]. rewrite /locales_of_list_from /=.
+    destruct (decide (locale_of tp0 e1 = ζ)); simplify_eq; first set_solver.
+    apply elem_of_cons; right. apply IH. eauto.
+  Qed.
+
+End locales_utils.
+Notation locales_of_list tp := (locales_of_list_from [] tp).
+
+
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
 

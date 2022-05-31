@@ -83,68 +83,46 @@ Section unstrict_order.
     x = y ∨ lt x y.
 End unstrict_order.
 
-Definition the_order (s1 s2: the_model): Prop :=
-  match s1, s2 with
-  | (N1, B1, yf1, nf1), (N2, B2, yf2, nf2) =>
-    prod_relation
-      (unstrict (lexprod _ _ (strict Nat.le) (strict bool_le)))
-      (prod_relation bool_le bool_le)
-      (N1, B1, (yf1, nf1))
-      (N2, B2, (yf2, nf2))
-  end.
+Definition the_order := unstrict (lexprod _ _ (strict Nat.le) (strict bool_le)).
 
 Ltac inv_lexs :=
   repeat match goal with
     [ H: lexprod _ _ _ _ _ _ |- _ ] => inversion H; clear H; simplify_eq
          end.
 
+Lemma lexprod_lexico x y:
+  lexprod _ _ (strict Nat.le) (strict bool_le) x y <-> lexico x y.
+Proof.
+  split.
+  - intros [???? H|x' y' z' H].
+    + left =>/=. compute. compute in H. lia.
+    + right =>/=. compute; split=>//. compute in H. destruct y'; destruct z' =>//; intuition.
+  - destruct x as [x1 x2]. destruct y as [y1 y2]. intros [H|[Heq H]]; simpl in *.
+    + left =>/=. compute. compute in H. lia.
+    + rewrite Heq. right =>/=. destruct x2; destruct y2 =>//; intuition. constructor =>//. eauto.
+Qed.
 
 #[local] Instance the_order_po: PartialOrder the_order.
 Proof.
   constructor.
   - constructor.
-    + intros x. destruct x as [[[??]?]?]. simpl.
-      unfold prod_relation. simpl. split; last done.
-      by econstructor.
-    + intros [[[??]?]?] [[[??]?]?] [[[??]?]?]. simpl.
-      unfold prod_relation. simpl. intros (Hlex1&?&?) (Hlex2&?&?). split; last first.
-      * split; etransitivity =>//.
-      * inversion Hlex1; inversion Hlex2; simplify_eq;
-          try (econstructor 1; try (etransitivity; done); inv_lexs; f_equal; done);
-          try (econstructor 2; try done).
-        inv_lexs.
-        ** econstructor. by etransitivity.
-        ** econstructor 1 =>//.
-        ** econstructor => //.
-        ** econstructor 2. by etransitivity.
-  -  intros [[[??]?]?] [[[??]?]?]. simpl.
-      unfold prod_relation. simpl. intros (Hlex1&?&?) (Hlex2&?&?).
-      do 3 f_equal; try (by eapply anti_symm =>//).
-     + inversion Hlex1; inversion Hlex2; simplify_eq; try (eapply anti_symm =>//; done);
-         inv_lexs; eauto. exfalso; eapply (strict_anti_symm (R := strict Nat.le)) =>//; eapply _.
-     + inversion Hlex1; inversion Hlex2; simplify_eq; try (eapply anti_symm =>//; done);
-       inv_lexs; eauto; try by eapply anti_symm;
-         exfalso; eapply (strict_anti_symm (R := strict Nat.le)); eauto.
-       exfalso; eapply (strict_anti_symm (R := strict bool_le)); eauto.
-     + eapply anti_symm =>//; apply _.
-     + eapply anti_symm =>//; apply _.
-       Unshelve. all: exact eq.
+    + intros ?. by left.
+    + unfold the_order. intros [x1 x2] [y1 y2] [z1 z2] [|H1] [|H2]; simplify_eq; try (by left); right; eauto.
+      rewrite -> lexprod_lexico in *. etransitivity =>//.
+  - intros [x1 x2] [y1 y2] [|H1] [|H2]; simplify_eq =>//.
+    inversion H1; inversion H2; simplify_eq; try (compute in *; lia).
+    destruct x2; destruct y2; compute in *; intuition.
 Qed.
 
 Definition the_decreasing_role (s: the_model): YN :=
   match s with
-  | (0%nat, false, true, false) => Y
-  | (0%nat, true, false, true) => No
-  | (1%nat, false, true, false) => Y
-  | (_, true, _, _) => Y
-  | (_, false, _, _) => No
+  | (0%nat, false) => Y
+  | (_, true) => Y
+  | (_, false) => No
   end.
 
 #[local] Instance eq_antisymm A: Antisymmetric A eq eq.
 Proof. by intros ??. Qed.
-
-Definition same: the_model -> (nat * bool * (bool * bool)) :=
-  λ '(N, B, yf, nf), (N, B, (yf, nf)).
 
 Lemma strict_unstrict {A} (R: relation A):
   forall x y, strict (unstrict R) x y -> R x y.
@@ -171,95 +149,63 @@ Proof.
   - constructor 2. etransitivity =>//.
 Qed.
 
-#[local] Instance test1 `{Transitive A R}: Transitive (unstrict R).
-Proof.
-  intros x y z [?|?] [?|?]; simplify_eq; ((left; done) || right; eauto).
-Qed.
-
-Lemma the_model_almost_wf:
-  wf (strict $
-    prod_relation
-      (unstrict (lexprod _ _ (strict Nat.le) (strict bool_le)))
-      (prod_relation bool_le bool_le)).
-Proof.
-  apply wf_prod_strict.
-  - apply _.
-  - assert (H: wf (lexprod nat bool (strict Nat.le) (strict bool_le))).
-    + apply wf_lexprod; last apply wf_bool_le.
-      eapply (wf_projected _ id); last apply Nat.lt_wf_0.
-      intros ??[??]. simpl. lia.
-    + eapply (wf_projected _ id); last exact H.
-      intros ???. apply strict_unstrict => //.
-  - apply wf_prod_strict; eauto using wf_bool_le.
-    apply _.
-Qed.
-
-
-
 #[local] Program Instance the_model_terminates: FairTerminatingModel the_model :=
   {|
   ftm_leq := the_order;
   ftm_decreasing_role := the_decreasing_role;
   |}.
 Next Obligation.
-  eapply (wf_projected _ same); last exact the_model_almost_wf.
-  intros [[[? ?] ?] ?] [[[? ?] ? ]?] ?. eauto.
+  unfold the_order.
+  assert (H: wf (lexprod nat bool (strict Nat.le) (strict bool_le))).
+  + apply wf_lexprod; last apply wf_bool_le.
+    eapply (wf_projected _ id); last apply Nat.lt_wf_0.
+    intros ??[??]. simpl. lia.
+  + eapply (wf_projected _ id); last exact H.
+    intros ???. apply strict_unstrict => //.
 Qed.
 Next Obligation.
-  intros [[[N B] yf] nf] Hex.
+  intros [N B] Hex.
   destruct B.
   - split.
-    + simpl. destruct yf.
-      * do 2 (destruct N; try set_solver).
+    + simpl. destruct N.
       * destruct Hex as [ρ' [s' Hex]].
-        inversion Hex; subst. set_solver.
-    + intros [[[N' B'] yf'] nf'] Htrans.
-      inversion Htrans; simplify_eq; rewrite strict_spec_alt; (split; [| try done; do 2 (destruct N'; eauto)]);
-       (constructor; [simpl; eauto; unfold unstrict; (try by left) |]).
-      { right. constructor 2. constructor; eauto. constructor. }
-      all: simpl; by constructor.
+        inversion Hex; subst; lia.
+      * destruct N; set_solver.
+    + intros [??] H. inversion H; simplify_eq.
+      * split; [right; right; compute; done| compute; intros [?|contra] =>//].
+        inversion contra; simplify_eq; intuition.
+      * destruct n =>//.
   - split.
-    + simpl. destruct nf.
-      * destruct N; simpl; destruct yf; try set_solver; destruct N; set_solver.
+    + destruct N; simpl.
       * destruct Hex as [ρ' [s' Hex]].
-        inversion Hex; subst. destruct N; try set_solver.
-        destruct N; try set_solver. lia.
-    + intros [[[N' B'] yf'] nf'] Htrans.
-      inversion Htrans; simplify_eq; rewrite strict_spec_alt; (split; [| try done; do 2 (destruct N'; eauto)]);
-       (constructor ; [simpl; eauto; unfold unstrict; (try by left) |]).
-      all: simpl; try by constructor.
-      all: right; constructor 1; split; lia.
+        inversion Hex; subst; lia.
+      * destruct N; set_solver.
+    + intros [[|?] ?] H.
+      * inversion H; simplify_eq; [lia|]. unfold strict, the_order; split.
+        ** right; left. compute. lia.
+        ** intros [|contra] =>//. inversion contra; simplify_eq. compute in *. lia.
+      * inversion H; simplify_eq. split; [right;left; compute; lia|].
+        intros [|contra] =>//; inversion contra; simplify_eq; last lia. compute in *. lia.
 Qed.
 Next Obligation.
-  intros [[[N B] yf] nf]  [[[N' B'] yf'] nf'] ρ Htrans Hnex.
+  intros [N B]  [N' B'] ρ Htrans Hnex.
   inversion Htrans ; simplify_eq; eauto; simpl in *;
     try (destruct N'; eauto); try lia; (try (destruct N'; done)); try done.
-  - destruct yf'; done.
-  - destruct B'; try done. destruct nf'; done.
-  - have ?: N' = 0%nat by lia. subst. destruct B' =>//.
-    destruct nf'=>//.
-  - destruct B' =>//; destruct yf' =>//.
 Qed.
 Next Obligation.
-  intros [[[N B] yf] nf] ρ [[[N' B'] yf'] nf'] Htrans.
+  intros [N B] ρ [N' B'] Htrans.
   destruct ρ; last by inversion Htrans.
-  inversion Htrans; simplify_eq; simpl.
-  all: constructor; [((left; done) || right; (constructor 1; constructor; done) || (try constructor 2)); simpl | simpl; try reflexivity].
-  - constructor. constructor. eauto.
-  - constructor 1; split; lia.
-  - constructor 1; split; lia.
-  - constructor. constructor. eauto. done.
-  - constructor; done.
+  inversion Htrans; simplify_eq; simpl; try reflexivity.
+  - right; constructor 2; by compute.
+  - right; constructor 1; compute. lia.
 Qed.
 
 (* The model is finitely branching *)
-Definition steppable '(n, w, yf, nf): list ((nat * bool * bool * bool) * option YN) :=
+Definition steppable '(n, w): list ((nat * bool) * option YN) :=
   n' ← [n; (n-1)%nat];
   w' ← [w; negb w];
-  yf' ← [yf; negb yf];
-  nf' ← [nf; negb nf];
   ℓ ← [Some Y; Some No];
-  mret ((n', w', yf', nf'), ℓ).
+  mret ((n', w'), ℓ).
 
 #[local] Instance proof_irrel_trans s x:
   ProofIrrel ((let '(s', ℓ) := x in yntrans s ℓ s'): Prop).
@@ -270,14 +216,14 @@ Lemma model_finitary s:
 Proof.
   assert (H: forall A (y x: A) xs, (y = x ∨ y ∈ xs) -> y ∈ x::xs) by set_solver.
   eapply (in_list_finite (steppable s)).
-  intros [[[n w] yf] nf] Htrans.
+  intros [n w] Htrans.
   inversion Htrans; try (repeat (rewrite ?Nat.sub_0_r; simpl;
     eapply H; try (by left); right); done).
 Qed.
 
 Theorem yesno_terminates
         (N : nat)
-        (HN: N > 0)
+        (HN: N > 1)
         (extr : extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [start #N]):
@@ -285,22 +231,21 @@ Theorem yesno_terminates
 Proof.
   assert (heapGpreS yesnoΣ the_model) as HPreG.
   { apply _. }
-  eapply (simulation_adequacy_terminate_ftm (Mdl := the_model) yesnoΣ NotStuck _ (N, true, true, true)) =>//.
+  eapply (simulation_adequacy_terminate_ftm (Mdl := the_model) yesnoΣ NotStuck _ (N, true) ∅) =>//.
   - eapply valid_state_evolution_finitary_fairness.
     intros ?. simpl. apply (model_finitary s1).
-  - set_solver.
-  - intros ?. iStartProof. iIntros "!> Hm Hf !>". simpl.
-    iApply (start_spec _ _ 45 with "[Hm Hf]"); eauto.
-    + lia.
-    + iSplitL "Hm"; eauto. iSplit; last done.
-      assert ({[Y := 45%nat; No := 45%nat]} = gset_to_gmap 45 {[Y; No]}) as <-; last done.
+  - destruct N; [lia|destruct N; set_solver].
+  - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.
+    iApply (start_spec _ _ 61 with "[Hm Hf HFR]"); eauto.
+    + iSplitL "Hm"; eauto. do 2 (destruct N; first lia).
+      assert (∅ ∖ {[ No; Y ]} = ∅) as -> by set_solver. iFrame. iSplit; last (iPureIntro; lia).
+      assert ({[Y := 61%nat; No := 61%nat]} = gset_to_gmap 61 {[No;Y]}) as <-; last done.
       rewrite -leibniz_equiv_iff. intros ρ.
-      destruct (gset_to_gmap 45 {[Y; No]} !! ρ) as [f|] eqn:Heq.
+      destruct (gset_to_gmap 61 {[Y; No]} !! ρ) as [f|] eqn:Heq.
       * apply lookup_gset_to_gmap_Some in Heq as [Heq ->].
         destruct (decide (ρ = Y)) as [-> |].
-        ** rewrite lookup_insert //.
+        ** rewrite lookup_insert //. rewrite lookup_gset_to_gmap option_guard_True //. set_solver.
         ** rewrite lookup_insert_ne //. assert (ρ = No) as -> by set_solver.
-           rewrite lookup_insert //.
-      * apply lookup_gset_to_gmap_None in Heq.
-        repeat (rewrite lookup_insert_ne //; last set_solver).
+           rewrite lookup_insert // lookup_gset_to_gmap option_guard_True //. set_solver.
+      * apply lookup_gset_to_gmap_None in Heq. destruct ρ; set_solver.
 Qed.
