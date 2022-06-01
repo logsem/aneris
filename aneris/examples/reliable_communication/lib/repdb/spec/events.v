@@ -4,30 +4,50 @@ From aneris.examples.reliable_communication.lib.repdb.spec
 
 (** Write and apply events *)
 
-Section Events.
+Section Write_event.
   Context `{!DB_time}.
 
-  Class DB_events :=
+  Record we :=
     {
-      (** Write events *)
-      we : Type;
-      WE_key : we -> Key;
-      WE_val : we → val;
-      WE_timed :> Timed we;
-      WE_EqDecision :> EqDecision we;
-      WE_Countable :> Countable we;
+      we_key : Key;
+      we_val : val;
+      we_time : Time;
     }.
-End Events.
+
+End Write_event.
 
 Notation ghst := (list we).
 Notation "h ≤ₚ h'" := (h `prefix_of` h') (at level 20).
 
+Notation "s '<ₜ' t" :=
+  (TM_lt (we_time s) (we_time t)) (at level 70, no associativity).
+
+Notation "s '≤ₜ' t" :=
+  (TM_lt (we_time s) (we_time t) ∨ s = t) (at level 70, no associativity).
+Notation "s '=ₜ' t" :=
+  (we_time s = we_time t) (at level 70, no associativity).
 
 Section Events_lemmas.
-  Context `{!DB_time, !DB_events}.
+  Context `{!DB_time}.
+
+  Global Instance we_dec : EqDecision we.
+  Proof. solve_decision. Qed.
+
+  Global Instance we_countable : Countable we.
+  Proof.
+    refine {| encode := λ a, encode (we_key a, we_val a, we_time a);
+            decode := λ n,
+                      (λ x, {| we_key := x.1.1; we_val := x.1.2;
+                               we_time := x.2; |}) <$>
+                        @decode
+                        (Key * val * Time)%type
+                        _ _ n
+           |}.
+    by intros []; rewrite /= decode_encode /=.
+  Qed.
 
   Definition hist_at_key (k : Key) (h : ghst) : ghst :=
-    filter (λ x, WE_key x = k) h.
+    filter (λ x, we_key x = k) h.
 
   Definition at_key (k : Key) (h : ghst) : option we :=
     last (hist_at_key k h).
@@ -43,7 +63,7 @@ Section Events_lemmas.
       rewrite Hl''. by exists (x :: l'').
   Qed.
 
-  Lemma at_key_singleton (e : we) : at_key (WE_key e) [e] = Some e.
+  Lemma at_key_singleton (e : we) : at_key (we_key e) [e] = Some e.
   Proof. rewrite -last_singleton /at_key /hist_at_key. f_equal.
          by rewrite filter_cons_True.
   Qed.
@@ -66,11 +86,11 @@ Section Events_lemmas.
       rewrite /hist_at_key in Hh.
       erewrite filter_cons_True; first done.
       rewrite filter_cons in Hh.
-      by destruct ((decide (WE_key e = k))).
+      by destruct ((decide (we_key e = k))).
   Qed.
 
  Lemma hist_at_key_none_singleton k e:
-   WE_key e ≠ k →
+   we_key e ≠ k →
    hist_at_key k [e] = [].
  Proof.
    intros Hne.
@@ -79,7 +99,7 @@ Section Events_lemmas.
    Qed.
 
  Lemma hist_at_key_some_singleton k e:
-   WE_key e = k →
+   we_key e = k →
    hist_at_key k [e] = [e].
  Proof.
    intros He.
@@ -100,7 +120,7 @@ Section Events_lemmas.
   Qed.
 
   Lemma hist_at_key_frame_r_singleton k h e :
-    WE_key e ≠ k →
+    we_key e ≠ k →
     hist_at_key k (h ++ [e]) = hist_at_key k h.
   Proof.
     intros Hnek.
@@ -120,7 +140,7 @@ Section Events_lemmas.
   Qed.
 
  Lemma hist_at_key_frame_l_singleton k h e :
-    WE_key e ≠ k →
+    we_key e ≠ k →
     hist_at_key k ([e] ++ h) = hist_at_key k h.
   Proof.
     intros Hnek.
@@ -140,7 +160,7 @@ Section Events_lemmas.
   Qed.
 
   Lemma hist_at_key_add_r_singleton k h e :
-    WE_key e = k →
+    we_key e = k →
     hist_at_key k (h ++ [e]) = hist_at_key k h ++ [e].
   Proof.
     intros Hek.
@@ -150,7 +170,7 @@ Section Events_lemmas.
   Qed.
 
  Lemma hist_at_key_add_l_singleton k h e :
-    WE_key e = k →
+    we_key e = k →
     hist_at_key k ([e] ++ h) = [e] ++ hist_at_key k h.
   Proof.
     intros Hnek.
@@ -160,7 +180,7 @@ Section Events_lemmas.
   Qed.
 
   Lemma at_key_snoc_none k h e :
-    WE_key e ≠ k → at_key k (h ++ [e]) = at_key k h.
+    we_key e ≠ k → at_key k (h ++ [e]) = at_key k h.
   Proof.
     intros Hk.
     rewrite /at_key.
@@ -169,7 +189,7 @@ Section Events_lemmas.
   Qed.
 
  Lemma at_key_snoc_some k h e :
-    WE_key e = k → at_key k (h ++ [e]) = Some e.
+    we_key e = k → at_key k (h ++ [e]) = Some e.
   Proof.
     intros Hk.
     rewrite /at_key.
@@ -223,7 +243,7 @@ Section Events_lemmas.
   Proof.
     intros Heq Hk. rewrite Heq in Hk.
     rewrite /hist_at_key in Hk. rewrite filter_app in Hk.
-    rewrite {1}(app_nil_end (filter (λ x : we, WE_key x = k) h1)) in Hk.
+    rewrite {1}(app_nil_end (filter (λ x : we, we_key x = k) h1)) in Hk.
     apply app_inv_head in Hk. symmetry in Hk. eauto.
   Qed.
 
@@ -258,7 +278,7 @@ Section Events_lemmas.
   Qed.
 
   Lemma at_key_has_key k h we :
-    at_key k h = Some we → WE_key we = k.
+    at_key k h = Some we → we_key we = k.
   Proof.
     intros Hatkey. apply last_Some_elem_of, elem_of_list_filter in Hatkey.
     by destruct Hatkey as [Hatkey _].

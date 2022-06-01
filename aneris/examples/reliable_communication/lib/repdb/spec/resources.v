@@ -6,7 +6,7 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Export db_params time events.
 
 Section Predicates.
-  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DB_events}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DB_time}.
 
   Reserved Notation "k ↦ₖ{ q } v" (at level 20).
   Reserved Notation "k ↦ₖ v" (at level 20).
@@ -25,9 +25,9 @@ Section Predicates.
     (** Observed requests *)
     Obs : socket_address → ghst → iProp Σ;
 
-    (** Reserved socket protocols for leader & followers *)
-    db_reserved_leader_socket_interp : message → iProp Σ;
-    db_reserved_follower_socket_interp : message → iProp Σ;
+    (* (** Reserved socket protocols for leader & followers *) *)
+    (* db_reserved_leader_socket_interp : message → iProp Σ; *)
+    (* db_reserved_follower_socket_interp : message → iProp Σ; *)
 
     (** Properties of points-to connective *)
     OwnMemKey_timeless k q v :> Timeless (k ↦ₖ{ q } v);
@@ -44,8 +44,9 @@ Section Predicates.
       k ↦ₖ{ q1 + q2 } v ⊢ k ↦ₖ{ q1 } v ∗ k ↦ₖ{ q2 } v ;
     OwnMemKey_key k q we E :
       nclose DB_InvName ⊆ E →
+      GlobalInv ⊢
       k ↦ₖ{q} Some we ={E}=∗
-      k ↦ₖ{q} Some we ∗ ⌜WE_key we = k⌝;
+      k ↦ₖ{q} Some we ∗ ⌜we_key we = k⌝;
 
     (** Properties of observed requests *)
     Obs_timeless a h :> Timeless (Obs a h);
@@ -76,7 +77,6 @@ Section Predicates.
       ⌜hist_at_key k h1 = hist_at_key k h2⌝;
 
     (** Relations between points-to connective and observed requests *)
-    (* TODO: Delete after we change *)
     OwnMemKey_some_obs_we k q we E :
       nclose DB_InvName ⊆ E →
       GlobalInv ⊢
@@ -86,26 +86,31 @@ Section Predicates.
     OwnMemKey_obs_frame_prefix a k q h h' E :
       nclose DB_InvName ⊆ E →
       h ≤ₚ h' →
+      GlobalInv ⊢
       k ↦ₖ{ q } (at_key k h) ∗ Obs a h' ={E}=∗
       k ↦ₖ{ q } (at_key k h) ∗ ⌜at_key k h = at_key k h'⌝;
     OwnMemKey_obs_frame_prefix_some a k q h h' we E :
       nclose DB_InvName ⊆ E →
       h ≤ₚ h' →
       at_key k h = Some we →
+      GlobalInv ⊢
       k ↦ₖ{ q } Some we ∗ Obs a h' ={E}=∗
       k ↦ₖ{ q } Some we ∗ ⌜at_key k h' = Some we⌝;
     OwnMemKey_some_obs_frame a k q we h hf E :
       nclose DB_InvName ⊆ E →
-       k ↦ₖ{ q } (Some we) ∗ Obs a (h ++ [we] ++ hf) ={E}=∗
-       k ↦ₖ{ q } (Some we) ∗ ⌜at_key k hf = None⌝;
+      GlobalInv ⊢
+      k ↦ₖ{ q } (Some we) ∗ Obs a (h ++ [we] ++ hf) ={E}=∗
+      k ↦ₖ{ q } (Some we) ∗ ⌜at_key k hf = None⌝;
     OwnMemKey_none_obs a k q h E :
       nclose DB_InvName ⊆ E →
+      GlobalInv ⊢
       k ↦ₖ{ q } None ∗ Obs a h ={E}=∗
       k ↦ₖ{ q } None ∗ ⌜hist_at_key k h = []⌝;
     OwnMemKey_allocated k q h0 h1 we0 E :
       nclose DB_InvName ⊆ E →
       h0 ≤ₚ h1 →
       at_key k h0 = Some we0 →
+      GlobalInv ⊢
       k ↦ₖ{ q } (at_key k h1) ={E}=∗
       ∃ we1, k ↦ₖ{ q } (at_key k h1) ∗
             ⌜at_key k h1 = Some we1⌝ ∗ ⌜we0 ≤ₜ we1⌝;
@@ -116,4 +121,4 @@ End Predicates.
 Notation "k ↦ₖ v" := (OwnMemKey k 1 v) (at level 20).
 Notation "k ↦ₖ{ q } v" := (OwnMemKey k q v) (at level 20).
 
-Arguments DB_resources _ _ {_ _ _ _}.
+Arguments DB_resources _ _ {_ _ _}.
