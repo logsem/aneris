@@ -58,14 +58,14 @@ Section Proto_simplified.
         ∃ hf a_new,
         ⌜repd = inl (hf, a_new)⌝ ∗
         ⌜repv = #()⌝ ∗
-        ⌜WE_key a_new = k⌝ ∗ ⌜WE_val a_new = v⌝ ∗
+        ⌜we_key a_new = k⌝ ∗ ⌜we_val a_new = v⌝ ∗
         ⌜at_key k hf = None⌝ ∗ Obs DB_addr (h ++ hf ++ [a_new]) ∗ k ↦ₖ Some a_new) ∨
     (∀ k q wo,
         ⌜reqd = inr (k, (q, wo))⌝ -∗
         ⌜repd = inr wo⌝ ∗
         ∃ vo, ⌜repv = vo⌝ ∗
           ((⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
-          (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜wo = Some a⌝))).
+          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))).
 
   Definition req_prot_def := @req_prot Σ ReqData RepData ReqPre ReqPost.
 
@@ -93,7 +93,7 @@ Section Proto_write_hocap.
             Obs DB_addr h ∗
             ▷ (∀ (hf : ghst) (a_new : we),
                   ⌜at_key k hf = None⌝ ∗
-                  ⌜WE_key a_new = k⌝ ∗ ⌜WE_val a_new = v⌝ ∗
+                  ⌜we_key a_new = k⌝ ∗ ⌜we_val a_new = v⌝ ∗
                   ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
                   k ↦ₖ Some a_new ∗
                   Obs DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf))) ∨
@@ -107,8 +107,9 @@ Section Proto_write_hocap.
     (∀ k wo q, ⌜reqd = inr (k, (q, wo))⌝ -∗
        ∃ vo, ⌜repd = inr wo⌝ ∗ ⌜repv = vo⌝ ∗  k ↦ₖ{q} wo ∗
        ((⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
-        (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜wo = Some a⌝))).
+        (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))).
 
   Definition req_prot_def' := @req_prot Σ ReqData' RepData' ReqPre' ReqPost'.
+
 
 End Proto_write_hocap.

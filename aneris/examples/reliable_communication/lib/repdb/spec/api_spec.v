@@ -9,8 +9,7 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params time events resources ras.
 
 Section API_spec.
-  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !Maximals_Computing,
-            !DB_events, !DB_resources Mdl Σ}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DB_resources Mdl Σ}.
 
   Definition write_spec
       (wr : val) (sa : socket_address) : iProp Σ :=
@@ -27,8 +26,8 @@ Section API_spec.
                 Obs DB_addr h ∗
                   ▷ (∀ (hf : ghst) (a_new : we),
                   ⌜at_key k hf = None⌝ ∗
-                  ⌜WE_key a_new = k⌝ ∗
-                  ⌜WE_val a_new = v⌝ ∗
+                  ⌜we_key a_new = k⌝ ∗
+                  ⌜we_val a_new = v⌝ ∗
                   ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
                   k ↦ₖ Some a_new ∗
                   Obs DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
@@ -58,7 +57,7 @@ Section API_spec.
           {{{ vo, RET vo;
             ∃ (h : ghst) (eo: option we),
               (⌜vo = NONEV⌝ ∗ ⌜eo = None⌝ ∗ Q1 eo h) ∨
-              (∃ v e, ⌜vo = SOMEV v⌝ ∗ ⌜eo = Some e⌝ ∗ ⌜WE_val e = v⌝ ∗ Q2 e h)
+              (∃ v e, ⌜vo = SOMEV v⌝ ∗ ⌜eo = Some e⌝ ∗ ⌜we_val e = v⌝ ∗ Q2 e h)
          }}})%I.
   *)
 
@@ -68,7 +67,7 @@ Section API_spec.
     {{{ ∃ wo : option we, k ↦ₖ wo ∗ Obs DB_addr h ∗ ⌜at_key k h = wo⌝ }}}
        wr #k v @[ip_of_address sa]
     {{{ RET #();
-        ∃ (hf : ghst) (a: we), ⌜WE_key a = k⌝ ∗ ⌜WE_val a = v⌝ ∗
+        ∃ (hf : ghst) (a: we), ⌜we_key a = k⌝ ∗ ⌜we_val a = v⌝ ∗
           ⌜at_key k hf = None⌝ ∗ Obs DB_addr (h ++ hf ++ [a]) ∗
           k ↦ₖ Some a
     }}}%I.
@@ -81,7 +80,7 @@ Section API_spec.
       rd #k @[ip_of_address sa]
     {{{vo, RET vo;
          k ↦ₖ{q} wo ∗ (⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
-         (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜wo = Some a⌝)
+         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝)
     }}}%I.
 
   Definition read_at_follower_spec
@@ -92,7 +91,7 @@ Section API_spec.
     {{{vo, RET vo;
           ∃ h', ⌜h ≤ₚ h'⌝ ∗ Obs fa h' ∗
          (⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
-         (∃ a, ⌜vo = SOMEV (WE_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)
+         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)
     }}}%I.
 
   Lemma get_simplified_write_spec wr sa :
@@ -111,7 +110,7 @@ Section API_spec.
        ⌜ip_of_address DB_addrF = ip_of_address DB_addr⌝ →
        ⌜port_of_address DB_addrF ≠ port_of_address DB_addr⌝ →
         {{{ fixed A ∗
-            DB_addr ⤇ db_reserved_leader_socket_interp ∗
+            (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
             DB_addr ⤳ (∅, ∅) ∗
             DB_addrF ⤳ (∅, ∅) ∗
             free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
@@ -127,8 +126,8 @@ Section API_spec.
         ⌜ip_of_address fa = ip_of_address f2La⌝ →
         ⌜port_of_address fa ≠ port_of_address f2La⌝ →
         {{{ fixed A ∗
-            fa ⤇ db_reserved_follower_socket_interp ∗
-            DB_addr ⤇ db_reserved_leader_socket_interp ∗
+            (* fa ⤇ db_reserved_follower_socket_interp ∗ *)
+            (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
             DB_addr ⤳ (∅, ∅) ∗
             DB_addrF ⤳ (∅, ∅) ∗
             free_ports (ip_of_address fa) {[port_of_address fa]} ∗
@@ -143,7 +142,7 @@ Section API_spec.
         ⌜DB_addr ∈ A⌝ →
         ⌜sa ∉ A⌝ →
         {{{ fixed A ∗
-            DB_addr ⤇ db_reserved_leader_socket_interp ∗
+            (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
             sa ⤳ (∅, ∅) ∗
             free_ports (ip_of_address sa) {[port_of_address sa]} }}}
           init_client_leader_proxy (s_serializer DB_serialization)
@@ -157,7 +156,7 @@ Section API_spec.
         ⌜fa ∈ A⌝ →
         ⌜sa ∉ A⌝ →
         {{{ fixed A ∗
-            fa ⤇ db_reserved_follower_socket_interp ∗
+            (* fa ⤇ db_reserved_follower_socket_interp ∗ *)
             sa ⤳ (∅, ∅) ∗
             free_ports (ip_of_address sa) {[port_of_address sa]} }}}
           init_client_follower_proxy (s_serializer DB_serialization)
@@ -168,12 +167,10 @@ Section API_spec.
 End API_spec.
 
 Section Init.
-  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !Maximals_Computing,
-            !DB_events, !DBG Σ, !DB_init_function}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DBG Σ, !DB_init_function}.
 
   Class DB_init := {
     DB_init_time :> DB_time;
-    DB_init_events :> DB_events;
     DB_init_setup E :
       ↑DB_InvName ⊆ E →
         True ⊢ |={E}=> ∃ (DBRS : DB_resources Mdl Σ),

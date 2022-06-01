@@ -113,7 +113,7 @@ Definition start_follower_processing_clients ser : val :=
   (client_request_handler_at_follower "db").
 
 Definition sync_loop : val :=
-  λ: "db" "log" "mon" "reqf",
+  λ: "db" "log" "mon" "reqf" <>,
   letrec: "aux" <> :=
     let: "i" := log_next "log" in
     let: "rep" := "reqf" "i" in
@@ -132,7 +132,7 @@ Definition sync_with_server ser : val :=
   λ: "l_addr" "f2l_addr" "db" "log" "mon",
   let: "reqf" := init_client_proxy req_f2l_ser (rep_l2f_ser ser) "f2l_addr"
                  "l_addr" in
-  sync_loop "db" "log" "mon" "reqf".
+  Fork (sync_loop "db" "log" "mon" "reqf" #()).
 
 Definition init_follower ser : val :=
   λ: "l_addr" "f2l_addr" "f_addr",
