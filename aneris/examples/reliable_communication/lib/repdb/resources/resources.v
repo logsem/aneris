@@ -60,7 +60,7 @@ Class IDBG Σ :=
 Section ValidStates.
   Context `{!anerisG Mdl Σ, !DB_params}.
 
-  (** Validity. *)
+  (** Global Validity. *)
   Definition mem_dom (M : gmap Key (option write_event)) := DB_keys = dom M.
 
   Definition mem_we_key (M : gmap Key (option write_event)) :=
@@ -87,7 +87,25 @@ Section ValidStates.
       DB_GSTV_log_events L : log_events L;
     }.
 
-(* TODO : valid state update lemma. *)
+ (** Local Validity. *)
+  Definition mem_dom_local (M : gmap Key write_event) := dom M ⊆ DB_keys.
+
+  Definition mem_log_coh_local (L : wrlog) (M : gmap Key write_event) :=
+    ∀ k, k ∈ dom M → M !! k = at_key k L.
+
+  Definition allocated_in_mem_local (L : wrlog) (M : gmap Key write_event) :=
+    ∀ l k wel, l ≤ₚ L → at_key k l = Some wel →
+               ∃ weL, M !! k = Some weL ∧ wel ≤ₜ weL.
+
+  Record valid_state_local (L : wrlog) (M : gmap Key write_event) : Prop :=
+    {
+      DB_LSTV_mem_dom : mem_dom_local M;
+      DB_LSTV_mem_log_coh_local : mem_log_coh_local L M;
+      DB_LSTV_mem_allocated_in_mem : allocated_in_mem_local L M;
+      DB_LSTV_log_events L : log_events L;
+    }.
+
+(* TODO : valid state update lemmas. *)
 
 End ValidStates.
 
@@ -360,10 +378,11 @@ Section Resources.
 
   Definition leader_local_main_inv_def (kvsL logL : loc) : iProp Σ :=
    ∃ (logV kvsV : val)
-     (kvsM : gmap Key (option write_event))
+     (kvsM : gmap Key write_event)
      (logM : wrlog),
      ⌜is_map kvsV kvsM⌝ ∗
      ⌜is_log logM logV⌝ ∗
+     ⌜valid_state_local logM kvsM⌝ ∗
      kvsL ↦[ipL] kvsV ∗
      logL ↦[ipL] logV ∗
      own_logL_local logM.
@@ -384,19 +403,17 @@ Section Resources.
     is_monitor (DB_InvName .@ "leader_secondary") ipF mγ mV
                (leader_local_secondary_inv_def logL).
 
-
-
   (* ------------------------------------------------------------------------ *)
   (** Follower's local invariant. *)
 
   Definition follower_local_inv_def
     (sa : socket_address) (kvsL logL : loc) : iProp Σ :=
     ∃ (logV kvsV : val)
-     (kvsM : gmap Key (option write_event))
+     (kvsM : gmap Key write_event)
      (logM : wrlog),
      ⌜is_map kvsV kvsM⌝ ∗
      ⌜is_log logM logV⌝ ∗
-     ⌜valid_state logM kvsM⌝ ∗
+     ⌜valid_state_local logM kvsM⌝ ∗
      kvsL ↦[ip_of_address sa] kvsV ∗
      logL ↦[ip_of_address sa] logV ∗
      own_replog_local sa logM.
