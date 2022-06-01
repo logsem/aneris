@@ -33,7 +33,11 @@ Definition write_event := @we int_time.
 Definition write_eventO := leibnizO write_event.
 Definition wrlog := list write_eventO.
 
+
+
 (* -------------------------------------------------------------------------- *)
+(** Resource Algebras and global ghost names needed to define resources. *)
+
 Class IDBG Σ :=
   { IDBG_Global_mem :>
       inG Σ (authR (gen_heapUR Key (option write_event)));
@@ -47,6 +51,11 @@ Class IDBG Σ :=
     IDBG_known_replog_name : gname;
     IDBG_free_replog_set_name : gname;
   }.
+
+
+
+(* -------------------------------------------------------------------------- *)
+(** The state validity defines coherence of the log and the memory model. *)
 
 Section ValidStates.
   Context `{!anerisG Mdl Σ, !DB_params}.
@@ -78,13 +87,16 @@ Section ValidStates.
       DB_GSTV_log_events L : log_events L;
     }.
 
+(* TODO : valid state update lemma. *)
+
 End ValidStates.
 
 Section Resources.
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
   Context (γL γM : gname).
 
-  (** Abstract global memory. *)
+  (* ------------------------------------------------------------------------ *)
+  (** Abstract global memory definition and properties. *)
 
   Definition own_mem_user (k : Key) (q: Qp) (a : option write_event) :=
     lmapsto γM k q a.
@@ -114,27 +126,33 @@ Section Resources.
     own_mem_user k (q1 + q2) v ⊢ own_mem_user k q1 v ∗ own_mem_user k q2 v.
   Proof. Admitted.
 
+
+
+  (* ------------------------------------------------------------------------ *)
   (** Log resources. *)
 
-  (** Owned by global invariant of the system. *)
+  (** ** Owned by global invariant of the system. *)
   Definition own_log_global (γ : gname) (l : wrlog) : iProp Σ :=
     own γ (●ML{ DfracOwn (1/2) } l).
 
-  (** Owned by the lock invariant of a replica *)
+  (** ** Owned by the lock invariant of a replica *)
   Definition own_log_local (γ : gname) (l : wrlog) : iProp Σ :=
     own γ (●ML{ DfracOwn (1/2) } l).
 
-  (** Duplicable observation describing the prefix of a log. *)
+  (** ** Duplicable observation describing the prefix of a log. *)
   Definition own_log_obs (γ : gname) (l : wrlog) : iProp Σ :=
     own γ (◯ML l).
 
+
+
+  (* ------------------------------------------------------------------------ *)
   (** Resources about free/known replicated logs. *)
 
-  (** Ownership to create a new replicated log. *)
+  (** ** Ownership to create a new replicated log. *)
   Definition free_replog_token (sa : socket_address) : iProp Σ :=
     own IDBG_free_replog_set_name (GSet {[sa]}).
 
-  (** Ownership for a replicated log known by the system. *)
+  (** ** Ownership for a replicated log known by the system. *)
   Definition known_replog_token (sa : socket_address) (γ : gname) : iProp Σ :=
     own IDBG_known_replog_name (◯ {[ sa := to_agree γ ]}).
 
@@ -142,20 +160,24 @@ Section Resources.
     Persistent (known_replog_token sa γ).
   Proof. apply _. Qed.
 
-  (** Ownership of all replicated logs known by the system. *)
+  (** ** Ownership of all replicated logs known by the system. *)
   Definition known_replog_tokens (N : gmap socket_address gname)  : iProp Σ :=
     own IDBG_free_replog_set_name (GSet (dom N)) ∗
-      own IDBG_known_replog_name (● (to_agree <$> N : gmap _ _ )).
+    own IDBG_known_replog_name (● (to_agree <$> N : gmap _ _ )).
 
-  (** Principal log *)
 
+
+  (* ------------------------------------------------------------------------ *)
+  (** Principal & replicated log ownership predicates *)
+
+  (** ** Principal log. *)
   Definition own_logL_global L : iProp Σ := own γL (●ML{ DfracOwn (1/2) } L).
 
   Definition own_logL_local L : iProp Σ := own γL (●ML{ DfracOwn (1/2) } L).
 
   Definition own_logL_obs L : iProp Σ := own γL (◯ML L).
 
-  (** Replicated logs. *)
+  (** ** Replicated logs. *)
 
   Definition own_replog_global γ sa l : iProp Σ :=
     known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_global γ l.
@@ -170,7 +192,7 @@ Section Resources.
   Definition own_replog_obs sa l : iProp Σ :=
     ∃ γ, known_replog_token sa γ ∗ own_logL_obs l.
 
-  (** General Obs predicate : socket_address → wrlog → iProp Σ. *)
+  (** ** General Obs predicate : socket_address → wrlog → iProp Σ. *)
   Definition own_obs sa l : iProp Σ :=
     (⌜sa = DB_addr⌝ ∗ own_logL_obs l) ∨ own_replog_obs sa l.
 
@@ -180,6 +202,9 @@ Section Resources.
   Lemma Obs_persistent_holds a h : Persistent (own_obs a h).
   Proof. apply _. Qed.
 
+
+
+  (* ------------------------------------------------------------------------ *)
   (** Definition of the global invariant. *)
   Definition global_inv_def : iProp Σ :=
     ∃ (L : wrlog)
@@ -193,6 +218,11 @@ Section Resources.
       ⌜valid_state L M⌝.
 
   Definition Global_Inv := inv DB_InvName global_inv_def.
+
+(* TODO : update lemma ? *)
+
+  (* ------------------------------------------------------------------------ *)
+  (** Properties entailed by the global invariant. *)
 
   Lemma Global_InvPersistent : Persistent Global_Inv.
   Proof. apply _. Qed.
@@ -289,8 +319,10 @@ Section Resources.
              ⌜at_key k h1 = Some we1⌝ ∗ ⌜we0 ≤ₜ we1⌝.
   Proof. Admitted.
 
-  Notation ip := (ip_of_address DB_addr).
 
+
+  (* ------------------------------------------------------------------------ *)
+  (** Is log (TODO: Move in log_proof file.) *)
   Section Log.
 
   Definition inject_log `{!Inject A val} (xs : list A) :=
@@ -316,44 +348,65 @@ Section Resources.
   (*   ∃ (logV : val), logL ↦[ip] logV ∗ ⌜is_log logM logV⌝. *)
   End Log.
 
+
+
+  (* ------------------------------------------------------------------------ *)
+  (** Leader's principal and secondary local invariants. *)
+
+
+
+  Notation ipL := (ip_of_address DB_addr).
+  Notation ipF := (ip_of_address DB_addr).
+
   Definition leader_local_main_inv_def (kvsL logL : loc) : iProp Σ :=
    ∃ (logV kvsV : val)
      (kvsM : gmap Key (option write_event))
      (logM : wrlog),
      ⌜is_map kvsV kvsM⌝ ∗
      ⌜is_log logM logV⌝ ∗
-     kvsL ↦[ip] kvsV ∗
-     logL ↦[ip] logV ∗
+     kvsL ↦[ipL] kvsV ∗
+     logL ↦[ipL] logV ∗
      own_logL_local logM.
 
-  Definition leader_local_main_inv (kvsL logL : loc) :=
-    inv (DB_InvName .@ "leader_main")
-        (leader_local_main_inv_def kvsL logL).
+  Definition leader_local_main_inv
+    (mγ : gname) (mV : val) (kvsL logL : loc) :=
+    is_monitor (DB_InvName .@ "leader_main") ipL mγ mV
+               (leader_local_main_inv_def kvsL logL).
 
   Definition leader_local_secondary_inv_def (logL : loc) : iProp Σ :=
    ∃ (logV : val) (logM : wrlog),
      ⌜is_log logM logV⌝ ∗
-     logL ↦[ip] logV ∗
-     own_replog_local_half DB_addrF logM.
+     logL ↦[ipF] logV ∗
+     own_replog_local DB_addrF logM.
 
-  Definition leader_local_secondary_main_inv (kvsL logL : loc) :=
-    inv (DB_InvName .@ "leader_secondary")
-        (leader_local_secondary_inv_def logL).
-
- (*  Definition follower_local_inv_def (sa : socket_adress) (dbLoc logLoc : loc) : iProp Σ := *)
- (*    dbLoc ↦[ip] vd ∗ *)
- (* own_obs sa l *)
- (*  ∃ (vd vt viq voq : val) (d : gmap Key val) *)
- (*      (t: vector_clock) (log: list write_event) (s: gset apply_event) *)
- (*      (ip : ip_address), *)
+  Definition leader_local_secondary_main_inv
+    (mγ : gname) (mV : val) (kvsL logL : loc) :=
+    is_monitor (DB_InvName .@ "leader_secondary") ipF mγ mV
+               (leader_local_secondary_inv_def logL).
 
 
- (*      ⌜ip_of_address <$> DB_addresses !! i = Some ip⌝ ∗ *)
- (*      DB ↦[ip] vd ∗ T ↦[ip] vt ∗ *)
- (*      InQueue_of_write_events ip IQ liq viq ∗ *)
- (*      OutQueue_of_write_events i ip OQ loq voq ∗ *)
- (*      ⌜is_map vd d⌝ ∗ ⌜is_vc vt t⌝ ∗ *)
- (*      local_history_Local_inv γLs i s ∗ *)
- (*      ⌜DBM_Lst_valid i {| Lst_mem := d; Lst_time := t; Lst_hst := s|}⌝. *)
+
+  (* ------------------------------------------------------------------------ *)
+  (** Follower's local invariant. *)
+
+  Definition follower_local_inv_def
+    (sa : socket_address) (kvsL logL : loc) : iProp Σ :=
+    ∃ (logV kvsV : val)
+     (kvsM : gmap Key (option write_event))
+     (logM : wrlog),
+     ⌜is_map kvsV kvsM⌝ ∗
+     ⌜is_log logM logV⌝ ∗
+     ⌜valid_state logM kvsM⌝ ∗
+     kvsL ↦[ip_of_address sa] kvsV ∗
+     logL ↦[ip_of_address sa] logV ∗
+     own_replog_local sa logM.
+
+  Definition socket_address_to_str (sa : socket_address) : string :=
+    match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
+
+  Definition follower_local_inv
+    (sa : socket_address) (mγ : gname) (mV : val) (kvsL logL : loc) :=
+    is_monitor (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
+               (follower_local_inv_def sa kvsL logL).
 
 End Resources.
