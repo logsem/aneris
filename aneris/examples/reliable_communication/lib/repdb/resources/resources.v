@@ -5,13 +5,15 @@ From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Import lang resources inject.
-From aneris.aneris_lang.lib Require Import lock_proof.
+From aneris.aneris_lang.lib Require Import
+     list_proof lock_proof monitor_proof map_proof.
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params time events.
 From aneris.examples.reliable_communication.lib.repdb.resources
      Require Import time.
-Import gen_heap_light.
 
+Import gen_heap_light.
+Import lock_proof.
 
 Instance: Inhabited (@we int_time) := populate (Build_we "" #() inhabitant).
 
@@ -136,6 +138,10 @@ Section Resources.
   Definition known_replog_token (sa : socket_address) (γ : gname) : iProp Σ :=
     own IDBG_known_replog_name (◯ {[ sa := to_agree γ ]}).
 
+  Global Instance  known_replog_token_Persistent sa γ :
+    Persistent (known_replog_token sa γ).
+  Proof. apply _. Qed.
+
   (** Ownership of all replicated logs known by the system. *)
   Definition known_replog_tokens (N : gmap socket_address gname)  : iProp Σ :=
     own IDBG_free_replog_set_name (GSet (dom N)) ∗
@@ -156,6 +162,10 @@ Section Resources.
 
   Definition own_replog_local sa l : iProp Σ :=
     ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_local γ l.
+
+  (* As local ownership is 1/2, the half of it is 1/4. *)
+  Definition own_replog_local_half sa l : iProp Σ :=
+    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own γ (●ML{#1 / 4} l).
 
   Definition own_replog_obs sa l : iProp Σ :=
     ∃ γ, known_replog_token sa γ ∗ own_logL_obs l.
@@ -278,5 +288,72 @@ Section Resources.
     ∃ we1, own_mem_user k q (at_key k h1) ∗
              ⌜at_key k h1 = Some we1⌝ ∗ ⌜we0 ≤ₜ we1⌝.
   Proof. Admitted.
+
+  Notation ip := (ip_of_address DB_addr).
+
+  Section Log.
+
+  Definition inject_log `{!Inject A val} (xs : list A) :=
+    ($xs, #(List.length xs))%V.
+
+  Global Program Instance Inject_log `{!Inject A val}
+    : Inject (list A) val := {| inject := inject_log |}.
+  Next Obligation.
+    intros ? [] xs ys. inversion 1 as [[Hinj Hinj2]].
+    by apply Inject_list in Hinj.
+  Qed.
+
+  Context `[!Inject A val].
+
+  Definition is_log (logM : list A) (logV : val) :=
+    ∃ (lV : val), logV = (lV, #(List.length logM))%V ∧ is_list logM lV.
+
+  Lemma is_log_inject xs l :
+    is_log xs l ↔ l = $xs.
+  Proof. Admitted.
+
+  (* Definition is_logLoc (logM : list A) (logL : loc) : iProp Σ := *)
+  (*   ∃ (logV : val), logL ↦[ip] logV ∗ ⌜is_log logM logV⌝. *)
+  End Log.
+
+  Definition leader_local_main_inv_def (kvsL logL : loc) : iProp Σ :=
+   ∃ (logV kvsV : val)
+     (kvsM : gmap Key (option write_event))
+     (logM : wrlog),
+     ⌜is_map kvsV kvsM⌝ ∗
+     ⌜is_log logM logV⌝ ∗
+     kvsL ↦[ip] kvsV ∗
+     logL ↦[ip] logV ∗
+     own_logL_local logM.
+
+  Definition leader_local_main_inv (kvsL logL : loc) :=
+    inv (DB_InvName .@ "leader_main")
+        (leader_local_main_inv_def kvsL logL).
+
+  Definition leader_local_secondary_inv_def (logL : loc) : iProp Σ :=
+   ∃ (logV : val) (logM : wrlog),
+     ⌜is_log logM logV⌝ ∗
+     logL ↦[ip] logV ∗
+     own_replog_local_half DB_addrF logM.
+
+  Definition leader_local_secondary_main_inv (kvsL logL : loc) :=
+    inv (DB_InvName .@ "leader_secondary")
+        (leader_local_secondary_inv_def logL).
+
+ (*  Definition follower_local_inv_def (sa : socket_adress) (dbLoc logLoc : loc) : iProp Σ := *)
+ (*    dbLoc ↦[ip] vd ∗ *)
+ (* own_obs sa l *)
+ (*  ∃ (vd vt viq voq : val) (d : gmap Key val) *)
+ (*      (t: vector_clock) (log: list write_event) (s: gset apply_event) *)
+ (*      (ip : ip_address), *)
+
+
+ (*      ⌜ip_of_address <$> DB_addresses !! i = Some ip⌝ ∗ *)
+ (*      DB ↦[ip] vd ∗ T ↦[ip] vt ∗ *)
+ (*      InQueue_of_write_events ip IQ liq viq ∗ *)
+ (*      OutQueue_of_write_events i ip OQ loq voq ∗ *)
+ (*      ⌜is_map vd d⌝ ∗ ⌜is_vc vt t⌝ ∗ *)
+ (*      local_history_Local_inv γLs i s ∗ *)
+ (*      ⌜DBM_Lst_valid i {| Lst_mem := d; Lst_time := t; Lst_hst := s|}⌝. *)
 
 End Resources.
