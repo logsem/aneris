@@ -21,14 +21,14 @@ let rep_l2c_ser (val_ser[@metavar]) =
   (sum_serializer (unit_serializer) (option_serializer val_ser))
 let req_f2l_ser = int_serializer
 let rep_l2f_ser (val_ser[@metavar]) =
-  prod_serializer (prod_serializer string_serializer val_ser) int_serializer
+  prod_serializer string_serializer val_ser
 let req_c2f_ser = read_serializer
 let rep_f2c_ser (val_ser[@metavar]) =  option_serializer val_ser
 
 (** Leader *)
 
 (** Processes the follower's request. *)
-let follower_request_handler log mon req : (string * 'a) log_entry =
+let follower_request_handler log mon req : (string * 'a) =
   log_wait_until log mon req;
   unSOME (log_get log req)
 
@@ -104,8 +104,7 @@ let sync_loop db log mon reqf () : unit =
   let rec aux () =
     let i = log_next log in
     let rep = reqf i in
-    let ((k, v), j) = rep in
-    assert (i = j);
+    let (k, v) = rep in
     monitor_acquire mon;
     log_add_entry log (k,v);
     db := map_insert k v !db;

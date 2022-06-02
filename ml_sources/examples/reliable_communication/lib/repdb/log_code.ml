@@ -1,8 +1,7 @@
 open Ast
 open List_code
 
-type 'a log_entry = ('a * int)
-type 'a log  = ('a log_entry alist * int) Atomic.t
+type 'a log  = ('a alist * int) Atomic.t
 
 (* -------------------------------------------------------------------------- *)
 (** Operations on log of requests *)
@@ -14,14 +13,14 @@ let log_create () : 'a log = ref (list_nil, 0) (* the log and next free index. *
 let log_add_entry (log : 'a log) (req : 'a) =
   let lp = !log in
   let (data, next) = lp in
-  let data' = list_append data (list_cons (req, next) list_nil) in
+  let data' = list_append data (list_cons req list_nil) in
   log := (data', next + 1)
 
 let log_next (log : 'a log) = snd !log
 
 let log_length (log : 'a log) = snd !log
 
-let log_get (log : 'a log) (i : int) : 'a log_entry option =
+let log_get (log : 'a log) (i : int) : 'a option =
   list_nth (fst !log) i
 
 let log_wait_until log mon i : unit =
