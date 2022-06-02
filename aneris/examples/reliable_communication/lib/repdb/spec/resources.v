@@ -25,6 +25,14 @@ Section Predicates.
     (** Observed requests *)
     Obs : socket_address → ghst → iProp Σ;
 
+    Init_follower : socket_address → iProp Σ;
+
+    Init_leader : iProp Σ;
+
+    Init_follower_exclusive sa : Init_follower sa ∗ Init_follower sa ⊢ False;
+
+    Init_leader_exclusive : Init_leader ∗ Init_leader ⊢ False;
+
     (* (** Reserved socket protocols for leader & followers *) *)
     (* db_reserved_leader_socket_interp : message → iProp Σ; *)
     (* db_reserved_follower_socket_interp : message → iProp Σ; *)

@@ -23,8 +23,7 @@ Definition rep_l2c_ser val_ser :=
 
 Definition req_f2l_ser := int_serializer.
 
-Definition rep_l2f_ser val_ser :=
-  prod_serializer (prod_serializer string_serializer val_ser) int_serializer.
+Definition rep_l2f_ser val_ser := prod_serializer string_serializer val_ser.
 
 Definition req_c2f_ser := read_serializer.
 
@@ -117,10 +116,8 @@ Definition sync_loop : val :=
   letrec: "aux" <> :=
     let: "i" := log_next "log" in
     let: "rep" := "reqf" "i" in
-    let: "k" := Fst (Fst "rep") in
-    let: "v" := Snd (Fst "rep") in
-    let: "j" := Snd "rep" in
-    assert: ("i" = "j");;
+    let: "k" := Fst "rep" in
+    let: "v" := Snd "rep" in
     monitor_acquire "mon";;
     log_add_entry "log" ("k", "v");;
     "db" <- (map_insert "k" "v" ! "db");;

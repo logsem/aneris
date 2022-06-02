@@ -111,6 +111,7 @@ Section API_spec.
        ⌜port_of_address DB_addrF ≠ port_of_address DB_addr⌝ →
         {{{ fixed A ∗
             (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
+            Init_leader ∗
             DB_addr ⤳ (∅, ∅) ∗
             DB_addrF ⤳ (∅, ∅) ∗
             free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
@@ -128,6 +129,7 @@ Section API_spec.
         {{{ fixed A ∗
             (* fa ⤇ db_reserved_follower_socket_interp ∗ *)
             (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
+            Init_follower fa ∗
             DB_addr ⤳ (∅, ∅) ∗
             DB_addrF ⤳ (∅, ∅) ∗
             free_ports (ip_of_address fa) {[port_of_address fa]} ∗
@@ -169,12 +171,16 @@ End API_spec.
 Section Init.
   Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DBG Σ, !DB_init_function}.
 
-  Class DB_init := {
+  Class DB_init (Followers : gset socket_address) := {
     DB_init_time :> DB_time;
     DB_init_setup E :
       ↑DB_InvName ⊆ E →
+      DB_addr ∉ Followers →
+      DB_addrF ∉ Followers →
         True ⊢ |={E}=> ∃ (DBRS : DB_resources Mdl Σ),
       GlobalInv ∗
+      Init_leader ∗
+      ([∗ set] fsa ∈ Followers, Init_follower fsa) ∗
       ([∗ set] k ∈ DB_keys, k ↦ₖ None) ∗
       (∀ A, init_leader_spec A) ∗
       (∀ A f2La fa, init_follower_spec f2La fa A) ∗
