@@ -856,6 +856,55 @@ Section finitary_lemma.
   Qed.
 End finitary_lemma.
 
+(** We can extract the simulation correspondence in the meta-logic
+    from a proof of the simulation correspondence in the object-logic. *)
+Theorem simulation_correspondence Λ M Σ `{!invGpreS Σ}
+        (s: stuckness)
+        (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        e1 σ1 δ1 :
+  rel_finitary ξ →
+  (⊢ Gsim Σ M s ξ {tr[ ([e1], σ1) ]} {tr[ δ1 ]}) →
+  continued_simulation ξ {tr[ ([e1], σ1) ]} {tr[δ1]}.
+Proof.
+  intros Hsc Hwptp.
+  exists (λ exatr, ⊢ Gsim Σ M s ξ exatr.1 exatr.2); split; first done.
+  clear Hwptp.
+  intros [ex atr].
+  rewrite {1}/Gsim (fixpoint_unfold (Gsim_pre _ _ _ _) _ _); simpl; intros Hgsim.
+  revert Hgsim; rewrite extract_later; intros Hgsim.
+  apply extract_and in Hgsim as [Hvlt Hgsim].
+  revert Hvlt; rewrite extract_pure; intros Hvlt.
+  split; first done.
+  intros c c' oζ Hsmends Hstep.
+  revert Hgsim; rewrite extract_forall; intros Hgsim.
+  specialize (Hgsim c).
+  revert Hgsim; rewrite extract_forall; intros Hgsim.
+  specialize (Hgsim oζ).
+  revert Hgsim; rewrite extract_forall; intros Hgsim.
+  specialize (Hgsim c').
+  apply (extract_impl ⌜_⌝) in Hgsim; last by apply extract_pure.
+  apply (extract_impl ⌜_⌝) in Hgsim; last by apply extract_pure.
+  induction (trace_length ex) as [|n IHlen]; last first.
+  { simpl in *.
+    revert Hgsim; do 3 rewrite extract_later; intros Hgsim.
+    apply IHlen. do 2 rewrite extract_later. apply Hgsim. }
+  revert Hgsim; rewrite !extract_later; intros Hgsim.
+  simpl in *.
+  assert (⊢ ▷ ∃ (δ': M) ℓ,
+               (⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ')⌝) ∧
+               fixpoint (Gsim_pre Σ M s ξ) (ex :tr[oζ]: c') (atr :tr[ℓ]: δ')).
+  { iStartProof. iDestruct Hgsim as (δ'' ℓ) "Hfix". iExists δ'', ℓ.
+    iSplit; last done.
+    rewrite (fixpoint_unfold (Gsim_pre _ _ _ _) _ _) /Gsim_pre.
+    iNext. by iDestruct "Hfix" as "[? _]". }
+  rewrite -> extract_later in H.
+  apply extract_exists_alt2 in H as (δ'' & ℓ & H); last done.
+  exists δ'', ℓ.
+  revert H.
+  rewrite !extract_and.
+  intros [_ ?]; done.
+Qed.
+
 Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
         (s: stuckness)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -889,46 +938,7 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
   intros Hsc Hwptp%wp_strong_adequacy_helper; last done.
-  exists (λ exatr, ⊢ Gsim Σ M s ξ exatr.1 exatr.2); split; first done.
-  clear Hwptp.
-  intros [ex atr] Hgsim; simpl.
-  revert Hgsim.
-  rewrite {1}/Gsim (fixpoint_unfold (Gsim_pre _ _ _ _) _ _); intros Hgsim;
-    simpl in *.
-  revert Hgsim; rewrite extract_later; intros Hgsim.
-  apply extract_and in Hgsim as [Hvlt Hgsim].
-  revert Hvlt; rewrite extract_pure; intros Hvlt.
-  split; first done.
-  intros c c' oζ Hsmends Hstep.
-  revert Hgsim; rewrite extract_forall; intros Hgsim.
-  specialize (Hgsim c).
-  revert Hgsim; rewrite extract_forall; intros Hgsim.
-  specialize (Hgsim oζ).
-  revert Hgsim; rewrite extract_forall; intros Hgsim.
-  specialize (Hgsim c').
-  apply (extract_impl ⌜_⌝) in Hgsim; last by apply extract_pure.
-  apply (extract_impl ⌜_⌝) in Hgsim; last by apply extract_pure.
-  induction (trace_length ex) as [|n IHlen]; last first.
-  { simpl in *.
-    revert Hgsim; do 3 rewrite extract_later; intros Hgsim.
-    apply IHlen. do 2 rewrite extract_later. apply Hgsim. }
-  revert Hgsim; rewrite !extract_later; intros Hgsim.
-  simpl in *.
-  assert (⊢ ▷ ∃ (δ': M) ℓ,
-               (⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ')⌝) ∧
-               fixpoint (Gsim_pre Σ M s ξ) (ex :tr[oζ]: c') (atr :tr[ℓ]: δ')).
-  { iStartProof. iDestruct Hgsim as (δ'' ℓ) "Hfix". iExists δ'', ℓ.
-    iSplit; last done.
-    rewrite (fixpoint_unfold (Gsim_pre _ _ _ _) _ _) /Gsim_pre.
-    iNext. by iDestruct "Hfix" as "[? _]". }
-
-  rewrite -> extract_later in H.
-  apply extract_exists_alt2 in H as (δ'' & ℓ & H); last done.
-
-  exists δ'', ℓ.
-  revert H.
-  rewrite !extract_and.
-  intros [? ?]; done.
+  by eapply simulation_correspondence.
 Qed.
 
 Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
