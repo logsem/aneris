@@ -81,9 +81,9 @@ Section MT_spec_params.
            ReqPre reqv reqd }}}
        handler_cloj mv reqv @[ip_of_address DB_addr]
     {{{ repv repd, RET repv;
-           ⌜Serializable (rep_l2c_serialization) repv⌝ ∗
-           lock_proof.locked mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗
-           ReqPost repv reqd repd }}}.
+        ⌜Serializable (rep_l2c_serialization) repv⌝ ∗
+        lock_proof.locked mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗
+        ReqPost repv reqd repd }}}.
   Proof.
   Admitted.
    (* iIntros (Φ) "(#Hmon & Hkey & HR & Hpre) HΦ".
@@ -129,31 +129,25 @@ Section MT_spec_params.
        + admit.
       + iFrame "Hkey". *)
 
-
-(* is_monitor (DB_InvName .@ "leader_main") (ip_of_address DB_addr) MTS_mγ  MTS_mv *)
-(*                (leader_local_main_inv_def γL kvsL logL) ∗ *)
-(*            lock_proof.locked MTS_mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗ *)
-(*            ReqPre reqv reqd }}} *)
-
-Global Program Instance client_handler_at_leader_spec_params : MTS_spec_params :=
-  {| (* Requests. *)
-    MTS_req_ser  := req_c2l_serialization;
-    MTS_req_ser_inj := req_c2l_ser_is_injective;
-    MTS_req_ser_inj_alt := req_c2l_ser_is_injective_alt;
-    MTS_req_data := ReqData;
-    MTS_rep_ser  := rep_l2c_serialization;
-    MTS_rep_ser_inj := rep_l2c_ser_is_injective;
-    MTS_rep_ser_inj_alt := rep_l2c_ser_is_injective_alt;
-    MTS_rep_data := RepData;
-    MTS_saddr := DB_addr;
-    MTS_mN := (DB_InvName .@ "leader_main");
-    MTS_mR := (leader_local_main_inv_def γL kvsL logL);
-    MTS_mγ := mγ;
-    MTS_mv := mv;
-    MTS_handler := handler_cloj;
-    MTS_handler_pre  := ReqPre;
-    MTS_handler_post := ReqPost;
-    MTS_handler_spec := client_request_handler_at_leader_spec;
-|}.
+  Global Instance client_handler_at_leader_spec_params : MTS_spec_params :=
+    {|
+      MTS_req_ser  := req_c2l_serialization;
+      MTS_req_ser_inj := req_c2l_ser_is_injective;
+      MTS_req_ser_inj_alt := req_c2l_ser_is_injective_alt;
+      MTS_req_data := ReqData;
+      MTS_rep_ser  := rep_l2c_serialization;
+      MTS_rep_ser_inj := rep_l2c_ser_is_injective;
+      MTS_rep_ser_inj_alt := rep_l2c_ser_is_injective_alt;
+      MTS_rep_data := RepData;
+      MTS_saddr := DB_addr;
+      MTS_mN := (DB_InvName .@ "leader_main");
+      MTS_mR := (leader_local_main_inv_def γL kvsL logL);
+      MTS_mγ := mγ;
+      MTS_mv := mv;
+      MTS_handler := handler_cloj;
+      MTS_handler_pre  := ReqPre;
+      MTS_handler_post := ReqPost;
+      MTS_handler_spec := client_request_handler_at_leader_spec;
+    |}.
 
 End MT_spec_params.
