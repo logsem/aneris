@@ -17,7 +17,18 @@ Section Repdb_ser.
     sum_serialization write_serialization read_serialization.
 
   Definition rep_l2c_serialization :=
-    sum_serialization unit_serialization (option_serialization DB_serialization).
+    sum_serialization
+      unit_serialization
+      (option_serialization DB_serialization).
+
+  Definition req_f2l_serialization := int_serialization.
+
+  Definition rep_l2f_serialization :=
+    prod_serialization string_serialization DB_serialization.
+
+  Definition req_c2f_serialization := read_serialization.
+
+  Definition rep_f2c_serialization := option_serialization DB_serialization.
 
   Lemma req_c2l_ser_is_injective : ser_is_injective req_c2l_serialization.
   Proof.
@@ -92,5 +103,46 @@ Section Repdb_ser.
     - apply option_ser_is_ser_injective_alt.
       apply DB_ser_inj_alt.
   Qed.
+
+  Lemma req_f2l_ser_is_injective :
+    ser_is_injective req_f2l_serialization.
+  Proof. apply int_ser_is_ser_injective. Qed.
+
+  Lemma req_f2l_ser_is_injective_alt :
+    ser_is_injective_alt req_f2l_serialization.
+  Proof. apply int_ser_is_ser_injective_alt. Qed.
+
+  Lemma rep_l2f_ser_is_injective :
+    ser_is_injective rep_l2f_serialization.
+  Proof.
+    apply prod_ser_is_ser_injective.
+    - apply string_ser_is_ser_injective.
+    - apply DB_ser_inj.
+  Qed.
+
+  Lemma rep_l2f_ser_is_injective_alt :
+    ser_is_injective_alt rep_l2f_serialization.
+  Proof.
+    apply prod_ser_is_ser_injective_alt.
+    - apply string_ser_is_ser_injective_alt.
+    - apply DB_ser_inj_alt.
+  Qed.
+
+  Lemma req_c2f_ser_is_injective :
+    ser_is_injective req_c2f_serialization.
+  Proof. apply string_ser_is_ser_injective. Qed.
+
+  Lemma req_c2f_ser_is_injective_alt :
+    ser_is_injective_alt req_c2f_serialization.
+  Proof. apply string_ser_is_ser_injective_alt. Qed.
+
+
+  Lemma rep_f2c_ser_is_injective :
+    ser_is_injective rep_f2c_serialization.
+  Proof. apply option_ser_is_ser_injective, DB_ser_inj. Qed.
+
+  Lemma rep_f2c_ser_is_injective_alt :
+    ser_is_injective_alt rep_f2c_serialization.
+  Proof. apply option_ser_is_ser_injective_alt, DB_ser_inj_alt. Qed.
 
 End Repdb_ser.
