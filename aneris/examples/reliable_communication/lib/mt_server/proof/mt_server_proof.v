@@ -21,7 +21,7 @@ Import client_server_code.
 Section MTS_proof_of_code.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
-  Context `{!MTS_spec_params}.
+  Context `{!MTS_user_params}.
 
   Definition req_prot_aux (rec : iProto Σ)  : iProto Σ :=
     (<! (reqv : val) (reqd : MTS_req_data) >
@@ -53,6 +53,7 @@ Section MTS_proof_of_code.
   Context `{SnRes : !SessionResources MT_UP}.
   Context `{HspecS : !Reliable_communication_Specified_API_session cmh}.
   Context `{HspecN : !Reliable_communication_Specified_API_network MT_UP SnRes}.
+  Context `{!MTS_spec_params}.
 
   Lemma service_loop_proof (c : val) :
     {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
@@ -219,12 +220,14 @@ From aneris.examples.reliable_communication.lib.mt_server.spec Require Import ap
 Section MTS_proof_of_init.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
-  Context `{!MTS_spec_params}.
+  Context `{MTU : !MTS_user_params}.
   Context `{!Reliable_communication_init}.
+  (* Context `{!MTS_spec_params}. *)
 
   Lemma MTS_init_setup_holds (E : coPset) :
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
+    ∀ (MTS : @MTS_spec_params _ _ _ _ MTU),
       SrvInit ∗
       (∀ A, run_server_spec SrvInit srv_si A) ∗
       (∀ A sa, init_client_proxy_spec srv_si A sa).
@@ -243,6 +246,7 @@ Section MTS_proof_of_init.
     iExists reserved_server_socket_interp, SrvInit.
     iFrame.
     iModIntro.
+    iIntros (MTS).
     iSplitL.
     - iIntros (A Φ) "!#".
       iIntros "(#Hsi & HinA & Hf & Hmh & Hfp & Hinit & #Hmon) HΦ".
@@ -268,13 +272,13 @@ End MTS_proof_of_init.
 Section MTS_proof_of_the_init_class.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
-  Context `{!MTS_spec_params}.
+  Context `{!MTS_user_params}.
   Context `{!Reliable_communication_init}.
 
   Global Instance mts_init : MTS_init.
   Proof.
-    split. iIntros (E MTS_sps HE _).
-    iMod (MTS_init_setup_holds E HE $! ⊤) as  (srv_si SrvInit) "(Ha & Hb & Hc)".
+    split. iIntros (E MTU HE _).
+    iMod (MTS_init_setup_holds E HE $! ⊤) as (srv_si SrvInit) "Hinit".
     iModIntro.
     iExists _, _.
     iFrame.

@@ -12,7 +12,8 @@ Notation iMsg Σ := (iMsg Σ val).
 
 Import lock_proof.
 
-Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } :=
+
+Class MTS_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
   { (* Requests. *)
     MTS_req_ser  : serialization;
     MTS_req_ser_inj : ser_is_injective MTS_req_ser;
@@ -23,16 +24,22 @@ Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } :=
     MTS_rep_ser_inj : ser_is_injective MTS_rep_ser;
     MTS_rep_ser_inj_alt : ser_is_injective_alt MTS_rep_ser;
     MTS_rep_data : Type;
-    (* Server address & monitor data. *)
+    MTS_handler_pre  : val → MTS_req_data → iProp Σ;
+    MTS_handler_post : val → MTS_req_data → MTS_rep_data → iProp Σ;
     MTS_saddr : socket_address;
     MTS_mN : namespace;
+  }.
+
+Arguments MTS_user_params {_ _ _ _}.
+
+Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ, !MTS_user_params } :=
+  { (* Requests. *)
+    (* monitor data. *)
     MTS_mR : iProp Σ;
     MTS_mγ : gname;
     MTS_mv : val;
-    (* Request handler value & specification. *)
     MTS_handler : val;
-    MTS_handler_pre  : val → MTS_req_data → iProp Σ;
-    MTS_handler_post : val → MTS_req_data → MTS_rep_data → iProp Σ;
+    (* Request handler value & specification. *)
     MTS_handler_spec :
     (∀ reqv reqd,
     {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
@@ -46,4 +53,4 @@ Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } :=
 
   }.
 
-Arguments MTS_spec_params {_ _ _ _}.
+Arguments MTS_spec_params {_ _ _ _ _}.
