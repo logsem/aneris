@@ -17,6 +17,27 @@ From aneris.examples.reliable_communication.lib.repdb.resources
 Import gen_heap_light.
 Import lock_proof.
 
+
+Section Log_Resources_definition.
+  Context `{!anerisG Mdl Σ, !IDBG Σ}.
+  (* ------------------------------------------------------------------------ *)
+  (** Log resources. *)
+
+  (** ** Owned by global invariant of the system. *)
+  Definition own_log_global (γ : gname) (l : wrlog) : iProp Σ :=
+    own γ (●ML{ DfracOwn (1/2) } l).
+
+  (** ** Owned by the lock invariant of a replica *)
+  Definition own_log_local (γ : gname) (l : wrlog) : iProp Σ :=
+    own γ (●ML{ DfracOwn (1/2) } l).
+
+  (** ** Duplicable observation describing the prefix of a log. *)
+  Definition own_log_obs (γ : gname) (l : wrlog) : iProp Σ :=
+    own γ (◯ML l).
+
+End Log_Resources_definition.
+
+
 Section Resources_definition.
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
   Context (γL γM : gname).
@@ -52,25 +73,6 @@ Section Resources_definition.
   Lemma OwnMemKey_split_holds k q1 q2 v :
     own_mem_user k (q1 + q2) v ⊢ own_mem_user k q1 v ∗ own_mem_user k q2 v.
   Proof. Admitted.
-
-
-
-  (* ------------------------------------------------------------------------ *)
-  (** Log resources. *)
-
-  (** ** Owned by global invariant of the system. *)
-  Definition own_log_global (γ : gname) (l : wrlog) : iProp Σ :=
-    own γ (●ML{ DfracOwn (1/2) } l).
-
-  (** ** Owned by the lock invariant of a replica *)
-  Definition own_log_local (γ : gname) (l : wrlog) : iProp Σ :=
-    own γ (●ML{ DfracOwn (1/2) } l).
-
-  (** ** Duplicable observation describing the prefix of a log. *)
-  Definition own_log_obs (γ : gname) (l : wrlog) : iProp Σ :=
-    own γ (◯ML l).
-
-
 
   (* ------------------------------------------------------------------------ *)
   (** Resources about free/known replicated logs. *)
