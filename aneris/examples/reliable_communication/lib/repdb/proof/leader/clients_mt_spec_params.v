@@ -22,12 +22,10 @@ From aneris.examples.reliable_communication.lib.repdb.proof
 Import gen_heap_light.
 Import lock_proof.
 
-Section MT_spec_params.
+Section MT_user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM mγ : gname).
-  Context (mv : val).
-  Context (kvsL logL : loc).
+  Context (γL γM : gname).
 
   Definition ReqData : Type :=
     (coPset * (string * val) * (iProp Σ * (we → wrlog → wrlog → iProp Σ))) +
@@ -69,21 +67,47 @@ Section MT_spec_params.
        ((⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))).
 
+  Global Instance client_handler_at_leader_user_params : MTS_user_params :=
+    {|
+      MTS_req_ser  := req_c2l_serialization;
+      MTS_req_ser_inj := req_c2l_ser_is_injective;
+      MTS_req_ser_inj_alt := req_c2l_ser_is_injective_alt;
+      MTS_req_data := ReqData;
+      MTS_rep_ser  := rep_l2c_serialization;
+      MTS_rep_ser_inj := rep_l2c_ser_is_injective;
+      MTS_rep_ser_inj_alt := rep_l2c_ser_is_injective_alt;
+      MTS_rep_data := RepData;
+      MTS_saddr := DB_addr;
+      MTS_mN := (DB_InvName .@ "leader_main");
+      MTS_handler_pre  := ReqPre;
+      MTS_handler_post := ReqPost;
+    |}.
+
+End MT_user_params.
+
+Section MT_spec_params.
+
+  Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
+  Context (γL γM mγ : gname).
+  Context (mv : val).
+  Context (kvsL logL : loc).
 
   Definition handler_cloj : val :=
     λ: "mv" "reqv", client_request_handler_at_leader #kvsL #logL "mv" "reqv".
 
+  Notation MTU := (client_handler_at_leader_user_params γL γM).
+
   Lemma client_request_handler_at_leader_spec  :
     ∀ reqv reqd,
-    {{{ is_monitor (DB_InvName .@ "leader_main") (ip_of_address DB_addr) mγ mv
+    {{{ is_monitor MTU.(MTS_mN) (ip_of_address MTU.(MTS_saddr)) mγ mv
                (leader_local_main_inv_def γL kvsL logL) ∗
            lock_proof.locked mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗
-           ReqPre reqv reqd }}}
-       handler_cloj mv reqv @[ip_of_address DB_addr]
+           MTU.(MTS_handler_pre) reqv reqd }}}
+       handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable (rep_l2c_serialization) repv⌝ ∗
         lock_proof.locked mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗
-        ReqPost repv reqd repd }}}.
+        MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
   Admitted.
    (* iIntros (Φ) "(#Hmon & Hkey & HR & Hpre) HΦ".
@@ -129,24 +153,14 @@ Section MT_spec_params.
        + admit.
       + iFrame "Hkey". *)
 
-  Global Instance client_handler_at_leader_spec_params : MTS_spec_params :=
+
+  Global Instance client_handler_at_leader_spec_params :
+    @MTS_spec_params _ _ _ _ MTU :=
     {|
-      MTS_req_ser  := req_c2l_serialization;
-      MTS_req_ser_inj := req_c2l_ser_is_injective;
-      MTS_req_ser_inj_alt := req_c2l_ser_is_injective_alt;
-      MTS_req_data := ReqData;
-      MTS_rep_ser  := rep_l2c_serialization;
-      MTS_rep_ser_inj := rep_l2c_ser_is_injective;
-      MTS_rep_ser_inj_alt := rep_l2c_ser_is_injective_alt;
-      MTS_rep_data := RepData;
-      MTS_saddr := DB_addr;
-      MTS_mN := (DB_InvName .@ "leader_main");
       MTS_mR := (leader_local_main_inv_def γL kvsL logL);
       MTS_mγ := mγ;
       MTS_mv := mv;
       MTS_handler := handler_cloj;
-      MTS_handler_pre  := ReqPre;
-      MTS_handler_post := ReqPost;
       MTS_handler_spec := client_request_handler_at_leader_spec;
     |}.
 

@@ -22,12 +22,10 @@ From aneris.examples.reliable_communication.lib.repdb.proof
 Import gen_heap_light.
 Import lock_proof.
 
-Section MT_spec_params.
+Section MT_user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM mγ : gname).
-  Context (mv : val).
-  Context (logF : loc).
+  Context (γL γM : gname).
 
   Definition ReqData : Type := wrlog.
 
@@ -43,25 +41,7 @@ Section MT_spec_params.
       ⌜repd = reqd ++ [we]⌝ ∗
       own_obs γL DB_addr repd.
 
-  Definition handler_cloj : val :=
-    λ: "mv" "reqv", follower_request_handler #logF "mv" "reqv".
-
-  Lemma follower_request_handler_spec  :
-    ∀ reqv reqd,
-    {{{ is_monitor (DB_InvName .@ "leader_secondary")
-                   (ip_of_address DB_addrF) mγ mv
-                   (leader_local_secondary_inv_def γL logF) ∗
-        lock_proof.locked mγ ∗ (leader_local_secondary_inv_def γL logF) ∗
-        ReqPre reqv reqd }}}
-      handler_cloj mv reqv @[ip_of_address DB_addrF]
-    {{{ repv repd, RET repv;
-        ⌜Serializable rep_l2f_serialization repv⌝ ∗
-        lock_proof.locked mγ ∗ (leader_local_secondary_inv_def γL logF) ∗
-        ReqPost repv reqd repd }}}.
-  Proof.
-  Admitted.
-
-  Global Instance follower_handler_spec_params : MTS_spec_params :=
+  Global Instance follower_handler_user_params : MTS_user_params :=
     {|
       MTS_req_ser  := req_f2l_serialization;
       MTS_req_ser_inj := req_f2l_ser_is_injective;
@@ -73,12 +53,46 @@ Section MT_spec_params.
       MTS_rep_data := RepData;
       MTS_saddr := DB_addrF;
       MTS_mN := (DB_InvName .@ "leader_secondary");
+      MTS_handler_pre  := ReqPre;
+      MTS_handler_post := ReqPost;
+    |}.
+
+End MT_user_params.
+
+Section MT_spec_params.
+
+  Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
+  Context (γL γM mγ : gname).
+  Context (mv : val).
+  Context (logF : loc).
+
+  Notation MTU_F := (follower_handler_user_params γL γM).
+
+
+  Definition handler_cloj : val :=
+    λ: "mv" "reqv", follower_request_handler #logF "mv" "reqv".
+
+  Lemma follower_request_handler_spec  :
+    ∀ reqv reqd,
+    {{{ is_monitor (DB_InvName .@ "leader_secondary")
+                  (ip_of_address MTU_F.(MTS_saddr)) mγ mv
+                   (leader_local_secondary_inv_def γL logF) ∗
+        lock_proof.locked mγ ∗ (leader_local_secondary_inv_def γL logF) ∗
+        MTU_F.(MTS_handler_pre) reqv reqd }}}
+      handler_cloj mv reqv @[ip_of_address MTU_F.(MTS_saddr)]
+    {{{ repv repd, RET repv;
+        ⌜Serializable rep_l2f_serialization repv⌝ ∗
+        lock_proof.locked mγ ∗ (leader_local_secondary_inv_def γL logF) ∗
+        MTU_F.(MTS_handler_post) repv reqd repd }}}.
+  Proof.
+  Admitted.
+
+  Global Instance follower_handler_spec_params :  @MTS_spec_params _ _ _ _ MTU_F :=
+    {|
       MTS_mR := (leader_local_secondary_inv_def γL logF);
       MTS_mγ := mγ;
       MTS_mv := mv;
       MTS_handler := handler_cloj;
-      MTS_handler_pre  := ReqPre;
-      MTS_handler_post := ReqPost;
       MTS_handler_spec := follower_request_handler_spec;
     |}.
 

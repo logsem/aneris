@@ -8,7 +8,8 @@ From aneris.examples.reliable_communication.lib.mt_server
 
 Section Spec.
   Context `{ !anerisG Mdl Σ, !lockG Σ}.
-  Context `{ !MTS_spec_params}.
+  Context `{ MTU: !MTS_user_params }.
+  Context `{ !@MTS_spec_params _ _ _ _ MTU }.
   Context (SrvInit : iProp Σ).
   Context (srv_si : message → iProp Σ).
   Notation srv_ip := (ip_of_address MTS_saddr).
@@ -19,7 +20,7 @@ Section Spec.
    {{{ MTS_saddr ⤇ srv_si ∗
        ⌜MTS_saddr ∈ A⌝ ∗
        fixed A ∗
-       MTS_saddr ⤳ (∅, ∅) ∗
+       MTS_saddr ⤳ (∅,∅) ∗
        free_ports (srv_ip) {[port_of_address MTS_saddr]} ∗
        SrvInit ∗
        is_monitor MTS_mN srv_ip MTS_mγ MTS_mv MTS_mR }}}
@@ -60,9 +61,10 @@ Section MTS_Init.
   Context `{ !anerisG Mdl Σ, !lockG Σ}.
 
   Class MTS_init := {
-    MTS_init_setup E (DLP : MTS_spec_params) :
+    MTS_init_setup E (MTU : MTS_user_params) :
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
+      ∀ (MTS : @MTS_spec_params _ _ _ _ MTU),
       SrvInit ∗
       (∀ A, run_server_spec SrvInit srv_si A) ∗
       (∀ A sa, init_client_proxy_spec srv_si A sa) }.
