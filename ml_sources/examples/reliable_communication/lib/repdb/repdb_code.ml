@@ -21,14 +21,14 @@ let rep_l2c_ser (val_ser[@metavar]) =
   (sum_serializer (unit_serializer) (option_serializer val_ser))
 let req_f2l_ser = int_serializer
 let rep_l2f_ser (val_ser[@metavar]) =
-  prod_serializer string_serializer val_ser
+  prod_serializer (prod_serializer string_serializer val_ser) int_serializer
 let req_c2f_ser = read_serializer
 let rep_f2c_ser (val_ser[@metavar]) =  option_serializer val_ser
 
 (** Leader *)
 
 (** Processes the follower's request. *)
-let follower_request_handler log mon req : (string * 'a) =
+let follower_request_handler log mon req : ((string * 'a) * int) =
   log_wait_until log mon req;
   unSOME (log_get log req)
 
@@ -51,13 +51,14 @@ let start_leader_processing_followers (ser[@metavar]) addr log mon () =
     (follower_request_handler log)
 
 (** Processes the request event (request & the reply cell). *)
-let client_request_handler_at_leader (db : 'a dbTy Atomic.t) (log :  (string * 'a) log)
+let client_request_handler_at_leader (db : 'a dbTy Atomic.t) (log :  ((string * 'a) * int) log)
     (mon : monitor) (req : 'a reqTy) : 'a repTy =
     match req with
     | InjL p ->                  (* WRITE REQUEST *)
       let (k, v) = p in
       db := map_insert k v !db;  (* Write value v to the key k.  *)
-      log_add_entry log (k,v);
+      let n = log_length log in
+      log_add_entry log ((k,v), n);
       monitor_signal mon;
       InjL ()
     | InjR k ->                  (* READ REQUEST *)
@@ -104,9 +105,10 @@ let sync_loop db log mon reqf () : unit =
   let rec aux () =
     let i = log_next log in
     let rep = reqf i in
-    let (k, v) = rep in
+    let ((k, v), j) = rep in
+    assert (i = j);
     monitor_acquire mon;
-    log_add_entry log (k,v);
+    log_add_entry log ((k,v), j);
     db := map_insert k v !db;
     monitor_release mon;
     aux ()

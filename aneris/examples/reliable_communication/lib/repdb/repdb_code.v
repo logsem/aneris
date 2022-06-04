@@ -23,7 +23,8 @@ Definition rep_l2c_ser val_ser :=
 
 Definition req_f2l_ser := int_serializer.
 
-Definition rep_l2f_ser val_ser := prod_serializer string_serializer val_ser.
+Definition rep_l2f_ser val_ser :=
+  prod_serializer (prod_serializer string_serializer val_ser) int_serializer.
 
 Definition req_c2f_ser := read_serializer.
 
@@ -63,7 +64,8 @@ Definition client_request_handler_at_leader : val :=
     let: "k" := Fst "p" in
     let: "v" := Snd "p" in
     "db" <- (map_insert "k" "v" ! "db");;
-    log_add_entry "log" ("k", "v");;
+    let: "n" := log_length "log" in
+    log_add_entry "log" ("k", "v", "n");;
     monitor_signal "mon";;
     InjL #()
   | InjR "k" => InjR (map_lookup "k" ! "db")
@@ -116,10 +118,12 @@ Definition sync_loop : val :=
   letrec: "aux" <> :=
     let: "i" := log_next "log" in
     let: "rep" := "reqf" "i" in
-    let: "k" := Fst "rep" in
-    let: "v" := Snd "rep" in
+    let: "k" := Fst (Fst "rep") in
+    let: "v" := Snd (Fst "rep") in
+    let: "j" := Snd "rep" in
+    assert: ("i" = "j");;
     monitor_acquire "mon";;
-    log_add_entry "log" ("k", "v");;
+    log_add_entry "log" ("k", "v", "j");;
     "db" <- (map_insert "k" "v" ! "db");;
     monitor_release "mon";;
     "aux" #() in
