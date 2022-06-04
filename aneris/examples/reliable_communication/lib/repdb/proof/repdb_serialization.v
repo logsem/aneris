@@ -24,7 +24,9 @@ Section Repdb_ser.
   Definition req_f2l_serialization := int_serialization.
 
   Definition rep_l2f_serialization :=
-    prod_serialization string_serialization DB_serialization.
+    prod_serialization
+      (prod_serialization string_serialization DB_serialization)
+      int_serialization.
 
   Definition req_c2f_serialization := read_serialization.
 
@@ -116,16 +118,20 @@ Section Repdb_ser.
     ser_is_injective rep_l2f_serialization.
   Proof.
     apply prod_ser_is_ser_injective.
-    - apply string_ser_is_ser_injective.
-    - apply DB_ser_inj.
+    - apply prod_ser_is_ser_injective.
+      -- apply string_ser_is_ser_injective.
+      -- apply DB_ser_inj.
+    - apply int_ser_is_ser_injective.
   Qed.
 
   Lemma rep_l2f_ser_is_injective_alt :
     ser_is_injective_alt rep_l2f_serialization.
   Proof.
     apply prod_ser_is_ser_injective_alt.
-    - apply string_ser_is_ser_injective_alt.
-    - apply DB_ser_inj_alt.
+    - apply prod_ser_is_ser_injective_alt.
+      -- apply string_ser_is_ser_injective_alt.
+      -- apply DB_ser_inj_alt.
+    - apply int_ser_is_ser_injective_alt.
   Qed.
 
   Lemma req_c2f_ser_is_injective :
