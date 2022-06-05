@@ -60,10 +60,10 @@ Section MT_user_params.
 
   Definition ReqPost
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=
-    (∀ E k v P Q, ⌜reqd = inl (E, (k, v), (P, Q))⌝ -∗
-       ∃ a_new h hf, ⌜repd = inl (a_new, h, hf)⌝ ∗ ⌜repv = #()⌝ ∗ Q a_new h hf) ∨
-    (∀ k wo q, ⌜reqd = inr (k, (q, wo))⌝ -∗
-       ∃ vo, ⌜repd = inr wo⌝ ∗ ⌜repv = InjRV vo⌝ ∗  own_mem_user γM k q wo ∗
+    (∃ E k v P Q, ⌜reqd = inl (E, (k, v), (P, Q))⌝ ∗
+       ∃ a_new h hf, ⌜repd = inl (a_new, h, hf)⌝ ∗ ⌜repv = InjLV #()⌝ ∗ Q a_new h hf) ∨
+    (∃ k wo q, ⌜reqd = inr (k, (q, wo))⌝ ∗
+       ∃ vo, ⌜repd = inr wo⌝ ∗ ⌜repv = InjRV vo⌝ ∗ own_mem_user γM k q wo ∗
        ((⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))).
 

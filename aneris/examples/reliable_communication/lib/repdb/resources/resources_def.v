@@ -66,7 +66,7 @@ Section Resources_definition.
   Proof. Admitted.
 
   Lemma OwnMemKey_combine_holds k q q' v v' :
-    own_mem_user k q v ∗ own_mem_user k q' v ⊢
+    own_mem_user k q v ∗ own_mem_user k q' v' ⊢
     own_mem_user k (q + q') v ∗ ⌜v = v'⌝.
   Proof. Admitted.
 

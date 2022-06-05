@@ -9,8 +9,8 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params time events resources ras.
 
 Section API_spec.
-  Context `{!anerisG Mdl Σ, db : !DB_params, tm : !DB_time,
-            !DB_resources db tm}.
+  Context `{!anerisG Mdl Σ, DB : !DB_params, TM : !DB_time,
+            !DB_resources TM DB}.
 
   Definition write_spec
       (wr : val) (sa : socket_address) : iProp Σ :=
@@ -152,7 +152,7 @@ Section API_spec.
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
-    {{{ rd wr, RET (rd, wr);
+    {{{ wr rd, RET (wr, rd);
         (∀ k q h, read_spec rd sa k q h) ∗
           write_spec wr sa }}}.
 
@@ -172,7 +172,7 @@ Section API_spec.
 End API_spec.
 
 Section Init.
-  Context `{!anerisG Mdl Σ, db : !DB_params, tm : !DB_time, !DBG Σ }.
+  Context `{!anerisG Mdl Σ, DB : !DB_params, TM : !DB_time, !DBG Σ }.
 
   Class DB_init (Followers : gset socket_address) := {
     DB_init_setup E :
@@ -180,7 +180,7 @@ Section Init.
       DB_addr ∉ Followers →
       DB_addrF ∉ Followers →
         True ⊢ |={E}=>
-      ∃ (DBRS : DB_resources db tm)
+      ∃ (DBRS : DB_resources TM DB)
         (Init_leader : iProp Σ)
         (leader_si : message → iProp Σ)
         (leaderF_si : message → iProp Σ),
