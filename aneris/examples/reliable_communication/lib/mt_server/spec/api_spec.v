@@ -64,8 +64,8 @@ Section MTS_Init.
     MTS_init_setup E (MTU : MTS_user_params) :
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
-      ∀ (MTS : @MTS_spec_params _ _ _ _ MTU),
       SrvInit ∗
+      ∀ (MTS : @MTS_spec_params _ _ _ _ MTU),
       (∀ A, run_server_spec SrvInit srv_si A) ∗
       (∀ A sa, init_client_proxy_spec srv_si A sa) }.
 

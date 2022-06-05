@@ -9,7 +9,8 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params time events resources ras.
 
 Section API_spec.
-  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DB_resources Mdl Σ}.
+  Context `{!anerisG Mdl Σ, db : !DB_params, tm : !DB_time,
+            !DB_resources db tm}.
 
   Definition write_spec
       (wr : val) (sa : socket_address) : iProp Σ :=
@@ -84,12 +85,12 @@ Section API_spec.
     }}}%I.
 
   Definition read_at_follower_spec
-           (rd : val) (k : Key) (sa fa : socket_address) (h : ghst) : iProp Σ :=
+           (rd : val) (k : Key) (csa f2csa : socket_address) (h : ghst) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗
-    {{{ Obs fa h }}}
-      rd #k @[ip_of_address sa]
+    {{{ Obs f2csa h }}}
+      rd #k @[ip_of_address csa]
     {{{vo, RET vo;
-          ∃ h', ⌜h ≤ₚ h'⌝ ∗ Obs fa h' ∗
+          ∃ h', ⌜h ≤ₚ h'⌝ ∗ Obs f2csa h' ∗
          (⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)
     }}}%I.
@@ -104,88 +105,96 @@ Section API_spec.
   Proof.
   Admitted. *)
 
-  Definition init_leader_spec A : iProp Σ :=
-       ⌜DB_addr ∈ A⌝ →
-       ⌜DB_addrF ∈ A⌝ →
-       ⌜ip_of_address DB_addrF = ip_of_address DB_addr⌝ →
-       ⌜port_of_address DB_addrF ≠ port_of_address DB_addr⌝ →
-        {{{ fixed A ∗
-            (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
-            Init_leader ∗
-            DB_addr ⤳ (∅, ∅) ∗
-            DB_addrF ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-            free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
-          init_leader (s_serializer DB_serialization)
-            #DB_addr #DB_addrF @[ip_of_address DB_addr]
-        {{{ RET #(); True }}}.
+  Definition init_leader_spec A Init_leader leader_si leaderF_si: iProp Σ :=
+    ⌜DB_addr ∈ A⌝ →
+    ⌜DB_addrF ∈ A⌝ →
+    ⌜ip_of_address DB_addrF = ip_of_address DB_addr⌝ →
+    ⌜port_of_address DB_addrF ≠ port_of_address DB_addr⌝ →
+    {{{ fixed A ∗
+          DB_addr ⤇ leader_si ∗
+          DB_addrF ⤇ leaderF_si ∗
+          Init_leader ∗
+          DB_addr ⤳ (∅, ∅) ∗
+          DB_addrF ⤳ (∅, ∅) ∗
+          free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
+          free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
+      init_leader (s_serializer DB_serialization)
+      #DB_addr #DB_addrF @[ip_of_address DB_addr]
+    {{{ RET #(); True }}}.
 
-  Definition init_follower_spec f2La fa A : iProp Σ :=
-        ⌜DB_addr ∈ A⌝ →
-        ⌜fa ∈ A⌝ →
-        ⌜f2La ∉ A⌝ →
-        ⌜ip_of_address fa = ip_of_address f2La⌝ →
-        ⌜port_of_address fa ≠ port_of_address f2La⌝ →
+  Definition init_follower_spec
+    f2lsa f2csa A Init_follower follower_si leaderF_si : iProp Σ :=
+        ⌜DB_addrF ∈ A⌝ →
+        ⌜f2csa ∈ A⌝ →
+        ⌜f2lsa ∉ A⌝ →
+        ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
+        ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
         {{{ fixed A ∗
-            (* fa ⤇ db_reserved_follower_socket_interp ∗ *)
-            (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
-            Init_follower fa ∗
+            f2csa ⤇ follower_si ∗
+            DB_addrF ⤇ leaderF_si ∗
+            Init_follower ∗
             DB_addr ⤳ (∅, ∅) ∗
             DB_addrF ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address fa) {[port_of_address fa]} ∗
-            free_ports (ip_of_address f2La) {[port_of_address f2La]} }}}
+            free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
+            free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
           init_follower (s_serializer DB_serialization)
-            #DB_addr #f2La #fa @[ip_of_address DB_addr]
+            #DB_addrF #f2lsa #f2csa @[ip_of_address DB_addr]
         {{{ RET #(); True }}}.
 
 
   Definition init_client_proxy_leader_spec
-             (A : gset socket_address) (sa : socket_address) : iProp Σ :=
-        ⌜DB_addr ∈ A⌝ →
-        ⌜sa ∉ A⌝ →
-        {{{ fixed A ∗
-            (* DB_addr ⤇ db_reserved_leader_socket_interp ∗ *)
-            sa ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address sa) {[port_of_address sa]} }}}
-          init_client_leader_proxy (s_serializer DB_serialization)
-            #sa #DB_addr @[ip_of_address sa]
-        {{{ rd wr, RET (rd, wr);
-            (∀ k q h, read_spec rd sa k q h) ∗
-            write_spec wr sa }}}.
+    (A : gset socket_address) (sa : socket_address) leader_si : iProp Σ :=
+    ⌜DB_addr ∈ A⌝ →
+    ⌜sa ∉ A⌝ →
+    {{{ fixed A ∗
+        DB_addr ⤇ leader_si ∗
+        sa ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address sa) {[port_of_address sa]} }}}
+      init_client_leader_proxy (s_serializer DB_serialization)
+                               #sa #DB_addr @[ip_of_address sa]
+    {{{ rd wr, RET (rd, wr);
+        (∀ k q h, read_spec rd sa k q h) ∗
+          write_spec wr sa }}}.
 
   Definition init_client_proxy_follower_spec
-             (A : gset socket_address) (sa fa : socket_address) : iProp Σ :=
-        ⌜fa ∈ A⌝ →
-        ⌜sa ∉ A⌝ →
+             (A : gset socket_address) (csa f2csa : socket_address) follower_si : iProp Σ :=
+        ⌜f2csa ∈ A⌝ →
+        ⌜csa ∉ A⌝ →
         {{{ fixed A ∗
-            (* fa ⤇ db_reserved_follower_socket_interp ∗ *)
-            sa ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address sa) {[port_of_address sa]} }}}
+            f2csa ⤇ follower_si ∗
+            csa ⤳ (∅, ∅) ∗
+            free_ports (ip_of_address csa) {[port_of_address csa]} }}}
           init_client_follower_proxy (s_serializer DB_serialization)
-            #sa #fa @[ip_of_address sa]
+            #csa #f2csa @[ip_of_address csa]
         {{{ rd, RET rd;
-            Obs fa [] ∗ (∀ k h, read_at_follower_spec rd k sa fa h) }}}.
+            Obs f2csa [] ∗ (∀ k h, read_at_follower_spec rd k csa f2csa h) }}}.
 
 End API_spec.
 
 Section Init.
-  Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DBG Σ, !DB_init_function}.
+  Context `{!anerisG Mdl Σ, db : !DB_params, tm : !DB_time, !DBG Σ }.
 
   Class DB_init (Followers : gset socket_address) := {
-    DB_init_time :> DB_time;
     DB_init_setup E :
       ↑DB_InvName ⊆ E →
       DB_addr ∉ Followers →
       DB_addrF ∉ Followers →
-        True ⊢ |={E}=> ∃ (DBRS : DB_resources Mdl Σ),
+        True ⊢ |={E}=>
+      ∃ (DBRS : DB_resources db tm)
+        (Init_leader : iProp Σ)
+        (leader_si : message → iProp Σ)
+        (leaderF_si : message → iProp Σ),
       GlobalInv ∗
-      Init_leader ∗
-      ([∗ set] fsa ∈ Followers, Init_follower fsa) ∗
       ([∗ set] k ∈ DB_keys, k ↦ₖ None) ∗
-      (∀ A, init_leader_spec A) ∗
-      (∀ A f2La fa, init_follower_spec f2La fa A) ∗
-      (∀ A ca, init_client_proxy_leader_spec A ca) ∗
-      (∀ A fa ca, init_client_proxy_follower_spec A fa ca)
+      Init_leader ∗
+      ((∀ A, init_leader_spec A Init_leader leader_si leaderF_si) ∗
+         (∀ A ca, init_client_proxy_leader_spec A ca leader_si)) ∗
+      ([∗ set] f2lsa ∈ Followers,
+         ∃ (follower_si : message → iProp Σ)
+           (Init_follower : iProp Σ),
+           Init_follower ∗
+           (∀ A f2csa, init_follower_spec f2lsa f2csa A Init_follower follower_si leaderF_si) ∗
+           (∀ A f2csa csa, init_client_proxy_follower_spec A f2csa csa follower_si))
     }.
 
 End Init.

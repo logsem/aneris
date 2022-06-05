@@ -227,8 +227,8 @@ Section MTS_proof_of_init.
   Lemma MTS_init_setup_holds (E : coPset) :
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
+    SrvInit ∗
     ∀ (MTS : @MTS_spec_params _ _ _ _ MTU),
-      SrvInit ∗
       (∀ A, run_server_spec SrvInit srv_si A) ∗
       (∀ A sa, init_client_proxy_spec srv_si A sa).
   Proof.
