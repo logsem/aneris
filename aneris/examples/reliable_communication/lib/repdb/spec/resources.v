@@ -25,18 +25,6 @@ Section Predicates.
     (** Observed requests *)
     Obs : socket_address → ghst → iProp Σ;
 
-    Init_follower : socket_address → iProp Σ;
-
-    Init_leader : iProp Σ;
-
-    Init_follower_exclusive sa : Init_follower sa ∗ Init_follower sa ⊢ False;
-
-    Init_leader_exclusive : Init_leader ∗ Init_leader ⊢ False;
-
-    (* (** Reserved socket protocols for leader & followers *) *)
-    (* db_reserved_leader_socket_interp : message → iProp Σ; *)
-    (* db_reserved_follower_socket_interp : message → iProp Σ; *)
-
     (** Properties of points-to connective *)
     OwnMemKey_timeless k q v :> Timeless (k ↦ₖ{ q } v);
     OwnMemKey_exclusive k q v v' :
@@ -129,4 +117,4 @@ End Predicates.
 Notation "k ↦ₖ v" := (OwnMemKey k 1 v) (at level 20).
 Notation "k ↦ₖ{ q } v" := (OwnMemKey k q v) (at level 20).
 
-Arguments DB_resources _ _ {_ _ _}.
+Arguments DB_resources {_ _ _}.
