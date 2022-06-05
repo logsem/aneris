@@ -3,8 +3,8 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import resources stdpp_utils events.
 
 Section with_Σ.
-  Context `{!anerisG Mdl Σ, db : !DB_params, tm : !DB_time,
-            !DB_events, !DB_resources db tm}.
+  Context `{!anerisG Mdl Σ, TM : !DB_time, DB : !DB_params,
+            !DB_events, !DB_resources TM DB}.
 
   (* TODO: maybe add frame after [we1] here *)
   Lemma OwnMemKey_Obs_extend a E h k we1 we2 :
