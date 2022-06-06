@@ -27,7 +27,7 @@ Section Followers_MT_spec_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
   Context (γL γM : gname).
-  Context (mγ : gname) (mv : val) (logFLoc : loc).
+  Context (mγ γF : gname) (mv : val) (logFLoc : loc).
 
   Notation MTU_F := (follower_handler_user_params γL γM).
 
@@ -37,22 +37,33 @@ Section Followers_MT_spec_params.
 
   Lemma follower_request_handler_spec  :
     ∀ reqv reqd,
-    {{{ is_monitor (DB_InvName .@ "leader_secondary")
-                  (ip_of_address MTU_F.(MTS_saddr)) mγ mv
-                   (leader_local_secondary_inv_def γL logFLoc) ∗
-        lock_proof.locked mγ ∗ (leader_local_secondary_inv_def γL logFLoc) ∗
+    {{{ is_monitor
+          (DB_InvName .@ "leader_secondary")
+          (ip_of_address MTU_F.(MTS_saddr)) mγ mv
+          (log_monitor_inv_def
+             (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
+             (leader_local_secondary_res γL γF)) ∗
+        lock_proof.locked mγ ∗
+        (log_monitor_inv_def
+             (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
+             (leader_local_secondary_res γL γF)) ∗
         MTU_F.(MTS_handler_pre) reqv reqd }}}
       handler_cloj mv reqv @[ip_of_address MTU_F.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable rep_l2f_serialization repv⌝ ∗
-        lock_proof.locked mγ ∗ (leader_local_secondary_inv_def γL logFLoc) ∗
+        lock_proof.locked mγ ∗
+        (log_monitor_inv_def
+             (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
+             (leader_local_secondary_res γL γF)) ∗
         MTU_F.(MTS_handler_post) repv reqd repd }}}.
   Proof.
   Admitted.
 
   Global Instance follower_handler_spec_params :  @MTS_spec_params _ _ _ _ MTU_F :=
     {|
-      MTS_mR := (leader_local_secondary_inv_def γL logFLoc);
+      MTS_mR := (log_monitor_inv_def
+                   (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
+                   (leader_local_secondary_res γL γF));
       MTS_mγ := mγ;
       MTS_mv := mv;
       MTS_handler := handler_cloj;

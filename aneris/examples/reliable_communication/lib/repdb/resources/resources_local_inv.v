@@ -23,61 +23,54 @@ Import lock_proof.
 Section Local_Invariants.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL : gname).
 
   (* ------------------------------------------------------------------------ *)
   (** Leader's principal and secondary local invariants. *)
 
-
-  Definition leader_local_main_inv_def (kvsL logL : loc) : iProp Σ :=
-   ∃ (logV kvsV : val)
-     (kvsM : gmap Key val)
-     (logM : wrlog),
+  Definition leader_local_main_res (kvsL : loc) (logM : wrlog) : iProp Σ :=
+   ∃ (kvsV : val) (kvsM : gmap Key val),
      ⌜is_map kvsV kvsM⌝ ∗
-     ⌜is_log logM logV⌝ ∗
      ⌜valid_state_local logM kvsM⌝ ∗
-     kvsL ↦[ip_of_address DB_addr] kvsV ∗
-     logL ↦[ip_of_address DB_addr] logV ∗
-     own_logL_local γL logM.
+     kvsL ↦[ip_of_address DB_addr] kvsV.
 
   Definition leader_local_main_inv
-    (mγ : gname) (mV : val) (kvsL logL : loc) :=
+    (kvsL logL : loc) (mγ : gname) (mV : val) : iProp Σ :=
     is_monitor (DB_InvName .@ "leader_main") (ip_of_address DB_addr) mγ mV
-               (leader_local_main_inv_def kvsL logL).
+               (log_monitor_inv_def
+                  (ip_of_address DB_addr) γL (1/2) logL
+                  (leader_local_main_res kvsL)).
 
-  Definition leader_local_secondary_inv_def (logL : loc) : iProp Σ :=
-   ∃ (logV : val) (logM : wrlog),
-     ⌜is_log logM logV⌝ ∗
-     logL ↦[ip_of_address DB_addrF] logV ∗
-     own_replog_local γL DB_addrF logM.
+  Definition leader_local_secondary_res (γF : gname) (logM : wrlog) : iProp Σ :=
+    known_replog_token DB_addrF γF ∗ own_logL_obs γL logM.
 
-  Definition leader_local_secondary_main_inv
-    (mγ : gname) (mV : val) (kvsL logL : loc) :=
-    is_monitor (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF) mγ mV
-               (leader_local_secondary_inv_def logL).
+  Definition leader_local_secondary_inv
+    (logFL : loc) (γF : gname) (mγ : gname) (mV : val) : iProp Σ :=
+      is_monitor (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF) mγ mV
+                 (log_monitor_inv_def
+                    (ip_of_address DB_addrF) γF (1/4) logFL
+                    (leader_local_secondary_res γF)).
 
   (* ------------------------------------------------------------------------ *)
   (** Follower's local invariant. *)
 
-  Definition follower_local_inv_def
-    (sa : socket_address) (kvsL logL : loc) : iProp Σ :=
-    ∃ (logV kvsV : val)
-     (kvsM : gmap Key val)
-     (logM : wrlog),
+  Definition follower_local_res
+    (kvsL : loc) (sa : socket_address) (γsa : gname) (logM : wrlog) : iProp Σ :=
+    ∃ (kvsV : val) (kvsM : gmap Key val),
      ⌜is_map kvsV kvsM⌝ ∗
-     ⌜is_log logM logV⌝ ∗
      ⌜valid_state_local logM kvsM⌝ ∗
      kvsL ↦[ip_of_address sa] kvsV ∗
-     logL ↦[ip_of_address sa] logV ∗
-     own_replog_local γL sa logM.
+     known_replog_token sa γsa ∗
+     own_logL_obs γL logM.
 
   Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
-  Definition follower_local_inv
-    (sa : socket_address) (mγ : gname) (mV : val) (kvsL logL : loc) :=
-    is_monitor (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
-               (follower_local_inv_def sa kvsL logL).
-
+  Definition follower_local_main_inv (kvsL logL : loc)
+    (sa : socket_address) (γsa : gname) (mγ : gname) (mV : val)  : iProp Σ :=
+     is_monitor (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
+               (log_monitor_inv_def
+                  (ip_of_address sa) γsa (1/2) logL
+                  (follower_local_res kvsL sa γsa)).
 
 End Local_Invariants.

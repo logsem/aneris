@@ -81,8 +81,6 @@ Section Resources_definition.
   (** ** Principal log. *)
   Definition own_logL_global L : iProp Σ := own_log_auth γL (1/2) L.
 
-  Definition own_logL_local L : iProp Σ := own_log_auth γL (1/2) L.
-
   Definition own_logL_obs L : iProp Σ := own γL (◯ML L).
 
   (** ** Replicated logs. *)
@@ -90,12 +88,8 @@ Section Resources_definition.
   Definition own_replog_global γ sa l : iProp Σ :=
     known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/2) l.
 
-  Definition own_replog_local sa l : iProp Σ :=
-    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/2) l.
-
-  (* As local ownership is 1/2, the half of it is 1/4. *)
-  Definition own_replog_local_half sa l : iProp Σ :=
-    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/4) l.
+  Definition own_replog_local_half l : iProp Σ :=
+    ∃ γ, known_replog_token DB_addrF γ ∗ own_logL_obs l ∗ own_log_auth γ (1/4) l.
 
   Definition own_replog_obs sa l : iProp Σ :=
     ∃ γ, known_replog_token sa γ ∗ own_logL_obs l.
