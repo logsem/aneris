@@ -27,14 +27,15 @@ From aneris.examples.reliable_communication.lib.repdb.proof
      repdb_serialization.
 From aneris.examples.reliable_communication.lib.repdb.proof.leader
      Require Import
-     clients_mt_spec_params.
+     clients_mt_user_params.
 
 Section Client_Proxy_Proof.
   Context `{!anerisG Mdl Σ, dbparams : !DB_params, !IDBG Σ}.
   Context (γL γM : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_at_leader_user_params γL γM).
-  Context (HClient_proxySpec : ⊢ (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC srv_si A sa)).
+  Context (HClient_proxySpec :
+          ⊢ (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC srv_si A sa)).
 
   Definition write_spec_internal
       (wr : val) (sa : socket_address) : iProp Σ :=
