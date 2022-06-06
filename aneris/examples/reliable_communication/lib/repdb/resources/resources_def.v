@@ -12,31 +12,10 @@ From aneris.examples.reliable_communication.lib.repdb
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
-     Require Import ras.
+     Require Import ras log_resources.
 
 Import gen_heap_light.
 Import lock_proof.
-
-
-Section Log_Resources_definition.
-  Context `{!anerisG Mdl Σ, !IDBG Σ}.
-  (* ------------------------------------------------------------------------ *)
-  (** Log resources. *)
-
-  (** ** Owned by global invariant of the system. *)
-  Definition own_log_global (γ : gname) (l : wrlog) : iProp Σ :=
-    own γ (●ML{ DfracOwn (1/2) } l).
-
-  (** ** Owned by the lock invariant of a replica *)
-  Definition own_log_local (γ : gname) (l : wrlog) : iProp Σ :=
-    own γ (●ML{ DfracOwn (1/2) } l).
-
-  (** ** Duplicable observation describing the prefix of a log. *)
-  Definition own_log_obs (γ : gname) (l : wrlog) : iProp Σ :=
-    own γ (◯ML l).
-
-End Log_Resources_definition.
-
 
 Section Resources_definition.
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
@@ -100,23 +79,23 @@ Section Resources_definition.
   (** Principal & replicated log ownership predicates *)
 
   (** ** Principal log. *)
-  Definition own_logL_global L : iProp Σ := own γL (●ML{ DfracOwn (1/2) } L).
+  Definition own_logL_global L : iProp Σ := own_log_auth γL (1/2) L.
 
-  Definition own_logL_local L : iProp Σ := own γL (●ML{ DfracOwn (1/2) } L).
+  Definition own_logL_local L : iProp Σ := own_log_auth γL (1/2) L.
 
   Definition own_logL_obs L : iProp Σ := own γL (◯ML L).
 
   (** ** Replicated logs. *)
 
   Definition own_replog_global γ sa l : iProp Σ :=
-    known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_global γ l.
+    known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/2) l.
 
   Definition own_replog_local sa l : iProp Σ :=
-    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_local γ l.
+    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/2) l.
 
   (* As local ownership is 1/2, the half of it is 1/4. *)
   Definition own_replog_local_half sa l : iProp Σ :=
-    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own γ (●ML{#1 / 4} l).
+    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/4) l.
 
   Definition own_replog_obs sa l : iProp Σ :=
     ∃ γ, known_replog_token sa γ ∗ own_logL_obs l.
