@@ -9,14 +9,11 @@ From aneris.examples.reliable_communication.lib.mt_server
 Section Spec.
   Context `{ !anerisG Mdl Σ, !lockG Σ}.
   Context `{ MTU: !MTS_user_params }.
-  Context `{ !@MTS_spec_params _ _ _ _ MTU }.
   Context (SrvInit : iProp Σ).
   Context (srv_si : message → iProp Σ).
   Notation srv_ip := (ip_of_address MTS_saddr).
 
-(* Val run_server :
-   'repl serializer -> 'req serializer -> saddr -> monitor -> (monitor -> 'req -> 'repl) -> unit *)
- Definition run_server_spec A : iProp Σ :=
+ Definition run_server_spec `{!MTS_spec_params} A : iProp Σ :=
    {{{ MTS_saddr ⤇ srv_si ∗
        ⌜MTS_saddr ∈ A⌝ ∗
        fixed A ∗
@@ -40,8 +37,6 @@ Section Spec.
      handler reqv @[ip_of_address clt_addr]
    {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
 
-(* val init_client_proxy :
-   'req serializer -> 'repl serializer -> saddr -> saddr -> ('req -> 'repl) *)
  Definition init_client_proxy_spec A sa : iProp Σ :=
    {{{⌜sa ∉ A⌝ ∗
       fixed A ∗
@@ -65,8 +60,8 @@ Section MTS_Init.
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
       SrvInit ∗
-      ∀ (MTS : @MTS_spec_params _ _ _ _ MTU),
-      (∀ A, run_server_spec SrvInit srv_si A) ∗
+      (∀ (MTS : @MTS_spec_params _ _ _ _ MTU) A,
+         run_server_spec SrvInit srv_si A) ∗
       (∀ A sa, init_client_proxy_spec srv_si A sa) }.
 
 End MTS_Init.
