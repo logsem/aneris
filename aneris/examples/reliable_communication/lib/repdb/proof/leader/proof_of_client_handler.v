@@ -36,14 +36,22 @@ Section Clients_MT_spec_params.
 
   Lemma client_request_handler_at_leader_spec  :
     ∀ reqv reqd,
-    {{{ is_monitor MTU.(MTS_mN) (ip_of_address MTU.(MTS_saddr)) mγ mv
-               (leader_local_main_inv_def γL kvsL logL) ∗
-           lock_proof.locked mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗
+    {{{  is_monitor MTU.(MTS_mN) (ip_of_address MTU.(MTS_saddr)) mγ mv
+               (log_monitor_inv_def
+                   (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
+                  (leader_local_main_res kvsL)) ∗
+           lock_proof.locked mγ ∗
+           (log_monitor_inv_def
+                   (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
+                  (leader_local_main_res kvsL)) ∗
            MTU.(MTS_handler_pre) reqv reqd }}}
        handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable (rep_l2c_serialization) repv⌝ ∗
-        lock_proof.locked mγ ∗ (leader_local_main_inv_def γL kvsL logL) ∗
+        lock_proof.locked mγ ∗
+          (log_monitor_inv_def
+             (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
+             (leader_local_main_res kvsL)) ∗
         MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
   Admitted.
@@ -94,7 +102,9 @@ Section Clients_MT_spec_params.
   Global Instance client_handler_at_leader_spec_params :
     @MTS_spec_params _ _ _ _ MTU :=
     {|
-      MTS_mR := (leader_local_main_inv_def γL kvsL logL);
+      MTS_mR := (log_monitor_inv_def
+                   (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
+                   (leader_local_main_res kvsL));
       MTS_mγ := mγ;
       MTS_mv := mv;
       MTS_handler := handler_cloj;
