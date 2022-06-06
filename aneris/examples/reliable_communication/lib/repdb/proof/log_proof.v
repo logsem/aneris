@@ -1,4 +1,5 @@
-From iris.algebra Require Import agree auth excl gmap dfrac.
+From iris.algebra Require Import agree auth excl gmap dfrac max_prefix_list.
+From iris.algebra Require Import updates local_updates.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic Require Import invariants.
 From iris.bi.lib Require Import fractional.
@@ -10,35 +11,43 @@ From aneris.aneris_lang.lib Require Import
 From aneris.examples.reliable_communication.lib.repdb
      Require Export log_code.
 From aneris.examples.reliable_communication.lib.repdb.resources
-     Require Import ras resources_def.
+     Require Import log_resources.
 
 Import lock_proof.
 
+Section Log.
+  Context `{!anerisG Mdl Σ, !lockG Σ}.
+  Context {Aty : Type}.
+  Notation A := (leibnizO Aty).
+  Context `{inG Σ (mono_listUR A)}.
+  Context `[!Inject A val].
 
-  (* ------------------------------------------------------------------------ *)
-  Section Log.
-    Context `{!anerisG Mdl Σ, !lockG Σ}.
-  Definition inject_log `{!Inject A val} (xs : list A) :=
+  Definition inject_log (xs : list A) :=
     ($xs, #(List.length xs))%V.
 
   Global Program Instance Inject_log `{!Inject A val}
     : Inject (list A) val := {| inject := inject_log |}.
   Next Obligation.
-    intros ? [] xs ys. inversion 1 as [[Hinj Hinj2]].
-    by apply Inject_list in Hinj.
+    intros ? [] xs ys.
+    - inversion ys as [[Hinj Hinj2]].
+      symmetry. apply nil_length_inv. naive_solver.
+    - inversion ys as [[Hinj Hinj2]].
+      destruct xs as [| x xs]; first done.
+      simplify_eq.
+      inversion Hinj as [[Hinj3]]. apply Inject_list in Hinj3.
+      naive_solver.
   Qed.
-
-  Context `[!Inject A val].
 
   Definition is_log (logM : list A) (logV : val) :=
     ∃ (lV : val), logV = (lV, #(List.length logM))%V ∧ is_list logM lV.
 
-  Lemma is_log_inject xs l :
-    is_log xs l ↔ l = $xs.
-  Proof. Admitted.
+  (* Lemma is_log_inject xs l : *)
+  (*   is_log xs l ↔ l = $xs. *)
+  (* Proof. Admitted. *)
 
   (* Definition is_logLoc (logM : list A) (logL : loc) : iProp Σ := *)
   (*   ∃ (logV : val), logL ↦[ip] logV ∗ ⌜is_log logM logV⌝. *)
+
 
   Lemma wp_log_create ip :
     {{{ True }}}
@@ -51,7 +60,6 @@ Import lock_proof.
     iApply "HΦ". iFrame. iPureIntro.
     by eexists.
     Qed.
-
 
   Lemma wp_log_add_entry ip logL logV logM (x : A) :
     {{{ ⌜is_log logM logV⌝ ∗ logL ↦[ip] logV }}}
@@ -133,61 +141,60 @@ Lemma wp_log_get ip logL logV logM i q :
     split; eauto; last by eexists.
   Qed.
 
+  Definition log_monitor_inv_def
+    (ip : ip_address) (γlog : gname) (q: Qp)
+    (logL : loc) (Res : list A → iProp Σ) : iProp Σ :=
+    ∃ logV logM,
+      ⌜is_log logM logV⌝ ∗
+      logL ↦[ip] logV ∗
+      own_log_auth γlog q logM ∗
+      Res logM.
 
-  (* Definition logMonitor_res *)
-  (*  ip (γlog : gname) (logL : loc) (Res : list A → iProp Σ) : iProp Σ := *)
-  (* ∃ logV logM, *)
-  (*   ⌜is_log logM logV⌝ ∗ *)
-  (*   logL ↦[ip] logV ∗ *)
-  (*   own_log_local γlog logM ∗ *)
-  (*   Res logM. *)
-
-(*
-  Lemma wp_log_wait_until ip monN monγ monV monR logL logV logM i :
-    {{{ ⌜i ≤ List.length logM⌝ ∗
-        ⌜is_log logM logV⌝ ∗
-        is_monitor monN ip monγ monV (logMonitor_res ip logL monR) ∗
-        lock_proof.locked monγ ∗ (monR logM) ∗
-        logL ↦[ip] logV }}}
+  Lemma wp_log_wait_until ip
+    γlog q logM (* created at the logical setup *)
+    monN monγ monV monR logL logV i (* created at the allocation of physical data *):
+    {{{ ⌜i ≤ List.length logM⌝ ∗ ⌜is_log logM logV⌝ ∗
+        is_monitor monN ip monγ monV (log_monitor_inv_def ip γlog q logL monR) ∗
+        locked monγ ∗ (monR logM) ∗ logL ↦[ip] logV ∗ own_log_auth γlog q logM }}}
       log_wait_until #logL monV #i @[ip]
     {{{ logV' logM', RET #();
-        ⌜i < List.length logM'⌝ ∗
-        ⌜is_log logM' logV'⌝ ∗
-        lock_proof.locked monγ ∗ (monR logM') ∗
-        logL ↦[ip] logV' }}}.
+        ⌜i < List.length logM'⌝ ∗ ⌜is_log logM' logV'⌝ ∗
+        locked monγ ∗ (monR logM') ∗ logL ↦[ip] logV' ∗ own_log_auth γlog q logM' }}}.
   Proof.
-    iIntros (Φ) "(%Hi & %Hl & #Hmon & Hlocked & Hres & Hp) HΦ".
-    assert (is_log logM logV) as Hlc by done.
-    destruct Hlc as (lV & -> & Hlst).
+    iIntros (Φ) "(%Hi & %Hl & #Hmon & Hlocked & Hres & Hp & Hown) HΦ".
     wp_lam.
     wp_pures.
-    case_bool_decide; first by lia.
+    case_bool_decide as Hi2 ; first by lia.
     wp_pures.
     wp_apply (wp_log_next with "[$Hp //]").
-    iIntros (n) "(-> & %Hlc & Hp)".
+    iIntros (n) "(-> & _ & Hp)".
     wp_pures.
     case_bool_decide as Hiz; first by lia.
     wp_pure _.
-    clear Hlc.
-    iLöb as "IH" forall (logM lV Hi Hl Hlst Hiz) "Hres".
+    clear Hiz Hi2.
+    iDestruct (get_obs with "Hown") as "#Hobs".
+    iLöb as "IH" forall (logV logM Hl Hi) "Hres Hp Hown Hobs".
     wp_pures.
     wp_apply (wp_log_next with "[$Hp //]").
     iIntros (n) "(-> & _ & Hp)".
     wp_pures.
     case_bool_decide as Hiz2.
     - wp_pure _.
-      wp_apply (monitor_wait_spec with "[$Hmon Hres $Hlocked Hp]").
+      wp_apply (monitor_wait_spec with "[$Hmon Hres $Hlocked Hp Hown]").
       iExists _, _. iFrame. eauto.
       iIntros (v) "(-> & Hlocked & Hres)".
-      iDestruct "Hres" as (logV' logM' Hlog') "(Hp & Hres)".
+      iDestruct "Hres" as (logV' logM' Hlog') "(Hp & Hown & Hres)".
       do 2 wp_pure _.
-      clear Hi Hl Hlst Hiz Hiz2 logM.
-      iSpecialize ("IH" $! logM' logV').
-      iApply ("IH" with "[][][][][$Hlocked][][][$Hres]").
-
+      iDestruct (own_obs_prefix with "[$Hown][$Hobs]") as "%Hpre".
+      assert (i ≤ length logM') as Hi'.
+      list_simplifier.
+      by apply prefix_length.
+      iSpecialize ("IH" $! logV' logM' Hlog' Hi').
+      iDestruct (get_obs with "Hown") as "#Hobs'".
+      iApply ("IH" with "[$Hlocked][$HΦ][$Hres][$Hp][$Hown][$Hobs']").
     - wp_pure _.
       wp_apply wp_assert.
-      wp_pures.
+       wp_pures.
       iSplitR.
       iPureIntro.
       f_equal.
@@ -196,45 +203,6 @@ Lemma wp_log_get ip logL logV logM i q :
       iApply "HΦ".
       iFrame.
       eauto with lia.
-    (* -------- *)
-    iLöb as "IH".
-    wp_pures.
-    wp_apply (wp_log_next with "[$Hp //]").
-    iIntros (n) "(-> & _ & Hp)".
-    wp_pures.
-    case_bool_decide as Hiz2.
-    - wp_pure _.
-      wp_apply (monitor_wait_spec with "[$Hmon Hres $Hlocked Hp]").
-      iExists _, _. iFrame. eauto.
-      iIntros (v) "(-> & Hlocked & Hres)".
-      iDestruct "Hres" as (logV' logM' Hlog') "(Hp & Hres)".
-      do 2 wp_pure _.
-      iApply ("IH" with "[$Hlocked][Hres]").
-    - wp_pure _.
-      wp_apply wp_assert.
-      wp_pures.
-      iSplitR.
-      iPureIntro.
-      f_equal.
-      case_bool_decide; eauto with lia.
-      iNext.
-      iApply "HΦ".
-      iFrame.
-      eauto with lia.
+  Qed.
 
-
-log_wait_until =
-(λ: "log" "mon" "i",
-   letrec: "aux" <> :=
-     let: "n" := log_next "log" in
-     if: "n" = "i" then monitor_wait "mon" ;; "aux" #()
-     else assert: "i" < "n" in
-   if: if: "i" < #0 then #true else log_next "log" < "i" then assert: #false
-   else "aux" #())%V
-     : val
-
-
-     Definition log_wait_until : val.
-
-*)
   End Log.
