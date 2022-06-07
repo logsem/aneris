@@ -88,9 +88,6 @@ Section Resources_definition.
   Definition own_replog_global γ sa l : iProp Σ :=
     known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/2) l.
 
-  Definition own_replog_local_half l : iProp Σ :=
-    ∃ γ, known_replog_token DB_addrF γ ∗ own_logL_obs l ∗ own_log_auth γ (1/4) l.
-
   Definition own_replog_obs sa l : iProp Σ :=
     ∃ γ, known_replog_token sa γ ∗ own_logL_obs l.
 

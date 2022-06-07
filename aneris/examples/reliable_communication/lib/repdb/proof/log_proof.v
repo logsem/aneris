@@ -22,33 +22,6 @@ Section Log.
   Context `{inG Σ (mono_listUR A)}.
   Context `[!Inject A val].
 
-  Definition inject_log (xs : list A) :=
-    ($xs, #(List.length xs))%V.
-
-  Global Program Instance Inject_log `{!Inject A val}
-    : Inject (list A) val := {| inject := inject_log |}.
-  Next Obligation.
-    intros ? [] xs ys.
-    - inversion ys as [[Hinj Hinj2]].
-      symmetry. apply nil_length_inv. naive_solver.
-    - inversion ys as [[Hinj Hinj2]].
-      destruct xs as [| x xs]; first done.
-      simplify_eq.
-      inversion Hinj as [[Hinj3]]. apply Inject_list in Hinj3.
-      naive_solver.
-  Qed.
-
-  Definition is_log (logM : list A) (logV : val) :=
-    ∃ (lV : val), logV = (lV, #(List.length logM))%V ∧ is_list logM lV.
-
-  (* Lemma is_log_inject xs l : *)
-  (*   is_log xs l ↔ l = $xs. *)
-  (* Proof. Admitted. *)
-
-  (* Definition is_logLoc (logM : list A) (logL : loc) : iProp Σ := *)
-  (*   ∃ (logV : val), logL ↦[ip] logV ∗ ⌜is_log logM logV⌝. *)
-
-
   Lemma wp_log_create ip :
     {{{ True }}}
       log_create #() @[ip]
@@ -140,15 +113,6 @@ Lemma wp_log_get ip logL logV logM i q :
     iPureIntro.
     split; eauto; last by eexists.
   Qed.
-
-  Definition log_monitor_inv_def
-    (ip : ip_address) (γlog : gname) (q: Qp)
-    (logL : loc) (Res : list A → iProp Σ) : iProp Σ :=
-    ∃ logV logM,
-      ⌜is_log logM logV⌝ ∗
-      logL ↦[ip] logV ∗
-      own_log_auth γlog q logM ∗
-      Res logM.
 
   Lemma wp_log_wait_until ip
     γlog q logM (* created at the logical setup *)

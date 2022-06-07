@@ -14,9 +14,10 @@ From aneris.examples.reliable_communication.lib.mt_server Require Import user_pa
 From aneris.examples.reliable_communication.lib.repdb Require Import repdb_code model.
 From aneris.examples.reliable_communication.lib.repdb.spec Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
-     Require Import ras resources_def resources_global_inv resources_local_inv.
+     Require Import ras log_resources resources_def
+     resources_global_inv resources_local_inv.
 From aneris.examples.reliable_communication.lib.repdb.proof
-     Require Import log_proof repdb_serialization.
+     Require Import repdb_serialization.
 From aneris.examples.reliable_communication.lib.repdb.proof.leader
      Require Import followers_mt_user_params.
 
@@ -35,14 +36,9 @@ Section Followers_MT_spec_params.
   Definition handler_cloj : val :=
     λ: "mv" "reqv", follower_request_handler #logFLoc "mv" "reqv".
 
-  Lemma follower_request_handler_spec  :
+  Lemma follower_request_handler_spec :
     ∀ reqv reqd,
-    {{{ is_monitor
-          (DB_InvName .@ "leader_secondary")
-          (ip_of_address MTU_F.(MTS_saddr)) mγ mv
-          (log_monitor_inv_def
-             (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
-             (leader_local_secondary_res γL γF)) ∗
+    {{{ leader_local_secondary_inv γL logFLoc γF mγ mv ∗
         lock_proof.locked mγ ∗
         (log_monitor_inv_def
              (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
