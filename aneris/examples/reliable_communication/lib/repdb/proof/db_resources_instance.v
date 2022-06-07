@@ -16,10 +16,8 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params time events resources.
 From aneris.examples.reliable_communication.lib.repdb.resources
      Require Import
-     ras resources_def
+     ras log_resources resources_def
      resources_global_inv resources_local_inv.
-From aneris.examples.reliable_communication.lib.repdb.proof
-     Require Import log_proof.
 
 Section DB_resources_instance.
   Context `{!anerisG Mdl Σ, !IDBG Σ}.

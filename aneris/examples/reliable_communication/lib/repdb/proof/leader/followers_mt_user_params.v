@@ -14,10 +14,10 @@ From aneris.examples.reliable_communication.lib.mt_server Require Import user_pa
 From aneris.examples.reliable_communication.lib.repdb Require Import repdb_code model.
 From aneris.examples.reliable_communication.lib.repdb.spec Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
-     Require Import ras resources_def resources_global_inv resources_local_inv.
+     Require Import ras log_resources resources_def
+     resources_global_inv resources_local_inv.
 From aneris.examples.reliable_communication.lib.repdb.proof
-     Require Import log_proof repdb_serialization.
-
+     Require Import repdb_serialization.
 
 Import gen_heap_light.
 Import lock_proof.

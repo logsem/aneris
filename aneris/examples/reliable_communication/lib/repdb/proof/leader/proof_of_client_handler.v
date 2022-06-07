@@ -14,9 +14,10 @@ From aneris.examples.reliable_communication.lib.mt_server Require Import user_pa
 From aneris.examples.reliable_communication.lib.repdb Require Import repdb_code model.
 From aneris.examples.reliable_communication.lib.repdb.spec Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
-     Require Import ras resources_def resources_global_inv resources_local_inv.
+     Require Import ras log_resources resources_def
+     resources_global_inv resources_local_inv.
 From aneris.examples.reliable_communication.lib.repdb.proof
-     Require Import log_proof repdb_serialization.
+     Require Import repdb_serialization.
 From aneris.examples.reliable_communication.lib.repdb.proof.leader
      Require Import clients_mt_user_params.
 
@@ -36,14 +37,11 @@ Section Clients_MT_spec_params.
 
   Lemma client_request_handler_at_leader_spec  :
     ∀ reqv reqd,
-    {{{  is_monitor MTU.(MTS_mN) (ip_of_address MTU.(MTS_saddr)) mγ mv
-               (log_monitor_inv_def
-                   (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
-                  (leader_local_main_res kvsL)) ∗
-           lock_proof.locked mγ ∗
-           (log_monitor_inv_def
-                   (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
-                  (leader_local_main_res kvsL)) ∗
+    {{{ leader_local_main_inv γL kvsL logL mγ mv ∗
+        lock_proof.locked mγ ∗
+        (log_monitor_inv_def
+           (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
+           (leader_local_main_res kvsL)) ∗
            MTU.(MTS_handler_pre) reqv reqd }}}
        handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;

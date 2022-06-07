@@ -13,9 +13,7 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
      Require Import
-     ras resources_def.
-From aneris.examples.reliable_communication.lib.repdb.proof
-     Require Import log_proof.
+     ras resources_def log_resources.
 
 Import gen_heap_light.
 Import lock_proof.
@@ -36,20 +34,18 @@ Section Local_Invariants.
 
   Definition leader_local_main_inv
     (kvsL logL : loc) (mγ : gname) (mV : val) : iProp Σ :=
-    is_monitor (DB_InvName .@ "leader_main") (ip_of_address DB_addr) mγ mV
-               (log_monitor_inv_def
-                  (ip_of_address DB_addr) γL (1/2) logL
-                  (leader_local_main_res kvsL)).
+    log_monitor_inv
+      (DB_InvName .@ "leader_main") (ip_of_address DB_addr) mγ mV
+      γL (1/2) logL (leader_local_main_res kvsL).
 
   Definition leader_local_secondary_res (γF : gname) (logM : wrlog) : iProp Σ :=
     known_replog_token DB_addrF γF ∗ own_logL_obs γL logM.
 
   Definition leader_local_secondary_inv
     (logFL : loc) (γF : gname) (mγ : gname) (mV : val) : iProp Σ :=
-      is_monitor (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF) mγ mV
-                 (log_monitor_inv_def
-                    (ip_of_address DB_addrF) γF (1/4) logFL
-                    (leader_local_secondary_res γF)).
+    log_monitor_inv
+      (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF) mγ mV
+      γF (1/4) logFL (leader_local_secondary_res γF).
 
   (* ------------------------------------------------------------------------ *)
   (** Follower's local invariant. *)
@@ -66,11 +62,11 @@ Section Local_Invariants.
   Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
-  Definition follower_local_main_inv (kvsL logL : loc)
-    (sa : socket_address) (γsa : gname) (mγ : gname) (mV : val)  : iProp Σ :=
-     is_monitor (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
-               (log_monitor_inv_def
-                  (ip_of_address sa) γsa (1/2) logL
-                  (follower_local_res kvsL sa γsa)).
+  Definition follower_local_inv (kvsL logL : loc)
+    (sa : socket_address) (γsa : gname) (mγ : gname) (mV : val) : iProp Σ :=
+    log_monitor_inv
+      (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
+      γsa (1/2) logL
+      (follower_local_res kvsL sa γsa).
 
 End Local_Invariants.
