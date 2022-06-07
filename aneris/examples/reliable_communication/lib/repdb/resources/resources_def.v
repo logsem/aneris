@@ -73,7 +73,11 @@ Section Resources_definition.
     own IDBG_free_replog_set_name (GSet (dom N)) ∗
     own IDBG_known_replog_name (● (to_agree <$> N : gmap _ _ )).
 
-
+  Lemma known_replog_in_N N sa γsa:
+    known_replog_tokens N ∗ known_replog_token sa γsa -∗
+    ⌜N !! sa = Some γsa⌝.
+  Proof.
+  Admitted.
 
   (* ------------------------------------------------------------------------ *)
   (** Principal & replicated log ownership predicates *)

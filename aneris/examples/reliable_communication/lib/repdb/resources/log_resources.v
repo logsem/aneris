@@ -43,6 +43,45 @@ From aneris.aneris_lang.lib Require Import
    naive_solver.
   Qed.
 
+
+  Lemma own_log_auth_combine γ q1 q2 l1 l2 :
+    own_log_auth γ q1 l1 -∗
+    own_log_auth γ q2 l2 -∗
+    own_log_auth γ (q1 + q2) l1 ∗ ⌜l1 = l2⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "[$H1][$H2]") as "%Hvalid".
+    rewrite mono_list_auth_dfrac_op_valid_L dfrac_op_own in Hvalid.
+    destruct Hvalid as (Hvalid & ->).
+    iCombine "H1 H2" as "H3".
+    rewrite /own_log_auth. rewrite -dfrac_op_own.
+    rewrite mono_list_auth_dfrac_op. by iFrame.
+  Qed.
+
+
+  Lemma own_log_auth_split γ q1 q2 l1 :
+    own_log_auth γ (q1 + q2) l1 ⊢
+    own_log_auth γ q1 l1 ∗ own_log_auth γ q2 l1.
+  Proof.
+    iIntros "H1".
+    rewrite /own_log_auth.
+    rewrite -dfrac_op_own  mono_list_auth_dfrac_op.
+    iDestruct "H1" as "(H11 & H12)". iFrame.
+  Qed.
+
+
+  Lemma obs_obs_prefix γ l1 l2 :
+    own_log_obs γ l1 ∗ own_log_obs γ l2 -∗
+    ⌜l1 `prefix_of` l2 ∨ l2 `prefix_of` l1⌝.
+  Proof.
+  Admitted.
+
+  Lemma own_log_auth_update γ l1 l2 :
+    l1 `prefix_of` l2 →
+    own_log_auth γ 1 l1 ==∗ own_log_auth γ 1 l2.
+  Proof.
+  Admitted.
+
 End Logical_Log_Resources.
 
 Section Physical_Log_Spec.

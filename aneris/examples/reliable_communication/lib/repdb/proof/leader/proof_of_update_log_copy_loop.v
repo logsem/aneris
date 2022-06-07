@@ -4,7 +4,8 @@ From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics coq_tactics reduction spec_patterns.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Import lang resources inject tactics proofmode.
-From aneris.aneris_lang.lib Require Import list_proof monitor_proof lock_proof map_proof.
+From aneris.aneris_lang.lib Require Import
+     list_proof monitor_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import aneris_lifting.
 From aneris.aneris_lang.program_logic Require Import aneris_weakestpre.
@@ -34,20 +35,22 @@ Import log_proof.
 Section UpdateLogCopy_Proof.
   Context `{!anerisG Mdl Σ, dbparams : !DB_params, !IDBG Σ}.
   Context (γL γM : gname).
+  Context (HipEq : ip_of_address DB_addr = ip_of_address DB_addrF).
 
   Definition own_replog_loop γ l : iProp Σ :=
     known_replog_token DB_addrF γ ∗ own_logL_obs γL l ∗ own_log_auth γ (1/4) l.
 
   Lemma update_log_copy_loop_spec
     (γF mFγ mCγ : gname) (kvsL logCL logFL : loc) (mvC mvF : val) :
-    {{{ leader_local_main_inv γL kvsL logCL mCγ mvC ∗
-       leader_local_secondary_inv γL logFL γF mFγ mvF ∗
-       own_replog_loop γF []
+    {{{ Global_Inv γL γM ∗
+        leader_local_main_inv γL kvsL logCL mCγ mvC ∗
+        leader_local_secondary_inv γL logFL γF mFγ mvF ∗
+        own_replog_loop γF []
     }}}
       update_log_copy_loop #logCL mvC #logFL mvF #() @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(#HinvL & #HinvF & Hloop) HΦ".
+    iIntros (Φ) "(#HGinv & #HinvL & #HinvF & Hloop) HΦ".
     rewrite /update_log_copy_loop.
     do 12 wp_pure _.
     (* pose (@nil_length) as Hnl. *)
@@ -63,16 +66,85 @@ Section UpdateLogCopy_Proof.
     wp_apply (monitor_acquire_spec with "[HinvL]"); first by iFrame "#".
     iIntros (v) "( -> & Hlocked & Hres)".
     wp_pures.
-    iDestruct "Hres" as (logV logM) "(Hlog & Hpl & HmainLog & HmainRes)".
+    iDestruct "Hres" as (logV logM) "(%Hlog & Hpl & HmainLog & HmainRes)".
+    iAssert (⌜lF `prefix_of` logM⌝)%I as "%Hprefix".
+    { iDestruct "Hloop" as "(_ & Hobs & _)".
+      iApply (own_obs_prefix with "[$HmainLog][$Hobs]"). }
+    assert (length lF ≤ length logM) as Hlen2.
+    { by apply prefix_length. }
     wp_apply (wp_log_wait_until
-               with "[$HinvL $Hlocked $Hpl $HmainLog $Hlog $HmainRes][]").
-    admit.
+               with "[$HinvL $Hlocked $Hpl $HmainLog $HmainRes][Hloop HΦ]").
+    { naive_solver. }
     iNext.
     iIntros (logV' logM').
     iIntros "(%Hlen' & %Hlog' & Hlocked & HmainRes & Hpl & HmainLog)".
     wp_pures.
     wp_load.
     wp_pures.
-  Admitted.
+    iAssert (⌜lF `prefix_of` logM'⌝)%I as "%Hprefix2".
+    {  iDestruct "Hloop" as "(_ & Hobs & _)".
+       by iDestruct (own_obs_prefix with "[$HmainLog][$Hobs]") as "%Hprefix2". }
+    iDestruct (get_obs with "[$HmainLog]") as "#HobsM'".
+    wp_apply (monitor_release_spec
+               with "[$HinvL $Hlocked Hpl HmainLog HmainRes]").
+    iExists _, _. eauto with iFrame.
+    iIntros (v ->).
+    wp_pures.
+    rewrite HipEq.
+    wp_apply (monitor_acquire_spec with "[$HinvF]").
+    iIntros (v) "( -> & Hlocked & Hres)".
+    wp_pures.
+    iDestruct "Hres" as (logVF logMF) "(%HlogF & HplF & HLogOwnF & HResF)".
+    wp_store.
+    iDestruct "Hloop" as "(#HknownTkn & #Hobs & HownLoop)".
+    iDestruct (own_log_auth_combine
+                with "[$HLogOwnF][$HownLoop]") as "(HownFHalf1 & ->)".
+    assert (length lF < length logM') by lia.
+    clear logM Hlog Hprefix logV n Hlen Hlen' Hlen2.
+    rewrite /Global_Inv /global_inv_def.
+    iApply fupd_aneris_wp.
+    iInv DB_InvName as ">HGinvRes" "Hcl".
+    iDestruct "HGinvRes" as (L M N Hkes) "HGinvRes".
+    iDestruct "HGinvRes" as "(HownS & HownL & HknownN & HmapN & %HvSt)".
+    iAssert (⌜N !! DB_addrF = Some γF⌝)%I as "%HinF".
+    by iDestruct (known_replog_in_N with "[$HknownN $HknownTkn]") as "%HinN".
+    iDestruct (big_sepM_lookup_acc _ N DB_addrF γF with "[$HmapN]")
+      as "(Hres & HmapN)"; [done|].
+    iDestruct "Hres" as (l) "(#HknownTkn' & #Hobs' & HownFHalf2)".
+    iDestruct (own_log_auth_combine
+                with "[$HownFHalf1][$HownFHalf2]") as "(HownF & ->)".
+    rewrite Qp_quarter_quarter Qp_half_half.
+    iMod (own_log_auth_update _ l logM'
+           with "[$HownF]") as "HownF"; first done.
+    rewrite -Qp_half_half.
+    rewrite {1} Qp_half_half.
+    iDestruct (own_log_auth_split with "HownF") as "[HownF1 HownF2]".
+    rewrite -Qp_quarter_quarter.
+    rewrite {1} Qp_quarter_quarter.
+    iMod ("Hcl" with "[HownF1 HmapN HknownN HownS HownL]") as "_".
+    { iNext. iExists L, M, N. iFrame "#∗".
+      iSplit; first done.
+      iSplit; last done.
+      iApply "HmapN".
+      iExists logM'. iFrame "#∗". }
+    iModIntro.
+    iDestruct (own_log_auth_split with "HownF2") as "[HownF1 HownF2]".
+    wp_apply (monitor_broadcast_spec
+               with "[$HinvF $Hlocked HplF HResF HownF1]").
+    { iExists _, logM'.
+      rewrite /leader_local_secondary_res.
+      iFrame "#∗".
+      done. }
+    iIntros "(Hlocked & Hres)".
+    wp_pures.
+    wp_apply (monitor_release_spec with "[$HinvF $Hlocked $Hres]").
+    iIntros (v ->).
+    do 4 wp_pure _.
+    assert (∃ lV : val, logV' = (lV, #(length logM'))%V ∧ is_list logM' lV)
+           as (lV & -> & Hlst') by done.
+    do 1 wp_pure _.
+    iApply ("IH" $! logM' with "[//][$HΦ][$HownF2]").
+    iFrame "#∗".
+  Qed.
 
 End UpdateLogCopy_Proof.
