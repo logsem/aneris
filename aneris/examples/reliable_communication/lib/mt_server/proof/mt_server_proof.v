@@ -21,7 +21,7 @@ Import client_server_code.
 Section MTS_proof_of_code.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
-  Context `{!MTS_user_params}.
+  Context `{MTU : !MTS_user_params}.
 
   Definition req_prot_aux (rec : iProto Σ)  : iProto Σ :=
     (<! (reqv : val) (reqd : MTS_req_data) >
@@ -54,7 +54,7 @@ Section MTS_proof_of_code.
   Context `{HspecS : !Reliable_communication_Specified_API_session cmh}.
   Context `{HspecN : !Reliable_communication_Specified_API_network MT_UP SnRes}.
 
-  Lemma service_loop_proof `{!MTS_spec_params} (c : val) :
+  Lemma service_loop_proof `{!MTS_spec_params MTU} (c : val) :
     {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
         c ↣{ ip_of_address MTS_saddr, MTS_rep_ser } iProto_dual req_prot  }}}
       service_loop c MTS_mv MTS_handler #() @[ip_of_address MTS_saddr]
@@ -82,7 +82,7 @@ Section MTS_proof_of_code.
     by iApply ("IH" with "[$Hc]").
   Qed.
 
-  Lemma wp_accept_new_connections_loop `{!MTS_spec_params} skt  :
+  Lemma wp_accept_new_connections_loop `{!MTS_spec_params MTU} skt  :
     {{{ MTS_saddr ⤇ reserved_server_socket_interp ∗
         SrvListens skt ∗
         is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR }}}
@@ -110,7 +110,7 @@ Section MTS_proof_of_code.
       by wp_apply (service_loop_proof with "[$Hlk $Hc]").
   Qed.
 
-  Definition run_server_internal_spec `{!MTS_spec_params} A : iProp Σ :=
+  Definition run_server_internal_spec `{!MTS_spec_params MTU} A : iProp Σ :=
     {{{ ⌜MTS_saddr ∈ A⌝ ∗
         fixed A ∗
         free_ports (ip_of_address MTS_saddr) {[port_of_address MTS_saddr]} ∗
@@ -127,7 +127,7 @@ Section MTS_proof_of_code.
         @[ip_of_address MTS_saddr]
     {{{ RET #(); ⌜True⌝ }}}.
 
-  Lemma run_server_internal_spec_holds `{!MTS_spec_params} A : ⊢ run_server_internal_spec A.
+  Lemma run_server_internal_spec_holds `{!MTS_spec_params MTU} A : ⊢ run_server_internal_spec A.
   Proof.
     iIntros (Φ) "!#".
     iIntros "Hres HΦ".
@@ -227,7 +227,7 @@ Section MTS_proof_of_init.
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
     SrvInit ∗
-    (∀ (MTS : @MTS_spec_params _ _ _ _ MTU) A,
+    (∀ (MTS : MTS_spec_params MTU) A,
        run_server_spec SrvInit srv_si A) ∗
     (∀ A sa, init_client_proxy_spec srv_si A sa).
   Proof.

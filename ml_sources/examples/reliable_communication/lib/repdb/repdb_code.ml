@@ -48,7 +48,7 @@ let update_log_copy_loop logC monC logF monF () =
 
 let start_leader_processing_followers (ser[@metavar]) addr log mon () =
   run_server (rep_l2f_ser ser) req_f2l_ser addr mon
-    (follower_request_handler log)
+    (fun mon req -> follower_request_handler log mon req)
 
 (** Processes the request event (request & the reply cell). *)
 let client_request_handler_at_leader (db : 'a dbTy Atomic.t) (log :  ((string * 'a) * int) log)
@@ -67,7 +67,7 @@ let client_request_handler_at_leader (db : 'a dbTy Atomic.t) (log :  ((string * 
 (** Initialization of the leader-followers database. *)
 let start_leader_processing_clients (ser[@metavar]) addr db log mon () =
   run_server (rep_l2c_ser ser) (req_c2l_ser ser) addr mon
-    (client_request_handler_at_leader db log)
+    (fun mon req -> client_request_handler_at_leader db log mon req)
 
 let init_leader (ser[@metavar] : 'a serializer) addr0 addr1 : unit =
   let logC = log_create () in
@@ -99,7 +99,7 @@ let client_request_handler_at_follower (db : 'a dbTy Atomic.t) _mon req_k  =
 
 let start_follower_processing_clients (ser[@metavar]) addr db mon =
   run_server (rep_f2c_ser ser) req_c2f_ser addr mon
-    (client_request_handler_at_follower db)
+    (fun mon req -> client_request_handler_at_follower db mon req)
 
 let sync_loop db log mon reqf () : unit =
   let rec aux () =

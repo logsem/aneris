@@ -17,11 +17,13 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.reliable_communication.lib.repdb
      Require Import repdb_code model.
 From aneris.examples.reliable_communication.lib.repdb.spec
-     Require Import db_params time events resources.
+     Require Import db_params time events.
 From aneris.examples.reliable_communication.lib.repdb.resources
      Require Import
-     ras resources_def
-     resources_global_inv resources_local_inv.
+     ras
+     resources_def
+     resources_global_inv 
+     resources_local_inv.
 From aneris.examples.reliable_communication.lib.repdb.proof
      Require Import
      repdb_serialization.

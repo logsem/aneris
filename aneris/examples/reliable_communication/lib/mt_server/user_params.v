@@ -32,7 +32,7 @@ Class MTS_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
 
 Arguments MTS_user_params {_ _ _ _}.
 
-Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ, !MTS_user_params } :=
+Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } (MTU : MTS_user_params) :=
   { (* Requests. *)
     (* monitor data. *)
     MTS_mR : iProp Σ;
@@ -53,4 +53,4 @@ Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ, !MTS_user_params } :=
 
   }.
 
-Arguments MTS_spec_params {_ _ _ _ _}.
+Arguments MTS_spec_params {_ _ _ _} _.

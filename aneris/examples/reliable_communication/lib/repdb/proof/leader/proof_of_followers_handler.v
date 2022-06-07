@@ -34,7 +34,7 @@ Section Followers_MT_spec_params.
 
 
   Definition handler_cloj : val :=
-    λ: "mv" "reqv", follower_request_handler #logFLoc "mv" "reqv".
+    λ: "mon" "req", follower_request_handler #logFLoc "mon" "req".
 
   Lemma follower_request_handler_spec :
     ∀ reqv reqd,

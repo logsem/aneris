@@ -38,7 +38,8 @@ Section Local_Invariants.
       (DB_InvName .@ "leader_main") (ip_of_address DB_addr) mγ mV
       γL (1/2) logL (leader_local_main_res kvsL).
 
-  Definition leader_local_secondary_res (γF : gname) (logM : wrlog) : iProp Σ :=
+  Definition leader_local_secondary_res
+    (γF : gname) (logM : wrlog) : iProp Σ :=
     known_replog_token DB_addrF γF ∗ own_logL_obs γL logM.
 
   Definition leader_local_secondary_inv
