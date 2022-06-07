@@ -61,6 +61,9 @@ Section ValidStates.
       DB_GSTV_log_events L : log_events L;
     }.
 
+  Lemma valid_state_empty : valid_state [] ∅.
+  Proof. Admitted.
+
  (** Local Validity. *)
   Definition mem_dom_local (M : gmap Key val) := dom M ⊆ DB_keys.
 
@@ -96,5 +99,8 @@ Section ValidStates.
     }.
 
 (* TODO : valid state update lemmas. *)
+
+  Lemma valid_state_local_empty : valid_state_local [] ∅.
+  Proof. Admitted.
 
 End ValidStates.

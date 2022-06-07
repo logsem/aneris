@@ -13,7 +13,7 @@ Section Spec.
   Context (srv_si : message → iProp Σ).
   Notation srv_ip := (ip_of_address MTS_saddr).
 
- Definition run_server_spec `{!MTS_spec_params} A : iProp Σ :=
+ Definition run_server_spec `{!MTS_spec_params MTU} A : iProp Σ :=
    {{{ MTS_saddr ⤇ srv_si ∗
        ⌜MTS_saddr ∈ A⌝ ∗
        fixed A ∗
@@ -60,7 +60,7 @@ Section MTS_Init.
     ↑MTS_mN ⊆ E →
     True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
       SrvInit ∗
-      (∀ (MTS : @MTS_spec_params _ _ _ _ MTU) A,
+      (∀ (MTS : MTS_spec_params MTU) A,
          run_server_spec SrvInit srv_si A) ∗
       (∀ A sa, init_client_proxy_spec srv_si A sa) }.
 

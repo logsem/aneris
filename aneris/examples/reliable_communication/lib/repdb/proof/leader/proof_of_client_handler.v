@@ -31,7 +31,7 @@ Section Clients_MT_spec_params.
   Context (mγ : gname) (mv : val) (kvsL logL : loc).
 
   Definition handler_cloj : val :=
-    λ: "mv" "reqv", client_request_handler_at_leader #kvsL #logL "mv" "reqv".
+    λ: "mon" "req", client_request_handler_at_leader #kvsL #logL "mon" "req".
 
   Notation MTU := (client_handler_at_leader_user_params γL γM).
 
