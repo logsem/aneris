@@ -151,10 +151,12 @@ Section Init_Leader_Proof.
       -- rewrite /start_leader_processing_followers.
          iNext.
          wp_pures.
+         assert (DB_addr ≠ DB_addrF) as Hneq.
+         { intro Heq. destruct DB_addr, DB_addrF. by inversion Heq. }
          wp_apply
            (HInitLeaderFSpec $! (follower_handler_spec_params
                                    γL γM mFγ γF mFv logLF) A _
-             with "[$HsrvFinit $HmhF $HfpF]"); eauto with iFrame.
+             with "[$HsrvFinit $HmhF $HfpF]");  eauto with iFrame.
     - rewrite /start_leader_processing_clients.
       iNext.
       wp_pures.

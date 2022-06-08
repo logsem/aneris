@@ -73,6 +73,23 @@ Section Resources_definition.
     own IDBG_free_replog_set_name (GSet (dom N)) ∗
     own IDBG_known_replog_name (● (to_agree <$> N : gmap _ _ )).
 
+ Lemma known_replog_token_agree sa γ1 γ2 :
+   known_replog_token sa γ1 -∗ known_replog_token sa γ2 -∗ ⌜γ1 = γ2⌝.
+  Proof.
+    iIntros "Hγ1 Hγ2".
+    iDestruct (own_valid_2 with "Hγ1 Hγ2") as %Hval.
+    iPureIntro.
+    rewrite -auth_frag_op singleton_op  in Hval.
+    apply auth_frag_valid_1 in Hval.
+    specialize (Hval sa).
+    rewrite lookup_singleton in Hval.
+    rewrite Some_op in Hval.
+    revert Hval.
+    rewrite Some_valid.
+    intros Hval.
+    by apply (to_agree_op_inv_L (A:=leibnizO _ )) in Hval.
+  Qed.
+
   Lemma known_replog_in_N N sa γsa:
     known_replog_tokens N ∗ known_replog_token sa γsa -∗
     ⌜N !! sa = Some γsa⌝.
@@ -93,7 +110,7 @@ Section Resources_definition.
     known_replog_token sa γ ∗ own_logL_obs l ∗ own_log_auth γ (1/2) l.
 
   Definition own_replog_obs sa l : iProp Σ :=
-    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l.
+    ∃ γ, known_replog_token sa γ ∗ own_logL_obs l ∗ own γ (◯ML l).
 
   (** ** General Obs predicate : socket_address → wrlog → iProp Σ. *)
   Definition own_obs sa l : iProp Σ :=

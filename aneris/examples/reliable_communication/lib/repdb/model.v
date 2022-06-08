@@ -44,6 +44,13 @@ Section ValidStates.
   Definition mem_log_coh (L : wrlog) (M : gmap Key (option write_event)) :=
     ∀ k, k ∈ dom M → M !! k = Some (at_key k L).
 
+  Definition in_log_mem_some_coh (L : wrlog) (M : gmap Key (option write_event)) :=
+    ∀ k we, at_key k L = Some we → M !! we.(we_key) = Some (Some we).
+
+ Definition mem_serializable_vals (M : gmap Key (option write_event)) :=
+    ∀ k we, k ∈ dom M → M !! k = Some (Some we) →
+            Serializable DB_serialization we.(we_val).
+
   Definition allocated_in_mem (L : wrlog) (M : gmap Key (option write_event)) :=
     ∀ l k wel, l ≤ₚ L → at_key k l = Some wel →
                ∃ weL, M !! k = Some (Some weL) ∧ wel ≤ₜ weL.
@@ -57,12 +64,26 @@ Section ValidStates.
       DB_GSTV_mem_dom : mem_dom M;
       DB_GSTV_mem_we_key : mem_we_key M;
       DB_GSTV_mem_log_coh : mem_log_coh L M;
+      DB_GSTV_mem_in_log_mem_some_coh : in_log_mem_some_coh L M;
+      DB_GSTV_mem_serializable_vals : mem_serializable_vals M;
       DB_GSTV_mem_allocated_in_mem : allocated_in_mem L M;
       DB_GSTV_log_events L : log_events L;
     }.
 
   Lemma valid_state_empty : valid_state [] ∅.
   Proof. Admitted.
+
+  Lemma log_events_serializable L M :
+    valid_state L M →
+    ∀ (we : write_event),
+    In we L →
+    Serializable
+     (prod_serialization
+        (prod_serialization string_serialization DB_serialization)
+        int_serialization) ($ we).
+  Proof.
+  Admitted.
+
 
  (** Local Validity. *)
   Definition mem_dom_local (M : gmap Key val) := dom M ⊆ DB_keys.

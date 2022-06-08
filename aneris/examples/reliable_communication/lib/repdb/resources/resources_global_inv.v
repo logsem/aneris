@@ -7,6 +7,7 @@ From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Import lang resources inject.
 From aneris.aneris_lang.lib Require Import
      list_proof monitor_proof lock_proof map_proof.
+From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.repdb
      Require Import model.
 From aneris.examples.reliable_communication.lib.repdb.spec
@@ -136,6 +137,16 @@ Section Global_Invariant.
     own_mem_user γM k q (at_key k h1) ={E}=∗
     ∃ we1, own_mem_user γM k q (at_key k h1) ∗
              ⌜at_key k h1 = Some we1⌝ ∗ ⌜we0 ≤ₜ we1⌝.
+  Proof. Admitted.
+
+  Lemma Obs_we_serializable a h E we :
+    nclose DB_InvName ⊆ E →
+    Global_Inv ⊢
+    own_obs γL a (h ++ [we]) ={E}=∗
+    ⌜Serializable
+     (prod_serialization
+        (prod_serialization string_serialization DB_serialization)
+        int_serialization) ($ we)⌝.
   Proof. Admitted.
 
 End Global_Invariant.
