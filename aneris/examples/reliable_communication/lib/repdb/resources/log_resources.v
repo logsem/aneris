@@ -15,7 +15,6 @@ From aneris.aneris_lang.lib Require Import
 
   (** Log resources. *)
 
-
   (** ** Owned by global invariant of the system. *)
   Definition own_log_auth (γ : gname) (q : Qp) (l : list A) : iProp Σ :=
     own γ (●ML{ DfracOwn q } l).
@@ -33,6 +32,28 @@ From aneris.aneris_lang.lib Require Import
    apply mono_list_included.
   Qed.
 
+  Lemma get_obs_prefix (γ : gname) (l1 l2 l3 : list A) :
+    l3 = l1 ++ l2 →
+    own_log_obs γ l3 ⊢ own_log_obs γ l1.
+  Proof.
+   rewrite /own_log_obs.
+   iIntros (Hl3) "Hauth".
+   iApply (own_mono with "Hauth").
+   apply mono_list_lb_mono.
+   list_simplifier.
+   by eexists.
+  Qed.
+
+  Lemma get_auth_obs_prefix (γ : gname) (q : Qp) (l1 l2 l3 : list A) :
+    l3 = l1 ++ l2 →
+    own_log_auth γ q l3 ⊢ own_log_obs γ l1.
+  Proof.
+   rewrite /own_log_obs /own_log_auth.
+   iIntros (Hl3) "Hauth".
+   iDestruct (get_obs with "Hauth") as "Hobs".
+   by iApply get_obs_prefix.
+  Qed.
+
   Lemma own_obs_prefix (γ : gname) (q : Qp) (L l : list A) :
     own_log_auth γ q L ⊢ own_log_obs γ l -∗ ⌜l `prefix_of` L⌝.
   Proof.
@@ -42,7 +63,6 @@ From aneris.aneris_lang.lib Require Import
    apply mono_list_both_dfrac_valid_L in Hvalid.
    naive_solver.
   Qed.
-
 
   Lemma own_log_auth_combine γ q1 q2 l1 l2 :
     own_log_auth γ q1 l1 -∗
@@ -58,7 +78,6 @@ From aneris.aneris_lang.lib Require Import
     rewrite mono_list_auth_dfrac_op. by iFrame.
   Qed.
 
-
   Lemma own_log_auth_split γ q1 q2 l1 :
     own_log_auth γ (q1 + q2) l1 ⊢
     own_log_auth γ q1 l1 ∗ own_log_auth γ q2 l1.
@@ -69,10 +88,15 @@ From aneris.aneris_lang.lib Require Import
     iDestruct "H1" as "(H11 & H12)". iFrame.
   Qed.
 
-
   Lemma obs_obs_prefix γ l1 l2 :
     own_log_obs γ l1 ∗ own_log_obs γ l2 -∗
     ⌜l1 `prefix_of` l2 ∨ l2 `prefix_of` l1⌝.
+  Proof.
+  Admitted.
+
+  Lemma obs_length_agree (γ : gname) (l1 l2 : list A) :
+    length l1 = length l2 →
+    own_log_obs γ l1 ⊢ own_log_obs γ l2 -∗ ⌜l1 = l2⌝.
   Proof.
   Admitted.
 

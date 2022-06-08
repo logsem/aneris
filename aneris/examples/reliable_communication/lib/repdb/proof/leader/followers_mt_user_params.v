@@ -10,9 +10,12 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import aneris_lifting.
 From aneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 From aneris.examples.reliable_communication.prelude Require Import ser_inj.
-From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
-From aneris.examples.reliable_communication.lib.repdb Require Import repdb_code model.
-From aneris.examples.reliable_communication.lib.repdb.spec Require Import db_params events.
+From aneris.examples.reliable_communication.lib.mt_server
+     Require Import user_params.
+From aneris.examples.reliable_communication.lib.repdb
+     Require Import repdb_code model.
+From aneris.examples.reliable_communication.lib.repdb.spec
+     Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
      Require Import ras log_resources resources_def
      resources_global_inv resources_local_inv.
@@ -25,21 +28,20 @@ Import lock_proof.
 Section MT_user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM γF : gname).
 
   Definition ReqData : Type := wrlog.
 
   Definition RepData : Type := wrlog.
 
   Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
-    Global_Inv γL γM ∗ ⌜reqv = #(List.length reqd)⌝ ∗ own_obs γL DB_addr reqd.
+    Global_Inv γL γM ∗ ⌜reqv = #(List.length reqd)⌝ ∗ own_replog_obs γL DB_addrF reqd.
 
   Definition ReqPost
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=
     ∃ (we : write_event),
-      ⌜repv = (#(we.(we_key)), (we.(we_val)))%V⌝ ∗
       ⌜repd = reqd ++ [we]⌝ ∗
-      own_obs γL DB_addr repd.
+      own_replog_obs γL DB_addrF repd.
 
   Global Instance follower_handler_user_params : MTS_user_params :=
     {|
