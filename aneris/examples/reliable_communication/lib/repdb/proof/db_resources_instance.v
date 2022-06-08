@@ -23,7 +23,7 @@ Section DB_resources_instance.
   Context `{!anerisG Mdl Σ, !IDBG Σ}.
   Context (γL γM : gname).
 
-  Global Instance DbRes `{DBP : !DB_params} : DB_resources int_time DBP :=
+  Global Instance DbRes `{DBP : !DB_params} : DB_resources :=
     {|
       GlobalInv := Global_Inv γL γM;
       OwnMemKey := own_mem_user γM;

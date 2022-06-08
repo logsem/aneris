@@ -44,8 +44,9 @@ Section DL_spec.
     {{{ v, RET v; ⌜v = #()⌝ ∗ DLockCanAcquire sa dl R }}}.
 
   Definition dl_subscribe_client_spec (sa : socket_address) A : iProp Σ :=
-    {{{ ⌜sa ∉ A⌝ ∗ fixed A ∗ free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
-         DL_server_addr ⤇ dl_reserved_server_socket_interp}}}
+    {{{ ⌜sa ∉ A⌝ ∗ ⌜DL_server_addr ∈ A⌝ ∗ fixed A ∗
+        free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
+         DL_server_addr ⤇ dl_reserved_server_socket_interp }}}
       dlock_subscribe_client #sa #srv_sa @[ip_of_address sa]
       {{{ dl, RET dl; DLockCanAcquire sa dl R ∗
           ⌜dl_acquire_spec sa dl⌝ ∗

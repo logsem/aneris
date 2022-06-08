@@ -4,7 +4,7 @@ From aneris.examples.reliable_communication.lib.repdb.spec
 
 Section with_Σ.
   Context `{!anerisG Mdl Σ, TM : !DB_time, DB : !DB_params,
-            !DB_events, !DB_resources TM DB}.
+            !DB_events, !DB_resources}.
 
   (* TODO: maybe add frame after [we1] here *)
   Lemma OwnMemKey_Obs_extend a E h k we1 we2 :

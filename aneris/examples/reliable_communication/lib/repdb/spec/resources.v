@@ -6,12 +6,11 @@ From aneris.examples.reliable_communication.lib.repdb.spec
      Require Export db_params time events.
 
 Section Predicates.
-  Context `{!anerisG Mdl Σ, !DB_time}.
-
+  Context `{!anerisG Mdl Σ, !DB_time, !DB_params}.
   Reserved Notation "k ↦ₖ{ q } v" (at level 20).
   Reserved Notation "k ↦ₖ v" (at level 20).
 
-  Class DB_resources `{!DB_params} := {
+  Class DB_resources := {
 
     (** System global invariant *)
     GlobalInv : iProp Σ;
@@ -114,7 +113,7 @@ Section Predicates.
 
 End Predicates.
 
+Arguments DB_resources {_ _ _ _ _}.
+
 Notation "k ↦ₖ v" := (OwnMemKey k 1 v) (at level 20).
 Notation "k ↦ₖ{ q } v" := (OwnMemKey k q v) (at level 20).
-
-Arguments DB_resources {_ _ _}.
