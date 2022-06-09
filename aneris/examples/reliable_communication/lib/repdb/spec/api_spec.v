@@ -171,7 +171,7 @@ Section API_spec.
 End API_spec.
 
 Section Init.
-  Context `{!anerisG Mdl Σ, DB : !DB_params, !DB_time, !DBG Σ }.
+  Context `{!anerisG Mdl Σ, DB : !DB_params, !DB_time, !DBPreG Σ }.
 
   Class DB_init (Followers : gset socket_address) := {
     DB_init_setup E :

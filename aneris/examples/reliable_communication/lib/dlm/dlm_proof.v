@@ -334,11 +334,17 @@ Section DL_proof_of_the_init.
 
 End DL_proof_of_the_init.
 
+From aneris.examples.reliable_communication.spec Require Import prelude ras.
+From aneris.examples.reliable_communication.instantiation
+     Require Import
+     instantiation_of_resources
+     instantiation_of_init.
+
 Section DL_proof_of_the_init_class.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
+  Context `{!SpecChanG Σ}.
   Context `{!DL_params}.
-  Context `{!Reliable_communication_init}.
 
   Global Instance dlinit : DL_init.
   Proof.
@@ -347,7 +353,8 @@ Section DL_proof_of_the_init_class.
     iModIntro.
     iExists dlr.
     iFrame.
-    Unshelve. done.
+    Unshelve.
+    done.
   Qed.
 
 End DL_proof_of_the_init_class.
