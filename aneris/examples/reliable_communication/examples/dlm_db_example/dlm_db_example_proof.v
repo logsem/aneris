@@ -70,24 +70,41 @@ Section proof_of_code.
   (* ------------------------------------------------------------------------ *)
   Lemma wp_do_writes dl wr clt_00 clt_01 :
     ip_of_address clt_00 = ip_of_address clt_01 →
-    {{{ ⌜(dl_acquire_spec SharedRes clt_00 dl)⌝ ∗
+    {{{ GlobalInv ∗
+        ⌜(dl_acquire_spec SharedRes clt_00 dl)⌝ ∗
         ⌜(dl_release_spec SharedRes clt_00 dl)⌝ ∗
         (∀ k v h, simplified_write_spec wr clt_01 k v h) ∗
         DLockCanAcquire clt_00 dl SharedRes }}}
       do_writes dl wr @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HipEq Φ) "(%Hacq & %Hrel & (Hwr & Hdl)) HΦ".
+    iIntros (HipEq Φ) "(#HGinv & %Hacq & %Hrel & (#Hwr & Hdl)) HΦ".
     rewrite /do_writes.
     wp_pures.
     wp_apply (Hacq with "[$Hdl]").
     iIntros (v) "(-> & Hrel & Hdlk & Hres)".
     wp_pures.
-    iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & Hcnd)".
+    iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
     rewrite HipEq.
     wp_apply ("Hwr" $! "x" (SerVal #37) h _ with "[Hx Hobs]").
     { iExists _. iFrame "#∗". done. }
     iIntros "Hpost".
+    wp_pures.
+    iDestruct "Hpost" as (hfx ax) "(%Hax & %Hwax & %Hatx & #Hobsx & Hx)".
+    wp_apply ("Hwr" $! "y" (SerVal #1) (h ++ hfx ++ [ax]) _ with "[Hy Hobsx]").
+    { iExists _. iFrame "#∗". admit. }
+    iIntros "Hpost".
+    wp_pures.
+    iDestruct "Hpost" as (hfy ay) "(%Hay & %Hway & %Haty & #Hobsy & Hy)".
+    rewrite -HipEq.
+    iApply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+    iExists (Some ax), (Some ay), ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]).
+    iFrame "#∗".
+    admit.
+    iNext.
+    iIntros (v) "(-> & _)".
+    by iApply "HΦ".
+    Unshelve. done. done.
   Admitted.
 
   (* ------------------------------------------------------------------------ *)
@@ -99,10 +116,11 @@ Section proof_of_code.
      or if it is also guarded by the distributed lock. *)
   Lemma wp_dl_wait_on_read dl rd clt_10 clt_11 :
     ip_of_address clt_10 = ip_of_address clt_11 →
-    {{{ (∀ k q h, read_spec rd clt_11 k q h) ∗
-          ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
-          ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
-          DLockCanAcquire clt_10 dl SharedRes }}}
+    {{{ GlobalInv ∗
+        (∀ k q h, read_spec rd clt_11 k q h) ∗
+        ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
+        ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
+        DLockCanAcquire clt_10 dl SharedRes }}}
       dl_wait_on_read dl rd #"x" #37 @[ip_of_address clt_10]
     {{{ RET #(); True }}}.
   Proof.
@@ -110,11 +128,12 @@ Section proof_of_code.
 
   Lemma wp_do_reads dl rd clt_10 clt_11 :
     ip_of_address clt_10 = ip_of_address clt_11 →
-    {{{ (∀ k q h, read_spec rd clt_11 k q h) ∗
-          ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
-          ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
-          DLockCanAcquire clt_10 dl SharedRes }}}
-        do_reads dl rd @[ip_of_address clt_10]
+    {{{ GlobalInv ∗
+        (∀ k q h, read_spec rd clt_11 k q h) ∗
+        ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
+        ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
+        DLockCanAcquire clt_10 dl SharedRes }}}
+      do_reads dl rd @[ip_of_address clt_10]
    {{{ RET #(); True }}}.
   Proof.
   Admitted.
@@ -125,7 +144,7 @@ Section proof_of_code.
 
   Lemma proof_of_node0 (clt_00 clt_01 : socket_address) A :
     ip_of_address clt_00 = ip_of_address clt_01 →
-    {{{
+    {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_00 ∉ A⌝ ∗
         (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
@@ -148,7 +167,7 @@ Section proof_of_code.
 
   Lemma proof_of_node1 (clt_10 clt_11 : socket_address) A :
     ip_of_address clt_10 = ip_of_address clt_11 →
-    {{{
+    {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_10 ∉ A⌝ ∗
         fixed A ∗
@@ -215,6 +234,7 @@ Section proof_of_main.
 
   Lemma main_spec :
     ⊢ |={⊤}=>
+         GlobalInv -∗
          (∀ A, dl_server_start_service_spec SharedRes A) -∗
          (∀ sa A, dl_subscribe_client_spec SharedRes sa A) -∗
          (∀ A, init_leader_spec A Init_leader leader_si leaderF_si) -∗
@@ -243,7 +263,7 @@ Section proof_of_main.
   Proof.
     iIntros "".
     iModIntro.
-    iIntros "HdlSrvS #HdlCltS HdbSrvS #HdbCltS".
+    iIntros "#HGinv HdlSrvS #HdlCltS HdbSrvS #HdbCltS".
     iIntros "#HinA #Hsrv0 #Hsrv1 #Hsrv2 #Hfixed Hfree0 Hfree1 Hfree2 Hfree3".
     iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 Hsa6 HSrvInit0 HSrvInit1 HR".
     rewrite /main.
@@ -271,7 +291,7 @@ Section proof_of_main.
     iSplitR "Hsa3 Hsa4"; last first.
     { iNext. iIntros "Hfps".
       iApply (proof_of_node0 leader_si db_sa db_Fsa dlm_sa clt_sa00 clt_sa01 A
-               with "[$Hsa3 $Hsa4 Hfps]"); first done.
+               with "[$HGinv $Hsa3 $Hsa4 Hfps]"); first done.
       iSplit.
       { iPureIntro. eauto with set_solver. }
       iDestruct (free_ports_split
@@ -287,7 +307,7 @@ Section proof_of_main.
     iSplitR "Hsa5 Hsa6"; last first.
     { iNext. iIntros "Hfps".
       iApply (proof_of_node1 leader_si db_sa db_Fsa dlm_sa clt_sa10 clt_sa11 A
-               with "[$Hsa5 $Hsa6 Hfps]"); first done.
+               with "[$HGinv $Hsa5 $Hsa6 Hfps]"); first done.
       iSplit.
       { iPureIntro. eauto with set_solver. }
       iDestruct (free_ports_split
@@ -436,7 +456,7 @@ Proof.
   iDestruct (big_sepS_delete _ _ clt_sa11 with "Hms") as "[Hc11 _]";
     first set_solver.
   iApply ("Hmain" with
-           "[$HdlSrvS][$HdlCltS][$HdbSrvS][$HdbCltS][//]
+           "[$HGinv][$HdlSrvS][$HdlCltS][$HdbSrvS][$HdbCltS][//]
             [$Hsi0][$Hsi1][$Hsi2][$Hf]
             [$Hip0][$Hip1][$Hip2][$Hip3]
             [$Hm0][$Hm1][$Hm2][$Hc00][$Hc01][$Hc10][$Hc11]
