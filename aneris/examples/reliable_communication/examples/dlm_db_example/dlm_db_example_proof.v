@@ -13,7 +13,7 @@ From aneris.examples.reliable_communication.lib.dlm
 From aneris.examples.reliable_communication.lib.repdb
      Require Import repdb_code.
 From aneris.examples.reliable_communication.lib.dlm
-     Require Import dlm_prelude dlm_code dlm_spec.
+     Require Import dlm_prelude dlm_resources dlm_code dlm_spec.
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import
      ras resources api_spec.
@@ -26,7 +26,7 @@ From aneris.examples.reliable_communication.examples.dlm_db_example
 (* -------------------------------------------------------------------------- *)
 Section proof_of_code.
   Context `{!anerisG Mdl Σ, !lockG Σ}.
-  Context `{TM: !DB_time, !DBG Σ}.
+  Context `{TM: !DB_time, !DBPreG Σ}.
   Context (leader_si : message → iProp Σ).
   Context (db_sa db_Fsa dlm_sa : socket_address).
 
@@ -68,77 +68,67 @@ Section proof_of_code.
   (* ------------------------------------------------------------------------ *)
   (** The proof of the internal do_writes call *)
   (* ------------------------------------------------------------------------ *)
-  Section proof_of_the_do_writes.
-    Context (dl : val) (clt_00 : socket_address).
-    Context (wr : val) (clt_01 : socket_address).
-    Context (HWriteSpec : ⊢ ∀ k v h, simplified_write_spec wr clt_01 k v h).
-    Context (HAcqSpec : dl_acquire_spec SharedRes clt_00 dl).
-    Context (HRelSpec : dl_release_spec SharedRes clt_00 dl).
-
-    Lemma wp_do_writes :
-      ip_of_address clt_00 = ip_of_address clt_01 →
-      {{{ DLockCanAcquire clt_00 dl SharedRes }}}
-        do_writes dl wr @[ip_of_address clt_00]
-      {{{ RET #(); True }}}.
-    Proof.
-      iIntros (HipEq Φ) "Hacq HΦ".
-      rewrite /do_writes.
-      wp_pures.
-      wp_apply (HAcqSpec with "[$Hacq]").
-      iIntros (v) "(-> & Hrel & Hdlk & Hres)".
-      wp_pures.
-      iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & Hcnd)".
-      rewrite HipEq.
-      wp_apply (HWriteSpec $! "x" (SerVal #37) h _ with "[Hx Hobs]").
-      { iExists _. iFrame "#∗". done. }
-      iIntros "Hpost".
-    Admitted.
-
-  End proof_of_the_do_writes.
+  Lemma wp_do_writes dl wr clt_00 clt_01 :
+    ip_of_address clt_00 = ip_of_address clt_01 →
+    {{{ ⌜(dl_acquire_spec SharedRes clt_00 dl)⌝ ∗
+        ⌜(dl_release_spec SharedRes clt_00 dl)⌝ ∗
+        (∀ k v h, simplified_write_spec wr clt_01 k v h) ∗
+        DLockCanAcquire clt_00 dl SharedRes }}}
+      do_writes dl wr @[ip_of_address clt_00]
+    {{{ RET #(); True }}}.
+  Proof.
+    iIntros (HipEq Φ) "(%Hacq & %Hrel & (Hwr & Hdl)) HΦ".
+    rewrite /do_writes.
+    wp_pures.
+    wp_apply (Hacq with "[$Hdl]").
+    iIntros (v) "(-> & Hrel & Hdlk & Hres)".
+    wp_pures.
+    iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & Hcnd)".
+    rewrite HipEq.
+    wp_apply ("Hwr" $! "x" (SerVal #37) h _ with "[Hx Hobs]").
+    { iExists _. iFrame "#∗". done. }
+    iIntros "Hpost".
+  Admitted.
 
   (* ------------------------------------------------------------------------ *)
   (** The proof of the internal do_reads call *)
   (* ------------------------------------------------------------------------ *)
-  Section proof_of_the_do_reads.
-    Context (dl : val) (clt_10 : socket_address).
-    Context (rd : val) (clt_11 : socket_address).
-    Context (HReadSpec : ⊢ ∀ k q h, read_spec rd clt_11 k q h).
-    Context (HAcqSpec : dl_acquire_spec SharedRes clt_10 dl).
-    Context (HRelSpec : dl_release_spec SharedRes clt_10 dl).
-
   (* NotaBene : the spec of dl_wait_on_read can be applied to
      generic key `k` and value `v` (instead of x and 37) only if
      a resource k ↦ₖ{q} v is either provided in the precondition
      or if it is also guarded by the distributed lock. *)
-    Lemma wp_dl_wait_on_read :
-      ip_of_address clt_10 = ip_of_address clt_11 →
-      {{{ DLockCanAcquire clt_10 dl SharedRes }}}
-        dl_wait_on_read dl rd #"x" #37 @[ip_of_address clt_10]
-      {{{ RET #(); True }}}.
-    Proof.
-    Admitted.
+  Lemma wp_dl_wait_on_read dl rd clt_10 clt_11 :
+    ip_of_address clt_10 = ip_of_address clt_11 →
+    {{{ (∀ k q h, read_spec rd clt_11 k q h) ∗
+          ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
+          ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
+          DLockCanAcquire clt_10 dl SharedRes }}}
+      dl_wait_on_read dl rd #"x" #37 @[ip_of_address clt_10]
+    {{{ RET #(); True }}}.
+  Proof.
+  Admitted.
 
-    Lemma wp_do_reads :
-      {{{ DLockCanAcquire clt_10 dl SharedRes }}}
+  Lemma wp_do_reads dl rd clt_10 clt_11 :
+    ip_of_address clt_10 = ip_of_address clt_11 →
+    {{{ (∀ k q h, read_spec rd clt_11 k q h) ∗
+          ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
+          ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
+          DLockCanAcquire clt_10 dl SharedRes }}}
         do_reads dl rd @[ip_of_address clt_10]
-      {{{ RET #(); True }}}.
-    Proof.
-    Admitted.
-
-  End proof_of_the_do_reads.
+   {{{ RET #(); True }}}.
+  Proof.
+  Admitted.
 
   (* ------------------------------------------------------------------------ *)
   (** The proof of the node 0 (writer) *)
   (* ------------------------------------------------------------------------ *)
-  Section proof_of_the_node_0.
-    Context (HdbCS : ⊢ (∀ A ca, init_client_proxy_leader_spec A ca leader_si)).
-    Context (HdlCS : ⊢ (∀ sa A, dl_subscribe_client_spec SharedRes sa A)).
 
-    Lemma proof_of_node0 (clt_00 clt_01 : socket_address) A :
+  Lemma proof_of_node0 (clt_00 clt_01 : socket_address) A :
     ip_of_address clt_00 = ip_of_address clt_01 →
     {{{
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_00 ∉ A⌝ ∗
+        (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
         fixed A ∗
         free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
@@ -146,6 +136,7 @@ Section proof_of_code.
         (* preconditions to start a client proxy for the database. *)
         ⌜db_sa ∈ A⌝ ∗
         ⌜clt_01 ∉ A⌝ ∗
+        (∀ A ca, init_client_proxy_leader_spec A ca leader_si) ∗
         db_sa ⤇ leader_si ∗
         clt_01 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_01) {[port_of_address clt_01]}
@@ -155,43 +146,30 @@ Section proof_of_code.
   Proof.
   Admitted.
 
-  End proof_of_the_node_0.
-
-  (* ------------------------------------------------------------------------ *)
-  (** The proof of the node 1 (reader) *)
-  (* ------------------------------------------------------------------------ *)
-  Section proof_of_the_node_1.
-    Context (HdbCS : ⊢ (∀ A ca, init_client_proxy_leader_spec A ca leader_si)).
-    Context (HdlCS : ⊢ (∀ sa A, dl_subscribe_client_spec SharedRes sa A)).
-
-    Lemma proof_of_node1 (clt_10 clt_11 : socket_address) A :
-      ip_of_address clt_10 = ip_of_address clt_11 →
-      {{{
+  Lemma proof_of_node1 (clt_10 clt_11 : socket_address) A :
+    ip_of_address clt_10 = ip_of_address clt_11 →
+    {{{
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_10 ∉ A⌝ ∗
         fixed A ∗
+        (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
         free_ports (ip_of_address clt_10) {[port_of_address clt_10]} ∗
         clt_10 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
         ⌜db_sa ∈ A⌝ ∗
         ⌜clt_11 ∉ A⌝ ∗
+        (∀ A ca, init_client_proxy_leader_spec A ca leader_si) ∗
         db_sa ⤇ leader_si ∗
         clt_11 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_11) {[port_of_address clt_11]}
-      }}}
-        node1 #clt_10 #clt_11 #dlm_sa #db_sa @[ip_of_address clt_10]
-      {{{ RET #(); True }}}.
-    Proof.
-    Admitted.
-
-  End proof_of_the_node_1.
+    }}}
+      node1 #clt_10 #clt_11 #dlm_sa #db_sa @[ip_of_address clt_10]
+    {{{ RET #(); True }}}.
+  Proof.
+  Admitted.
 
 End proof_of_code.
-
-(* From aneris.examples.reliable_communication.instantiation *)
-(*      Require Import instantiation_of_init. *)
-
 
 (** Concrete parameters (addresses, ips) *)
 Definition db_sa := SocketAddressInet "0.0.0.0" 80.
@@ -227,19 +205,19 @@ Definition main : expr :=
 
 Section proof_of_main.
   Context `{!anerisG Mdl Σ}.
-  Context `{TM: !DB_time, !DBG Σ}.
+  Context `{TM: !DB_time, !DBPreG Σ}.
   Context (leader_si leaderF_si : message → iProp Σ).
   Context (Init_leader : iProp Σ).
   Context `{!DlockG Σ, !DL_resources}.
   Context `{DBRes : !@DB_resources _ _ _ _ DBP}.
   Notation SharedRes := (@SharedRes _ _ _ _ db_sa db_Fsa DBRes).
-  Context (HdlSrvSpec : ⊢ (∀ A, dl_server_start_service_spec SharedRes A)).
-  Context (HdlCltSpec : ⊢ (∀ sa A, dl_subscribe_client_spec SharedRes sa A)).
-  Context (HdbSrvSpec : ⊢ (∀ A, init_leader_spec A Init_leader leader_si leaderF_si)).
-  Context (HdbCltSpec : ⊢ (∀ A ca,  init_client_proxy_leader_spec A ca leader_si)).
 
   Lemma main_spec :
     ⊢ |={⊤}=>
+         (∀ A, dl_server_start_service_spec SharedRes A) -∗
+         (∀ sa A, dl_subscribe_client_spec SharedRes sa A) -∗
+         (∀ A, init_leader_spec A Init_leader leader_si leaderF_si) -∗
+         (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
          db_sa ⤇ leader_si -∗
          db_Fsa ⤇ leaderF_si -∗
          dlm_sa ⤇ dl_reserved_server_socket_interp -∗
@@ -300,9 +278,19 @@ Proof.
  reflexivity.
 Qed.
 
+From stdpp Require Import fin_maps gmap.
+From iris.algebra Require Import auth gmap frac excl agree coPset
+     gset frac_auth ofe excl.
+From aneris.algebra Require Import disj_gsets.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.program_logic Require Import aneris_adequacy.
 From aneris.examples.reliable_communication.lib.repdb
      Require Import model.
+From aneris.examples.reliable_communication.lib.dlm
+     Require Import dlm_proof.
+From aneris.examples.reliable_communication.spec Require Import prelude ras.
+
+
 
 Definition socket_interp `{!anerisG empty_model Σ}
   db_si dbF_si dlm_si sa : socket_interp Σ :=
@@ -310,16 +298,30 @@ Definition socket_interp `{!anerisG empty_model Σ}
    | SocketAddressInet "0.0.0.0" 80 =>  db_si
    | SocketAddressInet "0.0.0.0" 81 =>  dbF_si
    | SocketAddressInet "0.0.0.1" 80 =>  dlm_si
-
    | _ => λ msg, ⌜True⌝
    end)%I.
 
+Notation ShRes := (@SharedRes _ _ _ _ db_sa db_Fsa).
+
+Lemma db_init_empty `{!anerisG Mdl Σ} : (DB_init ∅).
+Proof.
+  (* iMod (own_alloc (● (∅ : gmapUR socket_address (agreeR gnameO)))) as (γknwF) "Hknw"; *)
+  (*   first by apply auth_auth_valid. *)
+  (* iMod (own_alloc (● (GSet ∅ : (gset_disjUR socket_address)))) as (γfreF) "Hfre"; *)
+  (*   first by apply auth_auth_valid. *)
+  (* set (db := *)
+  (*        {| *)
+  (*          DBG_known_replog_name := γknwF; *)
+  (*          DBG_free_replog_set_name := γfreF *)
+  (*        |}). *)
+Admitted.
+
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
-  set (Σ := #[anerisΣ dummy_model; DBΣ]).
+  set (Σ := #[anerisΣ dummy_model; DBΣ; SpecChanΣ]).
   eapply (@adequacy
             Σ dummy_model _ _ ips fixed_dom
-            {[db_sa; db_Fsa; clt_sa00; clt_sa01; clt_sa10; clt_sa11]} ∅ ∅ ∅);
+            {[db_sa; db_Fsa; dlm_sa; clt_sa00; clt_sa01; clt_sa10; clt_sa11]} ∅ ∅ ∅);
     try done; last first.
   { set_solver. }
   { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
@@ -327,5 +329,56 @@ Proof.
   { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
-  admit.
-Admitted.
+  assert (DBPreG Σ) as HPreG by apply _.
+  iMod (db_init_empty.(DB_init_setup) ⊤ $! I) as (DBRes) "Hdb";
+    [solve_ndisj|set_solver|set_solver| ].
+  iDestruct "Hdb"
+    as (init_leader leader_si leaderF_si) "(#HGinv & Hkeys & HdbInit & #Hspecs)".
+  iDestruct "Hspecs"
+    as "((#HdbSrvS & #HdbCltS) & _)".
+  iMod (dlinit.(DL_init_setup) ⊤ DLP ShRes $! I )
+    as (DLRes) "(HdlInit & #HdlSrvS & #HdlCltS)";
+    [solve_ndisj| ].
+  iExists (socket_interp leader_si leaderF_si dl_reserved_server_socket_interp).
+  iMod (@main_spec
+          _ _ _
+          int_time _ leader_si leaderF_si init_leader _ DLRes DBRes)
+    as "Hmain".
+  iModIntro.
+  iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
+  simpl in *.
+  iDestruct (big_sepS_delete _ _ db_sa with "Hsis") as "[Hsi0 Hsis]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_Fsa with "Hsis") as "[Hsi1 Hsis]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ dlm_sa with "Hsis") as "[Hsi2 _]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "[Hip0 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "[Hip1 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.2" with "Hips") as "[Hip2 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.3" with "Hips") as "[Hip3 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_sa with "Hb") as "[Hm0 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_Fsa with "Hms") as "[Hm1 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ dlm_sa with "Hms") as "[Hm2 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ clt_sa00 with "Hms") as "[Hc00 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ clt_sa01 with "Hms") as "[Hc01 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ clt_sa10 with "Hms") as "[Hc10 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ clt_sa11 with "Hms") as "[Hc11 _]";
+    first set_solver.
+  iApply ("Hmain" with
+           "[$HdlSrvS][$HdlCltS][$HdbSrvS][$HdbCltS]
+            [$Hsi0][$Hsi1][$Hsi2][$Hf]
+            [$Hip0][$Hip1][$Hip2][$Hip3]
+            [$Hm0][$Hm1][$Hm2][$Hc00][$Hc01][$Hc10][$Hc11]
+            [$HdlInit][$HdbInit]").
+Qed.
