@@ -25,7 +25,7 @@ From aneris.examples.reliable_communication.examples.dlm_db_example
 (** The definition of the resource guarded by the distributed lock manager. *)
 (* -------------------------------------------------------------------------- *)
 Section proof_of_code.
-  Context `{!anerisG Mdl Σ, !lockG Σ}.
+  Context `{!anerisG Mdl Σ}.
   Context `{TM: !DB_time, !DBPreG Σ}.
   Context (leader_si : message → iProp Σ).
   Context (db_sa db_Fsa dlm_sa : socket_address).
@@ -199,12 +199,13 @@ Global Instance DBP : DB_params :=
     |}.
 
 Definition main : expr :=
-    Start "0.0.0.0" (init_leader (DB_serialization.(s_serializer)) #DB_addr);;
+    Start "0.0.0.0" (init_leader (DB_serialization.(s_serializer)) #DB_addr #DB_addrF);;
     Start "0.0.0.1" (dlock_start_service #dlm_sa) ;;
-    Start "0.0.0.2" (node0 #clt_sa00 #clt_sa01 #dlm_sa #db_sa).
+    Start "0.0.0.2" (node0 #clt_sa00 #clt_sa01 #dlm_sa #db_sa) ;;
+    Start "0.0.0.3" (node1 #clt_sa10 #clt_sa11 #dlm_sa #db_sa).
 
 Section proof_of_main.
-  Context `{!anerisG Mdl Σ}.
+  Context `{!anerisG Mdl Σ, lockG Σ}.
   Context `{TM: !DB_time, !DBPreG Σ}.
   Context (leader_si leaderF_si : message → iProp Σ).
   Context (Init_leader : iProp Σ).
@@ -218,6 +219,7 @@ Section proof_of_main.
          (∀ sa A, dl_subscribe_client_spec SharedRes sa A) -∗
          (∀ A, init_leader_spec A Init_leader leader_si leaderF_si) -∗
          (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
+         ⌜DL_server_addr ∈ A⌝ -∗
          db_sa ⤇ leader_si -∗
          db_Fsa ⤇ leaderF_si -∗
          dlm_sa ⤇ dl_reserved_server_socket_interp -∗
@@ -235,10 +237,68 @@ Section proof_of_main.
          SocketAddressInet "0.0.0.3" 81 ⤳ (∅, ∅) -∗
          dl_service_init -∗
          Init_leader -∗
+         SharedRes -∗
          WP main @["system"]
       {{ v, True }}.
   Proof.
-  Admitted.
+    iIntros "".
+    iModIntro.
+    iIntros "HdlSrvS #HdlCltS HdbSrvS #HdbCltS".
+    iIntros "#HinA #Hsrv0 #Hsrv1 #Hsrv2 #Hfixed Hfree0 Hfree1 Hfree2 Hfree3".
+    iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 Hsa6 HSrvInit0 HSrvInit1 HR".
+    rewrite /main.
+    (* Server 1. *)
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    iFrame "Hfree0".
+    iSplitR "Hsa0 Hsa1 HSrvInit1 HdbSrvS"; last first.
+    { iNext. iIntros "Hfps".
+      iApply ("HdbSrvS" $! A
+               with "[][][][][HSrvInit1 Hfps Hsa0 Hsa1]"); [eauto .. | | done ].
+      iDestruct (free_ports_split
+                    "0.0.0.0"
+                    {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
+      iFrame "#∗". iApply "Hfp1". iFrame. }
+    iNext. wp_pures.
+    (* Server 2. *)
+    wp_apply aneris_wp_start; first done.
+    iFrame "Hfree1".
+    iSplitR "Hsa2 HSrvInit0 HdlSrvS HR"; last first.
+    { iNext. iIntros "Hfps".
+      iApply ("HdlSrvS" $! A with "[Hfps HSrvInit0 Hsa2 HR]"); last done. iFrame "#∗". }
+    iNext. wp_pures.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    iFrame "Hfree2".
+    iSplitR "Hsa3 Hsa4"; last first.
+    { iNext. iIntros "Hfps".
+      iApply (proof_of_node0 leader_si db_sa db_Fsa dlm_sa clt_sa00 clt_sa01 A
+               with "[$Hsa3 $Hsa4 Hfps]"); first done.
+      iSplit.
+      { iPureIntro. eauto with set_solver. }
+      iDestruct (free_ports_split
+                   "0.0.0.2"
+                   {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
+      iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".
+      iFrame "#∗".
+      iPureIntro; set_solver.
+      done. }
+    iNext. wp_pures.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    iFrame "Hfree3".
+    iSplitR "Hsa5 Hsa6"; last first.
+    { iNext. iIntros "Hfps".
+      iApply (proof_of_node1 leader_si db_sa db_Fsa dlm_sa clt_sa10 clt_sa11 A
+               with "[$Hsa5 $Hsa6 Hfps]"); first done.
+      iSplit.
+      { iPureIntro. eauto with set_solver. }
+      iDestruct (free_ports_split
+                   "0.0.0.3"
+                   {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
+      iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".
+      iFrame "#∗".
+      iPureIntro; set_solver.
+      done. }
+    done.
+  Qed.
 
 End proof_of_main.
 
@@ -333,7 +393,7 @@ Proof.
   iMod (db_init_empty.(DB_init_setup) ⊤ $! I) as (DBRes) "Hdb";
     [solve_ndisj|set_solver|set_solver| ].
   iDestruct "Hdb"
-    as (init_leader leader_si leaderF_si) "(#HGinv & Hkeys & HdbInit & #Hspecs)".
+    as (init_leader leader_si leaderF_si) "(#HGinv & #Hobs & Hkeys & HdbInit & #Hspecs)".
   iDestruct "Hspecs"
     as "((#HdbSrvS & #HdbCltS) & _)".
   iMod (dlinit.(DL_init_setup) ⊤ DLP ShRes $! I )
@@ -376,9 +436,17 @@ Proof.
   iDestruct (big_sepS_delete _ _ clt_sa11 with "Hms") as "[Hc11 _]";
     first set_solver.
   iApply ("Hmain" with
-           "[$HdlSrvS][$HdlCltS][$HdbSrvS][$HdbCltS]
+           "[$HdlSrvS][$HdlCltS][$HdbSrvS][$HdbCltS][//]
             [$Hsi0][$Hsi1][$Hsi2][$Hf]
             [$Hip0][$Hip1][$Hip2][$Hip3]
             [$Hm0][$Hm1][$Hm2][$Hc00][$Hc01][$Hc10][$Hc11]
             [$HdlInit][$HdbInit]").
+  iExists None, None,  [].
+  iDestruct (big_sepS_delete _ _ "x" with "Hkeys") as "[Hx Hkeys]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "y" with "Hkeys") as "[Hy _]";
+   first set_solver.
+  iFrame "#∗".
+  iPureIntro; split_and!; [done|done|].
+  intros. naive_solver.
 Qed.

@@ -184,6 +184,7 @@ Section Init.
         (leader_si : message → iProp Σ)
         (leaderF_si : message → iProp Σ),
       GlobalInv ∗
+      Obs DB_addr [] ∗
       ([∗ set] k ∈ DB_keys, k ↦ₖ None) ∗
       Init_leader ∗
       ((∀ A, init_leader_spec A Init_leader leader_si leaderF_si) ∗
