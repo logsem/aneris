@@ -16,7 +16,7 @@ From aneris.examples.reliable_communication.lib.dlm
      Require Import dlm_prelude dlm_resources dlm_code dlm_spec.
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import
-     ras resources api_spec.
+     ras events resources api_spec.
 From aneris.examples.reliable_communication.examples.dlm_db_example
      Require Import dlm_db_example_code.
 
@@ -61,9 +61,8 @@ Section proof_of_code.
         Obs DB_addr h ∗
         ⌜at_key "x" h = xv⌝ ∗
         ⌜at_key "y" h = yv⌝ ∗
-        ⌜∀ xw yw,
-           (xv = Some xw ∧ xw.(we_val) = #37) ↔
-           (yv = Some yw ∧ yw.(we_val) = #1)⌝.
+        ⌜ (∃ xw, xv = Some xw ∧ xw.(we_val) = #37) ↔
+          (∃ yw, yv = Some yw ∧ yw.(we_val) = #1)⌝.
 
   (* ------------------------------------------------------------------------ *)
   (** The proof of the internal do_writes call *)
@@ -91,21 +90,51 @@ Section proof_of_code.
     iIntros "Hpost".
     wp_pures.
     iDestruct "Hpost" as (hfx ax) "(%Hax & %Hwax & %Hatx & #Hobsx & Hx)".
+    iApply fupd_aneris_wp.
+    rewrite -Hhy.
+    assert (h ≤ₚ (h ++ hfx ++ [ax])) as Hprefix.
+    { by apply prefix_app_r. }
+    iCombine "Hy" "Hobsx" as "HyObsx".
+    iMod (OwnMemKey_obs_frame_prefix DB_addr "y" 1%Qp h (h ++ hfx ++ [ax]) ⊤ _ Hprefix
+           with "HGinv HyObsx") as "(Hy & %HyHeq)".
+    iModIntro.
+    assert (at_key "x" (h ++ hfx ++ [ax]) = Some ax) as HatAx.
+    { rewrite app_assoc. by apply at_key_snoc_some. }
     wp_apply ("Hwr" $! "y" (SerVal #1) (h ++ hfx ++ [ax]) _ with "[Hy Hobsx]").
-    { iExists _. iFrame "#∗". admit. }
+    { iFrame "#∗".
+      iExists _. iFrame "#∗". naive_solver. }
     iIntros "Hpost".
     wp_pures.
     iDestruct "Hpost" as (hfy ay) "(%Hay & %Hway & %Haty & #Hobsy & Hy)".
     rewrite -HipEq.
+    iApply fupd_aneris_wp.
+    rewrite -HatAx.
+    assert ((h ++ hfx ++ [ax]) ≤ₚ ((h ++ hfx ++ [ax]) ++ hfy ++ [ay])) as Hprefix'.
+    {  by apply prefix_app_r. }
+    iCombine "Hx" "Hobsy" as "HxObsy".
+    iMod (OwnMemKey_obs_frame_prefix
+            DB_addr "x" 1%Qp
+            (h ++ hfx ++ [ax]) ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]) ⊤ _ Hprefix'
+           with "HGinv HxObsy") as "(Hx & %HxHeq)".
+    iModIntro.
+    assert (at_key "y" ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]) = Some ay) as HatAy.
+    { rewrite app_assoc. by apply at_key_snoc_some. }
     iApply (Hrel with "[$Hrel $Hdlk Hx Hy]").
-    iExists (Some ax), (Some ay), ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]).
-    iFrame "#∗".
-    admit.
+    { iExists (at_key "x" (h ++ hfx ++ [ax])),
+              (Some ay),
+              ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]).
+      iFrame "#∗".
+      iSplit; first done.
+      iSplit; first done.
+      iPureIntro.
+      split.
+      { intros Hx. by exists ay. }
+      intros Hy. by exists ax. }
     iNext.
     iIntros (v) "(-> & _)".
     by iApply "HΦ".
-    Unshelve. done. done.
-  Admitted.
+    Unshelve. done. done. done. done.
+  Qed.
 
   (* ------------------------------------------------------------------------ *)
   (** The proof of the internal do_reads call *)
