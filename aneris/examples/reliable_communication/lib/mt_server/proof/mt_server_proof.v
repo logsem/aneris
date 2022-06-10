@@ -225,14 +225,14 @@ Section MTS_proof_of_init.
 
   Lemma MTS_init_setup_holds (E : coPset) :
     ↑MTS_mN ⊆ E →
-    True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
+    ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
     SrvInit ∗
     (∀ (MTS : MTS_spec_params MTU) A,
        run_server_spec SrvInit srv_si A) ∗
     (∀ A sa, init_client_proxy_spec srv_si A sa).
   Proof.
-    iIntros (HE _).
-    iMod (Reliable_communication_init_setup E MT_UP HE $! ⊤)
+    iIntros (HE).
+    iMod (Reliable_communication_init_setup E MT_UP HE)
       as (chn sgn) "(Hinit & Hspecs)".
     iDestruct "Hspecs"
       as "(
@@ -241,7 +241,6 @@ Section MTS_proof_of_init.
          & %Hlisten & %Haccept
          & %Hsend & %HsendTele
          & %HtryRecv & %Hrecv)".
-    Unshelve. 2: { done. }
     iExists reserved_server_socket_interp, SrvInit.
     iFrame.
     iModIntro.
@@ -276,13 +275,12 @@ Section MTS_proof_of_the_init_class.
 
   Global Instance mts_init : MTS_init.
   Proof.
-    split. iIntros (E MTU HE _).
-    iMod (MTS_init_setup_holds E HE $! ⊤)
+    split. iIntros (E MTU HE).
+    iMod (MTS_init_setup_holds E HE)
       as (srv_si SrvInit) "(Hinit & Hspecs)".
     iModIntro.
     iExists _, SrvInit.
     iFrame.
-    Unshelve. done.
   Qed.
 
 End MTS_proof_of_the_init_class.

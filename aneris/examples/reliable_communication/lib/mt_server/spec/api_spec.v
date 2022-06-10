@@ -58,7 +58,7 @@ Section MTS_Init.
   Class MTS_init := {
     MTS_init_setup E (MTU : MTS_user_params) :
     ↑MTS_mN ⊆ E →
-    True ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
+    ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
       SrvInit ∗
       (∀ (MTS : MTS_spec_params MTU) A,
          run_server_spec SrvInit srv_si A) ∗
