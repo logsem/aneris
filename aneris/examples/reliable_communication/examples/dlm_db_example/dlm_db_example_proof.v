@@ -55,32 +55,6 @@ Section proof_of_code.
   Context `{!@DB_resources _ _ _ _ DBSrv}.
   Context `{!DlockG Σ, !DL_resources}.
 
-  (* Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
-
-  Lemma token_exclusive (γ : gname) : token γ -∗ token γ -∗ False.
-  Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
-
-
-   Definition SharedRes : iProp Σ :=
-      ∃ (xv yv : option we) (h : ghst),
-        Obs DB_addr h ∗
-        "x" ↦ₖ{1/2} (at_key "x" h) ∗
-        "y" ↦ₖ{1/2} (at_key "y" h) ∗
-        (⌜xv = None⌝ ∗ ⌜yv = None⌝) ∨
-        (∃ xw yw, "x" ↦ₖ{1/2} Some xw ∗ "y" ↦ₖ{1/2} Some yw ∗
-
-
-⌜ (∃ xw, xv = Some xw ∧ xw.(we_val) = #37) ↔
-          (∃ yw, yv = Some yw ∧ yw.(we_val) = #1)⌝.
-
-
-  Definition inv_x (γ : gname) (a : we) : iProp Σ :=
-    (∃ h, "x" ↦ᵤ h ∗ ⌜Maximum h = Some a⌝ ∗ ⌜WE_val a = #37⌝) ∨ token γ.
-
-  Definition inv_y (γ : gname) : iProp Σ :=
-    ∃ h, "y" ↦ᵤ h ∗ ∀ a, (⌜a ∈ h ∧ WE_val a = (# 1)⌝) →
-                         (∃ a', ⌜a' <ₜ a⌝ ∗ inv Nx (inv_x γ a')). *)
-
   Definition SharedRes : iProp Σ :=
       ∃ (xv yv : option we) (h : ghst),
         "x" ↦ₖ xv ∗
@@ -485,18 +459,9 @@ Definition socket_interp `{!anerisG empty_model Σ}
 
 Notation ShRes := (@SharedRes _ _ _ _ db_sa db_Fsa).
 
-Lemma db_init_empty `{!anerisG Mdl Σ} : (DB_init ∅).
-Proof.
-  (* iMod (own_alloc (● (∅ : gmapUR socket_address (agreeR gnameO)))) as (γknwF) "Hknw"; *)
-  (*   first by apply auth_auth_valid. *)
-  (* iMod (own_alloc (● (GSet ∅ : (gset_disjUR socket_address)))) as (γfreF) "Hfre"; *)
-  (*   first by apply auth_auth_valid. *)
-  (* set (db := *)
-  (*        {| *)
-  (*          DBG_known_replog_name := γknwF; *)
-  (*          DBG_free_replog_set_name := γfreF *)
-  (*        |}). *)
-Admitted.
+From aneris.examples.reliable_communication.lib.repdb.proof
+     Require Import proof_of_db_init.
+
 
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
