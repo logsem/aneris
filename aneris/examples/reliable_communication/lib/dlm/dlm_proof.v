@@ -9,8 +9,12 @@ From aneris.aneris_lang Require Import tactics proofmode.
 From actris.channel Require Export proto.
 From aneris.aneris_lang.program_logic Require Import aneris_lifting.
 From aneris.examples.reliable_communication Require Import user_params.
-From aneris.examples.reliable_communication.spec Require Import resources proofmode api_spec.
-From aneris.examples.reliable_communication.lib.dlm Require Import dlm_code dlm_prelude.
+From aneris.examples.reliable_communication.spec Require Import resources proofmode api_spec prelude ras.
+From aneris.examples.reliable_communication.lib.dlm Require Import dlm_code dlm_prelude dlm_spec.
+From aneris.examples.reliable_communication.instantiation
+     Require Import
+     instantiation_of_resources
+     instantiation_of_init.
 
 Import client_server_code.
 Import lock_proof.
@@ -31,7 +35,8 @@ Section DL_proof_of_code.
   Definition dlock_protocol_aux (rec : string -d> iProto Σ) : string -d> iProto Σ :=
     λ s,
       let rec : string -d> iProto Σ := rec in
-      (<!> MSG #s {{ (⌜s = "acquire"⌝) ∨ (⌜s = "release"⌝ ∗ (dl_locked_internal ∗ R)) }} ;
+      (<!> MSG #s {{ (⌜s = "acquire"⌝) ∨
+                     (⌜s = "release"⌝ ∗ (dl_locked_internal ∗ R)) }} ;
       if bool_decide (s = "acquire")
        then
          (<?> MSG #"acquire_OK" {{ (dl_locked_internal ∗ R) }};
@@ -45,17 +50,17 @@ Section DL_proof_of_code.
     ProtoUnfold (dlock_protocol s) (dlock_protocol_aux dlock_protocol s).
   Proof. apply proto_unfold_eq, (fixpoint_unfold dlock_protocol_aux). Qed.
 
-  Global Instance UP : Reliable_communication_service_params :=
-  {| RCParams_clt_ser := string_serialization;
-    RCParams_srv_ser := string_serialization;
-    RCParams_srv_ser_inj := ser_inj.string_ser_is_ser_injective;
-    RCParams_srv_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
-    RCParams_clt_ser_inj := ser_inj.string_ser_is_ser_injective;
-    RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
-    RCParams_srv_saddr := DL_server_addr;
-    RCParams_protocol := dlock_protocol "acquire";
-    RCParams_srv_N := DL_namespace;
-  |}.
+  Local Instance UP : Reliable_communication_service_params :=
+    {| RCParams_clt_ser := string_serialization;
+      RCParams_srv_ser := string_serialization;
+      RCParams_srv_ser_inj := ser_inj.string_ser_is_ser_injective;
+      RCParams_srv_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
+      RCParams_clt_ser_inj := ser_inj.string_ser_is_ser_injective;
+      RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
+      RCParams_srv_saddr := DL_server_addr;
+      RCParams_protocol := dlock_protocol "acquire";
+      RCParams_srv_N := DL_namespace;
+    |}.
 
   Context `{cmh: !@Chan_mapsto_resource Σ}.
   Context `{SnRes : !SessionResources UP}.
@@ -66,17 +71,17 @@ Section DL_proof_of_code.
     is_lock dlN ip γlk lk (R ∗ dl_locked_internal).
 
   Definition is_dlock_server_connection_state
-               (ip : ip_address) (γlk : gname) (c : val) (s : string)
-      : iProp Σ :=
-      (⌜s = "acquire"⌝ ∨ (⌜s = "release"⌝ ∗ locked γlk)) ∗
-        c ↣{ ip, string_serialization} (iProto_dual (dlock_protocol s)).
-
+             (ip : ip_address) (γlk : gname) (c : val) (s : string) : iProp Σ :=
+    (⌜s = "acquire"⌝ ∨ (⌜s = "release"⌝ ∗ locked γlk)) ∗
+    c ↣{ ip, string_serialization} (iProto_dual (dlock_protocol s)).
 
   Definition dl_acquire_internal_spec (sa : socket_address) (dl : val) : Prop :=
-    {{{ dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol "acquire") }}}
-       dlock_acquire dl @[ip_of_address sa]
-     {{{ RET #(); dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol "release") ∗
-                  dl_locked_internal ∗ R }}}.
+    {{{ dl ↣{ ip_of_address sa, string_serialization }
+           (dlock_protocol "acquire") }}}
+      dlock_acquire dl @[ip_of_address sa]
+    {{{ RET #(); dl ↣{ ip_of_address sa, string_serialization }
+                    (dlock_protocol "release") ∗
+                 dl_locked_internal ∗ R }}}.
 
   Lemma dl_acquire_internal_spec_holds sa dl : dl_acquire_internal_spec sa dl.
   Proof.
@@ -107,16 +112,19 @@ Section DL_proof_of_code.
     - by iApply "HΦ"; eauto with iFrame.
   Qed.
 
-  Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
-    {{{ ⌜sa ∉ A⌝ ∗ ⌜DL_server_addr ∈ A⌝ ∗ fixed A ∗ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
+    {{{ ⌜sa ∉ A⌝ ∗ ⌜DL_server_addr ∈ A⌝ ∗ fixed A ∗
+        free_ports (ip_of_address sa) {[port_of_address sa]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         sa ⤳ (∅, ∅) }}}
       dlock_subscribe_client #sa #DL_server_addr @[ip_of_address sa]
-    {{{ dl, RET dl; dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol "acquire") ∗
-          ⌜dl_acquire_internal_spec sa dl⌝ ∗
-          ⌜dl_release_internal_spec sa dl⌝ }}}.
+    {{{ dl, RET dl; dl ↣{ ip_of_address sa, string_serialization }
+                       (dlock_protocol "acquire") ∗
+                    ⌜dl_acquire_internal_spec sa dl⌝ ∗
+                    ⌜dl_release_internal_spec sa dl⌝ }}}.
 
-  Lemma dl_subscribe_client_internal_spec_holds sa A : ⊢ dl_subscribe_client_internal_spec sa A.
+  Lemma dl_subscribe_client_internal_spec_holds sa A :
+    ⊢ dl_subscribe_client_internal_spec sa A.
   Proof.
     iIntros (Φ) "!#".
     iIntros "(#HnA & #HinA & #Hf & Hfp & #Hsi & Hmh) HΦ".
@@ -127,7 +135,9 @@ Section DL_proof_of_code.
     wp_apply (RCSpec_connect_spec with "[$Hcl][HΦ]").
     iNext. iIntros (dl) "Hc". wp_pures.
     iApply "HΦ".
-    iFrame. by eauto using dl_acquire_internal_spec_holds, dl_release_internal_spec_holds.
+    iFrame.
+    by eauto using dl_acquire_internal_spec_holds,
+      dl_release_internal_spec_holds.
   Qed.
 
   Lemma wp_listen_to_client c lk γlk s :
@@ -212,8 +222,6 @@ Section DL_proof_of_code.
 
 End DL_proof_of_code.
 
-From aneris.examples.reliable_communication.lib.dlm Require Import dlm_spec.
-
 Section DL_proof_of_resources.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
@@ -268,32 +276,31 @@ Section DL_proof_of_the_init.
   Proof. apply _. Qed.
 
   Lemma init_setup_holds (E : coPset) (R : iProp Σ) :
-   ↑DL_namespace ⊆ E →
-    True ⊢ |={E}=>
+    ↑DL_namespace ⊆ E →
+    ⊢ |={E}=>
           ∃ (DLRS : DL_resources),
             dl_service_init ∗
              (∀ (A : gset socket_address), dl_server_start_service_spec R A) ∗
              (∀ sa (A : gset socket_address), dl_subscribe_client_spec R sa A).
   Proof.
-    iIntros (HE _).
+    iIntros (HE).
     iMod (own_alloc (Excl ())) as (γdlk) "Hdlk"; first done.
     set (DLUP := UP (own γdlk (Excl ())) R).
     assert (DL_namespace = DLUP.(RCParams_srv_N)) as Hnmeq by done.
     rewrite Hnmeq in HE.
-    iMod (Reliable_communication_init_setup E DLUP HE $! ⊤)
+    iMod (Reliable_communication_init_setup E DLUP HE)
       as (chn sgn) "(Hinit & Hspecs)".
-  iDestruct "Hspecs"
+    iDestruct "Hspecs"
     as "(
            %HmkClt & %HmkSrv
          & %Hconnect
          & %Hlisten & %Haccept
          & %Hsend & %HsendTele
          & %HtryRecv & %Hrecv)".
-  eset (dlr := dlri (dl_locked_internal γdlk) (dl_locked_internal_exclusive γdlk) (dlt γdlk) R).
-  iExists dlr.
-  Unshelve. 2:{ done. }
-  iFrame.
-  iSplitL.
+    eset (dlr := dlri (dl_locked_internal γdlk) (dl_locked_internal_exclusive γdlk) (dlt γdlk) R).
+    iExists dlr.
+    iFrame.
+    iSplitL.
     - iModIntro.
       iIntros (A).
       iIntros (Φ) "!#".
@@ -334,12 +341,6 @@ Section DL_proof_of_the_init.
 
 End DL_proof_of_the_init.
 
-From aneris.examples.reliable_communication.spec Require Import prelude ras.
-From aneris.examples.reliable_communication.instantiation
-     Require Import
-     instantiation_of_resources
-     instantiation_of_init.
-
 Section DL_proof_of_the_init_class.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
@@ -348,13 +349,11 @@ Section DL_proof_of_the_init_class.
 
   Global Instance dlinit : DL_init.
   Proof.
-    split. iIntros (E DL R HE _).
-    iMod (init_setup_holds E R HE $! ⊤) as  (dlr) "(Ha & Hb & Hc)".
+    split. iIntros (E DL R HE).
+    iMod (init_setup_holds E R HE) as  (dlr) "(Ha & Hb & Hc)".
     iModIntro.
     iExists dlr.
-    iFrame.
-    Unshelve.
-    done.
+    by iFrame.
   Qed.
 
 End DL_proof_of_the_init_class.

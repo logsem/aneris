@@ -296,7 +296,7 @@ Proof.
   { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
-  iMod (Reliable_communication_init_instance ⊤ UP  $! I)
+  iMod (Reliable_communication_init_instance ⊤ UP)
     as (chn sgn SnRes) "(HsrvInit & Hspecs)"; [ solve_ndisj|].
   iDestruct "Hspecs"
     as "(

@@ -523,7 +523,7 @@ Proof.
     as (init_leader leader_si leaderF_si) "(#HGinv & #Hobs & Hkeys & HdbInit & #Hspecs)".
   iDestruct "Hspecs"
     as "((#HdbSrvS & #HdbCltS) & _)".
-  iMod (dlinit.(DL_init_setup) ⊤ DLP ShRes $! I )
+  iMod (dlinit.(DL_init_setup) ⊤ DLP ShRes)
     as (DLRes) "(HdlInit & #HdlSrvS & #HdlCltS)";
     [solve_ndisj| ].
   iExists (socket_interp leader_si leaderF_si dl_reserved_server_socket_interp).

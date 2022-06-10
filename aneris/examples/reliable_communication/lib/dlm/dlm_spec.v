@@ -60,7 +60,7 @@ Section Init.
   Class DL_init := {
     DL_init_setup E (DLP : DL_params) (R: iProp Σ):
     ↑DL_namespace ⊆ E →
-    True ⊢ |={E}=> ∃ (DLRS : DL_resources),
+    ⊢ |={E}=> ∃ (DLRS : DL_resources),
       dl_service_init ∗
         (∀ (A : gset socket_address), dl_server_start_service_spec R A) ∗
         (∀ sa (A : gset socket_address), dl_subscribe_client_spec R sa A)
