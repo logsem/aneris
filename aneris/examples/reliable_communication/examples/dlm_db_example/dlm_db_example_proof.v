@@ -223,6 +223,7 @@ Section proof_of_code.
     {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_00 ∉ A⌝ ∗
+        ⌜DL_server_addr ∈ A⌝ ∗
         (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
         fixed A ∗
         free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
@@ -239,13 +240,33 @@ Section proof_of_code.
       node0 #clt_00 #clt_01 #dlm_sa #db_sa @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
-  Admitted.
+    iIntros (HipEq Φ).
+    iIntros "(#HGinv & %HnInA & %HdlinA & #HdlCltS &
+              #Hf & Hfps & Hclt00 & #Hdlmsi & Hpre) HΦ".
+    iDestruct "Hpre" as "(%HinA & %HninA2 & HdbCltS & #Hdbsa & Hclt01 & Hfps3)".
+    rewrite /node0.
+    wp_pures.
+    wp_apply ("HdlCltS" with "[$Hfps $Hclt00 $Hdlmsi $Hf]"); first done.
+    iIntros (dl) "(Hdl & %Hacq & %Hrel)".
+    wp_pures.
+    rewrite HipEq.
+    simplify_eq /=.
+    wp_apply ("HdbCltS" $! A clt_01 with "[//][//][$Hfps3 $Hclt01 $Hdbsa $Hf]").
+    iIntros (wr rd) "(#Hrd & Hwr)".
+    iDestruct (get_simplified_write_spec with "Hwr") as "Hwr".
+    wp_pures.
+    rewrite -HipEq.
+    wp_apply (wp_do_writes with "[HGinv Hwr Hdl]"); first done.
+    { by iFrame "#∗". }
+    done.
+  Qed.
 
   Lemma proof_of_node1 (clt_10 clt_11 : socket_address) A :
     ip_of_address clt_10 = ip_of_address clt_11 →
     {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_10 ∉ A⌝ ∗
+        ⌜DL_server_addr ∈ A⌝ ∗
         fixed A ∗
         (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
         free_ports (ip_of_address clt_10) {[port_of_address clt_10]} ∗
@@ -260,9 +281,28 @@ Section proof_of_code.
         free_ports (ip_of_address clt_11) {[port_of_address clt_11]}
     }}}
       node1 #clt_10 #clt_11 #dlm_sa #db_sa @[ip_of_address clt_10]
-    {{{ RET #(); True }}}.
+    {{{ v, RET v; ⌜v = SOMEV #1⌝ }}}.
   Proof.
-  Admitted.
+    iIntros (HipEq Φ).
+    iIntros "(#HGinv & %HnInA & %HdlinA & #Hf & #HdlCltS &
+                      Hfps & Hclt00 & #Hdlmsi & Hpre) HΦ".
+    iDestruct "Hpre" as "(%HinA & %HninA2 & HdbCltS & #Hdbsa & Hclt01 & Hfps3)".
+    rewrite /node1.
+    wp_pures.
+    wp_apply ("HdlCltS" with "[$Hfps $Hclt00 $Hdlmsi $Hf]"); first done.
+    iIntros (dl) "(Hdl & %Hacq & %Hrel)".
+    wp_pures.
+    rewrite HipEq.
+    simplify_eq /=.
+    wp_apply ("HdbCltS" $! A clt_11 with "[//][//][$Hfps3 $Hclt01 $Hdbsa $Hf]").
+    iIntros (wr rd) "(#Hrd & Hwr)".
+    wp_pures.
+    rewrite -HipEq.
+    wp_apply (wp_do_reads with "[HGinv Hwr Hdl]"); first done.
+    { by iFrame "#∗". }
+    iIntros.
+    by iApply "HΦ".
+  Qed.
 
 End proof_of_code.
 
@@ -489,8 +529,7 @@ Proof.
   iExists (socket_interp leader_si leaderF_si dl_reserved_server_socket_interp).
   iMod (@main_spec
           _ _ _
-          int_time _ leader_si leaderF_si init_leader _ DLRes DBRes)
-    as "Hmain".
+          int_time leader_si leaderF_si init_leader DLRes DBRes) as "Hmain".
   iModIntro.
   iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
   simpl in *.
