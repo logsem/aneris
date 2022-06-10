@@ -9,22 +9,25 @@ let do_writes lk wr =
   wr "y" 1;
   dlock_release lk
 
-let dl_wait_on_read lk rd k v =
+let do_reads lk rd  =
   let rec loop () =
     dlock_acquire lk;
-    let res = rd k in
-    dlock_release lk;
-    if res = Some v
-    then ()
-    else (unsafe (fun () -> Unix.sleepf 2.0); loop ())
+    let vx = rd "x" in
+    if vx = Some 37
+    then
+      begin
+        let vy = rd "y" in
+        assert (vy = Some 1);
+        dlock_release lk;
+        vy
+      end
+    else
+      begin
+        dlock_release lk;
+        unsafe (fun () -> Unix.sleepf 2.0);
+        loop ()
+      end
   in loop ()
-
-let do_reads lk rd =
-  dl_wait_on_read lk rd "x" 37;
-  dlock_acquire lk;
-  let vy = rd "y" in
-  dlock_release lk;
-  assert (vy = Some 1)
 
 let node0 clt_addr00 clt_addr01 dl_addr db_laddr =
   let lk_chan = dlock_subscribe_client clt_addr00 dl_addr in

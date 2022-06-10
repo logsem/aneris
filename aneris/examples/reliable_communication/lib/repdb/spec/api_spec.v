@@ -79,8 +79,8 @@ Section API_spec.
     {{{ k ↦ₖ{q} wo }}}
       rd #k @[ip_of_address sa]
     {{{vo, RET vo;
-         k ↦ₖ{q} wo ∗ (⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
-         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝)
+         k ↦ₖ{q} wo ∗ ((⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
+         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))
     }}}%I.
 
   Definition read_at_follower_spec

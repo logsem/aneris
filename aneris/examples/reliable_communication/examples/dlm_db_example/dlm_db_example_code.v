@@ -13,26 +13,22 @@ Definition do_writes : val :=
   "wr" #"y" #1;;
   dlock_release "lk".
 
-Definition dl_wait_on_read : val :=
-  λ: "lk" "rd" "k" "v",
-  letrec: "loop" <> :=
-    dlock_acquire "lk";;
-    let: "res" := "rd" "k" in
-    dlock_release "lk";;
-    (if: "res" = (SOME "v")
-     then  #()
-     else
-       #() (* unsafe (fun () -> Unix.sleepf 2.0); loop ()) *);;
-       "loop" #()) in
-    "loop" #().
-
 Definition do_reads : val :=
   λ: "lk" "rd",
-  dl_wait_on_read "lk" "rd" #"x" #37;;
-  dlock_acquire "lk";;
-  let: "vy" := "rd" #"y" in
-  dlock_release "lk";;
-  assert: ("vy" = (SOME #1)).
+  letrec: "loop" <> :=
+    dlock_acquire "lk";;
+    let: "vx" := "rd" #"x" in
+    (if: "vx" = (SOME #37)
+     then
+       let: "vy" := "rd" #"y" in
+       assert: ("vy" = (SOME #1));;
+       dlock_release "lk";;
+       "vy"
+     else
+       dlock_release "lk";;
+       #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
+       "loop" #()) in
+    "loop" #().
 
 Definition node0 : val :=
   λ: "clt_addr00" "clt_addr01" "dl_addr" "db_laddr",

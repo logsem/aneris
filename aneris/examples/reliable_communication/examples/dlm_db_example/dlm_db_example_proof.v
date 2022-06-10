@@ -1,3 +1,4 @@
+From iris.algebra Require Import excl.
 From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang Require Import lang.
@@ -53,6 +54,32 @@ Section proof_of_code.
 
   Context `{!@DB_resources _ _ _ _ DBSrv}.
   Context `{!DlockG Σ, !DL_resources}.
+
+  (* Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
+
+  Lemma token_exclusive (γ : gname) : token γ -∗ token γ -∗ False.
+  Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
+
+
+   Definition SharedRes : iProp Σ :=
+      ∃ (xv yv : option we) (h : ghst),
+        Obs DB_addr h ∗
+        "x" ↦ₖ{1/2} (at_key "x" h) ∗
+        "y" ↦ₖ{1/2} (at_key "y" h) ∗
+        (⌜xv = None⌝ ∗ ⌜yv = None⌝) ∨
+        (∃ xw yw, "x" ↦ₖ{1/2} Some xw ∗ "y" ↦ₖ{1/2} Some yw ∗
+
+
+⌜ (∃ xw, xv = Some xw ∧ xw.(we_val) = #37) ↔
+          (∃ yw, yv = Some yw ∧ yw.(we_val) = #1)⌝.
+
+
+  Definition inv_x (γ : gname) (a : we) : iProp Σ :=
+    (∃ h, "x" ↦ᵤ h ∗ ⌜Maximum h = Some a⌝ ∗ ⌜WE_val a = #37⌝) ∨ token γ.
+
+  Definition inv_y (γ : gname) : iProp Σ :=
+    ∃ h, "y" ↦ᵤ h ∗ ∀ a, (⌜a ∈ h ∧ WE_val a = (# 1)⌝) →
+                         (∃ a', ⌜a' <ₜ a⌝ ∗ inv Nx (inv_x γ a')). *)
 
   Definition SharedRes : iProp Σ :=
       ∃ (xv yv : option we) (h : ghst),
@@ -139,22 +166,6 @@ Section proof_of_code.
   (* ------------------------------------------------------------------------ *)
   (** The proof of the internal do_reads call *)
   (* ------------------------------------------------------------------------ *)
-  (* NotaBene : the spec of dl_wait_on_read can be applied to
-     generic key `k` and value `v` (instead of x and 37) only if
-     a resource k ↦ₖ{q} v is either provided in the precondition
-     or if it is also guarded by the distributed lock. *)
-  Lemma wp_dl_wait_on_read dl rd clt_10 clt_11 :
-    ip_of_address clt_10 = ip_of_address clt_11 →
-    {{{ GlobalInv ∗
-        (∀ k q h, read_spec rd clt_11 k q h) ∗
-        ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
-        ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
-        DLockCanAcquire clt_10 dl SharedRes }}}
-      dl_wait_on_read dl rd #"x" #37 @[ip_of_address clt_10]
-    {{{ RET #(); True }}}.
-  Proof.
-  Admitted.
-
   Lemma wp_do_reads dl rd clt_10 clt_11 :
     ip_of_address clt_10 = ip_of_address clt_11 →
     {{{ GlobalInv ∗
@@ -163,9 +174,71 @@ Section proof_of_code.
         ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
         DLockCanAcquire clt_10 dl SharedRes }}}
       do_reads dl rd @[ip_of_address clt_10]
-   {{{ RET #(); True }}}.
+    {{{ v, RET v; ⌜v = SOMEV #1⌝ }}}.
   Proof.
-  Admitted.
+    iIntros (HipEq Φ).
+    iIntros "(#HGinv & #Hrd & %Hacq & %Hrel & Har) HΦ".
+    rewrite /do_reads.
+    do 6 wp_pure _.
+    iLöb as "IH".
+    wp_pures.
+    wp_apply (Hacq with "[$Har]").
+    iIntros (v) "(-> & Hrel & Hdlk & Hres)".
+    wp_pures.
+    iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
+    rewrite HipEq.
+    wp_apply ("Hrd" $! "x" 1%Qp xv with "[//][$Hx]").
+    iIntros (vo) "Hvo".
+    iDestruct "Hvo" as "(Hx & %Hxv)".
+    wp_pures.
+    rewrite -HipEq.
+    destruct Hxv as [(-> & ->) | (xwe & -> & ->) ].
+    - do 2 (wp_pure _).
+      wp_apply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+      { iExists _, _, _.
+        by iFrame "#∗". }
+      iIntros (v) "(-> & Har)".
+      do 4 (wp_pure _).
+      by iApply ("IH" with "[$Har]").
+    - wp_pures.
+      case_bool_decide as Hxc.
+      -- wp_pures.
+         rewrite HipEq.
+         wp_apply ("Hrd" $! "y" 1%Qp yv with "[//][$Hy]").
+         iIntros (vo) "Hvo".
+         iDestruct "Hvo" as "(Hy & %Hyv)".
+         destruct Hyv as [(-> & ->) | (ywe & -> & ->) ].
+         --- wp_pures.
+             destruct Hcnd as (Hcnd & _).
+             assert (∃ yw : we, None = Some yw ∧ we_val yw = #1) as Habs.
+             { apply Hcnd. naive_solver. }
+             naive_solver.
+         --- do 2 (wp_pure _).
+             assert (∃ yw : we, Some ywe = Some yw ∧ we_val yw = #1) as Hy.
+             { apply Hcnd. naive_solver. }
+             wp_apply wp_assert.
+             wp_pures.
+             destruct Hy as (yw & Heq & Heq2).
+             assert (we_val ywe = we_val yw) as -> by naive_solver.
+             rewrite Heq2.
+             iSplit; first done.
+             iNext.
+             wp_pures.
+             rewrite -HipEq.
+             wp_apply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+             { iExists _, _, _.
+               by iFrame "#∗". }
+             iIntros (v) "(-> & Har)".
+             wp_pures.
+             by iApply "HΦ".
+      -- wp_pures.
+         wp_apply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+         { iExists _, _, _.
+           by iFrame "#∗". }
+         iIntros (v) "(-> & Har)".
+         do 4 (wp_pure _).
+         by iApply ("IH" with "[$Har]").
+  Qed.
 
   (* ------------------------------------------------------------------------ *)
   (** The proof of the node 0 (writer) *)
