@@ -56,14 +56,14 @@ Section proof_of_code.
   Context `{!DlockG Σ, !DL_resources}.
 
   Definition SharedRes : iProp Σ :=
-      ∃ (xv yv : option we) (h : ghst),
-        "x" ↦ₖ xv ∗
-        "y" ↦ₖ yv ∗
-        Obs DB_addr h ∗
-        ⌜at_key "x" h = xv⌝ ∗
-        ⌜at_key "y" h = yv⌝ ∗
-        ⌜ (∃ xw, xv = Some xw ∧ xw.(we_val) = #37) ↔
-          (∃ yw, yv = Some yw ∧ yw.(we_val) = #1)⌝.
+    ∃ (xv yv : option we) (h : ghst),
+      "x" ↦ₖ xv ∗
+      "y" ↦ₖ yv ∗
+      Obs DB_addr h ∗
+      ⌜at_key "x" h = xv⌝ ∗
+      ⌜at_key "y" h = yv⌝ ∗
+      ⌜ (∃ xw, xv = Some xw ∧ xw.(we_val) = #37) ↔
+      (∃ yw, yv = Some yw ∧ yw.(we_val) = #1)⌝.
 
   (* ------------------------------------------------------------------------ *)
   (** The proof of the internal do_writes call *)
@@ -86,7 +86,7 @@ Section proof_of_code.
     wp_pures.
     iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
     rewrite HipEq.
-    wp_apply ("Hwr" $! "x" (SerVal #37) h _ with "[Hx Hobs]").
+    wp_apply ("Hwr" $! "x" (SerVal #37) h with "[//] [Hx Hobs]").
     { iExists _. iFrame "#∗". done. }
     iIntros "Hpost".
     wp_pures.
@@ -96,14 +96,13 @@ Section proof_of_code.
     assert (h ≤ₚ (h ++ hfx ++ [ax])) as Hprefix.
     { by apply prefix_app_r. }
     iCombine "Hy" "Hobsx" as "HyObsx".
-    iMod (OwnMemKey_obs_frame_prefix DB_addr "y" 1%Qp h (h ++ hfx ++ [ax]) ⊤ _ Hprefix
-           with "HGinv HyObsx") as "(Hy & %HyHeq)".
+    iMod (OwnMemKey_obs_frame_prefix DB_addr "y" 1%Qp h (h ++ hfx ++ [ax]) ⊤
+           with "HGinv HyObsx") as "(Hy & %HyHeq)"; [done|done|].
     iModIntro.
     assert (at_key "x" (h ++ hfx ++ [ax]) = Some ax) as HatAx.
     { rewrite app_assoc. by apply at_key_snoc_some. }
-    wp_apply ("Hwr" $! "y" (SerVal #1) (h ++ hfx ++ [ax]) _ with "[Hy Hobsx]").
-    { iFrame "#∗".
-      iExists _. iFrame "#∗". naive_solver. }
+    wp_apply ("Hwr" $! "y" (SerVal #1) (h ++ hfx ++ [ax]) with "[//] [Hy Hobsx]").
+    { iFrame "#∗". iExists _. iFrame "#∗". naive_solver. }
     iIntros "Hpost".
     wp_pures.
     iDestruct "Hpost" as (hfy ay) "(%Hay & %Hway & %Haty & #Hobsy & Hy)".
@@ -111,12 +110,12 @@ Section proof_of_code.
     iApply fupd_aneris_wp.
     rewrite -HatAx.
     assert ((h ++ hfx ++ [ax]) ≤ₚ ((h ++ hfx ++ [ax]) ++ hfy ++ [ay])) as Hprefix'.
-    {  by apply prefix_app_r. }
+    { by apply prefix_app_r. }
     iCombine "Hx" "Hobsy" as "HxObsy".
     iMod (OwnMemKey_obs_frame_prefix
             DB_addr "x" 1%Qp
-            (h ++ hfx ++ [ax]) ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]) ⊤ _ Hprefix'
-           with "HGinv HxObsy") as "(Hx & %HxHeq)".
+            (h ++ hfx ++ [ax]) ((h ++ hfx ++ [ax]) ++ hfy ++ [ay])
+           with "HGinv HxObsy") as "(Hx & %HxHeq)"; [done|done|].
     iModIntro.
     assert (at_key "y" ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]) = Some ay) as HatAy.
     { rewrite app_assoc. by apply at_key_snoc_some. }
@@ -134,7 +133,6 @@ Section proof_of_code.
     iNext.
     iIntros (v) "(-> & _)".
     by iApply "HΦ".
-    Unshelve. done. done. done. done.
   Qed.
 
   (* ------------------------------------------------------------------------ *)
@@ -460,18 +458,18 @@ Definition dummy_model := model unit (fun x y => True) ().
 
 Lemma dummy_model_finitary : adequacy.aneris_model_rel_finitary dummy_model.
 Proof.
- intros st.
- intros f Hnot.
- pose proof (Hnot 0%nat 1%nat) as H.
- assert (0%nat = 1%nat -> False) as Himpl. {
-   intros Heq.
-   discriminate Heq.
- }
- apply Himpl; apply H.
- destruct (f 0%nat) as [s0 r0].
- destruct (f 1%nat) as [s1 r1].
- destruct s0, s1, st, r0, r1.
- reflexivity.
+  intros st.
+  intros f Hnot.
+  pose proof (Hnot 0%nat 1%nat) as H.
+  assert (0%nat = 1%nat -> False) as Himpl. {
+    intros Heq.
+    discriminate Heq.
+  }
+  apply Himpl; apply H.
+  destruct (f 0%nat) as [s0 r0].
+  destruct (f 1%nat) as [s1 r1].
+  destruct s0, s1, st, r0, r1.
+  reflexivity.
 Qed.
 
 From stdpp Require Import fin_maps gmap.
@@ -486,8 +484,6 @@ From aneris.examples.reliable_communication.lib.dlm
      Require Import dlm_proof.
 From aneris.examples.reliable_communication.spec Require Import prelude ras.
 
-
-
 Definition socket_interp `{!anerisG empty_model Σ}
   db_si dbF_si dlm_si sa : socket_interp Σ :=
   (match sa with
@@ -501,7 +497,6 @@ Notation ShRes := (@SharedRes _ _ _ _ db_sa db_Fsa).
 
 From aneris.examples.reliable_communication.lib.repdb.proof
      Require Import proof_of_db_init.
-
 
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
