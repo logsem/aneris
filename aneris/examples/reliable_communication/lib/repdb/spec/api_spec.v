@@ -3,6 +3,7 @@ From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import list_proof lock_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
+From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.reliable_communication.lib.repdb
      Require Import repdb_code.
 From aneris.examples.reliable_communication.lib.repdb.spec
@@ -36,6 +37,24 @@ Section API_spec.
         {{{ RET #();
            ∃ (h hf : ghst) (a: we), Q a h hf }}})%I.
 
+  Definition write_spec_atomic
+      (wr : val) (sa : socket_address) : iProp Σ :=
+    ∀ (E : coPset) (k : Key) (v : SerializableVal),
+    ⌜↑DB_InvName ⊆ E⌝ -∗
+    ⌜k ∈ DB_keys⌝ -∗
+    <<< ∀∀ (h : ghst) (a_old : option we),
+      ⌜at_key k h = a_old⌝ ∗
+      k ↦ₖ a_old ∗
+      Obs DB_addr h >>>
+      wr #k v @[ip_of_address sa] E
+    <<<▷ ∃∃ hf a_new, RET #();
+           ⌜at_key k hf = None⌝ ∗
+           ⌜we_key a_new = k⌝ ∗
+           ⌜we_val a_new = v⌝ ∗
+           ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
+           k ↦ₖ Some a_new ∗
+           Obs DB_addr (h ++ hf ++ [a_new]) >>>.
+
  (* Definition read_spec
       (rd : val) (sa : socket_address)  : iProp Σ :=
     Eval simpl in
@@ -59,6 +78,21 @@ Section API_spec.
               (⌜vo = NONEV⌝ ∗ ⌜eo = None⌝ ∗ Q1 eo h) ∨
               (∃ v e, ⌜vo = SOMEV v⌝ ∗ ⌜eo = Some e⌝ ∗ ⌜we_val e = v⌝ ∗ Q2 e h)
          }}})%I.
+
+  Definition read_spec_atomic (rd : val) (sa : socket_address) : iProp Σ :=
+    ∀ (E : coPset) (k : Key),
+    ⌜↑DB_InvName ⊆ E⌝ -∗
+    ⌜k ∈ DB_keys⌝ -∗
+    <<< ∀∀ (h : ghst) (q : Qp) (a_old : option we),
+            ⌜at_key k h = a_old⌝ ∗
+            Obs DB_addr h ∗
+            k ↦ₖ{q} a_old >>>
+      rd #k @[ip_of_address sa] E
+    <<<▷ RET match a_old with None => NONEV | Some a => SOMEV (we_val a) end;
+         (⌜a_old = None⌝ ∗ k ↦ₖ{q} None) ∨
+         (∃ e, ⌜a_old = Some e⌝ ∗
+            (k ↦ₖ{q} Some e)) >>>.
+
   *)
 
    Definition simplified_write_spec (wr : val) (sa : socket_address)
@@ -71,6 +105,21 @@ Section API_spec.
           ⌜at_key k hf = None⌝ ∗ Obs DB_addr (h ++ hf ++ [a]) ∗
           k ↦ₖ Some a
     }}}%I.
+
+   Lemma write_spec_write_spec_atomic wr sa :
+    write_spec wr sa -∗ write_spec_atomic wr sa.
+  Proof.
+    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
+    iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
+      [ done .. | | ].
+    { iIntros "!> Hvs".
+      iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
+      iModIntro.
+      eauto 10 with iFrame. }
+    iIntros "!> H".
+    iDestruct "H" as (_ _ _) "H".
+    iApply "H".
+  Qed.
 
   Definition read_spec
     (rd : val) (sa : socket_address) (k : Key) (q : Qp)

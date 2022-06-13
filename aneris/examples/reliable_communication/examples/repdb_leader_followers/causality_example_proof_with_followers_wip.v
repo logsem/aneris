@@ -18,85 +18,6 @@ From aneris.examples.reliable_communication.examples.repdb_leader_followers
      Require Import causality_example_code.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 
-Section API_spec_ext.
-  Context `{!anerisG Mdl Σ, !DB_time, !DB_params, !DB_resources}.
-
-  Definition write_spec
-      (wr : val) (sa : socket_address) : iProp Σ :=
-    Eval simpl in
-    □ (∀ (E : coPset) (k : Key) (v : SerializableVal)
-         (P : iProp Σ) (Q : we → ghst → ghst → iProp Σ),
-        ⌜↑DB_InvName ⊆ E⌝ -∗
-        ⌜k ∈ DB_keys⌝ -∗
-        □ (P
-            ={⊤, E}=∗
-              ∃ (h : ghst) (a_old: option we),
-                ⌜at_key k h = a_old⌝ ∗
-                k ↦ₖ a_old ∗
-                Obs DB_addr h ∗
-                  ▷ (∀ (hf : ghst) (a_new : we),
-                  ⌜at_key k hf = None⌝ ∗
-                  ⌜we_key a_new = k⌝ ∗
-                  ⌜we_val a_new = v⌝ ∗
-                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-                  k ↦ₖ Some a_new ∗
-                  Obs DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
-        {{{ P }}}
-          wr #k v @[ip_of_address sa]
-        {{{ RET #();
-           ∃ (h hf : ghst) (a: we), Q a h hf }}})%I.
-
-  Definition write_spec_atomic
-      (wr : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key) (v : SerializableVal),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
-    ⌜k ∈ DB_keys⌝ -∗
-    <<< ∀∀ (h : ghst) (a_old : option we),
-      ⌜at_key k h = a_old⌝ ∗
-      k ↦ₖ a_old ∗
-      Obs DB_addr h >>>
-      wr #k v @[ip_of_address sa] E
-    <<<▷ ∃∃ hf a_new, RET #();
-           ⌜at_key k hf = None⌝ ∗
-           ⌜we_key a_new = k⌝ ∗
-           ⌜we_val a_new = v⌝ ∗
-           ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-           k ↦ₖ Some a_new ∗
-           Obs DB_addr (h ++ hf ++ [a_new]) >>>.
-
-  Lemma write_spec_write_spec_atomic wr sa :
-    write_spec wr sa -∗ write_spec_atomic wr sa.
-  Proof.
-    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
-    iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
-      [ done .. | | ].
-    { iIntros "!> Hvs".
-      iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
-      iModIntro.
-      eauto 10 with iFrame. }
-    iIntros "!> H".
-    iDestruct "H" as (_ _ _) "H".
-    iApply "H".
-  Qed.
-
-  Axiom write_spec_implies_simplified_write_spec : ∀ wr sa,
-    write_spec wr sa -∗ ∀ k v h, simplified_write_spec wr sa k v h.
-
-  Definition read_spec_atomic (rd : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
-    ⌜k ∈ DB_keys⌝ -∗
-    <<< ∀∀ (h : ghst) (q : Qp) (a_old : option we),
-            ⌜at_key k h = a_old⌝ ∗
-            Obs DB_addr h ∗
-            k ↦ₖ{q} a_old >>>
-      rd #k @[ip_of_address sa] E
-    <<<▷ RET match a_old with None => NONEV | Some a => SOMEV (we_val a) end;
-         (⌜a_old = None⌝ ∗ k ↦ₖ{q} None) ∨
-         (∃ e, ⌜a_old = Some e⌝ ∗
-            (k ↦ₖ{q} Some e)) >>>.
-
-End API_spec_ext.
 
 Section proof_of_code.
   Context `{!anerisG Mdl Σ}.
@@ -132,12 +53,22 @@ Section proof_of_code.
   Definition inv_x (γ : gname) (a : we) : iProp Σ :=
     ("x" ↦ₖ Some a ∗ ⌜we_val a = #37⌝) ∨ token γ.
 
+  (* NB : seems too strong to prove at the do_reads, because of discrepancy
+     between Obs DB_addr h and Obs follower_addr hy with hy ≤ₚ h... *)
   Definition inv_y (γ : gname) : iProp Σ :=
     ∃ h owe, Obs DB_addr h ∗ ⌜at_key "y" h = owe⌝ ∗ "y" ↦ₖ owe ∗
              ∀ a, (⌜owe = Some a ∧ we_val a = (# 1)⌝) →
                   (∃ a', ⌜a' <ₜ a⌝ ∗ inv Nx (inv_x γ a')).
 
-  (* TODO: Get empty history from nothing. *)
+(* Maybe an alternative definition ?
+   I believe it would work at reads, but it is hard to prove at writes now. *)
+(*
+  Definition inv_y (γ : gname) : iProp Σ :=
+    ∃ h owe, Obs DB_addr h ∗ ⌜at_key "y" h = owe⌝ ∗ "y" ↦ₖ owe ∗
+           (∀ hy a, ⌜hy ≤ₚ h⌝ ∗ ⌜at_key "y" hy = Some a⌝ ∗ ⌜we_val a = #1⌝ →
+                    ∃ a', ⌜a' <ₜ a⌝ ∗ inv Nx (inv_x γ a')).
+   *)
+
   Lemma wp_do_writes wr clt_00 γ :
     GlobalInv -∗
     inv Ny (inv_y γ) -∗
@@ -149,7 +80,7 @@ Section proof_of_code.
   Proof.
     iIntros "#HGinv #Hinv #Hwr #Hobs".
     iIntros "!>" (Φ) "Hx HΦ".
-    iDestruct (write_spec_implies_simplified_write_spec with "Hwr") as "#Hswr".
+    iDestruct (get_simplified_write_spec with "Hwr") as "#Hswr".
     iDestruct (write_spec_write_spec_atomic with "Hwr") as "#Hawr".
     iClear "Hwr".
     wp_lam.
@@ -259,12 +190,14 @@ Definition read_at_follower_spec
     iInv Ny as "H" "Hcl".
     iDestruct "H" as (h wo) "(>HyobsF & >%Hyk & >Hy & H)".
     rewrite -Hyk.
+    iMod (OwnMemKey_allocated "y" 1%Qp hy h a with "[][HGinv Hy]") as "Hf";
+    [solve_ndisj|admit|done|iFrame "#"|iFrame|].
     (* iMod (OwnMemKey_obs_frame_prefix with "[$HGinv][$Hy]"); [solve_ndisj| | |]. *)
     (* admit. *)
     iAssert (▷ ∃ a', ⌜a' <ₜ a⌝ ∗ inv Nx (inv_x γ a'))%I as "#He".
     { iNext.
       iDestruct ("H" $! a with "[]") as (a') "Ha'".
-      {  iPureIntro. naive_solver. split; first set_solver.
+      {  iPureIntro. iSplit; last naive_solver. split; first set_solver.
         rewrite erasure_val; done. }
       rewrite erasure_time; eauto. }
     assert (e ∈ s2).
@@ -300,6 +233,6 @@ Definition read_at_follower_spec
     iSplit; [done|].
     by iApply "HΦ".
   Qed.
-*)
+   *)
 
 End proof_of_code.
