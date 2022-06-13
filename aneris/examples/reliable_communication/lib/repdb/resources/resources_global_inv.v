@@ -90,6 +90,15 @@ Section Global_Invariant.
     ⌜hist_at_key k h1 = hist_at_key k h2⌝.
   Proof. Admitted.
 
+ Lemma OwnMemKey_wo_obs_holds k q wo E :
+    nclose DB_InvName ⊆ E →
+    Global_Inv ⊢
+    own_mem_user γM k q wo ={E}=∗
+    own_mem_user γM k q wo ∗
+      ∃ h, own_obs γL DB_addr h ∗ ⌜at_key k h = wo⌝.
+  Proof. Admitted.
+
+
   Lemma OwnMemKey_some_obs_we_holds k q we E :
     nclose DB_InvName ⊆ E →
     Global_Inv ⊢
