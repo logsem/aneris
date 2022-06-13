@@ -84,14 +84,14 @@ Section API_spec.
     }}}%I.
 
   Definition read_at_follower_spec
-           (rd : val) (k : Key) (csa f2csa : socket_address) (h : ghst) : iProp Σ :=
+           (rd : val) (csa f2csa : socket_address) (k : Key) (h : ghst) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗
     {{{ Obs f2csa h }}}
       rd #k @[ip_of_address csa]
     {{{vo, RET vo;
           ∃ h', ⌜h ≤ₚ h'⌝ ∗ Obs f2csa h' ∗
-         (⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
-         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)
+         ((⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
+         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝))
     }}}%I.
 
   Lemma get_simplified_write_spec wr sa :
@@ -166,7 +166,7 @@ Section API_spec.
           init_client_follower_proxy (s_serializer DB_serialization)
             #csa #f2csa @[ip_of_address csa]
         {{{ rd, RET rd;
-            Obs f2csa [] ∗ (∀ k h, read_at_follower_spec rd k csa f2csa h) }}}.
+            Obs f2csa [] ∗ (∀ k h, read_at_follower_spec rd csa f2csa k h) }}}.
 
 End API_spec.
 
