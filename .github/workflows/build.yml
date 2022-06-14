@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         coq_version:
-          - '8.15.1'
+          - '8.15.2'
       max-parallel: 4
       # don't cancel all in-progress jobs if one matrix job fails:
       fail-fast: false
@@ -28,7 +28,7 @@ jobs:
     - uses: coq-community/docker-coq-action@v1
       with:
         coq_version: ${{ matrix.coq_version }}
-        ocaml_version: "4.13.1-flambda"
+        ocaml_version: "4.14.0-flambda"
         before_script: |
           sudo chown -R coq:coq . # workaround a permission issue
         script: |
