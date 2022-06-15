@@ -52,8 +52,6 @@ Section Clients_MT_spec_params.
              (leader_local_main_res kvsL)) ∗
           MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
-  Admitted.
-  (*
     iIntros (reqv reqd Φ) "(#Hmon & Hkey & HR & Hpre) HΦ".
     rewrite /handler_cloj /client_request_handler_at_leader.
     wp_pures.
@@ -69,27 +67,36 @@ Section Clients_MT_spec_params.
       iIntros (v Hv).
       inversion HvalidLocal.
       wp_apply fupd_aneris_wp.
-      iMod (OwnMemKey_wo_obs_holds with "HGinv Hk") as "(Hk & (%lM' & #HObsL & <-))"; [solve_ndisj|].
-
-      (* destruct (kvsM !! k) eqn:Hmk; rewrite Hmk in Hv; rewrite Hv. *)
+      iMod (OwnMemKey_wo_obs_holds with "HGinv Hk")
+        as "(Hk & (%lM' & #HObsL & <-))"; [solve_ndisj|].
+      iDestruct (own_obs_prefix _ _ lM lM' with "[$HlogL][HObsL]") as "%Hprefix".
+      by iApply Obs_own_log_obs.
+      iDestruct (get_obs with "[$HlogL]") as "#HObsL'".
+      iMod (OwnMemKey_obs_frame_prefix_holds
+             with "[$HGinv][Hk HObsL]") as "(Hk & %Heq)";
+        [solve_ndisj|done|iFrame "#∗"; by iLeft|].
       iAssert ( |={⊤}=> ( ⌜v = InjLV #()⌝ ∗ ⌜at_key k lM' = None⌝) ∨
               (∃ a : write_event,
                   ⌜v = (InjRV (we_val a))⌝ ∗ ⌜at_key k lM' = Some a⌝))%I
         as ">Hpost".
       { destruct (kvsM !! k) eqn:Hmk; rewrite Hmk in Hv; rewrite Hv.
-        - iModIntro.
-          iRight.
-          apply DB_LSTV_in_mem_log_some_coh_local in Hmk; last by apply elem_of_dom.
+        - iModIntro. iRight.
+          apply DB_LSTV_in_mem_log_some_coh_local in Hmk;
+            last by apply elem_of_dom.
           destruct Hmk as (we0 & Hwe0L & <-).
-          iExists _. iSplit; first done. naive_solver. done. iSplit; first done.
-        iInv DB_InvName as ">Hinv" "Hcl".
-        iLeft. iPureIntro.
-        iApply fupd_mask_intro. solve_ndisj. set_solver. iModIntro. admit. }
+          iExists _. iSplit; first done. iPureIntro. by rewrite Heq.
+        - iModIntro.
+          iLeft.
+          iSplit; first done.
+          iPureIntro.
+          apply DB_LSTV_in_mem_log_none_coh_local in Hmk.
+          by rewrite Heq. }
+      iModIntro.
       wp_pures.
       destruct (kvsM !! k) eqn:Hmk; rewrite Hmk in Hv; rewrite Hv.
-      -- iApply ("HΦ" $! _ (inr we)).
-         iDestruct "Hpost" as "[(%Habs & _)|Hpost]"; first done.
+      -- iDestruct "Hpost" as "[(%Habs & _)|Hpost]"; first done.
          iDestruct "Hpost" as (a Ha) "%Hwe".
+         iApply ("HΦ" $! _ (inr (Some a))).
          iFrame "Hkey".
          iSplit.
          { iPureIntro.
@@ -101,10 +108,12 @@ Section Clients_MT_spec_params.
          rewrite /log_monitor_inv_def /ReqPost.
          iSplitR "Hk"; last first.
          { iRight.
-           iExists _, _, _.
+           iExists k, (Some a), q.
+           rewrite Hwe in Hreqd.
            iSplit; first done.
-           iExists _.
+           iExists ((InjRV v0)).
            do 2 (iSplit; first done).
+           rewrite Hwe.
            iFrame.
            iRight.
            by iExists _. }
@@ -126,7 +135,9 @@ Section Clients_MT_spec_params.
          { iRight.
            iExists _, _, _.
            iSplit; first done.
-           iExists _.
+           iExists v.
+           apply DB_LSTV_in_mem_log_none_coh_local in Hmk.
+           rewrite -Hmk Heq Hv.
            do 2 (iSplit; first done).
            iFrame.
            by iLeft. }
@@ -135,34 +146,7 @@ Section Clients_MT_spec_params.
          iFrame.
          iExists _, _.
          by iFrame.
-
-
-      (*   iSplit. *)
-      (*   * rewrite Hv. rewrite /rep_l2c_serialization. *)
-      (*     iPureIntro. *)
-      (*     rewrite /Serializable /= /sum_valid_val /=; eauto. *)
-      (*     exists (InjLV #()). right. split; first done. by right. *)
-      (*   * iFrame "Hkey". *)
-      (*     iSplitR "Hk". *)
-      (*     ** admit. *)
-      (*     ** iRight. iIntros (k0 wo0 q0 Hreqd0). *)
-      (*        iExists v. *)
-      (*        iSplit. *)
-      (*        admit. *)
-      (*        iSplit; first done. *)
-      (*        rewrite Hreqd0 in Hreqd. inversion Hreqd. subst. *)
-      (*        iFrame. iLeft. admit. *)
-
-      (*     rewrite /option_valid_val. *)
-      (*     exists (InjLV #()). *)
-      (*     Eapply option_is_ser_valid. rewrite option_valid_val. /=; eauto.. *)
-      (*     eauto. done. apply (sum_is_ser_valid _ _ _ ""). simplify_eq. *)
-      (*     simpl. iPureIntro. simplify_eq /=. *)
-      (*     eapply sum_is_ser_valid. rewrite /sum_is_ser. simplify_eq /=. *)
-      (*     eexists _, _. right. split; eauto. done. *)
-      (*  + admit. *)
-      (* + iFrame "Hkey". *)*)
-
+  Admitted.
 
   Global Instance client_handler_at_leader_spec_params :
     @MTS_spec_params _ _ _ _ MTU :=
@@ -177,8 +161,3 @@ Section Clients_MT_spec_params.
     |}.
 
 End Clients_MT_spec_params.
-
-
-      (* wp_apply fupd_aneris_wp. *)
-      (* iInv DB_InvName as ">Hinv" "Hcl". *)
-      (* iDestruct "Hinv" as (L M N) "(%HkeysG & HownSys & HL & Hknwns & HN & %Hvalid)". *)

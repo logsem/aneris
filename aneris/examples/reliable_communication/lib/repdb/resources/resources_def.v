@@ -122,4 +122,11 @@ Section Resources_definition.
   Lemma Obs_persistent_holds a h : Persistent (own_obs a h).
   Proof. apply _. Qed.
 
+  Lemma Obs_own_log_obs DB_addr L:
+    own_obs DB_addr L ⊢ own_log_obs γL L.
+  Proof.
+    iIntros "[(%_ & #Hobs)|#Hobs]"; [iFrame "#"|].
+    by iDestruct "Hobs" as (γ) "(_ & Hobs &  _)".
+  Qed.
+
 End Resources_definition.
