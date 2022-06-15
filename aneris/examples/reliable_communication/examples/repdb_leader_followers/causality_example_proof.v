@@ -187,7 +187,16 @@ Section proof_of_code.
     iSplit; [done|].
     iNext.
     iIntros (h'' a').
-    iDestruct 1 as (Hatkey''' Hkey' Hval' Hle) "[Hy #Hobs'''']".
+    iDestruct 1 as (Hatkey''' Hkey' Hval' Hle) "[Hy #Hobs'']".
+    iMod (OwnMemKey_some_obs_frame with "HGinv [$Hx Hobs'']")
+      as "[Hx %Hatkey'''']"; [solve_ndisj| |].
+    { assert (([] ++ h ++ [a]) ++ h'' ++ [a'] =
+              (([] ++ h) ++ [a] ++ (h'' ++ [a']))) as ->.
+      { by rewrite !assoc. }
+      done. }
+    assert (at_key "x" h'' = None).
+    { rewrite at_key_snoc_none in Hatkey''''; [done|].
+      by rewrite Hkey'. }
     iMod ("Hclose" with "[-HΦ]"); [|by iApply "HΦ"].
     iNext.
     iRight.
@@ -201,9 +210,8 @@ Section proof_of_code.
     { iPureIntro.
       rewrite hist_at_key_empty_at_key in Hhist.
       rewrite at_key_snoc_none in Hhist; [done| by rewrite Hkey]. }
-    (* Need another invariant to make sure `x` does not change after being set *)
-    iSplit; [admit|done].
-  Admitted.
+    done.
+  Qed.
 
   Lemma wp_do_reads clt_01 rd fsa :
     GlobalInv -∗
