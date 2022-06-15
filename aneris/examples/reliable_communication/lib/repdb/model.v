@@ -92,7 +92,7 @@ Section ValidStates.
     ∀ k v, k ∈ dom M → M !! k = Some v → ∃ we, at_key k L = Some we ∧ we.(we_val) = v.
 
   Definition in_mem_log_none_coh_local (L : wrlog) (M : gmap Key val) :=
-    ∀ k, k ∈ dom M → M !! k = None → at_key k L = None.
+    ∀ k, M !! k = None → at_key k L = None.
 
   Definition mem_serializable_vals_local (M : gmap Key val) :=
     ∀ k v, k ∈ dom M → M !! k = Some v → Serializable DB_serialization v.
