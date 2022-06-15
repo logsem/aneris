@@ -272,7 +272,7 @@ Section proof_of_code.
 
     iAssert ("y" ↦ₖ Some we_y ={⊤ ∖ ↑Ny}=∗ ⌜a = we_y⌝ ∗ "y" ↦ₖ Some we_y)%I
       as "H".
-x    { iMod (Obs_compare with "HGinv Hobs Hobs''") as %Hprefix'; [solve_ndisj|].
+    { iMod (Obs_compare with "HGinv Hobs Hobs''") as %Hprefix'; [solve_ndisj|].
       iIntros "Hy".
       destruct Hprefix' as [Hprefix'|Hprefix'].
       - (* `h` is at least `hb ++ [we_x] ++ hfx ++ [we_y]`,
