@@ -142,4 +142,9 @@ Section ValidStates.
     valid_state_local (lM ++ [wev]) (<[k:= wev.(we_val)]> kvsMG).
   Proof. Admitted.
 
+  Lemma valid_state_local_log_no_dup lM mM:
+    valid_state_local lM mM ->
+    NoDup lM.
+  Proof. Admitted.
+
 End ValidStates.

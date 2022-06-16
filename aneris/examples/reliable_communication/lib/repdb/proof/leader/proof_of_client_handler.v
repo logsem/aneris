@@ -40,54 +40,6 @@ Section Clients_MT_spec_params.
 
   Notation MTU := (client_handler_at_leader_user_params γL γM).
 
-  Lemma at_key_app_none k h hf :
-    (∀ x, x ∈ h → x ∉ hf) →
-    (∀ x, x ∈ hf → x ∉ h) →
-    at_key k h = at_key k (h ++ hf) →
-    at_key k hf = None.
-  Proof.
-  rewrite /at_key /hist_at_key.
-  intros Hdisj1 Hdisj2 Happ.
-  destruct (last (filter (λ x : we, we_key x = k) h)) as [|elt] eqn:Happ1.
-  - destruct (last (filter (λ x : we, we_key x = k) hf)) as [| elthf] eqn:Happ2.
-    -- admit.
-    (*   apply last_Some_elem_of in Happ1.
-    apply elem_of_list_filter in Happ1 as (Hp & Hin).
-    symmetry in Happ. apply last_Some_elem_of in Happ.
-    apply elem_of_list_filter in Happ as (Hp' & Hin').
-    destruct (last (filter (λ x : we, we_key x = k) hf)) as [| elthf] eqn:Happ2.
-    -- apply last_Some_elem_of, elem_of_list_filter in Happ2 as (Hp'' & Hin'').
-       apply Hdisj in Hin. set_solver.
-
-    apply last_None.
-    apply Hdisj in Hin.
-    -- done.
-    --               filter (λ x : we, we_key x = k) hf
-  apply elem_of_list_filter in Happ as (Hp' & Hin').
-  rewrite filter_app in Happ.
-  destruct (last (filter (λ x : we, we_key x = k) h)) as [|elt] eqn:Happ1.
-  - apply last_Some_elem_of in Happ1.
-    symmetry in Happ. apply last_Some_elem_of in Happ.
-
-    apply Hdisj in Hin.
-    apply elem_of_list_filter in Hin.
-  - symmetry in Happ. apply last_None in Happ.
-    apply last_None. apply app_nil in Happ.
-    by destruct Happ.
-    list_simplifer. naive_solver. last_Some_elem_of
-  destruct (filter (λ x : we, we_key x = k) hf) as [| elt Hl]; first done.
-  rewrite last_app_cons in Happ. *)
-  Admitted.
-
-  (* Lemma valid_state_local_update *)
-  (*       (lM : wrlog) (kvsMG : gmap Key val) k wev : *)
-  (*   wev.(we_key) ∈ DB_keys → *)
-  (*   wev.(we_time) = (length lM : Time) → *)
-  (*   Serializable DB_serialization wev.(we_val) → *)
-  (*   valid_state_local lM kvsMG -> *)
-  (*   valid_state_local (lM ++ [wev]) (<[k:= wev.(we_val)]> kvsMG). *)
-  (* Proof. Admitted. *)
-
   Lemma client_request_handler_at_leader_spec  :
     ∀ reqv reqd,
     {{{ leader_local_main_inv γL kvsL logL mγ mv ∗
@@ -127,8 +79,8 @@ Section Clients_MT_spec_params.
       destruct Hprefixh as (hf & Hprefixh).
       assert (at_key k hf = None) as Hnone.
       { apply (at_key_app_none _ h).
-        - admit.
-        - admit.
+        - rewrite -Hprefixh.
+          by eapply valid_state_local_log_no_dup.
         - naive_solver. }
      iInv DB_InvName
         as (lMG kvsMG) ">(%N & %HkG & HmS & HlM & HknwF & HmapF & %HvalidG)".
@@ -226,7 +178,7 @@ Section Clients_MT_spec_params.
            apply DB_LSTV_in_mem_log_none_coh_local in Hmk.
            rewrite -Hmk Heq Hv. do 2 (iSplit; first done). iFrame. by iLeft. }
          iExists _, _. iSplit; first done. iFrame. iExists _, _. by iFrame.
-  Admitted.
+  Qed.
 
   Global Instance client_handler_at_leader_spec_params :
     @MTS_spec_params _ _ _ _ MTU :=
