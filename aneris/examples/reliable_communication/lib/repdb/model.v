@@ -84,6 +84,14 @@ Section ValidStates.
   Proof.
   Admitted.
 
+  Lemma valid_state_update (lM : wrlog) (kvsMG : gmap Key (option write_event)) k wev :
+    wev.(we_key) ∈ DB_keys →
+    wev.(we_time) = (length lM : Time) →
+    Serializable DB_serialization wev.(we_val) →
+    valid_state lM kvsMG ->
+    valid_state (lM ++ [wev]) (<[k:=Some wev]> kvsMG).
+  Proof. Admitted.
+
 
  (** Local Validity. *)
   Definition mem_dom_local (M : gmap Key val) := dom M ⊆ DB_keys.
@@ -122,6 +130,16 @@ Section ValidStates.
 (* TODO : valid state update lemmas. *)
 
   Lemma valid_state_local_empty : valid_state_local [] ∅.
+  Proof. Admitted.
+
+
+  Lemma valid_state_local_update
+        (lM : wrlog) (kvsMG : gmap Key val) k wev :
+    wev.(we_key) ∈ DB_keys →
+    wev.(we_time) = (length lM : Time) →
+    Serializable DB_serialization wev.(we_val) →
+    valid_state_local lM kvsMG ->
+    valid_state_local (lM ++ [wev]) (<[k:= wev.(we_val)]> kvsMG).
   Proof. Admitted.
 
 End ValidStates.

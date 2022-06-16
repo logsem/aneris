@@ -22,7 +22,7 @@ From aneris.examples.reliable_communication.lib.repdb.resources
      Require Import
      ras
      resources_def
-     resources_global_inv 
+     resources_global_inv
      resources_local_inv.
 From aneris.examples.reliable_communication.lib.repdb.proof
      Require Import
@@ -53,11 +53,11 @@ Section Client_Proxy_Proof.
                 own_mem_user γM k 1 a_old ∗
                 own_obs γL DB_addr h ∗
                   ▷ (∀ (hf : ghst) (a_new : we),
-                  ⌜at_key k hf = None⌝ ∗
-                  ⌜we_key a_new = k⌝ ∗
-                  ⌜we_val a_new = v⌝ ∗
-                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-                  own_mem_user γM k 1 (Some a_new) ∗
+                  ⌜at_key k hf = None⌝ -∗
+                  ⌜we_key a_new = k⌝ -∗
+                  ⌜we_val a_new = v⌝ -∗
+                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ -∗
+                  own_mem_user γM k 1 (Some a_new) -∗
                   own_obs γL DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
         {{{ P }}}
           wr #k v @[ip_of_address sa]

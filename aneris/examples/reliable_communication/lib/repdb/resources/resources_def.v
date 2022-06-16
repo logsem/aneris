@@ -53,6 +53,12 @@ Section Resources_definition.
     own_mem_user k (q1 + q2) v ⊢ own_mem_user k q1 v ∗ own_mem_user k q2 v.
   Proof. Admitted.
 
+  Lemma own_mem_update k M (we : option write_event) (we' : write_event) :
+    own_mem_user k 1%Qp we ⊢
+    own_mem_sys M ==∗ own_mem_user k 1%Qp (Some we') ∗ own_mem_sys (<[k := Some we']>M).
+  Proof. Admitted.
+
+
   (* ------------------------------------------------------------------------ *)
   (** Resources about free/known replicated logs. *)
 
