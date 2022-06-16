@@ -26,11 +26,11 @@ Section API_spec.
                 k ↦ₖ a_old ∗
                 Obs DB_addr h ∗
                   ▷ (∀ (hf : ghst) (a_new : we),
-                  ⌜at_key k hf = None⌝ ∗
-                  ⌜we_key a_new = k⌝ ∗
-                  ⌜we_val a_new = v⌝ ∗
-                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-                  k ↦ₖ Some a_new ∗
+                  ⌜at_key k hf = None⌝ -∗
+                  ⌜we_key a_new = k⌝ -∗
+                  ⌜we_val a_new = v⌝ -∗
+                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ -∗
+                  k ↦ₖ Some a_new -∗
                   Obs DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
         {{{ P }}}
           wr #k v @[ip_of_address sa]
@@ -54,6 +54,20 @@ Section API_spec.
            ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
            k ↦ₖ Some a_new ∗
            Obs DB_addr (h ++ hf ++ [a_new]) >>>.
+
+  Lemma write_spec_write_spec_atomic wr sa :
+    write_spec wr sa -∗ write_spec_atomic wr sa.
+  Proof.
+    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
+    iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
+      [ done .. | | ].
+    { iIntros "!> Hvs".
+      iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
+      iModIntro. iExists _, _. iFrame. iSplit; first done.
+      iNext. iIntros (hf anew Hhf Hnk Hnv) "Hpre1 Hpre2 Hpre3".
+      iApply "Hclose". eauto 10 with iFrame. }
+    iIntros "!> H". iDestruct "H" as (_ _ _) "H". iApply "H".
+  Qed.
 
  (* Definition read_spec
       (rd : val) (sa : socket_address)  : iProp Σ :=
@@ -106,22 +120,7 @@ Section API_spec.
           k ↦ₖ Some a
     }}}%I.
 
-   Lemma write_spec_write_spec_atomic wr sa :
-    write_spec wr sa -∗ write_spec_atomic wr sa.
-  Proof.
-    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
-    iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
-      [ done .. | | ].
-    { iIntros "!> Hvs".
-      iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
-      iModIntro.
-      eauto 10 with iFrame. }
-    iIntros "!> H".
-    iDestruct "H" as (_ _ _) "H".
-    iApply "H".
-  Qed.
-
-  Definition read_spec
+   Definition read_spec
     (rd : val) (sa : socket_address) (k : Key) (q : Qp)
     (wo : option we) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗

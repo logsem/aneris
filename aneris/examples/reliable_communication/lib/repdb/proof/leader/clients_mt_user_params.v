@@ -35,8 +35,8 @@ Section MT_user_params.
 
   Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
     Global_Inv γL γM ∗
-    ((∃ E k v P Q,
-     ⌜reqd = inl (E, (k, v), (P, Q))⌝ ∗
+    ((∃ E k (v : SerializableVal) P Q,
+     ⌜reqd = inl (E, (k, SV_val v), (P, Q))⌝ ∗
      ⌜reqv = InjLV (#(LitString k), v)%V⌝ ∗
      ⌜↑DB_InvName ⊆ E⌝ ∗
      ⌜k ∈ DB_keys⌝ ∗
@@ -48,11 +48,13 @@ Section MT_user_params.
             own_mem_user γM k 1 a_old ∗
             own_obs γL DB_addr h ∗
             ▷ (∀ (hf : ghst) (a_new : we),
-                  ⌜at_key k hf = None⌝ ∗
-                  ⌜we_key a_new = k⌝ ∗ ⌜we_val a_new = v⌝ ∗
-                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-                  own_mem_user γM k 1 (Some a_new) ∗
-                  own_obs γL DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf))) ∨
+                  ⌜at_key k hf = None⌝ -∗
+                  ⌜we_key a_new = k⌝ -∗
+                  ⌜we_val a_new = v⌝ -∗
+                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ -∗
+                  own_mem_user γM k 1 (Some a_new) -∗
+                  own_obs γL DB_addr (h ++ hf ++ [a_new])
+                  ={E,⊤}=∗ Q a_new h hf))) ∨
     (∃ k wo q, ⌜k ∈ DB_keys⌝ ∗
                ⌜reqd = inr (k, (q, wo))⌝ ∗
                ⌜reqv = InjRV #(LitString k)⌝ ∗
