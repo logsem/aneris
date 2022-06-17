@@ -213,6 +213,119 @@ Section proof_of_code.
     done.
   Qed.
 
+  Lemma prefix_Some_None {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys zs x :
+    last (filter P xs) = Some x →
+    last (filter P ys) = None →
+    xs `prefix_of` ys ++ zs →
+    ys `prefix_of` xs.
+  Proof.
+    intros Hsome Hnone Hprefix.
+    generalize dependent xs.
+    induction ys as [|y ys]; intros xs Hsome Hprefix.
+    { apply prefix_nil. }
+    destruct xs as [|x' xs]; [done|].
+    assert (y = x') as <-.
+    { by apply prefix_cons_inv_1 in Hprefix. }
+    apply prefix_cons.
+    apply IHys.
+    - rewrite last_None in Hnone.
+      rewrite last_None.
+      rewrite filter_cons in Hnone.
+      by destruct (decide (P y)).
+    - rewrite last_None in Hnone.
+      rewrite filter_cons in Hsome.
+      rewrite filter_cons in Hnone.
+      by destruct (decide (P y)).
+    - by apply prefix_cons_inv_2 in Hprefix.
+  Qed.
+
+  Lemma prefix_cons_nil {A:Type} (xs : list A) y ys :
+    xs ≠ [] →
+    xs `prefix_of` y :: ys →
+    [y] `prefix_of` xs.
+  Proof.
+    intros Hneq Hprefix.
+    destruct xs; [done|].
+    apply prefix_cons_inv_1 in Hprefix.
+    rewrite Hprefix.
+    apply prefix_cons. apply prefix_nil.
+  Qed.
+
+  Lemma last_filter_app_r {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys x :
+    last (filter P (xs ++ ys)) = Some x →
+    last (filter P xs) = None →
+    last (filter P ys) = Some x.
+  Proof.
+    intros Hsome Hnone.
+    rewrite filter_app in Hsome.
+    rewrite last_None in Hnone.
+    rewrite Hnone in Hsome.
+    done.
+  Qed.
+
+  Lemma prefix_split_eq {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys zs x y :
+    last (filter P xs) = Some x →
+    last (filter P ys) = None →
+    last (filter P zs) = None →
+    xs `prefix_of` ys ++ [y] ++ zs →
+    x = y.
+  Proof.
+    intros Hsome Hnone1 Hnone2 Hprefix.
+    assert (ys `prefix_of` xs) as [k ->].
+    { by eapply prefix_Some_None. }
+    apply prefix_app_inv in Hprefix.
+    apply last_filter_app_r in Hsome; [|done].
+    assert ([y] `prefix_of` k) as [k' ->].
+    { eapply prefix_cons_nil; [|done]. by intros ->. }
+    rewrite filter_app in Hsome.
+    rewrite last_None in Hnone2.
+    apply prefix_app_inv in Hprefix.
+    destruct Hprefix as [k'' ->].
+    rewrite filter_app in Hnone2.
+    apply app_eq_nil in Hnone2.
+    destruct Hnone2 as [Hnone2 _].
+    rewrite Hnone2 in Hsome.
+    rewrite filter_cons in Hsome.
+    destruct (decide (P y)).
+    - simpl in *. simplify_eq. done.
+    - done.
+  Qed.
+
+  Lemma elem_of_last_filter_exists_Some
+        {A} `{EqDecision A} (P : A → Prop) `{!∀ x, Decision (P x)} xs x y :
+    last (filter P xs) = x →
+    y ∈ xs →
+    P y →
+    ∃ x', last (filter P xs) = Some x'.
+  Proof.
+    intros Hlast Hin HPy.
+    induction xs as [|z xs IHxs]; [set_solver|].
+    simpl in *.
+    destruct (decide (P z)) as [HPz|HPz]; last first.
+    - rewrite filter_cons_False in Hlast; [|done].
+      assert (y ≠ z) as Hneq.
+      { intros Heq. rewrite -Heq in HPz. done. }
+      apply elem_of_cons in Hin.
+      destruct Hin as [Hin|Hin]; [done|].
+      assert (∃ x' : A, last (filter P xs) = Some x') as IHxs'.
+      { by apply IHxs. }
+      destruct IHxs' as [x' IHxs'].
+      exists x'. by rewrite filter_cons_False.
+    - assert (last (filter P xs) = None ∨
+              ∃ a', last (filter P xs) = Some a') as Hfilter.
+      { destruct (last (filter P xs)); eauto. }
+      destruct Hfilter as [Hnone|Hsome].
+      + exists z.
+        rewrite filter_cons_True; [|done].
+        rewrite last_None in Hnone. rewrite Hnone.
+        done.
+      + destruct Hsome as [a' Hsome].
+        exists a'.
+        rewrite filter_cons_True; [|done].
+        rewrite last_cons.
+        rewrite Hsome. done.
+  Qed.
+
   Lemma wp_do_reads clt_01 rd fsa :
     GlobalInv -∗
     (∀ k h, read_at_follower_spec rd clt_01 fsa k h) -∗
@@ -279,115 +392,17 @@ Section proof_of_code.
            and at_key "y" (hb ++ [we_x] ++ hfx) = None
            thus `at_key "y" h` can only be we_y *)
         iModIntro. iFrame "Hy". iPureIntro.
-
-        rewrite /at_key /hist_at_key !last_None in
-          Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx Hatkey_hfyy Hatkey_hfxy.
-        clear Hatkey_x.
-        clear Hatkey_y.
-        clear Hatkey_hbx.
-        clear Hatkey_hfxx.
-        clear Hatkey_hfyx.
-        clear Hprefix.
-
-        assert (hb `prefix_of` h) as Hprefix''.
-        {
-          generalize dependent h.
-          induction hb as [|v hb]; intros h Hatkey Hprefix'.
-          { apply prefix_nil. }
-          destruct h as [|w h]; [done|].
-          assert (w = v) as <-.
-          { rewrite !assoc in Hprefix'.
-            by apply prefix_cons_inv_1 in Hprefix'. }
-          apply prefix_cons.
-          apply IHhb.
-          - rewrite /hist_at_key in Hatkey_hby.
-            rewrite filter_cons in Hatkey_hby.
-            by destruct (decide (we_key w = "y")).
-          - rewrite filter_cons in Hatkey_hby.
-            destruct (decide (we_key w = "y")); [done|].
-            rewrite /at_key in Hatkey.
-            rewrite /hist_at_key in Hatkey.
-            by rewrite filter_cons_False in Hatkey.
-          - by apply prefix_cons_inv_2 in Hprefix'.
-        }
-        destruct Hprefix'' as [k ->].
-        apply prefix_app_inv in Hprefix'.
-        assert ([we_x] `prefix_of` k) as Hprefix''.
-        { simpl in *.
-          destruct k.
-          { rewrite /at_key /hist_at_key in Hatkey.
-            rewrite right_id in Hatkey.
-            by rewrite Hatkey_hby in Hatkey. }
-          apply prefix_cons_inv_1 in Hprefix'. simplify_eq.
-          apply prefix_cons. apply prefix_nil. }
-        destruct Hprefix'' as [k' ->].
-        apply prefix_app_inv in Hprefix'.
-        assert (hfx `prefix_of` k') as Hprefix''.
-        {
-          assert (at_key "y" k' = Some a) as Hatkey'.
-          { rewrite /at_key /hist_at_key in Hatkey.
-            rewrite filter_app in Hatkey.
-            rewrite Hatkey_hby in Hatkey.
-            rewrite filter_cons_False in Hatkey; [done|].
-            rewrite Hkey_x. done. }
-          generalize dependent k'.
-          induction hfx; intros k' Hatkey Hprefix' Hatkey'.
-          { apply prefix_nil. }
-          destruct k'; [done|].
-          assert (w = a0) as <-.
-          { rewrite !assoc in Hprefix'.
-            by apply prefix_cons_inv_1 in Hprefix'. }
-          apply prefix_cons.
-          apply IHhfx.
-          - rewrite filter_cons in Hatkey_hfxy.
-            by destruct (decide (we_key w = "y")).          
-          - rewrite filter_cons in Hatkey_hfxy.
-            rewrite /at_key in Hatkey'.
-            destruct (decide (we_key w = "y")); [done|].
-            rewrite /hist_at_key in Hatkey'.
-            rewrite /at_key /hist_at_key.
-            rewrite filter_app.
-            rewrite Hatkey_hby.
-            rewrite filter_cons_False; [|by rewrite Hkey_x].
-            rewrite filter_cons_False in Hatkey'; [done|done].
-          - by apply prefix_cons_inv_2 in Hprefix'.
-          - rewrite filter_cons in Hatkey_hfxy.
-            rewrite /at_key in Hatkey'.
-            destruct (decide (we_key w = "y")); [done|].
-            rewrite /hist_at_key in Hatkey'.
-            rewrite filter_cons_False in Hatkey'; [done|done].
-        }
-        destruct Hprefix'' as [k'' ->].
-        apply prefix_app_inv in Hprefix'.
-        assert ([we_y] `prefix_of` k'') as Hprefix''.
-        {
-          destruct k''.
-          {
-            rewrite /at_key /hist_at_key filter_app in Hatkey.
-            rewrite Hatkey_hby in Hatkey.
-            rewrite filter_cons_False in Hatkey; [|by rewrite Hkey_x].
-            rewrite right_id in Hatkey.
-            rewrite Hatkey_hfxy in Hatkey.
-            done. }
-          apply prefix_cons_inv_1 in Hprefix'.
-          subst. apply prefix_cons. apply prefix_nil.
-        }
-        destruct Hprefix'' as [k''' ->].
-        apply prefix_app_inv in Hprefix'.
-        destruct Hprefix' as [k'''' ->].
-        rewrite filter_app in Hatkey_hfyy.
-        apply app_eq_nil in Hatkey_hfyy.
-        destruct Hatkey_hfyy as [Hatkey_hfyy _].
-        rewrite /at_key /hist_at_key in Hatkey.
-        rewrite !filter_app in Hatkey.
-        rewrite Hatkey_hfyy in Hatkey.
-        rewrite right_id in Hatkey.
-        rewrite Hatkey_hby in Hatkey.
-        rewrite Hatkey_hfxy in Hatkey.
-        rewrite filter_cons_False in Hatkey; [|by rewrite Hkey_x].
-        rewrite filter_cons_True in Hatkey; [|by rewrite Hkey_y].
-        simpl in *.
-        by simplify_eq.
+        rewrite !assoc in Hprefix'.
+        rewrite -assoc in Hprefix'.
+        eapply prefix_split_eq; [apply Hatkey | | | apply Hprefix'].
+        + rewrite !filter_app.
+          rewrite /at_key /hist_at_key !last_None in
+            Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
+                       Hatkey_hfyy Hatkey_hfxy.
+          rewrite Hatkey_hby Hatkey_hfxy.
+          simpl.
+          rewrite filter_cons_False; [done| by rewrite Hkey_x].
+        + done.
       - rewrite -Hatkey_y.
         iMod (OwnMemKey_obs_frame_prefix with "HGinv [$Hy $Hobs]")
           as "[Hy %Heq]"; [solve_ndisj|done|].
@@ -418,7 +433,47 @@ Section proof_of_code.
       - (* `h'` is at least `h`, and `h` is at least
              `hb ++ [we_x] ++ hfx ++ [we_y]`,
               thus `at_key "x" h'` can only be we_x *)
-        admit.
+        iModIntro. iFrame "Hx". iPureIntro.
+
+        assert (h `prefix_of` hb ++ [we_x] ++ hfx ++ [we_y] ++ hfy) as Hprefix''.
+        { by eapply transitivity. }
+        rewrite !assoc in Hprefix''.
+        rewrite -assoc -assoc in Hprefix''.
+        assert (((hb ++ [we_x])) `prefix_of` h) as Hprefix'''.
+        {
+          eapply prefix_Some_None.
+          - apply Hatkey.
+          - rewrite !filter_app.
+            rewrite /at_key /hist_at_key !last_None in
+              Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
+                         Hatkey_hfyy Hatkey_hfxy.
+            rewrite Hatkey_hby.
+            simpl.
+            rewrite filter_cons_False; [done| by rewrite Hkey_x].
+          - apply Hprefix''.
+        }
+        destruct Hprefix''' as [k ->].
+
+        assert (∃ a', at_key "x" h' = Some a') as [a' Hatkey_a'].
+        { (* By investigation of Hprefix *)
+          destruct Hprefix as [k' ->].
+          eapply (elem_of_last_filter_exists_Some _ _ a we_x).
+          - apply Hatkey_a.
+          - set_solver.
+          - done.
+        }
+
+        assert (a = Some a') as -> by naive_solver.
+        f_equiv.
+        eapply prefix_split_eq; [apply Hatkey_a'| | |apply Hprefix'].
+        + done.
+        + rewrite !filter_app.
+          rewrite /at_key /hist_at_key !last_None in
+            Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
+                       Hatkey_hfyy Hatkey_hfxy.
+          rewrite Hatkey_hfxx Hatkey_hfyx.
+          simpl.
+          rewrite filter_cons_False; [done| by rewrite Hkey_y].
       - rewrite -Hatkey_x.
         iMod (OwnMemKey_obs_frame_prefix with "HGinv [$Hx $Hobs']")
           as "[Hy %Heq]"; [solve_ndisj|done|].
@@ -445,7 +500,7 @@ Section proof_of_code.
     rewrite Hval.
     iSplit; [done|].
     by iApply "HΦ".
-  Admitted.
+  Qed.
 
   Lemma proof_of_node0 (clt_00 : socket_address) A :
     DB_addr ∈ A →
