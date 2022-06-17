@@ -28,3 +28,6 @@ Coercion SV_val : SerializableVal >-> val.
 Existing Instance SV_ser.
 
 Arguments SerVal {_} _ {_}.
+
+Definition socket_address_to_str (sa : socket_address) : string :=
+    match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.

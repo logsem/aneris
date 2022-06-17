@@ -60,9 +60,6 @@ Section Local_Invariants.
      known_replog_token sa γsa ∗
      own_logL_obs γL logM.
 
-  Definition socket_address_to_str (sa : socket_address) : string :=
-    match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
-
   Definition follower_local_inv (kvsL logL : loc)
     (sa : socket_address) (γsa : gname) (mγ : gname) (mV : val) : iProp Σ :=
     log_monitor_inv
