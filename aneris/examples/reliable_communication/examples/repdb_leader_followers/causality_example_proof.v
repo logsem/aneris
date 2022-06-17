@@ -21,31 +21,6 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 Section API_spec_ext.
   Context `{!anerisG Mdl Σ, !DB_time, !DB_params, !DB_resources}.
 
-  Definition write_spec
-      (wr : val) (sa : socket_address) : iProp Σ :=
-    Eval simpl in
-    □ (∀ (E : coPset) (k : Key) (v : SerializableVal)
-         (P : iProp Σ) (Q : we → ghst → ghst → iProp Σ),
-        ⌜↑DB_InvName ⊆ E⌝ -∗
-        ⌜k ∈ DB_keys⌝ -∗
-        □ (P
-            ={⊤, E}=∗
-              ∃ (h : ghst) (a_old: option we),
-                ⌜at_key k h = a_old⌝ ∗
-                k ↦ₖ a_old ∗
-                Obs DB_addr h ∗
-                  ▷ (∀ (hf : ghst) (a_new : we),
-                  ⌜at_key k hf = None⌝ ∗
-                  ⌜we_key a_new = k⌝ ∗
-                  ⌜we_val a_new = v⌝ ∗
-                  ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-                  k ↦ₖ Some a_new ∗
-                  Obs DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
-        {{{ P }}}
-          wr #k v @[ip_of_address sa]
-        {{{ RET #();
-           ∃ (h hf : ghst) (a: we), Q a h hf }}})%I.
-
   Definition write_spec_atomic
       (wr : val) (sa : socket_address) : iProp Σ :=
     ∀ (E : coPset) (k : Key) (v : SerializableVal),
