@@ -64,7 +64,7 @@ Section Local_Invariants.
     (sa : socket_address) (γsa : gname) (mγ : gname) (mV : val) : iProp Σ :=
     log_monitor_inv
       (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
-      γsa (1/2) logL
+      γsa (1/4) logL
       (follower_local_res kvsL sa γsa).
 
 End Local_Invariants.

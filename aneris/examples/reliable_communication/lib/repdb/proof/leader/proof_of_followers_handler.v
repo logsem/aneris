@@ -77,13 +77,13 @@ Section Followers_MT_spec_params.
     wp_apply (wp_log_wait_until
                with "[$Hmon $Hlocked $Hpl $HLog $HobsL][HΦ]").
     { naive_solver. }
-    iNext.
-    iIntros (logV' logM').
+    iNext. iIntros (logV' logM').
     iIntros "(%Hlen' & %Hlog' & Hlocked & HmainRes & Hpl & HmainLog)".
     wp_pures.
     wp_apply (wp_log_get with "[$Hpl]"); first done.
     iIntros (we) "(%Hsome & _ & Hpl)".
     iDestruct (get_obs with "HmainLog") as "#Hobs'".
+    assert (nth_error logM' (length reqd) = Some we) as Hsome2 by auto.
     apply nth_error_split in Hsome.
     destruct Hsome as (l1 & l2 & HeqlogM' & Hlen1).
     iDestruct (get_obs_prefix with "Hobs'") as "Hobsl1"; first done.
@@ -95,20 +95,17 @@ Section Followers_MT_spec_params.
     iDestruct "HmainRes" as "(_  & #HobsL')".
     iDestruct (get_obs_prefix with "HobsL'") as "HobsLWe"; first done.
     iApply fupd_aneris_wp.
-    iMod (Obs_we_serializable _ _ DB_addr with "[$HGinv][$HobsLWe]") as "%Hser";
-    [done| by iLeft |].
-    iModIntro.
-    wp_apply network_util_proof.wp_unSOME; first done.
-    iIntros "_".
-    iApply ("HΦ" $! ($ we) (reqd ++ [we])).
-    iSplit; first done.
-    iFrame "Hlocked".
-    iSplitL.
-    { iExists logV', logM'. by iFrame "#∗". }
+    iMod (Obs_we_serializable _ _ DB_addr with "[$HGinv][$HobsLWe]")
+      as "%Hser"; [done| by iLeft |].
+    iModIntro. wp_apply network_util_proof.wp_unSOME; first done.
+    iIntros "_". iApply ("HΦ" $! ($ we) (reqd ++ [we])).
+    iSplit; first done. iFrame "Hlocked".
+    iSplitL. { iExists logV', logM'. by iFrame "#∗". }
     iExists we.
     iSplit; first done.
-    iExists γF. iFrame "#∗".
-  Qed.
+    iSplit. { iPureIntro. admit. }
+    iSplit; first done. iExists γF. iFrame "#∗".
+  Admitted.
 
   Global Instance follower_handler_spec_params :  @MTS_spec_params _ _ _ _ MTU_F :=
     {|

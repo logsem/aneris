@@ -45,7 +45,7 @@ Section Clients_MT_spec_params.
     {{{ follower_local_inv γL kvsL logL sa γF mγ mv ∗
         lock_proof.locked mγ ∗
         (log_monitor_inv_def
-           (ip_of_address MTU.(MTS_saddr)) γF (1/2) logL
+           (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
            (follower_local_res γL kvsL sa γF)) ∗
            MTU.(MTS_handler_pre) reqv reqd }}}
        handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
@@ -53,7 +53,7 @@ Section Clients_MT_spec_params.
         ⌜Serializable (rep_f2c_serialization) repv⌝ ∗
         lock_proof.locked mγ ∗
           (log_monitor_inv_def
-             (ip_of_address MTU.(MTS_saddr)) γF (1/2) logL
+             (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
              (follower_local_res γL kvsL sa γF)) ∗
           MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
@@ -73,18 +73,18 @@ Section Clients_MT_spec_params.
                  (∃ a : write_event, ⌜kvsM !! k = Some (we_val a)⌝ ∗
                      ⌜at_key k lM = Some a⌝))%I
       as ">Hpost".
-    { destruct (kvsM !! k) as [v|] eqn:Hmk. 
+    { destruct (kvsM !! k) as [v|] eqn:Hmk.
       - iModIntro. iRight.
         apply DB_LSTV_in_mem_log_some_coh_local in Hmk;
           last by apply elem_of_dom.
         destruct Hmk as (we0 & Hwe0L & <-).
-        iExists _. iSplit; first done. by iPureIntro. 
+        iExists _. iSplit; first done. by iPureIntro.
       - iModIntro. iLeft. iSplit; first done. iPureIntro.
         by apply DB_LSTV_in_mem_log_none_coh_local in Hmk. }
     iModIntro.
     wp_apply (wp_map_lookup $! Hkvs).
     iIntros (v Hkm).
-    destruct (kvsM !! k) eqn:Hmk. 
+    destruct (kvsM !! k) eqn:Hmk.
     - iDestruct "Hpost" as "[(%Habs & _)|Hpost]"; first done.
       iDestruct "Hpost" as (a Ha) "%Hwe".
       assert (v = SOMEV (we_val a)) as ->.
@@ -92,16 +92,16 @@ Section Clients_MT_spec_params.
       iApply ("HΦ" $! (SOMEV (we_val a)) lM). iFrame "Hkey". iSplit.
        { iPureIntro.  assert (k ∈ dom kvsM) as Hk by by apply elem_of_dom.
          assert (v0 = (we_val a)) as Heqa by naive_solver.
-         rewrite Heqa in Hmk. 
+         rewrite Heqa in Hmk.
          rewrite Hmk in Hkm.
          specialize (DB_LSTV_mem_serializable_vs_local k (we_val a) Hk Hmk).
          apply _. }
        simpl. rewrite /log_monitor_inv_def /ReqPost.
        iSplitL; last first.
-       { iExists k, h, lM. do 3 (iSplit; first done). 
+       { iExists k, h, lM. do 3 (iSplit; first done).
          iFrame "#".
-         iRight. iExists a. eauto. } 
-       iExists _, _. iSplit; first done. iFrame "#∗". iExists _, _. by iFrame. 
+         iRight. iExists a. eauto. }
+       iExists _, _. iSplit; first done. iFrame "#∗". iExists _, _. by iFrame.
     - iApply ("HΦ" $! _ lM).
       iDestruct "Hpost" as "[(_ & %Hnone) |%Habs]"; [|naive_solver].
       assert (v = NONEV) as ->.
@@ -110,7 +110,7 @@ Section Clients_MT_spec_params.
       { rewrite /rep_f2c_serialization. iPureIntro. apply _. }
       simpl. rewrite /log_monitor_inv_def /ReqPost.
       iSplitL; last first.
-      { iExists k, h, lM. do 3 (iSplit; first done). 
+      { iExists k, h, lM. do 3 (iSplit; first done).
         iFrame "#∗". iLeft. done. }
       iExists _, _. iSplit; first done. iFrame "#∗". iExists _, _. by iFrame "#∗".
   Qed.
@@ -119,7 +119,7 @@ Section Clients_MT_spec_params.
     @MTS_spec_params _ _ _ _ MTU :=
     {|
       MTS_mR := (log_monitor_inv_def
-                   (ip_of_address MTU.(MTS_saddr)) γF (1/2) logL
+                   (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
                    (follower_local_res γL kvsL sa γF));
       MTS_mγ := mγ;
       MTS_mv := mv;
