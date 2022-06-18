@@ -101,9 +101,8 @@ let start_follower_processing_clients (ser[@metavar]) addr db mon =
   run_server (rep_f2c_ser ser) req_c2f_ser addr mon
     (fun mon req -> client_request_handler_at_follower db mon req)
 
-let sync_loop db log mon reqf () : unit =
-  let rec aux () =
-    let i = log_next log in
+let sync_loop db log mon reqf n : unit =
+  let rec aux i =
     let rep = reqf i in
     let ((k, v), j) = rep in
     assert (i = j);
@@ -111,12 +110,12 @@ let sync_loop db log mon reqf () : unit =
     log_add_entry log ((k,v), j);
     db := map_insert k v !db;
     monitor_release mon;
-    aux ()
-  in aux ()
+    aux (i + 1)
+  in aux n
 
 let sync_with_server (ser[@metavar]) l_addr f2l_addr db log mon : unit =
   let reqf = init_client_proxy req_f2l_ser (rep_l2f_ser ser) f2l_addr l_addr in
-  fork (sync_loop db log mon reqf) ()
+  fork (sync_loop db log mon reqf) 0
 
 (** Initialization of the follower. *)
 let init_follower (ser[@metavar]) l_addr f2l_addr f_addr  =

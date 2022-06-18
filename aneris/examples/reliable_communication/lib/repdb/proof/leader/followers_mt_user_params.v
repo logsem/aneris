@@ -41,6 +41,8 @@ Section MT_user_params.
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=
     ∃ (we : write_event),
       ⌜repd = reqd ++ [we]⌝ ∗
+      ⌜we.(we_time) = (List.length reqd)⌝ ∗
+      ⌜repv = $ we⌝ ∗
       own_replog_obs γL DB_addrF repd.
 
   Global Instance follower_handler_user_params : MTS_user_params :=
