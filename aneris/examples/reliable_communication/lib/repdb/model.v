@@ -67,7 +67,7 @@ Section ValidStates.
       DB_GSTV_mem_in_log_mem_some_coh : in_log_mem_some_coh L M;
       DB_GSTV_mem_serializable_vals : mem_serializable_vals M;
       DB_GSTV_mem_allocated_in_mem : allocated_in_mem L M;
-      DB_GSTV_log_events L : log_events L;
+      DB_GSTV_log_events : log_events L;
     }.
 
   Lemma valid_state_empty : valid_state [] ∅.
@@ -92,6 +92,10 @@ Section ValidStates.
     valid_state (lM ++ [wev]) (<[k:=Some wev]> kvsMG).
   Proof. Admitted.
 
+  Lemma valid_state_log_no_dup lM mM:
+    valid_state lM mM ->
+    NoDup lM.
+  Proof. Admitted.
 
  (** Local Validity. *)
   Definition mem_dom_local (M : gmap Key val) := dom M ⊆ DB_keys.

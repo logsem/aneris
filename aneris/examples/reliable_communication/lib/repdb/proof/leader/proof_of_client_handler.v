@@ -82,7 +82,7 @@ Section Clients_MT_spec_params.
         - rewrite -Hprefixh.
           by eapply valid_state_local_log_no_dup.
         - naive_solver. }
-     iInv DB_InvName
+      iInv DB_InvName
         as (lMG kvsMG) ">(%N & %HkG & HmS & HlM & HknwF & HmapF & %HvalidG)".
       iDestruct (own_log_auth_combine with "HlM HlogL") as "(HlFull & ->)".
       rewrite Qp_half_half.
@@ -94,7 +94,7 @@ Section Clients_MT_spec_params.
       rewrite - {5} Qp_half_half.
       iDestruct (own_log_auth_split with "HlFull") as "(HlogM & HlogL)".
       iDestruct (get_obs with "[$HlogL]") as "#Hobsfr2".
-            iModIntro. rewrite /global_inv_def. iSplitL "HlogM HmS HmapF HknwF".
+      iModIntro. rewrite /global_inv_def. iSplitL "HlogM HmS HmapF HknwF".
       { iNext. iExists _, _, _. iFrame.
         erewrite dom_insert_L, DB_GSTV_mem_dom; last done.
         iPureIntro. split; first set_solver.
