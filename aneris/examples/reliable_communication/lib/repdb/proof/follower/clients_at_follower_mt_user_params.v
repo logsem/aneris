@@ -44,7 +44,7 @@ Section MT_user_params.
 
   Definition ReqPost (repv : val) (reqd : ReqData) (repd : RepData)
     : iProp Σ :=
-    ∃ k h h', ⌜reqd = (k,h)⌝ ∗ ⌜repd = h'⌝ ∗
+    ∃ k h h', ⌜reqd = (k,h)⌝ ∗ ⌜repd = h'⌝ ∗ ⌜h ≤ₚ h'⌝ ∗
               known_replog_token sa γF ∗ own_logL_obs γL h' ∗
               own_log_obs γF h' ∗
               ((⌜repv = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨

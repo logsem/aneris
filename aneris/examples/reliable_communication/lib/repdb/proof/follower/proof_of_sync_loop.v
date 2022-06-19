@@ -95,7 +95,7 @@ Section SyncLogCopy_Proof.
     wp_pures.
     iApply fupd_aneris_wp.
     iInv DB_InvName
-        as (lMG kvsMG) ">(%N & %HkG & HmS & HlM & HknwF & HmapF & %HvalidG)".
+        as (lMG kvsMG) ">(%N & %HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
     iDestruct (known_replog_in_N with "[$HknwF $Hknw]") as %HNsa.
     iDestruct (big_sepM_lookup_acc _ _ sa γF HNsa with "[$HmapF]")
       as "((%lF & (_ & #HobsL'' & HlMhalf')) & Hcl)".
@@ -115,7 +115,7 @@ Section SyncLogCopy_Proof.
     { iAssert (⌜lF ++ [we] `prefix_of` lMG⌝)%I as "%Hprefix".
       { iApply (own_obs_prefix with "[$HlM][$HobsLwe]"). }
       iNext. iExists _, _, _. iFrame.
-      iSplit; first done.
+      do 3 (iSplit; first done).
       iSplit; last done.
       iApply ("Hcl" with "").
       iExists (lF ++ [we]).

@@ -45,6 +45,7 @@ Section proof_of_code.
     {|
       DB_addr := db_sa;
       DB_addrF := db_Fsa;
+      DB_followers := ∅;
       DB_keys := {["x"; "y"]};
       DB_InvName := (nroot .@ "DBInv");
       DB_serialization := int_serialization;
@@ -314,22 +315,8 @@ Definition clt_sa10 := SocketAddressInet "0.0.0.3" 80.
 Definition clt_sa11 := SocketAddressInet "0.0.0.3" 81.
 Definition A : gset socket_address := {[ db_sa; db_Fsa; dlm_sa ]}.
 Definition ips : gset string := {[ "0.0.0.0" ; "0.0.0.1"; "0.0.0.2"; "0.0.0.3" ]}.
-Global Instance DLP : DL_params :=
-    {|
-      DL_server_addr := dlm_sa;
-      DL_namespace := (nroot .@ "DLInv");
-    |}.
-
-Global Instance DBP : DB_params :=
-    {|
-      DB_addr := db_sa;
-      DB_addrF := db_Fsa;
-      DB_keys := {["x"; "y"]};
-      DB_InvName := (nroot .@ "DBInv");
-      DB_serialization := int_serialization;
-      DB_ser_inj := int_ser_is_ser_injective;
-      DB_ser_inj_alt := int_ser_is_ser_injective_alt
-    |}.
+Global Instance DLP : DL_params := DLSrv dlm_sa.
+Global Instance DBP : DB_params := DBSrv db_sa db_Fsa.
 
 Definition main : expr :=
     Start "0.0.0.0" (init_leader (DB_serialization.(s_serializer)) #DB_addr #DB_addrF);;

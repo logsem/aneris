@@ -104,7 +104,7 @@ Section UpdateLogCopy_Proof.
     rewrite /Global_Inv /global_inv_def.
     iApply fupd_aneris_wp.
     iInv DB_InvName as ">HGinvRes" "Hcl".
-    iDestruct "HGinvRes" as (L M N Hkes) "HGinvRes".
+    iDestruct "HGinvRes" as (L M N Hkes Hdom Hdisj) "HGinvRes".
     iDestruct "HGinvRes" as "(HownS & HownL & HknownN & HmapN & %HvSt)".
     iAssert (⌜N !! DB_addrF = Some γF⌝)%I as "%HinF".
     by iDestruct (known_replog_in_N with "[$HknownN $HknownTkn]") as "%HinN".
@@ -123,7 +123,7 @@ Section UpdateLogCopy_Proof.
     rewrite {1} Qp_quarter_quarter.
     iMod ("Hcl" with "[HownF1 HmapN HknownN HownS HownL]") as "_".
     { iNext. iExists L, M, N. iFrame "#∗".
-      iSplit; first done.
+      do 3 (iSplit; first done).
       iSplit; last done.
       iApply "HmapN".
       iExists logM'. iFrame "#∗". }

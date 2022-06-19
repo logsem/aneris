@@ -24,7 +24,7 @@ From aneris.examples.reliable_communication.examples.dlm_db_example
 
 
 
-Lemma db_init_empty `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ } : (DB_init ∅).
+Lemma db_init_empty `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ } : DB_init.
 Proof.
   (* iMod (own_alloc (● (∅ : gmapUR socket_address (agreeR gnameO)))) as (γknwF) "Hknw"; *)
   (*   first by apply auth_auth_valid. *)

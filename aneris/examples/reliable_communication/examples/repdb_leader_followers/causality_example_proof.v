@@ -17,7 +17,7 @@ From aneris.examples.reliable_communication.lib.repdb.spec
 From aneris.examples.reliable_communication.examples.repdb_leader_followers
      Require Import causality_example_code.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-
+(*
 Section API_spec_ext.
   Context `{!anerisG Mdl Σ, !DB_time, !DB_params, !DB_resources}.
 
@@ -284,3 +284,4 @@ Section proof_of_code.
   Qed.
 
 End proof_of_code.
+*)

@@ -10,6 +10,7 @@ Definition Key := string.
 Class DB_params := {
   DB_addr :  socket_address;
   DB_addrF :  socket_address;
+  DB_followers : gset socket_address;
   DB_keys : gset Key;
   DB_InvName : namespace;
   DB_serialization : serialization;
