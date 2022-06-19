@@ -98,7 +98,8 @@ Section Followers_MT_spec_params.
     iMod (Obs_we_serializable _ _ DB_addr with "[$HGinv][$HobsLWe]")
       as "%Hser"; [done| by iLeft |].
     iInv DB_InvName
-        as (lMG kvsMG) ">(%N & %HkG & HmS & HlM & HknwF & HmapF & %HvalidG)".
+        as (lMG kvsMG)
+             ">(%N & %HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
     inversion HvalidG.
     iDestruct (own_obs_prefix with "[$HlM][$HobsLWe]") as "%Hprefixh2".
     assert (we ∈ reqd ++ [we]) by set_solver.

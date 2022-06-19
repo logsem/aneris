@@ -23,9 +23,9 @@ Class IDBG Σ :=
       inG Σ (mono_listUR write_eventO);
     IDBG_Known_replog :>
       inG Σ (authR (gmapUR socket_address (agreeR gnameO)));
-    IDBG_free_replogG :>
-      inG Σ (gset_disjUR socket_address);
+    (* IDBG_free_replogG :> *)
+      (* inG Σ (gset_disjUR socket_address); *)
     IDBG_lockG :> lockG Σ;
     IDBG_known_replog_name : gname;
-    IDBG_free_replog_set_name : gname;
+    (* IDBG_free_replog_set_name : gname; *)
   }.

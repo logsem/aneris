@@ -31,6 +31,8 @@ Section Global_Invariant.
       (M : gmap Key (option write_event))
       (N: gmap socket_address gname),
       ⌜DB_keys = dom M⌝ ∗
+      ⌜dom N = DB_followers ∪ {[DB_addrF]}⌝ ∗
+      ⌜DB_followers ## {[DB_addrF]}⌝ ∗
       own_mem_sys γM M ∗
       own_logL_global γL L ∗
       known_replog_tokens N ∗

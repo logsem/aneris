@@ -24,9 +24,9 @@ Section Known_followers.
   (* ------------------------------------------------------------------------ *)
   (** Resources about free/known replicated logs. *)
 
-  (** ** Ownership to create a new replicated log. *)
-  Definition free_replog_token (sa : socket_address) : iProp Σ :=
-    own IDBG_free_replog_set_name (GSet {[sa]}).
+  (* (** ** Ownership to create a new replicated log. *) *)
+  (* Definition free_replog_token (sa : socket_address) : iProp Σ := *)
+  (*   own IDBG_free_replog_set_name (GSet {[sa]}). *)
 
   (** ** Ownership for a replicated log known by the system. *)
   Definition known_replog_token (sa : socket_address) (γ : gname) : iProp Σ :=
@@ -38,7 +38,7 @@ Section Known_followers.
 
   (** ** Ownership of all replicated logs known by the system. *)
   Definition known_replog_tokens (N : gmap socket_address gname)  : iProp Σ :=
-    own IDBG_free_replog_set_name (GSet (dom N)) ∗
+    (* own IDBG_free_replog_set_name (GSet (dom N)) ∗ *)
     own IDBG_known_replog_name (● (to_agree <$> N : gmap _ _ )).
 
  Lemma known_replog_token_agree sa γ1 γ2 :
