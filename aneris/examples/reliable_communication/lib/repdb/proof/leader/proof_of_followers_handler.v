@@ -103,7 +103,7 @@ Section Followers_MT_spec_params.
     iDestruct (own_obs_prefix with "[$HlM][$HobsLWe]") as "%Hprefixh2".
     assert (we ∈ reqd ++ [we]) by set_solver.
     assert (we ∈ lMG) as HelM by by apply (elem_of_prefix (reqd ++ [we])).
-    assert (we.(we_time) = length reqd) as Htime.
+    assert (we.(we_time) = length reqd ∧ we.(we_key) ∈ dom kvsMG) as (Htime & Hwekeydom).
     { apply elem_of_list_In in HelM.
       destruct (In_nth_error lMG we HelM) as [n Hnth].
       assert (n < length lMG) as Hnh.
@@ -112,25 +112,41 @@ Section Followers_MT_spec_params.
       apply inj_lt in Hnh.
       assert (nth_error lMG (length reqd) = Some we) as Hlenreq.
       { inversion Hprefixh2 as [suf Hlen].
-        rewrite Hlen -app_assoc. rewrite nth_error_app2 //=.
+        rewrite Hlen -app_assoc.
+        rewrite nth_error_app2 //=.
         by replace (length reqd - length reqd) with 0%nat; [|lia]. }
-      destruct (DB_GSTV_log_events n Hn0Z Hnh) as (e' & He' & He'time).
+      destruct (DB_GSTV_log_events n Hn0Z Hnh) as (e' & He' & (He'time & He'keys)).
       assert (we = e') as Heqe. { rewrite Hnth in He'. by inversion He'. }
       rewrite Heqe - He'time.
       apply valid_state_log_no_dup in HvalidG as HnoDup.
       rewrite -Heqe in He'.
       destruct (@NoDup_nth_error write_eventO lMG) as (Heq & _).
-      apply Heq; [by apply NoDup_ListNoDup|lia|by rewrite He']. }
+      split.
+      - apply Heq; [by apply NoDup_ListNoDup|lia|by rewrite He'].
+      - set_solver. }
     iModIntro.
     rewrite /global_inv_def. iSplitL "HlM HmS HmapF HknwF".
     { iNext. iExists _, _, _. by iFrame. }
-    iModIntro. wp_apply network_util_proof.wp_unSOME; first done.
-    iIntros "_". iApply ("HΦ" $! ($ we) (reqd ++ [we])).
-    iSplit; first done. iFrame "Hlocked".
-    iSplitL. { iExists logV', logM'. by iFrame "#∗". }
+    iModIntro.
+    wp_apply network_util_proof.wp_unSOME; first done.
+    iIntros "_".
+    iApply ("HΦ" $! ($ we) (reqd ++ [we])).
+    iSplit; first done.
+    iFrame "Hlocked".
+    iSplitL.
+    { iExists logV', logM'.
+      by iFrame "#∗". }
     iExists we.
-    do 3 (iSplit; first done).
-    iExists γF. iFrame "#∗".
+    iSplit; first done.
+    iSplit; [iPureIntro; set_solver|].
+    iSplit.
+    { iPureIntro. unfold DB_Serializable.
+      simplify_eq /=. destruct Hser as (? & ? & ? & Hser & ?).
+      simplify_eq /=. destruct Hser as (? & ? & ? & ? & ?).
+      by simplify_eq /=. }
+    do 2 (iSplit; first done).
+    iExists γF.
+    iFrame "#∗".
   Qed.
 
   Global Instance follower_handler_spec_params :  @MTS_spec_params _ _ _ _ MTU_F :=

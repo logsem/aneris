@@ -78,8 +78,13 @@ Section Clients_MT_spec_params.
         apply DB_LSTV_in_mem_log_some_coh_local in Hmk;
           last by apply elem_of_dom.
         destruct Hmk as (we0 & Hwe0L & <-).
-        iExists _. iSplit; first done. by iPureIntro.
-      - iModIntro. iLeft. iSplit; first done. iPureIntro.
+        iExists _.
+        iSplit; first done.
+        by iPureIntro.
+      - iModIntro.
+        iLeft.
+        iSplit; first done.
+        iPureIntro.
         by apply DB_LSTV_in_mem_log_none_coh_local in Hmk. }
     iModIntro.
     wp_apply (wp_map_lookup $! Hkvs).
@@ -88,7 +93,8 @@ Section Clients_MT_spec_params.
     - iDestruct "Hpost" as "[(%Habs & _)|Hpost]"; first done.
       iDestruct "Hpost" as (a Ha) "%Hwe".
       assert (v = SOMEV (we_val a)) as ->.
-      { rewrite Hmk in Hkm. naive_solver. }
+      { rewrite Hmk in Hkm.
+        naive_solver. }
       iApply ("HΦ" $! (SOMEV (we_val a)) lM). iFrame "Hkey". iSplit.
        { iPureIntro.  assert (k ∈ dom kvsM) as Hk by by apply elem_of_dom.
          assert (v0 = (we_val a)) as Heqa by naive_solver.
@@ -98,21 +104,40 @@ Section Clients_MT_spec_params.
          apply _. }
        simpl. rewrite /log_monitor_inv_def /ReqPost.
        iSplitL; last first.
-       { iExists k, h, lM. do 3 (iSplit; first done).
+       { iExists k, h, lM.
+         do 3 (iSplit; first done).
          iFrame "#".
-         iRight. iExists a. eauto. }
-       iExists _, _. iSplit; first done. iFrame "#∗". iExists _, _. by iFrame.
+         iRight.
+         iExists a.
+         eauto. }
+       iExists _, _.
+       iSplit; first done.
+       iFrame "#∗".
+       iExists _, _.
+       by iFrame.
     - iApply ("HΦ" $! _ lM).
       iDestruct "Hpost" as "[(_ & %Hnone) |%Habs]"; [|naive_solver].
       assert (v = NONEV) as ->.
-      { rewrite Hmk in Hkm. naive_solver. }
-      iFrame "Hkey". iSplit.
-      { rewrite /rep_f2c_serialization. iPureIntro. apply _. }
-      simpl. rewrite /log_monitor_inv_def /ReqPost.
+      { rewrite Hmk in Hkm.
+        naive_solver. }
+      iFrame "Hkey".
+      iSplit.
+      { rewrite /rep_f2c_serialization.
+        iPureIntro.
+        apply _. }
+      simpl.
+      rewrite /log_monitor_inv_def /ReqPost.
       iSplitL; last first.
-      { iExists k, h, lM. do 3 (iSplit; first done).
-        iFrame "#∗". iLeft. done. }
-      iExists _, _. iSplit; first done. iFrame "#∗". iExists _, _. by iFrame "#∗".
+      { iExists k, h, lM.
+        do 3 (iSplit; first done).
+        iFrame "#∗".
+        iLeft.
+        done. }
+      iExists _, _.
+      iSplit; first done.
+      iFrame "#∗".
+      iExists _, _.
+      by iFrame "#∗".
   Qed.
 
   Global Instance client_handler_at_leader_spec_params :
