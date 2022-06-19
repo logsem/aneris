@@ -17,47 +17,9 @@ From aneris.examples.reliable_communication.lib.repdb.resources
 Import gen_heap_light.
 Import lock_proof.
 
-Section Resources_definition.
+
+Section Known_followers.
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
-
-  (* ------------------------------------------------------------------------ *)
-  (** Abstract global memory definition and properties. *)
-
-  Definition own_mem_user (k : Key) (q: Qp) (a : option write_event) :=
-    lmapsto γM k q a.
-
-  Definition own_mem_sys M := gen_heap_light_ctx γM M.
-
-  (** Properties of points-to connective *)
-  Lemma OwnMemKey_timeless_holds k q v : Timeless (own_mem_user k q v).
-  Proof. Admitted.
-
-  Lemma OwnMemKey_exclusive_holds k q v v' :
-    own_mem_user k 1 v ⊢ own_mem_user k q v' -∗ False.
-  Proof. Admitted.
-
-  Lemma OwnMemKey_fractioal_holds k v : Fractional (λ q, own_mem_user k q v).
-  Proof. Admitted.
-
-  Lemma OwnMemKey_as_fractioal_holds k q v :
-    AsFractional (own_mem_user k q v) (λ q, own_mem_user k q v) q.
-  Proof. Admitted.
-
-  Lemma OwnMemKey_combine_holds k q q' v v' :
-    own_mem_user k q v ∗ own_mem_user k q' v' ⊢
-    own_mem_user k (q + q') v ∗ ⌜v = v'⌝.
-  Proof. Admitted.
-
-  Lemma OwnMemKey_split_holds k q1 q2 v :
-    own_mem_user k (q1 + q2) v ⊢ own_mem_user k q1 v ∗ own_mem_user k q2 v.
-  Proof. Admitted.
-
-  Lemma own_mem_update k M (we : option write_event) (we' : write_event) :
-    own_mem_user k 1%Qp we ⊢
-    own_mem_sys M ==∗ own_mem_user k 1%Qp (Some we') ∗ own_mem_sys (<[k := Some we']>M).
-  Proof. Admitted.
-
 
   (* ------------------------------------------------------------------------ *)
   (** Resources about free/known replicated logs. *)
@@ -101,6 +63,52 @@ Section Resources_definition.
     ⌜N !! sa = Some γsa⌝.
   Proof.
   Admitted.
+
+End Known_followers.
+
+Section Resources_definition.
+  Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
+  Context (γL γM : gname).
+
+  (* ------------------------------------------------------------------------ *)
+  (** Abstract global memory definition and properties. *)
+
+  Definition own_mem_user (k : Key) (q: Qp) (a : option write_event) :=
+    lmapsto γM k q a.
+
+  Definition own_mem_sys M := gen_heap_light_ctx γM M.
+
+  (** Properties of points-to connective *)
+  Lemma OwnMemKey_timeless_holds k q v : Timeless (own_mem_user k q v).
+  Proof. Admitted.
+
+  Lemma OwnMemKey_exclusive_holds k q v v' :
+    own_mem_user k 1 v ⊢ own_mem_user k q v' -∗ False.
+  Proof. Admitted.
+
+  Lemma OwnMemKey_fractioal_holds k v : Fractional (λ q, own_mem_user k q v).
+  Proof. Admitted.
+
+  Lemma OwnMemKey_as_fractioal_holds k q v :
+    AsFractional (own_mem_user k q v) (λ q, own_mem_user k q v) q.
+  Proof. Admitted.
+
+  Lemma OwnMemKey_combine_holds k q q' v v' :
+    own_mem_user k q v ∗ own_mem_user k q' v' ⊢
+    own_mem_user k (q + q') v ∗ ⌜v = v'⌝.
+  Proof. Admitted.
+
+  Lemma OwnMemKey_split_holds k q1 q2 v :
+    own_mem_user k (q1 + q2) v ⊢ own_mem_user k q1 v ∗ own_mem_user k q2 v.
+  Proof. Admitted.
+
+  Lemma own_mem_update k M (we : option write_event) (we' : write_event) :
+    own_mem_user k 1%Qp we ⊢
+    own_mem_sys M ==∗ own_mem_user k 1%Qp (Some we') ∗ own_mem_sys (<[k := Some we']>M).
+  Proof. Admitted.
+
+
+
 
   (* ------------------------------------------------------------------------ *)
   (** Principal & replicated log ownership predicates *)

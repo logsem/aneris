@@ -57,7 +57,7 @@ Section ValidStates.
 
   Definition log_events (L : wrlog) :=
     ∀ (i : nat), 0 <= i → i < List.length L →
-         ∃ we, List.nth_error L i = Some we ∧ i = we.(we_time).
+         ∃ we, List.nth_error L i = Some we ∧ i = we.(we_time) ∧ we.(we_key) ∈ DB_keys.
 
   Record valid_state (L : wrlog) (M : gmap Key (option write_event)) : Prop :=
     {
