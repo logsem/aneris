@@ -17,176 +17,8 @@ From aneris.examples.reliable_communication.lib.repdb.spec
 From aneris.examples.reliable_communication.examples.repdb_leader_followers
      Require Import causality_example_code.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-(*
-Section API_spec_ext.
-  Context `{!anerisG Mdl Σ, !DB_time, !DB_params, !DB_resources}.
 
-  Definition write_spec_atomic
-      (wr : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key) (v : SerializableVal),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
-    ⌜k ∈ DB_keys⌝ -∗
-    <<< ∀∀ (h : ghst) (a_old : option we),
-      ⌜at_key k h = a_old⌝ ∗
-      k ↦ₖ a_old ∗
-      Obs DB_addr h >>>
-      wr #k v @[ip_of_address sa] E
-    <<<▷ ∃∃ hf a_new, RET #();
-           ⌜at_key k hf = None⌝ ∗
-           ⌜we_key a_new = k⌝ ∗
-           ⌜we_val a_new = v⌝ ∗
-           ⌜∀ e, e ∈ h → e <ₜ a_new⌝ ∗
-           k ↦ₖ Some a_new ∗
-           Obs DB_addr (h ++ hf ++ [a_new]) >>>.
-
-  Lemma write_spec_write_spec_atomic wr sa :
-    write_spec wr sa -∗ write_spec_atomic wr sa.
-  Proof.
-    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
-    iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
-      [ done .. | | ].
-    { iIntros "!> Hvs".
-      iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
-      iModIntro.
-      eauto 10 with iFrame. }
-    iIntros "!> H".
-    iDestruct "H" as (_ _ _) "H".
-    iApply "H".
-  Qed.
-
-  Axiom write_spec_implies_simplified_write_spec : ∀ wr sa,
-    write_spec wr sa -∗ ∀ k v h, simplified_write_spec wr sa k v h.
-
-End API_spec_ext.
-
-Section proof_of_code.
-  Context `{!anerisG Mdl Σ}.
-  Context `{TM: !DB_time, !DBPreG Σ}.
-  Context (leader_si follower_si : message → iProp Σ).
-  Context (db_sa db_Fsa : socket_address).
-
-  (* ------------------------------------------------------------------------ *)
-  (** The definition of the parameters for DB and DL and shared resources. *)
-  (* ------------------------------------------------------------------------ *)
-
-  Local Instance DBSrv : DB_params :=
-    {|
-      DB_addr := db_sa;
-      DB_addrF := db_Fsa;
-      DB_keys := {["x"; "y"]};
-      DB_InvName := (nroot .@ "DBInv");
-      DB_serialization := int_serialization;
-      DB_ser_inj := int_ser_is_ser_injective;
-      DB_ser_inj_alt := int_ser_is_ser_injective_alt
-    |}.
-
-  Context `{!@DB_resources _ _ _ _ DBSrv}.
-
-  Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
-
-  Lemma token_exclusive (γ : gname) : token γ -∗ token γ -∗ False.
-  Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
-
-  Definition Ny := nroot.@"y".
-  Definition Nx := nroot.@"x".
-
-  Lemma wp_wait_on_read clt_00 fsa rd h0:
-    GlobalInv -∗
-    (∀ k h, read_at_follower_spec rd clt_00 fsa k h) -∗
-    {{{ Obs fsa h0 }}}
-      wait_on_read rd #"y" #1 @[ip_of_address clt_00]
-    {{{ h' a, RET #();
-        ⌜h0 `prefix_of` h'⌝ ∗ Obs fsa h' ∗
-        ⌜(we_val a) = #1⌝ ∗ ⌜at_key "y" h' = Some a⌝ }}}.
-  Proof.
-    iIntros "#HGinv #Hard".
-    iIntros "!>" (Φ) "#HobsF HΦ".
-    wp_lam.
-    do 7 wp_pure _.
-    iLöb as "IH".
-    wp_pures.
-    wp_apply ("Hard" $! "y" ); [done|done|].
-    iIntros (w).
-    iDestruct 1 as (h') "(%Hprefix & #HobsF' & [(-> & %Hatkey)|(%a & -> & %Hatkey)]) /=".
-    { do 7 wp_pure _. iApply ("IH" with "HΦ"). }
-    wp_pures.
-    case_bool_decide as Ha.
-    { wp_pure _.
-      iApply ("HΦ" $! h' a).
-      naive_solver. }
-    do 3 wp_pure _.
-    iApply ("IH" with "HΦ").
-  Qed.
-
-  Definition inv_def : iProp Σ :=
-    ("y" ↦ₖ None) ∨
-    (∃ h hfx hfy we_y we_x,
-        "y" ↦ₖ Some we_y ∗ "x" ↦ₖ Some we_x ∗
-        Obs DB_addr (h ++ [we_x] ++ hfx ++ [we_y] ++ hfy) ∗
-        ⌜we_val we_x = #37⌝ ∗
-        ⌜at_key "x" h = None⌝ ∗ ⌜at_key "y" h = None⌝ ∗
-        ⌜at_key "x" hfx = None⌝ ∗ ⌜at_key "y" hfx = None⌝ ∗
-        ⌜at_key "x" hfy = None⌝ ∗ ⌜at_key "y" hfy = None⌝).
-
-  Lemma wp_do_writes wr clt_00 :
-    GlobalInv -∗
-    inv Ny inv_def -∗
-    write_spec wr clt_00 -∗
-    Obs DB_addr [] -∗
-    {{{ "x" ↦ₖ None }}}
-      do_writes wr @[ip_of_address clt_00]
-    {{{ RET #(); True }}}.
-  Proof.
-    iIntros "#HGinv #Hinv #Hwr #Hobs".
-    iIntros "!>" (Φ) "Hx HΦ".
-    iDestruct (write_spec_implies_simplified_write_spec with "Hwr") as "#Hswr".
-    iDestruct (write_spec_write_spec_atomic with "Hwr") as "#Hawr".
-    iClear "Hwr".
-    wp_lam.
-    wp_apply ("Hswr" $! _ (SerVal #37) with "[] [Hx]"); [done| |].
-    { iExists _. iFrame "#∗". done. }
-    iDestruct 1 as (h a Hkey Hval Hatkey) "[#Hobs' Hx]".
-    wp_pures.
-    wp_apply ("Hawr" $! (⊤ ∖ ↑Ny) _ (SerVal #1)); [solve_ndisj|done|].
-    iInv Ny as "IH" "Hclose".
-    iDestruct "IH" as "[>Hy | >IH]"; last first.
-    { iDestruct "IH" as (h' hfx hfy we_y we_x) "(Hy & Hx' & _)".
-      iDestruct (OwnMemKey_exclusive with "Hx Hx'") as "[]". }
-    iMod (OwnMemKey_none_obs with "HGinv [$Hy $Hobs']") as "[Hy %Hhist]";
-      [solve_ndisj|].
-    assert (at_key "y" ([] ++ h ++ [a]) = None).
-    { rewrite /at_key. rewrite Hhist. done. }
-    iModIntro.
-    iExists ([] ++ h ++ [a]), None.
-    iFrame "#∗".
-    iSplit; [done|].
-    iNext.
-    iIntros (h'' a').
-    iDestruct 1 as (Hatkey''' Hkey' Hval' Hle) "[Hy #Hobs'']".
-    iMod (OwnMemKey_some_obs_frame with "HGinv [$Hx Hobs'']")
-      as "[Hx %Hatkey'''']"; [solve_ndisj| |].
-    { assert (([] ++ h ++ [a]) ++ h'' ++ [a'] =
-              (([] ++ h) ++ [a] ++ (h'' ++ [a']))) as ->.
-      { by rewrite !assoc. }
-      done. }
-    assert (at_key "x" h'' = None).
-    { rewrite at_key_snoc_none in Hatkey''''; [done|].
-      by rewrite Hkey'. }
-    iMod ("Hclose" with "[-HΦ]"); [|by iApply "HΦ"].
-    iNext.
-    iRight.
-    iExists h, h'', [], a', a.
-    rewrite !app_assoc.
-    iFrame "#∗".
-    simpl in *.
-    iSplit; [done|].
-    iSplit; [done|].
-    iSplit.
-    { iPureIntro.
-      rewrite hist_at_key_empty_at_key in Hhist.
-      rewrite at_key_snoc_none in Hhist; [done| by rewrite Hkey]. }
-    done.
-  Qed.
+Section helper_lemmas.
 
   Lemma prefix_Some_None {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys zs x :
     last (filter P xs) = Some x →
@@ -195,23 +27,18 @@ Section proof_of_code.
     ys `prefix_of` xs.
   Proof.
     intros Hsome Hnone Hprefix.
+    rewrite last_None in Hnone.
     generalize dependent xs.
     induction ys as [|y ys]; intros xs Hsome Hprefix.
-    { apply prefix_nil. }
+    { by apply prefix_nil. }
     destruct xs as [|x' xs]; [done|].
     assert (y = x') as <-.
     { by apply prefix_cons_inv_1 in Hprefix. }
     apply prefix_cons.
-    apply IHys.
-    - rewrite last_None in Hnone.
-      rewrite last_None.
-      rewrite filter_cons in Hnone.
-      by destruct (decide (P y)).
-    - rewrite last_None in Hnone.
-      rewrite filter_cons in Hsome.
-      rewrite filter_cons in Hnone.
-      by destruct (decide (P y)).
-    - by apply prefix_cons_inv_2 in Hprefix.
+    rewrite filter_cons in Hnone.
+    apply prefix_cons_inv_2 in Hprefix.
+    rewrite filter_cons in Hsome.
+    apply IHys; [by destruct (decide (P y))|by destruct (decide (P y))|done].
   Qed.
 
   Lemma prefix_cons_nil {A:Type} (xs : list A) y ys :
@@ -223,7 +50,7 @@ Section proof_of_code.
     destruct xs; [done|].
     apply prefix_cons_inv_1 in Hprefix.
     rewrite Hprefix.
-    apply prefix_cons. apply prefix_nil.
+    by apply prefix_cons, prefix_nil.
   Qed.
 
   Lemma last_filter_app_r {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys x :
@@ -231,11 +58,8 @@ Section proof_of_code.
     last (filter P xs) = None →
     last (filter P ys) = Some x.
   Proof.
-    intros Hsome Hnone.
-    rewrite filter_app in Hsome.
-    rewrite last_None in Hnone.
-    rewrite Hnone in Hsome.
-    done.
+    intros Hsome Hnone%last_None.
+    by rewrite filter_app Hnone in Hsome.
   Qed.
 
   Lemma prefix_split_eq {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys zs x y :
@@ -261,50 +85,147 @@ Section proof_of_code.
     destruct Hnone2 as [Hnone2 _].
     rewrite Hnone2 in Hsome.
     rewrite filter_cons in Hsome.
-    destruct (decide (P y)).
-    - simpl in *. simplify_eq. done.
-    - done.
+    destruct (decide (P y)); [|done].
+    simpl in *. by simplify_eq.
   Qed.
 
   Lemma elem_of_last_filter_exists_Some
         {A} `{EqDecision A} (P : A → Prop) `{!∀ x, Decision (P x)} xs x y :
     last (filter P xs) = x →
-    y ∈ xs →
-    P y →
+    y ∈ xs → P y →
     ∃ x', last (filter P xs) = Some x'.
   Proof.
     intros Hlast Hin HPy.
-    induction xs as [|z xs IHxs]; [set_solver|].
-    simpl in *.
-    destruct (decide (P z)) as [HPz|HPz]; last first.
-    - rewrite filter_cons_False in Hlast; [|done].
+    induction xs as [|z xs IHxs]; [by set_solver|].
+    destruct (decide (P z)) as [HPz|HPz].
+    - rewrite filter_cons_True; [|done].
+      assert (last (filter P xs) = None ∨
+              ∃ x', last (filter P xs) = Some x') as Hfilter.
+      { by destruct (last (filter P xs)); [right; eexists _|left]. }
+      destruct Hfilter as [Hnone|[x' Hsome]].
+      + exists z. rewrite last_None in Hnone. by rewrite Hnone.
+      + exists x'. rewrite last_cons. by rewrite Hsome.
+    - rewrite filter_cons_False; [|done].
+      rewrite filter_cons_False in Hlast; [|done].
       assert (y ≠ z) as Hneq.
-      { intros Heq. rewrite -Heq in HPz. done. }
+      { intros Heq. by simplify_eq. }
       apply elem_of_cons in Hin.
-      destruct Hin as [Hin|Hin]; [done|].
-      assert (∃ x' : A, last (filter P xs) = Some x') as IHxs'.
-      { by apply IHxs. }
-      destruct IHxs' as [x' IHxs'].
-      exists x'. by rewrite filter_cons_False.
-    - assert (last (filter P xs) = None ∨
-              ∃ a', last (filter P xs) = Some a') as Hfilter.
-      { destruct (last (filter P xs)); eauto. }
-      destruct Hfilter as [Hnone|Hsome].
-      + exists z.
-        rewrite filter_cons_True; [|done].
-        rewrite last_None in Hnone. rewrite Hnone.
-        done.
-      + destruct Hsome as [a' Hsome].
-        exists a'.
-        rewrite filter_cons_True; [|done].
-        rewrite last_cons.
-        rewrite Hsome. done.
+      destruct Hin as [Hin|Hin]; [done|by apply IHxs].
+  Qed.
+
+End helper_lemmas.
+
+Section proof_of_code.
+  Context `{!anerisG Mdl Σ}.
+  Context `{TM: !DB_time, !DBPreG Σ}.
+  Context (leader_si follower_si : message → iProp Σ).
+  Context (db_sa db_Fsa : socket_address).
+
+  (* ------------------------------------------------------------------------ *)
+  (** The definition of the parameters for DB and DL and shared resources. *)
+  (* ------------------------------------------------------------------------ *)
+
+  Local Instance DBSrv : DB_params :=
+    {|
+      DB_addr := db_sa;
+      DB_addrF := db_Fsa;
+      DB_keys := {["x"; "y"]};
+      DB_InvName := (nroot .@ "DBInv");
+      DB_serialization := int_serialization;
+      DB_ser_inj := int_ser_is_ser_injective;
+      DB_ser_inj_alt := int_ser_is_ser_injective_alt
+    |}.
+
+  Context `{!@DB_resources _ _ _ _ DBSrv}.
+
+  Definition N := nroot.@"y".
+
+  Lemma wp_wait_on_read clt_00 fsa rd h0:
+    GlobalInv -∗
+    (∀ k h, read_at_follower_spec rd clt_00 fsa k h) -∗
+    {{{ Obs fsa h0 }}}
+      wait_on_read rd #"y" #1 @[ip_of_address clt_00]
+    {{{ h' a, RET #();
+        ⌜h0 `prefix_of` h'⌝ ∗ Obs fsa h' ∗
+        ⌜(we_val a) = #1⌝ ∗ ⌜at_key "y" h' = Some a⌝ }}}.
+  Proof.
+    iIntros "#HGinv #Hard".
+    iIntros "!>" (Φ) "#HobsF HΦ".
+    wp_lam. wp_pures.
+    iLöb as "IH".
+    wp_apply ("Hard" $! "y" ); [done|done|]; iIntros (w).
+    iDestruct 1 as (h') "(%Hprefix & #HobsF' &
+                           [(-> & %Hatkey)|(%a & -> & %Hatkey)]) /=".
+    { wp_pures. iApply ("IH" with "HΦ"). }
+    wp_pures.
+    case_bool_decide as Ha.
+    { wp_pures. iApply "HΦ". by naive_solver. }
+    wp_pures. iApply ("IH" with "HΦ").
+  Qed.
+
+  Definition inv_def : iProp Σ :=
+    ("y" ↦ₖ None) ∨
+    (∃ h hfx hfy we_y we_x,
+        "y" ↦ₖ Some we_y ∗ "x" ↦ₖ Some we_x ∗
+        Obs DB_addr (h ++ [we_x] ++ hfx ++ [we_y] ++ hfy) ∗
+        ⌜we_val we_x = #37⌝ ∗
+        ⌜at_key "x" h = None⌝ ∗ ⌜at_key "y" h = None⌝ ∗
+        ⌜at_key "x" hfx = None⌝ ∗ ⌜at_key "y" hfx = None⌝ ∗
+        ⌜at_key "x" hfy = None⌝ ∗ ⌜at_key "y" hfy = None⌝).
+
+  Lemma wp_do_writes wr clt_00 :
+    GlobalInv -∗
+    inv N inv_def -∗
+    write_spec wr clt_00 -∗
+    Obs DB_addr [] -∗
+    {{{ "x" ↦ₖ None }}}
+      do_writes wr @[ip_of_address clt_00]
+    {{{ RET #(); True }}}.
+  Proof.
+    iIntros "#HGinv #Hinv #Hwr #Hobs".
+    iIntros "!>" (Φ) "Hx HΦ".
+    iDestruct (get_simplified_write_spec with "Hwr") as "#Hswr".
+    iDestruct (write_spec_write_spec_atomic with "Hwr") as "#Hawr".
+    iClear "Hwr".
+    wp_lam.
+    wp_apply ("Hswr" $! _ (SerVal #37) with "[] [Hx]"); [done| |].
+    { iExists _. by iFrame "#∗". }
+    iDestruct 1 as (h a Hkey Hval Hatkey) "[#Hobs' Hx]".
+    wp_pures.
+    wp_apply ("Hawr" $! (⊤ ∖ ↑N) _ (SerVal #1)); [solve_ndisj|done|].
+    iInv N as "IH" "Hclose".
+    iDestruct "IH" as "[>Hy | >IH]"; last first.
+    { iDestruct "IH" as (h' hfx hfy we_y we_x) "(Hy & Hx' & _)".
+      by iDestruct (OwnMemKey_exclusive with "Hx Hx'") as "[]". }
+    iMod (OwnMemKey_none_obs with "HGinv [$Hy $Hobs']") as "[Hy %Hhist]";
+      [solve_ndisj|].
+    assert (at_key "y" ([] ++ h ++ [a]) = None) as Hatkey'.
+    { rewrite /at_key. by rewrite Hhist. }
+    iModIntro.
+    iExists ([] ++ h ++ [a]), None.
+    iFrame "#∗". iSplit; [done|].
+    iNext.
+    iIntros (h'' a').
+    iDestruct 1 as (Hatkey''' Hkey' Hval' Hle) "[Hy #Hobs'']".
+    iMod (OwnMemKey_some_obs_frame with "HGinv [$Hx Hobs'']")
+      as "[Hx %Hatkey'''']"; [solve_ndisj| |].
+    { assert (([] ++ h ++ [a]) ++ h'' ++ [a'] =
+              (([] ++ h) ++ [a] ++ (h'' ++ [a']))) as ->;
+        [by rewrite !assoc|done]. }
+    assert (at_key "x" h'' = None).
+    { rewrite at_key_snoc_none in Hatkey''''; [done|by rewrite Hkey']. }
+    iMod ("Hclose" with "[-HΦ]"); [|by iApply "HΦ"].
+    iNext. iRight. iExists h, h'', [], a', a.
+    rewrite !app_assoc.
+    iFrame "#∗".
+    rewrite hist_at_key_empty_at_key in Hhist.
+    rewrite at_key_snoc_none in Hhist; [done|by rewrite Hkey].
   Qed.
 
   Lemma wp_do_reads clt_01 rd fsa :
     GlobalInv -∗
     (∀ k h, read_at_follower_spec rd clt_01 fsa k h) -∗
-    inv Ny inv_def -∗
+    inv N inv_def -∗
     Obs fsa [] -∗
     {{{ True }}}
       do_reads rd @[ip_of_address clt_01]
@@ -316,17 +237,15 @@ Section proof_of_code.
     wp_apply (wp_wait_on_read); [done..|].
     iIntros (h a) "(_ & #Hobs & _ & %Hatkey)".
     wp_pures.
-    wp_apply ("Hard" $! "x"); [done|done|].
+    wp_apply ("Hard" $! "x"); [done..|].
     iIntros (vo) "H".
     iDestruct "H" as (h' Hprefix) "(#Hobs' & %Hdisj)".
     iApply fupd_aneris_wp.
-    iInv Ny as "HI" "Hclose".
+    iInv N as "HI" "Hclose".
     iDestruct "HI" as "[>Hy|>HI]".
     { iMod (OwnMemKey_none_obs with "HGinv [$Hy $Hobs]")as "[Hy %Hhist]";
         [solve_ndisj|].
-      rewrite /at_key in Hatkey.
-      rewrite Hhist in Hatkey.
-      done. }
+      by rewrite /at_key Hhist in Hatkey. }
     iDestruct "HI" as (hb hfx hfy we_y we_x)
                         "(Hy & Hx & #Hobs'' & %Hval &
                         %Hatkey_hbx & %Hatkey_hby &
@@ -338,7 +257,7 @@ Section proof_of_code.
            as Hatkey_y.
     { rewrite /at_key.
       rewrite hist_at_key_frame_l_prefix; [|done].
-      rewrite hist_at_key_frame_l_prefix; [|]; last first.
+      rewrite hist_at_key_frame_l_prefix; last first.
       { rewrite /at_key /hist_at_key.
         rewrite filter_cons_False; [done|by rewrite Hkey_x]. }
       rewrite hist_at_key_frame_l_prefix; [|done].
@@ -357,27 +276,21 @@ Section proof_of_code.
       rewrite hist_at_key_frame_r_suffix; [|done].
       rewrite /at_key /hist_at_key.
       rewrite filter_cons_False; [done|by rewrite Hkey_y]. }
-
-    iAssert ("y" ↦ₖ Some we_y ={⊤ ∖ ↑Ny}=∗ ⌜a = we_y⌝ ∗ "y" ↦ₖ Some we_y)%I
+    iAssert ("y" ↦ₖ Some we_y ={⊤ ∖ ↑N}=∗ ⌜a = we_y⌝ ∗ "y" ↦ₖ Some we_y)%I
       as "H".
     { iMod (Obs_compare with "HGinv Hobs Hobs''") as %Hprefix'; [solve_ndisj|].
       iIntros "Hy".
       destruct Hprefix' as [Hprefix'|Hprefix'].
-      - (* `h` is at least `hb ++ [we_x] ++ hfx ++ [we_y]`,
-           and at_key "y" (hb ++ [we_x] ++ hfx) = None
-           thus `at_key "y" h` can only be we_y *)
-        iModIntro. iFrame "Hy". iPureIntro.
+      - iModIntro. iFrame "Hy". iPureIntro.
         rewrite !assoc in Hprefix'.
         rewrite -assoc in Hprefix'.
-        eapply prefix_split_eq; [apply Hatkey | | | apply Hprefix'].
-        + rewrite !filter_app.
-          rewrite /at_key /hist_at_key !last_None in
-            Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
-                       Hatkey_hfyy Hatkey_hfxy.
-          rewrite Hatkey_hby Hatkey_hfxy.
-          simpl.
-          rewrite filter_cons_False; [done| by rewrite Hkey_x].
-        + done.
+        eapply prefix_split_eq; [apply Hatkey| |done|apply Hprefix'].
+        rewrite !filter_app.
+        rewrite /at_key /hist_at_key !last_None in
+          Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
+                     Hatkey_hfyy Hatkey_hfxy.
+        rewrite Hatkey_hby Hatkey_hfxy.
+        rewrite filter_cons_False; [done| by rewrite Hkey_x].
       - rewrite -Hatkey_y.
         iMod (OwnMemKey_obs_frame_prefix with "HGinv [$Hy $Hobs]")
           as "[Hy %Heq]"; [solve_ndisj|done|].
@@ -387,68 +300,52 @@ Section proof_of_code.
         iFrame "Hy".
         iPureIntro.
         by simplify_eq. }
-    iMod ("H" with "Hy") as (->) "Hy".
-    iClear "H".
-
+    iMod ("H" with "Hy") as (->) "Hy". iClear "H".
     assert (∃ ao : option we,
                 at_key "x" h' = ao ∧
                 ((vo = InjLV #() ∧ ao = None) ∨
                  (∃ a : we, vo = InjRV (we_val a) ∧ ao = Some a)))
       as [a [Hatkey_a Hdisj']].
     { destruct Hdisj as [Hdisj | Hdisj].
-      - destruct Hdisj as [-> Hdisj]. exists None. split; [done|]. left. done.
-      - destruct Hdisj as [a [-> Hdisj]]. exists (Some a). split; [done|].
-        by eauto. }
-
-    iAssert ("x" ↦ₖ Some we_x ={⊤ ∖ ↑Ny}=∗ ⌜a = Some we_x⌝ ∗ "x" ↦ₖ Some we_x)%I
+      - destruct Hdisj as [-> Hdisj]. exists None. split; [done|by left].
+      - destruct Hdisj as [a [-> Hdisj]]. exists (Some a).
+        split; [done|by right;eexists _]. }
+    iAssert ("x" ↦ₖ Some we_x ={⊤ ∖ ↑N}=∗ ⌜a = Some we_x⌝ ∗ "x" ↦ₖ Some we_x)%I
       as "H".
     { iMod (Obs_compare with "HGinv Hobs' Hobs''") as %Hprefix'; [solve_ndisj|].
       iIntros "Hx".
       destruct Hprefix' as [Hprefix'|Hprefix'].
-      - (* `h'` is at least `h`, and `h` is at least
-             `hb ++ [we_x] ++ hfx ++ [we_y]`,
-              thus `at_key "x" h'` can only be we_x *)
-        iModIntro. iFrame "Hx". iPureIntro.
-
+      - iModIntro. iFrame "Hx". iPureIntro.
         assert (h `prefix_of` hb ++ [we_x] ++ hfx ++ [we_y] ++ hfy) as Hprefix''.
         { by eapply transitivity. }
         rewrite !assoc in Hprefix''.
         rewrite -assoc -assoc in Hprefix''.
         assert (((hb ++ [we_x])) `prefix_of` h) as Hprefix'''.
-        {
-          eapply prefix_Some_None.
+        { eapply prefix_Some_None.
           - apply Hatkey.
           - rewrite !filter_app.
             rewrite /at_key /hist_at_key !last_None in
               Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
                          Hatkey_hfyy Hatkey_hfxy.
             rewrite Hatkey_hby.
-            simpl.
-            rewrite filter_cons_False; [done| by rewrite Hkey_x].
-          - apply Hprefix''.
-        }
+            rewrite filter_cons_False; [done|by rewrite Hkey_x].
+          - apply Hprefix''. }
         destruct Hprefix''' as [k ->].
-
         assert (∃ a', at_key "x" h' = Some a') as [a' Hatkey_a'].
-        { (* By investigation of Hprefix *)
-          destruct Hprefix as [k' ->].
+        { destruct Hprefix as [k' ->].
           eapply (elem_of_last_filter_exists_Some _ _ a we_x).
           - apply Hatkey_a.
           - set_solver.
-          - done.
-        }
-
+          - done. }
         assert (a = Some a') as -> by naive_solver.
         f_equiv.
-        eapply prefix_split_eq; [apply Hatkey_a'| | |apply Hprefix'].
-        + done.
+        eapply prefix_split_eq; [apply Hatkey_a'|apply Hatkey_hbx| |apply Hprefix'].
         + rewrite !filter_app.
           rewrite /at_key /hist_at_key !last_None in
             Hatkey_hbx Hatkey_hby Hatkey_hfxx Hatkey_hfyx
                        Hatkey_hfyy Hatkey_hfxy.
           rewrite Hatkey_hfxx Hatkey_hfyx.
-          simpl.
-          rewrite filter_cons_False; [done| by rewrite Hkey_y].
+          rewrite filter_cons_False; [done|by rewrite Hkey_y].
       - rewrite -Hatkey_x.
         iMod (OwnMemKey_obs_frame_prefix with "HGinv [$Hx $Hobs']")
           as "[Hy %Heq]"; [solve_ndisj|done|].
@@ -458,16 +355,13 @@ Section proof_of_code.
         iFrame "Hy".
         iPureIntro.
         by simplify_eq. }
-    iMod ("H" with "Hx") as (->) "Hx".
-    iClear "H".
-
+    iMod ("H" with "Hx") as (->) "Hx". iClear "H".
     destruct Hdisj' as [[_ Hineq]|Hdisj']; [done|].
     destruct Hdisj' as [a [-> Heq]].
     assert (we_x = a) as <-.
-    { by inversion Heq. }
+    { by simplify_eq. }
     iMod ("Hclose" with "[Hx Hy]") as "_".
-    { iRight. iExists _, _, _, _, _. iFrame "Hx Hy #".
-      eauto. }
+    { iRight. iExists _, _, _, _, _. by iFrame "Hx Hy #". }
     iModIntro.
     do 2 wp_pure _.
     wp_apply wp_assert.
@@ -484,7 +378,7 @@ Section proof_of_code.
     fixed A -∗
     (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
     Obs DB_addr [] -∗
-    inv Ny inv_def -∗
+    inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         db_sa ⤇ leader_si ∗
@@ -509,7 +403,7 @@ Section proof_of_code.
     fixed A -∗
     (∀ A ca, init_client_proxy_follower_spec A ca DB_addrF follower_si) -∗
     Obs DB_addr [] -∗
-    inv Ny inv_def -∗
+    inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
         DB_addrF ⤇ follower_si ∗
