@@ -48,7 +48,8 @@ Section SyncLogCopy_Proof.
     n = length logM →
     {{{ Global_Inv γL γM N ∗
         (follower_local_inv γL kvsL logL sa mγ mv) ∗
-        make_request_spec reqh sa ∗
+        (∃ f2lsa, ⌜ip_of_address sa = ip_of_address f2lsa⌝ ∗
+                    make_request_spec reqh f2lsa) ∗
         own_replog_loop logM
     }}}
       sync_loop #kvsL #logL mv reqh #n @[ip_of_address sa]
@@ -61,10 +62,13 @@ Section SyncLogCopy_Proof.
     iDestruct "HlogM" as (γF) "(#Hknw & #HobsL & HlogM)".
     iDestruct (get_obs with "[$HlogM]") as "#HobsF".
     wp_pures.
+    iDestruct "Hreqh" as (f2lsa HipEq) "Hreqh".
     rewrite /make_request_spec.
+    rewrite HipEq.
     wp_apply ("Hreqh" $! _ logM).
     { iSplit; first by iPureIntro; apply _. iFrame "#"; naive_solver. }
     iIntros (logM' repv) "Hpost".
+    rewrite -HipEq.
     iDestruct "Hpost" as (we) "(-> & %Hwekey & %HweSer & %Hlen & -> & #HobsLF')".
     do 13 wp_pure _.
     rewrite Hlen Hn.
