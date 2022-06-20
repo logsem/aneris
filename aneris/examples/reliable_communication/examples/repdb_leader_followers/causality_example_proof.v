@@ -401,7 +401,6 @@ Section proof_of_code.
     iApply (wp_do_writes with "[$] [$] [$] [$] Hx HΦ").
   Qed.
 
-
   Lemma proof_of_node1 (clt_01 : socket_address) A :
     db_Fsa ∈ A →
     clt_01 ∉ A →
@@ -426,33 +425,8 @@ Section proof_of_code.
     by iApply wp_do_reads.
   Qed.
 
-  (* Lemma proof_of_node1 (clt_01 : socket_address) A : *)
-  (*   db_Fsa ∈ A → *)
-  (*   clt_01 ∉ A → *)
-  (*   GlobalInv -∗ *)
-  (*   fixed A -∗ *)
-  (*   (∀ A ca, init_client_proxy_follower_spec A ca db_Fsa follower_si) -∗ *)
-  (*   Obs db_Fsa [] -∗ *)
-  (*   inv N inv_def -∗ *)
-  (*   {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗ *)
-  (*       clt_01 ⤳ (∅, ∅) ∗ *)
-  (*       db_Fsa ⤇ follower_si }}} *)
-  (*     node1 #clt_01 #db_Fsa @[ip_of_address clt_01] *)
-  (*   {{{ RET #(); True }}}. *)
-  (* Proof. *)
-  (*   iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y". *)
-  (*   iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi) HΦ". *)
-  (*   wp_lam. *)
-  (*   wp_pures. *)
-  (*   wp_apply ("Hspec" with "[//] [//] [$Hfps $Hclt00]"); [by iFrame "#"|]. *)
-  (*   iIntros (rd) "#Hrd". *)
-  (*   wp_pures. *)
-  (*   by iApply wp_do_reads. *)
-  (* Qed. *)
-
 End proof_of_code.
 
-(* WIP going forward *)
 (** Concrete parameters (addresses, ips) *)
 Definition db_l2csa := SocketAddressInet "0.0.0.0" 80.
 Definition db_l2fsa := SocketAddressInet "0.0.0.0" 81.
