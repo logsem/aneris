@@ -594,8 +594,6 @@ Definition init_state :=
     state_ms := ∅;
   |}.
 
-(* Definition fixed_dom : gset socket_address := {[ db_sa; db_Fsa; db_saF ]}. *)
-
 Definition dummy_model := model unit (fun x y => True) ().
 
 Lemma dummy_model_finitary : adequacy.aneris_model_rel_finitary dummy_model.
@@ -614,16 +612,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* From stdpp Require Import fin_maps gmap. *)
-(* From iris.algebra Require Import auth gmap frac excl agree coPset *)
-(*      gset frac_auth ofe excl. *)
-(* From aneris.algebra Require Import disj_gsets. *)
-(* From aneris.lib Require Import gen_heap_light. *)
-(* From aneris.aneris_lang.program_logic Require Import aneris_adequacy. *)
-(* From aneris.examples.reliable_communication.lib.repdb *)
-(*      Require Import model. *)
-(* From aneris.examples.reliable_communication.spec Require Import prelude ras. *)
-
 Definition socket_interp `{!anerisG empty_model Σ}
   db_l2csi db_l2fsi db_f2csi sa : socket_interp Σ :=
   (match sa with
@@ -632,11 +620,6 @@ Definition socket_interp `{!anerisG empty_model Σ}
    | SocketAddressInet "0.0.0.1" 81 => db_f2csi
    | _ => λ msg, ⌜True⌝
    end)%I.
-
-(* Notation ShRes := (@SharedRes _ _ _ _ db_sa db_Fsa). *)
-
-(* From aneris.examples.reliable_communication.lib.repdb.proof *)
-(*      Require Import proof_of_db_init. *)
 
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
