@@ -119,7 +119,7 @@ Section proof_of_code.
   Context `{!anerisG Mdl Σ}.
   Context `{TM: !DB_time, !DBPreG Σ}.
   Context (leader_si follower_si : message → iProp Σ).
-  Context (db_sa db_Fsa : socket_address).
+  Context (db_sa db_Fsa db_saF : socket_address).
 
   (* ------------------------------------------------------------------------ *)
   (** The definition of the parameters for DB and DL and shared resources. *)
@@ -128,8 +128,8 @@ Section proof_of_code.
   Local Instance DBSrv : DB_params :=
     {|
       DB_addr := db_sa;
-      DB_addrF := db_Fsa;
-      DB_followers := ∅;
+      DB_addrF := db_saF;
+      DB_followers := {[db_Fsa]};
       DB_keys := {["x"; "y"]};
       DB_InvName := (nroot .@ "DBInv");
       DB_serialization := int_serialization;
@@ -168,7 +168,7 @@ Section proof_of_code.
     ("y" ↦ₖ None) ∨
     (∃ h hfx hfy we_y we_x,
         "y" ↦ₖ Some we_y ∗ "x" ↦ₖ Some we_x ∗
-        Obs DB_addr (h ++ [we_x] ++ hfx ++ [we_y] ++ hfy) ∗
+        Obs db_sa (h ++ [we_x] ++ hfx ++ [we_y] ++ hfy) ∗
         ⌜we_val we_x = #37⌝ ∗
         ⌜at_key "x" h = None⌝ ∗ ⌜at_key "y" h = None⌝ ∗
         ⌜at_key "x" hfx = None⌝ ∗ ⌜at_key "y" hfx = None⌝ ∗
@@ -178,7 +178,7 @@ Section proof_of_code.
     GlobalInv -∗
     inv N inv_def -∗
     write_spec wr clt_00 -∗
-    Obs DB_addr [] -∗
+    Obs db_sa [] -∗
     {{{ "x" ↦ₖ None }}}
       do_writes wr @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
@@ -373,12 +373,12 @@ Section proof_of_code.
   Qed.
 
   Lemma proof_of_node0 (clt_00 : socket_address) A :
-    DB_addr ∈ A →
+    db_sa ∈ A →
     clt_00 ∉ A →
     GlobalInv -∗
     fixed A -∗
     (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
-    Obs DB_addr [] -∗
+    Obs db_sa [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
@@ -387,7 +387,7 @@ Section proof_of_code.
       node0 #clt_00 #db_sa @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HInDB HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
+    iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
     iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi & Hx) HΦ".
     wp_lam.
     wp_pures.
@@ -398,22 +398,21 @@ Section proof_of_code.
   Qed.
 
   Lemma proof_of_node1 (clt_01 : socket_address) A :
-    DB_addrF ∈ A →
+    db_Fsa ∈ A →
     clt_01 ∉ A →
     GlobalInv -∗
     fixed A -∗
-    (∀ A ca, init_client_proxy_follower_spec A ca DB_addrF follower_si) -∗
-    Obs DB_addr [] -∗
-    Obs DB_addrF [] -∗
+    (∀ A ca, init_client_proxy_follower_spec A ca db_Fsa follower_si) -∗
+    Obs db_Fsa [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
-        DB_addrF ⤇ follower_si ∗
+        db_Fsa ⤇ follower_si ∗
         "x" ↦ₖ None }}}
       node1 #clt_01 #db_Fsa @[ip_of_address clt_01]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HInDB HnInA) "#HGinv #Hfixed #Hspec #Hobs #HobsF #Hinv_y".
+    iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
     iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi & Hx) HΦ".
     wp_lam.
     wp_pures.
