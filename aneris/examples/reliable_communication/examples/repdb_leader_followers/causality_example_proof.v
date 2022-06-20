@@ -129,6 +129,7 @@ Section proof_of_code.
     {|
       DB_addr := db_sa;
       DB_addrF := db_Fsa;
+      DB_followers := ∅;
       DB_keys := {["x"; "y"]};
       DB_InvName := (nroot .@ "DBInv");
       DB_serialization := int_serialization;
@@ -403,6 +404,7 @@ Section proof_of_code.
     fixed A -∗
     (∀ A ca, init_client_proxy_follower_spec A ca DB_addrF follower_si) -∗
     Obs DB_addr [] -∗
+    Obs DB_addrF [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
@@ -411,12 +413,12 @@ Section proof_of_code.
       node1 #clt_01 #db_Fsa @[ip_of_address clt_01]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HInDB HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
+    iIntros (HInDB HnInA) "#HGinv #Hfixed #Hspec #Hobs #HobsF #Hinv_y".
     iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi & Hx) HΦ".
     wp_lam.
     wp_pures.
     wp_apply ("Hspec" with "[//] [//] [$Hfps $Hclt00]"); [by iFrame "#"|].
-    iIntros (rd) "[#Hobs' #Hrd]".
+    iIntros (rd) "#Hrd".
     wp_pures.
     by iApply wp_do_reads.
   Qed.
