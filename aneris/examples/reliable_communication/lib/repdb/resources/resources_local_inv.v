@@ -61,10 +61,16 @@ Section Local_Invariants.
      own_logL_obs γL logM.
 
   Definition follower_local_inv (kvsL logL : loc)
-    (sa : socket_address) (γsa : gname) (mγ : gname) (mV : val) : iProp Σ :=
-    log_monitor_inv
-      (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
-      γsa (1/4) logL
+    (sa : socket_address) (mγ : gname) (mV : val) : iProp Σ :=
+    ∃ (γsa : gname),
+      log_monitor_inv
+        (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
+        γsa (1/4) logL
       (follower_local_res kvsL sa γsa).
+
+  Lemma follower_local_inv_pers (kvsL logL : loc)
+    (sa : socket_address) (mγ : gname) (mV : val) :
+    Persistent (follower_local_inv kvsL logL sa mγ mV).
+  Proof. apply _. Qed.
 
 End Local_Invariants.

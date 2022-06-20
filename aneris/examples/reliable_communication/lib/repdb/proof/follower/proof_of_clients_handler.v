@@ -32,38 +32,48 @@ Import lock_proof.
 Section Clients_MT_spec_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM γF: gname) (sa : socket_address).
+  Context (γL γM : gname) (N : gmap socket_address gname) (sa : socket_address).
   Context (mγ : gname) (mv : val) (kvsL logL : loc).
 
   Definition handler_cloj : val :=
     λ: "mon" "req", client_request_handler_at_follower #kvsL "mon" "req".
 
-  Notation MTU := (client_handler_at_follower_user_params γL γM γF sa).
+  Notation MTU := (client_handler_at_follower_user_params γL γM N sa).
 
-  Lemma client_request_handler_at_follower_spec  :
+  Lemma client_request_handler_at_follower_spec γF :
     ∀ reqv reqd,
-    {{{ follower_local_inv γL kvsL logL sa γF mγ mv ∗
+    {{{  is_monitor
+      MTU.(MTS_mN)
+            (ip_of_address MTU.(MTS_saddr)) mγ mv
+            (known_replog_token sa γF ∗
+               log_monitor_inv_def
+                 (ip_of_address MTU.(MTS_saddr))
+                 γF ¼ logL (follower_local_res γL kvsL sa γF)) ∗
         lock_proof.locked mγ ∗
-        (log_monitor_inv_def
-           (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
-           (follower_local_res γL kvsL sa γF)) ∗
+        (known_replog_token sa γF ∗
+          (log_monitor_inv_def
+             (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
+             (follower_local_res γL kvsL sa γF))) ∗
            MTU.(MTS_handler_pre) reqv reqd }}}
        handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable (rep_f2c_serialization) repv⌝ ∗
         lock_proof.locked mγ ∗
+          (known_replog_token sa γF ∗
           (log_monitor_inv_def
              (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
-             (follower_local_res γL kvsL sa γF)) ∗
+             (follower_local_res γL kvsL sa γF))) ∗
           MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
-    iIntros (reqv reqd Φ) "(#Hmon & Hkey & HR & Hpre) HΦ".
-    rewrite /handler_cloj /client_request_handler_at_follower. wp_pures.
+    iIntros (reqv reqd Φ) "(#Hmon & Hkey & (#Hknw & HR) & Hpre) HΦ".
+    rewrite /handler_cloj /client_request_handler_at_follower.
+    wp_pures.
     iDestruct "HR" as (lV lM) "(%Hlog & Hpl & HlogL & HR)".
-    iDestruct "HR" as (kvsV kvsM) "(%Hkvs & %HvalidLocal & Hpm & #Hknw & #Hobs)".
+    iDestruct "HR" as (kvsV kvsM) "(%Hkvs & %HvalidLocal & Hpm & _ & #Hobs)".
     iDestruct "Hpre" as "(#HGinv & HpreR)".
-    iDestruct "HpreR" as (k h Hkeys Hreqd ->) "#(Hknown & HobsL & Hobs2)".
+    iDestruct "HpreR" as (k h Hkeys Hreqd ->) "(%γF' & #(Hknown & HobsL & Hobs2))".
     wp_load.
+    iDestruct (known_replog_token_agree with "[$Hknown][$Hknw]") as "->".
     iDestruct (own_obs_prefix _ _ _ h with "[$HlogL][$Hobs2]") as "%Hprefixh".
     iDestruct (get_obs with "[$HlogL]") as "#HobsF".
     inversion HvalidLocal.
@@ -107,9 +117,12 @@ Section Clients_MT_spec_params.
        { iExists k, h, lM.
          do 3 (iSplit; first done).
          iFrame "#".
+         iSplit.
+         { iFrame "#"; eauto. }
          iRight.
          iExists a.
          eauto. }
+       iFrame "#∗".
        iExists _, _.
        iSplit; first done.
        iFrame "#∗".
@@ -131,8 +144,11 @@ Section Clients_MT_spec_params.
       { iExists k, h, lM.
         do 3 (iSplit; first done).
         iFrame "#∗".
+        iSplit.
+        { iFrame "#"; eauto. }
         iLeft.
         done. }
+      iFrame "#∗".
       iExists _, _.
       iSplit; first done.
       iFrame "#∗".
@@ -140,16 +156,18 @@ Section Clients_MT_spec_params.
       by iFrame "#∗".
   Qed.
 
-  Global Instance client_handler_at_leader_spec_params :
+  Global Instance client_handler_at_leader_spec_params γF :
     @MTS_spec_params _ _ _ _ MTU :=
     {|
-      MTS_mR := (log_monitor_inv_def
-                   (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
-                   (follower_local_res γL kvsL sa γF));
+      MTS_mR :=
+      known_replog_token sa γF ∗
+      (log_monitor_inv_def
+         (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
+         (follower_local_res γL kvsL sa γF));
       MTS_mγ := mγ;
       MTS_mv := mv;
       MTS_handler := handler_cloj;
-      MTS_handler_spec := client_request_handler_at_follower_spec;
+      MTS_handler_spec := (client_request_handler_at_follower_spec γF);
     |}.
 
 End Clients_MT_spec_params.

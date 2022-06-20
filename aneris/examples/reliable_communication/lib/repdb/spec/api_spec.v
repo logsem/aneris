@@ -179,8 +179,8 @@ Section API_spec.
             f2csa ⤇ f_si ∗
             DB_addrF ⤇ lF_si ∗
             initF ∗
-            DB_addr ⤳ (∅, ∅) ∗
-            DB_addrF ⤳ (∅, ∅) ∗
+            f2csa ⤳ (∅, ∅) ∗
+            f2lsa ⤳ (∅, ∅) ∗
             free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
             free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
           init_follower (s_serializer DB_serialization)

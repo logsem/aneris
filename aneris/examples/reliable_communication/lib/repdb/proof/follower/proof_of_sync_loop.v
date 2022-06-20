@@ -34,31 +34,31 @@ Import log_proof.
 
 Section SyncLogCopy_Proof.
   Context `{!anerisG Mdl Σ, dbparams : !DB_params, !IDBG Σ}.
-  Context (γL γM γF : gname) ( sa : socket_address) (kvsL logL : loc).
+  Context (γL γM : gname) (N : gmap socket_address gname) (sa : socket_address) (kvsL logL : loc).
 
   Global Instance MTU : MTS_user_params.
-  Proof. apply (follower_handler_user_params γL γM). Defined.
+  Proof. apply (follower_handler_user_params γL γM N). Defined.
 
  Definition own_replog_loop l : iProp Σ :=
-    known_replog_token sa γF ∗ own_replog_obs γL DB_addrF l ∗
+    ∃ γF, known_replog_token sa γF ∗ own_replog_obs γL DB_addrF l ∗
     own_log_auth γF (1/4) l.
 
   Lemma sync_loop_spec
         (mγ : gname) (mv : val) (reqh : val) (logM : wrlog) (n : nat) :
     n = length logM →
-    {{{ Global_Inv γL γM ∗
-        follower_local_inv γL kvsL logL sa γF mγ mv ∗
+    {{{ Global_Inv γL γM N ∗
+        (follower_local_inv γL kvsL logL sa mγ mv) ∗
         make_request_spec reqh sa ∗
         own_replog_loop logM
     }}}
       sync_loop #kvsL #logL mv reqh #n @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Hn Φ) "(#HGinv & #HinvL & #Hreqh & HlogM) HΦ".
+    iIntros (Hn Φ) "((#HnMap & #HGinv) & (%γF' & #HinvL) & #Hreqh & HlogM) HΦ".
     rewrite /sync_loop.
     do 12 wp_pure _.
     iLöb as "IH" forall (n logM Hn).
-    iDestruct "HlogM" as "(#Hknw & #HobsL & HlogM)".
+    iDestruct "HlogM" as (γF) "(#Hknw & #HobsL & HlogM)".
     iDestruct (get_obs with "[$HlogM]") as "#HobsF".
     wp_pures.
     rewrite /make_request_spec.
@@ -77,10 +77,12 @@ Section SyncLogCopy_Proof.
     wp_pures.
     wp_apply (monitor_acquire_spec with "[HinvL]"); first by iFrame "#".
     iIntros (v) "( -> & Hlocked & Hres)".
-    wp_pures.
     iDestruct "Hres" as (logV logM') "(%Hlog & Hpl & HLog & HRes)".
+   iDestruct "HRes" as (kvsV kvsM) "(%Hkvs & %HvalidLocal & Hpm & #Hknw' & #HobsL')".
+    iAssert (⌜γF' = γF⌝)%I as "->".
+    { iApply (known_replog_token_agree with "[$Hknw'][$Hknw]"). }
+    wp_pures.
     iDestruct (own_log_auth_combine with "HLog HlogM") as "(HlMhalf & ->)".
-    iDestruct "HRes" as (kvsV kvsM) "(%Hkvs & %HvalidLocal & Hpm & _ & #HobsL')".
     set (a := {|we_key := (we_key we); we_val := (we_val we);
                                we_time := (length logM : int_time.(Time))|}).
     simplify_eq /=.
@@ -95,7 +97,7 @@ Section SyncLogCopy_Proof.
     wp_pures.
     iApply fupd_aneris_wp.
     iInv DB_InvName
-        as (lMG kvsMG) ">(%N & %HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
+        as (lMG kvsMG) ">(%HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
     iDestruct (known_replog_in_N with "[$HknwF $Hknw]") as %HNsa.
     iDestruct (big_sepM_lookup_acc _ _ sa γF HNsa with "[$HmapF]")
       as "((%lF & (_ & #HobsL'' & HlMhalf')) & Hcl)".
@@ -106,7 +108,7 @@ Section SyncLogCopy_Proof.
     iDestruct "HobsLF'" as (γF') "(_ & HobsLwe & HobsLFwe)".
     iMod (own_log_auth_update _ _ (lF ++ [we]) with "[$HlFull]") as "HlFull".
     { by apply prefix_app_r. }
-    rewrite - {3} Qp_half_half.
+    rewrite - {4} Qp_half_half.
     iDestruct (own_log_auth_split with "HlFull") as "(HlogM & HlogL)".
     iDestruct (get_obs with "[$HlogL]") as "#Hobsfr2".
     iModIntro.
@@ -114,7 +116,7 @@ Section SyncLogCopy_Proof.
     iSplitL "HlM HlogM HmS Hcl HknwF".
     { iAssert (⌜lF ++ [we] `prefix_of` lMG⌝)%I as "%Hprefix".
       { iApply (own_obs_prefix with "[$HlM][$HobsLwe]"). }
-      iNext. iExists _, _, _. iFrame.
+      iNext. iExists _, _. iFrame.
       do 3 (iSplit; first done).
       iSplit; last done.
       iApply ("Hcl" with "").
@@ -141,11 +143,10 @@ Section SyncLogCopy_Proof.
     replace (#(length lF + 1)) with (#(length lF + 1)%nat); last first.
     { do 2 f_equal.
       lia. }
-    iApply ("IH" $! (length lF + 1)%nat (lF ++ [we]) with "[][$HlogL2][$HΦ]").
-    rewrite last_length.
-    iPureIntro.
-    lia.
-    iFrame "#∗".
+    iApply ("IH" $! (length lF + 1)%nat (lF ++ [we]) with "[][HlogL2][$HΦ]").
+    { rewrite last_length.
+      iPureIntro; lia. }
+    iFrame "#∗"; eauto.
   Qed.
 
 End SyncLogCopy_Proof.

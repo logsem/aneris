@@ -32,13 +32,13 @@ Import lock_proof.
 Section Clients_MT_spec_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
   Context (mγ : gname) (mv : val) (kvsL logL : loc).
 
   Definition handler_cloj : val :=
     λ: "mon" "req", client_request_handler_at_leader #kvsL #logL "mon" "req".
 
-  Notation MTU := (client_handler_at_leader_user_params γL γM).
+  Notation MTU := (client_handler_at_leader_user_params γL γM N).
 
   Lemma client_request_handler_at_leader_spec  :
     ∀ reqv reqd,
@@ -62,7 +62,7 @@ Section Clients_MT_spec_params.
     wp_pures.
     iDestruct "HR" as (lV lM) "(%Hlog & Hpl & HlogL & HR)".
     iDestruct "HR" as (kvsV kvsM) "(%Hkvs & %HvalidLocal & Hpm)".
-    iDestruct "Hpre" as "(#HGinv & [HpreW | HpreR])".
+    iDestruct "Hpre" as "((#Htks & #HGinv) & [HpreW | HpreR])".
     - iDestruct "HpreW" as (E k v P Q) "(%Hrd & -> & %HE & %Hkeys & P & Hvsh)".
       wp_pures.
       wp_load.
@@ -77,8 +77,8 @@ Section Clients_MT_spec_params.
       { by iApply Obs_own_log_obs. }
       rewrite -{1} Hkh.
       iDestruct (get_obs with "[$HlogL]") as "#HobsL".
-      iMod (OwnMemKey_obs_frame_prefix_holds _ _ DB_addr
-                   with "[$HGinv][$Hk $HobsL]") as "(Hk & %Heqhk)";
+      iMod (OwnMemKey_obs_frame_prefix_holds _ _ _ DB_addr
+                   with "[$ Htks $HGinv][$Hk $HobsL]") as "(Hk & %Heqhk)";
         [solve_ndisj|apply Hprefixh | by iLeft | ].
       destruct Hprefixh as (hf & Hprefixh).
       assert (at_key k hf = None) as Hnone.
@@ -87,7 +87,7 @@ Section Clients_MT_spec_params.
           by eapply valid_state_local_log_no_dup.
         - naive_solver. }
       iInv DB_InvName
-        as (lMG kvsMG) ">(%N & %HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
+        as (lMG kvsMG) ">(%HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
       iDestruct (own_log_auth_combine with "HlM HlogL") as "(HlFull & ->)".
       rewrite Qp_half_half.
       iDestruct (own_obs_prefix with "[$HlFull][Hobsh]") as "%Hprefixh2".
@@ -100,7 +100,7 @@ Section Clients_MT_spec_params.
       iDestruct (get_obs with "[$HlogL]") as "#Hobsfr2".
       iModIntro. rewrite /global_inv_def. iSplitL "HlogM HmS HmapF HknwF".
       { iNext.
-        iExists _, _, _.
+        iExists _, _.
         iFrame.
         erewrite dom_insert_L, DB_GSTV_mem_dom; last done.
         iPureIntro.
@@ -152,13 +152,14 @@ Section Clients_MT_spec_params.
       iIntros (v Hv).
       inversion HvalidLocal.
       wp_apply fupd_aneris_wp.
-      iMod (OwnMemKey_wo_obs_holds with "HGinv Hk")
+      iAssert (Global_Inv γL γM N) as "#HGinvR". { by iFrame "#". }
+      iMod (OwnMemKey_wo_obs_holds with "HGinvR Hk")
         as "(Hk & (%lM' & #HObsL & <-))"; [solve_ndisj|].
       iDestruct (own_obs_prefix _ _ lM lM' with "[$HlogL][HObsL]")
         as "%Hprefix". by iApply Obs_own_log_obs.
       iDestruct (get_obs with "[$HlogL]") as "#HObsL'".
       iMod (OwnMemKey_obs_frame_prefix_holds
-             with "[$HGinv][Hk HObsL]") as "(Hk & %Heq)";
+             with "[$HGinvR][Hk HObsL]") as "(Hk & %Heq)";
         [solve_ndisj|done|iFrame "#∗"; by iLeft|].
       iAssert (|={⊤}=>
                  (⌜v = InjLV #()⌝ ∗ ⌜at_key k lM' = None⌝) ∨

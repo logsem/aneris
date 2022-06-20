@@ -28,14 +28,14 @@ Import lock_proof.
 Section MT_user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM γF : gname).
+  Context (γL γM : gname) (N: gmap socket_address gname).
 
   Definition ReqData : Type := wrlog.
 
   Definition RepData : Type := wrlog.
 
   Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
-    Global_Inv γL γM ∗ ⌜reqv = #(List.length reqd)⌝ ∗ own_replog_obs γL DB_addrF reqd.
+    Global_Inv γL γM N ∗ ⌜reqv = #(List.length reqd)⌝ ∗ own_replog_obs γL DB_addrF reqd.
 
   Definition ReqPost
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=

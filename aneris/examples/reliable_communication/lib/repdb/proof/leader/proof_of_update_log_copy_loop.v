@@ -34,7 +34,7 @@ Import log_proof.
 
 Section UpdateLogCopy_Proof.
   Context `{!anerisG Mdl Σ, dbparams : !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
   Context (HipEq : ip_of_address DB_addr = ip_of_address DB_addrF).
 
   Definition own_replog_loop γ l : iProp Σ :=
@@ -42,7 +42,7 @@ Section UpdateLogCopy_Proof.
 
   Lemma update_log_copy_loop_spec
     (γF mFγ mCγ : gname) (kvsL logCL logFL : loc) (mvC mvF : val) :
-    {{{ Global_Inv γL γM ∗
+    {{{ Global_Inv γL γM N ∗
         leader_local_main_inv γL kvsL logCL mCγ mvC ∗
         leader_local_secondary_inv γL logFL γF mFγ mvF ∗
         own_replog_loop γF []
@@ -50,7 +50,7 @@ Section UpdateLogCopy_Proof.
       update_log_copy_loop #logCL mvC #logFL mvF #() @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(#HGinv & #HinvL & #HinvF & Hloop) HΦ".
+    iIntros (Φ) "((#Htks & #HGinv) & #HinvL & #HinvF & Hloop) HΦ".
     rewrite /update_log_copy_loop.
     do 12 wp_pure _.
     (* pose (@nil_length) as Hnl. *)
@@ -104,7 +104,7 @@ Section UpdateLogCopy_Proof.
     rewrite /Global_Inv /global_inv_def.
     iApply fupd_aneris_wp.
     iInv DB_InvName as ">HGinvRes" "Hcl".
-    iDestruct "HGinvRes" as (L M N Hkes Hdom Hdisj) "HGinvRes".
+    iDestruct "HGinvRes" as (L M Hkes Hdom Hdisj) "HGinvRes".
     iDestruct "HGinvRes" as "(HownS & HownL & HknownN & HmapN & %HvSt)".
     iAssert (⌜N !! DB_addrF = Some γF⌝)%I as "%HinF".
     by iDestruct (known_replog_in_N with "[$HknownN $HknownTkn]") as "%HinN".
@@ -122,7 +122,7 @@ Section UpdateLogCopy_Proof.
     rewrite -Qp_quarter_quarter.
     rewrite {1} Qp_quarter_quarter.
     iMod ("Hcl" with "[HownF1 HmapN HknownN HownS HownL]") as "_".
-    { iNext. iExists L, M, N. iFrame "#∗".
+    { iNext. iExists L, M. iFrame "#∗".
       do 3 (iSplit; first done).
       iSplit; last done.
       iApply "HmapN".

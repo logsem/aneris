@@ -21,11 +21,11 @@ From aneris.examples.reliable_communication.lib.repdb.resources
 
 Section DB_resources_instance.
   Context `{!anerisG Mdl Σ, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
 
   Global Instance DbRes `{DBP : !DB_params} : DB_resources :=
     {|
-      GlobalInv := Global_Inv γL γM;
+      GlobalInv := Global_Inv γL γM N;
       OwnMemKey := own_mem_user γM;
       Obs := own_obs γL;
       OwnMemKey_timeless := OwnMemKey_timeless_holds γL γM;
@@ -34,21 +34,21 @@ Section DB_resources_instance.
       OwnMemKey_as_fractioal := OwnMemKey_as_fractioal_holds γL γM;
       OwnMemKey_combine := OwnMemKey_combine_holds γL γM;
       OwnMemKey_split := OwnMemKey_split_holds γL γM;
-      OwnMemKey_key :=  OwnMemKey_key_holds γL γM;
+      OwnMemKey_key :=  OwnMemKey_key_holds γL γM N;
       Obs_timeless := Obs_timeless_holds γL;
       Obs_persistent := Obs_persistent_holds γL;
-      Obs_compare := Obs_compare_holds γL γM;
-      Obs_exists_at_leader := Obs_exists_at_leader_holds γL γM;
-      Obs_get_smaller := Obs_get_smaller_holds γL γM;
-      Obs_snoc_time := Obs_snoc_time_holds γL γM;
-      Obs_ext_we := Obs_ext_we_holds γL γM;
-      Obs_ext_hist := Obs_ext_hist_holds γL γM;
-      OwnMemKey_some_obs_we := OwnMemKey_some_obs_we_holds γL γM;
-      OwnMemKey_obs_frame_prefix := OwnMemKey_obs_frame_prefix_holds γL γM;
-      OwnMemKey_obs_frame_prefix_some := OwnMemKey_obs_frame_prefix_some_holds γL γM;
-      OwnMemKey_some_obs_frame := OwnMemKey_some_obs_frame_holds γL γM;
-      OwnMemKey_none_obs := OwnMemKey_none_obs_holds γL γM;
-      OwnMemKey_allocated := OwnMemKey_allocated_holds γL γM;
+      Obs_compare := Obs_compare_holds γL γM N;
+      Obs_exists_at_leader := Obs_exists_at_leader_holds γL γM N;
+      Obs_get_smaller := Obs_get_smaller_holds γL γM N;
+      Obs_snoc_time := Obs_snoc_time_holds γL γM N;
+      Obs_ext_we := Obs_ext_we_holds γL γM N;
+      Obs_ext_hist := Obs_ext_hist_holds γL γM N;
+      OwnMemKey_some_obs_we := OwnMemKey_some_obs_we_holds γL γM N;
+      OwnMemKey_obs_frame_prefix := OwnMemKey_obs_frame_prefix_holds γL γM N;
+      OwnMemKey_obs_frame_prefix_some := OwnMemKey_obs_frame_prefix_some_holds γL γM N;
+      OwnMemKey_some_obs_frame := OwnMemKey_some_obs_frame_holds γL γM N;
+      OwnMemKey_none_obs := OwnMemKey_none_obs_holds γL γM N;
+      OwnMemKey_allocated := OwnMemKey_allocated_holds γL γM N;
     |}.
 
 End DB_resources_instance.
