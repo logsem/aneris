@@ -422,4 +422,3 @@ Section proof_of_code.
   Qed.
 
 End proof_of_code.
-*)
