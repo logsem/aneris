@@ -5,15 +5,19 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang Require Import lang.
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From aneris.aneris_lang.program_logic
-     Require Import aneris_weakestpre aneris_lifting.
+     Require Import aneris_weakestpre aneris_lifting aneris_adequacy.
 From aneris.aneris_lang.lib Require Import assert_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
+From aneris.examples.reliable_communication.spec
+     Require Import prelude ras.
 From aneris.examples.reliable_communication.prelude
      Require Import ser_inj.
 From aneris.examples.reliable_communication.lib.repdb
-     Require Import repdb_code.
+     Require Import model repdb_code.
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import ras events resources api_spec.
+From aneris.examples.reliable_communication.lib.repdb.proof
+     Require Import proof_of_db_init.
 From aneris.examples.reliable_communication.examples.repdb_leader_followers
      Require Import causality_example_code.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
@@ -397,12 +401,13 @@ Section proof_of_code.
     iApply (wp_do_writes with "[$] [$] [$] [$] Hx HΦ").
   Qed.
 
+
   Lemma proof_of_node1 (clt_01 : socket_address) A :
     db_Fsa ∈ A →
     clt_01 ∉ A →
     GlobalInv -∗
     fixed A -∗
-    (∀ A ca, init_client_proxy_follower_spec A ca db_Fsa follower_si) -∗
+    (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa follower_si) -∗
     Obs db_Fsa [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
@@ -420,6 +425,30 @@ Section proof_of_code.
     wp_pures.
     by iApply wp_do_reads.
   Qed.
+
+  (* Lemma proof_of_node1 (clt_01 : socket_address) A : *)
+  (*   db_Fsa ∈ A → *)
+  (*   clt_01 ∉ A → *)
+  (*   GlobalInv -∗ *)
+  (*   fixed A -∗ *)
+  (*   (∀ A ca, init_client_proxy_follower_spec A ca db_Fsa follower_si) -∗ *)
+  (*   Obs db_Fsa [] -∗ *)
+  (*   inv N inv_def -∗ *)
+  (*   {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗ *)
+  (*       clt_01 ⤳ (∅, ∅) ∗ *)
+  (*       db_Fsa ⤇ follower_si }}} *)
+  (*     node1 #clt_01 #db_Fsa @[ip_of_address clt_01] *)
+  (*   {{{ RET #(); True }}}. *)
+  (* Proof. *)
+  (*   iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y". *)
+  (*   iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi) HΦ". *)
+  (*   wp_lam. *)
+  (*   wp_pures. *)
+  (*   wp_apply ("Hspec" with "[//] [//] [$Hfps $Hclt00]"); [by iFrame "#"|]. *)
+  (*   iIntros (rd) "#Hrd". *)
+  (*   wp_pures. *)
+  (*   by iApply wp_do_reads. *)
+  (* Qed. *)
 
 End proof_of_code.
 
@@ -474,9 +503,9 @@ Section proof_of_main.
     ⊢ |={⊤}=>
          GlobalInv -∗
          (∀ A, init_leader_spec A InitL leader_si leaderF_si) -∗
-         (∀ A, init_follower_spec db_f2lsa db_f2csa A InitF follower_si leaderF_si) -∗
-         (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
-         (∀ A ca, init_client_proxy_follower_spec A ca db_f2csa follower_si) -∗
+         (∀ A csa, init_client_proxy_leader_spec A csa leader_si) -∗
+         (∀ A f2lsa, init_follower_spec f2lsa db_f2csa A InitF follower_si leaderF_si) -∗
+         (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa follower_si) -∗
          db_l2csa ⤇ leader_si -∗
          db_l2fsa ⤇ leaderF_si -∗
          db_f2csa ⤇ follower_si -∗
@@ -502,7 +531,7 @@ Section proof_of_main.
   Proof.
     iIntros "".
     iModIntro.
-    iIntros "#HGinv #HdbSrvS #HdbFS #HdbCltS #HdbCltF".
+    iIntros "#HGinv #HdbSrvS #HdbCltS #HdbFS #HdbCltF".
     iIntros "#Hdb_l2csa #Hdb_l2fsa #Hdb_f2csa #Hfixed #HobsL #HobsF #HI".
     iIntros "Hfree0 Hfree1 Hfree2 Hfree3".
     iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 HInitL HInitF".
@@ -523,7 +552,7 @@ Section proof_of_main.
     iFrame "Hfree1".
     iSplitR "Hsa2 Hsa3 HInitF"; last first.
     { iNext. iIntros "Hfps".
-      iApply ("HdbFS" $! A with "[//][//][][//][//][Hfps HInitF Hsa2 Hsa3]");
+      iApply ("HdbFS" $! A db_f2lsa with "[//][//][][//][//][Hfps HInitF Hsa2 Hsa3]");
         [iPureIntro; set_solver| |done].
       iDestruct (free_ports_split
                    "0.0.0.1"
@@ -552,3 +581,129 @@ Section proof_of_main.
   Qed.
 
 End proof_of_main.
+
+Definition init_state :=
+  {|
+    state_heaps := {[ "system" := ∅ ]};
+    state_sockets := {[ "system" := ∅ ]};
+    state_ports_in_use :=
+      <["0.0.0.0" := ∅ ]> $
+      <["0.0.0.1" := ∅ ]> $
+      <["0.0.0.2" := ∅ ]> $
+      <["0.0.0.3" := ∅ ]> $ ∅;
+    state_ms := ∅;
+  |}.
+
+(* Definition fixed_dom : gset socket_address := {[ db_sa; db_Fsa; db_saF ]}. *)
+
+Definition dummy_model := model unit (fun x y => True) ().
+
+Lemma dummy_model_finitary : adequacy.aneris_model_rel_finitary dummy_model.
+Proof.
+  intros st.
+  intros f Hnot.
+  pose proof (Hnot 0%nat 1%nat) as H.
+  assert (0%nat = 1%nat -> False) as Himpl. {
+    intros Heq.
+    discriminate Heq.
+  }
+  apply Himpl; apply H.
+  destruct (f 0%nat) as [s0 r0].
+  destruct (f 1%nat) as [s1 r1].
+  destruct s0, s1, st, r0, r1.
+  reflexivity.
+Qed.
+
+(* From stdpp Require Import fin_maps gmap. *)
+(* From iris.algebra Require Import auth gmap frac excl agree coPset *)
+(*      gset frac_auth ofe excl. *)
+(* From aneris.algebra Require Import disj_gsets. *)
+(* From aneris.lib Require Import gen_heap_light. *)
+(* From aneris.aneris_lang.program_logic Require Import aneris_adequacy. *)
+(* From aneris.examples.reliable_communication.lib.repdb *)
+(*      Require Import model. *)
+(* From aneris.examples.reliable_communication.spec Require Import prelude ras. *)
+
+Definition socket_interp `{!anerisG empty_model Σ}
+  db_l2csi db_l2fsi db_f2csi sa : socket_interp Σ :=
+  (match sa with
+   | SocketAddressInet "0.0.0.0" 80 => db_l2csi
+   | SocketAddressInet "0.0.0.0" 81 => db_l2fsi
+   | SocketAddressInet "0.0.0.1" 81 => db_f2csi
+   | _ => λ msg, ⌜True⌝
+   end)%I.
+
+(* Notation ShRes := (@SharedRes _ _ _ _ db_sa db_Fsa). *)
+
+(* From aneris.examples.reliable_communication.lib.repdb.proof *)
+(*      Require Import proof_of_db_init. *)
+
+Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
+Proof.
+  set (Σ := #[anerisΣ dummy_model; DBΣ; SpecChanΣ ]).
+  eapply (@adequacy
+            Σ dummy_model _ _ ips A
+            {[db_l2csa; db_l2fsa; db_f2lsa; db_f2csa; clt_sa0; clt_sa1]} ∅ ∅ ∅);
+    try done; last first.
+  { set_solver. }
+  { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
+    intros [|]; subst; simpl; set_solver. }
+  { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
+  iIntros (Hdg) "".
+  2:{ apply dummy_model_finitary . }
+  assert (DBPreG Σ) as HPreG by apply _.
+  iMod (db_init_empty.(DB_init_setup) ⊤ $! I) as (DBRes) "Hdb";
+    [solve_ndisj|set_solver|set_solver| ].
+  iDestruct "Hdb"
+    as (InitL leader_si leaderF_si) "(#HGinv & #Hobs & Hkeys & HInitL &
+                                      #[HinitL_spec HinitL_proxy_spec] &
+                                      HF)".
+  rewrite big_sepS_singleton.
+  iDestruct "HF" as (follower_si InitF) "(HInitF & #HobsF &
+                                          #HinitF_spec & #HinitF_proxy_spec)".
+  iExists (socket_interp leader_si leaderF_si follower_si).
+  iMod (@main_spec
+          _ _ _
+          int_time leader_si leaderF_si follower_si InitL InitF DBRes) as "Hmain".
+  iModIntro.
+  iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
+  simpl in *.
+  iDestruct (big_sepS_delete _ _ db_l2csa with "Hsis") as "[Hsi0 Hsis]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_l2fsa with "Hsis") as "[Hsi1 Hsis]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_f2csa with "Hsis") as "[Hsi2 _]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "[Hip0 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "[Hip1 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.2" with "Hips") as "[Hip2 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "0.0.0.3" with "Hips") as "[Hip3 Hips]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_l2csa with "Hb") as "[Hm0 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_l2fsa with "Hms") as "[Hm1 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_f2lsa with "Hms") as "[Hm2 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ db_f2csa with "Hms") as "[Hm3 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ clt_sa0 with "Hms") as "[Hc0 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ clt_sa1 with "Hms") as "[Hc1 Hms]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "x" with "Hkeys") as "[Hx Hkeys]";
+    first set_solver.
+  iDestruct (big_sepS_delete _ _ "y" with "Hkeys") as "[Hy _]";
+   first set_solver.
+  iMod (inv_alloc N _ (inv_def db_l2csa db_f2csa db_l2fsa) with "[Hy]") as "HI".
+  { by iLeft. }
+  iApply ("Hmain" with
+           "HGinv HinitL_spec HinitL_proxy_spec [HinitF_spec] HinitF_proxy_spec
+            Hsi0 Hsi1 Hsi2 Hf Hobs HobsF HI Hip0 Hip1 Hip2 Hip3
+            Hm0 Hm1 Hm2 Hm3 Hc0 Hc1 HInitL HInitF Hx").
+  (* Needs new spec for follower proxy *)
+  admit.
+Admitted.
