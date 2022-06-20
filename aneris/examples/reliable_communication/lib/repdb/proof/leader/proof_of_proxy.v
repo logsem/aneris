@@ -33,9 +33,9 @@ From aneris.examples.reliable_communication.lib.repdb.proof.leader
 
 Section Client_Proxy_Proof.
   Context `{!anerisG Mdl Σ, dbparams : !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_at_leader_user_params γL γM).
+  Notation MTC := (client_handler_at_leader_user_params γL γM N).
   Context (HClient_proxySpec :
           ⊢ (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC srv_si A sa)).
 
@@ -65,7 +65,7 @@ Section Client_Proxy_Proof.
            ∃ (h hf : wrlog) (a: write_event), Q a h hf }}})%I.
 
  Lemma write_spec_internal_holds A sa (reqh : val) :
-    Global_Inv γL γM -∗
+    Global_Inv γL γM N -∗
     fixed A -∗
     DB_addr ⤇ srv_si -∗
     @make_request_spec _ _ _ _ MTC reqh sa -∗
@@ -124,7 +124,7 @@ Section Client_Proxy_Proof.
     }}}%I.
 
   Lemma read_spec_internal_holds A sa (reqh : val) :
-    Global_Inv γL γM -∗
+    Global_Inv γL γM N -∗
     fixed A -∗
     DB_addr ⤇ srv_si -∗
     @make_request_spec _ _ _ _ MTC reqh sa -∗
@@ -180,7 +180,7 @@ Section Client_Proxy_Proof.
           write_spec_internal wr sa }}}.
 
   Lemma init_client_leader_proxy_internal_holds A sa :
-    Global_Inv γL γM ⊢ init_client_leader_proxy_internal A sa.
+    Global_Inv γL γM N ⊢ init_client_leader_proxy_internal A sa.
   Proof.
     iIntros "#Hinv".
     iIntros (HA HnA).

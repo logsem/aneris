@@ -30,23 +30,35 @@ Import lock_proof.
 Section MT_user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM γF : gname) (sa : socket_address).
+  Context (γL γM : gname) (N: gmap socket_address gname) (sa : socket_address).
 
   Definition ReqData : Type := string * wrlog.
 
   Definition RepData : Type := wrlog.
 
-  Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
-    Global_Inv γL γM ∗
+  (* Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ := *)
+  (*   Global_Inv γL γM N ∗ *)
+  (*   ∃ k h, ⌜k ∈ DB_keys⌝ ∗ ⌜reqd = (k, h)⌝ ∗ ⌜reqv = #(LitString k)⌝ ∗ *)
+  (*           known_replog_token sa γF ∗ own_logL_obs γL h ∗ *)
+  (*           own_log_obs γF h. *)
+
+  (* Definition ReqPost (repv : val) (reqd : ReqData) (repd : RepData) *)
+  (*   : iProp Σ := *)
+  (*   ∃ k h h', ⌜reqd = (k,h)⌝ ∗ ⌜repd = h'⌝ ∗ ⌜h ≤ₚ h'⌝ ∗ *)
+  (*             known_replog_token sa γF ∗ own_logL_obs γL h' ∗ *)
+  (*             own_log_obs γF h' ∗ *)
+  (*             ((⌜repv = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨ *)
+  (*              (∃ a, ⌜repv = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)). *)
+
+ Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
+    Global_Inv γL γM N ∗
     ∃ k h, ⌜k ∈ DB_keys⌝ ∗ ⌜reqd = (k, h)⌝ ∗ ⌜reqv = #(LitString k)⌝ ∗
-            known_replog_token sa γF ∗ own_logL_obs γL h ∗
-            own_log_obs γF h.
+             own_replog_obs γL sa h.
 
   Definition ReqPost (repv : val) (reqd : ReqData) (repd : RepData)
     : iProp Σ :=
     ∃ k h h', ⌜reqd = (k,h)⌝ ∗ ⌜repd = h'⌝ ∗ ⌜h ≤ₚ h'⌝ ∗
-              known_replog_token sa γF ∗ own_logL_obs γL h' ∗
-              own_log_obs γF h' ∗
+               own_replog_obs γL sa h' ∗
               ((⌜repv = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
                (∃ a, ⌜repv = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)).
 

@@ -40,24 +40,26 @@ From aneris.examples.reliable_communication.lib.repdb.proof.leader
 
 Section Init_Leader_Proof.
   Context `{aG : !anerisG Mdl Σ, dbparams : !DB_params, dbg: !IDBG Σ}.
-  Context (γL γM γF : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
   Context (leader_si leaderF_si : message → iProp Σ).
   Context (SrvLeaderInit SrvLeaderFInit : iProp Σ).
-  Notation MTC := (client_handler_at_leader_user_params γL γM).
-  Notation MTF := (follower_handler_user_params γL γM).
+  Notation MTC := (client_handler_at_leader_user_params γL γM N).
+  Notation MTF := (follower_handler_user_params γL γM N).
   Context (HInitLeaderSpec :
           ⊢  (∀ (MTS : MTS_spec_params MTC) A,
                 @run_server_spec _ _ _ _ _ SrvLeaderInit leader_si MTS A)).
   Context (HInitLeaderFSpec :
           ⊢  (∀ (MTS : MTS_spec_params MTF) A,
                 @run_server_spec _ _ _ _ _ SrvLeaderFInit leaderF_si MTS A)).
+  Context (γdbF : gname).
 
   Definition init_leader_res : iProp Σ :=
-    Global_Inv γL γM ∗
+    ⌜N !! DB_addrF = Some γdbF⌝ ∗
+    Global_Inv γL γM N ∗
     own_log_auth γL (1/2) [] ∗
     SrvLeaderInit ∗
-    known_replog_token DB_addrF γF ∗
-    own_log_auth γF (1/2) [] ∗
+    known_replog_token DB_addrF γdbF ∗
+    own_log_auth γdbF (1/2) [] ∗
     SrvLeaderFInit.
 
   Definition init_leader_spec_internal A : iProp Σ :=
@@ -95,7 +97,7 @@ Section Init_Leader_Proof.
     wp_alloc kvsL as "HpKvs".
     wp_pures.
     iDestruct "HinitRes"
-      as "(#HGinv & HownL & HsrvInit & #HFtkn & HownF & HsrvFinit)".
+      as "(%Htk & #HGinv & HownL & HsrvInit & #HFtkn & HownF & HsrvFinit)".
     iDestruct (get_obs with "[$HownL]") as "#HobsL".
     rewrite -Qp_quarter_quarter.
     rewrite {1} Qp_quarter_quarter.
@@ -122,8 +124,8 @@ Section Init_Leader_Proof.
     wp_apply (new_monitor_spec
                 (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF)
                 (log_monitor_inv_def
-                   (ip_of_address DB_addrF) γF (1/4) logLF
-                   (leader_local_secondary_res γL γF))
+                   (ip_of_address DB_addrF) γdbF (1/4) logLF
+                   (leader_local_secondary_res γL γdbF))
                with "[HownF1 HpLF HFtkn HobsL]") .
     iExists logVF, [].
     iSplit; first done.
@@ -141,7 +143,7 @@ Section Init_Leader_Proof.
          wp_apply aneris_wp_fork.
          iSplitL "HΦ"; iNext; [ by iApply "HΦ"|].
          rewrite -HipEq.
-         wp_apply (update_log_copy_loop_spec γL γM  _ γF mFγ
+         wp_apply (update_log_copy_loop_spec γL γM N _ γdbF mFγ
                     with "[HownF2]"); [ | done].
          iFrame "#∗".
          rewrite /leader_local_secondary_inv.
@@ -155,7 +157,7 @@ Section Init_Leader_Proof.
          { intro Heq. destruct DB_addr, DB_addrF. by inversion Heq. }
          wp_apply
            (HInitLeaderFSpec $! (follower_handler_spec_params
-                                   γL γM mFγ γF mFv logLF Hneq) A _
+                                   γL γM N mFγ γdbF mFv logLF Hneq) A _
              with "[$HsrvFinit $HmhF $HfpF]");  eauto with iFrame.
     - rewrite /start_leader_processing_clients.
       iNext.
@@ -163,7 +165,7 @@ Section Init_Leader_Proof.
       rewrite -HipEq.
       wp_apply
         (HInitLeaderSpec $! (client_handler_at_leader_spec_params
-                               γL γM mγ mv kvsL logL) A _
+                               γL γM N mγ mv kvsL logL) A _
           with "[$HsrvInit $Hmh $Hfp]"); eauto with iFrame.
   Qed.
 

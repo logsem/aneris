@@ -38,10 +38,10 @@ Import log_code.
 Section Followers_MT_spec_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
   Context (mγ γF : gname) (mv : val) (logFLoc : loc).
   Context (HipNeq : DB_addr ≠ DB_addrF).
-  Notation MTU_F := (follower_handler_user_params γL γM).
+  Notation MTU_F := (follower_handler_user_params γL γM N).
 
 
   Definition handler_cloj : val :=
@@ -67,7 +67,7 @@ Section Followers_MT_spec_params.
     iIntros (reqv reqd Φ) "(#Hmon & Hlocked & HR & Hpre) HΦ".
     rewrite /handler_cloj /follower_request_handler.
     simplify_eq /=.
-    iDestruct "Hpre" as "(#HGinv & -> & #Hobs)".
+    iDestruct "Hpre" as "((#Htks & #HGinv) & -> & #Hobs)".
     iDestruct "HR" as (logV logM) "(%Hlog & Hpl & HLog & #Htkn & #HobsL)".
     iDestruct "Hobs" as (γF') "(Htkn' & _ & Hobs)".
     iDestruct (known_replog_token_agree with "[$Htkn'][$Htkn]") as "->".
@@ -95,11 +95,11 @@ Section Followers_MT_spec_params.
     iDestruct "HmainRes" as "(_  & #HobsL')".
     iDestruct (get_obs_prefix with "HobsL'") as "HobsLWe"; first done.
     iApply fupd_aneris_wp.
-    iMod (Obs_we_serializable _ _ DB_addr with "[$HGinv][$HobsLWe]")
+    iMod (Obs_we_serializable _ _ _ DB_addr with "[$HGinv $Htks][$HobsLWe]")
       as "%Hser"; [done| by iLeft |].
     iInv DB_InvName
         as (lMG kvsMG)
-             ">(%N & %HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
+             ">(%HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
     inversion HvalidG.
     iDestruct (own_obs_prefix with "[$HlM][$HobsLWe]") as "%Hprefixh2".
     assert (we ∈ reqd ++ [we]) by set_solver.
@@ -127,7 +127,7 @@ Section Followers_MT_spec_params.
       - set_solver. }
     iModIntro.
     rewrite /global_inv_def. iSplitL "HlM HmS HmapF HknwF".
-    { iNext. iExists _, _, _. by iFrame. }
+    { iNext. iExists _, _. by iFrame. }
     iModIntro.
     wp_apply network_util_proof.wp_unSOME; first done.
     iIntros "_".

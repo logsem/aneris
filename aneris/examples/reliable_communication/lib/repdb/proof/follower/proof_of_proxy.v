@@ -34,35 +34,24 @@ From aneris.examples.reliable_communication.lib.repdb.proof.follower
 
 Section Client_Proxy_Proof.
   Context `{!anerisG Mdl Σ, dbparams : !DB_params, !IDBG Σ}.
-  Context (γL γM γF : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
   Context (fsa : socket_address).
   Context (Hin : fsa ∈ DB_followers).
   Context (follower_si : message → iProp Σ).
-  Notation MTC := (client_handler_at_follower_user_params γL γM γF fsa).
+  Notation MTC := (client_handler_at_follower_user_params γL γM N fsa).
   Context (HClient_proxySpec :
           ⊢ (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC follower_si A sa)).
 
-  Definition read_at_follower_spec_internal
+ Definition read_at_follower_spec_internal
            (rd : val) (csa fsaddr : socket_address) (k : Key) (h : wrlog) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗
-    {{{ known_replog_token fsa γF ∗ own_logL_obs γL h ∗ own γF (◯ML h) }}}
+    {{{ own_obs γL fsaddr h }}}
       rd #k @[ip_of_address csa]
     {{{vo, RET vo;
           ∃ h', ⌜h ≤ₚ h'⌝ ∗ own_obs γL fsaddr h' ∗
          ((⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨
          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝))
     }}}%I.
-
- (* Definition read_at_follower_spec_internal *)
- (*           (rd : val) (csa fsaddr : socket_address) (k : Key) (h : wrlog) : iProp Σ := *)
- (*      ⌜k ∈ DB_keys⌝ -∗ *)
- (*    {{{ own_obs γL fsaddr h }}} *)
- (*      rd #k @[ip_of_address csa] *)
- (*    {{{vo, RET vo; *)
- (*          ∃ h', ⌜h ≤ₚ h'⌝ ∗ own_obs γL fsaddr h' ∗ *)
- (*         ((⌜vo = NONEV⌝ ∗ ⌜at_key k h' = None⌝) ∨ *)
- (*         (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝)) *)
- (*    }}}%I. *)
 
    Definition init_client_proxy_follower_spec_internal A csa : iProp Σ :=
      ⌜fsa ≠ DB_addr⌝ →
@@ -78,7 +67,7 @@ Section Client_Proxy_Proof.
          (∀ k h, read_at_follower_spec_internal rd csa fsa k h) }}}.
 
   Lemma init_client_proxy_follower_internal_holds A sa :
-    Global_Inv γL γM ⊢ init_client_proxy_follower_spec_internal A sa.
+    Global_Inv γL γM N ⊢ init_client_proxy_follower_spec_internal A sa.
   Proof.
     iIntros "#Hinv".
     iIntros (Hneq HA HnA).
@@ -93,25 +82,30 @@ Section Client_Proxy_Proof.
     iIntros (k h).
     rewrite /read_at_follower_spec_internal.
     iIntros (Hkeys Ψ) "!#".
-    iIntros "Hobs HΨ".
+    iIntros "#Hobs HΨ".
     wp_apply ("Hspec" $! _ (k, h) with "[Hobs]").
     - iSplit.
       -- iPureIntro. apply _.
-      -- iDestruct "Hobs" as "(#Hknw & #HobsL & #HobsF)".
+      -- iDestruct "Hobs" as "[(%Habs & _)|Hobs]".
+         { naive_solver. }
+         iDestruct "Hobs" as (γF') "(#Hknw & #HobsL & #HobsF)".
+         (* iDestruct (known_replog_token_agree with "[$Hknown][$Hknw]") as "->". *)
          iFrame "#".
          iExists k, h.
-         by iFrame "#∗".
+         iFrame "#∗".
+         do 3 (iSplit; first done).
+         iExists _; iFrame "#".
     - iIntros (repd repv) "Hpost".
       iApply "HΨ".
       simplify_eq /=.
       rewrite /ReqPost.
       iDestruct "Hpost"
-        as (k' h0 h1) "(%Heq1 & -> & %Hpre & #Hknw & #HobsL1 & #HobsF1 & #Hpost)".
+        as (k' h0 h1) "(%Heq1 & -> & %Hpre & #Hreplog & #Hpost)".
       iExists h1.
       inversion Heq1; subst.
       iSplit; first done.
       iSplit.
-      { iFrame "#". iRight. rewrite /own_replog_obs. iExists γF. iFrame "#". }
+      { iFrame "#". }
       iDestruct "Hpost" as "[%Hpost|Hpost]".
       -- iLeft. naive_solver.
       -- iRight. naive_solver.

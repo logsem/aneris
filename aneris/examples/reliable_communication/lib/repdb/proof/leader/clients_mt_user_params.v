@@ -25,7 +25,7 @@ Import lock_proof.
 Section MT_user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
 
   Definition ReqData : Type :=
     (coPset * (string * val) * (iProp Σ * (we → wrlog → wrlog → iProp Σ))) +
@@ -34,7 +34,7 @@ Section MT_user_params.
   Definition RepData : Type := we * ghst * ghst + option we.
 
   Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
-    Global_Inv γL γM ∗
+    Global_Inv γL γM N ∗
     ((∃ E k (v : SerializableVal) P Q,
      ⌜reqd = inl (E, (k, SV_val v), (P, Q))⌝ ∗
      ⌜reqv = InjLV (#(LitString k), v)%V⌝ ∗
