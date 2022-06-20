@@ -3,7 +3,7 @@ From iris.base_logic.lib Require Import invariants.
 From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang Require Import lang.
-From aneris.aneris_lang Require Import tactics proofmode.
+From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From aneris.aneris_lang.program_logic
      Require Import aneris_weakestpre aneris_lifting.
 From aneris.aneris_lang.lib Require Import assert_proof.
@@ -407,13 +407,12 @@ Section proof_of_code.
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
-        db_Fsa ⤇ follower_si ∗
-        "x" ↦ₖ None }}}
+        db_Fsa ⤇ follower_si }}}
       node1 #clt_01 #db_Fsa @[ip_of_address clt_01]
     {{{ RET #(); True }}}.
   Proof.
     iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
-    iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi & Hx) HΦ".
+    iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi) HΦ".
     wp_lam.
     wp_pures.
     wp_apply ("Hspec" with "[//] [//] [$Hfps $Hclt00]"); [by iFrame "#"|].
@@ -423,3 +422,133 @@ Section proof_of_code.
   Qed.
 
 End proof_of_code.
+
+(* WIP going forward *)
+(** Concrete parameters (addresses, ips) *)
+Definition db_l2csa := SocketAddressInet "0.0.0.0" 80.
+Definition db_l2fsa := SocketAddressInet "0.0.0.0" 81.
+Definition db_f2lsa := SocketAddressInet "0.0.0.1" 80.
+Definition db_f2csa := SocketAddressInet "0.0.0.1" 81.
+Definition clt_sa0 := SocketAddressInet "0.0.0.2" 80.
+Definition clt_sa1 := SocketAddressInet "0.0.0.3" 80.
+Definition A : gset socket_address := {[ db_l2csa; db_l2fsa; db_f2csa ]}.
+Definition ips : gset string := {[ "0.0.0.0" ; "0.0.0.1"; "0.0.0.2"; "0.0.0.3" ]}.
+Global Instance DBP : DB_params := DBSrv db_l2csa db_f2csa db_l2fsa.
+
+Definition main : expr :=
+    Start "0.0.0.0" (init_leader (DB_serialization.(s_serializer))
+                                 #db_l2csa #db_l2fsa);;
+    Start "0.0.0.1" (init_follower (DB_serialization.(s_serializer)) #db_l2fsa
+                                   #db_f2lsa #db_f2csa);;
+    Start "0.0.0.2" (node0 #clt_sa0 #db_l2csa);;
+    Start "0.0.0.3" (node1 #clt_sa1 #db_f2csa).
+
+
+Section proof_of_main.
+  Context `{!anerisG Mdl Σ, lockG Σ}.
+  Context `{TM: !DB_time, !DBPreG Σ}.
+  Context (leader_si leaderF_si follower_si : message → iProp Σ).
+  Context (InitL InitF : iProp Σ).
+  Context `{DBRes : !@DB_resources _ _ _ _ DBP}.
+
+  Definition init_follower_spec f2lsa f2csa A initF f_si lF_si : iProp Σ :=
+        ⌜DB_addrF ∈ A⌝ →
+        ⌜f2csa ∈ A⌝ →
+        ⌜f2lsa ∉ A⌝ →
+        ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
+        ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
+        {{{ fixed A ∗
+            f2csa ⤇ f_si ∗
+            DB_addrF ⤇ lF_si ∗
+            initF ∗
+            f2lsa ⤳ (∅, ∅) ∗
+            f2csa ⤳ (∅, ∅) ∗
+            free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
+            free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
+          init_follower (s_serializer DB_serialization)
+            #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
+        {{{ RET #(); True }}}.
+
+
+  Lemma main_spec :
+    ⊢ |={⊤}=>
+         GlobalInv -∗
+         (∀ A, init_leader_spec A InitL leader_si leaderF_si) -∗
+         (∀ A, init_follower_spec db_f2lsa db_f2csa A InitF follower_si leaderF_si) -∗
+         (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
+         (∀ A ca, init_client_proxy_follower_spec A ca db_f2csa follower_si) -∗
+         db_l2csa ⤇ leader_si -∗
+         db_l2fsa ⤇ leaderF_si -∗
+         db_f2csa ⤇ follower_si -∗
+         fixed A -∗
+         Obs db_l2csa [] -∗
+         Obs db_f2csa [] -∗
+         inv N (inv_def db_l2csa db_f2csa db_l2fsa) -∗
+         free_ip "0.0.0.0" -∗
+         free_ip "0.0.0.1" -∗
+         free_ip "0.0.0.2" -∗
+         free_ip "0.0.0.3" -∗
+         SocketAddressInet "0.0.0.0" 80 ⤳ (∅, ∅) -∗
+         SocketAddressInet "0.0.0.0" 81 ⤳ (∅, ∅) -∗
+         SocketAddressInet "0.0.0.1" 80 ⤳ (∅, ∅) -∗
+         SocketAddressInet "0.0.0.1" 81 ⤳ (∅, ∅) -∗
+         SocketAddressInet "0.0.0.2" 80 ⤳ (∅, ∅) -∗
+         SocketAddressInet "0.0.0.3" 80 ⤳ (∅, ∅) -∗
+         InitL -∗
+         InitF -∗
+         "x" ↦ₖ None -∗
+         WP main @["system"]
+      {{ v, True }}.
+  Proof.
+    iIntros "".
+    iModIntro.
+    iIntros "#HGinv #HdbSrvS #HdbFS #HdbCltS #HdbCltF".
+    iIntros "#Hdb_l2csa #Hdb_l2fsa #Hdb_f2csa #Hfixed #HobsL #HobsF #HI".
+    iIntros "Hfree0 Hfree1 Hfree2 Hfree3".
+    iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 HInitL HInitF".
+    iIntros "Hx".
+    rewrite /main.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    iFrame "Hfree0".
+    iSplitR "Hsa0 Hsa1 HInitL"; last first.
+    { iNext. iIntros "Hfps".
+      iApply ("HdbSrvS" $! A
+               with "[][][][][HInitL Hfps Hsa0 Hsa1]"); [eauto .. | | done ].
+      iDestruct (free_ports_split
+                    "0.0.0.0"
+                    {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
+      iFrame "#∗". iApply "Hfp1". iFrame. }
+    iNext. wp_pures.
+    wp_apply (aneris_wp_start {[80%positive;81%positive]}); first done.
+    iFrame "Hfree1".
+    iSplitR "Hsa2 Hsa3 HInitF"; last first.
+    { iNext. iIntros "Hfps".
+      iApply ("HdbFS" $! A with "[//][//][][//][//][Hfps HInitF Hsa2 Hsa3]");
+        [iPureIntro; set_solver| |done].
+      iDestruct (free_ports_split
+                   "0.0.0.1"
+                   {[80%positive]} {[81%positive]} with "Hfps")
+        as "(Hfp1 & Hfp2)"; [set_solver|].
+      iFrame "#∗". }
+    iNext. wp_pures.
+    wp_apply (aneris_wp_start {[80%positive]}); first done.
+    iFrame "Hfree2".
+    iSplitR "Hsa4 Hx"; last first.
+    { iNext. iIntros "Hfps".
+      iApply (proof_of_node0 leader_si db_l2csa db_f2csa db_l2fsa clt_sa0 A
+               with "HGinv Hfixed HdbCltS HobsL HI [Hsa4 Hfps Hx]");
+        [done|set_solver| |done].
+      iFrame "#∗". }
+    iNext. wp_pures.
+    wp_apply (aneris_wp_start {[80%positive]}); first done.
+    iFrame "Hfree3".
+    iSplitR "Hsa5"; last first.
+    { iNext. iIntros "Hfps".
+      iApply (proof_of_node1 follower_si db_l2csa db_f2csa db_l2fsa clt_sa1 A
+               with "HGinv Hfixed HdbCltF HobsF HI [Hsa5 Hfps]");
+        [done|set_solver| |done].
+      iFrame "#∗". }
+    done.
+  Qed.
+
+End proof_of_main.
