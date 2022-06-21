@@ -1,5 +1,6 @@
 From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import invariants.
+From aneris.prelude Require Import list.
 From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang Require Import lang.
@@ -22,108 +23,11 @@ From aneris.examples.reliable_communication.examples.repdb_leader_followers
      Require Import causality_example_code.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 
-Section helper_lemmas.
-
-  Lemma prefix_Some_None {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys zs x :
-    last (filter P xs) = Some x →
-    last (filter P ys) = None →
-    xs `prefix_of` ys ++ zs →
-    ys `prefix_of` xs.
-  Proof.
-    intros Hsome Hnone Hprefix.
-    rewrite last_None in Hnone.
-    generalize dependent xs.
-    induction ys as [|y ys]; intros xs Hsome Hprefix.
-    { by apply prefix_nil. }
-    destruct xs as [|x' xs]; [done|].
-    assert (y = x') as <-.
-    { by apply prefix_cons_inv_1 in Hprefix. }
-    apply prefix_cons.
-    rewrite filter_cons in Hnone.
-    apply prefix_cons_inv_2 in Hprefix.
-    rewrite filter_cons in Hsome.
-    apply IHys; [by destruct (decide (P y))|by destruct (decide (P y))|done].
-  Qed.
-
-  Lemma prefix_cons_nil {A:Type} (xs : list A) y ys :
-    xs ≠ [] →
-    xs `prefix_of` y :: ys →
-    [y] `prefix_of` xs.
-  Proof.
-    intros Hneq Hprefix.
-    destruct xs; [done|].
-    apply prefix_cons_inv_1 in Hprefix.
-    rewrite Hprefix.
-    by apply prefix_cons, prefix_nil.
-  Qed.
-
-  Lemma last_filter_app_r {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys x :
-    last (filter P (xs ++ ys)) = Some x →
-    last (filter P xs) = None →
-    last (filter P ys) = Some x.
-  Proof.
-    intros Hsome Hnone%last_None.
-    by rewrite filter_app Hnone in Hsome.
-  Qed.
-
-  Lemma prefix_split_eq {A} (P : A → Prop) `{!∀ x, Decision (P x)} xs ys zs x y :
-    last (filter P xs) = Some x →
-    last (filter P ys) = None →
-    last (filter P zs) = None →
-    xs `prefix_of` ys ++ [y] ++ zs →
-    x = y.
-  Proof.
-    intros Hsome Hnone1 Hnone2 Hprefix.
-    assert (ys `prefix_of` xs) as [k ->].
-    { by eapply prefix_Some_None. }
-    apply prefix_app_inv in Hprefix.
-    apply last_filter_app_r in Hsome; [|done].
-    assert ([y] `prefix_of` k) as [k' ->].
-    { eapply prefix_cons_nil; [|done]. by intros ->. }
-    rewrite filter_app in Hsome.
-    rewrite last_None in Hnone2.
-    apply prefix_app_inv in Hprefix.
-    destruct Hprefix as [k'' ->].
-    rewrite filter_app in Hnone2.
-    apply app_eq_nil in Hnone2.
-    destruct Hnone2 as [Hnone2 _].
-    rewrite Hnone2 in Hsome.
-    rewrite filter_cons in Hsome.
-    destruct (decide (P y)); [|done].
-    simpl in *. by simplify_eq.
-  Qed.
-
-  Lemma elem_of_last_filter_exists_Some
-        {A} `{EqDecision A} (P : A → Prop) `{!∀ x, Decision (P x)} xs x y :
-    last (filter P xs) = x →
-    y ∈ xs → P y →
-    ∃ x', last (filter P xs) = Some x'.
-  Proof.
-    intros Hlast Hin HPy.
-    induction xs as [|z xs IHxs]; [by set_solver|].
-    destruct (decide (P z)) as [HPz|HPz].
-    - rewrite filter_cons_True; [|done].
-      assert (last (filter P xs) = None ∨
-              ∃ x', last (filter P xs) = Some x') as Hfilter.
-      { by destruct (last (filter P xs)); [right; eexists _|left]. }
-      destruct Hfilter as [Hnone|[x' Hsome]].
-      + exists z. rewrite last_None in Hnone. by rewrite Hnone.
-      + exists x'. rewrite last_cons. by rewrite Hsome.
-    - rewrite filter_cons_False; [|done].
-      rewrite filter_cons_False in Hlast; [|done].
-      assert (y ≠ z) as Hneq.
-      { intros Heq. by simplify_eq. }
-      apply elem_of_cons in Hin.
-      destruct Hin as [Hin|Hin]; [done|by apply IHxs].
-  Qed.
-
-End helper_lemmas.
-
 Section proof_of_code.
   Context `{!anerisG Mdl Σ}.
   Context `{TM: !DB_time, !DBPreG Σ}.
   Context (leader_si follower_si : message → iProp Σ).
-  Context (db_sa db_Fsa db_saF : socket_address).
+  Context (db_l2csa db_f2csa db_l2fsa : socket_address).
 
   (* ------------------------------------------------------------------------ *)
   (** The definition of the parameters for DB and DL and shared resources. *)
@@ -131,9 +35,9 @@ Section proof_of_code.
 
   Local Instance DBSrv : DB_params :=
     {|
-      DB_addr := db_sa;
-      DB_addrF := db_saF;
-      DB_followers := {[db_Fsa]};
+      DB_addr := db_l2csa;
+      DB_addrF := db_l2fsa;
+      DB_followers := {[db_f2csa]};
       DB_keys := {["x"; "y"]};
       DB_InvName := (nroot .@ "DBInv");
       DB_serialization := int_serialization;
@@ -172,7 +76,7 @@ Section proof_of_code.
     ("y" ↦ₖ None) ∨
     (∃ h hfx hfy we_y we_x,
         "y" ↦ₖ Some we_y ∗ "x" ↦ₖ Some we_x ∗
-        Obs db_sa (h ++ [we_x] ++ hfx ++ [we_y] ++ hfy) ∗
+        Obs db_l2csa (h ++ [we_x] ++ hfx ++ [we_y] ++ hfy) ∗
         ⌜we_val we_x = #37⌝ ∗
         ⌜at_key "x" h = None⌝ ∗ ⌜at_key "y" h = None⌝ ∗
         ⌜at_key "x" hfx = None⌝ ∗ ⌜at_key "y" hfx = None⌝ ∗
@@ -182,7 +86,7 @@ Section proof_of_code.
     GlobalInv -∗
     inv N inv_def -∗
     write_spec wr clt_00 -∗
-    Obs db_sa [] -∗
+    Obs db_l2csa [] -∗
     {{{ "x" ↦ₖ None }}}
       do_writes wr @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
@@ -377,18 +281,18 @@ Section proof_of_code.
   Qed.
 
   Lemma proof_of_node0 (clt_00 : socket_address) A :
-    db_sa ∈ A →
+    db_l2csa ∈ A →
     clt_00 ∉ A →
     GlobalInv -∗
     fixed A -∗
     (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
-    Obs db_sa [] -∗
+    Obs db_l2csa [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
-        db_sa ⤇ leader_si ∗
+        db_l2csa ⤇ leader_si ∗
         "x" ↦ₖ None }}}
-      node0 #clt_00 #db_sa @[ip_of_address clt_00]
+      node0 #clt_00 #db_l2csa @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
     iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
@@ -402,17 +306,17 @@ Section proof_of_code.
   Qed.
 
   Lemma proof_of_node1 (clt_01 : socket_address) A :
-    db_Fsa ∈ A →
+    db_f2csa ∈ A →
     clt_01 ∉ A →
     GlobalInv -∗
     fixed A -∗
     (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa follower_si) -∗
-    Obs db_Fsa [] -∗
+    Obs db_f2csa [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
-        db_Fsa ⤇ follower_si }}}
-      node1 #clt_01 #db_Fsa @[ip_of_address clt_01]
+        db_f2csa ⤇ follower_si }}}
+      node1 #clt_01 #db_f2csa @[ip_of_address clt_01]
     {{{ RET #(); True }}}.
   Proof.
     iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
@@ -605,7 +509,6 @@ Proof.
           int_time leader_si leaderF_si follower_si InitL InitF DBRes) as "Hmain".
   iModIntro.
   iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
-  simpl in *.
   iDestruct (big_sepS_delete _ _ db_l2csa with "Hsis") as "[Hsi0 Hsis]";
     first set_solver.
   iDestruct (big_sepS_delete _ _ db_l2fsa with "Hsis") as "[Hsi1 Hsis]";
