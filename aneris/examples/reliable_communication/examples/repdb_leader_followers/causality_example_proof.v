@@ -454,25 +454,6 @@ Section proof_of_main.
   Context (InitL InitF : iProp Σ).
   Context `{DBRes : !@DB_resources _ _ _ _ DBP}.
 
-  Definition init_follower_spec f2lsa f2csa A initF f_si lF_si : iProp Σ :=
-        ⌜DB_addrF ∈ A⌝ →
-        ⌜f2csa ∈ A⌝ →
-        ⌜f2lsa ∉ A⌝ →
-        ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
-        ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-        {{{ fixed A ∗
-            f2csa ⤇ f_si ∗
-            DB_addrF ⤇ lF_si ∗
-            initF ∗
-            f2lsa ⤳ (∅, ∅) ∗
-            f2csa ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
-            free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
-          init_follower (s_serializer DB_serialization)
-            #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
-        {{{ RET #(); True }}}.
-
-
   Lemma main_spec :
     ⊢ |={⊤}=>
          GlobalInv -∗
@@ -609,7 +590,7 @@ Proof.
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   assert (DBPreG Σ) as HPreG by apply _.
-  iMod (db_init_empty.(DB_init_setup) ⊤ $! I) as (DBRes) "Hdb";
+  iMod (DB_init_setup ⊤ $! I) as (DBRes) "Hdb";
     [solve_ndisj|set_solver|set_solver| ].
   iDestruct "Hdb"
     as (InitL leader_si leaderF_si) "(#HGinv & #Hobs & Hkeys & HInitL &
@@ -658,9 +639,7 @@ Proof.
   iMod (inv_alloc N _ (inv_def db_l2csa db_f2csa db_l2fsa) with "[Hy]") as "HI".
   { by iLeft. }
   iApply ("Hmain" with
-           "HGinv HinitL_spec HinitL_proxy_spec [HinitF_spec] HinitF_proxy_spec
+           "HGinv HinitL_spec HinitL_proxy_spec HinitF_spec HinitF_proxy_spec
             Hsi0 Hsi1 Hsi2 Hf Hobs HobsF HI Hip0 Hip1 Hip2 Hip3
             Hm0 Hm1 Hm2 Hm3 Hc0 Hc1 HInitL HInitF Hx").
-  (* Needs new spec for follower proxy *)
-  admit.
-Admitted.
+Qed.
