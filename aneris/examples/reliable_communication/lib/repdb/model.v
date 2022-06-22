@@ -73,7 +73,18 @@ Section ValidStates.
 
   Lemma valid_state_empty :
     valid_state [] (gset_to_gmap (@None write_event) DB_keys).
-  Proof. Admitted.
+  Proof.
+    split; rewrite /mem_dom /mem_we_key /mem_log_coh /in_log_mem_some_coh
+                   /mem_serializable_vals /allocated_in_mem /log_events.
+    - by rewrite dom_gset_to_gmap.
+    - intros ? ? ? Habs. apply lookup_gset_to_gmap_Some in Habs. naive_solver.
+    - intros k Hy2. apply lookup_gset_to_gmap_Some. rewrite dom_gset_to_gmap in Hy2. naive_solver.
+    - intros k we He. naive_solver.
+    - intros k we Hk Hnone. apply lookup_gset_to_gmap_Some in Hnone. naive_solver.
+    - intros l k wel Hpre Hsm. destruct Hpre as (h2 & Hpre).
+      symmetry in Hpre. apply app_eq_nil in Hpre. naive_solver.
+    - intros i Hi0 Hin. rewrite nil_length in Hin. by lia.
+  Qed.
 
   Lemma log_events_serializable L M :
     valid_state L M →
@@ -123,7 +134,7 @@ Section ValidStates.
 
   Record valid_state_local (L : wrlog) (M : gmap Key val) : Prop :=
     {
-      DB_LSTV_log_events L : log_events L;
+      DB_LSTV_log_events : log_events L;
       DB_LSTV_mem_dom : mem_dom_local M;
       DB_LSTV_mem_serializable_vs_local : mem_serializable_vals_local M;
       DB_LSTV_in_mem_log_some_coh_local : in_mem_log_some_coh_local L M;
@@ -133,11 +144,16 @@ Section ValidStates.
       DB_LSTV_mem_allocated_in_mem : allocated_in_mem_local L M;
     }.
 
-(* TODO : valid state update lemmas. *)
-
   Lemma valid_state_local_empty : valid_state_local [] ∅.
-  Proof. Admitted.
-
+  Proof.
+    split; rewrite /mem_dom_local /in_mem_log_some_coh_local /in_mem_log_none_coh_local
+                    /mem_serializable_vals_local /in_log_mem_some_coh_local /in_log_mem_none_coh_local
+                  /allocated_in_mem_local /log_events;  try set_solver.
+    - intros i Hi0 Hin. rewrite nil_length in Hin. by lia.
+    - intros l k we1 Hpre.
+      destruct Hpre as (h2 & Hpre).
+      symmetry in Hpre. apply app_eq_nil in Hpre. naive_solver.
+  Qed.
 
   Lemma valid_state_local_update
         (lM : wrlog) (kvsMG : gmap Key val) wev :

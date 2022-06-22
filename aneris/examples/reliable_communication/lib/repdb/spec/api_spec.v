@@ -69,47 +69,7 @@ Section API_spec.
     iIntros "!> H". iDestruct "H" as (_ _ _) "H". iApply "H".
   Qed.
 
- (* Definition read_spec
-      (rd : val) (sa : socket_address)  : iProp Σ :=
-    Eval simpl in
-    □ (∀ (E : coPset) (k : Key)
-         (P : iProp Σ)
-         (Q1 : option we → ghst → iProp Σ)
-         (Q2 : we → ghst → iProp Σ),
-        ⌜↑DB_InvName ⊆ E⌝ -∗
-        ⌜k ∈ DB_keys⌝ -∗
-        □ (P ={⊤, E}=∗
-           ∃ (h : ghst) (q : Qp) (ao: option we),
-               ⌜at_key k h = ao⌝ ∗
-               Obs DB_addr h ∗
-               k ↦ₖ{q} ao ∗
-               ▷ ((⌜ao = None⌝ ∗ (k ↦ₖ{q} None) ={E,⊤}=∗ Q1 ao h) ∧
-                  (∀ a, ⌜ao = Some a⌝ ∗ (k ↦ₖ{q} Some a) ={E,⊤}=∗ Q2 a h))) -∗
-        {{{ P }}}
-          rd #k @[ip_of_address sa]
-          {{{ vo, RET vo;
-            ∃ (h : ghst) (eo: option we),
-              (⌜vo = NONEV⌝ ∗ ⌜eo = None⌝ ∗ Q1 eo h) ∨
-              (∃ v e, ⌜vo = SOMEV v⌝ ∗ ⌜eo = Some e⌝ ∗ ⌜we_val e = v⌝ ∗ Q2 e h)
-         }}})%I.
-
-  Definition read_spec_atomic (rd : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
-    ⌜k ∈ DB_keys⌝ -∗
-    <<< ∀∀ (h : ghst) (q : Qp) (a_old : option we),
-            ⌜at_key k h = a_old⌝ ∗
-            Obs DB_addr h ∗
-            k ↦ₖ{q} a_old >>>
-      rd #k @[ip_of_address sa] E
-    <<<▷ RET match a_old with None => NONEV | Some a => SOMEV (we_val a) end;
-         (⌜a_old = None⌝ ∗ k ↦ₖ{q} None) ∨
-         (∃ e, ⌜a_old = Some e⌝ ∗
-            (k ↦ₖ{q} Some e)) >>>.
-
-  *)
-
-   Definition simplified_write_spec (wr : val) (sa : socket_address)
+  Definition simplified_write_spec (wr : val) (sa : socket_address)
       (k : Key) (v : SerializableVal) (h : ghst) : iProp Σ :=
     ⌜k ∈ DB_keys⌝ -∗
     {{{ ∃ wo : option we, k ↦ₖ wo ∗ Obs DB_addr h ∗ ⌜at_key k h = wo⌝ }}}
@@ -145,12 +105,19 @@ Section API_spec.
   Lemma get_simplified_write_spec wr sa :
     write_spec wr sa ⊢ ∀ k v h, simplified_write_spec wr sa k v h.
   Proof.
-  Admitted.
+    iIntros "#Hwr" (k v h).
+    iDestruct (write_spec_write_spec_atomic with "Hwr") as "#Hswr".
+    iIntros (Hk Φ) "!> HP HΦ".
+    iApply "Hswr"; [done..|].
+    iApply fupd_mask_intro; [done|]; iIntros "Hclose".
+    iDestruct "HP" as (wo) "(Hk & Hobs & %Hatkey)".
+    iExists _, _. iFrame "Hk Hobs". iSplit; [done|].
+    iIntros "!>" (hf wo') "(%Hatkey'&%Hkew&%Hval&%Hle&Hk&#Hobs')".
+    iMod "Hclose". iModIntro. iApply "HΦ".
+    iExists _, _. by iFrame "#∗".
+  Qed.
 
-  (* Lemma get_simplified_read_spec wr sa :
-    read_spec wr sa ⊢ ∀ k q h, simplified_read_spec wr sa k q h.
-  Proof.
-  Admitted. *)
+
 
   Definition init_leader_spec A Init_leader leader_si leaderF_si: iProp Σ :=
     ⌜DB_addr ∈ A⌝ →
@@ -241,7 +208,50 @@ Section Init.
            Init_follower ∗
            Obs fsa [] ∗
            (∀ A f2lsa, init_follower_spec f2lsa fsa A Init_follower f_si leaderF_si) ∗
-           (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa f_si))
+           (∀ A csa, init_client_proxy_follower_spec A csa fsa f_si))
     }.
 
 End Init.
+
+(* Definition read_spec
+      (rd : val) (sa : socket_address)  : iProp Σ :=
+    Eval simpl in
+    □ (∀ (E : coPset) (k : Key)
+         (P : iProp Σ)
+         (Q1 : option we → ghst → iProp Σ)
+         (Q2 : we → ghst → iProp Σ),
+        ⌜↑DB_InvName ⊆ E⌝ -∗
+        ⌜k ∈ DB_keys⌝ -∗
+        □ (P ={⊤, E}=∗
+           ∃ (h : ghst) (q : Qp) (ao: option we),
+               ⌜at_key k h = ao⌝ ∗
+               Obs DB_addr h ∗
+               k ↦ₖ{q} ao ∗
+               ▷ ((⌜ao = None⌝ ∗ (k ↦ₖ{q} None) ={E,⊤}=∗ Q1 ao h) ∧
+                  (∀ a, ⌜ao = Some a⌝ ∗ (k ↦ₖ{q} Some a) ={E,⊤}=∗ Q2 a h))) -∗
+        {{{ P }}}
+          rd #k @[ip_of_address sa]
+          {{{ vo, RET vo;
+            ∃ (h : ghst) (eo: option we),
+              (⌜vo = NONEV⌝ ∗ ⌜eo = None⌝ ∗ Q1 eo h) ∨
+              (∃ v e, ⌜vo = SOMEV v⌝ ∗ ⌜eo = Some e⌝ ∗ ⌜we_val e = v⌝ ∗ Q2 e h)
+         }}})%I.
+
+  Definition read_spec_atomic (rd : val) (sa : socket_address) : iProp Σ :=
+    ∀ (E : coPset) (k : Key),
+    ⌜↑DB_InvName ⊆ E⌝ -∗
+    ⌜k ∈ DB_keys⌝ -∗
+    <<< ∀∀ (h : ghst) (q : Qp) (a_old : option we),
+            ⌜at_key k h = a_old⌝ ∗
+            Obs DB_addr h ∗
+            k ↦ₖ{q} a_old >>>
+      rd #k @[ip_of_address sa] E
+    <<<▷ RET match a_old with None => NONEV | Some a => SOMEV (we_val a) end;
+         (⌜a_old = None⌝ ∗ k ↦ₖ{q} None) ∨
+         (∃ e, ⌜a_old = Some e⌝ ∗
+            (k ↦ₖ{q} Some e)) >>>.
+
+  *)
+
+ (* Lemma get_simplified_read_spec wr sa :
+    read_spec wr sa ⊢ ∀ k q h, simplified_read_spec wr sa k q h. *)

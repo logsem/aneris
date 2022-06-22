@@ -310,7 +310,7 @@ Section proof_of_code.
     clt_01 ∉ A →
     GlobalInv -∗
     fixed A -∗
-    (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa follower_si) -∗
+    (∀ A csa, init_client_proxy_follower_spec A csa db_f2csa follower_si) -∗
     Obs db_f2csa [] -∗
     inv N inv_def -∗
     {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
@@ -364,7 +364,7 @@ Section proof_of_main.
          (∀ A, init_leader_spec A InitL leader_si leaderF_si) -∗
          (∀ A csa, init_client_proxy_leader_spec A csa leader_si) -∗
          (∀ A f2lsa, init_follower_spec f2lsa db_f2csa A InitF follower_si leaderF_si) -∗
-         (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa follower_si) -∗
+         (∀ A csa, init_client_proxy_follower_spec A csa db_f2csa follower_si) -∗
          db_l2csa ⤇ leader_si -∗
          db_l2fsa ⤇ leaderF_si -∗
          db_f2csa ⤇ follower_si -∗
