@@ -70,7 +70,8 @@ Section ValidStates.
       DB_GSTV_log_events : log_events L;
     }.
 
-  Lemma valid_state_empty : valid_state [] ∅.
+  Lemma valid_state_empty :
+    valid_state [] (gset_to_gmap (@None write_event) DB_keys).
   Proof. Admitted.
 
   Lemma log_events_serializable L M :
