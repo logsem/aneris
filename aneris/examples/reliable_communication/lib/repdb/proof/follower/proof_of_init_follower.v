@@ -47,13 +47,6 @@ Section Init_Follower_Proof.
   Context (InitFollower : iProp Σ).
   Notation MTC := (client_handler_at_follower_user_params γL γM N f2csa).
   Notation MTF := (follower_handler_user_params γL γM N).
-  Context (HInitFollowerSpec :
-          ⊢  (∀ (MTS : MTS_spec_params MTC) A,
-                @run_server_spec _ _ _ _ _ InitFollower follower_si MTS A)).
-  Context (HinitFollowerAsClient :
-            ⊢ (∀ A sa,
-                @init_client_proxy_spec _ _ _ _ MTF leaderF_si A sa)).
-
   Context (γF : gname).
 
   Definition init_follower_res : iProp Σ :=
@@ -73,6 +66,9 @@ Section Init_Follower_Proof.
         {{{ fixed A ∗
             f2csa ⤇ follower_si ∗
             DB_addrF ⤇ leaderF_si ∗
+            (∀ (MTS : MTS_spec_params MTC) A,
+                 @run_server_spec _ _ _ _ _ InitFollower follower_si MTS A) ∗
+            (∀ A sa, @init_client_proxy_spec _ _ _ _ MTF leaderF_si A sa) ∗
             init_follower_res ∗
             f2csa ⤳ (∅, ∅) ∗
             f2lsa ⤳ (∅, ∅) ∗
@@ -86,7 +82,8 @@ Section Init_Follower_Proof.
   Proof.
     iIntros (HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
-      "(#HA & #Hsi & #HsiF & HinitRes & Hmh & HmhF & Hfp & HfpF)".
+      "(#HA & #Hsi & #HsiF & #HInitFollowerSpec
+            & HinitFollowerAsClient & HinitRes & Hmh & HmhF & Hfp & HfpF)".
     rewrite /init_follower.
     wp_pures.
     wp_apply (wp_map_empty with "[//]").
@@ -122,7 +119,7 @@ Section Init_Follower_Proof.
     rewrite /sync_with_server.
     wp_pures.
     rewrite {4} HipEq.
-    wp_apply (HinitFollowerAsClient $! A f2lsa with "[$HA $HmhF $HfpF $HsiF //]").
+    wp_apply ("HinitFollowerAsClient" $! A f2lsa with "[$HA $HmhF $HfpF $HsiF //]").
     iIntros (reqh) "#HSpec".
     wp_pures.
     wp_apply aneris_wp_fork.
@@ -132,7 +129,7 @@ Section Init_Follower_Proof.
       rewrite /start_follower_processing_clients.
       wp_pures.
       wp_apply
-        (HInitFollowerSpec $! (client_handler_at_leader_spec_params
+        ("HInitFollowerSpec" $! (client_handler_at_leader_spec_params
                                 γL γM N f2csa mγ mv kvsL logL γF) A _
                            with "[$Hinit $Hmh $Hfp][$HΦ]").
       { iFrame "#". iSplit; first done. simplify_eq /=.

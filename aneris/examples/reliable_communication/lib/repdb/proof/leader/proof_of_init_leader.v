@@ -45,12 +45,6 @@ Section Init_Leader_Proof.
   Context (SrvLeaderInit SrvLeaderFInit : iProp Σ).
   Notation MTC := (client_handler_at_leader_user_params γL γM N).
   Notation MTF := (follower_handler_user_params γL γM N).
-  Context (HInitLeaderSpec :
-          ⊢  (∀ (MTS : MTS_spec_params MTC) A,
-                @run_server_spec _ _ _ _ _ SrvLeaderInit leader_si MTS A)).
-  Context (HInitLeaderFSpec :
-          ⊢  (∀ (MTS : MTS_spec_params MTF) A,
-                @run_server_spec _ _ _ _ _ SrvLeaderFInit leaderF_si MTS A)).
   Context (γdbF : gname).
 
   Definition init_leader_res : iProp Σ :=
@@ -70,6 +64,10 @@ Section Init_Leader_Proof.
     {{{ fixed A ∗
           DB_addr ⤇ leader_si ∗
           DB_addrF ⤇ leaderF_si ∗
+          (∀ (MTS : MTS_spec_params MTC) A,
+                @run_server_spec _ _ _ _ _ SrvLeaderInit leader_si MTS A) ∗
+          (∀ (MTS : MTS_spec_params MTF) A,
+                @run_server_spec _ _ _ _ _ SrvLeaderFInit leaderF_si MTS A) ∗
           init_leader_res ∗
           DB_addr ⤳ (∅, ∅) ∗
           DB_addrF ⤳ (∅, ∅) ∗
@@ -83,7 +81,8 @@ Section Init_Leader_Proof.
   Proof.
     iIntros (HinA HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
-      "(#HA & #Hsi & #HsiF & HinitRes & Hmh & HmhF & Hfp & HfpF)".
+      "(#HA & #Hsi & #HsiF & #HInitLeaderSpec & #HInitLeaderFSpec
+            & HinitRes & Hmh & HmhF & Hfp & HfpF)".
     rewrite /init_leader.
     wp_pures.
     wp_apply (wp_log_create with "[//]").
@@ -156,7 +155,7 @@ Section Init_Leader_Proof.
          assert (DB_addr ≠ DB_addrF) as Hneq.
          { intro Heq. destruct DB_addr, DB_addrF. by inversion Heq. }
          wp_apply
-           (HInitLeaderFSpec $! (follower_handler_spec_params
+           ("HInitLeaderFSpec" $! (follower_handler_spec_params
                                    γL γM N mFγ γdbF mFv logLF Hneq) A _
              with "[$HsrvFinit $HmhF $HfpF]");  eauto with iFrame.
     - rewrite /start_leader_processing_clients.
@@ -164,7 +163,7 @@ Section Init_Leader_Proof.
       wp_pures.
       rewrite -HipEq.
       wp_apply
-        (HInitLeaderSpec $! (client_handler_at_leader_spec_params
+        ("HInitLeaderSpec" $! (client_handler_at_leader_spec_params
                                γL γM N mγ mv kvsL logL) A _
           with "[$HsrvInit $Hmh $Hfp]"); eauto with iFrame.
   Qed.
