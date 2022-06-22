@@ -15,6 +15,8 @@ From aneris.aneris_lang.lib Require Import assert_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.prelude
      Require Import ser_inj.
+From aneris.examples.reliable_communication.spec
+     Require Import ras.
 From aneris.examples.reliable_communication.lib.mt_server.spec
      Require Import api_spec.
 From aneris.examples.reliable_communication.lib.mt_server.proof
@@ -57,6 +59,7 @@ From aneris.examples.reliable_communication.lib.repdb.proof.follower
      proof_of_init_follower.
 
 Import user_params.
+
 Section Init_setup_proof.
   Context `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ, ras.SpecChanG Σ}.
 
@@ -82,7 +85,7 @@ Section Init_setup_proof.
            Obs fsa [] ∗
            (∀ A f2lsa, init_follower_spec f2lsa fsa A
                                           Init_follower f_si leaderF_si) ∗
-           (∀ A f2csa csa, init_client_proxy_follower_spec A csa f2csa f_si)).
+           (∀ A csa, init_client_proxy_follower_spec A csa fsa f_si)).
   Proof.
     iIntros (HE Hn1 Hn2).
     iMod (own_alloc
@@ -143,6 +146,8 @@ Section Init_setup_proof.
     iFrame "HGinv Htks HobsL HownUser Hsinit HsinitF HlogL2 HtkF".
     iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Hmap'")
       as "(HdbF & Hmap')"; first done.
+    iAssert (own_log_obs γdbF [])%I as "#HobsdbF".
+    iApply (get_obs with "[$HdbF]").
     iSplitL "HdbF"; first by iFrame.
     - iSplitR.
       -- iSplitL.
@@ -165,48 +170,60 @@ Section Init_setup_proof.
                          with "[$HGinv $Htks][//][//][-HΨ $HcltS][$HΨ]");
              try eauto with iFrame.
       -- assert (DB_followers ⊆ dom N) as Hsubset by set_solver.
+         assert (DB_followers = dom (delete DB_addrF N)) as HeqDB by set_solver.
          clear Hdom.
+         rewrite HeqDB.
+         rewrite HeqDB in Hsubset Hn1.
+         clear HeqDB.
          (* TODO : do induction on N instead of DB_followers! *)
-         iInduction DB_followers as [|fsa Fls Hnotin] "IH" using set_ind_L;
-           [iModIntro; done|].
-         rewrite big_sepS_insert; last done.
+         iInduction (delete DB_addrF N) as [|fsa Fls N0] "IH" using map_ind;
+           [by iModIntro; rewrite dom_empty_L |].
+         rewrite !big_sepM_insert; [|done..].
+         rewrite dom_insert_L.
+         rewrite big_sepS_insert; last by apply not_elem_of_dom.
+         iDestruct "Htks'" as "(Htk & Htks')".
+         iDestruct "Hmap'" as "(Hres & Hmap')".
          iAssert (own_replog_obs γL fsa [])%I as "#HobsF".
          iFrame "#".
-         admit.
-         iSplitR; last first.
-         iApply ("IH" with "[][][][$Hmap']"); iPureIntro; set_solver.
+         iExists Fls. iFrame "#".
+         by iApply get_obs.
+         iSplitR "Hmap'"; last first.
+         iApply ("IH" with "[][][$Htks'][$Hmap']"); iPureIntro; set_solver.
          set (MTSFF := client_handler_at_follower_user_params γL γM N fsa).
          iMod (MTS_init_setup E MTSFF) as (f_si initF) "(HinitF & #HFsrvSF & #HFcltS)".
          { simplify_eq /=; solve_ndisj. }
          iModIntro.
-         iExists f_si, initF.
-         iFrame "HinitF HobsF".
+         set (InitFRes := init_follower_res fsa γL γM N initF Fls).
+         iExists f_si, InitFRes.
+         iFrame "HobsF".
+         iSplitL.
+         { iFrame "#∗". iExists γdbF. iFrame "#". iExists γdbF. iFrame "#∗". }
          iSplitL.
          --- iIntros (A).
              rewrite /init_follower_spec.
              iIntros (f2lsa) "%HinA1 %HinA2 %HnA %HipEq1 %HprNeq !# %Ψ".
-             iIntros "(Hf & #Hsi1 & #Hsi2 & HinitF
-                   & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
-             iDestruct "HobsF" as (γfsa) "df".
-             set (InitFRes := init_follower_res fsa γL γM N initF γfsa).
+             iIntros "(Hf & #Hsi1 & #Hsi2 & HinitF & Hmh1
+                   & Hmh2 & Hfp1 & Hfp2) HΨ".
              iApply (init_follower_spec_internal_holds
-                       f2lsa fsa γL γM N f_si leaderF_si initF γfsa A
+                       f2lsa fsa γL γM N f_si leaderF_si initF Fls A
                          with "[//][//][//][//][//]
-                               [$Hf HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]").
-             admit.
-         --- admit.
-         (* --- iModIntro. *)
-         (*     iIntros (A). *)
-         (*     rewrite /init_client_proxy_leader_spec. *)
-         (*     iIntros (ca HinA HcaA). *)
-         (*     iIntros "!#" (Ψ). *)
-         (*     iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ". *)
-         (*     iApply (init_client_leader_proxy_internal_holds *)
-         (*                 with "[$HGinv $Htks][//][//][-HΨ $HcltS][$HΨ]"); *)
-         (*     try eauto with iFrame. *)
- Admitted.
+                               [$Hf $HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]");
+               try eauto with iFrame.
+         --- iIntros (A).
+             rewrite /init_client_proxy_follower_spec.
+             iIntros (ca HcaA HnA).
+             iIntros "!#" (Ψ).
+             iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ".
+             iApply (init_client_proxy_follower_internal_holds
+                         with
+                         "[$HGinv $Htks][][//][//][$Hsi1 $HFcltS $Hf $Hmh1 $Hfp1][$HΨ]").
+             iPureIntro; set_solver.
+  Qed.
 
-  Global Instance db_init_instance : DB_init.
+End Init_setup_proof.
+
+Global Instance db_init_instance
+       `{!anerisG Mdl Σ, !DB_params, !DBPreG Σ, SpecChanG Σ}: DB_init.
   Proof.
     split. iIntros (E HE Hn1 Hn2 _).
     iMod (init_setup_holds E HE Hn1 Hn2)
@@ -214,5 +231,3 @@ Section Init_setup_proof.
     iModIntro.
     iExists _, _, _, _. by iFrame.
   Qed.
-
-End Init_setup_proof.

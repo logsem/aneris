@@ -39,10 +39,8 @@ Section Client_Proxy_Proof.
   Context (Hin : fsa ∈ DB_followers).
   Context (follower_si : message → iProp Σ).
   Notation MTC := (client_handler_at_follower_user_params γL γM N fsa).
-  Context (HClient_proxySpec :
-          ⊢ (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC follower_si A sa)).
 
- Definition read_at_follower_spec_internal
+  Definition read_at_follower_spec_internal
            (rd : val) (csa fsaddr : socket_address) (k : Key) (h : wrlog) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗
     {{{ own_obs γL fsaddr h }}}
@@ -60,6 +58,7 @@ Section Client_Proxy_Proof.
      {{{ fixed A ∗
          fsa ⤇ follower_si ∗
          csa ⤳ (∅, ∅) ∗
+         (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC follower_si A sa) ∗
          free_ports (ip_of_address csa) {[port_of_address csa]} }}}
        init_client_follower_proxy (s_serializer DB_serialization)
          #csa #fsa @[ip_of_address csa]
@@ -72,10 +71,10 @@ Section Client_Proxy_Proof.
     iIntros "#Hinv".
     iIntros (Hneq HA HnA).
     iIntros (Φ) "!#".
-    iIntros "(#Hf & #Hsi & Hmh & Hfp) HΦ".
+    iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & Hfp) HΦ".
     rewrite /init_client_follower_proxy.
     wp_pures.
-    wp_apply (HClient_proxySpec with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
+    wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
     iNext.
     iIntros (reqh) "#Hspec".
     iApply "HΦ".

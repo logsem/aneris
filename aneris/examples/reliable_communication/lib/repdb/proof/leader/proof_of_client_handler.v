@@ -117,7 +117,7 @@ Section Clients_MT_spec_params.
           { apply (nth_error_Some _ _). by rewrite Hnth. }
           assert  (0 ≤ n)%Z as Hn0Z by lia.
           apply inj_lt in Hnh.
-          destruct (DB_LSTV_log_events lM n Hn0Z Hnh) as (e' & He' & He'time & He'keys).
+          destruct (DB_LSTV_log_events n Hn0Z Hnh) as (e' & He' & He'time & He'keys).
           assert (e = e') as Heqe. { rewrite Hnth in He'. by inversion He'. }
           rewrite Heqe - He'time. lia. }
         done. }
