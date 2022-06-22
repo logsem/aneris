@@ -92,19 +92,34 @@ From aneris.aneris_lang.lib Require Import
     own_log_obs γ l1 ∗ own_log_obs γ l2 -∗
     ⌜l1 `prefix_of` l2 ∨ l2 `prefix_of` l1⌝.
   Proof.
-  Admitted.
+    iIntros "[Hown1 Hown2]".
+    by iDestruct (own_valid_2 with "Hown1 Hown2") as
+      %Hvalid%mono_list_lb_op_valid_L.
+  Qed.
 
   Lemma obs_length_agree (γ : gname) (l1 l2 : list A) :
     length l1 = length l2 →
     own_log_obs γ l1 ⊢ own_log_obs γ l2 -∗ ⌜l1 = l2⌝.
   Proof.
-  Admitted.
+    iIntros (Hlen) "Hown1 Hown2".
+    iDestruct (obs_obs_prefix with "[$Hown1 $Hown2]")
+      as %[[k Hprefix]|[k Hprefix]].
+    - iPureIntro. simplify_eq.
+      destruct k; [by rewrite right_id|].
+      rewrite app_length in Hlen. simpl in Hlen. lia.
+    - iPureIntro. simplify_eq.
+      destruct k; [by rewrite right_id|].
+      rewrite app_length in Hlen. simpl in Hlen. lia.
+  Qed.
 
   Lemma own_log_auth_update γ l1 l2 :
     l1 `prefix_of` l2 →
     own_log_auth γ 1 l1 ==∗ own_log_auth γ 1 l2.
   Proof.
-  Admitted.
+    iIntros (Hprefix) "Hown".
+    iMod (own_update with "Hown"); [|done].
+    by apply mono_list_update.
+  Qed.
 
 End Logical_Log_Resources.
 
