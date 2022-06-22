@@ -25,7 +25,7 @@ Section Known_followers.
   (** Resources about free/known replicated logs. *)
 
   (** ** Ownership for a replicated log known by the system. *)
-  Definition known_replog_token (sa : socket_address) (γ : gname) : iProp Σ :=
+  Definition known_replog_token (sa : socket_address) (γ : gnameO) : iProp Σ :=
     own IDBG_known_replog_name (◯ {[ sa := to_agree γ ]}).
 
   Global Instance  known_replog_token_Persistent sa γ :
@@ -33,7 +33,7 @@ Section Known_followers.
   Proof. apply _. Qed.
 
   (** ** Ownership of all replicated logs known by the system. *)
-  Definition known_replog_tokens (N : gmap socket_address gname)  : iProp Σ :=
+  Definition known_replog_tokens (N : gmap socket_address gnameO)  : iProp Σ :=
     (* own IDBG_free_replog_set_name (GSet (dom N)) ∗ *)
     own IDBG_known_replog_name (● (to_agree <$> N : gmap _ _ )).
 
@@ -58,7 +58,22 @@ Section Known_followers.
     known_replog_tokens N ∗ known_replog_token sa γsa -∗
     ⌜N !! sa = Some γsa⌝.
   Proof.
-  Admitted.
+    iIntros "[Htoks Htok]".
+    rewrite /known_replog_tokens /known_replog_token.
+    iDestruct (own_valid_2 with "Htoks Htok") as %Hvalid.
+    rewrite auth_both_valid_discrete in Hvalid.
+    destruct Hvalid as [Hincluded _].
+    iPureIntro.
+    revert Hincluded.
+    rewrite singleton_included_l; intros (w & Hw1 & Hw2).
+    revert Hw2; rewrite -Hw1; clear Hw1.
+    rewrite lookup_fmap. clear w.
+    intros [|(w & w' & Hw1 & Hw2 & Hw3)]%option_included; [done|].
+    destruct (N !! sa); last by inversion Hw2.
+    simplify_eq /=.
+    destruct Hw3 as [->%(@to_agree_inj)%leibniz_equiv|Hw3]; [done|].
+    by apply to_agree_included in Hw3 as ->%leibniz_equiv.
+  Qed.
 
 End Known_followers.
 
@@ -76,37 +91,48 @@ Section Resources_definition.
 
   (** Properties of points-to connective *)
   Lemma OwnMemKey_timeless_holds k q v : Timeless (own_mem_user k q v).
-  Proof. Admitted.
+  Proof. apply _. Qed.
+
+  From stdpp Require Import numbers.
 
   Lemma OwnMemKey_exclusive_holds k q v v' :
     own_mem_user k 1 v ⊢ own_mem_user k q v' -∗ False.
-  Proof. Admitted.
+  Proof.
+    rewrite /own_mem_user.
+    iIntros "Hown1 Hown2".
+    iDestruct (lmapsto_valid_2 with "Hown1 Hown2") as %Hvalid.
+    rewrite frac_valid in Hvalid.
+    by apply Qp_not_add_le_l in Hvalid.
+  Qed.
 
   (* Maybe remove ? *)
   Lemma OwnMemKey_fractioal_holds k v : Fractional (λ q, own_mem_user k q v).
-  Proof. Admitted.
+  Proof. apply _. Qed.
 
-  (* Maybe remove ? *)
   Lemma OwnMemKey_as_fractioal_holds k q v :
     AsFractional (own_mem_user k q v) (λ q, own_mem_user k q v) q.
-  Proof. Admitted.
+  Proof. apply _. Qed.
 
   Lemma OwnMemKey_combine_holds k q q' v v' :
     own_mem_user k q v ∗ own_mem_user k q' v' ⊢
     own_mem_user k (q + q') v ∗ ⌜v = v'⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros "[Hown1 Hown2]".
+    iApply (lmapsto_combine with "Hown1 Hown2").
+  Qed.
 
   Lemma OwnMemKey_split_holds k q1 q2 v :
     own_mem_user k (q1 + q2) v ⊢ own_mem_user k q1 v ∗ own_mem_user k q2 v.
-  Proof. Admitted.
+  Proof. iIntros "[Hown1 Hown2]". by iFrame. Qed.
 
   Lemma own_mem_update k M (we : option write_event) (we' : write_event) :
     own_mem_user k 1%Qp we ⊢
     own_mem_sys M ==∗ own_mem_user k 1%Qp (Some we') ∗ own_mem_sys (<[k := Some we']>M).
-  Proof. Admitted.
-
-
-
+  Proof.
+    iIntros "Hown1 Hown2".
+    iMod (gen_heap_light_update with "Hown2 Hown1") as "[Hown2 Hown1]".
+    iModIntro. iFrame.
+  Qed.
 
   (* ------------------------------------------------------------------------ *)
   (** Principal & replicated log ownership predicates *)
