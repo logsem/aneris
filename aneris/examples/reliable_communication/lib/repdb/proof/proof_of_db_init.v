@@ -58,7 +58,7 @@ From aneris.examples.reliable_communication.lib.repdb.proof.follower
 
 Import user_params.
 Section Init_setup_proof.
-  Context `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ}.
+  Context `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ, ras.SpecChanG Σ}.
 
   Lemma init_setup_holds (E : coPset) :
     ↑DB_InvName ⊆ E →
@@ -104,6 +104,7 @@ Section Init_setup_proof.
     set (DBR := DbRes γL γM N).
     set (MTSC := client_handler_at_leader_user_params γL γM N).
     set (MTSF := follower_handler_user_params  γL γM N).
+    set (MTSCInit := @mts_init _ _ _ _ _).
     iExists DBR.
     iMod (MTS_init_setup E MTSC)
       as (leader_si SrvInit) "(Hsinit & #HsrvS & #HcltS)".
@@ -115,7 +116,7 @@ Section Init_setup_proof.
     { iApply (big_sepM_mono with "[$Hmap]").
       by iIntros (sa γsa Hin) "(Hkn & _ & _)". }
     iAssert (⌜∃ γdbF, N !! DB_addrF = Some γdbF⌝)%I as (γdbF) "%NdbF".
-    { admit. }
+    { iPureIntro. apply elem_of_dom. set_solver. }
     iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Htks")
       as "#(HtkF & Htks')"; first done.
     set (initL := init_leader_res γL γM N SrvInit SrvInitF γdbF).
@@ -143,17 +144,27 @@ Section Init_setup_proof.
     iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Hmap'")
       as "(HdbF & Hmap')"; first done.
     iSplitL "HdbF"; first by iFrame.
-    iSplitR.
-    iSplitL.
-    iModIntro.
-    iIntros (A).
-
-    (* iAssert ((init_leader_spec_internal *)
-    (*               γL γM N leader_si leaderF_si *)
-    (*               SrvInit SrvInitF γdbF A)%I) as "df".  *)
-    (* { iDestruct (init_leader_spec_internal_holds with "[HsrvS][HsrvSF]") as "df". *)
-    (*   admit. admit. admit. admit. *)
-    (* as "#HsrvSI". *)
+    - iSplitR.
+      -- iSplitL.
+         --- iModIntro.
+             iIntros (A).
+             rewrite /init_leader_spec.
+             iIntros "%HinA1 %HinA2 %HipEq1 %HipEq2 !#" (Ψ).
+             iIntros "(Hf & #Hsi1 & #Hsi2 & HinitL
+                   & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
+             by iApply (init_leader_spec_internal_holds
+                         with "[//][//][//][//][-HΨ][$HΨ]");
+             try eauto with iFrame.
+         --- iModIntro.
+             iIntros (A).
+             rewrite /init_client_proxy_leader_spec.
+             iIntros (ca HinA HcaA).
+             iIntros "!#" (Ψ).
+             iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ".
+             iApply (init_client_leader_proxy_internal_holds
+                         with "[$HGinv $Htks][//][//][-HΨ $HcltS][$HΨ]");
+             try eauto with iFrame.
+      -- admit.
  Admitted.
 
   Global Instance db_init_instance : DB_init.

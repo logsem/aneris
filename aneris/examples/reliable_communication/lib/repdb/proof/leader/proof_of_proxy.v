@@ -36,8 +36,6 @@ Section Client_Proxy_Proof.
   Context (γL γM : gname) (N : gmap socket_address gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_at_leader_user_params γL γM N).
-  Context (HClient_proxySpec :
-          ⊢ (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC srv_si A sa)).
 
   Definition write_spec_internal
       (wr : val) (sa : socket_address) : iProp Σ :=
@@ -172,6 +170,7 @@ Section Client_Proxy_Proof.
     {{{ fixed A ∗
         DB_addr ⤇ srv_si ∗
         sa ⤳ (∅, ∅) ∗
+        (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC srv_si A sa) ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
@@ -185,10 +184,10 @@ Section Client_Proxy_Proof.
     iIntros "#Hinv".
     iIntros (HA HnA).
     iIntros (Φ) "!#".
-    iIntros "(#Hf & #Hsi & Hmh & Hfp) HΦ".
+    iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & Hfp) HΦ".
     rewrite /init_client_leader_proxy.
     wp_pures.
-    wp_apply (HClient_proxySpec with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
+    wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
     iNext.
     iIntros (reqh) "#Hspec".
     wp_pures.

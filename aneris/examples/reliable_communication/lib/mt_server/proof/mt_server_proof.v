@@ -214,14 +214,18 @@ Section MTS_proof_of_code.
 
 End MTS_proof_of_code.
 
+From aneris.examples.reliable_communication.spec
+     Require Import ras.
+From aneris.examples.reliable_communication.instantiation
+     Require Import instantiation_of_init.
 From aneris.examples.reliable_communication.lib.mt_server.spec
      Require Import api_spec.
 
 Section MTS_proof_of_init.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
-  Context `{MTU : !MTS_user_params}.
-  Context `{!Reliable_communication_init}.
+  Context `{MTU : !MTS_user_params, !SpecChanG Σ}.
+  (* Context `{!Reliable_communication_init}. *)
 
   Lemma MTS_init_setup_holds (E : coPset) :
     ↑MTS_mN ⊆ E →
@@ -271,7 +275,7 @@ Section MTS_proof_of_the_init_class.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
   Context `{!MTS_user_params}.
-  Context `{!Reliable_communication_init}.
+  Context `{!SpecChanG Σ}.
 
   Global Instance mts_init : MTS_init.
   Proof.
@@ -284,3 +288,8 @@ Section MTS_proof_of_the_init_class.
   Qed.
 
 End MTS_proof_of_the_init_class.
+From aneris.examples.reliable_communication.instantiation Require Import
+     instantiation_of_resources
+     instantiation_of_client_specs
+     instantiation_of_server_specs
+     instantiation_of_send_and_recv_specs.
