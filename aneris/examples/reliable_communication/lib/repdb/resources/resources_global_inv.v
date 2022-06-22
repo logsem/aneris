@@ -53,31 +53,58 @@ Section Global_Invariant.
     Global_Inv ⊢
     own_mem_user γM k q (Some we) ={E}=∗
     own_mem_user γM k q (Some we) ∗ ⌜we_key we = k⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (HE) "[H HGinv] Hmem".
+    iInv DB_InvName as (L M) ">IH".
+    iDestruct "IH" as (Hkeys Hdom Hfollower) "(Hmems&HlogL&Htoks&Hlogs&%Hvalid)".
+    destruct Hvalid.
+    iDestruct (gen_heap_light_valid with "Hmems Hmem") as %Hvalid'.
+    assert (we_key we = k) as Hkey.
+    { eapply DB_GSTV_mem_we_key; [by apply elem_of_dom|done]. }
+    iModIntro. iSplitR "Hmem".
+    { iExists _, _. iFrame. eauto. }
+    iFrame. done.
+  Qed.
 
-  Lemma Obs_compare_holds a a' h h' E :
-    nclose DB_InvName ⊆ E →
-    Global_Inv ⊢ own_obs γL a h -∗ own_obs γL a' h' ={E}=∗
-    ⌜h ≤ₚ h'⌝ ∨ ⌜h' ≤ₚ h⌝.
-  Proof. Admitted.
+  Lemma Obs_compare_holds a a' h h' :
+    own_obs γL a h -∗ own_obs γL a' h' -∗ ⌜h ≤ₚ h'⌝ ∨ ⌜h' ≤ₚ h⌝.
+  Proof.
+    iIntros "Hobs1 Hobs2".
+    iDestruct "Hobs1" as "[[%Heq1 Hobs1] | Hobs1]";
+      iDestruct "Hobs2" as "[[%Heq2 Hobs2] | Hobs2]".
+    - by iDestruct (obs_obs_prefix with "[$Hobs1 $Hobs2]") as %H''.
+    - iDestruct "Hobs2" as (γ) "(_ & Hobs2 & _)".
+      by iDestruct (obs_obs_prefix with "[$Hobs1 $Hobs2]") as %H''.
+    - iDestruct "Hobs1" as (γ) "(_ & Hobs1 & _)".
+      by iDestruct (obs_obs_prefix with "[$Hobs1 $Hobs2]") as %H''.
+    - iDestruct "Hobs1" as (γ1) "(_ & Hobs1 & _)".
+      iDestruct "Hobs2" as (γ2) "(_ & Hobs2 & _)".
+      by iDestruct (obs_obs_prefix with "[$Hobs1 $Hobs2]") as %H''.
+  Qed.
 
   Lemma Obs_exists_at_leader_holds a1 h1 E:
     ↑DB_InvName ⊆ E → Global_Inv ⊢
     own_obs γL a1 h1 ={E}=∗ ∃ h2, own_obs γL DB_addr h2 ∗ ⌜h1 ≤ₚ h2⌝.
   Proof. Admitted.
 
-  Lemma Obs_get_smaller_holds a h h' E :
-    nclose DB_InvName ⊆ E →
-    h ≤ₚ h' →
-    own_obs γL a h' ={E}=∗ own_obs γL a h.
-  Proof. Admitted.
+  Lemma Obs_get_smaller_holds a h h' :
+    h ≤ₚ h' → own_obs γL a h' -∗ own_obs γL a h.
+  Proof. 
+    iIntros (Hprefix%mono_list_lb_mono) "[[%Heq Hobs]|Hobs]".
+    - iLeft. iSplit; [done|by iApply own_mono].
+    - iDestruct "Hobs" as (γ) "(Hlog&HlogL&Hown)".
+      iRight. iExists _. iFrame.
+      iSplitL "HlogL"; by iApply own_mono.
+  Qed.
 
+  (* TODO: Remove *)
   Lemma Obs_snoc_time_holds a h1 e1 h2 E :
     nclose DB_InvName ⊆ E →
     own_obs γL a (h1 ++ [e1] ++ h2) ={E}=∗
     ⌜∀ e0, e0 ∈ h1 → e0 <ₜ e1⌝ ∧ ⌜∀ e2, e2 ∈ h2 → e1 <ₜ e2⌝.
   Proof. Admitted.
 
+  (* Todo: Remove *)
   Lemma Obs_ext_we_holds a a' h h' E :
     nclose DB_InvName ⊆ E →
     Global_Inv ⊢ own_obs γL a h -∗ own_obs γL a' h' ={E}=∗
@@ -98,7 +125,6 @@ Section Global_Invariant.
     own_mem_user γM k q wo ∗
       ∃ h, own_obs γL DB_addr h ∗ ⌜at_key k h = wo⌝.
   Proof. Admitted.
-
 
   Lemma OwnMemKey_some_obs_we_holds k q we E :
     nclose DB_InvName ⊆ E →
@@ -123,7 +149,12 @@ Section Global_Invariant.
     Global_Inv ⊢
     own_mem_user γM k q (Some we) ∗ own_obs γL a h' ={E}=∗
     own_mem_user γM k q (Some we) ∗ ⌜at_key k h' = Some we⌝.
-  Proof. Admitted.
+  Proof. 
+    iIntros (HE Hprefx <-) "HGinv [Hmem Hobs]".
+    iMod (OwnMemKey_obs_frame_prefix_holds with "HGinv [$Hmem $Hobs]")
+      as "[$ %Heq]"; [solve_ndisj|done|].
+    iModIntro. iPureIntro. by symmetry.
+  Qed.
 
   Lemma OwnMemKey_some_obs_frame_holds a k q we h hf E :
     nclose DB_InvName ⊆ E →
@@ -139,6 +170,7 @@ Section Global_Invariant.
       own_mem_user γM k q None ∗ ⌜hist_at_key k h = []⌝.
   Proof. Admitted.
 
+  (* TODO: Remove *)
   Lemma OwnMemKey_allocated_holds k q h0 h1 we0 E :
     nclose DB_InvName ⊆ E →
     h0 ≤ₚ h1 →
