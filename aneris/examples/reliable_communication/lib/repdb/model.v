@@ -45,7 +45,7 @@ Section ValidStates.
     ∀ k, k ∈ dom M → M !! k = Some (at_key k L).
 
   Definition in_log_mem_some_coh (L : wrlog) (M : gmap Key (option write_event)) :=
-    ∀ k we, at_key k L = Some we → M !! we.(we_key) = Some (Some we).
+    ∀ k we, at_key k L = Some we → M !! k = Some (Some we).
 
  Definition mem_serializable_vals (M : gmap Key (option write_event)) :=
     ∀ k we, k ∈ dom M → M !! k = Some (Some we) →
@@ -57,7 +57,8 @@ Section ValidStates.
 
   Definition log_events (L : wrlog) :=
     ∀ (i : nat), 0 <= i → i < List.length L →
-         ∃ we, List.nth_error L i = Some we ∧ i = we.(we_time) ∧ we.(we_key) ∈ DB_keys.
+         ∃ we, List.nth_error L i = Some we ∧ i = we.(we_time) ∧ we.(we_key) ∈ DB_keys ∧
+                 Serializable DB_serialization we.(we_val).
 
   Record valid_state (L : wrlog) (M : gmap Key (option write_event)) : Prop :=
     {
@@ -85,12 +86,12 @@ Section ValidStates.
   Proof.
   Admitted.
 
-  Lemma valid_state_update (lM : wrlog) (kvsMG : gmap Key (option write_event)) k wev :
+  Lemma valid_state_update (lM : wrlog) (kvsMG : gmap Key (option write_event)) wev :
     wev.(we_key) ∈ DB_keys →
     wev.(we_time) = (length lM : Time) →
     Serializable DB_serialization wev.(we_val) →
     valid_state lM kvsMG ->
-    valid_state (lM ++ [wev]) (<[k:=Some wev]> kvsMG).
+    valid_state (lM ++ [wev]) (<[wev.(we_key) := Some wev]> kvsMG).
   Proof. Admitted.
 
   Lemma valid_state_log_no_dup lM mM:
@@ -111,7 +112,7 @@ Section ValidStates.
     ∀ k v, k ∈ dom M → M !! k = Some v → Serializable DB_serialization v.
 
   Definition in_log_mem_some_coh_local (L : wrlog) (M : gmap Key val) :=
-    ∀ k we, at_key k L = Some we →  M !! we.(we_key) = Some we.(we_val).
+    ∀ we, at_key we.(we_key) L = Some we →  M !! we.(we_key) = Some we.(we_val).
 
   Definition in_log_mem_none_coh_local (L : wrlog) (M : gmap Key val) :=
     ∀ k, at_key k L = None → M !! k = None.
@@ -139,12 +140,12 @@ Section ValidStates.
 
 
   Lemma valid_state_local_update
-        (lM : wrlog) (kvsMG : gmap Key val) k wev :
+        (lM : wrlog) (kvsMG : gmap Key val) wev :
     wev.(we_key) ∈ DB_keys →
     wev.(we_time) = (length lM : Time) →
     Serializable DB_serialization wev.(we_val) →
     valid_state_local lM kvsMG ->
-    valid_state_local (lM ++ [wev]) (<[k:= wev.(we_val)]> kvsMG).
+    valid_state_local (lM ++ [wev]) (<[wev.(we_key):= wev.(we_val)]> kvsMG).
   Proof. Admitted.
 
   Lemma valid_state_local_log_no_dup lM mM:

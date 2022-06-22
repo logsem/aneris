@@ -141,7 +141,7 @@ Section SyncLogCopy_Proof.
         iSplit; first done.
         iSplit; last by iFrame "#∗".
         iPureIntro.
-        by apply (valid_state_local_update lF kvsM (we_key we) we). }
+        by apply (valid_state_local_update lF kvsM we). }
     iIntros (v ->).
     do 3 wp_pure _.
     replace (#(length lF + 1)) with (#(length lF + 1)%nat); last first.
