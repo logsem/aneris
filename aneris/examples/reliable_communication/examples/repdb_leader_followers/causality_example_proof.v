@@ -187,7 +187,7 @@ Section proof_of_code.
       rewrite filter_cons_False; [done|by rewrite Hkey_y]. }
     iAssert ("y" ↦ₖ Some we_y ={⊤ ∖ ↑N}=∗ ⌜a = we_y⌝ ∗ "y" ↦ₖ Some we_y)%I
       as "H".
-    { iMod (Obs_compare with "HGinv Hobs Hobs''") as %Hprefix'; [solve_ndisj|].
+    { iDestruct (Obs_compare with "Hobs Hobs''") as %Hprefix'.
       iIntros "Hy".
       destruct Hprefix' as [Hprefix'|Hprefix'].
       - iModIntro. iFrame "Hy". iPureIntro.
@@ -221,7 +221,7 @@ Section proof_of_code.
         split; [done|by right;eexists _]. }
     iAssert ("x" ↦ₖ Some we_x ={⊤ ∖ ↑N}=∗ ⌜a = Some we_x⌝ ∗ "x" ↦ₖ Some we_x)%I
       as "H".
-    { iMod (Obs_compare with "HGinv Hobs' Hobs''") as %Hprefix'; [solve_ndisj|].
+    { iDestruct (Obs_compare with "Hobs' Hobs''") as %Hprefix'.
       iIntros "Hx".
       destruct Hprefix' as [Hprefix'|Hprefix'].
       - iModIntro. iFrame "Hx". iPureIntro.

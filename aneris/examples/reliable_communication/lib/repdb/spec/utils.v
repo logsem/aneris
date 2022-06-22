@@ -20,7 +20,7 @@ Section with_Σ.
     iIntros (HE Heq Hneq) "#HGinv #Hobs Hk".
     iMod (OwnMemKey_key with "[$HGinv][$Hk]") as "[Hk %Hkey]"; [solve_ndisj|].
     iMod (OwnMemKey_some_obs_we with "[$HGinv][$Hk]") as "[Hk (%h' & #Hobs' & %Hatkey)]"; [solve_ndisj|].
-    iMod (Obs_compare with "HGinv Hobs Hobs'") as %Hle; [solve_ndisj|].
+    iDestruct (Obs_compare with "Hobs Hobs'") as %Hle.
     destruct Hle as [Hle | Hle]; last first.
     { (* Solve contradiction *)
       iMod (OwnMemKey_obs_frame_prefix_some with "[$HGinv][$Hk $Hobs]")
@@ -41,7 +41,7 @@ Section with_Σ.
     apply last_cons_ne in Hatkey; [|done].
     apply last_filter_postfix in Hatkey.
     destruct Hatkey as (yz & zs & -> & HP).
-    iMod (Obs_get_smaller with "Hobs'") as "Hobs''"; [solve_ndisj| |].
+    iDestruct (Obs_get_smaller with "Hobs'") as "Hobs''".
     { rewrite !app_assoc. apply prefix_app_r. rewrite -!app_assoc. done. }
     by eauto.
   Qed.
