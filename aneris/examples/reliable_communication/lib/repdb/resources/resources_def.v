@@ -1,3 +1,4 @@
+From stdpp Require Import numbers.
 From iris.algebra Require Import agree auth excl gmap dfrac.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic Require Import invariants.
@@ -92,8 +93,6 @@ Section Resources_definition.
   (** Properties of points-to connective *)
   Lemma OwnMemKey_timeless_holds k q v : Timeless (own_mem_user k q v).
   Proof. apply _. Qed.
-
-  From stdpp Require Import numbers.
 
   Lemma OwnMemKey_exclusive_holds k q v v' :
     own_mem_user k 1 v ⊢ own_mem_user k q v' -∗ False.

@@ -94,7 +94,7 @@ Section Clients_MT_spec_params.
       by iApply Obs_own_log_obs.
       iMod (own_log_auth_update _ _ (lM ++ [a]) with "[$HlFull]") as "HlFull".
       { by apply prefix_app_r. }
-      iMod (own_mem_update γM _ _ _ _ a with "[$Hk][$HmS]") as "(Hk & HmS)".
+      iMod (own_mem_update _ _ _ _ a with "[$Hk][$HmS]") as "(Hk & HmS)".
       rewrite - {5} Qp_half_half.
       iDestruct (own_log_auth_split with "HlFull") as "(HlogM & HlogL)".
       iDestruct (get_obs with "[$HlogL]") as "#Hobsfr2".

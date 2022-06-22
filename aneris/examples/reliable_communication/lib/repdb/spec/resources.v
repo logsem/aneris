@@ -46,16 +46,13 @@ Section Predicates.
     (** Properties of observed requests *)
     Obs_timeless a h :> Timeless (Obs a h);
     Obs_persistent a h :> Persistent (Obs a h);
-    Obs_compare a a' h h' E :
-      nclose DB_InvName ⊆ E →
-      GlobalInv ⊢ Obs a h -∗ Obs a' h' ={E}=∗
+    Obs_compare a a' h h' :
+      Obs a h -∗ Obs a' h' -∗
       ⌜h ≤ₚ h'⌝ ∨ ⌜h' ≤ₚ h⌝;
     Obs_exists_at_leader a1 h1 E: ↑DB_InvName ⊆ E → GlobalInv ⊢
       Obs a1 h1 ={E}=∗ ∃ h2, Obs DB_addr h2 ∗ ⌜h1 ≤ₚ h2⌝;
-    Obs_get_smaller a h h' E :
-      nclose DB_InvName ⊆ E →
-      h ≤ₚ h' →
-      Obs a h' ={E}=∗ Obs a h;
+    Obs_get_smaller a h h' :
+      h ≤ₚ h' → Obs a h' -∗ Obs a h;
     Obs_snoc_time a h1 e1 h2 E :
       nclose DB_InvName ⊆ E →
       Obs a (h1 ++ [e1] ++ h2) ={E}=∗
