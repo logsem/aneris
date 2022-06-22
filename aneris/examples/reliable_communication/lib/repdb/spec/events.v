@@ -292,35 +292,5 @@ Lemma at_key_app_none k h hf :
   rewrite /at_key /hist_at_key.
   intros Hnodup Happ.
   Admitted.
-(*
-  destruct (last (filter (λ x : we, we_key x = k) h)) as [|elt] eqn:Happ1.
-  - destruct (last (filter (λ x : we, we_key x = k) hf)) as [| elthf] eqn:Happ2.
-    -- admit.
-     apply last_Some_elem_of in Happ1.
-    apply elem_of_list_filter in Happ1 as (Hp & Hin).
-    symmetry in Happ. apply last_Some_elem_of in Happ.
-    apply elem_of_list_filter in Happ as (Hp' & Hin').
-    destruct (last (filter (λ x : we, we_key x = k) hf)) as [| elthf] eqn:Happ2.
-    -- apply last_Some_elem_of, elem_of_list_filter in Happ2 as (Hp'' & Hin'').
-       apply Hdisj in Hin. set_solver.
-
-    apply last_None.
-    apply Hdisj in Hin.
-    -- done.
-    --               filter (λ x : we, we_key x = k) hf
-  apply elem_of_list_filter in Happ as (Hp' & Hin').
-  rewrite filter_app in Happ.
-  destruct (last (filter (λ x : we, we_key x = k) h)) as [|elt] eqn:Happ1.
-  - apply last_Some_elem_of in Happ1.
-    symmetry in Happ. apply last_Some_elem_of in Happ.
-
-    apply Hdisj in Hin.
-    apply elem_of_list_filter in Hin.
-  - symmetry in Happ. apply last_None in Happ.
-    apply last_None. apply app_nil in Happ.
-    by destruct Happ.
-    list_simplifer. naive_solver. last_Some_elem_of
-  destruct (filter (λ x : we, we_key x = k) hf) as [| elt Hl]; first done.
-  rewrite last_app_cons in Happ. *)
 
 End Events_lemmas.

@@ -24,10 +24,6 @@ Section Known_followers.
   (* ------------------------------------------------------------------------ *)
   (** Resources about free/known replicated logs. *)
 
-  (* (** ** Ownership to create a new replicated log. *) *)
-  (* Definition free_replog_token (sa : socket_address) : iProp Σ := *)
-  (*   own IDBG_free_replog_set_name (GSet {[sa]}). *)
-
   (** ** Ownership for a replicated log known by the system. *)
   Definition known_replog_token (sa : socket_address) (γ : gname) : iProp Σ :=
     own IDBG_known_replog_name (◯ {[ sa := to_agree γ ]}).
@@ -86,9 +82,11 @@ Section Resources_definition.
     own_mem_user k 1 v ⊢ own_mem_user k q v' -∗ False.
   Proof. Admitted.
 
+  (* Maybe remove ? *)
   Lemma OwnMemKey_fractioal_holds k v : Fractional (λ q, own_mem_user k q v).
   Proof. Admitted.
 
+  (* Maybe remove ? *)
   Lemma OwnMemKey_as_fractioal_holds k q v :
     AsFractional (own_mem_user k q v) (λ q, own_mem_user k q v) q.
   Proof. Admitted.

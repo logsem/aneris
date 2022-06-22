@@ -22,7 +22,7 @@ Import lock_proof.
 Section Global_Invariant.
 
   Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
-  Context (γL γM : gname) (N: gmap socket_address gname).
+  Context (γL γM : gname) (N : gmap socket_address gname).
 
   (* ------------------------------------------------------------------------ *)
   (** Definition of the global invariant. *)
@@ -41,8 +41,6 @@ Section Global_Invariant.
   Definition Global_Inv : iProp Σ :=
     ([∗ map] sa ↦ γ ∈ N, known_replog_token sa γ) ∗
     inv DB_InvName global_inv_def.
-
-(* TODO : update lemma ? *)
 
   (* ------------------------------------------------------------------------ *)
   (** Properties entailed by the global invariant. *)
