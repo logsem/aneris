@@ -13,7 +13,7 @@ From aneris.examples.reliable_communication.lib.repdb
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import db_params events.
 From aneris.examples.reliable_communication.lib.repdb.resources
-     Require Import ras resources_def.
+     Require Import ras log_resources resources_def.
 
 Import gen_heap_light.
 Import lock_proof.
@@ -162,3 +162,41 @@ Section Global_Invariant.
   Proof. Admitted.
 
 End Global_Invariant.
+
+Section Alloc_resources.
+ Context `{!anerisG Mdl Σ, !DB_params, !IDBG Σ}.
+
+  Lemma alloc_gmem :
+    ⊢ |==>
+          ∃ γM : gname,
+            own_mem_sys γM (gset_to_gmap (@None write_event) DB_keys) ∗
+           ([∗ set] k ∈ DB_keys, own_mem_user γM k 1%Qp None).
+  Proof.
+    (* B induction on the set DB_keys. *)
+    (* set (empty_mem := (gset_to_gmap (@None write_event) DB_keys)). *)
+    (* iMod (gen_heap_light_init empty_mem) as "(%γM & Hmem)". *)
+  Admitted.
+
+  Lemma alloc_leader_logM  :
+   ⊢ |==> ∃ γL, own_obs γL DB_addr [] ∗ own_log_auth γL 1 [].
+  Proof.
+  Admitted.
+
+  Lemma alloc_logM_and_followers_gnames γL :
+    DB_addrF ∉ DB_followers →
+    own_log_obs γL [] ∗
+    known_replog_tokens ∅ ⊢ |==>
+          ∃ (N : gmap socket_address gname),
+            ⌜dom N = DB_followers ∪ {[DB_addrF]}⌝ ∗
+            known_replog_tokens N ∗
+            ([∗ map] sa ↦ γ ∈ N,
+               known_replog_token sa γ ∗
+               own_log_obs γ [] ∗
+               own_log_obs γL [] ∗
+               own_log_auth γ (1/2) []) ∗
+            ([∗ map] sa ↦ γ ∈ N, own_log_auth γ (1/2) []).
+  Proof.
+    (* By induction on the set DB_followers ∪ DB_addrF. *)
+  Admitted.
+
+End Alloc_resources.

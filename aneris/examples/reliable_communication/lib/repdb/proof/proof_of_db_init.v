@@ -1,6 +1,7 @@
 From iris.algebra Require Import excl.
 From iris.algebra Require Import auth gmap dfrac.
 From iris.algebra.lib Require Import mono_list.
+From iris.base_logic.lib Require Import invariants.
 From iris.bi.lib Require Import fractional.
 From aneris.prelude Require Import collect.
 From aneris.lib Require Import gen_heap_light.
@@ -14,12 +15,12 @@ From aneris.aneris_lang.lib Require Import assert_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.prelude
      Require Import ser_inj.
-From aneris.examples.reliable_communication.lib.dlm
-     Require Import dlm_code.
+From aneris.examples.reliable_communication.lib.mt_server.spec
+     Require Import api_spec.
+From aneris.examples.reliable_communication.lib.mt_server.proof
+     Require Import mt_server_proof.
 From aneris.examples.reliable_communication.lib.repdb
      Require Import repdb_code model.
-From aneris.examples.reliable_communication.lib.dlm
-     Require Import dlm_prelude dlm_resources dlm_code dlm_spec.
 From aneris.examples.reliable_communication.lib.repdb.spec
      Require Import
      ras
@@ -55,45 +56,9 @@ From aneris.examples.reliable_communication.lib.repdb.proof.follower
      proof_of_sync_loop
      proof_of_init_follower.
 
-Section Alloc_ghost_resources.
-  Context `{!anerisG Mdl Σ, DB : !DB_params, !IDBG Σ }.
-
-  (* Move later to resources/?.v *)
-
-  Lemma alloc_gmem :
-    ⊢ |==>
-          ∃ γM : gname,
-            own_mem_sys γM (gset_to_gmap (@None write_event) DB_keys) ∗
-           ([∗ set] k ∈ DB_keys, own_mem_user γM k 1%Qp None).
-  Proof.
-    (* B induction on the set DB_keys. *)
-    (* set (empty_mem := (gset_to_gmap (@None write_event) DB_keys)). *)
-    (* iMod (gen_heap_light_init empty_mem) as "(%γM & Hmem)". *)
-  Admitted.
-
-  Lemma alloc_leader_logM  :
-   ⊢ |==>∃ γL, own_obs γL DB_addr [] ∗ own_log_auth γL 1 [].
-  Proof.
-  Admitted.
-
-  Lemma alloc_logM_and_followers_gnames :
-    DB_addrF ∉ DB_followers →
-    known_replog_tokens ∅ ⊢ |==>
-          ∃ (N : gmap socket_address gname),
-            ⌜dom N = DB_followers ∪ {[DB_addrF]}⌝ ∗
-            known_replog_tokens N ∗
-            ([∗ map] sa ↦ γ ∈ N,
-               known_replog_token sa γ ∗
-               own_log_obs γ [] ∗
-               own_log_auth γ 1 []).
-  Proof.
-    (* By induction on the set DB_followers ∪ DB_addrF. *)
-  Admitted.
-
-End Alloc_ghost_resources.
-
+Import user_params.
 Section Init_setup_proof.
-  Context `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ }.
+  Context `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ}.
 
   Lemma init_setup_holds (E : coPset) :
     ↑DB_InvName ⊆ E →
@@ -133,12 +98,52 @@ Section Init_setup_proof.
             |}).
     iMod (alloc_gmem) as (γM) "(HownSys & HownUser)".
     iMod (alloc_leader_logM) as (γL) "(#HobsL & HlogLM)".
-    iMod (alloc_logM_and_followers_gnames with "[$Hgnames]")
-      as (N) "(%Hdom & Hreplog & Hmap)"; first done.
+    iDestruct (Obs_own_log_obs with "[$HobsL]") as "HobsL'".
+    iMod (alloc_logM_and_followers_gnames γL with "[$HobsL' $Hgnames]")
+      as (N) "(%Hdom & Hreplog & Hmap & Hmap')"; first done.
     set (DBR := DbRes γL γM N).
+    set (MTSC := client_handler_at_leader_user_params γL γM N).
+    set (MTSF := follower_handler_user_params  γL γM N).
     iExists DBR.
-    (* Next step : Use MTS_init. *)
-  Admitted.
+    iMod (MTS_init_setup E MTSC)
+      as (leader_si SrvInit) "(Hsinit & #HsrvS & #HcltS)".
+    { simplify_eq /=; solve_ndisj. }
+    iMod (MTS_init_setup E MTSF)
+      as (leaderF_si SrvInitF) "(HsinitF & #HsrvSF & #HcltSF)".
+    { simplify_eq /=; solve_ndisj. }
+     iAssert (([∗ map] sa↦γ ∈ N, known_replog_token sa γ)%I) as "#Htks".
+    { iApply (big_sepM_mono with "[$Hmap]").
+      by iIntros (sa γsa Hin) "(Hkn & _ & _)". }
+    iAssert (⌜∃ γdbF, N !! DB_addrF = Some γdbF⌝)%I as (γdbF) "%NdbF".
+    { admit. }
+    iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Htks")
+      as "#(HtkF & Htks')"; first done.
+    set (initL := init_leader_res γL γM N SrvInit SrvInitF γdbF).
+    rewrite -{2} Qp_half_half.
+    iDestruct (own_log_auth_split _ (1/2) (1/2) [] with "[$HlogLM]")
+      as "(HlogL1 & HlogL2)".
+    iMod (inv_alloc
+            DB_InvName _
+            (global_inv_def γL γM N)
+           with "[HownSys Hreplog HlogL1 Hmap]") as "#HGinv".
+    { iNext.
+      iExists [], (gset_to_gmap (@None write_event) DB_keys).
+      iSplit; first by rewrite dom_gset_to_gmap.
+      iSplit; first done.
+      iSplit; first by iPureIntro; set_solver.
+      iFrame.
+      iSplitL; last by iPureIntro; apply valid_state_empty.
+      rewrite /own_replog_global.
+      iApply (big_sepM_mono with "[HobsL' $Hmap]").
+      iIntros (sa γsa Hin) "(Hkn & Hobs & Hown)".
+      eauto with iFrame. }
+    iExists initL, leader_si, leaderF_si.
+    simpl.
+    iFrame "HGinv Htks HobsL HownUser Hsinit HsinitF HlogL2 HtkF".
+    iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Hmap'")
+      as "(HdbF & Hmap')"; first done.
+    iSplitL "HdbF"; first by iFrame.
+ Admitted.
 
   Global Instance db_init_instance : DB_init.
   Proof.
