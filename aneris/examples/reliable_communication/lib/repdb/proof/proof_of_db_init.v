@@ -153,7 +153,7 @@ Section Init_setup_proof.
              iIntros "(Hf & #Hsi1 & #Hsi2 & HinitL
                    & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
              by iApply (init_leader_spec_internal_holds
-                         with "[//][//][//][//][-HΨ][$HΨ]");
+                         with "[//][//][//][//][-HΨ $Hf $HinitL][$HΨ]");
              try eauto with iFrame.
          --- iModIntro.
              iIntros (A).
@@ -164,7 +164,46 @@ Section Init_setup_proof.
              iApply (init_client_leader_proxy_internal_holds
                          with "[$HGinv $Htks][//][//][-HΨ $HcltS][$HΨ]");
              try eauto with iFrame.
-      -- admit.
+      -- assert (DB_followers ⊆ dom N) as Hsubset by set_solver.
+         clear Hdom.
+         (* TODO : do induction on N instead of DB_followers! *)
+         iInduction DB_followers as [|fsa Fls Hnotin] "IH" using set_ind_L;
+           [iModIntro; done|].
+         rewrite big_sepS_insert; last done.
+         iAssert (own_replog_obs γL fsa [])%I as "#HobsF".
+         iFrame "#".
+         admit.
+         iSplitR; last first.
+         iApply ("IH" with "[][][][$Hmap']"); iPureIntro; set_solver.
+         set (MTSFF := client_handler_at_follower_user_params γL γM N fsa).
+         iMod (MTS_init_setup E MTSFF) as (f_si initF) "(HinitF & #HFsrvSF & #HFcltS)".
+         { simplify_eq /=; solve_ndisj. }
+         iModIntro.
+         iExists f_si, initF.
+         iFrame "HinitF HobsF".
+         iSplitL.
+         --- iIntros (A).
+             rewrite /init_follower_spec.
+             iIntros (f2lsa) "%HinA1 %HinA2 %HnA %HipEq1 %HprNeq !# %Ψ".
+             iIntros "(Hf & #Hsi1 & #Hsi2 & HinitF
+                   & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
+             iDestruct "HobsF" as (γfsa) "df".
+             set (InitFRes := init_follower_res fsa γL γM N initF γfsa).
+             iApply (init_follower_spec_internal_holds
+                       f2lsa fsa γL γM N f_si leaderF_si initF γfsa A
+                         with "[//][//][//][//][//]
+                               [$Hf HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]").
+             admit.
+         --- admit.
+         (* --- iModIntro. *)
+         (*     iIntros (A). *)
+         (*     rewrite /init_client_proxy_leader_spec. *)
+         (*     iIntros (ca HinA HcaA). *)
+         (*     iIntros "!#" (Ψ). *)
+         (*     iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ". *)
+         (*     iApply (init_client_leader_proxy_internal_holds *)
+         (*                 with "[$HGinv $Htks][//][//][-HΨ $HcltS][$HΨ]"); *)
+         (*     try eauto with iFrame. *)
  Admitted.
 
   Global Instance db_init_instance : DB_init.
