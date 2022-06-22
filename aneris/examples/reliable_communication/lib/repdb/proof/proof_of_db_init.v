@@ -143,6 +143,17 @@ Section Init_setup_proof.
     iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Hmap'")
       as "(HdbF & Hmap')"; first done.
     iSplitL "HdbF"; first by iFrame.
+    iSplitR.
+    iSplitL.
+    iModIntro.
+    iIntros (A).
+
+    (* iAssert ((init_leader_spec_internal *)
+    (*               γL γM N leader_si leaderF_si *)
+    (*               SrvInit SrvInitF γdbF A)%I) as "df".  *)
+    (* { iDestruct (init_leader_spec_internal_holds with "[HsrvS][HsrvSF]") as "df". *)
+    (*   admit. admit. admit. admit. *)
+    (* as "#HsrvSI". *)
  Admitted.
 
   Global Instance db_init_instance : DB_init.

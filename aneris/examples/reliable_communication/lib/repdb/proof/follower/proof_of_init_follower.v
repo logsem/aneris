@@ -82,7 +82,7 @@ Section Init_Follower_Proof.
             #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
         {{{ RET #(); True }}}.
 
-  Lemma init_leader_spec_internal_holds A : ⊢ init_follower_spec_internal A.
+  Lemma init_follower_spec_internal_holds A : ⊢ init_follower_spec_internal A.
   Proof.
     iIntros (HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
