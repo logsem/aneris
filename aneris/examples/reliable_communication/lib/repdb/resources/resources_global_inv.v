@@ -42,6 +42,20 @@ Section Global_Invariant.
     ([∗ map] sa ↦ γ ∈ N, known_replog_token sa γ) ∗
     inv DB_InvName global_inv_def.
 
+
+
+  (* TODO: Utils: Move!  *)
+  Lemma obs_prefix_leader_follower sa h h' :
+    own_obs γL sa h -∗ own_logL_global γL h' -∗
+    ⌜h `prefix_of` h'⌝.
+  Proof.
+    iIntros "Hobs HlogL".
+    iDestruct "Hobs" as "[[%Heq Hobs]|Hobs]".
+    { by iDestruct (own_obs_prefix with "HlogL Hobs") as %Hprefix. }
+    iDestruct "Hobs" as (γ) "(Hrep & Hobs & HL)".
+    by iDestruct (own_obs_prefix with "HlogL Hobs") as %Hprefix.
+  Qed.
+
   (* ------------------------------------------------------------------------ *)
   (** Properties entailed by the global invariant. *)
 
@@ -90,19 +104,11 @@ Section Global_Invariant.
     iInv DB_InvName as ">IH".
     iDestruct "IH" as (L M Hkeys Hdom Hdisj)
                         "(Hmem & HlogL & Htoks & Hglob & %Hvalid)".
-    iDestruct "Hobs" as "[[%Heq Hobs]|Hobs]".
-    { iDestruct (own_obs_prefix with "HlogL Hobs") as %Hprefix.
-      iDestruct (get_obs with "HlogL") as "#Hobs'".
-      iModIntro.
-      iSplitL.
-      { iExists _, _. iFrame. done. }
-      iModIntro. iExists L. iFrame "#".
-      iSplit; [|done]. by iLeft. }
-    iDestruct "Hobs" as (γ) "(Hrep & Hobs & HL)".
-    iDestruct (own_obs_prefix with "HlogL Hobs") as %Hprefix.
+
+    iDestruct (obs_prefix_leader_follower with "Hobs HlogL") as %Hprefix.
     iDestruct (get_obs with "HlogL") as "#Hobs'".
     iModIntro.
-    iSplitR "Hrep Hobs' HL".
+    iSplitR "Hobs'".
     { iExists _, _. iFrame. done. }
     iModIntro. iExists L.
     iFrame "#". iSplit; [by iLeft|done].
@@ -217,7 +223,18 @@ Section Global_Invariant.
      (prod_serialization
         (prod_serialization string_serialization DB_serialization)
         int_serialization) ($ we)⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (HE) "[H HGinv] Hobs".
+    iInv DB_InvName as (L M) ">IH".
+    iDestruct "IH" as (Hkeys Hdom Hfollower) "(Hmems&HlogL&Htoks&Hlogs&%Hvalid)".
+    iDestruct (obs_prefix_leader_follower with "Hobs HlogL") as %[k Heq].
+    iModIntro.
+    iSplitR "Hobs".
+    { iExists _, _. iFrame. done. }
+    iModIntro. iPureIntro.
+    eapply log_events_serializable; [done|].
+    set_solver.
+Qed.
 
 End Global_Invariant.
 
