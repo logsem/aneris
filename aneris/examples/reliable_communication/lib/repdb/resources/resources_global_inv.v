@@ -60,7 +60,7 @@ Section Global_Invariant.
     destruct Hvalid.
     iDestruct (gen_heap_light_valid with "Hmems Hmem") as %Hvalid'.
     assert (we_key we = k) as Hkey.
-    { eapply DB_GSTV_mem_we_key; [by apply elem_of_dom|done]. }
+    { by eapply DB_GSTV_mem_we_key. }
     iModIntro. iSplitR "Hmem".
     { iExists _, _. iFrame. eauto. }
     iFrame. done.
