@@ -105,7 +105,6 @@ Section Global_Invariant.
     iInv DB_InvName as ">IH".
     iDestruct "IH" as (L M Hkeys Hdom Hdisj)
                         "(Hmem & HlogL & Htoks & Hglob & %Hvalid)".
-
     iDestruct (obs_prefix_leader_follower with "Hobs HlogL") as %Hprefix.
     iDestruct (get_obs with "HlogL") as "#Hobs'".
     iModIntro.
@@ -154,7 +153,25 @@ Section Global_Invariant.
     own_mem_user γM k q wo ={E}=∗
     own_mem_user γM k q wo ∗
       ∃ h, own_obs γL DB_addr h ∗ ⌜at_key k h = wo⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (HE) "[Htok HGinv] Hmem".
+    iInv DB_InvName as (L M) ">IH".
+    iDestruct "IH" as (Hkeys Hdom Hfollower) "(Hmems&HlogL&Htoks&Hlogs&%Hvalid)".
+    rewrite /own_logL_global /own_log_auth. rewrite mono_list_auth_lb_op.
+    iDestruct "HlogL" as "[HlogL Hobs]".
+    iDestruct (gen_heap_light_valid with "Hmems Hmem") as %Hvalid'.
+    assert (M !! k = Some (at_key k L)) as Heq'.
+    { destruct Hvalid.
+      eapply DB_GSTV_mem_log_coh.
+      apply elem_of_dom. done. }
+    assert (at_key k L = wo) as Hatkey.
+    { rewrite Heq' in Hvalid'. by simplify_eq. }
+    iModIntro.
+    iSplitR "Hmem Hobs".
+    { iExists _, _. iFrame. done. }
+    iModIntro. iFrame.
+    iExists _. iFrame. iSplit; [|done]. by iLeft.
+  Qed.
 
   Lemma OwnMemKey_some_obs_we_holds k q we E :
     nclose DB_InvName ⊆ E →
@@ -187,7 +204,7 @@ Section Global_Invariant.
     { destruct Hvalid.
       eapply DB_GSTV_mem_log_coh.
       apply elem_of_dom. done. }
-     assert (at_key k L = wo) as Hatkey.
+    assert (at_key k L = wo) as Hatkey.
     { rewrite Heq' in Hvalid'. by simplify_eq. }
     iModIntro.
     iSplitR "Hmem".
