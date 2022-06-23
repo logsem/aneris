@@ -202,15 +202,32 @@ Section Alloc_resources.
             own_mem_sys γM (gset_to_gmap (@None write_event) DB_keys) ∗
            ([∗ set] k ∈ DB_keys, own_mem_user γM k 1%Qp None).
   Proof.
-    (* B induction on the set DB_keys. *)
-    (* set (empty_mem := (gset_to_gmap (@None write_event) DB_keys)). *)
-    (* iMod (gen_heap_light_init empty_mem) as "(%γM & Hmem)". *)
-  Admitted.
+    iMod (own_alloc (● (to_gen_heap ((gset_to_gmap (@None write_event) ∅))))) as (γ) "HM"; [by apply auth_auth_valid|].
+    iAssert (|==>
+               own γ (● to_gen_heap (gset_to_gmap None DB_keys)) ∗
+               ([∗ set] k ∈ DB_keys, lmapsto γ k 1 None))%I
+    with "[HM]" as "HF".
+    { iInduction DB_keys as [|a l Hnotin] "IHl" using set_ind_L.
+      - iModIntro. rewrite big_sepS_empty. iFrame.
+      - iMod ("IHl" with "HM") as "[HM Hs]".
+        iMod (gen_heap_light_alloc _ a with "HM") as "[HM H]".
+        { by apply lookup_gset_to_gmap_None. }
+        rewrite big_sepS_union; [|set_solver].
+        rewrite big_sepS_singleton.
+        iFrame.
+        by rewrite gset_to_gmap_union_singleton. }
+    iMod "HF".
+    iModIntro. iExists γ. done.
+  Qed.
 
   Lemma alloc_leader_logM  :
    ⊢ |==> ∃ γL, own_obs γL DB_addr [] ∗ own_log_auth γL 1 [].
   Proof.
-  Admitted.
+    iMod (own_alloc (●ML [] ⋅ ◯ML [])) as (γ) "[Hown1 Hown2]".
+    { apply mono_list_both_dfrac_valid.
+      by split; [done|exists []; done]. }
+    iExists γ. iFrame. by iLeft.
+  Qed.
 
   Lemma alloc_logM_and_followers_gnames γL :
     DB_addrF ∉ DB_followers →
