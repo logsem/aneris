@@ -52,6 +52,9 @@ Section Events_lemmas.
   Definition at_key (k : Key) (h : ghst) : option we :=
     last (hist_at_key k h).
 
+  Lemma at_key_elem_of k l we : at_key k l = Some we → we ∈ l.
+  Proof. intros ?; eapply elem_of_list_filter; apply last_Some_elem_of; done. Qed.
+
   Lemma last_snoc_inv {A:Type} (l : list A) e:
     last l = Some e → ∃ l', l = l' ++ [e].
   Proof.
@@ -284,13 +287,33 @@ Section Events_lemmas.
     by destruct Hatkey as [Hatkey _].
   Qed.
 
-Lemma at_key_app_none k h hf :
+  Lemma at_key_app_in_r k h h' we :
+    at_key k h' = Some we → at_key k (h ++ h') = Some we.
+  Proof. rewrite /at_key /hist_at_key filter_app last_app. intros ->; done. Qed.
+
+  Lemma at_key_app_none k h hf :
     NoDup (h ++ hf) →
     at_key k h = at_key k (h ++ hf) →
     at_key k hf = None.
   Proof.
-  rewrite /at_key /hist_at_key.
-  intros Hnodup Happ.
-  Admitted.
+    intros Hnd Heq.
+    symmetry in Heq.
+    destruct (at_key k hf) as [we'|] eqn:Hkhf; last done.
+    destruct (at_key k h) as [we|] eqn:Hkh; last first.
+    { pose proof (hist_at_key_frame_l_prefix _ hf _ Hkh) as Heq'.
+      apply hist_at_key_empty_at_key in Heq.
+      rewrite Heq in Heq'; symmetry in Heq'.
+      apply hist_at_key_empty_at_key in Heq'; simplify_eq. }
+    pose proof (at_key_app_in_r _ h _ _ Hkhf); simplify_eq.
+    assert (∃ i, h !! i = Some we) as [i Hi].
+    { eapply elem_of_list_lookup_1, at_key_elem_of; done. }
+    assert (∃ j, hf !! j = Some we) as [j Hj].
+    { eapply elem_of_list_lookup_1, at_key_elem_of; done. }
+    assert (i < length h)%nat by by apply lookup_lt_is_Some_1; eauto.
+    assert (i = length h + j)%nat; last lia.
+    eapply NoDup_alt; [exact Hnd| |].
+    { rewrite lookup_app_l; done. }
+    { rewrite lookup_app_r; last lia. rewrite minus_plus; done. }
+  Qed.
 
 End Events_lemmas.

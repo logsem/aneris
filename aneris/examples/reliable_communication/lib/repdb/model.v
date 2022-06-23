@@ -114,10 +114,6 @@ Section ValidStates.
       right; eexists; done.
   Qed.
 
-  (* TODO: MOVE *)
-  Lemma at_key_elem_of k l we : at_key k l = Some we → we ∈ l.
-  Proof. intros ?; eapply elem_of_list_filter; apply last_Some_elem_of; done. Qed.
-
 (* TODO: MOVE *) (* again scope is screwed up! *)
   Lemma lt_TM_lt we we' : (we_time we < we_time we')%nat → we ≤ₜ we'.
   Proof. rewrite /TM_lt /=; by left. Qed.
