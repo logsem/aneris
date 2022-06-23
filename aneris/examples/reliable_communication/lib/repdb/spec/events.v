@@ -291,6 +291,14 @@ Section Events_lemmas.
     at_key k h' = Some we → at_key k (h ++ h') = Some we.
   Proof. rewrite /at_key /hist_at_key filter_app last_app. intros ->; done. Qed.
 
+  Lemma at_key_not_in_app k h h' :
+    at_key k (h ++ h') = None → at_key k h = None ∧ at_key k h' = None.
+  Proof.
+    rewrite /at_key /hist_at_key filter_app last_app.
+    destruct (filter _ h') as [|?? _] using rev_ind; first done.
+    rewrite last_snoc; done.
+  Qed.
+
   Lemma at_key_app_none k h hf :
     NoDup (h ++ hf) →
     at_key k h = at_key k (h ++ hf) →

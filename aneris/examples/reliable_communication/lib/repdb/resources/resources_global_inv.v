@@ -194,14 +194,51 @@ Section Global_Invariant.
     Global_Inv ⊢
     own_mem_user γM k q (Some we) ∗ own_obs γL a (h ++ [we] ++ hf) ={E}=∗
     own_mem_user γM k q (Some we) ∗ ⌜at_key k hf = None⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (?) "#[Htoks Hinv] [Hu1 #Hu2]".
+    iInv DB_InvName as
+      (lM M) ">(%Hkeys & %HNdom & %Hfollowers & Hsys & Hglog & HknN & Hreplogs & %Hvs)".
+    iDestruct (obs_prefix_leader_follower with "Hu2 Hglog") as %[fr ->].
+    rewrite -!assoc !(assoc _ h).
+    rewrite -!assoc !(assoc _ h) in Hvs.
+    iDestruct (gen_heap_light_valid with "Hsys Hu1") as %HMk.
+    pose proof HMk as HMk'.
+    rewrite (DB_GSTV_mem_log_coh _ _ Hvs k) in HMk; last by apply elem_of_dom; eauto.
+    simplify_eq.
+    iModIntro.
+    iSplitR "Hu1".
+    { iNext; iExists _, _; iFrame; eauto. }
+    iFrame.
+    iModIntro; iPureIntro.
+    apply (at_key_not_in_app _ _ fr).
+    eapply at_key_app_none; first by eapply valid_state_log_no_dup.
+    rewrite HMk.
+    rewrite at_key_snoc_some; first done.
+    eapply at_key_has_key; done.
+  Qed.
 
   Lemma OwnMemKey_none_obs_holds a k q h E :
     nclose DB_InvName ⊆ E →
     Global_Inv ⊢
       own_mem_user γM k q None ∗ own_obs γL a h ={E}=∗
       own_mem_user γM k q None ∗ ⌜hist_at_key k h = []⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (?) "#[Htoks Hinv] [Hu1 #Hu2]".
+    iInv DB_InvName as
+      (lM M) ">(%Hkeys & %HNdom & %Hfollowers & Hsys & Hglog & HknN & Hreplogs & %Hvs)".
+    iDestruct (obs_prefix_leader_follower with "Hu2 Hglog") as %[fr ->].
+    iDestruct (gen_heap_light_valid with "Hsys Hu1") as %HMk.
+    pose proof HMk as HMk'.
+    rewrite (DB_GSTV_mem_log_coh _ _ Hvs k) in HMk; last by apply elem_of_dom; eauto.
+    simplify_eq.
+    iModIntro.
+    iSplitR "Hu1".
+    { iNext; iExists _, _; iFrame; eauto. }
+    iFrame.
+    iModIntro; iPureIntro.
+    apply hist_at_key_empty_at_key.
+    apply (at_key_not_in_app _ _ fr); done.
+  Qed.
 
   (* TODO: Remove *)
   (* Lemma OwnMemKey_allocated_holds k q h0 h1 we0 E : *)
