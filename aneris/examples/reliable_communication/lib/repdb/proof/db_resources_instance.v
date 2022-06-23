@@ -30,8 +30,8 @@ Section DB_resources_instance.
       Obs := own_obs γL;
       OwnMemKey_timeless := OwnMemKey_timeless_holds γM;
       OwnMemKey_exclusive := OwnMemKey_exclusive_holds γM;
-      OwnMemKey_fractioal := OwnMemKey_fractioal_holds γM;
-      OwnMemKey_as_fractioal := OwnMemKey_as_fractioal_holds γM;
+      OwnMemKey_fractional := OwnMemKey_fractional_holds γM;
+      OwnMemKey_as_fractional := OwnMemKey_as_fractional_holds γM;
       OwnMemKey_combine := OwnMemKey_combine_holds γM;
       OwnMemKey_split := OwnMemKey_split_holds γM;
       OwnMemKey_key :=  OwnMemKey_key_holds γL γM N;
@@ -40,15 +40,15 @@ Section DB_resources_instance.
       Obs_compare := Obs_compare_holds γL;
       Obs_exists_at_leader := Obs_exists_at_leader_holds γL γM N;
       Obs_get_smaller := Obs_get_smaller_holds γL;
-      Obs_snoc_time := Obs_snoc_time_holds γL γM N;
-      Obs_ext_we := Obs_ext_we_holds γL γM N;
-      Obs_ext_hist := Obs_ext_hist_holds γL γM N;
+      (* Obs_snoc_time := Obs_snoc_time_holds γL γM N; *)
+      (* Obs_ext_we := Obs_ext_we_holds γL γM N; *)
+      (* Obs_ext_hist := Obs_ext_hist_holds γL γM N; *)
       OwnMemKey_some_obs_we := OwnMemKey_some_obs_we_holds γL γM N;
       OwnMemKey_obs_frame_prefix := OwnMemKey_obs_frame_prefix_holds γL γM N;
       OwnMemKey_obs_frame_prefix_some := OwnMemKey_obs_frame_prefix_some_holds γL γM N;
       OwnMemKey_some_obs_frame := OwnMemKey_some_obs_frame_holds γL γM N;
       OwnMemKey_none_obs := OwnMemKey_none_obs_holds γL γM N;
-      OwnMemKey_allocated := OwnMemKey_allocated_holds γL γM N;
+      (* OwnMemKey_allocated := OwnMemKey_allocated_holds γL γM N; *)
     |}.
 
 End DB_resources_instance.

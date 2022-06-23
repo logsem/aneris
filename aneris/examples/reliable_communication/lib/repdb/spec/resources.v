@@ -28,9 +28,9 @@ Section Predicates.
     OwnMemKey_timeless k q v :> Timeless (k ↦ₖ{ q } v);
     OwnMemKey_exclusive k q v v' :
       k ↦ₖ{ 1 } v ⊢ k ↦ₖ{ q } v' -∗ False;
-    OwnMemKey_fractioal k v :>
+    OwnMemKey_fractional k v :>
       Fractional (λ q, k ↦ₖ{ q } v);
-    OwnMemKey_as_fractioal k q v :>
+    OwnMemKey_as_fractional k q v :>
       AsFractional (k ↦ₖ{ q } v) (λ q, k ↦ₖ{ q } v) q ;
     OwnMemKey_combine k q q' v v' :
       k ↦ₖ{ q } v ∗ k ↦ₖ{ q' } v' ⊢
@@ -53,20 +53,20 @@ Section Predicates.
       Obs a1 h1 ={E}=∗ ∃ h2, Obs DB_addr h2 ∗ ⌜h1 ≤ₚ h2⌝;
     Obs_get_smaller a h h' :
       h ≤ₚ h' → Obs a h' -∗ Obs a h;
-    Obs_snoc_time a h1 e1 h2 E :
-      nclose DB_InvName ⊆ E →
-      Obs a (h1 ++ [e1] ++ h2) ={E}=∗
-      ⌜∀ e0, e0 ∈ h1 → e0 <ₜ e1⌝ ∧
-      ⌜∀ e2, e2 ∈ h2 → e1 <ₜ e2⌝;
-    Obs_ext_we a a' h h' E :
-      nclose DB_InvName ⊆ E →
-      GlobalInv ⊢ Obs a h -∗ Obs a' h' ={E}=∗
-      ⌜∀ e e', e ∈ h → e' ∈ h' → e =ₜ e' → e = e'⌝;
-    Obs_ext_hist a1 a2 h1 h2 k E :
-      nclose DB_InvName ⊆ E →
-      at_key k h1 = at_key k h2 →
-      GlobalInv ⊢ Obs a1 h1 -∗ Obs a2 h2 ={E}=∗
-      ⌜hist_at_key k h1 = hist_at_key k h2⌝;
+    (* Obs_snoc_time a h1 e1 h2 E : *)
+    (*   nclose DB_InvName ⊆ E → *)
+    (*   Obs a (h1 ++ [e1] ++ h2) ={E}=∗ *)
+    (*   ⌜∀ e0, e0 ∈ h1 → e0 <ₜ e1⌝ ∧ *)
+    (*   ⌜∀ e2, e2 ∈ h2 → e1 <ₜ e2⌝; *)
+    (* Obs_ext_we a a' h h' E : *)
+    (*   nclose DB_InvName ⊆ E → *)
+    (*   GlobalInv ⊢ Obs a h -∗ Obs a' h' ={E}=∗ *)
+    (*   ⌜∀ e e', e ∈ h → e' ∈ h' → e =ₜ e' → e = e'⌝; *)
+    (* Obs_ext_hist a1 a2 h1 h2 k E : *)
+    (*   nclose DB_InvName ⊆ E → *)
+    (*   at_key k h1 = at_key k h2 → *)
+    (*   GlobalInv ⊢ Obs a1 h1 -∗ Obs a2 h2 ={E}=∗ *)
+    (*   ⌜hist_at_key k h1 = hist_at_key k h2⌝; *)
 
     (** Relations between points-to connective and observed requests *)
     OwnMemKey_some_obs_we k q we E :
@@ -98,14 +98,14 @@ Section Predicates.
       GlobalInv ⊢
       k ↦ₖ{ q } None ∗ Obs a h ={E}=∗
       k ↦ₖ{ q } None ∗ ⌜hist_at_key k h = []⌝;
-    OwnMemKey_allocated k q h0 h1 we0 E :
-      nclose DB_InvName ⊆ E →
-      h0 ≤ₚ h1 →
-      at_key k h0 = Some we0 →
-      GlobalInv ⊢
-      k ↦ₖ{ q } (at_key k h1) ={E}=∗
-      ∃ we1, k ↦ₖ{ q } (at_key k h1) ∗
-            ⌜at_key k h1 = Some we1⌝ ∗ ⌜we0 ≤ₜ we1⌝;
+    (* OwnMemKey_allocated k q h0 h1 we0 E : *)
+    (*   nclose DB_InvName ⊆ E → *)
+    (*   h0 ≤ₚ h1 → *)
+    (*   at_key k h0 = Some we0 → *)
+    (*   GlobalInv ⊢ *)
+    (*   k ↦ₖ{ q } (at_key k h1) ={E}=∗ *)
+    (*   ∃ we1, k ↦ₖ{ q } (at_key k h1) ∗ *)
+    (*         ⌜at_key k h1 = Some we1⌝ ∗ ⌜we0 ≤ₜ we1⌝; *)
    }.
 
 End Predicates.
