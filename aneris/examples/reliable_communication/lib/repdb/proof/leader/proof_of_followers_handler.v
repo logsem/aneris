@@ -105,25 +105,20 @@ Section Followers_MT_spec_params.
     assert (we ∈ reqd ++ [we]) by set_solver.
     assert (we ∈ lMG) as HelM by by apply (elem_of_prefix (reqd ++ [we])).
     assert (we.(we_time) = length reqd ∧ we.(we_key) ∈ dom kvsMG) as (Htime & Hwekeydom).
-    { apply elem_of_list_In in HelM.
-      destruct (In_nth_error lMG we HelM) as [n Hnth].
-      assert (n < length lMG) as Hnh.
-      { apply (nth_error_Some _ _). by rewrite Hnth. }
-      assert  (0 ≤ n)%Z as Hn0Z by lia.
-      apply inj_lt in Hnh.
-      assert (nth_error lMG (length reqd) = Some we) as Hlenreq.
+    { destruct (elem_of_list_lookup_1 lMG we HelM) as [n Hnth].
+      assert (n < length lMG)%nat as Hnh.
+      { apply (lookup_lt_is_Some_1 _ _); eauto. }
+      assert (lMG !! length reqd = Some we) as Hlenreq.
       { inversion Hprefixh2 as [suf Hlen].
         rewrite Hlen -app_assoc.
-        rewrite nth_error_app2 //=.
-        by replace (length reqd - length reqd) with 0%nat; [|lia]. }
-      destruct (DB_GSTV_log_events n Hn0Z Hnh) as (e' & He' & (He'time & He'keys)).
+        rewrite lookup_app_r //= Nat.sub_diag //. }
+      destruct (DB_GSTV_log_events n Hnh) as (e' & He' & (He'time & He'keys)).
       assert (we = e') as Heqe. { rewrite Hnth in He'. by inversion He'. }
       rewrite Heqe - He'time.
       apply valid_state_log_no_dup in HvalidG as HnoDup.
       rewrite -Heqe in He'.
-      destruct (@NoDup_nth_error write_eventO lMG) as (Heq & _).
       split.
-      - apply Heq; [by apply NoDup_ListNoDup|lia|by rewrite He'].
+      - eapply NoDup_lookup; [done|done|done].
       - set_solver. }
     iModIntro.
     rewrite /global_inv_def. iSplitL "HlM HmS HmapF HknwF".

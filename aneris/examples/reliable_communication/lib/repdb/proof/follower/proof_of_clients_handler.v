@@ -85,8 +85,7 @@ Section Clients_MT_spec_params.
       as ">Hpost".
     { destruct (kvsM !! k) as [v|] eqn:Hmk.
       - iModIntro. iRight.
-        apply DB_LSTV_in_mem_log_some_coh_local in Hmk;
-          last by apply elem_of_dom.
+        apply DB_LSTV_in_mem_log_some_coh_local in Hmk.
         destruct Hmk as (we0 & Hwe0L & <-).
         iExists _.
         iSplit; first done.
@@ -110,7 +109,7 @@ Section Clients_MT_spec_params.
          assert (v0 = (we_val a)) as Heqa by naive_solver.
          rewrite Heqa in Hmk.
          rewrite Hmk in Hkm.
-         specialize (DB_LSTV_mem_serializable_vs_local k (we_val a) Hk Hmk).
+         specialize (DB_LSTV_mem_serializable_vs_local k (we_val a) Hmk).
          apply _. }
        simpl. rewrite /log_monitor_inv_def /ReqPost.
        iSplitL; last first.

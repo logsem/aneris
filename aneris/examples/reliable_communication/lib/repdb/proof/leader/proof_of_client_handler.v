@@ -111,13 +111,10 @@ Section Clients_MT_spec_params.
       { iPureIntro. inversion HvalidLocal. iIntros (e He).
         assert (e ∈ lM) as HelM. { set_solver. }
         assert (e.(we_time) < length lM) as Htime.
-        { apply elem_of_list_In in HelM.
-          destruct (In_nth_error lM e HelM) as [n Hnth].
-          assert (n < length lM) as Hnh.
-          { apply (nth_error_Some _ _). by rewrite Hnth. }
-          assert  (0 ≤ n)%Z as Hn0Z by lia.
-          apply inj_lt in Hnh.
-          destruct (DB_LSTV_log_events n Hn0Z Hnh) as (e' & He' & He'time & He'keys).
+        { destruct (elem_of_list_lookup_1 lM e HelM) as [n Hnth].
+          assert (n < length lM)%nat as Hnh.
+          { apply lookup_lt_is_Some_1; eauto. }
+          destruct (DB_LSTV_log_events n Hnh) as (e' & He' & He'time & He'keys).
           assert (e = e') as Heqe. { rewrite Hnth in He'. by inversion He'. }
           rewrite Heqe - He'time. lia. }
         done. }
@@ -168,8 +165,7 @@ Section Clients_MT_spec_params.
         as ">Hpost".
       { destruct (kvsM !! k) eqn:Hmk; rewrite Hmk in Hv; rewrite Hv.
         - iModIntro. iRight.
-          apply DB_LSTV_in_mem_log_some_coh_local in Hmk;
-            last by apply elem_of_dom.
+          apply DB_LSTV_in_mem_log_some_coh_local in Hmk.
           destruct Hmk as (we0 & Hwe0L & <-).
           iExists _.
           iSplit; first done.
@@ -188,7 +184,7 @@ Section Clients_MT_spec_params.
          { iPureIntro.
            assert (k ∈ dom kvsM) as Hk by by apply elem_of_dom.
            assert (v0 = (we_val a)) as -> by naive_solver.
-           specialize (DB_LSTV_mem_serializable_vs_local k (we_val a) Hk Hmk).
+           specialize (DB_LSTV_mem_serializable_vs_local k (we_val a) Hmk).
            apply _. }
          simpl. rewrite /log_monitor_inv_def /ReqPost.
          iSplitR "Hk"; last first.
