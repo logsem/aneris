@@ -105,10 +105,10 @@ Section Resources_definition.
   Qed.
 
   (* Maybe remove ? *)
-  Lemma OwnMemKey_fractioal_holds k v : Fractional (λ q, own_mem_user k q v).
+  Lemma OwnMemKey_fractional_holds k v : Fractional (λ q, own_mem_user k q v).
   Proof. apply _. Qed.
 
-  Lemma OwnMemKey_as_fractioal_holds k q v :
+  Lemma OwnMemKey_as_fractional_holds k q v :
     AsFractional (own_mem_user k q v) (λ q, own_mem_user k q v) q.
   Proof. apply _. Qed.
 
