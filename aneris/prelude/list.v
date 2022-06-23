@@ -149,3 +149,96 @@ Proof.
     apply elem_of_cons in Hin.
     destruct Hin as [Hin|Hin]; [done|by apply IHxs].
 Qed.
+
+Lemma NoDup_prefix {A} (xs ys : list A) :
+  NoDup ys →
+  xs `prefix_of` ys →
+  NoDup xs.
+Proof. 
+  revert ys.
+  induction xs as [|x xs IHxs]; intros ys HNoDup Hprefix.
+  { by apply NoDup_nil. }
+  apply NoDup_cons.
+  destruct ys as [|y ys].
+  { destruct Hprefix as [k Heq]. 
+    by rewrite -app_comm_cons in Heq. }
+  assert (x = y) as <- by by apply prefix_cons_inv_1 in Hprefix.
+  apply prefix_cons_inv_2 in Hprefix.
+  apply NoDup_cons in HNoDup as [Hnin HNoDup].
+  split; [|by eapply IHxs].
+  intros Hin. apply Hnin.
+  by eapply elem_of_prefix.
+Qed.
+
+Lemma Forall_filter_empty {A} P `{!∀ x, Decision (P x)} (xs : list A) :
+  Forall (λ x, ¬ P x) xs →
+  filter P xs = [].
+Proof.
+  intros HForall.
+  induction xs as [|x xs]; [done|].
+  apply Forall_cons in HForall as [HPx HForall].
+  rewrite filter_cons_False; [done|].
+  by apply IHxs.
+Qed.
+
+Lemma NoDup_last_filter_Some {A} P `{!∀ x, Decision (P x)} (xs ys zs : list A) x :
+  NoDup zs →
+  last (filter P xs) = Some x →
+  last (filter P zs) = Some x →
+  xs `prefix_of` ys →
+  ys `prefix_of` zs →
+  last (filter P ys) = Some x.
+Proof.
+  intros HNoDup Hxs Hzs Hprefix Hprefix'.
+  assert (NoDup ys) as HNoDupys by by eapply NoDup_prefix.
+  assert (NoDup xs) as HNoDupxs by by eapply NoDup_prefix.
+  assert (xs `prefix_of` zs) as Hprefix'' by by eapply transitivity.
+  assert (last (filter P xs) = Some x) as Hxs' by done.
+  assert (last (filter P zs) = Some x) as Hzs' by done.
+  apply last_filter_Some in Hxs as (l1 & l2 & -> & HP).
+  apply last_filter_Some in Hzs as (k1 & k2 & -> & HP').
+  assert (l1 = k1 ∧ x = x ∧ l2 `prefix_of` k2) as (Heq1 & Heq2 & Hprefix''').
+  { eapply prefix_not_elem_of_app_cons_inv.
+    { apply NoDup_app in HNoDup as (_&Hnin&HNoDup).
+      intros Hin.
+      apply Hnin in Hin.
+      apply Hin. by left. }
+    { apply NoDup_app in HNoDupxs as (_&Hnin&HNoDupxs).
+      intros Hin.
+      apply Hnin in Hin.
+      apply Hin. by left. }
+    done. }
+  simplify_eq.
+  destruct Hprefix as [k ->].
+  rewrite -!assoc in Hprefix'.
+  apply prefix_app_inv in Hprefix'.
+  rewrite -app_comm_cons in Hprefix'.
+  apply prefix_cons_inv_2 in Hprefix'.
+  rewrite filter_app.
+  rewrite last_app.
+  rewrite Hxs'.
+  destruct Hprefix' as [k' ->].
+  apply Forall_app in HP' as [HP' _].
+  apply Forall_app in HP' as [_ HP'].
+  by rewrite Forall_filter_empty.
+Qed.
+
+Lemma NoDup_last_filter_None {A} P `{!∀ x, Decision (P x)} (xs ys : list A) :
+  NoDup ys →
+  last (filter P ys) = None →
+  xs `prefix_of` ys →
+  last (filter P xs) = None.
+Proof.
+  revert ys.
+  induction xs as [|x xs IHxs]; intros ys HNodup Hys Hprefix; [done|].
+  destruct ys as [|y ys].
+  { destruct Hprefix as [k Heq].
+    by rewrite -app_comm_cons in Heq. }
+  assert (x = y) as <- by by apply prefix_cons_inv_1 in Hprefix.
+  apply prefix_cons_inv_2 in Hprefix.
+  rewrite filter_cons in Hys.
+  rewrite filter_cons.
+  destruct (decide (P x)) as [HPx|HPx].
+  { rewrite last_cons in Hys. by destruct (last (filter P ys)). }
+  eapply IHxs; [by eapply NoDup_cons_1_2|done|done].
+Qed.

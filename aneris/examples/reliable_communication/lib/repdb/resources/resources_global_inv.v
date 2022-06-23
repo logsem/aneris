@@ -3,6 +3,7 @@ From iris.algebra.lib Require Import mono_list.
 From iris.base_logic Require Import invariants.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
+From aneris.prelude Require Import list.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Import lang resources inject.
 From aneris.aneris_lang.lib Require Import
@@ -173,7 +174,38 @@ Section Global_Invariant.
     Global_Inv ⊢
     own_mem_user γM k q (at_key k h) ∗ own_obs γL a h' ={E}=∗
     own_mem_user γM k q (at_key k h) ∗ ⌜at_key k h = at_key k h'⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (HE Hprefix) "[Htok HGinv] [Hmem Hobs]".
+    iInv DB_InvName as (L M) ">IH".
+    iDestruct "IH" as (Hkeys Hdom Hfollower) "(Hmems&HlogL&Htoks&Hlogs&%Hvalid)".
+    assert (∃ wo, at_key k h = wo) as [wo Heq].
+    { destruct (at_key k h); by eexists _. }
+    iDestruct (gen_heap_light_valid with "Hmems Hmem") as %Hvalid'.
+    rewrite Heq in Hvalid'.
+    iDestruct (obs_prefix_leader_follower with "Hobs HlogL") as %Hprefix'.
+    assert (M !! k = Some (at_key k L)) as Heq'.
+    { destruct Hvalid.
+      eapply DB_GSTV_mem_log_coh.
+      apply elem_of_dom. done. }
+     assert (at_key k L = wo) as Hatkey.
+    { rewrite Heq' in Hvalid'. by simplify_eq. }
+    iModIntro.
+    iSplitR "Hmem".
+    { iExists _, _. iFrame. done. }
+    iFrame.
+    iModIntro.
+    iPureIntro.
+    destruct Hvalid.
+    assert (NoDup L) as HNoDup.
+    { by apply log_events_no_dup. }
+    destruct (wo).
+    { rewrite Heq. symmetry.
+      assert (NoDup h') by by eapply NoDup_prefix.
+      by eapply (NoDup_last_filter_Some _ h h' L). }
+    rewrite Heq.
+    symmetry.
+    by eapply (NoDup_last_filter_None _ h' L).
+  Qed.
 
   Lemma OwnMemKey_obs_frame_prefix_some_holds a k q h h' we E :
     nclose DB_InvName ⊆ E →
