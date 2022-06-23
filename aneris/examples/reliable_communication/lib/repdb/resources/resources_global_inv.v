@@ -89,7 +89,7 @@ Section Global_Invariant.
 
   Lemma Obs_get_smaller_holds a h h' :
     h ≤ₚ h' → own_obs γL a h' -∗ own_obs γL a h.
-  Proof. 
+  Proof.
     iIntros (Hprefix%mono_list_lb_mono) "[[%Heq Hobs]|Hobs]".
     - iLeft. iSplit; [done|by iApply own_mono].
     - iDestruct "Hobs" as (γ) "(Hlog&HlogL&Hown)".
@@ -149,7 +149,7 @@ Section Global_Invariant.
     Global_Inv ⊢
     own_mem_user γM k q (Some we) ∗ own_obs γL a h' ={E}=∗
     own_mem_user γM k q (Some we) ∗ ⌜at_key k h' = Some we⌝.
-  Proof. 
+  Proof.
     iIntros (HE Hprefx <-) "HGinv [Hmem Hobs]".
     iMod (OwnMemKey_obs_frame_prefix_holds with "HGinv [$Hmem $Hobs]")
       as "[$ %Heq]"; [solve_ndisj|done|].
@@ -243,7 +243,46 @@ Section Alloc_resources.
                own_log_auth γ (1/2) []) ∗
             ([∗ map] sa ↦ γ ∈ N, own_log_auth γ (1/2) []).
   Proof.
-    (* By induction on the set DB_followers ∪ DB_addrF. *)
-  Admitted.
+    iIntros (Hfollower) "[#Hlog Htoks]".
+    iMod (own_alloc (●ML [] ⋅ ◯ML [])) as (γF) "[HlogFa HlogFf]".
+    { apply mono_list_both_dfrac_valid.
+      by split; [done|exists []; done]. }
+    iMod (own_update with "Htoks") as "[Htoks HtokF]".
+    { apply (auth_update_alloc _
+                               ({[DB_addrF := to_agree γF]})
+                               ({[DB_addrF := to_agree γF]})).
+      rewrite fmap_empty.
+      by apply alloc_singleton_local_update. }
+    iInduction (DB_followers) as [|f s Hnin] "IH" using set_ind_L.
+    {
+      iModIntro. iExists {[DB_addrF := γF]}.
+      rewrite /known_replog_tokens.
+      rewrite fmap_insert fmap_empty.
+      rewrite !big_opM_singleton. iFrame "#∗".
+      iSplit; [ iPureIntro; set_solver |].
+      rewrite -{1}Qp_half_half -dfrac_op_own mono_list_auth_dfrac_op.
+      iDestruct "HlogFa" as "[$ $]". }
+    iMod ("IH" with "[] HlogFa HlogFf Htoks HtokF")
+      as (N Hdom) "(Htoks & Hlogs & HN)".
+    { iPureIntro. set_solver. }
+    iClear "IH".
+    iMod (own_alloc (●ML [] ⋅ ◯ML [])) as (γ) "[HlogFa HlogFf]".
+    { apply mono_list_both_dfrac_valid.
+      by split; [done|exists []; done]. }
+    iMod (own_update with "Htoks") as "[Htoks Htok]".
+    { apply (auth_update_alloc _
+               (to_agree <$> (<[f:=γ]>N))
+               ({[f := to_agree γ]})).
+      rewrite fmap_insert.
+      apply alloc_singleton_local_update; [|done].
+      rewrite -not_elem_of_dom. set_solver. }
+    iExists (<[f := γ]>N).
+    rewrite !big_opM_insert; [|rewrite -not_elem_of_dom; set_solver..].
+    iFrame "#∗".
+    iModIntro.
+    iSplit; [ iPureIntro; set_solver |].
+    rewrite -{1}Qp_half_half -dfrac_op_own mono_list_auth_dfrac_op.
+    iDestruct "HlogFa" as "[$ $]".
+  Qed.
 
 End Alloc_resources.
