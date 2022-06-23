@@ -1,0 +1,5 @@
+(library
+ (wrapped false)
+ (name reliable_rpc_code)
+ (flags :standard -rectypes)
+ (libraries aneris client_server_code))

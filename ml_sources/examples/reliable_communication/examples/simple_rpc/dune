@@ -1,0 +1,4 @@
+(executable
+  (name simple_rpc_code)
+  (flags :standard -rectypes)
+  (libraries reliable_rpc_code aneris))
