@@ -56,11 +56,12 @@ Section Init_Leader_Proof.
     own_log_auth γdbF (1/2) [] ∗
     SrvLeaderFInit.
 
-  Definition init_leader_spec_internal A : iProp Σ :=
-    ⌜DB_addr ∈ A⌝ →
-    ⌜DB_addrF ∈ A⌝ →
-    ⌜ip_of_address DB_addrF = ip_of_address DB_addr⌝ →
-    ⌜port_of_address DB_addrF ≠ port_of_address DB_addr⌝ →
+  Definition init_leader_spec_internal A :=
+    DB_addr ∈ A →
+    DB_addrF ∈ A →
+    ip_of_address DB_addrF = ip_of_address DB_addr →
+    port_of_address DB_addrF ≠ port_of_address DB_addr →
+    ⊢
     {{{ fixed A ∗
           DB_addr ⤇ leader_si ∗
           DB_addrF ⤇ leaderF_si ∗
@@ -77,7 +78,7 @@ Section Init_Leader_Proof.
       #DB_addr #DB_addrF @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
 
-  Lemma init_leader_spec_internal_holds A : ⊢ init_leader_spec_internal A.
+  Lemma init_leader_spec_internal_holds A : init_leader_spec_internal A.
   Proof.
     iIntros (HinA HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
@@ -142,13 +143,12 @@ Section Init_Leader_Proof.
          wp_apply aneris_wp_fork.
          iSplitL "HΦ"; iNext; [ by iApply "HΦ"|].
          rewrite -HipEq.
-         wp_apply (update_log_copy_loop_spec γL γM N _ γdbF mFγ
-                    with "[HownF2]"); [ | done].
+         wp_apply (update_log_copy_loop_spec γL γM N HipEq γdbF mFγ
+                    with "[$HownF2]"); [ | done].
          iFrame "#∗".
          rewrite /leader_local_secondary_inv.
          rewrite /log_monitor_inv.
          by rewrite HipEq.
-         Unshelve. done.
       -- rewrite /start_leader_processing_followers.
          iNext.
          wp_pures.

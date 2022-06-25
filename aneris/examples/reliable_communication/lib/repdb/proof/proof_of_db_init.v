@@ -158,7 +158,7 @@ Section Init_setup_proof.
              iIntros "(Hf & #Hsi1 & #Hsi2 & HinitL
                    & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
              by iApply (init_leader_spec_internal_holds
-                         with "[//][//][//][//][-HΨ $Hf $HinitL][$HΨ]");
+                         with "[-HΨ $Hf $HinitL][$HΨ]");
              try eauto with iFrame.
          --- iModIntro.
              iIntros (A).

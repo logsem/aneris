@@ -30,10 +30,10 @@ Section Endpoint_MetaData.
     iPureIntro. by apply (to_agree_op_inv_L (A:= _ )) in Hval.
   Qed.
 
- Definition ChannelSideToken (γe : endpoint_name) (s : side) : iProp Σ :=
-      own (endpoint_side_name γe) (to_agree s).
+  Definition ChannelSideToken (γe : endpoint_name) (s : side) : iProp Σ :=
+    own (endpoint_side_name γe) (to_agree s).
 
- Lemma ChannelSideToken_agree γe s1 s2 :
+  Lemma ChannelSideToken_agree γe s1 s2 :
     ChannelSideToken γe s1 -∗ ChannelSideToken γe s2 -∗ ⌜s1 = s2⌝.
   Proof.
     iIntros "HA HB". iDestruct (own_valid_2 with "HA HB") as %Hval.
@@ -41,7 +41,7 @@ Section Endpoint_MetaData.
   Qed.
 
   Definition ChannelIdxsToken (γe : endpoint_name) (pl : loc * loc) : iProp Σ :=
-      own (endpoint_idxs_name γe) (to_agree pl).
+    own (endpoint_idxs_name γe) (to_agree pl).
 
   Lemma ChannelIdxsToken_agree γe pl1 pl2 :
     ChannelIdxsToken γe pl1 -∗ ChannelIdxsToken γe pl2 -∗ ⌜pl1 = pl2⌝.

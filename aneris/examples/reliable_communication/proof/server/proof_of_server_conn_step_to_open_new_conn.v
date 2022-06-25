@@ -78,8 +78,8 @@ Section Proof_of_server_conn_step_1.
              replace ck with (Z.of_nat ckn); last by lia.
              wp_apply fupd_aneris_wp.
              iMod (session_map_update _ _ RCParams_protocol ckn (nroot : namespace) (⊤ :coPset)
-                    with "[] [] [$HknM] [$Hstep]") as "HupdRes";
-               [ by solve_ndisj | by rewrite -Hdom in Hdomc |].
+                    with "[] [$HknM] [$Hstep]") as "HupdRes";
+               [ by rewrite -Hdom in Hdomc |].
              iModIntro.
              iDestruct "HupdRes"
                as (γs) "(HknM & #Hstk & Hhopened & HckF & HckRes & HcanInit1 & HcanInit2)".
@@ -143,12 +143,11 @@ Section Proof_of_server_conn_step_1.
                  iFrame "#∗"; eauto.
                  iSplit; first done.
                  iSplit; [ by rewrite !dom_insert_L Hdom |].
-                 Unshelve. 2:{ apply γqlk. }
                  (* It is convenient to show that the case m ∈ R is absurd. *)
                  destruct (bool_decide (m ∈ R)) eqn:Hm.
                  { apply bool_decide_eq_true_1 in Hm.
                    iAssert (∃ cs, ⌜cM !! m_sender m = Some cs⌝)%I as "%Habs".
-                   { iDestruct (big_sepS_elem_of _ R m Hm with "[$HmsgRres]") as "Hres".
+                   { iDestruct (big_sepS_elem_of _ R m Hm with "HmsgRres") as "Hres".
                      iDestruct "Hres"
                        as (γs0 mval0 n0 Hser0) "(#Htk0 & [#(%Hl & %Hl2) | #Hr])"; [eauto|].
                      iDestruct "Hr" as (???) "%Habs"; eauto. }
@@ -171,9 +170,7 @@ Section Proof_of_server_conn_step_1.
                      rewrite Hseq lookup_insert Hargeq.
                      rewrite Hargeq Hseq in Hser.
                      eauto.
-                   - iApply (big_sepS_mono _ _ _ with "[$HmsgRres]").
-                     Unshelve.
-                     2:{ apply _. }
+                   - iApply (big_sepS_mono _ _ _ with "HmsgRres").
                      iIntros (m0 Hm0) "#Hres".
                      destruct (bool_decide (m_sender m = m_sender m0)) eqn:Hmeq.
                      + apply bool_decide_eq_true_1 in Hmeq.

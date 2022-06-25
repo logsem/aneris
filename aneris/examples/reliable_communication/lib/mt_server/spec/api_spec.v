@@ -13,42 +13,42 @@ Section Spec.
   Context (srv_si : message → iProp Σ).
   Notation srv_ip := (ip_of_address MTS_saddr).
 
- Definition run_server_spec `{!MTS_spec_params MTU} A : iProp Σ :=
-   {{{ MTS_saddr ⤇ srv_si ∗
-       ⌜MTS_saddr ∈ A⌝ ∗
-       fixed A ∗
-       MTS_saddr ⤳ (∅,∅) ∗
-       free_ports (srv_ip) {[port_of_address MTS_saddr]} ∗
-       SrvInit ∗
-       is_monitor MTS_mN srv_ip MTS_mγ MTS_mv MTS_mR }}}
-     run_server
+  Definition run_server_spec `{!MTS_spec_params MTU} A : iProp Σ :=
+    {{{ MTS_saddr ⤇ srv_si ∗
+        ⌜MTS_saddr ∈ A⌝ ∗
+        fixed A ∗
+        MTS_saddr ⤳ (∅,∅) ∗
+        free_ports (srv_ip) {[port_of_address MTS_saddr]} ∗
+        SrvInit ∗
+        is_monitor MTS_mN srv_ip MTS_mγ MTS_mv MTS_mR }}}
+      run_server
         (s_serializer MTS_rep_ser)
         (s_serializer MTS_req_ser)
         #MTS_saddr
         MTS_mv
         MTS_handler
        @[srv_ip]
-   {{{ RET #(); ⌜True⌝ }}}.
+    {{{ RET #(); ⌜True⌝ }}}.
 
- Definition make_request_spec (handler : val) clt_addr : iProp Σ :=
-   ∀ reqv reqd,
-   {{{ ⌜Serializable MTS_req_ser reqv⌝ ∗
-       MTS_handler_pre reqv reqd }}}
-     handler reqv @[ip_of_address clt_addr]
-   {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
+  Definition make_request_spec (handler : val) clt_addr : iProp Σ :=
+    ∀ reqv reqd,
+    {{{ ⌜Serializable MTS_req_ser reqv⌝ ∗
+        MTS_handler_pre reqv reqd }}}
+      handler reqv @[ip_of_address clt_addr]
+    {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
 
- Definition init_client_proxy_spec A sa : iProp Σ :=
-   {{{⌜sa ∉ A⌝ ∗
-      fixed A ∗
-      free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
-      MTS_saddr ⤇ srv_si }}}
-     init_client_proxy
+  Definition init_client_proxy_spec A sa : iProp Σ :=
+    {{{⌜sa ∉ A⌝ ∗
+       fixed A ∗
+       free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
+       MTS_saddr ⤇ srv_si }}}
+      init_client_proxy
         (s_serializer MTS_req_ser)
         (s_serializer MTS_rep_ser)
         #sa
         #MTS_saddr
        @[ip_of_address sa]
-   {{{ reqh, RET reqh; make_request_spec reqh sa }}}.
+    {{{ reqh, RET reqh; make_request_spec reqh sa }}}.
 
 End Spec.
 

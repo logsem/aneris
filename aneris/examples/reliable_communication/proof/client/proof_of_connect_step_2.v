@@ -144,8 +144,8 @@ Section Proof_of_connect_step_2.
     iDestruct "Hy3" as "[(%Hm & Hh & Hmh & Hres)|(%Hm & Hh & Hmh)]".
     (* Case 1/2 : m ∉ R *)
     *  iDestruct (client_interp_le with "[$Hres]") as "#Hres_pers".
-       iDestruct (big_sepS_insert_2 m with "[] [$HmhR Hres_pers]")
-         as "#HmhRext"; first done.
+       iDestruct (big_sepS_insert_2 m with "Hres_pers [$HmhR Hres_pers]")
+         as "#HmhRext".
        iDestruct "Hres" as (mval Hsender Hser) "Hres".
        wp_apply (s_deser_spec ((msg_serialization RCParams_srv_ser)));
          first done.
@@ -217,7 +217,7 @@ Section Proof_of_connect_step_2.
           iIntros (v) "Hpost". iApply "HΨ"; subst; eauto.
           iApply (conn_incoming_msg_cond_2_extend _ _ _ n with "[] [$Hcnd2]"); eauto.
      (* Case 1/2 : m ∈ R *)
-    * iDestruct (big_sepS_elem_of _ _ _ Hm with "[$HmhR]") as "#Hm".
+    * iDestruct (big_sepS_elem_of _ _ _ Hm with "HmhR") as "#Hm".
       iDestruct "Hm" as (mval Hsender Hser) "#Hres".
       wp_apply (s_deser_spec ((msg_serialization RCParams_srv_ser)));
         first done.
@@ -282,7 +282,6 @@ Section Proof_of_connect_step_2.
             rewrite Heq2.
             subst; eauto with iFrame. }
          iIntros (v) "Hpost". iApply "HΨ"; subst; eauto.
-         Unshelve. apply _. apply _.
   Qed.
 
 End Proof_of_connect_step_2.

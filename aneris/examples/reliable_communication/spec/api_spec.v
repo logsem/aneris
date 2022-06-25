@@ -13,12 +13,11 @@ Canonical Structure valO := leibnizO val.
 Notation iProto Σ := (iProto Σ val).
 Notation iMsg Σ := (iMsg Σ val).
 
-
 Section API_spec.
   Context `{ !anerisG Mdl Σ }.
-  Context `{ !@Chan_mapsto_resource Σ}.
-  Context `{ UP : !Reliable_communication_service_params}.
-  Context `{ !SessionResources UP}.
+  Context `{ !@Chan_mapsto_resource Σ }.
+  Context `{ UP : !Reliable_communication_service_params }.
+  Context `{ !SessionResources UP }.
 
   Implicit Types p : iProto Σ.
   Implicit Types TT : tele.

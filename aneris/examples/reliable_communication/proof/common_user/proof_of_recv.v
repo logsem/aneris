@@ -53,7 +53,7 @@ Section Proof_of_recv.
       iLeft. iSplitR; [done|].
       iExists _, _, _, _, _, _, _, _.
       iExists _, _, _, _, _, _.
-      by iFrame "#∗"; eauto. } Unshelve.
+      by iFrame "#∗"; eauto. }
     destruct Hqeq as (h & t & tv & -> & -> & Hq').
     iDestruct "Hvs" as "[(%w' & -> & Hfrag) Hvs]".
     wp_pures.

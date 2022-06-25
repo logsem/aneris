@@ -62,7 +62,7 @@ Section Client_Proxy_Proof.
         {{{ RET #();
            ∃ (h hf : wrlog) (a: write_event), Q a h hf }}})%I.
 
- Lemma write_spec_internal_holds A sa (reqh : val) :
+  Lemma write_spec_internal_holds A sa (reqh : val) :
     Global_Inv γL γM N -∗
     fixed A -∗
     DB_addr ⤇ srv_si -∗

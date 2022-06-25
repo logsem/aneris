@@ -24,7 +24,7 @@ Section Proof_of_make_server_skt.
 
   Notation srv_ip := (ip_of_address RCParams_srv_saddr).
 
- Lemma make_server_skt_internal_spec A :
+  Lemma make_server_skt_internal_spec A :
     {{{ free_ports srv_ip {[port_of_address RCParams_srv_saddr]} ∗
         RCParams_srv_saddr ⤳ (∅, ∅) ∗
         RCParams_srv_saddr ⤇ server_interp ∗

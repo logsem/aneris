@@ -153,7 +153,7 @@ Section MTS_proof_of_code.
     {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
 
   Lemma make_request_spec_internal_holds c lk γlk sa :
-    {{{  is_lock (MTS_mN.@"proxy") (ip_of_address sa) γlk lk
+    {{{ is_lock (MTS_mN.@"proxy") (ip_of_address sa) γlk lk
             (c ↣{ip_of_address sa,RCParams_clt_ser} RCParams_protocol) }}}
       make_request c lk @[ip_of_address sa]
     {{{ reqh, RET reqh; make_request_spec_internal reqh sa }}}.
@@ -225,7 +225,6 @@ Section MTS_proof_of_init.
   Context `{!anerisG Mdl Σ}.
   Context `{!lockG Σ}.
   Context `{MTU : !MTS_user_params, !SpecChanG Σ}.
-  (* Context `{!Reliable_communication_init}. *)
 
   Lemma MTS_init_setup_holds (E : coPset) :
     ↑MTS_mN ⊆ E →
@@ -251,8 +250,8 @@ Section MTS_proof_of_init.
     iSplitL.
     - iIntros (MTS A Φ) "!#".
       iIntros "(#Hsi & HinA & Hf & Hmh & Hfp & Hinit & #Hmon) HΦ".
-      iDestruct run_server_internal_spec_holds as "#HserviceSpec".
-      iApply ("HserviceSpec" with
+      (* iDestruct run_server_internal_spec_holds as "#HserviceSpec". *)
+      iApply (run_server_internal_spec_holds with
                "[$HinA $Hf $Hfp $Hsi $Hmon $Hmh $Hinit][$]").
       Unshelve.
       + done.
@@ -267,7 +266,6 @@ Section MTS_proof_of_init.
       + split; try done.
       + split; try done.
   Qed.
-
 
 End MTS_proof_of_init.
 
