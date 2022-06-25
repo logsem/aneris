@@ -29,7 +29,7 @@ Section KnownSessions.
   Proof. apply _. Qed.
 
   Lemma session_token_agree sa γ1 γ2 :
-      session_token sa γ1 -∗ session_token sa γ2 -∗ ⌜γ1 = γ2⌝.
+    session_token sa γ1 -∗ session_token sa γ2 -∗ ⌜γ1 = γ2⌝.
   Proof.
     iIntros "Hγ1 Hγ2".
     iDestruct (own_valid_2 with "Hγ1 Hγ2") as %Hval.
@@ -46,7 +46,6 @@ Section KnownSessions.
   Qed.
 
 End KnownSessions.
-
 
 Section OneShot.
   Context `{!anerisG Mdl Σ, !chanG Σ, !server_ghost_names}.
@@ -145,12 +144,9 @@ Section iProto_sessions.
   Qed.
 
 
-  (* TODO: remember to set up the namespace N correctly
-     as global parameter in user params. *)
   Lemma session_map_update
         (M : session_names_map) (sa : socket_address) (p : iProto Σ)
         (cookie : nat) (N: namespace) (E : coPset) :
-    ⌜↑N ⊆ E⌝ -∗ (* Do we need this hypothesis about masks ? *)
     ⌜sa ∉ dom M⌝ -∗
     known_sessions M -∗
     steps_lb 0 ={E}=∗
@@ -163,7 +159,7 @@ Section iProto_sessions.
       can_init γ sa p Left ∗
       can_init γ sa (iProto_dual p) Right.
     Proof.
-    iIntros (Hmask Hfresh) "Hkn #Hlb".
+    iIntros (Hfresh) "Hkn #Hlb".
     iMod (iProto_init p) as (γ_p) "(Hp_auth & Hpl & Hpr)".
     iMod (auth_list_alloc with "[//]") as (γ_Tl) "(HTl_auth & HTl_A)".
     iMod (auth_list_alloc with "[//]") as (γ_Rl) "(HRl_auth & HRl_A)".
@@ -171,11 +167,7 @@ Section iProto_sessions.
     iMod (auth_list_alloc with "[//]") as (γ_Rr) "(HRr_auth & HRr_A)".
     set (γ_chan := ChanName γ_p γ_Tl γ_Tr γ_Rl γ_Rr (N.@ (socket_address_to_str sa))).
     iMod (mono_nat_own_alloc 0%nat) as (γ_srv_idx) "(Hsrv_idxA & Hsrv_idxF)".
-    (* iMod (own_alloc (A := mono_natUR) (●MN{#1} 0)) as (γ_srv_idx) "Hsrv_idx". *)
-    (* { apply mono_nat_auth_valid. } *)
     iMod (mono_nat_own_alloc 0%nat) as (γ_clt_idx) "(Hclt_idxA & Hclt_idxF)".
-    (* iMod (own_alloc (A := mono_natUR) (●MN{#1} 0)) as (γ_clt_idx) "Hclt_idx". *)
-    (* { apply mono_nat_auth_valid. } *)
     iMod (own_alloc (● (to_agree <$> (∅: session_names_map) : session_names_mapUR)))
       as (γsa) "Hsa".
     { rewrite fmap_empty. by apply auth_auth_valid. }

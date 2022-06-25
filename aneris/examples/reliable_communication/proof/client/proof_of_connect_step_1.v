@@ -133,8 +133,8 @@ Section Proof_of_connect_step_1.
     iDestruct "Hy3" as "[(%Hm & Hh & Hmh & Hres)|(%Hm & Hh & Hmh)]".
     (* Case 1/2 : m ∉ R *)
     *  iDestruct (client_interp_le with "[$Hres]") as "#Hres_pers".
-       iDestruct (big_sepS_insert_2 m with "[] [$HmhR Hres_pers]")
-         as "#HmhRext"; first done.
+       iDestruct (big_sepS_insert_2 m with "Hres_pers [$HmhR Hres_pers]")
+         as "#HmhRext".
        iDestruct "Hres" as (mval Hsender Hser) "Hres".
        wp_apply (s_deser_spec ((msg_serialization
                     RCParams_srv_ser))); first done.
@@ -173,7 +173,7 @@ Section Proof_of_connect_step_1.
               (* wp_apply (aneris_wp_send_duplicate with "[$Hh $Hmh]"); *)
               (*   [done | done | set_solver | | ]. iFrame "Hsrv_si". *)
               (* iIntros "(Hh & Hmh)". wp_pures. *)
-              iApply ("IH" with  "[] [HΨ] [$Hh] [Hmh] [$HmhRext] [Hcnd1]"). 
+              iApply ("IH" with  "[] [HΨ] [$Hh] [Hmh] [$HmhRext] [Hcnd1]").
               { iIntros (m') "Hm'".
                 iDestruct "Hm'" as (ck γs' Hser1 ? ?) "(#Htk & Hm')".
                 iApply (conn_step_1_init_holds clt_addr R0 with "[Hm']").
@@ -185,7 +185,7 @@ Section Proof_of_connect_step_1.
                 rewrite Hn. subst. iRight.
                 iDestruct "Hgh" as (γs') "(H1 & H2)". eauto. }
        ** iDestruct "Hres" as (ackid -> n) "(-> & Hfr)". wp_pures.
-          iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhRext] [Hcnd1]"). 
+          iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhRext] [Hcnd1]").
           { iIntros (m') "Hm'".
             iDestruct "Hm'" as (ck γs' Hser1 ? ?) "(#Htk & Hm')".
             iApply (conn_step_1_init_holds clt_addr R0 with "[Hm']").
@@ -194,7 +194,7 @@ Section Proof_of_connect_step_1.
           { iApply (conn_incoming_msg_cond_1_extend _ _ _ n); eauto. }
           { iApply (conn_incoming_msg_cond_2_extend _ _ _ n); eauto. }
        ** iDestruct "Hres" as (i w -> n) "(Heq & Hidmsg)". wp_pures.
-          iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhRext] [Hcnd1]"). 
+          iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhRext] [Hcnd1]").
           { iIntros (m') "Hm'".
             iDestruct "Hm'" as (ck γs' Hser1 ? ?) "(#Htk & Hm')".
             iApply (conn_step_1_init_holds clt_addr R0 with "[Hm']").
@@ -203,7 +203,7 @@ Section Proof_of_connect_step_1.
           { iApply (conn_incoming_msg_cond_1_extend _ _ _ n); eauto. }
           { iApply (conn_incoming_msg_cond_2_extend _ _ _ n); eauto. }
     (* Case 1/2 : m ∈ R *)
-    * iDestruct (big_sepS_elem_of _ _ _ Hm with "[$HmhR]") as "Hm".
+    * iDestruct (big_sepS_elem_of _ _ _ Hm with "HmhR") as "Hm".
       iDestruct "Hm" as (mval Hsender Hser) "Hres".
       wp_apply (s_deser_spec ((msg_serialization RCParams_srv_ser)));
         first done.
@@ -230,27 +230,26 @@ Section Proof_of_connect_step_1.
          (* Case B: the reply is COOKIE-ACK. *)
          (* Check whether the reply is INIT-ACK and #(m_sender m) = #RCParams_srv_saddr. *)
          *** wp_pures.
-             iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhR] [$Hcnd1] [$Hcnd2]"); [| ]. 
+             iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhR] [$Hcnd1] [$Hcnd2]"); [| ].
              { iIntros (m') "Hm'".
                iDestruct "Hm'" as (ck γs' Hser1 ? ?) "(#Htk' & Hm')".
                iApply (conn_step_1_init_holds clt_addr R0 with "[Hm']").
                iExists ck. iFrame "#∗". eauto. }
              iIntros (v) "Hpost". iApply "HΨ"; subst; eauto.
       ** iDestruct "Hres" as (ackid -> n) "(-> & Hfr)". wp_pures.
-         iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhR] [$Hcnd1] [$Hcnd2]"). 
+         iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhR] [$Hcnd1] [$Hcnd2]").
          { iIntros (m') "Hm'".
            iDestruct "Hm'" as (ck γs' Hser1 ? ?) "(#Htk & Hm')".
            iApply (conn_step_1_init_holds clt_addr R0 with "[Hm']").
            iExists ck. iFrame "#∗". eauto. }
          iIntros (v) "Hpost". iApply "HΨ"; subst; eauto.
       ** iDestruct "Hres" as (i w -> n) "(Heq & Hidmsg)". wp_pures.
-         iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhR] [$Hcnd1] [$Hcnd2]"). 
+         iApply ("IH" with  "[] [HΨ] [$Hh] [$Hmh] [$HmhR] [$Hcnd1] [$Hcnd2]").
          { iIntros (m') "Hm'".
            iDestruct "Hm'" as (ck γs' Hser1 ? ?) "(#Htk & Hm')".
            iApply (conn_step_1_init_holds clt_addr R0 with "[Hm']").
            iExists ck. iFrame "#∗". eauto. }
          iIntros (v) "Hpost". iApply "HΨ"; subst; eauto.
-         Unshelve. apply _. apply _.
   Qed.
 
  End Proof_of_connect_step_1.

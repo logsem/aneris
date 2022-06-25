@@ -181,8 +181,8 @@ Section Proof_of_server_listen.
         rewrite Hsktsrv' in Hsktsrv. inversion Hsktsrv. subst.
         iApply ("IH" with "[] [$Hsl] [-HΦ] [HΦ]"); [naive_solver | iFrame |done]. }
     (* Message is a duplicate. *)
-    iDestruct (big_sepS_elem_of _ _ m with "[$Hdomfrag]") as "%Habs"; [set_solver|].
-    by rewrite Hdom in Habs. Unshelve. apply _.
+    iDestruct (big_sepS_elem_of _ _ m with "Hdomfrag") as "%Habs"; [set_solver|].
+    by rewrite Hdom in Habs.
   Qed.
 
   Lemma server_listen_internal_spec (skt : val) :

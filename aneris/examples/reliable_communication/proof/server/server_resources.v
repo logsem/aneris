@@ -38,7 +38,7 @@ Section Server_resources.
   | HalfOpened of nat
   | Connected of ((val * nat) * (loc * loc)).
 
-   #[global] Program Instance Inject_conn_state : Inject conn_state val :=
+  #[global] Program Instance Inject_conn_state : Inject conn_state val :=
     {| inject a :=
       match a with
       | HalfOpened n => InjLV #n
