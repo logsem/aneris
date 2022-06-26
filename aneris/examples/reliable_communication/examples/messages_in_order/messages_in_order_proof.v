@@ -74,9 +74,9 @@ Section proof_of_the_code.
     wp_apply (RCSpec_make_server_skt_spec with "[$Hmh $Hfp $Hf $Hsi $Hit][HΦ]"); first done.
     iNext. iIntros (skt) "Hcl". wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
-    iNext. iIntros (v) "(-> & Hp)". wp_pures.
+    iNext. iIntros "Hp". wp_pures.
     wp_apply (RCSpec_accept_spec with "[$Hp][HΦ]").
-    iNext. iIntros (c caddr v ) "(-> & Hlst & Hc)".
+    iNext. iIntros (c caddr) "(Hlst & Hc)".
     wp_pures. simpl in *. rewrite /proto_in_order.
     wp_recv (m1) as "_". wp_send with "[//]".
     wp_recv (m2) as "_". wp_send with "[//]".

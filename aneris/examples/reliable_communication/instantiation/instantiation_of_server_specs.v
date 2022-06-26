@@ -31,47 +31,43 @@ Section Server_API_spec_instantiation.
   Context `{!server_ghost_names}.
   Context `{User_params: !Reliable_communication_service_params}.
 
-  Lemma make_server_skt_spec_holds A :
+  Lemma make_server_skt_spec_holds :
     make_server_skt_spec
-        User_params
-        session_resources_instance A.
+      User_params
+      session_resources_instance.
   Proof.
     rewrite /make_server_skt_spec.
     rewrite /SrvInit /session_resources_instance /SrvInitRes /SrvCanListen.
-    iIntros (Φ) "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8) HΦ".
-    iApply (make_server_skt_internal_spec with
-             "[$][$HΦ]").
+    iIntros (A Φ) "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8) HΦ".
+    iApply (make_server_skt_internal_spec with "[$][$HΦ]").
   Qed.
 
-  Lemma server_listen_spec_holds skt:
-        server_listen_spec
-            User_params
-            session_resources_instance
-            skt.
+  Lemma server_listen_spec_holds :
+    server_listen_spec
+      User_params
+      session_resources_instance.
   Proof.
     rewrite /server_listen_spec.
     rewrite /SrvCanListen /SrvListens.
-    iIntros (Φ) "Hyp HΦ".
-    iApply (server_listen_internal_spec with
-             "[$][$HΦ]").
+    iIntros (skt Φ) "Hyp HΦ".
+    simpl.
+    iApply (server_listen_internal_spec with "[$][$HΦ]").
   Qed.
 
-  Lemma accept_spec_holds skt:
-        accept_spec
-            User_params
-            session_resources_instance
-            skt.
+  Lemma accept_spec_holds :
+    accept_spec
+      User_params
+      session_resources_instance.
   Proof.
     rewrite /server_listen_spec.
     rewrite /session_resources_instance !/SrvListens.
     rewrite /chan_mapsto_resource_instance.
-    iIntros (Φ) "Hyp HΦ".
+    iIntros (skt Φ) "Hyp HΦ".
     iApply (accept_internal_spec with "[$Hyp][HΦ]").
     iNext.
-    iIntros (γe c caddr v) "(%Heq & (H1 & H2 & _))".
+    iIntros (γe c clt_addr) "(H1 & H2 & _)".
     iApply "HΦ".
     rewrite /SrvListens.
-    iSplit; first done.
     iFrame.
     iExists _; iFrame.
   Qed.

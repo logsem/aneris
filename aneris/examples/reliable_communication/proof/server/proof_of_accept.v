@@ -31,7 +31,7 @@ Section Proof_of_accept.
   Lemma accept_internal_spec (skt : val)  :
     {{{ isServerSocketInternal skt true }}}
       accept skt @[ip_of_address RCParams_srv_saddr]
-    {{{ γe c (clt_addr: socket_address) v, RET v; ⌜v = (c, #clt_addr)%V⌝ ∗
+    {{{ γe c (clt_addr: socket_address), RET (c, #clt_addr);
         (isServerSocketInternal skt true) ∗
         c ↣{ γe, ip_of_address RCParams_srv_saddr, RCParams_srv_ser} iProto_dual RCParams_protocol ∗
         ChannelAddrToken γe (RCParams_srv_saddr, clt_addr) }}}.
@@ -67,7 +67,7 @@ Section Proof_of_accept.
       wp_apply (release_spec with "[$Hlocked $Hqlk Hcql HresS]").
       + iExists _, _; eauto with iFrame.
       + iIntros (v ->). wp_pures. iApply "HΦ". iFrame.
-        iSplit; first done. iExists srv_skt_l. iSplit; first done.
+        iExists srv_skt_l. iSplit; first done.
         iRight. iSplit; first done. eauto with iFrame.
   Qed.
 

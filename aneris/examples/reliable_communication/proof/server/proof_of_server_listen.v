@@ -24,11 +24,10 @@ Section Proof_of_server_listen.
   Context (N : namespace).
   Notation srv_ip := (ip_of_address RCParams_srv_saddr).
 
-
   Lemma server_recv_on_listening_skt_loop_spec (skt_passive : val) :
     {{{ isServer_listening_loop_resources skt_passive }}}
-       server_recv_on_listening_skt_loop skt_passive @[srv_ip]
-       {{{ w, RET w; False }}}.
+      server_recv_on_listening_skt_loop skt_passive @[srv_ip]
+    {{{ w, RET w; False }}}.
   Proof.
     iIntros (Φ) "HsrRes HΦ".
     iDestruct "HsrRes"
@@ -188,7 +187,7 @@ Section Proof_of_server_listen.
   Lemma server_listen_internal_spec (skt : val) :
     {{{ isServerSocketInternal skt false }}}
       server_listen skt @[ip_of_address RCParams_srv_saddr]
-    {{{ v, RET v; ⌜v = #()⌝ ∗ isServerSocketInternal skt true }}}.
+    {{{ RET #(); isServerSocketInternal skt true }}}.
   Proof.
     iIntros (Φ) "HsrvRes HΦ".
     iDestruct "HsrvRes" as (srv_skt_l <-) "[(_ & HsrvRes)|(%Habs & _)]"; [|done].
@@ -222,7 +221,7 @@ Section Proof_of_server_listen.
         rewrite -Qp_div_add_distr pos_to_Qp_add Qp_div_diag //=. }
       wp_apply (aneris_wp_fork with "[-]").
       iSplitL "HΦ Hl2".
-      + wp_pures. iApply "HΦ". iNext. iSplit; [done|]. iExists srv_skt_l. iSplit; [done|].
+      + wp_pures. iApply "HΦ". iNext. iExists srv_skt_l. iSplit; [done|].
         iRight.
         iSplit; [done|].
         iExists _, _, _.

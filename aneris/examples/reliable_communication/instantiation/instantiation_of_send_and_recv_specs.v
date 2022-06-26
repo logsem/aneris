@@ -33,25 +33,22 @@ Section Send_Recv_API_spec_instantiation.
   Implicit Types p : iProto Σ.
   Implicit Types TT : tele.
 
-  Lemma send_spec_holds (c : val) v p ip serA:
-    send_spec (c : val) v p ip serA.
+  Lemma send_spec_holds :
+    send_spec.
   Proof.
     rewrite /send_spec.
-    iIntros (Φ) "(H1 & H2) HΦ".
+    iIntros (c v p ip serA Φ) "(H1 & H2) HΦ".
     iDestruct "H1" as (γe) "H1".
     iApply (send_spec_internal _ _ _ p with "[$][HΦ]").
     iNext. iIntros "Hc". iApply "HΦ".
     iExists _. iFrame.
   Qed.
 
-  Lemma send_tele_spec_holds
-         TT c (tt : TT) (v : TT → val) (P : TT → iProp Σ) (p : TT → iProto Σ) ip serA:
-    send_spec_tele
-         TT c (tt : TT)
-      (v : TT → val) (P : TT → iProp Σ) (p : TT → iProto Σ) ip serA.
+  Lemma send_tele_spec_holds :
+    send_spec_tele.
   Proof.
     rewrite /send_spec_tele.
-    iIntros (Φ) "(H1 & Hp & H2) HΦ".
+    iIntros (TT c tt v P p ip serA Φ) "(H1 & Hp & H2) HΦ".
     iDestruct "H1" as (γe) "H1".
     iApply (send_spec_tele_internal _ _ _ _ _ _ with "[-HΦ][HΦ]").
     - by iFrame.
@@ -59,13 +56,11 @@ Section Send_Recv_API_spec_instantiation.
     iExists _. iFrame.
   Qed.
 
-  Lemma try_recv_spec_holds
-        TT (c : val) (v : TT → val) (P : TT → iProp Σ) (p : TT → iProto Σ) ip ser:
-    try_recv_spec
-        TT (c : val) (v : TT → val) (P : TT → iProp Σ) (p : TT → iProto Σ) ip ser.
+  Lemma try_recv_spec_holds :
+    try_recv_spec.
   Proof.
     rewrite /try_recv_spec.
-    iIntros (Φ) "H1 HΦ".
+    iIntros (TT c v P p ip ser Φ) "H1 HΦ".
     iDestruct "H1" as (γe) "H1".
     iApply (try_recv_spec_internal _ _ _  with "[$][HΦ]").
     iNext. iIntros (w) "Hc". iApply "HΦ".
@@ -79,18 +74,15 @@ Section Send_Recv_API_spec_instantiation.
       iExists _. iFrame.
   Qed.
 
-  Lemma recv_spec_holds
-        TT (c : val) (v : TT → val) (P : TT → iProp Σ) (p : TT → iProto Σ) ip ser:
-    recv_spec
-        TT (c : val) (v : TT → val) (P : TT → iProp Σ) (p : TT → iProto Σ) ip ser.
+  Lemma recv_spec_holds :
+    recv_spec.
   Proof.
     rewrite /recv_spec.
-    iIntros (Φ) "H1 HΦ".
+    iIntros (TT c v P p ip ser Φ) "H1 HΦ".
     iDestruct "H1" as (γe) "H1".
     iApply (recv_spec_internal _ _ _  with "[$][HΦ]").
     iNext. iIntros (w) "(Hc & Hp)". iApply "HΦ". iFrame.
     iExists _. iFrame.
   Qed.
-
 
 End Send_Recv_API_spec_instantiation.

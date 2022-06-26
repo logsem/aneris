@@ -165,10 +165,10 @@ Section proof_of_the_server_code.
     iNext. iIntros (skt) "Hcl".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
-    iNext. iIntros (v) "(-> & Hp)".
+    iNext. iIntros "Hp".
     wp_pures.
     wp_apply (RCSpec_accept_spec with "[$Hp][HΦ]").
-    iNext. iIntros (c caddr v ) "(-> & Hlst & Hc)".
+    iNext. iIntros (c caddr) "(Hlst & Hc)".
     wp_pures.
     simpl in *.
     rewrite /proto_hello_world.
