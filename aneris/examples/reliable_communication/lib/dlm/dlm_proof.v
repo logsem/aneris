@@ -183,7 +183,7 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
     iLöb as "IH".
     wp_pure _.
     wp_smart_apply (RCSpec_accept_spec with "[$Hlistens]").
-    iIntros (c clt_addr v) "(-> & Hlistens & Hc)".
+    iIntros (c clt_addr) "(Hlistens & Hc)".
     wp_pures.
     wp_apply (aneris_wp_fork with "[-]").
     iSplitL "Hlistens".
@@ -215,7 +215,7 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
     iIntros (lk γlk) "#Hlk".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
-    iNext. iIntros (v) "(-> & Hp)". wp_pures.
+    iNext. iIntros "Hp". wp_pures.
     iApply (wp_connections_loop with "[$]").
     iNext. by iIntros.
   Qed.

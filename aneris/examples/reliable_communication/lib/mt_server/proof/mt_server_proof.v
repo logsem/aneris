@@ -96,7 +96,7 @@ Section MTS_proof_of_code.
     iLöb as "IH".
     wp_pure _.
     wp_smart_apply (RCSpec_accept_spec with "[$Hlistens]").
-    iIntros (c clt_addr v) "(-> & Hlistens & Hc)".
+    iIntros (c clt_addr) "(Hlistens & Hc)".
     wp_pures.
     wp_apply (aneris_wp_fork with "[-]").
     iSplitL "Hlistens".
@@ -138,7 +138,7 @@ Section MTS_proof_of_code.
     iNext. iIntros (skt) "Hcl".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
-    iNext. iIntros (v) "(-> & Hp)".
+    iNext. iIntros "Hp".
     wp_pures.
     wp_apply aneris_wp_fork.
     iSplitL "HΦ".
