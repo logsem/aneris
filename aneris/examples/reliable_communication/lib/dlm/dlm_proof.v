@@ -280,8 +280,8 @@ Section DL_proof_of_the_init.
     ⊢ |={E}=>
           ∃ (DLRS : DL_resources),
             dl_service_init ∗
-             (∀ (A : gset socket_address), dl_server_start_service_spec R A) ∗
-             (∀ sa (A : gset socket_address), dl_subscribe_client_spec R sa A).
+             (dl_server_start_service_spec R) ∗
+             (dl_subscribe_client_spec R).
   Proof.
     iIntros (HE).
     iMod (own_alloc (Excl ())) as (γdlk) "Hdlk"; first done.
@@ -323,17 +323,15 @@ Section DL_proof_of_the_init.
       rewrite /dl_acquire_internal_spec.
       rewrite /dl_release_internal_spec.
       iSplit.
-      + iPureIntro.
-        iIntros (Ψ).
+      + iIntros (Ψ).
         specialize (HaS Ψ).
-        iIntros "Hr HΨ".
+        iIntros "!> Hr HΨ".
         iApply (HaS with "[$Hr][HΨ]").
         iNext. iIntros "Hr".
         iApply "HΨ". by iFrame.
-      + iPureIntro.
-        iIntros (Ψ).
+      + iIntros (Ψ).
         specialize (HrS Ψ).
-        iIntros "Hr HΨ".
+        iIntros "!> Hr HΨ".
         iApply (HrS with "[$Hr][HΨ]").
         iNext. iIntros "Hr".
         iApply "HΨ". by iFrame.

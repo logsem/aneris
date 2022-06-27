@@ -25,7 +25,8 @@ Section DL_spec.
   Notation srv_ip := (ip_of_address DL_server_addr).
   Notation srv_port := (port_of_address DL_server_addr).
 
-  Definition dl_server_start_service_spec A : iProp Σ :=
+  Definition dl_server_start_service_spec : iProp Σ :=
+    ∀ A,
     {{{ ⌜srv_sa ∈ A⌝ ∗ fixed A ∗ free_ports srv_ip {[srv_port]} ∗
         srv_sa ⤳ (∅, ∅) ∗
         srv_sa ⤇ dl_reserved_server_socket_interp ∗
@@ -33,24 +34,24 @@ Section DL_spec.
       dlock_start_service #srv_sa @[srv_ip]
     {{{ RET #(); True }}}.
 
-  Definition dl_acquire_spec (sa : socket_address) (dl : val) : Prop :=
+  Definition dl_acquire_spec (sa : socket_address) (dl : val) : iProp Σ :=
     {{{ DLockCanAcquire sa dl R  }}}
        dlock_acquire dl @[ip_of_address sa]
      {{{ v, RET v; ⌜v = #()⌝ ∗ DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}.
 
-  Definition dl_release_spec (sa : socket_address) (dl : val) : Prop :=
+  Definition dl_release_spec (sa : socket_address) (dl : val) : iProp Σ :=
     {{{ DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}
        dlock_release dl @[ip_of_address sa]
     {{{ v, RET v; ⌜v = #()⌝ ∗ DLockCanAcquire sa dl R }}}.
 
-  Definition dl_subscribe_client_spec (sa : socket_address) A : iProp Σ :=
+  Definition dl_subscribe_client_spec : iProp Σ :=
+    ∀ (sa : socket_address) A,
     {{{ ⌜sa ∉ A⌝ ∗ ⌜DL_server_addr ∈ A⌝ ∗ fixed A ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
          DL_server_addr ⤇ dl_reserved_server_socket_interp }}}
       dlock_subscribe_client #sa #srv_sa @[ip_of_address sa]
       {{{ dl, RET dl; DLockCanAcquire sa dl R ∗
-          ⌜dl_acquire_spec sa dl⌝ ∗
-          ⌜dl_release_spec sa dl⌝ }}}.
+          dl_acquire_spec sa dl ∗ dl_release_spec sa dl }}}.
 
 End DL_spec.
 
@@ -62,8 +63,8 @@ Section Init.
     ↑DL_namespace ⊆ E →
     ⊢ |={E}=> ∃ (DLRS : DL_resources),
       dl_service_init ∗
-        (∀ (A : gset socket_address), dl_server_start_service_spec R A) ∗
-        (∀ sa (A : gset socket_address), dl_subscribe_client_spec R sa A)
+        (dl_server_start_service_spec R) ∗
+        (dl_subscribe_client_spec R)
     }.
 
 End Init.
