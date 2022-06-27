@@ -37,12 +37,12 @@ Section DL_spec.
   Definition dl_acquire_spec (sa : socket_address) (dl : val) : iProp Σ :=
     {{{ DLockCanAcquire sa dl R  }}}
        dlock_acquire dl @[ip_of_address sa]
-     {{{ v, RET v; ⌜v = #()⌝ ∗ DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}.
+     {{{ RET #(); DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}.
 
   Definition dl_release_spec (sa : socket_address) (dl : val) : iProp Σ :=
     {{{ DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}
        dlock_release dl @[ip_of_address sa]
-    {{{ v, RET v; ⌜v = #()⌝ ∗ DLockCanAcquire sa dl R }}}.
+    {{{ RET #(); DLockCanAcquire sa dl R }}}.
 
   Definition dl_subscribe_client_spec : iProp Σ :=
     ∀ (sa : socket_address) A,
@@ -51,7 +51,7 @@ Section DL_spec.
          DL_server_addr ⤇ dl_reserved_server_socket_interp }}}
       dlock_subscribe_client #sa #srv_sa @[ip_of_address sa]
       {{{ dl, RET dl; DLockCanAcquire sa dl R ∗
-          dl_acquire_spec sa dl ∗ dl_release_spec sa dl }}}.
+                      dl_acquire_spec sa dl ∗ dl_release_spec sa dl }}}.
 
 End DL_spec.
 

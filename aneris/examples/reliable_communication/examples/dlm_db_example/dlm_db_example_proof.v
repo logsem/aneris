@@ -83,7 +83,7 @@ Section proof_of_code.
     rewrite /do_writes.
     wp_pures.
     wp_apply ("Hacq" with "[$Hdl]").
-    iIntros (v) "(-> & Hcanrel & Hdlk & Hres)".
+    iIntros "(Hcanrel & Hdlk & Hres)".
     wp_pures.
     iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
     rewrite HipEq.
@@ -132,7 +132,7 @@ Section proof_of_code.
       { intros Hx. by exists ay. }
       intros Hy. by exists ax. }
     iNext.
-    iIntros (v) "(-> & _)".
+    iIntros "_".
     by iApply "HΦ".
   Qed.
 
@@ -156,7 +156,7 @@ Section proof_of_code.
     iLöb as "IH".
     wp_pures.
     wp_apply ("Hacq" with "[$Har]").
-    iIntros (v) "(-> & Hcanrel & Hdlk & Hres)".
+    iIntros "(Hcanrel & Hdlk & Hres)".
     wp_pures.
     iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
     rewrite HipEq.
@@ -170,7 +170,7 @@ Section proof_of_code.
       wp_apply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
       { iExists _, _, _.
         by iFrame "#∗". }
-      iIntros (v) "(-> & Har)".
+      iIntros "Har".
       do 4 (wp_pure _).
       by iApply ("IH" with "[$Har]").
     - wp_pures.
@@ -201,14 +201,14 @@ Section proof_of_code.
              wp_apply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
              { iExists _, _, _.
                by iFrame "#∗". }
-             iIntros (v) "(-> & Har)".
+             iIntros "Har".
              wp_pures.
              by iApply "HΦ".
       -- wp_pures.
          wp_apply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
          { iExists _, _, _.
            by iFrame "#∗". }
-         iIntros (v) "(-> & Har)".
+         iIntros "Har".
          do 4 (wp_pure _).
          by iApply ("IH" with "[$Har]").
   Qed.
