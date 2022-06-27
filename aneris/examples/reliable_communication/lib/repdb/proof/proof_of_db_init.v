@@ -222,7 +222,7 @@ End Init_setup_proof.
 Global Instance db_init_instance
        `{!anerisG Mdl Σ, !DB_params, !DBPreG Σ, SpecChanG Σ}: DB_init.
   Proof.
-    split. iIntros (E HE Hn1 Hn2 _).
+    split. iIntros (E HE Hn1 Hn2).
     iMod (init_setup_holds E HE Hn1 Hn2)
       as "(%DBRes & %init & %lsi & %lsfi & Hinit)".
     iModIntro.
