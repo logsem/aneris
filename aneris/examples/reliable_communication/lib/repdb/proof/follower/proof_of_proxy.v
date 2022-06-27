@@ -59,7 +59,7 @@ Section Client_Proxy_Proof.
      {{{ fixed A ∗
          fsa ⤇ follower_si ∗
          csa ⤳ (∅, ∅) ∗
-         (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC follower_si A sa) ∗
+         (@init_client_proxy_spec _ _ _ _ MTC follower_si) ∗
          free_ports (ip_of_address csa) {[port_of_address csa]} }}}
        init_client_follower_proxy (s_serializer DB_serialization)
          #csa #fsa @[ip_of_address csa]
@@ -90,7 +90,6 @@ Section Client_Proxy_Proof.
       -- iDestruct "Hobs" as "[(%Habs & _)|Hobs]".
          { naive_solver. }
          iDestruct "Hobs" as (γF') "(#Hknw & #HobsL & #HobsF)".
-         (* iDestruct (known_replog_token_agree with "[$Hknown][$Hknw]") as "->". *)
          iFrame "#".
          iExists k, h.
          iFrame "#∗".

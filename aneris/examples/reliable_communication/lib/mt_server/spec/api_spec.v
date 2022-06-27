@@ -13,7 +13,8 @@ Section Spec.
   Context (srv_si : message → iProp Σ).
   Notation srv_ip := (ip_of_address MTS_saddr).
 
-  Definition run_server_spec `{!MTS_spec_params MTU} A : iProp Σ :=
+  Definition run_server_spec `{!MTS_spec_params MTU} : iProp Σ :=
+    ∀ A,
     {{{ MTS_saddr ⤇ srv_si ∗
         ⌜MTS_saddr ∈ A⌝ ∗
         fixed A ∗
@@ -37,11 +38,12 @@ Section Spec.
       handler reqv @[ip_of_address clt_addr]
     {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
 
-  Definition init_client_proxy_spec A sa : iProp Σ :=
-    {{{⌜sa ∉ A⌝ ∗
-       fixed A ∗
-       free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
-       MTS_saddr ⤇ srv_si }}}
+  Definition init_client_proxy_spec : iProp Σ :=
+    ∀ A sa,
+    {{{ ⌜sa ∉ A⌝ ∗
+        fixed A ∗
+        free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
+        MTS_saddr ⤇ srv_si }}}
       init_client_proxy
         (s_serializer MTS_req_ser)
         (s_serializer MTS_rep_ser)
@@ -60,8 +62,7 @@ Section MTS_Init.
     ↑MTS_mN ⊆ E →
     ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
       SrvInit ∗
-      (∀ (MTS : MTS_spec_params MTU) A,
-         run_server_spec SrvInit srv_si A) ∗
-      (∀ A sa, init_client_proxy_spec srv_si A sa) }.
+      (∀ (MTS : MTS_spec_params MTU), run_server_spec SrvInit srv_si) ∗
+      (init_client_proxy_spec srv_si) }.
 
 End MTS_Init.

@@ -67,9 +67,9 @@ Section Init_Follower_Proof.
     {{{ fixed A ∗
         f2csa ⤇ follower_si ∗
         DB_addrF ⤇ leaderF_si ∗
-        (∀ (MTS : MTS_spec_params MTC) A,
-           @run_server_spec _ _ _ _ _ InitFollower follower_si MTS A) ∗
-        (∀ A sa, @init_client_proxy_spec _ _ _ _ MTF leaderF_si A sa) ∗
+        (∀ (MTS : MTS_spec_params MTC),
+           @run_server_spec _ _ _ _ _ InitFollower follower_si MTS) ∗
+        (@init_client_proxy_spec _ _ _ _ MTF leaderF_si) ∗
         init_follower_res ∗
         f2csa ⤳ (∅, ∅) ∗
         f2lsa ⤳ (∅, ∅) ∗

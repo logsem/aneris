@@ -65,10 +65,10 @@ Section Init_Leader_Proof.
     {{{ fixed A ∗
           DB_addr ⤇ leader_si ∗
           DB_addrF ⤇ leaderF_si ∗
-          (∀ (MTS : MTS_spec_params MTC) A,
-                @run_server_spec _ _ _ _ _ SrvLeaderInit leader_si MTS A) ∗
-          (∀ (MTS : MTS_spec_params MTF) A,
-                @run_server_spec _ _ _ _ _ SrvLeaderFInit leaderF_si MTS A) ∗
+          (∀ (MTS : MTS_spec_params MTC),
+             @run_server_spec _ _ _ _ _ SrvLeaderInit leader_si MTS) ∗
+          (∀ (MTS : MTS_spec_params MTF),
+             @run_server_spec _ _ _ _ _ SrvLeaderFInit leaderF_si MTS) ∗
           init_leader_res ∗
           DB_addr ⤳ (∅, ∅) ∗
           DB_addrF ⤳ (∅, ∅) ∗
