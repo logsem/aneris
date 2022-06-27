@@ -170,7 +170,7 @@ Section Client_Proxy_Proof.
     {{{ fixed A ∗
         DB_addr ⤇ srv_si ∗
         sa ⤳ (∅, ∅) ∗
-        (∀ A sa, @init_client_proxy_spec _ _ _ _ MTC srv_si A sa) ∗
+        (@init_client_proxy_spec _ _ _ _ MTC srv_si) ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
