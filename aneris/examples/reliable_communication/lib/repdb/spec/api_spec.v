@@ -190,7 +190,7 @@ Section Init.
       ↑DB_InvName ⊆ E →
       DB_addr ∉ DB_followers →
       DB_addrF ∉ DB_followers →
-        True ⊢ |={E}=>
+      ⊢ |={E}=>
       ∃ (DBRS : @DB_resources _ _ _ _ DB)
         (Init_leader : iProp Σ)
         (leader_si : message → iProp Σ)

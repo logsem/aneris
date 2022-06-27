@@ -494,7 +494,7 @@ Proof.
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   assert (DBPreG Σ) as HPreG by apply _.
-  iMod (DB_init_setup ⊤ $! I) as (DBRes) "Hdb";
+  iMod (DB_init_setup ⊤) as (DBRes) "Hdb";
     [solve_ndisj|set_solver|set_solver| ].
   iDestruct "Hdb"
     as (InitL leader_si leaderF_si) "(#HGinv & #Hobs & Hkeys & HInitL &
