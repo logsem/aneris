@@ -57,30 +57,31 @@ Section Init_Follower_Proof.
     known_replog_token f2csa γF ∗
     (∃ γdbF : gname, known_replog_token DB_addrF γdbF ∗ own_replog_obs γL DB_addrF []).
 
-  Definition init_follower_spec_internal A : iProp Σ :=
-        ⌜DB_addrF ∈ A⌝ →
-        ⌜f2csa ∈ A⌝ →
-        ⌜f2lsa ∉ A⌝ →
-        ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
-        ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-        {{{ fixed A ∗
-            f2csa ⤇ follower_si ∗
-            DB_addrF ⤇ leaderF_si ∗
-            (∀ (MTS : MTS_spec_params MTC) A,
-                 @run_server_spec _ _ _ _ _ InitFollower follower_si MTS A) ∗
-            (∀ A sa, @init_client_proxy_spec _ _ _ _ MTF leaderF_si A sa) ∗
-            init_follower_res ∗
-            f2csa ⤳ (∅, ∅) ∗
-            f2lsa ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
-            free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
-          init_follower (s_serializer DB_serialization)
-            #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
-        {{{ RET #(); True }}}.
+  Definition init_follower_spec_internal : iProp Σ :=
+    ∀ A,
+    ⌜DB_addrF ∈ A⌝ →
+    ⌜f2csa ∈ A⌝ →
+    ⌜f2lsa ∉ A⌝ →
+    ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
+    ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
+    {{{ fixed A ∗
+        f2csa ⤇ follower_si ∗
+        DB_addrF ⤇ leaderF_si ∗
+        (∀ (MTS : MTS_spec_params MTC) A,
+           @run_server_spec _ _ _ _ _ InitFollower follower_si MTS A) ∗
+        (∀ A sa, @init_client_proxy_spec _ _ _ _ MTF leaderF_si A sa) ∗
+        init_follower_res ∗
+        f2csa ⤳ (∅, ∅) ∗
+        f2lsa ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
+        free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
+      init_follower (s_serializer DB_serialization)
+      #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
+    {{{ RET #(); True }}}.
 
-  Lemma init_follower_spec_internal_holds A : ⊢ init_follower_spec_internal A.
+  Lemma init_follower_spec_internal_holds : ⊢ init_follower_spec_internal.
   Proof.
-    iIntros (HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
+    iIntros (A HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
       "(#HA & #Hsi & #HsiF & #HInitFollowerSpec
             & HinitFollowerAsClient & HinitRes & Hmh & HmhF & Hfp & HfpF)".
@@ -175,6 +176,5 @@ Section Init_Follower_Proof.
       iExists γF.
       iFrame "#".
   Qed.
-
 
 End Init_Follower_Proof.

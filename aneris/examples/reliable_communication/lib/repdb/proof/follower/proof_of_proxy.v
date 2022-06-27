@@ -51,7 +51,8 @@ Section Client_Proxy_Proof.
          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝))
     }}}%I.
 
-   Definition init_client_proxy_follower_spec_internal A csa : iProp Σ :=
+   Definition init_client_proxy_follower_spec_internal : iProp Σ :=
+     ∀ A csa,
      ⌜fsa ≠ DB_addr⌝ →
      ⌜fsa ∈ A⌝ →
      ⌜csa ∉ A⌝ →
@@ -65,10 +66,11 @@ Section Client_Proxy_Proof.
      {{{ rd, RET rd;
          (∀ k h, read_at_follower_spec_internal rd csa fsa k h) }}}.
 
-  Lemma init_client_proxy_follower_internal_holds A sa :
-    Global_Inv γL γM N ⊢ init_client_proxy_follower_spec_internal A sa.
+  Lemma init_client_proxy_follower_internal_holds :
+    Global_Inv γL γM N ⊢ init_client_proxy_follower_spec_internal.
   Proof.
     iIntros "#Hinv".
+    iIntros (A csa).
     iIntros (Hneq HA HnA).
     iIntros (Φ) "!#".
     iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & Hfp) HΦ".

@@ -117,9 +117,8 @@ Section API_spec.
     iExists _, _. by iFrame "#∗".
   Qed.
 
-
-
-  Definition init_leader_spec A Init_leader leader_si leaderF_si: iProp Σ :=
+  Definition init_leader_spec Init_leader leader_si leaderF_si : iProp Σ :=
+    ∀ A,
     ⌜DB_addr ∈ A⌝ →
     ⌜DB_addrF ∈ A⌝ →
     ⌜ip_of_address DB_addrF = ip_of_address DB_addr⌝ →
@@ -136,27 +135,27 @@ Section API_spec.
       #DB_addr #DB_addrF @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
 
-  Definition init_follower_spec f2lsa f2csa A initF f_si lF_si : iProp Σ :=
-        ⌜DB_addrF ∈ A⌝ →
-        ⌜f2csa ∈ A⌝ →
-        ⌜f2lsa ∉ A⌝ →
-        ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
-        ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-        {{{ fixed A ∗
-            f2csa ⤇ f_si ∗
-            DB_addrF ⤇ lF_si ∗
-            initF ∗
-            f2csa ⤳ (∅, ∅) ∗
-            f2lsa ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
-            free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
-          init_follower (s_serializer DB_serialization)
-            #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
-        {{{ RET #(); True }}}.
+  Definition init_follower_spec f2csa initF f_si lF_si : iProp Σ :=
+    ∀ f2lsa A,
+    ⌜DB_addrF ∈ A⌝ →
+    ⌜f2csa ∈ A⌝ →
+    ⌜f2lsa ∉ A⌝ →
+    ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
+    ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
+    {{{ fixed A ∗
+        f2csa ⤇ f_si ∗
+        DB_addrF ⤇ lF_si ∗
+        initF ∗
+        f2csa ⤳ (∅, ∅) ∗
+        f2lsa ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
+        free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
+      init_follower (s_serializer DB_serialization)
+      #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
+    {{{ RET #(); True }}}.
 
-
-  Definition init_client_proxy_leader_spec
-    (A : gset socket_address) (sa : socket_address) leader_si : iProp Σ :=
+  Definition init_client_proxy_leader_spec leader_si : iProp Σ :=
+    ∀ (A : gset socket_address) (sa : socket_address),
     ⌜DB_addr ∈ A⌝ →
     ⌜sa ∉ A⌝ →
     {{{ fixed A ∗
@@ -166,20 +165,20 @@ Section API_spec.
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
     {{{ wr rd, RET (wr, rd);
-        (∀ k q h, read_spec rd sa k q h) ∗
-          write_spec wr sa }}}.
+        (∀ k q h, read_spec rd sa k q h) ∗ write_spec wr sa }}}.
 
-  Definition init_client_proxy_follower_spec A csa f2csa f_si : iProp Σ :=
-        ⌜f2csa ∈ A⌝ →
-        ⌜csa ∉ A⌝ →
-        {{{ fixed A ∗
-            f2csa ⤇ f_si ∗
-            csa ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address csa) {[port_of_address csa]} }}}
-          init_client_follower_proxy (s_serializer DB_serialization)
-            #csa #f2csa @[ip_of_address csa]
-        {{{ rd, RET rd;
-             (∀ k h, read_at_follower_spec rd csa f2csa k h) }}}.
+  Definition init_client_proxy_follower_spec f2csa f_si : iProp Σ :=
+    ∀ A csa,
+    ⌜f2csa ∈ A⌝ →
+    ⌜csa ∉ A⌝ →
+    {{{ fixed A ∗
+        f2csa ⤇ f_si ∗
+        csa ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address csa) {[port_of_address csa]} }}}
+      init_client_follower_proxy (s_serializer DB_serialization)
+      #csa #f2csa @[ip_of_address csa]
+      {{{ rd, RET rd;
+          (∀ k h, read_at_follower_spec rd csa f2csa k h) }}}.
 
 End API_spec.
 
@@ -200,15 +199,15 @@ Section Init.
       Obs DB_addr [] ∗
       ([∗ set] k ∈ DB_keys, k ↦ₖ None) ∗
       Init_leader ∗
-      ((∀ A, init_leader_spec A Init_leader leader_si leaderF_si) ∗
-         (∀ A ca, init_client_proxy_leader_spec A ca leader_si)) ∗
+      ((init_leader_spec Init_leader leader_si leaderF_si) ∗
+         (init_client_proxy_leader_spec leader_si)) ∗
       ([∗ set] fsa ∈ DB_followers,
          ∃ (f_si : message → iProp Σ)
            (Init_follower : iProp Σ),
            Init_follower ∗
            Obs fsa [] ∗
-           (∀ A f2lsa, init_follower_spec f2lsa fsa A Init_follower f_si leaderF_si) ∗
-           (∀ A csa, init_client_proxy_follower_spec A csa fsa f_si))
+           (init_follower_spec fsa Init_follower f_si leaderF_si) ∗
+           (init_client_proxy_follower_spec fsa f_si))
     }.
 
 End Init.

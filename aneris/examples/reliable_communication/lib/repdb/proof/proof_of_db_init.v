@@ -76,16 +76,15 @@ Section Init_setup_proof.
       Obs DB_addr [] ∗
       ([∗ set] k ∈ DB_keys, k ↦ₖ None) ∗
       Init_leader ∗
-      ((∀ A, init_leader_spec A Init_leader leader_si leaderF_si) ∗
-         (∀ A ca, init_client_proxy_leader_spec A ca leader_si)) ∗
+      ((init_leader_spec Init_leader leader_si leaderF_si) ∗
+         (init_client_proxy_leader_spec leader_si)) ∗
       ([∗ set] fsa ∈ DB_followers,
          ∃ (f_si : message → iProp Σ)
            (Init_follower : iProp Σ),
            Init_follower ∗
            Obs fsa [] ∗
-           (∀ A f2lsa, init_follower_spec f2lsa fsa A
-                                          Init_follower f_si leaderF_si) ∗
-           (∀ A csa, init_client_proxy_follower_spec A csa fsa f_si)).
+           (init_follower_spec fsa Init_follower f_si leaderF_si) ∗
+           (init_client_proxy_follower_spec fsa f_si)).
   Proof.
     iIntros (HE Hn1 Hn2).
     iMod (own_alloc
@@ -199,19 +198,17 @@ Section Init_setup_proof.
          iSplitL.
          { iFrame "#∗". iExists γdbF. iFrame "#". iExists γdbF. iFrame "#∗". }
          iSplitL.
-         --- iIntros (A).
-             rewrite /init_follower_spec.
-             iIntros (f2lsa) "%HinA1 %HinA2 %HnA %HipEq1 %HprNeq !# %Ψ".
+         --- rewrite /init_follower_spec.
+             iIntros (f2lsa A) "%HinA1 %HinA2 %HnA %HipEq1 %HprNeq !# %Ψ".
              iIntros "(Hf & #Hsi1 & #Hsi2 & HinitF & Hmh1
                    & Hmh2 & Hfp1 & Hfp2) HΨ".
              iApply (init_follower_spec_internal_holds
-                       f2lsa fsa γL γM N f_si leaderF_si initF Fls A
+                       f2lsa fsa γL γM N f_si leaderF_si initF Fls
                          with "[//][//][//][//][//]
                                [$Hf $HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]");
                try eauto with iFrame.
-         --- iIntros (A).
-             rewrite /init_client_proxy_follower_spec.
-             iIntros (ca HcaA HnA).
+         --- rewrite /init_client_proxy_follower_spec.
+             iIntros (A ca HcaA HnA).
              iIntros "!#" (Ψ).
              iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ".
              iApply (init_client_proxy_follower_internal_holds

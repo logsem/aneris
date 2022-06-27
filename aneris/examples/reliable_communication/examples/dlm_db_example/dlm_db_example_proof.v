@@ -72,18 +72,18 @@ Section proof_of_code.
   Lemma wp_do_writes dl wr clt_00 clt_01 :
     ip_of_address clt_00 = ip_of_address clt_01 →
     {{{ GlobalInv ∗
-        ⌜(dl_acquire_spec SharedRes clt_00 dl)⌝ ∗
-        ⌜(dl_release_spec SharedRes clt_00 dl)⌝ ∗
+        (dl_acquire_spec SharedRes clt_00 dl) ∗
+        (dl_release_spec SharedRes clt_00 dl) ∗
         (∀ k v h, simplified_write_spec wr clt_01 k v h) ∗
         DLockCanAcquire clt_00 dl SharedRes }}}
       do_writes dl wr @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HipEq Φ) "(#HGinv & %Hacq & %Hrel & (#Hwr & Hdl)) HΦ".
+    iIntros (HipEq Φ) "(#HGinv & #Hacq & #Hrel & (#Hwr & Hdl)) HΦ".
     rewrite /do_writes.
     wp_pures.
-    wp_apply (Hacq with "[$Hdl]").
-    iIntros (v) "(-> & Hrel & Hdlk & Hres)".
+    wp_apply ("Hacq" with "[$Hdl]").
+    iIntros (v) "(-> & Hcanrel & Hdlk & Hres)".
     wp_pures.
     iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
     rewrite HipEq.
@@ -120,7 +120,7 @@ Section proof_of_code.
     iModIntro.
     assert (at_key "y" ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]) = Some ay) as HatAy.
     { rewrite app_assoc. by apply at_key_snoc_some. }
-    iApply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+    iApply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
     { iExists (at_key "x" (h ++ hfx ++ [ax])),
               (Some ay),
               ((h ++ hfx ++ [ax]) ++ hfy ++ [ay]).
@@ -143,20 +143,20 @@ Section proof_of_code.
     ip_of_address clt_10 = ip_of_address clt_11 →
     {{{ GlobalInv ∗
         (∀ k q h, read_spec rd clt_11 k q h) ∗
-        ⌜(dl_acquire_spec SharedRes clt_10 dl)⌝ ∗
-        ⌜(dl_release_spec SharedRes clt_10 dl)⌝ ∗
+        (dl_acquire_spec SharedRes clt_10 dl) ∗
+        (dl_release_spec SharedRes clt_10 dl) ∗
         DLockCanAcquire clt_10 dl SharedRes }}}
       do_reads dl rd @[ip_of_address clt_10]
     {{{ v, RET v; ⌜v = SOMEV #1⌝ }}}.
   Proof.
     iIntros (HipEq Φ).
-    iIntros "(#HGinv & #Hrd & %Hacq & %Hrel & Har) HΦ".
+    iIntros "(#HGinv & #Hrd & #Hacq & #Hrel & Har) HΦ".
     rewrite /do_reads.
     do 6 wp_pure _.
     iLöb as "IH".
     wp_pures.
-    wp_apply (Hacq with "[$Har]").
-    iIntros (v) "(-> & Hrel & Hdlk & Hres)".
+    wp_apply ("Hacq" with "[$Har]").
+    iIntros (v) "(-> & Hcanrel & Hdlk & Hres)".
     wp_pures.
     iDestruct "Hres" as (xv yv h) "(Hx & Hy & #Hobs & %Hhx & %Hhy & %Hcnd)".
     rewrite HipEq.
@@ -167,7 +167,7 @@ Section proof_of_code.
     rewrite -HipEq.
     destruct Hxv as [(-> & ->) | (xwe & -> & ->) ].
     - do 2 (wp_pure _).
-      wp_apply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+      wp_apply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
       { iExists _, _, _.
         by iFrame "#∗". }
       iIntros (v) "(-> & Har)".
@@ -198,14 +198,14 @@ Section proof_of_code.
              iNext.
              wp_pures.
              rewrite -HipEq.
-             wp_apply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+             wp_apply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
              { iExists _, _, _.
                by iFrame "#∗". }
              iIntros (v) "(-> & Har)".
              wp_pures.
              by iApply "HΦ".
       -- wp_pures.
-         wp_apply (Hrel with "[$Hrel $Hdlk Hx Hy]").
+         wp_apply ("Hrel" with "[$Hcanrel $Hdlk Hx Hy]").
          { iExists _, _, _.
            by iFrame "#∗". }
          iIntros (v) "(-> & Har)".
@@ -223,7 +223,7 @@ Section proof_of_code.
         (* preconditions for subscribing client to dlock. *)
         ⌜clt_00 ∉ A⌝ ∗
         ⌜DL_server_addr ∈ A⌝ ∗
-        (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
+        dl_subscribe_client_spec SharedRes ∗
         fixed A ∗
         free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
@@ -231,7 +231,7 @@ Section proof_of_code.
         (* preconditions to start a client proxy for the database. *)
         ⌜db_sa ∈ A⌝ ∗
         ⌜clt_01 ∉ A⌝ ∗
-        (∀ A ca, init_client_proxy_leader_spec A ca leader_si) ∗
+        init_client_proxy_leader_spec leader_si ∗
         db_sa ⤇ leader_si ∗
         clt_01 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_01) {[port_of_address clt_01]}
@@ -246,7 +246,7 @@ Section proof_of_code.
     rewrite /node0.
     wp_pures.
     wp_apply ("HdlCltS" with "[$Hfps $Hclt00 $Hdlmsi $Hf]"); first done.
-    iIntros (dl) "(Hdl & %Hacq & %Hrel)".
+    iIntros (dl) "(Hdl & #Hacq & #Hrel)".
     wp_pures.
     rewrite HipEq.
     simplify_eq /=.
@@ -267,14 +267,14 @@ Section proof_of_code.
         ⌜clt_10 ∉ A⌝ ∗
         ⌜DL_server_addr ∈ A⌝ ∗
         fixed A ∗
-        (∀ sa A, dl_subscribe_client_spec SharedRes sa A) ∗
+        dl_subscribe_client_spec SharedRes ∗
         free_ports (ip_of_address clt_10) {[port_of_address clt_10]} ∗
         clt_10 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
         ⌜db_sa ∈ A⌝ ∗
         ⌜clt_11 ∉ A⌝ ∗
-        (∀ A ca, init_client_proxy_leader_spec A ca leader_si) ∗
+        init_client_proxy_leader_spec leader_si ∗
         db_sa ⤇ leader_si ∗
         clt_11 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_11) {[port_of_address clt_11]}
@@ -289,7 +289,7 @@ Section proof_of_code.
     rewrite /node1.
     wp_pures.
     wp_apply ("HdlCltS" with "[$Hfps $Hclt00 $Hdlmsi $Hf]"); first done.
-    iIntros (dl) "(Hdl & %Hacq & %Hrel)".
+    iIntros (dl) "(Hdl & #Hacq & #Hrel)".
     wp_pures.
     rewrite HipEq.
     simplify_eq /=.
@@ -336,10 +336,10 @@ Section proof_of_main.
   Lemma main_spec :
     ⊢ |={⊤}=>
          GlobalInv -∗
-         (∀ A, dl_server_start_service_spec SharedRes A) -∗
-         (∀ sa A, dl_subscribe_client_spec SharedRes sa A) -∗
-         (∀ A, init_leader_spec A Init_leader leader_si leaderF_si) -∗
-         (∀ A ca, init_client_proxy_leader_spec A ca leader_si) -∗
+         dl_server_start_service_spec SharedRes -∗
+         dl_subscribe_client_spec SharedRes -∗
+         init_leader_spec Init_leader leader_si leaderF_si -∗
+         init_client_proxy_leader_spec leader_si -∗
          ⌜DL_server_addr ∈ A⌝ -∗
          db_sa ⤇ leader_si -∗
          db_Fsa ⤇ leaderF_si -∗
