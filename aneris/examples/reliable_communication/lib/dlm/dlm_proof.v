@@ -113,7 +113,7 @@ Section DL_proof_of_code.
   Qed.
 
 Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
-    {{{ ⌜sa ∉ A⌝ ∗ ⌜DL_server_addr ∈ A⌝ ∗ fixed A ∗
+    {{{ ⌜sa ∉ A⌝ ∗ fixed A ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         sa ⤳ (∅, ∅) }}}
@@ -127,7 +127,7 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
     ⊢ dl_subscribe_client_internal_spec sa A.
   Proof.
     iIntros (Φ) "!#".
-    iIntros "(#HnA & #HinA & #Hf & Hfp & #Hsi & Hmh) HΦ".
+    iIntros "(#HnA & #Hf & Hfp & #Hsi & Hmh) HΦ".
     rewrite /dlock_subscribe_client.
     wp_pures.
     wp_apply (RCSpec_make_client_skt_spec with "[$HnA $Hmh $Hsi $Hf $Hfp][HΦ]").
@@ -312,11 +312,11 @@ Section DL_proof_of_the_init.
     - iModIntro.
       iIntros (sa A).
       iIntros (Φ) "!#".
-      iIntros "(HninA & HinA & Hf & Hfp & Hmh & #Hsi) HΦ".
+      iIntros "(HninA & Hf & Hfp & Hmh & #Hsi) HΦ".
       iDestruct (dl_subscribe_client_internal_spec_holds) as "#HclientSpec".
       split; try done.
       split; try done.
-      iApply ("HclientSpec" with "[$HninA $HinA $Hf $Hfp $Hmh $Hsi][HΦ]").
+      iApply ("HclientSpec" with "[$HninA $Hf $Hfp $Hmh $Hsi][HΦ]").
       rewrite /dlock_subscribe_client.
       iNext. iIntros (dl) "(Hinit & %HaS & %HrS)".
       iApply "HΦ". iFrame.
