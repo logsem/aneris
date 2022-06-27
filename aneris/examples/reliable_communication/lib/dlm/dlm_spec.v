@@ -46,7 +46,7 @@ Section DL_spec.
 
   Definition dl_subscribe_client_spec : iProp Σ :=
     ∀ (sa : socket_address) A,
-    {{{ ⌜sa ∉ A⌝ ∗ ⌜DL_server_addr ∈ A⌝ ∗ fixed A ∗
+    {{{ ⌜sa ∉ A⌝ ∗ fixed A ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
          DL_server_addr ⤇ dl_reserved_server_socket_interp }}}
       dlock_subscribe_client #sa #srv_sa @[ip_of_address sa]
