@@ -28,7 +28,7 @@ Section Spec.
         MTS_mv
         MTS_handler
        @[srv_ip]
-    {{{ RET #(); ⌜True⌝ }}}.
+    {{{ RET #(); True }}}.
 
   Definition make_request_spec (handler : val) clt_addr : iProp Σ :=
     ∀ reqv reqd,
