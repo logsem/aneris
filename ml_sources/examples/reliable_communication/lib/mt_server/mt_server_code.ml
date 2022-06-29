@@ -7,9 +7,7 @@ open Client_server_code
 let service_loop c mon (request_handler : monitor -> 'req -> 'rep) () : unit =
   let rec loop () =
     let req = recv c in
-    monitor_acquire mon;
     let rep = request_handler mon req in
-    monitor_release mon;
     send c rep;
     loop ()
   in loop ()
