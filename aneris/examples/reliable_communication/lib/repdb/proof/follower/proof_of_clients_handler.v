@@ -42,36 +42,29 @@ Section Clients_MT_spec_params.
 
   Lemma client_request_handler_at_follower_spec γF :
     ∀ reqv reqd,
-    {{{  is_monitor
-      MTU.(MTS_mN)
+    {{{ is_monitor
+           MTU.(MTS_mN)
             (ip_of_address MTU.(MTS_saddr)) mγ mv
             (known_replog_token sa γF ∗
                log_monitor_inv_def
                  (ip_of_address MTU.(MTS_saddr))
                  γF ¼ logL (follower_local_res γL kvsL sa γF)) ∗
-        lock_proof.locked mγ ∗
-        (known_replog_token sa γF ∗
-          (log_monitor_inv_def
-             (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
-             (follower_local_res γL kvsL sa γF))) ∗
-           MTU.(MTS_handler_pre) reqv reqd }}}
+          MTU.(MTS_handler_pre) reqv reqd }}}
        handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable (rep_f2c_serialization) repv⌝ ∗
-        lock_proof.locked mγ ∗
-          (known_replog_token sa γF ∗
-          (log_monitor_inv_def
-             (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
-             (follower_local_res γL kvsL sa γF))) ∗
-          MTU.(MTS_handler_post) repv reqd repd }}}.
+        MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
-    iIntros (reqv reqd Φ) "(#Hmon & Hkey & (#Hknw & HR) & Hpre) HΦ".
+    iIntros (reqv reqd Φ) "(#Hmon & Hpre) HΦ".
     rewrite /handler_cloj /client_request_handler_at_follower.
     wp_pures.
+    wp_apply (monitor_acquire_spec with "[Hmon]"); first by iFrame "#".
+    iIntros (v) "(-> & HKey & #Hknw & HR)".
     iDestruct "HR" as (lV lM) "(%Hlog & Hpl & HlogL & HR)".
     iDestruct "HR" as (kvsV kvsM) "(%Hkvs & %HvalidLocal & Hpm & _ & #Hobs)".
     iDestruct "Hpre" as "(#HGinv & HpreR)".
     iDestruct "HpreR" as (k h Hkeys Hreqd ->) "(%γF' & #(Hknown & HobsL & Hobs2))".
+    wp_pures.
     wp_load.
     iDestruct (known_replog_token_agree with "[$Hknown][$Hknw]") as "->".
     iDestruct (own_obs_prefix _ _ _ h with "[$HlogL][$Hobs2]") as "%Hprefixh".
@@ -104,55 +97,55 @@ Section Clients_MT_spec_params.
       assert (v = SOMEV (we_val a)) as ->.
       { rewrite Hmk in Hkm.
         naive_solver. }
-      iApply ("HΦ" $! (SOMEV (we_val a)) lM). iFrame "Hkey". iSplit.
-       { iPureIntro.  assert (k ∈ dom kvsM) as Hk by by apply elem_of_dom.
+      wp_pures.
+      wp_apply (monitor_release_spec with "[$Hmon Hpm Hpl HlogL $HKey]").
+      { iSplitR. iFrame "Hknw".
+        iExists _, _.  iSplit; first done.
+        iFrame "#∗". iExists _, _. by iFrame. }
+      iIntros (v ->).
+      do 2 wp_pure _.
+      iApply ("HΦ" $! (SOMEV (we_val a)) lM).
+      iSplit.
+      { iPureIntro.  assert (k ∈ dom kvsM) as Hk by by apply elem_of_dom.
          assert (v0 = (we_val a)) as Heqa by naive_solver.
          rewrite Heqa in Hmk.
          rewrite Hmk in Hkm.
          specialize (DB_LSTV_mem_serializable_vs_local k (we_val a) Hmk).
          apply _. }
-       simpl. rewrite /log_monitor_inv_def /ReqPost.
-       iSplitL; last first.
-       { iExists k, h, lM.
-         do 3 (iSplit; first done).
-         iFrame "#".
-         iSplit.
-         { iFrame "#"; eauto. }
-         iRight.
-         iExists a.
-         eauto. }
-       iFrame "#∗".
-       iExists _, _.
-       iSplit; first done.
-       iFrame "#∗".
-       iExists _, _.
-       by iFrame.
-    - iApply ("HΦ" $! _ lM).
+      simpl. rewrite /log_monitor_inv_def /ReqPost.
+      iExists k, h, lM.
+      do 3 (iSplit; first done).
+      iFrame "#".
+      iSplit.
+      { iFrame "#"; eauto. }
+      iRight.
+      iExists a.
+      eauto.
+    - wp_pures.
+      wp_apply (monitor_release_spec with "[$Hmon Hpm Hpl HlogL $HKey]").
+      { iSplitR. iFrame "Hknw".
+        iExists _, _.  iSplit; first done.
+        iFrame "#∗". iExists _, _. by iFrame. }
+      iIntros (v' ->).
+      do 2 wp_pure _.
+      iApply ("HΦ" $! _ lM).
       iDestruct "Hpost" as "[(_ & %Hnone) |%Habs]"; [|naive_solver].
       assert (v = NONEV) as ->.
       { rewrite Hmk in Hkm.
         naive_solver. }
-      iFrame "Hkey".
       iSplit.
       { rewrite /rep_f2c_serialization.
         iPureIntro.
         apply _. }
       simpl.
       rewrite /log_monitor_inv_def /ReqPost.
-      iSplitL; last first.
-      { iExists k, h, lM.
-        do 3 (iSplit; first done).
-        iFrame "#∗".
-        iSplit.
-        { iFrame "#"; eauto. }
-        iLeft.
-        done. }
+      iExists k, h, lM.
+      do 3 (iSplit; first done).
       iFrame "#∗".
-      iExists _, _.
-      iSplit; first done.
-      iFrame "#∗".
-      iExists _, _.
-      by iFrame "#∗".
+      iSplit.
+      { iFrame "#"; eauto. }
+      iLeft.
+      done.
   Qed.
 
   Global Instance client_handler_at_leader_spec_params γF :

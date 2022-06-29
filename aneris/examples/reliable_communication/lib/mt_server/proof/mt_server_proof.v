@@ -68,15 +68,9 @@ Section MTS_proof_of_code.
     simpl in *.
     wp_recv (reqv reqd) as "HreqPre".
     wp_pures.
-    wp_apply (monitor_acquire_spec with "[Hlk]"); first by iFrame "#".
-    iIntros (v) "(-> & HKey & HR)".
+    wp_apply (MTS_handler_spec with "[$Hlk $HreqPre]").
+    iIntros (repv repd) "(%Hser & HreqPost)".
     wp_pures.
-    wp_apply (MTS_handler_spec with "[$Hlk $HKey $HR $HreqPre]").
-    iIntros (repv repd) "(%Hser & HKey & HR & HreqPost)".
-    wp_pures.
-    wp_apply (monitor_release_spec with "[$Hlk $HR $HKey]").
-    iIntros (v ->).
-    do 2 wp_pure _.
     wp_send with "[$HreqPost]".
     do 2 wp_pure _.
     by iApply ("IH" with "[$Hc]").
