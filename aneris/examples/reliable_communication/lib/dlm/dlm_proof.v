@@ -32,16 +32,14 @@ Section DL_proof_of_code.
   Notation srv_port := (port_of_address DL_server_addr).
   Notation dlN := (DL_namespace .@ "lk").
 
-  Definition dlock_protocol_aux (rec : string -d> iProto Σ) : string -d> iProto Σ :=
-    λ s,
-      let rec : string -d> iProto Σ := rec in
-      (<!> MSG #s {{ (⌜s = "acquire"⌝) ∨
-                     (⌜s = "release"⌝ ∗ (dl_locked_internal ∗ R)) }} ;
-      if bool_decide (s = "acquire")
-       then
-         (<?> MSG #"acquire_OK" {{ (dl_locked_internal ∗ R) }};
-          rec "release")
-       else (rec "acquire"))%proto.
+  Definition dlock_protocol_aux (rec : bool -d> iProto Σ) : bool -d> iProto Σ :=
+    λ b, if b then
+           (<!> MSG #"acquire" ;
+           <?> MSG #"acquire_OK" {{ dl_locked_internal ∗ R }};
+           rec (negb b))%proto
+         else
+           (<!> MSG #"release" {{ dl_locked_internal ∗ R }};
+           rec (negb b))%proto.
 
   Global Instance dlock_protocol_aux_contractive : Contractive dlock_protocol_aux.
   Proof. solve_proper_prepare. f_equiv; solve_proto_contractive. Qed.
@@ -58,7 +56,7 @@ Section DL_proof_of_code.
       RCParams_clt_ser_inj := ser_inj.string_ser_is_ser_injective;
       RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
       RCParams_srv_saddr := DL_server_addr;
-      RCParams_protocol := dlock_protocol "acquire";
+      RCParams_protocol := dlock_protocol true;
       RCParams_srv_N := DL_namespace;
     |}.
 
@@ -71,16 +69,16 @@ Section DL_proof_of_code.
     is_lock dlN ip γlk lk (R ∗ dl_locked_internal).
 
   Definition is_dlock_server_connection_state
-             (ip : ip_address) (γlk : gname) (c : val) (s : string) : iProp Σ :=
-    (⌜s = "acquire"⌝ ∨ (⌜s = "release"⌝ ∗ locked γlk)) ∗
-    c ↣{ ip, string_serialization} (iProto_dual (dlock_protocol s)).
+             (ip : ip_address) (γlk : gname) (c : val) (b : bool) : iProp Σ :=
+    (if b then ⌜True⌝%I else locked γlk) ∗
+    c ↣{ ip, string_serialization} (iProto_dual (dlock_protocol b)).
 
   Definition dl_acquire_internal_spec (sa : socket_address) (dl : val) : Prop :=
     {{{ dl ↣{ ip_of_address sa, string_serialization }
-           (dlock_protocol "acquire") }}}
+           (dlock_protocol true) }}}
       dlock_acquire dl @[ip_of_address sa]
     {{{ RET #(); dl ↣{ ip_of_address sa, string_serialization }
-                    (dlock_protocol "release") ∗
+                    (dlock_protocol false) ∗
                  dl_locked_internal ∗ R }}}.
 
   Lemma dl_acquire_internal_spec_holds sa dl : dl_acquire_internal_spec sa dl.
@@ -88,7 +86,7 @@ Section DL_proof_of_code.
     iIntros (Φ) "Hdlk HΦ".
     rewrite /dlock_acquire.
     wp_pures.
-    wp_send with "[]"; first by iLeft.
+    wp_send with "[//]".
     wp_pures.
     wp_recv as "[Hdlk_key HR]".
     wp_pures.
@@ -97,19 +95,18 @@ Section DL_proof_of_code.
   Qed.
 
   Definition dl_release_internal_spec (sa : socket_address) (dl : val) : Prop :=
-    {{{ dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol "release") ∗
+    {{{ dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol false) ∗
         dl_locked_internal ∗ R }}}
        dlock_release dl @[ip_of_address sa]
-     {{{ RET #(); dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol "acquire") }}}.
+     {{{ RET #(); dl ↣{ ip_of_address sa, string_serialization } (dlock_protocol true) }}}.
 
   Lemma dl_release_internal_spec_holds sa dl : dl_release_internal_spec sa dl.
   Proof.
     iIntros (Φ) "(Hdlk & Hkey & HR) HΦ".
     rewrite /dlock_release.
     wp_pures.
-    wp_send with "[Hkey HR]".
-    - iRight; by iFrame.
-    - by iApply "HΦ"; eauto with iFrame.
+    wp_send with "[$Hkey $HR]".
+    by iApply "HΦ"; eauto with iFrame.
   Qed.
 
 Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
@@ -119,7 +116,7 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
         sa ⤳ (∅, ∅) }}}
       dlock_subscribe_client #sa #DL_server_addr @[ip_of_address sa]
     {{{ dl, RET dl; dl ↣{ ip_of_address sa, string_serialization }
-                       (dlock_protocol "acquire") ∗
+                       (dlock_protocol true) ∗
                     ⌜dl_acquire_internal_spec sa dl⌝ ∗
                     ⌜dl_release_internal_spec sa dl⌝ }}}.
 
@@ -140,35 +137,34 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
       dl_release_internal_spec_holds.
   Qed.
 
-  Lemma wp_listen_to_client c lk γlk s :
-    {{{ is_dlock_server_connection_state srv_ip γlk c s ∗
+  Lemma wp_listen_to_client c lk γlk b :
+    {{{ is_dlock_server_connection_state srv_ip γlk c b ∗
          is_lock dlN srv_ip γlk lk (dl_locked_internal ∗ R) }}}
       listen_to_client lk c @[ip_of_address RCParams_srv_saddr]
       {{{ v, RET v ; False }}}.
   Proof.
     iIntros (Φ) "(Hci & #Hlk) HΦ". rewrite /listen_to_client.
     do 6 wp_pure _.
-    iLöb as "IH" forall (s).
-    iDestruct "Hci" as "([-> | (-> & Hlkey)] & Hci)".
-    - wp_recv as "[% | (%Habs & _)]"; last done.
+    iLöb as "IH" forall (b).
+    iDestruct "Hci" as "[Hlkey Hci]".
+    destruct b.
+    - wp_recv as "_".
       wp_pures. wp_lam. wp_pures.
       wp_apply (acquire_spec with "[Hlk]"); first by iFrame "#".
       iIntros (v) "(-> & HlKey & HdlkKey & HR)".
       wp_pures.
       wp_send with "[$HdlkKey $HR]".
       wp_pure _. wp_lam.
-      iApply ("IH" $! "release" with "[$Hci HlKey]").
-      iRight. by iFrame.
-      eauto with iFrame.
+      by iApply ("IH" with "[$Hci $HlKey]").
     - wp_pures.
       simpl in *.
-      wp_recv as "[%|(% & (Hdlk & HR))]"; first done.
+      wp_recv as "[Hdlk HR]".
       wp_pures.
       wp_apply (release_spec with "[$Hlk $Hlkey $HR $Hdlk]").
       iIntros (v ->). do 2 wp_pure _.
-      iApply ("IH" $! "acquire" with "[Hci]").
+      iApply ("IH" with "[Hci]").
       rewrite /is_dlock_server_connection_state.
-      iFrame. by iLeft. eauto with iFrame.
+      iFrame. eauto with iFrame.
   Qed.
 
   Lemma wp_connections_loop skt lk γlk :
@@ -189,7 +185,7 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
     iSplitL "Hlistens".
     - iNext. do 2 wp_pure _. iApply ("IH" with "[$Hlistens]"). by iIntros.
     - iNext. wp_pures. iApply (wp_listen_to_client with "[$Hc $Hlk]").
-      by iLeft. eauto with iFrame.
+      eauto with iFrame.
   Qed.
 
   Definition dl_server_start_service_internal_spec A : Prop :=
@@ -248,10 +244,10 @@ Section DL_proof_of_resources.
   Global Instance dlri : DL_resources := {
     DLockCanAcquire sa dl R :=
       dl ↣{ ip_of_address sa, string_serialization }
-         (dlock_protocol dl_locked_internal R "acquire");
+         (dlock_protocol dl_locked_internal R true);
     DLockCanRelease sa dl R :=
         dl ↣{ ip_of_address sa, string_serialization }
-           (dlock_protocol dl_locked_internal R "release");
+           (dlock_protocol dl_locked_internal R false);
     dl_locked := dl_locked_internal;
     dl_locked_exclusive := Hexcl;
     dl_locked_timeless := Html;
