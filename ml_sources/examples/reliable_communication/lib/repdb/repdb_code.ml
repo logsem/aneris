@@ -29,8 +29,11 @@ let rep_f2c_ser (val_ser[@metavar]) =  option_serializer val_ser
 
 (** Processes the follower's request. *)
 let follower_request_handler log mon req : ((string * 'a) * int) =
+  monitor_acquire mon;
   log_wait_until log mon req;
-  unSOME (log_get log req)
+  let res = unSOME (log_get log req) in
+  monitor_release mon;
+  res
 
 let update_log_copy_loop logC monC logF monF () =
   let rec loop i =
@@ -53,6 +56,8 @@ let start_leader_processing_followers (ser[@metavar]) addr log mon () =
 (** Processes the request event (request & the reply cell). *)
 let client_request_handler_at_leader (db : 'a dbTy Atomic.t) (log :  ((string * 'a) * int) log)
     (mon : monitor) (req : 'a reqTy) : 'a repTy =
+  monitor_acquire mon;
+  let res =
     match req with
     | InjL p ->                  (* WRITE REQUEST *)
       let (k, v) = p in
@@ -63,6 +68,9 @@ let client_request_handler_at_leader (db : 'a dbTy Atomic.t) (log :  ((string * 
       InjL ()
     | InjR k ->                  (* READ REQUEST *)
       InjR (map_lookup k !db)    (* Read the key k. *)
+  in
+  monitor_release mon;
+  res
 
 (** Initialization of the leader-followers database. *)
 let start_leader_processing_clients (ser[@metavar]) addr db log mon () =
@@ -94,8 +102,11 @@ let init_client_leader_proxy (ser[@metavar]) clt_addr srv_addr =
 (** Follower. *)
 
 (** Processes the read-only request event (request & the reply cell). *)
-let client_request_handler_at_follower (db : 'a dbTy Atomic.t) _mon req_k  =
-  map_lookup req_k !db (* Read the key k. *)
+let client_request_handler_at_follower (db : 'a dbTy Atomic.t) mon req_k  =
+  monitor_acquire mon;
+  let res = map_lookup req_k !db in (* Read the key k. *)
+  monitor_release mon;
+  res
 
 let start_follower_processing_clients (ser[@metavar]) addr db mon =
   run_server (rep_f2c_ser ser) req_c2f_ser addr mon

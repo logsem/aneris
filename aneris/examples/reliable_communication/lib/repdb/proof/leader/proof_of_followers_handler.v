@@ -50,29 +50,25 @@ Section Followers_MT_spec_params.
   Lemma follower_request_handler_spec :
     ∀ reqv reqd,
     {{{ leader_local_secondary_inv γL logFLoc γF mγ mv ∗
-        lock_proof.locked mγ ∗
-        (log_monitor_inv_def
-             (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
-             (leader_local_secondary_res γL γF)) ∗
         MTU_F.(MTS_handler_pre) reqv reqd }}}
       handler_cloj mv reqv @[ip_of_address MTU_F.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable rep_l2f_serialization repv⌝ ∗
-        lock_proof.locked mγ ∗
-        (log_monitor_inv_def
-             (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
-             (leader_local_secondary_res γL γF)) ∗
         MTU_F.(MTS_handler_post) repv reqd repd }}}.
   Proof.
-    iIntros (reqv reqd Φ) "(#Hmon & Hlocked & HR & Hpre) HΦ".
+    iIntros (reqv reqd Φ) "(#Hmon & Hpre) HΦ".
     rewrite /handler_cloj /follower_request_handler.
     simplify_eq /=.
+    wp_pures.
+    wp_apply (monitor_acquire_spec with "[Hmon]"); first by iFrame "#".
+    iIntros (v) "(-> & Hlocked & HR)".
     iDestruct "Hpre" as "((#Htks & #HGinv) & -> & #Hobs)".
     iDestruct "HR" as (logV logM) "(%Hlog & Hpl & HLog & #Htkn & #HobsL)".
     iDestruct "Hobs" as (γF') "(Htkn' & _ & Hobs)".
     iDestruct (known_replog_token_agree with "[$Htkn'][$Htkn]") as "->".
     iDestruct (own_obs_prefix with "[$HLog][$Hobs]") as "%Hprefix".
     apply prefix_length in Hprefix.
+    rewrite /leader_local_secondary_inv /log_monitor_inv.
     wp_pures.
     wp_apply (wp_log_wait_until
                with "[$Hmon $Hlocked $Hpl $HLog $HobsL][HΦ]").
@@ -126,12 +122,13 @@ Section Followers_MT_spec_params.
     iModIntro.
     wp_apply network_util_proof.wp_unSOME; first done.
     iIntros "_".
+    wp_pures.
+    wp_apply (monitor_release_spec with "[$Hmon Hpl HmainLog $Hlocked]").
+    { iExists  logV', logM'. by iFrame "#∗". }
+    iIntros (v ->).
+    do 2 wp_pure _.
     iApply ("HΦ" $! ($ we) (reqd ++ [we])).
     iSplit; first done.
-    iFrame "Hlocked".
-    iSplitL.
-    { iExists logV', logM'.
-      by iFrame "#∗". }
     iExists we.
     iSplit; first done.
     iSplit; [iPureIntro; set_solver|].

@@ -10,9 +10,7 @@ Definition service_loop : val :=
   λ: "c" "mon" "request_handler" <>,
   letrec: "loop" <> :=
     let: "req" := recv "c" in
-    monitor_acquire "mon";;
     let: "rep" := "request_handler" "mon" "req" in
-    monitor_release "mon";;
     send "c" "rep";;
     "loop" #() in
     "loop" #().

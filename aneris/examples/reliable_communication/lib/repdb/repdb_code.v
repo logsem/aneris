@@ -34,8 +34,11 @@ Definition rep_f2c_ser val_ser := option_serializer val_ser.
 
 Definition follower_request_handler : val :=
   λ: "log" "mon" "req",
+  monitor_acquire "mon";;
   log_wait_until "log" "mon" "req";;
-  unSOME (log_get "log" "req").
+  let: "res" := unSOME (log_get "log" "req") in
+  monitor_release "mon";;
+  "res".
 
 Definition update_log_copy_loop : val :=
   λ: "logC" "monC" "logF" "monF" <>,
@@ -59,7 +62,8 @@ Definition start_leader_processing_followers ser : val :=
 
 Definition client_request_handler_at_leader : val :=
   λ: "db" "log" "mon" "req",
-  match: "req" with
+  monitor_acquire "mon";;
+  let: "res" := match: "req" with
     InjL "p" =>
     let: "k" := Fst "p" in
     let: "v" := Snd "p" in
@@ -69,7 +73,9 @@ Definition client_request_handler_at_leader : val :=
     monitor_signal "mon";;
     InjL #()
   | InjR "k" => InjR (map_lookup "k" ! "db")
-  end.
+  end in
+  monitor_release "mon";;
+  "res".
 
 Definition start_leader_processing_clients ser : val :=
   λ: "addr" "db" "log" "mon" <>,
@@ -106,7 +112,11 @@ Definition init_client_leader_proxy ser : val :=
 (**  Follower.  *)
 
 Definition client_request_handler_at_follower : val :=
-  λ: "db" "_mon" "req_k", map_lookup "req_k" ! "db".
+  λ: "db" "mon" "req_k",
+  monitor_acquire "mon";;
+  let: "res" := map_lookup "req_k" ! "db" in
+  monitor_release "mon";;
+  "res".
 
 Definition start_follower_processing_clients ser : val :=
   λ: "addr" "db" "mon",

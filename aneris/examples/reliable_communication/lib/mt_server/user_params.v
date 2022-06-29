@@ -43,13 +43,11 @@ Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } (MTU : MTS_user_params) :=
     MTS_handler_spec :
     (∀ reqv reqd,
     {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
-           locked MTS_mγ ∗ MTS_mR ∗
-           MTS_handler_pre reqv reqd }}}
-         MTS_handler MTS_mv reqv @[ip_of_address MTS_saddr]
-       {{{ repv repd, RET repv;
-           ⌜Serializable MTS_rep_ser repv⌝ ∗
-           locked MTS_mγ ∗ MTS_mR ∗
-           MTS_handler_post repv reqd repd }}})
+        MTS_handler_pre reqv reqd }}}
+        MTS_handler MTS_mv reqv @[ip_of_address MTS_saddr]
+    {{{ repv repd, RET repv;
+        ⌜Serializable MTS_rep_ser repv⌝ ∗
+        MTS_handler_post repv reqd repd }}})
 
   }.
 
