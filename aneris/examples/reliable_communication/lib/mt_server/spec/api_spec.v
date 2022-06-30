@@ -31,11 +31,11 @@ Section Spec.
        @[srv_ip]
     {{{ RET #(); True }}}.
 
-  Definition make_request_spec (handler : val) clt_addr : iProp Σ :=
+  Definition make_request_spec ip (handler : val) : iProp Σ :=
     ∀ reqv reqd,
     {{{ ⌜Serializable MTS_req_ser reqv⌝ ∗
         MTS_handler_pre reqv reqd }}}
-      handler reqv @[ip_of_address clt_addr]
+      handler reqv @[ip]
     {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
 
   Definition init_client_proxy_spec : iProp Σ :=
@@ -50,7 +50,7 @@ Section Spec.
         #sa
         #MTS_saddr
        @[ip_of_address sa]
-    {{{ reqh, RET reqh; make_request_spec reqh sa }}}.
+    {{{ reqh, RET reqh; make_request_spec (ip_of_address sa) reqh }}}.
 
 End Spec.
 
