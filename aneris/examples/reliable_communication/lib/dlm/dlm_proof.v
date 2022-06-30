@@ -242,11 +242,11 @@ Section DL_proof_of_resources.
   Qed.
 
   Global Instance dlri : DL_resources := {
-    DLockCanAcquire sa dl R :=
-      dl ↣{ ip_of_address sa, string_serialization }
+    DLockCanAcquire ip dl R :=
+      dl ↣{ ip, string_serialization }
          (dlock_protocol dl_locked_internal R true);
-    DLockCanRelease sa dl R :=
-        (dl ↣{ ip_of_address sa, string_serialization }
+    DLockCanRelease ip dl R :=
+        (dl ↣{ ip, string_serialization }
            (dlock_protocol dl_locked_internal R false) ∗
         dl_locked_internal)%I;
     dl_service_init := dl_locked_internal ∗ SrvInit;

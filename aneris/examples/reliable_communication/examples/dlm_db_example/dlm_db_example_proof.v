@@ -72,10 +72,10 @@ Section proof_of_code.
   Lemma wp_do_writes dl wr clt_00 clt_01 :
     ip_of_address clt_00 = ip_of_address clt_01 →
     {{{ GlobalInv ∗
-        (dl_acquire_spec SharedRes clt_00 dl) ∗
-        (dl_release_spec SharedRes clt_00 dl) ∗
+        (dl_acquire_spec SharedRes (ip_of_address clt_00) dl) ∗
+        (dl_release_spec SharedRes (ip_of_address clt_00) dl) ∗
         (∀ k v h, simplified_write_spec wr clt_01 k v h) ∗
-        DLockCanAcquire clt_00 dl SharedRes }}}
+        DLockCanAcquire (ip_of_address clt_00) dl SharedRes }}}
       do_writes dl wr @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
@@ -143,9 +143,9 @@ Section proof_of_code.
     ip_of_address clt_10 = ip_of_address clt_11 →
     {{{ GlobalInv ∗
         (∀ k q h, read_spec rd clt_11 k q h) ∗
-        (dl_acquire_spec SharedRes clt_10 dl) ∗
-        (dl_release_spec SharedRes clt_10 dl) ∗
-        DLockCanAcquire clt_10 dl SharedRes }}}
+        (dl_acquire_spec SharedRes (ip_of_address clt_10) dl) ∗
+        (dl_release_spec SharedRes (ip_of_address clt_10) dl) ∗
+        DLockCanAcquire (ip_of_address clt_10) dl SharedRes }}}
       do_reads dl rd @[ip_of_address clt_10]
     {{{ v, RET v; ⌜v = SOMEV #1⌝ }}}.
   Proof.
