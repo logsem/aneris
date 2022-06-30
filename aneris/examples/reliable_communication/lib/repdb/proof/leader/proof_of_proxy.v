@@ -38,7 +38,7 @@ Section Client_Proxy_Proof.
   Notation MTC := (client_handler_at_leader_user_params γL γM N).
 
   Definition write_spec_internal
-      (wr : val) (sa : socket_address) : iProp Σ :=
+      (ip : ip_address) (wr : val) : iProp Σ :=
     Eval simpl in
     □ (∀ (E : coPset) (k : Key) (v : SerializableVal)
          (P : iProp Σ) (Q : write_event → wrlog → wrlog → iProp Σ),
@@ -58,22 +58,21 @@ Section Client_Proxy_Proof.
                   own_mem_user γM k 1 (Some a_new) -∗
                   own_obs γL DB_addr (h ++ hf ++ [a_new]) ={E,⊤}=∗ Q a_new h hf)) -∗
         {{{ P }}}
-          wr #k v @[ip_of_address sa]
+          wr #k v @[ip]
         {{{ RET #();
            ∃ (h hf : wrlog) (a: write_event), Q a h hf }}})%I.
 
-  Lemma write_spec_internal_holds A sa (reqh : val) :
+  Lemma write_spec_internal_holds A ip (reqh : val) :
     Global_Inv γL γM N -∗
     fixed A -∗
     DB_addr ⤇ srv_si -∗
-    @make_request_spec _ _ _ _ MTC reqh sa -∗
-    write_spec_internal
+    @make_request_spec _ _ _ _ MTC ip reqh -∗
+    write_spec_internal ip
       (λ: "k" "v",
          match: reqh (InjL ("k", "v")) with
            InjL "_u" => #()
          | InjR "_abs" => assert: #false
-         end)
-      sa.
+         end).
   Proof.
     iIntros "#Hinv #HA #Hsi #Hspec".
     rewrite /write_spec_internal.
@@ -109,28 +108,28 @@ Section Client_Proxy_Proof.
       -- by iDestruct "Habs" as (k0 w0 q0 Hinr) "_".
   Qed.
 
-  Definition read_spec_internal
-    (rd : val) (sa : socket_address) (k : Key) (q : Qp)
+  Definition read_spec_internal (ip : ip_address)
+    (rd : val) (k : Key) (q : Qp)
     (wo : option write_event) : iProp Σ :=
       ⌜k ∈ DB_keys⌝ -∗
     {{{ own_mem_user γM k q wo }}}
-      rd #k @[ip_of_address sa]
+      rd #k @[ip]
     {{{vo, RET vo;
          own_mem_user γM k q wo ∗
          ((⌜vo = NONEV⌝ ∗ ⌜wo = None⌝) ∨
          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))
     }}}%I.
 
-  Lemma read_spec_internal_holds A sa (reqh : val) :
+  Lemma read_spec_internal_holds A ip (reqh : val) :
     Global_Inv γL γM N -∗
     fixed A -∗
     DB_addr ⤇ srv_si -∗
-    @make_request_spec _ _ _ _ MTC reqh sa -∗
+    @make_request_spec _ _ _ _ MTC ip reqh -∗
     ∀ (k : Key) (q : Qp) (h : option write_event),
-    read_spec_internal
+    read_spec_internal ip
       (λ: "k",
          match: reqh (InjR "k") with InjL "_abs" => assert: #false | InjR "r" => "r" end)
-           sa k q h.
+           k q h.
   Proof.
     iIntros "#Hinv #HA #Hsi #Hspec".
     iIntros (k q h).
@@ -175,8 +174,8 @@ Section Client_Proxy_Proof.
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
     {{{ wr rd, RET (wr, rd);
-        (∀ k q h, read_spec_internal rd sa k q h) ∗
-          write_spec_internal wr sa }}}.
+        (∀ k q h, read_spec_internal (ip_of_address sa) rd k q h) ∗
+          write_spec_internal (ip_of_address sa) wr }}}.
 
   Lemma init_client_leader_proxy_internal_holds A sa :
     Global_Inv γL γM N ⊢ init_client_leader_proxy_internal A sa.

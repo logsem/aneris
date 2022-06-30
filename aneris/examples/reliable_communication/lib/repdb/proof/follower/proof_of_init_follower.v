@@ -165,7 +165,7 @@ Section Init_Follower_Proof.
                  with "[HownF2]"); [naive_solver| | done].
       iFrame "HGinv".
       iSplitR; last first.
-      { iSplitR. { iExists f2lsa. eauto. }
+      { iSplitR. { iExists f2csa. eauto. }
         iFrame "#"; eauto.
         iExists _; iFrame "#∗".
         iDestruct "HdbF" as (γdbF) "#(Htk & HobsdbF)".

@@ -49,7 +49,7 @@ Section SyncLogCopy_Proof.
     {{{ Global_Inv γL γM N ∗
         (follower_local_inv γL kvsL logL sa mγ mv) ∗
         (∃ f2lsa, ⌜ip_of_address sa = ip_of_address f2lsa⌝ ∗
-                    make_request_spec reqh f2lsa) ∗
+                    make_request_spec (ip_of_address f2lsa) reqh) ∗
         own_replog_loop logM
     }}}
       sync_loop #kvsL #logL mv reqh #n @[ip_of_address sa]
