@@ -8,9 +8,6 @@ From aneris.examples.reliable_communication.lib.dlm Require Import dlm_code dlm_
 Class DL_resources `{!anerisG Mdl Σ} := {
     DLockCanAcquire : socket_address → val → iProp Σ → iProp Σ;
     DLockCanRelease : socket_address → val → iProp Σ → iProp Σ;
-    dl_locked : iProp Σ;
-    dl_locked_exclusive : dl_locked -∗ dl_locked -∗ False;
-    dl_locked_timeless :> Timeless (dl_locked);
     dl_service_init : iProp Σ;
     dl_service_init_exclusive : dl_service_init -∗ dl_service_init -∗ False;
     dl_service_init_timeless :> Timeless (dl_service_init);
@@ -37,10 +34,10 @@ Section DL_spec.
   Definition dl_acquire_spec (sa : socket_address) (dl : val) : iProp Σ :=
     {{{ DLockCanAcquire sa dl R  }}}
        dlock_acquire dl @[ip_of_address sa]
-     {{{ RET #(); DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}.
+     {{{ RET #(); DLockCanRelease sa dl R ∗ R }}}.
 
   Definition dl_release_spec (sa : socket_address) (dl : val) : iProp Σ :=
-    {{{ DLockCanRelease sa dl R ∗ dl_locked ∗ R }}}
+    {{{ DLockCanRelease sa dl R ∗ R }}}
        dlock_release dl @[ip_of_address sa]
     {{{ RET #(); DLockCanAcquire sa dl R }}}.
 

@@ -246,11 +246,9 @@ Section DL_proof_of_resources.
       dl ↣{ ip_of_address sa, string_serialization }
          (dlock_protocol dl_locked_internal R true);
     DLockCanRelease sa dl R :=
-        dl ↣{ ip_of_address sa, string_serialization }
-           (dlock_protocol dl_locked_internal R false);
-    dl_locked := dl_locked_internal;
-    dl_locked_exclusive := Hexcl;
-    dl_locked_timeless := Html;
+        (dl ↣{ ip_of_address sa, string_serialization }
+           (dlock_protocol dl_locked_internal R false) ∗
+        dl_locked_internal)%I;
     dl_service_init := dl_locked_internal ∗ SrvInit;
     dl_service_init_exclusive := Hexcl_init;
     dl_service_init_timeless := Html_init;
@@ -323,12 +321,12 @@ Section DL_proof_of_the_init.
         specialize (HaS Ψ).
         iIntros "!> Hr HΨ".
         iApply (HaS with "[$Hr][HΨ]").
-        iNext. iIntros "Hr".
+        iNext. iIntros "[Hrel Hr]".
         iApply "HΨ". by iFrame.
       + iIntros (Ψ).
         specialize (HrS Ψ).
-        iIntros "!> Hr HΨ".
-        iApply (HrS with "[$Hr][HΨ]").
+        iIntros "!> [[Hrel Hlocked] Hr] HΨ".
+        iApply (HrS with "[$Hrel $Hlocked $Hr][HΨ]").
         iNext. iIntros "Hr".
         iApply "HΨ". by iFrame.
   Qed.
