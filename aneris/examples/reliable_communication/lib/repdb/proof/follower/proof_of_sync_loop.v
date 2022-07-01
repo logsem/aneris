@@ -39,23 +39,23 @@ Section SyncLogCopy_Proof.
   Global Instance MTU : MTS_user_params.
   Proof. apply (follower_handler_user_params γL γM N). Defined.
 
- Definition own_replog_loop l : iProp Σ :=
+  Definition own_replog_loop l : iProp Σ :=
     ∃ γF, known_replog_token sa γF ∗ own_replog_obs γL DB_addrF l ∗
     own_log_auth γF (1/4) l.
 
-  Lemma sync_loop_spec
+  Lemma sync_loop_spec {MTR : MTS_resources}
         (mγ : gname) (mv : val) (reqh : val) (logM : wrlog) (n : nat) :
     n = length logM →
     {{{ Global_Inv γL γM N ∗
         (follower_local_inv γL kvsL logL sa mγ mv) ∗
+        make_request_spec ∗
         (∃ f2lsa, ⌜ip_of_address sa = ip_of_address f2lsa⌝ ∗
-                    make_request_spec (ip_of_address f2lsa) reqh) ∗
-        own_replog_loop logM
-    }}}
+                  MTSCanRequest (ip_of_address f2lsa) reqh) ∗
+        own_replog_loop logM }}}
       sync_loop #kvsL #logL mv reqh #n @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Hn Φ) "((#HnMap & #HGinv) & (%γF' & #HinvL) & #Hreqh & HlogM) HΦ".
+    iIntros (Hn Φ) "((#HnMap & #HGinv) & (%γF' & #HinvL) & #Hreq_spec &Hreqh & HlogM) HΦ".
     rewrite /sync_loop.
     do 12 wp_pure _.
     iLöb as "IH" forall (n logM Hn).
@@ -65,9 +65,10 @@ Section SyncLogCopy_Proof.
     iDestruct "Hreqh" as (f2lsa HipEq) "Hreqh".
     rewrite /make_request_spec.
     rewrite HipEq.
-    wp_apply ("Hreqh" $! _ logM).
+    wp_pures.
+    wp_apply ("Hreq_spec" with "[$Hreqh]").
     { iSplit; first by iPureIntro; apply _. iFrame "#"; naive_solver. }
-    iIntros (logM' repv) "Hpost".
+    iIntros (logM' repv) "[Hreq Hpost]".
     rewrite -HipEq.
     iDestruct "Hpost" as (we) "(-> & %Hwekey & %HweSer & %Hlen & -> & #HobsLF')".
     do 13 wp_pure _.
@@ -147,9 +148,10 @@ Section SyncLogCopy_Proof.
     replace (#(length lF + 1)) with (#(length lF + 1)%nat); last first.
     { do 2 f_equal.
       lia. }
-    iApply ("IH" $! (length lF + 1)%nat (lF ++ [we]) with "[][HlogL2][$HΦ]").
+    iApply ("IH" $! (length lF + 1)%nat (lF ++ [we]) with "[][Hreq][HlogL2][$HΦ]").
     { rewrite last_length.
       iPureIntro; lia. }
+    { iExists _. iSplit; [done|]. rewrite HipEq. iFrame. }
     iFrame "#∗"; eauto.
   Qed.
 

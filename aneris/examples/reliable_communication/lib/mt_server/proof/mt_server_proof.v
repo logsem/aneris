@@ -139,37 +139,26 @@ Section MTS_proof_of_code.
     - by iApply (wp_accept_new_connections_loop with "Hhandler [$]").
   Qed.
 
-  Definition make_request_spec_internal (handler : val) clt_addr : iProp Σ :=
-    ∀ reqv reqd,
-    {{{ ⌜Serializable MTS_req_ser reqv⌝ ∗ MTS_handler_pre reqv reqd }}}
-      handler reqv @[ip_of_address clt_addr]
-    {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
+  Definition make_request_spec_internal : iProp Σ :=
+    ∀ ip (c : val) reqv reqd,
+    {{{ c ↣{ip,RCParams_clt_ser} RCParams_protocol ∗
+        ⌜Serializable MTS_req_ser reqv⌝ ∗ MTS_handler_pre reqv reqd }}}
+      make_request c reqv @[ip]
+    {{{ repd repv, RET repv;
+          c ↣{ip,RCParams_clt_ser} RCParams_protocol ∗
+          MTS_handler_post repv reqd repd  }}}.
 
-  Lemma make_request_spec_internal_holds c lk γlk sa :
-    {{{ is_lock (MTS_mN.@"proxy") (ip_of_address sa) γlk lk
-            (c ↣{ip_of_address sa,RCParams_clt_ser} RCParams_protocol) }}}
-      make_request c lk @[ip_of_address sa]
-    {{{ reqh, RET reqh; make_request_spec_internal reqh sa }}}.
+  Lemma make_request_spec_internal_holds :
+    ⊢ make_request_spec_internal.
   Proof.
-    iIntros (Φ) "#Hlk HΦ".
+    iIntros (ip c reqv reqd) "!>".
+    iIntros (Φ) "(Hc & %Hser & HP) HΦ".
     rewrite /make_request.
+    rewrite /RCParams_protocol /=.
     wp_pures.
-    iApply "HΦ".
-    rewrite /make_request_spec_internal.
-    iIntros (reqv reqd) "!#".
-    iIntros (Ψ) "(%Hser & HreqPre) HΨ".
-    wp_pures.
-    wp_apply (acquire_spec with "[$Hlk]").
-    iIntros (v) "(-> & HKey & HR)".
-    wp_pures.
-    wp_send with "[$HreqPre]".
-    wp_pures.
-    wp_recv (repv repd) as "HreqPost".
-    wp_pures.
-    wp_apply (release_spec with "[$Hlk $HR $HKey]").
-    iIntros (v ->).
-    wp_pures.
-    by iApply "HΨ".
+    wp_send with "[$HP]".
+    wp_recv (repv repd) as "HQ".
+    iApply "HΦ". by iFrame.
   Qed.
 
   Definition init_client_proxy_internal_spec A sa : iProp Σ :=
@@ -183,9 +172,11 @@ Section MTS_proof_of_code.
         #sa
         #MTS_saddr
        @[ip_of_address sa]
-    {{{ reqh, RET reqh; make_request_spec_internal reqh sa }}}.
+    {{{ c, RET c;
+          c ↣{ip_of_address sa,RCParams_clt_ser} RCParams_protocol }}}.
 
-  Lemma init_client_proxy_internal_spec_holds A sa : ⊢ init_client_proxy_internal_spec A sa.
+  Lemma init_client_proxy_internal_spec_holds A sa :
+    ⊢ init_client_proxy_internal_spec A sa.
   Proof.
     iIntros (Φ) "!#".
     iIntros "(#HnA & #Hf & Hfp & Hmh & #Hsi) HΦ".
@@ -197,13 +188,12 @@ Section MTS_proof_of_code.
     wp_pures.
     wp_apply (RCSpec_connect_spec with "[$Hcl][HΦ]").
     iNext. iIntros (c) "Hcl". wp_pures.
-    wp_apply (newlock_spec
-                (MTS_mN .@ "proxy") _
-                ( c ↣{ip_of_address sa,RCParams_clt_ser} RCParams_protocol) with "[$Hcl]").
-    iIntros (lk γlk) "#Hlk".
     wp_pures.
-    by wp_apply (make_request_spec_internal_holds c lk γlk with "[$Hlk]").
+    by iApply "HΦ".
   Qed.
+
+  Global Instance mtsri : MTS_resources := {
+    MTSCanRequest ip rpc := rpc ↣{ip,RCParams_clt_ser} RCParams_protocol }.
 
 End MTS_proof_of_code.
 
@@ -221,10 +211,12 @@ Section MTS_proof_of_init.
 
   Lemma MTS_init_setup_holds (E : coPset) :
     ↑MTS_mN ⊆ E →
-    ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
-    SrvInit ∗
-    (run_server_spec SrvInit srv_si) ∗
-    (init_client_proxy_spec srv_si).
+    ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ)
+      (MTR : MTS_resources),
+      SrvInit ∗
+      (run_server_spec SrvInit srv_si) ∗
+      (init_client_proxy_spec srv_si) ∗
+      make_request_spec.
   Proof.
     iIntros (HE).
     iMod (Reliable_communication_init_setup E MT_UP HE)
@@ -236,7 +228,7 @@ Section MTS_proof_of_init.
          & %Hlisten & %Haccept
          & %Hsend & %HsendTele
          & %HtryRecv & %Hrecv)".
-    iExists reserved_server_socket_interp, SrvInit.
+    iExists reserved_server_socket_interp, SrvInit, mtsri.
     iFrame.
     iModIntro.
     iSplitL.
@@ -250,14 +242,19 @@ Section MTS_proof_of_init.
       + done.
       + split; done.
       + split; done.
-    - iIntros (A sa Φ) "!#".
-      iIntros "(HinA & Hf & Hfp & Hmh & #Hsi) HΦ".
-      iDestruct (init_client_proxy_internal_spec_holds) as "#HclientSpec".
-      by iApply ("HclientSpec" with "[$HinA $Hf $Hfp $Hmh $Hsi][HΦ]").
-      Unshelve.
-      + done.
-      + split; try done.
-      + split; try done.
+    - iSplitL.
+      + iIntros (A sa Φ) "!#".
+        iIntros "(HinA & Hf & Hfp & Hmh & #Hsi) HΦ".
+        iDestruct (init_client_proxy_internal_spec_holds) as "#HclientSpec".
+        by iApply ("HclientSpec" with "[$HinA $Hf $Hfp $Hmh $Hsi][HΦ]").
+        Unshelve.
+        done.
+      + iIntros (ip rpc reqv reqd Φ) "!#".
+        iIntros "(Hreq & %Hser & HP) HΦ".
+        iApply (make_request_spec_internal_holds with "[$Hreq $HP //]").
+        by iApply "HΦ".
+        Unshelve.
+        done.
   Qed.
 
 End MTS_proof_of_init.
@@ -272,9 +269,9 @@ Section MTS_proof_of_the_init_class.
   Proof.
     split. iIntros (E MTU HE).
     iMod (MTS_init_setup_holds E HE)
-      as (srv_si SrvInit) "(Hinit & Hspecs)".
+      as (srv_si SrvInit MTR) "(Hinit & Hspecs)".
     iModIntro.
-    iExists _, SrvInit.
+    iExists _, SrvInit, MTR.
     iFrame.
   Qed.
 

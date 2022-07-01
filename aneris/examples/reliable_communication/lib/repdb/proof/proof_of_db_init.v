@@ -109,10 +109,10 @@ Section Init_setup_proof.
     set (MTSCInit := @mts_init _ _ _ _ _).
     iExists DBR.
     iMod (MTS_init_setup E MTSC)
-      as (leader_si SrvInit) "(Hsinit & #HsrvS & #HcltS)".
+      as (leader_si SrvInit MTRC) "(Hsinit & #HsrvS & #HcltS & #HreqS)".
     { simplify_eq /=; solve_ndisj. }
     iMod (MTS_init_setup E MTSF)
-      as (leaderF_si SrvInitF) "(HsinitF & #HsrvSF & #HcltSF)".
+      as (leaderF_si SrvInitF MTRF) "(HsinitF & #HsrvSF & #HcltSF & #HreqSF)".
     { simplify_eq /=; solve_ndisj. }
      iAssert (([∗ map] sa↦γ ∈ N, known_replog_token sa γ)%I) as "#Htks".
     { iApply (big_sepM_mono with "[$Hmap]").
@@ -189,7 +189,8 @@ Section Init_setup_proof.
          iSplitR "Hmap'"; last first.
          iApply ("IH" with "[][][$Htks'][$Hmap']"); iPureIntro; set_solver.
          set (MTSFF := client_handler_at_follower_user_params γL γM N fsa).
-         iMod (MTS_init_setup E MTSFF) as (f_si initF) "(HinitF & #HFsrvSF & #HFcltS)".
+         iMod (MTS_init_setup E MTSFF) as (f_si initF MTRFF)
+                              "(HinitF & #HFsrvSF & #HFcltS & #HFreqS)".
          { simplify_eq /=; solve_ndisj. }
          iModIntro.
          set (InitFRes := init_follower_res fsa γL γM N initF Fls).
@@ -202,8 +203,8 @@ Section Init_setup_proof.
              iIntros (f2lsa A) "%HinA1 %HinA2 %HnA %HipEq1 %HprNeq !# %Ψ".
              iIntros "(Hf & #Hsi1 & #Hsi2 & HinitF & Hmh1
                    & Hmh2 & Hfp1 & Hfp2) HΨ".
-             iApply (init_follower_spec_internal_holds
-                       f2lsa fsa γL γM N f_si leaderF_si initF Fls
+             iApply (@init_follower_spec_internal_holds _ _ _ _ _
+                       f2lsa fsa γL γM N f_si leaderF_si initF Fls MTRF
                          with "[//][//][//][//][//]
                                [$Hf $HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]");
                try eauto with iFrame.
@@ -211,9 +212,8 @@ Section Init_setup_proof.
              iIntros (A ca HcaA HnA).
              iIntros "!#" (Ψ).
              iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ".
-             iApply (init_client_proxy_follower_internal_holds
-                         with
-                         "[$HGinv $Htks][][//][//][$Hsi1 $HFcltS $Hf $Hmh1 $Hfp1][$HΨ]").
+             iApply (init_client_proxy_follower_internal_holds with
+                         "[$HGinv $Htks][][//][//][$Hsi1 $HFcltS $HFreqS $Hf $Hmh1 $Hfp1][$HΨ]").
              iPureIntro; set_solver.
   Qed.
 
