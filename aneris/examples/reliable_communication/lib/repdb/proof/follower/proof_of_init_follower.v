@@ -67,8 +67,7 @@ Section Init_Follower_Proof.
     {{{ fixed A ∗
         f2csa ⤇ follower_si ∗
         DB_addrF ⤇ leaderF_si ∗
-        (∀ (MTS : MTS_spec_params MTC),
-           @run_server_spec _ _ _ _ _ InitFollower follower_si MTS) ∗
+        (@run_server_spec _ _ _ _ MTC InitFollower follower_si) ∗
         (@init_client_proxy_spec _ _ _ _ MTF leaderF_si) ∗
         init_follower_res ∗
         f2csa ⤳ (∅, ∅) ∗
@@ -83,7 +82,7 @@ Section Init_Follower_Proof.
   Proof.
     iIntros (A HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
-      "(#HA & #Hsi & #HsiF & #HInitFollowerSpec
+      "(#HA & #Hsi & HsiF & HInitFollowerSpec
             & HinitFollowerAsClient & HinitRes & Hmh & HmhF & Hfp & HfpF)".
     rewrite /init_follower.
     wp_pures.
@@ -106,14 +105,15 @@ Section Init_Follower_Proof.
                    (ip_of_address f2csa) γF (1/4) logL
                    (follower_local_res γL kvsL f2csa γF))
                with "[HownF1 HpL HpKvs]") .
-    iExists logV, [].
-    iSplit; first done.
-    iFrame.
-    iExists kvsV,  ∅.
-    iSplit; first done.
-    iSplit.
-    { iPureIntro. apply valid_state_local_empty. }
-    iFrame "#∗".
+    { iFrame "HFtkn".
+      iExists logV, [].
+      iSplit; first done.
+      iFrame.
+      iExists kvsV,  ∅.
+      iSplit; first done.
+      iSplit.
+      { iPureIntro. apply valid_state_local_empty. }
+      iFrame "#∗". }
     iIntros (mγ mv) "#HLInv".
     wp_let.
     wp_bind (sync_with_server _ _ _ _ _ _).
@@ -124,41 +124,36 @@ Section Init_Follower_Proof.
     iIntros (reqh) "#HSpec".
     wp_pures.
     wp_apply aneris_wp_fork.
-    iSplitL "Hinit Hmh Hfp HΦ".
+    iSplitL "HInitFollowerSpec Hinit Hmh Hfp HΦ".
     - iNext.
       wp_pures.
       rewrite /start_follower_processing_clients.
       wp_pures.
-      wp_apply
-        ("HInitFollowerSpec" $! (client_handler_at_leader_spec_params
-                                γL γM N f2csa mγ mv kvsL logL γF) A _
-                           with "[$Hinit $Hmh $Hfp][$HΦ]").
-      { iFrame "#". iSplit; first done. simplify_eq /=.
-        (* Of course, at least move this as a lemma into the monitor file.
-           Or better, improve later the definition of the followers_lock
-           to find optimal way to expose ghost names in the proofs.
-           By for now the low level proof below will do the job. *)
-        Local Transparent monitor_inv is_monitor.
-        rewrite /is_monitor /is_lock.
-        iDestruct "HLInv" as (lk ->) "HLInv".
-        iDestruct "HLInv" as (l ->) "HLInv".
-        iExists #l. iSplit; first done.
-        iExists l. iSplit; first done.
-        iApply (inv_iff with "[$HLInv]").
-        iNext. iModIntro.
-        rewrite /lock_inv.
-        iSplit.
-        - iIntros "(%b & (Hl & Hdef))".
-          iExists b. iFrame.
-          destruct b; first done.
-          iDestruct "Hdef" as "(Hk & Hdef)".
-          iSplitL "Hk"; first done.
-          iSplit; done.
-        - iIntros "(%b & (Hl & Hdef))".
-          iExists b. iFrame.
-          destruct b; first done.
-          iDestruct "Hdef" as "(Hk & _ & Hdef)".
-          by iFrame. }
+      wp_apply ("HInitFollowerSpec" with "[] [-HΦ]"); [|by iFrame "#∗"|done].
+      iIntros (v1 v2 Ψ) "!> HP HΨ".
+      wp_pures.
+      iApply (client_request_handler_at_follower_spec with "[HLInv $HP]"); [|done].
+      Local Transparent monitor_inv is_monitor.
+      rewrite /is_monitor /is_lock.
+      iDestruct "HLInv" as (lk ->) "HLInv".
+      iDestruct "HLInv" as (l ->) "HLInv".
+      iExists #l. iSplit; first done.
+      iExists l. iSplit; first done.
+      iApply (inv_iff with "[$HLInv]").
+      iNext. iModIntro.
+      rewrite /lock_inv.
+      iSplit.
+      + iIntros "(%b & (Hl & Hdef))".
+        iExists b. iFrame.
+        destruct b; first done.
+        iDestruct "Hdef" as "(Hk & Hdef)".
+        iSplitL "Hk"; first done.
+        iSplit; done.
+      +iIntros "(%b & (Hl & Hdef))".
+       iExists b. iFrame.
+       destruct b; first done.
+       iDestruct "Hdef" as "(Hk & _ & Hdef)".
+       by iFrame.
     - iNext.
       rewrite -HipEq.
       wp_apply (sync_loop_spec γL γM N f2csa kvsL logL mγ mv reqh [] 0

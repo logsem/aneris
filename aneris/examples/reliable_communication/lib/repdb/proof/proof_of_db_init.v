@@ -122,7 +122,7 @@ Section Init_setup_proof.
     iDestruct (big_sepM_delete _ N DB_addrF γdbF with "Htks")
       as "#(HtkF & Htks')"; first done.
     set (initL := init_leader_res γL γM N SrvInit SrvInitF γdbF).
-    rewrite -{2} Qp_half_half.
+    rewrite -{4} Qp_half_half.
     iDestruct (own_log_auth_split _ (1/2) (1/2) [] with "[$HlogLM]")
       as "(HlogL1 & HlogL2)".
     iMod (inv_alloc
@@ -156,7 +156,7 @@ Section Init_setup_proof.
              iIntros "%HinA1 %HinA2 %HipEq1 %HipEq2 !#" (Ψ).
              iIntros "(Hf & #Hsi1 & #Hsi2 & HinitL
                    & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
-             by iApply (init_leader_spec_internal_holds
+             iApply (init_leader_spec_internal_holds
                          with "[-HΨ $Hf $HinitL][$HΨ]");
              try eauto with iFrame.
          --- iModIntro.
