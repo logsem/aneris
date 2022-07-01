@@ -12,7 +12,6 @@ Notation iMsg Σ := (iMsg Σ val).
 
 Import lock_proof.
 
-
 Class MTS_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
   { (* Requests. *)
     MTS_req_ser  : serialization;
@@ -32,23 +31,10 @@ Class MTS_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
 
 Arguments MTS_user_params {_ _ _ _}.
 
-Class MTS_spec_params `{ !anerisG Mdl Σ, !lockG Σ } (MTU : MTS_user_params) :=
-  { (* Requests. *)
-    (* monitor data. *)
-    MTS_mR : iProp Σ;
-    MTS_mγ : gname;
-    MTS_mv : val;
-    MTS_handler : val;
-    (* Request handler value & specification. *)
-    MTS_handler_spec :
-    (∀ reqv reqd,
-    {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
-        MTS_handler_pre reqv reqd }}}
-        MTS_handler MTS_mv reqv @[ip_of_address MTS_saddr]
-    {{{ repv repd, RET repv;
-        ⌜Serializable MTS_rep_ser repv⌝ ∗
-        MTS_handler_post repv reqd repd }}})
-
-  }.
-
-Arguments MTS_spec_params {_ _ _ _} _.
+Definition handler_spec `{MTS_user_params} (handler : val) : iProp Σ :=
+  ∀ reqv reqd,
+  {{{ MTS_handler_pre reqv reqd }}}
+    handler reqv @[ip_of_address MTS_saddr]
+  {{{ repv repd, RET repv;
+      ⌜Serializable MTS_rep_ser repv⌝ ∗
+      MTS_handler_post repv reqd repd }}}.

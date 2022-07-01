@@ -57,8 +57,8 @@ Definition update_log_copy_loop : val :=
 
 Definition start_leader_processing_followers ser : val :=
   λ: "addr" "log" "mon" <>,
-  run_server (rep_l2f_ser ser) req_f2l_ser "addr" "mon"
-  (λ: "mon" "req", follower_request_handler "log" "mon" "req").
+  run_server (rep_l2f_ser ser) req_f2l_ser "addr"
+  (λ: "req", follower_request_handler "log" "mon" "req").
 
 Definition client_request_handler_at_leader : val :=
   λ: "db" "log" "mon" "req",
@@ -79,8 +79,8 @@ Definition client_request_handler_at_leader : val :=
 
 Definition start_leader_processing_clients ser : val :=
   λ: "addr" "db" "log" "mon" <>,
-  run_server (rep_l2c_ser ser) (req_c2l_ser ser) "addr" "mon"
-  (λ: "mon" "req", client_request_handler_at_leader "db" "log" "mon" "req").
+  run_server (rep_l2c_ser ser) (req_c2l_ser ser) "addr"
+  (λ: "req", client_request_handler_at_leader "db" "log" "mon" "req").
 
 Definition init_leader ser : val :=
   λ: "addr0" "addr1",
@@ -120,8 +120,8 @@ Definition client_request_handler_at_follower : val :=
 
 Definition start_follower_processing_clients ser : val :=
   λ: "addr" "db" "mon",
-  run_server (rep_f2c_ser ser) req_c2f_ser "addr" "mon"
-  (λ: "mon" "req", client_request_handler_at_follower "db" "mon" "req").
+  run_server (rep_f2c_ser ser) req_c2f_ser "addr"
+  (λ: "req", client_request_handler_at_follower "db" "mon" "req").
 
 Definition sync_loop : val :=
   λ: "db" "log" "mon" "reqf" "n",

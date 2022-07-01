@@ -54,78 +54,77 @@ Section MTS_proof_of_code.
   Context `{HspecS : !Reliable_communication_Specified_API_session cmh}.
   Context `{HspecN : !Reliable_communication_Specified_API_network MT_UP SnRes}.
 
-  Lemma service_loop_proof `{!MTS_spec_params MTU} (c : val) :
-    {{{ is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR ∗
-        c ↣{ ip_of_address MTS_saddr, MTS_rep_ser } iProto_dual req_prot  }}}
-      service_loop c MTS_mv MTS_handler #() @[ip_of_address MTS_saddr]
+  Lemma service_loop_proof (c handler : val) :
+    handler_spec (handler : val) -∗
+    {{{ c ↣{ ip_of_address MTS_saddr, MTS_rep_ser } iProto_dual req_prot }}}
+      service_loop c handler #() @[ip_of_address MTS_saddr]
     {{{ RET #(); ⌜True⌝  }}}.
   Proof.
-    iIntros (Φ) "(#Hlk & Hc) HΦ". rewrite /service_loop.
-    do 10 wp_pure _.
+    iIntros "#Hhandler" (Φ) "!> Hc HΦ". rewrite /service_loop.
+    wp_pures.
     iLöb as "IH".
     wp_pures.
     rewrite /req_prot. rewrite /req_prot_aux.
     simpl in *.
     wp_recv (reqv reqd) as "HreqPre".
     wp_pures.
-    wp_apply (MTS_handler_spec with "[$Hlk $HreqPre]").
+    wp_apply ("Hhandler" with "HreqPre").
     iIntros (repv repd) "(%Hser & HreqPost)".
     wp_pures.
     wp_send with "[$HreqPost]".
-    do 2 wp_pure _.
+    wp_pures.
     by iApply ("IH" with "[$Hc]").
   Qed.
 
-  Lemma wp_accept_new_connections_loop `{!MTS_spec_params MTU} skt  :
+  Lemma wp_accept_new_connections_loop skt handler :
+    handler_spec (handler : val) -∗
     {{{ MTS_saddr ⤇ reserved_server_socket_interp ∗
-        SrvListens skt ∗
-        is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR }}}
-      accept_new_connections_loop skt MTS_mv MTS_handler #()
+        SrvListens skt }}}
+      accept_new_connections_loop skt handler #()
       @[ip_of_address RCParams_srv_saddr]
     {{{ RET #(); False }}}.
   Proof.
-    iIntros (Φ) "(#Hsi & Hlistens & #Hlk) HΦ".
+    iIntros "#Hhandler" (Φ) "!> (#Hsi & Hlistens) HΦ".
     rewrite /accept_new_connections_loop.
-    do 10 (wp_pure _).
+    wp_pures.
     iLöb as "IH".
-    wp_pure _.
-    wp_smart_apply (RCSpec_accept_spec with "[$Hlistens]").
+    wp_smart_apply (RCSpec_accept_spec with "Hlistens").
     iIntros (c clt_addr) "(Hlistens & Hc)".
     wp_pures.
     wp_apply (aneris_wp_fork with "[-]").
     iSplitL "Hlistens".
     - iNext.
-      do 2 wp_pure _.
+      wp_pures.
       iApply ("IH" with "[$Hlistens]").
       by iIntros.
     - iNext.
       wp_pures.
       simpl in *.
-      by wp_apply (service_loop_proof with "[$Hlk $Hc]").
+      by wp_apply (service_loop_proof with "Hhandler Hc").
   Qed.
 
-  Definition run_server_internal_spec `{!MTS_spec_params MTU} A : iProp Σ :=
+  Definition run_server_internal_spec A handler : iProp Σ :=
+    handler_spec handler -∗
     {{{ ⌜MTS_saddr ∈ A⌝ ∗
         fixed A ∗
         free_ports (ip_of_address MTS_saddr) {[port_of_address MTS_saddr]} ∗
         MTS_saddr ⤇ reserved_server_socket_interp ∗
         MTS_saddr ⤳ (∅, ∅) ∗
-        SrvInit ∗
-        is_monitor MTS_mN (ip_of_address MTS_saddr) MTS_mγ MTS_mv MTS_mR }}}
+        SrvInit }}}
       run_server
         (s_serializer MTS_rep_ser)
         (s_serializer MTS_req_ser)
         #MTS_saddr
-        MTS_mv
-        MTS_handler
+        handler
         @[ip_of_address MTS_saddr]
     {{{ RET #(); ⌜True⌝ }}}.
 
-  Lemma run_server_internal_spec_holds `{!MTS_spec_params MTU} A : ⊢ run_server_internal_spec A.
+  Lemma run_server_internal_spec_holds A handler :
+    ⊢ run_server_internal_spec A handler.
   Proof.
-    iIntros (Φ) "!#".
+    iIntros "#Hhandler" (Φ) "!>".
     iIntros "Hres HΦ".
-    iDestruct "Hres" as "(#HA & #Hf & Hfp & #Hsi & Hmh & Hinit & #Hmon)".
+    iDestruct "Hres" as "(#HA & #Hf & Hfp & #Hsi & Hmh & Hinit)".
     rewrite /run_server.
     wp_pures.
     wp_apply (RCSpec_make_server_skt_spec with "[$HA $Hmh $Hsi $Hf $Hinit $Hfp][HΦ]").
@@ -137,7 +136,7 @@ Section MTS_proof_of_code.
     wp_apply aneris_wp_fork.
     iSplitL "HΦ".
     - iNext; by iApply "HΦ".
-    - by iApply (wp_accept_new_connections_loop with "[$]").
+    - by iApply (wp_accept_new_connections_loop with "Hhandler [$]").
   Qed.
 
   Definition make_request_spec_internal (handler : val) clt_addr : iProp Σ :=
@@ -224,8 +223,7 @@ Section MTS_proof_of_init.
     ↑MTS_mN ⊆ E →
     ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
     SrvInit ∗
-    (∀ (MTS : MTS_spec_params MTU),
-       run_server_spec SrvInit srv_si) ∗
+    (run_server_spec SrvInit srv_si) ∗
     (init_client_proxy_spec srv_si).
   Proof.
     iIntros (HE).
@@ -242,11 +240,12 @@ Section MTS_proof_of_init.
     iFrame.
     iModIntro.
     iSplitL.
-    - iIntros (MTS A Φ) "!#".
-      iIntros "(#Hsi & HinA & Hf & Hmh & Hfp & Hinit & #Hmon) HΦ".
+    - iIntros "!>" (A handler) "#Hhandler".
+      iIntros (Φ) "!#".
+      iIntros "(#Hsi & HinA & Hf & Hmh & Hfp & Hinit) HΦ".
       (* iDestruct run_server_internal_spec_holds as "#HserviceSpec". *)
       iApply (run_server_internal_spec_holds with
-               "[$HinA $Hf $Hfp $Hsi $Hmon $Hmh $Hinit][$]").
+               "Hhandler [$HinA $Hf $Hfp $Hsi $Hmh $Hinit][$]").
       Unshelve.
       + done.
       + split; done.

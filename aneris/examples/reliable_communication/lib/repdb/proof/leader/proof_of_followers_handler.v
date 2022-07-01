@@ -43,21 +43,17 @@ Section Followers_MT_spec_params.
   Context (HipNeq : DB_addr ≠ DB_addrF).
   Notation MTU_F := (follower_handler_user_params γL γM N).
 
-
-  Definition handler_cloj : val :=
-    λ: "mon" "req", follower_request_handler #logFLoc "mon" "req".
-
   Lemma follower_request_handler_spec :
     ∀ reqv reqd,
     {{{ leader_local_secondary_inv γL logFLoc γF mγ mv ∗
         MTU_F.(MTS_handler_pre) reqv reqd }}}
-      handler_cloj mv reqv @[ip_of_address MTU_F.(MTS_saddr)]
+      follower_request_handler #logFLoc mv reqv @[ip_of_address MTU_F.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable rep_l2f_serialization repv⌝ ∗
         MTU_F.(MTS_handler_post) repv reqd repd }}}.
   Proof.
     iIntros (reqv reqd Φ) "(#Hmon & Hpre) HΦ".
-    rewrite /handler_cloj /follower_request_handler.
+    rewrite /follower_request_handler.
     simplify_eq /=.
     wp_pures.
     wp_apply (monitor_acquire_spec with "[Hmon]"); first by iFrame "#".
@@ -141,16 +137,5 @@ Section Followers_MT_spec_params.
     iExists γF.
     iFrame "#∗".
   Qed.
-
-  Global Instance follower_handler_spec_params :  @MTS_spec_params _ _ _ _ MTU_F :=
-    {|
-      MTS_mR := (log_monitor_inv_def
-                   (ip_of_address MTU_F.(MTS_saddr)) γF (1/4) logFLoc
-                   (leader_local_secondary_res γL γF));
-      MTS_mγ := mγ;
-      MTS_mv := mv;
-      MTS_handler := handler_cloj;
-      MTS_handler_spec := follower_request_handler_spec;
-    |}.
 
 End Followers_MT_spec_params.

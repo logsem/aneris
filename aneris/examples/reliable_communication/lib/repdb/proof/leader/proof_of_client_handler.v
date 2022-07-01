@@ -34,22 +34,19 @@ Section Clients_MT_spec_params.
   Context (γL γM : gname) (N : gmap socket_address gname).
   Context (mγ : gname) (mv : val) (kvsL logL : loc).
 
-  Definition handler_cloj : val :=
-    λ: "mon" "req", client_request_handler_at_leader #kvsL #logL "mon" "req".
-
   Notation MTU := (client_handler_at_leader_user_params γL γM N).
 
   Lemma client_request_handler_at_leader_spec  :
     ∀ reqv reqd,
     {{{ leader_local_main_inv γL kvsL logL mγ mv ∗
         MTU.(MTS_handler_pre) reqv reqd }}}
-       handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
+        client_request_handler_at_leader #kvsL #logL mv reqv  @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable (rep_l2c_serialization) repv⌝ ∗
          MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
     iIntros (reqv reqd Φ) "(#Hmon & Hpre) HΦ".
-    rewrite /handler_cloj /client_request_handler_at_leader.
+    rewrite /client_request_handler_at_leader.
     wp_pures.
     wp_apply (monitor_acquire_spec with "[Hmon]"); first by iFrame "#".
     iIntros (v) "(-> & HKey & HR)".
@@ -217,17 +214,5 @@ Section Clients_MT_spec_params.
            iFrame.
            by iLeft. }
   Qed.
-
-  Global Instance client_handler_at_leader_spec_params :
-    @MTS_spec_params _ _ _ _ MTU :=
-    {|
-      MTS_mR := (log_monitor_inv_def
-                   (ip_of_address MTU.(MTS_saddr)) γL (1/2) logL
-                   (leader_local_main_res kvsL));
-      MTS_mγ := mγ;
-      MTS_mv := mv;
-      MTS_handler := handler_cloj;
-      MTS_handler_spec := client_request_handler_at_leader_spec;
-    |}.
 
 End Clients_MT_spec_params.
