@@ -35,8 +35,10 @@ Section Clients_MT_spec_params.
   Context (γL γM : gname) (N : gmap socket_address gname) (sa : socket_address).
   Context (mγ : gname) (mv : val) (kvsL logL : loc).
 
-  Definition handler_cloj : val :=
-    λ: "mon" "req", client_request_handler_at_follower #kvsL "mon" "req".
+  (* Definition handler_cloj : val := *)
+  (*   λ: "mon" "req", client_request_handler_at_follower #kvsL "mon" "req". *)
+  (* Definition handler_cloj' mon : val := *)
+  (*   λ: "req", handler_cloj mon "req". *)
 
   Notation MTU := (client_handler_at_follower_user_params γL γM N sa).
 
@@ -50,13 +52,13 @@ Section Clients_MT_spec_params.
                  (ip_of_address MTU.(MTS_saddr))
                  γF ¼ logL (follower_local_res γL kvsL sa γF)) ∗
           MTU.(MTS_handler_pre) reqv reqd }}}
-       handler_cloj mv reqv @[ip_of_address MTU.(MTS_saddr)]
+      client_request_handler_at_follower #kvsL mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;
         ⌜Serializable (rep_f2c_serialization) repv⌝ ∗
         MTU.(MTS_handler_post) repv reqd repd }}}.
   Proof.
     iIntros (reqv reqd Φ) "(#Hmon & Hpre) HΦ".
-    rewrite /handler_cloj /client_request_handler_at_follower.
+    rewrite /client_request_handler_at_follower.
     wp_pures.
     wp_apply (monitor_acquire_spec with "[Hmon]"); first by iFrame "#".
     iIntros (v) "(-> & HKey & #Hknw & HR)".
@@ -147,19 +149,5 @@ Section Clients_MT_spec_params.
       iLeft.
       done.
   Qed.
-
-  Global Instance client_handler_at_leader_spec_params γF :
-    @MTS_spec_params _ _ _ _ MTU :=
-    {|
-      MTS_mR :=
-      known_replog_token sa γF ∗
-      (log_monitor_inv_def
-         (ip_of_address MTU.(MTS_saddr)) γF (1/4) logL
-         (follower_local_res γL kvsL sa γF));
-      MTS_mγ := mγ;
-      MTS_mv := mv;
-      MTS_handler := handler_cloj;
-      MTS_handler_spec := (client_request_handler_at_follower_spec γF);
-    |}.
 
 End Clients_MT_spec_params.

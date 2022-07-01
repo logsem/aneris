@@ -4,32 +4,30 @@
 From aneris.aneris_lang Require Import ast.
 From aneris.examples.reliable_communication Require Import client_server_code.
 
-(**  Generic methods for multi-threaded server with monitored requests.  *)
-
 Definition service_loop : val :=
-  λ: "c" "mon" "request_handler" <>,
+  λ: "c" "request_handler" <>,
   letrec: "loop" <> :=
     let: "req" := recv "c" in
-    let: "rep" := "request_handler" "mon" "req" in
+    let: "rep" := "request_handler" "req" in
     send "c" "rep";;
     "loop" #() in
     "loop" #().
 
 Definition accept_new_connections_loop : val :=
-  λ: "skt" "mon" "request_handler" <>,
+  λ: "skt" "request_handler" <>,
   letrec: "loop" <> :=
     let: "new_conn" := accept "skt" in
     let: "c" := Fst "new_conn" in
     let: "_a" := Snd "new_conn" in
-    Fork (service_loop "c" "mon" "request_handler" #());;
+    Fork (service_loop "c" "request_handler" #());;
     "loop" #() in
     "loop" #().
 
 Definition run_server ser deser : val :=
-  λ: "addr" "mon" "request_handler",
+  λ: "addr" "request_handler",
   let: "skt" := make_server_skt ser deser "addr" in
   server_listen "skt";;
-  Fork (accept_new_connections_loop "skt" "mon" "request_handler" #()).
+  Fork (accept_new_connections_loop "skt" "request_handler" #()).
 
 Definition make_request : val :=
   λ: "ch" "lk" "req",

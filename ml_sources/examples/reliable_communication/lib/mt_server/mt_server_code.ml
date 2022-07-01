@@ -1,32 +1,30 @@
 open Ast
 open Client_server_code
 
-(** Generic methods for multi-threaded server with monitored requests. *)
-
-(** Serve requests on the the channel `c` via monitored queue of events. *)
-let service_loop c mon (request_handler : monitor -> 'req -> 'rep) () : unit =
+let service_loop c (request_handler : 'req -> 'rep) () : unit =
   let rec loop () =
     let req = recv c in
-    let rep = request_handler mon req in
+    let rep = request_handler req in
     send c rep;
     loop ()
   in loop ()
 
-let accept_new_connections_loop skt mon request_handler () : unit =
+let accept_new_connections_loop skt request_handler () : unit =
   let rec loop () =
     let new_conn = accept skt in
     let (c, _a) = new_conn in
-    fork (service_loop c mon request_handler) ();
+    fork (service_loop c request_handler) ();
     loop ()
   in loop ()
 
 let run_server
     (ser[@metavar] : 'repl serializer)
-    (deser[@metavar] : 'req serializer) addr mon
-    (request_handler : monitor -> 'req -> 'rep) : unit  =
+    (deser[@metavar] : 'req serializer)
+    addr
+    (request_handler : 'req -> 'rep) : unit  =
   let (skt :  ('repl, 'req) server_skt) = make_server_skt ser deser addr in
   server_listen skt;
-  fork (accept_new_connections_loop skt mon request_handler) ()
+  fork (accept_new_connections_loop skt request_handler) ()
 
 let make_request (ch :  ('req, 'repl) chan_descr) (lk : Mutex.t) (req : 'req) : 'repl =
   acquire lk;
