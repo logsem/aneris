@@ -1,6 +1,10 @@
 open Ast
 open Client_server_code
 
+
+type ('a, 'b) rcb = ('a, 'b) chan_descr
+
+
 let service_loop c (request_handler : 'req -> 'rep) () : unit =
   let rec loop () =
     let req = recv c in
@@ -26,17 +30,14 @@ let run_server
   server_listen skt;
   fork (accept_new_connections_loop skt request_handler) ()
 
-let make_request (ch :  ('req, 'repl) chan_descr) (lk : Mutex.t) (req : 'req) : 'repl =
-  acquire lk;
+let make_request (ch :  ('req, 'repl) chan_descr) : 'req -> 'repl =
+  fun req ->
   send ch req;
-  let msg = recv ch in
-  release lk;
-  msg
+  recv ch
 
 let init_client_proxy
     (ser[@metavar] : 'req serializer) (deser[@metavar] : 'repl serializer)
-    clt_addr srv_addr : 'req -> 'repl =
+    clt_addr srv_addr : ('a, 'b) rcb =
   let skt = make_client_skt ser deser clt_addr in
   let ch = connect skt srv_addr in
-  let lk = newlock () in
-  make_request ch lk
+  ch

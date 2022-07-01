@@ -29,17 +29,11 @@ Definition run_server ser deser : val :=
   server_listen "skt";;
   Fork (accept_new_connections_loop "skt" "request_handler" #()).
 
-Definition make_request : val :=
-  λ: "ch" "lk" "req",
-  acquire "lk";;
-  send "ch" "req";;
-  let: "msg" := recv "ch" in
-  release "lk";;
-  "msg".
+Definition make_request : val := λ: "ch" "req", send "ch" "req";;
+                                                 recv "ch".
 
 Definition init_client_proxy ser deser : val :=
   λ: "clt_addr" "srv_addr",
   let: "skt" := make_client_skt ser deser "clt_addr" in
   let: "ch" := connect "skt" "srv_addr" in
-  let: "lk" := newlock #() in
-  make_request "ch" "lk".
+  "ch".
