@@ -98,10 +98,11 @@ Definition init_client_leader_proxy ser : val :=
   let: "rpc" := init_client_proxy (req_c2l_ser ser) (rep_l2c_ser ser)
                 "clt_addr" "srv_addr" in
   let: "lk" := newlock #() in
-  let: "reqf" := acquire "lk";;
-                 let: "res" := make_request "rpc" in
-                 release "lk";;
-                 "res" in
+  let: "reqf" := λ: "req",
+  acquire "lk";;
+  let: "res" := make_request "rpc" "req" in
+  release "lk";;
+  "res" in
   let: "write" := λ: "k" "v",
   match: "reqf" (InjL ("k", "v")) with
     InjL "_u" => #()
@@ -147,7 +148,8 @@ Definition sync_with_server ser : val :=
   λ: "l_addr" "f2l_addr" "db" "log" "mon",
   let: "rpc" := init_client_proxy req_f2l_ser (rep_l2f_ser ser) "f2l_addr"
                 "l_addr" in
-  let: "reqf" := make_request "rpc" in
+  let: "reqf" := λ: "req",
+  make_request "rpc" "req" in
   Fork (sync_loop "db" "log" "mon" "reqf" #0).
 
 Definition init_follower ser : val :=
@@ -163,8 +165,9 @@ Definition init_client_follower_proxy ser : val :=
   let: "rpc" := init_client_proxy req_c2f_ser (rep_f2c_ser ser) "clt_addr"
                 "srv_addr" in
   let: "lk" := newlock #() in
-  let: "reqf" := acquire "lk";;
-                 let: "res" := make_request "rpc" in
-                 release "lk";;
-                 "res" in
+  let: "reqf" := λ: "req",
+  acquire "lk";;
+  let: "res" := make_request "rpc" "req" in
+  release "lk";;
+  "res" in
   "reqf".
