@@ -4,8 +4,6 @@
 From aneris.aneris_lang Require Import ast.
 From aneris.examples.reliable_communication Require Import client_server_code.
 
-(**  Generic methods for multi-threaded server with monitored requests.  *)
-
 Definition service_loop : val :=
   λ: "c" "request_handler" <>,
   letrec: "loop" <> :=
