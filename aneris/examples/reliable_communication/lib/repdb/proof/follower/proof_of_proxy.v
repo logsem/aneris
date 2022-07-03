@@ -51,51 +51,66 @@ Section Client_Proxy_Proof.
          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜at_key k h' = Some a⌝))
     }}}%I.
 
-   Definition init_client_proxy_follower_spec_internal : iProp Σ :=
-     ∀ A csa,
-     ⌜fsa ≠ DB_addr⌝ →
-     ⌜fsa ∈ A⌝ →
-     ⌜csa ∉ A⌝ →
-     {{{ fixed A ∗
-         fsa ⤇ follower_si ∗
-         csa ⤳ (∅, ∅) ∗
-         (@init_client_proxy_spec _ _ _ _ MTC follower_si) ∗
-         free_ports (ip_of_address csa) {[port_of_address csa]} }}}
-       init_client_follower_proxy (s_serializer DB_serialization)
-         #csa #fsa @[ip_of_address csa]
-     {{{ rd, RET rd;
-         (∀ k h, read_at_follower_spec_internal rd csa fsa k h) }}}.
+  Definition init_client_proxy_follower_spec_internal
+             {MTR : MTS_resources} : iProp Σ :=
+    ∀ A csa,
+    ⌜fsa ≠ DB_addr⌝ →
+    ⌜fsa ∈ A⌝ →
+    ⌜csa ∉ A⌝ →
+    {{{ fixed A ∗
+        fsa ⤇ follower_si ∗
+        csa ⤳ (∅, ∅) ∗
+        (@init_client_proxy_spec _ _ _ _ MTC _ follower_si) ∗
+        (@make_request_spec _ _ _ _ MTC _) ∗
+        free_ports (ip_of_address csa) {[port_of_address csa]} }}}
+      init_client_follower_proxy (s_serializer DB_serialization)
+      #csa #fsa @[ip_of_address csa]
+    {{{ rd, RET rd;
+        (∀ k h, read_at_follower_spec_internal rd csa fsa k h) }}}.
 
-  Lemma init_client_proxy_follower_internal_holds :
+  Lemma init_client_proxy_follower_internal_holds {MTR : MTS_resources} :
     Global_Inv γL γM N ⊢ init_client_proxy_follower_spec_internal.
   Proof.
     iIntros "#Hinv".
     iIntros (A csa).
     iIntros (Hneq HA HnA).
     iIntros (Φ) "!#".
-    iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & Hfp) HΦ".
+    iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & #Hreq_spec & Hfp) HΦ".
     rewrite /init_client_follower_proxy.
     wp_pures.
     wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
     iNext.
-    iIntros (reqh) "#Hspec".
+    iIntros (reqh) "Hreq".
+    wp_pures.
+    wp_apply (newlock_spec (DB_InvName .@ "follower") with "Hreq").
+    iIntros (lk γ) "#Hlk".
+    wp_pures.
     iApply "HΦ".
     iIntros (k h).
     rewrite /read_at_follower_spec_internal.
     iIntros (Hkeys Ψ) "!#".
     iIntros "#Hobs HΨ".
-    wp_apply ("Hspec" $! _ (k, h) with "[Hobs]").
-    - iSplit.
-      -- iPureIntro. apply _.
-      -- iDestruct "Hobs" as "[(%Habs & _)|Hobs]".
-         { naive_solver. }
-         iDestruct "Hobs" as (γF') "(#Hknw & #HobsL & #HobsF)".
-         iFrame "#".
-         iExists k, h.
-         iFrame "#∗".
-         do 3 (iSplit; first done).
-         iExists _; iFrame "#".
-    - iIntros (repd repv) "Hpost".
+    wp_pures.
+    wp_apply (acquire_spec with "Hlk").
+    iIntros (v) "(->&Hlocked&Hreq)".
+    wp_pures.
+    wp_apply ("Hreq_spec" with "[$Hreq]").
+    rewrite /MTS_handler_pre /=.
+    iSplit.
+    - iPureIntro. exists k. done.
+    - iDestruct "Hobs" as "[(%Habs & _)|Hobs]".
+      { naive_solver. }
+      iDestruct "Hobs" as (γF') "(#Hknw & #HobsL & #HobsF)".
+      iFrame "#".
+      iExists k, h.
+      iFrame "#∗".
+      do 3 (iSplit; first done).
+      iExists _; iFrame "#".
+    - iIntros (repd repv) "[Hreq Hpost]".
+      wp_pures.
+      wp_apply (release_spec with "[$Hlk $Hlocked $Hreq]").
+      iIntros (v) "->".
+      wp_pures.
       iApply "HΨ".
       simplify_eq /=.
       rewrite /ReqPost.
