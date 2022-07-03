@@ -38,3 +38,7 @@ Definition handler_spec `{MTS_user_params} (handler : val) : iProp Σ :=
   {{{ repv repd, RET repv;
       ⌜Serializable MTS_rep_ser repv⌝ ∗
       MTS_handler_post repv reqd repd }}}.
+
+Class MTS_resources `{!anerisG Mdl Σ} := {
+    MTSCanRequest : ip_address → val → iProp Σ;
+  }.

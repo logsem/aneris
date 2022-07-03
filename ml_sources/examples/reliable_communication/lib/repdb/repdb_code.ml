@@ -88,7 +88,14 @@ let init_leader (ser[@metavar] : 'a serializer) addr0 addr1 : unit =
   fork (update_log_copy_loop logC monC logF monF) ()
 
 let init_client_leader_proxy (ser[@metavar]) clt_addr srv_addr =
- let reqf = init_client_proxy (req_c2l_ser ser) (rep_l2c_ser ser) clt_addr srv_addr in
+ let rpc = init_client_proxy (req_c2l_ser ser) (rep_l2c_ser ser) clt_addr srv_addr in
+ let lk = newlock () in
+ let reqf req =
+   acquire lk;
+   let res = make_request rpc req in
+   release lk;
+   res
+ in
  let write k v =
     match reqf (InjL (k, v)) with
     | InjL _u -> ()
@@ -112,9 +119,9 @@ let start_follower_processing_clients (ser[@metavar]) addr db mon =
   run_server (rep_f2c_ser ser) req_c2f_ser addr
     (fun req -> client_request_handler_at_follower db mon req)
 
-let sync_loop db log mon reqf n : unit =
+let sync_loop db log mon rpc n : unit =
   let rec aux i =
-    let rep = reqf i in
+    let rep = make_request rpc i in
     let ((k, v), j) = rep in
     assert (i = j);
     monitor_acquire mon;
@@ -125,8 +132,8 @@ let sync_loop db log mon reqf n : unit =
   in aux n
 
 let sync_with_server (ser[@metavar]) l_addr f2l_addr db log mon : unit =
-  let reqf = init_client_proxy req_f2l_ser (rep_l2f_ser ser) f2l_addr l_addr in
-  fork (sync_loop db log mon reqf) 0
+  let rpc = init_client_proxy req_f2l_ser (rep_l2f_ser ser) f2l_addr l_addr in
+  fork (sync_loop db log mon rpc) 0
 
 (** Initialization of the follower. *)
 let init_follower (ser[@metavar]) l_addr f2l_addr f_addr  =
@@ -137,4 +144,11 @@ let init_follower (ser[@metavar]) l_addr f2l_addr f_addr  =
   start_follower_processing_clients ser f_addr db mon
 
 let init_client_follower_proxy (ser[@metavar]) clt_addr srv_addr =
-  init_client_proxy req_c2f_ser (rep_f2c_ser ser) clt_addr srv_addr
+  let rpc = init_client_proxy req_c2f_ser (rep_f2c_ser ser) clt_addr srv_addr in
+  let lk = newlock () in
+  let reqf req =
+    acquire lk;
+    let res = make_request rpc req in
+    release lk;
+    res in
+  reqf

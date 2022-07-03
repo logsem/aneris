@@ -57,7 +57,7 @@ Section Init_Follower_Proof.
     known_replog_token f2csa γF ∗
     (∃ γdbF : gname, known_replog_token DB_addrF γdbF ∗ own_replog_obs γL DB_addrF []).
 
-  Definition init_follower_spec_internal : iProp Σ :=
+  Definition init_follower_spec_internal {MTS:MTS_resources} : iProp Σ :=
     ∀ A,
     ⌜DB_addrF ∈ A⌝ →
     ⌜f2csa ∈ A⌝ →
@@ -68,7 +68,8 @@ Section Init_Follower_Proof.
         f2csa ⤇ follower_si ∗
         DB_addrF ⤇ leaderF_si ∗
         (@run_server_spec _ _ _ _ MTC InitFollower follower_si) ∗
-        (@init_client_proxy_spec _ _ _ _ MTF leaderF_si) ∗
+        (@init_client_proxy_spec _ _ _ _ MTF _ leaderF_si) ∗
+        (@make_request_spec _ _ _ _ MTF _) ∗
         init_follower_res ∗
         f2csa ⤳ (∅, ∅) ∗
         f2lsa ⤳ (∅, ∅) ∗
@@ -78,12 +79,14 @@ Section Init_Follower_Proof.
       #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
     {{{ RET #(); True }}}.
 
-  Lemma init_follower_spec_internal_holds : ⊢ init_follower_spec_internal.
+  Lemma init_follower_spec_internal_holds {MTR:MTS_resources} :
+    ⊢ init_follower_spec_internal.
   Proof.
     iIntros (A HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
       "(#HA & #Hsi & HsiF & HInitFollowerSpec
-            & HinitFollowerAsClient & HinitRes & Hmh & HmhF & Hfp & HfpF)".
+            & HinitFollowerAsClient & #HreqSpec
+            & HinitRes & Hmh & HmhF & Hfp & HfpF)".
     rewrite /init_follower.
     wp_pures.
     wp_apply (wp_map_empty with "[//]").
@@ -121,7 +124,7 @@ Section Init_Follower_Proof.
     wp_pures.
     rewrite {4} HipEq.
     wp_apply ("HinitFollowerAsClient" $! A f2lsa with "[$HA $HmhF $HfpF $HsiF //]").
-    iIntros (reqh) "#HSpec".
+    iIntros (reqh) "Hreq".
     wp_pures.
     wp_apply aneris_wp_fork.
     iSplitL "HInitFollowerSpec Hinit Hmh Hfp HΦ".
@@ -149,18 +152,20 @@ Section Init_Follower_Proof.
         iDestruct "Hdef" as "(Hk & Hdef)".
         iSplitL "Hk"; first done.
         iSplit; done.
-      +iIntros "(%b & (Hl & Hdef))".
-       iExists b. iFrame.
-       destruct b; first done.
-       iDestruct "Hdef" as "(Hk & _ & Hdef)".
-       by iFrame.
+      + iIntros "(%b & (Hl & Hdef))".
+        iExists b. iFrame.
+        destruct b; first done.
+        iDestruct "Hdef" as "(Hk & _ & Hdef)".
+        by iFrame.
     - iNext.
       rewrite -HipEq.
-      wp_apply (sync_loop_spec γL γM N f2csa kvsL logL mγ mv reqh [] 0
-                 with "[HownF2]"); [naive_solver| | done].
+      iApply (sync_loop_spec γL γM N f2csa kvsL logL mγ mv _ [] 0
+                 with "[HownF2 Hreq] []"); [naive_solver| | done].
       iFrame "HGinv".
       iSplitR; last first.
-      { iSplitR. { iExists f2csa. eauto. }
+      { iSplit; [done|].
+        iSplitL "Hreq".
+        { iExists f2csa. by iFrame. }
         iFrame "#"; eauto.
         iExists _; iFrame "#∗".
         iDestruct "HdbF" as (γdbF) "#(Htk & HobsdbF)".

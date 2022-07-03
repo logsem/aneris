@@ -9,6 +9,7 @@ From aneris.examples.reliable_communication.lib.mt_server
 Section Spec.
   Context `{ !anerisG Mdl Σ, !lockG Σ}.
   Context `{ MTU: !MTS_user_params }.
+  Context `{ MTR: !MTS_resources }.
   Context (SrvInit : iProp Σ).
   Context (srv_si : message → iProp Σ).
   Notation srv_ip := (ip_of_address MTS_saddr).
@@ -30,12 +31,14 @@ Section Spec.
        @[srv_ip]
     {{{ RET #(); True }}}.
 
-  Definition make_request_spec ip (handler : val) : iProp Σ :=
-    ∀ reqv reqd,
-    {{{ ⌜Serializable MTS_req_ser reqv⌝ ∗
+  Definition make_request_spec : iProp Σ :=
+    ∀ ip (rpc : val) reqv reqd,
+    {{{ MTSCanRequest ip rpc ∗
+        ⌜Serializable MTS_req_ser reqv⌝ ∗
         MTS_handler_pre reqv reqd }}}
-      handler reqv @[ip]
-    {{{ repd repv, RET repv; MTS_handler_post repv reqd repd  }}}.
+      make_request rpc reqv @[ip]
+    {{{ repd repv, RET repv;
+        MTSCanRequest ip rpc ∗ MTS_handler_post repv reqd repd  }}}.
 
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ A sa,
@@ -49,7 +52,7 @@ Section Spec.
         #sa
         #MTS_saddr
        @[ip_of_address sa]
-    {{{ reqh, RET reqh; make_request_spec (ip_of_address sa) reqh }}}.
+    {{{ reqh, RET reqh; MTSCanRequest (ip_of_address sa) reqh }}}.
 
 End Spec.
 
@@ -59,9 +62,11 @@ Section MTS_Init.
   Class MTS_init := {
     MTS_init_setup E (MTU : MTS_user_params) :
     ↑MTS_mN ⊆ E →
-    ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ),
+    ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ)
+      (MTR : MTS_resources),
       SrvInit ∗
       (run_server_spec SrvInit srv_si) ∗
-      (init_client_proxy_spec srv_si) }.
+      (init_client_proxy_spec srv_si) ∗
+      make_request_spec }.
 
 End MTS_Init.

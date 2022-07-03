@@ -95,8 +95,14 @@ Definition init_leader ser : val :=
 
 Definition init_client_leader_proxy ser : val :=
   λ: "clt_addr" "srv_addr",
-  let: "reqf" := init_client_proxy (req_c2l_ser ser) (rep_l2c_ser ser)
-                 "clt_addr" "srv_addr" in
+  let: "rpc" := init_client_proxy (req_c2l_ser ser) (rep_l2c_ser ser)
+                "clt_addr" "srv_addr" in
+  let: "lk" := newlock #() in
+  let: "reqf" := λ: "req",
+  acquire "lk";;
+  let: "res" := make_request "rpc" "req" in
+  release "lk";;
+  "res" in
   let: "write" := λ: "k" "v",
   match: "reqf" (InjL ("k", "v")) with
     InjL "_u" => #()
@@ -124,9 +130,9 @@ Definition start_follower_processing_clients ser : val :=
   (λ: "req", client_request_handler_at_follower "db" "mon" "req").
 
 Definition sync_loop : val :=
-  λ: "db" "log" "mon" "reqf" "n",
+  λ: "db" "log" "mon" "rpc" "n",
   letrec: "aux" "i" :=
-    let: "rep" := "reqf" "i" in
+    let: "rep" := make_request "rpc" "i" in
     let: "k" := Fst (Fst "rep") in
     let: "v" := Snd (Fst "rep") in
     let: "j" := Snd "rep" in
@@ -140,9 +146,9 @@ Definition sync_loop : val :=
 
 Definition sync_with_server ser : val :=
   λ: "l_addr" "f2l_addr" "db" "log" "mon",
-  let: "reqf" := init_client_proxy req_f2l_ser (rep_l2f_ser ser) "f2l_addr"
-                 "l_addr" in
-  Fork (sync_loop "db" "log" "mon" "reqf" #0).
+  let: "rpc" := init_client_proxy req_f2l_ser (rep_l2f_ser ser) "f2l_addr"
+                "l_addr" in
+  Fork (sync_loop "db" "log" "mon" "rpc" #0).
 
 Definition init_follower ser : val :=
   λ: "l_addr" "f2l_addr" "f_addr",
@@ -154,4 +160,12 @@ Definition init_follower ser : val :=
 
 Definition init_client_follower_proxy ser : val :=
   λ: "clt_addr" "srv_addr",
-  init_client_proxy req_c2f_ser (rep_f2c_ser ser) "clt_addr" "srv_addr".
+  let: "rpc" := init_client_proxy req_c2f_ser (rep_f2c_ser ser) "clt_addr"
+                "srv_addr" in
+  let: "lk" := newlock #() in
+  let: "reqf" := λ: "req",
+  acquire "lk";;
+  let: "res" := make_request "rpc" "req" in
+  release "lk";;
+  "res" in
+  "reqf".
