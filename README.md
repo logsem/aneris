@@ -69,7 +69,7 @@ To generate AnerisLang programs from OCaml source files, pin the `ocaml2lang` pa
 
 This will produce an executable `o2a`. After installation succeeds, you can try `o2a` by doing
 
-    o2a --h
+    o2a --help
 
 You can now run
 
