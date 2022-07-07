@@ -43,15 +43,17 @@ CPU cores.
 	* [`lib/repdb`](ml_sources/examples/reliable_communication/lib/repdb):
 	for the implementation and verification of the leader-follower case study
 
+
+
 ## Differences from the paper
 
-# No initial component-specific resources.
+### No initial component-specific resources.
 
 The specifications are defined in terms of primitive Aneris resources, rather
 than the initial component-specific resources presented in the paper.
 We plan to resolve this discrepancy in the future
 
-# Typeclasses as a means of the dependent specification pattern
+### Typeclasses as a means of the dependent specification pattern
 
 The so-called dependent specification pattern of the paper is a simplification
 of the mechanised abstraction, for presentation purposes.
@@ -60,14 +62,14 @@ which carry the user parameters and abstract resources.
 These are implicitly provided to the specifications which, in some cases, require
 us to provide them explicitly, as Coq cannot automatically unify the correct typeclass.
 
-# Auxilliary arguments in the user parameters and resources
+### Auxilliary arguments in the user parameters and resources
 
 Some of the specifications carry more parameters than presented in the paper.
 One particular parameter is the internal `namespace` of the reliable communication library,
 which is then required in all of the components built on top of it.
 We conjecture that this parameter can be hidden, and so we have not included it in the paper.
 
-# Differences in naming conventions
+### Differences in naming conventions
 
 In the mechanisation the RPC service is called MT server, as it originally
 served a slightly different purpose, while the name was not adapted with the tandem
