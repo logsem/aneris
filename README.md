@@ -30,3 +30,27 @@ CPU cores.
 - [`ml_sources/`](ml_sources/): The Multicore OCaml source files 
   * [`aneris_lang/`](ml_sources/aneris_lang/): for the shim and the implementation of libraries related to the [`aneris/`](aneris/) folder
   * [`examples/reliable_communication`](ml_sources/examples/reliable_communication): for the OCaml implementation of the reliable communication components
+
+## Differences from the paper
+
+# No initial component-specific resources.
+
+The specifications are defined in terms of primitive Aneris resources, rather
+than the initial component-specific resources presented in the paper.
+We plan to resolve this discrepancy in the future
+
+# Typeclasses as a means of the dependent specification pattern
+
+The so-called dependent specification pattern of the paper is a simplification
+of the mechanised abstraction, for presentation purposes.
+In the mechanisation we achieve the abstract specifications by using typeclasses,
+which carry the user parameters and abstract resources.
+These are implicitly provided to the specifications which, in some cases, require
+us to provide them explicitly, as Coq cannot automatically unify the correct typeclass.
+
+# Auxilliary arguments in the user parameters and resources 
+
+Some of the specifications carry more parameters than presented in the paper.
+One particular parameter is the internal `namespace` of the reliable communication library,
+which is then required in all of the components built on top of it.
+We conjecture that this parameter can be hidden, and so we have not included it in the paper.
