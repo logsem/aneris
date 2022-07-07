@@ -1,5 +1,0 @@
-(library
-  (wrapped false)
-  (name one_server)
-  (flags :standard -rectypes)
-  (libraries aneris))

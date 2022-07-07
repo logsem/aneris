@@ -1,5 +1,0 @@
-(library
-  (wrapped false)
-  (name table_of_lwwregs_code)
-  (flags :standard -rectypes)
-  (libraries oplib_code aneris map_comb_code lwwreg_code))

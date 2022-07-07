@@ -1,4 +1,0 @@
-(library
-  (name remove_wins_set_code)
-  (flags :standard -rectypes)
-  (libraries oplib_code aneris))

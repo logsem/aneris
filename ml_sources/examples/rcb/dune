@@ -1,5 +1,0 @@
-(library
- (wrapped false)
- (name rcb_code)
- (flags :standard -rectypes)
- (libraries aneris))

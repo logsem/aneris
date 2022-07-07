@@ -1,5 +1,0 @@
-(library
- (name map_comb_code)
- (wrapped false)
- (flags :standard -rectypes)
- (libraries oplib_code aneris))
