@@ -1,6 +1,5 @@
 -Q trillium trillium
 -Q aneris aneris
--Q fairness trillium.fairness
 
 -Q external/stdpp/theories stdpp
 -Q external/iris/iris iris
