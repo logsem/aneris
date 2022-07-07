@@ -24,12 +24,24 @@ CPU cores.
 - [`trillium/`](trillium/): The Trillium program logic framework
 
 - [`aneris/`](aneris/): The Aneris instantiation of Trillium
-  * [`examples/reliable_communication`](aneris/examples/reliable_communication):
-    for the AnerisLang implementation and Aneris verification of the reliable communication components
-  
-- [`ml_sources/`](ml_sources/): The Multicore OCaml source files 
+  + [`examples/reliable_communication`](aneris/examples/reliable_communication):
+	for the implementation and verification of the reliable communication library
+	* [`lib/dlm`](aneris/examples/reliable_communication/lib/dlm):
+	for the implementation and verification of the distributed lock manager
+	* [`lib/mt_server`](aneris/examples/reliable_communication/lib/mt_server):
+	for the implementation and verification of the RPC service
+	* [`lib/repdb`](aneris/examples/reliable_communication/lib/repdb):
+	for the implementation and verification of the leader-follower case study
+
+- [`ml_sources/`](ml_sources/): The Multicore OCaml source files
   * [`aneris_lang/`](ml_sources/aneris_lang/): for the shim and the implementation of libraries related to the [`aneris/`](aneris/) folder
-  * [`examples/reliable_communication`](ml_sources/examples/reliable_communication): for the OCaml implementation of the reliable communication components
+  + [`examples/reliable_communication`](ml_sources/examples/reliable_communication): for the OCaml implementation of the reliable communication components
+	* [`lib/dlm`](ml_sources/examples/reliable_communication/lib/dlm):
+	for the implementation and verification of the distributed lock manager
+	* [`lib/mt_server`](ml_sources/examples/reliable_communication/lib/mt_server):
+	for the implementation and verification of the RPC service
+	* [`lib/repdb`](ml_sources/examples/reliable_communication/lib/repdb):
+	for the implementation and verification of the leader-follower case study
 
 ## Differences from the paper
 
@@ -48,9 +60,18 @@ which carry the user parameters and abstract resources.
 These are implicitly provided to the specifications which, in some cases, require
 us to provide them explicitly, as Coq cannot automatically unify the correct typeclass.
 
-# Auxilliary arguments in the user parameters and resources 
+# Auxilliary arguments in the user parameters and resources
 
 Some of the specifications carry more parameters than presented in the paper.
 One particular parameter is the internal `namespace` of the reliable communication library,
 which is then required in all of the components built on top of it.
 We conjecture that this parameter can be hidden, and so we have not included it in the paper.
+
+# Differences in naming conventions
+
+In the mechanisation the RPC service is called MT server, as it originally
+served a slightly different purpose, while the name was not adapted with the tandem
+of changes to the implementation.
+
+In the mechanisation the leader-follower case study is called `repdb` (for replicated
+database), as it was originally not directly tied to the known service pattern.
