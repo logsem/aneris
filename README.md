@@ -26,9 +26,6 @@ CPU cores.
 - [`aneris/`](aneris/): The Aneris instantiation of Trillium
   * [`examples/reliable_communication`](aneris/examples/reliable_communication):
     for the AnerisLang implementation and Aneris verification of the reliable communication components
-
-- [`fairness/`](fairness/): A HeapLang instantiation of Trillium for reasoning
-  about fair termination of concurrent programs.
   
 - [`ml_sources/`](ml_sources/): The Multicore OCaml source files 
   * [`aneris_lang/`](ml_sources/aneris_lang/): for the shim and the implementation of libraries related to the [`aneris/`](aneris/) folder
