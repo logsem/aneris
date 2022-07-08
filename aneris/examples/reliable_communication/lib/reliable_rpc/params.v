@@ -1,5 +1,5 @@
 From aneris.aneris_lang Require Import lang.
-From aneris.aneris_lang.lib Require Import lock_proof monitor_proof serialization_proof.
+From aneris.aneris_lang.lib Require Import lock_proof serialization_proof list_proof.
 From aneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 From aneris.examples.reliable_communication.prelude Require Import ser_inj.
 From actris.channel Require Import proto.
@@ -12,123 +12,83 @@ Notation iMsg Σ := (iMsg Σ val).
 
 Import lock_proof.
 
-Definition ser_list_is_injective ser_list :=
-  Forall ser_is_injective ser_list.
-
-Definition ser_pair_list_is_injective ser_list :=
-  ser_list_is_injective (fst (split ser_list)) 
-  ∧ ser_list_is_injective (snd (split ser_list)).
-
-(* Tentatives avec un Fixpoint *)
-(*
-Fixpoint hlist (TS : list Type) : Type :=
-  match TS with
-    | nil => unit
-    | T :: TS' => prod T (hlist TS')
-  end.
-
-Definition head {T : Type} {TS : list Type} (h : hlist (T :: TS)) : T :=
-  fst h.
-
-Definition tail {T : Type} {TS : list Type} (h : hlist (T :: TS)) : hlist TS :=
-  snd h.
-
-Fixpoint data_to_pre (Σ : gFunctors) (TS : list Type) : list Type :=
-  match TS with
-    | nil => []
-    | T :: TS' => (val -> T -> iProp Σ) :: (data_to_pre Σ TS')
-  end.
-
-Fixpoint data_to_post (Σ : gFunctors) (TSargs : list Type) (TSreps : list Type) : list Type :=
-  match TSargs with
-    | nil => []
-    | Targ :: TSargs' => match TSreps with
-      | nil => [] (* shouldn't happen *)
-      | Trep :: TSreps => (val -> Targ -> Trep -> iProp Σ) :: (data_to_post Σ TSargs TSreps)
-    end
-  end. 
-
-Fixpoint hforall {Σ : gFunctors} (TS : list Type) (h : hlist TS) P : iProp Σ :=
-  match TS with
-    | nil => True
-    | T :: TS' => P (head h) ∧ hforall TS' (tail h) P
-  end. 
-*)
+Section Sec.
 
 
-(* Inductive hlist : list Type -> Type :=
-  | Hnil : hlist nil
-  | Hcons : forall {T} {TS}, T -> hlist TS -> hlist (T :: TS). 
+Context `{ !anerisG Mdl Σ, !lockG Σ } .
 
 
-
-
-
-Class MTS_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
-  { 
-    
-    RPC_ser_list : list (serialization * serialization);
-    RPC_ser_inj  : ser_pair_list_is_injective RPC_ser_list; 
-    (* do same thing for inj_alt *)
-
-    RPC_args_data : list Type;
-    RPC_reps_data : list Type;
-    RPC_handlers_pre : hlist (data_to_pre Σ RPC_args_data);
-    RPC_handlers_post : hlist (data_to_post Σ RPC_args_data RPC_reps_data);
-
-    RPC_saddr : socket_address;
-    RPC_mN : namespace;
-  }.
-
-Arguments MTS_user_params {_ _ _ _}. *)
-
-
-
-
-Class RPC_handler_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
-{
-  RPC_arg_ser  : serialization;
-  RPC_arg_ser_inj : ser_is_injective RPC_arg_ser;
-  RPC_arg_ser_inj_alt : ser_is_injective_alt RPC_arg_ser;
-  RPC_arg_data : Type;
-  RPC_rep_ser  : serialization;
-  RPC_rep_ser_inj : ser_is_injective RPC_rep_ser;
-  RPC_rep_ser_inj_alt : ser_is_injective_alt RPC_rep_ser;
-  RPC_rep_data : Type;
-  RPC_handler_pre  : val → RPC_arg_data → iProp Σ;
-  RPC_handler_post : val → RPC_arg_data → RPC_rep_data → iProp Σ;
-}.
-
-Arguments RPC_handler_user_params {_ _ _ _}. Check RPC_handler_user_params.
-
-Definition list_params `{ !anerisG Mdl Σ, !lockG Σ } := list RPC_handler_user_params.
-Check list_params.
-
-Class RPC_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
+Class RPC_user_params :=
 {
   RPC_saddr : socket_address;
   RPC_mN : namespace;
 }.
 
-Class RPC_spec_params `{ !anerisG Mdl Σ, !lockG Σ } := {
-  RPC_mR : iProp Σ;
-  RPC_mγ : gname;
-  RPC_mv : val;
-}.
+Context `{ !RPC_user_params }.
 
-Class RPC_handler_spec_params `{ !anerisG Mdl Σ, !lockG Σ } (HUP : RPC_handler_user_params) (UP : RPC_user_params)
-  (SP : RPC_spec_params) :=
+(* Params that characterize an RPC *)
+Class RPC_rpc_params :=
 {
-  RPC_handler : val;
-  RPC_handler_spec :
-  (∀ reqv reqd,
-  {{{ is_monitor RPC_mN (ip_of_address RPC_saddr) RPC_mγ RPC_mv RPC_mR ∗
-      locked RPC_mγ ∗ RPC_mR ∗
-      RPC_handler_pre reqv reqd }}}
-    RPC_handler RPC_mv reqv @[ip_of_address RPC_saddr]
-  {{{ repv repd, RET repv;
-      ⌜Serializable RPC_rep_ser repv⌝ ∗
-      locked RPC_mγ ∗ RPC_mR ∗
-      RPC_handler_post repv reqd repd }}})
+  RPC_name : string;
+  RPC_arg_ser  : serialization;
+  RPC_arg_data : Type;
+  RPC_rep_ser  : serialization;
+  RPC_rep_data : Type;
+  RPC_pre  : val → RPC_arg_data → iProp Σ;
+  RPC_post : val → RPC_arg_data → RPC_rep_data → iProp Σ;
 }.
 
+(* List of RPC params, i.e. params of the interface *)
+Definition RPC_interface_params := list RPC_rpc_params.
+
+(* Params to match the concrete rpc and handler implementations *)
+Class RPC_implementation_params (RP : RPC_rpc_params) :=
+{
+  RPC_val : val;
+  RPC_handler : val;
+  RPC_rpc_match :
+    RPC_val = (#RP.(RPC_name), 
+      ((RP.(RPC_arg_ser).(s_serializer).(s_ser), 
+      RP.(RPC_arg_ser).(s_serializer).(s_deser))%V,
+      (RP.(RPC_rep_ser).(s_serializer).(s_ser), 
+      RP.(RPC_rep_ser).(s_serializer).(s_deser))%V)%V
+    )%V;
+  RPC_handler_spec :
+    (∀ argv argd,
+    {{{ RP.(RPC_pre) argv argd }}}
+    RPC_handler argv @[ip_of_address RPC_saddr]
+    {{{ repv repd, RET repv; RP.(RPC_post) repv argd repd }}})
+}. 
+
+(* Check if a given concrete handler (a val) match the spec of an given RPC *)
+Definition is_impl_handler_of_rpc (handler : val) (RP : RPC_rpc_params):=
+  (∀ argv argd s_arg,
+    {{{ ⌜s_is_ser RP.(RPC_arg_ser) argv s_arg⌝ ∗
+        RP.(RPC_pre) argv argd }}}
+    handler #s_arg @[ip_of_address RPC_saddr]
+    {{{ repv repd s_rep, RET #s_rep;
+        ⌜s_is_ser RP.(RPC_rep_ser) repv s_rep⌝ ∗
+        RP.(RPC_post) repv argd repd }}}).
+
+Fixpoint is_list_of_interface (handlers : list val) (IP : RPC_interface_params) :=
+  match handlers, IP with
+  | [], [] => True
+  | (name, h)%V :: l', RP :: IP' => 
+      name = #RP.(RPC_name) ∧
+      is_impl_handler_of_rpc h RP ∧ 
+      is_list_of_interface l' IP'
+  | _, _ => False
+  end. 
+
+(* Matches the logical interface with the concrete interface *)
+Class RPC_interface_implementation (IP : RPC_interface_params) := 
+{
+  RPC_inter_val : val;
+  RPC_inter_list : list val;
+  RPC_inter_spec :
+    (is_list RPC_inter_list RPC_inter_val ∧ 
+     is_list_of_interface RPC_inter_list IP)
+}.
+
+
+End Sec.

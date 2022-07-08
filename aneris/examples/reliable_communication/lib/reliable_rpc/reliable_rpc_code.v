@@ -9,34 +9,32 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 
 Definition implement : val :=
   λ: "rpc" "f",
-  (Fst "rpc", λ: "mon" "s_arg", let: "arg" := Snd (Fst (Snd "rpc")) "s_arg" in
-                                 Fst (Snd (Snd "rpc")) ("f" "mon" "arg")).
+  (Fst "rpc", λ: "s_arg", let: "arg" := Snd (Fst (Snd "rpc")) "s_arg" in
+                           Fst (Snd (Snd "rpc")) ("f" "arg")).
 
 Definition call_handler : val :=
-  λ: "handlers" "name" "s_arg" "mon",
+  λ: "handlers" "name" "s_arg",
   let: "func" := unSOME (map_lookup "name" "handlers") in
-  "func" "mon" "s_arg".
+  "func" "s_arg".
 
 Definition service_loop : val :=
-  λ: "c" "mon" "handlers" <>,
+  λ: "c" "handlers" <>,
   letrec: "loop" <> :=
     let: "msg" := recv "c" in
     let: "name" := Fst "msg" in
     let: "s_arg" := Snd "msg" in
-    monitor_acquire "mon";;
-    let: "s_resp" := call_handler "handlers" "name" "s_arg" "mon" in
-    monitor_release "mon";;
+    let: "s_resp" := call_handler "handlers" "name" "s_arg" in
     send "c" "s_resp";;
     "loop" #() in
     "loop" #().
 
 Definition accept_new_connections_loop : val :=
-  λ: "skt" "mon" "handlers" <>,
+  λ: "skt" "handlers" <>,
   letrec: "loop" <> :=
     let: "new_conn" := accept "skt" in
     let: "c" := Fst "new_conn" in
     let: "_a" := Snd "new_conn" in
-    Fork (service_loop "c" "mon" "handlers" #());;
+    Fork (service_loop "c" "handlers" #());;
     "loop" #() in
     "loop" #().
 
@@ -46,10 +44,10 @@ Definition req_serializer :=
 Definition resp_serializer := string_serializer.
 
 Definition init_server_stub : val :=
-  λ: "addr" "mon" "handlers",
+  λ: "addr" "handlers",
   let: "skt" := make_server_skt resp_serializer req_serializer "addr" in
   server_listen "skt";;
-  accept_new_connections_loop "skt" "mon" "handlers" #().
+  accept_new_connections_loop "skt" "handlers" #().
 
 Definition init_client_stub : val :=
   λ: "clt_addr" "srv_addr",
