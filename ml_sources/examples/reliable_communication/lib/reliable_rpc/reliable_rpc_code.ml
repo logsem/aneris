@@ -6,39 +6,37 @@ open Serialization_code
 
 type 'a embedding = ('a -> string) * (string -> 'a)
 type ('a, 'b) rpc = string * ('a embedding * 'b embedding)
-type handler = string * (monitor -> string -> string)
-type handler_list = (string, monitor -> string -> string) amap
+type handler = string * (string -> string)
+type handler_list = (string, string -> string) amap
 
 
 (* Turns a function and its "RPC spec" into a handler, 
    which is ready to be applied directly on a serialized arg, and to return a serialized response *)
 let implement (rpc : ('a, 'b) rpc) f : handler = 
-  (fst rpc, (fun mon s_arg -> let arg = (snd (fst (snd rpc))) s_arg in (fst (snd (snd rpc))) (f mon arg)))
+  (fst rpc, (fun s_arg -> let arg = (snd (fst (snd rpc))) s_arg in (fst (snd (snd rpc))) (f arg)))
 
-(* Applies the right handler according to the name, and returns the serialized response *)
-let call_handler (handlers : handler_list) name (s_arg : string) mon =
+(* App  lies the right handler according to the name, and returns the serialized response *)
+let call_handler (handlers : handler_list) name (s_arg : string) =
   let func = unSOME (map_lookup name handlers) in
-  func mon s_arg
+  func s_arg
 
 
 
-let service_loop c mon (handlers : handler_list) () : unit =
+let service_loop c (handlers : handler_list) () : unit =
   let rec loop () =
     let msg = recv c in
     let name = fst msg in
     let s_arg = snd msg in
-    monitor_acquire mon;
-    let s_resp = call_handler handlers name s_arg mon in
-    monitor_release mon;
+    let s_resp = call_handler handlers name s_arg in
     send c s_resp;
     loop ()
   in loop ()
 
-let accept_new_connections_loop skt mon handlers () : unit =
+let accept_new_connections_loop skt handlers () : unit =
   let rec loop () =
     let new_conn = accept skt in
     let (c, _a) = new_conn in
-    fork (service_loop c mon handlers) ();
+    fork (service_loop c handlers) ();
     loop ()
   in loop ()
 
@@ -55,10 +53,10 @@ type chan = (req_type, resp_type) chan_descr * Mutex.t
 
 
 
-let init_server_stub addr mon handlers : unit =
+let init_server_stub addr handlers : unit =
   let (skt : (resp_type, req_type) server_skt) = make_server_skt resp_serializer req_serializer addr in
   server_listen skt;
-  accept_new_connections_loop skt mon handlers ()
+  accept_new_connections_loop skt handlers ()
 
 let init_client_stub clt_addr srv_addr : chan = 
   let skt = make_client_skt req_serializer resp_serializer clt_addr in

@@ -9,13 +9,13 @@ open List_code
 
 (* Setup of the RPC *)
 
-let add mon (a, b) = ignore mon; a + b
+let add (a, b) = a + b
 
-let sub mon (a, b) = ignore mon; a - b
+let sub (a, b) = a - b
 
-let nothing mon () = ignore mon
+let nothing () = ()
 
-let incr mon a = ignore mon; a + 1
+let incr a = a + 1
 
 let op_serializer = prod_serializer int_serializer int_serializer
 let unit_embedding = (unit_serializer.s_ser, unit_serializer.s_deser)
@@ -37,8 +37,7 @@ let nothing_handlers : handler alist = list_cons (implement nothing_RPC nothing)
 (* Codes of server and client *)
 
 let server srv = 
-  let mon = new_monitor () in
-init_server_stub srv mon op_handlers
+  init_server_stub srv op_handlers
 
 let client clt srv = 
   let chan = init_client_stub clt srv in

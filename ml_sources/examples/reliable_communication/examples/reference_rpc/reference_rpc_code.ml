@@ -1,4 +1,4 @@
-(* Path : cd Bureau/aneris/ml_sources/_build/default/examples/reliable_communication/examples/reference_rpc/ *)
+(* Path : cd Documents/aneris/ml_sources/_build/default/examples/reliable_communication/examples/reference_rpc/ *)
 
 open Reliable_rpc_code
 open Serialization_code
@@ -11,10 +11,9 @@ let incr' r () = r := !r + 1
 let show' r () = !r
 
 let put, incr, show = let r = ref 0 in (
-  (fun mon -> ignore mon; put' r),
-  (fun mon -> ignore mon; incr' r),
-  (fun mon -> ignore mon; show' r)
-  )
+  put' r,
+  incr' r,
+)
 
 let unit_embedding = (unit_serializer.s_ser, unit_serializer.s_deser)
 let int_embedding = (int_serializer.s_ser, int_serializer.s_deser)
@@ -29,8 +28,7 @@ let handlers : handler alist = list_cons (implement put_RPC put) (list_cons (imp
 
 
 let server srv = 
-  let mon = new_monitor () in
-init_server_stub srv mon handlers
+  init_server_stub srv handlers
 
 let client clt srv =
   let chan = init_client_stub clt srv in

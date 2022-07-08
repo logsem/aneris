@@ -2,8 +2,10 @@ open Ast
 open !Serialization_code
 open !Network_util_code
 
+let verbose = false
 
 let __print_recv_msg deser sa msg () =
+  if verbose then
   let (SADDR (s, i)) = sa in
   match deser (fst msg) with
   | InjL repl ->
@@ -17,6 +19,7 @@ let __print_recv_msg deser sa msg () =
       "(%s, %d) ---received---> SEQID packet: %s.\n%!" s i (fst msg)
 
 let __print_send_msg ser sa bdy () =
+  if verbose then
   let msg = ser bdy in
   let (SADDR (s, i)) = sa in
   match bdy with
@@ -31,10 +34,11 @@ let __print_send_msg ser sa bdy () =
       "(%s, %d) <-----send----- SEQID packet: %s.\n%!" s i msg
 
 let __print_send_handshake_msg sa msg () =
+  if verbose then
   let (SADDR (s, i)) = sa in
      Printf.printf "(%s, %d) <-----send----- HNDSHK packet %s: \n%!"
        s i msg
 
-let __print_new_chan clt_addr () =
+let __print_new_chan clt_addr () =  
   let (SADDR (s, i)) = clt_addr in
   Printf.printf "New channel created associated with saddr (%s, %d)\n%!" s i
