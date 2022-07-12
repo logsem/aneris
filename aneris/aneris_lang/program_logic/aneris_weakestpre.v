@@ -1,8 +1,9 @@
 From iris.proofmode Require Import base tactics classes.
 From trillium.program_logic Require Export weakestpre.
 From aneris.aneris_lang Require Export resources network base_lang.
-From aneris.aneris_lang.state_interp Require Import state_interp_def.
+From aneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
 From aneris.aneris_lang Require Import lifting resources network base_lang.
+
 Set Default Proof Using "Type".
 
 Definition aneris_wp_def `{!anerisG Mdl Σ} (ip : ip_address) (E : coPset)
@@ -365,6 +366,24 @@ Proof.
   iApply wp_mono; last by iApply "Hwp".
   iIntros (v); iDestruct 1 as (w) "[-> Hw]".
   iIntros "HP"; iMod ("Hw" with "HP"); eauto.
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc_group ip E e Φ sag Ψ :
+  TCEq (to_val e) None →
+  unfixed_groups {[sag]} -∗
+  (sag ⤇* Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  rewrite !aneris_wp_unfold /aneris_wp_def.
+  iIntros (He) "Hsag Hwp %tid Hin".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
+  rewrite He. simpl.
+  iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
+  iIntros "(Hev & Hσ & H)".
+  iMod (aneris_state_interp_socket_interp_allocate with "Hσ Hsag") as "[HΨ Hσ]".
+  iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
+  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
 Qed.
 
 Lemma aneris_wp_bind K ip E e Φ :

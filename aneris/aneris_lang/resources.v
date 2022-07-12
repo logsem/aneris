@@ -53,8 +53,10 @@ Definition socket_interpUR : ucmra :=
   gmapUR socket_address_group (agreeR (leibnizO gname)).
 Definition socket_address_groupUR : ucmra :=
   (disj_gsetsUR socket_address).
-Definition fixed_socket_address_groupsUR : ucmra :=
-  gsetUR socket_address_group.
+Definition unfixed_socket_address_groupsUR : ucmra :=
+  authUR (gset_disjUR socket_address_group).
+Definition tracked_socket_address_groupsUR : cmra :=
+  agreeR (gsetUR socket_address_group).
 Definition messagesUR : ucmra :=
   gen_heapUR socket_address_group (message_soup * message_soup).
 
@@ -98,9 +100,12 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_savedPredG :> savedPredG Σ message;
       aneris_si_name : gname;
       (** socket address groups with fixed socket interpretations *)
-      aneris_fixed_socket_address_groupsG :>
-        inG Σ (agreeR fixed_socket_address_groupsUR);
-      aneris_fixed_socket_address_groups_name : gname;
+      aneris_unfixed_socket_address_groupsG :>
+        inG Σ (unfixed_socket_address_groupsUR);
+      aneris_unfixed_socket_address_groups_name : gname;
+      (** socket address groups for which we track events *)
+      aneris_tracked_socket_address_groupsG :>
+        inG Σ (tracked_socket_address_groupsUR);
       (** message history *)
       aneris_messagesG :> inG Σ (authR messagesUR);
       aneris_messages_name : gname;
@@ -132,8 +137,10 @@ Class anerisPreG Σ (Mdl : Model) :=
       anerisPre_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       anerisPre_siG :> inG Σ (authR socket_interpUR);
       anerisPre_savedPredG :> savedPredG Σ message;
-      anerisPre_fixed_socket_address_groupsG :>
-        inG Σ (agreeR fixed_socket_address_groupsUR);
+      anerisPre_unfixed_socket_address_groupsG :>
+        inG Σ (unfixed_socket_address_groupsUR);
+      anerisPre_tracked_socket_address_groupsG :>
+        inG Σ (tracked_socket_address_groupsUR);
       anerisPre_messagesG :> inG Σ (authR messagesUR);
       anerisPre_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
       anerisPre_steps :> mono_natG Σ;
@@ -153,7 +160,8 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (authUR socket_address_groupUR);
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
-   GFunctor (agreeR fixed_socket_address_groupsUR);
+   GFunctor (unfixed_socket_address_groupsUR);
+   GFunctor (tracked_socket_address_groupsUR);
    GFunctor (authR messagesUR);
    GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
    mono_natΣ;
@@ -219,20 +227,23 @@ Section definitions.
   Definition free_ports (ip : ip_address) (ports : gset port) : iProp Σ :=
     own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
 
-  Definition socket_address_group_ctx
-             (sags : gset socket_address_group) : iProp Σ :=
-    ⌜set_Forall is_ne sags⌝ ∗
-    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
-        (● (DGSets sags)).
-
-  Definition socket_address_group_own (sag : socket_address_group) : iProp Σ :=
-    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
-        (◯ (DGSets {[sag]})).
 
   Definition socket_address_groups_own (sags : gset socket_address_group)
     : iProp Σ :=
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
         (◯ (DGSets sags)).
+
+  Definition socket_address_group_ctx
+             (sags : gset socket_address_group) : iProp Σ :=
+    ⌜set_Forall is_ne sags⌝ ∗
+    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
+        (● (DGSets sags)) ∗
+    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
+        (◯ (DGSets sags)).
+
+  Definition socket_address_group_own (sag : socket_address_group) : iProp Σ :=
+    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
+        (◯ (DGSets {[sag]})).  
 
   (** Ghost names of saved socket interpretations *)
   Definition saved_si_auth
@@ -248,12 +259,19 @@ Section definitions.
     ∃ γ, socket_address_group_own sag ∗ saved_si sag γ ∗ saved_pred_own γ Φ.
 
   (** The set [A] of addresses with fixed socket interpretations *)
-  Definition fixed_groups (A : gset socket_address_group) : iProp Σ :=
-    own aneris_fixed_socket_address_groups_name (to_agree A).
+  Definition unfixed_groups_auth (A : gset socket_address_group) : iProp Σ :=
+    own aneris_unfixed_socket_address_groups_name
+        (auth_auth (DfracOwn 1) (GSet A)).
 
-  Definition fixed (A : gset socket_address) : iProp Σ :=
-    fixed_groups (to_singletons A).
+  Definition unfixed_groups (A : gset socket_address_group) : iProp Σ :=
+    own aneris_unfixed_socket_address_groups_name
+        (auth_frag (GSet A)).
 
+  (* Definition unfixed_groups (A : gset socket_address_group) : iProp Σ := *)
+  (*   own aneris_unfixed_socket_address_groups_name (DGSets A). *)
+
+  Definition unfixed (A : gset socket_address) : iProp Σ :=
+    unfixed_groups (to_singletons A).
 
   (** The set [A] of addresses for which we track send events. *)
   Definition observed_send_groups (A : gset socket_address_group) : iProp Σ :=
@@ -423,6 +441,7 @@ Notation "l ↦[ ip ] v" :=
 Notation "l ↦[ ip ]{ q } -" :=
   (∃ v, l ↦[ip]{q} v)%I
     (at level 20, q at level 50, format "l  ↦[ ip ]{ q }  -") : bi_scope.
+
 Notation "l ↦[ ip ] -" :=
   (l ↦[ip]{1} -)%I
     (at level 20, format "l  ↦[ ip ]  -") : bi_scope.
@@ -545,18 +564,18 @@ Lemma free_ports_auth_init `{anerisPreG Σ Mdl} :
   ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● ∅).
 Proof. apply own_alloc. by apply auth_auth_valid. Qed.
 
-Lemma free_ips_init `{anerisPreG Σ Mdl} A :
-  ⊢ |==> ∃ γ, own γ (● GSet A) ∗ [∗ set] ip ∈ A, own γ (◯ GSet {[ ip ]}).
+Lemma free_ips_init `{anerisPreG Σ Mdl} (ips : gset ip_address) :
+  ⊢ |==> ∃ γ, own γ (● GSet ips) ∗ [∗ set] ip ∈ ips, own γ (◯ GSet {[ ip ]}).
 Proof.
-  iMod (own_alloc (● GSet ∅)) as (γ) "HM"; [by apply auth_auth_valid|].
+  iMod (own_alloc (● GSet (∅:gset ip_address))) as (γ) "HM"; [by apply auth_auth_valid|].
   iAssert (|==>
              ∃ M : gset ip_address,
-               (⌜elements M ≡ₚ elements A⌝) ∗
+               (⌜elements M ≡ₚ elements ips⌝) ∗
                own γ (● GSet M) ∗
                [∗ set] ip ∈ M, own γ (◯ GSet {[ ip ]}))%I
     with "[HM]" as "HF".
-  { pose proof (NoDup_elements A) as Hnd.
-    iInduction (elements A) as [|a l] "IHl".
+  { pose proof (NoDup_elements ips) as Hnd.
+    iInduction (elements ips) as [|a l] "IHl".
     - iModIntro. iExists ∅.
       rewrite big_sepS_empty. iFrame.
       by iPureIntro.
@@ -574,7 +593,7 @@ Proof.
         rewrite elements_union_singleton // HMl.
       rewrite big_sepS_insert //. iFrame. }
   iMod "HF" as (M HMF) "[? ?]".
-  replace M with A; first by iModIntro; iExists _; iFrame.
+  replace M with ips; first by iModIntro; iExists _; iFrame.
   apply set_eq => x.
   rewrite -!elem_of_elements HMF //.
 Qed.
@@ -715,6 +734,27 @@ Qed.
 Lemma steps_init `{anerisPreG Σ Mdl} n :
   ⊢ |==> ∃ γ, mono_nat_auth_own γ 1 n ∗ mono_nat_lb_own γ n.
 Proof. iApply mono_nat_own_alloc. Qed.
+
+Lemma unfixed_init `{anerisPreG Σ Mdl} (A : gset socket_address_group) :
+  ⊢ |==> ∃ γ, own γ (● (GSet A)) ∗
+              own γ (◯ (GSet A)).
+Proof.
+  iMod (own_alloc (● (GSet ∅) ⋅ ◯ (GSet ∅))) as (γ) "[Ha Hf]".
+  { by apply auth_both_valid. }
+  iExists γ.
+  iInduction A as [|a A Hnin] "IH" using set_ind_L.
+  - iModIntro. iFrame.
+  - iMod ("IH" with "Ha Hf") as "[Ha Hf]".
+    iMod (own_update with "Ha") as "[Ha Hf']".
+    { apply (auth_update_alloc _ (GSet ({[a]} ∪ A))).
+      apply gset_disj_alloc_empty_local_update.
+      set_solver. }
+    iModIntro. iFrame.
+    rewrite -gset_op -gset_disj_union; [|set_solver].
+    rewrite auth_frag_op.
+    iApply own_op.
+    iFrame.
+Qed.
 
 Lemma alloc_evs_init `{anerisPreG Σ Mdl} (lbls : gset string) :
   ⊢ |==> ∃ γ,
@@ -951,7 +991,7 @@ Section resource_lemmas.
     socket_address_group_ctx sags -∗
     ⌜all_disjoint sags⌝ ∗ ⌜set_Forall is_ne sags⌝.
   Proof.
-    iIntros "[%Hne Hsags]".
+    iIntros "[%Hne [Hsags _]]".
     iDestruct (own_valid with "Hsags") as %Hvalid.
     pose proof (auth_auth_valid {| dgsets_of := sags |}) as [H _].
     apply H in Hvalid.
@@ -960,6 +1000,27 @@ Section resource_lemmas.
     done.
   Qed.
 
+  Lemma socket_address_groups_ctx_own sags :
+    socket_address_group_ctx sags -∗
+    socket_address_groups_own sags.
+  Proof. by iIntros "[_ [_ Hsags]]". Qed.
+
+  #[global] Instance socket_address_group_own_timeless sag :
+    Timeless (socket_address_group_own sag).
+  Proof. apply _. Qed.
+
+  #[global] Instance socket_address_group_own_persistent sag :
+    Persistent (socket_address_group_own sag).
+  Proof. apply _. Qed.
+
+  #[global] Instance socket_address_groups_own_timeless sags :
+    Timeless (socket_address_groups_own sags).
+  Proof. apply _. Qed.
+
+  #[global] Instance socket_address_groups_own_persistent sags :
+    Persistent (socket_address_groups_own sags).
+  Proof. apply _. Qed.
+
   Lemma socket_address_group_ctx_update sags sags' :
     all_disjoint sags' → have_disj_elems sags' sags →
     set_Forall is_ne sags' →
@@ -967,13 +1028,14 @@ Section resource_lemmas.
     socket_address_group_ctx (sags' ∪ sags) ∗
     socket_address_groups_own sags'.
   Proof.
-    iIntros (Hdisj Helems Hne) "[%Hne' Hctx]".
-    iMod (own_update with "Hctx") as "[Hsags Hsag']".
+    iIntros (Hdisj Helems Hne) "[%Hne' [Hctx #Hsag]]".
+    iMod (own_update with "Hctx") as "[Hsags #Hsag']".
     { apply auth_update_alloc.
       by eapply disj_gset_alloc_empty_local_update. }
-    iModIntro. iFrame.
-    iPureIntro.
-    by apply set_Forall_union.
+    iModIntro. iFrame "#∗".
+    iSplit; [by iPureIntro; apply set_Forall_union|].
+    rewrite -disj_gsets_op_union auth_frag_op.
+    iApply own_op. by iFrame "#".
   Qed.
 
   Lemma socket_address_group_own_agree sa sag1 sag2 :
@@ -1071,14 +1133,6 @@ Section resource_lemmas.
     iFrame "#∗". iExists As, Ar. iFrame "#∗".
   Qed.
 
-  #[global] Instance socket_address_group_own_timeless sag :
-    Timeless (socket_address_group_own sag).
-  Proof. apply _. Qed.
-
-  #[global] Instance socket_address_group_own_persistent sag :
-    Persistent (socket_address_group_own sag).
-  Proof. apply _. Qed.
-
   Lemma messages_mapsto_ctx_valid sag bs br R T mh :
     sag ⤳*[bs, br] (R, T) -∗ messages_ctx mh -∗ ⌜mh !! sag = Some (R,T)⌝.
   Proof.
@@ -1117,11 +1171,66 @@ Section resource_lemmas.
     iModIntro. iFrame.
   Qed.
 
-  Lemma fixed_agree A B : fixed_groups A -∗ fixed_groups B -∗ ⌜A = B⌝.
+  Lemma unfixed_split A1 A2 :
+    A1 ## A2 →
+    ⊢ unfixed_groups (A1 ∪ A2) ∗-∗
+      unfixed_groups A1 ∗ unfixed_groups A2.
   Proof.
-    iIntros "HA HB".
-    by iDestruct (own_valid_2 with "HA HB") as %?%to_agree_op_inv_L.
+    intros Hdisj.
+    rewrite -gset_op {1}/unfixed_groups -gset_disj_union; [|done].
+    iSplit.
+    - iIntros "H". iDestruct "H" as "[H1 H2]". by iFrame.
+    - iIntros "[H1 H2]". rewrite auth_frag_op. iApply own_op. iFrame.
   Qed.
+
+  Lemma unfixed_update_alloc A B :
+    A ## B →
+    ⊢ unfixed_groups_auth A ==∗
+      unfixed_groups_auth (A ∪ B) ∗ unfixed_groups B.
+  Proof.
+    iIntros (Hdisj) "HA".
+    iMod (own_update with "HA") as "[HA HB]".
+    { by apply auth_update_alloc, gset_disj_alloc_empty_local_update. }
+    iModIntro. replace (B ∪ A) with (A ∪ B) by set_solver. by iFrame.
+  Qed.
+
+  Lemma unfixed_update_dealloc A B :
+    ⊢ unfixed_groups_auth A ∗ unfixed_groups B ==∗
+      unfixed_groups_auth (A ∖ B).
+  Proof.
+    iIntros "[HA HB]".
+    rewrite /unfixed_groups_auth /unfixed_groups.
+    iDestruct (own_valid_2 with "HA HB") as %Hvalid.
+    rewrite auth_both_valid_discrete in Hvalid.
+    destruct Hvalid as [Hincluded Hvalid].
+    rewrite gset_disj_included in Hincluded.
+    apply subseteq_disjoint_union_L in Hincluded.
+    destruct Hincluded as [C [-> Hdisj]].
+    rewrite -gset_disj_union; [|done].
+    replace ((B ∪ C) ∖ B) with C; [|set_solver].
+    iMod (own_update_2 with "HA HB") as "HA"; [|done].
+    apply auth_update_dealloc. 
+    apply gset_disj_dealloc_empty_local_update.
+  Qed.
+
+  Lemma unfixed_update_dealloc_union A B :
+    A ## B →
+    ⊢ unfixed_groups_auth (A ∪ B) ∗ unfixed_groups B ==∗
+      unfixed_groups_auth A.
+  Proof.
+    iIntros (Hdisj) "[HA HB]".
+    replace (A ∪ B) with (B ∪ A) by set_solver.
+    rewrite /unfixed_groups_auth -gset_op -gset_disj_union; [|done].
+    iMod (own_update_2 with "HA HB") as "HA"; [|done].
+    apply auth_update_dealloc. 
+    by apply gset_disj_dealloc_empty_local_update.
+  Qed.
+  
+  (* Lemma fixed_agree A B : unfixed_groups A -∗ fixed_groups B -∗ ⌜A = B⌝. *)
+  (* Proof. *)
+  (*   iIntros "HA HB". *)
+  (*   by iDestruct (own_valid_2 with "HA HB") as %?%to_agree_op_inv_L. *)
+  (* Qed. *)
 
   #[global] Instance saved_pred_proper `{savedPredG Σ A} n γ:
     Proper ((dist n) ==> (dist n))

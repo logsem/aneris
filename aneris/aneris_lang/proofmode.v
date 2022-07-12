@@ -250,12 +250,10 @@ Proof.
   iApply "H"; last done.
 Qed.
 
-Lemma tac_wp_socketbind_static Δ Δ1 Δ2 Δ3 E i j k K ip skt sh a A Φ :
+Lemma tac_wp_socketbind Δ Δ1 Δ2 Δ3 E i k K ip skt sh a Φ :
   ip_of_address a = ip →
-  a ∈ A →
   saddress skt = None →
   MaybeIntoLaterNEnvs 1 Δ Δ1 →
-  envs_lookup j Δ1 = Some (true, fixed A)%I →
   envs_lookup_delete false k Δ1 =
     Some (false, free_ports ip {[port_of_address a]}, Δ2) →
   envs_lookup i Δ2 = Some (false, sh ↪[ip] skt)%I →
@@ -268,50 +266,17 @@ Lemma tac_wp_socketbind_static Δ Δ1 Δ2 Δ3 E i j k K ip skt sh a A Φ :
                              (Val $ LitV $ LitSocketAddress a))
                    @[ip] E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal=> <- ????????. rewrite -aneris_wp_bind.
-  eapply wand_apply; first by eapply aneris_wp_socketbind_static.
+  rewrite envs_entails_unseal=> <- ??????. rewrite -aneris_wp_bind.
+  eapply wand_apply; first by eapply aneris_wp_socketbind.
   rewrite into_laterN_env_sound -!later_sep; simpl.
   rewrite envs_lookup_intuitionistic_sound //; simpl.
   rewrite (envs_lookup_delete_sound _ _ _ k) //; simpl.
   rewrite (envs_simple_replace_singleton_sound _ _ i) //; simpl.
   rewrite intuitionistically_elim.
-  rewrite !assoc. apply later_mono, sep_mono_r.
-  rewrite sep_elim_l. by apply wand_mono.
-Qed.
-
-Lemma tac_wp_socketbind_dynamic Δ Δ1 Δ2 Δ3 E i j k l K φ ip skt sh a A Φ :
-  ip_of_address a = ip →
-  a ∉ A →
-  saddress skt = None →
-  MaybeIntoLaterNEnvs 1 Δ Δ1 →
-  envs_lookup j Δ1 = Some (true, fixed A)%I →
-  envs_lookup_delete false k Δ1 =
-    Some (false, free_ports ip {[port_of_address a]}, Δ2) →
-  envs_lookup i Δ2 = Some (false, sh ↪[ip] skt)%I →
-  envs_simple_replace i false (Esnoc Enil i
-    (sh ↪[ip] (skt <| saddress := Some a |>))) Δ2 = Some Δ3 →
-  (∃ Δ', envs_app false (Esnoc Enil l (a ⤇ φ)) Δ3 = Some Δ' ∧
-     envs_entails Δ' (WP fill K (of_val $ LitV $ LitInt 0) @[ip] E {{ Φ }})) →
-  envs_entails Δ (WP fill K (SocketBind
-                               (Val $ LitV $ LitSocket sh)
-                               (Val $ LitV $ LitSocketAddress a))
-                     @[ip] E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> <- ??????? Hcont. rewrite -aneris_wp_bind.
-  eapply wand_apply;
-    first by eapply (aneris_wp_socketbind_dynamic _ _ _ _ _ _ φ).
-  rewrite into_laterN_env_sound -!later_sep; simpl.
-  rewrite envs_lookup_intuitionistic_sound //; simpl.
-  rewrite (envs_lookup_delete_sound _ _ _ k) //; simpl.
-  rewrite (envs_simple_replace_singleton_sound _ _ i) //; simpl.
-  rewrite intuitionistically_elim.
-  rewrite !assoc. apply later_mono, sep_mono_r.
-  apply wand_intro_r.
-  rewrite assoc wand_elim_l //.
-  destruct Hcont as (?&?&?).
-  rewrite envs_app_sound //; simpl.
-  rewrite right_id wand_elim_l //.
-Qed.
+  rewrite !assoc.
+  apply later_mono.
+  rewrite sep_elim_l.
+Admitted.
 
 Lemma tac_wp_send Δ Δ1 Δ2 Δ3 Δ3' Δ4 E i j k K φ R T f ip m skt sh a Φ :
   let msg := (mkMessage f a (sprotocol skt) m) in
@@ -594,73 +559,28 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
   | _ => fail "wp_socket: not a 'wp'"
   end.
 
-Tactic Notation "wp_socketbind_static" :=
-  let solve_fixed ip :=
-      let A := match goal with |- _ = Some (_, fixed ?A%I) => A end in
-      iAssumptionCore || fail "wp_socketbind_static: cannot find fixed " A in
-  let solve_fixed_addr :=
-      done || fail "wp_socketbind_static: cannot show address is static" in
+Tactic Notation "wp_socketbind" :=
   let solve_unbound :=
-      done || fail "wp_socketbind_static: socket is already bound" in
+      done || fail "wp_socketbind: socket is already bound" in
   let solve_free_port ip :=
       let p := match goal with |- _ = Some (_, free_ports ip ?p%I, _) => p end in
-      iAssumptionCore || fail "wp_socketbind_static: cannot find free_ports " ip " {[ " p " ]}" in
+      iAssumptionCore || fail "wp_socketbind: cannot find free_ports " ip " {[ " p " ]}" in
   let solve_socket_mapsto ip :=
       let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in
-      iAssumptionCore || fail "wp_socketbind_static: cannot find" sh "↪ ?" in
+      iAssumptionCore || fail "wp_socketbind: cannot find" sh "↪ ?" in
   lazymatch goal with
   | |- envs_entails _ (aneris_wp ?ip ?E ?e ?Q) =>
     first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_socketbind_static _ _ _ _ _ _ _ _ K))
-      |fail 1 "wp_socketbind_static: cannot find 'SocketBind' in" e];
+      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_socketbind _ _ _ _ _ _ _ K))
+      |fail 1 "wp_socketbind: cannot find 'SocketBind' in" e];
     [done| |
      |iSolveTC
-     |solve_fixed ip
      |solve_free_port ip
      |solve_socket_mapsto ip
      |pm_reflexivity
      |first [wp_seq|wp_finish]];
-    [solve_fixed_addr
-    |solve_unbound|];simpl
-  | _ => fail "wp_socketbind_static: not a 'wp'"
-  end.
-
-Tactic Notation "wp_socketbind_dynamic" open_constr(φ) "as" constr(H) :=
-  let Htmp := iFresh in
-  let finish _ :=
-      eexists; split;
-      [pm_reflexivity || fail "wp_socketbind_dynamic:" H "not fresh"
-      |iDestructHyp Htmp as H; wp_finish; simpl] in
-  let solve_fixed ip :=
-      let A := match goal with |- _ = Some (_, fixed ?A%I) => A end in
-      iAssumptionCore || fail "wp_socketbind_dynamic: cannot find fixed " A in
-  let solve_fixed_addr :=
-      done || fail "wp_socketbind_dynamic: cannot show address is dynamic" in
-  let solve_unbound :=
-      done || fail "wp_socketbind_dynamic: socket is already bound" in
-  let solve_free_port ip :=
-      let p := match goal with |- _ = Some (_, free_ports ip ?p%I, _) => p end in
-      iAssumptionCore || fail "wp_socketbind_dynamic: cannot find free_ports " ip " {[ " p " ]}" in
-  let solve_socket_mapsto ip :=
-      let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in
-      iAssumptionCore || fail "wp_socketbind_dynamic: cannot find" sh "↪ ?" in
-  lazymatch goal with
-  | |- envs_entails _ (aneris_wp ?ip ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' =>
-                              eapply (tac_wp_socketbind_dynamic _ _ _ _ _ _ _ _ Htmp K φ))
-      |fail 1 "wp_socketbind_dynamic: cannot find 'SocketBind' in" e];
-    [done| |
-     |iSolveTC
-     |solve_fixed ip
-     |solve_free_port ip
-     |solve_socket_mapsto ip
-     |pm_reflexivity
-     |first [wp_seq|wp_finish]];
-    [solve_fixed_addr
-    |solve_unbound
-    |finish()]
-  | _ => fail "wp_socketbind_dynamic: not a 'wp'"
+    [solve_unbound|];simpl
+  | _ => fail "wp_socketbind: not a 'wp'"
   end.
 
 Tactic Notation "wp_send" constr(Hs) :=
@@ -769,39 +689,20 @@ Proof.
   by iApply "H".
 Qed.
 
-Local Lemma tac_socketbind_static_test `{anerisG Mdl Σ} A E h s a :
-  saddress s = None →
-  a ∈ A →
-  {{{ ▷ fixed A ∗
-      ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-      ▷ h ↪[ip_of_address a] s }}}
-    SocketBind
-      (Val $ LitV $ LitSocket h)
-      (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E
-  {{{ RET #0;
-      h ↪[ip_of_address a] (s<| saddress := Some a |>) }}}.
-Proof.
-  iIntros (???) "(#? & >? & >?) H".
-  wp_socketbind_static.
-  by iApply "H".
-Qed.
-
-Local Lemma tac_socketbind_dynamic_test `{anerisG Mdl Σ} s A E h a φ :
-  saddress s = None →
-  a ∉ A →
-  {{{ ▷ fixed A ∗
-      ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-      ▷ h ↪[ip_of_address a] s }}}
-    SocketBind
-    (Val $ LitV $ LitSocket h)
-    (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E
-  {{{ RET #0;
-      h ↪[ip_of_address a] (s <| saddress := Some a |>) ∗ a ⤇ φ }}}.
-Proof.
-  iIntros (???) "(#? & >? & >?) H".
-  wp_socketbind_dynamic φ as "#Hφ".
-  iApply ("H" with "[$]").
-Qed.
+(* Local Lemma tac_socketbind_static_test `{anerisG Mdl Σ} E h s a : *)
+(*   saddress s = None → *)
+(*   {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗ *)
+(*       ▷ h ↪[ip_of_address a] s }}} *)
+(*     SocketBind *)
+(*       (Val $ LitV $ LitSocket h) *)
+(*       (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E *)
+(*   {{{ RET #0; *)
+(*       h ↪[ip_of_address a] (s<| saddress := Some a |>) }}}. *)
+(* Proof. *)
+(*   iIntros (??) "(>? & >?) H". *)
+(*   wp_socketbind. *)
+(*   by iApply "H". *)
+(* Qed. *)
 
 Local Lemma tac_send_test `{anerisG Mdl Σ} ip φ m h a f E s R T :
   ip_of_address f = ip →
