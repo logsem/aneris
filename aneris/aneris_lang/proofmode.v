@@ -571,9 +571,10 @@ Tactic Notation "wp_socketbind" :=
   lazymatch goal with
   | |- envs_entails _ (aneris_wp ?ip ?E ?e ?Q) =>
     first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_socketbind _ _ _ _ _ _ _ K))
+      [reshape_expr e ltac:(fun K e' =>
+                              eapply (tac_wp_socketbind _ _ _ _ _ _ _ K))
       |fail 1 "wp_socketbind: cannot find 'SocketBind' in" e];
-    [done| |
+    [done|
      |iSolveTC
      |solve_free_port ip
      |solve_socket_mapsto ip
@@ -689,20 +690,20 @@ Proof.
   by iApply "H".
 Qed.
 
-(* Local Lemma tac_socketbind_static_test `{anerisG Mdl Σ} E h s a : *)
-(*   saddress s = None → *)
-(*   {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗ *)
-(*       ▷ h ↪[ip_of_address a] s }}} *)
-(*     SocketBind *)
-(*       (Val $ LitV $ LitSocket h) *)
-(*       (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E *)
-(*   {{{ RET #0; *)
-(*       h ↪[ip_of_address a] (s<| saddress := Some a |>) }}}. *)
-(* Proof. *)
-(*   iIntros (??) "(>? & >?) H". *)
-(*   wp_socketbind. *)
-(*   by iApply "H". *)
-(* Qed. *)
+Local Lemma tac_socketbind_static_test `{anerisG Mdl Σ} E h s a :
+  saddress s = None →
+  {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+      ▷ h ↪[ip_of_address a] s }}}
+    SocketBind
+      (Val $ LitV $ LitSocket h)
+      (Val $ LitV $ LitSocketAddress a) @[ip_of_address a] E
+  {{{ RET #0;
+      h ↪[ip_of_address a] (s<| saddress := Some a |>) }}}.
+Proof.
+  iIntros (??) "(>? & >?) H".
+  wp_socketbind.
+  by iApply "H".
+Qed.
 
 Local Lemma tac_send_test `{anerisG Mdl Σ} ip φ m h a f E s R T :
   ip_of_address f = ip →

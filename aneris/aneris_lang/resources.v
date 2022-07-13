@@ -611,7 +611,7 @@ Proof.
   iModIntro. iExists _. iFrame.
 Qed.
 
-Lemma socket_address_group_own_alloc_subseteq `{anerisPreG Σ Mdl}
+Lemma socket_address_group_own_alloc_subseteq_pre `{anerisPreG Σ Mdl}
       γ (sags sags' : gset socket_address_group) :
   sags' ⊆ sags →
   own (A:=(authR socket_address_groupUR)) γ
@@ -644,7 +644,7 @@ Lemma socket_address_group_init `{anerisPreG Σ Mdl}
 Proof.
   intros Hdisj.
   iMod socket_address_group_ctx_init as (γ) "Hauth"; [done|].
-  iMod (socket_address_group_own_alloc_subseteq with "Hauth")
+  iMod (socket_address_group_own_alloc_subseteq_pre with "Hauth")
     as "[Hauth Hown]"; [done|].
   iModIntro. iExists γ. by iFrame.
 Qed.
@@ -667,7 +667,7 @@ Proof.
   iFrame. by iApply "IH".
 Qed.
 
-Lemma socket_address_group_own_subseteq `{anerisPreG Σ Mdl}
+Lemma socket_address_group_own_subseteq_pre `{anerisPreG Σ Mdl}
       γ (sags sags' : gset socket_address_group) :
   sags' ⊆ sags →
   own (A:=(authR socket_address_groupUR)) γ
@@ -1070,6 +1070,20 @@ Section resource_lemmas.
     eauto.
   Qed.
 
+  Lemma socket_address_group_own_subseteq sags1 sags2 :
+    sags2 ⊆ sags1 →
+    socket_address_groups_own sags1 -∗
+    socket_address_groups_own sags2.
+  Proof.
+    iIntros (Hle) "Hsags".
+    rewrite /socket_address_groups_own.
+    apply subseteq_disjoint_union_L in Hle.
+    destruct Hle as [Z [-> Hdisj]].
+    setoid_rewrite <-disj_gsets_op_union.
+    iDestruct "Hsags" as "[H1 H2]".
+    iFrame.
+  Qed.
+
   #[global] Instance mapsto_messages_fractional sag bs br s :
     Fractional (λ q, sag ⤳*[bs,br]{q} s)%I.
   Proof.
@@ -1171,7 +1185,7 @@ Section resource_lemmas.
     iModIntro. iFrame.
   Qed.
 
-  Lemma unfixed_split A1 A2 :
+  Lemma unfixed_groups_split A1 A2 :
     A1 ## A2 →
     ⊢ unfixed_groups (A1 ∪ A2) ∗-∗
       unfixed_groups A1 ∗ unfixed_groups A2.
@@ -1181,6 +1195,17 @@ Section resource_lemmas.
     iSplit.
     - iIntros "H". iDestruct "H" as "[H1 H2]". by iFrame.
     - iIntros "[H1 H2]". rewrite auth_frag_op. iApply own_op. iFrame.
+  Qed.
+
+  Lemma unfixed_split A1 A2 :
+    A1 ## A2 →
+    ⊢ unfixed (A1 ∪ A2) ∗-∗
+      unfixed A1 ∗ unfixed A2.
+  Proof.
+    rewrite /unfixed. rewrite to_singletons_union.
+    intros Hdisj.
+    iApply unfixed_groups_split.
+    set_solver.
   Qed.
 
   Lemma unfixed_update_alloc A B :
@@ -1225,12 +1250,6 @@ Section resource_lemmas.
     apply auth_update_dealloc. 
     by apply gset_disj_dealloc_empty_local_update.
   Qed.
-  
-  (* Lemma fixed_agree A B : unfixed_groups A -∗ fixed_groups B -∗ ⌜A = B⌝. *)
-  (* Proof. *)
-  (*   iIntros "HA HB". *)
-  (*   by iDestruct (own_valid_2 with "HA HB") as %?%to_agree_op_inv_L. *)
-  (* Qed. *)
 
   #[global] Instance saved_pred_proper `{savedPredG Σ A} n γ:
     Proper ((dist n) ==> (dist n))

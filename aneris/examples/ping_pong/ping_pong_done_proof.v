@@ -81,15 +81,13 @@ Section proof.
              (⌜m_body msg = "DONE"⌝ ∗ last_message γpong PING))
       )%I.
 
-  Lemma pong_spec a ip port A :
+  Lemma pong_spec a ip port :
     ip = ip_of_address a →
     port = port_of_address a →
     (* a is static *)
-    a ∈ A →
     (* the address [a] is governed by the pong_si socket protocol *)
     {{{ a ⤇ pong_si
     (* A should contain static addresses & the port should be free *)
-      ∗ fixed A
       ∗ free_ports ip {[port]}
     (* exclusive ownership of the [a], no messages have been sent nor received. *)
       ∗ a ⤳ (∅, ∅)
@@ -97,11 +95,11 @@ Section proof.
     (* pong terminates the last (non ping) received message, that is "DONE" *)
     }}} (pong #a) @[ip] {{{ RET #"DONE"; True }}}.
   Proof.
-    iIntros (-> -> Haddr Ψ) "(#Hsi & #Hfixed & Hport & Ha & Hγpong) HΨ".
+    iIntros (-> -> Ψ) "(#Hsi & Hport & Ha & Hγpong) HΨ".
     wp_lam.
     wp_socket h as "Hh".
     wp_let.
-    wp_socketbind_static.
+    wp_socketbind.
     wp_apply (aneris_wp_receivefrom with "[$Hsi $Hh $Ha]"); [done.. | ].
     iIntros (m) "(%Hdest & [Hm | Hm])"; last first.
     { iDestruct "Hm" as "[%abs _]". exfalso. set_solver. }
@@ -156,32 +154,29 @@ Section proof.
   Qed.
 
   (* Specifying the ping protocol: *)
-  Definition ping_si (server : socket_address) : socket_interp Σ  :=
+  Definition ping_si (server : socket_address) : socket_interp Σ :=
     (λ msg, ⌜m_body msg = "PONG"⌝ ∗ last_message γpong PING)%I.
 
-  Lemma ping_spec (a b : socket_address) ip port A :
+  Lemma ping_spec (a b : socket_address) ip port :
     ip = ip_of_address a →
     port = port_of_address a →
-    (* the ping address is dynamic *)
-    a ∉ A →
-    (* the pong address is static *)
-    b ∈ A →
     (* the address [a] is governed by the pong_si socket protocol *)
     b ⤇ pong_si -∗
     (* A should contain static addresses & the port should be free *)
-    fixed A -∗
+    unfixed {[a]} -∗
     free_ports ip {[port]} -∗
     (* exclusive ownership of the [a] and its sent and received messages *)
     a ⤳ (∅, ∅) -∗
     last_message γpong NONE -∗
     WP (ping #a #b) @[ip] {{ _, True }}.
   Proof.
-    iIntros (-> -> Hserver Haddr) "#Hsi #Hfixed Hfree Ha Hγpong".
+    iIntros (-> ->) "#Hsi Hunfixed Hfree Ha Hγpong".
     unfold ping; wp_pures.
     wp_socket sh as "Hsh".
     wp_pures.
-    wp_socketbind_dynamic (ping_si b) as "#Hping".
-    wp_seq.
+    iApply (aneris_wp_socket_interp_alloc _ _ _ _ _ (ping_si b) with "Hunfixed").
+    iIntros "#Hping".
+    wp_socketbind.
     wp_send "Hγpong".
     { iExists (ping_si _).
       iSplitR; [done | ].
@@ -219,23 +214,19 @@ Section proof.
   Definition ips : gset string :=
     {[ ip_of_address pong_addr ; ip_of_address ping_addr ]}.
 
-  Lemma ping_pong_runner_spec (A : gset socket_address) :
-    (* the pong address is static *)
-    pong_addr ∈ A ->
-    (* the ping adress is not *)
-    ping_addr ∉ A ->
+  Lemma ping_pong_runner_spec :
     {{{ (* the pong server satisfies its socket interpretation *)
         pong_addr ⤇ pong_si
         ∗ pong_addr ⤳ (∅, ∅)
         ∗ ping_addr ⤳ (∅, ∅)
         (* A contain static addresses, and the ips we use are free *)
-        ∗ fixed A
+        ∗ unfixed {[ping_addr]}
         ∗ ([∗ set] ip ∈ ips, free_ip ip)
         ∗ last_message γpong NONE ∗ last_message γpong NONE }}}
     ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Hponga Hpinga Φ) "(#Hsi & Hponga & Hpinga & #Hfixed & Hips & Hγpong & Hγpong') HΦ".
+    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunfixed & Hips & Hγpong & Hγpong') HΦ".
     unfold ping_pong_runner.
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hpong & Hips)";
       first set_solver.
@@ -252,9 +243,9 @@ Section proof.
     wp_seq.
     wp_apply aneris_wp_start; first done.
     iFrame.
-    iSplitR "Hγpong' Hpinga"; last first.
+    iSplitR "Hγpong' Hpinga Hunfixed"; last first.
     { iIntros "!> Hfree".
-      iApply (ping_spec with "[$] [$] [$] [$Hpinga] [$Hγpong']"); eauto.
+      iApply (ping_spec with "[$] Hunfixed [$] [$Hpinga] [$Hγpong']"); eauto.
     }
     iModIntro.
     iApply "HΦ".

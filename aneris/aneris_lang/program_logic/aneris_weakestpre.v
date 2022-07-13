@@ -386,6 +386,18 @@ Proof.
   iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
 Qed.
 
+Lemma aneris_wp_socket_interp_alloc ip E e Φ sa Ψ :
+  TCEq (to_val e) None →
+  unfixed {[sa]} -∗
+  (sa ⤇ Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  iIntros (He) "Hsag Hwp".
+  iApply (aneris_wp_socket_interp_alloc_group _ _ _ _ {[sa]} with "[Hsag]");
+    [|done].
+  by rewrite /unfixed /to_singletons gset_map.gset_map_singleton.
+Qed.
+
 Lemma aneris_wp_bind K ip E e Φ :
   WP e @[ip] E {{ v, WP fill K (of_val v) @[ip] E {{ Φ }} }} ⊢
   WP fill K e @[ip] E {{ Φ }}.
