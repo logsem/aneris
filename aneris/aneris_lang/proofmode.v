@@ -269,14 +269,12 @@ Proof.
   rewrite envs_entails_unseal=> <- ??????. rewrite -aneris_wp_bind.
   eapply wand_apply; first by eapply aneris_wp_socketbind.
   rewrite into_laterN_env_sound -!later_sep; simpl.
-  rewrite envs_lookup_intuitionistic_sound //; simpl.
   rewrite (envs_lookup_delete_sound _ _ _ k) //; simpl.
   rewrite (envs_simple_replace_singleton_sound _ _ i) //; simpl.
-  rewrite intuitionistically_elim.
   rewrite !assoc.
-  apply later_mono.
-  rewrite sep_elim_l.
-Admitted.
+  apply later_mono, sep_mono_r.
+  by apply wand_mono.
+Qed.
 
 Lemma tac_wp_send Δ Δ1 Δ2 Δ3 Δ3' Δ4 E i j k K φ R T f ip m skt sh a Φ :
   let msg := (mkMessage f a (sprotocol skt) m) in
