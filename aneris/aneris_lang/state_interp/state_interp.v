@@ -413,17 +413,31 @@ Section state_interpretation.
     { by iApply free_ips_coh_alloc_socket. }
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate σ mh sag φ :
-    aneris_state_interp σ mh -∗
-    unfixed_groups {[sag]} ==∗
-    sag ⤇* φ ∗ aneris_state_interp σ mh.
+  Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sag φ :
+    aneris_state_interp σ mh -∗ unfixed_groups {[sag]} ==∗
+    aneris_state_interp σ mh ∗ sag ⤇* φ.
   Proof.
     iIntros "Hσ Hunfixed".
     iDestruct "Hσ"
         as (mγ mn)
            "(? & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
-    iMod (socket_interp_coh_allocate with "Hsi Hunfixed") as "[Hφ Hsi]". 
+    iMod (socket_interp_coh_allocate_singleton with "Hsi Hunfixed")
+      as "[Hφ Hsi]". 
+    iModIntro. iFrame. iExists _, _. iFrame. eauto.
+  Qed.
+
+  Lemma aneris_state_interp_socket_interp_allocate σ mh sags φ :
+    aneris_state_interp σ mh -∗ unfixed_groups sags ==∗
+    aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
+  Proof.
+    iIntros "Hσ Hunfixed".
+    iDestruct "Hσ"
+        as (mγ mn)
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iMod (socket_interp_coh_allocate with "Hsi Hunfixed")
+      as "[Hφ Hsi]". 
     iModIntro. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 

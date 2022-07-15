@@ -38,10 +38,9 @@ Section state_interpretation.
     C ⊆ A -> A ∖ (B ∖ C) = A ∖ B ∪ C.
   Proof. rewrite sets.set_eq. intros. destruct (decide (x ∈ C)); set_solver. Qed.
 
-  Lemma socket_interp_coh_allocate sag φ :
-    socket_interp_coh -∗
-    unfixed_groups {[sag]} ==∗
-    sag ⤇* φ ∗ socket_interp_coh.
+  Lemma socket_interp_coh_allocate_singleton sag φ :
+    socket_interp_coh -∗ unfixed_groups {[sag]} ==∗
+    socket_interp_coh ∗ sag ⤇* φ.
   Proof.
     iIntros "Hinterp Hsag".
     iDestruct "Hinterp" as (sags A Hle) "(Hsags & Hunfixed & Hsis)".
@@ -71,6 +70,20 @@ Section state_interpretation.
     iApply big_sepS_union; [set_solver|].
     iFrame. iApply big_sepS_singleton.
     iExists _. iFrame "#".
+  Qed.
+
+  Lemma socket_interp_coh_allocate sags φ :
+    socket_interp_coh -∗ unfixed_groups sags ==∗
+    socket_interp_coh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
+  Proof.
+    iIntros "Hinterp Hsags".
+    iInduction sags as [|sag sags Hnin] "IHsags" using set_ind_L; [by eauto|].
+    iDestruct (unfixed_groups_split with "Hsags") as "[Hsag Hsags]";
+      [set_solver|].
+    rewrite big_sepS_union; [|set_solver].
+    rewrite big_sepS_singleton.
+    iMod ("IHsags" with "Hinterp Hsags") as "[Hinterp $]".
+    iApply (socket_interp_coh_allocate_singleton with "Hinterp Hsag").
   Qed.
 
 End state_interpretation.
