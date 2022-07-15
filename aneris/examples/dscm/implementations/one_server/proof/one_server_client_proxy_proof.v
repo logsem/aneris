@@ -108,11 +108,9 @@ Section Spec.
        *) )%I.
 
 Theorem install_proxy_spec
-        (A : gset socket_address)
         (srv_addr : socket_address):
     {{{ free_ports ip {[ port_of_address client_addr ]} ∗
-        fixed A ∗
-        ⌜client_addr ∉ A⌝ ∗
+        unfixed {[client_addr]} ∗
         ⌜client_addr ∉ DB_addresses⌝ ∗
         ⌜DB_addresses = [srv_addr]⌝ ∗
         client_addr ⤳ (∅, ∅)
@@ -125,16 +123,16 @@ Theorem install_proxy_spec
           ∗ (read_spec rd client_addr)
          }}}.
   Proof.
-     iIntros (ϕ) "(Hfree & #Hfixed & %Hca & %Hca2 & %Hdb & Hrs) Hcont".
+     iIntros (ϕ) "(Hfree & Hfixed & %Hca2 & %Hdb & Hrs) Hcont".
      wp_lam; wp_pures.
      wp_socket sh as "Hsh /=". wp_pures.
      wp_alloc l as "Hl". wp_pures.
      rewrite ip_eq.
      set s := {| sfamily := PF_INET; stype := SOCK_DGRAM;
                   sprotocol := IPPROTO_UDP; saddress := None |}.
-     wp_apply (aneris_wp_socketbind_dynamic _ _ _ _ _ _ client_si with
-                "[$Hfixed $Hfree $Hsh]"); eauto.
-     iIntros "(Hsh & #Hclient)". wp_seq.
+     iApply (aneris_wp_socket_interp_alloc_singleton client_si with "Hfixed").
+     iIntros "#Hclient".
+     wp_socketbind.
      wp_apply (aneris_wp_rcvtimeo_unblock with "[$Hsh]"); eauto with lia.
      iIntros "Hsh". wp_seq; simpl.
      wp_apply (newlock_spec SM_N _ (lock_inv ip l sh)  with "[Hl Hsh Hrs]").
