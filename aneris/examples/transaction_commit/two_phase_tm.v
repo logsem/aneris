@@ -58,10 +58,8 @@ Section transaction_manager.
   Qed.
 
   (** * Transaction manager spec *)
-  Lemma transaction_manager_spec A vRMs :
-    tm ∈ A →
+  Lemma transaction_manager_spec vRMs :
     is_set RMs vRMs →
-    fixed A -∗
     free_ports (ip_of_address tm) {[port_of_address tm]} -∗
     ([∗ set] rm ∈ RMs, rm ⤇ rm_si) -∗
     tm ⤇ tm_si -∗
@@ -71,9 +69,9 @@ Section transaction_manager.
     {{ v, (⌜v = #("COMMITTED")⌝ ∗ [∗ set] rm ∈ RMs,  rm ↦◯ COMMITTED) ∨
           (⌜v = #("ABORTED")⌝   ∗ ∃ rm, ⌜rm ∈ RMs⌝ ∗ rm ↦◯ ABORTED) }}.
   Proof.
-    iIntros (? HRMs) "#HA Hp #Hrmsis #Htm_si Htm Hpend".
+    iIntros (HRMs) "Hp #Hrmsis #Htm_si Htm Hpend".
     rewrite /transaction_manager.
-    wp_pures. wp_socket h as "Hh". wp_pures. wp_socketbind_static.
+    wp_pures. wp_socket h as "Hh". wp_pures. wp_socketbind.
     wp_apply (wp_nodup_init _ (udp_socket _ _)); [done..|].
     iIntros (l rcv) "[Hlog #Hrcv]". wp_let.
     (* sending "PREPARE" to all *)
