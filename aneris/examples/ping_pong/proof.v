@@ -143,13 +143,6 @@ Definition unit_model := model _ (λ _ _, False) ().
 Lemma unit_model_rel_finitary : aneris_model_rel_finitary unit_model.
 Proof. intros ?. apply finite_smaller_card_nat; apply _. Qed. 
 
-(* map of all static socket interpretations *)
-Definition socket_interp `{!anerisG empty_model Σ} sa : socket_interp Σ :=
-  (match sa with
-  | SocketAddressInet "0.0.0.0" 80 => pong_si (* pong *)
-  | _ => λ msg, ⌜True⌝
-   end)%I.
-
 Theorem ping_pong_safe :
   aneris_adequate ping_pong_runner "system" ping_pong_is (λ _, True).
 Proof.
