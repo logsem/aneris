@@ -166,11 +166,9 @@ Section paxos_acceptor.
       iApply "HΦ". iFrame. }
   Qed.
 
-  Lemma acceptor_spec (a : Acceptor) lv A :
+  Lemma acceptor_spec (a : Acceptor) lv :
     let ip := ip_of_address (`a) in
-    `a ∈ A →
     is_set Learners lv →
-    fixed A -∗
     inv paxosN paxos_inv -∗
     ([∗ set] a ∈ Learners, a ⤇ learner_si) -∗
     ([∗ set] p ∈ Proposers, p ⤇ proposer_si) -∗
@@ -180,11 +178,11 @@ Section paxos_acceptor.
     maxVal_frag a None -∗
     WP acceptor int_serializer lv #(`a) @[ip] {{ v, True }}.
   Proof.
-    iIntros (ip ??) "#HA #Hinv #Hlearners #Hproposers #Ha_si Hp HmaxBal HmaxVal".
+    iIntros (ip ?) "#Hinv #Hlearners #Hproposers #Ha_si Hp HmaxBal HmaxVal".
     rewrite /acceptor.
     wp_pures.
     wp_socket h as "Hh". wp_let.
-    wp_socketbind_static.
+    wp_socketbind.
     wp_alloc lbal as "Hbal".
     wp_pures.
     wp_alloc lval as "Hval".

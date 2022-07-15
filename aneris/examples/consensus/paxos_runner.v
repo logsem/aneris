@@ -49,8 +49,7 @@ Section runner.
   Context `{anerisG (Paxos_model runner_topo) Σ}.
 
   Lemma runner_spec :
-    {{{ fixed addrs ∗
-        inv paxosN paxos_inv ∗
+    {{{ inv paxosN paxos_inv ∗
         ([∗ set] a ∈ acceptors, a ⤇ acceptor_si) ∗
         ([∗ set] p ∈ proposers, p ⤇ proposer_si) ∗
         ([∗ set] l ∈ learners, l ⤇ learner_si) ∗
@@ -64,7 +63,7 @@ Section runner.
         runner 41 42 @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(#HA & #Hinv & #Has_si & #Hps_si & #Hls_si & #Hc_si &
+    iIntros (Φ) "(#Hinv & #Has_si & #Hps_si & #Hls_si & #Hc_si &
                   Hls & Hch & Hips & Hfrags & Hpend0 & Hpend1) HΦ".
     rewrite /runner.
     do 8 (wp_makeaddress; wp_let).
@@ -102,36 +101,36 @@ Section runner.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Ha1".
     iSplitR "Ha1_frag1 Ha1_frag2"; last first.
     { iIntros "!> Hport".
-      wp_apply (acceptor_spec (_ ↾ _) with "HA Hinv Hls_si Hps_si Ha1_si Hport Ha1_frag1 Ha1_frag2");
-        [set_solver|done|..]. }
+      wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha1_si Hport Ha1_frag1 Ha1_frag2");
+        [done|..]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Ha2".
     iSplitR "Ha2_frag1 Ha2_frag2"; last first.
     { iIntros "!> Hport".
-      wp_apply (acceptor_spec (_ ↾ _) with "HA Hinv Hls_si Hps_si Ha2_si Hport Ha2_frag1 Ha2_frag2");
-        [set_solver|done|..]. }
+      wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha2_si Hport Ha2_frag1 Ha2_frag2");
+        [done|..]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Ha3".
     iSplitR "Ha3_frag1 Ha3_frag2"; last first.
     { iIntros "!> Hport".
-      wp_apply (acceptor_spec (_ ↾ _) with "HA Hinv Hls_si Hps_si Ha3_si Hport Ha3_frag1 Ha3_frag2");
-        [set_solver|done|..]. }
+      wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha3_si Hport Ha3_frag1 Ha3_frag2");
+        [done|..]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hl1".
     iSplitR "Hl1h"; last first.
     { iIntros "!> Hport".
       assert (l1_addr ∈ Learners) as Hin by set_solver.
       iPoseProof (mapsto_messages_pers_alloc _ learner_si with "Hl1h []") as "Hl1h"; [done|].
-      wp_apply (learner'_spec (l1_addr ↾ Hin) with "HA Hl1_si Hc_si Hport Hl1h");
-        [set_solver|done|..]. }
+      wp_apply (learner'_spec (l1_addr ↾ Hin) with "Hl1_si Hc_si Hport Hl1h");
+        [done|..]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hl2".
     iSplitR "Hl2h"; last first.
     { iIntros "!> Hport".
       assert (l2_addr ∈ Learners) as Hin by set_solver.
       iPoseProof (mapsto_messages_pers_alloc _ learner_si with "Hl2h []") as "Hl2h"; [done|].
-      wp_apply (learner'_spec (l2_addr ↾ Hin) with "HA Hl2_si Hc_si Hport Hl2h");
-        [set_solver|done|..]. }
+      wp_apply (learner'_spec (l2_addr ↾ Hin) with "Hl2_si Hc_si Hport Hl2h");
+        [done|..]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hp1".
     iSplitR "Hpend0"; last first.
@@ -139,8 +138,8 @@ Section runner.
       assert (p1_addr ∈ Proposers) as Hin by set_solver.
       assert (41%Z ∈ values) as H41 by set_solver.
       wp_apply (proposer'_spec _ _ (p1_addr ↾ Hin) (41%Z ↾ H41)
-                  with "Hinv Has_si HA Hport Hp1_si Hpend0");
-        [|set_solver|done].
+                  with "Hinv Has_si Hport Hp1_si Hpend0");
+        [|done].
       rewrite ?size_union ?size_singleton; [lia|set_solver]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hp2".
@@ -149,8 +148,8 @@ Section runner.
       assert (p2_addr ∈ Proposers) as Hin by set_solver.
       assert (42%Z ∈ values) as H42 by set_solver.
       wp_apply (proposer'_spec _ _ (p2_addr ↾ Hin) (42%Z ↾ H42)
-                  with "Hinv Has_si HA Hport Hp2_si Hpend1");
-        [|set_solver|done].
+                  with "Hinv Has_si Hport Hp2_si Hpend1");
+        [|done].
       rewrite ?size_union ?size_singleton; [lia|set_solver]. }
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hc".
@@ -158,7 +157,7 @@ Section runner.
     { iIntros "!> Hport".
       iPoseProof (mapsto_messages_pers_alloc _ client_si with "Hch []") as "Hch"; [done|].
       wp_apply aneris_wp_wand_r.
-      iSplitL; [wp_apply (client_spec with "HA Hinv Hc_si Hport Hch"); set_solver|].
+      iSplitL; [wp_apply (client_spec with "Hinv Hc_si Hport Hch"); set_solver|].
       eauto. }
     by iApply "HΦ".
   Qed.

@@ -13,9 +13,7 @@ Section paxos_client.
         ⌜s_is_ser client_serialization ($bal, $val) (m_body m)⌝ ∗
         ⌜QuorumA Q⌝ ∗ [∗ set] a ∈ Q, msgs_elem_of (msg2b a bal val))%I.
 
-  Lemma client_spec c R T A :
-    c ∈ A →
-    fixed A -∗
+  Lemma client_spec c R T :
     inv paxosN paxos_inv -∗
     c ⤇ client_si -∗
     free_ports (ip_of_address c) {[ port_of_address c ]} -∗
@@ -23,10 +21,10 @@ Section paxos_client.
     WP client int_serializer #c
        @[ip_of_address c] {{ v, ∃ (z : Value), ⌜v = $z⌝ }}.
   Proof.
-    iIntros (?) "#Hfixed #Hinv #Hc_si Hp Hc". rewrite /client.
+    iIntros "#Hinv #Hc_si Hp Hc". rewrite /client.
     wp_pures.
     wp_socket h as "Hh". wp_let.
-    wp_socketbind_static.
+    wp_socketbind.
     wp_apply (aneris_wp_pers_receivefrom with "[$Hh $Hc $Hc_si]");
       [done|done|done|].
     iIntros (m1) "(Hh & Hc & (%Q1 & % & %val1 & % & %Hmaj1 & #HQ1))".
@@ -70,21 +68,19 @@ Section paxos_client.
     iModIntro. wp_pures. eauto.
   Qed.
 
-  Lemma learner'_spec (l : Learner) R T av A (c : socket_address):
+  Lemma learner'_spec (l : Learner) R T av (c : socket_address):
     let ip := ip_of_address (`l) in
-    `l ∈ A →
     is_set Acceptors av →
-    fixed A -∗
     `l ⤇ learner_si -∗
     c ⤇ client_si -∗
     free_ports ip {[ port_of_address (`l) ]} -∗
     `l @ learner_si ⤳# (R, T) -∗
     WP learner' int_serializer av #(`l) #c @[ip] {{ v, True }}.
   Proof.
-    iIntros (ip ??) "#Hfixed #Hl_si #Hc_si Hp Hl". rewrite /learner'.
+    iIntros (ip ?) "#Hl_si #Hc_si Hp Hl". rewrite /learner'.
     wp_pures.
     wp_socket h as "Hh". wp_let.
-    wp_socketbind_static.
+    wp_socketbind.
     wp_bind (learner _ _ _).
     wp_apply aneris_wp_wand_r. iSplitL.
     { by wp_apply (learner_spec with "Hl_si Hh Hl"). }
