@@ -638,11 +638,9 @@ Section OpLib_Proof.
   (* END TODO *)
 
   Definition internal_init_spec : iProp Σ :=
-    ∀ (i : nat) addr fixed_addrs addrs_val crdt_val,
+    ∀ (i : nat) addr addrs_val crdt_val,
     {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
          ⌜CRDT_Addresses !! i = Some addr⌝ ∗
-         ⌜addr ∈ fixed_addrs⌝ ∗
-         fixed fixed_addrs ∗
          ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ RCB_socket_proto i) ∗
          addr ⤳ (∅, ∅) ∗
          free_ports (ip_of_address addr) {[port_of_address addr]} ∗
@@ -666,13 +664,13 @@ Section OpLib_Proof.
   Lemma internal_init_spec_holds :
     oplib_inv ⊢ init.init_spec (rcb_code.rcb_init ser_fun deser_fun) -∗ internal_init_spec.
   Proof.
-    iIntros "#Hinv #Hinit" (i addr fixed_addr addrs_val crdt_val).
+    iIntros "#Hinv #Hinit" (i addr addrs_val crdt_val).
     iModIntro.
-    iIntros (Φ) "(%Hil&%Hlookup&%Haddrin&#Hfixed&#Hproto&Hpts&Hfree&Htok&#Hfun) HΦ".
+    iIntros (Φ) "(%Hil&%Hlookup&#Hproto&Hpts&Hfree&Htok&#Hfun) HΦ".
     rewrite /oplib_init.
     wp_pures.
     iDestruct "Htok" as (γown γfor γsub γcc) "(Hrcbtok & Husertok & Hlocktok)".
-    wp_apply ("Hinit" with "[//] [//] [//] [$Hrcbtok $Hfixed $Hpts $Hproto $Hfree]").
+    wp_apply ("Hinit" with "[//] [//] [$Hrcbtok $Hpts $Hproto $Hfree]").
     iIntros (del br) "(Hownloc & #Hdelspec & #Hbrspec)".
     wp_apply fupd_aneris_wp.
     iMod (oplib_inv_start with "Hinv Hownloc Husertok Hlocktok") as "[Huserw Hlockw]"; [done |].

@@ -60,12 +60,12 @@ Section table_of_counters_proof.
     @init_spec _ _ _ _ _ _ _ map_OpLib_Params _ _ oplib_init' -∗
     @init_spec_for_specific_crdt _ _ _ _ _ _ _ map_OpLib_Params _ _ table_of_counters_init.
   Proof.
-    iIntros "#Hinit" (repId addr fixedAddrs addrs_val).
-    iIntros (Φ) "!# (%Haddrs & %Hrepid & %Haddr & Hfx & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    iIntros "#Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
     rewrite /table_of_counters_init /table_of_counters_crdt.
     wp_pures.
-    wp_apply ("Hinit" with "[$Hfx $Hprotos $Htoken $Hskt $Hfr]").
-    { do 3 (iSplit; first done). iApply table_of_counters_crdt_fun_spec; done. }
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply table_of_counters_crdt_fun_spec; done. }
     iIntros (get update) "(HLS & #Hget & #Hupdate)".
     wp_pures.
     iApply "HΦ"; eauto.

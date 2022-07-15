@@ -145,12 +145,12 @@ Section gos_proof.
     init_spec_for_specific_crdt
       (gos_init (s_ser (s_serializer vl_serialization)) (s_deser (s_serializer vl_serialization))).
   Proof.
-    iIntros "#Hinit" (repId addr fixedAddrs addrs_val).
-    iIntros (Φ) "!# (%Haddrs & %Hrepid & %Haddr & Hfx & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    iIntros "#Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
     rewrite /gos_init.
     wp_pures.
-    wp_apply ("Hinit" with "[$Hfx $Hprotos $Htoken $Hskt $Hfr]").
-    { do 3 (iSplit; first done). iApply gos_crdt_fun_spec; done. }
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply gos_crdt_fun_spec; done. }
     iIntros (get update) "(HLS & #Hget & #Hupdate)".
     wp_pures.
     iApply "HΦ"; eauto.

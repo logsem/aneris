@@ -341,12 +341,10 @@ Section prod_proof.
     @crdt_fun_spec _ _ _ _ _ _ _ OPPA crdtA -∗
     @crdt_fun_spec _ _ _ _ _ _ _ OPPB crdtB -∗
     @init_spec _ _ _ _ _ _ _ prod_OpLib_Params _ _ oplib_init' -∗
-    ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
+    ∀ (repId : nat) (addr : socket_address)
       (addrs_val : val),
         {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
-            ⌜addr ∈ fixedAddrs⌝ ∗
-            fixed fixedAddrs ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
             free_ports (ip_of_address addr) {[port_of_address addr]} ∗
@@ -359,12 +357,12 @@ Section prod_proof.
             @update_spec _ _ _ _ _ _ _ prod_OpLib_Params _ _ update_val repId addr
         }}}.
     Proof.
-      iIntros "#HA #HB #Hinit" (repId addr fixedAddrs addrs_val).
-      iIntros (Φ) "!# (%Haddrs & %Hrepid & %Haddr & Hfx & Hprotos & Hskt & Hfr & Htoken) HΦ".
+      iIntros "#HA #HB #Hinit" (repId addr addrs_val).
+      iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
       rewrite /prod_comb_init /prod_comb_crdt.
       wp_pures.
-      wp_apply ("Hinit" with "[$Hfx $Hprotos $Htoken $Hskt $Hfr]").
-      { do 3 (iSplit; first done). iApply prod_crdt_fun_spec; done. }
+      wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+      { do 2 (iSplit; first done). iApply prod_crdt_fun_spec; done. }
       iIntros (get update) "(HLS & #Hget & #Hupdate)".
       wp_pures.
       iApply "HΦ".

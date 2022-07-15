@@ -138,12 +138,10 @@ Section Specification.
       {{{ v, RET v; crdt_pair_spec v }}}.
 
   Definition init_spec_for_specific_crdt (init : val)  : iProp Σ :=
-    ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
+    ∀ (repId : nat) (addr : socket_address)
       (addrs_val : val),
         {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
-            ⌜addr ∈ fixedAddrs⌝ ∗
-            fixed fixedAddrs ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
             free_ports (ip_of_address addr) {[port_of_address addr]} ∗
@@ -157,12 +155,10 @@ Section Specification.
         }}}.
 
     Definition init_spec (init : val) : iProp Σ :=
-    ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
+    ∀ (repId : nat) (addr : socket_address)
       (addrs_val crdt_val : val),
         {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
-            ⌜addr ∈ fixedAddrs⌝ ∗
-            fixed fixedAddrs ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
             free_ports (ip_of_address addr) {[port_of_address addr]} ∗
