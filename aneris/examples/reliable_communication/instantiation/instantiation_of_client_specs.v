@@ -34,32 +34,30 @@ Section Client_API_spec_instantiation.
   Implicit Types p : iProto Σ.
   Implicit Types TT : tele.
 
-  Lemma make_client_skt_spec_holds clt_addr A:
+  Lemma make_client_skt_spec_holds :
     make_client_skt_spec
         User_params
-        session_resources_instance
-        clt_addr A.
+        session_resources_instance.
   Proof.
     rewrite /make_client_skt_spec.
     rewrite /make_client_skt.
     rewrite /CltCanConnect /session_resources_instance.
-    iIntros (Φ) "(H1 & H2 & H3 & H4) HΦ".
+    iIntros (clt_addr A Φ) "(H1 & H2 & H3 & H4) HΦ".
     iDestruct (make_client_skt_internal_spec_holds clt_addr $! Φ
                 with "[$H1 $H2 $H3 $H4][HΦ]") as "Hspec".
     iNext. iIntros (skt h s) "Hr". iApply "HΦ". eauto with iFrame.
     iApply "Hspec".
   Qed.
 
-  Lemma make_connect_skt_spec_holds skt clt_addr:
-        connect_spec
-            User_params
-            session_resources_instance
-            skt clt_addr.
+  Lemma make_connect_skt_spec_holds :
+    connect_spec
+      User_params
+      session_resources_instance.
   Proof.
     rewrite /make_client_skt_spec.
     rewrite /connect_spec.
     rewrite /CltCanConnect /session_resources_instance.
-    iIntros (Φ) "(%h & %s & Hres) HΦ".
+    iIntros (skt clt_addr Φ) "(%h & %s & Hres) HΦ".
     iApply (connect_internal_spec with "[Hres][HΦ]").
     - iExists _, _. iFrame.
     - iNext. iIntros (γe c) "(Hpost & _)".

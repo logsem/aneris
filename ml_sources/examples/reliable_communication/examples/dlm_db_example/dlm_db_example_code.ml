@@ -1,41 +1,42 @@
 open !Ast
 open Serialization_code
 open Dlm_code
-open Ddb_code
+open Repdb_code
 
-let do_transaction lk wr =
+let do_writes lk wr =
   dlock_acquire lk;
-  wr "x" 1;
-  wr "y" 37;
+  wr "x" 37;
+  wr "y" 1;
   dlock_release lk
 
-let repeat_read_until lk rd k v =
+let do_reads lk rd  =
   let rec loop () =
     dlock_acquire lk;
-    let res = rd k in
-    dlock_release lk;
-    if res = Some v
-    then ()
-    else begin
-      unsafe (fun () -> Unix.sleepf 2.0); loop ()
-    end
+    let vx = rd "x" in
+    if vx = Some 37
+    then
+      begin
+        let vy = rd "y" in
+        assert (vy = Some 1);
+        dlock_release lk;
+        vy
+      end
+    else
+      begin
+        dlock_release lk;
+        unsafe (fun () -> Unix.sleepf 2.0);
+        loop ()
+      end
   in loop ()
 
-let do_read lk rd =
-  ignore (repeat_read_until lk rd "x" 1);
-  dlock_acquire lk;
-  let vy = rd "y" in
-  dlock_release lk;
-  assert (vy = Some 37)
-
-let node0 clt_addr00 clt_addr01 dlock_srv_addr db_srv_addr =
-  let lk_chan = dlock_subscribe_client clt_addr00 dlock_srv_addr in
-  let db_funs = install_proxy int_serializer clt_addr01 db_srv_addr in
+let node0 clt_addr00 clt_addr01 dl_addr db_laddr =
+  let lk_chan = dlock_subscribe_client clt_addr00 dl_addr in
+  let db_funs = init_client_leader_proxy int_serializer clt_addr01 db_laddr in
   let (wr, _rd) = db_funs in
-  do_transaction lk_chan wr
+  do_writes lk_chan wr
 
-let node1 clt_addr10 clt_addr11 dlock_srv_addr db_srv_addr =
-  let lk_chan = dlock_subscribe_client clt_addr10 dlock_srv_addr in
-  let db_funs = install_proxy int_serializer clt_addr11 db_srv_addr in
+let node1 clt_addr10 clt_addr11 dl_addr db_laddr =
+  let lk_chan = dlock_subscribe_client clt_addr10 dl_addr in
+  let db_funs = init_client_leader_proxy int_serializer clt_addr11 db_laddr in
   let (_wr, rd) = db_funs in
-  do_read lk_chan rd
+  do_reads lk_chan rd

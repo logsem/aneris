@@ -165,10 +165,10 @@ Section proof_of_the_server_code.
     iNext. iIntros (skt) "Hcl".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
-    iNext. iIntros (v) "(-> & Hp)".
+    iNext. iIntros "Hp".
     wp_pures.
     wp_apply (RCSpec_accept_spec with "[$Hp][HΦ]").
-    iNext. iIntros (c caddr v ) "(-> & Hlst & Hc)".
+    iNext. iIntros (c caddr) "(Hlst & Hc)".
     wp_pures.
     simpl in *.
     rewrite /proto_hello_world.
@@ -341,7 +341,7 @@ Proof.
   { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
-  iMod (Reliable_communication_init_instance ⊤ UP0 $! I)
+  iMod (Reliable_communication_init_instance ⊤ UP0)
     as (chn0 sgn0 SnRes0) "(HsrvInit0 & Hspecs0)"; [ solve_ndisj|].
   iDestruct "Hspecs0"
     as "(
@@ -350,7 +350,7 @@ Proof.
          & %Hlisten0 & %Haccept0
          & %Hsend0 & %HsendTele0
          & %HtryRecv0 & %Hrecv0)".
-  iMod (Reliable_communication_init_instance ⊤ UP1 $! I)
+  iMod (Reliable_communication_init_instance ⊤ UP1)
     as (chn1 sgn1 SnRes1) "(HsrvInit1 & Hspecs1)"; [ solve_ndisj|].
   iDestruct "Hspecs1"
     as "(

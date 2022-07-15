@@ -38,6 +38,7 @@ Ltac reshape_expr e tac :=
     | CAS ?e0 ?e1 ?e2                   => add_item (CasRCtx e0 e1) K e2
     | MakeAddress ?e0 (Val ?v1)         => add_item (MakeAddressLCtx v1) K e0
     | MakeAddress ?e0 ?e1               => add_item (MakeAddressRCtx e0) K e1
+    | GetAddressInfo ?e                 => add_item GetAddressInfoCtx K e
     | NewSocket ?e0 (Val ?v1) (Val ?v2) => add_item (NewSocketLCtx v1 v2) K e0
     | NewSocket ?e0 ?e1 (Val ?v2)       => add_item (NewSocketMCtx e0 v2) K e1
     | NewSocket ?e0 ?e1 ?e2             => add_item (NewSocketRCtx e0 e1) K e2

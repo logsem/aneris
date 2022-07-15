@@ -211,7 +211,7 @@ Section Proof_of_server_conn_step_2.
     (* Case 2.2.1. We show that m ∈ R0 is absurd. *)
     (* ----------------------------------------------------------------- *)
     { apply bool_decide_eq_true_1 in Hm.
-       iDestruct (big_sepS_elem_of _ R0 m Hm with "[$HmsgRres]") as "Hmsgres".
+       iDestruct (big_sepS_elem_of _ R0 m Hm with "HmsgRres") as "Hmsgres".
        iDestruct "Hmsgres"
          as (γs0 mval0 n0 Hser0)
               "(#Htk0 & [#(%Hl & %Hl2) | (%x & %y & %Habs1 & %Habs2)])";
@@ -427,9 +427,7 @@ Section Proof_of_server_conn_step_2.
                 iRight.
                 iExists c, sidLBLoc, ackIdLoc.
                 rewrite lookup_insert. naive_solver.
-              - iApply (big_sepS_mono _ _ _ with "[$HmsgRres]").
-                Unshelve.
-                2:{ apply _. }
+              - iApply (big_sepS_mono _ _ _ with "HmsgRres").
                 iIntros (m0 Hm0) "#Hres".
                 destruct (bool_decide (m_sender m = m_sender m0)) eqn:Hmeq.
                 + apply bool_decide_eq_true_1 in Hmeq.
@@ -451,8 +449,7 @@ Section Proof_of_server_conn_step_2.
                     iLeft. by rewrite lookup_insert_ne.
                   * iDestruct "Hr" as (???) "%Habs".
                     iExists γs0, _, n0. iFrame "#∗". iSplit; first done.
-                    iRight. rewrite lookup_insert_ne; subst; eauto.
-                + exact γqlk. }
+                    iRight. rewrite lookup_insert_ne; subst; eauto. }
             iApply big_sepM_insert_delete.
             iSplitR "HknResAcc".
             assert (n = ck0) as -> by naive_solver.

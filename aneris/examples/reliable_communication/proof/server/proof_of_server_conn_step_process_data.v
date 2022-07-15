@@ -36,7 +36,7 @@ Section Proof_of_server_conn_step_3.
             -- ACKID or SEQID, handled by process_data_on_chan. *)
 
 
-(** We start by factoring out the case when the msg is ACKID or SEQID. *)
+  (** We start by factoring out the case when the msg is ACKID or SEQID. *)
   Lemma server_conn_step_process_data_spec_transmission_data
         (skl : loc) (skt_passive : val)
         skt sock h (cml : loc) cmv (cql : loc) qlk γqlk mval m
@@ -80,7 +80,7 @@ Section Proof_of_server_conn_step_3.
     }}}
       server_conn_step_process_data (skt, #cml, (#cql, qlk))%V
        (cdata, #ck, (#ackId, #sidLBid))%V mval #(m_sender m) @[srv_ip]
-   {{{ v, RET v; ⌜v = #()⌝ ∗ isServer_listening_loop_resources skt_passive }}}.
+    {{{ v, RET v; ⌜v = #()⌝ ∗ isServer_listening_loop_resources skt_passive }}}.
   Proof.
     iIntros (Hsrv_skt Hdom Hdomc Hsm Hmap Hdest Hsaddr Hsblk Φ).
     iIntros "(%Hskt & #Hqlk & #Hsi & #Hcsi & #Hsinv & Hspat) HΦ".
@@ -447,7 +447,7 @@ Section Proof_of_server_conn_step_3.
     (* Case 1.1 INIT CASE. *)
     (* ----------------------------------------------------------------- *)
     (* Absurd case, as we can show that m is actually in R0. *)
-    { iDestruct (big_sepM_lookup _ cM (m_sender m) (Connected (cdata, ck, (ackId, sidLBid))) Hsm with "[$HknRes]")
+    { iDestruct (big_sepM_lookup _ cM (m_sender m) (Connected (cdata, ck, (ackId, sidLBid))) Hsm with "HknRes")
         as "Habs".
       iAssert ((∃ (m' : message) (mval' : val),
                    ⌜m' ∈ R0⌝ ∗
@@ -466,7 +466,7 @@ Section Proof_of_server_conn_step_3.
     (* ----------------------------------------------------------------- *)
     (* Regardless dynamic check, this case is absurd, which we show using
      the validity law governing the cookie resource. *)
-    iDestruct (big_sepM_lookup _ cM (m_sender m) (Connected (cdata, ck, (ackId, sidLBid))) Hsm with "[$HknRes]")
+    iDestruct (big_sepM_lookup _ cM (m_sender m) (Connected (cdata, ck, (ackId, sidLBid))) Hsm with "HknRes")
       as "Habs".
     { iDestruct "Habs" as (γs'' ck') "(_ & [(%Habs & _) |Habs])"; [naive_solver|].
       iDestruct "Habs" as (??????) "Habs".
@@ -477,8 +477,7 @@ Section Proof_of_server_conn_step_3.
       iDestruct "Hres" as "[Hres|(Hopened' & [(%_ & %H2 & _)|(%_a & %_b & %H2 & _)])]"; [|done.. ].
       iDestruct "Hres" as (???) "(%Habs & (%x & %Hx & Hres))".
       iDestruct "Hres" as "[(-> & _)|(_ & _ & Hres & _ & _)]"; first done.
-      by iDestruct (CookieRes_excl with "[$Hck] [$Hres]") as "Habs'".
-    Unshelve. apply _. apply _. }
+      by iDestruct (CookieRes_excl with "[$Hck] [$Hres]") as "Habs'". }
   Qed.
 
 End Proof_of_server_conn_step_3.

@@ -4,48 +4,46 @@
 From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.examples.reliable_communication.lib.dlm Require Import dlm_code.
-From aneris.examples.reliable_communication.lib.ddb Require Import ddb_code.
+From aneris.examples.reliable_communication.lib.repdb Require Import repdb_code.
 
-Definition do_transaction : val :=
+Definition do_writes : val :=
   λ: "lk" "wr",
   dlock_acquire "lk";;
-  "wr" #"x" #1;;
-  "wr" #"y" #37;;
+  "wr" #"x" #37;;
+  "wr" #"y" #1;;
   dlock_release "lk".
 
-Definition repeat_read_until : val :=
-  λ: "lk" "rd" "k" "v",
+Definition do_reads : val :=
+  λ: "lk" "rd",
   letrec: "loop" <> :=
     dlock_acquire "lk";;
-    let: "res" := "rd" "k" in
-    dlock_release "lk";;
-    (if: "res" = (SOME "v")
-     then  #()
-     else  #() (* unsafe (fun () -> Unix.sleepf 2.0); loop () *);;
-           "loop" #()) in
+    let: "vx" := "rd" #"x" in
+    (if: "vx" = (SOME #37)
+     then
+       let: "vy" := "rd" #"y" in
+       assert: ("vy" = (SOME #1));;
+       dlock_release "lk";;
+       "vy"
+     else
+       dlock_release "lk";;
+       #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
+       "loop" #()) in
     "loop" #().
 
-Definition do_read : val :=
-  λ: "lk" "rd",
-  repeat_read_until "lk" "rd" #"x" #1;;
-  #();;
-  dlock_acquire "lk";;
-  let: "vy" := "rd" #"y" in
-  dlock_release "lk";;
-  assert: ("vy" = (SOME #37)).
-
 Definition node0 : val :=
-  λ: "clt_addr00" "clt_addr01" "dlock_srv_addr" "db_srv_addr",
-  let: "lk_chan" := dlock_subscribe_client "clt_addr00" "dlock_srv_addr" in
-  let: "db_funs" := install_proxy int_serializer "clt_addr01" "db_srv_addr" in
+  λ: "clt_addr00" "clt_addr01" "dl_addr" "db_laddr",
+  let: "lk_chan" := dlock_subscribe_client "clt_addr00" "dl_addr" in
+  let: "db_funs" := init_client_leader_proxy int_serializer "clt_addr01"
+                    "db_laddr" in
   let: "wr" := Fst "db_funs" in
   let: "_rd" := Snd "db_funs" in
-  do_transaction "lk_chan" "wr".
+  do_writes "lk_chan" "wr".
 
 Definition node1 : val :=
-  λ: "clt_addr10" "clt_addr11" "dlock_srv_addr" "db_srv_addr",
-  let: "lk_chan" := dlock_subscribe_client "clt_addr10" "dlock_srv_addr" in
-  let: "db_funs" := install_proxy int_serializer "clt_addr11" "db_srv_addr" in
+  λ: "clt_addr10" "clt_addr11" "dl_addr" "db_laddr",
+  let: "lk_chan" := dlock_subscribe_client "clt_addr10" "dl_addr" in
+  let: "db_funs" := init_client_leader_proxy int_serializer "clt_addr11"
+                    "db_laddr" in
   let: "_wr" := Fst "db_funs" in
   let: "rd" := Snd "db_funs" in
-  do_read "lk_chan" "rd".
+  do_reads "lk_chan" "rd".

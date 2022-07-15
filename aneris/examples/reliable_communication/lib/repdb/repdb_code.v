@@ -6,7 +6,9 @@ From aneris.aneris_lang.lib Require Import map_code.
 From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.examples.reliable_communication.lib.repdb Require Import log_code.
-From aneris.examples.reliable_communication Require Import client_server_code.
+From aneris.examples.reliable_communication.lib.mt_server Require Import mt_server_code.
+
+(**  Serializers  *)
 
 Definition write_serializer val_ser :=
   prod_serializer string_serializer val_ser.
@@ -28,54 +30,15 @@ Definition req_c2f_ser := read_serializer.
 
 Definition rep_f2c_ser val_ser := option_serializer val_ser.
 
-(**  Generic methods for multi-threaded server with monitored requests.  *)
-
-Definition service_loop : val :=
-  λ: "c" "mon" "request_handler" <>,
-  letrec: "loop" <> :=
-    let: "req" := recv "c" in
-    monitor_acquire "mon";;
-    let: "rep" := "request_handler" "mon" "req" in
-    monitor_release "mon";;
-    send "c" "rep";;
-    "loop" #() in
-    "loop" #().
-
-Definition accept_new_connections_loop : val :=
-  λ: "skt" "mon" "request_handler" <>,
-  letrec: "loop" <> :=
-    let: "new_conn" := accept "skt" in
-    let: "c" := Fst "new_conn" in
-    let: "_a" := Snd "new_conn" in
-    Fork (service_loop "c" "mon" "request_handler" #());;
-    "loop" #() in
-    "loop" #().
-
-Definition run_server ser deser : val :=
-  λ: "addr" "mon" "request_handler",
-  let: "skt" := make_server_skt ser deser "addr" in
-  server_listen "skt";;
-  Fork (accept_new_connections_loop "skt" "mon" "request_handler" #()).
-
 (**  Leader  *)
 
 Definition follower_request_handler : val :=
   λ: "log" "mon" "req",
+  monitor_acquire "mon";;
   log_wait_until "log" "mon" "req";;
-  unSOME (log_get "log" "req").
-
-Definition client_request_handler_at_leader : val :=
-  λ: "db" "log" "mon" "req",
-  match: "req" with
-    InjL "p" =>
-    let: "k" := Fst "p" in
-    let: "v" := Snd "p" in
-    "db" <- (map_insert "k" "v" ! "db");;
-    log_add_entry "log" ("k", "v");;
-    monitor_signal "mon";;
-    InjL #()
-  | InjR "k" => InjR (map_lookup "k" ! "db")
-  end.
+  let: "res" := unSOME (log_get "log" "req") in
+  monitor_release "mon";;
+  "res".
 
 Definition update_log_copy_loop : val :=
   λ: "logC" "monC" "logF" "monF" <>,
@@ -92,15 +55,32 @@ Definition update_log_copy_loop : val :=
     "loop" (Snd "logC_copy") in
     "loop" #0.
 
-Definition start_leader_processing_clients ser : val :=
-  λ: "addr" "db" "log" "mon" <>,
-  run_server (rep_l2c_ser ser) (req_c2l_ser ser) "addr" "mon"
-  (client_request_handler_at_leader "db" "log").
-
 Definition start_leader_processing_followers ser : val :=
   λ: "addr" "log" "mon" <>,
-  run_server (rep_l2f_ser ser) req_f2l_ser "addr" "mon"
-  (follower_request_handler "log").
+  run_server (rep_l2f_ser ser) req_f2l_ser "addr"
+  (λ: "req", follower_request_handler "log" "mon" "req").
+
+Definition client_request_handler_at_leader : val :=
+  λ: "db" "log" "mon" "req",
+  monitor_acquire "mon";;
+  let: "res" := match: "req" with
+    InjL "p" =>
+    let: "k" := Fst "p" in
+    let: "v" := Snd "p" in
+    "db" <- (map_insert "k" "v" ! "db");;
+    let: "n" := log_length "log" in
+    log_add_entry "log" ("k", "v", "n");;
+    monitor_signal "mon";;
+    InjL #()
+  | InjR "k" => InjR (map_lookup "k" ! "db")
+  end in
+  monitor_release "mon";;
+  "res".
+
+Definition start_leader_processing_clients ser : val :=
+  λ: "addr" "db" "log" "mon" <>,
+  run_server (rep_l2c_ser ser) (req_c2l_ser ser) "addr"
+  (λ: "req", client_request_handler_at_leader "db" "log" "mon" "req").
 
 Definition init_leader ser : val :=
   λ: "addr0" "addr1",
@@ -113,38 +93,62 @@ Definition init_leader ser : val :=
   Fork (start_leader_processing_followers ser "addr1" "logF" "monF" #());;
   Fork (update_log_copy_loop "logC" "monC" "logF" "monF" #()).
 
+Definition init_client_leader_proxy ser : val :=
+  λ: "clt_addr" "srv_addr",
+  let: "rpc" := init_client_proxy (req_c2l_ser ser) (rep_l2c_ser ser)
+                "clt_addr" "srv_addr" in
+  let: "lk" := newlock #() in
+  let: "reqf" := λ: "req",
+  acquire "lk";;
+  let: "res" := make_request "rpc" "req" in
+  release "lk";;
+  "res" in
+  let: "write" := λ: "k" "v",
+  match: "reqf" (InjL ("k", "v")) with
+    InjL "_u" => #()
+  | InjR "_abs" => assert: #false
+  end in
+  let: "read" := λ: "k",
+  match: "reqf" (InjR "k") with
+    InjL "_abs" => assert: #false
+  | InjR "r" => "r"
+  end in
+  ("write", "read").
+
 (**  Follower.  *)
 
 Definition client_request_handler_at_follower : val :=
-  λ: "db" "_mon" "req_k", map_lookup "req_k" ! "db".
+  λ: "db" "mon" "req_k",
+  monitor_acquire "mon";;
+  let: "res" := map_lookup "req_k" ! "db" in
+  monitor_release "mon";;
+  "res".
 
 Definition start_follower_processing_clients ser : val :=
   λ: "addr" "db" "mon",
-  run_server (rep_f2c_ser ser) req_c2f_ser "addr" "mon"
-  (client_request_handler_at_follower "db").
+  run_server (rep_f2c_ser ser) req_c2f_ser "addr"
+  (λ: "req", client_request_handler_at_follower "db" "mon" "req").
 
 Definition sync_loop : val :=
-  λ: "ch" "db" "log" "mon",
-  letrec: "aux" <> :=
-    let: "i" := log_next "log" in
-    send "ch" "i";;
-    let: "rep" := recv "ch" in
+  λ: "db" "log" "mon" "rpc" "n",
+  letrec: "aux" "i" :=
+    let: "rep" := make_request "rpc" "i" in
     let: "k" := Fst (Fst "rep") in
     let: "v" := Snd (Fst "rep") in
     let: "j" := Snd "rep" in
     assert: ("i" = "j");;
     monitor_acquire "mon";;
-    log_add_entry "log" ("k", "v");;
+    log_add_entry "log" ("k", "v", "j");;
     "db" <- (map_insert "k" "v" ! "db");;
     monitor_release "mon";;
-    "aux" #() in
-    "aux" #().
+    "aux" ("i" + #1) in
+    "aux" "n".
 
 Definition sync_with_server ser : val :=
   λ: "l_addr" "f2l_addr" "db" "log" "mon",
-  let: "skt" := make_client_skt req_f2l_ser (rep_l2f_ser ser) "f2l_addr" in
-  let: "ch" := connect "skt" "l_addr" in
-  sync_loop "ch" "db" "log" "mon".
+  let: "rpc" := init_client_proxy req_f2l_ser (rep_l2f_ser ser) "f2l_addr"
+                "l_addr" in
+  Fork (sync_loop "db" "log" "mon" "rpc" #0).
 
 Definition init_follower ser : val :=
   λ: "l_addr" "f2l_addr" "f_addr",
@@ -154,39 +158,14 @@ Definition init_follower ser : val :=
   sync_with_server ser "l_addr" "f2l_addr" "db" "log" "mon";;
   start_follower_processing_clients ser "f_addr" "db" "mon".
 
-(**  Client Proxies.  *)
-
-Definition request : val :=
-  λ: "ch" "lk" "req",
-  acquire "lk";;
-  send "ch" "req";;
-  let: "msg" := recv "ch" in
-  release "lk";;
-  "msg".
-
-Definition init_client_leader_proxy ser : val :=
-  λ: "clt_addr" "srv_addr",
-  let: "skt" := make_client_skt (req_c2l_ser ser) (rep_l2c_ser ser)
-                "clt_addr" in
-  let: "ch" := connect "skt" "srv_addr" in
-  let: "lk" := newlock #() in
-  let: "write" := λ: "k" "v",
-  match: request "ch" "lk" (InjL ("k", "v")) with
-    InjL "_u" => #()
-  | InjR "_abs" => assert: #false
-  end in
-  let: "read" := λ: "k",
-  match: request "ch" "lk" (InjR "k") with
-    InjL "_abs" => assert: #false
-  | InjR "r" => "r"
-  end in
-  ("write", "read").
-
 Definition init_client_follower_proxy ser : val :=
-  λ: "clt_addr" "f_addr",
-  let: "skt" := make_client_skt req_c2f_ser (rep_f2c_ser ser) "clt_addr" in
-  let: "ch" := connect "skt" "f_addr" in
+  λ: "clt_addr" "srv_addr",
+  let: "rpc" := init_client_proxy req_c2f_ser (rep_f2c_ser ser) "clt_addr"
+                "srv_addr" in
   let: "lk" := newlock #() in
-  let: "read" := λ: "k",
-  request "ch" "lk" "k" in
-  "read".
+  let: "reqf" := λ: "req",
+  acquire "lk";;
+  let: "res" := make_request "rpc" "req" in
+  release "lk";;
+  "res" in
+  "reqf".

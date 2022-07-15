@@ -1,4 +1,4 @@
 (executable
   (name dlm_db_example_code)
   (flags :standard -rectypes)
-  (libraries client_server_code dlm_code ddb_code aneris))
+  (libraries dlm_code repdb_code aneris))

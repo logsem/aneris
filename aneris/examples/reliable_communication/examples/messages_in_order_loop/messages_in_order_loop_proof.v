@@ -88,7 +88,7 @@ Section proof_of_the_code.
     iLöb as "IH".
     wp_pure _.
     wp_smart_apply (RCSpec_accept_spec with "[$Hlistens]").
-    iIntros (c clt_addr v) "(-> & Hlistens & Hc)".
+    iIntros (c clt_addr) "(Hlistens & Hc)".
     wp_pures.
     wp_apply (aneris_wp_fork with "[-]").
     iSplitL "Hlistens".
@@ -113,7 +113,7 @@ Section proof_of_the_code.
     wp_smart_apply (RCSpec_make_server_skt_spec with "[$Hmh $Hfp $Hf $Hsi $Hit][HΦ]"); first done.
     iNext. iIntros (skt) "Hcl". wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
-    iNext. iIntros (v) "(-> & Hp)". wp_pures.
+    iNext. iIntros "Hp". wp_pures.
     wp_apply (aneris_wp_fork with "[-]").
     iSplitL "HΦ"; [by iApply "HΦ"|].
     iNext. by wp_apply (wp_accept_loop skt with "[$Hp $Hsi][]").
@@ -296,7 +296,7 @@ Proof.
   { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
-  iMod (Reliable_communication_init_instance ⊤ UP  $! I)
+  iMod (Reliable_communication_init_instance ⊤ UP)
     as (chn sgn SnRes) "(HsrvInit & Hspecs)"; [ solve_ndisj|].
   iDestruct "Hspecs"
     as "(

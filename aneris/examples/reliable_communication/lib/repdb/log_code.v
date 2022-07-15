@@ -13,7 +13,7 @@ Definition log_add_entry : val :=
   let: "lp" := ! "log" in
   let: "data" := Fst "lp" in
   let: "next" := Snd "lp" in
-  let: "data'" := list_append "data" [("req", "next")] in
+  let: "data'" := list_append "data" ["req"] in
   "log" <- ("data'", ("next" + #1)).
 
 Definition log_next : val := λ: "log", Snd ! "log".

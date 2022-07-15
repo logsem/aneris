@@ -27,22 +27,22 @@ Section Init_initialisation.
   Lemma Reliable_communication_init_instance
         E (UP : Reliable_communication_service_params) :
     ↑RCParams_srv_N ⊆ E →
-    True ⊢ |={E}=>
+    ⊢ |={E}=>
         ∃ ( _ : Chan_mapsto_resource),
         ∃ ( _ : server_ghost_names),
         ∃ (SnRes : SessionResources UP),
           SrvInit ∗
-          ⌜(∀ sa A, make_client_skt_spec UP SnRes sa A)⌝ ∗
-          ⌜(∀ A, make_server_skt_spec UP SnRes A)⌝ ∗
-          ⌜(∀ skt sa, connect_spec UP SnRes skt sa)⌝ ∗
-          ⌜(∀ skt, server_listen_spec UP SnRes skt)⌝ ∗
-          ⌜(∀ skt, accept_spec UP SnRes skt)⌝ ∗
-          ⌜(∀ c v p ip ser, send_spec c v p ip ser)⌝ ∗
-          ⌜(∀ TT c t v P q ip s, send_spec_tele TT c t v P q ip s)⌝ ∗
-          ⌜(∀ TT c v P q ip ser, try_recv_spec TT c v P q ip ser)⌝ ∗
-          ⌜(∀ TT c v P q ip ser, recv_spec TT c v P q ip ser)⌝.
+          ⌜make_client_skt_spec UP SnRes⌝ ∗
+          ⌜make_server_skt_spec UP SnRes⌝ ∗
+          ⌜connect_spec UP SnRes⌝ ∗
+          ⌜server_listen_spec UP SnRes⌝ ∗
+          ⌜accept_spec UP SnRes⌝ ∗
+          ⌜send_spec⌝ ∗
+          ⌜send_spec_tele⌝ ∗
+          ⌜try_recv_spec⌝ ∗
+          ⌜recv_spec⌝.
   Proof.
-    iIntros (Hne _).
+    iIntros (Hne).
     iMod (own_alloc (● ((to_agree <$> ∅) : session_names_mapUR)))
       as (γ_srv_kn_s_name) "Hkns"; first by apply auth_auth_valid.
     iMod (own_alloc (● (∅ : gsetUR message) ⋅ (◯ (∅ : gsetUR message))))
@@ -72,8 +72,7 @@ Section Init_initialisation.
     split.
     intros E UP Hn.
     iStartProof.
-    iMod (Reliable_communication_init_instance E UP Hn $! I) as "Hinit".
-    iIntros (_).
+    iMod (Reliable_communication_init_instance E UP Hn) as "Hinit".
     iModIntro.
     iDestruct "Hinit" as (???) "Hinit".
     eauto with iFrame.
