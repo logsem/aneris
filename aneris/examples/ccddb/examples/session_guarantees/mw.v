@@ -40,10 +40,8 @@ Section MonotonicWrites.
 
   Theorem mw_example_spec (A : gset socket_address) (ca sa1 : socket_address)
           (db_id1 : rep_id) :
-    {{{ fixed A
-        ∗ ⌜sa1 ∈ A⌝
-        ∗ sa1 ⤇ (db_si db_id1)
-        ∗ ⌜ca ∉ A⌝
+    {{{ sa1 ⤇ (db_si db_id1)
+        ∗ unfixed {[ca]}
         ∗ free_ports (ip_of_address ca) {[ port_of_address ca ]}
         ∗  ca ⤳ (∅, ∅)
     }}}
@@ -75,9 +73,9 @@ Section MonotonicWrites.
                                        ∗ ⌜e1' <ₜe2'⌝)
    }}}.
   Proof.
-    iIntros (ϕ) "(#Hfixed & #Hsa1 & #Hsi1 & #Hca & Hfree & Hrs) Hcont".
+    iIntros (ϕ) "(#Hsi1 & Hca & Hfree & Hrs) Hcont".
     wp_lam. wp_pures.
-    wp_apply (sm_setup_spec with "[$Hfree $Hfixed $Hca $Hrs]").
+    wp_apply (sm_setup_spec with "[$Hfree $Hca $Hrs]").
     iIntros (fns) "Hpre".
     iDestruct "Hpre" as (init_fn read_fn write_fn)
                           "(-> & #Hinit_spec & #Hread_spec & #Hwrite_spec)".

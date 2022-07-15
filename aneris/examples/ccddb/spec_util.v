@@ -75,8 +75,8 @@ Section spec.
   Context `{!anerisG Mdl Σ, !DB_params, !DB_time, !DB_events,
             !DB_resources Mdl Σ, !Maximals_Computing}.
 
-  Definition init_resources z A i : iProp Σ :=
-    (fixed A ∗ ([∗ list] z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
+  Definition init_resources z i : iProp Σ :=
+    (([∗ list] z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
                z ⤳ (∅, ∅) ∗
                free_ports (ip_of_address z) {[port_of_address z]} ∗
                init_token i).

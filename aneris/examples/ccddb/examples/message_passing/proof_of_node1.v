@@ -86,18 +86,17 @@ Section ProofOfNode1.
   Context `{!DB_resources Mdl Σ}.
   Context `{!DB_init_function, !DB_init}.
 
-  Theorem z1_node_spec A γ :
-    z1 ∈ A →
+  Theorem z1_node_spec γ :
     GlobalInv -∗
     init_spec init -∗
-    {{{ init_resources z1 A 1 ∗ inv Ny (inv_y γ) ∗ token γ }}}
+    {{{ init_resources z1 1 ∗ inv Ny (inv_y γ) ∗ token γ }}}
       z1_node dbs @[ip_of_address z1]
     {{{ RET (InjRV #37); True }}}.
   Proof.
-    iIntros (Hz1) "#HIG #init_spec".
+    iIntros "#HIG #init_spec".
     iIntros (Φ) "!> (Hinit & #HIy & Htok) HΦ".
     rewrite /z1_prog. wp_pures. wp_bind (init _ _).
-    wp_apply ("init_spec" $! _ 1 with "[] [] [] [$]"); [|done|done|].
+    wp_apply ("init_spec" $! 1 with "[] [] [$]"); [|done|].
     { iPureIntro. cbn; eauto. }
     iClear "init_spec".
     iIntros (rd wr) "(Hs & #Hrd & #Hwr) /=".

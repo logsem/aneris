@@ -25,12 +25,10 @@ Section proof.
 
   Lemma internal_init_spec_holds :
     Global_Inv γGauth γGsnap γGkeep γLs ⊢
-    □ ∀ (A : gset socket_address) (i: nat) (z : socket_address)
-        (v : val),
+    □ ∀ (i: nat) (z : socket_address) (v : val),
       ⌜is_list DB_addresses v⌝ →
       ⌜DB_addresses !! i = Some z⌝ →
-      ⌜z ∈ A⌝ →
-      {{{ fixed A ∗ ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ socket_proto γGsnap) ∗
+      {{{ ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ socket_proto γGsnap) ∗
           z ⤳ (∅, ∅) ∗
           free_ports (ip_of_address z) {[port_of_address z]} ∗
           local_history_Local_inv γLs i ∅ }}}
@@ -42,8 +40,8 @@ Section proof.
           internal_read_spec γGsnap γLs rd i z ∗
           internal_write_spec γGauth γGsnap γGkeep γLs wr i z}}}.
   Proof.
-    iIntros "#Hinv !#" (A i z v Hv Hiz HzA Φ)
-            "!# (#HA & #Hz & Hrs & Hfp & Hliv) HΦ".
+    iIntros "#Hinv !#" (i z v Hv Hiz Φ)
+            "!# (#Hz & Hrs & Hfp & Hliv) HΦ".
     remember (ip_of_address z) as ip.
     rewrite /ccddb_init.
     wp_pures.
@@ -98,9 +96,8 @@ Section proof.
       rewrite Hiz in Ha.
       by inversion Ha. }
     rewrite Heqip.
-    wp_apply (aneris_wp_socketbind_static with "[$]"); [done|done|done|].
+    wp_socketbind.
     rewrite -Heqip.
-    iIntros "[Hskt _]"; wp_seq. wp_pures.
     wp_apply aneris_wp_fork.
     iSplitL; last first.
     { iNext.
@@ -110,11 +107,8 @@ Section proof.
       repeat iSplit; done. }
     iNext.
     wp_pures.
-    set (s := RecordSet.set saddress (λ _ : option socket_address, Some z)
-                            {| sfamily := PF_INET; stype := SOCK_DGRAM;
-                               sprotocol := IPPROTO_UDP; saddress := None |}).
     iApply fupd_aneris_wp.
-    iAssert (|={⊤}=> socket_inv γGsnap z h s)%I with "[Hskt Hrs]" as ">#Hsocketinv".
+    iAssert (|={⊤}=> socket_inv γGsnap z h _)%I with "[Hh Hrs]" as ">#Hsocketinv".
     { rewrite Heqip.
       iApply inv_alloc. iNext. iExists _, _; iFrame.
       rewrite big_sepS_empty; done. }

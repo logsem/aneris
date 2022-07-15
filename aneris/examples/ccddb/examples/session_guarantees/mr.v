@@ -35,10 +35,8 @@ Section MonotonicReads.
     ("v1", "v2").
 
   Theorem mr_example_spec (A : gset socket_address) (ca sa : socket_address) (db_id : rep_id) :
-    {{{ fixed A
-        ∗ ⌜sa ∈ A⌝
-        ∗ sa ⤇ (db_si db_id)
-        ∗ ⌜ca ∉ A⌝
+    {{{ sa ⤇ (db_si db_id)
+        ∗ unfixed {[ca]}
         ∗ free_ports (ip_of_address ca) {[ port_of_address ca ]}
         ∗ ca ⤳ (∅, ∅)
     }}}
@@ -81,9 +79,9 @@ Section MonotonicReads.
               )
    ) }}}.
   Proof.
-    iIntros (ϕ) "(#Hfixed & #Hsa & #Hsi & #Hca & Hfree & Hrs) Hcont".
+    iIntros (ϕ) "(#Hsi & Hca & Hfree & Hrs) Hcont".
     wp_lam. wp_pures.
-    wp_apply (sm_setup_spec with "[$Hfree $Hfixed $Hca $Hrs]").
+    wp_apply (sm_setup_spec with "[$Hfree $Hca $Hrs]").
     iIntros (fns) "Hpre".
     iDestruct "Hpre" as (init_fn read_fn write_fn)
                           "(-> & #Hinit_spec & #Hread_spec & #Hwrite_spec)".
