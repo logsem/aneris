@@ -47,12 +47,10 @@ Section proof.
 
   Lemma internal_init_spec_holds :
     Global_Inv γGauth γGsnap γLs ⊢
-    □ ∀ (A : gset socket_address) (i: nat) (z : socket_address)
-        (v : val),
+    □ ∀ (i: nat) (z : socket_address) (v : val),
       ⌜is_list RCB_addresses v⌝ →
       ⌜RCB_addresses !! i = Some z⌝ →
-      ⌜z ∈ A⌝ →
-      {{{ fixed A ∗ ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ socket_proto γGsnap i) ∗
+      {{{ ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ socket_proto γGsnap i) ∗
           z ⤳ (∅, ∅) ∗
           free_ports (ip_of_address z) {[port_of_address z]} ∗
           lhst_lock γLs i ∅ ∗
@@ -65,8 +63,8 @@ Section proof.
           internal_deliver_spec γGsnap γLs del i z ∗
           internal_broadcast_spec γGauth γGsnap γLs bct i z}}}.
   Proof.
-    iIntros "#Hinv !#" (A i z v Hv Hiz HzA Φ)
-            "!# (#HA & #Hz & Hrs & Hfp & Hliv & Hluser) HΦ".
+    iIntros "#Hinv !#" (i z v Hv Hiz Φ)
+            "!# (#Hz & Hrs & Hfp & Hliv & Hluser) HΦ".
     remember (ip_of_address z) as ip.
     rewrite /rcb_init.
     wp_pures.
@@ -127,14 +125,9 @@ Section proof.
       rewrite Hiz in Ha.
       by inversion Ha. }
     rewrite Heqip.
-    wp_apply (aneris_wp_socketbind_static with "[$]"); [done|done|done|].
-    rewrite -Heqip.
-    iIntros "[Hskt _]"; wp_seq. wp_pures.
-    set (s := RecordSet.set saddress (λ _ : option socket_address, Some z)
-                            {| sfamily := PF_INET; stype := SOCK_DGRAM;
-                               sprotocol := IPPROTO_UDP; saddress := None |}).
+    wp_socketbind.
     iApply fupd_aneris_wp.
-    iAssert (|={⊤}=> socket_inv γGsnap z h s i)%I with "[Hskt Hrs]" as ">#Hsocketinv".
+    iAssert (|={⊤}=> socket_inv γGsnap z h _ i)%I with "[Hh Hrs]" as ">#Hsocketinv".
     { rewrite Heqip.
       iApply inv_alloc. iNext. iExists _, _; iFrame.
       rewrite big_sepS_empty; done. }
@@ -142,7 +135,6 @@ Section proof.
     wp_apply aneris_wp_fork.
     iSplitL; last first.
     { iNext.
-      rewrite Heqip.
       wp_apply send_thread_spec; last done.
       iDestruct (big_sepL_lookup _ _ _ _ Hiz with "Hz") as "Hz'".
       iFrame "#"; done. }
@@ -151,14 +143,12 @@ Section proof.
     wp_apply aneris_wp_fork.
     iSplitL; last first.
     { iNext.
-      rewrite Heqip.
       wp_apply (recv_thread_spec _ _ _ _ _ i _ _ _ _ _ _ _ z); last done.
       rewrite Hiz /=.
       iDestruct (big_sepL_lookup _ _ _ _ Hiz with "Hz") as "Hz'".
       iFrame "#"; done. }
     iModIntro.
     wp_pures.
-    rewrite Heqip.
     wp_apply internal_broadcast_spec_holds; first by iFrame "#".
     iIntros (br) "Hbr"; simpl.
     wp_apply internal_deliver_spec_holds.

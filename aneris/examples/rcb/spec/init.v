@@ -51,13 +51,11 @@ Section Specification.
                OwnLocal i s' >>>.
 
   Definition init_spec (init : val) : iProp Σ :=
-    □ ∀ (A : gset socket_address) (i : nat) (z : socket_address)
+    □ ∀ (i : nat) (z : socket_address)
         (v : val),
         ⌜is_list RCB_addresses v⌝ →
         ⌜RCB_addresses !! i = Some z⌝ →
-        ⌜z ∈ A⌝ →
-        {{{ fixed A ∗
-             ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ RCB_socket_proto i) ∗
+        {{{  ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ RCB_socket_proto i) ∗
              z ⤳ (∅, ∅) ∗
              free_ports (ip_of_address z) {[port_of_address z]} ∗
             init_token i}}}

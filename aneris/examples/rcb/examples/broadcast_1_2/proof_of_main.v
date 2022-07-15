@@ -11,18 +11,16 @@ Section main_spec.
 
   Definition ips : gset string := {[ "0.0.0.0" ; "0.0.0.1"]}.
 
-  Theorem main_spec (A : gset socket_address) :
-     z0 ∈ A -> z1 ∈ A ->
+  Theorem main_spec :
      ⊢ |={⊤}=> ∃ (_ : RCB_resources Mdl Σ),
     ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ RCB_socket_proto i) -∗
     z0 ⤳ (∅, ∅) -∗ z1 ⤳ (∅, ∅) -∗
-    fixed A -∗ ([∗ set] ip ∈ ips, free_ip ip) -∗
+    ([∗ set] ip ∈ ips, free_ip ip) -∗
     WP main @["system"] {{ v, True }}.
   Proof.
-    iIntros (z0_static z1_static).
     iMod (RCB_init_setup ⊤ with "[//]") as (RCBRS) "(#HGlobinv & Hitks & HGlob & #Hinit)".
     iModIntro. iExists RCBRS.
-    iIntros "#Hsis Hmsg_z0 Hmsg_z1 #HA Hips".
+    iIntros "#Hsis Hmsg_z0 Hmsg_z1 Hips".
     iDestruct "Hitks" as "(Hitk0 & Hitk1 & _)".
     iMod (own_alloc (Excl ())) as (γS1) "Hstk1"; first done.
     iMod (own_alloc (Excl ())) as (γS2) "Hstk2"; first done.
@@ -37,8 +35,8 @@ Section main_spec.
     wp_apply (aneris_wp_start with "[- $Hz0]"); first done.
     iSplitR "Hitk0 Hstk1 Hstk2 Hmsg_z0"; last first.
     { iIntros "!> Hfree".
-      wp_apply ("Hinit" $! A 0%nat z0 with "[] [] [] [$]");
-        [ iPureIntro; by apply is_list_inject | done | done | ].
+      wp_apply ("Hinit" $! 0%nat z0 with "[] [] [$]");
+        [ iPureIntro; by apply is_list_inject | done | ].
       iIntros (deliver broadcast) "(HLoc & _ & Hbroadcast)".
       wp_pures.
       iApply (broadcast_1_2_spec with "[$] [$] [$HLoc $Hstk1 $Hstk2 $Hinv_sys] []").
@@ -48,8 +46,8 @@ Section main_spec.
     wp_apply (aneris_wp_start with "[- $Hz1]"); first done.
     iSplitR; last first.
     { iIntros "!> Hfree".
-      wp_apply ("Hinit" $! A 1%nat z1 with "[] [] [] [$]");
-        [ iPureIntro; by apply is_list_inject | done | done | ].
+      wp_apply ("Hinit" $! 1%nat z1 with "[] [] [$]");
+        [ iPureIntro; by apply is_list_inject | done | ].
       iIntros (deliver broadcast) "(HLoc & Hdeliver & _)".
      wp_pures.
      iApply (deliver_1_2_spec with "[$] [$] [$]").

@@ -160,10 +160,10 @@ Section proof.
     iSplitL.
     { iModIntro.
       iApply (own_lhst_user_lock_init_token with "HLlock HLuser"); done. }
-    iIntros "!> !#" (A i z v Hv Hiz HzA Φ) "!# (HfA & Hz & Hrs & Hfp & [Htk1 Htk2]) HΦ".
+    iIntros "!> !#" (i z v Hv Hiz Φ) "!# (Hz & Hrs & Hfp & [Htk1 Htk2]) HΦ".
     iApply (internal_init_spec_holds
-              with "[] [] [] [] [$HfA $Hz $Hrs $Hfp $Htk1 $Htk2]");
-      [done| done|done|done|].
+              with "[] [] [] [$Hz $Hrs $Hfp $Htk1 $Htk2]");
+      [done| done|done|].
     iNext.
     iIntros (del bct) "(Hluser & #Hdel & #Hbct)".
     iApply "HΦ".
