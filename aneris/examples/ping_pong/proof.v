@@ -70,7 +70,7 @@ Section ping.
     wp_lam. wp_let.
     wp_socket sh as "Hsh".
     wp_let.
-    iApply (aneris_wp_socket_interp_alloc ping_si with "Hunfixed").
+    iApply (aneris_wp_socket_interp_alloc_singleton ping_si with "Hunfixed").
     iIntros "#Hping".
     wp_socketbind.
     wp_pures.
@@ -152,9 +152,8 @@ Proof.
   { apply unit_model_rel_finitary. }
   iIntros (dinvG).
   iIntros (?) "!# (Hf & Hhist & _ & Hips & _) HΦ".
-  rewrite /addrs.
   iDestruct (unfixed_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
-  iApply (aneris_wp_socket_interp_alloc pong_si with "Hf1").
+  iApply (aneris_wp_socket_interp_alloc_singleton pong_si with "Hf1").
   iIntros "#Hsi".  
   rewrite /addrs (big_sepS_delete _ _ pong_addr); [|set_solver].
   rewrite (big_sepS_delete _ _ ping_addr); [|set_solver].

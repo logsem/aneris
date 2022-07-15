@@ -174,7 +174,7 @@ Section proof.
     unfold ping; wp_pures.
     wp_socket sh as "Hsh".
     wp_pures.
-    iApply (aneris_wp_socket_interp_alloc (ping_si b) with "Hunfixed").
+    iApply (aneris_wp_socket_interp_alloc_singleton (ping_si b) with "Hunfixed").
     iIntros "#Hping".
     wp_socketbind.
     wp_send "Hγpong".
