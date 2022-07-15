@@ -688,7 +688,7 @@ Proof.
   by iApply "H".
 Qed.
 
-Local Lemma tac_socketbind_static_test `{anerisG Mdl Σ} E h s a :
+Local Lemma tac_socketbind_test `{anerisG Mdl Σ} E h s a :
   saddress s = None →
   {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
       ▷ h ↪[ip_of_address a] s }}}

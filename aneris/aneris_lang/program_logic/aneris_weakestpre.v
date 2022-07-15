@@ -368,7 +368,7 @@ Proof.
   iIntros "HP"; iMod ("Hw" with "HP"); eauto.
 Qed.
 
-Lemma aneris_wp_socket_interp_alloc_group ip E e Φ sag Ψ :
+Lemma aneris_wp_socket_interp_alloc_group Ψ ip E e Φ sag :
   TCEq (to_val e) None →
   unfixed_groups {[sag]} -∗
   (sag ⤇* Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
@@ -386,14 +386,14 @@ Proof.
   iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
 Qed.
 
-Lemma aneris_wp_socket_interp_alloc ip E e Φ sa Ψ :
+Lemma aneris_wp_socket_interp_alloc Ψ ip E e Φ sa :
   TCEq (to_val e) None →
   unfixed {[sa]} -∗
   (sa ⤇ Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.
   iIntros (He) "Hsag Hwp".
-  iApply (aneris_wp_socket_interp_alloc_group _ _ _ _ {[sa]} with "[Hsag]");
+  iApply (aneris_wp_socket_interp_alloc_group _ _ _ _ _ {[sa]} with "[Hsag]");
     [|done].
   by rewrite /unfixed /to_singletons gset_map.gset_map_singleton.
 Qed.
