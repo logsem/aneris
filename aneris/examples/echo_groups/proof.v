@@ -519,9 +519,9 @@ Proof.
     rewrite big_sepS_union; [|set_solver].
     rewrite !big_sepS_singleton.
     iDestruct (unfixed_groups_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
-    iApply (aneris_wp_socket_interp_alloc_group (client_si γ) with "Hf1").
+    iApply (aneris_wp_socket_interp_alloc_group_singleton (client_si γ) with "Hf1").
     iIntros "Hclt".
-    iApply (aneris_wp_socket_interp_alloc_group (server_si γ client_addr)
+    iApply (aneris_wp_socket_interp_alloc_group_singleton (server_si γ client_addr)
              with "Hf2").
     iIntros "Hsrv".
     iDestruct "Hhist" as "[Hhistc Hhists]".
