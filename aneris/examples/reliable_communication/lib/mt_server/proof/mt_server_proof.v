@@ -103,11 +103,9 @@ Section MTS_proof_of_code.
       by wp_apply (service_loop_proof with "Hhandler Hc").
   Qed.
 
-  Definition run_server_internal_spec A handler : iProp Σ :=
+  Definition run_server_internal_spec handler : iProp Σ :=
     handler_spec handler -∗
-    {{{ ⌜MTS_saddr ∈ A⌝ ∗
-        fixed A ∗
-        free_ports (ip_of_address MTS_saddr) {[port_of_address MTS_saddr]} ∗
+    {{{ free_ports (ip_of_address MTS_saddr) {[port_of_address MTS_saddr]} ∗
         MTS_saddr ⤇ reserved_server_socket_interp ∗
         MTS_saddr ⤳ (∅, ∅) ∗
         SrvInit }}}
@@ -119,15 +117,15 @@ Section MTS_proof_of_code.
         @[ip_of_address MTS_saddr]
     {{{ RET #(); ⌜True⌝ }}}.
 
-  Lemma run_server_internal_spec_holds A handler :
-    ⊢ run_server_internal_spec A handler.
+  Lemma run_server_internal_spec_holds handler :
+    ⊢ run_server_internal_spec handler.
   Proof.
     iIntros "#Hhandler" (Φ) "!>".
     iIntros "Hres HΦ".
-    iDestruct "Hres" as "(#HA & #Hf & Hfp & #Hsi & Hmh & Hinit)".
+    iDestruct "Hres" as "(Hfp & #Hsi & Hmh & Hinit)".
     rewrite /run_server.
     wp_pures.
-    wp_apply (RCSpec_make_server_skt_spec with "[$HA $Hmh $Hsi $Hf $Hinit $Hfp][HΦ]").
+    wp_apply (RCSpec_make_server_skt_spec with "[$Hmh $Hsi $Hinit $Hfp][HΦ]").
     iNext. iIntros (skt) "Hcl".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
@@ -161,9 +159,8 @@ Section MTS_proof_of_code.
     iApply "HΦ". by iFrame.
   Qed.
 
-  Definition init_client_proxy_internal_spec A sa : iProp Σ :=
-    {{{ ⌜sa ∉ A⌝ ∗
-        fixed A ∗
+  Definition init_client_proxy_internal_spec sa : iProp Σ :=
+    {{{ unfixed {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
         MTS_saddr ⤇ reserved_server_socket_interp }}}
       init_client_proxy
@@ -175,14 +172,14 @@ Section MTS_proof_of_code.
     {{{ c, RET c;
           c ↣{ip_of_address sa,RCParams_clt_ser} RCParams_protocol }}}.
 
-  Lemma init_client_proxy_internal_spec_holds A sa :
-    ⊢ init_client_proxy_internal_spec A sa.
+  Lemma init_client_proxy_internal_spec_holds sa :
+    ⊢ init_client_proxy_internal_spec sa.
   Proof.
     iIntros (Φ) "!#".
-    iIntros "(#HnA & #Hf & Hfp & Hmh & #Hsi) HΦ".
+    iIntros "(Hf & Hfp & Hmh & #Hsi) HΦ".
     rewrite /init_client_proxy.
     wp_pures.
-    wp_apply (RCSpec_make_client_skt_spec with "[$HnA $Hmh $Hsi $Hf $Hfp][HΦ]").
+    wp_apply (RCSpec_make_client_skt_spec with "[$Hmh $Hsi $Hf $Hfp][HΦ]").
     iNext.
     iIntros (skt) "Hcl".
     wp_pures.
@@ -232,21 +229,21 @@ Section MTS_proof_of_init.
     iFrame.
     iModIntro.
     iSplitL.
-    - iIntros "!>" (A handler) "#Hhandler".
+    - iIntros "!>" (handler) "#Hhandler".
       iIntros (Φ) "!#".
-      iIntros "(#Hsi & HinA & Hf & Hmh & Hfp & Hinit) HΦ".
+      iIntros "(#Hsi & Hmh & Hfp & Hinit) HΦ".
       (* iDestruct run_server_internal_spec_holds as "#HserviceSpec". *)
       iApply (run_server_internal_spec_holds with
-               "Hhandler [$HinA $Hf $Hfp $Hsi $Hmh $Hinit][$]").
+               "Hhandler [$Hfp $Hsi $Hmh $Hinit][$]").
       Unshelve.
       + done.
       + split; done.
       + split; done.
     - iSplitL.
-      + iIntros (A sa Φ) "!#".
-        iIntros "(HinA & Hf & Hfp & Hmh & #Hsi) HΦ".
+      + iIntros (sa Φ) "!#".
+        iIntros "(Hf & Hfp & Hmh & #Hsi) HΦ".
         iDestruct (init_client_proxy_internal_spec_holds) as "#HclientSpec".
-        by iApply ("HclientSpec" with "[$HinA $Hf $Hfp $Hmh $Hsi][HΦ]").
+        by iApply ("HclientSpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]").
         Unshelve.
         done.
       + iIntros (ip rpc reqv reqd Φ) "!#".

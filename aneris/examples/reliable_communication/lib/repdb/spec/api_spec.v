@@ -118,31 +118,24 @@ Section API_spec.
   Qed.
 
   Definition init_leader_spec Init_leader leader_si leaderF_si : iProp Σ :=
-    ∀ A,
-    ⌜DB_addr ∈ A⌝ →
-    ⌜DB_addrF ∈ A⌝ →
     ⌜ip_of_address DB_addrF = ip_of_address DB_addr⌝ →
     ⌜port_of_address DB_addrF ≠ port_of_address DB_addr⌝ →
-    {{{ fixed A ∗
-          DB_addr ⤇ leader_si ∗
-          DB_addrF ⤇ leaderF_si ∗
-          Init_leader ∗
-          DB_addr ⤳ (∅, ∅) ∗
-          DB_addrF ⤳ (∅, ∅) ∗
-          free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-          free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
+    {{{ DB_addr ⤇ leader_si ∗
+        DB_addrF ⤇ leaderF_si ∗
+        Init_leader ∗
+        DB_addr ⤳ (∅, ∅) ∗
+        DB_addrF ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
+        free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
       init_leader (s_serializer DB_serialization)
       #DB_addr #DB_addrF @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
 
   Definition init_follower_spec f2csa initF f_si lF_si : iProp Σ :=
-    ∀ f2lsa A,
-    ⌜DB_addrF ∈ A⌝ →
-    ⌜f2csa ∈ A⌝ →
-    ⌜f2lsa ∉ A⌝ →
+    ∀ f2lsa,
     ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
     ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-    {{{ fixed A ∗
+    {{{ unfixed {[f2lsa]} ∗
         f2csa ⤇ f_si ∗
         DB_addrF ⤇ lF_si ∗
         initF ∗
@@ -155,10 +148,8 @@ Section API_spec.
     {{{ RET #(); True }}}.
 
   Definition init_client_proxy_leader_spec leader_si : iProp Σ :=
-    ∀ (A : gset socket_address) (sa : socket_address),
-    ⌜DB_addr ∈ A⌝ →
-    ⌜sa ∉ A⌝ →
-    {{{ fixed A ∗
+    ∀ (sa : socket_address),
+    {{{ unfixed {[sa]} ∗
         DB_addr ⤇ leader_si ∗
         sa ⤳ (∅, ∅) ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
@@ -168,10 +159,8 @@ Section API_spec.
         (∀ k q h, read_spec rd sa k q h) ∗ write_spec wr sa }}}.
 
   Definition init_client_proxy_follower_spec f2csa f_si : iProp Σ :=
-    ∀ A csa,
-    ⌜f2csa ∈ A⌝ →
-    ⌜csa ∉ A⌝ →
-    {{{ fixed A ∗
+    ∀ csa,
+    {{{ unfixed {[csa]} ∗
         f2csa ⤇ f_si ∗
         csa ⤳ (∅, ∅) ∗
         free_ports (ip_of_address csa) {[port_of_address csa]} }}}

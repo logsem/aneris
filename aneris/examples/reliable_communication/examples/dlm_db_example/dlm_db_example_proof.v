@@ -217,21 +217,18 @@ Section proof_of_code.
   (** The proof of the node 0 (writer) *)
   (* ------------------------------------------------------------------------ *)
 
-  Lemma proof_of_node0 (clt_00 clt_01 : socket_address) A :
+  Lemma proof_of_node0 (clt_00 clt_01 : socket_address) :
     ip_of_address clt_00 = ip_of_address clt_01 →
     {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
-        ⌜clt_00 ∉ A⌝ ∗
-        ⌜DL_server_addr ∈ A⌝ ∗
         dl_subscribe_client_spec SharedRes ∗
-        fixed A ∗
+        unfixed {[clt_00]} ∗
         free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
-        ⌜db_sa ∈ A⌝ ∗
-        ⌜clt_01 ∉ A⌝ ∗
         init_client_proxy_leader_spec leader_si ∗
+        unfixed {[clt_01]} ∗
         db_sa ⤇ leader_si ∗
         clt_01 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_01) {[port_of_address clt_01]}
@@ -240,17 +237,16 @@ Section proof_of_code.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (HipEq Φ).
-    iIntros "(#HGinv & %HnInA & %HdlinA & #HdlCltS &
-              #Hf & Hfps & Hclt00 & #Hdlmsi & Hpre) HΦ".
-    iDestruct "Hpre" as "(%HinA & %HninA2 & HdbCltS & #Hdbsa & Hclt01 & Hfps3)".
+    iIntros "(#HGinv & #HdlCltS & Hf0 & Hfps0 & Hpre) HΦ".
+    iDestruct "Hpre" as "(Hclt00 & Hdlm_si & #HdbCltS & Hf1 & #Hdbsa & Hclt01 & Hfps1)".
     rewrite /node0.
     wp_pures.
-    wp_apply ("HdlCltS" with "[$Hfps $Hclt00 $Hdlmsi $Hf]"); first done.
+    wp_apply ("HdlCltS" with "[$Hfps0 $Hclt00 $Hdlm_si $Hf0]").
     iIntros (dl) "(Hdl & #Hacq & #Hrel)".
     wp_pures.
     rewrite HipEq.
     simplify_eq /=.
-    wp_apply ("HdbCltS" $! A clt_01 with "[//][//][$Hfps3 $Hclt01 $Hdbsa $Hf]").
+    wp_apply ("HdbCltS" with "[$Hfps1 $Hclt01 $Hdbsa $Hf1]").
     iIntros (wr rd) "(#Hrd & Hwr)".
     iDestruct (get_simplified_write_spec with "Hwr") as "Hwr".
     wp_pures.
@@ -260,21 +256,18 @@ Section proof_of_code.
     done.
   Qed.
 
-  Lemma proof_of_node1 (clt_10 clt_11 : socket_address) A :
+  Lemma proof_of_node1 (clt_10 clt_11 : socket_address) :
     ip_of_address clt_10 = ip_of_address clt_11 →
     {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
-        ⌜clt_10 ∉ A⌝ ∗
-        ⌜DL_server_addr ∈ A⌝ ∗
-        fixed A ∗
         dl_subscribe_client_spec SharedRes ∗
+        unfixed {[clt_10]} ∗
         free_ports (ip_of_address clt_10) {[port_of_address clt_10]} ∗
         clt_10 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
-        ⌜db_sa ∈ A⌝ ∗
-        ⌜clt_11 ∉ A⌝ ∗
         init_client_proxy_leader_spec leader_si ∗
+        unfixed {[clt_11]} ∗
         db_sa ⤇ leader_si ∗
         clt_11 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_11) {[port_of_address clt_11]}
@@ -283,17 +276,17 @@ Section proof_of_code.
     {{{ v, RET v; ⌜v = SOMEV #1⌝ }}}.
   Proof.
     iIntros (HipEq Φ).
-    iIntros "(#HGinv & %HnInA & %HdlinA & #Hf & #HdlCltS &
-                      Hfps & Hclt00 & #Hdlmsi & Hpre) HΦ".
-    iDestruct "Hpre" as "(%HinA & %HninA2 & HdbCltS & #Hdbsa & Hclt01 & Hfps3)".
+    iIntros "(#HGinv & #HdlCltS & Hf0 &
+                      Hfps0 & Hclt00 & #Hdlmsi & Hpre) HΦ".
+    iDestruct "Hpre" as "(HdbCltS & Hf1 & #Hdbsa & Hclt01 & Hfps1)".
     rewrite /node1.
     wp_pures.
-    wp_apply ("HdlCltS" with "[$Hfps $Hclt00 $Hdlmsi $Hf]"); first done.
+    wp_apply ("HdlCltS" with "[$Hfps0 $Hclt00 $Hdlmsi $Hf0]").
     iIntros (dl) "(Hdl & #Hacq & #Hrel)".
     wp_pures.
     rewrite HipEq.
     simplify_eq /=.
-    wp_apply ("HdbCltS" $! A clt_11 with "[//][//][$Hfps3 $Hclt01 $Hdbsa $Hf]").
+    wp_apply ("HdbCltS" with "[$Hfps1 $Hclt01 $Hdbsa $Hf1]").
     iIntros (wr rd) "(#Hrd & Hwr)".
     wp_pures.
     rewrite -HipEq.
@@ -340,11 +333,10 @@ Section proof_of_main.
          dl_subscribe_client_spec SharedRes -∗
          init_leader_spec Init_leader leader_si leaderF_si -∗
          init_client_proxy_leader_spec leader_si -∗
-         ⌜DL_server_addr ∈ A⌝ -∗
          db_sa ⤇ leader_si -∗
          db_Fsa ⤇ leaderF_si -∗
          dlm_sa ⤇ dl_reserved_server_socket_interp -∗
-         fixed A -∗
+         unfixed {[clt_sa00;clt_sa01;clt_sa10;clt_sa11]} -∗
          free_ip "0.0.0.0" -∗
          free_ip "0.0.0.1" -∗
          free_ip "0.0.0.2" -∗
@@ -365,16 +357,22 @@ Section proof_of_main.
     iIntros "".
     iModIntro.
     iIntros "#HGinv HdlSrvS #HdlCltS HdbSrvS #HdbCltS".
-    iIntros "#HinA #Hsrv0 #Hsrv1 #Hsrv2 #Hfixed Hfree0 Hfree1 Hfree2 Hfree3".
+    iIntros "#Hsrv0 #Hsrv1 #Hsrv2 Hf Hfree0 Hfree1 Hfree2 Hfree3".
     iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 Hsa6 HSrvInit0 HSrvInit1 HR".
     rewrite /main.
+    (* replace ({[clt_sa00; clt_sa01; clt_sa10; clt_sa11]}) *)
+    (*         with (({[clt_sa00; clt_sa01]} ∪ {[clt_sa10; clt_sa11]}) *)
+    (*                :gset socket_address) by set_solver. *)
+    iDestruct (unfixed_split with "Hf") as "[Hf Hf11]"; [set_solver|].
+    iDestruct (unfixed_split with "Hf") as "[Hf Hf10]"; [set_solver|].
+    iDestruct (unfixed_split with "Hf") as "[Hf00 Hf01]"; [set_solver|].
     (* Server 1. *)
     wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
     iFrame "Hfree0".
     iSplitR "Hsa0 Hsa1 HSrvInit1 HdbSrvS"; last first.
     { iNext. iIntros "Hfps".
-      iApply ("HdbSrvS" $! A
-               with "[][][][][HSrvInit1 Hfps Hsa0 Hsa1]"); [eauto .. | | done ].
+      iApply ("HdbSrvS"
+               with "[][][HSrvInit1 Hfps Hsa0 Hsa1]"); [eauto .. | | done ].
       iDestruct (free_ports_split
                     "0.0.0.0"
                     {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
@@ -385,39 +383,32 @@ Section proof_of_main.
     iFrame "Hfree1".
     iSplitR "Hsa2 HSrvInit0 HdlSrvS HR"; last first.
     { iNext. iIntros "Hfps".
-      iApply ("HdlSrvS" $! A with "[Hfps HSrvInit0 Hsa2 HR]"); last done. iFrame "#∗". }
+      iApply ("HdlSrvS" with "[Hfps HSrvInit0 Hsa2 HR]"); last done. iFrame "#∗". }
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
     iFrame "Hfree2".
-    iSplitR "Hsa3 Hsa4"; last first.
+    iSplitR "Hsa3 Hsa4 Hf00 Hf01"; last first.
     { iNext. iIntros "Hfps".
-      iApply (proof_of_node0 leader_si db_sa db_Fsa dlm_sa clt_sa00 clt_sa01 A
-               with "[$HGinv $Hsa3 $Hsa4 Hfps]"); first done.
-      iSplit.
-      { iPureIntro. eauto with set_solver. }
+      iApply (proof_of_node0 leader_si db_sa db_Fsa dlm_sa clt_sa00 clt_sa01
+               with "[$HGinv $Hsa3 $Hsa4 Hfps $Hf00 $Hf01]"); [done| |done].
+      iFrame "#∗".
       iDestruct (free_ports_split
                    "0.0.0.2"
                    {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".
-      iFrame "#∗".
-      iPureIntro; set_solver.
-      done. }
+      iFrame "#∗". }
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
     iFrame "Hfree3".
-    iSplitR "Hsa5 Hsa6"; last first.
+    iSplitR "Hsa5 Hsa6 Hf10 Hf11"; last first.
     { iNext. iIntros "Hfps".
-      iApply (proof_of_node1 leader_si db_sa db_Fsa dlm_sa clt_sa10 clt_sa11 A
-               with "[$HGinv $Hsa5 $Hsa6 Hfps]"); first done.
-      iSplit.
-      { iPureIntro. eauto with set_solver. }
+      iApply (proof_of_node1 leader_si db_sa db_Fsa dlm_sa clt_sa10 clt_sa11
+               with "[$HGinv $Hsa5 $Hsa6 Hfps $Hf10 Hf11]"); [done| |done].
       iDestruct (free_ports_split
                    "0.0.0.3"
                    {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".
-      iFrame "#∗".
-      iPureIntro; set_solver.
-      done. }
+      iFrame "#∗". }
     done.
   Qed.
 
@@ -471,15 +462,6 @@ From aneris.examples.reliable_communication.lib.dlm
      Require Import dlm_proof.
 From aneris.examples.reliable_communication.spec Require Import prelude ras.
 
-Definition socket_interp `{!anerisG empty_model Σ}
-  db_si dbF_si dlm_si sa : socket_interp Σ :=
-  (match sa with
-   | SocketAddressInet "0.0.0.0" 80 =>  db_si
-   | SocketAddressInet "0.0.0.0" 81 =>  dbF_si
-   | SocketAddressInet "0.0.0.1" 80 =>  dlm_si
-   | _ => λ msg, ⌜True⌝
-   end)%I.
-
 Notation ShRes := (@SharedRes _ _ _ _ db_sa db_Fsa).
 
 From aneris.examples.reliable_communication.lib.repdb.proof
@@ -489,15 +471,11 @@ Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ dummy_model; DBΣ; SpecChanΣ]).
   eapply (@adequacy
-            Σ dummy_model _ _ ips fixed_dom
-            {[db_sa; db_Fsa; dlm_sa; clt_sa00; clt_sa01; clt_sa10; clt_sa11]} ∅ ∅ ∅);
-    try done; last first.
-  { set_solver. }
-  { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
-    intros [|]; subst; simpl; set_solver. }
-  { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
-  iIntros (Hdg) "".
+            Σ dummy_model _ _ ips
+            {[clt_sa00; clt_sa01; clt_sa10; clt_sa11; db_sa; db_Fsa; dlm_sa]} _ ∅ ∅);
+    try set_solver; last first.
   2:{ apply dummy_model_finitary . }
+  iIntros (Hdg) "".
   assert (DBPreG Σ) as HPreG by apply _.
   iMod (db_init_instance.(DB_init_setup) ⊤) as (DBRes) "Hdb";
     [solve_ndisj|set_solver|set_solver| ].
@@ -508,19 +486,12 @@ Proof.
   iMod (dlinit.(DL_init_setup) ⊤ DLP ShRes)
     as (DLRes) "(HdlInit & #HdlSrvS & #HdlCltS)";
     [solve_ndisj| ].
-  iExists (socket_interp leader_si leaderF_si dl_reserved_server_socket_interp).
   iMod (@main_spec
           _ _ _
           int_time leader_si leaderF_si init_leader DLRes DBRes) as "Hmain".
   iModIntro.
-  iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
+  iIntros "Hf Hb Hfg Hips _ _ _ _ _".
   simpl in *.
-  iDestruct (big_sepS_delete _ _ db_sa with "Hsis") as "[Hsi0 Hsis]";
-    first set_solver.
-  iDestruct (big_sepS_delete _ _ db_Fsa with "Hsis") as "[Hsi1 Hsis]";
-    first set_solver.
-  iDestruct (big_sepS_delete _ _ dlm_sa with "Hsis") as "[Hsi2 _]";
-    first set_solver.
   iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "[Hip0 Hips]";
     first set_solver.
   iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "[Hip1 Hips]";
@@ -543,12 +514,22 @@ Proof.
     first set_solver.
   iDestruct (big_sepS_delete _ _ clt_sa11 with "Hms") as "[Hc11 _]";
     first set_solver.
+  (* TODO: Split things *)
+  iDestruct (unfixed_split with "Hf") as "[Hf Hfdlm_sa]"; [set_solver|].
+  iDestruct (unfixed_split with "Hf") as "[Hf Hfdb_Fsa]"; [set_solver|].
+  iDestruct (unfixed_split with "Hf") as "[Hf Hfdb_sa]"; [set_solver|].
+  iApply (aneris_wp_socket_interp_alloc_singleton dl_reserved_server_socket_interp with "Hfdlm_sa").
+  iIntros "Hfdlm_si".
+  iApply (aneris_wp_socket_interp_alloc_singleton leaderF_si with "Hfdb_Fsa").
+  iIntros "Hfdb_Fsi".
+  iApply (aneris_wp_socket_interp_alloc_singleton leader_si with "Hfdb_sa").
+  iIntros "Hfdb_si".
   iApply ("Hmain" with
-           "[$HGinv][$HdlSrvS][$HdlCltS][$HdbSrvS][$HdbCltS][//]
-            [$Hsi0][$Hsi1][$Hsi2][$Hf]
-            [$Hip0][$Hip1][$Hip2][$Hip3]
-            [$Hm0][$Hm1][$Hm2][$Hc00][$Hc01][$Hc10][$Hc11]
-            [$HdlInit][$HdbInit]").
+           "HGinv HdlSrvS HdlCltS HdbSrvS HdbCltS
+            Hfdb_si Hfdb_Fsi Hfdlm_si Hf
+            Hip0 Hip1 Hip2 Hip3
+            Hm0 Hm1 Hm2 Hc00 Hc01 Hc10 Hc11
+            HdlInit HdbInit").
   iExists None, None,  [].
   iDestruct (big_sepS_delete _ _ "x" with "Hkeys") as "[Hx Hkeys]";
     first set_solver.

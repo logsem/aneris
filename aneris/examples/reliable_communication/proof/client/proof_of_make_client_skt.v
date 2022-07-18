@@ -23,12 +23,11 @@ Section Proof_of_make_client_skt.
   Context `{!server_ghost_names}.
 
   Definition make_client_skt_internal_spec
-    (clt_addr : socket_address) (A : gset socket_address) : iProp Σ :=
-    {{{ ⌜clt_addr ∉ A⌝ ∗
-        free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
+    (clt_addr : socket_address) : iProp Σ :=
+    {{{ free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
         clt_addr ⤳ (∅, ∅) ∗
         RCParams_srv_saddr ⤇ server_interp ∗
-        fixed A
+        unfixed {[clt_addr]}
      }}}
        make_client_skt
        (s_serializer RCParams_clt_ser)
@@ -38,16 +37,17 @@ Section Proof_of_make_client_skt.
      {{{ skt h s, RET skt;
          isClientSocketInternal skt h s clt_addr true ∅ ∅ }}}.
 
-  Lemma make_client_skt_internal_spec_holds clt_addr A
-    : ⊢ make_client_skt_internal_spec clt_addr A.
+  Lemma make_client_skt_internal_spec_holds clt_addr
+    : ⊢ make_client_skt_internal_spec clt_addr.
   Proof.
     rewrite /make_client_skt_internal_spec /make_client_skt.
-    iIntros (Φ) "!# (%Hclt & Hprts & Hmh & #Hsrvi & Hf) HΦ".
+    iIntros (Φ) "!# (Hprts & Hmh & #Hsrvi & Hf) HΦ".
     wp_pures. wp_lam. wp_socket h as "Hh". wp_pures.
-    wp_apply (aneris_wp_socketbind_dynamic
-                _ _ _ _ _ _ client_interp with "[$Hh $Hprts $Hf]");
-      [done|done|done |].
-    iIntros "(Hh & #Hsi)". wp_pures. iApply "HΦ". iFrame "#∗"; eauto.
+    iApply (aneris_wp_socket_interp_alloc_singleton client_interp with "Hf").
+    iIntros "Hf".
+    wp_socketbind.
+    wp_pures.
+    iApply "HΦ". iFrame "#∗"; eauto.
   Qed.
 
 End Proof_of_make_client_skt.

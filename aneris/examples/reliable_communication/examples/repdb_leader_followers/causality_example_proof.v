@@ -280,50 +280,46 @@ Section proof_of_code.
     by iApply "HΦ".
   Qed.
 
-  Lemma proof_of_node0 (clt_00 : socket_address) A :
-    db_l2csa ∈ A →
-    clt_00 ∉ A →
+  Lemma proof_of_node0 (clt_00 : socket_address) :
     GlobalInv -∗
-    fixed A -∗
     init_client_proxy_leader_spec leader_si -∗
     Obs db_l2csa [] -∗
     inv N inv_def -∗
-    {{{ free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
+    {{{ unfixed {[clt_00]} ∗
+        free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         db_l2csa ⤇ leader_si ∗
         "x" ↦ₖ None }}}
       node0 #clt_00 #db_l2csa @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
-    iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi & Hx) HΦ".
+    iIntros "#HGinv #Hspec #Hobs #Hinv_y".
+    iIntros "!>" (Φ) "(Hf & Hfps & Hclt00 & #Hsi & Hx) HΦ".
     wp_lam.
     wp_pures.
-    wp_apply ("Hspec" with "[//] [//] [$Hfps $Hclt00]"); [by iFrame "#"|].
+    wp_apply ("Hspec" with "[$Hf $Hfps $Hclt00]"); [by iFrame "#"|].
     iIntros (wr rd) "[_ Hwr]".
     wp_pures.
     iApply (wp_do_writes with "[$] [$] [$] [$] Hx HΦ").
   Qed.
 
-  Lemma proof_of_node1 (clt_01 : socket_address) A :
-    db_f2csa ∈ A →
-    clt_01 ∉ A →
+  Lemma proof_of_node1 (clt_01 : socket_address) :
     GlobalInv -∗
-    fixed A -∗
     init_client_proxy_follower_spec db_f2csa follower_si -∗
     Obs db_f2csa [] -∗
     inv N inv_def -∗
-    {{{ free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
+    {{{ unfixed {[clt_01]} ∗
+        free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
         db_f2csa ⤇ follower_si }}}
       node1 #clt_01 #db_f2csa @[ip_of_address clt_01]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (HIndb HnInA) "#HGinv #Hfixed #Hspec #Hobs #Hinv_y".
-    iIntros "!>" (Φ) "(Hfps & Hclt00 & #Hsi) HΦ".
+    iIntros "#HGinv #Hspec #Hobs #Hinv_y".
+    iIntros "!>" (Φ) "(Hf & Hfps & Hclt00 & #Hsi) HΦ".
     wp_lam.
     wp_pures.
-    wp_apply ("Hspec" with "[//] [//] [$Hfps $Hclt00]"); [by iFrame "#"|].
+    wp_apply ("Hspec" with "[$Hf $Hfps $Hclt00]"); [by iFrame "#"|].
     iIntros (rd) "#Hrd".
     wp_pures.
     by iApply wp_do_reads.
@@ -339,6 +335,8 @@ Definition db_f2csa := SocketAddressInet "0.0.0.1" 81.
 Definition clt_sa0 := SocketAddressInet "0.0.0.2" 80.
 Definition clt_sa1 := SocketAddressInet "0.0.0.3" 80.
 Definition A : gset socket_address := {[ db_l2csa; db_l2fsa; db_f2csa ]}.
+Definition addrs : gset socket_address :=
+  {[ db_f2lsa; clt_sa0; clt_sa1; db_l2csa; db_l2fsa; db_f2csa ]}.
 Definition ips : gset string := {[ "0.0.0.0" ; "0.0.0.1"; "0.0.0.2"; "0.0.0.3" ]}.
 Global Instance DBP : DB_params := DBSrv db_l2csa db_f2csa db_l2fsa.
 
@@ -368,7 +366,7 @@ Section proof_of_main.
          db_l2csa ⤇ leader_si -∗
          db_l2fsa ⤇ leaderF_si -∗
          db_f2csa ⤇ follower_si -∗
-         fixed A -∗
+         unfixed {[db_f2lsa;clt_sa0;clt_sa1]} -∗
          Obs db_l2csa [] -∗
          Obs db_f2csa [] -∗
          inv N (inv_def db_l2csa db_f2csa db_l2fsa) -∗
@@ -391,7 +389,7 @@ Section proof_of_main.
     iIntros "".
     iModIntro.
     iIntros "#HGinv #HdbSrvS #HdbCltS #HdbFS #HdbCltF".
-    iIntros "#Hdb_l2csa #Hdb_l2fsa #Hdb_f2csa #Hfixed #HobsL #HobsF #HI".
+    iIntros "#Hdb_l2csa #Hdb_l2fsa #Hdb_f2csa Hf #HobsL #HobsF #HI".
     iIntros "Hfree0 Hfree1 Hfree2 Hfree3".
     iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 HInitL HInitF".
     iIntros "Hx".
@@ -400,8 +398,8 @@ Section proof_of_main.
     iFrame "Hfree0".
     iSplitR "Hsa0 Hsa1 HInitL"; last first.
     { iNext. iIntros "Hfps".
-      iApply ("HdbSrvS" $! A
-               with "[][][][][HInitL Hfps Hsa0 Hsa1]"); [eauto .. | | done ].
+      iApply ("HdbSrvS"
+               with "[][][HInitL Hsa0 Hfps Hsa1]"); [eauto .. | | done ].
       iDestruct (free_ports_split
                     "0.0.0.0"
                     {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
@@ -409,9 +407,11 @@ Section proof_of_main.
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive;81%positive]}); first done.
     iFrame "Hfree1".
-    iSplitR "Hsa2 Hsa3 HInitF"; last first.
+    iDestruct (unfixed_split with "Hf") as "[Hf Hf1]"; [set_solver|].
+    iDestruct (unfixed_split with "Hf") as "[Hff2lsa Hf0]"; [set_solver|].
+    iSplitR "Hsa2 Hsa3 HInitF Hff2lsa"; last first.
     { iNext. iIntros "Hfps".
-      iApply ("HdbFS" $! db_f2lsa A with "[//][//][][//][//][Hfps HInitF Hsa2 Hsa3]");
+      iApply ("HdbFS" $! db_f2lsa with "[//][][Hfps HInitF Hsa2 Hsa3 Hff2lsa]");
         [iPureIntro; set_solver| |done].
       iDestruct (free_ports_split
                    "0.0.0.1"
@@ -421,20 +421,20 @@ Section proof_of_main.
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}); first done.
     iFrame "Hfree2".
-    iSplitR "Hsa4 Hx"; last first.
+    iSplitR "Hsa4 Hx Hf0"; last first.
     { iNext. iIntros "Hfps".
-      iApply (proof_of_node0 leader_si db_l2csa db_f2csa db_l2fsa clt_sa0 A
-               with "HGinv Hfixed HdbCltS HobsL HI [Hsa4 Hfps Hx]");
-        [done|set_solver| |done].
+      iApply (proof_of_node0 leader_si db_l2csa db_f2csa db_l2fsa clt_sa0
+               with "HGinv HdbCltS HobsL HI [Hf0 Hsa4 Hfps Hx]");
+        [ |done].
       iFrame "#∗". }
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}); first done.
     iFrame "Hfree3".
-    iSplitR "Hsa5"; last first.
+    iSplitR "Hsa5 Hf1"; last first.
     { iNext. iIntros "Hfps".
-      iApply (proof_of_node1 follower_si db_l2csa db_f2csa db_l2fsa clt_sa1 A
-               with "HGinv Hfixed HdbCltF HobsF HI [Hsa5 Hfps]");
-        [done|set_solver| |done].
+      iApply (proof_of_node1 follower_si db_l2csa db_f2csa db_l2fsa clt_sa1
+               with "HGinv HdbCltF HobsF HI [Hf1 Hsa5 Hfps]");
+        [ |done].
       iFrame "#∗". }
     done.
   Qed.
@@ -471,28 +471,15 @@ Proof.
   reflexivity.
 Qed.
 
-Definition socket_interp `{!anerisG empty_model Σ}
-  db_l2csi db_l2fsi db_f2csi sa : socket_interp Σ :=
-  (match sa with
-   | SocketAddressInet "0.0.0.0" 80 => db_l2csi
-   | SocketAddressInet "0.0.0.0" 81 => db_l2fsi
-   | SocketAddressInet "0.0.0.1" 81 => db_f2csi
-   | _ => λ msg, ⌜True⌝
-   end)%I.
-
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ dummy_model; DBΣ; SpecChanΣ ]).
   eapply (@adequacy
-            Σ dummy_model _ _ ips A
-            {[db_l2csa; db_l2fsa; db_f2lsa; db_f2csa; clt_sa0; clt_sa1]} ∅ ∅ ∅);
-    try done; last first.
-  { set_solver. }
-  { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
-    intros [|]; subst; simpl; set_solver. }
-  { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
+            Σ dummy_model _ _ ips addrs _
+            ∅ ∅);
+    [ | | set_solver.. ].
+  { apply dummy_model_finitary. }
   iIntros (Hdg) "".
-  2:{ apply dummy_model_finitary . }
   assert (DBPreG Σ) as HPreG by apply _.
   iMod (DB_init_setup ⊤) as (DBRes) "Hdb";
     [solve_ndisj|set_solver|set_solver| ].
@@ -503,18 +490,22 @@ Proof.
   rewrite big_sepS_singleton.
   iDestruct "HF" as (follower_si InitF) "(HInitF & #HobsF &
                                           #HinitF_spec & #HinitF_proxy_spec)".
-  iExists (socket_interp leader_si leaderF_si follower_si).
+  (* iExists (socket_interp leader_si leaderF_si follower_si). *)
   iMod (@main_spec
           _ _ _
           int_time leader_si leaderF_si follower_si InitL InitF DBRes) as "Hmain".
   iModIntro.
-  iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
-  iDestruct (big_sepS_delete _ _ db_l2csa with "Hsis") as "[Hsi0 Hsis]";
-    first set_solver.
-  iDestruct (big_sepS_delete _ _ db_l2fsa with "Hsis") as "[Hsi1 Hsis]";
-    first set_solver.
-  iDestruct (big_sepS_delete _ _ db_f2csa with "Hsis") as "[Hsi2 _]";
-    first set_solver.
+  iIntros "Hf Hb Hfg Hips _ _ _ _ _".
+  rewrite /addrs.
+  iDestruct (unfixed_split with "Hf") as "[Hf Hff2csa]"; [set_solver|].
+  iDestruct (unfixed_split with "Hf") as "[Hf Hfl2fsa]"; [set_solver|].
+  iDestruct (unfixed_split with "Hf") as "[Hf Hfl2csa]"; [set_solver|].
+  iApply (aneris_wp_socket_interp_alloc_singleton follower_si with "Hff2csa").
+  iIntros "Hsi2".
+  iApply (aneris_wp_socket_interp_alloc_singleton leaderF_si with "Hfl2fsa").
+  iIntros "Hsi1".
+  iApply (aneris_wp_socket_interp_alloc_singleton leader_si with "Hfl2csa").
+  iIntros "Hsi0".
   iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "[Hip0 Hips]";
     first set_solver.
   iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "[Hip1 Hips]";

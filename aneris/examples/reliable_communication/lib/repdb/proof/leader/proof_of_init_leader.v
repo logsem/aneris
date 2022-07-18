@@ -56,32 +56,29 @@ Section Init_Leader_Proof.
     own_log_auth γdbF (1/2) [] ∗
     SrvLeaderFInit.
 
-  Definition init_leader_spec_internal A :=
-    DB_addr ∈ A →
-    DB_addrF ∈ A →
+  Definition init_leader_spec_internal :=
     ip_of_address DB_addrF = ip_of_address DB_addr →
     port_of_address DB_addrF ≠ port_of_address DB_addr →
     ⊢
-    {{{ fixed A ∗
-          DB_addr ⤇ leader_si ∗
-          DB_addrF ⤇ leaderF_si ∗
-          (@run_server_spec _ _ _ _ MTC SrvLeaderInit leader_si) ∗
-          (@run_server_spec _ _ _ _ MTF SrvLeaderFInit leaderF_si) ∗
-          init_leader_res ∗
-          DB_addr ⤳ (∅, ∅) ∗
-          DB_addrF ⤳ (∅, ∅) ∗
-          free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-          free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
+    {{{ DB_addr ⤇ leader_si ∗
+        DB_addrF ⤇ leaderF_si ∗
+        (@run_server_spec _ _ _ _ MTC SrvLeaderInit leader_si) ∗
+        (@run_server_spec _ _ _ _ MTF SrvLeaderFInit leaderF_si) ∗
+        init_leader_res ∗
+        DB_addr ⤳ (∅, ∅) ∗
+        DB_addrF ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
+        free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
       init_leader (s_serializer DB_serialization)
       #DB_addr #DB_addrF @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
 
-  Lemma init_leader_spec_internal_holds A : init_leader_spec_internal A.
+  Lemma init_leader_spec_internal_holds : init_leader_spec_internal.
   Proof.
-    iIntros (HinA HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
+    iIntros (HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
-      "(#HA & #Hsi & #HsiF & HInitLeaderSpec & HInitLeaderFSpec
-            & HinitRes & Hmh & HmhF & Hfp & HfpF)".
+      "(#Hsi & #HsiF & HInitLeaderSpec & HInitLeaderFSpec
+                  & HinitRes & Hmh & HmhF & Hfp & HfpF)".
     rewrite /init_leader.
     wp_pures.
     wp_apply (wp_log_create with "[//]").

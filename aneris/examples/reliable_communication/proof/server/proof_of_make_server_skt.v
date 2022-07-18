@@ -24,12 +24,10 @@ Section Proof_of_make_server_skt.
 
   Notation srv_ip := (ip_of_address RCParams_srv_saddr).
 
-  Lemma make_server_skt_internal_spec A :
+  Lemma make_server_skt_internal_spec :
     {{{ free_ports srv_ip {[port_of_address RCParams_srv_saddr]} ∗
         RCParams_srv_saddr ⤳ (∅, ∅) ∗
         RCParams_srv_saddr ⤇ server_interp ∗
-        ⌜RCParams_srv_saddr ∈ A⌝ ∗
-        fixed A ∗
         known_sessions ∅ ∗
         own γ_srv_known_messages_R_name (● ∅) ∗
         own γ_srv_known_messages_R_name (◯ ∅) ∗
@@ -43,13 +41,10 @@ Section Proof_of_make_server_skt.
        @[srv_ip]
      {{{ srv_skt, RET srv_skt; isServerSocketInternal srv_skt false }}}.
   Proof.
-    iIntros (Φ) "(Hprts & Hmh & #Hsi & %HinA & Hf & Hkn) HΦ".
+    iIntros (Φ) "(Hprts & Hmh & #Hsi & Hkn) HΦ".
     wp_lam. wp_lam.
     wp_socket h as "Hh". wp_pures.
-    wp_apply (aneris_wp_socketbind_static
-                _ A _ _ _ _ with "[$Hh $Hprts $Hf]");
-      [done|done|done|].
-    iIntros "(Hh & (%ϕ & #Hsi'))". wp_pures.
+    wp_socketbind.
     wp_alloc l as "Hl". iApply "HΦ". iExists l; iSplit; [done|].
     iLeft. iSplit; [done|]. iExists _, _, _. iFrame "#∗"; eauto.
   Qed.

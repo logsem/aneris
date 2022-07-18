@@ -58,13 +58,9 @@ Section Init_Follower_Proof.
     (∃ γdbF : gname, known_replog_token DB_addrF γdbF ∗ own_replog_obs γL DB_addrF []).
 
   Definition init_follower_spec_internal {MTS:MTS_resources} : iProp Σ :=
-    ∀ A,
-    ⌜DB_addrF ∈ A⌝ →
-    ⌜f2csa ∈ A⌝ →
-    ⌜f2lsa ∉ A⌝ →
     ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
     ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-    {{{ fixed A ∗
+    {{{ unfixed {[f2lsa]} ∗
         f2csa ⤇ follower_si ∗
         DB_addrF ⤇ leaderF_si ∗
         (@run_server_spec _ _ _ _ MTC InitFollower follower_si) ∗
@@ -82,9 +78,9 @@ Section Init_Follower_Proof.
   Lemma init_follower_spec_internal_holds {MTR:MTS_resources} :
     ⊢ init_follower_spec_internal.
   Proof.
-    iIntros (A HinA HinA2 HinFA HipEq HprNeq) "!# %Φ Hr HΦ".
+    iIntros (HipEq HprNeq) "!# %Φ Hr HΦ".
     iDestruct "Hr" as
-      "(#HA & #Hsi & HsiF & HInitFollowerSpec
+      "(HA & #Hsi & HsiF & HInitFollowerSpec
             & HinitFollowerAsClient & #HreqSpec
             & HinitRes & Hmh & HmhF & Hfp & HfpF)".
     rewrite /init_follower.
@@ -123,7 +119,7 @@ Section Init_Follower_Proof.
     rewrite /sync_with_server.
     wp_pures.
     rewrite {4} HipEq.
-    wp_apply ("HinitFollowerAsClient" $! A f2lsa with "[$HA $HmhF $HfpF $HsiF //]").
+    wp_apply ("HinitFollowerAsClient" $! f2lsa with "[$HA $HmhF $HfpF $HsiF //]").
     iIntros (reqh) "Hreq".
     wp_pures.
     wp_apply aneris_wp_fork.

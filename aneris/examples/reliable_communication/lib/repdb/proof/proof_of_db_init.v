@@ -151,22 +151,20 @@ Section Init_setup_proof.
     - iSplitR.
       -- iSplitL.
          --- iModIntro.
-             iIntros (A).
              rewrite /init_leader_spec.
-             iIntros "%HinA1 %HinA2 %HipEq1 %HipEq2 !#" (Ψ).
-             iIntros "(Hf & #Hsi1 & #Hsi2 & HinitL
+             iIntros "%HipEq1 %HipEq2 !#" (Ψ).
+             iIntros "(#Hsi1 & #Hsi2 & HinitL
                    & Hmh1 & Hmh2 & Hfp1 & Hfp2) HΨ".
              iApply (init_leader_spec_internal_holds
-                         with "[-HΨ $Hf $HinitL][$HΨ]");
+                         with "[-HΨ $HinitL][$HΨ]");
              try eauto with iFrame.
          --- iModIntro.
-             iIntros (A).
              rewrite /init_client_proxy_leader_spec.
-             iIntros (ca HinA HcaA).
+             iIntros (ca).
              iIntros "!#" (Ψ).
              iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ".
              iApply (init_client_leader_proxy_internal_holds
-                         with "[$HGinv $Htks][//][//][-HΨ $HcltS][$HΨ]");
+                         with "[$HGinv $Htks][-HΨ $HcltS][$HΨ]");
              try eauto with iFrame.
       -- assert (DB_followers ⊆ dom N) as Hsubset by set_solver.
          assert (DB_followers = dom (delete DB_addrF N)) as HeqDB by set_solver.
@@ -200,20 +198,19 @@ Section Init_setup_proof.
          { iFrame "#∗". iExists γdbF. iFrame "#". iExists γdbF. iFrame "#∗". }
          iSplitL.
          --- rewrite /init_follower_spec.
-             iIntros (f2lsa A) "%HinA1 %HinA2 %HnA %HipEq1 %HprNeq !# %Ψ".
+             iIntros (f2lsa) "%HipEq1 %HprNeq !# %Ψ".
              iIntros "(Hf & #Hsi1 & #Hsi2 & HinitF & Hmh1
                    & Hmh2 & Hfp1 & Hfp2) HΨ".
              iApply (@init_follower_spec_internal_holds _ _ _ _ _
                        f2lsa fsa γL γM N f_si leaderF_si initF Fls MTRF
-                         with "[//][//][//][//][//]
-                               [$Hf $HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]");
-               try eauto with iFrame.
+                         with "[//][//]
+                               [$Hf $HinitF $Hmh1 $Hmh2 $Hsi1 $Hsi2 $Hfp1 $Hfp2][$HΨ]"); try eauto with iFrame.
          --- rewrite /init_client_proxy_follower_spec.
-             iIntros (A ca HcaA HnA).
+             iIntros (ca).
              iIntros "!#" (Ψ).
              iIntros "(Hf & #Hsi1 & Hmh1 & Hfp1) HΨ".
              iApply (init_client_proxy_follower_internal_holds with
-                         "[$HGinv $Htks][][//][//][$Hsi1 $HFcltS $HFreqS $Hf $Hmh1 $Hfp1][$HΨ]").
+                         "[$HGinv $Htks][][$Hsi1 $HFcltS $HFreqS $Hf $Hmh1 $Hfp1][$HΨ]").
              iPureIntro; set_solver.
   Qed.
 
