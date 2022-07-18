@@ -13,6 +13,7 @@ let show' r () = !r
 let put, incr, show = let r = ref 0 in (
   put' r,
   incr' r,
+  show' r
 )
 
 let unit_embedding = (unit_serializer.s_ser, unit_serializer.s_deser)

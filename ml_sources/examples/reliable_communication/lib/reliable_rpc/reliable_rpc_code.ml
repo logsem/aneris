@@ -49,7 +49,7 @@ let req_serializer = prod_serializer string_serializer string_serializer
 type resp_type = string
 let resp_serializer = string_serializer
 
-type chan = (req_type, resp_type) chan_descr * Mutex.t
+type chan = (req_type, resp_type) chan_descr
 
 
 
@@ -61,15 +61,11 @@ let init_server_stub addr handlers : unit =
 let init_client_stub clt_addr srv_addr : chan = 
   let skt = make_client_skt req_serializer resp_serializer clt_addr in
   let ch = connect skt srv_addr in
-  let lk = newlock () in
-  (ch, lk)
+  ch
 
-let call chan rpc arg =
-  let ch, lk = chan in
+let call ch rpc arg =
   let s_arg = (fst (fst (snd rpc))) arg in
   let msg = (fst rpc, s_arg) in
-  acquire lk;
   send ch msg;
   let s_resp = recv ch in
-  release lk;
   (snd (snd (snd rpc))) s_resp

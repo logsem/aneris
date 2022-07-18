@@ -39,7 +39,11 @@ Class RPC_rpc_params :=
 }.
 
 (* List of RPC params, i.e. params of the interface *)
-Definition RPC_interface_params := list RPC_rpc_params.
+Class RPC_interface_params := 
+{
+  RPC_inter : list RPC_rpc_params;
+  RPC_inter_nodup : List.NoDup (map (fun RP => RP.(RPC_name)) RPC_inter)
+}.
 
 (* Params to match the concrete rpc and handler implementations *)
 Class RPC_implementation_params (RP : RPC_rpc_params) :=
@@ -57,7 +61,9 @@ Class RPC_implementation_params (RP : RPC_rpc_params) :=
     (∀ argv argd,
     {{{ RP.(RPC_pre) argv argd }}}
     RPC_handler argv @[ip_of_address RPC_saddr]
-    {{{ repv repd, RET repv; RP.(RPC_post) repv argd repd }}})
+    {{{ repv repd, RET repv; 
+        ⌜Serializable RP.(RPC_rep_ser) repv⌝ ∗
+        RP.(RPC_post) repv argd repd }}})
 }. 
 
 (* Check if a given concrete handler (a val) match the spec of an given RPC *)
@@ -70,13 +76,13 @@ Definition is_impl_handler_of_rpc (handler : val) (RP : RPC_rpc_params):=
         ⌜s_is_ser RP.(RPC_rep_ser) repv s_rep⌝ ∗
         RP.(RPC_post) repv argd repd }}}).
 
-Fixpoint is_list_of_interface (handlers : list val) (IP : RPC_interface_params) :=
-  match handlers, IP with
+Fixpoint is_list_of_interface (handlers : list val) (inter : list RPC_rpc_params) :=
+  match handlers, inter with
   | [], [] => True
-  | (name, h)%V :: l', RP :: IP' => 
+  | (name, h)%V :: l', RP :: inter' => 
       name = #RP.(RPC_name) ∧
       is_impl_handler_of_rpc h RP ∧ 
-      is_list_of_interface l' IP'
+      is_list_of_interface l' inter'
   | _, _ => False
   end. 
 
@@ -87,7 +93,8 @@ Class RPC_interface_implementation (IP : RPC_interface_params) :=
   RPC_inter_list : list val;
   RPC_inter_spec :
     (is_list RPC_inter_list RPC_inter_val ∧ 
-     is_list_of_interface RPC_inter_list IP)
+     (* NoDup (list_map Fst RPC_inter_list) ∧ *)
+     is_list_of_interface RPC_inter_list IP.(RPC_inter))
 }.
 
 

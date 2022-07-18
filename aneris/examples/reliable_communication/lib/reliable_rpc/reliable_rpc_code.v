@@ -53,17 +53,12 @@ Definition init_client_stub : val :=
   λ: "clt_addr" "srv_addr",
   let: "skt" := make_client_skt req_serializer resp_serializer "clt_addr" in
   let: "ch" := connect "skt" "srv_addr" in
-  let: "lk" := newlock #() in
-  ("ch", "lk").
+  "ch".
 
 Definition call : val :=
-  λ: "chan" "rpc" "arg",
-  let: "ch" := Fst "chan" in
-  let: "lk" := Snd "chan" in
+  λ: "ch" "rpc" "arg",
   let: "s_arg" := Fst (Fst (Snd "rpc")) "arg" in
   let: "msg" := (Fst "rpc", "s_arg") in
-  acquire "lk";;
   send "ch" "msg";;
   let: "s_resp" := recv "ch" in
-  release "lk";;
   Snd (Snd (Snd "rpc")) "s_resp".
