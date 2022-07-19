@@ -428,5 +428,12 @@ Section Preambule.
       by exists orig.
   Qed.
 
+  Lemma evidin (e e': Event Op):
+    e <_t e' → get_evid e ∈ EV_Time e → get_evid e ∈ EV_Time e'.
+  Proof.
+    unfold TM_lt, timestamp_time, ts_lt, ts_le, time, stlib_event_timed.
+    intros [A _] B.
+    apply A, B.
+  Qed.
 End Preambule.
 
