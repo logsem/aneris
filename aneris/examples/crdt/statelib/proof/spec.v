@@ -5,58 +5,13 @@ From aneris.prelude Require Import time.
 From aneris.aneris_lang.lib Require Import list_proof lock_proof vector_clock_proof serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.crdt.spec Require Import crdt_spec.
-From aneris.examples.crdt.statelib.user_model Require Import model.
+From aneris.examples.crdt.statelib.user_model
+  Require Import model semi_join_lattices.
 From aneris.examples.crdt.statelib.proof Require Import events.
+From aneris.examples.crdt.statelib.user_model Require Import params.
 
 (** * Specification of the op-based CRDT library *)
 
-Section Params.
-  Context {LogOp LogSt : Type}.
-  Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp}.
-  Context `{!Lattice LogSt}.
-
-  (* User-supplied parameters when using the library. *)
-  Class StLib_Params := {
-    (* Serialization of operations. *)
-    StLib_Serialization : serialization;
-
-    (* CRDT model *)
-    StLib_Denot :> CrdtDenot LogOp LogSt;
-    StLib_Model :> StateCrdtModel LogOp LogSt;
-
-    (* Coherence between logical and physical state: for
-       states, operations, and events (event = operation + timestamp).
-
-       For example, for a counter CRDT the logical state is
-       (morally) an integer, while the physical state is an
-       AnerisLang `val` (containing the integer).
-       The correspondence is trivial in that case, but can
-       be more complicated for other CRDTs. *)
-    StLib_State_Coh : LogSt -> val -> Prop;
-    StLib_Op_Coh : LogOp -> val -> Prop;
-    StLib_Op_Coh_Inj o1 o2 v : StLib_Op_Coh o1 v -> StLib_Op_Coh o2 v -> o1 = o2;
-    StLib_St_Coh : LogSt -> val -> Prop;
-    StLib_St_Coh_Inj o1 o2 v : StLib_St_Coh o1 v -> StLib_St_Coh o2 v -> o1 = o2;
-    StLib_Coh_Ser op v : StLib_Op_Coh op v -> Serializable StLib_Serialization v;
-  }.
-
-  Definition StLib_Event_Coh `{!StLib_Params} (e : Event LogOp) (v : val) : Prop :=
-    ∃ valOp valTime valOrig,
-      v = ((valOp, valTime), valOrig)%V ∧
-      StLib_Op_Coh e.(EV_Op) valOp ∧
-      True ∧ (*is_list (elements e.(EV_Time)) valTime ∧ TODO: deal with the time representation *)
-      valOrig = #(e.(EV_Orig)).
-
-  Class StLib_Res `{!CRDT_Params} := {
-    StLib_CRDT_Res :> CRDT_Res_Mixin Mdl Σ LogOp;
-    StLib_InitToken : nat -> iProp Σ;
-    StLib_SocketProto : nat -> socket_interp Σ;
-  }.
-
-End Params.
-
-Global Arguments StLib_Params (LogOp LogSt) {_ _ _}.
-Global Arguments StLib_Res (LogOp) {_ _ _ _ _ _}.
 
 Section Specification.
 
@@ -82,7 +37,7 @@ Section Specification.
      <<<▷ ∃∃ (s2' : gset (Event LogOp)) (phys_st : val) (log_st : LogSt), RET phys_st;
              ⌜s2 ⊆ s2'⌝ ∗
              LocState repId s1 s2' ∗
-             ⌜StLib_State_Coh log_st phys_st⌝ ∗
+             ⌜StLib_St_Coh log_st phys_st⌝ ∗
              ⌜⟦s1 ∪ s2'⟧ ⇝ log_st⌝ >>>.
 
   Definition mutator_spec (mutator : val) (repId : nat) (addr : socket_address) : iProp Σ :=
@@ -110,7 +65,7 @@ Section Specification.
     ∀ (addr : socket_address) (ev st : val) (s : (event_set LogOp))
       (log_ev : Event LogOp) (log_st : LogSt),
     {{{ ⌜StLib_Event_Coh log_ev ev⌝ ∗
-        ⌜StLib_State_Coh log_st st⌝ ∗
+        ⌜StLib_St_Coh log_st st⌝ ∗
         ⌜⟦ s ⟧ ⇝ log_st⌝ ∗
         ⌜log_ev ∉ s⌝ ∗
         ⌜maximal log_ev (s ∪ {[ log_ev ]})⌝ ∗
@@ -120,22 +75,22 @@ Section Specification.
       effect_fn ev st @[ip_of_address addr]
     {{{ st', RET st';
         ∃ (log_st' : LogSt),
-          ⌜StLib_State_Coh log_st' st'⌝ ∗
+          ⌜StLib_St_Coh log_st' st'⌝ ∗
           ⌜st_crdtM_mut log_st log_ev log_st'⌝
     }}}.
 
   Definition merge_spec (merge_fn : val) : iProp Σ :=
     ∀ (addr : socket_address) (st st' : val) (s s' : (event_set LogOp))
       (log_st log_st' : LogSt),
-    {{{ ⌜StLib_State_Coh log_st st⌝ ∗
-        ⌜StLib_State_Coh log_st' st'⌝ ∗
+    {{{ ⌜StLib_St_Coh log_st st⌝ ∗
+        ⌜StLib_St_Coh log_st' st'⌝ ∗
         ⌜⟦ s ⟧ ⇝ log_st⌝ ∗
         ⌜⟦ s' ⟧ ⇝ log_st'⌝
     }}}
       merge_fn st st' @[ip_of_address addr]
     {{{ st'', RET st'';
         ∃ (log_st'' : LogSt),
-          ⌜StLib_State_Coh log_st'' st''⌝ ∗
+          ⌜StLib_St_Coh log_st'' st''⌝ ∗
           ⌜lat_lub log_st log_st' = log_st''⌝
     }}}.
 
@@ -143,7 +98,7 @@ Section Specification.
     ∀ addr,
       {{{ True }}}
         init_st_fun #() @[ip_of_address addr]
-      {{{ v, RET v; ⌜StLib_State_Coh st_crdtM_init_st v⌝ }}}.
+      {{{ v, RET v; ⌜StLib_St_Coh st_crdtM_init_st v⌝ }}}.
 
   Definition crdt_triplet_spec (crdt_triplet : val) : iProp Σ :=
     ∃ (init_st_fn effect_fn merge_fn : val),
@@ -207,7 +162,7 @@ Section Specification.
       {{{ phys_st log_st, RET phys_st; ∃ s2',
           ⌜s2 ⊆ s2'⌝ ∗
           LocState repId s1 s2' ∗
-          ⌜StLib_State_Coh log_st phys_st⌝ ∗
+          ⌜StLib_St_Coh log_st phys_st⌝ ∗
           ⌜⟦ s1 ∪ s2' ⟧ ⇝ log_st⌝
       }}}.
 
@@ -270,8 +225,8 @@ Section StLibSetup.
 
   Class StLib_Init_Function := { init : val }.
 
-  Context {LogOp LogSt : Type}.
-  Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
+  Context `{LogOp: Type, LogSt : Type,
+            !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
             !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt, !StLib_Init_Function}.
 
   Class StLibSetup :=
@@ -286,8 +241,8 @@ End StLibSetup.
 
 Section RAs.
 
-  Context {LogOp LogSt : Type}.
-  Context `{!EqDecision LogOp, !Countable LogOp}.
+  Context `{LogOp: Type, LogSt : Type,
+            !EqDecision LogOp, !Countable LogOp}.
 
   Definition oneShotR := csumR (exclR unitO) (agreeR unitO).
 

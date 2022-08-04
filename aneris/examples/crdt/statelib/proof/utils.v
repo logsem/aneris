@@ -39,3 +39,9 @@ Section Defs.
 
 End Defs.
 
+Section TODOMove.
+
+  Definition frac_gt_half : Qp := 2/3.
+  Definition frac_gt_half_diff : Qp := 1/3.
+
+End TODOMove.

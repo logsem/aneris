@@ -16,7 +16,7 @@ Definition loop_forever : val :=
   rec: "loop_forever" "thunk" := "thunk" #();;
                                  "loop_forever" "thunk".
 
-Definition apply deser_st : val :=
+Definition apply_thread deser_st : val :=
   λ: "lk" "sh" "st" "merge",
   loop_forever (λ: <>,
                 acquire "lk";;
@@ -26,49 +26,50 @@ Definition apply deser_st : val :=
                 release "lk").
 
 Definition update : val :=
-  λ: "lk" "mut" "st" "op" "i",
-  acquire "lk";;
+  λ: "lk" "mut" "st" "op" "i" <>,
+  (acquire "lk";;
   "st" <- ("mut" "i" ! "st" "op");;
-  release "lk".
+  release "lk").
 
 Definition sendToAll : val :=
-  λ: "sh" "msg" "dstl" "i",
-  letrec: "aux" "j" :=
-    (if: "j" < (list_length "dstl")
-     then
-       (if: "i" = "j"
-       then  "aux" ("j" + #1)
-       else
-         let: "dst" := unSOME (list_nth "dstl" "j") in
-         SendTo "sh" "msg" "dst";;
-         #();;
-         "aux" ("j" + #1))
-     else  #()) in
-    "aux" #0.
+  λ: "sh" "dstl" "i" "msg",
+    let: "j" := ref #0 in
+    letrec: "aux" <> :=
+      (if: !"j" < (list_length "dstl")
+       then
+         (if: "i" = ! "j"
+         then  ("j" <- !"j" + #1;; "aux" #() )
+         else
+           let: "dst" := unSOME (list_nth "dstl" !"j") in
+           SendTo "sh" "msg" "dst";;
+           #();;
+           "j" <- !"j" + #1;;
+           "aux" #())
+       else  #()) in
+      "aux" #().
 
 Definition broadcast (ser_st : val) : val :=
-  λ: "lk" "sh" "st" "dstl" "i",
-  letrec: "loop" <> :=
-    #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
-    acquire "lk";;
-    let: "s" := ! "st" in
-    release "lk";;
-    let: "msg" := ser_st "s" in
-    sendToAll "sh" "msg" "dstl" "i";;
-    "loop" #() in
-    "loop" #().
+  λ: "lk" "sh" "st" "dstl" "i" <>,
+  loop_forever (
+    λ: <>,
+      #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
+      acquire "lk";;
+      let: "s" := ! "st" in
+      release "lk";;
+      let: "msg" := ser_st "s" in
+      sendToAll "sh" "dstl" "i" "msg") #().
 
 Definition statelib_init (st_ser : val) (st_deser : val) : val :=
   λ: "addrlst" "rid" "crdt",
   let: "init_st" := Fst (Fst "crdt") in
   let: "mut" := Snd (Fst "crdt") in
   let: "merge" := Snd "crdt" in
-  let: "st" := ref "init_st" in
+  let: "st" := ref ("init_st" #()) in
   let: "lk" := newlock #() in
   let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
   let: "addr" := unSOME (list_nth "addrlst" "rid") in
   SocketBind "sh" "addr";;
-  Fork (apply st_deser "lk" "sh" "st" "merge");;
+  Fork (apply_thread st_deser "lk" "sh" "st" "merge");;
   Fork (broadcast st_ser "lk" "sh" "st" "addrlst" "rid");;
   let: "get" := get_state "lk" "st" in
   let: "upd" := update "lk" "mut" "st" "rid" in
