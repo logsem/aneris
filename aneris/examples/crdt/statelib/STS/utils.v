@@ -437,3 +437,11 @@ Section Preambule.
   Qed.
 End Preambule.
 
+Section Useful.
+  Context `{CRDT_Op: Type, !EqDecision CRDT_Op, !Countable CRDT_Op}.
+
+  Definition local_events (i: RepId) (s: event_set CRDT_Op) : Prop :=
+    ∀ e, e ∈ s → e.(EV_Orig) = i.
+  Definition foreign_events (i: RepId) (s: event_set CRDT_Op) : Prop :=
+    ∀ e, e ∈ s → e.(EV_Orig) ≠ i.
+End Useful.
