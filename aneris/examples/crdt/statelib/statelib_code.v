@@ -26,7 +26,7 @@ Definition apply_thread deser_st : val :=
                 release "lk").
 
 Definition update : val :=
-  λ: "lk" "mut" "st" "op" "i" <>,
+  λ: "lk" "mut" "i" "st" "op",
   (acquire "lk";;
   "st" <- ("mut" "i" ! "st" "op");;
   release "lk").
