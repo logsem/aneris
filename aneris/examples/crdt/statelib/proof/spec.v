@@ -9,6 +9,7 @@ From aneris.examples.crdt.statelib.user_model
   Require Import model semi_join_lattices.
 From aneris.examples.crdt.statelib.proof Require Import events.
 From aneris.examples.crdt.statelib.user_model Require Import params.
+From aneris.examples.crdt.statelib.proof Require Import utils.
 
 (** * Specification of the op-based CRDT library *)
 
@@ -40,15 +41,15 @@ Section Specification.
              ⌜StLib_St_Coh log_st phys_st⌝ ∗
              ⌜⟦s1 ∪ s2'⟧ ⇝ log_st⌝ >>>.
 
-  Definition mutator_spec (mutator : val) (repId : nat) (addr : socket_address) : iProp Σ :=
+  Definition update_spec (update : val) (repId : nat) (addr : socket_address) : iProp Σ :=
     ∀ (op : val) (log_op : LogOp),
     ⌜CRDT_Addresses !! repId = Some addr⌝ -∗
     ⌜StLib_Op_Coh log_op op⌝ -∗
     <<< ∀∀ (h s1 s2 : gset (Event LogOp)),
            GlobState h ∗
            LocState repId s1 s2 >>>
-      mutator op @[ip_of_address addr] ↑CRDT_InvName
-    <<<▷ ∃∃ (e : Event LogOp) (h' s1' s2' : gset (Event LogOp)), RET #();
+      update op @[ip_of_address addr] ↑CRDT_InvName
+    <<<▷ ∃∃ (e : Event LogOp) (h' s1' s2' : event_set LogOp), RET #();
            ⌜e.(EV_Op) = log_op⌝ ∗
            ⌜e.(EV_Orig) = repId⌝ ∗
            ⌜h' = h ∪ {[ e ]}⌝ ∗
@@ -61,10 +62,10 @@ Section Specification.
            GlobState h' ∗
            LocState repId s1' s2' >>>.
 
-  Definition effect_spec (effect_fn : val) : iProp Σ :=
-    ∀ (addr : socket_address) (ev st : val) (s : (event_set LogOp))
-      (log_ev : Event LogOp) (log_st : LogSt),
-    {{{ ⌜StLib_Event_Coh log_ev ev⌝ ∗
+  Definition mutator_spec (mutator_fn : val) : iProp Σ :=
+    ∀ (addr : socket_address) (repId: RepId) (st op : val) (s : (event_set LogOp))
+      (log_ev : Event LogOp) (log_op: LogOp) (log_st : LogSt),
+    {{{ ⌜StLib_Op_Coh log_op op⌝ ∗
         ⌜StLib_St_Coh log_st st⌝ ∗
         ⌜⟦ s ⟧ ⇝ log_st⌝ ∗
         ⌜log_ev ∉ s⌝ ∗
@@ -72,7 +73,7 @@ Section Specification.
         ⌜events_ext (s ∪ {[ log_ev ]})⌝ ∗
         ⌜events_total_order (s ∪ {[ log_ev ]})⌝
     }}}
-      effect_fn ev st @[ip_of_address addr]
+      mutator_fn #repId st op @[ip_of_address addr]
     {{{ st', RET st';
         ∃ (log_st' : LogSt),
           ⌜StLib_St_Coh log_st' st'⌝ ∗
@@ -92,6 +93,7 @@ Section Specification.
         ∃ (log_st'' : LogSt),
           ⌜StLib_St_Coh log_st'' st''⌝ ∗
           ⌜lat_lub log_st log_st' = log_st''⌝
+        ⌜⟦ s ∪ s' ⟧ ⇝ log_st'⌝
     }}}.
 
   Definition init_st_fn_spec (init_st_fun : val) : iProp Σ :=
@@ -101,10 +103,10 @@ Section Specification.
       {{{ v, RET v; ⌜StLib_St_Coh st_crdtM_init_st v⌝ }}}.
 
   Definition crdt_triplet_spec (crdt_triplet : val) : iProp Σ :=
-    ∃ (init_st_fn effect_fn merge_fn : val),
-      ⌜crdt_triplet = PairV (PairV init_st_fn effect_fn) merge_fn⌝ ∗
+    ∃ (init_st_fn mutator_fn merge_fn : val),
+      ⌜crdt_triplet = PairV (PairV init_st_fn mutator_fn) merge_fn⌝ ∗
       init_st_fn_spec init_st_fn  ∗
-      effect_spec effect_fn ∗
+      mutator_spec mutator_fn ∗
       merge_spec merge_fn.
 
   Definition crdt_fun_spec (crdt_fun : val) : iProp Σ :=
@@ -128,8 +130,8 @@ Section Specification.
           init addrs_val #repId @[ip_of_address addr]
         {{{ get_state_val mutator_val, RET (get_state_val, mutator_val);
             LocState repId ∅ ∅ ∗
-            get_state_spec get_state_val repId addr ∗
-            mutator_spec mutator_val repId addr
+            get_state_spec get_state_val repId addr (*∗
+            ** TODO: mutator_spec mutator_val addr*)
         }}}.
 
     Definition init_spec (init : val) : iProp Σ :=
@@ -148,75 +150,9 @@ Section Specification.
           init addrs_val #repId crdt_val @[ip_of_address addr]
         {{{ get_state_val mutator_val, RET (get_state_val, mutator_val);
             LocState repId ∅ ∅ ∗
-            get_state_spec get_state_val repId addr ∗
-            mutator_spec mutator_val repId addr
+            get_state_spec get_state_val repId addr (*∗
+            TODO: mutator_spec mutator_val repId addr*)
         }}}.
-
-  (** * Simplified specs for when we have full ownership *)
-
-  Definition simplified_get_state_spec (get_state : val) (repId : nat) (addr : socket_address) : iProp Σ :=
-    ∀ (s1 s2 : event_set LogOp),
-      ⌜CRDT_Addresses !! repId = Some addr⌝ -∗
-      {{{ LocState repId s1 s2 }}}
-        get_state #() @[ip_of_address addr]
-      {{{ phys_st log_st, RET phys_st; ∃ s2',
-          ⌜s2 ⊆ s2'⌝ ∗
-          LocState repId s1 s2' ∗
-          ⌜StLib_St_Coh log_st phys_st⌝ ∗
-          ⌜⟦ s1 ∪ s2' ⟧ ⇝ log_st⌝
-      }}}.
-
-  Lemma read_spec_implies_simplified_spec get_state repId addr :
-    get_state_spec get_state repId addr ⊢ simplified_get_state_spec get_state repId addr.
-  Proof.
-    iIntros "#Hgetstate".
-    rewrite /simplified_get_state_spec.
-    iIntros (s1 s2) "#Haddr !>". iIntros (Φ) "Hloc HΦ".
-    iApply ("Hgetstate" with "[//]").
-    iExists s1, s2; iFrame.
-    iApply fupd_mask_intro; [set_solver |].
-    iIntros "Hcl !>".
-    iIntros (? ? ?) "(? & ? & ?)". iMod "Hcl". iModIntro.
-    iApply "HΦ".
-    eauto with iFrame.
-  Qed.
-
-  Definition simplified_mutator_spec (mutator : val) repId addr : iProp Σ :=
-    ∀ (op : val) (log_op : LogOp) (h s1 s2 : event_set LogOp),
-     ⌜CRDT_Addresses !! repId = Some addr⌝ -∗
-     ⌜StLib_Op_Coh log_op op⌝ -∗
-     {{{ GlobState h ∗
-         LocState repId s1 s2
-     }}}
-        mutator op @[ip_of_address addr]
-     {{{ RET #();
-         ∃ (e : Event LogOp) (h' s1' s2' : gset (Event LogOp)),
-           ⌜e.(EV_Op) = log_op⌝ ∗
-           ⌜e.(EV_Orig) = repId⌝ ∗
-           ⌜h' = h ∪ {[ e ]}⌝ ∗
-           ⌜s1' = s1 ∪ {[ e ]}⌝ ∗
-           ⌜s2 ⊆ s2'⌝ ∗
-           ⌜e ∉ h⌝ ∗
-           ⌜e ∉ s1⌝ ∗
-           ⌜e ∈ Maximals h'⌝ ∗
-           ⌜Maximum (s1' ∪ s2') = Some e⌝ ∗
-           GlobState h' ∗
-           LocState repId s1' s2' }}}.
-
-  Lemma mutator_spec_implies_simplified_mutator mutator repId addr :
-    mutator_spec mutator repId addr ⊢ simplified_mutator_spec mutator repId addr.
-  Proof.
-    iIntros "#Hmutator" (op log_op h s1 s2) "#Haddr %Hcoh".
-    iModIntro.
-    iIntros (Φ) "[Hglob Hloc] HΦ".
-    iApply ("Hmutator" with "[//]"); [done |].
-    iApply fupd_mask_intro; [set_solver |].
-    iIntros "Hcl". iExists h, s1, s2. iFrame.
-    iModIntro.
-    iIntros (e h' s1' s2') "(? & ? & ? & ? & ? & ? & ? & ? & ?)".
-    iMod "Hcl". iModIntro.
-    iApply "HΦ". eauto with iFrame.
-  Qed.
 
 End Specification.
 

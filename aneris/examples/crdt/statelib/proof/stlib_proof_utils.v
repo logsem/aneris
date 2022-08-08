@@ -120,11 +120,12 @@ Section SocketProtolDefinition.
     λ m,
       let (from, to) := (m_sender m, m_destination m) in
       let mb := m_body m in
-      (∃ (st_v: val) (st_log: LogSt) (h__local h__sub: event_set LogOp),
+      (∃ (st_v: val) (st_log: LogSt) (h__local h__sub: event_set LogOp) (i: RepId),
+        ⌜ CRDT_Addresses !! i = Some from ⌝ ∗
         ⌜ s_is_ser StLib_StSerialization st_v mb ⌝ ∗
         ⌜ StLib_St_Coh st_log st_v ⌝ ∗
         ⌜⟦h__local ∪ h__sub⟧ ⇝ st_log⌝ ∗
-        StLib_OwnLocalSnap repId h__local h__sub)%I.
+        StLib_OwnLocalSnap i h__local h__sub)%I.
 
   Global Instance socket_proto_Persistent (repId: RepId) (m: message):
     Persistent (socket_proto repId m).
