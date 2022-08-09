@@ -410,6 +410,26 @@ Section Preambule.
       by apply elem_of_union_l.
   Qed.
 
+  Lemma fresh_event_is_fresh (s: Lst Op) (f: fRepId) (op: Op):
+    let fev := fresh_event s op f in
+    Lst_Validity s →
+      fev ∉ s.
+  Proof.
+    intros fev Hv Hin.
+    by destruct (fresh_event_not_eq_t s op f Hv fev Hin).
+  Qed.
+
+  Lemma fresh_event_is_fresh_global (g: Gst Op) (f: fRepId) (op: Op):
+    let fev := fresh_event (g.2 !!! f) op f in
+    Gst_Validity g →
+      fev ∉ g.1.
+  Proof.
+    intros fev Hv Hin.
+    destruct (VGst_incl_orig _ Hv fev Hin) as (i & Heq & Hin').
+    assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite Heq. }
+    by destruct (fresh_event_not_eq_t (g.2 !!! f) op f (VGst_lhst_valid _ Hv f) fev Hin').
+  Qed.
+
   Lemma event_set_global_proj
     (g: Gst Op) (orig: fRepId):
     Gst_Validity g →

@@ -71,12 +71,13 @@ Section Specification.
         ⌜log_ev ∉ s⌝ ∗
         ⌜maximal log_ev (s ∪ {[ log_ev ]})⌝ ∗
         ⌜events_ext (s ∪ {[ log_ev ]})⌝ ∗
-        ⌜events_total_order (s ∪ {[ log_ev ]})⌝
+        ⌜event_set_same_orig_comparable (s ∪ {[ log_ev ]})⌝
     }}}
       mutator_fn #repId st op @[ip_of_address addr]
     {{{ st', RET st';
         ∃ (log_st' : LogSt),
           ⌜StLib_St_Coh log_st' st'⌝ ∗
+          ⌜⟦ s ∪ {[ log_ev ]} ⟧ ⇝ log_st'⌝ ∗
           ⌜st_crdtM_mut log_st log_ev log_st'⌝
     }}}.
 
@@ -92,7 +93,7 @@ Section Specification.
     {{{ st'', RET st'';
         ∃ (log_st'' : LogSt),
           ⌜StLib_St_Coh log_st'' st''⌝ ∗
-          ⌜lat_lub log_st log_st' = log_st''⌝
+          ⌜lat_lub log_st log_st' = log_st''⌝ ∗
         ⌜⟦ s ∪ s' ⟧ ⇝ log_st'⌝
     }}}.
 
