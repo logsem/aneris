@@ -155,7 +155,7 @@ Section LockInvariant.
     ∃ (ip : ip_address) (phys_st : val) (log_st : LogSt)
       (h__own h__for : gset (Event LogOp)),
       ⌜ip_of_address <$> CRDT_Addresses !! i = Some ip⌝ ∗
-     st_loc ↦[ip] phys_st ∗
+      st_loc ↦[ip] phys_st ∗
       ⌜StLib_St_Coh log_st phys_st⌝ ∗
       OwnLockInv i h__own h__for ∗
       ⌜⟦h__own ∪ h__for⟧ ⇝ log_st⌝.
