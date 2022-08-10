@@ -50,16 +50,27 @@ Section Utils.
             !StLib_GhostNames, !Internal_StLibG CRDT_Op Σ}.
   Notation princ_ev := (@principal (gset (Event CRDT_Op)) cc_subseteq).
 
+  Lemma princ_ev__subset_cc' h s γ :
+    own γ (◯ princ_ev s) -∗
+    own γ (● princ_ev h) -∗
+    own γ (● princ_ev h) ∗
+    ⌜ s ⊆_cc h ⌝.
+  Proof.
+    iIntros "#Hfrag Hauth".
+    iCombine "Hauth" "Hfrag" as "Hboth".
+    iDestruct (own_valid_l with "Hboth") as "[%Hvalid [Hauth _]]".
+    apply auth_both_valid_discrete in Hvalid as [Hsub Hvalid].
+    iFrame.
+    iPureIntro. by apply principal_included.
+  Qed.
+
   Lemma princ_ev__subset_cc h s γ :
     own γ (◯ princ_ev s) -∗
     own γ (● princ_ev h) -∗
     ⌜ s ⊆_cc h ⌝.
   Proof.
     iIntros "#Hfrag Hauth".
-    iCombine "Hauth" "Hfrag" as "Hboth".
-    iDestruct (own_valid with "Hboth") as "%Hvalid".
-    apply auth_both_valid_discrete in Hvalid as [Hsub Hvalid].
-    iPureIntro. by apply principal_included.
+    by iDestruct (princ_ev__subset_cc' with "Hfrag Hauth") as "[_ H]".
   Qed.
 
   Lemma princ_ev__union_frag_auth h s s' γ :
