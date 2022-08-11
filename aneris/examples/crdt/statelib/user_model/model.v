@@ -23,7 +23,7 @@ Section ModelDef.
       ⟦ s2 ⟧ ⇝ st2 ->
       event_set_valid s1 ->
       event_set_valid s2 ->
-      st1 ⊔_l st2 = st3 <-> ⟦ s1 ∪ s2 ⟧ ⇝ st3;
+      st1 ⊔_l st2 = st3 -> ⟦ s1 ∪ s2 ⟧ ⇝ st3;
 
     (* The mutator sends a state, an operation, and the replica id where the
        mutation is taking place to a new state.  *)
@@ -39,8 +39,7 @@ Section ModelDef.
       event_set_valid s ->
       ev ∉ s ->
       is_maximum ev (s ∪ {[ ev ]}) ->
-      st_crdtM_mut st ev st' <->
-      ⟦ s ∪ {[ ev ]} ⟧ ⇝ st';
+      st_crdtM_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st';
 
     (* The initial CRDT state. *)
     st_crdtM_init_st : LatSt;

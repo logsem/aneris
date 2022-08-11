@@ -10,7 +10,7 @@ From aneris.examples.crdt.statelib.STS Require Import lst gst utils.
 From iris.base_logic.lib Require Import invariants.
 
 From aneris.examples.crdt.statelib.resources
-  Require Import resources resources_inv resources_local resources_global.
+  Require Import utils resources_inv resources_local resources_global.
 
 Section AboutLock.
   Context `{CRDT_Op: Type,
@@ -30,4 +30,33 @@ Section AboutLock.
 
 End AboutLock.
 
+
+(** TODO: move in utils / utils-like file *)
+Section BlahBlah.
+  Context `{CRDT_Op: Type,
+            !anerisG Mdl Σ, !CRDT_Params,
+            !EqDecision CRDT_Op, !Countable CRDT_Op,
+            !StLib_GhostNames, !Internal_StLibG CRDT_Op Σ}.
+
+  Lemma test E repId st_h__local st_h__foreign :
+    ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
+    StLib_GlobalInv -∗
+    OwnLockInv repId st_h__local st_h__foreign ={E,E}=∗
+    OwnLockInv repId st_h__local st_h__foreign
+    ∗ StLib_OwnLocalSnap repId st_h__local st_h__foreign.
+  Proof.
+    iIntros (?) "Hinv
+    (%f & %Hf & %Hf_locisloc & %Hf_forisfor & Hf_own_local & Hf_own_foreign)".
+    iInv "Hinv" as "> (%g & Hglobal & Hg_snap & %Hv & Hg_local)" "Hclose".
+    iDestruct ((forall_fin f) with "Hg_local")
+      as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub &
+        %Hf_proj & _ & _ & Hf_forisfor' & %Hcc &
+        Hf_own_local' & Hf_own_foreign' & Hf_own_sub' & Hown_cc)]".
+    iDestruct (both_agree_agree with "Hf_own_local Hf_own_local'")
+      as "(Hf_own_local & Hf_own_local' & <-)".
+    iDestruct (both_agree_agree with "Hf_own_foreign Hf_own_foreign'")
+      as "(Hf_own_foreign & Hf_own_foreign' & <-)".
+  Admitted.
+
+End BlahBlah.
 

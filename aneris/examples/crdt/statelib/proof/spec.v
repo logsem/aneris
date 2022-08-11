@@ -77,7 +77,6 @@ Section Specification.
     {{{ st', RET st';
         ∃ (log_st' : LogSt),
           ⌜StLib_St_Coh log_st' st'⌝ ∗
-          ⌜⟦ s ∪ {[ log_ev ]} ⟧ ⇝ log_st'⌝ ∗
           ⌜st_crdtM_mut log_st log_ev log_st'⌝
     }}}.
 
@@ -87,14 +86,17 @@ Section Specification.
     {{{ ⌜StLib_St_Coh log_st st⌝ ∗
         ⌜StLib_St_Coh log_st' st'⌝ ∗
         ⌜⟦ s ⟧ ⇝ log_st⌝ ∗
-        ⌜⟦ s' ⟧ ⇝ log_st'⌝
+        ⌜⟦ s' ⟧ ⇝ log_st'⌝ ∗
+        ⌜events_ext s⌝ ∗
+        ⌜event_set_same_orig_comparable s⌝ ∗
+        ⌜events_ext s'⌝ ∗
+        ⌜event_set_same_orig_comparable s'⌝
     }}}
       merge_fn st st' @[ip_of_address addr]
     {{{ st'', RET st'';
         ∃ (log_st'' : LogSt),
           ⌜StLib_St_Coh log_st'' st''⌝ ∗
-          ⌜lat_lub log_st log_st' = log_st''⌝ ∗
-        ⌜⟦ s ∪ s' ⟧ ⇝ log_st'⌝
+          ⌜lat_lub log_st log_st' = log_st''⌝
     }}}.
 
   Definition init_st_fn_spec (init_st_fun : val) : iProp Σ :=

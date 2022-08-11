@@ -17,7 +17,7 @@ From aneris.prelude Require Import misc time.
 From aneris.examples.crdt.spec
   Require Import crdt_events crdt_resources crdt_denot crdt_time crdt_base.
 From aneris.examples.crdt.statelib.resources
-  Require Import resources resources_inv resources_local resources_global resources_lock.
+  Require Import utils resources resources_inv resources_local resources_global resources_lock.
 
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.user_model
@@ -25,7 +25,7 @@ From aneris.examples.crdt.statelib.user_model
 From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.STS Require Import utils gst lst.
 From aneris.examples.crdt.statelib.proof
-  Require Import spec events resources utils resources.
+  Require Import spec events utils.
 
 Instance timeinst : Log_Time := timestamp_time.
 

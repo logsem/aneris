@@ -17,7 +17,7 @@ From aneris.prelude Require Import misc time.
 From aneris.examples.crdt.spec
   Require Import crdt_events crdt_resources crdt_denot crdt_time crdt_base.
 From aneris.examples.crdt.statelib.resources
-  Require Import resources resources_inv resources_local resources_global resources_lock.
+  Require Import utils resources resources_inv resources_local resources_global resources_lock.
 
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.user_model
@@ -25,8 +25,7 @@ From aneris.examples.crdt.statelib.user_model
 From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.STS Require Import utils gst lst.
 From aneris.examples.crdt.statelib.proof
-  Require Import spec events resources utils resources
-    stlib_proof_utils.
+  Require Import spec events utils stlib_proof_utils.
 
 Instance timeinst : Log_Time := timestamp_time.
 
@@ -71,6 +70,25 @@ Section StateLib_InternalSpecs.
            ⌜Maximum (s1' ∪ s2') = Some e⌝ ∗
            StLib_OwnGlobalState h' ∗
            StLib_OwnLocalState repId s1' s2' >>>.
+
+  Definition internal_sendToAll_spec
+    (sendToAll_fn: val)
+    (h: socket_handle) (sock: socket) (repId: RepId) (sock_addr: socket_address)
+    (dstlist: val) : iProp Σ :=
+    □ ∀ (m: string),
+      ([∗ list] a ∈ CRDT_Addresses,
+        (▷ a ⤇ socket_proto repId)
+        ∗ ▷ socket_proto repId
+          {|
+            m_sender := sock_addr;
+            m_destination := a;
+            m_protocol := sprotocol sock;
+            m_body := m
+          |}) -∗
+    {{{ socket_inv repId h sock_addr sock }}}
+      sendToAll_fn $m @[ip_of_address sock_addr]
+    {{{ RET #(); True }}}.
+
 
 End StateLib_InternalSpecs.
 
