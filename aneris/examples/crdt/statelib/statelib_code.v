@@ -49,7 +49,7 @@ Definition sendToAll : val :=
       "aux" #().
 
 Definition broadcast (ser_st : val) : val :=
-  λ: "lk" "sh" "st" "dstl" "i" <>,
+  λ: "lk" "sh" "st" "dstl" "i",
   loop_forever (
     λ: <>,
       #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
@@ -57,7 +57,7 @@ Definition broadcast (ser_st : val) : val :=
       let: "s" := ! "st" in
       release "lk";;
       let: "msg" := ser_st "s" in
-      sendToAll "sh" "dstl" "i" "msg") #().
+      sendToAll "sh" "dstl" "i" "msg").
 
 Definition statelib_init (st_ser : val) (st_deser : val) : val :=
   λ: "addrlst" "rid" "crdt",

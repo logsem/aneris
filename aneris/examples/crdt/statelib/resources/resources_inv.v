@@ -9,7 +9,7 @@ From aneris.examples.crdt.statelib.proof Require Import utils events.
 From aneris.examples.crdt.statelib.STS Require Import lst gst utils.
 From iris.base_logic.lib Require Import invariants.
 
-From aneris.examples.crdt.statelib.resources Require Import resources.
+From aneris.examples.crdt.statelib.resources Require Import utils.
 
 Instance timetouse: Log_Time := timestamp_time.
 

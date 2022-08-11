@@ -170,14 +170,29 @@ Section Preambule.
       → event_set_orig_deps_seq s
       → event_set_seqnum_non_O s
       → event_set_seqid_val s
-      → ∀ ev, ev ∈ hproj orig s → ev <_t fev.
+      → ∀ ev, ev ∈ s → ev <_t fev.
   Proof.
     intros fev Hsame_orig Hext_time Hdc ?? Hval ev Hev_in.
     rewrite/time/stlib_event_timed/fev/fresh_event/=.
     destruct (set_choose_or_empty
       (filter (λ ev0 : Event Op, EV_Orig ev0 = orig) s))
       as [(ev' & Hev'_in) | Hempty];
-      last set_solver.
+      last first.
+    { rewrite Hempty compute_maximum_empty. split.
+      - apply union_subseteq_l'.
+        replace (EV_Time ev) with (get_deps_set {[ ev ]});
+          first by apply get_deps_set_mon, singleton_subseteq_l.
+        rewrite/get_deps_set/gset_flat_map gset_map_singleton elements_singleton.
+        set_solver.
+      - rewrite/ts_le.
+        intros Himp.
+        assert ((fin_to_nat orig, 1) ∈ EV_Time ev); first set_solver.
+        destruct (Hdc ev (fin_to_nat orig, 1) Hev_in)
+          as (ev' & Hev'_in & Hev'_orig); first assumption.
+        assert (ev' ∈ (∅: event_set Op)); last done.
+        rewrite -Hempty.
+        apply elem_of_filter. split; last assumption.
+        by rewrite (get_evid_valid_time ev')  Hev'_orig. }
     destruct (event_set_maximum_exists s orig) as (m & Hm).
     - exists ev'.
       by apply elem_of_filter in Hev'_in as [Horig Hs].
@@ -198,8 +213,7 @@ Section Preambule.
                     (get_deps_set s))))]})));
           first by apply elem_of_union_r, elem_of_singleton, event_set_get_evid.
         apply Himp in Hin. clear Himp.
-        destruct (Hdc ev (get_evid fev)) as (e & He'_in & He'_eid); try done;
-          first by apply elem_of_filter, proj2 in Hev_in.
+        destruct (Hdc ev (get_evid fev)) as (e & He'_in & He'_eid); try done.
         rewrite/fev event_set_get_evid in He'_eid; try done.
         apply get_evid_eq in He'_eid as [Horig Himp].
         rewrite (Hval e He'_in) in Himp.

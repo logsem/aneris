@@ -6,147 +6,226 @@ From aneris.aneris_lang.lib Require Import lock_proof.
 From aneris.examples.crdt.spec Require Import crdt_base crdt_time crdt_events crdt_resources.
 From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.proof Require Import utils events.
-From aneris.examples.crdt.statelib.STS Require Import gst.
+From aneris.examples.crdt.statelib.STS Require Import lst gst utils.
+From iris.base_logic.lib Require Import invariants.
 
-Instance timetouse: Log_Time := timestamp_time.
-
-
-
-Section RequiredRAs.
-  Context `{!anerisG Mdl Σ, !CRDT_Params,
-            CRDT_Op: Type, !EqDecision CRDT_Op, !Countable CRDT_Op}.
-
-  Class Internal_StLibG Σ := mkInternalG {
-      (* Global state, global snap and local state *)
-      Int_StLibG_auth_gset_ev :> inG Σ (authUR (gsetUR (Event CRDT_Op)));
-      (* Local state *)
-      Int_StLibG_frac_agree :> inG Σ (prodR fracR (agreeR (gsetO (Event CRDT_Op))));
-      (* Local state *)
-      Int_StLibG_frac_agreeaeee :> inG Σ (agreeR (gsetO (Event CRDT_Op)));
-      (* Local and global snapshots *)
-      Int_StLibG_mono :> inG Σ (authUR (monotoneUR (@cc_subseteq CRDT_Op _ _)));
-      (* Used to define the lock invariant (in the proof) *)
-      Int_StLibG_lockG :> lockG Σ;
-      Int_StLibG_frac_nat :> inG Σ (prodR fracR (agreeR natO))
-    }.
-
-  Class StLib_GhostNames := {
-    γ_global: gname;
-    γ_global_snap: gname;
-    (** local gnames *)
-    γ_loc_own: vec gname (length CRDT_Addresses);
-    γ_loc_for: vec gname (length CRDT_Addresses);
-    γ_loc_sub: vec gname (length CRDT_Addresses);
-    γ_loc_cc : vec gname (length CRDT_Addresses);
-  }.
-End RequiredRAs.
-Arguments Internal_StLibG (CRDT_Op) {_ _} (Σ).
+From aneris.examples.crdt.statelib.resources
+  Require Import utils resources_inv resources_local resources_global.
 
 
-Section Utils.
+
+Section AboutInv.
   Context `{CRDT_Op: Type,
             !anerisG Mdl Σ, !CRDT_Params,
             !EqDecision CRDT_Op, !Countable CRDT_Op,
             !StLib_GhostNames, !Internal_StLibG CRDT_Op Σ}.
   Notation princ_ev := (@principal (gset (Event CRDT_Op)) cc_subseteq).
 
-  Lemma princ_ev__subset_cc' h s γ :
-    own γ (◯ princ_ev s) -∗
-    own γ (● princ_ev h) -∗
-    own γ (● princ_ev h) ∗
-    ⌜ s ⊆_cc h ⌝.
+  Lemma StLib_OwnLocalSnap_GlobSnap_Provenance E i s1 s2 e :
+    ↑CRDT_InvName ⊆ E →
+    e ∈ s1 ∪ s2 →
+    StLib_GlobalInv ⊢
+    StLib_OwnLocalSnap i s1 s2 ={E}=∗ ∃ h, StLib_OwnGlobalSnap h ∗ ⌜e ∈ h⌝.
   Proof.
-    iIntros "#Hfrag Hauth".
-    iCombine "Hauth" "Hfrag" as "Hboth".
-    iDestruct (own_valid_l with "Hboth") as "[%Hvalid [Hauth _]]".
-    apply auth_both_valid_discrete in Hvalid as [Hsub Hvalid].
-    iFrame.
-    iPureIntro. by apply principal_included.
+    iIntros (Hincl He_in) "#Hinv (%f & %Hf & %Hlocal & %Hforeign' & #Hsnap)".
+    iInv "Hinv" as ">(%g & Hglobal & Hsnap_g & %Hv & Hloc)" "Hclose".
+    iExists g.1.
+    iMod (own_update _ (●g.1) (●g.1 ⋅ ◯g.1) with "Hsnap_g") as "[Hsnap_g Hsnap']".
+    { by apply auth_update_alloc, gset_local_update. }
+    iFrame "Hsnap'".
+    iDestruct ((forall_fin f) with "Hloc") as "[Hloc Hlocf]".
+    iDestruct "Hlocf"
+      as "(%h__local & %h__foreign & %h__sub & %Hproj' & %Hislocal' &
+        %Hislocal & %Hisforeign & [%Hsub %Hcc] &
+        Hown_local & Hown_for & Hown_sub & Hown_cc)".
+    iDestruct (princ_ev__subset_cc with "Hsnap Hown_cc") as "[%Hsub_ %Hcc_]".
+    iDestruct ((forall_fin' _ (λ f, StLib_GlibInv_local_part f g)) with "[Hloc Hown_local Hown_for Hown_sub Hown_cc]") as "Hloc";
+      first iFrame "Hloc".
+    { iExists h__local, h__foreign, h__sub. iFrame. by iPureIntro. }
+    iMod ("Hclose" with "[Hloc Hglobal Hsnap Hsnap_g]") as "_".
+    { iNext. iExists g. iFrame. iFrame "#". by iPureIntro. }
+    iPureIntro.
+
+    rewrite (VGst_incl_local _ Hv e). exists f.
+    rewrite Hproj'. by apply Hsub, Hsub_.
   Qed.
 
-  Lemma princ_ev__subset_cc h s γ :
-    own γ (◯ princ_ev s) -∗
-    own γ (● princ_ev h) -∗
-    ⌜ s ⊆_cc h ⌝.
+
+  Lemma StLib_OwnLocalState_GlobSnap_Provenance E i s1 s2 h :
+    ↑CRDT_InvName ⊆ E ->
+    StLib_GlobalInv ⊢
+    StLib_OwnLocalState i s1 s2 -∗
+    StLib_OwnGlobalSnap h ={E}=∗
+      StLib_OwnLocalState i s1 s2 ∗ ⌜∀ e, e ∈ h -> e.(EV_Orig) = i -> e ∈ s1⌝.
   Proof.
-    iIntros "#Hfrag Hauth".
-    by iDestruct (princ_ev__subset_cc' with "Hfrag Hauth") as "[_ H]".
+    iIntros (Hincl) "#Hinv
+      (%f & %Hf & %Hlocal & %Hforeign &
+        Hown_local & Hown_foreign &
+        Hsnap)
+      #Hsnap_global".
+    iInv "Hinv" as ">(%g & Hglobal & Hsnap_g & %Hv & Hloc)" "Hclose".
+    iDestruct ((forall_fin f) with "Hloc")
+      as "[Hloc
+        (%h__local' & %h__foreign' & %h__sub' &
+          %Hproj' & %Hlocal' & %Hforeign' & %Hsub' & %Hcc &
+          Hown_local' & Hown_foreign' & Hown_sub' & Hown_cc')]".
+    iApply fupd_frame_r.
+    iSplit; last first.
+    - iIntros (e He_in He_orig).
+      iCombine "Hsnap_g" "Hsnap_global" as "Hboth".
+      iDestruct (own_valid with "Hboth") as "%Hvalid".
+      apply auth_both_valid_discrete in Hvalid as [Hsub%gset_included _].
+      iDestruct "Hboth" as "[Hsnap_g _]".
+      iCombine "Hown_local" "Hown_local'" as "Hcomb".
+      iDestruct (own_valid with "Hcomb") as "%Hvalid".
+      iDestruct "Hcomb" as "[Hown_local Hown_local']".
+      apply pair_valid in Hvalid as [_ ->%to_agree_op_inv_L].
+      iPureIntro.
+      destruct (VGst_incl_orig _ Hv e) as (f' & Hf' & He_in');
+        first apply Hsub, He_in.
+      assert (f = f') as ->. { apply fin_to_nat_inj. by rewrite Hf Hf'. }
+      rewrite Hproj' in He_in'.
+      apply elem_of_union in He_in' as [He_in' | Himp%Hforeign' ]; first exact He_in'.
+      by destruct Himp.
+    - iExists f. iFrame "%". iFrame.
+      iMod ("Hclose" with "[Hglobal Hsnap_g Hloc Hown_local' Hown_foreign' Hown_sub' Hown_cc']") as "_"; last done.
+      iNext. iExists g.
+      iFrame. iFrame "%".
+      iApply (forall_fin' _ (λ f, StLib_GlibInv_local_part f g)  with "[Hloc Hown_local' Hown_foreign' Hown_sub' Hown_cc']");
+        first iFrame "Hloc".
+      iExists h__local', h__foreign', h__sub'.
+      iFrame. iFrame "%".
   Qed.
 
-  Lemma princ_ev__union_frag_auth h s s' γ :
-    own γ (◯ princ_ev s) -∗
-    own γ (◯ princ_ev s') -∗
-    own γ (● princ_ev h) ==∗
-    own γ (● princ_ev h) ∗ own γ (◯ princ_ev (s ∪ s')).
+    (* Events are received locally in causal order *)
+  Lemma StLib_OwnLocalState_GlobSnap_Causality E i s1 s2 h :
+    ↑CRDT_InvName ⊆ E →
+    StLib_GlobalInv ⊢
+    StLib_OwnLocalState i s1 s2 -∗ StLib_OwnGlobalSnap h ={E}=∗
+      StLib_OwnLocalState i s1 s2 ∗
+      ⌜∀ a e, a ∈ h → e ∈ s1 ∪ s2 → a <_t e → a ∈ s1 ∪ s2⌝.
   Proof.
-    iIntros "#Hfrag #Hfrag' Hauth".
-    iPoseProof (princ_ev__subset_cc with "Hfrag Hauth") as "%Hsubset".
-    iPoseProof (princ_ev__subset_cc with "Hfrag' Hauth") as "%Hsubset'".
-    assert (cc_subseteq (s ∪ s') h) as Hunion.
-    { apply cc_subseteq_union; done. }
-    iMod (own_update _ _ (● (princ_ev h) ⋅ ◯ (princ_ev (s ∪ s'))) with "Hauth") as "Hres".
-    { eapply monotone_update; done. }
-    iModIntro.
-    by iApply own_op.
+    iIntros (Hincl) "#Hinv
+      (%f & %Hf & %Hlocal & %Hforeign &
+        Hown_local & Hown_sub &
+        #Hsnap)
+      #Hsnap_global".
+    iInv "Hinv" as ">(%g & Hglobal & Hsnap_g & %Hv & Hloc)" "Hclose".
+    iDestruct ((forall_fin f) with "Hloc")
+      as "[Hloc
+        (%h__local & %h__foreign & %h__sub &
+          %Hproj' & %Hlocal' & %Hforeign' & %Hsub' & %Hcc &
+          Hown_local' & Hown_foreign' & Hown_sub' & Hown_cc')]".
+    iApply fupd_frame_r.
+    iSplit.
+    - iExists f. iFrame "%". iFrame.
+      iMod ("Hclose"
+        with "[Hglobal Hsnap_g Hloc
+          Hown_local' Hown_foreign' Hown_sub' Hown_cc']")
+        as "_"; last done.
+      iNext. iExists g.
+      iFrame. iFrame "%".
+      iApply ((forall_fin' f (λ f, StLib_GlibInv_local_part f g)) with "[Hloc Hown_local' Hown_foreign' Hown_sub' Hown_cc']").
+      iSplitL "Hloc"; first iFrame "Hloc".
+      iExists h__local, h__foreign, h__sub.
+      iFrame. iFrame "%".
+    - iIntros (e e' He_in He'_in Hlt_t).
+      iDestruct (both_agree_agree with "Hown_local Hown_local'")
+        as "(Hown_local & Hown_local' & %Heq)"; rewrite<- Heq.
+      iDestruct (both_agree_agree with "Hown_sub Hown_sub'")
+        as "(Hown_sub & Hown_sub' & %Heq')"; rewrite<- Heq'.
+
+      iDestruct (auth_frag_subset with "Hsnap_g Hsnap_global") as "(Hsnap_g & _ & %Hh)".
+
+      assert (g.2 !!! f ⊆_cc g.1) as Hsubcc.
+      { split.
+        - intros x Hx_in.
+          apply(VGst_incl_local _ Hv x). by exists f.
+        - intros x y Hx_in Hy_in Hle_t Hy_in'.
+          pose proof (iffLR (elem_of_subseteq (time x) (time y)) Hle_t (get_evid x)
+            (VLst_evid_incl_event _ (VGst_hst_valid _ Hv) x Hx_in)) as p.
+          destruct (VLst_dep_closed _ (VGst_lhst_valid _ Hv f) y (get_evid x) Hy_in' p) as (z & Hzin & Hzevid).
+          rewrite (VLst_ext_eqid _ (VGst_hst_valid _ Hv) x z Hx_in); try done.
+          apply (VGst_incl_local _ Hv). by exists f. }
+
+      assert ( h__local ∪ h__sub ⊆_cc g.1 ) as Hsubsetcc.
+      { destruct Hcc as [Hsub Hcc].
+        split.
+        - intros x Hx_in%Hsub.
+          rewrite<- Hproj' in Hx_in.
+          apply (VGst_incl_local _ Hv).
+          by exists f.
+        - intros x y Hx_in Hy_in Hle_t Hy_in'.
+          pose proof (iffLR (elem_of_subseteq (time x) (time y)) Hle_t (get_evid x)
+            (VLst_evid_incl_event _ (VGst_hst_valid _ Hv) x Hx_in)) as p.
+          apply (Hcc x y); try done;
+            last by apply Hsub.
+          rewrite<- Hproj'.
+          destruct Hsubcc as [_ Hcc'].
+          apply (Hcc' x y); try done.
+          rewrite Hproj'. by apply Hsub. }
+      iPureIntro.
+      rewrite Heq Heq'.
+      rewrite Heq Heq' in He'_in.
+
+      destruct Hsubsetcc as [Hsubseteq Hcc'].
+      apply (Hcc' e e').
+      + by apply Hh.
+      + by apply Hsubseteq.
+      + by apply strict_include.
+      + assumption.
   Qed.
 
-  Lemma forall_fin (f: fRepId) (P: fRepId → iProp Σ) :
-    (∃ S : gset fRepId, (∀ r : fRepId, ⌜r ∈ S⌝) ∗
-           ([∗ set] k ∈ S, P k))
-    -∗
-    ((∃ S : gset fRepId, (⌜ f ∉ S ⌝ ∗ ∀ r : fRepId, ⌜r ≠ f⌝ -∗ ⌜r ∈ S⌝) ∗ [∗ set] k ∈ S, P k)
-      ∗ P f).
-  Proof.
-    iIntros "(%S & %Hdef_S & HS)".
-    iApply bi.sep_exist_r.
-    iExists ( S ∖ {[ f ]} ).
-    iPoseProof (big_sepS_union _ ( S ∖ {[ f ]} ) {[f]}) as "[Hsep _]"; first set_solver.
-    assert ((S ∖ {[f]} ∪ {[f]}) = S) as ->.
-    { 
-      assert (S ∪ {[f]} = S) as Heq.
-      { assert (S ∪ {[f]} = {[f]} ∪ S) as ->; first set_solver.
-        by apply subseteq_union_1_L, elem_of_subseteq. }
-      pose proof (difference_union_L S {[f]}) as p.
-      by rewrite Heq in p. }
-    iDestruct ("Hsep" with "HS") as "[Hall Hone]".
-    iSplitR "Hone";
-      last by iApply big_sepS_singleton.
-    iSplitR; [iPureIntro | iAssumption].
-    set_solver.
-  Qed.
+End AboutInv.
 
-  Lemma forall_fin' (f: fRepId) (P: fRepId → iProp Σ) :
-    ((∃ S : gset fRepId, (⌜ f ∉ S ⌝ ∗ ∀ r : fRepId, ⌜r ≠ f⌝ -∗ ⌜r ∈ S⌝) ∗ [∗ set] k ∈ S, P k)
-      ∗ P f)
-    -∗
-    (∃ S : gset fRepId, (∀ r : fRepId, ⌜r ∈ S⌝) ∗
-           ([∗ set] k ∈ S, P k)).
-  Proof.
-    iIntros "[(%S & [%Hdef_S' %Hdef_S] & HS) Hone]".
-    iExists ( S ∪ {[ f ]} ).
-    iPoseProof (big_sepS_union _ S {[f]}) as "[_ Hsep]"; first set_solver.
 
-    iDestruct ("Hsep" with "[HS Hone]") as "H".
-    { iFrame. by iApply big_sepS_singleton. }
-    iFrame.
-    
-    iPureIntro. intros r.
-    destruct (decide (r = f)).
-    - by apply elem_of_union_r, elem_of_singleton.
-    - by apply elem_of_union_l, Hdef_S.
-  Qed.
 
-  Lemma both_agree_agree (γ: gname) (p q: Qp) (s s': event_set CRDT_Op):
-    own γ (q, to_agree s) -∗ own γ (p, to_agree s') -∗
-    own γ (q, to_agree s) ∗ own γ (p, to_agree s) ∗ ⌜ s = s' ⌝.
-  Proof.
-    iStartProof.
-    iIntros "H1 H2".
-    iCombine "H1" "H2" as "H".
-    iDestruct (own_valid_l with "H") as "[%Hvalid [H1 H2]]".
-    apply pair_valid in Hvalid as [_ ->%to_agree_op_inv_L].
-    rewrite agree_idemp.
-    by iFrame "H1 H2".
-  Qed.
+Section Resources.
+  Context `{CRDT_Op: Type,
+            !anerisG Mdl Σ, !CRDT_Params,
+            !EqDecision CRDT_Op, !Countable CRDT_Op,
+            !StLib_GhostNames, !Internal_StLibG CRDT_Op Σ}.
 
-End Utils.
+  Global Instance StLib_CRDT_Res_Mixin: CRDT_Res_Mixin _ _ CRDT_Op :=
+  {|
+    GlobState           := StLib_OwnGlobalState;
+    GlobState_Exclusive := StLib_OwnGlobalState_exclusive;
+    GlobState_Timeless  := StLib_OwnGlobalState_timeless;
+    GlobSnap            := StLib_OwnGlobalSnap;
+    GlobSnap_Timeless   := StLib_OwnGlobalSnap_Timeless;
+    GlobSnap_Persistent := StLib_OwnGlobalSnap_Persistent;
+    LocState            := StLib_OwnLocalState;
+    LocState_Timeless   := StLib_OwnLocalState_timeless;
+    LocState_Exclusive  := StLib_OwnLocalState_exclusive;
+    LocSnap             := StLib_OwnLocalSnap;
+    LocSnap_Timeless    := StLib_OwnLocalSnap_timeless;
+    LocSnap_Persistent  := StLib_OwnLocalSnap_persistent;
+
+    LocState_OwnOrig    := StLib_OwnLocalState_OwnOrig;
+    LocState_ForeignOrig:= StLib_OwnLocalState_ForeignOrig;
+    LocSnap_OwnOrig     := StLib_OwnLocalSnap_OwnOrig;
+    LocSnap_ForeignOrig := StLib_OwnLocalSnap_ForeignOrig;
+    LocState_TakeSnap   := StLib_OwnLocalState_TakeSnap;
+    GlobSnap_Union      := StLib_OwnGlobalSnap_Union;
+
+    GlobState_TakeSnap  := StLib_OwnGlobalState_TakeSnap;
+    GlobSnap_GlobState_Included
+                        := StLib_GlobalSnap_GlobState_Included;
+    GlobSnap_Ext        := StLib_OwnGlobalSnap_Ext;
+    GlobSnap_TotalOrder := StLib_OwnGlobalSnap_TotalOrder;
+
+    LocSnap_Union       := StLib_OwnLocalSnap_Union;
+    LocSnap_LocState_Included_CC
+                        := StLib_OwnLocalSnap_LocState_Included_CC;
+    LocSnap_Ext         := StLib_OwnLocalSnap_Ext;
+    LocState_GlobSnap_Provenance
+                        := StLib_OwnLocalState_GlobSnap_Provenance;
+    LocSnap_GlobSnap_Provenance
+                        := StLib_OwnLocalSnap_GlobSnap_Provenance;
+    LocState_GlobSnap_Causality
+                        := StLib_OwnLocalState_GlobSnap_Causality;
+  |}.
+
+End Resources.
+Arguments StLib_CRDT_Res_Mixin (CRDT_Op) {_ _ _ _ _ _ _ _}.
+

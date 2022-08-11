@@ -88,8 +88,6 @@ Section Gst_mutator_local_valid.
       rewrite Heq/fev.
       apply (fresh_event_time_mon s op orig);
         try by destruct Hv.
-      apply elem_of_filter.
-      by split; first rewrite -Heq_orig Heq fresh_event_orig.
     - destruct Hnle. by rewrite Heq Heq'.
   Qed.
 
@@ -117,8 +115,6 @@ Section Gst_mutator_local_valid.
       rewrite Heq/fev.
       apply (fresh_event_time_mon (g.2 !!! orig) op orig);
         try by destruct (VGst_lhst_valid _ Hv orig).
-      apply elem_of_filter.
-      split; first by rewrite -Heq_orig Heq fresh_event_orig.
       apply (Gst_incl_orig' _ orig ev'); [exact Hv |exact Hev'_in |].
       by rewrite -Heq_orig Heq fresh_event_orig.
     - destruct Hnle. by rewrite Heq Heq'.
@@ -316,12 +312,8 @@ Section Gst_mutator_local_valid.
     + by apply (VLst_same_orig_comp _ Hv).
     + left.
       apply fresh_event_time_mon; try by destruct Hv.
-      apply elem_of_filter.
-      by split; first by rewrite Heq_orig fresh_event_orig.
     + do 2 right.
       apply fresh_event_time_mon; try by destruct Hv.
-      apply elem_of_filter.
-      by split; first by rewrite -Heq_orig fresh_event_orig.
     + by right; left.
   Qed.
 
@@ -338,13 +330,9 @@ Section Gst_mutator_local_valid.
       + by apply (VLst_same_orig_comp g.1 (VGst_hst_valid g Hv)).
       + left.
         apply fresh_event_time_mon; try by destruct (VGst_lhst_valid _ Hv orig).
-        apply elem_of_filter.
-        split; first by rewrite Heq_orig fresh_event_orig.
         by apply (Gst_incl_orig' _ orig ev).
       + do 2 right.
         apply fresh_event_time_mon; try by destruct (VGst_lhst_valid _ Hv orig).
-        apply elem_of_filter.
-        split; first by rewrite -Heq_orig fresh_event_orig.
         by apply (Gst_incl_orig' _ orig ev').
       + by right; left.
   Qed.
