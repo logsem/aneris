@@ -6,7 +6,7 @@ From aneris.examples.crdt.statelib.proof Require Import utils events.
 From aneris.examples.crdt.statelib.time Require Import time maximality.
 
 Section Lst_definition.
-  Context `{!anerisG Mdl Σ, !CRDT_Params}.
+  Context `{!CRDT_Params}.
   Context `{Op: Type, !EqDecision Op, !Countable Op}.
 
   Definition Lst : Type := event_set Op.
@@ -40,9 +40,38 @@ Section Lst_definition.
       VLst_orig_max : event_set_orig_max_len ls;
       VLst_evid_mon : event_set_evid_mon ls;
       VLst_evid_incl_event: event_set_evid_incl_event ls;
+      VLst_evid_incl_time_le: ∀ ev ev', ev ∈ ls → ev' ∈ ls → get_evid ev' ∈ EV_Time ev → ev' ≤_t ev;
     }.
     Arguments VLst_orig {_ _ _} ls.
 
 End Lst_definition.
 Arguments Lst (Op) {_ _}.
 
+
+
+Section Lst_helper.
+  Context `{!CRDT_Params}.
+  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+
+  Lemma Lst_Validity_implies_event_set_valid (s: Lst Op):
+    Lst_Validity s → event_set_valid s.
+  Proof.
+    intros [Hdc Horig_comp Hext_eid Hext_time Horig Hseqid Horig_depseq Hseqnum Horig_max Hevis_mon Hevis_incl_ev].
+    split; first done.
+    intros e e' He_in He'_in. split.
+    - intros Hevs_orig.
+      destruct Horig_comp with e e' as [? |[-> |?]]; try done.
+      + left. by apply strict_include.
+      + by left.
+      + right. by apply strict_include.
+    - intros Hevs_eqt.
+      by destruct Hext_time with e e'.
+  Qed.
+
+  Lemma Lst_Validity_implies_events_ext (s: Lst Op):
+    Lst_Validity s → events_ext s.
+  Proof. by intros []. Qed.
+  Lemma Lst_Validity_implies_same_orig_comparable (s: Lst Op):
+    Lst_Validity s → event_set_same_orig_comparable s.
+  Proof. by intros []. Qed.
+End Lst_helper.

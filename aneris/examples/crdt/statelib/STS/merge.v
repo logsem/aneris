@@ -109,6 +109,17 @@ Section Gst_merge_local_valid.
     - intros ev [Hev_in | Hev_in%(iffLR (elem_of_subseteq s (g.2 !!! j)) Hs_incl)]%elem_of_union.
       + by apply (VLst_evid_incl_event _ (VGst_lhst_valid g Hv i)).
       + by apply (VLst_evid_incl_event _ (VGst_lhst_valid g Hv j)).
+   - intros x y [Hx_in | Hx_in%Hs_incl]%elem_of_union [Hy_in | Hy_in%Hs_incl]%elem_of_union.
+    + by apply (VLst_evid_incl_time_le _ (VGst_lhst_valid _ Hv i)).
+    + by apply (VLst_evid_incl_time_le _ (VGst_hst_valid _ Hv));
+        [ apply gst_valid_inclusion with i
+        | apply gst_valid_inclusion with j ].
+    + by apply (VLst_evid_incl_time_le _ (VGst_hst_valid _ Hv));
+        [ apply gst_valid_inclusion with j
+        | apply gst_valid_inclusion with i ].
+    + by apply (VLst_evid_incl_time_le _ (VGst_hst_valid _ Hv));
+        [ apply gst_valid_inclusion with j
+        | apply gst_valid_inclusion with j ].
   Qed.
 
   Lemma merge_loc_valid

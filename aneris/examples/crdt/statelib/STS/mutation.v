@@ -924,6 +924,20 @@ Section Gst_mutator_local_valid.
     - by apply mutator_local_orig_max_len_preservation.
     - by apply mutator_local_evid_mon_preservation.
     - by apply mutator_local_evid_incl_event.
+    - intros ev ev'
+      [Hev_in | ->%elem_of_singleton]%elem_of_union
+      [Hev'_in | ->%elem_of_singleton]%elem_of_union
+      Hin;
+      [ by apply (VLst_evid_incl_time_le _ Hold_valid) | | | done ];
+      last (apply fresh_event_time_mon; by destruct Hold_valid).
+      exfalso.
+      apply (VLst_dep_closed _ (VGst_lhst_valid _ Hv orig) _ _ Hev_in) in Hin
+        as (ev' & ev'_orig & ev'_eid).
+      apply mutator_ext_evid_preservation with g op orig in ev'_eid; try done.
+      + apply (fresh_event_is_fresh (g.2 !!! orig) orig op (VGst_lhst_valid _ Hv orig)).
+        by rewrite-/fev -ev'_eid.
+      + simpl. by apply elem_of_union_l, gst_valid_inclusion with orig.
+      + simpl. by apply elem_of_union_r, elem_of_singleton.
   Qed.
 
   Lemma mutator_hst_valid
@@ -944,6 +958,38 @@ Section Gst_mutator_local_valid.
     - by apply mutator_orig_max_len_preservation.
     - by apply mutator_evid_mon_preservation.
     - by apply mutator_evid_incl_event_preservation.
+    - simpl.
+      intros ev ev'
+        [Hev_in | ->%elem_of_singleton ]%elem_of_union
+        [Hev'_in | ->%elem_of_singleton ]%elem_of_union Hin; try done;
+        first by apply (VLst_evid_incl_time_le _ (VGst_hst_valid _ Hv)).
+      + 
+        apply (VLst_dep_closed _ (VGst_hst_valid _ Hv) _ _ Hev_in) in Hin
+          as (ev' & ev'_orig & ev'_eid).
+        apply mutator_ext_evid_preservation with g op orig in ev'_eid; try done.
+        * destruct (fresh_event_is_fresh_global g orig op Hv).
+          by rewrite-/fev -ev'_eid.
+        * simpl. by apply elem_of_union_l.
+        * simpl. by apply elem_of_union_r, elem_of_singleton.
+      + apply fresh_event_time_mon;
+          try by destruct (VGst_lhst_valid _ Hv orig).
+        destruct (mutator_local_dep_closed_preservation (g.2 !!! orig) op orig (VGst_lhst_valid _ Hv orig))
+          with fev (get_evid ev')
+          as (x & [Hx_in | ->%elem_of_singleton]%elem_of_union & Hx_evid).
+        * by apply elem_of_union_r, elem_of_singleton.
+        * assumption.
+        * apply mutator_ext_evid_preservation with g op orig in Hx_evid as ->;
+            simpl; try done;
+            [by apply elem_of_union_l, gst_valid_inclusion with orig
+            | by apply elem_of_union_l].
+        * exfalso.
+          assert (ev' ∈ g.1) as Htmp; first exact Hev'_in.
+          epose (mutator_ext_evid_preservation g op orig Hv fev ev' _ _ Hx_evid).
+          rewrite<- e in Hev'_in.
+          exact (fresh_event_is_fresh_global g orig op Hv Hev'_in).
+          Unshelve.
+          by apply elem_of_union_r, elem_of_singleton.
+          by apply elem_of_union_l.
   Qed.
 
   Lemma mutator_global_valid
@@ -958,6 +1004,26 @@ Section Gst_mutator_local_valid.
     - by apply mutator_hst_valid.
     - by apply mutator_lhst_valid.
   Qed.
+
+  Lemma fresh_events_mutator_global_maximals
+    (g: Gst Op) (op: Op) (orig: fRepId):
+    let fev := fresh_event (g.2 !!! orig) op orig in
+    Gst_Validity g →
+    fev ∈ Maximals (g.1 ∪ {[fev]}).
+  Proof.
+    intros fev Hv.
+    apply Maximals_correct.
+    split; first by apply elem_of_union_r, elem_of_singleton.
+    intros e [He_in| ->%elem_of_singleton]%elem_of_union;
+      last by apply TM_lt_irreflexive.
+    intros Himp.
+    assert (get_evid fev ∈ time fev).
+    { apply (mutator_local_evid_incl_event (g.2 !!! orig) op orig
+        (VGst_lhst_valid _ Hv orig) fev).
+      by apply elem_of_union_r, elem_of_singleton. }
+    assert (get_evid fev ∈ time e).
+    { admit. }
+  Admitted.
 
 End Gst_mutator_local_valid.
 
