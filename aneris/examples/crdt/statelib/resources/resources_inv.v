@@ -31,7 +31,8 @@ Section AboutGlobalInvariant.
       own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree h__local) ∗
       own (γ_loc_for !!! f) ((1 / 2)%Qp, to_agree h__foreign) ∗
       own (γ_loc_sub !!! f) ((1 / 3)%Qp, to_agree h__sub) ∗
-      own (γ_loc_cc !!! f) (● princ_ev (h__local ∪ h__sub)).
+      own (γ_loc_cc !!! f) (● princ_ev (h__local ∪ h__sub)) ∗
+      own (γ_loc_cc' !!! f) (● princ_ev (h__local ∪ h__foreign)).
 
   Definition StLib_GlobalInv : iProp Σ :=
     inv CRDT_InvName

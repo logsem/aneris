@@ -115,20 +115,29 @@ Section SocketProtolDefinition.
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
             !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
   Context `{!Internal_StLibG LogOp Σ, !StLib_GhostNames}.
+  Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
 
-  Definition socket_proto (repId : RepId) : socket_interp Σ :=
+  Definition socket_proto : socket_interp Σ :=
     λ m,
       let (from, to) := (m_sender m, m_destination m) in
       let mb := m_body m in
-      (∃ (st_v: val) (st_log: LogSt) (h__local h__sub: event_set LogOp) (i: RepId),
-        ⌜ CRDT_Addresses !! i = Some from ⌝ ∗
+      (∃ (st_v: val) (st_log: LogSt) (h__local h__sub: event_set LogOp)
+        (repId r: RepId)
+        (f f_remote: fRepId),
+        ⌜ CRDT_Addresses !! repId = Some from ⌝ ∗
+        ⌜ CRDT_Addresses !! r = Some to ⌝ ∗
+        ⌜ fin_to_nat f = repId ⌝ ∗
+        ⌜ fin_to_nat f_remote = r ⌝ ∗
         ⌜ s_is_ser StLib_StSerialization st_v mb ⌝ ∗
         ⌜ StLib_St_Coh st_log st_v ⌝ ∗
         ⌜⟦h__local ∪ h__sub⟧ ⇝ st_log⌝ ∗
-        StLib_OwnLocalSnap i h__local h__sub)%I.
+        ⌜ local_events f h__local ⌝ ∗
+        ⌜ foreign_events f h__sub ⌝ ∗
+        ⌜ Lst_Validity (h__local ∪ h__sub)⌝ ∗
+        own (γ_loc_cc' !!! f) (◯ princ_ev (h__local ∪ h__sub)))%I.
 
   Global Instance socket_proto_Persistent (repId: RepId) (m: message):
-    Persistent (socket_proto repId m).
+    Persistent (socket_proto m).
   Proof. apply _. Qed.
 
   Definition socket_inv (repId: RepId) (h: socket_handle) (z: socket_address) (s: socket) : iProp Σ :=
@@ -138,7 +147,7 @@ Section SocketProtolDefinition.
         ⌜ saddress s = Some z ⌝ ∗
         ⌜ CRDT_Addresses !! repId = Some z ⌝ ∗
         z ⤳ (R, S) ∗
-        [∗ set] m ∈ R, socket_proto repId m).
+        [∗ set] m ∈ R, socket_proto m).
 
 End SocketProtolDefinition.
 

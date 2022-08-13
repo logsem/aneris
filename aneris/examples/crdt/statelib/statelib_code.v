@@ -61,9 +61,10 @@ Definition broadcast (ser_st : val) : val :=
 
 Definition statelib_init (st_ser : val) (st_deser : val) : val :=
   λ: "addrlst" "rid" "crdt",
-  let: "init_st" := Fst (Fst "crdt") in
-  let: "mut" := Snd (Fst "crdt") in
-  let: "merge" := Snd "crdt" in
+  let: "c" := "crdt" #() in
+  let: "init_st" := Fst (Fst "c") in
+  let: "mut" := Snd (Fst "c") in
+  let: "merge" := Snd "c" in
   let: "st" := ref ("init_st" #()) in
   let: "lk" := newlock #() in
   let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
@@ -72,5 +73,5 @@ Definition statelib_init (st_ser : val) (st_deser : val) : val :=
   Fork (apply_thread st_deser "lk" "sh" "st" "merge");;
   Fork (broadcast st_ser "lk" "sh" "st" "addrlst" "rid");;
   let: "get" := get_state "lk" "st" in
-  let: "upd" := update "lk" "mut" "st" "rid" in
+  let: "upd" := update "lk" "mut" "rid" "st" in
   ("get", "upd").

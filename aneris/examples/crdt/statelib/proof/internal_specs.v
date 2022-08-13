@@ -76,9 +76,9 @@ Section StateLib_InternalSpecs.
     (h: socket_handle) (sock: socket) (repId: RepId) (sock_addr: socket_address)
     (dstlist: val) : iProp Σ :=
     □ ∀ (m: string),
-      ([∗ list] a ∈ CRDT_Addresses,
-        (▷ a ⤇ socket_proto repId)
-        ∗ ▷ socket_proto repId
+      ([∗ list] k ↦ a ∈ CRDT_Addresses,
+        (▷ a ⤇ socket_proto)
+        ∗ ▷ socket_proto
           {|
             m_sender := sock_addr;
             m_destination := a;
