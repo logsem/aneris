@@ -17,7 +17,8 @@ From aneris.prelude Require Import misc time.
 From aneris.examples.crdt.spec
   Require Import crdt_events crdt_resources crdt_denot crdt_time crdt_base.
 From aneris.examples.crdt.statelib.resources
-  Require Import resources_update resources utils resources_inv resources_local resources_global resources_lock.
+  Require Import resources_update resources utils resources_utils
+    resources_inv resources_local resources_global resources_lock.
 
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.user_model
@@ -88,92 +89,60 @@ Section StateLib_Proof.
     {{{ (getst__fun : val), RET getst__fun; internal_get_state_spec getst__fun i saddr }}}.
   Proof.
     iIntros (φ) "[#Hinv #Hislock] Hφ".
-    rewrite/get_state. wp_pures.
-    iApply "Hφ"; clear φ.
+    wp_lam. wp_pures. iApply "Hφ"; clear φ.
 
     iIntros (Haddr φ) "!> Hpre".
     wp_pures.
     wp_apply (acquire_spec with "Hislock").
-    iIntros (v) "(-> & Hlocked & Hlock_aux)".
-    wp_pures.
-    
-    rewrite/lock_inv_aux.
-    iDestruct "Hlock_aux"
-      as (ip phys_st log_st st_h__local h__for Hip)
-        "(Hloc & %Hcoh & (%f & %Hf & %Hislocal & %isforeign & Hown_loc & Hown_for) & %Hcoh')".
+    iIntros (v) "(-> & Hlocked &
+      (%ip & %phys_st & %log_st & %st_h__local & %st_h__foreign & %Hip &
+        Hloc & %Hcoh & (%f & %Hf & %Hislocal & %isforeign & Hst_h__local & Hst_h__foreign) & %Hcoh'))".
     rewrite Haddr in Hip.
     simplify_eq/=.
-    wp_load.
+    wp_seq. wp_load.
 
     wp_bind (Lam _ _).
     wp_apply (aneris_wp_atomic _ _ (↑CRDT_InvName)).
-    iMod "Hpre" as (s1 s2) "[(%f' & %Hf' & %Hlocal & %Hsub & Hown_local & Hown_sub & #Hlocal_snap) Hclose]".
-    wp_pures.
-
+    iMod "Hpre" as (s1 st_h__sub) "[(%f' & %Hf' & %Hlocal & %Hsub & Hown_local & Hown_sub & #Hlocal_snap) Hclose]".
     assert (f = f') as <-; first by apply fin_to_nat_inj.
-    iDestruct (both_agree_agree with "Hown_loc Hown_local")
-      as "(Hown_loc & Hown_local & <-)".
+    iDestruct (both_agree_agree with "Hst_h__local Hown_local")
+      as "(Hst_h__local & Hown_local & <-)".
 
-    (* open invariant *)
-    iInv "Hinv" as "> (%g & Hglob_ag & Hglob_snap & %Hv & Hglob_local)" "Hclose'".
-    
-    iDestruct ((forall_fin f) with "Hglob_local")
-      as "[(%S' & [%Hnin Hin] & Hother)
-        (%h__local & %h__foreign & %h__subset &
-          %Hproj & %Hlocal_evs & %Hfor_evs & %Hsub_evs & %Hcc &
-          Hown_local' & Hown_foreign' & Hown_subset' & Hown_cc')]".
-    iDestruct (both_agree_agree with "Hown_sub Hown_subset'")
-      as "(Hown_sub & Hown_subset' & ->)".
-    iDestruct (both_agree_agree with "Hown_for Hown_foreign'")
-      as "(Hown_for & Hown_foreign' & ->)".
-    iDestruct (both_agree_agree with "Hown_local' Hown_loc")
-      as "(Hown_local' & Hown_loc & <-)".
 
-    (** Update of the resources: beginning. *)
-    iDestruct (
-      (own_update_2 (γ_loc_sub !!! f) _ _ ((1/3 + 2/3)%Qp, to_agree h__foreign))
-      with "Hown_subset' Hown_sub") as ">[Hown_subset' Hown_sub]".
-    { rewrite -pair_op frac_op agree_idemp.
-      assert (1 / 3 + 2 / 3 = 1)%Qp as ->; first compute_done.
-      by apply cmra_update_exclusive. }
-    iDestruct (
-      (own_update (γ_loc_cc !!! f) _
-      (● princ_ev (h__local ∪ h__foreign) ⋅ ◯ princ_ev (h__local ∪ h__foreign)))
-      with "Hown_cc'") as ">[Hown_cc' #Hfrag]";
-      first by apply monotone_update.
-    (** Update of the resources: end. *)
-
-    iDestruct ((forall_fin' f) with "[Hown_local' Hown_foreign' Hown_subset' Hown_cc' Hin Hother]") as "Hglob_local".
-    { iSplitL "Hother Hin".
-      - iExists S'. iFrame "%". iFrame "Hother Hin".
-      - iExists h__local, h__foreign, h__foreign.
-        iFrame "%". by iFrame. }
-    iMod ("Hclose'" with "[Hglob_snap Hglob_ag Hglob_local]") as "_".
+    (** Begin TODO: move this block to [resources/resources_utils.v] *)
+    iInv "Hinv" as ">(%g & Hown_global & Hown_global_auth & %Hv & HS)" "Hclose'".
+    iDestruct ((forall_fin f) with "HS") as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub' & %Hproj & %Hlocisloc & %Hforisfor & %Hsubisfor & %Hcc & Hown_own_ & Hown_for_ & Hown_sub_ & Hown_cc_ & Hown_cc'_)]".
+    iDestruct (both_agree_agree with "Hown_sub Hown_sub_") as "(Hown_sub & Hown_sub_ & <-)".
+    iDestruct (both_agree_agree with "Hst_h__foreign Hown_for_") as "(Hst_h__foreign & Hown_for_ & <-)".
+    iDestruct (both_agree_agree with "Hst_h__local Hown_own_") as "(Hst_h__local & Hown_own_ & <-)".
+    assert (st_h__sub ⊆ st_h__foreign).
+    { by destruct Hcc as [?%(own_foreign_subset_foreign f) ?]. }
+    iDestruct ((forall_fin' f) with "[$Hothers Hown_sub_ Hown_for_ Hown_cc_ Hown_own_ Hown_cc'_]")
+      as "HS".
+    { iExists st_h__local, st_h__foreign, st_h__sub. iFrame. iFrame "%". }
+    iMod ("Hclose'" with "[Hown_global_auth Hown_global HS]") as "_"; last iModIntro.
     { iNext. iExists g. by iFrame. }
-    iModIntro. wp_pures.
-    iMod ("Hclose" with "[Hown_local Hown_sub]") as "Hφ"; last iModIntro.
-    { repeat iSplit.
-      - iPureIntro.
-        destruct Hcc as [hsub hcc].
-        intros x Hx_in.
-        pose (Hsub _ Hx_in) as Hx_orig.
-        apply (elem_of_union_r _ h__local) in Hx_in as Hx_in'.
-        apply hsub in Hx_in'.
-        apply elem_of_union in Hx_in' as [Hx_in'%Hislocal | Hx_in'];
-          first by exfalso; eauto.
-        exact Hx_in'.
-      - iExists f. iFrame "%". iFrame.
-        iExists f. by iFrame "%".
-      - iFrame "%".
-      - iFrame "%". }
+    (** End TODO: move this block to [resources/resources_utils.v] *)
+ 
+    (** Update of the resources. *)
+    iDestruct ((get_state_update _ f st_h__local st_h__foreign st_h__sub)
+      with "[] Hinv [Hst_h__local Hown_sub] [Hst_h__foreign Hown_local]")
+      as "> [Hown__local Hown_lockinv]"; first trivial.
+    { iExists f. iFrame. by iFrame "#". }
+    { iExists f. by iFrame. }
+    wp_pures.
+
+    iMod ("Hclose" with "[Hown__local]") as "Hφ"; last iModIntro.
+    { iFrame. by iFrame "%". }
 
     wp_pures.
-    wp_apply (release_spec with "[$Hislock $Hlocked Hloc Hown_loc Hown_for]").
-    { iExists (ip_of_address saddr), phys_st, log_st, h__local, h__foreign.
+    wp_apply (release_spec with "[$Hislock $Hlocked Hown_lockinv Hloc]").
+    { iExists (ip_of_address saddr), phys_st, log_st, st_h__local, st_h__foreign.
       rewrite Haddr.
       iFrame "%". iFrame.
       iSplit; first done.
-      iExists f. by iFrame. }
+      iDestruct "Hown_lockinv" as "(%h & %H2 & %H3 & %H4 & j)".
+      iExists h. by iFrame. }
 
     iIntros (v) "->". wp_pures.
     iApply "Hφ".
@@ -184,12 +153,6 @@ Section StateLib_Proof.
   (**       +~~~~~~~~~~~~~~~~~~~~~~~~~~~+
             | Speficication of [update] |
             +~~~~~~~~~~~~~~~~~~~~~~~~~~~+                     **)
-
-  (* TODO: move somewhere else *)
-  Lemma op_coh_sv_val {log_op op} :
-    StLib_Op_Coh log_op op -> ∃ (sv : StLib_SerializableVal), op = StLib_SV_val sv.
-  Proof. Admitted.
-
   Lemma internal_update_spec_holds (repId : nat) (addr : socket_address)
       (lockv mutator__fun : val) (st_loc : loc) (γ__lock : gname) :
     {{{ StLib_GlobalInv ∗
@@ -207,209 +170,101 @@ Section StateLib_Proof.
     wp_pures.
     wp_apply (acquire_spec with "Hlockinv").
     iIntros (v) "(-> & Hlocked & HPlock)".
-    pose proof (op_coh_sv_val Hop_coh) as [sv ->].
     wp_pures.
     iDestruct "HPlock"
       as (ip phys_st log_st h__local h__for Hip)
-        "(Hloc & %Hcoh & (%f & %Hf & %Hislocal & %isforeign & Hown_loc & Hown_for) & %Hcoh')".
+        "(Hloc & %Hcoh & Hown__lockinv & %Hcoh')".
     wp_bind (!_)%E.
-    iInv "Hinv" as "> (%g & Hown_global & Hown_global_snap & %Hv & HS)" "Hclose".
-    iDestruct ((forall_fin f) with "HS")
-      as "[(%S & %S_def & HS)
-        (%h__local_f & %h__foreign_f & %h__loc_f &
-        %Hproj & %islocal_f & %isforeign_f & %isforeign'_f & %iscc_f &
-        Hown_local_f & Hown_for_f & Hown_sub_f & Hown_cc_f)]".
-    iDestruct (both_agree_agree with "Hown_local_f Hown_loc")
-      as "(Hown_local_f & Hown_loc & ->)".
-    iDestruct (both_agree_agree with "Hown_for_f Hown_for")
-      as "(Hown_for_f & Hown_for & ->)".
-    iDestruct ((forall_fin' f) with "[Hown_cc_f Hown_for_f Hown_local_f HS Hown_sub_f]") as "HS".
-    { iSplitL "HS". iExists S. by iFrame.
-      simpl. iExists h__local, h__for, h__loc_f. by iFrame. }
-    wp_apply (aneris_wp_load with "[Hloc]").
-    { iNext. rewrite Haddr_proj in Hip. by simplify_eq/=. }
-    iIntros "Hloc'".
-    iMod ("Hclose" with "[Hown_global Hown_global_snap HS]") as "_"; last iModIntro.
-    { iNext. iExists g. by iFrame. }
-    wp_bind (mutator__fun _ _ _).
-    pose (fresh_event (h__local ∪ h__for) log_op repId) as fev.
-    iDestruct ("mutatorspec" $! addr repId phys_st sv (h__local ∪ h__for) fev log_op log_st) as "mutatorspec'".
-    iApply ("mutatorspec'" with "[]").
-    { pose (mutator_lhst_valid g log_op f Hv f) as Hval.
-      rewrite /= in Hval.
-      repeat iSplit; iPureIntro; try done.
-      - rewrite/fev -Hproj -Hf.
-        exact (fresh_event_is_fresh (g.2 !!! f) f log_op (VGst_lhst_valid _ Hv f)).
-      - apply elem_of_union_r, elem_of_singleton. reflexivity.
-      - intros ev [Hev_in | ->%elem_of_singleton]%elem_of_union Hlt.
-        + assert (ev <_t fev) as Himp.
-          { pose (VGst_lhst_valid _ Hv f) as Hlval.
-            rewrite -Hproj in Hev_in.
-            replace fev with (fresh_event (g.2 !!! f) log_op f);
-              last by rewrite/fev -Hproj -Hf.
-            apply (fresh_event_time_mon (g.2 !!! f) log_op f);
-              try by destruct Hlval. }
-          assert(fev <_t fev);
-            first (apply ts_lt_trans with (EV_Time ev); assumption).
-          apply ts_lt_irreflexive with (EV_Time fev); assumption.
-        + apply ts_lt_irreflexive with (EV_Time fev); assumption.
-      - intros ev ev' Hev_in Hev'_in Ht_eq.
-        apply (mutator_ext_time_preservation g log_op f Hv ev ev');
-          last assumption; simpl.
-        + apply elem_of_union in Hev_in as [Hev_in | ->%elem_of_singleton].
-          * apply elem_of_union_l.
-            rewrite -Hproj in Hev_in.
-            exact (gst_valid_inclusion g f Hv ev Hev_in).
-          * apply elem_of_union_r, elem_of_singleton.
-            by rewrite/fev Hproj Hf.
-        + apply elem_of_union in Hev'_in
-          as [Hev'_in | ->%elem_of_singleton].
-          * apply elem_of_union_l.
-            rewrite -Hproj in Hev'_in.
-            exact (gst_valid_inclusion g f Hv ev' Hev'_in).
-          * apply elem_of_union_r, elem_of_singleton.
-            by rewrite/fev Hproj Hf.
-      - intros ev ev' Hev Hev' Hneq.
-        destruct (VLst_same_orig_comp _ Hval ev ev').
-        + simpl. by rewrite vlookup_insert Hf Hproj -/fev.
-        + simpl. by rewrite vlookup_insert Hf Hproj -/fev.
-        + assumption.
-        + by left.
-        + by right. }
-    clear Hproj Hv g S S_def.
-    iIntros (st') "!> (%log_st' & %Hst'_coh & %Hst'_mut)".
-
-    wp_bind(_ <- _)%E.
     wp_apply (aneris_wp_atomic _ _ (↑CRDT_InvName)).
     iMod "Hpre" as (h_g h__local' h__sub)
-      "[(Hglobstate &
-      %f' & %Hf' & %Hlocalislocal & %Hsubisforeign & Hown_local' & Hown_sub' & #Hlocsnap)
-      Hclose]".
-    iModIntro.
-    wp_store.
-    assert (f = f') as <-.
-    { apply fin_to_nat_inj. by rewrite Hf Hf'. }
-    iInv "Hinv" as "> (%g & Hglob_ag & Hglob_snap & %Hv & Hglob_local)" "Hclose'".
-    iDestruct ((forall_fin f) with "Hglob_local")
-      as "[(%S & [%Hnin %Hin] & HdefS) (%local & %foreign & %sub & %Hg_proj & %locevs & %forevs & %forevs' & %Hcc & Hloc & Hfor & Hsub & Hcc)]".
+      "[[Hown__global Hown__local] Hclose]".
 
-    (** Update of the resources: beginning. *)
-    (** Regrouping owned resources to prepare for an update *)
-    Ltac mypairvalid A B :=
-      ( apply pair_valid in A as [_ A]; simpl in A;
-        apply (to_agree_op_inv_L) in A as B; destruct B;
-        rewrite agree_idemp; clear A ).
-    iCombine "Hglob_ag" "Hglobstate" as "Hglobal".
-    iDestruct (own_valid_l with "Hglobal") as "[%Hvalid Hown_global]".
-    mypairvalid Hvalid Hglobal_eq.
-    iCombine "Hown_loc" "Hloc" as "Hown_loc".
-    iDestruct (own_valid_l with "Hown_loc") as "[%Hvalid Hown_local]".
-    mypairvalid Hvalid Hlocal_eq.
-    iCombine "Hown_local" "Hown_local'" as "Hown_local".
-    iDestruct (own_valid_l with "Hown_local") as "[%Hvalid Hown_local]".
-    mypairvalid Hvalid Hlocal_eq.
-    iDestruct (both_agree_agree with "Hown_for Hfor") as "(Hown_for & Hfor & <-)".
-    iCombine "Hsub" "Hown_sub'" as "Hown_sub".
-    iDestruct (own_valid_l with "Hown_sub") as "[%Hvalid Hown_sub]".
-    mypairvalid Hvalid Hsub_eq.
 
-    assert(1/3 + 2/3 = 1)%Qp as ->; first compute_done.
-    assert(1/3 + 1/3 + 1/3 = 1)%Qp as ->; first compute_done.
+    (** Begin: TODO: move to resources/resources_utils.v *)
+    iAssert (StLib_OwnLocalState repId h__local' h__sub
+      ∗ ∃ (f: fRepId), ⌜fin_to_nat f = repId⌝)%I
+      with "[Hown__local]"
+      as "(Hown__local & %f & %Hf)".
+    { iDestruct "Hown__local" as "(%f & %Hf & H)".
+      iSplitL; last by iExists f.
+      iExists f. by iFrame. }
+    (** End: TODO: move to resources/resources_utils.v *)
 
-    iDestruct (own_update _ _ (((1/3)%Qp, to_agree ( h__local ∪ {[ fev ]} )) ⋅ ((2/3)%Qp, to_agree ( h__local ∪ {[ fev ]} )))
-      with "Hown_local") as "> [Hown_local Hown_local']".
-    { rewrite -pair_op agree_idemp frac_op. by apply cmra_update_exclusive. }
-    iDestruct (own_update _ _ (((1/3)%Qp, to_agree h__for) ⋅ ((2/3)%Qp, to_agree h__for ))
-      with "Hown_sub") as "> [Hsub Hown_sub']".
-    { rewrite -pair_op agree_idemp frac_op. by apply cmra_update_exclusive. }
-    iDestruct (own_update _ _ (((1/3)%Qp, to_agree ( g.1 ∪ {[ fev ]} )) ⋅ ((2/3)%Qp, to_agree (g.1 ∪ {[ fev ]} )))
-      with "Hown_global") as "> [Hown_global' Hown_global]".
-    { rewrite -pair_op agree_idemp frac_op. by apply cmra_update_exclusive. }
-    iDestruct (own_update _ _ (● (g.1 ∪ {[ fev ]}))
-      with "Hglob_snap") as "> Hown_global_snap".
-    { rewrite (auth_update_auth g.1 (g.1 ∪ {[fev]})(g.1 ∪ {[fev]})); first done.
-      apply gset_local_update, union_subseteq_l. }
-    iDestruct (own_update _ _ (● princ_ev (h__local ∪ {[ fev ]} ∪ h__for) ⋅ ◯ princ_ev (h__local ∪ {[fev]} ∪ h__for))
-      with "Hcc") as "> [Hcc #Hcc_frag]".
-    { apply auth_update_alloc. admit. }
 
-    pose (mutator_global_valid g log_op f Hv) as Hv'.
-    assert (fresh_event (g.2 !!! f) log_op f = fev) as Hfev_eq.
-    { unfold fev. by rewrite Hg_proj Hf'. }
-    (** Update of the resources: end. *)
+    (** Begin: TODO: move to resources/resources_utils.v *)
+    iAssert (StLib_OwnLocalState repId h__local h__sub
+      ∗ OwnLockInv repId h__local h__for
+      ∗ ⌜h__local = h__local'⌝)%I
+      with "[Hown__local Hown__lockinv]"
+      as "(Hown__local &  Hown__lockinv & %heq)".
+    { iDestruct "Hown__local" as "(%f' & %Hf' & %Hlocisloc &  %Hsubisfor & Hst_own__loc & Hst_own__sub & Hsnap)".
+      iDestruct "Hown__lockinv" as "(%f'' & %Hf'' & _ & %Hforisfor & Hst_own__loc' & Hst_own__for)".
+      assert(f' = f'') as ->.
+      { apply fin_to_nat_inj. by rewrite Hf' Hf''. }
+      iDestruct (both_agree_agree with "Hst_own__loc Hst_own__loc'")
+        as "(Hst_own__loc & Hst_own__loc' & %heq )".
+      rewrite heq.
+      iSplitL "Hst_own__loc Hst_own__sub Hsnap"; last iSplitL; last done.
+      all: iExists f''; iFrame.
+      - iFrame "%". by rewrite -heq.
+      - iFrame "%". by rewrite -Hf'' -heq. }
+    (** End: TODO: move to resources/resources_utils.v *)
 
-    iMod ("Hclose'" with "[HdefS Hfor Hsub Hcc Hown_global' Hown_global_snap Hown_local]") as "_".
-    { iNext.
-      iExists (g.1 ∪ {[ fev ]}, vinsert f (g.2 !!! f ∪ {[ fev ]}) g.2).
-      iFrame "Hown_global' Hown_global_snap".
-      rewrite -Hfev_eq. iFrame "%".
-      iExists (S ∪ {[ f ]}).
-      iSplit.
-      { iPureIntro. intros f'.
-         destruct (decide (f' = f)) as [-> | Hneq%Hin];
-          [ by apply elem_of_union_r, elem_of_singleton
-          | by apply elem_of_union_l ]. }
-      iApply big_sepS_union; first set_solver.
-      iSplitL "HdefS".
-      - iApply (big_sepS_mono with "HdefS").
-        iIntros (x Hx_in) "(%__local & %__foreign & %__sub & %__Hproj & %__islocal & %__isfor & %__issub & %__iscc & __ownloc & __own)".
-        iExists __local, __foreign, __sub.
-        repeat iSplit; try done.
-        + iPureIntro. simpl. rewrite vlookup_insert_ne; first assumption.
-          set_solver.
-        + iPureIntro. by destruct __iscc.
-        + iPureIntro. by destruct __iscc.
-        + iFrame.
-      - iApply big_sepS_singleton.
-        iExists (h__local ∪ {[ fev ]}), h__for, h__for.
-        iSplitR.
-        { iPureIntro.
-          rewrite vlookup_insert -Hfev_eq Hg_proj. set_solver. }
-        iSplitR.
-        { iPureIntro.
-          by intros e [He_in%locevs | ->%elem_of_singleton]%elem_of_union. }
-        iSplitR; first by iPureIntro.
-        iSplitR; first by iPureIntro.
-        iSplitR; first done.
-        rewrite Hfev_eq. iFrame. }
 
-    assert (Hfev_op: EV_Op fev = log_op); first reflexivity.
+    iDestruct ((LocState_LockInv__sub_in_foreign _ f h__local h__for h__sub)
+      with "[] Hinv [Hown__local] [Hown__lockinv]")
+      as ">(Hown__local & Hown__lockinv & %Htmp)";
+      [trivial | by rewrite -Hf | by rewrite -Hf |].
+    iDestruct ((LocState_LockInv__localisvalid _ f h__local h__for h__sub)
+      with "[] Hinv [Hown__local] [Hown__lockinv]")
+      as ">(Hown__local & Hown__lockinv & %Htmp')";
+      [trivial | by rewrite -Hf | by rewrite -Hf |].
 
-    iDestruct "Hown_local'" as "[Hown_local Hown_local']".
-    replace (2/3/2)%Qp with (1/3)%Qp; last compute_done.
-    iMod ("Hclose" $! fev (g.1 ∪ {[fev]}) (h__local ∪ {[fev]}) h__for with "[Hown_sub' Hown_global Hown_local']") as "Hpost".
-    { repeat iSplit; try done.
-      - iPureIntro. destruct Hcc as [Hsubset _].
-        intros x Hx_in.
-        apply (elem_of_union_r _ h__local) in Hx_in as Hx_in'.
-        apply forevs' in Hx_in.
-        by apply Hsubset in Hx_in' as [?%locevs%Hx_in | Hx_in' ]%elem_of_union.
-      - iPureIntro.
-        rewrite -Hfev_eq. exact (fresh_event_is_fresh_global g f log_op Hv).
-      - iPureIntro.
-        rewrite -Hfev_eq.
-        assert (fresh_event (g.2 !!! f) log_op f ∉ h__local ∪ h__for).
-        { intros Jap.
-          destruct (fresh_event_is_fresh (g.2 !!! f) f log_op (VGst_lhst_valid _ Hv f)).
-          by rewrite -Hg_proj in Jap. }
-        set_solver.
-      - iPureIntro. (** TODO: use fresh is maximal *) admit.
-      - iPureIntro. (** TODO: use fresh is maximal *) admit.
-      - iFrame.
-        iExists f. iFrame "%".
-        iSplit.
-        + iPureIntro.
-          intros e [He_in%Hislocal | ->%elem_of_singleton]%elem_of_union;
-            by rewrite Hf.
-        + iFrame "Hown_sub' Hown_local'". iExists f. iFrame "#".
-          repeat (iSplit; iPureIntro); try done.
-          split; last assumption.
-          intros e [He_in%Hislocal | ->%elem_of_singleton]%elem_of_union;
-            by rewrite Hf. }
 
-    iModIntro.
-    wp_seq.
-    wp_apply (release_spec with "[$Hlockinv $Hlocked Hown_local Hown_for Hloc']").
+    rewrite -Hf.
+    iDestruct ((update_update _ _ log_op) with "[]Hinv Hown__local Hown__lockinv Hown__global")
+      as ">(Hown__local & Hown__lockinv & Hown__global & %fev_g_fresh & %fev_fresh & %fev_maximals & %fev_max & %Hloc_valid)";
+      first trivial; last iModIntro.
+    wp_apply (aneris_wp_load with "[Hloc]").
+    { iNext. rewrite Haddr_proj in Hip. by simplify_eq/=. }
+    wp_pures.
+
+    set fev := fresh_event (h__local ∪ h__for) log_op f.
+
+    rewrite -heq.
+    iIntros "Hloc'".
+    iMod ("Hclose" $! fev (h_g ∪ {[fev]}) (h__local ∪ {[fev]}) h__for with "[Hown__global Hown__local]") as "Hpost"; last iModIntro.
+    { iFrame. iFrame "%".
+      iPureIntro.
+      repeat split; try done.
+      by intros Hin%(elem_of_union_l _ _ h__for). }
+
+    wp_bind (mutator__fun _ _ _).
+    rewrite Hf.
+    iDestruct ("mutatorspec" $! addr repId phys_st op_v (h__local ∪ h__for) fev log_op log_st) as "mutatorspec'".
+    wp_apply ("mutatorspec'" with "[]").
+    { repeat iSplit; try done; iPureIntro.
+      3, 4: by destruct Hloc_valid.
+      - by apply elem_of_union_r, elem_of_singleton.
+      - apply Maximum_correct in fev_max as [_ B].
+        + intros e [He_in | ->%elem_of_singleton]%elem_of_union;
+            last by apply TM_lt_irreflexive.
+          assert (e ≠ fev).
+          { intros Heq. rewrite Heq in He_in. by apply fev_fresh. }
+          assert (e <_t fev);
+            first ( apply B; [ set_solver | assumption] ).
+          intros?.
+          by apply TM_lt_exclusion with (time e) (time fev).
+        + replace (h__local ∪ {[fresh_event (h__local ∪ h__for) log_op f]} ∪ h__for)
+            with (h__local ∪ h__for ∪ {[fresh_event (h__local ∪ h__for) log_op f]});
+            last set_solver.
+          by apply (VLst_ext_time _ Hloc_valid). }
+
+    iIntros (st') "(%log_st' & %Hst'_coh & %Hst'_mut)".
+    wp_bind(_ <- _)%E.
+    wp_store. wp_seq.
+
+    wp_apply (release_spec with "[$Hlockinv $Hlocked Hloc' Hown__lockinv ]").
     { iExists ip, st', log_st', (h__local ∪ {[ fev ]}), h__for.
       iFrame "%".
       iSplitL "Hloc'".
@@ -419,17 +274,18 @@ Section StateLib_Proof.
         replace (h__local ∪ {[fev]} ∪ h__for)
           with (h__local ∪ h__for ∪ {[fev]});
           last set_solver.
-          admit. } (** TODO: use the parameters *)
-      iExists f.
-      iSplit; first done.
-      iSplit.
-      { iPureIntro.
-        by intros x [Hxin%Hislocal | ->%elem_of_singleton]%elem_of_union. }
+        apply st_crdtM_mut_coh with log_st; try done.
+        - by apply Lst_Validity_implies_event_set_valid.
+        - replace (h__local ∪ h__for ∪ {[fev]})
+            with (h__local ∪ {[fev]} ∪ h__for); last set_solver.
+          apply Maximum_correct in fev_max as [??]; first done.
+          replace (h__local ∪ {[fresh_event (h__local ∪ h__for) log_op f]} ∪ h__for)
+            with (h__local ∪ h__for ∪ {[fresh_event (h__local ∪ h__for) log_op f]}); last set_solver.
+          by destruct Hloc_valid. }
       iFrame. }
     iIntros (v ->).
     iApply "Hpost".
-  Admitted.
-
+  Qed.
 
 
   (**       +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
@@ -514,7 +370,7 @@ Section StateLib_Proof.
             >(Hh & %Hsaddr_eq & %Hsaddr_proj & Hsoup & #Hproto_respected))"
             "Hclose".
 
-        wp_apply (aneris_wp_send _  (socket_proto repId) with "[$Hh $Hsoup ]");
+        wp_apply (aneris_wp_send _ socket_proto with "[$Hh $Hsoup ]");
           try done.
         { iDestruct (big_sepL_lookup with "Hprotos") as "[a b]"; first exact Hsome.
           by iSplit. }
@@ -546,11 +402,11 @@ Section StateLib_Proof.
   Lemma internal_broadcast_spec_holds
     (repId : nat) s h (addr : socket_address) (lockv addr_list : val) (st_loc : loc) (γ__lock : gname):
     ⌜is_list CRDT_Addresses addr_list⌝ -∗
-    ⌜repId < length CRDT_Addresses⌝ -∗
+    ⌜repId < length CRDT_Addresses⌝%nat -∗
     ⌜ CRDT_Addresses !! repId = Some addr⌝ -∗
     ⌜ saddress s = Some addr ⌝ -∗
     ⌜ sblock s = true ⌝ -∗
-    ([∗ list] r ∈ CRDT_Addresses, r ⤇ (socket_proto repId)) -∗
+    ([∗ list] k ↦ r ∈ CRDT_Addresses, r ⤇ socket_proto) -∗
     {{{ socket_inv repId h addr s ∗
         internal_sendToAll_spec sendToAll h s repId addr addr_list ∗
         StLib_GlobalInv ∗
@@ -567,20 +423,29 @@ Section StateLib_Proof.
     wp_apply (acquire_spec with "Hlock_inv").
     iIntros (v) "(-> & Hlocked &
       (%ip & %st_v & %st_log & %st_h__local & %st_h__foreign &
-        %Hip & Hloc & %Hst_coh & H_own_lock_inv & %Hdenot))".
+        %Hip & Hloc & %Hst_coh &
+        (%f & %Hf & %Hisloc & %Hisfor & Hown_loc & Hown_for) & %Hdenot))".
     wp_seq.
     wp_bind (!_)%E.
+    iDestruct ((broadcast_update _ f st_h__local st_h__foreign)
+      with "[]Hinv[Hown_loc Hown_for]")
+      as ">(Hown__lockinv & #Hsnap & %Hloc_valid)";
+      first trivial.
+    { iExists f. rewrite Hf. by iFrame. }
+
     wp_apply (aneris_wp_load with "[Hloc]").
     { rewrite Haddr in Hip. by simplify_eq/=. }
     iIntros "Hloc". wp_pures.
-    wp_apply (release_spec with "[$Hlock_inv $Hlocked H_own_lock_inv Hloc]").
-    { iExists ip, st_v, st_log, st_h__local, st_h__foreign. iFrame "%".
-      rewrite Haddr in Hip. simplify_eq/=. iFrame. }
+    wp_apply (release_spec with "[$Hlock_inv $Hlocked Hown__lockinv Hloc]").
+    { iExists ip, st_v, st_log, st_h__local, st_h__foreign.
+      rewrite -Hf. iFrame. iFrame "%".
+      rewrite Haddr in Hip. simplify_eq/=. iFrame.
+      iPureIntro. by rewrite Haddr. }
     iIntros (v ->). wp_seq.
     wp_apply (s_ser_spec);
       first by pose (StLib_StCoh_Ser st_log st_v Hst_coh).
     iIntros (msg Hmsg_ser). wp_let.
-    wp_apply internal_sendToAll_spec_holds; [done | done | done | ].
+    wp_apply internal_sendToAll_spec_holds; [iPureIntro; lia | done | done | ].
     iIntros (v) "Hspec_send2all'".
     wp_apply "Hspec_send2all'"; [ | done | done].
     rewrite big_sepL_sep. iSplit.
@@ -588,9 +453,17 @@ Section StateLib_Proof.
     - rewrite -big_sepL_later. iNext.
       iApply big_sepL_intro.
       iIntros "!> %replica %address %Haddress_proj".
-      iExists st_v, st_log, st_h__local, st_h__foreign, repId.
+      iExists st_v, st_log, st_h__local, st_h__foreign.
       repeat (iSplit; first done).
-  Admitted.
+      iSimplifyEq.
+      pose (lookup_lt_Some CRDT_Addresses replica address Haddress_proj) as Hlen.
+      iExists f, replica, f, (nat_to_fin Hlen).
+      iFrame "%".
+      iSplit; first done.
+      iSplit; last iFrame "Hsnap".
+      iPureIntro.
+      apply fin_to_nat_to_fin.
+  Qed.
 
 
 
@@ -604,7 +477,7 @@ Section StateLib_Proof.
     ⌜ CRDT_Addresses !! repId = Some addr⌝ -∗
     ⌜ saddress s = Some addr ⌝ -∗
     ⌜ sblock s = true ⌝ -∗
-    addr ⤇ (socket_proto repId) -∗
+    addr ⤇ socket_proto -∗
     socket_inv repId h addr s -∗
     {{{
       StLib_GlobalInv ∗
@@ -619,31 +492,27 @@ Section StateLib_Proof.
     iIntros (Haddr Hsaddr Hsblock)
       "#Hproto #Hsock_inv %φ !> (#Hinv & #His_lock & #Hmerge) Hφ".
     wp_lam. wp_pures.
-
     wp_apply (wp_loop_forever _ True);
       last iAssumption.
     clear φ.
     iSplitL; last done.
-
     iIntros "!> %φ _ Hφ".
     wp_lam.
-
     wp_apply (acquire_spec with "His_lock").
     iIntros (v) "(-> & Hlocked &
       (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
-      %Hip & Hloc & %Hcoh & Hown_lock & %Hst_coh))".
+      %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
     assert (Hip_eq: ip_of_address addr = ip).
     { rewrite Haddr in Hip. by simplify_eq/=. }
     wp_seq.
-
     wp_bind(ReceiveFrom _).
     iInv "Hsock_inv" as "(%R & %S & Hh & > (%Haddr_sock & %Haddr_proj & Hsoup & #Hproto_respected))" "Hclose".
     wp_apply ((aneris_wp_receivefrom
-      (ip_of_address addr) addr _ h s R S (socket_proto repId))
+      (ip_of_address addr) addr _ h s R S socket_proto)
       with "[$Hh $Hsoup $Hproto]");
       try assumption; try reflexivity.
     iIntros (m) "[%Hdest
-      [(%Hfresh & Hsock & Hhist & _ & #Hproto_respected_m) |
+      [(%Hfresh & Hsock & Hhist & #Haddr_proto & #Hproto_respected_m) |
       (%Hm_inR & Hh & Hsoup)]]".
     - (** The mesage is fresh *)
       iMod ("Hclose" with "[$Hsock Hhist]") as "_"; last iModIntro.
@@ -655,57 +524,109 @@ Section StateLib_Proof.
       wp_apply wp_unSOME; [ done | iIntros (_) ].
       wp_let. wp_proj.
       iDestruct "Hproto_respected_m"
-        as "(%st'_val & %st'_log & %st'_h__local & %st'_h__foreign &
-          %remote_orig & %Hremote_addr & %Hser &
-          %Hst'_serialization & %Hst'_coherence &
-          %remote_f & %Hremote_f &
-          %Hst'_localislocal & %Hst'_foreignisforeign &
-          #Hst'_own_cc)".
-      wp_apply (s_deser_spec); [ iFrame "%" | iIntros (_) ].
+        as "(%st'_val & %st'_log & %st'_h__local & %st'_h__sub &
+          %senderId & %recipientId & %f_sender & %f_recipient &
+          %Hsender_addr & %Hrecipient_addr & %Hf_sender & %Hf_recipient &
+          %Hst'_ser & %Hst'_coh & %st'_denot & %Hst'_locisloc & %Hst'_subisfor
+          & %Hst'_validity & #Hst'_snap)".
+      assert (recipientId = f) as ->.
+      { rewrite Hf.
+        apply (NoDup_lookup CRDT_Addresses recipientId repId addr);
+          [ by apply CRDT_Addresses_NoDup
+          | by rewrite Hdest in Hrecipient_addr
+          | assumption ]. }
+      assert (f_recipient = f) as ->.
+      { apply fin_to_nat_inj. by rewrite Hf Hf_recipient. }
+      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
       wp_let.
       wp_bind (!_)%E.
+      iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
+        as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
       wp_apply (aneris_wp_load with "[Hloc]").
       { rewrite Haddr_proj in Hip. by simplify_eq/=. }
       iIntros "Hloc".
       wp_bind (merge_fun _ _)%E.
       wp_apply ("Hmerge" $! addr
-        phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__foreign)
+        phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub)
         log_st st'_log).
-      { iFrame "%".
-        admit. }
+      { pose (Lst_Validity_implies_events_ext _ Hv).
+        pose (Lst_Validity_implies_same_orig_comparable _ Hv).
+        pose (Lst_Validity_implies_events_ext _ Hst'_validity).
+        pose (Lst_Validity_implies_same_orig_comparable _ Hst'_validity).
+        iFrame "%". }
       iIntros (st'' (st''_log & Hst''_coh & Hst''_islub)).
       wp_bind (_ <- _)%E.
       wp_store.
+
+
+
       (** Update of the resources: using the [merge_update] lemma. *)
-      iMod ((merge_update ⊤ repId remote_f
-        st_h__local h__foreign st'_h__local st'_h__foreign)
-        with "[][$Hinv][$Hown_lock][Hst'_own_cc]")
-        as "[(%f & %Hf & %Hf_locisloc & %Hf_forisfor &
-          Hown_local & Hown_foreign) %Heq]"; first done.
-      { iExists remote_f. iFrame "%".
-        iSplit; first done.
-        iFrame "Hst'_own_cc". }
+      iDestruct ((merge_update ⊤ f f_sender
+        st_h__local h__foreign st'_h__local st'_h__sub)
+        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap")
+        as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
+        [ trivial | iExists f; iFrame; by rewrite Hf | ].
+      assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
+
+      iDestruct (Lock_RemoteLockSnap__incl
+        with "[]Hinv[Hst_own__local Hst_own__sub]Hst'_snap")
+        as ">[(%f_ & %Hf_ & _ & _ & Hst_own__local & Hst_own__sub) %Hincl]";
+        first trivial.
+      { rewrite Hf. iExists f. iFrame. iFrame "%".
+        iSplit; first (iPureIntro; by rewrite Hf).
+        iPureIntro.
+        intros x [Hx_in%Hf_for | [Hx_orig Hx_in]%elem_of_filter]%elem_of_union;
+          by rewrite Hf. }
+      assert(f_ = f) as ->. { apply fin_to_nat_inj. by rewrite Hf_. }
+
 
       wp_seq.
-      wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hown_local Hown_foreign]").
+      wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hst_own__local Hst_own__sub]").
       { iExists ip, st'', st''_log,
           st_h__local,
           (h__foreign
                   ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                      (st'_h__local ∪ st'_h__foreign)).
+                      (st'_h__local ∪ st'_h__sub)).
         rewrite Hip_eq. iFrame "Hloc". iFrame "%".
         iSplit.
         - iExists f. rewrite-Hf.
-          iFrame "Hown_local Hown_foreign".
           iSplit; first done.
-          iPureIntro.
-          by rewrite Hf.
+          iSplit.
+          { iPureIntro.
+            by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union;
+              first rewrite Hf. }
+          iFrame "Hst_own__local Hst_own__sub".
         - iPureIntro.
-          rewrite Hf Heq.
-          apply (st_crdtM_lub_coh
-            (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__foreign)
-            (log_st) (st'_log)); try done;
-          split; admit. }
+          epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Hst''_islub).
+          assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
+            st_h__local
+              ∪ (h__foreign
+               ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub)))
+            as <-;
+            last done.
+          assert (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub)
+            = (st_h__local ∪ (st'_h__local ∪ st'_h__sub)) ∪ h__foreign) as ->;
+            first set_solver.
+          assert (
+            st_h__local
+            ∪ (h__foreign
+            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
+            =
+            (st_h__local
+            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
+            ∪ h__foreign)
+            as ->;
+            first set_solver.
+          assert (st_h__local ∪ (st'_h__local ∪ st'_h__sub)
+            = st_h__local
+              ∪ filter (λ e, EV_Orig e ≠ f)(st'_h__local ∪ st'_h__sub))
+            as ->; last reflexivity.
+          apply set_eq. intros x. split; last set_solver.
+          intros [Hx_in | Hx_in]%elem_of_union;
+            first by apply  elem_of_union_l.
+          destruct (decide (EV_Orig x = f));
+            [ by apply elem_of_union_l, Hincl, elem_of_filter
+            | by apply elem_of_union_r, elem_of_filter]. }
       iIntros (v ->).
       by iApply "Hφ".
     - (** The message is not fresh. *)
@@ -716,66 +637,251 @@ Section StateLib_Proof.
       { iNext. iExists R, S. iFrame "%". iFrame "#". iFrame. }
       wp_apply wp_unSOME; [done | iIntros (_) ].
       wp_let. wp_proj.
-      iAssert (socket_proto repId m)
-        as "(%st'_val & %st'_log & %st'_h__local & %st'_h__foreign &
-          %remote_orig & %Hremote_addr & %Hser &
-          %Hst'_serialization & %Hst'_coherence &
-          %remote_f & Hremote_f &
-          Hst'_localislocal & Hst'_foreignisforeign &
-          Hst'_own_cc)";
+      iAssert (socket_proto m)
+        as "(%st'_val & %st'_log & %st'_h__local & %st'_h__sub &
+          %senderId & %recipientId & %f_sender & %f_recipient &
+          %Hsender_addr & %Hrecipient_addr & %Hf_sender & %Hf_recipient &
+          %Hst'_ser & %Hst'_coh & %st'_denot & %Hst'_locisloc & %Hst'_subisfor
+          & %Hst'_validity & #Hst'_snap)";
         first by iDestruct (big_sepS_elem_of with "Hproto_respected") as "Hm";
           first exact Hm_inR.
-      wp_apply (s_deser_spec); [ iFrame "%" | iIntros (_) ].
+      assert (recipientId = f) as ->.
+      { rewrite Hf.
+        apply (NoDup_lookup CRDT_Addresses recipientId repId addr);
+          [ by apply CRDT_Addresses_NoDup
+          | by rewrite Hdest in Hrecipient_addr
+          | assumption ]. }
+      assert (f_recipient = f) as ->.
+      { apply fin_to_nat_inj. by rewrite Hf Hf_recipient. }
+      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
       wp_let.
-      wp_apply (aneris_wp_load with "[Hloc]");
-        first by rewrite Hip_eq.
+      wp_bind (!_)%E.
+      iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
+        as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
+      wp_apply (aneris_wp_load with "[Hloc]").
+      { rewrite Haddr_proj in Hip. by simplify_eq/=. }
       iIntros "Hloc".
+      wp_bind (merge_fun _ _)%E.
       wp_apply ("Hmerge" $! addr
-        phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__foreign)
+        phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub)
         log_st st'_log).
-      { iFrame "%".
-        admit. }
+      { pose (Lst_Validity_implies_events_ext _ Hv).
+        pose (Lst_Validity_implies_same_orig_comparable _ Hv).
+        pose (Lst_Validity_implies_events_ext _ Hst'_validity).
+        pose (Lst_Validity_implies_same_orig_comparable _ Hst'_validity).
+        iFrame "%". }
       iIntros (st'' (st''_log & Hst''_coh & Hst''_islub)).
       wp_bind (_ <- _)%E.
       wp_store.
+
+
+
       (** Update of the resources: using the [merge_update] lemma. *)
-      iMod ((merge_update ⊤ repId remote_f
-        st_h__local h__foreign st'_h__local st'_h__foreign)
-        with "[][$Hinv][$Hown_lock][Hst'_own_cc]")
-        as "[(%f & %Hf & %Hf_locisloc & %Hf_forisfor &
-          Hown_local & Hown_foreign) %Heq]"; first done.
-      { iExists remote_f. iFrame "%".
-        iSplit; first done.
-        iFrame "Hst'_own_cc Hst'_localislocal Hst'_foreignisforeign". }
+      iDestruct ((merge_update ⊤ f f_sender
+        st_h__local h__foreign st'_h__local st'_h__sub)
+        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap")
+        as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
+        [ trivial | iExists f; iFrame; by rewrite Hf | ].
+      assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
+
+      iDestruct (Lock_RemoteLockSnap__incl
+        with "[]Hinv[Hst_own__local Hst_own__sub]Hst'_snap")
+        as ">[(%f_ & %Hf_ & _ & _ & Hst_own__local & Hst_own__sub) %Hincl]";
+        first trivial.
+      { rewrite Hf. iExists f. iFrame. iFrame "%".
+        iSplit; first (iPureIntro; by rewrite Hf).
+        iPureIntro.
+        intros x [Hx_in%Hf_for | [Hx_orig Hx_in]%elem_of_filter]%elem_of_union;
+          by rewrite Hf. }
+      assert(f_ = f) as ->. { apply fin_to_nat_inj. by rewrite Hf_. }
+
+
       wp_seq.
-      wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hown_local Hown_foreign]").
+      wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hst_own__local Hst_own__sub]").
       { iExists ip, st'', st''_log,
           st_h__local,
           (h__foreign
                   ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                      (st'_h__local ∪ st'_h__foreign)).
+                      (st'_h__local ∪ st'_h__sub)).
         rewrite Hip_eq. iFrame "Hloc". iFrame "%".
         iSplit.
         - iExists f. rewrite-Hf.
-          iFrame "Hown_local Hown_foreign".
           iSplit; first done.
-          iPureIntro.
-          by rewrite Hf.
+          iSplit.
+          { iPureIntro.
+            by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union;
+              first rewrite Hf. }
+          iFrame "Hst_own__local Hst_own__sub".
         - iPureIntro.
-          rewrite Hf Heq.
-          apply (st_crdtM_lub_coh
-            (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__foreign)
-            (log_st) (st'_log)); try done;
-          split; admit. }
+          epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Hst''_islub).
+          assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
+            st_h__local
+              ∪ (h__foreign
+               ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub)))
+            as <-;
+            last done.
+          assert (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub)
+            = (st_h__local ∪ (st'_h__local ∪ st'_h__sub)) ∪ h__foreign) as ->;
+            first set_solver.
+          assert (
+            st_h__local
+            ∪ (h__foreign
+            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
+            =
+            (st_h__local
+            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
+            ∪ h__foreign)
+            as ->;
+            first set_solver.
+          assert (st_h__local ∪ (st'_h__local ∪ st'_h__sub)
+            = st_h__local
+              ∪ filter (λ e, EV_Orig e ≠ f)(st'_h__local ∪ st'_h__sub))
+            as ->; last reflexivity.
+          apply set_eq. intros x. split; last set_solver.
+          intros [Hx_in | Hx_in]%elem_of_union;
+            first by apply  elem_of_union_l.
+          destruct (decide (EV_Orig x = f));
+            [ by apply elem_of_union_l, Hincl, elem_of_filter
+            | by apply elem_of_union_r, elem_of_filter]. }
       iIntros (v ->).
       by iApply "Hφ".
-  Admitted.
+
+    Unshelve.
+    all: by apply Lst_Validity_implies_event_set_valid.
+  Qed.
+
 
 
   (**       +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
             | Speficication of [statelib_init] |
             +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+              **)
-  (** Not proven yet. *)
+  Definition user_tok i : iProp Σ :=
+    own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
+    own (γ_loc_sub !!! i) ((2/3)%Qp, to_agree ∅) ∗
+    own (γ_loc_cc  !!! i) (◯ (princ_ev ∅)).
 
+  Definition lock_tok i : iProp Σ :=
+    own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
+    own (γ_loc_for !!! i) ((1/2)%Qp, to_agree ∅).
+  Definition internal_init_spec : iProp Σ :=
+    ∀ (repId : fRepId) addr fixed_addrs addrs_val crdt_val,
+    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
+         ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
+         ⌜addr ∈ fixed_addrs⌝ ∗
+         fixed fixed_addrs ∗
+         ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ socket_proto repId) ∗
+         addr ⤳ (∅, ∅) ∗
+         free_ports (ip_of_address addr) {[port_of_address addr]} ∗
+         user_tok repId ∗
+         lock_tok repId ∗
+         crdt_fun_spec crdt_val
+    }}}
+      statelib_init StLib_StSerialization.(s_serializer).(s_ser)
+                    StLib_StSerialization.(s_serializer).(s_deser)
+                    addrs_val
+                    #repId
+                    crdt_val @[ip_of_address addr]
+    {{{ gs_val upd_val, RET (gs_val, upd_val);
+        StLib_OwnLocalState repId ∅ ∅ ∗
+        internal_get_state_spec gs_val repId addr ∗
+        internal_update_spec upd_val repId addr
+    }}}.
+
+  Lemma internal_init_spec_holds :
+    StLib_GlobalInv -∗ internal_init_spec.
+  Proof.
+    iIntros "#Hinv" (i addr fixed_addr addrs_val crdt_val).
+    iModIntro.
+    iIntros (φ) "(%Hislist&%Haddr&%Haddr_fixed&#Hfixed&#Hprotos&Hsoup&Hfree&Huser_tok&Hlock_tok&#Hcrdt_spec)Hφ".
+    wp_lam. wp_pures.
+    wp_apply "Hcrdt_spec"; first trivial.
+    iIntros (v) "(%init_st_fn & %mutator_fn & %merge_fn & -> &
+      #init_st_spec & #mutator_spec & #merge_spec)".
+    wp_pures.
+    wp_apply "init_st_spec"; first trivial.
+    iIntros (st Hcoh_st).
+    wp_alloc stp as "Hstp". wp_pures.
+    wp_apply ((newlock_spec (nroot .@ "stateliblock") _ (lock_inv_aux i stp)) with "[Hlock_tok Hstp]").
+    { iExists (ip_of_address addr), st, st_crdtM_init_st, ∅, ∅.
+      iSplit; first by rewrite Haddr/=.
+      iFrame.
+      iFrame "%".
+      iSplit.
+      - iExists i.
+        repeat (iSplit; first done).
+        iFrame.
+      - iPureIntro.
+        replace (∅ ∪ ∅) with (∅: Lst LogOp); last set_solver.
+        exact st_crdtM_init_st_coh. }
+    iIntros (lockp γ_lock) "#Hislock". wp_let.
+    wp_apply aneris_wp_new_socket; first trivial.
+    iIntros (h) "Hh". wp_pures.
+    wp_apply (wp_list_nth_some _ i CRDT_Addresses).
+    { iSplit; iPureIntro; first assumption.
+      pose (fin_to_nat_lt i). lia. }
+    iIntros (v (a & -> & HH)).
+    assert (a = addr) as ->.
+    { apply nth_error_lookup in HH. rewrite Haddr in HH. by simplify_eq/=. }
+    wp_apply wp_unSOME; first trivial.
+    iIntros (_).
+    wp_let.
+    wp_apply (aneris_wp_socketbind_static with "[Hh Hfree]"); try done.
+    - admit.
+    - iSplit; first iFrame "#".
+      iSplitL "Hfree"; iFrame.
+    - iIntros "Hh".
+      wp_pures.
+      wp_apply aneris_wp_fork.
+      iSplitL; first (iNext; wp_seq; wp_apply aneris_wp_fork; iSplitL); iNext.
+      + wp_pures.
+        wp_apply (internal_get_state_spec_holds with "[Hislock]").
+        { admit. }
+        iIntros (getst_fun) "getstate_spec".
+        wp_pures. 
+        wp_apply (internal_update_spec_holds with "[]").
+        { iFrame "#". admit. }
+        iIntros (update_fun) "update_spec".
+        wp_pures. iApply "Hφ".
+        iFrame.
+        admit.
+      + wp_apply internal_broadcast_spec_holds; try done; admit.
+      + wp_apply apply_thread_spec; try done. admit.
+  Admitted.
 End StateLib_Proof.
 
+
+
+Section StLibSetup.
+
+(** TODO: setup the library for aient to use:
+  * From true, derive the existence of initial resources (using the above
+  * section)
+  * + init spec. *)
+
+End StLibSetup.
+
+Section Instantiation.
+
+  (**TODO: adapt.
+  Context {LogOp LogSt : Type}.
+  Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
+            !CRDT_Params, !StLib_Params LogOp LogSt, !Internal_StLibG LogOp Σ,
+            !RCBG Σ}.
+
+  Global Instance init_fun_instance : StLib_Init_Function := { init := oplib_init ser_fun deser_fun }.
+  Global Instance oplib_res_instance `{!RCB_resources Mdl Σ, !StLib_InvGhostNames} : StLib_Res LogOp := {
+      StLib_InitToken := oplib_init_token;
+      StLib_SocketProto := RCB_socket_proto;
+  }.
+
+  Program Global Instance oplib_setup_instance : StLibSetup.
+  Next Obligation.
+    iIntros (E) "_".
+    iMod (oplib_setup with "[//]") as (res names) "(#Hinv & Hglob & Htoks & #Hinit)".
+    iModIntro.
+    iExists oplib_res_instance.
+    simpl.
+    iFrame "Hinv Hglob Htoks Hinit".
+  Qed. *)
+
+End Instantiation.

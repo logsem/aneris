@@ -38,6 +38,7 @@ Section RequiredRAs.
     γ_loc_for: vec gname (length CRDT_Addresses);
     γ_loc_sub: vec gname (length CRDT_Addresses);
     γ_loc_cc : vec gname (length CRDT_Addresses);
+    γ_loc_cc' : vec gname (length CRDT_Addresses);
   }.
 End RequiredRAs.
 Arguments Internal_StLibG (CRDT_Op) {_ _} (Σ).

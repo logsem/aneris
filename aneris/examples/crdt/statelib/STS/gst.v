@@ -9,7 +9,7 @@ From aneris.examples.crdt.statelib.STS Require Import lst.
 Require Import Decidable.
 
 Section Gst_definition.
-  Context `{!anerisG Mdl Σ, !CRDT_Params}.
+  Context `{!CRDT_Params}.
   Context `{Op: Type, !EqDecision Op, !Countable Op}.
 
   Definition Gst : Type :=
@@ -72,3 +72,39 @@ End Gst_definition.
 Arguments Gst {_} (Op) {_ _}.
 
 
+Section Gst_helper.
+  Context `{!CRDT_Params}.
+  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+
+  Lemma in_valid_gst__in_orig_local (h: Lst Op) (g: Gst Op) (f: fRepId):
+    Gst_Validity g →
+    h ⊆ g.1 → filter (λ e, EV_Orig e = f) h ⊆ g.2 !!! f.
+  Proof.
+    intros Hv Hsubset x [Hx_orig Hx_in%Hsubset]%elem_of_filter.
+    destruct (VGst_incl_orig _ Hv x Hx_in) as (i & Hi & Hx_in').
+    assert (i = f) as ->; last assumption.
+    apply fin_to_nat_inj. by rewrite Hi Hx_orig.
+  Qed.
+
+  Lemma in_valid_gst__eq_proj_foreign (h: Lst Op) (g: Gst Op) (f: fRepId):
+    Gst_Validity g →
+    h ⊆ g.1 →
+      g.2 !!! f ∪ filter (λ e, EV_Orig e ≠ f) h = g.2 !!! f ∪ h.
+  Proof.
+    intros Hv Hsubset.
+    pose (in_valid_gst__in_orig_local h g f Hv Hsubset).
+    (** filter lemmas require as much work as the direct approach. *)
+    apply set_eq. intros x. split.
+    - intros [Hx_in | [Hx_orig Hx_in]%elem_of_filter]%elem_of_union;
+      [ by apply elem_of_union_l | by apply elem_of_union_r ].
+    - intros [ Hx_in | Hx_in ]%elem_of_union;
+        first by apply elem_of_union_l.
+      destruct (decide (EV_Orig x = f)).
+      + apply elem_of_union_l. apply Hsubset in Hx_in.
+        destruct (VGst_incl_orig _ Hv x Hx_in) as (i & Hi & Hin).
+        assert (i = f) as ->; last assumption.
+        apply fin_to_nat_inj. by rewrite Hi e.
+      + by apply elem_of_union_r, elem_of_filter.
+  Qed.
+
+End Gst_helper.

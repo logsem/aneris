@@ -17,7 +17,7 @@ From aneris.prelude Require Import misc time.
 From aneris.examples.crdt.spec
   Require Import crdt_events crdt_resources crdt_denot crdt_time crdt_base.
 From aneris.examples.crdt.statelib.resources
-  Require Import resources utils resources_inv resources_local resources_global resources_lock.
+  Require Import resources utils resources_inv resources_local resources_global resources_lock resources_utils.
 
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.user_model
@@ -42,264 +42,393 @@ Section Resources_updates.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
 
-  Lemma merge_update
-    E
-    (repId: RepId) (remote_f: fRepId)
-    (st_h__local st_h__foreign st'_h__local st'_h__foreign: Lst LogOp) :
-    ⌜↑CRDT_InvName ⊆ E⌝ -∗
-    StLib_GlobalInv -∗
-    OwnLockInv repId st_h__local st_h__foreign -∗
-    StLib_OwnLocalSnap remote_f st'_h__local st'_h__foreign
-      ={E, E}=∗
-      OwnLockInv repId
-        st_h__local
-        (st_h__foreign
-          ∪ (filter (λ e, EV_Orig e ≠ repId) (st'_h__local ∪ st'_h__foreign)))
-      ∗
-        ⌜ st_h__local ∪ (st_h__foreign
-          ∪ filter (λ e : Event LogOp, EV_Orig e ≠ repId)
-            (st'_h__local ∪ st'_h__foreign))
-          = st_h__local ∪ st_h__foreign ∪ (st'_h__local ∪ st'_h__foreign) ⌝.
+
+
+  Lemma get_state_update E (i: fRepId) st_h__local st_h__foreign st_h__sub:
+    ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
+    StLib_GlobalInv
+      -∗ StLib_OwnLocalState i st_h__local st_h__sub
+      -∗ OwnLockInv i st_h__local st_h__foreign
+      ={E, E}=∗ StLib_OwnLocalState i st_h__local st_h__foreign
+        ∗ OwnLockInv i st_h__local st_h__foreign.
   Proof.
-    iIntros (Hincl)
-      "#Hinv Hown_lock (%remote_f' & %Hremote_f_eq &
-      %Hremote_local & %Hremote_foreign & #Hst'_own_cc)".
-    assert (remote_f' = remote_f) as ->;
-      first by apply fin_to_nat_inj.
+    iIntros (Hincl) "#Hinv
+      (%f & %Hf & _ & _ & Hst_own__local & Hst_own__sub & Hown_localsnap)
+      (%f' & %Hf' & _ & _ & Hst_own__local' & Hst_own__foreign')".
+    iInv "Hinv" as ">(%g & Hown_global & Hown_global_snap & %Hv & HS)" "Hclose".
+    iDestruct ((forall_fin i) with "HS")
+      as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub' & %Hst_proj &
+        %st_locisloc & %st_forisfor & %st_subisfor & %Hst_cc &
+        Hst_own__local'' & Hst_own__for'' & Hst_own__sub'' & Hst_own__cc'' & Hst_own__cc''')]".
+    assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite-Hf. }
+    assert (f = f') as <-. { apply fin_to_nat_inj. by rewrite Hf'. }
 
-    iInv "Hinv" as "> (%g & Hown_global & Hown_global_snap & %Hv & HS)" "Hclose".
+    (** Unification of the history names *)
+    iDestruct (both_agree_agree with "Hst_own__local Hst_own__local''")
+      as "(Hst_own__local & Hst_own__local'' & <-)".
+    iDestruct (both_agree_agree with "Hst_own__sub Hst_own__sub''")
+      as "(Hst_own__sub & Hst_own__sub'' & <-)".
+    iDestruct (both_agree_agree with "Hst_own__foreign' Hst_own__for''")
+      as "(Hst_own__foreign' & Hst_own__for'' & <-)".
     
-    (* *** α) from HS:
-     *       → st'__h__local ∪ st'_h__foreign ⊆_cc g.2 !!! (f_remote)
-     *       → h__local ∪ h__foreign = g.2 !!! f
-     *
-     * *** β) from STS:
-     *       → updated g is valid (Gst-wise)
-     *       → filter (not from f) (st'_h__local ∪ st'_h__foreign)
-     *           ⊆_cc h__local ∪ h__foreign
-     * NB: remember that
-     *     the updated version of g.2 !!! f
-     *     is equal to (h__local ∪ h_foreign ∪ st'_h__local ∪ st'_h__foreign)
-     *
-     * *** γ) Actual resource update:
-     *       → resources:  only affects h__foreign
-     *       → properties: affects both GlobInv and OwnLock
-     *)
-    iDestruct ((forall_fin remote_f) with "HS")
-      as "[(%T & [%HT_nin%HT_def] & HT_res)
-        (%st'_h__local' & %st'_h__foreign' & %st'_h__sub' & %Hremote_proj &
-        %Hst'_local' & %Hst'_foreign' & %Hst'_sub' & %Hst'_cc' &
-        Hremote_own_local' & Hremote_own_foreign' & Hremote_own_sub' &
-        Hremote_own_cc')]".
-    iAssert (
-      own (γ_loc_cc !!! remote_f) (● princ_ev (st'_h__local' ∪ st'_h__sub'))
-      ∗ ⌜st'_h__local ∪ st'_h__foreign ⊆_cc g.2 !!! remote_f⌝)%I
-      with "[Hremote_own_cc' Hst'_own_cc]"
-      as "[Hremote_own_cc' [%Hst'_subset%Hst'_depclosed]]".
-    { rewrite Hremote_proj.
-      iDestruct (princ_ev__subset_cc' with "Hst'_own_cc Hremote_own_cc'")
-        as "[Hremote_onw_cc %Hcc]".
-      iFrame. iPureIntro.
-      destruct Hst'_cc' as [Hsub' Hcc']. destruct Hcc as [Hsub Hcc].
-      split.
-      - intros x Hx_in%Hsub. by apply Hsub'.
-      - intros x y Hx_in Hy_in Hxy_le Hy_in''.
-        (** TODO: use the transitivity uf ⊆_cc instead. *)
-        assert (Hy_in': y ∈ st'_h__local' ∪ st'_h__sub');
-          first by apply Hsub in Hy_in''.
-        by apply (Hcc x y (Hcc' x y Hx_in Hy_in Hxy_le Hy_in')). }
+    (** Combination of the resources (related to sub) to prepare the updates *)
+    iCombine "Hst_own__sub" "Hst_own__sub''" as "Hst_own__sub".
 
-    iDestruct ((forall_fin' remote_f)
-      with "[HT_res Hremote_own_local' Hremote_own_foreign' Hremote_own_sub'
-        Hremote_own_cc']")
-      as "HS".
-    { iSplitL "HT_res".
-      - iExists T. by iFrame "HT_res".
-      - simpl.
-        iExists st'_h__local', st'_h__foreign', st'_h__sub'. by iFrame. }
-    clear T HT_nin HT_def.
+    (** Update st_h__sub → st_h__for *)
+    iDestruct(own_update _ _ ((2/3 + 1/3)%Qp, to_agree st_h__foreign)
+      with "Hst_own__sub")
+      as ">[Hst_own__sub Hst_own__sub']".
+    { assert (2/3 + 1/3 = 1)%Qp as ->; first compute_done.
+      by apply cmra_update_exclusive. }
+    iDestruct (own_update _ _
+      (● princ_ev (st_h__local ∪ st_h__foreign)
+        ⋅ ◯ princ_ev (st_h__local ∪ st_h__foreign ))
+      with "Hst_own__cc''")
+      as ">[Hst_own_cc'' #Hfrag]"; first by apply monotone_update.
 
-    iDestruct "Hown_lock" as "(%f & %Hf & %Hloc & %Hfor & Hown_local & Hown_for)".
-    iDestruct ((forall_fin f) with "HS")
-      as "[(%T & [%HT_nin%HT_def] & HT_res)
-        (%h__local & %h__foreign & %st_h__sub &
-        %Hf_proj & %Hst_local & %Hst_foreign & %Hst_sub & %Hst_cc &
-        Hf_own_local & Hf_own_foreign & Hf_own_sub & Hf_own_cc)]".
-    (** unification of the names of local and foreign histories on repId *)
-    iDestruct (both_agree_agree with "Hown_local Hf_own_local")
-      as "(Hown_local & Hf_own_local & <-)".
-    iDestruct (both_agree_agree with "Hown_for Hf_own_foreign")
-      as "(Hown_for & Hf_own_foreign & <-)".
-
-    (** A few assertions on the new state wrt. equality and subseteq. *)
-    assert (H1in:
-      filter (λ e, EV_Orig e = f) (st'_h__local ∪ st'_h__foreign)
-        ⊆ g.2 !!! f).
-    { intros e [He_orig He_in%Hst'_subset%gst_valid_inclusion]%elem_of_filter;  
-        last exact Hv.
-      destruct (VGst_incl_orig _ Hv e He_in) as (i & Hi & Hiin).
-      assert (f = i) as ->.
-      { apply fin_to_nat_inj. by rewrite Hi He_orig. }
-      assumption. }
-    assert (Heq:
-      st_h__local ∪ (st_h__foreign
-        ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-          (st'_h__local ∪ st'_h__foreign))
-        = st_h__local ∪ st_h__foreign ∪ (st'_h__local ∪ st'_h__foreign)).
-    { pose (filter_union_complement
-        (λ e, EV_Orig e = f) (st'_h__local ∪ st'_h__foreign))
-        as Hpartition.
-      apply set_eq. intros x. split.
-      - intros [?|[?|[_?]%elem_of_filter]%elem_of_union]%elem_of_union;
-        [ by apply elem_of_union_l, elem_of_union_l
-        | by apply elem_of_union_l, elem_of_union_r
-        | by apply elem_of_union_r].
-      - intros [[?|?]%elem_of_union | [Hx_in%H1in|?]%Hpartition%elem_of_union]%elem_of_union;
-          [ by apply elem_of_union_l
-          | by apply elem_of_union_r, elem_of_union_l
-          | rewrite Hf_proj in Hx_in
-          |by apply elem_of_union_r, elem_of_union_r].
-        apply elem_of_union in Hx_in as [?|?];
-          [ by apply elem_of_union_l
-          | by apply elem_of_union_r, elem_of_union_l]. }
-
-    assert(
-      g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign) =
-      g.2 !!! f
-        ∪ filter
-            (λ e : Event LogOp, EV_Orig e ≠ f)
-            (st'_h__local ∪ st'_h__foreign)).
-    { pose (filter_union_complement
-        (λ e, EV_Orig e = f) (st'_h__local ∪ st'_h__foreign))
-        as Hpartition.
-      apply set_eq.
-      intros x. split.
-      - intros [?|[?%H1in|?]%Hpartition%elem_of_union]%elem_of_union;
-          [by apply elem_of_union_l 
-          | by apply elem_of_union_l
-          | by apply elem_of_union_r].
-      - intros [?|[_?]%elem_of_filter]%elem_of_union;
-        [ by apply elem_of_union_l
-        | by apply elem_of_union_r ]. }
-    assert(
-      foreign_events f
-        (st_h__foreign
-         ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-             (st'_h__local ∪ st'_h__foreign)));
-      first by intros e
-        [He_in%Hst_foreign | [He_norig _]%elem_of_filter]%elem_of_union.
-    assert(
-      st_h__local ∪ st_h__sub
-      ⊆_cc g.2 !!! f
-        ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__foreign)).
-    { split. destruct Hst_cc as [Hsubset Hcc].
-      - intros e He_in%Hsubset. rewrite Hf_proj.
-        by apply elem_of_union_l.
-      - destruct Hst_cc as [Hst_subset Hst_depclosed].
-        pose (VLst_dep_closed _ (VGst_lhst_valid _ Hv f)) as Hst_dc.
-        intros x y
-          [ Hx_in | Hx_in ]%elem_of_union [ Hy_in | Hy_in ]%elem_of_union
-          Hxy_le Hy_in'.
-        + apply (Hst_depclosed x y); try done;
-            [by rewrite -Hf_proj | by apply Hst_subset].
-        + apply (Hst_depclosed x y); try done;
-            [by rewrite -Hf_proj | by apply Hst_subset].
-        + apply (Hst_depclosed x y); try done;
-            [ | by apply Hst_subset].
-          destruct (Hst_dc y (get_evid x) Hy_in) as (z & Hz_in & Hz_evid).
-          { admit. }
-          rewrite Hf_proj in Hz_in.
-          assert (x = z) as ->; last done.
-          { apply (VLst_ext_eqid _ (VGst_hst_valid _ Hv) x z); last done.
-            - apply gst_valid_inclusion with remote_f; first assumption.
-              apply elem_of_filter in Hx_in as [_ Hx_in].
-              rewrite Hremote_proj.
-              admit.
-            - by apply gst_valid_inclusion with f; last rewrite Hf_proj. }
-        + apply (Hst_depclosed x y); try done;
-            [ | by apply Hst_subset].
-          admit. }
-
-    iApply fupd_frame_r.
-    iSplit; last by rewrite -Hf.
-    iExists f. iFrame "%".
-
-    assert(Hdc: dep_closed (st'_h__local ∪ st'_h__foreign)).
-    { intros x e Hx_in He_in.
-      apply Hst'_subset in Hx_in as Hx_in'.
-      destruct (VLst_dep_closed _ (VGst_lhst_valid _ Hv remote_f) x e Hx_in' He_in)
-        as (e' & He'_in & He_eid).
-      exists e'. split; last by rewrite He_eid.
-      apply (Hst'_depclosed e' x He'_in Hx_in'); last assumption.
-      admit. }
-    pose (merge_global_valid g f remote_f (st'_h__local ∪ st'_h__foreign)
-      Hv Hst'_subset Hdc) as Hv'.
-
-    iDestruct (own_update_2 (γ_loc_for !!! f) (½, to_agree st_h__foreign) (½, to_agree st_h__foreign)
-      (((1/2)%Qp, to_agree (st_h__foreign ∪ (filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__foreign))))
-      ⋅ ((1/2)%Qp, to_agree (st_h__foreign ∪ (filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__foreign)))))
-      with "Hf_own_foreign Hown_for")
-      as "> [Hf_own_foreign Hown_for]".
-    { do 2 rewrite -pair_op frac_op Qp_half_half agree_idemp.
-        by apply cmra_update_exclusive. }
-
-    iDestruct ((big_sepS_mono
-      (λ k, StLib_GlibInv_local_part k g) (λ k, StLib_GlibInv_local_part k (g.1, vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2)))
-      with "[$HT_res]") as "HT_res".
-    { iIntros (x Hx_in) "(%hloc & %hfor & %hsub & %Hproj & Hreste)".
-      iExists hloc, hfor, hsub. iFrame.
-      rewrite vlookup_insert_ne; first done.
-      intros Heq'. rewrite -Heq' in Hx_in. by destruct HT_nin. }
-
+    (** Closing the invariant *)
     iDestruct ((forall_fin' f)
-      with "[HT_res Hf_own_local Hf_own_foreign Hf_own_sub Hf_own_cc]")
-      as "HS".
-    { iSplitL "HT_res".
-      - iExists T. by iFrame "HT_res".
-      - simpl.
-        iExists
-          st_h__local,
-          (st_h__foreign
-            ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                (st'_h__local ∪ st'_h__foreign)),
-          st_h__sub.
-        replace (
-          st_h__local
-          ∪ (st_h__foreign
-            ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                (st'_h__local ∪ st'_h__foreign)))
-          with
-            (g.2 !!! f
-              ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                  (st'_h__local ∪ st'_h__foreign)); last first.
-        { rewrite Hf_proj. symmetry.
-          rewrite Heq.
-          pose (filter_union_complement
-            (λ e, EV_Orig e = f) (st'_h__local ∪ st'_h__foreign))
-            as Hpartition.
-          apply set_eq. intros x. split.
-          - intros [[?|?]%elem_of_union|[?%H1in|Hx_in]%Hpartition%elem_of_union]%elem_of_union;
-              [ by do 2 apply elem_of_union_l
-              | by apply elem_of_union_l, elem_of_union_r
-              | apply elem_of_union_l; by rewrite -Hf_proj
-              | by apply elem_of_union_r].
-          - intros [[?|?]%elem_of_union | [_?]%elem_of_filter]%elem_of_union;
-            [ by do 2 apply elem_of_union_l
-            | by apply elem_of_union_l, elem_of_union_r
-            | by apply  elem_of_union_r]. }
+      with "[$Hothers Hst_own__local'' Hst_own__foreign' Hst_own__sub'
+        Hst_own_cc'' Hst_own__cc''']") as "HS".
+    { iExists st_h__local, st_h__foreign, st_h__foreign. by iFrame. }
+    iMod ("Hclose" with "[Hown_global_snap Hown_global HS]") as "_";
+      last iModIntro.
+    { iNext. iExists g. by iFrame. }
+
+    iSplitR "Hst_own__for'' Hst_own__local'".
+    - iExists f. rewrite/StLib_OwnLocalSnap. iFrame "%". iFrame.
+      iExists f. by iFrame "#".
+    - iExists f. by iFrame.
+  Qed.
+
+
+
+  Lemma update_update E (i: fRepId) op st_h__local st_h__foreign st_h__sub h:
+    let fev := fresh_event (st_h__local ∪ st_h__foreign) op i in
+    ⌜ ↑CRDT_InvName ⊆ E ⌝
+    -∗ StLib_GlobalInv
+    -∗ StLib_OwnLocalState i st_h__local st_h__sub
+    -∗ OwnLockInv i st_h__local st_h__foreign
+    -∗ StLib_OwnGlobalState h
+    ={E,E}=∗
+      StLib_OwnLocalState i (st_h__local ∪ {[fev]}) st_h__foreign
+      ∗ OwnLockInv i (st_h__local ∪ {[fev]}) st_h__foreign
+      ∗ StLib_OwnGlobalState (h ∪ {[ fev ]})
+      ∗ ⌜fev ∉ h ⌝
+      ∗ ⌜fev ∉ st_h__local ∪ st_h__foreign ⌝
+      ∗ ⌜fev ∈ Maximals (h ∪ {[fev]}) ⌝
+      ∗ ⌜Maximum (st_h__local ∪ {[fev]} ∪ st_h__foreign) = Some fev ⌝
+      ∗ ⌜Lst_Validity (st_h__local ∪ st_h__foreign ∪ {[fev]})⌝.
+  Proof.
+    iIntros (fev Hincl) "#Hinv Hown__local Hown__lockinv Hown__global".
+
+    (** Get the resources from the local state, global invariant and lock *)
+    iInv "Hinv" as ">(%g & Hg_ag & Hg_auth & %Hv & HS)" "Hclose".
+    iDestruct ((forall_fin i) with "HS")
+      as "[Hothers (%st_h__local' & %st_h__forign' & %st_h__sub' & %Hst_proj &
+        %Hlocisloc & %Hforisfor & %Hsubisfor & %Hcc &
+        Hst_own__local & Hst_own__foreign & Hst_own__sub &
+        Hst_own__cc & Hst_own__cc')]".
+    iDestruct "Hown__local" as "(%f & %Hf & _ & _ & Hst_own__local' & Hst_own__sub' & #Hlocsnap)".
+    iDestruct "Hown__lockinv" as "(%f' & %Hf' & _ & _ & Hst_own__local'' & Hst_own__foreign'')".
+
+    (** Unify i, f and f' *)
+    assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite Hf. }
+    assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
+
+    (** Unify the names of st_h_* *)
+    iDestruct (both_agree_agree with "Hst_own__local Hst_own__local'")
+      as "(Hst_own__local & Hst_own__local' & ->)".
+    iDestruct (both_agree_agree with "Hst_own__sub Hst_own__sub'")
+      as "(Hst_own__sub & Hst_own__sub' & ->)".
+    iDestruct (both_agree_agree with "Hst_own__foreign Hst_own__foreign''")
+      as "(Hst_own__foreign & Hst_own__foreign'' & ->)".
+    iDestruct (both_agree_agree with "Hg_ag Hown__global")
+      as "(Hg_ag & Hown__global & <-)".
+
+
+    (** Combining the resources to prepare their update. *)
+    iCombine "Hst_own__local" "Hst_own__local'" as "Hst_own__local".
+    iCombine "Hst_own__local" "Hst_own__local''" as "Hst_own__local".
+    iCombine "Hst_own__sub" "Hst_own__sub'" as "Hst_own__sub".
+    iCombine "Hg_ag" "Hown__global" as "Hg_ag".
+
+    (** Update of the agreeing resources *)
+    iDestruct (own_update _ _ ((1/3 + 1/3 + 1/3)%Qp, to_agree (st_h__local ∪ {[fev]}))
+      with "Hst_own__local")
+      as ">[[Hst_own__local Hst_own__local' ] Hst_own__local'']".
+    { assert(1/3 + 1/3 + 1/3 = 1)%Qp as ->; first compute_done.
+      by apply cmra_update_exclusive. }
+
+    iDestruct (own_update _ _ ((1/3 + 2/3)%Qp, to_agree st_h__foreign)
+      with "Hst_own__sub")
+      as "> (Hst_own__sub & Hst_own__sub')".
+    { assert(1/3 + 2/3 = 1)%Qp as ->; first compute_done.
+      by apply cmra_update_exclusive. }
+
+    iDestruct (own_update _ _ ((1/3 + 2/3)%Qp, to_agree (g.1 ∪ {[fev]}))
+      with "Hg_ag")
+      as "> (Hg_ag & Hown__global)".
+    { assert(1/3 + 2/3 = 1)%Qp as ->; first compute_done.
+      by apply cmra_update_exclusive. }
+
+    (** Update of the authoritative resources. *)
+    iDestruct (own_update _ _ (● (g.1 ∪ {[ fev ]}))
+      with "Hg_auth")
+      as ">Hg_auth".
+    { rewrite (auth_update_auth g.1 (g.1 ∪ {[fev]})(g.1 ∪ {[fev]})); first done.
+      apply gset_local_update, union_subseteq_l. }
+
+    iDestruct (own_update _ _ (● princ_ev (st_h__local ∪ {[ fev ]} ∪ st_h__foreign) ⋅ ◯ princ_ev (st_h__local ∪ {[fev]} ∪ st_h__foreign))
+      with "Hst_own__cc") as "> [Hst_own__cc #Hcc_frag]".
+    { apply monotone_update; last done.
+      replace (st_h__local ∪ {[fev]} ∪ st_h__foreign)
+        with  (st_h__local ∪ st_h__foreign ∪ {[fev]}); last set_solver.
+      destruct Hcc as [Hsubset Hcc].
+      split; first set_solver.
+      intros ev ev'
+        [Hev_in | ->%elem_of_singleton]%elem_of_union
+        [Hev'_in | ->%elem_of_singleton]%elem_of_union
+        Hle Hev'_in';
+        first by apply (Hcc ev ev').
+      1,3: ( exfalso;
+        apply Hsubset in Hev'_in';
+        apply (fresh_event_is_fresh (g.2 !!! f) f op (VGst_lhst_valid _ Hv f));
+        by rewrite Hst_proj -/fev).
+      exfalso.
+      destruct (fresh_event_time_mon (g.2 !!! f) op f) with ev' as [H1 H2];
+        try by destruct (VGst_lhst_valid _ Hv f).
+      - by rewrite Hst_proj.
+      - apply H2.
+        by rewrite Hst_proj -/fev. }
+    iDestruct (own_update _ _ (● princ_ev (st_h__local ∪ {[ fev ]} ∪ st_h__foreign) ⋅ ◯ princ_ev (st_h__local ∪ {[fev]} ∪ st_h__foreign))
+      with "Hst_own__cc'") as "> [Hst_own__cc' _]".
+    { apply monotone_update; last done.
+      replace (st_h__local ∪ {[fev]} ∪ st_h__foreign)
+        with  (st_h__local ∪ st_h__foreign ∪ {[fev]}); last set_solver.
+      destruct Hcc as [Hsubset Hcc].
+      split; first set_solver.
+      intros ev ev'
+        [Hev_in | ->%elem_of_singleton]%elem_of_union
+        [Hev'_in | ->%elem_of_singleton]%elem_of_union
+        Hle Hev'_in'; try done.
+      exfalso.
+      destruct (fresh_event_time_mon (g.2 !!! f) op f) with ev' as [H1 H2];
+        try by destruct (VGst_lhst_valid _ Hv f).
+      - by rewrite Hst_proj.
+      - apply H2.
+        by rewrite Hst_proj -/fev. }
+
+    pose (mutator_global_valid g op f Hv) as Hv'.
+    assert (fresh_event (g.2 !!! f) op f = fev) as Hfev_eq.
+    { unfold fev. by rewrite Hst_proj. }
+     
+    assert (Hloc_isloc: local_events f (st_h__local ∪ {[fev]})).
+    { intros x [?%Hlocisloc | ->%elem_of_singleton]%elem_of_union;
+      [ assumption | by rewrite/fev fresh_event_orig ]. }
+
+
+    assert (fev ∉ st_h__local ∪ st_h__foreign).
+    { rewrite/fev -Hst_proj.
+      exact (fresh_event_is_fresh (g.2 !!! f) f op (VGst_lhst_valid _ Hv f)). }
+    assert (fev ∉ g.1).
+    { rewrite -Hfev_eq. exact (fresh_event_is_fresh_global g f op Hv). }
+    assert (fev ∈ Maximals (g.1 ∪ {[fev]})).
+    { rewrite/fev-Hst_proj.
+      by apply fresh_events_mutator_global_maximals. }
+
+    assert(Maximum (st_h__local ∪ {[fev]} ∪ st_h__foreign) = Some fev).
+    { apply Maximum_correct; last split.
+      - intros x y Hc_in Hy_in.
+        destruct (VGst_lhst_valid _ Hv' f).
+        apply (VLst_ext_time x y); simpl;
+          rewrite vlookup_insert Hst_proj -/fev; set_solver.
+      - by apply elem_of_union_l, elem_of_union_r, elem_of_singleton.
+      - intros ev Hev_in Hev_neq.
+        destruct (fresh_event_time_mon (g.2 !!! f) op f) with ev as [Ha j];
+          try by destruct (VGst_lhst_valid _ Hv f).
+        rewrite Hst_proj; set_solver.
+        destruct (TM_le_eq_or_lt (time ev) (time fev)) as [?|];
+          [ by rewrite /fev -Hst_proj | | assumption ].
+        exfalso. apply j. rewrite H4.
+        by rewrite Hst_proj -/fev. }
+
+    assert(Lst_Validity (g.2 !!! f ∪{[fev]})).
+    { pose (VGst_lhst_valid _ Hv' f) as Htmp.
+      rewrite /= in Htmp.
+      rewrite -Hfev_eq.
+      by assert ((vinsert f (g.2 !!! f ∪ {[fresh_event (g.2 !!! f) op f]}) g.2 !!! f)
+        = (g.2 !!! f ∪ {[fresh_event (g.2 !!! f) op f]})) as <-;
+        first by rewrite vlookup_insert. }
+
+    (** Closing everythig and framing the resulting resources. *)
+    iMod ("Hclose"
+      with "[Hothers
+        Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc'
+        Hg_ag Hg_auth]") as "_"; last iModIntro.
+    { iNext. iExists (g.1 ∪ {[fresh_event (g.2 !!! f) op f]},
+      vinsert f (g.2 !!! f ∪ {[fresh_event (g.2 !!! f) op f]}) g.2).
+      simpl. rewrite Hfev_eq. iFrame. iSplit; first by rewrite -Hfev_eq.
+      iApply (forall_fin' f). iSplitL "Hothers".
+      - iDestruct "Hothers" as "(%S & %HS_def & HS)".
+        iExists S. iSplit; first done.
+        iApply (big_sepS_mono with "HS").
+        iIntros (x Hx_in) "(%__local & %__foreign & %__sub & %__Hproj & %__islocal & %__isfor & %__issub & %__iscc & __ownloc & __own)".
+        iExists __local, __foreign, __sub.
+        repeat iSplit; try done.
+        + iPureIntro. simpl. rewrite vlookup_insert_ne; first assumption.
+          set_solver.
+        + iPureIntro. by destruct __iscc.
+        + iPureIntro. by destruct __iscc.
+        + iFrame.
+      - iExists (st_h__local ∪ {[ fev]}), st_h__foreign, st_h__foreign.
         iFrame. iFrame "%".
-        by rewrite /= vlookup_insert. }
-    clear T HT_nin HT_def.
-    iMod ("Hclose" with "[HS Hown_global Hown_global_snap]") as "_"; last iModIntro.
-    { iNext.
-      iExists (g.1, vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2).
-      iFrame "%". simpl. iFrame. }
-    iFrame "Hown_local".
-    iSplit.
-    { iPureIntro.
-      intros ev [Hev_in%Hst_foreign | [Hev_f _]%elem_of_filter]%elem_of_union;
-        [ by rewrite -Hf | done]. }
-    by rewrite Hf.
+        repeat iSplit ; [ | done..].
+        rewrite vlookup_insert Hst_proj.
+        iPureIntro.
+        set_solver. }
+    rewrite Hst_proj in H5.
+    iFrame. iFrame "%".
+    iSplitR "Hst_own__foreign'' Hst_own__local'";
+      iExists f; iFrame ; iFrame "%".
+    iExists f. iFrame "%". iFrame "Hcc_frag".
+  Qed.
+
+
+  Lemma broadcast_update E (i: fRepId) st_h__local st_h__foreign:
+    ⌜ ↑CRDT_InvName ⊆ E ⌝
+    -∗ StLib_GlobalInv
+    -∗ OwnLockInv i st_h__local st_h__foreign
+    ={E}=∗ OwnLockInv i st_h__local st_h__foreign
+      ∗ own (γ_loc_cc' !!! i) (◯ princ_ev (st_h__local ∪ st_h__foreign))
+      ∗ ⌜ Lst_Validity (st_h__local ∪ st_h__foreign) ⌝.
+  Proof.
+    iIntros (Hincl) "#Hinv Hown__lockinv".
+
+    iInv "Hinv" as ">(%g & Hg_ag & Hg_auth & %Hv & HS)" "Hclose".
+    iDestruct ((forall_fin i) with "HS")
+      as "[Hothers (%st_h__local' & %st_h__forign' & %st_h__sub' & %Hst_proj &
+        %Hlocisloc & %Hforisfor & %Hsubisfor & %Hcc &
+        Hst_own__local & Hst_own__foreign & Hst_own__sub &
+        Hst_own__cc & Hst_own__cc')]".
+    iDestruct "Hown__lockinv" as "(%f & %Hf & _ & _ & Hst_own__local' & Hst_own__foreign')".
+
+    assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite Hf. }
+
+    (** Unify the names of st_h_* *)
+    iDestruct (both_agree_agree with "Hst_own__local Hst_own__local'")
+      as "(Hst_own__local & Hst_own__local' & ->)".
+    iDestruct (both_agree_agree with "Hst_own__foreign Hst_own__foreign'")
+      as "(Hst_own__foreign & Hst_own__foreign' & ->)".
+
+    iDestruct (own_update _ _
+      (● princ_ev (st_h__local ∪ st_h__foreign)
+      ⋅ ◯ princ_ev (st_h__local ∪ st_h__foreign)) with "Hst_own__cc'")
+      as ">[Hst_own__cc' #Hsnap]";
+      first by apply monotone_update.
+
+    assert (Lst_Validity (st_h__local ∪ st_h__foreign)).
+    { rewrite -Hst_proj. exact (VGst_lhst_valid _ Hv f). }
+
+    iMod ("Hclose"
+      with "[Hothers
+        Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc'
+        Hg_ag Hg_auth]") as "_"; last iModIntro.
+    { iNext. iExists g. iFrame. iFrame "%".
+      iApply ((forall_fin' f) with "[$Hothers Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc']").
+      iExists st_h__local, st_h__foreign, st_h__sub'.
+      iFrame "%". iFrame. }
+
+    iSplitL.
+    { iExists f. by iFrame. }
+    by iFrame "#".
+  Qed.
+
+
+  Lemma merge_update E (i j: fRepId) (st_h__local st_h__foreign st'_h__local st'_h__foreign: event_set LogOp):
+    ⌜ ↑CRDT_InvName ⊆ E ⌝
+    -∗ StLib_GlobalInv
+    -∗ OwnLockInv i st_h__local st_h__foreign
+    -∗ own (γ_loc_cc' !!! j) (◯ princ_ev (st'_h__local ∪ st'_h__foreign))
+    -∗ ⌜ Lst_Validity (st'_h__local ∪ st'_h__foreign) ⌝
+    ={E}=∗
+      OwnLockInv i st_h__local
+        (st_h__foreign ∪
+          (filter (λ e, EV_Orig e ≠ i) (st'_h__local ∪ st'_h__foreign))).
+  Proof.
+    iIntros (Hincl) "#Hinv Hown__lockinv #Hforeign_snap %Hval".
+
+    iInv "Hinv" as ">(%g & Hg_ag & Hg_auth & %Hv & HS)" "Hclose".
+
+    iDestruct ((forall_fin j) with "HS")
+      as "[Hothers (%st'_h__local' & %st'_h__forign' & %st'_h__sub & %Hst'_proj &
+        %H'locisloc & %H'forisfor & %H'subisfor & %H'cc &
+        Hst'_own__local & Hst'_own__foreign & Hst'_own__sub &
+        Hst'_own__cc & Hst'_own__cc')]".
+    iDestruct (princ_ev__subset_cc' with "Hforeign_snap Hst'_own__cc'")
+      as "[Hst'_own__cc' %Hcc']".
+    rewrite -Hst'_proj in Hcc'.
+    destruct Hcc' as [Hcc'_sub Hcc'_cc].
+    iDestruct ((forall_fin' j)
+      with "[$Hothers Hst'_own__local Hst'_own__foreign Hst'_own__sub Hst'_own__cc Hst'_own__cc']")
+      as "HS".
+    { iExists st'_h__local', st'_h__forign', st'_h__sub. by iFrame. }
+
+    iDestruct ((forall_fin i) with "HS")
+      as "[Hothers (%st_h__local' & %st_h__forign' & %st_h__sub & %Hst_proj &
+        %Hlocisloc & %Hforisfor & %Hsubisfor & %Hcc &
+        Hst_own__local & Hst_own__foreign & Hst_own__sub &
+        Hst_own__cc & Hst_own__cc')]".
+    iDestruct "Hown__lockinv" as "(%f & %Hf & _ & _ & Hst_own__local' & Hst_own__foreign')".
+
+    (** Unify i, f and f' *)
+    assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite Hf. }
+    
+    (** Unify the names of st'?_h_* *)
+    iDestruct (both_agree_agree with "Hst_own__local Hst_own__local'")
+      as "(Hst_own__local & Hst_own__local' & ->)".
+    iDestruct (both_agree_agree with "Hst_own__foreign Hst_own__foreign'")
+      as "(Hst_own__foreign & Hst_own__foreign' & ->)".
+
+    set filtered_out := filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__foreign).
+
+    assert(H1: st'_h__local ∪ st'_h__foreign ⊆ g.1).
+    { by intros x Hx_in%Hcc'_sub%gst_valid_inclusion. }
+
+    assert(Gst_Validity
+           (g.1, vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2)).
+    { apply (merge_global_valid g f j (st'_h__local ∪ st'_h__foreign) Hv Hcc'_sub).
+      by destruct Hval. }
+
+    assert ( cc_impl (st_h__local ∪ st_h__foreign)
+      (st_h__local ∪ st_h__foreign ∪ filtered_out)).
+    { intros x y [? | Hx_in]%elem_of_union Hy_in Hxy_le Hy_in';
+        first assumption.
+      admit. }
+
+    (** Uodate the resources *)
+    iCombine "Hst_own__foreign" "Hst_own__foreign'" as "Hst_own__foreign".
+    iDestruct (own_update _ _ ((1/2 + 1/2)%Qp, to_agree (st_h__foreign ∪ filtered_out))
+      with "Hst_own__foreign")
+      as ">[Hst_own__foreign Hst_own__foreign']";
+      first by apply cmra_update_exclusive.
+
+    iDestruct (own_update _ _
+      (● princ_ev (st_h__local ∪ st_h__foreign ∪ filtered_out)
+        ⋅ ◯ princ_ev (st_h__local ∪ st_h__foreign ∪ filtered_out))
+      with "Hst_own__cc'")
+      as ">[Hst_own__cc' #Hlocksnap]".
+    { apply monotone_update; last done.
+      split; first by apply union_subseteq_l'.
+      assumption. }
+
+    iMod ("Hclose"
+      with "[Hothers
+        Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc'
+        Hg_ag Hg_auth]") as "_"; last iModIntro.
+    { admit. }
+
   Admitted.
 
 End Resources_updates.
+

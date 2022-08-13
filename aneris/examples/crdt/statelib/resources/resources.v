@@ -37,9 +37,9 @@ Section AboutInv.
     iDestruct "Hlocf"
       as "(%h__local & %h__foreign & %h__sub & %Hproj' & %Hislocal' &
         %Hislocal & %Hisforeign & [%Hsub %Hcc] &
-        Hown_local & Hown_for & Hown_sub & Hown_cc)".
+        Hown_local & Hown_for & Hown_sub & Hown_cc & Hown_cc')".
     iDestruct (princ_ev__subset_cc with "Hsnap Hown_cc") as "[%Hsub_ %Hcc_]".
-    iDestruct ((forall_fin' _ (λ f, StLib_GlibInv_local_part f g)) with "[Hloc Hown_local Hown_for Hown_sub Hown_cc]") as "Hloc";
+    iDestruct ((forall_fin' _ (λ f, StLib_GlibInv_local_part f g)) with "[Hloc Hown_local Hown_for Hown_sub Hown_cc Hown_cc']") as "Hloc";
       first iFrame "Hloc".
     { iExists h__local, h__foreign, h__sub. iFrame. by iPureIntro. }
     iMod ("Hclose" with "[Hloc Hglobal Hsnap Hsnap_g]") as "_".
@@ -228,4 +228,39 @@ Section Resources.
 
 End Resources.
 Arguments StLib_CRDT_Res_Mixin (CRDT_Op) {_ _ _ _ _ _ _ _}.
+
+
+Section Utils.
+  Context `{CRDT_Op: Type,
+            !anerisG Mdl Σ, !CRDT_Params,
+            !EqDecision CRDT_Op, !Countable CRDT_Op,
+            !StLib_GhostNames, !Internal_StLibG CRDT_Op Σ}.
+
+  Lemma lock_globinv__lst_validity E (f: fRepId)
+    (st_h__local st_h__foreign: Lst CRDT_Op):
+    ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
+     StLib_GlobalInv -∗
+     own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local) -∗
+     own (γ_loc_for !!! f) ((1/2)%Qp, to_agree st_h__foreign) ={E,E}=∗
+     ⌜ Lst_Validity (st_h__local ∪ st_h__foreign) ⌝ ∗
+       own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local) ∗
+       own (γ_loc_for !!! f) ((1/2)%Qp, to_agree st_h__foreign).
+  Proof.
+    iIntros (Hincl) "#Hinv Hf_own_loc Hf_own_for".
+    iInv "Hinv" as ">(%g & Hown_global & Hown_gsnap_auth &%Hv & HS)" "Hclose".
+    iDestruct ((forall_fin f) with "HS")
+      as "[Hothers (%h__loc & %h__for & %h__sub & %H_proj & %Hisloc & %Hisfor & %Hisfor' & %Hcc & Hf_own_local & Hf_own_foreign & Hf_own_sub & Hf_own_cc)]".
+    iDestruct (both_agree_agree with "Hf_own_local Hf_own_loc")
+      as "(Hf_own_local & Hf_own_loc & ->)".
+    iDestruct (both_agree_agree with "Hf_own_foreign Hf_own_for")
+      as "(Hf_own_foreign & Hf_own_for & ->)".
+    assert (Hres: Lst_Validity (st_h__local ∪ st_h__foreign)).
+    { rewrite -H_proj. exact (VGst_lhst_valid _ Hv f). }
+    iDestruct ((forall_fin' f) with "[Hf_own_local Hf_own_foreign Hf_own_sub Hf_own_cc $Hothers]") as "HS".
+    { iExists st_h__local, st_h__foreign, h__sub. by iFrame. }
+    iMod ("Hclose" with "[HS Hown_global Hown_gsnap_auth]") as "_".
+    { iNext. iExists g. by iFrame. }
+    by iFrame.
+  Qed.
+End Utils.
 
