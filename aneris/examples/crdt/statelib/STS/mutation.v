@@ -1021,9 +1021,20 @@ Section Gst_mutator_local_valid.
     { apply (mutator_local_evid_incl_event (g.2 !!! orig) op orig
         (VGst_lhst_valid _ Hv orig) fev).
       by apply elem_of_union_r, elem_of_singleton. }
-    assert (get_evid fev ∈ time e).
-    { admit. }
-  Admitted.
+    assert (get_evid fev ∈ time e);
+      first by apply Himp in H0.
+    assert (Lst_Validity (g.1 ∪ {[fev]}));
+      first exact (VGst_hst_valid _ (mutator_global_valid g op orig Hv)).
+    destruct (VLst_dep_closed _ (VGst_hst_valid g Hv) e (get_evid fev) He_in H1)
+        as (ev & Hev_in & Hgeteid).
+    assert(Heq: ev = fev);
+      first by apply (VLst_ext_eqid _ H2 ev fev);
+        [ by apply elem_of_union_l
+        | by apply elem_of_union_r, elem_of_singleton
+        | assumption ].
+    rewrite Heq in Hev_in.
+    by apply (fresh_event_is_fresh_global g orig op Hv).
+  Qed.
 
 End Gst_mutator_local_valid.
 
