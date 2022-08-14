@@ -755,45 +755,12 @@ Section StateLib_Proof.
   (**       +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
             | Speficication of [statelib_init] |
             +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+              **)
-  Definition locstate_tok i : iProp Σ :=
-    own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
-    own (γ_loc_sub !!! i) ((2/3)%Qp, to_agree ∅) ∗
-    own (γ_loc_cc  !!! i) (◯ (princ_ev ∅)).
-
-  Definition lockinv_tok i : iProp Σ :=
-    own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
-    own (γ_loc_for !!! i) ((1/2)%Qp, to_agree ∅).
-
-  Definition internal_init_spec : iProp Σ :=
-    ∀ (repId : fRepId) addr fixed_addrs addrs_val crdt_val,
-    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
-         ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
-         ⌜addr ∈ fixed_addrs⌝ ∗
-         fixed fixed_addrs ∗
-         ([∗ list] z ∈ CRDT_Addresses, z ⤇ socket_proto) ∗
-         addr ⤳ (∅, ∅) ∗
-         free_ports (ip_of_address addr) {[port_of_address addr]} ∗
-         locstate_tok repId ∗
-         lockinv_tok repId ∗
-         crdt_fun_spec crdt_val
-    }}}
-      statelib_init StLib_StSerialization.(s_serializer).(s_ser)
-                    StLib_StSerialization.(s_serializer).(s_deser)
-                    addrs_val
-                    #repId
-                    crdt_val @[ip_of_address addr]
-    {{{ gs_val upd_val, RET (gs_val, upd_val);
-        StLib_OwnLocalState repId ∅ ∅ ∗
-        internal_get_state_spec gs_val repId addr ∗
-        internal_update_spec upd_val repId addr
-    }}}.
-
   Lemma internal_init_spec_holds :
     StLib_GlobalInv -∗ internal_init_spec.
   Proof.
     iIntros "#Hinv" (i addr fixed_addr addrs_val crdt_val).
     iModIntro.
-    iIntros (φ) "(%Hislist&%Haddr&%Haddr_fixed&#Hfixed&#Hprotos&Hsoup&Hfree&Huser_tok&Hlock_tok&#Hcrdt_spec)Hφ".
+    iIntros (φ) "(%Hislist&%Haddr&%Haddr_fixed&#Hfixed&#Hprotos&Hsoup&Hfree&[Huser_tok Hlock_tok]&#Hcrdt_spec)Hφ".
     wp_lam. wp_pures.
     wp_apply "Hcrdt_spec"; first trivial.
     iIntros (v) "(%init_st_fn & %mutator_fn & %merge_fn & -> &
@@ -861,39 +828,3 @@ Section StateLib_Proof.
 
 End StateLib_Proof.
 
-
-
-Section StLibSetup.
-
-(** TODO: setup the library for aient to use:
-  * From true, derive the existence of initial resources (using the above
-  * section)
-  * + init spec. *)
-
-End StLibSetup.
-
-Section Instantiation.
-
-  (**TODO: adapt.
-  Context {LogOp LogSt : Type}.
-  Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !StLib_Params LogOp LogSt, !Internal_StLibG LogOp Σ,
-            !RCBG Σ}.
-
-  Global Instance init_fun_instance : StLib_Init_Function := { init := oplib_init ser_fun deser_fun }.
-  Global Instance oplib_res_instance `{!RCB_resources Mdl Σ, !StLib_InvGhostNames} : StLib_Res LogOp := {
-      StLib_InitToken := oplib_init_token;
-      StLib_SocketProto := RCB_socket_proto;
-  }.
-
-  Program Global Instance oplib_setup_instance : StLibSetup.
-  Next Obligation.
-    iIntros (E) "_".
-    iMod (oplib_setup with "[//]") as (res names) "(#Hinv & Hglob & Htoks & #Hinit)".
-    iModIntro.
-    iExists oplib_res_instance.
-    simpl.
-    iFrame "Hinv Hglob Htoks Hinit".
-  Qed. *)
-
-End Instantiation.
