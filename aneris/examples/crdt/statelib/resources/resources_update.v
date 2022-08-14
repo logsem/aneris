@@ -500,7 +500,7 @@ Section Resources_updates.
       repeat split; try done.
       by rewrite vlookup_insert Hst_proj. }
     iExists f. by iFrame.
-  Admitted.
+  Qed.
 
 End Resources_updates.
 

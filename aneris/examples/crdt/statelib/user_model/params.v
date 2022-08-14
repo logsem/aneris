@@ -41,8 +41,8 @@ Section Params.
 
   Class StLib_Res `{!CRDT_Params} := {
     StLib_CRDT_Res :> CRDT_Res_Mixin Mdl Σ LogOp;
-    StLib_InitToken : nat -> iProp Σ;
-    StLib_SocketProto : nat -> socket_interp Σ;
+    StLib_InitToken : (fin (length CRDT_Addresses)) -> iProp Σ;
+    StLib_SocketProto : socket_interp Σ;
   }.
 
 End Params.

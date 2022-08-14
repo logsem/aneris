@@ -118,44 +118,46 @@ Section Specification.
         crdt_fun #() @[ip_of_address addr]
       {{{ v, RET v; crdt_triplet_spec v }}}.
 
-  Definition init_spec_for_specific_crdt (init : val)  : iProp Σ :=
-    ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
-      (addrs_val : val),
-        {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
-            ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
-            ⌜addr ∈ fixedAddrs⌝ ∗
-            fixed fixedAddrs ∗
-            ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto i) ∗
-            addr ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address addr) {[port_of_address addr]} ∗
-            StLib_InitToken repId
-        }}}
-          init addrs_val #repId @[ip_of_address addr]
-        {{{ get_state_val mutator_val, RET (get_state_val, mutator_val);
-            LocState repId ∅ ∅ ∗
-            get_state_spec get_state_val repId addr (*∗
-            ** TODO: mutator_spec mutator_val addr*)
-        }}}.
-
+    (** TODO: discuss the differences. 
     Definition init_spec (init : val) : iProp Σ :=
     ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
-      (addrs_val crdt_val : val),
+      (addrs_val crdt_val : val) (f: (repId < length CRDT_Addresses)%nat),
         {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
             ⌜addr ∈ fixedAddrs⌝ ∗
             fixed fixedAddrs ∗
-            ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto i) ∗
+            ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
             addr ⤳ (∅, ∅) ∗
             free_ports (ip_of_address addr) {[port_of_address addr]} ∗
-            StLib_InitToken repId ∗
+            StLib_InitToken (nat_to_fin f) ∗
             crdt_fun_spec crdt_val
         }}}
           init addrs_val #repId crdt_val @[ip_of_address addr]
         {{{ get_state_val mutator_val, RET (get_state_val, mutator_val);
             LocState repId ∅ ∅ ∗
-            get_state_spec get_state_val repId addr (*∗
-            TODO: mutator_spec mutator_val repId addr*)
-        }}}.
+            get_state_spec get_state_val repId addr ∗
+            update_spec mutator_val repId addr
+        }}}. *)
+
+  Definition init_spec (init: val) : iProp Σ :=
+    ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
+      (fixedAddrs : gset socket_address) (addrs_val crdt_val : val),
+    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
+        ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
+        ⌜addr ∈ fixedAddrs⌝ ∗
+        fixed fixedAddrs ∗
+        ([∗ list] z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
+        addr ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address addr) {[port_of_address addr]} ∗
+        StLib_InitToken repId ∗
+        crdt_fun_spec crdt_val
+    }}}
+      init #repId crdt_val @[ip_of_address addr]
+    {{{ gs_val upd_val, RET (gs_val, upd_val);
+        LocState repId ∅ ∅ ∗
+        get_state_spec gs_val repId addr ∗
+        update_spec upd_val repId addr
+    }}}.
 
 End Specification.
 
@@ -173,7 +175,9 @@ Section StLibSetup.
       True ⊢ |={E}=> ∃ (Res : StLib_Res LogOp),
         GlobInv ∗
         GlobState ∅ ∗
-        ([∗ list] i ↦ _ ∈ CRDT_Addresses, StLib_InitToken i) ∗
+        (∃ (S: gset (fin (length CRDT_Addresses))),
+          (∀ i, ⌜i ∈ S⌝) ∗
+          [∗ set] i ∈ S, StLib_InitToken i) ∗
         init_spec init.
 
 End StLibSetup.

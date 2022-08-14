@@ -74,4 +74,12 @@ Section Lst_helper.
   Lemma Lst_Validity_implies_same_orig_comparable (s: Lst Op):
     Lst_Validity s → event_set_same_orig_comparable s.
   Proof. by intros []. Qed.
+
+
+  Lemma lst_init_valid:
+    Lst_Validity (∅: Lst Op).
+  Proof.
+    split; try done.
+    intros??. by left.
+  Qed.
 End Lst_helper.

@@ -122,4 +122,15 @@ Section Gst_helper.
     by apply gst_valid_inclusion with f.
   Qed.
 
+  Lemma gst_init_valid:
+    Gst_Validity ((∅, vreplicate (length CRDT_Addresses) ∅): Gst Op).
+  Proof.
+    split; [ | | apply lst_init_valid | ].
+    - intros x. split; first by intros?.
+      intros[??].
+      by rewrite vlookup_replicate in H0.
+    - intros x. by intros?.
+    - intros ?; rewrite vlookup_replicate. apply lst_init_valid.
+  Qed.
+
 End Gst_helper.

@@ -29,6 +29,35 @@ From aneris.examples.crdt.statelib.proof
 
 Instance timeinst : Log_Time := timestamp_time.
 
+
+
+Section SpecsPremiminary.
+
+  Context `{LogOp: Type, LogSt : Type,
+            !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !Internal_StLibG LogOp Σ, !StLib_GhostNames,
+            st_deser: val, stser: serialization}.
+
+  Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
+
+  Definition locstate_tok i : iProp Σ :=
+    own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
+    own (γ_loc_sub !!! i) ((2/3)%Qp, to_agree ∅) ∗
+    own (γ_loc_cc  !!! i) (◯ (princ_ev ∅)).
+
+  Definition lockinv_tok i : iProp Σ :=
+    own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
+    own (γ_loc_for !!! i) ((1/2)%Qp, to_agree ∅).
+
+  Definition stlib_init_token `{!StLib_GhostNames} i : iProp Σ :=
+    locstate_tok i ∗
+    lockinv_tok i.
+
+End SpecsPremiminary.
+
+
+
 Section StateLib_InternalSpecs.
 
   Context `{LogOp: Type, LogSt : Type,
@@ -88,6 +117,32 @@ Section StateLib_InternalSpecs.
     {{{ socket_inv repId h sock_addr sock }}}
       sendToAll_fn $m @[ip_of_address sock_addr]
     {{{ RET #(); True }}}.
+
+
+  Definition internal_init_spec : iProp Σ :=
+    ∀ (repId : fRepId) addr fixed_addrs addrs_val crdt_val,
+    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
+         ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
+         ⌜addr ∈ fixed_addrs⌝ ∗
+         fixed fixed_addrs ∗
+         ([∗ list] z ∈ CRDT_Addresses, z ⤇ socket_proto) ∗
+         addr ⤳ (∅, ∅) ∗
+         free_ports (ip_of_address addr) {[port_of_address addr]} ∗
+         (*locstate_tok repId ∗
+         lockinv_tok repId ∗*)
+         stlib_init_token repId ∗
+         crdt_fun_spec crdt_val
+    }}}
+      statelib_init StLib_StSerialization.(s_serializer).(s_ser)
+                    StLib_StSerialization.(s_serializer).(s_deser)
+                    addrs_val
+                    #repId
+                    crdt_val @[ip_of_address addr]
+    {{{ gs_val upd_val, RET (gs_val, upd_val);
+        StLib_OwnLocalState repId ∅ ∅ ∗
+        internal_get_state_spec gs_val repId addr ∗
+        internal_update_spec upd_val repId addr
+    }}}.
 
 
 End StateLib_InternalSpecs.

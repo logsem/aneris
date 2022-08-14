@@ -34,15 +34,18 @@ Section AboutGlobalInvariant.
       own (γ_loc_cc !!! f) (● princ_ev (h__local ∪ h__sub)) ∗
       own (γ_loc_cc' !!! f) (● princ_ev (h__local ∪ h__foreign)).
 
-  Definition StLib_GlobalInv : iProp Σ :=
-    inv CRDT_InvName
-      (∃ (g: Gst CRDT_Op), own γ_global ((1/3)%Qp, to_agree g.1)
+  Definition StLib_GlobalInv_prop : iProp Σ :=
+    ∃ (g: Gst CRDT_Op), own γ_global ((1/3)%Qp, to_agree g.1)
       ∗ own γ_global_snap (● g.1)
       ∗ ⌜ Gst_Validity g ⌝
       ∗ ∃ (S: gset (fRepId)),
         (∀ (f: fRepId), ⌜f ∈ S⌝)
         ∗ [∗ set] k ∈ S,
-          StLib_GlibInv_local_part k g).
+          StLib_GlibInv_local_part k g.
+
+  Definition StLib_GlobalInv : iProp Σ :=
+    inv CRDT_InvName
+      StLib_GlobalInv_prop.
   Global Instance StLib_GlobalInv_persistent : Persistent StLib_GlobalInv := _.
 End AboutGlobalInvariant.
 
