@@ -563,9 +563,9 @@ Section StateLib_Proof.
       (** Update of the resources: using the [merge_update] lemma. *)
       iDestruct ((merge_update ⊤ f f_sender
         st_h__local h__foreign st'_h__local st'_h__sub)
-        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap")
+        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap[]")
         as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
-        [ trivial | iExists f; iFrame; by rewrite Hf | ].
+        [ trivial | iExists f; iFrame; by rewrite Hf | done | ].
       assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
 
       iDestruct (Lock_RemoteLockSnap__incl
@@ -679,9 +679,9 @@ Section StateLib_Proof.
       (** Update of the resources: using the [merge_update] lemma. *)
       iDestruct ((merge_update ⊤ f f_sender
         st_h__local h__foreign st'_h__local st'_h__sub)
-        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap")
+        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap[]")
         as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
-        [ trivial | iExists f; iFrame; by rewrite Hf | ].
+        [ trivial | iExists f; iFrame; by rewrite Hf | done | ].
       assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
 
       iDestruct (Lock_RemoteLockSnap__incl
@@ -755,25 +755,26 @@ Section StateLib_Proof.
   (**       +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
             | Speficication of [statelib_init] |
             +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+              **)
-  Definition user_tok i : iProp Σ :=
+  Definition locstate_tok i : iProp Σ :=
     own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
     own (γ_loc_sub !!! i) ((2/3)%Qp, to_agree ∅) ∗
     own (γ_loc_cc  !!! i) (◯ (princ_ev ∅)).
 
-  Definition lock_tok i : iProp Σ :=
+  Definition lockinv_tok i : iProp Σ :=
     own (γ_loc_own !!! i) ((1/3)%Qp, to_agree ∅) ∗
     own (γ_loc_for !!! i) ((1/2)%Qp, to_agree ∅).
+
   Definition internal_init_spec : iProp Σ :=
     ∀ (repId : fRepId) addr fixed_addrs addrs_val crdt_val,
     {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
          ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
          ⌜addr ∈ fixed_addrs⌝ ∗
          fixed fixed_addrs ∗
-         ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ socket_proto repId) ∗
+         ([∗ list] z ∈ CRDT_Addresses, z ⤇ socket_proto) ∗
          addr ⤳ (∅, ∅) ∗
          free_ports (ip_of_address addr) {[port_of_address addr]} ∗
-         user_tok repId ∗
-         lock_tok repId ∗
+         locstate_tok repId ∗
+         lockinv_tok repId ∗
          crdt_fun_spec crdt_val
     }}}
       statelib_init StLib_StSerialization.(s_serializer).(s_ser)
@@ -801,7 +802,7 @@ Section StateLib_Proof.
     wp_apply "init_st_spec"; first trivial.
     iIntros (st Hcoh_st).
     wp_alloc stp as "Hstp". wp_pures.
-    wp_apply ((newlock_spec (nroot .@ "stateliblock") _ (lock_inv_aux i stp)) with "[Hlock_tok Hstp]").
+    wp_apply ((newlock_spec lock_inv_ns _ (lock_inv_aux i stp)) with "[Hlock_tok Hstp]").
     { iExists (ip_of_address addr), st, st_crdtM_init_st, ∅, ∅.
       iSplit; first by rewrite Haddr/=.
       iFrame.
@@ -825,28 +826,39 @@ Section StateLib_Proof.
     wp_apply wp_unSOME; first trivial.
     iIntros (_).
     wp_let.
-    wp_apply (aneris_wp_socketbind_static with "[Hh Hfree]"); try done.
-    - admit.
-    - iSplit; first iFrame "#".
-      iSplitL "Hfree"; iFrame.
-    - iIntros "Hh".
-      wp_pures.
-      wp_apply aneris_wp_fork.
-      iSplitL; first (iNext; wp_seq; wp_apply aneris_wp_fork; iSplitL); iNext.
-      + wp_pures.
-        wp_apply (internal_get_state_spec_holds with "[Hislock]").
-        { admit. }
-        iIntros (getst_fun) "getstate_spec".
-        wp_pures. 
-        wp_apply (internal_update_spec_holds with "[]").
-        { iFrame "#". admit. }
-        iIntros (update_fun) "update_spec".
-        wp_pures. iApply "Hφ".
-        iFrame.
+    wp_apply (aneris_wp_socketbind_static with "[$]"); try done.
+    remember (udp_socket None true) as s.
+    iIntros "[Hh (%proto & #Haddr)]".
+    wp_seq.
+    wp_apply aneris_wp_fork.
+    iSplitL "Huser_tok Hφ"; first (iNext; wp_seq; wp_apply aneris_wp_fork; iSplitL); iNext.
+    + wp_pures.
+      wp_apply ((internal_get_state_spec_holds (fin_to_nat i)) with "[$]").
+      iIntros (getst_fun) "getstate_spec".
+      wp_pures. 
+      wp_apply (internal_update_spec_holds with "[$]").
+      iIntros (update_fun) "update_spec".
+      wp_pures. iApply "Hφ".
+      iFrame.
+      iExists i.
+      iDestruct "Huser_tok" as "(Hown & Hsub & Hcc)".
+      iFrame.
+      do 3 (iSplit; first done).
+      iExists i.
+      rewrite union_empty_R. by iFrame.
+    + wp_apply internal_broadcast_spec_holds; try done.
+      - iPureIntro. apply fin_to_nat_lt.
+      - admit.
+      - admit.
+      - iFrame "#".
         admit.
-      + wp_apply internal_broadcast_spec_holds; try done; admit.
-      + wp_apply apply_thread_spec; try done. admit.
+    + wp_apply (apply_thread_spec with "[][][][][][$]"); try done.
+      - admit.
+      - admit.
+      - admit.
+      - admit.
   Admitted.
+
 End StateLib_Proof.
 
 
