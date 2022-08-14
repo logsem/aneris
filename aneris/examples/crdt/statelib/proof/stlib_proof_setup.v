@@ -146,7 +146,7 @@ Section Instantiation.
     iModIntro.
     iExists stlib_res_instance.
     simpl.
-    iFrame "Hinv Hglob Htoks".
-  Admitted.
+    iFrame "Hinv Hglob Htoks Hinit".
+  Qed.
 
 End Instantiation.

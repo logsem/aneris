@@ -152,7 +152,7 @@ Section Specification.
         StLib_InitToken repId ∗
         crdt_fun_spec crdt_val
     }}}
-      init #repId crdt_val @[ip_of_address addr]
+      init addrs_val #repId crdt_val @[ip_of_address addr]
     {{{ gs_val upd_val, RET (gs_val, upd_val);
         LocState repId ∅ ∅ ∗
         get_state_spec gs_val repId addr ∗
