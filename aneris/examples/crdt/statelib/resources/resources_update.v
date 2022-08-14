@@ -400,11 +400,61 @@ Section Resources_updates.
     { apply (merge_global_valid g f j (st'_h__local ∪ st'_h__foreign) Hv Hcc'_sub).
       by destruct Hval. }
 
-    assert ( cc_impl (st_h__local ∪ st_h__foreign)
+    assert (Hccimpl: cc_impl (st_h__local ∪ st_h__foreign)
       (st_h__local ∪ st_h__foreign ∪ filtered_out)).
     { intros x y [? | Hx_in]%elem_of_union Hy_in Hxy_le Hy_in';
         first assumption.
-      admit. }
+      rewrite -Hst_proj.
+      apply elem_of_filter in Hx_in as [_ Hx_in%H1].
+      rewrite -Hst_proj in Hy_in'.
+      assert (y ∈ g.2 !!! f) as Hy_in''; first assumption.
+      apply gst_valid_inclusion in Hy_in'; try done.
+      by apply (gst_local_incl_cc f g Hv x y Hx_in Hy_in'). }
+
+    assert(foreign_events f (st_h__foreign ∪ filtered_out)).
+    { intros x [?%Hforisfor|[? _]%elem_of_filter]%elem_of_union; assumption. }
+
+    assert(st_h__local ∪ st_h__sub ⊆ st_h__local ∪ (st_h__foreign ∪ filtered_out)).
+    { assert (st_h__local ∪ (st_h__foreign ∪ filtered_out) = (st_h__local ∪ st_h__foreign) ∪ filtered_out) as ->; first set_solver.
+      destruct Hcc as [Hsub _].
+      intros x Hx_in%Hsub. by apply elem_of_union_l. }
+
+    assert(causally_closed LogOp (st_h__local ∪ st_h__sub) (st_h__local ∪ (st_h__foreign ∪ filtered_out))).
+    { intros x y Hx_in Hy_in Hxy_le Hy_in'.
+      destruct Hcc as [Hsub Hcc].
+      assert(st_h__local ∪ st_h__foreign ∪ filtered_out
+        = st_h__local ∪ (st_h__foreign ∪ filtered_out)) as H'.
+      { (** set_solver takes a lot of time on this *)
+        apply set_eq. intros z. split.
+        - intros [[?|?]%elem_of_union|?]%elem_of_union;
+          [ by apply elem_of_union_l
+          | by apply elem_of_union_r, elem_of_union_l
+          | by do 2 apply elem_of_union_r].
+        - intros [?|[?|?]%elem_of_union]%elem_of_union;
+          [ by do 2 apply elem_of_union_l
+          | by apply elem_of_union_l, elem_of_union_r
+          | by apply elem_of_union_r]. }
+      assert (Hy_in'': y ∈ st_h__local ∪ st_h__foreign);
+        first by apply Hsub.
+      apply (Hcc x y); try done.
+      apply (Hccimpl x y); try done; by rewrite H'. }
+
+    assert(
+      st_h__local ∪ st_h__foreign ∪ (st'_h__local ∪ st'_h__foreign) =
+      st_h__local ∪ (st_h__foreign ∪ filtered_out)).
+    { rewrite -Hst_proj
+        -(in_valid_gst__eq_proj_foreign
+          (st'_h__local ∪ st'_h__foreign) g f Hv H1)
+        Hst_proj -/filtered_out.
+      apply set_eq. intros z. split.
+      - intros [[?|?]%elem_of_union|?]%elem_of_union;
+        [ by apply elem_of_union_l
+        | by apply elem_of_union_r, elem_of_union_l
+        | by do 2 apply elem_of_union_r].
+      - intros [?|[?|?]%elem_of_union]%elem_of_union;
+        [ by do 2 apply elem_of_union_l
+        | by apply elem_of_union_l, elem_of_union_r
+        | by apply elem_of_union_r]. }
 
     (** Uodate the resources *)
     iCombine "Hst_own__foreign" "Hst_own__foreign'" as "Hst_own__foreign".
@@ -426,8 +476,30 @@ Section Resources_updates.
       with "[Hothers
         Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc'
         Hg_ag Hg_auth]") as "_"; last iModIntro.
-    { admit. }
-
+    { iNext.
+       iExists (g.1,
+        vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2).
+      iFrame. iFrame "%".
+      iDestruct "Hothers" as "(%S & [%S_def %S_def'] & HS)".
+      iDestruct (big_sepS_mono _
+        (λ k, StLib_GlibInv_local_part k (g.1, vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2))
+        with "HS")
+        as "HS".
+      { iIntros (x Hx_in) "(%h_loc & %h_for & %h_sub & Hx)".
+        iExists h_loc, h_for, h_sub. simpl.
+        rewrite vlookup_insert_ne; last set_solver.
+        iFrame. }
+      iApply ((forall_fin' f)
+        with "[HS Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc']").
+      iSplitL "HS"; first (by iExists S; iFrame).
+      iExists st_h__local, (st_h__foreign ∪ filtered_out), st_h__sub.
+      assert(st_h__local ∪ (st_h__foreign ∪ filtered_out)
+        = st_h__local ∪ st_h__foreign ∪ filtered_out) as <-; first set_solver.
+      iFrame. iFrame "%".
+      iPureIntro.
+      repeat split; try done.
+      by rewrite vlookup_insert Hst_proj. }
+    iExists f. by iFrame.
   Admitted.
 
 End Resources_updates.

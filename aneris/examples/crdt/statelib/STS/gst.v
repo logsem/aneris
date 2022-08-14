@@ -107,4 +107,19 @@ Section Gst_helper.
       + by apply elem_of_union_r, elem_of_filter.
   Qed.
 
+
+  Lemma gst_local_incl_cc (f: fRepId) (g: Gst Op):
+    Gst_Validity g → cc_impl (g.2 !!! f) g.1.
+  Proof.
+    intros Hv x y Hx_in Hy_in Hxy_le Hy_in'.
+    assert (get_evid x ∈ time y).
+    { pose (VLst_evid_incl_event _ (VGst_hst_valid _ Hv) x Hx_in) as Hin.
+      by apply Hxy_le in Hin. }
+    destruct (VLst_dep_closed _ (VGst_lhst_valid _ Hv f) y (get_evid x))
+      as (e & He_eq & He_in); [ done | done | ].
+    assert(x = e) as ->; last assumption.
+    apply (VLst_ext_eqid _ (VGst_hst_valid _ Hv)); try done.
+    by apply gst_valid_inclusion with f.
+  Qed.
+
 End Gst_helper.
