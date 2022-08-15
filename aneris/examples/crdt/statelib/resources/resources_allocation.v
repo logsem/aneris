@@ -1,4 +1,4 @@
-From stdpp Require Import gmap.
+From stdpp Require Import gmap finite.
 
 From iris.base_logic Require Import invariants bi.
 From iris.algebra Require Import agree auth excl gmap.
@@ -207,13 +207,127 @@ Section ResourcesInstantiationVecs.
   Context `{!EqDecision LogOp, !Countable LogOp, !Internal_StLibG LogOp Σ, !CRDT_Params}.
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
 
+  Lemma destruct_fin n:
+    ∀ (i: fin (S n)), i = 0%fin ∨ (∃ i': fin n, i = Fin.FS i').
+  Proof. apply fin_S_inv; eauto. Qed.
+
+  Lemma exists_s (n: nat):
+    ∃ (S: gset (fin n)), ∀ i, i ∈S.
+  Proof.
+    induction n as [|n IH].
+    - exists ∅. intros?. inversion i.
+    - destruct IH as [S' S'_def].
+      exists ((gset_map.gset_map Fin.FS S') ∪ {[ Fin.F1 ]}).
+      intros i.
+      destruct (destruct_fin n i) as [|[i' Hi']]; 
+        first set_solver.
+      rewrite Hi'.
+      by apply elem_of_union_l, gset_map.gset_map_correct1.
+  Qed.
+
+  Lemma conv_list_vec {A} n (l: list A) (R: A → iProp Σ) :
+      ([∗ list] k ∈ l, R k) -∗
+      ∃ (S: gset (fin n)), ⌜∀ i, i ∈ S⌝ ∗
+      [∗ set] i ∈ S,
+        let j := fin_to_nat i in
+        match decide (j < (length l))%nat with
+        | left Hlt =>
+         R ((Vector.of_list l) !!! (nat_to_fin Hlt))
+        | right _ => True
+        end.
+  Proof.
+    iInduction l as [|h t] "IHl" using rev_ind forall (n).
+    - iIntros "_".
+      destruct(exists_s n) as [S' HS'].
+      iExists S'.
+      iSplit; first done.
+      clear HS'.
+      iInduction S' as [] "H" using set_ind_L; first done.
+      iApply big_sepS_union; first set_solver.
+      iFrame "H".
+      by iApply big_sepS_singleton.
+    - iIntros "[Ht [Hh _]]".
+      iDestruct ("IHl" $! n with "Ht") as "(%S' & %HS' & H)".
+      iExists S'. iSplit; first done.
+      iAssert([∗ set] i ∈ S', match decide (fin_to_nat i = length t)%nat with
+                      | left Heq => R h
+                      | right _ => True
+                      end)%I with "[Hh]" as "H1".
+      { destruct (decide (length t < n)%nat) as [Hlt | Hnlt].
+        - iApply ((big_sepS_delete_2 (nat_to_fin Hlt)) with "[Hh]").
+          by destruct (decide); iFrame.
+          iApply big_sepS_intro. iIntros "!> %x %Hx_in".
+          rewrite decide_False; first done.
+          replace (length t) with (fin_to_nat (nat_to_fin Hlt));
+            first set_solver.
+          apply fin_to_nat_to_fin.
+        - iApply big_sepS_intro. iIntros "!> %x %Hx_in".
+          rewrite decide_False; first done.
+          intros Hx_eq. rewrite -Hx_eq in Hnlt.
+          by pose (fin_to_nat_lt x). }
+      iDestruct (big_sepS_sep_2 with "H H1") as "H".
+      iApply (big_sepS_mono with "H").
+      iIntros (x Hx_in) "[H H']".
+      destruct decide.
+      + destruct (decide (x < _)%nat); last trivial.
+        assert(list_to_vec t !!! nat_to_fin l
+          = list_to_vec (t ++ [h]) !!! nat_to_fin l0) as ->; last by iFrame.
+        symmetry. rewrite vlookup_lookup.
+        rewrite !vec_to_list_to_vec.
+        rewrite lookup_app_l; last by rewrite fin_to_nat_to_fin.
+        destruct (lookup_lt_is_Some_2 t (fin_to_nat (nat_to_fin l0))) as [a Ha];
+          first by rewrite fin_to_nat_to_fin.
+        rewrite Ha.
+        f_equal.
+        symmetry.
+        by rewrite vlookup_lookup -Ha !fin_to_nat_to_fin vec_to_list_to_vec.
+      + destruct (decide (_ < _)%nat); last done.
+        pose proof l as l'.
+        rewrite app_length in l'.
+        simpl in *.
+        assert(x = length t:>nat) as ?; first lia.
+        rewrite decide_True; last assumption.
+        assert(list_to_vec (t ++ [h]) !!! nat_to_fin l = h) as ->; last done.
+        rewrite vlookup_lookup.
+        rewrite !vec_to_list_to_vec.
+        rewrite fin_to_nat_to_fin H0.
+        rewrite lookup_app_r; last done.
+        by rewrite Nat.sub_diag.
+  Qed.
+
+  Lemma conv_list_vec' {A} (l: list A) (R: A → iProp Σ) :
+    ([∗ list] k ∈ l, R k) -∗
+      ∃ (S: gset (fin (length l))), ⌜∀ i, i ∈ S⌝ ∗
+      [∗ set] i ∈ S, R ((Vector.of_list l) !!! i).
+  Proof.
+    iIntros "Hl".
+    iDestruct (conv_list_vec with "Hl") as "(%S & %Hs & H)".
+    iExists S.
+    iSplit; first done.
+    iApply (big_sepS_mono with "H").
+    iIntros (x Hx_in) "H".
+    destruct decide as [Hlt | Hnlt]; last first.
+    { destruct Hnlt. apply fin_to_nat_lt. }
+    assert(list_to_vec l !!! x = list_to_vec l !!! nat_to_fin Hlt) as ->;
+      [ by rewrite nat_to_fin_to_nat | iFrame ].
+  Qed.
+
   Lemma alloc_loc_cc:
     True ==∗ ∃ (γ_loc_cc_vec: vec gname (length CRDT_Addresses)),
       ∃ (S: gset (fin (length CRDT_Addresses))),
         ⌜ ∀ f, f ∈ S ⌝
         ∗ ([∗ set] f ∈ S, own (γ_loc_cc_vec !!! f) (● princ_ev ∅))
         ∗ ([∗ set] f ∈ S, own (γ_loc_cc_vec !!! f) (◯ princ_ev ∅)).
-  Proof. Admitted.
+  Proof.
+    iIntros (_). 
+    iMod (alloc_loc_cc_list with "[//]") as "(%l & %Hlen & Hl)".
+    iModIntro.
+    iDestruct (conv_list_vec' with "Hl") as "(%S & %HS_def & HS)".
+    repeat rewrite -Hlen.
+    iExists (list_to_vec l), S.
+    iSplit; first done.
+    iApply big_sepS_sep. iFrame.
+  Qed.
 
   (** This lemma is a copy of the precedent one. It is there nonetheless in case
    * the definitions attached to the vector γ_loc_cc' change. *)
@@ -232,7 +346,18 @@ Section ResourcesInstantiationVecs.
         ∗ ([∗ set] f ∈ S, own (γ_loc_own_vec !!! f) ((1/3)%Qp, to_agree ∅))
         ∗ ([∗ set] f ∈ S, own (γ_loc_own_vec !!! f) ((1/3)%Qp, to_agree ∅))
         ∗ ([∗ set] f ∈ S, own (γ_loc_own_vec !!! f) ((1/3)%Qp, to_agree ∅)).
-  Proof. Admitted.
+  Proof.
+    iIntros (_). 
+    iMod (alloc_loc_own_list with "[//]") as "(%l & %Hlen & Hl0 & Hl1 & Hl2)".
+    iModIntro. repeat rewrite -Hlen.
+    iDestruct (conv_list_vec' with "Hl0") as "(%S & %HS_def & HS0)".
+    iDestruct (conv_list_vec' with "Hl1") as "(%S' & %HS'_def & HS1)".
+      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
+    iDestruct (conv_list_vec' with "Hl2") as "(%S' & %HS'_def & HS2)".
+      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
+    iExists (list_to_vec l), S.
+    iSplit; first done. iFrame.
+  Qed.
 
   Lemma alloc_loc_sub:
     True ==∗ ∃ (γ_loc_sub_vec: vec gname (length CRDT_Addresses)),
@@ -240,7 +365,16 @@ Section ResourcesInstantiationVecs.
         ⌜ ∀ f, f ∈ S ⌝
         ∗ ([∗ set] f ∈ S, own (γ_loc_sub_vec !!! f) ((2/3)%Qp, to_agree ∅))
         ∗ ([∗ set] f ∈ S, own (γ_loc_sub_vec !!! f) ((1/3)%Qp, to_agree ∅)).
-  Proof. Admitted.
+  Proof.
+    iIntros (_). 
+    iMod (alloc_loc_sub_list with "[//]") as "(%l & %Hlen & Hl0 & Hl1)".
+    iModIntro. repeat rewrite -Hlen.
+    iDestruct (conv_list_vec' with "Hl0") as "(%S & %HS_def & HS0)".
+    iDestruct (conv_list_vec' with "Hl1") as "(%S' & %HS'_def & HS1)".
+      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
+    iExists (list_to_vec l), S.
+    iSplit; first done. iFrame.
+  Qed.
 
   Lemma alloc_loc_for:
     True ==∗ ∃ (γ_loc_for_vec: vec gname (length CRDT_Addresses)),
@@ -248,7 +382,16 @@ Section ResourcesInstantiationVecs.
         ⌜ ∀ f, f ∈ S ⌝
         ∗ ([∗ set] f ∈ S, own (γ_loc_for_vec !!! f) ((1/2)%Qp, to_agree ∅))
         ∗ ([∗ set] f ∈ S, own (γ_loc_for_vec !!! f) ((1/2)%Qp, to_agree ∅)).
-  Proof. Admitted.
+  Proof.
+    iIntros (_). 
+    iMod (alloc_loc_for_list with "[//]") as "(%l & %Hlen & Hl0 & Hl1)".
+    iModIntro. repeat rewrite -Hlen.
+    iDestruct (conv_list_vec' with "Hl0") as "(%S & %HS_def & HS0)".
+    iDestruct (conv_list_vec' with "Hl1") as "(%S' & %HS'_def & HS1)".
+      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
+    iExists (list_to_vec l), S.
+    iSplit; first done. iFrame.
+  Qed.
 
 End ResourcesInstantiationVecs.
 
