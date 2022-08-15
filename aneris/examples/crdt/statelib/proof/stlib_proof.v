@@ -408,14 +408,14 @@ Section StateLib_Proof.
     ⌜ sblock s = true ⌝ -∗
     ([∗ list] k ↦ r ∈ CRDT_Addresses, r ⤇ socket_proto) -∗
     {{{ socket_inv repId h addr s ∗
-        internal_sendToAll_spec sendToAll h s repId addr addr_list ∗
+        (* internal_sendToAll_spec sendToAll h s repId addr addr_list ∗ *)
         StLib_GlobalInv ∗
         lock_inv addr γ__lock lockv repId st_loc }}}
         broadcast StLib_StSerialization.(s_serializer).(s_ser) lockv #(LitSocket h) #st_loc addr_list #repId  @[ip_of_address addr]
     {{{ (v: val), RET v; False  }}}.
   Proof.
     iIntros (Hislist HrepIdlen Haddr Hsock_addr Hsock_block)
-      "#Hprotos !> %φ (#Hsocket_inv & #Hspec_send2all & #Hinv & #Hlock_inv) Hφ".
+      "#Hprotos !> %φ (#Hsocket_inv & #Hinv & #Hlock_inv) Hφ".
     wp_lam. do 4 wp_let.
     wp_smart_apply (wp_loop_forever _ True);
       [ clear φ; iSplit; last done | by iIntros (?) ].
@@ -782,20 +782,25 @@ Section StateLib_Proof.
         replace (∅ ∪ ∅) with (∅: Lst LogOp); last set_solver.
         exact st_crdtM_init_st_coh. }
     iIntros (lockp γ_lock) "#Hislock". wp_let.
-    wp_apply aneris_wp_new_socket; first trivial.
-    iIntros (h) "Hh". wp_pures.
+    wp_socket h as "Hh". wp_pures.
     wp_apply (wp_list_nth_some _ i CRDT_Addresses).
     { iSplit; iPureIntro; first assumption.
       pose (fin_to_nat_lt i). lia. }
     iIntros (v (a & -> & HH)).
     assert (a = addr) as ->.
     { apply nth_error_lookup in HH. rewrite Haddr in HH. by simplify_eq/=. }
-    wp_apply wp_unSOME; first trivial.
-    iIntros (_).
+    wp_apply wp_unSOME; [ trivial | iIntros (_) ].
     wp_let.
     wp_apply (aneris_wp_socketbind_static with "[$]"); try done.
-    remember (udp_socket None true) as s.
     iIntros "[Hh (%proto & #Haddr)]".
+    set (s := RecordSet.set saddress (λ _ : option socket_address, Some addr)
+                            {| sfamily := PF_INET; stype := SOCK_DGRAM;
+                               sprotocol := IPPROTO_UDP; saddress := None |}).
+    iDestruct (inv_alloc socket_inv_ns _ (socket_inv_prop i h addr s)
+      with "[Hh Hsoup]")
+      as "> #Hsocketinv".
+    { iNext. iExists ∅, ∅. iFrame.
+      by repeat iSplit; last iApply big_sepS_empty. }
     wp_seq.
     wp_apply aneris_wp_fork.
     iSplitL "Huser_tok Hφ"; first (iNext; wp_seq; wp_apply aneris_wp_fork; iSplitL); iNext.
@@ -813,18 +818,12 @@ Section StateLib_Proof.
       do 3 (iSplit; first done).
       iExists i.
       rewrite union_empty_R. by iFrame.
-    + wp_apply internal_broadcast_spec_holds; try done.
+    + wp_apply (internal_broadcast_spec_holds _ s); try done.
       - iPureIntro. apply fin_to_nat_lt.
-      - admit.
-      - admit.
       - iFrame "#".
-        admit.
-    + wp_apply (apply_thread_spec with "[][][][][][$]"); try done.
-      - admit.
-      - admit.
-      - admit.
-      - admit.
-  Admitted.
+    + wp_apply ((apply_thread_spec h addr s) with "[][][][][][$]"); try done.
+      by iApply (big_sepL_lookup with "Hprotos").
+  Qed.
 
 End StateLib_Proof.
 
