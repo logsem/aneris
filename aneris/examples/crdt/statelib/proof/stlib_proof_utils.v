@@ -140,14 +140,18 @@ Section SocketProtolDefinition.
     Persistent (socket_proto m).
   Proof. apply _. Qed.
 
+  Definition socket_inv_prop (repId: RepId) (h: socket_handle) (z: socket_address) (s: socket) : iProp Σ :=
+    ∃ R S,
+      h ↪[ip_of_address z] s ∗
+      ⌜ saddress s = Some z ⌝ ∗
+      ⌜ CRDT_Addresses !! repId = Some z ⌝ ∗
+      z ⤳ (R, S) ∗
+      [∗ set] m ∈ R, socket_proto m.
+
+  Definition socket_inv_ns : namespace := (nroot .@ "socketinv").
+
   Definition socket_inv (repId: RepId) (h: socket_handle) (z: socket_address) (s: socket) : iProp Σ :=
-    inv (nroot .@ "socketinv")
-      (∃ R S,
-        h ↪[ip_of_address z] s ∗
-        ⌜ saddress s = Some z ⌝ ∗
-        ⌜ CRDT_Addresses !! repId = Some z ⌝ ∗
-        z ⤳ (R, S) ∗
-        [∗ set] m ∈ R, socket_proto m).
+    inv socket_inv_ns (socket_inv_prop repId h z s).
 
 End SocketProtolDefinition.
 
