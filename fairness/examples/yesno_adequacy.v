@@ -114,7 +114,7 @@ Proof.
     destruct x2; destruct y2; compute in *; intuition.
 Qed.
 
-Definition the_decreasing_role (s: the_model): YN :=
+Definition the_decreasing_role (s: the_fair_model): YN :=
   match s with
   | (0%nat, false) => Y
   | (_, true) => Y
@@ -149,7 +149,7 @@ Proof.
   - constructor 2. etransitivity =>//.
 Qed.
 
-#[local] Program Instance the_model_terminates: FairTerminatingModel the_model :=
+#[local] Program Instance the_model_terminates: FairTerminatingModel the_fair_model :=
   {|
   ftm_leq := the_order;
   ftm_decreasing_role := the_decreasing_role;
@@ -229,9 +229,9 @@ Theorem yesno_terminates
         (Hexfirst : (trfirst extr).1 = [start #N]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  assert (heapGpreS yesnoΣ the_model) as HPreG.
+  assert (heapGpreS yesnoΣ the_fair_model the_model) as HPreG.
   { apply _. }
-  eapply (simulation_adequacy_terminate_ftm (Mdl := the_model) yesnoΣ NotStuck _ (N, true) ∅) =>//.
+  eapply (simulation_adequacy_terminate_ftm (Mdl := the_fair_model) yesnoΣ NotStuck _ (N, true) ∅) =>//.
   - eapply valid_state_evolution_finitary_fairness.
     intros ?. simpl. apply (model_finitary s1).
   - destruct N; [lia|destruct N; set_solver].

@@ -7,15 +7,15 @@ Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
-Class fairnessGpreS (Mdl : FairModel) Λ Σ `{Countable (locale Λ)} := {
+Class fairnessGpreS (Mdl : FairModel) Λ (LM: LiveModel Λ Mdl) Σ `{Countable (locale Λ)} := {
   fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
   fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO Mdl)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO Mdl) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO Mdl)));
 }.
 
-Class fairnessGS (Mdl: FairModel) Λ Σ `{Countable (locale Λ)} := FairnessGS {
-  fairness_inG :> fairnessGpreS Mdl Λ Σ;
+Class fairnessGS (Mdl: FairModel) Λ (LM: LiveModel Λ Mdl) Σ `{Countable (locale Λ)} := FairnessGS {
+  fairness_inG :> fairnessGpreS Mdl Λ LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
   (** Mapping of threads to sets of roles *)
@@ -26,11 +26,11 @@ Class fairnessGS (Mdl: FairModel) Λ Σ `{Countable (locale Λ)} := FairnessGS {
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments FairnessGS Mdl Λ  Σ {_ _ _} _ _ _.
-Global Arguments fairness_model_name {Mdl Λ Σ _ _} _.
-Global Arguments fairness_model_mapping_name {Mdl Λ Σ _ _} _ : assert.
-Global Arguments fairness_model_fuel_name {Mdl Λ Σ _ _} _ : assert.
-Global Arguments fairness_model_free_roles_name {Mdl Λ Σ _ _} _ : assert.
+Global Arguments FairnessGS Mdl Λ LM Σ {_ _ _} _ _ _.
+Global Arguments fairness_model_name {Mdl Λ LM Σ _ _} _.
+Global Arguments fairness_model_mapping_name {Mdl Λ LM Σ _ _} _ : assert.
+Global Arguments fairness_model_fuel_name {Mdl Λ LM Σ _ _} _ : assert.
+Global Arguments fairness_model_free_roles_name {Mdl Λ LM Σ _ _} _ : assert.
 
 Definition fairnessΣ (Mdl: FairModel) Λ `{Countable (locale Λ)} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
@@ -39,8 +39,8 @@ Definition fairnessΣ (Mdl: FairModel) Λ `{Countable (locale Λ)} : gFunctors :
    GFunctor (authUR (gset_disjUR (RoleO Mdl)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ Λ Mdl} `{Countable (locale Λ)} :
-  subG (fairnessΣ Mdl Λ) Σ -> fairnessGpreS Mdl Λ Σ.
+Global Instance subG_fairnessGpreS {Σ Λ Mdl LM} `{Countable (locale Λ)} :
+  subG (fairnessΣ Mdl Λ) Σ -> fairnessGpreS Mdl Λ LM Σ.
 Proof. solve_inG. Qed.
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
@@ -166,7 +166,7 @@ End map_imap.
 
 Section model_state_interp.
   Context {Mdl: FairModel}.
-  Context `{fG: fairnessGS Mdl Λ Σ}.
+  Context `{fG: fairnessGS Mdl Λ LM Σ}.
 
   Notation Role := (Mdl.(fmrole)).
 
@@ -228,7 +228,7 @@ Lemma own_proper `{inG Σ X} γ (x y: X):
   own γ x -∗ own γ y.
 Proof. by intros ->. Qed.
 
-Lemma auth_fuel_is_proper `{fairnessGS Mdl Λ Σ} (x y : gmap (fmrole Mdl) nat):
+Lemma auth_fuel_is_proper `{fairnessGS Mdl Λ LM Σ} (x y : gmap (fmrole Mdl) nat):
   x = y ->
   auth_fuel_is x -∗ auth_fuel_is y.
 Proof. by intros ->. Qed.
@@ -239,7 +239,7 @@ Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
 Section model_state_lemmas.
   Context {Mdl: FairModel}.
-  Context `{fairnessGS Mdl Λ Σ}.
+  Context `{fairnessGS Mdl Λ LM Σ}.
 
   Notation Role := (Mdl.(fmrole)).
 
@@ -325,7 +325,7 @@ End model_state_lemmas.
 
 Section adequacy.
 
-  Lemma model_state_init `{fairnessGpreS Mdl Λ Σ} (s0: Mdl):
+  Lemma model_state_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl):
     ⊢ |==> ∃ γ,
         own (A := authUR (optionUR (exclR (ModelO Mdl)))) γ
             (● (Excl' s0) ⋅ ◯ (Excl' s0)).
@@ -335,7 +335,7 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  Lemma model_mapping_init `{fairnessGpreS Mdl Λ Σ} (s0: Mdl) (ζ0: locale Λ):
+  Lemma model_mapping_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl) (ζ0: locale Λ):
     ⊢ |==> ∃ γ,
         own (A := authUR (gmapUR _ (exclR (gsetR (RoleO Mdl))))) γ
             (● ({[ ζ0 :=  Excl (Mdl.(live_roles) s0) ]}) ⋅
@@ -347,24 +347,24 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  Lemma model_fuel_init `{fairnessGpreS Mdl Λ Σ} (s0: Mdl):
+  Lemma model_fuel_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl):
     ⊢ |==> ∃ γ,
         own (A := authUR (gmapUR (RoleO Mdl) (exclR natO))) γ
-            (● gset_to_gmap (Excl (fuel_limit s0)) (Mdl.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (fuel_limit s0)) (Mdl.(live_roles) s0))).
+            (● gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0)  ⋅
+               (◯ gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0))).
   Proof.
     iMod (own_alloc
-            (● gset_to_gmap (Excl (fuel_limit s0)) (Mdl.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (fuel_limit s0)) (Mdl.(live_roles) s0)))) as (γ) "[H1 H2]".
+            (● gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0)  ⋅
+               (◯ gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0)))) as (γ) "[H1 H2]".
     { apply auth_both_valid_2;eauto. intros ρ.
-      destruct (gset_to_gmap (Excl (fuel_limit s0)) (live_roles Mdl s0) !! ρ) eqn:Heq;
+      destruct (gset_to_gmap (Excl (LM.(fuel_limit) s0)) (live_roles Mdl s0) !! ρ) eqn:Heq;
         rewrite Heq; last done.
       apply lookup_gset_to_gmap_Some in Heq.
       destruct Heq as [?<-]. done. }
     iExists _. by iSplitL "H1".
   Qed.
 
-  Lemma model_free_roles_init `{fairnessGpreS Mdl Λ Σ} (s0: Mdl) (FR: gset _):
+  Lemma model_free_roles_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl) (FR: gset _):
     ⊢ |==> ∃ γ,
         own (A := authUR (gset_disjUR (RoleO Mdl))) γ (● GSet FR  ⋅ ◯ GSet FR).
   Proof.
@@ -376,7 +376,7 @@ End adequacy.
 
 Section model_state_lemmas.
   Context {Mdl: FairModel}.
-  Context `{fairnessGS Mdl Λ Σ}.
+  Context `{fairnessGS Mdl Λ LM Σ}.
   Context `{EqDecision (expr Λ)}.
 
   Lemma update_model δ δ1 δ2:
@@ -745,13 +745,13 @@ Section model_state_lemmas.
     rewrite Hfuelρ Hfs //.
   Qed.
 
-  Lemma update_no_step_enough_fuel extr (auxtr : auxiliary_trace (fair_model Mdl)) rem c2 fs ζ:
+  Lemma update_no_step_enough_fuel extr (auxtr : auxiliary_trace LM) rem c2 fs ζ:
     (dom fs ≠ ∅) ->
     (live_roles _ (trace_last auxtr)) ∩ rem = ∅ →
     rem ⊆ dom fs →
     locale_step (trace_last extr) (Some ζ) c2 ->
     has_fuels_S ζ fs -∗ model_state_interp (trace_last extr).1 (trace_last auxtr)
-    ==∗ ∃ δ2 (ℓ : mlabel $ fair_model Mdl),
+    ==∗ ∃ δ2 (ℓ : mlabel LM),
         ⌜labels_match (Some ζ) ℓ
         ∧ valid_state_evolution_fairness (extr :tr[Some ζ]: c2) (auxtr :tr[ℓ]: δ2)⌝
                                 ∗ has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗ model_state_interp c2.1 δ2.
@@ -901,7 +901,7 @@ Section model_state_lemmas.
   Qed.
 
   Lemma update_fork_split R1 R2 tp1 tp2 fs (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace (fair_model Mdl)) ζ efork σ1 σ2 (Hdisj: R1 ## R2):
+        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
     trace_last extr = (tp1, σ1) ->
@@ -1142,10 +1142,10 @@ Section model_state_lemmas.
   Qed.
 
   Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole Mdl) nat) (s1 s2: Mdl) (ρ: fmrole Mdl) :=
-    (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (fuel_limit s2))) ∧
+    (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(fuel_limit) s2))) ∧
     (ρ ∉ live_roles _ s2 -> ρ ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ) (fs1 !! ρ)) ∧
     ρ ∈ dom fs1 ∧
-    (forall ρ', ρ' ∈ dom fs2 ∖ dom fs1 -> oleq (fs2 !! ρ') (Some $ fuel_limit s2)) ∧
+    (forall ρ', ρ' ∈ dom fs2 ∖ dom fs1 -> oleq (fs2 !! ρ') (Some $ LM.(fuel_limit) s2)) ∧
     (forall ρ', ρ ≠ ρ' -> ρ' ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ') (fs1 !! ρ')) ∧
     (dom fs1 ∖ {[ ρ ]}) ∪ (live_roles _ s2 ∖ live_roles _ s1) ⊆ dom fs2 ∧
     dom fs2 ⊆
@@ -1161,8 +1161,8 @@ Section model_state_lemmas.
 
   Lemma update_step_still_alive
         (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace (fair_model Mdl))
-        tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ (δ1 : fair_model Mdl) ζ fr1:
+        (auxtr: auxiliary_trace LM)
+        tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ (δ1 : LM) ζ fr1:
     (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ->
     trace_last extr = (tp1, σ1) →
     trace_last auxtr = δ1 ->
@@ -1170,7 +1170,7 @@ Section model_state_lemmas.
     fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 δ1 s2 ρ ->
     has_fuels ζ fs1 -∗ frag_model_is s1 -∗ model_state_interp tp1 δ1 -∗
     frag_free_roles_are fr1
-    ==∗ ∃ (δ2: fair_model Mdl) ℓ,
+    ==∗ ∃ (δ2: LM) ℓ,
         ⌜labels_match (Some ζ) ℓ
         ∧ valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝
         ∗ has_fuels ζ fs2 ∗ frag_model_is s2 ∗ model_state_interp tp2 δ2 ∗

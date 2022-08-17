@@ -22,6 +22,7 @@ End gmap.
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
+  Context `{LM: LiveModel Λ M}.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
 
@@ -39,11 +40,11 @@ Section finitary.
     exists (exist _ (s2, ℓ) H). split =>//. apply elem_of_enum.
   Qed.
 
-  Program Definition enumerate_next (δ1: (fair_model (Λ := Λ) M)) (oζ : olocale Λ) (c': cfg Λ):
-    list (fair_model M * @mlabel (fair_model (Λ := Λ) M)) :=
+  Program Definition enumerate_next (δ1: LM) (oζ : olocale Λ) (c': cfg Λ):
+    list (LM * @mlabel LM) :=
     '(s2, ℓ) ← (δ1.(ls_under), None) :: enum_inner δ1.(ls_under);
     d ← enumerate_dom_gsets' (dom δ1.(ls_fuel) ∪ live_roles _ s2);
-    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` fuel_limit s2);
+    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(fuel_limit) s2);
     ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) (locales_of_list c'.1);
     let ℓ' := match ℓ with
               | None => match oζ with
@@ -68,7 +69,7 @@ Section finitary.
     rewrite /= Heq //.
   Qed.
 
-  Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace (fair_model M) -> Prop) :
+  Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
     rel_finitary (valid_lift_fairness φ).
   Proof.
     intros extr auxtr [e' σ'] oζ.
@@ -117,7 +118,7 @@ Section finitary.
               specialize (Hleq' ρ ltac:(done) ltac:(congruence)) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. destruct (ls_fuel (trace_last auxtr) !! ρ) as [f'|] eqn:Heqn; last done.
             pose proof (max_gmap_spec _ _ _ Heqn). simpl in *. lia.
-          * assert (Hok: oleq (ls_fuel δ2 !! ρ) (Some (fuel_limit δ2))).
+          * assert (Hok: oleq (ls_fuel δ2 !! ρ) (Some (LM.(fuel_limit) δ2))).
             { apply Hnew. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. simpl in Hok. lia.
       - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).

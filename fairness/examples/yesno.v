@@ -89,20 +89,23 @@ Proof.
   inversion Htrans; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia.
 Qed.
 
-Definition the_model: FairModel.
+Definition the_fair_model: FairModel.
 Proof.
   refine({|
             fmstate := nat * bool;
             fmrole := YN;
             fmtrans := yntrans;
             live_roles nb := yn_live_roles nb;
-            fuel_limit _ := 61%nat;
             fm_live_spec := live_spec_holds;
           |}).
   intros ρ' [? ?] ρ [n' ?] Htrans Hin Hneq; rewrite /yn_live_roles.
   inversion Htrans; destruct ρ; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia.
 Defined.
 
+Definition the_model: LiveModel heap_lang the_fair_model :=
+  {|
+            fuel_limit (x: fmstate the_fair_model) := 61%nat;
+  |}.
 
 (** The CMRAs we need. *)
 Class yesnoG Σ := YesnoG {
@@ -116,13 +119,13 @@ Class yesnoPreG Σ := {
   yesno_f_PreG :> inG Σ (excl_authR boolO);
  }.
 Definition yesnoΣ : gFunctors :=
-  #[ heapΣ the_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
+  #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
 
 Global Instance subG_yesnoΣ {Σ} : subG yesnoΣ Σ → yesnoPreG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!heapGS Σ the_model, !yesnoG Σ}.
+  Context `{!heapGS Σ the_fair_model the_model, !yesnoG Σ}.
   Let Ns := nroot .@ "yes_no".
 
   Definition yes_at (n: nat) := own yes_name (◯E n).
@@ -199,7 +202,7 @@ Section proof.
 
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
-      + iApply (wp_cmpxchg_suc_step_singlerole_keep_dead _ tid (Y: fmrole the_model) _ 30%nat _
+      + iApply (wp_cmpxchg_suc_step_singlerole_keep_dead _ tid (Y: fmrole the_fair_model) _ 30%nat _
                                              (1, true) (1, false)
              with "[$]") =>//.
         { set_solver. }
@@ -230,7 +233,7 @@ Section proof.
         iInv Ns as (M B) "(>HFR & >Hmod & >Hb & Hauths & >%Hbever')" "Hclose".
 
         destruct B.
-        * iApply (wp_lift_pure_step_no_fork_remove_role {[ Y ]} ((0, true): fmstate the_model) _ _ _ _ _ _ {[ Y := _ ]}) =>//.
+        * iApply (wp_lift_pure_step_no_fork_remove_role {[ Y ]} ((0, true): fmstate the_fair_model) _ _ _ _ _ _ {[ Y := _ ]}) =>//.
           { apply map_non_empty_singleton. }
           { rewrite dom_singleton. set_solver. }
           { simpl. set_solver. }
@@ -251,7 +254,7 @@ Section proof.
         * iDestruct "Hauths" as "[>Hay >Han]". iDestruct (yes_agree with "Hyes Hay") as %Heq.
           assert (M = 1) by (destruct M; [done|lia]). simplify_eq.
 
-          iApply (wp_lift_pure_step_no_fork_remove_role {[ Y ]} ((1, false): fmstate the_model) _ _ _ _ _ _ {[ Y := _ ]}) =>//.
+          iApply (wp_lift_pure_step_no_fork_remove_role {[ Y ]} ((1, false): fmstate the_fair_model) _ _ _ _ _ _ {[ Y := _ ]}) =>//.
           { apply map_non_empty_singleton. }
           { rewrite dom_singleton. set_solver. }
           { simpl. set_solver. }
@@ -268,7 +271,7 @@ Section proof.
           iModIntro. iApply "Hk".
           rewrite map_filter_singleton_False; last set_solver. rewrite /has_fuels dom_empty_L.
           iDestruct "Hf" as "[??]". iFrame.
-      +  assert (N = N) by lia. simplify_eq. iApply (wp_cmpxchg_suc_step_singlerole _ tid (Y: fmrole the_model) _ 55%nat _
+      +  assert (N = N) by lia. simplify_eq. iApply (wp_cmpxchg_suc_step_singlerole _ tid (Y: fmrole the_fair_model) _ 55%nat _
                                              (M, true) (M, false)
              with "[$]"); eauto.
       { simpl. lia. }
@@ -311,7 +314,7 @@ Section proof.
       have HM: M > 0 by lia.
 
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (Y: fmrole the_model) _ 50%nat _
+      iApply (wp_cmpxchg_fail_step_singlerole _ tid (Y: fmrole the_fair_model) _ 50%nat _
                                              (M, false) (M, false)
              with "[$]"); eauto.
       { simpl. lia. }
@@ -388,7 +391,7 @@ Section proof.
 
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
-      + iApply (wp_cmpxchg_suc_step_singlerole_keep_dead _ tid (No: fmrole the_model) _ 30%nat _
+      + iApply (wp_cmpxchg_suc_step_singlerole_keep_dead _ tid (No: fmrole the_fair_model) _ 30%nat _
                                              (1, false) (0, true)
              with "[$]") =>//.
         { lia. }
@@ -417,7 +420,7 @@ Section proof.
         iInv Ns as (M B) "(>HFR & >Hmod & >Hb & Hauths & >%Hbever')" "Hclose".
 
         destruct B.
-        * iApply (wp_lift_pure_step_no_fork_remove_role {[ No ]} ((0, true): fmstate the_model) _ _ _ _ _ _ {[ No := _ ]}) =>//.
+        * iApply (wp_lift_pure_step_no_fork_remove_role {[ No ]} ((0, true): fmstate the_fair_model) _ _ _ _ _ _ {[ No := _ ]}) =>//.
           { apply map_non_empty_singleton. }
           { rewrite dom_singleton. set_solver. }
           { simpl. set_solver. }
@@ -440,7 +443,7 @@ Section proof.
       +  assert (N = N) by lia. simplify_eq.
          destruct M; first done.
 
-         iApply (wp_cmpxchg_suc_step_singlerole _ tid (No: fmrole the_model) _ 55%nat _
+         iApply (wp_cmpxchg_suc_step_singlerole _ tid (No: fmrole the_fair_model) _ 55%nat _
                                              (S M, false) (M, true)
              with "[$]"); eauto.
          { simpl. lia. }
@@ -479,7 +482,7 @@ Section proof.
       have HM: M > 0 by lia.
 
       rewrite -has_fuel_fuels. assert (M = N) by lia. simplify_eq.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (No: fmrole the_model) _ 50%nat _
+      iApply (wp_cmpxchg_fail_step_singlerole _ tid (No: fmrole the_fair_model) _ 50%nat _
                                              (N, true) (N, true)
              with "[$]"); eauto.
       { simpl. lia. }
@@ -533,7 +536,7 @@ End proof.
 
 
 Section proof_start.
-  Context `{!heapGS Σ the_model, !yesnoPreG Σ}.
+  Context `{!heapGS Σ the_fair_model the_model, !yesnoPreG Σ}.
   Let Ns := nroot .@ "yes_no".
 
   Lemma start_spec tid (N: nat) f (Hf: f > 60):
