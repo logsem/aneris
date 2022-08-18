@@ -119,6 +119,184 @@ Definition sim_rel (M : FairModel) (LM: LiveModel heap_lang M) (ex : execution_t
            (aux : auxiliary_trace LM) :=
   valid_state_evolution_fairness ex aux ∧ live_rel M ex aux.
 
+(* TODO: move *)
+Fixpoint trace_map {A A' L L'} (sf: A → A') (lf: L -> L') (tr: finite_trace A L): finite_trace A' L' :=
+  match tr with
+  | trace_singleton x => trace_singleton $ sf x
+  | trace_extend tr' ℓ x => trace_extend (trace_map sf lf tr') (lf ℓ) (sf x)
+  end.
+
+Fixpoint get_underlying_fairness_trace (M : FairModel) (LM: LiveModel heap_lang M) (ex : auxiliary_trace LM) :=
+  match ex with
+  | trace_singleton δ => trace_singleton (ls_under δ)
+  | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LM ex') ρ (ls_under δ)
+  | trace_extend ex' _ _ => get_underlying_fairness_trace M LM ex'
+  end.
+
+Definition get_role {M : FairModel} {LM: LiveModel heap_lang M} (lab: mlabel LM) :=
+  match lab with
+  | Take_step ρ _ => Some ρ
+  | _ => None
+  end.
+
+Definition map_underlying_trace {M : FairModel} {LM: LiveModel heap_lang M} (aux : auxiliary_trace LM) :=
+  (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
+
+Definition sim_rel_with_user (M : FairModel) (LM: LiveModel heap_lang M)  (ξ : execution_trace _ -> finite_trace M (option (fmrole M)) -> Prop)
+  (ex : execution_trace heap_lang) (aux : auxiliary_trace LM) :=
+  sim_rel _ _ ex aux ∧ ξ ex (map_underlying_trace aux).
+
+Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
+        (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) → Prop) :
+  rel_finitary (sim_rel_with_user Mdl LM ξ) →
+  live_roles Mdl s1 ≠ ∅ ->
+  (∀ `{Hinv : !heapGS Σ Mdl LM},
+    ⊢ |={⊤}=>
+       (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
+       frag_model_is s1 -∗
+       frag_free_roles_are (FR ∖ live_roles _ s1) -∗
+       has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
+       WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
+       (∀ (ex : execution_trace heap_lang) (atr : auxiliary_trace LM) c,
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
+         ⌜trace_starts_in atr (initial_ls (LM := LM) s1 0%nat)⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         state_interp ex atr -∗
+         |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝)) ->
+  continued_simulation (sim_rel_with_user Mdl LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
+Proof.
+  intros Hfin Hfevol H.
+  apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
+  iIntros (?) "".
+  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen _]".
+  iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
+  iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
+  iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
+  iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]".
+  set (distG :=
+         {|
+          heap_fairnessGS := {|
+                              fairness_model_name := γmod;
+                              fairness_model_mapping_name := γmap;
+                              fairness_model_fuel_name := γfuel;
+                              fairness_model_free_roles_name := γfr;
+                              |}
+         |}).
+
+  iMod (H distG) as "Hwp". clear H.
+  iExists state_interp, (λ _, 0%nat ↦M ∅)%I, fork_post.
+  iSplitR.
+  { unfold config_wp. iIntros "!>!>" (???????) "?". done. }
+  (* iAssert (state_interp with "[Hgen Hmoda Hmodf Hmapa Hfuela HFR] Hfr [Hfuelf Hmapf]"). *)
+  (* { iFrame "Hmodf". unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles Mdl s1) ]}, _. *)
+  (*   iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //. *)
+  (*   iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //. *)
+  (*   iSplit; first done. *)
+  (*   iSplit; iPureIntro; [|split]. *)
+  (*   - intros ρ tid. rewrite lookup_gset_to_gmap_Some. *)
+  (*     setoid_rewrite lookup_singleton_Some. split; naive_solver. *)
+  (*   - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver. *)
+  (*   - rewrite dom_gset_to_gmap. set_solver. } *)
+  iSpecialize ("Hwp" with "Hmodf Hfr [Hfuelf Hmapf]").
+  { rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
+    iAssert ([∗ set] ρ ∈ live_roles Mdl s1, ρ ↦F (LM.(fuel_limit) s1))%I with "[Hfuelf]" as "H".
+    - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
+      rewrite -big_opS_own //. iApply (own_proper with "Hfuelf").
+      rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
+    - rewrite dom_gset_to_gmap. iFrame.
+      iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
+      iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
+  iDestruct "Hwp" as ">[Hwp H]".
+
+  iModIntro. iFrame "Hwp".
+  iSplitL "Hgen Hmoda Hmapa Hfuela HFR".
+  { unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles Mdl s1) ]}, _.
+    iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
+    iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
+    iSplit; first done.
+    iSplit; iPureIntro; [|split].
+    - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
+      setoid_rewrite lookup_singleton_Some. split; naive_solver.
+    - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
+    - rewrite dom_gset_to_gmap. set_solver. }
+  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
+
+  assert ( ∀ (ex' : finite_trace (cfg heap_lang) (olocale heap_lang)) (atr' : auxiliary_trace LM) (oζ : olocale heap_lang) (ℓ : mlabel LM),
+   trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')) as Hcontr'.
+  { intros ex' atr' oζ ℓ H1 H2. cut (sim_rel_with_user Mdl LM ξ ex' atr'); eauto. rewrite /sim_rel_with_user. intros [??]. done. }
+
+  iSpecialize ("H" $! ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr' Hstuck).
+  unfold sim_rel_with_user.
+
+  iAssert (|={⊤}=> ⌜ξ ex (map_underlying_trace atr)⌝ ∗ state_interp ex atr)%I with "[Hsi H]" as "H".
+  { iApply fupd_plain_keep_l. iFrame. iIntros "Hsi". iSpecialize ("H" with "Hsi").
+    by iApply fupd_plain_mask_empty. }
+  iMod "H" as "[H1 Hsi]".
+
+  destruct ex as [c'|ex' tid (e, σ)].
+  - (* We need to prove that the initial state satisfies the property *)
+    destruct atr as [δ|???]; last by inversion Hvalex. simpl.
+    have Heq1 := trace_singleton_ends_in_inv _ _ Hendex.
+    have Heq3 := trace_singleton_starts_in_inv _ _ Hstartex.
+    have Heq4 := trace_singleton_starts_in_inv _ _ Hstartex.
+    pose proof (trace_singleton_starts_in_inv _ _ Hstartatr). simpl.
+    simplify_eq.
+    iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
+    assert (∀ (ρ : fmrole Mdl) (tid : nat),
+               ls_mapping (initial_ls (LM := LM) s1 0%nat) !! ρ = Some tid →
+               is_Some (([e1], σ1).1 !! tid)) as HA.
+    { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
+      simplify_eq. by eexists _. }
+    iSplit; last done. iClear "H1".
+    iSplit; first done.
+    destruct (to_val e1) as [v1|] eqn:Heq.
+    + iSplit.
+      { iPureIntro. intros ρ tid Hinit.
+        simpl in *. apply lookup_gset_to_gmap_Some in Hinit as [_ <-].
+        rewrite /from_locale //. }
+      iIntros (tid e Hsome Hnoval ρ). destruct tid; last done.
+      simpl in Hsome. compute in Hsome. simplify_eq. simpl.
+      iAssert (0%nat ↦M ∅) with "[Hposts]" as "Hem".
+      { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
+      iDestruct "Hsi" as "(_&_&Hsi)".
+      iDestruct "Hsi" as "(%M&%FR'&Hfuela&Hmapa&HFR&%Hinvmap&%Hsmall&Hmodel&HfrFR)".
+      iDestruct (frag_mapping_same 0%nat M with "[Hmapa] Hem") as "%H"; first done.
+      iPureIntro. by eapply no_locale_empty.
+    + iSplit; iPureIntro.
+      { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
+        simplify_eq. by eexists _. }
+      intros tid e Hsome Hval' ρ.
+      destruct tid as [|tid]; rewrite /from_locale /= in Hsome; by simplify_eq.
+  - (* We need to prove that that the property is preserved *)
+    destruct atr as [|atr' ℓ δ]; first by inversion Hvalex.
+    (* rewrite (trace_singleton_ends_in_inv _ _ Hendex); last exact unit. *)
+    specialize (Hcontr ex' atr' tid ℓ).
+    have H: trace_contract (trace_extend ex' tid (e, σ)) tid ex' by eexists.
+    have H': trace_contract (trace_extend atr' ℓ δ) ℓ atr' by eexists.
+    specialize (Hcontr H H') as Hvs. clear H H' Hcontr.
+    (* destruct Hvalex as (Hlm & Hlt & Hts). *)
+    have H: trace_ends_in ex' (trace_last ex') by eexists.
+    have H': trace_ends_in atr' (trace_last atr') by eexists.
+    iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
+    apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
+    simpl in *. simplify_eq.
+    iSplit; [|done].
+
+    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)". iDestruct "Hsi" as "(%M&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
+    iSplit; first done.
+    iSplit.
+    + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids. eapply Htids. done.
+    + iIntros (tid' e' Hsome Hnoval ρ). simpl.
+      iAssert (tid' ↦M ∅) with "[Hposts]" as "H".
+      { destruct (to_val e') as [?|] eqn:Heq; last done.
+        iApply posts_of_empty_mapping => //.
+        apply from_locale_lookup =>//. }
+      iDestruct (frag_mapping_same tid' M with "Hmapa H") as "%Hlk".
+      { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
+Qed.
 
 Theorem simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _):
   (* The model has finite branching *)
@@ -143,108 +321,20 @@ Theorem simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s:
     (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfevol Hne H.
-  apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
-  iIntros (?) "".
-  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen _]".
-  iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
-  iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
-  iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
-  iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]".
-  set (distG :=
-         {|
-          heap_fairnessGS := {|
-                              fairness_model_name := γmod;
-                              fairness_model_mapping_name := γmap;
-                              fairness_model_fuel_name := γfuel;
-                              fairness_model_free_roles_name := γfr;
-                              |}
-         |}).
+  assert (sim_rel Mdl LM = sim_rel_with_user Mdl LM (λ _ _, True)) as Heq.
+  { Require Import Coq.Logic.FunctionalExtensionality.
+    Require Import Coq.Logic.PropExtensionality.
+    do 2 (apply functional_extensionality_dep; intros ?).
+    apply propositional_extensionality.
+    unfold sim_rel_with_user. intuition. }
 
-  iMod (H distG) as "Hwp". clear H.
-  iSpecialize ("Hwp" with "Hmodf Hfr [Hmapf Hfuelf]").
-  { rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
-    iAssert ([∗ set] ρ ∈ live_roles Mdl s1, ρ ↦F (LM.(fuel_limit) s1))%I with "[Hfuelf]" as "H".
-    - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
-      rewrite -big_opS_own //. iApply (own_proper with "Hfuelf").
-      rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
-    - rewrite dom_gset_to_gmap. iFrame.
-      iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
-      iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
-  iMod "Hwp". iModIntro.
-  iExists state_interp, (λ _, 0%nat ↦M ∅)%I, fork_post.
-  iSplitR.
-  { unfold config_wp. iIntros "!>" (???????) "?". done. }
-  iFrame.
-  iSplitL "Hmapa Hfuela HFR".
-  { iExists {[ 0%nat := (live_roles Mdl s1) ]}, _.
-    iSplitL "Hfuela"; [|iSplitL "Hmapa"; repeat iSplit; try iPureIntro].
-    - rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
-    - rewrite /auth_mapping_is /ls_mapping /= map_fmap_singleton. iFrame; iPureIntro.
-    - rewrite /auth_free_roles_are. iFrame.
-    - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
-      setoid_rewrite lookup_singleton_Some. split; naive_solver.
-    - intros tid Hlocs. rewrite lookup_singleton_ne //.
-      unfold locales_of_list in Hlocs. simpl in Hlocs. set_solver.
-    - rewrite dom_gset_to_gmap. set_solver. }
-
-  iIntros (ex atr c3 Hval Hexst Hauxst Hexend Hbig).
-  iIntros (Hns) "[%Hvalid Hsi] Hposts".
-  destruct ex as [c|ex' tid (e, σ)].
-  - (* We need to prove that the initial state satisfies the property *)
-    destruct atr as [δ|???]; last by inversion Hval. simpl.
-    have Heq1 := trace_singleton_ends_in_inv _ _ Hexend.
-    have Heq3 := trace_singleton_starts_in_inv _ _ Hexst.
-    have Heq4 := trace_singleton_starts_in_inv _ _ Hauxst.
-    simplify_eq.
-    iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
-    assert (∀ (ρ : fmrole Mdl) (tid : nat),
-               ls_mapping (initial_ls (LM := LM) s1 0%nat) !! ρ = Some tid →
-               is_Some (([e1], σ1).1 !! tid)) as HA.
-    { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
-      simplify_eq. by eexists _. }
-    iSplit; first done.
-    destruct (to_val e1) as [v1|] eqn:Heq.
-    + iSplit.
-      { iPureIntro. intros ρ tid Hinit.
-        simpl in Hinit. apply lookup_gset_to_gmap_Some in Hinit as [_ <-].
-        rewrite /from_locale //. }
-      iIntros (tid e Hsome Hnoval ρ). destruct tid; last done.
-      simpl in Hsome. simplify_eq.
-      iAssert (0%nat ↦M ∅) with "[Hposts]" as "Hem".
-      { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
-      iDestruct "Hsi" as "(_&Hsi)".
-      iDestruct "Hsi" as "(%M&%FR'&Hfuela&Hmapa&HFR&%Hinvmap&%Hsmall&Hmodel&HfrFR)".
-      iDestruct (frag_mapping_same 0%nat M with "[Hmapa] Hem") as "%H"; first done.
-      iPureIntro. by eapply no_locale_empty.
-    + iSplit; iPureIntro.
-      { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
-        simplify_eq. by eexists _. }
-      intros tid e Hsome Hval' ρ.
-      destruct tid as [|tid]; rewrite /from_locale /= in Hsome; by simplify_eq.
-  - (* We need to prove that that the property is preserved *)
-    destruct atr as [|atr' ℓ δ]; first by inversion Hval.
-    rewrite (trace_singleton_ends_in_inv _ _ Hexend); last exact unit.
-    specialize (Hbig ex' atr' tid ℓ).
-    have H: trace_contract (trace_extend ex' tid (e, σ)) tid ex' by eexists.
-    have H': trace_contract (trace_extend atr' ℓ δ) ℓ atr' by eexists.
-    specialize (Hbig H H') as Hvs. clear H H' Hbig.
-    destruct Hvalid as (Hlm & Hlt & Hts).
-    have H: trace_ends_in ex' (trace_last ex') by eexists.
-    have H': trace_ends_in atr' (trace_last atr') by eexists.
-    iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
-    apply (trace_singleton_ends_in_inv (L := unit)) in Hexend.
-    simpl in *. simplify_eq.
-    iSplit; [done|].
-    iSplit.
-    + iPureIntro. intros ρ tid' Hsome. by eapply Hts.
-    + iIntros (tid' e' Hsome Hnoval ρ). simpl.
-      iAssert (tid' ↦M ∅) with "[Hposts]" as "H".
-      { destruct (to_val e') as [?|] eqn:Heq; last done.
-        iApply posts_of_empty_mapping => //.
-        apply from_locale_lookup =>//. }
-      iDestruct "Hsi" as "(_&Hsi)". iDestruct "Hsi" as "(%M&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
-      iDestruct (frag_mapping_same tid' M with "Hmapa H") as "%Hlk".
-      { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
+  rewrite Heq.
+  apply (strong_simulation_adequacy Σ s _ _ _ FR) =>//.
+  { rewrite -Heq. done. }
+  iIntros (Hinv) "".
+  iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hm Hfr Hf". iSplitR "".
+  - iApply ("H" with "Hm Hfr Hf").
+  - iIntros "!>%%%???????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} (s: stuckness) FR
