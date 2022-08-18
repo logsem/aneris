@@ -104,6 +104,8 @@ Inductive expr :=
   | Store (e1 : expr) (e2 : expr)
   | CmpXchg (e0 : expr) (e1 : expr) (e2 : expr) (* Compare-exchange *)
   | FAA (e1 : expr) (e2 : expr) (* Fetch-and-add *)
+  (* Non-determinism *)
+  | ChooseNat
 with val :=
   | LitV (l : base_lit)
   | RecV (f x : binder) (e : expr)
@@ -237,6 +239,7 @@ Proof.
         cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
      | FAA e1 e2, FAA e1' e2' =>
         cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
+     | ChooseNat, ChooseNat => left _
      | _, _ => right _
      end
    with gov (v1 v2 : val) {struct v1} : Decision (v1 = v2) :=
@@ -314,6 +317,7 @@ Proof.
      | Store e1 e2 => GenNode 15 [go e1; go e2]
      | CmpXchg e0 e1 e2 => GenNode 16 [go e0; go e1; go e2]
      | FAA e1 e2 => GenNode 17 [go e1; go e2]
+     | ChooseNat => GenNode 18 []
      end
    with gov v :=
      match v with
@@ -347,6 +351,7 @@ Proof.
      | GenNode 15 [e1; e2] => Store (go e1) (go e2)
      | GenNode 16 [e0; e1; e2] => CmpXchg (go e0) (go e1) (go e2)
      | GenNode 17 [e1; e2] => FAA (go e1) (go e2)
+     | GenNode 18 [] => ChooseNat
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -361,7 +366,7 @@ Proof.
    for go).
  refine (inj_countable' enc dec _).
  refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
- - destruct e as [v| | | | | | | | | | | | | | | | | |]; simpl; f_equal;
+ - destruct e as [v| | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
      [exact (gov v)|done..].
  - destruct v; by f_equal.
 Qed.
@@ -461,6 +466,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | Store e1 e2 => Store (subst x v e1) (subst x v e2)
   | CmpXchg e0 e1 e2 => CmpXchg (subst x v e0) (subst x v e1) (subst x v e2)
   | FAA e1 e2 => FAA (subst x v e1) (subst x v e2)
+  | ChooseNat => ChooseNat
   end.
 
 Definition subst' (mx : binder) (v : val) : expr → expr :=
@@ -636,7 +642,10 @@ Inductive head_step : expr → state → expr → state → list expr → Prop :
      σ.(heap) !! l = Some (LitV (LitInt i1)) →
      head_step (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ
                (Val $ LitV $ LitInt i1) (state_upd_heap <[l:=LitV (LitInt (i1 + i2))]>σ)
-               [].
+              []
+  | ChooseNatS n σ:
+    head_step ChooseNat σ (Val $ LitV $ LitInt n) σ []
+.
 
 (** Basic properties about the language *)
 #[global] Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
