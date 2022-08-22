@@ -13,7 +13,7 @@ Notation iMsg Σ := (iMsg Σ val).
 Import lock_proof.
 
 Section Sec.
-
+  
 
 Context `{ !anerisG Mdl Σ, !lockG Σ } .
 
@@ -45,26 +45,21 @@ Class RPC_interface_params :=
   RPC_inter_nodup : List.NoDup (map (fun RP => RP.(RPC_name)) RPC_inter)
 }.
 
-(* Params to match the concrete rpc and handler implementations *)
-Class RPC_implementation_params (RP : RPC_rpc_params) :=
-{
-  RPC_val : val;
-  RPC_handler : val;
-  RPC_rpc_match :
-    RPC_val = (#RP.(RPC_name), 
+Definition handler_spec (RP : RPC_rpc_params) (handler : val) : iProp Σ :=
+  ∀ argv argd,
+  {{{ RP.(RPC_pre) argv argd }}}
+    handler argv @[ip_of_address RPC_saddr]
+  {{{ repv repd, RET repv; 
+      ⌜Serializable RP.(RPC_rep_ser) repv⌝ ∗
+      RP.(RPC_post) repv argd repd }}}.
+
+Definition is_rpc_val (RP : RPC_rpc_params) (rpc_val : val) : Prop :=
+  rpc_val = (#RP.(RPC_name), 
       ((RP.(RPC_arg_ser).(s_serializer).(s_ser), 
       RP.(RPC_arg_ser).(s_serializer).(s_deser))%V,
       (RP.(RPC_rep_ser).(s_serializer).(s_ser), 
       RP.(RPC_rep_ser).(s_serializer).(s_deser))%V)%V
-    )%V;
-  RPC_handler_spec :
-    (∀ argv argd,
-    {{{ RP.(RPC_pre) argv argd }}}
-    RPC_handler argv @[ip_of_address RPC_saddr]
-    {{{ repv repd, RET repv; 
-        ⌜Serializable RP.(RPC_rep_ser) repv⌝ ∗
-        RP.(RPC_post) repv argd repd }}})
-}. 
+  )%V.
 
 (* Check if a given concrete handler (a val) match the spec of an given RPC *)
 Definition is_impl_handler_of_rpc (handler : val) (RP : RPC_rpc_params):=
@@ -93,7 +88,6 @@ Class RPC_interface_implementation (IP : RPC_interface_params) :=
   RPC_inter_list : list val;
   RPC_inter_spec :
     (is_list RPC_inter_list RPC_inter_val ∧ 
-     (* NoDup (list_map Fst RPC_inter_list) ∧ *)
      is_list_of_interface RPC_inter_list IP.(RPC_inter))
 }.
 

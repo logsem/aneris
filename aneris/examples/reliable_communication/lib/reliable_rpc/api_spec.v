@@ -15,9 +15,12 @@ Section Spec.
 
 	Context (Channel : val → socket_address → iProp Σ).
 
-	Definition implement_spec {RP : RPC_rpc_params} (IMP : RPC_implementation_params RP) : iProp Σ :=
-		{{{ ⌜In RP IP.(RPC_inter)⌝ }}}
-			implement IMP.(RPC_val) IMP.(RPC_handler) @[srv_ip]
+	Definition implement_spec (*{RP : RPC_rpc_params}*) (*IMP : RPC_implementation_params RP*) : iProp Σ :=
+		∀ (RP : RPC_rpc_params) rpc_val handler,
+		{{{ ⌜In RP IP.(RPC_inter)⌝ ∗
+			⌜is_rpc_val RP rpc_val⌝ ∗
+			handler_spec RP handler }}}
+			implement rpc_val handler @[srv_ip]
 		{{{ h, RET (#RP.(RPC_name), h)%V; ⌜is_impl_handler_of_rpc h RP⌝ }}}.
 
 	Definition init_server_stub_spec (II : RPC_interface_implementation IP) : iProp Σ :=
@@ -41,28 +44,17 @@ Section Spec.
 			init_client_stub #clt_addr #RPC_saddr @[ip_of_address clt_addr]
 		{{{ chan, RET chan; Channel chan clt_addr }}}.
 
-	Definition call_spec {RP : RPC_rpc_params} (IMP : RPC_implementation_params RP) : iProp Σ :=
-		∀ chan clt_addr argv argd,
-		{{{ ⌜In RP IP.(RPC_inter)⌝ ∗ 
+	Definition call_spec (*{RP : RPC_rpc_params}*) (*IMP : RPC_implementation_params RP*) : iProp Σ :=
+		∀ (RP : RPC_rpc_params) chan clt_addr argv argd rpc_val,
+		{{{ ⌜In RP IP.(RPC_inter)⌝ ∗
+			⌜is_rpc_val RP rpc_val⌝ ∗ 
 			Channel chan clt_addr ∗
 			⌜Serializable RP.(RPC_arg_ser) argv⌝ ∗ 
 			RP.(RPC_pre) argv argd }}}
-			call chan IMP.(RPC_val) argv @[ip_of_address clt_addr]
+			call chan rpc_val argv @[ip_of_address clt_addr]
 		{{{ repv repd, RET repv; 
 			Channel chan clt_addr ∗
 			RP.(RPC_post) repv argd repd }}}.
-
-	(* Definition rpc_spec {RP : RPC_rpc_params} (f : val) clt_addr : iProp Σ :=
-		∀ argv argd,
-		{{{ ⌜Serializable RP.(RPC_arg_ser) argv⌝ ∗ RP.(RPC_pre) argv argd }}}
-			f argv @[ip_of_address clt_addr]
-		{{{ repv repd, RET repv; RP.(RPC_post) repv argd repd }}}.
-
-	Definition call_spec {RP : RPC_rpc_params} (IMP : RPC_implementation_params RP) : iProp Σ :=
-		∀ chan clt_addr,
-		{{{ ⌜In RP IP.(RPC_inter)⌝ ∗ Channel chan clt_addr }}}
-			call chan IMP.(RPC_val) @[ip_of_address clt_addr]
-		{{{ f, RET f; @rpc_spec RP f clt_addr }}}. *)
 
 End Spec.
 
@@ -80,8 +72,7 @@ Section RPC_Init.
 			(∀ (II : RPC_interface_implementation IP), 
 				init_server_stub_spec SrvInit srv_si II) ∗
 			(init_client_stub_spec srv_si Channel) ∗
-			( ∀ (RP : RPC_rpc_params) (IMP : RPC_implementation_params RP),
-				@call_spec _ _ _ _ IP Channel RP IMP)
+			( @call_spec _ _ _ IP Channel)
 	}.
 
 End RPC_Init.

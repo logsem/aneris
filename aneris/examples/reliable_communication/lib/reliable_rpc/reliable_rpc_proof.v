@@ -148,16 +148,11 @@ Section RPC_proof_of_code.
 		iLöb as "IH".
 		wp_pures.
 		wp_recv (rpc s_arg arg argd) as "(%Hin & Hser & Hpre)".
-		wp_pures.
-		(* wp_apply (monitor_acquire_spec with "[Hmon]"); first by iFrame "#".
-		iIntros (v) "(-> & Hlocked & HR)". wp_seq. *)
 		wp_apply (call_handler_spec_holds); first by iFrame "#".
 		iIntros (h Hh). rewrite /is_impl_handler_of_rpc.
 		wp_apply (Hh with "[$Hpre $Hser]").
 		iIntros (repv repd s_rep) "[Hser Hpost]".
 		wp_let.
-		(* wp_apply (monitor_release_spec with "[$Hmon $HR $Hlocked]").
-		iIntros (v ->). wp_seq. *)
 		wp_send with "[$Hser $Hpost]". wp_seq.
 		iApply ("IH" with "[$Hc] [$Hcont]").
 	Qed.
@@ -166,7 +161,7 @@ Section RPC_proof_of_code.
 		
 
 	Lemma accept_new_connections_loop_proof (II : RPC_interface_implementation IP) skt  :
-		{{{ RPC_saddr ⤇ reserved_server_socket_interp ∗
+		{{{ RPC_saddr ⤇ 	 ∗
 			SrvListens skt }}}
 		accept_new_connections_loop skt II.(RPC_inter_val) #() @[srv_ip]
 		{{{ RET #(); False }}}.
@@ -289,44 +284,6 @@ Section RPC_proof_of_code.
 		wp_apply s_deser_spec; first done.
 		iIntros "_". iApply "Hcont". iFrame.
 	Qed.
-
-
-
-	(* Definition rpc_spec {RP : RPC_rpc_params} (f : val) clt_addr : iProp Σ :=
-		∀ argv argd,
-		{{{ ⌜Serializable RP.(RPC_arg_ser) argv⌝ ∗ RP.(RPC_pre) argv argd }}}
-			f argv @[ip_of_address clt_addr]
-		{{{ repv repd, RET repv; RP.(RPC_post) repv argd repd }}}.
-
-	Definition call_internal_spec {RP : RPC_rpc_params} (IMP : RPC_implementation_params RP) : iProp Σ :=
-		∀ chan clt_addr,
-		{{{ ⌜In RP IP.(RPC_inter)⌝ ∗ chan ↣{ip_of_address clt_addr,RCParams_clt_ser} RCParams_protocol }}}
-			call chan IMP.(RPC_val) @[ip_of_address clt_addr]
-		{{{ f, RET f; @rpc_spec RP f clt_addr }}}.
-
-	Lemma call_internal_spec_holds {RP : RPC_rpc_params} (IMP : RPC_implementation_params RP) :
-		⊢ call_internal_spec IMP.
-	Proof.
-		rewrite /call_internal_spec.
-		iIntros (chan clt_addr Φ) "!#".
-		iIntros "[%HRP Hc] Hcont".
-		rewrite /call. wp_pures.
-		(* rewrite /rpc_spec. *)
-		iApply "Hcont".
-		rewrite /rpc_spec. 
-		iIntros (argv argd Ψ) "!> [%Hseria Hpre] Hcont".
-		(* iDestruct "Hc" as (c lk γ ->) "Hlk". wp_pures. *)
-		rewrite RPC_rpc_match. wp_pures.
-		wp_apply s_ser_spec; first done.
-		iIntros (s Hisserarg). wp_pures.
-		wp_send with "[$Hpre]"; first done.
-		wp_seq.
-		wp_recv (s_rep repv repd) as "[%Hisserep Hpost]". wp_pures.
-		wp_apply (release_spec with "[$Hlk $Hc $Hlocked]").
-		iIntros (? ->). wp_seq. wp_pures. 
-		wp_apply s_deser_spec; first done.
-		iIntros "_". by iApply "Hcont".
-	Qed. *)
 
 	Global Definition Channel chan clt_addr := chan ↣{ip_of_address clt_addr,RCParams_clt_ser} RCParams_protocol.
 
