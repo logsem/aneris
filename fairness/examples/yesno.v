@@ -98,8 +98,6 @@ Proof.
             live_roles nb := yn_live_roles nb;
             fm_live_spec := live_spec_holds;
           |}).
-  intros ρ' [? ?] ρ [n' ?] Htrans Hin Hneq; rewrite /yn_live_roles.
-  inversion Htrans; destruct ρ; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia.
 Defined.
 
 Definition the_model: LiveModel heap_lang the_fair_model :=

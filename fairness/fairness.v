@@ -21,8 +21,6 @@ Record FairModel : Type := {
   live_roles: fmstate -> gset fmrole;
   fm_live_spec:
      forall s ρ s', fmtrans s (Some ρ) s' -> ρ ∈ live_roles s;
-  fm_live_preserved:
-     forall ρ' s ρ s', fmtrans s (Some ρ) s' -> ρ' ∈ live_roles s -> ρ ≠ ρ' ->  ρ' ∈ live_roles s';
 }.
 
 #[global] Existing Instance fmrole_eqdec.
