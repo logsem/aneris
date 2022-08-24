@@ -79,28 +79,6 @@ Section definitions.
         (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
         sis_own (sags ∖ A))%I.
 
-  (* (** Socket interpretation coherence *) *)
-  (* (* Addresses with socket interpretations are bound *) *)
-  (* Definition socket_interp_coh P := *)
-  (*   (∃ (sags : gset socket_address_group) *)
-  (*      (sis : gset socket_address_group) *)
-  (*      (A : gset socket_address_group), *)
-  (*       (* socket_address_group_ctx A ∗ *) *)
-  (*       socket_address_group_ctx sags ∗ *)
-  (*       (* [A] is the set of addresses with fixed interpretations *) *)
-  (*       fixed_groups A ∗ *)
-  (*       (* [sags] is the set of addresses with a saved socket interpretation *) *)
-  (*       sis_own sis ∗ ⌜sis ⊆ sags⌝ ∗ *)
-  (*       (* All sets not in [A] are singletons *) *)
-  (*       ⌜set_Forall is_singleton (sags ∖ A)⌝ ∗ *)
-  (*       (* all addresses in [sags] either have a fixed interpretation *)
-  (*          ([a ∈ A]) or are dynamically bound. *) *)
-  (*       ⌜∀ sag, sag ∈ sis ↔ sag ∈ A ∨ *)
-  (*                           (sag ∉ A ∧ have_disj_elems {[sag]} A ∧ *)
-  (*                            ∃ sa ps, sag = {[sa]} ∧ *)
-  (*                                     P !! ip_of_address sa = Some ps ∧ *)
-  (*                                     port_of_address sa ∈ ps)⌝)%I. *)
-
   Lemma socket_interp_coh_le (sags : gset socket_address_group) A P :
     (∀ sag, sag ∈ sags ↔ sag ∈ A ∨
                          (sag ∉ A ∧ have_disj_elems {[sag]} A ∧
