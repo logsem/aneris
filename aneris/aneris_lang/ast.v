@@ -101,6 +101,10 @@ Inductive expr :=
 | ReceiveFrom (e1 : expr)
 | SetReceiveTimeout (e1 : expr) (e2 e3 : expr)
 | Start (ip : base_lit) (e : expr)
+  (* Like `Start`, but additionally record that `ip` runs an adversary *)
+| StartAdversary (ip : base_lit) (e : expr)
+  (* Mark the given socket address as public (reachable by an adversary) *)
+| SetPublicAddr (saddr : base_lit)
 
 with val :=
 | LitV (l : base_lit)

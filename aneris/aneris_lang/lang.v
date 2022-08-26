@@ -104,6 +104,10 @@ Proof.
             (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | Start e0 e1, Start e0' e1' =>
           cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
+        | StartAdversary e0 e1, StartAdversary e0' e1' =>
+          cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
+        | SetPublicAddr e, SetPublicAddr e' =>
+          cast_if (decide (e = e'))
         | _, _ => right _
         end
       with gov (v1 v2 : val) {struct v1} : Decision (v1 = v2) :=
@@ -242,6 +246,8 @@ Proof.
      | CAS e1 e2 e3 => GenNode 25 [go e1; go e2; go e3]
      | GetAddressInfo e => GenNode 26 [go e]
      | Rand e => GenNode 27 [go e]
+     | StartAdversary i e => GenNode 28 [GenLeaf (inl (inr (inl i))); go e]
+     | SetPublicAddr saddr => GenNode 29 [GenLeaf (inl (inr (inl saddr)))]
      end
    with gov v :=
      match v with
@@ -288,6 +294,8 @@ Proof.
      | GenNode 25 [e1; e2; e3] => CAS (go e1) (go e2) (go e3)
      | GenNode 26 [e] => GetAddressInfo (go e)
      | GenNode 27 [e] => Rand (go e)
+     | GenNode 28 [GenLeaf (inl (inr (inl i))); e2] => StartAdversary i (go e2)
+     | GenNode 29 [GenLeaf (inl (inr (inl saddr)))] => SetPublicAddr saddr
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -444,6 +452,8 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
     SetReceiveTimeout (subst x v e0) (subst x v e1) (subst x v e2)
   | ReceiveFrom e => ReceiveFrom (subst x v e)
   | Start i e => Start i (subst x v e)
+  | StartAdversary i e => StartAdversary i (subst x v e)
+  | SetPublicAddr saddr => SetPublicAddr saddr
   end.
 
 Definition subst' (mx : binder) (v : val) : expr → expr :=
@@ -635,7 +645,7 @@ Inductive base_config_step : state -> state -> Prop :=
 | ConfigIdStep σ : base_config_step σ σ.
 
 Definition base_locale := nat.
-Definition locale_of (c: list expr) (e : expr) := length c.
+Definition locale_of (c: list expr) (e : expr) := (length c).
 
 Lemma locale_step e1 e2 t1 σ1 σ2 efs:
   head_step e1 σ1 e2 σ2 efs ->
@@ -704,12 +714,16 @@ Definition ports_in_use := gmap ip_address (gset port).
 
 (** The global state of the system
    - maps each node of the system to it local state (H, S, P)
-   - keeps track of all messages that has been sent throught the network *)
+   - keeps track of all messages that has been sent throught the network
+   - keeps track of all ip addresses assigned to adversaries
+   - tracks the set of public socket addresses (those reachable by adversaries) *)
 Record state := mkState {
   state_heaps : gmap ip_address heap;
   state_sockets : gmap ip_address sockets;
   state_ports_in_use : ports_in_use;
   state_ms : message_multi_soup;
+  state_adversaries : gset ip_address;
+  state_public_addrs : gset socket_address;
 }.
 
 #[global] Instance etaState : Settable _ :=
@@ -717,7 +731,9 @@ Record state := mkState {
   <state_heaps;
    state_sockets;
    state_ports_in_use;
-   state_ms>.
+   state_ms;
+   state_adversaries;
+   state_public_addrs >.
 
 Definition option_socket_address_to_val (sa : option socket_address) :=
   match sa with
@@ -894,8 +910,40 @@ Inductive head_step : aneris_expr → state →
                 state_heaps := <[ip:=∅]>(state_heaps σ);
                 state_sockets := <[ip:=∅]>(state_sockets σ);
                 state_ports_in_use := state_ports_in_use σ;
-                state_ms := state_ms σ |}
+                state_ms := state_ms σ;
+                state_adversaries := state_adversaries σ;
+                state_public_addrs := state_public_addrs σ;
+              |}
               [mkExpr ip e]
+| StartAdveraryStepS ip e σ :
+    ip ≠ "system" →
+    state_heaps σ !! ip = None →
+    state_sockets σ !! ip = None →
+    is_Some (state_ports_in_use σ !! ip) →
+    ip ∉ (state_adversaries σ) -> (* TODO: this is redundant. Remove it? *)
+    head_step (mkExpr "system" (StartAdversary (LitString ip) e)) σ
+              (mkExpr "system" (Val $ LitV $ LitUnit))
+              {|
+                state_heaps := <[ip:=∅]>(state_heaps σ);
+                state_sockets := <[ip:=∅]>(state_sockets σ);
+                state_ports_in_use := state_ports_in_use σ;
+                state_ms := state_ms σ;
+                state_adversaries := state_adversaries σ ∪ {[ ip ]};
+                state_public_addrs := state_public_addrs σ;
+              |}
+              [(mkExpr ip e)]
+| SetPublicAddrStepS sa σ :
+  head_step (mkExpr "system" (SetPublicAddr (LitSocketAddress sa))) σ
+            (mkExpr "system" (Val $ LitV $ LitUnit))
+            {|
+              state_heaps := state_heaps σ;
+              state_sockets := state_sockets σ;
+              state_ports_in_use := state_ports_in_use σ;
+              state_ms := state_ms σ;
+              state_adversaries := state_adversaries σ;
+              state_public_addrs := state_public_addrs σ ∪ {[ sa ]};
+            |}
+            []
 | SocketStepS n e e' Sn Sn' P' M' σ
     (SocketStep : socket_step n
         e  Sn (state_ports_in_use σ) (state_ms σ)
@@ -906,7 +954,10 @@ Inductive head_step : aneris_expr → state →
               {| state_heaps := state_heaps σ;
                  state_sockets := <[n:=Sn']>(state_sockets σ);
                  state_ports_in_use := P';
-                 state_ms := M'; |}
+                 state_ms := M';
+                 state_adversaries := state_adversaries σ;
+                 state_public_addrs := state_public_addrs σ;
+              |}
               [].
 
 Lemma aneris_to_of_val v : aneris_to_val (aneris_of_val v) = Some v.
@@ -979,6 +1030,11 @@ Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
                              simplify_eq/=; auto with f_equal. Qed.
 
+(* *)
+Definition public_ip_check m σ :=
+  ip_of_address (m_sender m) ∈ (state_adversaries σ) ->
+    (m_destination m) ∈ (state_public_addrs σ).
+
 Inductive config_step :
   state → state -> Prop :=
 | MessageDeliverStep n σ Sn Sn' sh a skt r m:
@@ -987,18 +1043,25 @@ Inductive config_step :
     Sn !! sh = Some (skt, r) →
     Sn' = <[sh := (skt, m :: r)]>Sn →
     saddress skt = Some a →
+    public_ip_check m σ ->
     config_step σ
                 {| state_heaps := state_heaps σ;
                    state_sockets := <[n:=Sn']>(state_sockets σ);
                    state_ports_in_use := state_ports_in_use σ;
-                   state_ms := state_ms σ; |}
+                   state_ms := state_ms σ;
+                   state_adversaries := state_adversaries σ;
+                   state_public_addrs := state_public_addrs σ;
+                |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
     config_step σ
                  {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ports_in_use := state_ports_in_use σ;
-                   state_ms := state_ms σ ∖ {[+ m +]}; |}.
+                   state_ms := state_ms σ ∖ {[+ m +]};
+                   state_adversaries := state_adversaries σ;
+                   state_public_addrs := state_public_addrs σ;
+                 |}.
 
 Definition aneris_locale := (ip_address * nat)%type.
 Definition locale_of (c: list aneris_expr) (e : aneris_expr) := (e.(expr_n), length $ (filter (λ e', e'.(expr_n) = e.(expr_n))) c).
@@ -1084,6 +1147,8 @@ Proof.
           state_sockets := ∅;
           state_ports_in_use := ∅;
           state_ms := ∅;
+          state_adversaries := ∅;
+          state_public_addrs := ∅;
         |}
     |}.
 Qed.
