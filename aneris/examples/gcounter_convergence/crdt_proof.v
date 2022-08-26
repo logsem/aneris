@@ -754,11 +754,10 @@ Section proof.
   Lemma list_sum_replicate n m : list_sum (replicate n m) = n * m.
   Proof. induction n; simpl; lia. Qed.
 
-  Lemma install_proof (A : gset socket_address) (i : nat) (a : socket_address) (v : val) :
+  Lemma install_proof (i : nat) (a : socket_address) (v : val) :
     is_list (gcd_addr_list gcdata) v →
     gcd_addr_list gcdata !! i = Some a →
-    a ∈ A →
-    {{{ fixed A ∗ Global_Inv ∗ unallocated i ∗
+    {{{ Global_Inv ∗ unallocated i ∗
         ([∗ list] i ↦ a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
         free_ports (ip_of_address a) {[port_of_address a]} ∗
         sendevs_frag i [] ∗ recevs_frag i [] }}}
@@ -766,7 +765,7 @@ Section proof.
     {{{ (GCounter : nat → nat → iProp Σ) query incr, RET (query, incr);
         GCounter i 0 ∗ query_spec GCounter query i a ∗ incr_spec GCounter incr i a}}}.
   Proof.
-    iIntros (Hilv Hia HaA Φ) "(#Hfx & #Hgi & Hua & #Hprotos & Hfpa & Hsevsfrg & Hrevsfrg) HΦ".
+    iIntros (Hilv Hia Φ) "(#Hgi & Hua & #Hprotos & Hfpa & Hsevsfrg & Hrevsfrg) HΦ".
     rewrite /gcounter_install.
     assert (i < GClen gcdata) as Hilt.
     { apply lookup_lt_is_Some_1; eauto. }
@@ -824,7 +823,7 @@ Section proof.
     wp_pures.
     wp_socket sh as "Hsh".
     wp_pures.
-    wp_socketbind_static.
+    wp_socketbind.
     iMod (inv_alloc (nroot .@ "skt") _ (sh ↪[ ip_of_address r] udp_socket (Some r) true)
             with "[$Hsh //]") as "#Hsh".
     wp_apply aneris_wp_fork.

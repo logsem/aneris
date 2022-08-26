@@ -427,6 +427,20 @@ Section state_interpretation.
     iModIntro. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
+  Lemma aneris_state_interp_socket_interp_allocate_fun σ mh sags f :
+    aneris_state_interp σ mh -∗ unfixed_groups sags ==∗
+    aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* f sag.
+  Proof.
+    iIntros "Hσ Hunfixed".
+    iDestruct "Hσ"
+        as (mγ mn)
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iMod (socket_interp_coh_allocate_fun with "Hsi Hunfixed")
+      as "[Hφ Hsi]". 
+    iModIntro. iFrame. iExists _, _. iFrame. eauto.
+  Qed.
+
   Lemma aneris_state_interp_socket_interp_allocate σ mh sags φ :
     aneris_state_interp σ mh -∗ unfixed_groups sags ==∗
     aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.

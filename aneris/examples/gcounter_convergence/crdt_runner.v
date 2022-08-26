@@ -40,13 +40,11 @@ Section runner_spec_helper.
   Definition prog_spec i a ports A (B : gset socket_address)
              (f : socket_address → socket_interp Σ) (prog : val) : iProp Σ :=
     ⌜port_of_address a ∉ ports⌝ ∧
-    ∀ A' GCounter query incr,
-      ⌜A ⊆ A'⌝ -∗
+    ∀ GCounter query incr,
       GCounter i 0 -∗
       query_spec GCounter query i a -∗
       incr_spec GCounter incr i a -∗
       free_ports (ip_of_address a) ports -∗
-      fixed A' -∗
       ([∗ set] a ∈ A, a ⤇ f a) -∗
       ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗
       WP prog query incr @[ip_of_address a] {{_, True}}.
@@ -62,7 +60,6 @@ Section runner_spec_helper.
     is_list (gcd_addr_list gcdata) v →
     (∀ a, a ∈ (gcd_addr_list gcdata) → a ∈ A) →
     Aprogs ⊆ A →
-    fixed A -∗
     Global_Inv -∗
     ([∗ list] i ∈ seq k (length progs), unallocated i) -∗
     ([∗ list] i ↦ a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) -∗
@@ -76,7 +73,7 @@ Section runner_spec_helper.
     WP runner gcdata k progs v @["system"] {{ v, ⌜v = #()⌝ }}.
   Proof.
     iIntros (Hprgslen Hv HA HAprogs)
-      "#Hfa #Hinv Huas #Hprotos #HAprogs Hfips Hsevs Hrevs Hprogs".
+      "#Hinv Huas #Hprotos #HAprogs Hfips Hsevs Hrevs Hprogs".
     iInduction progs as [|prog progs IHprogs] "IH" forall (k Hprgslen portssocks).
     { rewrite /runner /=. iApply aneris_wp_value; done. }
     rewrite runner_cons /run_prog /=.
@@ -104,10 +101,10 @@ Section runner_spec_helper.
     rewrite free_ports_split; last by apply disjoint_singleton_r.
     iDestruct "Hfps" as "[Hfps Hfsa]".
     wp_apply (install_proof with "[$Hua $Hfsa $Hsev $Hrev]");
-      [done|done|by apply HA; apply elem_of_list_lookup; eauto|by iFrame "#"|].
+      [done|done|by iFrame "#"|].
     iIntros (GCounter query incr) "(HG0 & Hq & Hi)".
     wp_pures.
-    iApply ("Hprog" with "[] HG0 Hq Hi Hfps Hfa HAprogs Hprgsas"); done.
+    iApply ("Hprog" with "HG0 Hq Hi Hfps HAprogs Hprgsas").
   Qed.
 
 End runner_spec_helper.
@@ -170,6 +167,7 @@ Section runner_spec.
   Lemma runner_spec (Aprogs : gset socket_address)
         (portssocks : list ((gset port) * (gset socket_address)))
         (progs : list val) v :
+    0 < length progs →
     length progs = GClen gcdata →
     is_list (gcd_addr_list gcdata) v →
     (∀ a, a ∈ (gcd_addr_list gcdata) → a ∉ Aprogs) →
@@ -179,10 +177,8 @@ Section runner_spec.
        ([∗ list] i ↦ prtsas; prog ∈ portssocks; progs,
        prog_spec i (ith_sa i) prtsas.1 Aprogs prtsas.2 f prog)) -∗
     |={⊤}=> ∃ _ : GCounterG Σ gcdata,
-       ∃ f,
          frag_st (initial_crdt_state (GClen gcdata)) -∗
-         fixed (list_to_set (gcd_addr_list gcdata) ∪ Aprogs) -∗
-         ([∗ set] a ∈ list_to_set (gcd_addr_list gcdata) ∪ Aprogs, a ⤇ f a) -∗
+         unfixed (list_to_set (gcd_addr_list gcdata) ∪ Aprogs) -∗
          ([∗ set] a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata) ∪ (⋃ portssocks.*2),
             a ⤳[bool_decide (a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata)),
                 bool_decide (a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata))] (∅, ∅)) -∗
@@ -192,7 +188,7 @@ Section runner_spec.
          ([∗ list] i ∈ seq 0 (GClen gcdata), alloc_evs (StringOfZ (i : nat)) []) ={⊤}=∗
          Global_Inv ∗ WP runner gcdata 0 progs v @["system"] {{ v, ⌜v = #()⌝ }}.
   Proof.
-    iIntros (Hproglen Hilv HAprogs Hsocks1 Hsocks2) "Hprogs".
+    iIntros (Hprogsne Hproglen Hilv HAprogs Hsocks1 Hsocks2) "Hprogs".
     iMod "Hprogs" as (f) "Hprogs".
     iMod Gcounter_init as (γvcs) "Hvcs".
     iMod locations_init as (γlocs) "[Hlocs Hlocsf]".
@@ -204,8 +200,7 @@ Section runner_spec.
                 GCG_sendevs_name := γsendevs;
                 GCG_recevs_name := γrecevs |}).
     iExists _.
-    iExists (λ a, if (bool_decide (a ∈ Aprogs)) then f a else GCounter_socket_proto).
-    iIntros "Hfst #Hfx #Hprotos Hmsgpts Hpsevs Hprevs Hfips Halevs".
+    iIntros "Hfst Hfx Hmsgpts Hpsevs Hprevs Hfips Halevs".
     iDestruct (big_sepS_union with "Hmsgpts") as "[Hmsgptscrdt Hmsgptsprogs]"; first done.
     iAssert (|={⊤}=> Global_Inv)%I
       with "[Hvcs Hlocs Hsevss Hrevss Hfst Hpsevs Hprevs Halevs Hmsgptscrdt]" as ">#Hinv".
@@ -227,32 +222,31 @@ Section runner_spec.
     { iIntros "!#" (? ?) "H".
       rewrite bool_decide_eq_false_2; last set_solver.
       iExact "H". }
-    wp_apply (runner_spec_helper 0 _ Aprogs portssocks f
-                with "Hfx Hinv [Hlocsf] [] [] [Hfips] [Hsevssf] [Hrevssf]"); simpl.
+    iDestruct (unfixed_split with "Hfx") as "[Hfx HfxA]"; [set_solver|].
+    iApply (aneris_wp_socket_interp_alloc GCounter_socket_proto with "Hfx").
+    { destruct progs; [|done]. simpl in *. lia. }
+    iIntros "#Hsi".
+    iApply (aneris_wp_socket_interp_alloc_fun f with "HfxA").
+    { destruct progs; [|done]. simpl in *. lia. }
+    iIntros "#HsiA".
+    (* TODO: introduce new lemma for allocating socket interps with map *)
+    wp_apply (runner_spec_helper 0 (list_to_set (gcd_addr_list gcdata) ∪ Aprogs)
+                                 Aprogs portssocks f
+                with "Hinv [Hlocsf] [] [] [Hfips] [Hsevssf] [Hrevssf]"); simpl.
     - lia.
     - done.
     - set_solver.
     - set_solver.
     - rewrite Hproglen; done.
-    - iDestruct (big_sepS_subseteq _ _ (list_to_set (gcd_addr_list gcdata)) with "Hprotos")
-        as "Hprt"; first set_solver.
-      rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup.
-      iApply (big_sepL_impl with "Hprt").
-      iIntros "!#" (???).
-      rewrite bool_decide_eq_false_2; last by apply HAprogs; eapply elem_of_list_lookup_2.
-      iIntros "$".
-    - iDestruct (big_sepS_subseteq _ _ Aprogs with "Hprotos")
-        as "Hprt"; first set_solver.
-      iApply (big_sepS_impl with "Hprt").
-      iIntros "!#" (??).
-      rewrite bool_decide_eq_true_2; last done.
-      iIntros "$".
+    - rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup.
+      done.
+    - done.
     - rewrite Hproglen.
       iApply helper_3; done.
     - rewrite Hproglen; done.
     - rewrite Hproglen; done.
     - iApply (helper_1 0 with "Hprogs Hmsgptsprogs"); done.
-  Qed.
+Qed.
 
 End runner_spec.
 
@@ -262,10 +256,12 @@ Record programs_using_gcounters {gcdata : GCData} :=
   { Aprogs : gset socket_address;
     portssocks : list ((gset port) * (gset socket_address));
     progs : list val;
+    progs_ne : 0 < length progs;
     progs_length : length progs = GClen gcdata;
     Aprogs_no_conflict : ∀ a, a ∈ (gcd_addr_list gcdata) → a ∉ Aprogs;
     Aprogs_on_nodes :
       ∀ a, a ∈ Aprogs → ∃ sa, sa ∈ (gcd_addr_list gcdata) ∧ ip_of_address a = ip_of_address sa;
+    Aprogs_portssocks_eq : Aprogs = (⋃ portssocks.*2);
     sockets_no_conflict : list_to_set (gcd_addr_list gcdata) ## (⋃ portssocks.*2);
     sockets_disj :
       ∀ i j PB PB', portssocks !! i = Some PB → portssocks !! j = Some PB' → PB.2 ## PB'.2;

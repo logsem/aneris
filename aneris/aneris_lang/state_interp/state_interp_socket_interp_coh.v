@@ -72,9 +72,9 @@ Section state_interpretation.
     iExists _. iFrame "#".
   Qed.
 
-  Lemma socket_interp_coh_allocate sags φ :
+  Lemma socket_interp_coh_allocate_fun sags f :
     socket_interp_coh -∗ unfixed_groups sags ==∗
-    socket_interp_coh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
+    socket_interp_coh ∗ [∗ set] sag ∈ sags, sag ⤇* (f sag).
   Proof.
     iIntros "Hinterp Hsags".
     iInduction sags as [|sag sags Hnin] "IHsags" using set_ind_L; [by eauto|].
@@ -85,5 +85,10 @@ Section state_interpretation.
     iMod ("IHsags" with "Hinterp Hsags") as "[Hinterp $]".
     iApply (socket_interp_coh_allocate_singleton with "Hinterp Hsag").
   Qed.
+
+  Lemma socket_interp_coh_allocate sags φ :
+    socket_interp_coh -∗ unfixed_groups sags ==∗
+    socket_interp_coh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
+  Proof. iApply socket_interp_coh_allocate_fun. Qed.
 
 End state_interpretation.
