@@ -498,13 +498,6 @@ Section StateLib_Proof.
     iSplitL; last done.
     iIntros "!> %φ _ Hφ".
     wp_lam.
-    wp_apply (acquire_spec with "His_lock").
-    iIntros (v) "(-> & Hlocked &
-      (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
-      %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
-    assert (Hip_eq: ip_of_address addr = ip).
-    { rewrite Haddr in Hip. by simplify_eq/=. }
-    wp_seq.
     wp_bind(ReceiveFrom _).
     iInv "Hsock_inv" as "(%R & %S & Hh & > (%Haddr_sock & %Haddr_proj & Hsoup & #Hproto_respected))" "Hclose".
     wp_apply ((aneris_wp_receivefrom
@@ -529,6 +522,15 @@ Section StateLib_Proof.
           %Hsender_addr & %Hrecipient_addr & %Hf_sender & %Hf_recipient &
           %Hst'_ser & %Hst'_coh & %st'_denot & %Hst'_locisloc & %Hst'_subisfor
           & %Hst'_validity & #Hst'_snap)".
+      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
+      wp_let.
+      wp_apply (acquire_spec with "His_lock").
+      iIntros (v) "(-> & Hlocked &
+        (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
+        %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
+      assert (Hip_eq: ip_of_address addr = ip).
+      { rewrite Haddr in Hip. by simplify_eq/=. }
+      wp_seq.
       assert (recipientId = f) as ->.
       { rewrite Hf.
         apply (NoDup_lookup CRDT_Addresses recipientId repId addr);
@@ -537,8 +539,6 @@ Section StateLib_Proof.
           | assumption ]. }
       assert (f_recipient = f) as ->.
       { apply fin_to_nat_inj. by rewrite Hf Hf_recipient. }
-      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
-      wp_let.
       wp_bind (!_)%E.
       iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
         as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
@@ -645,6 +645,15 @@ Section StateLib_Proof.
           & %Hst'_validity & #Hst'_snap)";
         first by iDestruct (big_sepS_elem_of with "Hproto_respected") as "Hm";
           first exact Hm_inR.
+      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
+      wp_let.
+      wp_apply (acquire_spec with "His_lock").
+      iIntros (v) "(-> & Hlocked &
+        (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
+        %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
+      assert (Hip_eq: ip_of_address addr = ip).
+      { rewrite Haddr in Hip. by simplify_eq/=. }
+      wp_seq.
       assert (recipientId = f) as ->.
       { rewrite Hf.
         apply (NoDup_lookup CRDT_Addresses recipientId repId addr);
@@ -653,8 +662,6 @@ Section StateLib_Proof.
           | assumption ]. }
       assert (f_recipient = f) as ->.
       { apply fin_to_nat_inj. by rewrite Hf Hf_recipient. }
-      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
-      wp_let.
       wp_bind (!_)%E.
       iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
         as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
