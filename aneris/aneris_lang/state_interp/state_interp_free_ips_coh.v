@@ -166,7 +166,10 @@ Section state_interpretation.
       {| state_heaps := state_heaps σ;
          state_sockets := <[ip:=Sn']> (state_sockets σ);
          state_ports_in_use := state_ports_in_use σ;
-         state_ms := state_ms σ |}.
+         state_ms := state_ms σ;
+         state_adversaries := state_adversaries σ;
+         state_public_addrs := state_public_addrs σ;
+      |}.
   Proof.
     rewrite /free_ips_coh /=.
     iDestruct 1 as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".

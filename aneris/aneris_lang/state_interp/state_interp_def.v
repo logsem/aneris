@@ -100,6 +100,10 @@ Section definitions.
         free_ips_auth free_ips ∗
         free_ports_auth free_ports)%I.
 
+  (** Coherence of adversary and public addresses **)
+  Definition adversary_coh σ : iProp Σ :=
+    adversary_ips_auth (state_adversaries σ).
+
   (** Network sockets coherence for bound ports, socket handlers,
       receive buffers, and socket addresses *)
   (* The ports of all bound addresses in [Sn] are also in [P] *)
@@ -170,7 +174,8 @@ Section definitions.
     messages_received_from_sent_coh mhm.
 
   (* For all messages [m] in [M], either the network owns the resources [Φ m]
-     described by some socket protocol [Φ] or it has been delivered. *)
+     described by some socket protocol [Φ], or it has been delivered, or
+     [m] was sent by an adversary. *)
   Definition messages_resource_coh mhm : iProp Σ :=
     (* All sets in the domain of [mhm] are disjoint *)
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
@@ -194,7 +199,11 @@ Section definitions.
               resources  specified by the protocol *)
            ((∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ▷ Φ m') ∨
             (* or [m] has been delivered somewhere *)
-            (∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ⌜message_received m' mhm⌝))).
+            (∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ⌜message_received m' mhm⌝)) ∨
+            (* or [m] was sent by an adversary *)
+            (* TODO: unclear what, if anything, to do about address groups *)
+            (* TODO: unclear if in this case need to own `sagR ⤇* Φ` *)
+            (adversary_ip (ip_of_address (m_sender m)))).
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=
@@ -207,6 +216,7 @@ Section definitions.
         socket_interp_coh ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
+        adversary_coh σ ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 

@@ -29,7 +29,7 @@ Definition aneris_to_trace_model (M: Model): traces.Model := {|
   mlabel := unit;
   mtrans x _ y := model_rel M x y;
 |}.
-  
+
 Record node_gnames := Node_gname {
   heap_name : gname;
   sockets_name : gname;
@@ -92,6 +92,10 @@ Class anerisG (Mdl : Model) Σ :=
       (** free ports  *)
       aneris_freeportsG :> inG Σ (authUR free_portsUR);
       aneris_freeports_name : gname;
+      (** adversary ips **)
+      aneris_adversaryips_name : gname;
+      (** public socket addresses **)
+      aneris_publicaddrs_name : gname;
       (** groups *)
       aneris_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       aneris_socket_address_group_name : gname;
@@ -227,6 +231,13 @@ Section definitions.
   Definition free_ports (ip : ip_address) (ports : gset port) : iProp Σ :=
     own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
 
+  (** Adversary ip addresses *)
+  Definition adversary_ips_auth (A : gset ip_address) : iProp Σ :=
+    own aneris_adversaryips_name (● GSet A).
+
+  Definition adversary_ip (ip : ip_address) : iProp Σ :=
+    own aneris_adversaryips_name (◯ GSet {[ ip ]}).
+
   Definition socket_address_groups_own (sags : gset socket_address_group)
     : iProp Σ :=
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
@@ -242,7 +253,7 @@ Section definitions.
 
   Definition socket_address_group_own (sag : socket_address_group) : iProp Σ :=
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
-        (◯ (DGSets {[sag]})).  
+        (◯ (DGSets {[sag]})).
 
   (** Ghost names of saved socket interpretations *)
   Definition saved_si_auth
