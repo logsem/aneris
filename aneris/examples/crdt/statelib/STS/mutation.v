@@ -1,15 +1,15 @@
-From aneris.aneris_lang Require Import lang resources.
+From aneris.aneris_lang Require Import lang.
 From stdpp Require Import gmap.
-From aneris.prelude Require Import misc gset_map.
-From aneris.examples.crdt Require Import crdt_spec crdt_events crdt_time.
-From aneris.examples.crdt.statelib.time Require Import evtime time maximality.
+From aneris.prelude Require Import gset_map.
+From aneris.examples.crdt Require Import crdt_spec.
+From aneris.examples.crdt.statelib.time Require Import evtime maximality.
 From aneris.examples.crdt.statelib.proof Require Import utils events.
 From aneris.examples.crdt.statelib.STS Require Import lst gst utils.
 
 
 Section Gst_mutator_local_valid.
-  Context `{!anerisG Mdl Σ, !CRDT_Params}.
-  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+  Context `{!CRDT_Params,
+            Op: Type, !EqDecision Op, !Countable Op}.
 
   Lemma mutator_incl_local
     (g: Gst Op) (op: Op) (orig: fRepId):

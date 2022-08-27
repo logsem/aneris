@@ -1,13 +1,10 @@
-From aneris.aneris_lang Require Import lang resources.
-From stdpp Require Import gmap sets.
-From aneris.prelude Require Import misc gset_map.
-From aneris.examples.crdt Require Import crdt_spec crdt_events crdt_time.
+From aneris.aneris_lang Require Import lang.
+From aneris.examples.crdt Require Import crdt_spec.
 From aneris.examples.crdt.statelib.proof Require Import utils events.
-From aneris.examples.crdt.statelib.time Require Import time maximality.
 
 Section Lst_definition.
-  Context `{!CRDT_Params}.
-  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+  Context `{!CRDT_Params,
+            Op: Type, !EqDecision Op, !Countable Op}.
 
   Definition Lst : Type := event_set Op.
 
@@ -50,8 +47,8 @@ Arguments Lst (Op) {_ _}.
 
 
 Section Lst_helper.
-  Context `{!CRDT_Params}.
-  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+  Context `{!CRDT_Params,
+            Op: Type, !EqDecision Op, !Countable Op}.
 
   Lemma Lst_Validity_implies_event_set_valid (s: Lst Op):
     Lst_Validity s → event_set_valid s.
@@ -83,3 +80,4 @@ Section Lst_helper.
     intros??. by left.
   Qed.
 End Lst_helper.
+

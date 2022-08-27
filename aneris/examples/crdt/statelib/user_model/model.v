@@ -1,6 +1,5 @@
-From stdpp Require Import base gmap.
+From stdpp Require Import gmap.
 From aneris.examples.crdt.spec Require Import crdt_denot crdt_events crdt_time.
-From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.proof Require Import events.
 From aneris.examples.crdt.statelib.user_model Require Import semi_join_lattices.
 
@@ -11,8 +10,8 @@ From aneris.examples.crdt.statelib.user_model Require Import semi_join_lattices.
 
 Section ModelDef.
 
-  Context {Op : Type} {LatSt: Type}.
-  Context `{!Lattice LatSt, !EqDecision Op, !Countable Op, !CrdtDenot Op LatSt}.
+  Context `{Op : Type, LatSt: Type,
+            !Lattice LatSt, !EqDecision Op, !Countable Op, !CrdtDenot Op LatSt}.
 
   Class StateCrdtModel := {
     (* The lub operation must be coherent with respect to denotations.

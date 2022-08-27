@@ -1,4 +1,4 @@
-From stdpp Require Import base gmap.
+From stdpp Require Import gmap.
 From aneris.prelude Require Import misc.
 From aneris.examples.crdt.spec Require Import crdt_time.
 
@@ -13,11 +13,10 @@ Proof.
 Qed.
 
 Section ComputeMaximals.
-  Context {T: Type}.
-  Context `{
-      !EqDecision T, !Countable T,
-      !Log_Time, !Timed T,
-      !RelDecision TM_lt}.
+  Context `{T: Type,
+            !EqDecision T, !Countable T,
+            !Log_Time, !Timed T,
+            !RelDecision TM_lt}.
 
   Definition compute_maximals (g: gset T): gset T :=
     filter
@@ -258,11 +257,10 @@ Section ComputeMaximals.
 End ComputeMaximals.
 
 Section UsefulLemmas.
-  Context {T: Type}.
-  Context `{
-      !EqDecision T, !Countable T,
-      !Log_Time, !Timed T,
-      !RelDecision TM_lt}.
+  Context `{T: Type,
+            !EqDecision T, !Countable T,
+            !Log_Time, !Timed T,
+            !RelDecision TM_lt}.
 
   Lemma maximals_union (X Y: gset T) (x: T):
     x ∈ compute_maximals (X ∪ Y)

@@ -1,16 +1,14 @@
-From aneris.aneris_lang Require Import lang resources.
+From aneris.aneris_lang Require Import lang.
 From stdpp Require Import gmap.
-From aneris.prelude Require Import misc gset_map.
-From aneris.examples.crdt Require Import crdt_spec crdt_events crdt_time.
-From aneris.examples.crdt.statelib.proof Require Import utils events.
-From aneris.examples.crdt.statelib.time Require Import evtime time maximality.
+From aneris.examples.crdt Require Import crdt_spec.
+From aneris.examples.crdt.statelib.proof Require Import events.
 From aneris.examples.crdt.statelib.STS Require Import lst.
 
 Require Import Decidable.
 
 Section Gst_definition.
-  Context `{!CRDT_Params}.
-  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+  Context `{!CRDT_Params,
+            Op: Type, !EqDecision Op, !Countable Op}.
 
   Definition Gst : Type :=
     (Lst Op) * vec (Lst Op) (length CRDT_Addresses).
@@ -73,8 +71,8 @@ Arguments Gst {_} (Op) {_ _}.
 
 
 Section Gst_helper.
-  Context `{!CRDT_Params}.
-  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+  Context `{!CRDT_Params,
+            Op: Type, !EqDecision Op, !Countable Op}.
 
   Lemma in_valid_gst__in_orig_local (h: Lst Op) (g: Gst Op) (f: fRepId):
     Gst_Validity g →
@@ -134,3 +132,4 @@ Section Gst_helper.
   Qed.
 
 End Gst_helper.
+

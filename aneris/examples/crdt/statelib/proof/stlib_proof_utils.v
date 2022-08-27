@@ -1,31 +1,18 @@
-From stdpp Require Import gmap.
-
-From iris.base_logic Require Import invariants bi.
-From iris.algebra Require Import agree auth excl gmap.
-
 From aneris.algebra Require Import monotone.
-From aneris.aneris_lang
-  Require Import lang network tactics proofmode lifting resources.
+From aneris.aneris_lang Require Import proofmode.
 From aneris.aneris_lang.lib
   Require Import list_proof lock_proof vector_clock_proof serialization_proof
     map_proof lock_proof network_util_proof inject.
-From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
-From aneris.aneris_lang.lib.vector_clock Require Import vector_clock_proof.
-From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-From aneris.prelude Require Import misc time.
-
 From aneris.examples.crdt.spec
-  Require Import crdt_events crdt_resources crdt_denot crdt_time crdt_base.
+  Require Import crdt_events crdt_denot crdt_time crdt_base.
 From aneris.examples.crdt.statelib.resources
-  Require Import utils resources resources_inv resources_local resources_global resources_lock.
-
+  Require Import utils resources_lock.
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.user_model
-  Require Import params model semi_join_lattices.
+  Require Import params semi_join_lattices.
 From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.STS Require Import utils gst lst.
-From aneris.examples.crdt.statelib.proof
-  Require Import spec events utils.
+From aneris.examples.crdt.statelib.proof Require Import events utils.
 
 Instance timeinst : Log_Time := timestamp_time.
 
@@ -180,3 +167,4 @@ Section LockInvariant.
     is_lock lock_inv_ns (ip_of_address saddr) γ__lock lockv (lock_inv_aux i st_loc).
 
 End LockInvariant.
+

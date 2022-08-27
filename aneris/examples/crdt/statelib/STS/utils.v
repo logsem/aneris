@@ -1,7 +1,7 @@
+(** TODO: get rid of the aneris resources here. **)
 From aneris.aneris_lang Require Import lang resources.
-From stdpp Require Import gmap.
-From aneris.prelude Require Import misc gset_map.
-From aneris.examples.crdt Require Import crdt_spec crdt_events crdt_time.
+From aneris.prelude Require Import gset_map.
+From aneris.examples.crdt Require Import crdt_spec.
 From aneris.examples.crdt.statelib.time Require Import evtime time maximality.
 From aneris.examples.crdt.statelib.proof Require Import utils events.
 From aneris.examples.crdt.statelib.STS Require Import lst gst.
@@ -28,8 +28,8 @@ Section UsefulLemmas.
 End UsefulLemmas.
 
 Section Preambule.
-  Context `{!anerisG Mdl Σ, !CRDT_Params}.
-  Context `{Op: Type, !EqDecision Op, !Countable Op}.
+  Context `{!CRDT_Params,
+            Op: Type, !EqDecision Op, !Countable Op}.
 
   Lemma get_evid_valid_time (ev: @Event timestamp_time Op):
     ev.(EV_Orig) = (get_evid ev).1.
@@ -479,3 +479,4 @@ Section Useful.
   Definition foreign_events (i: RepId) (s: event_set CRDT_Op) : Prop :=
     ∀ e, e ∈ s → e.(EV_Orig) ≠ i.
 End Useful.
+

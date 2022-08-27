@@ -1,5 +1,4 @@
 From stdpp Require Import gmap.
-From aneris.examples.crdt.spec Require Import crdt_time.
 
 Section Defs.
 

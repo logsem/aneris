@@ -1,8 +1,6 @@
-From stdpp Require Import gmap.
-From aneris.aneris_lang Require Import lang resources.
+From aneris.aneris_lang Require Import lang.
 From aneris.examples.crdt.spec Require Import crdt_time.
 From aneris.examples.crdt.statelib.proof Require Import utils.
-From Coq.Logic Require Import Decidable.
 
 (** Implementation of Log_Time base don the event id (EvId != RepId * SeqNum) *)
 
