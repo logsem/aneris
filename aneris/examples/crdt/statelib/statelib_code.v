@@ -19,9 +19,9 @@ Definition loop_forever : val :=
 Definition apply_thread deser_st : val :=
   λ: "lk" "sh" "st" "merge",
   loop_forever (λ: <>,
-                acquire "lk";;
                 let: "msg" := unSOME (ReceiveFrom "sh") in
                 let: "st'" := deser_st (Fst "msg") in
+                acquire "lk";;
                 "st" <- ("merge" ! "st" "st'");;
                 release "lk").
 
