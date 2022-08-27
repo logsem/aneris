@@ -227,7 +227,6 @@ Section definitions.
   Definition free_ports (ip : ip_address) (ports : gset port) : iProp Σ :=
     own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
 
-
   Definition socket_address_groups_own (sags : gset socket_address_group)
     : iProp Σ :=
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
@@ -266,9 +265,6 @@ Section definitions.
   Definition unfixed_groups (A : gset socket_address_group) : iProp Σ :=
     own aneris_unfixed_socket_address_groups_name
         (auth_frag (GSet A)).
-
-  (* Definition unfixed_groups (A : gset socket_address_group) : iProp Σ := *)
-  (*   own aneris_unfixed_socket_address_groups_name (DGSets A). *)
 
   Definition unfixed (A : gset socket_address) : iProp Σ :=
     unfixed_groups (to_singletons A).
