@@ -620,7 +620,8 @@ Section primitive_laws.
   Proof.
     iIntros (? Φ) "(>Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
+            "(Hevs & Hσ & Hm & % & Hauth) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
@@ -659,7 +660,8 @@ Section primitive_laws.
   Proof.
     iIntros (? Φ) "(>Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
+            "(Hevs & Hσ & Hm & % & Hauth) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
@@ -674,7 +676,7 @@ Section primitive_laws.
     eapply aneris_events_state_interp_no_triggered in Htrig;
       [|done|done|done|done|done].
     inv_head_step.
-    iMod (aneris_state_interp_socketbind  with "Hσ Hsh Hp")
+    iMod (aneris_state_interp_socketbind with "Hσ Hsh Hp")
       as "(Hσ & Hsh)"; [set_solver..|].
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     iModIntro.

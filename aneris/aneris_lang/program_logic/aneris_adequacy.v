@@ -52,7 +52,7 @@ Theorem adequacy1 Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_mode
   aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=>
      unfixed A -∗
-     ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
+     ([∗ set] a ∈ A, a ⤳1[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -87,7 +87,7 @@ Theorem adequacy Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model
   aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢ |={⊤}=>
      unfixed A -∗
-     ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
+     ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -125,7 +125,7 @@ Theorem adequacy_hoare_groups Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_t
   aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢
           {{{ unfixed_groups A ∗
-              ([∗ set] b ∈ A, b ⤳*[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) ∗
+              ([∗ set] a ∈ A, a ⤳*[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
               frag_st Mdl.(model_state_initial) ∗
               ([∗ set] ip ∈ IPs, free_ip ip) ∗
               ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
@@ -159,7 +159,7 @@ Theorem adequacy1_hoare Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trac
   aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢
           {{{ unfixed A ∗
-              ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) ∗
+              ([∗ set] a ∈ A, a ⤳1[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
               frag_st Mdl.(model_state_initial) ∗
               ([∗ set] ip ∈ IPs, free_ip ip) ∗
               ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
@@ -192,7 +192,7 @@ Theorem adequacy_hoare Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace
   aneris_model_rel_finitary Mdl →
   (∀ `{anerisG Mdl Σ}, ⊢
           {{{ unfixed A ∗
-              ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) ∗
+              ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
               frag_st Mdl.(model_state_initial) ∗
               ([∗ set] ip ∈ IPs, free_ip ip) ∗
               ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗

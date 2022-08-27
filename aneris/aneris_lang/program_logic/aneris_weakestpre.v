@@ -79,6 +79,7 @@ Implicit Types Φ : val → iProp Σ.
 Implicit Types v : val.
 Implicit Types e : expr.
 
+(* This lifts a primitive wp into the aneris wp that hides the node *)
 Lemma aneris_wp_lift tid ip e E Φ :
   is_node ip -∗ aneris_wp ip E e Φ -∗
   wp NotStuck E (ip,tid) (mkExpr ip e) (λ w, ∃ v, ⌜w = mkVal ip v⌝ ∗ Φ v).

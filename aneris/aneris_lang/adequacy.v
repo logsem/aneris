@@ -34,7 +34,7 @@ Definition wp_group_single_proto `{anerisPreG Σ Mdl} IPs A
            (obs_send_sas obs_rec_sas : gset socket_address) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unfixed A -∗
-     ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
+     ([∗ set] a ∈ A, a ⤳1[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
      is_node ip -∗
@@ -50,7 +50,7 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs A
            (obs_send_sas obs_rec_sas : gset socket_address) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unfixed A -∗
-     ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
+     ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
      is_node ip -∗
