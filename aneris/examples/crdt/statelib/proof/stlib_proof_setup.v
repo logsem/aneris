@@ -1,18 +1,7 @@
-From stdpp Require Import gmap.
-
-From iris.base_logic Require Import invariants bi.
-From iris.algebra Require Import agree auth excl gmap.
-
 From aneris.algebra Require Import monotone.
-From aneris.aneris_lang
-  Require Import lang network tactics proofmode lifting resources.
-From aneris.aneris_lang.lib
-  Require Import list_proof lock_proof vector_clock_proof serialization_proof
-    map_proof lock_proof network_util_proof inject.
+From aneris.aneris_lang Require Import proofmode.
+From iris.base_logic Require Import invariants bi.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
-From aneris.aneris_lang.lib.vector_clock Require Import vector_clock_proof.
-From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-From aneris.prelude Require Import misc time.
 
 From aneris.examples.crdt.spec
   Require Import crdt_events crdt_resources crdt_denot crdt_time crdt_base.
@@ -150,3 +139,4 @@ Section Instantiation.
   Qed.
 
 End Instantiation.
+
