@@ -79,20 +79,6 @@ Section definitions.
         (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
         sis_own (sags ∖ A))%I.
 
-  Lemma socket_interp_coh_le (sags : gset socket_address_group) A P :
-    (∀ sag, sag ∈ sags ↔ sag ∈ A ∨
-                         (sag ∉ A ∧ have_disj_elems {[sag]} A ∧
-                          ∃ sa ps, sag = {[sa]} ∧
-                                   P !! ip_of_address sa = Some ps ∧
-                                   port_of_address sa ∈ ps)) →
-    A ⊆ sags.
-  Proof.
-    rewrite elem_of_subseteq.
-    intros Hdms sag Hin.
-    rewrite Hdms.
-    by left.
-  Qed.
-
   (** Free ips coherence *)
   (* Free ips have no bound ports, no heap, and no sockets  *)
   Definition free_ips_coh σ :=

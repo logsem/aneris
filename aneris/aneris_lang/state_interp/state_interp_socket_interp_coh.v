@@ -2,6 +2,7 @@ From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
+From aneris.prelude Require Import misc.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Import
      aneris_lang network resources.
@@ -32,11 +33,6 @@ Section state_interpretation.
     iExists _.
     iFrame. iSplit; [by iPureIntro; set_solver|done].
   Qed.
-
-  (* TODO: Move this to local stdpp folder *)
-  Lemma difference_difference_union `{Countable T} (A B C : gset T) :
-    C ⊆ A -> A ∖ (B ∖ C) = A ∖ B ∪ C.
-  Proof. rewrite sets.set_eq. intros. destruct (decide (x ∈ C)); set_solver. Qed.
 
   Lemma socket_interp_coh_allocate_singleton sag φ :
     socket_interp_coh -∗ unallocated_groups {[sag]} ==∗

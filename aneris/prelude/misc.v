@@ -211,4 +211,8 @@ Proof. destruct n, m; eauto with lia. Qed.
 Lemma rt_rtc_same {A} (R : relation A) `{!Reflexive R, !Transitive R} : ∀ x y, rtc R x y ↔ R x y.
 Proof. intros ??; split; last by apply rtc_once. induction 1; first done. etrans; eauto. Qed.
 
-  Global Instance fin_inh n : Inhabited (fin (S n)) := populate 0%fin.
+Global Instance fin_inh n : Inhabited (fin (S n)) := populate 0%fin.
+
+Lemma difference_difference_union `{Countable T} (A B C : gset T) :
+  C ⊆ A -> A ∖ (B ∖ C) = A ∖ B ∪ C.
+Proof. rewrite sets.set_eq. intros. destruct (decide (x ∈ C)); set_solver. Qed.
