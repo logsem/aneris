@@ -131,7 +131,7 @@ Ltac wp_bind_core K :=
   | _ => eapply (tac_wp_bind K); [simpl; reflexivity|lazy beta]
   end.
 
-(* FIXME: wp_bind tactic needs to be fixed w.r.t. expr_n which now is of the form
+(* FIXME: wp_bind tactic needs to be allocated w.r.t. expr_n which now is of the form
    of functional application "ip_of_address a" and not of a string
    constant "n" as previously (this probably has something to do with eval hnf in
    wp_bind_core above.*)

@@ -392,8 +392,8 @@ Proof.
     repeat (rewrite bool_decide_eq_false_2; last set_solver).
     done. }
   iMod wp_use_case_program as (Res) "Hwp".  
-  iDestruct (unfixed_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
-  iDestruct (unfixed_split with "Hfx") as "[Hfx1 _]"; [set_solver|].
+  iDestruct (unallocated_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
+  iDestruct (unallocated_split with "Hfx") as "[Hfx1 _]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton
             (@OpLib_SocketProto _ _ _ _ _ _ _ Res 0) with "Hfx0").
   iIntros "#Hsi0".

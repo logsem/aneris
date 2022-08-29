@@ -17,7 +17,7 @@ Definition wp_group_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address_group) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
-     unfixed_groups A -∗
+     unallocated_groups A -∗
      ([∗ set] sag ∈ A, sag ⤳*[bool_decide (sag ∈ obs_send_sas), bool_decide (sag ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
@@ -33,7 +33,7 @@ Definition wp_group_single_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
-     unfixed A -∗
+     unallocated A -∗
      ([∗ set] a ∈ A, a ⤳1[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
@@ -49,7 +49,7 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
-     unfixed A -∗
+     unallocated A -∗
      ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
@@ -87,12 +87,12 @@ Proof.
   iIntros (?) "/=".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
-  iMod (unfixed_init A) as (γsif) "[Hunfixed_auth Hunfixed]".
+  iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
   iMod free_ports_auth_init as (γpiu) "HPiu".
-  iMod (fixed_address_groups_init obs_send_sas) as
+  iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
-  iMod (fixed_address_groups_init obs_rec_sas) as
+  iMod (allocated_address_groups_init obs_rec_sas) as
       (γobserved_receive) "#Hobserved_receive".
   iMod (socket_address_group_ctx_init) as (γC) "Hauth"; [done|].
   iMod (socket_address_group_own_alloc_subseteq_pre _ A A with "Hauth") as
@@ -113,7 +113,7 @@ Proof.
            aneris_node_gnames_name := γmp;
            aneris_si_name := γsi;
            aneris_socket_address_group_name := γC;
-           aneris_unfixed_socket_address_groups_name := γsif;
+           aneris_unallocated_socket_address_groups_name := γsif;
            aneris_freeips_name := γips;
            aneris_freeports_name := γpiu;
            aneris_messages_name := γms;
@@ -148,9 +148,9 @@ Proof.
   iDestruct (socket_address_group_own_big_sepS with "Hown_recv") as "Hown_recv".
   iSplitR.
   { eauto. }
-  iSplitR "Hwp Hunfixed HIPs HB Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
+  iSplitR "Hwp Hunallocated HIPs HB Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
   {
-    iDestruct ("Hwp" with "Hunfixed HB [$Hmfrag //] HIPs Hn Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
+    iDestruct ("Hwp" with "Hunallocated HB [$Hmfrag //] HIPs Hn Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
     { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
     { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
     iMod "Hwp". iModIntro. iFrame.
@@ -165,7 +165,7 @@ Proof.
   iMod (socket_address_group_own_alloc_subseteq_pre _ A A with "Hauth")
     as "[Hauth Hown]"; [by set_solver|].
   iPoseProof (@aneris_state_interp_init _ _ dg IPs
-               with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunfixed_auth Hsi HIPsCtx HPiu") as "$"; eauto.
+               with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "$"; eauto.
   simpl.
   iFrame "Hmfull Hsteps".
   done.
@@ -367,7 +367,7 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
      ∃ (trace_inv : execution_trace aneris_lang → auxiliary_trace _ → iProp Σ)
        (Φ : language.val aneris_lang → iProp Σ),
      (* Given resources reflecting initial configuration, we need to prove two goals *)
-     unfixed_groups A -∗
+     unallocated_groups A -∗
      ([∗ set] b ∈ A, b ⤳*[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -407,12 +407,12 @@ Proof.
   iIntros (?) "".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
-  iMod (unfixed_init A) as (γsif) "[Hunfixed_auth Hunfixed]".
+  iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
   iMod free_ports_auth_init as (γpiu) "HPiu".
-  iMod (fixed_address_groups_init obs_send_sas) as
+  iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
-  iMod (fixed_address_groups_init obs_rec_sas) as
+  iMod (allocated_address_groups_init obs_rec_sas) as
       (γobserved_receive) "#Hobserved_receive".
   iMod (socket_address_group_ctx_init) as (γC) "Hauth"; [done|].
   iMod (socket_address_group_own_alloc_subseteq_pre _ A A with "Hauth") as
@@ -433,7 +433,7 @@ Proof.
            aneris_node_gnames_name := γmp;
            aneris_si_name := γsi;
            aneris_socket_address_group_name := γC;
-           aneris_unfixed_socket_address_groups_name := γsif;
+           aneris_unallocated_socket_address_groups_name := γsif;
            aneris_freeips_name := γips;
            aneris_freeports_name := γpiu;
            aneris_messages_name := γms;
@@ -469,7 +469,7 @@ Proof.
   iFrame "Hwp HΦ".
   iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$".
   iPoseProof (@aneris_state_interp_init _ _ dg IPs
-               with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunfixed_auth Hsi HIPsCtx HPiu") as "Hsi"; eauto; [].
+               with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "Hsi"; eauto; [].
   rewrite /= Hms gset_of_gmultiset_empty.
   iFrame. iSplit; [done|].
   iIntros (??????? Hcontr ?) "(Hev & Hsi & Hauth & % & Hsteps) Hpost".
@@ -506,7 +506,7 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
      ∃ (trace_inv : execution_trace aneris_lang → auxiliary_trace _ → iProp Σ)
        (Φ : language.val aneris_lang → iProp Σ),
        (* Given resources reflecting initial configuration, we need to prove two goals *)
-       unfixed A -∗
+       unallocated A -∗
        ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
        ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -607,7 +607,7 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
      ∃ (trace_inv : execution_trace aneris_lang → auxiliary_trace _ → iProp Σ)
        (Φ : language.val aneris_lang → iProp Σ),
        (* Given resources reflecting initial configuration, we need to prove two goals *)
-       unfixed A -∗
+       unallocated A -∗
        ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
        ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -712,7 +712,7 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
        (f : socket_address_group → socket_interp Σ),
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
-       unfixed_groups A -∗
+       unallocated_groups A -∗
        ([∗ set] b ∈ A, b ⤳*[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
        ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -783,7 +783,7 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
        (f : socket_address → socket_interp Σ),
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
-     unfixed A -∗
+     unallocated A -∗
      ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
@@ -853,7 +853,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
      ∃ Φ,
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
-     unfixed A -∗
+     unallocated A -∗
      ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗ is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗

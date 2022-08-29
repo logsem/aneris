@@ -487,13 +487,12 @@ Definition unit_model := model _ (λ _ _, False) ().
 Lemma unit_model_rel_finitary : aneris_model_rel_finitary unit_model.
 Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 
-(* The static/fixed domain contains only the adress of the pong server *)
-Definition fixed_dom : gset socket_address_group :=
+Definition sa_dom : gset socket_address_group :=
   {[ {[client_addr]} ; server_addrs ]}.
 
-Lemma all_disjoint_fixed_dom : all_disjoint fixed_dom.
+Lemma all_disjoint_sa_dom : all_disjoint sa_dom.
 Proof.
-  rewrite /fixed_dom.
+  rewrite /sa_dom.
   rewrite -all_disjoint_union.
   split; [apply all_disjoint_singleton|].
   split; [apply all_disjoint_singleton|].
@@ -508,9 +507,9 @@ Theorem echo_safe :
   aneris_adequate echo_runner "system" echo_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (adequacy_groups Σ _ ips fixed_dom ∅ ∅ ∅);
+  apply (adequacy_groups Σ _ ips sa_dom ∅ ∅ ∅);
     try set_solver.
-  { apply all_disjoint_fixed_dom. }
+  { apply all_disjoint_sa_dom. }
   { apply set_Forall_union; apply set_Forall_singleton; set_solver. }
   { apply unit_model_rel_finitary. }
   { iIntros (dinvG).
@@ -518,7 +517,7 @@ Proof.
     iMod Do_Done_alloc as (γ) "[HDo HDone]".
     rewrite big_sepS_union; [|set_solver].
     rewrite !big_sepS_singleton.
-    iDestruct (unfixed_groups_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+    iDestruct (unallocated_groups_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
     iApply (aneris_wp_socket_interp_alloc_group_singleton (client_si γ) with "Hf1").
     iIntros "Hclt".
     iApply (aneris_wp_socket_interp_alloc_group_singleton (server_si γ client_addr)
@@ -526,7 +525,7 @@ Proof.
     iIntros "Hsrv".
     iDestruct "Hhist" as "[Hhistc Hhists]".
     wp_apply (echo_runner_spec with "[$]"); [try set_solver..|eauto]. }
-  rewrite /ips /fixed_dom.
+  rewrite /ips /sa_dom.
   intros sag sa Hsag Hsa.
   apply elem_of_union in Hsag.
   destruct Hsag as [Hsag|Hsag]; apply elem_of_singleton in Hsag; set_solver.

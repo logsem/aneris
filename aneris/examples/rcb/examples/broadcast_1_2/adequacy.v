@@ -41,7 +41,7 @@ Proof.
   iIntros "Hf Hsoups _ Hfree _ _ _ _ _".
   iDestruct (big_sepS_delete _ _ z0 with "Hsoups") as "[Hz0 Hsoups]"; first set_solver.
   iDestruct (big_sepS_delete _ _ z1 with "Hsoups") as "[Hz1 _]"; first set_solver.
-  iDestruct (unfixed_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton (RCB_socket_proto 0)
     with "Hf1").
   iIntros "#Hsi1".

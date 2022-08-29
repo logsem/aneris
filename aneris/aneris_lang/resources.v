@@ -53,7 +53,7 @@ Definition socket_interpUR : ucmra :=
   gmapUR socket_address_group (agreeR (leibnizO gname)).
 Definition socket_address_groupUR : ucmra :=
   (disj_gsetsUR socket_address).
-Definition unfixed_socket_address_groupsUR : ucmra :=
+Definition unallocated_socket_address_groupsUR : ucmra :=
   authUR (gset_disjUR socket_address_group).
 Definition tracked_socket_address_groupsUR : cmra :=
   agreeR (gsetUR socket_address_group).
@@ -99,10 +99,10 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_siG :> inG Σ (authR socket_interpUR);
       aneris_savedPredG :> savedPredG Σ message;
       aneris_si_name : gname;
-      (** socket address groups with fixed socket interpretations *)
-      aneris_unfixed_socket_address_groupsG :>
-        inG Σ (unfixed_socket_address_groupsUR);
-      aneris_unfixed_socket_address_groups_name : gname;
+      (** socket address groups with unallocated socket interpretations *)
+      aneris_unallocated_socket_address_groupsG :>
+        inG Σ (unallocated_socket_address_groupsUR);
+      aneris_unallocated_socket_address_groups_name : gname;
       (** socket address groups for which we track events *)
       aneris_tracked_socket_address_groupsG :>
         inG Σ (tracked_socket_address_groupsUR);
@@ -137,8 +137,8 @@ Class anerisPreG Σ (Mdl : Model) :=
       anerisPre_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       anerisPre_siG :> inG Σ (authR socket_interpUR);
       anerisPre_savedPredG :> savedPredG Σ message;
-      anerisPre_unfixed_socket_address_groupsG :>
-        inG Σ (unfixed_socket_address_groupsUR);
+      anerisPre_unallocated_socket_address_groupsG :>
+        inG Σ (unallocated_socket_address_groupsUR);
       anerisPre_tracked_socket_address_groupsG :>
         inG Σ (tracked_socket_address_groupsUR);
       anerisPre_messagesG :> inG Σ (authR messagesUR);
@@ -160,7 +160,7 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (authUR socket_address_groupUR);
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
-   GFunctor (unfixed_socket_address_groupsUR);
+   GFunctor (unallocated_socket_address_groupsUR);
    GFunctor (tracked_socket_address_groupsUR);
    GFunctor (authR messagesUR);
    GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
@@ -257,17 +257,17 @@ Section definitions.
              (Φ : socket_interp Σ) : iProp Σ :=
     ∃ γ, socket_address_group_own sag ∗ saved_si sag γ ∗ saved_pred_own γ Φ.
 
-  (** The set [A] of addresses with fixed socket interpretations *)
-  Definition unfixed_groups_auth (A : gset socket_address_group) : iProp Σ :=
-    own aneris_unfixed_socket_address_groups_name
+  (** The set [A] of addresses with unallocated socket interpretations *)
+  Definition unallocated_groups_auth (A : gset socket_address_group) : iProp Σ :=
+    own aneris_unallocated_socket_address_groups_name
         (auth_auth (DfracOwn 1) (GSet A)).
 
-  Definition unfixed_groups (A : gset socket_address_group) : iProp Σ :=
-    own aneris_unfixed_socket_address_groups_name
+  Definition unallocated_groups (A : gset socket_address_group) : iProp Σ :=
+    own aneris_unallocated_socket_address_groups_name
         (auth_frag (GSet A)).
 
-  Definition unfixed (A : gset socket_address) : iProp Σ :=
-    unfixed_groups (to_singletons A).
+  Definition unallocated (A : gset socket_address) : iProp Σ :=
+    unallocated_groups (to_singletons A).
 
   (** The set [A] of addresses for which we track send events. *)
   Definition observed_send_groups (A : gset socket_address_group) : iProp Σ :=
@@ -551,7 +551,7 @@ Lemma saved_si_update `{anerisG Mdl Σ} (A : gset socket_address_group) γsi f :
     rewrite dom_insert_L elements_union_singleton //. auto.
 Qed.
 
-Lemma fixed_address_groups_init `{anerisPreG Σ Mdl} A :
+Lemma allocated_address_groups_init `{anerisPreG Σ Mdl} A :
   ⊢ |==> ∃ γ, own (A := agreeR (gsetUR socket_address_group)) γ (to_agree A).
 Proof. by apply own_alloc. Qed.
 
@@ -731,7 +731,7 @@ Lemma steps_init `{anerisPreG Σ Mdl} n :
   ⊢ |==> ∃ γ, mono_nat_auth_own γ 1 n ∗ mono_nat_lb_own γ n.
 Proof. iApply mono_nat_own_alloc. Qed.
 
-Lemma unfixed_init `{anerisPreG Σ Mdl} (A : gset socket_address_group) :
+Lemma unallocated_init `{anerisPreG Σ Mdl} (A : gset socket_address_group) :
   ⊢ |==> ∃ γ, own γ (● (GSet A)) ∗
               own γ (◯ (GSet A)).
 Proof.
@@ -1181,33 +1181,33 @@ Section resource_lemmas.
     iModIntro. iFrame.
   Qed.
 
-  Lemma unfixed_groups_split A1 A2 :
+  Lemma unallocated_groups_split A1 A2 :
     A1 ## A2 →
-    ⊢ unfixed_groups (A1 ∪ A2) ∗-∗
-      unfixed_groups A1 ∗ unfixed_groups A2.
+    ⊢ unallocated_groups (A1 ∪ A2) ∗-∗
+      unallocated_groups A1 ∗ unallocated_groups A2.
   Proof.
     intros Hdisj.
-    rewrite -gset_op {1}/unfixed_groups -gset_disj_union; [|done].
+    rewrite -gset_op {1}/unallocated_groups -gset_disj_union; [|done].
     iSplit.
     - iIntros "H". iDestruct "H" as "[H1 H2]". by iFrame.
     - iIntros "[H1 H2]". rewrite auth_frag_op. iApply own_op. iFrame.
   Qed.
 
-  Lemma unfixed_split A1 A2 :
+  Lemma unallocated_split A1 A2 :
     A1 ## A2 →
-    ⊢ unfixed (A1 ∪ A2) ∗-∗
-      unfixed A1 ∗ unfixed A2.
+    ⊢ unallocated (A1 ∪ A2) ∗-∗
+      unallocated A1 ∗ unallocated A2.
   Proof.
-    rewrite /unfixed. rewrite to_singletons_union.
+    rewrite /unallocated. rewrite to_singletons_union.
     intros Hdisj.
-    iApply unfixed_groups_split.
+    iApply unallocated_groups_split.
     set_solver.
   Qed.
 
-  Lemma unfixed_update_alloc A B :
+  Lemma unallocated_update_alloc A B :
     A ## B →
-    ⊢ unfixed_groups_auth A ==∗
-      unfixed_groups_auth (A ∪ B) ∗ unfixed_groups B.
+    ⊢ unallocated_groups_auth A ==∗
+      unallocated_groups_auth (A ∪ B) ∗ unallocated_groups B.
   Proof.
     iIntros (Hdisj) "HA".
     iMod (own_update with "HA") as "[HA HB]".
@@ -1215,12 +1215,12 @@ Section resource_lemmas.
     iModIntro. replace (B ∪ A) with (A ∪ B) by set_solver. by iFrame.
   Qed.
 
-  Lemma unfixed_update_dealloc A B :
-    ⊢ unfixed_groups_auth A ∗ unfixed_groups B ==∗
-      unfixed_groups_auth (A ∖ B).
+  Lemma unallocated_update_dealloc A B :
+    ⊢ unallocated_groups_auth A ∗ unallocated_groups B ==∗
+      unallocated_groups_auth (A ∖ B).
   Proof.
     iIntros "[HA HB]".
-    rewrite /unfixed_groups_auth /unfixed_groups.
+    rewrite /unallocated_groups_auth /unallocated_groups.
     iDestruct (own_valid_2 with "HA HB") as %Hvalid.
     rewrite auth_both_valid_discrete in Hvalid.
     destruct Hvalid as [Hincluded Hvalid].
@@ -1234,14 +1234,14 @@ Section resource_lemmas.
     apply gset_disj_dealloc_empty_local_update.
   Qed.
 
-  Lemma unfixed_update_dealloc_union A B :
+  Lemma unallocated_update_dealloc_union A B :
     A ## B →
-    ⊢ unfixed_groups_auth (A ∪ B) ∗ unfixed_groups B ==∗
-      unfixed_groups_auth A.
+    ⊢ unallocated_groups_auth (A ∪ B) ∗ unallocated_groups B ==∗
+      unallocated_groups_auth A.
   Proof.
     iIntros (Hdisj) "[HA HB]".
     replace (A ∪ B) with (B ∪ A) by set_solver.
-    rewrite /unfixed_groups_auth -gset_op -gset_disj_union; [|done].
+    rewrite /unallocated_groups_auth -gset_op -gset_disj_union; [|done].
     iMod (own_update_2 with "HA HB") as "HA"; [|done].
     apply auth_update_dealloc. 
     by apply gset_disj_dealloc_empty_local_update.

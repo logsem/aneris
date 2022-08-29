@@ -56,7 +56,7 @@ Proof.
   rewrite big_sepS_sep. iDestruct "He" as "[Hwork1 Hwork2]".
   set (tcGI := MkTcG Σ _ _ γ).
   iIntros "!#".
-  iIntros "Hunfixed Hhist Hfrag ? #Hnode _ _ _ _ _".
+  iIntros "Hunallocated Hhist Hfrag ? #Hnode _ _ _ _ _".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
   iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.
@@ -65,16 +65,16 @@ Proof.
     as "#Hinv".
   iModIntro.
   rewrite /addrs /rms.
-  iDestruct (unfixed_split with "Hunfixed") as "[Hunfixed1 Hunfixed]";
+  iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated1 Hunallocated]";
     [set_solver|].
   iModIntro.
   iApply (wp_wand _ _ _ _ (λ w, ∃ v, ⌜w = mkVal "system" v⌝ ∗ True)%I
          with "[-]"); [|done].
   iApply (aneris_wp_lift with "Hnode").
   iApply (aneris_wp_socket_interp_alloc_singleton (@tm_si my_topo _ _)
-           with "Hunfixed1").
+           with "Hunallocated1").
   iIntros "#Htm".
-  iApply (aneris_wp_socket_interp_alloc (@rm_si my_topo _ _) with "Hunfixed").
+  iApply (aneris_wp_socket_interp_alloc (@rm_si my_topo _ _) with "Hunallocated").
   iIntros "#Hrm".
   iPoseProof (runner_spec with "[-]") as "Hspec".
   { iFrame "∗#". }
@@ -144,7 +144,7 @@ Proof.
   iSplitL.
   { (* TODO: lift the adeaucy theorems to aneris_wp *)
     iApply (aneris_wp_lift with "Hnode").
-    iDestruct (unfixed_split with "Hf") as "[Hftm Hfrm]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hftm Hfrm]"; [set_solver|].
     iApply (aneris_wp_socket_interp_alloc_singleton (@tm_si my_topo _ _)
              with "Hftm").
     iIntros "#Htm".

@@ -320,7 +320,7 @@ Section spec.
 
   Theorem sm_setup_spec :
     {{{ free_ports ip {[ port_of_address client_addr ]} ∗
-        unfixed {[client_addr]} ∗
+        unallocated {[client_addr]} ∗
         client_addr ⤳ (∅, ∅) }}}
       sm_setup #client_addr @[ip]
     {{{ fns, RET fns;
@@ -329,7 +329,7 @@ Section spec.
           ∗ (read_spec ip read_fn)
           ∗ (write_spec ip write_fn) }}}.
   Proof.
-    iIntros (ϕ) "(Hfree & Hunfixed & Hrs) Hcont".
+    iIntros (ϕ) "(Hfree & Hunallocated & Hrs) Hcont".
     wp_lam.
     iDestruct (request_init $! I) as "> Hown".
     iDestruct "Hown" as (γ) "Hown".
@@ -337,7 +337,7 @@ Section spec.
     rewrite ip_eq.
     set socket := {| sfamily := PF_INET; stype := SOCK_DGRAM;
                      sprotocol := IPPROTO_UDP; saddress := None |}.
-    iApply (aneris_wp_socket_interp_alloc_singleton (client_si γ) with "Hunfixed").
+    iApply (aneris_wp_socket_interp_alloc_singleton (client_si γ) with "Hunallocated").
     iIntros "#Hclient".
     wp_socketbind.
     wp_alloc l as "Hl". wp_pures.

@@ -59,18 +59,18 @@ Section ping.
     port = port_of_address a →
     {{{ (* the [pong] address is governed by [pong_si] *)
          b ⤇ pong_si
-        ∗ unfixed {[a]}
+        ∗ unallocated {[a]}
         ∗ free_ports ip {[port]}
         ∗ a ⤳ (∅, ∅) }}}
       ping #a #b @[ip]
     {{{ v, RET v; ∃ m, ⌜v = #"PONG"⌝ ∗ ⌜v = #(m_body m)⌝ ∗
                         a ⤳ ({[m]}, {[ mkMessage a b IPPROTO_UDP "PING" ]})}}}.
   Proof.
-    iIntros (-> -> Φ) "(#Hsi & Hunfixed & Hip & Ha) Hcont".
+    iIntros (-> -> Φ) "(#Hsi & Hunallocated & Hip & Ha) Hcont".
     wp_lam. wp_let.
     wp_socket sh as "Hsh".
     wp_let.
-    iApply (aneris_wp_socket_interp_alloc_singleton ping_si with "Hunfixed").
+    iApply (aneris_wp_socket_interp_alloc_singleton ping_si with "Hunallocated").
     iIntros "#Hping".
     wp_socketbind.
     wp_pures.
@@ -102,7 +102,7 @@ Section ping_pong_runner.
          ∗ pong_addr ⤳ (∅, ∅)
          ∗ ping_addr ⤳ (∅, ∅)
          (* A contain static addresses, and the ips we use are free *)
-         ∗ unfixed {[ping_addr]}
+         ∗ unallocated {[ping_addr]}
          ∗ [∗ set] ip ∈ ips, free_ip ip }}}
       ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
@@ -152,7 +152,7 @@ Proof.
   { apply unit_model_rel_finitary. }
   iIntros (dinvG).
   iIntros (?) "!# (Hf & Hhist & _ & Hips & _) HΦ".
-  iDestruct (unfixed_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton pong_si with "Hf1").
   iIntros "#Hsi".  
   rewrite /addrs (big_sepS_delete _ _ pong_addr); [|set_solver].

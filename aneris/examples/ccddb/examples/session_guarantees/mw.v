@@ -41,7 +41,7 @@ Section MonotonicWrites.
   Theorem mw_example_spec (A : gset socket_address) (ca sa1 : socket_address)
           (db_id1 : rep_id) :
     {{{ sa1 ⤇ (db_si db_id1)
-        ∗ unfixed {[ca]}
+        ∗ unallocated {[ca]}
         ∗ free_ports (ip_of_address ca) {[ port_of_address ca ]}
         ∗  ca ⤳ (∅, ∅)
     }}}

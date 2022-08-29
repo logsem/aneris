@@ -55,7 +55,7 @@ Section Client_Proxy_Proof.
              {MTR : MTS_resources} : iProp Σ :=
     ∀ csa,
     ⌜fsa ≠ DB_addr⌝ →
-    {{{ unfixed {[csa]} ∗
+    {{{ unallocated {[csa]} ∗
         fsa ⤇ follower_si ∗
         csa ⤳ (∅, ∅) ∗
         (@init_client_proxy_spec _ _ _ _ MTC _ follower_si) ∗

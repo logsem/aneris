@@ -40,7 +40,7 @@ Section Spec.
 
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ sa,
-    {{{ unfixed {[sa]} ∗
+    {{{ unallocated {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
         MTS_saddr ⤇ srv_si }}}
       init_client_proxy

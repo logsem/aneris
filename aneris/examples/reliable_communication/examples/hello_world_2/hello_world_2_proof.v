@@ -79,11 +79,11 @@ Section proof_of_the_client_code.
         clt_addr0 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_addr0)
                    {[port_of_address clt_addr0]} ∗
-        unfixed {[clt_addr0]} ∗
+        unallocated {[clt_addr0]} ∗
         clt_addr1 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_addr1)
                    {[port_of_address clt_addr1]} ∗
-        unfixed {[clt_addr1]} }}}
+        unallocated {[clt_addr1]} }}}
        client #clt_addr0 #clt_addr1 #srv_sa0 #srv_sa1 @[ip_of_address clt_addr0]
     {{{ skt, RET skt; True }}}.
   Proof.
@@ -219,7 +219,7 @@ Section proof_of_the_main.
     ⊢ |={⊤}=>
          srv_sa0 ⤇ @reserved_server_socket_interp _ _ _ UP0 SnRes0 -∗
          srv_sa1 ⤇ @reserved_server_socket_interp _ _ _ UP1 SnRes1 -∗
-         unfixed {[clt_sa80; clt_sa81]} -∗
+         unallocated {[clt_sa80; clt_sa81]} -∗
          free_ip "0.0.0.0" -∗
          free_ip "0.0.0.1" -∗
          free_ip "0.0.0.2" -∗
@@ -256,7 +256,7 @@ Section proof_of_the_main.
     iFrame "Hfree2".
     iSplit; first done.
     iNext. iIntros "Hfps".
-    iDestruct (unfixed_split with "Hf") as "[Hf0 Hf1]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf0 Hf1]"; [set_solver|].
     iApply (wp_client srv_sa0 srv_sa1 _ _ chn0 SnRes0 _ _ chn1 SnRes1 _ _ clt_sa80 clt_sa81
              with "[Hsa2 Hsa3 Hfps Hf0 Hf1]"); last done.
     iSplit; first done. iFrame "#∗".
@@ -342,8 +342,8 @@ Proof.
   iModIntro.
   iIntros "Hf Hb Hfg Hips _ _ _ _ _".
   simpl in *.
-  iDestruct (unfixed_split with "Hf") as "[Hf Hf1]"; [set_solver|].
-  iDestruct (unfixed_split with "Hf") as "[Hf Hf0]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hf1]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hf0]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton
             (@reserved_server_socket_interp _ _ _ UP0 SnRes0) with "Hf0").
   iIntros "Hsi0".

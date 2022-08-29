@@ -135,7 +135,7 @@ Section API_spec.
     ∀ f2lsa,
     ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
     ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-    {{{ unfixed {[f2lsa]} ∗
+    {{{ unallocated {[f2lsa]} ∗
         f2csa ⤇ f_si ∗
         DB_addrF ⤇ lF_si ∗
         initF ∗
@@ -149,7 +149,7 @@ Section API_spec.
 
   Definition init_client_proxy_leader_spec leader_si : iProp Σ :=
     ∀ (sa : socket_address),
-    {{{ unfixed {[sa]} ∗
+    {{{ unallocated {[sa]} ∗
         DB_addr ⤇ leader_si ∗
         sa ⤳ (∅, ∅) ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
@@ -160,7 +160,7 @@ Section API_spec.
 
   Definition init_client_proxy_follower_spec f2csa f_si : iProp Σ :=
     ∀ csa,
-    {{{ unfixed {[csa]} ∗
+    {{{ unallocated {[csa]} ∗
         f2csa ⤇ f_si ∗
         csa ⤳ (∅, ∅) ∗
         free_ports (ip_of_address csa) {[port_of_address csa]} }}}

@@ -23,7 +23,7 @@ Definition init_state :=
     state_ms := ∅;
   |}.
 
-Definition fixed_dom : gset socket_address := {[ z0; z1 ]}.
+Definition sa_dom : gset socket_address := {[ z0; z1 ]}.
 
 (* TODO: factor this out, together with the proof of finite branching *)
 Definition dummy_model := model unit (fun x y => True) ().
@@ -58,7 +58,7 @@ From aneris.examples.ccddb.instantiation Require Import proof.
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
  set (Σ := #[anerisΣ dummy_model; mpΣ; DBΣ]).
- eapply (@adequacy Σ dummy_model _ _ ips fixed_dom ∅ ∅ ∅);
+ eapply (@adequacy Σ dummy_model _ _ ips sa_dom ∅ ∅ ∅);
    try done; last first.
   { set_solver. }
   { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
@@ -66,7 +66,7 @@ Proof.
   { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. }
   2: { apply dummy_model_finitary. }
   iIntros (Hdg) "".
-  iPoseProof (main_spec fixed_dom) as "Hmain".
+  iPoseProof (main_spec sa_dom) as "Hmain".
   iMod "Hmain" as (dbr) "Hmain".
   iModIntro.
   iIntros "Hfx Hproto Hrs Hips".
@@ -82,7 +82,7 @@ Proof.
   iApply (aneris_wp_socket_interp_alloc DB_socket_proto with "Hfx").
   iIntros "Hsi".
   iApply ("Hmain" with "[Hsi] Hz0 Hz1 Hips").
-  rewrite /DB_addresses /fixed_dom. simpl.
+  rewrite /DB_addresses /sa_dom. simpl.
   rewrite big_sepS_union; [|set_solver].
   rewrite !big_sepS_singleton.
   iDestruct "Hsi" as "[Hsi1 Hsi2]".

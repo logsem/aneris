@@ -285,7 +285,7 @@ Section proof_of_code.
     init_client_proxy_leader_spec leader_si -∗
     Obs db_l2csa [] -∗
     inv N inv_def -∗
-    {{{ unfixed {[clt_00]} ∗
+    {{{ unallocated {[clt_00]} ∗
         free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         db_l2csa ⤇ leader_si ∗
@@ -308,7 +308,7 @@ Section proof_of_code.
     init_client_proxy_follower_spec db_f2csa follower_si -∗
     Obs db_f2csa [] -∗
     inv N inv_def -∗
-    {{{ unfixed {[clt_01]} ∗
+    {{{ unallocated {[clt_01]} ∗
         free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
         db_f2csa ⤇ follower_si }}}
@@ -366,7 +366,7 @@ Section proof_of_main.
          db_l2csa ⤇ leader_si -∗
          db_l2fsa ⤇ leaderF_si -∗
          db_f2csa ⤇ follower_si -∗
-         unfixed {[db_f2lsa;clt_sa0;clt_sa1]} -∗
+         unallocated {[db_f2lsa;clt_sa0;clt_sa1]} -∗
          Obs db_l2csa [] -∗
          Obs db_f2csa [] -∗
          inv N (inv_def db_l2csa db_f2csa db_l2fsa) -∗
@@ -407,8 +407,8 @@ Section proof_of_main.
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive;81%positive]}); first done.
     iFrame "Hfree1".
-    iDestruct (unfixed_split with "Hf") as "[Hf Hf1]"; [set_solver|].
-    iDestruct (unfixed_split with "Hf") as "[Hff2lsa Hf0]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf1]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hff2lsa Hf0]"; [set_solver|].
     iSplitR "Hsa2 Hsa3 HInitF Hff2lsa"; last first.
     { iNext. iIntros "Hfps".
       iApply ("HdbFS" $! db_f2lsa with "[//][][Hfps HInitF Hsa2 Hsa3 Hff2lsa]");
@@ -497,9 +497,9 @@ Proof.
   iModIntro.
   iIntros "Hf Hb Hfg Hips _ _ _ _ _".
   rewrite /addrs.
-  iDestruct (unfixed_split with "Hf") as "[Hf Hff2csa]"; [set_solver|].
-  iDestruct (unfixed_split with "Hf") as "[Hf Hfl2fsa]"; [set_solver|].
-  iDestruct (unfixed_split with "Hf") as "[Hf Hfl2csa]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hff2csa]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hfl2fsa]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hfl2csa]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton follower_si with "Hff2csa").
   iIntros "Hsi2".
   iApply (aneris_wp_socket_interp_alloc_singleton leaderF_si with "Hfl2fsa").

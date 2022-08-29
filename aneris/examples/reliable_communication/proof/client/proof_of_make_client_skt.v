@@ -27,7 +27,7 @@ Section Proof_of_make_client_skt.
     {{{ free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
         clt_addr ⤳ (∅, ∅) ∗
         RCParams_srv_saddr ⤇ server_interp ∗
-        unfixed {[clt_addr]}
+        unallocated {[clt_addr]}
      }}}
        make_client_skt
        (s_serializer RCParams_clt_ser)

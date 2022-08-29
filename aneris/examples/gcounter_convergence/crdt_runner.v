@@ -61,7 +61,7 @@ Section runner_spec_helper.
     (∀ a, a ∈ (gcd_addr_list gcdata) → a ∈ A) →
     Aprogs ⊆ A →
     Global_Inv -∗
-    ([∗ list] i ∈ seq k (length progs), unallocated i) -∗
+    ([∗ list] i ∈ seq k (length progs), GCunallocated i) -∗
     ([∗ list] i ↦ a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) -∗
     ([∗ set] a ∈ Aprogs, a ⤇ f a) -∗
     ([∗ list] i ∈ seq k (length progs), free_ip (ip_of_address (ith_sa i))) -∗
@@ -178,7 +178,7 @@ Section runner_spec.
        prog_spec i (ith_sa i) prtsas.1 Aprogs prtsas.2 f prog)) -∗
     |={⊤}=> ∃ _ : GCounterG Σ gcdata,
          frag_st (initial_crdt_state (GClen gcdata)) -∗
-         unfixed (list_to_set (gcd_addr_list gcdata) ∪ Aprogs) -∗
+         unallocated (list_to_set (gcd_addr_list gcdata) ∪ Aprogs) -∗
          ([∗ set] a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata) ∪ (⋃ portssocks.*2),
             a ⤳[bool_decide (a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata)),
                 bool_decide (a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata))] (∅, ∅)) -∗
@@ -222,7 +222,7 @@ Section runner_spec.
     { iIntros "!#" (? ?) "H".
       rewrite bool_decide_eq_false_2; last set_solver.
       iExact "H". }
-    iDestruct (unfixed_split with "Hfx") as "[Hfx HfxA]"; [set_solver|].
+    iDestruct (unallocated_split with "Hfx") as "[Hfx HfxA]"; [set_solver|].
     iApply (aneris_wp_socket_interp_alloc GCounter_socket_proto with "Hfx").
     { destruct progs; [|done]. simpl in *. lia. }
     iIntros "#Hsi".

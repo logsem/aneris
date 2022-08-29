@@ -182,7 +182,7 @@ Section Client_Proxy_Proof.
 
   Definition init_client_leader_proxy_internal {MTR : MTS_resources}
     (sa : socket_address) : iProp Σ :=
-    {{{ unfixed {[sa]} ∗
+    {{{ unallocated {[sa]} ∗
         DB_addr ⤇ srv_si ∗
         sa ⤳ (∅, ∅) ∗
         (@init_client_proxy_spec _ _ _ _ MTC _ srv_si) ∗

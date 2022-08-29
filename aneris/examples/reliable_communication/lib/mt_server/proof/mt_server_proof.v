@@ -160,7 +160,7 @@ Section MTS_proof_of_code.
   Qed.
 
   Definition init_client_proxy_internal_spec sa : iProp Σ :=
-    {{{ unfixed {[sa]} ∗
+    {{{ unallocated {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
         MTS_saddr ⤇ reserved_server_socket_interp }}}
       init_client_proxy

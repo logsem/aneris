@@ -165,7 +165,7 @@ Section Specification.
     □ ∀ (sa : socket_address) (srvl : val),
         ⌜is_list DB_addresses srvl⌝ →
         ⌜sa ∉ DB_addresses⌝ →
-        {{{ unfixed {[sa]} ∗
+        {{{ unallocated {[sa]} ∗
              ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
              sa ⤳ (∅, ∅) ∗
              free_ports (ip_of_address sa) {[port_of_address sa]} }}}

@@ -110,7 +110,7 @@ Section DL_proof_of_code.
   Qed.
 
 Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
-    {{{ unfixed {[sa]} ∗
+    {{{ unallocated {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         sa ⤳ (∅, ∅) }}}

@@ -222,13 +222,13 @@ Section proof_of_code.
     {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
         dl_subscribe_client_spec SharedRes ∗
-        unfixed {[clt_00]} ∗
+        unallocated {[clt_00]} ∗
         free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
         init_client_proxy_leader_spec leader_si ∗
-        unfixed {[clt_01]} ∗
+        unallocated {[clt_01]} ∗
         db_sa ⤇ leader_si ∗
         clt_01 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_01) {[port_of_address clt_01]}
@@ -261,13 +261,13 @@ Section proof_of_code.
     {{{ GlobalInv ∗
         (* preconditions for subscribing client to dlock. *)
         dl_subscribe_client_spec SharedRes ∗
-        unfixed {[clt_10]} ∗
+        unallocated {[clt_10]} ∗
         free_ports (ip_of_address clt_10) {[port_of_address clt_10]} ∗
         clt_10 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
         init_client_proxy_leader_spec leader_si ∗
-        unfixed {[clt_11]} ∗
+        unallocated {[clt_11]} ∗
         db_sa ⤇ leader_si ∗
         clt_11 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_11) {[port_of_address clt_11]}
@@ -336,7 +336,7 @@ Section proof_of_main.
          db_sa ⤇ leader_si -∗
          db_Fsa ⤇ leaderF_si -∗
          dlm_sa ⤇ dl_reserved_server_socket_interp -∗
-         unfixed {[clt_sa00;clt_sa01;clt_sa10;clt_sa11]} -∗
+         unallocated {[clt_sa00;clt_sa01;clt_sa10;clt_sa11]} -∗
          free_ip "0.0.0.0" -∗
          free_ip "0.0.0.1" -∗
          free_ip "0.0.0.2" -∗
@@ -363,9 +363,9 @@ Section proof_of_main.
     (* replace ({[clt_sa00; clt_sa01; clt_sa10; clt_sa11]}) *)
     (*         with (({[clt_sa00; clt_sa01]} ∪ {[clt_sa10; clt_sa11]}) *)
     (*                :gset socket_address) by set_solver. *)
-    iDestruct (unfixed_split with "Hf") as "[Hf Hf11]"; [set_solver|].
-    iDestruct (unfixed_split with "Hf") as "[Hf Hf10]"; [set_solver|].
-    iDestruct (unfixed_split with "Hf") as "[Hf00 Hf01]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf11]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf10]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf00 Hf01]"; [set_solver|].
     (* Server 1. *)
     wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
     iFrame "Hfree0".
@@ -429,8 +429,6 @@ Definition init_state :=
       <["0.0.0.3" := ∅ ]> $ ∅;
     state_ms := ∅;
   |}.
-
-Definition fixed_dom : gset socket_address := {[ db_sa; db_Fsa; dlm_sa ]}.
 
 Definition dummy_model := model unit (fun x y => True) ().
 
@@ -515,9 +513,9 @@ Proof.
   iDestruct (big_sepS_delete _ _ clt_sa11 with "Hms") as "[Hc11 _]";
     first set_solver.
   (* TODO: Split things *)
-  iDestruct (unfixed_split with "Hf") as "[Hf Hfdlm_sa]"; [set_solver|].
-  iDestruct (unfixed_split with "Hf") as "[Hf Hfdb_Fsa]"; [set_solver|].
-  iDestruct (unfixed_split with "Hf") as "[Hf Hfdb_sa]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hfdlm_sa]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hfdb_Fsa]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hfdb_sa]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton dl_reserved_server_socket_interp with "Hfdlm_sa").
   iIntros "Hfdlm_si".
   iApply (aneris_wp_socket_interp_alloc_singleton leaderF_si with "Hfdb_Fsa").

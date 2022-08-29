@@ -244,7 +244,7 @@ Section with_Σ.
     sa1 ≠ sa2 →
     GlobalInv -∗
     inv N (thread_inv k sa1 sa2 n1 n2) -∗
-    unfixed {[sa1]} -∗
+    unallocated {[sa1]} -∗
     ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) -∗
     sa1 ⤳ (∅, ∅) -∗
     free_ports (ip_of_address sa1) {[port_of_address sa1]} -∗
@@ -268,7 +268,7 @@ Section with_Σ.
                              ⌜hist_at_origin sa1 h2f2' = []⌝))) }}.
   Proof.
     iIntros (Hdbsv HsaninA Hk Hsaneq)
-            "#HGinv #Hinv Hunfixed Hlist Hsa1 Hfree Hinit".
+            "#HGinv #Hinv Hunallocated Hlist Hsa1 Hfree Hinit".
     wp_pures. wp_lam.
     wp_smart_apply ("Hinit" with "[//] [//] [-]"); [by iFrame|].
     iIntros (rd wr) "(Hobs & Hwrites & Hrd & Hwr)".
@@ -299,7 +299,7 @@ Section with_Σ.
     {{{ sa1 ⤳ (∅, ∅) ∗ sa2 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address sa1) {[port_of_address sa1]} ∗
         free_ports (ip_of_address sa2) {[port_of_address sa2]} ∗
-        k ↦ₖ None ∗ unfixed {[sa1;sa2]} ∗
+        k ↦ₖ None ∗ unallocated {[sa1;sa2]} ∗
         ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) }}}
       prog init sa1 sa2 k n1 n2 dbsv @[ip]
     {{{ (v : val), RET v; ⌜v = (SOMEV #n1, SOMEV #n1)%V⌝ ∨
@@ -307,7 +307,7 @@ Section with_Σ.
                           ⌜v = (SOMEV #n2, SOMEV #n2)%V⌝}}}.
   Proof.
     iIntros (Hlist Hkin Hip1 Hip2 Hsanin1 Hsanin2 Hsaneq).
-    iIntros "#HGInv #Hinit !>" (Φ) "(Hsa1 & Hsa2 & Hsap1 & Hsap2 & Hk & Hunfixed & #Hlist) HΦ".
+    iIntros "#HGInv #Hinit !>" (Φ) "(Hsa1 & Hsa2 & Hsap1 & Hsap2 & Hk & Hunallocated & #Hlist) HΦ".
     rewrite /prog.
     iMod (inv_alloc N _ (thread_inv k sa1 sa2 n1 n2) with "[Hk]") as "#Hinv1";
       [by iFrame|].
@@ -315,9 +315,9 @@ Section with_Σ.
     { iIntros "!> !>". iApply thread_inv_sym. }
     do 2 wp_pure _.
     iApply aneris_wp_fupd.
-    iDestruct (unfixed_split with "Hunfixed") as "[Hunfixed1 Hunfixed2]";
+    iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated1 Hunallocated2]";
       [set_solver|].
-    wp_smart_apply (wp_par with "[Hsa1 Hsap1 Hunfixed1] [Hsa2 Hsap2 Hunfixed2]").
+    wp_smart_apply (wp_par with "[Hsa1 Hsap1 Hunallocated1] [Hsa2 Hsap2 Hunallocated2]").
     { rewrite -Hip1. by iApply (thread_spec sa1 sa2 k n1 n2 init dbsv
                                   with "[$] [$] [$] [$] [$] [$]"). }
     { rewrite -Hip2. by iApply (thread_spec sa2 sa1 k n2 n1 init dbsv

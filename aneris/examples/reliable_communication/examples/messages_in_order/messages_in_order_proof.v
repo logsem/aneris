@@ -86,7 +86,7 @@ Section proof_of_the_code.
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
         clt_addr ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
-        unfixed {[clt_addr]} }}}
+        unallocated {[clt_addr]} }}}
        client #clt_addr #srv_sa @[ip_of_address clt_addr]
     {{{ skt, RET skt; True }}}.
   Proof.
@@ -135,7 +135,7 @@ Section proof_of_the_main.
   Lemma main_spec :
     ⊢ |={⊤}=>
          srv_sa ⤇ @reserved_server_socket_interp _ _ _ UP SnRes -∗
-         unfixed {[clt_sa]} -∗
+         unallocated {[clt_sa]} -∗
          free_ip "0.0.0.0" -∗
          free_ip "0.0.0.1" -∗
          SocketAddressInet "0.0.0.0" 80 ⤳ (∅, ∅) -∗
@@ -230,7 +230,7 @@ Proof.
   iModIntro.
   iIntros "Hf Hb Hfg Hips _ _ _ _ _".
   simpl in *.
-  iDestruct (unfixed_split with "Hf") as "[Hf_srv Hf]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf_srv Hf]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton
             (@reserved_server_socket_interp _ _ _ UP SnRes) with "Hf_srv").
   iIntros "Hsi".

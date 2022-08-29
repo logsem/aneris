@@ -163,18 +163,18 @@ Section proof.
     (* the address [a] is governed by the pong_si socket protocol *)
     b ⤇ pong_si -∗
     (* A should contain static addresses & the port should be free *)
-    unfixed {[a]} -∗
+    unallocated {[a]} -∗
     free_ports ip {[port]} -∗
     (* exclusive ownership of the [a] and its sent and received messages *)
     a ⤳ (∅, ∅) -∗
     last_message γpong NONE -∗
     WP (ping #a #b) @[ip] {{ _, True }}.
   Proof.
-    iIntros (-> ->) "#Hsi Hunfixed Hfree Ha Hγpong".
+    iIntros (-> ->) "#Hsi Hunallocated Hfree Ha Hγpong".
     unfold ping; wp_pures.
     wp_socket sh as "Hsh".
     wp_pures.
-    iApply (aneris_wp_socket_interp_alloc_singleton (ping_si b) with "Hunfixed").
+    iApply (aneris_wp_socket_interp_alloc_singleton (ping_si b) with "Hunallocated").
     iIntros "#Hping".
     wp_socketbind.
     wp_send "Hγpong".
@@ -220,13 +220,13 @@ Section proof.
         ∗ pong_addr ⤳ (∅, ∅)
         ∗ ping_addr ⤳ (∅, ∅)
         (* A contain static addresses, and the ips we use are free *)
-        ∗ unfixed {[ping_addr]}
+        ∗ unallocated {[ping_addr]}
         ∗ ([∗ set] ip ∈ ips, free_ip ip)
         ∗ last_message γpong NONE ∗ last_message γpong NONE }}}
     ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunfixed & Hips & Hγpong & Hγpong') HΦ".
+    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunallocated & Hips & Hγpong & Hγpong') HΦ".
     unfold ping_pong_runner.
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hpong & Hips)";
       first set_solver.
@@ -243,9 +243,9 @@ Section proof.
     wp_seq.
     wp_apply aneris_wp_start; first done.
     iFrame.
-    iSplitR "Hγpong' Hpinga Hunfixed"; last first.
+    iSplitR "Hγpong' Hpinga Hunallocated"; last first.
     { iIntros "!> Hfree".
-      iApply (ping_spec with "[$] Hunfixed [$] [$Hpinga] [$Hγpong']"); eauto.
+      iApply (ping_spec with "[$] Hunallocated [$] [$Hpinga] [$Hγpong']"); eauto.
     }
     iModIntro.
     iApply "HΦ".

@@ -75,7 +75,7 @@ Section definitions.
         (* socket_address_group_ctx A ∗ *)
         socket_address_group_ctx sags ∗
         (* [A] is the set of socket addresses without an interpretation *)
-        unfixed_groups_auth A ∗
+        unallocated_groups_auth A ∗
         (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
         sis_own (sags ∖ A))%I.
 

@@ -326,9 +326,9 @@ Proof.
   { 
     iApply (aneris_wp_lift with "Hnode").
     rewrite /addrs.
-    iDestruct (unfixed_split with "Hf") as "[Hf Hf_caddr]"; [set_solver|].
-    iDestruct (unfixed_split with "Hf") as "[Hf Hf_learners]"; [set_solver|].
-    iDestruct (unfixed_split with "Hf") as "[Hf_acceptors Hf_proposers]";
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf_caddr]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf_learners]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf_acceptors Hf_proposers]";
       [set_solver|].
     iApply (aneris_wp_socket_interp_alloc_singleton client_si with "Hf_caddr").
     iIntros "#Hcaddr_si".

@@ -377,7 +377,7 @@ Qed.
 
 Lemma aneris_wp_socket_interp_alloc_group_singleton Ψ ip E e Φ sag :
   TCEq (to_val e) None →
-  unfixed_groups {[sag]} -∗
+  unallocated_groups {[sag]} -∗
   (sag ⤇* Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.
@@ -396,7 +396,7 @@ Qed.
 
 Lemma aneris_wp_socket_interp_alloc_group_fun f ip E e Φ sags :
   TCEq (to_val e) None →
-  unfixed_groups sags -∗
+  unallocated_groups sags -∗
   (([∗ set] sag ∈ sags, sag ⤇* f sag) -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.
@@ -414,7 +414,7 @@ Qed.
 
 Lemma aneris_wp_socket_interp_alloc_group Ψ ip E e Φ sags :
   TCEq (to_val e) None →
-  unfixed_groups sags -∗
+  unallocated_groups sags -∗
   (([∗ set] sag ∈ sags, sag ⤇* Ψ) -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.
@@ -432,7 +432,7 @@ Qed.
 
 Lemma aneris_wp_socket_interp_alloc_singleton Ψ ip E e Φ sa :
   TCEq (to_val e) None →
-  unfixed {[sa]} -∗
+  unallocated {[sa]} -∗
   (sa ⤇ Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.
@@ -440,12 +440,12 @@ Proof.
   iApply (aneris_wp_socket_interp_alloc_group_singleton _ _ _ _ _ {[sa]}
            with "[Hsag]");
     [|done].
-  by rewrite /unfixed /to_singletons gset_map.gset_map_singleton.
+  by rewrite /unallocated /to_singletons gset_map.gset_map_singleton.
 Qed.
 
 Lemma aneris_wp_socket_interp_alloc_fun f ip E e Φ sas :
   TCEq (to_val e) None →
-  unfixed sas -∗
+  unallocated sas -∗
   (([∗ set] sa ∈ sas, sa ⤇ f sa) -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.
@@ -464,7 +464,7 @@ Qed.
 
 Lemma aneris_wp_socket_interp_alloc Ψ ip E e Φ sas :
   TCEq (to_val e) None →
-  unfixed sas -∗
+  unallocated sas -∗
   (([∗ set] sa ∈ sas, sa ⤇ Ψ) -∗ WP e @[ip] E {{ Φ }}) -∗
   WP e @[ip] E {{ Φ }}.
 Proof.

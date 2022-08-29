@@ -33,7 +33,7 @@ Section API_spec.
     {{{ clt_addr ⤳ (∅, ∅)  ∗
         free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
         RCParams_srv_saddr ⤇ srv_si ∗
-        unfixed {[clt_addr]} }}}
+        unallocated {[clt_addr]} }}}
        make_client_skt (s_serializer clt_ser) (s_serializer srv_ser) #clt_addr
        @[ip_of_address clt_addr]
     {{{ skt, RET skt; CltCanConnect skt clt_addr }}}.

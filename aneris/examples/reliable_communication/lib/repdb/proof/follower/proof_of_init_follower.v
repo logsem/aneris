@@ -60,7 +60,7 @@ Section Init_Follower_Proof.
   Definition init_follower_spec_internal {MTS:MTS_resources} : iProp Σ :=
     ⌜ip_of_address f2csa = ip_of_address f2lsa⌝ →
     ⌜port_of_address f2csa ≠ port_of_address f2lsa⌝ →
-    {{{ unfixed {[f2lsa]} ∗
+    {{{ unallocated {[f2lsa]} ∗
         f2csa ⤇ follower_si ∗
         DB_addrF ⤇ leaderF_si ∗
         (@run_server_spec _ _ _ _ MTC InitFollower follower_si) ∗
