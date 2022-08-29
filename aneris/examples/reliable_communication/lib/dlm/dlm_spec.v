@@ -23,8 +23,7 @@ Section DL_spec.
   Notation srv_port := (port_of_address DL_server_addr).
 
   Definition dl_server_start_service_spec : iProp Σ :=
-    ∀ A,
-    {{{ ⌜srv_sa ∈ A⌝ ∗ fixed A ∗ free_ports srv_ip {[srv_port]} ∗
+    {{{ free_ports srv_ip {[srv_port]} ∗
         srv_sa ⤳ (∅, ∅) ∗
         srv_sa ⤇ dl_reserved_server_socket_interp ∗
         R ∗ dl_service_init }}}
@@ -42,8 +41,8 @@ Section DL_spec.
     {{{ RET #(); DLockCanAcquire ip dl R }}}.
 
   Definition dl_subscribe_client_spec : iProp Σ :=
-    ∀ (sa : socket_address) A,
-    {{{ ⌜sa ∉ A⌝ ∗ fixed A ∗
+    ∀ (sa : socket_address),
+    {{{ unallocated {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
          DL_server_addr ⤇ dl_reserved_server_socket_interp }}}
       dlock_subscribe_client #sa #srv_sa @[ip_of_address sa]

@@ -68,39 +68,16 @@ Section definitions.
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
-  Definition socket_interp_coh P :=
+  Definition socket_interp_coh :=
     (∃ (sags : gset socket_address_group)
-       (sis : gset socket_address_group)
        (A : gset socket_address_group),
+        ⌜A ⊆ sags⌝ ∗
         (* socket_address_group_ctx A ∗ *)
         socket_address_group_ctx sags ∗
-        (* [A] is the set of addresses with fixed interpretations *)
-        fixed_groups A ∗
-        (* [sags] is the set of addresses with a saved socket interpretation *)
-        sis_own sis ∗ ⌜sis ⊆ sags⌝ ∗
-        (* All sets not in [A] are singletons *)
-        ⌜set_Forall is_singleton (sags ∖ A)⌝ ∗
-        (* all addresses in [sags] either have a fixed interpretation
-           ([a ∈ A]) or are dynamically bound. *)
-        ⌜∀ sag, sag ∈ sis ↔ sag ∈ A ∨
-                            (sag ∉ A ∧ have_disj_elems {[sag]} A ∧
-                             ∃ sa ps, sag = {[sa]} ∧
-                                      P !! ip_of_address sa = Some ps ∧
-                                      port_of_address sa ∈ ps)⌝)%I.
-
-  Lemma socket_interp_coh_le (sags : gset socket_address_group) A P :
-    (∀ sag, sag ∈ sags ↔ sag ∈ A ∨
-                         (sag ∉ A ∧ have_disj_elems {[sag]} A ∧
-                          ∃ sa ps, sag = {[sa]} ∧
-                                   P !! ip_of_address sa = Some ps ∧
-                                   port_of_address sa ∈ ps)) →
-    A ⊆ sags.
-  Proof.
-    rewrite elem_of_subseteq.
-    intros Hdms sag Hin.
-    rewrite Hdms.
-    by left.
-  Qed.
+        (* [A] is the set of socket addresses without an interpretation *)
+        unallocated_groups_auth A ∗
+        (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
+        sis_own (sags ∖ A))%I.
 
   (** Free ips coherence *)
   (* Free ips have no bound ports, no heap, and no sockets  *)
@@ -227,7 +204,7 @@ Section definitions.
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhm⌝ ∗
         node_gnames_auth γm ∗
-        socket_interp_coh (state_ports_in_use σ) ∗
+        socket_interp_coh ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
         messages_ctx mhm ∗

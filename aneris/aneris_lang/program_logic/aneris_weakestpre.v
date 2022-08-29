@@ -1,8 +1,10 @@
 From iris.proofmode Require Import base tactics classes.
 From trillium.program_logic Require Export weakestpre.
 From aneris.aneris_lang Require Export resources network base_lang.
-From aneris.aneris_lang.state_interp Require Import state_interp_def.
+From aneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
 From aneris.aneris_lang Require Import lifting resources network base_lang.
+From aneris.lib Require Import singletons.
+
 Set Default Proof Using "Type".
 
 Definition aneris_wp_def `{!anerisG Mdl Σ} (ip : ip_address) (E : coPset)
@@ -76,6 +78,12 @@ Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types v : val.
 Implicit Types e : expr.
+
+(* This lifts a primitive wp into the aneris wp that hides the node *)
+Lemma aneris_wp_lift tid ip e E Φ :
+  is_node ip -∗ aneris_wp ip E e Φ -∗
+  wp NotStuck E (ip,tid) (mkExpr ip e) (λ w, ∃ v, ⌜w = mkVal ip v⌝ ∗ Φ v).
+Proof. iIntros "Hnode Hwp". rewrite aneris_wp_eq. by iApply "Hwp". Qed.
 
 (* Weakest pre *)
 Lemma aneris_wp_unfold ip E e Φ :
@@ -365,6 +373,111 @@ Proof.
   iApply wp_mono; last by iApply "Hwp".
   iIntros (v); iDestruct 1 as (w) "[-> Hw]".
   iIntros "HP"; iMod ("Hw" with "HP"); eauto.
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc_group_singleton Ψ ip E e Φ sag :
+  TCEq (to_val e) None →
+  unallocated_groups {[sag]} -∗
+  (sag ⤇* Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  rewrite !aneris_wp_unfold /aneris_wp_def.
+  iIntros (He) "Hsag Hwp %tid Hin".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
+  rewrite He. simpl.
+  iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
+  iIntros "(Hev & Hσ & H)".
+  iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hσ Hsag")
+    as "[Hσ HΨ]".
+  iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
+  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc_group_fun f ip E e Φ sags :
+  TCEq (to_val e) None →
+  unallocated_groups sags -∗
+  (([∗ set] sag ∈ sags, sag ⤇* f sag) -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  rewrite !aneris_wp_unfold /aneris_wp_def.
+  iIntros (He) "Hsag Hwp %tid Hin".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
+  rewrite He. simpl.
+  iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
+  iIntros "(Hev & Hσ & H)".
+  iMod (aneris_state_interp_socket_interp_allocate_fun with "Hσ Hsag") as "[Hσ HΨ]".
+  iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
+  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc_group Ψ ip E e Φ sags :
+  TCEq (to_val e) None →
+  unallocated_groups sags -∗
+  (([∗ set] sag ∈ sags, sag ⤇* Ψ) -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  rewrite !aneris_wp_unfold /aneris_wp_def.
+  iIntros (He) "Hsag Hwp %tid Hin".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
+  rewrite He. simpl.
+  iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
+  iIntros "(Hev & Hσ & H)".
+  iMod (aneris_state_interp_socket_interp_allocate with "Hσ Hsag") as "[Hσ HΨ]".
+  iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
+  rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
+  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc_singleton Ψ ip E e Φ sa :
+  TCEq (to_val e) None →
+  unallocated {[sa]} -∗
+  (sa ⤇ Ψ -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  iIntros (He) "Hsag Hwp".
+  iApply (aneris_wp_socket_interp_alloc_group_singleton _ _ _ _ _ {[sa]}
+           with "[Hsag]");
+    [|done].
+  by rewrite /unallocated /to_singletons gset_map.gset_map_singleton.
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc_fun f ip E e Φ sas :
+  TCEq (to_val e) None →
+  unallocated sas -∗
+  (([∗ set] sa ∈ sas, sa ⤇ f sa) -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  iIntros (He) "Hsag Hwp".
+  iApply (aneris_wp_socket_interp_alloc_group_fun (λ x, from_singleton $ f (hd inhabitant (elements x))) _ _ _ _ (to_singletons sas)
+           with "Hsag").
+  iIntros "Hsags". iApply ("Hwp" with "[Hsags]").
+  iInduction sas as [|sag sags Hnin] "IHsags" using set_ind_L; [done|].
+  rewrite to_singletons_union. rewrite big_sepS_union; [|set_solver].
+  rewrite big_sepS_union; [| by rewrite to_singletons_inv; set_solver].
+  iDestruct "Hsags" as "[Hsag Hsags]".
+  iDestruct ("IHsags" with "Hsags") as "H".
+  rewrite to_singletons_inv !big_sepS_singleton (elements_singleton _).
+  by iFrame.
+Qed.
+
+Lemma aneris_wp_socket_interp_alloc Ψ ip E e Φ sas :
+  TCEq (to_val e) None →
+  unallocated sas -∗
+  (([∗ set] sa ∈ sas, sa ⤇ Ψ) -∗ WP e @[ip] E {{ Φ }}) -∗
+  WP e @[ip] E {{ Φ }}.
+Proof.
+  iIntros (He) "Hsag Hwp".
+  iApply (aneris_wp_socket_interp_alloc_group _ _ _ _ _ (to_singletons sas)
+           with "Hsag").
+  iIntros "Hsags". iApply ("Hwp" with "[Hsags]").
+  iInduction sas as [|sag sags Hnin] "IHsags" using set_ind_L; [done|].
+  rewrite to_singletons_union. rewrite big_sepS_union; [|set_solver].
+  rewrite big_sepS_union; [| by rewrite to_singletons_inv; set_solver].
+  iDestruct "Hsags" as "[Hsag Hsags]".
+  iDestruct ("IHsags" with "Hsags") as "$".
+  by rewrite to_singletons_inv !big_sepS_singleton.
 Qed.
 
 Lemma aneris_wp_bind K ip E e Φ :

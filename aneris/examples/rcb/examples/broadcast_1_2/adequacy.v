@@ -33,18 +33,23 @@ Definition addr_to_id a : nat :=
 Theorem broadcast_1_2_safe :
   aneris_adequate main "system" broadcast_1_2_is (λ _, True).
 Proof.
-  eapply (@adequacy Σ unit_model _ _ ips addrs addrs ∅ ∅ ∅);
-    [ apply unit_model_rel_finitary |  | done | set_solver | set_solver | set_solver |
-      done | done | done].
+  eapply (@adequacy Σ unit_model _ _ ips addrs ∅ ∅ ∅);
+    [ apply unit_model_rel_finitary |  | done | set_solver.. | done | done].
   iIntros (dInvG).
-  iMod (main_spec addrs) as (RCBRS) "Hmain"; [set_solver | set_solver | ].
+  iMod (main_spec) as (RCBRS) "Hmain".
   iModIntro.
-  iExists (fun a => RCB_socket_proto (addr_to_id a)).
-  iIntros "#Hfixed #Hproto Hsoups _ Hfree _ _ _ _ _".
+  iIntros "Hf Hsoups _ Hfree _ _ _ _ _".
   iDestruct (big_sepS_delete _ _ z0 with "Hsoups") as "[Hz0 Hsoups]"; first set_solver.
   iDestruct (big_sepS_delete _ _ z1 with "Hsoups") as "[Hz1 _]"; first set_solver.
-  iApply ("Hmain" with "[] [$Hz0] [$Hz1] [$Hfixed] [$Hfree]").
+  iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+  iApply (aneris_wp_socket_interp_alloc_singleton (RCB_socket_proto 0)
+    with "Hf1").
+  iIntros "#Hsi1".
+  iApply (aneris_wp_socket_interp_alloc_singleton (RCB_socket_proto 1)
+    with "Hf2").
+  iIntros "#Hsi2".
+  iApply ("Hmain" with "[] [$Hz0] [$Hz1] [$Hfree]").
   repeat iSplitL; last done.
-  - iPoseProof (big_sepS_delete _ _ z0 with "Hproto") as "[? _]"; done.
-  - iPoseProof (big_sepS_delete _ _ z1 with "Hproto") as "[? _]"; done.
+  - iApply "Hsi1".
+  - iApply "Hsi2".
 Qed.

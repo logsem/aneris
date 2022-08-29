@@ -107,10 +107,8 @@ Section resource_manager.
   Qed.
 
   (** * Resource manager spec *)
-  Lemma resource_manager_spec A rm :
-    rm ∈ A →
+  Lemma resource_manager_spec rm :
     rm ∈ RMs →
-    fixed A -∗
     free_ports (ip_of_address rm) {[port_of_address rm]} -∗
     inv tcN tc_inv -∗
     rm ⤇ rm_si -∗
@@ -119,9 +117,9 @@ Section resource_manager.
     rm ↦●{1 / 2} WORKING -∗
     WP resource_manager #rm #tm @[ip_of_address rm] {{ v, True }}.
   Proof.
-    iIntros (??) "#HA Hp #Hinv #Hrmsi #Htmsi Hpend HErm".
+    iIntros (?) "Hp #Hinv #Hrmsi #Htmsi Hpend HErm".
     rewrite /resource_manager.
-    wp_pures. wp_socket h as "Hh". wp_pures. wp_socketbind_static.
+    wp_pures. wp_socket h as "Hh". wp_pures. wp_socketbind.
     wp_bind (ReceiveFrom _).
     wp_apply (wp_rm_receivefrom with "[$Hh $Hrmsi $Hinv]"); [done..|].
     iIntros (?) "[Hh Hm]". simplify_eq.

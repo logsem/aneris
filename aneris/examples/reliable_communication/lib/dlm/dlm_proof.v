@@ -109,8 +109,8 @@ Section DL_proof_of_code.
     by iApply "HΦ"; eauto with iFrame.
   Qed.
 
-Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
-    {{{ ⌜sa ∉ A⌝ ∗ fixed A ∗
+Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
+    {{{ unallocated {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         sa ⤳ (∅, ∅) }}}
@@ -120,14 +120,14 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
                     ⌜dl_acquire_internal_spec sa dl⌝ ∗
                     ⌜dl_release_internal_spec sa dl⌝ }}}.
 
-  Lemma dl_subscribe_client_internal_spec_holds sa A :
-    ⊢ dl_subscribe_client_internal_spec sa A.
+  Lemma dl_subscribe_client_internal_spec_holds sa :
+    ⊢ dl_subscribe_client_internal_spec sa.
   Proof.
     iIntros (Φ) "!#".
-    iIntros "(#HnA & #Hf & Hfp & #Hsi & Hmh) HΦ".
+    iIntros "(Hf & Hfp & #Hsi & Hmh) HΦ".
     rewrite /dlock_subscribe_client.
     wp_pures.
-    wp_apply (RCSpec_make_client_skt_spec with "[$HnA $Hmh $Hsi $Hf $Hfp][HΦ]").
+    wp_apply (RCSpec_make_client_skt_spec with "[$Hmh $Hsi $Hf $Hfp][HΦ]").
     iNext. iIntros (skt) "Hcl". wp_pures.
     wp_apply (RCSpec_connect_spec with "[$Hcl][HΦ]").
     iNext. iIntros (dl) "Hc". wp_pures.
@@ -188,10 +188,8 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
       eauto with iFrame.
   Qed.
 
-  Definition dl_server_start_service_internal_spec A : Prop :=
-    {{{ ⌜DL_server_addr ∈ A⌝ ∗
-        fixed A ∗
-        free_ports srv_ip {[srv_port]} ∗
+  Definition dl_server_start_service_internal_spec : Prop :=
+    {{{ free_ports srv_ip {[srv_port]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         srv_sa ⤳ (∅, ∅) ∗
         SrvInit ∗
@@ -199,13 +197,13 @@ Definition dl_subscribe_client_internal_spec sa A : iProp Σ :=
       dlock_start_service #srv_sa @[srv_ip]
     {{{ RET #(); True }}}.
 
-  Lemma dl_server_start_service_internal_spec_holds A : dl_server_start_service_internal_spec A.
+  Lemma dl_server_start_service_internal_spec_holds : dl_server_start_service_internal_spec.
   Proof.
     iIntros (Φ) "Hdlk HΦ".
-    iDestruct "Hdlk" as "(#HA & #Hf & Hfp & #Hsi & Hmh & Hinit & Hdlocked & HR)".
+    iDestruct "Hdlk" as "(Hfp & #Hsi & Hmh & Hinit & Hdlocked & HR)".
     rewrite /dlock_start_service.
     wp_pures.
-    wp_apply (RCSpec_make_server_skt_spec with "[$HA $Hmh $Hsi $Hf $Hinit $Hfp][Hdlocked HR HΦ]").
+    wp_apply (RCSpec_make_server_skt_spec with "[$Hmh $Hsi $Hinit $Hfp][Hdlocked HR HΦ]").
     iNext. iIntros (skt) "Hcl". wp_pures.
     wp_apply (newlock_spec dlN srv_ip (dl_locked_internal ∗ R) with "[$HR $Hdlocked]").
     iIntros (lk γlk) "#Hlk".
@@ -296,21 +294,20 @@ Section DL_proof_of_the_init.
     iFrame.
     iSplitL.
     - iModIntro.
-      iIntros (A).
       iIntros (Φ) "!#".
-      iIntros "(HinA & Hf & Hfp & Hmh & #Hsi & HR & (Hinit & HsrvInit)) HΦ".
+      iIntros "(Hfp & Hmh & #Hsi & HR & (Hinit & HsrvInit)) HΦ".
       iDestruct (dl_server_start_service_internal_spec_holds) as "HserviceSpec".
       split; try done.
       split; try done.
-      iApply ("HserviceSpec" with "[$HinA $Hf $Hfp $Hsi $Hmh $HR $Hinit $HsrvInit][$]").
+      iApply ("HserviceSpec" with "[$Hfp $Hsi $Hmh $HR $Hinit $HsrvInit][$]").
     - iModIntro.
-      iIntros (sa A).
+      iIntros (sa).
       iIntros (Φ) "!#".
-      iIntros "(HninA & Hf & Hfp & Hmh & #Hsi) HΦ".
+      iIntros "(Hf & Hfp & Hmh & #Hsi) HΦ".
       iDestruct (dl_subscribe_client_internal_spec_holds) as "#HclientSpec".
       split; try done.
       split; try done.
-      iApply ("HclientSpec" with "[$HninA $Hf $Hfp $Hmh $Hsi][HΦ]").
+      iApply ("HclientSpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]").
       rewrite /dlock_subscribe_client.
       iNext. iIntros (dl) "(Hinit & %HaS & %HrS)".
       iApply "HΦ". iFrame.

@@ -237,15 +237,14 @@ Section with_Σ.
     naive_solver.
   Qed.
 
-  Lemma thread_spec A sa1 sa2 (k : Key) (n1 n2 : Z) init dbsv :
+  Lemma thread_spec sa1 sa2 (k : Key) (n1 n2 : Z) init dbsv :
     is_list DB_addresses dbsv →
     sa1 ∉ DB_addresses →
-    sa1 ∉ A →
     k ∈ DB_keys →
     sa1 ≠ sa2 →
     GlobalInv -∗
     inv N (thread_inv k sa1 sa2 n1 n2) -∗
-    fixed A -∗
+    unallocated {[sa1]} -∗
     ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) -∗
     sa1 ⤳ (∅, ∅) -∗
     free_ports (ip_of_address sa1) {[port_of_address sa1]} -∗
@@ -268,10 +267,10 @@ Section with_Σ.
                              ⌜mval_of_we we2' = (#n2, WE_timed we2', sa2)⌝ ∗
                              ⌜hist_at_origin sa1 h2f2' = []⌝))) }}.
   Proof.
-    iIntros (Hdbsv Hsanin HsaninA Hk Hsaneq)
-            "#HGinv #Hinv Hfixed Hlist Hsa1 Hfree Hinit".
+    iIntros (Hdbsv HsaninA Hk Hsaneq)
+            "#HGinv #Hinv Hunallocated Hlist Hsa1 Hfree Hinit".
     wp_pures. wp_lam.
-    wp_smart_apply ("Hinit" with "[//] [//] [//] [-]"); [by iFrame|].
+    wp_smart_apply ("Hinit" with "[//] [//] [-]"); [by iFrame|].
     iIntros (rd wr) "(Hobs & Hwrites & Hrd & Hwr)".
     wp_pures.
     iDestruct (thread_write_spec with "Hwr Hinv Hobs Hwrites") as "Hwr'"; [done|].
@@ -287,30 +286,28 @@ Section with_Σ.
     iFrame. done.
   Qed.
 
-  Lemma prog_spec ip A sa1 sa2 init k (n1 n2 : Z) dbsv :
+  Lemma prog_spec ip sa1 sa2 init k (n1 n2 : Z) dbsv :
     is_list DB_addresses dbsv →
     k ∈ DB_keys →
     ip_of_address sa1 = ip →
     ip_of_address sa2 = ip →
     sa1 ∉ DB_addresses →
     sa2 ∉ DB_addresses →
-    sa1 ∉ A →
-    sa2 ∉ A →
     sa1 ≠ sa2 →
     GlobalInv -∗
     init_spec init -∗
     {{{ sa1 ⤳ (∅, ∅) ∗ sa2 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address sa1) {[port_of_address sa1]} ∗
         free_ports (ip_of_address sa2) {[port_of_address sa2]} ∗
-        k ↦ₖ None ∗ fixed A ∗
+        k ↦ₖ None ∗ unallocated {[sa1;sa2]} ∗
         ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) }}}
       prog init sa1 sa2 k n1 n2 dbsv @[ip]
     {{{ (v : val), RET v; ⌜v = (SOMEV #n1, SOMEV #n1)%V⌝ ∨
                           ⌜v = (SOMEV #n1, SOMEV #n2)%V⌝ ∨
                           ⌜v = (SOMEV #n2, SOMEV #n2)%V⌝}}}.
   Proof.
-    iIntros (Hlist Hkin Hip1 Hip2 Hsanin1 Hsanin2 HsaninA1 HsaninA2 Hsaneq).
-    iIntros "#HGInv #Hinit !>" (Φ) "(Hsa1 & Hsa2 & Hsap1 & Hsap2 & Hk & #Hfixed & #Hlist) HΦ".
+    iIntros (Hlist Hkin Hip1 Hip2 Hsanin1 Hsanin2 Hsaneq).
+    iIntros "#HGInv #Hinit !>" (Φ) "(Hsa1 & Hsa2 & Hsap1 & Hsap2 & Hk & Hunallocated & #Hlist) HΦ".
     rewrite /prog.
     iMod (inv_alloc N _ (thread_inv k sa1 sa2 n1 n2) with "[Hk]") as "#Hinv1";
       [by iFrame|].
@@ -318,14 +315,16 @@ Section with_Σ.
     { iIntros "!> !>". iApply thread_inv_sym. }
     do 2 wp_pure _.
     iApply aneris_wp_fupd.
-    wp_smart_apply (wp_par with "[Hsa1 Hsap1] [Hsa2 Hsap2]").
-    { rewrite -Hip1. by iApply (thread_spec A sa1 sa2 k n1 n2 init dbsv
+    iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated1 Hunallocated2]";
+      [set_solver|].
+    wp_smart_apply (wp_par with "[Hsa1 Hsap1 Hunallocated1] [Hsa2 Hsap2 Hunallocated2]").
+    { rewrite -Hip1. by iApply (thread_spec sa1 sa2 k n1 n2 init dbsv
                                   with "[$] [$] [$] [$] [$] [$]"). }
-    { rewrite -Hip2. by iApply (thread_spec A sa2 sa1 k n2 n1 init dbsv
+    { rewrite -Hip2. by iApply (thread_spec sa2 sa1 k n2 n1 init dbsv
                                   with "[$] [$] [$] [$] [$] [$]"). }
     iIntros (v1 v2) "[H1 H2]".
     iIntros "!>".
-    iClear "Hinit Hfixed Hlist Hinv1 Hinv2".
+    iClear "Hinit Hlist Hinv1 Hinv2".
     iDestruct "H1" as (sa1h2f1 sa1h1f sa1we1 sa1h2f2)
       "(H1Obs & H1Writes & %H1mval & %H1k & %H1atkey & %H1h1 & %H1h2)".
     iDestruct "H2" as (sa2h2f1 sa2h1f sa2we1 sa2h2f2)

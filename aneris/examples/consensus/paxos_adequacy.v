@@ -296,7 +296,9 @@ Proof.
   set (Σ := #[anerisΣ (Paxos_model runner_topo); (paxosΣ runner_topo)]).
   assert (anerisPreG Σ (Paxos_model runner_topo)) as HPreG by apply _.
   unfold safe, runner_expr.
-  apply (simulation_adequacy Σ (Paxos_model runner_topo) NotStuck ips ∅ addrs addrs ∅ ∅).
+  apply (simulation_adequacy Σ (Paxos_model runner_topo) NotStuck ips ∅ addrs ∅ ∅).
+  { set_solver. }
+  { set_solver. }
   { apply simulates_finitary. }
   { set_solver. }
   { set_solver. }
@@ -310,33 +312,37 @@ Proof.
       (γM γP γmv γmb) "(HM & HM' & Hpend0 & Hpend1 & Hmv_ctx & Hmb_ctx & Has)".
   set (paxosGI := Build_paxosG Σ runner_topo _ γM _ γP _ γmb _ γmv).
   iIntros "!#".
-  iExists (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I, socket_interp.
-  iIntros "? Hsi Hhist ? #? _ _ _ _ _ Hfrag".
+  iExists (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
+  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
   iDestruct (big_sepS_union with "Hhist") as "[Hhist Hclient]"; [set_solver|].
-  iPoseProof (big_sepS_singleton (λ _, _ ⤳ _)%I with "Hclient") as "Hclient".
+  iPoseProof (big_sepS_singleton with "Hclient") as "Hclient".
   iDestruct (big_sepS_union with "Hhist") as "[Hhist Hlearners]"; [set_solver|].
   iDestruct (big_sepS_union with "Hhist") as "[Hacceptors Hproposers]"; [set_solver|].
-  iDestruct (big_sepS_union with "Hsi") as "[Hsi Hclient_si]"; [set_solver|].
-  iPoseProof (big_sepS_singleton (λ _, _ ⤇ _)%I with "Hclient_si") as "Hclient_si".
-  iDestruct (big_sepS_union with "Hsi") as "[Hsi Hlearners_si]"; [set_solver|].
-  iDestruct (big_sepS_union with "Hsi") as "[Hacceptors_si Hproposers_si]"; [set_solver|].
   iMod (paxos_inv_alloc with "[$Hfrag $Hmb_ctx $Hmv_ctx $Hacceptors
                                $Hproposers $HM $HM']") as "#Hinv".
   iModIntro.
   iSplit; [done|].
   iSplitL.
-  { iPoseProof (runner_spec with "[-]") as "Hspec".
+  { 
+    iApply (aneris_wp_lift with "Hnode").
+    rewrite /addrs.
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf_caddr]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf Hf_learners]"; [set_solver|].
+    iDestruct (unallocated_split with "Hf") as "[Hf_acceptors Hf_proposers]";
+      [set_solver|].
+    iApply (aneris_wp_socket_interp_alloc_singleton client_si with "Hf_caddr").
+    iIntros "#Hcaddr_si".
+    iApply (aneris_wp_socket_interp_alloc learner_si with "Hf_learners").
+    iIntros "#Hleaners_si".
+    iApply (aneris_wp_socket_interp_alloc acceptor_si with "Hf_acceptors").
+    iIntros "#Hacceptors_si".
+    iApply (aneris_wp_socket_interp_alloc proposer_si with "Hf_proposers").
+    iIntros "#Hproposers_si".
+    iPoseProof (runner_spec with "[-]") as "Hspec".
     { iFrame "#∗".
-      iSplitL "Hacceptors_si".
-      { rewrite !big_sepS_union ?big_sepS_singleton //; set_solver. }
-      iSplitL "Hproposers_si".
-      { rewrite !big_sepS_union ?big_sepS_singleton //; set_solver. }
       rewrite !big_sepS_union ?big_sepS_singleton //; try set_solver.
       rewrite /pending_class -length_elements.
       by iFrame. }
-    rewrite aneris_wp_unfold /aneris_wp_def /=.
-    iApply wp_wand_l.
-    iSplitR; auto.
     iApply ("Hspec" with "[]"); auto. }
   iIntros (ex atr c' Hval Hexst Hauxst Hexend Hsim Hnotstuck) "Hsi _".
   iInv (paxosN) as ([c δ]) ">(Hfrag & Hmauth & HmaxBal & HmaxVal & Hmcoh & HbI)" "_".

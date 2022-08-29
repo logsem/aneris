@@ -70,18 +70,17 @@ Section ProofOfNode0.
   Context `{!DB_resources Mdl Σ}.
   Context `{!DB_init_function, !DB_init}.
 
-  Theorem z0_node_spec A γ :
-    z0 ∈ A →
+  Theorem z0_node_spec γ :
     GlobalInv -∗
     init_spec init -∗
-    {{{ init_resources z0 A 0 ∗ "x" ↦ᵤ ∅ ∗ inv Ny (inv_y γ) }}}
+    {{{ init_resources z0 0 ∗ "x" ↦ᵤ ∅ ∗ inv Ny (inv_y γ) }}}
       z0_node dbs @[ip_of_address z0]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Hz0) "#HIG #init_spec".
+    iIntros "#HIG #init_spec".
     iIntros (Φ) "!> (Hinit & Hxu & #HIy) HΦ".
     rewrite /z0_node. wp_pures. wp_bind (init _ _)%E.
-    wp_apply ("init_spec" $! _ 0 with "[] [] [] [$]"); [|done|done|].
+    wp_apply ("init_spec" $! 0 with "[] [] [$]"); [|done|].
     { iPureIntro. cbn; eauto. }
     iClear "init_spec".
     iIntros (rd wr) "(Hs & #Hrd & #Hwr) /=".

@@ -53,13 +53,13 @@ Proof.
             _
             (list_to_set (ip_of_address <$> gcd_addr_list gcdata))
             (list_to_set (gcd_addr_list gcdata) ∪ (Aprogs ps))
-            (list_to_set (C := gset _) (gcd_addr_list gcdata) ∪ (⋃ (portssocks ps).*2))
             (list_to_set ((λ i : nat, StringOfZ i) <$> seq 0 (GClen gcdata)))
             (list_to_set (gcd_addr_list gcdata))
             (list_to_set (gcd_addr_list gcdata))).
   { apply GcounterM_rel_finitary. }
   { intros ?.
-    iMod (runner_spec with "[]") as (? f) "Hwp".
+    iMod (runner_spec with "[]") as (?) "Hwp".
+    - apply ps.
     - apply ps.
     - apply is_list_inject; eauto.
     - apply ps.
@@ -67,20 +67,21 @@ Proof.
     - apply ps.
     - iPoseProof (progs_wp ps) as "?"; done.
     - iModIntro.
-      iExists f.
-      iIntros "Hfx Hprotos Hmps Hfst Hfips Hins Halevs Hsevs Hrevs _ _".
-      iMod ("Hwp" with "Hfst Hfx Hprotos Hmps [Hsevs] [Hrevs] [Hfips] [Halevs]") as "[#Hinv Hwp]".
+      iIntros "Hfx Hmps Hfst Hfips Hins Halevs Hsevs Hrevs _ _".
+      iModIntro.
+      iApply (wp_wand _ _ _ _ (λ w, ∃ v, ⌜w = mkVal "system" v⌝ ∗ True)%I with "[-]"); [|done].
+      iApply (aneris_wp_lift with "Hins").
+      iMod ("Hwp" with "Hfst Hfx [Hmps] [Hsevs] [Hrevs] [Hfips] [Halevs]") as "[#Hinv Hwp]".
+      + assert (Aprogs ps = (⋃ (portssocks ps).*2)) as -> by apply ps. done.
       + by rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup.
       + by rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup.
       + rewrite big_sepS_list_to_set; last by apply gcd_addr_list_NoDup_ips.
         rewrite big_sepL_fmap; done.
       + rewrite big_sepS_list_to_set; last (apply NoDup_fmap; [apply _|apply NoDup_seq]).
         rewrite big_sepL_fmap; done.
-      + iModIntro.
-        rewrite aneris_wp_unfold /aneris_wp_def.
-        iApply(wp_wand with "[Hins Hwp]").
-        * iApply "Hwp"; done.
-        * eauto. }
+      + by iApply (aneris_wp_wand with "Hwp"). }
+  { set_solver. }
+  { set_solver. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
   { rewrite /=; induction (gcd_addr_list gcdata); set_solver. }
@@ -105,10 +106,11 @@ Proof.
             (list_to_set (ip_of_address <$> gcd_addr_list gcdata))
             (list_to_set ((λ i : nat, StringOfZ i) <$> seq 0 (GClen gcdata)))
             (list_to_set (gcd_addr_list gcdata) ∪ (Aprogs ps))
-            (list_to_set (C := gset _) (gcd_addr_list gcdata) ∪ (⋃ (portssocks ps).*2))
             (list_to_set (gcd_addr_list gcdata))
             (list_to_set (gcd_addr_list gcdata))
             (λ _, True) _ _ _ (init_state gcdata)).
+  { set_solver. }
+  { set_solver. }
   { apply aneris_sim_rel_finitary, GcounterM_rel_finitary. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
@@ -119,7 +121,8 @@ Proof.
   { done. }
   { done. }
   iIntros (?) "".
-  iMod (runner_spec with "[]") as (? f) "Hwp".
+  iMod (runner_spec with "[]") as (?) "Hwp".
+  { apply ps. }
   { apply ps. }
   { apply is_list_inject; eauto. }
   { apply ps. }
@@ -127,9 +130,10 @@ Proof.
   { apply ps. }
   { iPoseProof (progs_wp ps) as "?"; done. }
   iModIntro.
-  iExists (λ v, ∃ w : val, ⌜v = _⌝ ∗ ⌜w = #()⌝)%I, f.
-  iIntros "Hfx Hprotos Hmps Hfips Hins Halevs Hsevs Hrevs _ _ Hfst".
-  iMod ("Hwp" with "Hfst Hfx Hprotos Hmps [Hsevs] [Hrevs] [Hfips] [Halevs]") as "[#Hinv Hwp]".
+  iExists (λ v, ∃ w : val, ⌜v = _⌝ ∗ ⌜w = #()⌝)%I.
+  iIntros "Hfx Hmps Hfips Hins Halevs Hsevs Hrevs _ _ Hfst".
+  iMod ("Hwp" with "Hfst Hfx [Hmps] [Hsevs] [Hrevs] [Hfips] [Halevs]") as "[#Hinv Hwp]".
+  { assert (Aprogs ps = (⋃ (portssocks ps).*2)) as -> by apply ps. done. }
   { by rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup. }
   { by rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup. }
   { rewrite big_sepS_list_to_set; last by apply gcd_addr_list_NoDup_ips.

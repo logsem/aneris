@@ -18,25 +18,22 @@ Section pong.
           (* client's protocol is satisfied with a PONG response *)
           ∗ (<pers> ∀ m, ⌜m_body m = "PONG"⌝ → ϕ m))%I.
 
-  Lemma pong_spec a ip port A R T:
+  Lemma pong_spec a ip port R T:
     ip = ip_of_address a →
     port = port_of_address a →
-    (* a is static *)
-    a ∈ A →
     (* the address [a] is governed by the pong_si socket protocol *)
     a ⤇ pong_si -∗
     (* A should contain static addresses & the port should be free *)
-    fixed A -∗
     free_ports ip {[port]} -∗
     (* exclusive ownership of the [a] and its sent and received messages *)
     a @ pong_si ⤳# (R, T) -∗
     WP (pong #a) @[ip] {{ v, True }}.
   Proof.
-    iIntros (-> -> Haddr) "#Hsi #Hfixed Hport Ha".
+    iIntros (-> ->) "#Hsi Hport Ha".
     wp_lam.
     wp_socket h as "Hh".
     wp_let.
-    wp_socketbind_static.
+    wp_socketbind.
     wp_apply (aneris_wp_pers_receivefrom with "[$Hsi $Hh $Ha]"); [done..|].
     iIntros (m) "(Hh & Ha & Hm)".
     wp_lam.
@@ -57,27 +54,25 @@ Section ping.
   Definition ping_si : socket_interp Σ :=
     (λ msg, ⌜m_body msg = "PONG"⌝)%I.
 
-  Lemma ping_spec a b ip port A :
+  Lemma ping_spec a b ip port :
     ip = ip_of_address a →
     port = port_of_address a →
-    (* the pong address is static *)
-    b ∈ A ->
-    (* the ping is not*)
-    a ∉ A ->
     {{{ (* the [pong] address is governed by [pong_si] *)
          b ⤇ pong_si
-        ∗ fixed A
+        ∗ unallocated {[a]}
         ∗ free_ports ip {[port]}
         ∗ a ⤳ (∅, ∅) }}}
       ping #a #b @[ip]
     {{{ v, RET v; ∃ m, ⌜v = #"PONG"⌝ ∗ ⌜v = #(m_body m)⌝ ∗
                         a ⤳ ({[m]}, {[ mkMessage a b IPPROTO_UDP "PING" ]})}}}.
   Proof.
-    iIntros (-> -> Hserver Haddr Φ) "(#Hsi & #Hfixed & Hip & Ha) Hcont".
+    iIntros (-> -> Φ) "(#Hsi & Hunallocated & Hip & Ha) Hcont".
     wp_lam. wp_let.
     wp_socket sh as "Hsh".
     wp_let.
-    wp_socketbind_dynamic ping_si as "#Hping".
+    iApply (aneris_wp_socket_interp_alloc_singleton ping_si with "Hunallocated").
+    iIntros "#Hping".
+    wp_socketbind.
     wp_pures.
     wp_send.
     { iExists _. eauto. }
@@ -92,31 +87,27 @@ Section ping.
 
 End ping.
 
+Definition pong_addr := SocketAddressInet "0.0.0.0" 80.
+Definition ping_addr := SocketAddressInet "0.0.0.1" 80.
+Definition addrs : gset socket_address := {[ pong_addr ]} ∪ {[ ping_addr ]}.
+Definition ips : gset string :=
+  {[ ip_of_address pong_addr ; ip_of_address ping_addr ]}.
+
 Section ping_pong_runner.
   Context `{dG : anerisG Mdl Σ}.
 
-  Definition pong_addr := SocketAddressInet "0.0.0.0" 80.
-  Definition ping_addr := SocketAddressInet "0.0.0.1" 80.
-  Definition addrs : gset socket_address := {[ pong_addr; ping_addr ]}.
-  Definition ips : gset string :=
-    {[ ip_of_address pong_addr ; ip_of_address ping_addr ]}.
-
-  Lemma ping_pong_runner_spec (A : gset socket_address) :
-    (* the pong address is static *)
-    pong_addr ∈ A ->
-    (* the ping adress is not *)
-    ping_addr ∉ A ->
+  Lemma ping_pong_runner_spec :
     {{{  (* the pong server satisfies its socket interpretation *)
          pong_addr ⤇ pong_si
          ∗ pong_addr ⤳ (∅, ∅)
          ∗ ping_addr ⤳ (∅, ∅)
          (* A contain static addresses, and the ips we use are free *)
-         ∗ fixed A
+         ∗ unallocated {[ping_addr]}
          ∗ [∗ set] ip ∈ ips, free_ip ip }}}
       ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (server client Φ) "(#Hsi & Hponga & Hpinga & #Hfix & Hips) Hcont".
+    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hfix & Hips) Hcont".
     rewrite /ping_pong_runner.
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hpong & Hips)";
       first set_solver.
@@ -128,12 +119,12 @@ Section ping_pong_runner.
     { iIntros "!> Hp".
       iPoseProof (mapsto_messages_pers_alloc _ pong_si with "Hponga []") as "Ha".
       { done. }
-      by iApply (pong_spec with "Hsi Hfix Hp Ha"). }
+      by iApply (pong_spec with "Hsi Hp Ha"). }
     iModIntro. wp_pures.
     wp_apply (aneris_wp_start {[80%positive : port]}); eauto.
-    iFrame. iSplitR "Hpinga"; last first.
+    iFrame. iSplitR "Hpinga Hfix"; last first.
     { iIntros "!> Ha".
-      iApply (ping_spec with "[$Ha $Hpinga] []"); eauto. }
+      iApply (ping_spec with "[$Ha $Hfix $Hpinga] []"); eauto. }
     by iApply "Hcont".
   Qed.
 
@@ -152,26 +143,18 @@ Definition unit_model := model _ (λ _ _, False) ().
 Lemma unit_model_rel_finitary : aneris_model_rel_finitary unit_model.
 Proof. intros ?. apply finite_smaller_card_nat; apply _. Qed. 
 
-(* map of all static socket interpretations *)
-Definition socket_interp `{!anerisG empty_model Σ} sa : socket_interp Σ :=
-  (match sa with
-  | SocketAddressInet "0.0.0.0" 80 => pong_si (* pong *)
-  | _ => λ msg, ⌜True⌝
-   end)%I.
-
-(* The static/fixed domain contains only the adress of the pong server *)
-Definition fixed_dom : gset socket_address := {[ pong_addr ]}.
-
 Theorem ping_pong_safe :
   aneris_adequate ping_pong_runner "system" ping_pong_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (adequacy_hoare Σ _ ips fixed_dom addrs ∅ ∅ ∅);
-    [..|done|set_solver|set_solver|set_solver|done|done|done].
+  apply (adequacy_hoare Σ _ ips addrs ∅ ∅ ∅);
+    [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done|done|done].
   { apply unit_model_rel_finitary. }
-  iIntros (dinvG). iExists socket_interp.
-  iIntros (?) "!# (#Hf & #Hsi & Hhist & _ & Hips & _) HΦ".
-  rewrite /fixed_dom big_sepS_singleton.
+  iIntros (dinvG).
+  iIntros (?) "!# (Hf & Hhist & _ & Hips & _) HΦ".
+  iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+  iApply (aneris_wp_socket_interp_alloc_singleton pong_si with "Hf1").
+  iIntros "#Hsi".  
   rewrite /addrs (big_sepS_delete _ _ pong_addr); [|set_solver].
   rewrite (big_sepS_delete _ _ ping_addr); [|set_solver].
   iDestruct "Hhist" as "(Hpong & Hping & _)".

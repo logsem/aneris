@@ -12,15 +12,6 @@ Definition init_state := {|
     <["rm.02" := ∅ ]> $ <["rm.03" := ∅ ]> $ ∅;
   state_ms := ∅; |}.
 
-Definition socket_interp `{!tcG Σ} sa : socket_interp Σ :=
-  match sa with
-  | SocketAddressInet "tm" 80 => @tm_si my_topo _ _
-  | SocketAddressInet "rm.01" 80
-  | SocketAddressInet "rm.02" 80
-  | SocketAddressInet "rm.03" 80 => @rm_si my_topo _ _
-  | _ => λ msg, ⌜True⌝
-  end%I.
-
 Definition runner_expr := mkExpr "system" runner.
 
 Local Instance: ∀ x y z, ProofIrrel (TC_model x y z).
@@ -50,8 +41,9 @@ Theorem tpc_safe :
   safe runner_expr init_state.
 Proof.
   set (Σ := #[anerisΣ (TC_model rms); tcΣ]).
-  eapply (@adequacy_safe Σ (TC_model rms) _ _ ips addrs addrs ∅ ∅ ∅);
-    [| |done|set_solver|set_solver|set_solver|done|done|done].
+  eapply (@adequacy_safe Σ (TC_model rms) _ _ ips addrs ∅ ∅ ∅);
+    [| |set_solver|set_solver|set_solver|set_solver|set_solver|set_solver|
+      done|done|done].
   { apply tc_model_finitary. }
   iIntros (anG).
   iMod pending_alloc as (γ) "Hpend".
@@ -63,25 +55,30 @@ Proof.
   { iIntros "!#" (??) "[? ?]". iFrame. }
   rewrite big_sepS_sep. iDestruct "He" as "[Hwork1 Hwork2]".
   set (tcGI := MkTcG Σ _ _ γ).
-  iIntros "!#". iExists socket_interp.
-  iIntros "? Hsi Hhist Hfrag ? #? _ _ _ _ _".
+  iIntros "!#".
+  iIntros "Hunallocated Hhist Hfrag ? #Hnode _ _ _ _ _".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
-  rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
-  iDestruct "Hsi" as "[? Hrms_si]". iDestruct "Hhist" as "[? Hhist]".
+  iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.
   iApply fupd_wp.
   iMod (@tc_inv_alloc my_topo _ anG tcGI with "[$Hfrag $Hhist $Hwork2]")
     as "#Hinv".
   iModIntro.
-  (* TODO: lift the adeaucy theorems to aneris_wp *)
-  iPoseProof (runner_spec with "[-]") as "Hspec".
-  { iFrame "∗#". rewrite !big_sepS_union ?big_sepS_singleton //; set_solver. }
-  rewrite aneris_wp_unfold /aneris_wp_def /=.
+  rewrite /addrs /rms.
+  iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated1 Hunallocated]";
+    [set_solver|].
   iModIntro.
-  iApply wp_wand_l.
-  iSplitR; last first.
-  { iApply ("Hspec" with "[]"); auto. }
-  auto.
+  iApply (wp_wand _ _ _ _ (λ w, ∃ v, ⌜w = mkVal "system" v⌝ ∗ True)%I
+         with "[-]"); [|done].
+  iApply (aneris_wp_lift with "Hnode").
+  iApply (aneris_wp_socket_interp_alloc_singleton (@tm_si my_topo _ _)
+           with "Hunallocated1").
+  iIntros "#Htm".
+  iApply (aneris_wp_socket_interp_alloc (@rm_si my_topo _ _) with "Hunallocated").
+  iIntros "#Hrm".
+  iPoseProof (runner_spec with "[-]") as "Hspec".
+  { iFrame "∗#". }
+  iApply ("Hspec" with "[]"); auto.
 Qed.
 
 Notation state_message_coh := (@state_message_coh my_topo).
@@ -120,8 +117,8 @@ Theorem tpc_simulation :
 Proof.
   set (Σ := #[anerisΣ (TC_model rms); tcΣ]).
   assert (anerisPreG Σ (TC_model rms)) as HPreG by apply _.
-  eapply (simulation_adequacy Σ (TC_model rms) NotStuck ips ∅ addrs addrs ∅ ∅ (λ _, True));
-    [|done|set_solver..|].
+  eapply (simulation_adequacy Σ (TC_model rms) NotStuck ips ∅ addrs ∅ ∅ (λ _, True));
+    [set_solver|set_solver| |set_solver..|].
   { apply aneris_sim_rel_finitary, tc_model_finitary. }
   iIntros (anG).
   iMod pending_alloc as (γ) "Hpend".
@@ -135,11 +132,10 @@ Proof.
   set (tcGI := MkTcG Σ _ _ γ).
   iIntros "!#".
   iExists (* (λ _ atr, ⌜trace_steps (λ δ _ δ', δ = δ' ∨ TCNext rms δ δ') atr⌝%I) *)
-    (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I, socket_interp.
-  iIntros "? Hsi Hhist ? #? _ _ _ _ _ Hfrag".
+    (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
+  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
-  rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
-  iDestruct "Hsi" as "[? Hrms]". iDestruct "Hhist" as "[? Hhist]".
+  iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.
   iMod (@tc_inv_alloc my_topo _ anG tcGI with "[$Hfrag $Hhist $Hwork2]")
     as "#Hinv".
@@ -147,11 +143,15 @@ Proof.
   iSplit; [done|].
   iSplitL.
   { (* TODO: lift the adeaucy theorems to aneris_wp *)
+    iApply (aneris_wp_lift with "Hnode").
+    iDestruct (unallocated_split with "Hf") as "[Hftm Hfrm]"; [set_solver|].
+    iApply (aneris_wp_socket_interp_alloc_singleton (@tm_si my_topo _ _)
+             with "Hftm").
+    iIntros "#Htm".
+    iApply (aneris_wp_socket_interp_alloc (@rm_si my_topo _ _) with "Hfrm").
+    iIntros "#Hrm".    
     iPoseProof (runner_spec with "[-]") as "Hspec".
-    { iFrame "∗#". rewrite !big_sepS_union ?big_sepS_singleton //; set_solver. }
-    rewrite aneris_wp_unfold /aneris_wp_def /=.
-    iApply wp_wand_l.
-    iSplitR; auto.
+    { iFrame "∗#". }
     iApply ("Hspec" with "[]"); auto. }
   iIntros (ex atr c Hval Hexst Hauxst Hexend Hauxend Hstuck) "Hsi _".
   iInv tcN as (mdl) ">[Hfrag HrmI]" "_".

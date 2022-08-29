@@ -53,11 +53,9 @@ Section Client_Proxy_Proof.
 
   Definition init_client_proxy_follower_spec_internal
              {MTR : MTS_resources} : iProp Σ :=
-    ∀ A csa,
+    ∀ csa,
     ⌜fsa ≠ DB_addr⌝ →
-    ⌜fsa ∈ A⌝ →
-    ⌜csa ∉ A⌝ →
-    {{{ fixed A ∗
+    {{{ unallocated {[csa]} ∗
         fsa ⤇ follower_si ∗
         csa ⤳ (∅, ∅) ∗
         (@init_client_proxy_spec _ _ _ _ MTC _ follower_si) ∗
@@ -72,13 +70,13 @@ Section Client_Proxy_Proof.
     Global_Inv γL γM N ⊢ init_client_proxy_follower_spec_internal.
   Proof.
     iIntros "#Hinv".
-    iIntros (A csa).
-    iIntros (Hneq HA HnA).
+    iIntros (csa).
+    iIntros (Hneq).
     iIntros (Φ) "!#".
-    iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & #Hreq_spec & Hfp) HΦ".
+    iIntros "(Hf & #Hsi & Hmh & #HClient_proxySpec & #Hreq_spec & Hfp) HΦ".
     rewrite /init_client_follower_proxy.
     wp_pures.
-    wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
+    wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]").
     iNext.
     iIntros (reqh) "Hreq".
     wp_pures.

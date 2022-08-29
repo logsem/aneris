@@ -76,30 +76,28 @@ Section proof_of_the_client_code.
     {{{ up0.(RCParams_srv_saddr) ⤇ @reserved_server_socket_interp _ _ _ up0 SnRes0 ∗
         up1.(RCParams_srv_saddr) ⤇ @reserved_server_socket_interp _ _ _ up1 SnRes1 ∗
         ⌜ip_of_address clt_addr0 = ip_of_address clt_addr1⌝ ∗
-        ⌜clt_addr0 ∉ A⌝ ∗
         clt_addr0 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_addr0)
                    {[port_of_address clt_addr0]} ∗
-        ⌜clt_addr1 ∉ A⌝ ∗
+        unallocated {[clt_addr0]} ∗
         clt_addr1 ⤳ (∅, ∅) ∗
         free_ports (ip_of_address clt_addr1)
                    {[port_of_address clt_addr1]} ∗
-
-        fixed A }}}
+        unallocated {[clt_addr1]} }}}
        client #clt_addr0 #clt_addr1 #srv_sa0 #srv_sa1 @[ip_of_address clt_addr0]
     {{{ skt, RET skt; True }}}.
   Proof.
-    iIntros (Φ) "(#Hsi0 & #Hsi1 & %Heq & #Hca0 & Hmh0 & Hfp0 & #Hca1 & Hmh1 & Hfp1 & #Hf) HΦ".
+    iIntros (Φ) "(#Hsi0 & #Hsi1 & %Heq & Hmh0 & Hfp0 & Hf0 & Hmh1 & Hfp1 & Hf1) HΦ".
     rewrite /client.
     wp_lam.
     wp_pures.
     destruct HspecsN0 as [Hcl0 Hsrv0 Hcnt0 Hlst0 Hac0].
     destruct HspecsN1 as [Hcl1 Hsrv1 Hcnt1 Hlst1 Hac1].
-    wp_apply (Hcl0 with "[$Hmh0 $Hfp0 $Hca0 $Hsi0 $Hf][Hfp1 Hmh1 HΦ]").
+    wp_apply (Hcl0 with "[$Hmh0 $Hfp0 $Hsi0 $Hf0][Hfp1 Hmh1 Hf1 HΦ]").
     iNext. iIntros (skt0) "Hcl0".
     wp_pures.
     rewrite Heq.
-    wp_apply (Hcl1 clt_addr1 with "[$Hmh1 $Hfp1 $Hca1 $Hsi1 $Hf][HΦ Hcl0]").
+    wp_apply (Hcl1 clt_addr1 with "[$Hmh1 $Hfp1 $Hsi1 $Hf1][HΦ Hcl0]").
     iNext. iIntros (skt1) "Hcl1".
     wp_pures.
     rewrite -Heq.
@@ -151,17 +149,15 @@ Section proof_of_the_server_code.
           RCParams_srv_saddr ⤳ (∅, ∅) ∗
         free_ports (ip_of_address RCParams_srv_saddr)
                    {[port_of_address RCParams_srv_saddr]} ∗
-        ⌜srv_sa ∈ A⌝ ∗
-        fixed A ∗
         SrvInit }}}
        server #RCParams_srv_saddr @[ip_of_address RCParams_srv_saddr]
     {{{ skt, RET skt; True }}}.
   Proof.
-    iIntros (Φ) "(#Hsi & Hmh & Hfp & %HinA & Hf & Hit) HΦ".
+    iIntros (Φ) "(#Hsi & Hmh & Hfp & Hit) HΦ".
     rewrite /server.
     wp_lam.
     wp_apply (RCSpec_make_server_skt_spec
-               with "[$Hmh $Hfp $Hf $Hsi $Hit][HΦ]"); [done|].
+               with "[$Hmh $Hfp $Hsi $Hit][HΦ]").
     iNext. iIntros (skt) "Hcl".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").
@@ -223,7 +219,7 @@ Section proof_of_the_main.
     ⊢ |={⊤}=>
          srv_sa0 ⤇ @reserved_server_socket_interp _ _ _ UP0 SnRes0 -∗
          srv_sa1 ⤇ @reserved_server_socket_interp _ _ _ UP1 SnRes1 -∗
-         fixed A -∗
+         unallocated {[clt_sa80; clt_sa81]} -∗
          free_ip "0.0.0.0" -∗
          free_ip "0.0.0.1" -∗
          free_ip "0.0.0.2" -∗
@@ -240,35 +236,34 @@ Section proof_of_the_main.
     destruct HsAPIn1, HsAPIs1.
     iIntros "".
     iModIntro.
-    iIntros "#Hsrv0 #Hsrv1 #Hfixed Hfree0 Hfree1 Hfree2 Hsa0 Hsa1 Hsa2 Hsa3 HSrvInit0 HSrvInit1".
+    iIntros "#Hsrv0 #Hsrv1 Hf Hfree0 Hfree1 Hfree2 Hsa0 Hsa1 Hsa2 Hsa3 HSrvInit0 HSrvInit1".
     rewrite /main.
     (* Server 1. *)
     wp_apply aneris_wp_start; first done.
     iFrame "Hfree0".
     iSplitR "Hsa0 HSrvInit0"; last first.
     { iNext. iIntros "Hfps".
-      iApply (@wp_server _ _ _ _ _ A _ SnRes0 chn0 _ with "[-]"); last done. by iFrame "#∗". }
+      iApply (@wp_server _ _ _ _ _ _ SnRes0 chn0 _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     (* Server 2. *)
     wp_apply aneris_wp_start; first done.
     iFrame "Hfree1".
     iSplitR "Hsa1 HSrvInit1"; last first.
     { iNext. iIntros "Hfps".
-      iApply (@wp_server _ _ _ _ _ A _ SnRes1 chn1 _ with "[-]"); last done. by iFrame "#∗". }
+      iApply (@wp_server _ _ _ _ _ _ SnRes1 chn1 _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
     iFrame "Hfree2".
     iSplit; first done.
     iNext. iIntros "Hfps".
-    iApply (wp_client srv_sa0 srv_sa1 A _ _ chn0 SnRes0 _ _ chn1 SnRes1 _ _ clt_sa80 clt_sa81
-             with "[Hsa2 Hsa3 Hfps]"); last done.
+    iDestruct (unallocated_split with "Hf") as "[Hf0 Hf1]"; [set_solver|].
+    iApply (wp_client srv_sa0 srv_sa1 _ _ chn0 SnRes0 _ _ chn1 SnRes1 _ _ clt_sa80 clt_sa81
+             with "[Hsa2 Hsa3 Hfps Hf0 Hf1]"); last done.
     iSplit; first done. iFrame "#∗".
     iSplit; first done.
-    iSplit; first done.
-    simpl.
     iPoseProof (free_ports_split "0.0.0.2" {[80%positive]} {[81%positive]})  as "(Hlm1 & _)"; first by set_solver.
     iDestruct ("Hlm1" with "[$Hfps]") as "(Hf1 & Hf2)".
-    iFrame; eauto.
+    iFrame; eauto.    
   Qed.
 
 End proof_of_the_main.
@@ -292,8 +287,6 @@ From aneris.examples.reliable_communication.resources
 From aneris.examples.reliable_communication.spec
      Require Import ras resources.
 
-Definition fixed_dom : gset socket_address := {[ srv_sa0; srv_sa1 ]}.
-
 Definition dummy_model := model unit (fun x y => True) ().
 
 Lemma dummy_model_finitary : adequacy.aneris_model_rel_finitary dummy_model.
@@ -313,34 +306,14 @@ Proof.
 Qed.
 
 From aneris.aneris_lang.program_logic Require Import aneris_adequacy.
-Definition socket_interp
-           `{ag: !anerisG empty_model Σ}
-           `{!SpecChanG Σ}
-           `{server_ghost_names}
-           (HinA0 : srv_sa0 ∈ fixed_dom)
-           (HinA1 : srv_sa1 ∈ fixed_dom)
-           (N1 N2 : namespace)
-           (SnRes0 : SessionResources UP0)
-           (SnRes1 : SessionResources UP1)
-           sa : socket_interp Σ :=
-  (match sa with
-   | SocketAddressInet "0.0.0.0" 80 =>  @reserved_server_socket_interp _ _ ag UP0 SnRes0
-   | SocketAddressInet "0.0.0.1" 80 =>  @reserved_server_socket_interp _ _ ag UP1 SnRes1
-
-   | _ => λ msg, ⌜True⌝
-   end)%I.
 
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ dummy_model; SpecChanΣ]).
-  eapply (@adequacy Σ dummy_model _ _ ips fixed_dom {[srv_sa0; srv_sa1; clt_sa80; clt_sa81]} ∅ ∅ ∅);
-    try done; last first.
-  { set_solver. }
-  { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
-    intros [|]; subst; simpl; set_solver. }
-  { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
-  iIntros (Hdg) "".
+  eapply (@adequacy Σ dummy_model _ _ ips {[clt_sa80; clt_sa81; srv_sa0; srv_sa1]} ∅ ∅ ∅);
+    try set_solver; last first.
   2:{ apply dummy_model_finitary . }
+  iIntros (Hdg) "".
   iMod (Reliable_communication_init_instance ⊤ UP0)
     as (chn0 sgn0 SnRes0) "(HsrvInit0 & Hspecs0)"; [ solve_ndisj|].
   iDestruct "Hspecs0"
@@ -359,7 +332,6 @@ Proof.
          & %Hlisten1 & %Haccept1
          & %Hsend1 & %HsendTele1
          & %HtryRecv1 & %Hrecv1)".
-  iExists (socket_interp inA0 inA1 (nroot .@ "hw0") (nroot .@ "hw1") SnRes0 SnRes1).
   iMod (@main_spec _ _ _ _ chn0 chn1) as "Hmain".
   split; try done.
   split; try done.
@@ -368,12 +340,16 @@ Proof.
   instantiate (1 := SnRes1).
   split; try done.
   iModIntro.
-  iIntros "Hf Hsis Hb Hfg Hips _ _ _ _ _".
+  iIntros "Hf Hb Hfg Hips _ _ _ _ _".
   simpl in *.
-  iDestruct (big_sepS_delete _ _ srv_sa0 with "Hsis") as "[Hsi0 Hsis]";
-    first set_solver.
-  iDestruct (big_sepS_delete _ _ srv_sa1 with "Hsis") as "[Hsi1 _]";
-    first set_solver.
+  iDestruct (unallocated_split with "Hf") as "[Hf Hf1]"; [set_solver|].
+  iDestruct (unallocated_split with "Hf") as "[Hf Hf0]"; [set_solver|].
+  iApply (aneris_wp_socket_interp_alloc_singleton
+            (@reserved_server_socket_interp _ _ _ UP0 SnRes0) with "Hf0").
+  iIntros "Hsi0".
+  iApply (aneris_wp_socket_interp_alloc_singleton
+            (@reserved_server_socket_interp _ _ _ UP1 SnRes1) with "Hf1").
+  iIntros "Hsi1".
   iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "[Hip0 Hips]";
     first set_solver.
   iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "[Hip1 Hips]";

@@ -416,24 +416,22 @@ Section paxos_proposer.
       by iApply (big_sepS_elem_of _ _ a with "H2a").
   Qed.
 
-  Lemma proposer'_spec av i (p : Proposer) (z : Value) A :
+  Lemma proposer'_spec av i (p : Proposer) (z : Value) :
     i < size Proposers →             
-    `p ∈ A →
     is_set Acceptors av →
     inv paxosN paxos_inv -∗
     ([∗ set] a ∈ Acceptors, a ⤇ acceptor_si) -∗
-    fixed A -∗
     free_ports (ip_of_address (`p)) {[port_of_address (`p)]} -∗
     (`p) ⤇ proposer_si -∗
     pending_class i 0 -∗
     WP proposer' int_serializer av #(`p) #i #(size Proposers) #`z
        @[ip_of_address (`p)] {{ _, True }}.
   Proof.
-    iIntros (???) "#Hinv #Has #Hfixed Hport #Hp Hi". rewrite /proposer'.
+    iIntros (??) "#Hinv #Has Hport #Hp Hi". rewrite /proposer'.
     wp_pures.
     wp_socket sh as "Hskt".
     wp_pures.
-    wp_socketbind_static.
+    wp_socketbind.
     wp_alloc l as "Hl".
     do 4 wp_pure _.
     (* loop invariant *)

@@ -29,25 +29,20 @@ Section API_spec.
   Notation srv_ip := (ip_of_address srv_saddr).
 
   Definition make_client_skt_spec : Prop :=
-    ∀ (clt_addr : socket_address) (A : gset socket_address),
-    {{{ ⌜clt_addr ∉ A⌝ ∗
-        clt_addr ⤳ (∅, ∅)  ∗
+    ∀ (clt_addr : socket_address),
+    {{{ clt_addr ⤳ (∅, ∅)  ∗
         free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
         RCParams_srv_saddr ⤇ srv_si ∗
-        fixed A }}}
+        unallocated {[clt_addr]} }}}
        make_client_skt (s_serializer clt_ser) (s_serializer srv_ser) #clt_addr
        @[ip_of_address clt_addr]
     {{{ skt, RET skt; CltCanConnect skt clt_addr }}}.
 
   Definition make_server_skt_spec : Prop :=
-    ∀ A,
     {{{ srv_saddr ⤇ srv_si ∗
-        ⌜RCParams_srv_saddr ∈ A⌝ ∗
-        fixed A ∗
         RCParams_srv_saddr ⤳ (∅, ∅) ∗
         free_ports (srv_ip) {[port_of_address srv_saddr]} ∗
-        SrvInit
-    }}}
+        SrvInit }}}
        make_server_skt (s_serializer srv_ser) (s_serializer clt_ser) #RCParams_srv_saddr
        @[srv_ip]
     {{{ skt, RET skt; SrvCanListen skt }}}.

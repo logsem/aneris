@@ -606,26 +606,22 @@ Section primitive_laws.
     iSplit; [ iPureIntro; apply user_model_evolution_id |].
     iApply "HΦ"; done.
   Qed.
-
-  Lemma wp_socketbind_static_groups (A : gset socket_address_group)
-        E ζ sh skt k sa sag :
-    sa ∈ sag →
+    
+  Lemma wp_socketbind_groups
+        E ζ sh skt k sa :
     saddress skt = None →
-    sag ∈ A →
-    {{{ ▷ fixed_groups A ∗
-        ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+    {{{ ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
         ▷ sh ↪[ip_of_address sa] skt }}}
       (mkExpr (ip_of_address sa)
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress sa))) @ k; ζ; E
    {{{ RET (mkVal (ip_of_address sa) #0);
-       sh ↪[ip_of_address sa] (skt<| saddress := Some sa |>) ∗
-       ∃ φ, sag ⤇* φ }}}.
+       sh ↪[ip_of_address sa] (skt<| saddress := Some sa |>) }}}.
   Proof.
-    intros Hin.
-    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
+    iIntros (? Φ) "(>Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
+            "(Hevs & Hσ & Hm & % & Hauth) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
@@ -640,8 +636,8 @@ Section primitive_laws.
     eapply aneris_events_state_interp_no_triggered in Htrig;
       [|done|done|done|done|done].
     inv_head_step.
-    iMod (aneris_state_interp_socketbind_static _ _ sag with "Hσ Hfixed Hsh Hp")
-      as "(Hσ & Hsh & Hφ)"; [set_solver..|].
+    iMod (aneris_state_interp_socketbind with "Hσ Hsh Hp")
+      as "(Hσ & Hsh)"; [set_solver..|].
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     iModIntro.
     iExists (trace_last atr), ().
@@ -652,22 +648,20 @@ Section primitive_laws.
     iApply ("HΦ" with "[$]").
   Qed.
 
-  Lemma wp_socketbind_static A E ζ sh skt k a :
+  Lemma wp_socketbind A E ζ sh skt k a :
     saddress skt = None →
-    a ∈ A →
-    {{{ ▷ fixed A ∗
-        ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+    {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
         ▷ sh ↪[ip_of_address a] skt }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress a))) @ k; ζ; E
    {{{ RET (mkVal (ip_of_address a) #0);
-       sh ↪[ip_of_address a] (skt<| saddress := Some a |>) ∗
-       ∃ φ, a ⤇1 φ }}}.
+       sh ↪[ip_of_address a] (skt<| saddress := Some a |>) }}}.
   Proof.
-    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
+    iIntros (? Φ) "(>Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
+            "(Hevs & Hσ & Hm & % & Hauth) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
@@ -682,8 +676,8 @@ Section primitive_laws.
     eapply aneris_events_state_interp_no_triggered in Htrig;
       [|done|done|done|done|done].
     inv_head_step.
-    iMod (aneris_state_interp_socketbind_static _ _ {[a]} with "Hσ Hfixed Hsh Hp")
-      as "(Hσ & Hsh & Hφ)"; [set_solver..|].
+    iMod (aneris_state_interp_socketbind with "Hσ Hsh Hp")
+      as "(Hσ & Hsh)"; [set_solver..|].
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     iModIntro.
     iExists (trace_last atr), ().
@@ -692,49 +686,6 @@ Section primitive_laws.
     rewrite Htrig; iFrame.
     iSplit; [ iPureIntro; apply user_model_evolution_id |].
     iApply ("HΦ"). iFrame.
-  Qed.
-
-  Lemma wp_socketbind_dynamic skt A E ζ sh k a φ :
-    saddress skt = None →
-    a ∉ A →
-    {{{ ▷ fixed A ∗
-        ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ sh ↪[ip_of_address a] skt
-    }}}
-      (mkExpr (ip_of_address a)
-              (SocketBind (Val $ LitV $ LitSocket sh)
-                          (Val $ LitV $ LitSocketAddress a))) @ k; ζ; E
-    {{{ RET (mkVal (ip_of_address a) #0);
-        sh ↪[ip_of_address a] (skt <| saddress := Some a |>) ∗
-        a ⤇ φ }}}.
-  Proof.
-    iIntros (?? Φ) "(#Hfixed & >Hp & >Hsh) HΦ".
-    iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
-    rewrite (last_eq_trace_ends_in _ _ Hex).
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
-      as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
-      as (?) "[% %]".
-    iSplit.
-    { iPureIntro; do 3 eexists. eapply SocketStepS; eauto.
-      by econstructor; naive_solver. }
-    iIntros (v2' ? ? Hstep) "!>".
-    pose proof Hex as Htrig.
-    eapply aneris_events_state_interp_no_triggered in Htrig;
-      [|done|done|done|done|done].
-    inv_head_step.
-    iMod (aneris_state_interp_socketbind_dynamic _ a with "Hσ Hfixed Hsh Hp")
-      as "(Hσ & Hsh & Hφ)"; [try done..|].
-    { by apply not_elem_of_to_singletons_union_set. }
-    iMod (steps_auth_update_S with "Hauth") as "Hauth".
-    iModIntro.
-    iExists (trace_last atr), ().
-    rewrite -message_history_evolution_socketbind; [|done|done].
-    iSplitR; [done|].
-    rewrite Htrig; iFrame.
-    iSplit; [ iPureIntro; apply user_model_evolution_id |].
-    iApply ("HΦ" with "[$]").
   Qed.
 
   Lemma wp_send_gen_groups φ mbody (is_dup : bool) sh skt saT sagT saR sagR strck rtrck evs k E ζ R T

@@ -75,12 +75,12 @@ Section Resources.
   Definition oloc_to_one_shot (ol : option loc) : csum (excl unit) (agree loc) :=
     from_option (λ l, Cinr (to_agree l)) (Cinl (Excl ())) ol.
 
-  Definition locations (l : list (option loc)) :=
+  Definition GClocations (l : list (option loc)) :=
     own (A:= crdt_locsUR) GCG_locs_name (● (list_to_gmap oloc_to_one_shot l)).
 
-  Definition unallocated (i : nat) := own GCG_locs_name (◯ {[ i := Cinl (Excl ())]}).
+  Definition GCunallocated (i : nat) := own GCG_locs_name (◯ {[ i := Cinl (Excl ())]}).
 
-  Definition allocated (i : nat) (l : loc) := own GCG_locs_name (◯ {[ i := Cinr (to_agree l)]}).
+  Definition GCallocated (i : nat) (l : loc) := own GCG_locs_name (◯ {[ i := Cinr (to_agree l)]}).
 
   Definition loc_coherence (i : nat) (ol : option loc) (vc : vector_clock) : iProp Σ :=
     match ol with
@@ -155,14 +155,14 @@ Section Resources.
   Definition recev_coh (i : nat) (revs : list vector_clock) : iProp Σ :=
     ∃ sa evs, ⌜gcd_addr_list gcdata !! i = Some sa⌝ ∧
       (∀ rev j, ⌜S j < length revs⌝ → ⌜revs !! j = Some rev⌝ → GCounterSnapShot i rev) ∗
-      (⌜evs ≠ []⌝ → ∃ l, allocated i l) ∗
+      (⌜evs ≠ []⌝ → ∃ l, GCallocated i l) ∗
       receiveon_evs sa evs ∗ ⌜Forall2 (rec_events_correspond sa) evs revs⌝.
 
   Definition recevs_coherence (revss : list (list vector_clock)) : iProp Σ :=
     [∗ list] i ↦ sa; revs ∈ gcd_addr_list gcdata; revss,
        (∀ rev j, ⌜S j < length revs⌝ → ⌜revs !! j = Some rev⌝ → GCounterSnapShot i rev) ∗
        ∃ evs,
-         (⌜evs ≠ []⌝ → ∃ l, allocated i l) ∗
+         (⌜evs ≠ []⌝ → ∃ l, GCallocated i l) ∗
          receiveon_evs sa evs ∗ ⌜Forall2 (rec_events_correspond sa) evs revs⌝.
 
   (* Properties *)
@@ -221,7 +221,7 @@ Section Resources.
   Proof. rewrite -{2}(vlookup_insert_self i st); apply GCounters_update; done. Qed.
 
   Lemma locations_is_unallocated i locs :
-    locations locs -∗ unallocated i -∗ ⌜locs !! i = Some None⌝.
+    GClocations locs -∗ GCunallocated i -∗ ⌜locs !! i = Some None⌝.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2")
@@ -233,7 +233,7 @@ Section Resources.
   Qed.
 
   Lemma locations_is_allocated i locs l :
-    locations locs -∗ allocated i l -∗ ⌜locs !! i = Some (Some l)⌝.
+    GClocations locs -∗ GCallocated i l -∗ ⌜locs !! i = Some (Some l)⌝.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2")
@@ -248,7 +248,7 @@ Section Resources.
   Qed.
 
   Lemma locations_alloc i locs l :
-    locations locs -∗ unallocated i ==∗ locations (<[i := Some l]> locs) ∗ allocated i l.
+    GClocations locs -∗ GCunallocated i ==∗ GClocations (<[i := Some l]> locs) ∗ GCallocated i l.
   Proof.
     iIntros "Hlocs Hua".
     iDestruct (locations_is_unallocated with "Hlocs Hua") as %Hlu.
@@ -589,7 +589,7 @@ Section Global_invariant.
   Definition Global_Inv :=
     inv CvRDT_InvName
         (∃ st locs sevss revss,
-            frag_st st ∗ GCounters st ∗ locations locs ∗ sendevs_auth sevss ∗ recevs_auth revss ∗
+            frag_st st ∗ GCounters st ∗ GClocations locs ∗ sendevs_auth sevss ∗ recevs_auth revss ∗
             locations_coherence locs st ∗
             sendevs_coherence locs sevss ∗ recevs_coherence revss ∗
             ([∗ list] a ∈ gcd_addr_list gcdata,

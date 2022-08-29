@@ -56,13 +56,11 @@ Section Specification.
               ∃ (h: gmem) (s1: lhst) (e: ae), ⌜s ⊆ s1⌝ ∗ Q e h s1 }}})%I.
 
   Definition init_spec (init : val) : iProp Σ :=
-    □ ∀ (A : gset socket_address) (i : nat) (z : socket_address)
+    □ ∀ (i : nat) (z : socket_address)
         (v : val),
         ⌜is_list DB_addresses v⌝ →
         ⌜DB_addresses !! i = Some z⌝ →
-        ⌜z ∈ A⌝ →
-        {{{ fixed A ∗
-             ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
+        {{{  ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
              z ⤳ (∅, ∅) ∗
              free_ports (ip_of_address z) {[port_of_address z]} ∗
             init_token i}}}

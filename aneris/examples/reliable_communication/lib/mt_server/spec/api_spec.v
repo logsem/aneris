@@ -15,11 +15,9 @@ Section Spec.
   Notation srv_ip := (ip_of_address MTS_saddr).
 
   Definition run_server_spec : iProp Σ :=
-    □ ∀ A handler,
+    □ ∀ handler,
     handler_spec handler -∗
     {{{ MTS_saddr ⤇ srv_si ∗
-        ⌜MTS_saddr ∈ A⌝ ∗
-        fixed A ∗
         MTS_saddr ⤳ (∅,∅) ∗
         free_ports (srv_ip) {[port_of_address MTS_saddr]} ∗
         SrvInit }}}
@@ -41,9 +39,8 @@ Section Spec.
         MTSCanRequest ip rpc ∗ MTS_handler_post repv reqd repd  }}}.
 
   Definition init_client_proxy_spec : iProp Σ :=
-    ∀ A sa,
-    {{{ ⌜sa ∉ A⌝ ∗
-        fixed A ∗
+    ∀ sa,
+    {{{ unallocated {[sa]} ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
         MTS_saddr ⤇ srv_si }}}
       init_client_proxy

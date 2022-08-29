@@ -71,12 +71,12 @@ Section table_of_lwwregs_proof.
       (table_of_lwwregs_init
          (s_ser (s_serializer vl_serialization)) (s_deser (s_serializer vl_serialization))).
   Proof.
-    iIntros "#Hinit" (repId addr fixedAddrs addrs_val).
-    iIntros (Φ) "!# (%Haddrs & %Hrepid & %Haddr & Hfx & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    iIntros "#Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
     rewrite /table_of_lwwregs_init /table_of_lwwregs_crdt.
     wp_pures.
-    wp_apply ("Hinit" with "[$Hfx $Hprotos $Htoken $Hskt $Hfr]").
-    { do 3 (iSplit; first done). iApply table_of_lwwregs_crdt_fun_spec; done. }
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply table_of_lwwregs_crdt_fun_spec; done. }
     iIntros (get update) "(HLS & #Hget & #Hupdate)".
     wp_pures.
     iApply "HΦ"; eauto.

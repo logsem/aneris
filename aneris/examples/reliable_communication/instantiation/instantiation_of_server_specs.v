@@ -38,7 +38,7 @@ Section Server_API_spec_instantiation.
   Proof.
     rewrite /make_server_skt_spec.
     rewrite /SrvInit /session_resources_instance /SrvInitRes /SrvCanListen.
-    iIntros (A Φ) "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8) HΦ".
+    iIntros (Φ) "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8) HΦ".
     iApply (make_server_skt_internal_spec with "[$][$HΦ]").
   Qed.
 

@@ -133,12 +133,10 @@ Section spec.
     iIntros (x Hx) "Hx"; eauto.
   Qed.
 
-  Theorem server_spec (A : gset socket_address) (db_id : rep_id)
+  Theorem server_spec (db_id : rep_id)
           (dbs : val) (db_addr req_addr : socket_address) :
     DB_addresses !! db_id = Some db_addr ->
     is_list DB_addresses dbs ->
-    db_addr ∈ A ->
-    req_addr ∈ A ->
     (ip db_addr) = (ip req_addr) ->
     (port_of_address db_addr) ≠ (port_of_address req_addr) ->
     {{{ req_addr ⤇ db_si db_id
@@ -146,22 +144,22 @@ Section spec.
         ∗ free_ports (ip req_addr) {[port_of_address req_addr]}
         ∗ GlobalInv
         ∗ init_spec init
-        ∗ init_resources db_addr A db_id
+        ∗ init_resources db_addr db_id
         ∗ ([∗ set] k ∈ DB_keys, OwnMemSnapshot k ∅)
         ∗ inv SERVER_NM mem_inv
     }}}
       server dbs #db_id #req_addr @[ip req_addr]
     {{{ RET #(); False }}}.
   Proof.
-    iIntros (Hith_addr Hcoh Hdb_in Hreq_in Hips_eq Hports_ne ϕ)
+    iIntros (Hith_addr Hcoh Hips_eq Hports_ne ϕ)
             "(#Hreq_si & Hrs & Hreq_free & #Hinv & #Hinit_spec & Hinit_res
                & #Hsnap0 & #Hmem_inv) Hcont".
-    iDestruct "Hinit_res" as "(#Hfixed & #Hproto & Hdb_free & Htoken)".
+    iDestruct "Hinit_res" as "(#Hproto & Hdb_free & Htoken)".
     wp_pures.
     wp_bind (init _ _)%E. rewrite -/ip_of_address.
     rewrite -Hips_eq.
-    wp_apply ("Hinit_spec" $! _ db_id db_addr
-                with "[] [] [] [$Htoken $Hdb_free] [Hreq_free Hrs]"); auto.
+    wp_apply ("Hinit_spec" $! db_id db_addr
+                with "[] [] [$Htoken $Hdb_free] [Hreq_free Hrs]"); auto.
     iNext.
     iIntros (rd wr) "(#Hseen & #Hread_spec & #Hwrite_spec)".
     wp_pures.
@@ -172,13 +170,7 @@ Section spec.
                      stype := SOCK_DGRAM;
                      sprotocol := IPPROTO_UDP;
                      saddress := None |}.
-    wp_apply (aneris_wp_socketbind_static _ A _ _ socket req_addr
-                with "[$Hsh $Hreq_free] [Hrs]");
-      [by simpl|done|done|iFrame "#"|].
-    rewrite /set /=.
-    iNext.
-    iIntros "[Hsh _]". simpl.
-    do 2 (wp_pure _).
+    wp_socketbind.
     set socket' :=
       RecordSet.set saddress (λ _ : option socket_address, Some req_addr) socket.
     (* Establish the loop invariant *)

@@ -62,14 +62,9 @@ Section echo.
                 m_protocol := IPPROTO_UDP;
                 m_body := "" |}.
 
-  Lemma server_spec1 saR sagR ip port A Φ :
+  Lemma server_spec1 saR ip port Φ :
     ip = ip_of_address saR →
     port = port_of_address saR →
-    (* [sagR] is a static group *)
-    sagR ∈ A →
-    saR ∈g sagR -∗
-    (* A should contain static addresses & the port should be free *)
-    fixed_groups A -∗
     free_ports ip {[port]} -∗
     (* post condition includes the newly allocated socket handler *)
     (∀ sh,
@@ -78,15 +73,14 @@ Section echo.
                                  (udp_socket None true) -∗ Φ #(LitSocket sh)) -∗
     WP (server1 #saR) @[ip] {{ v, Φ v }}.
   Proof.
-    iIntros (-> -> HinA) "[%Hin _] #Hfixed Hports HΦ".
+    iIntros (-> ->) "Hports HΦ".
     wp_lam.
     wp_socket h as "Hh".
-    wp_let.
-    wp_apply (aneris_wp_socketbind_static_groups with "[$Hports $Hh $Hfixed]");
-      [set_solver..|].
-    iIntros "[Hh _]".
+    wp_let.  
+    wp_apply (aneris_wp_socketbind_groups with "[$Hports $Hh]"); [set_solver..|].
+    iIntros "Hh".
     wp_pures.
-    iApply "HΦ". done.
+    by iApply "HΦ".
   Qed.
 
   (* TODO: Make spec with texan triple instead? *)
@@ -335,22 +329,20 @@ Section echo.
     done.
   Qed.
 
-  Lemma server_spec saT saR sagR ip port A N γe γi :
+  Lemma server_spec saT saR sagR ip port N γe γi :
     ip = ip_of_address saR →
     port = port_of_address saR →
-    sagR ∈ A →
     saR ∈g sagR -∗
     sagR ⤇* server_si γe saT -∗
-    fixed_groups A -∗
     free_ports ip {[port]} -∗
     saT ⤇1 client_si γe -∗
     inv N (echo_inv γe γi saT sagR) -∗
     WP (server #saR) @[ip] {{ v, True }}.
   Proof.
-    iIntros (-> -> HinA) "#Hin #Hsag #Hfixed Hports #HsaT #Hinv".
+    iIntros (-> ->) "#Hin #Hsag Hports #HsaT #Hinv".
     wp_lam.
     wp_bind (server1 #saR).
-    wp_apply (server_spec1 with "Hin Hfixed Hports"); [set_solver..|].
+    wp_apply (server_spec1 with "Hports"); [set_solver..|].
     iIntros (sh) "Hsh".
     wp_pures.
     wp_bind (server2 _).
@@ -361,13 +353,11 @@ Section echo.
   Qed.
 
   Lemma client_spec (saT saR1 saR2 : socket_address)
-        (sagR : socket_address_group) ip port A γe Φ :
+        (sagR : socket_address_group) ip port γe Φ :
     ip = ip_of_address saT →
     port = port_of_address saT →
-    {[saT]} ∈ A →
     saR1 ∈g sagR -∗
     saR2 ∈g sagR -∗
-    fixed_groups A -∗
     saT ⤇1 client_si γe -∗
     sagR ⤇* server_si γe saT -∗
     Do γe -∗
@@ -376,7 +366,7 @@ Section echo.
     (Done γe -∗ Φ) -∗
     WP (client #saT #saR1 #saR2) @[ip] {{ v, Φ }}.
   Proof.
-    iIntros (-> -> HA) "#HsaRin1 #HsaRin2 #Hfixed #HsaT #HsagR HDo Hports Hrt HΦ".
+    iIntros (-> ->) "#HsaRin1 #HsaRin2 #HsaT #HsagR HDo Hports Hrt HΦ".
     iAssert (saT ∈g {[saT]}) as "HsaT'".
     { iSplit; [iPureIntro;set_solver | ].
       iDestruct "HsaT" as (γ) "[$ _]". }
@@ -386,9 +376,8 @@ Section echo.
     wp_pures.
     wp_socket h as "Hsh".
     wp_pures.
-    wp_apply (aneris_wp_socketbind_static_groups _ _ _ _ _ _ {[saT]}
-                with "[$Hports $Hsh $Hfixed]"); [set_solver..|].
-    iIntros "[Hsh _]".
+    wp_apply (aneris_wp_socketbind_groups with "[$Hports $Hsh]"); [set_solver..|].
+    iIntros "Hsh".
     wp_pures.
     wp_apply (aneris_wp_send_groups _ _ _ _ saT {[saT]} saR1 sagR
                 with "[$Hsh $Hrt $HsagR $HsaRin1 $HsaT' HDo]"); [try set_solver..|].
@@ -425,11 +414,7 @@ Section echo.
     {[ ip_of_address client_addr ;
      ip_of_address server_addr1 ; ip_of_address server_addr2 ]}.
 
-  Lemma echo_runner_spec γ (A : gset socket_address_group) :
-    (* the pong address is static *)
-    {[client_addr]} ∈ A ->
-    {[server_addr1;server_addr2]} ∈ A ->
-    (* the ping adress is not *)
+  Lemma echo_runner_spec γ :
     {{{  (* the pong server satisfies its socket interpretation *)
          Do γ ∗
          Done γ ∗
@@ -438,12 +423,11 @@ Section echo.
          client_addr ⤳1 (∅, ∅) ∗
          server_addrs ⤳* (∅, ∅) ∗
          (* A contain static addresses, and the ips we use are free *)
-         fixed_groups A ∗
          [∗ set] ip ∈ ips, free_ip ip }}}
       echo_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (server client Φ) "(HDo & HDone & #Hcsi & #Hssi & Hclienta & Hservera & #Hfix & Hips) Hcont".
+    iIntros (Φ) "(HDo & HDone & #Hcsi & #Hssi & Hclienta & Hservera & Hips) Hcont".
     rewrite /echo_runner.
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hclient & Hips)";
       first set_solver.
@@ -463,7 +447,7 @@ Section echo.
     iFrame. iSplitR "Hclienta HDo"; last first.
     { iIntros "!> Hp".
       iApply (client_spec with "Hserver_valid1 Hserver_valid2
-      Hfix Hcsi Hssi HDo Hp Hclienta");
+      Hcsi Hssi HDo Hp Hclienta");
         [set_solver..|].
       by iIntros "_". }
     iModIntro.
@@ -477,14 +461,14 @@ Section echo.
     wp_apply (aneris_wp_start {[80%positive : port]}); eauto.
     iFrame. iSplitL; last first.
     { iIntros "!> Ha".
-       by iApply (server_spec with "Hserver_valid1 Hssi Hfix Ha Hcsi Hinv"); set_solver. }
+       by iApply (server_spec with "Hserver_valid1 Hssi Ha Hcsi Hinv"); set_solver. }
     iIntros "!>".
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive : port]}); eauto.
     iFrame. iSplitL; last first.
     {
       iIntros "!> Ha".
-       by iApply (server_spec with "Hserver_valid2 Hssi Hfix Ha Hcsi Hinv"); set_solver. }
+       by iApply (server_spec with "Hserver_valid2 Hssi Ha Hcsi Hinv"); set_solver. }
     by iApply "Hcont".
   Qed.
 
@@ -503,21 +487,12 @@ Definition unit_model := model _ (λ _ _, False) ().
 Lemma unit_model_rel_finitary : aneris_model_rel_finitary unit_model.
 Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 
-(* map of all static socket interpretations *)
-Definition socket_interp `{!anerisG empty_model Σ} γ sag : socket_interp Σ :=
-  (if bool_decide (sag = {[client_addr]})
-   then client_si γ
-   else if bool_decide (sag = server_addrs)
-        then server_si γ client_addr
-        else λ msg, ⌜True⌝)%I.
-
-(* The static/fixed domain contains only the adress of the pong server *)
-Definition fixed_dom : gset socket_address_group :=
+Definition sa_dom : gset socket_address_group :=
   {[ {[client_addr]} ; server_addrs ]}.
 
-Lemma all_disjoint_fixed_dom : all_disjoint fixed_dom.
+Lemma all_disjoint_sa_dom : all_disjoint sa_dom.
 Proof.
-  rewrite /fixed_dom.
+  rewrite /sa_dom.
   rewrite -all_disjoint_union.
   split; [apply all_disjoint_singleton|].
   split; [apply all_disjoint_singleton|].
@@ -532,24 +507,25 @@ Theorem echo_safe :
   aneris_adequate echo_runner "system" echo_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (adequacy_groups Σ _ ips fixed_dom fixed_dom fixed_dom ∅ ∅ ∅);
+  apply (adequacy_groups Σ _ ips sa_dom ∅ ∅ ∅);
     try set_solver.
-  { apply all_disjoint_fixed_dom. }
+  { apply all_disjoint_sa_dom. }
   { apply set_Forall_union; apply set_Forall_singleton; set_solver. }
-  { rewrite difference_diag_L. apply set_Forall_empty. }
   { apply unit_model_rel_finitary. }
   { iIntros (dinvG).
+    iIntros "!> Hf Hhist Hfrag Hips Hlbl _ _ _ _".
     iMod Do_Done_alloc as (γ) "[HDo HDone]".
-    iExists (socket_interp γ).
-    iIntros "!> #Hf #Hsi Hhist Hfrag Hips Hlbl _ _ _ _".
-    rewrite /fixed_dom.
-    rewrite big_sepS_union; [|set_solver].
     rewrite big_sepS_union; [|set_solver].
     rewrite !big_sepS_singleton.
-    iDestruct "Hsi" as "[Hsic Hsis]".
+    iDestruct (unallocated_groups_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+    iApply (aneris_wp_socket_interp_alloc_group_singleton (client_si γ) with "Hf1").
+    iIntros "Hclt".
+    iApply (aneris_wp_socket_interp_alloc_group_singleton (server_si γ client_addr)
+             with "Hf2").
+    iIntros "Hsrv".
     iDestruct "Hhist" as "[Hhistc Hhists]".
     wp_apply (echo_runner_spec with "[$]"); [try set_solver..|eauto]. }
-  rewrite /ips /fixed_dom.
+  rewrite /ips /sa_dom.
   intros sag sa Hsag Hsa.
   apply elem_of_union in Hsag.
   destruct Hsag as [Hsag|Hsag]; apply elem_of_singleton in Hsag; set_solver.

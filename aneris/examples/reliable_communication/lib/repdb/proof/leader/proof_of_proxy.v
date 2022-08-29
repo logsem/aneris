@@ -62,9 +62,8 @@ Section Client_Proxy_Proof.
         {{{ RET #();
            ∃ (h hf : wrlog) (a: write_event), Q a h hf }}})%I.
 
-  Lemma write_spec_internal_holds {MTR:MTS_resources} A ip γ lk (reqh : val) :
+  Lemma write_spec_internal_holds {MTR:MTS_resources} ip γ lk (reqh : val) :
     Global_Inv γL γM N -∗
-    fixed A -∗
     DB_addr ⤇ srv_si -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     is_lock (DB_InvName.@"leader") ip γ lk
@@ -79,7 +78,7 @@ Section Client_Proxy_Proof.
        | InjR "_abs" => assert: #false
        end).
   Proof.
-    iIntros "#Hinv #HA #Hsi #Hspec #Hlk".
+    iIntros "#Hinv #Hsi #Hspec #Hlk".
     rewrite /write_spec_internal.
     iIntros (E k v P Q HE Hkeys) "!# #Hviewshift".
     iIntros (Φ) "!#".
@@ -128,9 +127,8 @@ Section Client_Proxy_Proof.
          (∃ a, ⌜vo = SOMEV (we_val a)⌝ ∗ ⌜wo = Some a⌝))
     }}}%I.
 
-  Lemma read_spec_internal_holds {MTR:MTS_resources} A ip γ lk (reqh : val) :
+  Lemma read_spec_internal_holds {MTR:MTS_resources} ip γ lk (reqh : val) :
     Global_Inv γL γM N -∗
-    fixed A -∗
     DB_addr ⤇ srv_si -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     is_lock (DB_InvName.@"leader") ip γ lk
@@ -147,7 +145,7 @@ Section Client_Proxy_Proof.
          end)
            k q h.
   Proof.
-    iIntros "#Hinv #HA #Hsi #Hspec #Hlk".
+    iIntros "#Hinv #Hsi #Hspec #Hlk".
     iIntros (k q h).
     rewrite /read_spec_internal.
     iIntros (Hkeys Φ) "!#".
@@ -183,10 +181,8 @@ Section Client_Proxy_Proof.
   Qed.
 
   Definition init_client_leader_proxy_internal {MTR : MTS_resources}
-    (A : gset socket_address) (sa : socket_address) : iProp Σ :=
-    ⌜DB_addr ∈ A⌝ →
-    ⌜sa ∉ A⌝ →
-    {{{ fixed A ∗
+    (sa : socket_address) : iProp Σ :=
+    {{{ unallocated {[sa]} ∗
         DB_addr ⤇ srv_si ∗
         sa ⤳ (∅, ∅) ∗
         (@init_client_proxy_spec _ _ _ _ MTC _ srv_si) ∗
@@ -198,16 +194,15 @@ Section Client_Proxy_Proof.
         (∀ k q h, read_spec_internal (ip_of_address sa) rd k q h) ∗
           write_spec_internal (ip_of_address sa) wr }}}.
 
-  Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources} A sa :
-    Global_Inv γL γM N ⊢ init_client_leader_proxy_internal A sa.
+  Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources} sa :
+    Global_Inv γL γM N ⊢ init_client_leader_proxy_internal sa.
   Proof.
     iIntros "#Hinv".
-    iIntros (HA HnA).
     iIntros (Φ) "!#".
-    iIntros "(#Hf & #Hsi & Hmh & #HClient_proxySpec & # Hreq_spec & Hfp) HΦ".
+    iIntros "(Hf & #Hsi & Hmh & #HClient_proxySpec & # Hreq_spec & Hfp) HΦ".
     rewrite /init_client_leader_proxy.
     wp_pures.
-    wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]"); first done.
+    wp_apply ("HClient_proxySpec" with "[$Hf $Hfp $Hmh $Hsi][HΦ]").
     iNext.
     iIntros (reqh) "Hreq".
     wp_pures.

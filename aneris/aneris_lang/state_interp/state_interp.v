@@ -74,11 +74,8 @@ Section state_interpretation.
   Qed.
 
   (* aneris_state_interp *)
-  Lemma aneris_state_interp_init ips C B A σ f M γs ip :
-    dom M = A →
+  Lemma aneris_state_interp_init ips A σ γs ip :
     dom (state_ports_in_use σ) = ips →
-    A ⊆ C → B ⊆ C →
-    set_Forall is_singleton (C ∖ A) →
     (∀ ip, ip ∈ ips → state_ports_in_use σ !! ip = Some ∅) →
     (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ ips) →
     state_heaps σ = {[ip:=∅]} →
@@ -89,21 +86,16 @@ Section state_interpretation.
     mapsto_node ip γs -∗
     heap_ctx γs ∅ -∗
     sockets_ctx γs ∅ -∗
-    messages_ctx (gset_to_gmap (∅, ∅) B)  -∗
-    socket_address_group_ctx C -∗
-    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
-        (◯ (DGSets C)) -∗      (* TODO: Derive this side condition *)
-    own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
-        (◯ (DGSets B)) -∗      (* TODO: Derive this side condition *)
-    fixed_groups A -∗
-    saved_si_auth M -∗
-    ([∗ set] sag ∈ A, sag ⤇* (f sag)) -∗
+    messages_ctx (gset_to_gmap (∅, ∅) A)  -∗
+    socket_address_group_ctx A -∗
+    unallocated_groups_auth A -∗
+    saved_si_auth ∅ -∗
     free_ips_auth ips -∗
     free_ports_auth ∅ -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
-    iIntros (HMdom Hipdom HAle HBle Hsingle Hpiiu Hfixdom Hste Hsce Hmse Hip)
-            "Hmp #Hn Hh Hs Hm Hsags Hown HownB #Hsif HM #Hsa HipsCtx HPiu".
+    iIntros (Hipdom Hpiiu Hfixdom Hste Hsce Hmse Hip)
+            "Hmp #Hn Hh Hs Hm Hsags Hunallocated Hsif HipsCtx HPiu".
     iDestruct (socket_address_group_ctx_valid with "Hsags") as %[Hdisj Hne].
     iExists _, _; iFrame.
     rewrite !Hste !Hsce !Hmse.
@@ -123,8 +115,9 @@ Section state_interpretation.
       { by eapply all_disjoint_subseteq. }
       intros x Hx. apply Hne. set_solver. }
     (* socket_interp_coh *)
-    iSplitL "HM Hsags".
-    { by iApply (socket_interp_coh_init with "Hsa Hsags Hsif HM"). }
+    iDestruct (socket_address_groups_ctx_own with "Hsags") as "#Hsags'".
+    iSplitL "Hsags Hunallocated Hsif".
+    { by iApply (socket_interp_coh_init with "Hsags Hunallocated Hsif"). }
     iSplitL "Hh Hs".
     (* local_state_coh *)
     { rewrite big_sepM_singleton /local_state_coh Hste Hsce !lookup_singleton.
@@ -135,7 +128,7 @@ Section state_interpretation.
     { by iApply (free_ips_coh_init with "[$]"). }
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
-    iFrame.
+    iFrame "#".
   Qed.
 
   Lemma aneris_events_state_interp_init c As Ar lbls :
@@ -420,10 +413,49 @@ Section state_interpretation.
     { by iApply free_ips_coh_alloc_socket. }
   Qed.
 
-  Lemma aneris_state_interp_socketbind_static σ1
-        sa sag sh skt ps Sn A mh :
-    sa ∈ sag →
-    sag ∈ A →
+  Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sag φ :
+    aneris_state_interp σ mh -∗ unallocated_groups {[sag]} ==∗
+    aneris_state_interp σ mh ∗ sag ⤇* φ.
+  Proof.
+    iIntros "Hσ Hunallocated".
+    iDestruct "Hσ"
+        as (mγ mn)
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iMod (socket_interp_coh_allocate_singleton with "Hsi Hunallocated")
+      as "[Hφ Hsi]". 
+    iModIntro. iFrame. iExists _, _. iFrame. eauto.
+  Qed.
+
+  Lemma aneris_state_interp_socket_interp_allocate_fun σ mh sags f :
+    aneris_state_interp σ mh -∗ unallocated_groups sags ==∗
+    aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* f sag.
+  Proof.
+    iIntros "Hσ Hunallocated".
+    iDestruct "Hσ"
+        as (mγ mn)
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iMod (socket_interp_coh_allocate_fun with "Hsi Hunallocated")
+      as "[Hφ Hsi]". 
+    iModIntro. iFrame. iExists _, _. iFrame. eauto.
+  Qed.
+
+  Lemma aneris_state_interp_socket_interp_allocate σ mh sags φ :
+    aneris_state_interp σ mh -∗ unallocated_groups sags ==∗
+    aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
+  Proof.
+    iIntros "Hσ Hunallocated".
+    iDestruct "Hσ"
+        as (mγ mn)
+           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iMod (socket_interp_coh_allocate with "Hsi Hunallocated")
+      as "[Hφ Hsi]". 
+    iModIntro. iFrame. iExists _, _. iFrame. eauto.
+  Qed.
+
+  Lemma aneris_state_interp_socketbind σ1 sa sh skt ps Sn mh :
     let ip := ip_of_address sa in
     let S' :=
         <[ip := <[sh:=(skt<| saddress := Some sa |>, [])]> Sn]>
@@ -434,15 +466,12 @@ Section state_interpretation.
     Sn !! sh = Some (skt, []) →
     state_ports_in_use σ1 !! ip = Some ps →
     saddress skt = None →
-    sag ∈ A →
     aneris_state_interp σ1 mh -∗
-    fixed_groups A -∗
     sh ↪[ip_of_address sa] skt -∗
     free_ports ip {[port_of_address sa]} ==∗
-    aneris_state_interp σ2 mh ∗ sh ↪[ip] (skt<| saddress := Some sa |>) ∗
-    ∃ φ, sag ⤇* φ.
+    aneris_state_interp σ2 mh ∗ sh ↪[ip] (skt<| saddress := Some sa |>).
   Proof.
-    simpl. iIntros (???????) "Hσ #HA Hsh Hp".
+    simpl. iIntros (????) "Hσ Hsh Hp".
     iDestruct "Hσ"
       as (mγ mn)
            "(? & %Hgcoh & %Hnscoh & %Hmhcoh
@@ -461,7 +490,6 @@ Section state_interpretation.
       as "Hlcoh"; [done|].
     iDestruct (free_ips_coh_free_ports_valid with "Hfreeips Hp")
       as (?) "[% %]".
-    iDestruct (socket_interp_coh_fixed_valid with "Hsi HA") as "#$"; [done|].
     iMod (free_ips_coh_dealloc _ _ sh skt with "Hfreeips Hp")
       as "Hfreeips"; [done..|].
     iModIntro. iExists mγ, _. iFrame. rewrite /set /=.
@@ -470,62 +498,6 @@ Section state_interpretation.
     iSplitR.
     { iPureIntro.
       apply network_sockets_coh_socketbind; eauto with set_solver. }
-    iSplitR.
-    { iPureIntro. by apply messages_history_coh_socketbind. }
-    iSplitL "Hsi".
-    { iApply socket_interp_coh_socketbind_static; eauto with set_solver. }
-    assert (ps = ps0) as -> by set_solver.
-    iFrame.
-  Qed.
-
-  Lemma aneris_state_interp_socketbind_dynamic σ1 sa sh skt ps Sn A φ mh :
-    let ip := ip_of_address sa in
-    let S' :=
-        <[ip := <[sh:=(skt<| saddress := Some sa |>, [])]> Sn]>
-        (state_sockets σ1) in
-    let P' := <[ip := {[port_of_address sa]} ∪ ps]> (state_ports_in_use σ1) in
-    let σ2 := σ1 <| state_sockets := S' |> <| state_ports_in_use := P' |> in
-    state_sockets σ1 !! ip = Some Sn →
-    Sn !! sh = Some (skt, []) →
-    state_ports_in_use σ1 !! ip = Some ps →
-    saddress skt = None →
-    sa ∉ ⋃ₛ A →
-    aneris_state_interp σ1 mh -∗
-    fixed_groups A -∗
-    sh ↪[ip_of_address sa] skt -∗
-    free_ports ip {[port_of_address sa]} ==∗
-    aneris_state_interp σ2 mh ∗ sh ↪[ip] (skt<| saddress := Some sa |>) ∗
-    sa ⤇ φ.
-  Proof.
-    simpl. iIntros (?????) "Hσ #HA Hsh Hp".
-    iDestruct "Hσ"
-      as (mγ mn)
-           "(? & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
-    iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
-    iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
-    iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
-      as "(Hstate & Hlcoh)"; [done|].
-    iMod (local_state_coh_socketbind with "[$Hstate Hsh]") as
-        "[Hstate' $]"; try done.
-    iDestruct
-      (big_sepM_local_state_coh_update_socket_notin with "Hlcoh")
-      as "Hlcoh".
-    { apply lookup_delete. }
-    iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh")
-      as "Hlcoh"; [done|].
-    iDestruct (free_ips_coh_free_ports_valid with "Hfreeips Hp")
-      as (?) "[% %]".
-    iMod (socket_interp_coh_socketbind_dynamic with "HA Hsi")
-      as "[Hsi #$]"; try done.
-    iMod (free_ips_coh_dealloc _ _ sh skt with "Hfreeips Hp")
-      as "Hfreeips"; [done..|].
-    iModIntro. iExists mγ, _. iFrame. rewrite /set /=.
-    iSplit.
-    { iPureIntro; by eapply gnames_coh_update_sockets. }
-    iSplitR.
-    { iPureIntro.
-      eapply network_sockets_coh_socketbind; eauto with set_solver. }
     iSplitR.
     { iPureIntro. by apply messages_history_coh_socketbind. }
     assert (ps = ps0) as -> by set_solver.

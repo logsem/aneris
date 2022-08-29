@@ -21,20 +21,18 @@ Section ProofOfMain.
   Definition ips : gset string := {[ "0.0.0.0" ; "0.0.0.1"]}.
 
   Theorem main_spec (A : gset socket_address) :
-     z0 ∈ A -> z1 ∈ A ->
      ⊢ |={⊤}=> ∃ (_ : DB_resources Mdl Σ),
     ([∗ list] z ∈ DB_addresses, z ⤇ DB_socket_proto) -∗
     z0 ⤳ (∅, ∅) -∗
     z1 ⤳ (∅, ∅) -∗
-    fixed A -∗ ([∗ set] ip ∈ ips, free_ip ip) -∗
+    ([∗ set] ip ∈ ips, free_ip ip) -∗
     WP main @["system"] {{ v, True }}.
   Proof.
-    iIntros (Hz0 Hz1) "".
     iMod (DB_init_setup $! (I: True))
         as (DBres) "(#GlobInv & (Hitk0 & Hitk1 & _) & Hkeys & #HinitSpec)".
     iModIntro.
     iExists _.
-    iIntros "#Hproto Hrs0 Hrs1 #Hfix Hips".
+    iIntros "#Hproto Hrs0 Hrs1 Hips".
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hz0 & Hips)";
       first set_solver.
     iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "(Hz1 & _)";
@@ -57,14 +55,14 @@ Section ProofOfMain.
       iApply fupd_aneris_wp.
       iModIntro. simpl.
       iApply (z0_node_spec with "[] [] [$Hn $Hitk0 $Hx $Hrs0]"); simpl;
-        [done|done|done|iFrame "#"|done].
+        [done|done|iFrame "#"|done].
     - iNext. wp_seq.
       wp_apply (aneris_wp_start with "[-]"); first done.
       iFrame.
       iSplitR; first done.
       iNext. iIntros "Hn".
       iApply (z1_node_spec with "[] [] [$Hn $Hitk1 $Htk $Hrs1]"); simpl;
-        [done|done|done|iFrame "#"|done].
+        [done|done|iFrame "#"|done].
   Qed.
 
 End ProofOfMain.

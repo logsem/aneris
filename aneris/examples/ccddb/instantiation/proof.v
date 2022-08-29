@@ -83,10 +83,10 @@ Section proof.
       - iPureIntro; apply DBM_GstValid_empty. }
     iExists (db_resources γGauth γGsnap γGkeep γLs).
     iFrame; iFrame "#".
-    iIntros "!> !#" (A i z v Hv Hiz HzA Φ) "!# (HfA & Hz & Hrs & Hfp & Htk) HΦ".
+    iIntros "!> !#" (i z v Hv Hiz Φ) "!# (Hz & Hrs & Hfp & Htk) HΦ".
     iApply (internal_init_spec_holds
-              with "[] [] [] [] [$HfA $Hz $Hrs $Hfp $Htk]");
-      [done| done|done|done|].
+              with "[] [] [] [$Hz $Hrs $Hfp $Htk]");
+      [done| done|done|].
     iNext.
     iIntros (rd wr) "#(Hseen & Hrd & Hwr)".
     iApply "HΦ".

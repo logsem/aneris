@@ -320,12 +320,12 @@ Section MVreg_proof.
                (s_deser (s_serializer OpLib_Serialization))) -∗
     init_spec_for_specific_crdt mvreg_init.
   Proof.
-    iIntros "#Hinit" (repId addr fixedAddrs addrs_val).
-    iIntros (Φ) "!# (%Haddrs & %Hrepid & %Haddr & Hfx & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    iIntros "#Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
     rewrite /mvreg_init.
     wp_pures.
-    wp_apply ("Hinit" with "[$Hfx $Hprotos $Htoken $Hskt $Hfr]").
-    { do 3 (iSplit; first done). iApply mv_register_crdt_fun_spec; done. }
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply mv_register_crdt_fun_spec; done. }
     iIntros (get update) "(HLS & #Hget & #Hupdate)".
     wp_pures.
     iApply "HΦ"; eauto.

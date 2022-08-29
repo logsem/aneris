@@ -296,73 +296,39 @@ Section lifting_network.
     iApply "HΦ"; done.
   Qed.
 
-  Lemma aneris_wp_socketbind_static_groups ip A E h s sa sag :
-    sa ∈ sag →
+  Lemma aneris_wp_socketbind_groups ip E h s sa :
     ip_of_address sa = ip →
     saddress s = None →
-    sag ∈ A →
-    {{{ ▷ fixed_groups A ∗
-        ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+    {{{ ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
         ▷ h ↪[ip_of_address sa] s }}}
       SocketBind
       (Val $ LitV $ LitSocket h)
       (Val $ LitV $ LitSocketAddress sa) @[ip] E
     {{{ RET #0;
-        h ↪[ip_of_address sa] (s<| saddress := Some sa |>) ∗
-        ∃ φ, sag ⤇* φ }}}.
+        h ↪[ip_of_address sa] (s<| saddress := Some sa |>) }}}.
   Proof.
-    intros Hin.
-    iIntros (Hip Hskt Ha Φ) "(>HA & Hfp & Hsh) HΦ".
+    iIntros (Hip Hskt Φ) "(Hfp & Hsh) HΦ".
     rewrite !aneris_wp_unfold /aneris_wp_def.
     iIntros "%tid #Hin".
     rewrite -Hip.
-    iApply (wp_socketbind_static_groups with "[$HA $Hfp $Hsh]"); [done..|].
+    iApply (wp_socketbind_groups with "[$Hfp $Hsh]"); [done..|].
     iNext.
-    iIntros "(Hsh & Hproto)".
+    iIntros "Hsh".
     iExists _; iSplit; first done.
     iApply "HΦ"; iFrame.
   Qed.
 
-  Lemma aneris_wp_socketbind_static ip A E h s a :
+  Lemma aneris_wp_socketbind ip E h s a :
     ip_of_address a = ip →
     saddress s = None →
-    a ∈ A →
-    {{{ ▷ fixed A ∗
-        ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+    {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
         ▷ h ↪[ip_of_address a] s }}}
       SocketBind
       (Val $ LitV $ LitSocket h)
       (Val $ LitV $ LitSocketAddress a) @[ip] E
     {{{ RET #0;
-        h ↪[ip_of_address a] (s<| saddress := Some a |>) ∗
-        ∃ φ, a ⤇1 φ }}}.
-  Proof. intros. apply aneris_wp_socketbind_static_groups; try set_solver. Qed.
-
-  Lemma aneris_wp_socketbind_dynamic ip s A E h a φ :
-    ip_of_address a = ip →
-    saddress s = None →
-    a ∉ A →
-    {{{ ▷ fixed A ∗
-        ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
-        ▷ h ↪[ip_of_address a] s
-    }}}
-      SocketBind
-      (Val $ LitV $ LitSocket h)
-      (Val $ LitV $ LitSocketAddress a) @[ip] E
-    {{{ RET #0;
-        h ↪[ip_of_address a] (s <| saddress := Some a |>) ∗
-        a ⤇ φ }}}.
-  Proof.
-    iIntros (Hip Hskt Ha Φ) "(HA & Hfp & Hsh) HΦ".
-    rewrite !aneris_wp_unfold /aneris_wp_def.
-    iIntros "%tid #Hin".
-    rewrite -Hip.
-    iApply (wp_socketbind_dynamic with "[$HA $Hfp $Hsh]"); [done|done|].
-    iNext.
-    iIntros "(Hsh & Hproto)".
-    iExists _; iSplit; first done.
-    iApply "HΦ"; iFrame.
-  Qed.
+        h ↪[ip_of_address a] (s<| saddress := Some a |>) }}}.
+  Proof. intros. apply aneris_wp_socketbind_groups; try set_solver. Qed.
 
   Lemma aneris_wp_send_groups ip φ m h saT sagT saR sagR rtrck E s R T m' :
     ip_of_address saT = ip →

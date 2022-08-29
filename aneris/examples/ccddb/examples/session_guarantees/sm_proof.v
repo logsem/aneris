@@ -318,10 +318,9 @@ Section spec.
         write_fn #db_addr #k v @[ip]
       {{{ RET #(); write_post db_id k v s h }}}.
 
-  Theorem sm_setup_spec (A : gset socket_address) :
+  Theorem sm_setup_spec :
     {{{ free_ports ip {[ port_of_address client_addr ]} ∗
-        fixed A ∗
-        ⌜client_addr ∉ A⌝ ∗
+        unallocated {[client_addr]} ∗
         client_addr ⤳ (∅, ∅) }}}
       sm_setup #client_addr @[ip]
     {{{ fns, RET fns;
@@ -330,8 +329,7 @@ Section spec.
           ∗ (read_spec ip read_fn)
           ∗ (write_spec ip write_fn) }}}.
   Proof.
-    iIntros (ϕ) "(Hfree & #Hfixed & #Hca & Hrs) Hcont".
-    iDestruct "Hca" as %Hca.
+    iIntros (ϕ) "(Hfree & Hunallocated & Hrs) Hcont".
     wp_lam.
     iDestruct (request_init $! I) as "> Hown".
     iDestruct "Hown" as (γ) "Hown".
@@ -339,10 +337,9 @@ Section spec.
     rewrite ip_eq.
     set socket := {| sfamily := PF_INET; stype := SOCK_DGRAM;
                      sprotocol := IPPROTO_UDP; saddress := None |}.
-    wp_apply (aneris_wp_socketbind_dynamic _ _ _ _ _ _ (client_si γ) with
-                  "[$Hfixed $Hfree $Hsh]"); eauto.
-    iIntros "(Hsh & #Hclient)".
-    wp_pures.
+    iApply (aneris_wp_socket_interp_alloc_singleton (client_si γ) with "Hunallocated").
+    iIntros "#Hclient".
+    wp_socketbind.
     wp_alloc l as "Hl". wp_pures.
     wp_apply (newlock_spec SM_N _ (lock_inv l γ sh) with "[Hown Hl Hsh Hrs]").
     { rewrite -/ip_of_address. iFrame "#".

@@ -168,7 +168,7 @@ Section proof.
   Lemma wp_perform_merge l (vcx : vector_clock (GClen gcdata)) vc i (j : fin (GClen gcdata)) a :
     gcd_addr_list gcdata !! i = Some a →
     vc = vec_to_list vcx →
-    {{{ allocated i l ∗ GCounterSnapShot j vcx ∗ Global_Inv }}}
+    {{{ GCallocated i l ∗ GCounterSnapShot j vcx ∗ Global_Inv }}}
       perform_merge #l (vector_clock_to_val vc) @[ip_of_address a]
     {{{ RET #(); GCounterSnapShot i vcx }}}.
   Proof.
@@ -260,7 +260,7 @@ Section proof.
   Lemma gcounter_apply_proof l sh i a :
     gcd_addr_list gcdata !! i = Some a →
     {{{ ([∗ list] a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
-        allocated i l ∗ Global_Inv ∗ recevs_frag i [] ∗
+        GCallocated i l ∗ Global_Inv ∗ recevs_frag i [] ∗
         inv (nroot .@ "skt") (sh ↪[ip_of_address a] udp_socket (Some a) true) }}}
       gcounter_apply #l #(LitSocket sh) @[ip_of_address a]
     {{{ RET #(); True }}}.
@@ -346,7 +346,7 @@ Section proof.
     (∀ sev, sev ∈ sevs → vc_le sev.2.1 vc) →
     {{{ GCounterSnapShot i vc ∗
         inv (nroot.@"skt") (sh ↪[ ip_of_address a] udp_socket (Some a) true) ∗
-        Global_Inv ∗ sendevs_frag i sevs ∗ allocated i l ∗
+        Global_Inv ∗ sendevs_frag i sevs ∗ GCallocated i l ∗
         [∗ list] a0 ∈ gcd_addr_list gcdata, a0 ⤇ GCounter_socket_proto }}}
       sendToAll #(LitSocket sh) #s v #i @[ip_of_address a]
     {{{ sevs', RET #(); sendevs_frag i sevs' }}}.
@@ -470,7 +470,7 @@ Section proof.
     gcd_addr_list gcdata !! i = Some a →
     is_list (gcd_addr_list gcdata) v →
     {{{ ([∗ list] a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
-        allocated i l ∗ Global_Inv ∗ sendevs_frag i [] ∗
+        GCallocated i l ∗ Global_Inv ∗ sendevs_frag i [] ∗
         inv (nroot .@ "skt") (sh ↪[ip_of_address a] udp_socket (Some a) true) }}}
       gcounter_broadcast #l #(LitSocket sh) v #i @[ip_of_address a]
     {{{ RET #(); True }}}.
@@ -575,7 +575,7 @@ Section proof.
 
   Lemma gcounter_query_proof l i a :
     ⊢ query_spec
-      (λ i n, ∃ vc, Global_Inv ∗ allocated i l ∗
+      (λ i n, ∃ vc, Global_Inv ∗ GCallocated i l ∗
                  GCounterSnapShot i vc ∗ ⌜list_sum vc = n⌝)%I
       (λ: <>, gcounter_sum ! #l)%V i a.
   Proof.
@@ -654,7 +654,7 @@ Section proof.
 
   Lemma gcounter_incr_proof l (i : nat) a :
     ⊢ incr_spec
-      (λ i n, ∃ vc, Global_Inv ∗ allocated i l ∗ GCounterSnapShot i vc ∗ ⌜list_sum vc = n⌝)%I
+      (λ i n, ∃ vc, Global_Inv ∗ GCallocated i l ∗ GCounterSnapShot i vc ∗ ⌜list_sum vc = n⌝)%I
       (rec: "incr" <> := let: "tmp" := ! #l in if: CAS #l "tmp" (vect_inc "tmp" #i) then
                                                  #() else "incr" #())%V
       i a.
@@ -754,11 +754,10 @@ Section proof.
   Lemma list_sum_replicate n m : list_sum (replicate n m) = n * m.
   Proof. induction n; simpl; lia. Qed.
 
-  Lemma install_proof (A : gset socket_address) (i : nat) (a : socket_address) (v : val) :
+  Lemma install_proof (i : nat) (a : socket_address) (v : val) :
     is_list (gcd_addr_list gcdata) v →
     gcd_addr_list gcdata !! i = Some a →
-    a ∈ A →
-    {{{ fixed A ∗ Global_Inv ∗ unallocated i ∗
+    {{{ Global_Inv ∗ GCunallocated i ∗
         ([∗ list] i ↦ a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
         free_ports (ip_of_address a) {[port_of_address a]} ∗
         sendevs_frag i [] ∗ recevs_frag i [] }}}
@@ -766,7 +765,7 @@ Section proof.
     {{{ (GCounter : nat → nat → iProp Σ) query incr, RET (query, incr);
         GCounter i 0 ∗ query_spec GCounter query i a ∗ incr_spec GCounter incr i a}}}.
   Proof.
-    iIntros (Hilv Hia HaA Φ) "(#Hfx & #Hgi & Hua & #Hprotos & Hfpa & Hsevsfrg & Hrevsfrg) HΦ".
+    iIntros (Hilv Hia Φ) "(#Hgi & Hua & #Hprotos & Hfpa & Hsevsfrg & Hrevsfrg) HΦ".
     rewrite /gcounter_install.
     assert (i < GClen gcdata) as Hilt.
     { apply lookup_lt_is_Some_1; eauto. }
@@ -824,7 +823,7 @@ Section proof.
     wp_pures.
     wp_socket sh as "Hsh".
     wp_pures.
-    wp_socketbind_static.
+    wp_socketbind.
     iMod (inv_alloc (nroot .@ "skt") _ (sh ↪[ ip_of_address r] udp_socket (Some r) true)
             with "[$Hsh //]") as "#Hsh".
     wp_apply aneris_wp_fork.
@@ -839,7 +838,7 @@ Section proof.
     wp_pures.
     rewrite /gcounter_query /gcounter_incr /=.
     wp_pures.
-    iApply ("HΦ" $! (λ i n, ∃ vc, Global_Inv ∗ allocated i l ∗
+    iApply ("HΦ" $! (λ i n, ∃ vc, Global_Inv ∗ GCallocated i l ∗
                                 GCounterSnapShot i vc ∗ ⌜list_sum vc = n⌝)%I).
     iSplit.
     { iExists _; iFrame "#". rewrite vec_to_list_replicate list_sum_replicate; auto with lia. }

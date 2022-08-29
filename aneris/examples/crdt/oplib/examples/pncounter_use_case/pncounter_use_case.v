@@ -83,7 +83,7 @@ Section use_case_proof.
           own γ1 (Excl ()) ∗ own γ2 (Excl ()))).
 
   Lemma wp_use_case_program1 `{!OpLib_Res CtrOp} γ1 γ2 :
-    {{{ GlobInv ∗ OpLib_InitToken 0 ∗ init_spec init ∗ fixed (list_to_set addresses) ∗
+    {{{ GlobInv ∗ OpLib_InitToken 0 ∗ init_spec init ∗
         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
         SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) ∗ free_ports "1.1.1.1" {[100%positive]} ∗
         inv use_case_inv_name (use_case_inv γ1 γ2) ∗ own γ1 (Excl ()) }}}
@@ -91,14 +91,13 @@ Section use_case_proof.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (Φ)
-      "(#HGinv & Hcrdt_tk & Hinit & #Hfixed & #Hprotos & Hsa & Hfp & #Hinv & Htok) HΦ".
+      "(#HGinv & Hcrdt_tk & Hinit & #Hprotos & Hsa & Hfp & #Hinv & Htok) HΦ".
     rewrite /use_case_program1.
     iPoseProof (Ctr_init_spec with "Hinit") as "Hinit".
-    wp_apply ("Hinit" $! 0%nat (SocketAddressInet "1.1.1.1" 100) _ addresses_val
+    wp_apply ("Hinit" $! 0%nat (SocketAddressInet "1.1.1.1" 100) addresses_val
                with "[$Hsa $Hfp $Hcrdt_tk]").
     { iFrame "#".
       iSplit; first by iPureIntro; apply is_list_inject.
-      iSplit; first done.
       iPureIntro; set_solver. }
     iIntros (get upd) "(Hls & #Hget & #Hupd)".
     wp_pures.
@@ -199,7 +198,7 @@ Section use_case_proof.
   Qed.
 
   Lemma wp_use_case_program2 `{!OpLib_Res CtrOp} γ1 γ2 :
-    {{{ GlobInv ∗ OpLib_InitToken 1 ∗ init_spec init ∗ fixed (list_to_set addresses) ∗
+    {{{ GlobInv ∗ OpLib_InitToken 1 ∗ init_spec init ∗
         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
         SocketAddressInet "1.1.1.2" 100 ⤳ (∅, ∅) ∗ free_ports "1.1.1.2" {[100%positive]} ∗
         inv use_case_inv_name (use_case_inv γ1 γ2) ∗ own γ2 (Excl ()) }}}
@@ -207,14 +206,13 @@ Section use_case_proof.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (Φ)
-      "(#HGinv & Hcrdt_tk & Hinit & #Hfixed & #Hprotos & Hsa & Hfp & #Hinv & Htok) HΦ".
+      "(#HGinv & Hcrdt_tk & Hinit& #Hprotos & Hsa & Hfp & #Hinv & Htok) HΦ".
     rewrite /use_case_program2.
     iPoseProof (Ctr_init_spec with "Hinit") as "Hinit".
-    wp_apply ("Hinit" $! 1%nat (SocketAddressInet "1.1.1.2" 100) _ addresses_val
+    wp_apply ("Hinit" $! 1%nat (SocketAddressInet "1.1.1.2" 100) addresses_val
                with "[$Hsa $Hfp $Hcrdt_tk]").
     { iFrame "#".
       iSplit; first by iPureIntro; apply is_list_inject.
-      iSplit; first done.
       iPureIntro; set_solver. }
     iIntros (get upd) "(Hls & #Hget & #Hupd)".
     wp_pures.
@@ -319,7 +317,6 @@ Section use_case_proof.
   Lemma wp_use_case_program :
     ⊢ |={⊤}=> ∃ Res : OpLib_Res CtrOp,
          ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) -∗
-         fixed (list_to_set addresses) -∗
          free_ip "1.1.1.1" -∗
          free_ip "1.1.1.2" -∗
          SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) -∗
@@ -331,7 +328,7 @@ Section use_case_proof.
     iMod (OpLibSetup_Init with "[//]") as (Res) "(#HGinv & HGs & Htks & #Hinit)".
     iModIntro.
     iExists Res.
-    iIntros "#Hprotos #Hfixed Hfip1 Hfip2 Hsa1 Hsa2".
+    iIntros "#Hprotos Hfip1 Hfip2 Hsa1 Hsa2".
     iDestruct "Htks" as "(Hitk1 & Hitk2 & _)".
     rewrite /use_case_program.
     iMod (own_alloc (Excl ())) as (γ1) "Htk1"; first done.
@@ -378,21 +375,11 @@ Theorem use_case_program_adequate :
 Proof.
   eapply (@adequacy
             use_case_Σ Trivial_Mdl _ _ {["1.1.1.1"; "1.1.1.2"]}
-            (list_to_set addresses) (list_to_set addresses) ∅ ∅ ∅ ∅);
-    [apply Trivial_Mdl_finitary| |set_solver|set_solver|set_solver|set_solver|done|done|done].
+            (list_to_set addresses) ∅ ∅ ∅);
+    [apply Trivial_Mdl_finitary| |set_solver..|done|done].
   iIntros (HanerisG) "".
-  iMod wp_use_case_program as (Res) "Hwp".
-  Unshelve.
   iModIntro.
-  iExists
-    (λ sa,
-      if bool_decide (sa = SocketAddressInet "1.1.1.1" 100) then
-        (@OpLib_SocketProto _ _ _ _ _ _ _ Res 0)
-      else
-        if bool_decide (sa = SocketAddressInet "1.1.1.2" 100) then
-          (@OpLib_SocketProto _ _ _ _ _ _ _ Res 1)
-        else (λ _, True)%I).
-  iIntros "Hfx Hprotos Hsas _ Hfips _ _ _ _ _".
+  iIntros "Hfx Hsas _ Hfips _ _ _ _ _".
   rewrite big_sepS_union; last set_solver.
   rewrite !big_sepS_singleton.
   unfold addresses.
@@ -404,21 +391,16 @@ Proof.
     rewrite !big_sepS_singleton.
     repeat (rewrite bool_decide_eq_false_2; last set_solver).
     done. }
-  iAssert ([∗ list] i↦z ∈ addresses, z ⤇ (@OpLib_SocketProto _ _ _ _ _ _ _ Res i))%I
-    with "[Hprotos]" as "Hprotos".
-  { rewrite !list_to_set_cons list_to_set_nil right_id_L.
-    rewrite big_sepS_union; last set_solver.
-    rewrite !big_sepS_singleton.
-    rewrite (bool_decide_eq_true_2
-               (SocketAddressInet "1.1.1.1" 100 = SocketAddressInet "1.1.1.1" 100));
-      last done.
-    rewrite (bool_decide_eq_false_2
-               (SocketAddressInet "1.1.1.2" 100 = SocketAddressInet "1.1.1.1" 100));
-      last done.
-    rewrite (bool_decide_eq_true_2
-               (SocketAddressInet "1.1.1.2" 100 = SocketAddressInet "1.1.1.2" 100));
-      last done.
-    simpl.
-    iDestruct "Hprotos" as "[$ $]". }
-  wp_apply ("Hwp" with "Hprotos Hfx Hfip1 Hfip2 Hsa1 Hsa2").
+  iMod wp_use_case_program as (Res) "Hwp".  
+  iDestruct (unallocated_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
+  iDestruct (unallocated_split with "Hfx") as "[Hfx1 _]"; [set_solver|].
+  iApply (aneris_wp_socket_interp_alloc_singleton
+            (@OpLib_SocketProto _ _ _ _ _ _ _ Res 0) with "Hfx0").
+  iIntros "#Hsi0".
+  iApply (aneris_wp_socket_interp_alloc_singleton
+            (@OpLib_SocketProto _ _ _ _ _ _ _ Res 1) with "Hfx1").
+  iIntros "#Hsi1".
+  iAssert ([∗ list] i↦z ∈ addresses, z ⤇ (@OpLib_SocketProto _ _ _ _ _ _ _ Res i))%I as "Hprotos".
+  { repeat iSplit; done. }
+  wp_apply ("Hwp" with "Hprotos Hfip1 Hfip2 Hsa1 Hsa2").
 Qed.

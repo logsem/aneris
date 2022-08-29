@@ -499,12 +499,10 @@ Section map_proof.
   Lemma map_init_spec crdt :
     @crdt_fun_spec _ _ _ _ _ _ _ OPP crdt -∗
     @init_spec _ _ _ _ _ _ _ map_OpLib_Params _ _ oplib_init' -∗
-    ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
+    ∀ (repId : nat) (addr : socket_address)
       (addrs_val : val),
         {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
-            ⌜addr ∈ fixedAddrs⌝ ∗
-            fixed fixedAddrs ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
             free_ports (ip_of_address addr) {[port_of_address addr]} ∗
@@ -517,12 +515,12 @@ Section map_proof.
             @update_spec _ _ _ _ _ _ _ map_OpLib_Params _ _ update_val repId addr
         }}}.
     Proof.
-      iIntros "#Hcrdt #Hinit" (repId addr fixedAddrs addrs_val).
-      iIntros (Φ) "!# (%Haddrs & %Hrepid & %Haddr & Hfx & Hprotos & Hskt & Hfr & Htoken) HΦ".
+      iIntros "#Hcrdt #Hinit" (repId addr addrs_val).
+      iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
       rewrite /map_comb_init /map_comb_crdt.
       wp_pures.
-      wp_apply ("Hinit" with "[$Hfx $Hprotos $Htoken $Hskt $Hfr]").
-      { do 3 (iSplit; first done). iApply map_crdt_fun_spec; done. }
+      wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+      { do 2 (iSplit; first done). iApply map_crdt_fun_spec; done. }
       iIntros (get update) "(HLS & #Hget & #Hupdate)".
       wp_pures.
       iApply "HΦ"; eauto.

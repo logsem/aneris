@@ -42,7 +42,7 @@ Section Client_API_spec_instantiation.
     rewrite /make_client_skt_spec.
     rewrite /make_client_skt.
     rewrite /CltCanConnect /session_resources_instance.
-    iIntros (clt_addr A Φ) "(H1 & H2 & H3 & H4) HΦ".
+    iIntros (clt_addr Φ) "(H1 & H2 & H3 & H4) HΦ".
     iDestruct (make_client_skt_internal_spec_holds clt_addr $! Φ
                 with "[$H1 $H2 $H3 $H4][HΦ]") as "Hspec".
     iNext. iIntros (skt h s) "Hr". iApply "HΦ". eauto with iFrame.
