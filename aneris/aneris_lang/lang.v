@@ -106,7 +106,7 @@ Proof.
           cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
         | StartAdversary e0 e1, StartAdversary e0' e1' =>
           cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
-        | SetPublicAddr e, SetPublicAddr e' =>
+        | SetPublicAddrs e, SetPublicAddrs e' =>
           cast_if (decide (e = e'))
         | _, _ => right _
         end
@@ -247,7 +247,7 @@ Proof.
      | GetAddressInfo e => GenNode 26 [go e]
      | Rand e => GenNode 27 [go e]
      | StartAdversary i e => GenNode 28 [GenLeaf (inl (inr (inl i))); go e]
-     | SetPublicAddr saddr => GenNode 29 [GenLeaf (inl (inr (inl saddr)))]
+     | SetPublicAddrs e => GenNode 29 [go e]
      end
    with gov v :=
      match v with
@@ -295,7 +295,7 @@ Proof.
      | GenNode 26 [e] => GetAddressInfo (go e)
      | GenNode 27 [e] => Rand (go e)
      | GenNode 28 [GenLeaf (inl (inr (inl i))); e2] => StartAdversary i (go e2)
-     | GenNode 29 [GenLeaf (inl (inr (inl saddr)))] => SetPublicAddr saddr
+     | GenNode 29 [e] => SetPublicAddrs (go e)
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -369,7 +369,8 @@ Inductive ectx_item :=
 | SetReceiveTimeoutLCtx (v1 v2 : val)
 | SetReceiveTimeoutMCtx (e0 : expr) (v2 : val)
 | SetReceiveTimeoutRCtx (e0 e1 : expr)
-| ReceiveFromCtx.
+| ReceiveFromCtx
+| SetPublicAddrsCtx.
 
 Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
@@ -415,6 +416,7 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | SetReceiveTimeoutMCtx e0 v2 => SetReceiveTimeout e0 e (Val v2)
   | SetReceiveTimeoutRCtx e0 e1 => SetReceiveTimeout e0 e1 e
   | ReceiveFromCtx => ReceiveFrom e
+  | SetPublicAddrsCtx => SetPublicAddrs e
   end.
 
 (** Substitution *)
@@ -453,7 +455,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | ReceiveFrom e => ReceiveFrom (subst x v e)
   | Start i e => Start i (subst x v e)
   | StartAdversary i e => StartAdversary i (subst x v e)
-  | SetPublicAddr saddr => SetPublicAddr saddr
+  | SetPublicAddrs e => SetPublicAddrs (subst x v e)
   end.
 
 Definition subst' (mx : binder) (v : val) : expr → expr :=
@@ -884,6 +886,14 @@ Definition is_head_step_pure (e : expr) : bool :=
   | _ => true
   end.
 
+(* A version of `is_list` hardcoded for socket addresses.
+   We can't use `is_list` here because the list module depends on this one. *)
+Fixpoint is_saddr_list (l : list socket_address) (v : val) : Prop :=
+  match l with
+  | [] => v = NONEV
+  | x :: xs => ∃ vt, v = SOMEV (LitV $ LitSocketAddress x, vt) ∧ is_saddr_list xs vt
+  end.
+
 Inductive head_step : aneris_expr → state →
                       aneris_expr → state → list aneris_expr → Prop :=
 | LocalStepPureS n h e e' ef σ
@@ -932,8 +942,11 @@ Inductive head_step : aneris_expr → state →
                 state_public_addrs := state_public_addrs σ;
               |}
               [(mkExpr ip e)]
-| SetPublicAddrStepS sa σ :
-  head_step (mkExpr "system" (SetPublicAddr (LitSocketAddress sa))) σ
+| SetPublicAddrsStepS saddrs saddrsv σ :
+  (* The argument to `SetPublicAddrs` must evaluate to a list of socket address
+     literals. *)
+  is_saddr_list saddrs saddrsv ->
+  head_step (mkExpr "system" (SetPublicAddrs (Val saddrsv))) σ
             (mkExpr "system" (Val $ LitV $ LitUnit))
             {|
               state_heaps := state_heaps σ;
@@ -941,7 +954,7 @@ Inductive head_step : aneris_expr → state →
               state_ports_in_use := state_ports_in_use σ;
               state_ms := state_ms σ;
               state_adversaries := state_adversaries σ;
-              state_public_addrs := state_public_addrs σ ∪ {[ sa ]};
+              state_public_addrs := state_public_addrs σ ∪ (list_to_set saddrs)
             |}
             []
 | SocketStepS n e e' Sn Sn' P' M' σ
@@ -1019,8 +1032,10 @@ Proof.
     try
       (apply/fmap_is_Some; exact: base_lang.head_ctx_step_val);
     apply/fmap_is_Some.
-    all: destruct Ki; try (by eauto);
-      inversion H0; subst; by eauto.
+  all: destruct Ki;
+    match goal with
+      [ H : _ = fill_item _ _ |- _ ] => inversion H; subst
+    end; by eauto.
 Qed.
 
 #[global] Instance of_aneris_val_inj : Inj (=) (=) aneris_of_val.
@@ -1030,7 +1045,7 @@ Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
                              simplify_eq/=; auto with f_equal. Qed.
 
-(* *)
+(* If `m` was sent by an adversary, it must be directed to a public saddr *)
 Definition public_ip_check m σ :=
   ip_of_address (m_sender m) ∈ (state_adversaries σ) ->
     (m_destination m) ∈ (state_public_addrs σ).

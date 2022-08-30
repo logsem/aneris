@@ -103,8 +103,9 @@ Inductive expr :=
 | Start (ip : base_lit) (e : expr)
   (* Like `Start`, but additionally record that `ip` runs an adversary *)
 | StartAdversary (ip : base_lit) (e : expr)
-  (* Mark the given socket address as public (reachable by an adversary) *)
-| SetPublicAddr (saddr : base_lit)
+  (* Mark the given list of socket addresses as public (reachable by an adversary).
+     Argument should evaluate to a list of socket address literals. *)
+| SetPublicAddrs (saddrs : expr)
 
 with val :=
 | LitV (l : base_lit)
