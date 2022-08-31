@@ -1157,16 +1157,16 @@ Section resource_lemmas.
     inversion Heq2; subst.
     f_equal.
     destruct Heq3 as [Hequiv | Hincl'].
-    - rewrite /equiv in Hequiv.
-      destruct Hequiv as [_ Hequiv].
+    - destruct Hequiv as [_ Hequiv].
       simpl in Hequiv.
+      symmetry.
       apply leibniz_equiv.
-      admit.
+      by apply to_agree_inj.
     - apply prod_included in Hincl' as [_ Hincl'].
       simpl in *.
       apply to_agree_included in Hincl'.
       by apply leibniz_equiv.
-  Admitted.
+  Qed.
 
   #[global] Instance mapsto_messages_fractional sag bs br s :
     Fractional (λ q, sag ⤳*[bs,br]{q} s)%I.
