@@ -68,7 +68,7 @@ Inductive firewall_st :=
 | FWPublic
 | FWPrivate.
 
-Definition firewallUR : ucmra := authUR (gmapUR socket_address_group (exclR (leibnizO firewall_st))).
+Definition firewallUR : ucmra := authUR (gmapUR socket_address_group (prodR fracR (agreeR (leibnizO firewall_st)))).
 
 #[global] Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames))
   := (∅ : gmap ip_address (agree node_gnames)).
@@ -256,11 +256,11 @@ Section definitions.
   (* We track firewall state for an _entire_ socket address group.
      That is, within an address group, all addresses are public or private. *)
   Definition firewall_auth (fw_st : gmap socket_address_group firewall_st) : iProp Σ :=
-    own (A:=firewallUR) aneris_firewall_name (● (Excl <$> fw_st)).
+    own (A:=firewallUR) aneris_firewall_name (● ((λ st, (1%Qp, to_agree st)) <$> fw_st)).
 
   (* Firewall state for an individual socket address group *)
-  Definition sag_fw_st (sag : socket_address_group) (fw_st : firewall_st) : iProp Σ :=
-    own (A:=firewallUR) aneris_firewall_name (◯ {[ sag := Excl fw_st ]}).
+  Definition firewall_frag (sag : socket_address_group) (q : Qp) (fw_st : firewall_st) : iProp Σ :=
+    own (A:=firewallUR) aneris_firewall_name (◯ {[ sag := (q, to_agree fw_st) ]}).
 
   Definition socket_address_groups_own (sags : gset socket_address_group)
     : iProp Σ :=
@@ -449,12 +449,13 @@ Section definitions.
   Notation "sa ∈g sag" := (elem_of_group sa sag) (at level 10).
   Notation "sa ∉g sag" := (not_elem_of_group sa sag) (at level 10).
 
-  Definition mapsto_messages (sag : socket_address_group) q
-             (send_obs receive_obs : bool)
+  Definition mapsto_messages (sag : socket_address_group) (q : Qp)
+             (send_obs receive_obs : bool) (fw_st : firewall_st)
              (mh : message_soup * message_soup) : iProp Σ :=
     ∃ As Ar, observed_send_groups As ∗ observed_receive_groups Ar ∗
              (⌜(sag ∈ As ↔ (send_obs = true)) ∧ (sag ∈ Ar ↔ (receive_obs = true))⌝) ∗
              socket_address_group_own sag ∗
+             firewall_frag sag q fw_st ∗
              lmapsto aneris_messages_name sag q mh.
 
   (** Steps *)
@@ -483,16 +484,22 @@ Notation "z ↪[ ip ]{ q } s" :=
     (at level 20, q at level 50, format "z  ↪[ ip ]{ q }  s") : bi_scope.
 Notation "z ↪[ ip ] s" := (z ↪[ ip ]{1} s)%I (at level 20) : bi_scope.
 
-(** Messages points-to for groups *)
+(** Messages points-to for private groups *)
 Notation "sag ⤳*{ q } s" :=
-  (mapsto_messages sag q false false s)
+  (mapsto_messages sag q false false FWPrivate s)
     (at level 20, q at level 50, format "sag  ⤳*{ q }  s") : bi_scope.
 Notation "sag ⤳* s" := (sag ⤳*{ 1 } s)%I (at level 20) : bi_scope.
 Notation "sag ⤳*[ bs , br ]{ q } s" :=
-  (mapsto_messages sag q bs br s)
+  (mapsto_messages sag q bs br FWPrivate s)
     (at level 20, q at level 50, format "sag  ⤳*[ bs ,  br ]{ q }  s") : bi_scope.
 Notation "sag ⤳*[ bs , br ] s" :=
   (sag ⤳*[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
+
+(* ... and for public ones *)
+(* TODO: re-assess the notation? *)
+Notation "sag ⤳*p{ q } s" :=
+  (mapsto_messages sag q false false FWPublic s)
+    (at level 20, q at level 50, format "sag  ⤳*p{ q }  s") : bi_scope.
 
 Notation "sag ⤇* Φ" := (si_pred sag Φ) (at level 20).
 
@@ -505,6 +512,13 @@ Notation "sa ⤳1[ bs , br ]{ q } s" :=
   ({[sa]} ⤳*[ bs , br ]{ q } s)%I
     (at level 20, q at level 50, format "sa  ⤳1[ bs ,  br ]{ q }  s") : bi_scope.
 Notation "sa ⤳1[ bs , br ] s" := (sa ⤳1[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
+
+(* for public groups *)
+Notation "sa ⤳1p{ q } s" :=
+  ({[sa]} ⤳*p{ q } s)%I
+    (at level 20, q at level 50, format "sa  ⤳1p{ q }  s") : bi_scope.
+Notation "sa ⤳1p s" := (sa ⤳1p{ 1 } s)%I (at level 20) : bi_scope.
+
 Notation "sa ⤇1 Φ" := ({[sa]} ⤇* Φ) (at level 20).
 
 Section singleton_to_singleton_connectives.
@@ -525,7 +539,7 @@ End singleton_to_singleton_connectives.
 
 (* Singleton to singleton messages points-to *)
 Notation "sa ⤳{ q } s" :=
-  (message_history_singleton {[sa]} q false false s)%I
+  (message_history_singleton {[sa]} q false false FWPrivate s)%I
     (at level 20, q at level 50, format "sa  ⤳{ q }  s") : bi_scope.
 Notation "sa ⤳ s" := (sa ⤳{ 1 } s)%I (at level 20) : bi_scope.
 Notation "sa ⤳[ bs , br ]{ q } s" :=
@@ -1115,12 +1129,51 @@ Section resource_lemmas.
     iFrame.
   Qed.
 
+  Instance firewall_frag_fractional sag st : Fractional (λ q, firewall_frag sag q st).
+  Proof.
+    intros p q.
+    rewrite /firewall_frag.
+    rewrite -own_op -auth_frag_op singleton_op
+            -pair_op frac_op agree_idemp.
+    done.
+  Qed.
+
+  Lemma firewall_frag_auth_agree fw_st sag q st :
+    firewall_auth fw_st ⊢ firewall_frag sag q st -∗ ⌜fw_st !! sag = Some st⌝.
+  Proof.
+    iIntros "Hauth Hfrag".
+    rewrite /firewall_auth /firewall_frag.
+    iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hvalid".
+    iPureIntro.
+    apply auth_both_valid_discrete in Hvalid as [Hincl _].
+    pose proof (iffLR (lookup_included _ _) Hincl sag) as Hlookup.
+    rewrite lookup_fmap in Hlookup.
+    rewrite lookup_singleton in Hlookup.
+    apply option_included in Hlookup as [Hcontr|[a [b [Heq1 [Heq2 Heq3]]]]].
+    { by inversion Hcontr. }
+    inversion Heq1; subst.
+    destruct (fw_st !! sag) as [x|] eqn:Hst; rewrite Hst in Heq2; [|done].
+    simpl in Heq2.
+    inversion Heq2; subst.
+    f_equal.
+    destruct Heq3 as [Hequiv | Hincl'].
+    - rewrite /equiv in Hequiv.
+      destruct Hequiv as [_ Hequiv].
+      simpl in Hequiv.
+      apply leibniz_equiv.
+      admit.
+    - apply prod_included in Hincl' as [_ Hincl'].
+      simpl in *.
+      apply to_agree_included in Hincl'.
+      by apply leibniz_equiv.
+  Admitted.
+
   #[global] Instance mapsto_messages_fractional sag bs br s :
     Fractional (λ q, sag ⤳*[bs,br]{q} s)%I.
   Proof.
     intros p q.
     iSplit.
-    - iDestruct 1 as (? ?) "(#?&#?&#?&(#Hsag & [H1 H2]))".
+    - iDestruct 1 as (? ?) "(#?&#?&#?&(#Hsag & [Hfw [Hp Hq]]))".
       iFrame. iSplit; iExists _, _; iFrame "#".
     - iIntros "[Hp Hq]".
       iDestruct "Hp" as (? ?) "(#HAs1&#HAr1&#?&#Hsag&Hp)".
