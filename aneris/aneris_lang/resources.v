@@ -59,6 +59,16 @@ Definition tracked_socket_address_groupsUR : cmra :=
   agreeR (gsetUR socket_address_group).
 Definition messagesUR : ucmra :=
   gen_heapUR socket_address_group (message_soup * message_soup).
+Definition adversary_ipsUR : ucmra := authUR (gsetUR ip_address).
+
+(** Firewall state of socket addresses.
+    Public socket addresses can be contacted by an adversary,
+    while private ones can't. *)
+Inductive firewall_st :=
+| FWPublic
+| FWPrivate.
+
+Definition firewallUR : ucmra := authUR (gmapUR socket_address_group (exclR (leibnizO firewall_st))).
 
 #[global] Instance system_state_mapUR_unit : Unit (gmap ip_address (agree node_gnames))
   := (∅ : gmap ip_address (agree node_gnames)).
@@ -94,8 +104,9 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_freeports_name : gname;
       (** adversary ips **)
       aneris_adversaryips_name : gname;
-      (** public socket addresses **)
-      aneris_publicaddrs_name : gname;
+      (** socket address firewall **)
+      aneris_firewallG :> inG Σ firewallUR;
+      aneris_firewall_name : gname;
       (** groups *)
       aneris_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       aneris_socket_address_group_name : gname;
@@ -138,6 +149,8 @@ Class anerisPreG Σ (Mdl : Model) :=
       anerisPre_socketG :> inG Σ (authR local_socketsUR);
       anerisPre_freeipsG :> inG Σ (authUR free_ipsUR);
       anerisPre_freeportsG :> inG Σ (authUR free_portsUR);
+      anerisPre_adversary :> inG Σ adversary_ipsUR;
+      anerisPre_firewall :> inG Σ firewallUR;
       anerisPre_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       anerisPre_siG :> inG Σ (authR socket_interpUR);
       anerisPre_savedPredG :> savedPredG Σ message;
@@ -170,8 +183,10 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
    mono_natΣ;
    GFunctor (authUR (gmapUR string (exclR aneris_eventsO)));
-   GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
-   ].
+   GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)));
+   GFunctor adversary_ipsUR;
+   GFunctor firewallUR
+  ].
 
 #[global] Instance subG_anerisPreG {Σ Mdl} :
   subG (anerisΣ Mdl) Σ → anerisPreG Σ Mdl.
@@ -237,6 +252,15 @@ Section definitions.
 
   Definition adversary_ip (ip : ip_address) : iProp Σ :=
     own aneris_adversaryips_name (◯ GSet {[ ip ]}).
+
+  (* We track firewall state for an _entire_ socket address group.
+     That is, within an address group, all addresses are public or private. *)
+  Definition firewall_auth (fw_st : gmap socket_address_group firewall_st) : iProp Σ :=
+    own (A:=firewallUR) aneris_firewall_name (● (Excl <$> fw_st)).
+
+  (* Firewall state for an individual socket address group *)
+  Definition sag_fw_st (sag : socket_address_group) (fw_st : firewall_st) : iProp Σ :=
+    own (A:=firewallUR) aneris_firewall_name (◯ {[ sag := Excl fw_st ]}).
 
   Definition socket_address_groups_own (sags : gset socket_address_group)
     : iProp Σ :=
