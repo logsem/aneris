@@ -994,6 +994,31 @@ Proof.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
 Qed.
 
+Lemma wp_choose_nat_nostep s tid E v fs :
+  fs ≠ ∅ ->
+  {{{ has_fuels_S tid fs }}}
+    ChooseNat @ s; tid; E
+  {{{ n, RET LitV (LitInt n); has_fuels tid fs }}}.
+Proof.
+  iIntros (? Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
+  iModIntro; iSplit; eauto.
+  (* TODO: Improve this so we hide the (arbitrary) choice of `n` *)
+  Unshelve. 2: apply 0.
+  iIntros (e2 σ2 efs Hstep). iNext.
+  inv_head_step.
+  iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
+  { by intros ?%dom_empty_inv_L. }
+  { set_solver. }
+  { rewrite Hexend. apply head_locale_step. by econstructor. }
+  iModIntro; iExists δ2, ℓ.
+  rewrite Hexend //=. iFrame "Hmi Hsi".
+  repeat iSplit =>//.
+  iApply "HΦ".
+  iApply (has_fuels_proper with "Hfuel") =>//.
+  rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
+Qed.
+
 Lemma wp_load_nostep s tid E l q v fs:
   fs ≠ ∅ ->
   {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
@@ -1016,7 +1041,8 @@ Qed.
 
 Lemma wp_store_nostep s tid E l v' v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
+  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
+    Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "[>Hl HfuelS] HΦ".
