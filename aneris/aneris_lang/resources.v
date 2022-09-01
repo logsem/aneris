@@ -500,6 +500,11 @@ Notation "sag ⤳*[ bs , br ] s" :=
 Notation "sag ⤳*p{ q } s" :=
   (mapsto_messages sag q false false FWPublic s)
     (at level 20, q at level 50, format "sag  ⤳*p{ q }  s") : bi_scope.
+Notation "sag ⤳*p[ bs , br ]{ q } s" :=
+  (mapsto_messages sag q bs br FWPublic s)
+    (at level 20, q at level 50, format "sag  ⤳*p[ bs ,  br ]{ q }  s") : bi_scope.
+Notation "sag ⤳*p[ bs , br ] s" :=
+  (sag ⤳*p[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
 
 Notation "sag ⤇* Φ" := (si_pred sag Φ) (at level 20).
 
@@ -1168,6 +1173,25 @@ Section resource_lemmas.
       by apply leibniz_equiv.
   Qed.
 
+  (* Used in `firewall_auth_frag_update` as a type annotation to help type inference *)
+  Notation fw_valR := (prodR fracR (agreeR (leibnizO firewall_st))).
+
+  Lemma firewall_auth_frag_update fw_st sag st st' :
+    firewall_auth fw_st -∗ firewall_frag sag 1%Qp st ==∗
+                  firewall_auth (<[sag := st']> fw_st) ∗ firewall_frag sag 1%Qp st'.
+  Proof.
+    iIntros "Hauth Hfrag".
+    iDestruct (firewall_frag_auth_agree with "Hauth Hfrag") as "%Hlookup".
+    rewrite /firewall_auth /firewall_frag.
+    iMod ((own_update_2 _ _ _ (● _ ⋅ ◯ {[sag := (1%Qp, to_agree st')]})) with "Hauth Hfrag") as "[Hauth' Hfrag']".
+    { apply auth_update.
+      apply (singleton_local_update _ sag ((1%Qp, to_agree st) : fw_valR) _
+                                          ((1%Qp, to_agree st') : fw_valR) _).
+      - rewrite lookup_fmap Hlookup; done.
+      - apply exclusive_local_update; done. }
+    rewrite fmap_insert. auto with iFrame.
+  Qed.
+
   #[global] Instance mapsto_messages_fractional sag bs br s :
     Fractional (λ q, sag ⤳*[bs,br]{q} s)%I.
   Proof.
@@ -1232,6 +1256,17 @@ Section resource_lemmas.
             with "Ha Hl") as "[Ha Hf]".
     iModIntro.
     iFrame "#∗". iExists As, Ar. iFrame "#∗".
+  Qed.
+
+  Lemma messages_mapto_firewall_update fw_st sag bs br R T :
+    firewall_auth fw_st -∗ sag ⤳*[bs, br] (R, T) ==∗
+      firewall_auth (<[sag := FWPublic]> fw_st) ∗ sag ⤳*p[ bs, br ] (R, T).
+  Proof.
+    iIntros "Hfw_auth Hpt".
+    iDestruct "Hpt" as (??) "(?&?&?&?&Hfw_frag&?)".
+    iMod (firewall_auth_frag_update _ _ _ FWPublic with "Hfw_auth Hfw_frag") as "[Hfwa Hfwf]".
+    iModIntro.
+    eauto with iFrame.
   Qed.
 
   Lemma messages_mapsto_ctx_valid sag bs br R T mh :
@@ -1321,7 +1356,7 @@ Section resource_lemmas.
     rewrite -gset_disj_union; [|done].
     replace ((B ∪ C) ∖ B) with C; [|set_solver].
     iMod (own_update_2 with "HA HB") as "HA"; [|done].
-    apply auth_update_dealloc. 
+    apply auth_update_dealloc.
     apply gset_disj_dealloc_empty_local_update.
   Qed.
 
@@ -1334,7 +1369,7 @@ Section resource_lemmas.
     replace (A ∪ B) with (B ∪ A) by set_solver.
     rewrite /unallocated_groups_auth -gset_op -gset_disj_union; [|done].
     iMod (own_update_2 with "HA HB") as "HA"; [|done].
-    apply auth_update_dealloc. 
+    apply auth_update_dealloc.
     by apply gset_disj_dealloc_empty_local_update.
   Qed.
 
