@@ -1,6 +1,7 @@
 From iris.proofmode Require Import tactics.
+From stdpp Require Import finite.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination.
+From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 
 Require Import stdpp.decidable.
@@ -28,9 +29,6 @@ Inductive CN := Start | N (n : nat).
 
 #[global] Instance CN_eqdec: EqDecision CN.
 Proof. solve_decision. Qed.
-
-#[global] Instance YN_countable: Countable CN.
-Proof. Admitted.
 
 #[global] Instance YN_inhabited: Inhabited CN.
 Proof. exact (populate Start). Qed.
@@ -70,20 +68,22 @@ Definition the_model : LiveModel heap_lang the_cn_fair_model :=
 Section proof.
   Context `{!heapGS Σ the_cn_fair_model the_model}.
 
-  Lemma decr_loop_spec tid (n:nat) :
-    {{{ has_fuel tid () 6 ∗ frag_free_roles_are ∅ ∗ frag_model_is (N (S n)) }}}
+  Lemma decr_loop_spec tid (n:nat) f :
+    6 ≤ f → f ≤ 40 →
+    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗ frag_model_is (N (S n)) }}}
       decr_loop_prog #(S n) @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(Hf & Hr & Hm) HΦ".
+    iIntros (Hle1 Hle2 Φ) "(Hf & Hr & Hm) HΦ".
     iInduction n as [|n] "IHn".
     { wp_lam. wp_pures. wp_lam. wp_pures.
       iApply (@wp_lift_pure_step_no_fork_singlerole_take_step
               _ the_cn_fair_model _ _
-              (N 1) (N 0) tid _ _ 0 3 _ _ _ _ ())=> /=;
+              (N 1) (N 0) tid _ _ (f - 6) (f - 3) _ _ _ _ ())=> /=;
         [done|set_solver|lia|constructor|].
       do 3 iModIntro.
       rewrite has_fuel_fuels.
+      replace (f - 1 - 1 - 1 - 1 - 1 - 1) with (f - 6) by lia.
       iFrame.
       iIntros "Hm Hr Hf".
       destruct (decide (() ∈ ∅)); [set_solver|].
@@ -96,10 +96,11 @@ Section proof.
     rewrite fmap_insert fmap_empty. (* Sigh.. *)
     iApply (@wp_lift_pure_step_no_fork_singlerole_take_step
               _ the_cn_fair_model _ _
-              (N $ S $ S n) (N $ S n) tid _ _ 3 6 _ _ _ _ ())=> /=;
+              (N $ S $ S n) (N $ S n) tid _ _ (f - 3) f _ _ _ _ ())=> /=;
       [done|done|set_solver|lia|constructor|].
     do 3 iModIntro.
     rewrite has_fuel_fuels.
+    replace (f - 1 - 1 - 1) with (f - 3) by lia.
     iFrame.    
     iIntros "Hm Hr Hf".
     wp_pures.
@@ -109,21 +110,23 @@ Section proof.
     by iApply ("IHn" with "Hf Hr Hm").
   Qed.
 
-  Lemma choose_nat_spec tid :
-    {{{ has_fuel tid () 2 ∗ frag_free_roles_are ∅ ∗ frag_model_is Start }}}
+  Lemma choose_nat_spec tid f :
+    8 ≤ f → f ≤ 40 →
+    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗ frag_model_is Start }}}
       choose_nat_prog #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(Hf & Hr & Hm) HΦ".
+    iIntros (Hle1 Hle2 Φ) "(Hf & Hr & Hm) HΦ".
     wp_lam.
     wp_bind ChooseNat.
-    iApply (wp_choose_nat_nostep _ _ _ {[() := 0]} with "[Hf]").
+    iApply (wp_choose_nat_nostep _ _ _ {[() := (f - 2)]} with "[Hf]").
     { set_solver. }
-    { rewrite -has_fuel_fuels_S has_fuel_fuels. done. }
+    { rewrite -has_fuel_fuels_S has_fuel_fuels.
+      replace (S (f - 2)) with (f - 1) by lia. done. }
     iIntros "!>" (n) "Hf".
     iApply (@wp_lift_pure_step_no_fork_singlerole_take_step
               _ the_cn_fair_model _ _
-              Start (N $ S n) tid _ _ 0 8 _ _ _ _ ())=> /=;
+              Start (N $ S n) tid _ _ (f - 2) f _ _ _ _ ())=> /=;
       [done|done|set_solver|lia|constructor|].
     do 3 iModIntro.
     rewrite has_fuel_fuels.
@@ -132,9 +135,41 @@ Section proof.
     destruct (decide (() ∈ {[()]})); [|set_solver].
     wp_pures.
     replace (Z.of_nat n + 1)%Z with (Z.of_nat $ S n) by lia.
-    iApply (decr_loop_spec with "[Hm Hr Hf]").
-    { rewrite has_fuel_fuels. iFrame. }
+    rewrite -has_fuel_fuels.
+    iApply (decr_loop_spec with "[$Hm $Hr $Hf]"); [lia|lia|].
     done.
   Qed.
 
 End proof.    
+
+#[local] Instance the_model_terminates :
+  FairTerminatingModel the_cn_fair_model.
+Proof. Admitted. 
+
+#[local] Instance proof_irrel_trans s x :
+  ProofIrrel ((let '(s', ℓ) := x in cntrans s ℓ s'): Prop).
+Proof. apply make_proof_irrel. Qed.
+
+Lemma model_finitary s :
+  Finite { '(s', ℓ) | cntrans s ℓ s'}.
+Proof. Admitted.
+
+Theorem choose_nat_terminates
+        (extr : extrace) (Hvex : extrace_valid extr)
+        (Hexfirst : (trfirst extr).1 = [choose_nat_prog #()]):
+  (∀ tid, fair_ex tid extr) -> terminating_trace extr.
+Proof.
+  eapply (simulation_adequacy_terminate_ftm (Mdl := the_cn_fair_model) (heapΣ the_cn_fair_model) NotStuck _ Start ∅) =>//.
+  { eapply valid_state_evolution_finitary_fairness.
+    intros ?. simpl. apply (model_finitary s1). }
+  iIntros (HGS) "!> Hm Hr Hs !>".
+  simpl.
+  replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
+  rewrite -fmap_gset_to_gmap.
+  rewrite /gset_to_gmap. simpl.
+  repeat rewrite fmap_insert.
+  repeat rewrite fmap_empty.
+  rewrite -has_fuel_fuels.
+  iApply (choose_nat_spec with "[$Hm $Hr $Hs]"); [simpl;lia|simpl;lia|].
+  eauto.
+Qed.
