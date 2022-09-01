@@ -48,9 +48,9 @@ Section Resources_updates.
     ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
     StLib_GlobalInv
       -∗ StLib_OwnLocalState i st_h__local st_h__sub
-      -∗ OwnLockInv i st_h__local st_h__foreign
+      -∗ StLib_OwnLockInv i st_h__local st_h__foreign
       ={E, E}=∗ StLib_OwnLocalState i st_h__local st_h__foreign
-        ∗ OwnLockInv i st_h__local st_h__foreign.
+        ∗ StLib_OwnLockInv i st_h__local st_h__foreign.
   Proof.
     iIntros (Hincl) "#Hinv
       (%f & %Hf & _ & _ & Hst_own__local & Hst_own__sub & Hown_localsnap)
@@ -108,11 +108,11 @@ Section Resources_updates.
     ⌜ ↑CRDT_InvName ⊆ E ⌝
     -∗ StLib_GlobalInv
     -∗ StLib_OwnLocalState i st_h__local st_h__sub
-    -∗ OwnLockInv i st_h__local st_h__foreign
+    -∗ StLib_OwnLockInv i st_h__local st_h__foreign
     -∗ StLib_OwnGlobalState h
     ={E,E}=∗
       StLib_OwnLocalState i (st_h__local ∪ {[fev]}) st_h__foreign
-      ∗ OwnLockInv i (st_h__local ∪ {[fev]}) st_h__foreign
+      ∗ StLib_OwnLockInv i (st_h__local ∪ {[fev]}) st_h__foreign
       ∗ StLib_OwnGlobalState (h ∪ {[ fev ]})
       ∗ ⌜fev ∉ h ⌝
       ∗ ⌜fev ∉ st_h__local ∪ st_h__foreign ⌝
@@ -298,8 +298,8 @@ Section Resources_updates.
   Lemma broadcast_update E (i: fRepId) st_h__local st_h__foreign:
     ⌜ ↑CRDT_InvName ⊆ E ⌝
     -∗ StLib_GlobalInv
-    -∗ OwnLockInv i st_h__local st_h__foreign
-    ={E}=∗ OwnLockInv i st_h__local st_h__foreign
+    -∗ StLib_OwnLockInv i st_h__local st_h__foreign
+    ={E}=∗ StLib_OwnLockInv i st_h__local st_h__foreign
       ∗ own (γ_loc_cc' !!! i) (◯ princ_ev (st_h__local ∪ st_h__foreign))
       ∗ ⌜ Lst_Validity (st_h__local ∪ st_h__foreign) ⌝.
   Proof.
@@ -348,11 +348,11 @@ Section Resources_updates.
   Lemma merge_update E (i j: fRepId) (st_h__local st_h__foreign st'_h__local st'_h__foreign: event_set LogOp):
     ⌜ ↑CRDT_InvName ⊆ E ⌝
     -∗ StLib_GlobalInv
-    -∗ OwnLockInv i st_h__local st_h__foreign
+    -∗ StLib_OwnLockInv i st_h__local st_h__foreign
     -∗ own (γ_loc_cc' !!! j) (◯ princ_ev (st'_h__local ∪ st'_h__foreign))
     -∗ ⌜ Lst_Validity (st'_h__local ∪ st'_h__foreign) ⌝
     ={E}=∗
-      OwnLockInv i st_h__local
+      StLib_OwnLockInv i st_h__local
         (st_h__foreign ∪
           (filter (λ e, EV_Orig e ≠ i) (st'_h__local ∪ st'_h__foreign))).
   Proof.

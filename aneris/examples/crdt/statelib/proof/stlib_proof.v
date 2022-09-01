@@ -108,25 +108,23 @@ Section StateLib_Proof.
     iDestruct (both_agree_agree with "Hst_h__local Hown_local")
       as "(Hst_h__local & Hown_local & <-)".
 
-
-    (** Begin TODO: move this block to [resources/resources_utils.v] *)
-    iInv "Hinv" as ">(%g & Hown_global & Hown_global_auth & %Hv & HS)" "Hclose'".
-    iDestruct ((forall_fin f) with "HS") as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub' & %Hproj & %Hlocisloc & %Hforisfor & %Hsubisfor & %Hcc & Hown_own_ & Hown_for_ & Hown_sub_ & Hown_cc_ & Hown_cc'_)]".
-    iDestruct (both_agree_agree with "Hown_sub Hown_sub_") as "(Hown_sub & Hown_sub_ & <-)".
-    iDestruct (both_agree_agree with "Hst_h__foreign Hown_for_") as "(Hst_h__foreign & Hown_for_ & <-)".
-    iDestruct (both_agree_agree with "Hst_h__local Hown_own_") as "(Hst_h__local & Hown_own_ & <-)".
-    assert (st_h__sub ⊆ st_h__foreign).
-    { by destruct Hcc as [?%(own_foreign_subset_foreign f) ?]. }
-    iDestruct ((forall_fin' f) with "[$Hothers Hown_sub_ Hown_for_ Hown_cc_ Hown_own_ Hown_cc'_]")
-      as "HS".
-    { iExists st_h__local, st_h__foreign, st_h__sub. iFrame. iFrame "%". }
-    iMod ("Hclose'" with "[Hown_global_auth Hown_global HS]") as "_"; last iModIntro.
-    { iNext. iExists g. by iFrame. }
-    (** End TODO: move this block to [resources/resources_utils.v] *)
+    iDestruct (LocState_LockInv__sub_in_foreign
+      with "[] Hinv [Hown_local Hown_sub][Hst_h__foreign Hst_h__local]")
+      as "> (
+        (%f' & %Hf_' & Hislocal & Hisfor & Hst_h__local & Hst_h__sub & #Hsnap) &
+        (%f'' & %Hf_'' & _ & _ & Hown_local & Hst_h__foreign) & %Hsub_in_for)";
+      [ done
+      | iExists f; by iFrame "Hown_local Hown_sub #"
+      | iExists f; by iFrame "Hst_h__foreign Hst_h__local" |].
+    assert(f' = f) as ->.
+    { apply fin_to_nat_inj. by rewrite Hf_'. }
+    assert(f'' = f) as ->.
+    { apply fin_to_nat_inj. by rewrite Hf_''. }
  
     (** Update of the resources. *)
+    iModIntro.
     iDestruct ((get_state_update _ f st_h__local st_h__foreign st_h__sub)
-      with "[] Hinv [Hst_h__local Hown_sub] [Hst_h__foreign Hown_local]")
+      with "[] Hinv [Hst_h__local Hst_h__sub] [Hst_h__foreign Hown_local]")
       as "> [Hown__local Hown_lockinv]"; first trivial.
     { iExists f. iFrame. by iFrame "#". }
     { iExists f. by iFrame. }
@@ -180,35 +178,12 @@ Section StateLib_Proof.
       "[[Hown__global Hown__local] Hclose]".
 
 
-    (** Begin: TODO: move to resources/resources_utils.v *)
-    iAssert (StLib_OwnLocalState repId h__local' h__sub
-      ∗ ∃ (f: fRepId), ⌜fin_to_nat f = repId⌝)%I
-      with "[Hown__local]"
-      as "(Hown__local & %f & %Hf)".
-    { iDestruct "Hown__local" as "(%f & %Hf & H)".
-      iSplitL; last by iExists f.
-      iExists f. by iFrame. }
-    (** End: TODO: move to resources/resources_utils.v *)
+    iDestruct (StLib_OwnLocalState__get_fRepId with "Hown__local")
+      as "(%f & %Hf & Hown__local)".
 
 
-    (** Begin: TODO: move to resources/resources_utils.v *)
-    iAssert (StLib_OwnLocalState repId h__local h__sub
-      ∗ OwnLockInv repId h__local h__for
-      ∗ ⌜h__local = h__local'⌝)%I
-      with "[Hown__local Hown__lockinv]"
-      as "(Hown__local &  Hown__lockinv & %heq)".
-    { iDestruct "Hown__local" as "(%f' & %Hf' & %Hlocisloc &  %Hsubisfor & Hst_own__loc & Hst_own__sub & Hsnap)".
-      iDestruct "Hown__lockinv" as "(%f'' & %Hf'' & _ & %Hforisfor & Hst_own__loc' & Hst_own__for)".
-      assert(f' = f'') as ->.
-      { apply fin_to_nat_inj. by rewrite Hf' Hf''. }
-      iDestruct (both_agree_agree with "Hst_own__loc Hst_own__loc'")
-        as "(Hst_own__loc & Hst_own__loc' & %heq )".
-      rewrite heq.
-      iSplitL "Hst_own__loc Hst_own__sub Hsnap"; last iSplitL; last done.
-      all: iExists f''; iFrame.
-      - iFrame "%". by rewrite -heq.
-      - iFrame "%". by rewrite -Hf'' -heq. }
-    (** End: TODO: move to resources/resources_utils.v *)
+    iDestruct (Lock_Local__same_local with "Hown__lockinv Hown__local")
+      as "(Hown__lockinv & Hown__local & ->)".
 
 
     iDestruct ((LocState_LockInv__sub_in_foreign _ f h__local h__for h__sub)
@@ -231,7 +206,6 @@ Section StateLib_Proof.
 
     set fev := fresh_event (h__local ∪ h__for) log_op f.
 
-    rewrite -heq.
     iIntros "Hloc'".
     iMod ("Hclose" $! fev (h_g ∪ {[fev]}) (h__local ∪ {[fev]}) h__for with "[Hown__global Hown__local]") as "Hpost"; last iModIntro.
     { iFrame. iFrame "%".
@@ -319,7 +293,7 @@ Section StateLib_Proof.
     wp_pure _.
     wp_alloc l as "Hl". wp_let.
     iMod(own_alloc (1%Qp, to_agree O%nat)) as (γi) "[Hγi Hi]"; first done.
-    iMod (inv_alloc (nroot .@ "jfj") _
+    iMod (inv_alloc socket_inv_ns _
       (∃ (v: nat),
         own γi ((1/2)%Qp, to_agree v) ∗ l ↦[ip_of_address sock_addr] #v)%I
         with "[Hi Hl]") as "#Hl".

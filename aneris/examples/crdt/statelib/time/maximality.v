@@ -101,17 +101,13 @@ Section ComputeMaximals.
       → find_one_maximal (fun a => time a) TM_lt x (elements g)
         ∈ (compute_maximals g).
   Proof.
-    (** TODO: remove this assertion *)
-    assert (Hrex: ∀ a b, TM_lt a b → TM_lt b a → False);
-      first apply TM_lt_exclusion.
-    (**)
     intros Hxl.
     apply compute_maximals_spec_2;
       first by destruct ( find_one_maximal_eq_or_elem_of (fun a => time a) TM_lt x
         (elements g)) as [Hyp|Hyp%elem_of_elements]; first by rewrite Hyp.
     intros ev' Hev'l%elem_of_elements Hneg.
     by apply (find_one_maximal_maximal (fun a => time a) TM_lt TM_le
-      TM_lt_TM_le TM_le_eq_or_lt TM_lt_irreflexive Hrex TM_le_lt_trans
+      TM_lt_TM_le TM_le_eq_or_lt TM_lt_irreflexive TM_lt_exclusion TM_le_lt_trans
       x (elements g) ev').
   Qed.
 

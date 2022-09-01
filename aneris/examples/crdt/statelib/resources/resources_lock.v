@@ -20,12 +20,15 @@ Section AboutLock.
 
   Notation princ_ev := (@principal (gset (Event CRDT_Op)) cc_subseteq).
 
-  Definition OwnLockInv (i: RepId) (h__local h__foreign: event_set CRDT_Op): iProp Σ :=
+  Definition StLib_OwnLockInv (i: RepId) (h__local h__foreign: event_set CRDT_Op): iProp Σ :=
     ∃ (f: fRepId),
       ⌜ fin_to_nat f = i ⌝
       ∗ ⌜ local_events i h__local ⌝
       ∗ ⌜ foreign_events i h__foreign ⌝
       ∗ own (γ_loc_own !!! f) ((1/3)%Qp, to_agree h__local)
       ∗ own (γ_loc_for !!! f) ((1/2)%Qp, to_agree h__foreign).
+
+  Definition StLib_OwnLockSnap (f: fRepId) (h: event_set CRDT_Op) :=
+    own (γ_loc_cc' !!! f) (◯ princ_ev h).
 
 End AboutLock.
