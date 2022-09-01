@@ -256,7 +256,8 @@ Section definitions.
   (* We track firewall state for an _entire_ socket address group.
      That is, within an address group, all addresses are public or private. *)
   Definition firewall_auth (fw_st : gmap socket_address_group firewall_st) : iProp Σ :=
-    own (A:=firewallUR) aneris_firewall_name (● ((λ st, (1%Qp, to_agree st)) <$> fw_st)).
+    own (A:=firewallUR) aneris_firewall_name (● ((λ st, (1%Qp, to_agree st)) <$> fw_st)) ∗
+    own aneris_socket_address_group_name (◯ (DGSets (dom fw_st))).
 
   (* Firewall state for an individual socket address group *)
   Definition firewall_frag (sag : socket_address_group) (q : Qp) (fw_st : firewall_st) : iProp Σ :=
@@ -1143,10 +1144,10 @@ Section resource_lemmas.
     done.
   Qed.
 
-  Lemma firewall_frag_auth_agree fw_st sag q st :
+  Lemma firewall_auth_frag_agree fw_st sag q st :
     firewall_auth fw_st ⊢ firewall_frag sag q st -∗ ⌜fw_st !! sag = Some st⌝.
   Proof.
-    iIntros "Hauth Hfrag".
+    iIntros "[Hauth _] Hfrag".
     rewrite /firewall_auth /firewall_frag.
     iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hvalid".
     iPureIntro.
@@ -1157,7 +1158,7 @@ Section resource_lemmas.
     apply option_included in Hlookup as [Hcontr|[a [b [Heq1 [Heq2 Heq3]]]]].
     { by inversion Hcontr. }
     inversion Heq1; subst.
-    destruct (fw_st !! sag) as [x|] eqn:Hst; rewrite Hst in Heq2; [|done].
+    destruct (fw_st !! sag) as [x|] eqn:Hst; [ | by inversion Heq2].
     simpl in Heq2.
     inversion Heq2; subst.
     f_equal.
@@ -1169,7 +1170,7 @@ Section resource_lemmas.
       by apply to_agree_inj.
     - apply prod_included in Hincl' as [_ Hincl'].
       simpl in *.
-      apply to_agree_included in Hincl'.
+      rewrite to_agree_included in Hincl'.
       by apply leibniz_equiv.
   Qed.
 
@@ -1181,7 +1182,8 @@ Section resource_lemmas.
                   firewall_auth (<[sag := st']> fw_st) ∗ firewall_frag sag 1%Qp st'.
   Proof.
     iIntros "Hauth Hfrag".
-    iDestruct (firewall_frag_auth_agree with "Hauth Hfrag") as "%Hlookup".
+    iDestruct (firewall_auth_frag_agree with "Hauth Hfrag") as "%Hlookup".
+    iDestruct "Hauth" as "[Hauth #Hdom]".
     rewrite /firewall_auth /firewall_frag.
     iMod ((own_update_2 _ _ _ (● _ ⋅ ◯ {[sag := (1%Qp, to_agree st')]})) with "Hauth Hfrag") as "[Hauth' Hfrag']".
     { apply auth_update.
@@ -1189,7 +1191,25 @@ Section resource_lemmas.
                                           ((1%Qp, to_agree st') : fw_valR) _).
       - rewrite lookup_fmap Hlookup; done.
       - apply exclusive_local_update; done. }
-    rewrite fmap_insert. auto with iFrame.
+    rewrite fmap_insert.
+    iModIntro.  iFrame "∗#".
+    assert (dom (<[sag:=st']> fw_st) ≡ dom fw_st) as Heq.
+    { rewrite (dom_insert fw_st sag st').
+      split.
+      - intros [->%elem_of_singleton|Hr]%elem_of_union; [|done].
+        rewrite elem_of_dom; done.
+      - set_solver. }
+    apply leibniz_equiv in Heq.
+    rewrite Heq. (* can't rewrite in the assert directly for some reason *)
+    done.
+  Qed.
+
+  Lemma firewall_auth_mapsto_agree fw_st sag q bs br st s :
+    firewall_auth fw_st -∗ mapsto_messages sag q bs br st s -∗ ⌜fw_st !! sag = Some st⌝.
+  Proof.
+    iIntros "Hauth Hmt".
+    iDestruct "Hmt" as (??) "(_&_&_&_&Hfrag&_)".
+    iApply (firewall_auth_frag_agree with "Hauth Hfrag").
   Qed.
 
   #[global] Instance mapsto_messages_fractional sag bs br s :

@@ -100,9 +100,36 @@ Section definitions.
         free_ips_auth free_ips ∗
         free_ports_auth free_ports)%I.
 
-  (** Coherence of adversary and public addresses **)
-  Definition adversary_coh σ : iProp Σ :=
-    adversary_ips_auth (state_adversaries σ).
+  (** Coherence of adversary and firewall state **)
+  Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
+    ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FWPublic.
+
+  Lemma mapsto_messages_lookup_public fw_st σ sa sag bs bt s q :
+    firewall_st_coh fw_st σ ->
+    sa ∈ sag ->
+    firewall_auth fw_st -∗
+    sag ⤳*p[ bs , bt ]{ q } s -∗
+    ⌜sa ∈ state_public_addrs σ⌝.
+  Proof.
+    iIntros (Hcoh Hin) "Hauth Hmpt".
+    iDestruct (firewall_auth_mapsto_agree with "Hauth Hmpt") as "%Hlook".
+    iPureIntro.
+    apply (Hcoh sa); eauto.
+  Qed.
+
+  Lemma mapsto_messages_lookup_private fw_st σ sa sag bs bt s q :
+    firewall_st_coh fw_st σ ->
+    sa ∈ sag ->
+    firewall_auth fw_st -∗
+    sag ⤳*[ bs , bt ]{ q } s -∗
+    ⌜sa ∉ state_public_addrs σ⌝.
+  Proof.
+  Admitted.
+
+  Definition adversary_coh σ : iProp Σ := ∃ fw_st,
+    adversary_ips_auth (state_adversaries σ) ∗
+    firewall_auth fw_st ∗
+    ⌜⌝
 
   (** Network sockets coherence for bound ports, socket handlers,
       receive buffers, and socket addresses *)
