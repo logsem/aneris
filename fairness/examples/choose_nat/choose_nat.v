@@ -21,7 +21,7 @@ Definition decr_loop_prog : val :=
 
 Definition choose_nat_prog : val :=
   λ: <>,
-     let: "n" := ChooseNat in
+     let: "n" := ChooseNat + #1 in
      decr_loop_prog "n".
 
 Inductive CN := Start | N (n : nat).
@@ -107,6 +107,34 @@ Section proof.
     destruct (decide (() ∈ {[()]})); [|set_solver].
     rewrite has_fuel_fuels.
     by iApply ("IHn" with "Hf Hr Hm").
+  Qed.
+
+  Lemma choose_nat_spec tid :
+    {{{ has_fuel tid () 2 ∗ frag_free_roles_are ∅ ∗ frag_model_is Start }}}
+      choose_nat_prog #() @ tid
+    {{{ RET #(); tid ↦M ∅ }}}.
+  Proof.
+    iIntros (Φ) "(Hf & Hr & Hm) HΦ".
+    wp_lam.
+    wp_bind ChooseNat.
+    iApply (wp_choose_nat_nostep _ _ _ {[() := 0]} with "[Hf]").
+    { set_solver. }
+    { rewrite -has_fuel_fuels_S has_fuel_fuels. done. }
+    iIntros "!>" (n) "Hf".
+    iApply (@wp_lift_pure_step_no_fork_singlerole_take_step
+              _ the_cn_fair_model _ _
+              Start (N $ S n) tid _ _ 0 8 _ _ _ _ ())=> /=;
+      [done|done|set_solver|lia|constructor|].
+    do 3 iModIntro.
+    rewrite has_fuel_fuels.
+    iFrame.
+    iIntros "Hm Hr Hf".
+    destruct (decide (() ∈ {[()]})); [|set_solver].
+    wp_pures.
+    replace (Z.of_nat n + 1)%Z with (Z.of_nat $ S n) by lia.
+    iApply (decr_loop_spec with "[Hm Hr Hf]").
+    { rewrite has_fuel_fuels. iFrame. }
+    done.
   Qed.
 
 End proof.    

@@ -643,7 +643,7 @@ Inductive head_step : expr → state → expr → state → list expr → Prop :
      head_step (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ
                (Val $ LitV $ LitInt i1) (state_upd_heap <[l:=LitV (LitInt (i1 + i2))]>σ)
               []
-  | ChooseNatS n σ:
+  | ChooseNatS (n:nat) σ:
     head_step ChooseNat σ (Val $ LitV $ LitInt n) σ []
 .
 

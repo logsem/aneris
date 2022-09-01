@@ -994,17 +994,17 @@ Proof.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
 Qed.
 
-Lemma wp_choose_nat_nostep s tid E v fs :
+Lemma wp_choose_nat_nostep s tid E fs :
   fs ≠ ∅ ->
   {{{ has_fuels_S tid fs }}}
     ChooseNat @ s; tid; E
-  {{{ n, RET LitV (LitInt n); has_fuels tid fs }}}.
+  {{{ (n:nat), RET LitV (LitInt n); has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iModIntro; iSplit; eauto.
   (* TODO: Improve this so we hide the (arbitrary) choice of `n` *)
-  Unshelve. 2: apply 0.
+  Unshelve. 2: apply O.
   iIntros (e2 σ2 efs Hstep). iNext.
   inv_head_step.
   iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
