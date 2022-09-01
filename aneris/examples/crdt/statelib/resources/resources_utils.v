@@ -73,10 +73,10 @@ Section Resources_utils.
     E (f f': fRepId) (st_h__local st_h__foreign h: event_set LogOp):
     ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
     StLib_GlobalInv -∗
-    OwnLockInv f st_h__local st_h__foreign -∗
-    own (γ_loc_cc' !!! f') (◯ princ_ev h)
+    StLib_OwnLockInv f st_h__local st_h__foreign -∗
+    StLib_OwnLockSnap f' h
     ={E}=∗
-      OwnLockInv f st_h__local st_h__foreign
+      StLib_OwnLockInv f st_h__local st_h__foreign
       ∗ ⌜ filter (λ e, EV_Orig e = f) h ⊆ st_h__local ⌝.
   Proof.
     iIntros (Hincl) "#Hinv Hown__lockinv #Hown__snap".
@@ -150,9 +150,9 @@ Section Resources_utils.
     ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
     StLib_GlobalInv
       -∗ StLib_OwnLocalState i st_h__local st_h__sub
-      -∗ OwnLockInv i st_h__local st_h__foreign
+      -∗ StLib_OwnLockInv i st_h__local st_h__foreign
       ={E}=∗ StLib_OwnLocalState i st_h__local st_h__sub
-        ∗ OwnLockInv i st_h__local st_h__foreign
+        ∗ StLib_OwnLockInv i st_h__local st_h__foreign
         ∗ ⌜ st_h__sub ⊆ st_h__foreign ⌝.
   Proof.
     iIntros (Hincl) "#Hinv Hown__local Hown__lockinv".
@@ -201,9 +201,9 @@ Section Resources_utils.
     ⌜ ↑CRDT_InvName ⊆ E ⌝ -∗
     StLib_GlobalInv
       -∗ StLib_OwnLocalState i st_h__local st_h__sub
-      -∗ OwnLockInv i st_h__local st_h__foreign
+      -∗ StLib_OwnLockInv i st_h__local st_h__foreign
       ={E}=∗ StLib_OwnLocalState i st_h__local st_h__sub
-        ∗ OwnLockInv i st_h__local st_h__foreign
+        ∗ StLib_OwnLockInv i st_h__local st_h__foreign
         ∗ ⌜ Lst_Validity (st_h__local ∪ st_h__foreign) ⌝.
   Proof.
     iIntros (Hincl) "#Hinv Hown__local Hown__lockinv".
@@ -245,6 +245,36 @@ Section Resources_utils.
     { iExists f. by iFrame. }
     iPureIntro.
     rewrite -Hst_proj. exact (VGst_lhst_valid _ Hv f).
+  Qed.
+
+  Lemma StLib_OwnLocalState__get_fRepId repId h__local h__sub:
+    StLib_OwnLocalState repId h__local h__sub
+    -∗ ∃ (f: fRepId), ⌜fin_to_nat f = repId⌝
+      ∗ StLib_OwnLocalState repId h__local h__sub.
+  Proof.
+    iIntros "(%f & %Hf & H)".
+    iExists f. iSplit; first done.
+    iExists f. by iSplit.
+  Qed.
+
+  Lemma Lock_Local__same_local repId h__local h__for h__local' h__sub:
+    StLib_OwnLockInv repId h__local h__for
+    -∗ StLib_OwnLocalState repId h__local' h__sub
+    -∗ StLib_OwnLockInv repId h__local h__for
+     ∗ StLib_OwnLocalState repId h__local h__sub
+     ∗ ⌜ h__local'  = h__local ⌝.
+  Proof.
+    iIntros "Hown__lockinv Hown__local".
+    iDestruct "Hown__local" as "(%f' & %Hf' & %Hlocisloc &  %Hsubisfor & Hst_own__loc & Hst_own__sub & Hsnap)".
+    iDestruct "Hown__lockinv" as "(%f'' & %Hf'' & %Hlocisloc' & %Hforisfor & Hst_own__loc' & Hst_own__for)".
+    assert(f' = f'') as ->.
+    { apply fin_to_nat_inj. by rewrite Hf' Hf''. }
+    iDestruct (both_agree_agree with "Hst_own__loc Hst_own__loc'")
+      as "(Hst_own__loc & Hst_own__loc' & %heq )".
+    rewrite heq.
+    iSplitR "Hst_own__loc Hst_own__sub Hsnap"; last iSplitL; last done.
+    all: iExists f''; iFrame; iFrame "%".
+    by rewrite -heq.
   Qed.
 
 End Resources_utils.

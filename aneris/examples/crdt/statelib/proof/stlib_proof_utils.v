@@ -157,7 +157,7 @@ Section LockInvariant.
       ⌜ip_of_address <$> CRDT_Addresses !! i = Some ip⌝ ∗
       st_loc ↦[ip] phys_st ∗
       ⌜StLib_St_Coh log_st phys_st⌝ ∗
-      OwnLockInv i h__own h__for ∗
+      StLib_OwnLockInv i h__own h__for ∗
       ⌜⟦h__own ∪ h__for⟧ ⇝ log_st⌝.
 
   Definition lock_inv_ns := nroot.@"lock_inv_ns".

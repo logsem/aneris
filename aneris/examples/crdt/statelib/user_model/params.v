@@ -33,13 +33,6 @@ Section Params.
     StLib_StCoh_Ser st v : StLib_St_Coh st v -> Serializable StLib_StSerialization v;
   }.
 
-  Definition StLib_Event_Coh `{!StLib_Params} (e : Event LogOp) (v : val) : Prop :=
-    ∃ valOp valTime valOrig,
-      v = ((valOp, valTime), valOrig)%V ∧
-      StLib_Op_Coh e.(EV_Op) valOp ∧
-      True ∧ (*is_list (elements e.(EV_Time)) valTime ∧ TODO: deal with the time representation *)
-      valOrig = #(e.(EV_Orig)).
-
   Class StLib_Res `{!CRDT_Params} := {
     StLib_CRDT_Res :> CRDT_Res_Mixin Mdl Σ LogOp;
     StLib_InitToken : (fin (length CRDT_Addresses)) -> iProp Σ;

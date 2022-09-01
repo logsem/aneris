@@ -124,10 +124,6 @@ Section Instantiation.
       StLib_SocketProto := socket_proto;
   }.
 
-  (** TODO: ask Abel whether I should:
-    * - replace this by a proof obligation
-    * - Qed instead of defined
-    *)
   Global Instance stlib_setup_instance : StLibSetup.
   Proof.
     iIntros (E) "_".
