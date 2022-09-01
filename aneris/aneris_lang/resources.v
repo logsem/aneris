@@ -1174,10 +1174,13 @@ Section resource_lemmas.
     intros p q.
     iSplit.
     - iDestruct 1 as (? ?) "(#?&#?&#?&(#Hsag & [Hfw [Hp Hq]]))".
-      iFrame. iSplit; iExists _, _; iFrame "#".
+      iFrame.
+      iDestruct "Hfw" as "[Hp Hq]".
+      iSplitL "Hp"; iExists _, _; iFrame "#∗".
     - iIntros "[Hp Hq]".
-      iDestruct "Hp" as (? ?) "(#HAs1&#HAr1&#?&#Hsag&Hp)".
-      iDestruct "Hq" as (? ?) "(#HAs2&#HAr2&#?&_&Hq)".
+      iDestruct "Hp" as (? ?) "(#HAs1&#HAr1&#?&#Hsag&Hfp&Hp)".
+      iDestruct "Hq" as (? ?) "(#HAs2&#HAr2&#?&_&Hfq&Hq)".
+      iDestruct (fractional p q with "[Hfp Hfq]") as "Hfw"; [iFrame|].
       iExists _,_; iFrame "#∗".
   Qed.
 
@@ -1224,7 +1227,7 @@ Section resource_lemmas.
     sag ⤳*[bs, br] (R', T') ∗ messages_ctx (<[sag := (R',T')]>mhm).
   Proof.
     iIntros "(Hl & Ha)".
-    iDestruct "Hl" as (??) "(?&?&?&#Hsag&Hl)".
+    iDestruct "Hl" as (??) "(?&?&?&#Hsag&Hfw&Hl)".
     iMod (gen_heap_light_update _ mhm sag (R,T) (R', T')
             with "Ha Hl") as "[Ha Hf]".
     iModIntro.
@@ -1235,7 +1238,7 @@ Section resource_lemmas.
     sag ⤳*[bs, br] (R, T) -∗ messages_ctx mh -∗ ⌜mh !! sag = Some (R,T)⌝.
   Proof.
     iIntros "Hf Ha".
-    iDestruct "Hf" as (??) "(?&?&?&?&Hf&Hown)".
+    iDestruct "Hf" as (??) "(?&?&?&?&Hfw&Hf&Hown)".
     by iApply (gen_heap_light_valid with "Ha Hf").
   Qed.
 
@@ -1245,8 +1248,8 @@ Section resource_lemmas.
     ⌜sag1 = sag2 ∧ bs = bs' ∧ br = br' ∧ R = R' ∧ T = T'⌝.
   Proof.
     iIntros (Hin1 Hin2) "Ha1 Ha2".
-    iDestruct "Ha1" as (??) "(HAs1&HAr1&[%Heq1 %Heq2]&(#Hsag1 & Ha1 & Hown1))".
-    iDestruct "Ha2" as (??) "(HAs2&HAr2&[%Heq3 %Heq4]&(#Hsag2 & Ha2 & Hown2))".
+    iDestruct "Ha1" as (??) "(HAs1&HAr1&[%Heq1 %Heq2]&(#Hsag1 & Hfw1 & Ha1 & Hown1))".
+    iDestruct "Ha2" as (??) "(HAs2&HAr2&[%Heq3 %Heq4]&(#Hsag2 & Hfw2 & Ha2 & Hown2))".
     iDestruct (observed_send_agree with "HAs1 HAs2") as %->.
     iDestruct (observed_receive_agree with "HAr1 HAr2") as %->.
     iDestruct (socket_address_group_own_agree with "Hsag1 Hsag2")
