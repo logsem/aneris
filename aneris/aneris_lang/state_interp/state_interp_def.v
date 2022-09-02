@@ -104,6 +104,7 @@ Section definitions.
   Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
     ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FWPublic.
 
+  (* TODO: move the lemmas below to a separate file? *)
   Lemma mapsto_messages_lookup_public fw_st σ sa sag bs bt s q :
     firewall_st_coh fw_st σ ->
     sa ∈ sag ->
@@ -124,12 +125,22 @@ Section definitions.
     sag ⤳*[ bs , bt ]{ q } s -∗
     ⌜sa ∉ state_public_addrs σ⌝.
   Proof.
-  Admitted.
+    iIntros (Hcoh Hsa) "Hauth Hmpt".
+    iDestruct (firewall_auth_mapsto_agree with "Hauth Hmpt") as "%Hlook".
+    iDestruct (firewall_auth_disj with "Hauth") as "%Heq".
+    iPureIntro.
+    intros contra.
+    apply (Hcoh sa) in contra as [sag' [Hin Hpublic]].
+    assert (sag = sag') as ->.
+    { eapply (Heq sa sag sag'); eauto. }
+    rewrite Hlook in Hpublic.
+    inversion Hpublic; done.
+  Qed.
 
   Definition adversary_coh σ : iProp Σ := ∃ fw_st,
     adversary_ips_auth (state_adversaries σ) ∗
     firewall_auth fw_st ∗
-    ⌜⌝
+    ⌜firewall_st_coh fw_st σ⌝.
 
   (** Network sockets coherence for bound ports, socket handlers,
       receive buffers, and socket addresses *)

@@ -1174,6 +1174,25 @@ Section resource_lemmas.
       by apply leibniz_equiv.
   Qed.
 
+  Lemma firewall_auth_disj fw_st :
+    firewall_auth fw_st -∗
+                  ⌜∀ sa sag sag',
+                     sa ∈ sag ->
+                     sa ∈ sag' ->
+                     is_Some (fw_st !! sag) ->
+                     is_Some (fw_st !! sag') ->
+                     sag = sag'⌝.
+  Proof.
+    iIntros "[_ Hdisj]".
+    iIntros (sa sag sag' Hin Hin' Hsome Hsome').
+    iDestruct (own_valid with "Hdisj") as "%Hv".
+    rewrite auth_frag_valid in Hv.
+    iPureIntro.
+    rewrite -elem_of_dom in Hsome.
+    rewrite -elem_of_dom in Hsome'.
+    eapply (elem_of_all_disjoint_eq _ _ sa (dom fw_st)); auto.
+  Qed.
+
   (* Used in `firewall_auth_frag_update` as a type annotation to help type inference *)
   Notation fw_valR := (prodR fracR (agreeR (leibnizO firewall_st))).
 
