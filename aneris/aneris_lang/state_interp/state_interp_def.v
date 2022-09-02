@@ -100,7 +100,7 @@ Section definitions.
         free_ips_auth free_ips ∗
         free_ports_auth free_ports)%I.
 
-  (** Coherence of adversary and firewall state **)
+  (* The state and firewall agree on which addresses are public *)
   Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
     ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FWPublic.
 
@@ -137,10 +137,22 @@ Section definitions.
     inversion Hpublic; done.
   Qed.
 
+  (* Every delivered message that comes from an adversary
+     is delivered to a public address *)
+  Definition firewall_delivery_coh σ : Prop :=
+    ∀ ip skts sh skt msgs m,
+      state_sockets σ !! ip = Some skts ->
+      skts !! sh = Some (skt, msgs) ->
+      m ∈ msgs ->
+      (ip_of_address (m_sender m)) ∈ (state_adversaries σ) ->
+      ∃ sa, (saddress skt) = Some sa ∧ sa ∈ (state_public_addrs σ).
+
+  (* Adversary and firewall coherence *)
   Definition adversary_coh σ : iProp Σ := ∃ fw_st,
     adversary_ips_auth (state_adversaries σ) ∗
     firewall_auth fw_st ∗
-    ⌜firewall_st_coh fw_st σ⌝.
+    ⌜firewall_st_coh fw_st σ⌝ ∗
+    ⌜firewall_delivery_coh σ⌝.
 
   (** Network sockets coherence for bound ports, socket handlers,
       receive buffers, and socket addresses *)
@@ -229,6 +241,8 @@ Section definitions.
           socket_address_group_own sagR) ∗
       (* For any message [m] in [ms] *)
       ([∗ set] m ∈ ms,
+        (* [m] was sent by an adversary *)
+         (adversary_ip (ip_of_address (m_sender m))) ∨
          ∃ sagT sagR Φ,
            (* The group of the message is disjoint, and *)
            ⌜m_destination m ∈ sagR⌝ ∗ sagR ⤇* Φ ∗
@@ -237,11 +251,7 @@ Section definitions.
               resources  specified by the protocol *)
            ((∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ▷ Φ m') ∨
             (* or [m] has been delivered somewhere *)
-            (∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ⌜message_received m' mhm⌝)) ∨
-            (* or [m] was sent by an adversary *)
-            (* TODO: unclear what, if anything, to do about address groups *)
-            (* TODO: unclear if in this case need to own `sagR ⤇* Φ` *)
-            (adversary_ip (ip_of_address (m_sender m)))).
+            (∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ⌜message_received m' mhm⌝))).
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=

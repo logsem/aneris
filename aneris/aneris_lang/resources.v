@@ -1193,7 +1193,7 @@ Section resource_lemmas.
     eapply (elem_of_all_disjoint_eq _ _ sa (dom fw_st)); auto.
   Qed.
 
-  (* Used in `firewall_auth_frag_update` as a type annotation to help type inference *)
+  (* Used in [firewall_auth_frag_update] as a type annotation to help type inference *)
   Notation fw_valR := (prodR fracR (agreeR (leibnizO firewall_st))).
 
   Lemma firewall_auth_frag_update fw_st sag st st' :
