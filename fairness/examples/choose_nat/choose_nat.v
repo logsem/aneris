@@ -18,12 +18,12 @@ Set Default Proof Using "Type".
 
 Definition decr_loop_prog (l : loc) : val :=
   rec: "go" <> :=
-    if: !#l = #0 then #() else #l <- (!#l - #1);; "go" #().
+    if: !#l = #1 then #l <- (!#l - #1) else #l <- (!#l - #1);; "go" #().
 
 Definition choose_nat_prog (l : loc) : val :=
   λ: <>,
      #l <- (ChooseNat + #1);;
-     decr_loop_prog l.
+     decr_loop_prog l #().
 
 Inductive CN := Start | N (n : nat).
 
@@ -71,23 +71,21 @@ Defined.
 Definition the_model : LiveModel heap_lang the_cn_fair_model :=
   {| fuel_limit (x: fmstate the_cn_fair_model) := 40 %nat |}.
 
-Class choose_natPreG Σ := ChooseNatPreG {
+Class choose_natG Σ := ChooseNatG {
   choose_nat_G :> inG Σ (excl_authR ZO);
  }.
 
-Class choose_natG Σ := ChooseNatG {
-  choose_nat_gname : gname;
-  choose_nat_preG :> inG Σ (excl_authR ZO);
- }.
+Definition choose_natΣ : gFunctors :=
+  #[ heapΣ the_cn_fair_model; GFunctor (excl_authR ZO) ].
 
 Global Instance subG_choosenatΣ {Σ} :
-  subG (GFunctor (excl_authR ZO)) Σ → choose_natPreG Σ.
+  subG choose_natΣ Σ → choose_natG Σ.
 Proof. solve_inG. Qed.
+
+Let Ns := nroot .@ "choose_nat".
 
 Section proof.
   Context `{!heapGS Σ the_cn_fair_model the_model, choose_natG Σ}.
-
-  Let Ns := nroot .@ "choose_nat".
 
   Definition choose_nat_inv_inner (γ : gname) (l:loc) : iProp Σ :=
     ∃ (cn:CN), frag_model_is cn ∗ l ↦ #(F_CN cn) ∗ own γ (●E (F_CN cn)).
@@ -96,97 +94,187 @@ Section proof.
     inv Ns (choose_nat_inv_inner γ l).
 
   Lemma decr_loop_spec γ tid l (n:nat) f :
-    6 ≤ f → f ≤ 40 →
+    7 ≤ f → f ≤ 38 →
     choose_nat_inv γ l -∗
     {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗
         own γ (◯E (Z.of_nat (S n))) }}}
-      decr_loop_prog l #() @ tid
+      decr_loop_prog l #() @ tid ; ⊤
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof. Admitted.
-
-  (* Lemma decr_loop_spec γ tid l (n:nat) f : *)
-  (*   6 ≤ f → f ≤ 40 → *)
-  (*   {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗ *)
-  (*       own γ (◯E (Z.of_nat (S n))) }}} *)
-  (*     decr_loop_prog l @ tid *)
-  (*   {{{ RET #(); tid ↦M ∅ }}}. *)
-  (* Proof. *)
-  (*   iIntros (Hle1 Hle2 Φ) "(Hf & Hr & Hm) HΦ". *)
-  (*   iInduction n as [|n] "IHn". *)
-  (*   { wp_lam. wp_pures. wp_lam. wp_pures. *)
-  (*     iApply (@wp_lift_pure_step_no_fork_singlerole_take_step *)
-  (*             _ the_cn_fair_model _ _ *)
-  (*             (N 1) (N 0) tid _ _ (f - 6) (f - 3) _ _ _ _ ())=> /=; *)
-  (*       [done|set_solver|lia|constructor|]. *)
-  (*     do 3 iModIntro. *)
-  (*     rewrite has_fuel_fuels. *)
-  (*     replace (f - 1 - 1 - 1 - 1 - 1 - 1) with (f - 6) by lia. *)
-  (*     iFrame. *)
-  (*     iIntros "Hm Hr Hf". *)
-  (*     destruct (decide (() ∈ ∅)); [set_solver|]. *)
-  (*     wp_pures. by iApply "HΦ". } *)
-  (*   wp_lam. *)
-  (*   rewrite fmap_insert fmap_empty. (* Sigh.. *) *)
-  (*   wp_pures. *)
-  (*   rewrite fmap_insert fmap_empty. (* Sigh.. *) *)
-  (*   wp_pures. *)
-  (*   rewrite fmap_insert fmap_empty. (* Sigh.. *) *)
-  (*   iApply (@wp_lift_pure_step_no_fork_singlerole_take_step *)
-  (*             _ the_cn_fair_model _ _ *)
-  (*             (N $ S $ S n) (N $ S n) tid _ _ (f - 3) f _ _ _ _ ())=> /=; *)
-  (*     [done|done|set_solver|lia|constructor|]. *)
-  (*   do 3 iModIntro. *)
-  (*   rewrite has_fuel_fuels. *)
-  (*   replace (f - 1 - 1 - 1) with (f - 3) by lia. *)
-  (*   iFrame.     *)
-  (*   iIntros "Hm Hr Hf". *)
-  (*   wp_pures. *)
-  (*   replace (Z.of_nat (S $ S n) - 1)%Z with (Z.of_nat $ S n) by lia. *)
-  (*   destruct (decide (() ∈ {[()]})); [|set_solver]. *)
-  (*   rewrite has_fuel_fuels. *)
-  (*   by iApply ("IHn" with "Hf Hr Hm"). *)
-  (* Qed. *)
+  Proof. 
+    iIntros (Hle1 Hle2) "#IH".
+    iIntros "!>" (Φ) "(Hf & Hr & Hm) HΦ".
+    iInduction n as [|n] "IHn".
+    { wp_lam.
+      rewrite /choose_nat_inv.
+      wp_bind (Load _).
+      iApply wp_atomic.
+      iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+      iModIntro.
+      iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+      wp_load.
+      iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+      iModIntro. iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+      { iExists _. iFrame. }
+      iModIntro.
+      rewrite Hvalid. wp_pures.
+      clear cn Hvalid.
+      wp_bind (Load _).
+      iApply wp_atomic.
+      iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+      iModIntro.
+      iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+      wp_load.
+      iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+      iModIntro. iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+      { iExists _. iFrame. }
+      iModIntro.
+      rewrite Hvalid. wp_pures.
+      replace (Z.of_nat 1 - 1)%Z with 0%Z by lia.
+      clear cn Hvalid.
+      wp_bind (Store _ _).
+      iApply wp_atomic.
+      iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+      iModIntro.
+      iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+      iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+      rewrite Hvalid.
+      assert (cn = N 1) as ->.
+      { destruct cn; inversion Hvalid. by simplify_eq. }
+      iApply (wp_store_step_singlerole _ _ (():fmrole the_cn_fair_model) (f - 6) (f-3)
+               with "[$Hl $Hs $Hr Hf]").
+      { simpl. lia. }
+      { constructor. }
+      { set_solver. }
+      { replace (f - 1 - 1 - 1 - 1 - 1 - 1) with (f - 6) by lia. 
+        rewrite has_fuel_fuels. done. }
+      iIntros "!> (Hl & Hs & Hr & Hf)".
+      iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
+      { apply (excl_auth_update _ _ 0%Z). }
+      iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+      { iExists _. iFrame. simpl. iFrame. }
+      iModIntro.
+      simpl.
+      destruct (decide (() ∈ ∅)); [set_solver|].
+      by iApply "HΦ".
+    }
+    wp_lam.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    wp_bind (Load _).
+    iApply wp_atomic.
+    iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+    iModIntro.
+    iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+    wp_load.
+    iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+    iModIntro. iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+    { iExists _. iFrame. }
+    iModIntro.
+    rewrite Hvalid. wp_pures.
+    clear cn Hvalid.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    wp_pures.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    case_bool_decide as Heq; [inversion Heq; lia|clear Heq].
+    wp_pures.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    wp_bind (Load _).
+    iApply wp_atomic.
+    iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+    iModIntro.
+    iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+    wp_load.
+    iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+    iModIntro. iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+    { iExists _. iFrame. }
+    iModIntro.
+    rewrite Hvalid. wp_pures.
+    clear cn Hvalid.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    wp_pures.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    replace (Z.of_nat (S (S n))  - 1)%Z with (Z.of_nat (S n)) %Z by lia.
+    wp_bind (Store _ _).
+    iApply wp_atomic.
+    iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+    iModIntro.
+    iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+    iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+    rewrite Hvalid.
+    assert (cn = N (S (S n))) as ->.
+    { destruct cn; inversion Hvalid. by simplify_eq. }
+    iApply (wp_store_step_singlerole _ _ (():fmrole the_cn_fair_model) (f - 6) (f+2)
+             with "[$Hl $Hs $Hr Hf]").
+    { simpl. lia. }
+    { constructor. }
+    { set_solver. }
+    { replace (f - 1 - 1 - 1 - 1 - 1 - 1) with (f - 6) by lia. 
+      rewrite has_fuel_fuels. done. }
+    iIntros "!> (Hl & Hs & Hr & Hf)".
+    iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
+    { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }
+    iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+    { iExists _. iFrame. simpl. iFrame. }
+    iModIntro.
+    simpl.
+    destruct (decide (() ∈ {[()]})); [|set_solver].
+    wp_pures.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    wp_pures.
+    rewrite fmap_insert fmap_empty. (* Sigh.. *)
+    replace (f + 2 - 1 - 1) with f by lia.
+    by iApply ("IHn" with "Hf Hr Hm").
+  Qed.
 
   Lemma choose_nat_spec γ l tid f :
-    8 ≤ f → f ≤ 40 →
+    12 ≤ f → f ≤ 40 →
     choose_nat_inv γ l -∗
-    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗
-        own γ (◯E (-1)%Z) }}}
+    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
       choose_nat_prog l #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof. Admitted.
-
-  (*   iIntros (Hle1 Hle2 Φ) "(Hf & Hr & Hm) HΦ". *)
-  (*   wp_lam. *)
-  (*   wp_bind ChooseNat. *)
-  (*   iApply (wp_choose_nat_nostep _ _ _ {[() := (f - 2)]} with "[Hf]"). *)
-  (*   { set_solver. } *)
-  (*   { rewrite -has_fuel_fuels_S has_fuel_fuels. *)
-  (*     replace (S (f - 2)) with (f - 1) by lia. done. } *)
-  (*   iIntros "!>" (n) "Hf". *)
-  (*   iApply (@wp_lift_pure_step_no_fork_singlerole_take_step *)
-  (*             _ the_cn_fair_model _ _ *)
-  (*             Start (N $ S n) tid _ _ (f - 2) f _ _ _ _ ())=> /=; *)
-  (*     [done|done|set_solver|lia|constructor|]. *)
-  (*   do 3 iModIntro. *)
-  (*   rewrite has_fuel_fuels. *)
-  (*   iFrame. *)
-  (*   iIntros "Hm Hr Hf". *)
-  (*   destruct (decide (() ∈ {[()]})); [|set_solver]. *)
-  (*   wp_pures. *)
-  (*   replace (Z.of_nat n + 1)%Z with (Z.of_nat $ S n) by lia. *)
-  (*   rewrite -has_fuel_fuels. *)
-  (*   iApply (decr_loop_spec with "[$Hm $Hr $Hf]"); [lia|lia|]. *)
-  (*   done. *)
-  (* Qed. *)
+  Proof.
+    iIntros (Hle1 Hle2) "#IH".
+    iIntros "!>" (Φ) "(Hf & Hr & Hm) HΦ".
+    wp_lam.
+    wp_bind ChooseNat.
+    iApply (wp_choose_nat_nostep _ _ _ {[() := (f - 2)]} with "[Hf]").
+    { set_solver. }
+    { rewrite -has_fuel_fuels_S has_fuel_fuels.
+      replace (S (f - 2)) with (f - 1) by lia. done. }
+    iIntros "!>" (n) "Hf".
+    wp_pures.
+    wp_bind (Store _ _).
+    iApply wp_atomic.
+    iMod (inv_acc ⊤ with "IH") as "[>HI Hclose]"; [set_solver|].
+    iModIntro.
+    iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
+    iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+    rewrite Hvalid.
+    assert (cn = Start) as ->.
+    { destruct cn; inversion Hvalid; [done|]. lia. }
+    iApply (wp_store_step_singlerole _ _ (():fmrole the_cn_fair_model) (f - 3) (f-2) _ _ (N (S n))
+             with "[$Hl $Hs $Hr Hf]").
+    { simpl. lia. }
+    { constructor. }
+    { set_solver. }
+    { replace (f - 2 - 1) with (f - 3) by lia. 
+      rewrite has_fuel_fuels. done. }
+    iIntros "!> (Hl & Hs & Hr & Hf)".
+    iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
+    { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }
+    iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
+    { iExists _. iFrame. simpl. iFrame. 
+      replace (Z.of_nat n + 1)%Z with (Z.of_nat (S n)) by lia.
+      iFrame. }
+    iModIntro.
+    simpl.
+    destruct (decide (() ∈ {[()]})); [|set_solver].
+    wp_pures.
+    replace (f + 2 - 1 - 1) with f by lia.
+    rewrite -has_fuel_fuels.
+    by iApply (decr_loop_spec with "IH [$Hm $Hr $Hf]"); [lia|lia|].
+  Qed.
 
 End proof.
-
-(* Theorem choose_nat_terminates *)
-(*         (extr : extrace) (Hvex : extrace_valid extr) *)
-(*         (Hexfirst : (trfirst extr).1 = [choose_nat_prog #()]): *)
-(*   (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
-(* Proof. *)
 
 Inductive the_order : CN → CN → Prop :=
   | Start_order cn : the_order cn Start
@@ -281,13 +369,17 @@ Proof. solve_decision. Qed.
 Theorem choose_nat_sim l
         (extr : extrace) (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [choose_nat_prog l #()]):
-  continued_simulation (sim_rel_with_user the_cn_fair_model the_model (ξ_cn l)) (trace_singleton ([choose_nat_prog l #()], {| heap := <[l:=#-1]>∅; used_proph_id := ∅ |}))
-                       (trace_singleton (initial_ls (LM := the_model) Start 0%nat)).
+  continued_simulation (sim_rel_with_user the_cn_fair_model the_model
+                                          (ξ_cn l))
+                       (trace_singleton ([choose_nat_prog l #()],
+                                           {| heap := {[l:=#-1]};
+                                              used_proph_id := ∅ |}))
+                       (trace_singleton (initial_ls (LM := the_model)
+                                                    Start 0%nat)).
 Proof.
-  assert (heapGpreS #[GFunctor (excl_authR ZO); heapΣ the_cn_fair_model] the_cn_fair_model the_model) as HPreG.
+  assert (heapGpreS choose_natΣ the_cn_fair_model the_model) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy).
-  { done. }
+  eapply (strong_simulation_adequacy (Mdl := the_cn_fair_model) choose_natΣ NotStuck _ _ _ ∅).
   { clear.
     intros extr atr c' oζ.
     eapply finite_smaller_card_nat.
@@ -295,24 +387,23 @@ Proof.
     eapply (in_list_finite [(_,_)]).
     intros [δ' ℓ] [Hrel [cn [Hextr Hatr]]].
     admit. }
+  { set_solver. }
+  iIntros (?) "!> Hs Hr Hf".
+  iMod (own_alloc) as (γ) "He".
+  { apply (excl_auth_valid (-1)%Z). }
+  iDestruct "He" as "[He● He○]".
+  iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hs]")
+    as "#IH".
+  { iIntros "!>". iExists _. iFrame.
+    admit. }                    (* TODO: Need `l ↦ #(F_CN Start)` here *)
+  iModIntro.
+  iSplitL.
+  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
+      [lia|lia| |by eauto]=> /=.
+    replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
+    rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
+  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
+  iInv Ns as ">H".
+  iDestruct "H" as (cn) "H". simpl.
+  (* TODO: Derive relation from invariant here *)
 Admitted.
-
-(* Theorem choose_nat_terminates l *)
-(*         (extr : extrace) (Hvex : extrace_valid extr) *)
-(*         (Hexfirst : (trfirst extr).1 = [choose_nat_prog l #()]): *)
-(*   (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
-(* Proof. *)
-(*   eapply (simulation_adequacy_terminate_ftm (Mdl := the_cn_fair_model) (heapΣ the_cn_fair_model) NotStuck _ Start ∅) =>//. *)
-(*   { eapply valid_state_evolution_finitary_fairness. *)
-(*     intros ?. simpl. apply (model_finitary s1). } *)
-(*   iIntros (HGS) "!> Hm Hr Hs !>". *)
-(*   simpl. *)
-(*   replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver. *)
-(*   rewrite -fmap_gset_to_gmap. *)
-(*   rewrite /gset_to_gmap. simpl. *)
-(*   repeat rewrite fmap_insert. *)
-(*   repeat rewrite fmap_empty. *)
-(*   rewrite -has_fuel_fuels. *)
-(*   iApply (choose_nat_spec with "[$Hm $Hr $Hs]"); [simpl;lia|simpl;lia|]. *)
-(*   eauto. *)
-(* Qed. *)
