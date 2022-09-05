@@ -232,7 +232,7 @@ Proof.
   assert (heapGpreS yesnoΣ the_fair_model the_model) as HPreG.
   { apply _. }
   eapply (simulation_adequacy_terminate_ftm (Mdl := the_fair_model) yesnoΣ NotStuck _ (N, true) ∅) =>//.
-  - eapply valid_state_evolution_finitary_fairness.
+  - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
   - destruct N; [lia|destruct N; set_solver].
   - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.

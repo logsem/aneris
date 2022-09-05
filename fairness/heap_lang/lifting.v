@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination.
+From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness.
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
@@ -119,28 +119,6 @@ Definition sim_rel (M : FairModel) (LM: LiveModel heap_lang M) (ex : execution_t
            (aux : auxiliary_trace LM) :=
   valid_state_evolution_fairness ex aux ∧ live_rel M ex aux.
 
-(* TODO: move *)
-Fixpoint trace_map {A A' L L'} (sf: A → A') (lf: L -> L') (tr: finite_trace A L): finite_trace A' L' :=
-  match tr with
-  | trace_singleton x => trace_singleton $ sf x
-  | trace_extend tr' ℓ x => trace_extend (trace_map sf lf tr') (lf ℓ) (sf x)
-  end.
-
-Fixpoint get_underlying_fairness_trace (M : FairModel) (LM: LiveModel heap_lang M) (ex : auxiliary_trace LM) :=
-  match ex with
-  | trace_singleton δ => trace_singleton (ls_under δ)
-  | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LM ex') ρ (ls_under δ)
-  | trace_extend ex' _ _ => get_underlying_fairness_trace M LM ex'
-  end.
-
-Definition get_role {M : FairModel} {LM: LiveModel heap_lang M} (lab: mlabel LM) :=
-  match lab with
-  | Take_step ρ _ => Some ρ
-  | _ => None
-  end.
-
-Definition map_underlying_trace {M : FairModel} {LM: LiveModel heap_lang M} (aux : auxiliary_trace LM) :=
-  (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
 
 Definition sim_rel_with_user (M : FairModel) (LM: LiveModel heap_lang M)  (ξ : execution_trace _ -> finite_trace M (option (fmrole M)) -> Prop)
   (ex : execution_trace heap_lang) (aux : auxiliary_trace LM) :=
