@@ -404,6 +404,12 @@ Proof.
     rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
   iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
   iInv Ns as ">H".
-  iDestruct "H" as (cn) "H". simpl.
-  (* TODO: Derive relation from invariant here *)
+  iDestruct "H" as (cn) "(Hf & Hl & H●)".
+  iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
+  iDestruct (gen_heap_valid with "Hσ Hl") as %Hlookup.
+  iDestruct (model_agree' with "Hs Hf") as %Hlast.
+  iModIntro. iSplitL; [by iExists _; iFrame|].
+  iApply fupd_mask_intro; [set_solver|]. iIntros "_".
+  iPureIntro. exists cn. split; [done|].
+  subst. by destruct atr.
 Admitted.
