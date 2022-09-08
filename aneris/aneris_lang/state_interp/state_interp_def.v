@@ -234,24 +234,21 @@ Section definitions.
     ∃ ms,
       (* [ms] is a subset of [mhm], ... *)
       ⌜ms ⊆ (messages_sent mhm)⌝ ∗
-      (* and carries one message, for each message sent by a group in `mhm` *)
-      ([∗ set] m ∈ messages_sent mhm, ∃ sagT sagR m',
-          ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
-          socket_address_group_own sagT ∗
-          socket_address_group_own sagR) ∗
-      (* For any message [m] in [ms] *)
-      ([∗ set] m ∈ ms,
-        (* [m] was sent by an adversary *)
-         (adversary_ip (ip_of_address (m_sender m))) ∨
-         ∃ sagT sagR Φ,
-           (* The group of the message is disjoint, and *)
-           ⌜m_destination m ∈ sagR⌝ ∗ sagR ⤇* Φ ∗
+      (* and carries one message [m'], for each message [m] sent by a group in `mhm` *)
+      ([∗ set] m ∈ messages_sent mhm,
+        (∃ sagT sagR m',
+           ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
+           (* we know the sender is in a valid SAG, but the destination need
+              not be because adversaries can send to anyone, and ... *)
            socket_address_group_own sagT ∗
-           (* either [m] is governed by a protocol [Φ] and the network owns the
-              resources  specified by the protocol *)
-           ((∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ▷ Φ m') ∨
-            (* or [m] has been delivered somewhere *)
-            (∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ⌜message_received m' mhm⌝))).
+           (* either [m'] is governed by a protocol [Φ] and the network owns the
+              resources  specified by the protocol, ... *)
+           ((∃ Φ, sagR ⤇* Φ ∗ ▷ Φ m') ∨
+            (* or [m'] has been delivered somewhere, ... *)
+            ⌜message_received m' mhm⌝ ∨
+            (* or [m'] was sent by an adversary *)
+            adversary_ip (ip_of_address (m_sender m))
+        ))).
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=

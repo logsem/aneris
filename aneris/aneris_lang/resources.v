@@ -103,6 +103,7 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_freeportsG :> inG Σ (authUR free_portsUR);
       aneris_freeports_name : gname;
       (** adversary ips **)
+      aneris_adversaryipsG :> inG Σ adversary_ipsUR;
       aneris_adversaryips_name : gname;
       (** socket address firewall **)
       aneris_firewallG :> inG Σ firewallUR;
@@ -149,8 +150,8 @@ Class anerisPreG Σ (Mdl : Model) :=
       anerisPre_socketG :> inG Σ (authR local_socketsUR);
       anerisPre_freeipsG :> inG Σ (authUR free_ipsUR);
       anerisPre_freeportsG :> inG Σ (authUR free_portsUR);
-      anerisPre_adversary :> inG Σ adversary_ipsUR;
-      anerisPre_firewall :> inG Σ firewallUR;
+      anerisPre_adversaryG :> inG Σ adversary_ipsUR;
+      anerisPre_firewallG :> inG Σ firewallUR;
       anerisPre_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       anerisPre_siG :> inG Σ (authR socket_interpUR);
       anerisPre_savedPredG :> savedPredG Σ message;
@@ -248,10 +249,10 @@ Section definitions.
 
   (** Adversary ip addresses *)
   Definition adversary_ips_auth (A : gset ip_address) : iProp Σ :=
-    own aneris_adversaryips_name (● GSet A).
+    own (A:=adversary_ipsUR) aneris_adversaryips_name (● A).
 
   Definition adversary_ip (ip : ip_address) : iProp Σ :=
-    own aneris_adversaryips_name (◯ GSet {[ ip ]}).
+    own (A:=adversary_ipsUR) aneris_adversaryips_name (◯ {[ ip ]}).
 
   (* We track firewall state for an _entire_ socket address group.
      That is, within an address group, all addresses are public or private. *)
@@ -1134,6 +1135,9 @@ Section resource_lemmas.
     iDestruct "Hsags" as "[H1 H2]".
     iFrame.
   Qed.
+
+  #[global] Instance adversary_ip_persistent ip : Persistent (adversary_ip ip).
+  Proof. apply _. Qed.
 
   Instance firewall_frag_fractional sag st : Fractional (λ q, firewall_frag sag q st).
   Proof.
