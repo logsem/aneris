@@ -134,19 +134,13 @@ Section state_interpretation.
       rewrite !messages_received_insert.
       iApply (big_sepS_mono with "Hcoh").
       iIntros (x Hin') "Hcoh".
-      iDestruct "Hcoh" as (sagT' sagR' Φ Hin'') "[#HΦ' [HownT' Hcoh]]".
-      subst.
-      iExists _, _, _.
-      iFrame "HΦ'".
-      iSplit.
-      { iPureIntro. set_solver. }
-      iFrame "HownT'".
-      iDestruct "Hcoh" as "[Hcoh | Hcoh]".
-      { by iLeft. }
-      iRight.
-      iDestruct "Hcoh" as %(m' & Heq & Hrecv).
-      iExists m'. iSplit; [done|].
-      iPureIntro.
+      iDestruct "Hcoh" as (sagT' sagR' m') "(%Hequiv & #HownT' & Hopt)".
+      iExists sagT', sagR', m'.
+      iSplitL ""; [done |].
+      iFrame "#".
+      iDestruct "Hopt" as "[HΦ | [%Hrecv | [Hsender | Hrecv]]]";
+        [eauto | | eauto | eauto].
+      iRight; iLeft; iPureIntro.
       rewrite -(insert_id mh sagT (R,T) Hmh) in Hrecv.
       apply message_received_insert in Hrecv.
       set_solver.
@@ -154,26 +148,21 @@ Section state_interpretation.
     rewrite big_sepS_union; [|set_solver].
     rewrite big_sepS_singleton.
     iSplitL "Hm".
-    + iExists _,_, _. iFrame "HΦ".
+    + iExists sagT, sagR, msg'. iSplitL "".
+      { iPureIntro.
+        apply message_group_equiv_symmetry; eauto. }
       iFrame "HownT".
-      iSplit.
-      { iPureIntro. set_solver. }
-      iLeft. iExists _.
-      iSplitR "Hm"; [done | iApply "Hm"].
+      iLeft; iExists ϕ.
+      iFrame "HΦ". iFrame "Hm".
     + iApply (big_sepS_mono with "Hcoh").
       iIntros (x Hin') "Hcoh".
-      iDestruct "Hcoh" as (sagT' sagR' Φ Hin'') "[#HΦ' [HownT Hcoh]]".
-      subst.
-      iExists _,_, _.
-      iFrame "HΦ'". iFrame "HownT".
-      iSplit.
-      { iPureIntro. set_solver. }
-      iDestruct "Hcoh" as "[Hcoh | Hcoh]".
-      { by iLeft. }
-      iRight.
-      iDestruct "Hcoh" as %(m' & Heq & Hrecv).
-      iExists m'. iSplit; [done|].
-      iPureIntro.
+      iDestruct "Hcoh" as (sagT' sagR' m') "(%Hequiv & #HownT' & Hopt)".
+      iExists sagT', sagR', m'.
+            iSplitL ""; [done |].
+      iFrame "#".
+      iDestruct "Hopt" as "[HΦ | [%Hrecv | [Hsender | Hrecv]]]";
+        [eauto | | eauto | eauto].
+      iRight; iLeft; iPureIntro.
       rewrite -(insert_id mh sagT (R,T) Hmh) in Hrecv.
       rewrite message_received_insert.
       by apply message_received_insert in Hrecv.

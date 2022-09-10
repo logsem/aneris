@@ -728,6 +728,9 @@ Record state := mkState {
   state_public_addrs : gset socket_address;
 }.
 
+Definition adversary_saddr saddr σ : Prop :=
+  ip_of_address saddr ∈ state_adversaries σ.
+
 #[global] Instance etaState : Settable _ :=
   settable! mkState
   <state_heaps;

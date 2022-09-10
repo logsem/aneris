@@ -68,12 +68,14 @@ Section definitions.
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
-  Definition socket_interp_coh :=
+  Definition socket_interp_coh σ :=
     (∃ (sags : gset socket_address_group)
        (A : gset socket_address_group),
         ⌜A ⊆ sags⌝ ∗
         (* socket_address_group_ctx A ∗ *)
         socket_address_group_ctx sags ∗
+        (* groups containing adversaries contain just one ip address *)
+        ⌜adversary_sag_single_ip sags σ⌝ ∗
         (* [A] is the set of socket addresses without an interpretation *)
         unallocated_groups_auth A ∗
         (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
@@ -221,34 +223,37 @@ Section definitions.
     message_soup_coh M mhm ∧
     receive_buffers_coh S mhm ∧
     messages_addresses_coh mhm ∧
-    messages_received_from_sent_coh mhm.
+      messages_received_from_sent_coh mhm.
 
-  (* For all messages [m] in [M], either the network owns the resources [Φ m]
-     described by some socket protocol [Φ], or it has been delivered, or
-     [m] was sent by an adversary. *)
-  Definition messages_resource_coh mhm : iProp Σ :=
+  (* For all messages in the message history one of the following holds:
+     - the network owns the resourced described by some socket protocol
+     - the message has been delivered
+     - the message was sent by an adversary
+     - the message is addressed to an adversary
+  *)
+ Definition messages_resource_coh mhm : iProp Σ :=
     (* All sets in the domain of [mhm] are disjoint *)
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
         (◯ (DGSets (dom mhm))) ∗
     (* Take the set [ms] of sent messages closed under group equivalence *)
     ∃ ms,
-      (* [ms] is a subset of [mhm], ... *)
       ⌜ms ⊆ (messages_sent mhm)⌝ ∗
-      (* and carries one message [m'], for each message [m] sent by a group in `mhm` *)
-      ([∗ set] m ∈ messages_sent mhm,
-        (∃ sagT sagR m',
-           ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
-           (* we know the sender is in a valid SAG, but the destination need
-              not be because adversaries can send to anyone, and ... *)
-           socket_address_group_own sagT ∗
-           (* either [m'] is governed by a protocol [Φ] and the network owns the
-              resources  specified by the protocol, ... *)
-           ((∃ Φ, sagR ⤇* Φ ∗ ▷ Φ m') ∨
-            (* or [m'] has been delivered somewhere, ... *)
-            ⌜message_received m' mhm⌝ ∨
-            (* or [m'] was sent by an adversary *)
-            adversary_ip (ip_of_address (m_sender m))
-        ))).
+      (* [ms] carries one message, for each message sent by a group in [mhm] *)
+      ([∗ set] m ∈ messages_sent mhm, ∃ sagT sagR m',
+          ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
+          socket_address_group_own sagT ∗
+          (* we only require valid SAGs for messages that don't originate from an
+             adversary, because adversaries can send messages to anyone (even invalid
+             addresses) *)
+          (adversary_saddr_own (m_sender m') ∨ socket_address_group_own sagR)) ∗
+      ([∗ set] m ∈ ms,
+        ∃ sagT sagR m',
+          ⌜m' ≡g{sagT, sagR} m⌝ ∗
+          (socket_address_group_own sagT) ∗
+          ((∃ Φ, sagR ⤇* Φ ∗ ▷ Φ m') ∨
+           ⌜message_received m' mhm⌝ ∨
+           (adversary_saddr_own (m_sender m')) ∨
+           (adversary_saddr_own (m_destination m'))) ).
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=
@@ -258,7 +263,7 @@ Section definitions.
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhm⌝ ∗
         node_gnames_auth γm ∗
-        socket_interp_coh ∗
+        socket_interp_coh σ ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
         adversary_coh σ ∗
