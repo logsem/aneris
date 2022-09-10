@@ -168,17 +168,44 @@ Section state_interpretation.
       by apply message_received_insert in Hrecv.
   Qed.
 
-  Lemma messages_resource_coh_send_duplicate mh sagT sagR R T msg :
+  Lemma adversary_saddr_own_same_ip sags σ sag saddr1 saddr2 :
+    adversary_coh sags σ -∗
+    socket_interp_coh sags -∗
+    socket_address_group_own sag -∗
+    ⌜saddr1 ∈ sag⌝ -∗
+    ⌜saddr2 ∈ sag⌝ -∗
+    adversary_saddr_own saddr1 -∗
+      adversary_saddr_own saddr2 ∗
+      adversary_coh sags σ ∗
+      socket_interp_coh sags.
+  Proof.
+    iIntros "Hadv_coh Hskt_coh Hsag #Hin1 #Hin2 #Hadv".
+    iDestruct "Hadv_coh" as (?) "(Hauth&%Hip&Ha1&Ha2&Ha3)".
+    iDestruct "Hskt_coh" as (?) "(Hb1&Hgroups&Hb2&Hb3)".
+    iDestruct (socket_address_group_own_adversary_same_ip _ _ _ _ _ Hip with "Hgroups Hsag Hin1 Hin2 Hauth Hadv") as "#Heq".
+    iDestruct (adversary_saddr_own_same_ip with "Heq Hadv") as "Hadv2".
+    iFrame "Hadv2".
+    iSplitL "Ha1 Ha2 Ha3 Hauth".
+    { iExists _.
+      iFrame "∗#"; by iPureIntro. }
+    iExists _; iFrame "∗#".
+  Qed.
+
+  Lemma messages_resource_coh_send_duplicate mh sagT sagR R T msg sags σ :
     mh !! sagT = Some (R, T) →
     m_sender msg ∈ sagT →
     messages_addresses_coh mh →
     set_Exists (λ m, m ≡g{sagT, sagR} msg) T →
     m_destination msg ∈g sagR -∗
+    socket_interp_coh sags -∗
+    adversary_coh sags σ -∗
     messages_resource_coh mh -∗
-    messages_resource_coh (<[sagT:=(R, {[msg]} ∪ T)]> mh).
+      messages_resource_coh (<[sagT:=(R, {[msg]} ∪ T)]> mh) ∗
+      socket_interp_coh sags ∗
+      adversary_coh sags σ.
   Proof.
     rewrite /messages_resource_coh /=.
-    iIntros (Hmh HsagT Hmcoh Hexists) "[%HsagR #Hown'] [#Hown Hcoh]".
+    iIntros (Hmh HsagT Hmcoh Hexists) "[%HsagR #Hown'] Hsk Hadv [#Hown Hcoh]".
     iAssert (socket_address_group_own sagT) as "HownT".
     {
       rewrite -(insert_id mh sagT (R,T)); [|set_solver].
@@ -189,6 +216,7 @@ Section state_interpretation.
     }
     destruct Hmcoh as (Halldisj & Hne & Hmcoh).
     iDestruct "Hcoh" as (ms Hle) "[#HcohT Hcoh]".
+    rewrite -sep_assoc.
     iSplitR.
     {
       rewrite dom_insert_L.
@@ -197,27 +225,6 @@ Section state_interpretation.
       iApply own_op.
       iFrame "Hown HownT".
     }
-    iExists ms.
-    rewrite -{3}(insert_id mh sagT (R, T)); [|set_solver].
-    rewrite /message_received.
-    rewrite !messages_received_insert.
-    iFrame.
-    iSplitR.
-    {
-      iPureIntro.
-      rewrite messages_sent_insert.
-      rewrite -union_assoc_L.
-      rewrite -(messages_sent_split sagT R T mh Hmh); set_solver.
-    }
-    rewrite messages_sent_insert.
-    rewrite -union_assoc_L.
-    rewrite -(messages_sent_split sagT R T mh Hmh).
-    destruct (decide (msg ∈ messages_sent mh)) as [Hin|Hnin].
-    { assert ({[msg]} ∪ messages_sent mh = messages_sent mh) as Heq by set_solver.
-      rewrite Heq. done. }
-    rewrite big_sepS_union; [|set_solver].
-    iFrame "HcohT".
-    rewrite big_sepS_singleton.
     destruct Hexists as [m' [Hin Hmeq]].
     assert (m_destination m' ∈ sagR).
     { by destruct Hmeq as (_ & _ & H' & _). }
@@ -225,26 +232,93 @@ Section state_interpretation.
     rewrite messages_sent_insert.
     iDestruct (big_sepS_elem_of_acc _ _ m' with "HcohT") as "[Hmsg _]";
       [set_solver|].
-    iDestruct "Hmsg" as (sagT' sagR' m'' [Hmeq' Hmin]) "[HownT' HownR']".
-    iExists sagT', sagR', m''. iFrame "HownT' HownR'". iSplit;[|done].
-    iAssert (socket_address_groups_own
-               ({[sagT]} ∪ {[sagR]} ∪ {[sagT']} ∪ {[sagR']})) as "H".
-    {
-      iApply socket_address_groups_own_union. iFrame "HownR'".
-      iApply socket_address_groups_own_union. iFrame "HownT'".
-      iApply socket_address_groups_own_union. iFrame "Hown' HownT".
-    }
-    iDestruct (own_valid with "H") as %Hvalid.
-    setoid_rewrite auth_frag_valid in Hvalid.
-    setoid_rewrite disj_gsets_valid in Hvalid.
-    iPureIntro.
-    pose proof (message_group_equiv_trans _ sagT sagT' sagR sagR' msg m' m'' Hvalid) as (<- & <- & Hmeq'');
+    iDestruct "Hmsg" as (sagT' sagR' m'' [Hmeq' Hmin]) "[HownT' [HadvS | HownR']]".
+    - (* we don't know that the receiver's sag is valid, in which case
+         we're sending from an adversary *)
+      (* first notice that if m'' is sent from an adversary, then so is m' *)
+      iAssert (⌜m_sender m' ∈ sagT'⌝%I) as "#Hsender_m'".
+      { iPureIntro.
+        destruct Hmeq' as (?&?&?).
+        done. }
+      iAssert (⌜m_sender m'' ∈ sagT'⌝%I) as "#Hsender_m''".
+      { destruct Hmeq' as (?&?&?).
+        done. }
+      iDestruct (adversary_saddr_own_same_ip with "Hadv Hsk HownT' Hsender_m'' Hsender_m' HadvS") as
+        "(#Hadv'&Hadv&Hsk)".
+    (* now we should be able to add [m'] as the "respresentative" of [msg] *)
+      iFrame "Hadv Hsk".
+      iExists (ms ∪ {[ m' ]}).
+      iSplitR.
+      { iPureIntro.
+        rewrite messages_sent_insert.
+        rewrite union_subseteq.
+        split; [|set_solver].
+        rewrite -union_assoc_L.
+        rewrite -(messages_sent_split sagT R T mh Hmh).
+        set_solver. }
+      rewrite messages_sent_insert.
+      rewrite -union_assoc_L.
+      rewrite -(messages_sent_split sagT R T mh Hmh).
+      destruct (decide (msg ∈ messages_sent mh)) as [Hmsgin|Hnin].
+      + assert ({[msg]} ∪ messages_sent mh = messages_sent mh) as Heq by set_solver.
+        rewrite Heq.
+        iSplitR.
+        { iApply (big_sepS_mono with "HcohT").
+          iIntros (??) "H".
+          iDestruct "H" as (???) "([%%]&?&?)".
+          iExists _, _, _.
+          iFrame.
+          eauto with set_solver. }
+        destruct (decide (m' ∈ ms)) as [Hin'|Hnin].
+        { assert (ms ∪ {[m']} = ms) as -> by set_solver.
+          iApply (big_sepS_mono with "Hcoh").
+          iIntros (??) "H".
+          admit. }
+        admit.
+      + admit.
+    - (* we know the receiver is valid *)
+      iFrame "Hsk Hadv".
+      iExists ms.
+      rewrite -{3}(insert_id mh sagT (R, T)); [|set_solver].
+      rewrite /message_received.
+      rewrite !messages_received_insert.
+      iFrame.
+      iSplitR.
+      {
+        iPureIntro.
+        rewrite messages_sent_insert.
+        rewrite -union_assoc_L.
+        rewrite -(messages_sent_split sagT R T mh Hmh); set_solver.
+      }
+      rewrite messages_sent_insert.
+      rewrite -union_assoc_L.
+      rewrite -(messages_sent_split sagT R T mh Hmh).
+      destruct (decide (msg ∈ messages_sent mh)) as [Hmsgin|Hnin].
+      { assert ({[msg]} ∪ messages_sent mh = messages_sent mh) as Heq by set_solver.
+        rewrite Heq. done. }
+      rewrite big_sepS_union; [|set_solver].
+      iFrame "HcohT".
+      rewrite big_sepS_singleton.
+
+      iExists sagT', sagR', m''. iFrame "HownT' HownR'". iSplit;[|done].
+      iAssert (socket_address_groups_own
+                 ({[sagT]} ∪ {[sagR]} ∪ {[sagT']} ∪ {[sagR']})) as "H".
+      {
+        iApply socket_address_groups_own_union. iFrame "HownR'".
+        iApply socket_address_groups_own_union. iFrame "HownT'".
+        iApply socket_address_groups_own_union. iFrame "Hown' HownT".
+      }
+      iDestruct (own_valid with "H") as %Hvalid.
+      setoid_rewrite auth_frag_valid in Hvalid.
+      setoid_rewrite disj_gsets_valid in Hvalid.
+      iPureIntro.
+      pose proof (message_group_equiv_trans _ sagT sagT' sagR sagR' msg m' m'' Hvalid) as (<- & <- & Hmeq'');
       [set_solver..| | | ].
-    - apply message_group_equiv_symmetry; try done.
-      by destruct Hmeq as (H' & _).
-    - apply Hmeq'.
-    - done.
-  Qed.
+      * apply message_group_equiv_symmetry; try done.
+        by destruct Hmeq as (H' & _).
+      * apply Hmeq'.
+      * done.
+  Admitted.
 
   Lemma message_received_delete m mh sag1 sag2 :
     messages_addresses_coh mh →
