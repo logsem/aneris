@@ -68,18 +68,14 @@ Section definitions.
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
-  Definition socket_interp_coh σ :=
-    (∃ (sags : gset socket_address_group)
-       (A : gset socket_address_group),
-        ⌜A ⊆ sags⌝ ∗
-        (* socket_address_group_ctx A ∗ *)
-        socket_address_group_ctx sags ∗
-        (* groups containing adversaries contain just one ip address *)
-        ⌜adversary_sag_single_ip sags σ⌝ ∗
-        (* [A] is the set of socket addresses without an interpretation *)
-        unallocated_groups_auth A ∗
-        (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
-        sis_own (sags ∖ A))%I.
+  Definition socket_interp_coh (sags : gset socket_address_group) :=
+    (∃ (A : gset socket_address_group),
+      ⌜A ⊆ sags⌝ ∗
+      socket_address_group_ctx sags ∗
+      (* [A] is the set of socket addresses without an interpretation *)
+      unallocated_groups_auth A ∗
+      (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
+      sis_own (sags ∖ A))%I.
 
   (** Free ips coherence *)
   (* Free ips have no bound ports, no heap, and no sockets  *)
@@ -150,8 +146,10 @@ Section definitions.
       ∃ sa, (saddress skt) = Some sa ∧ sa ∈ (state_public_addrs σ).
 
   (* Adversary and firewall coherence *)
-  Definition adversary_coh σ : iProp Σ := ∃ fw_st,
+  Definition adversary_coh sags σ : iProp Σ := ∃ fw_st,
     adversary_ips_auth (state_adversaries σ) ∗
+    (* groups containing adversaries contain just one ip address *)
+    ⌜adversary_sag_single_ip sags σ⌝ ∗
     firewall_auth fw_st ∗
     ⌜firewall_st_coh fw_st σ⌝ ∗
     ⌜firewall_delivery_coh σ⌝.
@@ -257,16 +255,16 @@ Section definitions.
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=
-    (∃ γm mhm,
+    (∃ γm mhm sags,
         ⌜messages_received_sent mhm = rt⌝ ∗
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ)⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhm⌝ ∗
         node_gnames_auth γm ∗
-        socket_interp_coh σ ∗
+        socket_interp_coh sags ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        adversary_coh σ ∗
+        adversary_coh sags σ ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 
