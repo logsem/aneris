@@ -259,23 +259,29 @@ Section state_interpretation.
       rewrite messages_sent_insert.
       rewrite -union_assoc_L.
       rewrite -(messages_sent_split sagT R T mh Hmh).
-      destruct (decide (msg ∈ messages_sent mh)) as [Hmsgin|Hnin].
-      + assert ({[msg]} ∪ messages_sent mh = messages_sent mh) as Heq by set_solver.
-        rewrite Heq.
-        iSplitR.
-        { iApply (big_sepS_mono with "HcohT").
+      iSplitR.
+      + destruct (decide (msg ∈ messages_sent mh)) as [Hmsgin|Hnin].
+        * assert ({[msg]} ∪ messages_sent mh = messages_sent mh) as Heq by set_solver.
+          rewrite Heq.
+          iApply (big_sepS_mono with "HcohT").
           iIntros (??) "H".
           iDestruct "H" as (???) "([%%]&?&?)".
           iExists _, _, _.
           iFrame.
-          eauto with set_solver. }
-        destruct (decide (m' ∈ ms)) as [Hin'|Hnin].
-        { assert (ms ∪ {[m']} = ms) as -> by set_solver.
+          eauto with set_solver.
+        * admit.
+      + destruct (decide (m' ∈ ms)) as [Hin'|Hnin].
+        * assert (ms ∪ {[m']} = ms) as -> by set_solver.
           iApply (big_sepS_mono with "Hcoh").
           iIntros (??) "H".
-          admit. }
-        admit.
-      + admit.
+          assert (messages_received mh = messages_received (<[sagT:=(R, {[msg]} ∪ T)]> mh)) as Hrecv.
+          { rewrite -{1}(insert_id mh sagT (R, T)); [|done].
+            do 2 rewrite messages_received_insert.
+            done. }
+          rewrite /message_received.
+          rewrite Hrecv.
+          iFrame.
+        * admit.
     - (* we know the receiver is valid *)
       iFrame "Hsk Hadv".
       iExists ms.
