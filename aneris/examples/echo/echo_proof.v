@@ -194,8 +194,8 @@ Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_addr := SocketAddressInet "0.0.0.1" 80.
 
-  Definition ips : gset string :=
-    {[ ip_of_address server_addr ; ip_of_address client_addr ]}.
+Definition ips : gset string :=
+  {[ ip_of_address server_addr ; ip_of_address client_addr ]}.
 
 Definition sa_dom : gset socket_address :=
   {[ server_addr ; client_addr ]}.
