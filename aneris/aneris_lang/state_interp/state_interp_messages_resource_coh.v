@@ -269,19 +269,38 @@ Section state_interpretation.
           iExists _, _, _.
           iFrame.
           eauto with set_solver.
-        * admit.
-      + destruct (decide (m' ∈ ms)) as [Hin'|Hnin].
-        * assert (ms ∪ {[m']} = ms) as -> by set_solver.
-          iApply (big_sepS_mono with "Hcoh").
-          iIntros (??) "H".
-          assert (messages_received mh = messages_received (<[sagT:=(R, {[msg]} ∪ T)]> mh)) as Hrecv.
-          { rewrite -{1}(insert_id mh sagT (R, T)); [|done].
-            do 2 rewrite messages_received_insert.
+        * rewrite big_sepS_union; [|set_solver].
+          iSplit.
+          { rewrite big_sepS_singleton.
+            iExists sagT, sagR, m'.
+            iFrame "#".
+            iPureIntro.
+            split; [|set_solver].
+            apply message_group_equiv_symmetry.
             done. }
-          rewrite /message_received.
-          rewrite Hrecv.
+          iApply (big_sepS_mono with "HcohT").
+          iIntros (??) "H".
+          iDestruct "H" as (???) "([%%]&?&?)".
+          iExists _, _, _.
           iFrame.
-        * admit.
+          eauto with set_solver.
+      + rewrite /message_received.
+        assert (messages_received mh = messages_received (<[sagT:=(R, {[msg]} ∪ T)]> mh)) as ->.
+        { rewrite -{1}(insert_id mh sagT (R, T)); [|done].
+          do 2 rewrite messages_received_insert.
+          done. }
+        destruct (decide (m' ∈ ms)) as [Hin'|Hnin].
+        * assert (ms ∪ {[m']} = ms) as -> by set_solver.
+          iApply (big_sepS_mono with "Hcoh"); eauto.
+        * rewrite big_sepS_union; [|set_solver].
+          iFrame.
+          rewrite big_sepS_singleton.
+          iExists sagT', sagR', m'.
+          iFrame "#".
+          iPureIntro.
+          rewrite /message_group_equiv.
+          destruct Hmeq' as (?&?&?&?&?&?).
+          repeat split; eauto.
     - (* we know the receiver is valid *)
       iFrame "Hsk Hadv".
       iExists ms.
@@ -321,10 +340,9 @@ Section state_interpretation.
       pose proof (message_group_equiv_trans _ sagT sagT' sagR sagR' msg m' m'' Hvalid) as (<- & <- & Hmeq'');
       [set_solver..| | | ].
       * apply message_group_equiv_symmetry; try done.
-        by destruct Hmeq as (H' & _).
       * apply Hmeq'.
       * done.
-  Admitted.
+  Qed.
 
   Lemma message_received_delete m mh sag1 sag2 :
     messages_addresses_coh mh →

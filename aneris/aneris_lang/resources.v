@@ -406,11 +406,11 @@ Section definitions.
   Proof. intros Hsend Hdest. done. Qed.
 
   Lemma message_group_equiv_symmetry sagT sagR m1 m2 :
-    m_sender m1 ∈ sagT → m_destination m1 ∈ sagR →m1 ≡g{sagT, sagR} m2 →
+    m1 ≡g{sagT, sagR} m2 →
     m2 ≡g{sagT, sagR} m1.
   Proof.
     rewrite /message_group_equiv.
-    intros Hsend Hdest (HT1 & HT2 & HR1 & HR2 & <- & <-).
+    intros (HT1 & HT2 & HR1 & HR2 & <- & <-).
     done.
   Qed.
 
