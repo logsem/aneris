@@ -1,17 +1,14 @@
+From iris.algebra Require Import excl_auth.
 From trillium.prelude Require Import finitary.
-From aneris.algebra Require Import disj_gsets.
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
-From aneris.aneris_lang.lib Require Import pers_socket_proto network_util_proof assert_proof.
+From aneris.aneris_lang.lib Require Import network_util_proof assert_proof.
 From aneris.examples.echo Require Export echo_code.
-From iris.base_logic.lib Require Import invariants.
-From iris.algebra Require Import excl_auth.
 Set Default Proof Using "Type".
 
 Class stringG Σ := { string_inG :> inG Σ (excl_authUR (leibnizO string)) }.
-Definition stringΣ : gFunctors :=
-  #[GFunctor (excl_authUR (leibnizO string))].
+Definition stringΣ : gFunctors := #[GFunctor (excl_authUR (leibnizO string))].
 Instance subG_stringΣ {Σ} : subG stringΣ Σ → stringG Σ.
 Proof. solve_inG. Qed.
 
@@ -48,13 +45,12 @@ Section echo_server_proof.
     wp_apply (aneris_wp_receivefrom with "[$Hsa $Hsh $Hsi]"); try auto.
     iIntros (m) "(%Hdst & [H | H])".
     - iDestruct "H" as "(%Hnin & Hsh & Hsa & _ & Hm)".
-      wp_pures.
       iDestruct "Hm" as (Ψ P) "(HP & #Hsi_clt & HΨ)".
       wp_apply wp_unSOME; [done|]; iIntros "_".
       wp_pures.
       wp_apply (aneris_wp_send with "[$Hsa $Hsh $Hsi_clt HP HΨ]");
         [try eauto..| |].
-      { iApply "HΨ". iFrame "HP". done. }
+      { by iApply ("HΨ" with "[$HP]"). }
       iIntros "[Hsh Hsa]".
       do 2 wp_pure _.
       iApply ("IH" with "HΦ Hsh Hsa [HR]").
@@ -75,15 +71,13 @@ Section echo_server_proof.
     - iDestruct "H" as "(%Hin & Hsh & Hsa)".
       wp_apply wp_unSOME; [done|]; iIntros "_".
       wp_pures.
-      wp_bind (SendTo _ _ _).
       iDestruct (big_sepS_elem_of with "HR") as (Ψ) "#Hsi_clt"; [done|].
-      iApply (aneris_wp_send_duplicate with "[$Hsa $Hsh $Hsi_clt]"); try auto.
+      wp_apply (aneris_wp_send_duplicate with "[$Hsa $Hsh $Hsi_clt]"); try auto.
       { destruct (HRT _ Hin) as [m' (Hmin' & Hbody' & Hsrc' & Hdst')].
         destruct m'. simplify_eq. simpl in *. simplify_eq. done. }
-      iIntros "!> [Hsh Hsa]".
+      iIntros "[Hsh Hsa]".
       do 2 wp_pure _.
-      iApply ("IH" with "HΦ Hsh Hsa HR").
-      done.
+      by iApply ("IH" with "HΦ Hsh Hsa HR").
   Qed.
 
 End echo_server_proof.
@@ -92,9 +86,9 @@ Section echo_client_proof.
   Context `{dG : !anerisG Mdl Σ}.
   Context `{strG : !stringG Σ}.
 
-  Definition own_auth γ (mb : message_body) : iProp Σ :=
+  Definition own_auth (γ : gname) (mb : message_body) : iProp Σ :=
     own γ (●E (mb:leibnizO string)).
-  Definition own_frag γ (mb : message_body) : iProp Σ :=
+  Definition own_frag (γ : gname) (mb : message_body) : iProp Σ :=
     own γ (◯E (mb:leibnizO string)).
 
   Definition clt_si γ : message → iProp Σ :=
@@ -105,7 +99,7 @@ Section echo_client_proof.
         free_ports (ip_of_address sa) {[(port_of_address sa)]} ∗
         sa ⤳ (∅, ∅) ∗ srv_sa ⤇ srv_si }}}
       echo_client #sa #srv_sa @[ip_of_address sa]
-      {{{ RET #(); True }}}.
+    {{{ RET #(); True }}}.
   Proof using Mdl dG strG Σ.
     iIntros (Φ) "(Hunallocated & Hfree & Hsa & #Hsrv_si) HΦ".
     wp_lam.
@@ -122,17 +116,13 @@ Section echo_client_proof.
     wp_apply (aneris_wp_send with "[$Hsh $Hsa Hsrv_si Hfrag]"); [try done..|].
     { iFrame "#".
       iExists (clt_si γ), (λ m, (own_frag γ m.(m_body))).
-      iFrame "#∗". simpl.
-      rewrite /clt_si.
-      iIntros "!>" (m) "[%Hm Hm]".
-      rewrite Hm. done. }
+      iFrame "#∗". iIntros "!>" (m) "[%Hm Hm]". by rewrite Hm. }
     iIntros "[Hsh Hsa]".
     wp_pures.
     wp_apply (aneris_wp_receivefrom with "[$Hsh $Hsa $Hsi]"); [try done..|].
     iIntros (m) "[%Hdst [H|H]]"; last first.
     { iDestruct "H" as "[%Hin _]"; set_solver. }
     iDestruct "H" as "(%Hnin & Hsh & Hsa & _ & Hfrag)".
-    wp_pures.
     iDestruct (own_valid_2 with "Hauth Hfrag") as %Hhello%excl_auth_agree_L.
     iMod (own_update_2 with "Hauth Hfrag") as "[Hauth Hfrag]".
     { apply (excl_auth_update _ _ ("World":leibnizO string)). }
@@ -141,10 +131,7 @@ Section echo_client_proof.
     wp_apply (aneris_wp_send with "[$Hsh $Hsa Hsrv_si Hfrag]"); [try done..|].
     { iFrame "#".
       iExists (clt_si γ), (λ m, (own_frag γ m.(m_body))).
-      iFrame "#∗". simpl.
-      rewrite /clt_si.
-      iIntros "!>" (m') "[%Hm Hm]".
-      rewrite Hm. done. }
+      iFrame "#∗". simpl. iIntros "!>" (m') "[%Hm Hm]". by rewrite Hm. }
     iIntros "[Hsh Hsa]".
     wp_pures.
     wp_apply (aneris_wp_receivefrom with "[$Hsh $Hsa $Hsi]"); [try done..|].
@@ -200,18 +187,11 @@ Definition ips : gset string :=
 Definition sa_dom : gset socket_address :=
   {[ server_addr ; client_addr ]}.
 
-Definition echo_runner : expr :=
-  let: "s_addr" := MakeAddress #"0.0.0.0" #80 in
-  let: "c_addr" := MakeAddress #"0.0.0.1" #80 in
-  Start "0.0.0.0" (echo_server "s_addr");;
-  Start "0.0.0.1" (echo_client "c_addr" "s_addr").
-
 Theorem echo_safe :
   aneris_adequate echo_runner "system" echo_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model; stringΣ]).
-  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
-    try set_solver.
+  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); try set_solver.
   { apply unit_model_rel_finitary. }
   iIntros (dinvG).
   iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".

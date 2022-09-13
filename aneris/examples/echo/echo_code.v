@@ -30,4 +30,4 @@ Definition echo_runner : expr :=
   let: "s_addr" := MakeAddress #"0.0.0.0" #80 in
   let: "c_addr" := MakeAddress #"0.0.0.1" #80 in
   Start "0.0.0.0" (echo_server "s_addr");;
-  Start "0.0.0.0" (echo_client "c_addr" "s_addr").
+  Start "0.0.0.1" (echo_client "c_addr" "s_addr").
