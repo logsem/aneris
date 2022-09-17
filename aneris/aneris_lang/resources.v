@@ -1,6 +1,6 @@
 From stdpp Require Import fin_maps gmap.
 From iris.algebra Require Import auth gmap frac agree coPset
-     gset frac_auth ofe excl.
+     gset frac_auth ofe excl csum.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop invariants mono_nat.
 From iris.proofmode Require Import tactics.
@@ -59,7 +59,18 @@ Definition tracked_socket_address_groupsUR : cmra :=
   agreeR (gsetUR socket_address_group).
 Definition messagesUR : ucmra :=
   gen_heapUR socket_address_group (message_soup * message_soup).
-Definition adversary_ipsUR : ucmra := authUR (gsetUR ip_address).
+
+(** An ip address can be marked as an adverarial ip, or a regular non-adversarial ip. *)
+Inductive adversary_ip_st := AdvIp | AdvNon.
+
+(* Intuition: every ip address is mapped to its state which is one of: (1) unset (left injection), (2) an
+   adversary or (3) a non-adversary (right injection). If we're at unset, then we can update to one of the
+   other two, but once there we're stuck so that the resource is persistent. *)
+Definition adversary_ipsUR : ucmra :=
+  authUR (gmapUR ip_address (csumR (exclR unitO) (agreeR (leibnizO adversary_ip_st)))).
+
+(* In the type we represent "unset" as None. *)
+Definition adversary_ip_map := gmap ip_address (option adversary_ip_st).
 
 (** Firewall state of socket addresses.
     Public socket addresses can be contacted by an adversary,
@@ -248,14 +259,33 @@ Section definitions.
     own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
 
   (** Adversary ip addresses *)
-  Definition adversary_ips_auth (A : gset ip_address) : iProp Σ :=
-    own (A:=adversary_ipsUR) aneris_adversaryips_name (● A).
+  Definition adversary_ip_st_to_cmra_elem (stOpt : option adversary_ip_st) :
+    csumR (exclR unitO) (agreeR (leibnizO adversary_ip_st)) :=
+    match stOpt with
+    | None => Cinl (Excl ())
+    | Some st => Cinr (to_agree st)
+    end.
 
-  Definition adversary_ip_own (ip : ip_address) : iProp Σ :=
-    own (A:=adversary_ipsUR) aneris_adversaryips_name (◯ {[ ip ]}).
+  Definition adversary_ips_auth (A : adversary_ip_map) : iProp Σ :=
+    own (A:=adversary_ipsUR) aneris_adversaryips_name (● (adversary_ip_st_to_cmra_elem <$> A)).
 
-  Definition adversary_saddr_own (saddr : socket_address) : iProp Σ :=
-    adversary_ip_own (ip_of_address saddr).
+  Definition adversary_ip_unset_own (ip : ip_address) : iProp Σ :=
+    own (A:=adversary_ipsUR) aneris_adversaryips_name (◯ {[ ip := adversary_ip_st_to_cmra_elem None ]}) .
+
+  Definition adversary_ip_adv_own (ip : ip_address) : iProp Σ :=
+    own (A:=adversary_ipsUR) aneris_adversaryips_name
+        (◯ {[ ip := adversary_ip_st_to_cmra_elem (Some AdvIp) ]}).
+
+  Definition adversary_ip_nonadv_own (ip : ip_address) : iProp Σ :=
+    own (A:=adversary_ipsUR) aneris_adversaryips_name
+        (◯ {[ ip := adversary_ip_st_to_cmra_elem (Some AdvNon) ]}).
+
+  (* socket address version of the above *)
+  Definition adversary_saddr_adv_own (saddr : socket_address) : iProp Σ :=
+    adversary_ip_adv_own (ip_of_address saddr).
+
+  Definition adversary_saddr_nonadv_own (saddr : socket_address) : iProp Σ :=
+    adversary_ip_nonadv_own (ip_of_address saddr).
 
   (* We track firewall state for an _entire_ socket address group.
      That is, within an address group, all addresses are public or private. *)
@@ -1152,8 +1182,27 @@ Section resource_lemmas.
     iPureIntro; set_solver.
   Qed.
 
-  #[global] Instance adversary_ip_own_persistent ip : Persistent (adversary_ip_own ip).
+  #[global] Instance adversary_ip_adv_own_persistent ip : Persistent (adversary_ip_adv_own ip).
   Proof. apply _. Qed.
+
+  #[global] Instance adversary_ip_nonadv_own_persistent ip : Persistent (adversary_ip_nonadv_own ip).
+  Proof. apply _. Qed.
+
+  Lemma adversary_ip_unset_own_update_adv M ip :
+    adversary_ips_auth M -∗ adversary_ip_unset_own ip ==∗ adversary_ips_auth (<[ip := Some AdvIp]> M) ∗ adversary_ip_adv_own ip.
+  Proof.
+    iIntros "Hauth Hfrag".
+    rewrite -own_op.
+    iApply (own_update_2 with "Hauth Hfrag").
+    apply auth_update.
+    rewrite fmap_insert.
+    eapply singleton_local_update.
+  Admitted.
+
+  Lemma adversary_ip_unset_own_update_nonadv ip :
+    adversary_ips_auth M -∗ adversary_ip_unset_own ip ==∗
+                       adversary_ips_auth (<[ip := Some AdvNon]> M) ∗ adversary_ip_adv_own ip.
+  Admitted.
 
   Lemma adversary_saddr_own_same_ip sa1 sa2 :
     ⌜ip_of_address sa1 = ip_of_address sa2⌝ -∗

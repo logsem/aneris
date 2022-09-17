@@ -382,7 +382,7 @@ Section state_interpretation.
     ∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m'.
   Proof.
     iIntros (Hmha Hmhb HmR HmT' (Hdisj & Hne & Hmacoh)).
-    iIntros "[%Hmdest _] [%Hmsend _]". 
+    iIntros "[%Hmdest _] [%Hmsend _]".
     iDestruct 1 as "[#Hown Hrcoh]". rewrite /messages_resource_coh.
     iDestruct "Hrcoh" as (ms Hle) "[#HrcohT Hrcoh]".
     iAssert (⌜∃ m', m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝%I) as %(m' & Hmeq & Hmin).
