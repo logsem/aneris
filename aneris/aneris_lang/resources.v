@@ -1197,7 +1197,7 @@ Section resource_lemmas.
     iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hv".
     iPureIntro.
     rewrite auth_both_valid_discrete in Hv.
-    destruct Hv as [Hv _].
+    destruct Hv as [Hv Hval].
     pose proof (iffLR (lookup_included _ _) Hv ip) as Hlookup.
     rewrite lookup_singleton lookup_fmap in Hlookup.
     destruct (M !! ip) as [optSt'|] eqn:Hrem.
@@ -1210,14 +1210,49 @@ Section resource_lemmas.
       inversion HS2.
       inversion HS1.
       subst.
-      admit.
+      destruct Hincl as [Hequiv | Hincl]; destruct optSt' as [st' |]; destruct optSt as [st |];
+        auto; simpl in *.
+      + apply f_equal.
+        inversion Hequiv.
+        match goal with
+        | [H : to_agree _ ≡ to_agree _ |- _] => pose proof H as Hequiv'
+        end.
+        pose proof (Hequiv' 0%nat) as [Hequiv'' _].
+        pose proof (Hequiv'' st) as Hequiv'''.
+        assert (st ∈ agree_car (to_agree st)) as Hin; [set_solver|].
+        pose proof (Hequiv''' Hin) as [c' [Hinc' Hequivc'%leibniz_equiv]].
+        assert (c' = st') as -> by set_solver; auto.
+      + inversion Hequiv.
+      + inversion Hequiv.
+      + destruct Hincl as [f Hincl].
+        destruct f; simpl in Hincl; auto.
+        * rewrite /op /cmra_op in Hincl; simpl in Hincl.
+          inversion Hincl.
+        * inversion Hincl.
+          match goal with
+          | [H : to_agree _ ≡ _ |- _] => pose proof H as Hequiv'
+          end.
+          pose proof (Hequiv' 0%nat) as [_ Hequiv''].
+          pose proof (Hequiv'' st) as Hequiv'''.
+          apply f_equal.
+          assert (st ∈ agree_car (op (A:=agreeR (leibnizO _)) (to_agree st) c)) as Hin; [set_solver|].
+          apply Hequiv''' in Hin as [x [Hin Hequiv0%leibniz_equiv]].
+          rewrite /to_agree in Hin.
+          simpl in Hin.
+          apply elem_of_list_singleton in Hin as ->; done.
+        * rewrite /op /cmra_op in Hincl; simpl in Hincl.
+          inversion Hincl.
+      + destruct Hincl as [f Hincl].
+        destruct f; inversion Hincl.
+      + destruct Hincl as [f Hincl].
+        destruct f; inversion Hincl.
     - rewrite Hrem in Hlookup.
       apply option_included in Hlookup.
       destruct Hlookup as [Hcontra|[a [b [_ [Hcontra _]]]]].
       { inversion Hcontra. }
       simpl in Hcontra.
       inversion Hcontra.
-  Admitted.
+  Qed.
 
   Lemma adversary_ips_auth_lookup_unset M ip :
     adversary_ips_auth M -∗ adversary_ip_unset_own ip -∗ ⌜M !! ip = Some None⌝.
