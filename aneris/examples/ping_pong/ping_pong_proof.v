@@ -3,7 +3,7 @@ From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy.
 From aneris.aneris_lang.lib Require Import pers_socket_proto network_util_proof.
-From aneris.examples.ping_pong Require Export code.
+From aneris.examples.ping_pong Require Export ping_pong.
 Set Default Proof Using "Type".
 
 Section pong.
