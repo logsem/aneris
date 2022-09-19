@@ -1188,21 +1188,86 @@ Section resource_lemmas.
   #[global] Instance adversary_ip_nonadv_own_persistent ip : Persistent (adversary_ip_nonadv_own ip).
   Proof. apply _. Qed.
 
-  Lemma adversary_ip_unset_own_update_adv M ip :
-    adversary_ips_auth M -∗ adversary_ip_unset_own ip ==∗ adversary_ips_auth (<[ip := Some AdvIp]> M) ∗ adversary_ip_adv_own ip.
+  Lemma adversary_ips_auth_lookup M ip optSt :
+    adversary_ips_auth M -∗
+    own aneris_adversaryips_name (◯ {[ ip := adversary_ip_st_to_cmra_elem optSt ]}) -∗
+    ⌜M !! ip = Some optSt⌝.
   Proof.
     iIntros "Hauth Hfrag".
+    iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hv".
+    iPureIntro.
+    rewrite auth_both_valid_discrete in Hv.
+    destruct Hv as [Hv _].
+    pose proof (iffLR (lookup_included _ _) Hv ip) as Hlookup.
+    rewrite lookup_singleton lookup_fmap in Hlookup.
+    destruct (M !! ip) as [optSt'|] eqn:Hrem.
+    - apply f_equal.
+      rewrite Hrem in Hlookup.
+      apply option_included in Hlookup.
+      destruct Hlookup as [Hcontra|[a [b [HS1 [HS2 Hincl]]]]].
+      { inversion Hcontra. }
+      simpl in HS2.
+      inversion HS2.
+      inversion HS1.
+      subst.
+      admit.
+    - rewrite Hrem in Hlookup.
+      apply option_included in Hlookup.
+      destruct Hlookup as [Hcontra|[a [b [_ [Hcontra _]]]]].
+      { inversion Hcontra. }
+      simpl in Hcontra.
+      inversion Hcontra.
+  Admitted.
+
+  Lemma adversary_ips_auth_lookup_unset M ip :
+    adversary_ips_auth M -∗ adversary_ip_unset_own ip -∗ ⌜M !! ip = Some None⌝.
+  Proof.
+    apply adversary_ips_auth_lookup.
+  Qed.
+
+  Lemma adversary_ips_auth_lookup_adv M ip :
+    adversary_ips_auth M -∗ adversary_ip_adv_own ip -∗ ⌜M !! ip = Some (Some AdvIp)⌝.
+  Proof.
+    apply adversary_ips_auth_lookup.
+  Qed.
+
+  Lemma adversary_ips_auth_lookup_nonadv M ip :
+    adversary_ips_auth M -∗ adversary_ip_nonadv_own ip -∗ ⌜M !! ip = Some (Some AdvNon)⌝.
+  Proof.
+    apply adversary_ips_auth_lookup.
+  Qed.
+
+  Lemma adversary_ips_unset_own_update M ip st :
+    adversary_ips_auth M -∗ adversary_ip_unset_own ip ==∗
+                       adversary_ips_auth (<[ip := Some st]> M) ∗
+                       own aneris_adversaryips_name (◯ {[ip := adversary_ip_st_to_cmra_elem (Some st)]}).
+  Proof.
+    iIntros "Hauth Hfrag".
+    iDestruct (adversary_ips_auth_lookup_unset with "Hauth Hfrag") as "%Hlookup".
     rewrite -own_op.
     iApply (own_update_2 with "Hauth Hfrag").
     apply auth_update.
     rewrite fmap_insert.
     eapply singleton_local_update.
-  Admitted.
+    { rewrite lookup_fmap Hlookup.
+      eauto. }
+    rewrite /adversary_ip_st_to_cmra_elem.
+    eapply exclusive_local_update; done.
+  Qed.
 
-  Lemma adversary_ip_unset_own_update_nonadv ip :
+  Lemma adversary_ip_unset_own_update_adv M ip :
     adversary_ips_auth M -∗ adversary_ip_unset_own ip ==∗
-                       adversary_ips_auth (<[ip := Some AdvNon]> M) ∗ adversary_ip_adv_own ip.
-  Admitted.
+                       adversary_ips_auth (<[ip := Some AdvIp]> M) ∗ adversary_ip_adv_own ip.
+  Proof.
+    apply (adversary_ips_unset_own_update M ip AdvIp).
+  Qed.
+
+  Lemma adversary_ip_unset_own_update_nonadv M ip :
+    adversary_ips_auth M -∗ adversary_ip_unset_own ip ==∗
+                       adversary_ips_auth (<[ip := Some AdvNon]> M) ∗ adversary_ip_nonadv_own ip.
+  Proof.
+    apply (adversary_ips_unset_own_update M ip AdvNon).
+  Qed.
 
   Lemma adversary_saddr_own_same_ip sa1 sa2 :
     ⌜ip_of_address sa1 = ip_of_address sa2⌝ -∗
