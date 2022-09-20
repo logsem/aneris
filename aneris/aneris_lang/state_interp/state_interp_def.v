@@ -68,14 +68,15 @@ Section definitions.
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
-  Definition socket_interp_coh (sags : gset socket_address_group) :=
-    (∃ (A : gset socket_address_group),
-      ⌜A ⊆ sags⌝ ∗
-      socket_address_group_ctx sags ∗
-      (* [A] is the set of socket addresses without an interpretation *)
-      unallocated_groups_auth A ∗
-      (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
-      sis_own (sags ∖ A))%I.
+  Definition socket_interp_coh :=
+    (∃ (sags : gset socket_address_group)
+       (A : gset socket_address_group),
+        ⌜A ⊆ sags⌝ ∗
+        socket_address_group_ctx sags ∗
+        (* [A] is the set of socket addresses without an interpretation *)
+        unallocated_groups_auth A ∗
+        (* [sags ∖ A] is the set of addresses with a saved socket interpretation *)
+        sis_own (sags ∖ A))%I.
 
   (** Free ips coherence *)
   (* Free ips have no bound ports, no heap, and no sockets  *)
@@ -98,10 +99,7 @@ Section definitions.
         free_ips_auth free_ips ∗
         free_ports_auth free_ports)%I.
 
-  (* The state and firewall agree on which addresses are public *)
-  Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
-    ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FWPublic.
-
+  (*
   (* TODO: move the lemmas below to a separate file? *)
   Lemma mapsto_messages_lookup_public fw_st σ sa sag bs bt s q :
     firewall_st_coh fw_st σ ->
@@ -134,9 +132,13 @@ Section definitions.
     rewrite Hlook in Hpublic.
     inversion Hpublic; done.
   Qed.
+  *)
 
-  (* Every delivered message that comes from an adversary
-     is delivered to a public address *)
+  (* The firewall map and state agree on which socket addresses are public *)
+  Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
+    ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FirewallStPublic.
+
+  (* Every delivered message that comes from an adversary is delivered to a public address *)
   Definition firewall_delivery_coh σ : Prop :=
     ∀ ip skts sh skt msgs m,
       state_sockets σ !! ip = Some skts ->
@@ -145,16 +147,18 @@ Section definitions.
       (ip_of_address (m_sender m)) ∈ (state_adversaries σ) ->
       ∃ sa, (saddress skt) = Some sa ∧ sa ∈ (state_public_addrs σ).
 
-  Definition adversary_st_coh (adv_st : adversary_ip_map) σ :=
-    ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some (Some AdvIp).
+  (* The adversary map and state agree on which ips are public *)
+  Definition adversary_st_coh (adv_st : adversary_map) σ :=
+    ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some (Some AdvStIp).
 
   (* Adversary and firewall coherence *)
-  Definition adversary_firewall_coh σ : iProp Σ := ∃ adv_st fw_st,
-    adversary_ips_auth adv_st ∗
-    firewall_auth fw_st ∗
-    ⌜adversary_st_coh adv_st σ⌝ ∗
-    ⌜firewall_st_coh fw_st σ⌝ ∗
-    ⌜firewall_delivery_coh σ⌝.
+  Definition adversary_firewall_coh σ : iProp Σ :=
+    ∃ adv_st fw_st,
+      adversary_auth adv_st ∗
+      firewall_auth fw_st ∗
+      ⌜adversary_st_coh adv_st σ⌝ ∗
+      ⌜firewall_st_coh fw_st σ⌝ ∗
+      ⌜firewall_delivery_coh σ⌝.
 
   (** Network sockets coherence for bound ports, socket handlers,
       receive buffers, and socket addresses *)
@@ -239,21 +243,24 @@ Section definitions.
     ∃ ms,
       ⌜ms ⊆ (messages_sent mhm)⌝ ∗
       (* [ms] carries one message, for each message sent by a group in [mhm] *)
-      ([∗ set] m ∈ messages_sent mhm, ∃ sagT sagR m',
-          ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
-          socket_address_group_own sagT ∗
-          (* we only require valid SAGs for messages that don't originate from an
-             adversary, because adversaries can send messages to anyone (even invalid
-             addresses) *)
-          (adversary_saddr_own (m_sender m') ∨ socket_address_group_own sagR)) ∗
+      ([∗ set] m ∈ messages_sent mhm,
+         adversary_saddr_adv_own (m_sender m) ∨
+         adversary_saddr_adv_own (m_destination m) ∨
+         ∃ sagT sagR m',
+           ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
+           socket_address_group_own sagT ∗
+           socket_address_group_own sagR) ∗
+      (* For any message [m] in [ms] *)
       ([∗ set] m ∈ ms,
-        ∃ sagT sagR m',
-          ⌜m' ≡g{sagT, sagR} m⌝ ∗
-          (socket_address_group_own sagT) ∗
-          ((∃ Φ, sagR ⤇* Φ ∗ ▷ Φ m') ∨
-           ⌜message_received m' mhm⌝ ∨
-           (adversary_saddr_own (m_sender m')) ∨
-           (adversary_saddr_own (m_destination m'))) ).
+         ∃ sagT sagR Φ,
+           (* The group of the message is disjoint, and *)
+           ⌜m_destination m ∈ sagR⌝ ∗ sagR ⤇* Φ ∗
+           socket_address_group_own sagT ∗
+           (* either [m] is governed by a protocol [Φ] and the network owns the
+              resources  specified by the protocol *)
+           ((∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ▷ Φ m') ∨
+            (* or [m] has been delivered somewhere *)
+            (∃ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ ⌜message_received m' mhm⌝))).
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=
