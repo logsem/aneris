@@ -65,6 +65,7 @@ Section state_interpretation.
     m_sender msg ∈ sagT →
     messages_addresses_coh mh →
     msg ≡g{sagT, sagR} msg' →
+    adversary_saddr_nonadv_own (m_sender msg) -∗
     m_destination msg ∈g sagR -∗
     sagR ⤇* ϕ -∗
     messages_resource_coh mh -∗
@@ -72,7 +73,7 @@ Section state_interpretation.
     messages_resource_coh (<[sagT:=(R, {[msg]} ∪ T)]> mh).
   Proof.
     rewrite /messages_resource_coh /=.
-    iIntros (Hmh HsagT Hmcoh Hmeq) "[%HsagR _] #HΦ [#Hown Hcoh] Hm".
+    iIntros (Hmh HsagT Hmcoh Hmeq) "#Hnonadv [%HsagR _] #HΦ [#Hown Hcoh] Hm".
     iAssert (socket_address_group_own sagT) as "HownT".
     {
       rewrite -(insert_id mh sagT (R,T)); [|set_solver].
@@ -111,6 +112,7 @@ Section state_interpretation.
       setoid_rewrite elem_of_union in Hin.
       destruct Hin as [Hin|Hin].
       {
+        iRight; iRight.
         assert (m' = msg) as <- by set_solver.
         iExists sagT, sagR, m'.
         iSplit; [iSplit; [|iPureIntro; set_solver] |].
@@ -119,12 +121,15 @@ Section state_interpretation.
           - done. }
         iFrame "HownT Hown'".
       }
-      iDestruct ("HcohT" $!(m') (Hin))
-        as (sagT' sagR' m'' [Hmeq' Hmin]) "[HcohT' HcohT'']".
-      iExists sagT', sagR', m''.
-      apply (elem_of_union_r m'' {[msg]} ms) in Hmin.
-      iFrame "#".
-      iSplit; [done|]. iPureIntro.  done.
+      iDestruct ("HcohT" $!(m') (Hin)) as "[Hadv|[Hadv|HcohT']]".
+      - iLeft; done.
+      - iRight; iLeft; done.
+      - iRight; iRight.
+        iDestruct "HcohT'" as (sagT' sagR' m'' [Hmeq' Hmin]) "[HownT'' HownR]".
+        iExists sagT', sagR', m''.
+        apply (elem_of_union_r m'' {[msg]} ms) in Hmin.
+        iFrame "#".
+        iSplit; [done|]. iPureIntro. done.
     }
     destruct (decide (msg ∈ ms)).
     {
@@ -134,26 +139,29 @@ Section state_interpretation.
       rewrite !messages_received_insert.
       iApply (big_sepS_mono with "Hcoh").
       iIntros (x Hin') "Hcoh".
-      iDestruct "Hcoh" as (sagT' sagR' m') "(%Hequiv & #HownT' & Hopt)".
+      iDestruct "Hcoh" as (sagT' sagR' m') "(%Hequiv & #Hsi & #HownT' & Hopt)".
       iExists sagT', sagR', m'.
       iSplitL ""; [done |].
       iFrame "#".
-      iDestruct "Hopt" as "[HΦ | [%Hrecv | [Hsender | Hrecv]]]";
-        [eauto | | eauto | eauto].
-      iRight; iLeft; iPureIntro.
-      rewrite -(insert_id mh sagT (R,T) Hmh) in Hrecv.
-      apply message_received_insert in Hrecv.
-      set_solver.
+      iDestruct "Hopt" as "[Hl | Hr]".
+      - iLeft; done.
+      - iRight.
+        iDestruct "Hr" as (m'') "(%&%Hrecv)".
+        iPureIntro.
+        exists m''.
+        rewrite -(insert_id mh sagT (R,T) Hmh) in Hrecv.
+        apply message_received_insert in Hrecv.
+        eauto with set_solver.
     }
+    (* msg ∉ ms*)
     rewrite big_sepS_union; [|set_solver].
     rewrite big_sepS_singleton.
     iSplitL "Hm".
-    + iExists sagT, sagR, msg'. iSplitL "".
-      { iPureIntro.
-        apply message_group_equiv_symmetry; eauto. }
-      iFrame "HownT".
-      iLeft; iExists ϕ.
-      iFrame "HΦ". iFrame "Hm".
+    + iExists sagT, sagR, ϕ.
+      iSplitL ""; [by iPureIntro|].
+      iFrame "HΦ #".
+      iLeft.
+      eauto with iFrame.
     + iApply (big_sepS_mono with "Hcoh").
       iIntros (x Hin') "Hcoh".
       iDestruct "Hcoh" as (sagT' sagR' m') "(%Hequiv & #HownT' & Hopt)".
@@ -379,7 +387,8 @@ Section state_interpretation.
     m_sender m ∈g sagT -∗
     messages_resource_coh mh -∗
     messages_resource_coh (<[sagR:=({[m]} ∪ R, T)]> mh) ∗
-    ∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m'.
+    (∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m') ∨
+    (adversary_saddr_own (m_sender m)).
   Proof.
     iIntros (Hmha Hmhb HmR HmT' (Hdisj & Hne & Hmacoh)).
     iIntros "[%Hmdest _] [%Hmsend _]".
