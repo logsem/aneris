@@ -244,8 +244,13 @@ Section definitions.
       ⌜ms ⊆ (messages_sent mhm)⌝ ∗
       (* [ms] carries one message, for each message sent by a group in [mhm] *)
       ([∗ set] m ∈ messages_sent mhm,
+         (* the message's sender is an adversary... *)
          adversary_saddr_adv_own (m_sender m) ∨
+         (* or the receiver is... *)
          adversary_saddr_adv_own (m_destination m) ∨
+         (* or the message is between non-adversaries, in which case
+            it could carry a spatial resource, so there's a meaching message
+            in [ms] *)
          ∃ sagT sagR m',
            ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
            socket_address_group_own sagT ∗
@@ -264,16 +269,16 @@ Section definitions.
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=
-    (∃ γm mhm sags,
+    (∃ γm mhm,
         ⌜messages_received_sent mhm = rt⌝ ∗
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ)⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhm⌝ ∗
         node_gnames_auth γm ∗
-        socket_interp_coh sags ∗
+        socket_interp_coh ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        adversary_coh sags σ ∗
+        adversary_firewall_coh σ ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 
