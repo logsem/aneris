@@ -1324,20 +1324,20 @@ Section resource_lemmas.
     rewrite /adversary_saddr_nonadv_own Heq; done.
   Qed.
 
-  Instance firewall_frag_fractional sag st : Fractional (λ q, firewall_frag sag q st).
+  Instance firewall_own_fractional sag st : Fractional (λ q, firewall_own sag q st).
   Proof.
     intros p q.
-    rewrite /firewall_frag.
+    rewrite /firewall_own.
     rewrite -own_op -auth_frag_op singleton_op
             -pair_op frac_op agree_idemp.
     done.
   Qed.
 
-  Lemma firewall_auth_frag_agree fw_st sag q st :
-    firewall_auth fw_st ⊢ firewall_frag sag q st -∗ ⌜fw_st !! sag = Some st⌝.
+  Lemma firewall_auth_own_agree fw_st sag q st :
+    firewall_auth fw_st ⊢ firewall_own sag q st -∗ ⌜fw_st !! sag = Some st⌝.
   Proof.
     iIntros "[Hauth _] Hfrag".
-    rewrite /firewall_auth /firewall_frag.
+    rewrite /firewall_auth /firewall_own.
     iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hvalid".
     iPureIntro.
     apply auth_both_valid_discrete in Hvalid as [Hincl _].
@@ -1385,15 +1385,16 @@ Section resource_lemmas.
   (* Used in [firewall_auth_frag_update] as a type annotation to help type inference *)
   Notation fw_valR := (prodR fracR (agreeR (leibnizO firewall_st))).
 
-  Lemma firewall_auth_frag_update fw_st sag st st' :
-    firewall_auth fw_st -∗ firewall_frag sag 1%Qp st ==∗
-                  firewall_auth (<[sag := st']> fw_st) ∗ firewall_frag sag 1%Qp st'.
+  Lemma firewall_auth_own_update fw_st sag st st' :
+    firewall_auth fw_st -∗ firewall_own sag 1%Qp st ==∗
+                  firewall_auth (<[sag := st']> fw_st) ∗ firewall_own sag 1%Qp st'.
   Proof.
     iIntros "Hauth Hfrag".
-    iDestruct (firewall_auth_frag_agree with "Hauth Hfrag") as "%Hlookup".
+    iDestruct (firewall_auth_own_agree with "Hauth Hfrag") as "%Hlookup".
     iDestruct "Hauth" as "[Hauth #Hdom]".
-    rewrite /firewall_auth /firewall_frag.
-    iMod ((own_update_2 _ _ _ (● _ ⋅ ◯ {[sag := (1%Qp, to_agree st')]})) with "Hauth Hfrag") as "[Hauth' Hfrag']".
+    rewrite /firewall_auth /firewall_own.
+    iMod ((own_update_2 _ _ _ (● _ ⋅ ◯ {[sag := (1%Qp, to_agree st')]}))
+           with "Hauth Hfrag") as "[Hauth' Hfrag']".
     { apply auth_update.
       apply (singleton_local_update _ sag ((1%Qp, to_agree st) : fw_valR) _
                                           ((1%Qp, to_agree st') : fw_valR) _).
@@ -1417,7 +1418,7 @@ Section resource_lemmas.
   Proof.
     iIntros "Hauth Hmt".
     iDestruct "Hmt" as (??) "(_&_&_&_&Hfrag&_)".
-    iApply (firewall_auth_frag_agree with "Hauth Hfrag").
+    iApply (firewall_auth_own_agree with "Hauth Hfrag").
   Qed.
 
   #[global] Instance mapsto_messages_fractional sag bs br s :
@@ -1488,11 +1489,11 @@ Section resource_lemmas.
 
   Lemma messages_mapto_firewall_update fw_st sag bs br R T :
     firewall_auth fw_st -∗ sag ⤳*[bs, br] (R, T) ==∗
-      firewall_auth (<[sag := FWPublic]> fw_st) ∗ sag ⤳*p[ bs, br ] (R, T).
+      firewall_auth (<[sag := FirewallStPublic]> fw_st) ∗ sag ⤳*p[ bs, br ] (R, T).
   Proof.
     iIntros "Hfw_auth Hpt".
     iDestruct "Hpt" as (??) "(?&?&?&?&Hfw_frag&?)".
-    iMod (firewall_auth_frag_update _ _ _ FWPublic with "Hfw_auth Hfw_frag") as "[Hfwa Hfwf]".
+    iMod (firewall_auth_own_update _ _ _ FirewallStPublic with "Hfw_auth Hfw_frag") as "[Hfwa Hfwf]".
     iModIntro.
     eauto with iFrame.
   Qed.
