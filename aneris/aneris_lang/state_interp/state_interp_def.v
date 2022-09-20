@@ -145,12 +145,14 @@ Section definitions.
       (ip_of_address (m_sender m)) ∈ (state_adversaries σ) ->
       ∃ sa, (saddress skt) = Some sa ∧ sa ∈ (state_public_addrs σ).
 
+  Definition adversary_st_coh (adv_st : adversary_ip_map) σ :=
+    ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some (Some AdvIp).
+
   (* Adversary and firewall coherence *)
-  Definition adversary_coh sags σ : iProp Σ := ∃ fw_st,
-    adversary_ips_auth (state_adversaries σ) ∗
-    (* groups containing adversaries contain just one ip address *)
-    ⌜adversary_sag_single_ip sags σ⌝ ∗
+  Definition adversary_firewall_coh σ : iProp Σ := ∃ adv_st fw_st,
+    adversary_ips_auth adv_st ∗
     firewall_auth fw_st ∗
+    ⌜adversary_st_coh adv_st σ⌝ ∗
     ⌜firewall_st_coh fw_st σ⌝ ∗
     ⌜firewall_delivery_coh σ⌝.
 

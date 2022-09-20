@@ -1188,6 +1188,7 @@ Section resource_lemmas.
   #[global] Instance adversary_ip_nonadv_own_persistent ip : Persistent (adversary_ip_nonadv_own ip).
   Proof. apply _. Qed.
 
+  (* TODO: simplify this proof *)
   Lemma adversary_ips_auth_lookup M ip optSt :
     adversary_ips_auth M -∗
     own aneris_adversaryips_name (◯ {[ ip := adversary_ip_st_to_cmra_elem optSt ]}) -∗
@@ -1304,53 +1305,22 @@ Section resource_lemmas.
     apply (adversary_ips_unset_own_update M ip AdvNon).
   Qed.
 
-  Lemma adversary_saddr_own_same_ip sa1 sa2 :
+  Lemma adversary_saddr_adv_own_same_ip sa1 sa2 :
     ⌜ip_of_address sa1 = ip_of_address sa2⌝ -∗
-    adversary_saddr_own sa1 -∗
-    adversary_saddr_own sa2.
+    adversary_saddr_adv_own sa1 -∗
+    adversary_saddr_adv_own sa2.
   Proof.
     iIntros "%Heq #Ha1".
-    rewrite /adversary_saddr_own Heq; done.
+    rewrite /adversary_saddr_adv_own Heq; done.
   Qed.
 
-  (* Well-formedness of socket address groups. If a SAG contains an adversarial
-     socket address, then all other addresses in the group are adversarial and
-     belong to the same ip. That is, we can't have a SAG that contains mixes
-     addresses from different nodes. *)
-  Definition adversary_sag_single_ip (sags : gset socket_address_group) (σ : state) : Prop :=
-    ∀ sag sa1 sa2, sag ∈ sags ->
-                   sa1 ∈ sag ->
-                   sa2 ∈ sag ->
-                   adversary_saddr sa1 σ ->
-                   ip_of_address sa1 = ip_of_address sa2.
-
-  Lemma adversary_saddr_own_sound sa σ :
-    adversary_ips_auth (state_adversaries σ) -∗
-    adversary_saddr_own sa -∗
-    ⌜adversary_saddr sa σ⌝.
+  Lemma adversary_saddr_nonadv_own_same_ip sa1 sa2 :
+    ⌜ip_of_address sa1 = ip_of_address sa2⌝ -∗
+    adversary_saddr_nonadv_own sa1 -∗
+    adversary_saddr_nonadv_own sa2.
   Proof.
-    iIntros "Hauth Hfrag".
-    iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hv".
-    rewrite auth_both_valid_discrete gset_included in Hv.
-    destruct Hv as [Hv _].
-    iPureIntro.
-    set_solver.
-  Qed.
-
-  Lemma socket_address_group_own_adversary_same_ip sags sag saddr1 saddr2 σ :
-    adversary_sag_single_ip sags σ ->
-    socket_address_group_ctx sags -∗
-    socket_address_group_own sag -∗
-    ⌜saddr1 ∈ sag⌝ -∗
-    ⌜saddr2 ∈ sag⌝ -∗
-    adversary_ips_auth (state_adversaries σ) -∗
-    adversary_saddr_own saddr1 -∗
-    ⌜ip_of_address saddr1 = ip_of_address saddr2⌝.
-  Proof.
-    iIntros (Hip) "Hauth Hfrag %Hin1 %Hin2 Hadvauth #Hadv".
-    iDestruct (adversary_saddr_own_sound with "Hadvauth Hadv") as "%Hadvaddr".
-    iDestruct (socket_address_group_ctx_own_included with "Hauth Hfrag") as "%Helem".
-    eauto.
+    iIntros "%Heq #Ha1".
+    rewrite /adversary_saddr_nonadv_own Heq; done.
   Qed.
 
   Instance firewall_frag_fractional sag st : Fractional (λ q, firewall_frag sag q st).
