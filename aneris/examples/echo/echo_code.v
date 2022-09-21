@@ -18,13 +18,11 @@ Definition echo_client : val := λ: "c_addr" "s_addr",
   SendTo "socket" #"Hello" "s_addr";;
   let: "m1" := unSOME (ReceiveFrom "socket") in
   SendTo "socket" #"World" "s_addr";;
-  let: "m2" := unSOME (ReceiveFrom "socket") in
-  if: "m1" ≠ "m2" then
-    let: "m1'" := Fst "m1" in
-    let: "m2'" := Fst "m2" in
-    assert: ("m1'" = #"Hello");;
-    assert: ("m2'" = #"World")
-  else #().
+  let: "m2" := unSOME (wait_receivefrom "socket" (λ: "m", Fst "m" ≠ #"Hello")) in
+  let: "m1'" := Fst "m1" in
+  let: "m2'" := Fst "m2" in
+  assert: ("m1'" = #"Hello");;
+  assert: ("m2'" = #"World").
 
 Definition echo_runner : expr :=
   let: "s_addr" := MakeAddress #"0.0.0.0" #80 in
