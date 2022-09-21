@@ -1,6 +1,5 @@
 From aneris.aneris_lang Require Import lang.
 From aneris.aneris_lang.lib Require Export network_util_code list_code.
-From aneris.examples.echo Require Import receivefresh.
 
 Definition echo_server : val :=
   λ: "addr",
@@ -19,7 +18,7 @@ Definition echo_client : val := λ: "c_addr" "s_addr",
   SendTo "socket" #"Hello" "s_addr";;
   let: "m1" := unSOME (ReceiveFrom "socket") in
   SendTo "socket" #"World" "s_addr";;
-  let: "m2" := receivefresh "socket" ["m1"] in
+  let: "m2" := wait_receivefresh "socket" ["m1"] in
   let: "m1'" := Fst "m1" in
   let: "m2'" := Fst "m2" in
   assert: ("m1'" = #"Hello");;

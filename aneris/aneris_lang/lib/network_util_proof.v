@@ -1,6 +1,6 @@
 From stdpp Require Import base pretty.
 From iris.proofmode Require Import coq_tactics tactics.
-From aneris.prelude Require Export strings.
+From aneris.prelude Require Export strings gset_map.
 From aneris.aneris_lang Require Import ast lang tactics proofmode network.
 From aneris.aneris_lang.lib Require Import inject pers_socket_proto.
 From aneris.aneris_lang.lib Require Import assert_proof list_proof map_proof set_proof.
@@ -71,6 +71,58 @@ Section library.
     iIntros ([]) "Htest"; wp_if.
     { iApply "HΦ". by iFrame. }
     wp_apply ("IH" with "Hh Ha HΦ").
+  Qed.
+
+  (* TODO: Maybe move this elsewhere *)
+  Definition pair_to_msg (sa : socket_address)
+             (m : message_body * socket_address) : message :=
+    mkMessage m.2 sa IPPROTO_UDP m.1.
+
+  Instance pair_to_msg_injective sa : Inj eq eq (pair_to_msg sa).
+  Proof. intros [] [] Heq. by simplify_eq. Qed.
+
+  Lemma pair_to_msg_id m :
+    pair_to_msg (m_destination m) (m_body m, m_sender m) = m.
+  Proof. destruct m. destruct m_protocol. done. Qed.
+
+  Lemma wp_wait_receivefresh a φ R T h l
+        (ms : list (message_body * socket_address)) :
+    is_list ms l →
+    R = gset_map (pair_to_msg a) (list_to_set ms) →
+    {{{ h ↪[ip_of_address a] (udp_socket (Some a) true) ∗ a ⤇ φ ∗ a ⤳ (R, T) }}}
+      wait_receivefresh #(LitSocket h) l @[ip_of_address a]
+    {{{ m, RET (#(m_body m), #(m_sender m));
+           ⌜m_destination m = a⌝ ∗
+           h ↪[ip_of_address a] (udp_socket (Some a) true) ∗
+           a ⤳ ({[m]} ∪ R, T) ∗ φ m }}}.
+  Proof.
+    iIntros (Hl Heq Φ) "(Hh & #Hsi & Ha) HΦ".
+    wp_lam. rewrite /wait_receivefrom.
+    do 9 wp_pure _.
+    iLöb as "IH".
+    wp_pures.
+    wp_apply (aneris_wp_receivefrom with "[$Hh $Ha $Hsi]"); [done..|].
+    iIntros (m) "[%Hdest H]".
+    wp_apply wp_unSOME; [done|]. iIntros "_". wp_pures.
+    wp_apply (wp_list_mem _ ms l (m_body m, m_sender m)); [done|].
+    iDestruct "H" as "[H|H]".
+    - iDestruct "H" as "(%Hnin & Hh & Ha & _ & Hm)".
+      iIntros ([]) "%Hb".
+      { rewrite Heq in Hnin.
+        apply (elem_of_list_to_set (C:=gset _)) in Hb.
+        apply (gset_map_correct1 (pair_to_msg a)) in Hb.
+        rewrite -{1}Hdest in Hb. rewrite pair_to_msg_id in Hb. done. }
+      wp_pures. iApply "HΦ". by iFrame.
+    - iDestruct "H" as "(%Hin & Hh & Ha)".
+      iIntros ([]) "%Hb"; last first.
+      { destruct Hb as [Hb|Hb]; last first.
+        { rewrite Heq in Hin. rewrite Hb in Hin. set_solver. }
+        rewrite Heq in Hin.
+        apply (not_elem_of_list_to_set (C:=gset _)) in Hb.
+        apply (gset_map_not_elem_of (pair_to_msg a)) in Hb; [|apply _].
+        rewrite -{1}Hdest in Hb. rewrite pair_to_msg_id in Hb. done. }
+      do 2 wp_pure _.
+      iApply ("IH" with "Hh Ha HΦ").
   Qed.
 
   Lemma wp_pers_receivefrom_all nodes φ ns h s ip a R T :

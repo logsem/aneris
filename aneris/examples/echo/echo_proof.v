@@ -1,4 +1,3 @@
-(* From aneris.aneris_lang.lib Require Import inject. *)
 From iris.algebra Require Import excl_auth.
 From trillium.prelude Require Import finitary.
 From aneris.prelude Require Import gset_map.
@@ -7,7 +6,6 @@ From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From aneris.aneris_lang.lib Require Import network_util_proof assert_proof.
 From aneris.aneris_lang.lib Require Import list_code list_proof.
-From aneris.examples.echo Require Import receivefresh.
 From aneris.examples.echo Require Export echo_code.
 Set Default Proof Using "Type".
 
@@ -141,16 +139,10 @@ Section echo_client_proof.
     wp_apply (wp_list_cons ((m_body m), (m_sender m)) []).
     { iPureIntro. done. }
     iIntros (v Hl).
-    wp_apply (wp_receivefresh with "[$Hsh $Hsa $Hsi]"); [done| |].
+    wp_apply (wp_wait_receivefresh with "[$Hsh $Hsa $Hsi]"); [done| |].
     { simpl.
-      rewrite !union_empty_r_L.
-      rewrite gset_map_singleton.
-      rewrite /pair_to_msg.
-      f_equiv. simpl.
-      destruct m. 
-      simplify_eq. simpl.
-      destruct m_protocol.
-      done. }
+      rewrite !union_empty_r_L gset_map_singleton.
+      by rewrite -Hdst pair_to_msg_id. }
     iIntros (m') "[%Hdst' H]".
     iDestruct "H" as "(Hsh & Hsa & Hfrag)".
     iDestruct (own_valid_2 with "Hauth Hfrag") as %Hworld%excl_auth_agree_L.

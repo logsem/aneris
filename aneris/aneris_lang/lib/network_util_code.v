@@ -35,6 +35,9 @@ Definition wait_receivefrom : val :=
      else  "loop" #()) in
     "loop" #().
 
+Definition wait_receivefresh : val :=
+  λ: "skt" "ms", wait_receivefrom "skt" (λ: "m", ~ (list_mem "m" "ms")).
+
 Definition sendto_all_set : val :=
   λ: "skt" "x" "msg",
   set_iter (λ: "n", let: "_l" := SendTo "skt" "msg" "n" in
