@@ -289,13 +289,14 @@ Section definitions.
   Definition adversary_unset_own (ip : ip_address) : iProp Σ :=
     own (A:=adversaryUR) aneris_adversary_name (◯ {[ ip := adversary_st_to_cmra None ]}) .
 
+  Definition adversary_set_own (ip : ip_address) (st : adversary_st) : iProp Σ :=
+    own (A:=adversaryUR) aneris_adversary_name (◯ {[ ip := adversary_st_to_cmra (Some st) ]}) .
+
   Definition adversary_adv_own (ip : ip_address) : iProp Σ :=
-    own (A:=adversaryUR) aneris_adversary_name
-        (◯ {[ ip := adversary_st_to_cmra (Some AdvStIp) ]}).
+    adversary_set_own ip AdvStIp.
 
   Definition adversary_nonadv_own (ip : ip_address) : iProp Σ :=
-    own (A:=adversaryUR) aneris_adversary_name
-        (◯ {[ ip := adversary_st_to_cmra (Some AdvStNon) ]}).
+    adversary_set_own ip AdvStNon.
 
   (* socket address version of the above *)
   Definition adversary_saddr_adv_own (saddr : socket_address) : iProp Σ :=
