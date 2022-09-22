@@ -1355,7 +1355,7 @@ Section resource_lemmas.
 
   (* We can update the fragment as long as its unset *)
   Lemma adversary_persistent_keys_insert M ip st :
-    M !! ip = None ->
+    M !! ip = Some None ->
     adversary_persistent_keys (<[ ip := Some st ]> M) =
       <[ ip := Some st ]> (adversary_persistent_keys M).
   Proof.
@@ -1366,16 +1366,23 @@ Section resource_lemmas.
   Qed.
 
   Lemma adversary_persistent_keys_lookup_None M ip :
-    M !! ip = None ->
+    M !! ip = Some None ->
     adversary_persistent_keys M !! ip = None.
   Proof.
     intros Hlook.
     rewrite /adversary_persistent_keys.
-    apply map_filter_lookup_None; auto.
+    rewrite map_filter_lookup_None.
+    right.
+    intros x Hlook'.
+    assert (x = None) as ->.
+    { rewrite Hlook in Hlook'.
+      by inversion Hlook'. }
+    intros [? contra].
+    inversion contra.
   Qed.
 
   Lemma adversary_persistent_own_update M ip st :
-    M !! ip = None ->
+    M !! ip = Some None ->
     adversary_persistent_own M -∗
     own aneris_adversary_name (◯ {[ ip := adversary_st_to_cmra (Some st) ]}) -∗
       adversary_persistent_own (<[ ip := Some st ]> M).
@@ -1399,26 +1406,25 @@ Section resource_lemmas.
     iIntros "Hauth Hfrag".
     iDestruct (adversary_auth_lookup_unset with "Hauth Hfrag") as "%Hlookup".
     iDestruct "Hauth" as "[Hauth Hpers]".
-    
-    iDestruct "Hauth" as "[Hauth Hfrag']".
-    iAssert (|==> adversary_auth (<[ip:=Some st]> M))%I with "[Hauth Hfrag]" as "Hauth".
+    iAssert (|==> own (A:=adversaryUR) aneris_adversary_name
+                      (● (adversary_st_to_cmra <$> <[ ip := Some st ]> M)) ∗
+                  own aneris_adversary_name
+                  (◯ {[ip := adversary_st_to_cmra (Some st)]}))%I with "[Hauth Hfrag]"
+      as "> [Hauth #Hfrag]".
     { rewrite /adversary_auth.
       rewrite -own_op.
       iApply (own_update_2 with "Hauth Hfrag").
       apply auth_update.
       rewrite fmap_insert.
-
       eapply singleton_local_update.
-    { rewrite lookup_fmap Hlookup.
-      eauto. }
-    rewrite /adversary_st_to_cmra.
-    eapply exclusive_local_update; done.
-    iDestruct (adversary_auth_rev_lookup with "Hauth") as "[Hauth #Hfrag]".
-    { rewrite lookup_insert.
+      { rewrite lookup_fmap Hlookup.
+        eauto. }
+      rewrite /adversary_st_to_cmra.
+      eapply exclusive_local_update; done. }
     rewrite /adversary_auth.
-    iAssert ()
-    rewrite -own_op.
- 
+    iModIntro.
+    iFrame "∗#".
+    iApply (adversary_persistent_own_update with "Hpers Hfrag"); done.
   Qed.
 
   Corollary adversary_unset_own_update_adv M ip :
