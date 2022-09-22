@@ -164,16 +164,20 @@ Section state_interpretation.
       eauto with iFrame.
     + iApply (big_sepS_mono with "Hcoh").
       iIntros (x Hin') "Hcoh".
-      iDestruct "Hcoh" as (sagT' sagR' m') "(%Hequiv & #HownT' & Hopt)".
-      iExists sagT', sagR', m'.
-            iSplitL ""; [done |].
+      iDestruct "Hcoh" as (sagT' sagR' Φ') "(%Hin & #Hproto & [#? Hopt])".
+      iExists sagT', sagR', Φ'.
+      iSplitL ""; [done |].
       iFrame "#".
-      iDestruct "Hopt" as "[HΦ | [%Hrecv | [Hsender | Hrecv]]]";
-        [eauto | | eauto | eauto].
-      iRight; iLeft; iPureIntro.
-      rewrite -(insert_id mh sagT (R,T) Hmh) in Hrecv.
-      rewrite message_received_insert.
-      by apply message_received_insert in Hrecv.
+      iDestruct "Hopt" as "[Hres | Hrec]".
+      * iLeft; done.
+      * iRight.
+        iDestruct "Hrec" as (m') "[% %Hrecv]".
+        iExists m'. iPureIntro.
+        split; [done|].
+        rewrite -(insert_id mh sagT (R,T) Hmh) in Hrecv.
+        rewrite message_received_insert.
+        apply message_received_insert in Hrecv.
+        done.
   Qed.
 
   Lemma adversary_saddr_own_same_ip sags σ sag saddr1 saddr2 :

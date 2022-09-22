@@ -99,41 +99,6 @@ Section definitions.
         free_ips_auth free_ips ∗
         free_ports_auth free_ports)%I.
 
-  (*
-  (* TODO: move the lemmas below to a separate file? *)
-  Lemma mapsto_messages_lookup_public fw_st σ sa sag bs bt s q :
-    firewall_st_coh fw_st σ ->
-    sa ∈ sag ->
-    firewall_auth fw_st -∗
-    sag ⤳*p[ bs , bt ]{ q } s -∗
-    ⌜sa ∈ state_public_addrs σ⌝.
-  Proof.
-    iIntros (Hcoh Hin) "Hauth Hmpt".
-    iDestruct (firewall_auth_mapsto_agree with "Hauth Hmpt") as "%Hlook".
-    iPureIntro.
-    apply (Hcoh sa); eauto.
-  Qed.
-
-  Lemma mapsto_messages_lookup_private fw_st σ sa sag bs bt s q :
-    firewall_st_coh fw_st σ ->
-    sa ∈ sag ->
-    firewall_auth fw_st -∗
-    sag ⤳*[ bs , bt ]{ q } s -∗
-    ⌜sa ∉ state_public_addrs σ⌝.
-  Proof.
-    iIntros (Hcoh Hsa) "Hauth Hmpt".
-    iDestruct (firewall_auth_mapsto_agree with "Hauth Hmpt") as "%Hlook".
-    iDestruct (firewall_auth_disj with "Hauth") as "%Heq".
-    iPureIntro.
-    intros contra.
-    apply (Hcoh sa) in contra as [sag' [Hin Hpublic]].
-    assert (sag = sag') as ->.
-    { eapply (Heq sa sag sag'); eauto. }
-    rewrite Hlook in Hpublic.
-    inversion Hpublic; done.
-  Qed.
-  *)
-
   (* The firewall map and state agree on which socket addresses are public *)
   Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
     ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FirewallStPublic.
@@ -249,7 +214,7 @@ Section definitions.
          (* or the receiver is... *)
          adversary_saddr_adv_own (m_destination m) ∨
          (* or the message is between non-adversaries, in which case
-            it could carry a spatial resource, so there's a meaching message
+            it could carry a spatial resource, so there's a matching message
             in [ms] *)
          ∃ sagT sagR m',
            ⌜m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝ ∗
