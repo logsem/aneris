@@ -68,9 +68,8 @@ Section definitions.
 
   (** Socket interpretation coherence *)
   (* Addresses with socket interpretations are bound *)
-  Definition socket_interp_coh :=
-    (∃ (sags : gset socket_address_group)
-       (A : gset socket_address_group),
+  Definition socket_interp_coh sags :=
+    (∃ (A : gset socket_address_group),
         ⌜A ⊆ sags⌝ ∗
         socket_address_group_ctx sags ∗
         (* [A] is the set of socket addresses without an interpretation *)
@@ -103,7 +102,8 @@ Section definitions.
   Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
     ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FirewallStPublic.
 
-  (* Every delivered message that comes from an adversary is delivered to a public address *)
+  (* Every delivered message that comes from an adversary is delivered
+     to a public address *)
   Definition firewall_delivery_coh σ : Prop :=
     ∀ ip skts sh skt msgs m,
       state_sockets σ !! ip = Some skts ->
@@ -116,11 +116,20 @@ Section definitions.
   Definition adversary_st_coh (adv_st : adversary_map) σ :=
     ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some (Some AdvStIp).
 
+  (* SAGs are either all public or all private *)
+  Definition sags_preserve_adv_state (sags : gset socket_address_group)
+                                     (advs : gset ip_address) : Prop :=
+    ∀ sag sa1 sa2, sag ∈ sags ->
+                   sa1 ∈ sag ->
+                   sa2 ∈ sag ->
+                   (ip_of_address sa1 ∈ advs <-> ip_of_address sa2 ∈ advs).
+
   (* Adversary and firewall coherence *)
-  Definition adversary_firewall_coh σ : iProp Σ :=
+  Definition adversary_firewall_coh σ sags : iProp Σ :=
     ∃ adv_st fw_st,
       adversary_auth adv_st ∗
       firewall_auth fw_st ∗
+      ⌜sags_preserve_adv_state sags (state_adversaries σ)⌝ ∗
       ⌜adversary_st_coh adv_st σ⌝ ∗
       ⌜firewall_st_coh fw_st σ⌝ ∗
       ⌜firewall_delivery_coh σ⌝.
@@ -234,16 +243,16 @@ Section definitions.
 
   (** State interpretation *)
   Definition aneris_state_interp σ (rt : messages_history) :=
-    (∃ γm mhm,
+    (∃ γm mhm sags,
         ⌜messages_received_sent mhm = rt⌝ ∗
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ)⌝ ∗
         ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhm⌝ ∗
         node_gnames_auth γm ∗
-        socket_interp_coh ∗
+        socket_interp_coh sags ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        adversary_firewall_coh σ ∗
+        adversary_firewall_coh σ sags ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 

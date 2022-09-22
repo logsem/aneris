@@ -276,7 +276,8 @@ Section definitions.
 
   (** Adversaries *)
   Definition adversary_auth (adv_map : adversary_map) : iProp Σ :=
-    own (A:=adversaryUR) aneris_adversary_name (● (adversary_st_to_cmra <$> adv_map)).
+    own (A:=adversaryUR) aneris_adversary_name (● (adversary_st_to_cmra <$> adv_map)) ∗
+    own (A:=adversaryUR) aneris_adversary_name (◯ (adversary_st_to_cmra <$> adv_map)).
 
   Definition adversary_unset_own (ip : ip_address) : iProp Σ :=
     own (A:=adversaryUR) aneris_adversary_name (◯ {[ ip := adversary_st_to_cmra None ]}) .
@@ -1204,7 +1205,7 @@ Section resource_lemmas.
     own aneris_adversary_name (◯ {[ ip := adversary_st_to_cmra optSt ]}) -∗
     ⌜M !! ip = Some optSt⌝.
   Proof.
-    iIntros "Hauth Hfrag".
+    iIntros "[Hauth _] Hfrag".
     iDestruct (own_valid_2 with "Hauth Hfrag") as "%Hv".
     iPureIntro.
     rewrite auth_both_valid_discrete in Hv.
@@ -1221,7 +1222,8 @@ Section resource_lemmas.
       inversion HS2.
       inversion HS1.
       subst.
-      destruct Hincl as [Hequiv | Hincl]; destruct optSt' as [st' |]; destruct optSt as [st |];
+      destruct Hincl as [Hequiv | Hincl];
+        destruct optSt' as [st' |]; destruct optSt as [st |];
         auto; simpl in *.
       + apply f_equal.
         inversion Hequiv.
@@ -1277,6 +1279,51 @@ Section resource_lemmas.
     adversary_auth M -∗ adversary_nonadv_own ip -∗ ⌜M !! ip = Some (Some AdvStNon)⌝.
   Proof. apply adversary_auth_lookup. Qed.
 
+  Lemma adversary_auth_rev_lookup M ip advSt :
+    M !! ip = Some (Some advSt) ->
+    adversary_auth M -∗
+      adversary_auth M ∗
+      own aneris_adversary_name (◯ {[ ip := adversary_st_to_cmra (Some advSt) ]}).
+  Proof.
+    iIntros (Hlookup) "[Hauth Hfrag]".
+    (* isolate the persistent resource at key [ip] and frame it *)
+    rewrite -(insert_delete M ip (Some advSt)); [|done].
+    rewrite fmap_insert.
+    rewrite insert_singleton_op; last first.
+    { rewrite fmap_delete lookup_delete_None; auto. }
+    rewrite auth_frag_op.
+    iDestruct "Hfrag" as "[#Hfrag1 Hfrag2]".
+    iFrame "#".
+    (* now reverse the above steps *)
+    iDestruct (own_op with "[Hfrag1 Hfrag2]") as "Hfrag".
+    { iSplitL ""; [iFrame "Hfrag1"|].
+      iFrame "Hfrag2". }
+    rewrite -auth_frag_op.
+    rewrite -insert_singleton_op; last first.
+    { rewrite fmap_delete lookup_delete_None; auto. }
+    rewrite -fmap_insert.
+    rewrite (insert_delete M ip (Some advSt)); [|done].
+    iFrame.
+  Qed.
+
+  Corollary adversary_auth_rev_lookup_adv M ip :
+    M !! ip = Some (Some AdvStIp) ->
+    adversary_auth M -∗
+      adversary_auth M ∗ adversary_adv_own ip.
+  Proof.
+    iIntros (?) "?".
+    iApply adversary_auth_rev_lookup; done.
+  Qed.
+
+  Corollary adversary_auth_rev_lookup_nonadv M ip :
+    M !! ip = Some (Some AdvStNon) ->
+    adversary_auth M -∗
+      adversary_auth M ∗ adversary_nonadv_own ip.
+  Proof.
+    iIntros (?) "?".
+    iApply adversary_auth_rev_lookup; done.
+  Qed.
+
   (* We can update the fragment as long as its unset *)
   Lemma adversary_unset_own_update M ip st :
     adversary_auth M -∗ adversary_unset_own ip ==∗
@@ -1285,15 +1332,25 @@ Section resource_lemmas.
   Proof.
     iIntros "Hauth Hfrag".
     iDestruct (adversary_auth_lookup_unset with "Hauth Hfrag") as "%Hlookup".
-    rewrite -own_op.
-    iApply (own_update_2 with "Hauth Hfrag").
-    apply auth_update.
-    rewrite fmap_insert.
-    eapply singleton_local_update.
+    iDestruct "Hauth" as "[Hauth Hfrag']".
+    iAssert (|==> adversary_auth (<[ip:=Some st]> M))%I with "[Hauth Hfrag]" as "Hauth".
+    { rewrite /adversary_auth.
+      rewrite -own_op.
+      iApply (own_update_2 with "Hauth Hfrag").
+      apply auth_update.
+      rewrite fmap_insert.
+
+      eapply singleton_local_update.
     { rewrite lookup_fmap Hlookup.
       eauto. }
     rewrite /adversary_st_to_cmra.
     eapply exclusive_local_update; done.
+    iDestruct (adversary_auth_rev_lookup with "Hauth") as "[Hauth #Hfrag]".
+    { rewrite lookup_insert.
+    rewrite /adversary_auth.
+    iAssert ()
+    rewrite -own_op.
+ 
   Qed.
 
   Corollary adversary_unset_own_update_adv M ip :
