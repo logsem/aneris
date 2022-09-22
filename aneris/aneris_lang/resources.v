@@ -1456,6 +1456,25 @@ Section resource_lemmas.
     rewrite /adversary_saddr_nonadv_own Heq; done.
   Qed.
 
+  Lemma adversary_saddr_adv_nonadv_own sa :
+    adversary_saddr_adv_own sa -∗
+    adversary_saddr_nonadv_own sa -∗
+    False.
+  Proof.
+    iIntros "Hadv Hnonadv".
+    iDestruct (own_valid_2 with "Hadv Hnonadv") as "%Hv".
+    iPureIntro.
+    simpl in Hv.
+    rewrite -auth_frag_op auth_frag_valid singleton_op singleton_valid in Hv.
+    compute in Hv.
+    assert (AdvStIp = AdvStNon -> False) as Hcontra; [by inversion 1|].
+    apply Hcontra.
+    apply (Hv 0%nat).
+    - apply elem_of_list_here.
+    - apply elem_of_list_further.
+      apply elem_of_list_here.
+  Qed.
+
   Instance firewall_own_fractional sag st : Fractional (λ q, firewall_own sag q st).
   Proof.
     intros p q.

@@ -68,25 +68,6 @@ Section state_interpretation_lemmas.
     iExists _, _; iFrame "#∗".
   Qed.
 
-  Lemma adversary_saddr_adv_nonadv_own sa :
-    adversary_saddr_adv_own sa -∗
-    adversary_saddr_nonadv_own sa -∗
-    False.
-  Proof.
-    iIntros "Hadv Hnonadv".
-    iDestruct (own_valid_2 with "Hadv Hnonadv") as "%Hv".
-    iPureIntro.
-    simpl in Hv.
-    rewrite -auth_frag_op auth_frag_valid singleton_op singleton_valid in Hv.
-    compute in Hv.
-    assert (AdvStIp = AdvStNon -> False) as Hcontra; [by inversion 1|].
-    apply Hcontra.
-    apply (Hv 0).
-    - apply elem_of_list_here.
-    - apply elem_of_list_further.
-      apply elem_of_list_here.
-  Qed.
-
   Lemma adversary_saddr_adv_nonadv_own_same_sag σ sags sag sa sa' :
     adversary_firewall_coh σ sags -∗
     socket_address_group_ctx sags -∗
@@ -109,6 +90,38 @@ Section state_interpretation_lemmas.
     iDestruct (adversary_auth_rev_lookup_adv with "Hadv_auth") as "[Hadv_auth #Hadv_own]";
       [done|].
     iDestruct (adversary_saddr_adv_nonadv_own with "Hadv_own Hnonadv") as "?"; done.
+  Qed.
+
+  Lemma adversary_saddr_adv_own_equiv_sender σ sags sagT sagR m m' :
+    adversary_firewall_coh σ sags -∗
+    socket_address_group_ctx sags -∗
+    socket_address_group_own sagT -∗
+    ⌜m ≡g{sagT, sagR} m'⌝ -∗
+    adversary_saddr_adv_own (m_sender m) -∗
+      adversary_firewall_coh σ sags ∗
+      socket_address_group_ctx sags ∗
+      adversary_saddr_adv_own (m_sender m').
+  Proof.
+    iIntros "Hadv_coh Hsock_ctx #Hsock_own %Hequiv #Hadv_sender".
+    destruct Hequiv as (Hin&Hin'&_).
+    iApply (adversary_saddr_adv_own_same_sag _ _ _ (m_sender m) (m_sender m')
+             with "Hadv_coh Hsock_ctx Hsock_own"); try (by iPureIntro || iFrame "#").
+  Qed.
+
+  Lemma adversary_saddr_adv_own_equiv_destination σ sags sagT sagR m m' :
+    adversary_firewall_coh σ sags -∗
+    socket_address_group_ctx sags -∗
+    socket_address_group_own sagR -∗
+    ⌜m ≡g{sagT, sagR} m'⌝ -∗
+    adversary_saddr_adv_own (m_destination m) -∗
+      adversary_firewall_coh σ sags ∗
+      socket_address_group_ctx sags ∗
+      adversary_saddr_adv_own (m_destination m').
+  Proof.
+    iIntros "Hadv_coh Hsock_ctx #Hsock_own %Hequiv #Hadv_dest".
+    destruct Hequiv as (_&_&Hin&Hin'&_).
+    iApply (adversary_saddr_adv_own_same_sag _ _ _ (m_destination m) (m_destination m')
+             with "Hadv_coh Hsock_ctx Hsock_own"); try (by iPureIntro || iFrame "#").
   Qed.
 
 End state_interpretation_lemmas.
