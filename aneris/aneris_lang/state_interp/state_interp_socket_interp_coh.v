@@ -25,40 +25,40 @@ Section state_interpretation.
     socket_address_group_ctx C -∗
     unallocated_groups_auth C -∗
     saved_si_auth ∅ -∗
-    socket_interp_coh.
+    socket_interp_coh C.
   Proof.
     iIntros "Hsags Hunallocated Hsis".
-    iExists _, _. iFrame. iSplit; [done|].
+    iExists _. iFrame. iSplit; [done|].
     rewrite difference_diag_L.
     iExists _.
     iFrame. iSplit; [by iPureIntro; set_solver|done].
   Qed.
 
-  Lemma socket_interp_coh_allocate_singleton sag φ :
-    socket_interp_coh -∗ unallocated_groups {[sag]} ==∗
-    socket_interp_coh ∗ sag ⤇* φ.
+  Lemma socket_interp_coh_allocate_singleton sags sag φ :
+    socket_interp_coh sags -∗ unallocated_groups {[sag]} ==∗
+    socket_interp_coh sags ∗ sag ⤇* φ.
   Proof.
     iIntros "Hinterp Hsag".
-    iDestruct "Hinterp" as (sags A Hle) "(Hsags & Hunallocated & Hsis)".
+    iDestruct "Hinterp" as (A Hle) "(Hsags & Hunallocated & Hsis)".
     iAssert (⌜sag ∈ A⌝)%I as %Hin.
     { iDestruct (own_valid_2 with "Hunallocated Hsag") as %Hvalid.
       rewrite auth_both_valid_discrete in Hvalid.
       destruct Hvalid as [Hincluded Hvalid].
       rewrite gset_disj_included in Hincluded.
-      iPureIntro. set_solver. }    
+      iPureIntro. set_solver. }
     iAssert (socket_address_group_own sag) as "#Hsag'".
     { rewrite /socket_address_group_own.
       iApply (socket_address_group_own_subseteq sags); [set_solver|].
-      by iApply socket_address_groups_ctx_own. }    
+      by iApply socket_address_groups_ctx_own. }
     iMod (unallocated_update_dealloc with "[$Hunallocated $Hsag]") as "Hunallocated".
     iDestruct "Hsis" as (sis) "(Hsaved & %Hdom & Hsis)".
     iMod (socket_interp_alloc with "Hsag' Hsaved")
       as (γsi) "[Hsaved #Hsi]".
     { apply not_elem_of_dom. set_solver. }
     iModIntro. iFrame "#∗".
-    iExists sags, (A ∖ {[sag]}).
+    iExists (A ∖ {[sag]}).
     iSplit; [iPureIntro; set_solver|].
-    iFrame. iExists _. iSplit; [done|].    
+    iFrame. iExists _. iSplit; [done|].
     iSplit; [iPureIntro|].
     { rewrite dom_insert_L.
       rewrite Hdom. rewrite difference_difference_union; set_solver. }
@@ -68,9 +68,9 @@ Section state_interpretation.
     iExists _. iFrame "#".
   Qed.
 
-  Lemma socket_interp_coh_allocate_fun sags f :
-    socket_interp_coh -∗ unallocated_groups sags ==∗
-    socket_interp_coh ∗ [∗ set] sag ∈ sags, sag ⤇* (f sag).
+  Lemma socket_interp_coh_allocate_fun S sags f :
+    socket_interp_coh S -∗ unallocated_groups sags ==∗
+    socket_interp_coh S ∗ [∗ set] sag ∈ sags, sag ⤇* (f sag).
   Proof.
     iIntros "Hinterp Hsags".
     iInduction sags as [|sag sags Hnin] "IHsags" using set_ind_L; [by eauto|].
@@ -82,9 +82,9 @@ Section state_interpretation.
     iApply (socket_interp_coh_allocate_singleton with "Hinterp Hsag").
   Qed.
 
-  Lemma socket_interp_coh_allocate sags φ :
-    socket_interp_coh -∗ unallocated_groups sags ==∗
-    socket_interp_coh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
+  Lemma socket_interp_coh_allocate S sags φ :
+    socket_interp_coh S -∗ unallocated_groups sags ==∗
+    socket_interp_coh S ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
   Proof. iApply socket_interp_coh_allocate_fun. Qed.
 
 End state_interpretation.
