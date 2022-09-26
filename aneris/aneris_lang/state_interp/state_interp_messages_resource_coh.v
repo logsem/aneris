@@ -690,7 +690,7 @@ Section state_interpretation.
     }
     iDestruct (socket_interp_own with "Hsag'") as "Hown''".
     iDestruct (own_op with "[Hown' Hown'']") as "Hown'''".
-    { iSplit; [ iApply "Hown'" | iApply "Hown''" ]. }
+    { iSplitL ""; [ iApply "Hown'" | iApply "Hown''" ]. }
     rewrite -auth_frag_op.
     iDestruct (own_valid with "Hown'''") as %Hvalid'.
     setoid_rewrite auth_frag_valid in Hvalid'.
@@ -713,6 +713,7 @@ Section state_interpretation.
     split; [done|done].
   Qed.
 
+  (*
   Lemma messages_resource_coh_receive sagR sagT R T R' T' m mh :
     mh !! sagR = Some (R, T) →
     mh !! sagT = Some (R',T') →
@@ -722,8 +723,9 @@ Section state_interpretation.
     m_sender m ∈g sagT -∗
     messages_resource_coh mh -∗
     messages_resource_coh (<[sagR:=({[m]} ∪ R, T)]> mh) ∗
-    (⌜set_Forall (λ m', ¬ (m ≡g{sagT,sagR} m')) R⌝ -∗
-     ∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m').
+    (adversary_saddr_nonadv_own (m_destination m) -∗
+     ⌜set_Forall (λ m', ¬ (m ≡g{sagT,sagR} m')) R⌝ -∗
+       ∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m').
   Proof.
     iIntros (Hmha Hmhb HmT' Hcoh).
     iIntros "HsagR HsagT Hcoh".
@@ -735,5 +737,6 @@ Section state_interpretation.
         as "[Hcoh Hφ]"; [ by eauto.. |].
       iFrame. by iIntros (H).
   Qed.
+  *)
 
 End state_interpretation.

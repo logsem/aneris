@@ -239,7 +239,7 @@ Section state_interpretation.
     iDestruct (observed_receive_agree with "HAr HAr'") as %<-.
     iExists _, _, _; iFrame "#".
     iDestruct (own_op with "[Hown Hown']") as "Hown''".
-    { iSplit; [ iApply "Hown" | iApply "Hown'" ]. }
+    { iSplitL ""; [ iApply "Hown" | iApply "Hown'" ]. }
     rewrite -auth_frag_op.
     iDestruct (own_valid with "Hown''") as %Hvalid.
     setoid_rewrite auth_frag_valid in Hvalid.
@@ -329,7 +329,7 @@ Section state_interpretation.
     iDestruct (observed_receive_agree with "HAr HAr'") as %<-.
     iExists _, _, _; iFrame "#".
     iDestruct (own_op with "[Hown Hown']") as "Hown''".
-    { iSplit; [ iApply "Hown" | iApply "Hown'" ]. }
+    { iSplitL ""; [ iApply "Hown" | iApply "Hown'" ]. }
     rewrite -auth_frag_op.
     iDestruct (own_valid with "Hown''") as %Hvalid.
     setoid_rewrite auth_frag_valid in Hvalid.
