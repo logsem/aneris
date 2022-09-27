@@ -13,7 +13,8 @@ From aneris.aneris_lang.state_interp Require Import
      state_interp_messages_resource_coh
      state_interp_messages_history_coh
      state_interp_events
-     state_interp_messages_history.
+     state_interp_messages_history
+     state_interp_adversary_firewall_coh.
 
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
@@ -30,7 +31,7 @@ Section state_interpretation.
     iIntros (ex atr c σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth)". simpl.
     rewrite /state_interp; simplify_eq /=.
     rewrite (last_eq_trace_ends_in ex c) /=; last done.
-    iDestruct "Hsi" as (γm mh)
+    iDestruct "Hsi" as (γm mh sags)
                          "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh
                     & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     assert (∃ n, n = trace_length ex) as [n Heqn] by eauto.
@@ -56,7 +57,7 @@ Section state_interpretation.
       simplify_eq/=.
     - iFrame "Hm Hevs Hauth".
       iSplit; last by iPureIntro; left.
-      iExists γm, mh. iFrame "Hsi".
+      iExists γm, mh, sags. iFrame "Hsi".
       iSplit.
       { erewrite  <- message_history_evolution_deliver_message; eauto with set_solver. }
       iSplitR; [eauto using gnames_coh_update_sockets|].
@@ -65,8 +66,10 @@ Section state_interpretation.
       iFrame. iSplitL "Hlcoh".
       { by iApply (local_state_coh_deliver_message with "[Hlcoh]"). }
       iSplitL "Hfreeips". by iApply free_ips_coh_deliver_message.
+      iSplitL "Hmctx".
+      { iApply adversary_firewall_coh_config_step; [eapply Hstep| done]. }
       rewrite /messages_resource_coh.
-      iDestruct "Hmres" as "[$ Hmres]".
+      iDestruct "Hmres" as "[$ [$ Hmres]]".
       iDestruct "Hmres" as (ms Hle) "[HmresT Hmres]".
       iExists ms. iSplit; [done|]. iFrame "HmresT".
       iApply (big_sepS_mono with "Hmres").
@@ -80,7 +83,7 @@ Section state_interpretation.
         iRight. iExists m'. done.
     - iFrame "Hevs Hm Hauth".
       iSplitL; last by iPureIntro; left.
-      iExists γm, mh. iFrame; simpl.
+      iExists γm, mh, sags. iFrame; simpl.
       iSplit.
       { iPureIntro.
         rewrite -message_history_evolution_drop_message; first done.
@@ -89,7 +92,7 @@ Section state_interpretation.
       iSplitR; first done.
       iSplitR; first by iPureIntro; eapply messages_history_drop_message.
       rewrite /messages_resource_coh.
-      iDestruct "Hmres" as "[$ Hmres]".
+      iDestruct "Hmres" as "[$ [$ Hmres]]".
       iDestruct "Hmres" as (ms Hle) "[HmresT Hmres]".
       iExists ms. iSplit; [done|]. iFrame "HmresT".
       iApply (big_sepS_mono with "Hmres").
