@@ -5,7 +5,7 @@ From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy.
 From aneris.aneris_lang.lib Require Import
      pers_socket_proto assert_proof network_util_code network_util_proof.
-From aneris.examples.ping_pong Require Import ping_pong_done_code ping_pong_done_runner.
+From aneris.examples.ping_pong_done Require Import ping_pong_done_code ping_pong_done_runner.
 Set Default Proof Using "Type".
 
 (* To conduct the proof, we need to keep track of the last message received by the pong server. *)
