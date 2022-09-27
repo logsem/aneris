@@ -178,4 +178,47 @@ Section state_interpretation_lemmas.
       iFrame; done.
   Qed.
 
+  Lemma adversary_firewall_coh_init ips sags σ :
+    state_adversaries σ = ∅ ->
+    state_public_addrs σ = ∅ ->
+    adversary_auth (gset_to_gmap None ips) -∗
+    firewall_auth (gset_to_gmap FirewallStPrivate sags) -∗
+    adversary_firewall_coh σ sags.
+  Proof.
+    iIntros (Hadve Hfwe) "Hadv Hfw".
+    iExists (gset_to_gmap None ips), (gset_to_gmap FirewallStPrivate sags).
+    iFrame.
+    iPureIntro.
+    split.
+    { rewrite Hadve; done. }
+    split.
+    { rewrite /adversary_st_coh.
+      rewrite Hadve.
+      intros ip'; split.
+      - intros Hin. exfalso.
+        apply (not_elem_of_empty ip' Hin).
+      - intros Hlook. exfalso.
+          rewrite lookup_gset_to_gmap_Some in Hlook.
+          destruct Hlook as [_ Hlook].
+          inversion Hlook. }
+    split.
+    { rewrite /firewall_st_coh.
+      intros sa.
+      rewrite Hfwe.
+      split.
+      - intros Hin.
+        exfalso.
+          apply (not_elem_of_empty _ Hin).
+      - intros Hfw.
+        exfalso.
+        destruct Hfw as [sag [_ Hlook]].
+        rewrite lookup_gset_to_gmap_Some in Hlook.
+        destruct Hlook as [_ Hlook].
+        inversion Hlook. }
+    rewrite /firewall_delivery_coh.
+    rewrite Hadve Hfwe.
+    intros ? ? ? ? ? ? ? ? ? Hin.
+    exfalso; apply (not_elem_of_empty _ Hin).
+  Qed.
+
 End state_interpretation_lemmas.

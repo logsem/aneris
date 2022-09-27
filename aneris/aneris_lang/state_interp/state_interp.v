@@ -19,7 +19,8 @@ From aneris.aneris_lang.state_interp Require Export
      state_interp_messages_resource_coh
      state_interp_messages_history_coh
      state_interp_config_wp
-     state_interp_messages_history.
+     state_interp_messages_history
+     state_interp_adversary_firewall_coh.
 
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
@@ -36,7 +37,7 @@ Section state_interpretation.
     mapsto_node n γs -∗
     ∃ h, ⌜state_heaps σ !! n = Some h⌝.
   Proof.
-    iDestruct 1 as (Mγ ?????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
+    iDestruct 1 as (Mγ ??????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
     iIntros "Hn".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %Hninm.
     iDestruct (local_state_coh_heaps with "Hlcoh") as (h) "%"; [done|].
@@ -57,7 +58,7 @@ Section state_interpretation.
     mapsto_node n γs -∗
     ∃ Sn, ⌜state_sockets σ !! n = Some Sn⌝.
   Proof.
-    iDestruct 1 as (Mγ ?????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
+    iDestruct 1 as (Mγ ??????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
     iIntros "Hn".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %Hninm.
     iDestruct (local_state_coh_sockets with "Hlcoh") as (h) "%"; [done|].
@@ -81,6 +82,8 @@ Section state_interpretation.
     state_heaps σ = {[ip:=∅]} →
     state_sockets σ = {[ip:=∅]} →
     state_ms σ = ∅ →
+    state_adversaries σ = ∅ ->
+    state_public_addrs σ = ∅ ->
     ip ∉ ips →
     node_gnames_auth {[ip:=γs]} -∗
     mapsto_node ip γs -∗
@@ -92,12 +95,14 @@ Section state_interpretation.
     saved_si_auth ∅ -∗
     free_ips_auth ips -∗
     free_ports_auth ∅ -∗
+    adversary_auth (gset_to_gmap None ips) -∗
+    firewall_auth (gset_to_gmap FirewallStPrivate A) -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
-    iIntros (Hipdom Hpiiu Hfixdom Hste Hsce Hmse Hip)
-            "Hmp #Hn Hh Hs Hm Hsags Hunallocated Hsif HipsCtx HPiu".
+    iIntros (Hipdom Hpiiu Hfixdom Hste Hsce Hmse Hadve Hfwe Hip)
+            "Hmp #Hn Hh Hs Hm Hsags Hunallocated Hsif HipsCtx HPiu Hadv Hfw".
     iDestruct (socket_address_group_ctx_valid with "Hsags") as %[Hdisj Hne].
-    iExists _, _; iFrame.
+    iExists {[ip := γs]}, (gset_to_gmap (∅, ∅) A), A.
     rewrite !Hste !Hsce !Hmse.
     iSplit.
     (* messages_received_sent *)
@@ -116,6 +121,7 @@ Section state_interpretation.
       intros x Hx. apply Hne. set_solver. }
     (* socket_interp_coh *)
     iDestruct (socket_address_groups_ctx_own with "Hsags") as "#Hsags'".
+    iFrame "Hmp".
     iSplitL "Hsags Hunallocated Hsif".
     { by iApply (socket_interp_coh_init with "Hsags Hunallocated Hsif"). }
     iSplitL "Hh Hs".
@@ -126,9 +132,13 @@ Section state_interpretation.
     iSplitL "HipsCtx HPiu".
     (* free_ips_coh *)
     { by iApply (free_ips_coh_init with "[$]"). }
+    iSplitL "Hadv Hfw".
+    (* adversary_firewall_coh *)
+    { iApply (adversary_firewall_coh_init with "Hadv Hfw"); done. }
+    iFrame "Hm".
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
-    iFrame "#".
+    iFrame "Hsags'".
   Qed.
 
   Lemma aneris_events_state_interp_init c As Ar lbls :
