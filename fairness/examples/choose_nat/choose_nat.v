@@ -388,14 +388,12 @@ Proof.
     intros [δ' ℓ] [Hrel [cn [Hextr Hatr]]].
     admit. }
   { set_solver. }
-  iIntros (?) "!> Hs Hr Hf".
+  iIntros (?) "!> Hσ Hs Hr Hf".
   iMod (own_alloc) as (γ) "He".
   { apply (excl_auth_valid (-1)%Z). }
   iDestruct "He" as "[He● He○]".
-  iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hs]")
-    as "#IH".
-  { iIntros "!>". iExists _. iFrame.
-    admit. }                    (* TODO: Need `l ↦ #(F_CN Start)` here *)
+  iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hσ Hs]") as "#IH".
+  { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
   iModIntro.
   iSplitL.
   { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");

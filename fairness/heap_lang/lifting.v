@@ -131,6 +131,7 @@ Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl 
   (∀ `{Hinv : !heapGS Σ Mdl LM},
     ⊢ |={⊤}=>
        (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
+       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) -∗
        frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
@@ -149,7 +150,7 @@ Proof.
   intros Hfin Hfevol H.
   apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
   iIntros (?) "".
-  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen _]".
+  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
   iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
   iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
   iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
@@ -178,7 +179,7 @@ Proof.
   (*     setoid_rewrite lookup_singleton_Some. split; naive_solver. *)
   (*   - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver. *)
   (*   - rewrite dom_gset_to_gmap. set_solver. } *)
-  iSpecialize ("Hwp" with "Hmodf Hfr [Hfuelf Hmapf]").
+  iSpecialize ("Hwp" with "Hσ Hmodf Hfr [Hfuelf Hmapf]").
   { rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
     iAssert ([∗ set] ρ ∈ live_roles Mdl s1, ρ ↦F (LM.(fuel_limit) s1))%I with "[Hfuelf]" as "H".
     - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
@@ -310,7 +311,7 @@ Proof.
   apply (strong_simulation_adequacy Σ s _ _ _ FR) =>//.
   { rewrite -Heq. done. }
   iIntros (Hinv) "".
-  iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hm Hfr Hf". iSplitR "".
+  iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hσ Hm Hfr Hf". iSplitR "".
   - iApply ("H" with "Hm Hfr Hf").
   - iIntros "!>%%%???????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
