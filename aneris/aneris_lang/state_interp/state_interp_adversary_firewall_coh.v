@@ -144,10 +144,17 @@ Section state_interpretation_lemmas.
     adversary_firewall_coh σ' sags.
   Proof.
     iIntros (Hstep) "Hcoh".
-    iDestruct "Hcoh" as (adv_map fw_st) "(?&?&?&?&?&%Hdel)".
-    inversion Hstep; subst; iExists adv_map, fw_st.
+    iDestruct "Hcoh" as (adv_map fw_st) "(?&?&?&%Hcoh&?&%Hdel)".
+    inversion Hstep; subst; iExists adv_map, fw_st; simpl in *.
     - (* receive *)
       iFrame.
+      iSplitL "".
+      { iPureIntro.
+        destruct Hcoh as [? ?].
+        split; [|done].
+        simpl.
+        rewrite dom_insert_lookup_L; [done|].
+        rewrite H0; done. }
       iPureIntro.
       intros ip skts sh' skt' msgs m'.
       simpl.
@@ -179,17 +186,23 @@ Section state_interpretation_lemmas.
         rewrite lookup_insert_ne in Hlook; [|done].
         apply (Hdel _ _ _ _ _ _ Hlook Hlook' Hin' Hadv).
     - (* drop *)
-      iFrame; done.
+      iFrame.
+      iSplitL "".
+      { iPureIntro.
+        destruct Hcoh as [? ?].
+        split; done. }
+      done.
   Qed.
 
   Lemma adversary_firewall_coh_init ips sags σ :
     state_adversaries σ = ∅ ->
     state_public_addrs σ = ∅ ->
+    dom (state_sockets σ) = ips ->
     adversary_auth (gset_to_gmap None ips) -∗
     firewall_auth (gset_to_gmap FirewallStPrivate sags) -∗
     adversary_firewall_coh σ sags.
   Proof.
-    iIntros (Hadve Hfwe) "Hadv Hfw".
+    iIntros (Hadve Hfwe Hdom) "Hadv Hfw".
     iExists (gset_to_gmap None ips), (gset_to_gmap FirewallStPrivate sags).
     iFrame.
     iPureIntro.
@@ -197,6 +210,8 @@ Section state_interpretation_lemmas.
     { rewrite Hadve; done. }
     split.
     { rewrite /adversary_st_coh.
+      rewrite dom_gset_to_gmap.
+      split; [auto|].
       rewrite Hadve.
       intros ip'; split.
       - intros Hin. exfalso.
@@ -232,7 +247,12 @@ Section state_interpretation_lemmas.
     ip ∉ (state_adversaries σ) ->
     adversary_st_coh (<[ip := None]> adv_map) σ'.
   Proof.
-    intros σ' Hcoh Hnotin ip'.
+    intros σ' Hcoh Hnotin.
+    split.
+    { subst σ'.
+      rewrite !dom_insert_L.
+      destruct Hcoh as [? _]; set_solver. }
+    intros ip'.
     assert (state_adversaries σ = state_adversaries σ') as <-; [done|].
     split.
     - intros Hin.
@@ -288,14 +308,44 @@ Section state_interpretation_lemmas.
   Lemma adversary_firewall_coh_alloc_node σ ip sags :
     let σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ) |>
                  <| state_sockets := <[ip:=∅]> (state_sockets σ) |>) in
-    ip ∉ state_adversaries σ ->
+    state_sockets σ !! ip = None ->
     adversary_firewall_coh σ sags ==∗
     adversary_firewall_coh σ' sags.
   Proof.
-    iIntros (σ' Hnotin) "Hcoh".
+    iIntros (σ' Hnone) "Hcoh".
     rewrite /adversary_firewall_coh.
-    iDestruct "Hcoh" as (adv_st fw_st) "(?&?&?&?&?&?)".
+    iDestruct "Hcoh" as (adv_st fw_st) "(Hadvauth&?&?&%Hadvst&?&%Hdel)".
     iExists (<[ip := None]> adv_st), fw_st.
-  Admitted.
+    iFrame.
+    assert (adv_st !! ip = None) as HlookNone.
+    { destruct Hadvst as [Hadvst _].
+      rewrite -not_elem_of_dom.
+      rewrite Hadvst.
+      rewrite not_elem_of_dom.
+      done. }
+    iMod (adversary_auth_alloc with "Hadvauth") as "Hadvauth"; [done|].
+    iModIntro.
+    iFrame.
+    iPureIntro.
+    split.
+    - apply adv_st_coh_alloc; [done|].
+      destruct Hadvst as [_ Hadvst].
+      intros contra%Hadvst.
+      rewrite HlookNone in contra.
+      inversion contra.
+    - subst σ'.
+      intros ip' skts sh skt msgs m Hlook Hlook' Hin Hip.
+      simpl in *.
+      destruct (decide (ip = ip')) as [->|Hne].
+      + (* ip = ip' *)
+        rewrite lookup_insert in Hlook.
+        inversion Hlook; subst.
+        exfalso.
+        rewrite lookup_empty in Hlook'.
+        inversion Hlook'.
+      + (* ip <> ip' *)
+        rewrite lookup_insert_ne in Hlook; [|done].
+        eapply Hdel; eauto.
+  Qed.
 
 End state_interpretation_lemmas.
