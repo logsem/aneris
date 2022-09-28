@@ -168,7 +168,7 @@ Section state_interpretation.
     state_sockets σ !! ip = None ∧
     is_Some (state_ports_in_use σ !! ip)⌝.
   Proof.
-    iDestruct 1 as (mγ mn) "(?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ?)".
+    iDestruct 1 as (mγ mn ?) "(?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ? & ? & ?)".
     iIntros "Hfip".
     iDestruct "Hfreeips"
       as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
@@ -182,7 +182,7 @@ Section state_interpretation.
     ∃ ps, ⌜state_ports_in_use σ !! ip_of_address a = Some ps ∧
           port_of_address a ∉ ps⌝.
   Proof.
-    iDestruct 1 as (mγ mn) "(?&?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ?)".
+    iDestruct 1 as (mγ mn ?) "(?&?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ? & ? & ?)".
     by iApply free_ips_coh_free_ports_valid.
   Qed.
 

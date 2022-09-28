@@ -114,6 +114,7 @@ Section definitions.
 
   (* The adversary map and state agree on which ips are public *)
   Definition adversary_st_coh (adv_st : adversary_map) σ :=
+    dom adv_st = dom (state_sockets σ) ∧
     ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some (Some AdvStIp).
 
   (* SAGs are either all public or all private *)

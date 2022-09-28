@@ -1,7 +1,11 @@
 From stdpp Require Import gmap.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap.
+From aneris.aneris_lang Require Import resources.
 From aneris.aneris_lang.state_interp Require Import state_interp_def.
+
+From RecordUpdate Require Import RecordSet.
+Import RecordSetNotations.
 
 (** * Helper lemmas for coherence of adversary and firewall state *)
 
@@ -220,5 +224,78 @@ Section state_interpretation_lemmas.
     intros ? ? ? ? ? ? ? ? ? Hin.
     exfalso; apply (not_elem_of_empty _ Hin).
   Qed.
+
+  Lemma adv_st_coh_alloc (adv_map : adversary_map) (σ : state) (ip : ip_address) :
+    let σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ) |>
+                 <| state_sockets := <[ip:=∅]> (state_sockets σ) |>) in
+    adversary_st_coh adv_map σ ->
+    ip ∉ (state_adversaries σ) ->
+    adversary_st_coh (<[ip := None]> adv_map) σ'.
+  Proof.
+    intros σ' Hcoh Hnotin ip'.
+    assert (state_adversaries σ = state_adversaries σ') as <-; [done|].
+    split.
+    - intros Hin.
+      destruct (decide (ip = ip')) as [->|Hne].
+      { exfalso.
+        apply Hnotin; auto. }
+      rewrite lookup_insert_Some.
+      right.
+      split; [done|].
+      apply Hcoh; done.
+    - intros Hlook.
+      apply Hcoh.
+      rewrite lookup_insert_Some in Hlook.
+      destruct Hlook as [[_ contra] | [_ Hlook]].
+      { exfalso.
+        inversion contra. }
+      done.
+  Qed.
+
+  Lemma adversary_persistent_keys_insert_None M ip :
+    M !! ip = None →
+    adversary_persistent_keys (<[ip:=None]> M) = adversary_persistent_keys M.
+  Proof.
+    intros Hnone.
+    rewrite /adversary_persistent_keys.
+    rewrite map_filter_insert_False; last first.
+    { destruct 1 as [advSt contra].
+      inversion contra. }
+    rewrite map_filter_delete delete_notin; [done|].
+    rewrite map_filter_lookup_None; auto.
+  Qed.
+
+  Lemma adversary_auth_alloc adv_map ip :
+    adv_map !! ip = None ->
+    adversary_auth adv_map ==∗
+    adversary_auth (<[ip := None]> adv_map).
+  Proof.
+    iIntros (Hlook) "[Hauth Hpers]".
+    rewrite /adversary_auth /adversary_persistent_own.
+    remember (adversary_st_to_cmra <$> adv_map) as elem.
+    iMod ((own_update _ _ (● (<[ip := adversary_st_to_cmra None]> elem))) with "Hauth") as "Hauth".
+    { eapply (auth_update_auth _ _ _).
+      eapply alloc_local_update; [|done].
+      subst.
+      rewrite lookup_fmap.
+      rewrite Hlook; done. }
+    iModIntro.
+    rewrite fmap_insert.
+    rewrite Heqelem. iFrame.
+    rewrite adversary_persistent_keys_insert_None; done.
+  Qed.
+
+  Lemma adversary_firewall_coh_alloc_node σ ip sags :
+    let σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ) |>
+                 <| state_sockets := <[ip:=∅]> (state_sockets σ) |>) in
+    ip ∉ state_adversaries σ ->
+    adversary_firewall_coh σ sags ==∗
+    adversary_firewall_coh σ' sags.
+  Proof.
+    iIntros (σ' Hnotin) "Hcoh".
+    rewrite /adversary_firewall_coh.
+    iDestruct "Hcoh" as (adv_st fw_st) "(?&?&?&?&?&?)".
+    iExists (<[ip := None]> adv_st), fw_st.
+  Admitted.
 
 End state_interpretation_lemmas.
