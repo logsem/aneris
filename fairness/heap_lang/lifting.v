@@ -112,21 +112,32 @@ Proof.
     first apply from_locale_from_lookup. simpl; lia.
 Qed.
 
-Definition live_rel (M : FairModel) {LM: LiveModel heap_lang M} (ex : execution_trace heap_lang)
-           (aux : auxiliary_trace LM) :=
+Definition live_rel (M : FairModel) {LM: LiveModel heap_lang M}
+           (ex : execution_trace heap_lang) (aux : auxiliary_trace LM) :=
   live_tids (M := M) (trace_last ex) (trace_last aux).
 
-Definition sim_rel (M : FairModel) (LM: LiveModel heap_lang M) (ex : execution_trace heap_lang)
-           (aux : auxiliary_trace LM) :=
+Definition sim_rel (M : FairModel) (LM: LiveModel heap_lang M)
+           (ex : execution_trace heap_lang) (aux : auxiliary_trace LM) :=
   valid_state_evolution_fairness ex aux ∧ live_rel M ex aux.
-
 
 Definition sim_rel_with_user (M : FairModel) (LM: LiveModel heap_lang M)  (ξ : execution_trace _ -> finite_trace M (option (fmrole M)) -> Prop)
   (ex : execution_trace heap_lang) (aux : auxiliary_trace LM) :=
   sim_rel _ _ ex aux ∧ ξ ex (map_underlying_trace aux).
 
-Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
-        (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) → Prop) :
+(* TODO: Redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
+Lemma valid_lift_fairness_sim_rel_with_user {Mdl: FairModel} {LM}
+      (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) →
+           Prop) extr atr :
+  valid_lift_fairness
+    (λ extr auxtr, ξ extr (map_underlying_trace (LM:=LM) auxtr) ∧
+                   live_rel Mdl extr auxtr) extr atr ↔
+  sim_rel_with_user Mdl LM ξ extr atr.
+Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
+
+Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM}
+    `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
+    (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) →
+         Prop) :
   rel_finitary (sim_rel_with_user Mdl LM ξ) →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{Hinv : !heapGS Σ Mdl LM},
@@ -263,10 +274,10 @@ Proof.
     iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
     apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
     simpl in *. simplify_eq.
+    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)".
+    iDestruct "Hsi" as "(%M&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
     iSplit; [|done].
-
-    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)". iDestruct "Hsi" as "(%M&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
-    iSplit; first done.
+    iSplit; [done|].
     iSplit.
     + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids. eapply Htids. done.
     + iIntros (tid' e' Hsome Hnoval ρ). simpl.
@@ -278,33 +289,10 @@ Proof.
       { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
 Qed.
 
-Lemma rel_finitary_alt Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) → Prop) :
-  rel_finitary
-    (valid_lift_fairness
-       (λ extr auxtr, ξ extr (map_underlying_trace (LM:=LM) auxtr) ∧
-                      live_rel Mdl extr auxtr)) ↔
-  rel_finitary (sim_rel_with_user Mdl LM ξ).
-Proof.
-  simpl.
-  rewrite /valid_lift_fairness.
-  rewrite /sim_rel_with_user /sim_rel. simpl.
-  split.
-  - intros Hrel.
-    eapply rel_finitary_impl; [|done].
-    clear.
-    intros ex aux [[Hvalid Hlive] Hξ].
-    eauto.
-    Unshelve. solve_decision. intros x y. apply make_decision.
-  - intros Hrel.
-    eapply rel_finitary_impl; [|done].
-    clear.
-    intros ex aux [Hvalid [Hlive Hξ]].
-    eauto.
-    Unshelve. solve_decision. intros x y. apply make_decision.
-Qed.
-
-Theorem strong_simulation_adequacy' Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
-        (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) → Prop) :
+Theorem strong_simulation_adequacy' Σ {Mdl: FairModel} {LM}
+    `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
+    (ξ : execution_trace heap_lang → finite_trace Mdl
+         (option $ fmrole Mdl) → Prop) :
   rel_finitary' ξ →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{Hinv : !heapGS Σ Mdl LM},
@@ -328,8 +316,14 @@ Theorem strong_simulation_adequacy' Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl
 Proof.
   intros Hfin Hfevol H.
   eapply (strong_simulation_adequacy); try done.
-  eapply rel_finitary_alt; try done.
+  eapply rel_finitary_impl.
+  { intros ex aux. by eapply valid_lift_fairness_sim_rel_with_user.
+    (* TODO: Figure out if these typeclass subgoals should be resolved locally *)
+    Unshelve.
+    - intros ??. apply make_decision.
+    - intros ??. apply make_decision. }
   by eapply valid_state_evolution_finitary_fairness.
+  (* TODO: Figure out if these typeclass subgoals should be resolved locally *)
   Unshelve.
   - intros ??. apply make_decision.
   - intros ??. apply make_proof_irrel.

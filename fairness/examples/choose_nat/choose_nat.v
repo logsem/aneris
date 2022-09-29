@@ -155,8 +155,7 @@ Section proof.
       iModIntro.
       simpl.
       destruct (decide (() ∈ ∅)); [set_solver|].
-      by iApply "HΦ".
-    }
+      by iApply "HΦ". }
     wp_lam.
     rewrite fmap_insert fmap_empty. (* Sigh.. *)
     wp_bind (Load _).
@@ -353,8 +352,9 @@ Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
   ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(F_CN cn) ∧
              (trace_last auxtr) = cn.
 
-#[local] Instance proof_irrel_ξ_cn l oζ c' ex atr ℓ δ' :
-  ProofIrrel ((ξ_cn l) (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ')).
+(* TODO: This does not match for some reason *)
+#[local] Instance proof_irrel_ξ_cn l ex oζ c atr δ ℓ :
+  ProofIrrel ((ξ_cn l) (ex :tr[ oζ ]: c) (atr :tr[ ℓ ]: δ)).
 Proof. apply make_proof_irrel. Qed.
 
 (* NB: This can also be proven without classical axioms *)
@@ -377,19 +377,12 @@ Definition CN_F (v : val) : CN :=
   | _ => Start                  (* Error case *)
   end.
 
-Lemma CN_F_F_CN cn :
-  CN_F #(F_CN cn) = cn.
-Proof.
-  destruct cn; [done|].
-  destruct n; [done|].
-  simpl. f_equal. lia.
-Qed.
+Lemma CN_F_F_CN cn : CN_F #(F_CN cn) = cn.
+Proof. destruct cn; [done|]; destruct n; [done|]=> /=; f_equal; lia. Qed.
 
-Theorem choose_nat_sim l
-        (extr : extrace) (Hvex : extrace_valid extr)
+Theorem choose_nat_sim l (extr : extrace) (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [choose_nat_prog l #()]):
-  continued_simulation (sim_rel_with_user the_cn_fair_model the_model
-                                          (ξ_cn l))
+  continued_simulation (sim_rel_with_user the_cn_fair_model the_model (ξ_cn l))
                        (trace_singleton ([choose_nat_prog l #()],
                                            {| heap := {[l:=#-1]};
                                               used_proph_id := ∅ |}))
@@ -398,21 +391,17 @@ Theorem choose_nat_sim l
 Proof.
   assert (heapGpreS choose_natΣ the_cn_fair_model the_model) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy' (Mdl := the_cn_fair_model) choose_natΣ NotStuck _ _ _ ∅).
-  { clear.
-    intros extr atr c' oζ.
+  eapply (strong_simulation_adequacy' (Mdl := the_cn_fair_model) choose_natΣ NotStuck _ _ _ ∅); [|set_solver|].
+  { clear. intros extr atr c' oζ.
     eapply finite_smaller_card_nat=> /=.
-    eapply (in_list_finite [(CN_F (heap c'.2 !!! l),None); (CN_F (heap c'.2 !!! l),Some ())]).
+    eapply (in_list_finite [(CN_F (heap c'.2 !!! l), None);
+                            (CN_F (heap c'.2 !!! l), Some ())]).
+    (* TODO: Figure out why this does not unify with typeclass *)
+    Unshelve. 2: intros x; apply make_proof_irrel.
     intros [cn o] [cn' [Hextr Hatr]].
-    simpl in *.
-    rewrite Hextr.
-    rewrite CN_F_F_CN.
-    rewrite Hatr.
-    destruct o; [destruct u|]; set_solver. }
-  { set_solver. }
+    rewrite Hextr CN_F_F_CN -Hatr. destruct o; [destruct u|]; set_solver. }
   iIntros (?) "!> Hσ Hs Hr Hf".
-  iMod (own_alloc) as (γ) "He".
-  { apply (excl_auth_valid (-1)%Z). }
+  iMod (own_alloc) as (γ) "He"; [apply (excl_auth_valid (-1)%Z)|].
   iDestruct "He" as "[He● He○]".
   iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hσ Hs]") as "#IH".
   { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
@@ -433,5 +422,4 @@ Proof.
   iPureIntro. exists cn.
   split; [done|].
   subst. by destruct atr.
-  Unshelve. intros x. apply make_proof_irrel.
 Qed.
