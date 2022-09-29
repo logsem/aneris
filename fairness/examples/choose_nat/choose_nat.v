@@ -350,21 +350,40 @@ Proof. apply make_proof_irrel. Qed.
 
 Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
            (auxtr : finite_trace the_cn_fair_model (option unit)) :=
-  ∃ (cn:CN), (trace_last extr).2.(heap) !! l = Some #(F_CN cn) ∧
+  ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(F_CN cn) ∧
              (trace_last auxtr) = cn.
 
-#[local] Instance proof_irrel_ξ l oζ c' ex atr ℓ δ' :
-  ProofIrrel (sim_rel_with_user the_cn_fair_model the_model
-                  (ξ_cn l) (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ')).
+#[local] Instance proof_irrel_ξ_cn l oζ c' ex atr ℓ δ' :
+  ProofIrrel ((ξ_cn l) (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ')).
 Proof. apply make_proof_irrel. Qed.
 
+(* NB: This can also be proven without classical axioms *)
 #[local] Instance eq_decision_the_model :
   EqDecision (live_model_to_model the_cn_fair_model the_model).
-Proof. Admitted.
+Proof. intros x y. apply make_decision. Qed.
 
 #[local] Instance eq_decision_mlabel :
   EqDecision (mlabel (live_model_to_model the_cn_fair_model the_model)).
 Proof. solve_decision. Qed.
+
+Definition CN_F (v : val) : CN :=
+  match v with
+  | LitV (LitInt z) =>
+      match z with
+      | Z0 => N 0
+      | Zpos p => N (Pos.to_nat p)
+      | Zneg _ => Start         (* Error case when z < -1 *)
+      end
+  | _ => Start                  (* Error case *)
+  end.
+
+Lemma CN_F_F_CN cn :
+  CN_F #(F_CN cn) = cn.
+Proof.
+  destruct cn; [done|].
+  destruct n; [done|].
+  simpl. f_equal. lia.
+Qed.
 
 Theorem choose_nat_sim l
         (extr : extrace) (Hvex : extrace_valid extr)
@@ -379,14 +398,17 @@ Theorem choose_nat_sim l
 Proof.
   assert (heapGpreS choose_natΣ the_cn_fair_model the_model) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy (Mdl := the_cn_fair_model) choose_natΣ NotStuck _ _ _ ∅).
+  eapply (strong_simulation_adequacy' (Mdl := the_cn_fair_model) choose_natΣ NotStuck _ _ _ ∅).
   { clear.
     intros extr atr c' oζ.
-    eapply finite_smaller_card_nat.
-    simpl.
-    eapply (in_list_finite [(_,_)]).
-    intros [δ' ℓ] [Hrel [cn [Hextr Hatr]]].
-    admit. }
+    eapply finite_smaller_card_nat=> /=.
+    eapply (in_list_finite [(CN_F (heap c'.2 !!! l),None); (CN_F (heap c'.2 !!! l),Some ())]).
+    intros [cn o] [cn' [Hextr Hatr]].
+    simpl in *.
+    rewrite Hextr.
+    rewrite CN_F_F_CN.
+    rewrite Hatr.
+    destruct o; [destruct u|]; set_solver. }
   { set_solver. }
   iIntros (?) "!> Hσ Hs Hr Hf".
   iMod (own_alloc) as (γ) "He".
@@ -404,10 +426,12 @@ Proof.
   iInv Ns as ">H".
   iDestruct "H" as (cn) "(Hf & Hl & H●)".
   iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
-  iDestruct (gen_heap_valid with "Hσ Hl") as %Hlookup.
+  iDestruct (gen_heap_valid with "Hσ Hl") as %Hlookup%lookup_total_correct.
   iDestruct (model_agree' with "Hs Hf") as %Hlast.
   iModIntro. iSplitL; [by iExists _; iFrame|].
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
-  iPureIntro. exists cn. split; [done|].
+  iPureIntro. exists cn.
+  split; [done|].
   subst. by destruct atr.
-Admitted.
+  Unshelve. intros x. apply make_proof_irrel.
+Qed.
