@@ -161,7 +161,6 @@ Section proof.
       destruct (decide (() ∈ ∅)); [set_solver|].
       by iApply "HΦ". }
     wp_lam.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
     wp_bind (Load _).
     iApply wp_atomic.
     iInv Ns as ">HI" "Hclose".
@@ -174,19 +173,8 @@ Section proof.
     iModIntro.
     rewrite Hvalid. clear cn Hvalid.
     wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
-    wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
-    wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
-    wp_pures.
     case_bool_decide as Heq; [inversion Heq; lia|clear Heq].
     wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
-    wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
-    wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
     replace (Z.of_nat (S (S n))  - 1)%Z with (Z.of_nat (S n)) %Z by lia.
     (* Store - with invariant *)
     wp_bind (Store _ _).
@@ -213,9 +201,6 @@ Section proof.
     simpl.
     destruct (decide (() ∈ {[()]})); [|set_solver].
     wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
-    wp_pures.
-    rewrite fmap_insert fmap_empty. (* Sigh.. *)
     replace (f + 2 - 1 - 1)%nat with f by lia.
     by iApply ("IHn" with "Hf Hr Hm").
   Qed.
