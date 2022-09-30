@@ -198,8 +198,7 @@ Section proof.
     iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
     { iExists (N (S n)). iFrame. }
     iModIntro.
-    simpl.
-    destruct (decide (() ∈ {[()]})); [|set_solver].
+    simpl. destruct (decide (() ∈ {[()]})); [|set_solver].
     wp_pures.
     replace (f + 2 - 1 - 1)%nat with f by lia.
     by iApply ("IHn" with "Hf Hr Hm").
@@ -243,12 +242,10 @@ Section proof.
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
     { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }
     iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
-    { iExists _. iFrame. simpl. iFrame. 
-      replace (Z.of_nat n + 1)%Z with (Z.of_nat (S n)) by lia.
-      iFrame. }
+    { replace (Z.of_nat n + 1)%Z with (Z.of_nat (S n)) by lia.
+      iExists (N (S n)). iFrame. }
     iModIntro.
-    simpl.
-    destruct (decide (() ∈ {[()]})); [|set_solver].
+    simpl. destruct (decide (() ∈ {[()]})); [|set_solver].
     wp_pures.
     rewrite -has_fuel_fuels.
     by iApply (decr_loop_spec with "IH [$Hm $Hr $Hf]"); [lia|lia|].
@@ -333,7 +330,7 @@ Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
   ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(CN_Z cn) ∧
              (trace_last auxtr) = cn.
 
-(* TODO: This does not match for some reason *)
+(* TODO: This does not unify for some reason *)
 #[local] Instance proof_irrel_ξ_cn l ex oζ c atr δ ℓ :
   ProofIrrel ((ξ_cn l) (ex :tr[ oζ ]: c) (atr :tr[ ℓ ]: δ)).
 Proof. apply make_proof_irrel. Qed.
