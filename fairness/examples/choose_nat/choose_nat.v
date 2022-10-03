@@ -341,7 +341,7 @@ Proof. intros x y. apply make_decision. Qed.
   EqDecision (mlabel (live_model_to_model cn_fair_model cn_model)).
 Proof. solve_decision. Qed.
 
-Theorem choose_nat_sim l:
+Theorem choose_nat_sim l :
   continued_simulation
     (sim_rel_with_user cn_fair_model cn_model (ξ_cn l))
     (trace_singleton ([choose_nat_prog l #()],
@@ -395,40 +395,43 @@ Notation exaux_traces_match Mdl LM :=
                    (ls_trans LM.(fuel_limit))
     ).
 
-Theorem choose_nat_terminates l (extr : extrace) (Hvex : extrace_valid extr)
-        (Hexfirst : trfirst extr = ([choose_nat_prog l #()],
-                                      {| heap := {[l:=#-1]};
-                                        used_proph_id := ∅ |})) :
+Definition fairly_terminating extr :=
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
+
+Theorem continued_simulation_fair_termination {FM : FairModel}
+        `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
+  extrace_valid extr →
+  continued_simulation
+    (sim_rel_with_user FM LM ξ)
+    ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
+  fairly_terminating extr.
 Proof.
-  pose proof (choose_nat_sim l) as Hsim.
-  destruct (infinite_or_finite extr) as [Hinf|] =>//.
+  intros Hvex Hsim.
+  destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?].
   assert (∃ iatr,
-             @valid_inf_system_trace _ cn_model
+             @valid_inf_system_trace _ LM
                                      (@continued_simulation
                                         heap_lang
-                                        cn_model
-                                        (sim_rel_with_user cn_fair_model cn_model (ξ_cn l)
+                                        LM
+                                        (sim_rel_with_user FM LM ξ
                                         ))
-                                     (trace_singleton ([choose_nat_prog l #()], {| heap := {[l := #(-1)]}; used_proph_id := ∅ |}))
-                                     (trace_singleton (initial_ls (LM := cn_model) (Start) 0%nat))
+                                     (trace_singleton (trfirst extr))
+                                     (trace_singleton (initial_ls (LM := LM) a1 r1))
                                      (from_trace extr)
                                      iatr) as [iatr Hiatr].
-  {
-    eexists. eapply produced_inf_aux_trace_valid_inf.
+  { eexists _. eapply produced_inf_aux_trace_valid_inf.
     Unshelve.
     - econstructor.
     - done.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ auxtr, exaux_traces_match cn_fair_model cn_model extr auxtr) as
-    [auxtr Hmatch].
-  { exists (to_trace (initial_ls (LM := cn_model) Start 0%nat) iatr).
+  assert (∃ auxtr, exaux_traces_match FM LM extr auxtr) as [auxtr Hmatch].
+  { exists (to_trace (initial_ls (LM := LM) a1 r1) iatr).
     eapply (valid_inf_system_trace_implies_traces_match
-              (continued_simulation (sim_rel_with_user cn_fair_model cn_model (ξ_cn l)))); eauto.
+              (continued_simulation (sim_rel_with_user FM LM ξ))); eauto.
     - by intros ? ? [[??]?]%continued_simulation_rel.
     - by intros ? ? [[??]?]%continued_simulation_rel.
-  - by apply from_trace_spec.
-  - by apply to_trace_spec. }
+    - by apply from_trace_spec.
+    - by apply to_trace_spec. }
   intros Hfair.
   assert (Hstutter := Hmatch).
   apply can_destutter_auxtr in Hstutter; last first.
@@ -438,8 +441,17 @@ Proof.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-  (* have Htermtr := Hterm mtr Hmtrvalid Hfairm. *)
   eapply exaux_preserves_termination =>//.
   eapply upto_stutter_finiteness =>//.
   apply fair_terminating_traces_terminate=>//.
+Qed.
+
+Theorem choose_nat_terminates l (extr : extrace) (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = ([choose_nat_prog l #()],
+                                      {| heap := {[l:=#-1]};
+                                        used_proph_id := ∅ |})) :
+  fairly_terminating extr.
+Proof.
+  eapply continued_simulation_fair_termination; eauto.
+  rewrite Hexfirst. eapply choose_nat_sim.
 Qed.
