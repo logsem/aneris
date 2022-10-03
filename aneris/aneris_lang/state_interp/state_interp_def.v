@@ -113,9 +113,10 @@ Section definitions.
       ∃ sa, (saddress skt) = Some sa ∧ sa ∈ (state_public_addrs σ).
 
   (* The adversary map and state agree on which ips are public *)
-  Definition adversary_st_coh (adv_st : adversary_map) σ :=
+  Definition adversary_st_coh (adv_st : gmap ip_address bool) σ :=
+    (* we track precisely the allocated ips *)
     dom adv_st = dom (state_sockets σ) ∧
-    ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some (Some AdvStIp).
+    ∀ ip, ip ∈ (state_adversaries σ) <-> adv_st !! ip = Some true.
 
   (* SAGs are either all public or all private *)
   Definition sags_preserve_adv_state (sags : gset socket_address_group)

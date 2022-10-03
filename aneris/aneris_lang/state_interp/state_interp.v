@@ -56,7 +56,7 @@ Section state_interpretation.
   Lemma mapsto_node_valid_sockets n γs σ mh:
     aneris_state_interp σ mh -∗
     mapsto_node n γs -∗
-    ∃ Sn, ⌜state_sockets σ !! n = Some Sn⌝.
+     ∃ Sn, ⌜state_sockets σ !! n = Some Sn⌝.
   Proof.
     iDestruct 1 as (Mγ ??????) "(Hnauth & Hscoh & Hlcoh & Hfip & Hmrcoh)".
     iIntros "Hn".
@@ -95,7 +95,7 @@ Section state_interpretation.
     saved_si_auth ∅ -∗
     free_ips_auth ips -∗
     free_ports_auth ∅ -∗
-    adversary_auth (gset_to_gmap None ips) -∗
+    adversary_auth {[ip := false]} -∗
     firewall_auth (gset_to_gmap FirewallStPrivate A) -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
@@ -134,7 +134,9 @@ Section state_interpretation.
     { by iApply (free_ips_coh_init with "[$]"). }
     iSplitL "Hadv Hfw".
     (* adversary_firewall_coh *)
-    { iApply (adversary_firewall_coh_init with "Hadv Hfw"); done. }
+    { iApply (adversary_firewall_coh_init with "Hadv Hfw"); [done|done|].
+      rewrite Hsce dom_singleton_L.
+      done. }
     iFrame "Hm".
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
@@ -199,9 +201,9 @@ Section state_interpretation.
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & % & %)".
     iDestruct "Hσ"
-      as (mγ mh')
+      as (mγ mh' sags)
            "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
-                     & Hnauth & Hsi & Hlcoh & HFip & Hmctx & Hmres)".
+                     & Hnauth & Hsi & Hlcoh & HFip & Hadvcoh &  Hmctx & Hmres)".
     iMod (free_ips_coh_alloc_node _ _ ports with "HFip Hfip")
       as "[HFip Hports]".
     iMod (node_ctx_init ∅ ∅) as (γn) "(Hh & Hs)".
@@ -213,7 +215,7 @@ Section state_interpretation.
     iSplitR.
     { iExists _; eauto. }
     iFrame "Hports".
-    iExists _, _. iFrame.
+    iExists _, _, _. iFrame.
     iSplit; [done|].
     iSplitR.
     { iPureIntro. by apply gnames_coh_alloc_node. }

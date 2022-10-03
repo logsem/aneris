@@ -53,8 +53,6 @@ Section state_interpretation_lemmas.
     ⌜sa ∈ sag⌝ -∗
     ⌜sa' ∈ sag⌝ -∗
     adversary_saddr_adv_own sa -∗
-      adversary_firewall_coh σ sags ∗
-      socket_address_group_ctx sags ∗
       adversary_saddr_adv_own sa'.
   Proof.
     iIntros "Hadv_coh Hsags_auth #Hsag %Hin %Hin' #Hset".
@@ -66,10 +64,8 @@ Section state_interpretation_lemmas.
     apply Hadv_coh in Hsa.
     apply (Hsags _ _ _ Hincl Hin Hin') in Hsa.
     apply Hadv_coh in Hsa.
-    iDestruct (adversary_auth_rev_lookup_adv with "Hadv_auth") as "[Hadv_auth #Hadv_own]";
-      [done|].
-    iFrame "Hadv_own Hsags_auth".
-    iExists _, _; iFrame "#∗".
+    iDestruct (adversary_auth_rev_lookup_adv with "Hadv_auth") as "$".
+    done.
   Qed.
 
   Lemma adversary_saddr_adv_nonadv_own_same_sag σ sags sag sa sa' :
@@ -91,7 +87,7 @@ Section state_interpretation_lemmas.
     apply Hadv_coh in Hsa.
     apply (Hsags _ _ _ Hincl Hin Hin') in Hsa.
     apply Hadv_coh in Hsa.
-    iDestruct (adversary_auth_rev_lookup_adv with "Hadv_auth") as "[Hadv_auth #Hadv_own]";
+    iDestruct (adversary_auth_rev_lookup_adv with "Hadv_auth") as "#Hadv_own";
       [done|].
     iDestruct (adversary_saddr_adv_nonadv_own with "Hadv_own Hnonadv") as "?"; done.
   Qed.
@@ -102,8 +98,6 @@ Section state_interpretation_lemmas.
     socket_address_group_own sagT -∗
     ⌜m ≡g{sagT, sagR} m'⌝ -∗
     adversary_saddr_adv_own (m_sender m) -∗
-      adversary_firewall_coh σ sags ∗
-      socket_address_group_ctx sags ∗
       adversary_saddr_adv_own (m_sender m').
   Proof.
     iIntros "Hadv_coh Hsock_ctx #Hsock_own %Hequiv #Hadv_sender".
@@ -118,8 +112,6 @@ Section state_interpretation_lemmas.
     socket_address_group_own sagR -∗
     ⌜m ≡g{sagT, sagR} m'⌝ -∗
     adversary_saddr_adv_own (m_destination m) -∗
-      adversary_firewall_coh σ sags ∗
-      socket_address_group_ctx sags ∗
       adversary_saddr_adv_own (m_destination m').
   Proof.
     iIntros "Hadv_coh Hsock_ctx #Hsock_own %Hequiv #Hadv_dest".
@@ -194,32 +186,32 @@ Section state_interpretation_lemmas.
       done.
   Qed.
 
-  Lemma adversary_firewall_coh_init ips sags σ :
+  Lemma adversary_firewall_coh_init ip sags σ :
     state_adversaries σ = ∅ ->
     state_public_addrs σ = ∅ ->
-    dom (state_sockets σ) = ips ->
-    adversary_auth (gset_to_gmap None ips) -∗
+    dom (state_sockets σ) = {[ip]} ->
+    adversary_auth {[ip := false]} -∗
     firewall_auth (gset_to_gmap FirewallStPrivate sags) -∗
     adversary_firewall_coh σ sags.
   Proof.
     iIntros (Hadve Hfwe Hdom) "Hadv Hfw".
-    iExists (gset_to_gmap None ips), (gset_to_gmap FirewallStPrivate sags).
+    iExists {[ip := false]}, (gset_to_gmap FirewallStPrivate sags).
     iFrame.
     iPureIntro.
     split.
     { rewrite Hadve; done. }
     split.
     { rewrite /adversary_st_coh.
-      rewrite dom_gset_to_gmap.
-      split; [auto|].
+      rewrite Hdom dom_singleton_L.
+      split; [done|].
       rewrite Hadve.
       intros ip'; split.
       - intros Hin. exfalso.
         apply (not_elem_of_empty ip' Hin).
       - intros Hlook. exfalso.
-          rewrite lookup_gset_to_gmap_Some in Hlook.
-          destruct Hlook as [_ Hlook].
-          inversion Hlook. }
+        apply lookup_singleton_Some in Hlook.
+        destruct Hlook as [_ Hlook].
+        inversion Hlook. }
     split.
     { rewrite /firewall_st_coh.
       intros sa.
@@ -240,18 +232,33 @@ Section state_interpretation_lemmas.
     exfalso; apply (not_elem_of_empty _ Hin).
   Qed.
 
-  Lemma adv_st_coh_alloc (adv_map : adversary_map) (σ : state) (ip : ip_address) :
+  Lemma adv_st_coh_alloc_nonadv (adv_map : gmap ip_address bool) (σ : state) (ip : ip_address) :
     let σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ) |>
                  <| state_sockets := <[ip:=∅]> (state_sockets σ) |>) in
     adversary_st_coh adv_map σ ->
-    ip ∉ (state_adversaries σ) ->
-    adversary_st_coh (<[ip := None]> adv_map) σ'.
+    state_sockets σ !! ip = None ->
+    adversary_st_coh (<[ip := false]> adv_map) σ'.
   Proof.
-    intros σ' Hcoh Hnotin.
+    intros σ' [Hdom Hcoh] Hlook.
+    assert (ip ∉ state_adversaries σ) as Hnotin.
+    { intros contra.
+      assert (ip ∉ dom (state_sockets σ)) as Hnotin'.
+      { intros contra'.
+        apply elem_of_dom in contra' as [? Hlook'].
+        rewrite Hlook in Hlook'.
+        inversion Hlook'. }
+      apply Hnotin'.
+      apply Hcoh in contra.
+      assert (ip ∈ dom adv_map) as Hin.
+      { apply elem_of_dom.
+        eauto. }
+      rewrite Hdom in Hin.
+      exfalso.
+      apply Hnotin'; done. }
     split.
     { subst σ'.
       rewrite !dom_insert_L.
-      destruct Hcoh as [? _]; set_solver. }
+      rewrite Hdom; done. }
     intros ip'.
     assert (state_adversaries σ = state_adversaries σ') as <-; [done|].
     split.
@@ -263,48 +270,16 @@ Section state_interpretation_lemmas.
       right.
       split; [done|].
       apply Hcoh; done.
-    - intros Hlook.
+    - intros Hlook'.
       apply Hcoh.
-      rewrite lookup_insert_Some in Hlook.
-      destruct Hlook as [[_ contra] | [_ Hlook]].
+      rewrite lookup_insert_Some in Hlook'.
+      destruct Hlook' as [[_ contra] | [_ Hlook']].
       { exfalso.
         inversion contra. }
       done.
   Qed.
 
-  Lemma adversary_persistent_keys_insert_None M ip :
-    M !! ip = None →
-    adversary_persistent_keys (<[ip:=None]> M) = adversary_persistent_keys M.
-  Proof.
-    intros Hnone.
-    rewrite /adversary_persistent_keys.
-    rewrite map_filter_insert_False; last first.
-    { destruct 1 as [advSt contra].
-      inversion contra. }
-    rewrite map_filter_delete delete_notin; [done|].
-    rewrite map_filter_lookup_None; auto.
-  Qed.
-
-  Lemma adversary_auth_alloc adv_map ip :
-    adv_map !! ip = None ->
-    adversary_auth adv_map ==∗
-    adversary_auth (<[ip := None]> adv_map).
-  Proof.
-    iIntros (Hlook) "[Hauth Hpers]".
-    rewrite /adversary_auth /adversary_persistent_own.
-    remember (adversary_st_to_cmra <$> adv_map) as elem.
-    iMod ((own_update _ _ (● (<[ip := adversary_st_to_cmra None]> elem))) with "Hauth") as "Hauth".
-    { eapply (auth_update_auth _ _ _).
-      eapply alloc_local_update; [|done].
-      subst.
-      rewrite lookup_fmap.
-      rewrite Hlook; done. }
-    iModIntro.
-    rewrite fmap_insert.
-    rewrite Heqelem. iFrame.
-    rewrite adversary_persistent_keys_insert_None; done.
-  Qed.
-
+  (*
   Lemma adversary_firewall_coh_alloc_node σ ip sags :
     let σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ) |>
                  <| state_sockets := <[ip:=∅]> (state_sockets σ) |>) in
@@ -347,5 +322,6 @@ Section state_interpretation_lemmas.
         rewrite lookup_insert_ne in Hlook; [|done].
         eapply Hdel; eauto.
   Qed.
+  *)
 
 End state_interpretation_lemmas.

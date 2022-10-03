@@ -222,7 +222,7 @@ Section state_interpretation.
     iDestruct "Hmsg" as "[#Hadv_send|[#Hadv_dest|#Hreg]]".
     - (* the sender's an adversary: contradiction *)
       iExFalso.
-      iDestruct (adversary_saddr_adv_own_equiv_sender with "Hadvcoh Hsag HownT [] Hadv_send") as "(_&_&#Hcontra)".
+      iDestruct (adversary_saddr_adv_own_equiv_sender with "Hadvcoh Hsag HownT [] Hadv_send") as "#Hcontra".
       { iPureIntro; eauto. }
       iApply (adversary_saddr_adv_nonadv_own with "Hcontra Hnon").
     - (* the destination's an adversary: then our destination must be an adversary too *)
@@ -247,7 +247,7 @@ Section state_interpretation.
           iSplitL "Hadvcoh Hsag".
           { iApply big_sepS_singleton.
             iRight; iLeft.
-            iDestruct (adversary_saddr_adv_own_equiv_destination with "Hadvcoh Hsag Hown' [] Hadv_dest") as "(_&_&#?)".
+            iDestruct (adversary_saddr_adv_own_equiv_destination with "Hadvcoh Hsag Hown' [] Hadv_dest") as "#?".
             { by iPureIntro. }
             iFrame "#". }
           iFrame "#". }
