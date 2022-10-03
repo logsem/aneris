@@ -59,40 +59,37 @@ Proof. solve_decision. Qed.
 #[global] Instance CN_inhabited: Inhabited CN.
 Proof. exact (populate Start). Qed.
 
-Inductive cntrans: CN -> option unit -> CN -> Prop :=
+Inductive cntrans : CN -> option unit -> CN -> Prop :=
 | start_trans n : cntrans Start (Some ()) (N n)
 | decr_trans n : cntrans (N $ S n) (Some ()) (N n).
 
+(** Free construction of the active labels on each state by [cntrans] *)
 Definition cn_live_roles (cn : CN) : gset unit :=
-  match cn with
-  | N 0 => ∅
-  | _ => {[ () ]}
-  end.
+  match cn with N 0 => ∅ | _ => {[ () ]} end.
 
-Lemma live_spec_holds :
-  forall s ρ s', cntrans s (Some ρ) s' -> ρ ∈ cn_live_roles s.
-Proof. intros [] ρ s'; [set_solver|]. destruct n; [|set_solver]. inversion 1. Qed.
+Lemma cn_live_spec_holds s ρ s' : cntrans s (Some ρ) s' -> ρ ∈ cn_live_roles s.
+Proof. destruct s; [set_solver|]. destruct n; [|set_solver]. inversion 1. Qed.
 
-Definition the_cn_fair_model : FairModel.
+Definition cn_fair_model : FairModel.
 Proof.
   refine({|
             fmstate := CN;
             fmrole := unit;
             fmtrans := cntrans;
             live_roles := cn_live_roles;
-            fm_live_spec := live_spec_holds;
+            fm_live_spec := cn_live_spec_holds;
           |}).
 Defined.
 
-Definition the_model : LiveModel heap_lang the_cn_fair_model :=
-  {| fuel_limit (x: fmstate the_cn_fair_model) := 40%nat |}.
+Definition cn_model : LiveModel heap_lang cn_fair_model :=
+  {| fuel_limit _ := 40%nat |}.
 
 Class choose_natG Σ := ChooseNatG {
   choose_nat_G :> inG Σ (excl_authR ZO);
- }.
+}.
 
 Definition choose_natΣ : gFunctors :=
-  #[ heapΣ the_cn_fair_model; GFunctor (excl_authR ZO) ].
+  #[ heapΣ cn_fair_model; GFunctor (excl_authR ZO) ].
 
 Global Instance subG_choosenatΣ {Σ} :
   subG choose_natΣ Σ → choose_natG Σ.
@@ -101,7 +98,7 @@ Proof. solve_inG. Qed.
 Let Ns := nroot .@ "choose_nat".
 
 Section proof.
-  Context `{!heapGS Σ the_cn_fair_model the_model, choose_natG Σ}.
+  Context `{!heapGS Σ cn_fair_model cn_model, choose_natG Σ}.
 
   Definition choose_nat_inv_inner (γ : gname) (l:loc) : iProp Σ :=
     ∃ (cn:CN), frag_model_is cn ∗ l ↦ #(CN_Z cn) ∗ own γ (●E (CN_Z cn)).
@@ -116,7 +113,7 @@ Section proof.
         own γ (◯E (Z.of_nat (S n))) }}}
       decr_loop_prog l #() @ tid ; ⊤
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof. 
+  Proof.
     iIntros (Hle1 Hle2) "#IH".
     iIntros "!>" (Φ) "(Hf & Hr & Hm) HΦ".
     iInduction n as [|n] "IHn".
@@ -144,12 +141,12 @@ Section proof.
       iModIntro.
       assert (cn = N 1) as ->.
       { destruct cn; inversion Hvalid. by simplify_eq. }
-      iApply (wp_store_step_singlerole _ _ (():fmrole the_cn_fair_model) (f - 7) (f-3)
+      iApply (wp_store_step_singlerole _ _ (():fmrole cn_fair_model) (f - 7) (f-3)
                with "[$Hl $Hs $Hr Hf]").
       { simpl. lia. }
       { constructor. }
       { set_solver. }
-      { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. 
+      { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia.
         by rewrite has_fuel_fuels. }
       iIntros "!> (Hl & Hs & Hr & Hf)".
       iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
@@ -185,12 +182,12 @@ Section proof.
     iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
     assert (cn = N (S (S n))) as ->.
     { destruct cn; inversion Hvalid. by simplify_eq. }
-    iApply (wp_store_step_singlerole _ _ (():fmrole the_cn_fair_model) (f - 7)
+    iApply (wp_store_step_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
                                      (f+2) with "[$Hl $Hs $Hr Hf]").
     { simpl. lia. }
     { constructor. }
     { set_solver. }
-    { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. 
+    { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia.
       rewrite has_fuel_fuels. done. }
     iIntros "!> (Hl & Hs & Hr & Hf)".
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
@@ -230,13 +227,13 @@ Section proof.
     iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
     assert (cn = Start) as ->.
     { destruct cn; inversion Hvalid; [done|]. lia. }
-    iApply (wp_store_step_singlerole _ _ (():fmrole the_cn_fair_model)
+    iApply (wp_store_step_singlerole _ _ (():fmrole cn_fair_model)
                                      (f - 3) (f-2) _ _ (N (S n))
              with "[$Hl $Hs $Hr Hf]").
     { simpl. lia. }
     { constructor. }
     { set_solver. }
-    { replace (f - 2 - 1)%nat with (f - 3)%nat by lia. 
+    { replace (f - 2 - 1)%nat with (f - 3)%nat by lia.
       rewrite has_fuel_fuels. done. }
     iIntros "!> (Hl & Hs & Hr & Hf)".
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
@@ -253,11 +250,11 @@ Section proof.
 
 End proof.
 
-Inductive the_order : CN → CN → Prop :=
-  | Start_order cn : the_order cn Start
-  | N_order (n1 n2:nat) : n1 ≤ n2 → the_order (N n1) (N n2).
+Inductive cn_order : CN → CN → Prop :=
+  | cn_order_Start cn : cn_order cn Start
+  | cn_order_N (n1 n2:nat) : n1 ≤ n2 → cn_order (N n1) (N n2).
 
-Local Instance the_order_po: PartialOrder the_order.
+Local Instance the_order_po: PartialOrder cn_order.
 Proof.
   split.
   - split.
@@ -271,17 +268,17 @@ Proof.
     simplify_eq. f_equal. lia.
 Qed.
 
-Definition the_decreasing_role (s : fmstate the_cn_fair_model) : unit :=
+Definition cn_decreasing_role (s : fmstate cn_fair_model) : unit :=
   match s with | _ => () end.
 
-#[local] Program Instance the_model_terminates :
-  FairTerminatingModel the_cn_fair_model :=
+#[local] Program Instance cn_model_terminates :
+  FairTerminatingModel cn_fair_model :=
   {|
-    ftm_leq := the_order;
-    ftm_decreasing_role := the_decreasing_role;
+    ftm_leq := cn_order;
+    ftm_decreasing_role := cn_decreasing_role;
   |}.
 Next Obligation.
-  assert (∀ n, Acc (strict the_order) (N n)).
+  assert (∀ n, Acc (strict cn_order) (N n)).
   { intros n.
     induction n as [n IHn] using lt_wf_ind.
     constructor. intros cn [Hcn1 Hcn2].
@@ -294,7 +291,7 @@ Qed.
 Next Obligation.
   intros cn [ρ' [cn' Htrans]]. simpl in *.
   split.
-  - rewrite /the_decreasing_role. simpl. rewrite /cn_live_roles.
+  - rewrite /cn_decreasing_role. simpl. rewrite /cn_live_roles.
     destruct cn; [set_solver|].
     destruct n; [inversion Htrans|set_solver].
   - intros cn'' Htrans'.
@@ -326,7 +323,7 @@ Qed.
 Proof. apply make_proof_irrel. Qed.
 
 Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
-           (auxtr : finite_trace the_cn_fair_model (option unit)) :=
+           (auxtr : finite_trace cn_fair_model (option unit)) :=
   ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(CN_Z cn) ∧
              (trace_last auxtr) = cn.
 
@@ -337,25 +334,24 @@ Proof. apply make_proof_irrel. Qed.
 
 (* NB: This can also be proven without classical axioms *)
 #[local] Instance eq_decision_the_model :
-  EqDecision (live_model_to_model the_cn_fair_model the_model).
+  EqDecision (live_model_to_model cn_fair_model cn_model).
 Proof. intros x y. apply make_decision. Qed.
 
 #[local] Instance eq_decision_mlabel :
-  EqDecision (mlabel (live_model_to_model the_cn_fair_model the_model)).
+  EqDecision (mlabel (live_model_to_model cn_fair_model cn_model)).
 Proof. solve_decision. Qed.
 
-Theorem choose_nat_sim l (extr : extrace) (Hvex : extrace_valid extr)
-        (Hexfirst : (trfirst extr).1 = [choose_nat_prog l #()]):
-  continued_simulation (sim_rel_with_user the_cn_fair_model the_model (ξ_cn l))
-                       (trace_singleton ([choose_nat_prog l #()],
-                                           {| heap := {[l:=#-1]};
-                                              used_proph_id := ∅ |}))
-                       (trace_singleton (initial_ls (LM := the_model)
-                                                    Start 0%nat)).
+Theorem choose_nat_sim l:
+  continued_simulation
+    (sim_rel_with_user cn_fair_model cn_model (ξ_cn l))
+    (trace_singleton ([choose_nat_prog l #()],
+                        {| heap := {[l:=#-1]};
+                          used_proph_id := ∅ |}))
+    (trace_singleton (initial_ls (LM := cn_model) Start 0%nat)).
 Proof.
-  assert (heapGpreS choose_natΣ the_cn_fair_model the_model) as HPreG.
+  assert (heapGpreS choose_natΣ cn_fair_model cn_model) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy' (Mdl := the_cn_fair_model) choose_natΣ NotStuck _ _ _ ∅); [|set_solver|].
+  eapply (strong_simulation_adequacy' (Mdl := cn_fair_model) choose_natΣ NotStuck _ _ _ ∅); [|set_solver|].
   { clear. intros extr atr c' oζ.
     eapply finite_smaller_card_nat=> /=.
     eapply (in_list_finite [(Z_CN (heap c'.2 !!! l), None);
@@ -386,4 +382,64 @@ Proof.
   iPureIntro. exists cn.
   split; [done|].
   subst. by destruct atr.
+Qed.
+
+Notation exaux_traces_match Mdl LM :=
+    (@traces_match (option nat)
+                   (@mlabel LM)
+                   (cfg heap_lang)
+                   (LiveState Mdl)
+                   labels_match
+                   live_tids
+                   locale_step
+                   (ls_trans LM.(fuel_limit))
+    ).
+
+Theorem choose_nat_terminates l (extr : extrace) (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = ([choose_nat_prog l #()],
+                                      {| heap := {[l:=#-1]};
+                                        used_proph_id := ∅ |})) :
+  (∀ tid, fair_ex tid extr) -> terminating_trace extr.
+Proof.
+  pose proof (choose_nat_sim l) as Hsim.
+  destruct (infinite_or_finite extr) as [Hinf|] =>//.
+  assert (∃ iatr,
+             @valid_inf_system_trace _ cn_model
+                                     (@continued_simulation
+                                        heap_lang
+                                        cn_model
+                                        (sim_rel_with_user cn_fair_model cn_model (ξ_cn l)
+                                        ))
+                                     (trace_singleton ([choose_nat_prog l #()], {| heap := {[l := #(-1)]}; used_proph_id := ∅ |}))
+                                     (trace_singleton (initial_ls (LM := cn_model) (Start) 0%nat))
+                                     (from_trace extr)
+                                     iatr) as [iatr Hiatr].
+  {
+    eexists. eapply produced_inf_aux_trace_valid_inf.
+    Unshelve.
+    - econstructor.
+    - done.
+    - eapply from_trace_preserves_validity; eauto; first econstructor. }
+  assert (∃ auxtr, exaux_traces_match cn_fair_model cn_model extr auxtr) as
+    [auxtr Hmatch].
+  { exists (to_trace (initial_ls (LM := cn_model) Start 0%nat) iatr).
+    eapply (valid_inf_system_trace_implies_traces_match
+              (continued_simulation (sim_rel_with_user cn_fair_model cn_model (ξ_cn l)))); eauto.
+    - by intros ? ? [[??]?]%continued_simulation_rel.
+    - by intros ? ? [[??]?]%continued_simulation_rel.
+  - by apply from_trace_spec.
+  - by apply to_trace_spec. }
+  intros Hfair.
+  assert (Hstutter := Hmatch).
+  apply can_destutter_auxtr in Hstutter; last first.
+  { intros ?? contra. inversion contra. done. }
+  destruct Hstutter as [mtr Hupto].
+  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
+  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+  (* have Htermtr := Hterm mtr Hmtrvalid Hfairm. *)
+  eapply exaux_preserves_termination =>//.
+  eapply upto_stutter_finiteness =>//.
+  apply fair_terminating_traces_terminate=>//.
 Qed.
