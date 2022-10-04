@@ -3,11 +3,23 @@ From trillium.fairness Require Export fairness.
 From stdpp Require Import option.
 From Paco Require Import pacotac.
 
-Definition fairly_terminating (Mdl: FairModel) :=
-  ∀ (mtr: @mtrace Mdl),
-    mtrace_valid mtr ->
-    (∀ ρ, fair_model_trace ρ mtr) ->
-    terminating_trace mtr.
+(* TODO: See if we can generalise the notion of fair terminating traces *)
+Definition mtrace_fairly_terminating {Mdl : FairModel} (mtr : @mtrace Mdl) :=
+  mtrace_valid mtr →
+  (∀ ρ, fair_model_trace ρ mtr) →
+  terminating_trace mtr.
+
+Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
+           {LM : LiveModel Λ Mdl} (auxtr : @auxtrace Λ Mdl) :=
+  auxtrace_valid (LM:=LM) auxtr →
+  (∀ ρ, fair_aux ρ auxtr) →
+  terminating_trace auxtr.
+
+Definition extrace_fairly_terminating {Λ} `{EqDecision (locale Λ)}
+           (extr : @extrace Λ) :=
+  extrace_valid extr →
+  (∀ tid, fair_ex tid extr) →
+  terminating_trace extr.
 
 Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_leq: relation Mdl;
@@ -90,8 +102,6 @@ Proof.
       * intros s'' Htrans''. eapply ftm_decr; eauto.
 Qed.
 
-Theorem fair_terminating_traces_terminate `{FairTerminatingModel Mdl}:
-      fairly_terminating Mdl.
-Proof.
-  intros ???. eapply fair_terminating_traces_terminate_rec=>//.
-Qed.
+Theorem fair_terminating_traces_terminate `{FairTerminatingModel Mdl} :
+  ∀ (mtrace : @mtrace Mdl), mtrace_fairly_terminating mtrace.
+Proof. intros ???. eapply fair_terminating_traces_terminate_rec=>//. Qed.

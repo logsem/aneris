@@ -384,73 +384,11 @@ Proof.
   subst. by destruct atr.
 Qed.
 
-Notation exaux_traces_match Mdl LM :=
-    (@traces_match (option nat)
-                   (@mlabel LM)
-                   (cfg heap_lang)
-                   (LiveState Mdl)
-                   labels_match
-                   live_tids
-                   locale_step
-                   (ls_trans LM.(fuel_limit))
-    ).
-
-Definition fairly_terminating extr :=
-  (∀ tid, fair_ex tid extr) -> terminating_trace extr.
-
-Theorem continued_simulation_fair_termination {FM : FairModel}
-        `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
-  extrace_valid extr →
-  continued_simulation
-    (sim_rel_with_user FM LM ξ)
-    ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
-  fairly_terminating extr.
-Proof.
-  intros Hvex Hsim.
-  destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?].
-  assert (∃ iatr,
-             @valid_inf_system_trace _ LM
-                                     (@continued_simulation
-                                        heap_lang
-                                        LM
-                                        (sim_rel_with_user FM LM ξ
-                                        ))
-                                     (trace_singleton (trfirst extr))
-                                     (trace_singleton (initial_ls (LM := LM) a1 r1))
-                                     (from_trace extr)
-                                     iatr) as [iatr Hiatr].
-  { eexists _. eapply produced_inf_aux_trace_valid_inf.
-    Unshelve.
-    - econstructor.
-    - done.
-    - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ auxtr, exaux_traces_match FM LM extr auxtr) as [auxtr Hmatch].
-  { exists (to_trace (initial_ls (LM := LM) a1 r1) iatr).
-    eapply (valid_inf_system_trace_implies_traces_match
-              (continued_simulation (sim_rel_with_user FM LM ξ))); eauto.
-    - by intros ? ? [[??]?]%continued_simulation_rel.
-    - by intros ? ? [[??]?]%continued_simulation_rel.
-    - by apply from_trace_spec.
-    - by apply to_trace_spec. }
-  intros Hfair.
-  assert (Hstutter := Hmatch).
-  apply can_destutter_auxtr in Hstutter; last first.
-  { intros ?? contra. inversion contra. done. }
-  destruct Hstutter as [mtr Hupto].
-  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
-  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
-  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
-  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-  eapply exaux_preserves_termination =>//.
-  eapply upto_stutter_finiteness =>//.
-  apply fair_terminating_traces_terminate=>//.
-Qed.
-
-Theorem choose_nat_terminates l (extr : extrace) (Hvex : extrace_valid extr)
+Theorem choose_nat_terminates l (extr : extrace)
         (Hexfirst : trfirst extr = ([choose_nat_prog l #()],
                                       {| heap := {[l:=#-1]};
                                         used_proph_id := ∅ |})) :
-  fairly_terminating extr.
+  extrace_fairly_terminating extr.
 Proof.
   eapply continued_simulation_fair_termination; eauto.
   rewrite Hexfirst. eapply choose_nat_sim.
