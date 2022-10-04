@@ -95,7 +95,7 @@ Global Instance subG_choosenatΣ {Σ} :
   subG choose_natΣ Σ → choose_natG Σ.
 Proof. solve_inG. Qed.
 
-Let Ns := nroot .@ "choose_nat".
+Definition Ns := nroot .@ "choose_nat".
 
 Section proof.
   Context `{!heapGS Σ cn_fair_model cn_model, choose_natG Σ}.
@@ -343,7 +343,7 @@ Proof. solve_decision. Qed.
 
 Theorem choose_nat_sim l :
   continued_simulation
-    (sim_rel_with_user cn_fair_model cn_model (ξ_cn l))
+    (sim_rel_with_user cn_model (ξ_cn l))
     (trace_singleton ([choose_nat_prog l #()],
                         {| heap := {[l:=#-1]};
                           used_proph_id := ∅ |}))
@@ -390,6 +390,6 @@ Theorem choose_nat_terminates l (extr : extrace)
                                         used_proph_id := ∅ |})) :
   extrace_fairly_terminating extr.
 Proof.
-  eapply continued_simulation_fair_termination; eauto.
+  eapply heap_lang_continued_simulation_fair_termination; eauto.
   rewrite Hexfirst. eapply choose_nat_sim.
 Qed.

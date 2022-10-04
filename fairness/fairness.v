@@ -1016,7 +1016,6 @@ Section fuel_dec_unless.
                    (ls_trans LM.(fuel_limit))
     ).
 
-  Set Printing All.
   Definition Ul (ℓ: LM.(mlabel)) :=
     match ℓ with
     | Take_step ρ _ => Some (Some ρ)

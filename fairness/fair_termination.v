@@ -1,5 +1,5 @@
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export fairness.
+From trillium.fairness Require Export fairness fairness_finiteness.
 From stdpp Require Import option.
 From Paco Require Import pacotac.
 
@@ -105,3 +105,56 @@ Qed.
 Theorem fair_terminating_traces_terminate `{FairTerminatingModel Mdl} :
   ∀ (mtrace : @mtrace Mdl), mtrace_fairly_terminating mtrace.
 Proof. intros ???. eapply fair_terminating_traces_terminate_rec=>//. Qed.
+
+Notation exaux_traces_match Λ Mdl LM :=
+    (@traces_match _ (@mlabel LM)
+                   (cfg Λ)
+                   (LiveState Mdl)
+                   labels_match
+                   live_tids
+                   locale_step
+                   (ls_trans LM.(fuel_limit))).
+
+Theorem continued_simulation_fair_termination
+        `{FairTerminatingModel FM} `(LM:LiveModel Λ FM) `{EqDecision (locale Λ)}
+        ξ a1 r1 extr :
+  (* TODO: This is required for destruttering - Not sure why *)
+  (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
+  continued_simulation
+    (sim_rel_with_user LM ξ)
+    ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
+  extrace_fairly_terminating extr.
+Proof.
+  intros Hstep Hsim Hvex.
+  destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?].
+  assert (∃ iatr,
+             valid_inf_system_trace
+               (continued_simulation (sim_rel_with_user LM ξ))
+               (trace_singleton (trfirst extr))
+               (trace_singleton (initial_ls (LM := LM) a1 r1))
+               (from_trace extr)
+               iatr) as [iatr Hiatr].
+  { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
+    Unshelve.
+    - done.
+    - eapply from_trace_preserves_validity; eauto; first econstructor. }
+  assert (∃ auxtr, exaux_traces_match Λ FM LM extr auxtr) as [auxtr Hmatch].
+  { exists (to_trace (initial_ls (LM := LM) a1 r1) iatr).
+    eapply (valid_inf_system_trace_implies_traces_match
+              (continued_simulation (sim_rel_with_user LM ξ))); eauto.
+    - by intros ? ? [[??]?]%continued_simulation_rel.
+    - by intros ? ? [[??]?]%continued_simulation_rel.
+    - by apply from_trace_spec.
+    - by apply to_trace_spec. }
+  intros Hfair.
+  assert (Hstutter := Hmatch).
+  apply can_destutter_auxtr in Hstutter; [|done].
+  destruct Hstutter as [mtr Hupto].
+  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
+  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+  eapply exaux_preserves_termination =>//.
+  eapply upto_stutter_finiteness =>//.
+  apply fair_terminating_traces_terminate=>//.
+Qed.

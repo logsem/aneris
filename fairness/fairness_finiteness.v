@@ -204,3 +204,27 @@ Section finitary_simple.
     rel_finitary (valid_lift_fairness φ).
   Proof. Admitted.
 End finitary_simple.
+
+Definition live_rel `(LM: LiveModel Λ M) `{EqDecision (locale Λ)}
+           (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
+  live_tids (M := M) (trace_last ex) (trace_last aux).
+
+Definition sim_rel `(LM: LiveModel Λ M) `{EqDecision (locale Λ)}
+           (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
+  valid_state_evolution_fairness ex aux ∧ live_rel LM ex aux.
+
+Definition sim_rel_with_user `(LM: LiveModel Λ M) `{EqDecision (locale Λ)}
+           (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
+  (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
+  sim_rel LM ex aux ∧ ξ ex (map_underlying_trace aux).
+
+(* TODO: Maybe redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
+Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel Λ Mdl}
+      `{EqDecision (locale Λ)}
+      (ξ : execution_trace Λ → finite_trace Mdl (option $ fmrole Mdl) →
+           Prop) extr atr :
+  valid_lift_fairness
+    (λ extr auxtr, ξ extr (map_underlying_trace (LM:=LM) auxtr) ∧
+                   live_rel LM extr auxtr) extr atr ↔
+  sim_rel_with_user LM ξ extr atr.
+Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
