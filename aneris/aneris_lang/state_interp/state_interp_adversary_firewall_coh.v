@@ -325,4 +325,53 @@ Section state_interpretation_lemmas.
         eapply Hdel; eauto.
   Qed.
 
+  Lemma adversary_firewall_coh_heap_update σ sags heaps :
+    adversary_firewall_coh σ sags -∗
+    adversary_firewall_coh (σ <| state_heaps := heaps |>) sags.
+  Proof.
+    iIntros "Hcoh".
+    rewrite /adversary_firewall_coh.
+    eauto.
+  Qed.
+
+  Lemma adversary_firewall_coh_sblock_update σ sags ip Sn sh skt r b :
+    state_sockets σ !! ip = Some Sn ->
+    Sn !! sh = Some (skt, r) ->
+    let S := <[ip := <[sh:= (skt<| sblock := b|>, r)]> Sn]>(state_sockets σ) in
+    let σ' := σ <| state_sockets := S |> in
+    adversary_firewall_coh σ sags -∗
+      adversary_firewall_coh σ' sags.
+  Proof.
+    iIntros (Hip Hsh) "Hcoh".
+    iDestruct "Hcoh" as (adv_st fw_st) "(?&?&%Hsags&%Hadv&%Hfw&%Hdel)".
+    destruct Hadv as [Hdom Hadv].
+    iExists adv_st, fw_st.
+    iFrame. iPureIntro.
+    simpl.
+    repeat (split; eauto; simpl).
+    - rewrite dom_insert_L.
+      rewrite Hdom.
+      apply elem_of_dom_2 in Hip.
+      set_solver.
+    - rewrite /firewall_delivery_coh.
+      simpl.
+      intros ip' skts' sh' skt' msgs' m Hlook.
+      destruct (decide (ip = ip')) as [-> | Hne].
+      + rewrite lookup_insert in Hlook.
+        inversion Hlook; subst.
+        destruct (decide (sh = sh')) as [-> | Hne'].
+        * intros Hsh'.
+          rewrite lookup_insert in Hsh'.
+          intros Hin Hip'.
+          assert (saddress skt = saddress skt') as <-.
+          { inversion Hsh'; subst.
+            done. }
+          inversion Hsh'; subst.
+          eapply Hdel; eauto.
+        * rewrite lookup_insert_ne; [|done].
+          eapply Hdel; eauto.
+      + rewrite lookup_insert_ne in Hlook; [|done].
+        eapply Hdel; eauto.
+  Qed.
+
 End state_interpretation_lemmas.
