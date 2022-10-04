@@ -117,19 +117,24 @@ Notation exaux_traces_match Λ Mdl LM :=
 
 Theorem continued_simulation_fair_termination
         `{FairTerminatingModel FM} `(LM:LiveModel Λ FM) `{EqDecision (locale Λ)}
-        ξ a1 r1 extr :
+        (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :
   (* TODO: This is required for destruttering - Not sure why *)
   (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
+  (* The relation must capture that live tids correspond *)
+  (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+     ξ ex atr -> live_tids (trace_last ex) (trace_last atr)) ->
+  (* The relation must capture that the traces evolve fairly *)
+  (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+     ξ ex atr -> valid_state_evolution_fairness ex atr) →
   continued_simulation
-    (sim_rel_with_user LM ξ)
-    ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
+    ξ ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
   extrace_fairly_terminating extr.
 Proof.
-  intros Hstep Hsim Hvex.
+  intros Hstep Hlive Hvalid Hsim Hvex.
   destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?].
   assert (∃ iatr,
              valid_inf_system_trace
-               (continued_simulation (sim_rel_with_user LM ξ))
+               (continued_simulation ξ)
                (trace_singleton (trfirst extr))
                (trace_singleton (initial_ls (LM := LM) a1 r1))
                (from_trace extr)
@@ -141,9 +146,9 @@ Proof.
   assert (∃ auxtr, exaux_traces_match Λ FM LM extr auxtr) as [auxtr Hmatch].
   { exists (to_trace (initial_ls (LM := LM) a1 r1) iatr).
     eapply (valid_inf_system_trace_implies_traces_match
-              (continued_simulation (sim_rel_with_user LM ξ))); eauto.
-    - by intros ? ? [[??]?]%continued_simulation_rel.
-    - by intros ? ? [[??]?]%continued_simulation_rel.
+              (continued_simulation ξ)); eauto.
+    - intros ? ? ?%continued_simulation_rel. by apply Hlive.
+    - intros ? ? ?%continued_simulation_rel. by apply Hvalid.
     - by apply from_trace_spec.
     - by apply to_trace_spec. }
   intros Hfair.

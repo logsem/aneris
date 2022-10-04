@@ -15,7 +15,7 @@ Import derived_laws_later.bi.
 Set Default Proof Using "Type".
 
 (** The program verify liveness for *)
-(** recursion is "off by one" to allow immediate termination after storing 0 *)
+(** Recursion is "off by one" to allow immediate termination after storing 0 *)
 Definition decr_loop_prog (l : loc) : val :=
   rec: "go" <> :=
     let: "x" := !#l in
@@ -250,6 +250,60 @@ Section proof.
 
 End proof.
 
+Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
+           (auxtr : finite_trace cn_fair_model (option unit)) :=
+  ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(CN_Z cn) ∧
+             (trace_last auxtr) = cn.
+
+(** Derive that program is related to model by [ξ_cn l] *)
+Lemma choose_nat_sim l :
+  continued_simulation
+    (sim_rel_with_user cn_model (ξ_cn l))
+    (trace_singleton ([choose_nat_prog l #()],
+                        {| heap := {[l:=#-1]};
+                           used_proph_id := ∅ |}))
+    (trace_singleton (initial_ls (LM := cn_model) Start 0%nat)).
+Proof.
+  assert (heapGpreS choose_natΣ cn_fair_model cn_model) as HPreG.
+  { apply _. }
+  eapply (strong_simulation_adequacy (Mdl := cn_fair_model)
+            choose_natΣ NotStuck _ _ _ ∅); [|set_solver|].
+  { clear.
+    apply rel_finitary_sim_rel_with_user_ξ.
+    intros extr atr c' oζ.
+    eapply finite_smaller_card_nat=> /=.
+    eapply (in_list_finite [(Z_CN (heap c'.2 !!! l), None);
+                            (Z_CN (heap c'.2 !!! l), Some ())]).
+    (* TODO: Figure out why this does not unify with typeclass *)
+    Unshelve. 2: intros x; apply make_proof_irrel.
+    intros [cn o] [cn' [Hextr Hatr]].
+    rewrite Hextr Z_CN_CN_Z -Hatr. destruct o; [destruct u|]; set_solver. }
+  iIntros (?) "!> Hσ Hs Hr Hf".
+  iMod (own_alloc) as (γ) "He"; [apply (excl_auth_valid (-1)%Z)|].
+  iDestruct "He" as "[He● He○]".
+  iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hσ Hs]") as "#IH".
+  { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
+  iModIntro.
+  iSplitL.
+  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
+      [lia|lia| |by eauto]=> /=.
+    replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
+    rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
+  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
+  iInv Ns as ">H".
+  iDestruct "H" as (cn) "(Hf & Hl & H●)".
+  iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
+  iDestruct (gen_heap_valid with "Hσ Hl") as %Hlookup%lookup_total_correct.
+  iDestruct (model_agree' with "Hs Hf") as %Hlast.
+  iModIntro. iSplitL; [by iExists _; iFrame|].
+  iApply fupd_mask_intro; [set_solver|]. iIntros "_".
+  iPureIntro. exists cn.
+  split; [done|].
+  subst. by destruct atr.
+Qed.
+
+(** Show that model is fairly terminating *)
+
 Inductive cn_order : CN → CN → Prop :=
   | cn_order_Start cn : cn_order cn Start
   | cn_order_N (n1 n2:nat) : n1 ≤ n2 → cn_order (N n1) (N n2).
@@ -316,72 +370,6 @@ Next Obligation.
   destruct cn1.
   - inversion Htrans; simplify_eq. constructor.
   - inversion Htrans; simplify_eq. constructor. lia.
-Qed.
-
-#[local] Instance proof_irrel_trans s x :
-  ProofIrrel ((let '(s', ℓ) := x in cntrans s ℓ s'): Prop).
-Proof. apply make_proof_irrel. Qed.
-
-Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
-           (auxtr : finite_trace cn_fair_model (option unit)) :=
-  ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(CN_Z cn) ∧
-             (trace_last auxtr) = cn.
-
-(* TODO: This does not unify for some reason *)
-#[local] Instance proof_irrel_ξ_cn l ex oζ c atr δ ℓ :
-  ProofIrrel ((ξ_cn l) (ex :tr[ oζ ]: c) (atr :tr[ ℓ ]: δ)).
-Proof. apply make_proof_irrel. Qed.
-
-(* NB: This can also be proven without classical axioms *)
-#[local] Instance eq_decision_the_model :
-  EqDecision (live_model_to_model cn_fair_model cn_model).
-Proof. intros x y. apply make_decision. Qed.
-
-#[local] Instance eq_decision_mlabel :
-  EqDecision (mlabel (live_model_to_model cn_fair_model cn_model)).
-Proof. solve_decision. Qed.
-
-Theorem choose_nat_sim l :
-  continued_simulation
-    (sim_rel_with_user cn_model (ξ_cn l))
-    (trace_singleton ([choose_nat_prog l #()],
-                        {| heap := {[l:=#-1]};
-                          used_proph_id := ∅ |}))
-    (trace_singleton (initial_ls (LM := cn_model) Start 0%nat)).
-Proof.
-  assert (heapGpreS choose_natΣ cn_fair_model cn_model) as HPreG.
-  { apply _. }
-  eapply (strong_simulation_adequacy' (Mdl := cn_fair_model) choose_natΣ NotStuck _ _ _ ∅); [|set_solver|].
-  { clear. intros extr atr c' oζ.
-    eapply finite_smaller_card_nat=> /=.
-    eapply (in_list_finite [(Z_CN (heap c'.2 !!! l), None);
-                            (Z_CN (heap c'.2 !!! l), Some ())]).
-    (* TODO: Figure out why this does not unify with typeclass *)
-    Unshelve. 2: intros x; apply make_proof_irrel.
-    intros [cn o] [cn' [Hextr Hatr]].
-    rewrite Hextr Z_CN_CN_Z -Hatr. destruct o; [destruct u|]; set_solver. }
-  iIntros (?) "!> Hσ Hs Hr Hf".
-  iMod (own_alloc) as (γ) "He"; [apply (excl_auth_valid (-1)%Z)|].
-  iDestruct "He" as "[He● He○]".
-  iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hσ Hs]") as "#IH".
-  { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
-  iModIntro.
-  iSplitL.
-  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
-      [lia|lia| |by eauto]=> /=.
-    replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
-    rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
-  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
-  iInv Ns as ">H".
-  iDestruct "H" as (cn) "(Hf & Hl & H●)".
-  iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
-  iDestruct (gen_heap_valid with "Hσ Hl") as %Hlookup%lookup_total_correct.
-  iDestruct (model_agree' with "Hs Hf") as %Hlast.
-  iModIntro. iSplitL; [by iExists _; iFrame|].
-  iApply fupd_mask_intro; [set_solver|]. iIntros "_".
-  iPureIntro. exists cn.
-  split; [done|].
-  subst. by destruct atr.
 Qed.
 
 Theorem choose_nat_terminates l (extr : extrace)

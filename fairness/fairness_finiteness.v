@@ -228,3 +228,20 @@ Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel Λ Mdl}
                    live_rel LM extr auxtr) extr atr ↔
   sim_rel_with_user LM ξ extr atr.
 Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
+
+Lemma rel_finitary_sim_rel_with_user_ξ `{LM:LiveModel Λ Mdl}
+      `{EqDecision (locale Λ)} ξ :
+  rel_finitary' ξ → rel_finitary (sim_rel_with_user LM ξ).
+Proof.
+  intros Hrel.
+  eapply rel_finitary_impl.
+  { intros ex aux. by eapply valid_lift_fairness_sim_rel_with_user.
+    (* TODO: Figure out if these typeclass subgoals should be resolved locally *)
+    Unshelve.
+    - intros ??. apply make_decision.
+    - intros ??. apply make_decision. }
+  by eapply valid_state_evolution_finitary_fairness.
+  Unshelve.
+  - intros ??. apply make_decision.
+  - intros ??. apply make_proof_irrel.
+Qed.
