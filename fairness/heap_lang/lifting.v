@@ -40,7 +40,7 @@ Proof. solve_inG. Qed.
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
        gen_heap_interp (trace_last extr).2.(heap) ∗
        model_state_interp (trace_last extr).1 (trace_last auxtr))%I ;
-  fork_post tid := λ _, tid ↦M ∅;
+    fork_post tid := λ _, tid ↦M ∅;
 }.
 
 Section adequacy.
@@ -124,7 +124,23 @@ Proof.
   simplify_eq. inversion H2.
 Qed.
 
-Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM}
+Definition rel_holds {Σ} `{LM:LiveModel heap_lang Mdl} 
+           `{!heapGS Σ Mdl LM}
+           s (ξ : execution_trace heap_lang → finite_trace Mdl
+         (option $ fmrole Mdl) → Prop) c1 c2 : iProp Σ :=
+  ∀ (ex : execution_trace heap_lang) (atr : auxiliary_trace LM) c,
+    ⌜valid_system_trace ex atr⌝ -∗
+    ⌜trace_starts_in ex c1⌝ -∗
+    ⌜trace_starts_in atr c2⌝ -∗
+    ⌜trace_ends_in ex c⌝ -∗
+    ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' →
+                      trace_contract atr ℓ atr' →
+                      ξ ex' (map_underlying_trace atr')⌝ -∗
+                      ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+    state_interp ex atr -∗
+    |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝.
+
+Theorem strong_simulation_adequacy Σ `{LM:LiveModel heap_lang Mdl}
     `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
     (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) →
          Prop) :
@@ -138,15 +154,7 @@ Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM}
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
-       (∀ (ex : execution_trace heap_lang) (atr : auxiliary_trace LM) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr (initial_ls (LM := LM) s1 0%nat)⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         state_interp ex atr -∗
-         |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝)) ->
+       rel_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfin Hfevol H.
@@ -287,21 +295,12 @@ Theorem strong_simulation_adequacy' Σ {Mdl: FairModel} {LM}
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{Hinv : !heapGS Σ Mdl LM},
     ⊢ |={⊤}=>
-       (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) -∗
        frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
-       (∀ (ex : execution_trace heap_lang) (atr : auxiliary_trace LM) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr (initial_ls (LM := LM) s1 0%nat)⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         state_interp ex atr -∗
-         |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝)) ->
+       rel_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) →
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfin Hfevol H.
@@ -466,7 +465,8 @@ Proof.
   eauto.
 Qed.
 
-Theorem simulation_adequacy_terminate Σ Mdl `{!heapGpreS Σ Mdl LM} (s: stuckness)
+Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
+        `{!heapGpreS Σ Mdl LM} (s: stuckness)
         e1 (s1: Mdl) FR
         (extr : extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
@@ -498,7 +498,9 @@ Proof.
   eapply upto_stutter_finiteness =>//.
 Qed.
 
-Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl} `{!heapGpreS Σ Mdl LM} (s: stuckness)
+Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl}
+        `{LM : LiveModel heap_lang Mdl}
+        `{!heapGpreS Σ Mdl LM} (s: stuckness)
         e1 (s1: Mdl) FR
         (extr : extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
@@ -701,6 +703,7 @@ Lemma auth_fuel_is_proper `{heapGS Σ Mdl} (x y : gmap (fmrole Mdl) nat):
 Proof. by intros ->. Qed.
 
 Section lifting.
+Context `{LM:LiveModel heap_lang Mdl}.
 Context `{!heapGS Σ Mdl LM}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.

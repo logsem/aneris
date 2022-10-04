@@ -387,7 +387,7 @@ Qed.
 Theorem choose_nat_terminates l (extr : extrace)
         (Hexfirst : trfirst extr = ([choose_nat_prog l #()],
                                       {| heap := {[l:=#-1]};
-                                        used_proph_id := ∅ |})) :
+                                         used_proph_id := ∅ |})) :
   extrace_fairly_terminating extr.
 Proof.
   eapply heap_lang_continued_simulation_fair_termination; eauto.
