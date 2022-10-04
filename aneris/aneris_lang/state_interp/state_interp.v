@@ -211,6 +211,7 @@ Section state_interpretation.
     iMod (node_gnames_alloc γn with "Hnauth") as "[Hnauth #Hγn]"; [done|].
     set σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ)|>
                                    <| state_sockets := <[ip:=∅]> (state_sockets σ) |>).
+    iMod (adversary_firewall_coh_alloc_nonadv with "Hadvcoh") as "Hadv"; [done|].
     iModIntro. iSplit; first done.
     iSplitR.
     { iExists _; eauto. }
