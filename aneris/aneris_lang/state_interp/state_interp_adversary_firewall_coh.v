@@ -408,4 +408,42 @@ Section state_interpretation_lemmas.
       inversion 1.
   Qed.
 
+  Lemma adversary_firewall_coh_socketbind σ sags Sn sh s sa ps :
+    state_sockets σ !! ip_of_address sa = Some Sn →
+    Sn !! sh = Some (s, []) →
+    state_ports_in_use σ !! ip_of_address sa = Some ps ->
+    let σ' :=
+      σ <| state_sockets :=
+          <[ip_of_address sa :=<[sh:=(s <| saddress := Some sa |>, [])]> Sn]>
+          (state_sockets σ) |>
+        <| state_ports_in_use :=
+          <[ip_of_address sa:={[port_of_address sa]} ∪ ps]> (state_ports_in_use σ) |> in
+    adversary_firewall_coh σ sags -∗
+      adversary_firewall_coh σ' sags.
+  Proof.
+    iIntros (Hip Hsh Haddr) "Hcoh".
+    iDestruct "Hcoh" as (adv_st fw_st) "(Hadv&Hfw&%Hsags&[%Hdom %Hadv]&%Hfw&%Hdel)".
+    iExists adv_st, fw_st.
+    iFrame.
+    iPureIntro.
+    repeat (split; eauto; simpl).
+    - rewrite dom_insert_L.
+      rewrite Hdom.
+      apply elem_of_dom_2 in Hip.
+      set_solver.
+    - intros ip' skts' sh' skt' msgs' m'.
+      simpl.
+      destruct (decide (ip_of_address sa = ip')) as [-> | Hne]; last first.
+      { rewrite lookup_insert_ne; [|done].
+        eapply Hdel. }
+      rewrite lookup_insert.
+      inversion 1; subst.
+      destruct (decide (sh = sh')) as [-> | Hne]; last first.
+      { rewrite lookup_insert_ne; [|done].
+        eapply Hdel; eauto. }
+      rewrite lookup_insert.
+      inversion 1; subst.
+      inversion 1.
+  Qed.
+
 End state_interpretation_lemmas.

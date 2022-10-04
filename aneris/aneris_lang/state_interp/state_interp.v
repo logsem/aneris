@@ -490,9 +490,9 @@ Section state_interpretation.
   Proof.
     simpl. iIntros (????) "Hσ Hsh Hp".
     iDestruct "Hσ"
-      as (mγ mn)
+      as (mγ mn sags)
            "(? & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hadv & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
@@ -509,7 +509,7 @@ Section state_interpretation.
       as (?) "[% %]".
     iMod (free_ips_coh_dealloc _ _ sh skt with "Hfreeips Hp")
       as "Hfreeips"; [done..|].
-    iModIntro. iExists mγ, _. iFrame. rewrite /set /=.
+    iModIntro. iExists mγ, _, sags. iFrame. rewrite /set /=.
     iSplit.
     { iPureIntro; by eapply gnames_coh_update_sockets. }
     iSplitR.
@@ -517,8 +517,10 @@ Section state_interpretation.
       apply network_sockets_coh_socketbind; eauto with set_solver. }
     iSplitR.
     { iPureIntro. by apply messages_history_coh_socketbind. }
-    assert (ps = ps0) as -> by set_solver.
-    iFrame.
+    iSplitL "Hfreeips".
+    { assert (ps = ps0) as -> by set_solver.
+      iFrame. }
+    iApply adversary_firewall_coh_socketbind; done.
   Qed.
 
   Lemma aneris_state_interp_send
