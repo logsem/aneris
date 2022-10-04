@@ -395,14 +395,13 @@ Section state_interpretation.
     saddress s = None →
     is_node ip -∗
     aneris_state_interp σ mh ==∗ aneris_state_interp σ' mh ∗ sh ↪[ip] s.
-  Proof. Admitted.
-  (*
+  Proof.
     simpl. iIntros (???) "Hn Hσ".
     iDestruct "Hn" as (γs) "Hn".
     iDestruct "Hσ"
-      as (mγ mn)
+      as (mγ mn sags)
            "(? & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hadv & Hmctx & Hmres)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     iDestruct (big_sepM_local_state_coh_delete with "Hlcoh")
       as "(Hstate & Hlcoh)"; [done|].
@@ -414,7 +413,7 @@ Section state_interpretation.
     { apply lookup_delete. }
     iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh")
       as "HX"; [done|].
-    iModIntro. iFrame. iExists _, _. iFrame.
+    iModIntro. iFrame. iExists _, _, _. iFrame.
     rewrite /set /=.
     iSplitR.
     { iPureIntro. by eapply gnames_coh_update_sockets. }
@@ -426,8 +425,10 @@ Section state_interpretation.
       iPureIntro.
       destruct Hmhcoh as (? & Hrcoh & ?).
       eauto using receive_buffers_coh_alloc_socket. }
+    iSplitL "Hfreeips".
     { by iApply free_ips_coh_alloc_socket. }
-  Qed.*)
+    iApply adversary_firewall_coh_alloc_socket; done.
+  Qed.
 
   Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sag φ :
     aneris_state_interp σ mh -∗ unallocated_groups {[sag]} ==∗

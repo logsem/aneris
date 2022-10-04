@@ -374,4 +374,38 @@ Section state_interpretation_lemmas.
         eapply Hdel; eauto.
   Qed.
 
+  Lemma adversary_firewall_coh_alloc_socket σ sags ip Sn sh s :
+    state_sockets σ !! ip = Some Sn →
+    Sn !! sh = None →
+    saddress s = None →
+    let σ' := σ <| state_sockets :=
+                <[ip:=<[sh:=(s, [])]> Sn]> (state_sockets σ) |> in
+    adversary_firewall_coh σ sags -∗
+      adversary_firewall_coh σ' sags.
+  Proof.
+    iIntros (Hip Hsh Haddr) "Hcoh".
+    iDestruct "Hcoh" as (adv_st fw_st) "(Hadv&Hfw&%Hsags&[%Hdom %Hadv]&%Hfw&%Hdel)".
+    iExists adv_st, fw_st.
+    iFrame.
+    iPureIntro.
+    repeat (split; eauto; simpl).
+    - rewrite dom_insert_L.
+      rewrite Hdom.
+      apply elem_of_dom_2 in Hip.
+      set_solver.
+    - intros ip' skts' sh' skt' msgs' m'.
+      simpl.
+      destruct (decide (ip = ip')) as [-> | Hne]; last first.
+      { rewrite lookup_insert_ne; [|done].
+        eapply Hdel. }
+      rewrite lookup_insert.
+      inversion 1; subst.
+      destruct (decide (sh = sh')) as [-> | Hne]; last first.
+      { rewrite lookup_insert_ne; [|done].
+        eapply Hdel; eauto. }
+      rewrite lookup_insert.
+      inversion 1; subst.
+      inversion 1.
+  Qed.
+
 End state_interpretation_lemmas.
