@@ -734,6 +734,7 @@ Section state_interpretation.
     messages_addresses_coh mhm → all_disjoint (dom mhm).
   Proof. rewrite /messages_addresses_coh. naive_solver. Qed.
 
+  (*
   Lemma aneris_state_interp_receive_some sa sag bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :
     let ip := ip_of_address sa in
@@ -766,9 +767,9 @@ Section state_interpretation.
     iDestruct (elem_of_group_unfold with "Hsag") as "[%Hsag _]".
     rewrite {1}/aneris_state_interp.
     iDestruct "Hσ"
-      as (mγ mh')
+      as (mγ mh' sags)
            "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
-                            & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+                            & Hnauth & Hsi & Hlcoh & Hfreeips & Hadv & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     assert ( network_sockets_coh (state_sockets σ1) (state_ports_in_use σ1))
@@ -906,6 +907,7 @@ Section state_interpretation.
       { iPureIntro. by eapply messages_history_coh_receive_2; eauto. }
       by iApply free_ips_coh_update_msg.
   Qed.
+  *)
 
   Lemma aneris_state_interp_model_agree m ex atr :
     state_interp ex atr -∗ frag_st m -∗ ⌜(trace_last atr) = m⌝.
@@ -942,7 +944,7 @@ Section state_interpretation.
     iIntros "Hlt Hsi".
     rewrite /state_interp /= /aneris_state_interp /messages_sent_from.
     iDestruct "Hsi" as "(? & Hsi & Hauth)".
-    iDestruct "Hsi" as (γm mh Hmh Hgnms Hnetsock Hhistcoh) "(?&?&?&?& Hctx &?)".
+    iDestruct "Hsi" as (γm mh sags Hmh Hgnms Hnetsock Hhistcoh) "(?&?&?&?&?& Hctx &?)".
     rewrite -Hmh /=.
     iDestruct (messages_mapsto_ctx_valid with "Hlt Hctx") as %Hma.
     iPureIntro.

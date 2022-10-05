@@ -564,7 +564,7 @@ End singleton_to_singleton_connectives.
 
 (* Singleton to singleton messages points-to *)
 Notation "sa ⤳{ q } s" :=
-  (message_history_singleton {[sa]} q false false FirewallStPrivate s)%I
+  (message_history_singleton {[sa]} q false false s)%I
     (at level 20, q at level 50, format "sa  ⤳{ q }  s") : bi_scope.
 Notation "sa ⤳ s" := (sa ⤳{ 1 } s)%I (at level 20) : bi_scope.
 Notation "sa ⤳[ bs , br ]{ q } s" :=
