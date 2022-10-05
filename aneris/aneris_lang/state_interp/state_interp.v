@@ -734,7 +734,6 @@ Section state_interpretation.
     messages_addresses_coh mhm → all_disjoint (dom mhm).
   Proof. rewrite /messages_addresses_coh. naive_solver. Qed.
 
-  (*
   Lemma aneris_state_interp_receive_some sa sag bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :
     let ip := ip_of_address sa in
@@ -907,7 +906,6 @@ Section state_interpretation.
       { iPureIntro. by eapply messages_history_coh_receive_2; eauto. }
       by iApply free_ips_coh_update_msg.
   Qed.
-  *)
 
   Lemma aneris_state_interp_model_agree m ex atr :
     state_interp ex atr -∗ frag_st m -∗ ⌜(trace_last atr) = m⌝.
