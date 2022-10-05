@@ -533,6 +533,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     saddress skt = Some saT →
     msg ≡g{sagT,sagR} msg' →
+    adversary_saddr_nonadv_own (m_sender msg) -∗
     saT ∈g sagT -∗
     saR ∈g sagR -∗
     sh ↪[ip_of_address saT] skt -∗
@@ -548,11 +549,11 @@ Section state_interpretation.
     sagT ⤳*[bs, br] (R, {[msg]} ∪ T).
   Proof.
     simpl.
-    iIntros (HS HSn Hskt Hmeq) "#HsagT #HsagR Hsh Hrt #Hφ Hmsg Hσ".
+    iIntros (HS HSn Hskt Hmeq) "#Hnonadv #HsagT #HsagR Hsh Hrt #Hφ Hmsg Hσ".
     iDestruct "Hσ"
-      as (mγ mh')
+      as (mγ mh' sags)
            "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hadv & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     set (msg := {|
@@ -575,7 +576,7 @@ Section state_interpretation.
         apply elem_of_messages_sent.
         edestruct Hmscoh as (R0 & T0 & sag0 & ? & ? & ?); first by apply gmultiset_elem_of_dom.
         exists sag0, (R0,T0). set_solver.
-      + iExists mγ, (<[sagT:=(R, T)]> mh'). iFrame.
+      + iExists mγ, (<[sagT:=(R, T)]> mh'), sags. iFrame.
         simpl.
         rewrite {2 3 4} (insert_id mh'); eauto.
         iFrame.
@@ -606,7 +607,7 @@ Section state_interpretation.
       apply elem_of_messages_sent.
       edestruct Hmscoh as (R0 & T0 & sag0 & ? & ?); first by apply gmultiset_elem_of_dom.
       exists sag0, (R0,T0). set_solver.
-      iExists mγ, (<[sagT:=(R, {[msg]} ∪ T)]> mh'). iFrame.
+      iExists mγ, (<[sagT:=(R, {[msg]} ∪ T)]> mh'), sags. iFrame.
       simpl.
       iSplit.
       { iPureIntro.
@@ -621,7 +622,7 @@ Section state_interpretation.
       iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
       iSplit.
       { iPureIntro. by eapply messages_history_coh_send. }
-      iApply (messages_resource_coh_send with "[HsagR] [Hφ] [$Hmres] [Hmsg]"); eauto.
+      iApply (messages_resource_coh_send with "[] [HsagR] [Hφ] [$Hmres] [Hmsg]"); eauto.
       by destruct Hmhcoh; intuition.
   Qed.
 
@@ -634,6 +635,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     saddress skt = Some saT →
     set_Exists (λ m, m ≡g{sagT,sagR} msg) T →
+    adversary_saddr_nonadv_own (m_sender msg) -∗
     saT ∈g sagT -∗
     saR ∈g sagR -∗
     sh ↪[ip_of_address saT] skt -∗
@@ -647,11 +649,11 @@ Section state_interpretation.
     sagT ⤳*[bs, br] (R, {[msg]} ∪ T).
   Proof.
     simpl.
-    iIntros (HS HSn Hskt Hexist) "#HsagT #HsagR Hsh Hrt Hσ".
+    iIntros (HS HSn Hskt Hexist) "#Hnonadv #HsagT #HsagR Hsh Hrt Hσ".
     iDestruct "Hσ"
-      as (mγ mh')
+      as (mγ mh' sags)
            "(%Hhst & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hadv & Hmctx & Hmres)".
     iDestruct (mapsto_socket_node with "Hsh") as (γs) "(#Hn & Hsh)".
     iDestruct (node_gnames_valid with "Hnauth Hn") as %?.
     set (msg := {|
@@ -674,7 +676,7 @@ Section state_interpretation.
         apply elem_of_messages_sent.
         edestruct Hmscoh as (R0 & T0 & sag0 & ? & ? & ?); first by apply gmultiset_elem_of_dom.
         exists sag0, (R0,T0). set_solver.
-      + iExists mγ, (<[sagT:=(R, T)]> mh'). iFrame.
+      + iExists mγ, (<[sagT:=(R, T)]> mh'), sags. iFrame.
         simpl.
         rewrite {2 3 4} (insert_id mh'); eauto.
         iFrame.
@@ -705,10 +707,9 @@ Section state_interpretation.
       apply elem_of_messages_sent.
       edestruct Hmscoh as (R0 & T0 & sag0 & ? & ?); first by apply gmultiset_elem_of_dom.
       exists sag0, (R0,T0). set_solver.
-      iExists mγ, (<[sagT:=(R, {[msg]} ∪ T)]> mh'). iFrame.
-      simpl.
+      iExists mγ, (<[sagT:=(R, {[msg]} ∪ T)]> mh'), sags. simpl.
       iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
-      iSplit.
+      iSplitR.
       { iPureIntro.
         rewrite /messages_received_sent.
         rewrite /messages_received_sent in Hhst.
@@ -717,11 +718,16 @@ Section state_interpretation.
         rewrite !messages_sent_insert.
         rewrite !messages_received_insert.
         f_equal; set_solver. }
-      do 2 (iSplit; [done|]).
-      iSplit.
+      do 2 (iSplitR; [done|]).
+      iSplitR.
       { iPureIntro. by eapply messages_history_coh_send. }
-      iApply (messages_resource_coh_send_duplicate with "[HsagR] [$Hmres]"); eauto.
-      by destruct Hmhcoh; intuition.
+      iFrame "Hnauth Hlcoh Hrt".
+      iDestruct "Hsi" as (A) "(#?&Hctx&?&?)".
+      iDestruct (messages_resource_coh_send_duplicate with
+                  "[] Hadv Hctx [HsagR] [$Hmres]") as "(?&?&?)"; eauto.
+      + done.
+      + by destruct Hmhcoh; intuition.
+      + eauto with iFrame.
   Qed.
 
   Lemma messages_addresses_coh_disj mhm :
