@@ -725,7 +725,6 @@ Section state_interpretation.
     split; [done|done].
   Qed.
 
-  (*
   Lemma messages_resource_coh_receive sagR sagT R T R' T' m mh :
     mh !! sagR = Some (R, T) →
     mh !! sagT = Some (R',T') →
@@ -733,22 +732,22 @@ Section state_interpretation.
     messages_addresses_coh mh →
     m_destination m ∈g sagR -∗
     m_sender m ∈g sagT -∗
+    adversary_saddr_nonadv_own (m_destination m) -∗
     messages_resource_coh mh -∗
     messages_resource_coh (<[sagR:=({[m]} ∪ R, T)]> mh) ∗
-    (adversary_saddr_nonadv_own (m_destination m) -∗
-     ⌜set_Forall (λ m', ¬ (m ≡g{sagT,sagR} m')) R⌝ -∗
-       ∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m').
+     (⌜set_Forall (λ m', ¬ (m ≡g{sagT,sagR} m')) R⌝ -∗
+        (∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m') ∨
+                adversary_saddr_adv_own (m_sender m)).
   Proof.
     iIntros (Hmha Hmhb HmT' Hcoh).
-    iIntros "HsagR HsagT Hcoh".
+    iIntros "HsagR HsagT #Hnonadv Hcoh".
     destruct (decide (set_Forall (λ m', ¬ (m ≡g{sagT,sagR} m')) R)).
-    - iDestruct (messages_resource_coh_receive_in with "HsagR HsagT Hcoh")
+    - iDestruct (messages_resource_coh_receive_in with "Hnonadv HsagR HsagT Hcoh")
         as "[Hcoh Hφ]"; [ by eauto.. |].
       by iFrame.
     - iDestruct (messages_resource_coh_receive_nin with "HsagR HsagT Hcoh")
         as "[Hcoh Hφ]"; [ by eauto.. |].
       iFrame. by iIntros (H).
   Qed.
-  *)
 
 End state_interpretation.

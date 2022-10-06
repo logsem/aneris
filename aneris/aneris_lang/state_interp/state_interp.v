@@ -734,7 +734,7 @@ Section state_interpretation.
     messages_addresses_coh mhm → all_disjoint (dom mhm).
   Proof. rewrite /messages_addresses_coh. naive_solver. Qed.
 
-  Lemma aneris_state_interp_receive_some sa sag bs br sh skt
+  Lemma aneris_state_interp_receive_some sa sag fwst bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :
     let ip := ip_of_address sa in
     let S' := <[ip :=<[sh:=(skt, r)]> Sn]> (state_sockets σ1) in
@@ -746,7 +746,9 @@ Section state_interpretation.
     match Ψo with Some Ψ => sag ⤇* Ψ | _ => True end -∗
     aneris_state_interp σ1 mh -∗
     sh ↪[ip] skt -∗
-    sag ⤳*[bs, br] (R, T) -∗
+    sag ⤳*⟨fwst⟩[bs, br] (R, T) -∗
+    (* the receiving ip isn't an adversary *)
+    adversary_nonadv_own ip -∗
     ∃ R' sagT,
       ⌜m_destination m = sa⌝ ∗
       m_sender m ∈g sagT ∗
@@ -754,9 +756,14 @@ Section state_interpretation.
       message_history_evolution
         (state_ms σ1) (state_ms σ1) (state_sockets σ1) S'  mh⌝ ∗
       ⌜R' = {[ m ]} ∪ R⌝ ∗
-      ((⌜set_Forall (λ m', ¬ m ≡g{sagT, sag} m') R⌝ ∗
-        ∃ m', ⌜m ≡g{sagT, sag} m'⌝ ∗
-              ▷ match Ψo with Some Ψ => Ψ m' | _ => ∃ φ, sag ⤇* φ ∗ φ m' end)
+      ((⌜set_Forall (λ m', ¬ m ≡g{sagT, sag} m') R⌝ ∗ (* this is a new message and *)
+        ((∃ m', ⌜m ≡g{sagT, sag} m'⌝ ∗ (* either we get that the message satisfies our protocol or *)
+                ▷ match Ψo with Some Ψ => Ψ m' | _ => ∃ φ, sag ⤇* φ ∗ φ m' end) ∨
+          (* the message was sent by an adversary *)
+          match fwst with (* but only if the socket is public *)
+          | FirewallStPrivate => False
+          | FirewallStPublic => adversary_saddr_adv_own (m_sender m)
+          end))
        ∨
        ⌜set_Exists (λ m', m ≡g{sagT, sag} m') R⌝)
       ∗ |==> aneris_state_interp σ2 (R' ∪ mh.1, mh.2)
