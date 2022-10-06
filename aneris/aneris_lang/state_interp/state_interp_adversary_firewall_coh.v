@@ -16,7 +16,7 @@ Section state_interpretation_lemmas.
     firewall_st_coh fw_st σ ->
     sa ∈ sag ->
     firewall_auth fw_st -∗
-    sag ⤳*p[ bs , bt ]{ q } s -∗
+    sag ⤳*⟨pub⟩[ bs , bt ]{ q } s -∗
     ⌜sa ∈ state_public_addrs σ⌝.
   Proof.
     iIntros (Hcoh Hin) "Hauth Hmpt".
