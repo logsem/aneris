@@ -504,31 +504,29 @@ Notation "z ↪[ ip ]{ q } s" :=
     (at level 20, q at level 50, format "z  ↪[ ip ]{ q }  s") : bi_scope.
 Notation "z ↪[ ip ] s" := (z ↪[ ip ]{1} s)%I (at level 20) : bi_scope.
 
-(** Messages points-to for private groups *)
+(** Messages points-to general form *)
+Notation "sag ⤳*⟨ fw ⟩{ q } s" :=
+  (mapsto_messages sag q false false fw s)
+    (at level 20, q at level 50, format "sag  ⤳*⟨ fw ⟩{ q }  s") : bi_scope.
+Notation "sag ⤳*⟨ fw ⟩ s" := (sag ⤳*⟨fw⟩{ 1 } s)%I (at level 20) : bi_scope.
+Notation "sag ⤳*⟨ fw ⟩[ bs , br ]{ q } s" :=
+  (mapsto_messages sag q bs br fw s)
+    (at level 20, q at level 50, format "sag  ⤳*⟨ fw ⟩[ bs ,  br ]{ q }  s") : bi_scope.
+Notation "sag ⤳*⟨ fw ⟩[ bs , br ] s" :=
+  (sag ⤳*⟨fw⟩[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
+
+(* Private socket address groups *)
 Notation "sag ⤳*{ q } s" :=
-  (mapsto_messages sag q false false FirewallStPrivate s)
+  (sag ⤳*⟨FirewallStPrivate⟩{ q } s)%I
     (at level 20, q at level 50, format "sag  ⤳*{ q }  s") : bi_scope.
 Notation "sag ⤳* s" := (sag ⤳*{ 1 } s)%I (at level 20) : bi_scope.
 Notation "sag ⤳*[ bs , br ]{ q } s" :=
-  (mapsto_messages sag q bs br FirewallStPrivate s)
-    (at level 20, q at level 50, format "sag  ⤳*[ bs ,  br ]{ q }  s") : bi_scope.
+  (sag ⤳*⟨FirewallStPrivate⟩[ bs , br ]{ q } s)%I
+    (at level 20, q at level 50, format "sag ⤳*[ bs , br ]{ q }  s") : bi_scope.
 Notation "sag ⤳*[ bs , br ] s" :=
   (sag ⤳*[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
 
-(* ... and for public ones *)
-(* TODO: re-assess the notation? *)
-Notation "sag ⤳*p{ q } s" :=
-  (mapsto_messages sag q false false FirewallStPublic s)
-    (at level 20, q at level 50, format "sag  ⤳*p{ q }  s") : bi_scope.
-Notation "sag ⤳*p[ bs , br ]{ q } s" :=
-  (mapsto_messages sag q bs br FirewallStPublic s)
-    (at level 20, q at level 50, format "sag  ⤳*p[ bs ,  br ]{ q }  s") : bi_scope.
-Notation "sag ⤳*p[ bs , br ] s" :=
-  (sag ⤳*p[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
-
-Notation "sag ⤇* Φ" := (si_pred sag Φ) (at level 20).
-
-(** Singleton messages points-to *)
+(* Private singletons *)
 Notation "sa ⤳1{ q } s" :=
   ({[sa]} ⤳*{ q } s)%I
     (at level 20, q at level 50, format "sa  ⤳1{ q }  s") : bi_scope.
@@ -538,11 +536,30 @@ Notation "sa ⤳1[ bs , br ]{ q } s" :=
     (at level 20, q at level 50, format "sa  ⤳1[ bs ,  br ]{ q }  s") : bi_scope.
 Notation "sa ⤳1[ bs , br ] s" := (sa ⤳1[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
 
-(* for public groups *)
-Notation "sa ⤳1p{ q } s" :=
-  ({[sa]} ⤳*p{ q } s)%I
-    (at level 20, q at level 50, format "sa  ⤳1p{ q }  s") : bi_scope.
-Notation "sa ⤳1p s" := (sa ⤳1p{ 1 } s)%I (at level 20) : bi_scope.
+(* Public socket address groups *)
+Notation "sag ⤳*⟨pub⟩{ q } s" :=
+  (sag ⤳*⟨FirewallStPublic⟩{ q } s)%I
+    (at level 20, q at level 50, format "sag  ⤳*⟨pub⟩{ q }  s") : bi_scope.
+Notation "sag ⤳*⟨pub⟩ s" := (sag ⤳*⟨pub⟩{ 1 } s)%I (at level 20) : bi_scope.
+Notation "sag ⤳*⟨pub⟩[ bs , br ]{ q } s" :=
+  (sag ⤳*⟨FirewallStPublic⟩[ bs , br ]{ q } s)%I
+    (at level 20, q at level 50, format "sag  ⤳*⟨pub⟩[ bs , br ]{ q }  s") : bi_scope.
+Notation "sag ⤳*⟨pub⟩[ bs , br ] s" :=
+  (sag ⤳*⟨pub⟩[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
+
+(* Public singletons *)
+Notation "sa ⤳1⟨pub⟩{ q } s" :=
+  ({[sa]} ⤳*⟨pub⟩{ q } s)%I
+    (at level 20, q at level 50, format "sa  ⤳1⟨pub⟩{ q }  s") : bi_scope.
+Notation "sa ⤳1⟨pub⟩ s" := (sa ⤳1⟨pub⟩{ 1 } s)%I (at level 20) : bi_scope.
+Notation "sa ⤳1⟨pub⟩[ bs , br ]{ q } s" :=
+  ({[sa]} ⤳*⟨pub⟩[ bs , br ]{ q } s)%I
+    (at level 20, q at level 50, format "sa  ⤳1⟨pub⟩[ bs ,  br ]{ q }  s") : bi_scope.
+Notation "sa ⤳1⟨pub⟩[ bs , br ] s" := (sa ⤳1⟨pub⟩[bs,br]{ 1 } s)%I (at level 20) : bi_scope.
+
+(** Socket address group interpretation *)
+
+Notation "sag ⤇* Φ" := (si_pred sag Φ) (at level 20).
 
 Notation "sa ⤇1 Φ" := ({[sa]} ⤇* Φ) (at level 20).
 
@@ -1494,7 +1511,7 @@ Section resource_lemmas.
 
   Lemma messages_mapto_firewall_update fw_st sag bs br R T :
     firewall_auth fw_st -∗ sag ⤳*[bs, br] (R, T) ==∗
-      firewall_auth (<[sag := FirewallStPublic]> fw_st) ∗ sag ⤳*p[ bs, br ] (R, T).
+      firewall_auth (<[sag := FirewallStPublic]> fw_st) ∗ sag ⤳*⟨pub⟩[ bs, br ] (R, T).
   Proof.
     iIntros "Hfw_auth Hpt".
     iDestruct "Hpt" as (??) "(?&?&?&?&Hfw_frag&?)".
