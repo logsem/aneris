@@ -126,7 +126,7 @@ Proof.
   - by intros ex atr [[??]?].
 Qed.
 
-Definition rel_holds {Σ} `{LM:LiveModel heap_lang Mdl} `{!heapGS Σ Mdl LM}
+Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang Mdl} `{!heapGS Σ Mdl LM}
            (s:stuckness) (ξ : execution_trace heap_lang → finite_trace Mdl
                   (option $ fmrole Mdl) → Prop) (c1:cfg heap_lang)
            (c2:live_model_to_model Mdl LM) : iProp Σ :=
@@ -156,7 +156,7 @@ Theorem strong_simulation_adequacy Σ `{LM:LiveModel heap_lang Mdl}
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
-       rel_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
+       rel_always_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfin Hfevol H.
