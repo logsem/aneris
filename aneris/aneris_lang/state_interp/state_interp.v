@@ -578,7 +578,7 @@ Section state_interpretation.
         exists sag0, (R0,T0). set_solver.
       + iExists mγ, (<[sagT:=(R, T)]> mh'), sags. iFrame.
         simpl.
-        rewrite {2 3 4} (insert_id mh'); eauto.
+        rewrite {2 3 4 5} (insert_id mh'); eauto.
         iFrame.
         iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
         iPureIntro; split_and!; eauto.
@@ -733,6 +733,27 @@ Section state_interpretation.
   Lemma messages_addresses_coh_disj mhm :
     messages_addresses_coh mhm → all_disjoint (dom mhm).
   Proof. rewrite /messages_addresses_coh. naive_solver. Qed.
+
+  Lemma mapsto_messages_private_no_adversaries sag bs bt R T σ mh :
+    aneris_state_interp σ mh -∗
+    sag ⤳*[bs,bt] (R, T) -∗
+    ⌜∀ m, m ∈ R -> ip_of_address (m_sender m) ∉ state_adversaries σ⌝.
+  Proof.
+    iIntros "Hsi Hmaps".
+    iDestruct "Hsi" as (? ? sags) "(%Hmh&%&%&(%&%&%Haddr&?)&?&?&?&?&Hadv&Hctx&?)".
+    iDestruct "Hadv" as (adv fw) "(?&Hauth&?&?&%Hfwcoh&%Hdel)".
+    iDestruct (mapsto_messages_lookup_private with "Hauth Hmaps") as "%Hnotpub";
+      [done|].
+    iDestruct (messages_mapsto_ctx_valid with "Hmaps Hctx") as "%Hlook".
+    iPureIntro.
+    intros m Hin contra.
+    eapply (Hnotpub (m_destination m)).
+    { destruct Haddr as [_ [_ Haddr]].
+      apply Haddr in Hlook.
+      destruct Hlook as [Hlook _].
+      by apply Hlook. }
+    eapply Hdel; eauto.
+  Qed.
 
   Lemma aneris_state_interp_receive_some sa sag fwst bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :

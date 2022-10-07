@@ -104,13 +104,12 @@ Section definitions.
 
   (* Every delivered message that comes from an adversary is delivered
      to a public address *)
-  Definition firewall_delivery_coh σ : Prop :=
-    ∀ ip skts sh skt msgs m,
-      state_sockets σ !! ip = Some skts ->
-      skts !! sh = Some (skt, msgs) ->
-      m ∈ msgs ->
+  Definition firewall_delivery_coh mhm σ : Prop :=
+    ∀ (sag : gset socket_address) R T m,
+      mhm !! sag = Some (R, T) ->
+      m ∈ R ->
       (ip_of_address (m_sender m)) ∈ (state_adversaries σ) ->
-      ∃ sa, (saddress skt) = Some sa ∧ sa ∈ (state_public_addrs σ).
+      m_destination m ∈ (state_public_addrs σ).
 
   (* The adversary map and state agree on which ips are public *)
   Definition adversary_st_coh (adv_st : gmap ip_address bool) σ :=
@@ -127,14 +126,14 @@ Section definitions.
                    (ip_of_address sa1 ∈ advs <-> ip_of_address sa2 ∈ advs).
 
   (* Adversary and firewall coherence *)
-  Definition adversary_firewall_coh σ sags : iProp Σ :=
+  Definition adversary_firewall_coh mhm σ sags : iProp Σ :=
     ∃ adv_st fw_st,
       adversary_auth adv_st ∗
       firewall_auth fw_st ∗
       ⌜sags_preserve_adv_state sags (state_adversaries σ)⌝ ∗
       ⌜adversary_st_coh adv_st σ⌝ ∗
       ⌜firewall_st_coh fw_st σ⌝ ∗
-      ⌜firewall_delivery_coh σ⌝.
+      ⌜firewall_delivery_coh mhm σ⌝.
 
   (** Network sockets coherence for bound ports, socket handlers,
       receive buffers, and socket addresses *)
@@ -254,7 +253,7 @@ Section definitions.
         socket_interp_coh sags ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        adversary_firewall_coh σ sags ∗
+        adversary_firewall_coh mhm σ sags ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 
