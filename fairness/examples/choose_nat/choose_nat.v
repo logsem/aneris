@@ -105,22 +105,19 @@ Next Obligation.
   inversion Hc1; simplify_eq. done.
 Qed.
 Next Obligation.
-  intros cn [ρ' [cn' Htrans]]. simpl in *.
+  intros cn [ρ' [cn' Htrans]].
   split.
   - rewrite /cn_decreasing_role. simpl. rewrite /cn_live_roles.
     destruct cn; [set_solver|].
     destruct n; [inversion Htrans|set_solver].
   - intros cn'' Htrans'.
     destruct cn.
-    + split.
-      * constructor.
-      * intros Hrel. inversion Hrel; simplify_eq.
-        inversion Htrans'.
+    + split; [constructor|].
+      intros Hrel. inversion Hrel; simplify_eq. inversion Htrans'.
     + split.
       * destruct cn''.
         -- inversion Htrans'.
-        -- inversion Htrans'; simplify_eq.
-           constructor. lia.
+        -- inversion Htrans'; simplify_eq. constructor. lia.
       * intros Hrel.
         inversion Htrans'; simplify_eq.
         inversion Hrel; simplify_eq.
@@ -137,7 +134,15 @@ Qed.
 Definition cn_model : LiveModel heap_lang cn_fair_model :=
   {| fuel_limit _ := 40%nat |}.
 
-(** Set up necessary RA constructions *)
+(** Determine additional restriction on relation to obtain finite branching *)
+Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
+           (auxtr : finite_trace cn_fair_model (option unit)) :=
+  ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(CN_Z cn) ∧
+             (trace_last auxtr) = cn.
+
+(** Verify that the program refines the model *)
+
+(* Set up necessary RA constructions *)
 Class choose_natG Σ := ChooseNatG { choose_nat_G :> inG Σ (excl_authR ZO) }.
 
 Definition choose_natΣ : gFunctors :=
@@ -151,6 +156,7 @@ Definition Ns := nroot .@ "choose_nat".
 Section proof.
   Context `{!heapGS Σ cn_fair_model cn_model, choose_natG Σ}.
 
+  (** Determine invariant so we can eventually derive ξ_cn from it *)
   Definition choose_nat_inv_inner (γ : gname) (l:loc) : iProp Σ :=
     ∃ (cn:CN), frag_model_is cn ∗ l ↦ #(CN_Z cn) ∗ own γ (●E (CN_Z cn)).
 
@@ -305,12 +311,8 @@ Section proof.
 
 End proof.
 
-Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
-           (auxtr : finite_trace cn_fair_model (option unit)) :=
-  ∃ (cn:CN), (trace_last extr).2.(heap) !!! l = #(CN_Z cn) ∧
-             (trace_last auxtr) = cn.
-
-(** Inverse mapping of program state to model state *)
+(** Construct inverse mapping of program state to model state,
+    to compute finite relation *)
 Definition Z_CN (v : val) : CN :=
   match v with
   | LitV (LitInt z) =>
@@ -325,7 +327,8 @@ Definition Z_CN (v : val) : CN :=
 Lemma Z_CN_CN_Z cn : Z_CN #(CN_Z cn) = cn.
 Proof. destruct cn; [done|]; destruct n; [done|]=> /=; f_equal; lia. Qed.
 
-(** Derive that program is related to model by [ξ_cn l] *)
+(** Derive that program is related to model by
+    [sim_rel_with_user cn_model (ξ_cn l) using Trillium adequacy *)
 Lemma choose_nat_sim l :
   continued_simulation
     (sim_rel_with_user cn_model (ξ_cn l))
