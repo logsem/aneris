@@ -1,4 +1,4 @@
-From trillium.fairness.examples Require Import yesno.
+From trillium.fairness.examples.yesno Require Import yesno.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
