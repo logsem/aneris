@@ -200,32 +200,6 @@ Section finite_lemmas.
     split; apply elem_of_list_In, elem_of_enum.
   Qed.
 
-  Fixpoint sig_and_list {A} (P Q : A → Prop) `{!∀ x, Decision (Q x)}
-             (enum : list { x | P x }) : list { x | P x ∧ Q x } :=
-    match enum with
-    | [] => []
-    | x :: xs =>
-        match (decide (Q (proj1_sig x))) with
-        | left HQ => (sig_and x HQ) :: sig_and_list P Q xs
-        | _ => sig_and_list P Q xs
-        end
-    end.
-
-  Lemma sig_and_list_le (P Q : A → Prop) `{!∀ x, Decision (Q x)}
-        `{!EqDecision A}
-        `{!∀ x, ProofIrrel (P x)}
-        `{!∀ x, ProofIrrel (Q x)} (enum : list { x | P x }) :
-    ∀ x HQ, sig_and x HQ ∈ (sig_and_list P Q enum) → x ∈ enum.
-  Proof.
-    intros x y Hin.
-    induction enum; [by apply elem_of_nil in Hin|].
-    apply elem_of_cons.
-    destruct (decide (x = a)) as [Heq|Hneq]; simplify_eq /=; [left;done|right].
-    destruct (decide (Q (`a))); [|by apply IHenum].
-    apply elem_of_cons in Hin as [Hin|Hin]; [|by apply IHenum].
-    inversion Hin as [Heq]. by apply proj1_sig_inj in Heq.
-  Qed.
-
   Program Definition sig_finite_and2 (P : A → Prop) (Q : A → Prop)
         `{!∀ x, Decision (P x)} `{!∀ x, ProofIrrel (P x)}
         `{!∀ x, Decision (Q x)} `{!∀ x, ProofIrrel (Q x)}
@@ -236,8 +210,7 @@ Section finite_lemmas.
   Proof.
     intros.
     assert (NoDup (enum {x : A | P x})) as HNoDup by apply NoDup_enum.
-    induction enum as [|e enum IHenum]; [by apply NoDup_nil|].
-    simpl.
+    induction enum as [|e enum IHenum]; [by apply NoDup_nil|]=> /=.
     destruct (decide (Q (`e))); [|by eapply IHenum, NoDup_cons_1_2].
     apply NoDup_cons.
     split; [|by eapply IHenum, NoDup_cons_1_2].
