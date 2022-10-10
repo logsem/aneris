@@ -19,11 +19,6 @@ Section gmap.
   Qed.
 End gmap.
 
-(* TODO: unify with [rel_finitary] which requires a Trillium model and does not use Finite *)
-Definition rel_finitary' {Λ St Lb} ξ :=
-  ∀ (ex : execution_trace Λ) (atr : finite_trace St Lb) c' oζ,
-    smaller_card (sig (λ '(δ', ℓ), ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'))) nat.
-
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
@@ -35,7 +30,7 @@ Section finitary.
 
   Variable (ξ: execution_trace Λ -> finite_trace M (option M.(fmrole)) -> Prop).
 
-  Variable model_finitary: rel_finitary' ξ.
+  Variable model_finitary: rel_finitary ξ.
 
   #[local] Instance eq_dec_next_states ex atr c' oζ:
     EqDecision {'(δ', ℓ) : M * (option (fmrole M)) |
@@ -249,7 +244,7 @@ Section finitary_simple.
   (* TODO: Derive this from the stronger version *)
   Lemma valid_state_evolution_finitary_fairness_simple (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
     rel_finitary (valid_lift_fairness φ).
-  Proof. 
+  Proof.
     intros extr auxtr [e' σ'] oζ.
     eapply finite_smaller_card_nat.
     eapply (in_list_finite (enumerate_next_simple (trace_last auxtr) oζ (e',σ'))).
@@ -352,7 +347,7 @@ Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Q
 
 Lemma rel_finitary_sim_rel_with_user_ξ `{LM:LiveModel Λ Mdl}
       `{EqDecision (locale Λ)} ξ :
-  rel_finitary' ξ → rel_finitary (sim_rel_with_user LM ξ).
+  rel_finitary ξ → rel_finitary (sim_rel_with_user LM ξ).
 Proof.
   intros Hrel.
   eapply rel_finitary_impl.
