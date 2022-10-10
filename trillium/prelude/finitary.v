@@ -200,6 +200,39 @@ Section finite_lemmas.
     split; apply elem_of_list_In, elem_of_enum.
   Qed.
 
+  Program Definition sig_finite_and2 (P : A → Prop) (Q : A → Prop)
+        `{!∀ x, Decision (P x)} `{!∀ x, ProofIrrel (P x)}
+        `{!∀ x, Decision (Q x)} `{!∀ x, ProofIrrel (Q x)}
+        (HfP : Finite {x : A | P x}) :
+    Finite {x : A | P x ∧ Q x} :=
+    {| enum := sig_and_list P Q (@enum _ _ HfP) |}.
+  Next Obligation.
+  Proof.
+    intros.
+    assert (NoDup (enum {x : A | P x})) as HNoDup by apply NoDup_enum.
+    induction enum as [|e enum IHenum]; [by apply NoDup_nil|]=> /=.
+    destruct (decide (Q (`e))); [|by eapply IHenum, NoDup_cons_1_2].
+    apply NoDup_cons.
+    split; [|by eapply IHenum, NoDup_cons_1_2].
+    apply NoDup_cons in HNoDup as [HNoDup1 HNoDup2].
+    intros Hin. apply HNoDup1.
+    by eapply sig_and_list_le.
+  Qed.
+  Next Obligation.
+  Proof.
+    intros.
+    assert (∀ (x : {x : A | P x}), x ∈ enum {x : A | P x})
+      as Hin by apply elem_of_enum.
+    destruct x as [x [HP HQ]].
+    specialize (Hin (exist _ _ HP)).
+    induction enum as [|e enum IHenum]; [by apply elem_of_nil in Hin|].
+    apply elem_of_cons in Hin as [Hin|Hin]; simplify_eq /=.
+    - case_decide as HQ'; [|done].
+      pose proof (proof_irrel HQ HQ') as <-; simplify_eq.
+      apply elem_of_cons. by left.
+    - case_decide; [right|]; by apply IHenum.
+  Qed.
+
   Program Instance sig_finite_eq1 (a : A) : Finite {x : A | x = a} :=
     {| enum := [a ↾ eq_refl] |}.
   Next Obligation.

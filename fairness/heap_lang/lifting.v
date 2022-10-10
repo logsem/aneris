@@ -2,8 +2,9 @@ From stdpp Require Import fin_maps.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
+From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination.
+From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness.
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
@@ -39,7 +40,7 @@ Proof. solve_inG. Qed.
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
        gen_heap_interp (trace_last extr).2.(heap) ∗
        model_state_interp (trace_last extr).1 (trace_last auxtr))%I ;
-  fork_post tid := λ _, tid ↦M ∅;
+    fork_post tid := λ _, tid ↦M ∅;
 }.
 
 Section adequacy.
@@ -111,67 +112,57 @@ Proof.
     first apply from_locale_from_lookup. simpl; lia.
 Qed.
 
-Definition live_rel (M : FairModel) {LM: LiveModel heap_lang M} (ex : execution_trace heap_lang)
-           (aux : auxiliary_trace LM) :=
-  live_tids (M := M) (trace_last ex) (trace_last aux).
+Theorem heap_lang_continued_simulation_fair_termination {FM : FairModel}
+        `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
+  continued_simulation
+    (sim_rel_with_user LM ξ)
+    ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
+  extrace_fairly_terminating extr.
+Proof.
+  apply continued_simulation_fair_termination.
+  - intros ?? contra. inversion contra.
+    simplify_eq. inversion H2.
+  - by intros ex atr [[??]?].
+  - by intros ex atr [[??]?].
+Qed.
 
-Definition sim_rel (M : FairModel) (LM: LiveModel heap_lang M) (ex : execution_trace heap_lang)
-           (aux : auxiliary_trace LM) :=
-  valid_state_evolution_fairness ex aux ∧ live_rel M ex aux.
+Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang Mdl} `{!heapGS Σ Mdl LM}
+           (s:stuckness) (ξ : execution_trace heap_lang → finite_trace Mdl
+                  (option $ fmrole Mdl) → Prop) (c1:cfg heap_lang)
+           (c2:live_model_to_model Mdl LM) : iProp Σ :=
+  ∀ ex atr c,
+    ⌜valid_system_trace ex atr⌝ -∗
+    ⌜trace_starts_in ex c1⌝ -∗
+    ⌜trace_starts_in atr c2⌝ -∗
+    ⌜trace_ends_in ex c⌝ -∗
+    ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' →
+                      trace_contract atr ℓ atr' →
+                      ξ ex' (map_underlying_trace atr')⌝ -∗
+    ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+    state_interp ex atr -∗
+    |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝.
 
-(* TODO: move *)
-Fixpoint trace_map {A A' L L'} (sf: A → A') (lf: L -> L') (tr: finite_trace A L): finite_trace A' L' :=
-  match tr with
-  | trace_singleton x => trace_singleton $ sf x
-  | trace_extend tr' ℓ x => trace_extend (trace_map sf lf tr') (lf ℓ) (sf x)
-  end.
-
-Fixpoint get_underlying_fairness_trace (M : FairModel) (LM: LiveModel heap_lang M) (ex : auxiliary_trace LM) :=
-  match ex with
-  | trace_singleton δ => trace_singleton (ls_under δ)
-  | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LM ex') ρ (ls_under δ)
-  | trace_extend ex' _ _ => get_underlying_fairness_trace M LM ex'
-  end.
-
-Definition get_role {M : FairModel} {LM: LiveModel heap_lang M} (lab: mlabel LM) :=
-  match lab with
-  | Take_step ρ _ => Some ρ
-  | _ => None
-  end.
-
-Definition map_underlying_trace {M : FairModel} {LM: LiveModel heap_lang M} (aux : auxiliary_trace LM) :=
-  (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
-
-Definition sim_rel_with_user (M : FairModel) (LM: LiveModel heap_lang M)  (ξ : execution_trace _ -> finite_trace M (option (fmrole M)) -> Prop)
-  (ex : execution_trace heap_lang) (aux : auxiliary_trace LM) :=
-  sim_rel _ _ ex aux ∧ ξ ex (map_underlying_trace aux).
-
-Theorem strong_simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
-        (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) → Prop) :
-  rel_finitary (sim_rel_with_user Mdl LM ξ) →
+Theorem strong_simulation_adequacy Σ `{LM:LiveModel heap_lang Mdl}
+    `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _)
+    (ξ : execution_trace heap_lang → finite_trace Mdl (option $ fmrole Mdl) →
+         Prop) :
+  rel_finitary (sim_rel_with_user LM ξ) →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{Hinv : !heapGS Σ Mdl LM},
     ⊢ |={⊤}=>
        (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
+       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) -∗
        frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
-       (∀ (ex : execution_trace heap_lang) (atr : auxiliary_trace LM) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr (initial_ls (LM := LM) s1 0%nat)⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         state_interp ex atr -∗
-         |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝)) ->
-  continued_simulation (sim_rel_with_user Mdl LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
+       rel_always_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
+  continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfin Hfevol H.
   apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
   iIntros (?) "".
-  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen _]".
+  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
   iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
   iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
   iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
@@ -200,7 +191,7 @@ Proof.
   (*     setoid_rewrite lookup_singleton_Some. split; naive_solver. *)
   (*   - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver. *)
   (*   - rewrite dom_gset_to_gmap. set_solver. } *)
-  iSpecialize ("Hwp" with "Hmodf Hfr [Hfuelf Hmapf]").
+  iSpecialize ("Hwp" with "Hσ Hmodf Hfr [Hfuelf Hmapf]").
   { rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
     iAssert ([∗ set] ρ ∈ live_roles Mdl s1, ρ ↦F (LM.(fuel_limit) s1))%I with "[Hfuelf]" as "H".
     - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
@@ -226,7 +217,7 @@ Proof.
 
   assert ( ∀ (ex' : finite_trace (cfg heap_lang) (olocale heap_lang)) (atr' : auxiliary_trace LM) (oζ : olocale heap_lang) (ℓ : mlabel LM),
    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')) as Hcontr'.
-  { intros ex' atr' oζ ℓ H1 H2. cut (sim_rel_with_user Mdl LM ξ ex' atr'); eauto. rewrite /sim_rel_with_user. intros [??]. done. }
+  { intros ex' atr' oζ ℓ H1 H2. cut (sim_rel_with_user LM ξ ex' atr'); eauto. rewrite /sim_rel_with_user. intros [??]. done. }
 
   iSpecialize ("H" $! ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr' Hstuck).
   unfold sim_rel_with_user.
@@ -283,10 +274,10 @@ Proof.
     iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
     apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
     simpl in *. simplify_eq.
+    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)".
+    iDestruct "Hsi" as "(%M&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
     iSplit; [|done].
-
-    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)". iDestruct "Hsi" as "(%M&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
-    iSplit; first done.
+    iSplit; [done|].
     iSplit.
     + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids. eapply Htids. done.
     + iIntros (tid' e' Hsome Hnoval ρ). simpl.
@@ -300,7 +291,7 @@ Qed.
 
 Theorem simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s: stuckness) (e1 : expr) σ1 (s1: Mdl) (FR: gset _):
   (* The model has finite branching *)
-  rel_finitary (sim_rel Mdl LM) →
+  rel_finitary (sim_rel LM) →
   live_roles Mdl s1 ≠ ∅ ->
   (* The initial configuration satisfies certain properties *)
   (* A big implication, and we get back a Coq proposition *)
@@ -316,12 +307,12 @@ Theorem simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s:
   @continued_simulation
     heap_lang
     LM
-    (sim_rel Mdl LM)
+    (sim_rel LM)
     (trace_singleton ([e1], σ1))
     (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfevol Hne H.
-  assert (sim_rel Mdl LM = sim_rel_with_user Mdl LM (λ _ _, True)) as Heq.
+  assert (sim_rel LM = sim_rel_with_user LM (λ _ _, True)) as Heq.
   { Require Import Coq.Logic.FunctionalExtensionality.
     Require Import Coq.Logic.PropExtensionality.
     do 2 (apply functional_extensionality_dep; intros ?).
@@ -332,7 +323,7 @@ Proof.
   apply (strong_simulation_adequacy Σ s _ _ _ FR) =>//.
   { rewrite -Heq. done. }
   iIntros (Hinv) "".
-  iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hm Hfr Hf". iSplitR "".
+  iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hσ Hm Hfr Hf". iSplitR "".
   - iApply ("H" with "Hm Hfr Hf").
   - iIntros "!>%%%???????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
@@ -343,7 +334,7 @@ Theorem simulation_adequacy_inftraces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl L
         (Hvex : valid_inf_exec (trace_singleton ([e1], σ1)) iex)
   :
   (* The model has finite branching *)
-  rel_finitary (sim_rel Mdl LM)  →
+  rel_finitary (sim_rel LM)  →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{!heapGS Σ Mdl LM},
       ⊢ |={⊤}=>
@@ -358,7 +349,7 @@ Theorem simulation_adequacy_inftraces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl L
     (@continued_simulation
        heap_lang
        LM
-       (sim_rel Mdl LM))
+       (sim_rel LM))
     (trace_singleton ([e1], σ1))
     (trace_singleton (initial_ls (LM := LM) s1 0%nat))
     iex
@@ -373,18 +364,6 @@ Proof.
   - done.
 Qed.
 
-
-Notation exaux_traces_match Mdl LM :=
-    (@traces_match (option nat)
-                   (@mlabel LM)
-                   (cfg heap_lang)
-                   (LiveState Mdl)
-                   labels_match
-                   live_tids
-                   locale_step
-                   (ls_trans LM.(fuel_limit))
-    ).
-
 Theorem simulation_adequacy_traces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} (s: stuckness) FR
         e1 (s1: Mdl)
         (extr : extrace)
@@ -392,7 +371,7 @@ Theorem simulation_adequacy_traces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} 
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
-  rel_finitary (sim_rel Mdl LM) →
+  rel_finitary (sim_rel LM) →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{!heapGS Σ Mdl LM},
       ⊢ |={⊤}=>
@@ -402,7 +381,7 @@ Theorem simulation_adequacy_traces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} 
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  exists auxtr, exaux_traces_match Mdl LM extr auxtr.
+  exists auxtr, exaux_traces_match heap_lang Mdl LM extr auxtr.
 Proof.
   intros Hfin Hlr Hwp.
   have [iatr Hbig] : exists iatr,
@@ -411,7 +390,7 @@ Proof.
         (@continued_simulation
            heap_lang
            LM
-           (sim_rel Mdl LM))
+           (sim_rel LM))
         (trace_singleton ([e1], (trfirst extr).2))
         (trace_singleton (initial_ls (LM := LM) s1 0%nat))
         (from_trace extr)
@@ -421,7 +400,7 @@ Proof.
     simpl. destruct (trfirst extr) eqn:Heq.
     simpl in Hexfirst. rewrite -Hexfirst Heq //. }
   exists (to_trace (initial_ls (LM := LM) s1 0%nat) iatr).
-  eapply (valid_inf_system_trace_implies_traces_match (continued_simulation (sim_rel Mdl LM))); eauto.
+  eapply (valid_inf_system_trace_implies_traces_match (continued_simulation (sim_rel LM))); eauto.
   - by intros ? ? [? ?]%continued_simulation_rel.
   - by intros ? ? [? ?]%continued_simulation_rel.
   - apply from_trace_spec. simpl. destruct (trfirst extr) eqn:Heq. simplify_eq. f_equal.
@@ -436,7 +415,7 @@ Theorem simulation_adequacy_model_trace Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
-  rel_finitary (sim_rel Mdl LM) →
+  rel_finitary (sim_rel LM) →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{!heapGS Σ Mdl LM},
       ⊢ |={⊤}=>
@@ -446,7 +425,7 @@ Theorem simulation_adequacy_model_trace Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  exists auxtr mtr, exaux_traces_match Mdl LM extr auxtr ∧
+  exists auxtr mtr, exaux_traces_match heap_lang Mdl LM extr auxtr ∧
                upto_stutter ls_under Ul auxtr mtr.
 Proof.
   intros Hfb Hlr Hwp.
@@ -457,15 +436,15 @@ Proof.
   eauto.
 Qed.
 
-Theorem simulation_adequacy_terminate Σ Mdl `{!heapGpreS Σ Mdl LM} (s: stuckness)
+Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
+        `{!heapGpreS Σ Mdl LM} (s: stuckness)
         e1 (s1: Mdl) FR
         (extr : extrace)
-        (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
-  fairly_terminating Mdl ->
+  (∀ mtr : @mtrace Mdl, mtrace_fairly_terminating mtr) ->
   (* The model has finite branching *)
-  rel_finitary (sim_rel Mdl LM) →
+  rel_finitary (sim_rel LM) →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{!heapGS Σ Mdl LM},
       ⊢ |={⊤}=>
@@ -475,9 +454,9 @@ Theorem simulation_adequacy_terminate Σ Mdl `{!heapGpreS Σ Mdl LM} (s: stuckne
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  (∀ tid, fair_ex tid extr) -> terminating_trace extr.
+  extrace_fairly_terminating extr.
 Proof.
-  intros Hterm Hfb Hlr Hwp Hfair.
+  intros Hterm Hfb Hlr Hwp Hvex Hfair.
   destruct (simulation_adequacy_model_trace
               Σ Mdl _ FR e1 s1 extr Hvex Hexfirst Hfb Hlr Hwp) as (auxtr&mtr&Hmatch&Hupto).
   destruct (infinite_or_finite extr) as [Hinf|] =>//.
@@ -490,14 +469,15 @@ Proof.
   eapply upto_stutter_finiteness =>//.
 Qed.
 
-Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl} `{!heapGpreS Σ Mdl LM} (s: stuckness)
+Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl}
+        `{LM : LiveModel heap_lang Mdl}
+        `{!heapGpreS Σ Mdl LM} (s: stuckness)
         e1 (s1: Mdl) FR
         (extr : extrace)
-        (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
-  rel_finitary (sim_rel Mdl LM) →
+  rel_finitary (sim_rel LM) →
   live_roles Mdl s1 ≠ ∅ ->
   (∀ `{!heapGS Σ Mdl LM},
       ⊢ |={⊤}=>
@@ -507,7 +487,7 @@ Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl} `{!heap
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  (∀ tid, fair_ex tid extr) -> terminating_trace extr.
+  extrace_fairly_terminating extr.
 Proof.
   eapply simulation_adequacy_terminate =>//.
   apply fair_terminating_traces_terminate.
@@ -694,6 +674,7 @@ Lemma auth_fuel_is_proper `{heapGS Σ Mdl} (x y : gmap (fmrole Mdl) nat):
 Proof. by intros ->. Qed.
 
 Section lifting.
+Context `{LM:LiveModel heap_lang Mdl}.
 Context `{!heapGS Σ Mdl LM}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -994,6 +975,31 @@ Proof.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
 Qed.
 
+Lemma wp_choose_nat_nostep s tid E fs :
+  fs ≠ ∅ ->
+  {{{ has_fuels_S tid fs }}}
+    ChooseNat @ s; tid; E
+  {{{ (n:nat), RET LitV (LitInt n); has_fuels tid fs }}}.
+Proof.
+  iIntros (? Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
+  iModIntro; iSplit; eauto.
+  (* TODO: Improve this so we hide the (arbitrary) choice of `n` *)
+  Unshelve. 2: apply O.
+  iIntros (e2 σ2 efs Hstep). iNext.
+  inv_head_step.
+  iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
+  { by intros ?%dom_empty_inv_L. }
+  { set_solver. }
+  { rewrite Hexend. apply head_locale_step. by econstructor. }
+  iModIntro; iExists δ2, ℓ.
+  rewrite Hexend //=. iFrame "Hmi Hsi".
+  repeat iSplit =>//.
+  iApply "HΦ".
+  iApply (has_fuels_proper with "Hfuel") =>//.
+  rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
+Qed.
+
 Lemma wp_load_nostep s tid E l q v fs:
   fs ≠ ∅ ->
   {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
@@ -1016,7 +1022,8 @@ Qed.
 
 Lemma wp_store_nostep s tid E l v' v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
+  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
+    Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "[>Hl HfuelS] HΦ".
@@ -1035,6 +1042,49 @@ Proof.
   do 2 (iSplit=>//).
   iApply "HΦ". iFrame. iApply (has_fuels_proper with "Hfuel") =>//.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
+Qed.
+
+Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
+  f2 ≤ LM.(fuel_limit) s2 -> fmtrans Mdl s1 (Some ρ) s2 ->
+  live_roles _ s2 ⊆ live_roles _ s1 ->
+  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
+    Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
+  {{{ RET LitV LitUnit; l ↦ v ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
+      (if decide (ρ ∈ live_roles Mdl s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
+Proof.
+  iIntros (Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
+  iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
+  iSplit; first by rewrite Hexend // in Hheap;  eauto.
+  iIntros "!>" (e2 σ2 efs Hstep).
+  rewrite Hexend in Hheap. inv_head_step.
+  iDestruct (model_agree' with "Hmi Hst") as %Hmeq.
+  rewrite has_fuel_fuels Hexend.
+  iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
+            (if decide (ρ ∈ live_roles Mdl s2) then {[ ρ := f2 ]} else ∅)
+            with "Hfuel1 Hst Hmi Hfr") as
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
+  - set_solver.
+  - destruct (decide (ρ ∈ live_roles Mdl s2)); apply head_locale_step; econstructor =>//.
+  - destruct (decide (ρ ∈ live_roles Mdl s2)).
+    + split; first by intros _; rewrite lookup_singleton /=; lia.
+      split; first set_solver.
+      split; first set_solver.
+      split; first (intros ρ' Hin; set_solver).
+      split; set_solver.
+    + repeat (split; set_solver).
+  - iModIntro; iExists δ2, ℓ. iSplit.
+    { iPureIntro. simpl in *. split =>//. }
+    iFrame.
+    iSplit; first done.
+    iApply "HΦ". iFrame.
+    replace (fr ∖ (live_roles Mdl s2 ∖ live_roles Mdl s1))
+      with fr; [iFrame|set_solver].
+    destruct (decide (ρ ∈ live_roles Mdl s2)).
+    + rewrite has_fuel_fuels //.
+    + iDestruct "Hfuel" as "[?_]". rewrite dom_empty_L //.
 Qed.
 
 Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l q v' v1 v2:
@@ -1068,7 +1118,8 @@ Proof.
   - rewrite -> bool_decide_eq_false_2 in *; eauto.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
-    iFrame. iSplit; first done. iApply "HΦ". iFrame.
+    iFrame.
+    iSplit; first done. iApply "HΦ". iFrame.
     replace (fr ∖ (live_roles Mdl s2 ∖ live_roles Mdl s1)) with fr; [iFrame|set_solver].
     destruct (decide (ρ ∈ live_roles Mdl s2)).
     + rewrite has_fuel_fuels //.

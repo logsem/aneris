@@ -1,13 +1,25 @@
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export fairness.
+From trillium.fairness Require Export fairness fairness_finiteness.
 From stdpp Require Import option.
 From Paco Require Import pacotac.
 
-Definition fairly_terminating (Mdl: FairModel) :=
-  ∀ (mtr: @mtrace Mdl),
-    mtrace_valid mtr ->
-    (∀ ρ, fair_model_trace ρ mtr) ->
-    terminating_trace mtr.
+(* TODO: See if we can generalise the notion of fair terminating traces *)
+Definition mtrace_fairly_terminating {Mdl : FairModel} (mtr : @mtrace Mdl) :=
+  mtrace_valid mtr →
+  (∀ ρ, fair_model_trace ρ mtr) →
+  terminating_trace mtr.
+
+Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
+           {LM : LiveModel Λ Mdl} (auxtr : @auxtrace Λ Mdl) :=
+  auxtrace_valid (LM:=LM) auxtr →
+  (∀ ρ, fair_aux ρ auxtr) →
+  terminating_trace auxtr.
+
+Definition extrace_fairly_terminating {Λ} `{EqDecision (locale Λ)}
+           (extr : @extrace Λ) :=
+  extrace_valid extr →
+  (∀ tid, fair_ex tid extr) →
+  terminating_trace extr.
 
 Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_leq: relation Mdl;
@@ -90,8 +102,64 @@ Proof.
       * intros s'' Htrans''. eapply ftm_decr; eauto.
 Qed.
 
-Theorem fair_terminating_traces_terminate `{FairTerminatingModel Mdl}:
-      fairly_terminating Mdl.
+Theorem fair_terminating_traces_terminate `{FairTerminatingModel Mdl} :
+  ∀ (mtrace : @mtrace Mdl), mtrace_fairly_terminating mtrace.
+Proof. intros ???. eapply fair_terminating_traces_terminate_rec=>//. Qed.
+
+Notation exaux_traces_match Λ Mdl LM :=
+    (@traces_match _ (@mlabel LM)
+                   (cfg Λ)
+                   (LiveState Mdl)
+                   labels_match
+                   live_tids
+                   locale_step
+                   (ls_trans LM.(fuel_limit))).
+
+Theorem continued_simulation_fair_termination
+        `{FairTerminatingModel FM} `(LM:LiveModel Λ FM) `{EqDecision (locale Λ)}
+        (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :
+  (* TODO: This is required for destruttering - Not sure why *)
+  (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
+  (* The relation must capture that live tids correspond *)
+  (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+     ξ ex atr -> live_tids (trace_last ex) (trace_last atr)) ->
+  (* The relation must capture that the traces evolve fairly *)
+  (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+     ξ ex atr -> valid_state_evolution_fairness ex atr) →
+  continued_simulation
+    ξ ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
+  extrace_fairly_terminating extr.
 Proof.
-  intros ???. eapply fair_terminating_traces_terminate_rec=>//.
+  intros Hstep Hlive Hvalid Hsim Hvex.
+  destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?].
+  assert (∃ iatr,
+             valid_inf_system_trace
+               (continued_simulation ξ)
+               (trace_singleton (trfirst extr))
+               (trace_singleton (initial_ls (LM := LM) a1 r1))
+               (from_trace extr)
+               iatr) as [iatr Hiatr].
+  { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
+    Unshelve.
+    - done.
+    - eapply from_trace_preserves_validity; eauto; first econstructor. }
+  assert (∃ auxtr, exaux_traces_match Λ FM LM extr auxtr) as [auxtr Hmatch].
+  { exists (to_trace (initial_ls (LM := LM) a1 r1) iatr).
+    eapply (valid_inf_system_trace_implies_traces_match
+              (continued_simulation ξ)); eauto.
+    - intros ? ? ?%continued_simulation_rel. by apply Hlive.
+    - intros ? ? ?%continued_simulation_rel. by apply Hvalid.
+    - by apply from_trace_spec.
+    - by apply to_trace_spec. }
+  intros Hfair.
+  assert (Hstutter := Hmatch).
+  apply can_destutter_auxtr in Hstutter; [|done].
+  destruct Hstutter as [mtr Hupto].
+  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
+  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+  eapply exaux_preserves_termination =>//.
+  eapply upto_stutter_finiteness =>//.
+  apply fair_terminating_traces_terminate=>//.
 Qed.

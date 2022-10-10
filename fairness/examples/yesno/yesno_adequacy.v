@@ -1,4 +1,4 @@
-From trillium.fairness.examples Require Import yesno.
+From trillium.fairness.examples.yesno Require Import yesno.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
@@ -232,7 +232,7 @@ Proof.
   assert (heapGpreS yesnoΣ the_fair_model the_model) as HPreG.
   { apply _. }
   eapply (simulation_adequacy_terminate_ftm (Mdl := the_fair_model) yesnoΣ NotStuck _ (N, true) ∅) =>//.
-  - eapply valid_state_evolution_finitary_fairness.
+  - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
   - destruct N; [lia|destruct N; set_solver].
   - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.

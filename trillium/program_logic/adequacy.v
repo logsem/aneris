@@ -948,20 +948,19 @@ Proof.
     rewrite Hlocales //.
 Qed.
 
-Definition rel_finitary {Λ M} ξ :=
-  ∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c' oζ,
+Definition rel_finitary {A B C D}
+           (ξ : finite_trace A B → finite_trace C D → Prop) :=
+  ∀ (ex : finite_trace A B) (atr : finite_trace C D) c' oζ,
     smaller_card (sig (λ '(δ', ℓ), ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'))) nat.
 
 Section finitary_lemma.
-  Lemma rel_finitary_impl {Λ M}
-        `{EqDecision (mlabel M), EqDecision M}
-        (ξ ξ' : execution_trace Λ -> auxiliary_trace M -> Prop):
+  Lemma rel_finitary_impl {A B C D} `{EqDecision C, EqDecision D}
+        (ξ ξ' : finite_trace A B -> finite_trace C D -> Prop):
     (∀ ex aux, ξ ex aux -> ξ' ex aux) ->
     rel_finitary ξ' ->
     rel_finitary ξ.
   Proof.
     intros Himpl Hξ' ex aux c' oζ.
-
     assert (
         ∀ ξ x, ProofIrrel
                  (match x return Prop with (δ', ℓ) =>

@@ -226,6 +226,8 @@ Ltac solve_fuel_positive :=
             [rewrite lookup_insert; intros ?; simplify_eq; lia |
              rewrite lookup_insert_ne; [ try done | done]]
         end.
+Ltac simpl_has_fuels :=
+  iEval (rewrite ?[in has_fuels _ _]fmap_insert ?[in has_fuels _ _]/= ?[in has_fuels _ _]fmap_empty) in "#∗".
 Tactic Notation "wp_pure" open_constr(efoc) :=
   let solve_fuel _ :=
     let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
@@ -246,7 +248,7 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
           iAssumptionCore || fail "wp_pures: cannot find" fs
         |iSolveTC
         | pm_reduce;
-          rewrite ?[in has_fuels _ _]fmap_insert [in has_fuels _ _]/= ?[in has_fuels _ _]fmap_empty;
+          simpl_has_fuels;
           wp_finish
         ] ; [ solve_fuel_positive
             | try apply map_non_empty_singleton; try apply insert_non_empty; try done
@@ -530,7 +532,7 @@ Tactic Notation "wp_load" :=
       | let fs := match goal with |- _ = Some (_, ?l ↦{_} _)%I => l end in
           iAssumptionCore || fail "wp_load: cannot find" fs
       | pm_reduce;
-        rewrite ?[in has_fuels _ _]fmap_insert [in has_fuels _ _]/= ?[in has_fuels _ _]fmap_empty;
+        simpl_has_fuels;
         wp_finish
       ]; [ solve_fuel_positive
          | try apply map_non_empty_singleton; try apply insert_non_empty; try done
@@ -562,7 +564,7 @@ Tactic Notation "wp_store" :=
       | let fs := match goal with |- _ = Some (_, ?l ↦{_} _)%I => l end in
           iAssumptionCore || fail "wp_store: cannot find" fs
       | split; [done | pm_reduce;
-        rewrite ?[in has_fuels _ _]fmap_insert [in has_fuels _ _]/= ?[in has_fuels _ _]fmap_empty;
+        simpl_has_fuels;
         wp_finish]
       ]; [ solve_fuel_positive
          | try apply map_non_empty_singleton; try apply insert_non_empty; try done
