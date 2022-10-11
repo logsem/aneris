@@ -523,6 +523,27 @@ Section state_interpretation.
     iApply adversary_firewall_coh_socketbind; done.
   Qed.
 
+  Lemma adversary_firewall_coh_send mh σ sags msg sagT R T :
+    mh !! sagT = Some (R, T) ->
+    adversary_firewall_coh mh σ sags -∗
+    let σ' := σ <| state_ms := {[+ msg +]} ⊎ state_ms σ |> in
+    let mh' := <[ sagT := (R, {[msg]} ∪ T) ]> mh in
+    adversary_firewall_coh mh' σ' sags.
+  Proof.
+    iIntros (Hlook) "Hadv".
+    iDestruct "Hadv" as (fwst advst) "(?&?&%&%&%&%Hdel)".
+    iExists fwst, advst.
+    iFrame. iPureIntro.
+    repeat (split; eauto).
+    intros sag R' T' m Hlook' Hin Hadv.
+    destruct (decide (sag = sagT)) as [->|Hne].
+    - eapply Hdel; eauto.
+      rewrite lookup_insert in Hlook'.
+      inversion Hlook'; done.
+    - rewrite lookup_insert_ne in Hlook'; [|done].
+      eapply Hdel; eauto.
+  Qed.
+
   Lemma aneris_state_interp_send
         sh saT sagT saR sagR bs br skt Sn r R T φ mbody σ1 mh msg' :
     let ip := ip_of_address saT in
@@ -622,6 +643,8 @@ Section state_interpretation.
       iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
       iSplit.
       { iPureIntro. by eapply messages_history_coh_send. }
+      iSplitL "Hadv".
+      { iApply adversary_firewall_coh_send; done. }
       iApply (messages_resource_coh_send with "[] [HsagR] [Hφ] [$Hmres] [Hmsg]"); eauto.
       by destruct Hmhcoh; intuition.
   Qed.
@@ -678,7 +701,7 @@ Section state_interpretation.
         exists sag0, (R0,T0). set_solver.
       + iExists mγ, (<[sagT:=(R, T)]> mh'), sags. iFrame.
         simpl.
-        rewrite {2 3 4} (insert_id mh'); eauto.
+        rewrite {2 3 4 5} (insert_id mh'); eauto.
         iFrame.
         iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
         iPureIntro; split_and!; eauto.
@@ -724,10 +747,12 @@ Section state_interpretation.
       iFrame "Hnauth Hlcoh Hrt".
       iDestruct "Hsi" as (A) "(#?&Hctx&?&?)".
       iDestruct (messages_resource_coh_send_duplicate with
-                  "[] Hadv Hctx [HsagR] [$Hmres]") as "(?&?&?)"; eauto.
+                  "[] Hadv Hctx [HsagR] [$Hmres]") as "(Hadv&?&?)"; eauto.
       + done.
       + by destruct Hmhcoh; intuition.
-      + eauto with iFrame.
+      + iFrame.
+        iSplitR "Hadv"; [eauto with iFrame|].
+        iApply adversary_firewall_coh_send; eauto.
   Qed.
 
   Lemma messages_addresses_coh_disj mhm :
@@ -788,9 +813,9 @@ Section state_interpretation.
        ∨
        ⌜set_Exists (λ m', m ≡g{sagT, sag} m') R⌝)
       ∗ |==> aneris_state_interp σ2 (R' ∪ mh.1, mh.2)
-             ∗ sh ↪[ip_of_address sa] skt ∗ sag ⤳*[bs, br] (R', T).
+             ∗ sh ↪[ip_of_address sa] skt ∗ sag ⤳*⟨fwst⟩[bs, br] (R', T).
   Proof.
-    simpl. iIntros (HS HSn Hskt) "#Hsag #Hproto Hσ Hsh Ha".
+    simpl. iIntros (HS HSn Hskt) "#Hsag #Hproto Hσ Hsh Ha #Hnon".
     iDestruct (elem_of_group_unfold with "Hsag") as "[%Hsag _]".
     rewrite {1}/aneris_state_interp.
     iDestruct "Hσ"
@@ -829,8 +854,9 @@ Section state_interpretation.
       as [Hmeq | Hmeq]; last first.
     - pose proof Hmeq as [m' [Hmin Hmq]].
       iPoseProof
-        (messages_resource_coh_receive sag sagT _ _ _ _ m with "[Hsag] [HsagT] Hmres")
-        as "(Hmres & _)"; [set_solver..|by simplify_eq|by simplify_eq|].
+        (messages_resource_coh_receive sag sagT _ _ _ _ m with "[] [Hsag] [HsagT] Hmres")
+        as "(Hmres & _)"; [set_solver..|by simplify_eq|by simplify_eq| |].
+      { rewrite Hma. done. }
       iSplitR.
       { iPureIntro.
         eapply message_history_evolution_receive; eauto.
@@ -856,7 +882,7 @@ Section state_interpretation.
               with "[$Ha $Hmctx]") as "[Hmctx Ha]".
       iModIntro.
       iFrame.
-      iExists mγ, (<[sag:=({[m]} ∪ R, T)]> mh').
+      iExists mγ, (<[sag:=({[m]} ∪ R, T)]> mh'), sags.
       simpl. iFrame. simpl. iSplit; eauto. iPureIntro.
       { rewrite /messages_received_sent.
         rewrite /messages_received_sent in Hhst.
@@ -870,17 +896,18 @@ Section state_interpretation.
       iPoseProof
       (free_ips_coh_update_msg with "Hfreeips") as "Hfreeips"; eauto.
       iFrame.
-      iPureIntro.
-      split_and!.
+      repeat (iSplitL ""; [iPureIntro|]).
       + by eapply gnames_coh_update_sockets.
       + by eapply network_sockets_coh_receive.
       + eapply messages_history_coh_receive_2; eauto.
         by rewrite /messages_history_coh.
+      + admit.
     - iPoseProof
         (messages_resource_coh_receive sag sagT _ _ _ _ m
-           with "[Hsag] [HsagT] Hmres")
+           with "[] [Hsag] [HsagT] Hmres")
         as "(Hmres & Hres)";
-        [set_solver..|by simplify_eq|by simplify_eq|].
+        [set_solver..|by simplify_eq|by simplify_eq| |].
+      { rewrite Hma. done. }
       iDestruct ("Hres" with "[//]") as "(%φ & %m'' & %Hmeq' & #Hφ & Hres)".
       iSplitR.
       { iPureIntro.

@@ -1492,14 +1492,14 @@ Section resource_lemmas.
     iApply (lmapsto_agree with "Hv1 Hv2").
   Qed.
 
-  Lemma messages_mapsto_valid sag bs br R T:
-    sag ⤳*[bs, br] (R, T) -∗
+  Lemma messages_mapsto_valid sag bs br R T fwst:
+    sag ⤳*⟨fwst⟩[bs, br] (R, T) -∗
     socket_address_group_own sag.
   Proof. by iDestruct 1 as  (??) "(?&?&?&$&?&$)". Qed.
 
-  Lemma messages_mapsto_update sag bs br R T R' T' mhm :
-    sag ⤳*[bs, br] (R, T) ∗ messages_ctx mhm ==∗
-    sag ⤳*[bs, br] (R', T') ∗ messages_ctx (<[sag := (R',T')]>mhm).
+  Lemma messages_mapsto_update sag bs br R T R' T' mhm fwst :
+    sag ⤳*⟨fwst⟩[bs, br] (R, T) ∗ messages_ctx mhm ==∗
+    sag ⤳*⟨fwst⟩[bs, br] (R', T') ∗ messages_ctx (<[sag := (R',T')]>mhm).
   Proof.
     iIntros "(Hl & Ha)".
     iDestruct "Hl" as (??) "(?&?&?&#Hsag&Hfw&Hl)".
@@ -1520,17 +1520,17 @@ Section resource_lemmas.
     eauto with iFrame.
   Qed.
 
-  Lemma messages_mapsto_ctx_valid sag bs br R T mh :
-    sag ⤳*[bs, br] (R, T) -∗ messages_ctx mh -∗ ⌜mh !! sag = Some (R,T)⌝.
+  Lemma messages_mapsto_ctx_valid sag bs br R T mh fwst :
+    sag ⤳*⟨fwst⟩[bs, br] (R, T) -∗ messages_ctx mh -∗ ⌜mh !! sag = Some (R,T)⌝.
   Proof.
     iIntros "Hf Ha".
     iDestruct "Hf" as (??) "(?&?&?&?&Hfw&Hf&Hown)".
     by iApply (gen_heap_light_valid with "Ha Hf").
   Qed.
 
-  Lemma messages_mapsto_agree sa sag1 sag2 bs br bs' br' R T R' T' q1 q2 :
+  Lemma messages_mapsto_agree sa sag1 sag2 bs br bs' br' R T R' T' q1 q2 fwst :
     sa ∈ sag1 → sa ∈ sag2 →
-    sag1 ⤳*[bs, br]{q1} (R, T) -∗ sag2 ⤳*[bs', br']{q2} (R', T') -∗
+    sag1 ⤳*⟨fwst⟩[bs, br]{q1} (R, T) -∗ sag2 ⤳*⟨fwst⟩[bs', br']{q2} (R', T') -∗
     ⌜sag1 = sag2 ∧ bs = bs' ∧ br = br' ∧ R = R' ∧ T = T'⌝.
   Proof.
     iIntros (Hin1 Hin2) "Ha1 Ha2".
