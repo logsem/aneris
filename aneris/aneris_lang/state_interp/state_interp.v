@@ -842,6 +842,73 @@ Section state_interpretation.
     done.
   Qed.
 
+  Lemma adversary_firewall_coh_receive_some skt sa Sn σ sh mh r m sag sags R T:
+    saddress skt = Some sa →
+    sa ∈ sag ->
+    mh !! sag = Some (R, T) ->
+    let ip := ip_of_address sa in
+    state_sockets σ !! ip = Some Sn →
+    Sn !! sh = Some (skt, r ++ [m]) →
+    let S' := <[ip :=<[sh:=(skt, r)]> Sn]> (state_sockets σ) in
+    let σ' := σ <| state_sockets := S' |> in
+    adversary_firewall_coh mh σ sags -∗
+    adversary_firewall_coh (<[sag:=({[m]} ∪ R, T)]> mh) σ' sags.
+  Proof.
+    iIntros (Hskt Hsain Hmh Hip Hlook Hlook') "Hadv".
+    iDestruct "Hadv" as (advst' fwst') "(?&?&%&%Hadvcoh&%Hfwcoh&%Hdelcoh)".
+    iExists advst', fwst'.
+    iFrame.
+    iPureIntro.
+    split; [done|].
+    (* adversary coh *)
+    split.
+    { destruct Hadvcoh as [? ?].
+      split; eauto.
+      rewrite dom_insert_L.
+      assert (ip_of_address sa ∈ dom (state_sockets σ)) as Hin.
+      { rewrite elem_of_dom.
+        eauto. }
+      rewrite subseteq_union_1_L; [|set_solver].
+      done.
+    }
+    (* firewall coh *)
+    split.
+    { rewrite /firewall_st_coh.
+      eapply Hfwcoh. }
+    (* delivery coh *)
+    destruct Hdelcoh as [Hdel1 Hdel2].
+    assert (public_ip_check m σ) as Hm.
+    { intros Hadv.
+      eapply Hdel2; eauto with set_solver. }
+    split.
+    - intros sag' R' T' m' Hm' Hin' Hadv'.
+      destruct (decide (sag = sag')) as [->|Hne]; last first.
+      { rewrite lookup_insert_ne in Hm'; [|done].
+        eapply Hdel1; eauto. }
+      simpl.
+      rewrite lookup_insert in Hm'.
+      inversion Hm'; subst.
+      rewrite elem_of_union in Hin'.
+      destruct Hin' as [->%elem_of_singleton|Hin'].
+      + eapply Hm; eauto.
+      + eapply Hdel1; eauto.
+    - intros ? ? ? ? ? ? Hl Hl'.
+      rewrite /public_ip_check.
+      simpl.
+      destruct (decide (ip = Hip)) as [->|Hne]; last first.
+      { rewrite lookup_insert_ne in Hl; [|done].
+        eapply Hdel2; eauto. }
+      rewrite lookup_insert in Hl.
+      inversion Hl; subst.
+      destruct (decide (sh = sh0)) as [->|Hne]; last first.
+      { rewrite lookup_insert_ne in Hl'; [|done].
+        eapply Hdel2; eauto. }
+      rewrite lookup_insert in Hl'.
+      inversion Hl'; subst.
+      intros Hin'.
+      eapply Hdel2; eauto with set_solver.
+  Qed.
+
   Lemma aneris_state_interp_receive_some sa sag fwst bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :
     let ip := ip_of_address sa in
@@ -964,28 +1031,7 @@ Section state_interpretation.
       + by eapply network_sockets_coh_receive.
       + eapply messages_history_coh_receive_2; eauto.
         by rewrite /messages_history_coh.
-      + (* TODO: factor out into separate lemma *)
-        iDestruct "Hadv" as (advst' fwst') "(?&?&%&%&%&%)".
-        iExists advst', fwst'.
-        iFrame.
-        iPureIntro.
-        simpl.
-        split; [done|].
-        split.
-        { destruct H2 as [? ?].
-          split; eauto.
-          rewrite dom_insert_L.
-          assert (ip_of_address sa ∈ dom (state_sockets σ1)) as Hin.
-          { rewrite elem_of_dom.
-            eauto. }
-          rewrite subseteq_union_1_L; [|set_solver].
-          done.
-        }
-        split.
-        { rewrite /firewall_st_coh.
-          simpl.
-          eapply H3. }
-        admit.
+      + iApply adversary_firewall_coh_receive_some; eauto.
     - iPoseProof
         (messages_resource_coh_receive sag sagT _ _ _ _ m
            with "[] [Hsag] [HsagT] Hmres")
@@ -1015,7 +1061,8 @@ Section state_interpretation.
              | FirewallStPublic => adversary_saddr_adv_own (m_sender m)
              | FirewallStPrivate => False
              end) ∗
-           sag ⤳*⟨ fwst ⟩[ bs, br] (R, T))%I with "[Hres Ha Hadv]" as "[Hfa [Hres Ha]]".
+           sag ⤳*⟨ fwst ⟩[ bs, br] (R, T) ∗
+           adversary_firewall_coh mh' σ1 sags)%I with "[Hres Ha Hadv]" as "[Hfa [Hres [Ha Hadv]]]".
       { iSplitR; [eauto|].
         iDestruct ("Hres" with "[//]") as
           "[(%φ & %m'' & %Hmeq' & #Hφ & Hres)|#Hadv']".
@@ -1081,7 +1128,7 @@ Section state_interpretation.
       { iPureIntro. by eapply messages_history_coh_receive_2; eauto. }
       iSplitL "Hfreeips".
       { by iApply free_ips_coh_update_msg. }
-      admit.
+      iApply adversary_firewall_coh_receive_some; eauto.
   Qed.
 
   Lemma aneris_state_interp_model_agree m ex atr :
