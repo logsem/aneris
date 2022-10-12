@@ -760,7 +760,7 @@ Section state_interpretation.
     messages_addresses_coh mhm → all_disjoint (dom mhm).
   Proof. rewrite /messages_addresses_coh. naive_solver. Qed.
 
-  Lemma mapsto_messages_private_no_adversaries sag bs bt R T σ mh :
+  Lemma mapsto_messages_private_no_adversaries' sag bs bt R T σ mh :
     aneris_state_interp σ mh -∗
     sag ⤳*[bs,bt] (R, T) -∗
     ⌜∀ m, m ∈ R -> ip_of_address (m_sender m) ∉ state_adversaries σ⌝.
@@ -782,8 +782,65 @@ Section state_interpretation.
     eapply Hdel; eauto.
   Qed.
 
-  (* TODO: Prove a version of the lemma above for messages in the socket
-     buffer of a private socket address *)
+  Lemma mapsto_messages_private_no_adversaries sag sags bs bt R T σ mh ip Sn sh skt rcv saddr :
+    (state_sockets σ) !! ip = Some Sn ->
+    Sn !! sh = Some (skt, rcv) ->
+    saddress skt = Some saddr ->
+    saddr ∈ sag ->
+    network_sockets_coh (state_sockets σ) (state_ports_in_use σ) ->
+    adversary_firewall_coh mh σ sags -∗
+    sag ⤳*[bs,bt] (R, T) -∗
+    ⌜∀ m, m ∈ rcv -> ip_of_address (m_sender m) ∉ (state_adversaries σ)⌝.
+  Proof.
+    iIntros (Hlookip Hlooksock Hsockaddr Haddrin Hnetcoh) "Hadv Hmaps".
+    iDestruct "Hadv" as (adv fw) "(?&Hauth&?&?&%Hfwcoh&%Hdel)".
+    iDestruct (mapsto_messages_lookup_private with "Hauth Hmaps") as "%Hnotpub";
+      [done|].
+    apply Hnotpub in Haddrin.
+    destruct Hdel as [_ Hdel].
+    pose Hlookip as Hlook'.
+    apply Hnetcoh in Hlook'.
+    iPureIntro.
+    destruct Hlook' as (?&?&Hsockcoh&?).
+    intros m Hin Hcontra.
+    eapply Hdel in Hlookip.
+    pose proof Hlooksock as Hlooksock'.
+    eapply Hlookip in Hlooksock; [|eauto].
+    apply Hlooksock in Hcontra.
+    assert (m_destination m = saddr) as Heq; last first.
+    { rewrite Heq in Hcontra.
+      apply Haddrin.
+      done. }
+    eapply Hsockcoh; eauto.
+  Qed.
+
+  Lemma adversary_firewall_coh_lookup_adv mh σ sags ip :
+    adversary_firewall_coh mh σ sags -∗
+    adversary_adv_own ip -∗
+    ⌜ip ∈ state_adversaries σ⌝.
+  Proof.
+    iIntros "Hadv Hfrag".
+    iDestruct "Hadv" as (advst fwst) "(Hauth&?&%&%Hcoh&%&%)".
+    iDestruct (adversary_auth_lookup_adv with "Hauth Hfrag") as "%Hlook".
+    iPureIntro.
+    apply Hcoh.
+    done.
+  Qed.
+
+  Lemma adversary_firewall_coh_lookup_nonadv mh σ sags ip :
+    adversary_firewall_coh mh σ sags -∗
+    adversary_nonadv_own ip -∗
+    ⌜ip ∉ state_adversaries σ⌝.
+  Proof.
+    iIntros "Hadv Hfrag".
+    iDestruct "Hadv" as (advst fwst) "(Hauth&?&%&%Hcoh&%&%)".
+    iDestruct (adversary_auth_lookup_nonadv with "Hauth Hfrag") as "%Hlook".
+    iPureIntro.
+    intros contra.
+    apply Hcoh in contra.
+    rewrite contra in Hlook.
+    done.
+  Qed.
 
   Lemma aneris_state_interp_receive_some sa sag fwst bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :
@@ -907,7 +964,28 @@ Section state_interpretation.
       + by eapply network_sockets_coh_receive.
       + eapply messages_history_coh_receive_2; eauto.
         by rewrite /messages_history_coh.
-      + admit.
+      + (* TODO: factor out into separate lemma *)
+        iDestruct "Hadv" as (advst' fwst') "(?&?&%&%&%&%)".
+        iExists advst', fwst'.
+        iFrame.
+        iPureIntro.
+        simpl.
+        split; [done|].
+        split.
+        { destruct H2 as [? ?].
+          split; eauto.
+          rewrite dom_insert_L.
+          assert (ip_of_address sa ∈ dom (state_sockets σ1)) as Hin.
+          { rewrite elem_of_dom.
+            eauto. }
+          rewrite subseteq_union_1_L; [|set_solver].
+          done.
+        }
+        split.
+        { rewrite /firewall_st_coh.
+          simpl.
+          eapply H3. }
+        admit.
     - iPoseProof
         (messages_resource_coh_receive sag sagT _ _ _ _ m
            with "[] [Hsag] [HsagT] Hmres")
@@ -926,9 +1004,23 @@ Section state_interpretation.
         exists sag, (R,T); split; last done.
         eauto. }
       iSplit; [done|].
-      iSplitL "Hres".
-      { iDestruct ("Hres" with "[//]") as "[(%φ & %m'' & %Hmeq' & #Hφ & Hres)|#Hadv]".
-        - iLeft. iSplit; eauto. destruct Ψo as [ψ|].
+      iAssert (
+           ⌜set_Forall (λ m' : message, ¬ m ≡g{ sagT, sag} m') R⌝%I ∗
+           ((∃ m' : message, ⌜m ≡g{ sagT, sag} m'⌝ ∗
+               ▷ match Ψo with
+                 | Some Ψ => Ψ m'
+                 | None => ∃ φ : socket_interp Σ, sag ⤇* φ ∗ φ m'
+             end)
+           ∨ match fwst with
+             | FirewallStPublic => adversary_saddr_adv_own (m_sender m)
+             | FirewallStPrivate => False
+             end) ∗
+           sag ⤳*⟨ fwst ⟩[ bs, br] (R, T))%I with "[Hres Ha Hadv]" as "[Hfa [Hres Ha]]".
+      { iSplitR; [eauto|].
+        iDestruct ("Hres" with "[//]") as
+          "[(%φ & %m'' & %Hmeq' & #Hφ & Hres)|#Hadv']".
+        - iFrame.
+          destruct Ψo as [ψ|].
           + iPoseProof (socket_interp_agree _ _ _ _ _ m'' with "Hproto Hφ")
               as (?) "Heq"; eauto.
             iLeft.
@@ -937,12 +1029,26 @@ Section state_interpretation.
           + iLeft.
             iExists m''. iSplit; [done|]. iNext.
             iExists φ. by iFrame.
-        - iLeft.
-          iSplitL; [eauto|].
-          iRight.
-          destruct fwst; [done|].
-          
+        - destruct fwst.
+          + (* public *)
+            iFrame.
+            eauto.
+          + (* private *)
+            iExFalso.
+            iDestruct (mapsto_messages_private_no_adversaries with "Hadv Ha") as "%Hnonadv"; eauto.
+            assert (m ∈ r ++ [m]) as Hmin.
+            { rewrite elem_of_app.
+              right.
+              apply elem_of_cons; auto. }
+            pose proof (Hnonadv m Hmin) as Hm'.
+            iDestruct (adversary_firewall_coh_lookup_adv with "Hadv Hadv'")
+              as "%Hnotin".
+            exfalso.
+            apply Hm'.
+            apply Hnotin.
       }
+      iSplitL "Hfa Hres".
+      { iLeft; iFrame. }
       iMod "Hstate" as "(Hstate & Hsh)".
       iDestruct (big_sepM_local_state_coh_insert
                    with "[$Hstate] [Hlcoh]") as "Hlcoh"; eauto.
