@@ -534,14 +534,15 @@ Section state_interpretation.
     iDestruct "Hadv" as (fwst advst) "(?&?&%&%&%&%Hdel)".
     iExists fwst, advst.
     iFrame. iPureIntro.
+    destruct Hdel as [Hdel1 Hdel2].
     repeat (split; eauto).
     intros sag R' T' m Hlook' Hin Hadv.
     destruct (decide (sag = sagT)) as [->|Hne].
-    - eapply Hdel; eauto.
+    - eapply Hdel1; eauto.
       rewrite lookup_insert in Hlook'.
       inversion Hlook'; done.
     - rewrite lookup_insert_ne in Hlook'; [|done].
-      eapply Hdel; eauto.
+      eapply Hdel1; eauto.
   Qed.
 
   Lemma aneris_state_interp_send
@@ -777,6 +778,7 @@ Section state_interpretation.
       apply Haddr in Hlook.
       destruct Hlook as [Hlook _].
       by apply Hlook. }
+    destruct Hdel as [Hdel _].
     eapply Hdel; eauto.
   Qed.
 
@@ -803,7 +805,8 @@ Section state_interpretation.
         (state_ms σ1) (state_ms σ1) (state_sockets σ1) S'  mh⌝ ∗
       ⌜R' = {[ m ]} ∪ R⌝ ∗
       ((⌜set_Forall (λ m', ¬ m ≡g{sagT, sag} m') R⌝ ∗ (* this is a new message and *)
-        ((∃ m', ⌜m ≡g{sagT, sag} m'⌝ ∗ (* either we get that the message satisfies our protocol or *)
+
+         ((∃ m', ⌜m ≡g{sagT, sag} m'⌝ ∗ (* either we get that the message satisfies our protocol or *)
                 ▷ match Ψo with Some Ψ => Ψ m' | _ => ∃ φ, sag ⤇* φ ∗ φ m' end) ∨
           (* the message was sent by an adversary *)
           match fwst with (* but only if the socket is public *)
@@ -908,7 +911,6 @@ Section state_interpretation.
         as "(Hmres & Hres)";
         [set_solver..|by simplify_eq|by simplify_eq| |].
       { rewrite Hma. done. }
-      iDestruct ("Hres" with "[//]") as "(%φ & %m'' & %Hmeq' & #Hφ & Hres)".
       iSplitR.
       { iPureIntro.
         eapply message_history_evolution_receive; eauto.
@@ -922,13 +924,17 @@ Section state_interpretation.
         eauto. }
       iSplit; [done|].
       iSplitL "Hres".
-      { iLeft. iSplit; eauto. destruct Ψo as [ψ|].
+      {       (*iDestruct ("Hres" with "[//]") as "(%φ & %m'' & %Hmeq' & #Hφ & Hres)".*)
+        (*
+        iLeft. iSplit; eauto. destruct Ψo as [ψ|].
         - iPoseProof (socket_interp_agree _ _ _ _ _ m'' with "Hproto Hφ")
             as (?) "Heq"; eauto.
           iExists _. iSplit; [done|].
           iNext. by iRewrite "Heq".
         - iExists m''. iSplit; [done|]. iNext.
-          iExists φ. by iFrame. }
+          iExists φ. by iFrame. *)
+        admit.
+      }
       iMod "Hstate" as "(Hstate & Hsh)".
       iDestruct (big_sepM_local_state_coh_insert
                    with "[$Hstate] [Hlcoh]") as "Hlcoh"; eauto.
@@ -941,7 +947,7 @@ Section state_interpretation.
       iMod (messages_mapsto_update sag bs br R T ({[m]} ∪ R) T mh'
               with "[$Ha $Hmctx]") as "[Hmctx Ha]".
       iModIntro. iFrame.
-      iExists mγ, (<[sag:=({[m]} ∪ R, T)]> mh').
+      iExists mγ, (<[sag:=({[m]} ∪ R, T)]> mh'), sags.
       iFrame. simpl. iSplitR.
       { iPureIntro.
         rewrite /messages_received_sent.
@@ -959,7 +965,9 @@ Section state_interpretation.
       { iPureIntro. by eapply network_sockets_coh_receive. }
       iSplit.
       { iPureIntro. by eapply messages_history_coh_receive_2; eauto. }
-      by iApply free_ips_coh_update_msg.
+      iSplitL "Hfreeips".
+      { by iApply free_ips_coh_update_msg. }
+      admit.
   Qed.
 
   Lemma aneris_state_interp_model_agree m ex atr :

@@ -102,14 +102,23 @@ Section definitions.
   Definition firewall_st_coh (fw_st : gmap socket_address_group firewall_st) (σ : state) : Prop :=
     ∀ sa, sa ∈ (state_public_addrs σ) <-> ∃ sag, sa ∈ sag ∧ fw_st !! sag = Some FirewallStPublic.
 
-  (* Every delivered message that comes from an adversary is delivered
+  (* Every received message that comes from an adversary is delivered
      to a public address *)
-  Definition firewall_delivery_coh mhm σ : Prop :=
+  Definition firewall_received_coh mhm σ : Prop :=
     ∀ (sag : gset socket_address) R T m,
-      mhm !! sag = Some (R, T) ->
+      mhm !! sag = Some (R, T) -> m ∈ R -> public_ip_check m σ.
+
+  (* Every message waiting in a socket satisfies the public ip check *)
+  Definition firewall_sockets_coh σ : Prop :=
+    ∀ ip Sn sh skt (R : list message) m,
+      (state_sockets σ) !! ip = Some Sn ->
+      Sn !! sh = Some (skt, R) ->
       m ∈ R ->
-      (ip_of_address (m_sender m)) ∈ (state_adversaries σ) ->
-      m_destination m ∈ (state_public_addrs σ).
+      public_ip_check m σ.
+
+  Definition firewall_delivery_coh mhm σ : Prop :=
+    firewall_received_coh mhm σ ∧
+    firewall_sockets_coh σ.
 
   (* The adversary map and state agree on which ips are public *)
   Definition adversary_st_coh (adv_st : gmap ip_address bool) σ :=
