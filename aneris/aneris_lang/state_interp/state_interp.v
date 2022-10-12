@@ -782,6 +782,9 @@ Section state_interpretation.
     eapply Hdel; eauto.
   Qed.
 
+  (* TODO: Prove a version of the lemma above for messages in the socket
+     buffer of a private socket address *)
+
   Lemma aneris_state_interp_receive_some sa sag fwst bs br sh skt
         (Ψo : option (socket_interp Σ)) σ1 Sn r R T m mh :
     let ip := ip_of_address sa in
@@ -924,16 +927,21 @@ Section state_interpretation.
         eauto. }
       iSplit; [done|].
       iSplitL "Hres".
-      {       (*iDestruct ("Hres" with "[//]") as "(%φ & %m'' & %Hmeq' & #Hφ & Hres)".*)
-        (*
-        iLeft. iSplit; eauto. destruct Ψo as [ψ|].
-        - iPoseProof (socket_interp_agree _ _ _ _ _ m'' with "Hproto Hφ")
-            as (?) "Heq"; eauto.
-          iExists _. iSplit; [done|].
-          iNext. by iRewrite "Heq".
-        - iExists m''. iSplit; [done|]. iNext.
-          iExists φ. by iFrame. *)
-        admit.
+      { iDestruct ("Hres" with "[//]") as "[(%φ & %m'' & %Hmeq' & #Hφ & Hres)|#Hadv]".
+        - iLeft. iSplit; eauto. destruct Ψo as [ψ|].
+          + iPoseProof (socket_interp_agree _ _ _ _ _ m'' with "Hproto Hφ")
+              as (?) "Heq"; eauto.
+            iLeft.
+            iExists _. iSplit; [done|].
+            iNext. by iRewrite "Heq".
+          + iLeft.
+            iExists m''. iSplit; [done|]. iNext.
+            iExists φ. by iFrame.
+        - iLeft.
+          iSplitL; [eauto|].
+          iRight.
+          destruct fwst; [done|].
+          
       }
       iMod "Hstate" as "(Hstate & Hsh)".
       iDestruct (big_sepM_local_state_coh_insert
