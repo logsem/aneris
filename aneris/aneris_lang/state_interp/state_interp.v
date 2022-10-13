@@ -760,28 +760,6 @@ Section state_interpretation.
     messages_addresses_coh mhm → all_disjoint (dom mhm).
   Proof. rewrite /messages_addresses_coh. naive_solver. Qed.
 
-  Lemma mapsto_messages_private_no_adversaries' sag bs bt R T σ mh :
-    aneris_state_interp σ mh -∗
-    sag ⤳*[bs,bt] (R, T) -∗
-    ⌜∀ m, m ∈ R -> ip_of_address (m_sender m) ∉ state_adversaries σ⌝.
-  Proof.
-    iIntros "Hsi Hmaps".
-    iDestruct "Hsi" as (? ? sags) "(%Hmh&%&%&(%&%&%Haddr&?)&?&?&?&?&Hadv&Hctx&?)".
-    iDestruct "Hadv" as (adv fw) "(?&Hauth&?&?&%Hfwcoh&%Hdel)".
-    iDestruct (mapsto_messages_lookup_private with "Hauth Hmaps") as "%Hnotpub";
-      [done|].
-    iDestruct (messages_mapsto_ctx_valid with "Hmaps Hctx") as "%Hlook".
-    iPureIntro.
-    intros m Hin contra.
-    eapply (Hnotpub (m_destination m)).
-    { destruct Haddr as [_ [_ Haddr]].
-      apply Haddr in Hlook.
-      destruct Hlook as [Hlook _].
-      by apply Hlook. }
-    destruct Hdel as [Hdel _].
-    eapply Hdel; eauto.
-  Qed.
-
   Lemma mapsto_messages_private_no_adversaries sag sags bs bt R T σ mh ip Sn sh skt rcv saddr :
     (state_sockets σ) !! ip = Some Sn ->
     Sn !! sh = Some (skt, rcv) ->
@@ -812,101 +790,6 @@ Section state_interpretation.
       apply Haddrin.
       done. }
     eapply Hsockcoh; eauto.
-  Qed.
-
-  Lemma adversary_firewall_coh_lookup_adv mh σ sags ip :
-    adversary_firewall_coh mh σ sags -∗
-    adversary_adv_own ip -∗
-    ⌜ip ∈ state_adversaries σ⌝.
-  Proof.
-    iIntros "Hadv Hfrag".
-    iDestruct "Hadv" as (advst fwst) "(Hauth&?&%&%Hcoh&%&%)".
-    iDestruct (adversary_auth_lookup_adv with "Hauth Hfrag") as "%Hlook".
-    iPureIntro.
-    apply Hcoh.
-    done.
-  Qed.
-
-  Lemma adversary_firewall_coh_lookup_nonadv mh σ sags ip :
-    adversary_firewall_coh mh σ sags -∗
-    adversary_nonadv_own ip -∗
-    ⌜ip ∉ state_adversaries σ⌝.
-  Proof.
-    iIntros "Hadv Hfrag".
-    iDestruct "Hadv" as (advst fwst) "(Hauth&?&%&%Hcoh&%&%)".
-    iDestruct (adversary_auth_lookup_nonadv with "Hauth Hfrag") as "%Hlook".
-    iPureIntro.
-    intros contra.
-    apply Hcoh in contra.
-    rewrite contra in Hlook.
-    done.
-  Qed.
-
-  Lemma adversary_firewall_coh_receive_some skt sa Sn σ sh mh r m sag sags R T:
-    saddress skt = Some sa →
-    sa ∈ sag ->
-    mh !! sag = Some (R, T) ->
-    let ip := ip_of_address sa in
-    state_sockets σ !! ip = Some Sn →
-    Sn !! sh = Some (skt, r ++ [m]) →
-    let S' := <[ip :=<[sh:=(skt, r)]> Sn]> (state_sockets σ) in
-    let σ' := σ <| state_sockets := S' |> in
-    adversary_firewall_coh mh σ sags -∗
-    adversary_firewall_coh (<[sag:=({[m]} ∪ R, T)]> mh) σ' sags.
-  Proof.
-    iIntros (Hskt Hsain Hmh Hip Hlook Hlook') "Hadv".
-    iDestruct "Hadv" as (advst' fwst') "(?&?&%&%Hadvcoh&%Hfwcoh&%Hdelcoh)".
-    iExists advst', fwst'.
-    iFrame.
-    iPureIntro.
-    split; [done|].
-    (* adversary coh *)
-    split.
-    { destruct Hadvcoh as [? ?].
-      split; eauto.
-      rewrite dom_insert_L.
-      assert (ip_of_address sa ∈ dom (state_sockets σ)) as Hin.
-      { rewrite elem_of_dom.
-        eauto. }
-      rewrite subseteq_union_1_L; [|set_solver].
-      done.
-    }
-    (* firewall coh *)
-    split.
-    { rewrite /firewall_st_coh.
-      eapply Hfwcoh. }
-    (* delivery coh *)
-    destruct Hdelcoh as [Hdel1 Hdel2].
-    assert (public_ip_check m σ) as Hm.
-    { intros Hadv.
-      eapply Hdel2; eauto with set_solver. }
-    split.
-    - intros sag' R' T' m' Hm' Hin' Hadv'.
-      destruct (decide (sag = sag')) as [->|Hne]; last first.
-      { rewrite lookup_insert_ne in Hm'; [|done].
-        eapply Hdel1; eauto. }
-      simpl.
-      rewrite lookup_insert in Hm'.
-      inversion Hm'; subst.
-      rewrite elem_of_union in Hin'.
-      destruct Hin' as [->%elem_of_singleton|Hin'].
-      + eapply Hm; eauto.
-      + eapply Hdel1; eauto.
-    - intros ? ? ? ? ? ? Hl Hl'.
-      rewrite /public_ip_check.
-      simpl.
-      destruct (decide (ip = Hip)) as [->|Hne]; last first.
-      { rewrite lookup_insert_ne in Hl; [|done].
-        eapply Hdel2; eauto. }
-      rewrite lookup_insert in Hl.
-      inversion Hl; subst.
-      destruct (decide (sh = sh0)) as [->|Hne]; last first.
-      { rewrite lookup_insert_ne in Hl'; [|done].
-        eapply Hdel2; eauto. }
-      rewrite lookup_insert in Hl'.
-      inversion Hl'; subst.
-      intros Hin'.
-      eapply Hdel2; eauto with set_solver.
   Qed.
 
   Lemma aneris_state_interp_receive_some sa sag fwst bs br sh skt
