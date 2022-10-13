@@ -109,16 +109,12 @@ Section definitions.
       mhm !! sag = Some (R, T) -> m ∈ R -> public_ip_check m σ.
 
   (* Every message waiting in a socket satisfies the public ip check *)
-  Definition firewall_sockets_coh σ : Prop :=
+  Definition firewall_delivery_coh mhm σ : Prop :=
     ∀ ip Sn sh skt (R : list message) m,
       (state_sockets σ) !! ip = Some Sn ->
       Sn !! sh = Some (skt, R) ->
       m ∈ R ->
       public_ip_check m σ.
-
-  Definition firewall_delivery_coh mhm σ : Prop :=
-    firewall_received_coh mhm σ ∧
-    firewall_sockets_coh σ.
 
   (* The adversary map and state agree on which ips are public *)
   Definition adversary_st_coh (adv_st : gmap ip_address bool) σ :=

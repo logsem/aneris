@@ -523,28 +523,6 @@ Section state_interpretation.
     iApply adversary_firewall_coh_socketbind; done.
   Qed.
 
-  Lemma adversary_firewall_coh_send mh σ sags msg sagT R T :
-    mh !! sagT = Some (R, T) ->
-    adversary_firewall_coh mh σ sags -∗
-    let σ' := σ <| state_ms := {[+ msg +]} ⊎ state_ms σ |> in
-    let mh' := <[ sagT := (R, {[msg]} ∪ T) ]> mh in
-    adversary_firewall_coh mh' σ' sags.
-  Proof.
-    iIntros (Hlook) "Hadv".
-    iDestruct "Hadv" as (fwst advst) "(?&?&%&%&%&%Hdel)".
-    iExists fwst, advst.
-    iFrame. iPureIntro.
-    destruct Hdel as [Hdel1 Hdel2].
-    repeat (split; eauto).
-    intros sag R' T' m Hlook' Hin Hadv.
-    destruct (decide (sag = sagT)) as [->|Hne].
-    - eapply Hdel1; eauto.
-      rewrite lookup_insert in Hlook'.
-      inversion Hlook'; done.
-    - rewrite lookup_insert_ne in Hlook'; [|done].
-      eapply Hdel1; eauto.
-  Qed.
-
   Lemma aneris_state_interp_send
         sh saT sagT saR sagR bs br skt Sn r R T φ mbody σ1 mh msg' :
     let ip := ip_of_address saT in
@@ -600,7 +578,7 @@ Section state_interpretation.
         exists sag0, (R0,T0). set_solver.
       + iExists mγ, (<[sagT:=(R, T)]> mh'), sags. iFrame.
         simpl.
-        rewrite {2 3 4 5} (insert_id mh'); eauto.
+        rewrite {2 3 4} (insert_id mh'); eauto.
         iFrame.
         iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
         iPureIntro; split_and!; eauto.
@@ -644,8 +622,6 @@ Section state_interpretation.
       iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
       iSplit.
       { iPureIntro. by eapply messages_history_coh_send. }
-      iSplitL "Hadv".
-      { iApply adversary_firewall_coh_send; done. }
       iApply (messages_resource_coh_send with "[] [HsagR] [Hφ] [$Hmres] [Hmsg]"); eauto.
       by destruct Hmhcoh; intuition.
   Qed.
@@ -702,7 +678,7 @@ Section state_interpretation.
         exists sag0, (R0,T0). set_solver.
       + iExists mγ, (<[sagT:=(R, T)]> mh'), sags. iFrame.
         simpl.
-        rewrite {2 3 4 5} (insert_id mh'); eauto.
+        rewrite {2 3 4} (insert_id mh'); eauto.
         iFrame.
         iDestruct (elem_of_group_unfold with "HsagT") as "[%HsagT _]".
         iPureIntro; split_and!; eauto.
@@ -751,9 +727,7 @@ Section state_interpretation.
                   "[] Hadv Hctx [HsagR] [$Hmres]") as "(Hadv&?&?)"; eauto.
       + done.
       + by destruct Hmhcoh; intuition.
-      + iFrame.
-        iSplitR "Hadv"; [eauto with iFrame|].
-        iApply adversary_firewall_coh_send; eauto.
+      + eauto with iFrame.
   Qed.
 
   Lemma messages_addresses_coh_disj mhm :
@@ -775,7 +749,6 @@ Section state_interpretation.
     iDestruct (mapsto_messages_lookup_private with "Hauth Hmaps") as "%Hnotpub";
       [done|].
     apply Hnotpub in Haddrin.
-    destruct Hdel as [_ Hdel].
     pose Hlookip as Hlook'.
     apply Hnetcoh in Hlook'.
     iPureIntro.
