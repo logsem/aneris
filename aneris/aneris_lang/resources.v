@@ -258,11 +258,14 @@ Section definitions.
     own (A:=adversaryUR) aneris_adversary_name (● (to_agree <$> adv_map)) ∗
     own (A:=adversaryUR) aneris_adversary_name (◯ (to_agree <$> adv_map)).
 
+  Definition adversary_own (ip : ip_address) (is_adv : bool) : iProp Σ :=
+    own (A:=adversaryUR) aneris_adversary_name (◯ {[ ip := to_agree is_adv ]}).
+
   Definition adversary_adv_own (ip : ip_address) : iProp Σ :=
-    own (A:=adversaryUR) aneris_adversary_name (◯ {[ ip := to_agree true ]}) .
+    adversary_own ip true.
 
   Definition adversary_nonadv_own (ip : ip_address) : iProp Σ :=
-    own (A:=adversaryUR) aneris_adversary_name (◯ {[ ip := to_agree false ]}) .
+    adversary_own ip false.
 
   (* socket address version of the above *)
   Definition adversary_saddr_adv_own (saddr : socket_address) : iProp Σ :=
