@@ -186,13 +186,13 @@ Section state_interpretation.
     messages_addresses_coh mh →
     set_Exists (λ m, m ≡g{sagT, sagR} msg) T →
     adversary_saddr_nonadv_own (m_sender msg) -∗
-    adversary_firewall_coh mh σ sags -∗
+    adversary_firewall_coh σ sags -∗
     socket_address_group_ctx sags -∗
     m_destination msg ∈g sagR -∗
     messages_resource_coh mh -∗
       (* it's important to recover the first two resources, since they aren't
          persistent *)
-      adversary_firewall_coh mh σ sags ∗
+      adversary_firewall_coh σ sags ∗
       socket_address_group_ctx sags ∗
       messages_resource_coh (<[sagT:=(R, {[msg]} ∪ T)]> mh).
   Proof.

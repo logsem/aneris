@@ -45,8 +45,8 @@ Section state_interpretation_lemmas.
 
   (* If we know that a saddr is adversarial, then we can obtain a resource showing
      that another arbitrary saddr in the same group is adversarial. *)
-  Lemma adversary_saddr_adv_own_same_sag mh σ sags sag sa sa' :
-    adversary_firewall_coh mh σ sags -∗
+  Lemma adversary_saddr_adv_own_same_sag σ sags sag sa sa' :
+    adversary_firewall_coh σ sags -∗
     socket_address_group_ctx sags -∗
     socket_address_group_own sag -∗
     ⌜sa ∈ sag⌝ -∗
@@ -67,8 +67,8 @@ Section state_interpretation_lemmas.
     done.
   Qed.
 
-  Lemma adversary_saddr_adv_nonadv_own_same_sag mh σ sags sag sa sa' :
-    adversary_firewall_coh mh σ sags -∗
+  Lemma adversary_saddr_adv_nonadv_own_same_sag σ sags sag sa sa' :
+    adversary_firewall_coh σ sags -∗
     socket_address_group_ctx sags -∗
     socket_address_group_own sag -∗
     ⌜sa ∈ sag⌝ -∗
@@ -91,8 +91,8 @@ Section state_interpretation_lemmas.
     iDestruct (adversary_saddr_adv_nonadv_own with "Hadv_own Hnonadv") as "?"; done.
   Qed.
 
-  Lemma adversary_saddr_adv_own_equiv_sender mh σ sags sagT sagR m m' :
-    adversary_firewall_coh mh σ sags -∗
+  Lemma adversary_saddr_adv_own_equiv_sender σ sags sagT sagR m m' :
+    adversary_firewall_coh σ sags -∗
     socket_address_group_ctx sags -∗
     socket_address_group_own sagT -∗
     ⌜m ≡g{sagT, sagR} m'⌝ -∗
@@ -101,12 +101,12 @@ Section state_interpretation_lemmas.
   Proof.
     iIntros "Hadv_coh Hsock_ctx #Hsock_own %Hequiv #Hadv_sender".
     destruct Hequiv as (Hin&Hin'&_).
-    iApply (adversary_saddr_adv_own_same_sag _ _ _ _ (m_sender m) (m_sender m')
+    iApply (adversary_saddr_adv_own_same_sag _ _ _ (m_sender m) (m_sender m')
              with "Hadv_coh Hsock_ctx Hsock_own"); try (by iPureIntro || iFrame "#").
   Qed.
 
-  Lemma adversary_saddr_adv_own_equiv_destination mh σ sags sagT sagR m m' :
-    adversary_firewall_coh mh σ sags -∗
+  Lemma adversary_saddr_adv_own_equiv_destination σ sags sagT sagR m m' :
+    adversary_firewall_coh σ sags -∗
     socket_address_group_ctx sags -∗
     socket_address_group_own sagR -∗
     ⌜m ≡g{sagT, sagR} m'⌝ -∗
@@ -115,7 +115,7 @@ Section state_interpretation_lemmas.
   Proof.
     iIntros "Hadv_coh Hsock_ctx #Hsock_own %Hequiv #Hadv_dest".
     destruct Hequiv as (_&_&Hin&Hin'&_).
-    iApply (adversary_saddr_adv_own_same_sag _ _ _ _ (m_destination m) (m_destination m')
+    iApply (adversary_saddr_adv_own_same_sag _ _ _ (m_destination m) (m_destination m')
              with "Hadv_coh Hsock_ctx Hsock_own"); try (by iPureIntro || iFrame "#").
   Qed.
 
@@ -129,10 +129,10 @@ Section state_interpretation_lemmas.
     done.
   Qed.
 
-  Lemma adversary_firewall_coh_config_step mh σ σ' sags :
+  Lemma adversary_firewall_coh_config_step σ σ' sags :
     config_step σ σ' ->
-    adversary_firewall_coh mh σ sags -∗
-    adversary_firewall_coh mh σ' sags.
+    adversary_firewall_coh σ sags -∗
+    adversary_firewall_coh σ' sags.
   Proof.
     iIntros (Hstep) "Hcoh".
     iDestruct "Hcoh" as (adv_map fw_st) "(?&?&?&%Hcoh&?&%Hdel)".
@@ -182,7 +182,7 @@ Section state_interpretation_lemmas.
     dom (state_sockets σ) = {[ip]} ->
     adversary_auth {[ip := false]} -∗
     firewall_auth (gset_to_gmap FirewallStPrivate sags) -∗
-    adversary_firewall_coh (gset_to_gmap (∅, ∅) sags) σ sags.
+    adversary_firewall_coh σ sags.
   Proof.
     iIntros (Hadve Hfwe Hdom) "Hadv Hfw".
     iExists {[ip := false]}, (gset_to_gmap FirewallStPrivate sags).
@@ -270,12 +270,12 @@ Section state_interpretation_lemmas.
       done.
   Qed.
 
-  Lemma adversary_firewall_coh_alloc_nonadv mh σ ip sags :
+  Lemma adversary_firewall_coh_alloc_nonadv σ ip sags :
     let σ' := (σ <| state_heaps := <[ip:=∅]> (state_heaps σ) |>
                  <| state_sockets := <[ip:=∅]> (state_sockets σ) |>) in
     state_sockets σ !! ip = None ->
-    adversary_firewall_coh mh σ sags ==∗
-    adversary_firewall_coh mh σ' sags.
+    adversary_firewall_coh σ sags ==∗
+    adversary_firewall_coh σ' sags.
   Proof.
     iIntros (σ' Hnone) "Hcoh".
     rewrite /adversary_firewall_coh.
@@ -313,22 +313,22 @@ Section state_interpretation_lemmas.
       apply lookup_empty_Some in H; done.
   Qed.
 
-  Lemma adversary_firewall_coh_heap_update mh σ sags heaps :
-    adversary_firewall_coh mh σ sags -∗
-    adversary_firewall_coh mh (σ <| state_heaps := heaps |>) sags.
+  Lemma adversary_firewall_coh_heap_update σ sags heaps :
+    adversary_firewall_coh σ sags -∗
+    adversary_firewall_coh (σ <| state_heaps := heaps |>) sags.
   Proof.
     iIntros "Hcoh".
     rewrite /adversary_firewall_coh.
     eauto.
   Qed.
 
-  Lemma adversary_firewall_coh_sblock_update mh σ sags ip Sn sh skt r b :
+  Lemma adversary_firewall_coh_sblock_update σ sags ip Sn sh skt r b :
     state_sockets σ !! ip = Some Sn ->
     Sn !! sh = Some (skt, r) ->
     let S := <[ip := <[sh:= (skt<| sblock := b|>, r)]> Sn]>(state_sockets σ) in
     let σ' := σ <| state_sockets := S |> in
-    adversary_firewall_coh mh σ sags -∗
-      adversary_firewall_coh mh σ' sags.
+    adversary_firewall_coh σ sags -∗
+      adversary_firewall_coh σ' sags.
   Proof.
     iIntros (Hip Hsh) "Hcoh".
     iDestruct "Hcoh" as (adv_st fw_st) "(?&?&%Hsags&%Hadv&%Hfw&%Hdel)".
@@ -355,14 +355,14 @@ Section state_interpretation_lemmas.
       eapply Hdel; eauto.
   Qed.
 
-  Lemma adversary_firewall_coh_alloc_socket mh σ sags ip Sn sh s :
+  Lemma adversary_firewall_coh_alloc_socket σ sags ip Sn sh s :
     state_sockets σ !! ip = Some Sn →
     Sn !! sh = None →
     saddress s = None →
     let σ' := σ <| state_sockets :=
                 <[ip:=<[sh:=(s, [])]> Sn]> (state_sockets σ) |> in
-    adversary_firewall_coh mh σ sags -∗
-      adversary_firewall_coh mh σ' sags.
+    adversary_firewall_coh σ sags -∗
+      adversary_firewall_coh σ' sags.
   Proof.
     iIntros (Hip Hsh Haddr) "Hcoh".
     iDestruct "Hcoh" as (adv_st fw_st) "(Hadv&Hfw&%Hsags&[%Hdom %Hadv]&%Hfw&%Hdel)".
@@ -388,7 +388,7 @@ Section state_interpretation_lemmas.
       inversion H1.
   Qed.
 
-  Lemma adversary_firewall_coh_socketbind mh σ sags Sn sh s sa ps :
+  Lemma adversary_firewall_coh_socketbind σ sags Sn sh s sa ps :
     state_sockets σ !! ip_of_address sa = Some Sn →
     Sn !! sh = Some (s, []) →
     state_ports_in_use σ !! ip_of_address sa = Some ps ->
@@ -398,8 +398,8 @@ Section state_interpretation_lemmas.
           (state_sockets σ) |>
         <| state_ports_in_use :=
           <[ip_of_address sa:={[port_of_address sa]} ∪ ps]> (state_ports_in_use σ) |> in
-    adversary_firewall_coh mh σ sags -∗
-      adversary_firewall_coh mh σ' sags.
+    adversary_firewall_coh σ sags -∗
+      adversary_firewall_coh σ' sags.
   Proof.
     iIntros (Hip Hsh Haddr) "Hcoh".
     iDestruct "Hcoh" as (adv_st fw_st) "(Hadv&Hfw&%Hsags&[%Hdom %Hadv]&%Hfw&%Hdel)".
@@ -425,8 +425,8 @@ Section state_interpretation_lemmas.
       inversion H1.
   Qed.
 
-  Lemma adversary_firewall_coh_lookup_adv mh σ sags ip :
-    adversary_firewall_coh mh σ sags -∗
+  Lemma adversary_firewall_coh_lookup_adv σ sags ip :
+    adversary_firewall_coh σ sags -∗
     adversary_adv_own ip -∗
     ⌜ip ∈ state_adversaries σ⌝.
   Proof.
@@ -438,8 +438,8 @@ Section state_interpretation_lemmas.
     done.
   Qed.
 
-  Lemma adversary_firewall_coh_lookup_nonadv mh σ sags ip :
-    adversary_firewall_coh mh σ sags -∗
+  Lemma adversary_firewall_coh_lookup_nonadv σ sags ip :
+    adversary_firewall_coh σ sags -∗
     adversary_nonadv_own ip -∗
     ⌜ip ∉ state_adversaries σ⌝.
   Proof.
@@ -453,32 +453,17 @@ Section state_interpretation_lemmas.
     done.
   Qed.
 
-  Lemma adversary_firewall_coh_send mh σ sags msg sagT R T :
-    mh !! sagT = Some (R, T) ->
-    adversary_firewall_coh mh σ sags -∗
-    let σ' := σ <| state_ms := {[+ msg +]} ⊎ state_ms σ |> in
-    let mh' := <[ sagT := (R, {[msg]} ∪ T) ]> mh in
-    adversary_firewall_coh mh' σ' sags.
-  Proof.
-    iIntros (Hlook) "Hadv".
-    iDestruct "Hadv" as (fwst advst) "(?&?&%&%&%&%Hdel)".
-    iExists fwst, advst.
-    eauto with iFrame.
-  Qed.
-
-  Lemma adversary_firewall_coh_receive_some skt sa Sn σ sh mh r m sag sags R T:
+  Lemma adversary_firewall_coh_receive_some skt sa Sn σ sh r m sags:
     saddress skt = Some sa →
-    sa ∈ sag ->
-    mh !! sag = Some (R, T) ->
     let ip := ip_of_address sa in
     state_sockets σ !! ip = Some Sn →
     Sn !! sh = Some (skt, r ++ [m]) →
     let S' := <[ip :=<[sh:=(skt, r)]> Sn]> (state_sockets σ) in
     let σ' := σ <| state_sockets := S' |> in
-    adversary_firewall_coh mh σ sags -∗
-    adversary_firewall_coh (<[sag:=({[m]} ∪ R, T)]> mh) σ' sags.
+    adversary_firewall_coh σ sags -∗
+    adversary_firewall_coh σ' sags.
   Proof.
-    iIntros (Hskt Hsain Hmh Hip Hlook Hlook') "Hadv".
+    iIntros (Hskt Hip Hlook Hlook') "Hadv".
     iDestruct "Hadv" as (advst' fwst') "(?&?&%&%Hadvcoh&%Hfwcoh&%Hdelcoh)".
     iExists advst', fwst'.
     iFrame.

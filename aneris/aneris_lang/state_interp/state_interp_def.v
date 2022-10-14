@@ -252,7 +252,7 @@ Section definitions.
         socket_interp_coh sags ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        adversary_firewall_coh mhm σ sags ∗
+        adversary_firewall_coh σ sags ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 
