@@ -224,7 +224,7 @@ Qed.
 Theorem yesno_terminates
         (N : nat)
         (HN: N > 1)
-        (extr : extrace)
+        (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [start #N]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.

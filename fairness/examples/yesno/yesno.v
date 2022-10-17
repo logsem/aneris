@@ -102,7 +102,7 @@ Defined.
 
 Definition the_model: LiveModel heap_lang the_fair_model :=
   {|
-            fuel_limit (x: fmstate the_fair_model) := 61%nat;
+    lm_fl (x: fmstate the_fair_model) := 61%nat;
   |}.
 
 (** The CMRAs we need. *)

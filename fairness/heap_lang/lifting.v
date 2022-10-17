@@ -129,7 +129,7 @@ Qed.
 Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang Mdl} `{!heapGS Σ Mdl LM}
            (s:stuckness) (ξ : execution_trace heap_lang → finite_trace Mdl
                   (option $ fmrole Mdl) → Prop) (c1:cfg heap_lang)
-           (c2:live_model_to_model Mdl LM) : iProp Σ :=
+           (c2:live_model_to_model LM) : iProp Σ :=
   ∀ ex atr c,
     ⌜valid_system_trace ex atr⌝ -∗
     ⌜trace_starts_in ex c1⌝ -∗
@@ -154,7 +154,7 @@ Theorem strong_simulation_adequacy Σ `{LM:LiveModel heap_lang Mdl}
        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) -∗
        frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-       has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
+       has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
        rel_always_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
@@ -193,7 +193,7 @@ Proof.
   (*   - rewrite dom_gset_to_gmap. set_solver. } *)
   iSpecialize ("Hwp" with "Hσ Hmodf Hfr [Hfuelf Hmapf]").
   { rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
-    iAssert ([∗ set] ρ ∈ live_roles Mdl s1, ρ ↦F (LM.(fuel_limit) s1))%I with "[Hfuelf]" as "H".
+    iAssert ([∗ set] ρ ∈ live_roles Mdl s1, ρ ↦F (LM.(lm_fl) s1))%I with "[Hfuelf]" as "H".
     - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
       rewrite -big_opS_own //. iApply (own_proper with "Hfuelf").
       rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
@@ -300,7 +300,7 @@ Theorem simulation_adequacy Σ {Mdl: FairModel} {LM} `{!heapGpreS Σ Mdl LM} (s:
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
         frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1))
+        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -340,7 +340,7 @@ Theorem simulation_adequacy_inftraces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl L
       ⊢ |={⊤}=>
      frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -364,9 +364,11 @@ Proof.
   - done.
 Qed.
 
+Definition heap_lang_extrace : Type := extrace heap_lang.
+
 Theorem simulation_adequacy_traces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} (s: stuckness) FR
         e1 (s1: Mdl)
-        (extr : extrace)
+        (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
@@ -377,11 +379,11 @@ Theorem simulation_adequacy_traces Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} 
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  exists auxtr, exaux_traces_match heap_lang Mdl LM extr auxtr.
+  ∃ (auxtr : auxtrace LM), exaux_traces_match extr auxtr.
 Proof.
   intros Hfin Hlr Hwp.
   have [iatr Hbig] : exists iatr,
@@ -410,7 +412,7 @@ Qed.
 
 Theorem simulation_adequacy_model_trace Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl LM} (s: stuckness) FR
         e1 (s1: Mdl)
-        (extr : extrace)
+        (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
@@ -421,12 +423,12 @@ Theorem simulation_adequacy_model_trace Σ (Mdl : FairModel) `{!heapGpreS Σ Mdl
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  exists auxtr mtr, exaux_traces_match heap_lang Mdl LM extr auxtr ∧
-               upto_stutter ls_under Ul auxtr mtr.
+  ∃ (auxtr : auxtrace LM) mtr, exaux_traces_match extr auxtr ∧
+                               upto_stutter ls_under Ul auxtr mtr.
 Proof.
   intros Hfb Hlr Hwp.
   destruct (simulation_adequacy_traces
@@ -439,7 +441,7 @@ Qed.
 Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
         `{!heapGpreS Σ Mdl LM} (s: stuckness)
         e1 (s1: Mdl) FR
-        (extr : extrace)
+        (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (∀ mtr : @mtrace Mdl, mtrace_fairly_terminating mtr) ->
@@ -450,7 +452,7 @@ Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1))
+         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -473,7 +475,7 @@ Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl}
         `{LM : LiveModel heap_lang Mdl}
         `{!heapGpreS Σ Mdl LM} (s: stuckness)
         e1 (s1: Mdl) FR
-        (extr : extrace)
+        (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
@@ -483,7 +485,7 @@ Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel Mdl}
       ⊢ |={⊤}=>
         frag_model_is s1 -∗
         frag_free_roles_are (FR ∖ live_roles _ s1) -∗
-        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(fuel_limit) s1) (Mdl.(live_roles) s1))
+        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -835,7 +837,7 @@ Qed.
 Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' (f1 f2: nat) fr Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (f2 ≤ LM.(fuel_limit) s2)%nat -> Mdl.(fmtrans) s1 (Some ρ) s2 ->
+  (f2 ≤ LM.(lm_fl) s2)%nat -> Mdl.(fmtrans) s1 (Some ρ) s2 ->
   (|={E}[E']▷=> frag_model_is s1 ∗ frag_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
    (frag_model_is s2 -∗ frag_free_roles_are fr -∗ (if decide (ρ ∈ live_roles Mdl s2) then has_fuel tid ρ f2 else tid ↦M ∅) -∗
                                WP e2 @ tid; E {{ Φ }}))
@@ -1045,7 +1047,7 @@ Proof.
 Qed.
 
 Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
-  f2 ≤ LM.(fuel_limit) s2 -> fmtrans Mdl s1 (Some ρ) s2 ->
+  f2 ≤ LM.(lm_fl) s2 -> fmtrans Mdl s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
@@ -1088,7 +1090,7 @@ Proof.
 Qed.
 
 Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l q v' v1 v2:
-  v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ LM.(fuel_limit) s2 -> Mdl.(fmtrans) s1 (Some ρ) s2 ->
+  v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ LM.(lm_fl) s2 -> Mdl.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   {{{ ▷ l ↦{q} v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
@@ -1162,7 +1164,7 @@ Proof.
 Qed.
 
 Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v1 v2:
-  v' = v1 → vals_compare_safe v' v1 → f2 ≤ LM.(fuel_limit) s2 -> Mdl.(fmtrans) s1 (Some ρ) s2 ->
+  v' = v1 → vals_compare_safe v' v1 → f2 ≤ LM.(lm_fl) s2 -> Mdl.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
