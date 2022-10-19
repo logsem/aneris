@@ -120,11 +120,9 @@ Section StateLib_InternalSpecs.
 
 
   Definition internal_init_spec : iProp Σ :=
-    ∀ (repId : fRepId) addr fixed_addrs addrs_val crdt_val,
+    ∀ (repId : fRepId) addr addrs_val crdt_val,
     {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
          ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
-         ⌜addr ∈ fixed_addrs⌝ ∗
-         fixed fixed_addrs ∗
          ([∗ list] z ∈ CRDT_Addresses, z ⤇ socket_proto) ∗
          addr ⤳ (∅, ∅) ∗
          free_ports (ip_of_address addr) {[port_of_address addr]} ∗

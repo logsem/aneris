@@ -741,7 +741,7 @@ Section StateLib_Proof.
   Proof.
     iIntros "#Hinv" (i addr fixed_addr addrs_val crdt_val).
     iModIntro.
-    iIntros (φ) "(%Hislist&%Haddr&%Haddr_fixed&#Hfixed&#Hprotos&Hsoup&Hfree&[Huser_tok Hlock_tok]&#Hcrdt_spec)Hφ".
+    iIntros "(%Hislist&%Haddr&#Hprotos&Hsoup&Hfree&[Huser_tok Hlock_tok]&#Hcrdt_spec)Hφ".
     wp_lam. wp_pures.
     wp_apply "Hcrdt_spec"; first trivial.
     iIntros (v) "(%init_st_fn & %mutator_fn & %merge_fn & -> &
@@ -772,8 +772,8 @@ Section StateLib_Proof.
     { apply nth_error_lookup in HH. rewrite Haddr in HH. by simplify_eq/=. }
     wp_apply wp_unSOME; [ trivial | iIntros (_) ].
     wp_let.
-    wp_apply (aneris_wp_socketbind_static with "[$]"); try done.
-    iIntros "[Hh (%proto & #Haddr)]".
+    wp_apply (aneris_wp_socketbind with "[$]"); try done.
+    iIntros "Hh".
     set (s := RecordSet.set saddress (λ _ : option socket_address, Some addr)
                             {| sfamily := PF_INET; stype := SOCK_DGRAM;
                                sprotocol := IPPROTO_UDP; saddress := None |}).
@@ -788,7 +788,7 @@ Section StateLib_Proof.
     + wp_pures.
       wp_apply ((internal_get_state_spec_holds (fin_to_nat i)) with "[$]").
       iIntros (getst_fun) "getstate_spec".
-      wp_pures. 
+      wp_pures.
       wp_apply (internal_update_spec_holds with "[$]").
       iIntros (update_fun) "update_spec".
       wp_pures. iApply "Hφ".

@@ -141,11 +141,9 @@ Section Specification.
 
   Definition init_spec (init: val) : iProp Σ :=
     ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
-      (fixedAddrs : gset socket_address) (addrs_val crdt_val : val),
+      (addrs_val crdt_val : val),
     {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
         ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
-        ⌜addr ∈ fixedAddrs⌝ ∗
-        fixed fixedAddrs ∗
         ([∗ list] z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
         addr ⤳ (∅, ∅) ∗
         free_ports (ip_of_address addr) {[port_of_address addr]} ∗
