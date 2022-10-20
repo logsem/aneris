@@ -808,4 +808,3 @@ Section StateLib_Proof.
 
 End StateLib_Proof.
 
-(* TODO: prove that we can instiate the relevant type class *)
