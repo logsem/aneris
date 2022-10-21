@@ -83,7 +83,7 @@ Section finitary.
     let δ1 := trace_last fmodtr in
     '(s2, ℓ) ← (δ1.(ls_under), None) :: enum_inner extr (map_underlying_trace fmodtr) c' oζ;
     d ← enumerate_dom_gsets' (dom δ1.(ls_fuel) ∪ live_roles _ s2);
-    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(fuel_limit) s2);
+    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(lm_fl) s2);
     ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) (locales_of_list c'.1);
     let ℓ' := match ℓ with
               | None => match oζ with
@@ -159,7 +159,7 @@ Section finitary.
               specialize (Hleq' ρ ltac:(done) ltac:(congruence)) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn; last done.
             pose proof (max_gmap_spec _ _ _ Heqn). simpl in *. lia.
-          * assert (Hok: oleq (ls_fuel δ' !! ρ) (Some (LM.(fuel_limit) δ'))).
+          * assert (Hok: oleq (ls_fuel δ' !! ρ) (Some (LM.(lm_fl) δ'))).
             { apply Hnew. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. simpl in Hok. lia.
       - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
@@ -216,7 +216,7 @@ Section finitary_simple.
     list (LM * @mlabel LM) :=
     '(s2, ℓ) ← (δ1.(ls_under), None) :: enum_inner_simple δ1.(ls_under);
     d ← enumerate_dom_gsets' (dom δ1.(ls_fuel) ∪ live_roles _ s2);
-    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(fuel_limit) s2);
+    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(lm_fl) s2);
     ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) (locales_of_list c'.1);
     let ℓ' := match ℓ with
               | None => match oζ with
@@ -291,7 +291,7 @@ Section finitary_simple.
               specialize (Hleq' ρ ltac:(done) ltac:(congruence)) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. destruct (ls_fuel (trace_last auxtr) !! ρ) as [f'|] eqn:Heqn; last done.
             pose proof (max_gmap_spec _ _ _ Heqn). simpl in *. lia.
-          * assert (Hok: oleq (ls_fuel δ2 !! ρ) (Some (LM.(fuel_limit) δ2))).
+          * assert (Hok: oleq (ls_fuel δ2 !! ρ) (Some (LM.(lm_fl) δ2))).
             { apply Hnew. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. simpl in Hok. lia.
       - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
@@ -321,22 +321,23 @@ Section finitary_simple.
   Qed.
 End finitary_simple.
 
-Definition live_rel `(LM: LiveModel Λ M) `{EqDecision (locale Λ)}
+(* TODO: Why do we need [LM] explicit here? *)
+Definition live_rel `(LM: LiveModel Λ M) `{Countable (locale Λ)}
            (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
-  live_tids (M := M) (trace_last ex) (trace_last aux).
+  live_tids (LM:=LM) (trace_last ex) (trace_last aux).
 
-Definition sim_rel `(LM: LiveModel Λ M) `{EqDecision (locale Λ)}
+Definition sim_rel `(LM: LiveModel Λ M) `{Countable (locale Λ)}
            (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   valid_state_evolution_fairness ex aux ∧ live_rel LM ex aux.
 
-Definition sim_rel_with_user `(LM: LiveModel Λ M) `{EqDecision (locale Λ)}
+Definition sim_rel_with_user `(LM: LiveModel Λ M) `{Countable (locale Λ)}
            (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
   (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   sim_rel LM ex aux ∧ ξ ex (map_underlying_trace aux).
 
 (* TODO: Maybe redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
 Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel Λ Mdl}
-      `{EqDecision (locale Λ)}
+      `{Countable (locale Λ)}
       (ξ : execution_trace Λ → finite_trace Mdl (option $ fmrole Mdl) →
            Prop) extr atr :
   valid_lift_fairness
@@ -346,7 +347,7 @@ Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel Λ Mdl}
 Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
 
 Lemma rel_finitary_sim_rel_with_user_ξ `{LM:LiveModel Λ Mdl}
-      `{EqDecision (locale Λ)} ξ :
+      `{Countable (locale Λ)} ξ :
   rel_finitary ξ → rel_finitary (sim_rel_with_user LM ξ).
 Proof.
   intros Hrel.

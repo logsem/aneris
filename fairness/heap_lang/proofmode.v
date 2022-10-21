@@ -6,7 +6,7 @@ From trillium.fairness.heap_lang Require Import notation.
 From iris.prelude Require Import options.
 Import uPred.
 
-Lemma tac_wp_expr_eval `{!heapGS Σ Mdl LM} Δ tid E Φ e e' :
+Lemma tac_wp_expr_eval `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} Δ tid E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ tid; E {{ Φ }}) → envs_entails Δ (WP e @ tid; E {{ Φ }}).
 Proof. by intros ->. Qed.
@@ -21,7 +21,7 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
   end.
 Ltac wp_expr_simpl := wp_expr_eval simpl.
 
-Lemma tac_wp_pure_helper `{!heapGS Σ Mdl LM} tid E K e1 e2 fs  φ n Φ :
+Lemma tac_wp_pure_helper `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} tid E K e1 e2 fs  φ n Φ :
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
@@ -63,17 +63,19 @@ Proof.
   apply leibniz_equiv_iff. lia.
 Qed.
 
-Lemma has_fuels_gt_n `{!heapGS Σ Mdl LM} (fs: gmap (fmrole Mdl) _) n tid:
+Lemma has_fuels_gt_n `{LM : LiveModel heap_lang M} `{!heapGS Σ LM} (fs: gmap (fmrole M) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 
-Lemma has_fuels_gt_1 `{!heapGS Σ Mdl LM} (fs: gmap (fmrole Mdl) _) tid:
+Lemma has_fuels_gt_1 `{LM:LiveModel heap_lang M}
+      `{!heapGS Σ LM} (fs: gmap (fmrole M) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
-Lemma tac_wp_pure_helper_2 `{!heapGS Σ Mdl LM} tid E K e1 e2 fs  φ n Φ :
+Lemma tac_wp_pure_helper_2 `{LM:LiveModel heap_lang M}
+      `{!heapGS Σ LM} tid E K e1 e2 fs  φ n Φ :
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
@@ -138,8 +140,9 @@ Proof.
       * rewrite env_lookup_env_delete_ne //.
 Qed.
 
-Lemma tac_wp_pure `{!heapGS Σ Mdl LM} Δ Δ'other tid E i K e1 e2 φ n Φ fs :
-  (∀ (ρ : fmrole Mdl) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
+Lemma tac_wp_pure `{LM:LiveModel heap_lang M}
+      `{!heapGS Σ LM} Δ Δ'other tid E i K e1 e2 φ n Φ fs :
+  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
@@ -167,11 +170,13 @@ Proof.
 Qed.
 
 
-Lemma tac_wp_value_nofupd `{!heapGS Σ Mdl LM} Δ tid E Φ v :
+Lemma tac_wp_value_nofupd `{LM:LiveModel heap_lang M}
+      `{!heapGS Σ LM} Δ tid E Φ v :
   envs_entails Δ (Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. by apply wp_value. Qed.
 
-Lemma tac_wp_value `{!heapGS Σ Mdl LM} Δ tid E (Φ : val → iPropI Σ) v :
+Lemma tac_wp_value `{LM:LiveModel heap_lang M}
+      `{!heapGS Σ LM} Δ tid E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=> Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. iIntros "?". by iApply wp_value_fupd. Qed.
 
@@ -294,7 +299,7 @@ Tactic Notation "wp_inj" := wp_pure (InjL _) || wp_pure (InjR _).
 Tactic Notation "wp_pair" := wp_pure (Pair _ _).
 Tactic Notation "wp_closure" := wp_pure (Rec _ _ _).
 
-Lemma tac_wp_bind `{!heapGS Σ Mdl LM} K Δ s E Φ e f :
+Lemma tac_wp_bind `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} K Δ s E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
   envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
@@ -317,7 +322,8 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
 (** Heap tactics *)
 Section heap.
-Context `{!heapGS Σ Mdl LM}.
+Context `{LM:LiveModel heap_lang M}.
+Context `{!heapGS Σ LM}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
@@ -425,7 +431,7 @@ Implicit Types tid : locale heap_lang.
 (* Qed. *)
 
 Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
-  (∀ (ρ : fmrole Mdl) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
+  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
@@ -463,7 +469,7 @@ Qed.
 
 
 Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
-  (∀ (ρ : fmrole Mdl) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
+  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →

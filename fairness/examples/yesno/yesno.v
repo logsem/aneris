@@ -102,7 +102,7 @@ Defined.
 
 Definition the_model: LiveModel heap_lang the_fair_model :=
   {|
-            fuel_limit (x: fmstate the_fair_model) := 61%nat;
+    lm_fl (x: fmstate the_fair_model) := 61%nat;
   |}.
 
 (** The CMRAs we need. *)
@@ -123,7 +123,7 @@ Global Instance subG_yesnoΣ {Σ} : subG yesnoΣ Σ → yesnoPreG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!heapGS Σ the_fair_model the_model, !yesnoG Σ}.
+  Context `{!heapGS Σ the_model, !yesnoG Σ}.
   Let Ns := nroot .@ "yes_no".
 
   Definition yes_at (n: nat) := own yes_name (◯E n).
@@ -534,7 +534,7 @@ End proof.
 
 
 Section proof_start.
-  Context `{!heapGS Σ the_fair_model the_model, !yesnoPreG Σ}.
+  Context `{!heapGS Σ the_model, !yesnoPreG Σ}.
   Let Ns := nroot .@ "yes_no".
 
   Lemma start_spec tid (N: nat) f (Hf: f > 60):

@@ -2,20 +2,19 @@ From trillium.fairness Require Import fairness.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 
-
 Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
-Class fairnessGpreS (Mdl : FairModel) Λ (LM: LiveModel Λ Mdl) Σ `{Countable (locale Λ)} := {
-  fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
-  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO Mdl)))));
-  fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO Mdl) (exclR natO)));
-  fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO Mdl)));
+Class fairnessGpreS `(LM: LiveModel Λ M) Σ `{Countable (locale Λ)} := {
+  fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO M))));
+  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
+  fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
+  fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
-Class fairnessGS (Mdl: FairModel) Λ (LM: LiveModel Λ Mdl) Σ `{Countable (locale Λ)} := FairnessGS {
-  fairness_inG :> fairnessGpreS Mdl Λ LM Σ;
+Class fairnessGS `(LM : LiveModel Λ M) Σ `{Countable (locale Λ)} := FairnessGS {
+  fairness_inG :> fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
   (** Mapping of threads to sets of roles *)
@@ -26,21 +25,23 @@ Class fairnessGS (Mdl: FairModel) Λ (LM: LiveModel Λ Mdl) Σ `{Countable (loca
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments FairnessGS Mdl Λ LM Σ {_ _ _} _ _ _.
-Global Arguments fairness_model_name {Mdl Λ LM Σ _ _} _.
-Global Arguments fairness_model_mapping_name {Mdl Λ LM Σ _ _} _ : assert.
-Global Arguments fairness_model_fuel_name {Mdl Λ LM Σ _ _} _ : assert.
-Global Arguments fairness_model_free_roles_name {Mdl Λ LM Σ _ _} _ : assert.
+Global Arguments fairnessGS {_ _} LM Σ {_ _}.
+Global Arguments FairnessGS {_ _} LM Σ {_ _ _} _ _ _.
+Global Arguments fairness_model_name {_ _ LM Σ _ _} _.
+Global Arguments fairness_model_mapping_name {Λ M LM Σ _ _} _ : assert.
+Global Arguments fairness_model_fuel_name {Λ M LM Σ _ _} _ : assert.
+Global Arguments fairness_model_free_roles_name {Λ M LM Σ _ _} _ : assert.
 
-Definition fairnessΣ (Mdl: FairModel) Λ `{Countable (locale Λ)} : gFunctors := #[
-   GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
-   GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO Mdl)))));
-   GFunctor (authUR (gmapUR (RoleO Mdl) (exclR natO)));
-   GFunctor (authUR (gset_disjUR (RoleO Mdl)))
+Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
+   GFunctor (authUR (optionUR (exclR (ModelO M))));
+   GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
+   GFunctor (authUR (gmapUR (RoleO M) (exclR natO)));
+   GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ Λ Mdl LM} `{Countable (locale Λ)} :
-  subG (fairnessΣ Mdl Λ) Σ -> fairnessGpreS Mdl Λ LM Σ.
+Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel Λ M}
+       `{Countable (locale Λ)} :
+  subG (fairnessΣ Λ M) Σ -> fairnessGpreS LM Σ.
 Proof. solve_inG. Qed.
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
@@ -165,36 +166,38 @@ Section map_imap.
 End map_imap.
 
 Section model_state_interp.
-  Context {Mdl: FairModel}.
-  Context `{fG: fairnessGS Mdl Λ LM Σ}.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
 
-  Notation Role := (Mdl.(fmrole)).
+  Notation Role := (M.(fmrole)).
 
   Definition auth_fuel_is (F: gmap Role nat): iProp Σ :=
     own (fairness_model_fuel_name fG)
-        (● (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO Mdl) (exclR natO)))).
+        (● (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))).
 
   Definition frag_fuel_is (F: gmap Role nat): iProp Σ :=
     own (fairness_model_fuel_name fG)
-        (◯ (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO Mdl) (exclR natO)))).
+        (◯ (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))).
 
-  Definition auth_mapping_is (M: gmap (locale Λ) (gset Role)): iProp Σ :=
+  Definition auth_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ :=
     own (fairness_model_mapping_name fG)
-        (● ( (fmap (λ (f: gset Mdl.(fmrole)), Excl f) M) :
-              ucmra_car (gmapUR _ (exclR (gsetR (RoleO Mdl))))
+        (● ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) :
+              ucmra_car (gmapUR _ (exclR (gsetR (RoleO M))))
         )).
 
-  Definition frag_mapping_is (M: gmap (locale Λ) (gset Role)): iProp Σ :=
+  Definition frag_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ :=
     own (fairness_model_mapping_name fG)
-        (◯ ( (fmap (λ (f: gset Mdl.(fmrole)), Excl f) M) :
-              ucmra_car (gmapUR _ (exclR (gsetR (RoleO Mdl))))
+        (◯ ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) :
+              ucmra_car (gmapUR _ (exclR (gsetR (RoleO M))))
         )).
 
-  Definition auth_model_is (M: Mdl): iProp Σ :=
-    own (fairness_model_name fG) (● Excl' M).
+  Definition auth_model_is (fm: M): iProp Σ :=
+    own (fairness_model_name fG) (● Excl' fm).
 
-  Definition frag_model_is (M: Mdl): iProp Σ :=
-    own (fairness_model_name fG) (◯ Excl' M).
+  Definition frag_model_is (fm: M): iProp Σ :=
+    own (fairness_model_name fG) (◯ Excl' fm).
 
   Definition auth_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (● (GSet FR)).
@@ -202,7 +205,7 @@ Section model_state_interp.
   Definition frag_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
-  Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Mdl): iProp Σ :=
+  Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Λ M): iProp Σ :=
     ∃ M FR, auth_fuel_is δ.(ls_fuel) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗
       ⌜maps_inverse_match δ.(ls_mapping) M⌝ ∗
       ⌜ ∀ ζ, ζ ∉ locales_of_list tp → M !! ζ = None ⌝ ∗
@@ -211,12 +214,13 @@ Section model_state_interp.
   Lemma model_state_interp_tids_smaller δ tp :
     model_state_interp tp δ -∗ ⌜ tids_smaller tp δ ⌝.
   Proof.
-    iIntros "(%M&%FR&_&_&_&%Hminv&%Hbig&_)". iPureIntro.
+    iIntros "(%m&%FR&_&_&_&%Hminv&%Hbig&_)". iPureIntro.
     intros ρ ζ Hin.
     assert (¬ (ζ ∉ locales_of_list tp)).
     - intros contra.
       apply Hminv in Hin as [? [Hsome _]].
-      specialize (Hbig _ contra); congruence.
+      specialize (Hbig _ contra).
+      by rewrite Hbig in Hsome.
     - destruct (decide (ζ ∈ locales_of_list tp)) as [Hin'|] =>//.
       apply elem_of_list_fmap in Hin' as [[tp' e'] [-> Hin']].
       unfold from_locale. exists e'. by apply from_locale_from_Some.
@@ -228,7 +232,8 @@ Lemma own_proper `{inG Σ X} γ (x y: X):
   own γ x -∗ own γ y.
 Proof. by intros ->. Qed.
 
-Lemma auth_fuel_is_proper `{fairnessGS Mdl Λ LM Σ} (x y : gmap (fmrole Mdl) nat):
+Lemma auth_fuel_is_proper `{fairnessGS (LM:=LM) Σ}
+      (x y : gmap (fmrole M) nat):
   x = y ->
   auth_fuel_is x -∗ auth_fuel_is y.
 Proof. by intros ->. Qed.
@@ -238,10 +243,12 @@ Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
 Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
 Section model_state_lemmas.
-  Context {Mdl: FairModel}.
-  Context `{fairnessGS Mdl Λ LM Σ}.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
 
-  Notation Role := (Mdl.(fmrole)).
+  Notation Role := (M.(fmrole)).
 
   Definition has_fuel (ζ: locale Λ) (ρ: Role) (f: nat): iProp Σ :=
     ζ ↦m ρ ∗ ρ ↦F f.
@@ -303,8 +310,8 @@ Section model_state_lemmas.
     rewrite !lookup_fmap //.
   Qed.
 
-  Lemma frag_mapping_same ζ M R:
-    auth_mapping_is M -∗ ζ ↦M R -∗ ⌜ M !! ζ = Some R ⌝.
+  Lemma frag_mapping_same ζ m R:
+    auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ m !! ζ = Some R ⌝.
   Proof.
     iIntros "Ha Hf". iCombine "Ha Hf" as "H". rewrite own_valid.
     iDestruct "H" as "%Hval". iPureIntro.
@@ -324,10 +331,14 @@ Section model_state_lemmas.
 End model_state_lemmas.
 
 Section adequacy.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGpreS LM Σ}.
 
-  Lemma model_state_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl):
+  Lemma model_state_init (s0: M):
     ⊢ |==> ∃ γ,
-        own (A := authUR (optionUR (exclR (ModelO Mdl)))) γ
+        own (A := authUR (optionUR (exclR (ModelO M)))) γ
             (● (Excl' s0) ⋅ ◯ (Excl' s0)).
   Proof.
     iMod (own_alloc (● Excl' s0 ⋅ ◯ Excl' s0)) as (γ) "[Hfl Hfr]".
@@ -335,38 +346,38 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  Lemma model_mapping_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl) (ζ0: locale Λ):
+  Lemma model_mapping_init (s0: M) (ζ0: locale Λ):
     ⊢ |==> ∃ γ,
-        own (A := authUR (gmapUR _ (exclR (gsetR (RoleO Mdl))))) γ
-            (● ({[ ζ0 :=  Excl (Mdl.(live_roles) s0) ]}) ⋅
-               ◯ ({[ ζ0 :=  Excl (Mdl.(live_roles) s0) ]})).
+        own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
+            (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
+               ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})).
   Proof.
-    iMod (own_alloc (● ({[ ζ0 :=  Excl (Mdl.(live_roles) s0) ]}) ⋅
-                       ◯ ({[ ζ0 :=  Excl (Mdl.(live_roles) s0) ]}))) as (γ) "[Hfl Hfr]".
+    iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
+                       ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}))) as (γ) "[Hfl Hfr]".
     { apply auth_both_valid_2; eauto. by apply singleton_valid. }
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  Lemma model_fuel_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl):
+  Lemma model_fuel_init (s0: M):
     ⊢ |==> ∃ γ,
-        own (A := authUR (gmapUR (RoleO Mdl) (exclR natO))) γ
-            (● gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0))).
+        own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ
+            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
+               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))).
   Proof.
     iMod (own_alloc
-            (● gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(fuel_limit) s0)) (Mdl.(live_roles) s0)))) as (γ) "[H1 H2]".
+            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
+               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]".
     { apply auth_both_valid_2;eauto. intros ρ.
-      destruct (gset_to_gmap (Excl (LM.(fuel_limit) s0)) (live_roles Mdl s0) !! ρ) eqn:Heq;
+      destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq;
         rewrite Heq; last done.
       apply lookup_gset_to_gmap_Some in Heq.
       destruct Heq as [?<-]. done. }
     iExists _. by iSplitL "H1".
   Qed.
 
-  Lemma model_free_roles_init `{fairnessGpreS Mdl Λ LM Σ} (s0: Mdl) (FR: gset _):
+  Lemma model_free_roles_init (s0: M) (FR: gset _):
     ⊢ |==> ∃ γ,
-        own (A := authUR (gset_disjUR (RoleO Mdl))) γ (● GSet FR  ⋅ ◯ GSet FR).
+        own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
   Proof.
     iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]".
     { apply auth_both_valid_2 =>//. }
@@ -375,9 +386,11 @@ Section adequacy.
 End adequacy.
 
 Section model_state_lemmas.
-  Context {Mdl: FairModel}.
-  Context `{fairnessGS Mdl Λ LM Σ}.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
   Context `{EqDecision (expr Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
 
   Lemma update_model δ δ1 δ2:
     auth_model_is δ1 -∗ frag_model_is δ2 ==∗ auth_model_is δ ∗ frag_model_is δ.
@@ -453,23 +466,25 @@ Section model_state_lemmas.
     typeclasses eauto.
   Qed.
 
-  Definition fuel_apply (fs' F:  gmap (fmrole Mdl) nat) (LR: gset (fmrole Mdl)):
-    gmap (fmrole Mdl) nat :=
+  Definition fuel_apply (fs' F:  gmap (fmrole M) nat) (LR: gset (fmrole M)):
+    gmap (fmrole M) nat :=
     map_imap
-      (λ (ρ: fmrole Mdl ) (fold : nat),
+      (λ (ρ: fmrole M ) (fold : nat),
        match decide (ρ ∈ dom fs') with
        | left x => fs' !! ρ
        | right _ => F !! ρ
        end) (gset_to_gmap (0%nat) LR).
 
-  Definition update_fuel_resource (δ1: LiveState Mdl) (fs1 fs2: gmap (fmrole Mdl) nat) (s2: Mdl):
-    gmap (fmrole Mdl) nat :=
+  Definition update_fuel_resource (δ1: LiveState Λ M) (fs1 fs2: gmap (fmrole M) nat) (s2: M):
+    gmap (fmrole M) nat :=
+
+
     fuel_apply fs2 (δ1.(ls_fuel (Λ := Λ))) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
 
   Lemma elem_of_frame_excl_map
-        (fs F: gmap (fmrole Mdl) nat)
-        (mf: gmap (fmrole Mdl) (excl nat))
-        (ρ: fmrole Mdl)
+        (fs F: gmap (fmrole M) nat)
+        (mf: gmap (fmrole M) (excl nat))
+        (ρ: fmrole M)
         (f: excl nat):
     ✓ ((λ f : nat, Excl f) <$> F) ->
     ((λ f : nat, Excl f) <$> F ≡ ((Excl <$> fs) ⋅? (Some mf))) ->
@@ -572,8 +587,8 @@ Section model_state_lemmas.
         apply not_elem_of_dom in Hnotin. rewrite Hnotin //.
   Qed.
 
-  Lemma update_mapping ζ (R' : gset $ fmrole Mdl) (R: gset (fmrole Mdl)) M:
-    auth_mapping_is M -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R' ]> M) ∗ ζ ↦M R'.
+  Lemma update_mapping ζ (R' : gset $ fmrole M) (R: gset (fmrole M)) m :
+    auth_mapping_is m -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R' ]> m) ∗ ζ ↦M R'.
   Proof.
     iIntros "Hamap Hmap".
     iCombine "Hamap Hmap" as "H".
@@ -584,8 +599,8 @@ Section model_state_lemmas.
     intros. by apply exclusive_local_update.
   Qed.
 
-  Lemma mapping_lookup ζ M R:
-    auth_mapping_is M -∗ ζ ↦M R -∗ ⌜ ζ ∈ dom M ⌝.
+  Lemma mapping_lookup ζ m R:
+    auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ ζ ∈ dom m ⌝.
   Proof.
     unfold auth_mapping_is, frag_mapping_is.
     iIntros "Ham Hm".
@@ -599,27 +614,27 @@ Section model_state_lemmas.
     apply elem_of_dom. eauto.
   Qed.
 
-  Lemma update_mapping_new_locale ζ ζ' (R R1 R2 : gset $ fmrole Mdl) M:
-    ζ' ∉ dom M ->
-    auth_mapping_is M -∗
-                         ζ ↦M R ==∗
-                                      auth_mapping_is (<[ ζ' := R2]> (<[ ζ := R1 ]> M)) ∗
-                                      ζ ↦M R1 ∗ ζ' ↦M R2.
+  Lemma update_mapping_new_locale ζ ζ' (R R1 R2 : gset $ fmrole M) m :
+    ζ' ∉ dom m ->
+    auth_mapping_is m -∗
+    ζ ↦M R ==∗
+    auth_mapping_is (<[ ζ' := R2]> (<[ ζ := R1 ]> m)) ∗
+    ζ ↦M R1 ∗ ζ' ↦M R2.
   Proof.
     iIntros (Hnotin) "Hamap Hmap".
     iDestruct (mapping_lookup with "Hamap Hmap") as %Hin.
     iCombine "Hamap Hmap" as "H".
-    iMod (own_update (A := (authUR (gmapUR _ (exclR (gsetR (RoleO Mdl)))))) _ _ (
-                       ● ((λ f : gset (fmrole Mdl), Excl f) <$> ((<[ ζ := R1 ]> M)))
-                         ⋅ ◯ ((λ f : gset (fmrole Mdl), Excl f) <$> {[ζ := R1]})
+    iMod (own_update (A := (authUR (gmapUR _ (exclR (gsetR (RoleO M)))))) _ _ (
+                       ● ((λ f : gset (fmrole M), Excl f) <$> ((<[ ζ := R1 ]> m)))
+                         ⋅ ◯ ((λ f : gset (fmrole M), Excl f) <$> {[ζ := R1]})
                      ) with "H") as "[A B]".
     { rewrite !map_fmap_singleton fmap_insert.
       eapply auth_update. eapply singleton_local_update_any.
       intros. by apply exclusive_local_update. }
     iCombine "A B" as "H".
-    iMod (own_update (A := (authUR (gmapUR _ (exclR (gsetR (RoleO Mdl)))))) _ _ (
-                       ● ((λ f : gset (fmrole Mdl), Excl f) <$> (<[ ζ' := R2]> (<[ ζ := R1 ]> M)))
-                         ⋅ ◯ ((λ f : gset (fmrole Mdl), Excl f) <$> {[ζ := R1 ; ζ' := R2]})
+    iMod (own_update (A := (authUR (gmapUR _ (exclR (gsetR (RoleO M)))))) _ _ (
+                       ● ((λ f : gset (fmrole M), Excl f) <$> (<[ ζ' := R2]> (<[ ζ := R1 ]> m)))
+                         ⋅ ◯ ((λ f : gset (fmrole M), Excl f) <$> {[ζ := R1 ; ζ' := R2]})
                      ) with "H") as "[A B]"; last first.
     { iModIntro. iSplitL "A"; first iFrame. rewrite !fmap_insert fmap_empty insert_empty.
       replace (◯ {[ζ := Excl R1; ζ' := Excl R2]}) with (◯ {[ζ := Excl R1]} ⋅ ◯ {[ζ' := Excl R2]}).
@@ -632,14 +647,14 @@ Section model_state_lemmas.
     - done.
   Qed.
 
-  Lemma update_mapping_delete ζ (Rrem : gset $ fmrole Mdl) (R: gset (fmrole Mdl)) M:
-    auth_mapping_is M -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R ∖ Rrem ]> M) ∗ ζ ↦M (R ∖ Rrem).
+  Lemma update_mapping_delete ζ (Rrem : gset $ fmrole M) (R: gset (fmrole M)) m :
+    auth_mapping_is m -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R ∖ Rrem ]> m) ∗ ζ ↦M (R ∖ Rrem).
   Proof.
     eauto using update_mapping.
   Qed.
 
-  Lemma update_mapping_add ζ (Radd : gset $ fmrole Mdl) (R: gset (fmrole Mdl)) M:
-    auth_mapping_is M -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R ∪ Radd ]> M) ∗ ζ ↦M (R ∪ Radd).
+  Lemma update_mapping_add ζ (Radd : gset $ fmrole M) (R: gset (fmrole M)) m :
+    auth_mapping_is m -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R ∪ Radd ]> m) ∗ ζ ↦M (R ∪ Radd).
   Proof.
     eauto using update_mapping.
   Qed.
@@ -656,16 +671,16 @@ Section model_state_lemmas.
       iIntros "!#" (ρ f Hin)  "?". iExists f. iSplit; done.
   Qed.
 
-  Lemma update_has_fuels ζ fs fs' F M:
+  Lemma update_has_fuels ζ fs fs' F m :
     let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
     (fs ≠ ∅) ->
     (dom fs' ∖ dom fs ∩ dom F = ∅) ->
     has_fuels ζ fs -∗
     auth_fuel_is F -∗
-    auth_mapping_is M ==∗
-      auth_fuel_is (fuel_apply fs' F LR) ∗
-      has_fuels ζ fs' ∗
-      auth_mapping_is (<[ ζ := dom fs' ]> M).
+    auth_mapping_is m ==∗
+    auth_fuel_is (fuel_apply fs' F LR) ∗
+    has_fuels ζ fs' ∗
+    auth_mapping_is (<[ ζ := dom fs' ]> m).
   Proof.
     iIntros (LR Hfs Hdom) "Hfuels Hafuels Hamapping".
     rewrite !has_fuels_equiv. iDestruct "Hfuels" as "[Hmapping Hfuels]".
@@ -675,16 +690,16 @@ Section model_state_lemmas.
     iFrame.
   Qed.
 
-  Lemma update_has_fuels_no_step ζ fs fs' F M:
+  Lemma update_has_fuels_no_step ζ fs fs' F m :
     let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
     (fs ≠ ∅) ->
     (dom fs' ⊆ dom fs) ->
     has_fuels ζ fs -∗
     auth_fuel_is F -∗
-    auth_mapping_is M ==∗
-      auth_fuel_is (fuel_apply fs' F LR) ∗
-      has_fuels ζ fs' ∗
-      auth_mapping_is (<[ ζ := dom fs' ]> M).
+    auth_mapping_is m ==∗
+    auth_fuel_is (fuel_apply fs' F LR) ∗
+    has_fuels ζ fs' ∗
+    auth_mapping_is (<[ ζ := dom fs' ]> m).
   Proof.
     iIntros (LR Hfs Hdom) "Hfuels Hafuels Hamapping".
     rewrite !has_fuels_equiv. iDestruct "Hfuels" as "[Hmapping Hfuels]".
@@ -693,16 +708,16 @@ Section model_state_lemmas.
     iModIntro. iFrame.
   Qed.
 
-  Lemma update_has_fuels_no_step_no_change ζ fs fs' F M:
+  Lemma update_has_fuels_no_step_no_change ζ fs fs' F m :
     let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
     (fs ≠ ∅) ->
     (dom fs' = dom fs) ->
     has_fuels ζ fs -∗
     auth_fuel_is F -∗
-    auth_mapping_is M ==∗
-      auth_fuel_is (fuel_apply fs' F LR) ∗
-      has_fuels ζ fs' ∗
-      auth_mapping_is M.
+    auth_mapping_is m ==∗
+    auth_fuel_is (fuel_apply fs' F LR) ∗
+    has_fuels ζ fs' ∗
+    auth_mapping_is m.
   Proof.
     iIntros (LR Hfs Hdom) "Hfuels Hafuels Hamapping".
     rewrite !has_fuels_equiv. iDestruct "Hfuels" as "[Hmapping Hfuels]".
@@ -716,7 +731,7 @@ Section model_state_lemmas.
     has_fuels ζ fs -∗ model_state_interp n δ -∗ ⌜ ∀ ρ, ls_mapping δ !! ρ = Some ζ <-> ρ ∈ dom fs ⌝.
   Proof.
     unfold model_state_interp, has_fuels, auth_mapping_is, frag_mapping_is.
-    iIntros "[Hζ Hfuels] (%M&%FR&Hafuel&Hamapping &HFR&%Hmapinv&Hamod&Hfr) %ρ".
+    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping &HFR&%Hmapinv&Hamod&Hfr) %ρ".
     iCombine "Hamapping Hζ" as "H".
     iDestruct (own_valid with "H") as %Hval. iPureIntro.
     apply auth_both_valid_discrete in Hval as [Hval ?].
@@ -725,15 +740,16 @@ Section model_state_lemmas.
     rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
     apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq.
     rewrite (Hmapinv ρ ζ) HMζ. split.
-    - intros (?&?&?). congruence.
+    - intros (?&?&?). by simplify_eq.
     - intros ?. eexists. split; eauto.
   Qed.
 
   Lemma has_fuel_fuel ζ δ fs n:
-    has_fuels ζ fs -∗ model_state_interp n δ -∗  ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
+    has_fuels ζ fs -∗ model_state_interp n δ -∗ 
+    ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
   Proof.
     unfold has_fuels, model_state_interp, auth_fuel_is.
-    iIntros "[Hζ Hfuels] (%M&%FR&Hafuel&Hamapping&HFR&%Hmapinv&Hamod)" (ρ Hρ).
+    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping&HFR&%Hmapinv&Hamod)" (ρ Hρ).
     iDestruct (big_sepS_delete _ _ ρ with "Hfuels") as "[(%f&%Hfs&Hfuel) _]" =>//.
     iCombine "Hafuel Hfuel" as "H".
     iDestruct (own_valid with "H") as %Hval. iPureIntro.
@@ -752,7 +768,7 @@ Section model_state_lemmas.
     locale_step (trace_last extr) (Some ζ) c2 ->
     has_fuels_S ζ fs -∗ model_state_interp (trace_last extr).1 (trace_last auxtr)
     ==∗ ∃ δ2 (ℓ : mlabel LM),
-        ⌜labels_match (Some ζ) ℓ
+        ⌜labels_match (LM:=LM) (Some ζ) ℓ
         ∧ valid_state_evolution_fairness (extr :tr[Some ζ]: c2) (auxtr :tr[ℓ]: δ2)⌝
                                 ∗ has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗ model_state_interp c2.1 δ2.
   Proof.
@@ -762,7 +778,7 @@ Section model_state_lemmas.
     iDestruct (has_fuel_in with "Hf Hmod") as %Hxdom; eauto.
     iDestruct (has_fuel_fuel with "Hf Hmod") as "%Hfuel"; eauto.
     iDestruct (model_state_interp_tids_smaller with "Hmod") as %Hζs.
-    iDestruct "Hmod" as "(%M & %FR & Hfuel & Hamapping & HFR & %Hminv & %Hlocssmall & Hmodel & %HFR)".
+    iDestruct "Hmod" as "(%m & %FR & Hfuel & Hamapping & HFR & %Hminv & %Hlocssmall & Hmodel & %HFR)".
     unfold has_fuels_S.
     simpl in *.
 
@@ -773,8 +789,7 @@ Section model_state_lemmas.
                    ((dom (ls_fuel (trace_last auxtr)) ∪ dom fs) ∖ rem)) = new_dom) as Hnewdom.
     { rewrite /fuel_apply map_imap_dom_eq ?dom_gset_to_gmap //.
       intros ρ0 _ Hindom.
-      destruct (decide (ρ0 ∈ dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs))) as [Hinf|Hninf];
-        first by apply elem_of_dom.
+      case_decide as Hninf; [by apply elem_of_dom|].
       apply elem_of_difference in Hindom as [Hin1 ?].
       apply elem_of_union in Hin1 as [?|Hin2]; first by apply elem_of_dom.
       exfalso. apply Hninf. apply elem_of_dom in Hin2 as [f ?].
@@ -786,27 +801,26 @@ Section model_state_lemmas.
                                        (ls_fuel (trace_last auxtr))
                                        ((dom (ls_fuel (trace_last auxtr)) ∪ dom fs) ∖ rem))).
     { rewrite /new_mapping /new_dom. unfold fuel_apply.
-      assert (dom fs ⊆ dom (trace_last auxtr).(ls_fuel)).
+      assert (dom fs ⊆ dom (trace_last auxtr).(ls_fuel)) as Hdom_le.
       { intros ρ Hin. rewrite elem_of_dom Hfuel; last set_solver.
         apply elem_of_dom in Hin as [? Hin]. rewrite lookup_fmap Hin //=. }
       rewrite map_imap_dom_eq; last first.
       { intros ρ _ Hin. rewrite dom_gset_to_gmap in Hin.
-        destruct (decide (ρ ∈ dom $ fs ⇂ (dom fs ∖ rem))) as [Hin'|_].
-        * by apply elem_of_dom.
-        * apply elem_of_dom. set_solver. }
-      rewrite dom_domain_restrict ?dom_gset_to_gmap ?ls_same_doms //. set_solver. }
+        case_decide; [by apply elem_of_dom|].
+        apply elem_of_dom. set_solver +Hin Hdom_le. }
+      rewrite dom_domain_restrict ?dom_gset_to_gmap ?ls_same_doms //.
+      set_solver +Hdom_le. }
     assert (Hfueldom: live_roles _ (trace_last auxtr) ⊆
      dom (fuel_apply (fs ⇂ (dom fs ∖ rem))
                      (ls_fuel (trace_last auxtr))
                      ((dom (ls_fuel (trace_last auxtr)) ∪ dom fs) ∖ rem))).
     { rewrite /fuel_apply Hnewdom.
       intros ρ Hin. apply elem_of_difference; split;
-        [apply ls_fuel_dom in Hin; set_solver | set_solver]. }
-
+        [apply ls_fuel_dom in Hin; set_solver +Hin|
+          set_solver -Hlocssmall Hnewdom Hsamedoms]. }
     iMod (update_has_fuels_no_step ζ (S <$> fs) (fs ⇂ (dom fs ∖ rem)) with "[Hf] [Hfuel] [Hamapping]") as "(Hafuels&Hfuels&Hamapping)" =>//.
-    { rewrite -dom_empty_iff_L. set_solver. }
-    { rewrite dom_domain_restrict; set_solver. }
-
+    { rewrite -dom_empty_iff_L. set_solver -Hnewdom Hsamedoms Hfueldom. }
+    { rewrite dom_domain_restrict; set_solver -Hnewdom Hsamedoms Hfueldom. }
     iModIntro.
     iExists {|
       ls_under := (trace_last auxtr).(ls_under);
@@ -823,38 +837,43 @@ Section model_state_lemmas.
         by apply Hxdom. }
       iSplit.
       { iApply (auth_fuel_is_proper with "Hafuels"). f_equiv.
-        rewrite dom_domain_restrict; last set_solver.
-        replace (dom fs ∖ (dom fs ∖ rem)) with rem; [set_solver|].
-        rewrite -leibniz_equiv_iff. intros ρ. split; [set_solver|].
+        rewrite dom_domain_restrict; last set_solver -Hnewdom Hsamedoms Hfueldom.
+        replace (dom fs ∖ (dom fs ∖ rem)) with rem; [set_solver +|].
+        rewrite -leibniz_equiv_iff. intros ρ. split; [set_solver -Hnewdom Hsamedoms Hfueldom|].
         intros [? [?|?]%not_elem_of_difference]%elem_of_difference =>//. }
       iPureIntro. split; last split.
-      - intros ρ ζ'. rewrite /new_mapping dom_domain_restrict; last set_solver. split.
+      - intros ρ ζ'. rewrite /new_mapping dom_domain_restrict; last set_solver +. split.
         + intros [Hlk Hin]%map_filter_lookup_Some. destruct (decide (ζ' = ζ)) as [->|Hneq].
-          * rewrite lookup_insert. eexists; split=>//. set_solver.
+          * rewrite lookup_insert. eexists; split=>//. set_solver -Hnewdom Hsamedoms Hfueldom.
           * rewrite lookup_insert_ne //. by apply Hminv.
         + intros Hin. destruct (decide (ζ' = ζ)) as [->|Hneq].
           * rewrite lookup_insert in Hin. apply map_filter_lookup_Some.
-            destruct Hin as (?&?&?). simplify_eq. split; last set_solver.
-            apply Hxdom. rewrite dom_fmap. set_solver.
+            destruct Hin as (?&?&?). simplify_eq. split; last set_solver -Hnewdom Hsamedoms Hfueldom.
+            apply Hxdom. rewrite dom_fmap. set_solver -Hnewdom Hsamedoms Hfueldom.
           * rewrite lookup_insert_ne // -Hminv in Hin. apply map_filter_lookup_Some; split=>//.
             rewrite /new_dom. apply elem_of_difference; split.
-            ** apply elem_of_dom_2 in Hin. rewrite ls_same_doms in Hin. set_solver.
-            ** assert (ρ ∉ dom fs); last set_solver. rewrite dom_fmap_L in Hxdom.
+            ** apply elem_of_dom_2 in Hin. rewrite ls_same_doms in Hin. set_solver -Hnewdom Hsamedoms Hfueldom.
+            ** assert (ρ ∉ dom fs); last set_solver -Hnewdom Hsamedoms Hfueldom.
+               rewrite dom_fmap_L in Hxdom.
                intros contra%Hxdom. congruence.
       - intros ζ0 Hnotin. apply lookup_insert_None; split.
         + apply Hlocssmall.
           destruct (trace_last extr).
-          have ? := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
-          clear Hfueldom Hsamedoms. set_solver.
-        + intros <-.
-          destruct (trace_last extr).
+          have Hle := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
+          clear -Hnotin Hle. set_solver.
+        + intros <-. destruct (trace_last extr).
           have ? := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
           clear Hfueldom Hsamedoms. inversion Hstep. simplify_eq.
-          assert (locale_of t1 e1 ∈ locales_of_list (t1 ++ e1 :: t2)); last set_solver.
+          assert (locale_of t1 e1 ∈ locales_of_list (t1 ++ e1 :: t2));
+            last by eauto.
           apply locales_of_list_from_locale_from.
-          rewrite from_locale_from_Some // prefixes_from_spec. eexists _,_. by list_simplifier.
+          rewrite from_locale_from_Some //. 
+          eapply prefixes_from_spec.
+          eexists _,_. by list_simplifier.
       - rewrite Hnewdom /new_dom. apply elem_of_equiv_empty_L. intros ρ [Hin1 Hin2]%elem_of_intersection.
-        assert (ρ ∈ dom (ls_fuel (trace_last auxtr))) by set_solver. set_solver. }
+        assert (ρ ∈ dom (ls_fuel (trace_last auxtr)))
+               by set_solver -Hnewdom Hsamedoms Hfueldom.
+        set_solver -Hnewdom Hsamedoms Hfueldom. }
     iPureIntro.
     do 2 split; first done. split; [split; [|split; [|split; [|split]]]|] =>//.
     - eexists. apply Hxdom. by rewrite dom_fmap.
@@ -869,29 +888,33 @@ Section model_state_lemmas.
 
         pose proof Hinfs as Hinfs'. apply elem_of_dom in Hinfs' as [f Heqf].
         assert (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs !! ρ' = Some f) as Heqfilter.
-        { rewrite map_filter_lookup Heqf /= option_guard_True //. set_solver. }
+        { rewrite map_filter_lookup Heqf /= option_guard_True //. set_solver -Hnewdom Hsamedoms Hfueldom Hmustdec. }
         rewrite decide_True // ?Heqfilter ?lookup_fmap ?Heqf /=; last by eapply elem_of_dom_2. lia.
       + rewrite /= /new_mapping map_filter_lookup in Hneqtid.
         pose proof Hin as Hin2. rewrite -ls_same_doms in Hin2. apply elem_of_dom in Hin2 as [f Hf].
         rewrite Hf /= option_guard_True // in Hneqtid.
     - intros ρ' Hin _. simpl. destruct (decide (ρ' ∈ rem)) as [Hin'|Hnin'].
-      + right; split; last set_solver. rewrite /fuel_apply map_imap_dom_eq ?dom_gset_to_gmap; first set_solver.
-        intros ρ0 _ Hin0. destruct (decide (ρ0 ∈ dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs))) as [?|Hnin];
-          first by apply elem_of_dom.
+      + right; split; last set_solver -Hnewdom Hsamedoms Hfueldom.
+        rewrite /fuel_apply map_imap_dom_eq ?dom_gset_to_gmap; first set_solver.
+        intros ρ0 _ Hin0. 
+        case_decide as Hnin; [by apply elem_of_dom|].
         apply elem_of_difference in Hin0 as [Hin1 ?].
         apply elem_of_union in Hin1 as [?|Hin2]; first by apply elem_of_dom.
         exfalso. apply Hnin. apply elem_of_dom in Hin2 as [f ?].
         eapply elem_of_dom_2. rewrite map_filter_lookup_Some. split =>//.
         apply elem_of_difference; split =>//. by eapply elem_of_dom_2.
-      + left. rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=; last set_solver.
+      + left. rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=;
+                      last set_solver -Hnewdom Hsamedoms Hfueldom.
         apply elem_of_dom in Hin as [f Hf].
-        destruct (decide (ρ' ∈ dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs))) as [Hin|?];
-          last by rewrite !Hf //=.
+        case_decide as Hin; [|by rewrite !Hf //=].
         apply elem_of_dom in Hin as [f' Hf']. rewrite Hf'.
         apply map_filter_lookup_Some in Hf' as [Hfs Hf'].
-        rewrite Hfuel ?lookup_fmap ?Hfs /=; [lia |]. rewrite dom_fmap; set_solver.
-    - rewrite Hnewdom. assert (dom fs ⊆ dom $ ls_fuel (trace_last auxtr)); last set_solver.
-        intros ρ Hin. apply elem_of_dom. rewrite Hfuel ?dom_fmap // -elem_of_dom dom_fmap //.
+        rewrite Hfuel ?lookup_fmap ?Hfs /=; [lia |].
+        rewrite dom_fmap; set_solver -Hnewdom Hsamedoms Hfueldom.
+    - rewrite Hnewdom. assert (dom fs ⊆ dom $ ls_fuel (trace_last auxtr));
+        last set_solver -Hnewdom Hsamedoms Hfueldom.
+      intros ρ Hin. apply elem_of_dom.
+      rewrite Hfuel ?dom_fmap // -elem_of_dom dom_fmap //.
     - unfold tids_smaller; simpl. intros ρ ζ0 Hin.
       destruct (trace_last extr); destruct (trace_last extr).
       eapply from_locale_step =>//.
@@ -914,25 +937,18 @@ Section model_state_lemmas.
     iIntros (Hnemp Hunioneq -> Hstep Htlen) "Hf Hmod".
     unfold has_fuels_S.
     simpl in *.
-
     iDestruct (has_fuel_fuel with "Hf Hmod") as %Hfuels.
-
     iDestruct (model_state_interp_tids_smaller with "Hmod") as %Hts.
-    iDestruct "Hmod" as (M FR) "(Haf&Ham&HFR&%Hminv&%Hsmall&Hamod&%HFR)".
-
+    iDestruct "Hmod" as (m FR) "(Haf&Ham&HFR&%Hminv&%Hsmall&Hamod&%HFR)".
     pose Hlocincl := locales_of_list_step_incl _ _ _ _ _ Hstep.
-
     iMod (update_has_fuels_no_step_no_change ζ (S <$> fs) fs with "Hf Haf Ham") as "(Haf&Hf&Ham)".
     { intros contra. apply fmap_empty_inv in contra. set_solver. }
     { rewrite dom_fmap_L //. }
-
     iDestruct "Hf" as "(Hf & Hfuels)".
     iDestruct (frag_mapping_same with "Ham Hf") as %Hmapping.
-
-    assert (Hnewζ: (locale_of tp1 efork) ∉ dom M).
+    assert (Hnewζ: (locale_of tp1 efork) ∉ dom m).
     { apply not_elem_of_dom. apply Hsmall.
       unfold tids_smaller in Hsmall.
-
       rewrite elem_of_list_fmap. intros ([??]&Hloc&Hin).
       symmetry in Hloc.
       rewrite -> prefixes_from_spec in Hin.
@@ -941,9 +957,7 @@ Section model_state_lemmas.
       eapply locale_injective=>//.
       apply prefixes_from_spec.
       exists t0, []. split =>//. by list_simplifier. }
-
     iMod (update_mapping_new_locale ζ (locale_of tp1 efork) _ R1 R2 with "Ham Hf") as "(Ham&HR1&HR2)"; eauto.
-
     pose δ1 := trace_last auxtr.
     assert (Hsamedoms: dom (map_imap
                                 (λ ρ o,
@@ -977,11 +991,17 @@ Section model_state_lemmas.
       rewrite lookup_fmap fmap_is_Some. by apply elem_of_dom. }
     rewrite -Hunioneq big_sepS_union //. iDestruct "Hfuels" as "[Hf1 Hf2]".
     iSplitL "Hf2 HR2".
-    { unfold has_fuels. rewrite dom_domain_restrict; [|set_solver]. iFrame.
+    { unfold has_fuels.
+      rewrite dom_domain_restrict;
+        [|set_solver -Hsamedoms Hsamedoms Hfueldom Hlocincl Hdomincl].
+      iFrame.
       iApply (big_sepS_impl with "Hf2"). iIntros "!#" (x Hin) "(%f&%&?)".
       iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }
     iSplitL "Hf1 HR1".
-    { unfold has_fuels. rewrite dom_domain_restrict; [|set_solver]. iFrame.
+    { unfold has_fuels.
+      rewrite dom_domain_restrict;
+        [|set_solver -Hsamedoms Hsamedoms Hfueldom Hlocincl Hdomincl].
+      iFrame.
       iApply (big_sepS_impl with "Hf1"). iIntros "!#" (x Hin) "(%f&%&?)".
       iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }
     iSplitL "Ham Haf Hamod HFR".
@@ -993,15 +1013,17 @@ Section model_state_lemmas.
         rewrite lookup_gset_to_gmap.
         destruct (decide (ρ ∈ dom (ls_fuel δ1) ∪ dom fs)) as [Hin|Hin].
         + rewrite option_guard_True //=.
-
           assert (Hmap: ρ ∈ dom (ls_fuel δ1)).
-          { set_solver. }
-
+          { set_unfold. naive_solver. }
           destruct (decide (ρ ∈ dom fs)) as [Hinfs|Hinfs].
           * apply elem_of_dom in Hmap as [? Hinfuels]. rewrite Hinfuels /=.
-            rewrite Hfuels in Hinfuels; last set_solver. rewrite lookup_fmap in Hinfuels.
-            destruct (fs !! ρ); last done. f_equiv. simpl in Hinfuels. injection Hinfuels. intros ?.
-            rewrite leibniz_equiv_iff. lia.
+            rewrite Hfuels in Hinfuels; last set_solver.
+            rewrite lookup_fmap in Hinfuels.
+            rewrite leibniz_equiv_iff.
+            rewrite -lookup_fmap in Hinfuels.
+            rewrite lookup_fmap_Some in Hinfuels.
+            destruct Hinfuels as [y [<- Hinfuels]].
+            rewrite Hinfuels. f_equiv. lia.
           * apply elem_of_dom in Hmap as [? Hinfuels].
             rewrite Hinfuels //.
         + rewrite option_guard_False //=.
@@ -1011,25 +1033,25 @@ Section model_state_lemmas.
         { intros ζ' Hζ'. rewrite lookup_insert_ne; last first.
           { pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep).
             clear Hfueldom Hsamedoms.
-            assert (ζ' ∉ locales_of_list tp1); first by set_solver.
+            assert (ζ' ∉ locales_of_list tp1) by eauto.            
             intros contra. simplify_eq.
             destruct Htlen as [tp1' [-> Hlen]].
-            inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |]. simplify_eq.
+            inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |].
+            simplify_eq.
             assert (efs = [efork]) as ->.
             { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
               rewrite app_length //=; rewrite app_length //= in Hlen.
               clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
-            rewrite H3 in Hζ'.
+            rewrite H2 in Hζ'.
             apply Hζ'. apply elem_of_list_fmap.
             eexists (t1 ++ e2 :: t2, _); split =>//.
             - erewrite locale_equiv =>//. apply locales_equiv_middle.
               eapply locale_step_preserve => //.
             - replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]); last by list_simplifier.
-              rewrite prefixes_from_app. set_solver. }
-
+              rewrite prefixes_from_app. set_unfold; naive_solver. }
           rewrite lookup_insert_ne; last first.
-          { intros <-. rewrite Hsmall in Hmapping; [congruence | set_solver]. }
-          apply Hsmall; set_solver.  }
+          { intros <-. rewrite Hsmall in Hmapping; [congruence | naive_solver]. }
+          apply Hsmall; set_unfold; naive_solver. }
         { rewrite map_imap_dom_eq // => ρ f Hin. by destruct (decide (ρ ∈ R1 ∪ R2)). }
         intros ρ ζ'. rewrite map_lookup_imap.
         destruct (decide (ρ ∈ dom (ls_mapping δ1))) as [Hin|Hin].
@@ -1040,9 +1062,9 @@ Section model_state_lemmas.
             -- intros (ks & Hlk & H'). destruct (decide (ζ' = locale_of tp1 efork)); first congruence.
                rewrite lookup_insert_ne // in Hlk. exfalso.
                assert (ρ ∈ dom fs).
-               { set_solver. }
+               { set_unfold. naive_solver. }
                destruct (decide (ζ = ζ')); simplify_eq.
-               ** rewrite lookup_insert in Hlk. set_solver.
+               ** rewrite lookup_insert in Hlk. set_unfold. naive_solver.
                ** rewrite lookup_insert_ne // in Hlk.
                   assert (ζ = ζ'); last done.
                   { eapply (maps_inverse_bij _ _ _ _ ks); eauto. }
@@ -1064,7 +1086,7 @@ Section model_state_lemmas.
                { simplify_eq. rewrite lookup_insert // in Hin.
                  f_equal. simplify_eq.
                  assert (ls_mapping δ1 !! ρ = Some ζ).
-                 { eapply Hminv. eexists _. split; eauto. set_solver. }
+                 { eapply Hminv. eexists _. split; eauto. set_unfold; naive_solver. }
                  congruence. }
                rewrite lookup_insert_ne // in Hin.
                assert (ls_mapping δ1 !! ρ = Some ζ').
@@ -1074,10 +1096,12 @@ Section model_state_lemmas.
           intros (?&Hin'&?). rewrite -ls_same_doms in Hdomincl.
           apply not_elem_of_dom in Hin.
           destruct (decide (ζ' = locale_of tp1 efork)).
-          { simplify_eq. rewrite lookup_insert in Hin'. simplify_eq. set_solver. }
+          { simplify_eq. rewrite lookup_insert in Hin'. simplify_eq.
+            set_unfold; naive_solver. }
           rewrite lookup_insert_ne // in Hin'.
           destruct (decide (ζ' = ζ)).
-          { simplify_eq. rewrite lookup_insert // in Hin'. simplify_eq. set_solver. }
+          { simplify_eq. rewrite lookup_insert // in Hin'. simplify_eq.
+            set_unfold; naive_solver. }
           rewrite lookup_insert_ne // in Hin'.
           assert (ls_mapping δ1 !! ρ = Some ζ').
           { eapply Hminv. eauto. }
@@ -1097,7 +1121,7 @@ Section model_state_lemmas.
         + unfold from_locale. erewrite from_locale_from_Some; eauto.
           apply prefixes_from_spec. list_simplifier. eexists _, []. split=>//.
           by list_simplifier.
-        + eapply from_locale_from_equiv =>//; [constructor |]. rewrite H1.
+        + eapply from_locale_from_equiv =>//; [constructor |]. rewrite H0.
           replace (t1 ++ e1 :: t2 ++ [efork]) with ((t1 ++ e1 :: t2) ++ [efork]);
             last by list_simplifier.
           replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]);
@@ -1123,16 +1147,17 @@ Section model_state_lemmas.
           specialize (Hfuels _ Hin''). rewrite lookup_fmap Hin' in Hfuels.
           destruct (fs !! ρ); simplify_eq. simpl in Hfuels. injection Hfuels.
           intros ->. simpl. lia. }
-        symmetry in Hsametid. apply Hminv in Hsametid as (?&?&?). set_solver.
+        symmetry in Hsametid. apply Hminv in Hsametid as (?&?&?).
+        set_unfold; naive_solver.
       - rewrite map_lookup_imap. simpl in *. clear Hmd.
         destruct (decide (ρ ∈ dom (ls_mapping δ1))) as [Hin|Hin]; last first.
         { apply not_elem_of_dom in Hin. rewrite map_lookup_imap Hin //= in Hissome. by inversion Hissome. }
         apply elem_of_dom in Hin as [ζ' Hin'].
         rewrite map_lookup_imap Hin' /= in Hneqtid.
         destruct (decide (ρ ∈ R2)) as [Hin''|Hin'']; last done.
-        rewrite Hfuels; last set_solver. rewrite lookup_fmap.
-        assert (Hindom: ρ ∈ dom fs); first by set_solver.
-        apply elem_of_dom in Hindom as [f Hindom]. rewrite Hindom /= decide_True /=; [lia|set_solver]. }
+        rewrite Hfuels; last (set_unfold; naive_solver). rewrite lookup_fmap.
+        assert (Hindom: ρ ∈ dom fs); first by set_unfold; naive_solver.
+        apply elem_of_dom in Hindom as [f Hindom]. rewrite Hindom /= decide_True /=; [lia|set_unfold; naive_solver]. }
     iSplit.
     { iPureIntro. intros ρ' Hρ' _. simpl. left.
       rewrite map_lookup_imap. rewrite elem_of_dom in Hρ'.
@@ -1141,11 +1166,11 @@ Section model_state_lemmas.
     by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)).
   Qed.
 
-  Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole Mdl) nat) (s1 s2: Mdl) (ρ: fmrole Mdl) :=
-    (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(fuel_limit) s2))) ∧
+  Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole M) nat) (s1 s2: M) (ρ: fmrole M) :=
+    (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(lm_fl) s2))) ∧
     (ρ ∉ live_roles _ s2 -> ρ ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ) (fs1 !! ρ)) ∧
     ρ ∈ dom fs1 ∧
-    (forall ρ', ρ' ∈ dom fs2 ∖ dom fs1 -> oleq (fs2 !! ρ') (Some $ LM.(fuel_limit) s2)) ∧
+    (forall ρ', ρ' ∈ dom fs2 ∖ dom fs1 -> oleq (fs2 !! ρ') (Some $ LM.(lm_fl) s2)) ∧
     (forall ρ', ρ ≠ ρ' -> ρ' ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ') (fs1 !! ρ')) ∧
     (dom fs1 ∖ {[ ρ ]}) ∪ (live_roles _ s2 ∖ live_roles _ s1) ⊆ dom fs2 ∧
     dom fs2 ⊆
@@ -1185,7 +1210,7 @@ Section model_state_lemmas.
     iDestruct (has_fuel_fuel with "Hfuel Hsi") as %Hfuel; eauto.
     iDestruct (model_state_interp_tids_smaller with "Hsi") as %Hless.
 
-    iDestruct "Hsi" as "(%M&%FR&Hafuel&Hamapping&HFR&%Hinv&%Hsmall&Hamod&%HFR)".
+    iDestruct "Hsi" as "(%m&%FR&Hafuel&Hamapping&HFR&%Hinv&%Hsmall&Hamod&%HFR)".
     iDestruct (model_agree with "Hamod Hmod") as "%Heq".
 
     iDestruct (free_roles_inclusion with "HFR Hfr1") as %HfrFR.
@@ -1224,19 +1249,22 @@ Section model_state_lemmas.
 
     assert (Hfueldom: live_roles _ s2 ⊆ dom $ update_fuel_resource δ1 fs1 fs2 s2).
     { rewrite -Hsamedoms map_imap_dom_eq dom_gset_to_gmap //.
-      { epose proof ls_fuel_dom. intros ρ' Hin.
-        destruct Hfuelsval as (?&?&?&?&?&?).
+      { epose proof ls_fuel_dom as Hfueldom. intros ρ' Hin.
+        destruct Hfuelsval as (?&?&?&?&?&Hdom_le).
         destruct (decide (ρ' ∈ live_roles _ δ1)).
-        - apply elem_of_difference; split; [set_solver|].
+        - apply elem_of_difference.
+          split; [set_solver -Hnewdom Hsamedoms Hdom_le|].
           intros [? Habs]%elem_of_difference.
           destruct (decide (ρ' = ρ)).
           + simplify_eq. apply not_elem_of_dom in Habs.
             rewrite -> Habs in *. simpl in *. eauto.
-          + apply Habs. assert (ρ' ∈ dom fs1 ∖ {[ρ]}); set_solver.
-        - apply elem_of_difference; split; [apply elem_of_union; right; set_solver|set_solver]. }
+          + apply Habs.
+            assert (ρ' ∈ dom fs1 ∖ {[ρ]}); set_solver -Hnewdom Hsamedoms.
+        - apply elem_of_difference.
+          split; [apply elem_of_union; right; set_unfold; naive_solver|
+                   set_unfold; naive_solver]. }
       intros ρ0??. destruct (decide (ρ0 ∈ dom $ ls_fuel δ1)); [|done].
       apply elem_of_dom. rewrite ls_same_doms. SS. }
-
     iExists {|
       ls_under := s2;
       ls_fuel :=  _;
@@ -1249,18 +1277,17 @@ Section model_state_lemmas.
     { set_solver. }
     { unfold valid_new_fuelmap in Hfuelsval.
       destruct Hfuelsval as (_&_&?&?& Hfs2_inf&Hfs2_sup).
-
       apply elem_of_equiv_empty_L => ρ0 Hin.
       apply elem_of_intersection in Hin as [Hin1 Hin2].
       apply elem_of_difference in Hin1 as [Hin11 Hin12].
-
-      assert (ρ0 ∈ live_roles _ s2 ∖ live_roles _ s1) by set_solver.
-      assert (ρ0 ∈ fr1) by set_solver.
-      assert (ρ0 ∈ FR) by set_solver.
-      assert (ρ0 ∉ dom (ls_fuel δ1)) by set_solver.
+      assert (ρ0 ∈ live_roles _ s2 ∖ live_roles _ s1)
+             by set_solver -Hsamedoms Hnewdom.
+      assert (ρ0 ∈ fr1) by set_solver -Hsamedoms Hnewdom.
+      assert (ρ0 ∈ FR) by set_solver -Hsamedoms Hnewdom.
+      assert (ρ0 ∉ dom (ls_fuel δ1)) by set_solver -Hsamedoms Hnewdom.
       done. }
     iMod (update_model s2 with "Hamod Hmod") as "[Hamod Hmod]".
-    iMod (update_free_roles (live_roles Mdl s2 ∖ live_roles Mdl s1)
+    iMod (update_free_roles (live_roles M s2 ∖ live_roles M s1)
            with "HFR Hfr1") as "[HFR Hfr2]"; [set_solver|].
     iModIntro. iSplit.
     { iSplit; first done. iPureIntro.
@@ -1269,36 +1296,40 @@ Section model_state_lemmas.
       - constructor; simpl; first by rewrite Hauxtrlast Heq //.
         split; first by rewrite Hauxtrlast; apply Hxdom; set_solver.
         split.
-        { intros ??? Hmd. inversion Hmd; clear Hmd; simplify_eq.
+        { intros ? ? Hdom Hmd. inversion Hmd; clear Hmd; simplify_eq.
           + symmetry in Hsametid. rewrite -> Hxdom in Hsametid. simpl.
             unfold update_fuel_resource, fuel_apply.
             rewrite map_lookup_imap lookup_gset_to_gmap.
-            destruct (decide (ρ' ∈ live_roles Mdl s2 ∪ dom fs2)) as [Hin|Hin].
+            destruct (decide (ρ' ∈ live_roles M s2 ∪ dom fs2)) as [Hin|Hin].
             * rewrite option_guard_True //=.
               { destruct (decide (ρ' ∈ dom fs2)) as [Hin2|Hin2].
-                ** rewrite Hfuel; last set_solver. apply Hdec; [congruence|set_solver].
-                ** exfalso. set_solver. }
-              apply elem_of_difference; split; [set_solver|].
+                ** rewrite Hfuel; last set_solver.
+                   apply Hdec; [congruence|set_solver -Hsamedoms Hnewdom Hdom].
+                ** exfalso. set_solver -Hsamedoms Hnewdom Hdom. }
+              apply elem_of_difference; split;
+                [set_solver -Hsamedoms Hnewdom Hdom|].
               apply not_elem_of_difference; right.
               apply elem_of_union in Hin as [|]; [|done].
               destruct (decide (ρ' = ρ)); simplify_eq.
-              apply Hinf; set_solver.
+              apply Hinf; set_solver -Hsamedoms Hnewdom Hdom.
             * rewrite option_guard_False //=.
-              ** assert (ρ' ∈ dom fs2); set_solver.
-              ** apply not_elem_of_difference; right; set_solver.
+              ** assert (ρ' ∈ dom fs2); set_solver -Hsamedoms Hnewdom Hdom.
+              ** apply not_elem_of_difference; right; set_solver -Hsamedoms Hnewdom Hdom.
           + simpl in *. unfold update_fuel_resource, fuel_apply.
             rewrite map_lookup_imap lookup_gset_to_gmap.
 
             destruct (decide (ρ' ∈ (dom (ls_fuel (trace_last auxtr)) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))) as [Hin|Hin].
             * rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //= decide_True //= in Hneqtid.
-            * apply not_elem_of_difference in Hin as [?|Hin]; [set_solver|].
+            * apply not_elem_of_difference in Hin as [?|Hin];
+                [set_solver -Hsamedoms Hnewdom Hdom|].
               apply elem_of_difference in Hin as [??].
               rewrite map_lookup_imap lookup_gset_to_gmap /= option_guard_False /= in Hissome;
-                [inversion Hissome; congruence|set_solver].
-          + simpl in *. rewrite Hfuel; last set_solver. unfold update_fuel_resource, fuel_apply.
+                [inversion Hissome; congruence|set_solver -Hsamedoms Hnewdom Hdom].
+          + simpl in *. rewrite Hfuel; last set_solver -Hsamedoms Hnewdom Hdom.
+            unfold update_fuel_resource, fuel_apply.
             rewrite Hnewdom in Hnotdead. rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=.
-            assert (ρ' ∈ dom fs2) by set_solver.
-            rewrite decide_True; [apply Hzombie =>//; set_solver | done]. }
+            assert (ρ' ∈ dom fs2) by (set_solver -Hsamedoms Hnewdom Hdom).
+           rewrite decide_True; [apply Hzombie =>//; set_solver -Hsamedoms Hnewdom Hdom | done]. }
         split.
         + intros ? Hin ?. simplify_eq; simpl.
           unfold update_fuel_resource, fuel_apply.
@@ -1307,34 +1338,33 @@ Section model_state_lemmas.
           * rewrite option_guard_True //=.
             apply elem_of_difference in Hlive as [Hin1 Hnin].
             apply not_elem_of_difference in Hnin.
-
             destruct (decide (ρ' ∈ dom fs2)) as [Hin2|Hin2].
             ** destruct (decide (ρ' ∈ live_roles _ (trace_last auxtr)));left.
                *** destruct (decide (ρ' ∈ dom fs1)).
-                   { rewrite Hfuel //. apply oleq_oless, Hdec; [congruence|set_solver]. }
-                   { exfalso. set_solver. }
+                   { rewrite Hfuel //. apply oleq_oless, Hdec; [congruence|set_solver -Hsamedoms Hnewdom]. }
+                   { exfalso. set_solver -Hsamedoms Hnewdom. }
                *** assert (ρ' ∉ live_roles _ s2).
-                   { by_contradiction. assert (ρ' ∈ fr1); [eapply elem_of_subseteq; eauto; set_solver|].
-                     assert (ρ' ∈ FR); [eapply elem_of_subseteq; eauto; set_solver|set_solver]. }
-                   assert (ρ' ∈ dom fs1). set_solver.
-                   rewrite Hfuel //. apply oleq_oless, Hdec; [congruence|set_solver].
+                   { by_contradiction. assert (ρ' ∈ fr1); [eapply elem_of_subseteq; eauto; set_solver -Hsamedoms Hnewdom|].
+                     assert (ρ' ∈ FR); [eapply elem_of_subseteq; eauto; set_solver -Hsamedoms Hnewdom|set_solver -Hsamedoms Hnewdom]. }
+                   assert (ρ' ∈ dom fs1) by set_solver -Hsamedoms Hnewdom.
+                   rewrite Hfuel //. apply oleq_oless, Hdec; [congruence|set_solver -Hsamedoms Hnewdom].
             ** left. rewrite elem_of_dom in Hin. destruct Hin as [? ->]. simpl;lia.
           * right; split.
             ** eapply not_elem_of_weaken; [|by apply map_imap_dom_inclusion; rewrite dom_gset_to_gmap].
                rewrite dom_gset_to_gmap //.
-            ** apply not_elem_of_difference in Hlive as [?|Hlive]; [set_solver|].
+            ** apply not_elem_of_difference in Hlive as [?|Hlive]; [set_solver -Hsamedoms Hnewdom|].
                apply elem_of_difference in Hlive as [? Habs].
-               exfalso. apply Habs. set_solver.
+               exfalso. apply Habs. set_solver -Hsamedoms Hnewdom Hfueldom.
         + split.
           { intros Hlive. unfold update_fuel_resource, fuel_apply.
           destruct (decide (ρ ∈ (dom (ls_fuel (trace_last auxtr)) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))) as [Hin|Hnin].
-          - rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=; last set_solver.
-            rewrite decide_True; [by apply Hlim |set_solver].
+          - rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=; last set_solver -Hsamedoms Hnewdom Hfueldom.
+            rewrite decide_True; [by apply Hlim |set_solver -Hsamedoms Hnewdom Hfueldom].
           - exfalso; apply not_elem_of_difference in Hnin as [Hnin|Hnin].
             + assert (ρ ∉ live_roles _ (trace_last auxtr)).
               eapply not_elem_of_weaken => //.
-              { epose proof ls_fuel_dom. set_solver. }
-              assert (ρ ∈ dom fs2) by set_solver. set_solver.
+              { epose proof ls_fuel_dom. set_solver -Hsamedoms Hnewdom Hfueldom. }
+              assert (ρ ∈ dom fs2) by set_solver -Hsamedoms Hnewdom Hfueldom. set_solver -Hsamedoms Hnewdom Hfueldom.
             + apply elem_of_difference in Hnin as [? Hnin].
               apply not_elem_of_dom in Hnin. rewrite Hnin /= in Hlim.
               by apply Hlim. }
@@ -1344,24 +1374,24 @@ Section model_state_lemmas.
             { intros ρ0 _ Hin'. destruct (decide (ρ0 ∈ dom fs2)); [by apply elem_of_dom|].
               rewrite dom_gset_to_gmap elem_of_difference in Hin'.
               destruct Hin' as [Hin' ?]. apply elem_of_union in Hin' as [?|?]; [by apply elem_of_dom|done]. }
-            rewrite dom_gset_to_gmap in Hin. rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True /=; last set_solver.
-            assert (ρ' ∈ dom fs2) by set_solver. rewrite decide_True //. apply Hnewlim. apply elem_of_difference; split =>//.
-            intros contra%Hxdom%elem_of_dom_2. rewrite ls_same_doms in contra. simplify_eq. set_solver. }
+            rewrite dom_gset_to_gmap in Hin. rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True /=; last set_solver -Hsamedoms Hnewdom Hfueldom.
+            assert (ρ' ∈ dom fs2) by set_solver -Hsamedoms Hnewdom Hfueldom. rewrite decide_True //. apply Hnewlim. apply elem_of_difference; split =>//.
+            intros contra%Hxdom%elem_of_dom_2. rewrite ls_same_doms in contra. simplify_eq. set_solver -Hsamedoms Hnewdom Hfueldom. }
           intros ρ0 Hin.
           assert (ρ0 ∉ live_roles _ (trace_last auxtr)).
-          { eapply not_elem_of_weaken; last apply ls_fuel_dom. set_solver. }
+          { eapply not_elem_of_weaken; last apply ls_fuel_dom. set_solver -Hsamedoms Hnewdom Hfueldom. }
           apply elem_of_difference in Hin as [Hin1 Hnin].
           assert (ρ0 ∈ live_roles _ s2).
           { by_contradiction.
             assert (ρ0 ∈ dom fs2).
             { unfold update_fuel_resource, fuel_apply in Hin1.
               eapply elem_of_subseteq in Hin1; last apply map_imap_dom_inclusion.
-              rewrite dom_gset_to_gmap in Hin1. set_solver. }
-            exfalso. assert (Hinabs: ρ0 ∈ dom fs1) by set_solver.
+              rewrite dom_gset_to_gmap in Hin1. set_solver -Hsamedoms Hnewdom Hfueldom. }
+            exfalso. assert (Hinabs: ρ0 ∈ dom fs1) by set_solver -Hsamedoms Hnewdom Hfueldom.
             apply not_elem_of_dom in Hnin. rewrite Hauxtrlast Hfuel // in Hnin.
             apply elem_of_dom in Hinabs. rewrite Hnin in Hinabs. simpl in Hinabs.
             by inversion Hinabs. }
-          set_solver.
+          set_solver -Hsamedoms Hnewdom Hfueldom.
       - simplify_eq. unfold tids_smaller; simpl.
         intros ρ' ? Hmim.
         rewrite map_lookup_imap in Hmim. rewrite lookup_gset_to_gmap in Hmim.
@@ -1388,37 +1418,37 @@ Section model_state_lemmas.
           * rewrite lookup_insert. split.
             { eexists; split =>//. apply elem_of_difference in Hin as [? Hin].
               apply not_elem_of_difference in Hin as [?|?]; [|done].
-              set_solver. }
+              set_solver -Hsamedoms Hnewdom Hfueldom. }
             { intros (?&?&?). simplify_eq. apply Hxdom.
               destruct Hfuelsval as (?&?&?&?&?). by_contradiction.
-              assert (ρ' ∈ live_roles Mdl s2 ∖ live_roles Mdl (trace_last auxtr)) by set_solver.
-              assert (ρ' ∈ fr1) by set_solver.
-              assert (ρ' ∈ FR) by set_solver.
-              assert (ρ' ∉ dom $ ls_fuel (trace_last auxtr)) by set_solver.
+              assert (ρ' ∈ live_roles M s2 ∖ live_roles M (trace_last auxtr)) by set_solver -Hsamedoms Hnewdom Hfueldom.
+              assert (ρ' ∈ fr1) by set_solver -Hsamedoms Hnewdom Hfueldom.
+              assert (ρ' ∈ FR) by set_solver -Hsamedoms Hnewdom Hfueldom.
+              assert (ρ' ∉ dom $ ls_fuel (trace_last auxtr)) by set_solver -Hsamedoms Hnewdom Hfueldom.
               done. }
           * rewrite lookup_insert_ne //.
         + split.
           * intros Htid. simplify_eq. rewrite lookup_insert. eexists; split=>//.
-            set_solver.
-          * assert (ρ' ∈ dom fs2) by set_solver. intros Hm. by_contradiction.
+            set_solver -Hsamedoms Hnewdom Hfueldom.
+          * assert (ρ' ∈ dom fs2) by set_solver -Hsamedoms Hnewdom Hfueldom. intros Hm. by_contradiction.
             rewrite lookup_insert_ne in Hm; last congruence.
             rewrite -Hinv in Hm. apply elem_of_dom_2 in Hm. rewrite ls_same_doms // in Hm.
       - destruct Hfuelsval as (?&?&?&?&Hinf&?). rewrite option_guard_False //=. split; first done.
         destruct (decide (ζ' = ζ)) as [->|Hneq].
-        { rewrite lookup_insert //. intros (?&?&?). simplify_eq. set_solver. }
+        { rewrite lookup_insert //. intros (?&?&?). simplify_eq. set_solver -Hsamedoms Hnewdom Hfueldom. }
         rewrite lookup_insert_ne //.
         rewrite -Hinv. intros Habs.
 
         apply not_elem_of_difference in Hnotin as [Hnin|Hin].
-        + apply elem_of_dom_2 in Habs. rewrite ls_same_doms in Habs. set_solver.
+        + apply elem_of_dom_2 in Habs. rewrite ls_same_doms in Habs. set_solver -Hsamedoms Hnewdom Hfueldom.
         + apply elem_of_difference in Hin as [Hin Hnin].
           apply Hxdom in Hin. congruence. }
     split.
     { intros ζ' ?. pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep). simpl.
-      rewrite lookup_insert_ne; first by apply Hsmall; set_solver.
+      rewrite lookup_insert_ne; first by apply Hsmall; set_solver -Hsamedoms Hnewdom Hfueldom.
       intros <-. destruct Hfuelsval as (_&_&Hfs1&_).
       rewrite <-Hxdom in Hfs1. apply Hinv in Hfs1 as (?&HM&?).
-      rewrite Hsmall // in HM. set_solver. }
+      rewrite Hsmall // in HM. set_solver -Hsamedoms Hnewdom Hfueldom. }
     { simpl. rewrite /update_fuel_resource /fuel_apply.
       rewrite map_imap_dom_eq ?dom_gset_to_gmap.
       + apply elem_of_equiv_empty_L. intros ρ' [Hin1 Hin2]%elem_of_intersection.
@@ -1426,16 +1456,16 @@ Section model_state_lemmas.
         apply not_elem_of_difference in Hin12.
         apply elem_of_difference in Hin2 as [Hin21 Hin22].
         apply not_elem_of_difference in Hin22.
-        assert (ρ' ∉ dom $ ls_fuel δ1) by set_solver.
-        assert (ρ' ∈ dom fs2) by set_solver.
-        destruct Hin12 as [Hin12|Hin12]; last by (epose proof ls_fuel_dom; set_solver).
+        assert (ρ' ∉ dom $ ls_fuel δ1) by set_solver -Hsamedoms Hnewdom Hfueldom.
+        assert (ρ' ∈ dom fs2) by set_solver -Hsamedoms Hnewdom Hfueldom.
+        destruct Hin12 as [Hin12|Hin12]; last by (epose proof ls_fuel_dom; set_solver -Hsamedoms Hnewdom Hfueldom).
         destruct Hfuelsval as (?&?&?&?&?&?).
-        assert (ρ' ∉ dom fs1); last set_solver.
+        assert (ρ' ∉ dom fs1); last set_solver -Hsamedoms Hnewdom Hfueldom.
         intros contra. pose proof (Hfuel _ contra) as Habs. apply elem_of_dom in contra as [? contra].
         rewrite contra in Habs. apply elem_of_dom_2 in Habs. done.
     + intros ρ' _ Hin. destruct (decide (ρ' ∈ dom fs2)) as [Hin'|].
       * apply elem_of_dom in Hin' as [? ->]. done.
-      * assert (ρ' ∈ dom (ls_fuel δ1)) as Hin' by set_solver. apply elem_of_dom in Hin' as [? ->]. done. }
+      * assert (ρ' ∈ dom (ls_fuel δ1)) as Hin' by set_solver -Hsamedoms Hnewdom Hfueldom. apply elem_of_dom in Hin' as [? ->]. done. }
 Qed.
 
 End model_state_lemmas.

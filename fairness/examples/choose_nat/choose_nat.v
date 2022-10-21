@@ -132,7 +132,7 @@ Next Obligation.
 Qed.
 
 Definition cn_model : LiveModel heap_lang cn_fair_model :=
-  {| fuel_limit _ := 40%nat |}.
+  {| lm_fl _ := 40%nat |}.
 
 (** Determine additional restriction on relation to obtain finite branching *)
 Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
@@ -154,7 +154,7 @@ Proof. solve_inG. Qed.
 Definition Ns := nroot .@ "choose_nat".
 
 Section proof.
-  Context `{!heapGS Σ cn_fair_model cn_model, choose_natG Σ}.
+  Context `{!heapGS Σ cn_model, choose_natG Σ}.
 
   (** Determine invariant so we can eventually derive ξ_cn from it *)
   Definition choose_nat_inv_inner (γ : gname) (l:loc) : iProp Σ :=
@@ -337,10 +337,10 @@ Lemma choose_nat_sim l :
                            used_proph_id := ∅ |}))
     (trace_singleton (initial_ls (LM := cn_model) Start 0%nat)).
 Proof.
-  assert (heapGpreS choose_natΣ cn_fair_model cn_model) as HPreG.
+  assert (heapGpreS choose_natΣ cn_model) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy (Mdl := cn_fair_model)
-            choose_natΣ NotStuck _ _ _ ∅); [|set_solver|].
+  eapply (strong_simulation_adequacy
+            choose_natΣ _ NotStuck _ _ _ ∅); [|set_solver|].
   { clear.
     apply rel_finitary_sim_rel_with_user_ξ.
     intros extr atr c' oζ.
