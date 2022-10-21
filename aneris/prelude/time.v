@@ -19,7 +19,7 @@ Next Obligation.
   intros x; induction x as [ | h x' IH]; intros y Heq;
     destruct y; [done | done | done |].
   inversion Heq as [[Hh Ht]].
-  apply f_equal2; [by apply Z_of_nat_inj | by apply IH].
+  apply f_equal2; [by apply Nat2Z.inj | by apply IH].
 Qed.
 
 Definition vector_clock_le (t t' : vector_clock) := Forall2 le t t'.

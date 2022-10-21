@@ -1,7 +1,7 @@
 From stdpp Require Import finite.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gmap auth agree gset coPset.
-From iris.base_logic.lib Require Import wsat.
+From iris.base_logic.lib Require Import wsat later_credits.
 From trillium.prelude Require Import quantifiers iris_extraction finitary classical_instances.
 From trillium.program_logic Require Export weakestpre traces.
 
@@ -281,12 +281,15 @@ Section locales_helpers.
       eapply locale_equiv_transitive.
       eapply IH =>//.
       pose proof (locale_step_equiv _ _ _ Hstep) as Hequiv.
-      rewrite ->Hends in Hequiv. simpl in Hequiv.
+      rewrite /trace_ends_in /trace_last in Hends.
+      rewrite Hends in Hequiv.
       apply (locale_equiv_take _ _ (length tp1)) in Hequiv.
       rewrite take_take in Hequiv.
       assert (length tp1 ≤ length tp').
       { eapply (valid_exec_length ex ) =>//. }
-      replace (length tp1 `min` length tp') with (length tp1) in Hequiv; [done|lia].
+      simpl in Hequiv.
+      replace (length tp1 `min` length tp') with (length tp1) in Hequiv;
+        [done|lia].
   Qed.
 
 End locales_helpers.
@@ -756,10 +759,21 @@ Section adequacy_helper_lemmas.
 
 End adequacy_helper_lemmas.
 
+(* TODO: Dummy lemma; remove! *)
+Lemma lc_alloc `{!lcGpreS Σ} :
+  ⊢ |==> ∃ _ : lcGS Σ, (True:iProp Σ).
+Proof.
+  iMod (own_alloc (● 0)) as (γLC) "H●".
+  { by apply auth_auth_valid. }
+  iModIntro.
+  iExists (LcGS _ (lcGpreS0.(lcGpreS_inG)) γLC).
+  eauto. Unshelve. apply lcGpreS0.
+Qed.
+
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ:
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -787,14 +801,17 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
   ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
 Proof.
   intros Hwp.
-  iMod wsat_alloc as (Hinv) "[Hw HE]".
-  iPoseProof Hwp as "Hwp".
+    (* TODO: Why cant this guess (invGpreS0.(invGpreS_wsat))? *)
+  iMod (@wsat_alloc _ (invGpreS0.(invGpreS_wsat))) as (Hwsat) "[Hw HE]".
+  iMod (@lc_alloc _ (invGpreS0.(invGpreS_lc))) as (Hlc) "_".
+  (* TODO: Why is [InvG HasNoLc Σ _ _] needed explicitly *)
+  iPoseProof (Hwp (InvG HasNoLc Σ Hwsat Hlc)) as "Hwp".
   rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
   iMod ("Hwp" with "[$Hw $HE]") as ">[Hw [HE Hwp']]".
   iClear "Hwp".
   iDestruct "Hwp'" as (stateI trace_inv Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
   clear Hwp.
-  set (IrisG Λ M Σ Hinv stateI fork_post).
+  set (IrisG Λ M Σ (InvG HasNoLc Σ Hwsat Hlc) stateI fork_post).
   iAssert (∃ ex atr c1 δ1,
               ⌜trace_singleton ([e1], σ1) = ex⌝ ∗
               ⌜trace_singleton δ = atr⌝ ∗
@@ -912,7 +929,6 @@ Proof.
     assert (Hequiv_from'': forall t, locales_equiv_from [e2] [e3] t t).
     { intros t. apply locales_from_equiv_refl. constructor =>//. by inversion Hequiv. }
     erewrite (forkposts_locales_equiv [e2]); last by eauto.
-
     rewrite -map_app -prefixes_from_app take_drop.
     rewrite [drop _ _]/= drop_0 //. }
   iAssert (▷ ⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'')⌝)%I as "#Hextend'".
@@ -1031,7 +1047,7 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -1067,7 +1083,7 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
@@ -1178,7 +1194,7 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
         (φ : val Λ → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -1233,7 +1249,7 @@ Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), E
         (φ : val Λ → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -1269,7 +1285,7 @@ Proof.
 Qed.
 
 (* Corollary wp_adequacy Λ M Σ `{!invGpreS Σ} s e σ δ φ : *)
-(*   (∀ `{Hinv : !invGS Σ}, *)
+(*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
 (*      ⊢ |={⊤}=> ∃ *)
 (*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
 (*          (fork_post : locale Λ -> val Λ → iProp Σ), *)
@@ -1324,7 +1340,7 @@ Qed.
 
 (* Corollary wp_invariance Λ M Σ `{!invGpreS Σ} s e1 σ1 δ1 t2 σ2 φ : *)
 (*   rel_finitary (wp_invariance_relation Λ M e1 σ1 t2 σ2 φ) → *)
-(*   (∀ `{Hinv : !invGS Σ}, *)
+(*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
 (*      ⊢ |={⊤}=> ∃ *)
 (*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
 (*          (fork_post : locale Λ -> val Λ → iProp Σ), *)

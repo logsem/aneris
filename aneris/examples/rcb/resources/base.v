@@ -49,8 +49,8 @@ Section utility.
     rewrite -pair_op frac_op in Hv.
     apply (iffLR (pair_valid _ _)) in Hv as [Hl _].
     apply (iffLR (frac_valid _)) in Hl.
-    pose proof (Qp_lt_le_trans _ _ _ Hlt Hl) as Hc.
-    by eapply (irreflexivity Qp_lt).
+    pose proof (Qp.lt_le_trans _ _ _ Hlt Hl) as Hc.
+    by eapply (irreflexivity Qp.lt).
   Qed.
 
 End utility.

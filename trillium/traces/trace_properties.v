@@ -141,11 +141,11 @@ Section trace_prop.
     intros [n Hn] [m Hm].
     exists (n `max` m).
     split.
-    - assert (n ≤ n `max` m) as [k ->]%nat_le_sum by lia.
+    - assert (n ≤ n `max` m) as [k ->]%Nat.le_sum by lia.
       rewrite inflist_take_add [n + k]Nat.add_comm inflist_drop_add
       -trace_append_list_assoc.
       apply always_unroll_n; done.
-    - assert (m ≤ n `max` m) as [k ->]%nat_le_sum by lia.
+    - assert (m ≤ n `max` m) as [k ->]%Nat.le_sum by lia.
       rewrite inflist_take_add [m + k]Nat.add_comm inflist_drop_add
       -trace_append_list_assoc.
       apply always_unroll_n; done.
@@ -404,11 +404,11 @@ Section trace_prop.
     exists (n `max` m).
     split; last done.
     split.
-    - assert (n ≤ n `max` m) as [k ->]%nat_le_sum by lia.
+    - assert (n ≤ n `max` m) as [k ->]%Nat.le_sum by lia.
       rewrite !inflist_take_add ![n + k]Nat.add_comm !inflist_drop_add
       -!trace_append_list_assoc.
       apply always2_unroll_n; done.
-    - assert (m ≤ n `max` m) as [k ->]%nat_le_sum by lia.
+    - assert (m ≤ n `max` m) as [k ->]%Nat.le_sum by lia.
       rewrite !inflist_take_add ![m + k]Nat.add_comm !inflist_drop_add
       -!trace_append_list_assoc.
       apply always2_unroll_n; done.
@@ -732,11 +732,11 @@ Section trace_prop.
     exists (n `max` m).
     split; last done.
     split.
-    - assert (n ≤ n `max` m) as [k ->]%nat_le_sum by lia.
+    - assert (n ≤ n `max` m) as [k ->]%Nat.le_sum by lia.
       rewrite !inflist_take_add ![n + k]Nat.add_comm !inflist_drop_add
       -!trace_append_list_assoc.
       apply always3_unroll_n; done.
-    - assert (m ≤ n `max` m) as [k ->]%nat_le_sum by lia.
+    - assert (m ≤ n `max` m) as [k ->]%Nat.le_sum by lia.
       rewrite !inflist_take_add ![m + k]Nat.add_comm !inflist_drop_add
       -!trace_append_list_assoc.
       apply always3_unroll_n; done.

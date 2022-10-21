@@ -5,7 +5,7 @@ From stdpp Require Import base gmap fin_sets.
 (* For the [lia] tactic to support [Nat.div]. *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 #[global] Program Instance Op_Nat_div : BinOp Nat.div :=
-  {| TBOp := Z.div ; TBOpInj := Nat2Z_inj_div |}.
+  {| TBOp := Z.div ; TBOpInj := Nat2Z.inj_div |}.
 Add Zify BinOp Op_Nat_div.
 
 Record Quorum `{Countable A} (X : gset A) := quorum {

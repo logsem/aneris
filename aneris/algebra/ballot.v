@@ -16,10 +16,10 @@ Definition ballot_oneshotUR (A : ofe) :=
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 (* For the [lia] tactic to support [Nat.modulo] and [Nat.div]. *)
 #[global] Program Instance Op_Nat_mod : BinOp Nat.modulo :=
-  {| TBOp := Z.modulo ; TBOpInj := Nat2Z_inj_mod |}.
+  {| TBOp := Z.modulo ; TBOpInj := Nat2Z.inj_mod |}.
 Add Zify BinOp Op_Nat_mod.
 #[global] Program Instance Op_Nat_div : BinOp Nat.div :=
-  {| TBOp := Z.div ; TBOpInj := Nat2Z_inj_div |}.
+  {| TBOp := Z.div ; TBOpInj := Nat2Z.inj_div |}.
 Add Zify BinOp Op_Nat_div.
 
 Section arith_lemmas.

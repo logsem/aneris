@@ -302,7 +302,7 @@ Section crdt_main_rel.
     gcounter_monotone_locs_resolved_simple lcs l → gcounter_monotone_locs_resolved lcs l.
   Proof.
     intros Hgms i j c1 c2 Hij Hi Hj.
-    apply nat_le_sum in Hij as [k Hk].
+    apply Nat.le_sum in Hij as [k Hk].
     revert i j Hk c1 c2 Hi Hj.
     induction k as [|k IHk]; intros i j Hk c1 c2 Hi Hj.
     { assert (j = i) by lia; clear Hk; simplify_eq; reflexivity. }

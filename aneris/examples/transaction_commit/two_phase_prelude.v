@@ -198,7 +198,7 @@ Section tpc_prelude.
     - rewrite /state_message_coh. case_match; [|done].
       simplify_eq. set_solver.
     - rewrite /state_message_coh.
-      intros st'' Hcoh'; case_match; last first.
+      intros st'' Hcoh'; case_match eqn : Heqo; last first.
       { destruct st''; [|done..]. apply rm_step_rtc_working_any. }
       apply elem_of_union in Hcoh' as [?%elem_of_singleton | ?]; simplify_eq.
       { rewrite -Hm in Heqo. simplify_eq. done. }
@@ -270,7 +270,7 @@ Section tpc_prelude.
     rewrite big_sepS_union ?big_sepS_singleton; [|set_solver].
     iIntros "[HP HX]".
     rewrite size_union ?size_singleton; [|set_solver].
-    rewrite set_seq_plus_L.
+    rewrite set_seq_add_L.
     rewrite big_sepS_union /=; [|set_solver by lia].
     rewrite union_empty_r_L big_sepS_singleton.
     iFrame. by iApply IHX.

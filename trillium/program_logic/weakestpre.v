@@ -5,7 +5,7 @@ From trillium.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 
 Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
-  iris_invGS :> invGS Σ;
+  iris_invGS :> invGS_gen HasNoLc Σ;
 
   (** The state interpretation is an invariant that should hold in between each
   step of reduction. Here [Λstate] is the global state, [list Λobservation] are

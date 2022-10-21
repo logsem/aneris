@@ -77,11 +77,11 @@ Section Proof.
     iPoseProof (OwnMemKey_combine with "[$Hkwr2 $Hkwr1]") as "(Hkwr & %Hkwrv_eq)".
     eauto. rewrite Hkwrv_eq.
     iExists h1, s1, (at_key k1 h1).
-    rewrite Hkwrv_eq. rewrite Qp_half_half. iFrame "Hkwr Hw HobsInv". simpl in *.
+    rewrite Hkwrv_eq. rewrite Qp.half_half. iFrame "Hkwr Hw HobsInv". simpl in *.
     iIntros "!#".
     iSplit; [ done | ].
     iIntros (hkwr1f ewr1) "!> (%Hkwr1f & %Hkwr1k & %Hkwr1v & %Hkwr1o & %Hkwr1t & Hkwr & #Hkwr1Obs & Hw)".
-    rewrite -{4}Qp_half_half.
+    rewrite -{4}Qp.half_half.
     iPoseProof (OwnMemKey_split k1 (1/2)%Qp (1/2)%Qp with "[$Hkwr]") as "(Hkwr1 & Hkwr2)".
     iMod (OwnMemKey_allocated k2 _ h0 h1 e_rd with "[$Hkrd1 //]") as (erd) "(Hkrd1 & %Herdh1 & %Hrde0e1)";
       [ solve_ndisj | list_simplifier; by apply prefix_app_r | by simplify_list_eq |  ].
@@ -195,7 +195,7 @@ Section Proof.
     iDestruct 1 as (hy0f y0) "(%Hy0k & %Hy0v & %Hy0o & %Hy0f & #Hobs & Hy & Hw)".
 
     (* Split resources. *)
-    wp_pures. simpl in *. rewrite -Qp_half_half.
+    wp_pures. simpl in *. rewrite -Qp.half_half.
     iDestruct (fractional_split_1 ("x" ↦ₖ{_} Some (mval_of_we x0))%I
                  with "[$Hx]") as "(Hx1 & Hx2)".
     iDestruct (fractional_split_1 ("y" ↦ₖ{_} Some (mval_of_we y0))%I

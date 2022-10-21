@@ -113,14 +113,14 @@ Section UpdateLogCopy_Proof.
     iDestruct "Hres" as (l) "(#HknownTkn' & #Hobs' & HownFHalf2)".
     iDestruct (own_log_auth_combine
                 with "[$HownFHalf1][$HownFHalf2]") as "(HownF & ->)".
-    rewrite Qp_quarter_quarter Qp_half_half.
+    rewrite Qp.quarter_quarter Qp.half_half.
     iMod (own_log_auth_update _ l logM'
            with "[$HownF]") as "HownF"; first done.
-    rewrite -Qp_half_half.
-    rewrite {1} Qp_half_half.
+    rewrite -Qp.half_half.
+    rewrite {1} Qp.half_half.
     iDestruct (own_log_auth_split with "HownF") as "[HownF1 HownF2]".
-    rewrite -Qp_quarter_quarter.
-    rewrite {1} Qp_quarter_quarter.
+    rewrite -Qp.quarter_quarter.
+    rewrite {1} Qp.quarter_quarter.
     iMod ("Hcl" with "[HownF1 HmapN HknownN HownS HownL]") as "_".
     { iNext. iExists L, M. iFrame "#∗".
       do 3 (iSplit; first done).

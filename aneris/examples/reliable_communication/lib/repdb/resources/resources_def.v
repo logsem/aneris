@@ -101,7 +101,7 @@ Section Resources_definition.
     iIntros "Hown1 Hown2".
     iDestruct (lmapsto_valid_2 with "Hown1 Hown2") as %Hvalid.
     rewrite frac_valid in Hvalid.
-    by apply Qp_not_add_le_l in Hvalid.
+    by apply Qp.not_add_le_l in Hvalid.
   Qed.
 
   (* Maybe remove ? *)

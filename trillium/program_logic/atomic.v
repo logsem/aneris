@@ -1,6 +1,6 @@
 From stdpp Require Import namespaces.
 From iris.bi Require Import telescopes.
-From iris.bi.lib Require Export atomic.
+From iris.bi.lib Require Export atomic laterable.
 From iris.proofmode Require Import tactics classes.
 From trillium.program_logic Require Export weakestpre.
 From iris.base_logic Require Import invariants.

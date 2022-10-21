@@ -99,8 +99,8 @@ Section proof.
     assert (bc_time w1 = bc_time w2) as Ht'.
     { by apply (inj (R := eq)) in Ht; [ | apply _]. }
     destruct w1, w2; simpl in *.
-    apply Z_of_nat_inj in Ho; subst.
-    apply Z_of_nat_inj in Hs; subst.
+    apply Nat2Z.inj in Ho; subst.
+    apply Nat2Z.inj in Hs; subst.
     done.
   Qed.
 

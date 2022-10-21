@@ -96,10 +96,10 @@ Section dfrac_oneshot_lemmas.
       rewrite size_union ?size_singleton /=; [|set_solver].
       rewrite IHX.
       destruct (decide (size X = 0)) as [->|].
-      { rewrite /nat_to_Qp /Pos.of_nat /=  Qp_mul_1_l bi.sep_emp //. }
+      { rewrite /nat_to_Qp /Pos.of_nat /=  Qp.mul_1_l bi.sep_emp //. }
       rewrite -own_op -Cinl_op dfrac_op_own.
       rewrite /nat_to_Qp -Pos.of_nat_succ -Pos.succ_of_nat //.
-      rewrite Pplus_one_succ_l -pos_to_Qp_add Qp_mul_add_distr_r Qp_mul_1_l //.
+      rewrite Pplus_one_succ_l -pos_to_Qp_add Qp.mul_add_distr_r Qp.mul_1_l //.
   Qed.
 
   (* TODO: upstream? *)
@@ -120,7 +120,7 @@ Section dfrac_oneshot_lemmas.
     rewrite big_sepS_pending_combine.
     rewrite size_set_seq.
     destruct decide; [lia|].
-    rewrite Qp_mul_inv_r //.
+    rewrite Qp.mul_inv_r //.
   Qed.
 
   Lemma pending_split_gset `{Countable B} (X : gset B) γ :
@@ -131,7 +131,7 @@ Section dfrac_oneshot_lemmas.
     rewrite big_sepS_pending_combine.
     destruct (decide (size X = 0)) as [?%size_empty_inv|].
     { simplify_eq. }
-    rewrite Qp_mul_inv_r //.
+    rewrite Qp.mul_inv_r //.
   Qed.
 
   Lemma pending_discard γ q :

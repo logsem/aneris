@@ -88,9 +88,9 @@ Section resources_lemmas.
     ==∗ ownGhst (1/2) h2 ∗ ownGhst (1/2) h2.
   Proof.
     iIntros "H1 H2". rewrite /ownGhst. iCombine "H1 H2" as "H".
-    rewrite -own_op -pair_op frac_op  Qp_half_half agree_idemp.
+    rewrite -own_op -pair_op frac_op  Qp.half_half agree_idemp.
     iApply (own_update with "H"). apply cmra_update_exclusive.
-    rewrite -pair_op frac_op Qp_half_half agree_idemp //.
+    rewrite -pair_op frac_op Qp.half_half agree_idemp //.
   Qed.
 
 End resources_lemmas.
