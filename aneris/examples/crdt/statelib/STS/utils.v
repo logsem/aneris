@@ -469,14 +469,164 @@ Section Preambule.
     intros [A _] B.
     apply A, B.
   Qed.
+
+
+  Definition local_events (i: RepId) (s: event_set Op) : Prop :=
+    ∀ e, e ∈ s → e.(EV_Orig) = i.
+  Definition foreign_events (i: RepId) (s: event_set Op) : Prop :=
+    ∀ e, e ∈ s → e.(EV_Orig) ≠ i.
 End Preambule.
 
 Section Useful.
-  Context `{CRDT_Op: Type, !EqDecision CRDT_Op, !Countable CRDT_Op}.
+  Context `{CRDT_Op: Type, !EqDecision CRDT_Op, !Countable CRDT_Op,
+            !CRDT_Params}.
 
-  Definition local_events (i: RepId) (s: event_set CRDT_Op) : Prop :=
-    ∀ e, e ∈ s → e.(EV_Orig) = i.
-  Definition foreign_events (i: RepId) (s: event_set CRDT_Op) : Prop :=
-    ∀ e, e ∈ s → e.(EV_Orig) ≠ i.
+  Lemma foreign_local_filtered_inclusion
+    (st_h__local h__foreign st'_h__local st'_h__sub: event_set CRDT_Op)
+    (g: Lst CRDT_Op) :
+    st'_h__local ∪ st'_h__sub ⊆_cc g →
+    st_h__local ∪ h__foreign ⊆_cc g →
+    Lst_Validity g →
+    Lst_Validity (st_h__local ∪ h__foreign) →
+    Lst_Validity (st'_h__local ∪ st'_h__sub) →
+    ∀ (i : nat),
+    filter
+      (λ ev : Event CRDT_Op, EV_Orig ev = i)
+      (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub))
+      =
+      filter
+        (λ ev : Event CRDT_Op, EV_Orig ev = i)
+        (st_h__local ∪ h__foreign)
+  ∨ filter
+    (λ ev : Event CRDT_Op, EV_Orig ev = i)
+    (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub))
+    =
+    filter
+      (λ ev : Event CRDT_Op, EV_Orig ev = i)
+      (st'_h__local ∪ st'_h__sub).
+  Proof.
+    intros [Hs2 Hdc2] [Hs1 Hdc1] Hval Hv Hst'_validity i.
+    pose proof (VLst_ext_time _ Hval) as Hext_t.
+    pose proof (VLst_same_orig_comp _ Hval) as Hsoc.
+    set s1 := st_h__local ∪ h__foreign.
+    set s2 := st'_h__local ∪ st'_h__sub.
+    set fs1 := filter (λ ev, ev.(EV_Orig) = i) s1.
+    set fs2 := filter (λ ev, ev.(EV_Orig) = i) s2.
+    destruct (decide (fs1 = ∅)) as [Heq1 | Hneq1];
+    destruct (decide (fs2 = ∅)) as [Heq2 | Hneq2].
+    - left.
+      apply set_eq. intros x. split;
+      intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
+          exfalso; set_solver.
+    - right.
+      apply set_eq. intros x. split;
+      intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
+          try (exfalso; set_solver).
+      + apply elem_of_filter. split; assumption.
+      + apply elem_of_filter. split; first assumption.
+        by apply elem_of_union_r, elem_of_union_l.
+      + apply elem_of_filter. split; first assumption.
+        by apply elem_of_union_r, elem_of_union_r.
+    - left.
+      apply set_eq. intros x. split;
+      intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
+          try (exfalso; set_solver).
+      + apply elem_of_filter. split; assumption.
+      + apply elem_of_filter. split; first assumption.
+        by apply elem_of_union_l, elem_of_union_l.
+      + apply elem_of_filter. split; first assumption.
+        by apply elem_of_union_l, elem_of_union_r.
+    - epose proof (iffLR (compute_maximum_non_empty fs1 _ _) Hneq1) as HH;
+        destruct HH as (max1 & [Hmax1_in H1']%compute_maximum_correct); last first.
+      { intros x y [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter
+          [Hy_p [Hy_in|Hy_in]%elem_of_union]%elem_of_filter Heq.
+        all: apply (VLst_ext_time _ Hv x y).
+        all: try (apply elem_of_union_l; assumption).
+        all: try (apply elem_of_union_r; assumption).
+        all: assumption. }
+      Unshelve.
+      2: {  intros x y [Hx_p Hx_in%Hs1]%elem_of_filter [Hy_p Hy_in%Hs1]%elem_of_filter.
+            apply Hsoc; [assumption | assumption |].
+            by rewrite Hx_p Hy_p. }
+      2: {  intros x y [Hx_p Hx_in%Hs1]%elem_of_filter [Hy_p Hy_in%Hs1]%elem_of_filter.
+            apply Hext_t; assumption. }
+      epose proof (iffLR (compute_maximum_non_empty fs2 _ _) Hneq2) as HH;
+        destruct HH as (max2 & [Hmax2_in H2']%compute_maximum_correct); last first.
+      { intros x y [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter
+          [Hy_p [Hy_in|Hy_in]%elem_of_union]%elem_of_filter Heq.
+        all: apply (VLst_ext_time _ Hst'_validity x y).
+        all: try (apply elem_of_union_l; assumption).
+        all: try (apply elem_of_union_r; assumption).
+        all: assumption. }
+      Unshelve.
+      2,3: intros x y [Hx_p Hx_in%Hs2]%elem_of_filter [Hy_p Hy_in%Hs2]%elem_of_filter.
+      2: apply Hsoc; [assumption | assumption |]; by rewrite Hx_p Hy_p.
+      2: apply Hext_t; assumption.
+
+      assert(max1 <_t max2 ∨ max1 =_t max2 ∨ max2 <_t max1) as [|[|]].
+      + apply elem_of_filter in Hmax1_in as [Hmax1_i Hmax1_in].
+        apply elem_of_filter in Hmax2_in as [Hmax2_i Hmax2_in].
+        by epose proof (Hsoc max1 max2 _ _ _).
+        Unshelve.
+        by apply Hs1. by apply Hs2. by rewrite Hmax1_i Hmax2_i.
+      + right.
+        apply set_eq. intros x; split.
+        * intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
+            last set_solver.
+          assert(Hmax2_in': max2 ∈ g).
+          { apply Hs2.
+            by apply elem_of_filter in Hmax2_in as [_ Hmax2_in]. }
+          apply elem_of_filter. split; first assumption.
+          apply (Hdc2 x max2 (Hs1 _ Hx_in) Hmax2_in'); last set_solver.
+          simpl. simpl in H0.
+          apply strict_include.
+          by epose (ts_le_lt_trans (time x) (time max1) (time max2) _ H0).
+          Unshelve.
+          destruct (decide (max1 = x)) as [ -> | ]; first done.
+          apply strict_include.
+          by apply H1'; first set_solver.
+        * intros [Hx_p Hx_in]%elem_of_filter.
+          by apply elem_of_filter; split; [ | apply elem_of_union_r ].
+      + right.
+        apply set_eq. intros x; split.
+        * intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
+            last set_solver.
+          apply elem_of_filter. split; first assumption.
+          assert(Hmax2_in': max2 ∈ g).
+          { apply Hs2.
+            by apply elem_of_filter in Hmax2_in as [_ Hmax2_in]. }
+          apply (Hdc2 x max2 (Hs1 _ Hx_in) Hmax2_in'); last set_solver.
+          epose proof (Hext_t max1 max2 _ _ H0) as ->.
+          destruct(decide (x = max2)) as [ -> | ]; first done.
+          apply strict_include.
+          apply H1'. set_solver.
+          assumption.
+          Unshelve.
+          apply Hs1. by apply elem_of_filter in Hmax1_in as [_?].
+          assumption.
+        * intros [Hx_p Hx_in]%elem_of_filter.
+          by apply elem_of_filter; split; [ | apply elem_of_union_r ].
+      + left.
+        apply set_eq. intros x; split.
+        * intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
+            first set_solver.
+          assert(Hmax1_in': max1 ∈ g).
+          { apply Hs1.
+            by apply elem_of_filter in Hmax1_in as [_ Hmax1_in]. }
+          apply elem_of_filter. split; first assumption.
+          apply (Hdc1 x max1 (Hs2 _ Hx_in) Hmax1_in'); last set_solver.
+          simpl. simpl in H0.
+          apply strict_include.
+          destruct(decide(x = max2)) as [ -> | ] ; first done.
+          by epose (ts_lt_le_trans (time x) (time max2) (time max1) _ _).
+          Unshelve.
+          apply H2'. set_solver.
+          assumption.
+          by apply strict_include.
+        * intros [Hx_p Hx_in]%elem_of_filter.
+          by apply elem_of_filter; split; [ | apply elem_of_union_l ].
+  Qed.
+
+
 End Useful.
 

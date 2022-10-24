@@ -23,7 +23,7 @@ From aneris.examples.crdt.statelib.resources
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.user_model
   Require Import params model semi_join_lattices.
-From aneris.examples.crdt.statelib.time Require Import time.
+From aneris.examples.crdt.statelib.time Require Import time maximality.
 From aneris.examples.crdt.statelib.STS
   Require Import utils gst lst mutation merge.
 From aneris.examples.crdt.statelib.proof
@@ -120,7 +120,7 @@ Section StateLib_Proof.
     { apply fin_to_nat_inj. by rewrite Hf_'. }
     assert(f'' = f) as ->.
     { apply fin_to_nat_inj. by rewrite Hf_''. }
- 
+
     (** Update of the resources. *)
     iModIntro.
     iDestruct ((get_state_update _ f st_h__local st_h__foreign st_h__sub)
@@ -330,7 +330,7 @@ Section StateLib_Proof.
         { iNext. iExists (S vinit). iFrame. }
         wp_seq.
         iApply ("IH" with "Hφ"). by iExists (S vinit).
-      + wp_if_false. 
+      + wp_if_false.
         myload Hvalis vinit.
         wp_apply (wp_list_nth_some _ vinit CRDT_Addresses dstlist).
         { iPureIntro. split; [ assumption | lia ]. }
@@ -444,6 +444,145 @@ Section StateLib_Proof.
   (**       +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
             | Speficication of [apply_thread] |
             +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+               **)
+  Lemma apply_thread_spec_aux
+    {h s γlock lockp stp merge_fun st'_h__local st'_h__sub st'_val φ m R}
+    {repId: RepId}
+    {f_sender: fRepId}
+    {st'_log: LogSt}
+    {Hst'_validity : Lst_Validity (st'_h__local ∪ st'_h__sub)}
+    {Hst'_coh : StLib_St_Coh st'_log st'_val}
+    {Hst'_ser : s_is_ser StLib_StSerialization st'_val (m_body m)}
+    {Haddr_proj : CRDT_Addresses !! repId = Some (m_destination m)}
+    {st'_denot : ⟦ st'_h__local ∪ st'_h__sub ⟧ ⇝ st'_log}:
+    (m_destination m) ⤇ socket_proto -∗
+    socket_inv repId h (m_destination m) s -∗
+    StLib_GlobalInv -∗
+    lock_inv (m_destination m) γlock lockp repId stp -∗
+    merge_spec merge_fun -∗
+    ([∗ set] m0 ∈ R, socket_proto m0) -∗
+    own (γ_loc_cc' !!! f_sender)
+                    (◯ princ_ev (st'_h__local ∪ st'_h__sub)) -∗
+    (True -∗ φ #()) -∗
+
+    WP let: "st'" := s_deser (s_serializer StLib_StSerialization) #(m_body m) in
+       acquire lockp ;; #stp <- merge_fun ! #stp "st'" ;; release lockp @[
+    ip_of_address (m_destination m)] {{ v, φ v }}.
+  Proof.
+    iIntros "#Hproto #Hsock_inv #Hinv #His_lock #Hmerge #Hproto_respected #Hst'_snap Hφ".
+    wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
+    wp_let.
+    wp_apply (acquire_spec with "His_lock").
+    iIntros (v) "(-> & Hlocked &
+      (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
+      %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
+    assert (repId = f) as ->.
+    { rewrite Hf.
+      apply (NoDup_lookup CRDT_Addresses repId repId (m_destination m));
+        [ by apply CRDT_Addresses_NoDup
+        | assumption
+        | assumption ]. }
+
+    assert (Hip_eq: ip_of_address (m_destination m) = ip).
+    { rewrite Haddr_proj in Hip. by simplify_eq/=. }
+    wp_seq.
+    wp_bind (!_)%E.
+    iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
+      as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
+    wp_apply (aneris_wp_load with "[Hloc]").
+    { rewrite Haddr_proj in Hip. by simplify_eq/=. }
+    iIntros "Hloc".
+    wp_bind (merge_fun _ _)%E.
+    wp_apply ("Hmerge" $! (m_destination m)
+      phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub)
+      log_st st'_log).
+    { pose (Lst_Validity_implies_events_ext _ Hv).
+      pose (Lst_Validity_implies_same_orig_comparable _ Hv).
+      pose (Lst_Validity_implies_events_ext _ Hst'_validity).
+      pose (Lst_Validity_implies_same_orig_comparable _ Hst'_validity).
+      iFrame "%". }
+    iIntros (st'' (st''_log & Hst''_coh & Hst''_islub)).
+    wp_bind (_ <- _)%E.
+
+    iDestruct (locals_incl_global with "Hinv Hst'_snap hf_own_loc Hf_own_for")
+      as "> (hf_own_loc & Hf_own_for & (%g & %Hg))";
+      first trivial.
+    destruct Hg as (Hcc2 & Hcc1 & Hval).
+    pose proof (VLst_ext_time _ Hval) as Hext_t.
+    pose proof (VLst_same_orig_comp _ Hval) as Hsoc.
+    pose proof (foreign_local_filtered_inclusion st_h__local h__foreign st'_h__local st'_h__sub g Hcc2 Hcc1 Hval Hv Hst'_validity) as Heq.
+
+    wp_store.
+    (** Update of the resources: using the [merge_update] lemma. *)
+    iDestruct ((merge_update ⊤ f f_sender
+      st_h__local h__foreign st'_h__local st'_h__sub)
+      with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap[]")
+      as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
+      [ trivial | iExists f; iFrame; iSplit; first trivial; iFrame "%" | done | ].
+    assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
+
+    iDestruct (Lock_RemoteLockSnap__incl
+      with "[]Hinv[Hst_own__local Hst_own__sub]Hst'_snap")
+      as ">[(%f_ & %Hf_ & _ & _ & Hst_own__local & Hst_own__sub) %Hincl]";
+      first trivial.
+    { iExists f. iFrame. iFrame "%".
+      iPureIntro.
+      by intros x [Hx_in%Hf_for | [Hx_orig Hx_in]%elem_of_filter]%elem_of_union. }
+    assert(f_ = f) as ->. { apply fin_to_nat_inj. by rewrite Hf_. }
+
+
+    wp_seq.
+    wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hst_own__local Hst_own__sub]").
+    { iExists ip, st'', st''_log,
+        st_h__local,
+        (h__foreign
+                ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
+                    (st'_h__local ∪ st'_h__sub)).
+      rewrite Hip_eq. iFrame "Hloc". iFrame "%".
+      iSplit.
+      - iExists f.
+        iSplit; first done.
+        iSplit.
+        { iPureIntro.
+          by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union. }
+        iFrame "Hst_own__local Hst_own__sub".
+      - iPureIntro.
+        epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Heq Hst''_islub).
+        assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
+          st_h__local
+            ∪ (h__foreign
+             ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub)))
+          as <-;
+          last done.
+        assert (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub)
+          = (st_h__local ∪ (st'_h__local ∪ st'_h__sub)) ∪ h__foreign) as ->;
+          first set_solver.
+        assert (
+          st_h__local
+          ∪ (h__foreign
+          ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
+          =
+          (st_h__local
+          ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
+          ∪ h__foreign)
+          as ->;
+          first set_solver.
+        assert (st_h__local ∪ (st'_h__local ∪ st'_h__sub)
+          = st_h__local
+            ∪ filter (λ e, EV_Orig e ≠ f)(st'_h__local ∪ st'_h__sub))
+          as ->; last reflexivity.
+        apply set_eq. intros x. split; last set_solver.
+        intros [Hx_in | Hx_in]%elem_of_union;
+          first by apply  elem_of_union_l.
+        destruct (decide (EV_Orig x = f));
+          [ by apply elem_of_union_l, Hincl, elem_of_filter
+          | by apply elem_of_union_r, elem_of_filter]. }
+    iIntros (v ->).
+    by iApply "Hφ".
+
+    Unshelve.
+    all: by apply Lst_Validity_implies_event_set_valid.
+  Qed.
+
   Lemma apply_thread_spec
     (h: socket_handle) (addr: socket_address) (s: socket)
     (repId: RepId) (γlock: gname)
@@ -479,7 +618,7 @@ Section StateLib_Proof.
       with "[$Hh $Hsoup $Hproto]");
       try assumption; try reflexivity.
     iIntros (m) "[%Hdest
-      [(%Hfresh & Hsock & Hhist & #Haddr_proto & #Hproto_respected_m) |
+      [(%Hfresh & Hsock & Hhist & _ & #Hproto_respected_m) |
       (%Hm_inR & Hh & Hsoup)]]".
     - (** The mesage is fresh *)
       iMod ("Hclose" with "[$Hsock Hhist]") as "_"; last iModIntro.
@@ -496,113 +635,11 @@ Section StateLib_Proof.
           %Hsender_addr & %Hrecipient_addr & %Hf_sender & %Hf_recipient &
           %Hst'_ser & %Hst'_coh & %st'_denot & %Hst'_locisloc & %Hst'_subisfor
           & %Hst'_validity & #Hst'_snap)".
-      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
-      wp_let.
-      wp_apply (acquire_spec with "His_lock").
-      iIntros (v) "(-> & Hlocked &
-        (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
-        %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
-      assert (Hip_eq: ip_of_address addr = ip).
-      { rewrite Haddr in Hip. by simplify_eq/=. }
-      wp_seq.
-      assert (recipientId = f) as ->.
-      { rewrite Hf.
-        apply (NoDup_lookup CRDT_Addresses recipientId repId addr);
-          [ by apply CRDT_Addresses_NoDup
-          | by rewrite Hdest in Hrecipient_addr
-          | assumption ]. }
-      assert (f_recipient = f) as ->.
-      { apply fin_to_nat_inj. by rewrite Hf Hf_recipient. }
-      wp_bind (!_)%E.
-      iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
-        as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
-      wp_apply (aneris_wp_load with "[Hloc]").
-      { rewrite Haddr_proj in Hip. by simplify_eq/=. }
-      iIntros "Hloc".
-      wp_bind (merge_fun _ _)%E.
-      wp_apply ("Hmerge" $! addr
-        phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub)
-        log_st st'_log).
-      { pose (Lst_Validity_implies_events_ext _ Hv).
-        pose (Lst_Validity_implies_same_orig_comparable _ Hv).
-        pose (Lst_Validity_implies_events_ext _ Hst'_validity).
-        pose (Lst_Validity_implies_same_orig_comparable _ Hst'_validity).
-        iFrame "%". }
-      iIntros (st'' (st''_log & Hst''_coh & Hst''_islub)).
-      wp_bind (_ <- _)%E.
-      wp_store.
-
-
-
-      (** Update of the resources: using the [merge_update] lemma. *)
-      iDestruct ((merge_update ⊤ f f_sender
-        st_h__local h__foreign st'_h__local st'_h__sub)
-        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap[]")
-        as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
-        [ trivial | iExists f; iFrame; by rewrite Hf | done | ].
-      assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
-
-      iDestruct (Lock_RemoteLockSnap__incl
-        with "[]Hinv[Hst_own__local Hst_own__sub]Hst'_snap")
-        as ">[(%f_ & %Hf_ & _ & _ & Hst_own__local & Hst_own__sub) %Hincl]";
-        first trivial.
-      { rewrite Hf. iExists f. iFrame. iFrame "%".
-        iSplit; first (iPureIntro; by rewrite Hf).
-        iPureIntro.
-        intros x [Hx_in%Hf_for | [Hx_orig Hx_in]%elem_of_filter]%elem_of_union;
-          by rewrite Hf. }
-      assert(f_ = f) as ->. { apply fin_to_nat_inj. by rewrite Hf_. }
-
-
-      wp_seq.
-      wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hst_own__local Hst_own__sub]").
-      { iExists ip, st'', st''_log,
-          st_h__local,
-          (h__foreign
-                  ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                      (st'_h__local ∪ st'_h__sub)).
-        rewrite Hip_eq. iFrame "Hloc". iFrame "%".
-        iSplit.
-        - iExists f. rewrite-Hf.
-          iSplit; first done.
-          iSplit.
-          { iPureIntro.
-            by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union;
-              first rewrite Hf. }
-          iFrame "Hst_own__local Hst_own__sub".
-        - iPureIntro.
-          epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Hst''_islub).
-          assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
-            st_h__local
-              ∪ (h__foreign
-               ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub)))
-            as <-;
-            last done.
-          assert (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub)
-            = (st_h__local ∪ (st'_h__local ∪ st'_h__sub)) ∪ h__foreign) as ->;
-            first set_solver.
-          assert (
-            st_h__local
-            ∪ (h__foreign
-            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
-            =
-            (st_h__local
-            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
-            ∪ h__foreign)
-            as ->;
-            first set_solver.
-          assert (st_h__local ∪ (st'_h__local ∪ st'_h__sub)
-            = st_h__local
-              ∪ filter (λ e, EV_Orig e ≠ f)(st'_h__local ∪ st'_h__sub))
-            as ->; last reflexivity.
-          apply set_eq. intros x. split; last set_solver.
-          intros [Hx_in | Hx_in]%elem_of_union;
-            first by apply  elem_of_union_l.
-          destruct (decide (EV_Orig x = f));
-            [ by apply elem_of_union_l, Hincl, elem_of_filter
-            | by apply elem_of_union_r, elem_of_filter]. }
-      iIntros (v ->).
-      by iApply "Hφ".
+      simplify_eq/=.
+      wp_apply ((@apply_thread_spec_aux
+        h s γlock lockp stp merge_fun st'_h__local st'_h__sub st'_val φ m R
+        repId f_sender st'_log Hst'_validity Hst'_coh Hst'_ser Haddr st'_denot)
+        with "[$][$][$][$][$][$][$][$]").
     - (** The message is not fresh. *)
       (** TODO: Use the ownership of a local snapshot associated to the remote
         * state and the peoperties of the lub not to blindly update the
@@ -619,116 +656,11 @@ Section StateLib_Proof.
           & %Hst'_validity & #Hst'_snap)";
         first by iDestruct (big_sepS_elem_of with "Hproto_respected") as "Hm";
           first exact Hm_inR.
-      wp_apply (s_deser_spec ); [ iFrame "%" | iIntros (_) ].
-      wp_let.
-      wp_apply (acquire_spec with "His_lock").
-      iIntros (v) "(-> & Hlocked &
-        (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
-        %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
-      assert (Hip_eq: ip_of_address addr = ip).
-      { rewrite Haddr in Hip. by simplify_eq/=. }
-      wp_seq.
-      assert (recipientId = f) as ->.
-      { rewrite Hf.
-        apply (NoDup_lookup CRDT_Addresses recipientId repId addr);
-          [ by apply CRDT_Addresses_NoDup
-          | by rewrite Hdest in Hrecipient_addr
-          | assumption ]. }
-      assert (f_recipient = f) as ->.
-      { apply fin_to_nat_inj. by rewrite Hf Hf_recipient. }
-      wp_bind (!_)%E.
-      iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
-        as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
-      wp_apply (aneris_wp_load with "[Hloc]").
-      { rewrite Haddr_proj in Hip. by simplify_eq/=. }
-      iIntros "Hloc".
-      wp_bind (merge_fun _ _)%E.
-      wp_apply ("Hmerge" $! addr
-        phys_st st'_val (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub)
-        log_st st'_log).
-      { pose (Lst_Validity_implies_events_ext _ Hv).
-        pose (Lst_Validity_implies_same_orig_comparable _ Hv).
-        pose (Lst_Validity_implies_events_ext _ Hst'_validity).
-        pose (Lst_Validity_implies_same_orig_comparable _ Hst'_validity).
-        iFrame "%". }
-      iIntros (st'' (st''_log & Hst''_coh & Hst''_islub)).
-      wp_bind (_ <- _)%E.
-      wp_store.
-
-
-
-      (** Update of the resources: using the [merge_update] lemma. *)
-      iDestruct ((merge_update ⊤ f f_sender
-        st_h__local h__foreign st'_h__local st'_h__sub)
-        with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap[]")
-        as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
-        [ trivial | iExists f; iFrame; by rewrite Hf | done | ].
-      assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
-
-      iDestruct (Lock_RemoteLockSnap__incl
-        with "[]Hinv[Hst_own__local Hst_own__sub]Hst'_snap")
-        as ">[(%f_ & %Hf_ & _ & _ & Hst_own__local & Hst_own__sub) %Hincl]";
-        first trivial.
-      { rewrite Hf. iExists f. iFrame. iFrame "%".
-        iSplit; first (iPureIntro; by rewrite Hf).
-        iPureIntro.
-        intros x [Hx_in%Hf_for | [Hx_orig Hx_in]%elem_of_filter]%elem_of_union;
-          by rewrite Hf. }
-      assert(f_ = f) as ->. { apply fin_to_nat_inj. by rewrite Hf_. }
-
-
-      wp_seq.
-      wp_apply (release_spec with "[$His_lock $Hlocked Hloc Hst_own__local Hst_own__sub]").
-      { iExists ip, st'', st''_log,
-          st_h__local,
-          (h__foreign
-                  ∪ filter (λ e : Event LogOp, EV_Orig e ≠ f)
-                      (st'_h__local ∪ st'_h__sub)).
-        rewrite Hip_eq. iFrame "Hloc". iFrame "%".
-        iSplit.
-        - iExists f. rewrite-Hf.
-          iSplit; first done.
-          iSplit.
-          { iPureIntro.
-            by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union;
-              first rewrite Hf. }
-          iFrame "Hst_own__local Hst_own__sub".
-        - iPureIntro.
-          epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Hst''_islub).
-          assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
-            st_h__local
-              ∪ (h__foreign
-               ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub)))
-            as <-;
-            last done.
-          assert (st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub)
-            = (st_h__local ∪ (st'_h__local ∪ st'_h__sub)) ∪ h__foreign) as ->;
-            first set_solver.
-          assert (
-            st_h__local
-            ∪ (h__foreign
-            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
-            =
-            (st_h__local
-            ∪ filter (λ e, EV_Orig e ≠ f) (st'_h__local ∪ st'_h__sub))
-            ∪ h__foreign)
-            as ->;
-            first set_solver.
-          assert (st_h__local ∪ (st'_h__local ∪ st'_h__sub)
-            = st_h__local
-              ∪ filter (λ e, EV_Orig e ≠ f)(st'_h__local ∪ st'_h__sub))
-            as ->; last reflexivity.
-          apply set_eq. intros x. split; last set_solver.
-          intros [Hx_in | Hx_in]%elem_of_union;
-            first by apply  elem_of_union_l.
-          destruct (decide (EV_Orig x = f));
-            [ by apply elem_of_union_l, Hincl, elem_of_filter
-            | by apply elem_of_union_r, elem_of_filter]. }
-      iIntros (v ->).
-      by iApply "Hφ".
-
-    Unshelve.
-    all: by apply Lst_Validity_implies_event_set_valid.
+      simplify_eq/=.
+      wp_apply ((@apply_thread_spec_aux
+        h s γlock lockp stp merge_fun st'_h__local st'_h__sub st'_val φ m R
+        repId f_sender st'_log Hst'_validity Hst'_coh Hst'_ser Haddr st'_denot)
+        with "[$][$][$][$][$][$][$][$]").
   Qed.
 
 

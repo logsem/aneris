@@ -69,6 +69,8 @@ Section Specification.
         ⌜StLib_St_Coh log_st st⌝ ∗
         ⌜⟦ s ⟧ ⇝ log_st⌝ ∗
         ⌜log_ev ∉ s⌝ ∗
+        ⌜EV_Op log_ev = log_op⌝ ∗
+        ⌜EV_Orig log_ev = repId⌝ ∗
         ⌜maximal log_ev (s ∪ {[ log_ev ]})⌝ ∗
         ⌜events_ext (s ∪ {[ log_ev ]})⌝ ∗
         ⌜event_set_same_orig_comparable (s ∪ {[ log_ev ]})⌝
@@ -117,27 +119,6 @@ Section Specification.
       {{{ True }}}
         crdt_fun #() @[ip_of_address addr]
       {{{ v, RET v; crdt_triplet_spec v }}}.
-
-    (** TODO: discuss the differences. 
-    Definition init_spec (init : val) : iProp Σ :=
-    ∀ (repId : nat) (addr : socket_address) (fixedAddrs : gset socket_address)
-      (addrs_val crdt_val : val) (f: (repId < length CRDT_Addresses)%nat),
-        {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
-            ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
-            ⌜addr ∈ fixedAddrs⌝ ∗
-            fixed fixedAddrs ∗
-            ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
-            addr ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address addr) {[port_of_address addr]} ∗
-            StLib_InitToken (nat_to_fin f) ∗
-            crdt_fun_spec crdt_val
-        }}}
-          init addrs_val #repId crdt_val @[ip_of_address addr]
-        {{{ get_state_val mutator_val, RET (get_state_val, mutator_val);
-            LocState repId ∅ ∅ ∗
-            get_state_spec get_state_val repId addr ∗
-            update_spec mutator_val repId addr
-        }}}. *)
 
   Definition init_spec (init: val) : iProp Σ :=
     ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)

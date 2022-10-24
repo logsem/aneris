@@ -22,6 +22,11 @@ Section ModelDef.
       ⟦ s2 ⟧ ⇝ st2 ->
       event_set_valid s1 ->
       event_set_valid s2 ->
+      (∀ i,
+        filter (λ ev, ev.(EV_Orig) = i) (s1 ∪ s2)
+          = filter (λ ev, ev.(EV_Orig) = i) s1
+        ∨ filter (λ ev, ev.(EV_Orig) = i) (s1 ∪ s2)
+          = filter (λ ev, ev.(EV_Orig) =  i) s2)  →
       st1 ⊔_l st2 = st3 -> ⟦ s1 ∪ s2 ⟧ ⇝ st3;
 
     (* The mutator sends a state, an operation, and the replica id where the

@@ -277,4 +277,76 @@ Section Resources_utils.
     by rewrite -heq.
   Qed.
 
+  Lemma locals_incl_global E (s2 st_h__local st_h__foreign: event_set LogOp) (f f': fRepId) :
+    ↑CRDT_InvName ⊆ E →
+    ⊢ StLib_GlobalInv -∗
+    own (γ_loc_cc' !!! f') (◯ princ_ev s2) -∗
+    own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local) -∗
+    own (γ_loc_for !!! f) ((1 / 2)%Qp, to_agree st_h__foreign)
+    ={E}=∗
+      (own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local)
+      ∗ own (γ_loc_for !!! f) ((1 / 2)%Qp, to_agree st_h__foreign)
+      ∗ ⌜ ∃ (g: event_set LogOp),
+        s2 ⊆_cc g
+        /\ (st_h__local ∪ st_h__foreign) ⊆_cc g
+        /\ Lst_Validity g ⌝).
+  Proof.
+    iIntros (HE) "#Hinv #Hsnap Hownloc Hownfor".
+    iInv "Hinv" as ">(%g & Hown_glob & Hglob_snap & %Hv & HS)" "Hclose".
+
+    iDestruct ((forall_fin f') with "HS")
+      as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub' & %Hst_proj &
+        %st_locisloc & %st_forisfor & %st_subisfor & %Hst_cc &
+        Hst_own__local'' & Hst_own__foreign' & Hst_own__sub' & Hst_own__cc' & Hst_own__cc'')]".
+    iDestruct (princ_ev__subset_cc' with "Hsnap Hst_own__cc''")
+      as "[Hst_own__cc'' %Hcc2]".
+
+    iDestruct ((forall_fin' f')
+      with "[$Hothers Hst_own__local'' Hst_own__foreign' Hst_own__sub'
+        Hst_own__cc' Hst_own__cc'']") as "HS".
+    { iExists st_h__local', st_h__foreign', st_h__sub'. by iFrame. }
+
+    iDestruct ((forall_fin f) with "HS")
+      as "[Hothers (%st_h__local2 & %st_h__foreign2 & %st_h__sub2 & %Hst_proj2 &
+        %st_locisloc2 & %st_forisfor2 & %st_subisfor2 & %Hst_cc2 &
+        Hst_own__local' & Hst_own__foreign' & Hst_own__sub' & Hst_own__cc' & Hst_own__cc'')]".
+
+    iDestruct (both_agree_agree with "Hownloc Hst_own__local'")
+      as "(Hownloc & Hst_own__local' & <-)".
+    iDestruct (both_agree_agree with "Hownfor Hst_own__foreign'")
+      as "(Hownfor & Hst_own__foreign' & <-)".
+
+    iDestruct ((forall_fin' f)
+      with "[$Hothers Hst_own__local' Hst_own__foreign' Hst_own__sub'
+        Hst_own__cc' Hst_own__cc'']") as "HS".
+    { iExists st_h__local, st_h__foreign, st_h__sub2. by iFrame. }
+
+    iFrame.
+    iMod ("Hclose" with "[Hown_glob Hglob_snap HS]") as "_".
+    { iNext. iExists g. by iFrame. }
+
+    iPureIntro. exists g.1.
+    pose proof (gst_local_incl_cc f' _ Hv).
+    pose proof (gst_local_incl_cc f _ Hv).
+    split; last split; last exact (VGst_hst_valid _ Hv).
+    - destruct Hcc2 as [Hs2 Hc2]. split.
+      + intros x Hx%Hs2. apply (VGst_incl_local _ Hv).
+        exists f'. by rewrite Hst_proj.
+      + intros e e' He_in He'_in He_e'_le He'_in'.
+        eapply (Hc2 e e' _ _ He_e'_le He'_in').
+        Unshelve.
+        2: by apply Hs2.
+        rewrite<-Hst_proj.
+        apply (H1 e e' He_in He'_in He_e'_le).
+        rewrite Hst_proj. by apply Hs2.
+    - destruct Hst_cc2 as [Hs1 Hc1]. split.
+      + intros x Hx. apply (VGst_incl_local _ Hv).
+        exists f. by rewrite Hst_proj2.
+      + intros e e' He_in He'_in He_e'_le He'_in'.
+        rewrite -Hst_proj2.
+        apply (H2 e e' He_in He'_in He_e'_le).
+        by rewrite Hst_proj2.
+  Qed.
+
 End Resources_utils.
+
