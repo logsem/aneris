@@ -759,17 +759,6 @@ Section adequacy_helper_lemmas.
 
 End adequacy_helper_lemmas.
 
-(* TODO: Dummy lemma; remove! *)
-Lemma lc_alloc `{!lcGpreS Σ} :
-  ⊢ |==> ∃ _ : lcGS Σ, (True:iProp Σ).
-Proof.
-  iMod (own_alloc (● 0)) as (γLC) "H●".
-  { by apply auth_auth_valid. }
-  iModIntro.
-  iExists (LcGS _ (lcGpreS0.(lcGpreS_inG)) γLC).
-  eauto. Unshelve. apply lcGpreS0.
-Qed.
-
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ:
@@ -801,9 +790,10 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
   ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
 Proof.
   intros Hwp.
-    (* TODO: Why cant this guess (invGpreS0.(invGpreS_wsat))? *)
+  (* TODO: Why cant this guess (invGpreS0.(invGpreS_wsat))? *)
   iMod (@wsat_alloc _ (invGpreS0.(invGpreS_wsat))) as (Hwsat) "[Hw HE]".
-  iMod (@lc_alloc _ (invGpreS0.(invGpreS_lc))) as (Hlc) "_".
+  iMod (@later_credits.le_upd.lc_alloc _ (invGpreS0.(invGpreS_lc)) 0)
+    as (Hlc) "_".
   (* TODO: Why is [InvG HasNoLc Σ _ _] needed explicitly *)
   iPoseProof (Hwp (InvG HasNoLc Σ Hwsat Hlc)) as "Hwp".
   rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
