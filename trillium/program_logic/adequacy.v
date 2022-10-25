@@ -916,7 +916,7 @@ Proof.
   assert (∃ n, n = trace_length ex) as [n Hn] by eauto.
   rewrite -Hn.
   clear Hn.
-  rewrite -> fupd_to_bupd_unfold; rewrite /fupd_to_bupd_one.
+  rewrite -> fupd_to_bupd_unfold; rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
   iApply bupd_plain.
   iApply "HFtB".
@@ -924,7 +924,7 @@ Proof.
   iMod "Hstp".
   iModIntro.
   iIntros "HFtB".
-  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
   iNext.
   iApply except_0_later.
   iApply bupd_plain.
@@ -933,14 +933,14 @@ Proof.
   iModIntro.
   iIntros "HFtB".
   iInduction n as [|n] "IHlen"; simpl; last first.
-  { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+  { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iApply except_0_later.
     iApply bupd_plain.
     iApply "HFtB".
     iMod "Hstp".
     iModIntro.
     iIntros "HFtB".
-    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iNext.
     iApply except_0_later.
     iApply bupd_plain.
@@ -948,9 +948,9 @@ Proof.
     iMod "Hstp".
     iModIntro.
     iIntros "HFtB".
-    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iApply ("IHlen" with "Hstep HTI Hstp"); done. }
-  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
   iApply bupd_plain.
   iApply "HFtB".
@@ -1009,7 +1009,7 @@ Proof.
     - done.
     - rewrite Hlocales.
       iPoseProof (wptp_of_val_post with "Hback") as "Hback".
-      rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_one.
+      rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
       iApply except_0_later.
       iApply bupd_plain.
       iApply "HFtB".
@@ -1021,7 +1021,7 @@ Proof.
       + iModIntro.
         iIntros "HFtB"; done. }
   iExists _, _.
-  rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_one.
+  rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
   iApply bupd_plain.
   iApply "HFtB".
