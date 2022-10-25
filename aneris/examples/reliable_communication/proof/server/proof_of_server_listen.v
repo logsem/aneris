@@ -218,7 +218,7 @@ Section Proof_of_server_listen.
                    _ _ _ _  (1/3)%Qp (2/3)%Qp with "[Hl]") as "(Hl1 & Hl2)";
         [apply mapsto_heap_as_fractional .. | |].
       { replace (1 / 3 + 2 / 3)%Qp with 1%Qp; first by iFrame.
-        rewrite -Qp_div_add_distr pos_to_Qp_add Qp_div_diag //=. }
+        rewrite -Qp.div_add_distr pos_to_Qp_add Qp.div_diag //=. }
       wp_apply (aneris_wp_fork with "[-]").
       iSplitL "HΦ Hl2".
       + wp_pures. iApply "HΦ". iNext. iExists srv_skt_l. iSplit; [done|].

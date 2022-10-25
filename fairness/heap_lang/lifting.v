@@ -22,7 +22,7 @@ Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
 Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
   heap_inG :> heapGpreS Σ LM;
 
-  heap_invGS :> invGS Σ;
+  heap_invGS :> invGS_gen HasNoLc Σ;
   heap_gen_heapGS :> gen_heapGS loc val Σ;
 
   heap_fairnessGS :> fairnessGS LM Σ;

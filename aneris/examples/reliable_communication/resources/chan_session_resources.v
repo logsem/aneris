@@ -131,7 +131,7 @@ Section iProto_sessions.
     iDestruct 1 as (?) "(Htk2 & Hown2)".
     iDestruct (session_token_agree with "Htk1 Htk2") as "<-".
     iDestruct (own_valid_2 with "Hown1 Hown2") as %Hvl.
-    by apply frac_auth.frac_auth_frag_valid_op_1_l in Hvl.
+    by apply frac_auth_frag_op_valid in Hvl as [Hvl _].
   Qed.
 
   Lemma CookieRes_Full_valid sa n1 n2: CookieTokenFull sa n1 ⊢  CookieRes sa n2 -∗ ⌜n1 = n2⌝.

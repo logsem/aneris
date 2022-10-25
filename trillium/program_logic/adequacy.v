@@ -1,7 +1,8 @@
 From stdpp Require Import finite.
-From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gmap auth agree gset coPset.
-From iris.base_logic.lib Require Import wsat.
+From iris.bi.lib Require Import fixpoint.
+From iris.base_logic.lib Require Import wsat later_credits.
+From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers iris_extraction finitary classical_instances.
 From trillium.program_logic Require Export weakestpre traces.
 
@@ -281,12 +282,15 @@ Section locales_helpers.
       eapply locale_equiv_transitive.
       eapply IH =>//.
       pose proof (locale_step_equiv _ _ _ Hstep) as Hequiv.
-      rewrite ->Hends in Hequiv. simpl in Hequiv.
+      rewrite /trace_ends_in /trace_last in Hends.
+      rewrite Hends in Hequiv.
       apply (locale_equiv_take _ _ (length tp1)) in Hequiv.
       rewrite take_take in Hequiv.
       assert (length tp1 ≤ length tp').
       { eapply (valid_exec_length ex ) =>//. }
-      replace (length tp1 `min` length tp') with (length tp1) in Hequiv; [done|lia].
+      simpl in Hequiv.
+      replace (length tp1 `min` length tp') with (length tp1) in Hequiv;
+        [done|lia].
   Qed.
 
 End locales_helpers.
@@ -756,10 +760,53 @@ Section adequacy_helper_lemmas.
 
 End adequacy_helper_lemmas.
 
+(** Fixpoint definition of the soundness goal of Trillium *)
+Definition fupd_to_bupd_aux `{invGS_gen hlc Σ}
+           (rec : coPset → iProp Σ) (E1 : coPset) : iProp Σ :=
+  ∀ (P : iProp Σ) E2, ((|={E1,E2}=> rec E2 -∗ P) ==∗ ◇ P).
+
+Definition fupd_to_bupd `{invGS_gen hlc Σ} :=
+  bi_greatest_fixpoint fupd_to_bupd_aux.
+
+Instance fupd_to_bupd_aux_bi_mono `{invGS_gen hlc Σ} :
+  BiMonoPred (fupd_to_bupd_aux).
+Proof.
+  split.
+  - iIntros (Φ Ψ HΦne HΨne) "#H". iIntros (E1) "HE". iIntros (P E2) "HP".
+    iApply "HE"; iMod "HP"; iModIntro. by iIntros; iApply "HP"; iApply "H".
+  - iIntros (Φ HΦne). by intros ??? ->%leibniz_equiv.
+Qed.
+
+Lemma fupd_to_bupd_unfold `{invGS_gen hlc Σ} E :
+  fupd_to_bupd E ≡ fupd_to_bupd_aux fupd_to_bupd E.
+Proof. by rewrite /fupd_to_bupd greatest_fixpoint_unfold. Qed.
+
+Lemma fupd_to_bupd_soundness_no_lc `{!invGpreS Σ} (Q : iProp Σ) :
+  (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ |==> Q.
+Proof.
+  iIntros (Hfupd).
+  iMod (@wsat_alloc _ (invGpreS0.(invGpreS_wsat))) as (Hw) "[Hw HE]".
+  iMod (@later_credits.le_upd.lc_alloc _ (invGpreS0.(invGpreS_lc)) 0) as (Hc) "_".
+  set (Hi := InvG HasNoLc _ Hw Hc).
+  iApply (@Hfupd Hi).
+  assert (NonExpansive (λ E, wsat ∗ ownE E)%I).
+  { by intros ??? ->%leibniz_equiv. }
+  iApply (greatest_fixpoint_coiter _ (λ E, wsat ∗ ownE E)%I with "[] [$Hw $HE]").
+  iIntros "!>" (E1) "?".
+  iIntros (P E2) "HP".
+  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def /=.
+  iMod ("HP" with "[$]") as ">(Hw & HE & HP)".
+  do 2 iModIntro; iApply "HP"; iFrame.
+Qed.
+
+Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
+  (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
+Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
+
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ:
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -787,12 +834,14 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
   ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
 Proof.
   intros Hwp.
-  iMod wsat_alloc as (Hinv) "[Hw HE]".
-  iPoseProof Hwp as "Hwp".
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Hwp" with "[$Hw $HE]") as ">[Hw [HE Hwp']]".
-  iClear "Hwp".
-  iDestruct "Hwp'" as (stateI trace_inv Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
+  apply extract_except_0.
+  iApply fupd_to_bupd_soundness_no_lc'.
+  iIntros (Hinv) "HFtB".
+  rewrite fupd_to_bupd_unfold /fupd_to_bupd_aux.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iPoseProof (Hwp Hinv) as "Hwp".
+  iMod "Hwp" as (stateI trace_inv Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
   clear Hwp.
   set (IrisG Λ M Σ Hinv stateI fork_post).
   iAssert (∃ ex atr c1 δ1,
@@ -833,26 +882,32 @@ Proof.
   { by eapply valid_system_trace_valid_exec_trace. }
   iPoseProof (wptp_not_stuck _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
     [apply locales_equiv_refl|done|by list_simplifier|].
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Htp" with "[$Hw $HE]") as ">(Hw & HE & HSI & Htp & %Hnstk)".
+  iMod ("Htp") as "(HSI & Htp & %Hnstk)".
   rewrite (last_eq_trace_ends_in _ (tp, σ1')) in Hnstk; last done.
   iPoseProof (wptp_of_val_post with "Htp") as "Htp".
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Htp" with "[$Hw $HE]") as ">(Hw & HE & Hpost & Hback)".
-  iAssert (▷ ⌜ξ ex atr⌝)%I as "#Hξ".
-  { iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
-    iMod ("Hξ" with "HTI [$Hw $HE]") as ">(Hw & HE & %)"; auto. }
+  iMod ("Htp") as "(Hpost & Hback)".
+  iAssert (|={⊤}=> ▷ ⌜ξ ex atr⌝ ∗ (_ ∗ _ ∗ _ ∗ _))%I with "[Hstep HTI HSI Hpost]"
+    as ">[Hξ (HSI & Hpost & HTI & Hstep)]".
+  { iCombine "HTI" "Hstep" as "HS".
+    iCombine "Hpost" "HS" as "HS".
+    iCombine "HSI" "HS" as "HS".
+    iApply fupd_plain_keep_l; iSplitR; [|iExact "HS"].
+    iIntros "(HSI & Hpost & HTI & Hstep)".
+    iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
+    iApply fupd_plain_mask.
+    iMod ("Hξ" with "HTI") as "%"; auto. }
   iAssert (□ (stateI ex atr -∗
              (∀ ex' atr' oζ ℓ,
-                 ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') -∗
-             wsat ∗ ownE ⊤ ==∗
-             ◇ (wsat ∗ ownE ⊤ ∗ stateI ex atr ∗ trace_inv ex atr)))%I as "#HTIextend".
+                 ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+                 ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
   { iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[#Hext _]"; auto.
     iModIntro.
-    iIntros "HSI HTI [Hw HE]".
-    iApply ("Hext" with "[$HSI $HTI] [$Hw $HE]"). }
-  iMod ("HTIextend" with "HSI HTI [$Hw $HE]") as ">(Hw & HE & HSI & HTI)".
+    iIntros "HSI HTI".
+    iApply ("Hext" with "[$HSI $HTI]"). }
+  iMod ("HTIextend" with "HSI HTI") as "[HSI HTI]".
   iDestruct ("Hback" with "Hpost") as "Htp".
+  iModIntro.
+  iIntros "HFtB".
   iNext; iSplit; first done.
   iDestruct "Hξ" as %Hξ'.
   iIntros (c oζ c' Hc Hstep).
@@ -861,17 +916,47 @@ Proof.
   assert (∃ n, n = trace_length ex) as [n Hn] by eauto.
   rewrite -Hn.
   clear Hn.
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
+  rewrite -> fupd_to_bupd_unfold; rewrite /fupd_to_bupd_aux.
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod "Hstp"; simpl.
+  iMod "Hstp".
+  iModIntro.
+  iIntros "HFtB".
+  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
   iNext.
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
-  iInduction n as [|n] "IHlen"; last first.
-  { iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod "Hstp".
+  iModIntro.
+  iIntros "HFtB".
+  iInduction n as [|n] "IHlen"; simpl; last first.
+  { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
+    iApply except_0_later.
+    iApply bupd_plain.
+    iApply "HFtB".
+    iMod "Hstp".
+    iModIntro.
+    iIntros "HFtB".
+    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iNext.
-    iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
-    iApply ("IHlen" with "Hstep HTI Hw HE"). done. }
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & % & H)".
+    iApply except_0_later.
+    iApply bupd_plain.
+    iApply "HFtB".
+    iMod "Hstp".
+    iModIntro.
+    iIntros "HFtB".
+    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
+    iApply ("IHlen" with "Hstep HTI Hstp"); done. }
+  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod "Hstp" as "(% & H)".
+  iModIntro.
+  iIntros "HFtB".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
   iSpecialize ("Hback" with "Hpost").
   assert (Hlocales: map (λ '(tnew, e), weakestpre.fork_post (locale_of tnew e))
@@ -912,7 +997,6 @@ Proof.
     assert (Hequiv_from'': forall t, locales_equiv_from [e2] [e3] t t).
     { intros t. apply locales_from_equiv_refl. constructor =>//. by inversion Hequiv. }
     erewrite (forkposts_locales_equiv [e2]); last by eauto.
-
     rewrite -map_app -prefixes_from_app take_drop.
     rewrite [drop _ _]/= drop_0 //. }
   iAssert (▷ ⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'')⌝)%I as "#Hextend'".
@@ -925,15 +1009,23 @@ Proof.
     - done.
     - rewrite Hlocales.
       iPoseProof (wptp_of_val_post with "Hback") as "Hback".
-      rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-      iMod ("Hback" with "[$Hw $HE]") as ">(Hw & HE & Hpost & Hwptp)".
+      rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
+      iApply except_0_later.
+      iApply bupd_plain.
+      iApply "HFtB".
+      iMod "Hback" as "(Hpost & Hwptp)".
       iDestruct ("H" with "Hpost") as "[? Hξ]".
-      iMod ("Hξ" with "[HTI] [$Hw $HE]") as ">(Hw & HE & %)"; last done.
-      iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
-                 [-> ->]%trace_contract_of_extend); done. }
+      iMod ("Hξ" with "[HTI]") as "%".
+      + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
+                 [-> ->]%trace_contract_of_extend); done.
+      + iModIntro.
+        iIntros "HFtB"; done. }
   iExists _, _.
-  iApply ("IH" with "[] [] Hw HE Hstep HSI [HTI]");
-    [| | |iFrame].
+  rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod ("IH" with "[] [] Hstep HSI [HTI] [Hback]") as "IH'".
   - iPureIntro; split_and!.
     + eapply valid_system_trace_extend; eauto.
     + eapply trace_extend_starts_in; eauto.
@@ -944,8 +1036,8 @@ Proof.
   - iPureIntro. pose proof (step_tp_length _ _ _ Hstep). simpl in *. lia.
   - iIntros (???? [-> ->]%trace_contract_of_extend
                   [-> ->]%trace_contract_of_extend); done.
-  - change fork_post with weakestpre.fork_post.
-    rewrite Hlocales //.
+  - rewrite Hlocales //.
+  - iModIntro. iIntros "HFtB". iNext. iApply "IH'"; done.
 Qed.
 
 Definition rel_finitary {A B C D}
@@ -1031,7 +1123,7 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -1067,7 +1159,7 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
@@ -1178,7 +1270,7 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
         (φ : val Λ → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -1233,7 +1325,7 @@ Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), E
         (φ : val Λ → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
-  (∀ `{Hinv : !invGS Σ},
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
@@ -1269,7 +1361,7 @@ Proof.
 Qed.
 
 (* Corollary wp_adequacy Λ M Σ `{!invGpreS Σ} s e σ δ φ : *)
-(*   (∀ `{Hinv : !invGS Σ}, *)
+(*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
 (*      ⊢ |={⊤}=> ∃ *)
 (*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
 (*          (fork_post : locale Λ -> val Λ → iProp Σ), *)
@@ -1324,7 +1416,7 @@ Qed.
 
 (* Corollary wp_invariance Λ M Σ `{!invGpreS Σ} s e1 σ1 δ1 t2 σ2 φ : *)
 (*   rel_finitary (wp_invariance_relation Λ M e1 σ1 t2 σ2 φ) → *)
-(*   (∀ `{Hinv : !invGS Σ}, *)
+(*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
 (*      ⊢ |={⊤}=> ∃ *)
 (*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
 (*          (fork_post : locale Λ -> val Λ → iProp Σ), *)

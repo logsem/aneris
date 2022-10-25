@@ -80,13 +80,13 @@ Section Clients_MT_spec_params.
       iInv DB_InvName
         as (lMG kvsMG) ">(%HkG & %Hdom & %Hdisj & HmS & HlM & HknwF & HmapF & %HvalidG)".
       iDestruct (own_log_auth_combine with "HlM HlogL") as "(HlFull & ->)".
-      rewrite Qp_half_half.
+      rewrite Qp.half_half.
       iDestruct (own_obs_prefix with "[$HlFull][Hobsh]") as "%Hprefixh2".
       by iApply Obs_own_log_obs.
       iMod (own_log_auth_update _ _ (lM ++ [a]) with "[$HlFull]") as "HlFull".
       { by apply prefix_app_r. }
       iMod (own_mem_update _ _ _ _ a with "[$Hk][$HmS]") as "(Hk & HmS)".
-      rewrite - {4} Qp_half_half.
+      rewrite - {4} Qp.half_half.
       iDestruct (own_log_auth_split with "HlFull") as "(HlogM & HlogL)".
       iDestruct (get_obs with "[$HlogL]") as "#Hobsfr2".
       iModIntro. rewrite /global_inv_def. iSplitL "HlogM HmS HmapF HknwF".

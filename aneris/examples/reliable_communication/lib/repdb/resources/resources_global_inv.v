@@ -391,7 +391,7 @@ Section Alloc_resources.
       rewrite fmap_insert fmap_empty.
       rewrite !big_opM_singleton. iFrame "#∗".
       iSplit; [ iPureIntro; set_solver |].
-      rewrite -{1}Qp_half_half -dfrac_op_own mono_list_auth_dfrac_op.
+      rewrite -{1}Qp.half_half -dfrac_op_own mono_list_auth_dfrac_op.
       iDestruct "HlogFa" as "[$ $]". }
     iMod ("IH" with "[] HlogFa HlogFf Htoks HtokF")
       as (N Hdom) "(Htoks & Hlogs & HN)".
@@ -412,7 +412,7 @@ Section Alloc_resources.
     iFrame "#∗".
     iModIntro.
     iSplit; [ iPureIntro; set_solver |].
-    rewrite -{1}Qp_half_half -dfrac_op_own mono_list_auth_dfrac_op.
+    rewrite -{1}Qp.half_half -dfrac_op_own mono_list_auth_dfrac_op.
     iDestruct "HlogFa" as "[$ $]".
   Qed.
 

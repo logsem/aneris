@@ -26,7 +26,7 @@ Section ghost.
     ⊢ |==> ∃ γ, last_message γ m ∗ last_message γ m.
   Proof.
     unfold last_message. iMod (own_alloc (to_frac_agree 1 m)) as (γ) "Hown". { done. }
-    iModIntro. iExists γ. iApply own_op. rewrite<- frac_agree_op. rewrite Qp_half_half.
+    iModIntro. iExists γ. iApply own_op. rewrite<- frac_agree_op. rewrite Qp.half_half.
     iAssumption.
   Qed.
 
@@ -48,8 +48,8 @@ Section ghost.
     unfold last_message. iIntros "H0 H1".
     iAssert (own γ (to_frac_agree (1 / 2 + 1 / 2) m)) with "[H0 H1]" as "H".
     { rewrite frac_agree_op. iApply own_op. iFrame. }
-    rewrite Qp_half_half. iApply bupd_mono.
-    { iIntros "Goal". iApply own_op. rewrite<- frac_agree_op, Qp_half_half. iExact "Goal". }
+    rewrite Qp.half_half. iApply bupd_mono.
+    { iIntros "Goal". iApply own_op. rewrite<- frac_agree_op, Qp.half_half. iExact "Goal". }
     iApply (own_update with "H"). apply cmra_update_exclusive. done.
   Qed.
 

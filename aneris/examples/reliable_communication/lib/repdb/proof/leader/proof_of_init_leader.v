@@ -94,8 +94,8 @@ Section Init_Leader_Proof.
     iDestruct "HinitRes"
       as "(%Htk & #HGinv & HownL & HsrvInit & #HFtkn & HownF & HsrvFinit)".
     iDestruct (get_obs with "[$HownL]") as "#HobsL".
-    rewrite -Qp_quarter_quarter.
-    rewrite {1} Qp_quarter_quarter.
+    rewrite -Qp.quarter_quarter.
+    rewrite {1} Qp.quarter_quarter.
     iDestruct (own_log_auth_split _ (1/4) (1/4) with "[$HownF]")
       as "(HownF1 & HownF2)".
     wp_apply (new_monitor_spec

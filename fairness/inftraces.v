@@ -534,9 +534,6 @@ End lex_ind.
 
 #[global] Program Instance add_monoid: Monoid Nat.add :=
   {| monoid_unit := 0 |}.
-Next Obligation. intros ???. apply Nat.add_assoc. Qed.
-Next Obligation. intros ??. apply Nat.add_comm. Qed.
-Next Obligation. intros ?. done. Qed.
 
 Section addition_monoid.
   Context `{Countable K}.

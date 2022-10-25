@@ -107,13 +107,13 @@ Section SyncLogCopy_Proof.
     iDestruct (big_sepM_lookup_acc _ _ sa γF HNsa with "[$HmapF]")
       as "((%lF & (_ & #HobsL'' & HlMhalf')) & Hcl)".
     iDestruct (own_log_auth_combine with  "HlMhalf HlMhalf'") as "(HlFull & ->)".
-    rewrite Qp_quarter_quarter Qp_half_half.
+    rewrite Qp.quarter_quarter Qp.half_half.
     iAssert (own_replog_obs γL DB_addrF (lF ++ [we])) as "HobsLF'cpy".
     { by done. }
     iDestruct "HobsLF'" as (γF') "(_ & HobsLwe & HobsLFwe)".
     iMod (own_log_auth_update _ _ (lF ++ [we]) with "[$HlFull]") as "HlFull".
     { by apply prefix_app_r. }
-    rewrite - {4} Qp_half_half.
+    rewrite - {4} Qp.half_half.
     iDestruct (own_log_auth_split with "HlFull") as "(HlogM & HlogL)".
     iDestruct (get_obs with "[$HlogL]") as "#Hobsfr2".
     iModIntro.
@@ -128,7 +128,7 @@ Section SyncLogCopy_Proof.
       iExists (lF ++ [we]).
       iFrame "#∗". }
     iModIntro.
-    rewrite - Qp_quarter_quarter.
+    rewrite - Qp.quarter_quarter.
     iDestruct (own_log_auth_split with "HlogL") as "(HlogL1 & HlogL2)".
     wp_apply (monitor_release_spec
                with "[$HinvL $Hlocked Hpl' Hpm HlogL1]").

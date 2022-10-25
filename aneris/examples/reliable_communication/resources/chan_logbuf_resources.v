@@ -43,7 +43,7 @@ Section SeqIdResources.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hvl.
-    by apply frac_auth_frag_valid_op_1_l in Hvl.
+    by apply frac_auth_frag_op_valid in Hvl as [Hvl _].
   Qed.
 
   (* Axiom auth_list_agree : ∀ {T} γ (xs : list T) n (x : T),

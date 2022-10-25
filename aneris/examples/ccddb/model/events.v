@@ -46,7 +46,7 @@ Next Obligation.
   assert (we_time w1 = we_time w2) as Ht'.
   { by apply (inj (R := eq)) in Ht; [ | apply _]. }
   destruct w1, w2; simpl in *.
-  by apply Z_of_nat_inj in Ho; subst.
+  by apply Nat2Z.inj in Ho; subst.
 Qed.
 
 

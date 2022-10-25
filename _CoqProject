@@ -2,14 +2,15 @@
 -Q aneris aneris
 -Q fairness trillium.fairness
 
--Q external/stdpp/theories stdpp
+-Q external/stdpp/stdpp stdpp
+-Q external/stdpp/stdpp_unstable stdpp.unstable
 -Q external/iris/iris iris
 -Q external/record-update/src RecordUpdate
 -Q external/paco/src Paco
 -Q external/actris/theories actris
 
 -Q external/iris/iris_deprecated iris.deprecated
--Q external/iris/iris_staging iris.staging
+-Q external/iris/iris_unstable iris.unstable
 -Q external/iris/iris_heap_lang iris.heap_lang
 
 -arg -w -arg -notation-overridden

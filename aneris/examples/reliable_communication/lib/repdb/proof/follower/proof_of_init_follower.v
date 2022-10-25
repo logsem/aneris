@@ -95,7 +95,7 @@ Section Init_Follower_Proof.
     iDestruct "HinitRes"
       as "(#HGinv & HownF & #HobsL & Hinit & #HFtkn & #HdbF)".
     iDestruct (get_obs with "[$HownF]") as "#HobsF".
-    rewrite - {1} Qp_quarter_quarter.
+    rewrite - {1} Qp.quarter_quarter.
     iDestruct (own_log_auth_split _ (1/4) (1/4) with "[$HownF]")
       as "(HownF1 & HownF2)".
     wp_apply (new_monitor_spec

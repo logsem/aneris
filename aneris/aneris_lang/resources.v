@@ -78,7 +78,7 @@ Canonical Structure aneris_eventsO := leibnizO aneris_events.
 (** The system CMRA *)
 Class anerisG (Mdl : Model) Σ :=
   AnerisG {
-      aneris_invG :> invGS Σ;
+      aneris_invG :> invGS_gen HasNoLc Σ;
       (** global tracking of the ghost names of node-local heaps *)
       aneris_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
       aneris_node_gnames_name : gname;
@@ -255,7 +255,8 @@ Section definitions.
   (** Socket interpretation [Φ] of group [sag] *)
   Definition si_pred (sag : socket_address_group)
              (Φ : socket_interp Σ) : iProp Σ :=
-    ∃ γ, socket_address_group_own sag ∗ saved_si sag γ ∗ saved_pred_own γ Φ.
+    ∃ γ, socket_address_group_own sag ∗ saved_si sag γ ∗
+         saved_pred_own γ (DfracDiscarded) Φ.
 
   (** The set [A] of addresses with unallocated socket interpretations *)
   Definition unallocated_groups_auth (A : gset socket_address_group) : iProp Σ :=
@@ -523,7 +524,7 @@ Lemma saved_si_update `{anerisG Mdl Σ} (A : gset socket_address_group) γsi f :
     own (A:=authR socket_interpUR) γsi (● (to_agree <$> M)) ∗
     [∗ map] a ↦ γ ∈ M, own (A:=authR socket_interpUR)
                            γsi (◯ {[ a := (to_agree γ) ]}) ∗
-                       saved_pred_own (A:=message) γ (f a).
+                       saved_pred_own (A:=message) γ (DfracDiscarded) (f a).
   iIntros "[Hsi Hsi']".
   pose proof (NoDup_elements A) as Hnd.
   iInduction (elements A) as [|a l] "IHl" forall "Hsi Hsi'".
@@ -532,7 +533,7 @@ Lemma saved_si_update `{anerisG Mdl Σ} (A : gset socket_address_group) γsi f :
     iPureIntro. by rewrite dom_empty_L.
   - inversion Hnd as [|? ? ? Hrd']; subst.
     iMod ("IHl" $! Hrd' with "Hsi Hsi'") as (M HMl) "[HM HML]"; iFrame.
-    iMod (saved_pred_alloc (f a)) as (γ) "Hγ".
+    iMod (saved_pred_alloc (f a) (DfracDiscarded)) as (γ) "Hγ"; [done|].
     assert (a ∉ dom M) as Hnm.
     { by rewrite -elem_of_elements HMl. }
     iMod (own_update (A:=authR socket_interpUR) _ _
@@ -1247,16 +1248,16 @@ Section resource_lemmas.
     by apply gset_disj_dealloc_empty_local_update.
   Qed.
 
-  #[global] Instance saved_pred_proper `{savedPredG Σ A} n γ:
+  #[global] Instance saved_pred_proper `{savedPredG Σ A} n γ dq :
     Proper ((dist n) ==> (dist n))
-           (@saved_pred_own Σ A _ γ : (A -d> iPropO Σ) -d> iPropO Σ).
+           (@saved_pred_own Σ A _ γ dq : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof.
     intros Φ Ψ Hps.
     f_equiv. destruct n; [done|].
     by apply dist_S.
   Qed.
-  #[global] Instance saved_pred_proper' `{savedPredG Σ A} γ:
-    Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ
+  #[global] Instance saved_pred_proper' `{savedPredG Σ A} γ dq :
+    Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ dq
                           : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof. solve_proper. Qed.
   #[global] Instance si_pred_prop `{anerisG Mdl Σ} a :
@@ -1357,7 +1358,7 @@ Section resource_lemmas.
     ∃ γsi, saved_si_auth (<[sag:=γsi]>sis) ∗ sag ⤇* φ.
   Proof.
     iIntros (Hnone) "Hsag Hsi".
-    iMod (saved_pred_alloc φ) as (γsi) "#Hsipred".
+    iMod (saved_pred_alloc φ DfracDiscarded) as (γsi) "Hsipred"; [done|].
     iMod (own_update _ _
                      (● (to_agree <$> (<[sag:=γsi]> sis)) ⋅
                       ◯ {[ sag := to_agree γsi ]}
@@ -1384,7 +1385,7 @@ Section resource_lemmas.
     apply auth_frag_valid_1, singleton_valid in Hvalid.
     apply (to_agree_op_inv_L γ1 γ2) in Hvalid.
     rewrite Hvalid.
-    iDestruct (saved_pred_agree _ _ _ x with "Hϕ1 Hϕ2") as "H".
+    iDestruct (saved_pred_agree _ _ _ _ _ x with "Hϕ1 Hϕ2") as "H".
     iExact "H".
   Qed.
 

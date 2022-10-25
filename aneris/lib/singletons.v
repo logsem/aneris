@@ -105,7 +105,7 @@ Section with_K.
     (to_singletons X) ∖ (to_singletons Y) = to_singletons (X ∖ Y).
   Proof. apply gset_map_difference_comm. apply _. Qed.
 
-  Lemma big_sepS_fmap `{invGS Σ} `{Countable K} `{Countable U}
+  Lemma big_sepS_fmap `{invGS_gen hlc Σ} `{Countable K} `{Countable U}
         (f : K → U) `{Inj _ _ (=) (=) f} (X : gset K)
         (Φ : U → iProp Σ) (Ψ : K → iProp Σ) :
     □ (∀ x, Φ (f x) -∗ Ψ x) -∗
@@ -120,7 +120,7 @@ Section with_K.
       by iApply "Hf".
   Qed.
 
-  Lemma big_sepS_to_singletons `{invGS Σ} `{Countable K}
+  Lemma big_sepS_to_singletons `{invGS_gen hlc Σ} `{Countable K}
         (X : gset K) (Φ : gset K → iProp Σ) (Ψ : K → iProp Σ) :
     □ (∀ x, Φ {[x]} -∗ Ψ x) -∗
       ([∗ set] x ∈ to_singletons X, Φ x) -∗ ([∗ set] x ∈ X, Ψ x).
