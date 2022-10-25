@@ -759,6 +759,49 @@ Section adequacy_helper_lemmas.
 
 End adequacy_helper_lemmas.
 
+From iris.bi.lib Require Import fixpoint.
+
+Definition fupd_to_bupd_one `{invGS_gen HasNoLc Σ} (Q : coPset → iProp Σ) (E1 : coPset) : iProp Σ :=
+  ∀ (P : iProp Σ) E2, ((|={E1,E2}=> Q E2 -∗ P) ==∗ ◇ P).
+
+Definition fupd_to_bupd `{invGS_gen HasNoLc Σ} := bi_greatest_fixpoint fupd_to_bupd_one.
+
+Instance fupd_to_bupd_one_bi_mono `{invGS_gen HasNoLc Σ} : BiMonoPred (fupd_to_bupd_one).
+Proof.
+  split.
+  - iIntros (Φ Ψ HΦne HΨne) "#H".
+    iIntros (E1) "HE".
+    iIntros (P E2) "HP".
+    iApply "HE"; iMod "HP"; iModIntro.
+    iIntros; iApply "HP"; iApply "H"; done.
+  - iIntros (Φ HΦne). by intros ??? ->%leibniz_equiv.
+Qed.
+
+(** Note: the [_no_lc] soundness lemmas also allow generating later credits, but *)
+(*   these cannot be used for anything. They are merely provided to enable making *)
+(*   the adequacy proof generic in whether later credits are used. *)
+Lemma fupd_plain_soundness_no_lc_strong `{!invGpreS Σ} (Q : iProp Σ) :
+  (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ |==> Q.
+Proof.
+  iIntros (Hfupd).
+  iMod (@wsat_alloc _ (invGpreS0.(invGpreS_wsat))) as (Hw) "[Hw HE]".
+  iMod (@later_credits.le_upd.lc_alloc _ (invGpreS0.(invGpreS_lc)) 0) as (Hc) "_".
+  set (Hi := InvG HasNoLc _ Hw Hc).
+  iApply (@Hfupd Hi).
+  assert (NonExpansive (λ E, wsat ∗ ownE E)%I).
+  { by intros ??? ->%leibniz_equiv. }
+  iApply (greatest_fixpoint_coiter _ (λ E, wsat ∗ ownE E)%I with "[] [$Hw $HE]").
+  iIntros "!>" (E1) "?".
+  iIntros (P E2) "HP".
+  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def /=.
+  iMod ("HP" with "[$]") as ">(Hw & HE & HP)".
+  do 2 iModIntro; iApply "HP"; iFrame.
+Qed.
+
+Lemma fupd_to_bupd_unfold `{invGS_gen HasNoLc Σ} E :
+  fupd_to_bupd E ≡ fupd_to_bupd_one fupd_to_bupd E.
+Proof. by rewrite /fupd_to_bupd greatest_fixpoint_unfold. Qed.
+
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ:
@@ -790,18 +833,17 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
   ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
 Proof.
   intros Hwp.
-  (* TODO: Why cant this guess (invGpreS0.(invGpreS_wsat))? *)
-  iMod (@wsat_alloc _ (invGpreS0.(invGpreS_wsat))) as (Hwsat) "[Hw HE]".
-  iMod (@later_credits.le_upd.lc_alloc _ (invGpreS0.(invGpreS_lc)) 0)
-    as (Hlc) "_".
-  (* TODO: Why is [InvG HasNoLc Σ _ _] needed explicitly *)
-  iPoseProof (Hwp (InvG HasNoLc Σ Hwsat Hlc)) as "Hwp".
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Hwp" with "[$Hw $HE]") as ">[Hw [HE Hwp']]".
-  iClear "Hwp".
-  iDestruct "Hwp'" as (stateI trace_inv Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
+  apply extract_except_0.
+  iApply bupd_plain.
+  iApply fupd_plain_soundness_no_lc_strong.
+  iIntros (Hinv) "HFtB".
+  rewrite fupd_to_bupd_unfold /fupd_to_bupd_one.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iPoseProof (Hwp Hinv) as "Hwp".
+  iMod "Hwp" as (stateI trace_inv Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
   clear Hwp.
-  set (IrisG Λ M Σ (InvG HasNoLc Σ Hwsat Hlc) stateI fork_post).
+  set (IrisG Λ M Σ Hinv stateI fork_post).
   iAssert (∃ ex atr c1 δ1,
               ⌜trace_singleton ([e1], σ1) = ex⌝ ∗
               ⌜trace_singleton δ = atr⌝ ∗
@@ -840,26 +882,32 @@ Proof.
   { by eapply valid_system_trace_valid_exec_trace. }
   iPoseProof (wptp_not_stuck _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
     [apply locales_equiv_refl|done|by list_simplifier|].
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Htp" with "[$Hw $HE]") as ">(Hw & HE & HSI & Htp & %Hnstk)".
+  iMod ("Htp") as "(HSI & Htp & %Hnstk)".
   rewrite (last_eq_trace_ends_in _ (tp, σ1')) in Hnstk; last done.
   iPoseProof (wptp_of_val_post with "Htp") as "Htp".
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Htp" with "[$Hw $HE]") as ">(Hw & HE & Hpost & Hback)".
-  iAssert (▷ ⌜ξ ex atr⌝)%I as "#Hξ".
-  { iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
-    iMod ("Hξ" with "HTI [$Hw $HE]") as ">(Hw & HE & %)"; auto. }
+  iMod ("Htp") as "(Hpost & Hback)".
+  iAssert (|={⊤}=> ▷ ⌜ξ ex atr⌝ ∗ (_ ∗ _ ∗ _ ∗ _))%I with "[Hstep HTI HSI Hpost]"
+    as ">[Hξ (HSI & Hpost & HTI & Hstep)]".
+  { iCombine "HTI" "Hstep" as "HS".
+    iCombine "Hpost" "HS" as "HS".
+    iCombine "HSI" "HS" as "HS".
+    iApply fupd_plain_keep_l; iSplitR; [|iExact "HS"].
+    iIntros "(HSI & Hpost & HTI & Hstep)".
+    iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
+    iApply fupd_plain_mask.
+    iMod ("Hξ" with "HTI") as "%"; auto. }
   iAssert (□ (stateI ex atr -∗
              (∀ ex' atr' oζ ℓ,
-                 ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') -∗
-             wsat ∗ ownE ⊤ ==∗
-             ◇ (wsat ∗ ownE ⊤ ∗ stateI ex atr ∗ trace_inv ex atr)))%I as "#HTIextend".
+                 ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+                 ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
   { iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[#Hext _]"; auto.
     iModIntro.
-    iIntros "HSI HTI [Hw HE]".
-    iApply ("Hext" with "[$HSI $HTI] [$Hw $HE]"). }
-  iMod ("HTIextend" with "HSI HTI [$Hw $HE]") as ">(Hw & HE & HSI & HTI)".
+    iIntros "HSI HTI".
+    iApply ("Hext" with "[$HSI $HTI]"). }
+  iMod ("HTIextend" with "HSI HTI") as "[HSI HTI]".
   iDestruct ("Hback" with "Hpost") as "Htp".
+  iModIntro.
+  iIntros "HFtB".
   iNext; iSplit; first done.
   iDestruct "Hξ" as %Hξ'.
   iIntros (c oζ c' Hc Hstep).
@@ -868,17 +916,47 @@ Proof.
   assert (∃ n, n = trace_length ex) as [n Hn] by eauto.
   rewrite -Hn.
   clear Hn.
-  rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
+  rewrite -> fupd_to_bupd_unfold; rewrite /fupd_to_bupd_one.
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod "Hstp"; simpl.
+  iMod "Hstp".
+  iModIntro.
+  iIntros "HFtB".
+  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
   iNext.
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
-  iInduction n as [|n] "IHlen"; last first.
-  { iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod "Hstp".
+  iModIntro.
+  iIntros "HFtB".
+  iInduction n as [|n] "IHlen"; simpl; last first.
+  { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+    iApply except_0_later.
+    iApply bupd_plain.
+    iApply "HFtB".
+    iMod "Hstp".
+    iModIntro.
+    iIntros "HFtB".
+    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
     iNext.
-    iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & Hstp)".
-    iApply ("IHlen" with "Hstep HTI Hw HE"). done. }
-  iMod ("Hstp" with "[$Hw $HE]") as ">(Hw & HE & % & H)".
+    iApply except_0_later.
+    iApply bupd_plain.
+    iApply "HFtB".
+    iMod "Hstp".
+    iModIntro.
+    iIntros "HFtB".
+    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+    iApply ("IHlen" with "Hstep HTI Hstp"); done. }
+  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_one.
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod "Hstp" as "(% & H)".
+  iModIntro.
+  iIntros "HFtB".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
   iSpecialize ("Hback" with "Hpost").
   assert (Hlocales: map (λ '(tnew, e), weakestpre.fork_post (locale_of tnew e))
@@ -931,15 +1009,23 @@ Proof.
     - done.
     - rewrite Hlocales.
       iPoseProof (wptp_of_val_post with "Hback") as "Hback".
-      rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-      iMod ("Hback" with "[$Hw $HE]") as ">(Hw & HE & Hpost & Hwptp)".
+      rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_one.
+      iApply except_0_later.
+      iApply bupd_plain.
+      iApply "HFtB".
+      iMod "Hback" as "(Hpost & Hwptp)".
       iDestruct ("H" with "Hpost") as "[? Hξ]".
-      iMod ("Hξ" with "[HTI] [$Hw $HE]") as ">(Hw & HE & %)"; last done.
-      iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
-                 [-> ->]%trace_contract_of_extend); done. }
+      iMod ("Hξ" with "[HTI]") as "%".
+      + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
+                 [-> ->]%trace_contract_of_extend); done.
+      + iModIntro.
+        iIntros "HFtB"; done. }
   iExists _, _.
-  iApply ("IH" with "[] [] Hw HE Hstep HSI [HTI]");
-    [| | |iFrame].
+  rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_one.
+  iApply except_0_later.
+  iApply bupd_plain.
+  iApply "HFtB".
+  iMod ("IH" with "[] [] Hstep HSI [HTI] [Hback]") as "IH'".
   - iPureIntro; split_and!.
     + eapply valid_system_trace_extend; eauto.
     + eapply trace_extend_starts_in; eauto.
@@ -950,8 +1036,8 @@ Proof.
   - iPureIntro. pose proof (step_tp_length _ _ _ Hstep). simpl in *. lia.
   - iIntros (???? [-> ->]%trace_contract_of_extend
                   [-> ->]%trace_contract_of_extend); done.
-  - change fork_post with weakestpre.fork_post.
-    rewrite Hlocales //.
+  - rewrite Hlocales //.
+  - iModIntro. iIntros "HFtB". iNext. iApply "IH'"; done.
 Qed.
 
 Definition rel_finitary {A B C D}
