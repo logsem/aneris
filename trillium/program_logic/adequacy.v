@@ -1,6 +1,6 @@
 From stdpp Require Import finite.
-From iris.bi.lib Require Import fixpoint.
 From iris.algebra Require Import gmap auth agree gset coPset.
+From iris.bi.lib Require Import fixpoint.
 From iris.base_logic.lib Require Import wsat later_credits.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers iris_extraction finitary classical_instances.
