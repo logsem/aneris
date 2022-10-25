@@ -2,7 +2,7 @@
 -Q aneris aneris
 -Q fairness trillium.fairness
 
--Q external/stdpp/theories stdpp
+-Q external/stdpp/stdpp stdpp
 -Q external/stdpp/stdpp_unstable stdpp.unstable
 -Q external/iris/iris iris
 -Q external/record-update/src RecordUpdate
