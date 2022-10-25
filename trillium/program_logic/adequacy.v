@@ -1,7 +1,8 @@
 From stdpp Require Import finite.
-From iris.proofmode Require Import tactics.
+From iris.bi.lib Require Import fixpoint.
 From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.base_logic.lib Require Import wsat later_credits.
+From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers iris_extraction finitary classical_instances.
 From trillium.program_logic Require Export weakestpre traces.
 
@@ -759,28 +760,28 @@ Section adequacy_helper_lemmas.
 
 End adequacy_helper_lemmas.
 
-From iris.bi.lib Require Import fixpoint.
+(** Fixpoint definition of the soundness goal of Trillium *)
+Definition fupd_to_bupd_aux `{invGS_gen hlc Σ}
+           (rec : coPset → iProp Σ) (E1 : coPset) : iProp Σ :=
+  ∀ (P : iProp Σ) E2, ((|={E1,E2}=> rec E2 -∗ P) ==∗ ◇ P).
 
-Definition fupd_to_bupd_one `{invGS_gen HasNoLc Σ} (Q : coPset → iProp Σ) (E1 : coPset) : iProp Σ :=
-  ∀ (P : iProp Σ) E2, ((|={E1,E2}=> Q E2 -∗ P) ==∗ ◇ P).
+Definition fupd_to_bupd `{invGS_gen hlc Σ} :=
+  bi_greatest_fixpoint fupd_to_bupd_aux.
 
-Definition fupd_to_bupd `{invGS_gen HasNoLc Σ} := bi_greatest_fixpoint fupd_to_bupd_one.
-
-Instance fupd_to_bupd_one_bi_mono `{invGS_gen HasNoLc Σ} : BiMonoPred (fupd_to_bupd_one).
+Instance fupd_to_bupd_aux_bi_mono `{invGS_gen hlc Σ} :
+  BiMonoPred (fupd_to_bupd_aux).
 Proof.
   split.
-  - iIntros (Φ Ψ HΦne HΨne) "#H".
-    iIntros (E1) "HE".
-    iIntros (P E2) "HP".
-    iApply "HE"; iMod "HP"; iModIntro.
-    iIntros; iApply "HP"; iApply "H"; done.
+  - iIntros (Φ Ψ HΦne HΨne) "#H". iIntros (E1) "HE". iIntros (P E2) "HP".
+    iApply "HE"; iMod "HP"; iModIntro. by iIntros; iApply "HP"; iApply "H".
   - iIntros (Φ HΦne). by intros ??? ->%leibniz_equiv.
 Qed.
 
-(** Note: the [_no_lc] soundness lemmas also allow generating later credits, but *)
-(*   these cannot be used for anything. They are merely provided to enable making *)
-(*   the adequacy proof generic in whether later credits are used. *)
-Lemma fupd_plain_soundness_no_lc_strong `{!invGpreS Σ} (Q : iProp Σ) :
+Lemma fupd_to_bupd_unfold `{invGS_gen hlc Σ} E :
+  fupd_to_bupd E ≡ fupd_to_bupd_aux fupd_to_bupd E.
+Proof. by rewrite /fupd_to_bupd greatest_fixpoint_unfold. Qed.
+
+Lemma fupd_to_bupd_soundness_no_lc `{!invGpreS Σ} (Q : iProp Σ) :
   (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ |==> Q.
 Proof.
   iIntros (Hfupd).
@@ -798,9 +799,9 @@ Proof.
   do 2 iModIntro; iApply "HP"; iFrame.
 Qed.
 
-Lemma fupd_to_bupd_unfold `{invGS_gen HasNoLc Σ} E :
-  fupd_to_bupd E ≡ fupd_to_bupd_one fupd_to_bupd E.
-Proof. by rewrite /fupd_to_bupd greatest_fixpoint_unfold. Qed.
+Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
+  (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
+Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
 
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -834,10 +835,9 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
 Proof.
   intros Hwp.
   apply extract_except_0.
-  iApply bupd_plain.
-  iApply fupd_plain_soundness_no_lc_strong.
+  iApply fupd_to_bupd_soundness_no_lc'.
   iIntros (Hinv) "HFtB".
-  rewrite fupd_to_bupd_unfold /fupd_to_bupd_one.
+  rewrite fupd_to_bupd_unfold /fupd_to_bupd_aux.
   iApply bupd_plain.
   iApply "HFtB".
   iPoseProof (Hwp Hinv) as "Hwp".
