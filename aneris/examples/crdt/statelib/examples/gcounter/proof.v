@@ -8,6 +8,7 @@ From aneris.examples.crdt.spec Require Import crdt_base crdt_time crdt_events cr
 From aneris.examples.crdt.statelib.user_model
   Require Import semi_join_lattices model params.
 From aneris.examples.crdt.statelib.time Require Import time.
+From aneris.examples.crdt.statelib.STS Require Import lst.
 From aneris.examples.crdt.statelib.proof
   Require Import events spec.
 From aneris.examples.crdt.statelib Require Import statelib_code.
@@ -85,8 +86,8 @@ Section Utils.
 
   Context `{!CRDT_Params}.
 
-  Definition fil (i: fin (length CRDT_Addresses)) (st: event_set gctr_op):
-    event_set gctr_op := filter (λ ev : Event gctr_op, ev.(EV_Orig) = i ) st.
+  Definition fil (s: event_set gctr_op) (i: nat) : event_set gctr_op :=
+    filter (λ ev: Event gctr_op, EV_Orig ev = i) s.
 
   Definition fold_sum (s: event_set gctr_op) :=
     set_fold (fun (ev: Event gctr_op) v => v + ev.(EV_Op))%nat O s.
@@ -128,7 +129,7 @@ Section Utils.
 
   Lemma fold_sum_disj_union i s (ev: Event gctr_op):
     ev ∉ s
-    → fold_sum (fil i s ∪ {[ev]}) = ((fold_sum (fil i s)) + ev.(EV_Op))%nat.
+    → fold_sum (fil s i ∪ {[ev]}) = ((fold_sum (fil s i)) + ev.(EV_Op))%nat.
   Proof.
     intros Hnin.
     rewrite/fold_sum.
@@ -339,7 +340,7 @@ Section GCtr_Denot.
 
   Definition gctr_denot_prop (s: event_set gctr_op) (st: gctr_st) :=
     ∀ (i: fin (length CRDT_Addresses)),
-      st !!! i = fold_sum (fil i s).
+      st !!! i = fold_sum (fil s i).
 
   Global Instance gctr_denot_fun : Rel2__Fun gctr_denot_prop.
   Proof.
@@ -358,43 +359,35 @@ End GCtr_Denot.
 (** Definition of the mutator *)
 Section GCtr_Model.
 
-  Context `{!CRDT_Params}.
+  Context `{!CRDT_Params, !EventSetValidity gctr_op}.
 
   Lemma gctr_lub_coh
     (s1 s2 : event_set gctr_op) (st1 st2 st3 : gctr_st):
-    ⟦ s1 ⟧ ⇝ st1
-    → ⟦ s2 ⟧ ⇝ st2
-    → event_set_valid s1
-    → event_set_valid s2
-    → (∀ (i: fin (length CRDT_Addresses)),
-        fil i (s1 ∪ s2) = fil i s1
-        ∨ fil i (s1 ∪ s2) =  fil i s2)
+    ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
+    → event_set_valid s1 → event_set_valid s2 → event_set_valid (s1 ∪ s2)
     → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
   Proof.
-    intros Hden1 Hden2 Hval1 Hval2 Hproj_incl <-.
+    intros Hden1 Hden2 Hval1 Hval2 Hval <-.
     rewrite/=/gctr_denot_prop/gctr_st_lub.
-    intros i. destruct (Hproj_incl i) as [Hincl | Hincl].
-    - rewrite Hincl vlookup_zip_with.
-      assert (Hmax: (st1 !!! i `max` st2 !!! i = st1 !!! i)%nat);
-        last by rewrite Hmax (Hden1 i).
-      rewrite (Hden1 i) (Hden2 i).
-      assert (fil i s2 ⊆ fil i s1).
-      { intros e [He_filter He_in]%elem_of_filter.
-        rewrite<-Hincl. apply elem_of_filter.
-        split; first assumption.
-        by apply elem_of_union_r. }
-      assert (fold_sum (fil i s2) ≤ fold_sum (fil i s1))%nat;
-        [ by apply fold_sum_mon | lia ].
-    - rewrite Hincl vlookup_zip_with.
+    intros i.
+    destruct (event_set_valid_filtered s1 s2 Hval1 Hval2 Hval i) as [Hincl' | Hincl'].
+    - assert (Hincl: fil s2 i = fil (s1 ∪ s2) i); first set_solver.
+      rewrite -Hincl vlookup_zip_with.
       assert (Hmax: (st1 !!! i `max` st2 !!! i = st2 !!! i)%nat);
         last by rewrite Hmax (Hden2 i).
       rewrite (Hden1 i) (Hden2 i).
-      assert (fil i s1 ⊆ fil i s2).
-      { intros e [He_filter He_in]%elem_of_filter.
-        rewrite<-Hincl. apply elem_of_filter.
-        split; first assumption.
-        by apply elem_of_union_l. }
-      assert (fold_sum (fil i s1) ≤ fold_sum (fil i s2))%nat;
+      assert (fil s1 i ⊆ fil s2 i).
+      { intros e [He_filter He_in]%elem_of_filter. set_solver. }
+      assert (fold_sum (fil s1 i) ≤ fold_sum (fil s2 i))%nat;
+        [ by apply fold_sum_mon | lia ].
+    - assert (Hincl: fil s1 i = fil (s1 ∪ s2) i); first set_solver.
+      rewrite -Hincl vlookup_zip_with.
+      assert (Hmax: (st1 !!! i `max` st2 !!! i = st1 !!! i)%nat);
+        last by rewrite Hmax (Hden1 i).
+      rewrite (Hden1 i) (Hden2 i).
+      assert (fil s2 i ⊆ fil s1 i).
+      { intros e [He_filter He_in]%elem_of_filter. set_solver. }
+      assert (fold_sum (fil s2 i) ≤ fold_sum (fil s1 i))%nat;
         [ by apply fold_sum_mon | lia ].
   Qed.
 
@@ -433,7 +426,7 @@ Section GCtr_Model.
     intros Hden Hval Hnin Hmax Hmut.
     intros i.
     destruct (decide (ev.(EV_Orig) = i)).
-    - assert (Hfil: fil i (s ∪ {[ev]}) = (fil i s) ∪ {[ev]}); first set_solver.
+    - assert (Hfil: fil (s ∪ {[ev]}) i = (fil s i) ∪ {[ev]}); first set_solver.
       rewrite Hmut Hfil.
       destruct (decide (EV_Orig ev < length CRDT_Addresses)%nat);
         last (pose proof (fin_to_nat_lt i); lia).
@@ -441,7 +434,7 @@ Section GCtr_Model.
         { apply fin_to_nat_inj. by rewrite -e fin_to_nat_to_fin. }
       simplify_eq/=.
       by rewrite (fold_sum_disj_union _ _ _ Hnin) (Hden i) vlookup_insert.
-    - assert (Hfil: fil i (s ∪ {[ev]}) = fil i s); first set_solver.
+    - assert (Hfil: fil (s ∪ {[ev]}) i = fil s i); first set_solver.
       rewrite Hmut Hfil.
       destruct (decide (EV_Orig ev < length CRDT_Addresses)%nat);
         last exact (Hden i).
@@ -458,12 +451,12 @@ Section GCtr_Model.
   Proof.
     rewrite/=/gctr_denot_prop/gctr_st_init.
     intros i.
-    assert (fil i ∅ = ∅) as Heq;
+    assert (fil (∅: event_set gctr_op) i = ∅) as Heq;
       first by rewrite/fil filter_empty_L.
     by rewrite Heq vlookup_replicate /fold_sum set_fold_empty.
   Qed.
 
-   Instance gctr_model : (StateCrdtModel gctr_op gctr_st) :=
+  Instance gctr_model : (StateCrdtModel gctr_op gctr_st) :=
     { st_crdtM_lub_coh     := gctr_lub_coh;
       st_crdtM_mut         := gctr_mutator;
       st_crdtM_mut_mon     := gctr_mut_mon;
@@ -477,7 +470,7 @@ End GCtr_Model.
 
 Section GCounter_params.
 
-  Context `{!CRDT_Params}.
+  Context `{!CRDT_Params, !EventSetValidity gctr_op}.
   
   Definition gctr_op_coh (op: gctr_op) (v: val) : Prop := v = #op.
 
@@ -557,7 +550,7 @@ End GCounter_params.
 
 
 Section GCounter_Specs.
-  Context `{!anerisG M Σ, !CRDT_Params}.
+  Context `{!anerisG M Σ, !CRDT_Params, !EventSetValidity gctr_op}.
 
   Lemma init_st_coh:
   StLib_St_Coh st_crdtM_init_st

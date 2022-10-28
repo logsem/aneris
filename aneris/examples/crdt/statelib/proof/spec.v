@@ -5,6 +5,7 @@ From aneris.prelude Require Import time.
 From aneris.aneris_lang.lib Require Import list_proof lock_proof vector_clock_proof serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.crdt.spec Require Import crdt_spec.
+From aneris.examples.crdt.statelib.STS Require Import lst.
 From aneris.examples.crdt.statelib.user_model
   Require Import model semi_join_lattices.
 From aneris.examples.crdt.statelib.proof Require Import events.
@@ -26,9 +27,10 @@ Section Specification.
             !EqDecision LogOp,
             !Countable LogOp,
             !Lattice LogSt,
+            !CRDT_Params,
+            !EventSetValidity LogOp,
             !StLib_Params LogOp LogSt,
             !StLib_SysParams Σ,
-            !CRDT_Params,
             !StLib_Res LogOp}.
 
   Definition get_state_spec (get_state : val) (repId : nat) (addr : socket_address) : iProp Σ :=
@@ -147,11 +149,12 @@ Section StLibSetup.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt, !StLib_Init_Function}.
+            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp,
+            !StLib_Params LogOp LogSt, !StLib_Init_Function}.
 
   Class StLibSetup :=
       StLibSetup_Init E :
-      True ⊢ |={E}=> ∃ (Res : StLib_Res LogOp),
+      True ⊢ |={E}=> ∃ (Res : StLib_Res LogOp) (EvSetVal: EventSetValidity LogOp),
         GlobInv ∗
         GlobState ∅ ∗
         (∃ (S: gset (fin (length CRDT_Addresses))),

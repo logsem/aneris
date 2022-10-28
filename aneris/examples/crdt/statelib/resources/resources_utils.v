@@ -35,7 +35,7 @@ Section Resources_utils.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -347,6 +347,74 @@ Section Resources_utils.
         apply (H2 e e' He_in He'_in He_e'_le).
         by rewrite Hst_proj2.
   Qed.
+
+  Lemma merged_sets_valid E st_h__local st_h__foreign st'_h__local st'_h__sub f f_sender :
+    ↑ CRDT_InvName ⊆ E →
+    StLib_GlobalInv -∗
+    own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local) -∗
+    own (γ_loc_for !!! f) (½, to_agree st_h__foreign) -∗
+    own (γ_loc_cc' !!! f_sender) (◯ princ_ev (st'_h__local ∪ st'_h__sub))
+    ={E}=∗
+    ⌜event_set_valid ((st_h__local ∪ st_h__foreign) ∪ (st'_h__local ∪ st'_h__sub))⌝
+    ∗ own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local)
+    ∗ own (γ_loc_for !!! f) (½, to_agree st_h__foreign).
+  Proof.
+    iIntros (HE) "#Hinv Hst_own__local Hst_own__foreign Hst'_snap".
+    iInv "Hinv" as ">(%g & Hglob_ag & Hglob_auth & %Hg_val & HS)" "Hclose".
+
+    iDestruct ((forall_fin f) with "HS")
+      as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub' & %Hst_proj &
+        %st_locisloc & %st_forisfor & %st_subisfor & %Hst_cc &
+        Hst_own__local' & Hst_own__for' & Hst_own__sub' & Hst_own__cc' & Hst_own__cc'')]".
+    iDestruct (both_agree_agree with "Hst_own__local Hst_own__local'")
+      as "(Hst_own__local & Hst_own__local' & <-)".
+    iDestruct (both_agree_agree with "Hst_own__foreign Hst_own__for'")
+      as "(Hst_own__foreign & Hst_own__foreign' & <-)".
+    iDestruct ((forall_fin' f)
+      with "[$Hothers Hst_own__local' Hst_own__foreign' Hst_own__sub'
+        Hst_own__cc' Hst_own__cc'']") as "HS".
+    { iExists st_h__local, st_h__foreign, st_h__sub'. by iFrame. }
+
+    iDestruct ((forall_fin f_sender) with "HS")
+      as "[Hothers (%st'_h__local' & %st'_h__foreign' & %st'_h__sub' & %Hst'_proj &
+        %st'_locisloc & %st'_forisfor & %st'_subisfor & %Hst'_cc &
+        Hst'_own__local' & Hst'_own__for' & Hst'_own__sub' & Hst'_own__cc' & Hst'_own__cc'')]".
+
+    iCombine "Hst'_own__cc''" "Hst'_snap" as "Hboth".
+    iDestruct (own_valid with "Hboth") as "%Hvalid".
+    apply auth_both_valid_discrete in Hvalid as [Hsub _].
+    iDestruct "Hboth" as "[Hst'_own__cc'' _]".
+
+    iDestruct ((forall_fin' f_sender)
+      with "[$Hothers Hst'_own__local' Hst'_own__for' Hst'_own__sub'
+        Hst'_own__cc' Hst'_own__cc'']") as "HS".
+    { iExists st'_h__local', st'_h__foreign', st'_h__sub'. by iFrame. }
+    rewrite principal_included in Hsub.
+    destruct Hsub as [Hsub Hcc].
+
+    epose proof (merge_dst_valid g f f_sender (st'_h__local ∪ st'_h__sub) Hg_val _ _).
+    Unshelve.
+    2: by rewrite Hst'_proj.
+    2: {
+      intros x e Hx He.
+      destruct (VLst_dep_closed _ (VGst_lhst_valid _ Hg_val f_sender) x e)
+        as (y & Hy_in & Hy_e);
+        [ apply Hsub in Hx; by rewrite Hst'_proj | assumption | ].
+      exists y. split; last assumption.
+      apply (Hcc y x);
+        [ by rewrite Hst'_proj in Hy_in | by apply Hsub in Hx | | exact Hx ].
+      apply (VLst_evid_incl_time_le _ (VGst_lhst_valid _ Hg_val f_sender) x y);
+        [ rewrite Hst'_proj; apply Hsub, Hx | assumption | by rewrite Hy_e ]. }
+
+    iMod ("Hclose" with "[HS Hglob_auth Hglob_ag]") as "_".
+    { iNext. iExists g. by iFrame. }
+
+    iModIntro. iFrame.
+    iPureIntro.
+    rewrite -Hst_proj.
+    by apply Lst_Validity_event_set_valid.
+  Qed.
+
 
 End Resources_utils.
 

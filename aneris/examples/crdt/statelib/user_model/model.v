@@ -1,7 +1,8 @@
 From stdpp Require Import gmap.
-From aneris.examples.crdt.spec Require Import crdt_denot crdt_events crdt_time.
+From aneris.examples.crdt.spec Require Import crdt_base crdt_denot crdt_events crdt_time.
 From aneris.examples.crdt.statelib.proof Require Import events.
 From aneris.examples.crdt.statelib.user_model Require Import semi_join_lattices.
+From aneris.examples.crdt.statelib.STS Require Import lst.
 
 (** * Models for state-based CRDTs **)
 
@@ -11,22 +12,16 @@ From aneris.examples.crdt.statelib.user_model Require Import semi_join_lattices.
 Section ModelDef.
 
   Context `{Op : Type, LatSt: Type,
-            !Lattice LatSt, !EqDecision Op, !Countable Op, !CrdtDenot Op LatSt}.
+            !Lattice LatSt, !EqDecision Op, !Countable Op, !CrdtDenot Op LatSt,
+            !CRDT_Params, !EventSetValidity Op}.
 
   Class StateCrdtModel := {
     (* The lub operation must be coherent with respect to denotations.
        We can assume that s1 and s2 are dep_closed because that is an invariant
        that is always preserved by state-based CRDTs. *)
     st_crdtM_lub_coh : ∀ (s1 s2 : gset (Event Op)) (st1 st2 st3 : LatSt),
-      ⟦ s1 ⟧ ⇝ st1 ->
-      ⟦ s2 ⟧ ⇝ st2 ->
-      event_set_valid s1 ->
-      event_set_valid s2 ->
-      (∀ i,
-        filter (λ ev, ev.(EV_Orig) = i) (s1 ∪ s2)
-          = filter (λ ev, ev.(EV_Orig) = i) s1
-        ∨ filter (λ ev, ev.(EV_Orig) = i) (s1 ∪ s2)
-          = filter (λ ev, ev.(EV_Orig) =  i) s2)  →
+      ⟦ s1 ⟧ ⇝ st1 -> ⟦ s2 ⟧ ⇝ st2 ->
+      event_set_valid s1 -> event_set_valid s2 -> event_set_valid (s1 ∪ s2) ->
       st1 ⊔_l st2 = st3 -> ⟦ s1 ∪ s2 ⟧ ⇝ st3;
 
     (* The mutator sends a state, an operation, and the replica id where the
@@ -53,5 +48,5 @@ Section ModelDef.
   }.
 
 End ModelDef.
-Arguments StateCrdtModel (Op LatSt) {_ _ _ _}.
+Arguments StateCrdtModel (Op LatSt) {_ _ _ _ _ _}.
 

@@ -50,21 +50,6 @@ Section Lst_helper.
   Context `{!CRDT_Params,
             Op: Type, !EqDecision Op, !Countable Op}.
 
-  Lemma Lst_Validity_implies_event_set_valid (s: Lst Op):
-    Lst_Validity s → event_set_valid s.
-  Proof.
-    intros [Hdc Horig_comp Hext_eid Hext_time Horig Hseqid Horig_depseq Hseqnum Horig_max Hevis_mon Hevis_incl_ev].
-    split; first done.
-    intros e e' He_in He'_in. split.
-    - intros Hevs_orig.
-      destruct Horig_comp with e e' as [? |[-> |?]]; try done.
-      + left. by apply strict_include.
-      + by left.
-      + right. by apply strict_include.
-    - intros Hevs_eqt.
-      by destruct Hext_time with e e'.
-  Qed.
-
   Lemma Lst_Validity_implies_events_ext (s: Lst Op):
     Lst_Validity s → events_ext s.
   Proof. by intros []. Qed.
@@ -80,4 +65,51 @@ Section Lst_helper.
     intros??. by left.
   Qed.
 End Lst_helper.
+
+Section EventSetValidity.
+
+  Context `{Op: Type, !EqDecision Op, !Countable Op, !CRDT_Params}.
+
+  Definition fil (s: event_set Op) (i: nat) : event_set Op :=
+    filter (λ ev: Event Op, EV_Orig ev = i) s.
+
+  Class EventSetValidity := {
+    event_set_valid : event_set Op → Prop ;
+
+    (** Properties *)
+    event_set_valid_same_orig_comp :
+      ∀ (s: event_set Op) (e e': Event Op),
+        event_set_valid s → e ∈ s → e' ∈ s
+        → EV_Orig e = EV_Orig e'
+        → e <_t e' ∨ e =_t e' ∨ e' <_t e ;
+
+    event_set_valid_dep_closed :
+      ∀ (s: event_set Op), event_set_valid s → dep_closed s ;
+
+    event_set_valid_ext_evid :
+      ∀ (s: event_set Op) (e e': Event Op),
+        event_set_valid s → e ∈ s → e' ∈ s → get_evid e = get_evid e' → e = e' ;
+
+    event_set_valid_ext_t :
+      ∀ (s: event_set Op) (e e': Event Op),
+        event_set_valid s → e ∈ s → e' ∈ s → e =_t e' → e = e' ;
+
+    event_set_valid_evid_in_time :
+      ∀ (s: event_set Op) (e: Event Op),
+        event_set_valid s → e ∈ s → get_evid e ∈ e.(EV_Time) ;
+
+    event_set_valid_filtered :
+      ∀ (s s': event_set Op),
+        event_set_valid s
+        → event_set_valid s'
+        → event_set_valid (s ∪ s')
+        → ∀ (i: nat), fil s i ⊆ fil s' i ∨ fil s' i ⊆  fil s i;
+
+    Lst_Validity_event_set_valid :
+      ∀ s, Lst_Validity s → event_set_valid s;
+  }.
+
+End EventSetValidity.
+
+Global Arguments EventSetValidity (Op) {_ _ _}.
 

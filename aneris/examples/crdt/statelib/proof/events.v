@@ -100,17 +100,6 @@ Section EventSets.
     ∀ ev ev', ev ∈ st → ev' ∈ st → ev.(EV_Orig) = ev'.(EV_Orig) →
       ev <_t ev' → evid_le (get_evid ev) (get_evid ev').
 
-
-
-  Definition event_set_valid (s : gset (Event Op)) : Prop :=
-    dep_closed s
-    ∧ ∀ (e e': Event Op),
-      e ∈ s → e' ∈ s →
-      ((EV_Orig e = EV_Orig e' → (e ≤_t e' ∨ e' ≤_t e))
-      ∧ (e =_t e' → e = e')).
-
-
-
   Lemma dep_closed_union (s s' : gset (Event Op)) :
     dep_closed s -> dep_closed s' -> dep_closed (s ∪ s').
   Proof.

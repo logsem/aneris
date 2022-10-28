@@ -71,7 +71,7 @@ Section StateLib_Proof.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -249,8 +249,8 @@ Section StateLib_Proof.
           with (h__local ∪ h__for ∪ {[fev]});
           last set_solver.
         apply st_crdtM_mut_coh with log_st; try done.
-        - by apply Lst_Validity_implies_event_set_valid.
-        - replace (h__local ∪ h__for ∪ {[fev]})
+        - by apply Lst_Validity_event_set_valid.
+        - replace (h__local ∪ h__for ∪ ({[fev]}: event_set LogOp))
             with (h__local ∪ {[fev]} ∪ h__for); last set_solver.
           apply Maximum_correct in fev_max as [??]; first done.
           replace (h__local ∪ {[fresh_event (h__local ∪ h__for) log_op f]} ∪ h__for)
@@ -474,7 +474,7 @@ Section StateLib_Proof.
     wp_apply (acquire_spec with "His_lock").
     iIntros (v) "(-> & Hlocked &
       (%ip & %phys_st & %log_st & %st_h__local & %h__foreign &
-      %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & hf_own_loc & Hf_own_for) & %Hst_coh))".
+      %Hip & Hloc & %Hcoh & (%f & %Hf & %Hf_loc & %Hf_for & Hf_own_loc & Hf_own_for) & %Hst_coh))".
     assert (repId = f) as ->.
     { rewrite Hf.
       apply (NoDup_lookup CRDT_Addresses repId repId (m_destination m));
@@ -486,8 +486,8 @@ Section StateLib_Proof.
     { rewrite Haddr_proj in Hip. by simplify_eq/=. }
     wp_seq.
     wp_bind (!_)%E.
-    iMod (lock_globinv__lst_validity with "[] Hinv hf_own_loc Hf_own_for" )
-      as "(%Hv & hf_own_loc & Hf_own_for)"; first trivial.
+    iMod (lock_globinv__lst_validity with "[] Hinv Hf_own_loc Hf_own_for" )
+      as "(%Hv & Hf_own_loc & Hf_own_for)"; first trivial.
     wp_apply (aneris_wp_load with "[Hloc]").
     { rewrite Haddr_proj in Hip. by simplify_eq/=. }
     iIntros "Hloc".
@@ -503,19 +503,22 @@ Section StateLib_Proof.
     iIntros (st'' (st''_log & Hst''_coh & Hst''_islub)).
     wp_bind (_ <- _)%E.
 
-    iDestruct (locals_incl_global with "Hinv Hst'_snap hf_own_loc Hf_own_for")
-      as "> (hf_own_loc & Hf_own_for & (%g & %Hg))";
+    iDestruct (locals_incl_global with "Hinv Hst'_snap Hf_own_loc Hf_own_for")
+      as "> (Hf_own_loc & Hf_own_for & (%g & %Hg))";
       first trivial.
     destruct Hg as (Hcc2 & Hcc1 & Hval).
     pose proof (VLst_ext_time _ Hval) as Hext_t.
     pose proof (VLst_same_orig_comp _ Hval) as Hsoc.
-    pose proof (foreign_local_filtered_inclusion st_h__local h__foreign st'_h__local st'_h__sub g Hcc2 Hcc1 Hval Hv Hst'_validity) as Heq.
+
+    iMod (merged_sets_valid with "[$Hinv][$Hf_own_loc][$Hf_own_for][$Hst'_snap]")
+      as "(%Hval' & Hf_own_loc & Hf_own_for)";
+      first trivial.
 
     wp_store.
     (** Update of the resources: using the [merge_update] lemma. *)
     iDestruct ((merge_update ⊤ f f_sender
       st_h__local h__foreign st'_h__local st'_h__sub)
-      with "[]Hinv[hf_own_loc Hf_own_for]Hst'_snap[]")
+      with "[]Hinv[Hf_own_loc Hf_own_for]Hst'_snap[]")
       as "> (%f' & %Hf' & _ & _ & Hst_own__local & Hst_own__sub)";
       [ trivial | iExists f; iFrame; iSplit; first trivial; iFrame "%" | done | ].
     assert (f' = f) as ->. { apply fin_to_nat_inj. by rewrite Hf'. }
@@ -546,7 +549,7 @@ Section StateLib_Proof.
           by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union. }
         iFrame "Hst_own__local Hst_own__sub".
       - iPureIntro.
-        epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Heq Hst''_islub).
+        epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Hval' Hst''_islub).
         assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
           st_h__local
             ∪ (h__foreign
@@ -580,7 +583,7 @@ Section StateLib_Proof.
     by iApply "Hφ".
 
     Unshelve.
-    all: by apply Lst_Validity_implies_event_set_valid.
+    all: by apply Lst_Validity_event_set_valid.
   Qed.
 
   Lemma apply_thread_spec
