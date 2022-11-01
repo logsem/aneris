@@ -8,7 +8,7 @@ type ('opTy, 'stTy) mutatorFnTy = int -> 'stTy -> 'opTy -> 'stTy
 
 type 'a stateRef = 'a Atomic.t
 
-type ('opTy, 'stTy) crdtTy = () -> (('stTy * ('opTy, 'stTy) mutatorFnTy) * 'stTy mergeFnTy)
+type ('opTy, 'stTy) crdtTy = unit -> (((unit -> 'stTy) * ('opTy, 'stTy) mutatorFnTy) * 'stTy mergeFnTy)
 
 type 'stTy stSerTy = 'stTy -> string
 type 'stTy stDeserTy = string -> 'stTy
@@ -28,7 +28,7 @@ let rec loop_forever thunk =
 
 (* The apply thread perpetually loops and tries to fetch the state from
    other nodes, merging it with the replica's own state. *)
-let apply (deser_st[@metavar]: 'stTy stDeserTy)
+let apply_thread (deser_st[@metavar]: 'stTy stDeserTy)
     lk sh (st : 'stTy stateRef) (merge : 'stTy mergeFnTy) : unit =
   loop_forever
     (fun () ->
@@ -45,16 +45,16 @@ let update lk (mut : ('opTy,'stTy) mutatorFnTy)
   acquire lk; st := mut i !st op; release lk
 
 
-let sendToAll sh dstl i msg =
+let sendToAll sh (dstl : saddr alist) i msg =
   let j = ref 0 in
   let rec aux () =
     if !j < list_length dstl then
-      if i = j then (j := !j +1; aux ())
+      if i = !j then (j := !j + 1; aux ())
       else
         begin
           let dst = unSOME (list_nth dstl !j) in
           ignore(sendTo sh msg dst);
-          j := !j + 1
+          j := !j + 1;
           aux ()
         end
     else ()
@@ -77,14 +77,15 @@ let statelib_init
     (addrlst : saddr alist)
     (rid : int)
     (crdt : ('opTy, 'stTy) crdtTy) =
-  let ((init_st, mut), merge) = crdt () in
+  let init_st_crdt = crdt () in
+  let ((init_st, mut), merge) = init_st_crdt in
   let st = ref (init_st ()) in
   let lk = newlock () in
   let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
   let addr = unSOME (list_nth addrlst rid) in
   socketBind sh addr;
-  fork (apply st_deser lk sh st merge);
-  fork (broadcast st_ser lk sh st addrlst rid);
+  fork (apply_thread st_deser lk sh st) merge;
+  fork (broadcast st_ser lk sh st addrlst) rid;
   let get = get_state lk st in
   let upd = update lk mut rid st in
   (get, upd)

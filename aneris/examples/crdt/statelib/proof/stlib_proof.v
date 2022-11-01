@@ -742,4 +742,3 @@ Section StateLib_Proof.
   Qed.
 
 End StateLib_Proof.
-

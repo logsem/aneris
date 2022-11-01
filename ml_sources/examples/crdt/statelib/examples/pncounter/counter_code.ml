@@ -43,27 +43,27 @@ let merge (st1 : stTy) (st2 : stTy) : stTy =
   let nres = merge_aux nl1 nl2 in
   (pres, nres)
 
-let eval_state_aux st =
+let eval_state_aux (st : int alist) =
   list_fold (fun acc x -> acc + x) 0 st
 
-let eval_state st : int =
+let eval_state (st : stTy) : int =
   let (pl, nl) = st in
   let eval_pos = eval_state_aux pl in
   let eval_neg = eval_state_aux nl in
   eval_pos - eval_neg
 
-let init_st () = (list_nil, list_nil)
+let init_st () : stTy = (list_nil, list_nil)
 
-let counter_crdt () : (int, stTy) crdtTy =
-  ((init_st (), mutator), merge)
+let counter_crdt : (int, stTy) crdtTy =
+  fun () -> ((init_st, mutator), merge)
 
-let st_ser = prod_serializer
+let st_ser : stTy serializer = prod_serializer
     (list_serializer int_serializer)
     (list_serializer int_serializer)
 
 let counter_init (addrs : saddr alist) (rid : int) =
   let initRes =
-    statelib_init st_ser.s_ser st_ser.s_deser addrs rid (counter_crdt ()) in
+    statelib_init st_ser.s_ser st_ser.s_deser addrs rid counter_crdt in
   let (get_state, update) = initRes in
-  let eval st = eval_state (get_state st) in
+  let eval () = eval_state (get_state ()) in
   (eval, update)

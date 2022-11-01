@@ -27,44 +27,44 @@ Definition apply_thread deser_st : val :=
 
 Definition update : val :=
   λ: "lk" "mut" "i" "st" "op",
-  (acquire "lk";;
+  acquire "lk";;
   "st" <- ("mut" "i" ! "st" "op");;
-  release "lk").
+  release "lk".
 
 Definition sendToAll : val :=
   λ: "sh" "dstl" "i" "msg",
-    let: "j" := ref #0 in
-    letrec: "aux" <> :=
-      (if: !"j" < (list_length "dstl")
-       then
-         (if: "i" = ! "j"
-         then  ("j" <- !"j" + #1;; "aux" #() )
-         else
-           let: "dst" := unSOME (list_nth "dstl" !"j") in
-           SendTo "sh" "msg" "dst";;
-           #();;
-           "j" <- !"j" + #1;;
-           "aux" #())
-       else  #()) in
-      "aux" #().
+  let: "j" := ref #0 in
+  letrec: "aux" <> :=
+    (if: ! "j" < (list_length "dstl")
+     then
+       (if: "i" = ! "j"
+       then  "j" <- (! "j" + #1);;
+             "aux" #()
+       else
+         let: "dst" := unSOME (list_nth "dstl" ! "j") in
+         SendTo "sh" "msg" "dst";;
+         #();;
+         "j" <- (! "j" + #1);;
+         "aux" #())
+     else  #()) in
+    "aux" #().
 
 Definition broadcast (ser_st : val) : val :=
   λ: "lk" "sh" "st" "dstl" "i",
-  loop_forever (
-    λ: <>,
-      #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
-      acquire "lk";;
-      let: "s" := ! "st" in
-      release "lk";;
-      let: "msg" := ser_st "s" in
-      sendToAll "sh" "dstl" "i" "msg").
+  loop_forever (λ: <>,
+                #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
+                acquire "lk";;
+                let: "s" := ! "st" in
+                release "lk";;
+                let: "msg" := ser_st "s" in
+                sendToAll "sh" "dstl" "i" "msg").
 
 Definition statelib_init (st_ser : val) (st_deser : val) : val :=
   λ: "addrlst" "rid" "crdt",
-  let: "c" := "crdt" #() in
-  let: "init_st" := Fst (Fst "c") in
-  let: "mut" := Snd (Fst "c") in
-  let: "merge" := Snd "c" in
+  let: "init_st_crdt" := "crdt" #() in
+  let: "init_st" := Fst (Fst "init_st_crdt") in
+  let: "mut" := Snd (Fst "init_st_crdt") in
+  let: "merge" := Snd "init_st_crdt" in
   let: "st" := ref ("init_st" #()) in
   let: "lk" := newlock #() in
   let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in

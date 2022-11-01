@@ -68,7 +68,7 @@ Definition eval_state : val :=
 
 Definition init_st : val := λ: <>, ([], []).
 
-Definition counter_crdt : val := λ: <>, (init_st #(), mutator, merge).
+Definition counter_crdt : val := λ: <>, (init_st, mutator, merge).
 
 Definition st_ser :=
   prod_serializer (list_serializer int_serializer)
@@ -77,9 +77,9 @@ Definition st_ser :=
 Definition counter_init : val :=
   λ: "addrs" "rid",
   let: "initRes" := statelib_init st_ser.(s_ser) st_ser.(s_deser) "addrs"
-                    "rid" (counter_crdt #()) in
+                    "rid" counter_crdt in
   let: "get_state" := Fst "initRes" in
   let: "update" := Snd "initRes" in
-  let: "eval" := λ: "st",
-  eval_state ("get_state" "st") in
+  let: "eval" := λ: <>,
+  eval_state ("get_state" #()) in
   ("eval", "update").
