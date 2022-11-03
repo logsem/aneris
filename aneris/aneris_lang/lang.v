@@ -982,7 +982,7 @@ Proof. destruct Ki; move => [? ?] [? ?] [? ?];
 Inductive config_step :
   state → state -> Prop :=
 | MessageDeliverStep n σ Sn Sn' sh a skt r m:
-    m ∈ (messages_to_receive_at_multi_soup a (state_ms σ)) →
+    m ∈ messages_to_receive_at_multi_soup a (state_ms σ) →
     state_sockets σ !! n = Some Sn ->
     Sn !! sh = Some (skt, r) →
     Sn' = <[sh := (skt, m :: r)]>Sn →
@@ -991,11 +991,18 @@ Inductive config_step :
                 {| state_heaps := state_heaps σ;
                    state_sockets := <[n:=Sn']>(state_sockets σ);
                    state_ports_in_use := state_ports_in_use σ;
-                   state_ms := state_ms σ; |}
+                   state_ms := state_ms σ ∖ {[+ m +]}; |}
+| MessageDuplicateStep σ m :
+    m ∈ state_ms σ →
+    config_step σ
+                {| state_heaps := state_heaps σ;
+                   state_sockets := state_sockets σ;
+                   state_ports_in_use := state_ports_in_use σ;
+                   state_ms := state_ms σ ∪ {[+ m +]}; |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
     config_step σ
-                 {| state_heaps := state_heaps σ;
+                {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ports_in_use := state_ports_in_use σ;
                    state_ms := state_ms σ ∖ {[+ m +]}; |}.
