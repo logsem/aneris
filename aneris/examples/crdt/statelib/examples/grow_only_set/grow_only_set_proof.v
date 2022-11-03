@@ -111,37 +111,146 @@ Section gos_model.
 
 End gos_model.
 
+Section list_serialization.
+
+  Context `{!Inject A val}.
+  Context (E : serialization).
+
+  Fixpoint list_valid_val_aux (la : list A) :=
+    match la with
+    | hd :: tl => s_valid_val E $ hd ∧ list_valid_val_aux tl
+    | [] => True
+    end.
+
+  Definition list_valid_val (v : val) :=
+    ∃ (la: list A), is_list la v ∧ list_valid_val_aux la.
+
+  Fixpoint list_is_ser_aux (la : list A) (s : string) :=
+    match la with
+      | hd :: tl =>
+          ∃ s1 s2 : string,
+            E.(s_is_ser) $hd s1 ∧
+            s = prod_ser_str s1 s2 ∧
+            list_is_ser_aux tl s2
+      | [] => s = ""
+  end.
+
+  Definition list_is_ser (v : val) (s : string) :=
+    ∃ (la : list A),
+      is_list la v ∧ list_valid_val_aux la ∧ list_is_ser_aux la s.
+
+  Lemma list_is_ser_valid (v : val) (s : string) :
+    list_is_ser v s -> list_valid_val v.
+  Proof. destruct 1 as (?&?&?&?). by eexists. Qed.
+
+
+  Lemma list_ser_spec `{!anerisG Mdl Σ} ip v:
+    {{{ ⌜list_valid_val v⌝ }}}
+      (list_serializer (s_serializer E)).(s_ser) v @[ip]
+    {{{ (s : string), RET #s; ⌜list_is_ser v s⌝ }}}.
+  Proof.
+    iIntros (Φ) "Hv HΦ".
+    iLöb as "IH" forall (Φ v).
+    wp_rec.
+    iDestruct "Hv" as %(l&Hvl&Hvv).
+    destruct l as [|a l].
+    - rewrite Hvl.
+      wp_pures.
+      iApply "HΦ".
+      iPureIntro.
+      rewrite /list_is_ser; eexists []; done.
+    - simpl in Hvl, Hvv.
+      destruct Hvl as [lv [-> Hvl]].
+      destruct Hvv as [Hva Hvv].
+      wp_pures.
+      wp_apply (s_ser_spec E); first done.
+      iIntros (s1) "%Hs1".
+      wp_pures.
+      wp_bind (list_ser (s_ser (s_serializer E)) _).
+      iApply "IH"; [iPureIntro; eexists; done |].
+      iIntros "!>" (s2) "%Hs2".
+      wp_pures.
+      destruct Hs2 as (l'&Hs2x&Hs2y&Hs2z).
+      iApply "HΦ".
+      iPureIntro.
+      exists (a :: l').
+      split; first by eexists.
+      split; first by eexists.
+      by exists s1, s2.
+  Qed.
+
+
+  Lemma list_deser_spec `{!anerisG Mdl Σ} ip v s:
+    {{{ ⌜list_is_ser v s⌝ }}}
+      (list_serializer (s_serializer E)).(s_deser) #s @[ip]
+      {{{ RET v; True }}}.
+  Proof.
+    iIntros (Φ) "Hs HΦ".
+    iLöb as "IH" forall (Φ v s).
+    wp_rec.
+    iDestruct "Hs" as %(l&Hl1&Hl2&Hl3).
+    destruct l as [|a l]; simpl.
+    - rewrite Hl1 Hl3.
+      wp_find_from. instantiate (1 := 0). by eauto.
+      wp_pures.
+      by iApply "HΦ".
+    - destruct Hl1 as [w [-> Hl]].
+     (*  wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia]. *)
+    (*   erewrite (index_0_append_char ); auto; last first. *)
+    (*   { apply valid_tag_stringOfZ. } *)
+    (*   wp_pures. *)
+    (*   wp_substring; first by split_and!; [|by apply nat_Z_eq; first lia|done]. *)
+    (*   rewrite substring_0_length_append. *)
+    (*   wp_pure _. *)
+    (*   { simpl. rewrite ZOfString_inv //. } *)
+    (*   wp_apply wp_unSOME; [done|]. *)
+    (*   iIntros "_ /=". wp_pures. *)
+    (*   rewrite !length_app. *)
+    (*   wp_substring; *)
+    (*     first by split_and!; *)
+    (*           [|by apply nat_Z_eq; first lia|by apply nat_Z_eq; first lia]. *)
+    (*   match goal with *)
+    (*   | |- context [substring ?X ?Y _] => *)
+    (*       replace X with (String.length (StringOfZ a) + 1)%nat by lia; *)
+    (*       replace Y with (String.length (vc_to_string l)) by lia *)
+    (*   end. *)
+    (*   rewrite substring_add_length_app substring_Sn /=. *)
+    (*   rewrite substring_0_length. *)
+    (* wp_apply "IH"; [iPureIntro; exists l; done|]. *)
+    (* iIntros "_ /=". wp_pures. *)
+    (* wp_apply (wp_list_cons $! Hl). *)
+    (* iIntros (? [u [-> Hu]]). *)
+    (* rewrite (is_list_eq _ _ _ Hl Hu). *)
+    (* iApply "HΦ"; done. *)
+  Admitted.
+
+Definition list_serialization : serialization :=
+  {| s_valid_val := list_valid_val;
+     s_serializer := list_serializer E.(s_serializer);
+     s_is_ser := list_is_ser;
+     s_is_ser_valid := list_is_ser_valid;
+     s_ser_spec := @list_ser_spec;
+     s_deser_spec := @list_deser_spec; |}.
+
+End list_serialization.
+
 Section gos_params.
 
   Context `{!CRDT_Params}.
   Context `{!EqDecision vl} `{!Countable vl}.
   Context `{!EventSetValidity vl}.
+  Context `{E : serialization}.
 
-  (* Lemma gos_st_coh_is_vc (st: gos_st): *)
-  (*   is_vc (gos_st_inject st) st. *)
-  (* Proof. *)
-  (*   rewrite/gos_st_inject/is_vc. *)
-  (*   apply is_list_inject. reflexivity. *)
-  (* Qed. *)
-
-  (* Lemma gos_st_coh_serializable *)
-  (*       (st : gos_st) (v : val): *)
-  (*   gos_st_coh st v → Serializable gos_ser v. *)
-  (* Proof. *)
-  (*   intros->. *)
-  (*   exists st. exact (gos_st_coh_is_vc st). *)
-  (* Qed. *)
-
-
-  (* Global Instance gos_params : (StLib_Params gos_op gos_st) := *)
-  (*   { *)
-  (*     StLib_StSerialization := gos_ser; *)
-  (*     StLib_Denot           := gos_denot; *)
-  (*     StLib_Model           := gos_model; *)
-  (*     StLib_Op_Coh          := gos_op_coh; *)
-  (*     StLib_Op_Coh_Inj      := gos_op_coh_inj; *)
-  (*     StLib_St_Coh          := gos_st_coh; *)
-  (*     StLib_St_Coh_Inj      := gos_st_coh_inj; *)
-  (*     StLib_StCoh_Ser       := gos_st_coh_serializable }. *)
+  (* Global Program Instance gos_params : (StLib_Params gos_op (@gos_st vl _ _) ) := *)
+ (*    { *)
+ (*      StLib_StSerialization := list_serialization E; *)
+ (*      StLib_Denot           := gos_denot; *)
+ (*      StLib_Model           := gos_model; *)
+ (*      (* StLib_Op_Coh          := gos_op_coh; *) *)
+ (*      (* StLib_Op_Coh_Inj      := gos_op_coh_inj; *) *)
+ (*      (* StLib_St_Coh          := gos_st_coh; *) *)
+ (*      (* StLib_St_Coh_Inj      := gos_st_coh_inj; *) *)
+ (*      (* StLib_StCoh_Ser       := gos_st_coh_serializable *) *)
+ (* }. *)
 
 End gos_params.
