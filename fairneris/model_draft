@@ -1,0 +1,76 @@
+
+let A saA saB :=
+  let sktA := socket in
+  socketbind sktA saA;;
+  send sktA m saB
+
+let B saB :=
+  let sktB := socket in
+  socketbind sktB saB;;
+  receivefrom sktB
+
+
+(If we assume allocated sockets)
+
+let A sktA saB :=
+  send sktA m saB
+
+let B sktB :=
+  receivefrom sktB
+
+
+Model (pre unreliable) (pre fuel):
+
+State := Start | Sent | Delivered | Received
+Role := A | B | N
+
+Transitions : State → Role → State → Prop :=
+  | Start_B_recv_fail : Start B Start
+  | Start_A_send : Start A Sent
+  | Sent_B_recv_fail n : (Sent n) B (Sent n)
+  | Sent_N_deliver n : Sent N Delivered
+  | Delivered_B_recv_succ n m : Delivered B Received
+
+Model (pre fuel):
+
+State := Start | Sent n | Delivered n m | Received n m 
+Role := A | B | N
+
+Transitions : State → Role → State → Prop :=
+  | Start_B_recv_fail : Start B Start
+  | Start_A_send : Start A (Sent 1)
+  (* Need transition on the network in initial state? *)
+  | Sent_N_duplicate n : (Sent n) N (Sent (S n))
+  | Sent_N_drop n : (Sent (S n)) N (Sent n)
+  | Sent_B_recv_fail n : (Sent n) B (Sent n)
+  | Sent_N_deliver n : (Sent (S n)) N (Delivered n 1)
+  | Delivered_N_duplicate n m : (Delivered n m) N (Delivered (S n) m)
+  | Delivered_N_drop n m : (Delivered (S n) m) N (Delivered n m)
+  | Delivered_N_deliver n m : (Delivered (S n) m) N (Delivered n (S m))
+  | Delivered_B_recv_succ n m : Delivered n (S m) B (Received n m)
+  | Received_N_duplicate n m : (Received n m) N (Received (S n) m)
+  | Received_N_drop n m : (Received (S n) m) N (Received n m)
+  | Received_N_deliver n m : (Received (S n) m) N (Received n (S m))
+
+
+Assuming that messages are never duplicated or dropped the model "simplifies" to the following:
+Transitions : State → Role → State → Prop :=
+  | Start_B_recv_fail : Start B Start
+  | Start_A_send : Start A Sent
+  | Sent_B_recv_fail n : Sent B Sent
+  | Sent_N_deliver n : Sent N Delivered
+  | Delivered_B_recv_succ n m : Delivered B Received
+Note that "Delivered_B_recv_succ" is removed as well as its `n` will always be 0.
+
+With an assumption about fair scheduling between A, B and the network we then prove that the trace is
+fairly terminating:
+[Start B Start*; 
+ Start A Sent;
+ Sent B Sent*;
+ Sent N Delivered;
+ Delivered B Received]
+
+
+Other things to consider:
+- fuel?
+  + Might omit by assuming existing sockets
