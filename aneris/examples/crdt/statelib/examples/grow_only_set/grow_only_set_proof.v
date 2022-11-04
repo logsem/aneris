@@ -4,7 +4,7 @@ From iris.proofmode Require Import tactics.
 From aneris.prelude Require Import gset_map.
 From aneris.prelude Require Import misc strings.
 From aneris.aneris_lang.lib Require Import network_util_proof.
-From aneris.aneris_lang.lib Require Import list_proof inject.
+From aneris.aneris_lang.lib Require Import list_proof set_proof inject.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang Require Import aneris_lifting proofmode.
 From aneris.aneris_lang.lib.vector_clock Require Import vector_clock_code vector_clock_proof.
@@ -116,8 +116,8 @@ End gos_model.
 (* TODO : move to the lib. *)
 Section list_serialization.
 
-  Context `{!Inject A val}.
   Context (E : serialization).
+  Context `{!Inject A val}.
 
   Fixpoint list_valid_val_aux (la : list A) :=
     match la with
@@ -262,11 +262,10 @@ Definition list_serialization : serialization :=
 End list_serialization.
 
 Section gos_params.
-
+  Context (E : serialization).
   Context `{!CRDT_Params}.
   Context `{!EqDecision vl} `{!Countable vl}.
   Context `{!EventSetValidity vl}.
-  Context `{E : serialization}.
   Context `{!Inject vl val}.
 
   Definition gos_op_coh (op: gos_op) (v: val) : Prop := v = $op.
@@ -317,3 +316,40 @@ Section gos_params.
  }.
 
 End gos_params.
+
+(* TODO: fix typeclasses instantiation. *)
+Section Gos_specs.
+  Context (E : serialization).
+  Context `{!anerisG M Σ}.
+  Context `{!CRDT_Params}.
+  Context `{!EqDecision vl} `{!Countable vl}.
+  Context `{!EventSetValidity vl}.
+  Context `{!Inject vl val}.
+
+  Lemma gos_init_st_fn_spec :
+    ⊢ @init_st_fn_spec _ _ _ _ _ _  _ _ _ _ (gos_params E) init_st.
+  Proof.
+    iIntros (addr).
+    iIntros "!#" (Φ) "_ HΦ".
+    rewrite /init_st.
+    wp_pures.
+    wp_apply wp_set_empty; first done.
+    iIntros (v Hv).
+    iApply "HΦ".
+    destruct Hv as (l & Hl & Heq & Hn).
+    rewrite -list_to_set_nil in Heq.
+    simpl; rewrite /gos_st_coh /gos_st_init elements_empty.
+    destruct l as [|x l]; last first.
+    { simpl in Heq. assert (x ∉ (∅ : gset vl)) as Habs.
+      set_solver. rewrite Heq in Habs. set_solver. }
+    iPureIntro.
+    rewrite Hl.
+    simpl in *.
+    split; first done.
+    by exists [].
+    Unshelve. eauto.
+    Unshelve. eauto.
+    Unshelve. eauto.
+  Qed.
+
+End Gos_specs.
