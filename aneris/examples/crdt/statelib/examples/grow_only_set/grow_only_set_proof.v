@@ -113,6 +113,7 @@ Section gos_model.
 
 End gos_model.
 
+(* TODO : move to the lib. *)
 Section list_serialization.
 
   Context `{!Inject A val}.
@@ -266,17 +267,53 @@ Section gos_params.
   Context `{!EqDecision vl} `{!Countable vl}.
   Context `{!EventSetValidity vl}.
   Context `{E : serialization}.
+  Context `{!Inject vl val}.
 
-  (* Global Program Instance gos_params : (StLib_Params gos_op (@gos_st vl _ _) ) := *)
- (*    { *)
- (*      StLib_StSerialization := list_serialization E; *)
- (*      StLib_Denot           := gos_denot; *)
- (*      StLib_Model           := gos_model; *)
- (*      (* StLib_Op_Coh          := gos_op_coh; *) *)
- (*      (* StLib_Op_Coh_Inj      := gos_op_coh_inj; *) *)
- (*      (* StLib_St_Coh          := gos_st_coh; *) *)
- (*      (* StLib_St_Coh_Inj      := gos_st_coh_inj; *) *)
- (*      (* StLib_StCoh_Ser       := gos_st_coh_serializable *) *)
- (* }. *)
+  Definition gos_op_coh (op: gos_op) (v: val) : Prop := v = $op.
+
+  Lemma gos_op_coh_inj (o o': gos_op) (v: val) :
+    gos_op_coh o v -> gos_op_coh o' v -> o = o'.
+  Proof.
+    intros Hv Hv'.
+    rewrite/gos_op_coh in Hv. rewrite/gos_op_coh in Hv'.
+    by simplify_eq/=.
+  Qed.
+
+  Definition gos_st_coh (st: (@gos_st vl _ _)) (v: val) : Prop :=
+    v = inject_list (elements st) ∧ list_valid_val E v.
+
+  Lemma gos_st_coh_inj (st st': gos_st) (v: val) :
+    gos_st_coh st v -> gos_st_coh st' v -> st = st'.
+  Proof.
+    intros (Hv & _) (Hv' & _).
+    rewrite/gos_st_coh in Hv Hv'.
+    simplify_eq.
+    apply Inject_list.(inject_inj) in Hv'.
+    apply set_eq.
+    intros x. by rewrite - !elem_of_elements Hv'.
+  Qed.
+
+  Lemma gos_st_coh_serializable :
+    ∀ (st : gos_st) (v : val),
+    gos_st_coh st v → Serializable (list_serialization E) v.
+  Proof.
+    rewrite /gos_st_coh.
+    intros st v (-> & (l & Hl & Hv)).
+    exists (elements st).
+    apply is_list_inject, Inject_list.(inject_inj) in Hl as ->.
+    by split; first by apply is_list_inject.
+  Qed.
+
+  Global Instance gos_params : (StLib_Params gos_op (@gos_st vl _ _) ) :=
+    {
+      StLib_StSerialization := list_serialization E;
+      StLib_Denot           := gos_denot;
+      StLib_Model           := gos_model;
+      StLib_Op_Coh          := gos_op_coh;
+      StLib_Op_Coh_Inj      := gos_op_coh_inj;
+      StLib_St_Coh          := gos_st_coh;
+      StLib_St_Coh_Inj      := gos_st_coh_inj;
+      StLib_StCoh_Ser       := gos_st_coh_serializable
+ }.
 
 End gos_params.
