@@ -2,6 +2,8 @@ From Coq Require Import ssreflect Vector.
 From stdpp Require Import base gmap vector.
 From iris.proofmode Require Import tactics.
 From aneris.prelude Require Import gset_map.
+From aneris.prelude Require Import misc strings.
+From aneris.aneris_lang.lib Require Import network_util_proof.
 From aneris.aneris_lang.lib Require Import list_proof inject.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang Require Import aneris_lifting proofmode.
@@ -179,7 +181,6 @@ Section list_serialization.
       by exists s1, s2.
   Qed.
 
-
   Lemma list_deser_spec `{!anerisG Mdl Σ} ip v s:
     {{{ ⌜list_is_ser v s⌝ }}}
       (list_serializer (s_serializer E)).(s_deser) #s @[ip]
@@ -191,38 +192,63 @@ Section list_serialization.
     iDestruct "Hs" as %(l&Hl1&Hl2&Hl3).
     destruct l as [|a l]; simpl.
     - rewrite Hl1 Hl3.
-      wp_find_from. instantiate (1 := 0). by eauto.
+      wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
       wp_pures.
       by iApply "HΦ".
-    - destruct Hl1 as [w [-> Hl]].
-     (*  wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia]. *)
-    (*   erewrite (index_0_append_char ); auto; last first. *)
-    (*   { apply valid_tag_stringOfZ. } *)
-    (*   wp_pures. *)
-    (*   wp_substring; first by split_and!; [|by apply nat_Z_eq; first lia|done]. *)
-    (*   rewrite substring_0_length_append. *)
-    (*   wp_pure _. *)
-    (*   { simpl. rewrite ZOfString_inv //. } *)
-    (*   wp_apply wp_unSOME; [done|]. *)
-    (*   iIntros "_ /=". wp_pures. *)
-    (*   rewrite !length_app. *)
-    (*   wp_substring; *)
-    (*     first by split_and!; *)
-    (*           [|by apply nat_Z_eq; first lia|by apply nat_Z_eq; first lia]. *)
-    (*   match goal with *)
-    (*   | |- context [substring ?X ?Y _] => *)
-    (*       replace X with (String.length (StringOfZ a) + 1)%nat by lia; *)
-    (*       replace Y with (String.length (vc_to_string l)) by lia *)
-    (*   end. *)
-    (*   rewrite substring_add_length_app substring_Sn /=. *)
-    (*   rewrite substring_0_length. *)
-    (* wp_apply "IH"; [iPureIntro; exists l; done|]. *)
-    (* iIntros "_ /=". wp_pures. *)
-    (* wp_apply (wp_list_cons $! Hl). *)
-    (* iIntros (? [u [-> Hu]]). *)
-    (* rewrite (is_list_eq _ _ _ Hl Hu). *)
-    (* iApply "HΦ"; done. *)
-  Admitted.
+    - destruct Hl1 as [lv [-> Hl1]].
+      destruct Hl2 as (Hvv2 & Hl2).
+      destruct Hl3 as (s1&s2&Hs1&->&Hl3).
+      rewrite! /prod_ser_str.
+      wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
+      erewrite (index_0_append_char ); auto; last first.
+      { apply valid_tag_stringOfZ. }
+      wp_pures.
+      wp_substring; first by split_and!; [|by apply nat_Z_eq; first lia|done].
+      rewrite substring_0_length_append.
+      wp_pure _.
+      { simpl. rewrite ZOfString_inv //. }
+      wp_apply wp_unSOME; [done|].
+      iIntros "_ /=". wp_pures.
+      wp_substring;
+        first by split_and!;
+              [|by apply nat_Z_eq; first lia|by apply nat_Z_eq; first lia].
+      replace (Z.to_nat (Z.add (Z.of_nat
+                                  (String.length
+                                     (StringOfZ (Z.of_nat (String.length s1)))))
+                               1%Z)) with
+        (String.length (StringOfZ (Z.of_nat (String.length s1))) + 1)%nat by lia.
+      replace (Z.to_nat (String.length s1)) with (String.length s1)%nat by lia.
+      rewrite substring_add_length_app /= substring_0_length_append.
+      wp_pures.
+      rewrite !length_app /=.
+      match goal with
+      | |- context [Substring _ _ ?X] =>
+          replace X with (Val #(String.length s2)); last first
+      end.
+    { repeat f_equal; lia. }
+    wp_substring; first by split_and!; [|by apply nat_Z_eq; first lia|done].
+    match goal with
+    | |- context [substring ?X _ _] =>
+      replace X with (String.length
+                        (StringOfZ (Z.of_nat (String.length s1))) + 1 +
+                        String.length s1)%nat by lia
+    end.
+    rewrite -plus_assoc substring_add_length_app /= substring_length_append.
+    wp_pures.
+    wp_apply (s_deser_spec E); first done.
+    iIntros "_"; simpl.
+    wp_pures.
+    wp_bind (list_deser _ _).
+    iApply ("IH" $! _ lv); first by iPureIntro; eexists.
+    iIntros "!> _".
+    wp_pures.
+    wp_apply (wp_list_cons _ l); first done.
+    iIntros (v Hl).
+    assert ((InjRV ($ a, lv) = v)) as ->.
+    { destruct Hl as [lv' [-> Hl1']].
+      by rewrite (is_list_eq _ _ _ Hl1 Hl1'). }
+    by iApply "HΦ".
+  Qed.
 
 Definition list_serialization : serialization :=
   {| s_valid_val := list_valid_val;
