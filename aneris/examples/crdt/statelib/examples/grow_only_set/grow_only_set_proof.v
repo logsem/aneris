@@ -18,101 +18,6 @@ From aneris.examples.crdt.statelib.proof
 From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.examples.grow_only_set Require Import grow_only_set_code.
 
-
-Section gos_denot.
-  Context `{!vl : Type}.
-  Context `{!CRDT_Params} `{!Log_Time}.
-  Context `{!EqDecision vl} `{!Countable vl}.
-
-  (** Definition of operations and states. *)
-  Definition gos_op : Type := vl.
-  Definition gos_st : Type := gset vl.
-
-  (** Definition of the denotation. *)
-  Definition gos_denot_prop (s: event_set gos_op) (st: gos_st) :=
-    gset_map (fun (ev: Event gos_op) => ev.(EV_Op)) s = st.
-
-  Global Instance gos_denot_fun : Rel2__Fun gos_denot_prop.
-  Proof.
-    constructor; unfold gos_denot_prop; intros s st st' Hst Hst'.
-    by rewrite -Hst -Hst'.
-  Qed.
-
-  Global Instance gos_denot : CrdtDenot gos_op gos_st :=
-    { crdt_denot     := gos_denot_prop;
-      crdt_denot_fun := gos_denot_fun; }.
-
-  Global Instance gset_subset_po : PartialOrder  (⊆@{gset vl}).
-  Proof. repeat split; repeat intro; multiset_solver. Qed.
-
-  Lemma gset_union_lub_spec :
-    ∀ e1 e2 : gos_st, e1 ⊆ e1 ∪ e2 ∧
-                        e2 ⊆ e1 ∪ e2 ∧
-                        (∀ e : gos_st, e1 ⊆ e → e2 ⊆ e → e1 ∪ e2 ⊆ e).
-  Proof. repeat split; repeat intro; multiset_solver. Qed.
-
-
-  (** Instantiation of the Join-Semi-Lattice. *)
-  Global Instance gos_st_le_lat : Lattice gos_st :=
-    { lat_le := (⊆);
-      lat_po := gset_subset_po;
-      lat_lub := (∪);
-      lat_lub_spec := gset_union_lub_spec }.
-
-End gos_denot.
-
-Section gos_model.
-  Context `{!CRDT_Params}.
-  Context `{!EqDecision vl} `{!Countable vl}.
-  Context `{!EventSetValidity vl}.
-
-
-  Definition gos_mutator
-             (st: @gos_st gos_op _ _) (ev: Event gos_op) (st': gos_st) : Prop :=
-    st' = st ∪ {[ev.(EV_Op)]}.
-
-  Lemma gos_mut_mon (st : gos_st) (e: Event gos_op) (st': gos_st) :
-    gos_mutator st e st' → st ≤_l st'.
-  Proof. set_solver. Qed.
-
-  Lemma gos_mut_coh
-        (s : event_set gos_op) (st st' : gos_st) (ev: Event gos_op) :
-    ⟦ s ⟧ ⇝ st ->
-    event_set_valid s ->
-    ev ∉ s ->
-    is_maximum ev (s ∪ {[ ev ]}) ->
-    gos_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
-  Proof.
-    rewrite /=/gos_denot_prop /gos_mutator.
-    intros ???? ->. by set_solver.
-  Qed.
-
-  Lemma gos_lub_coh
-        (s1 s2 : event_set gos_op) (st1 st2 st3 : (@gos_st gos_op _ _)):
-    ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
-    → event_set_valid s1 → event_set_valid s2 → event_set_valid (s1 ∪ s2)
-    → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
-  Proof.
-    rewrite /=/gos_denot_prop.
-    intros <- <- Hval1 Hval2 Hval <-.
-    by rewrite gset_map_union.
-  Qed.
-
-  Definition gos_st_init : (@gos_st gos_op _ _) := ∅.
-
-  Lemma gos_init_coh : ⟦ ∅ ⟧ ⇝ gos_st_init.
-  Proof. by set_solver. Qed.
-
-  Global Instance gos_model : (StateCrdtModel gos_op gos_st) :=
-    { st_crdtM_lub_coh     := gos_lub_coh;
-      st_crdtM_mut         := gos_mutator;
-      st_crdtM_mut_mon     := gos_mut_mon;
-      st_crdtM_mut_coh     := gos_mut_coh;
-      st_crdtM_init_st     := gos_st_init;
-      st_crdtM_init_st_coh := gos_init_coh; }.
-
-End gos_model.
-
 (* TODO : move to the lib. *)
 Section list_serialization.
 
@@ -261,12 +166,107 @@ Definition list_serialization : serialization :=
 
 End list_serialization.
 
+Section gos_denot.
+  Context `{!CRDT_Params} `{!Log_Time}.
+  Context `{!EqDecision vl, !Countable vl}.
+
+  (** Definition of operations and states. *)
+  Definition gos_op : Type := vl.
+  Definition gos_st : Type := gset vl.
+
+  (** Definition of the denotation. *)
+  Definition gos_denot_prop (s: event_set gos_op) (st: gos_st) :=
+    gset_map (fun (ev: Event gos_op) => ev.(EV_Op)) s = st.
+
+  Global Instance gos_denot_fun : Rel2__Fun gos_denot_prop.
+  Proof.
+    constructor; unfold gos_denot_prop; intros s st st' Hst Hst'.
+    by rewrite -Hst -Hst'.
+  Qed.
+
+  Global Instance gos_denot : CrdtDenot gos_op gos_st :=
+    { crdt_denot     := gos_denot_prop;
+      crdt_denot_fun := gos_denot_fun; }.
+
+  Global Instance gset_subset_po : PartialOrder  (⊆@{gset vl}).
+  Proof. repeat split; repeat intro; multiset_solver. Qed.
+
+  Lemma gset_union_lub_spec :
+    ∀ e1 e2 : gos_st, e1 ⊆ e1 ∪ e2 ∧
+                        e2 ⊆ e1 ∪ e2 ∧
+                        (∀ e : gos_st, e1 ⊆ e → e2 ⊆ e → e1 ∪ e2 ⊆ e).
+  Proof. repeat split; repeat intro; multiset_solver. Qed.
+
+
+  (** Instantiation of the Join-Semi-Lattice. *)
+  Global Instance gos_st_le_lat : Lattice gos_st :=
+    { lat_le := (⊆);
+      lat_po := gset_subset_po;
+      lat_lub := (∪);
+      lat_lub_spec := gset_union_lub_spec }.
+
+End gos_denot.
+
+Section gos_model.
+  Context `{!CRDT_Params}.
+  Context `{!EqDecision vl, !Countable vl}.
+  Context `{!EventSetValidity vl}.
+
+
+  Definition gos_mutator
+             (st: @gos_st gos_op _ _) (ev: Event gos_op) (st': gos_st) : Prop :=
+    st' = st ∪ {[ev.(EV_Op)]}.
+
+  Lemma gos_mut_mon (st : gos_st) (e: Event gos_op) (st': gos_st) :
+    gos_mutator st e st' → st ≤_l st'.
+  Proof. set_solver. Qed.
+
+  Lemma gos_mut_coh
+        (s : event_set gos_op) (st st' : gos_st) (ev: Event gos_op) :
+    ⟦ s ⟧ ⇝ st ->
+    event_set_valid s ->
+    ev ∉ s ->
+    is_maximum ev (s ∪ {[ ev ]}) ->
+    gos_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
+  Proof.
+    rewrite /=/gos_denot_prop /gos_mutator.
+    intros ???? ->. by set_solver.
+  Qed.
+
+  Lemma gos_lub_coh
+        (s1 s2 : event_set gos_op) (st1 st2 st3 : (@gos_st gos_op _ _)):
+    ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
+    → event_set_valid s1 → event_set_valid s2 → event_set_valid (s1 ∪ s2)
+    → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
+  Proof.
+    rewrite /=/gos_denot_prop.
+    intros <- <- Hval1 Hval2 Hval <-.
+    by rewrite gset_map_union.
+  Qed.
+
+  Definition gos_st_init : (@gos_st gos_op _ _) := ∅.
+
+  Lemma gos_init_coh : ⟦ ∅ ⟧ ⇝ gos_st_init.
+  Proof. by set_solver. Qed.
+
+  Global Instance gos_model : (StateCrdtModel gos_op gos_st) :=
+    { st_crdtM_lub_coh     := gos_lub_coh;
+      st_crdtM_mut         := gos_mutator;
+      st_crdtM_mut_mon     := gos_mut_mon;
+      st_crdtM_mut_coh     := gos_mut_coh;
+      st_crdtM_init_st     := gos_st_init;
+      st_crdtM_init_st_coh := gos_init_coh; }.
+
+End gos_model.
+
+
+
 Section gos_params.
   Context (E : serialization).
-  Context `{!CRDT_Params}.
-  Context `{!EqDecision vl} `{!Countable vl}.
-  Context `{!EventSetValidity vl}.
   Context `{!Inject vl val}.
+  Context `{!CRDT_Params}.
+  Context `{!EqDecision vl, !Countable vl}.
+  Context `{!EventSetValidity vl}.
 
   Definition gos_op_coh (op: gos_op) (v: val) : Prop := v = $op.
 
@@ -279,12 +279,12 @@ Section gos_params.
   Qed.
 
   Definition gos_st_coh (st: (@gos_st vl _ _)) (v: val) : Prop :=
-    v = inject_list (elements st) ∧ list_valid_val E v.
+    is_set st v ∧ v = inject_list (elements st) ∧ list_valid_val E v.
 
   Lemma gos_st_coh_inj (st st': gos_st) (v: val) :
     gos_st_coh st v -> gos_st_coh st' v -> st = st'.
   Proof.
-    intros (Hv & _) (Hv' & _).
+    intros (_ & Hv & _) (_ & Hv' & _).
     rewrite/gos_st_coh in Hv Hv'.
     simplify_eq.
     apply Inject_list.(inject_inj) in Hv'.
@@ -297,7 +297,7 @@ Section gos_params.
     gos_st_coh st v → Serializable (list_serialization E) v.
   Proof.
     rewrite /gos_st_coh.
-    intros st v (-> & (l & Hl & Hv)).
+    intros st v (_ & -> & (l & Hl & Hv)).
     exists (elements st).
     apply is_list_inject, Inject_list.(inject_inj) in Hl as ->.
     by split; first by apply is_list_inject.
@@ -317,23 +317,54 @@ Section gos_params.
 
 End gos_params.
 
-(* TODO: fix typeclasses instantiation. *)
+(* TODO: move to the lib. *)
+Section wp_set_union.
+  Context `{anerisG Mdl Σ}.
+  Context `[Countable A, !Inject A val].
+
+ Lemma wp_set_union ip (X Y : gset A) x y :
+    {{{ ⌜is_set X x⌝ ∗ ⌜is_set Y y⌝ }}}
+      set_union x y @[ip]
+    {{{ v, RET v; ⌜is_set (X ∪ Y) v⌝}}}.
+  Proof.
+   iIntros (Φ) "(%Hx & %Hy) HΦ".
+   wp_lam. wp_pures.
+   wp_apply (wp_set_foldl
+               (A := A)
+               (λ (accZ : gset A) (accV : val), ⌜is_set (X ∪ accZ) accV⌝)%I
+               (λ (v : A), ⌜True⌝)%I
+               (λ (v : A), ⌜True⌝)%I
+               _ _ Y).
+   - iIntros (a accV accZ Ψ) "!> (Hs & _) HΨ".
+     wp_pures.
+     wp_apply (wp_set_add with "Hs").
+     iIntros (v) "Hs".
+     iApply "HΨ".
+     assert ({[a]} ∪ (X ∪ accZ) = X ∪ (accZ ∪ {[a]})) as -> by set_solver.
+     by iSplit; last done.
+   - by assert (X ∪ ∅ = X) as -> by set_solver.
+   - iIntros (r (Hr & _)). by iApply "HΦ".
+  Qed.
+
+End wp_set_union.
+
+
 Section Gos_specs.
-  Context (E : serialization).
   Context `{!anerisG M Σ}.
-  Context `{!CRDT_Params}.
-  Context `{!EqDecision vl} `{!Countable vl}.
-  Context `{!EventSetValidity vl}.
+  Context (E : serialization).
   Context `{!Inject vl val}.
+  Context `{!CRDT_Params}.
+  Context `{!EqDecision vl, !Countable vl}.
+  Context `{!EventSetValidity vl}.
 
   Lemma gos_init_st_fn_spec :
-    ⊢ @init_st_fn_spec _ _ _ _ _ _  _ _ _ _ (gos_params E) init_st.
+    ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ _ (gos_params E) init_st.
   Proof.
     iIntros (addr).
     iIntros "!#" (Φ) "_ HΦ".
     rewrite /init_st.
     wp_pures.
-    wp_apply wp_set_empty; first done.
+    wp_apply (wp_set_empty vl); first done.
     iIntros (v Hv).
     iApply "HΦ".
     destruct Hv as (l & Hl & Heq & Hn).
@@ -345,11 +376,32 @@ Section Gos_specs.
     iPureIntro.
     rewrite Hl.
     simpl in *.
-    split; first done.
-    by exists [].
-    Unshelve. eauto.
-    Unshelve. eauto.
-    Unshelve. eauto.
+    split_and!; [by exists [] | done | by exists []].
   Qed.
+
+  Lemma gos_merge_spec : ⊢ @merge_spec _ _ _ _ _ _ _ _ _ _ (gos_params E) merge.
+  Proof.
+    iIntros (sa v v' s s' st st')
+            "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' &
+                    %Hext & %Hsoc & %Hext' & %Hsoc') Hφ".
+    destruct Hcoh_st as (Hst & HvEq & Hvv).
+    destruct Hcoh_st' as (Hst' & Hv'Eq & Hvv').
+    wp_lam.
+    wp_let.
+    wp_apply (wp_set_union _ st st' v v'); first by eauto.
+    iIntros (u Hu).
+    iApply "Hφ".
+    iExists (st ∪ st').
+    iSplit; last done.
+    iPureIntro.
+    split; first done.
+    split.
+    apply is_list_inject.
+    rewrite /is_set in Hu.
+    destruct Hu as (lu & Hlu & HluX & Hndup).
+    apply (is_list_inv_l _ _ _ Hlu).
+    rewrite HluX.
+  Admitted.
+
 
 End Gos_specs.
