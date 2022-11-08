@@ -24,14 +24,9 @@ Section list_serialization.
   Context (E : serialization).
   Context `{!Inject A val}.
 
-  Fixpoint list_valid_val_aux (la : list A) :=
-    match la with
-    | hd :: tl => s_valid_val E $ hd ∧ list_valid_val_aux tl
-    | [] => True
-    end.
 
   Definition list_valid_val (v : val) :=
-    ∃ (la: list A), is_list la v ∧ list_valid_val_aux la.
+    ∃ (la: list A), is_list la v ∧ (∀ x, x ∈ la → s_valid_val E $ x).
 
   Fixpoint list_is_ser_aux (la : list A) (s : string) :=
     match la with
@@ -44,13 +39,23 @@ Section list_serialization.
   end.
 
   Definition list_is_ser (v : val) (s : string) :=
-    ∃ (la : list A),
-      is_list la v ∧ list_valid_val_aux la ∧ list_is_ser_aux la s.
+    ∃ (l : list A), is_list l v ∧ list_is_ser_aux l s.
+
+  Lemma list_is_ser_aux_valid_val l :
+    ∀ s x, list_is_ser_aux l s → x ∈ l → s_valid_val E $ x.
+  Proof.
+    induction l as [|a' l']; first by set_solver.
+    intros ?? (?&?&?&?&?) [->|Hin]%elem_of_cons;
+      by [eapply s_is_ser_valid| eapply IHl'].
+  Qed.
 
   Lemma list_is_ser_valid (v : val) (s : string) :
     list_is_ser v s -> list_valid_val v.
-  Proof. destruct 1 as (?&?&?&?). by eexists. Qed.
-
+  Proof.
+    destruct 1 as (l&Hl&Hs).
+    exists l. split; first done.
+    intros x Hx. by eapply list_is_ser_aux_valid_val.
+  Qed.
 
   Lemma list_ser_spec `{!anerisG Mdl Σ} ip v:
     {{{ ⌜list_valid_val v⌝ }}}
@@ -69,20 +74,21 @@ Section list_serialization.
       rewrite /list_is_ser; eexists []; done.
     - simpl in Hvl, Hvv.
       destruct Hvl as [lv [-> Hvl]].
-      destruct Hvv as [Hva Hvv].
       wp_pures.
-      wp_apply (s_ser_spec E); first done.
+      wp_apply (s_ser_spec E).
+      { iPureIntro.
+        apply Hvv.
+        set_solver. }
       iIntros (s1) "%Hs1".
       wp_pures.
       wp_bind (list_ser (s_ser (s_serializer E)) _).
-      iApply "IH"; [iPureIntro; eexists; done |].
+      iApply "IH"; [iPureIntro; exists l; set_solver |].
       iIntros "!>" (s2) "%Hs2".
       wp_pures.
-      destruct Hs2 as (l'&Hs2x&Hs2y&Hs2z).
+      destruct Hs2 as (l'& Hs2x & Hs2y).
       iApply "HΦ".
       iPureIntro.
       exists (a :: l').
-      split; first by eexists.
       split; first by eexists.
       by exists s1, s2.
   Qed.
@@ -95,15 +101,14 @@ Section list_serialization.
     iIntros (Φ) "Hs HΦ".
     iLöb as "IH" forall (Φ v s).
     wp_rec.
-    iDestruct "Hs" as %(l&Hl1&Hl2&Hl3).
+    iDestruct "Hs" as %(l & Hl1 & Hl2).
     destruct l as [|a l]; simpl.
-    - rewrite Hl1 Hl3.
+    - rewrite Hl1 Hl2.
       wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
       wp_pures.
       by iApply "HΦ".
     - destruct Hl1 as [lv [-> Hl1]].
-      destruct Hl2 as (Hvv2 & Hl2).
-      destruct Hl3 as (s1&s2&Hs1&->&Hl3).
+      destruct Hl2 as (s1&s2&Hs1&->&Hl2).
       rewrite! /prod_ser_str.
       wp_find_from; first by split_and!; [|by apply nat_Z_eq; first lia].
       erewrite (index_0_append_char ); auto; last first.
@@ -268,28 +273,28 @@ Section gos_params.
   Context `{!EqDecision vl, !Countable vl}.
   Context `{!EventSetValidity vl}.
 
-  Definition gos_op_coh (op: gos_op) (v: val) : Prop := v = $op.
+  Definition gos_op_coh (op: gos_op) (v: val) : Prop := v = $op ∧ s_valid_val E $ v.
 
   Lemma gos_op_coh_inj (o o': gos_op) (v: val) :
     gos_op_coh o v -> gos_op_coh o' v -> o = o'.
   Proof.
-    intros Hv Hv'.
+    intros (Hv & _) (Hv' & _).
     rewrite/gos_op_coh in Hv. rewrite/gos_op_coh in Hv'.
     by simplify_eq/=.
   Qed.
 
   Definition gos_st_coh (st: (@gos_st vl _ _)) (v: val) : Prop :=
-    is_set st v ∧ v = inject_list (elements st) ∧ list_valid_val E v.
+    (* is_set st v ∧ v = inject_list (elements st) ∧ list_valid_val E v. *)
+    is_set st v ∧ (∀ elt, elt ∈ st → s_valid_val E $ elt).
 
   Lemma gos_st_coh_inj (st st': gos_st) (v: val) :
     gos_st_coh st v -> gos_st_coh st' v -> st = st'.
   Proof.
-    intros (_ & Hv & _) (_ & Hv' & _).
-    rewrite/gos_st_coh in Hv Hv'.
-    simplify_eq.
-    apply Inject_list.(inject_inj) in Hv'.
-    apply set_eq.
-    intros x. by rewrite - !elem_of_elements Hv'.
+    intros ((l & Hv & Hst & Hd) & _) ((l' & Hv' & Hst' & Hd') & _).
+    apply is_list_inject in Hv, Hv'.
+    subst.
+    f_equal.
+    by apply Inject_list.(inject_inj) in Hv'.
   Qed.
 
   Lemma gos_st_coh_serializable :
@@ -297,10 +302,9 @@ Section gos_params.
     gos_st_coh st v → Serializable (list_serialization E) v.
   Proof.
     rewrite /gos_st_coh.
-    intros st v (_ & -> & (l & Hl & Hv)).
-    exists (elements st).
-    apply is_list_inject, Inject_list.(inject_inj) in Hl as ->.
-    by split; first by apply is_list_inject.
+    intros st v ((l & Hl & Hl2) & Hs).
+    exists l. split; first done.
+    intros x Hx. set_solver.
   Qed.
 
   Global Instance gos_params : (StLib_Params gos_op (@gos_st vl _ _) ) :=
@@ -357,7 +361,8 @@ Section Gos_specs.
   Context `{!EqDecision vl, !Countable vl}.
   Context `{!EventSetValidity vl}.
 
-  Lemma gos_init_st_fn_spec :
+
+  Lemma gos_init_st_spec :
     ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ _ (gos_params E) init_st.
   Proof.
     iIntros (addr).
@@ -369,14 +374,30 @@ Section Gos_specs.
     iApply "HΦ".
     destruct Hv as (l & Hl & Heq & Hn).
     rewrite -list_to_set_nil in Heq.
-    simpl; rewrite /gos_st_coh /gos_st_init elements_empty.
+    simpl; rewrite /gos_st_coh /gos_st_init.
     destruct l as [|x l]; last first.
     { simpl in Heq. assert (x ∉ (∅ : gset vl)) as Habs.
       set_solver. rewrite Heq in Habs. set_solver. }
     iPureIntro.
     rewrite Hl.
     simpl in *.
-    split_and!; [by exists [] | done | by exists []].
+    split_and!; [by exists [] | set_solver].
+  Qed.
+
+  Lemma gos_mutator_st_spec :
+    ⊢ @mutator_spec _ _ _ _ _ _ _ _ _ _ (gos_params E) mutator.
+  Proof.
+    iIntros (sa f st_v op_v s ev op_log st_log)
+            "!> %φ ((-> & %Hvv) & (%Hst_coh & %Hst_coh') & %Hden &
+                    %Hnin & <- & <- & %Hmax & %Hext & %Hsoc) Hφ".
+    wp_lam. wp_pures.
+    wp_apply (wp_set_add $! Hst_coh).
+    iIntros (v Hv).
+    iApply "Hφ". simplify_eq /=.
+    iExists ({[EV_Op ev]} ∪ st_log).
+    iPureIntro.
+    split; last by set_solver.
+    split; set_solver.
   Qed.
 
   Lemma gos_merge_spec : ⊢ @merge_spec _ _ _ _ _ _ _ _ _ _ (gos_params E) merge.
@@ -384,8 +405,8 @@ Section Gos_specs.
     iIntros (sa v v' s s' st st')
             "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' &
                     %Hext & %Hsoc & %Hext' & %Hsoc') Hφ".
-    destruct Hcoh_st as (Hst & HvEq & Hvv).
-    destruct Hcoh_st' as (Hst' & Hv'Eq & Hvv').
+    destruct Hcoh_st as (Hst & Hvv).
+    destruct Hcoh_st' as (Hst' & Hvv').
     wp_lam.
     wp_let.
     wp_apply (wp_set_union _ st st' v v'); first by eauto.
@@ -395,13 +416,48 @@ Section Gos_specs.
     iSplit; last done.
     iPureIntro.
     split; first done.
-    split.
-    apply is_list_inject.
-    rewrite /is_set in Hu.
     destruct Hu as (lu & Hlu & HluX & Hndup).
-    apply (is_list_inv_l _ _ _ Hlu).
-    rewrite HluX.
-  Admitted.
+    by set_solver.
+    Qed.
 
+
+  Lemma gos_crdt_fun_spec : ⊢ @crdt_fun_spec _ _ _ _ _ _ _ _ _ _ (gos_params E) gos_crdt.
+  Proof.
+    iIntros (sa φ) "!> _ Hφ".
+    wp_lam; wp_pures. iApply "Hφ".
+    iExists init_st, mutator, merge.
+    iSplit; first trivial.
+    iDestruct gos_init_st_spec as "Hinit".
+    iDestruct gos_merge_spec as "Hmerge".
+    iDestruct gos_mutator_st_spec as "Hmutator".
+    iFrame "Hinit Hmerge Hmutator".
+  Qed.
+
+  (* Definition gos_init' val_ser val_deser  : val := *)
+  (*   λ: "addrs" "rid", *)
+  (*     let: "initRes" := statelib_init val_ser val_deser "addrs" "rid" gos_crdt in *)
+  (*     let: "get_state" := Fst "initRes" in *)
+  (*     let: "update" := Snd "initRes" in *)
+  (*     ("get_state", "update"). *)
+
+
+  (* Lemma gos_init_spec `{!StLib_Res (@gos_op vl)}: *)
+  (*   @init_spec  *)
+  (*     _ _ _ _ _ _ _ _ _ _  (gos_params E) _  *)
+  (*     (statelib_init (s_serializer E).(s_ser) (s_serializer E).(s_deser)) -∗ *)
+  (*   @init_spec_for_specific_crdt  *)
+  (*     _ _ _ _ _ _ _ _ _ _  (gos_params E) _  *)
+  (*     (gos_init' (s_serializer E).(s_ser) (s_serializer E).(s_deser)). *)
+  (* Proof. *)
+  (*   iIntros "#Hinit" (repId addr addrs_val). *)
+  (*   iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ". *)
+  (*   rewrite /gos_init'. *)
+  (*   wp_pures. *)
+  (*   wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]"). *)
+  (*   { do 2 (iSplit; first done). iApply gos_crdt_fun_spec; done. } *)
+  (*   iIntros (get update) "(HLS & Hget & Hupdate)". *)
+  (*   wp_pures. *)
+  (*   iApply "HΦ"; iFrame.  *)
+  (* Qed. *)
 
 End Gos_specs.

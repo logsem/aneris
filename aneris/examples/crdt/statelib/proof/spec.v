@@ -122,6 +122,23 @@ Section Specification.
         crdt_fun #() @[ip_of_address addr]
       {{{ v, RET v; crdt_triplet_spec v }}}.
 
+ Definition init_spec_for_specific_crdt (init: val) : iProp Σ :=
+    ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
+      (addrs_val : val),
+    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
+        ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
+        ([∗ list] z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
+        addr ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address addr) {[port_of_address addr]} ∗
+        StLib_InitToken repId
+    }}}
+      init addrs_val #repId @[ip_of_address addr]
+    {{{ gs_val upd_val, RET (gs_val, upd_val);
+        LocState repId ∅ ∅ ∗
+        get_state_spec gs_val repId addr ∗
+        update_spec upd_val repId addr
+    }}}.
+
   Definition init_spec (init: val) : iProp Σ :=
     ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
       (addrs_val crdt_val : val),
@@ -190,4 +207,3 @@ Section RAs.
   Proof. constructor; solve_inG. Qed.
 
 End RAs.
-
