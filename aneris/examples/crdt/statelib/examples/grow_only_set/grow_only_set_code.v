@@ -12,8 +12,6 @@ Definition mutator : val := λ: "_i" "gs" "op", set_add "op" "gs".
 Definition set_union : val :=
   λ: "s1" "s2", set_foldl (λ: "su" "e", set_add "e" "su") "s1" "s2".
 
-Definition set_serializer (elt_ser : serializer) := list_serializer elt_ser.
-
 Definition merge : val := λ: "st1" "st2", set_union "st1" "st2".
 
 Definition eval_state : val := λ: "st", "st".
@@ -22,14 +20,10 @@ Definition init_st : val := λ: <>, set_empty #().
 
 Definition gos_crdt : val := λ: <>, (init_st, mutator, merge).
 
-Definition st_ser (elt_ser : serializer) := set_serializer elt_ser.
-
-Definition gos_init (elt_ser : serializer) : val :=
-  λ: "addrs" "rid",
-  let: "initRes" := statelib_init (st_ser elt_ser).(s_ser)
-                    (st_ser elt_ser).(s_deser) "addrs" "rid" gos_crdt in
-  let: "get_state" := Fst "initRes" in
-  let: "update" := Snd "initRes" in
-  let: "eval" := λ: "st",
-  eval_state ("get_state" "st") in
-  ("eval", "update").
+Definition gos_init elt_ser elt_deser  : val :=
+    λ: "addrs" "rid",
+      let: "initRes" := statelib_init (list_ser elt_ser)
+                       (list_deser elt_deser) "addrs" "rid" gos_crdt in
+      let: "get_state" := Fst "initRes" in
+      let: "update" := Snd "initRes" in
+      ("get_state", "update").

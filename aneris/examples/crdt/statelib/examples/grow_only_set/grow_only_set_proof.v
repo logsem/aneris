@@ -433,31 +433,24 @@ Section Gos_specs.
     iFrame "Hinit Hmerge Hmutator".
   Qed.
 
-  (* Definition gos_init' val_ser val_deser  : val := *)
-  (*   λ: "addrs" "rid", *)
-  (*     let: "initRes" := statelib_init val_ser val_deser "addrs" "rid" gos_crdt in *)
-  (*     let: "get_state" := Fst "initRes" in *)
-  (*     let: "update" := Snd "initRes" in *)
-  (*     ("get_state", "update"). *)
 
-
-  (* Lemma gos_init_spec `{!StLib_Res (@gos_op vl)}: *)
-  (*   @init_spec  *)
-  (*     _ _ _ _ _ _ _ _ _ _  (gos_params E) _  *)
-  (*     (statelib_init (s_serializer E).(s_ser) (s_serializer E).(s_deser)) -∗ *)
-  (*   @init_spec_for_specific_crdt  *)
-  (*     _ _ _ _ _ _ _ _ _ _  (gos_params E) _  *)
-  (*     (gos_init' (s_serializer E).(s_ser) (s_serializer E).(s_deser)). *)
-  (* Proof. *)
-  (*   iIntros "#Hinit" (repId addr addrs_val). *)
-  (*   iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ". *)
-  (*   rewrite /gos_init'. *)
-  (*   wp_pures. *)
-  (*   wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]"). *)
-  (*   { do 2 (iSplit; first done). iApply gos_crdt_fun_spec; done. } *)
-  (*   iIntros (get update) "(HLS & Hget & Hupdate)". *)
-  (*   wp_pures. *)
-  (*   iApply "HΦ"; iFrame.  *)
-  (* Qed. *)
+  Lemma gos_init_spec `{!StLib_Res (@gos_op vl)}:
+    @init_spec
+      _ _ _ _ _ _ _ _ _ _  (gos_params E) _
+      (statelib_init (list_ser (s_serializer E).(s_ser)) (list_deser (s_serializer E).(s_deser))) -∗
+    @init_spec_for_specific_crdt
+      _ _ _ _ _ _ _ _ _ _  (gos_params E) _
+      (gos_init (s_serializer E).(s_ser) (s_serializer E).(s_deser)).
+  Proof.
+    iIntros "#Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    rewrite /gos_init.
+    wp_pures.
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply gos_crdt_fun_spec; done. }
+    iIntros (get update) "(HLS & Hget & Hupdate)".
+    wp_pures.
+    iApply "HΦ"; iFrame.
+  Qed.
 
 End Gos_specs.
