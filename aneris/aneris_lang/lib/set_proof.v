@@ -165,6 +165,29 @@ Section set_specs.
     by iApply "HΦ".
   Qed.
 
+  Lemma wp_set_union ip (X Y : gset A) x y :
+   {{{ ⌜is_set X x⌝ ∗ ⌜is_set Y y⌝ }}}
+      set_union x y @[ip]
+    {{{ v, RET v; ⌜is_set (X ∪ Y) v⌝}}}.
+  Proof.
+   iIntros (Φ) "(%Hx & %Hy) HΦ".
+   wp_lam. wp_pures.
+   wp_apply (wp_set_foldl
+               (λ (accZ : gset A) (accV : val), ⌜is_set (X ∪ accZ) accV⌝)%I
+               (λ (v : A), ⌜True⌝)%I
+               (λ (v : A), ⌜True⌝)%I
+               _ _ Y).
+   - iIntros (a accV accZ Ψ) "!> (Hs & _) HΨ".
+     wp_pures.
+     wp_apply (wp_set_add with "Hs").
+     iIntros (v) "Hs".
+     iApply "HΨ".
+     assert ({[a]} ∪ (X ∪ accZ) = X ∪ (accZ ∪ {[a]})) as -> by set_solver.
+     by iSplit; last done.
+   - by assert (X ∪ ∅ = X) as -> by set_solver.
+   - iIntros (r (Hr & _)). by iApply "HΦ".
+  Qed.
+
 End set_specs.
 
 Global Arguments wp_set_empty : clear implicits.

@@ -31,3 +31,6 @@ Definition set_subseteq : val :=
 
 Definition set_equal : val :=
   λ: "x" "y", (set_subseteq "x" "y") && (set_subseteq "y" "x").
+
+Definition set_union : val :=
+  λ: "s1" "s2", set_foldl (λ: "su" "e", set_add "e" "su") "s1" "s2".

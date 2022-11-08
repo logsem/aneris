@@ -9,9 +9,6 @@ From aneris.examples.crdt.statelib Require Import statelib_code.
 
 Definition mutator : val := λ: "_i" "gs" "op", set_add "op" "gs".
 
-Definition set_union : val :=
-  λ: "s1" "s2", set_foldl (λ: "su" "e", set_add "e" "su") "s1" "s2".
-
 Definition merge : val := λ: "st1" "st2", set_union "st1" "st2".
 
 Definition eval_state : val := λ: "st", "st".

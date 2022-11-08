@@ -30,3 +30,6 @@ let set_subseteq : 'a aset -> 'a aset -> bool =
 
 let set_equal : 'a aset -> 'a aset -> bool =
   fun x y ->  set_subseteq x y && set_subseteq y x
+
+let set_union (s1 : 'a aset) (s2 : 'a aset) : 'a aset =
+  set_foldl (fun su e -> set_add e su) s1 s2
