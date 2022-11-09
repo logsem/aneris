@@ -197,4 +197,19 @@ Section state_interpretation.
     ddeq ip ip'; set_solver.
   Qed.
 
+  Lemma free_ips_coh_ms hps skts ports ms1 ms2 :
+    free_ips_coh {|
+      state_heaps := hps;
+      state_sockets := skts;
+      state_ports_in_use := ports;
+      state_ms := ms1;
+      |} -∗
+    free_ips_coh {|
+      state_heaps := hps;
+      state_sockets := skts;
+      state_ports_in_use := ports;
+      state_ms := ms2;
+    |}.
+  Proof. done. Qed.
+
 End state_interpretation.

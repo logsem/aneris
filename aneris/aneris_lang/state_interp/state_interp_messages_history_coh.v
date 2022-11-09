@@ -276,9 +276,20 @@ Section state_interpretation.
     - by rewrite lookup_insert_ne in HSn1; eauto.
   Qed.
 
-  Lemma messages_history_drop_message σ mhγ m :
-    messages_history_coh (state_ms σ) (state_sockets σ) mhγ →
-    messages_history_coh (state_ms σ ∖ {[+ m +]}) (state_sockets σ) mhγ.
+  Lemma messages_history_coh_duplicate_message M S mhm m :
+    m ∈ M →
+    messages_history_coh M S mhm → messages_history_coh (M ∪ {[+ m +]}) S mhm.
+  Proof.
+    intros Hin (HMcoh&Hrbuf&Hacoh&Hrsfcoh).
+    split; [|done].
+    intros m' [Hin'|Hin']%gmultiset_elem_of_union; [by eauto|].
+    apply gmultiset_elem_of_singleton in Hin' as ->.
+    by eauto.
+  Qed.
+
+  Lemma messages_history_coh_drop_message σ S mhγ m :
+    messages_history_coh (state_ms σ) S mhγ →
+    messages_history_coh (state_ms σ ∖ {[+ m +]}) S mhγ.
   Proof.
     unfold messages_history_coh. intros (Hmsh & Hrb & Hmac & Hmr).
     split_and!; [|done..].

@@ -185,15 +185,35 @@ Lemma message_history_evolution_deliver_message ip Sn sh skt r m S M rt :
   S !! ip = Some Sn →
   Sn !! sh = Some (skt, r) →
   rt = message_history_evolution
-         M M S (<[ip:=<[sh:=(skt, m::r)]> Sn]> S) rt.
+         M (M ∖ {[+ m +]}) S (<[ip:=<[sh:=(skt, m::r)]> Sn]> S) rt.
 Proof.
   intros ??.
   rewrite /message_history_evolution.
   destruct rt as (R, T).
-  simplify_eq /=.
-  rewrite !gmultiset_difference_diag gset_of_gmultiset_empty !left_id_L. f_equal.
+  assert (M ∖ {[+ m +]} ∖ M = ∅) as -> by multiset_solver.
+  f_equal; [|by set_solver].
   rewrite gmultiset_empty_difference; first set_solver.
   by eapply buffers_subseteq.
+Qed.
+
+(* TODO: Figure out why difference_union_dist_l_L is not sufficient. *)
+Lemma gmultiset_difference_union_distr_l_L `{Countable A}
+      (X Y Z : gmultiset A) :
+  (X ∪ Y) ∖ Z = X ∖ Z ∪ Y ∖ Z.
+Proof. multiset_solver. Qed.
+
+Lemma message_history_evolution_duplicate_message S M M' rt :
+  M' ⊆ M → rt = message_history_evolution M (M ∪ M') S S rt.
+Proof.
+  intros ?.
+  rewrite /message_history_evolution.
+  destruct rt as (R, T).
+  rewrite !gmultiset_difference_diag.
+  assert (dom (D := message_soup) (∅ : gmultiset _) = ∅) as Hempty by multiset_solver.
+  rewrite Hempty. f_equal; [multiset_solver|].
+  rewrite gmultiset_difference_union_distr_l_L gmultiset_difference_diag
+          gmultiset_empty_difference; [|multiset_solver].
+  rewrite left_id. set_solver.
 Qed.
 
 Lemma message_history_evolution_drop_message S M M' rt :

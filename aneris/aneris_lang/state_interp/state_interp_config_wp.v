@@ -24,83 +24,67 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Mdl Σ}.
 
+  (* TODO: Move this elsehwere and use it where we now use ad hoc induction *)
+  Lemma fupd_elim_laterN E1 E2 n (P:iProp Σ) :
+    E2 ⊆ E1 → P -∗ |={E1,E2}=> |={E2}▷=>^n |={E2,E1}=> P.
+  Proof.
+    iIntros (Hle) "HP".
+    iApply fupd_mask_intro; [done|].
+    iIntros "Hclose".
+    iInduction n as [|n] "IHn"; [by iMod "Hclose"|]=> /=.
+    iIntros "!>!>!>".
+    iApply ("IHn" with "HP Hclose").
+  Qed.
+
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
-    rewrite /config_wp. iIntros. iModIntro.
-    iIntros (ex atr c σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth)". simpl.
-    rewrite /state_interp; simplify_eq /=.
-    rewrite (last_eq_trace_ends_in ex c) /=; last done.
+    rewrite /config_wp. iModIntro.
+    iIntros (ex atr c σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth)".
+    rewrite (last_eq_trace_ends_in ex c); [|done].
     iDestruct "Hsi" as (γm mh)
-                         "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh
-                    & Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
-    assert (∃ n, n = trace_length ex) as [n Heqn] by eauto.
-    rewrite -{2}Heqn.
-    assert (∃ n', n' = trace_length ex) as [n' Heqn'] by eauto.
-    rewrite -!Heqn'.
-    clear Heqn Heqn'.
-    iInduction (n) as [|n] "IHlen" forall (n'); last first.
-    { by iMod ("IHlen" with
-                "Hevs Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres Hm Hauth") as "H". }
-    iAssert (|={⊤,∅}=>|={∅,⊤}=> True)%I as "Hshift".
-    { by iApply fupd_mask_intro_subseteq. }
+                         "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh &
+                           Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
-    iMod "Hshift". iModIntro.
-    iModIntro. iNext. iModIntro.
-    iMod "Hshift". iModIntro.
-    destruct c as [tp1 σ1]; simpl in *.
+    iApply fupd_elim_laterN; [solve_ndisj|].
+    destruct c as [tp1 σ1]=> /=.
     iExists (trace_last atr), ().
-    rewrite (aneris_events_state_interp_same_tp _ (tp1, _)); [| |done|done]; last first.
+    rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
+      [| |done|done]; last first.
     { econstructor; [done| |done]. econstructor 2; eauto. }
-    pose proof Hstep as Hstep'.
-    inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr | σ];
+    iFrame "Hm Hevs Hauth Hsi".
+    iSplit; [|by iPureIntro; left].
+    iExists γm, mh. iFrame.
+    inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
       simplify_eq/=.
-    - iFrame "Hm Hevs Hauth".
-      iSplit; last by iPureIntro; left.
-      iExists γm, mh. iFrame "Hsi".
-      iSplit.
-      { erewrite  <- message_history_evolution_deliver_message; eauto with set_solver. }
+    - iSplit.
+      { apply (last_eq_trace_ends_in) in Hex as ->.
+        erewrite <- message_history_evolution_deliver_message;
+          eauto with set_solver. }
       iSplitR; [eauto using gnames_coh_update_sockets|].
       iSplitR; [eauto using network_sockets_coh_deliver_message|].
-      iSplitR; [eauto using messages_history_coh_deliver_message|].
-      iFrame. iSplitL "Hlcoh".
-      { by iApply (local_state_coh_deliver_message with "[Hlcoh]"). }
-      iSplitL "Hfreeips". by iApply free_ips_coh_deliver_message.
-      rewrite /messages_resource_coh.
-      iDestruct "Hmres" as "[$ Hmres]".
-      iDestruct "Hmres" as (ms Hle) "[HmresT Hmres]".
-      iExists ms. iSplit; [done|]. iFrame "HmresT".
-      iApply (big_sepS_mono with "Hmres").
-      iIntros (??) "Hmr".
-      iDestruct "Hmr" as (sagT sagR Φ Hsag) "[HΦ [HsagT Hmr]]".
-      iExists sagT, sagR, Φ.  iSplit; [done|]. iFrame "HΦ HsagT".
-      iDestruct "Hmr" as "[Hmr | Hmr]".
-      + iDestruct "Hmr" as (m' Hmeq) "Hmr".
-        iLeft. iExists m'. iSplit; done.
-      + iDestruct "Hmr" as %(m' & Hmeq & Hrecv).
-        iRight. iExists m'. done.
-    - iFrame "Hevs Hm Hauth".
-      iSplitL; last by iPureIntro; left.
-      iExists γm, mh. iFrame; simpl.
+      iSplitR; [iPureIntro; apply messages_history_coh_drop_message;
+                eauto using messages_history_coh_deliver_message|].
+      iSplitL "Hlcoh";
+        [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
+      iApply free_ips_coh_ms. by iApply free_ips_coh_deliver_message.
+    - iFrame.
       iSplit.
       { iPureIntro.
+        simplify_eq /=.
+        apply (last_eq_trace_ends_in) in Hex as ->.
+        rewrite -message_history_evolution_duplicate_message; [done|].
+        by apply gmultiset_singleton_subseteq_l. }
+      iSplitR; [done|]. iSplitR; [done|].
+      iPureIntro. by apply messages_history_coh_duplicate_message.
+    - iFrame.
+      iSplit.
+      { iPureIntro.
+        simplify_eq /=.
+        apply (last_eq_trace_ends_in) in Hex as ->.
         rewrite -message_history_evolution_drop_message; first done.
         apply gmultiset_difference_subseteq. }
-      iSplitR; first done.
-      iSplitR; first done.
-      iSplitR; first by iPureIntro; eapply messages_history_drop_message.
-      rewrite /messages_resource_coh.
-      iDestruct "Hmres" as "[$ Hmres]".
-      iDestruct "Hmres" as (ms Hle) "[HmresT Hmres]".
-      iExists ms. iSplit; [done|]. iFrame "HmresT".
-      iApply (big_sepS_mono with "Hmres").
-      iIntros (??) "Hmres".
-      iDestruct "Hmres" as (sagT sagR Φ Hsag) "[HΦ [HsagT Hmres]]".
-      iExists sagT, sagR, Φ.  iSplit; [done|]. iFrame "HΦ HsagT".
-      iDestruct "Hmres" as "[Hmres | Hmres]".
-      + iDestruct "Hmres" as (m' Hmeq) "Hmres".
-        iLeft. iExists m'. iSplit; done.
-      + iDestruct "Hmres" as %(m' & Hmeq & Hrecv).
-        iRight. iExists m'. done.
+      iSplitR; [done|]. iSplitR; [done|].
+      by iPureIntro; eapply messages_history_coh_drop_message.
   Qed.
 
 End state_interpretation.
