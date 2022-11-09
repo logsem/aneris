@@ -11,16 +11,14 @@ Definition mutator : val := λ: "_i" "gs" "op", set_add "op" "gs".
 
 Definition merge : val := λ: "st1" "st2", set_union "st1" "st2".
 
-Definition eval_state : val := λ: "st", "st".
-
 Definition init_st : val := λ: <>, set_empty #().
 
 Definition gos_crdt : val := λ: <>, (init_st, mutator, merge).
 
-Definition gos_init elt_ser elt_deser  : val :=
-    λ: "addrs" "rid",
-      let: "initRes" := statelib_init (list_ser elt_ser)
-                       (list_deser elt_deser) "addrs" "rid" gos_crdt in
-      let: "get_state" := Fst "initRes" in
-      let: "update" := Snd "initRes" in
-      ("get_state", "update").
+Definition gos_init (elt_ser : val) (elt_deser : val) : val :=
+  λ: "addrs" "rid",
+  let: "initRes" := statelib_init (list_ser elt_ser) (list_deser elt_deser)
+                    "addrs" "rid" gos_crdt in
+  let: "get_state" := Fst "initRes" in
+  let: "update" := Snd "initRes" in
+  ("get_state", "update").

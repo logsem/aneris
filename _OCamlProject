@@ -43,6 +43,7 @@ ML_SOURCES:
 	examples/crdt/statelib/statelib_code.ml
 	examples/crdt/statelib/examples/pncounter/counter_code.ml
 	examples/crdt/statelib/examples/grow_only_set/grow_only_set_code.ml
+	examples/crdt/statelib/examples/prod_comb/prod_comb_code.ml
 	examples/ping_pong_done/ping_pong_done_code.ml
 	examples/dscm/implementations/one_server/one_server_serialization_code.ml
 	examples/dscm/implementations/one_server/one_server_client_proxy_code.ml
@@ -77,6 +78,8 @@ ML_DEPENDENCIES:
         examples/crdt/oplib/examples/lwwreg/
 	examples/crdt/statelib/
 	examples/crdt/statelib/examples/
+        examples/crdt/oplib/examples/prod_comb/
+        examples/crdt/oplib/examples/grow_only_set/
 	examples/ccddb/
 	examples/reliable_communication/
 	examples/reliable_communication/lib/

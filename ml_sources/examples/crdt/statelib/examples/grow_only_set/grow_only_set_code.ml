@@ -13,15 +13,14 @@ let mutator : ('a, 'stTy) mutatorFnTy =
 let merge (st1 : 'a stTy) (st2 : 'a stTy) : 'a stTy =
   set_union st1 st2
 
-let eval_state (st : 'a stTy) = st
-
 let init_st () = set_empty ()
 
 let gos_crdt : ('a, 'a stTy) crdtTy = fun () -> ((init_st, mutator), merge)
 
-let gos_init  (elt_ser[@metavar "val"])(elt_deser[@metavar "val"])
+let gos_init  (elt_ser[@metavar "val"]) (elt_deser[@metavar "val"])
     (addrs : saddr alist) (rid : int) =
   let initRes =
-    statelib_init (list_ser elt_ser) (list_deser elt_deser) addrs rid gos_crdt in
+    statelib_init (list_ser elt_ser) (list_deser elt_deser)
+      addrs rid gos_crdt in
   let (get_state, update) = initRes in
   (get_state, update)
