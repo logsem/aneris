@@ -1,6 +1,6 @@
 From aneris.aneris_lang Require Import lang.
 From aneris.examples.crdt Require Import crdt_spec.
-From aneris.examples.crdt.statelib.time Require Import evtime maximality.
+From aneris.examples.crdt.statelib.time Require Import maximality.
 From aneris.examples.crdt.statelib.proof Require Import events.
 From aneris.examples.crdt.statelib.STS Require Import lst gst.
 
