@@ -5,6 +5,7 @@ From trillium.fairness Require Export inftraces.
 
 Record FairModel : Type := {
   fmstate:> Type;
+  fmstate_eqdec: EqDecision fmstate;
   fmstate_inhabited: Inhabited fmstate;
 
   fmrole: Type;

@@ -23,13 +23,15 @@ Definition extrace_fairly_terminating {Λ} `{Countable (locale Λ)}
 
 Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_leq: relation Mdl;
-  ftm_order: PartialOrder ftm_leq;
+  ftm_order: PreOrder ftm_leq;
   ftm_wf: wf (strict ftm_leq);
 
   ftm_decreasing_role: Mdl -> fmrole Mdl;
   ftm_decr:
-    ∀ (s: Mdl), (∃ ρ' s', fmtrans _ s ρ' s') -> ftm_decreasing_role s ∈ live_roles _ s ∧
-      ∀ s', (fmtrans _ s (Some (ftm_decreasing_role s)) s' -> (strict ftm_leq) s' s);
+    ∀ (s: Mdl), (∃ ρ' s', fmtrans _ s ρ' s') ->
+                ftm_decreasing_role s ∈ live_roles _ s ∧
+                ∀ s', (fmtrans _ s (Some (ftm_decreasing_role s)) s' ->
+                       (strict ftm_leq) s' s);
   ftm_decreasing_role_preserved:
     ∀ (s s': Mdl) ρ',
       (fmtrans _ s ρ' s' -> ρ' ≠ Some (ftm_decreasing_role s) ->
@@ -53,10 +55,12 @@ Lemma ftm_trans' `{FairTerminatingModel Mdl} a b c:
   a < b -> b ≤ c -> a < c.
 Proof.
   intros [H1 H1'] H2.
-  split; first transitivity b=>//.
-  intro contra. apply H1'.
-  suffices ->: b = a by reflexivity.
-  eapply anti_symm; last done; [typeclasses eauto | by (transitivity c)].
+  (* TODO: Why do we need to extract this manually? *)
+  assert (EqDecision Mdl) by apply Mdl.(fmstate_eqdec).
+  destruct (decide (b = c)) as [->|Heq]; [done|].
+  split; [by etransitivity|].
+  intros H'. apply H1'.
+  by etransitivity.
 Qed.
 
 Lemma fair_terminating_traces_terminate_rec `{FairTerminatingModel Mdl}
