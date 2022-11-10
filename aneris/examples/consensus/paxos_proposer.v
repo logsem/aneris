@@ -8,12 +8,12 @@ Section paxos_proposer.
   Lemma recv_promises_spec p h (n : nat) (b : Ballot) :
     p ∈ Proposers →
     {{{ inv paxosN paxos_inv ∗ p ⤇ proposer_si ∗
-        h ↪[ip_of_address p] (udp_socket (Some p) true) }}}
+        h ↪[ip_of_address p] (mkSocket (Some p) true) }}}
       recv_promises int_serializer #(LitSocket h) #n #b
       @[ip_of_address p]
     {{{ vp (promises : gset (option (Ballot * Value))) (senders : gset Acceptor),
         RET vp;
-        h ↪[ip_of_address p] (udp_socket (Some p) true) ∗
+        h ↪[ip_of_address p] (mkSocket (Some p) true) ∗
         ⌜is_set promises vp⌝ ∗
         ⌜size senders = n⌝ ∗
         (∀ a, ⌜a ∈ senders⌝ -∗
@@ -166,11 +166,11 @@ Section paxos_proposer.
     inv paxosN paxos_inv -∗
     ([∗ set] a ∈ Acceptors, a ⤇ acceptor_si) -∗
     (`p) ⤇ proposer_si -∗
-    h ↪[ip_of_address (`p)] (udp_socket (Some (`p)) true) -∗
+    h ↪[ip_of_address (`p)] (mkSocket (Some (`p)) true) -∗
     pending b -∗
     WP proposer int_serializer av #(LitSocket h) #b #`z @[ip_of_address (`p)]
     {{ _, ∃ v, msgs_elem_of (msg2a b v) ∗
-               h ↪[ip_of_address (`p)] (udp_socket (Some (`p)) true) }}.
+               h ↪[ip_of_address (`p)] (mkSocket (Some (`p)) true) }}.
   Proof.
     iIntros (?) "#Hinv #HA_sis #Hp_si Hh Hb".
     rewrite /proposer.
@@ -186,8 +186,7 @@ Section paxos_proposer.
                 (λ _, True)%I
                 with "[] [$Hh //]"); [done|done|eassumption| |].
     { iIntros "!#" (a ?) "(_ & _ & %Ha)".
-      set (m := {| m_sender := `p; m_destination := a;
-                   m_protocol := _; m_body := s |}).
+      set (m := {| m_sender := `p; m_destination := a; m_body := s |}).
       iInv (paxosN) as (δ) ">(Hfrag & Hmauth & Hbal & Hval & Hmcoh & HbI)" "Hclose".
       iMod (msgs_update (msg1a b) with "Hmauth") as "[Hmauth #Hm]".
       iModIntro.
@@ -249,8 +248,7 @@ Section paxos_proposer.
         iDestruct "Hmcoh" as (F Ts) "(Has & Hps & -> & %HM)".
         iDestruct (big_sepS_delete _ _ (`p) with "Hps") as "[[% Hp] Hps]"; [auto|].
         iDestruct (big_sepS_elem_of _ _ a with "HA_sis") as "#Ha_si"; [done|].
-        set (m := {| m_sender := `p; m_destination := a;
-                     m_protocol := _; m_body := s' |}).
+        set (m := {| m_sender := `p; m_destination := a; m_body := s' |}).
         (* this viewshift is used for all acceptors; here we destruct on whether
            we're considering the first (the 2a message has not been recorded in
            the model) or not. *)
@@ -347,7 +345,7 @@ Section paxos_proposer.
         iDestruct "Hmcoh" as (F Ts) "(Has & Hps & -> & %HM)".
         iDestruct (big_sepS_delete _ _ (`p) with "Hps") as "[[% Hp] Hps]"; [auto|].
         iDestruct (big_sepS_elem_of _ _ a with "HA_sis") as "#Ha_si"; [done|].
-        set (m := {| m_sender := `p; m_destination := a; m_protocol := _; m_body := s' |}).
+        set (m := {| m_sender := `p; m_destination := a; m_body := s' |}).
         destruct (decide ((msg2a b z') ∈ δ.(msgs))).
         + iExists _, _, _, _, δ, δ.
           iFrame "Hfrag Hp Ha_si".

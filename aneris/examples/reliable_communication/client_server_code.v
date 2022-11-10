@@ -26,7 +26,7 @@ Definition gen_msg_ser ser := sum_serializer tag_int_ser (idmsg_ser ser).
 
 Definition make_skt ser deser : val :=
   λ: "sa",
-  let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "sh" := NewSocket in
   SocketBind "sh" "sa";;
   ("sh", ((gen_msg_ser ser).(s_ser), (gen_msg_ser deser).(s_deser)), ser.(s_ser)).
 

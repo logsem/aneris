@@ -26,7 +26,7 @@ Definition client_serializer value_serializer :=
 
 Definition acceptor valS : val :=
   λ: "learners" "addr",
-  let: "skt" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "skt" := NewSocket in
   SocketBind "skt" "addr";;
   let: "maxBal" := ref NONE in
   let: "maxVal" := ref NONE in
@@ -114,7 +114,7 @@ Definition proposer valS : val :=
 
 Definition proposer' valS : val :=
   λ: "acceptors" "addr" "i" "n" "v",
-  let: "skt" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "skt" := NewSocket in
   SocketBind "skt" "addr";;
   let: "ballot_counter" := ref #0 in
   letrec: "loop" <> :=
@@ -149,14 +149,14 @@ Definition learner valS : val :=
 
 Definition learner' valS : val :=
   λ: "acceptors" "addr" "client",
-  let: "skt" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "skt" := NewSocket in
   SocketBind "skt" "addr";;
   let: "z" := learner valS "skt" "acceptors" in
   SendTo "skt" ((client_serializer valS).(s_ser) "z") "client".
 
 Definition client valS : val :=
   λ: "addr",
-  let: "skt" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "skt" := NewSocket in
   SocketBind "skt" "addr";;
   let: "msg1" := unSOME (ReceiveFrom "skt") in
   let: "sender1" := Snd "msg1" in

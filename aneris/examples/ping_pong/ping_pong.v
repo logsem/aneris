@@ -6,7 +6,7 @@ Set Default Proof Using "Type".
 
 Definition pong : val :=
   λ: "addr",
-  let: "socket" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "socket" := NewSocket in
   SocketBind "socket" "addr";;
   (* sockets are per default in blocking mode when allocated so we are
      guaranteed to receive a message *)
@@ -18,7 +18,7 @@ Definition pong : val :=
 
 Definition ping : val :=
   λ: "addr" "server",
-  let: "socket" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "socket" := NewSocket in
   SocketBind "socket" "addr";;
   SendTo "socket" #"PING" "server";;
   Fst (unSOME (ReceiveFrom "socket")).
@@ -101,7 +101,7 @@ Section ping.
         ∗ a ⤳ (∅, ∅) }}}
       ping #a #b @[ip]
     {{{ v m, RET #"PONG";
-        ⌜v = #(m_body m)⌝ ∗ a ⤳ ({[m]}, {[ mkMessage a b IPPROTO_UDP "PING" ]})}}}.
+        ⌜v = #(m_body m)⌝ ∗ a ⤳ ({[m]}, {[ mkMessage a b "PING" ]})}}}.
   Proof.
     iIntros (-> -> Φ) "(#Hpong & Hunallocated & Hip & Ha) HΦ".
     wp_lam.

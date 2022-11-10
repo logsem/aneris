@@ -277,14 +277,11 @@ Section lifting_network.
     done.
   Qed.
 
-  Lemma aneris_wp_new_socket ip E v1 v2 v3 :
+  Lemma aneris_wp_new_socket ip E :
     {{{ True }}}
-      NewSocket
-      (Val $ LitV $ LitAddressFamily v1)
-      (Val $ LitV $ LitSocketType v2)
-      (Val $ LitV $ LitProtocol v3) @[ip] E
+      NewSocket @[ip] E
     {{{ h, RET (LitV (LitSocket h));
-          h ↪[ip] (mkSocket v1 v2 v3 None true) }}}.
+          h ↪[ip] (mkSocket None true) }}}.
   Proof.
     iIntros (Φ) "Hl HΦ".
     rewrite !aneris_wp_unfold /aneris_wp_def.
@@ -336,7 +333,6 @@ Section lifting_network.
     let msg := {|
           m_sender := saT;
           m_destination := saR;
-          m_protocol := sprotocol s;
           m_body := m;
         |} in
     msg ≡g{sagT,sagR} m' →
@@ -363,7 +359,6 @@ Section lifting_network.
     let msg := {|
           m_sender := f;
           m_destination := a;
-          m_protocol := sprotocol s;
           m_body := m;
         |} in
     {{{ ▷ h ↪[ip] s ∗ ▷ f ⤳[false, rtrck] (R, T) ∗ ▷ a ⤇ φ ∗ ▷ φ msg }}}
@@ -384,7 +379,7 @@ Section lifting_network.
   Lemma aneris_wp_send_duplicate_groups ip m h saT sagT saR sagR rtrck E s R T φ :
     ip_of_address saT = ip →
     saddress s = Some saT ->
-    let msg := mkMessage saT saR (sprotocol s) m in
+    let msg := mkMessage saT saR m in
     set_Exists (λ m, m≡g{sagT,sagR} msg) T →
     {{{ ▷ saT ∈g sagT ∗ ▷ saR ∈g sagR ∗
         ▷ h ↪[ip] s ∗ ▷ sagT ⤳*[false, rtrck] (R, T) ∗ sagR ⤇* φ }}}
@@ -406,7 +401,7 @@ Section lifting_network.
   Lemma aneris_wp_send_duplicate ip m h a f rtrck E s R T φ :
     ip_of_address f = ip →
     saddress s = Some f ->
-    let msg := mkMessage f a (sprotocol s) m in
+    let msg := mkMessage f a m in
     msg ∈ T →
     {{{ ▷ h ↪[ip] s ∗ ▷ f ⤳[false, rtrck] (R, T) ∗ ▷ a ⤇ φ }}}
       SendTo (Val $ LitV $ LitSocket h) #m #a @[ip] E
@@ -424,7 +419,7 @@ Section lifting_network.
   Lemma aneris_wp_send_tracked_groups ip φ m h saT sagT saR sagR rtrck s E R T evs
         (Ψ1 Ψ2 : state → iProp Σ) m' :
     ip_of_address saT = ip →
-    let msg := mkMessage saT saR (sprotocol s) m in
+    let msg := mkMessage saT saR m in
     msg ≡g{sagT,sagR} m' →
     saddress s = Some saT ->
     {{{ ▷ saT ∈g sagT ∗
@@ -465,7 +460,6 @@ Section lifting_network.
     let msg := {|
           m_sender := f;
           m_destination := a;
-          m_protocol := sprotocol s;
           m_body := m;
         |} in
     {{{ ▷ h ↪[ip_of_address f] s ∗
@@ -501,7 +495,7 @@ Section lifting_network.
         R T evs (Ψ1 Ψ2 : state → iProp Σ) φ :
     ip_of_address saT = ip →
     saddress s = Some saT ->
-    let msg := mkMessage saT saR (sprotocol s) m in
+    let msg := mkMessage saT saR m in
     set_Exists (λ m, m ≡g{sagT,sagR} msg) T →
     {{{ ▷ saT ∈g sagT ∗
         ▷ saR ∈g sagR ∗
@@ -535,7 +529,7 @@ Section lifting_network.
   Lemma aneris_wp_send_duplicate_tracked ip m h a f E rtrck s R T evs (Ψ1 Ψ2 : state → iProp Σ) φ :
     ip_of_address f = ip →
     saddress s = Some f ->
-    let msg := mkMessage f a (sprotocol s) m in
+    let msg := mkMessage f a m in
     msg ∈ T →
     {{{ ▷ h ↪[ip] s ∗
         ▷ f ⤳[true, rtrck] (R, T) ∗

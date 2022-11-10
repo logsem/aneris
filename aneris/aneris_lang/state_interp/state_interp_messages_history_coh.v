@@ -38,10 +38,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     receive_buffers_coh (state_sockets σ) mh →
     receive_buffers_coh
-      (<[ip:=<[sh:=({| sfamily := sfamily skt;
-                       stype := stype skt;
-                       sprotocol := sprotocol skt;
-                       saddress := saddress skt;
+      (<[ip:=<[sh:=({| saddress := saddress skt;
                        sblock := b |}, r)]> Sn]> (state_sockets σ)) mh.
   Proof.
     rewrite /receive_buffers_coh.

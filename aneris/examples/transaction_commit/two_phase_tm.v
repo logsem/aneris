@@ -11,13 +11,13 @@ Section transaction_manager.
     is_set RMs vRMs →
     {{{ pending ∗
         is_rcvset_log l R tm ∗
-        wp_nodup_rcv rcv tm (udp_socket (Some tm) true) l ∗
+        wp_nodup_rcv rcv tm (mkSocket (Some tm) true) l ∗
         tm ⤳ (R, T) ∗
-        h ↪[ip_of_address tm] udp_socket (Some tm) true ∗
+        h ↪[ip_of_address tm] mkSocket (Some tm) true ∗
         tm ⤇ tm_si }}}
       recv_responses rcv #(LitSocket h) vRMs @[ip_of_address tm]
     {{{ (b : bool) R', RET #b;
-          pending ∗ tm ⤳ (R', T) ∗ h ↪[ip_of_address tm] udp_socket (Some tm) true ∗
+          pending ∗ tm ⤳ (R', T) ∗ h ↪[ip_of_address tm] mkSocket (Some tm) true ∗
           is_rcvset_log l R' tm ∗
           if b then [∗ set] rm ∈ RMs, rm ↦◯ PREPARED ∗ pending
           else ∃ rm, ⌜rm ∈ RMs⌝ ∗ rm ↦◯ ABORTED ∗ pending_discarded }}}.
@@ -72,7 +72,7 @@ Section transaction_manager.
     iIntros (HRMs) "Hp #Hrmsis #Htm_si Htm Hpend".
     rewrite /transaction_manager.
     wp_pures. wp_socket h as "Hh". wp_pures. wp_socketbind.
-    wp_apply (wp_nodup_init _ (udp_socket _ _)); [done..|].
+    wp_apply (wp_nodup_init _ (mkSocket _ _)); [done..|].
     iIntros (l rcv) "[Hlog #Hrcv]". wp_let.
     (* sending "PREPARE" to all *)
     wp_apply (wp_sendto_all_set (λ _, rm_si) with "[$Hh $Htm]"); auto.

@@ -127,8 +127,8 @@ Proof. solve_atomic. Qed.
 #[global] Instance snd_atomic n s v : Atomic s (mkExpr n (Snd (Val v))).
 Proof. solve_atomic. Qed.
 
-#[global] Instance newsocket_atomic n v0 v1 v2 s :
-  Atomic s (mkExpr n  (NewSocket (Val v0) (Val v1) (Val v2))).
+#[global] Instance newsocket_atomic n s :
+  Atomic s (mkExpr n NewSocket).
 Proof. solve_atomic. Qed.
 #[global] Instance socketbind_atomic n v0 v1  s :
   Atomic s (mkExpr n (SocketBind (Val v0) (Val v1))).
@@ -568,13 +568,11 @@ Section primitive_laws.
     iSplitL; [ by iApply ("Hwp" with "[$] [$]")|done].
   Qed.
 
-  Lemma wp_new_socket ip s E ζ f t p :
+  Lemma wp_new_socket ip s E ζ :
     {{{ ▷ is_node ip }}}
-      (mkExpr ip (NewSocket (Val $ LitV $ LitAddressFamily f)
-                            (Val $ LitV $ LitSocketType t)
-                            (Val $ LitV $ LitProtocol p))) @ s; ζ; E
+      (mkExpr ip NewSocket) @ s; ζ; E
     {{{ sh, RET (mkVal ip (LitV (LitSocket sh)));
-        sh ↪[ip] (mkSocket f t p None true) }}}.
+        sh ↪[ip] (mkSocket None true) }}}.
   Proof.
     iIntros (Φ) ">Hn HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
@@ -585,10 +583,7 @@ Section primitive_laws.
     { iPureIntro; do 3 eexists.
       eapply SocketStepS; eauto.
       apply newsocket_fresh. }
-    set (sock := {| sfamily := f;
-                    stype := t;
-                    sprotocol := p;
-                    saddress := None;
+    set (sock := {| saddress := None;
                     sblock := true |}).
     iIntros (????).
     pose proof Hex as Htrig.
@@ -690,7 +685,7 @@ Section primitive_laws.
 
   Lemma wp_send_gen_groups φ mbody (is_dup : bool) sh skt saT sagT saR sagR strck rtrck evs k E ζ R T
         (Ψ1 Ψ2 : state → iProp Σ) :
-    let msg := mkMessage saT saR (sprotocol skt) mbody  in
+    let msg := mkMessage saT saR mbody  in
     saddress skt = Some saT ->
     {{{ ▷ saT ∈g sagT ∗
         ▷ saR ∈g sagR ∗
@@ -827,7 +822,7 @@ Section primitive_laws.
   Lemma wp_send_gen φ mbody (is_dup : bool) sh skt a strck rtrck evs to k E
         ζ R T
     (Ψ1 Ψ2 : state → iProp Σ):
-    let msg := mkMessage a to (sprotocol skt) mbody in
+    let msg := mkMessage a to mbody in
     saddress skt = Some a ->
     {{{ ▷ sh ↪[ip_of_address a] skt ∗
         ▷ a ⤳[strck, rtrck] (R, T) ∗
@@ -876,7 +871,7 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_send_groups φ mbody sh skt saT sagT saR sagR rtrck k E ζ R T m' :
-    let msg := mkMessage saT saR (sprotocol skt) mbody in
+    let msg := mkMessage saT saR mbody in
     saddress skt = Some saT ->
     msg ≡g{sagT,sagR} m' →
     {{{ ▷ saT ∈g sagT ∗
@@ -898,7 +893,7 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_send φ mbody sh skt a to rtrck k E ζ R T:
-    let msg := mkMessage a to (sprotocol skt) mbody  in
+    let msg := mkMessage a to mbody  in
     saddress skt = Some a ->
     {{{ ▷ sh ↪[ip_of_address a] skt ∗
         ▷ a ⤳[false, rtrck] (R, T) ∗
@@ -918,7 +913,7 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_send_duplicate_groups mbody sh skt saT sagT saR sagR rtrck k E ζ R T φ :
-    let msg := mkMessage saT saR (sprotocol skt) mbody in
+    let msg := mkMessage saT saR mbody in
     saddress skt = Some saT ->
     set_Exists (λ m, m ≡g{sagT,sagR} msg) T →
     {{{ ▷ saT ∈g sagT ∗
@@ -938,7 +933,7 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_send_duplicate mbody sh skt a to rtrck k E ζ R T φ :
-    let msg := mkMessage a to (sprotocol skt) mbody in
+    let msg := mkMessage a to mbody in
     saddress skt = Some a ->
     msg ∈ T →
     {{{ ▷ sh ↪[ip_of_address a] skt ∗
@@ -960,7 +955,7 @@ Section primitive_laws.
 
   Lemma wp_send_tracked_groups φ mbody sh skt saT sagT saR sagR rtrck evs k E ζ R T
         (Ψ1 Ψ2 : state → iProp Σ) m' :
-    let msg := mkMessage saT saR (sprotocol skt) mbody  in
+    let msg := mkMessage saT saR mbody  in
     msg ≡g{sagT,sagR} m' →
     saddress skt = Some saT ->
     {{{ ▷ saT ∈g sagT ∗
@@ -994,7 +989,7 @@ Section primitive_laws.
 
   Lemma wp_send_tracked φ mbody sh skt a rtrck evs to k E ζ R T
     (Ψ1 Ψ2 : state → iProp Σ) :
-    let msg := mkMessage a to (sprotocol skt) mbody  in
+    let msg := mkMessage a to mbody  in
     saddress skt = Some a ->
     {{{ ▷ sh ↪[ip_of_address a] skt ∗
         ▷ a ⤳[true, rtrck] (R, T) ∗
@@ -1025,7 +1020,7 @@ Section primitive_laws.
 
   Lemma wp_send_duplicate_tracked_groups mbody sh skt saT sagT saR sagR rtrck evs
         k E ζ R T (Ψ1 Ψ2 : state → iProp Σ) φ :
-    let msg := mkMessage saT saR (sprotocol skt) mbody  in
+    let msg := mkMessage saT saR mbody  in
     saddress skt = Some saT ->
     set_Exists (λ m, m ≡g{sagT,sagR} msg) T →
     {{{ ▷ saT ∈g sagT  ∗
@@ -1056,7 +1051,7 @@ Section primitive_laws.
 
   Lemma wp_send_duplicate_tracked mbody sh skt a rtrck evs to k E ζ R T φ
         (Ψ1 Ψ2 : state → iProp Σ) :
-    let msg := mkMessage a to (sprotocol skt) mbody  in
+    let msg := mkMessage a to mbody  in
     saddress skt = Some a ->
     msg ∈ T →
     {{{ ▷ sh ↪[ip_of_address a] skt ∗
@@ -1469,7 +1464,7 @@ Section primitive_laws.
           assert (m = m').
           { destruct m, m'. rewrite /message_group_equiv in Hmeq.
             simpl in *.
-            destruct Hmeq as (Hm11 & Hm12 & Hm21 & Hm22 & <- & <-).
+            destruct Hmeq as (Hm11 & Hm12 & Hm21 & Hm22 & <-).
             (* destruct Hmeq as (<- & <- & <- & Hm1 & Hm2). *)
             assert (m_sender = m_sender0) as <- by set_solver.
             assert (m_destination = m_destination0) as <- by set_solver.
@@ -1488,7 +1483,7 @@ Section primitive_laws.
         {
           destruct m. destruct m'. simpl in *.
           destruct Hmeq as (Hm11 & Hm12 & Hm21 & Hm22 & Hprot).
-          repeat f_equiv; eauto. set_solver. set_solver. set_solver. }
+          repeat f_equiv; eauto. set_solver. }
         iNext.
         iMod "Hrest" as "(Hσ & Hsh & Ha)".
         iMod "Hmk".

@@ -9,7 +9,7 @@ Section resource_manager.
 
   Lemma wp_rm_sendto_aborted st rm ip s h :
     ip_of_address rm = ip →
-    s = udp_socket (Some rm) true →
+    s = mkSocket (Some rm) true →
     (st = WORKING ∨ st = PREPARED) →
     rm ∈ RMs →
     inv tcN tc_inv -∗
@@ -57,7 +57,7 @@ Section resource_manager.
 
   Lemma wp_rm_receivefrom rm ip s h :
     ip_of_address rm = ip →
-    s = udp_socket (Some rm) true →
+    s = mkSocket (Some rm) true →
     rm ∈ RMs →
     {{{ inv tcN tc_inv ∗ rm ⤇ rm_si ∗ h ↪[ip] s }}}
       ReceiveFrom (# (LitSocket h)) @[ip]
@@ -78,7 +78,7 @@ Section resource_manager.
 
   Lemma wp_rm_wait_commit_abort_receivefrom ip rm h s :
     ip_of_address rm = ip →
-    s = udp_socket (Some rm) true →
+    s = mkSocket (Some rm) true →
     rm ∈ RMs →
     {{{ inv tcN tc_inv ∗ rm ⤇ rm_si ∗ h ↪[ip] s }}}
       wait_receivefrom #(LitSocket h)

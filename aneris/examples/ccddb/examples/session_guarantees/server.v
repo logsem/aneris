@@ -69,9 +69,7 @@ Section code.
     let: "rd_fn" := Fst "fns" in
     let: "wr_fn" := Snd "fns" in
     (* Set up and launch request handler *)
-    let: "sh" := NewSocket #PF_INET
-                           #SOCK_DGRAM
-                           #IPPROTO_UDP in
+    let: "sh" := NewSocket in
     SocketBind "sh" "req_addr";;
                request_handler "sh" "rd_fn" "wr_fn".
 
@@ -166,10 +164,7 @@ Section spec.
     rewrite Hips_eq.
     wp_socket h as "Hsh /=".
     wp_pures.
-    set socket := {| sfamily := PF_INET;
-                     stype := SOCK_DGRAM;
-                     sprotocol := IPPROTO_UDP;
-                     saddress := None |}.
+    set socket := {| saddress := None |}.
     wp_socketbind.
     set socket' :=
       RecordSet.set saddress (λ _ : option socket_address, Some req_addr) socket.

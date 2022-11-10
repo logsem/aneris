@@ -228,7 +228,7 @@ Section Proof_of_server_conn_step_3.
              iExists y0, _; eauto with set_solver. }
            iExists y1, _; eauto with set_solver.
            iRight.
-           destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ? & ?).
+           destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ?).
            destruct Hhst4i as (y4 & ? & ? & ? & ? & ? & ?).
            subst.
            iExists γc', _, _, _, _, _.
@@ -385,12 +385,10 @@ Section Proof_of_server_conn_step_3.
           set (mt := {|
                       m_sender := RCParams_srv_saddr;
                       m_destination := m_sender m;
-                      m_protocol := sprotocol sock;
                       m_body := s1
                     |}).
           assert (mt = mm) as Heqmm.
-          { rewrite /mt. rewrite -Hmbdy_eq. destruct mm. simpl. simplify_eq /=. f_equal; subst.
-            destruct sock, m_protocol. simpl. destruct sprotocol. done. }
+          { rewrite /mt. rewrite -Hmbdy_eq. destruct mm. simplify_eq /=. f_equal. }
           assert (mt ∈ T0) as Ht0 by set_solver.
           set_solver.
           iFrame "#".

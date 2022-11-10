@@ -361,7 +361,6 @@ Section proof.
      iDestruct "Hto_proto" as (to_id) "Hto_proto".
      iAssert (socket_proto to_id {| m_sender := from_addr;
                                     m_destination := to_addr;
-                                    m_protocol := sprotocol skt;
                                     m_body := s |}) as "#Hsp".
      { iExists _.
        iSplitL "".

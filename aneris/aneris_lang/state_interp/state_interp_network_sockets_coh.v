@@ -73,10 +73,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     bound_ports_coh Sn (state_ports_in_use σ) →
     bound_ports_coh
-      (<[sh:=({| sfamily := sfamily skt;
-                 stype := stype skt;
-                 sprotocol := sprotocol skt;
-                 saddress := saddress skt;
+      (<[sh:=({| saddress := saddress skt;
                  sblock := b |}, r)]> Sn)
       (state_ports_in_use σ).
   Proof.
@@ -162,10 +159,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     socket_handlers_coh Sn  →
     socket_handlers_coh
-      (<[sh:=({| sfamily := sfamily skt;
-                 stype := stype skt;
-                 sprotocol := sprotocol skt;
-                 saddress := saddress skt;
+      (<[sh:=({| saddress := saddress skt;
                  sblock := b |}, r)]> Sn).
   Proof.
     intros ?? Hscoh sh1 sh2 skt1 skt2 ????? Heq.
@@ -225,10 +219,7 @@ Section state_interpretation.
   Lemma socket_messages_coh_update_sblock Sn sh skt r b:
     Sn !! sh = Some (skt, r) →
     socket_messages_coh Sn →
-    socket_messages_coh   (<[sh:=({| sfamily := sfamily skt;
-                                     stype := stype skt;
-                                     sprotocol := sprotocol skt;
-                                     saddress := saddress skt;
+    socket_messages_coh   (<[sh:=({| saddress := saddress skt;
                                      sblock := b |}, r)]> Sn).
   Proof.
     intros HSn Hcoh sh' kt' r' a' Hsh' Hskt' m' Hm'.
@@ -281,9 +272,6 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     socket_addresses_coh Sn ip →
     socket_addresses_coh (<[sh:=({|
-                                    sfamily := sfamily skt;
-                                    stype := stype skt;
-                                    sprotocol := sprotocol skt;
                                     saddress := saddress skt;
                                     sblock := b |}, r)]> Sn) ip.
   Proof.
@@ -343,10 +331,7 @@ Section state_interpretation.
   Lemma socket_unbound_empty_buf_coh_update_sblock Sn sh skt r b ip:
     Sn !! sh = Some (skt, r) →
     socket_unbound_empty_buf_coh Sn ip →
-    socket_unbound_empty_buf_coh (<[sh:=({| sfamily := sfamily skt;
-                                            stype := stype skt;
-                                            sprotocol := sprotocol skt;
-                                            saddress := saddress skt;
+    socket_unbound_empty_buf_coh (<[sh:=({| saddress := saddress skt;
                                             sblock := b |}, r)]> Sn) ip.
   Proof.
     intros Hsn Hcoh sh' skt' r' Hsh' Hskt'. ddeq sh sh'; eauto.
@@ -385,10 +370,7 @@ Section state_interpretation.
     Sn !! sh = Some (skt, r) →
     network_sockets_coh (state_sockets σ) (state_ports_in_use σ) →
     network_sockets_coh
-      (<[ip:=<[sh:=({| sfamily := sfamily skt;
-                       stype := stype skt;
-                       sprotocol := sprotocol skt;
-                       saddress := saddress skt;
+      (<[ip:=<[sh:=({| saddress := saddress skt;
                        sblock := b |}, r)]> Sn]> (state_sockets σ))
       (state_ports_in_use σ).
   Proof.

@@ -25,10 +25,7 @@ Section spec.
   Global Opaque ip.
 
   Definition mk_socket z :=
-    {| sfamily := PF_INET;
-       stype := SOCK_DGRAM;
-       sprotocol := IPPROTO_UDP;
-       saddress := Some z;
+    {| saddress := Some z;
        sblock := true |}.
 
   Definition lock_inv (lsid : loc) (γ : gname) (sh : socket_handle) : iProp Σ :=
@@ -335,8 +332,7 @@ Section spec.
     iDestruct "Hown" as (γ) "Hown".
     wp_socket sh as "Hsh /=". wp_pures.
     rewrite ip_eq.
-    set socket := {| sfamily := PF_INET; stype := SOCK_DGRAM;
-                     sprotocol := IPPROTO_UDP; saddress := None |}.
+    set socket := {| saddress := None |}.
     iApply (aneris_wp_socket_interp_alloc_singleton (client_si γ) with "Hunallocated").
     iIntros "#Hclient".
     wp_socketbind.

@@ -90,9 +90,7 @@ Proof.
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | GetAddressInfo e, GetAddressInfo e' =>
           cast_if (decide (e = e'))
-        | NewSocket e0 e1 e2, NewSocket e0' e1' e2' =>
-          cast_if_and3
-            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+        | NewSocket, NewSocket => left _
         | SocketBind e1 e2, SocketBind e1' e2' =>
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | SendTo e0 e1 e2, SendTo e0' e1' e2' =>
@@ -130,9 +128,6 @@ Proof.
    | LitUnit => inl (inl (inr (inl ())))
    | LitLoc l => inl (inl (inr (inr l)))
    | LitString s => inl (inr (inl (inl s)))
-   | LitAddressFamily a => inl (inr (inl (inr a)))
-   | LitSocketType t => inl (inr (inr (inl t)))
-   | LitProtocol p => inl (inr (inr (inr p)))
    | LitSocket s => inr (inl (inl (inl s)))
    | LitSocketAddress a => inr (inl (inl (inr a)))
    end) (λ l, match l with
@@ -141,9 +136,9 @@ Proof.
    | inl (inl (inr (inl ()))) => LitUnit
    | inl (inl (inr (inr l))) => LitLoc l
    | inl (inr (inl (inl s))) => LitString s
-   | inl (inr (inl (inr a))) => LitAddressFamily a
-   | inl (inr (inr (inl t))) => LitSocketType t
-   | inl (inr (inr (inr p))) => LitProtocol p
+   | inl (inr (inl (inr ()))) => LitUnit
+   | inl (inr (inr (inl ()))) => LitUnit
+   | inl (inr (inr (inr ()))) => LitUnit
    | inr (inl (inl (inl s))) => LitSocket s
    | inr (inl (inl (inr a))) => LitSocketAddress a
    | inr (inl (inr (inl ()))) => LitUnit
@@ -231,7 +226,7 @@ Proof.
      | Load e => GenNode 14 [go e]
      | Store e1 e2 => GenNode 15 [go e1; go e2]
      | MakeAddress e1 e2 => GenNode 16 [go e1; go e2]
-     | NewSocket e1 e2 e3 => GenNode 17 [go e1; go e2; go e3]
+     | NewSocket => GenNode 17 []
      | SocketBind e1 e2 => GenNode 18 [go e1; go e2]
      | SendTo e1 e2 e3 => GenNode 19 [go e1; go e2; go e3]
      | ReceiveFrom e => GenNode 20 [go e]
@@ -277,7 +272,7 @@ Proof.
      | GenNode 14 [e] => Load (go e)
      | GenNode 15 [e1; e2] => Store (go e1) (go e2)
      | GenNode 16 [e1; e2] => MakeAddress (go e1) (go e2)
-     | GenNode 17 [e1; e2; e3] => NewSocket (go e1) (go e2) (go e3)
+     | GenNode 17 [] => NewSocket
      | GenNode 18 [e1; e2] => SocketBind (go e1) (go e2)
      | GenNode 19 [e1; e2; e3] => SendTo (go e1) (go e2) (go e3)
      | GenNode 20 [e] => ReceiveFrom (go e)
@@ -350,9 +345,6 @@ Inductive ectx_item :=
 | MakeAddressLCtx (v2 : val)
 | MakeAddressRCtx (e1 : expr)
 | GetAddressInfoCtx
-| NewSocketLCtx (v1 v2 : val)
-| NewSocketMCtx (e0 : expr) (v2 : val)
-| NewSocketRCtx (e0 e1 : expr)
 | SocketBindLCtx (v2 : val)
 | SocketBindRCtx (e1 : expr)
 | SendToLCtx (v1 v2 : val)
@@ -395,9 +387,6 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | MakeAddressLCtx v2 => MakeAddress e (Val v2)
   | MakeAddressRCtx e1 => MakeAddress e1 e
   | GetAddressInfoCtx => GetAddressInfo e
-  | NewSocketLCtx v1 v2 => NewSocket e (Val v1) (Val v2)
-  | NewSocketMCtx e0 v2 => NewSocket e0 e (Val v2)
-  | NewSocketRCtx e0 e1 => NewSocket e0 e1 e
   | SocketBindLCtx v2 => SocketBind e (Val v2)
   | SocketBindRCtx e1 => SocketBind e1 e
   | SendToLCtx v1 v2 => SendTo e (Val v1) (Val v2)
@@ -436,8 +425,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | CAS e0 e1 e2 => CAS (subst x v e0) (subst x v e1) (subst x v e2)
   | MakeAddress e1 e2 => MakeAddress (subst x v e1) (subst x v e2)
   | GetAddressInfo e => GetAddressInfo (subst x v e)
-  | NewSocket e0 e1 e2 =>
-    NewSocket (subst x v e0) (subst x v e1) (subst x v e2)
+  | NewSocket => NewSocket
   | SocketBind e1 e2 => SocketBind (subst x v e1) (subst x v e2)
   | SendTo e0 e1 e2 => SendTo (subst x v e0) (subst x v e1) (subst x v e2)
   | SetReceiveTimeout e0 e1 e2 =>
@@ -746,18 +734,13 @@ Inductive socket_step ip :
   expr -> sockets -> ports_in_use -> message_multi_soup ->
   expr -> sockets -> ports_in_use -> message_multi_soup ->
   Prop :=
-| NewSocketS f p sh s Sn P M :
+| NewSocketS sh Sn P M :
     (* The socket handle is fresh *)
     Sn !! sh = None →
-    socket_step
-      ip
-      (NewSocket (Val $ LitV $ LitAddressFamily f)
-                 (Val $ LitV $ LitSocketType s)
-                 (Val $ LitV $ LitProtocol p))
-      Sn P M
+    socket_step ip NewSocket Sn P M
       (* reduces to *)
       (Val $ LitV $ LitSocket sh)
-      (<[sh:=(mkSocket f s p None true, [])]>Sn) P M
+      (<[sh:=(mkSocket None true, [])]>Sn) P M
 | SocketBindS sh a skt Sn P ps M  :
     (* The socket handle is bound to a socket. *)
     Sn !! sh = Some (skt, []) →
@@ -782,7 +765,7 @@ Inductive socket_step ip :
     Sn !! sh = Some (skt, r) →
     (* The socket has an assigned address *)
     saddress skt = Some f ->
-    let new_message := mkMessage f a (sprotocol skt) mbody in
+    let new_message := mkMessage f a mbody in
     socket_step
       ip
       (SendTo (Val $ LitV $ LitSocket sh)
@@ -859,7 +842,7 @@ Definition is_head_step_pure (e : expr) : bool :=
   | Load _
   | Store _ _
   | CAS _ _ _
-  | NewSocket _ _ _
+  | NewSocket
   | SocketBind _ _
   | SendTo _ _ _
   | ReceiveFrom _
@@ -1095,14 +1078,11 @@ Proof.
     |}.
 Qed.
 
-Lemma newsocket_fresh n Sn P M v1 v2 v3 :
+Lemma newsocket_fresh n Sn P M :
   let h := fresh (dom Sn) in
-  socket_step n
-              (NewSocket (Val $ LitV $ LitAddressFamily v1)
-                         (Val $ LitV $ LitSocketType v2)
-                         (Val $ LitV $ LitProtocol v3)) Sn P M
+  socket_step n NewSocket Sn P M
               (Val $ LitV (LitSocket h))
-              (<[h:=(mkSocket v1 v2 v3 None true, [])]>Sn) P M.
+              (<[h:=(mkSocket None true, [])]>Sn) P M.
 Proof.
   intros; apply NewSocketS.
   apply (not_elem_of_dom (D:=gset loc)), is_fresh.

@@ -332,7 +332,6 @@ Section definitions.
              (m1 m2 : message) :=
     m_sender m1 ∈ sagT ∧ m_sender m2 ∈ sagT ∧
     m_destination m1 ∈ sagR ∧ m_destination m2 ∈ sagR ∧
-    m_protocol m1 = m_protocol m2 ∧
     m_body m1 = m_body m2.
 
   Notation "m1 ≡g{ sagT , sagR } m2" :=
@@ -344,7 +343,6 @@ Section definitions.
     rewrite /Decision.
     rewrite /message_group_equiv.
     destruct (decide (m_body m1 = m_body m2)); [| right; naive_solver ].
-    destruct (decide (m_protocol m1 = m_protocol m2)); [| right; naive_solver ].
     destruct (decide (m_sender m1 ∈ sagT)); [| right; naive_solver ].
     destruct (decide (m_sender m2 ∈ sagT)); [| right; naive_solver ].
     destruct (decide (m_destination m1 ∈ sagR)); [| right; naive_solver ].
@@ -371,7 +369,7 @@ Section definitions.
     m2 ≡g{sagT, sagR} m1.
   Proof.
     rewrite /message_group_equiv.
-    intros Hsend Hdest (HT1 & HT2 & HR1 & HR2 & <- & <-).
+    intros Hsend Hdest (HT1 & HT2 & HR1 & HR2 & <-).
     done.
   Qed.
 
@@ -382,8 +380,8 @@ Section definitions.
   Proof.
     rewrite /message_group_equiv.
     intros Hdisj HsagT1 HsagT2 HsagR1 HsagR2.
-    intros (HinT11 & HinT12 & HinR11 & HinR12 & <- & <-).
-    intros (HinT21 & HinT22 & HinR21 & HinR22 & <- & <-).
+    intros (HinT11 & HinT12 & HinR11 & HinR12 & <-).
+    intros (HinT21 & HinT22 & HinR21 & HinR22 & <-).
     pose proof (elem_of_all_disjoint_eq sagT1 sagT2 _ X Hdisj HsagT1 HsagT2 HinT12 HinT21) as ->.
     pose proof (elem_of_all_disjoint_eq sagR1 sagR2 _ X Hdisj HsagR1 HsagR2 HinR12 HinR21) as ->.
     done.

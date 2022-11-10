@@ -179,7 +179,6 @@ Section Server_resources.
               ⌜s_is_ser (msg_serialization RCParams_clt_ser) mval (m_body m2)⌝ ∗
               ⌜m_destination m2 = RCParams_srv_saddr⌝ ∗
               ⌜m_sender m2 = sa⌝ ∗
-              ⌜m_protocol m2 = IPPROTO_UDP⌝ ∗
               ⌜mval = InjLV (#"COOKIE", #n)⌝) ∗
              (* ii) sent message. *)
              (∃ (m' : message) (mval': val), ⌜m' ∈ T⌝ ∗
