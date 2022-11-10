@@ -200,7 +200,7 @@ Section Utils.
     induction l as [ | h t IH ];
       first ( intros i Hi; inversion Hi ).
     intros [ | i' ] Hi; first by exists h.
-    simpl; simpl in Hi; apply lt_S_n in Hi.
+    simpl; simpl in Hi; apply Nat.succ_lt_mono in Hi.
     by apply IH.
   Qed.
 
@@ -412,7 +412,7 @@ Section GCtr_Model.
     destruct (decide (i = nat_to_fin l)) as [-> | Hneq];
       last by rewrite vlookup_insert_ne.
     rewrite vlookup_insert.
-    apply le_plus_l.
+    apply Nat.le_add_r.
   Qed.
 
   Lemma gctr_mut_coh

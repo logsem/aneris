@@ -218,7 +218,7 @@ Section Preambule.
         apply get_evid_eq in He'_eid as [Horig Himp].
         rewrite (Hval e He'_in) in Himp.
         assert (size (filter (λ v : EvId, v.1 = EV_Orig e) (EV_Time e)) < S (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))))%nat; last lia.
-        apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply lt_n_Sn.
+        apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply Nat.lt_succ_diag_r.
         rewrite Horig.
         apply subseteq_size, filter_set_mono.
         rewrite -get_deps_singleton.
@@ -259,8 +259,8 @@ Section Preambule.
   Proof.
     intros Hval Hev_in Hev_orig.
     rewrite Hval; last assumption.
-    apply le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s)));
-      last apply lt_n_Sn.
+    apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s)));
+      last apply Nat.lt_succ_diag_r.
     apply subseteq_size.
     intros e [He_p He_in]%elem_of_filter.
     apply elem_of_filter. split.
@@ -325,7 +325,7 @@ Section Preambule.
          (size
             (filter (λ eid : EvId, eid.1 = orig)
                (get_deps_set s)))); last lia.
-      apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply lt_n_Sn.
+      apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply Nat.lt_succ_diag_r.
       rewrite Hy_orig.
       apply subseteq_size, filter_set_mono.
       rewrite -get_deps_singleton.
@@ -368,7 +368,7 @@ Section Preambule.
          (size
             (filter (λ eid : EvId, eid.1 = orig)
                (get_deps_set (g.2 !!! orig))))); last lia.
-      apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set (g.2 !!! orig)))); last apply lt_n_Sn.
+      apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set (g.2 !!! orig)))); last apply Nat.lt_succ_diag_r.
       rewrite Hy_orig.
       apply subseteq_size, filter_set_mono.
       rewrite -get_deps_singleton.

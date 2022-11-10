@@ -572,7 +572,7 @@ Section Gst_mutator_local_valid.
           assert (get_seqnum ev < sid)%nat.
           { destruct (event_set_seqnum_max (g.2 !!! orig) orig sid);
               try by destruct (VGst_lhst_valid _ Hv orig).
-            apply lt_n_Sn. }
+            apply Nat.lt_succ_diag_r. }
           apply get_evid_eq in Hev_eid as [_ Hsid]. lia.
         * destruct
             (get_deps_set_incl _ (VLst_dep_closed _
@@ -823,7 +823,7 @@ Section Gst_mutator_local_valid.
         [Hxorig Hxin]%elem_of_filter [Hyorig Hyin]%elem_of_filter Heq_t.
       by apply (VLst_ext_time _ Hv). }
     
-    apply le_lt_or_eq in Hsle as [Hlt | ->];
+    apply Nat.lt_eq_cases in Hsle as [Hlt | ->];
       last (
         apply elem_of_union_r, elem_of_singleton; f_equal;
         rewrite event_set_get_seqnum; by destruct Hv).
@@ -879,7 +879,7 @@ Section Gst_mutator_local_valid.
         [Hxorig Hxin]%elem_of_filter [Hyorig Hyin]%elem_of_filter Heq_t.
       by apply (VLst_ext_time _ (VGst_lhst_valid _ Hv orig)). }
     
-    apply le_lt_or_eq in Hsle as [Hlt | ->];
+    apply Nat.lt_eq_cases in Hsle as [Hlt | ->];
       last (
         apply elem_of_union_r, elem_of_singleton; f_equal;
         rewrite event_set_get_seqnum; by destruct (VGst_lhst_valid _ Hv orig)).

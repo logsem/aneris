@@ -20,13 +20,13 @@ Section Defs.
   Global Instance evid_le_trans : Transitive evid_le.
   Proof.
     intros [r s][r' s'][r'' s''][-> Hle][<- Hle'].
-    split; [ reflexivity | by apply le_trans with s'].
+    split; [ reflexivity | by apply Nat.le_trans with s'].
   Qed.
 
   Global Instance evid_le_antisym: AntiSymm eq evid_le.
   Proof.
     intros[r s][r' s'] [-> Hle] [Heq Hle'].
-    apply pair_equal_spec; split; [reflexivity | by apply le_antisym].
+    apply pair_equal_spec; split; [reflexivity | by apply Nat.le_antisymm].
   Qed.
 
 	Global Instance evid_le_po: PartialOrder evid_le.
