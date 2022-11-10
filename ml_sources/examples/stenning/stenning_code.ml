@@ -2,11 +2,8 @@ open! Ast
 open List_code
 open Network_util_code
 
-
-let mk_udp_socket () = socket PF_INET SOCK_DGRAM IPPROTO_UDP
-
 let server_aux addr j0 =
-  let sckt = mk_udp_socket () in
+  let sckt = udp_socket () in
   socketBind sckt addr;
   let rec handler j msg sender =
     let tag = unSOME (s2i (tag_of_message msg)) in
@@ -23,7 +20,7 @@ let server addr = server_aux addr 0
 
 
 let client_aux addr srvr mlst i0 =
-  let sckt = mk_udp_socket () in
+  let sckt = udp_socket () in
   socketBind sckt addr;
   let rslt = ref (list_rev (list_sub i0 mlst)) in
   let rec  next_step i =

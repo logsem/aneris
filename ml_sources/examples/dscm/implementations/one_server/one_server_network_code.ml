@@ -55,7 +55,7 @@ let send_thread (val_ser[@metavar] : 'a serializer) lk sh outQ =
   in loop ()
 
 let init_network (val_ser[@metavar]) srv =
-  let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let sh = udp_socket () in
   let lk = newlock () in
   socketBind sh srv;
   let (inQ : 'a requestTy queue Atomic.t) = ref (queue_empty ()) in

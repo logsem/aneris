@@ -6,7 +6,7 @@ open Coin_flip_code
 open Nodup_code
 
 let resource_manager rm tm =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt rm;
   let msg = unSOME (receiveFrom skt) in
   let value = fst msg in
@@ -41,7 +41,7 @@ let recv_responses recv skt rms =
   loop (set_empty ())
 
 let transaction_manager tm rms =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt tm;
   let recv = nodup_init () in
   sendto_all_set skt rms "PREPARE";

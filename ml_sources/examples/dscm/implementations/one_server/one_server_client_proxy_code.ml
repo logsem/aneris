@@ -31,7 +31,7 @@ let wait_for_reply (val_ser[@metavar]) srv sh reqId reqMsg =
     r
 
 let install_proxy (val_ser[@metavar]) srv caddr =
-  let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let sh = udp_socket () in
   let reqId = ref 0 in
   socketBind sh caddr;
   setReceiveTimeout sh 3 0;

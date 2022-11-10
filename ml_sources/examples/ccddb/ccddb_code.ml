@@ -122,7 +122,7 @@ let ccddb_init (val_ser[@metavar]) (val_deser[@metavar]) addrlst i =
   let inQueue = ref list_nil in
   let outQueue = ref list_nil in
   let lock = newlock () in
-  let socket_handler = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let socket_handler = udp_socket () in
   let addr = unSOME (list_nth addrlst i) in
   socketBind socket_handler addr;
   fork (store_apply db t lock inQueue) i;

@@ -29,7 +29,7 @@ let client_serializer (value_serializer[@metavar]) =
   prod_serializer ballot_serializer value_serializer
 
 let acceptor (valS[@metavar]) learners addr =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt addr;
   let maxBal = ref None in
   let maxVal = ref None in
@@ -143,7 +143,7 @@ let proposer'
       n                      (* number of proposers *)
       v                    (* value to possibly propose *)
   =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt addr;
   let ballot_counter = ref 0 in
   let rec loop () =
@@ -183,14 +183,14 @@ let learner (valS[@metavar])
   loop ()
 
 let learner' (valS[@metavar]) acceptors addr client =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt addr;
   let z = learner valS skt acceptors in
   sendTo skt ((client_serializer valS).s_ser z) client
 
 
 let client (valS[@metavar]) addr =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt addr;
   let msg1 = unSOME (receiveFrom skt) in
   let sender1 = snd msg1 in

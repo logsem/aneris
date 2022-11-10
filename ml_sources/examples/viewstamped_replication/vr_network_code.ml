@@ -23,7 +23,7 @@ let cfg_cell (cfg : (saddr alist) alist) i j =
 
 (* socket with non-blocking receive *)
 let init_socket_ij cfg i j =
-  let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let sh = udp_socket () in
   let addr = cfg_cell cfg i j in
   (if i = j
    then setReceiveTimeout sh 2 0
