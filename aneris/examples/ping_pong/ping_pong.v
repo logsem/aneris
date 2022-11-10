@@ -6,7 +6,7 @@ Set Default Proof Using "Type".
 
 Definition pong : val :=
   λ: "addr",
-  let: "socket" := NewSocket in
+  let: "socket" := NewSocket #() in
   SocketBind "socket" "addr";;
   (* sockets are per default in blocking mode when allocated so we are
      guaranteed to receive a message *)
@@ -18,7 +18,7 @@ Definition pong : val :=
 
 Definition ping : val :=
   λ: "addr" "server",
-  let: "socket" := NewSocket in
+  let: "socket" := NewSocket #() in
   SocketBind "socket" "addr";;
   SendTo "socket" #"PING" "server";;
   Fst (unSOME (ReceiveFrom "socket")).

@@ -90,7 +90,7 @@ Proof.
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | GetAddressInfo e, GetAddressInfo e' =>
           cast_if (decide (e = e'))
-        | NewSocket, NewSocket => left _
+        | NewSocket e, NewSocket e' => cast_if (decide (e = e'))
         | SocketBind e1 e2, SocketBind e1' e2' =>
           cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
         | SendTo e0 e1 e2, SendTo e0' e1' e2' =>
@@ -226,7 +226,7 @@ Proof.
      | Load e => GenNode 14 [go e]
      | Store e1 e2 => GenNode 15 [go e1; go e2]
      | MakeAddress e1 e2 => GenNode 16 [go e1; go e2]
-     | NewSocket => GenNode 17 []
+     | NewSocket e => GenNode 17 [go e]
      | SocketBind e1 e2 => GenNode 18 [go e1; go e2]
      | SendTo e1 e2 e3 => GenNode 19 [go e1; go e2; go e3]
      | ReceiveFrom e => GenNode 20 [go e]
@@ -272,7 +272,7 @@ Proof.
      | GenNode 14 [e] => Load (go e)
      | GenNode 15 [e1; e2] => Store (go e1) (go e2)
      | GenNode 16 [e1; e2] => MakeAddress (go e1) (go e2)
-     | GenNode 17 [] => NewSocket
+     | GenNode 17 [e] => NewSocket (go e)
      | GenNode 18 [e1; e2] => SocketBind (go e1) (go e2)
      | GenNode 19 [e1; e2; e3] => SendTo (go e1) (go e2) (go e3)
      | GenNode 20 [e] => ReceiveFrom (go e)
@@ -345,6 +345,7 @@ Inductive ectx_item :=
 | MakeAddressLCtx (v2 : val)
 | MakeAddressRCtx (e1 : expr)
 | GetAddressInfoCtx
+| NewSocketCtx
 | SocketBindLCtx (v2 : val)
 | SocketBindRCtx (e1 : expr)
 | SendToLCtx (v1 v2 : val)
@@ -387,6 +388,7 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | MakeAddressLCtx v2 => MakeAddress e (Val v2)
   | MakeAddressRCtx e1 => MakeAddress e1 e
   | GetAddressInfoCtx => GetAddressInfo e
+  | NewSocketCtx => NewSocket e
   | SocketBindLCtx v2 => SocketBind e (Val v2)
   | SocketBindRCtx e1 => SocketBind e1 e
   | SendToLCtx v1 v2 => SendTo e (Val v1) (Val v2)
@@ -425,7 +427,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | CAS e0 e1 e2 => CAS (subst x v e0) (subst x v e1) (subst x v e2)
   | MakeAddress e1 e2 => MakeAddress (subst x v e1) (subst x v e2)
   | GetAddressInfo e => GetAddressInfo (subst x v e)
-  | NewSocket => NewSocket
+  | NewSocket e => NewSocket (subst x v e)
   | SocketBind e1 e2 => SocketBind (subst x v e1) (subst x v e2)
   | SendTo e0 e1 e2 => SendTo (subst x v e0) (subst x v e1) (subst x v e2)
   | SetReceiveTimeout e0 e1 e2 =>
@@ -737,7 +739,7 @@ Inductive socket_step ip :
 | NewSocketS sh Sn P M :
     (* The socket handle is fresh *)
     Sn !! sh = None →
-    socket_step ip NewSocket Sn P M
+    socket_step ip (NewSocket #()) Sn P M
       (* reduces to *)
       (Val $ LitV $ LitSocket sh)
       (<[sh:=(mkSocket None true, [])]>Sn) P M
@@ -842,7 +844,7 @@ Definition is_head_step_pure (e : expr) : bool :=
   | Load _
   | Store _ _
   | CAS _ _ _
-  | NewSocket
+  | NewSocket _
   | SocketBind _ _
   | SendTo _ _ _
   | ReceiveFrom _
@@ -1080,7 +1082,7 @@ Qed.
 
 Lemma newsocket_fresh n Sn P M :
   let h := fresh (dom Sn) in
-  socket_step n NewSocket Sn P M
+  socket_step n (NewSocket #()) Sn P M
               (Val $ LitV (LitSocket h))
               (<[h:=(mkSocket None true, [])]>Sn) P M.
 Proof.

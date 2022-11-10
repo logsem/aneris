@@ -91,7 +91,7 @@ Section code.
       let: "len" := list_length "addrlst" in
       let: "M" := ref<<name>> (vect_make "len" #0) in
       let: "addr" := unSOME (list_nth "addrlst" "i") in
-      let: "sh" := NewSocket in
+      let: "sh" := NewSocket #() in
       SocketBind "sh" "addr";;
       Fork (gcounter_apply "M" "sh");;
       Fork (gcounter_broadcast "M" "sh" "addrlst" "i");;

@@ -6,7 +6,7 @@ From aneris.aneris_lang.lib Require Import network_util_code.
 
 Definition pong : val :=
   λ: "addr",
-  let: "skt" := NewSocket in
+  let: "skt" := NewSocket #() in
   SocketBind "skt" "addr";;
   let: "msg" := unSOME (ReceiveFrom "skt") in
   let: "sender" := Snd "msg" in
@@ -23,7 +23,7 @@ Definition pong : val :=
 
 Definition ping : val :=
   λ: "addr" "server",
-  let: "skt" := NewSocket in
+  let: "skt" := NewSocket #() in
   SocketBind "skt" "addr";;
   SendTo "skt" #"PING" "server";;
   #();;

@@ -62,7 +62,7 @@ Section Code.
    *)
   Definition sm_setup : val :=
     λ: "client_addr",
-      let: "socket" := NewSocket in
+      let: "socket" := NewSocket #() in
       SocketBind "socket" "client_addr";;
       let: "seq_id" := ref #0 in
       let: "lock" := newlock #() in

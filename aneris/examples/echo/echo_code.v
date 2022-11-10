@@ -3,7 +3,7 @@ From aneris.aneris_lang.lib Require Export network_util_code list_code.
 
 Definition echo_server : val :=
   λ: "addr",
-    let: "socket" := NewSocket in
+    let: "socket" := NewSocket #() in
     SocketBind "socket" "addr";;
     (rec: "go" <> :=
         let: "m" := unSOME $ ReceiveFrom "socket" in
@@ -13,7 +13,7 @@ Definition echo_server : val :=
         "go" #()) #().
 
 Definition echo_client : val := λ: "c_addr" "s_addr",
-  let: "socket" := NewSocket in
+  let: "socket" := NewSocket #() in
   SocketBind "socket" "c_addr";;
   SendTo "socket" #"Hello" "s_addr";;
   let: "m1" := unSOME (ReceiveFrom "socket") in

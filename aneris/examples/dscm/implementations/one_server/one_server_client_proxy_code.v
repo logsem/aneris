@@ -36,7 +36,7 @@ Definition request val_ser : val :=
 
 Definition install_proxy val_ser : val :=
   λ: "srv" "caddr",
-  let: "sh" := NewSocket in
+  let: "sh" := NewSocket #() in
   let: "reqId" := ref #0 in
   SocketBind "sh" "caddr";;
   SetReceiveTimeout "sh" #3 #0;;

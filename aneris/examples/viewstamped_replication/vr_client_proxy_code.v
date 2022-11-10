@@ -50,7 +50,7 @@ Definition make_request val_ser : val :=
 
 Definition install_proxy val_ser : val :=
   λ: "saddrl" "caddr",
-  let: "sh" := NewSocket in
+  let: "sh" := NewSocket #() in
   let: "lock" := newlock #() in
   let: "prmId" := ref #0 in
   let: "reqId" := ref #0 in

@@ -234,7 +234,7 @@ Lemma tac_wp_socket Δ Δ' E j K ip Φ :
         Δ' = Some Δ'' ∧
       envs_entails
         Δ'' (WP fill K (of_val $ LitV (LitSocket h)) @[ip] E {{ Φ }})) →
-  envs_entails Δ (WP fill K NewSocket @[ip] E {{ Φ }}).
+  envs_entails Δ (WP fill K (NewSocket #()) @[ip] E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ? HΔ. rewrite -aneris_wp_bind.
   iIntros "H". rewrite into_laterN_env_sound /=.
@@ -544,7 +544,7 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
     let process_single _ :=
         first [
             reshape_expr e ltac:(fun K e' => eapply (tac_wp_socket _ _ _ Htmp K ip))
-           |fail 1 "wp_socket: cannot find 'NewSocket' in" e];
+           |fail 1 "wp_socket: cannot find 'NewSocket #()' in" e];
         [iSolveTC
         |finish()]
     in (process_single ())
@@ -670,7 +670,7 @@ Tactic Notation "wp_send_duplicate" :=
 
 Local Lemma tac_socket_test `{anerisG Mdl Σ} ip E :
   {{{ True }}}
-    NewSocket @[ip] E
+    NewSocket #() @[ip] E
   {{{ h, RET (LitV (LitSocket h));
       h ↪[ip] (mkSocket None true) }}}.
 Proof.

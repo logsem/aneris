@@ -69,7 +69,7 @@ Section code.
     let: "rd_fn" := Fst "fns" in
     let: "wr_fn" := Snd "fns" in
     (* Set up and launch request handler *)
-    let: "sh" := NewSocket in
+    let: "sh" := NewSocket #() in
     SocketBind "sh" "req_addr";;
                request_handler "sh" "rd_fn" "wr_fn".
 

@@ -128,7 +128,7 @@ Proof. solve_atomic. Qed.
 Proof. solve_atomic. Qed.
 
 #[global] Instance newsocket_atomic n s :
-  Atomic s (mkExpr n NewSocket).
+  Atomic s (mkExpr n (NewSocket #())).
 Proof. solve_atomic. Qed.
 #[global] Instance socketbind_atomic n v0 v1  s :
   Atomic s (mkExpr n (SocketBind (Val v0) (Val v1))).
@@ -570,7 +570,7 @@ Section primitive_laws.
 
   Lemma wp_new_socket ip s E ζ :
     {{{ ▷ is_node ip }}}
-      (mkExpr ip NewSocket) @ s; ζ; E
+      (mkExpr ip (NewSocket #())) @ s; ζ; E
     {{{ sh, RET (mkVal ip (LitV (LitSocket sh)));
         sh ↪[ip] (mkSocket None true) }}}.
   Proof.

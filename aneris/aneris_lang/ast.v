@@ -79,7 +79,7 @@ Inductive expr :=
 (* Sockets/Network *)
 | MakeAddress (e1 : expr) (e2 : expr)
 | GetAddressInfo (e : expr)
-| NewSocket
+| NewSocket (e : expr)
 | SocketBind (e1 : expr) (e2 : expr)
 | SendTo (e1 : expr) (e2 : expr) (e3 : expr)
 | ReceiveFrom (e1 : expr)

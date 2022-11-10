@@ -279,7 +279,7 @@ Section lifting_network.
 
   Lemma aneris_wp_new_socket ip E :
     {{{ True }}}
-      NewSocket @[ip] E
+      NewSocket #() @[ip] E
     {{{ h, RET (LitV (LitSocket h));
           h ↪[ip] (mkSocket None true) }}}.
   Proof.
