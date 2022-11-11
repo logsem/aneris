@@ -68,13 +68,15 @@ Definition simple_live_roles (s : simple_state) : gset simple_role :=
   match s with
   | Start => {[A;B]}
   | Sent n => {[B;Ndup;Ndrop;Ndeliver]}
+  (* Should Ndeliver etc. be live in Sent 0? *)
   | Delivered n m => {[B;Ndup;Ndrop;Ndeliver]}
   (* Is the network live in the last state? *)
   (* | Received n m => {[Ndup;Ndrop;Ndeliver]} *)
   | Received n m => ∅
   end.
 
-Lemma simple_live_spec_holds s ρ s' : simple_trans s (Some ρ) s' -> ρ ∈ simple_live_roles s.
+Lemma simple_live_spec_holds s ρ s' :
+  simple_trans s (Some ρ) s' -> ρ ∈ simple_live_roles s.
 Proof. destruct s; inversion 1; set_solver. Qed.
 
 Definition simple_fair_model : FairModel.
@@ -108,7 +110,8 @@ Proof.
     all: rewrite /simple_state_order; try lia.
 Qed.
 
-Definition simple_decreasing_role (s : fmstate simple_fair_model) : fmrole simple_fair_model :=
+Definition simple_decreasing_role (s : fmstate simple_fair_model) :
+  fmrole simple_fair_model :=
   match s with
   | Start => A
   | Sent _ => Ndeliver
