@@ -82,7 +82,7 @@ End ToBeMoved.
 Section ToBeMoved'.
 
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt}.
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
 
   Notation StLib_Serializable v := (Serializable StLib_StSerialization v).
   Record StLib_SerializableVal :=
@@ -100,7 +100,7 @@ Section SocketProtolDefinition.
 
   Context {LogOp LogSt : Type}.
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt}.
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
   Context `{!Internal_StLibG LogOp Σ, !StLib_GhostNames}.
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
 
@@ -148,7 +148,7 @@ Section LockInvariant.
 
   Context {LogOp LogSt : Type}.
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt}.
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
   Context `{!Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Definition lock_inv_aux (i : RepId) (st_loc : loc) : iProp Σ :=
@@ -167,4 +167,3 @@ Section LockInvariant.
     is_lock lock_inv_ns (ip_of_address saddr) γ__lock lockv (lock_inv_aux i st_loc).
 
 End LockInvariant.
-

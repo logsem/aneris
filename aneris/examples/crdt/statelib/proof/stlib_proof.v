@@ -71,7 +71,7 @@ Section StateLib_Proof.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -249,13 +249,12 @@ Section StateLib_Proof.
           with (h__local ∪ h__for ∪ {[fev]});
           last set_solver.
         apply st_crdtM_mut_coh with log_st; try done.
-        - by apply Lst_Validity_event_set_valid.
-        - replace (h__local ∪ h__for ∪ ({[fev]}: event_set LogOp))
+        replace (h__local ∪ h__for ∪ ({[fev]}: event_set LogOp))
             with (h__local ∪ {[fev]} ∪ h__for); last set_solver.
-          apply Maximum_correct in fev_max as [??]; first done.
-          replace (h__local ∪ {[fresh_event (h__local ∪ h__for) log_op f]} ∪ h__for)
+        apply Maximum_correct in fev_max as [??]; first done.
+        replace (h__local ∪ {[fresh_event (h__local ∪ h__for) log_op f]} ∪ h__for)
             with (h__local ∪ h__for ∪ {[fresh_event (h__local ∪ h__for) log_op f]}); last set_solver.
-          by destruct Hloc_valid. }
+        by destruct Hloc_valid. }
       iFrame. }
     iIntros (v ->).
     iApply "Hpost".
@@ -583,7 +582,7 @@ Section StateLib_Proof.
     by iApply "Hφ".
 
     Unshelve.
-    all: by apply Lst_Validity_event_set_valid.
+    all: by done. 
   Qed.
 
   Lemma apply_thread_spec

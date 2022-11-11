@@ -10,7 +10,7 @@ Section Params.
   Context `{LogOp: Type, LogSt: Type,
             !anerisG Mdl Σ,
             !EqDecision LogOp, !Countable LogOp, !Lattice LogSt,
-            !CRDT_Params, !EventSetValidity LogOp}.
+            !CRDT_Params }.
 
   (* User-supplied parameters when using the library. *)
   Class StLib_Params := {
@@ -44,6 +44,5 @@ Section Params.
 
 End Params.
 
-Global Arguments StLib_Params (LogOp LogSt) {_ _ _ _ _}.
+Global Arguments StLib_Params (LogOp LogSt) {_ _ _ _}.
 Global Arguments StLib_Res (LogOp) {_ _ _ _ _ _}.
-

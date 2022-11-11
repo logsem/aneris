@@ -28,7 +28,6 @@ Section Specification.
             !Countable LogOp,
             !Lattice LogSt,
             !CRDT_Params,
-            !EventSetValidity LogOp,
             !StLib_Params LogOp LogSt,
             !StLib_SysParams Σ,
             !StLib_Res LogOp}.
@@ -166,12 +165,12 @@ Section StLibSetup.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp,
+            !CRDT_Params, !Lattice LogSt,
             !StLib_Params LogOp LogSt, !StLib_Init_Function}.
 
   Class StLibSetup :=
       StLibSetup_Init E :
-      True ⊢ |={E}=> ∃ (Res : StLib_Res LogOp) (EvSetVal: EventSetValidity LogOp),
+      True ⊢ |={E}=> ∃ (Res : StLib_Res LogOp),
         GlobInv ∗
         GlobState ∅ ∗
         (∃ (S: gset (fin (length CRDT_Addresses))),

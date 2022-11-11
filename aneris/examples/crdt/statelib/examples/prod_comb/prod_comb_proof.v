@@ -19,57 +19,6 @@ From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.examples.prod_comb
      Require Import prod_comb_code.
 
-(* TODO: Move to semi-lattices. *)
-Section prodLattice.
-  Definition prod_lat_le {A B: Type} (latA : Lattice A) (latB : Lattice B)
-    : relation (A * B) :=
-    fun (p1 : A * B) (p2 : A * B) =>
-      latA.(lat_le) p1.1 p2.1 ∧ latB.(lat_le) p1.2 p2.2.
-
-  Global Instance prod_lat_le_po {A B: Type}
-         (latA : Lattice A) (latB : Lattice B)
-    : PartialOrder (prod_lat_le latA latB).
-  Proof.
-    destruct latA as [leA poA lubA specA].
-    destruct latB as [leB poB lubB specB].
-    destruct poA as ((HpoA11 & HpoA12) & HpoA2).
-    destruct poB as ((HpoB11 & HpoB12) & HpoB2).
-    repeat (split; rewrite! /prod_lat_le);
-      repeat (intros (x1,x2) (y1,y2) Hx Hy); try naive_solver.
-    by f_equal; naive_solver.
-  Qed.
-
-  Definition prod_lat_lub {A B: Type} (latA : Lattice A) (latB : Lattice B)
-    : (A * B) → (A * B) → (A * B) :=
-    fun (p1 : A * B) (p2 : A * B) =>
-      ((latA.(lat_lub) p1.1 p2.1), (latB.(lat_lub) p1.2 p2.2)).
-
-  Lemma prod_lat_lub_spec {A B: Type}
-        (latA : Lattice A) (latB : Lattice B) :
-    ∀ e1 e2,
-    (prod_lat_le latA latB)
-      e1 ((prod_lat_lub latA latB) e1 e2)
-      ∧ (prod_lat_le latA latB)
-          e2 ((prod_lat_lub latA latB) e1 e2)
-      ∧ ∀ e, (prod_lat_le latA latB) e1 e →
-              (prod_lat_le latA latB) e2 e →
-              (prod_lat_le latA latB) ((prod_lat_lub latA latB) e1 e2) e.
-  Proof.
-    destruct latA as [leA poA lubA specA].
-    destruct latB as [leB poB lubB specB].
-    repeat (split; rewrite /prod_lat_le); repeat intro; naive_solver.
-  Qed.
-
-
-  (** Instantiation of the Join-Semi-Lattice. *)
-  Global Instance prod_lattice {A B: Type}
-         (latA : Lattice A) (latB : Lattice B): Lattice (A * B) :=
-    { lat_le := prod_lat_le latA latB;
-      lat_po := prod_lat_le_po latA latB;
-      lat_lub := prod_lat_lub latA latB;
-      lat_lub_spec := prod_lat_lub_spec latA latB }.
-
-End prodLattice.
 
 Section prod_crdt_denot.
   Context `{!CRDT_Params} `{!Log_Time}
@@ -101,7 +50,92 @@ Section prod_crdt_denot.
   Global Instance prod_st_le_lat : Lattice prodSt :=
     prod_lattice latStA latStB.
 
- End prod_crdt_denot.
+End prod_crdt_denot.
 
 Global Arguments prodOp _ _ : clear implicits.
 Global Arguments prodSt _ _ : clear implicits.
+
+Section prod_crdt_model.
+  Context `{!CRDT_Params}.
+  Context `{!EqDecision opA} `{!Countable opA}
+          `{!EqDecision opB} `{!Countable opB}.
+
+  Context `{!StateLib_Res (prodOp opA opB)}.
+  Context `{!anerisG M Σ}.
+  Context `{latStA : Lattice stA} `{latStB : Lattice stB}.
+
+  Context `{PA : !StLib_Params opA stA}.
+  Context `{PB : !StLib_Params opB stB}.
+
+  Notation prodOp := (prodOp opA opB).
+  Notation prodSt := (prodSt stA stB).
+
+  Lemma gos_lub_coh
+        (s1 s2 : event_set prodOp) (st1 st2 st3 : prodSt):
+    ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
+    → Lst_Validity s1 → Lst_Validity s2 → Lst_Validity (s1 ∪ s2)
+    → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
+  Proof.
+    intros Hd1 Hd2 Hs1 Hs2 Hsu Hlub.
+    destruct PA as [pa1 pa2 pa3 pa4 pa5 pa6 pa7 pa8].
+    destruct PB as [pb1 pb2 pb3 pb4 pb5 pb6 pb7 pb8].
+    destruct Hd1 as (Hd11 & Hd12).
+    destruct Hd2 as (Hd21 & Hd22).
+    rewrite /=/prod_denot. simplify_eq /=.
+    clear pa1 pa4 pa5 pa6 pa7 pa8.
+    clear pb1 pb4 pb5 pb6 pb7 pb8.
+    destruct st1 as (st11, st12).
+    destruct st2 as (st21, st22).
+    simplify_eq /=.
+    rewrite! gset_map_union.
+    split.
+    - eapply lst_validity_valid_event_map in Hs1, Hs2, Hsu.
+      destruct pa3 as [pam1 pam2 pam3 pam4 pam5 pam6].
+      clear pam2 pam3 pam4 pam5 pam6.
+      apply (pam1
+               (gset_map (event_map fst) s1)
+               (gset_map (event_map fst) s2)
+            st11 st21); [done|done|done|done| |done ].
+      by rewrite -gset_map_union.
+    - eapply lst_validity_valid_event_map in Hs1, Hs2, Hsu.
+      destruct pb3 as [pbm1 pbm2 pbm3 pbm4 pbm5 pbm6].
+      clear pbm2 pbm3 pbm4 pbm5 pbm6.
+      apply (pbm1
+               (gset_map (event_map snd) s1)
+               (gset_map (event_map snd) s2)
+            st12 st22); [done|done|done|done| |done ].
+      by rewrite -gset_map_union.
+  Qed.
+
+End prod_crdt_model.
+
+ (* Global Program Instance prod_crdt_model :  *)
+ (*   (StateCrdtModel (prodOp opA opB) (prodSt stA stB)). := *)
+ (*    { st_crdtM_lub_coh     := gos_lub_coh; *)
+ (*      st_crdtM_mut         := gos_mutator; *)
+ (*      st_crdtM_mut_mon     := gos_mut_mon; *)
+ (*      st_crdtM_mut_coh     := gos_mut_coh; *)
+ (*      st_crdtM_init_st     := gos_st_init; *)
+ (*      st_crdtM_init_st_coh := gos_init_coh; }. *)
+
+ (*  Global Program Instance prod_crdt_params :  *)
+ (*   StLib_Params (prodOp opA opB) (prodSt stA stB) := *)
+ (*    { *)
+ (*      StLib_StSerialization :=  *)
+ (*      prod_serialization  *)
+ (*        PA.(StLib_StSerialization) PB.(StLib_StSerialization); *)
+ (*      StLib_Denot := prod_denot_instance PA.(StLib_Denot) PB.(StLib_Denot); }. *)
+ (*      StLib_Model           := gos_model; *)
+ (*      StLib_Op_Coh          := gos_op_coh; *)
+ (*      StLib_Op_Coh_Inj      := gos_op_coh_inj; *)
+ (*      StLib_St_Coh          := gos_st_coh; *)
+ (*      StLib_St_Coh_Inj      := gos_st_coh_inj; *)
+ (*      StLib_StCoh_Ser       := gos_st_coh_serializable *)
+ (* }. *)
+
+  (* Definition gos_mutator (st: @gos_st gos_op _ _) (ev: Event gos_op) (st': gos_st) : Prop := *)
+  (*   st' = st ∪ {[ev.(EV_Op)]}. *)
+
+  (* Lemma gos_mut_mon (st : gos_st) (e: Event gos_op) (st': gos_st) : *)
+  (*   gos_mutator st e st' → st ≤_l st'. *)
+  (* Proof. set_solver. Qed. *)

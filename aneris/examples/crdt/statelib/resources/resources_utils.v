@@ -35,7 +35,7 @@ Section Resources_utils.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -52,7 +52,7 @@ Section Resources_utils.
     apply (elem_of_union_l x ho hf), Hsubset, elem_of_union in Hx_in
       as [?|Hx_in%Hfor'];
       first assumption.
-    by exfalso. 
+    by exfalso.
   Qed.
 
   Lemma own_foreign_subset_foreign i (ho hf ho' hf': event_set LogOp):
@@ -355,7 +355,7 @@ Section Resources_utils.
     own (γ_loc_for !!! f) (½, to_agree st_h__foreign) -∗
     own (γ_loc_cc' !!! f_sender) (◯ princ_ev (st'_h__local ∪ st'_h__sub))
     ={E}=∗
-    ⌜event_set_valid ((st_h__local ∪ st_h__foreign) ∪ (st'_h__local ∪ st'_h__sub))⌝
+    ⌜Lst_Validity ((st_h__local ∪ st_h__foreign) ∪ (st'_h__local ∪ st'_h__sub))⌝
     ∗ own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local)
     ∗ own (γ_loc_for !!! f) (½, to_agree st_h__foreign).
   Proof.
@@ -411,10 +411,8 @@ Section Resources_utils.
 
     iModIntro. iFrame.
     iPureIntro.
-    rewrite -Hst_proj.
-    by apply Lst_Validity_event_set_valid.
+    by rewrite -Hst_proj.
   Qed.
 
 
 End Resources_utils.
-

@@ -35,7 +35,7 @@ Section SpecsPremiminary.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames,
             st_deser: val, stser: serialization}.
 
@@ -62,7 +62,7 @@ Section StateLib_InternalSpecs.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames,
             st_deser: val, stser: serialization}.
 
@@ -144,4 +144,3 @@ Section StateLib_InternalSpecs.
 
 
 End StateLib_InternalSpecs.
-

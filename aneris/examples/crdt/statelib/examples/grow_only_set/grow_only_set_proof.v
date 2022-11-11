@@ -41,30 +41,11 @@ Section gos_denot.
     { crdt_denot     := gos_denot_prop;
       crdt_denot_fun := gos_denot_fun; }.
 
-  Global Instance gset_subset_po : PartialOrder  (⊆@{gset vl}).
-  Proof. repeat split; repeat intro; multiset_solver. Qed.
-
-  Lemma gset_union_lub_spec :
-    ∀ e1 e2 : gos_st, e1 ⊆ e1 ∪ e2 ∧
-                        e2 ⊆ e1 ∪ e2 ∧
-                        (∀ e : gos_st, e1 ⊆ e → e2 ⊆ e → e1 ∪ e2 ⊆ e).
-  Proof. repeat split; repeat intro; multiset_solver. Qed.
-
-
-  (** Instantiation of the Join-Semi-Lattice. *)
-  Global Instance gos_st_le_lat : Lattice gos_st :=
-    { lat_le := (⊆);
-      lat_po := gset_subset_po;
-      lat_lub := (∪);
-      lat_lub_spec := gset_union_lub_spec }.
-
 End gos_denot.
 
 Section gos_model.
   Context `{!CRDT_Params}.
   Context `{!EqDecision vl, !Countable vl}.
-  Context `{!EventSetValidity vl}.
-
 
   Definition gos_mutator (st: @gos_st gos_op _ _) (ev: Event gos_op) (st': gos_st) : Prop :=
     st' = st ∪ {[ev.(EV_Op)]}.
@@ -75,7 +56,7 @@ Section gos_model.
 
   Lemma gos_mut_coh (s : event_set gos_op) (st st' : gos_st) (ev: Event gos_op) :
     ⟦ s ⟧ ⇝ st ->
-    event_set_valid s ->
+    Lst_Validity s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     gos_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
@@ -87,7 +68,7 @@ Section gos_model.
   Lemma gos_lub_coh
         (s1 s2 : event_set gos_op) (st1 st2 st3 : (@gos_st gos_op _ _)):
     ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
-    → event_set_valid s1 → event_set_valid s2 → event_set_valid (s1 ∪ s2)
+    → Lst_Validity s1 → Lst_Validity s2 → Lst_Validity (s1 ∪ s2)
     → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
   Proof.
     rewrite /=/gos_denot_prop.
@@ -115,7 +96,6 @@ Section gos_proof.
   Context `{!Inject vl val}.
   Context `{!CRDT_Params}.
   Context `{!EqDecision vl, !Countable vl}.
-  Context `{!EventSetValidity vl}.
   Context `{anerisG Mdl Σ}.
 
   Definition gos_op_coh (op: gos_op) (v: val) : Prop := v = $op ∧ s_valid_val E $ v.
@@ -129,7 +109,6 @@ Section gos_proof.
   Qed.
 
   Definition gos_st_coh (st: (@gos_st vl _ _)) (v: val) : Prop :=
-    (* is_set st v ∧ v = inject_list (elements st) ∧ list_valid_val E v. *)
     is_set st v ∧ (∀ elt, elt ∈ st → s_valid_val E $ elt).
 
   Lemma gos_st_coh_inj (st st': gos_st) (v: val) :
@@ -165,7 +144,7 @@ Section gos_proof.
  }.
 
   Lemma gos_init_st_spec :
-    ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ _ gos_params init_st.
+    ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ gos_params init_st.
   Proof.
     iIntros (addr).
     iIntros "!#" (Φ) "_ HΦ".
@@ -187,7 +166,7 @@ Section gos_proof.
   Qed.
 
   Lemma gos_mutator_st_spec :
-    ⊢ @mutator_spec _ _ _ _ _ _ _ _ _ _ gos_params mutator.
+    ⊢ @mutator_spec _ _ _ _ _ _ _ _ _ gos_params mutator.
   Proof.
     iIntros (sa f st_v op_v s ev op_log st_log)
             "!> %φ ((-> & %Hvv) & (%Hst_coh & %Hst_coh') & %Hden &
@@ -202,7 +181,7 @@ Section gos_proof.
     split; set_solver.
   Qed.
 
-  Lemma gos_merge_spec : ⊢ @merge_spec _ _ _ _ _ _ _ _ _ _ gos_params merge.
+  Lemma gos_merge_spec : ⊢ @merge_spec _ _ _ _ _ _ _ _ _ gos_params merge.
   Proof.
     iIntros (sa v v' s s' st st')
             "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' &
@@ -222,7 +201,7 @@ Section gos_proof.
     by set_solver.
     Qed.
 
-  Lemma gos_crdt_fun_spec : ⊢ @crdt_fun_spec _ _ _ _ _ _ _ _ _ _ gos_params gos_crdt.
+  Lemma gos_crdt_fun_spec : ⊢ @crdt_fun_spec _ _ _ _ _ _ _ _ _ gos_params gos_crdt.
   Proof.
     iIntros (sa φ) "!> _ Hφ".
     wp_lam; wp_pures. iApply "Hφ".
@@ -236,10 +215,10 @@ Section gos_proof.
 
   Lemma gos_init_spec `{!StLib_Res (@gos_op vl)}:
     @init_spec
-      _ _ _ _ _ _ _ _ _ _  gos_params _
+      _ _ _ _ _ _ _ _ _  gos_params _
       (statelib_init (list_ser (s_serializer E).(s_ser)) (list_deser (s_serializer E).(s_deser))) -∗
     @init_spec_for_specific_crdt
-      _ _ _ _ _ _ _ _ _ _  gos_params _
+      _ _ _ _ _ _ _ _ _  gos_params _
       (gos_init (s_serializer E).(s_ser) (s_serializer E).(s_deser)).
   Proof.
     iIntros "#Hinit" (repId addr addrs_val).

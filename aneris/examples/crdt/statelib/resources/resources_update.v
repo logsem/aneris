@@ -37,7 +37,7 @@ Section Resources_updates.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -70,7 +70,7 @@ Section Resources_updates.
       as "(Hst_own__sub & Hst_own__sub'' & <-)".
     iDestruct (both_agree_agree with "Hst_own__foreign' Hst_own__for''")
       as "(Hst_own__foreign' & Hst_own__for'' & <-)".
-    
+
     (** Combination of the resources (related to sub) to prepare the updates *)
     iCombine "Hst_own__sub" "Hst_own__sub''" as "Hst_own__sub".
 
@@ -222,7 +222,7 @@ Section Resources_updates.
     pose (mutator_global_valid g op f Hv) as Hv'.
     assert (fresh_event (g.2 !!! f) op f = fev) as Hfev_eq.
     { unfold fev. by rewrite Hst_proj. }
-     
+
     assert (Hloc_isloc: local_events f (st_h__local ∪ {[fev]})).
     { intros x [?%Hlocisloc | ->%elem_of_singleton]%elem_of_union;
       [ assumption | by rewrite/fev fresh_event_orig ]. }
@@ -383,7 +383,7 @@ Section Resources_updates.
 
     (** Unify i, f and f' *)
     assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite Hf. }
-    
+
     (** Unify the names of st'?_h_* *)
     iDestruct (both_agree_agree with "Hst_own__local Hst_own__local'")
       as "(Hst_own__local & Hst_own__local' & ->)".
@@ -503,4 +503,3 @@ Section Resources_updates.
   Qed.
 
 End Resources_updates.
-

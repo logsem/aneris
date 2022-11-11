@@ -111,8 +111,8 @@ Section Utils.
         [ | lia | set_solver].
       rewrite set_fold_singleton.
       pose proof (Nat.le_add_r
-        (set_fold (λ (ev : Event gctr_op) (v : nat), (v + EV_Op ev)%nat) O (s ∪ X))
-        (EV_Op x)).
+                    (set_fold (λ (ev : Event gctr_op) (v : nat), (v + EV_Op ev)%nat) O (s ∪ X))
+                    (EV_Op x)).
       by apply Nat.le_trans
         with
         (set_fold (λ (ev : Event gctr_op) (v : nat), (v + EV_Op ev)%nat) O (s ∪ X)).
@@ -171,7 +171,7 @@ Section Utils.
     apply IHn';
       [ by inversion Hlen | by inversion Hlen' ].
   Qed.
-  
+
   Lemma lmap_lookup (l l': list nat) (n i x y: nat):
     length l = n →
     length l' = n →
@@ -204,95 +204,11 @@ Section Utils.
     by apply IH.
   Qed.
 
-End Utils.
-
-
-
-
-(** Definition of the ordering on the states *)
-Section GCtr_st_le_def.
-
-  Context `{!CRDT_Params}.
-
-  Definition gctr_st_le (st st': gctr_st) : Prop :=
-    Forall2 le st st'.
-
-  Global Instance gctr_st_le_trans : Transitive gctr_st_le.
-  Proof.
-    intros st st' st'' H1 H2.
-    rewrite /gctr_st_le Forall2_vlookup.
-    intros i.
-    rewrite /gctr_st_le Forall2_vlookup in H1. specialize H1 with i.
-    rewrite /gctr_st_le Forall2_vlookup in H2. specialize H2 with i.
-    lia.
-  Qed.
-  Global Instance gctr_st_le_refl : Reflexive gctr_st_le.
-  Proof.
-    intros v.
-    by rewrite /gctr_st_le Forall2_vlookup.
-  Qed.
-  Global Instance gctr_st_le_anti_symm : AntiSymm eq gctr_st_le.
-  Proof.
-    intros st st' H1 H2.
-    apply vec_eq. intros i.
-    rewrite /gctr_st_le Forall2_vlookup in H1. specialize H1 with i.
-    rewrite /gctr_st_le Forall2_vlookup in H2. specialize H2 with i.
-    lia.
-  Qed.
-
-  Global Instance gctr_st_le_PreOrder : PreOrder gctr_st_le :=
-    { PreOrder_Reflexive  := gctr_st_le_refl;
-      PreOrder_Transitive := gctr_st_le_trans; }.
-
-  Global Instance gctr_st_le_po : PartialOrder gctr_st_le :=
-    { partial_order_pre       := gctr_st_le_PreOrder;
-      partial_order_anti_symm := gctr_st_le_anti_symm; }.
-
-End GCtr_st_le_def.
-
-
-
-Section GCtr_st_lub_def.
-
-  Context `{!CRDT_Params}.
-
-  Definition gctr_st_lub : gctr_st -> gctr_st -> gctr_st :=
-    map2 Nat.max.
-
-  Lemma gctr_st_lub_prop (st st' : gctr_st) :
-    gctr_st_le st (gctr_st_lub st st')
-    ∧ gctr_st_le st' (gctr_st_lub st st')
-    ∧ (∀ e : gctr_st,
-      gctr_st_le st e → gctr_st_le st' e → gctr_st_le (gctr_st_lub st st') e).
-  Proof.
-    repeat split.
-    - rewrite/gctr_st_le Forall2_vlookup/gctr_st_lub. intros i.
-      rewrite vlookup_zip_with. lia.
-    - rewrite/gctr_st_le Forall2_vlookup/gctr_st_lub. intros i.
-      rewrite vlookup_zip_with. lia.
-    - intros st'' H1 H2.
-      rewrite/gctr_st_le Forall2_vlookup/gctr_st_lub. intros i.
-      rewrite vlookup_zip_with.
-      rewrite/gctr_st_le Forall2_vlookup/gctr_st_lub in H1.
-        specialize H1 with i.
-      rewrite/gctr_st_le Forall2_vlookup/gctr_st_lub in H2.
-        specialize H2 with i.
-      by apply Nat.max_lub.
-  Qed.
-
-
-  (** Instantiation of the Join-Semi-Lattice *)
-  Global Instance gctr_st_le_lat : Lattice gctr_st:=
-    { lat_le := gctr_st_le;
-      lat_po := gctr_st_le_po;
-      lat_lub := gctr_st_lub;
-      lat_lub_spec := gctr_st_lub_prop; }.
-
   Lemma gctr_st_lub_lmap2 (st st': gctr_st):
-    lmap2 max st st' = gctr_st_lub st st'.
+    lmap2 max st st' = vectn_lub (length CRDT_Addresses) st st'.
   Proof.
     apply list_eq. intros i.
-    rewrite/gctr_st_lub.
+    rewrite/vectn_lub.
     destruct (decide (i < length CRDT_Addresses)).
     - set f := nat_to_fin l.
       pose proof l as l_st; pose proof l as l_st'; pose proof l as l'.
@@ -322,15 +238,13 @@ Section GCtr_st_lub_def.
         | rewrite vec_to_list_length; lia
         | ].
       rewrite (lmap2_length st st' (length CRDT_Addresses));
-        [ 
+        [
         | by rewrite vec_to_list_length
         | by rewrite vec_to_list_length ].
       rewrite vec_to_list_length. lia.
   Qed.
 
-End GCtr_st_lub_def.
-
-
+End Utils.
 
 Section GCtr_Denot.
 
@@ -354,23 +268,21 @@ Section GCtr_Denot.
 
 End GCtr_Denot.
 
-
-
 (** Definition of the mutator *)
 Section GCtr_Model.
 
-  Context `{!CRDT_Params, !EventSetValidity gctr_op}.
+  Context `{!CRDT_Params}.
 
   Lemma gctr_lub_coh
     (s1 s2 : event_set gctr_op) (st1 st2 st3 : gctr_st):
     ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
-    → event_set_valid s1 → event_set_valid s2 → event_set_valid (s1 ∪ s2)
+    → Lst_Validity s1 → Lst_Validity s2 → Lst_Validity (s1 ∪ s2)
     → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
   Proof.
     intros Hden1 Hden2 Hval1 Hval2 Hval <-.
-    rewrite/=/gctr_denot_prop/gctr_st_lub.
+    rewrite/=/gctr_denot_prop/vectn_lub.
     intros i.
-    destruct (event_set_valid_filtered s1 s2 Hval1 Hval2 Hval i) as [Hincl' | Hincl'].
+    destruct (lst_validity_filtered s1 s2 Hval1 Hval2 Hval i) as [Hincl' | Hincl'].
     - assert (Hincl: fil s2 i = fil (s1 ∪ s2) i); first set_solver.
       rewrite -Hincl vlookup_zip_with.
       assert (Hmax: (st1 !!! i `max` st2 !!! i = st2 !!! i)%nat);
@@ -418,7 +330,7 @@ Section GCtr_Model.
   Lemma gctr_mut_coh
     (s : event_set gctr_op) (st st' : gctr_st) (ev: Event gctr_op) :
     ⟦ s ⟧ ⇝ st ->
-    event_set_valid s ->
+    Lst_Validity s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     gctr_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
@@ -470,8 +382,8 @@ End GCtr_Model.
 
 Section GCounter_params.
 
-  Context `{!CRDT_Params, !EventSetValidity gctr_op}.
-  
+  Context `{!CRDT_Params}.
+
   Definition gctr_op_coh (op: gctr_op) (v: val) : Prop := v = #op.
 
   Lemma gctr_op_coh_inj (o o': gctr_op) (v: val) :
@@ -532,8 +444,6 @@ Section GCounter_params.
     exists st. exact (gctr_st_coh_is_vc st).
   Qed.
 
-
-
   Global Instance gctr_params : (StLib_Params gctr_op gctr_st) :=
     {
       StLib_StSerialization := gctr_ser;
@@ -550,7 +460,7 @@ End GCounter_params.
 
 
 Section GCounter_Specs.
-  Context `{!anerisG M Σ, !CRDT_Params, !EventSetValidity gctr_op}.
+  Context `{!anerisG M Σ, !CRDT_Params}.
 
   Lemma init_st_coh:
   StLib_St_Coh st_crdtM_init_st
@@ -638,7 +548,7 @@ Section GCounter_Specs.
       iApply "Hφ". iPureIntro.
       exists (st ⊔_l st'). split; last reflexivity.
       simpl. rewrite/gctr_st_coh/gctr_st_inject.
-      replace (vec_to_list (gctr_st_lub st st'))
+      replace (vec_to_list (vectn_lub (length CRDT_Addresses) st st'))
         with (lmap2 Init.Nat.max st st');
         first by apply is_list_inject in Hrv as ->.
       apply gctr_st_lub_lmap2.
@@ -705,4 +615,3 @@ Section GCounter_Specs.
   Qed.
 
 End GCounter_Specs.
-

@@ -28,7 +28,7 @@ Section StLibSetup.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -110,7 +110,7 @@ Section Instantiation.
 
   Context {LogOp LogSt : Type}.
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !EventSetValidity LogOp, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ}.
 
   Global Instance init_fun_instance : StLib_Init_Function := {
@@ -124,70 +124,15 @@ Section Instantiation.
       StLib_SocketProto := socket_proto;
   }.
 
-  Section EventSetValidity.
-
-    Global Instance event_set_validity : EventSetValidity LogOp.
-    Proof.
-      refine {|
-        event_set_valid := Lst_Validity ; |}.
-      - intros s e e' Hv He_in He'_in Ht_eq.
-        exact (VLst_same_orig_comp _ Hv e e' He_in He'_in Ht_eq).
-      - by intros s [].
-      - intros s e e' Hv He_in He'_in Hevid.
-        exact (VLst_ext_eqid _ Hv e e' He_in He'_in Hevid).
-      - intros s e e' Hv He_in He'_in Ht.
-        exact (VLst_ext_time _ Hv e e' He_in He'_in Ht).
-      - intros s e Hv He_in.
-        exact (VLst_evid_incl_event _ Hv e He_in).
-      - intros s s' Hv Hv' Hv'' i.
-        destruct (decide ( fil ( s ∪ s' ) i = ∅ )) as [ | n ]; first (left; set_solver).
-        epose proof (iffLR (compute_maximum_non_empty (fil (s ∪ s') i) _ _) n)
-          as (m & [[Hm_orig [Hm_in|Hm_in]%elem_of_union]%elem_of_filter Hm_ismax]%compute_maximum_correct); last first.
-        { intros??[_?]%elem_of_filter[_?]%elem_of_filter?.
-          by apply (VLst_ext_time _ Hv''). }
-        1: left. 2: right.
-        all: intros x [Hx_orig Hx_in]%elem_of_filter.
-        all: apply elem_of_filter; split; try assumption.
-        all: destruct (decide (x = m)) as [ -> | ]; first assumption.
-        all: assert (Hx: x ∈ fil (s ∪ s') i); first set_solver.
-        all: pose proof (Hm_ismax x Hx n0).
-        1: pose proof (VLst_evid_incl_event _ Hv x Hx_in).
-        2: pose proof (VLst_evid_incl_event _ Hv' x Hx_in).
-        all: assert (H2: get_evid x ∈ EV_Time m); first set_solver.
-        + destruct (VLst_dep_closed _ Hv' m (get_evid x) Hm_in H2)
-            as (x' & Hx'_in & Hx'_evid).
-          by rewrite <-(VLst_ext_eqid _ Hv''
-            x' x (elem_of_union_r x' s s' Hx'_in) (elem_of_union_l x s s' Hx_in)
-            Hx'_evid).
-        + destruct (VLst_dep_closed _ Hv m (get_evid x) Hm_in H2)
-            as (x' & Hx'_in & Hx'_evid).
-          by rewrite <-(VLst_ext_eqid _ Hv''
-            x' x (elem_of_union_l x' s s' Hx'_in) (elem_of_union_r x s s' Hx_in)
-            Hx'_evid).
-      - trivial.
-      Unshelve.
-      all: intros x y [Hx_orig Hx_in]%elem_of_filter [Hy_orig Hy_in]%elem_of_filter.
-      apply (VLst_same_orig_comp _ Hv'' _ _ Hx_in Hy_in).
-      by rewrite Hx_orig Hy_orig.
-      apply (VLst_ext_time _ Hv'' _ _ Hx_in Hy_in).
-    Defined.
-
-    Lemma Lst_Validity_implies_event_set_valid (s: Lst LogOp):
-      Lst_Validity s → event_set_validity.(event_set_valid) s.
-    Proof. trivial. Qed.
-
-  End EventSetValidity.
-
 
   Global Instance stlib_setup_instance : StLibSetup.
   Proof.
     iIntros (E) "_".
     iMod (stlib_setup with "[//]") as (names) "(#Hinv & Hglob & Htoks & #Hinit)".
     iModIntro.
-    iExists stlib_res_instance, event_set_validity.
+    iExists stlib_res_instance.
     simpl.
     iFrame "Hinv Hglob Htoks Hinit".
   Qed.
 
 End Instantiation.
-
