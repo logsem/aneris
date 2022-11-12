@@ -231,13 +231,16 @@ Proof. intros ??. apply make_decision. Qed.
 
 Local Lemma incl_messages_sent M (c' : cfg _) extr:
   M ∈ messages_sent_from_parties
-    (gset_of_gmultiset (state_ms c'.2 ∖ state_ms (trace_last extr).2)
-                       ∪ (trace_messages_history extr).2) ->
+    (gset_of_gmultiset (state_ms c'.2)
+             ∖ gset_of_gmultiset (state_ms (trace_last extr).2)
+             ∪ (trace_messages_history extr).2) ->
   M ∈ elements (state_ms c'.2) ++ elements (trace_messages_history extr).2.
 Proof.
   rewrite /messages_sent_from_parties /gset_of_gmultiset elem_of_filter.
   intros [_ [Hin|Hin]%elem_of_union]; apply elem_of_app; [left|right; set_solver].
-  apply gmultiset_elem_of_elements. apply gmultiset_elem_of_dom in Hin.
+  apply gmultiset_elem_of_elements.
+  apply gmultiset_elem_of_dom.
+  eapply elem_of_weaken; [apply Hin|].
   multiset_solver.
 Qed.
 

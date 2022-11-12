@@ -276,15 +276,16 @@ Section state_interpretation.
     - by rewrite lookup_insert_ne in HSn1; eauto.
   Qed.
 
+  Lemma message_soup_coh_subseteq M N mhm :
+    (∀ m, m ∈ M → m ∈ N) → message_soup_coh N mhm → message_soup_coh M mhm.
+  Proof. intros Hle Hcoh m Hin. by apply Hcoh, Hle. Qed.
+
   Lemma messages_history_coh_duplicate_message M S mhm m :
     m ∈ M →
-    messages_history_coh M S mhm → messages_history_coh (M ∪ {[+ m +]}) S mhm.
+    messages_history_coh M S mhm → messages_history_coh (M ⊎ {[+ m +]}) S mhm.
   Proof.
     intros Hin (HMcoh&Hrbuf&Hacoh&Hrsfcoh).
-    split; [|done].
-    intros m' [Hin'|Hin']%gmultiset_elem_of_union; [by eauto|].
-    apply gmultiset_elem_of_singleton in Hin' as ->.
-    by eauto.
+    split; [|done]. eapply message_soup_coh_subseteq; [|done]. set_solver.
   Qed.
 
   Lemma messages_history_coh_drop_message σ S mhγ m :

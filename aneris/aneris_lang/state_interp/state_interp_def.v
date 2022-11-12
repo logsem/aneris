@@ -226,7 +226,7 @@ Section definitions.
              (M1 M2 : message_multi_soup)
              (S1 S2 : gmap ip_address sockets)
              (mhm : messages_history) : messages_history :=
-    (dom (buffers S1 ∖ buffers S2) ∪ mhm.1, gset_of_gmultiset (M2 ∖ M1) ∪ mhm.2).
+    (dom (buffers S1 ∖ buffers S2) ∪ mhm.1, (gset_of_gmultiset M2 ∖ gset_of_gmultiset M1) ∪ mhm.2).
 
   Fixpoint trace_messages_history (ex : execution_trace aneris_lang) : messages_history :=
     match ex with

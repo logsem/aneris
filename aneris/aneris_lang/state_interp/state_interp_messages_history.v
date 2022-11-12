@@ -1,18 +1,18 @@
+From RecordUpdate Require Import RecordSet.
 From stdpp Require Import fin_maps gmap option gmultiset.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
+From trillium.program_logic Require Export traces.
 From aneris.prelude Require Import collect gmultiset.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Export aneris_lang network resources.
-From trillium.program_logic Require Export traces.
 From aneris.aneris_lang.state_interp Require Import
      state_interp_def
      state_interp_network_sockets_coh
      state_interp_socket_interp_coh
      state_interp_messages_history_coh.
 
-From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
 Import uPred.
@@ -147,7 +147,7 @@ Lemma message_history_evolution_update_sblock S Sn ip M mh sh skt r  b:
 Proof.
   intros ??. rewrite /message_history_evolution.
   destruct mh as (R,T).
-  rewrite !gmultiset_difference_diag gset_of_gmultiset_empty !left_id_L. f_equal.
+  rewrite difference_diag_L !left_id_L. f_equal.
   rewrite gmultiset_empty_difference; first set_solver.
   rewrite /buffers. simplify_eq /=.
   by eapply buffers_subseteq_update_socket_sblock.
@@ -161,7 +161,7 @@ Lemma message_history_evolution_new_socket S Sn ip M mh sh f t p:
 Proof.
   intros ??. rewrite /message_history_evolution.
   destruct mh as (R,T).
-  rewrite !gmultiset_difference_diag gset_of_gmultiset_empty !left_id_L. f_equal.
+  rewrite !difference_diag_L !left_id_L. f_equal.
   rewrite gmultiset_empty_difference; first set_solver.
   rewrite /buffers. simplify_eq /=.
   by eapply buffers_subseteq_new_socket.
@@ -175,7 +175,7 @@ Lemma message_history_evolution_socketbind S Sn ip M mh sh skt r sa:
 Proof.
   intros ??. rewrite /message_history_evolution.
   destruct mh as (R,T).
-  rewrite !gmultiset_difference_diag gset_of_gmultiset_empty !left_id_L. f_equal.
+  rewrite !difference_diag_L !left_id_L. f_equal.
   rewrite gmultiset_empty_difference; first set_solver.
   rewrite /buffers. simplify_eq /=.
   by eapply buffers_subseteq_update_socket.
@@ -190,20 +190,21 @@ Proof.
   intros ??.
   rewrite /message_history_evolution.
   destruct rt as (R, T).
-  assert (M ∖ {[+ m +]} ∖ M = ∅) as -> by multiset_solver.
+  assert (gset_of_gmultiset (M ∖ {[+ m +]}) ∖ gset_of_gmultiset M = ∅) as ->.
+  { rewrite subseteq_empty_difference_L; [done|].
+    intros x Hin%elem_of_gset_of_gmultiset.
+    apply elem_of_gset_of_gmultiset.
+    destruct (decide (x = m)) as [->|Hneq].
+    - rewrite multiplicity_difference multiplicity_singleton in Hin. lia.
+    - rewrite multiplicity_difference multiplicity_singleton_ne in Hin; [|done].
+      lia. }
   f_equal; [|by set_solver].
   rewrite gmultiset_empty_difference; first set_solver.
   by eapply buffers_subseteq.
 Qed.
 
-(* TODO: Figure out why difference_union_dist_l_L is not sufficient. *)
-Lemma gmultiset_difference_union_distr_l_L `{Countable A}
-      (X Y Z : gmultiset A) :
-  (X ∪ Y) ∖ Z = X ∖ Z ∪ Y ∖ Z.
-Proof. multiset_solver. Qed.
-
 Lemma message_history_evolution_duplicate_message S M M' rt :
-  M' ⊆ M → rt = message_history_evolution M (M ∪ M') S S rt.
+  M' ⊆ M → rt = message_history_evolution M (M ⊎ M') S S rt.
 Proof.
   intros ?.
   rewrite /message_history_evolution.
@@ -211,9 +212,8 @@ Proof.
   rewrite !gmultiset_difference_diag.
   assert (dom (D := message_soup) (∅ : gmultiset _) = ∅) as Hempty by multiset_solver.
   rewrite Hempty. f_equal; [multiset_solver|].
-  rewrite gmultiset_difference_union_distr_l_L gmultiset_difference_diag
-          gmultiset_empty_difference; [|multiset_solver].
-  rewrite left_id. set_solver.
+  rewrite gset_of_gmultiset_disj_union_subseteq; [|done].
+  rewrite difference_diag_L. set_solver.
 Qed.
 
 Lemma message_history_evolution_drop_message S M M' rt :
@@ -226,7 +226,7 @@ Proof.
   rewrite !gmultiset_difference_diag.
   assert (dom (D := message_soup) (∅ : gmultiset _) = ∅) as Hempty by multiset_solver.
   rewrite Hempty. f_equal; first multiset_solver.
-  rewrite gmultiset_empty_difference; last done.
+  rewrite subseteq_empty_difference_L; [|by apply gset_of_gmultiset_subseteq_mono].
   set_solver.
 Qed.
 
@@ -259,10 +259,9 @@ Lemma message_history_evolution_receive ip S Sn M sh skt r R mh m:
 Proof.
   intros Hcoh HR HS HSn.
   rewrite /message_history_evolution.
-  rewrite !gmultiset_difference_diag gset_of_gmultiset_empty !left_id_L. f_equal.
+  rewrite !difference_diag_L !left_id_L. f_equal.
   assert ({[m]} ∪ mh.1 =  {[m]} ∪ R ∪ mh.1) as Heq by set_solver.
   rewrite -Heq. f_equal.
-
   rewrite /buffers /multi_collect.
   rewrite -insert_delete_insert.
   rewrite map_fold_insert; last first.
@@ -273,11 +272,6 @@ Proof.
   { apply lookup_delete. }
   { intros. multiset_solver. }
   rewrite delete_insert; last apply lookup_delete.
-
-  (* match goal with *)
-  (*   [|- _ = dom _ ?x ] => assert (x = {[+ m +]}) as H; last by rewrite H; multiset_solver *)
-  (* end. *)
-
   rewrite -gmultiset_difference_disj_union.
   rewrite -insert_delete_insert.
   rewrite map_fold_insert; last first.
@@ -306,8 +300,15 @@ Proof.
   rewrite !gmultiset_difference_diag.
   assert (dom (D := message_soup) (∅ : gmultiset _) = ∅) as Hempty by multiset_solver.
   rewrite Hempty. f_equal; first multiset_solver.
-  f_equal. simpl.
-  rewrite gmultiset_difference_after_disj_union gset_of_gmultiset_singleotn //.
+  destruct (decide (msg ∈ T)) as [Hin|Hnin]=> /=.
+  - assert ({[msg]} ∪ T = T) as -> by set_solver.
+    rewrite gset_of_gmultiset_disj_union
+            difference_union_distr_l_L
+            difference_diag_L.
+    set_solver.
+  - rewrite gset_of_gmultiset_disj_union
+            difference_union_distr_l_L.
+    set_solver.
 Qed.
 
 Lemma message_history_evolution_send_duplicate_message S M msg mh :
@@ -319,8 +320,10 @@ Proof.
   rewrite !gmultiset_difference_diag.
   assert (dom (D := message_soup) (∅ : gmultiset _) = ∅) as Hempty by multiset_solver.
   rewrite Hempty. f_equal; first multiset_solver.
-  f_equal. simpl in *.
-  rewrite gmultiset_difference_after_disj_union gset_of_gmultiset_singleotn.
+  f_equal.
+  rewrite gset_of_gmultiset_disj_union
+          difference_union_distr_l_L
+          difference_diag_L.
   set_solver.
 Qed.
 
@@ -330,7 +333,7 @@ Lemma message_history_evolution_new_ip S ip M mh :
 Proof.
   intros ?. rewrite /message_history_evolution.
   destruct mh as (r,t).
-  rewrite gmultiset_difference_diag gset_of_gmultiset_empty !left_id_L. f_equal.
+  rewrite difference_diag_L !left_id_L. f_equal.
   rewrite gmultiset_empty_difference; first set_solver.
   rewrite /buffers. simplify_eq /=. by eapply buffers_subseteq_new_ip.
 Qed.
@@ -340,11 +343,8 @@ Lemma message_history_evolution_id σ mh :
          (state_ms σ) (state_ms σ) (state_sockets σ)
          (state_sockets σ) mh.
 Proof.
-  rewrite /message_history_evolution.
-  rewrite !gmultiset_difference_diag.
-  assert (dom (D := message_soup) (∅ : gmultiset _) = ∅) as Hempty by multiset_solver.
-  rewrite Hempty gset_of_gmultiset_empty. destruct mh. simpl.
-  f_equal; set_solver.
+  rewrite /message_history_evolution !gmultiset_difference_diag.
+  destruct mh. f_equal; set_solver.
 Qed.
 
 Lemma trace_messages_history_includes_last ex msg :
@@ -356,8 +356,5 @@ Proof.
   destruct (decide (msg ∈ state_ms (trace_last ex).2)) as [Hin|Hnin].
   - apply elem_of_union; right; auto.
   - apply elem_of_union; left.
-    rewrite elem_of_gset_of_gmultiset multiplicity_difference.
-    revert Hmsg Hnin; rewrite !elem_of_multiplicity; intros Hmsg Hnin.
-    assert (multiplicity msg (state_ms (trace_last ex).2) = O) as Heq0 by lia.
-    rewrite Heq0; lia.
+    apply elem_of_difference. rewrite !elem_of_gset_of_gmultiset. set_solver.
 Qed.

@@ -998,7 +998,7 @@ Inductive config_step :
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ports_in_use := state_ports_in_use σ;
-                   state_ms := state_ms σ ∪ {[+ m +]}; |}
+                   state_ms := state_ms σ ⊎ {[+ m +]}; |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
     config_step σ
