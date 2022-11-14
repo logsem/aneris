@@ -1,6 +1,6 @@
-From trillium.fairness Require Import fairness.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
+From trillium.fairness Require Import fairness fuel.
 
 Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
