@@ -1,0 +1,48 @@
+
+Questions:
+
+How are config steps reflected in the final trace?
+How to consider fairness for the "config actor"?
+- Can possible track `None` label.
+- But what about fuel?
+- Might work if every config action is "productive" in the model
+
+
+
+Takeaways:
+- Maybe add [valid_state_evolution] to generalised weakest precondition of Trillium
+- [config_wp] may solve how to incorporate config transitions in the trace
+  + Prove once and for all that the (user-selected) model guarantees `config_wp`.
+    * Initially, this will not work for any but the singular example
+- Consider labels for duplication/dropping/delivery, to allow describing such
+  transitions in the fairness definition
+- Deliver buffers might be handled internally in a custom lifting lemma for recv
+
+
+Full-blown concrete approach:
+- Approach
+  + Copy Aneris in its entirety
+  + Remove current Trillium model instantiation
+  + Remove all examples
+  + Instantiate Aneris with specific Trillium model for the one-shot example
+  + Remove lifting lemmas, and prove ad hoc lifting lemmas for the specific
+    example
+- Pros
+  + Can disregard a lot of factors
+- Cons
+  + Integration with Aneris proper later can be very problematic
+
+Intermediate approach:
+- Approach
+  + Copy Aneris in its entirety
+  + Remove current Trillium model instantiation
+
+Full-blown general approach:
+- Approach
+  + Lift current Trillium instantiation to support fairness
+    * Figure out how to do this generally for any kind of communication
+  + Proof fairness relevant lifting lemmas
+- Pros
+  + Preserves and reuses a lot of existing material
+- Cons
+  + Need to figure out a lot upfront (e.g. fuel for liveness etc)

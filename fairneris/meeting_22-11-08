@@ -1,0 +1,37 @@
+
+What kind of property is exactly extracted from the gcounter example?
+- What role does Trillium play here?
+- What is the model of Trillium, and how is this reflected in the proof of WP?
+- How is the steps taken by the network reflected in the model?
+
+Is the model ever updated in the gcounter example?
+- `frag_st` is kept in the invariant, but I dont see it changed
+  + This would required unfolding the state interpretation manually,
+    or custom lifting lemmas
+
+
+
+
+Takeaway:
+- Current Aneris instantiation throws away Trillium labels
+- It exposes the aux state (trace_last atr) through ghost state, tied in the
+  state interpretation
+- The ghost state is updated using custom (generic) WP lemmas
+  + [aneris_wp_atomic_take_step_model]
+- Current Aneris instantiation has built-in stuttering
+  + OBS: Not compatible with fairness, as we would need fuel to mimick the same
+  + TODO: Investigate how this works formally
+    * Seems like stuttering is built-in in Trillium
+    * OBS: Stuttering is like an opt-in - Still reflected in the final model
+- Aneris orthogonally employs labels to make tying allocated references to the
+  model easier.
+  + TODO: Is this really needed?
+  + OBS: It is needed, whenever we want to extract properties about it
+
+
+Trillium "config steps" (i.e. network steps) are currently labelled with "None".
+This can (likely) be used to capture the fair scheduling of the network.
+
+Still need to figure out how to connect the execution trace
+(including the network), with the program trace.
+
