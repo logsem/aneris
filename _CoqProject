@@ -1,6 +1,7 @@
 -Q trillium trillium
 -Q aneris aneris
 -Q fairness trillium.fairness
+-Q fairneris fairneris
 
 -Q external/stdpp/stdpp stdpp
 -Q external/stdpp/stdpp_unstable stdpp.unstable

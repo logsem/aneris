@@ -1,0 +1,123 @@
+  Lemma set_lemma1 `{Countable A} (X Y Z : gset A) :
+    Y ⊆ Z → X ∖ Y ∪ Z = X ∪ Z.
+  Proof. Admitted.
+
+  Lemma set_lemma `{Countable A} (X Y Z : gset A) :
+    Z ⊆ Y → Y ⊆ X → X ∖ Y ∪ Z = X ∖ (Y ∖ Z).
+  Proof.
+    revert X Z.
+    induction Y as [|y Y Hnin IHY] using set_ind_L; intros X Z Hle1 Hle2.
+    - set_solver.
+    - assert (Y ⊆ X) as Hle' by set_solver.
+      rewrite -difference_difference_L.
+      rewrite difference_union_distr_l_L.
+      rewrite -difference_difference_L.
+      replace (X ∖ ({[y]} ∖ Z) ∖ (Y ∖ Z)) with (X ∖ (Y ∖ Z) ∖ ({[y]} ∖ Z)) by set_solver.
+      destruct (decide (y ∈ Z)) as [Hin|Hnin']; last first.
+      { 
+        rewrite -IHY; [|set_solver|done].
+        replace ({[y]} ∖ Z) with ({[y]}:gset A) by set_solver.
+        set_solver. }
+      replace ({[y]} ∖ Z) with (∅:gset A) by set_solver.
+      rewrite difference_empty_L.
+      replace (X ∖ {[y]} ∖ Y) with (X ∖ Y ∖ {[y]}) by set_solver.
+      rewrite difference_difference_L.
+      Search difference union.
+      rewrite difference_union_distr_r_L.
+      rewrite set_lemma1.
+      apply IHY.
+      replace (Z) with (Z ∪ {[y]}) by set_solver.
+      set_solver.
+      set_solver.
+
+
+
+
+      assert (Y ⊆ X) as Hle' by set_solver.
+      rewrite -difference_difference_L.
+      rewrite difference_union_distr_l_L.
+      rewrite -difference_difference_L.
+      replace (X ∖ ({[y]} ∖ Z) ∖ (Y ∖ Z)) with (X ∖ (Y ∖ Z) ∖ ({[y]} ∖ Z)) by set_solver.
+      destruct (decide (y ∈ Z)) as [Hin|Hnin']; last first.
+      { 
+        rewrite -IHY; [|set_solver|done].
+        replace ({[y]} ∖ Z) with ({[y]}:gset A) by set_solver.
+        set_solver. }
+      replace ({[y]} ∖ Z) with (∅:gset A) by set_solver.
+      rewrite difference_empty_L.
+      replace (X ∖ {[y]} ∖ Y) with (X ∖ Y ∖ {[y]}) by set_solver.
+      rewrite set_lemma1. set_solver.
+      replace (X ∖ Y ∖ {[y]} ∪ Z) with (X ∖ Y ∪ Z) by set_solver.
+      Search difference union.
+
+
+  Lemma set_lemma1 `{Countable A} (X Y Z : gset A) :
+    Y ⊆ Z → X ∖ Y ∪ Z = X ∪ Z.
+  Proof. Admitted.
+
+  Lemma set_lemma `{Countable A} (X Y Z : gset A) :
+    Z ⊆ Y → Y ⊆ X → X ∖ Y ∪ Z = X ∖ (Y ∖ Z).
+  Proof.
+    intros Hle1 Hle2.
+    induction Y as [|y Y Hnin IHY] using set_ind_L.
+    - set_solver.
+    - assert (Y ⊆ X) as Hle' by set_solver.
+      rewrite -difference_difference_L.
+      rewrite difference_union_distr_l_L.
+      rewrite -difference_difference_L.
+      replace (X ∖ ({[y]} ∖ Z) ∖ (Y ∖ Z)) with (X ∖ (Y ∖ Z) ∖ ({[y]} ∖ Z)) by set_solver.
+      destruct (decide (y ∈ Z)) as [Hin|Hnin']; last first.
+      { 
+        rewrite -IHY; [|set_solver|done].
+        replace ({[y]} ∖ Z) with ({[y]}:gset A) by set_solver.
+        set_solver. }
+      replace ({[y]} ∖ Z) with (∅:gset A) by set_solver.
+      rewrite difference_empty_L.
+      replace (X ∖ {[y]} ∖ Y) with (X ∖ Y ∖ {[y]}) by set_solver.
+      rewrite set_lemma1. set_solver.
+      replace (X ∖ Y ∖ {[y]} ∪ Z) with (X ∖ Y ∪ Z) by set_solver.
+      Search difference union.
+      
+      rewrite difference_difference_L.
+      
+      rewrite difference_union_distr_r_L.
+      
+      set_solver.
+      assert (Z = Z ∖ {[y]}) by set_solver.
+      replace (Z with 
+      
+      set_solver.
+      specialize (IHZ Hle').
+      replace (X ∖ Y ∪ ({[z]} ∪ Z)) with (X ∖ Y ∪ Z ∪ {[z]}) by set_solver.
+      replace ({[z]} ∪ Z) with (Z ∪ {[z]}) by set_solver.
+      rewrite -difference_difference_L.
+
+
+  Lemma set_lemma `{Countable A} (X Y Z : gset A) :
+    Z ⊆ Y → Y ⊆ X → X ∖ Y ∪ Z = X ∖ (Y ∖ Z).
+  Proof.
+    intros Hle1 Hle2.
+    induction Z as [|z Z Hnin] using set_ind_L.
+    - set_solver.
+    - assert (Z ⊆ Y) as Hle' by set_solver.
+      specialize (IHZ Hle').
+      replace (X ∖ Y ∪ ({[z]} ∪ Z)) with (X ∖ Y ∪ Z ∪ {[z]}) by set_solver.
+      replace ({[z]} ∪ Z) with (Z ∪ {[z]}) by set_solver.
+      rewrite -difference_difference_L.
+      
+      rewrite IHZ.
+      set_solver.
+      Search difference union.
+      
+      set_solver.
+
+    intros Hle.
+    induction Y as [|y Y Hnin] using set_ind_L.
+    - set_solver.
+    -
+      rewrite subseteq_union_L in Hle.
+      destruct Hle as [Hle1 Hle2].
+
+      Search "∖" "∪".
+      (* rewrite difference_union_distr_l_L. *)
+      set_solver.
