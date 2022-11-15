@@ -103,15 +103,14 @@ Section exec_trace.
 
 End exec_trace.
 
+Definition mtrace (M:FairModel) := trace M (option M.(fmrole)).
+
 Section model_traces.
   Context `{M: FairModel}.
-  Context `{Countable (locale Λ)}.
-
-  Definition mtrace := trace M (option M.(fmrole)).
 
   Definition role_enabled_model ρ (s: M) := ρ ∈ M.(live_roles) s.
 
-  Definition fair_model_trace ρ (mtr: mtrace): Prop  :=
+  Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
     forall n, pred_at mtr n (λ δ _, role_enabled_model ρ δ) ->
          ∃ m, pred_at mtr (n+m) (λ δ _, ¬role_enabled_model ρ δ)
               ∨ pred_at mtr (n+m) (λ _ ℓ, ℓ = Some (Some ρ)).
@@ -136,7 +135,8 @@ Section model_traces.
     (∀ ℓ, fair_model_trace ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_model_trace ℓ r).
   Proof. eauto using fair_model_trace_cons. Qed.
 
-  Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace -> Prop): mtrace -> Prop :=
+  Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace M -> Prop) :
+    mtrace M -> Prop :=
   | mtrace_valid_singleton δ: mtrace_valid_ind _ ⟨δ⟩
   | mtrace_valid_cons δ ℓ tr:
       fmtrans _ δ ℓ (trfirst tr) ->
@@ -155,8 +155,4 @@ Section model_traces.
 End model_traces.
 
 Global Hint Resolve fair_model_trace_cons: core.
-
-Arguments mtrace : clear implicits.
-
-
 Global Hint Resolve mtrace_valid_mono : paco.
