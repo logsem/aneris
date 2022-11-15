@@ -26,7 +26,7 @@ Lemma wp_lift_step_fupdN s E Φ e1 ζ:
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
      ∃ δ2 ℓ,
        state_interp
-         (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+         (trace_extend extr (inl ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
          (trace_extend atr ℓ δ2) ∗
         WP e2 @ s; ζ; E {{ Φ }} ∗
         [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -53,7 +53,7 @@ Lemma wp_lift_step_fupd s E Φ e1 ζ:
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
      ∃ δ2 ℓ,
        state_interp
-         (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+         (trace_extend extr (inl ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
          (trace_extend atr ℓ δ2) ∗
         WP e2 @ s; ζ; E {{ Φ }} ∗
         [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -91,7 +91,7 @@ Lemma wp_lift_step s E Φ e1 ζ:
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅,E}=∗
       ∃ δ2 ℓ, 
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       WP e2 @ s; ζ; E {{ Φ }} ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -152,7 +152,7 @@ Lemma wp_lift_atomic_step_fupd {s E1 E2 Φ} e1 ζ:
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={E1}[E2]▷=∗
       ∃ δ2 ℓ, 
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2) ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -186,7 +186,7 @@ Lemma wp_lift_atomic_step {s E Φ} e1 ζ:
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={E}=∗
       ∃ δ2 ℓ, 
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2) ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤

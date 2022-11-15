@@ -32,7 +32,7 @@ Record FairModel : Type := {
 
 (* Definition of fairness for both kinds of traces *)
 
-Definition extrace Λ := trace (cfg Λ) (olocale Λ).
+Definition extrace Λ := trace (cfg Λ) (ex_label Λ).
 
 Section exec_trace.
   Context {Λ : language}.
@@ -44,7 +44,7 @@ Section exec_trace.
   Definition fair_ex ζ (extr: extrace Λ): Prop :=
     forall n, pred_at extr n (λ c _, locale_enabled ζ c) ->
          ∃ m, pred_at extr (n+m) (λ c _, ¬locale_enabled ζ c)
-              ∨ pred_at extr (n+m) (λ _ otid, otid = Some (Some ζ)).
+              ∨ pred_at extr (n+m) (λ _ otid, otid = Some (inl ζ)).
 
   Lemma fair_ex_after ζ tr tr' k:
     after k tr = Some tr' ->
@@ -52,7 +52,7 @@ Section exec_trace.
   Proof.
     intros Haf Hf n Hp.
     have Hh:= Hf (k+n).
-    have Hp': pred_at tr (k + n) (λ (c : cfg Λ) (_ : option (olocale Λ)), locale_enabled ζ c).
+    have Hp': pred_at tr (k + n) (λ (c : cfg Λ) (_ : option (ex_label Λ)), locale_enabled ζ c).
     { rewrite (pred_at_sum _ k) Haf /= //. }
     have [m Hm] := Hh Hp'. exists m.
     by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
@@ -156,3 +156,4 @@ End model_traces.
 
 Global Hint Resolve fair_model_trace_cons: core.
 Global Hint Resolve mtrace_valid_mono : paco.
+

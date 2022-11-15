@@ -74,12 +74,13 @@ Structure ectxiLanguage := EctxiLanguage {
   ectx_item : Type;
   state : Type;
   locale : Type;
+  config_label : Type;
 
   of_val : val → expr;
   to_val : expr → option val;
   fill_item : ectx_item → expr → expr;
   head_step : expr → state → expr → state → list expr → Prop;
-  config_step : state → state → Prop;
+  config_step : state → config_label → state → Prop;
   locale_of : list expr -> expr -> locale;
 
   ectxi_language_mixin :
@@ -89,12 +90,12 @@ Structure ectxiLanguage := EctxiLanguage {
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Arguments EctxiLanguage {_ _ _ _ _ _ _ _} _ _.
+Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _} _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments fill_item {_} _ _.
 Arguments head_step {_} _ _ _ _ _.
-Arguments config_step {_} _ _.
+Arguments config_step {_} _ _ _.
 Arguments locale_of {_} _ _.
 
 Section ectxi_language.
@@ -192,7 +193,7 @@ Coercion ectxi_lang_ectx : ectxiLanguage >-> ectxLanguage.
 Coercion ectxi_lang : ectxiLanguage >-> language.
 
 Definition EctxLanguageOfEctxi (Λ : ectxiLanguage) : ectxLanguage :=
-  let '@EctxiLanguage E V C St L of_val to_val fill head config locale_of mix := Λ in
-  @EctxLanguage E V (list C) St L of_val to_val _ _ _ _ config locale_of
+  let '@EctxiLanguage E V C St L _ of_val to_val fill head config locale_of mix := Λ in
+  @EctxLanguage E V (list C) St L _ of_val to_val _ _ _ _ config locale_of
     (@ectxi_lang_ectx_mixin
-       (@EctxiLanguage E V C St L of_val to_val fill head config locale_of mix)).
+       (@EctxiLanguage E V C St L _ of_val to_val fill head config locale_of mix)).

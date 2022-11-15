@@ -3,7 +3,9 @@ From trillium.program_logic Require Import language.
 
 Import InfListNotations.
 
-Definition execution_trace Λ := finite_trace (cfg Λ) (option (locale Λ)).
+Definition ex_label Λ : Type := (locale Λ + config_label Λ).
+
+Definition execution_trace Λ := finite_trace (cfg Λ) (ex_label Λ).
 
 Record Model : Type := MkModel {
   mstate:> Type;
@@ -13,7 +15,7 @@ Record Model : Type := MkModel {
 
 Arguments mtrans {_} _ _ _.
 
-Notation olocale Λ := (option (locale Λ)).
+(* Notation olocale Λ := (option (locale Λ)). *)
 
 Notation auxiliary_trace m := (finite_trace m.(mstate) m.(mlabel)).
 
@@ -22,7 +24,8 @@ Section execution_trace.
 
   Implicit Types c : cfg Λ.
 
-  Definition valid_exec (ex : execution_trace Λ) : Prop := trace_steps locale_step ex.
+  Definition valid_exec (ex : execution_trace Λ) : Prop :=
+    trace_steps locale_step ex.
 
   Lemma valid_singleton_exec c : valid_exec (trace_singleton c).
   Proof. constructor. Qed.
@@ -47,7 +50,7 @@ Section system_trace.
 
   Implicit Types ex : execution_trace Λ.
   Implicit Types atr : auxiliary_trace M.
-  Implicit Types ζ : olocale Λ.
+  Implicit Types ζ : ex_label Λ.
   Implicit Types ℓ : mlabel M.
 
   Inductive valid_system_trace : execution_trace Λ → auxiliary_trace M → Prop :=
@@ -111,7 +114,7 @@ End system_trace.
 
 Section simulation.
   Context {Λ : language} {M : Model}.
-  Variable (labels_match : olocale Λ → mlabel M → Prop).
+  Variable (labels_match : ex_label Λ → mlabel M → Prop).
 
   Implicit Types ex : execution_trace Λ.
   Implicit Types atr : auxiliary_trace M.
@@ -218,7 +221,7 @@ Section simulation.
 
 End simulation.
 
-Definition inf_execution_trace Λ := inflist (olocale Λ * cfg Λ).
+Definition inf_execution_trace Λ := inflist (ex_label Λ * cfg Λ).
 
 Section inf_execution_trace.
   Context {Λ : language}.
@@ -274,7 +277,7 @@ Section simulation.
   Implicit Types ex : execution_trace Λ.
   Implicit Types iex : inf_execution_trace Λ.
   Implicit Types atr : auxiliary_trace M.
-  Implicit Types ζ : olocale Λ.
+  Implicit Types ζ : ex_label Λ.
   Implicit Types ℓ : mlabel M.
 
   Lemma valid_system_trace_start_or_contract ex atr :
@@ -295,7 +298,7 @@ Section simulation.
         (ex : execution_trace Λ) (atr : auxiliary_trace M)
         (Hcsm : continued_simulation φ ex atr)
         (c : cfg Λ)
-        (ζ: olocale Λ)
+        (ζ: ex_label Λ)
         (iex : inf_execution_trace Λ)
         (Hvex : valid_inf_exec ex (inf_exec_prepend ζ c iex)) :
     ∃ δℓ, continued_simulation φ (trace_extend ex ζ c) (trace_extend atr δℓ.2 δℓ.1).
@@ -308,7 +311,7 @@ Section simulation.
              (ex : execution_trace Λ) (atr : auxiliary_trace M)
              (Hcsm : continued_simulation φ ex atr)
              (c : cfg Λ)
-             (ζ: olocale Λ)
+             (ζ: ex_label Λ)
              (iex : inf_execution_trace Λ)
              (Hvex : valid_inf_exec ex (inf_exec_prepend ζ c iex))
     : (M * mlabel M)%type :=
@@ -321,7 +324,7 @@ Section simulation.
         (ex : execution_trace Λ) (atr : auxiliary_trace M)
         (Hcsm : continued_simulation φ ex atr)
         (c : cfg Λ)
-        (ζ: olocale Λ)
+        (ζ: ex_label Λ)
         (iex : inf_execution_trace Λ)
         (Hvex : valid_inf_exec ex (inf_exec_prepend ζ c iex)) :
     continued_simulation

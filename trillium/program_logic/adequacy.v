@@ -41,12 +41,12 @@ Notation posts_of t Φs :=
           (zip_with (λ x y, (x, y)) t Φs)), vΦ.2 vΦ.1)%I.
 
 Definition config_wp `{!irisG Λ M Σ} : iProp Σ :=
-  □ ∀ ex atr c1 σ2 ,
+  □ ∀ ex atr c1 lbl σ2 ,
       ⌜valid_exec ex⌝ →
       ⌜trace_ends_in ex c1⌝ →
-      ⌜config_step c1.2 σ2⌝ →
+      ⌜config_step c1.2 lbl σ2⌝ →
       state_interp ex atr ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex) |={∅,⊤}=>
-         ∃ δ2 ℓ, state_interp (trace_extend ex None (c1.1, σ2))
+         ∃ δ2 ℓ, state_interp (trace_extend ex (inr lbl) (c1.1, σ2))
                               (trace_extend atr ℓ δ2).
 
 #[global] Instance config_wp_persistent `{!irisG Λ M Σ} : Persistent config_wp.
@@ -429,7 +429,7 @@ Section adequacy_helper_lemmas.
     WP e1 @ s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
                                              |={∅,⊤}=>
     ∃ δ' ℓ,
-      state_interp (trace_extend ex (Some ζ) (tp1 ++ e2 :: tp2 ++ efs, σ2))
+      state_interp (trace_extend ex (inl ζ) (tp1 ++ e2 :: tp2 ++ efs, σ2))
                    (trace_extend atr ℓ δ') ∗
       WP e2 @ s; ζ; ⊤ {{ v, Φ v } } ∗
       ([∗ list] i↦ef ∈ efs,
@@ -689,7 +689,7 @@ Section adequacy_helper_lemmas.
   Proof.
     iIntros (Hexvalid Hexe Hstep) "config_wp HSI Hc1".
     inversion Hstep as
-        [ρ1 ρ2 e1 σ1 e2 σ2 efs t1 t2 -> -> Hpstep | ρ1 ρ2 σ1 σ2 t -> -> Hcfgstep].
+        [ρ1 ρ2 e1 σ1 e2 σ2 efs t1 t2 -> -> Hpstep | ρ1 ρ2 σ1 lbl σ2 t -> -> Hcfgstep].
     - rewrite /= !prefixes_from_app.
       iDestruct (big_sepL2_app_inv_l with "Hc1") as
           (Φs1 Φs2') "[-> [Ht1 Het2]]".
@@ -708,7 +708,7 @@ Section adequacy_helper_lemmas.
         iIntros "!#" (i e Hin) "Hwp". list_simplifier.
         erewrite locale_equiv; first by iFrame.
         apply locales_equiv_middle. erewrite locale_step_preserve =>//. }
-      assert (valid_exec (ex :tr[Some (locale_of t1 e1)]: (t1 ++ e2 :: t2 ++ efs, σ2))).
+      assert (valid_exec (ex :tr[inl (locale_of t1 e1)]: (t1 ++ e2 :: t2 ++ efs, σ2))).
       { econstructor; eauto. }
       iMod (wptp_not_stuck_same _ _ σ2 _ _ [] with "HSI Hefs") as "[HSI [Hefs %]]"; [done| | ].
       { list_simplifier. done. }
@@ -746,7 +746,7 @@ Section adequacy_helper_lemmas.
       iApply (step_fupdN_wand with "[Hcfg]"); first by iApply "Hcfg".
       iIntros "Hcfg".
       iMod "Hcfg" as (δ2 ℓ) "HSI".
-      assert (valid_exec (ex :tr[None]: ((t, σ1).1, σ2))).
+      assert (valid_exec (ex :tr[inr lbl]: ((t, σ1).1, σ2))).
       { econstructor; eauto. }
       iMod (wptp_not_stuck _ _ σ2 _ _ _ [] with "HSI Hc1") as "[HSI [Hc1 %]]";
         [apply locales_equiv_refl|done|by list_simplifier|].

@@ -307,7 +307,7 @@ Section properties.
       eapply extend_not_observed; [eauto|eauto|by apply trace_has_events_of_trace].
   Qed.
 
-  Lemma events_of_trace_app (ex : execution_trace Λ) (l : list (olocale Λ * cfg Λ)) :
+  Lemma events_of_trace_app (ex : execution_trace Λ) (l : list (ex_label Λ * cfg Λ)) :
     valid_exec (ex +trl+ l) →
     ∃ evs,
       length evs ≤ length l ∧
@@ -347,7 +347,11 @@ Section properties.
         rewrite Nat.sub_diag //.
   Qed.
 
-  Lemma events_of_trace_app_map (ex : execution_trace Λ) (l : list (olocale Λ * cfg Λ)) :
+  (* TODO: Move this *)
+  Global Instance ex_label_inhabited : Inhabited (ex_label Λ).
+  Proof. Admitted.
+
+  Lemma events_of_trace_app_map (ex : execution_trace Λ) (l : list (ex_label Λ * cfg Λ)) :
     valid_exec (ex +trl+ l) →
     ∃ evs,
       length evs ≤ length l ∧

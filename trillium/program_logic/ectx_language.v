@@ -71,6 +71,7 @@ Structure ectxLanguage := EctxLanguage {
   ectx : Type;
   state : Type;
   locale : Type;
+  config_label : Type;
 
   of_val : val → expr;
   to_val : expr → option val;
@@ -78,7 +79,7 @@ Structure ectxLanguage := EctxLanguage {
   comp_ectx : ectx → ectx → ectx;
   fill : ectx → expr → expr;
   head_step : expr → state → expr → state → list expr → Prop;
-  config_step : state → state → Prop;
+  config_step : state → config_label → state → Prop;
   locale_of : list expr -> expr -> locale;
 
   ectx_language_mixin :
@@ -88,14 +89,14 @@ Structure ectxLanguage := EctxLanguage {
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Arguments EctxLanguage {_ _ _ _ _ _ _ _ _ _} _ _.
+Arguments EctxLanguage {_ _ _ _ _ _ _ _ _ _ _} _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments empty_ectx {_}.
 Arguments comp_ectx {_} _ _.
 Arguments fill {_} _ _.
 Arguments head_step {_} _ _ _ _ _.
-Arguments config_step {_} _ _.
+Arguments config_step {_} _ _ _.
 Arguments locale_of {_} _ _.
 
 Notation locales_equiv t0 t0' :=
@@ -348,7 +349,7 @@ Section ectx_language.
     head_step e1 σ1 e2 σ2 efs →
     locale_step
       (tp1 ++ fill K e1 :: tp2, σ1)
-      (Some (locale_of tp1 e1))
+      (inl (locale_of tp1 e1))
       (tp1 ++ fill K e2 :: tp2 ++ efs, σ2).
   Proof.
     intros Hstep. rewrite -(locale_fill _ K). econstructor =>//.
@@ -368,7 +369,7 @@ work.
 Note that this trick no longer works when we switch to canonical projections
 because then the pattern match [let '...] will be desugared into projections. *)
 Definition LanguageOfEctx (Λ : ectxLanguage) : language :=
-  let '@EctxLanguage E V C St Loc of_val to_val empty comp fill head config loc_of mix := Λ in
-  @Language E V C St Loc of_val to_val _ config loc_of comp empty fill
+  let '@EctxLanguage E V C St Loc _ of_val to_val empty comp fill head config loc_of mix := Λ in
+  @Language E V C St Loc _ of_val to_val _ config loc_of comp empty fill
     (@ectx_lang_mixin
-       (@EctxLanguage E V C St Loc of_val to_val empty comp fill head config loc_of mix)).
+       (@EctxLanguage E V C St Loc _ of_val to_val empty comp fill head config loc_of mix)).

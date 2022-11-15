@@ -57,12 +57,13 @@ Notation prefixes l := (prefixes_from [] l).
 Section language_mixin.
   Context {expr val ectx state : Type}.
   Context {locale : Type}.
+  Context {config_label : Type}.
 
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
 
   Context (prim_step : expr → state → expr → state → list expr → Prop).
-  Context (config_step : state → state → Prop).
+  Context (config_step : state → config_label → state → Prop).
 
   Context (locale_of : list expr -> expr -> locale).
 
@@ -105,17 +106,17 @@ Section language_mixin.
   }.
 End language_mixin.
 
-
 Structure language := Language {
   expr : Type;
   val : Type;
   ectx : Type;
   state : Type;
   locale : Type;
+  config_label : Type;
   of_val : val → expr;
   to_val : expr → option val;
   prim_step : expr → state → expr → state → list expr → Prop;
-  config_step : state → state → Prop;
+  config_step : state → config_label → state → Prop;
   locale_of : list expr -> expr -> locale;
   ectx_comp : ectx → ectx → ectx;
   ectx_emp : ectx;
@@ -132,11 +133,11 @@ Declare Scope val_scope.
 Delimit Scope val_scope with V.
 Bind Scope val_scope with val.
 
-Arguments Language {_ _ _ _ _ _ _} _ {_ _ _} _.
+Arguments Language {_ _ _ _ _ _ _ _} _ {_ _ _} _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments prim_step {_} _ _ _ _ _.
-Arguments config_step {_} _ _.
+Arguments config_step {_} _ _ _.
 Arguments ectx_comp {_} _ _.
 Arguments ectx_emp {_}.
 Arguments ectx_fill {_} _ _.
@@ -276,24 +277,24 @@ Section language.
        ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
        prim_step e1 σ1 e2 σ2 efs →
        step ρ1 ρ2
-    | step_state σ1 σ2 t :
+    | step_state σ1 lbl σ2 t :
        ρ1 = (t, σ1) →
        ρ2 = (t, σ2) →
-       config_step σ1 σ2 →
+       config_step σ1 lbl σ2 →
        step ρ1 ρ2.
   Hint Constructors step : core.
 
-  Inductive locale_step: cfg Λ -> option(locale Λ) -> cfg Λ -> Prop :=
+  Inductive locale_step: cfg Λ -> (locale Λ + config_label Λ) -> cfg Λ -> Prop :=
   | locale_step_atomic ρ1 ρ2 e1 σ1 e2 σ2 efs t1 t2 :
       ρ1 = (t1 ++ e1 :: t2, σ1) →
       ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
       prim_step e1 σ1 e2 σ2 efs →
-      locale_step ρ1 (Some $ locale_of t1 e1) ρ2
-  | locale_step_state ρ1 ρ2 σ1 σ2 t :
+      locale_step ρ1 (inl $ locale_of t1 e1) ρ2
+  | locale_step_state ρ1 ρ2 σ1 lbl σ2 t :
       ρ1 = (t, σ1) →
       ρ2 = (t, σ2) →
-      config_step σ1 σ2 →
-      locale_step ρ1 None ρ2.
+      config_step σ1 lbl σ2 →
+      locale_step ρ1 (inr $ lbl) ρ2.
   Hint Constructors locale_step : core.
 
   Inductive nsteps : nat → cfg Λ → cfg Λ → Prop :=
@@ -486,7 +487,7 @@ Section language.
     (∃ i e efs e',
       t1 !! i = Some e ∧ t3 !! i = Some e ∧
       t2 = <[i:=e']>t1 ++ efs ∧
-      prim_step e σ1 e' σ2 efs) ∨ config_step σ1 σ2.
+      prim_step e σ1 e' σ2 efs) ∨ (∃ lbl, config_step σ1 lbl σ2).
   Proof.
     intros Ht Hps.
     inversion Ht as [e σ e' σ' efs t11 t12 ?? Hstep|]; simplify_eq/=.

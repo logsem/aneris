@@ -36,7 +36,7 @@ Definition wp_pre `{!irisG Λ AS Σ} (s : stuckness)
          ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
          ∃ δ2 ℓ,
            state_interp
-             (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+             (trace_extend extr (inl ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
              (trace_extend atr ℓ δ2) ∗
            wp E ζ e2 Φ ∗
            [∗ list] i ↦ ef ∈ efs,
@@ -257,10 +257,10 @@ Lemma wp_stutteringatomic_take_step
        (∀ c2 δ2 ℓ,
            ∃ δ',
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl ζ') c2)
              (trace_extend atr ℓ δ2) ∗ Q ={E2}=∗
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl ζ') c2)
              (trace_extend atr stuttering_label δ') ∗ R) ∗
        (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
    WP e @ s; ζ; E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; ζ; E1 {{ Φ }}.
@@ -386,10 +386,10 @@ Lemma wp_atomic_take_step
        (∀ c2 δ2 ℓ,
            ∃ δ' ℓ',
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl ζ') c2)
              (trace_extend atr ℓ δ2) ∗ Q ={E2}=∗
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl ζ') c2)
              (trace_extend atr ℓ' δ') ∗ R) ∗
        (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
    WP e @ s; ζ; E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; ζ; E1 {{ Φ }}.

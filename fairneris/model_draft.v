@@ -1,5 +1,5 @@
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
+From trillium.fairness Require Import fair_termination.
 
 Import derived_laws_later.bi.
 
