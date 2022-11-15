@@ -1,10 +1,10 @@
 From stdpp Require Import fin_maps gmap.
 From iris.proofmode Require Import tactics.
-From aneris.prelude Require Import collect.
-From aneris.aneris_lang Require Import aneris_lang network resources.
-From aneris.aneris_lang.state_interp Require Import state_interp_def.
+From fairneris.prelude Require Import collect.
+From fairneris.aneris_lang Require Import aneris_lang network resources.
+From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From RecordUpdate Require Import RecordSet.
-From aneris.algebra Require Import disj_gsets.
+From fairneris.algebra Require Import disj_gsets.
 From iris.algebra Require Import auth.
 Set Default Proof Using "Type".
 

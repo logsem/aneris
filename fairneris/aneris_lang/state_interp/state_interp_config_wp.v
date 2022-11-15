@@ -1,9 +1,9 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export adequacy.
-From aneris.aneris_lang Require Import
+From fairneris.aneris_lang Require Import
      aneris_lang network resources.
-From aneris.prelude Require Import gmultiset.
-From aneris.aneris_lang.state_interp Require Import
+From fairneris.prelude Require Import gmultiset.
+From fairneris.aneris_lang.state_interp Require Import
      state_interp_def
      state_interp_local_coh
      state_interp_gnames_coh
@@ -39,7 +39,7 @@ Section state_interpretation.
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
     rewrite /config_wp. iModIntro.
-    iIntros (ex atr c σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth)".
+    iIntros (ex atr c lbl σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth)".
     rewrite (last_eq_trace_ends_in ex c); [|done].
     iDestruct "Hsi" as (γm mh)
                          "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh &

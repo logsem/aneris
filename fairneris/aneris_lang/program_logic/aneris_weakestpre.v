@@ -1,9 +1,10 @@
 From iris.proofmode Require Import base tactics classes.
 From trillium.program_logic Require Export weakestpre.
-From aneris.aneris_lang Require Export resources network base_lang.
-From aneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
-From aneris.aneris_lang Require Import lifting resources network base_lang.
-From aneris.lib Require Import singletons.
+From fairneris.lib Require Import singletons.
+From fairneris.aneris_lang Require Export resources network base_lang.
+From fairneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
+(* Maybe move the TC stuff out of lifting *)
+From fairneris.aneris_lang Require Export lifting.
 
 Set Default Proof Using "Type".
 
@@ -117,7 +118,7 @@ Proof.
   iIntros "HΦ".
   rewrite aneris_wp_unfold /aneris_wp_def.
   iIntros (tid) "Hin".
-  iApply wp_value; eauto.
+  by iApply wp_value; eauto.
  Qed.
 
 Lemma aneris_wp_is_node ip E Φ e :
@@ -195,7 +196,7 @@ Proof.
   iModIntro.
   iExists Q, R; iFrame.
   iSplitL "H1".
-  { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (Some (ip, tid))).
+  { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (inl (ip, tid))).
     iFrame. }
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iDestruct ("Hwp" with "Hisnode") as "Hwp".
@@ -251,7 +252,7 @@ Proof.
   iModIntro.
   iExists _, _; iFrame.
   iSplitL "H1".
-  { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (Some (ip, tid))).
+  { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (inl (ip, tid))).
     iFrame. }
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iDestruct ("Hwp" with "Hisnode") as "Hwp".

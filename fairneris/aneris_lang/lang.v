@@ -1,5 +1,5 @@
-From aneris.aneris_lang Require Export ast.
-From aneris.prelude Require Export strings.
+From fairneris.aneris_lang Require Export ast.
+From fairneris.prelude Require Export strings.
 From trillium.program_logic Require Export
      language ectx_language ectxi_language adequacy.
 From iris.algebra Require Export ofe gset.
@@ -7,7 +7,7 @@ From stdpp Require Export strings.
 From stdpp Require Import gmap fin pretty.
 From stdpp Require Export binders.
 From RecordUpdate Require Import RecordSet.
-From aneris.aneris_lang Require Export network.
+From fairneris.aneris_lang Require Export network.
 
 
 Set Default Proof Using "Type".
@@ -631,8 +631,9 @@ Lemma alloc_fresh lbl v σ :
   head_step (Alloc lbl (Val v)) σ (Val $ LitV (LitLoc l)) (<[l:=v]>σ) [].
 Proof. by intros; apply AllocS, (not_elem_of_dom (D:=gset loc)), is_fresh. Qed.
 
-Inductive base_config_step : state -> state -> Prop :=
-| ConfigIdStep σ : base_config_step σ σ.
+
+Inductive base_config_step : state → unit → state →  Prop :=
+| ConfigIdStep σ : base_config_step σ () σ.
 
 Definition base_locale := nat.
 Definition locale_of (c: list expr) (e : expr) := length c.
@@ -979,29 +980,31 @@ Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
                              simplify_eq/=; auto with f_equal. Qed.
 
+Inductive config_label := DeliverLabel | DuplicateLabel | DropLabel.
+
 Inductive config_step :
-  state → state -> Prop :=
+  state → config_label → state → Prop :=
 | MessageDeliverStep n σ Sn Sn' sh a skt r m:
     m ∈ messages_to_receive_at_multi_soup a (state_ms σ) →
     state_sockets σ !! n = Some Sn ->
     Sn !! sh = Some (skt, r) →
     Sn' = <[sh := (skt, m :: r)]>Sn →
     saddress skt = Some a →
-    config_step σ
+    config_step σ DeliverLabel
                 {| state_heaps := state_heaps σ;
                    state_sockets := <[n:=Sn']>(state_sockets σ);
                    state_ports_in_use := state_ports_in_use σ;
                    state_ms := state_ms σ ∖ {[+ m +]}; |}
 | MessageDuplicateStep σ m :
     m ∈ state_ms σ →
-    config_step σ
+    config_step σ DuplicateLabel
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ports_in_use := state_ports_in_use σ;
                    state_ms := state_ms σ ⊎ {[+ m +]}; |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
-    config_step σ
+    config_step σ DropLabel
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ports_in_use := state_ports_in_use σ;

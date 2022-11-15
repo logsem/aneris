@@ -1,7 +1,7 @@
 From Coq Require Import Ascii.
 From Coq.ssr Require Import ssreflect.
 From stdpp Require Import pretty strings.
-From aneris.prelude Require Import misc.
+From fairneris.prelude Require Import misc.
 Coercion Z.of_nat : nat >-> Z.
 
 Definition StringOfZ (x : Z) :=

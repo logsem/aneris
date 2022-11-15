@@ -1,6 +1,6 @@
 From stdpp Require Import fin_maps gmap.
-From aneris.aneris_lang Require Import aneris_lang network resources.
-From aneris.aneris_lang.state_interp Require Import state_interp_def.
+From fairneris.aneris_lang Require Import aneris_lang network resources.
+From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 

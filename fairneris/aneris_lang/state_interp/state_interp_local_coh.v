@@ -2,9 +2,9 @@ From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
-From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export aneris_lang network resources.
-From aneris.aneris_lang.state_interp Require Export state_interp_def.
+From fairneris.lib Require Import gen_heap_light.
+From fairneris.aneris_lang Require Export aneris_lang network resources.
+From fairneris.aneris_lang.state_interp Require Export state_interp_def.
 
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".

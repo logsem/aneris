@@ -1,10 +1,10 @@
-From aneris.aneris_lang Require Import aneris_lang network resources.
-From aneris.prelude  Require Import gset_map.
+From fairneris.aneris_lang Require Import aneris_lang network resources.
+From fairneris.prelude  Require Import gset_map.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Import traces.
-From aneris.aneris_lang Require Import events.
-From aneris.aneris_lang.state_interp Require Import state_interp_def.
-From aneris.algebra Require Import disj_gsets.
+From fairneris.aneris_lang Require Import events.
+From fairneris.aneris_lang.state_interp Require Import state_interp_def.
+From fairneris.algebra Require Import disj_gsets.
 From iris.algebra Require Import auth.
 
 Set Default Proof Using "Type".

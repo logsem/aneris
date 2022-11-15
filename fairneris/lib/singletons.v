@@ -1,7 +1,7 @@
 From stdpp Require Import gmap fin_maps.
 Require Import ssreflect.
-From aneris.prelude Require Import gset_map.
-From aneris.algebra Require Import disj_gsets.
+From fairneris.prelude Require Import gset_map.
+From fairneris.algebra Require Import disj_gsets.
 From iris.algebra Require Import auth.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Import weakestpre adequacy.

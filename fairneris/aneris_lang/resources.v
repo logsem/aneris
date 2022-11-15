@@ -4,13 +4,13 @@ From iris.algebra Require Import auth gmap frac agree coPset
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop invariants mono_nat.
 From iris.proofmode Require Import tactics.
-From aneris.lib Require Import gen_heap_light.
-From aneris.aneris_lang Require Export aneris_lang network.
-From aneris.algebra Require Import disj_gsets.
+From fairneris.lib Require Import gen_heap_light.
+From fairneris.aneris_lang Require Export aneris_lang network.
+From fairneris.algebra Require Import disj_gsets.
 From trillium.events Require Import event.
-From aneris.aneris_lang Require Import events.
-From aneris.prelude Require Import gset_map.
-From aneris.lib Require Export singletons.
+From fairneris.aneris_lang Require Import events.
+From fairneris.prelude Require Import gset_map.
+From fairneris.lib Require Export singletons.
 
 Set Default Proof Using "Type".
 

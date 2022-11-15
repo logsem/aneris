@@ -3,13 +3,13 @@ From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris.algebra Require Import auth excl.
-From aneris.prelude Require Import collect gset_map gmultiset.
+From fairneris.prelude Require Import collect gset_map gmultiset.
 From trillium.program_logic Require Export weakestpre.
-From aneris.lib Require Import gen_heap_light.
-From aneris.algebra Require Import disj_gsets.
-From aneris.aneris_lang Require Export
+From fairneris.lib Require Import gen_heap_light.
+From fairneris.algebra Require Import disj_gsets.
+From fairneris.aneris_lang Require Export
      aneris_lang network resources events.
-From aneris.aneris_lang.state_interp Require Export
+From fairneris.aneris_lang.state_interp Require Export
      state_interp_def
      state_interp_local_coh
      state_interp_gnames_coh

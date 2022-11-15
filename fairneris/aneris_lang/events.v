@@ -1,9 +1,9 @@
 From trillium.events Require Export event.
 From trillium.program_logic Require Import
      language ectx_language ectxi_language.
-From aneris.aneris_lang Require Import aneris_lang base_lang.
+From fairneris.aneris_lang Require Import aneris_lang base_lang.
 From RecordUpdate Require Import RecordSet.
-From aneris.algebra Require Import disj_gsets.
+From fairneris.algebra Require Import disj_gsets.
 
 Import ast.
 Import RecordSetNotations.

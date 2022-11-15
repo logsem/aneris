@@ -1,6 +1,6 @@
 From Coq.ssr Require Import ssreflect.
 From stdpp Require Import gmap.
-From aneris.prelude Require Import gset_map.
+From fairneris.prelude Require Import gset_map.
 
 Section sig_gset.
   Context `{EqDecision A, !Countable A}.

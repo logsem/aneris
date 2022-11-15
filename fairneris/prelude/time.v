@@ -1,7 +1,7 @@
 (** Realisation of the time using vector clocs. *)
 
-From aneris.aneris_lang Require Import lang.
-From aneris.prelude Require Import misc strings.
+From fairneris.aneris_lang Require Import lang.
+From fairneris.prelude Require Import misc strings.
 From stdpp Require Import list sets.
 
 Definition vector_clock := list nat.
