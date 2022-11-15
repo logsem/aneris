@@ -52,10 +52,10 @@ Section Gst_merge_local_valid.
         [He_in%(gst_valid_inclusion g _ Hv)
           | He_in%Hs_incl%(gst_valid_inclusion g _ Hv)]%elem_of_union;
       destruct Hvloc as [_ _ _ _ _ H' _ _]; by apply H'.
-    - intros ev [Hev_in | Hev_in]%elem_of_union rid sid Hevid_le;
+(*    - intros ev [Hev_in | Hev_in]%elem_of_union rid sid Hevid_le;
         first by apply (VLst_orig_deps_seq (g.2 !!! i) (VGst_lhst_valid g Hv i)).
       apply (VLst_orig_deps_seq (g.2 !!! j) (VGst_lhst_valid g Hv j)); last assumption.
-      by apply Hs_incl.
+      by apply Hs_incl.*)
     - intros ev [Hev_in | Hev_in]%elem_of_union.
       + by apply (VLst_seqnum_non_O _ (VGst_lhst_valid _ Hv i)).
       + by apply (VLst_seqnum_non_O _ (VGst_lhst_valid _ Hv j)), Hs_incl.
@@ -103,7 +103,7 @@ Section Gst_merge_local_valid.
           | He_in%Hs_incl%(gst_valid_inclusion g _ Hv)]%elem_of_union
         [He'_in%(gst_valid_inclusion g _ Hv)
           | He'_in%Hs_incl%(gst_valid_inclusion g _ Hv)]%elem_of_union;
-      destruct Hvloc as [_ _ _ _ _ _ _ _ _ H']; by apply H'.
+      destruct Hvloc as [_ _ _ _ _ _ _ _ H']; by apply H'.
     - intros ev [Hev_in | Hev_in%(iffLR (elem_of_subseteq s (g.2 !!! j)) Hs_incl)]%elem_of_union.
       + by apply (VLst_evid_incl_event _ (VGst_lhst_valid g Hv i)).
       + by apply (VLst_evid_incl_event _ (VGst_lhst_valid g Hv j)).

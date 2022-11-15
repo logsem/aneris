@@ -264,41 +264,6 @@ Section Gst_mutator_local_valid.
       | by apply (fresh_event_not_eq_t s op orig Hv ev') ].
   Qed.
 
-  Lemma mutator_local_seqnum_val_preservation
-    (s: Lst Op) (op: Op) (orig: fRepId):
-    let fev := fresh_event s op orig in
-    Lst_Validity s → event_set_seqid_val (s ∪ {[fev]}).
-  Proof.
-    intros fev Hv ev [Hev_in | ->%elem_of_singleton]%elem_of_union;
-      first by apply (VLst_seqid_val _ Hv).
-    rewrite event_set_get_seqnum; try by destruct Hv.
-    rewrite/fev/fresh_event/=.
-    destruct (set_choose_or_empty
-      (filter (λ ev, EV_Orig ev = orig) s))
-      as [[e [He_orig He_in]%elem_of_filter] | Hempty].
-    - destruct (event_set_maximum_exists s orig) as [m Hm].
-      + exists e. by split.
-      + by destruct Hv.
-      + by destruct Hv.
-      + rewrite Hm filter_union filter_singleton; last reflexivity.
-        rewrite size_union; first by rewrite size_singleton Nat.add_1_r.
-        apply disjoint_singleton_r.
-        intros [Horig (ev & Hev_in & Hev_eid)%get_deps_set_incl]%elem_of_filter;
-          last by destruct Hv.
-        apply (fresh_event_not_eq_eid s op orig Hv ev Hev_in).
-        rewrite /get_evid fresh_event_orig event_set_get_seqnum;
-          by destruct Hv.
-    - rewrite Hempty compute_maximum_empty'.
-      rewrite filter_union filter_singleton; last reflexivity.
-      rewrite size_union; first by rewrite size_singleton Nat.add_1_r.
-      simpl.
-      rewrite disjoint_singleton_r.
-      intros [Horig (e & He_in & He_eid)%get_deps_set_incl]%elem_of_filter;
-        last by destruct Hv.
-      apply (filter_empty_not_elem_of_L _ s e Hempty); last assumption.
-      by apply get_evid_eq in He_eid as [??].
-  Qed.
-
   Lemma mutator_local_same_orig_comparable_preservation
     (s: Lst Op) (op: Op) (orig: fRepId):
     let fev := fresh_event s op orig in
@@ -636,19 +601,6 @@ Section Gst_mutator_local_valid.
         apply (fin_to_nat_lt orig).
     Qed.
 
-  Lemma mutator_seqid_val_preservation
-    (g: Gst Op) (op: Op) (orig: fRepId):
-      let fev := fresh_event (g.2 !!! orig) op orig in
-      Gst_Validity g →
-      event_set_seqid_val
-        (g.1 ∪ {[fev]}, vinsert orig (g.2 !!! orig ∪ {[fev]}) g.2).1.
-  Proof.
-    intros fev Hv ev. simpl.
-    intros [Hev_in | Heq%elem_of_singleton]%elem_of_union.
-    + by apply (VLst_seqid_val g.1 (VGst_hst_valid g Hv)).
-    + reflexivity.
-  Qed.
-
   Lemma mutator_seqnum_non_O_preservation
     (g: Gst Op) (op: Op) (orig: fRepId):
       let fev := fresh_event (g.2 !!! orig) op orig in
@@ -918,7 +870,6 @@ Section Gst_mutator_local_valid.
     - by apply mutator_local_ext_evid.
     - by apply mutator_local_ext_time.
     - by apply mutator_local_orig_lt_len_preservation.
-    - by apply mutator_local_seqnum_val_preservation.
     - by apply mutator_local_orig_deps_seq_preservation.
     - by apply mutator_local_seqnum_non_O_preservation.
     - by apply mutator_local_orig_max_len_preservation.
@@ -952,7 +903,6 @@ Section Gst_mutator_local_valid.
     - by apply mutator_ext_evid_preservation.
     - by apply mutator_ext_time_preservation.
     - by apply mutator_orig_lt_len_preservation.
-    - by apply mutator_seqid_val_preservation.
     - by apply mutator_orig_deps_seq_preservation.
     - by apply mutator_seqnum_non_O_preservation.
     - by apply mutator_orig_max_len_preservation.

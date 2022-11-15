@@ -77,12 +77,11 @@ Section Preambule.
   Lemma event_set_seqnum_max (s: event_set Op) (orig: RepId) :
     ∀ (i: nat),
     dep_closed s →
-    event_set_seqid_val s →
     (∀ ev, ev ∈ s → get_evid ev ∈ ev.(EV_Time)) →
     lt (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))) i →
     (orig, i) ∉ get_deps_set s.
   Proof.
-    intros i Hdc Hseqidval Heidin Hlt Himp.
+    intros i Hdc Heidin Hlt Himp.
     destruct (get_deps_set_incl s Hdc _ Himp) as (ev & Hev_in & [Hev_orig Hev_sid]%get_evid_eq).
     unfold get_seqnum in Hev_sid.
     assert (
@@ -169,10 +168,9 @@ Section Preambule.
       → dep_closed s
       → event_set_orig_deps_seq s
       → event_set_seqnum_non_O s
-      → event_set_seqid_val s
       → ∀ ev, ev ∈ s → ev <_t fev.
   Proof.
-    intros fev Hsame_orig Hext_time Hdc ?? Hval ev Hev_in.
+    intros fev Hsame_orig Hext_time Hdc ? Hval ev Hev_in.
     rewrite/time/stlib_event_timed/fev/fresh_event/=.
     destruct (set_choose_or_empty
       (filter (λ ev0 : Event Op, EV_Orig ev0 = orig) s))
@@ -216,7 +214,7 @@ Section Preambule.
         destruct (Hdc ev (get_evid fev)) as (e & He'_in & He'_eid); try done.
         rewrite/fev event_set_get_evid in He'_eid; try done.
         apply get_evid_eq in He'_eid as [Horig Himp].
-        rewrite (Hval e He'_in) in Himp.
+        rewrite /get_seqnum in Himp.
         assert (size (filter (λ v : EvId, v.1 = EV_Orig e) (EV_Time e)) < S (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))))%nat; last lia.
         apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply Nat.lt_succ_diag_r.
         rewrite Horig.
@@ -251,14 +249,13 @@ Section Preambule.
   Qed.
 
   Lemma event_set_get_seqnum_lt (s: event_set Op) (ev: Event Op) (orig: fRepId):
-    event_set_seqid_val s →
     ev ∈ s →
     ev.(EV_Orig) = orig →
     get_seqnum ev <
              S (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))).
   Proof.
-    intros Hval Hev_in Hev_orig.
-    rewrite Hval; last assumption.
+    intros Hev_in Hev_orig.
+    rewrite /get_seqnum.
     apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s)));
       last apply Nat.lt_succ_diag_r.
     apply subseteq_size.
@@ -319,7 +316,7 @@ Section Preambule.
           S (size (filter (λ eid: EvId, eid.1 = orig) (get_deps_set s))))
         Hev_in) as (y & Hy_in & [Hy_orig Hy_sid]%get_evid_eq);
         first by (rewrite Heq_t; apply elem_of_union_r, elem_of_singleton).
-      rewrite (VLst_seqid_val _ Hv) in Hy_sid; last assumption.
+      rewrite /get_seqnum in Hy_sid.
       assert (size (filter (λ v : EvId, v.1 = EV_Orig y) (EV_Time y)) < 
         S
          (size
@@ -361,8 +358,7 @@ Section Preambule.
           S (size (filter (λ eid: EvId, eid.1 = orig) (get_deps_set (g.2 !!! orig)))))
         Hev_in) as (y & Hy_in & [Hy_orig Hy_sid]%get_evid_eq);
         first by (rewrite Heq_t; apply elem_of_union_r, elem_of_singleton).
-      rewrite (VLst_seqid_val _ (VGst_lhst_valid _ Hv orig)) in Hy_sid;
-        last by apply Gst_incl_orig'.
+      rewrite /get_seqnum in Hy_sid.
       assert (size (filter (λ v : EvId, v.1 = EV_Orig y) (EV_Time y)) < 
         S
          (size

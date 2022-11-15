@@ -16,10 +16,6 @@ Section Lst_definition.
   Definition event_set_orig_max_len (ls: Lst) :=
     @event_set_orig_max _ _ _ (length CRDT_Addresses) ls.
 
-  Definition event_set_seqid_val (ls: Lst) : Prop :=
-    ∀ ev, ev ∈ ls → get_seqnum ev =
-      size (filter (λ v: EvId, v.1 = ev.(EV_Orig)) ev.(EV_Time)).
-
   Definition event_set_evid_incl_event (ls: Lst): Prop :=
     ∀ ev, ev ∈ ls → get_evid ev ∈ get_deps ev.
 
@@ -33,7 +29,6 @@ Section Lst_definition.
       VLst_ext_eqid : events_ext_evid ls;
       VLst_ext_time : events_ext_time ls;
       VLst_orig : event_set_orig_lt_len ls;
-      VLst_seqid_val : event_set_seqid_val ls;
       VLst_orig_deps_seq : event_set_orig_deps_seq ls;
       VLst_seqnum_non_O : event_set_seqnum_non_O ls;
       VLst_orig_max : event_set_orig_max_len ls;
@@ -88,7 +83,7 @@ Section Lst_helper.
         (s : gset (Event Op))  (f : Op → Op') :
     Lst_Validity s  → Lst_Validity (gset_map (event_map f) s).
   Proof.
-    destruct 1 as [Hl1 Hl2 Hl3 Hl4 Hl5 Hl6 Hl7 Hl8 Hl9 Hl10 Hl11 Hl12].
+    destruct 1 as [Hl1 Hl2 Hl3 Hl4 Hl5 Hl6 Hl7 Hl8 Hl9 Hl10 Hl11].
     split.
     - intros ev id Hev Hid.
       pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
@@ -128,12 +123,6 @@ Section Lst_helper.
       destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
       rewrite -Heq2.
       by apply Hl5.
-    - intros ev Hev.
-      pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
-      destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
-      rewrite -Heq3 -Heq2.
-      assert (get_seqnum ev = get_seqnum ev0) as -> by naive_solver.
-      by apply Hl6.
     - intros ev Hev i sid Hsid Hle.
       pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
       destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
@@ -141,17 +130,17 @@ Section Lst_helper.
       assert (get_evid ev = get_evid ev0) as Heqg.
       { rewrite /get_evid. f_equal; first by naive_solver.
         rewrite /get_seqnum. naive_solver. }
-      apply Hl7; naive_solver.
+      apply Hl6; naive_solver.
     - intros ev Hev.
       pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
       destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
       assert (get_seqnum ev = get_seqnum ev0) as -> by naive_solver.
-      by apply Hl8.
+      by apply Hl7.
     - intros i Hi.
-      specialize (Hl9 i Hi) as [Hl9|Hl9].
+      specialize (Hl8 i Hi) as [Hl8|Hl8].
       -- left. set_solver.
       -- right.
-         destruct Hl9 as (m & Hm & Hmm).
+         destruct Hl8 as (m & Hm & Hmm).
          assert ((event_map f m) ∈ gset_map (event_map f) s ∧ EV_Orig ((event_map f m)) = i)
            as Hfm.
          {  split; first by set_solver.
@@ -200,16 +189,16 @@ Section Lst_helper.
       destruct (event_map_inv f ev ev0 Hev) as (HevEq1 & HevEq2 & HevEq3).
       destruct (event_map_inv f ev' ev1 Hev') as (Hev'Eq1 & Hev'Eq2 & Hev'Eq3).
       assert (EV_Orig ev = EV_Orig ev') as HeqOrig by naive_solver.
-      specialize (Hl10 ev ev' Hin Hin' HeqOrig).
+      specialize (Hl9 ev ev' Hin Hin' HeqOrig).
       by subst.
     - intros ev Hev.
       pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
       destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
-      specialize (Hl11 ev0 Hin0).
+      specialize (Hl10 ev0 Hin0).
       assert (get_evid ev0 = get_evid ev) as Heqg.
       { rewrite /get_evid. f_equal; first by naive_solver.
         rewrite /get_seqnum. naive_solver. }
-      rewrite Heqg in Hl11.
+      rewrite Heqg in Hl10.
       set_solver.
     - intros ev0 ev1 Hev0 Hev1 Heq.
       pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
