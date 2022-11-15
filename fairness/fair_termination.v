@@ -1,4 +1,3 @@
-From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export fairness.
 From stdpp Require Import option.
 From Paco Require Import pacotac.

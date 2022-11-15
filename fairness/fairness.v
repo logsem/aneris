@@ -1,6 +1,5 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export inftraces.
 
 Record FairModel : Type := {

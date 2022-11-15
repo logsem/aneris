@@ -1,6 +1,5 @@
 From stdpp Require Import option.
 From Paco Require Import pacotac.
-From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export fairness fair_termination fuel.
 
 Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
