@@ -288,9 +288,9 @@ Section state_interpretation.
     split; [|done]. eapply message_soup_coh_subseteq; [|done]. set_solver.
   Qed.
 
-  Lemma messages_history_coh_drop_message σ S mhγ m :
-    messages_history_coh (state_ms σ) S mhγ →
-    messages_history_coh (state_ms σ ∖ {[+ m +]}) S mhγ.
+  Lemma messages_history_coh_drop_message M S mhγ m :
+    messages_history_coh M S mhγ →
+    messages_history_coh (M ∖ {[+ m +]}) S mhγ.
   Proof.
     unfold messages_history_coh. intros (Hmsh & Hrb & Hmac & Hmr).
     split_and!; [|done..].

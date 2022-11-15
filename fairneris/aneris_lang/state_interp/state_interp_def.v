@@ -1,20 +1,22 @@
+From RecordUpdate Require Import RecordSet.
 From stdpp Require Import fin_maps gmap option finite.
 From trillium.prelude Require Import
      quantifiers finitary classical_instances sigma.
-From fairneris.prelude Require Import collect gset_map gmultiset.
 From iris.bi.lib Require Import fractional.
+From iris.algebra Require Import auth.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
+From trillium.fairness Require Import fairness.
+From fairneris.prelude Require Import collect gset_map gmultiset.
 From fairneris.aneris_lang Require Import resources events.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Export aneris_lang network resources.
 From fairneris.aneris_lang.state_interp Require Export messages_history.
 From fairneris.algebra Require Import disj_gsets.
-From iris.algebra Require Import auth.
+From fairneris Require Import model_draft.
 
-From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
 Import uPred.
@@ -243,67 +245,158 @@ Section definitions.
 End definitions.
 
 Section Aneris_AS.
-  Context `{aG : !anerisG Mdl Σ}.
+  Context `{aG : !anerisG (fair_model_to_model simple_fair_model) Σ}.
 
-  Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) :=
-    mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2.
+  (* Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) := *)
+  (*   mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2. *)
 
-  Lemma user_model_evolution_id δ :
-    user_model_evolution δ δ.
-  Proof. by left. Qed.
+  (* Lemma user_model_evolution_id δ : *)
+  (*   user_model_evolution δ δ. *)
+  (* Proof. by left. Qed. *)
 
-  Definition valid_state_evolution (_ : execution_trace aneris_lang)
-             (atr : auxiliary_trace (aneris_to_trace_model Mdl)) :=
-    match atr with
-    | atr :tr[_]: δ => user_model_evolution (trace_last atr) δ
-    |  _ => True
+  (* Definition valid_state_evolution (_ : execution_trace aneris_lang) *)
+  (*            (atr : auxiliary_trace (aneris_to_trace_model Mdl)) := *)
+  (*   match atr with *)
+  (*   | atr :tr[_]: δ => user_model_evolution (trace_last atr) δ *)
+  (*   |  _ => True *)
+  (*   end. *)
+
+  (* Definition sim_rel (φ : execution_trace aneris_lang → auxiliary_trace Mdl → Prop) *)
+  (*            (ex : execution_trace aneris_lang) (atr : auxiliary_trace Mdl) := *)
+  (*   valid_state_evolution ex atr ∧ φ ex atr. *)
+
+  (* Let M := (aneris_to_trace_model Mdl). *)
+
+  (* Local Definition enumerate_next_auxstate (δ : Mdl) (l : list Mdl) : list (M * mlabel M) := *)
+  (*   δ' ← δ :: l; *)
+  (*   mret (δ', ()). *)
+
+  (* Lemma aneris_sim_rel_finitary φ: *)
+  (*   (∀ mdl, smaller_card (sig (λ mdl', model_rel Mdl mdl mdl')) nat) → *)
+  (*   rel_finitary (sim_rel φ). *)
+  (* Proof. *)
+  (*   intros Hmodel ex atr c oζ. *)
+  (*   specialize (Hmodel (trace_last atr)). *)
+
+  (*   assert (∀ ex atr x, *)
+  (*    ProofIrrel ((match x return Prop with *)
+  (*                   (δ', ℓ) => (sim_rel φ (ex :tr[ oζ ]: c) (atr :tr[ ℓ ]: δ')) *)
+  (*                 end))). *)
+  (*   { intros ?? []. apply make_proof_irrel. } *)
+  (*   assert (EqDecision (M * mlabel M)). *)
+  (*   { intros ??; apply make_decision. } *)
+  (*   apply finite_smaller_card_nat. *)
+  (*   assert (EqDecision {mdl' : Mdl | Mdl (trace_last atr) mdl'}). *)
+  (*   { intros ??; apply make_decision. } *)
+  (*   apply smaller_card_nat_finite in Hmodel. *)
+  (*   eapply (in_list_finite $ enumerate_next_auxstate (trace_last atr) (map proj1_sig (@enum _ _ Hmodel))). *)
+  (*   intros [δ' []] [[<- | Hstep] _]; unfold enumerate_next_auxstate; simpl; [set_solver |]. *)
+  (*   apply elem_of_cons; right. apply elem_of_list_bind. exists δ'; split; first set_solver. *)
+  (*   apply elem_of_list_fmap. exists (δ' ↾ Hstep); split =>//. *)
+  (*   apply elem_of_enum. *)
+  (* Qed. *)
+
+  (* TODO: valid_state_evolution should capture:
+     - Relation between state n/m and message sent/delivered
+   *)
+
+  Definition saA := SocketAddressInet "0.0.0.0" 80. 
+  Definition sA := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saA) true.
+  Definition saB := SocketAddressInet "0.0.0.1" 80.
+  Definition sB := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saB) true.
+  Definition mAB := mkMessage saA saB IPPROTO_UDP "Hello".
+
+  Definition state_get_n s :=
+    match s with
+    | Start => 0
+    | Sent n => n
+    | Delivered n _ => n
+    | Received n _ => n
     end.
 
-  Definition sim_rel (φ : execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
-             (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) :=
-    valid_state_evolution ex atr ∧ φ ex atr.
+  Definition state_get_m s :=
+    match s with
+    | Start => 0
+    | Sent _ => 0
+    | Delivered _ m => m
+    | Received _ m => m
+    end.
+  
+  Definition mABn n : message_multi_soup :=
+    Nat.iter n (λ ms, ms ⊎ {[+ mAB +]}) ∅. 
+  Definition mABm m : list message := repeat mAB m.
 
-  Let M := (aneris_to_trace_model Mdl).
+  Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
+             (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
+    state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
+    ∃ shA shB, 
+    state_sockets (trace_last ex).2 =
+      {[ ip_of_address saA := {[shA := (sA,[])]};
+         ip_of_address saB := {[shB := (sB,mABm (state_get_m (trace_last atr)))]} ]}.
 
-  Local Definition enumerate_next_auxstate (δ : Mdl) (l : list Mdl) : list (M * mlabel M) :=
-    δ' ← δ :: l;
-    mret (δ', ()).
+  (* Definition simple_valid_state_evolution (ex : execution_trace aneris_lang) *)
+  (*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) := *)
+  (*   match trace_last atr with *)
+  (*   | Start => state_ms (trace_last ex).2 = ∅ ∧ *)
+  (*              ∃ sh, (state_sockets (trace_last ex).2 !!! *)
+  (*                                      (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, []) *)
+  (*   | Sent n => state_ms (trace_last ex).2 = mABn n ∧ *)
+  (*               ∃ sh, (state_sockets (trace_last ex).2 !!! *)
+  (*                                      (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, []) *)
+  (*   | Delivered n m => state_ms (trace_last ex).2 = mABn n ∧ *)
+  (*                      ∃ sh, *)
+  (*                        (state_sockets (trace_last ex).2 !!! *)
+  (*                                       (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, repeat mAB m) *)
+  (*   | Received n m => state_ms (trace_last ex).2 = mABn n ∧ *)
+  (*                     ∃ sh, *)
+  (*                       (state_sockets (trace_last ex).2 !!! *)
+  (*                                      (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, repeat mAB m) *)
+  (*   end. *)
+  
+  (* Definition simple_valid_state_evolution (ex : execution_trace aneris_lang) *)
+  (*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) := *)
+  (*   match trace_last atr with *)
+  (*   | Start => state_ms (trace_last ex).2 = ∅ ∧ *)
+  (*              ∃ sh, (state_sockets (trace_last ex).2 !!! *)
+  (*                                      (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, []) *)
+  (*   | Sent n => multiplicity mAB (state_ms (trace_last ex).2) = n ∧ *)
+  (*               ∃ sh, (state_sockets (trace_last ex).2 !!! *)
+  (*                                      (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, []) *)
+  (*   | Delivered n m => multiplicity mAB (state_ms (trace_last ex).2) = n ∧ *)
+  (*                      ∃ sh, *)
+  (*                        (state_sockets (trace_last ex).2 !!! *)
+  (*                                       (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, repeat mAB m) *)
+  (*   | Received n m => multiplicity mAB (state_ms (trace_last ex).2) = n ∧ *)
+  (*                     ∃ sh, *)
+  (*                       (state_sockets (trace_last ex).2 !!! *)
+  (*                                      (ip_of_address saB)) !! sh = *)
+  (*                                         Some (sB, repeat mAB m) *)
+  (*   end. *)
 
-  Lemma aneris_sim_rel_finitary φ:
-    (∀ mdl, smaller_card (sig (λ mdl', model_rel Mdl mdl mdl')) nat) →
-    rel_finitary (sim_rel φ).
-  Proof.
-    intros Hmodel ex atr c oζ.
-    specialize (Hmodel (trace_last atr)).
+  (* Definition simple_valid_state_evolution (ex : execution_trace aneris_lang) *)
+  (*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) := *)
+  (*   match trace_last atr with *)
+  (*   | Sent n => (trace_messages_history ex) *)
+  (*   | _ => 0 *)
+  (*   end. *)
 
-    assert (∀ ex atr x,
-     ProofIrrel ((match x return Prop with
-                    (δ', ℓ) => (sim_rel φ (ex :tr[ oζ ]: c) (atr :tr[ ℓ ]: δ'))
-                  end))).
-    { intros ?? []. apply make_proof_irrel. }
-    assert (EqDecision (M * mlabel M)).
-    { intros ??; apply make_decision. }
-    apply finite_smaller_card_nat.
-    assert (EqDecision {mdl' : Mdl | Mdl (trace_last atr) mdl'}).
-    { intros ??; apply make_decision. }
-    apply smaller_card_nat_finite in Hmodel.
-    eapply (in_list_finite $ enumerate_next_auxstate (trace_last atr) (map proj1_sig (@enum _ _ Hmodel))).
-    intros [δ' []] [[<- | Hstep] _]; unfold enumerate_next_auxstate; simpl; [set_solver |].
-    apply elem_of_cons; right. apply elem_of_list_bind. exists δ'; split; first set_solver.
-    apply elem_of_list_fmap. exists (δ' ↾ Hstep); split =>//.
-    apply elem_of_enum.
-  Qed.
-
-  Global Instance anerisG_irisG `{!anerisG Mdl Σ} :
-    irisG aneris_lang M Σ := {
+  Global Instance anerisG_irisG :
+    irisG aneris_lang (fair_model_to_model simple_fair_model) Σ := {
     iris_invGS := _;
     state_interp ex atr :=
       (aneris_events_state_interp ex ∗
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗
-       auth_st (trace_last atr) ∗
-       ⌜valid_state_evolution ex atr⌝ ∗
+       (* auth_st (trace_last atr) ∗ *)
+       ⌜simple_valid_state_evolution ex atr⌝ ∗
        steps_auth (trace_length ex))%I;
     fork_post _ _ := True%I }.
 

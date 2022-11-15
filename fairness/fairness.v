@@ -23,6 +23,13 @@ Record FairModel : Type := {
 #[global] Existing Instance fmrole_inhabited.
 #[global] Existing Instance fmstate_inhabited.
 
+Definition fair_model_to_model (FM : FairModel) : Model :=
+  {|
+    mstate := fmstate FM;
+    mlabel := option $ fmrole FM;
+    mtrans := fmtrans FM;
+  |}.
+
 (* Basically, soundness of the logic and the lemmas above tell us that we have a program
    trace and a model trace which are related by traces_match labels_math!
 

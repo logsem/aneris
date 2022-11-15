@@ -155,21 +155,22 @@ Section state_interpretation.
     by apply HFip2.
   Qed.
 
-  Lemma free_ips_coh_deliver_message σ M Sn Sn' ip sh skt a R m :
+  Lemma free_ips_coh_deliver_message σ σ' M Sn Sn' ip sh skt a R m ms :
     m ∈ messages_to_receive_at a M →
     (state_sockets σ) !! ip = Some Sn →
     Sn !! sh = Some (skt, R) →
     Sn' = <[sh:=(skt, m :: R)]> Sn →
     saddress skt = Some a →
+    σ' = {| state_heaps := state_heaps σ;
+           state_sockets := <[ip:=Sn']> (state_sockets σ);
+           state_ports_in_use := state_ports_in_use σ;
+           state_ms := ms |} →
     free_ips_coh σ -∗
-    free_ips_coh
-      {| state_heaps := state_heaps σ;
-         state_sockets := <[ip:=Sn']> (state_sockets σ);
-         state_ports_in_use := state_ports_in_use σ;
-         state_ms := state_ms σ |}.
+    free_ips_coh σ'.
   Proof.
     rewrite /free_ips_coh /=.
     iDestruct 1 as (Fip Piu (Hdsj & HFip & HFip2 & HPiu)) "[HfCtx HpCtx]".
+    rewrite H4.
     iExists _, _. simpl. iFrame. iPureIntro.
     do 2 (split; [auto|]).
     split; [|done].

@@ -17,18 +17,18 @@ Set Default Proof Using "Type".
 Import uPred.
 Import ast.
 
-Record Model :=
-  model {
-      model_state :> Type;
-      model_rel :> model_state → model_state → Prop;
-      model_state_initial : model_state;
-    }.
+(* Record Model := *)
+(*   model { *)
+(*       model_state :> Type; *)
+(*       model_rel :> model_state → model_state → Prop; *)
+(*       model_state_initial : model_state; *)
+(*     }. *)
 
-Definition aneris_to_trace_model (M: Model): traces.Model := {|
-  mstate := model_state M;
-  mlabel := unit;
-  mtrans x _ y := model_rel M x y;
-|}.
+(* Definition aneris_to_trace_model (M: Model): traces.Model := {| *)
+(*   mstate := model_state M; *)
+(*   mlabel := unit; *)
+(*   mtrans x ℓ y := model_rel M ℓ y; *)
+(* |}. *)
   
 Record node_gnames := Node_gname {
   heap_name : gname;
@@ -177,9 +177,11 @@ Section definitions.
   Context `{aG : !anerisG Mdl Σ}.
 
   Definition auth_st (st : Mdl) : iProp Σ :=
-    own aneris_model_name (● Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝.
+    (* own aneris_model_name (● Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
+    own aneris_model_name (● Excl' st).
   Definition frag_st (st : Mdl) : iProp Σ :=
-    own aneris_model_name (◯ Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝.
+    own aneris_model_name (◯ Excl' st).
+    (* own aneris_model_name (◯ Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
 
   (** Authoritative view of the system ghost names *)
   Definition node_gnames_auth (m : gmap ip_address node_gnames) :=
@@ -858,16 +860,23 @@ Section resource_lemmas.
   Lemma auth_frag_st_agree st st' :
     auth_st st -∗ frag_st st' -∗ ⌜st = st'⌝.
   Proof.
-    iIntros "[Ha %] [Hf %]".
+    iIntros "Ha Hf".
     by iDestruct (own_valid_2 with "Ha Hf") as
         %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
   Qed.
 
+  (* Lemma auth_frag_st_agree st st' : *)
+  (*   auth_st st -∗ frag_st st' -∗ ⌜st = st'⌝. *)
+  (* Proof. *)
+  (*   iIntros "[Ha %] [Hf %]". *)
+  (*   by iDestruct (own_valid_2 with "Ha Hf") as *)
+  (*       %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete. *)
+  (* Qed. *)
+
   Lemma auth_frag_st_update st st' :
-    rtc Mdl Mdl.(model_state_initial) st' →
     auth_st st -∗ frag_st st ==∗ auth_st st' ∗ frag_st st'.
   Proof.
-    iIntros (?) "[Hauth %] [Hfrag %]".
+    iIntros "Hauth Hfrag".
     iMod ((own_update _ (● (Excl' st) ⋅ ◯ (Excl' st))
                       (● (Excl' st') ⋅ ◯ (Excl' st')))
             with "[Hauth Hfrag]") as "[??]".
@@ -876,9 +885,22 @@ Section resource_lemmas.
     by iFrame "∗ %".
   Qed.
 
-  Lemma frag_st_rtc st :
-    frag_st st -∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝.
-  Proof. by iIntros "[_ %]". Qed.
+ (* Lemma auth_frag_st_update st st' : *)
+ (*    rtc Mdl Mdl.(model_state_initial) st' → *)
+ (*    auth_st st -∗ frag_st st ==∗ auth_st st' ∗ frag_st st'. *)
+ (*  Proof. *)
+ (*    iIntros (?) "[Hauth %] [Hfrag %]". *)
+ (*    iMod ((own_update _ (● (Excl' st) ⋅ ◯ (Excl' st)) *)
+ (*                      (● (Excl' st') ⋅ ◯ (Excl' st'))) *)
+ (*            with "[Hauth Hfrag]") as "[??]". *)
+ (*    { by apply auth_update, option_local_update, exclusive_local_update. } *)
+ (*    { rewrite own_op //. iFrame. } *)
+ (*    by iFrame "∗ %". *)
+ (*  Qed. *)
+
+  (* Lemma frag_st_rtc st : *)
+  (*   frag_st st -∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
+  (* Proof. by iIntros "[_ %]". Qed. *)
 
   Lemma mapsto_node_agree ip γn γn' :
     mapsto_node ip γn -∗ mapsto_node ip γn' -∗ ⌜γn = γn'⌝.
