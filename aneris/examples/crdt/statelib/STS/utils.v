@@ -519,23 +519,25 @@ Section Useful.
       intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
           exfalso; set_solver.
     - right.
-      apply set_eq. intros x. split;
-      intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
-          try (exfalso; set_solver).
-      + apply elem_of_filter. split; assumption.
-      + apply elem_of_filter. split; first assumption.
-        by apply elem_of_union_r, elem_of_union_l.
-      + apply elem_of_filter. split; first assumption.
-        by apply elem_of_union_r, elem_of_union_r.
+      apply set_eq. intros x.
+      split; intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter; apply elem_of_filter.
+      + auto with set_solver.
+      + done.
+      + split; first assumption.
+        apply elem_of_union_r; set_solver.
+      + split; [done|].
+        apply elem_of_union_r; set_solver.
     - left.
       apply set_eq. intros x. split;
       intros [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter;
-          try (exfalso; set_solver).
-      + apply elem_of_filter. split; assumption.
-      + apply elem_of_filter. split; first assumption.
-        by apply elem_of_union_l, elem_of_union_l.
-      + apply elem_of_filter. split; first assumption.
-        by apply elem_of_union_l, elem_of_union_r.
+          apply elem_of_filter.
+      + done.
+      + split; [done|].
+        apply elem_of_union_l; set_solver.
+      + split; [done|].
+        apply elem_of_union_l; set_solver.
+      + split; [done|].
+        apply elem_of_union_l; set_solver.
     - epose proof (iffLR (compute_maximum_non_empty fs1 _ _) Hneq1) as HH;
         destruct HH as (max1 & [Hmax1_in H1']%compute_maximum_correct); last first.
       { intros x y [Hx_p [Hx_in|Hx_in]%elem_of_union]%elem_of_filter
