@@ -1,5 +1,7 @@
 From iris.proofmode Require Import base tactics classes.
+From trillium.fairness Require Export fairness.
 From trillium.program_logic Require Export weakestpre.
+From fairneris Require Export model_draft.
 From fairneris.lib Require Import singletons.
 From fairneris.aneris_lang Require Export resources network base_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
@@ -8,15 +10,15 @@ From fairneris.aneris_lang Require Export lifting.
 
 Set Default Proof Using "Type".
 
-Definition aneris_wp_def `{!anerisG Mdl Σ} (ip : ip_address) (E : coPset)
+Definition aneris_wp_def `{!anerisG (fair_model_to_model simple_fair_model) Σ} (ip : ip_address) (E : coPset)
            (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
   (∀ tid, is_node ip -∗
    wp NotStuck E (ip, tid) (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!anerisG Mdl Σ} : seal (@aneris_wp_def Mdl Σ _).
+Definition aneris_wp_aux `{!anerisG (fair_model_to_model simple_fair_model) Σ} : seal (@aneris_wp_def Σ _).
 Proof. by eexists. Qed.
-Definition aneris_wp `{!anerisG Mdl Σ} := aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!anerisG Mdl Σ} : aneris_wp = @aneris_wp_def Mdl Σ _ :=
+Definition aneris_wp `{!anerisG (fair_model_to_model simple_fair_model) Σ} := aneris_wp_aux.(unseal).
+Definition aneris_wp_eq `{!anerisG (fair_model_to_model simple_fair_model) Σ} : aneris_wp = @aneris_wp_def Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Notation "'WP' e '@[' ip ] E {{ Φ } }" := (aneris_wp ip E e%E Φ)
@@ -73,7 +75,7 @@ Notation "'{{{' P } } } e '@[' ip ] {{{ 'RET' pat ; Q } } }" :=
      format "{{{  P  } } }  e  '@[' ip ]  {{{  RET  pat ;  Q } } }") : stdpp_scope.
 
 Section aneris_wp.
-Context `{!anerisG Mdl Σ}.
+Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -169,7 +171,7 @@ Lemma aneris_wp_atomic_take_step ip E1 E2 e Φ
       `{!Atomic WeaklyAtomic (mkExpr ip e)} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c1,
+   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) c1,
      ⌜trace_ends_in extr c1⌝ →
      state_interp extr atr ={E2}=∗
      ∃ Q R,
@@ -207,61 +209,61 @@ Proof.
   iModIntro; iExists _; iFrame; done.
 Qed.
 
-Lemma aneris_wp_stuttering_atomic ip E1 E2 e Φ
-      `{!StutteringAtomic WeaklyAtomic (mkExpr ip e)} :
-  (|={E1,E2}=> WP e @[ip] E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @[ip] E1 {{ Φ }}.
-Proof.
-  rewrite !aneris_wp_unfold /aneris_wp_def.
-  iIntros "He %tid Hn".
-  iApply wp_stuttering_atomic.
-  iMod "He". iModIntro.
-  iApply wp_wand_r; iSplitL.
-  { iApply ("He" with "Hn"). }
-  iIntros (?). iDestruct 1 as (?) "[% HΦ]".
-  iMod "HΦ". iModIntro. eauto.
-Qed.
+(* Lemma aneris_wp_stuttering_atomic ip E1 E2 e Φ *)
+(*       `{!StutteringAtomic WeaklyAtomic (mkExpr ip e)} : *)
+(*   (|={E1,E2}=> WP e @[ip] E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @[ip] E1 {{ Φ }}. *)
+(* Proof. *)
+(*   rewrite !aneris_wp_unfold /aneris_wp_def. *)
+(*   iIntros "He %tid Hn". *)
+(*   iApply wp_stuttering_atomic. *)
+(*   iMod "He". iModIntro. *)
+(*   iApply wp_wand_r; iSplitL. *)
+(*   { iApply ("He" with "Hn"). } *)
+(*   iIntros (?). iDestruct 1 as (?) "[% HΦ]". *)
+(*   iMod "HΦ". iModIntro. eauto. *)
+(* Qed. *)
 
-Lemma aneris_wp_stuttering_atomic_take_step ip E1 E2 e Φ
-      `{!StutteringAtomic WeaklyAtomic (mkExpr ip e)} :
-  TCEq (to_val e) None →
-  (|={E1,E2}=>
-   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c1,
-     ⌜trace_ends_in extr c1⌝ →
-     state_interp extr atr ={E2}=∗
-     ∃ Q R,
-       state_interp extr atr ∗
-       (∀ c2 δ2 ℓ oζ,
-           ∃ δ',
-           state_interp
-             (trace_extend extr oζ c2)
-             (trace_extend atr ℓ δ2) ∗ Q ={E2}=∗
-           state_interp
-             (trace_extend extr oζ c2)
-             (trace_extend atr stuttering_label δ') ∗ R) ∗
-       (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
-   WP e @[ip] E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @[ip] E1 {{ Φ }}.
-Proof.
-  rewrite !aneris_wp_unfold /aneris_wp_def.
-  iIntros (He) "Hwp %tid Hisnode".
-  iApply (wp_stutteringatomic_take_step _ _ E2).
-  { rewrite /= /aneris_to_val He //. }
-  iMod "Hwp". iModIntro.
-  iIntros (ex atr c1 δ1 ? Hδ1 Hatr <-) "Hsi".
-  iDestruct ("Hwp" with "[] Hsi") as "> Hwp"; first done.
-  iDestruct "Hwp" as (Q R) "(Hsi & H1 & H2 & Hwp)".
-  iModIntro.
-  iExists _, _; iFrame.
-  iSplitL "H1".
-  { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (inl (ip, tid))).
-    iFrame. }
-  rewrite !aneris_wp_unfold /aneris_wp_def.
-  iDestruct ("Hwp" with "Hisnode") as "Hwp".
-  iApply wp_wand_r; iFrame.
-  iIntros (v) "H". iDestruct "H" as (w) "[-> HQimp]".
-  iIntros "HR".
-  iMod ("HQimp" with "HR").
-  iModIntro; iExists _; iFrame; done.
-Qed.
+(* Lemma aneris_wp_stuttering_atomic_take_step ip E1 E2 e Φ *)
+(*       `{!StutteringAtomic WeaklyAtomic (mkExpr ip e)} : *)
+(*   TCEq (to_val e) None → *)
+(*   (|={E1,E2}=> *)
+(*    ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c1, *)
+(*      ⌜trace_ends_in extr c1⌝ → *)
+(*      state_interp extr atr ={E2}=∗ *)
+(*      ∃ Q R, *)
+(*        state_interp extr atr ∗ *)
+(*        (∀ c2 δ2 ℓ oζ, *)
+(*            ∃ δ', *)
+(*            state_interp *)
+(*              (trace_extend extr oζ c2) *)
+(*              (trace_extend atr ℓ δ2) ∗ Q ={E2}=∗ *)
+(*            state_interp *)
+(*              (trace_extend extr oζ c2) *)
+(*              (trace_extend atr stuttering_label δ') ∗ R) ∗ *)
+(*        (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗ *)
+(*    WP e @[ip] E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @[ip] E1 {{ Φ }}. *)
+(* Proof. *)
+(*   rewrite !aneris_wp_unfold /aneris_wp_def. *)
+(*   iIntros (He) "Hwp %tid Hisnode". *)
+(*   iApply (wp_stutteringatomic_take_step _ _ E2). *)
+(*   { rewrite /= /aneris_to_val He //. } *)
+(*   iMod "Hwp". iModIntro. *)
+(*   iIntros (ex atr c1 δ1 ? Hδ1 Hatr <-) "Hsi". *)
+(*   iDestruct ("Hwp" with "[] Hsi") as "> Hwp"; first done. *)
+(*   iDestruct "Hwp" as (Q R) "(Hsi & H1 & H2 & Hwp)". *)
+(*   iModIntro. *)
+(*   iExists _, _; iFrame. *)
+(*   iSplitL "H1". *)
+(*   { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (inl (ip, tid))). *)
+(*     iFrame. } *)
+(*   rewrite !aneris_wp_unfold /aneris_wp_def. *)
+(*   iDestruct ("Hwp" with "Hisnode") as "Hwp". *)
+(*   iApply wp_wand_r; iFrame. *)
+(*   iIntros (v) "H". iDestruct "H" as (w) "[-> HQimp]". *)
+(*   iIntros "HR". *)
+(*   iMod ("HQimp" with "HR"). *)
+(*   iModIntro; iExists _; iFrame; done. *)
+(* Qed. *)
 
 Lemma aneris_wp_lb_get ip E e Φ :
   TCEq (to_val e) None →
@@ -273,7 +275,7 @@ Proof.
   iIntros (tid) "Hip".
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /= He.
   iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
-          "(?&?&?&?&Hauth)".
+          "(?&?&?&Hauth)".
   iDestruct (steps_lb_get with "Hauth") as "#Hlb".
   iDestruct (steps_lb_le _ 0 with "Hlb") as "Hlb'"; [lia|].
   iMod (fupd_mask_subseteq E) as "Hclose"; first done.
@@ -286,7 +288,7 @@ Proof.
   iMod ("H" with "[//]") as "H". iIntros "!> !>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
-  iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth) & H & Hefs)".
+  iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&Hauth) & H & Hefs)".
   iMod "Hclose" as "_". iModIntro.
   iExists δ2, ℓ.
   iFrame.
@@ -305,7 +307,7 @@ Proof.
   rewrite !wp_unfold /wp_pre /=.
   rewrite /aneris_to_val. simpl. rewrite He. simpl.
   iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
-          "(?&?&?&?&Hauth)".
+          "(?&?&?&Hauth)".
   iMod (fupd_mask_subseteq E) as "Hclose"; first done.
   iDestruct (steps_lb_valid with "Hauth Hlb") as %Hle.
   iMod ("Hwp" with "[//] [//] [//] [$]") as "[% H]".
@@ -315,7 +317,7 @@ Proof.
   iMod ("H" with "[//]") as "H". iIntros "!> !>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
-  iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth) & H & Hefs)".
+  iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&Hauth) & H & Hefs)".
   iDestruct (steps_lb_get with "Hauth") as "#Hlb'".
   iDestruct (steps_lb_le _ (S n) with "Hlb'") as "#Hlb''"; [lia|].
   iMod "Hclose" as "_". iModIntro.
@@ -356,7 +358,7 @@ Proof.
   iIntros (He HE) "Hlb HP Hwp".
   iApply aneris_wp_step_fupdN; [done|].
   iSplit; [|by iFrame].
-  iIntros (extr atr) "(? & ? & ? & ? & Hsteps)".
+  iIntros (extr atr) "(? & ? & ? & Hsteps)".
   iDestruct (steps_lb_valid with "Hsteps Hlb") as %Hle.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_". iPureIntro. lia.
@@ -525,7 +527,7 @@ Proof.
   iMod "Hstp". iModIntro.
   iMod "Hstp" as (δ' ℓ) "(Hsi & Hwp & Hefs)".
   iModIntro; iFrame.
-  iExists _, ().  iFrame.
+  iExists _, _. iFrame.
   iApply "IH"; done.
 Qed.
 
@@ -619,7 +621,7 @@ End aneris_wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!anerisG Mdl Σ}.
+  Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 
@@ -650,30 +652,30 @@ Section proofmode_classes.
       fupd_frame_r bi.wand_elim_r fupd_aneris_wp.
   Qed.
 
-  Global Instance elim_modal_fupd_wp_stutteringatomic p ip E1 E2 e P Φ :
-    StutteringAtomic WeaklyAtomic (mkExpr ip e) →
-    ElimModal True p false (|={E1,E2}=> P) P
-            (WP e @[ip] E1 {{ Φ }}) (WP e @[ip] E2 {{ v, |={E2,E1}=> Φ v }})%I.
-  Proof.
-    intros. by rewrite /ElimModal bi.intuitionistically_if_elim
-      fupd_frame_r bi.wand_elim_r aneris_wp_stuttering_atomic.
-  Qed.
+  (* Global Instance elim_modal_fupd_wp_stutteringatomic p ip E1 E2 e P Φ : *)
+  (*   StutteringAtomic WeaklyAtomic (mkExpr ip e) → *)
+  (*   ElimModal True p false (|={E1,E2}=> P) P *)
+  (*           (WP e @[ip] E1 {{ Φ }}) (WP e @[ip] E2 {{ v, |={E2,E1}=> Φ v }})%I. *)
+  (* Proof. *)
+  (*   intros. by rewrite /ElimModal bi.intuitionistically_if_elim *)
+  (*     fupd_frame_r bi.wand_elim_r aneris_wp_stuttering_atomic. *)
+  (* Qed. *)
 
   Global Instance add_modal_fupd_wp ip E e P Φ :
     AddModal (|={E}=> P) P (WP e @[ip] E {{ Φ }}).
   Proof. by rewrite /AddModal fupd_frame_r bi.wand_elim_r fupd_aneris_wp. Qed.
 
-  Global Instance elim_acc_wp_stuttering {X} E1 E2 α β γ e ip Φ :
-    StutteringAtomic WeaklyAtomic (mkExpr ip e) →
-    ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1)
-            α β γ (WP e @[ip] E1 {{ Φ }})
-            (λ x, WP e @[ip] E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I.
-  Proof.
-    intros ? _.
-    iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
-    iApply (aneris_wp_wand with "(Hinner Hα)").
-    iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
-  Qed.
+  (* Global Instance elim_acc_wp_stuttering {X} E1 E2 α β γ e ip Φ : *)
+  (*   StutteringAtomic WeaklyAtomic (mkExpr ip e) → *)
+  (*   ElimAcc (X:=X) True (fupd E1 E2) (fupd E2 E1) *)
+  (*           α β γ (WP e @[ip] E1 {{ Φ }}) *)
+  (*           (λ x, WP e @[ip] E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I. *)
+  (* Proof. *)
+  (*   intros ? _. *)
+  (*   iIntros "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]". *)
+  (*   iApply (aneris_wp_wand with "(Hinner Hα)"). *)
+  (*   iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose". *)
+  (* Qed. *)
 
   Global Instance elim_acc_wp_nonatomic {X} E α β γ e ip Φ :
     ElimAcc (X:=X) True (fupd E E) (fupd E E)

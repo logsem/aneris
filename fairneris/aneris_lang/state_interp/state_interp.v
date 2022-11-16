@@ -4,7 +4,9 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris.algebra Require Import auth excl.
 From fairneris.prelude Require Import collect gset_map gmultiset.
+From trillium.fairness Require Export fairness.
 From trillium.program_logic Require Export weakestpre.
+From fairneris Require Import model_draft.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.algebra Require Import disj_gsets.
 From fairneris.aneris_lang Require Export
@@ -27,7 +29,7 @@ Set Default Proof Using "Type".
 Import uPred.
 Import RecordSetNotations.
 
-Section state_interpretation.
+Section aneris_state_interpretation.
   Context `{!anerisG Mdl Σ}.
 
   (** aneris_state_interp *)
@@ -882,34 +884,39 @@ Section state_interpretation.
       by iApply free_ips_coh_update_msg.
   Qed.
 
-  Lemma aneris_state_interp_model_agree m ex atr :
-    state_interp ex atr -∗ frag_st m -∗ ⌜(trace_last atr) = m⌝.
-  Proof.
-    iIntros "(_ & _ & Ha & _) Hf".
-    by iDestruct (auth_frag_st_agree with "Ha Hf") as %<-.
-  Qed.
-
-  Lemma aneris_state_interp_model_extend m1 m2 ex atr :
-    state_interp ex (atr :tr[()]: m1) -∗
-    frag_st m1 -∗
-    ⌜trace_last atr = m1⌝ -∗
-    ⌜m1 = m2 ∨ Mdl.(model_rel) m1 m2⌝ ==∗
-    state_interp ex (atr :tr[()]: m2) ∗ frag_st m2.
-  Proof.
-    iIntros "Hsi Hfrag %Hm1 %Hrel".
-    iDestruct (aneris_state_interp_model_agree with "Hsi Hfrag") as %Heq.
-    iDestruct "Hsi" as "(? & ? & Hauth & %Hv & Hsteps)". simpl.
-    iDestruct (frag_st_rtc with "Hfrag") as %?.
-    iMod (auth_frag_st_update _ m2 with "Hauth Hfrag") as "[Hauth Hfrag]".
-    { destruct Hrel as [->|?]; [done|]. by eapply rtc_r. }
-    iModIntro. iFrame. iPureIntro. simpl in *.
-    rewrite Hm1. destruct Hrel as [->|?]; by [left|right].
-  Qed.
-
   Definition messages_sent_from (sag: socket_address_group) (rt: messages_history) : message_soup :=
     filter (λ m, m.(m_sender) ∈ sag) rt.2.
 
-  Lemma aneris_state_interp_sent_mapsto_agree_group sag R T ex atr:
+End aneris_state_interpretation.
+
+Section state_interpretation.
+  Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
+
+  (* Lemma aneris_state_interp_model_agree m ex atr : *)
+  (*   state_interp ex atr -∗ frag_st m -∗ ⌜(trace_last atr) = m⌝. *)
+  (* Proof. *)
+  (*   iIntros "(_ & _ & Ha & _) Hf". *)
+  (*   by iDestruct (auth_frag_st_agree with "Ha Hf") as %<-. *)
+  (* Qed. *)
+
+  (* Lemma aneris_state_interp_model_extend m1 m2 ex atr : *)
+  (*   state_interp ex (atr :tr[()]: m1) -∗ *)
+  (*   frag_st m1 -∗ *)
+  (*   ⌜trace_last atr = m1⌝ -∗ *)
+  (*   ⌜m1 = m2 ∨ Mdl.(model_rel) m1 m2⌝ ==∗ *)
+  (*   state_interp ex (atr :tr[()]: m2) ∗ frag_st m2. *)
+  (* Proof. *)
+  (*   iIntros "Hsi Hfrag %Hm1 %Hrel". *)
+  (*   iDestruct (aneris_state_interp_model_agree with "Hsi Hfrag") as %Heq. *)
+  (*   iDestruct "Hsi" as "(? & ? & Hauth & %Hv & Hsteps)". simpl. *)
+  (*   iDestruct (frag_st_rtc with "Hfrag") as %?. *)
+  (*   iMod (auth_frag_st_update _ m2 with "Hauth Hfrag") as "[Hauth Hfrag]". *)
+  (*   { destruct Hrel as [->|?]; [done|]. by eapply rtc_r. } *)
+  (*   iModIntro. iFrame. iPureIntro. simpl in *. *)
+  (*   rewrite Hm1. destruct Hrel as [->|?]; by [left|right]. *)
+  (* Qed. *)
+
+  Lemma aneris_state_interp_sent_mapsto_agree_group sag R T ex atr :
     sag ⤳* (R, T) -∗
     state_interp ex atr -∗
     ⌜messages_sent_from sag (trace_messages_history ex) = T⌝.
