@@ -221,19 +221,12 @@ Section StateLib_Proof.
       3, 4: by destruct Hloc_valid.
       - by apply elem_of_union_r, elem_of_singleton.
       - apply Maximum_correct in fev_max as [_ B].
-        + intros e [He_in | ->%elem_of_singleton]%elem_of_union;
-            last by apply TM_lt_irreflexive.
-          assert (e ≠ fev).
-          { intros Heq. rewrite Heq in He_in. by apply fev_fresh. }
-          assert (e <_t fev);
-            first ( apply B; [ set_solver | assumption] ).
-          intros?.
-          by apply TM_lt_exclusion with (time e) (time fev).
+        + intros e [He_in | ->%elem_of_singleton]%elem_of_union; last done.
+          intros. set_solver.
         + replace (h__local ∪ {[fresh_event (h__local ∪ h__for) log_op f]} ∪ h__for)
             with (h__local ∪ h__for ∪ {[fresh_event (h__local ∪ h__for) log_op f]});
             last set_solver.
           by apply (VLst_ext_time _ Hloc_valid). }
-
     iIntros (st') "(%log_st' & %Hst'_coh & %Hst'_mut)".
     wp_bind(_ <- _)%E.
     wp_store. wp_seq.
@@ -582,7 +575,7 @@ Section StateLib_Proof.
     by iApply "Hφ".
 
     Unshelve.
-    all: by done. 
+    all: by done.
   Qed.
 
   Lemma apply_thread_spec

@@ -72,7 +72,7 @@ Section Specification.
         ⌜log_ev ∉ s⌝ ∗
         ⌜EV_Op log_ev = log_op⌝ ∗
         ⌜EV_Orig log_ev = repId⌝ ∗
-        ⌜maximal log_ev (s ∪ {[ log_ev ]})⌝ ∗
+        ⌜is_maximum log_ev (s ∪ {[ log_ev ]})⌝ ∗
         ⌜events_ext (s ∪ {[ log_ev ]})⌝ ∗
         ⌜event_set_same_orig_comparable (s ∪ {[ log_ev ]})⌝
     }}}

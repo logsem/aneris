@@ -21,13 +21,15 @@ From aneris.examples.crdt.statelib.examples.prod_comb
 
 
 Section prod_crdt_denot.
-  Context `{!CRDT_Params} `{!Log_Time}
-          `{!EqDecision opA} `{!Countable opA}
-          `{!EqDecision opB} `{!Countable opB}
-          `(crdt_denotA : !CrdtDenot opA stA)
-          `(crdt_denotB : !CrdtDenot opB stB)
-          `{latStA : Lattice stA}
-          `{latStB : Lattice stB}.
+  Context (opA : Type) (stA : Type).
+  Context (opB : Type) (stB : Type).
+  Context `{!Log_Time}.
+  Context `{!EqDecision opA} `{!Countable opA}.
+  Context `{!EqDecision opB} `{!Countable opB}.
+  Context `(crdt_denotA : !CrdtDenot opA stA).
+  Context `(crdt_denotB : !CrdtDenot opB stB).
+  Context `{latStA : Lattice stA} `{latStB : Lattice stB}.
+  Context `{!CRDT_Params}.
 
   Definition prodOp : Type := opA * opB.
   Definition prodSt : Type := stA * stB.
@@ -52,20 +54,20 @@ Section prod_crdt_denot.
 
 End prod_crdt_denot.
 
-Global Arguments prodOp _ _ : clear implicits.
-Global Arguments prodSt _ _ : clear implicits.
+(* Global Arguments prodOp _ _ : clear implicits. *)
+(* Global Arguments prodSt _ _ : clear implicits. *)
 
 Section prod_crdt_model.
-  Context `{!CRDT_Params}.
-  Context `{!EqDecision opA} `{!Countable opA}
-          `{!EqDecision opB} `{!Countable opB}.
 
-  Context `{!StateLib_Res (prodOp opA opB)}.
-  Context `{!anerisG M Σ}.
-  Context `{latStA : Lattice stA} `{latStB : Lattice stB}.
+  Context (opA : Type) (stA : Type).
+  Context (opB : Type) (stB : Type).
+  Context `{!EqDecision opA} `{!Countable opA}.
+  Context `{!EqDecision opB} `{!Countable opB}.
   Context `{!Inject opA val} `{!Inject opB val}.
   Context `{!Inject stA val} `{!Inject stB val}.
-
+  Context `{latStA : Lattice stA} `{latStB : Lattice stB}.
+  Context `{!anerisG M Σ}.
+  Context `{!CRDT_Params}.
   Context `{PA : !StLib_Params opA stA}.
   Context `{PB : !StLib_Params opB stB}.
 
@@ -91,7 +93,7 @@ Section prod_crdt_model.
     simplify_eq /=.
     rewrite! gset_map_union.
     split.
-    - eapply lst_validity_valid_event_map in Hs1, Hs2, Hsu.
+    - eapply (lst_validity_valid_event_map _ fst) in Hs1, Hs2, Hsu.
       destruct pa3 as [pam1 pam2 pam3 pam4 pam5 pam6].
       clear pam2 pam3 pam4 pam5 pam6.
       apply (pam1
@@ -138,22 +140,8 @@ Section prod_crdt_model.
     assert (event_map fst ev ∉ gset_map (event_map fst) s ∧
               event_map snd ev ∉ gset_map (event_map snd) s).
     { split.
-      - intro Habs.
-        apply Hev.
-        apply gset_map_correct2 in Habs.
-        destruct Habs as (a & Ha & Hin).
-        inversion Ha.
-        destruct Hm as (HinM & Ht).
-        assert (a = ev ∨ a ≠ ev) as [->| Hneq] by naive_solver; first done.
-        epose proof (Ht a _ Hneq); set_solver. Unshelve. by set_solver.
-      - intro Habs.
-        apply Hev.
-        apply gset_map_correct2 in Habs.
-        destruct Habs as (a & Ha & Hin).
-        inversion Ha.
-        destruct Hm as (HinM & Ht).
-        assert (a = ev ∨ a ≠ ev) as [->| Hneq] by naive_solver; first done.
-        epose proof (Ht a _ Hneq); set_solver. Unshelve. by set_solver. }
+      - by apply event_map_max_not_in.
+      - by apply event_map_max_not_in. }
     assert ( is_maximum (event_map fst ev)
                         (gset_map (event_map fst) s ∪ {[event_map fst ev]}) ∧
                is_maximum (event_map snd ev)
@@ -184,7 +172,6 @@ Section prod_crdt_model.
     - eapply (PB.(StLib_Model).(st_crdtM_mut_coh) _ st.2 st'.2 ); try naive_solver.
   Qed.
 
-
   Definition prodSt_init : prodSt :=
     (PA.(StLib_Model).(st_crdtM_init_st), PB.(StLib_Model).(st_crdtM_init_st)).
 
@@ -205,27 +192,36 @@ Section prod_crdt_model.
       st_crdtM_init_st_coh := prodSt_init_coh; }.
 
   Definition prodOp_coh (op: prodOp) (v: val) : Prop :=
-    v = $op ∧ s_valid_val (prod_serialization PA.(StLib_StSerialization) PB.(StLib_StSerialization)) $ v.
+    ∃ (v1 v2 : val), (v1, v2)%V = v ∧
+    PA.(StLib_Op_Coh) op.1 v1 ∧
+    PB.(StLib_Op_Coh) op.2 v2 ∧
+    s_valid_val (prod_serialization PA.(StLib_StSerialization) PB.(StLib_StSerialization)) $ v.
 
   Lemma prodOp_coh_inj (o o': prodOp) (v: val) :
     prodOp_coh o v -> prodOp_coh o' v -> o = o'.
   Proof.
-    intros (Hv & _) (Hv' & _).
-    rewrite/prodOp_coh in Hv. rewrite/prodOp_coh in Hv'.
-    rewrite Hv in Hv'.
-    by apply (@inject_inj _ val) in Hv'.
+     intros (v11 & v12 &  Heq12 & (Hp11 & Hp12 & _))
+           (v21 & v22 &  Heq22 & (Hp21 & Hp22 & _)).
+     rewrite/prodOp_coh in Hp11.
+     rewrite/prodOp_coh in Hp22.
+     rewrite -Heq12 in Heq22.
+     inversion Heq22. subst.
+     destruct o, o'.
+     f_equal /=.
+    - by eapply PA.(StLib_Op_Coh_Inj).
+    - by eapply PB.(StLib_Op_Coh_Inj).
   Qed.
 
   Definition prodSt_coh (st: prodSt) (v: val) : Prop :=
-  ∃ (v1 v2 : val), v = $st ∧ (v1, v2)%V = v ∧
+  ∃ (v1 v2 : val), (v1, v2)%V = v ∧
      PA.(StLib_St_Coh) st.1 v1 ∧
      PB.(StLib_St_Coh) st.2 v2.
 
   Lemma prodSt_coh_inj (st st': prodSt) (v: val) :
     prodSt_coh st v -> prodSt_coh st' v -> st = st'.
   Proof.
-    intros (v11 & v12 & Heq11 & Heq12 & (Hp11 & Hp12))
-           (v21 & v22 & Heq21 & Heq22 & (Hp21 & Hp22)).
+    intros (v11 & v12 &  Heq12 & (Hp11 & Hp12))
+           (v21 & v22 &  Heq22 & (Hp21 & Hp22)).
     rewrite -Heq12 in Heq22.
     inversion Heq22. subst.
     destruct st, st'.
@@ -238,13 +234,12 @@ Section prod_crdt_model.
     (∀ (st : prodSt) (v : val),
        prodSt_coh st v
        → Serializable
-           (prod_serialization PA.(StLib_StSerialization) PB.(StLib_StSerialization))
-           v).
+           (prod_serialization PA.(StLib_StSerialization) PB.(StLib_StSerialization)) v).
   Proof.
     intros st v Hcoh.
     simpl.
     rewrite /prodSt_coh in Hcoh.
-    destruct Hcoh as (v1 & v2 & Heq1 & Heq2 & Hcoh1 & Hcoh2).
+    destruct Hcoh as (v1 & v2 & Heq2 & Hcoh1 & Hcoh2).
     exists v1, v2.
     split; first done.
     split.
@@ -252,15 +247,13 @@ Section prod_crdt_model.
     - apply (PB.(StLib_StCoh_Ser) st.2 v2 Hcoh2).
   Qed.
 
-
-
   Global Program Instance prod_crdt_params :
    StLib_Params prodOp prodSt :=
     {
       StLib_StSerialization :=
       prod_serialization
         PA.(StLib_StSerialization) PB.(StLib_StSerialization);
-      StLib_Denot := prod_denot_instance PA.(StLib_Denot) PB.(StLib_Denot);
+      StLib_Denot := prod_denot_instance opA stA opB stB PA.(StLib_Denot) PB.(StLib_Denot);
       StLib_Model           := prod_crdt_model;
       StLib_Op_Coh_Inj      := prodOp_coh_inj;
       StLib_St_Coh          := prodSt_coh;
@@ -269,3 +262,220 @@ Section prod_crdt_model.
     }.
 
 End prod_crdt_model.
+
+Section prod_proof.
+  Context (opA : Type) (stA : Type).
+  Context (opB : Type) (stB : Type).
+  Context `{!EqDecision opA} `{!Countable opA}
+          `{!EqDecision opB} `{!Countable opB}.
+  Context `{!Inject opA val} `{!Inject opB val}.
+  Context `{!Inject stA val} `{!Inject stB val}.
+  Context `{latStA : Lattice stA} `{latStB : Lattice stB}.
+  Context `{!anerisG M Σ}.
+  Context `{!CRDT_Params}.
+  Context `{PA : !StLib_Params opA stA}.
+  Context `{PB : !StLib_Params opB stB}.
+
+  Global Instance prod_params : StLib_Params (prodOp opA opB) (prodSt stA stB).
+  Proof. exact (prod_crdt_params opA stA opB stB). Defined.
+
+  Lemma prod_init_st_fn_spec initA initB :
+    @init_st_fn_spec _ _ _ _ _ _ stA _ _ PA initA -∗
+    @init_st_fn_spec _ _ _ _ _ _ stB _ _ PB initB -∗
+    @init_st_fn_spec _ _ _ _ _ _ (prodSt stA stB) _ _ prod_params (λ: <>, init_st initA initB #()).
+  Proof.
+    iIntros "#HA #HB" (addr).
+    iIntros "!#" (Φ) "_ HΦ".
+    do 2 wp_lam.
+    wp_pures.
+    wp_apply "HB"; first done.
+    iIntros (vB HvB).
+    wp_apply "HA"; first done.
+    iIntros (vA HvA).
+    wp_pures.
+    iApply "HΦ".
+    iPureIntro. eexists _, _; eauto.
+  Qed.
+
+  Lemma prod_mutator_st_spec mut_fnA mut_fnB :
+    @mutator_spec _ _ _ _ _ _ stA _ _ PA mut_fnA -∗
+    @mutator_spec _ _ _ _ _ _ stB _ _ PB mut_fnB -∗
+    @mutator_spec _ _ _ _ _ _ _ _ _ prod_params
+                  (λ: "i" "gs" "op", mutator mut_fnA mut_fnB "i" "gs" "op").
+  Proof.
+    iIntros "#HA #HB" (addr id st_v op_v s ev op_log st_log)
+                 "!> %φ ((%v1 & %v2 & <- & %Hv1 & %Hv2 & %Hvv) &
+                 (%stv1 & %stv2 & <- & %Hst_coh & %Hst_coh') & %Hden &
+                    %Hnin & <- & <- & %Hmax & %Hext & %Hsoc) Hφ".
+    destruct ev as [[op1 op2] orig vc].
+    wp_lam. wp_pures.
+    wp_lam. wp_pures.
+    wp_apply ("HB" $! _ _ stv2 v2
+                    (gset_map (event_map snd) s)
+                    (event_map snd {| EV_Op := (op1, op2); EV_Orig := orig; EV_Time := vc |})
+                    op2 st_log.2).
+    iPureIntro.
+    inversion Hden as [Hden1 Hden2].
+    split_and!; try eauto with set_solver.
+    - by apply event_map_max_not_in.
+    - rewrite -gset_map_singleton -gset_map_union.
+      by apply event_map_is_maximum.
+    - rewrite -gset_map_singleton -gset_map_union.
+      by apply events_ext_map.
+    - rewrite -gset_map_singleton -gset_map_union.
+      by apply event_map_is_same_orig_comparable.
+    - iIntros (v2') "(%lg2 & %Hstc2 & %Hϕ2)".
+      wp_apply ("HA" $! _ _ stv1 v1
+                     (gset_map (event_map fst) s)
+                     (event_map fst {| EV_Op := (op1, op2); EV_Orig := orig; EV_Time := vc |})
+                     op1 st_log.1).
+      iPureIntro.
+      inversion Hden as [Hden1 Hden2].
+      split_and!; try eauto with set_solver.
+      -- by apply event_map_max_not_in.
+      -- rewrite -gset_map_singleton -gset_map_union.
+         by apply event_map_is_maximum.
+      -- rewrite -gset_map_singleton -gset_map_union.
+         by apply events_ext_map.
+      -- rewrite -gset_map_singleton -gset_map_union.
+         by apply event_map_is_same_orig_comparable.
+      -- iIntros (v1') "(%lg1 & %Hstc1 & %Hϕ1)".
+         wp_pures.
+         iApply "Hφ".
+         iPureIntro.
+         exists (lg1, lg2).
+         rewrite /StLib_St_Coh /= /prodSt_coh /prod_mutator /=.
+         split_and!; try eauto.
+  Qed.
+
+  Definition prod_crdt' : val :=
+    (λ: "cA" "cB" <>,
+        let: "cAp" := "cA" #() in
+        let: "cBp" := "cB" #() in
+        let: "init_fnA" := Fst (Fst "cAp") in
+        let: "mut_fnA" := Snd (Fst "cAp") in
+        let: "merge_fnA" := Snd "cAp" in
+        let: "init_fnB" := Fst (Fst "cBp") in
+        let: "mut_fnB" := Snd (Fst "cBp") in
+        let: "merge_fnB" := Snd "cBp" in
+        let: "init_fn" := (λ: <>, init_st "init_fnA" "init_fnB" #()) in
+        let: "mut_fn" := (λ: "i" "gs" "op", mutator "mut_fnA" "mut_fnB" "i" "gs" "op") in
+        let: "merge_fn" := (λ: "st1" "st2", merge "merge_fnA" "merge_fnB" "st1" "st2") in
+        ("init_fn", "mut_fn", "merge_fn"))%V.
+
+  Definition prod_init' (stA_ser : val) (stA_deser : val) (stB_ser : val)
+             (stB_deser : val) : val :=
+    λ: "cA" "cB" "addrs" "rid",
+      let: "initRes" := statelib_init (prod_ser stA_ser stB_ser)
+                                      (prod_deser stA_deser stB_deser) "addrs" "rid"
+                                      (λ: <>, prod_crdt' "cA" "cB" #()) in
+      let: "get_state" := Fst "initRes" in
+      let: "update" := Snd "initRes" in
+      ("get_state", "update").
+
+
+  Lemma prod_merge_st_spec merge_fnA merge_fnB :
+    @merge_spec _ _ _ _ _ _ stA _ _ PA merge_fnA -∗
+    @merge_spec _ _ _ _ _ _ stB _ _ PB merge_fnB -∗
+    @merge_spec _ _ _ _ _ _ _ _ _ prod_params
+                  (λ: "st1" "st2", merge merge_fnA merge_fnB "st1" "st2").
+  Proof.
+    iIntros  "#HA #HB" (sa v v' s s' st st')
+            "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' &
+                    %Hext & %Hsoc & %Hext' & %Hsoc') Hφ".
+    destruct Hcoh_st as (v11 & v12 & <- & Hv11 & Hv12).
+    destruct Hcoh_st' as (v21 & v22 & <- & Hv21 & Hv22).
+    wp_lam. wp_let.
+    wp_lam. wp_pures.
+    inversion Hden as [Hden1 Hden2].
+    inversion Hden' as [Hden'1 Hden'2].
+    wp_apply ("HA" $! _ v11 v21
+                    (gset_map (event_map fst) s)
+                    (gset_map (event_map fst) s')
+                    st.1
+                    st'.1).
+    - iPureIntro.
+       split_and!; try eauto with set_solver.
+       -- by apply events_ext_map.
+       -- by apply event_map_is_same_orig_comparable.
+       -- by apply events_ext_map.
+       -- by apply event_map_is_same_orig_comparable.
+    - iIntros (v1')  "(%lg1 & %Hstc1 & %Hϕ1)".
+      wp_pures.
+      wp_apply ("HB" $! _ v12 v22
+                    (gset_map (event_map snd) s)
+                    (gset_map (event_map snd) s')
+                    st.2
+                    st'.2).
+      -- iPureIntro.
+       split_and!; try eauto with set_solver.
+         --- by apply events_ext_map.
+         --- by apply event_map_is_same_orig_comparable.
+         --- by apply events_ext_map.
+         --- by apply event_map_is_same_orig_comparable.
+      -- iIntros (v2')  "(%lg2 & %Hstc2 & %Hϕ2)".
+         wp_pures.
+         iApply "Hφ".
+         iPureIntro.
+         exists (lg1, lg2).
+         rewrite /StLib_St_Coh /= /prodSt_coh /prod_lat_lub /=.
+         split_and!; try eauto.
+         by f_equal.
+  Qed.
+
+  Lemma prod_crdt_fun_spec cA cB :
+      @crdt_fun_spec _ _ _ _ _ _ stA _ _ PA cA -∗
+      @crdt_fun_spec _ _ _ _ _ _ stB _ _ PB cB -∗
+      @crdt_fun_spec _ _ _ _ _ _ _ _ _ prod_params (λ: <>, prod_crdt' cA cB #()).
+    Proof.
+      iIntros "#HA #HB" (sa φ) "!> _ Hφ".
+      wp_lam; wp_pures. wp_lam. wp_pures.
+      wp_apply "HA"; first done.
+      iIntros (c1) "(%c11 & %c12 & %c13 & -> & Hc11 & Hc12 & Hc13)".
+      wp_pures.
+      wp_apply "HB"; first done.
+      iIntros (c2) "(%c21 & %c22 & %c23 & -> & Hc21 & Hc22 & Hc23)".
+      wp_pures.
+      iApply "Hφ".
+      iExists _, _, _. iSplit; first eauto.
+      iSplitL "Hc11 Hc21".
+      - iApply (prod_init_st_fn_spec c11 c21 with "[$Hc11][$Hc21]") .
+      - iSplitL "Hc12 Hc22".
+        iApply (prod_mutator_st_spec c12 c22 with "[$Hc12][$Hc22]").
+       iApply (prod_merge_st_spec c13 c23 with "[$Hc13][$Hc23]").
+    Qed.
+
+  Lemma prod_init_spec `{!StLib_Res (prodOp opA opB)} cA cB :
+    @crdt_fun_spec _ _ _ _ _ _ stA _ _ PA cA -∗
+    @crdt_fun_spec _ _ _ _ _ _ stB _ _ PB cB -∗
+    @init_spec
+      _ _ _ _ _ _ _ _ _ prod_params _
+      (statelib_init
+         (prod_ser
+            (PA.(StLib_StSerialization).(s_serializer)).(s_ser)
+            (PB.(StLib_StSerialization).(s_serializer)).(s_ser))
+         (prod_deser
+            (PA.(StLib_StSerialization).(s_serializer)).(s_deser)
+            (PB.(StLib_StSerialization).(s_serializer)).(s_deser))) -∗
+    @init_spec_for_specific_crdt
+      _ _ _ _ _ _ _ _ _  prod_params _
+      (λ: "addrs" "rid",
+         prod_init'
+          (PA.(StLib_StSerialization).(s_serializer)).(s_ser)
+          (PA.(StLib_StSerialization).(s_serializer)).(s_deser)
+          (PB.(StLib_StSerialization).(s_serializer)).(s_ser)
+          (PB.(StLib_StSerialization).(s_serializer)).(s_deser)
+          cA cB "addrs" "rid").
+  Proof.
+    iIntros "#HA #HB #Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    rewrite /prod_init.
+    wp_pures. wp_lam. wp_pures.
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply prod_crdt_fun_spec; done. }
+    iIntros (get update) "(HLS & Hget & Hupdate)".
+    wp_pures.
+    iApply "HΦ"; iFrame.
+  Qed.
+
+End prod_proof.

@@ -53,7 +53,6 @@ Section Lst_helper.
     Lst_Validity s → event_set_same_orig_comparable s.
   Proof. by intros []. Qed.
 
-
   Lemma lst_init_valid:
     Lst_Validity (∅: Lst Op).
   Proof.
@@ -78,6 +77,62 @@ Section Lst_helper.
     intros Hev. apply gset_map_correct2 in Hev. set_solver.
   Qed.
 
+  Lemma event_map_is_maximum
+        {Op' : Type}
+        `{!EqDecision Op'} `{!Countable Op'}
+        (ev : Event Op) (s : event_set Op) (f : Op → Op') :
+    is_maximum ev s →
+    is_maximum (event_map f ev) (gset_map (event_map f) s).
+  Proof.
+    intros (Hin & Hmax).
+    split; first by apply gset_map_correct1.
+    intros tf Htf Htnf.
+    apply event_map_elem_of in Htf as (ev0 & Hev0 & Hev0m).
+    apply event_map_inv in Hev0m as (Hh1 & Hh2 & Hh3).
+    assert (ev0 ≠ ev) as Hneq.
+    { intro Habs. apply Htnf. rewrite /event_map.
+      rewrite -Habs. destruct tf. f_equal; eauto. }
+    specialize (Hmax ev0 Hev0 Hneq).
+    rewrite /time /stlib_event_timed in Hmax.
+    rewrite /time /stlib_event_timed.
+    by rewrite -Hh3.
+  Qed.
+
+  Lemma event_map_is_same_orig_comparable
+         {Op' : Type}
+        `{!EqDecision Op'} `{!Countable Op'}
+        (s : event_set Op) (f : Op → Op') :
+    event_set_same_orig_comparable s →
+    event_set_same_orig_comparable (gset_map (event_map f) s).
+  Proof.
+    intros HevH ev0 ev1 Hev0 Hev1 Heq1.
+      pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
+      pose proof (event_map_elem_of f ev1 s Hev1) as (ev' & Hin' & Hev').
+      destruct (event_map_inv f ev ev0 Hev) as (HevEq1 & HevEq2 & HevEq3).
+      destruct (event_map_inv f ev' ev1 Hev') as (Hev'Eq1 & Hev'Eq2 & Hev'Eq3).
+      assert (EV_Orig ev = EV_Orig ev') as HeqOrig by naive_solver.
+      specialize (HevH ev ev' Hin Hin' HeqOrig).
+      set_solver.
+  Qed.
+
+  Lemma event_map_max_not_in
+        {Op' : Type}
+        `{!EqDecision Op'} `{!Countable Op'}
+        (ev : Event Op) (s : event_set Op) (f : Op → Op') :
+    is_maximum ev (s ∪ {[ev]})  →
+    ev ∉ s →
+    event_map f ev ∉ gset_map (event_map f) s.
+  Proof.
+    intros Hmax Hnotin Habs.
+    apply Hnotin.
+    apply gset_map_correct2 in Habs.
+    destruct Habs as (a & Heq & Hin).
+    inversion Heq.
+    destruct Hmax as (HinM & Ht).
+    assert (a = ev ∨ a ≠ ev) as [->| Hneq] by naive_solver; first done.
+    epose proof (Ht a _ Hneq); set_solver. Unshelve. by set_solver.
+  Qed.
+
   Lemma lst_validity_valid_event_map
         {Op' : Type} `{!EqDecision Op'} `{!Countable Op'}
         (s : gset (Event Op))  (f : Op → Op') :
@@ -92,14 +147,7 @@ Section Lst_helper.
       specialize (Hl1 ev0 id Hin0 Hid) as (ev1 & Hdep).
       exists (event_map f ev1).
       set_solver.
-    - intros ev0 ev1 Hev0 Hev1 Heq1.
-      pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
-      pose proof (event_map_elem_of f ev1 s Hev1) as (ev' & Hin' & Hev').
-      destruct (event_map_inv f ev ev0 Hev) as (HevEq1 & HevEq2 & HevEq3).
-      destruct (event_map_inv f ev' ev1 Hev') as (Hev'Eq1 & Hev'Eq2 & Hev'Eq3).
-      assert (EV_Orig ev = EV_Orig ev') as HeqOrig by naive_solver.
-      specialize (Hl2 ev ev' Hin Hin' HeqOrig).
-      set_solver.
+    - by apply event_map_is_same_orig_comparable.
     - intros ev0 ev1 Hev0 Hev1 Heq.
       pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
       pose proof (event_map_elem_of f ev1 s Hev1) as (ev' & Hin' & Hev').
