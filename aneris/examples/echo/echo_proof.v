@@ -66,7 +66,6 @@ Section echo_server_proof.
         exists {|
           m_sender := sa;
           m_destination := m_sender m;
-          m_protocol := sprotocol (udp_socket (Some sa) true);
           m_body := m_body m
         |}. set_solver. }
       set_solver.

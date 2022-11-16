@@ -41,13 +41,12 @@ Section Proof_of_connect_step_1.
     iLeft. iSplit; first done. subst; eauto with iFrame.
   Qed.
 
-  Lemma conn_step_1_server_interp_holds clt_addr s1 s (R : gset message) :
+  Lemma conn_step_1_server_interp_holds clt_addr s1 (R : gset message) :
     ⌜s_is_ser (msg_serialization RCParams_clt_ser) (InjLV (#"INIT", #0%nat)) s1⌝ ∗
     RCParams_srv_saddr ⤇ server_interp ∗
     clt_addr ⤇ client_interp -∗
     server_interp {| m_sender := clt_addr;
-                    m_destination := RCParams_srv_saddr;
-                    m_protocol := sprotocol s; m_body := s1 |}.
+                    m_destination := RCParams_srv_saddr; m_body := s1 |}.
   Proof.
     iIntros "(%Hser & #Hsrv_si & #Hclt_si)".
     iExists (InjLV (#"INIT", #0%nat)). simpl. iFrame "Hclt_si".
@@ -100,13 +99,12 @@ Section Proof_of_connect_step_1.
                with "[$Hh $Hmh]"); [done|done|  | ].
     (* Prove the servers socket interp. *)
     { iSplit; iNext; first eauto.
-      by iApply ((conn_step_1_server_interp_holds clt_addr s1 _ R0)
+      by iApply ((conn_step_1_server_interp_holds clt_addr s1 R0)
                with "[$Hsrv_si $Hsi]"). }
     iIntros "(Hh & Hmh)". wp_pures.
     set (mt :=  {|
                 m_sender := clt_addr;
                 m_destination := RCParams_srv_saddr;
-                m_protocol := sprotocol s;
                 m_body := s1
               |}).
     (* Listen. *)

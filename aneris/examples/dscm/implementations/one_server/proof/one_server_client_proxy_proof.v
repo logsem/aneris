@@ -100,7 +100,7 @@ Section Spec.
              (sid : loc) (sh : socket_handle) : iProp Σ :=
     (∃ (n : nat) R T,
          sid ↦[ip] #n
-         ∗ sh ↪[ip] (udp_socket (Some client_addr) false)
+         ∗ sh ↪[ip] (mkSocket (Some client_addr) false)
          ∗ client_addr ⤳ (R, T)
        (*  ∗ ([∗ set] m ∈ R, ∃ (sid : nat) dres,
               ⌜s_is_ser reply_serializer DB_serialization
@@ -128,8 +128,7 @@ Theorem install_proxy_spec
      wp_socket sh as "Hsh /=". wp_pures.
      wp_alloc l as "Hl". wp_pures.
      rewrite ip_eq.
-     set s := {| sfamily := PF_INET; stype := SOCK_DGRAM;
-                  sprotocol := IPPROTO_UDP; saddress := None |}.
+     set s := {| saddress := None |}.
      iApply (aneris_wp_socket_interp_alloc_singleton client_si with "Hunallocated").
      iIntros "#Hclient".
      wp_socketbind.
@@ -275,7 +274,7 @@ Definition client_si' (γ : gname) : socket_interp Σ :=
   Hdb : DB_addresses = [srv_addr]
   sh : socket_handle
   l : loc
-  s := udp_socket None true : socket
+  s := mkSocket None true : socket
   lock : val
   γ_lock : gname
   ============================

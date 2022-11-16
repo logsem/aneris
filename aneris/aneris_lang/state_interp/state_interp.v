@@ -507,7 +507,7 @@ Section state_interpretation.
   Lemma aneris_state_interp_send
         sh saT sagT saR sagR bs br skt Sn r R T φ mbody σ1 mh msg' :
     let ip := ip_of_address saT in
-    let msg := mkMessage saT saR (sprotocol skt) mbody in
+    let msg := mkMessage saT saR mbody in
     let M' := {[+ msg +]} ⊎ state_ms σ1 in
     let σ2 := σ1 <| state_ms := M' |> in
     state_sockets σ1 !! ip_of_address saT = Some Sn →
@@ -539,7 +539,6 @@ Section state_interpretation.
     set (msg := {|
             m_sender := saT;
             m_destination := saR;
-            m_protocol := sprotocol skt;
             m_body := mbody |}).
     iDestruct (messages_mapsto_ctx_valid with "Hrt Hmctx") as %Hma.
     destruct (decide (msg ∈ T)).
@@ -608,7 +607,7 @@ Section state_interpretation.
 
   Lemma aneris_state_interp_send_duplicate sh saT sagT saR sagR bs br skt Sn r R T mbody σ1 mh :
     let ip := ip_of_address saT in
-    let msg := mkMessage saT saR (sprotocol skt) mbody in
+    let msg := mkMessage saT saR mbody in
     let M' := {[+ msg +]} ⊎ state_ms σ1 in
     let σ2 := σ1 <| state_ms := M' |> in
     state_sockets σ1 !! ip_of_address saT = Some Sn →
@@ -638,7 +637,6 @@ Section state_interpretation.
     set (msg := {|
             m_sender := saT;
             m_destination := saR;
-            m_protocol := sprotocol skt;
             m_body := mbody |}).
     iDestruct (messages_mapsto_ctx_valid with "Hrt Hmctx") as %Hma.
     destruct (decide (msg ∈ T)).

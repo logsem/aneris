@@ -188,7 +188,7 @@ let rcb_init (val_ser[@metavar]) (val_deser[@metavar]) addrlst i =
   let inQueue : 'b inqueue Atomic.t = ref list_nil in
   let outQueues : 'a outqueues Atomic.t = ref (list_make n (queue_empty ())) in
   let lock = newlock () in
-  let socket_handler = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let socket_handler = udp_socket () in
   let addr = unSOME (list_nth addrlst i) in
   socketBind socket_handler addr;
   fork (send_thread val_ser i socket_handler lock addrlst) outQueues;

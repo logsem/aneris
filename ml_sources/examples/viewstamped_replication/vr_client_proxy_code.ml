@@ -44,7 +44,7 @@ let make_request (val_ser[@metavar]) len saddrl caddr sh lock reqId prmId =
 
 (* TODO: check and explain the code. *)
 let install_proxy (val_ser[@metavar]) saddrl caddr =
-  let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let sh = udp_socket () in
   let lock = newlock () in
   let prmId = ref 0 in
   let reqId = ref 0 in

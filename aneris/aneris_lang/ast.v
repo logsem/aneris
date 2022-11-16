@@ -6,18 +6,6 @@ Definition ip_address := string.
 
 Definition port := positive.
 
-(** Socket definitions, subset of POSIX standard. *)
-Inductive address_family :=
-| PF_INET.
-
-(* Supported socket types. *)
-Inductive socket_type :=
-| SOCK_DGRAM.
-
-(* Supported protocols. *)
-Inductive protocol :=
-| IPPROTO_UDP.
-
 Inductive socket_address :=
 | SocketAddressInet (address : ip_address) (port : positive).
 
@@ -31,11 +19,9 @@ Definition port_of_address (sa : socket_address) : positive :=
   end.
 
 Record socket := mkSocket {
-  sfamily : address_family;
-  stype : socket_type;
-  sprotocol : protocol;
   saddress : option socket_address;
-  sblock : bool;             }.
+  sblock : bool;
+}.
 
 (** Grammar of AnerisLang *)
 Delimit Scope expr_scope with E.
@@ -51,8 +37,6 @@ Definition loc := positive. (* Really, any countable type. *)
 Inductive base_lit : Set :=
 | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitLoc (l : loc)
 | LitString (s : string)
-| LitAddressFamily (a : address_family)
-| LitSocketType (t : socket_type) | LitProtocol (p : protocol)
 | LitSocket (s : socket_handle) | LitSocketAddress (s : socket_address).
 Inductive un_op : Set :=
 | NegOp | MinusUnOp | StringOfInt | IntOfString | StringLength.
@@ -95,7 +79,7 @@ Inductive expr :=
 (* Sockets/Network *)
 | MakeAddress (e1 : expr) (e2 : expr)
 | GetAddressInfo (e : expr)
-| NewSocket (e1 : expr) (e2 : expr) (e3 : expr)
+| NewSocket (e : expr)
 | SocketBind (e1 : expr) (e2 : expr)
 | SendTo (e1 : expr) (e2 : expr) (e3 : expr)
 | ReceiveFrom (e1 : expr)
@@ -136,9 +120,6 @@ Notation "¾" := (3/4)%Qp.
 Coercion LitInt : Z >-> base_lit.
 Coercion LitBool : bool >-> base_lit.
 Coercion LitLoc : loc >-> base_lit.
-Coercion LitAddressFamily : address_family >-> base_lit.
-Coercion LitSocketType : socket_type >-> base_lit.
-Coercion LitProtocol : protocol >-> base_lit.
 Coercion LitSocketAddress : socket_address >-> base_lit.
 Coercion LitString : string >-> base_lit.
 
@@ -290,14 +271,6 @@ Notation "'letrec:' f x y .. z := e1 'in' e2" :=
   (at level 200, f at level 1, x,y,z at level 1, e1, e2 at level 200,
    format "'[' 'letrec:'  f  x y .. z :=  '/  ' '[' e1 ']'  'in'  '/' e2 ']'")
   : expr_scope.
-
-Notation udp_socket a b :=
-  {| sfamily := PF_INET;
-     stype := SOCK_DGRAM;
-     sblock := b;
-     sprotocol :=
-       IPPROTO_UDP;
-     saddress := a |}.
 
 (** Constructions on top of the language *)
 

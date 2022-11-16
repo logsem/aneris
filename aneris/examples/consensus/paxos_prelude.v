@@ -262,13 +262,13 @@ Section paxos_prelude.
   Definition is_mdl_message (M : Message) (m : message) :=
     match M with
     | msg1a b =>
-      ∃ (p : Proposer) (a : Acceptor), m = mkMessage (`p) (`a) IPPROTO_UDP (msg1a_ser b)
+      ∃ (p : Proposer) (a : Acceptor), m = mkMessage (`p) (`a) (msg1a_ser b)
     | msg1b a b mv =>
-      ∃ (p : Proposer), m = mkMessage (`a) (`p) IPPROTO_UDP (msg1b_ser b mv)
+      ∃ (p : Proposer), m = mkMessage (`a) (`p) (msg1b_ser b mv)
     | msg2a b v =>
-      ∃ (p : Proposer) (a : Acceptor), m = mkMessage (`p) (`a) IPPROTO_UDP (msg2a_ser b v)
+      ∃ (p : Proposer) (a : Acceptor), m = mkMessage (`p) (`a) (msg2a_ser b v)
     | msg2b a b v =>
-      ∃ (l : Learner), m = mkMessage (`a) (`l) IPPROTO_UDP (msg2b_ser b v)
+      ∃ (l : Learner), m = mkMessage (`a) (`l) (msg2b_ser b v)
   end.
 
   Definition messages_model_agree (δms : gset Message) (T : gset message) :=
@@ -463,7 +463,7 @@ Section paxos_prelude.
   Qed.
 
    Lemma is_mdl_message_2b_inv M a l b v :
-    is_mdl_message M (udp_msg (`a) l (msg2b_ser b v)) → M = msg2b a b v.
+    is_mdl_message M (mkMessage (`a) l (msg2b_ser b v)) → M = msg2b a b v.
   Proof.
     destruct M.
     - destruct 1 as (?&?& [= Ha Hl Heq]).

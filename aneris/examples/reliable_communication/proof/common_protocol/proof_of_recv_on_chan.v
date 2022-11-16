@@ -193,7 +193,6 @@ Section Proof_of_process_data_on_chan.
                ({[{|
                 m_sender := sa;
                 m_destination := dst;
-                m_protocol := sprotocol sock;
                 m_body := s
                    |}]} ∪ T). iFrame. }
         wp_pures. iApply "HΦ". iExists ridx, (i+1). iFrame.
@@ -225,7 +224,6 @@ Section Proof_of_process_data_on_chan.
       { iIntros "!>". iExists R, ({[{|
                 m_sender := sa;
                 m_destination := dst;
-                m_protocol := sprotocol sock;
                 m_body := s
               |}]} ∪ T).
         iDestruct "IH" as "(IH1 & (%T0 & %T1 & IH2) & IH3)".
@@ -257,7 +255,6 @@ Section Proof_of_process_data_on_chan.
       { iIntros "!>". iExists _, ({[{|
                 m_sender := sa;
                 m_destination := dst;
-                m_protocol := sprotocol sock;
                 m_body := s
               |}]} ∪ T). iFrame. }
       wp_pures. iApply "HΦ". iExists ridx, ackId. iFrame.
@@ -285,7 +282,6 @@ Section Proof_of_process_data_on_chan.
       iExists R, ({[{|
                 m_sender := sa;
                 m_destination := dst;
-                m_protocol := sprotocol sock;
                 m_body := s
               |}]} ∪ T).
       iDestruct "IH" as "(IH1 & (%T0 & %T1 & IH2) & IH3)".

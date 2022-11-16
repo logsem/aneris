@@ -145,9 +145,8 @@ Lemma resend_listen_spec ip P Q h s R T a mt handler φ ψ :
        + assert ( {|
                     m_sender := a;
                     m_destination := m_destination mt;
-                    m_protocol := sprotocol s;
                     m_body := m_body mt  |} = mt) as ->.
-         { rewrite -Hsender. by destruct mt, m_protocol, sprotocol; simpl. }
+         { rewrite -Hsender. by destruct mt. }
          set_solver.
        + iIntros "(Hs & Hm)".
          do 6 (wp_pure _).

@@ -50,7 +50,7 @@ Definition send_thread val_ser : val :=
 
 Definition init_network val_ser : val :=
   λ: "srv",
-  let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "sh" := NewSocket #() in
   let: "lk" := newlock #() in
   SocketBind "sh" "srv";;
   let: "inQ" := ref (queue_empty #()) in

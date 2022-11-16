@@ -3,7 +3,7 @@ From aneris.aneris_lang.lib Require Export network_util_code.
 
 Definition server1 : val :=
   λ: "addr",
-  let: "socket" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "socket" := NewSocket #() in
   SocketBind "socket" "addr";;
   "socket".
 
@@ -24,7 +24,7 @@ Definition server : val :=
   server3 "socket" "m".
 
 Definition client : val := λ: "c_addr" "s_addr_1" "s_addr_2",
-  let: "socket" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "socket" := NewSocket #() in
   SocketBind "socket" "c_addr";;
   SendTo "socket" #"do" "s_addr_1";;
   SendTo "socket" #"do" "s_addr_2";;

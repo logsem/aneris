@@ -50,12 +50,12 @@ Section library.
       {{{ True }}}
         f (#(m_body m), #(m_sender m))%V @[ip_of_address a]
       {{{ (b : bool), RET #b; if b then Ψ m else True }}}) -∗
-    {{{ h ↪[ip_of_address a] (udp_socket (Some a) true) ∗
+    {{{ h ↪[ip_of_address a] (mkSocket (Some a) true) ∗
         a ⤇ φ ∗
         a @ φ ⤳# (R, T) }}}
       wait_receivefrom #(LitSocket h) f @[ip_of_address a]
     {{{ m R', RET (#(m_body m), #(m_sender m));
-        h ↪[ip_of_address a] (udp_socket (Some a) true) ∗
+        h ↪[ip_of_address a] (mkSocket (Some a) true) ∗
         a @ φ ⤳# (R', T) ∗
         Ψ m ∗ φ m }}}.
   Proof.
@@ -76,24 +76,24 @@ Section library.
   (* TODO: Maybe move this elsewhere *)
   Definition pair_to_msg (sa : socket_address)
              (m : message_body * socket_address) : message :=
-    mkMessage m.2 sa IPPROTO_UDP m.1.
+    mkMessage m.2 sa m.1.
 
   Instance pair_to_msg_injective sa : Inj eq eq (pair_to_msg sa).
   Proof. intros [] [] Heq. by simplify_eq. Qed.
 
   Lemma pair_to_msg_id m :
     pair_to_msg (m_destination m) (m_body m, m_sender m) = m.
-  Proof. destruct m. destruct m_protocol. done. Qed.
+  Proof. by destruct m. Qed.
 
   Lemma wp_wait_receivefresh a φ R T h l
         (ms : list (message_body * socket_address)) :
     is_list ms l →
     R = gset_map (pair_to_msg a) (list_to_set ms) →
-    {{{ h ↪[ip_of_address a] (udp_socket (Some a) true) ∗ a ⤇ φ ∗ a ⤳ (R, T) }}}
+    {{{ h ↪[ip_of_address a] (mkSocket (Some a) true) ∗ a ⤇ φ ∗ a ⤳ (R, T) }}}
       wait_receivefresh #(LitSocket h) l @[ip_of_address a]
     {{{ m, RET (#(m_body m), #(m_sender m));
            ⌜m_destination m = a⌝ ∗
-           h ↪[ip_of_address a] (udp_socket (Some a) true) ∗
+           h ↪[ip_of_address a] (mkSocket (Some a) true) ∗
            a ⤳ ({[m]} ∪ R, T) ∗ φ m }}}.
   Proof.
     iIntros (Hl Heq Φ) "(Hh & #Hsi & Ha) HΦ".
@@ -290,7 +290,7 @@ Section library.
   Qed.
 
   Lemma wp_sendto_all f m ip a h s R T ns nodes :
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     ip = ip_of_address a →
     saddress s = Some a →
     {{{ h ↪[ip] s
@@ -318,7 +318,7 @@ Section library.
 
   Lemma wp_pers_sendto_all f m a h s R T ns nodes Ψ :
     let ip := ip_of_address a in
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     saddress s = Some a →
     {{{ h ↪[ip] s
           ∗ a @ Ψ ⤳# (R, T)
@@ -344,7 +344,7 @@ Section library.
   Qed.
 
   Lemma wp_sendto_all_set f m ip a h s R T ns nodes :
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     ip = ip_of_address a →
     saddress s = Some a →
     {{{ h ↪[ip] s
@@ -371,7 +371,7 @@ Section library.
   Qed.
 
   Lemma wp_sendto_all_vs P Q E m ip a h s ns nodes :
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     ip = ip_of_address a →
     saddress s = Some a →
     is_set nodes ns →
@@ -399,7 +399,7 @@ Section library.
   Qed.
 
   Lemma wp_sendto_all_take_step P Q Φ E m ip a h s ns nodes :
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     ip = ip_of_address a →
     saddress s = Some a →
     is_set nodes ns →
@@ -434,7 +434,7 @@ Section library.
   Qed.
 
   Lemma wp_pers_sendto_all_vs P Q E m ip a h s ns nodes :
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     ip = ip_of_address a →
     saddress s = Some a →
     is_set nodes ns →
@@ -458,7 +458,7 @@ Section library.
   Qed.
 
   Lemma wp_pers_sendto_all_take_step P Q Φ E m ip a h s ns nodes :
-    let msg n := mkMessage a n (sprotocol s) m in
+    let msg n := mkMessage a n m in
     ip = ip_of_address a →
     saddress s = Some a →
     is_set nodes ns →

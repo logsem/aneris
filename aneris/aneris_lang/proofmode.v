@@ -220,7 +220,7 @@ Proof.
   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono.
 Qed.
 
-Lemma tac_wp_socket Δ Δ' E j K ip v1 v2 v3 Φ :
+Lemma tac_wp_socket Δ Δ' E j K ip Φ :
   MaybeIntoLaterNEnvs 1 Δ Δ' →
   (∀ h,
     ∃ Δ'',
@@ -229,18 +229,12 @@ Lemma tac_wp_socket Δ Δ' E j K ip v1 v2 v3 Φ :
         (Esnoc Enil j
           (h ↪[ip]
              ({|
-                 sfamily := v1;
-                 stype := v2;
-                 sprotocol := v3;
                  saddress := None;
                  sblock := true|})))
         Δ' = Some Δ'' ∧
       envs_entails
         Δ'' (WP fill K (of_val $ LitV (LitSocket h)) @[ip] E {{ Φ }})) →
-  envs_entails Δ (WP fill K (NewSocket
-                               (Val $ LitV $ LitAddressFamily v1)
-                               (Val $ LitV $ LitSocketType v2)
-                               (Val $ LitV $ LitProtocol v3)) @[ip] E {{ Φ }}).
+  envs_entails Δ (WP fill K (NewSocket #()) @[ip] E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ? HΔ. rewrite -aneris_wp_bind.
   iIntros "H". rewrite into_laterN_env_sound /=.
@@ -277,7 +271,7 @@ Proof.
 Qed.
 
 Lemma tac_wp_send Δ Δ1 Δ2 Δ3 Δ3' Δ4 E i j k K φ R T f ip m skt sh a Φ :
-  let msg := (mkMessage f a (sprotocol skt) m) in
+  let msg := (mkMessage f a m) in
   ip_of_address f = ip →
   saddress skt = Some f →
   MaybeIntoLaterNEnvs 1 Δ Δ1 →
@@ -309,7 +303,7 @@ Proof.
 Qed.
 
 Lemma tac_wp_send_duplicate Δ Δ1 Δ1' Δ2 E i j k K R T f ip m skt sh a Φ φ :
-  let msg := (mkMessage f a (sprotocol skt) m) in
+  let msg := (mkMessage f a m) in
   ip_of_address f = ip →
   saddress skt = Some f →
   msg ∈ T →
@@ -550,7 +544,7 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
     let process_single _ :=
         first [
             reshape_expr e ltac:(fun K e' => eapply (tac_wp_socket _ _ _ Htmp K ip))
-           |fail 1 "wp_socket: cannot find 'NewSocket' in" e];
+           |fail 1 "wp_socket: cannot find 'NewSocket #()' in" e];
         [iSolveTC
         |finish()]
     in (process_single ())
@@ -674,14 +668,11 @@ Tactic Notation "wp_send_duplicate" :=
 (*   let Hb := fresh "H" in *)
 (*   wp_receive msg Ha Hb as H. *)
 
-Local Lemma tac_socket_test `{anerisG Mdl Σ} ip E v1 v2 v3 :
+Local Lemma tac_socket_test `{anerisG Mdl Σ} ip E :
   {{{ True }}}
-    NewSocket
-    (Val $ LitV $ LitAddressFamily v1)
-    (Val $ LitV $ LitSocketType v2)
-    (Val $ LitV $ LitProtocol v3) @[ip] E
+    NewSocket #() @[ip] E
   {{{ h, RET (LitV (LitSocket h));
-      h ↪[ip] (mkSocket v1 v2 v3 None true) }}}.
+      h ↪[ip] (mkSocket None true) }}}.
 Proof.
   iIntros (?) "_ H".
   wp_socket sh as "Hsh".
@@ -709,7 +700,6 @@ Local Lemma tac_send_test `{anerisG Mdl Σ} ip φ m h a f E s R T :
   let msg := {|
         m_sender := f;
         m_destination := a;
-        m_protocol := sprotocol s;
         m_body := m;
       |} in
   {{{ ▷ h ↪[ip] s ∗ ▷ f ⤳ (R, T) ∗ ▷ a ⤇ φ ∗ ▷ φ msg }}}
@@ -725,7 +715,7 @@ Qed.
 Local Lemma tac_send_duplicate_test `{anerisG Mdl Σ} ip φ m h a f E s R T :
   ip_of_address f = ip →
   saddress s = Some f ->
-  let msg := mkMessage f a (sprotocol s) m in
+  let msg := mkMessage f a m in
   msg ∈ T →
   {{{ ▷ h ↪[ip] s ∗ ▷ f ⤳ (R, T) ∗ ▷ a ⤇ φ }}}
     SendTo (Val $ LitV $ LitSocket h) #m #a @[ip] E

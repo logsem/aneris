@@ -65,7 +65,7 @@ Definition statelib_init (st_ser : val) (st_deser : val) : val :=
   let: "merge" := Snd "crdt" in
   let: "st" := ref "init_st" in
   let: "lk" := newlock #() in
-  let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "sh" := NewSocket #() in
   let: "addr" := unSOME (list_nth "addrlst" "rid") in
   SocketBind "sh" "addr";;
   Fork (apply st_deser "lk" "sh" "st" "merge");;

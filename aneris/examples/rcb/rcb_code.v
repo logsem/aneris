@@ -177,7 +177,7 @@ Definition rcb_init val_ser val_deser : val :=
   let: "inQueue" := ref [] in
   let: "outQueues" := ref (list_make "n" (queue_empty #())) in
   let: "lock" := newlock #() in
-  let: "socket_handler" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "socket_handler" := NewSocket #() in
   let: "addr" := unSOME (list_nth "addrlst" "i") in
   SocketBind "socket_handler" "addr";;
   Fork (send_thread val_ser "i" "socket_handler" "lock" "addrlst" "outQueues");;

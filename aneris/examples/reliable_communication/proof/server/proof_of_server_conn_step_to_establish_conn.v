@@ -150,13 +150,11 @@ Section Proof_of_server_conn_step_2.
       set (mt := {|
                   m_sender := RCParams_srv_saddr;
                   m_destination := m_sender m;
-                  m_protocol := sprotocol sock;
                   m_body := s1
                 |}).
       simpl in *.
       assert (mt = mm) as Heqmm.
-      { rewrite /mt. rewrite -Hmbdy_eq. destruct mm. simpl. simplify_eq /=. f_equal; subst.
-        destruct sock, m_protocol. simpl. destruct sprotocol. done. }
+      { rewrite /mt. rewrite -Hmbdy_eq. destruct mm. simpl. simplify_eq /=. f_equal. }
       assert (mt ∈ T0) as Ht0 by set_solver.
       set_solver.
       iFrame "#".
@@ -356,7 +354,6 @@ Section Proof_of_server_conn_step_2.
           set (resp := {|
                         m_sender := RCParams_srv_saddr;
                         m_destination := m_sender m;
-                        m_protocol := sprotocol sock;
                         m_body := s1
                       |}).
           iDestruct "HmTauth" as (T00 HsubT00) "HmTauth".
@@ -469,7 +466,7 @@ Section Proof_of_server_conn_step_2.
                iSplit.
                { iExists m, _. iPureIntro.
                  split; first by set_solver.
-                 split_and!; eauto. by destruct (m_protocol m). }
+                 split_and!; eauto. }
                iSplit.
                { iExists resp, _. iPureIntro.
                  split; first by set_solver.
@@ -506,7 +503,7 @@ Section Proof_of_server_conn_step_2.
                 iDestruct "Hpers"
                   as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk & Hinv)".
                 iRight.
-                destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ? & ?).
+                destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ?).
                 destruct Hhst4i as (y4 & ? & ? & ? & ? & ? & ?).
                 subst.
                 iExists γc', _, _, _, _, _.

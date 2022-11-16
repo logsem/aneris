@@ -90,7 +90,7 @@ Section crdt_convergence_lemmas.
       ev.(pre_expr) = (mkExpr (ip_of_address from) (SendTo #(LitSocket sh) #mbody #to)) ∧
       ev.(post_expr) = (mkExpr (ip_of_address from) #(String.length mbody)) ∧
       ev.(post_state) = ev.(pre_state)
-                             <| state_ms := {[+ mkMessage from to (sprotocol skt) mbody +]}
+                             <| state_ms := {[+ mkMessage from to mbody +]}
                                               ⊎ ev.(pre_state).(state_ms) |>.
 
   Definition is_send (i j : nat) (ev : EventObservation aneris_lang) : Prop :=
@@ -117,7 +117,7 @@ Section crdt_convergence_lemmas.
     { right; intros (?&?&?&?&?&?&?&?&?&?&?&?&?&?&?); simplify_eq/=. }
     destruct (skts !! sh) as [[skt r]|] eqn:Hsktssh; last first.
     { right; intros (?&?&?&?&?&?&?&?&?&?&?&?&?&?&?); simplify_eq/=. }
-    destruct (decide (σ' = σ <| state_ms := {[+ mkMessage from to (sprotocol skt) mbody +]}
+    destruct (decide (σ' = σ <| state_ms := {[+ mkMessage from to mbody +]}
                                             ⊎ σ.(state_ms) |>)) as [->|]; last first.
     { right; intros (?&?&?&?&?&?&?&?&?&?&?&?&?&?&?); simplify_eq/=. }
     destruct (decide (saddress skt = Some from)); last first.

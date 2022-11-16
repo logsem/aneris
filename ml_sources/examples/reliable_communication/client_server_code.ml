@@ -56,7 +56,7 @@ type ('a, 'b) server_skt =
     one step. **)
 
 let make_skt (ser[@metavar]) (deser[@metavar]) (sa : saddr) : ('a, 'b) skt =
-  let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let sh = udp_socket () in
   socketBind sh sa;
   ((sh, ((gen_msg_ser ser).s_ser, (gen_msg_ser deser).s_deser)), ser.s_ser)
 

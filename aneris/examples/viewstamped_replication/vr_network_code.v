@@ -19,7 +19,7 @@ Definition cfg_cell : val :=
 
 Definition init_socket_ij : val :=
   λ: "cfg" "i" "j",
-  let: "sh" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "sh" := NewSocket #() in
   let: "addr" := cfg_cell "cfg" "i" "j" in
   (if: "i" = "j"
    then  SetReceiveTimeout "sh" #2 #0

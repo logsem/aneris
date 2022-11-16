@@ -79,7 +79,7 @@ let statelib_init
   let ((init_st, mut), merge) = crdt in
   let st = ref init_st in
   let lk = newlock () in
-  let sh = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let sh = udp_socket () in
   let addr = unSOME (list_nth addrlst rid) in
   socketBind sh addr;
   fork (apply st_deser lk sh st) merge;

@@ -12,13 +12,13 @@ Section paxos_acceptor.
     (if b is Some bal' then bal > bal' else True) →
     {{{ inv paxosN paxos_inv ∗
         ([∗ set] p ∈ Proposers, p ⤇ proposer_si) ∗
-        h ↪[ ip] udp_socket (Some (`a)) true ∗
+        h ↪[ ip] mkSocket (Some (`a)) true ∗
         maxVal_frag a maxVal ∗
         maxBal_frag a b ∗
         msgs_elem_of (msg1a bal) }}}
       SendTo #(LitSocket h) #s #(`p) @[ip]
     {{{ RET #(String.length s);
-        h ↪[ip] udp_socket (Some (`a)) true ∗
+        h ↪[ip] mkSocket (Some (`a)) true ∗
         maxVal_frag a maxVal ∗
         maxBal_frag a (Some bal) ∗
         msgs_elem_of (msg1b a bal maxVal) }}}.
@@ -49,7 +49,7 @@ Section paxos_acceptor.
     iExists _. iModIntro. iFrame. iSplitR "HbI"; last first.
     { iApply ballot_inv_maxBal.
       iApply ballot_inv_send_not2a; [|done]. intros (?&?& [=]). }
-    set (m' := udp_msg (`a) (`p) s).
+    set (m' := mkMessage (`a) (`p) s).
     iExists (<[(`a) := {[m']} ∪ F' (`a)]>F'), _.
     rewrite (send_msg_notin _ Proposers); [|auto]. iFrame.
     iDestruct (send_msg_combine with "Ha Has") as "$"; [auto|].
@@ -72,13 +72,13 @@ Section paxos_acceptor.
     (if b is Some bal' then bal ≥ bal' else True) →
     {{{ inv paxosN paxos_inv ∗
         ([∗ set] l ∈ Learners, l ⤇ learner_si) ∗
-        h ↪[ ip] udp_socket (Some (`a)) true ∗
+        h ↪[ ip] mkSocket (Some (`a)) true ∗
         maxVal_frag a mv ∗
         maxBal_frag a b ∗
         msgs_elem_of (msg2a bal val) }}}
       sendto_all_set #(LitSocket h) lv #s @[ip]
     {{{ RET #();
-        h ↪[ip] udp_socket (Some (`a)) true ∗
+        h ↪[ip] mkSocket (Some (`a)) true ∗
         maxVal_frag a (Some (bal, val)) ∗
         maxBal_frag a (Some bal) ∗
         [∗ set] _ ∈ Learners, msgs_elem_of (msg2b a bal val) }}}.
@@ -126,8 +126,7 @@ Section paxos_acceptor.
         iSplitR "HbI"; last first.
         { iApply ballot_inv_maxBal_maxVal.
           iApply ballot_inv_send_not2a; [|done]. naive_solver. }
-        set (m := {| m_sender := `a; m_destination := l;
-                     m_protocol := _; m_body := s |}).
+        set (m := {| m_sender := `a; m_destination := l; m_body := s |}).
         iExists (<[(`a) := {[m]} ∪ F' (`a)]>F'), _. simpl.
         rewrite (send_msg_notin _ Proposers); [|auto]. iFrame.
         iDestruct (send_msg_combine with "Ha Has") as "$"; [auto|].
@@ -151,8 +150,7 @@ Section paxos_acceptor.
         iSplitR "HbI"; last first.
         { iApply ballot_inv_maxBal_maxVal.
           iApply ballot_inv_send_not2a; [|done]. naive_solver. }
-        set (m := {| m_sender := `a; m_destination := l;
-                     m_protocol := _; m_body := s |}).
+        set (m := {| m_sender := `a; m_destination := l; m_body := s |}).
         iExists (<[(`a) := {[m]} ∪ F' (`a)]>F'), _. simpl.
         rewrite (send_msg_notin _ Proposers); [|auto]. iFrame.
         iDestruct (send_msg_combine with "Ha Has") as "$"; [auto|].

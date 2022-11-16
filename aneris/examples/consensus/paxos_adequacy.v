@@ -419,7 +419,7 @@ Definition ChosenImpl (s : state) (v : Value) :=
     QuorumA Q ∧
     ∀ a, a ∈ Q →
          ∃ (l : Learner),
-           mkMessage (`a) (`l) IPPROTO_UDP (msg2b_ser b v) ∈ s.(state_ms).
+           mkMessage (`a) (`l) (msg2b_ser b v) ∈ s.(state_ms).
 
 Corollary paxos_correct_impl v1 v2 tp σ ex:
   trace_starts_in ex ([runner_expr], init_state) →
@@ -445,7 +445,7 @@ Proof.
     destruct (Ha1 a' Ha') as (l1 & Hm1).
     replace σ with ((trace_last ex).2) in Hm1; last by erewrite last_eq_trace_ends_in; eauto.
     apply trace_messages_history_includes_last in Hm1.
-    edestruct (Hsent (udp_msg (`a') (`l1) (msg2b_ser b1 v1)))
+    edestruct (Hsent (mkMessage (`a') (`l1) (msg2b_ser b1 v1)))
       as (M & HinM & <-%is_mdl_message_2b_inv).
     { apply elem_of_filter. simpl. split; [apply elem_of_union_l; auto|].
       by rewrite HeqH in Hm1. }
@@ -455,7 +455,7 @@ Proof.
     destruct (Ha2 a' Ha') as (l2 & Hm2).
     replace σ with ((trace_last ex).2) in Hm2; last by erewrite last_eq_trace_ends_in; eauto.
     apply trace_messages_history_includes_last in Hm2.
-    edestruct (Hsent (udp_msg (`a') (`l2) (msg2b_ser b2 v2)))
+    edestruct (Hsent (mkMessage (`a') (`l2) (msg2b_ser b2 v2)))
       as (M & HinM & <-%is_mdl_message_2b_inv).
     { apply elem_of_filter. simpl.
       split; [apply elem_of_union_l; auto|].

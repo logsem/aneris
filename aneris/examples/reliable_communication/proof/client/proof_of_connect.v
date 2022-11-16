@@ -109,11 +109,7 @@ Section Proof_of_connect.
     wp_alloc lLB as "(HsidLB1 & HsidLB2)".
     wp_alloc lAD as "(Hackid1 & Hackid2)".
     wp_pures.
-    set (sock := {|sfamily := sfamily s;
-                   stype := stype s;
-                   sprotocol := sprotocol s;
-                   saddress := saddress s; sblock := true
-                  |}).
+    set (sock := {| saddress := saddress s; sblock := true |}).
     iMod ((inv_alloc
              (chan_N (session_chan_name γ))
             _ (socket_inv_def h clt_addr sock Left))

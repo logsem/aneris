@@ -2,7 +2,7 @@ open Ast
 open Network_util_code
 
 let pong addr =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt addr;
   (* Receiving the initial message. We check that the body is "PING". *)
   let msg = unSOME (receiveFrom skt) in
@@ -21,7 +21,7 @@ let pong addr =
   in loop ()
   
  let ping addr server =
-  let skt = socket PF_INET SOCK_DGRAM IPPROTO_UDP in
+  let skt = udp_socket () in
   socketBind skt addr;
   (* Sending the inital "PING" message. *)
   ignore (sendTo skt "PING" server);

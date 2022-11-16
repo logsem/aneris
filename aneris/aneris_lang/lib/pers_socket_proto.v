@@ -108,7 +108,7 @@ Section pers_messages_lemmas.
   Lemma aneris_wp_pers_send ip φ ψ m h a f E s R T :
     ip_of_address f = ip →
     saddress s = Some f ->
-    let msg := mkMessage f a (sprotocol s) m in
+    let msg := mkMessage f a m in
     {{{ ▷ h ↪[ip] s ∗ ▷ f @ ψ ⤳# (R, T) ∗ ▷ a ⤇ φ ∗ ▷ φ msg }}}
       SendTo #(LitSocket h) #m #a @[ip] E
     {{{ RET #(String.length m); h ↪[ip] s ∗ f @ ψ ⤳# (R, {[ msg ]} ∪ T) }}}.
@@ -123,7 +123,7 @@ Section pers_messages_lemmas.
   Lemma aneris_wp_send_pers_duplicate ψ ip m h a f E s R T:
     ip_of_address f = ip →
     saddress s = Some f ->
-    let msg := mkMessage f a (sprotocol s) m in
+    let msg := mkMessage f a m in
     msg ∈ T →
     {{{ ▷ h ↪[ip] s ∗ ▷ f @ ψ ⤳# (R, T) ∗ a ⤇ ψ }}}
       SendTo #(LitSocket h) #m #a @[ip] E

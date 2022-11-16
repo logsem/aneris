@@ -7,18 +7,9 @@ From RecordUpdate Require Import RecordSet.
 From aneris.aneris_lang Require Import ast.
 
 Global Instance etaSocket : Settable _ :=
-  settable! mkSocket <sfamily; stype; sprotocol; saddress; sblock>.
+  settable! mkSocket <saddress; sblock>.
 
 Definition socket_handle := positive.
-
-Global Instance address_family_eq_dec : EqDecision address_family.
-Proof. solve_decision. Defined.
-
-Global Instance socket_type_eq_dec : EqDecision socket_type.
-Proof. solve_decision. Defined.
-
-Global Instance protocol_eq_dec : EqDecision protocol.
-Proof. solve_decision. Defined.
 
 Global Instance socket_address_eq_dec : EqDecision socket_address.
 Proof. solve_decision. Defined.
@@ -29,18 +20,6 @@ Proof. solve_decision. Qed.
 Global Program Instance socket_address_countable : Countable socket_address :=
   inj_countable (λ '(SocketAddressInet s p), (s, p))
                 (λ '(s,p), Some (SocketAddressInet s p)) _.
-Next Obligation. by intros []. Qed.
-
-Global Program Instance address_family_countable : Countable address_family :=
-  inj_countable (λ 'PF_INET, ()) (λ _, Some PF_INET) _.
-Next Obligation. by intros []. Qed.
-
-Global Program Instance socket_type_countable : Countable socket_type :=
-  inj_countable (λ 'SOCK_DGRAM, ()) (λ _, Some SOCK_DGRAM) _.
-Next Obligation. by intros []. Qed.
-
-Global Program Instance protocol_countable : Countable protocol :=
-  inj_countable (λ 'IPPROTO_UDP, ()) (λ _, Some IPPROTO_UDP) _.
 Next Obligation. by intros []. Qed.
 
 Global Instance: Inhabited socket_address := populate (SocketAddressInet "" 1%positive).
@@ -54,19 +33,18 @@ Definition message_body := string.
 Record message := mkMessage {
                       m_sender : socket_address;
                       m_destination : socket_address;
-                      m_protocol : protocol;
                       m_body : message_body;
                     }.
 
 Global Instance etaMessage : Settable _ :=
-  settable! mkMessage <m_sender; m_destination; m_protocol; m_body>.
+  settable! mkMessage <m_sender; m_destination; m_body>.
 
 Global Instance message_decidable : EqDecision message.
 Proof. solve_decision. Defined.
 
 Global Program Instance message_countable : Countable message :=
-  inj_countable (λ '(mkMessage s d m b), (s,d,m,b))
-                (λ '(s, d, p, b), Some (mkMessage s d p b)) _.
+  inj_countable (λ '(mkMessage s d b), (s,d,b))
+                (λ '(s, d, b), Some (mkMessage s d b)) _.
 Next Obligation. by intros []. Qed.
 
 Lemma message_inv m1 m2 :
@@ -75,7 +53,7 @@ Lemma message_inv m1 m2 :
   m_body m1 = m_body m2 →
   m1 = m2.
 Proof.
-  destruct m1 as [?? [] ?], m2 as [?? [] ?].
+  destruct m1 as [???], m2 as [???].
   move=> /= -> -> -> //.
 Qed.
 
@@ -107,8 +85,3 @@ Definition messages_to_receive_at_multi_soup (sa : socket_address) (M : message_
 Definition messages_sent_from_multi_soup (sa : socket_address) (M : message_multi_soup) :=
   filter (λ (m : message), m_sender m = sa) (gset_of_gmultiset M).
 
- Notation udp_msg s d b :=
-  {| m_sender := s;
-     m_destination := d;
-     m_protocol := IPPROTO_UDP;
-     m_body := b |}.

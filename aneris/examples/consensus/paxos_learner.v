@@ -11,11 +11,11 @@ Section paxos_learner.
     let ip := ip_of_address (`l) in
     is_set Acceptors av →
     `l ⤇ learner_si -∗
-    h ↪[ip] (udp_socket (Some (`l)) true) -∗
+    h ↪[ip] (mkSocket (Some (`l)) true) -∗
     `l @ learner_si ⤳# (R, T) -∗
     WP learner int_serializer #(LitSocket h) av @[ip]
     {{ v, ∃ (Q : gset Acceptor) (bal : Ballot) (val : Value) R T,
-            h ↪[ip] (udp_socket (Some (`l)) true) ∗
+            h ↪[ip] (mkSocket (Some (`l)) true) ∗
             `l @ learner_si ⤳# (R, T) ∗
             ⌜QuorumA Q⌝ ∗ ⌜v = $(bal, val)⌝ ∗
             [∗ set] a ∈ Q, msgs_elem_of (msg2b a bal val) }}.

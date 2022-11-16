@@ -42,15 +42,14 @@ Section Proof_of_connect_step_2.
     iRight. iSplit; first done. iExists γs. subst; iFrame; eauto.
   Qed.
 
-  Lemma conn_step_2_server_interp_holds clt_addr s1 s (ck : nat) :
+  Lemma conn_step_2_server_interp_holds clt_addr s1 (ck : nat) :
     ⌜s_is_ser (msg_serialization RCParams_clt_ser)
      (InjLV (#"COOKIE", #ck%nat)) s1⌝ ∗
     RCParams_srv_saddr ⤇ server_interp ∗
     clt_addr ⤇ client_interp ∗
     CookieRes clt_addr ck -∗
     server_interp {| m_sender := clt_addr;
-                    m_destination := RCParams_srv_saddr;
-                    m_protocol := sprotocol s; m_body := s1 |}.
+                    m_destination := RCParams_srv_saddr; m_body := s1 |}.
   Proof.
     iIntros "(%Hser & #Hsrv_si & #Hclt_si & Hck)".
     iExists (InjLV (#"COOKIE", #ck%nat)). simpl.
@@ -111,13 +110,12 @@ Section Proof_of_connect_step_2.
                with "[$Hh $Hmh Hck]"); [done|done|  | ].
     (* Prove the servers socket interp. *)
     { iSplit; iNext; first eauto.
-      by iApply ((conn_step_2_server_interp_holds clt_addr s1 _ ck)
+      by iApply ((conn_step_2_server_interp_holds clt_addr s1 ck)
                with "[$Hsrv_si $Hsi $Hck]"). }
     iIntros "(Hh & Hmh)". wp_pures.
     set (mt :=  {|
                 m_sender := clt_addr;
                 m_destination := RCParams_srv_saddr;
-                m_protocol := sprotocol s;
                 m_body := s1
               |}).
     (* Listen. *)

@@ -105,7 +105,7 @@ let[@builtinAtom "MakeAddress"] makeAddress (ip : string) (port : int) =
 let[@builtinAtom "GetAddrInfo"] get_address_info (s : saddr) =
   match s with | SADDR (ip, p) -> (ip, p)
 
-let[@builtinAtom "NewSocket"] socket x y z = socket x y (num_of_protocol z)
+let[@builtinAtom "NewSocket"] udp_socket () = socket PF_INET SOCK_DGRAM IPPROTO_UDP
 
 let[@builtinAtom "ReceiveFrom"] receiveFrom skt =
   let buffer = Bytes.create 65536 in

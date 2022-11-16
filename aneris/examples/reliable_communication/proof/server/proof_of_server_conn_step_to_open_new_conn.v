@@ -111,7 +111,6 @@ Section Proof_of_server_conn_step_1.
                set (resp := {|
                            m_sender := RCParams_srv_saddr;
                            m_destination := m_sender m;
-                           m_protocol := sprotocol sock;
                            m_body := s1
                          |}).
                iDestruct "HmTauth" as (T0 HsubT0) "HmTauth".
@@ -227,7 +226,7 @@ Section Proof_of_server_conn_step_1.
                        iExists _, _, _, _, _, _.
                        iFrame.
                        iSplit; iPureIntro; simpl.
-                       ++ destruct Heq1 as (m1 & v1 & Hm1 & Hser1 & Hdest1 & Hsender1 & Hpr1 & Hv1).
+                       ++ destruct Heq1 as (m1 & v1 & Hm1 & Hser1 & Hdest1 & Hsender1 & Hv1).
                           exists m1, v1. split_and!; eauto with set_solver.
                        ++ split.
                           destruct Hresp as (m2 & v2 & Hm2 & Hser2 & Hdest2 & Hsender2 & Hv2).

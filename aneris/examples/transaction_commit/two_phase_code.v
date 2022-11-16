@@ -10,7 +10,7 @@ From aneris.aneris_lang.lib Require Import nodup_code.
 
 Definition resource_manager : val :=
   λ: "rm" "tm",
-  let: "skt" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "skt" := NewSocket #() in
   SocketBind "skt" "rm";;
   let: "msg" := unSOME (ReceiveFrom "skt") in
   let: "value" := Fst "msg" in
@@ -41,7 +41,7 @@ Definition recv_responses : val :=
 
 Definition transaction_manager : val :=
   λ: "tm" "rms",
-  let: "skt" := NewSocket #PF_INET #SOCK_DGRAM #IPPROTO_UDP in
+  let: "skt" := NewSocket #() in
   SocketBind "skt" "tm";;
   let: "recv" := nodup_init #() in
   sendto_all_set "skt" "rms" #"PREPARE";;

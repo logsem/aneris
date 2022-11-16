@@ -147,7 +147,6 @@ Section Proof_of_send_loop.
            iExists R, ({[{|
                 m_sender := sa;
                 m_destination := dst;
-                m_protocol := sprotocol sock;
                 m_body := s
               |}]} ∪ T). iFrame. }
         wp_pures; by iApply "HΦ'".
@@ -177,7 +176,6 @@ Section Proof_of_send_loop.
           iExists R, ({[{|
                              m_sender := sa;
                              m_destination := dst;
-                             m_protocol := sprotocol sock;
                              m_body := s
                            |}]} ∪ T).
           iDestruct "IH" as "(IH1 & (%T0 & %T1 & IH2) & IH3)".

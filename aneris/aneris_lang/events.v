@@ -89,7 +89,7 @@ Program Definition sendonEV_groups (sag : gset socket_address) : Event aneris_la
          saddress skt = Some sa ∧
          e = (mkExpr (ip_of_address sa) (SendTo #(LitSocket sh) #mbody #to)) ∧
          e' = (mkExpr (ip_of_address sa) #(String.length mbody)) ∧
-         σ' = σ <| state_ms := {[+ mkMessage sa to (sprotocol skt) mbody +]} ⊎ σ.(state_ms) |>
+         σ' = σ <| state_ms := {[+ mkMessage sa to mbody +]} ⊎ σ.(state_ms) |>
   |}.
 Next Obligation.
 Proof.
@@ -120,7 +120,7 @@ Lemma sendonEV_groups_impure sag eo :
 Proof.
   destruct 1 as (sa&sh&mbody&to&skts&skt&r&Hsa&Hiplu&Hskts&Hskt&?&?&Hsts); intros Heq.
   rewrite -Heq in Hsts.
-  set (msg := {| m_sender := sa; m_destination := to; m_protocol := sprotocol skt; m_body := mbody |}).
+  set (msg := {| m_sender := sa; m_destination := to; m_body := mbody |}).
   pose proof (f_equal (λ σ, multiplicity msg σ.(state_ms)) Hsts) as Hsts2.
   rewrite /= multiplicity_disj_union multiplicity_singleton in Hsts2; lia.
 Qed.
@@ -155,7 +155,7 @@ Definition sendonObs (sa : socket_address) (σ : state) (sh : socket_handle)
     (mkExpr (ip_of_address sa) (SendTo #(LitSocket sh) #mbody #to))
     σ
     (mkExpr (ip_of_address sa) #(String.length mbody))
-    (σ <| state_ms := {[+ mkMessage sa to (sprotocol skt) mbody +]} ⊎ σ.(state_ms) |>).
+    (σ <| state_ms := {[+ mkMessage sa to mbody +]} ⊎ σ.(state_ms) |>).
 
 Definition valid_sendonObs (sa : socket_address) (σ : state) (sh : socket_handle)
            (skts : sockets) (skt : socket) (r : list message) :=

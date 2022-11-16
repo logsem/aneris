@@ -261,7 +261,7 @@ Section proof.
     gcd_addr_list gcdata !! i = Some a →
     {{{ ([∗ list] a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
         GCallocated i l ∗ Global_Inv ∗ recevs_frag i [] ∗
-        inv (nroot .@ "skt") (sh ↪[ip_of_address a] udp_socket (Some a) true) }}}
+        inv (nroot .@ "skt") (sh ↪[ip_of_address a] mkSocket (Some a) true) }}}
       gcounter_apply #l #(LitSocket sh) @[ip_of_address a]
     {{{ RET #(); True }}}.
   Proof.
@@ -292,7 +292,7 @@ Section proof.
     { iSplitL; last iNext; auto. }
     iIntros (m) "(% & H & Hprevs)".
     iDestruct "Hprevs" as (σ stks r ?) "(Hprevs & _ & _)".
-    iAssert (sh ↪[ ip_of_address a] udp_socket (Some a) true ∗
+    iAssert (sh ↪[ ip_of_address a] mkSocket (Some a) true ∗
              GCounter_socket_proto m ∗
              ∃ R T, a ⤳[true, true] (R, T) ∗ ([∗ set] m ∈ R, GCounter_socket_proto m))%I
       with "[H HR]" as "(Hsh' & #Hm & Hnet)".
@@ -345,7 +345,7 @@ Section proof.
     vc_is_ser (vector_clock_to_val vc) s →
     (∀ sev, sev ∈ sevs → vc_le sev.2.1 vc) →
     {{{ GCounterSnapShot i vc ∗
-        inv (nroot.@"skt") (sh ↪[ ip_of_address a] udp_socket (Some a) true) ∗
+        inv (nroot.@"skt") (sh ↪[ ip_of_address a] mkSocket (Some a) true) ∗
         Global_Inv ∗ sendevs_frag i sevs ∗ GCallocated i l ∗
         [∗ list] a0 ∈ gcd_addr_list gcdata, a0 ⤇ GCounter_socket_proto }}}
       sendToAll #(LitSocket sh) #s v #i @[ip_of_address a]
@@ -471,7 +471,7 @@ Section proof.
     is_list (gcd_addr_list gcdata) v →
     {{{ ([∗ list] a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
         GCallocated i l ∗ Global_Inv ∗ sendevs_frag i [] ∗
-        inv (nroot .@ "skt") (sh ↪[ip_of_address a] udp_socket (Some a) true) }}}
+        inv (nroot .@ "skt") (sh ↪[ip_of_address a] mkSocket (Some a) true) }}}
       gcounter_broadcast #l #(LitSocket sh) v #i @[ip_of_address a]
     {{{ RET #(); True }}}.
   Proof.
@@ -819,12 +819,11 @@ Section proof.
     rewrite Hia in Hr; simplify_eq.
     wp_apply wp_unSOME; first done.
     iIntros "_".
-    rewrite /mk_udp_socket.
     wp_pures.
     wp_socket sh as "Hsh".
     wp_pures.
     wp_socketbind.
-    iMod (inv_alloc (nroot .@ "skt") _ (sh ↪[ ip_of_address r] udp_socket (Some r) true)
+    iMod (inv_alloc (nroot .@ "skt") _ (sh ↪[ ip_of_address r] mkSocket (Some r) true)
             with "[$Hsh //]") as "#Hsh".
     wp_apply aneris_wp_fork.
     iSplitR "Hrevsfrg"; last first.

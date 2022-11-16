@@ -40,7 +40,7 @@ Section echo.
        (∃ m, ⌜set_Exists (λ m', m ≡g{{[saT]},sagR} m') R⌝ ∗ ⌜T = ∅⌝ ∗
              Do γe ∗ Done γe) ∨
        (∃ m, ⌜set_Exists (λ m', m ≡g{{[saT]},sagR} m') R⌝ ∗
-             ⌜set_Exists (λ m', udp_msg (m_destination m) (m_sender m) "done"
+             ⌜set_Exists (λ m', mkMessage (m_destination m) (m_sender m) "done"
                                    ≡g{sagR,{[saT]}} m') T⌝ ∗ Do γe)).
 
   Definition server_si γ saT : socket_interp Σ  :=
@@ -52,14 +52,12 @@ Section echo.
   Definition message_I : message :=
     {| m_sender := SocketAddressInet "" xH;
        m_destination := SocketAddressInet "" xH;
-       m_protocol := IPPROTO_UDP;
        m_body := "" |}.
 
   (* TODO: Move this into aneris proper *)
   Instance message_inhabited : Inhabited message :=
     populate {| m_sender := SocketAddressInet "" xH;
                 m_destination := SocketAddressInet "" xH;
-                m_protocol := IPPROTO_UDP;
                 m_body := "" |}.
 
   Lemma server_spec1 saR ip port Φ :
@@ -70,7 +68,7 @@ Section echo.
     (∀ sh,
         sh ↪[ ip_of_address saR] RecordSet.set saddress
                                  (λ _ : option socket_address, Some saR)
-                                 (udp_socket None true) -∗ Φ #(LitSocket sh)) -∗
+                                 (mkSocket None true) -∗ Φ #(LitSocket sh)) -∗
     WP (server1 #saR) @[ip] {{ v, Φ v }}.
   Proof.
     iIntros (-> ->) "Hports HΦ".
@@ -95,11 +93,11 @@ Section echo.
     inv N (echo_inv γe γi saT sagR) -∗
     sh ↪[ ip_of_address saR] RecordSet.set saddress
                                  (λ _ : option socket_address, Some saR)
-                                 (udp_socket None true) -∗
+                                 (mkSocket None true) -∗
     (∀ m, ⌜m_sender m = saT⌝ ∗ ⌜m_destination m = saR⌝ ∗
           sh ↪[ ip_of_address saR] RecordSet.set saddress
             (λ _ : option socket_address, Some saR)
-            (udp_socket None true) ∗
+            (mkSocket None true) ∗
             hist_view γi {[m]} -∗
             Φ (PairV (LitV $ LitString (m_body m))
                      (LitV $ LitSocketAddress (m_sender m)))) -∗
@@ -238,7 +236,7 @@ Section echo.
     hist_view γi {[m]} -∗
     sh ↪[ ip_of_address saR] RecordSet.set saddress
     (λ _ : option socket_address, Some saR)
-    (udp_socket None true) -∗
+    (mkSocket None true) -∗
     (* post condition is any predicate as [pong] does not terminate *)
     WP (server3 #(LitSocket sh)) (PairV (LitV $ LitString (m_body m))
                   (LitV $ LitSocketAddress (m_sender m))) @[ip]
@@ -263,7 +261,7 @@ Section echo.
       iDestruct "H" as (m'')  "(>%HR & >%HT & HDo & HDone)".
       wp_apply (aneris_wp_send_groups
                   _ _ _ _ _ _ _ _ _ _ _ _ _
-                  (udp_msg (m_destination m) (m_sender m) _)
+                  (mkMessage (m_destination m) (m_sender m) _)
                   with "[$Hsh $Hrt $HsaT $HsagR HDone]"); [try set_solver..|].
       { subst. eapply message_group_equiv_refl; set_solver. }
       { iSplit.
@@ -279,11 +277,10 @@ Section echo.
       iSplit; [done|].
       iFrame "HDo".
       iPureIntro.
-      exists (udp_msg saR (m_sender m) "done").
+      exists (mkMessage saR (m_sender m) "done").
       split; [set_solver|].
       destruct HR as [m''' [Hmin' Hmeq']].
       destruct Hmeq' as (Hsend12 & Hsend22 & Hdest12 & Hdest22 & _).
-      split; [set_solver|].
       split; [set_solver|].
       split; [set_solver|].
       split; [set_solver|].
@@ -297,9 +294,8 @@ Section echo.
       exists mT'.
       split; [done|].
       destruct HR as [m''' [Hmin' Hmeq']].
-      destruct Hmeq' as (Hsend12 & Hsend22 & Hdest12 & Hdest22 & Hprot2 & Hbody2).
-      destruct HmeqT as (Hsend1T & Hsend2T & Hdest1T & Hdest2T & Hprot3 & Hbody3).
-      split; [set_solver|].
+      destruct Hmeq' as (Hsend12 & Hsend22 & Hdest12 & Hdest22 & Hbody2).
+      destruct HmeqT as (Hsend1T & Hsend2T & Hdest1T & Hdest2T & Hbody3).
       split; [set_solver|].
       split; [set_solver|].
       split; [set_solver|].
@@ -317,11 +313,10 @@ Section echo.
     iSplit; [done|].
     iFrame "HDo".
     iPureIntro.
-    exists (udp_msg saR (m_sender m) "done").
+    exists (mkMessage saR (m_sender m) "done").
     split; [set_solver|].
     destruct HR as [m''' [Hmin' Hmeq']].
     destruct Hmeq' as (Hsend12 & Hsend22 & Hdest12 & Hdest22 & _).
-    split; [set_solver|].
     split; [set_solver|].
     split; [set_solver|].
     split; [set_solver|].
@@ -387,7 +382,7 @@ Section echo.
     wp_pures.
     wp_apply (aneris_wp_send_duplicate_groups _ _ _ saT
                 with "[$Hsh $Hrt $HsagR $HsaRin2 $HsaT']"); [try set_solver..|].
-    { simpl. exists (udp_msg saT saR1 "do").
+    { simpl. exists (mkMessage saT saR1 "do").
       split; [set_solver|]. rewrite /message_group_equiv. set_solver. }
     iIntros "[Hsh Hrt]".
     wp_pures.

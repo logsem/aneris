@@ -113,7 +113,7 @@ Section tpc_prelude.
   Definition shot := shot tc_oneshot_gname ().
 
   Definition state_to_msg (rm : socket_address) (st : rm_state) :=
-    let msg s := mkMessage rm tm IPPROTO_UDP s in
+    let msg s := mkMessage rm tm s in
     match st with
     | WORKING   => None
     | PREPARED  => Some (msg "PREPARED")

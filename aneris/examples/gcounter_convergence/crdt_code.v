@@ -4,11 +4,6 @@ From aneris.aneris_lang.lib.vector_clock Require Import vector_clock_code.
 
 Section code.
 
-  Definition mk_udp_socket : val :=
-  (λ: <>, NewSocket #PF_INET
-                    #SOCK_DGRAM
-                    #IPPROTO_UDP)%V.
-
   Definition gcounter_merge : val :=
     rec: "merge" "m1" "m2" :=
       match: "m1" with
@@ -96,7 +91,7 @@ Section code.
       let: "len" := list_length "addrlst" in
       let: "M" := ref<<name>> (vect_make "len" #0) in
       let: "addr" := unSOME (list_nth "addrlst" "i") in
-      let: "sh" := mk_udp_socket #() in
+      let: "sh" := NewSocket #() in
       SocketBind "sh" "addr";;
       Fork (gcounter_apply "M" "sh");;
       Fork (gcounter_broadcast "M" "sh" "addrlst" "i");;
