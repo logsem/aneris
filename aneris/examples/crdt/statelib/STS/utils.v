@@ -105,7 +105,7 @@ Section Preambule.
   Lemma fresh_event_orig (s: event_set Op) (op: Op) (orig: RepId):
     (fresh_event s op orig).(EV_Orig) = orig.
   Proof. reflexivity. Qed.
-
+  
   Lemma event_set_get_seqnum (s: event_set Op) (op: Op) (orig: fRepId):
     let fev := fresh_event s op orig in
     event_set_same_orig_comparable s
@@ -118,31 +118,17 @@ Section Preambule.
   Proof.
     intros fev Hsame_orig Hext_t Hdc ??.
     rewrite/get_seqnum fresh_event_orig/fev/fresh_event.
-    destruct (set_choose_or_empty (hproj orig s)) as [Hnon_empty | Hempty].
-    - destruct (event_set_maximum_exists s orig) as (m & Hm);
-      [ destruct Hnon_empty as [x [Hx_orig Hx_in]%elem_of_filter]; by exists x
-        | assumption | assumption | ].
-      rewrite Hm/=filter_union size_union;
-        first (
-          rewrite filter_singleton;
-          [by rewrite size_singleton Nat.add_1_r | reflexivity]).
-      apply disjoint_filter, disjoint_singleton_r.
-      apply event_set_seqnum_max, le_n; try done.
-      intros e He_in. by apply event_set_evid_in_time with s.
-    - unfold hproj in Hempty.
-      rewrite Hempty compute_maximum_empty'/= filter_union size_union.
-      + rewrite filter_singleton; last reflexivity.  by rewrite size_singleton Nat.add_1_r.
-      + replace (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))
-          with (∅: gset EvId);
-          first by apply disjoint_empty_l.
-        destruct (set_choose_or_empty (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s)))
-          as [[x [Hx_orig Hx_in]%elem_of_filter]|]; last done.
-        exfalso.
-        assert (∃ x, x ∈ filter (λ ev : Event Op, EV_Orig ev = orig) s); last set_solver.
-        destruct (get_deps_set_incl s Hdc x Hx_in) as (ev & Hev_in & Hev_eid).
-        exists ev.
-        apply elem_of_filter.
-        by split; first rewrite -Hx_orig -Hev_eid.
+    simpl.
+    rewrite filter_union filter_singleton; [|done].
+    rewrite size_union.
+    - rewrite size_singleton.
+      by rewrite plus_comm.
+    - apply disjoint_singleton_r.
+      rewrite elem_of_filter.
+      intros [_ contra].
+      eapply event_set_seqnum_max; eauto.
+      intros ? ?.
+      eapply event_set_evid_in_time; eauto.
   Qed.
 
   Lemma event_set_get_evid (s: event_set Op) (op: Op) (orig: fRepId):
@@ -161,6 +147,14 @@ Section Preambule.
     by rewrite event_set_get_seqnum.
   Qed.
 
+  Lemma get_deps_set_singleton (ev : Event Op) :
+    get_deps_set {[ev]} = EV_Time ev.
+  Proof.
+    rewrite /get_deps_set /gset_flat_map gset_map_singleton.
+    rewrite elements_singleton.
+    set_solver.
+  Qed.
+
   Lemma fresh_event_time_mon (s: event_set Op) (op: Op) (orig: fRepId):
     let fev := fresh_event s op orig in
       event_set_same_orig_comparable s
@@ -172,57 +166,23 @@ Section Preambule.
   Proof.
     intros fev Hsame_orig Hext_time Hdc ? Hval ev Hev_in.
     rewrite/time/stlib_event_timed/fev/fresh_event/=.
-    destruct (set_choose_or_empty
-      (filter (λ ev0 : Event Op, EV_Orig ev0 = orig) s))
-      as [(ev' & Hev'_in) | Hempty];
-      last first.
-    { rewrite Hempty compute_maximum_empty. split.
-      - apply union_subseteq_l'.
-        replace (EV_Time ev) with (get_deps_set {[ ev ]});
-          first by apply get_deps_set_mon, singleton_subseteq_l.
-        rewrite/get_deps_set/gset_flat_map gset_map_singleton elements_singleton.
-        set_solver.
-      - rewrite/ts_le.
-        intros Himp.
-        assert ((fin_to_nat orig, 1) ∈ EV_Time ev); first set_solver.
-        destruct (Hdc ev (fin_to_nat orig, 1) Hev_in)
-          as (ev' & Hev'_in & Hev'_orig); first assumption.
-        assert (ev' ∈ (∅: event_set Op)); last done.
-        rewrite -Hempty.
-        apply elem_of_filter. split; last assumption.
-        by rewrite (get_evid_valid_time ev')  Hev'_orig. }
-    destruct (event_set_maximum_exists s orig) as (m & Hm).
-    - exists ev'.
-      by apply elem_of_filter in Hev'_in as [Horig Hs].
-    - assumption.
-    - assumption.
-    - rewrite Hm.
-      apply elem_of_subset. split.
-      + intros e He_in. apply elem_of_union_l, elem_of_union_list. set_solver.
-      + intros Himp.
-        specialize Himp with (get_evid fev).
-        assert(Hin:
-          (get_evid fev)
-            ∈ (get_deps_set s
-               ∪
-               ({[(fin_to_nat orig,
-                S (size
-                  (filter (λ eid : EvId, ((eid.1) = orig))
-                    (get_deps_set s))))]})));
-          first by apply elem_of_union_r, elem_of_singleton, event_set_get_evid.
-        apply Himp in Hin. clear Himp.
-        destruct (Hdc ev (get_evid fev)) as (e & He'_in & He'_eid); try done.
-        rewrite/fev event_set_get_evid in He'_eid; try done.
-        apply get_evid_eq in He'_eid as [Horig Himp].
-        rewrite /get_seqnum in Himp.
-        assert (size (filter (λ v : EvId, v.1 = EV_Orig e) (EV_Time e)) < S (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))))%nat; last lia.
-        apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply Nat.lt_succ_diag_r.
-        rewrite Horig.
-        apply subseteq_size, filter_set_mono.
-        rewrite -get_deps_singleton.
-        by apply get_deps_set_mon, singleton_subseteq_l.
+    rewrite /ts_lt /ts_le.
+    split.
+    - apply union_subseteq_l'.
+      replace (EV_Time ev) with (get_deps_set {[ ev ]}).
+      { apply get_deps_set_mon, singleton_subseteq_l.
+        done. }
+      by rewrite get_deps_set_singleton.
+    - intros Hdep.
+      assert ((orig : nat, S (size (filter (λ eid : RepId * SeqNum, eid.1 = orig) (get_deps_set s)))) ∈ EV_Time ev) as Hin; [set_solver|].
+      eapply (event_set_seqnum_max _ orig); eauto.
+      + intros ? ?.
+        eapply event_set_evid_in_time; eauto.
+      + assert (EV_Time ev ⊆ get_deps_set s) as Hsub; [|set_solver].
+        rewrite -get_deps_set_singleton.
+        apply get_deps_set_mon; set_solver.
   Qed.
-
+        
   Lemma Gst_incl_orig' (g: Gst Op) (orig: fRepId) (ev: Event Op):
     Gst_Validity g → ev ∈ g.1 → ev.(EV_Orig) = fin_to_nat orig → ev ∈ g.2 !!! orig.
   Proof.
@@ -302,42 +262,38 @@ Section Preambule.
     → ∀ ev : Event Op, ev ∈ s → ev =_t fev → False.
   Proof.
     intros fev Hv ev Hev_in Heq_t.
-    rewrite/fev/fresh_event/time/stlib_event_timed/= in Heq_t.
-    destruct (set_choose_or_empty (hproj orig s))
-      as [[x [Hx_orig Hx_in]%elem_of_filter] | Hneq].
-    + destruct (event_set_maximum_exists s orig) as [m Hm];
-      [ by exists x
-      | by destruct Hv
-      | by destruct Hv | ].
-      rewrite Hm in Heq_t.
-      clear Hm m x Hx_in Hx_orig.
-      destruct (VLst_dep_closed _ Hv ev
-        (fin_to_nat orig,
-          S (size (filter (λ eid: EvId, eid.1 = orig) (get_deps_set s))))
-        Hev_in) as (y & Hy_in & [Hy_orig Hy_sid]%get_evid_eq);
-        first by (rewrite Heq_t; apply elem_of_union_r, elem_of_singleton).
-      rewrite /get_seqnum in Hy_sid.
-      assert (size (filter (λ v : EvId, v.1 = EV_Orig y) (EV_Time y)) < 
-        S
-         (size
-            (filter (λ eid : EvId, eid.1 = orig)
-               (get_deps_set s)))); last lia.
-      apply Nat.le_lt_trans with (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))); last apply Nat.lt_succ_diag_r.
-      rewrite Hy_orig.
-      apply subseteq_size, filter_set_mono.
-      rewrite -get_deps_singleton.
-      by apply get_deps_set_mon, singleton_subseteq_l.
-    + unfold hproj in Hneq. rewrite Hneq compute_maximum_empty in Heq_t.
-      destruct (VLst_dep_closed _
-        Hv
-        ev (fin_to_nat orig, 1)%nat Hev_in) as (ev' & Hev'_in & Hev'_eid);
-        first set_solver.
-      assert (ev' ∈ hproj orig s) as Himp.
-      { apply elem_of_filter. split; last done.
-          by apply get_evid_eq in Hev'_eid as []. }
-      set_solver.
+    assert (ev <_t fev -> false) as Hcontra.
+    { intros Hlt.
+      rewrite Heq_t in Hlt.
+      apply TM_lt_irreflexive in Hlt.
+      done. }
+    apply Hcontra.
+    eapply fresh_event_time_mon; try (apply Hv || eauto).
   Qed.
 
+  Lemma empty_proj_is_empty (s: event_set Op) (orig: fRepId):
+    Lst_Validity s →
+    filter (λ ev : Event Op, ev.(EV_Orig) = orig) s = ∅ →
+      size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s)) = O.
+  Proof.
+    intros Hv Hempty.
+    assert (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s) = ∅) as ->;
+      last by rewrite size_empty.
+    apply set_eq. intros x.
+    split; last by intros?.
+    intros [Hx_orig (ev & Hev_orig & Hev_x)%get_deps_set_incl]%elem_of_filter;
+      last by apply (VLst_dep_closed _ Hv).
+    assert (∃ m, compute_maximum
+      (filter (λ ev : Event Op, EV_Orig ev = orig) s) = Some m) as (m & H').
+    { apply event_set_maximum_exists.
+      - exists ev. split; first assumption.
+        rewrite /get_evid in Hev_x.
+        by rewrite<- Hev_x in Hx_orig.
+      - by apply (VLst_same_orig_comp _ Hv).
+      - by apply (VLst_ext_time _ Hv). }
+    by rewrite Hempty in H'.
+  Qed.
+  
   Lemma fresh_event_not_eq_t_global (g: Gst Op) (op: Op) (orig: fRepId):
     let fev := fresh_event (g.2 !!! orig) op orig : Event Op in
     Gst_Validity g
@@ -351,7 +307,6 @@ Section Preambule.
       [ by exists x
       | by destruct (VGst_lhst_valid _ Hv orig)
       | by destruct (VGst_lhst_valid _ Hv orig) | ].
-      rewrite Hm in Heq_t.
       clear Hm m x Hx_in Hx_orig.
       destruct (VLst_dep_closed _ (VGst_hst_valid _ Hv) ev
         (fin_to_nat orig,
@@ -369,18 +324,21 @@ Section Preambule.
       apply subseteq_size, filter_set_mono.
       rewrite -get_deps_singleton.
       by apply get_deps_set_mon, singleton_subseteq_l, Gst_incl_orig'.
-    + unfold hproj in Hneq. rewrite Hneq compute_maximum_empty in Heq_t.
+    + unfold hproj in Hneq. (* rewrite Hneq compute_maximum_empty in Heq_t. *)
       destruct (VLst_dep_closed _
         (VGst_hst_valid _ Hv)
-        ev (fin_to_nat orig, 1)%nat Hev_in) as (ev' & Hev'_in & Hev'_eid);
-        first set_solver.
+        ev (fin_to_nat orig, 1)%nat Hev_in) as (ev' & Hev'_in & Hev'_eid).
+        { rewrite Heq_t.
+          apply elem_of_union_r, elem_of_singleton.
+          f_equal.
+          apply empty_proj_is_empty in Hneq; [by rewrite Hneq|].
+          apply VGst_lhst_valid; done. }
       assert (ev' ∈ hproj orig (g.2 !!! orig)) as Himp.
       { apply elem_of_filter. split;
           last (apply Gst_incl_orig'; try done);
           by apply get_evid_eq in Hev'_eid as []. }
       set_solver.
   Qed.
-
 
   Lemma get_deps_set_proj (g: Gst Op) (orig: fRepId):
     Gst_Validity g

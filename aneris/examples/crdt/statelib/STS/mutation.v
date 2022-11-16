@@ -135,29 +135,6 @@ Section Gst_mutator_local_valid.
     - by apply (fresh_event_not_eq_t_global g op orig Hv ev').
   Qed.
 
-  Lemma empty_proj_is_empty (s: event_set Op) (orig: fRepId):
-    Lst_Validity s →
-    filter (λ ev : Event Op, ev.(EV_Orig) = orig) s = ∅ →
-      size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s)) = O.
-  Proof.
-    intros Hv Hempty.
-    assert (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s) = ∅) as ->;
-      last by rewrite size_empty.
-    apply set_eq. intros x.
-    split; last by intros?.
-    intros [Hx_orig (ev & Hev_orig & Hev_x)%get_deps_set_incl]%elem_of_filter;
-      last by apply (VLst_dep_closed _ Hv).
-    assert (∃ m, compute_maximum
-      (filter (λ ev : Event Op, EV_Orig ev = orig) s) = Some m) as (m & H').
-    { apply event_set_maximum_exists.
-      - exists ev. split; first assumption.
-        rewrite /get_evid in Hev_x.
-        by rewrite<- Hev_x in Hx_orig.
-      - by apply (VLst_same_orig_comp _ Hv).
-      - by apply (VLst_ext_time _ Hv). }
-    by rewrite Hempty in H'.
-  Qed.
-
   Lemma mutator_ext_evid_preservation (g: Gst Op) (op: Op) (orig: fRepId):
     let fev := fresh_event (g.2 !!! orig) op orig in
     Gst_Validity g →
@@ -183,24 +160,10 @@ Section Gst_mutator_local_valid.
     (** Directly follows from the definition of a fresh event *)
     intros fev eid Heid_in Hv.
     rewrite /fev/fresh_event/= in Heid_in.
-    destruct (set_choose_or_empty
-      (filter (λ ev : Event Op, EV_Orig ev = orig) s))
-      as [[e [He_orig He_in]%elem_of_filter] | Hempty].
-    - destruct (event_set_maximum_exists s orig) as [m Hm].
-      + exists e. by split.
-      + by destruct Hv.
-      + by destruct Hv.
-      + rewrite Hm in Heid_in.
-        apply elem_of_union in Heid_in as [Heid_in | ->%elem_of_singleton].
-        * by left.
-        * right.
-          rewrite event_set_get_evid; by destruct Hv.
-    - rewrite Hempty compute_maximum_empty' in Heid_in.
-      apply elem_of_union in Heid_in as [Heid_in | ->%elem_of_singleton].
-      * by left.
-      * right.
-        rewrite event_set_get_evid; try by destruct Hv. f_equal.
-        by rewrite empty_proj_is_empty.
+    apply elem_of_union in Heid_in as [Heid_in | ->%elem_of_singleton].
+    * by left.
+    * right.
+      rewrite event_set_get_evid; by destruct Hv.
   Qed.
 
   Lemma mutator_local_dep_closed_preservation
@@ -504,8 +467,6 @@ Section Gst_mutator_local_valid.
         exists e'. by split; [apply elem_of_union_l |].
       + rewrite /fev /fresh_event in Heid_in.
         simpl in *.
-        destruct (compute_maximum
-          (filter (λ ev : Event Op, EV_Orig ev = orig) (g.2 !!! orig))) eqn:E;
         apply elem_of_union in Heid_in as [Heid_in_old | ->%elem_of_singleton].
         * destruct
             (get_deps_set_incl (g.2 !!! orig)
@@ -522,7 +483,7 @@ Section Gst_mutator_local_valid.
         * exists fev.
           split; first by apply elem_of_union_r, elem_of_singleton.
           rewrite/get_evid fresh_event_orig. f_equal.
-          rewrite/get_seqnum/fev/fresh_event E filter_union size_union. simpl;
+          rewrite/get_seqnum/fev/fresh_event filter_union size_union; simpl;
             first by rewrite filter_singleton;
             first rewrite size_singleton Nat.add_1_r.
           simpl. apply disjoint_filter, disjoint_singleton_r.
@@ -539,51 +500,6 @@ Section Gst_mutator_local_valid.
               try by destruct (VGst_lhst_valid _ Hv orig).
             apply Nat.lt_succ_diag_r. }
           apply get_evid_eq in Hev_eid as [_ Hsid]. lia.
-        * destruct
-            (get_deps_set_incl _ (VLst_dep_closed _
-              (VGst_lhst_valid _ Hv orig)) eid Heid_in_old)
-            as (ev & Hev_orig & Hev_sid).
-          exists ev. split; last assumption.
-          apply elem_of_union_l, (VGst_incl_local _ Hv).
-          by exists orig.
-        * exists fev. split; first by apply elem_of_union_r, elem_of_singleton.
-          rewrite /fev/fresh_event/get_evid/get_seqnum E. f_equal. simpl.
-          rewrite filter_union.
-          replace
-            (filter (λ eid : EvId, eid.1 = orig) (get_deps_set (g.2 !!! orig)))
-            with (∅: gset EvId).
-          --
-            rewrite filter_singleton; last reflexivity.
-            by rewrite union_empty_L size_singleton.
-          --
-            apply set_eq. intros x. split; first by intros?.
-            intros [Hx_orig Hx_init]%elem_of_filter.
-            exfalso.
-            assert (∃ ev, ev ∈ (g.2 !!! orig) ∧ get_evid ev = x)
-              as (ev & Hev_in & Hev_evid).
-            { apply get_deps_set_incl; last assumption.
-              exact (VLst_dep_closed _ (VGst_lhst_valid g Hv orig)). }
-            assert (x ∈ EV_Time ev) as Hx_ev.
-            { replace (EV_Time ev) with (get_deps ev); last reflexivity.
-              rewrite -Hev_evid.
-              by apply
-                (VLst_evid_incl_event (g.2 !!! orig)
-                  (VGst_lhst_valid g Hv orig) ev). }
-            destruct (
-              VLst_dep_closed (g.2 !!! orig)
-                (VGst_lhst_valid g Hv orig)
-                ev x
-                Hev_in Hx_ev) as (e' & He'_in & He'_evid).
-            destruct (event_set_maximum_exists (g.2 !!! orig) orig).
-            ++
-              exists e'. split; first assumption.
-              by rewrite get_evid_valid_time He'_evid Hx_orig.
-            ++
-              apply (VLst_same_orig_comp (g.2 !!! orig)
-                (VGst_lhst_valid g Hv orig)).
-            ++
-              apply (VLst_ext_time (g.2 !!! orig) (VGst_lhst_valid g Hv orig)).
-            ++ by rewrite H0 in E.
   Qed.
 
   Lemma mutator_orig_lt_len_preservation
@@ -636,26 +552,7 @@ Section Gst_mutator_local_valid.
       first by apply (VLst_evid_incl_event _ Hv).
     rewrite event_set_get_evid; try by destruct Hv.
     rewrite /fev/fresh_event/get_evid/get_seqnum/get_deps/=.
-    destruct(compute_maximum
-       (filter (λ ev : Event Op, EV_Orig ev = orig) s)) eqn:E; rewrite E.
-    + by apply elem_of_union_r, elem_of_singleton.
-    + apply elem_of_union_r, elem_of_singleton. f_equal.
-      replace (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))
-        with (∅: gset EvId);
-        first by rewrite size_empty.
-      apply set_eq. intros x.
-      split; first by intros?.
-      intros [Hx_orig (ev & Hev_orig & Hev_x)%get_deps_set_incl]%elem_of_filter;
-        last by apply (VLst_dep_closed _ Hv).
-      assert (∃ m, compute_maximum
-        (filter (λ ev : Event Op, EV_Orig ev = orig) s) = Some m) as (m & H').
-      { apply event_set_maximum_exists.
-        - exists ev. split; first assumption.
-          rewrite /get_evid in Hev_x.
-          by rewrite<- Hev_x in Hx_orig.
-        - by apply (VLst_same_orig_comp _ Hv).
-        - by apply (VLst_ext_time _ Hv). }
-      by rewrite H' in E.
+    by apply elem_of_union_r, elem_of_singleton. 
   Qed.
 
   Lemma mutator_evid_incl_event_preservation
@@ -671,29 +568,8 @@ Section Gst_mutator_local_valid.
     rewrite event_set_get_evid;
       try by destruct (VGst_lhst_valid _ Hv orig).
     rewrite /fev/fresh_event.
-    destruct(compute_maximum
-       (filter (λ ev : Event Op, EV_Orig ev = orig) (g.2 !!! orig))) eqn:E;
-       simpl.
-    + apply elem_of_union_r, elem_of_singleton. f_equal.
-    + apply elem_of_union_r, elem_of_singleton. f_equal.
-      replace
-        (filter (λ eid : EvId, eid.1 = orig) (get_deps_set (g.2 !!! orig)))
-        with (∅: gset EvId);
-        first by rewrite size_empty.
-      apply set_eq. intros x.
-      split; first by intros?.
-      intros [Hx_orig (ev & Hev_orig & Hev_x)%get_deps_set_incl]%elem_of_filter;
-        last by apply (VLst_dep_closed _ (VGst_lhst_valid _ Hv orig)).
-      assert (∃ m, compute_maximum
-        (filter (λ ev : Event Op, EV_Orig ev = orig) (g.2 !!! orig)) = Some m)
-        as (m & H').
-      { apply event_set_maximum_exists.
-        - exists ev. split; first assumption.
-          rewrite /get_evid in Hev_x.
-          by rewrite<- Hev_x in Hx_orig.
-        - by apply (VLst_same_orig_comp _ (VGst_lhst_valid _ Hv orig)).
-        - by apply (VLst_ext_time _ (VGst_lhst_valid _ Hv orig)). }
-      by rewrite H' in E.
+    simpl.
+    apply elem_of_union_r, elem_of_singleton. f_equal.
   Qed.
 
   Lemma event_set_get_seqnum_maximum
@@ -751,22 +627,23 @@ Section Gst_mutator_local_valid.
       rid sid HltO [-> Hsle];
       first by apply (VLst_orig_deps_seq _ Hv).
     rewrite/fev/fresh_event/=.
-
+    
     destruct
       (set_choose_or_empty (filter (λ ev : Event Op, EV_Orig ev = orig) s))
       as [[ev [Hev_orig Hev_in]%elem_of_filter] | Hempty]; last first.
-
-    { rewrite Hempty compute_maximum_empty'.
-      assert (get_seqnum fev = 1);
+    { apply elem_of_union_r, elem_of_singleton.
+      assert (get_seqnum fev = 1) as Hsn;
         first (
           (rewrite event_set_get_seqnum; try by destruct Hv);
-          by rewrite empty_proj_is_empty).
+            by rewrite empty_proj_is_empty).
+      pose proof Hsn as Hsn'.
+      rewrite event_set_get_seqnum in Hsn; try by destruct Hv.
+      rewrite Hsn.
       assert (sid = 1) as ->; first lia.
-      by apply elem_of_union_r, elem_of_singleton. }
+      done. }
 
     destruct (event_set_maximum_exists s orig) as [m Hm];
       try (by destruct Hv); first by exists ev.
-    rewrite Hm.
 
     pose proof Hm as Hm'.
     apply compute_maximum_correct in Hm
@@ -810,18 +687,18 @@ Section Gst_mutator_local_valid.
       (set_choose_or_empty
         (filter (λ ev : Event Op, EV_Orig ev = orig) (g.2 !!! orig)))
       as [[ev [Hev_orig Hev_in]%elem_of_filter] | Hempty]; last first.
-    { rewrite Hempty compute_maximum_empty'.
+    { apply empty_proj_is_empty in Hempty; last first.
+      { apply VGst_lhst_valid; done. }
       assert (get_seqnum fev = 1).
       - rewrite event_set_get_seqnum;
           try by destruct (VGst_lhst_valid _ Hv orig).
-        rewrite empty_proj_is_empty; try done.
-        exact (VGst_lhst_valid _ Hv orig).
+        rewrite Hempty; done.
       - assert (sid = 1) as ->; first lia.
-        by apply elem_of_union_r, elem_of_singleton. }
+        apply elem_of_union_r, elem_of_singleton.
+        rewrite Hempty; done. }
 
     destruct (event_set_maximum_exists (g.2 !!! orig) orig) as [m Hm];
       try (by destruct (VGst_lhst_valid _ Hv orig)); first by exists ev.
-    rewrite Hm.
 
     pose proof Hm as Hm'.
     apply compute_maximum_correct in Hm

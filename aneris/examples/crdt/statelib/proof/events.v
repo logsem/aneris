@@ -47,14 +47,9 @@ Section UsefulFunctions.
         EV_Op := op ;
         EV_Orig := orig ;
         EV_Time :=
-    match compute_maximum ( filter (λ ev, ev.(EV_Orig) = orig) s ) with
-    | None => get_deps_set s ∪ {[(orig, 1%nat)]}
-    | Some e =>
-      let seen_events := get_deps_set s in
-          seen_events
-          ∪ {[(orig,
-              S (size (filter (λ eid, eid.1 = orig) (get_deps_set s))))]}
-    end
+          let seen_events := get_deps_set s in
+          let new_event := (orig, S (size (filter (λ eid, eid.1 = orig) (get_deps_set s)))) in
+          seen_events ∪ {[ new_event ]}
       |}.
 
   Definition hproj (i: RepId) (st: event_set Op) :=
