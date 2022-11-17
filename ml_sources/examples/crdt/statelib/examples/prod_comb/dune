@@ -1,4 +1,4 @@
 (library
-  (name statelib_prod_comb_code)
+  (name prod_comb_code)
   (flags :standard -rectypes)
   (libraries statelib_code aneris))

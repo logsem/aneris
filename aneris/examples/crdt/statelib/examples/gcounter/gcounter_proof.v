@@ -4,70 +4,19 @@ From iris.proofmode Require Import tactics.
 From aneris.aneris_lang.lib Require Import list_proof inject.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang Require Import aneris_lifting proofmode.
-From aneris.examples.crdt.spec Require Import crdt_base crdt_time crdt_events crdt_denot crdt_resources.
+From aneris.examples.crdt.spec Require Import
+     crdt_base crdt_time crdt_events crdt_denot crdt_resources.
 From aneris.examples.crdt.statelib.user_model
-  Require Import semi_join_lattices model params.
+     Require Import semi_join_lattices model params.
 From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.STS Require Import lst.
 From aneris.examples.crdt.statelib.proof
-  Require Import events spec.
+     Require Import events spec.
 From aneris.examples.crdt.statelib Require Import statelib_code.
-From aneris.aneris_lang.lib.vector_clock Require Import vector_clock_code vector_clock_proof.
-
-
-
-
-Section GCounter_code.
-
-  Context `{!CRDT_Params}.
-
-  Section AnnexCode.
-    Definition list_map2 : val :=
-      rec: "list_map2" "f" "l" "l'" :=
-      match: "l" with
-        SOME "a" =>
-        match: "l'" with
-        SOME "b" =>
-          ("f" (Fst "a") (Fst "b")) :: ("list_map2" "f" (Snd "a") (Snd "b"))
-        | NONE => assert: #0 #0
-        end
-      | NONE => NONE
-      end.
-
-  End AnnexCode.
-
-  Definition init_st_fn : val :=
-    λ: <>, (inject_list (vreplicate (length CRDT_Addresses) O)).
-
-  (** Code of the G-Counter. *)
-  Definition mutator_fn : val :=
-    λ: "repId" "st" "op",
-      match: (list_nth "st" "repId") with
-        NONE => "st"
-      | SOME "p" => vect_update "st" "repId" ("op" + "p")
-      end.
-
-  Definition max_fn: val :=
-    λ: "i" "j", if: "i" < "j" then "j" else "i".
-
-  Definition merge_fn : val :=
-    λ: "st" "st'",
-      list_map2 max_fn "st" "st'".
-
-  Definition counter_crdt : val :=
-    λ: <>, ((init_st_fn, mutator_fn), merge_fn).
-
-  Definition counter_init : val :=
-    λ: "addrs" "rid",
-    let: "initRes" :=
-      statelib_init int_ser int_deser "addrs" "rid" counter_crdt in
-    let: "get_state" := Fst "initRes" in
-    let: "update" := Snd "initRes" in
-    ("get_state", "update").
-
-End GCounter_code.
-
-
+From aneris.aneris_lang.lib.vector_clock
+     Require Import vector_clock_code vector_clock_proof.
+From aneris.examples.crdt.statelib.examples.gcounter
+     Require Import gcounter_code.
 
 Section GCtr_defs.
 
@@ -80,14 +29,9 @@ Section GCtr_defs.
 
 End GCtr_defs.
 
-
-
 Section Utils.
 
   Context `{!CRDT_Params}.
-
-  Definition fil (s: event_set gctr_op) (i: nat) : event_set gctr_op :=
-    filter (λ ev: Event gctr_op, EV_Orig ev = i) s.
 
   Definition fold_sum (s: event_set gctr_op) :=
     set_fold (fun (ev: Event gctr_op) v => v + ev.(EV_Op))%nat O s.
@@ -303,7 +247,7 @@ Section GCtr_Model.
         [ by apply fold_sum_mon | lia ].
   Qed.
 
-  Definition gctr_mutator
+  Definition gctr_mut
     (st: gctr_st) (ev: Event gctr_op) (st': gctr_st) : Prop :=
     st' =
       match decide (ev.(EV_Orig) < length CRDT_Addresses)%nat with
@@ -315,7 +259,7 @@ Section GCtr_Model.
 
   Lemma gctr_mut_mon
     (st : gctr_st) (e: Event gctr_op) (st': gctr_st) :
-    gctr_mutator st e st' → st ≤_l st'.
+    gctr_mut st e st' → st ≤_l st'.
   Proof.
     intros ->.
     destruct (decide (EV_Orig e < length CRDT_Addresses)%nat); last reflexivity.
@@ -333,7 +277,7 @@ Section GCtr_Model.
     Lst_Validity s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
-    gctr_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
+    gctr_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
   Proof.
     intros Hden Hval Hnin Hmax Hmut.
     intros i.
@@ -370,15 +314,13 @@ Section GCtr_Model.
 
   Instance gctr_model : (StateCrdtModel gctr_op gctr_st) :=
     { st_crdtM_lub_coh     := gctr_lub_coh;
-      st_crdtM_mut         := gctr_mutator;
+      st_crdtM_mut         := gctr_mut;
       st_crdtM_mut_mon     := gctr_mut_mon;
       st_crdtM_mut_coh     := gctr_mut_coh;
       st_crdtM_init_st     := gctr_st_init;
       st_crdtM_init_st_coh := gctr_init_coh; }.
 
 End GCtr_Model.
-
-
 
 Section GCounter_params.
 
@@ -393,8 +335,6 @@ Section GCounter_params.
     rewrite/gctr_op_coh in Hv. rewrite/gctr_op_coh in Hv'.
     by simplify_eq/=.
   Qed.
-
-
 
   (** Injection *)
   Definition gctr_st_inject {A : Type} {Inject0 : Inject A val}
@@ -423,7 +363,6 @@ Section GCounter_params.
     simplify_eq.
     exact (@gctr_st_inject_inj val st st' Hv').
   Qed.
-
 
   (** serialization *)
 
@@ -458,24 +397,8 @@ Section GCounter_params.
 End GCounter_params.
 
 
-
 Section GCounter_Specs.
   Context `{!anerisG M Σ, !CRDT_Params}.
-
-  Lemma init_st_coh:
-  StLib_St_Coh st_crdtM_init_st
-    (inject_list (vreplicate (length CRDT_Addresses) O)).
-  Proof. reflexivity. Qed.
-
-  Lemma Ctr_init_st_fn_spec : ⊢ init_st_fn_spec init_st_fn.
-  Proof.
-    iIntros (addr).
-    iIntros "!#" (Φ) "_ HΦ".
-    rewrite /init_st_fn.
-    wp_pures.
-    iApply "HΦ".
-    iPureIntro. exact init_st_coh.
-  Qed.
 
   Lemma gctr_st_coh_is_list log_st v_st:
     gctr_st_coh log_st v_st → is_list log_st v_st.
@@ -498,6 +421,7 @@ Section GCounter_Specs.
     all: wp_if; iApply "Hφ"; iPureIntro; lia.
   Qed.
 
+  (* TODO: move to the list proof *)
   Lemma wp_list_map2 (l: list nat) (l': list nat) (lv l'v: val) ip:
     {{{ ⌜length l = length l'⌝ ∗
         ⌜is_list l lv⌝ ∗
@@ -536,9 +460,10 @@ Section GCounter_Specs.
       iPureIntro. by exists rv'.
   Qed.
 
-  Lemma Ctr_merge_spec : ⊢ merge_spec merge_fn.
+  Lemma Ctr_merge_spec : ⊢ merge_spec gcpt_merge.
   Proof.
-    iIntros (sa v v' s s' st st') "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' & %Hext & %Hsoc & %Hext' & %Hsoc') Hφ".
+    iIntros (sa v v' s s' st st')
+            "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' & %Hext & %Hsoc & %Hext' & %Hsoc') Hφ".
     wp_lam. wp_let.
     wp_apply (wp_list_map2 st st' v v').
     - iPureIntro. repeat split;
@@ -555,8 +480,7 @@ Section GCounter_Specs.
   Qed.
 
 
-
-  Lemma Ctr_mutator_spec : ⊢ mutator_spec mutator_fn.
+  Lemma Ctr_mutator_spec : ⊢ mutator_spec gcpt_mutator.
   Proof.
     iIntros (sa f st_v op_v s ev op_log st_log)
       "!> %φ (%Hop_coh & %Hst_coh & %Hden & %Hnin & <- & <- & %Hmax & %Hext & %Hsoc) Hφ".
@@ -566,7 +490,7 @@ Section GCounter_Specs.
     { iPureIntro. by apply gctr_st_coh_is_list. }
     iIntros (v [[-> Hlen]| (r & -> & Herr)]).
     - wp_match. iApply "Hφ". iPureIntro. exists st_log. split; first assumption.
-      rewrite/st_crdtM_mut/StLib_Model/StLib_Params/gctr_params/gctr_model/gctr_mutator.
+      rewrite/st_crdtM_mut/StLib_Model/StLib_Params/gctr_params/gctr_model/gctr_mut.
       rewrite (gctr_st_coh_length st_log st_v Hst_coh) in Hlen.
       destruct(decide (EV_Orig ev < length CRDT_Addresses))%nat;
         [ lia | reflexivity ].
@@ -588,7 +512,7 @@ Section GCounter_Specs.
       + rewrite/StLib_St_Coh/gctr_params/gctr_st_coh/gctr_st_inject
           vec_to_list_insert fin_to_nat_to_fin.
         by apply is_list_inject.
-      + rewrite/st_crdtM_mut/StLib_Model/gctr_params/gctr_model/gctr_mutator
+      + rewrite/st_crdtM_mut/StLib_Model/gctr_params/gctr_model/gctr_mut
           decide_True_pi Nat.add_comm.
         do 2 f_equal. symmetry.
         apply vlookup_lookup.
@@ -596,19 +520,37 @@ Section GCounter_Specs.
         f_equal. apply fin_to_nat_to_fin.
   Qed.
 
-  Lemma Ctr_init_spec : ⊢ init_st_fn_spec init_st_fn.
+   Lemma init_st_coh:
+  StLib_St_Coh st_crdtM_init_st
+    (inject_list (vreplicate (length CRDT_Addresses) O)).
+  Proof. reflexivity. Qed.
+
+  Lemma Ctr_init_st_fn_spec :
+    ⊢ init_st_fn_spec (λ: <>, gcpt_init_st #(length CRDT_Addresses) #()).
   Proof.
-    iIntros(sa) "!> %φ _ H".
-    wp_lam. by iApply "H".
+    iIntros (addr).
+    iIntros "!#" (Φ) "_ HΦ".
+    rewrite /gcpt_init_st.
+    wp_pures.
+    wp_apply (wp_vect_make _ (length CRDT_Addresses) 0 Φ $! I ).
+    iIntros (v Hv).
+    iApply "HΦ".
+    iPureIntro.
+    assert (v = (inject_list (vreplicate (length CRDT_Addresses) O))) as ->.
+    { rewrite /is_vc in Hv. rewrite -vec_to_list_replicate in Hv.
+      by apply is_list_inject. }
+    exact init_st_coh.
   Qed.
 
-  Lemma Ctr_crdt_fun_spec : ⊢ crdt_fun_spec counter_crdt.
+  Lemma Ctr_crdt_fun_spec :
+    ⊢ crdt_fun_spec (λ: <>, gcpt_crdt #(length CRDT_Addresses) #()).
   Proof.
     iIntros (sa φ) "!> _ Hφ".
-    wp_lam; wp_pures. iApply "Hφ".
-    iExists init_st_fn, mutator_fn, merge_fn.
+    wp_lam; wp_pures. wp_lam. wp_pures.
+    iApply "Hφ".
+    iExists _, gcpt_mutator, gcpt_merge.
     iSplit; first trivial.
-    iDestruct Ctr_init_spec as "Hinit".
+    iDestruct Ctr_init_st_fn_spec as "Hinit"; first eauto.
     iDestruct Ctr_merge_spec as "Hmerge".
     iDestruct Ctr_mutator_spec as "Hmutator".
     iFrame "Hinit Hmerge Hmutator".

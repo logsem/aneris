@@ -7,13 +7,13 @@ From aneris.aneris_lang.lib Require Import list_code.
 From aneris.aneris_lang.lib Require Import set_code.
 From aneris.examples.crdt.statelib Require Import statelib_code.
 
-Definition mutator : val := λ: "_i" "gs" "op", set_add "op" "gs".
+Definition gos_init_st : val := λ: <>, set_empty #().
 
-Definition merge : val := λ: "st1" "st2", set_union "st1" "st2".
+Definition gos_mutator : val := λ: "_i" "gs" "op", set_add "op" "gs".
 
-Definition init_st : val := λ: <>, set_empty #().
+Definition gos_merge : val := λ: "st1" "st2", set_union "st1" "st2".
 
-Definition gos_crdt : val := λ: <>, (init_st, mutator, merge).
+Definition gos_crdt : val := λ: <>, (gos_init_st, gos_mutator, gos_merge).
 
 Definition gos_init (elt_ser : val) (elt_deser : val) : val :=
   λ: "addrs" "rid",

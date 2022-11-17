@@ -111,12 +111,12 @@ Section prod_crdt_model.
       by rewrite -gset_map_union.
   Qed.
 
-  Definition prod_mutator (st : prodSt) (ev: Event prodOp) (st': prodSt) : Prop :=
+  Definition prod_mutator_denot (st : prodSt) (ev: Event prodOp) (st': prodSt) : Prop :=
     PA.(StLib_Model).(st_crdtM_mut) st.1 (event_map fst ev) st'.1 ∧
     PB.(StLib_Model).(st_crdtM_mut) st.2 (event_map snd ev) st'.2.
 
   Lemma prod_mut_mon (st : prodSt) (e: Event prodOp) (st': prodSt) :
-    prod_mutator st e st' → st ≤_l st'.
+    prod_mutator_denot st e st' → st ≤_l st'.
   Proof.
     intros (Hp1 & HP2).
     split;
@@ -129,7 +129,7 @@ Section prod_crdt_model.
     Lst_Validity s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
-    prod_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
+    prod_mutator_denot st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
   Proof.
     rewrite /=/prod_denot /prod_mutator.
     intros (Hd1 & Hd2) Hv Hev Hm (Hm1 & Hm2).
@@ -185,7 +185,7 @@ Section prod_crdt_model.
   Global Instance prod_crdt_model :
     (StateCrdtModel prodOp prodSt) :=
     { st_crdtM_lub_coh     := prod_lub_coh;
-      st_crdtM_mut         := prod_mutator;
+      st_crdtM_mut         := prod_mutator_denot;
       st_crdtM_mut_mon     := prod_mut_mon;
       st_crdtM_mut_coh     := prod_mut_coh;
       st_crdtM_init_st     := prodSt_init;
@@ -282,7 +282,8 @@ Section prod_proof.
   Lemma prod_init_st_fn_spec initA initB :
     @init_st_fn_spec _ _ _ _ _ _ stA _ _ PA initA -∗
     @init_st_fn_spec _ _ _ _ _ _ stB _ _ PB initB -∗
-    @init_st_fn_spec _ _ _ _ _ _ (prodSt stA stB) _ _ prod_params (λ: <>, init_st initA initB #()).
+    @init_st_fn_spec _ _ _ _ _ _ (prodSt stA stB) _ _ prod_params
+                     (λ: <>, prod_init_st initA initB #()).
   Proof.
     iIntros "#HA #HB" (addr).
     iIntros "!#" (Φ) "_ HΦ".
@@ -301,7 +302,7 @@ Section prod_proof.
     @mutator_spec _ _ _ _ _ _ stA _ _ PA mut_fnA -∗
     @mutator_spec _ _ _ _ _ _ stB _ _ PB mut_fnB -∗
     @mutator_spec _ _ _ _ _ _ _ _ _ prod_params
-                  (λ: "i" "gs" "op", mutator mut_fnA mut_fnB "i" "gs" "op").
+                  (λ: "i" "gs" "op", prod_mutator mut_fnA mut_fnB "i" "gs" "op").
   Proof.
     iIntros "#HA #HB" (addr id st_v op_v s ev op_log st_log)
                  "!> %φ ((%v1 & %v2 & <- & %Hv1 & %Hv2 & %Hvv) &
@@ -344,41 +345,15 @@ Section prod_proof.
          iApply "Hφ".
          iPureIntro.
          exists (lg1, lg2).
-         rewrite /StLib_St_Coh /= /prodSt_coh /prod_mutator /=.
+         rewrite /StLib_St_Coh /= /prodSt_coh /prod_mutator_denot /=.
          split_and!; try eauto.
   Qed.
-
-  Definition prod_crdt' : val :=
-    (λ: "cA" "cB" <>,
-        let: "cAp" := "cA" #() in
-        let: "cBp" := "cB" #() in
-        let: "init_fnA" := Fst (Fst "cAp") in
-        let: "mut_fnA" := Snd (Fst "cAp") in
-        let: "merge_fnA" := Snd "cAp" in
-        let: "init_fnB" := Fst (Fst "cBp") in
-        let: "mut_fnB" := Snd (Fst "cBp") in
-        let: "merge_fnB" := Snd "cBp" in
-        let: "init_fn" := (λ: <>, init_st "init_fnA" "init_fnB" #()) in
-        let: "mut_fn" := (λ: "i" "gs" "op", mutator "mut_fnA" "mut_fnB" "i" "gs" "op") in
-        let: "merge_fn" := (λ: "st1" "st2", merge "merge_fnA" "merge_fnB" "st1" "st2") in
-        ("init_fn", "mut_fn", "merge_fn"))%V.
-
-  Definition prod_init' (stA_ser : val) (stA_deser : val) (stB_ser : val)
-             (stB_deser : val) : val :=
-    λ: "cA" "cB" "addrs" "rid",
-      let: "initRes" := statelib_init (prod_ser stA_ser stB_ser)
-                                      (prod_deser stA_deser stB_deser) "addrs" "rid"
-                                      (λ: <>, prod_crdt' "cA" "cB" #()) in
-      let: "get_state" := Fst "initRes" in
-      let: "update" := Snd "initRes" in
-      ("get_state", "update").
-
 
   Lemma prod_merge_st_spec merge_fnA merge_fnB :
     @merge_spec _ _ _ _ _ _ stA _ _ PA merge_fnA -∗
     @merge_spec _ _ _ _ _ _ stB _ _ PB merge_fnB -∗
     @merge_spec _ _ _ _ _ _ _ _ _ prod_params
-                  (λ: "st1" "st2", merge merge_fnA merge_fnB "st1" "st2").
+                  (λ: "st1" "st2", prod_merge merge_fnA merge_fnB "st1" "st2").
   Proof.
     iIntros  "#HA #HB" (sa v v' s s' st st')
             "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' &
@@ -426,7 +401,7 @@ Section prod_proof.
   Lemma prod_crdt_fun_spec cA cB :
       @crdt_fun_spec _ _ _ _ _ _ stA _ _ PA cA -∗
       @crdt_fun_spec _ _ _ _ _ _ stB _ _ PB cB -∗
-      @crdt_fun_spec _ _ _ _ _ _ _ _ _ prod_params (λ: <>, prod_crdt' cA cB #()).
+      @crdt_fun_spec _ _ _ _ _ _ _ _ _ prod_params (λ: <>, prod_crdt cA cB #()).
     Proof.
       iIntros "#HA #HB" (sa φ) "!> _ Hφ".
       wp_lam; wp_pures. wp_lam. wp_pures.
@@ -460,7 +435,7 @@ Section prod_proof.
     @init_spec_for_specific_crdt
       _ _ _ _ _ _ _ _ _  prod_params _
       (λ: "addrs" "rid",
-         prod_init'
+         prod_init
           (PA.(StLib_StSerialization).(s_serializer)).(s_ser)
           (PA.(StLib_StSerialization).(s_serializer)).(s_deser)
           (PB.(StLib_StSerialization).(s_serializer)).(s_ser)
@@ -470,7 +445,7 @@ Section prod_proof.
     iIntros "#HA #HB #Hinit" (repId addr addrs_val).
     iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
     rewrite /prod_init.
-    wp_pures. wp_lam. wp_pures.
+    wp_pures.
     wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
     { do 2 (iSplit; first done). iApply prod_crdt_fun_spec; done. }
     iIntros (get update) "(HLS & Hget & Hupdate)".

@@ -47,11 +47,11 @@ Section gos_model.
   Context `{!CRDT_Params}.
   Context `{!EqDecision vl, !Countable vl}.
 
-  Definition gos_mutator (st: @gos_st gos_op _ _) (ev: Event gos_op) (st': gos_st) : Prop :=
+  Definition gos_mut (st: @gos_st gos_op _ _) (ev: Event gos_op) (st': gos_st) : Prop :=
     st' = st ∪ {[ev.(EV_Op)]}.
 
   Lemma gos_mut_mon (st : gos_st) (e: Event gos_op) (st': gos_st) :
-    gos_mutator st e st' → st ≤_l st'.
+    gos_mut st e st' → st ≤_l st'.
   Proof. set_solver. Qed.
 
   Lemma gos_mut_coh (s : event_set gos_op) (st st' : gos_st) (ev: Event gos_op) :
@@ -59,7 +59,7 @@ Section gos_model.
     Lst_Validity s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
-    gos_mutator st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
+    gos_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
   Proof.
     rewrite /=/gos_denot_prop /gos_mutator.
     intros ???? ->. by set_solver.
@@ -83,7 +83,7 @@ Section gos_model.
 
   Global Instance gos_model : (StateCrdtModel gos_op gos_st) :=
     { st_crdtM_lub_coh     := gos_lub_coh;
-      st_crdtM_mut         := gos_mutator;
+      st_crdtM_mut         := gos_mut;
       st_crdtM_mut_mon     := gos_mut_mon;
       st_crdtM_mut_coh     := gos_mut_coh;
       st_crdtM_init_st     := gos_st_init;
@@ -144,11 +144,11 @@ Section gos_proof.
  }.
 
   Lemma gos_init_st_spec :
-    ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ gos_params init_st.
+    ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ gos_params gos_init_st.
   Proof.
     iIntros (addr).
     iIntros "!#" (Φ) "_ HΦ".
-    rewrite /init_st.
+    rewrite /gos_init_st.
     wp_pures.
     wp_apply (wp_set_empty vl); first done.
     iIntros (v Hv).
@@ -166,7 +166,7 @@ Section gos_proof.
   Qed.
 
   Lemma gos_mutator_st_spec :
-    ⊢ @mutator_spec _ _ _ _ _ _ _ _ _ gos_params mutator.
+    ⊢ @mutator_spec _ _ _ _ _ _ _ _ _ gos_params gos_mutator.
   Proof.
     iIntros (sa f st_v op_v s ev op_log st_log)
             "!> %φ ((-> & %Hvv) & (%Hst_coh & %Hst_coh') & %Hden &
@@ -181,7 +181,7 @@ Section gos_proof.
     split; set_solver.
   Qed.
 
-  Lemma gos_merge_spec : ⊢ @merge_spec _ _ _ _ _ _ _ _ _ gos_params merge.
+  Lemma gos_merge_spec : ⊢ @merge_spec _ _ _ _ _ _ _ _ _ gos_params gos_merge.
   Proof.
     iIntros (sa v v' s s' st st')
             "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' &
@@ -205,7 +205,7 @@ Section gos_proof.
   Proof.
     iIntros (sa φ) "!> _ Hφ".
     wp_lam; wp_pures. iApply "Hφ".
-    iExists init_st, mutator, merge.
+    iExists gos_init_st, gos_mutator, gos_merge.
     iSplit; first trivial.
     iDestruct gos_init_st_spec as "Hinit".
     iDestruct gos_merge_spec as "Hmerge".

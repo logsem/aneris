@@ -7,6 +7,7 @@ IMPORT_PATH_PREFIX:
 
 ML_SOURCES:
 
+	## --------- AnerisLang Library ---------
 	aneris_lang/lib/network_util_code.ml
 	aneris_lang/lib/list_code.ml
         aneris_lang/lib/queue_code.ml
@@ -19,13 +20,8 @@ ML_SOURCES:
 	aneris_lang/lib/vector_clock/vector_clock_code.ml
 	aneris_lang/lib/spawn_code.ml
 	aneris_lang/lib/par_code.ml
-	examples/ccddb/ccddb_code.ml
-	examples/consensus/paxos_code.ml
-	examples/transaction_commit/two_phase_code.ml
-	examples/viewstamped_replication/vr_serialization_code.ml
-	examples/viewstamped_replication/vr_network_code.ml
-	examples/viewstamped_replication/vr_replica_code.ml
-	examples/viewstamped_replication/vr_client_proxy_code.ml
+
+	## --------- CRDT Oplib ---------
 	examples/rcb/rcb_code.ml
 	examples/crdt/oplib/oplib_code.ml
 	examples/crdt/oplib/examples/pncounter/pncounter_code.ml
@@ -40,15 +36,29 @@ ML_SOURCES:
 	examples/crdt/oplib/examples/remove_wins_set/remove_wins_set_code.ml
 	examples/crdt/oplib/examples/table_of_counters/table_of_counters_code.ml
 	examples/crdt/oplib/examples/table_of_lwwregs/table_of_lwwregs_code.ml
+
+	## --------- CRDT Statelib ---------
 	examples/crdt/statelib/statelib_code.ml
-	examples/crdt/statelib/examples/pncounter/counter_code.ml
-	examples/crdt/statelib/examples/grow_only_set/grow_only_set_code.ml
+	examples/crdt/statelib/examples/gcounter/gcounter_code.ml
 	examples/crdt/statelib/examples/prod_comb/prod_comb_code.ml
+	examples/crdt/statelib/examples/pncounter/pncounter_code.ml
+	examples/crdt/statelib/examples/grow_only_set/grow_only_set_code.ml
+
+	## --------- Misc ---------
+	examples/ccddb/ccddb_code.ml
+	examples/consensus/paxos_code.ml
+	examples/transaction_commit/two_phase_code.ml
 	examples/ping_pong_done/ping_pong_done_code.ml
 	examples/dscm/implementations/one_server/one_server_serialization_code.ml
 	examples/dscm/implementations/one_server/one_server_client_proxy_code.ml
 	examples/dscm/implementations/one_server/one_server_network_code.ml
 	examples/dscm/implementations/one_server/one_server_server_code.ml
+	examples/viewstamped_replication/vr_serialization_code.ml
+	examples/viewstamped_replication/vr_network_code.ml
+	examples/viewstamped_replication/vr_replica_code.ml
+	examples/viewstamped_replication/vr_client_proxy_code.ml
+
+	## --------- Reliable Communication ---------
 	examples/reliable_communication/client_server_printing.ml
 	examples/reliable_communication/client_server_code.ml
   	examples/reliable_communication/lib/dlm/dlm_code.ml
@@ -78,8 +88,10 @@ ML_DEPENDENCIES:
         examples/crdt/oplib/examples/lwwreg/
 	examples/crdt/statelib/
 	examples/crdt/statelib/examples/
-        examples/crdt/oplib/examples/prod_comb/
-        examples/crdt/oplib/examples/grow_only_set/
+        examples/crdt/statelib/examples/gcounter/
+        examples/crdt/statelib/examples/grow_only_set/
+        examples/crdt/statelib/examples/prod_comb/
+        examples/crdt/statelib/examples/pncounter/
 	examples/ccddb/
 	examples/reliable_communication/
 	examples/reliable_communication/lib/

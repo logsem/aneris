@@ -6,7 +6,10 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang.lib Require Import list_code.
 From aneris.examples.crdt.statelib Require Import statelib_code.
 
-Definition mutator : val :=
+Definition prod_init_st : val :=
+  λ: "init_fnA" "init_fnB" <>, ("init_fnA" #(), "init_fnB" #()).
+
+Definition prod_mutator : val :=
   λ: "mut_fnA" "mut_fnB" "i" "gs" "op",
   let: "gsA" := Fst "gs" in
   let: "gsB" := Snd "gs" in
@@ -14,7 +17,7 @@ Definition mutator : val :=
   let: "opB" := Snd "op" in
   ("mut_fnA" "i" "gsA" "opA", "mut_fnB" "i" "gsB" "opB").
 
-Definition merge : val :=
+Definition prod_merge : val :=
   λ: "merge_fnA" "merge_fnB" "st1" "st2",
   let: "st11" := Fst "st1" in
   let: "st12" := Snd "st1" in
@@ -24,30 +27,30 @@ Definition merge : val :=
   let: "mB" := "merge_fnB" "st12" "st22" in
   ("mA", "mB").
 
-Definition init_st : val :=
-  λ: "init_fnA" "init_fnB" <>, ("init_fnA" #(), "init_fnB" #()).
-
-Definition prod_crdt : val :=
-  λ: "cA" "cB" <>,
-  let: "cAp" := "cA" #() in
-  let: "cBp" := "cB" #() in
+Definition prod_crdt (cA : val) (cB : val) : val :=
+  λ: <>,
+  let: "cAp" := cA #() in
+  let: "cBp" := cB #() in
   let: "init_fnA" := Fst (Fst "cAp") in
   let: "mut_fnA" := Snd (Fst "cAp") in
   let: "merge_fnA" := Snd "cAp" in
   let: "init_fnB" := Fst (Fst "cBp") in
   let: "mut_fnB" := Snd (Fst "cBp") in
   let: "merge_fnB" := Snd "cBp" in
-  let: "init_fn" := init_st "init_fnA" "init_fnB" in
-  let: "mut_fn" := mutator "mut_fnA" "mut_fnB" in
-  let: "merge_fn" := merge "merge_fnA" "merge_fnB" in
+  let: "init_fn" := λ: <>,
+  prod_init_st "init_fnA" "init_fnB" #() in
+  let: "mut_fn" := λ: "i" "gs" "op",
+  prod_mutator "mut_fnA" "mut_fnB" "i" "gs" "op" in
+  let: "merge_fn" := λ: "st1" "st2",
+  prod_merge "merge_fnA" "merge_fnB" "st1" "st2" in
   ("init_fn", "mut_fn", "merge_fn").
 
 Definition prod_init (stA_ser : val) (stA_deser : val) (stB_ser : val)
-                     (stB_deser : val) : val :=
-  λ: "cA" "cB" "addrs" "rid",
+                     (stB_deser : val) (cA : val) (cB : val) : val :=
+  λ: "addrs" "rid",
   let: "initRes" := statelib_init (prod_ser stA_ser stB_ser)
                     (prod_deser stA_deser stB_deser) "addrs" "rid"
-                    (prod_crdt "cA" "cB") in
+                    (λ: <>, prod_crdt cA cB #()) in
   let: "get_state" := Fst "initRes" in
   let: "update" := Snd "initRes" in
   ("get_state", "update").

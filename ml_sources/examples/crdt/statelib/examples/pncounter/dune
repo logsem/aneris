@@ -1,4 +1,4 @@
-(executable
-  (name counter_runner)
+(library
+  (name pn_counter_code)
   (flags :standard -rectypes)
-  (libraries statelib_code aneris))
+  (libraries prod_comb_code statelib_code gcounter_code aneris))

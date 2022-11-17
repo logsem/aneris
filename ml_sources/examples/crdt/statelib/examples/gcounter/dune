@@ -1,0 +1,4 @@
+(library
+  (name gcounter_code)
+  (flags :standard -rectypes)
+  (libraries statelib_code aneris))
