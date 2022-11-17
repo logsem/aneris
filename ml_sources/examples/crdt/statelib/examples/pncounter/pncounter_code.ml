@@ -54,7 +54,7 @@ let pncounter_eval (get_state : unit -> pnCptStTy) () =
   let (pl, nl) = st in
   let p = list_int_sum pl in
   let n = list_int_sum nl in
-  p + n
+  p - n
 
 let pncounter_init addrs rid =
   let pn_cpt = pn_cpt_init addrs rid in

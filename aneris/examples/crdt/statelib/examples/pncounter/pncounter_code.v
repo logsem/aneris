@@ -18,7 +18,7 @@ Definition pn_cpt_mutator : val :=
   λ: "i" "cpt" "op",
   let: "p" := Fst "op" in
   let: "n" := Snd "op" in
-  assert: (((#0 = "p") && (#0 = "n")) || (((#0 < "p") && ("n" = #0)) || 
+  assert: (((#0 = "p") && (#0 = "n")) || (((#0 < "p") && ("n" = #0)) ||
                                           ((#0 < "n") && ("p" = #0))));;
   prod_mutator gcpt_mutator gcpt_mutator "i" "cpt" "op".
 
@@ -56,7 +56,7 @@ Definition pncounter_eval : val :=
   let: "nl" := Snd "st" in
   let: "p" := list_int_sum "pl" in
   let: "n" := list_int_sum "nl" in
-  "p" + "n".
+  "p" - "n".
 
 Definition pncounter_init : val :=
   λ: "addrs" "rid",
