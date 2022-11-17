@@ -18,8 +18,8 @@ Definition pn_cpt_mutator : val :=
   λ: "i" "cpt" "op",
   let: "p" := Fst "op" in
   let: "n" := Snd "op" in
-  assert: (((#0 = "p") && (#0 = "n")) || ((("p" < #0) && ("n" = #0)) ||
-                                          (("n" < #0) && ("p" = #0))));;
+  assert: (((#0 = "p") && (#0 = "n")) || (((#0 < "p") && ("n" = #0)) || 
+                                          ((#0 < "n") && ("p" = #0))));;
   prod_mutator gcpt_mutator gcpt_mutator "i" "cpt" "op".
 
 Definition pn_cpt_merge : val :=
@@ -44,9 +44,10 @@ Definition list_int_sum : val :=
   λ: "l", list_fold (λ: "acc" "n", "acc" + "n") #0 "l".
 
 Definition pncounter_update : val :=
-  λ: "upd" "n", (if: #0 ≤ "n"
+  λ: "upd" "n",
+  (if: #0 ≤ "n"
    then  "upd" ("n", #0)
-   else  "upd" (#0, "n")).
+   else  "upd" (#0, (- "n"))).
 
 Definition pncounter_eval : val :=
   λ: "get_state" <>,

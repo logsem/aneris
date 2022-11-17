@@ -17,7 +17,7 @@ let pn_cpt_init_st n : unit -> pnCptStTy =
 let pn_cpt_mutator : (pnCptOpTy, pnCptStTy) mutatorFnTy =
   fun (i : int) (cpt : pnCptStTy) (op : pnCptOpTy) ->
   let (p, n) = op in
-  assert ((0 = p && 0 = n) || (p < 0 && n = 0) || (n < 0 && p = 0));
+  assert ((0 = p && 0 = n) || (0 < p && n = 0) || (0 < n && p = 0));
   prod_mutator gcpt_mutator gcpt_mutator i cpt op
 
 let pn_cpt_merge (st : pnCptStTy) (st' : pnCptStTy) : pnCptStTy =
@@ -47,7 +47,7 @@ let list_int_sum (l : int alist) =
 let pncounter_update (upd : pnCptOpTy -> unit) (n : int) =
   if 0 <= n
   then upd (n, 0)
-  else upd (0, n)
+  else upd (0, -n)
 
 let pncounter_eval (get_state : unit -> pnCptStTy) () =
   let st = get_state () in
