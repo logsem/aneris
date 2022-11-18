@@ -43,6 +43,7 @@ ML_SOURCES:
 	examples/crdt/statelib/examples/prod_comb/prod_comb_code.ml
 	examples/crdt/statelib/examples/pncounter/pncounter_code.ml
 	examples/crdt/statelib/examples/grow_only_set/grow_only_set_code.ml
+	examples/crdt/statelib/examples/map_comb/statelib_map_comb_code.ml
 
 	## --------- Misc ---------
 	examples/ccddb/ccddb_code.ml
@@ -92,6 +93,7 @@ ML_DEPENDENCIES:
         examples/crdt/statelib/examples/grow_only_set/
         examples/crdt/statelib/examples/prod_comb/
         examples/crdt/statelib/examples/pncounter/
+        examples/crdt/statelib/examples/map_comb/
 	examples/ccddb/
 	examples/reliable_communication/
 	examples/reliable_communication/lib/

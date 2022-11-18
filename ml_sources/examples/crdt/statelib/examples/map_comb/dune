@@ -1,0 +1,4 @@
+(library
+  (name statelib_map_comb_code)
+  (flags :standard -rectypes)
+  (libraries statelib_code aneris))
