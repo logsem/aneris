@@ -77,11 +77,10 @@ Section Preambule.
   Lemma event_set_seqnum_max (s: event_set Op) (orig: RepId) :
     ∀ (i: nat),
     dep_closed s →
-    (∀ ev, ev ∈ s → get_evid ev ∈ ev.(EV_Time)) →
     lt (size (filter (λ eid : EvId, eid.1 = orig) (get_deps_set s))) i →
     (orig, i) ∉ get_deps_set s.
   Proof.
-    intros i Hdc Heidin Hlt Himp.
+    intros i Hdc Hlt Himp.
     destruct (get_deps_set_incl s Hdc _ Himp) as (ev & Hev_in & [Hev_orig Hev_sid]%get_evid_eq).
     unfold get_seqnum in Hev_sid.
     assert (
@@ -127,8 +126,6 @@ Section Preambule.
       rewrite elem_of_filter.
       intros [_ contra].
       eapply event_set_seqnum_max; eauto.
-      intros ? ?.
-      eapply event_set_evid_in_time; eauto.
   Qed.
 
   Lemma event_set_get_evid (s: event_set Op) (op: Op) (orig: fRepId):
@@ -176,11 +173,9 @@ Section Preambule.
     - intros Hdep.
       assert ((orig : nat, S (size (filter (λ eid : RepId * SeqNum, eid.1 = orig) (get_deps_set s)))) ∈ EV_Time ev) as Hin; [set_solver|].
       eapply (event_set_seqnum_max _ orig); eauto.
-      + intros ? ?.
-        eapply event_set_evid_in_time; eauto.
-      + assert (EV_Time ev ⊆ get_deps_set s) as Hsub; [|set_solver].
-        rewrite -get_deps_set_singleton.
-        apply get_deps_set_mon; set_solver.
+      assert (EV_Time ev ⊆ get_deps_set s) as Hsub; [|set_solver].
+      rewrite -get_deps_set_singleton.
+      apply get_deps_set_mon; set_solver.
   Qed.
         
   Lemma Gst_incl_orig' (g: Gst Op) (orig: fRepId) (ev: Event Op):
