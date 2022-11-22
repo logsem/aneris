@@ -328,64 +328,12 @@ Section Aneris_AS.
 
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
+    trace_steps simple_trans atr ∧
     state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
     ∃ shA shB, 
     state_sockets (trace_last ex).2 =
       {[ ip_of_address saA := {[shA := (sA,[])]};
          ip_of_address saB := {[shB := (sB,mABm (state_get_m (trace_last atr)))]} ]}.
-
-  (* Definition simple_valid_state_evolution (ex : execution_trace aneris_lang) *)
-  (*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) := *)
-  (*   match trace_last atr with *)
-  (*   | Start => state_ms (trace_last ex).2 = ∅ ∧ *)
-  (*              ∃ sh, (state_sockets (trace_last ex).2 !!! *)
-  (*                                      (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, []) *)
-  (*   | Sent n => state_ms (trace_last ex).2 = mABn n ∧ *)
-  (*               ∃ sh, (state_sockets (trace_last ex).2 !!! *)
-  (*                                      (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, []) *)
-  (*   | Delivered n m => state_ms (trace_last ex).2 = mABn n ∧ *)
-  (*                      ∃ sh, *)
-  (*                        (state_sockets (trace_last ex).2 !!! *)
-  (*                                       (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, repeat mAB m) *)
-  (*   | Received n m => state_ms (trace_last ex).2 = mABn n ∧ *)
-  (*                     ∃ sh, *)
-  (*                       (state_sockets (trace_last ex).2 !!! *)
-  (*                                      (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, repeat mAB m) *)
-  (*   end. *)
-  
-  (* Definition simple_valid_state_evolution (ex : execution_trace aneris_lang) *)
-  (*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) := *)
-  (*   match trace_last atr with *)
-  (*   | Start => state_ms (trace_last ex).2 = ∅ ∧ *)
-  (*              ∃ sh, (state_sockets (trace_last ex).2 !!! *)
-  (*                                      (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, []) *)
-  (*   | Sent n => multiplicity mAB (state_ms (trace_last ex).2) = n ∧ *)
-  (*               ∃ sh, (state_sockets (trace_last ex).2 !!! *)
-  (*                                      (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, []) *)
-  (*   | Delivered n m => multiplicity mAB (state_ms (trace_last ex).2) = n ∧ *)
-  (*                      ∃ sh, *)
-  (*                        (state_sockets (trace_last ex).2 !!! *)
-  (*                                       (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, repeat mAB m) *)
-  (*   | Received n m => multiplicity mAB (state_ms (trace_last ex).2) = n ∧ *)
-  (*                     ∃ sh, *)
-  (*                       (state_sockets (trace_last ex).2 !!! *)
-  (*                                      (ip_of_address saB)) !! sh = *)
-  (*                                         Some (sB, repeat mAB m) *)
-  (*   end. *)
-
-  (* Definition simple_valid_state_evolution (ex : execution_trace aneris_lang) *)
-  (*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) := *)
-  (*   match trace_last atr with *)
-  (*   | Sent n => (trace_messages_history ex) *)
-  (*   | _ => 0 *)
-  (*   end. *)
 
   Global Instance anerisG_irisG :
     irisG aneris_lang (fair_model_to_model simple_fair_model) Σ := {
@@ -395,6 +343,7 @@ Section Aneris_AS.
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗
+       (* TODO: Expose state of live roles *)
        (* auth_st (trace_last atr) ∗ *)
        ⌜simple_valid_state_evolution ex atr⌝ ∗
        steps_auth (trace_length ex))%I;

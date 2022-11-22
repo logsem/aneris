@@ -62,15 +62,15 @@ Section state_interpretation.
     rewrite /trace_ends_in in Hex.
     rewrite Hex in H. simpl in *.
     destruct σ1; simpl in *; simplify_eq.
-    destruct (trace_last atr).
-    { destruct H as [Hσ _].
+    destruct (trace_last atr) eqn:Hs.
+    { destruct H as (_ & Hσ & _).
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       - rewrite /messages_to_receive_at_multi_soup in Hm. set_solver.
       - set_solver.
       - set_solver. }
     (* Sent *)
-    - destruct H as [Hσ H'].
+    - destruct H as (Hsteps & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
@@ -92,6 +92,7 @@ Section state_interpretation.
             done. }
           assert (a = m_destination mAB) as ->.
           { by apply elem_of_filter in Hm as [-> _]. }
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
           exists shA, sh'.
@@ -128,7 +129,8 @@ Section state_interpretation.
           [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       (* Dup *)
-      + iExists (Sent $ S sent), (Some Ndup).
+      + destruct sent as [|sent]; [set_solver|].
+        iExists (Sent $ S $ S sent), (Some Ndup).
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -137,6 +139,7 @@ Section state_interpretation.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|done]. }
         iExists γm, mh. iFrame.
         iSplit.
@@ -157,6 +160,7 @@ Section state_interpretation.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [by multiset_solver|done]. }
         iExists γm, mh. iFrame.
         iSplit.
@@ -168,7 +172,7 @@ Section state_interpretation.
         iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. by apply messages_history_coh_drop_message.
     (* Delivered *)
-    - destruct H as [Hσ H'].
+    - destruct H as (Hvalid&Hσ&H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
@@ -190,6 +194,7 @@ Section state_interpretation.
             done. }
           assert (a = m_destination mAB) as ->.
           { by apply elem_of_filter in Hm as [-> _]. }
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
           exists shA, sh'.
@@ -226,7 +231,8 @@ Section state_interpretation.
           [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       (* Dup *)
-      + iExists (Delivered (S sent) delivered), (Some Ndup).
+      + destruct sent as [|sent]; [set_solver|].
+        iExists (Delivered (S $ S sent) delivered), (Some Ndup).
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -235,6 +241,7 @@ Section state_interpretation.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|done]. }
         iExists γm, mh. iFrame.
         iSplit.
@@ -255,6 +262,7 @@ Section state_interpretation.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [by multiset_solver|done]. }
         iExists γm, mh. iFrame.
         iSplit.
@@ -266,11 +274,11 @@ Section state_interpretation.
         iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. by apply messages_history_coh_drop_message.
     (* Delivered *)
-    - destruct H as [Hσ H'].
+    - destruct H as (Hvalid&Hσ&H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
-      + destruct sent;
+      + destruct sent as [|sent];
           [by rewrite /messages_to_receive_at_multi_soup in Hm; set_solver|].
         iExists (Received sent (S delivered)), (Some Ndeliver).
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
@@ -289,6 +297,7 @@ Section state_interpretation.
           assert (a = m_destination mAB) as ->.
           { by apply elem_of_filter in Hm as [-> _]. }
           simpl.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
           exists shA, sh'.
@@ -325,7 +334,8 @@ Section state_interpretation.
           [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       (* Dup *)
-      + iExists (Received (S sent) delivered), (Some Ndup).
+      + destruct sent as [|sent]; [set_solver|].
+        iExists (Received (S $ S sent) delivered), (Some Ndup).
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -334,6 +344,7 @@ Section state_interpretation.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|done]. }
         iExists γm, mh. iFrame.
         iSplit.
@@ -354,6 +365,7 @@ Section state_interpretation.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
+          split; [econstructor; [apply Hs|econstructor|done]|].
           split; [by multiset_solver|done]. }
         iExists γm, mh. iFrame.
         iSplit.

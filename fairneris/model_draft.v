@@ -3,7 +3,7 @@ From trillium.fairness Require Import fair_termination.
 
 Import derived_laws_later.bi.
 
-(** Initial simple Fiarneris example *)
+(** Initial simple Fairneris example *)
 
 (** The simple model states *)
 Inductive simple_state :=
@@ -44,7 +44,7 @@ Proof.
 Qed.
 
 Inductive simple_trans
-  : simple_state → option simple_role → simple_state -> Prop :=
+  : simple_state → option simple_role → simple_state → Prop :=
 (* Transitions from Start *)
 | Start_B_recv_fail_simple_trans : simple_trans Start (Some B) Start
 | Start_A_send_simple_trans : simple_trans Start (Some A) (Sent 1)
@@ -57,11 +57,11 @@ Inductive simple_trans
 | Delivered_N_duplicate_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndup) (Delivered (S $ S n) m)
 | Delivered_N_drop_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndrop) (Delivered n m)
 | Delivered_N_deliver_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndeliver) (Delivered n (S m))
-| Delivered_B_recv_succ_simple_trans n m : simple_trans (Delivered n m) (Some B) (Received n m)
+| Delivered_B_recv_succ_simple_trans n m : simple_trans (Delivered n (S m)) (Some B) (Received n m)
 (* Transitions from Received - Are these needed? *)
-(* | Received_N_duplicate_simple_trans n m : simple_trans (Received n m) (Some Ndup) (Received (S n) m) *)
-(* | Received_N_drop_simple_trans n m : simple_trans (Received (S n) m) (Some Ndrop) (Received n m) *)
-(* | Received_N_deliver_simple_trans n m : simple_trans (Received (S n) m) (Some Ndeliver) (Received n (S m)) *)
+| Received_N_duplicate_simple_trans n m : simple_trans (Received (S n) m) (Some Ndup) (Received (S $ S n) m)
+| Received_N_drop_simple_trans n m : simple_trans (Received (S n) m) (Some Ndrop) (Received n m)
+| Received_N_deliver_simple_trans n m : simple_trans (Received (S n) m) (Some Ndeliver) (Received n (S m))
 .
 
 Definition simple_live_roles (s : simple_state) : gset simple_role :=
@@ -72,7 +72,7 @@ Definition simple_live_roles (s : simple_state) : gset simple_role :=
   | Delivered n m => {[B;Ndup;Ndrop;Ndeliver]}
   (* Is the network live in the last state? *)
   (* | Received n m => {[Ndup;Ndrop;Ndeliver]} *)
-  | Received n m => ∅
+  | Received n m => {[Ndup;Ndrop;Ndeliver]}
   end.
 
 Lemma simple_live_spec_holds s ρ s' :
@@ -90,61 +90,64 @@ Proof.
           |}).
 Defined.
 
-Definition state_to_nat (s : simple_state) : nat :=
-  match s with
-  | Start => 3
-  | Sent _ => 2
-  | Delivered _ _ => 1
-  | Received _ _ => 0
-  end.
 
-Definition simple_state_order (s1 s2 : simple_state) : Prop :=
-  state_to_nat s1 ≤ state_to_nat s2.
+(* (** Fair Model construction (currently does not work) *) *)
 
-Local Instance simple_state_order_preorder : PreOrder simple_state_order.
-Proof.
-  split.
-  - by intros []; constructor.
-  - intros [] [] []; rewrite /simple_state_order.
-    all: intros Hc12 Hc23; try by inversion Hc12.
-    all: rewrite /simple_state_order; try lia.
-Qed.
+(* Definition state_to_nat (s : simple_state) : nat := *)
+(*   match s with *)
+(*   | Start => 3 *)
+(*   | Sent _ => 2 *)
+(*   | Delivered _ _ => 1 *)
+(*   | Received _ _ => 0 *)
+(*   end. *)
 
-Definition simple_decreasing_role (s : fmstate simple_fair_model) :
-  fmrole simple_fair_model :=
-  match s with
-  | Start => A
-  | Sent _ => Ndeliver
-  | Delivered _ _ => B
-  | Received _ _ => Ndeliver    (* Why is this needed? *)
-  end.
+(* Definition simple_state_order (s1 s2 : simple_state) : Prop := *)
+(*   state_to_nat s1 ≤ state_to_nat s2. *)
 
-#[local] Program Instance simple_model_terminates :
-  FairTerminatingModel simple_fair_model :=
-  {|
-    ftm_leq := simple_state_order;
-    ftm_decreasing_role := simple_decreasing_role;
-  |}.
-Next Obligation.
-  rewrite /simple_state_order.
-  intros []; repeat (constructor; intros [] []; simpl in *; try lia).
-Qed.
-Next Obligation.
-  rewrite /simple_state_order.
-  intros s [ρ' [s' Htrans]]=> /=.
-  split.
-  - destruct s; try set_solver. inversion Htrans.
-  - intros s'' Htrans'. simpl in *.
-    destruct s.
-    + inversion Htrans'. split; simpl; lia.
-    + inversion Htrans'. split; simpl; lia.
-    + inversion Htrans'. split; simpl; lia.
-    + inversion Htrans'.
-Qed.
-Next Obligation.
-  intros s s' ρ Htrans Hρ. by destruct s; inversion Htrans.
-Qed.
-Next Obligation.
-  rewrite /simple_state_order.
-  intros s1 ρ s2 Htrans. destruct s1; inversion Htrans; simpl; lia.
-Qed.
+(* Local Instance simple_state_order_preorder : PreOrder simple_state_order. *)
+(* Proof. *)
+(*   split. *)
+(*   - by intros []; constructor. *)
+(*   - intros [] [] []; rewrite /simple_state_order. *)
+(*     all: intros Hc12 Hc23; try by inversion Hc12. *)
+(*     all: rewrite /simple_state_order; try lia. *)
+(* Qed. *)
+
+(* Definition simple_decreasing_role (s : fmstate simple_fair_model) : *)
+(*   fmrole simple_fair_model := *)
+(*   match s with *)
+(*   | Start => A *)
+(*   | Sent _ => Ndeliver *)
+(*   | Delivered _ _ => B *)
+(*   | Received _ _ => Ndeliver    (* Why is this needed? *) *)
+(*   end. *)
+
+(* #[local] Program Instance simple_model_terminates : *)
+(*   FairTerminatingModel simple_fair_model := *)
+(*   {| *)
+(*     ftm_leq := simple_state_order; *)
+(*     ftm_decreasing_role := simple_decreasing_role; *)
+(*   |}. *)
+(* Next Obligation. *)
+(*   rewrite /simple_state_order. *)
+(*   intros []; repeat (constructor; intros [] []; simpl in *; try lia). *)
+(* Qed. *)
+(* Next Obligation. *)
+(*   rewrite /simple_state_order. *)
+(*   intros s [ρ' [s' Htrans]]=> /=. *)
+(*   split. *)
+(*   - destruct s; try set_solver. inversion Htrans. *)
+(*   - intros s'' Htrans'. simpl in *. *)
+(*     destruct s. *)
+(*     + inversion Htrans'. split; simpl; lia. *)
+(*     + inversion Htrans'. split; simpl; lia. *)
+(*     + inversion Htrans'. split; simpl; lia. *)
+(*     + inversion Htrans'. *)
+(* Qed. *)
+(* Next Obligation. *)
+(*   intros s s' ρ Htrans Hρ. by destruct s; inversion Htrans. *)
+(* Qed. *)
+(* Next Obligation. *)
+(*   rewrite /simple_state_order. *)
+(*   intros s1 ρ s2 Htrans. destruct s1; inversion Htrans; simpl; lia. *)
+(* Qed. *)

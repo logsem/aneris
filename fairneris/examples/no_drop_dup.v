@@ -72,9 +72,10 @@ Section with_Σ.
     rewrite /simple_valid_state_evolution.
     rewrite Heq in Hvalid. simpl in Hvalid.
     simpl.
-    destruct Hvalid as [Hms Hskt].
+    destruct Hvalid as (Hvalid&Hms&Hskt).
     rewrite /trace_ends_in in Hex.
     rewrite Hex in Hms. simpl in Hms. rewrite Hms.
+    split; [econstructor; [apply Heq|econstructor|done]|].
     split.
     { rewrite (comm _ ∅). f_equiv. f_equiv. eauto. }
     rewrite Hex in Hskt.
@@ -112,7 +113,7 @@ Section with_Σ.
     iIntros (tid) "Hnode".
     iLöb as "IH".
     iApply wp_lift_head_step; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & %Hm & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & %Hvalid & Hauth) /=".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -136,21 +137,57 @@ Section with_Σ.
         iNext.
         iMod "Hmk".
         iModIntro.
-        iExists (trace_last atr), (Some B).
-        rewrite -message_history_evolution_id; iFrame.
-        rewrite Hnotriggered;
-           [|done|done| by intros ? (?&?&?&?&?&?&?&?&?&?&?&?&?) |
-             by intros ? (?&?&?&?&?&?&?&?&?&?&?&?&?) |
-             by intros ? (?&?&?&?&?&?&?&?&?)].
-        iFrame.
-        iSplit.
-        { iPureIntro.
-          rewrite /trace_ends_in in Hex.
-          rewrite /simple_valid_state_evolution.
-          rewrite /simple_valid_state_evolution in Hm.
-          rewrite Hex in Hm=> /=.
-          done. }
-        iApply ("IH" with "[$] [$] [$] [$]").
+        (* Derive this using ghost state tracking current live roles *)
+        assert (B ∈ simple_live_roles (trace_last atr)) as Hrole by admit.
+        destruct (trace_last atr) eqn:Hs; [..|by set_solver].
+        * iExists (trace_last atr), (Some B).
+          rewrite -message_history_evolution_id; iFrame.
+          rewrite Hnotriggered;
+            [|done|done| by intros ? (?&?&?&?&?&?&?&?&?&?&?&?&?) |
+              by intros ? (?&?&?&?&?&?&?&?&?&?&?&?&?) |
+              by intros ? (?&?&?&?&?&?&?&?&?)].
+          iFrame.
+          iSplit.
+          { iPureIntro.
+            rewrite /trace_ends_in in Hex.
+            rewrite /simple_valid_state_evolution.
+            rewrite /simple_valid_state_evolution in Hvalid.
+            destruct Hvalid as [Hvalid Hm].
+            rewrite Hex in Hm=> /=.
+            split; [|done].
+            rewrite Hs.
+            econstructor; [apply Hs|econstructor|done].
+          }
+          iApply ("IH" with "[$] [$] [$] [$]").
+        * iExists (trace_last atr), (Some B).
+          rewrite -message_history_evolution_id; iFrame.
+          rewrite Hnotriggered;
+            [|done|done| by intros ? (?&?&?&?&?&?&?&?&?&?&?&?&?) |
+              by intros ? (?&?&?&?&?&?&?&?&?&?&?&?&?) |
+              by intros ? (?&?&?&?&?&?&?&?&?)].
+          iFrame.
+          iSplit.
+          { iPureIntro.
+            rewrite /trace_ends_in in Hex.
+            rewrite /simple_valid_state_evolution.
+            rewrite /simple_valid_state_evolution in Hvalid.
+            destruct Hvalid as [Hvalid Hm].
+            rewrite Hex in Hm=> /=.
+            split; [|done].
+            rewrite Hs.
+            econstructor; [apply Hs|econstructor|done].
+          }
+          iApply ("IH" with "[$] [$] [$] [$]").
+        * (* Derive this from trace property, or change model. *)
+          assert (∃ delivered', delivered = S delivered') as [delivered' ->]
+                                                               by admit.
+          simpl in *.
+          destruct Hvalid as (Hvalid&Hσ&Hskts).
+          rewrite Hs in Hskts.
+          simpl in *.
+          clear Hnotriggered.
+          admit.                (* Assert contradiction from state determining
+                                   buffer is non-empty, while it is empty. *)
     - iClear "IH".
       iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
         first set_solver; auto.
@@ -182,33 +219,35 @@ Section with_Σ.
         repeat split; set_solver. }
       clear Huntracked.
       iModIntro.
-      (* TODO: Deduce that we are in [Delivered n m] *)
-      assert (∃ x y, trace_last atr = Received x (S y)) as (x&y&Hatlast).
+      (* TODO: Deduce that we are in [Delivered n m] from buffer state,
+               and liveness of [B] *)
+      assert (∃ x y, trace_last atr = Delivered x (S y)) as (x&y&Hs).
       { admit. }
       iExists (Received x y), (Some B).
       rewrite Hhist.
       iFrame.
       iSplit.
       { iPureIntro.
+        destruct Hvalid as (Hvalid&Hσ&Hskts).
         rewrite /simple_valid_state_evolution. simpl.
-        rewrite /simple_valid_state_evolution in Hm.
-        rewrite Hatlast in Hm. simpl in Hm.
+        rewrite Hex in Hskts. simpl in Hskts.
         rewrite /trace_ends_in in Hex.
-        rewrite Hex in Hm.
-        simpl in Hm.
-        destruct Hm as [Hm1 Hm2].
+        rewrite Hex in Hσ.
+        simpl in Hσ.
+        split; [econstructor; [apply Hs|econstructor|done]|].
+        rewrite Hs in Hσ.
         split; [done|].
         simplify_eq.
         simpl in *.
-        destruct Hm2 as (shA & shB' & Hm2).
-        rewrite Hm2 in HSn.
+        destruct Hskts as (shA & shB' & Hskts).
+        rewrite Hskts in HSn.
         simpl in *. rewrite insert_commute in HSn; [|done].
         rewrite lookup_insert in HSn.
         simplify_eq.
         assert (shB = shB') as <-.
         { rewrite lookup_insert_Some in Hr. set_solver. }
         exists shA, shB.
-        rewrite Hm2.
+        rewrite Hskts.
         rewrite insert_commute; [|done].
         rewrite insert_insert.
         f_equiv.
@@ -217,6 +256,7 @@ Section with_Σ.
         { rewrite lookup_insert_Some in Hr.
           destruct Hr as [[_ Hr]|[Hr _]]; [|done].
           rewrite /mABm in Hr.
+          rewrite Hs in Hr.
           replace (S y) with (y + 1)%nat in Hr by lia.
           rewrite repeat_app in Hr. simpl in Hr.
           simplify_eq.
