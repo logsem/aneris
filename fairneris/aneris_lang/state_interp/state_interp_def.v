@@ -318,7 +318,7 @@ Section Aneris_AS.
     match s with
     | Start => 0
     | Sent _ => 0
-    | Delivered _ m => m
+    | Delivered _ m => S m
     | Received _ m => m
     end.
   

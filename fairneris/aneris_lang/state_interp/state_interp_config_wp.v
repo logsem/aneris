@@ -76,7 +76,7 @@ Section state_interpretation.
       (* Deliver *)
       + destruct sent;
           [by rewrite /messages_to_receive_at_multi_soup in Hm; set_solver|].
-        iExists (Delivered sent 1), (Some Ndeliver).
+        iExists (Delivered sent 0), (Some Ndeliver).
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -202,7 +202,7 @@ Section state_interpretation.
           apply Hnscoh in HSn as (?&?&?&?&?).
           assert (ip = ip_of_address saB) as ->.
           { eapply H2 in Hsh. eapply Hsh in Hsaddr. done. }
-          assert (Sn = {[sh' := (sB, mABm delivered)]}) as ->.
+          assert (Sn = {[sh' := (sB, mABm (S delivered))]}) as ->.
           { rewrite H' in HSn'.
             rewrite insert_commute in HSn'; [|done].
             rewrite lookup_insert in HSn'.
@@ -211,7 +211,7 @@ Section state_interpretation.
           { rewrite lookup_insert_Some in Hsh. set_solver. }
           assert (skt = sB) as ->.
           { rewrite lookup_insert in Hsh. set_solver. }
-          assert (R = mABm delivered) as ->.
+          assert (R = mABm (S delivered)) as ->.
           { rewrite lookup_insert in Hsh. set_solver. }
           rewrite H'.
           simpl.

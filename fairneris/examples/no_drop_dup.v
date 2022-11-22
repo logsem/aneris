@@ -178,16 +178,26 @@ Section with_Σ.
             econstructor; [apply Hs|econstructor|done].
           }
           iApply ("IH" with "[$] [$] [$] [$]").
-        * (* Derive this from trace property, or change model. *)
-          assert (∃ delivered', delivered = S delivered') as [delivered' ->]
-                                                               by admit.
-          simpl in *.
+        * clear Hnotriggered.
           destruct Hvalid as (Hvalid&Hσ&Hskts).
-          rewrite Hs in Hskts.
-          simpl in *.
-          clear Hnotriggered.
-          admit.                (* Assert contradiction from state determining
-                                   buffer is non-empty, while it is empty. *)
+          destruct Hskts as (shA&shB'&Hskts).
+          rewrite Hex in Hskts. simpl in Hskts.
+          rewrite Hskts in HSn.
+          rewrite insert_commute in HSn; [|done].
+          rewrite lookup_insert in HSn.
+          simplify_eq.
+          rewrite lookup_insert_Some in Hr.
+          destruct Hr as [[-> Hr]|]; [|set_solver].
+          simplify_eq.
+          rewrite /state_get_m in Hr.
+          rewrite Hs in Hr. simpl in Hr.
+          rewrite /mABm in Hr.
+          replace (S delivered) with (delivered + 1)%nat in Hr by lia.
+          rewrite repeat_app in Hr. simpl in Hr.
+          simplify_eq.
+          rewrite /mABm.
+          apply app_nil in Hr.
+          naive_solver.
     - iClear "IH".
       iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
         first set_solver; auto.
@@ -221,7 +231,7 @@ Section with_Σ.
       iModIntro.
       (* TODO: Deduce that we are in [Delivered n m] from buffer state,
                and liveness of [B] *)
-      assert (∃ x y, trace_last atr = Delivered x (S y)) as (x&y&Hs).
+      assert (∃ x y, trace_last atr = Delivered x y) as (x&y&Hs).
       { admit. }
       iExists (Received x y), (Some B).
       rewrite Hhist.
@@ -257,6 +267,7 @@ Section with_Σ.
           destruct Hr as [[_ Hr]|[Hr _]]; [|done].
           rewrite /mABm in Hr.
           rewrite Hs in Hr.
+          rewrite /state_get_m in Hr=> /=.
           replace (S y) with (y + 1)%nat in Hr by lia.
           rewrite repeat_app in Hr. simpl in Hr.
           simplify_eq.
