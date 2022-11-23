@@ -569,9 +569,10 @@ Inductive head_step
   | LoadS l v σ :
       σ !! l = Some v →
       head_step (Load (Val $ LitV $ LitLoc l)) σ (Val v) σ []
-  | StoreS l v σ :
-      head_step (Store (Val $ LitV $ LitLoc l) (Val v)) σ
-                (Val $ LitV $ LitUnit) (<[l:=v]>σ)
+  | StoreS l v w σ :
+      σ !! l = Some v →
+      head_step (Store (Val $ LitV $ LitLoc l) (Val w)) σ
+                (Val $ LitV $ LitUnit) (<[l:=w]>σ)
                 []
   | CasFailS l v1 v2 vl σ :
       σ !! l = Some vl → vl ≠ v1 →
@@ -750,6 +751,7 @@ Inductive socket_step ip :
     saddress skt = None →
     (* The port is not in use *)
     P !! ip_of_address a = Some ps →
+    ip = ip_of_address a →
     port_of_address a ∉ ps →
     socket_step
       ip
@@ -766,7 +768,8 @@ Inductive socket_step ip :
     (* There is a socket that has been allocated for the handle *)
     Sn !! sh = Some (skt, r) →
     (* The socket has an assigned address *)
-    saddress skt = Some f ->
+    saddress skt = Some f →
+    ip = ip_of_address f →
     let new_message := mkMessage f a mbody in
     socket_step
       ip
@@ -782,6 +785,7 @@ Inductive socket_step ip :
     Sn !! sh = Some (skt, r ++ [m]) →
     (* The socket has an assigned address *)
     saddress skt = Some a →
+    ip = ip_of_address a →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh))
@@ -790,33 +794,39 @@ Inductive socket_step ip :
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
       (<[sh:=(skt, r)]>Sn) P M
-| ReceiveFromNoneS sh skt Sn P M :
+| ReceiveFromNoneS sh skt a Sn P M :
     (* The socket handle is bound to some socket
        and there is nothing to receive
        and the operation should not block forever
        (a positive timeout was set). *)
     Sn !! sh = Some (skt, []) →
     sblock skt = false →
+    saddress skt = Some a →
+    ip = ip_of_address a →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
       (* reduces to *)
       (Val $ InjLV (LitV LitUnit)) Sn P M
-| ReceiveFromBlockS sh skt Sn P M :
+| ReceiveFromBlockS sh skt a Sn P M :
     (* The socket handle is bound to some socket
        and there is nothing to receive
        and the operation should block
        (either no timeout, or timeout 0.0 was set). *)
     Sn !! sh = Some (skt, []) →
     sblock skt = true →
+    saddress skt = Some a →
+    ip = ip_of_address a →
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
       (* reduces to *)
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn P M
-| SetReceiveTimeoutPositiveS sh skt R Sn P M m n :
+| SetReceiveTimeoutPositiveS sh skt a R Sn P M m n :
     Sn !! sh = Some (skt, R) →
     (0 <= m ∧ 0 <= n ∧ 0 < (m+n)) →
+    saddress skt = Some a →
+    ip = ip_of_address a →
     socket_step
       ip
       (SetReceiveTimeout
@@ -826,8 +836,10 @@ Inductive socket_step ip :
       (* reduces to *)
       (Val $ (LitV LitUnit))
       (<[sh:=((skt<|sblock := false|>), R)]>Sn) P M
-| SetReceiveTimeoutZeroS sh skt R Sn P M :
+| SetReceiveTimeoutZeroS sh skt a R Sn P M :
     Sn !! sh = Some (skt, R) →
+    saddress skt = Some a →
+    ip = ip_of_address a →
     socket_step
       ip
       (SetReceiveTimeout

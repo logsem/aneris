@@ -429,12 +429,12 @@ Section primitive_laws.
     {{{ ▷ l ↦[n] v1 }}}
       (mkExpr n (Store #l (Val v2))) @ k; ζ; E
     {{{ RET (mkVal n #()); l ↦[n] v2 }}}.
-  Proof.
+  Proof. 
     iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
-    iSplit. { iPureIntro; do 3 eexists. eapply LocalStepS; eauto. econstructor. }
+    iSplit. { iPureIntro; do 3 eexists. eapply LocalStepS; eauto. econstructor. eauto. }
     iIntros (? ? ? ?).
     pose proof Hex as Htrig.
     eapply aneris_events_state_interp_no_triggered in Htrig;
