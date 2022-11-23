@@ -76,7 +76,7 @@ End pn_cpt_proof.
 
 Section pncounter_proof.
 
-  Context `{!anerisG M Σ, !CRDT_Params, !StLib_Res (prodOp gctr_op gctr_op)}.
+  Context `{!anerisG M Σ, !CRDT_Params, pnRes : !StLib_Res (prodOp gctr_op gctr_op)}.
 
   Notation pnOp := (prodOp gctr_op gctr_op).
   Notation pnSt := (prodSt gctr_st gctr_st).
@@ -105,12 +105,27 @@ Section pncounter_proof.
       by iApply "HΦ".
   Qed.
 
+  Notation pn_upd_spec := (@update_spec _ _ _ pnOp _ _ pnSt _ _ pnParams pnRes).
+  Notation pn_get_state_spec := (@get_state_spec _ _ _ pnOp _ _ pnSt _ _ pnParams pnRes).
+
+
+
   (* TODO: Prove: *)
   (* Definition pncounter_update : val := *)
   (*   λ: "upd" "n", *)
   (*     (if: #0 ≤ "n" *)
   (*      then  "upd" ("n", #0) *)
   (*      else  "upd" (#0, (- "n"))). *)
+
+  (* NB: this is not what we want in the end. We want rather an
+     @update_spec with a logical state being Z. *)
+  Lemma pncounter_update_spec (upd_fn : val) (n : Z) repId addr:
+    pn_upd_spec upd_fn repId addr -∗
+    {{{ ⌜True⌝ }}}
+      pncounter_update upd_fn #n @[ip_of_address addr]
+    {{{ (n : nat),  RET #n; ⌜n = n⌝ }}}.
+  Proof. Admitted.
+
 
   (* TODO: Prove: *)
   (* Definition pncounter_eval : val := *)
@@ -121,6 +136,15 @@ Section pncounter_proof.
   (*      let: "p" := list_int_sum "pl" in *)
   (*      let: "n" := list_int_sum "nl" in *)
   (*      "p" - "n". *)
+
+ (* NB: this is not what we want in the end. We want rather an
+     @get_state_spec with a logical state being Z. *)
+  Lemma pncounter_eval_spec (get_state_fn : val) repId addr:
+    pn_get_state_spec get_state_fn repId addr -∗
+    {{{ ⌜True⌝ }}}
+      pncounter_eval get_state_fn #() @[ip_of_address addr]
+    {{{ (n : nat),  RET #n; ⌜n = n⌝ }}}.
+  Proof. Admitted.
 
   (* TODO: Prove: *)
   (* Definition pncounter_init : val := *)
