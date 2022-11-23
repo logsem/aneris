@@ -82,9 +82,28 @@ Section pncounter_proof.
   Notation pnSt := (prodSt gctr_st gctr_st).
   Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st).
 
-  (* TODO: Prove: *)
-  (* Definition list_int_sum : val := *)
-    (* λ: "l", list_fold (λ: "acc" "n", "acc" + "n") #0 "l". *)
+  Lemma wp_list_int_sum (l : list nat) lv ip :
+    {{{ ⌜is_list l lv⌝ }}}
+      list_int_sum lv  @[ip]
+    {{{ (n : nat),  RET #n; ⌜n = list_sum l⌝ }}}.
+  Proof.
+    iIntros (Φ) "%Hlst HΦ".
+    rewrite /list_int_sum. wp_lam. wp_pure _.
+    iApply (@wp_list_fold _ _ _ _ _
+                (λ (l0 : list nat) (acc : val), ⌜∃ (n : nat), acc = #n ∧ n = list_sum l0⌝)%I
+                (λ n, True)%I (λ n, True)%I ip (λ: "acc" "n", "acc" + "n") l #0 lv with "[] []").
+    - iIntros (n nv lacc lrem) "!#".
+      iIntros (Ψ) "(%Hl & ((%m & -> & ->) & _)) HΨ".
+      wp_pures.
+      iApply "HΨ".
+      iPureIntro. split; last done.
+       replace (list_sum lacc + n)%Z with ((list_sum lacc + n)%nat : Z); last lia.
+       exists ((list_sum lacc + n)). split; eauto with lia.
+       rewrite list_sum_app. simpl. eauto with lia.
+    - iPureIntro. simpl. split_and!; try eauto. exists 0; done.
+    - iModIntro. iIntros (v) "((%n & -> & ->) & _)".
+      by iApply "HΦ".
+  Qed.
 
   (* TODO: Prove: *)
   (* Definition pncounter_update : val := *)
