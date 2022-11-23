@@ -29,7 +29,6 @@ Section Specification.
             !Lattice LogSt,
             !CRDT_Params,
             !StLib_Params LogOp LogSt,
-            !StLib_SysParams Σ,
             !StLib_Res LogOp}.
 
   Definition get_state_spec (get_state : val) (repId : nat) (addr : socket_address) : iProp Σ :=
