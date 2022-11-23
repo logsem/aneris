@@ -2,7 +2,6 @@
 <repository_root>/ml_sources/examples/crdt/statelib/examples/pncounter/pncounter_code.ml *)
 
 From aneris.aneris_lang Require Import ast.
-From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang.lib Require Import list_code.
 From aneris.aneris_lang.lib.vector_clock Require Import vector_clock_code.
 From aneris.examples.crdt.statelib Require Import statelib_code.
@@ -15,28 +14,19 @@ Definition pn_cpt_init_st : val :=
   λ: "n" <>, prod_init_st (gcpt_init_st "n") (gcpt_init_st "n") #().
 
 Definition pn_cpt_mutator : val :=
-  λ: "i" "cpt" "op",
-  let: "p" := Fst "op" in
-  let: "n" := Snd "op" in
-  assert: (((#0 = "p") && (#0 = "n")) || (((#0 < "p") && ("n" = #0)) ||
-                                          ((#0 < "n") && ("p" = #0))));;
-  prod_mutator gcpt_mutator gcpt_mutator "i" "cpt" "op".
+  λ: "i" "gs" "op", prod_mutator gcpt_mutator gcpt_mutator "i" "gs" "op".
 
 Definition pn_cpt_merge : val :=
-  λ: "st" "st'", prod_merge gcpt_merge gcpt_merge "st" "st'".
+  λ: "st1" "st2", prod_merge gcpt_merge gcpt_merge "st1" "st2".
 
 Definition pn_cpt_crdt : val :=
-  λ: "n" <>, (pn_cpt_init_st "n", pn_cpt_mutator, pn_cpt_merge).
+  λ: "n" <>, prod_crdt (gcpt_crdt "n") (gcpt_crdt "n") #().
 
 Definition pn_cpt_init : val :=
   λ: "addrs" "rid",
   let: "len" := list_length "addrs" in
-  let: "initRes" := statelib_init (prod_ser vect_serialize vect_serialize)
-                    (prod_deser vect_deserialize vect_deserialize) "addrs"
-                    "rid" (pn_cpt_crdt "len") in
-  let: "get_state" := Fst "initRes" in
-  let: "update" := Snd "initRes" in
-  ("get_state", "update").
+  prod_init vect_serialize vect_deserialize vect_serialize vect_deserialize
+  (gcpt_crdt "len") (gcpt_crdt "len") "addrs" "rid".
 
 (**  Step 2. PN counter wrapper.  *)
 

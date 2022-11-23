@@ -16,7 +16,7 @@ From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.aneris_lang.lib.vector_clock
      Require Import vector_clock_code vector_clock_proof.
 From aneris.examples.crdt.statelib.examples.gcounter
-     Require Import gcounter_code.
+     Require Import gcounter_code_wrapper.
 
 Section GCtr_defs.
 
@@ -396,7 +396,6 @@ Section GCounter_params.
 
 End GCounter_params.
 
-
 Section GCounter_Specs.
   Context `{!anerisG M Σ, !CRDT_Params}.
 
@@ -460,7 +459,7 @@ Section GCounter_Specs.
       iPureIntro. by exists rv'.
   Qed.
 
-  Lemma Ctr_merge_spec : ⊢ merge_spec gcpt_merge.
+  Lemma gctr_merge_spec : ⊢ merge_spec gcpt_merge.
   Proof.
     iIntros (sa v v' s s' st st')
             "!> %φ (%Hcoh_st & %Hcoh_st' & %Hden & %Hden' & %Hext & %Hsoc & %Hext' & %Hsoc') Hφ".
@@ -479,8 +478,7 @@ Section GCounter_Specs.
       apply gctr_st_lub_lmap2.
   Qed.
 
-
-  Lemma Ctr_mutator_spec : ⊢ mutator_spec gcpt_mutator.
+  Lemma gctr_mutator_spec : ⊢ mutator_spec gcpt_mutator.
   Proof.
     iIntros (sa f st_v op_v s ev op_log st_log)
       "!> %φ (%Hop_coh & %Hst_coh & %Hden & %Hnin & <- & <- & %Hmax & %Hext & %Hsoc) Hφ".
@@ -525,12 +523,12 @@ Section GCounter_Specs.
     (inject_list (vreplicate (length CRDT_Addresses) O)).
   Proof. reflexivity. Qed.
 
-  Lemma Ctr_init_st_fn_spec :
-    ⊢ init_st_fn_spec (λ: <>, gcpt_init_st #(length CRDT_Addresses) #()).
+  Lemma gctr_init_st_fn_spec :
+    ⊢ init_st_fn_spec gcpt_init_st.
   Proof.
     iIntros (addr).
     iIntros "!#" (Φ) "_ HΦ".
-    rewrite /gcpt_init_st.
+    rewrite /gcpt_init_st /gcounter_code_wrapper.gcpt_init_st.
     wp_pures.
     wp_apply (wp_vect_make _ (length CRDT_Addresses) 0 Φ $! I ).
     iIntros (v Hv).
@@ -542,17 +540,17 @@ Section GCounter_Specs.
     exact init_st_coh.
   Qed.
 
-  Lemma Ctr_crdt_fun_spec :
-    ⊢ crdt_fun_spec (λ: <>, gcpt_crdt #(length CRDT_Addresses) #()).
+  Lemma gctr_crdt_fun_spec :
+    ⊢ crdt_fun_spec gcpt_crdt.
   Proof.
     iIntros (sa φ) "!> _ Hφ".
-    wp_lam; wp_pures. wp_lam. wp_pures.
+    wp_lam; wp_pures.
     iApply "Hφ".
     iExists _, gcpt_mutator, gcpt_merge.
     iSplit; first trivial.
-    iDestruct Ctr_init_st_fn_spec as "Hinit"; first eauto.
-    iDestruct Ctr_merge_spec as "Hmerge".
-    iDestruct Ctr_mutator_spec as "Hmutator".
+    iDestruct gctr_init_st_fn_spec as "Hinit"; first eauto.
+    iDestruct gctr_merge_spec as "Hmerge".
+    iDestruct gctr_mutator_spec as "Hmutator".
     iFrame "Hinit Hmerge Hmutator".
   Qed.
 

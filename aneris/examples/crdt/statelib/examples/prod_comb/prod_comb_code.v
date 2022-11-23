@@ -27,10 +27,10 @@ Definition prod_merge : val :=
   let: "mB" := "merge_fnB" "st12" "st22" in
   ("mA", "mB").
 
-Definition prod_crdt (cA : val) (cB : val) : val :=
-  λ: <>,
-  let: "cAp" := cA #() in
-  let: "cBp" := cB #() in
+Definition prod_crdt : val :=
+  λ: "cA" "cB" <>,
+  let: "cAp" := "cA" #() in
+  let: "cBp" := "cB" #() in
   let: "init_fnA" := Fst (Fst "cAp") in
   let: "mut_fnA" := Snd (Fst "cAp") in
   let: "merge_fnA" := Snd "cAp" in
@@ -46,11 +46,11 @@ Definition prod_crdt (cA : val) (cB : val) : val :=
   ("init_fn", "mut_fn", "merge_fn").
 
 Definition prod_init (stA_ser : val) (stA_deser : val) (stB_ser : val)
-                     (stB_deser : val) (cA : val) (cB : val) : val :=
-  λ: "addrs" "rid",
+                     (stB_deser : val) : val :=
+  λ: "cA" "cB" "addrs" "rid",
   let: "initRes" := statelib_init (prod_ser stA_ser stB_ser)
                     (prod_deser stA_deser stB_deser) "addrs" "rid"
-                    (λ: <>, prod_crdt cA cB #()) in
+                    (λ: <>, prod_crdt "cA" "cB" #()) in
   let: "get_state" := Fst "initRes" in
   let: "update" := Snd "initRes" in
   ("get_state", "update").

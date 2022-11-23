@@ -1,5 +1,4 @@
 open !Ast
-open Serialization_code
 open List_code
 open Vector_clock_code
 open Statelib_code
@@ -15,28 +14,21 @@ let pn_cpt_init_st n : unit -> pnCptStTy =
   fun () -> prod_init_st (gcpt_init_st n) (gcpt_init_st n) ()
 
 let pn_cpt_mutator : (pnCptOpTy, pnCptStTy) mutatorFnTy =
-  fun (i : int) (cpt : pnCptStTy) (op : pnCptOpTy) ->
-  let (p, n) = op in
-  assert ((0 = p && 0 = n) || (0 < p && n = 0) || (0 < n && p = 0));
-  prod_mutator gcpt_mutator gcpt_mutator i cpt op
+  fun (i : int) (gs : pnCptStTy) (op : pnCptOpTy) ->
+  prod_mutator gcpt_mutator gcpt_mutator i gs op
 
-let pn_cpt_merge (st : pnCptStTy) (st' : pnCptStTy) : pnCptStTy =
-  prod_merge gcpt_merge gcpt_merge st st'
-
+let pn_cpt_merge (st1 : pnCptStTy) (st2 : pnCptStTy) : pnCptStTy =
+  prod_merge gcpt_merge gcpt_merge st1 st2
 
 let pn_cpt_crdt n : (pnCptOpTy, pnCptStTy) crdtTy =
-  fun () -> ((pn_cpt_init_st n, pn_cpt_mutator), pn_cpt_merge)
+  fun () -> prod_crdt (gcpt_crdt n) (gcpt_crdt n) ()
 
 let pn_cpt_init addrs rid =
   let len = list_length addrs in
-  let initRes =
-    statelib_init
-      (prod_ser vect_serialize vect_serialize)
-      (prod_deser vect_deserialize vect_deserialize)
-      addrs rid (pn_cpt_crdt len) in
-  let get_state = fst initRes in
-  let update = snd initRes in
-  (get_state, update)
+  prod_init
+    vect_serialize vect_deserialize
+    vect_serialize vect_deserialize
+    (gcpt_crdt len) (gcpt_crdt len) addrs rid
 
 (** Step 2. PN counter wrapper. *)
 

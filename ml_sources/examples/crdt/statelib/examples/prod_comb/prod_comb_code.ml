@@ -47,8 +47,8 @@ let prod_merge
    (mA, mB)
 
 let prod_crdt
-  (cA[@metavar "val"] : ('opA, 'stA) crdtTy)
-  (cB[@metavar "val"] : ('opB, 'stB) crdtTy)
+  (cA : ('opA, 'stA) crdtTy)
+  (cB : ('opB, 'stB) crdtTy)
   :  (('opA, 'opB) opProdTy, ('stA, 'stB) stProdTy) crdtTy =
   (* :  ('opA, 'opB, 'stA, 'stB) crdtProdTy = *)
   fun () ->
@@ -64,8 +64,8 @@ let prod_crdt
 let prod_init
     (stA_ser[@metavar "val"]) (stA_deser[@metavar "val"])
     (stB_ser[@metavar "val"]) (stB_deser[@metavar "val"])
-    (cA[@metavar "val"] : ('opA, 'stA) crdtTy)
-    (cB[@metavar "val"] : ('opB, 'stB) crdtTy)
+    (cA : ('opA, 'stA) crdtTy)
+    (cB : ('opB, 'stB) crdtTy)
     (addrs : saddr alist) (rid : int) =
   let initRes =
     statelib_init
