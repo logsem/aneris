@@ -21,8 +21,6 @@ Section RequiredRAs.
       Int_StLibG_auth_gset_ev :> inG Σ (authUR (gsetUR (Event CRDT_Op)));
       (* Local state *)
       Int_StLibG_frac_agree :> inG Σ (prodR fracR (agreeR (gsetO (Event CRDT_Op))));
-      (* Local state *)
-      Int_StLibG_frac_agreeaeee :> inG Σ (agreeR (gsetO (Event CRDT_Op)));
       (* Local and global snapshots *)
       Int_StLibG_mono :> inG Σ (authUR (monotoneUR (@cc_subseteq CRDT_Op _ _)));
       (* Used to define the lock invariant (in the proof) *)
