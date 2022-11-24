@@ -50,6 +50,11 @@ Section Lattices.
     by apply (Rt e'' e' (lat_lub e e')).
   Qed.
 
+  Lemma lat_lub_le {E: Type} (L: Lattice E) (v v' v'': E) :
+    lat_le v v'' → lat_le v' v'' →
+    lat_le (lat_lub v v') v''.
+  Proof. apply (proj2 (proj2 (lat_lub_spec v v'))). Qed.
+
   Lemma lat_lub_assoc {E: Type} (L: Lattice E) (e e' e'': E) :
     lat_lub e (lat_lub e' e'') = lat_lub (lat_lub e e') e''.
   Proof.
