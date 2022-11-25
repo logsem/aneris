@@ -97,7 +97,32 @@ Section AboutInv.
       iFrame. iFrame "%".
   Qed.
 
-    (* Events are received locally in causal order *)
+  Lemma dep_closed_causally_closed (h s : event_set CRDT_Op) :
+    Lst_Validity h -> s ⊆ h -> dep_closed s -> s ⊆_cc h.
+  Proof.
+    intros Hv Hsub Hdc.
+    split; [done|].
+    intros x y Hx_in Hy_in Hle_t Hy_in'.
+    pose proof (iffLR (elem_of_subseteq (time x) (time y)) Hle_t (get_evid x)
+                  (VLst_evid_incl_event _ Hv x Hx_in)) as p.
+    destruct (Hdc y (get_evid x) Hy_in' p) as (z & Hzin & Hzevid).
+    rewrite (VLst_ext_eqid _ Hv x z Hx_in); try done.
+    set_solver.
+  Qed.
+
+  Lemma subseteqcc_trans (s1 s2 s3 : event_set CRDT_Op) :
+    s1 ⊆_cc s2 -> s2 ⊆_cc s3 -> s1 ⊆_cc s3.
+  Proof.
+    intros [Hsub1 Hcc1] [Hsub2 Hcc2].
+    split; [set_solver|].
+    intros x y Hx_in Hy_in Hle_t Hy_in'.
+    assert (y ∈ s2) as Hys2; [set_solver|].
+    assert (x ∈ s2) as Hxs2.
+    { eapply (Hcc2 x y); eauto. }
+    eapply (Hcc1 x y); eauto.
+  Qed.
+
+  (* Events are received locally in causal order *)
   Lemma StLib_OwnLocalState_GlobSnap_Causality E i s1 s2 h :
     ↑CRDT_InvName ⊆ E →
     StLib_GlobalInv ⊢
@@ -134,46 +159,22 @@ Section AboutInv.
         as "(Hown_local & Hown_local' & %Heq)"; rewrite<- Heq.
       iDestruct (both_agree_agree with "Hown_sub Hown_sub'")
         as "(Hown_sub & Hown_sub' & %Heq')"; rewrite<- Heq'.
-
       iDestruct (auth_frag_subset with "Hsnap_g Hsnap_global") as "(Hsnap_g & _ & %Hh)".
-
       assert (g.2 !!! f ⊆_cc g.1) as Hsubcc.
-      { split.
+      { apply dep_closed_causally_closed.
+        - apply VGst_hst_valid; done.
         - intros x Hx_in.
-          apply(VGst_incl_local _ Hv x). by exists f.
-        - intros x y Hx_in Hy_in Hle_t Hy_in'.
-          pose proof (iffLR (elem_of_subseteq (time x) (time y)) Hle_t (get_evid x)
-            (VLst_evid_incl_event _ (VGst_hst_valid _ Hv) x Hx_in)) as p.
-          destruct (VLst_dep_closed _ (VGst_lhst_valid _ Hv f) y (get_evid x) Hy_in' p) as (z & Hzin & Hzevid).
-          rewrite (VLst_ext_eqid _ (VGst_hst_valid _ Hv) x z Hx_in); try done.
-          apply (VGst_incl_local _ Hv). by exists f. }
-
+          apply (VGst_incl_local _ Hv x); eauto.
+        - apply (VLst_dep_closed _ (VGst_lhst_valid _ Hv f)). }          
       assert ( h__local ∪ h__sub ⊆_cc g.1 ) as Hsubsetcc.
-      { destruct Hcc as [Hsub Hcc].
-        split.
-        - intros x Hx_in%Hsub.
-          rewrite<- Hproj' in Hx_in.
-          apply (VGst_incl_local _ Hv).
-          by exists f.
-        - intros x y Hx_in Hy_in Hle_t Hy_in'.
-          pose proof (iffLR (elem_of_subseteq (time x) (time y)) Hle_t (get_evid x)
-            (VLst_evid_incl_event _ (VGst_hst_valid _ Hv) x Hx_in)) as p.
-          apply (Hcc x y); try done;
-            last by apply Hsub.
-          rewrite<- Hproj'.
-          destruct Hsubcc as [_ Hcc'].
-          apply (Hcc' x y); try done.
-          rewrite Hproj'. by apply Hsub. }
+      { apply (subseteqcc_trans _ (h__local ∪ h__foreign)); [done|].
+        by rewrite -Hproj'. }
       iPureIntro.
       rewrite Heq Heq'.
       rewrite Heq Heq' in He'_in.
-
       destruct Hsubsetcc as [Hsubseteq Hcc'].
-      apply (Hcc' e e').
-      + by apply Hh.
-      + by apply Hsubseteq.
-      + by apply strict_include.
-      + assumption.
+      apply (Hcc' e e'); eauto.
+      by apply strict_include.
   Qed.
 
 End AboutInv.
