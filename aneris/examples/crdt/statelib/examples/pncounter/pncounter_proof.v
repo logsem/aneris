@@ -59,13 +59,13 @@ Section pn_cpt_proof.
       _ _ _ _ _ _ _ _ _ pnParams _
       (statelib_init
          (prod_ser
-            (gctr_params.(StLib_StSerialization).(s_serializer)).(s_ser)
-            (gctr_params.(StLib_StSerialization).(s_serializer)).(s_ser))
+            (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_ser)
+            (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_ser))
          (prod_deser
-            (gctr_params.(StLib_StSerialization).(s_serializer)).(s_deser)
-            (gctr_params.(StLib_StSerialization).(s_serializer)).(s_deser))) -∗
+            (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_deser)
+            (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_deser))) -∗
     @init_spec_for_specific_crdt
-      _ _ _ _ _ _ _ _ _ pnParams _
+      _ _ _ _ _ _ _ _ _ _ _
        pn_cpt_init.
   Proof.
     iIntros "#Hinit".
@@ -105,9 +105,8 @@ Section pncounter_proof.
       by iApply "HΦ".
   Qed.
 
-  Notation pn_upd_spec := (@update_spec _ _ _ pnOp _ _ pnSt _ _ pnParams pnRes).
-  Notation pn_get_state_spec := (@get_state_spec _ _ _ pnOp _ _ pnSt _ _ pnParams pnRes).
-
+  Definition pn_upd_spec := (@update_spec pnOp pnSt _ _ _ _ _ _ (prod_crdt_coh_params _ _ _ _) pnRes).
+  Definition pn_get_state_spec := (@get_state_spec pnOp pnSt _ _ _ _ _ _ _ (prod_crdt_coh_params _ _ _ _) pnRes).
 
 
   (* TODO: Prove: *)

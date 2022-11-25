@@ -14,22 +14,14 @@ From aneris.examples.crdt.statelib.proof Require Import utils.
 
 (** * Specification of the op-based CRDT library *)
 
-
-Section Specification.
-
-  (* The following resources are all needed to _state_ the specifications of library
-     functions, but they should _not_ all be provided by the user of the library
-     (e.g. the user provides StLib_UserParams, but not StLib_SysParams).
-
-     To use the library, the user should refer to class StLibSetup below.
-   *)
-  Context `{!anerisG Mdl Σ,
-            !EqDecision LogOp,
-            !Countable LogOp,
-            !Lattice LogSt,
-            !CRDT_Params,
-            !StLib_Params LogOp LogSt,
-            !StLib_Res LogOp}.
+Section Crdt_Specification.
+  Context `{LogOp : Type, LogSt: Type}.
+  Context `{!EqDecision LogOp, !Countable LogOp}.
+  Context `{!anerisG Mdl Σ}.
+  Context `{!CRDT_Params}.
+  Context `{!CrdtDenot LogOp LogSt}.
+  Context `{!@StLib_Coh_Params LogOp LogSt}.
+  Context `{!StLib_Res LogOp}.
 
   Definition get_state_spec (get_state : val) (repId : nat) (addr : socket_address) : iProp Σ :=
     ⌜CRDT_Addresses !! repId = Some addr⌝ -∗
@@ -61,6 +53,42 @@ Section Specification.
            ⌜Maximum (s1' ∪ s2') = Some e⌝ ∗
            GlobState h' ∗
            LocState repId s1' s2' >>>.
+
+ Definition init_spec_for_specific_crdt (init: val) : iProp Σ :=
+    ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
+      (addrs_val : val),
+    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
+        ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
+        ([∗ list] z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
+        addr ⤳ (∅, ∅) ∗
+        free_ports (ip_of_address addr) {[port_of_address addr]} ∗
+        StLib_InitToken repId
+    }}}
+      init addrs_val #repId @[ip_of_address addr]
+    {{{ gs_val upd_val, RET (gs_val, upd_val);
+        LocState repId ∅ ∅ ∗
+        get_state_spec gs_val repId addr ∗
+        update_spec upd_val repId addr
+    }}}.
+
+End Crdt_Specification.
+
+
+Section Crdt_Implementator_Specification.
+  Context `{LogOp : Type, LogSt: Type}.
+  Context `{!EqDecision LogOp, !Countable LogOp}.
+  Context `{!anerisG Mdl Σ}.
+  Context `{!CRDT_Params}.
+  Context `{!Lattice LogSt}.
+  Context `{!StLib_Params LogOp LogSt}.
+  Context `{!StLib_Res LogOp}.
+
+  Definition init_st_fn_spec (init_st_fun : val) : iProp Σ :=
+    ∀ addr,
+      {{{ True }}}
+        init_st_fun #() @[ip_of_address addr]
+      {{{ v, RET v; ⌜StLib_St_Coh st_crdtM_init_st v⌝ }}}.
+
 
   Definition mutator_spec (mutator_fn : val) : iProp Σ :=
     ∀ (addr : socket_address) (repId: RepId) (st op : val) (s : (event_set LogOp))
@@ -101,12 +129,6 @@ Section Specification.
           ⌜lat_lub log_st log_st' = log_st''⌝
     }}}.
 
-  Definition init_st_fn_spec (init_st_fun : val) : iProp Σ :=
-    ∀ addr,
-      {{{ True }}}
-        init_st_fun #() @[ip_of_address addr]
-      {{{ v, RET v; ⌜StLib_St_Coh st_crdtM_init_st v⌝ }}}.
-
   Definition crdt_triplet_spec (crdt_triplet : val) : iProp Σ :=
     ∃ (init_st_fn mutator_fn merge_fn : val),
       ⌜crdt_triplet = PairV (PairV init_st_fn mutator_fn) merge_fn⌝ ∗
@@ -119,23 +141,6 @@ Section Specification.
       {{{ True }}}
         crdt_fun #() @[ip_of_address addr]
       {{{ v, RET v; crdt_triplet_spec v }}}.
-
- Definition init_spec_for_specific_crdt (init: val) : iProp Σ :=
-    ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
-      (addrs_val : val),
-    {{{ ⌜is_list CRDT_Addresses addrs_val⌝ ∗
-        ⌜CRDT_Addresses !! (fin_to_nat repId) = Some addr⌝ ∗
-        ([∗ list] z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) ∗
-        addr ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address addr) {[port_of_address addr]} ∗
-        StLib_InitToken repId
-    }}}
-      init addrs_val #repId @[ip_of_address addr]
-    {{{ gs_val upd_val, RET (gs_val, upd_val);
-        LocState repId ∅ ∅ ∗
-        get_state_spec gs_val repId addr ∗
-        update_spec upd_val repId addr
-    }}}.
 
   Definition init_spec (init: val) : iProp Σ :=
     ∀ (repId : (fin(length CRDT_Addresses))) (addr : socket_address)
@@ -155,17 +160,20 @@ Section Specification.
         update_spec upd_val repId addr
     }}}.
 
-End Specification.
+End Crdt_Implementator_Specification.
 
 (** * Library interface **)
 Section StLibSetup.
 
   Class StLib_Init_Function := { init : val }.
 
-  Context `{LogOp: Type, LogSt : Type,
-            !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt,
-            !StLib_Params LogOp LogSt, !StLib_Init_Function}.
+  Context `{LogOp : Type, LogSt: Type}.
+  Context `{!EqDecision LogOp, !Countable LogOp}.
+  Context `{!anerisG Mdl Σ}.
+  Context `{!CRDT_Params}.
+  Context `{!Lattice LogSt}.
+  Context `{!StLib_Params LogOp LogSt}.
+  Context `{!StLib_Init_Function}.
 
   Class StLibSetup :=
       StLibSetup_Init E :

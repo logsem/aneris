@@ -35,7 +35,8 @@ Section SpecsPremiminary.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt,
+            !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames,
             st_deser: val, stser: serialization}.
 
@@ -56,13 +57,13 @@ Section SpecsPremiminary.
 
 End SpecsPremiminary.
 
-
-
-Section StateLib_InternalSpecs.
+Section StateLib_InternalSpecs_get_upd.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !CRDT_Params,
+            !CrdtDenot LogOp LogSt,
+            !@StLib_Coh_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames,
             st_deser: val, stser: serialization}.
 
@@ -99,6 +100,19 @@ Section StateLib_InternalSpecs.
            ⌜Maximum (s1' ∪ s2') = Some e⌝ ∗
            StLib_OwnGlobalState h' ∗
            StLib_OwnLocalState repId s1' s2' >>>.
+
+End StateLib_InternalSpecs_get_upd.
+
+Section StateLib_InternalSpecs.
+
+  Context `{LogOp: Type, LogSt : Type,
+            !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
+            !CRDT_Params, !Lattice LogSt,
+            !StLib_Params LogOp LogSt,
+            !Internal_StLibG LogOp Σ, !StLib_GhostNames,
+            st_deser: val, stser: serialization}.
+
+  Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
 
   Definition internal_sendToAll_spec
     (sendToAll_fn: val)

@@ -131,17 +131,23 @@ Section gos_proof.
     intros x Hx. set_solver.
   Qed.
 
-  Global Instance gos_params : (StLib_Params gos_op (@gos_st vl _ _) ) :=
+  Global Instance gos_coh_params : (@StLib_Coh_Params gos_op (@gos_st vl _ _) ) :=
     {
       StLib_StSerialization := list_serialization E;
-      StLib_Denot           := gos_denot;
-      StLib_Model           := gos_model;
       StLib_Op_Coh          := gos_op_coh;
       StLib_Op_Coh_Inj      := gos_op_coh_inj;
       StLib_St_Coh          := gos_st_coh;
       StLib_St_Coh_Inj      := gos_st_coh_inj;
       StLib_StCoh_Ser       := gos_st_coh_serializable
  }.
+
+  Global Instance gos_params : (StLib_Params gos_op (@gos_st vl _ _) ) :=
+    {
+      StLib_Denot           := gos_denot;
+      StLib_Model           := gos_model;
+      StLib_CohParams       := gos_coh_params;
+    }.
+
 
   Lemma gos_init_st_spec :
     ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ gos_params gos_init_st.
@@ -217,9 +223,7 @@ Section gos_proof.
     @init_spec
       _ _ _ _ _ _ _ _ _  gos_params _
       (statelib_init (list_ser (s_serializer E).(s_ser)) (list_deser (s_serializer E).(s_deser))) -∗
-    @init_spec_for_specific_crdt
-      _ _ _ _ _ _ _ _ _  gos_params _
-      (gos_init (s_serializer E).(s_ser) (s_serializer E).(s_deser)).
+    init_spec_for_specific_crdt (gos_init (s_serializer E).(s_ser) (s_serializer E).(s_deser)).
   Proof.
     iIntros "#Hinit" (repId addr addrs_val).
     iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".

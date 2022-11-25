@@ -383,16 +383,21 @@ Section GCounter_params.
     exists st. exact (gctr_st_coh_is_vc st).
   Qed.
 
-  Global Instance gctr_params : (StLib_Params gctr_op gctr_st) :=
+  Global Instance gctr_coh_params : (@StLib_Coh_Params gctr_op gctr_st) :=
     {
       StLib_StSerialization := gctr_ser;
-      StLib_Denot           := gctr_denot;
-      StLib_Model           := gctr_model;
       StLib_Op_Coh          := gctr_op_coh;
       StLib_Op_Coh_Inj      := gctr_op_coh_inj;
       StLib_St_Coh          := gctr_st_coh;
       StLib_St_Coh_Inj      := gctr_st_coh_inj;
       StLib_StCoh_Ser       := gctr_st_coh_serializable }.
+
+  Global Instance gctr_params : (StLib_Params gctr_op gctr_st) :=
+    {
+      StLib_Denot           := gctr_denot;
+      StLib_Model           := gctr_model;
+      StLib_CohParams       := gctr_coh_params;
+    }.
 
 End GCounter_params.
 
@@ -507,7 +512,7 @@ Section GCounter_Specs.
       rewrite (vec_to_list_length st_log) in Hlen_lt.
       exists (vinsert (nat_to_fin Hlen_lt) (EV_Op ev + r) st_log).
       split.
-      + rewrite/StLib_St_Coh/gctr_params/gctr_st_coh/gctr_st_inject
+      + rewrite/StLib_St_Coh/StLib_CohParams/gctr_params/gctr_coh_params/gctr_st_coh/gctr_st_inject
           vec_to_list_insert fin_to_nat_to_fin.
         by apply is_list_inject.
       + rewrite/st_crdtM_mut/StLib_Model/gctr_params/gctr_model/gctr_mut

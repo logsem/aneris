@@ -81,8 +81,11 @@ End ToBeMoved.
 
 Section ToBeMoved'.
 
-  Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
+  Context `{!anerisG Mdl Σ,
+            !EqDecision LogOp, !Countable LogOp,
+            !CRDT_Params,
+            !Lattice LogSt,
+            !StLib_Params LogOp LogSt}.
 
   Notation StLib_Serializable v := (Serializable StLib_StSerialization v).
   Record StLib_SerializableVal :=
@@ -100,7 +103,8 @@ Section SocketProtolDefinition.
 
   Context {LogOp LogSt : Type}.
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
+            !CRDT_Params, !Lattice LogSt,
+              !StLib_Params LogOp LogSt}.
   Context `{!Internal_StLibG LogOp Σ, !StLib_GhostNames}.
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
 
@@ -143,12 +147,14 @@ Section SocketProtolDefinition.
 End SocketProtolDefinition.
 
 
-
 Section LockInvariant.
 
-  Context {LogOp LogSt : Type}.
-  Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
+  Context  {LogOp LogSt : Type}.
+  Context `{!anerisG Mdl Σ,
+            !EqDecision LogOp, !Countable LogOp,
+            !CRDT_Params,
+            !Lattice LogSt,
+            !StLib_Params LogOp LogSt}.
   Context `{!Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Definition lock_inv_aux (i : RepId) (st_loc : loc) : iProp Σ :=

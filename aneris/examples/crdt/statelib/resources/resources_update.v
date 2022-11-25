@@ -37,7 +37,8 @@ Section Resources_updates.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt,
+            !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).

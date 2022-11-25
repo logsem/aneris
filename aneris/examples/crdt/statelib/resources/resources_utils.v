@@ -35,7 +35,8 @@ Section Resources_utils.
 
   Context `{LogOp: Type, LogSt : Type,
             !anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
+            !CRDT_Params, !Lattice LogSt,
+            !StLib_Params LogOp LogSt,
             !Internal_StLibG LogOp Σ, !StLib_GhostNames}.
 
   Notation princ_ev := (@principal (gset (Event LogOp)) cc_subseteq).
@@ -66,7 +67,7 @@ Section Resources_utils.
     apply (elem_of_union_r x ho hf), Hsubset, elem_of_union in Hx_in
       as [Hx_in%Hloc' | ?];
       last assumption.
-    by exfalso. 
+    by exfalso.
   Qed.
 
   Lemma Lock_RemoteLockSnap__incl
@@ -177,7 +178,7 @@ Section Resources_utils.
       as "(Hst_own__sub & Hst_own__sub' & ->)".
     iDestruct (both_agree_agree with "Hst_own__foreign Hst_own__foreign''")
       as "(Hst_own__foreign & Hst_own__foreign'' & ->)".
-    
+
     (** Closing everythig and framing the resulting resources. *)
     iMod ("Hclose"
       with "[Hothers
@@ -228,7 +229,7 @@ Section Resources_utils.
       as "(Hst_own__sub & Hst_own__sub' & ->)".
     iDestruct (both_agree_agree with "Hst_own__foreign Hst_own__foreign''")
       as "(Hst_own__foreign & Hst_own__foreign'' & ->)".
-    
+
     (** Closing everythig and framing the resulting resources. *)
     iMod ("Hclose"
       with "[Hothers
