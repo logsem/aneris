@@ -68,11 +68,12 @@ Section gos_model.
   Lemma gos_lub_coh
         (s1 s2 : event_set gos_op) (st1 st2 st3 : (@gos_st gos_op _ _)):
     ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
-    → Lst_Validity s1 → Lst_Validity s2 → Lst_Validity (s1 ∪ s2)
+    → Lst_Validity' s1 → Lst_Validity' s2 → Lst_Validity' (s1 ∪ s2)
+    → (∀ (i: nat), fil s1 i ⊆ fil s2 i ∨ fil s2 i ⊆  fil s1 i)
     → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
   Proof.
     rewrite /=/gos_denot_prop.
-    intros <- <- Hval1 Hval2 Hval <-.
+    intros <- <- Hval1 Hval2 Hval _ <-.
     by rewrite gset_map_union.
   Qed.
 
@@ -237,3 +238,4 @@ Section gos_proof.
   Qed.
 
 End gos_proof.
+

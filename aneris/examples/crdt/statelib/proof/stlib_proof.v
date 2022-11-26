@@ -541,7 +541,9 @@ Section StateLib_Proof.
           by intros e [?%Hf_for | [? _]%elem_of_filter]%elem_of_union. }
         iFrame "Hst_own__local Hst_own__sub".
       - iPureIntro.
-        epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign) (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot _ _ Hval' Hst''_islub).
+        epose (st_crdtM_lub_coh (st_h__local ∪ h__foreign)
+          (st'_h__local ∪ st'_h__sub) log_st st'_log st''_log Hst_coh st'_denot
+          _ _ (lst_validity_implies_lst_validity' Hval') _ Hst''_islub).
         assert(st_h__local ∪ h__foreign ∪ (st'_h__local ∪ st'_h__sub) =
           st_h__local
             ∪ (h__foreign
@@ -575,7 +577,8 @@ Section StateLib_Proof.
     by iApply "Hφ".
 
     Unshelve.
-    all: by done.
+    1,2: by apply lst_validity_implies_lst_validity'.
+    by apply lst_validity_filtered.
   Qed.
 
   Lemma apply_thread_spec
@@ -734,3 +737,4 @@ Section StateLib_Proof.
   Qed.
 
 End StateLib_Proof.
+

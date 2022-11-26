@@ -121,7 +121,7 @@ Section Preambule.
     rewrite filter_union filter_singleton; [|done].
     rewrite size_union.
     - rewrite size_singleton.
-      by rewrite plus_comm.
+      by rewrite Nat.add_comm.
     - apply disjoint_singleton_r.
       rewrite elem_of_filter.
       intros [_ contra].

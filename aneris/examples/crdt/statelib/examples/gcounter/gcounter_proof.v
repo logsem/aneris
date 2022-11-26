@@ -220,13 +220,14 @@ Section GCtr_Model.
   Lemma gctr_lub_coh
     (s1 s2 : event_set gctr_op) (st1 st2 st3 : gctr_st):
     ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
-    → Lst_Validity s1 → Lst_Validity s2 → Lst_Validity (s1 ∪ s2)
+    → Lst_Validity' s1 → Lst_Validity' s2 → Lst_Validity' (s1 ∪ s2)
+    → (∀ (i: nat), fil s1 i ⊆ fil s2 i ∨ fil s2 i ⊆  fil s1 i)
     → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
   Proof.
-    intros Hden1 Hden2 Hval1 Hval2 Hval <-.
+    intros Hden1 Hden2 Hval1 Hval2 Hval Hincl'' <-.
     rewrite/=/gctr_denot_prop/vectn_lub.
     intros i.
-    destruct (lst_validity_filtered s1 s2 Hval1 Hval2 Hval i) as [Hincl' | Hincl'].
+    destruct (Hincl'' i) as [Hincl' | Hincl'].
     - assert (Hincl: fil s2 i = fil (s1 ∪ s2) i); first set_solver.
       rewrite -Hincl vlookup_zip_with.
       assert (Hmax: (st1 !!! i `max` st2 !!! i = st2 !!! i)%nat);
@@ -560,3 +561,4 @@ Section GCounter_Specs.
   Qed.
 
 End GCounter_Specs.
+

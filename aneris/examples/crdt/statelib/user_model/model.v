@@ -21,7 +21,8 @@ Section ModelDef.
        that is always preserved by state-based CRDTs. *)
     st_crdtM_lub_coh : ∀ (s1 s2 : gset (Event Op)) (st1 st2 st3 : LatSt),
       ⟦ s1 ⟧ ⇝ st1 -> ⟦ s2 ⟧ ⇝ st2 ->
-      Lst_Validity s1 -> Lst_Validity s2 -> Lst_Validity (s1 ∪ s2) ->
+      Lst_Validity' s1 -> Lst_Validity' s2 -> Lst_Validity' (s1 ∪ s2) ->
+      (∀ (i: nat), fil s1 i ⊆ fil s2 i ∨ fil s2 i ⊆  fil s1 i) ->
       st1 ⊔_l st2 = st3 -> ⟦ s1 ∪ s2 ⟧ ⇝ st3;
 
     (* The mutator sends a state, an operation, and the replica id where the

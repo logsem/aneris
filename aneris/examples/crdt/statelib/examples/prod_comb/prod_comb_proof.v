@@ -172,10 +172,11 @@ Section prod_crdt_model.
   Lemma prod_lub_coh
         (s1 s2 : event_set prodOp) (st1 st2 st3 : prodSt):
     ⟦ s1 ⟧ ⇝ st1 → ⟦ s2 ⟧ ⇝ st2
-    → Lst_Validity s1 → Lst_Validity s2 → Lst_Validity (s1 ∪ s2)
+    → Lst_Validity' s1 → Lst_Validity' s2 → Lst_Validity' (s1 ∪ s2)
+    → (∀ (i: nat), fil s1 i ⊆ fil s2 i ∨ fil s2 i ⊆  fil s1 i)
     → st1 ⊔_l st2 = st3 → ⟦ s1 ∪ s2 ⟧ ⇝ st3.
   Proof.
-    intros Hd1 Hd2 Hs1 Hs2 Hsu Hlub.
+    intros Hd1 Hd2 Hs1 Hs2 Hsu Hsub.
     destruct PA as [pa1 pa2 pa3 pa4 pa5 pa6].
     destruct PB as [pb1 pb2 pb3 pb4 pb5 pb6].
     destruct Hd1 as (Hd11 & Hd12).
@@ -185,19 +186,22 @@ Section prod_crdt_model.
     destruct st2 as (st21, st22).
     simplify_eq /=.
     rewrite! gset_map_union.
-    split.
-    - eapply (lst_validity_valid_event_map _ fst) in Hs1, Hs2, Hsu.
+    intros Hlub. split.
+    - eapply (lst_validity'_valid_event_map _ fst) in Hs1, Hs2, Hsu.
       apply (pa1
                (gset_map (event_map fst) s1)
                (gset_map (event_map fst) s2)
-            st11 st21); [done|done|done|done| |done ].
-      by rewrite -gset_map_union.
-    - eapply lst_validity_valid_event_map in Hs1, Hs2, Hsu.
+            st11 st21);
+            [done|done|done|done| by rewrite -gset_map_union|
+            | by rewrite -Hlub].
+      intros i. destruct(Hsub i)as[|];set_solver.
+    - eapply lst_validity'_valid_event_map in Hs1, Hs2, Hsu.
       apply (pb1
                (gset_map (event_map snd) s1)
                (gset_map (event_map snd) s2)
-            st12 st22); [done|done|done|done| |done ].
-      by rewrite -gset_map_union.
+            st12 st22); [done|done|done|done| by rewrite-gset_map_union |
+            | by rewrite -Hlub].
+      intros i. destruct(Hsub i)as[|];set_solver.
   Qed.
 
   Definition prod_mutator_denot (st : prodSt) (ev: Event prodOp) (st': prodSt) : Prop :=
@@ -502,3 +506,4 @@ Section prod_proof.
   Qed.
 
 End prod_proof.
+
