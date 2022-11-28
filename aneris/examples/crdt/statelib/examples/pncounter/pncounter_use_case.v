@@ -32,7 +32,7 @@ Program Instance pnc_use_case_CRDT_Params : CRDT_Params :=
   {| CRDT_Addresses := addresses;
     CRDT_InvName := nroot .@ "gi_pnuc"|}.
 Next Obligation.
-Proof. repeat constructor; set_solver. Qed.
+Proof. repeat constructor; set_solver. Defined.
 
 Definition use_case_program1 : expr :=
   let: "init_res" := pncounter_init addresses_val #0%nat in
@@ -92,7 +92,7 @@ Section use_case_proof.
           EV_Op ev2 = Add 2 ∧ EV_Orig ev2 = 1%nat⌝ ∗
           own γ1 (Excl ()) ∗ own γ2 (Excl ()))).
 
-  Program Definition Ofin : fin (length addresses).
+  Program Definition Ofin : fin (length CRDT_Addresses).
   Proof. apply (@Fin.of_nat_lt 0 (length addresses)); simpl; lia.  Defined.
 
   Lemma wp_use_case_program1  γ1 γ2 :
@@ -209,7 +209,7 @@ Section use_case_proof.
         iNext; iApply "HΦ"; done.
   Qed.
 
-  Program Definition Ifin : fin (length addresses).
+  Program Definition Ifin : fin (length CRDT_Addresses).
   Proof. apply (@Fin.of_nat_lt 1 (length addresses)); simpl; lia. Defined.
 
   Lemma wp_use_case_program2 `{!StLib_Res CtrOp} γ1 γ2 :
@@ -328,14 +328,19 @@ Section use_case_proof.
 
 End use_case_proof.
 
+
+From aneris.examples.crdt.statelib.proof Require Import stlib_proof_setup.
+From aneris.examples.crdt.statelib.proof  Require Import spec events utils
+    stlib_proof_utils internal_specs stlib_proof.
+From aneris.examples.crdt.statelib.resources  Require Import resources_allocation.
 Section program_proof.
   Context `{!anerisG M Σ} `{!inG Σ (exclR unitO)}.
-  Context `{!@StLibG CtrOp _ _ Σ}.
+  Context `{!@StLibG (prodOp gctr_op gctr_op) _ _ Σ}.
+  Context `{uig: !utils.Internal_StLibG (prodOp gctr_op gctr_op) Σ}.
 
-  Global Instance pn_cpt_init_cl : StLib_Init_Function := {| init := pn_cpt_init |}.
 
-  Lemma wp_use_case_program :
-    ⊢ |={⊤}=> ∃ Res : StLib_Res (prodOp gctr_op gctr_op),
+  Lemma wp_use_case_program E:
+    ⊢ |={E}=> ∃ Res : StLib_Res (prodOp gctr_op gctr_op),
          ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) -∗
          free_ip "1.1.1.1" -∗
          free_ip "1.1.1.2" -∗
@@ -347,37 +352,46 @@ Section program_proof.
     iIntros "".
     iMod (@StLibSetup_Init
             (prodOp gctr_op gctr_op) (prodSt gctr_st gctr_st)
-            _ _ _ _ _ _ (prod_lattice (vectn_le_lat _) (vectn_le_lat _))
-            (prod_params gctr_op gctr_st gctr_op gctr_st) pn_cpt_init_cl with "[//]")
-      as (Res) "(#HGinv & HGs & Htks & #Hinit)".
-    admit.
-    iExists Res.
+            _ _ _ _ _ pnc_use_case_CRDT_Params (prod_lattice (vectn_le_lat ((length CRDT_Addresses))) (vectn_le_lat ((length CRDT_Addresses))))
+            (prod_params gctr_op gctr_st gctr_op gctr_st)  _ _ E with "[//]")
+      as (ResProd) "(#HGinvProd & HGsPRod & HtksProd & #HinitProd)".
+    rewrite /init. simpl in *.
+    iExists ResProd.
     iModIntro.
     iIntros "#Hprotos Hfip1 Hfip2 Hsa1 Hsa2".
-    admit.
-  Admitted.
-  (*  iDestruct "Htks" as "(Hitk1 & Hitk2 & _)".
+    iDestruct "HtksProd" as (S) "(%Hfin & HitksProd)".
+    simpl in *. simplify_eq /=.
+    iAssert (StLib_InitToken Ofin) as "Hitk1Prod". admit.
+    iAssert (StLib_InitToken Ifin) as "Hitk2Prod". admit.
     rewrite /use_case_program.
     iMod (own_alloc (Excl ())) as (γ1) "Htk1"; first done.
     iMod (own_alloc (Excl ())) as (γ2) "Htk2"; first done.
-    iMod (inv_alloc use_case_inv_name _ (use_case_inv γ1 γ2) with "[HGs]") as "#Hinv".
-    { iNext; iExists _; iFrame. iLeft; done. }
+    iMod (inv_alloc use_case_inv_name _ (use_case_inv γ1 γ2) with "[HGsPRod]") as "#Hinv".
+    { iNext. iExists ∅.  iFrame. iLeft; done. }
     wp_apply aneris_wp_start; first done.
     iSplitL "Hfip1"; first by iNext.
-    iSplitR "Hitk1 Hsa1 Htk1"; last first.
+    iSplitR "Hitk1Prod Hsa1 Htk1"; last first.
     { iNext. iIntros "Hfps".
-      iApply (wp_use_case_program1 with "[$]"); done. }
+      iApply (wp_use_case_program1 with "[$Hsa1 $Htk1 $Hfps][]"); last eauto.
+      iFrame "#".
+      iSplit.
+      iApply pncounter_init_crdt_spec. rewrite /pn_prod_init_crdt_spec.
+      iApply pn_init_spec. iFrame "#". eauto. }
     iNext.
     wp_pures.
     wp_apply aneris_wp_start; first done.
     iSplitL "Hfip2"; first by iNext.
     iSplit; first done.
     iNext. iIntros "Hfps".
-    iApply (wp_use_case_program2 with "[$]"); done.
-  Qed.
+    iApply (wp_use_case_program2 with "[$Hsa2 $Htk2 $Hfps][]"); last eauto.
+      iFrame "#".
+      iSplit.
+      iApply pncounter_init_crdt_spec. rewrite /pn_prod_init_crdt_spec.
+      iApply pn_init_spec. iFrame "#". eauto.
+  Admitted.
 
-End use_case_proof. *)
 End program_proof.
+
 (*
 Definition init_state :=
   {|
@@ -489,3 +503,7 @@ Qed.
   (* Definition init_spec_pn  := *)
   (* @init_spec *)
   (*     _ _ _ _ _ _ _ _ _ pnParams stparams0 init_val_pn. *)
+ (* Global Instance pn_cpt_init_cl : StLib_Init_Function := {| init := pn_cpt_init |}. *)
+
+  (* Definition tott := @stlib_setup_instance (prodOp gctr_op gctr_op) (prodSt gctr_st gctr_st) _ _ _ _ _ pnc_use_case_CRDT_Params (prod_lattice (vectn_le_lat ((length CRDT_Addresses))) (vectn_le_lat ((length CRDT_Addresses)))) *)
+  (*                                          (prod_params gctr_op gctr_st gctr_op gctr_st) uig.  *)

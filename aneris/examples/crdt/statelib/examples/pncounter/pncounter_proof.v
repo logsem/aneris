@@ -252,7 +252,75 @@ Section pn_event_mapping.
   Definition event_set_Z_of_prod (s : event_set pn_prod_Op) : event_set CtrOp :=
     gset_map (λ ev, event_Z_of_prod ev) s.
 
+  Lemma event_set_prod_of_Z_union s s' :
+    event_set_prod_of_Z s ∪ event_set_prod_of_Z  s' = event_set_prod_of_Z (s ∪ s').
+  Proof. Admitted.
+  Lemma event_set_prod_of_Z_inclusion s s' : event_set_prod_of_Z s ⊆ event_set_prod_of_Z s' → s ⊆ s'.
+  Proof. Admitted.
+
 End pn_event_mapping.
+
+Section pn_CRDT_Res_Mixin_mapping.
+  Context `{!anerisG M Σ}.
+  Context `{!CRDT_Params}.
+  Context `{pn : !CRDT_Res_Mixin M Σ (prodOp gctr_op gctr_op)}.
+
+  Global Program Instance pn_CRDT_Res : CRDT_Res_Mixin M Σ CtrOp :=
+    {|
+      GlobInv := pn.(GlobInv) ;
+      GlobState s := (pn.(GlobState) (event_set_prod_of_Z s));
+      GlobSnap s := (pn.(GlobSnap) (event_set_prod_of_Z s));
+      LocState i s1 s2 := (pn.(LocState) i (event_set_prod_of_Z s1) (event_set_prod_of_Z s2));
+      LocSnap i s1 s2 := (pn.(LocSnap) i (event_set_prod_of_Z s1) (event_set_prod_of_Z s2));
+    |}.
+  Next Obligation.
+    iIntros (s s') "Hs".
+    by iApply GlobState_Exclusive.
+  Defined.
+  Next Obligation.
+    iIntros (i s1 s2 s1' s2') "Hs".
+    by iApply LocState_Exclusive.
+  Defined.
+  Next Obligation.
+    iIntros (E s HE) "#Hinv Hg".
+    by iApply GlobState_TakeSnap; eauto.
+  Defined.
+  Next Obligation.
+    iIntros (s s') "#Hs1 #Hs2". rewrite -event_set_prod_of_Z_union.
+    iApply GlobSnap_Union; eauto.
+  Defined.
+  Next Obligation.
+    iIntros (E s s' HE) "#Hinv #Hsn Hs".
+    iPoseProof (GlobSnap_GlobState_Included with "[//][][$Hs]") as "dfd"; eauto.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+
+End pn_CRDT_Res_Mixin_mapping.
 
 Section pn_Res_mapping.
   Context `{!anerisG M Σ}.
@@ -261,11 +329,10 @@ Section pn_Res_mapping.
 
   Global Program Instance pn_Res : StLib_Res CtrOp :=
     {|
+      StLib_CRDT_Res := pn_CRDT_Res;
       StLib_InitToken := pn_prod_Res.(StLib_InitToken);
       StLib_SocketProto := pn_prod_Res.(StLib_SocketProto);
     |}.
-  Next Obligation.
-  Admitted.
 
 End pn_Res_mapping.
 
