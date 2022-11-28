@@ -16,7 +16,7 @@ From aneris.examples.crdt.statelib Require Import statelib_code.
 From aneris.examples.crdt.statelib.time Require Import time.
 From aneris.examples.crdt.statelib.STS Require Import lst.
 From aneris.examples.crdt.statelib.proof
-     Require Import events spec.
+     Require Import events spec stlib_proof_setup stlib_proof_utils internal_specs stlib_proof.
 From aneris.examples.crdt.statelib.examples.gcounter
      Require Import gcounter_proof.
 From aneris.examples.crdt.statelib.examples.prod_comb
@@ -329,10 +329,8 @@ Section use_case_proof.
 End use_case_proof.
 
 
-From aneris.examples.crdt.statelib.proof Require Import stlib_proof_setup.
-From aneris.examples.crdt.statelib.proof  Require Import spec events utils
-    stlib_proof_utils internal_specs stlib_proof.
-From aneris.examples.crdt.statelib.resources  Require Import resources_allocation.
+
+
 Section program_proof.
   Context `{!anerisG M Σ} `{!inG Σ (exclR unitO)}.
   Context `{!@StLibG (prodOp gctr_op gctr_op) _ _ Σ}.
@@ -392,7 +390,7 @@ Section program_proof.
 
 End program_proof.
 
-(*
+
 Definition init_state :=
   {|
     state_heaps := {[ "system" := ∅ ]};
@@ -410,7 +408,7 @@ Lemma Trivial_Mdl_finitary : aneris_model_rel_finitary Trivial_Mdl.
 Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 
 
-Definition use_case_Σ := #[anerisΣ Trivial_Mdl; RCBΣ; @OPLIBΣ CtrOp _ _; GFunctor (exclR unitO)].
+Definition use_case_Σ := #[anerisΣ Trivial_Mdl;  @OPLIBΣ CtrOp _ _; GFunctor (exclR unitO)].
 
 Theorem use_case_program_adequate :
   aneris_adequate use_case_program "system" init_state (λ v, v = #()).
@@ -434,76 +432,18 @@ Proof.
     repeat (rewrite bool_decide_eq_false_2; last set_solver).
     done. }
   iMod wp_use_case_program as (Res) "Hwp".
-  iD  estruct (unallocated_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
+  iDestruct (unallocated_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
   iDestruct (unallocated_split with "Hfx") as "[Hfx1 _]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton
-            (@OpLib_SocketProto _ _ _ _ _ _ _ Res 0) with "Hfx0").
+            (@StLib_SocketProto _ _ _ _ _ _ _ Res) with "Hfx0").
   iIntros "#Hsi0".
   iApply (aneris_wp_socket_interp_alloc_singleton
-            (@OpLib_SocketProto _ _ _ _ _ _ _ Res 1) with "Hfx1").
+            (@StLib_SocketProto _ _ _ _ _ _ _ Res) with "Hfx1").
   iIntros "#Hsi1".
-  iAssert ([∗ list] i↦z ∈ addresses, z ⤇ (@OpLib_SocketProto _ _ _ _ _ _ _ Res i))%I as "Hprotos".
+  iAssert ([∗ list] i↦z ∈ addresses, z ⤇ (@StLib_SocketProto _ _ _ _ _ _ _ Res))%I as "Hprotos".
   { repeat iSplit; done. }
   wp_apply ("Hwp" with "Hprotos Hfip1 Hfip2 Hsa1 Hsa2").
-Qed.
-
-*)
-
-
-
-(* Section OpPNCounter. *)
-
-(*   Context `{!Log_Time}. *)
-
-(*   Definition op_ctr_effect st (ev : Event CtrOp) st' := *)
-(*     st' = (st + ctr_payload ev.(EV_Op))%Z. *)
-
-(*   Lemma op_ctr_effect_fun st : Rel2__Fun (op_ctr_effect st). *)
-(*   Proof. *)
-(*     constructor. unfold op_ctr_effect. *)
-(*     intros a b b' Hb Hb'. *)
-(*     destruct (EV_Op a) as [z]; simpl in *; subst; auto. *)
-(*   Qed. *)
-
-
-(*   Lemma ctr_denot_union (s : gset (Event CtrOp)) (ev : Event CtrOp) (res : CtrSt) : *)
-(*     ⟦ s ⟧ ⇝ res -> *)
-(*     ev ∉ s -> *)
-(*     ⟦ s ∪ {[ ev ]} ⟧ ⇝ (res + ctr_payload ev.(EV_Op))%Z. *)
-(*   Proof. *)
-(*     simpl. unfold ctr_denot. *)
-(*     intros -> Hnotin. *)
-(*     assert (s ## {[ ev ]}) as Hdisj by set_solver. *)
-(*     pose proof (elements_disj_union s *)
-(*                                     ({[ev]} : gset (Event CtrOp)) *)
-(*                                     Hdisj) as Hperm. *)
-(*     apply ctr_value_perm in Hperm. rewrite Hperm. *)
-(*     by rewrite elements_singleton ctr_value_app ctr_value_singleton. *)
-(*   Qed. *)
-
-(*    Definition op_ctr_init_st := 0%Z. *)
-
-(*   Lemma op_ctr_init_st_coh : ⟦ (∅ : gset (Event CtrOp)) ⟧ ⇝ op_ctr_init_st. *)
-(*   Proof. done. Qed. *)
-
-(*  End OpPNCounter. *)
-
-
-(* Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st). *)
-
-  (* Definition init_val_pn : val := *)
-  (*   (statelib_init *)
-  (*        (prod_ser *)
-  (*           (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_ser) *)
-  (*           (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_ser)) *)
-  (*        (prod_deser *)
-  (*           (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_deser) *)
-  (*           (gctr_params.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_deser))). *)
-
-  (* Definition init_spec_pn  := *)
-  (* @init_spec *)
-  (*     _ _ _ _ _ _ _ _ _ pnParams stparams0 init_val_pn. *)
- (* Global Instance pn_cpt_init_cl : StLib_Init_Function := {| init := pn_cpt_init |}. *)
-
-  (* Definition tott := @stlib_setup_instance (prodOp gctr_op gctr_op) (prodSt gctr_st gctr_st) _ _ _ _ _ pnc_use_case_CRDT_Params (prod_lattice (vectn_le_lat ((length CRDT_Addresses))) (vectn_le_lat ((length CRDT_Addresses)))) *)
-  (*                                          (prod_params gctr_op gctr_st gctr_op gctr_st) uig.  *)
+  Unshelve.
+  - apply subG_OPLIBΣ. admit.
+  - admit.
+Admitted.
