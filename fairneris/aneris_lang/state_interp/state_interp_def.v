@@ -296,14 +296,18 @@ Section Aneris_AS.
   (*   apply elem_of_enum. *)
   (* Qed. *)
 
-  (* TODO: valid_state_evolution should capture:
-     - Relation between state n/m and message sent/delivered
-   *)
-
-  Definition saA := SocketAddressInet "0.0.0.0" 80. 
+  Definition ipA := "0.0.0.0".
+  Definition saA := SocketAddressInet ipA 80.
   Definition sA := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saA) true.
-  Definition saB := SocketAddressInet "0.0.0.1" 80.
+  Definition tidA := 0.
+  Definition localeA := (ipA, tidA).
+
+  Definition ipB := "0.0.0.1".
+  Definition saB := SocketAddressInet ipB 80.
   Definition sB := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saB) true.
+  Definition tidB := 0.
+  Definition localeB := (ipB, tidB).
+
   Definition mAB := mkMessage saA saB IPPROTO_UDP "Hello".
 
   Definition state_get_n s :=
@@ -335,17 +339,20 @@ Section Aneris_AS.
       {[ ip_of_address saA := {[shA := (sA,[])]};
          ip_of_address saB := {[shB := (sB,mABm (state_get_m (trace_last atr)))]} ]}.
 
+  Definition thread_live_roles_interp (tp : list aneris_expr) (δ : simple_state)
+    : iProp Σ :=
+    live_roles_auth_own (simple_live_roles δ).
+
   Global Instance anerisG_irisG :
     irisG aneris_lang (fair_model_to_model simple_fair_model) Σ := {
     iris_invGS := _;
     state_interp ex atr :=
-      (aneris_events_state_interp ex ∗
+      (⌜simple_valid_state_evolution ex atr⌝ ∗
+       aneris_events_state_interp ex ∗
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗
-       (* TODO: Expose state of live roles *)
-       (* auth_st (trace_last atr) ∗ *)
-       ⌜simple_valid_state_evolution ex atr⌝ ∗
+       thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗
        steps_auth (trace_length ex))%I;
     fork_post _ _ := True%I }.
 

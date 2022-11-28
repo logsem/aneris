@@ -275,7 +275,7 @@ Proof.
   iIntros (tid) "Hip".
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /= He.
   iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
-          "(?&?&?&Hauth)".
+          "(?&?&?&?&Hauth)".
   iDestruct (steps_lb_get with "Hauth") as "#Hlb".
   iDestruct (steps_lb_le _ 0 with "Hlb") as "Hlb'"; [lia|].
   iMod (fupd_mask_subseteq E) as "Hclose"; first done.
@@ -306,8 +306,7 @@ Proof.
   iDestruct ("Hwp" with "Hip") as "Hwp".
   rewrite !wp_unfold /wp_pre /=.
   rewrite /aneris_to_val. simpl. rewrite He. simpl.
-  iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
-          "(?&?&?&Hauth)".
+  iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe) "(?&?&?&?&Hauth)".
   iMod (fupd_mask_subseteq E) as "Hclose"; first done.
   iDestruct (steps_lb_valid with "Hauth Hlb") as %Hle.
   iMod ("Hwp" with "[//] [//] [//] [$]") as "[% H]".
@@ -317,7 +316,7 @@ Proof.
   iMod ("H" with "[//]") as "H". iIntros "!> !>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
-  iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&Hauth) & H & Hefs)".
+  iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth) & H & Hefs)".
   iDestruct (steps_lb_get with "Hauth") as "#Hlb'".
   iDestruct (steps_lb_le _ (S n) with "Hlb'") as "#Hlb''"; [lia|].
   iMod "Hclose" as "_". iModIntro.
@@ -358,7 +357,7 @@ Proof.
   iIntros (He HE) "Hlb HP Hwp".
   iApply aneris_wp_step_fupdN; [done|].
   iSplit; [|by iFrame].
-  iIntros (extr atr) "(? & ? & ? & Hsteps)".
+  iIntros (extr atr) "(? & ? & ? & ? & Hsteps)".
   iDestruct (steps_lb_valid with "Hsteps Hlb") as %Hle.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_". iPureIntro. lia.
@@ -389,12 +388,12 @@ Proof.
   rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
   rewrite He. simpl.
   iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
-  iIntros "(Hev & Hσ & H)".
+  iIntros "(% & Hev & Hσ & H)".
   iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hσ Hsag")
     as "[Hσ HΨ]".
   iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
   rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
-  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
+  by iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
 Qed.
 
 Lemma aneris_wp_socket_interp_alloc_group_fun f ip E e Φ sags :
@@ -408,11 +407,11 @@ Proof.
   rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
   rewrite He. simpl.
   iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
-  iIntros "(Hev & Hσ & H)".
+  iIntros "(% & Hev & Hσ & H)".
   iMod (aneris_state_interp_socket_interp_allocate_fun with "Hσ Hsag") as "[Hσ HΨ]".
   iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
   rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
-  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
+  by iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
 Qed.
 
 Lemma aneris_wp_socket_interp_alloc_group Ψ ip E e Φ sags :
@@ -426,11 +425,11 @@ Proof.
   rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val.
   rewrite He. simpl.
   iIntros (extr atr K tp1 tp2 σ1 Hextr Hlocale Htr).
-  iIntros "(Hev & Hσ & H)".
+  iIntros "(% & Hev & Hσ & H)".
   iMod (aneris_state_interp_socket_interp_allocate with "Hσ Hsag") as "[Hσ HΨ]".
   iDestruct ("Hwp" with "HΨ Hin") as "Hwp".
   rewrite !wp_unfold /wp_def /wp_pre. simpl. rewrite /aneris_to_val He.
-  iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
+  by iApply ("Hwp" with "[//] [//] [//] [$Hev $Hσ $H]").
 Qed.
 
 Lemma aneris_wp_socket_interp_alloc_singleton Ψ ip E e Φ sa :

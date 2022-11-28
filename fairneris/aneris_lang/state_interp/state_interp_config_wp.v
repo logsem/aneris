@@ -50,7 +50,7 @@ Section state_interpretation.
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
     rewrite /config_wp. iModIntro.
-    iIntros (ex atr c lbl σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & % & Hauth)".
+    iIntros (ex atr c lbl σ2 Hexvalid Hex Hstep) "(% & Hevs & Hsi & Hlive & Hauth)".
     rewrite (last_eq_trace_ends_in ex c); [|done].
     iDestruct "Hsi" as (γm mh)
                          "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh &
@@ -80,8 +80,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           rewrite /messages_to_receive_at_multi_soup in Hm.
@@ -134,8 +134,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
@@ -155,8 +155,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
@@ -182,8 +182,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           rewrite /messages_to_receive_at_multi_soup in Hm.
@@ -236,8 +236,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
@@ -257,8 +257,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
@@ -284,8 +284,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           rewrite /messages_to_receive_at_multi_soup in Hm.
@@ -339,8 +339,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
@@ -360,8 +360,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi".
-        iSplit; last first.
+        iFrame "Hevs Hauth Hsi Hlive".
+        iSplit.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.

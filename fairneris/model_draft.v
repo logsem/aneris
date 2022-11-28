@@ -16,24 +16,24 @@ Proof. solve_decision. Qed.
 #[global] Instance simple_state_inhabited : Inhabited simple_state.
 Proof. exact (populate Start). Qed.
 
-Inductive simple_role := A | B | Ndup | Ndrop | Ndeliver.
+Inductive simple_role := A_role | B_role | Ndup | Ndrop | Ndeliver.
 #[global] Instance simple_role_eqdec : EqDecision simple_role.
 Proof. solve_decision. Qed.
 #[global] Instance simple_role_inhabited : Inhabited simple_role.
-Proof. exact (populate A). Qed.
+Proof. exact (populate A_role). Qed.
 #[global] Instance simple_role_countable : Countable simple_role.
 Proof.
   refine ({|
              encode s := match s with
-                         | A => 1
-                         | B => 2
+                         | A_role => 1
+                         | B_role => 2
                          | Ndup => 3
                          | Ndrop => 4
                          | Ndeliver => 5
                          end;
              decode n := match n with
-                         | 1 => Some A
-                         | 2 => Some B
+                         | 1 => Some A_role
+                         | 2 => Some B_role
                          | 3 => Some Ndup
                          | 4 => Some Ndrop
                          | 5 => Some Ndeliver
@@ -46,10 +46,10 @@ Qed.
 Inductive simple_trans
   : simple_state → option simple_role → simple_state → Prop :=
 (* Transitions from Start *)
-| Start_B_recv_fail_simple_trans : simple_trans Start (Some B) Start
-| Start_A_send_simple_trans : simple_trans Start (Some A) (Sent 1)
+| Start_B_recv_fail_simple_trans : simple_trans Start (Some B_role) Start
+| Start_A_send_simple_trans : simple_trans Start (Some A_role) (Sent 1)
 (* Transitions from Sent *)
-| Sent_B_recv_fail_simple_trans n : simple_trans (Sent n) (Some B) (Sent n)
+| Sent_B_recv_fail_simple_trans n : simple_trans (Sent n) (Some B_role) (Sent n)
 | Sent_N_duplicate_simple_trans n : simple_trans (Sent $ S n) (Some Ndup) (Sent $ S $ S n)
 | Sent_N_drop_simple_trans n : simple_trans (Sent $ S n) (Some Ndrop) (Sent n)
 | Sent_N_deliver_simple_trans n : simple_trans (Sent $ S n) (Some Ndeliver) (Delivered n 0)
@@ -57,7 +57,7 @@ Inductive simple_trans
 | Delivered_N_duplicate_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndup) (Delivered (S $ S n) m)
 | Delivered_N_drop_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndrop) (Delivered n m)
 | Delivered_N_deliver_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndeliver) (Delivered n (S m))
-| Delivered_B_recv_succ_simple_trans n m : simple_trans (Delivered n m) (Some B) (Received n m)
+| Delivered_B_recv_succ_simple_trans n m : simple_trans (Delivered n m) (Some B_role) (Received n m)
 (* Transitions from Received - Are these needed? *)
 | Received_N_duplicate_simple_trans n m : simple_trans (Received (S n) m) (Some Ndup) (Received (S $ S n) m)
 | Received_N_drop_simple_trans n m : simple_trans (Received (S n) m) (Some Ndrop) (Received n m)
@@ -66,10 +66,10 @@ Inductive simple_trans
 
 Definition simple_live_roles (s : simple_state) : gset simple_role :=
   match s with
-  | Start => {[A;B]}
-  | Sent n => {[B;Ndup;Ndrop;Ndeliver]}
+  | Start => {[A_role;B_role]}
+  | Sent n => {[B_role;Ndup;Ndrop;Ndeliver]}
   (* Should Ndeliver etc. be live in Sent 0? *)
-  | Delivered n m => {[B;Ndup;Ndrop;Ndeliver]}
+  | Delivered n m => {[B_role;Ndup;Ndrop;Ndeliver]}
   (* Is the network live in the last state? *)
   (* | Received n m => {[Ndup;Ndrop;Ndeliver]} *)
   | Received n m => {[Ndup;Ndrop;Ndeliver]}
