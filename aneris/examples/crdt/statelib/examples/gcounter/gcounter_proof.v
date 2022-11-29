@@ -275,7 +275,7 @@ Section GCtr_Model.
   Lemma gctr_mut_coh
     (s : event_set gctr_op) (st st' : gctr_st) (ev: Event gctr_op) :
     ⟦ s ⟧ ⇝ st ->
-    Lst_Validity s ->
+    Lst_Validity' s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     gctr_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.

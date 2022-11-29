@@ -41,8 +41,6 @@ Section Bloup.
   Context (Hcd: @CrdtDenot LogOp LogSt timestamp_time eqdec_logop countable_logop).
   Context (inj_st: Inject LogSt val).
 
-  Context (p: @StLib_Params LogOp LogSt eqdec_logop countable_logop latA _).
-
   Definition mapSt: Type := gmap string LogSt.
   Definition mapOp: Type := string * LogOp.
 
@@ -339,12 +337,14 @@ Section Bloup.
   Global Instance map_op_countable: Countable mapOp.
   Proof. apply prod_countable. Qed.
 
+  Context `{PA : !StLib_Params LogOp LogSt}.
+
   Definition map_denot_def
     (s: gset (Event mapOp)) (st: mapSt) : Prop :=
     gset_dom st = gset_map (λ ev: Event mapOp, ev.(EV_Op).1) s
     ∧ (∀ (str: string) (v: LogSt), st !! str = Some v →
       @crdt_denot LogOp LogSt timestamp_time eqdec_logop countable_logop
-      p.(StLib_Denot)
+      PA.(StLib_Denot)
       (gset_map
           (λ e, {|EV_Op := e.(EV_Op).2;
                   EV_Orig := e.(EV_Orig);
@@ -358,7 +358,7 @@ Section Bloup.
     destruct (m !! u)as[v|]eqn:Hms; destruct (m' !! u)as[v'|]eqn:Hm's.
     - pose proof (Helts u v Hms) as A. pose proof (Helts' u v' Hm's) as B.
       rewrite Hms Hm's. f_equal.
-      exact (p.(StLib_Denot).(crdt_denot_fun).(rel2_fun)A B).
+      exact (PA.(StLib_Denot).(crdt_denot_fun).(rel2_fun)A B).
     - exfalso. rewrite -Hdom in Hdom'.
       pose proof (map_dom_Some _ _ _ Hms). apply (map_dom_None _ _ Hm's).
       by rewrite Hdom'.
@@ -377,34 +377,33 @@ Section Bloup.
       EV_Time := EV_Time e;
     |}.
 
-  Context `{PA : !StLib_Params LogOp LogSt}.
-
   Definition map_mutator (m: mapSt) (e: Event mapOp) (m': mapSt) : Prop :=
     let key: string := e.(EV_Op).1 in
     let val: LogOp := e.(EV_Op).2 in
-    gset_dom m' = gset_dom m ∪ {[key]}
-    ∧ (∀ k v, k ≠ key → m !! k = Some v → m' !! k = Some v)
-    ∧ (∀ (v: LogSt),
-        m !! key = Some v →
-        ∃ v', PA.(StLib_Model).(st_crdtM_mut) v (map_event e) v'
-          ∧ m' !! key = Some v')
-    ∧ (m !! key = None →  ∃ (v': LogSt),
-        PA.(StLib_Model).(st_crdtM_mut)
-          PA.(StLib_Model).(st_crdtM_init_st) (map_event e) v' ∧
-        m' !! key = Some v').
+    (∀ k v, k ≠ key → m !! k = Some v ↔ m' !! k = Some v)
+    ∧ ∃ (v': LogSt),
+        m' !! key = Some v'
+        ∧ st_crdtM_mut (default st_crdtM_init_st (m !! key)) (map_event e) v'.
 
-  Definition map_event_map :=
-    λ e : Event (string * LogOp),
-       {|
-         EV_Op := (EV_Op e).2;
-         EV_Orig := EV_Orig e;
-         EV_Time := EV_Time e
-       |}.
+  Lemma map_mutator_dom {m m': mapSt}{e: Event mapOp}:
+    map_mutator m e m' → gset_dom m' = gset_dom m ∪ {[e.(EV_Op).1]}.
+  Proof.
+    intros(Hold&v'&Hm'k&Hnew).
+    apply set_eq; intros x; split;
+    destruct (decide(x = e.(EV_Op).1))as[-> | A];
+      [ by (intros _; apply elem_of_union_r, elem_of_singleton)
+      | by intros[v?]%map_dom_Some_2;
+        apply elem_of_union_l, map_dom_Some with v, Hold
+      | intros _; by apply map_dom_Some with v'
+      |intros[[v?]%map_dom_Some_2| ->%elem_of_singleton]%elem_of_union;
+        [by apply map_dom_Some with v, Hold
+        |by apply map_dom_Some with v'] ].
+  Qed.
 
   Lemma lst_val_map s lst:
     Lst_Validity' lst →
     Lst_Validity'
-      (gset_map map_event_map
+      (gset_map map_event
         (filter (λ ev : Event (string * LogOp), (EV_Op ev).1 = s) lst)).
   Proof.
     destruct 1.
@@ -440,6 +439,84 @@ Section Bloup.
         apply elem_of_filter; set_solver.
   Qed.
 
+  Lemma map_mut_coh:
+    ∀ (s : event_set mapOp) (st st' : mapSt) (ev : Event mapOp),
+      ⟦ s ⟧ ⇝ st
+      → Lst_Validity' s
+      → ev ∉ s
+      → is_maximum ev (s ∪ {[ev]})
+      → map_mutator st ev st' → ⟦ s ∪ {[ev]} ⟧ ⇝ st'.
+  Proof.
+    intros s m m' ev [Hdom Hden] Hv Hnin Hmax Hmut.
+    split; first (rewrite (map_mutator_dom Hmut); set_solver).
+    destruct Hmut as(Hold&v&Hm'k&Hnew).
+    intros x v' Hm'x.
+    set sx :=
+      gset_map map_event (filter (λ ev0, (EV_Op ev0).1 = (EV_Op ev).1) s).
+    assert(gset_map map_event
+        (filter (λ ev0, (EV_Op ev0).1 = (EV_Op ev).1) (s ∪ {[ev]}))
+      = sx ∪ {[map_event ev]}) as Heq; first set_solver.
+    destruct(decide(x = ev.(EV_Op).1))as[ -> | Hneq].
+    - simplify_eq/=. rewrite-/map_event Heq.
+      destruct (m !! ev.(EV_Op).1)as[l|]eqn:E.
+      + pose proof (Hden (EV_Op ev).1) l E as H0; rewrite-/sx in H0.
+        apply (st_crdtM_mut_coh sx _ _ _ H0);
+          [ by apply lst_val_map | | | by simplify_eq ].
+          intros (x&Hx_map_eq&[]%elem_of_filter)%gset_map_correct2.
+          assert(Lst_Validity' (s ∪ {[ev]})) as Hv'.
+          { split.
+            - destruct Hmax as [_ Hmax].
+              intros??[| ->%elem_of_singleton]%elem_of_union[| ->%elem_of_singleton]%elem_of_union?.
+              + by apply (VLst_same_orig_comp' s Hv e e').
+              + left. apply Hmax; set_solver.
+              + do 2 right. apply Hmax; set_solver.
+              + by right; left.
+            - admit.
+            - destruct Hmax as [_ Hmax].
+              intros??[| ->%elem_of_singleton]%elem_of_union[| ->%elem_of_singleton]%elem_of_union?.
+              + by apply (VLst_ext_time' s Hv).
+              + exfalso; epose proof Hmax ev0 _ _.
+                rewrite H4 in H5. by apply (ts_lt_irreflexive (EV_Time ev)).
+              + exfalso; epose proof Hmax ev' _ _.
+                rewrite H4 in H5. by apply (ts_lt_irreflexive (EV_Time ev')).
+              + reflexivity.
+            - intros?[| ->%elem_of_singleton]%elem_of_union;
+                [|inversion Hx_map_eq; rewrite H5];
+                by apply (VLst_orig' s Hv).
+            - intros?[| ->%elem_of_singleton]%elem_of_union;
+                first by apply (VLst_seqnum_non_O' s Hv).
+              admit.
+            - admit.
+            - admit.
+            - admit.
+            - admit.
+            Unshelve.
+            all: set_solver. }
+          assert(x = ev) as ->; last done.
+          apply (VLst_ext_time' _ Hv');
+            [ by apply elem_of_union_l
+            | by apply elem_of_union_r,elem_of_singleton
+            | by inversion Hx_map_eq ].
+        * split; first by apply elem_of_union_r, elem_of_singleton.
+          intros t [(p&->&[]%elem_of_filter)%gset_map_correct2| ->%elem_of_singleton]%elem_of_union Ht_neq;
+            last done.
+          destruct Hmax as [_ B].
+          by epose proof (B p _ _).
+          Unshelve.
+          by apply elem_of_union_l.
+          by intros->.
+      + assert(sx = ∅) as ->.
+        { simplify_eq/=. apply map_dom_None in E. rewrite Hdom in E.
+          apply set_eq; intros ?; split; [ | inversion 1 ].
+          intros (?&->&[]%elem_of_filter)%gset_map_correct2.
+          destruct E. set_solver. }
+        simplify_eq/=.
+        apply (st_crdtM_mut_coh ∅) with st_crdtM_init_st; try done;
+          [exact st_crdtM_init_st_coh | split; try by intros; try by left | ].
+        split; first by apply elem_of_union_r, elem_of_singleton.
+        by intros?[?| ->%elem_of_singleton]%elem_of_union.
+  Admitted.
+
   Lemma map_mut_lub_coh:
     ∀ (s1 s2 : event_set mapOp) (st1 st2 st3 : mapSt),
       ⟦ s1 ⟧ ⇝ st1
@@ -472,7 +549,7 @@ Section Bloup.
       replace mapped_s12 with (mapped_s1 ∪ mapped_s2); last set_solver.
       pose proof (Hden s l E) as H1; pose proof (Hden' s l' E') as H2.
       rewrite-/mapped_s1 in H1; rewrite-/mapped_s2 in H2.
-      apply (p.(StLib_Model).(st_crdtM_lub_coh)_ _ _ _ _ H1 H2).
+      apply (PA.(StLib_Model).(st_crdtM_lub_coh)_ _ _ _ _ H1 H2).
       + by apply lst_val_map.
       + by apply lst_val_map.
       + assert((mapped_s1 ∪ mapped_s2) = mapped_s12) as Hseq; first set_solver.
@@ -498,26 +575,15 @@ Section Bloup.
       replace (∅ ∪ mapped_s2) with mapped_s2; [assumption | set_solver].
   Qed.
 
-  Lemma map_mut_coh:
-    ∀ (s : event_set mapOp) (st st' : mapSt) (ev : Event mapOp),
-      ⟦ s ⟧ ⇝ st
-      → Lst_Validity s
-      → ev ∉ s
-      → is_maximum ev (s ∪ {[ev]})
-      → map_mutator st ev st' → ⟦ s ∪ {[ev]} ⟧ ⇝ st'.
-  Proof.
-  Admitted.
-
   Lemma map_mut_mon (m : mapSt) (e : Event mapOp) (m' : mapSt) :
     map_mutator m e m' → m ≤_l m'.
   Proof.
-    intros(Hdom&Hold_v&Hnew_v&Hnew_v')s v Hmsv.
-    destruct(decide(s = (EV_Op e).1)) as[-> | ].
-    + destruct (Hnew_v _ Hmsv)as(v'&Hmut&Hm'sv').
-      exists v'. split; first assumption.
-      apply st_crdtM_mut_mon with (map_event e).
-      apply Hmut.
-    + exists v. split; last done. exact (Hold_v s v n Hmsv).
+    intros (Hdom&v'&Hm'k&Hmk)s v Hms.
+    destruct(decide(s = (EV_Op e).1)) as[-> | ];
+      last (exists v; split; last done; by apply Hdom).
+    exists v'. split; first assumption.
+    apply st_crdtM_mut_mon with (map_event e).
+    by rewrite Hms in Hmk.
   Qed.
 
   Global Instance map_model : StateCrdtModel mapOp mapSt.
@@ -536,20 +602,32 @@ Section Bloup.
   Definition map_ser : serialization :=
     list_serialization
       (prod_serialization
-        string_serialization p.(StLib_CohParams).(StLib_StSerialization)).
+        string_serialization PA.(StLib_CohParams).(StLib_StSerialization)).
 
   Definition map_op_coh (op: mapOp) (v: val): Prop :=
     ∃(s: string)(lop: LogOp)(vs vop: val),
       op.1 = s ∧ op.2 = lop
       ∧ v = (vs, vop)%V
-      ∧ p.(StLib_CohParams).(StLib_Op_Coh) lop vop
+      ∧ PA.(StLib_CohParams).(StLib_Op_Coh) lop vop
       ∧ vs = #s.
 
-  Definition map_st_coh (st: mapSt) (v: val): Prop := is_map v st.
+  Definition map_st_coh :=
+    λ (st : mapSt) v,
+      ∃ (m : gmap string val), is_map v m ∧
+      gset_dom m = gset_dom st ∧
+      ∀ k vs w, m !! k = Some w → st !! k = Some vs → StLib_St_Coh vs w.
 
   Lemma map_coh_ser:
-    ∀ (st : mapSt) (v : val), map_st_coh st v → Serializable map_ser v.
+    ∀ (st : mapSt) (v : val), map_st_coh st v →
+      Serializable map_ser v.
+  Proof.
+    intros m v (x&H1&H2&Hnodup).
+    (*exists x.*)
     Admitted.
+
+  Lemma map_coh_inj:
+    ∀ (o1 o2 : mapSt) (v : val), map_st_coh o1 v → map_st_coh o2 v → o1 = o2.
+  Admitted.
 
   Global Instance map_coh_params : @StLib_Coh_Params mapOp mapSt.
   Proof.
@@ -561,10 +639,8 @@ Section Bloup.
         (s & lop & vs & vop & Hseq & Hlopeq & Hveq & Hlopcoh & Hvsq)
         (s'& lop'& vs'& vop'& Hseq'& Hlopeq'& Hveq'& Hlopcoh'& Hvsq').
       f_equal; first by simplify_eq/=.
-      simplify_eq/=. by apply (p.(StLib_CohParams).(StLib_Op_Coh_Inj)lop lop' vop').
-    - intros st st' v (l&->&Hl&H'l)(l'&->&Hl'&H'l').
-      assert(l=l') as ->; last reflexivity.
-      rewrite Hl in Hl'. by apply inject_inj.
+      simplify_eq/=. by apply (PA.(StLib_CohParams).(StLib_Op_Coh_Inj)lop lop' vop').
+    - exact map_coh_inj.
     - exact map_coh_ser.
   Defined.
 
@@ -575,21 +651,10 @@ Section Bloup.
       StLib_Model := map_model;
     |}.
 
-End Bloup.
-
-Arguments map_params {_ _ _ _ _ _ _ _ _ _}.
-
-Section MapComp_Proof.
-  Context (LogOp : Type) (LogSt : Type).
-  Context `{!EqDecision LogOp} `{!Countable LogOp}.
-  Context `{!Inject LogSt val}.
-  Context `{lat : Lattice LogSt}.
   Context `{a: anerisG M Σ}.
-  Context `{!CRDT_Params}.
-  Context `{PA : !StLib_Params LogOp LogSt}.
 
   Lemma map_init_st_fn_spec :
-    ⊢ @init_st_fn_spec (mapOp LogOp) (mapSt LogSt)_ _ _ _ _ _ _ _ map_comb_init_st.
+    ⊢ @init_st_fn_spec mapOp mapSt _ _ _ _ _ _ _ _ map_comb_init_st.
   Proof.
     iIntros (addr).
     iIntros "!#" (Φ) "_ HΦ".
@@ -598,24 +663,228 @@ Section MapComp_Proof.
     iIntros (v Hv).
     iApply "HΦ".
     iPureIntro.
-    by rewrite/StLib_St_Coh/StLib_CohParams/map_params/map_coh_params
-      /map_st_coh/st_crdtM_init_st/StLib_Model/map_model.
+    exists gmap_empty. repeat split; try done.
+    rewrite/st_crdtM_init_st/StLib_Model/map_params/map_model. set_solver.
   Qed.
 
   Lemma map_mutator_st_spec mut_fn init_fn :
     @init_st_fn_spec LogOp LogSt _ _ _ _ _ _ _ PA init_fn -∗
     (** TODO: Init !!! *)
     @mutator_spec LogOp LogSt _ _ _ _ _ _ _ PA mut_fn -∗
-    @mutator_spec  (mapOp LogOp) (mapSt LogSt) _ _ _ _ _ _ _ map_params
+    @mutator_spec  mapOp mapSt _ _ _ _ _ _ _ map_params
       (λ: "i" "gs" "op", map_comb_mutator init_fn mut_fn "i" "gs" "op").
   Proof.
-  Admitted.
+    iIntros "#Hinit #Hmut_spec" (addr id st_v op_v s ev_log op_log st_log)
+      "!> %φ (%Hop_coh&%Hst_coh&%Hden&%Hnin&%Hop&%Horig&%Hmax&%Hevents_ext&%Hsame_orig_comp) Hφ".
+    destruct Hop_coh as (_&_&_&vop&<-&<-&->&Hlop_coh&->).
+    destruct Hst_coh as (m&Hm_ismap&Hm_dom&Hm_elts).
+    destruct op_log as [op_log_key op_log_op].
+    iSimplifyEq.
+    destruct(st_log !! (EV_Op ev_log).1)as[l|]eqn:E.
+    - do 2 (wp_lam; wp_pures).
+      wp_apply (wp_map_lookup (K := string) (V := val)); first done.
+      iIntros(l_v) "%Hl_v". rewrite Hop/= in E.
+      pose proof (map_dom_Some _ _ _ E) as HE. rewrite -Hm_dom in HE.
+      destruct (map_dom_Some_2 _ _ HE) as (l'&F);
+      rewrite F in Hl_v; rewrite Hl_v.
+      wp_pures.
+      wp_apply "Hmut_spec".
+      { iPureIntro. repeat split;
+          first (replace op_log_op with (EV_Op (map_event ev_log)) in Hlop_coh;
+            [done | simpl; by rewrite Hop ]).
+        1: exact (Hm_elts op_log_key l l' F E).
+        3: reflexivity. 3: by apply elem_of_union_r, elem_of_singleton.
+        - destruct Hden as (Hden_dom&Hden_elts).
+          exact (Hden_elts op_log_key l E).
+        - intros (e&He&[_ He_in]%elem_of_filter)%gset_map_correct2.
+          by assert(e = ev_log) as ->;
+            first (apply (Hevents_ext e ev_log);
+              [set_solver | set_solver | by inversion He]).
+        - apply elem_of_union in H0 as [(e&He&He_in)%gset_map_correct2| ->%elem_of_singleton]; last done.
+          replace(time(map_event ev_log)) with(time ev_log); last done.
+          replace(time t) with(time e); last by inversion He.
+          destruct Hmax as [_ Hmax];
+          by epose proof (Hmax e _ _)as H0%TM_lt_TM_le.
+          Unshelve.
+          set_solver.
+          intros ->; by inversion He.
+        - apply elem_of_union in H0 as [(e&He&He_in)%gset_map_correct2| ->%elem_of_singleton]; last done.
+          replace(time(map_event ev_log)) with(time ev_log); last done.
+          replace(time t) with(time e); last by inversion He.
+          destruct Hmax as [_ Hmax].
+          epose proof (Hmax e _ _)as H0; set_solver.
+          Unshelve.
+          set_solver.
+          intros ->; by inversion He.
+        - intros e e'
+            [(b&?&?)%gset_map_correct2| ->%elem_of_singleton]%elem_of_union
+            [(b'&?&?)%gset_map_correct2| ->%elem_of_singleton]%elem_of_union;
+            last reflexivity.
+          + intros ?. epose proof (Hevents_ext b b' _ _ _).
+            by simplify_eq.
+            Unshelve.
+            3: replace (time b) with(time e); last (by simplify_eq/=);
+              by replace (time b') with(time e'); last by simplify_eq/=.
+            all: set_solver.
+          + intros Ht. assert(b = ev_log) as ->;
+              first apply Hevents_ext; set_solver.
+          + intros Ht. assert(b' = ev_log) as ->;
+              first apply Hevents_ext; set_solver.
+        - intros e e'
+            [(b&?&?)%gset_map_correct2| ->%elem_of_singleton]%elem_of_union
+            [(b'&?&?)%gset_map_correct2| ->%elem_of_singleton]%elem_of_union;
+            last by right; left.
+          + replace(time e)with(time b); last by inversion H0.
+            replace(time e')with(time b'); last by inversion H2.
+            intros?; by epose proof (Hsame_orig_comp b b' _ _ _).
+            Unshelve.
+            3: by simplify_eq/=.
+            all: set_solver.
+          + replace(time e)with(time b); last by inversion H0.
+            intros?; by epose proof (Hsame_orig_comp b ev_log _ _ _).
+            Unshelve.
+            3: by simplify_eq/=.
+            all: set_solver.
+          + replace(time e')with(time b'); last by inversion H0.
+            intros?; by epose proof (Hsame_orig_comp ev_log b' _ _ _).
+            Unshelve.
+            3: by simplify_eq/=.
+            all: set_solver. }
+      iIntros (st'_v (st'_log&Hst'_coh&Hst'_mut)).
+      wp_pures.
+      wp_apply (wp_map_insert (K := string) (V := val) _ op_log_key); first done.
+      iIntros(d Hd).
+      iApply "Hφ".
+      iPureIntro.
+      exists (<[op_log_key:=st'_log]> st_log); split.
+      + exists (<[op_log_key:=st'_v]> m); repeat split; first done.
+        { apply set_eq; intro x; destruct (decide(x = op_log_key))as[->|Hneq];
+          split; intros Hin;
+            [ apply map_dom_Some with st'_log; by rewrite lookup_insert
+            | apply map_dom_Some with st'_v; by rewrite lookup_insert
+            |
+            | ].
+          - destruct (st_log !! x)eqn:G.
+            * apply map_dom_Some with l0.
+              by rewrite lookup_insert_ne; last done.
+            * exfalso.
+              apply map_dom_Some_2 in Hin as(v&Hmx).
+              rewrite lookup_insert_ne in Hmx; last done.
+              pose proof (map_dom_Some m x v Hmx) as Hx.
+              rewrite Hm_dom in Hx.
+              apply map_dom_Some_2 in Hx as(v'&Hstx).
+              by rewrite Hstx in G.
+          - destruct (m !! x)as[l0| ]eqn:G.
+            * apply map_dom_Some with l0.
+              by rewrite lookup_insert_ne; last done.
+            * exfalso.
+              apply map_dom_Some_2 in Hin as(v&Hmx).
+              rewrite lookup_insert_ne in Hmx; last done.
+              pose proof (map_dom_Some st_log x v Hmx) as Hx.
+              rewrite -Hm_dom in Hx.
+              apply map_dom_Some_2 in Hx as(v'&Hstx).
+              by rewrite Hstx in G. }
+        intros x vs w Hmx Hstx.
+        destruct(decide(x = op_log_key)) as [-> | Hneq].
+        * rewrite lookup_insert in Hmx; rewrite lookup_insert in Hstx.
+          by simplify_eq/=.
+        * rewrite lookup_insert_ne in Hmx; last done.
+          rewrite lookup_insert_ne in Hstx; last done.
+          by apply Hm_elts with x.
+      + split;
+          last (exists st'_log; split;
+            [ by rewrite Hop/= lookup_insert | by rewrite Hop/= E/= ]).
+        intros???. split; intros?;
+          last (rewrite lookup_insert_ne in H1; try done;
+            by rewrite Hop in H0).
+        rewrite Hop/= in H0.
+        by rewrite lookup_insert_ne; last done.
+    - do 2 (wp_lam; wp_pures).
+      wp_apply (wp_map_lookup (K := string) (V := val)); first done.
+      iIntros(l_v) "%Hl_v". rewrite Hop/= in E.
+      assert(F: m !! op_log_key = None).
+      { apply map_dom_None in E. rewrite -Hm_dom in E.
+        by apply not_elem_of_dom. }
+      rewrite F in Hl_v; rewrite Hl_v.
+      wp_pures.
+      wp_apply "Hinit"; first trivial.
+      iIntros(vinit Hinit_st_coh).
+      wp_apply "Hmut_spec".
+      { iPureIntro. repeat split; try done;
+          first (replace op_log_op with (EV_Op (map_event ev_log)) in Hlop_coh;
+            [done | simpl; by rewrite Hop ]).
+        3: reflexivity.
+        3: by apply elem_of_union_r, elem_of_singleton.
+        - apply st_crdtM_init_st_coh.
+        - by intros?.
+        - exfalso; set_solver.
+        - exfalso; set_solver.
+        - intros?????. set_solver.
+        - intros?????. set_solver. }
+      iIntros (st'_v (st'_log&Hst'_coh&Hst'_mut)).
+      wp_pures.
+      wp_apply (wp_map_insert (K := string) (V := val) _ op_log_key); first done.
+      iIntros(d Hd).
+      iApply "Hφ".
+      iPureIntro.
+      exists (<[op_log_key:=st'_log]> st_log); split.
+      + exists (<[op_log_key:=st'_v]> m); repeat split; first done.
+        { apply set_eq; intro x; destruct (decide(x = op_log_key))as[->|Hneq];
+          split; intros Hin;
+            [ apply map_dom_Some with st'_log; by rewrite lookup_insert
+            | apply map_dom_Some with st'_v; by rewrite lookup_insert
+            |
+            | ].
+          - destruct (st_log !! x)eqn:G.
+            * apply map_dom_Some with l.
+              by rewrite lookup_insert_ne; last done.
+            * exfalso.
+              apply map_dom_Some_2 in Hin as(v&Hmx).
+              rewrite lookup_insert_ne in Hmx; last done.
+              pose proof (map_dom_Some m x v Hmx) as Hx.
+              rewrite Hm_dom in Hx.
+              apply map_dom_Some_2 in Hx as(v'&Hstx).
+              by rewrite Hstx in G.
+          - destruct (m !! x)as[l| ]eqn:G.
+            * apply map_dom_Some with l.
+              by rewrite lookup_insert_ne; last done.
+            * exfalso.
+              apply map_dom_Some_2 in Hin as(v&Hmx).
+              rewrite lookup_insert_ne in Hmx; last done.
+              pose proof (map_dom_Some st_log x v Hmx) as Hx.
+              rewrite -Hm_dom in Hx.
+              apply map_dom_Some_2 in Hx as(v'&Hstx).
+              by rewrite Hstx in G. }
+        intros x vs w Hmx Hstx.
+        destruct(decide(x = op_log_key)) as [-> | Hneq].
+        * rewrite lookup_insert in Hmx; rewrite lookup_insert in Hstx.
+          by simplify_eq/=.
+        * rewrite lookup_insert_ne in Hmx; last done.
+          rewrite lookup_insert_ne in Hstx; last done.
+          by apply Hm_elts with x.
+      + split;
+          last (exists st'_log; split;
+            [ by rewrite Hop/= lookup_insert | by rewrite Hop/= E/= ]).
+        intros???. split; intros?;
+          last (rewrite lookup_insert_ne in H1; try done;
+            by rewrite Hop in H0).
+        rewrite Hop/= in H0.
+        by rewrite lookup_insert_ne; last done.
+  Qed.
 
   Lemma map_merge_st_spec merge_fn :
     @merge_spec LogOp LogSt _ _ _ _ _ _ _ PA merge_fn -∗
     @merge_spec _ _ _ _ _ _ _ _ _ map_params
     (λ: "st1" "st2", map_comb_merge merge_fn "st1" "st2").
   Proof.
+    iIntros"#Hmerge"(addr st_v st'_v s s' st_log st'_log φ)
+      "!>((%m&%Hst_coh&%Hst_dom&%Hst_elts)&(%m'&%Hst'_coh&%Hst'_dom&%Hst'_elts)&%Hs_den&%Hs'_den&
+        %Hevents_ext&%Hsame_orig_comp&%Hevents_ext'&%Hsame_orig_comp') Hφ".
+    do 2 (wp_lam; wp_pures).
+    wp_apply wp_map_dom; first done; iIntros(dom_m_v Hdom_m_v); wp_let.
+    wp_apply wp_map_dom; first done; iIntros(dom_m'_v Hdom_m'_v); wp_pures.
+    wp_apply wp_set_union; first done; iIntros(dom_v Hdom_v); wp_pures.
+    wp_apply wp_map_empty; first done; iIntros(empty_v Hempty_v).
   Admitted.
 
   Lemma map_crdt_fun_spec cA :
@@ -637,7 +906,7 @@ Section MapComp_Proof.
     - by iApply map_merge_st_spec.
   Qed.
 
-  Lemma map_init_spec `{!StLib_Res (@mapOp LogOp)} cA :
+  Lemma map_init_spec `{!StLib_Res mapOp} cA :
     @crdt_fun_spec LogOp LogSt _ _ _ _ _ _ _ PA cA -∗
     @init_spec _ _ _ _ _ _ _ _ _ map_params _
       (statelib_init
@@ -653,7 +922,16 @@ Section MapComp_Proof.
           (PA.(StLib_CohParams).(StLib_StSerialization).(s_serializer)).(s_deser)
           cA "addrs" "rid").
   Proof.
-  Admitted.
+    iIntros "#HA #Hinit" (repId addr addrs_val).
+    iIntros (Φ) "!# (%Haddrs & %Hrepid & Hprotos & Hskt & Hfr & Htoken) HΦ".
+    rewrite /map_comb_init.
+    wp_pures.
+    wp_apply ("Hinit" with "[$Hprotos $Htoken $Hskt $Hfr]").
+    { do 2 (iSplit; first done). iApply map_crdt_fun_spec; done. }
+    iIntros (get update) "(HLS & Hget & Hupdate)".
+    wp_pures.
+    iApply "HΦ"; iFrame.
+  Qed.
 
-End MapComp_Proof.
+End Bloup.
 

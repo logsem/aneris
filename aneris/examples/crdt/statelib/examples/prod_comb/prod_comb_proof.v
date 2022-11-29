@@ -219,7 +219,7 @@ Section prod_crdt_model.
 
   Lemma prod_mut_coh (s : event_set prodOp) (st st' : prodSt) (ev: Event prodOp) :
     ⟦ s ⟧ ⇝ st ->
-    Lst_Validity s ->
+    Lst_Validity' s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     prod_mutator_denot st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
@@ -227,9 +227,9 @@ Section prod_crdt_model.
     rewrite /=/prod_denot /prod_mutator.
     intros (Hd1 & Hd2) Hv Hev Hm (Hm1 & Hm2).
     rewrite! gset_map_union ! gset_map_singleton.
-    assert (Lst_Validity (gset_map (event_map fst) s) ∧
-              Lst_Validity (gset_map (event_map snd) s)).
-    { split; by apply lst_validity_valid_event_map. }
+    assert (Lst_Validity' (gset_map (event_map fst) s) ∧
+              Lst_Validity' (gset_map (event_map snd) s)).
+    { split; by apply lst_validity'_valid_event_map. }
     assert (event_map fst ev ∉ gset_map (event_map fst) s ∧
               event_map snd ev ∉ gset_map (event_map snd) s).
     { split.

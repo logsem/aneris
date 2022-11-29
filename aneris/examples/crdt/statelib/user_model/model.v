@@ -36,7 +36,7 @@ Section ModelDef.
     (* Mutations are coherent with denotations. *)
     st_crdtM_mut_coh (s : gset (Event Op)) (st st' : LatSt) (ev: Event Op) :
       ⟦ s ⟧ ⇝ st ->
-      Lst_Validity s ->
+      Lst_Validity' s ->
       ev ∉ s ->
       is_maximum ev (s ∪ {[ ev ]}) ->
       st_crdtM_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st';

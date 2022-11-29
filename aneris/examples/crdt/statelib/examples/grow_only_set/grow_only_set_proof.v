@@ -56,7 +56,7 @@ Section gos_model.
 
   Lemma gos_mut_coh (s : event_set gos_op) (st st' : gos_st) (ev: Event gos_op) :
     ⟦ s ⟧ ⇝ st ->
-    Lst_Validity s ->
+    Lst_Validity' s ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     gos_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
