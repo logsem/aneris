@@ -299,8 +299,13 @@ Section pn_event_mapping.
 
   Lemma to_pn_op_inj z z' : to_pn_op z = to_pn_op z' -> z = z'.
   Proof.
+    (*
+    intros Heq.
+    destruct (to_pn_op z) as [[o1 o2] pf] eqn:to1.
+    destruct (to_pn_op z') as [[o1' o2'] pf'] eqn:to2.
+    destruct z; simpl in *; destruct z'; simpl in *; auto.
+     *)
   Admitted.
-    
 
   Lemma event_prod_of_Z_eq_inv e e' :
     event_prod_of_Z e = event_prod_of_Z e' → e = e'.
