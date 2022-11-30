@@ -73,23 +73,6 @@ Section Bloup.
         by rewrite Ebis in E.
   Qed.
 
-  (*Definition map_lat_lub (m m': mapSt) : mapSt :=
-    let dom0 := gset_dom m in let dom1 := gset_dom m' in let dom := dom0 ∪ dom1 in
-    (set_fold
-      (λ s acc,
-        match gmap_lookup s m with
-        | None =>
-          match gmap_lookup s m' with
-          | None => acc
-          | Some v' => map_insert s v' acc
-          end
-        | Some v =>
-          match gmap_lookup s m' with
-          | None => map_insert s v acc
-          | Some v' => map_insert s (latA.(lat_lub) v v') acc
-          end
-        end) (gmap_empty: gmap string LogSt) dom).*)
-
   Definition map_lat_lub (m m': mapSt): mapSt :=
     map_fold (λ s v' acc,
       match acc !! s with
@@ -611,11 +594,14 @@ Section Bloup.
       ∧ PA.(StLib_CohParams).(StLib_Op_Coh) lop vop
       ∧ vs = #s.
 
-  Definition map_st_coh :=
-    λ (st : mapSt) v,
-      ∃ (m : gmap string val), is_map v m ∧
+  Definition map_st_coh_v_log (v: val) (m: gmap string val) (st: mapSt) :=
+      is_map v m ∧
       gset_dom m = gset_dom st ∧
       ∀ k vs w, m !! k = Some w → st !! k = Some vs → StLib_St_Coh vs w.
+  
+  Definition map_st_coh :=
+    λ (st : mapSt) v,
+      ∃ (m : gmap string val), map_st_coh_v_log v m st.
 
   Lemma map_coh_ser:
     ∀ (st : mapSt) (v : val), map_st_coh st v →
@@ -872,6 +858,160 @@ Section Bloup.
         by rewrite lookup_insert_ne; last done.
   Qed.
 
+  Lemma bloup (addr : socket_address) merge_fn
+    (st_v_v st'_v_v: val) (st_v_log st'_v_log: gmap string val)
+    (st_log st'_log: mapSt)
+    (s s': event_set mapOp) (Hsden: ⟦ s ⟧ ⇝ st_log) (Hs'den: ⟦ s' ⟧ ⇝ st'_log)
+    (key : string)
+    (acc_v : val) (* Current result *)
+    (Xacc : gset string) (* keys seen so far (ie. in previous iterations) *)
+    (Hevents_ext : events_ext s)
+    (Hsame_orig_comp : event_set_same_orig_comparable s)
+    (Hevents_ext' : events_ext s')
+    (Hsame_orig_comp' : event_set_same_orig_comparable s') :
+    let lub_log: mapSt := map_lat_lub st_log st'_log in
+    let P := λ (X: gset string) (a: val),
+      ∃ (m: gmap string val),
+      gset_dom m = X
+      ∧ is_map a m
+      ∧ (∀ (s: string),
+        s ∈ X →
+        ∃ (vs: val) (es: LogSt),
+          m !! s = Some vs
+          ∧ lub_log !! s = Some es
+          ∧ StLib_St_Coh es vs) in
+    ⌜ map_st_coh_v_log st_v_v st_v_log st_log ⌝ -∗
+    ⌜ map_st_coh_v_log st'_v_v st'_v_log st'_log ⌝ -∗
+    @merge_spec LogOp LogSt _ _ _ _ _ _ _ PA merge_fn -∗
+    {{{ ⌜P Xacc acc_v⌝ ∗ ⌜key ∈ (gset_dom st_log) ∪ (gset_dom st'_log)⌝ }}}
+    (λ: "m" "k",
+      match: map_lookup "k" st_v_v with
+        InjL <> =>
+          match: map_lookup "k" st'_v_v with
+            InjL <> => assert: #false
+          | InjR "v1" => map_code.map_insert "k" "v1" "m"
+          end
+      | InjR "v0" =>
+        match: map_lookup "k" st'_v_v with
+          InjL <> => map_code.map_insert "k" "v0" "m"
+        | InjR "v1" => map_code.map_insert "k" (merge_fn "v0" "v1") "m"
+        end
+      end)%V acc_v $ key @[ip_of_address addr]
+  {{{ (res_v : val),  RET res_v; ⌜P (Xacc ∪ {[key]}) res_v⌝ ∗ ⌜key ∈ gset_dom (lub_log)⌝ }}}.
+  Proof.
+    intros lub_log P.
+    iIntros((Hst_ismap&Hst_dom&Hst_elts)(Hst'_ismap&Hst'_dom&Hst'_elts))
+      "#Hmerge%φ!>[(%m&%Hm_dom&%Hm_ismap&%Hm_elts) %Hkey] Hφ".
+    wp_lam; wp_let.
+    wp_apply (wp_map_lookup (K := string) (V := val)); first done.
+    destruct(st_v_log !! key)as[l|]eqn:E.
+    - destruct (st_log !! key)as[l_log|]eqn:E';
+        last by (apply map_dom_Some in E; apply map_dom_None in E';
+          by rewrite -Hst_dom in E').
+      iIntros(v->).
+      wp_pures.
+      wp_apply (wp_map_lookup (K := string) (V := val)); first done.
+      destruct(st'_v_log !! key)as[l'|]eqn:F.
+      + destruct (st'_log !! key)as[l'_log|]eqn:F';
+          last by ( apply map_dom_Some in F; apply map_dom_None in F';
+            rewrite-Hst'_dom in F').
+        iIntros(v'->). wp_pures.
+        wp_bind(merge_fn _ _)%E.
+        wp_apply "Hmerge".
+        { iPureIntro.
+          destruct Hsden as[Hs_dom Hs_den]; destruct Hs'den as[Hs'_dom Hs'_den].
+          pose proof(Hst_elts key l_log l E E').
+          pose proof(Hst'_elts key l'_log l' F F').
+          pose proof (Hs_den key l_log E').
+          pose proof (Hs'_den key l'_log F').
+          repeat split; try done.
+          all: (intros e1 e2 (e&He&[_ Hein]%elem_of_filter)%gset_map_correct2
+                      (e'&He'&[_ He'in]%elem_of_filter)%gset_map_correct2?;
+            inversion He; inversion He'; simplify_eq/=).
+          1: by rewrite(Hevents_ext e e').
+          2: by rewrite(Hevents_ext' e e').
+          1: by apply(Hsame_orig_comp e e').
+          1: by apply(Hsame_orig_comp' e e'). }
+        iIntros(loc_lub_val (loc_lub_log&Hloc_lub_coh&Hloc_lub_eq)).
+        wp_apply (wp_map_insert (K := string) (V := val) _ key ); first done.
+        iIntros(st''_v Hst'').
+        iApply"Hφ".
+        iPureIntro.
+        split; last (rewrite map_lat_lub_dom; apply elem_of_union_l;
+            rewrite-Hst_dom; by apply map_dom_Some in E).
+        exists (<[key:=loc_lub_val]> m); repeat split; try done.
+        * rewrite-Hm_dom.
+          replace (gset_dom(<[key:=loc_lub_val]> m))with(dom(<[key:=loc_lub_val]> m)); last set_solver. 
+          replace (gset_dom m) with (dom m); last set_solver. 
+          set_solver.
+        * intros x Hxin; destruct(decide(x = key))as[->|Hneq].
+          ++pose proof (map_lub_elt_Some_Some E' F') as Hsome.
+            exists loc_lub_val, (l_log ⊔_l l'_log).
+            repeat split; [ by rewrite lookup_insert | done | ].
+            replace(l_log ⊔_l l'_log)with loc_lub_log.
+            exact Hloc_lub_coh.
+          ++apply elem_of_union in Hxin as [Hx_in| ->%elem_of_singleton]; last (exfalso; by set_solver).
+            rewrite lookup_insert_ne; last done.
+            by apply Hm_elts.
+    + iIntros(v'->). wp_pures.
+      wp_apply (wp_map_insert (K := string) (V := val) _ key ); first done.
+      iIntros(st''_v Hst'').
+      iApply"Hφ".
+      iPureIntro.
+      split; last(by rewrite map_lat_lub_dom).
+      exists (<[key:=l]> m); repeat split; [| done |].
+      * rewrite-Hm_dom.
+        replace (gset_dom(<[key:=l]> m))with(dom(<[key:=l]> m)); last set_solver. 
+        replace (gset_dom m) with (dom m); last set_solver. 
+        set_solver.
+      * intros x Hxin.
+        destruct(decide(x = key))as[->| J].
+        --exists l, l_log; repeat split;
+            [ by rewrite lookup_insert | | by apply(Hst_elts key l_log l)].
+          rewrite(map_lub_elt_Some_None st_log st'_log key l_log E');
+            first done.
+          apply map_dom_None in F. rewrite Hst'_dom in F.
+          destruct(st'_log !! key)eqn:G; last done.
+          destruct F. by apply map_dom_Some in G.
+        --rewrite lookup_insert_ne; last done.
+          apply elem_of_union in Hxin as[?| ->%elem_of_singleton]; last (exfalso; by set_solver).
+          by apply Hm_elts.
+    - iIntros(v->). wp_match.
+      destruct(st'_v_log !! key)eqn:E'; last first.
+      { exfalso.
+        apply map_dom_None in E; apply map_dom_None in E'.
+        rewrite -Hst_dom -Hst'_dom in Hkey.
+        set_solver. }
+      wp_apply (wp_map_lookup (K := string) (V := val)); first done.
+      rewrite E'.
+      iIntros(st'_v->). wp_match.
+      wp_apply (wp_map_insert (K := string) (V := val) _ key ); first done.
+      iIntros(st''_v Hst'').
+      iApply"Hφ".
+      iPureIntro.
+      split; last by rewrite map_lat_lub_dom.
+      exists(<[key:=v]> m); repeat split; [| done |].
+      * rewrite-Hm_dom.
+        replace (gset_dom(<[key:=v]> m))with(dom(<[key:=v]> m)); last set_solver. 
+        replace (gset_dom m) with (dom m); last set_solver. 
+        set_solver.
+      * intros x Hxin.
+        destruct (st'_log !! key)eqn:F; first last.
+        { apply map_dom_None in F. apply map_dom_Some in E'.
+          by rewrite Hst'_dom in E'. }
+        destruct(decide(x = key))as[->| J].
+        --exists v, l; repeat split;
+            [ by rewrite lookup_insert | | by apply(Hst'_elts key l v)].
+          rewrite(map_lub_elt_None_Some st_log st'_log key l F);
+            first done.
+          apply map_dom_None in E. rewrite Hst_dom in E.
+          destruct(st_log !! key)eqn:G; last done.
+          destruct E. by apply map_dom_Some in G.
+        --rewrite lookup_insert_ne; last done.
+          apply elem_of_union in Hxin as[?| ->%elem_of_singleton]; last (exfalso; by set_solver).
+          by apply Hm_elts.
+  Qed.
+
   Lemma map_merge_st_spec merge_fn :
     @merge_spec LogOp LogSt _ _ _ _ _ _ _ PA merge_fn -∗
     @merge_spec _ _ _ _ _ _ _ _ _ map_params
@@ -885,7 +1025,35 @@ Section Bloup.
     wp_apply wp_map_dom; first done; iIntros(dom_m'_v Hdom_m'_v); wp_pures.
     wp_apply wp_set_union; first done; iIntros(dom_v Hdom_v); wp_pures.
     wp_apply wp_map_empty; first done; iIntros(empty_v Hempty_v).
-  Admitted.
+    (** TODO: [wp_set_foldl] using the former lemma on the handler. *)
+    iApply (wp_set_foldl);
+    [ iIntros (key acc_v Xacc);
+      iPoseProof ((bloup _ merge_fn
+        st_v st'_v m m' st_log st'_log s s' Hs_den Hs'_den key acc_v Xacc
+        Hevents_ext Hsame_orig_comp Hevents_ext' Hsame_orig_comp')
+        with "[][]Hmerge")
+        as "#Haux"; [done | done | iApply "Haux" ]
+    | iPureIntro;
+      repeat split; [ done |
+        exists ∅; repeat split; try done;
+        apply set_eq; set_solver
+        | intros?; set_solver]|].
+    iNext.
+    iIntros(res_v ((res_log&Hdom&His_map&Helts)&Hset)).
+    iApply "Hφ".
+    iPureIntro.
+    exists (map_lat_lub st_log st'_log); split; last reflexivity.
+    exists res_log.
+    repeat split;
+      [ assumption
+      | rewrite map_lat_lub_dom Hdom;
+        by replace (dom m ∪ dom m') with (gset_dom st_log  ∪gset_dom st'_log);
+          last set_solver|].
+    intros k elt_v elt_log Hres_log Hlub.
+    by destruct (Helts k)as(?&?&?&?&?);
+      [ (rewrite-Hdom; by apply map_dom_Some in Hres_log)
+      | simplify_eq/=].
+  Qed.
 
   Lemma map_crdt_fun_spec cA :
     @crdt_fun_spec LogOp LogSt _ _ _ _ _ _ _ PA cA -∗
