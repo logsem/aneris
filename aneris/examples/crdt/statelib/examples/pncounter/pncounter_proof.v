@@ -488,18 +488,151 @@ Section pn_event_mapping.
     by rewrite event_prod_of_Z_of_prod.
   Qed.
 
-  Lemma event_set_prod_of_Z_compute_maximum (s : event_set CtrOp) :
-    maximality.compute_maximum (event_set_prod_of_Z s) = event_prod_of_Z <$> (maximality.compute_maximum s).
-  Proof. Admitted.
-
-  Lemma event_set_Z_of_prod_compute_maximum (s : event_set pn_prod_Op) :
-    maximality.compute_maximum (event_set_Z_of_prod s) = event_Z_of_prod <$> (maximality.compute_maximum s).
-  Proof. Admitted.
+  Lemma event_prod_of_Z_time e :
+    time (event_prod_of_Z e) = time e.
+  Proof. done. Qed.
 
   Lemma event_set_prod_of_Z_compute_maximals (s : event_set CtrOp) :
     maximality.compute_maximals (event_set_prod_of_Z s) =
     event_set_prod_of_Z (maximality.compute_maximals s).
-  Proof. Admitted.
+  Proof.
+    assert (∀ e, e ∈ maximality.compute_maximals (event_set_prod_of_Z s) <-> e ∈ event_set_prod_of_Z (maximality.compute_maximals s)) as Helem; [|set_solver].
+    intros e; split; rewrite /maximality.compute_maximals; intros Hin.
+    - rewrite elem_of_filter in Hin.
+      destruct Hin as [Hmax Hin].
+      rewrite /event_set_prod_of_Z in Hin.
+      apply gset_map_correct2 in Hin as [a [-> Hin]].
+      apply gset_map_correct1.
+      apply elem_of_filter.
+      split; [|done].
+      intros e' Hin' Hnot.
+      assert (event_prod_of_Z e' ∈ event_set_prod_of_Z s) as Hin''.
+      { rewrite /event_set_prod_of_Z.
+        apply gset_map_correct1; done. }
+      pose proof (Hmax (event_prod_of_Z e') Hin'') as Hlt.
+      simpl in Hlt.
+      apply Hlt.
+      do 2 rewrite event_prod_of_Z_time.
+      done.
+    - rewrite /event_set_prod_of_Z in Hin.
+      apply gset_map_correct2 in Hin as [a [-> [Hfa Hin]%elem_of_filter]].
+      apply elem_of_filter.
+      split.
+      + intros e' Hin' Hnot.
+        rewrite /event_set_prod_of_Z in Hin'.
+        apply gset_map_correct2 in Hin' as [a' [-> Hin'']].
+        do 2 rewrite event_prod_of_Z_time in Hnot.
+        pose proof (Hfa a' Hin'') as H'.
+        simpl in H'.
+        apply H'.
+        done.
+      + rewrite /event_set_prod_of_Z.
+        apply gset_map_correct1; done.
+  Qed.
+
+  Lemma gset_map_empty_inv (s : event_set CtrOp) : gset_map event_prod_of_Z s = ∅ -> s = ∅.
+  Proof.
+    intros Heq.
+    rewrite /gset_map in Heq.
+    rewrite mapset_eq in Heq.
+    apply mapset_eq.
+    intros x; split; intros Hin.
+    - pose proof (Heq (event_prod_of_Z x)) as Heq'.
+      apply Heq'.
+      (*
+      apply elem_of_list_to_set.
+      eapply elem_of_fmap.
+      exists x.
+      split; [done|].
+      apply elem_of_elements.
+      done.
+       *)
+      admit.
+    - inversion Hin.
+  Admitted.
+
+  Lemma elements_gset_empty_inv {A} `{Countable A} `{EqDecision A} (s : gset A) : elements s = [] -> s = ∅.
+  Proof.
+    intros Helem.
+    destruct (decide (s = ∅)) as [-> | Hnot]; [done|].
+    exfalso.
+    apply Hnot.
+    (* why does this work? *)
+    assert (∀ e, e ∈ s <-> e ∈ (∅ : gset A)); [ | set_solver].
+    apply elements_empty_inv in Helem.
+    done.
+  Qed.
+
+  Lemma gset_singleton_eq_elem {A} `{Countable A} `{EqDecision A} a b : ({[a]} : gset A) = ({[b]} : gset A) -> a = b.
+  Proof.
+    intros Heq.
+    assert (a ∈ ({[b]} : gset A)).
+    { rewrite -Heq.
+      set_solver. }
+    set_solver.
+  Qed.
+
+  Lemma elements_event_set_prod_of_Z (s : event_set CtrOp) :
+    elements (event_set_prod_of_Z s) = event_prod_of_Z <$> elements s.
+  Proof.
+  Admitted.
+      
+  Lemma event_set_prod_of_Z_compute_maximum (s : event_set CtrOp) :
+    maximality.compute_maximum (event_set_prod_of_Z s) =
+      event_prod_of_Z <$> (maximality.compute_maximum s).
+  Proof.
+    rewrite /maximality.compute_maximum.
+    destruct (elements (maximality.compute_maximals (event_set_prod_of_Z s))) as [ | f r] eqn:Hmax;
+      destruct (elements (maximality.compute_maximals s)) as [ | f' r'] eqn:Hmax'.
+    - done.
+    - destruct r' as [ | r1 r2 ] eqn:Hmax''; [ | done].
+      rewrite event_set_prod_of_Z_compute_maximals in Hmax.
+      assert (maximality.compute_maximals s = ∅) as Hmaxeq.
+      { apply elements_gset_empty_inv in Hmax.
+        rewrite /event_set_prod_of_Z in Hmax.
+        apply gset_map_empty_inv in Hmax.
+        done. }
+      rewrite Hmaxeq in Hmax'.
+      inversion Hmax'.
+    - destruct r as [ | r1 r2 ] eqn:Hmax''; [ | done].
+      rewrite event_set_prod_of_Z_compute_maximals in Hmax.
+      assert (maximality.compute_maximals s = ∅) as Hmaxeq.
+      { apply elements_gset_empty_inv in Hmax'. done. }
+      rewrite Hmaxeq in Hmax.
+      inversion Hmax.
+    - destruct r as [ | r1 r2] eqn:Hmax''.
+      + destruct r' as [ | r1' r2'] eqn:Hmax'''.
+        * simpl.
+          rewrite event_set_prod_of_Z_compute_maximals in Hmax.
+          rewrite maximality.set_singleton_elements in Hmax.
+          rewrite maximality.set_singleton_elements in Hmax'.
+          rewrite Hmax' in Hmax.
+          rewrite event_set_prod_of_Z_singleton in Hmax.
+          f_equal.
+          apply gset_singleton_eq_elem in Hmax.
+          done.
+        * simpl in *.
+          rewrite event_set_prod_of_Z_compute_maximals in Hmax.
+          exfalso.
+          rewrite elements_event_set_prod_of_Z in Hmax.
+          rewrite Hmax' in Hmax.
+          simpl in Hmax.
+          inversion Hmax.
+      + destruct r' as [ | r1' r2' ] eqn:Hmax'''.
+        *  rewrite event_set_prod_of_Z_compute_maximals in Hmax.
+           exfalso.
+           rewrite elements_event_set_prod_of_Z in Hmax.
+           rewrite Hmax' in Hmax.
+           simpl in Hmax.
+           inversion Hmax.
+        * done.
+  Qed.
+
+  Lemma event_set_Z_of_prod_compute_maximum (s : event_set pn_prod_Op) :
+    maximality.compute_maximum (event_set_Z_of_prod s) = event_Z_of_prod <$> (maximality.compute_maximum s).
+  Proof.
+  Admitted.
+
 
 End pn_event_mapping.
 
