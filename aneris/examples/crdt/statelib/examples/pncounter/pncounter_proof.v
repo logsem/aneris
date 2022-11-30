@@ -253,17 +253,17 @@ Section pn_event_mapping.
   Next Obligation.
     intros z <-.
     done.
-  Qed.
+  Defined.
   Next Obligation.
     intros z n Heq.
     simpl.
     rewrite orb_true_r.
     done.
-  Qed.
+  Defined.
   Next Obligation.
     intros z n Heq.
     done.
-  Qed.
+  Defined.
 
   Definition event_prod_of_Z (ev : Event CtrOp) : Event pn_prod_Op :=
     let z := ctr_payload ev.(EV_Op) in
@@ -488,6 +488,19 @@ Section pn_event_mapping.
     by rewrite event_prod_of_Z_of_prod.
   Qed.
 
+  Lemma event_set_prod_of_Z_compute_maximum (s : event_set CtrOp) :
+    maximality.compute_maximum (event_set_prod_of_Z s) = event_prod_of_Z <$> (maximality.compute_maximum s).
+  Proof. Admitted.
+
+  Lemma event_set_Z_of_prod_compute_maximum (s : event_set pn_prod_Op) :
+    maximality.compute_maximum (event_set_Z_of_prod s) = event_Z_of_prod <$> (maximality.compute_maximum s).
+  Proof. Admitted.
+
+  Lemma event_set_prod_of_Z_compute_maximals (s : event_set CtrOp) :
+    maximality.compute_maximals (event_set_prod_of_Z s) =
+    event_set_prod_of_Z (maximality.compute_maximals s).
+  Proof. Admitted.
+
 End pn_event_mapping.
 
 Section pn_CRDT_Res_Mixin_mapping.
@@ -692,18 +705,15 @@ Section pncounter_proof.
          { exists {| EV_Op := Add (Z.to_nat z); EV_Orig := ep.(EV_Orig);  EV_Time := ep.(EV_Time) |}.
            rewrite /event_prod_of_Z. simplify_eq /=.
            destruct ep. f_equal /=.
-           (*
+           rewrite He1. simplify_eq /=.
            destruct (bool_decide (0 ≤ Z.to_nat z)%Z) eqn:Hle; simplify_eq /=; eauto with lia.
-           - destruct z.
-             * admit.
-             * admit.
-             *
-           - apply bool_decide_eq_false in Hle; lia. *)
-           admit.
+           - apply bool_decide_eq_true in Hle.
+             admit.
+           - apply bool_decide_eq_false in Hle; lia.
          }
          destruct Hf1 as (e & <-).
          replace ({[event_prod_of_Z e]}) with (event_set_prod_of_Z {[e]}); last first.
-         { rewrite /event_set_prod_of_Z gset_map_singleton; set_solver. }
+         { apply event_set_prod_of_Z_singleton. }
          assert ((event_set_prod_of_Z (event_set_Z_of_prod (event_set_prod_of_Z h ∪ event_set_prod_of_Z {[e]}))) =
                  (event_set_prod_of_Z h ∪ event_set_prod_of_Z {[e]})) as Hf1.
          { rewrite -event_set_prod_of_Z_union.
@@ -719,7 +729,42 @@ Section pncounter_proof.
          rewrite! event_set_Z_of_prod_of_Z.
          rewrite! event_Z_of_prod_of_Z.
          simplify_eq /=.
-         destruct (bool_decide (0 ≤ ctr_payload (EV_Op e))%Z) eqn:Hle.
+         assert (EV_Op e = Add z) as Hez.
+         { admit. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro.
+           intros x Hx.
+           apply event_set_prod_of_Z_in in Hx.
+           assert (event_prod_of_Z x ∈ s2p) as Hxs2p. { eapply elem_of_weaken; set_solver. }
+           apply event_set_prod_of_Z_in_inv.
+           by rewrite event_set_prod_of_Z_of_prod. }
+         iSplit.
+         { iPureIntro.
+           intro Habs. apply He6.
+           by apply event_set_prod_of_Z_in in Habs. }
+         iSplit.
+         { iPureIntro.
+           intro Habs. apply He7.
+           by apply event_set_prod_of_Z_in in Habs. }
+         iSplit.
+         { iPureIntro.
+           apply event_set_prod_of_Z_in_inv.
+           rewrite -event_set_prod_of_Z_singleton in He8.
+           rewrite -event_set_prod_of_Z_union in He8.
+           admit. }
+         iSplit.
+         { iPureIntro.
+           admit. }
+         by rewrite event_set_prod_of_Z_of_prod.
+        (*         destruct (bool_decide (0 ≤ ctr_payload (EV_Op e))%Z) eqn:Hle.
          --- apply bool_decide_eq_true_1 in Hle. inversion He1 as [He11].
              destruct (EV_Op e). rewrite /ctr_payload in He11, Hle.
              apply Z2Nat.id in Hle, Hz.
@@ -731,14 +776,14 @@ Section pncounter_proof.
          (*     iSplit; first done. *)
          (*     iSplit; first done. *)
          (* admit. *)
-         --- apply bool_decide_eq_false in Hle. inversion He1. admit.
-    - admit.
-      (* wp_apply ("Hspec" $! (#0, #(-z))%V (0, Z.to_nat (- z))); try eauto.
+         --- apply bool_decide_eq_false in Hle. inversion He1. admit. *)
+    - wp_apply ("Hspec" $! (#0, #(-z))%V (pnop_right ((Z.to_nat (-z))))); try eauto.
       -- iPureIntro. simpl. rewrite /prodOp_coh /StLib_Op_Coh /= /gctr_op_coh /=.
          eexists #0, #(-z). split_and!; eauto.
          --- symmetry. f_equal. f_equal.
-             assert (0 <= (- z))%Z by lia. by apply Z2Nat.id.
-         --- admit.  (* todo: fix gctr *)
+             assert (0 <= (- z))%Z by lia.
+             unfold_prodOp_projs.
+             apply Z2Nat.id. simplify_eq /=; eauto with lia.
       -- iMod "Hvsh". iModIntro.
          iDestruct "Hvsh" as (h s1 s2) "((HGst & HLst) & Hvsh)".
          iExists (event_set_prod_of_Z h),
@@ -746,14 +791,77 @@ Section pncounter_proof.
                      (event_set_prod_of_Z s2).
          iFrame.
          iNext.
-         iIntros (ep h'p s1'p s2'p) "Hy".
+         iIntros (ep hp s1p s2p)
+                 "(%He1 & %He2 & %He3 & %He4 & %He5 & %He6 & %He7 & %He8 & %He9 & HGst & HLst)".
          iApply ("Hvsh" $!
                       (event_Z_of_prod ep)
-                      (event_set_Z_of_prod h'p)
-                      (event_set_Z_of_prod s1'p)
-                      (event_set_Z_of_prod s2'p)).
-         admit. *)
+                      (event_set_Z_of_prod hp)
+                      (event_set_Z_of_prod s1p)
+                      (event_set_Z_of_prod s2p)).
+         simplify_eq /=.
+         assert (∃ e, event_prod_of_Z e = ep) as Hf1.
+         { exists {| EV_Op := Add z; EV_Orig := ep.(EV_Orig);  EV_Time := ep.(EV_Time) |}.
+           rewrite /event_prod_of_Z. simplify_eq /=.
+           destruct ep. f_equal /=.
+           rewrite He1. simplify_eq /=.
+           admit.
+         }
+         destruct Hf1 as (e & <-).
+         replace ({[event_prod_of_Z e]}) with (event_set_prod_of_Z {[e]}); last first.
+         { apply event_set_prod_of_Z_singleton. }
+         assert ((event_set_prod_of_Z (event_set_Z_of_prod (event_set_prod_of_Z h ∪ event_set_prod_of_Z {[e]}))) =
+                 (event_set_prod_of_Z h ∪ event_set_prod_of_Z {[e]})) as Hf1.
+         { rewrite -event_set_prod_of_Z_union.
+           by rewrite event_set_Z_of_prod_of_Z. }
+         rewrite Hf1.
+         iFrame.
+         assert (event_set_prod_of_Z (event_set_Z_of_prod (event_set_prod_of_Z s1 ∪ event_set_prod_of_Z {[e]})) =
+                (event_set_prod_of_Z s1 ∪ event_set_prod_of_Z {[e]})) as Hf2.
+         { rewrite -event_set_prod_of_Z_union.
+           by rewrite event_set_Z_of_prod_of_Z. }
+         rewrite Hf2.
+         rewrite - !event_set_prod_of_Z_union.
+         rewrite! event_set_Z_of_prod_of_Z.
+         rewrite! event_Z_of_prod_of_Z.
+         simplify_eq /=.
+         assert (EV_Op e = Add z) as Hez.
+         { admit. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro. done. }
+         iSplit.
+         { iPureIntro.
+           intros x Hx.
+           apply event_set_prod_of_Z_in in Hx.
+           assert (event_prod_of_Z x ∈ s2p) as Hxs2p. { eapply elem_of_weaken; set_solver. }
+           apply event_set_prod_of_Z_in_inv.
+           by rewrite event_set_prod_of_Z_of_prod. }
+         iSplit.
+         { iPureIntro.
+           intro Habs. apply He6.
+           by apply event_set_prod_of_Z_in in Habs. }
+         iSplit.
+         { iPureIntro.
+           intro Habs. apply He7.
+           by apply event_set_prod_of_Z_in in Habs. }
+         iSplit.
+         { iPureIntro.
+           apply event_set_prod_of_Z_in_inv.
+           rewrite -event_set_prod_of_Z_singleton in He8.
+           rewrite -event_set_prod_of_Z_union in He8.
+           admit. }
+         iSplit.
+         { iPureIntro.
+           admit. }
+         by rewrite event_set_prod_of_Z_of_prod.
   Admitted.
+
+
 
   (* TODO: Prove: *)
   (* Definition pncounter_eval : val := *)
