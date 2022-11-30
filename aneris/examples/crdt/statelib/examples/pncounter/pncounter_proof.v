@@ -25,11 +25,18 @@ From aneris.examples.crdt.statelib.examples.pncounter
      Require Import pncounter_code_wrapper.
 
 Section pn_cpt_proof.
-  Context `{!anerisG M Σ, !CRDT_Params, !StLib_Res (prodOp gctr_op gctr_op)}.
+  (* PN counter operations are either (n, 0) if we're adding n, or
+     (0, m) if we're substracting m *)
+  Definition pnctr_op_pred (o : gctr_op * gctr_op): bool :=
+    match o with
+    | (n1, n2) => (n1 =? 0) || (n2 =? 0)
+    end.
 
-  Notation pnOp := (prodOp gctr_op gctr_op).
+  Context `{!anerisG M Σ, !CRDT_Params, !StLib_Res (prodOp gctr_op gctr_op pnctr_op_pred)}.
+
+  Notation pnOp := (prodOp gctr_op gctr_op pnctr_op_pred).
   Notation pnSt := (prodSt gctr_st gctr_st).
-  Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st).
+  Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st pnctr_op_pred).
 
   Lemma pn_init_st_fn_spec :
     ⊢ @init_st_fn_spec _ _ _ _ _ _ _ _ _ pnParams pn_cpt_init_st.
@@ -235,19 +242,41 @@ Section pn_event_mapping.
   Context `{!anerisG M Σ}.
   Context `{!CRDT_Params}.
 
-  Notation pn_prod_Op := (prodOp gctr_op gctr_op).
+  Notation pn_prod_Op := (prodOp gctr_op gctr_op pnctr_op_pred).
 
+  Program Definition to_pn_op (z : Z) : pn_prod_Op :=
+    match z with
+    | Z0 => exist _ (0, 0) _
+    | Zpos p => exist _ (Pos.to_nat p, 0) _
+    | Zneg p => exist _ (0, Pos.to_nat p) _
+    end.
+  Next Obligation.
+    intros z <-.
+    done.
+  Qed.
+  Next Obligation.
+    intros z n Heq.
+    simpl.
+    rewrite orb_true_r.
+    done.
+  Qed.
+  Next Obligation.
+    intros z n Heq.
+    done.
+  Qed.
+  
   Definition event_prod_of_Z (ev : Event CtrOp) : Event pn_prod_Op :=
     let z := ctr_payload ev.(EV_Op) in
-    let op := if bool_decide (Z.le 0 z) then (Z.to_nat z, 0) else (0, Z.to_nat (-z)) in
-   {| EV_Op := op;  EV_Orig := ev.(EV_Orig);  EV_Time := ev.(EV_Time) |}.
-
+    {| EV_Op := to_pn_op z;  EV_Orig := ev.(EV_Orig);  EV_Time := ev.(EV_Time) |}.
+                                             
   Definition event_set_prod_of_Z (s : event_set CtrOp) : event_set pn_prod_Op :=
     gset_map (λ ev, event_prod_of_Z ev) s.
 
   Definition event_Z_of_prod (ev : Event pn_prod_Op) : Event CtrOp :=
-    let (p,n) := ev.(EV_Op) in
-    {| EV_Op := Add (p-n);  EV_Orig := ev.(EV_Orig);  EV_Time := ev.(EV_Time) |}.
+    match ev.(EV_Op) with
+    | exist _ (p,n) _ =>
+        {| EV_Op := Add (p-n);  EV_Orig := ev.(EV_Orig);  EV_Time := ev.(EV_Time) |}
+    end.
 
   Definition event_set_Z_of_prod (s : event_set pn_prod_Op) : event_set CtrOp :=
     gset_map (λ ev, event_Z_of_prod ev) s.
@@ -264,9 +293,14 @@ Section pn_event_mapping.
     e = e' → (event_prod_of_Z e = event_prod_of_Z e').
   Proof.
     intro Heq.
-    destruct e, e'.
-    by inversion Heq as [[Heq1 Heq2 Heq3]].
+    rewrite Heq.
+    done.
   Qed.
+
+  Lemma to_pn_op_inj z z' : to_pn_op z = to_pn_op z' -> z = z'.
+  Proof.
+  Admitted.
+    
 
   Lemma event_prod_of_Z_eq_inv e e' :
     event_prod_of_Z e = event_prod_of_Z e' → e = e'.
@@ -276,18 +310,7 @@ Section pn_event_mapping.
     inversion Heq as [[Heq1 Heq2 Heq3]]. subst.
     destruct EV_Op, EV_Op0.
     do 2 f_equal. rewrite! /ctr_payload in Heq1.
-    destruct (bool_decide (0 ≤ z)%Z) eqn:Hle1;
-      destruct (bool_decide (0 ≤ z0)%Z) eqn:Hle2.
-    - apply bool_decide_eq_true_1 in Hle1, Hle2.
-      inversion Heq1 as [Heqz]; lia.
-    -  apply bool_decide_eq_true_1 in Hle1.
-       apply bool_decide_eq_false in Hle2.
-       inversion Heq1 as [Heqz]; eauto with lia.
-    - apply bool_decide_eq_true_1 in Hle2.
-      apply bool_decide_eq_false in Hle1.
-      inversion Heq1 as [Heqz]; eauto with lia.
-    - apply bool_decide_eq_false in Hle1, Hle2.
-      inversion Heq1 as [Heqz]; lia.
+    apply to_pn_op_inj; done.
   Qed.
 
   Lemma event_set_prod_of_Z_union s s' :
@@ -354,7 +377,74 @@ Section pn_event_mapping.
   Lemma event_Z_of_prod_of_Z (e : Event CtrOp) :
     event_Z_of_prod (event_prod_of_Z e) = e.
   Proof.
+    rewrite /event_prod_of_Z /event_Z_of_prod.
+    simpl.
+    destruct (ctr_payload (EV_Op e)) eqn:Hpayload; simpl.
+    - assert ((0%nat - 0%nat) = 0)%Z as ->; [lia|].
+      assert (EV_Op e = Add 0) as Hopeq.
+      { destruct (EV_Op e).
+        rewrite /ctr_payload in Hpayload.
+        rewrite Hpayload.
+        done. }
+      rewrite <- Hopeq.
+      destruct e; done.
+    - assert ((Pos.to_nat p - 0%nat) = Z.pos p)%Z as ->; [lia|].
+      admit.
+    - assert ((0%nat - Pos.to_nat p) = Z.neg p)%Z as ->; [lia|].
+      admit.
   Admitted.
+  
+  Lemma event_prod_of_Z_of_prod (e : Event pn_prod_Op) :
+    event_prod_of_Z (event_Z_of_prod e) = e.
+  Proof.
+    destruct e as [[[p n] pf] repId ts].
+    rewrite /event_Z_of_prod.
+    simpl.
+    rewrite /event_prod_of_Z.
+    simpl.
+    assert (to_pn_op (p - n) = (p, n) ↾ pf) as ->; [|done].
+    pose proof pf as pf'.
+    rewrite /pnctr_op_pred in pf'.
+    apply orb_prop_elim in pf'.
+    destruct pf' as [Hl | Hr].
+    - assert (p = 0) as ->.
+      { rewrite Is_true_true in Hl.
+        apply Nat.eqb_eq in Hl.
+        done.
+      }
+      assert (0%nat - n = -n)%Z as -> by lia.
+      rewrite /to_pn_op.
+      destruct (decide (n = 0)) as [-> | Hne].
+      { simpl.
+        apply prodOp_val_eq.
+        done. }
+      assert (-n = Z.neg (Pos.of_nat n)) as ->.
+      { rewrite -(Pos2Z.opp_pos (Pos.of_nat n)).
+        f_equal.
+        admit. }
+      assert (Pos.to_nat (Pos.of_nat n) = n) as ->.
+      { apply Nat2Pos.id.
+        done. }
+      apply prodOp_val_eq.
+      done.
+    - assert (n = 0) as ->.
+      { rewrite Is_true_true in Hr.
+        apply Nat.eqb_eq in Hr.
+        done. }
+      assert (p - 0%nat = p)%Z as -> by lia.
+      rewrite /to_pn_op.
+      destruct (decide (p = 0)) as [-> | Hne].
+      { simpl.
+        apply prodOp_val_eq; done. }
+      assert (Z.of_nat p = Z.pos (Pos.of_nat p)) as ->.
+      { admit. }
+      apply prodOp_val_eq.
+      simpl.
+      f_equal.
+      apply Nat2Pos.id.
+      done.
+  Admitted.
+      
 
   Lemma event_set_Z_of_prod_of_Z s :
     event_set_Z_of_prod (event_set_prod_of_Z s) = s.
@@ -366,7 +456,7 @@ End pn_event_mapping.
 Section pn_CRDT_Res_Mixin_mapping.
   Context `{!anerisG M Σ}.
   Context `{!CRDT_Params}.
-  Context `{pn : !CRDT_Res_Mixin M Σ (prodOp gctr_op gctr_op)}.
+  Context `{pn : !CRDT_Res_Mixin M Σ (prodOp gctr_op gctr_op pnctr_op_pred)}.
 
   Global Program Instance pn_CRDT_Res : CRDT_Res_Mixin M Σ CtrOp :=
     {|
@@ -446,7 +536,7 @@ End pn_CRDT_Res_Mixin_mapping.
 Section pn_Res_mapping.
   Context `{!anerisG M Σ}.
   Context `{!CRDT_Params}.
-  Context `{pn_prod_Res : !StLib_Res (prodOp gctr_op gctr_op)}.
+  Context `{pn_prod_Res : !StLib_Res (prodOp gctr_op gctr_op pnctr_op_pred)}.
 
   Global Program Instance pn_Res : StLib_Res CtrOp :=
     {|
@@ -460,9 +550,9 @@ End pn_Res_mapping.
 Section pn_prod_specs_def.
   Context `{!anerisG M Σ}.
   Context `{!CRDT_Params}.
-  Context `{pn_prod_Res : !StLib_Res (prodOp gctr_op gctr_op)}.
+  Context `{pn_prod_Res : !StLib_Res (prodOp gctr_op gctr_op pnctr_op_pred)}.
 
-  Notation pn_prod_Op := (prodOp gctr_op gctr_op).
+  Notation pn_prod_Op := (prodOp gctr_op gctr_op pnctr_op_pred).
   Notation pn_prod_St := (prodSt gctr_st gctr_st).
   Notation pn_prod_Params := (prod_params gctr_op gctr_st gctr_op gctr_st).
 
@@ -501,8 +591,27 @@ End pn_specs_def.
 Section pncounter_proof.
   Context `{!anerisG M Σ}.
   Context `{!CRDT_Params}.
-  Context `{pn_prod_Res : !StLib_Res (prodOp gctr_op gctr_op)}.
+  Context `{pn_prod_Res : !StLib_Res (prodOp gctr_op gctr_op pnctr_op_pred)}.
 
+  Definition pnop_proof_left (n : nat) : pnctr_op_pred (n, 0).
+  Proof.
+    simpl.
+    rewrite orb_true_r.
+    done.
+  Qed.
+
+  Definition pnop_proof_right (n : nat) : pnctr_op_pred (0, n).
+  Proof.
+    done.
+  Qed.
+
+  Definition pnop_left (n : nat) : (prodOp _ _ pnctr_op_pred) :=
+    (n, 0) ↾ (pnop_proof_left n).
+
+  Definition pnop_right (n : nat) : (prodOp _ _ pnctr_op_pred) :=
+    (0, n) ↾ (pnop_proof_right n).
+
+  
   (* TODO: Prove: *)
   (* Definition pncounter_update : val := *)
   (*   λ: "upd" "n", *)
@@ -523,11 +632,10 @@ Section pncounter_proof.
     iIntros (Φ) "Hvsh".
     wp_pures. wp_lam. wp_pures.
     case_bool_decide as Hz; wp_pures.
-    - wp_apply ("Hspec" $! (#z, #0)%V ((Z.to_nat z), 0)); try eauto.
+    - wp_apply ("Hspec" $! (#z, #0)%V (pnop_left (Z.to_nat z)) ); try eauto.
       -- iPureIntro. simpl. rewrite /prodOp_coh /StLib_Op_Coh /= /gctr_op_coh /=.
          eexists #z, #0. split_and!; eauto.
-         --- symmetry. f_equal. f_equal. by apply Z2Nat.id.
-         --- admit.  (* todo: fix gctr *)
+         symmetry. f_equal. f_equal. by apply Z2Nat.id.
       -- iMod "Hvsh". iModIntro.
          iDestruct "Hvsh" as (h s1 s2) "((HGst & HLst) & Hvsh)".
          iExists (event_set_prod_of_Z h),
@@ -547,8 +655,15 @@ Section pncounter_proof.
          { exists {| EV_Op := Add (Z.to_nat z); EV_Orig := ep.(EV_Orig);  EV_Time := ep.(EV_Time) |}.
            rewrite /event_prod_of_Z. simplify_eq /=.
            destruct ep. f_equal /=.
+           (*
            destruct (bool_decide (0 ≤ Z.to_nat z)%Z) eqn:Hle; simplify_eq /=; eauto with lia.
-           apply bool_decide_eq_false in Hle; lia. }
+           - destruct z.
+             * admit.
+             * admit.
+             * 
+           - apply bool_decide_eq_false in Hle; lia. *)
+           admit.
+         }
          destruct Hf1 as (e & <-).
          replace ({[event_prod_of_Z e]}) with (event_set_prod_of_Z {[e]}); last first.
          { rewrite /event_set_prod_of_Z gset_map_singleton; set_solver. }
