@@ -264,11 +264,11 @@ Section pn_event_mapping.
     intros z n Heq.
     done.
   Qed.
-  
+
   Definition event_prod_of_Z (ev : Event CtrOp) : Event pn_prod_Op :=
     let z := ctr_payload ev.(EV_Op) in
     {| EV_Op := to_pn_op z;  EV_Orig := ev.(EV_Orig);  EV_Time := ev.(EV_Time) |}.
-                                             
+
   Definition event_set_prod_of_Z (s : event_set CtrOp) : event_set pn_prod_Op :=
     gset_map (λ ev, event_prod_of_Z ev) s.
 
@@ -299,13 +299,11 @@ Section pn_event_mapping.
 
   Lemma to_pn_op_inj z z' : to_pn_op z = to_pn_op z' -> z = z'.
   Proof.
-    (*
     intros Heq.
     destruct (to_pn_op z) as [[o1 o2] pf] eqn:to1.
     destruct (to_pn_op z') as [[o1' o2'] pf'] eqn:to2.
-    destruct z; simpl in *; destruct z'; simpl in *; auto.
-     *)
-  Admitted.
+    destruct z; simpl in *; destruct z'; simpl in *;  simplify_eq /=; eauto with lia.
+  Qed.
 
   Lemma event_prod_of_Z_eq_inv e e' :
     event_prod_of_Z e = event_prod_of_Z e' → e = e'.
@@ -394,11 +392,11 @@ Section pn_event_mapping.
       rewrite <- Hopeq.
       destruct e; done.
     - assert ((Pos.to_nat p - 0%nat) = Z.pos p)%Z as ->; [lia|].
-      admit.
+      destruct e; simpl; f_equal /=. rewrite /ctr_payload in Hpayload. destruct EV_Op. subst. by eauto.
     - assert ((0%nat - Pos.to_nat p) = Z.neg p)%Z as ->; [lia|].
-      admit.
-  Admitted.
-  
+      destruct e; simpl; f_equal /=. rewrite /ctr_payload in Hpayload. destruct EV_Op. subst. by eauto.
+  Qed.
+
   Lemma event_prod_of_Z_of_prod (e : Event pn_prod_Op) :
     event_prod_of_Z (event_Z_of_prod e) = e.
   Proof.
@@ -426,7 +424,7 @@ Section pn_event_mapping.
       assert (-n = Z.neg (Pos.of_nat n)) as ->.
       { rewrite -(Pos2Z.opp_pos (Pos.of_nat n)).
         f_equal.
-        admit. }
+        eauto with lia. }
       assert (Pos.to_nat (Pos.of_nat n) = n) as ->.
       { apply Nat2Pos.id.
         done. }
@@ -442,19 +440,53 @@ Section pn_event_mapping.
       { simpl.
         apply prodOp_val_eq; done. }
       assert (Z.of_nat p = Z.pos (Pos.of_nat p)) as ->.
-      { admit. }
+      { eauto with lia. }
       apply prodOp_val_eq.
       simpl.
       f_equal.
       apply Nat2Pos.id.
       done.
-  Admitted.
-      
+  Qed.
+
+  Lemma event_set_Z_of_prod_union s s' :
+    event_set_Z_of_prod (s ∪ s') = event_set_Z_of_prod s ∪ event_set_Z_of_prod s'.
+  Proof. by rewrite /event_set_Z_of_prod gset_map_union. Qed.
+
+  Lemma event_set_Z_of_prod_singleton (e : Event pn_prod_Op) : (event_set_Z_of_prod {[e]}) = {[event_Z_of_prod e]}.
+  Proof.
+    rewrite /event_set_Z_of_prod.
+    by rewrite gset_map_singleton.
+  Qed.
+
+  Lemma event_set_prod_of_Z_singleton (e : Event CtrOp) : (event_set_prod_of_Z {[e]}) = {[event_prod_of_Z e]}.
+  Proof.
+    rewrite /event_set_prod_of_Z.
+    by rewrite gset_map_singleton.
+  Qed.
 
   Lemma event_set_Z_of_prod_of_Z s :
     event_set_Z_of_prod (event_set_prod_of_Z s) = s.
   Proof.
-  Admitted.
+    induction s as [| e' s Hs IH] using set_ind_L; first done.
+    rewrite event_set_prod_of_Z_union.
+    rewrite event_set_Z_of_prod_union.
+    rewrite IH.
+    rewrite event_set_prod_of_Z_singleton.
+    rewrite event_set_Z_of_prod_singleton.
+    by rewrite event_Z_of_prod_of_Z.
+  Qed.
+
+  Lemma event_set_prod_of_Z_of_prod s :
+    event_set_prod_of_Z (event_set_Z_of_prod s) = s.
+  Proof.
+    induction s as [| e' s Hs IH] using set_ind_L; first done.
+    rewrite event_set_Z_of_prod_union.
+    rewrite event_set_prod_of_Z_union.
+    rewrite IH.
+    rewrite event_set_Z_of_prod_singleton.
+    rewrite event_set_prod_of_Z_singleton.
+    by rewrite event_prod_of_Z_of_prod.
+  Qed.
 
 End pn_event_mapping.
 
@@ -616,7 +648,7 @@ Section pncounter_proof.
   Definition pnop_right (n : nat) : (prodOp _ _ pnctr_op_pred) :=
     (0, n) ↾ (pnop_proof_right n).
 
-  
+
   (* TODO: Prove: *)
   (* Definition pncounter_update : val := *)
   (*   λ: "upd" "n", *)
@@ -665,7 +697,7 @@ Section pncounter_proof.
            - destruct z.
              * admit.
              * admit.
-             * 
+             *
            - apply bool_decide_eq_false in Hle; lia. *)
            admit.
          }
@@ -691,14 +723,17 @@ Section pncounter_proof.
          --- apply bool_decide_eq_true_1 in Hle. inversion He1 as [He11].
              destruct (EV_Op e). rewrite /ctr_payload in He11, Hle.
              apply Z2Nat.id in Hle, Hz.
-             rewrite -Hle -Hz He11.
-             iSplit; first done.
-             iSplit; first done.
-             iSplit; first done.
-             iSplit; first done.
-         admit.
-         --- apply bool_decide_eq_false in Hle. inversion He1. lia.
-    - wp_apply ("Hspec" $! (#0, #(-z))%V (0, Z.to_nat (- z))); try eauto.
+             (* rewrite -Hle -Hz He11. *)
+             simpl in He11.
+             admit.
+             (* iSplit; first done. *)
+         (*     iSplit; first done. *)
+         (*     iSplit; first done. *)
+         (*     iSplit; first done. *)
+         (* admit. *)
+         --- apply bool_decide_eq_false in Hle. inversion He1. admit.
+    - admit.
+      (* wp_apply ("Hspec" $! (#0, #(-z))%V (0, Z.to_nat (- z))); try eauto.
       -- iPureIntro. simpl. rewrite /prodOp_coh /StLib_Op_Coh /= /gctr_op_coh /=.
          eexists #0, #(-z). split_and!; eauto.
          --- symmetry. f_equal. f_equal.
@@ -717,7 +752,7 @@ Section pncounter_proof.
                       (event_set_Z_of_prod h'p)
                       (event_set_Z_of_prod s1'p)
                       (event_set_Z_of_prod s2'p)).
-         admit.
+         admit. *)
   Admitted.
 
   (* TODO: Prove: *)

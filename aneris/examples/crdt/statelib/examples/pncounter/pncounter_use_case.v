@@ -333,12 +333,16 @@ End use_case_proof.
 
 Section program_proof.
   Context `{!anerisG M Σ} `{!inG Σ (exclR unitO)}.
-  Context `{!@StLibG (prodOp gctr_op gctr_op) _ _ Σ}.
-  Context `{uig: !utils.Internal_StLibG (prodOp gctr_op gctr_op) Σ}.
+  Context `{!@StLibG (prodOp gctr_op gctr_op pnctr_op_pred) _ _ Σ}.
+  Context `{uig: !utils.Internal_StLibG (prodOp gctr_op gctr_op pnctr_op_pred) Σ}.
+
+  Notation pnOp := (prodOp gctr_op gctr_op pnctr_op_pred).
+  Notation pnSt := (prodSt gctr_st gctr_st).
+  Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st pnctr_op_pred).
 
 
   Lemma wp_use_case_program E:
-    ⊢ |={E}=> ∃ Res : StLib_Res (prodOp gctr_op gctr_op),
+    ⊢ |={E}=> ∃ Res : StLib_Res pnOp,
          ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) -∗
          free_ip "1.1.1.1" -∗
          free_ip "1.1.1.2" -∗
@@ -349,9 +353,9 @@ Section program_proof.
   Proof.
     iIntros "".
     iMod (@StLibSetup_Init
-            (prodOp gctr_op gctr_op) (prodSt gctr_st gctr_st)
+            pnOp pnSt
             _ _ _ _ _ pnc_use_case_CRDT_Params (prod_lattice (vectn_le_lat ((length CRDT_Addresses))) (vectn_le_lat ((length CRDT_Addresses))))
-            (prod_params gctr_op gctr_st gctr_op gctr_st)  _ _ E with "[//]")
+            pnParams  _ _ E with "[//]")
       as (ResProd) "(#HGinvProd & HGsPRod & HtksProd & #HinitProd)".
     rewrite /init. simpl in *.
     iExists ResProd.
