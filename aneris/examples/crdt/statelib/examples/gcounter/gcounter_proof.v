@@ -276,11 +276,12 @@ Section GCtr_Model.
     (s : event_set gctr_op) (st st' : gctr_st) (ev: Event gctr_op) :
     ⟦ s ⟧ ⇝ st ->
     Lst_Validity' s ->
+    Lst_Validity' (s ∪ {[ ev ]}) ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     gctr_mut st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
   Proof.
-    intros Hden Hval Hnin Hmax Hmut.
+    intros Hden Hval _ Hnin Hmax Hmut.
     intros i.
     destruct (decide (ev.(EV_Orig) = i)).
     - assert (Hfil: fil (s ∪ {[ev]}) i = (fil s i) ∪ {[ev]}); first set_solver.

@@ -13,7 +13,7 @@ From aneris.examples.crdt.spec
 From aneris.examples.crdt.statelib.user_model
   Require Import params model semi_join_lattices.
 From aneris.examples.crdt.statelib.STS Require Import lst.
-From aneris.examples.crdt.statelib.time Require Import time.
+From aneris.examples.crdt.statelib.time Require Import time maximality.
 From aneris.examples.crdt.statelib.proof Require Import spec.
 From aneris.examples.crdt.statelib.examples.map_comb
   Require Import statelib_map_comb_code.
@@ -425,56 +425,32 @@ Section Bloup.
   Lemma map_mut_coh:
     ∀ (s : event_set mapOp) (st st' : mapSt) (ev : Event mapOp),
       ⟦ s ⟧ ⇝ st
-      → Lst_Validity' s
+      → Lst_Validity' s → Lst_Validity' (s ∪ {[ ev ]})
       → ev ∉ s
       → is_maximum ev (s ∪ {[ev]})
       → map_mutator st ev st' → ⟦ s ∪ {[ev]} ⟧ ⇝ st'.
   Proof.
-    intros s m m' ev [Hdom Hden] Hv Hnin Hmax Hmut.
+    intros s m m' ev [Hdom Hden] Hv Hv' Hnin Hmax Hmut.
     split; first (rewrite (map_mutator_dom Hmut); set_solver).
     destruct Hmut as(Hold&v&Hm'k&Hnew).
     intros x v' Hm'x.
     set sx :=
       gset_map map_event (filter (λ ev0, (EV_Op ev0).1 = (EV_Op ev).1) s).
+    set sxe :=
+      gset_map map_event (filter (λ ev0, (EV_Op ev0).1 = (EV_Op ev).1) (s∪{[ev]})).
     assert(gset_map map_event
         (filter (λ ev0, (EV_Op ev0).1 = (EV_Op ev).1) (s ∪ {[ev]}))
       = sx ∪ {[map_event ev]}) as Heq; first set_solver.
-    destruct(decide(x = ev.(EV_Op).1))as[ -> | Hneq].
+    destruct(decide(x = ev.(EV_Op).1))as[ -> | Hneq]eqn:Eq.
     - simplify_eq/=. rewrite-/map_event Heq.
       destruct (m !! ev.(EV_Op).1)as[l|]eqn:E.
       + pose proof (Hden (EV_Op ev).1) l E as H0; rewrite-/sx in H0.
         apply (st_crdtM_mut_coh sx _ _ _ H0);
-          [ by apply lst_val_map | | | by simplify_eq ].
+          [ by apply lst_val_map |
+            replace(sx ∪ {[map_event ev]}) with sxe;
+            by apply lst_val_map
+            | | | by simplify_eq ].
           intros (x&Hx_map_eq&[]%elem_of_filter)%gset_map_correct2.
-          assert(Lst_Validity' (s ∪ {[ev]})) as Hv'.
-          { split.
-            - destruct Hmax as [_ Hmax].
-              intros??[| ->%elem_of_singleton]%elem_of_union[| ->%elem_of_singleton]%elem_of_union?.
-              + by apply (VLst_same_orig_comp' s Hv e e').
-              + left. apply Hmax; set_solver.
-              + do 2 right. apply Hmax; set_solver.
-              + by right; left.
-            - admit.
-            - destruct Hmax as [_ Hmax].
-              intros??[| ->%elem_of_singleton]%elem_of_union[| ->%elem_of_singleton]%elem_of_union?.
-              + by apply (VLst_ext_time' s Hv).
-              + exfalso; epose proof Hmax ev0 _ _.
-                rewrite H4 in H5. by apply (ts_lt_irreflexive (EV_Time ev)).
-              + exfalso; epose proof Hmax ev' _ _.
-                rewrite H4 in H5. by apply (ts_lt_irreflexive (EV_Time ev')).
-              + reflexivity.
-            - intros?[| ->%elem_of_singleton]%elem_of_union;
-                [|inversion Hx_map_eq; rewrite H5];
-                by apply (VLst_orig' s Hv).
-            - intros?[| ->%elem_of_singleton]%elem_of_union;
-                first by apply (VLst_seqnum_non_O' s Hv).
-              admit.
-            - admit.
-            - admit.
-            - admit.
-            - admit.
-            Unshelve.
-            all: set_solver. }
           assert(x = ev) as ->; last done.
           apply (VLst_ext_time' _ Hv');
             [ by apply elem_of_union_l
@@ -495,10 +471,28 @@ Section Bloup.
           destruct E. set_solver. }
         simplify_eq/=.
         apply (st_crdtM_mut_coh ∅) with st_crdtM_init_st; try done;
-          [exact st_crdtM_init_st_coh | split; try by intros; try by left | ].
-        split; first by apply elem_of_union_r, elem_of_singleton.
-        by intros?[?| ->%elem_of_singleton]%elem_of_union.
-  Admitted.
+          [exact st_crdtM_init_st_coh | split; try by intros; try by left | | ].
+        2: split; first by apply elem_of_union_r, elem_of_singleton.
+        2: by intros?[?| ->%elem_of_singleton]%elem_of_union.
+        split; try done.
+        all: intros?.
+        all: intros.
+        1,2,3,7: set_solver.
+        (pose proof (VLst_orig' _ Hv' ev); set_solver).
+        (pose proof (VLst_seqnum_non_O' _ Hv' ev); set_solver).
+        2: (pose proof (VLst_evid_incl_event' _ Hv' ev); set_solver).
+        2: (pose proof VLst_evid_incl_time_le' _ Hv' ev ev); set_solver.
+        destruct (decide (ev.(EV_Orig) = i));
+          last (left; set_solver).
+        right; exists (map_event ev). split; first set_solver.
+        replace(hproj i(∅ ∪ {[map_event ev]}))with({[map_event ev]}: event_set LogOp);
+          last set_solver.
+        by rewrite compute_maximum_simgleton.
+    - replace(filter (λ ev0, (EV_Op ev0).1 = x) (s ∪ {[ev]}))
+        with(filter (λ ev0 : Event (string * LogOp), (EV_Op ev0).1 = x) s);
+        last set_solver.
+      by apply Hden, Hold.
+  Qed.
 
   Lemma map_mut_lub_coh:
     ∀ (s1 s2 : event_set mapOp) (st1 st2 st3 : mapSt),
@@ -607,13 +601,37 @@ Section Bloup.
     ∀ (st : mapSt) (v : val), map_st_coh st v →
       Serializable map_ser v.
   Proof.
-    intros m v (x&H1&H2&Hnodup).
-    (*exists x.*)
+    intros st_log st_v_v (st_v&Hismap&Hdom&Helts).
     Admitted.
 
   Lemma map_coh_inj:
     ∀ (o1 o2 : mapSt) (v : val), map_st_coh o1 v → map_st_coh o2 v → o1 = o2.
-  Admitted.
+  Proof.
+    intros st_log st'_log v
+      [st_v (Hst_ismap &Hst_dom &Hst_elts)]
+      [st'_v(Hst'_ismap&Hst'_dom&Hst'_elts)].
+    assert(st'_v = st_v) as ->.
+    { destruct Hst_ismap as(A&B&->&_);
+      destruct Hst'_ismap as(A'&B'&C&_).
+      simplify_eq/=. f_equal.
+      by apply Inject_list.(inject_inj). }
+    apply map_eq. intros x.
+    destruct(st_log !! x)as[l|]eqn:E; destruct(st'_log !! x)as[n|]eqn:F;last by rewrite E F.
+    - destruct(st_v !! x)as[lv|]eqn:E';
+        last (apply map_dom_None in E' as [];
+        apply map_dom_Some in E;
+        by rewrite Hst_dom).
+      rewrite E F; f_equal.
+      pose proof (Hst_elts x l lv E' E).
+      pose proof (Hst'_elts x n lv E' F).
+      by apply StLib_St_Coh_Inj with lv.
+    - exfalso.
+      apply map_dom_None in F as[]; apply map_dom_Some in E.
+      by rewrite -Hst'_dom Hst_dom.
+    - exfalso.
+      apply map_dom_None in E as[]; apply map_dom_Some in F.
+      by rewrite -Hst_dom Hst'_dom.
+  Qed.
 
   Global Instance map_coh_params : @StLib_Coh_Params mapOp mapSt.
   Proof.

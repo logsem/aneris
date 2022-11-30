@@ -242,7 +242,8 @@ Section StateLib_Proof.
           with (h__local ∪ h__for ∪ {[fev]});
           last set_solver.
         apply st_crdtM_mut_coh with log_st; try done;
-          first by apply lst_validity_implies_lst_validity'.
+          [ by apply lst_validity_implies_lst_validity'
+          | by apply lst_validity_implies_lst_validity' |].
         replace (h__local ∪ h__for ∪ ({[fev]}: event_set LogOp))
             with (h__local ∪ {[fev]} ∪ h__for); last set_solver.
         apply Maximum_correct in fev_max as [??]; first done.

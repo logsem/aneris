@@ -255,12 +255,13 @@ Section prod_crdt_model.
   Lemma prod_mut_coh (s : event_set prodOp) (st st' : prodSt) (ev: Event prodOp) :
     ⟦ s ⟧ ⇝ st ->
     Lst_Validity' s ->
+    Lst_Validity' (s ∪ {[ ev ]}) ->
     ev ∉ s ->
     is_maximum ev (s ∪ {[ ev ]}) ->
     prod_mutator_denot st ev st' -> ⟦ s ∪ {[ ev ]} ⟧ ⇝ st'.
   Proof.
     rewrite /=/prod_denot /prod_mutator.
-    intros (Hd1 & Hd2) Hv Hev Hm (Hm1 & Hm2).
+    intros (Hd1 & Hd2) Hv ? Hev Hm (Hm1 & Hm2).
     rewrite! gset_map_union ! gset_map_singleton.
     assert (Lst_Validity' (gset_map (event_map prodOp_fst) s) ∧
               Lst_Validity' (gset_map (event_map prodOp_snd) s)).
@@ -297,7 +298,13 @@ Section prod_crdt_model.
     }
     split.
     - eapply (PA.(st_crdtM_mut_coh) _ st.1 st'.1 ); try naive_solver.
+      replace (gset_map (event_map prodOp_fst) s ∪ {[event_map prodOp_fst ev]})
+        with(gset_map (event_map prodOp_fst) (s ∪ {[ev]})); last set_solver.
+      by apply lst_validity'_valid_event_map.
     - eapply (PB.(st_crdtM_mut_coh) _ st.2 st'.2 ); try naive_solver.
+      replace (gset_map (event_map prodOp_snd) s ∪ {[event_map prodOp_snd ev]})
+        with(gset_map (event_map prodOp_snd) (s ∪ {[ev]})); last set_solver.
+      by apply lst_validity'_valid_event_map.
   Qed.
 
   Definition prodSt_init : prodSt :=
