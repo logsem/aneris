@@ -530,6 +530,8 @@ Section pn_event_mapping.
         apply gset_map_correct1; done.
   Qed.
 
+  Definition event_semi_inst := @gset_semi_set (@Event timestamp_time (prodOp gctr_op gctr_op pnctr_op_pred)) _ _.
+  
   Lemma gset_map_empty_inv (s : event_set CtrOp) : gset_map event_prod_of_Z s = ∅ -> s = ∅.
   Proof.
     intros Heq.
@@ -539,17 +541,12 @@ Section pn_event_mapping.
     intros x; split; intros Hin.
     - pose proof (Heq (event_prod_of_Z x)) as Heq'.
       apply Heq'.
-      (*
-      apply elem_of_list_to_set.
-      eapply elem_of_fmap.
-      exists x.
-      split; [done|].
+      rewrite (elem_of_list_to_set (H3:=event_semi_inst)).
+      apply elem_of_list_fmap_1.
       apply elem_of_elements.
       done.
-       *)
-      admit.
     - inversion Hin.
-  Admitted.
+  Qed.  
 
   Lemma elements_gset_empty_inv {A} `{Countable A} `{EqDecision A} (s : gset A) : elements s = [] -> s = ∅.
   Proof.
