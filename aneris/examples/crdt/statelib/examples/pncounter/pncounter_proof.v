@@ -631,6 +631,21 @@ Section pn_event_mapping.
   Proof.
   Admitted.
 
+  Lemma event_set_prod_of_Z_cc s1 s2 :
+    event_set_prod_of_Z s1 ⊆_cc event_set_prod_of_Z s2 →
+    s1 ⊆_cc s2.
+  Proof.
+    rewrite /causally_closed_subseteq.
+    rewrite /causally_closed.
+    intros (Hs & Hcc).
+    split.
+    - by apply event_set_prod_of_Z_inclusion.
+    - intros e e' He He' Hle He''.
+      apply event_set_prod_of_Z_in_inv.
+
+      specialize (Hcc (event_prod_of_Z e) (event_prod_of_Z e')).
+      apply Hcc; try apply event_set_prod_of_Z_in; eauto.
+  Qed.
 
 End pn_event_mapping.
 
@@ -750,19 +765,67 @@ Section pn_CRDT_Res_Mixin_mapping.
   Defined.
   Next Obligation.
     iIntros (E i s1 s2 s1' s2' HE) "#Hinv #Hs HLst".
-    iMod (pn.(LocSnap_LocState_Included_CC) E _ (event_set_prod_of_Z s1) _ _ _ HE with "[$][$][$]") as "(Hh & Hsnap)".
+    iMod (pn.(LocSnap_LocState_Included_CC) E _ (event_set_prod_of_Z s1) _ _ _ HE with "[$][$][$]")
+      as "(%Hh & Hsnap)".
     iModIntro.
     iFrame.
-  Admitted. (* TODO: Léon *)
+    rewrite -!event_set_prod_of_Z_union in Hh.
+    iPureIntro.
+    by apply event_set_prod_of_Z_cc.
+    Defined.
   Next Obligation.
-  Admitted. (* TODO: Léon *)
+    iIntros (E i i' s1 s2 s1' s2' HE) "#Hinv #Hs1 #Hs2".
+    iMod (pn.(LocSnap_Ext) E _ _ (event_set_prod_of_Z s1) _ _ _ HE with "[$][$][$]")
+      as "%Hh".
+    iModIntro.
+    rewrite -!event_set_prod_of_Z_union in Hh.
+    iPureIntro.
+    intros e e' He He' Heq.
+    apply event_prod_of_Z_eq_inv.
+    apply Hh; try apply event_set_prod_of_Z_in; eauto.
+    Defined.
   Next Obligation.
-  Admitted. (* TODO: Léon *)
+    iIntros (E i s1 s2 e HE He) "#Hinv #Hs".
+    iMod (pn.(LocSnap_GlobSnap_Provenance) E _ (event_set_prod_of_Z s1) _ _ HE with "[$][$]")
+      as "(%es & #Hsnap & %Hd)".
+    rewrite -!event_set_prod_of_Z_union.
+    apply event_set_prod_of_Z_in; eauto.
+    iModIntro.
+    iExists (event_set_Z_of_prod es).
+    rewrite event_set_prod_of_Z_of_prod.
+    iFrame "#".
+    iPureIntro.
+    apply event_set_prod_of_Z_in_inv.
+    by rewrite event_set_prod_of_Z_of_prod.
+  Defined.
   Next Obligation.
-  Admitted. (* TODO: Léon *)
+    iIntros (E i s1 s2 h HE) "#Hinv HLst #Hg".
+    iMod (pn.(LocState_GlobSnap_Provenance)
+               E i (event_set_prod_of_Z s1) (event_set_prod_of_Z s2) (event_set_prod_of_Z h) HE
+                with "[$][$HLst][$Hg]") as "(HLst & %Hp)".
+    iModIntro.
+    iFrame.
+    iPureIntro.
+    intros e He Horig.
+    apply event_set_prod_of_Z_in_inv; eauto.
+    apply Hp; last done.
+    by apply event_set_prod_of_Z_in.
+  Defined.
   Next Obligation.
-  Admitted. (* TODO: Léon *)
-
+    iIntros (E i s1 s2 h HE) "#Hinv HLst #Hg".
+    iMod (pn.(LocState_GlobSnap_Causality)
+               E i (event_set_prod_of_Z s1) (event_set_prod_of_Z s2) (event_set_prod_of_Z h) HE
+                with "[$][$HLst][$Hg]") as "(HLst & %Hp)".
+    iModIntro.
+    iFrame.
+    iPureIntro.
+    intros a e Ha He Ht.
+    rewrite -!event_set_prod_of_Z_union in Hp.
+    apply event_set_prod_of_Z_in_inv.
+    apply (Hp _ (event_prod_of_Z e)); last done.
+    by apply event_set_prod_of_Z_in.
+    by apply event_set_prod_of_Z_in.
+  Defined.
 
 End pn_CRDT_Res_Mixin_mapping.
 
@@ -964,7 +1027,10 @@ Section pncounter_proof.
            rewrite He1. simplify_eq /=.
            destruct (bool_decide (0 ≤ Z.to_nat z)%Z) eqn:Hle; simplify_eq /=; eauto with lia.
            - apply bool_decide_eq_true in Hle.
-             admit.
+             destruct z; simplify_eq /=; rewrite /pnop_left;
+                apply prodOp_val_eq; simpl; f_equal.
+             replace (Z.of_nat (Z.to_nat (Z.pos p))) with (Z.pos p) by lia.
+             simpl. f_equal.
            - apply bool_decide_eq_false in Hle; lia.
          }
          destruct Hf1 as (e & <-).
