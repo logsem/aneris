@@ -24,6 +24,7 @@ From aneris.examples.crdt.statelib.examples.prod_comb
 From aneris.examples.crdt.statelib.examples.pncounter
      Require Import pncounter_code_wrapper.
 
+
 Section pn_cpt_proof.
   (* PN counter operations are either (n, 0) if we're adding n, or
      (0, m) if we're substracting m *)
@@ -100,9 +101,9 @@ Section Util.
       iApply "HΨ".
       iPureIntro. split; last done.
        replace (list_sum lacc + n)%Z with ((list_sum lacc + n)%nat : Z); last lia.
-       exists ((list_sum lacc + n)). split; eauto with lia.
+       exists ((list_sum lacc + n)%nat). split; eauto with lia.
        rewrite list_sum_app. simpl. eauto with lia.
-    - iPureIntro. simpl. split_and!; try eauto. exists 0; done.
+    - iPureIntro. simpl. split_and!; try eauto. exists 0%nat; done.
     - iModIntro. iIntros (v) "((%n & -> & ->) & _)".
       by iApply "HΦ".
   Qed.
@@ -531,7 +532,7 @@ Section pn_event_mapping.
   Qed.
 
   Definition event_semi_inst := @gset_semi_set (@Event timestamp_time (prodOp gctr_op gctr_op pnctr_op_pred)) _ _.
-  
+
   Lemma gset_map_empty_inv (s : event_set CtrOp) : gset_map event_prod_of_Z s = ∅ -> s = ∅.
   Proof.
     intros Heq.
@@ -546,7 +547,7 @@ Section pn_event_mapping.
       apply elem_of_elements.
       done.
     - inversion Hin.
-  Qed.  
+  Qed.
 
   Lemma elements_gset_empty_inv {A} `{Countable A} `{EqDecision A} (s : gset A) : elements s = [] -> s = ∅.
   Proof.
@@ -791,7 +792,6 @@ Section pncounter_proof.
   Definition pnop_right (n : nat) : (prodOp _ _ pnctr_op_pred) :=
     (0, n) ↾ (pnop_proof_right n).
 
-  From aneris.aneris_lang.lib Require Import inject.
 
   (* TODO: Prove: *)
   (* Definition pncounter_eval : val := *)
@@ -825,12 +825,14 @@ Section pncounter_proof.
     rewrite Hcoh1 Hcoh2.
     iAssert (⌜s2 ⊆ event_set_Z_of_prod s2'p⌝ ∗
                LocState repId s1 (event_set_Z_of_prod s2'p) ∗
-               ⌜StLib_St_Coh (list_sum lv1 - list_sum lv2)
+               ⌜@StLib_St_Coh CtrOp _ Ctr_Coh_Params (list_sum lv1 - list_sum lv2)
                 #(list_sum lv1 - list_sum lv2)⌝ ∗
-               ⌜⟦ s1 ∪ event_set_Z_of_prod s2'p ⟧ ⇝ list_sum lv1 - list_sum lv2⌝)%I
+               ⌜@ctr_denot (s1 ∪ event_set_Z_of_prod s2'p)
+                (list_sum lv1 - list_sum lv2)⌝)%I
             with "[HLst]"
             as "Hh".
     { admit. }
+    simplify_eq /=.
     iDestruct ("Hvsh" $! (event_set_Z_of_prod s2'p)
                       #(list_sum lv1 - list_sum lv2)
                       (list_sum lv1 - list_sum lv2) with "[$Hh]") as "Hvsh".
