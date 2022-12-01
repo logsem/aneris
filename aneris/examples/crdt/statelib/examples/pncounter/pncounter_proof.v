@@ -817,26 +817,41 @@ Section pncounter_proof.
     iFrame.
     iModIntro.
     iNext.
-    iIntros (s2'p v lv) "(%Hsub & HLst & %Hcoh & Hdenot)".
+    iIntros (s2'p v lv) "(%Hsub & HLst & %Hcoh & %Hdenot)".
     rewrite /StLib_St_Coh /= /prodSt_coh in Hcoh.
     destruct lv as (lv1, lv2).
+    rewrite /crdt_denot /= /prod_denot in Hdenot.
+    destruct Hdenot as (Hdenot1 & Hdenot2).
     destruct Hcoh as (v1 & v2 & <- & Hcoh1 & Hcoh2).
     rewrite /StLib_St_Coh /= /gctr_st_coh in Hcoh1, Hcoh2.
     rewrite Hcoh1 Hcoh2.
     iAssert (⌜s2 ⊆ event_set_Z_of_prod s2'p⌝ ∗
                LocState repId s1 (event_set_Z_of_prod s2'p) ∗
-               ⌜@StLib_St_Coh CtrOp _ Ctr_Coh_Params (list_sum lv1 - list_sum lv2)
+               ⌜@StLib_St_Coh CtrOp _ Ctr_Coh_Params (list_sum lv1 - list_sum lv2)%Z
                 #(list_sum lv1 - list_sum lv2)⌝ ∗
                ⌜@ctr_denot (s1 ∪ event_set_Z_of_prod s2'p)
-                (list_sum lv1 - list_sum lv2)⌝)%I
+                (list_sum lv1 - list_sum lv2)%Z⌝)%I
             with "[HLst]"
             as "Hh".
-    { admit. }
-    simplify_eq /=.
-    iDestruct ("Hvsh" $! (event_set_Z_of_prod s2'p)
+    { simpl.
+      rewrite event_set_prod_of_Z_of_prod.
+      iFrame.
+      iPureIntro.
+      split_and!; [|done|].
+      - intros x Hx.
+        apply event_set_prod_of_Z_in in Hx.
+        assert (event_prod_of_Z x ∈ s2'p) as Hxs2p.
+        { eapply elem_of_weaken; set_solver. }
+        apply event_set_prod_of_Z_in_inv.
+        by rewrite event_set_prod_of_Z_of_prod.
+      - rewrite /ctr_denot.
+        simpl in Hdenot1. rewrite /gctr_denot_prop in Hdenot1.
+        simpl in Hdenot2. rewrite /gctr_denot_prop in Hdenot2.
+        admit. (*TODO: This is a difficult lemma to prove! *)
+    }
+    iMod ("Hvsh" $! (event_set_Z_of_prod s2'p)
                       #(list_sum lv1 - list_sum lv2)
-                      (list_sum lv1 - list_sum lv2) with "[$Hh]") as "Hvsh".
-    iMod "Hvsh".
+                      (list_sum lv1 - list_sum lv2)%Z with "[$Hh]") as "HΦ".
     iModIntro.
     wp_pures.
     rewrite /gctr_st_inject.
