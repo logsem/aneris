@@ -1264,10 +1264,18 @@ Section pncounter_proof.
          rewrite! event_set_Z_of_prod_of_Z.
          rewrite! event_Z_of_prod_of_Z.
          simplify_eq /=.
-         assert (EV_Op e = Add z) as Hez.
-         { admit. }
+         assert (EV_Op e = Add (Z.to_nat z)) as Hez.
+         { destruct (EV_Op e) as (z0). f_equal.
+           apply to_pn_op_inj. simplify_eq /=. rewrite He1. symmetry.
+           destruct (bool_decide (0 ≤ Z.to_nat z)%Z) eqn:Hle; simplify_eq /=; eauto with lia.
+           - apply bool_decide_eq_true in Hle.
+             destruct z; simplify_eq /=; rewrite /pnop_left;
+               apply prodOp_val_eq; simpl; f_equal.
+             replace (Z.of_nat (Z.to_nat (Z.pos p))) with (Z.pos p) by lia.
+             simpl. f_equal.
+           - apply bool_decide_eq_false in Hle; lia. }
          iSplit.
-         { iPureIntro. done. }
+         { iPureIntro. rewrite Hez. f_equal. eauto with lia. }
          iSplit.
          { iPureIntro. done. }
          iSplit.
@@ -1366,7 +1374,13 @@ Section pncounter_proof.
          rewrite! event_Z_of_prod_of_Z.
          simplify_eq /=.
          assert (EV_Op e = Add z) as Hez.
-         { admit. }
+         { destruct (EV_Op e) as (z0). f_equal.
+           apply to_pn_op_inj. simplify_eq /=. rewrite He1. symmetry.
+           destruct (bool_decide (0 ≤ Z.to_nat z)%Z) eqn:Hle; simplify_eq /=; eauto with lia.
+           - apply bool_decide_eq_true in Hle.
+             destruct z; simplify_eq /=; rewrite /pnop_right;
+               apply prodOp_val_eq; simpl; f_equal. lia.
+           - apply bool_decide_eq_false in Hle; lia. }
          iSplit.
          { iPureIntro. done. }
          iSplit.
