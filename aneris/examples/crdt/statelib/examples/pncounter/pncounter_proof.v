@@ -792,7 +792,6 @@ Section pncounter_proof.
   Definition pnop_right (n : nat) : (prodOp _ _ pnctr_op_pred) :=
     (0, n) ↾ (pnop_proof_right n).
 
-
   (* TODO: Prove: *)
   (* Definition pncounter_eval : val := *)
   (*   λ: "get_state" <>, *)
@@ -847,6 +846,7 @@ Section pncounter_proof.
       - rewrite /ctr_denot.
         simpl in Hdenot1. rewrite /gctr_denot_prop in Hdenot1.
         simpl in Hdenot2. rewrite /gctr_denot_prop in Hdenot2.
+
         admit. (*TODO: This is a difficult lemma to prove! *)
     }
     iMod ("Hvsh" $! (event_set_Z_of_prod s2'p)
@@ -1065,21 +1065,35 @@ Section pncounter_proof.
          by rewrite event_set_prod_of_Z_of_prod.
   Admitted.
 
-
-
-
   (* TODO: Prove: *)
-  (* Definition pncounter_init : val := *)
+  (* Definition pncounter_init : val :=  *)
   (*   λ: "addrs" "rid", *)
-  (*     let: "pn_cpt" := pn_cpt_init "addrs" "rid" in *)
-  (*     let: "get_st" := Fst "pn_cpt" in *)
-  (*     let: "upd_st" := Snd "pn_cpt" in *)
-  (*     let: "get" := pncounter_eval "get_st" in *)
-  (*     let: "upd" := pncounter_update "upd_st" in *)
-  (*     ("get", "upd"). *)
+  (*    let: "pn_cpt" := pn_cpt_init "addrs" "rid" in *)
+  (*    let: "get_st" := Fst "pn_cpt" in *)
+  (*    let: "upd_st" := Snd "pn_cpt" in *)
+  (*    let: "get" := (λ: <>, pncounter_eval "get_st" #()) in *)
+  (*    let: "upd" :=  (λ: "n", pncounter_update "upd_st" "n") in ("get", "upd"). *)
+
   Lemma pncounter_init_crdt_spec :
     pn_prod_init_crdt_spec pn_cpt_init -∗
     pn_init_crdt_spec pncounter_init.
-  Proof. Admitted.
+  Proof.
+    rewrite /pn_prod_init_crdt_spec /pn_init_crdt_spec /init_spec_for_specific_crdt.
+    iIntros "#Hspec".
+    iIntros (repId addr addrs_val Φ) "!#".
+    iIntros "(%Hlst & %Hin & Hproto & Haddr & Hfps & Htk) HΦ".
+    wp_lam.
+    wp_pures.
+    wp_apply ("Hspec" with "[$Hproto $Haddr $Htk $Hfps]"); try eauto.
+    iIntros (gsv updv) "(HLst & #Hgspec & #Hupdspec)".
+    wp_pures.
+    iApply "HΦ".
+    iFrame.
+    iPoseProof (pncounter_eval_spec gsv repId addr with "Hgspec") as "Hs1".
+    rewrite /pn_get_state_spec.
+    iPoseProof (pncounter_update_spec updv repId addr with "Hupdspec") as "Hs2".
+    iFrame "#".
+  Qed.
+
 
 End pncounter_proof.

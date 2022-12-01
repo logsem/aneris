@@ -55,14 +55,12 @@ Section pn_cpt_code_wrapper.
        let: "n" := list_int_sum "nl" in
        "p" - "n".
 
-
-  Definition pncounter_init : val :=
+ Definition pncounter_init : val :=
     λ: "addrs" "rid",
-      let: "pn_cpt" := pn_cpt_init "addrs" "rid" in
-      let: "get_st" := Fst "pn_cpt" in
-      let: "upd_st" := Snd "pn_cpt" in
-      let: "get" := pncounter_eval "get_st" in
-      let: "upd" := pncounter_update "upd_st" in
-      ("get", "upd").
+     let: "pn_cpt" := pn_cpt_init "addrs" "rid" in
+     let: "get_st" := Fst "pn_cpt" in
+     let: "upd_st" := Snd "pn_cpt" in
+     let: "get" := (λ: <>, pncounter_eval "get_st" #()) in
+     let: "upd" :=  (λ: "n", pncounter_update "upd_st" "n") in ("get", "upd").
 
 End pn_cpt_code_wrapper.
