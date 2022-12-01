@@ -39,7 +39,6 @@ Section Bloup.
           (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
   Context (LogSt: Type) (latA: Lattice LogSt).
   Context (Hcd: @CrdtDenot LogOp LogSt timestamp_time eqdec_logop countable_logop).
-  Context (inj_st: Inject LogSt val).
 
   Definition mapSt: Type := gmap string LogSt.
   Definition mapOp: Type := string * LogOp.
@@ -575,12 +574,8 @@ Section Bloup.
 
 
 
-  (** serialization *)
-  Definition map_ser : serialization :=
-    list_serialization
-      (prod_serialization
-        string_serialization PA.(StLib_CohParams).(StLib_StSerialization)).
-
+  (** The two following defs come from OpLib and allows the proofs to use the
+    * coherence of the underlying CRDT (LogOp, LogSt). *)
   Definition map_op_coh (op: mapOp) (v: val): Prop :=
     ∃(s: string)(lop: LogOp)(vs vop: val),
       op.1 = s ∧ op.2 = lop
@@ -597,11 +592,31 @@ Section Bloup.
     λ (st : mapSt) v,
       ∃ (m : gmap string val), map_st_coh_v_log v m st.
 
+  (** serialization *)
+  Definition map_ser : serialization :=
+    list_serialization
+      (prod_serialization
+        string_serialization PA.(StLib_CohParams).(StLib_StSerialization)).
+
   Lemma map_coh_ser:
     ∀ (st : mapSt) (v : val), map_st_coh st v →
       Serializable map_ser v.
   Proof.
-    intros st_log st_v_v (st_v&Hismap&Hdom&Helts).
+    intros st_log st_v_v (st_v&(ls&->&Hls&?)&Hdom&Helts).
+    set lsv := map(λ e, ($e.1, e.2)%V) ls.
+    exists lsv.
+    split.
+    - admit.
+    - intros x Hx_in.
+      assert(∀ e, e ∈ lsv → ∃ e', e' ∈ ls ∧ e = ($e'.1, e'.2)%V).
+      { admit. }
+      induction lsv; first inversion Hx_in.
+      inversion Hx_in; last apply IHlsv; try done.
+      simplify_eq/=.
+      2: {intros e He_in.
+          destruct (H1 e) as(elt&Helt); last by exists elt.
+          by apply elem_of_list_further. }
+      destruct (H1 a) as(elt&Helt&->); first apply elem_of_list_here.
     Admitted.
 
   Lemma map_coh_inj:
