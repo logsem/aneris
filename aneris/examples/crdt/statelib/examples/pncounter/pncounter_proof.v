@@ -690,27 +690,79 @@ Section pn_CRDT_Res_Mixin_mapping.
     by apply event_set_prod_of_Z_events_total_order.
   Defined.
   Next Obligation.
-  Admitted.
+    iIntros (i s1 s2) "Hf".
+    iIntros (e Hs1).
+    simpl.
+    iPoseProof (pn.(LocState_OwnOrig) with "[$Hf]") as "%Hf".
+    specialize (Hf (event_prod_of_Z e)).
+    simpl in *.
+    iPureIntro.
+    apply Hf.
+    by apply event_set_prod_of_Z_in.
+  Defined.
   Next Obligation.
-  Admitted.
+    iIntros (i s1 s2) "Hf".
+    iIntros (e Hs1).
+    simpl.
+    iPoseProof (pn.(LocState_ForeignOrig) with "[$Hf]") as "%Hf".
+    specialize (Hf (event_prod_of_Z e)).
+    simpl in *.
+    iPureIntro.
+    apply Hf.
+    by apply event_set_prod_of_Z_in.
+  Defined.
   Next Obligation.
-  Admitted.
+    iIntros (i s1 s2) "Hf".
+    iIntros (e Hs1).
+    simpl.
+    iPoseProof (pn.(LocSnap_OwnOrig) with "[$Hf]") as "%Hf".
+    specialize (Hf (event_prod_of_Z e)).
+    simpl in *.
+    iPureIntro.
+    apply Hf.
+    by apply event_set_prod_of_Z_in.
+  Defined.
   Next Obligation.
-  Admitted.
+    iIntros (i s1 s2) "Hf".
+    iIntros (e Hs1).
+    simpl.
+    iPoseProof (pn.(LocSnap_ForeignOrig) with "[$Hf]") as "%Hf".
+    specialize (Hf (event_prod_of_Z e)).
+    simpl in *.
+    iPureIntro.
+    apply Hf.
+    by apply event_set_prod_of_Z_in.
+  Defined.
   Next Obligation.
-  Admitted.
+    iIntros (i s1 s2) "Hf".
+    simpl.
+    iPoseProof (pn.(LocState_TakeSnap) with "[$Hf]") as "(Hf1 & Hf2)".
+    iFrame.
+  Defined.
   Next Obligation.
-  Admitted.
+    iIntros (E i s1 s2 s1' s2' HE) "#Hinv #Hs #Hs'".
+    iMod (pn.(LocSnap_Union) E _ (event_set_prod_of_Z s1) _ _ _ HE
+           with "[$][$][$]") as "Hsnap".
+    iModIntro.
+    rewrite !event_set_prod_of_Z_union.
+    simpl.
+    iFrame.
+  Defined.
   Next Obligation.
-  Admitted.
+    iIntros (E i s1 s2 s1' s2' HE) "#Hinv #Hs HLst".
+    iMod (pn.(LocSnap_LocState_Included_CC) E _ (event_set_prod_of_Z s1) _ _ _ HE with "[$][$][$]") as "(Hh & Hsnap)".
+    iModIntro.
+    iFrame.
+  Admitted. (* TODO: Léon *)
   Next Obligation.
-  Admitted.
+  Admitted. (* TODO: Léon *)
   Next Obligation.
-  Admitted.
+  Admitted. (* TODO: Léon *)
   Next Obligation.
-  Admitted.
+  Admitted. (* TODO: Léon *)
   Next Obligation.
-  Admitted.
+  Admitted. (* TODO: Léon *)
+
 
 End pn_CRDT_Res_Mixin_mapping.
 
