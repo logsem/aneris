@@ -246,25 +246,14 @@ Section pn_event_mapping.
   Notation pn_prod_Op := (prodOp gctr_op gctr_op pnctr_op_pred).
 
   Program Definition to_pn_op (z : Z) : pn_prod_Op :=
-    match z with
+    match z return pn_prod_Op with
     | Z0 => exist _ (0, 0) _
     | Zpos p => exist _ (Pos.to_nat p, 0) _
     | Zneg p => exist _ (0, Pos.to_nat p) _
     end.
-  Next Obligation.
-    intros z <-.
-    done.
-  Defined.
-  Next Obligation.
-    intros z n Heq.
-    simpl.
-    rewrite orb_true_r.
-    done.
-  Defined.
-  Next Obligation.
-    intros z n Heq.
-    done.
-  Defined.
+  Next Obligation. done. Defined.
+  Next Obligation. by intros z n; simpl; rewrite orb_true_r. Defined.
+  Next Obligation. done. Defined.
 
   Definition event_prod_of_Z (ev : Event CtrOp) : Event pn_prod_Op :=
     let z := ctr_payload ev.(EV_Op) in
@@ -892,6 +881,208 @@ Section pncounter_proof.
   Definition pnop_right (n : nat) : (prodOp _ _ pnctr_op_pred) :=
     (0, n) ↾ (pnop_proof_right n).
 
+
+  (* TODO: move to library *)
+  Lemma gset_map_comp `{!EqDecision A, !Countable A, !EqDecision B, !Countable B, !EqDecision C, !Countable C}
+    (f : A → B) (g : B → C) (s : gset A) :
+    gset_map g (gset_map f s) = gset_map (g ∘ f) s.
+  Proof.
+    induction s as [|a s ? IHs] using set_ind_L.
+    { rewrite !gset_map_empty//. }
+    rewrite !gset_map_union !gset_map_singleton/= IHs//.
+  Qed.
+  Lemma gset_map_ext  `{!EqDecision A, !Countable A, !EqDecision B, !Countable B}
+    (f g : A → B) (s : gset A) : (∀ x, f x = g x) → gset_map f s = gset_map g s.
+  Proof.
+    induction s as [|a s ? IHs] using set_ind_L; intros Hfg.
+    { rewrite !gset_map_empty//. }
+    rewrite !gset_map_union !gset_map_singleton/= IHs; last done.
+    rewrite Hfg; done.
+  Qed.
+
+  (* Lemma fst_of_event_prod_nneg a : (0 ≤ EV_Op (event_map prodOp_fst (event_prod_of_Z a)))%Z. *)
+  (* Proof. destruct a as [[[]] ? ?]; lia. Qed. *)
+
+  (* Lemma snd_of_event_prod_nneg a : (0 ≤ EV_Op (event_map prodOp_snd (event_prod_of_Z a)))%Z. *)
+  (* Proof. destruct a as [[[]] ? ?]; lia. Qed. *)
+
+  (* (* this could probably be made more generally about elements and union which could also be useful for other purposes. *) *)
+  (* Lemma ctr_value_elements (s1 s2 : event_set CtrOp) : *)
+  (*   (∀ x, x ∈ s1 → (0 ≤ ctr_payload (EV_Op x))%Z) → *)
+  (*   (ctr_value (elements (s1 ∪ s2)) ≤ ctr_value (elements s1) + ctr_value (elements s2))%Z. *)
+  (* Proof. *)
+  (*   revert s2; induction s1 as [|a s1 ? IHs1] using set_ind_L; intros s2 Hs1nneg. *)
+  (*   { rewrite left_id_L elements_empty /=; lia. } *)
+  (*   erewrite (ctr_value_perm (elements ({[a]} ∪ s1))); last apply elements_union_singleton; last done. *)
+  (*   simpl. *)
+  (*   assert (ctr_value (elements (s1 ∪ s2)) ≤ ctr_value (elements s1) + ctr_value (elements s2))%Z. *)
+  (*   { apply IHs1; set_solver. } *)
+  (*   assert (0 ≤ ctr_payload (EV_Op a))%Z by set_solver. *)
+  (*   destruct (decide (a ∈ s1 ∪ s2)). *)
+  (*   - replace ({[a]} ∪ s1 ∪ s2) with (s1 ∪ s2) by set_solver. *)
+  (*     lia. *)
+  (*   - rewrite -assoc_L. *)
+  (*     erewrite (ctr_value_perm (elements ({[a]} ∪ _))); last apply elements_union_singleton; last done. *)
+  (*     simpl; lia. *)
+  (* Qed. *)
+
+  Lemma ctr_value_sub_helper1 a s :
+    a ∉ s →
+    event_map (λ z : nat, Add z) (event_map prodOp_fst (event_prod_of_Z a)) ∈
+    (gset_map (λ x, event_map
+        (λ z : nat, Add z) (event_map prodOp_fst x)) (event_set_prod_of_Z s)) →
+    EV_Op (event_map prodOp_fst (event_prod_of_Z a)) = 0 :> nat.
+  Proof.
+    intros Has.
+    rewrite gset_map_comp; intros (z & Hz1 & Hz2)%gset_map_correct2.
+    destruct a as [[a] ?]; simplify_eq/=.
+    destruct z as [[z] ?]; simplify_eq/=.
+    destruct a; destruct z; try done.
+    rewrite /prodOp_fst /prodOp_val /= in Hz1.
+    simplify_eq; set_solver.
+  Qed.
+
+  Lemma ctr_value_sub_helper2 a s :
+    a ∉ s →
+    event_map (λ z : nat, Add z) (event_map prodOp_snd (event_prod_of_Z a)) ∈
+    (gset_map (λ x, event_map
+        (λ z : nat, Add z) (event_map prodOp_snd x)) (event_set_prod_of_Z s)) →
+    EV_Op (event_map prodOp_snd (event_prod_of_Z a)) = 0 :> nat.
+  Proof.
+    intros Has.
+    rewrite gset_map_comp; intros (z & Hz1 & Hz2)%gset_map_correct2.
+    destruct a as [[a] ?]; simplify_eq/=.
+    destruct z as [[z] ?]; simplify_eq/=.
+    destruct a; destruct z; try done.
+    rewrite /prodOp_snd /prodOp_val /= in Hz1.
+    simplify_eq; set_solver.
+  Qed.
+
+  Lemma ctr_value_sub_helper3 a (s : event_set CtrOp) :
+    (a ∈ s → ctr_payload (EV_Op a) = 0) →
+    (ctr_value (elements ({[a]} ∪ s)) = ctr_payload (EV_Op a) + ctr_value (elements s))%Z.
+  Proof.
+    intros Has.
+    destruct (decide (a ∈ s)).
+    - rewrite Has; last done.
+      replace ({[a]} ∪ s) with s by set_solver.
+      lia.
+    - erewrite (ctr_value_perm (elements ({[a]} ∪ _))); last apply elements_union_singleton; done.
+  Qed.
+
+  Lemma ctr_value_sub_helper4 a :
+    ctr_payload (EV_Op a) =
+    ((prodOp_fst (to_pn_op (ctr_payload (EV_Op a)))) -
+      (prodOp_snd (to_pn_op (ctr_payload (EV_Op a)))))%Z.
+  Proof. destruct a as [[[]] ?]; rewrite /prodOp_fst /prodOp_snd /prodOp_val /=; lia. Qed.
+
+  Definition fst_map s := (gset_map (λ x, event_map
+                    (λ z : nat, Add z) (event_map prodOp_fst x)) (event_set_prod_of_Z s)).
+
+  Lemma fst_map_union s1 s2 : fst_map (s1 ∪ s2) = fst_map s1 ∪ fst_map s2.
+  Proof. rewrite /fst_map /event_set_prod_of_Z !gset_map_union //. Qed.
+
+  Lemma fst_map_empty : fst_map ∅ = ∅.
+  Proof. rewrite /fst_map /event_prod_of_Z gset_map_empty //. Qed.
+
+  Lemma fst_map_singleton a :
+    fst_map {[a]} = {[ event_map (λ z : nat, Add z) (event_map prodOp_fst (event_prod_of_Z a))]}.
+  Proof. rewrite /fst_map /event_set_prod_of_Z !gset_map_singleton //. Qed.
+
+  Definition snd_map s := (gset_map (λ x, event_map
+                    (λ z : nat, Add z) (event_map prodOp_snd x)) (event_set_prod_of_Z s)).
+
+  Lemma snd_map_union s1 s2 : snd_map (s1 ∪ s2) = snd_map s1 ∪ snd_map s2.
+  Proof. rewrite /snd_map /event_set_prod_of_Z !gset_map_union //. Qed.
+
+  Lemma snd_map_empty : snd_map ∅ = ∅.
+  Proof. rewrite /snd_map /event_prod_of_Z gset_map_empty //. Qed.
+
+  Lemma snd_map_singleton a :
+    snd_map {[a]} = {[ event_map (λ z : nat, Add z) (event_map prodOp_snd (event_prod_of_Z a))]}.
+  Proof. rewrite /snd_map /event_set_prod_of_Z !gset_map_singleton //. Qed.
+
+  Lemma ctr_value_sub s :
+    ctr_value (elements s) = (ctr_value (elements (fst_map s)) - ctr_value (elements (snd_map s)))%Z.
+  Proof.
+    induction s as [|a s] using set_ind_L.
+    { rewrite fst_map_empty snd_map_empty //. }
+    rewrite fst_map_union fst_map_singleton snd_map_union snd_map_singleton.
+    erewrite (ctr_value_perm (elements ({[a]} ∪ _))); last apply elements_union_singleton; last done.
+    rewrite ctr_value_sub_helper3; last first.
+    { intros Heq%ctr_value_sub_helper1; last done.
+      destruct a; simpl in *; rewrite Heq; lia. }
+    rewrite ctr_value_sub_helper3; last first.
+    { intros Heq%ctr_value_sub_helper2; last done.
+      destruct a; simpl in *; rewrite Heq; lia. }
+    rewrite /= {1}(ctr_value_sub_helper4 a).
+    rewrite IHs. lia.
+  Qed.
+
+  Lemma ctr_value_fold_sum s :
+    ctr_value (elements (gset_map (event_map (λ z : nat, Add z)) s)) = fold_sum s.
+  Proof.
+    apply (set_fold_ind_L (λ (n : nat) s, ctr_value (elements (gset_map (event_map (λ z : nat, Add z)) s)) = n)).
+    { rewrite gset_map_empty elements_empty //. }
+    clear s.
+    intros a s n Has IHs.
+    rewrite gset_map_union gset_map_singleton.
+    erewrite (ctr_value_perm (elements (_ ∪ _))); last apply elements_union_singleton; last first.
+    { intros (z & Hz1 & Hz2)%gset_map_correct2.
+      destruct a as [a ?]; simplify_eq/=.
+      destruct z as [z ?]; simplify_eq/=.
+      set_solver. }
+    rewrite /= IHs.
+    destruct a; simpl; lia.
+  Qed.
+
+  Lemma list_sum_fold_sum n m (l : list nat) s :
+    m ≤ n →
+    (∀ a, a ∈ s → EV_Orig a < m) →
+    length l = m →
+    (∀ i, i < m → l !!! i = fold_sum (fil s i)) →
+    list_sum l = fold_sum s.
+  Proof.
+    revert m l s; induction n as [|n IHn]; intros m l s Hle Horigs Hlen Heq.
+    - destruct (set_choose_or_empty s) as [[x Hx]| ->].
+      { specialize (Horigs x Hx); lia. }
+      destruct l eqn:Hlv.
+      { rewrite /= /fold_sum set_fold_empty //. }
+      pose proof (f_equal length Hlv) as Hlen'.
+      simpl in *; lia.
+    - destruct l as [|a l _] using rev_ind.
+      { simpl in *; subst.
+        destruct (set_choose_or_empty s) as [[x Hx]| ->].
+        - specialize (Horigs x Hx); lia.
+        - rewrite /= /fold_sum set_fold_empty //. }
+      rewrite list_sum_app /=.
+      rewrite app_length /= in Hlen.
+      specialize (IHn (length l) l (filter (λ ev : Event gctr_op, EV_Orig ev ≠ (length l)) s)).
+      rewrite IHn; [|lia| |done|]; last first.
+      { intros j Hj.
+        specialize (Heq j).
+        rewrite lookup_total_app_l in Heq; last done.
+        rewrite Heq; last lia.
+        rewrite /fil.
+        f_equal.
+        apply set_eq; intros ?; rewrite !elem_of_filter.
+        split; last tauto.
+        intros [-> ]; split_and!; [done|lia|done]. }
+      { intros ?; rewrite elem_of_filter; intros [? Hin].
+        apply Horigs in Hin; lia. }
+      specialize (Heq (length l)).
+      rewrite lookup_total_app_r in Heq; last lia.
+      rewrite Nat.sub_diag /= in Heq.
+      rewrite Heq; last lia.
+      rewrite /fil.
+      rewrite Nat.add_0_r.
+      rewrite -fold_sum_disj_union_gen;
+        last by symmetry; apply disjoint_filter_complement.
+      rewrite comm_L.
+      rewrite filter_union_complement_L; first done.
+      apply inhabitant.
+  Qed.
+
   (* TODO: Prove: *)
   (* Definition pncounter_eval : val := *)
   (*   λ: "get_state" <>, *)
@@ -946,9 +1137,46 @@ Section pncounter_proof.
       - rewrite /ctr_denot.
         simpl in Hdenot1. rewrite /gctr_denot_prop in Hdenot1.
         simpl in Hdenot2. rewrite /gctr_denot_prop in Hdenot2.
-
-        admit. (*TODO: This is a difficult lemma to prove! *)
-    }
+        rewrite ctr_value_sub.
+        f_equal.
+        + rewrite /fst_map.
+           transitivity (ctr_value
+                           (elements
+                              (gset_map (λ x, event_map (λ z : nat, Add z) x)
+                                 (gset_map (λ x, event_map prodOp_fst x)
+                                 (event_set_prod_of_Z (s1 ∪ event_set_Z_of_prod s2'p))))));
+           last by rewrite gset_map_comp; f_equal.
+          rewrite ctr_value_fold_sum.
+          erewrite (list_sum_fold_sum (length CRDT_Addresses) (length CRDT_Addresses));
+            [done|reflexivity| |by rewrite vec_to_list_length|].
+          * admit.
+          * intros i Hi.
+            specialize (Hdenot1 (nat_to_fin Hi)).
+            apply vlookup_lookup in Hdenot1.
+            rewrite fin_to_nat_to_fin in Hdenot1.
+            apply list_lookup_total_correct in Hdenot1.
+            rewrite Hdenot1.
+            repeat f_equal.
+            rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod //.
+        + rewrite /fst_map.
+           transitivity (ctr_value
+                           (elements
+                              (gset_map (λ x, event_map (λ z : nat, Add z) x)
+                                 (gset_map (λ x, event_map prodOp_snd x)
+                                 (event_set_prod_of_Z (s1 ∪ event_set_Z_of_prod s2'p))))));
+           last by rewrite gset_map_comp; f_equal.
+          rewrite ctr_value_fold_sum.
+          erewrite (list_sum_fold_sum (length CRDT_Addresses) (length CRDT_Addresses));
+            [done|reflexivity| |by rewrite vec_to_list_length|].
+          * admit.
+          * intros i Hi.
+            specialize (Hdenot2 (nat_to_fin Hi)).
+            apply vlookup_lookup in Hdenot2.
+            rewrite fin_to_nat_to_fin in Hdenot2.
+            apply list_lookup_total_correct in Hdenot2.
+            rewrite Hdenot2.
+            repeat f_equal.
+            rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod //. }
     iMod ("Hvsh" $! (event_set_Z_of_prod s2'p)
                       #(list_sum lv1 - list_sum lv2)
                       (list_sum lv1 - list_sum lv2)%Z with "[$Hh]") as "HΦ".

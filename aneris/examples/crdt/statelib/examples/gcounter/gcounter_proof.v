@@ -71,6 +71,24 @@ Section Utils.
     apply fold_sum_union_le.
   Qed.
 
+  Lemma fold_sum_disj_union_gen_helper n s : set_fold (λ ev v, v + EV_Op ev) n s = fold_sum s + n.
+  Proof.
+    revert n; induction s as [|a s ? IHs] using set_ind_L; intros n.
+    - rewrite /fold_sum !set_fold_empty; lia.
+    - rewrite /fold_sum.
+      repeat (rewrite set_fold_disj_union_strong; [|lia|set_solver]).
+      rewrite !set_fold_singleton /= !IHs.
+      destruct a; simpl; lia.
+  Qed.
+
+  Lemma fold_sum_disj_union_gen s1 s2 : s1 ## s2 → fold_sum (s1 ∪ s2) = fold_sum s1 + fold_sum s2.
+  Proof.
+    intros Hdisj.
+    rewrite/fold_sum.
+    rewrite set_fold_disj_union_strong; [ | lia | set_solver ].
+    rewrite fold_sum_disj_union_gen_helper /fold_sum; lia.
+  Qed.
+
   Lemma fold_sum_disj_union i s (ev: Event gctr_op):
     ev ∉ s
     → fold_sum (fil s i ∪ {[ev]}) = ((fold_sum (fil s i)) + ev.(EV_Op))%nat.
