@@ -573,7 +573,7 @@ Section pn_event_mapping.
     elements (event_set_prod_of_Z s) = event_prod_of_Z <$> elements s.
   Proof.
   Admitted.
-      
+
   Lemma event_set_prod_of_Z_compute_maximum (s : event_set CtrOp) :
     maximality.compute_maximum (event_set_prod_of_Z s) =
       event_prod_of_Z <$> (maximality.compute_maximum s).
@@ -791,6 +791,63 @@ Section pncounter_proof.
   Definition pnop_right (n : nat) : (prodOp _ _ pnctr_op_pred) :=
     (0, n) ↾ (pnop_proof_right n).
 
+  From aneris.aneris_lang.lib Require Import inject.
+
+  (* TODO: Prove: *)
+  (* Definition pncounter_eval : val := *)
+  (*   λ: "get_state" <>, *)
+  (*      let: "st" := "get_state" #() in *)
+  (*      let: "pl" := Fst "st" in *)
+  (*      let: "nl" := Snd "st" in *)
+  (*      let: "p" := list_int_sum "pl" in *)
+  (*      let: "n" := list_int_sum "nl" in *)
+  (*      "p" - "n". *)
+  Lemma pncounter_eval_spec (get_state_fn : val) repId addr:
+    pn_prod_get_state_spec get_state_fn repId addr -∗
+    pn_get_state_spec (λ:<>, pncounter_eval get_state_fn #()) repId addr.
+  Proof.
+    rewrite /pn_prod_get_state_spec/get_state_spec.
+    iIntros "#Hspec".
+    iIntros (Hin Φ) "!# Hvsh".
+    wp_pures. wp_lam. wp_pures.
+    wp_apply ("Hspec" $! Hin); try eauto.
+    iMod "Hvsh".
+    iDestruct "Hvsh" as (s1 s2) "(HLst & Hvsh)".
+    iExists (event_set_prod_of_Z s1), (event_set_prod_of_Z s2).
+    iFrame.
+    iModIntro.
+    iNext.
+    iIntros (s2'p v lv) "(%Hsub & HLst & %Hcoh & Hdenot)".
+    rewrite /StLib_St_Coh /= /prodSt_coh in Hcoh.
+    destruct lv as (lv1, lv2).
+    destruct Hcoh as (v1 & v2 & <- & Hcoh1 & Hcoh2).
+    rewrite /StLib_St_Coh /= /gctr_st_coh in Hcoh1, Hcoh2.
+    rewrite Hcoh1 Hcoh2.
+    iAssert (⌜s2 ⊆ event_set_Z_of_prod s2'p⌝ ∗
+               LocState repId s1 (event_set_Z_of_prod s2'p) ∗
+               ⌜StLib_St_Coh (list_sum lv1 - list_sum lv2)
+                #(list_sum lv1 - list_sum lv2)⌝ ∗
+               ⌜⟦ s1 ∪ event_set_Z_of_prod s2'p ⟧ ⇝ list_sum lv1 - list_sum lv2⌝)%I
+            with "[HLst]"
+            as "Hh".
+    { admit. }
+    iDestruct ("Hvsh" $! (event_set_Z_of_prod s2'p)
+                      #(list_sum lv1 - list_sum lv2)
+                      (list_sum lv1 - list_sum lv2) with "[$Hh]") as "Hvsh".
+    iMod "Hvsh".
+    iModIntro.
+    wp_pures.
+    rewrite /gctr_st_inject.
+    wp_apply (wp_list_int_sum lv1).
+    { iPureIntro. apply is_list_inject; eauto. }
+    iIntros (p ->).
+    wp_pures.
+    wp_apply (wp_list_int_sum lv2).
+    { iPureIntro. apply is_list_inject; eauto. }
+    iIntros (n ->).
+    wp_pures.
+    done.
+  Admitted.
 
   (* TODO: Prove: *)
   (* Definition pncounter_update : val := *)
@@ -889,7 +946,7 @@ Section pncounter_proof.
            apply event_set_prod_of_Z_in_inv.
            rewrite -event_set_prod_of_Z_singleton in He8.
            rewrite -event_set_prod_of_Z_union in He8.
-           admit. }
+           by rewrite -event_set_prod_of_Z_compute_maximals. }
          iSplit.
          { iPureIntro.
            admit. }
@@ -993,19 +1050,6 @@ Section pncounter_proof.
 
 
 
-  (* TODO: Prove: *)
-  (* Definition pncounter_eval : val := *)
-  (*   λ: "get_state" <>, *)
-  (*      let: "st" := "get_state" #() in *)
-  (*      let: "pl" := Fst "st" in *)
-  (*      let: "nl" := Snd "st" in *)
-  (*      let: "p" := list_int_sum "pl" in *)
-  (*      let: "n" := list_int_sum "nl" in *)
-  (*      "p" - "n". *)
-  Lemma pncounter_eval_spec (get_state_fn : val) repId addr:
-    pn_prod_get_state_spec get_state_fn repId addr -∗
-    pn_get_state_spec (λ:<>, pncounter_update get_state_fn #()) repId addr.
-  Proof. Admitted.
 
   (* TODO: Prove: *)
   (* Definition pncounter_init : val := *)
