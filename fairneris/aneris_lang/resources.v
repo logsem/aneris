@@ -453,8 +453,10 @@ Section definitions.
   (** Live roles *)
   Definition live_roles_auth_own (A : gset simple_role) : iProp Σ :=
     own (A := live_roleUR) aneris_live_roles_name (● GSet A).
-  Definition live_roles_frag_own (role : simple_role) : iProp Σ :=
-    own (A := live_roleUR) aneris_live_roles_name (◯ GSet {[ role ]}).
+  Definition live_roles_frag_own (roles : gset simple_role) : iProp Σ :=
+    own (A := live_roleUR) aneris_live_roles_name (◯ GSet roles).
+  Definition live_role_frag_own (role : simple_role) : iProp Σ :=
+    live_roles_frag_own {[role]}.
 
 End definitions.
 
@@ -767,11 +769,11 @@ Proof. iApply mono_nat_own_alloc. Qed.
 (*               [∗ map] tid ↦ role ∈ M, own (A := authUR (gmapUR nat (exclR $ leibnizO simple_role))) γ (● (Excl <$> M)). *)
 (* Proof. Admitted. *)
 
-Local Lemma live_roles_auth_extend_pre `{anerisPreG Σ Mdl} γ A role :
-  role ∉ A →
+Local Lemma live_roles_auth_extend_pre `{anerisPreG Σ Mdl} γ A roles :
+  roles ## A →
   own (A := live_roleUR) γ (● GSet A) ==∗
-  own (A := live_roleUR) γ (● GSet ({[role]} ∪ A)) ∗
-  own (A := live_roleUR) γ (◯ GSet {[role]}).
+  own (A := live_roleUR) γ (● GSet (roles ∪ A)) ∗
+  own (A := live_roleUR) γ (◯ GSet roles).
 Proof.
   iIntros (Hnin) "Hauth".
   iMod (own_update with "Hauth") as "[$ $]"; [|done].
@@ -782,17 +784,13 @@ Qed.
 
 Lemma live_roles_init `{anerisPreG Σ Mdl} A :
   ⊢ |==> ∃ γ, own (A := live_roleUR) γ (● GSet A) ∗
-              [∗ set] role ∈ A, own (A := live_roleUR) γ (◯ GSet {[role]}).
+              own (A := live_roleUR) γ (◯ GSet A).
 Proof.
   iMod (own_alloc (● GSet (∅:gset simple_roleO))) as (γ) "Hauth";
     [by apply auth_auth_valid|].
   iExists γ.
-  iInduction A as [|a A Hnin] "IHA" using set_ind_L; [by eauto|].
-  iMod ("IHA" with "Hauth") as "[Hauth Howns]".
-  iMod (live_roles_auth_extend_pre with "Hauth") as "[Hauth Hown]"; [set_solver|].
-  iModIntro. rewrite big_sepS_union; [|set_solver].
-  rewrite big_sepS_singleton.
-  iFrame.
+  iMod (live_roles_auth_extend_pre with "Hauth") as "[Hauth $]"; [set_solver|].
+  by rewrite union_empty_r_L.
 Qed.
 
 Lemma unallocated_init `{anerisPreG Σ Mdl} (A : gset socket_address_group) :
@@ -1648,8 +1646,8 @@ Section resource_lemmas.
   (*   live_roles_auth_own (delete tid M). *)
   (* Proof. Admitted. *)
 
-  Lemma live_roles_auth_elem_of A role :
-    live_roles_auth_own A -∗ live_roles_frag_own role -∗ ⌜role ∈ A⌝.
+  Lemma live_roles_auth_subseteq A roles :
+    live_roles_auth_own A -∗ live_roles_frag_own roles -∗ ⌜roles ⊆ A⌝.
   Proof.
     iIntros "Hauth Hown".
     iDestruct (own_valid_2 with "Hauth Hown") as %Hvalid%auth_both_valid_discrete.
@@ -1657,26 +1655,65 @@ Section resource_lemmas.
     iPureIntro. set_solver.
   Qed.
 
-  Lemma live_roles_auth_delete A role :
-    live_roles_auth_own A -∗ live_roles_frag_own role ==∗
-    live_roles_auth_own (A ∖ {[role]}).
-  Proof.
-    iIntros "Hauth Hown".
-    iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done].
-    apply auth_update_dealloc, gset_disj_dealloc_local_update.
-  Qed.
-
-  Lemma live_roles_auth_extend A role :
-    role ∉ A →
+  Lemma live_roles_auth_extend A roles :
+    roles ## A →
     live_roles_auth_own A ==∗
-    live_roles_auth_own ({[role]} ∪ A) ∗
-    live_roles_frag_own role.
+    live_roles_auth_own (roles ∪ A) ∗
+    live_roles_frag_own roles.
   Proof.
     iIntros (Hnin) "Hauth".
     iMod (own_update with "Hauth") as "[$ $]"; [|done].
     apply auth_update_alloc.
     apply gset_disj_alloc_empty_local_update.
     set_solver.
+  Qed.
+
+  Lemma live_roles_auth_delete A roles :
+    live_roles_auth_own A -∗ live_roles_frag_own roles ==∗
+    live_roles_auth_own (A ∖ roles).
+  Proof.
+    iIntros "Hauth Hown".
+    iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done].
+    apply auth_update_dealloc, gset_disj_dealloc_local_update.
+  Qed.
+
+  Lemma live_role_auth_elem_of A role :
+    live_roles_auth_own A -∗ live_role_frag_own role -∗ ⌜role ∈ A⌝.
+  Proof.
+    iIntros "Hauth Hown".
+    iDestruct (live_roles_auth_subseteq with "Hauth Hown") as %Hle.
+    iPureIntro. set_solver.
+  Qed.
+
+  Lemma live_role_auth_extend A role :
+    role ∉ A →
+    live_roles_auth_own A ==∗
+    live_roles_auth_own ({[role]} ∪ A) ∗
+    live_role_frag_own role.
+  Proof.
+    iIntros (Hnin) "Hauth".
+    by iMod (live_roles_auth_extend with "Hauth") as "[$ $]"; [set_solver|].
+  Qed.
+
+  Lemma live_role_auth_delete A role :
+    live_roles_auth_own A -∗ live_role_frag_own role ==∗
+    live_roles_auth_own (A ∖ {[role]}).
+  Proof.
+    iIntros "Hauth Hown".
+    by iMod (live_roles_auth_delete with "Hauth Hown") as "$".
+  Qed.
+
+  Lemma live_roles_own_split roles1 roles2 :
+    roles1 ## roles2 →
+    ⊢ live_roles_frag_own (roles1 ∪ roles2) ∗-∗
+      live_roles_frag_own roles1 ∗ live_roles_frag_own roles2.
+  Proof.
+    intros Hdisj.
+    iSplit.
+    - rewrite /live_roles_frag_own -gset_disj_union /=; [|done].
+      iDestruct 1 as "[Hroles1 Hroles2]". iFrame.
+    - rewrite /live_roles_frag_own -gset_disj_union /=; [|done].
+      rewrite -own_op -auth_frag_op. by eauto.
   Qed.
 
 End resource_lemmas.

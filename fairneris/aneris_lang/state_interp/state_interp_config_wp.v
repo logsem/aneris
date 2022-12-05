@@ -28,7 +28,7 @@ Section state_interpretation.
 
   (* TODO: Move this elsehwere and use it where we now use ad hoc induction *)
   Lemma fupd_elim_laterN E1 E2 n (P:iProp Σ) :
-    E2 ⊆ E1 → P -∗ |={E1,E2}=> |={E2}▷=>^n |={E2,E1}=> P.
+    E2 ⊆ E1 → (|={E1}=> P)%I -∗ |={E1,E2}=> |={E2}▷=>^n |={E2,E1}=> P.
   Proof.
     iIntros (Hle) "HP".
     iApply fupd_mask_intro; [done|].
@@ -80,8 +80,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iFrame "Hevs Hauth Hsi".
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           rewrite /messages_to_receive_at_multi_soup in Hm.
@@ -116,6 +116,22 @@ Section state_interpretation.
           rewrite insert_insert.
           rewrite insert_commute; [|done]. rewrite insert_insert.
           set_solver. }
+        iSplitR "Hlive"; last first.
+        { destruct sent; [|done].
+          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
+          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
+          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+            [set_solver|].
+          iModIntro. simpl.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
+            (config_roles:gset simple_role) by set_solver.
+          replace ({[B_role]} ∩ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          rewrite union_empty_l_L.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
+            ({[B_role]}:gset simple_role) by set_solver.
+          done. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -135,12 +151,13 @@ Section state_interpretation.
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
         iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|done]. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -155,13 +172,29 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iFrame "Hevs Hauth Hsi".
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [by multiset_solver|done]. }
+        iSplitR "Hlive"; last first.
+        { destruct sent; [|done].
+          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
+          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
+          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+            [set_solver|].
+          iModIntro. simpl.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
+            (config_roles:gset simple_role) by set_solver.
+          replace ({[B_role]} ∩ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          rewrite union_empty_l_L.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
+            ({[B_role]}:gset simple_role) by set_solver.
+          done. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { iPureIntro.
@@ -182,8 +215,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iFrame "Hevs Hauth Hsi".
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           rewrite /messages_to_receive_at_multi_soup in Hm.
@@ -218,6 +251,22 @@ Section state_interpretation.
           rewrite insert_insert.
           rewrite insert_commute; [|done]. rewrite insert_insert. 
           set_solver. }
+        iSplitR "Hlive"; last first.
+        { destruct sent; [|done].
+          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
+          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
+          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+            [set_solver|].
+          iModIntro. simpl.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
+            (config_roles:gset simple_role) by set_solver.
+          replace ({[B_role]} ∩ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          rewrite union_empty_l_L.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
+            ({[B_role]}:gset simple_role) by set_solver.
+          done. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -237,12 +286,13 @@ Section state_interpretation.
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
         iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|done]. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -257,13 +307,29 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iFrame "Hevs Hauth Hsi".
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [by multiset_solver|done]. }
+        iSplitR "Hlive"; last first.
+        { destruct sent; [|done].
+          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
+          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
+          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+            [set_solver|].
+          iModIntro. simpl.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
+            (config_roles:gset simple_role) by set_solver.
+          replace ({[B_role]} ∩ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          rewrite union_empty_l_L.
+          replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
+            ({[B_role]}:gset simple_role) by set_solver.
+          done. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { iPureIntro.
@@ -284,8 +350,8 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iFrame "Hevs Hauth Hsi".
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           rewrite /messages_to_receive_at_multi_soup in Hm.
@@ -321,6 +387,22 @@ Section state_interpretation.
           rewrite insert_insert.
           rewrite insert_commute; [|done]. rewrite insert_insert. 
           set_solver. }
+        iSplitR "Hlive"; last first.
+        { destruct sent; [|done].
+          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
+          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
+          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+            [set_solver|].
+          iModIntro. simpl.
+          replace ({[Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
+            (config_roles:gset simple_role) by set_solver.
+          replace (∅ ∩ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          rewrite union_empty_l_L.
+          replace ({[Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          done. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -340,12 +422,13 @@ Section state_interpretation.
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
         iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|done]. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -360,13 +443,29 @@ Section state_interpretation.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
-        iFrame "Hevs Hauth Hsi Hlive".
-        iSplit.
+        iFrame "Hevs Hauth Hsi".
+        iSplitR.
         { iPureIntro.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [by multiset_solver|done]. }
+        iSplitR "Hlive"; last first.
+        { destruct sent; [|done].
+          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
+          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
+          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+            [set_solver|].
+          iModIntro. simpl.
+          replace ({[Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
+            (config_roles:gset simple_role) by set_solver.
+          replace (∅ ∩ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          rewrite union_empty_l_L.
+          replace ({[Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
+            (∅:gset simple_role) by set_solver.
+          done. }
+        iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
         { iPureIntro.

@@ -339,9 +339,12 @@ Section Aneris_AS.
       {[ ip_of_address saA := {[shA := (sA,[])]};
          ip_of_address saB := {[shB := (sB,mABm (state_get_m (trace_last atr)))]} ]}.
 
+  Definition config_roles : gset simple_role := {[ Ndup; Ndrop; Ndeliver ]}.
+
   Definition thread_live_roles_interp (tp : list aneris_expr) (δ : simple_state)
     : iProp Σ :=
-    live_roles_auth_own (simple_live_roles δ).
+    live_roles_auth_own (simple_live_roles δ) ∗
+    live_roles_frag_own (simple_live_roles δ ∩ config_roles).
 
   Global Instance anerisG_irisG :
     irisG aneris_lang (fair_model_to_model simple_fair_model) Σ := {

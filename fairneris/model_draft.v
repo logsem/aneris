@@ -67,17 +67,19 @@ Inductive simple_trans
 Definition simple_live_roles (s : simple_state) : gset simple_role :=
   match s with
   | Start => {[A_role;B_role]}
+  | Sent 0 => {[B_role]}
   | Sent n => {[B_role;Ndup;Ndrop;Ndeliver]}
   (* Should Ndeliver etc. be live in Sent 0? *)
+  | Delivered 0 m => {[B_role]}
   | Delivered n m => {[B_role;Ndup;Ndrop;Ndeliver]}
   (* Is the network live in the last state? *)
-  (* | Received n m => {[Ndup;Ndrop;Ndeliver]} *)
+  | Received 0 m => ∅
   | Received n m => {[Ndup;Ndrop;Ndeliver]}
   end.
 
 Lemma simple_live_spec_holds s ρ s' :
   simple_trans s (Some ρ) s' -> ρ ∈ simple_live_roles s.
-Proof. destruct s; inversion 1; set_solver. Qed.
+Proof. destruct s; inversion 1; try set_solver; destruct sent; set_solver. Qed.
 
 Definition simple_fair_model : FairModel.
 Proof.
@@ -91,7 +93,8 @@ Proof.
 Defined.
 
 
-(* (** Fair Model construction (currently does not work) *) *)
+(* (** Fair Model construction (currently does not work, as the config roles
+do not terminate) *) *)
 
 (* Definition state_to_nat (s : simple_state) : nat := *)
 (*   match s with *)
@@ -116,9 +119,9 @@ Defined.
 (* Definition simple_decreasing_role (s : fmstate simple_fair_model) : *)
 (*   fmrole simple_fair_model := *)
 (*   match s with *)
-(*   | Start => A *)
+(*   | Start => A_role *)
 (*   | Sent _ => Ndeliver *)
-(*   | Delivered _ _ => B *)
+(*   | Delivered _ _ => B_role *)
 (*   | Received _ _ => Ndeliver    (* Why is this needed? *) *)
 (*   end. *)
 
@@ -136,7 +139,7 @@ Defined.
 (*   rewrite /simple_state_order. *)
 (*   intros s [ρ' [s' Htrans]]=> /=. *)
 (*   split. *)
-(*   - destruct s; try set_solver. inversion Htrans. *)
+(*   - destruct s; try set_solver. *)
 (*   - intros s'' Htrans'. simpl in *. *)
 (*     destruct s. *)
 (*     + inversion Htrans'. split; simpl; lia. *)
