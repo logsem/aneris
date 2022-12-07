@@ -330,9 +330,30 @@ Section Aneris_AS.
     Nat.iter n (λ ms, ms ⊎ {[+ mAB +]}) ∅. 
   Definition mABm m : list message := repeat mAB m.
 
+  Definition locale_simple_label (ζ : ex_label aneris_lang) : simple_role :=
+    match ζ with
+    | inl ("0.0.0.0",0) => A_role
+    | inl ("0.0.0.1",0) => B_role
+    | inl _ => A_role
+    | inr DeliverLabel => Ndeliver
+    | inr DropLabel => Ndrop
+    | inr DuplicateLoabel => Ndup
+    end.
+
+  Definition labels_match (ex : execution_trace aneris_lang)
+             (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
+    : Prop :=
+    match ex, atr with
+    | _ :tr[ζ]: _, _ :tr[ℓ]: _ => ℓ = locale_simple_label ζ
+    | {tr[_]}, {tr[_]} => True
+    | _, _ => False
+    end.
+
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
-             (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
+             (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
+      : Prop :=
     trace_steps simple_trans atr ∧
+    labels_match ex atr ∧
     state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
     ∃ shA shB, 
     state_sockets (trace_last ex).2 =

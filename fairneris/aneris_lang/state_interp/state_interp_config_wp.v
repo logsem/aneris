@@ -63,20 +63,20 @@ Section state_interpretation.
     rewrite Hex in H. simpl in *.
     destruct σ1; simpl in *; simplify_eq.
     destruct (trace_last atr) eqn:Hs.
-    { destruct H as (_ & Hσ & _).
+    { destruct H as (_ & _ & Hσ & _).
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       - rewrite /messages_to_receive_at_multi_soup in Hm. set_solver.
       - set_solver.
       - set_solver. }
     (* Sent *)
-    - destruct H as (Hsteps & Hσ & H').
+    - destruct H as (Hsteps & Hmatch & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
       + destruct sent;
           [by rewrite /messages_to_receive_at_multi_soup in Hm; set_solver|].
-        iExists (Delivered sent 0), (Some Ndeliver).
+        iExists (Delivered sent 0), Ndeliver.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -95,6 +95,7 @@ Section state_interpretation.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
+          split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
           apply Hnscoh in HSn as (?&?&?&?&?).
@@ -146,7 +147,7 @@ Section state_interpretation.
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       (* Dup *)
       + destruct sent as [|sent]; [set_solver|].
-        iExists (Sent $ S $ S sent), (Some Ndup).
+        iExists (Sent $ S $ S sent), Ndup.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -168,7 +169,7 @@ Section state_interpretation.
         iPureIntro. by apply messages_history_coh_duplicate_message.
       (* Drop *)
       + destruct sent as [|sent]; [by set_solver|].
-        iExists (Sent sent), (Some Ndrop).
+        iExists (Sent sent), Ndrop.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -178,6 +179,7 @@ Section state_interpretation.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
+          split; [done|].
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
@@ -205,13 +207,13 @@ Section state_interpretation.
         iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. by apply messages_history_coh_drop_message.
     (* Delivered *)
-    - destruct H as (Hvalid&Hσ&H').
+    - destruct H as (Hsteps & Hmatch & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
       + destruct sent;
           [by rewrite /messages_to_receive_at_multi_soup in Hm; set_solver|].
-        iExists (Delivered sent (S delivered)), (Some Ndeliver).
+        iExists (Delivered sent (S delivered)), Ndeliver.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -230,6 +232,7 @@ Section state_interpretation.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
+          split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
           apply Hnscoh in HSn as (?&?&?&?&?).
@@ -281,7 +284,7 @@ Section state_interpretation.
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       (* Dup *)
       + destruct sent as [|sent]; [set_solver|].
-        iExists (Delivered (S $ S sent) delivered), (Some Ndup).
+        iExists (Delivered (S $ S sent) delivered), Ndup.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -303,7 +306,7 @@ Section state_interpretation.
         iPureIntro. by apply messages_history_coh_duplicate_message.
       (* Drop *)
       + destruct sent as [|sent]; [by set_solver|].
-        iExists (Delivered sent delivered), (Some Ndrop).
+        iExists (Delivered sent delivered), Ndrop.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -313,6 +316,7 @@ Section state_interpretation.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
+          split; [multiset_solver|].
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
@@ -340,13 +344,13 @@ Section state_interpretation.
         iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. by apply messages_history_coh_drop_message.
     (* Delivered *)
-    - destruct H as (Hvalid&Hσ&H').
+    - destruct H as (Hsteps & Hmatch & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
       + destruct sent as [|sent];
           [by rewrite /messages_to_receive_at_multi_soup in Hm; set_solver|].
-        iExists (Received sent (S delivered)), (Some Ndeliver).
+        iExists (Received sent (S delivered)), Ndeliver.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -366,6 +370,7 @@ Section state_interpretation.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
+          split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
           apply Hnscoh in HSn as (?&?&?&?&?).
@@ -417,7 +422,7 @@ Section state_interpretation.
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       (* Dup *)
       + destruct sent as [|sent]; [set_solver|].
-        iExists (Received (S $ S sent) delivered), (Some Ndup).
+        iExists (Received (S $ S sent) delivered), Ndup.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -439,7 +444,7 @@ Section state_interpretation.
         iPureIntro. by apply messages_history_coh_duplicate_message.
       (* Drop *)
       + destruct sent as [|sent]; [by set_solver|].
-        iExists (Received sent delivered), (Some Ndrop).
+        iExists (Received sent delivered), Ndrop.
         rewrite (aneris_events_state_interp_same_tp _ (tp1, _));
           [| |done|done]; last first.
         { econstructor; [done| |done]. econstructor 2; eauto. }
@@ -449,6 +454,7 @@ Section state_interpretation.
           rewrite /simple_valid_state_evolution.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
+          split; [multiset_solver|].
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].

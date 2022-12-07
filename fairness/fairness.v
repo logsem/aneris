@@ -12,10 +12,10 @@ Record FairModel : Type := {
   fmrole_countable: Countable fmrole;
   fmrole_inhabited: Inhabited fmrole;
 
-  fmtrans: fmstate -> option fmrole -> fmstate -> Prop;
+  fmtrans: fmstate -> fmrole -> fmstate -> Prop;
 
   live_roles: fmstate -> gset fmrole;
-  fm_live_spec: forall s ρ s', fmtrans s (Some ρ) s' -> ρ ∈ live_roles s;
+  fm_live_spec: forall s ρ s', fmtrans s ρ s' -> ρ ∈ live_roles s;
 }.
 
 #[global] Existing Instance fmrole_eqdec.
@@ -26,7 +26,7 @@ Record FairModel : Type := {
 Definition fair_model_to_model (FM : FairModel) : Model :=
   {|
     mstate := fmstate FM;
-    mlabel := option $ fmrole FM;
+    mlabel := fmrole FM;
     mtrans := fmtrans FM;
   |}.
 
@@ -110,7 +110,7 @@ Section exec_trace.
 
 End exec_trace.
 
-Definition mtrace (M:FairModel) := trace M (option M.(fmrole)).
+Definition mtrace (M:FairModel) := trace M (M.(fmrole)).
 
 Section model_traces.
   Context `{M: FairModel}.
@@ -120,7 +120,7 @@ Section model_traces.
   Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
     forall n, pred_at mtr n (λ δ _, role_enabled_model ρ δ) ->
          ∃ m, pred_at mtr (n+m) (λ δ _, ¬role_enabled_model ρ δ)
-              ∨ pred_at mtr (n+m) (λ _ ℓ, ℓ = Some (Some ρ)).
+              ∨ pred_at mtr (n+m) (λ _ ℓ, ℓ = Some ρ).
 
   Lemma fair_model_trace_after ℓ tr tr' k:
     after k tr = Some tr' ->

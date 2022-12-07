@@ -23,11 +23,11 @@ Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_decr:
     ∀ (s: Mdl), (∃ ρ' s', fmtrans _ s ρ' s') ->
                 ftm_decreasing_role s ∈ live_roles _ s ∧
-                ∀ s', (fmtrans _ s (Some (ftm_decreasing_role s)) s' ->
+                ∀ s', (fmtrans _ s (ftm_decreasing_role s) s' ->
                        (strict ftm_leq) s' s);
   ftm_decreasing_role_preserved:
     ∀ (s s': Mdl) ρ',
-      (fmtrans _ s ρ' s' -> ρ' ≠ Some (ftm_decreasing_role s) ->
+      (fmtrans _ s ρ' s' -> ρ' ≠ ftm_decreasing_role s ->
       ftm_decreasing_role s = ftm_decreasing_role s');
   ftm_notinc:
     ∀ (s: Mdl) ρ s', (fmtrans _ s ρ s' -> ftm_leq s' s);
@@ -86,7 +86,7 @@ Proof.
     rewrite -> !pred_at_S in Hev.
     punfold Hval; inversion Hval as [|??? Htrans Hval']; simplify_eq.
     destruct Hval' as [Hval'|]; last done.
-    destruct (decide (ℓ = Some (ftm_decreasing_role s))) as [-> | Hnoteq].
+    destruct (decide (ℓ = ftm_decreasing_role s)) as [-> | Hnoteq].
     + apply terminating_trace_cons. eapply IH=>//; eauto.
       eapply ftm_trans' =>//; apply Htrdec. simpl. destruct Hval;done.
     + destruct mtr as [|s' ℓ' mtr''] eqn:Heq; first by eexists 2.

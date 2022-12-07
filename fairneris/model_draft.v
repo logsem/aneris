@@ -44,24 +44,24 @@ Proof.
 Qed.
 
 Inductive simple_trans
-  : simple_state → option simple_role → simple_state → Prop :=
+  : simple_state → simple_role → simple_state → Prop :=
 (* Transitions from Start *)
-| Start_B_recv_fail_simple_trans : simple_trans Start (Some B_role) Start
-| Start_A_send_simple_trans : simple_trans Start (Some A_role) (Sent 1)
+| Start_B_recv_fail_simple_trans : simple_trans Start B_role Start
+| Start_A_send_simple_trans : simple_trans Start A_role (Sent 1)
 (* Transitions from Sent *)
-| Sent_B_recv_fail_simple_trans n : simple_trans (Sent n) (Some B_role) (Sent n)
-| Sent_N_duplicate_simple_trans n : simple_trans (Sent $ S n) (Some Ndup) (Sent $ S $ S n)
-| Sent_N_drop_simple_trans n : simple_trans (Sent $ S n) (Some Ndrop) (Sent n)
-| Sent_N_deliver_simple_trans n : simple_trans (Sent $ S n) (Some Ndeliver) (Delivered n 0)
+| Sent_B_recv_fail_simple_trans n : simple_trans (Sent n) B_role (Sent n)
+| Sent_N_duplicate_simple_trans n : simple_trans (Sent $ S n) Ndup (Sent $ S $ S n)
+| Sent_N_drop_simple_trans n : simple_trans (Sent $ S n) Ndrop (Sent n)
+| Sent_N_deliver_simple_trans n : simple_trans (Sent $ S n) Ndeliver (Delivered n 0)
 (* Transitions from Delivered *)
-| Delivered_N_duplicate_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndup) (Delivered (S $ S n) m)
-| Delivered_N_drop_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndrop) (Delivered n m)
-| Delivered_N_deliver_simple_trans n m : simple_trans (Delivered (S n) m) (Some Ndeliver) (Delivered n (S m))
-| Delivered_B_recv_succ_simple_trans n m : simple_trans (Delivered n m) (Some B_role) (Received n m)
+| Delivered_N_duplicate_simple_trans n m : simple_trans (Delivered (S n) m) Ndup (Delivered (S $ S n) m)
+| Delivered_N_drop_simple_trans n m : simple_trans (Delivered (S n) m) Ndrop (Delivered n m)
+| Delivered_N_deliver_simple_trans n m : simple_trans (Delivered (S n) m) Ndeliver (Delivered n (S m))
+| Delivered_B_recv_succ_simple_trans n m : simple_trans (Delivered n m) B_role (Received n m)
 (* Transitions from Received - Are these needed? *)
-| Received_N_duplicate_simple_trans n m : simple_trans (Received (S n) m) (Some Ndup) (Received (S $ S n) m)
-| Received_N_drop_simple_trans n m : simple_trans (Received (S n) m) (Some Ndrop) (Received n m)
-| Received_N_deliver_simple_trans n m : simple_trans (Received (S n) m) (Some Ndeliver) (Received n (S m))
+| Received_N_duplicate_simple_trans n m : simple_trans (Received (S n) m) Ndup (Received (S $ S n) m)
+| Received_N_drop_simple_trans n m : simple_trans (Received (S n) m) Ndrop (Received n m)
+| Received_N_deliver_simple_trans n m : simple_trans (Received (S n) m) Ndeliver (Received n (S m))
 .
 
 Definition simple_live_roles (s : simple_state) : gset simple_role :=
@@ -78,7 +78,7 @@ Definition simple_live_roles (s : simple_state) : gset simple_role :=
   end.
 
 Lemma simple_live_spec_holds s ρ s' :
-  simple_trans s (Some ρ) s' -> ρ ∈ simple_live_roles s.
+  simple_trans s ρ s' -> ρ ∈ simple_live_roles s.
 Proof. destruct s; inversion 1; try set_solver; destruct sent; set_solver. Qed.
 
 Definition simple_fair_model : FairModel.
@@ -91,7 +91,6 @@ Proof.
             fm_live_spec := simple_live_spec_holds;
           |}).
 Defined.
-
 
 (* (** Fair Model construction (currently does not work, as the config roles
 do not terminate) *) *)
