@@ -16,11 +16,13 @@ Section with_Σ.
     {{{ shA ↪[ip_of_address saA] sA ∗ saA ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗
         live_role_frag_own A_role }}}
       (mkExpr (ip_of_address saA) (Aprog shA)) @ s; (ip_of_address saA,tidA); E
-    {{{ v, RET v; True }}}.
+    {{{ v, RET v; dead_role_frag_own A_role }}}.
   Proof.
     iIntros (Φ) "(Hsh & Hrt & Hmsg & HA) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; [done|].
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(%Hvalid & Hevs & Hσ & [Hlive Hown] & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
+            "(%Hvalid & Hevs & Hσ & Hlive & Hauth) /=".
+    iDestruct "Hlive" as "(Hlive_auth & Hlive_owns & Hdead_auth & Hdead_owns)".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -53,16 +55,24 @@ Section with_Σ.
     { iDestruct "Hrt" as "[$ Hrt]". }
     { simpl. rewrite /from_singleton. eauto. }
     (* Derive this using ghost state tracking current live roles *)
-    iDestruct (live_role_auth_elem_of with "Hlive HA") as %Hrole.
+    iDestruct (live_role_auth_elem_of with "Hlive_auth HA") as %Hrole.
     (* assert (A_role ∈ simple_live_roles (trace_last atr)) as Hrole by admit. *)
     assert ((trace_last atr) = model_draft.Start) as Heq.
     { destruct (trace_last atr); simpl in Hrole; try set_solver;
         destruct sent; set_solver. }
     (* iDestruct "Hlive" as (M HM) "Hlive". *)
-    iMod (live_role_auth_delete with "Hlive HA") as "Hlive".
+    iMod (live_role_auth_delete with "Hlive_auth HA") as "Hlive_auth".
     rewrite Heq.
-    iMod (live_roles_auth_extend _ {[Ndup;Ndrop;Ndeliver]} with "Hlive")
-      as "[Hlive Howns]"; [set_solver|].
+    iMod (live_roles_auth_extend _ {[Ndup;Ndrop;Ndeliver]} with "Hlive_auth")
+      as "[Hlive_auth Hlive_owns']"; [set_solver|].
+    replace (config_roles ∖ simple_live_roles model_draft.Start) with
+      config_roles by set_solver.
+    iMod (dead_roles_auth_delete _ {[Ndup;Ndrop;Ndeliver]} with
+           "Hdead_auth Hdead_owns") as "Hdead_auth".
+    iMod (dead_roles_auth_extend _ {[A_role]} with "Hdead_auth")
+      as "[Hdead_auth Hdead_owns]"; [set_solver|].
+    iMod (dead_roles_auth_extend _ ∅ with "Hdead_auth")
+      as "[Hdead_auth Hdead_owns_∅]"; [set_solver|].
     iExists (Sent 1), A_role.
     iDestruct (Huntracked with "Hrt Hevs") as "[$ Hrt]";
           [done..|set_solver|].
@@ -71,18 +81,25 @@ Section with_Σ.
     iFrame.
     iSplitR; [done|].
     simpl.
-    iSpecialize ("HΦ" with "[//]").
+    iSpecialize ("HΦ" with "Hdead_owns").
     iSplitR "HΦ"; [|done].
-    iSplitR "Hlive Howns"; last first.
+    iSplitR "Hlive_auth Hlive_owns' Hdead_auth Hdead_owns_∅"; last first.
     { replace ({[A_role; B_role]} ∖ {[A_role]}) with
               ({[B_role]}:gset simple_role) by set_solver.
       rewrite /thread_live_roles_interp. simpl.
       replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
         config_roles by set_solver.
-      iFrame.
+      replace (config_roles ∖ {[B_role; Ndup; Ndrop; Ndeliver]}) with
+        (∅:gset simple_role) by set_solver.
       replace ({[Ndup; Ndrop; Ndeliver; B_role]}) with
         ({[B_role; Ndup; Ndrop; Ndeliver]}:gset simple_role) by set_solver.
-      done. }
+      iFrame.
+      rewrite union_empty_l_L.
+      replace (all_roles ∖ {[A_role; B_role]}) with
+        config_roles by set_solver. rewrite difference_diag_L union_empty_r_L.
+      replace (all_roles ∖ {[B_role; Ndup; Ndrop; Ndeliver]}) with
+        ({[A_role]}:gset simple_role) by set_solver.
+      by iFrame. }
     iPureIntro.
     rewrite /simple_valid_state_evolution in Hvalid.
     rewrite /simple_valid_state_evolution.
@@ -124,12 +141,13 @@ Section with_Σ.
     {{{ shB ↪[ip_of_address saB] sB ∗ saB ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗
         live_role_frag_own B_role }}}
       (mkExpr (ip_of_address saB) (Bprog shB)) @ s; (ip_of_address saB, tidB); E
-    {{{ v, RET v; True }}}.
+    {{{ v, RET v; dead_role_frag_own B_role }}}.
   Proof.
     iIntros (Φ) "(Hsh & Hrt & #HΨ & HB) HΦ".
     iLöb as "IH".
     iApply wp_lift_head_step; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(%Hvalid & Hevs & Hσ & [Hlive Hown] & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(%Hvalid & Hevs & Hσ & Hlive & Hauth) /=".
+    iDestruct "Hlive" as "(Hlive_auth & Hlive_owns & Hdead_auth & Hdead_owns)".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -152,7 +170,7 @@ Section with_Σ.
         rewrite (insert_id (state_sockets σ)) in Hnotriggered; last done.
         iNext.
         iMod "Hmk".
-        iDestruct (live_role_auth_elem_of with "Hlive HB") as %Hrole.
+        iDestruct (live_role_auth_elem_of with "Hlive_auth HB") as %Hrole.
         iModIntro.
         destruct (trace_last atr) eqn:Hs; [..|by destruct sent; set_solver].
         * iExists (trace_last atr), B_role.
@@ -241,7 +259,7 @@ Section with_Σ.
       { eexists saB, _, _, _, _, _.
         repeat split; set_solver. }
       clear Huntracked.
-      iDestruct (live_role_auth_elem_of with "Hlive HB") as %Hrole.
+      iDestruct (live_role_auth_elem_of with "Hlive_auth HB") as %Hrole.
       iAssert (⌜∃ x y, trace_last atr = Delivered x y⌝)%I as %(x&y&Hs).
       { rewrite /simple_valid_state_evolution in Hvalid.
         destruct (trace_last atr) eqn:Heq;
@@ -268,11 +286,13 @@ Section with_Σ.
           simplify_eq.
           rewrite lookup_insert_Some in Hr.
           destruct Hr as [Hr|Hr]; set_solver. }
-      iMod (live_roles_auth_delete with "Hlive HB") as "Hlive".
+      iMod (live_roles_auth_delete with "Hlive_auth HB") as "Hlive_auth".
+      rewrite Hs.
+      iMod (dead_role_auth_extend _ B_role with "Hdead_auth")
+        as "[Hdead_auth Hdead_own]"; [destruct x; set_solver|].
       iModIntro.
       iExists (Received x y), B_role.
       rewrite Hhist.
-      rewrite Hs.
       rewrite /thread_live_roles_interp=> /=.
       replace (match x with
                | 0%nat => {[B_role]}
@@ -291,6 +311,29 @@ Section with_Σ.
          | 0%nat => ∅
          | S _ => {[Ndup; Ndrop; Ndeliver]}
          end ∩ config_roles:gset simple_role); last first.
+      { destruct x; set_solver. }
+      replace ({[B_role]}
+                    ∪ all_roles
+                      ∖ match x with
+                        | 0%nat => {[B_role]}
+                        | S _ => {[B_role; Ndup; Ndrop; Ndeliver]}
+                        end) with
+        (all_roles
+       ∖ match x with
+         | 0%nat => ∅
+         | S _ => {[Ndup; Ndrop; Ndeliver]}
+         end); last first.
+      { destruct x; set_solver. }
+      replace (config_roles
+                    ∖ match x with
+                      | 0%nat => {[B_role]}
+                      | S _ => {[B_role; Ndup; Ndrop; Ndeliver]}
+                      end) with
+        (config_roles
+       ∖ match x with
+         | 0%nat => ∅
+         | S _ => {[Ndup; Ndrop; Ndeliver]}
+         end); last first.
       { destruct x; set_solver. }
       iFrame.
       iSplit.

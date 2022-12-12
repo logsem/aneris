@@ -119,9 +119,26 @@ Section state_interpretation.
           set_solver. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
-          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
-          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
-          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+          iDestruct "Hlive" as "(Hlive_auth & Hlive_frags &
+                                 Hdead_auth & Hdead_frags)"=> /=.
+          iMod (live_roles_auth_delete with "Hlive_auth Hlive_frags")
+            as "Hlive_auth".
+          iMod (live_roles_auth_extend with "Hlive_auth") as "[Hlive_auth $]";
+            [set_solver|].
+          simpl.
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace (all_roles ∖ {[B_role; Ndup; Ndrop; Ndeliver]}) with
+            ({[A_role]}:gset simple_role) by set_solver.
+          rewrite /config_roles. rewrite /all_roles.
+          replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]} ∖ {[B_role]})
+            with ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role); last first.
+          { replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]}) with
+              ({[B_role]} ∪ {[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role)
+              by set_solver.
+            rewrite difference_union_distr_l_L.
+            rewrite difference_diag_L. rewrite union_empty_l_L.
+            set_solver. }
+          iMod (dead_roles_auth_extend with "Hdead_auth") as "[Hdead_ $]";
             [set_solver|].
           iModIntro. simpl.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
@@ -131,7 +148,10 @@ Section state_interpretation.
           rewrite union_empty_l_L.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
             ({[B_role]}:gset simple_role) by set_solver.
-          done. }
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace ({[Ndup; Ndrop; Ndeliver; A_role]}) with
+            ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role) by set_solver.
+          by iFrame. }
         iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
@@ -181,11 +201,28 @@ Section state_interpretation.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|].
           split; [by multiset_solver|done]. }
-        iSplitR "Hlive"; last first.
+                iSplitR "Hlive"; last first.
         { destruct sent; [|done].
-          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
-          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
-          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+          iDestruct "Hlive" as "(Hlive_auth & Hlive_frags &
+                                 Hdead_auth & Hdead_frags)"=> /=.
+          iMod (live_roles_auth_delete with "Hlive_auth Hlive_frags")
+            as "Hlive_auth".
+          iMod (live_roles_auth_extend with "Hlive_auth") as "[Hlive_auth $]";
+            [set_solver|].
+          simpl.
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace (all_roles ∖ {[B_role; Ndup; Ndrop; Ndeliver]}) with
+            ({[A_role]}:gset simple_role) by set_solver.
+          rewrite /config_roles. rewrite /all_roles.
+          replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]} ∖ {[B_role]})
+            with ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role); last first.
+          { replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]}) with
+              ({[B_role]} ∪ {[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role)
+              by set_solver.
+            rewrite difference_union_distr_l_L.
+            rewrite difference_diag_L. rewrite union_empty_l_L.
+            set_solver. }
+          iMod (dead_roles_auth_extend with "Hdead_auth") as "[Hdead_ $]";
             [set_solver|].
           iModIntro. simpl.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
@@ -195,7 +232,10 @@ Section state_interpretation.
           rewrite union_empty_l_L.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
             ({[B_role]}:gset simple_role) by set_solver.
-          done. }
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace ({[Ndup; Ndrop; Ndeliver; A_role]}) with
+            ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role) by set_solver.
+          by iFrame. }
         iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
@@ -256,9 +296,26 @@ Section state_interpretation.
           set_solver. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
-          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
-          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
-          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+          iDestruct "Hlive" as "(Hlive_auth & Hlive_frags &
+                                 Hdead_auth & Hdead_frags)"=> /=.
+          iMod (live_roles_auth_delete with "Hlive_auth Hlive_frags")
+            as "Hlive_auth".
+          iMod (live_roles_auth_extend with "Hlive_auth") as "[Hlive_auth $]";
+            [set_solver|].
+          simpl.
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace (all_roles ∖ {[B_role; Ndup; Ndrop; Ndeliver]}) with
+            ({[A_role]}:gset simple_role) by set_solver.
+          rewrite /config_roles. rewrite /all_roles.
+          replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]} ∖ {[B_role]})
+            with ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role); last first.
+          { replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]}) with
+              ({[B_role]} ∪ {[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role)
+              by set_solver.
+            rewrite difference_union_distr_l_L.
+            rewrite difference_diag_L. rewrite union_empty_l_L.
+            set_solver. }
+          iMod (dead_roles_auth_extend with "Hdead_auth") as "[Hdead_ $]";
             [set_solver|].
           iModIntro. simpl.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
@@ -268,7 +325,10 @@ Section state_interpretation.
           rewrite union_empty_l_L.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
             ({[B_role]}:gset simple_role) by set_solver.
-          done. }
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace ({[Ndup; Ndrop; Ndeliver; A_role]}) with
+            ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role) by set_solver.
+          by iFrame. }
         iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
@@ -320,9 +380,26 @@ Section state_interpretation.
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
-          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
-          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
-          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+          iDestruct "Hlive" as "(Hlive_auth & Hlive_frags &
+                                 Hdead_auth & Hdead_frags)"=> /=.
+          iMod (live_roles_auth_delete with "Hlive_auth Hlive_frags")
+            as "Hlive_auth".
+          iMod (live_roles_auth_extend with "Hlive_auth") as "[Hlive_auth $]";
+            [set_solver|].
+          simpl.
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace (all_roles ∖ {[B_role; Ndup; Ndrop; Ndeliver]}) with
+            ({[A_role]}:gset simple_role) by set_solver.
+          rewrite /config_roles. rewrite /all_roles.
+          replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]} ∖ {[B_role]})
+            with ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role); last first.
+          { replace ({[A_role; B_role; Ndup; Ndrop; Ndeliver]}) with
+              ({[B_role]} ∪ {[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role)
+              by set_solver.
+            rewrite difference_union_distr_l_L.
+            rewrite difference_diag_L. rewrite union_empty_l_L.
+            set_solver. }
+          iMod (dead_roles_auth_extend with "Hdead_auth") as "[Hdead_ $]";
             [set_solver|].
           iModIntro. simpl.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
@@ -332,7 +409,10 @@ Section state_interpretation.
           rewrite union_empty_l_L.
           replace ({[B_role; Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
             ({[B_role]}:gset simple_role) by set_solver.
-          done. }
+          replace (config_roles ∖ {[B_role]}) with config_roles by set_solver.
+          replace ({[Ndup; Ndrop; Ndeliver; A_role]}) with
+            ({[A_role; Ndup; Ndrop; Ndeliver]}:gset simple_role) by set_solver.
+          by iFrame. }
         iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
@@ -394,19 +474,28 @@ Section state_interpretation.
           set_solver. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
-          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
-          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
-          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+          iDestruct "Hlive" as "(Hlive_auth & Hlive_frags &
+                                 Hdead_auth & Hdead_frags)"=> /=.
+          iMod (live_roles_auth_delete with "Hlive_auth Hlive_frags")
+            as "Hlive_auth".
+          iMod (live_roles_auth_extend with "Hlive_auth") as "[Hlive_auth $]";
             [set_solver|].
-          iModIntro. simpl.
-          replace ({[Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
-            (config_roles:gset simple_role) by set_solver.
-          replace (∅ ∩ config_roles) with
-            (∅:gset simple_role) by set_solver.
-          rewrite union_empty_l_L.
-          replace ({[Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
-            (∅:gset simple_role) by set_solver.
-          done. }
+          rewrite /all_roles.
+          replace (({[A_role; B_role; Ndup; Ndrop; Ndeliver]}
+                    ∖ {[Ndup; Ndrop; Ndeliver]})) with
+            ({[A_role; B_role]}:gset simple_role) by set_solver.
+          iMod (dead_roles_auth_extend with "Hdead_auth") as "[Hdead_auth $]";
+            [set_solver|].
+          simpl.
+          rewrite intersection_empty_l_L union_empty_l_L.
+          rewrite /config_roles. rewrite /all_roles.
+          rewrite intersection_idemp_L.
+          rewrite difference_diag_L.
+          rewrite !difference_empty_L.
+          replace ({[Ndup; Ndrop; Ndeliver]} ∪ {[A_role; B_role]}) with
+            ({[A_role; B_role; Ndup; Ndrop; Ndeliver]}:gset simple_role)
+            by set_solver.
+          iModIntro. by iFrame. }
         iModIntro.
         iExists γm, mh. iFrame.
         iSplit.
@@ -458,19 +547,28 @@ Section state_interpretation.
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
-          iDestruct "Hlive" as "[Hauth Hfrags]"=> /=.
-          iMod (live_roles_auth_delete with "Hauth Hfrags") as "Hauth".
-          iMod (live_roles_auth_extend with "Hauth") as "[Hauth $]";
+          iDestruct "Hlive" as "(Hlive_auth & Hlive_frags &
+                                 Hdead_auth & Hdead_frags)"=> /=.
+          iMod (live_roles_auth_delete with "Hlive_auth Hlive_frags")
+            as "Hlive_auth".
+          iMod (live_roles_auth_extend with "Hlive_auth") as "[Hlive_auth $]";
             [set_solver|].
-          iModIntro. simpl.
-          replace ({[Ndup; Ndrop; Ndeliver]} ∩ config_roles) with
-            (config_roles:gset simple_role) by set_solver.
-          replace (∅ ∩ config_roles) with
-            (∅:gset simple_role) by set_solver.
-          rewrite union_empty_l_L.
-          replace ({[Ndup; Ndrop; Ndeliver]} ∖ config_roles) with
-            (∅:gset simple_role) by set_solver.
-          done. }
+          rewrite /all_roles.
+          replace (({[A_role; B_role; Ndup; Ndrop; Ndeliver]}
+                    ∖ {[Ndup; Ndrop; Ndeliver]})) with
+            ({[A_role; B_role]}:gset simple_role) by set_solver.
+          iMod (dead_roles_auth_extend with "Hdead_auth") as "[Hdead_auth $]";
+            [set_solver|].
+          simpl.
+          rewrite intersection_empty_l_L union_empty_l_L.
+          rewrite /config_roles. rewrite /all_roles.
+          rewrite intersection_idemp_L.
+          rewrite difference_diag_L.
+          rewrite !difference_empty_L.
+          replace ({[Ndup; Ndrop; Ndeliver]} ∪ {[A_role; B_role]}) with
+            ({[A_role; B_role; Ndup; Ndrop; Ndeliver]}:gset simple_role)
+            by set_solver.
+          iModIntro. by iFrame. }
         iModIntro.
         iExists γm, mh. iFrame.
         iSplit.

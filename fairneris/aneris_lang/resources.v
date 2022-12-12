@@ -120,8 +120,9 @@ Class anerisG (Mdl : Model) Σ :=
       (** model *)
       aneris_model_name : gname;
       anerisG_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
-      (** live roles *)
+      (** live and dead roles *)
       aneris_live_roles_name : gname;
+      aneris_dead_roles_name : gname;
       anerisG_live_roles :> inG Σ live_roleUR;
       (** steps *)
       aneris_steps_name : gname;
@@ -457,6 +458,14 @@ Section definitions.
     own (A := live_roleUR) aneris_live_roles_name (◯ GSet roles).
   Definition live_role_frag_own (role : simple_role) : iProp Σ :=
     live_roles_frag_own {[role]}.
+
+  Definition dead_roles_auth_own (A : gset simple_role) : iProp Σ :=
+    own (A := live_roleUR) aneris_dead_roles_name (● GSet A).
+  Definition dead_roles_frag_own (roles : gset simple_role) : iProp Σ :=
+    own (A := live_roleUR) aneris_dead_roles_name (◯ GSet roles).
+  Definition dead_role_frag_own (role : simple_role) : iProp Σ :=
+    dead_roles_frag_own {[role]}.
+
 
 End definitions.
 
@@ -1713,6 +1722,78 @@ Section resource_lemmas.
     - rewrite /live_roles_frag_own -gset_disj_union /=; [|done].
       iDestruct 1 as "[Hroles1 Hroles2]". iFrame.
     - rewrite /live_roles_frag_own -gset_disj_union /=; [|done].
+      rewrite -own_op -auth_frag_op. by eauto.
+  Qed.
+
+  (* Dead Roles *)
+
+  Lemma dead_roles_auth_subseteq A roles :
+    dead_roles_auth_own A -∗ dead_roles_frag_own roles -∗ ⌜roles ⊆ A⌝.
+  Proof.
+    iIntros "Hauth Hown".
+    iDestruct (own_valid_2 with "Hauth Hown") as %Hvalid%auth_both_valid_discrete.
+    destruct Hvalid as [Hvalid%gset_disj_included _].
+    iPureIntro. set_solver.
+  Qed.
+
+  Lemma dead_roles_auth_extend A roles :
+    roles ## A →
+    dead_roles_auth_own A ==∗
+    dead_roles_auth_own (roles ∪ A) ∗
+    dead_roles_frag_own roles.
+  Proof.
+    iIntros (Hnin) "Hauth".
+    iMod (own_update with "Hauth") as "[$ $]"; [|done].
+    apply auth_update_alloc.
+    apply gset_disj_alloc_empty_local_update.
+    set_solver.
+  Qed.
+
+  Lemma dead_roles_auth_delete A roles :
+    dead_roles_auth_own A -∗ dead_roles_frag_own roles ==∗
+    dead_roles_auth_own (A ∖ roles).
+  Proof.
+    iIntros "Hauth Hown".
+    iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done].
+    apply auth_update_dealloc, gset_disj_dealloc_local_update.
+  Qed.
+
+  Lemma dead_role_auth_elem_of A role :
+    dead_roles_auth_own A -∗ dead_role_frag_own role -∗ ⌜role ∈ A⌝.
+  Proof.
+    iIntros "Hauth Hown".
+    iDestruct (dead_roles_auth_subseteq with "Hauth Hown") as %Hle.
+    iPureIntro. set_solver.
+  Qed.
+
+  Lemma dead_role_auth_extend A role :
+    role ∉ A →
+    dead_roles_auth_own A ==∗
+    dead_roles_auth_own ({[role]} ∪ A) ∗
+    dead_role_frag_own role.
+  Proof.
+    iIntros (Hnin) "Hauth".
+    by iMod (dead_roles_auth_extend with "Hauth") as "[$ $]"; [set_solver|].
+  Qed.
+
+  Lemma dead_role_auth_delete A role :
+    dead_roles_auth_own A -∗ dead_role_frag_own role ==∗
+    dead_roles_auth_own (A ∖ {[role]}).
+  Proof.
+    iIntros "Hauth Hown".
+    by iMod (dead_roles_auth_delete with "Hauth Hown") as "$".
+  Qed.
+
+  Lemma dead_roles_own_split roles1 roles2 :
+    roles1 ## roles2 →
+    ⊢ dead_roles_frag_own (roles1 ∪ roles2) ∗-∗
+      dead_roles_frag_own roles1 ∗ dead_roles_frag_own roles2.
+  Proof.
+    intros Hdisj.
+    iSplit.
+    - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done].
+      iDestruct 1 as "[Hroles1 Hroles2]". iFrame.
+    - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done].
       rewrite -own_op -auth_frag_op. by eauto.
   Qed.
 
