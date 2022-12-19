@@ -32,24 +32,28 @@ Lemma map_dom_Some_2 {E E'} `{!EqDecision E, !Countable E} (m: gmap E E') u:
   u ∈ gset_dom m → ∃ v, m !! u = Some v.
 Proof. by intros[]%elem_of_dom; exists x. Qed.
 
-Section Bloup.
+Section MapDef_Op_St.
+  Definition mapSt (LogSt: Type): Type := gmap string LogSt.
+  Definition mapOp (LogOp: Type): Type := string * LogOp.
+End MapDef_Op_St.
+
+
+
+Section MapLattice.
   Context `{!CRDT_Params}.
 
   Context (LogOp: Type)
           (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
   Context (LogSt: Type) (latA: Lattice LogSt).
-  Context (Hcd: @CrdtDenot LogOp LogSt timestamp_time eqdec_logop countable_logop).
 
-  Definition mapSt: Type := gmap string LogSt.
-  Definition mapOp: Type := string * LogOp.
-
-  Definition map_lat_le (st1 st2: mapSt) : Prop :=
+  Definition map_lat_le (st1 st2: mapSt LogSt) : Prop :=
     ∀ (s: string) (v: LogSt),
       st1 !! s = Some v
       → ∃ (v': LogSt), st2 !! s = Some v' ∧ (latA.(lat_le)) v v'.
 
   Definition map_lat_le_po: PartialOrder map_lat_le.
   Proof.
+    unfold mapSt in *.
     repeat split.
     + intros m s v. by exists v.
     + intros m m' m'' Hle Hle' s v Hms.
@@ -64,31 +68,31 @@ Section Bloup.
       - destruct (Hle s v E) as (v' & Heq & Hle_vv'); rewrite Heq.
         destruct (Hle' s v' Heq) as (v'' & Heq' & Hle_v'v). f_equal.
         destruct latA as [leA [[reflA trA] AntiSymA] lubA lub_propA].
-        assert (v'' = v) as ->; first by simplify_eq.
-        rewrite Heq'; f_equal.
+        assert (v'' = v) as ->; first (rewrite Heq' in E; by simplify_eq/=).
         by apply (AntiSymA v v').
-      - destruct (m' !! s) as [v|] eqn:E'; last by rewrite E E'.
+      - destruct (m' !! s) as [v|] eqn:E'; last reflexivity.
         destruct (Hle' s v E') as (v'' & Ebis & HleA).
         by rewrite Ebis in E.
   Qed.
 
-  Definition map_lat_lub (m m': mapSt): mapSt :=
+  Definition map_lat_lub (m m': mapSt LogSt): mapSt LogSt :=
     map_fold (λ s v' acc,
       match acc !! s with
       | None => map_insert s v' acc
       | Some v => map_insert s (latA.(lat_lub)v v') acc
       end) m m'.
 
-  Lemma TODO1 (m: mapSt):
+  Lemma TODO1 (m: mapSt LogSt):
     dom m = (gset_dom m).
   Proof. reflexivity. Qed.
-  Lemma TODO0 i v (m: mapSt):
+  Lemma TODO0 i v (m: mapSt LogSt):
     gset_dom (map_insert i v m) = (gset_dom m) ∪ ({[i]}).
   Proof. do 2rewrite -TODO1.
-    apply set_eq. split; rewrite dom_insert; set_solver. Qed.
+    apply set_eq; split; unfold mapSt in*;
+    rewrite dom_insert; set_solver. Qed.
 
-  Lemma lat_lub_fold_aux i x (m0: mapSt):
-    ∀ (j1 j2 : string) (z1 z2 : LogSt) (y : mapSt),
+  Lemma lat_lub_fold_aux i x (m0: mapSt LogSt):
+    ∀ (j1 j2 : string) (z1 z2 : LogSt) (y : mapSt LogSt),
       j1 ≠ j2 → <[i:=x]> m0 !! j1 = Some z1 → <[i:=x]> m0 !! j2 = Some z2 →
       match match y !! j2 with
         | Some v0 => map_insert j2 (v0 ⊔_l z2) y
@@ -117,38 +121,37 @@ Section Bloup.
     try (destruct(map_insert s1 (e1 ⊔_l st1) st !! s2)as[e4|]eqn:E4);
     try (destruct(map_insert s2 (e2 ⊔_l st2) st !! s1)as[e5|]eqn:E5);
     try (destruct(map_insert s1 st1 st !! s2)as[e|]eqn:E);
-    apply map_eq; intros s; (destruct (decide (s = s1)); [|destruct(decide(s=s2))]);
+    unfold mapSt; apply map_eq; intros s;
+    (destruct (decide (s = s1)); [|destruct(decide(s=s2))]);
     simplify_eq/=.
+    all: unfold mapSt in *.
+    all: unfold mapOp in *.
+    all: try (rewrite lookup_insert_ne in E; last done).
     all: try (rewrite lookup_insert_ne in E3; last done).
     all: try (rewrite lookup_insert_ne in E4; last done).
     all: try (rewrite lookup_insert_ne in E5; last done).
-    all: try (rewrite lookup_insert in E3).
-    all: try (rewrite lookup_insert in E4).
-    all: try (rewrite lookup_insert in E5).
-    all: try(rewrite lookup_insert_ne in E; last done).
-    all: try rewrite E5 in E1.
-    all: try rewrite E2 in E4.
-    all: try rewrite E1 in E3.
-    all: try rewrite E in E2.
-    all: simplify_eq/=.
-    all: try ((rewrite lookup_insert lookup_insert_ne; last done);
-      by rewrite lookup_insert).
-    all: by do 4 (rewrite lookup_insert_ne; last done).
+    all: try rewrite lookup_insert.
+    all: try repeat (rewrite lookup_insert_ne; last done).
+    all: try rewrite lookup_insert.
+    all: try by simplify_eq.
+    all: try (rewrite lookup_insert_ne; last done).
   Qed.
 
 
-  Lemma map_lat_lub_dom (m m': mapSt):
+  Lemma map_lat_lub_dom (m m': mapSt LogSt):
     gset_dom (map_lat_lub m m') = (gset_dom m) ∪ (gset_dom m').
   Proof.
+    unfold mapSt in *.
     generalize dependent m'. induction m' using map_ind;
-      first (rewrite /map_lat_lub map_fold_empty;
-      replace (gset_dom ∅) with (∅: gset string);
-        [ set_solver | by apply set_eq ]).
-    rewrite /map_lat_lub map_fold_insert;
+      first (rewrite/map_lat_lub/mapSt map_fold_empty;
+              replace (gset_dom ∅) with (∅: gset string);
+                [ set_solver | by apply set_eq]).
+    rewrite /map_lat_lub/mapSt map_fold_insert;
       [ | apply lat_lub_fold_aux | assumption ].
     apply set_eq. intros s. split.
     + destruct (m !! i)eqn:E'.
-      * pose proof (iffLR(elem_of_dom (map_lat_lub m m0) i)).
+      * set tmp := (map_lat_lub m m0). unfold mapSt in tmp.
+        pose proof (iffLR(elem_of_dom tmp i)).
         rewrite /map_lat_lub in H1.
         destruct H1 as (elt & Helt).
         { rewrite TODO1 IHm'. apply elem_of_dom_2 in E'.
@@ -192,8 +195,8 @@ Section Bloup.
     generalize dependent s;
     generalize dependent m'; induction m' using map_ind;
       first (intros s; split; first inversion 2;
-      intros; by rewrite/map_lat_lub map_fold_empty).
-    rewrite /map_lat_lub map_fold_insert;
+      intros; by rewrite/map_lat_lub/mapSt map_fold_empty).
+    rewrite /map_lat_lub/mapSt map_fold_insert;
       [ | apply lat_lub_fold_aux | assumption ].
     set IHSS := λ e, proj1 (IHm' e).
     set IHSN := λ e, proj1(proj2 (IHm' e)).
@@ -313,17 +316,33 @@ Section Bloup.
       + by rewrite (map_lub_elt_None_None _ _ _ Hms Hm's) in Hlubs.
   Defined.
 
-  Global Instance map_op_eqdec: EqDecision mapOp.
-  Proof. apply prod_eq_dec. Defined.
+End MapLattice.
 
-  Global Instance map_op_countable: Countable mapOp.
-  Proof. apply prod_countable. Qed.
+Arguments map_lat_lub {_ _}.
+Arguments map_lat_lub_dom {_ _ _ _}.
+Arguments map_lub_elt_Some_Some {_ _ _ _ _ _ _}.
+Arguments map_lub_elt_Some_None {_ _ _ _ _ _}.
+Arguments map_lub_elt_None_None {_ _ _ _ _}.
+Arguments map_lub_elt_None_Some {_ _ _ _ _ _}.
 
+
+Section MapDenot.
+  Context `{!CRDT_Params}.
+
+  Context (LogOp: Type)
+          (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
+  Context (LogSt: Type) (latA: Lattice LogSt).
   Context `{PA : !StLib_Params LogOp LogSt}.
 
+  Global Instance map_op_eqdec: EqDecision (mapOp LogOp).
+  Proof. apply prod_eq_dec. Defined.
+
+  Global Instance map_op_countable: Countable (mapOp LogOp).
+  Proof. apply prod_countable. Qed.
+
   Definition map_denot_def
-    (s: gset (Event mapOp)) (st: mapSt) : Prop :=
-    gset_dom st = gset_map (λ ev: Event mapOp, ev.(EV_Op).1) s
+    (s: gset (Event (mapOp LogOp))) (st: mapSt LogSt) : Prop :=
+    gset_dom st = gset_map (λ ev: Event (mapOp LogOp), ev.(EV_Op).1) s
     ∧ (∀ (str: string) (v: LogSt), st !! str = Some v →
       @crdt_denot LogOp LogSt timestamp_time eqdec_logop countable_logop
       PA.(StLib_Denot)
@@ -336,51 +355,42 @@ Section Bloup.
   Global Instance map_denot_fun : Rel2__Fun map_denot_def.
   Proof.
     constructor. intros s m m' (Hdom&Helts)(Hdom'&Helts').
-    apply map_eq. intros u.
+    unfold mapSt in *; apply map_eq. intros u.
     destruct (m !! u)as[v|]eqn:Hms; destruct (m' !! u)as[v'|]eqn:Hm's.
     - pose proof (Helts u v Hms) as A. pose proof (Helts' u v' Hm's) as B.
-      rewrite Hms Hm's. f_equal.
-      exact (PA.(StLib_Denot).(crdt_denot_fun).(rel2_fun)A B).
+      by rewrite (PA.(StLib_Denot).(crdt_denot_fun).(rel2_fun)A B).
     - exfalso. rewrite -Hdom in Hdom'.
       pose proof (map_dom_Some _ _ _ Hms). apply (map_dom_None _ _ Hm's).
       by rewrite Hdom'.
     - exfalso. rewrite -Hdom in Hdom'.
       pose proof (map_dom_Some _ _ _ Hm's). apply (map_dom_None _ _ Hms).
       by rewrite -Hdom'.
-    - by rewrite Hms Hm's.
+    - reflexivity.
   Qed.
 
-  Global Instance map_denot: CrdtDenot mapOp mapSt :=
+  Global Instance map_denot: CrdtDenot (mapOp LogOp) (mapSt LogSt) :=
     {| crdt_denot := map_denot_def |}.
 
-  Definition map_event (e: Event mapOp) : Event LogOp :=
+End MapDenot.
+
+Arguments map_denot {_} (LogOp) {_ _} (LogSt) {_ _}.
+
+
+
+Section MapMutator.
+  Context `{!CRDT_Params}.
+
+  Context (LogOp: Type)
+          (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
+  Context (LogSt: Type) (latA: Lattice LogSt).
+  Context `{PA : !StLib_Params LogOp LogSt}.
+
+
+  Definition map_event (e: Event (mapOp LogOp)) : Event LogOp :=
     {|EV_Orig := EV_Orig e;
       EV_Op := e.(EV_Op).2;
       EV_Time := EV_Time e;
     |}.
-
-  Definition map_mutator (m: mapSt) (e: Event mapOp) (m': mapSt) : Prop :=
-    let key: string := e.(EV_Op).1 in
-    let val: LogOp := e.(EV_Op).2 in
-    (∀ k v, k ≠ key → m !! k = Some v ↔ m' !! k = Some v)
-    ∧ ∃ (v': LogSt),
-        m' !! key = Some v'
-        ∧ st_crdtM_mut (default st_crdtM_init_st (m !! key)) (map_event e) v'.
-
-  Lemma map_mutator_dom {m m': mapSt}{e: Event mapOp}:
-    map_mutator m e m' → gset_dom m' = gset_dom m ∪ {[e.(EV_Op).1]}.
-  Proof.
-    intros(Hold&v'&Hm'k&Hnew).
-    apply set_eq; intros x; split;
-    destruct (decide(x = e.(EV_Op).1))as[-> | A];
-      [ by (intros _; apply elem_of_union_r, elem_of_singleton)
-      | by intros[v?]%map_dom_Some_2;
-        apply elem_of_union_l, map_dom_Some with v, Hold
-      | intros _; by apply map_dom_Some with v'
-      |intros[[v?]%map_dom_Some_2| ->%elem_of_singleton]%elem_of_union;
-        [by apply map_dom_Some with v, Hold
-        |by apply map_dom_Some with v'] ].
-  Qed.
 
   Lemma lst_val_map s lst:
     Lst_Validity' lst →
@@ -421,8 +431,32 @@ Section Bloup.
         apply elem_of_filter; set_solver.
   Qed.
 
+  Definition map_mutator
+    (m: mapSt LogSt) (e: Event (mapOp LogOp)) (m': mapSt LogSt) : Prop :=
+    let key: string := e.(EV_Op).1 in
+    let val: LogOp := e.(EV_Op).2 in
+    (∀ k v, k ≠ key → m !! k = Some v ↔ m' !! k = Some v)
+    ∧ ∃ (v': LogSt),
+        m' !! key = Some v'
+        ∧ st_crdtM_mut (default st_crdtM_init_st (m !! key)) (map_event e) v'.
+
+  Lemma map_mutator_dom {m m': mapSt LogSt}{e: Event (mapOp LogOp)}:
+    map_mutator m e m' → gset_dom m' = gset_dom m ∪ {[e.(EV_Op).1]}.
+  Proof.
+    intros(Hold&v'&Hm'k&Hnew).
+    apply set_eq; intros x; split;
+    destruct (decide(x = e.(EV_Op).1))as[-> | A];
+      [ by (intros _; apply elem_of_union_r, elem_of_singleton)
+      | by intros[v?]%map_dom_Some_2;
+        apply elem_of_union_l, map_dom_Some with v, Hold
+      | intros _; by apply map_dom_Some with v'
+      |intros[[v?]%map_dom_Some_2| ->%elem_of_singleton]%elem_of_union;
+        [by apply map_dom_Some with v, Hold
+        |by apply map_dom_Some with v'] ].
+  Qed.
+
   Lemma map_mut_coh:
-    ∀ (s : event_set mapOp) (st st' : mapSt) (ev : Event mapOp),
+    ∀ (s : event_set (mapOp LogOp)) (st st' : (mapSt LogSt)) (ev : Event (mapOp LogOp)),
       ⟦ s ⟧ ⇝ st
       → Lst_Validity' s → Lst_Validity' (s ∪ {[ ev ]})
       → ev ∉ s
@@ -494,7 +528,7 @@ Section Bloup.
   Qed.
 
   Lemma map_mut_lub_coh:
-    ∀ (s1 s2 : event_set mapOp) (st1 st2 st3 : mapSt),
+    ∀ (s1 s2 : event_set (mapOp LogOp)) (st1 st2 st3 : (mapSt LogSt)),
       ⟦ s1 ⟧ ⇝ st1
       → ⟦ s2 ⟧ ⇝ st2
       → Lst_Validity' s1
@@ -518,9 +552,7 @@ Section Bloup.
       {| EV_Op := (EV_Op e).2; EV_Orig := EV_Orig e; EV_Time := EV_Time e |})
       (filter (λ ev : Event (string * LogOp), (EV_Op ev).1 = s) (s1 ∪ s2)).
     destruct (st1 !! s) as [l |] eqn:E;
-    destruct (st2 !! s) as [l' |] eqn:E';
-    last (exfalso; pose proof (map_lub_elt_None_None st1 st2 s E E');
-      by rewrite H0 in Hs).
+    destruct (st2 !! s) as [l' |] eqn:E'.
     - pose proof (map_lub_elt_Some_Some E E').
       replace mapped_s12 with (mapped_s1 ∪ mapped_s2); last set_solver.
       pose proof (Hden s l E) as H1; pose proof (Hden' s l' E') as H2.
@@ -533,7 +565,7 @@ Section Bloup.
       + rewrite Hs in H0.
         intros i. destruct (Hproj i); [left | right]; set_solver.
       + rewrite(map_lub_elt_Some_Some E E') in Hs. by simplify_eq/=.
-    - pose proof (map_lub_elt_Some_None st1 st2 s l E E')as H0.
+    - pose proof (map_lub_elt_Some_None E E')as H0.
       replace mapped_s12 with (mapped_s1 ∪ mapped_s2); last set_solver.
       pose proof (Hden s l E) as H1.
       rewrite-/mapped_s1 in H1.
@@ -541,7 +573,7 @@ Section Bloup.
       { apply map_dom_None in E'. set_solver. }
       rewrite Hs in H0. simplify_eq/=.
       replace (mapped_s1 ∪ ∅) with mapped_s1; [assumption | set_solver].
-    - pose proof (map_lub_elt_None_Some st1 st2 s l' E' E)as H0.
+    - pose proof (map_lub_elt_None_Some E' E)as H0.
       replace mapped_s12 with (mapped_s1 ∪ mapped_s2); last set_solver.
       pose proof (Hden' s l' E') as H2.
       rewrite-/mapped_s2 in H2.
@@ -549,9 +581,12 @@ Section Bloup.
       { apply map_dom_None in E. set_solver. }
       rewrite Hs in H0. simplify_eq/=.
       replace (∅ ∪ mapped_s2) with mapped_s2; [assumption | set_solver].
+    - (exfalso; pose proof (map_lub_elt_None_None E E');
+      by rewrite H0 in Hs).
   Qed.
 
-  Lemma map_mut_mon (m : mapSt) (e : Event mapOp) (m' : mapSt) :
+  Lemma map_mut_mon
+    (m : mapSt LogSt) (e : Event (mapOp LogOp)) (m' : mapSt LogSt) :
     map_mutator m e m' → m ≤_l m'.
   Proof.
     intros (Hdom&v'&Hm'k&Hmk)s v Hms.
@@ -562,7 +597,7 @@ Section Bloup.
     by rewrite Hms in Hmk.
   Qed.
 
-  Global Instance map_model : StateCrdtModel mapOp mapSt.
+  Global Instance map_model : StateCrdtModel (mapOp LogOp) (mapSt LogSt).
   Proof.
     refine {| st_crdtM_lub_coh := map_mut_lub_coh;
               st_crdtM_mut_mon := map_mut_mon;
@@ -571,56 +606,41 @@ Section Bloup.
               st_crdtM_init_st := gmap_empty; |}.
     split; [ by apply set_eq | inversion 1 ].
   Defined.
+End MapMutator.
 
+Arguments map_event {_}.
+Arguments map_model {_} (LogOp) {_ _} (LogSt) {_ _}.
+
+
+Section MapParams.
+  Context `{!CRDT_Params}.
+
+  Context (LogOp: Type)
+          (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
+  Context (LogSt: Type) (latA: Lattice LogSt).
+  Context `{PA : !StLib_Params LogOp LogSt}.
 
 
   (** The two following defs come from OpLib and allows the proofs to use the
     * coherence of the underlying CRDT (LogOp, LogSt). *)
-  Definition map_op_coh (op: mapOp) (v: val): Prop :=
+  Definition map_op_coh (op: (mapOp LogOp)) (v: val): Prop :=
     ∃(s: string)(lop: LogOp)(vs vop: val),
       op.1 = s ∧ op.2 = lop
       ∧ v = (vs, vop)%V
       ∧ PA.(StLib_CohParams).(StLib_Op_Coh) lop vop
       ∧ vs = #s.
 
-  Definition map_st_coh_v_log (v: val) (m: gmap string val) (st: mapSt) :=
+  Definition map_st_coh_v_log (v: val) (m: gmap string val) (st: (mapSt LogSt)) :=
       is_map v m ∧
       gset_dom m = gset_dom st ∧
       ∀ k vs w, m !! k = Some w → st !! k = Some vs → StLib_St_Coh vs w.
   
   Definition map_st_coh :=
-    λ (st : mapSt) v,
+    λ (st : mapSt LogSt) v,
       ∃ (m : gmap string val), map_st_coh_v_log v m st.
 
-  (** serialization *)
-  Definition map_ser : serialization :=
-    list_serialization
-      (prod_serialization
-        string_serialization PA.(StLib_CohParams).(StLib_StSerialization)).
-
-  Lemma map_coh_ser:
-    ∀ (st : mapSt) (v : val), map_st_coh st v →
-      Serializable map_ser v.
-  Proof.
-    intros st_log st_v_v (st_v&(ls&->&Hls&?)&Hdom&Helts).
-    set lsv := map(λ e, ($e.1, e.2)%V) ls.
-    exists lsv.
-    split.
-    - admit.
-    - intros x Hx_in.
-      assert(∀ e, e ∈ lsv → ∃ e', e' ∈ ls ∧ e = ($e'.1, e'.2)%V).
-      { admit. }
-      induction lsv; first inversion Hx_in.
-      inversion Hx_in; last apply IHlsv; try done.
-      simplify_eq/=.
-      2: {intros e He_in.
-          destruct (H1 e) as(elt&Helt); last by exists elt.
-          by apply elem_of_list_further. }
-      destruct (H1 a) as(elt&Helt&->); first apply elem_of_list_here.
-    Admitted.
-
   Lemma map_coh_inj:
-    ∀ (o1 o2 : mapSt) (v : val), map_st_coh o1 v → map_st_coh o2 v → o1 = o2.
+    ∀ (o1 o2 : mapSt LogSt) (v : val), map_st_coh o1 v → map_st_coh o2 v → o1 = o2.
   Proof.
     intros st_log st'_log v
       [st_v (Hst_ismap &Hst_dom &Hst_elts)]
@@ -630,7 +650,7 @@ Section Bloup.
       destruct Hst'_ismap as(A'&B'&C&_).
       simplify_eq/=. f_equal.
       by apply Inject_list.(inject_inj). }
-    apply map_eq. intros x.
+    unfold mapSt; apply map_eq. intros x.
     destruct(st_log !! x)as[l|]eqn:E; destruct(st'_log !! x)as[n|]eqn:F;last by rewrite E F.
     - destruct(st_v !! x)as[lv|]eqn:E';
         last (apply map_dom_None in E' as [];
@@ -648,7 +668,23 @@ Section Bloup.
       by rewrite -Hst_dom Hst'_dom.
   Qed.
 
-  Global Instance map_coh_params : @StLib_Coh_Params mapOp mapSt.
+
+
+  (** serialization *)
+  Definition map_ser : serialization.
+  Admitted.
+
+  Lemma map_coh_ser:
+    ∀ (st : mapSt LogSt) (v : val), map_st_coh st v →
+      Serializable map_ser v.
+  Proof.
+    intros st_log st_v_v (st_v&(ls&->&Hls&?)&Hdom&Helts).
+    set lsv := map(λ e, ($e.1, e.2)%V) ls.
+    Admitted.
+
+
+
+  Global Instance map_coh_params : @StLib_Coh_Params (mapOp LogOp) (mapSt LogSt).
   Proof.
     refine {|
       StLib_StSerialization := map_ser;
@@ -663,17 +699,29 @@ Section Bloup.
     - exact map_coh_ser.
   Defined.
 
-  Global Instance map_params : StLib_Params mapOp mapSt :=
+  Global Instance map_params : StLib_Params (mapOp LogOp) (mapSt LogSt) :=
     {|
       StLib_CohParams := map_coh_params;
-      StLib_Denot := map_denot;
-      StLib_Model := map_model;
     |}.
+End MapParams.
 
+Arguments map_params {_ _ _ _ _ _ _}.
+Arguments map_st_coh_v_log {_ _ _ _ _ _ _}.
+
+
+
+Section MapSpecs.
+
+  Context `{!CRDT_Params}.
+
+  Context (LogOp: Type)
+          (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
+  Context (LogSt: Type) (latA: Lattice LogSt).
+  Context `{PA : !StLib_Params LogOp LogSt}.
   Context `{a: anerisG M Σ}.
 
   Lemma map_init_st_fn_spec :
-    ⊢ @init_st_fn_spec mapOp mapSt _ _ _ _ _ _ _ _ map_comb_init_st.
+    ⊢ @init_st_fn_spec (mapOp LogOp) (mapSt LogSt) _ _ _ _ _ _ _ _ map_comb_init_st.
   Proof.
     iIntros (addr).
     iIntros "!#" (Φ) "_ HΦ".
@@ -688,9 +736,8 @@ Section Bloup.
 
   Lemma map_mutator_st_spec mut_fn init_fn :
     @init_st_fn_spec LogOp LogSt _ _ _ _ _ _ _ PA init_fn -∗
-    (** TODO: Init !!! *)
     @mutator_spec LogOp LogSt _ _ _ _ _ _ _ PA mut_fn -∗
-    @mutator_spec  mapOp mapSt _ _ _ _ _ _ _ map_params
+    @mutator_spec  (mapOp LogOp) (mapSt LogSt) _ _ _ _ _ _ _ map_params
       (λ: "i" "gs" "op", map_comb_mutator init_fn mut_fn "i" "gs" "op").
   Proof.
     iIntros "#Hinit #Hmut_spec" (addr id st_v op_v s ev_log op_log st_log)
@@ -805,15 +852,16 @@ Section Bloup.
               by rewrite Hstx in G. }
         intros x vs w Hmx Hstx.
         destruct(decide(x = op_log_key)) as [-> | Hneq].
-        * rewrite lookup_insert in Hmx; rewrite lookup_insert in Hstx.
+        * rewrite lookup_insert in Hmx;
+          unfold mapSt in *; rewrite lookup_insert in Hstx;
           by simplify_eq/=.
         * rewrite lookup_insert_ne in Hmx; last done.
-          rewrite lookup_insert_ne in Hstx; last done.
+          unfold mapSt in*; rewrite lookup_insert_ne in Hstx; last done.
           by apply Hm_elts with x.
       + split;
-          last (exists st'_log; split;
+          last (exists st'_log; split; unfold mapSt in*;
             [ by rewrite Hop/= lookup_insert | by rewrite Hop/= E/= ]).
-        intros???. split; intros?;
+        intros???. split; intros?; unfold mapSt in*;
           last (rewrite lookup_insert_ne in H1; try done;
             by rewrite Hop in H0).
         rewrite Hop/= in H0.
@@ -876,25 +924,26 @@ Section Bloup.
               by rewrite Hstx in G. }
         intros x vs w Hmx Hstx.
         destruct(decide(x = op_log_key)) as [-> | Hneq].
-        * rewrite lookup_insert in Hmx; rewrite lookup_insert in Hstx.
+        * rewrite lookup_insert in Hmx;
+          unfold mapSt in *; rewrite lookup_insert in Hstx.
           by simplify_eq/=.
         * rewrite lookup_insert_ne in Hmx; last done.
-          rewrite lookup_insert_ne in Hstx; last done.
+          unfold mapSt in*; rewrite lookup_insert_ne in Hstx; last done.
           by apply Hm_elts with x.
       + split;
-          last (exists st'_log; split;
+          last (exists st'_log; split; unfold mapSt in*;
             [ by rewrite Hop/= lookup_insert | by rewrite Hop/= E/= ]).
-        intros???. split; intros?;
+        intros???. split; intros?; unfold mapSt in*;
           last (rewrite lookup_insert_ne in H1; try done;
             by rewrite Hop in H0).
         rewrite Hop/= in H0.
         by rewrite lookup_insert_ne; last done.
   Qed.
 
-  Lemma bloup (addr : socket_address) merge_fn
+  Lemma merge_spec_fold_aux (addr : socket_address) merge_fn
     (st_v_v st'_v_v: val) (st_v_log st'_v_log: gmap string val)
-    (st_log st'_log: mapSt)
-    (s s': event_set mapOp) (Hsden: ⟦ s ⟧ ⇝ st_log) (Hs'den: ⟦ s' ⟧ ⇝ st'_log)
+    (st_log st'_log: mapSt LogSt)
+    (s s': event_set (mapOp LogOp)) (Hsden: ⟦ s ⟧ ⇝ st_log) (Hs'den: ⟦ s' ⟧ ⇝ st'_log)
     (key : string)
     (acc_v : val) (* Current result *)
     (Xacc : gset string) (* keys seen so far (ie. in previous iterations) *)
@@ -902,7 +951,7 @@ Section Bloup.
     (Hsame_orig_comp : event_set_same_orig_comparable s)
     (Hevents_ext' : events_ext s')
     (Hsame_orig_comp' : event_set_same_orig_comparable s') :
-    let lub_log: mapSt := map_lat_lub st_log st'_log in
+    let lub_log: mapSt LogSt := map_lat_lub st_log st'_log in
     let P := λ (X: gset string) (a: val),
       ∃ (m: gmap string val),
       gset_dom m = X
@@ -1001,7 +1050,7 @@ Section Bloup.
         destruct(decide(x = key))as[->| J].
         --exists l, l_log; repeat split;
             [ by rewrite lookup_insert | | by apply(Hst_elts key l_log l)].
-          rewrite(map_lub_elt_Some_None st_log st'_log key l_log E');
+          rewrite(map_lub_elt_Some_None E');
             first done.
           apply map_dom_None in F. rewrite Hst'_dom in F.
           destruct(st'_log !! key)eqn:G; last done.
@@ -1035,7 +1084,7 @@ Section Bloup.
         destruct(decide(x = key))as[->| J].
         --exists v, l; repeat split;
             [ by rewrite lookup_insert | | by apply(Hst'_elts key l v)].
-          rewrite(map_lub_elt_None_Some st_log st'_log key l F);
+          rewrite(map_lub_elt_None_Some F);
             first done.
           apply map_dom_None in E. rewrite Hst_dom in E.
           destruct(st_log !! key)eqn:G; last done.
@@ -1058,10 +1107,10 @@ Section Bloup.
     wp_apply wp_map_dom; first done; iIntros(dom_m'_v Hdom_m'_v); wp_pures.
     wp_apply wp_set_union; first done; iIntros(dom_v Hdom_v); wp_pures.
     wp_apply wp_map_empty; first done; iIntros(empty_v Hempty_v).
-    (** TODO: [wp_set_foldl] using the former lemma on the handler. *)
+    (** [wp_set_foldl] using the former lemma on the handler. *)
     iApply (wp_set_foldl);
     [ iIntros (key acc_v Xacc);
-      iPoseProof ((bloup _ merge_fn
+      iPoseProof ((merge_spec_fold_aux _ merge_fn
         st_v st'_v m m' st_log st'_log s s' Hs_den Hs'_den key acc_v Xacc
         Hevents_ext Hsame_orig_comp Hevents_ext' Hsame_orig_comp')
         with "[][]Hmerge")
@@ -1107,7 +1156,7 @@ Section Bloup.
     - by iApply map_merge_st_spec.
   Qed.
 
-  Lemma map_init_spec `{!StLib_Res mapOp} cA :
+  Lemma map_init_spec `{!StLib_Res (mapOp LogOp)} cA :
     @crdt_fun_spec LogOp LogSt _ _ _ _ _ _ _ PA cA -∗
     @init_spec _ _ _ _ _ _ _ _ _ map_params _
       (statelib_init
@@ -1134,5 +1183,5 @@ Section Bloup.
     iApply "HΦ"; iFrame.
   Qed.
 
-End Bloup.
+Section MapSpecs.
 
