@@ -612,7 +612,7 @@ Arguments map_event {_}.
 Arguments map_model {_} (LogOp) {_ _} (LogSt) {_ _}.
 
 
-Section MapParams.
+Section MapCoh.
   Context `{!CRDT_Params}.
 
   Context (LogOp: Type)
@@ -667,20 +667,61 @@ Section MapParams.
       apply map_dom_None in E as[]; apply map_dom_Some in F.
       by rewrite -Hst_dom Hst'_dom.
   Qed.
+End MapCoh.
+Arguments map_st_coh_v_log {_ _ _ _ _ _ _}.
+Arguments map_st_coh{_ _ _ _ _ _ _}.
+Arguments map_op_coh{_ _ _ _ _ _ _}.
+Arguments map_coh_inj{_ _ _ _ _ _ _}.
 
 
 
-  (** serialization *)
-  Definition map_ser : serialization.
-  Admitted.
+Section MapParams.
+  Context `{!CRDT_Params}.
+
+  Context (LogOp: Type)
+          (eqdec_logop: EqDecision LogOp) (countable_logop: Countable LogOp).
+  Context (LogSt: Type) (latA: Lattice LogSt).
+  Context `{PA : !StLib_Params LogOp LogSt}.
+
+
+  (* [Aser] is the serializer of the underlying CRDT [A]. *)
+  Definition Aser := PA.(StLib_CohParams).(StLib_StSerialization).
+  Instance str_val_inj: Inject (string * val) val := _.
+
+  Definition str_val_ser: serialization :=
+    prod_serialization string_serialization Aser.
+
+  (** [map_ser] serializes the underlying [string -> val], where each value
+   * represents an element of [LogSt].
+   * It requires:
+   *  - a serialization for the elements of [string * val]
+   *     it will be a product serialization formed of
+   *     [string_serialization] and [Aser].
+   *  - an injection of [string * val] into [val] (obvious) *)
+  Definition map_ser: serialization :=
+    @list_serialization str_val_ser _ str_val_inj.
+
 
   Lemma map_coh_ser:
     ∀ (st : mapSt LogSt) (v : val), map_st_coh st v →
       Serializable map_ser v.
   Proof.
     intros st_log st_v_v (st_v&(ls&->&Hls&?)&Hdom&Helts).
-    set lsv := map(λ e, ($e.1, e.2)%V) ls.
-    Admitted.
+    exists ls. split; first by apply is_list_inject.
+    intros [x v] Hin.
+    simplify_eq/=.
+    exists #x, v; split; first reflexivity.
+    split; first by exists x.
+    destruct (st_log !! x)as[l|]eqn:E; last first.
+    { (* Impossible case (domains of the maps coincide) *) exfalso.
+      apply elem_of_list_to_map, map_dom_Some in Hin; last done.
+      apply map_dom_None in E. rewrite -Hdom in E.
+      exact (E Hin). }
+    epose proof (Helts x l v _ E) as Hcoh.
+    exact (PA.(StLib_CohParams).(StLib_StCoh_Ser) _ _ Hcoh).
+    Unshelve.
+    by apply elem_of_list_to_map.
+  Qed.
 
 
 
@@ -688,8 +729,8 @@ Section MapParams.
   Proof.
     refine {|
       StLib_StSerialization := map_ser;
-      StLib_Op_Coh := map_op_coh;
-      StLib_St_Coh := map_st_coh; |}.
+      StLib_Op_Coh := @map_op_coh _ LogOp _ _ _ _ PA;
+      StLib_St_Coh := @map_st_coh _ LogOp _ _ _ _ PA; |}.
     - intros [ol or][ol' or'] v
         (s & lop & vs & vop & Hseq & Hlopeq & Hveq & Hlopcoh & Hvsq)
         (s'& lop'& vs'& vop'& Hseq'& Hlopeq'& Hveq'& Hlopcoh'& Hvsq').
@@ -704,9 +745,7 @@ Section MapParams.
       StLib_CohParams := map_coh_params;
     |}.
 End MapParams.
-
 Arguments map_params {_ _ _ _ _ _ _}.
-Arguments map_st_coh_v_log {_ _ _ _ _ _ _}.
 
 
 
@@ -1183,5 +1222,5 @@ Section MapSpecs.
     iApply "HΦ"; iFrame.
   Qed.
 
-Section MapSpecs.
+End MapSpecs.
 
