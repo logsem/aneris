@@ -4,8 +4,8 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris.algebra Require Import auth excl.
 From fairneris.prelude Require Import collect gset_map gmultiset.
-From trillium.fairness Require Export fairness.
 From trillium.program_logic Require Export weakestpre.
+From fairneris Require Export fairness.
 From fairneris Require Import model_draft.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.algebra Require Import disj_gsets.

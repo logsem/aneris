@@ -138,7 +138,7 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_observed_recv_name : gname;
     }.
 
-Class anerisPreG Σ (Mdl : Model) :=
+Class anerisPreG (Mdl : Model) Σ :=
   AnerisPreG {
       anerisPre_invGS :> invGpreS Σ;
       anerisPre_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
@@ -184,7 +184,7 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    ].
 
 #[global] Instance subG_anerisPreG {Σ Mdl} :
-  subG (anerisΣ Mdl) Σ → anerisPreG Σ Mdl.
+  subG (anerisΣ Mdl) Σ → anerisPreG Mdl Σ.
 Proof. solve_inG. Qed.
 
 Section definitions.
@@ -547,11 +547,11 @@ Notation "m1 ≡g{ sagT , sagR } m2" := (message_group_equiv sagT sagR m1 m2) (a
 Notation "sa ∈g sag" := (elem_of_group sa sag) (at level 10).
 Notation "sa ∉g sag" := (not_elem_of_group sa sag) (at level 10).
 
-Lemma node_gnames_auth_init `{anerisPreG Σ Mdl} :
+Lemma node_gnames_auth_init `{anerisPreG Mdl Σ} :
   ⊢ |==> ∃ γ, own (A:=authR node_gnames_mapUR) γ (● (to_agree <$> ∅)).
 Proof. apply own_alloc. by apply auth_auth_valid. Qed.
 
-Lemma saved_si_init `{anerisPreG Σ Mdl} :
+Lemma saved_si_init `{anerisPreG Mdl Σ} :
   ⊢ |==> ∃ γ, own (A := authR socket_interpUR) γ (● (to_agree <$> ∅) ⋅
                                                   ◯ (to_agree <$> ∅)).
 Proof. apply own_alloc. by apply auth_both_valid_discrete. Qed.
@@ -592,16 +592,16 @@ Lemma saved_si_update `{anerisG Mdl Σ} (A : gset socket_address_group) γsi f :
     rewrite dom_insert_L elements_union_singleton //. auto.
 Qed.
 
-Lemma allocated_address_groups_init `{anerisPreG Σ Mdl} A :
+Lemma allocated_address_groups_init `{anerisPreG Mdl Σ} A :
   ⊢ |==> ∃ γ, own (A := agreeR (gsetUR socket_address_group)) γ (to_agree A).
 Proof. by apply own_alloc. Qed.
 
 (** Free ports lemmas *)
-Lemma free_ports_auth_init `{anerisPreG Σ Mdl} :
+Lemma free_ports_auth_init `{anerisPreG Mdl Σ} :
   ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● ∅).
 Proof. apply own_alloc. by apply auth_auth_valid. Qed.
 
-Lemma free_ips_init `{anerisPreG Σ Mdl} (ips : gset ip_address) :
+Lemma free_ips_init `{anerisPreG Mdl Σ} (ips : gset ip_address) :
   ⊢ |==> ∃ γ, own γ (● GSet ips) ∗ [∗ set] ip ∈ ips, own γ (◯ GSet {[ ip ]}).
 Proof.
   iMod (own_alloc (● GSet (∅:gset ip_address))) as (γ) "HM"; [by apply auth_auth_valid|].
@@ -635,7 +635,7 @@ Proof.
   rewrite -!elem_of_elements HMF //.
 Qed.
 
-Lemma socket_address_group_ctx_init `{anerisPreG Σ Mdl}
+Lemma socket_address_group_ctx_init `{anerisPreG Mdl Σ}
       (sags : gset socket_address_group) :
   all_disjoint sags →
   ⊢ |==> ∃ γ,
@@ -648,7 +648,7 @@ Proof.
   iModIntro. iExists _. iFrame.
 Qed.
 
-Lemma socket_address_group_own_alloc_subseteq_pre `{anerisPreG Σ Mdl}
+Lemma socket_address_group_own_alloc_subseteq_pre `{anerisPreG Mdl Σ}
       γ (sags sags' : gset socket_address_group) :
   sags' ⊆ sags →
   own (A:=(authR socket_address_groupUR)) γ
@@ -671,7 +671,7 @@ Proof.
   by rewrite subseteq_union_1_L.
 Qed.
 
-Lemma socket_address_group_init `{anerisPreG Σ Mdl}
+Lemma socket_address_group_init `{anerisPreG Mdl Σ}
       (sags : gset socket_address_group) :
   all_disjoint sags →
   ⊢ |==> ∃ γ, own (A:=(authR socket_address_groupUR)) γ
@@ -686,7 +686,7 @@ Proof.
   iModIntro. iExists γ. by iFrame.
 Qed.
 
-Lemma socket_address_group_own_big_sepS `{anerisPreG Σ Mdl}
+Lemma socket_address_group_own_big_sepS `{anerisPreG Mdl Σ}
       γ
       (sags : gset socket_address_group) :
   ⊢ own (A:=(authR socket_address_groupUR)) γ
@@ -704,7 +704,7 @@ Proof.
   iFrame. by iApply "IH".
 Qed.
 
-Lemma socket_address_group_own_subseteq_pre `{anerisPreG Σ Mdl}
+Lemma socket_address_group_own_subseteq_pre `{anerisPreG Mdl Σ}
       γ (sags sags' : gset socket_address_group) :
   sags' ⊆ sags →
   own (A:=(authR socket_address_groupUR)) γ
@@ -720,7 +720,7 @@ Proof.
   iFrame.
 Qed.
 
-Lemma messages_ctx_init `{anerisPreG Σ Mdl}
+Lemma messages_ctx_init `{anerisPreG Mdl Σ}
       (gs : gset socket_address_group)
       (γo γs γr : gname)
       (As Ar: gset socket_address_group) :
@@ -760,7 +760,7 @@ Proof.
   rewrite !bool_decide_eq_true; eauto.
 Qed.
 
-Lemma model_init `{anerisPreG Σ Mdl} (st : Mdl) :
+Lemma model_init `{anerisPreG Mdl Σ} (st : Mdl) :
   ⊢ |==> ∃ γ, own γ (● Excl' st) ∗ own γ (◯ Excl' st).
 Proof.
   iMod (own_alloc (● Excl' st ⋅ ◯ Excl' st)) as (γ) "[Hfl Hfr]".
@@ -768,17 +768,17 @@ Proof.
   iExists _. by iFrame.
 Qed.
 
-Lemma steps_init `{anerisPreG Σ Mdl} n :
+Lemma steps_init `{anerisPreG Mdl Σ} n :
   ⊢ |==> ∃ γ, mono_nat_auth_own γ 1 n ∗ mono_nat_lb_own γ n.
 Proof. iApply mono_nat_own_alloc. Qed.
 
-(* Lemma live_roles_init `{anerisPreG Σ Mdl} M : *)
+(* Lemma live_roles_init `{anerisPreG Mdl Σ} M : *)
 (*   ⊢ |==> ∃ γ, own (A := authUR (gmapUR nat (exclR $ leibnizO simple_role))) *)
 (*                   γ (● (Excl <$> M)) ∗   *)
 (*               [∗ map] tid ↦ role ∈ M, own (A := authUR (gmapUR nat (exclR $ leibnizO simple_role))) γ (● (Excl <$> M)). *)
 (* Proof. Admitted. *)
 
-Local Lemma live_roles_auth_extend_pre `{anerisPreG Σ Mdl} γ A roles :
+Local Lemma roles_auth_extend_pre `{anerisPreG Mdl Σ} γ A roles :
   roles ## A →
   own (A := live_roleUR) γ (● GSet A) ==∗
   own (A := live_roleUR) γ (● GSet (roles ∪ A)) ∗
@@ -791,18 +791,18 @@ Proof.
   set_solver.
 Qed.
 
-Lemma live_roles_init `{anerisPreG Σ Mdl} A :
+Lemma roles_init `{anerisPreG Mdl Σ} A :
   ⊢ |==> ∃ γ, own (A := live_roleUR) γ (● GSet A) ∗
               own (A := live_roleUR) γ (◯ GSet A).
 Proof.
   iMod (own_alloc (● GSet (∅:gset simple_roleO))) as (γ) "Hauth";
     [by apply auth_auth_valid|].
   iExists γ.
-  iMod (live_roles_auth_extend_pre with "Hauth") as "[Hauth $]"; [set_solver|].
+  iMod (roles_auth_extend_pre with "Hauth") as "[Hauth $]"; [set_solver|].
   by rewrite union_empty_r_L.
 Qed.
 
-Lemma unallocated_init `{anerisPreG Σ Mdl} (A : gset socket_address_group) :
+Lemma unallocated_init `{anerisPreG Mdl Σ} (A : gset socket_address_group) :
   ⊢ |==> ∃ γ, own γ (● (GSet A)) ∗ own γ (◯ (GSet A)).
 Proof.
   iMod (own_alloc (● (GSet (∅:gset socket_address_group)) ⋅ ◯ (GSet ∅))) as (γ) "[Ha Hf]".
@@ -822,7 +822,7 @@ Proof.
     iFrame.
 Qed.
 
-Lemma alloc_evs_init `{anerisPreG Σ Mdl} (lbls : gset string) :
+Lemma alloc_evs_init `{anerisPreG Mdl Σ} (lbls : gset string) :
   ⊢ |==> ∃ γ,
     own (A := authUR (gmapUR string (exclR aneris_eventsO)))
         γ (● (Excl <$> (gset_to_gmap [] lbls))) ∗
@@ -867,7 +867,7 @@ Proof.
   rewrite -!elem_of_elements HMF //.
 Qed.
 
-Lemma sendreceive_evs_init `{anerisPreG Σ Mdl} (sags : gset socket_address_group) :
+Lemma sendreceive_evs_init `{anerisPreG Mdl Σ} (sags : gset socket_address_group) :
   ⊢ |==> ∃ γ, own
                 (A := authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
                 γ (● (Excl <$> (gset_to_gmap [] sags))) ∗
@@ -1263,7 +1263,6 @@ Section resource_lemmas.
 
   Lemma node_ctx_init σ s :
     ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
-
   Proof.
     iMod (gen_heap_light_init σ) as (γh) "Hh".
     iMod (gen_heap_light_init s) as (γs) "Hs".

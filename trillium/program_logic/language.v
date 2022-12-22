@@ -66,6 +66,7 @@ Section language_mixin.
   Context (config_step : state → config_label → state → Prop).
 
   Context (locale_of : list expr -> expr -> locale).
+  Context (config_enabled : config_label → state → Prop).
 
   (** Evaluation contexts: we need to include them in the definition of the
       language because they are used in the program logic for forming
@@ -98,11 +99,15 @@ Section language_mixin.
       ectx_fill K e = ectx_fill K' e' →
       (∃ K'', K' = ectx_comp K K'') ∨ (∃ K'', K = ectx_comp K' K'');
     mixin_locale_step e1 e2 t1 σ1 σ2 efs: prim_step e1 σ1 e2 σ2 efs ->
-                                         locale_of t1 e1 = locale_of t1 e2;
+                                          locale_of t1 e1 = locale_of t1 e2;
     mixin_locale_fill e K t1: locale_of t1 (ectx_fill K e) = locale_of t1 e;
     mixin_locale_equiv t t' e: locales_equiv t t' -> locale_of t e = locale_of t' e;
     mixin_locale_injective tp0 e0 tp1 tp e:
-      (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;
+      (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;    
+  (* Might need something like this to prove fair derivation for generic
+     programs and models *)
+  (*   mixin_config_enabled σ lbl : *)
+  (*     (∃ σ', config_step σ lbl σ') ↔ config_enabled lbl σ; *)
   }.
 End language_mixin.
 
@@ -117,12 +122,13 @@ Structure language := Language {
   to_val : expr → option val;
   prim_step : expr → state → expr → state → list expr → Prop;
   config_step : state → config_label → state → Prop;
-  locale_of : list expr -> expr -> locale;
+  locale_of : list expr → expr → locale;
+  config_enabled : config_label → state → Prop;
   ectx_comp : ectx → ectx → ectx;
   ectx_emp : ectx;
   ectx_fill : ectx → expr → expr;
   language_mixin :
-    LanguageMixin of_val to_val prim_step locale_of ectx_comp ectx_emp ectx_fill
+    LanguageMixin of_val to_val prim_step (* config_step*) locale_of (* config_enabled *) ectx_comp ectx_emp ectx_fill
 }.
 
 Declare Scope expr_scope.
@@ -133,7 +139,7 @@ Declare Scope val_scope.
 Delimit Scope val_scope with V.
 Bind Scope val_scope with val.
 
-Arguments Language {_ _ _ _ _ _ _ _} _ {_ _ _} _.
+Arguments Language {_ _ _ _ _ _ _ _} prim_step config_step {_ _ _} _ _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments prim_step {_} _ _ _ _ _.
@@ -142,6 +148,7 @@ Arguments ectx_comp {_} _ _.
 Arguments ectx_emp {_}.
 Arguments ectx_fill {_} _ _.
 Arguments locale_of {_} _ _.
+Arguments config_enabled {_} _ _.
 
 Notation locales_equiv t0 t0' :=
   (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0')).

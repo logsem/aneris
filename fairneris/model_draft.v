@@ -220,7 +220,7 @@ Proof.
   clear Hfair_scheduling.
   revert mtr Hexcl Hinit Hval Hleq Hfair Hlive IH Hev Htrdec. induction n as [| n IHn];
     intros mtr Hexcl Hinit Hval Hleq Hfair Hlive IH Hev Htrdec.
-  - simpl in *. rewrite /pred_at /= in Hev.
+  - simpl in *. rewrite pred_at_or in Hev. rewrite /pred_at /= in Hev.
     destruct Hev as [Hev|Hev]; first by destruct mtr; done.
     destruct mtr; first done. injection Hev => ->.
     apply terminating_trace_cons.
@@ -248,7 +248,7 @@ Proof.
         -- eapply (fmfairness_preserved _ _ _ 1); [|apply Hfair]. done.
     + destruct mtr as [|s' ℓ' mtr''] eqn:Heq; first by eexists 2.
       destruct (ftm_decr (trfirst mtr)) as (Hlive' & Htrdec').
-      { pose proof (Hexcl 1) as Hexcl0%pred_at_0; [|done]. by simplify_eq.}
+      { pose proof (Hexcl 1) as Hexcl0%pred_at_0; [|done]. by simplify_eq. }
       { exists ℓ', (trfirst mtr''). punfold Hval'; inversion Hval'; subst; done. }
       apply terminating_trace_cons. eapply IHn=>//; eauto.
       * apply ftm_reachable; [|apply Hval'|].
@@ -283,11 +283,11 @@ Proof. intros ???[??]. eapply fair_terminating_traces_terminate_rec=>//. Qed.
 Definition simple_reachable_state s :=
   match s with
   | Sent 1 => True
-  | Sent n => False
+  | Sent _ => False
   | Delivered 0 0 => True
-  | Delivered n m => False
+  | Delivered _ _ => False
   | Received 0 0 => True
-  | Received n m => False
+  | Received _ _ => False
   | _ => True
   end.
 
@@ -388,3 +388,4 @@ Next Obligation.
   rewrite /simple_state_order.
   intros s1 ρ s2 Hreachable Htrans. destruct s1; inversion Htrans; simpl; lia.
 Qed.
+

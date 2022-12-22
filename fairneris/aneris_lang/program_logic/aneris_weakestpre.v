@@ -1,5 +1,5 @@
 From iris.proofmode Require Import base tactics classes.
-From trillium.fairness Require Export fairness.
+From fairneris Require Export fairness.
 From trillium.program_logic Require Export weakestpre.
 From fairneris Require Export model_draft.
 From fairneris.lib Require Import singletons.

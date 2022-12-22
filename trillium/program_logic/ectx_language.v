@@ -11,13 +11,16 @@ file for doing that. *)
 Section ectx_language_mixin.
   Context {expr val ectx state : Type}.
   Context {locale : Type}.
+  Context {config_label : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   Context (empty_ectx : ectx).
   Context (comp_ectx : ectx → ectx → ectx).
   Context (fill : ectx → expr → expr).
   Context (head_step : expr → state → expr → state → list expr → Prop).
-  Context (locale_of : list expr -> expr -> locale).
+  Context (config_step : state → config_label → state → Prop).
+  Context (locale_of : list expr → expr → locale).
+  Context (config_enabled : config_label → state → Prop).
 
   Notation locales_equiv t0 t0' :=
     (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0')).
@@ -62,6 +65,8 @@ Section ectx_language_mixin.
     mixin_locale_equiv t t' e: locales_equiv t t' -> locale_of t e = locale_of t' e;
     mixin_locale_injective tp0 e0 tp1 tp e:
       (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;
+    (* mixin_config_enabled σ lbl : *)
+    (*   (∃ σ', config_step σ lbl σ') ↔ config_enabled lbl σ; *)
   }.
 End ectx_language_mixin.
 
@@ -80,16 +85,17 @@ Structure ectxLanguage := EctxLanguage {
   fill : ectx → expr → expr;
   head_step : expr → state → expr → state → list expr → Prop;
   config_step : state → config_label → state → Prop;
-  locale_of : list expr -> expr -> locale;
+  locale_of : list expr → expr → locale;
+  config_enabled : config_label → state → Prop;
 
   ectx_language_mixin :
-    EctxLanguageMixin of_val to_val empty_ectx comp_ectx fill head_step locale_of
+    EctxLanguageMixin of_val to_val empty_ectx comp_ectx fill head_step (* config_step *) locale_of (* config_enabled *)
 }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Arguments EctxLanguage {_ _ _ _ _ _ _ _ _ _ _} _ _.
+Arguments EctxLanguage {_ _ _ _ _ _ _ _ _ _ _} _ _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments empty_ectx {_}.
@@ -98,6 +104,7 @@ Arguments fill {_} _ _.
 Arguments head_step {_} _ _ _ _ _.
 Arguments config_step {_} _ _ _.
 Arguments locale_of {_} _ _.
+Arguments config_enabled {_} _ _.
 
 Notation locales_equiv t0 t0' :=
   (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0')).
@@ -164,7 +171,7 @@ Section ectx_language.
   Proof. rewrite !eq_None_not_Some. eauto using fill_val. Qed.
 
   Definition ectx_lang_mixin :
-    LanguageMixin of_val to_val prim_step locale_of comp_ectx empty_ectx fill.
+    LanguageMixin of_val to_val prim_step (* config_step *) locale_of (* config_enabled *) comp_ectx empty_ectx fill.
   Proof.
     split.
     - apply ectx_language_mixin.
@@ -190,10 +197,12 @@ Section ectx_language.
     - apply ectx_language_mixin.
     - apply ectx_language_mixin.
     - apply ectx_language_mixin.
+    (* - apply ectx_language_mixin. *)
   Qed.
 
   Canonical Structure ectx_lang : language :=
-    Language (config_step := config_step) prim_step empty_ectx fill ectx_lang_mixin.
+    Language prim_step config_step (config_enabled := config_enabled)
+             empty_ectx fill ectx_lang_mixin.
 
   Definition head_atomic (a : atomicity) (e : expr Λ) : Prop :=
     ∀ σ e' σ' efs,
@@ -369,7 +378,7 @@ work.
 Note that this trick no longer works when we switch to canonical projections
 because then the pattern match [let '...] will be desugared into projections. *)
 Definition LanguageOfEctx (Λ : ectxLanguage) : language :=
-  let '@EctxLanguage E V C St Loc _ of_val to_val empty comp fill head config loc_of mix := Λ in
-  @Language E V C St Loc _ of_val to_val _ config loc_of comp empty fill
+  let '@EctxLanguage E V C St Loc _ of_val to_val empty comp fill head config loc_of config_enabled mix := Λ in
+  @Language E V C St Loc _ of_val to_val _ config loc_of config_enabled comp empty fill
     (@ectx_lang_mixin
-       (@EctxLanguage E V C St Loc _ of_val to_val empty comp fill head config loc_of mix)).
+       (@EctxLanguage E V C St Loc _ of_val to_val empty comp fill head config loc_of config_enabled mix)).

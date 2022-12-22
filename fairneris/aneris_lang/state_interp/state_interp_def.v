@@ -8,7 +8,7 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
-From trillium.fairness Require Import fairness.
+From fairneris Require Import fairness.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From fairneris.aneris_lang Require Import resources events.
 From fairneris.lib Require Import gen_heap_light.

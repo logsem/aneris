@@ -14,7 +14,7 @@ From fairneris.aneris_lang.state_interp Require Import
      state_interp_messages_history_coh
      state_interp_events
      state_interp_messages_history.
-From trillium.fairness Require Import fairness.
+From fairneris Require Import fairness.
 From fairneris Require Import model_draft.
 
 From RecordUpdate Require Import RecordSet.

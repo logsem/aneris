@@ -26,13 +26,14 @@ Below you can find the relevant parts:
 *)
 
 Section ectxi_language_mixin.
-  Context {expr val ectx_item state locale : Type}.
+  Context {expr val ectx_item state locale config_label : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   Context (fill_item : ectx_item → expr → expr).
   Context (head_step : expr → state → expr → state → list expr → Prop).
-  Context (config_step : state → state → Prop).
-  Context (locale_of : list expr -> expr -> locale).
+  Context (config_step : state → config_label → state → Prop).
+  Context (locale_of : list expr → expr → locale).
+  Context (config_enabled : config_label → state → Prop).
 
   Notation locales_equiv t0 t0' :=
     (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0')).
@@ -65,6 +66,8 @@ Section ectxi_language_mixin.
     mixin_locale_equiv t t' e: locales_equiv t t' -> locale_of t e = locale_of t' e;
     mixin_locale_injective tp0 e0 tp1 tp e:
       (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;
+    (* mixin_config_enabled σ lbl : *)
+    (*   (∃ σ', config_step σ lbl σ') ↔ config_enabled lbl σ; *)
   }.
 End ectxi_language_mixin.
 
@@ -81,22 +84,24 @@ Structure ectxiLanguage := EctxiLanguage {
   fill_item : ectx_item → expr → expr;
   head_step : expr → state → expr → state → list expr → Prop;
   config_step : state → config_label → state → Prop;
-  locale_of : list expr -> expr -> locale;
+  locale_of : list expr → expr → locale;
+  config_enabled : config_label → state → Prop;
 
   ectxi_language_mixin :
-    EctxiLanguageMixin of_val to_val fill_item head_step locale_of
+    EctxiLanguageMixin of_val to_val fill_item head_step (* config_step *) locale_of (* config_enabled *)
 }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _} _ _.
+Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _} _ _ _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments fill_item {_} _ _.
 Arguments head_step {_} _ _ _ _ _.
 Arguments config_step {_} _ _ _.
 Arguments locale_of {_} _ _.
+Arguments config_enabled {_} _ _.
 
 Section ectxi_language.
   Context {Λ : ectxiLanguage}.
@@ -122,7 +127,7 @@ Section ectxi_language.
   Proof. apply foldl_app. Qed.
 
   Definition ectxi_lang_ectx_mixin :
-    EctxLanguageMixin of_val to_val [] (flip (++)) fill head_step locale_of.
+    EctxLanguageMixin of_val to_val [] (flip (++)) fill head_step (* config_step *) locale_of (* config_enabled *).
   Proof.
     assert (fill_val : ∀ K e, is_Some (to_val (fill K e)) → is_Some (to_val e)).
     { intros K. induction K as [|Ki K IH]=> e //=. by intros ?%IH%fill_item_val. }
@@ -169,9 +174,10 @@ Section ectxi_language.
       intros e t1. rewrite IH. apply ectxi_language_mixin.
     - apply ectxi_language_mixin.
     - apply ectxi_language_mixin.
+    (* - apply ectxi_language_mixin. *)
   Qed.
 
-  Canonical Structure ectxi_lang_ectx := EctxLanguage head_step config_step locale_of ectxi_lang_ectx_mixin.
+  Canonical Structure ectxi_lang_ectx := EctxLanguage head_step config_step locale_of config_enabled ectxi_lang_ectx_mixin.
   Canonical Structure ectxi_lang := LanguageOfEctx ectxi_lang_ectx.
 
   Lemma fill_not_val K e : to_val e = None → to_val (fill K e) = None.
@@ -193,7 +199,7 @@ Coercion ectxi_lang_ectx : ectxiLanguage >-> ectxLanguage.
 Coercion ectxi_lang : ectxiLanguage >-> language.
 
 Definition EctxLanguageOfEctxi (Λ : ectxiLanguage) : ectxLanguage :=
-  let '@EctxiLanguage E V C St L _ of_val to_val fill head config locale_of mix := Λ in
-  @EctxLanguage E V (list C) St L _ of_val to_val _ _ _ _ config locale_of
+  let '@EctxiLanguage E V C St L _ of_val to_val fill head config locale_of config_enabled mix := Λ in
+  @EctxLanguage E V (list C) St L _ of_val to_val _ _ _ _ config locale_of config_enabled
     (@ectxi_lang_ectx_mixin
-       (@EctxiLanguage E V C St L _ of_val to_val fill head config locale_of mix)).
+       (@EctxiLanguage E V C St L _ of_val to_val fill head config locale_of config_enabled mix)).

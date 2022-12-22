@@ -1,6 +1,7 @@
 From stdpp Require Import list fin_maps.
 From iris.proofmode Require Import proofmode.
 From trillium.program_logic Require Import ectx_lifting.
+From fairneris Require Import fairness.
 From fairneris Require Import model_draft.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.

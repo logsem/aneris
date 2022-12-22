@@ -9,7 +9,6 @@ From stdpp Require Export binders.
 From RecordUpdate Require Import RecordSet.
 From fairneris.aneris_lang Require Export network.
 
-
 Set Default Proof Using "Type".
 
 Delimit Scope expr_scope with E.
@@ -631,10 +630,6 @@ Lemma alloc_fresh lbl v σ :
   head_step (Alloc lbl (Val v)) σ (Val $ LitV (LitLoc l)) (<[l:=v]>σ) [].
 Proof. by intros; apply AllocS, (not_elem_of_dom (D:=gset loc)), is_fresh. Qed.
 
-
-Inductive base_config_step : state → unit → state →  Prop :=
-| ConfigIdStep σ : base_config_step σ () σ.
-
 Definition base_locale := nat.
 Definition locale_of (c: list expr) (e : expr) := length c.
 
@@ -654,11 +649,16 @@ Proof.
   rewrite /locale_of !app_length /=. lia.
 Qed.
 
-Lemma base_mixin : EctxiLanguageMixin of_val to_val fill_item head_step locale_of.
+Definition base_config_label := unit.
+Definition base_config_step (σ : state) (lbl : base_config_label) (σ' : state) := False.
+Definition base_config_enabled (lbl : base_config_label) (σ : state) := False.
+
+Lemma base_mixin : EctxiLanguageMixin of_val to_val fill_item head_step (* base_config_step *) locale_of (* base_config_enabled *).
 Proof.
   split; apply _ || eauto using to_of_val, of_to_val, val_head_stuck,
     fill_item_val, fill_item_no_val_inj, head_ctx_step_val, locale_step, base_locale_injective.
   { intros ??? H%Forall2_length. rewrite !prefixes_from_length // in H. }
+  (* { apply base_config_enabled_step. } *)
 Qed.
 
 End base_lang.
@@ -1062,7 +1062,6 @@ Proof. intros ? ?; unfold Decision; solve_decision. Qed.
 #[global] Instance aneris_state_eq_dec : EqDecision state.
 Proof. intros ? ?; unfold Decision; solve_decision. Qed.
 
-
 Lemma aneris_locale_injective tp0 e0 tp1 tp e :
   (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 →
   locale_of tp0 e0 ≠ locale_of tp e.
@@ -1072,6 +1071,9 @@ Proof.
   intros contra. injection contra => Heq Heq'.
   rewrite filter_cons_True //= Heq' in Heq. lia.
 Qed.
+
+(* Needs to be refined for support multiple messages *)
+Definition config_enabled (lbl : config_label) (σ : state) := σ.(state_ms) ≠ ∅.
 
 Lemma aneris_lang_mixin :
   EctxiLanguageMixin aneris_of_val aneris_to_val aneris_fill_item head_step locale_of.

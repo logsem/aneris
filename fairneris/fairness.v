@@ -15,12 +15,10 @@ Record FairModel : Type := {
   fmtrans: fmstate → fmrole → fmstate → Prop;
   fmfairness : trace fmstate fmrole → Prop;
   fmfairness_preserved : ∀ mtr mtr' k, after k mtr = Some mtr' →
-                                       fmfairness mtr →
-                                       fmfairness mtr';
+                                       fmfairness mtr → fmfairness mtr';
 
   live_roles: fmstate → gset fmrole;
   fm_live_spec: ∀ s ρ s', fmtrans s ρ s' → ρ ∈ live_roles s;
-
 }.
 
 #[global] Existing Instance fmstate_eqdec.
@@ -47,6 +45,48 @@ Definition fair_model_to_model (FM : FairModel) : Model :=
 
 Definition extrace Λ := trace (cfg Λ) (ex_label Λ).
 
+(* This should not be necessary *)
+Close Scope Z_scope.
+
+Definition trace_implies {S L} (P Q : S → option L → Prop) (tr : trace S L) : Prop :=
+  ∀ n, pred_at tr n P → ∃ m, pred_at tr (n+m) Q.
+
+Lemma trace_implies_after {S L : Type} (P Q : S → option L → Prop) tr tr' k :
+  after k tr = Some tr' →
+  trace_implies P Q tr → trace_implies P Q tr'.
+Proof.
+  intros Haf Hf n Hp.
+  have Hh:= Hf (k+n).
+  have Hp': pred_at tr (k + n) P.
+  { rewrite (pred_at_sum _ k) Haf /= //. }
+  have [m Hm] := Hh Hp'. exists m.
+  by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
+Qed.
+
+Lemma trace_implies_cons {S L : Type} (P Q : S → option L → Prop) s l tr :
+  trace_implies P Q (s -[l]-> tr) → trace_implies P Q tr.
+Proof. intros H. by eapply (trace_implies_after _ _ (s -[l]-> tr) tr 1). Qed.
+
+Lemma pred_at_or {S L : Type} (P1 P2 : S → option L → Prop) tr n :
+  pred_at tr n (λ s l, P1 s l ∨ P2 s l) ↔
+  pred_at tr n P1 ∨
+  pred_at tr n P2.
+Proof.
+  split.
+  - revert tr.
+    induction n as [|n IHn]; intros tr Htr.
+    + destruct tr; [done|].
+      rewrite !pred_at_0. rewrite !pred_at_0 in Htr.
+      destruct Htr as [Htr | Htr]; [by left|by right].
+    + destruct tr; [done|by apply IHn].
+  - revert tr.
+    induction n as [|n IHn]; intros tr Htr.
+    + destruct tr; [done|].
+      rewrite !pred_at_0 in Htr. rewrite !pred_at_0.
+      destruct Htr as [Htr | Htr]; [by left|by right].
+    + by destruct tr; [by destruct Htr as [Htr|Htr]|apply IHn].
+Qed.
+
 Section exec_trace.
   Context {Λ : language}.
   Context `{EqDecision (locale Λ)}.
@@ -54,33 +94,28 @@ Section exec_trace.
   Definition locale_enabled (ζ : locale Λ) (c: cfg Λ) :=
     ∃ e, from_locale c.1 ζ = Some e ∧ to_val e = None.
 
-  Definition fair_ex ζ (extr: extrace Λ): Prop :=
-    ∀ n, pred_at extr n (λ c _, locale_enabled ζ c) →
-         ∃ m, pred_at extr (n+m) (λ c _, ¬locale_enabled ζ c) ∨
-              pred_at extr (n+m) (λ _ otid, otid = Some (inl ζ)).
+  Definition fair_locale_ex ζ : extrace Λ → Prop :=
+    trace_implies (λ c _, locale_enabled ζ c)
+                  (λ c otid, ¬ locale_enabled ζ c ∨ otid = Some (inl ζ)).
 
-  Definition config_enabled (ζ : config_label Λ) := True.
+  Definition fair_config_ex ζ: extrace Λ →Prop :=
+    trace_implies (λ c _, config_enabled ζ c.2)
+                  (λ c otid, ¬config_enabled ζ c.2 ∨ otid = Some (inr ζ)).
 
-  Definition fair_config_ex ζ (extr : extrace Λ) : Prop :=
-    ∀ n, pred_at extr n (λ c _, config_enabled ζ) →
-         ∃ m, pred_at extr (n+m) (λ c _, ¬config_enabled ζ) ∨
-              pred_at extr (n+m) (λ _ otid, otid = Some (inr ζ)).
+  Definition fair_ex ζ (extr : extrace Λ) : Prop :=
+    match ζ with
+    | inl ζ => fair_locale_ex ζ extr
+    | inr ζ => fair_config_ex ζ extr
+    end.
 
   Lemma fair_ex_after ζ tr tr' k:
     after k tr = Some tr' →
     fair_ex ζ tr → fair_ex ζ tr'.
-  Proof.
-    intros Haf Hf n Hp.
-    have Hh:= Hf (k+n).
-    have Hp': pred_at tr (k + n) (λ (c : cfg Λ) (_ : option (ex_label Λ)), locale_enabled ζ c).
-    { rewrite (pred_at_sum _ k) Haf /= //. }
-    have [m Hm] := Hh Hp'. exists m.
-    by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
-  Qed.
+  Proof. destruct ζ; apply trace_implies_after. Qed.
 
-  Lemma fair_ex_cons tid c tid' r:
-    fair_ex tid (c -[tid']-> r) → fair_ex tid r.
-  Proof. intros H. by eapply (fair_ex_after tid (c -[tid']-> r) r 1). Qed.
+  Lemma fair_ex_cons ζ c ζ' r:
+    fair_ex ζ (c -[ζ']-> r) → fair_ex ζ r.
+  Proof. destruct ζ; apply trace_implies_cons. Qed.
 
   CoInductive extrace_valid: extrace Λ → Prop :=
   | extrace_valid_singleton c: extrace_valid ⟨c⟩
@@ -130,30 +165,22 @@ Section model_traces.
 
   Definition role_enabled_model ρ (s: M.(fmstate)) := ρ ∈ M.(live_roles) s.
 
-  Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
-    forall n, pred_at mtr n (λ δ _, role_enabled_model ρ δ) →
-         ∃ m, pred_at mtr (n+m) (λ δ _, ¬role_enabled_model ρ δ)
-              ∨ pred_at mtr (n+m) (λ _ ℓ, ℓ = Some ρ).
+  Definition fair_model_trace ρ : mtrace M → Prop :=
+    trace_implies (λ δ _, role_enabled_model ρ δ)
+                  (λ δ ℓ, ¬ role_enabled_model ρ δ ∨ ℓ = Some ρ).
 
   Lemma fair_model_trace_after ℓ tr tr' k:
     after k tr = Some tr' →
     fair_model_trace ℓ tr → fair_model_trace ℓ tr'.
-  Proof.
-    intros Haf Hf n Hp.
-    have Hh:= Hf (k+n).
-    have Hp': pred_at tr (k + n) (λ δ _, role_enabled_model ℓ δ).
-    { rewrite (pred_at_sum _ k) Haf /= //. }
-    have [m Hm] := Hh Hp'. exists m.
-    by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
-  Qed.
+  Proof. apply trace_implies_after. Qed.
 
   Lemma fair_model_trace_cons ℓ δ ℓ' r:
     fair_model_trace ℓ (δ -[ℓ']-> r) → fair_model_trace ℓ r.
-  Proof. intros Hfm. by eapply (fair_model_trace_after ℓ _ r 1) =>//. Qed.
+  Proof. apply trace_implies_cons. Qed.
 
-  Lemma fair_model_trace_cons_forall δ ℓ' r:
+Lemma fair_model_trace_cons_forall δ ℓ' r:
     (∀ ℓ, fair_model_trace ℓ (δ -[ℓ']-> r)) → (∀ ℓ, fair_model_trace ℓ r).
-  Proof. eauto using fair_model_trace_cons. Qed.
+  Proof. intros Hℓ ℓ. eapply trace_implies_cons. apply Hℓ. Qed.
 
   Definition fair_scheduling mtr := ∀ ρ, fair_model_trace ρ mtr.
   Definition mtrace_fair mtr := fair_scheduling mtr ∧ M.(fmfairness) mtr.
@@ -177,5 +204,4 @@ Section model_traces.
 
 End model_traces.
 
-Global Hint Resolve fair_model_trace_cons: core.
 Global Hint Resolve mtrace_valid_mono : paco.
