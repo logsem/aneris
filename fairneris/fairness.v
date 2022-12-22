@@ -94,27 +94,27 @@ Section exec_trace.
   Definition locale_enabled (ζ : locale Λ) (c: cfg Λ) :=
     ∃ e, from_locale c.1 ζ = Some e ∧ to_val e = None.
 
-  Definition fair_locale_ex ζ : extrace Λ → Prop :=
+  Definition fair_locale_scheduling_ex ζ : extrace Λ → Prop :=
     trace_implies (λ c _, locale_enabled ζ c)
                   (λ c otid, ¬ locale_enabled ζ c ∨ otid = Some (inl ζ)).
 
-  Definition fair_config_ex ζ: extrace Λ →Prop :=
+  Definition fair_config_scheduling_ex ζ: extrace Λ →Prop :=
     trace_implies (λ c _, config_enabled ζ c.2)
                   (λ c otid, ¬config_enabled ζ c.2 ∨ otid = Some (inr ζ)).
 
-  Definition fair_ex ζ (extr : extrace Λ) : Prop :=
+  Definition fair_scheduling_ex ζ (extr : extrace Λ) : Prop :=
     match ζ with
-    | inl ζ => fair_locale_ex ζ extr
-    | inr ζ => fair_config_ex ζ extr
+    | inl ζ => fair_locale_scheduling_ex ζ extr
+    | inr ζ => fair_config_scheduling_ex ζ extr
     end.
 
-  Lemma fair_ex_after ζ tr tr' k:
+  Lemma fair_scheduling_ex_after ζ tr tr' k:
     after k tr = Some tr' →
-    fair_ex ζ tr → fair_ex ζ tr'.
+    fair_scheduling_ex ζ tr → fair_scheduling_ex ζ tr'.
   Proof. destruct ζ; apply trace_implies_after. Qed.
 
-  Lemma fair_ex_cons ζ c ζ' r:
-    fair_ex ζ (c -[ζ']-> r) → fair_ex ζ r.
+  Lemma fair_scheduling_ex_cons ζ c ζ' r:
+    fair_scheduling_ex ζ (c -[ζ']-> r) → fair_scheduling_ex ζ r.
   Proof. destruct ζ; apply trace_implies_cons. Qed.
 
   CoInductive extrace_valid: extrace Λ → Prop :=
@@ -125,7 +125,8 @@ Section exec_trace.
       extrace_valid (c -[oζ]-> tr).
 
   Lemma to_trace_preserves_validity ex iex:
-    extrace_valid (to_trace (trace_last ex) iex) → valid_exec ex → valid_inf_exec ex iex.
+    extrace_valid (to_trace (trace_last ex) iex) → valid_exec ex →
+    valid_inf_exec ex iex.
   Proof.
     revert ex iex. cofix CH. intros ex iex Hexval Hval.
     rewrite (trace_unfold_fold (to_trace _ _)) in Hexval.
@@ -165,24 +166,24 @@ Section model_traces.
 
   Definition role_enabled_model ρ (s: M.(fmstate)) := ρ ∈ M.(live_roles) s.
 
-  Definition fair_model_trace ρ : mtrace M → Prop :=
+  Definition fair_scheduling_mtr ρ : mtrace M → Prop :=
     trace_implies (λ δ _, role_enabled_model ρ δ)
                   (λ δ ℓ, ¬ role_enabled_model ρ δ ∨ ℓ = Some ρ).
 
-  Lemma fair_model_trace_after ℓ tr tr' k:
+  Lemma fair_scheduling_mtr_after ℓ tr tr' k:
     after k tr = Some tr' →
-    fair_model_trace ℓ tr → fair_model_trace ℓ tr'.
+    fair_scheduling_mtr ℓ tr → fair_scheduling_mtr ℓ tr'.
   Proof. apply trace_implies_after. Qed.
 
-  Lemma fair_model_trace_cons ℓ δ ℓ' r:
-    fair_model_trace ℓ (δ -[ℓ']-> r) → fair_model_trace ℓ r.
+  Lemma fair_scheduling_mtr_cons ℓ δ ℓ' r:
+    fair_scheduling_mtr ℓ (δ -[ℓ']-> r) → fair_scheduling_mtr ℓ r.
   Proof. apply trace_implies_cons. Qed.
 
-Lemma fair_model_trace_cons_forall δ ℓ' r:
-    (∀ ℓ, fair_model_trace ℓ (δ -[ℓ']-> r)) → (∀ ℓ, fair_model_trace ℓ r).
+  Lemma fair_scheduling_mtr_cons_forall δ ℓ' r:
+    (∀ ℓ, fair_scheduling_mtr ℓ (δ -[ℓ']-> r)) → (∀ ℓ, fair_scheduling_mtr ℓ r).
   Proof. intros Hℓ ℓ. eapply trace_implies_cons. apply Hℓ. Qed.
 
-  Definition fair_scheduling mtr := ∀ ρ, fair_model_trace ρ mtr.
+  Definition fair_scheduling mtr := ∀ ρ, fair_scheduling_mtr ρ mtr.
   Definition mtrace_fair mtr := fair_scheduling mtr ∧ M.(fmfairness) mtr.
 
   Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace M → Prop) :

@@ -6,7 +6,6 @@ From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
 From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris.examples Require no_drop_dup.
 From iris.proofmode Require Import proofmode.
 
 Definition always_holds {Σ}
@@ -216,4 +215,94 @@ Proof.
   iIntros "_".
   iPureIntro.
   by destruct Hvalid as (Htrace&Hlabels&_).
+Qed.
+
+(** Existing approach
+- Prove [WP] for program
+- Obtain [continued_simulation valid_sim extr auxtr] from [adequacy]
+- Obtain [exaux_traces_match extr auxtr] from [continued_simulation valid_sim extr auxtr]
+  + NB: [exaux_traces_match] works on infinite traces ([extrace / mtrace]), while
+        [continued_simulation] works on finite traces ([execution_trace / auxillary_trace])
+- Assume [fair_ex extr], and derive [fair_model_trace mtr] from [exaux_traces_match extr mtr]
+- Derive [terminating_trace mtr] from [fair_model_trace mtr] (and FairTerminatingModel])
+- Derive [terminating_trace extr] from [terminating_trace mtr] and [exaux_traces_match extr auxtr]
+
+OBS: Translation between [finite_trace] and (infinite) [trace] happens via
+     taking the head element and the continued simulation.
+*)
+
+(* TODO: Should generalise this for more languages *)
+Definition fair_network_ex (extr : extrace aneris_lang) :=
+  ∀ n, pred_at extr n (λ _ ζ, ζ ≠ Some (inr DuplicateLabel) ∧
+                              ζ ≠ Some (inr DropLabel)).
+
+Definition fair_ex (extr : extrace aneris_lang) :=
+  (∀ ζ, fair_scheduling_ex ζ extr) ∧ fair_network_ex extr.
+
+Definition traces_match (extr : extrace aneris_lang)
+           (mtr : mtrace simple_fair_model) := True.
+
+Lemma continued_simulation_traces_match extr mtr :
+  continued_simulation valid_state_evolution_fairness
+                       {tr[trfirst extr]} {tr[trfirst mtr]} →
+  traces_match extr mtr.
+Proof. Admitted.
+
+Lemma traces_match_valid_preserved extr mtr :
+  traces_match extr mtr → mtrace_valid mtr.
+Proof. Admitted.
+
+Lemma continued_simulation_valid_preserved
+        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
+  continued_simulation valid_state_evolution_fairness
+    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
+  mtrace_valid mtr.
+Proof. Admitted.
+
+Lemma traces_match_fairness_preserved extr mtr :
+  traces_match extr mtr →
+  fair_ex extr → mtrace_fair mtr.
+Proof. Admitted.
+
+Theorem continued_simulation_fairness_preserved
+        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
+  continued_simulation valid_state_evolution_fairness
+    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
+  fair_ex extr → mtrace_fair mtr.
+Proof.
+  intros ?%continued_simulation_traces_match.
+  by eapply traces_match_fairness_preserved.
+Qed.
+
+Lemma traces_match_termination_preserved extr mtr :
+  traces_match extr mtr →
+  terminating_trace mtr →
+  terminating_trace extr.
+Proof. Admitted.
+
+Theorem continued_simulation_termination_preserved
+        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
+  continued_simulation valid_state_evolution_fairness
+    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
+  terminating_trace mtr → terminating_trace extr.
+Proof.
+  intros ?%continued_simulation_traces_match.
+  by eapply traces_match_termination_preserved.
+Qed.
+
+Definition extrace_fairly_terminating extr :=
+  fair_ex extr → terminating_trace extr.
+
+Theorem continued_simulation_fair_termination_preserved
+        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
+  initial_reachable mtr →
+  continued_simulation valid_state_evolution_fairness
+    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
+  extrace_fairly_terminating extr.
+Proof.
+  intros Hinitial Hsim Hfair.
+  eapply continued_simulation_termination_preserved; [done|].
+  eapply fair_terminating_traces_terminate;
+    [done|by eapply continued_simulation_valid_preserved|
+      by eapply continued_simulation_fairness_preserved].
 Qed.

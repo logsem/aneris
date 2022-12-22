@@ -1,5 +1,6 @@
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From fairneris Require Import fairness.
+From Paco Require Import pacotac.
 
 Import derived_laws_later.bi.
 
@@ -81,15 +82,15 @@ Lemma simple_live_spec_holds s ρ s' :
   simple_trans s ρ s' -> ρ ∈ simple_live_roles s.
 Proof. destruct s; inversion 1; try set_solver; destruct sent; set_solver. Qed.
 
-Definition network_fair_trace (mtr : trace simple_state simple_role) :=
+Definition fair_network_mtr (mtr : trace simple_state simple_role) :=
   ∀ n, pred_at mtr n (λ _ ℓ, ℓ ≠ Some Ndup ∧ ℓ ≠ Some Ndrop).
 
-Lemma network_fair_trace_after mtr mtr' k :
+Lemma fair_network_mtr_after mtr mtr' k :
   after k mtr = Some mtr' →
-  network_fair_trace mtr →
-  network_fair_trace mtr'.
+  fair_network_mtr mtr →
+  fair_network_mtr mtr'.
 Proof.
-  rewrite /network_fair_trace.
+  rewrite /fair_network_mtr.
   intros Hafter Hfair.
   intros n.
   specialize (Hfair (k+n)).
@@ -104,8 +105,8 @@ Proof.
             fmstate := simple_state;
             fmrole := simple_role;
             fmtrans := simple_trans;
-            fmfairness := network_fair_trace;
-            fmfairness_preserved := network_fair_trace_after;
+            fmfairness := fair_network_mtr;
+            fmfairness_preserved := fair_network_mtr_after;
             live_roles := simple_live_roles;
             fm_live_spec := simple_live_spec_holds;
           |}).
@@ -196,12 +197,13 @@ Proof.
   by etransitivity.
 Qed.
 
-From Paco Require Import pacotac.
+Definition initial_reachable `{FairTerminatingModel M} (mtr : mtrace M) :=
+  pred_at mtr 0 (λ ρ _, ftm_reachable_state ρ).
 
 Lemma fair_terminating_traces_terminate_rec `{FairTerminatingModel Mdl}
       (s0: fmstate Mdl) (mtr: mtrace Mdl):
   (trfirst mtr) ≤ s0 →
-  pred_at mtr 0 (λ ρ _, ftm_reachable_state ρ) →
+  initial_reachable mtr →
   mtrace_valid mtr →
   mtrace_fair mtr →
   terminating_trace mtr.
@@ -232,7 +234,7 @@ Proof.
       destruct H4; done.
     + destruct Hfair as [Hscheduling Hfair].
       split.
-      * intros ρ. by eapply fair_model_trace_cons.
+      * intros ρ. by eapply fair_scheduling_mtr_cons.
       * eapply (fmfairness_preserved _ _ _ 1); [|apply Hfair]. done.
   - simpl in *. destruct mtr; first (exists 1; done).
     rewrite -> !pred_at_S in Hev.
@@ -244,7 +246,7 @@ Proof.
       * apply (Hexcl 1). apply pred_at_S. by destruct mtr.
       * destruct Hfair as [Hscheduling Hfair].
         split.
-        -- intros ρ. by eapply fair_model_trace_cons.
+        -- intros ρ. by eapply fair_scheduling_mtr_cons.
         -- eapply (fmfairness_preserved _ _ _ 1); [|apply Hfair]. done.
     + destruct mtr as [|s' ℓ' mtr''] eqn:Heq; first by eexists 2.
       destruct (ftm_decr (trfirst mtr)) as (Hlive' & Htrdec').
@@ -254,13 +256,13 @@ Proof.
       * apply ftm_reachable; [|apply Hval'|].
         -- apply (Hexcl 1). apply pred_at_S, pred_at_0. done.
         -- split.
-           ++ intros ρ. eapply (fair_model_trace_after _ _ _ 1); [|apply Hfair]. done.
+           ++ intros ρ. eapply (fair_scheduling_mtr_after _ _ _ 1); [|apply Hfair]. done.
            ++ eapply (fmfairness_preserved _ _ _ 1); [|apply Hfair]. done.
       * apply (Hexcl 1). apply pred_at_S, pred_at_0. done.
       * etransitivity; eauto. eapply ftm_notinc =>//.
       * destruct Hfair as [Hscheduling Hfair].
         split.
-       -- intros ρ. by eapply fair_model_trace_cons.
+       -- intros ρ. by eapply fair_scheduling_mtr_cons.
        -- eapply (fmfairness_preserved _ _ _ 1); [|apply Hfair]. done.
       * simplify_eq. eapply Hlive'.
       * erewrite <- ftm_decreasing_role_preserved =>//.
@@ -276,8 +278,8 @@ Definition mtrace_fairly_terminating (mtr : mtrace simple_fair_model) :=
 
 Theorem fair_terminating_traces_terminate `{FairTerminatingModel simple_fair_model} :
   ∀ (mtrace : @mtrace simple_fair_model),
-    pred_at mtrace 0 (λ ρ _, ftm_reachable_state ρ) →
-    mtrace_fairly_terminating mtrace.
+  initial_reachable mtrace →
+  mtrace_fairly_terminating mtrace.
 Proof. intros ???[??]. eapply fair_terminating_traces_terminate_rec=>//. Qed.
 
 Definition simple_reachable_state s :=
@@ -303,7 +305,7 @@ Proof.
   by inversion Hval'.
 Qed.
 
-#[local] Program Instance simple_model_terminates :
+Program Instance simple_model_terminates :
   FairTerminatingModel simple_fair_model :=
   {|
     ftm_leq := simple_state_order;
@@ -347,20 +349,20 @@ Next Obligation.
     inversion Hvalid'.
     simplify_eq.
     apply H1. }
-  assert (network_fair_trace ((mtr'' -[ℓ']-> mtr'''):mtrace simple_fair_model)) as
+  assert (fair_network_mtr ((mtr'' -[ℓ']-> mtr'''):mtrace simple_fair_model)) as
     Hfair'.
-  { by eapply network_fair_trace_after. }
+  { by eapply fair_network_mtr_after. }
   inversion H; simplify_eq; try by inversion Hinit.
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
-  - rewrite /network_fair_trace in Hfair.
+  - rewrite /fair_network_mtr in Hfair.
     specialize (Hfair' 0). by destruct Hfair' as [Hfair' ?].
-  - rewrite /network_fair_trace in Hfair.
+  - rewrite /fair_network_mtr in Hfair.
     specialize (Hfair' 0). by destruct Hfair' as [Hfair' ?].
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
-  - rewrite /network_fair_trace in Hfair.
+  - rewrite /fair_network_mtr in Hfair.
     specialize (Hfair' 0). by destruct Hfair' as [Hfair' ?].
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
   - rewrite /trfirst in H3. destruct mtr'''; by rewrite -H3.
@@ -388,4 +390,3 @@ Next Obligation.
   rewrite /simple_state_order.
   intros s1 ρ s2 Hreachable Htrans. destruct s1; inversion Htrans; simpl; lia.
 Qed.
-

@@ -6,6 +6,7 @@ From fairneris Require Import model_draft.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
+From fairneris Require Import adequacy.
 
 Definition Aprog shA : expr := SendTo #(LitSocket shA) #"Hello" #saB.
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
@@ -382,3 +383,30 @@ Section with_Σ.
   Qed.
 
 End with_Σ.
+
+Definition initial_state shA shB :=
+  ([mkExpr ipA (Aprog shA); mkExpr ipB (Bprog shB)],
+     {| state_heaps := {[ipA:=∅; ipB:=∅]};
+       state_sockets := ∅; (* NB: Needs to be filled *)
+       state_ports_in_use := ∅; (* NB: Needs to be filled *)
+       state_ms := ∅; |}).
+
+Lemma no_drop_dup_continued_simulation shA shB :
+  ∃ (mtr : mtrace simple_fair_model),
+    trfirst mtr = model_draft.Start ∧
+    continued_simulation
+      valid_state_evolution_fairness
+      (trace_singleton $ initial_state shA shB)
+      (trace_singleton (trfirst mtr)).
+Proof. Admitted.
+
+Theorem choose_nat_terminates shA shB extr :
+  trfirst extr = initial_state shA shB →
+  extrace_fairly_terminating extr.
+Proof.
+  intros Hexfirst.
+  destruct (no_drop_dup_continued_simulation shA shB) as (mtr & Hmtr & Hsim).
+  eapply continued_simulation_fair_termination_preserved; [|by rewrite Hexfirst].
+  rewrite /initial_reachable.
+  destruct mtr; simpl in *; rewrite Hmtr; done.
+Qed.
