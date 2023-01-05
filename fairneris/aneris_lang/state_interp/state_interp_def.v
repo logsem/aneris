@@ -352,11 +352,18 @@ Section Aneris_AS.
     | _, _ => False
     end.
 
+  (* TODO: This should probably be located in a better place *)
+  (* Correspondence between live configurations and model states *)
+  Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
+    ∀ ζ (ℓ:fmrole simple_fair_model),
+    labels_match ζ ℓ → (role_enabled_model ℓ δ ↔ live_ex_label ζ c).
+
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
       : Prop :=
     trace_steps simple_trans atr ∧
     labels_match_trace ex atr ∧
+    (* live_tids (trace_last ex) (trace_last atr) ∧ *)
     state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
     ∃ shA shB, 
     state_sockets (trace_last ex).2 =

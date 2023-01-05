@@ -29,7 +29,8 @@ Definition always_holds {Σ}
 Definition valid_state_evolution_fairness
            (extr : execution_trace aneris_lang)
            (auxtr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
-  labels_match_trace extr auxtr ∧ trace_steps simple_trans auxtr.
+  labels_match_trace extr auxtr ∧ trace_steps simple_trans auxtr ∧
+  live_tids (trace_last extr) (trace_last auxtr).
 
 Lemma rel_finitary_valid_state_evolution_fairness :
   rel_finitary valid_state_evolution_fairness.
@@ -65,7 +66,7 @@ Theorem strong_simulation_adequacy_multiple Σ
      observed_send obs_send_sas -∗
      observed_receive obs_rec_sas ={⊤}=∗
      wptp s es (map (λ _ _, True) es) ∗
-     always_holds s valid_state_evolution_fairness (es, σ) st) ->
+     always_holds s valid_state_evolution_fairness (es, σ) st) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   dom (state_ports_in_use σ) = IPs →
@@ -217,8 +218,11 @@ Proof.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
   iPureIntro.
-  by destruct Hvalid as (Htrace&Hlabels&_).
-Qed.
+  destruct Hvalid as (Htrace&Hlabels&_).
+  split; [done|].
+  split; [done|].
+  admit.                        (* Need to derive [live_tids] *)
+Admitted.
 
 Theorem strong_simulation_adequacy Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
@@ -395,8 +399,11 @@ Proof.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
   iPureIntro.
-  by destruct Hvalid as (Htrace&Hlabels&_).
-Qed.
+  destruct Hvalid as (Htrace&Hlabels&_).
+  split; [done|].
+  split; [done|].
+  admit.                        (* Need to derive [live_tids] *)
+Admitted.
 
 (** Existing approach
 - Prove [WP] for program
@@ -420,21 +427,76 @@ Definition fair_network_ex (extr : extrace aneris_lang) :=
 Definition fair_ex (extr : extrace aneris_lang) :=
   (∀ ζ, fair_scheduling_ex ζ extr) ∧ fair_network_ex extr.
 
-(* Correspondence between live configurations and model states *)
-Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
-  ∀ ζ (ℓ:fmrole simple_fair_model),
-  labels_match ζ ℓ → (role_enabled_model ℓ δ ↔ live_ex_label ζ c).
-
 Definition exmtr_traces_match : extrace aneris_lang → mtrace simple_fair_model → Prop :=
   traces_match labels_match live_tids language.locale_step simple_trans.
 
-(* TODO: Derive from `valid_state_evolution_fairness` *)
-(* OBS: Need to bump definition to include `live_tids` *)
-Lemma continued_simulation_traces_match extr mtr :
+(* TODO: Clean this up - Currently just ported directly from Fairness *)
+Lemma valid_inf_system_trace_implies_traces_match
+      ex atr iex iatr progtr (auxtr : mtrace simple_fair_model) :
+  exec_trace_match ex iex progtr ->
+  exec_trace_match atr iatr auxtr ->
+  valid_inf_system_trace (continued_simulation valid_state_evolution_fairness) ex atr iex iatr ->
+  exmtr_traces_match progtr auxtr.
+Proof.
+  revert ex atr iex iatr auxtr progtr. cofix IH.
+  intros ex atr iex iatr auxtr progtr Hem Ham Hval.
+  inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
+  - inversion Hem; inversion Ham. econstructor; eauto.
+    apply continued_simulation_rel in Hphi.
+    destruct Hphi as (Hmatch&Hsteps&Hlive).
+    by simplify_eq.
+  - inversion Hem; inversion Ham. subst.
+    pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
+    apply continued_simulation_rel in Hphi.
+    destruct Hphi as (Hmatch&Hsteps&Hlive).
+    apply continued_simulation_rel in Hphi'.
+    destruct Hphi' as (Hmatch'&Hsteps'&Hlive').
+    (* destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?). *)
+    econstructor.
+    + eauto.
+    + eauto.
+    + match goal with
+      | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
+      end; done.
+    + match goal with
+      | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
+      end.
+      * inversion Hsteps'; simplify_eq.
+        rewrite /trace_ends_in in H3. rewrite H3. done.
+      * simpl. inversion Hsteps'; simplify_eq.
+        rewrite /trace_ends_in in H4. rewrite H4. done.
+    + eapply IH; eauto.
+Qed.
+
+Lemma continued_simulation_traces_match extr st :
+  extrace_valid extr →
   continued_simulation valid_state_evolution_fairness
-                       {tr[trfirst extr]} {tr[trfirst mtr]} →
-  exmtr_traces_match extr mtr.
-Proof. Admitted.
+                       {tr[trfirst extr]} {tr[st]} →
+  ∃ (mtr : mtrace simple_fair_model),
+    trfirst mtr = st ∧ exmtr_traces_match extr mtr.
+Proof.
+  intros Hvalid Hsim.
+  assert (∃ iatr,
+             valid_inf_system_trace
+               (continued_simulation valid_state_evolution_fairness)
+               (trace_singleton (trfirst extr))
+               (trace_singleton (st))
+               (from_trace extr)
+               iatr) as [iatr Hiatr].
+  { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
+    Unshelve.
+    - done.
+    - eapply from_trace_preserves_validity; eauto; first econstructor. }
+  eexists _.
+  split; last first.
+  { eapply (valid_inf_system_trace_implies_traces_match); eauto.
+    - by apply from_trace_spec.
+    - by apply to_trace_spec. }
+  (* TODO: Clean this up *)
+  rewrite /trace_last.
+  destruct iatr; simpl. done.
+  destruct x. done.
+Qed.
 
 Lemma traces_match_valid_preserved extr mtr :
   exmtr_traces_match extr mtr → mtrace_valid mtr.
@@ -445,16 +507,6 @@ Proof.
   constructor =>//.
   specialize (CH _ _ H3).
   right. done.
-Qed.
-
-Lemma continued_simulation_valid_preserved
-        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
-  continued_simulation valid_state_evolution_fairness
-    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
-  mtrace_valid mtr.
-Proof.
-  intros ?%continued_simulation_traces_match.
-  by eapply traces_match_valid_preserved.
 Qed.
 
 (* TODO: Move the lemmas relalted to general `traces_match` *)
@@ -597,22 +649,13 @@ Proof.
     split.
     + rewrite H2.
       intros Heq. apply Hdup. simplify_eq.
-      admit. (* Weird matching inversion stuff. *)
+      rewrite /locale_simple_label in Heq.
+      repeat case_match; simplify_eq.
     + rewrite H2. intros Heq.
       apply Hdrop.
       simplify_eq.
       rewrite /locale_simple_label in Heq.
-      admit. (* Weird matching inversion stuff. *)
-Admitted.
-
-Theorem continued_simulation_fairness_preserved
-        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
-  continued_simulation valid_state_evolution_fairness
-    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
-  fair_ex extr → mtrace_fair mtr.
-Proof.
-  intros ?%continued_simulation_traces_match.
-  by eapply traces_match_fairness_preserved.
+      repeat case_match; simplify_eq.
 Qed.
 
 Lemma traces_match_termination_preserved extr mtr :
@@ -621,18 +664,21 @@ Lemma traces_match_termination_preserved extr mtr :
   terminating_trace extr.
 Proof. Admitted.
 
-Theorem continued_simulation_termination_preserved
-        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
-  continued_simulation valid_state_evolution_fairness
-    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
-  terminating_trace mtr → terminating_trace extr.
-Proof.
-  intros ?%continued_simulation_traces_match.
-  by eapply traces_match_termination_preserved.
-Qed.
-
 Definition extrace_fairly_terminating extr :=
-  fair_ex extr → terminating_trace extr.
+  extrace_valid extr → fair_ex extr → terminating_trace extr.
+
+Lemma traces_match_fair_termination_preserved
+      extr (mtr : mtrace simple_fair_model) :
+  initial_reachable mtr →
+  exmtr_traces_match extr mtr →
+  extrace_fairly_terminating extr.
+Proof.
+  intros Hinitial Hsim Hvalid Hfair.
+  eapply traces_match_termination_preserved; [done|].
+  eapply fair_terminating_traces_terminate;
+    [done|by eapply traces_match_valid_preserved|
+      by eapply traces_match_fairness_preserved].
+Qed.
 
 Theorem continued_simulation_fair_termination_preserved
         (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
@@ -641,9 +687,12 @@ Theorem continued_simulation_fair_termination_preserved
     ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
   extrace_fairly_terminating extr.
 Proof.
-  intros Hinitial Hsim Hfair.
-  eapply continued_simulation_termination_preserved; [done|].
-  eapply fair_terminating_traces_terminate;
-    [done|by eapply continued_simulation_valid_preserved|
-      by eapply continued_simulation_fairness_preserved].
+  intros Hinitial Hsim Hvalid Hfair.
+  apply continued_simulation_traces_match in Hsim as [mtr' [Hfst Hmatch]];
+    [|done].
+  eapply traces_match_fair_termination_preserved; [|done..].
+  (* TODO: Clean this up! *)
+  rewrite /initial_reachable. rewrite /initial_reachable in Hinitial.
+  destruct mtr, mtr'; rewrite /pred_at; rewrite /pred_at in Hinitial; simpl in *;
+                by simplify_eq.
 Qed.
