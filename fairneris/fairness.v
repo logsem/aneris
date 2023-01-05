@@ -94,19 +94,15 @@ Section exec_trace.
   Definition locale_enabled (ζ : locale Λ) (c: cfg Λ) :=
     ∃ e, from_locale c.1 ζ = Some e ∧ to_val e = None.
 
-  Definition fair_locale_scheduling_ex ζ : extrace Λ → Prop :=
-    trace_implies (λ c _, locale_enabled ζ c)
-                  (λ c otid, ¬ locale_enabled ζ c ∨ otid = Some (inl ζ)).
-
-  Definition fair_config_scheduling_ex ζ: extrace Λ →Prop :=
-    trace_implies (λ c _, config_enabled ζ c.2)
-                  (λ c otid, ¬config_enabled ζ c.2 ∨ otid = Some (inr ζ)).
-
-  Definition fair_scheduling_ex ζ (extr : extrace Λ) : Prop :=
+  Definition live_ex_label (ζ : ex_label Λ) (c : cfg Λ) : Prop :=
     match ζ with
-    | inl ζ => fair_locale_scheduling_ex ζ extr
-    | inr ζ => fair_config_scheduling_ex ζ extr
+    | inl ζ => locale_enabled ζ c
+    | inr ζ => config_enabled ζ c.2
     end.
+
+  Definition fair_scheduling_ex ζ : extrace Λ → Prop :=
+    trace_implies (λ c _, live_ex_label ζ c)
+                  (λ c otid, ¬ live_ex_label ζ c ∨ otid = Some ζ).
 
   Lemma fair_scheduling_ex_after ζ tr tr' k:
     after k tr = Some tr' →

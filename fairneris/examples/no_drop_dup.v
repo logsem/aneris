@@ -111,9 +111,8 @@ Section with_Σ.
     rewrite /trace_ends_in in Hex.
     rewrite Hex in Hms. simpl in Hms. rewrite Hms.
     split; [econstructor; [apply Heq|econstructor|done]|].
-    split; [eauto|].
-    split.
-    { rewrite (comm _ ∅). f_equiv. f_equiv. eauto. }
+    split; [done|].
+    split; [by rewrite (comm _ ∅)|].
     rewrite Hex in Hskt.
     simpl in Hskt.
     done.
@@ -387,7 +386,8 @@ End with_Σ.
 Definition initial_state shA shB :=
   ([mkExpr ipA (Aprog shA); mkExpr ipB (Bprog shB)],
      {| state_heaps := {[ipA:=∅; ipB:=∅]};
-       state_sockets := ∅; (* NB: Needs to be filled *)
+       state_sockets := {[ipA := {[shA := (sA, [])]}; ipB := {[shB := (sB, mABm 0)]}]};
+       (* NB: Needs to be filled *)
        state_ports_in_use := ∅; (* NB: Needs to be filled *)
        state_ms := ∅; |}).
 
@@ -398,7 +398,45 @@ Lemma no_drop_dup_continued_simulation shA shB :
       valid_state_evolution_fairness
       (trace_singleton $ initial_state shA shB)
       (trace_singleton (trfirst mtr)).
-Proof. Admitted.
+Proof.
+  eexists (tr_singl model_draft.Start).
+  split; [done|].
+
+  assert (anerisPreG (fair_model_to_model simple_fair_model)
+                     (anerisΣ (fair_model_to_model simple_fair_model))) as HPreG.
+  { apply _. }
+  eapply (strong_simulation_adequacy_multiple _ _ _ _ _ {[saA;saB]});
+    [simpl; lia|set_solver|set_solver| |set_solver|set_solver|..| |]=> /=.
+  {
+    iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hfree Hnode Hlbl Hsendevs Hrecvevs".
+    iIntros "Hsend_obs Hrecv_obs".
+    iIntros "!>".
+    iDestruct (unallocated_split with "Hunallocated") as "[HA HB]"; [set_solver|].
+    rewrite big_sepS_union; [|set_solver].
+    iDestruct "Hrt" as "[HrtA HrtB]".
+    rewrite !big_sepS_singleton.
+    replace ({[A_role; B_role]} ∖ config_roles) with (({[A_role; B_role]}):gset _)
+                                                     by set_solver.
+    iDestruct (live_roles_own_split with "Hlive") as "[HliveA HliveB]";
+      [set_solver|].
+    iSplitL.
+    {
+      (* TODO: Aneris WP discrepancies are acting up.. *)
+      (*   iSplitL "HrtA HliveA HA". *)
+      (*   { *)
+      (*     iApply wp_mono; [|iApply aneris_wp_lift]; [by eauto|admit|]. *)
+      (*     (* TODO: is_node ipA needs to be obtained from adequacy *) *)
+      (*     iApply (aneris_wp_socket_interp_alloc_singleton with "HA"). *)
+      (*     iIntros "HsaA". *)
+      (*     iApply aneris_wp_unfold. *)
+      (*     iIntros (tidA) "His_node". *)
+      (*     iApply wp_mono; [|iApply (wp_A)]. with "[$HsaA]"). *)
+      (* } *)
+      admit.
+    }
+    (* TODO: Obtain `always_holds _ valid_state_evolution_fairness _ _`
+             from state_interp_def (likely?)*)
+Admitted.
 
 Theorem choose_nat_terminates shA shB extr :
   trfirst extr = initial_state shA shB →

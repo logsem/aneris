@@ -337,14 +337,17 @@ Section Aneris_AS.
     | inl _ => A_role
     | inr DeliverLabel => Ndeliver
     | inr DropLabel => Ndrop
-    | inr DuplicateLoabel => Ndup
+    | inr DuplicateLabel => Ndup
     end.
 
-  Definition labels_match (ex : execution_trace aneris_lang)
+  Definition labels_match (ζ : ex_label aneris_lang) (ℓ : simple_role) : Prop :=
+    ℓ = locale_simple_label ζ.
+
+  Definition labels_match_trace (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
     : Prop :=
     match ex, atr with
-    | _ :tr[ζ]: _, _ :tr[ℓ]: _ => ℓ = locale_simple_label ζ
+    | _ :tr[ζ]: _, _ :tr[ℓ]: _ => labels_match ζ ℓ
     | {tr[_]}, {tr[_]} => True
     | _, _ => False
     end.
@@ -353,7 +356,7 @@ Section Aneris_AS.
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
       : Prop :=
     trace_steps simple_trans atr ∧
-    labels_match ex atr ∧
+    labels_match_trace ex atr ∧
     state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
     ∃ shA shB, 
     state_sockets (trace_last ex).2 =
