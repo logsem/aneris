@@ -658,11 +658,31 @@ Proof.
       repeat case_match; simplify_eq.
 Qed.
 
+(* TODO: Move this *)
+Lemma traces_match_after_None {S1 S2 L1 L2}
+      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+      (trans1: S1 -> L1 -> S1 -> Prop)
+      (trans2: S2 -> L2 -> S2 -> Prop)
+      tr1 tr2 n :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ->
+  after n tr2 = None ->
+  after n tr1 = None.
+Proof.
+  revert tr1 tr2.
+  induction n; intros tr1 tr2; [done|].
+  move=> /= Hm Ha.
+  destruct tr1; first by inversion Hm.
+  inversion Hm; simplify_eq. by eapply IHn.
+Qed.
+
 Lemma traces_match_termination_preserved extr mtr :
   exmtr_traces_match extr mtr →
   terminating_trace mtr →
   terminating_trace extr.
-Proof. Admitted.
+Proof.
+  intros Hmatch [n Hmtr]. exists n.
+  by eapply traces_match_after_None.
+Qed.
 
 Definition extrace_fairly_terminating extr :=
   extrace_valid extr → fair_ex extr → terminating_trace extr.
