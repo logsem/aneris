@@ -41,6 +41,160 @@ Lemma gset_union_difference_intersection_L `{Countable A} (X Y : gset A) :
   X = (X ∖ Y) ∪ (X ∩ Y).
 Proof. rewrite union_intersection_l_L difference_union_L. set_solver. Qed.
 
+Lemma valid_state_live_tids ex atr :
+  simple_valid_state_evolution ex atr →
+  live_tids (trace_last ex) (trace_last atr).
+Proof.
+  intros (Hsteps&Hmatch&Hn&Hm).
+  intros ζ ℓ Hlabels.
+  split.
+  - intros Henabled.
+    rewrite /role_enabled_model in Henabled.
+    destruct (trace_last atr) eqn:Heq; simpl in *.
+    + destruct ℓ; try by set_solver.
+      * admit.           (* Needs to add liveness of threads to invariant *)
+      * admit.           (* Needs to add liveness of threads to invariant *)
+    + destruct ℓ.
+      * by destruct sent; set_solver.
+      * admit.           (* Needs to add liveness of threads to invariant *)
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DuplicateLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DropLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DeliverLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+    + destruct ℓ.
+      * by destruct sent; set_solver.
+      * admit.           (* Needs to add liveness of threads to invariant *)
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DuplicateLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DropLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DeliverLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+    + destruct ℓ.
+      * by destruct sent; set_solver.
+      * admit.           (* Needs to add liveness of threads to invariant *)
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DuplicateLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DropLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+      * destruct sent; [by set_solver|].
+        assert (ζ = inr DeliverLabel) as ->.
+        { rewrite /labels_match /locale_simple_label in Hlabels.
+          by repeat case_match; simplify_eq. }
+        simpl. rewrite /config_enabled. rewrite Hn.
+        simpl.
+        rewrite gmultiset_disj_union_comm.
+        intros Hneq.
+        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+        rewrite Hneq in H.
+        set_solver.
+  - intros Hζ.
+    destruct ζ as [ζ|ζ].
+    + admit. (* Needs to add liveness of threads to invariant *)
+    + destruct ζ; simpl in Hζ.
+      * assert (ℓ = Ndeliver) as -> by done.
+        rewrite /config_enabled in Hζ.
+        destruct (trace_last atr); try by set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+      * assert (ℓ = Ndup) as -> by done.
+        rewrite /config_enabled in Hζ.
+        destruct (trace_last atr); try by set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+      * assert (ℓ = Ndrop) as -> by done.
+        rewrite /config_enabled in Hζ.
+        destruct (trace_last atr); try by set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+        -- rewrite /role_enabled_model. simpl.
+           destruct sent; set_solver.
+Admitted.
+
 Theorem strong_simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
     (s : stuckness) (es : list aneris_expr) (σ : state) (st : simple_state)
@@ -218,11 +372,12 @@ Proof.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
   iPureIntro.
-  destruct Hvalid as (Htrace&Hlabels&_).
+  pose proof Hvalid as Hvalid'.
+  destruct Hvalid as (Htrace&Hlabels&Hstate).
   split; [done|].
   split; [done|].
-  admit.                        (* Need to derive [live_tids] *)
-Admitted.
+  by apply valid_state_live_tids.
+Qed.
 
 Theorem strong_simulation_adequacy Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
@@ -399,11 +554,12 @@ Proof.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
   iPureIntro.
-  destruct Hvalid as (Htrace&Hlabels&_).
+  pose proof Hvalid as Hvalid'.
+  destruct Hvalid as (Htrace&Hlabels&Hstate).
   split; [done|].
   split; [done|].
-  admit.                        (* Need to derive [live_tids] *)
-Admitted.
+  by apply valid_state_live_tids.
+Qed.
 
 (** Existing approach
 - Prove [WP] for program
@@ -451,7 +607,6 @@ Proof.
     destruct Hphi as (Hmatch&Hsteps&Hlive).
     apply continued_simulation_rel in Hphi'.
     destruct Hphi' as (Hmatch'&Hsteps'&Hlive').
-    (* destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?). *)
     econstructor.
     + eauto.
     + eauto.
