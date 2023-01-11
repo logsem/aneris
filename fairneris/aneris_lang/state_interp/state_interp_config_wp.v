@@ -63,14 +63,14 @@ Section state_interpretation.
     rewrite Hex in H. simpl in *.
     destruct σ1; simpl in *; simplify_eq.
     destruct (trace_last atr) eqn:Hs.
-    { destruct H as (_ & _ & Hσ & _).
+    { destruct H as (_ & _ & _ & Hσ & _).
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       - rewrite /messages_to_receive_at_multi_soup in Hm. set_solver.
       - set_solver.
       - set_solver. }
     (* Sent *)
-    - destruct H as (Hsteps & Hmatch & Hσ & H').
+    - destruct H as (Hsteps & Hmatch & Hlive & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
@@ -94,6 +94,30 @@ Section state_interpretation.
           { by apply elem_of_filter in Hm as [-> _]. }
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
+          split.
+          { intros ζ ℓ Hroles.
+            specialize (Hlive ζ ℓ Hroles).
+            simpl in *.
+            rewrite /locale_enabled.
+            rewrite /locale_enabled in Hlive.
+            simpl in *.
+            split.
+            - intros H.
+              apply Hlive.
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H.
+              simpl in *.
+              destruct sent; set_solver.
+            - intros H.
+              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
+              { by apply Hlive. }
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H0.
+              simpl in *.
+              assert (ℓ = A_role ∨ ℓ = B_role).
+              { rewrite /labels_match /locale_simple_label in Hroles.
+                repeat case_match; simplify_eq; eauto. }
+              destruct sent; set_solver. }
           destruct H' as (shA & sh' & H').
           split; [multiset_solver|].
           exists shA, sh'.
@@ -200,6 +224,30 @@ Section state_interpretation.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [done|].
+          split.
+          { intros ζ ℓ Hroles.
+            specialize (Hlive ζ ℓ Hroles).
+            simpl in *.
+            rewrite /locale_enabled.
+            rewrite /locale_enabled in Hlive.
+            simpl in *.
+            split.
+            - intros H.
+              apply Hlive.
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H.
+              simpl in *.
+              destruct sent; set_solver.
+            - intros H.
+              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
+              { by apply Hlive. }
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H0.
+              simpl in *.
+              assert (ℓ = A_role ∨ ℓ = B_role).
+              { rewrite /labels_match /locale_simple_label in Hroles.
+                repeat case_match; simplify_eq; eauto. }
+              destruct sent; set_solver. }
           split; [by multiset_solver|done]. }
                 iSplitR "Hlive"; last first.
         { destruct sent; [|done].
@@ -247,7 +295,7 @@ Section state_interpretation.
         iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. by apply messages_history_coh_drop_message.
     (* Delivered *)
-    - destruct H as (Hsteps & Hmatch & Hσ & H').
+    - destruct H as (Hsteps & Hmatch & Hlive & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
@@ -272,6 +320,30 @@ Section state_interpretation.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
+          split.
+          { intros ζ ℓ Hroles.
+            specialize (Hlive ζ ℓ Hroles).
+            simpl in *.
+            rewrite /locale_enabled.
+            rewrite /locale_enabled in Hlive.
+            simpl in *.
+            split.
+            - intros H.
+              apply Hlive.
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H.
+              simpl in *.
+              destruct sent; set_solver.
+            - intros H.
+              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
+              { by apply Hlive. }
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H0.
+              simpl in *.
+              assert (ℓ = A_role ∨ ℓ = B_role).
+              { rewrite /labels_match /locale_simple_label in Hroles.
+                repeat case_match; simplify_eq; eauto. }
+              destruct sent; set_solver. }
           split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
@@ -377,6 +449,30 @@ Section state_interpretation.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
+          split.
+          { intros ζ ℓ Hroles.
+            specialize (Hlive ζ ℓ Hroles).
+            simpl in *.
+            rewrite /locale_enabled.
+            rewrite /locale_enabled in Hlive.
+            simpl in *.
+            split.
+            - intros H.
+              apply Hlive.
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H.
+              simpl in *.
+              destruct sent; set_solver.
+            - intros H.
+              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
+              { by apply Hlive. }
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H0.
+              simpl in *.
+              assert (ℓ = A_role ∨ ℓ = B_role).
+              { rewrite /labels_match /locale_simple_label in Hroles.
+                repeat case_match; simplify_eq; eauto. }
+              destruct sent; set_solver. }
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
@@ -424,7 +520,7 @@ Section state_interpretation.
         iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. by apply messages_history_coh_drop_message.
     (* Delivered *)
-    - destruct H as (Hsteps & Hmatch & Hσ & H').
+    - destruct H as (Hsteps & Hmatch & Hlive & Hσ & H').
       inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
         simplify_eq/=.
       (* Deliver *)
@@ -450,6 +546,30 @@ Section state_interpretation.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
           destruct H' as (shA & sh' & H').
+          split.
+          { intros ζ ℓ Hroles.
+            specialize (Hlive ζ ℓ Hroles).
+            simpl in *.
+            rewrite /locale_enabled.
+            rewrite /locale_enabled in Hlive.
+            simpl in *.
+            split.
+            - intros H.
+              apply Hlive.
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H.
+              simpl in *.
+              destruct sent; set_solver.
+            - intros H.
+              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Received (S sent) delivered)).
+              { by apply Hlive. }
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H0.
+              simpl in *.
+              assert (ℓ = A_role ∨ ℓ = B_role).
+              { rewrite /labels_match /locale_simple_label in Hroles.
+                repeat case_match; simplify_eq; eauto. }
+              destruct sent; set_solver. }
           split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
@@ -544,6 +664,30 @@ Section state_interpretation.
           apply elem_of_mABn in H as ->. simpl.
           split; [econstructor; [apply Hs|econstructor|done]|].
           split; [multiset_solver|].
+          split.
+          { intros ζ ℓ Hroles.
+            specialize (Hlive ζ ℓ Hroles).
+            simpl in *.
+            rewrite /locale_enabled.
+            rewrite /locale_enabled in Hlive.
+            simpl in *.
+            split.
+            - intros H.
+              apply Hlive.
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H.
+              simpl in *.
+              destruct sent; set_solver.
+            - intros H.
+              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Received (S sent) delivered)).
+              { by apply Hlive. }
+              rewrite /role_enabled_model.
+              rewrite /role_enabled_model in H0.
+              simpl in *.
+              assert (ℓ = A_role ∨ ℓ = B_role).
+              { rewrite /labels_match /locale_simple_label in Hroles.
+                repeat case_match; simplify_eq; eauto. }
+              destruct sent; set_solver. }
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].

@@ -330,18 +330,18 @@ Section Aneris_AS.
     Nat.iter n (λ ms, ms ⊎ {[+ mAB +]}) ∅. 
   Definition mABm m : list message := repeat mAB m.
 
-  Definition locale_simple_label (ζ : ex_label aneris_lang) : simple_role :=
+  Definition locale_simple_label (ζ : ex_label aneris_lang) : option simple_role :=
     match ζ with
-    | inl ("0.0.0.0",0) => A_role
-    | inl ("0.0.0.1",0) => B_role
-    | inl _ => A_role
-    | inr DeliverLabel => Ndeliver
-    | inr DropLabel => Ndrop
-    | inr DuplicateLabel => Ndup
+    | inl ("0.0.0.0",0) => Some A_role
+    | inl ("0.0.0.1",0) => Some B_role
+    | inl _ => None
+    | inr DeliverLabel => Some Ndeliver
+    | inr DropLabel => Some Ndrop
+    | inr DuplicateLabel => Some Ndup
     end.
 
   Definition labels_match (ζ : ex_label aneris_lang) (ℓ : simple_role) : Prop :=
-    ℓ = locale_simple_label ζ.
+    Some ℓ = locale_simple_label ζ.
 
   Definition labels_match_trace (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
@@ -358,12 +358,17 @@ Section Aneris_AS.
     ∀ ζ (ℓ:fmrole simple_fair_model),
     labels_match ζ ℓ → (role_enabled_model ℓ δ ↔ live_ex_label ζ c).
 
+  (* TODO: This definition seems a bit repetitive *)
+  Definition live_threads (c : cfg aneris_lang) (δ : simple_state) : Prop :=
+    ∀ (ζ:locale aneris_lang) (ℓ:fmrole simple_fair_model),
+    labels_match (inl ζ) ℓ → (role_enabled_model ℓ δ ↔ live_ex_label (inl ζ) c).
+
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
       : Prop :=
     trace_steps simple_trans atr ∧
     labels_match_trace ex atr ∧
-    (* live_tids (trace_last ex) (trace_last atr) ∧ *)
+    live_threads (trace_last ex) (trace_last atr) ∧
     state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
     ∃ shA shB, 
     state_sockets (trace_last ex).2 =
