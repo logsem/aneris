@@ -291,52 +291,29 @@ Section with_Σ.
     split; [econstructor; [apply Heq|econstructor|done]|].
     split; [done|].
     split.
-    {
-      intros ζ ℓ Hroles.
-      specialize (Hlive ζ ℓ Hroles).
-      simpl in *. rewrite /locale_enabled. rewrite /locale_enabled in Hlive. simpl.
-      assert (ℓ = A_role ∨ ℓ = B_role).
-      { rewrite /labels_match /locale_simple_label in Hroles.
+    { intros ℓ ζ Hlabels Henabled.
+      assert (ℓ = A_role ∨ ℓ = B_role) as [Hℓ|Hℓ].
+      { rewrite /labels_match /locale_simple_label in Hlabels.
         repeat case_match; simplify_eq; eauto. }
-      split.
-      - rewrite /role_enabled_model. intros Hrole'.
-        assert (ℓ = B_role) as -> by set_solver.
-        assert (∃ e : language.expr aneris_lang,
-               from_locale (trace_last ex).1 ζ = Some e ∧
-               language.to_val e = None) as [e [Hlive' Hval]].
-        { apply Hlive. rewrite /role_enabled_model. set_solver. }
-        exists e. simpl. split; [|done].
-        rewrite Hex in Hlive'. simpl in *.
-        rewrite right_id.
-        assert (ζ = ("0.0.0.1",0%nat)) as ->.
-        { rewrite /labels_match /locale_simple_label in Hroles.
-          by repeat case_match; simplify_eq. }
-        rewrite -Hlive'.
-        rewrite -!aneris_base_fill.
-        by apply from_locale_from_split_ne.
-      - rewrite /role_enabled_model. intros Hrole'.
-        rewrite /live_roles. simpl.
-        destruct H0 as [Heq'|Heq'].
-        + simplify_eq.
-          destruct Hrole' as [e [Hrole' Hval]].
-          assert (ζ = ("0.0.0.0",0%nat)) as ->.
-          { rewrite /labels_match /locale_simple_label in Hroles.
-            by repeat case_match; simplify_eq. }
-          (* Needs to know that [tp1] has no threads on 0.0.0.0 *)
-          assert (e = fill K {| expr_n := ipA; expr_e := #5%nat |})
-            as -> by admit.
-          assert (K = ectx_emp) as -> by admit.
-          rewrite ectx_fill_emp in Hval.
-          done.
-        + simplify_eq.
-          destruct Hrole' as [e Hrole'].
-          set_solver.
-    }
+      - simplify_eq.
+        eapply from_locale_step.
+        eapply locale_step_atomic; eauto.
+        2: { rewrite Hex in Hlive.
+             eapply Hlive; [done|].
+             rewrite /labels_match /role_enabled_model. set_solver. }
+        by repeat econstructor.
+      - simplify_eq.
+        eapply from_locale_step.
+        eapply locale_step_atomic; eauto.
+        2: { rewrite Hex in Hlive.
+             eapply Hlive; [done|].
+             rewrite /labels_match /role_enabled_model. set_solver. }
+        by repeat econstructor. }
     split; [by rewrite (comm _ ∅)|].
     rewrite Hex in Hskt.
     simpl in Hskt.
     done.
-  Admitted.
+  Qed.
 
   Lemma snoc_eq {A} (xs ys : list A) x y :
     xs ++ [x] = ys ++ [y] → xs = ys ∧ x = y.
@@ -415,47 +392,28 @@ Section with_Σ.
           split; [econstructor;[done|econstructor|done]|].
           split; [done|].
           split; [|done].
-          intros ζ ℓ Hroles.
-          specialize (Hlive ζ ℓ Hroles).
-          simpl in *. rewrite /locale_enabled. rewrite /locale_enabled in Hlive. simpl.
-          assert (ℓ = A_role ∨ ℓ = B_role).
-          { rewrite /labels_match /locale_simple_label in Hroles.
+          intros ℓ ζ Hlabels Henabled.
+          assert (ℓ = A_role ∨ ℓ = B_role) as [Hℓ|Hℓ].
+          { rewrite /labels_match /locale_simple_label in Hlabels.
             repeat case_match; simplify_eq; eauto. }
-          (* TODO: Refactor this to remove the bracketing *)
-          { split.
-            - rewrite /role_enabled_model. intros Hrole'.
-              destruct H0; simplify_eq.
-              + assert (∃ e : language.expr aneris_lang,
-                           from_locale (trace_last ex).1 ζ = Some e ∧
-                           language.to_val e = None) as [e [Hlive' Hval]].
-                { apply Hlive. rewrite /role_enabled_model. rewrite Hs. done. }
-                exists e. simpl. split; [|done].
-                rewrite Hex in Hlive'. simpl in *.
-                rewrite right_id.
-                assert (ζ = ("0.0.0.0",0%nat)) as ->.
-                { rewrite /labels_match /locale_simple_label in Hroles.
-                  by repeat case_match; simplify_eq. }
-                rewrite -Hlive'.
-                rewrite -!aneris_base_fill.
-                by apply from_locale_from_split_ne.
-              + exists (fill K {| expr_n := ipB;
-                                 expr_e := ReceiveFrom #(LitSocket shB)|}).
-                rewrite right_id.
-                split; [|by apply fill_not_val].
-                admit.
-            - rewrite /role_enabled_model. intros Hrole'.
-              rewrite /live_roles. simpl.
-              destruct H0 as [Heq'|Heq'].
-              + simplify_eq. set_solver.
-              + destruct Hrole' as [e [Hrole' Hval]].
-                assert (ζ = ("0.0.0.1",0%nat)) as ->.
-                { rewrite /labels_match /locale_simple_label in Hroles.
-                  by repeat case_match; simplify_eq. }
-                assert (e = fill K {| expr_n := ipA; expr_e := #5%nat |})
-                  as -> by admit.
-                assert (K = ectx_emp) as -> by admit.
-                rewrite ectx_fill_emp in Hval.
-                done. }
+          -- simplify_eq.
+             eapply from_locale_step.
+             eapply locale_step_atomic; eauto.
+             2: { rewrite Hex in Hlive.
+                  eapply Hlive; [done|].
+                  rewrite /labels_match /role_enabled_model.
+                  rewrite Hs.
+                  set_solver. }
+             by repeat econstructor.
+          -- simplify_eq.
+             eapply from_locale_step.
+             eapply locale_step_atomic; eauto.
+             2: { rewrite Hex in Hlive.
+                  eapply Hlive; [done|].
+                  rewrite /labels_match /role_enabled_model.
+                  rewrite Hs.
+                  set_solver. }
+             by repeat econstructor.
         * iExists (trace_last atr), B_role.
           rewrite -message_history_evolution_id; iFrame.
           rewrite Hnotriggered;
@@ -475,62 +433,28 @@ Section with_Σ.
           split; [econstructor;[done|econstructor|done]|].
           split; [done|].
           split; [|done].
-          intros ζ ℓ Hroles.
-          specialize (Hlive ζ ℓ Hroles).
-          simpl in *. rewrite /locale_enabled. rewrite /locale_enabled in Hlive. simpl.
-          assert (ℓ = A_role ∨ ℓ = B_role).
-          { rewrite /labels_match /locale_simple_label in Hroles.
+          intros ℓ ζ Hlabels Henabled.
+          assert (ℓ = A_role ∨ ℓ = B_role) as [Hℓ|Hℓ].
+          { rewrite /labels_match /locale_simple_label in Hlabels.
             repeat case_match; simplify_eq; eauto. }
-          (* TODO: Refactor this to remove the bracketing *)
-          { split.
-            - rewrite /role_enabled_model. intros Hrole'.
-              destruct H0; simplify_eq.
-              + assert (∃ e : language.expr aneris_lang,
-                           from_locale (trace_last ex).1 ζ = Some e ∧
-                           language.to_val e = None) as [e [Hlive' Hval]].
-                { apply Hlive. rewrite /role_enabled_model. rewrite Hs. done. }
-                exists e. simpl. split; [|done].
-                rewrite Hex in Hlive'. simpl in *.
-                rewrite right_id.
-                assert (ζ = ("0.0.0.0",0%nat)) as ->.
-                { rewrite /labels_match /locale_simple_label in Hroles.
-                  by repeat case_match; simplify_eq. }
-                rewrite -Hlive'.
-                rewrite -!aneris_base_fill.
-                by apply from_locale_from_split_ne.
-              + exists (fill K {| expr_n := ipB;
-                                 expr_e := ReceiveFrom #(LitSocket shB)|}).
-                rewrite right_id.
-                split; [|by apply fill_not_val].
-                admit.
-            - rewrite /role_enabled_model. intros Hrole'.
-              rewrite /live_roles. simpl.
-              destruct H0 as [Heq'|Heq'].
-              + simplify_eq.
-                rewrite Hs in Hlive.
-                assert (role_enabled_model (A_role:fmrole simple_fair_model) (Sent sent)).
-                { apply Hlive.
-                  destruct Hrole' as [e [Hlive' Hval]].
-                  exists e.
-                  split; [|done].
-                  rewrite Hex. simpl.
-                  rewrite right_id in Hlive'.
-                  rewrite /from_locale.
-                  assert (ζ = ("0.0.0.0",0%nat)) as ->.
-                  { rewrite /labels_match /locale_simple_label in Hroles.
-                    by repeat case_match; simplify_eq. }
-                  erewrite from_locale_from_split_ne;
-                    [done|by rewrite -aneris_base_fill..]. }
-                set_solver.
-              + destruct Hrole' as [e [Hrole' Hval]].
-                assert (ζ = ("0.0.0.1",0%nat)) as ->.
-                { rewrite /labels_match /locale_simple_label in Hroles.
-                  by repeat case_match; simplify_eq. }
-                assert (e = fill K {| expr_n := ipA; expr_e := #5%nat |})
-                  as -> by admit.
-                assert (K = ectx_emp) as -> by admit.
-                rewrite ectx_fill_emp in Hval.
-                done. }
+          -- simplify_eq.
+             eapply from_locale_step.
+             eapply locale_step_atomic; eauto.
+             2: { rewrite Hex in Hlive.
+                  eapply Hlive; [done|].
+                  rewrite /labels_match /role_enabled_model.
+                  rewrite Hs.
+                  set_solver. }
+             by repeat econstructor.
+          -- simplify_eq.
+             eapply from_locale_step.
+             eapply locale_step_atomic; eauto.
+             2: { rewrite Hex in Hlive.
+                  eapply Hlive; [done|].
+                  rewrite /labels_match /role_enabled_model.
+                  rewrite Hs.
+                  set_solver. }
+             by repeat econstructor.
         * clear Hnotriggered.
           destruct Hvalid as (Hvalid&Hmatch&Hlive&Hσ&Hskts).
           destruct Hskts as (shA&shB'&Hskts).
@@ -679,49 +603,27 @@ Section with_Σ.
         assert (shB = shB') as <-.
         { rewrite lookup_insert_Some in Hr. set_solver. }
         split.
-        {
-          intros ζ ℓ Hroles.
-          specialize (Hlive ζ ℓ Hroles).
-          simpl in *. rewrite /locale_enabled. rewrite /locale_enabled in Hlive. simpl.
-          assert (ℓ = A_role ∨ ℓ = B_role).
-          { rewrite /labels_match /locale_simple_label in Hroles.
+        { intros ℓ ζ Hlabels Henabled.
+          assert (ℓ = A_role ∨ ℓ = B_role) as [Hℓ|Hℓ].
+          { rewrite /labels_match /locale_simple_label in Hlabels.
             repeat case_match; simplify_eq; eauto. }
-          split.
-          - rewrite /role_enabled_model. intros Hrole'.
-            destruct H0; simplify_eq.
-            + rewrite /live_roles in Hrole'. simpl in Hrole'.
-              destruct x; set_solver.
-            + (* Needs to derive that result is a value *)
-              admit.
-            - rewrite /role_enabled_model. intros Hrole'.
-              rewrite /live_roles. simpl.
-              destruct H0 as [Heq'|Heq'].
-              + assert (ζ = ("0.0.0.0",0%nat)) as ->.
-                { rewrite /labels_match /locale_simple_label in Hroles.
-                  by repeat case_match; simplify_eq. }
-                simplify_eq.
-                rewrite Hs in Hlive.
-                assert (role_enabled_model (A_role : fmrole simple_fair_model) (Delivered x y)).
-                { apply Hlive.
-                  destruct Hrole' as [e [Hlive' Hval]].
-                  exists e.
-                  split; [|done].
-                  rewrite Hex. simpl.
-                  rewrite right_id in Hlive'.
-                  rewrite /from_locale.
-                  erewrite from_locale_from_split_ne;
-                    [done|by rewrite -aneris_base_fill..]. }
-                rewrite /role_enabled_model /live_roles in H0. simpl in H0.
-                destruct x; set_solver.
-              + destruct Hrole' as [e [Hrole' Hval]].
-                assert (ζ = ("0.0.0.1",0%nat)) as ->.
-                { rewrite /labels_match /locale_simple_label in Hroles.
-                  by repeat case_match; simplify_eq. }
-                assert (e = fill K {| expr_n := ipA; expr_e := #5%nat |})
-                  as -> by admit.
-                assert (K = ectx_emp) as -> by admit.
-                rewrite ectx_fill_emp in Hval.
-                done. }
+          - simplify_eq.
+            rewrite /role_enabled_model in Henabled.
+            destruct x; set_solver.
+          - simplify_eq.
+            eapply from_locale_step.
+            eapply locale_step_atomic; eauto.
+            2: { rewrite Hex in Hlive.
+                 eapply Hlive; [done|].
+                 rewrite /labels_match /role_enabled_model.
+                 rewrite Hs.
+                 destruct x; set_solver. }
+            (* TODO: Clean this up. *)
+            repeat econstructor.
+            set_solver. done.
+            instantiate (1:= σ).
+            rewrite Hskts.
+            set_solver. }
         split; [done|].
         exists shA, shB.
         rewrite Hskts.
@@ -744,7 +646,7 @@ Section with_Σ.
         done. }
       iApply wp_value.
       by iApply "HΦ".
-  Admitted.
+  Qed.
 
 End with_Σ.
 
@@ -772,23 +674,17 @@ Proof.
   { apply _. }
   eapply (strong_simulation_adequacy_multiple _ _ _ _ _ {[saA;saB]});
     [simpl; lia| |set_solver|set_solver| |set_solver|set_solver|..| |]=> /=.
-  { intros ζ ℓ Hmatch. rewrite /role_enabled_model. simpl.
-    split.
-    - intros Hlive.
-      assert (ℓ = A_role ∨ ℓ = B_role) as [Heq|Heq] by set_solver; simplify_eq.
-      + assert (ζ = ("0.0.0.0", 0%nat)) as ->.
-        { rewrite /labels_match /locale_simple_label in Hmatch.
-          by repeat case_match; simplify_eq. }
-        eexists _. simpl. done.
-      + assert (ζ = ("0.0.0.1", 0%nat)) as ->.
-        { rewrite /labels_match /locale_simple_label in Hmatch.
-          by repeat case_match; simplify_eq. }
-        eexists _. simpl. done.
-    - intros Henabled.
-      destruct Henabled as [e [Hlocale Hval]].
-      simpl in *.
-      (* Trivial, but tedious. *)
-      admit. }
+  { intros ℓ ζ Hmatch Henabled. rewrite /role_enabled_model in Henabled. simpl.
+    
+    assert (ℓ = A_role ∨ ℓ = B_role) as [Heq|Heq] by set_solver; simplify_eq.
+    - assert (ζ = ("0.0.0.0", 0%nat)) as ->.
+      { rewrite /labels_match /locale_simple_label in Hmatch.
+        by repeat case_match; simplify_eq. }
+      eexists _. simpl. done.
+    - assert (ζ = ("0.0.0.1", 0%nat)) as ->.
+      { rewrite /labels_match /locale_simple_label in Hmatch.
+        by repeat case_match; simplify_eq. }
+      eexists _. simpl. done. }
   {
     iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hfree Hnode Hlbl Hsendevs Hrecvevs".
     iIntros "Hsend_obs Hrecv_obs".

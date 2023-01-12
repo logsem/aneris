@@ -352,23 +352,29 @@ Section Aneris_AS.
     | _, _ => False
     end.
 
-  (* TODO: This should probably be located in a better place *)
-  (* Correspondence between live configurations and model states *)
-  Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
-    ∀ ζ (ℓ:fmrole simple_fair_model),
-    labels_match ζ ℓ → (role_enabled_model ℓ δ ↔ live_ex_label ζ c).
+  Definition role_has_locale (c : cfg aneris_lang) (δ : simple_state) :=
+    ∀ (ℓ:fmrole simple_fair_model) ζ,
+    labels_match (inl ζ) ℓ →
+    role_enabled_model ℓ δ →
+    is_Some (from_locale c.1 ζ).
 
-  (* TODO: This definition seems a bit repetitive *)
-  Definition live_threads (c : cfg aneris_lang) (δ : simple_state) : Prop :=
-    ∀ (ζ:locale aneris_lang) (ℓ:fmrole simple_fair_model),
-    labels_match (inl ζ) ℓ → (role_enabled_model ℓ δ ↔ live_ex_label (inl ζ) c).
+  (* (* TODO: This should probably be located in a better place *) *)
+  (* (* Correspondence between live configurations and model states *) *)
+  (* Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop := *)
+  (*   ∀ ζ (ℓ:fmrole simple_fair_model), *)
+  (*   labels_match ζ ℓ → (role_enabled_model ℓ δ ↔ live_ex_label ζ c). *)
+
+  (* (* TODO: This definition seems a bit repetitive *) *)
+  (* Definition live_threads (c : cfg aneris_lang) (δ : simple_state) : Prop := *)
+  (*   ∀ (ζ:locale aneris_lang) (ℓ:fmrole simple_fair_model), *)
+  (*   labels_match (inl ζ) ℓ → (role_enabled_model ℓ δ ↔ live_ex_label (inl ζ) c). *)
 
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
       : Prop :=
     trace_steps simple_trans atr ∧
     labels_match_trace ex atr ∧
-    live_threads (trace_last ex) (trace_last atr) ∧
+    role_has_locale (trace_last ex) (trace_last atr) ∧
     state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
     ∃ shA shB, 
     state_sockets (trace_last ex).2 =

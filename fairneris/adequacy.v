@@ -26,6 +26,13 @@ Definition always_holds {Σ}
     state_interp ex atr -∗
     |={⊤, ∅}=> ⌜ξ ex atr⌝.
 
+(* TODO: This should probably be located in a better place *)
+(* Correspondence between live configurations and model states *)
+Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
+  ∀ ζ (ℓ:fmrole simple_fair_model),
+  labels_match ζ ℓ →
+  (role_enabled_model ℓ δ → live_ex_label ζ c).
+
 Definition valid_state_evolution_fairness
            (extr : execution_trace aneris_lang)
            (auxtr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
@@ -41,170 +48,536 @@ Lemma gset_union_difference_intersection_L `{Countable A} (X Y : gset A) :
   X = (X ∖ Y) ∪ (X ∩ Y).
 Proof. rewrite union_intersection_l_L difference_union_L. set_solver. Qed.
 
+(* (* TODO: This definition seems a bit repetitive *) *)
+(* Definition live_threads' (c : cfg aneris_lang) (δ : simple_state) : Prop := *)
+(*   ∀ (ζ:locale aneris_lang) (ℓ:fmrole simple_fair_model), *)
+(*   labels_match (inl ζ) ℓ → *)
+(*   (* Carried in the state interpretation *) *)
+(*   ((role_enabled_model ℓ δ → is_Some (from_locale c.1 ζ)) ∧ *)
+(*    (* Consequence of the post conditions *) *)
+(*    (∀ e, from_locale c.1 ζ = Some e → *)
+(*          aneris_to_val e ≠ None → ¬ role_enabled_model ℓ δ)). *)
+
+(* Lemma derive_live_tids_thing c ζ (ℓ : fmrole simple_fair_model) δ : *)
+(*   live_threads c δ → *)
+(*   role_enabled_model ℓ δ → locale_enabled ζ c. *)
+(* Proof. *)
+(*   intros Hmatch Himpl1 Himpl2 Hrole. *)
+(*   specialize (Himpl1 _ _ Hmatch Hrole) as [e He]. *)
+(*   exists e. *)
+(*   split; [done|]. *)
+(*   destruct (language.to_val e) eqn:Heqn; [|done]. *)
+(*   specialize (Himpl2 e He). *)
+(*   assert (language.to_val e ≠ None). *)
+(*   { intros Heq. simplify_eq. } *)
+(*   specialize (Himpl2 H). *)
+(*   done. *)
+(* Qed. *)
+
+Definition from_locale_no_val_no_enabled (c : cfg aneris_lang)
+           (δ : simple_state) :=
+  ∀ (ℓ:fmrole simple_fair_model) ζ, 
+  labels_match (inl ζ) ℓ →
+  ∀ e, from_locale c.1 ζ = Some e → language.to_val e ≠ None →
+  ¬ role_enabled_model ℓ δ.
+
+Lemma derive_live_tids_thing (c : cfg aneris_lang) δ :  
+  role_has_locale c δ →
+  from_locale_no_val_no_enabled c δ →
+  ∀ (ℓ : fmrole simple_fair_model) ζ, labels_match (inl ζ) ℓ →
+                                      role_enabled_model ℓ δ → locale_enabled ζ c.
+Proof.
+  intros Himpl1 Himpl2 ℓ ζ Hmatch Hrole.
+  specialize (Himpl1 _ _ Hmatch Hrole) as [e He].
+  exists e.
+  split; [done|].
+  destruct (language.to_val e) eqn:Heqn; [|done].
+  specialize (Himpl2 _ _ Hmatch e He).
+  assert (language.to_val e ≠ None).
+  { intros Heq. simplify_eq. }
+  specialize (Himpl2 H).
+  done.
+Qed.
+
+(* Lemma derive_live_tids_thing (c : cfg aneris_lang) ζ *)
+(*       (ℓ : fmrole simple_fair_model) δ : *)
+(*   (role_enabled_model ℓ δ → is_Some (from_locale c.1 ζ)) → *)
+(*   (∀ e, from_locale c.1 ζ = Some e → language.to_val e ≠ None → *)
+(*         ¬ role_enabled_model ℓ δ) → *)
+(*   role_enabled_model ℓ δ → locale_enabled ζ c. *)
+(* Proof. *)
+(*   intros Himpl1 Himpl2 Hrole. *)
+(*   specialize (Himpl1 Hrole) as [e He]. *)
+(*   exists e. *)
+(*   split; [done|]. *)
+(*   destruct (language.to_val e) eqn:Heqn; [|done]. *)
+(*   specialize (Himpl2 e He). *)
+(*   assert (language.to_val e ≠ None). *)
+(*   { intros Heq. simplify_eq. } *)
+(*   specialize (Himpl2 H). *)
+(*   done. *)
+(* Qed. *)
+
+(* Lemma derive_live_tids_thing' (c : cfg aneris_lang) ζ *)
+(*       (ℓ : fmrole simple_fair_model) δ : *)
+(*   (role_enabled_model ℓ δ → is_Some (from_locale c.1 ζ)) → *)
+(*   (∀ e, from_locale c.1 ζ = Some e → language.to_val e ≠ None → *)
+(*         ¬ role_enabled_model ℓ δ) → *)
+(*   ¬ locale_enabled ζ c → ¬ role_enabled_model ℓ δ. *)
+(* Proof. *)
+(*   intros Himpl1 Himpl2 Hlocale Hrole'. *)
+(*   apply Hlocale. by eapply derive_live_tids_thing. *)
+(* Qed. *)
+
+(* Lemma derive_live_tids_thing c ζ (ℓ : fmrole simple_fair_model) δ : *)
+(*   labels_match (inl ζ) ℓ → *)
+(*   (∀ (ℓ : fmrole simple_fair_model) ζ, *)
+(*      labels_match (inl ζ) ℓ → role_enabled_model ℓ δ → *)
+(*      is_Some (from_locale c.1 ζ)) → *)
+(*   (∀ e, from_locale c.1 ζ = Some e → language.to_val e ≠ None → *)
+(*         ¬ role_enabled_model ℓ δ) → *)
+(*   role_enabled_model ℓ δ → locale_enabled ζ c. *)
+(* Proof. *)
+(*   intros Hmatch Himpl1 Himpl2 Hrole. *)
+(*   specialize (Himpl1 _ _ Hmatch Hrole) as [e He]. *)
+(*   exists e. *)
+(*   split; [done|]. *)
+(*   destruct (language.to_val e) eqn:Heqn; [|done]. *)
+(*   specialize (Himpl2 e He). *)
+(*   assert (language.to_val e ≠ None). *)
+(*   { intros Heq. simplify_eq. } *)
+(*   specialize (Himpl2 H). *)
+(*   done. *)
+(* Qed. *)
+
+(* Definition simple_valid_state_evolution' (ex : execution_trace aneris_lang) *)
+(*            (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) *)
+(*   : Prop := *)
+(*   trace_steps simple_trans atr ∧ *)
+(*   labels_match_trace ex atr ∧ *)
+(*   live_threads' (trace_last ex) (trace_last atr) ∧ *)
+(*   state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧ *)
+(*   ∃ shA shB,  *)
+(*     state_sockets (trace_last ex).2 = *)
+(*     {[ ip_of_address saA := {[shA := (sA,[])]}; *)
+(*        ip_of_address saB := {[shB := (sB,mABm (state_get_m (trace_last atr)))]} ]}. *)
 
 Lemma valid_state_live_tids ex atr :
   simple_valid_state_evolution ex atr →
+  from_locale_no_val_no_enabled (trace_last ex) (trace_last atr) →
   live_tids (trace_last ex) (trace_last atr).
 Proof.
-  intros (Hsteps&Hmatch&Hlive&Hn&Hm).
+  intros (Hsteps&Hmatch&Hlive1&Hn&Hm) Hlive2.
   intros ζ ℓ Hlabels.
-  destruct ζ as [ζ|ζ]; [by apply Hlive|].
-  split.
-  - assert (ℓ ≠ A_role ∧ ℓ ≠ B_role) as [HAneq HBneq].
-    { rewrite /labels_match /locale_simple_label in Hlabels.
-      repeat case_match; simplify_eq; eauto. }
-    intros Henabled.
-    rewrite /role_enabled_model in Henabled.
-    destruct (trace_last atr) eqn:Heq; simpl in *.
-    + set_solver.
-    + destruct ℓ.
-      * by destruct sent; set_solver.
-      * by destruct sent; set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DuplicateLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DropLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DeliverLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-    + destruct ℓ.
-      * by destruct sent; set_solver.
-      * by destruct sent; set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DuplicateLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DropLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DeliverLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-    + destruct ℓ.
-      * by destruct sent; set_solver.
-      * by destruct sent; set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DuplicateLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DropLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-      * destruct sent; [by set_solver|].
-        assert (ζ = DeliverLabel) as ->.
-        { rewrite /labels_match /locale_simple_label in Hlabels.
-          by repeat case_match; simplify_eq. }
-        simpl. rewrite /config_enabled. rewrite Hn.
-        simpl.
-        rewrite gmultiset_disj_union_comm.
-        intros Hneq.
-        assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
-        rewrite Hneq in H.
-        set_solver.
-  - intros Hζ.
-    + destruct ζ; simpl in Hζ.
-      * assert (Some ℓ = Some Ndeliver) as Heq by done.
-        assert (ℓ = Ndeliver) as -> by naive_solver.
-        rewrite /config_enabled in Hζ.
-        destruct (trace_last atr); try by set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-      * assert (Some ℓ = Some Ndup) as Heq by done.
-        assert (ℓ = Ndup) as -> by naive_solver.
-        rewrite /config_enabled in Hζ.
-        destruct (trace_last atr); try by set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-      * assert (Some ℓ = Some Ndrop) as Heq by done.
-        assert (ℓ = Ndrop) as -> by naive_solver.
-        rewrite /config_enabled in Hζ.
-        destruct (trace_last atr); try by set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
-        -- rewrite /role_enabled_model. simpl.
-           destruct sent; set_solver.
+  destruct ζ as [ζ|ζ].
+  { by apply derive_live_tids_thing. } 
+  assert (ℓ ≠ A_role ∧ ℓ ≠ B_role) as [HAneq HBneq].
+  { rewrite /labels_match /locale_simple_label in Hlabels.
+    repeat case_match; simplify_eq; eauto. }
+  intros Henabled.
+  rewrite /role_enabled_model in Henabled.
+  destruct (trace_last atr) eqn:Heq; simpl in *.
+  + set_solver.
+  + destruct ℓ.
+    * by destruct sent; set_solver.
+    * by destruct sent; set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DuplicateLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DropLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DeliverLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+  + destruct ℓ.
+    * by destruct sent; set_solver.
+    * by destruct sent; set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DuplicateLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DropLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DeliverLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+  + destruct ℓ.
+    * by destruct sent; set_solver.
+    * by destruct sent; set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DuplicateLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DropLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
+    * destruct sent; [by set_solver|].
+      assert (ζ = DeliverLabel) as ->.
+      { rewrite /labels_match /locale_simple_label in Hlabels.
+        by repeat case_match; simplify_eq. }
+      simpl. rewrite /config_enabled. rewrite Hn.
+      simpl.
+      rewrite gmultiset_disj_union_comm.
+      intros Hneq.
+      assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver.
+      rewrite Hneq in H.
+      set_solver.
 Qed.
+
+(* Lemma valid_state_live_tids' ex atr : *)
+(*   simple_valid_state_evolution' ex atr → *)
+(*   live_tids' (trace_last ex) (trace_last atr). *)
+(* Proof. *)
+(*   intros (Hsteps&Hmatch&Hlive&Hn&Hm). *)
+(*   intros ζ ℓ Hlabels. *)
+(*   destruct ζ as [ζ|ζ]. *)
+(*   { specialize (Hlive _ _ Hlabels) as [Hlive1 Hlive2]. *)
+(*     pose proof (derive_live_tids_thing _ _ _ _ Hlive1 Hlive2). *)
+(*     done. } *)
+(*   assert (ℓ ≠ A_role ∧ ℓ ≠ B_role) as [HAneq HBneq]. *)
+(*   { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*     repeat case_match; simplify_eq; eauto. } *)
+(*   intros Henabled. *)
+(*   rewrite /role_enabled_model in Henabled. *)
+(*   destruct (trace_last atr) eqn:Heq; simpl in *. *)
+(*   + set_solver. *)
+(*   + destruct ℓ. *)
+(*     * by destruct sent; set_solver. *)
+(*     * by destruct sent; set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DuplicateLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DropLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DeliverLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*   + destruct ℓ. *)
+(*     * by destruct sent; set_solver. *)
+(*     * by destruct sent; set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DuplicateLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DropLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DeliverLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*   + destruct ℓ. *)
+(*     * by destruct sent; set_solver. *)
+(*     * by destruct sent; set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DuplicateLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DropLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(*     * destruct sent; [by set_solver|]. *)
+(*       assert (ζ = DeliverLabel) as ->. *)
+(*       { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*         by repeat case_match; simplify_eq. } *)
+(*       simpl. rewrite /config_enabled. rewrite Hn. *)
+(*       simpl. *)
+(*       rewrite gmultiset_disj_union_comm. *)
+(*       intros Hneq. *)
+(*       assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*       rewrite Hneq in H. *)
+(*       set_solver. *)
+(* Qed. *)
+
+(* Lemma valid_state_live_tids ex atr : *)
+(*   simple_valid_state_evolution ex atr → *)
+(*   live_tids (trace_last ex) (trace_last atr). *)
+(* Proof. *)
+(*   intros (Hsteps&Hmatch&Hlive&Hn&Hm). *)
+(*   intros ζ ℓ Hlabels. *)
+(*   destruct ζ as [ζ|ζ]; [by apply Hlive|]. *)
+(*   split. *)
+(*   - assert (ℓ ≠ A_role ∧ ℓ ≠ B_role) as [HAneq HBneq]. *)
+(*     { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*       repeat case_match; simplify_eq; eauto. } *)
+(*     intros Henabled. *)
+(*     rewrite /role_enabled_model in Henabled. *)
+(*     destruct (trace_last atr) eqn:Heq; simpl in *. *)
+(*     + set_solver. *)
+(*     + destruct ℓ. *)
+(*       * by destruct sent; set_solver. *)
+(*       * by destruct sent; set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DuplicateLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DropLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DeliverLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*     + destruct ℓ. *)
+(*       * by destruct sent; set_solver. *)
+(*       * by destruct sent; set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DuplicateLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DropLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DeliverLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*     + destruct ℓ. *)
+(*       * by destruct sent; set_solver. *)
+(*       * by destruct sent; set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DuplicateLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DropLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*       * destruct sent; [by set_solver|]. *)
+(*         assert (ζ = DeliverLabel) as ->. *)
+(*         { rewrite /labels_match /locale_simple_label in Hlabels. *)
+(*           by repeat case_match; simplify_eq. } *)
+(*         simpl. rewrite /config_enabled. rewrite Hn. *)
+(*         simpl. *)
+(*         rewrite gmultiset_disj_union_comm. *)
+(*         intros Hneq. *)
+(*         assert (mAB ∈ {[+ mAB +]} ⊎ mABn sent) by multiset_solver. *)
+(*         rewrite Hneq in H. *)
+(*         set_solver. *)
+(*   - intros Hζ. *)
+(*     + destruct ζ; simpl in Hζ. *)
+(*       * assert (Some ℓ = Some Ndeliver) as Heq by done. *)
+(*         assert (ℓ = Ndeliver) as -> by naive_solver. *)
+(*         rewrite /config_enabled in Hζ. *)
+(*         destruct (trace_last atr); try by set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*       * assert (Some ℓ = Some Ndup) as Heq by done. *)
+(*         assert (ℓ = Ndup) as -> by naive_solver. *)
+(*         rewrite /config_enabled in Hζ. *)
+(*         destruct (trace_last atr); try by set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*       * assert (Some ℓ = Some Ndrop) as Heq by done. *)
+(*         assert (ℓ = Ndrop) as -> by naive_solver. *)
+(*         rewrite /config_enabled in Hζ. *)
+(*         destruct (trace_last atr); try by set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(*         -- rewrite /role_enabled_model. simpl. *)
+(*            destruct sent; set_solver. *)
+(* Qed. *)
 
 Theorem strong_simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
     (s : stuckness) (es : list aneris_expr) (σ : state) (st : simple_state)
     A obs_send_sas obs_rec_sas IPs ip lbls :
   length es ≥ 1 →
-  live_threads (es, σ) st →
+  role_has_locale (es, σ) st →
   state_ms σ = mABn (state_get_n st) →
   (∃ shA shB : socket_handle,
       state_sockets σ =
@@ -224,7 +597,8 @@ Theorem strong_simulation_adequacy_multiple Σ
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
      observed_receive obs_rec_sas ={⊤}=∗
-     wptp s es (map (λ _ _, True) es)
+     wptp s es (map (λ e _, ∃ ℓ, ⌜labels_match (inl (e.(expr_n),0%nat)) ℓ⌝ ∗
+                                 dead_role_frag_own ℓ) es)
      (* OBS: Can add [always_holds ξ] here *)) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
@@ -305,7 +679,8 @@ Proof.
          (trace_messages_history ex) ∗
        thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗
        steps_auth (trace_length ex)))%I.
-  iExists (map (λ _ _, True)%I es), (λ _ _, True)%I.
+  iExists (map (λ e _, ∃ ℓ, ⌜labels_match (inl (e.(expr_n),0%nat)) ℓ⌝ ∗
+                                 dead_role_frag_own ℓ) es)%I, (λ _ _, True)%I.
   (* iExists (λ _, dead_role_frag_own A_role ∗ *)
   (*               dead_role_frag_own B_role)%I, (λ _ _, True)%I. *)
   iSplitR; [by iApply config_wp_correct|].
@@ -373,199 +748,223 @@ Proof.
       (config_roles ∖ simple_live_roles st) by set_solver.
     rewrite /= Hmse /= dom_empty_L. by iFrame. }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
-  iDestruct "Hsi" as "(%Hvalid&_)".
+  iDestruct "Hsi" as "(%Hvalid&_&_&Hlive&_)".
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
-  iPureIntro.
-  pose proof Hvalid as Hvalid'.
-  destruct Hvalid as (Htrace&Hlabels&Hstate).
-  split; [done|].
-  split; [done|].
-  by apply valid_state_live_tids.
-Qed.
-
-Theorem strong_simulation_adequacy Σ
-    `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
-    (s : stuckness) (e : aneris_expr) (σ : state) (st : simple_state)
-    A obs_send_sas obs_rec_sas IPs ip lbls :
-  live_threads ([e], σ) st →
-  state_ms σ = mABn (state_get_n st) →
-  (∃ shA shB : socket_handle,
-      state_sockets σ =
-      {[ipA := {[shA := (sA, [])]};
-        ipB := {[shB := (sB, mABm (state_get_m st))]}]}) →
-  (∀ (Hinv : anerisG (fair_model_to_model simple_fair_model) Σ),
-     ⊢ |={⊤}=>
-     unallocated A -∗
-     ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas),
-                         bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
-     live_roles_frag_own (simple_live_roles st ∖ config_roles) -∗
-     dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∖ config_roles) -∗
-     ([∗ set] i ∈ IPs, free_ip i) -∗
-     is_node ip -∗
-     ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
-     ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
-     ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
-     observed_send obs_send_sas -∗
-     observed_receive obs_rec_sas ={⊤}=∗
-     WP e @ s; locale_of [] e; ⊤ {{ v, dead_role_frag_own A_role ∗
-                                       dead_role_frag_own B_role }}(*  ∗ *)
-     (* always_holds s valid_state_evolution_fairness ([e], σ) st *)) ->
-  obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
-  ip ∉ IPs →
-  dom (state_ports_in_use σ) = IPs →
-  (∀ ip, ip ∈ IPs → state_ports_in_use σ !! ip = Some ∅) →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
-  state_heaps σ = {[ip:=∅]} →
-  state_sockets σ = {[ip:=∅]} →
-  state_ms σ = ∅ →
-  continued_simulation valid_state_evolution_fairness
-                       (trace_singleton ([e], σ))
-                       (trace_singleton st).
-Proof.
-  intros Hlive HmABn HmABm Hwp Hsendle Hrecvle Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
-  apply (wp_strong_adequacy aneris_lang (fair_model_to_model simple_fair_model) Σ s).
-  { apply rel_finitary_valid_state_evolution_fairness. }
-  iIntros (?) "".
-  iMod node_gnames_auth_init as (γmp) "Hmp".
-  iMod saved_si_init as (γsi) "[Hsi Hsi']".
-  iMod (unallocated_init (to_singletons A)) as (γsif)
-    "[Hunallocated_auth Hunallocated]".
-  iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
-  iMod free_ports_auth_init as (γpiu) "HPiu".
-  iMod (allocated_address_groups_init (to_singletons obs_send_sas)) as
-      (γobserved_send) "#Hobserved_send".
-  iMod (allocated_address_groups_init (to_singletons obs_rec_sas)) as
-      (γobserved_receive) "#Hobserved_receive".
-  iMod (socket_address_group_ctx_init (to_singletons A)) as (γC) "Hauth";
-    [apply to_singletons_all_disjoint|].
-  iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A)
-                                                      (to_singletons A)
-         with "Hauth") as
-      "[Hauth HownA]"; [done|].
-  iDestruct (socket_address_group_own_big_sepS with "HownA") as "#HownAS".
-  iMod (messages_ctx_init (to_singletons A) _ _ _ _ with "HownAS Hobserved_send Hobserved_receive" ) as (γms) "[Hms HB]".
-  iMod (steps_init 1) as (γsteps) "[Hsteps _]".
-  iMod (roles_init (simple_live_roles st)) as (γlive) "[Hlivefull Hlivefrag]".
-  iMod (roles_init (all_roles ∖ simple_live_roles st))
-    as (γdead) "[Hdeadfull Hdeadfrag]".
-  iMod (alloc_evs_init lbls) as (γalevs) "[Halobctx Halobs]".
-  iMod (sendreceive_evs_init (to_singletons obs_send_sas)) as
-      (γsendevs) "[Hsendevsctx Hsendevs]".
-  iMod (sendreceive_evs_init (to_singletons obs_rec_sas)) as
-    (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]".
-  (* NB: The model state is not used in the current state interpretation
-         and can be removed. *)
-  iMod (model_init (model_draft.Start:(fair_model_to_model simple_fair_model).(mstate))) as (γm) "[Hmfull Hmfrag]".
-  set (dg :=
-         {|
-           aneris_node_gnames_name := γmp;
-           aneris_si_name := γsi;
-           aneris_socket_address_group_name := γC;
-           aneris_unallocated_socket_address_groups_name := γsif;
-           aneris_freeips_name := γips;
-           aneris_freeports_name := γpiu;
-           aneris_messages_name := γms;
-           aneris_model_name := γm;
-           aneris_live_roles_name := γlive;
-           aneris_dead_roles_name := γdead;
-           aneris_steps_name := γsteps;
-           aneris_allocEVS_name := γalevs;
-           aneris_sendonEVS_name := γsendevs;
-           aneris_receiveonEVS_name := γreceiveevs;
-           aneris_observed_send_name := γobserved_send;
-           aneris_observed_recv_name := γobserved_receive;
-         |}).
-  iMod (Hwp dg) as "Hwp".
-  iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
-  iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp #Hγn]"; [done|].
-  iAssert (is_node ip) as "Hn".
-  { iExists _. eauto. }
-  iExists (λ ex atr,
-      (⌜simple_valid_state_evolution ex atr⌝ ∗
-       aneris_events_state_interp ex ∗
-       aneris_state_interp
-         (trace_last ex).2
-         (trace_messages_history ex) ∗
-       thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗
-       steps_auth (trace_length ex)))%I.
-  iExists (λ _, dead_role_frag_own A_role ∗
-                dead_role_frag_own B_role)%I, (λ _ _, True)%I.
-  iSplitR; [by iApply config_wp_correct|].
-   iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) (to_singletons obs_send_sas) with "Hauth")
-    as "[Hauth Hown_send]".
-   { intros x Hin. eapply elem_of_to_singletons. set_solver. }
-  iDestruct (socket_address_group_own_big_sepS with "Hown_send") as "Hown_send".
-  iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) (to_singletons obs_rec_sas) with "Hauth")
-    as "[Hauth Hown_recv]".
-  { intros x Hin. eapply elem_of_to_singletons. set_solver. }
-  iAssert (live_roles_frag_own ((simple_live_roles st) ∖ config_roles) ∗
-           live_roles_frag_own ((simple_live_roles st) ∩ config_roles))%I with
-            "[Hlivefrag]" as "[Hlivefrag Hlivefrag_cfg]".
-  { iApply live_roles_own_split; [set_solver|].
-    by rewrite -gset_union_difference_intersection_L. }
-  iAssert (dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∖ config_roles) ∗
-           dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∩ config_roles))%I with
-            "[Hdeadfrag]" as "[Hdeadfrag Hdeadfrag_cfg]".
-  { iApply dead_roles_own_split; [set_solver|].
-    by rewrite -gset_union_difference_intersection_L. }
-  iDestruct (socket_address_group_own_big_sepS with "Hown_recv") as "Hown_recv".
-  iDestruct ("Hwp" with "Hunallocated [HB] Hlivefrag Hdeadfrag HIPs Hn Halobs
-            [Hsendevs Hown_send] [Hreceiveevs Hown_recv]
-            Hobserved_send Hobserved_receive") as ">Hwp".
-  { iApply (big_sepS_to_singletons with "[] HB").
-    iIntros "!>" (x) "Hx".
-    iDestruct "Hx" as (As Ar) "(?&?&[%%]&?&?)".
-    iFrame. simpl. iSplitL; [|done].
-    iExists _, _. iFrame.
+  iAssert (⌜from_locale_no_val_no_enabled c (trace_last atr)⌝)%I as "%Hrole".
+  {
+    iIntros (ℓ ζ Hmatch e Hlocale Hval).
+    iAssert (⌜labels_match (inl ζ) ℓ⌝ ∗
+             dead_role_frag_own ℓ)%I with "[Hposts]" as "[%Hmatch' H]".
+    { destruct (language.to_val e) as [?|] eqn:Heq; last done.
+      iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H".
+      {
+        rewrite elem_of_list_omap.
+        exists (e, (λ _: language.val aneris_lang,
+                      ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ))%I.
+        split; last first.
+        - simpl. apply fmap_Some. exists v. split; done.
+        - admit. }
+      iApply "H".
+    }
+    simpl in *.
+    iDestruct "Hlive" as "(_&_&Hdead&Hdead')".
+    iDestruct (dead_role_auth_elem_of with "Hdead H") as %Hin.
     iPureIntro.
-    rewrite H H0. rewrite !bool_decide_eq_true. set_solver. }
-  { iApply big_sepS_sep.
-    iSplitL "Hown_send".
-    - iApply (big_sepS_to_singletons with "[] Hown_send"); by eauto.
-    - iApply (big_sepS_to_singletons with "[] Hsendevs"); by eauto. }
-  { iApply big_sepS_sep.
-    iSplitL "Hown_recv".
-    - iApply (big_sepS_to_singletons with "[] Hown_recv"); by eauto.
-    - iApply (big_sepS_to_singletons with "[] Hreceiveevs"); by eauto. }
-  iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A)
-                                                    (to_singletons (obs_send_sas ∪ obs_rec_sas)) with "Hauth")
-    as "[Hauth Hown_send_recv]"; [by set_solver|].
-  rewrite to_singletons_union.
-  iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$".
-  iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A)
-                                                    (to_singletons A) with "Hauth")
-    as "[Hauth Hown]"; [by set_solver|].
-  iPoseProof (@aneris_state_interp_init _ _ dg IPs
-               with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "Hinterp"; eauto.
-  { intros sag sa Hsag Hsa.
-    apply Hfixdom.
-    assert (is_singleton sag) as [sa' ->]; [by eapply elem_of_to_singletons_inv|].
-    apply elem_of_to_singletons in Hsag.
-    set_solver. }
-  { iPureIntro. apply to_singletons_fmap. intros x.
-    rewrite /is_ne. set_solver. }
-  iModIntro.
-  iFrame "Hwp".
-  iSplitL.
-  { iSplitR.
-    { iPureIntro. split; [constructor|done]. }
-    iFrame "Hsteps".
-    (* TODO: Change definition in state interp *)
-    replace ((all_roles ∖ simple_live_roles st) ∩ config_roles) with
-      (config_roles ∖ simple_live_roles st) by set_solver.
-    rewrite /= Hmse /= dom_empty_L. by iFrame. }
-  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
-  iDestruct "Hsi" as "(%Hvalid&_)".
-  iApply fupd_mask_intro; [set_solver|].
-  iIntros "_".
+    intros Hneq. set_solver.
+  }
   iPureIntro.
   pose proof Hvalid as Hvalid'.
   destruct Hvalid as (Htrace&Hlabels&Hstate).
   split; [done|].
-  split; [done|].
-  by apply valid_state_live_tids.
-Qed.
+  split; [done|].  
+  apply valid_state_live_tids; [done|].
+  by rewrite Hendex.
+Admitted.
+
+(* TODO: Bump this too *)
+(* Theorem strong_simulation_adequacy Σ *)
+(*     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ} *)
+(*     (s : stuckness) (e : aneris_expr) (σ : state) (st : simple_state) *)
+(*     A obs_send_sas obs_rec_sas IPs ip lbls : *)
+(*   live_threads ([e], σ) st → *)
+(*   state_ms σ = mABn (state_get_n st) → *)
+(*   (∃ shA shB : socket_handle, *)
+(*       state_sockets σ = *)
+(*       {[ipA := {[shA := (sA, [])]}; *)
+(*         ipB := {[shB := (sB, mABm (state_get_m st))]}]}) → *)
+(*   (∀ (Hinv : anerisG (fair_model_to_model simple_fair_model) Σ), *)
+(*      ⊢ |={⊤}=> *)
+(*      unallocated A -∗ *)
+(*      ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), *)
+(*                          bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗ *)
+(*      live_roles_frag_own (simple_live_roles st ∖ config_roles) -∗ *)
+(*      dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∖ config_roles) -∗ *)
+(*      ([∗ set] i ∈ IPs, free_ip i) -∗ *)
+(*      is_node ip -∗ *)
+(*      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗ *)
+(*      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗ *)
+(*      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗ *)
+(*      observed_send obs_send_sas -∗ *)
+(*      observed_receive obs_rec_sas ={⊤}=∗ *)
+(*      WP e @ s; locale_of [] e; ⊤ {{ v, dead_role_frag_own A_role ∗ *)
+(*                                        dead_role_frag_own B_role }}(*  ∗ *) *)
+(*      (* always_holds s valid_state_evolution_fairness ([e], σ) st *)) -> *)
+(*   obs_send_sas ⊆ A → obs_rec_sas ⊆ A → *)
+(*   ip ∉ IPs → *)
+(*   dom (state_ports_in_use σ) = IPs → *)
+(*   (∀ ip, ip ∈ IPs → state_ports_in_use σ !! ip = Some ∅) → *)
+(*   (∀ a, a ∈ A → ip_of_address a ∈ IPs) → *)
+(*   state_heaps σ = {[ip:=∅]} → *)
+(*   state_sockets σ = {[ip:=∅]} → *)
+(*   state_ms σ = ∅ → *)
+(*   continued_simulation valid_state_evolution_fairness *)
+(*                        (trace_singleton ([e], σ)) *)
+(*                        (trace_singleton st). *)
+(* Proof. *)
+(*   intros Hlive HmABn HmABm Hwp Hsendle Hrecvle Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse. *)
+(*   apply (wp_strong_adequacy aneris_lang (fair_model_to_model simple_fair_model) Σ s). *)
+(*   { apply rel_finitary_valid_state_evolution_fairness. } *)
+(*   iIntros (?) "". *)
+(*   iMod node_gnames_auth_init as (γmp) "Hmp". *)
+(*   iMod saved_si_init as (γsi) "[Hsi Hsi']". *)
+(*   iMod (unallocated_init (to_singletons A)) as (γsif) *)
+(*     "[Hunallocated_auth Hunallocated]". *)
+(*   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]". *)
+(*   iMod free_ports_auth_init as (γpiu) "HPiu". *)
+(*   iMod (allocated_address_groups_init (to_singletons obs_send_sas)) as *)
+(*       (γobserved_send) "#Hobserved_send". *)
+(*   iMod (allocated_address_groups_init (to_singletons obs_rec_sas)) as *)
+(*       (γobserved_receive) "#Hobserved_receive". *)
+(*   iMod (socket_address_group_ctx_init (to_singletons A)) as (γC) "Hauth"; *)
+(*     [apply to_singletons_all_disjoint|]. *)
+(*   iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) *)
+(*                                                       (to_singletons A) *)
+(*          with "Hauth") as *)
+(*       "[Hauth HownA]"; [done|]. *)
+(*   iDestruct (socket_address_group_own_big_sepS with "HownA") as "#HownAS". *)
+(*   iMod (messages_ctx_init (to_singletons A) _ _ _ _ with "HownAS Hobserved_send Hobserved_receive" ) as (γms) "[Hms HB]". *)
+(*   iMod (steps_init 1) as (γsteps) "[Hsteps _]". *)
+(*   iMod (roles_init (simple_live_roles st)) as (γlive) "[Hlivefull Hlivefrag]". *)
+(*   iMod (roles_init (all_roles ∖ simple_live_roles st)) *)
+(*     as (γdead) "[Hdeadfull Hdeadfrag]". *)
+(*   iMod (alloc_evs_init lbls) as (γalevs) "[Halobctx Halobs]". *)
+(*   iMod (sendreceive_evs_init (to_singletons obs_send_sas)) as *)
+(*       (γsendevs) "[Hsendevsctx Hsendevs]". *)
+(*   iMod (sendreceive_evs_init (to_singletons obs_rec_sas)) as *)
+(*     (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]". *)
+(*   (* NB: The model state is not used in the current state interpretation *)
+(*          and can be removed. *) *)
+(*   iMod (model_init (model_draft.Start:(fair_model_to_model simple_fair_model).(mstate))) as (γm) "[Hmfull Hmfrag]". *)
+(*   set (dg := *)
+(*          {| *)
+(*            aneris_node_gnames_name := γmp; *)
+(*            aneris_si_name := γsi; *)
+(*            aneris_socket_address_group_name := γC; *)
+(*            aneris_unallocated_socket_address_groups_name := γsif; *)
+(*            aneris_freeips_name := γips; *)
+(*            aneris_freeports_name := γpiu; *)
+(*            aneris_messages_name := γms; *)
+(*            aneris_model_name := γm; *)
+(*            aneris_live_roles_name := γlive; *)
+(*            aneris_dead_roles_name := γdead; *)
+(*            aneris_steps_name := γsteps; *)
+(*            aneris_allocEVS_name := γalevs; *)
+(*            aneris_sendonEVS_name := γsendevs; *)
+(*            aneris_receiveonEVS_name := γreceiveevs; *)
+(*            aneris_observed_send_name := γobserved_send; *)
+(*            aneris_observed_recv_name := γobserved_receive; *)
+(*          |}). *)
+(*   iMod (Hwp dg) as "Hwp". *)
+(*   iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]". *)
+(*   iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp #Hγn]"; [done|]. *)
+(*   iAssert (is_node ip) as "Hn". *)
+(*   { iExists _. eauto. } *)
+(*   iExists (λ ex atr, *)
+(*       (⌜simple_valid_state_evolution ex atr⌝ ∗ *)
+(*        aneris_events_state_interp ex ∗ *)
+(*        aneris_state_interp *)
+(*          (trace_last ex).2 *)
+(*          (trace_messages_history ex) ∗ *)
+(*        thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗ *)
+(*        steps_auth (trace_length ex)))%I. *)
+(*   iExists (λ _, dead_role_frag_own A_role ∗ *)
+(*                 dead_role_frag_own B_role)%I, (λ _ _, True)%I. *)
+(*   iSplitR; [by iApply config_wp_correct|]. *)
+(*    iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) (to_singletons obs_send_sas) with "Hauth") *)
+(*     as "[Hauth Hown_send]". *)
+(*    { intros x Hin. eapply elem_of_to_singletons. set_solver. } *)
+(*   iDestruct (socket_address_group_own_big_sepS with "Hown_send") as "Hown_send". *)
+(*   iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) (to_singletons obs_rec_sas) with "Hauth") *)
+(*     as "[Hauth Hown_recv]". *)
+(*   { intros x Hin. eapply elem_of_to_singletons. set_solver. } *)
+(*   iAssert (live_roles_frag_own ((simple_live_roles st) ∖ config_roles) ∗ *)
+(*            live_roles_frag_own ((simple_live_roles st) ∩ config_roles))%I with *)
+(*             "[Hlivefrag]" as "[Hlivefrag Hlivefrag_cfg]". *)
+(*   { iApply live_roles_own_split; [set_solver|]. *)
+(*     by rewrite -gset_union_difference_intersection_L. } *)
+(*   iAssert (dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∖ config_roles) ∗ *)
+(*            dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∩ config_roles))%I with *)
+(*             "[Hdeadfrag]" as "[Hdeadfrag Hdeadfrag_cfg]". *)
+(*   { iApply dead_roles_own_split; [set_solver|]. *)
+(*     by rewrite -gset_union_difference_intersection_L. } *)
+(*   iDestruct (socket_address_group_own_big_sepS with "Hown_recv") as "Hown_recv". *)
+(*   iDestruct ("Hwp" with "Hunallocated [HB] Hlivefrag Hdeadfrag HIPs Hn Halobs *)
+(*             [Hsendevs Hown_send] [Hreceiveevs Hown_recv] *)
+(*             Hobserved_send Hobserved_receive") as ">Hwp". *)
+(*   { iApply (big_sepS_to_singletons with "[] HB"). *)
+(*     iIntros "!>" (x) "Hx". *)
+(*     iDestruct "Hx" as (As Ar) "(?&?&[%%]&?&?)". *)
+(*     iFrame. simpl. iSplitL; [|done]. *)
+(*     iExists _, _. iFrame. *)
+(*     iPureIntro. *)
+(*     rewrite H H0. rewrite !bool_decide_eq_true. set_solver. } *)
+(*   { iApply big_sepS_sep. *)
+(*     iSplitL "Hown_send". *)
+(*     - iApply (big_sepS_to_singletons with "[] Hown_send"); by eauto. *)
+(*     - iApply (big_sepS_to_singletons with "[] Hsendevs"); by eauto. } *)
+(*   { iApply big_sepS_sep. *)
+(*     iSplitL "Hown_recv". *)
+(*     - iApply (big_sepS_to_singletons with "[] Hown_recv"); by eauto. *)
+(*     - iApply (big_sepS_to_singletons with "[] Hreceiveevs"); by eauto. } *)
+(*   iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) *)
+(*                                                     (to_singletons (obs_send_sas ∪ obs_rec_sas)) with "Hauth") *)
+(*     as "[Hauth Hown_send_recv]"; [by set_solver|]. *)
+(*   rewrite to_singletons_union. *)
+(*   iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$". *)
+(*   iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) *)
+(*                                                     (to_singletons A) with "Hauth") *)
+(*     as "[Hauth Hown]"; [by set_solver|]. *)
+(*   iPoseProof (@aneris_state_interp_init _ _ dg IPs *)
+(*                with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "Hinterp"; eauto. *)
+(*   { intros sag sa Hsag Hsa. *)
+(*     apply Hfixdom. *)
+(*     assert (is_singleton sag) as [sa' ->]; [by eapply elem_of_to_singletons_inv|]. *)
+(*     apply elem_of_to_singletons in Hsag. *)
+(*     set_solver. } *)
+(*   { iPureIntro. apply to_singletons_fmap. intros x. *)
+(*     rewrite /is_ne. set_solver. } *)
+(*   iModIntro. *)
+(*   iFrame "Hwp". *)
+(*   iSplitL. *)
+(*   { iSplitR. *)
+(*     { iPureIntro. split; [constructor|done]. } *)
+(*     iFrame "Hsteps". *)
+(*     (* TODO: Change definition in state interp *) *)
+(*     replace ((all_roles ∖ simple_live_roles st) ∩ config_roles) with *)
+(*       (config_roles ∖ simple_live_roles st) by set_solver. *)
+(*     rewrite /= Hmse /= dom_empty_L. by iFrame. } *)
+(*   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts". *)
+(*   iDestruct "Hsi" as "(%Hvalid&_)". *)
+(*   iApply fupd_mask_intro; [set_solver|]. *)
+(*   iIntros "_". *)
+(*   iPureIntro. *)
+(*   pose proof Hvalid as Hvalid'. *)
+(*   destruct Hvalid as (Htrace&Hlabels&Hstate). *)
+(*   split; [done|]. *)
+(*   split; [done|]. *)
+(*   by apply valid_state_live_tids. *)
+(* Qed. *)
 
 (** Existing approach
 - Prove [WP] for program
@@ -670,16 +1069,11 @@ Proof.
   right. done.
 Qed.
 
-(* TODO: Move the lemmas relalted to general `traces_match` *)
-Definition flip_impl {A B} (R : A → B → Prop) : Prop :=
-  ∀ a b, R a b ↔ flip R b a.
-
 Lemma traces_match_flip {S1 S2 L1 L2}
       (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
       (trans1: S1 -> L1 -> S1 -> Prop)
       (trans2: S2 -> L2 -> S2 -> Prop)
       tr1 tr2 :
-  flip_impl Rℓ → flip_impl Rs →
   traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
   traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
 Proof.
@@ -703,7 +1097,6 @@ Lemma traces_match_traces_implies {S1 S2 L1 L2}
       (P1 Q1 : S1 → option L1 → Prop)
       (P2 Q2 : S2 → option L2 → Prop)
       tr1 tr2 :
-  flip_impl Rℓ → flip_impl Rs →
   traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
   (∀ s1 s2 oℓ1 oℓ2, Rs s1 s2 →
                     match oℓ1, oℓ2 with
@@ -720,7 +1113,7 @@ Lemma traces_match_traces_implies {S1 S2 L1 L2}
                     end → Q1 s1 oℓ1 → Q2 s2 oℓ2) →
   trace_implies P1 Q1 tr1 → trace_implies P2 Q2 tr2.
 Proof.
-  intros HRℓ HRs Hmatch HP HQ Htr1.
+  intros Hmatch HP HQ Htr1.
   intros n Hpred_at.
   rewrite /pred_at in Hpred_at.
   assert (traces_match (flip Rℓ)
@@ -772,7 +1165,7 @@ Definition simple_label_locale (ℓ : simple_role) : ex_label aneris_lang :=
   | Ndeliver => inr DeliverLabel
   | Ndrop => inr DropLabel
   | Ndup => inr DuplicateLabel
-  end.
+  end.  
 
 Lemma traces_match_fairness_preserved extr mtr :
   exmtr_traces_match extr mtr →
@@ -787,7 +1180,7 @@ Proof.
     assert (∃ ζ, labels_match ζ ℓ) as [ζ Hlabel].
     { exists (simple_label_locale ℓ). destruct ℓ; done. }
     specialize (Hfairex_scheduling ζ).
-    eapply traces_match_traces_implies; [by split|by split|done| | |done].
+    eapply traces_match_traces_implies; [done| | |done].
     + intros s1 s2 oℓ1 oℓ2 Hlive HRℓ Henabled.
       simpl in *. simplify_eq.
       apply Hlive in Hlabel.

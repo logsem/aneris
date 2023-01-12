@@ -101,23 +101,12 @@ Section state_interpretation.
             rewrite /locale_enabled.
             rewrite /locale_enabled in Hlive.
             simpl in *.
-            split.
-            - intros H.
-              apply Hlive.
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H.
-              simpl in *.
-              destruct sent; set_solver.
-            - intros H.
-              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
-              { by apply Hlive. }
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H0.
-              simpl in *.
-              assert (ℓ = A_role ∨ ℓ = B_role).
-              { rewrite /labels_match /locale_simple_label in Hroles.
-                repeat case_match; simplify_eq; eauto. }
-              destruct sent; set_solver. }
+            intros H.
+            apply Hlive.
+            rewrite /role_enabled_model.
+            rewrite /role_enabled_model in H.
+            simpl in *.
+            destruct sent; set_solver. }
           destruct H' as (shA & sh' & H').
           split; [multiset_solver|].
           exists shA, sh'.
@@ -231,23 +220,12 @@ Section state_interpretation.
             rewrite /locale_enabled.
             rewrite /locale_enabled in Hlive.
             simpl in *.
-            split.
-            - intros H.
-              apply Hlive.
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H.
-              simpl in *.
-              destruct sent; set_solver.
-            - intros H.
-              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
-              { by apply Hlive. }
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H0.
-              simpl in *.
-              assert (ℓ = A_role ∨ ℓ = B_role).
-              { rewrite /labels_match /locale_simple_label in Hroles.
-                repeat case_match; simplify_eq; eauto. }
-              destruct sent; set_solver. }
+            intros H.
+            apply Hlive.
+            rewrite /role_enabled_model.
+            rewrite /role_enabled_model in H.
+            simpl in *.
+            destruct sent; set_solver. }
           split; [by multiset_solver|done]. }
                 iSplitR "Hlive"; last first.
         { destruct sent; [|done].
@@ -327,23 +305,12 @@ Section state_interpretation.
             rewrite /locale_enabled.
             rewrite /locale_enabled in Hlive.
             simpl in *.
-            split.
-            - intros H.
-              apply Hlive.
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H.
-              simpl in *.
-              destruct sent; set_solver.
-            - intros H.
-              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
-              { by apply Hlive. }
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H0.
-              simpl in *.
-              assert (ℓ = A_role ∨ ℓ = B_role).
-              { rewrite /labels_match /locale_simple_label in Hroles.
-                repeat case_match; simplify_eq; eauto. }
-              destruct sent; set_solver. }
+            intros H.
+            apply Hlive.
+            rewrite /role_enabled_model.
+            rewrite /role_enabled_model in H.
+            simpl in *.
+            destruct sent; set_solver. }
           split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
@@ -456,23 +423,12 @@ Section state_interpretation.
             rewrite /locale_enabled.
             rewrite /locale_enabled in Hlive.
             simpl in *.
-            split.
-            - intros H.
-              apply Hlive.
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H.
-              simpl in *.
-              destruct sent; set_solver.
-            - intros H.
-              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Sent (S sent))).
-              { by apply Hlive. }
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H0.
-              simpl in *.
-              assert (ℓ = A_role ∨ ℓ = B_role).
-              { rewrite /labels_match /locale_simple_label in Hroles.
-                repeat case_match; simplify_eq; eauto. }
-              destruct sent; set_solver. }
+            intros H.
+            apply Hlive.
+            rewrite /role_enabled_model.
+            rewrite /role_enabled_model in H.
+            simpl in *.
+            destruct sent; set_solver. }
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
@@ -553,23 +509,12 @@ Section state_interpretation.
             rewrite /locale_enabled.
             rewrite /locale_enabled in Hlive.
             simpl in *.
-            split.
-            - intros H.
-              apply Hlive.
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H.
-              simpl in *.
-              destruct sent; set_solver.
-            - intros H.
-              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Received (S sent) delivered)).
-              { by apply Hlive. }
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H0.
-              simpl in *.
-              assert (ℓ = A_role ∨ ℓ = B_role).
-              { rewrite /labels_match /locale_simple_label in Hroles.
-                repeat case_match; simplify_eq; eauto. }
-              destruct sent; set_solver. }
+            intros H.
+            apply Hlive.
+            rewrite /role_enabled_model.
+            rewrite /role_enabled_model in H.
+            simpl in *.
+            destruct sent; set_solver. }
           split; [multiset_solver|].
           exists shA, sh'.
           assert (state_sockets0 !! ip = Some Sn) as HSn' by eauto.
@@ -671,23 +616,12 @@ Section state_interpretation.
             rewrite /locale_enabled.
             rewrite /locale_enabled in Hlive.
             simpl in *.
-            split.
-            - intros H.
-              apply Hlive.
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H.
-              simpl in *.
-              destruct sent; set_solver.
-            - intros H.
-              assert (role_enabled_model (ℓ : fmrole simple_fair_model) (Received (S sent) delivered)).
-              { by apply Hlive. }
-              rewrite /role_enabled_model.
-              rewrite /role_enabled_model in H0.
-              simpl in *.
-              assert (ℓ = A_role ∨ ℓ = B_role).
-              { rewrite /labels_match /locale_simple_label in Hroles.
-                repeat case_match; simplify_eq; eauto. }
-              destruct sent; set_solver. }
+            intros H.
+            apply Hlive.
+            rewrite /role_enabled_model.
+            rewrite /role_enabled_model in H.
+            simpl in *.
+            destruct sent; set_solver. }
           split; [by multiset_solver|done]. }
         iSplitR "Hlive"; last first.
         { destruct sent; [|done].
