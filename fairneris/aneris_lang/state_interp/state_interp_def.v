@@ -247,55 +247,6 @@ End definitions.
 Section Aneris_AS.
   Context `{aG : !anerisG (fair_model_to_model simple_fair_model) Σ}.
 
-  (* Definition user_model_evolution (mdl1 mdl2 : model_state Mdl) := *)
-  (*   mdl1 = mdl2 ∨ model_rel Mdl mdl1 mdl2. *)
-
-  (* Lemma user_model_evolution_id δ : *)
-  (*   user_model_evolution δ δ. *)
-  (* Proof. by left. Qed. *)
-
-  (* Definition valid_state_evolution (_ : execution_trace aneris_lang) *)
-  (*            (atr : auxiliary_trace (aneris_to_trace_model Mdl)) := *)
-  (*   match atr with *)
-  (*   | atr :tr[_]: δ => user_model_evolution (trace_last atr) δ *)
-  (*   |  _ => True *)
-  (*   end. *)
-
-  (* Definition sim_rel (φ : execution_trace aneris_lang → auxiliary_trace Mdl → Prop) *)
-  (*            (ex : execution_trace aneris_lang) (atr : auxiliary_trace Mdl) := *)
-  (*   valid_state_evolution ex atr ∧ φ ex atr. *)
-
-  (* Let M := (aneris_to_trace_model Mdl). *)
-
-  (* Local Definition enumerate_next_auxstate (δ : Mdl) (l : list Mdl) : list (M * mlabel M) := *)
-  (*   δ' ← δ :: l; *)
-  (*   mret (δ', ()). *)
-
-  (* Lemma aneris_sim_rel_finitary φ: *)
-  (*   (∀ mdl, smaller_card (sig (λ mdl', model_rel Mdl mdl mdl')) nat) → *)
-  (*   rel_finitary (sim_rel φ). *)
-  (* Proof. *)
-  (*   intros Hmodel ex atr c oζ. *)
-  (*   specialize (Hmodel (trace_last atr)). *)
-
-  (*   assert (∀ ex atr x, *)
-  (*    ProofIrrel ((match x return Prop with *)
-  (*                   (δ', ℓ) => (sim_rel φ (ex :tr[ oζ ]: c) (atr :tr[ ℓ ]: δ')) *)
-  (*                 end))). *)
-  (*   { intros ?? []. apply make_proof_irrel. } *)
-  (*   assert (EqDecision (M * mlabel M)). *)
-  (*   { intros ??; apply make_decision. } *)
-  (*   apply finite_smaller_card_nat. *)
-  (*   assert (EqDecision {mdl' : Mdl | Mdl (trace_last atr) mdl'}). *)
-  (*   { intros ??; apply make_decision. } *)
-  (*   apply smaller_card_nat_finite in Hmodel. *)
-  (*   eapply (in_list_finite $ enumerate_next_auxstate (trace_last atr) (map proj1_sig (@enum _ _ Hmodel))). *)
-  (*   intros [δ' []] [[<- | Hstep] _]; unfold enumerate_next_auxstate; simpl; [set_solver |]. *)
-  (*   apply elem_of_cons; right. apply elem_of_list_bind. exists δ'; split; first set_solver. *)
-  (*   apply elem_of_list_fmap. exists (δ' ↾ Hstep); split =>//. *)
-  (*   apply elem_of_enum. *)
-  (* Qed. *)
-
   Definition ipA := "0.0.0.0".
   Definition saA := SocketAddressInet ipA 80.
   Definition sA := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saA) true.
@@ -357,17 +308,6 @@ Section Aneris_AS.
     labels_match (inl ζ) ℓ →
     role_enabled_model ℓ δ →
     is_Some (from_locale c.1 ζ).
-
-  (* (* TODO: This should probably be located in a better place *) *)
-  (* (* Correspondence between live configurations and model states *) *)
-  (* Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop := *)
-  (*   ∀ ζ (ℓ:fmrole simple_fair_model), *)
-  (*   labels_match ζ ℓ → (role_enabled_model ℓ δ ↔ live_ex_label ζ c). *)
-
-  (* (* TODO: This definition seems a bit repetitive *) *)
-  (* Definition live_threads (c : cfg aneris_lang) (δ : simple_state) : Prop := *)
-  (*   ∀ (ζ:locale aneris_lang) (ℓ:fmrole simple_fair_model), *)
-  (*   labels_match (inl ζ) ℓ → (role_enabled_model ℓ δ ↔ live_ex_label (inl ζ) c). *)
 
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
