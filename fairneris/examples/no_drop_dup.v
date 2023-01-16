@@ -128,7 +128,8 @@ Section with_Σ.
              eapply Hlive; [done|].
              rewrite /labels_match /role_enabled_model. set_solver. }
         by repeat econstructor. }
-    split; [by rewrite (comm _ ∅)|].
+    split.
+    { rewrite (comm _ ∅). set_solver. }
     rewrite Hex in Hskt.
     simpl in Hskt.
     done.
@@ -448,6 +449,7 @@ Section with_Σ.
         rewrite Hskts.
         rewrite insert_commute; [|done].
         rewrite insert_insert.
+        simpl.
         f_equiv.
         rewrite insert_insert.
         assert (r0 = mABm y) as ->.

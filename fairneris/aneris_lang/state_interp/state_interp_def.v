@@ -309,17 +309,20 @@ Section Aneris_AS.
     role_enabled_model ℓ δ →
     is_Some (from_locale c.1 ζ).
 
+  Definition config_state_valid (c : cfg aneris_lang) δ :=
+    state_ms c.2 = mABn (state_get_n δ) ∧
+    ∃ shA shB,
+    state_sockets c.2 =
+      {[ ip_of_address saA := {[shA := (sA,[])]};
+         ip_of_address saB := {[shB := (sB,mABm (state_get_m δ))]} ]}.
+
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
       : Prop :=
     trace_steps simple_trans atr ∧
     labels_match_trace ex atr ∧
     role_has_locale (trace_last ex) (trace_last atr) ∧
-    state_ms (trace_last ex).2 = mABn (state_get_n (trace_last atr)) ∧
-    ∃ shA shB, 
-    state_sockets (trace_last ex).2 =
-      {[ ip_of_address saA := {[shA := (sA,[])]};
-         ip_of_address saB := {[shB := (sB,mABm (state_get_m (trace_last atr)))]} ]}.
+    config_state_valid (trace_last ex) (trace_last atr).
 
   Definition config_roles : gset simple_role := {[ Ndup; Ndrop; Ndeliver ]}.
   Definition all_roles : gset simple_role := {[ A_role; B_role; Ndup; Ndrop; Ndeliver ]}.
@@ -342,7 +345,7 @@ Section Aneris_AS.
          (trace_messages_history ex) ∗
        thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗
        steps_auth (trace_length ex))%I;
-    fork_post _ _ := True%I }.
+    fork_post ζ _ := (∃ ℓ, ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ)%I }.
 
 End Aneris_AS.
 

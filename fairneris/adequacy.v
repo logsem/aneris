@@ -9,29 +9,30 @@ From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 From iris.proofmode Require Import proofmode.
 
-Definition always_holds {Σ}
-           `{!anerisG (fair_model_to_model simple_fair_model) Σ}
-           (s : stuckness) (ξ : execution_trace aneris_lang →
-                              finite_trace simple_state simple_role → Prop)
-           (c1 : cfg aneris_lang)
-           (c2 : (fair_model_to_model simple_fair_model).(mstate)) : iProp Σ :=
-  ∀ ex atr c,
-    ⌜valid_system_trace ex atr⌝ -∗
-    ⌜trace_starts_in ex c1⌝ -∗
-    ⌜trace_starts_in atr c2⌝ -∗
-    ⌜trace_ends_in ex c⌝ -∗
-    ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' →
-                      trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-    ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-    state_interp ex atr -∗
-    |={⊤, ∅}=> ⌜ξ ex atr⌝.
+(* TODO: This is not used right now - Remove/Reintroduce? *)
+(* Definition always_holds {Σ} *)
+(*            `{!anerisG (fair_model_to_model simple_fair_model) Σ} *)
+(*            (s : stuckness) (ξ : execution_trace aneris_lang → *)
+(*                               finite_trace simple_state simple_role → Prop) *)
+(*            (c1 : cfg aneris_lang) *)
+(*            (c2 : (fair_model_to_model simple_fair_model).(mstate)) : iProp Σ := *)
+(*   ∀ ex atr c, *)
+(*     ⌜valid_system_trace ex atr⌝ -∗ *)
+(*     ⌜trace_starts_in ex c1⌝ -∗ *)
+(*     ⌜trace_starts_in atr c2⌝ -∗ *)
+(*     ⌜trace_ends_in ex c⌝ -∗ *)
+(*     ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → *)
+(*                       trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗ *)
+(*     ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗ *)
+(*     state_interp ex atr -∗ *)
+(*     |={⊤, ∅}=> ⌜ξ ex atr⌝. *)
 
-(* TODO: This should probably be located in a better place *)
-(* Correspondence between live configurations and model states *)
+Definition live_tid (c : cfg aneris_lang) (δ : simple_state)
+  (ℓ:fmrole simple_fair_model) ζ : Prop :=
+  labels_match ζ ℓ → role_enabled_model ℓ δ → live_ex_label ζ c.
+
 Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
-  ∀ ζ (ℓ:fmrole simple_fair_model),
-  labels_match ζ ℓ →
-  (role_enabled_model ℓ δ → live_ex_label ζ c).
+  ∀ (ℓ:fmrole simple_fair_model) ζ, live_tid c δ ℓ ζ.
 
 Definition valid_state_evolution_fairness
            (extr : execution_trace aneris_lang)
@@ -50,18 +51,17 @@ Proof. rewrite union_intersection_l_L difference_union_L. set_solver. Qed.
 
 Definition from_locale_no_val_no_enabled (c : cfg aneris_lang)
            (δ : simple_state) :=
-  ∀ (ℓ:fmrole simple_fair_model) ζ, 
+  ∀ (ℓ:fmrole simple_fair_model) ζ,
   labels_match (inl ζ) ℓ →
   ∀ e, from_locale c.1 ζ = Some e → language.to_val e ≠ None →
   ¬ role_enabled_model ℓ δ.
 
-Lemma derive_live_tids_thing (c : cfg aneris_lang) δ :  
+Lemma derive_live_tid_inl (c : cfg aneris_lang) δ (ℓ : fmrole simple_fair_model) ζ :
   role_has_locale c δ →
   from_locale_no_val_no_enabled c δ →
-  ∀ (ℓ : fmrole simple_fair_model) ζ, labels_match (inl ζ) ℓ →
-                                      role_enabled_model ℓ δ → locale_enabled ζ c.
+  live_tid c δ ℓ (inl ζ).
 Proof.
-  intros Himpl1 Himpl2 ℓ ζ Hmatch Hrole.
+  intros Himpl1 Himpl2 Hmatch Hrole.
   specialize (Himpl1 _ _ Hmatch Hrole) as [e He].
   exists e.
   split; [done|].
@@ -73,21 +73,17 @@ Proof.
   done.
 Qed.
 
-Lemma valid_state_live_tids ex atr :
-  simple_valid_state_evolution ex atr →
-  from_locale_no_val_no_enabled (trace_last ex) (trace_last atr) →
-  live_tids (trace_last ex) (trace_last atr).
+Lemma derive_live_tid_inr (c : cfg aneris_lang) δ
+      (ℓ : fmrole simple_fair_model) ζ :
+  config_state_valid c δ → live_tid c δ ℓ (inr ζ).
 Proof.
-  intros (Hsteps&Hmatch&Hlive1&Hn&Hm) Hlive2.
-  intros ζ ℓ Hlabels.
-  destruct ζ as [ζ|ζ].
-  { by apply derive_live_tids_thing. } 
+  intros (Hn&Hm) Hlabels.
   assert (ℓ ≠ A_role ∧ ℓ ≠ B_role) as [HAneq HBneq].
   { rewrite /labels_match /locale_simple_label in Hlabels.
     repeat case_match; simplify_eq; eauto. }
   intros Henabled.
   rewrite /role_enabled_model in Henabled.
-  destruct (trace_last atr) eqn:Heq; simpl in *.
+  destruct δ eqn:Heq; simpl in *.
   + set_solver.
   + destruct ℓ.
     * by destruct sent; set_solver.
@@ -199,6 +195,144 @@ Proof.
       set_solver.
 Qed.
 
+Lemma valid_state_live_tids ex atr :
+  simple_valid_state_evolution ex atr →
+  from_locale_no_val_no_enabled (trace_last ex) (trace_last atr) →
+  live_tids (trace_last ex) (trace_last atr).
+Proof.
+  intros (_&_&Hlive1&Hnm) Hlive2.
+  intros ℓ ζ Hlabels.
+  destruct ζ as [ζ|ζ].
+  - by apply derive_live_tid_inl.
+  - by apply derive_live_tid_inr.
+Qed.
+
+Lemma from_locale_from_elem_of es tp ζ e :
+  from_locale_from es tp ζ = Some e → ∃ i, tp !! i = Some e.
+Proof.
+  revert es.
+  induction tp as [|e' tp IHtp]; [done|].
+  intros es Hlocale.
+  rewrite /from_locale in Hlocale.
+  simpl in *.
+  case_decide.
+  - simplify_eq. exists 0. rewrite lookup_cons. done.
+  - specialize (IHtp (es ++ [e']) Hlocale) as [i Hi].
+    exists (S i). done.
+Qed.
+
+Lemma from_locale_elem_of tp ζ e :
+  from_locale tp ζ = Some e → ∃ i, tp !! i = Some e.
+Proof. apply from_locale_from_elem_of. Qed.
+
+Lemma from_locale_from_elem_of' es tp ζ e :
+  from_locale_from es tp ζ = Some e →
+  ∃ i, tp !! i = Some e ∧ locale_of (es ++ take i tp) e = ζ.
+Proof.
+  revert es.
+  induction tp as [|e' tp IHtp]; [done|].
+  intros es Hlocale.
+  rewrite /from_locale in Hlocale.
+  simpl in *.
+  case_decide.
+  - simplify_eq. exists 0. rewrite lookup_cons.
+    rewrite right_id. done.
+  - specialize (IHtp (es ++ [e']) Hlocale) as [i [Hlookup Hi]].
+    exists (S i). simpl. split; [done|].
+    rewrite cons_middle assoc. done.
+Qed.
+
+Lemma from_locale_elem_of' tp ζ e :
+  from_locale tp ζ = Some e → ∃ i, tp !! i = Some e ∧ locale_of (take i tp) e = ζ.
+Proof. apply from_locale_from_elem_of'. Qed.
+
+Lemma posts_of_idx
+      `{!anerisG (fair_model_to_model simple_fair_model) Σ}
+      (e : aneris_expr) v (tp : list aneris_expr) ζ :
+  from_locale tp ζ = Some e → aneris_to_val e = Some v →
+  posts_of tp
+           (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes tp)) -∗
+  (∃ ℓ, ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ)%I.
+Proof.
+  iIntros (Hlocale Hval) "Hposts".
+  apply from_locale_elem_of' in Hlocale as [i [Hlookup Hlocale]].
+  iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H".
+  { rewrite elem_of_list_omap.
+    eexists (e, (λ _, ∃ ℓ : simple_role, ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ)%I).
+    split; last first.
+    - simpl. apply fmap_Some. exists v. split; done.
+    - destruct tp as [|e1' tp]; [set_solver|]. simpl.
+      apply elem_of_cons.
+      destruct i as [|i]; [left|right].
+      * simpl in *. simplify_eq. done.
+      * apply elem_of_lookup_zip_with.
+        eexists i, e, _.
+        do 2 split=> //.
+        rewrite /locale_of /=.
+        rewrite list_lookup_fmap fmap_Some. simpl in Hlookup.
+        exists (e1' :: take i tp, e). simpl in *.
+        split.
+        -- erewrite prefixes_from_lookup =>//.
+        -- rewrite /locale_of in Hlocale.
+           rewrite Hlocale.
+           done. }
+  done.
+Qed.
+
+Lemma posts_of_thing Σ
+    `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
+  locales_of_list_from es' es = take (length es) (locales_of_list_from es' tp) →
+  posts_of tp
+           (map
+              (λ '(tnew, e) (v : language.val aneris_lang),
+                 fork_post (locale_of tnew e) v)
+              (prefixes_from es' (es ++ drop (length es) tp))) -∗
+  posts_of tp
+           (map
+              (λ '(tnew, e) (v : language.val aneris_lang),
+                 fork_post (locale_of tnew e) v)
+              (prefixes_from es' tp)).
+Proof.
+  iIntros (Hζ) "H".
+  iInduction es as [|e es] "IHtp" forall (tp es' Hζ); [done|].
+  destruct tp as [|e' tp]; [done|].
+  simpl in *.
+  destruct (aneris_to_val e'); simpl in *.
+  - iDestruct "H" as "[He H]".
+    simpl in *. rewrite /locales_of_list_from in Hζ.
+    simpl in *.
+    rewrite /locale_of.
+    simpl.
+    simplify_eq.
+    rewrite H.
+    iFrame.
+    iApply ("IHtp" with "[] [H]").
+    { iPureIntro.
+      assert (e = e') as -> by admit.
+      (* TODO: need to know that inner proposition does not rely on [e] *)
+      done. }
+    simpl.
+    assert (e = e') as -> by admit.
+    (* TODO: need to know that inner proposition does not rely on [e] *)
+    done.
+  - simpl in *. rewrite /locales_of_list_from in Hζ.
+    simpl in *.
+    rewrite /locale_of.
+    simpl.
+    simplify_eq.
+    iApply ("IHtp" with "[] [H]").
+    { iPureIntro.
+      simpl in *.
+      rewrite /locales_of_list_from.
+      assert (e = e') as -> by admit.
+      (* TODO: need to know that inner proposition does not rely on [e] *)
+      done. }
+    simpl.
+    assert (e = e') as -> by admit.
+    (* TODO: need to know that inner proposition does not rely on [e] *)
+    done.
+Admitted.
+
 Theorem strong_simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
     (s : stuckness) (es : list aneris_expr) (σ : state) (st : simple_state)
@@ -224,8 +358,8 @@ Theorem strong_simulation_adequacy_multiple Σ
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
      observed_receive obs_rec_sas ={⊤}=∗
-     wptp s es (map (λ e _, ∃ ℓ, ⌜labels_match (inl (e.(expr_n),0%nat)) ℓ⌝ ∗
-                                 dead_role_frag_own ℓ) es)
+     wptp s es (map (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
+                    (prefixes es))
      (* OBS: Can add [always_holds ξ] here *)) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
@@ -271,8 +405,6 @@ Proof.
       (γsendevs) "[Hsendevsctx Hsendevs]".
   iMod (sendreceive_evs_init (to_singletons obs_rec_sas)) as
     (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]".
-  (* NB: The model state is not used in the current state interpretation
-         and can be removed. *)
   iMod (model_init (model_draft.Start:(fair_model_to_model simple_fair_model).(mstate))) as (γm) "[Hmfull Hmfrag]".
   set (dg :=
          {|
@@ -306,8 +438,10 @@ Proof.
          (trace_messages_history ex) ∗
        thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗
        steps_auth (trace_length ex)))%I.
-  iExists (map (λ e _, ∃ ℓ, ⌜labels_match (inl (e.(expr_n),0%nat)) ℓ⌝ ∗
-                                 dead_role_frag_own ℓ) es)%I, (λ _ _, True)%I.
+  iExists (map (λ '(tnew,e) v, fork_post (locale_of tnew e) v) (prefixes es))%I,
+            (fork_post)%I.
+  (* iExists (map (λ e _, ∃ ℓ, ⌜labels_match (inl (e.(expr_n),0%nat)) ℓ⌝ ∗ *)
+  (*                                dead_role_frag_own ℓ) es)%I, (λ _ _, True)%I. *)
   (* iExists (λ _, dead_role_frag_own A_role ∗ *)
   (*               dead_role_frag_own B_role)%I, (λ _ _, True)%I. *)
   iSplitR; [by iApply config_wp_correct|].
@@ -365,8 +499,7 @@ Proof.
   { iPureIntro. apply to_singletons_fmap. intros x.
     rewrite /is_ne. set_solver. }
   iModIntro.
-  iFrame "Hwp".
-  iSplitL.
+  iSplitR "Hwp".
   { iSplitR.
     { iPureIntro. split; [constructor|done]. }
     iFrame "Hsteps".
@@ -374,6 +507,7 @@ Proof.
     replace ((all_roles ∖ simple_live_roles st) ∩ config_roles) with
       (config_roles ∖ simple_live_roles st) by set_solver.
     rewrite /= Hmse /= dom_empty_L. by iFrame. }
+  iFrame "Hwp".
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
   iDestruct "Hsi" as "(%Hvalid&_&_&Hlive&_)".
   iApply fupd_mask_intro; [set_solver|].
@@ -381,19 +515,18 @@ Proof.
   iAssert (⌜from_locale_no_val_no_enabled c (trace_last atr)⌝)%I as "%Hrole".
   {
     iIntros (ℓ ζ Hmatch e Hlocale Hval).
-    iAssert (⌜labels_match (inl ζ) ℓ⌝ ∗
-             dead_role_frag_own ℓ)%I with "[Hposts]" as "[%Hmatch' H]".
-    { destruct (language.to_val e) as [?|] eqn:Heq; last done.
-      iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H".
-      {
-        rewrite elem_of_list_omap.
-        exists (e, (λ _: language.val aneris_lang,
-                      ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ))%I.
-        split; last first.
-        - simpl. apply fmap_Some. exists v. split; done.
-        - admit. }
-      iApply "H".
-    }
+    iAssert ((* ⌜labels_match (inl ζ) ℓ⌝ ∗ *)
+             dead_role_frag_own ℓ)%I with "[Hposts]" as "H".
+    { rewrite -map_app -prefixes_from_app.
+      assert (locales_of_list es = (take (length es) (locales_of_list c.1))).
+      { admit. }                (* Need to obtain from adequacy *)
+      iDestruct (posts_of_thing with "Hposts") as "Hposts"; [done|].
+      assert (is_Some $ language.to_val e) as [v Hv].
+      { by apply not_eq_None_Some. }
+      iDestruct (posts_of_idx with "Hposts") as (ℓ' Hmatch') "H"; [done|done|].
+      rewrite /labels_match in Hmatch.
+      rewrite /labels_match in Hmatch'.
+      rewrite -Hmatch in Hmatch'. simplify_eq. done. }
     simpl in *.
     iDestruct "Hlive" as "(_&_&Hdead&Hdead')".
     iDestruct (dead_role_auth_elem_of with "Hdead H") as %Hin.
@@ -404,7 +537,7 @@ Proof.
   pose proof Hvalid as Hvalid'.
   destruct Hvalid as (Htrace&Hlabels&Hstate).
   split; [done|].
-  split; [done|].  
+  split; [done|].
   apply valid_state_live_tids; [done|].
   by rewrite Hendex.
 Admitted.
@@ -792,7 +925,7 @@ Definition simple_label_locale (ℓ : simple_role) : ex_label aneris_lang :=
   | Ndeliver => inr DeliverLabel
   | Ndrop => inr DropLabel
   | Ndup => inr DuplicateLabel
-  end.  
+  end.
 
 Lemma traces_match_fairness_preserved extr mtr :
   exmtr_traces_match extr mtr →
