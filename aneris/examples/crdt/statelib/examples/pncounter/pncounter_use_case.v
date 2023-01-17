@@ -340,6 +340,39 @@ Section program_proof.
   Notation pnSt := (prodSt gctr_st gctr_st).
   Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st pnctr_op_pred).
 
+  Definition Sn (n: nat) : (gset (fin n)).
+  Proof.
+    induction n.
+    + exact (∅: gset (fin O)).
+    + exact (( {[ nat_to_fin (Nat.lt_0_succ n)]}: gset (fin (S n)))
+            ∪ (set_map FS IHn)).
+  Defined.
+
+  Lemma Sn_prop: forall n, ∀ (f: fin n), f ∈ (Sn n).
+  Proof.
+    induction n; intros x; first inversion x.
+    destruct (resources_allocation.destruct_fin _ x) as [Hx | [x' Hx]];
+      simplify_eq/=; set_solver.
+  Qed.
+
+  Lemma S_to_Sn: forall n S, (∀ (f: fin n), f ∈ S) -> S = Sn n.
+  Proof.
+    induction n as [|n IHn]; simplify_eq/=; intros S HS; apply set_eq; intros x;
+      first by inversion x.
+    split; destruct (resources_allocation.destruct_fin _ x) as [Hx | [x' Hx]];
+      simplify_eq/=.
+    - set_solver.
+    - intros Hx'. apply elem_of_union_r, elem_of_map_2, Sn_prop.
+    - intros _. apply HS.
+    - intros [Himp|Hx']%elem_of_union; first set_solver. apply HS.
+  Qed.
+
+  Lemma S2_eq : forall S, (forall (f: fin 2), f ∈ S) -> S = ({[Ofin; Ifin]}: gset (fin 2)).
+  Proof.
+    intros S Hs.
+    rewrite (S_to_Sn 2 S Hs).
+    set_solver.
+  Qed.
 
   Lemma wp_use_case_program E:
     ⊢ |={E}=> ∃ Res : StLib_Res pnOp,
@@ -363,8 +396,16 @@ Section program_proof.
     iIntros "#Hprotos Hfip1 Hfip2 Hsa1 Hsa2".
     iDestruct "HtksProd" as (S) "(%Hfin & HitksProd)".
     simpl in *. simplify_eq /=.
-    iAssert (StLib_InitToken Ofin) as "Hitk1Prod". admit.
-    iAssert (StLib_InitToken Ifin) as "Hitk2Prod". admit.
+    rewrite (S2_eq _ Hfin).
+    Check FS.
+    iAssert (StLib_InitToken Ofin ∗ StLib_InitToken Ifin)%I with "[HitksProd]"
+      as "[Hitk1Prod Hitk2Prod]".
+    { iDestruct (big_sepS_union with "HitksProd") as "[H1 H2]"; first set_solver.
+      iDestruct ((bi.equiv_entails_1_1 _ _ ( big_sepS_singleton  _ _)) with "H1")
+        as "H1".
+      iDestruct ((bi.equiv_entails_1_1 _ _ ( big_sepS_singleton  _ _)) with "H2")
+        as "H2".
+      iFrame. }
     rewrite /use_case_program.
     iMod (own_alloc (Excl ())) as (γ1) "Htk1"; first done.
     iMod (own_alloc (Excl ())) as (γ2) "Htk2"; first done.
@@ -374,7 +415,7 @@ Section program_proof.
     iSplitL "Hfip1"; first by iNext.
     iSplitR "Hitk1Prod Hsa1 Htk1"; last first.
     { iNext. iIntros "Hfps".
-      iApply (wp_use_case_program1 with "[$Hsa1 $Htk1 $Hfps][]"); last eauto.
+      iApply (wp_use_case_program1 with "[$Hsa1 $Hitk1Prod $Htk1 $Hfps][]"); last eauto.
       iFrame "#".
       iSplit.
       iApply pncounter_init_crdt_spec. rewrite /pn_prod_init_crdt_spec.
@@ -385,12 +426,12 @@ Section program_proof.
     iSplitL "Hfip2"; first by iNext.
     iSplit; first done.
     iNext. iIntros "Hfps".
-    iApply (wp_use_case_program2 with "[$Hsa2 $Htk2 $Hfps][]"); last eauto.
+    iApply (wp_use_case_program2 with "[$Hsa2 $Htk2 $Hitk2Prod $Hfps][]"); last eauto.
       iFrame "#".
       iSplit.
       iApply pncounter_init_crdt_spec. rewrite /pn_prod_init_crdt_spec.
       iApply pn_init_spec. iFrame "#". eauto.
-  Admitted.
+  Qed.
 
 End program_proof.
 
