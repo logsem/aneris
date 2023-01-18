@@ -279,59 +279,100 @@ Proof.
   done.
 Qed.
 
-Lemma posts_of_thing Σ
+(* TODO: Should likely move this to [lang.v] *)
+Definition locale_of' (ips : list ip_address) ip :=
+  (ip, length $ (filter (λ ip', ip' = ip)) ips).
+
+Lemma locale_of_locale_of' es e :
+  locale_of es e = locale_of' (map expr_n es) (expr_n e).
+Proof.
+  induction es; [done|].
+  rewrite /locale_of /locale_of'. simpl.
+  rewrite !filter_cons. case_decide; [|done]=> /=.
+  f_equiv. rewrite /locale_of /locale_of' in IHes. simplify_eq. by rewrite IHes.
+Qed.
+
+Lemma prefixes_map_from_locale_of_locale_of' tp0 tp1 :
+  map (λ '(t,e), locale_of t e) (prefixes_from tp0 tp1) =
+  map (λ '(t,e), locale_of' t e) (prefixes_from (map expr_n tp0) (map expr_n tp1)).
+Proof.
+  revert tp0.
+  induction tp1; [done|]; intros tp0=> /=.
+  rewrite locale_of_locale_of'. f_equiv.
+  replace ([expr_n a]) with (map expr_n [a]) by done.
+  rewrite -(map_app _ tp0 [a]).
+  apply IHtp1.
+Qed.
+
+(* This is almost identical to above lemma, but differs in [map] vs [list_fmap] *)
+Lemma prefixes_list_fmap_from_locale_of_locale_of' tp0 tp1 :
+  (λ '(t, e), locale_of t e) <$> prefixes_from tp0 tp1 =
+  (λ '(t, e), locale_of' t e) <$> prefixes_from (map (expr_n) tp0) (map expr_n tp1).
+Proof.
+  revert tp0.
+  induction tp1; [done|]; intros tp0=> /=.
+  rewrite locale_of_locale_of'. f_equiv.
+  replace ([expr_n a]) with (map expr_n [a]) by done.
+  rewrite -(map_app _ tp0 [a]).
+  apply IHtp1.
+Qed.
+
+Lemma posts_of_length_drop Σ
     `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
   locales_of_list_from es' es = take (length es) (locales_of_list_from es' tp) →
-  posts_of tp
-           (map
-              (λ '(tnew, e) (v : language.val aneris_lang),
-                 fork_post (locale_of tnew e) v)
-              (prefixes_from es' (es ++ drop (length es) tp))) -∗
-  posts_of tp
-           (map
-              (λ '(tnew, e) (v : language.val aneris_lang),
-                 fork_post (locale_of tnew e) v)
-              (prefixes_from es' tp)).
+  posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
+                   (prefixes_from es' (es ++ drop (length es) tp))) -∗
+  posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
+                   (prefixes_from es' tp)).
 Proof.
   iIntros (Hζ) "H".
-  iInduction es as [|e es] "IHtp" forall (tp es' Hζ); [done|].
+  rewrite /locales_of_list_from in Hζ.
+  rewrite !prefixes_list_fmap_from_locale_of_locale_of' in Hζ.
+  set f := locale_of.
+  set g := (λ ζ, λ v, flip fork_post v ζ).
+  assert (∀ xs, map g (map (λ '(x,y), f x y) xs) = map (λ '(x,y), g (f x y)) xs).
+  { intros. rewrite map_map. f_equiv. apply FunExt. by intros []. }
+  rewrite /f /g in H.
+  rewrite -!H !prefixes_map_from_locale_of_locale_of'.
+  clear f g H.
+  iInduction es as [|e es IHes] "IHtp" forall (tp es' Hζ); [done|].
   destruct tp as [|e' tp]; [done|].
-  simpl in *.
-  destruct (aneris_to_val e'); simpl in *.
+  iEval (simpl). iEval (simpl) in "H".
+  destruct (aneris_to_val e') as [v|].
   - iDestruct "H" as "[He H]".
-    simpl in *. rewrite /locales_of_list_from in Hζ.
-    simpl in *.
-    rewrite /locale_of.
-    simpl.
-    simplify_eq.
-    rewrite H.
+    assert (expr_n e = expr_n e') as Heq.
+    { rewrite /locales_of_list_from in Hζ. simpl in *. by simplify_eq. }
+    rewrite Heq.
     iFrame.
-    iApply ("IHtp" with "[] [H]").
-    { iPureIntro.
-      assert (e = e') as -> by admit.
-      (* TODO: need to know that inner proposition does not rely on [e] *)
-      done. }
-    simpl.
-    assert (e = e') as -> by admit.
-    (* TODO: need to know that inner proposition does not rely on [e] *)
-    done.
-  - simpl in *. rewrite /locales_of_list_from in Hζ.
-    simpl in *.
-    rewrite /locale_of.
-    simpl.
-    simplify_eq.
-    iApply ("IHtp" with "[] [H]").
-    { iPureIntro.
-      simpl in *.
-      rewrite /locales_of_list_from.
-      assert (e = e') as -> by admit.
-      (* TODO: need to know that inner proposition does not rely on [e] *)
-      done. }
-    simpl.
-    assert (e = e') as -> by admit.
-    (* TODO: need to know that inner proposition does not rely on [e] *)
-    done.
-Admitted.
+    assert ((λ '(t, e0), locale_of' t e0) <$>
+            prefixes_from (map expr_n (es' ++ [e'])) (map expr_n es) =
+            take (length es)
+                 ((λ '(t, e0), locale_of' t e0) <$>
+                  prefixes_from (map expr_n (es' ++ [e'])) (map expr_n tp))) as
+      Heq'.
+    { rewrite /locales_of_list_from in Hζ. simpl in *. rewrite Heq in Hζ.
+      replace ([expr_n e']) with (map expr_n [e']) in Hζ by done.
+      rewrite -!map_app in Hζ. by simplify_eq. }
+    replace ([expr_n e']) with (map expr_n [e']) by done.
+    rewrite -!map_app.
+    iApply ("IHtp" with "[//] H").
+  - assert (expr_n e = expr_n e') as Heq.
+    { rewrite /locales_of_list_from in Hζ. simpl in *. by simplify_eq. }
+    rewrite Heq.
+    iFrame.
+    assert ((λ '(t, e0), locale_of' t e0) <$>
+            prefixes_from (map expr_n (es' ++ [e'])) (map expr_n es) =
+            take (length es)
+                 ((λ '(t, e0), locale_of' t e0) <$>
+                  prefixes_from (map expr_n (es' ++ [e'])) (map expr_n tp))) as
+      Heq'.
+    { rewrite /locales_of_list_from in Hζ. simpl in *. rewrite Heq in Hζ.
+      replace ([expr_n e']) with (map expr_n [e']) in Hζ by done.
+      rewrite -!map_app in Hζ. by simplify_eq. }
+    replace ([expr_n e']) with (map expr_n [e']) by done.
+    rewrite -!map_app.
+    iApply ("IHtp" with "[//] H").
+Qed.
 
 Theorem strong_simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
@@ -520,7 +561,7 @@ Proof.
     { rewrite -map_app -prefixes_from_app.
       assert (locales_of_list es = (take (length es) (locales_of_list c.1))).
       { admit. }                (* Need to obtain from adequacy *)
-      iDestruct (posts_of_thing with "Hposts") as "Hposts"; [done|].
+      iDestruct (posts_of_length_drop with "Hposts") as "Hposts"; [done|].
       assert (is_Some $ language.to_val e) as [v Hv].
       { by apply not_eq_None_Some. }
       iDestruct (posts_of_idx with "Hposts") as (ℓ' Hmatch') "H"; [done|done|].
