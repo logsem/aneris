@@ -306,8 +306,8 @@ Qed.
 
 (* This is almost identical to above lemma, but differs in [map] vs [list_fmap] *)
 Lemma prefixes_list_fmap_from_locale_of_locale_of' tp0 tp1 :
-  (λ '(t, e), locale_of t e) <$> prefixes_from tp0 tp1 =
-  (λ '(t, e), locale_of' t e) <$> prefixes_from (map (expr_n) tp0) (map expr_n tp1).
+  (λ '(t,e), locale_of t e) <$> prefixes_from tp0 tp1 =
+  (λ '(t,e), locale_of' t e) <$> prefixes_from (map (expr_n) tp0) (map expr_n tp1).
 Proof.
   revert tp0.
   induction tp1; [done|]; intros tp0=> /=.
@@ -319,14 +319,15 @@ Qed.
 
 Lemma posts_of_length_drop Σ
     `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
-  locales_of_list_from es' es = take (length es) (locales_of_list_from es' tp) →
+  locales_equiv_from es' es' es (take (length es) tp) →
   posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
                    (prefixes_from es' (es ++ drop (length es) tp))) -∗
   posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
                    (prefixes_from es' tp)).
 Proof.
-  iIntros (Hζ) "H".
+  iIntros (Hζ%locales_equiv_from_equivI) "H".
   rewrite /locales_of_list_from in Hζ.
+  rewrite prefixes_from_take fmap_take in Hζ.
   rewrite !prefixes_list_fmap_from_locale_of_locale_of' in Hζ.
   set f := locale_of.
   set g := (λ ζ, λ v, flip fork_post v ζ).
@@ -549,18 +550,15 @@ Proof.
       (config_roles ∖ simple_live_roles st) by set_solver.
     rewrite /= Hmse /= dom_empty_L. by iFrame. }
   iFrame "Hwp".
-  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
+  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
+          "Hsi Hposts".
   iDestruct "Hsi" as "(%Hvalid&_&_&Hlive&_)".
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
   iAssert (⌜from_locale_no_val_no_enabled c (trace_last atr)⌝)%I as "%Hrole".
-  {
-    iIntros (ℓ ζ Hmatch e Hlocale Hval).
-    iAssert ((* ⌜labels_match (inl ζ) ℓ⌝ ∗ *)
-             dead_role_frag_own ℓ)%I with "[Hposts]" as "H".
+  { iIntros (ℓ ζ Hmatch e Hlocale Hval).
+    iAssert (dead_role_frag_own ℓ)%I with "[Hposts]" as "H".
     { rewrite -map_app -prefixes_from_app.
-      assert (locales_of_list es = (take (length es) (locales_of_list c.1))).
-      { admit. }                (* Need to obtain from adequacy *)
       iDestruct (posts_of_length_drop with "Hposts") as "Hposts"; [done|].
       assert (is_Some $ language.to_val e) as [v Hv].
       { by apply not_eq_None_Some. }
@@ -572,8 +570,7 @@ Proof.
     iDestruct "Hlive" as "(_&_&Hdead&Hdead')".
     iDestruct (dead_role_auth_elem_of with "Hdead H") as %Hin.
     iPureIntro.
-    intros Hneq. set_solver.
-  }
+    intros Hneq. set_solver. }
   iPureIntro.
   pose proof Hvalid as Hvalid'.
   destruct Hvalid as (Htrace&Hlabels&Hstate).
@@ -581,7 +578,7 @@ Proof.
   split; [done|].
   apply valid_state_live_tids; [done|].
   by rewrite Hendex.
-Admitted.
+Qed.
 
 (* TODO: Bump this too *)
 (* Theorem strong_simulation_adequacy Σ *)
