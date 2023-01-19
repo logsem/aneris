@@ -317,6 +317,17 @@ Proof.
   apply IHtp1.
 Qed.
 
+
+Lemma prefixes_from_take {A} n (xs ys : list A) :
+  prefixes_from xs (take n ys) = take n (prefixes_from xs ys).
+Proof.
+  revert n xs.
+  induction ys as [|y ys IHys]; intros n xs.
+  { by rewrite !take_nil. }
+  destruct n; [done|]=> /=.
+  by f_equiv.
+Qed.
+
 Lemma posts_of_length_drop Σ
     `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
   locales_equiv_from es' es' es (take (length es) tp) →
@@ -325,7 +336,7 @@ Lemma posts_of_length_drop Σ
   posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
                    (prefixes_from es' tp)).
 Proof.
-  iIntros (Hζ%locales_equiv_from_equivI) "H".
+  iIntros (Hζ%locales_of_list_equiv) "H".
   rewrite /locales_of_list_from in Hζ.
   rewrite prefixes_from_take fmap_take in Hζ.
   rewrite !prefixes_list_fmap_from_locale_of_locale_of' in Hζ.
