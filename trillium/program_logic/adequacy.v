@@ -244,36 +244,6 @@ Section locales_helpers.
     locales_equiv (take n t1) (take n t2).
   Proof. apply locales_equiv_from_take. Qed.
 
-  Definition locales_equiv_prefix_from {Λ} (tp0 tp1 tp2 : list $ expr Λ) :=
-    locales_equiv_from tp0 tp0 tp1 (take (length tp1) tp2).
-  Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
-
-  Lemma locales_equiv_prefix_trans (tp1 tp2 tp3 : list $ expr Λ) :
-    locales_equiv_prefix tp1 tp2 →
-    locales_equiv_prefix tp2 tp3 →
-    locales_equiv_prefix tp1 tp3.
-  Proof.
-    (* rewrite /locales_equiv_prefix_from !locales_of_list_equiv. *)
-    (* intros H12 H23. *)
-  Admitted.
-
-  Lemma locales_equiv_from_locale_of (tp0 tp0' tp1 tp2 tp3 : list $ expr Λ) :
-    locales_equiv tp0 tp0' →
-    locales_equiv_from tp0 tp1 tp2 tp3 ↔
-    locales_equiv_from tp0' tp1 tp2 tp3.
-  Proof. Admitted.
-
-  Lemma locales_equiv_from_comm (tp0 tp0' tp1 tp2 : list $ expr Λ) :
-    locales_equiv_from tp0 tp0' tp1 tp2 →
-    locales_equiv_from tp0' tp0 tp2 tp1.
-  Proof. Admitted.
-
-  (* NB: This is proven further down - Move! *)
-  Lemma locales_equiv_prefix_thing (tp0 tp1 tp2 : list $ expr Λ) :
-    locales_equiv_prefix_from tp0 tp1 tp2 →
-    locales_equiv_from tp0 tp0 tp2 (tp1 ++ (drop (length tp1) tp2)).
-  Proof. Admitted.
-
   Lemma locales_equiv_from_transitive (s1 s2 s3 t1 t2 t3 : list $ expr Λ):
     locales_equiv s1 s2 ->
     locales_equiv s2 s3 ->
@@ -297,35 +267,6 @@ Section locales_helpers.
     locales_equiv t2 t3 ->
     locales_equiv t1 t3.
   Proof. apply locales_equiv_from_transitive; constructor. Qed.
-
-  (* OBS: Generalise to additional bases when time *)
-  Lemma locales_equiv_from_drop (t0 t1 t2 t2' : list $ expr Λ) :
-    locales_equiv_prefix_from t0 t1 t2 →
-    locales_equiv_prefix_from t0 t1 t2' →
-    locales_equiv_from t0 t0 t2 t2' →
-    locales_equiv_from (t0++t1) (t0++t1) (drop (length t1) t2) (drop (length t1) t2').
-  Proof.
-    intros Hprefix1 Hprefix2 Hequiv.
-    apply locales_equiv_from_impl.
-    { apply Forall2_length in Hequiv. rewrite !prefixes_from_length in Hequiv.
-      rewrite !skipn_length. rewrite Hequiv. done. }
-    apply locales_equiv_prefix_thing in Hprefix1.
-    apply locales_equiv_prefix_thing in Hprefix2.
-    apply locales_equiv_from_comm in Hprefix1.
-    assert (locales_equiv_from t0 t0 (t1 ++ drop (length t1) t2) t2').
-    { eapply locales_equiv_from_transitive.
-      - apply locales_equiv_refl.
-      - apply locales_equiv_refl.
-      - apply Hprefix1.
-      - apply Hequiv. }
-    assert (locales_equiv_from t0 t0 (t1 ++ drop (length t1) t2) (t1 ++ drop (length t1) t2')).
-    { eapply locales_equiv_from_transitive.
-      - apply locales_equiv_refl.
-      - apply locales_equiv_refl.
-      - apply H.
-      - apply Hprefix2. }
-    done.
-  Qed.
 
   Lemma locale_valid_exec ex (tp1 tp2 : list $ expr Λ) σ1 σ2:
     valid_exec ex ->
@@ -353,7 +294,7 @@ Section locales_helpers.
   Qed.
 
 End locales_helpers.
-Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
+(* Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2). *)
 
 Section from_locale.
   Context {Λ: language}.
@@ -474,8 +415,7 @@ Section locales_utils.
       apply (Forall2_impl _ (λ x y, uncurry locale_of x = uncurry locale_of y))
         in Heq; last first.
       { intros [] [] HP. done. }
-      rewrite Forall2_eq in Heq.
-      done.
+      rewrite Forall2_eq in Heq. done.
     - intros Heq.
       apply (Forall2_impl (λ x y, uncurry locale_of x = uncurry locale_of y));
         last first.
@@ -506,9 +446,137 @@ Section locales_utils.
     apply elem_of_cons; right. apply IH. eauto.
   Qed.
 
+  Definition locales_equiv_prefix_from {Λ} (tp0 tp1 tp2 : list $ expr Λ) :=
+    locales_equiv_from tp0 tp0 tp1 (take (length tp1) tp2).
+  Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
+
+  Lemma locales_equiv_from_length (tp0 tp0' tp1 tp2 : list $ expr Λ) :
+    locales_equiv_from tp0 tp0' tp1 tp2 → length tp1 = length tp2.
+  Proof. intros Heq%Forall2_length. by rewrite !prefixes_from_length in Heq. Qed.
+
+  Lemma locales_equiv_prefix_from_length (tp0 tp1 tp2 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 → length tp1 ≤ length tp2.
+  Proof.
+    rewrite /locales_equiv_prefix_from.
+    intros ->%locales_equiv_from_length.
+    revert tp2. induction tp1; [simpl; lia|].
+    destruct tp2; [done|]. by apply le_n_S.
+  Qed.
+
+  Lemma locales_equiv_prefix_from_trans (tp0 tp1 tp2 tp3 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 →
+    locales_equiv_prefix_from tp0 tp2 tp3 →
+    locales_equiv_prefix_from tp0 tp1 tp3.
+  Proof.
+    rewrite /locales_equiv_prefix_from.
+    intros.
+    assert (length tp1 ≤ length tp2).
+    { by eapply locales_equiv_prefix_from_length. }
+    eapply locales_equiv_from_transitive;
+      [apply locales_equiv_refl..|done|].
+    assert (length tp1 = length tp1 `min` length tp2) as Heq by lia.
+    rewrite {2}Heq -take_take.
+    by apply locales_equiv_from_take.
+  Qed.
+
+  Lemma locales_equiv_prefix_trans (tp1 tp2 tp3 : list $ expr Λ) :
+    locales_equiv_prefix tp1 tp2 →
+    locales_equiv_prefix tp2 tp3 →
+    locales_equiv_prefix tp1 tp3.
+  Proof. intros. by eapply locales_equiv_prefix_from_trans. Qed.
+
+  Lemma locales_equiv_from_comm (tp0 tp0' tp1 tp2 : list $ expr Λ) :
+    locales_equiv_from tp0 tp0' tp1 tp2 →
+    locales_equiv_from tp0' tp0 tp2 tp1.
+  Proof. by rewrite !locales_of_list_equiv. Qed.
+
+  Lemma locales_equiv_from_locale_of (tp0 tp0' tp1 tp2 tp3 : list $ expr Λ) :
+    locales_equiv tp0 tp0' →
+    locales_equiv_from tp0 tp1 tp2 tp3 ↔
+    locales_equiv_from tp0' tp1 tp2 tp3.
+  Proof.
+    rewrite !locales_of_list_equiv.
+    intros.
+    split.
+    - intros. rewrite -H0.
+      rewrite -locales_of_list_equiv.
+      rewrite -locales_of_list_equiv in H.
+      apply locales_equiv_from_refl.
+      by apply locales_equiv_from_comm.
+    - intros. rewrite -H0.
+      rewrite -locales_of_list_equiv.
+      rewrite -locales_of_list_equiv in H.
+      by apply locales_equiv_from_refl.
+  Qed.
+
+  Lemma locales_equiv_prefix_from_drop (tp0 tp1 tp2 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 →
+    locales_equiv_from tp0 tp0 tp2 (tp1 ++ (drop (length tp1) tp2)).
+  Proof.
+    revert tp0 tp2.
+    induction tp1 as [|e1 tp1 IHtp1]; intros tp0 tp2 Heq.
+    { simpl in *.
+      rewrite /locales_equiv_prefix_from !locales_of_list_equiv.
+      done. }
+    simpl in *.
+    destruct tp2 as [|e2 tp2].
+    { rewrite /locales_equiv_prefix_from !locales_of_list_equiv in Heq.
+      rewrite /locales_of_list_from in Heq. simpl in *. done. }
+    rewrite /locales_equiv_prefix_from !locales_of_list_equiv in Heq.
+    rewrite /locales_of_list_from in Heq.
+    rewrite /locales_of_list_from.
+    simpl in *.
+    simplify_eq.
+    f_equiv; [done|].
+    assert (∀ {A B} (f : A → B) xs, list_fmap _ _ f xs = f <$> xs) as Hugh.
+    { done. }
+    rewrite /locales_of_list_from in IHtp1. simpl in *.
+    eapply (locales_equiv_from_locale_of _ (tp0 ++ [e1])).
+    { apply locales_equiv_from_app; [apply locales_equiv_refl|].
+      by apply Forall2_cons. }
+    apply IHtp1.
+    apply locales_equiv_from_comm.
+    apply (locales_equiv_from_locale_of (tp0 ++ [e1]) (tp0 ++ [e2])).
+    { apply locales_equiv_from_app; [apply locales_equiv_refl|].
+      by apply Forall2_cons. }
+    apply locales_equiv_from_comm.
+    rewrite /locales_equiv_prefix_from locales_of_list_equiv /locales_of_list_from.
+    rewrite -!Hugh.
+    apply H0.
+  Qed.
+
+  (* OBS: Generalise to additional bases when time *)
+  Lemma locales_equiv_from_drop (t0 t1 t2 t2' : list $ expr Λ) :
+    locales_equiv_prefix_from t0 t1 t2 →
+    locales_equiv_prefix_from t0 t1 t2' →
+    locales_equiv_from t0 t0 t2 t2' →
+    locales_equiv_from (t0++t1) (t0++t1) (drop (length t1) t2) (drop (length t1) t2').
+  Proof.
+    intros Hprefix1 Hprefix2 Hequiv.
+    apply locales_equiv_from_impl.
+    { apply Forall2_length in Hequiv. rewrite !prefixes_from_length in Hequiv.
+      rewrite !skipn_length. rewrite Hequiv. done. }
+    apply locales_equiv_prefix_from_drop in Hprefix1.
+    apply locales_equiv_prefix_from_drop in Hprefix2.
+    apply locales_equiv_from_comm in Hprefix1.
+    assert (locales_equiv_from t0 t0 (t1 ++ drop (length t1) t2) t2').
+    { eapply locales_equiv_from_transitive.
+      - apply locales_equiv_refl.
+      - apply locales_equiv_refl.
+      - apply Hprefix1.
+      - apply Hequiv. }
+    assert (locales_equiv_from t0 t0 (t1 ++ drop (length t1) t2) (t1 ++ drop (length t1) t2')).
+    { eapply locales_equiv_from_transitive.
+      - apply locales_equiv_refl.
+      - apply locales_equiv_refl.
+      - apply H.
+      - apply Hprefix2. }
+    done.
+  Qed.
+
 End locales_utils.
 Notation locales_of_list tp := (locales_of_list_from [] tp).
-
+Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
 
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
@@ -896,44 +964,6 @@ Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
   (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
 Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
 
-(* TODO: refactor this and unify with above identical lemma *)
-Lemma locales_equiv_prefix_thing' {Λ} (tp0 tp1 tp2 : list $ expr Λ) :
-  locales_equiv_prefix_from tp0 tp1 tp2 →
-  locales_equiv_from tp0 tp0 tp2 (tp1 ++ (drop (length tp1) tp2)).
-Proof.
-  revert tp0 tp2.
-  induction tp1 as [|e1 tp1 IHtp1]; intros tp0 tp2 Heq.
-  { simpl in *.
-    rewrite /locales_equiv_prefix_from !locales_of_list_equiv.
-    done. }
-  simpl in *.
-  destruct tp2 as [|e2 tp2].
-  {
-    rewrite /locales_equiv_prefix_from !locales_of_list_equiv in Heq.
-    rewrite /locales_of_list_from in Heq. simpl in *. done. }
-  rewrite /locales_equiv_prefix_from !locales_of_list_equiv in Heq.
-  rewrite /locales_of_list_from in Heq.
-  rewrite /locales_of_list_from.
-  simpl in *.
-  simplify_eq.
-  f_equiv; [done|].
-  assert (∀ {A B} (f : A → B) xs, list_fmap _ _ f xs = f <$> xs) as Hugh.
-  { done. }
-  rewrite /locales_of_list_from in IHtp1. simpl in *.
-  eapply (locales_equiv_from_locale_of _ (tp0 ++ [e1])).
-  { apply locales_equiv_from_app; [apply locales_equiv_refl|].
-    by apply Forall2_cons. }
-  apply IHtp1.
-  apply locales_equiv_from_comm.
-  apply (locales_equiv_from_locale_of (tp0 ++ [e1]) (tp0 ++ [e2])).
-  { apply locales_equiv_from_app; [apply locales_equiv_refl|].
-    by apply Forall2_cons. }
-  apply locales_equiv_from_comm.
-  rewrite /locales_equiv_prefix_from locales_of_list_equiv /locales_of_list_from.
-  rewrite -!Hugh.
-  apply H0.
-Qed.
-
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         es σ δ:
@@ -1130,9 +1160,9 @@ Proof.
     pose proof Hprefix as Hprefix'.
     pose proof Htake as Htake'.
     pose proof Hstep as Hstep'.
-    apply locales_equiv_prefix_thing in Htake.
-    apply locales_equiv_prefix_thing in Hstep.
-    apply locales_equiv_prefix_thing in Hprefix.
+    apply locales_equiv_prefix_from_drop in Htake.
+    apply locales_equiv_prefix_from_drop in Hstep.
+    apply locales_equiv_prefix_from_drop in Hprefix.
     assert (locales_equiv_from tp ((es ++ drop (length es) tp))
                                (drop (length tp) c'.1)
                                (drop (length tp) c'.1)) as Heq%locales_of_list_equiv.
