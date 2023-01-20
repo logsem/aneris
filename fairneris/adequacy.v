@@ -317,74 +317,35 @@ Proof.
   apply IHtp1.
 Qed.
 
-
 Lemma prefixes_from_take {A} n (xs ys : list A) :
   prefixes_from xs (take n ys) = take n (prefixes_from xs ys).
 Proof.
   revert n xs.
   induction ys as [|y ys IHys]; intros n xs.
   { by rewrite !take_nil. }
-  destruct n; [done|]=> /=.
-  by f_equiv.
+  destruct n; [done|]=> /=. by f_equiv.
+Qed.
+
+Lemma locales_of_list_from_drop Σ
+    `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
+  locales_equiv_prefix_from es' es tp →
+  (λ '(t,e) v, fork_post (locale_of t e) v) <$>
+      (prefixes_from es' tp) =
+  (λ '(t,e) v, fork_post (locale_of t e) v) <$>
+      (prefixes_from es' (es ++ drop (length es) tp)).
+Proof.
+  intros Hζ. apply locales_of_list_from_fork_post.
+  by apply locales_of_list_equiv, locales_equiv_prefix_from_drop.
 Qed.
 
 Lemma posts_of_length_drop Σ
     `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
-  locales_equiv_from es' es' es (take (length es) tp) →
-  posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
+  locales_equiv_prefix_from es' es tp →
+  posts_of tp ((λ '(t,e) v, fork_post (locale_of t e) v) <$>
                    (prefixes_from es' (es ++ drop (length es) tp))) -∗
-  posts_of tp (map (λ '(t,e) v, fork_post (locale_of t e) v)
+  posts_of tp ((λ '(t,e) v, fork_post (locale_of t e) v) <$>
                    (prefixes_from es' tp)).
-Proof.
-  iIntros (Hζ%locales_of_list_equiv) "H".
-  rewrite /locales_of_list_from in Hζ.
-  rewrite prefixes_from_take fmap_take in Hζ.
-  rewrite !prefixes_list_fmap_from_locale_of_locale_of' in Hζ.
-  set f := locale_of.
-  set g := (λ ζ, λ v, flip fork_post v ζ).
-  assert (∀ xs, map g (map (λ '(x,y), f x y) xs) = map (λ '(x,y), g (f x y)) xs).
-  { intros. rewrite map_map. f_equiv. apply FunExt. by intros []. }
-  rewrite /f /g in H.
-  rewrite -!H !prefixes_map_from_locale_of_locale_of'.
-  clear f g H.
-  iInduction es as [|e es IHes] "IHtp" forall (tp es' Hζ); [done|].
-  destruct tp as [|e' tp]; [done|].
-  iEval (simpl). iEval (simpl) in "H".
-  destruct (aneris_to_val e') as [v|].
-  - iDestruct "H" as "[He H]".
-    assert (expr_n e = expr_n e') as Heq.
-    { rewrite /locales_of_list_from in Hζ. simpl in *. by simplify_eq. }
-    rewrite Heq.
-    iFrame.
-    assert ((λ '(t, e0), locale_of' t e0) <$>
-            prefixes_from (map expr_n (es' ++ [e'])) (map expr_n es) =
-            take (length es)
-                 ((λ '(t, e0), locale_of' t e0) <$>
-                  prefixes_from (map expr_n (es' ++ [e'])) (map expr_n tp))) as
-      Heq'.
-    { rewrite /locales_of_list_from in Hζ. simpl in *. rewrite Heq in Hζ.
-      replace ([expr_n e']) with (map expr_n [e']) in Hζ by done.
-      rewrite -!map_app in Hζ. by simplify_eq. }
-    replace ([expr_n e']) with (map expr_n [e']) by done.
-    rewrite -!map_app.
-    iApply ("IHtp" with "[//] H").
-  - assert (expr_n e = expr_n e') as Heq.
-    { rewrite /locales_of_list_from in Hζ. simpl in *. by simplify_eq. }
-    rewrite Heq.
-    iFrame.
-    assert ((λ '(t, e0), locale_of' t e0) <$>
-            prefixes_from (map expr_n (es' ++ [e'])) (map expr_n es) =
-            take (length es)
-                 ((λ '(t, e0), locale_of' t e0) <$>
-                  prefixes_from (map expr_n (es' ++ [e'])) (map expr_n tp))) as
-      Heq'.
-    { rewrite /locales_of_list_from in Hζ. simpl in *. rewrite Heq in Hζ.
-      replace ([expr_n e']) with (map expr_n [e']) in Hζ by done.
-      rewrite -!map_app in Hζ. by simplify_eq. }
-    replace ([expr_n e']) with (map expr_n [e']) by done.
-    rewrite -!map_app.
-    iApply ("IHtp" with "[//] H").
-Qed.
+Proof. iIntros (Hζ) "H". by erewrite <-locales_of_list_from_drop. Qed.
 
 Theorem strong_simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
