@@ -489,7 +489,6 @@ Lemma no_drop_dup_continued_simulation shA shB :
 Proof.
   eexists (tr_singl model_draft.Start).
   split; [done|].
-
   assert (anerisPreG (fair_model_to_model simple_fair_model)
                      (anerisΣ (fair_model_to_model simple_fair_model))) as HPreG.
   { apply _. }
@@ -506,8 +505,7 @@ Proof.
       { rewrite /labels_match /locale_simple_label in Hmatch.
         by repeat case_match; simplify_eq. }
       eexists _. simpl. done. }
-  {
-    iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hfree Hnode Hlbl Hsendevs Hrecvevs".
+  { iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hfree Hnode Hlbl Hsendevs Hrecvevs".
     iIntros "Hsend_obs Hrecv_obs".
     iIntros "!>".
     iDestruct (unallocated_split with "Hunallocated") as "[HA HB]"; [set_solver|].
@@ -518,18 +516,17 @@ Proof.
                                                      by set_solver.
     iDestruct (live_roles_own_split with "Hlive") as "[HliveA HliveB]";
       [set_solver|].
-    (* TODO: Aneris WP discrepancies are acting up.. *)
-    (*   iSplitL "HrtA HliveA HA". *)
-    (*   { *)
-    (*     iApply wp_mono; [|iApply aneris_wp_lift]; [by eauto|admit|]. *)
-    (*     (* TODO: is_node ipA needs to be obtained from adequacy *) *)
-    (*     iApply (aneris_wp_socket_interp_alloc_singleton with "HA"). *)
-    (*     iIntros "HsaA". *)
-    (*     iApply aneris_wp_unfold. *)
-    (*     iIntros (tidA) "His_node". *)
-    (*     iApply wp_mono; [|iApply (wp_A)]. with "[$HsaA]"). *)
-    (* } *)
-    admit.
+    iSplitL "HrtA".
+    { iApply (wp_A with "[HrtA]"); [admit|].
+      iIntros "!>" (v) "H".
+      iExists _. by iFrame. }
+    iSplitL "HrtB".
+    { iApply (wp_B with "[HrtB]"); [admit|].
+      iIntros "!>" (v) "H".
+      iExists _. by iFrame. }
+    done. }
+  (* Needs to simplify requirements on initial node in Aneris adequacy *)
+  admit.
 Admitted.
 
 Theorem choose_nat_terminates shA shB extr :
