@@ -474,10 +474,10 @@ End with_Σ.
 Definition initial_state shA shB :=
   ([mkExpr ipA (Aprog shA); mkExpr ipB (Bprog shB)],
      {| state_heaps := {[ipA:=∅; ipB:=∅]};
-       state_sockets := {[ipA := {[shA := (sA, [])]}; ipB := {[shB := (sB, mABm 0)]}]};
-       (* NB: Needs to be filled *)
+       state_sockets := {[ipA := {[shA := (sA, [])]};
+                          ipB := {[shB := (sB, mABm 0)]}]};
        state_ports_in_use := ∅; (* NB: Needs to be filled *)
-       state_ms := ∅; |}).
+       state_ms := ∅; (* NB: Needs to be filled *) |}).
 
 Lemma no_drop_dup_continued_simulation shA shB :
   ∃ (mtr : mtrace simple_fair_model),
