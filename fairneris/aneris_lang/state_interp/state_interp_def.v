@@ -291,6 +291,15 @@ Section Aneris_AS.
     | inr DuplicateLabel => Some Ndup
     end.
 
+  Definition simple_label_locale (ℓ : simple_role) : ex_label aneris_lang :=
+    match ℓ with
+    | A_role => inl ("0.0.0.0",0)
+    | B_role => inl ("0.0.0.1",0)
+    | Ndeliver => inr DeliverLabel
+    | Ndrop => inr DropLabel
+    | Ndup => inr DuplicateLabel
+    end.
+
   Definition labels_match (ζ : ex_label aneris_lang) (ℓ : simple_role) : Prop :=
     Some ℓ = locale_simple_label ζ.
 

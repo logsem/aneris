@@ -347,6 +347,11 @@ Lemma posts_of_length_drop Σ
                    (prefixes_from es' tp)).
 Proof. iIntros (Hζ) "H". by erewrite <-locales_of_list_from_drop. Qed.
 
+Definition continued_simulation_init {Λ M}
+           (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+           (c : cfg Λ) (s : mstate M) :=
+  continued_simulation ξ {tr[c]} {tr[s]}.
+
 Theorem strong_simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
     (s : stuckness) (es : list aneris_expr) (σ : state) (st : simple_state)
@@ -383,9 +388,7 @@ Theorem strong_simulation_adequacy_multiple Σ
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
-  continued_simulation valid_state_evolution_fairness
-                       (trace_singleton (es, σ))
-                       (trace_singleton st).
+  continued_simulation_init valid_state_evolution_fairness (es, σ) st.
 Proof.
   intros Hlen Hlive HmABn HmABm Hwp Hsendle Hrecvle Hipdom Hpiiu Hip Hfixdom Hste Hsce Hmse.
   apply (wp_strong_adequacy_multiple aneris_lang (fair_model_to_model simple_fair_model) Σ s);
@@ -454,10 +457,6 @@ Proof.
        steps_auth (trace_length ex)))%I.
   iExists (map (λ '(tnew,e) v, fork_post (locale_of tnew e) v) (prefixes es))%I,
             (fork_post)%I.
-  (* iExists (map (λ e _, ∃ ℓ, ⌜labels_match (inl (e.(expr_n),0%nat)) ℓ⌝ ∗ *)
-  (*                                dead_role_frag_own ℓ) es)%I, (λ _ _, True)%I. *)
-  (* iExists (λ _, dead_role_frag_own A_role ∗ *)
-  (*               dead_role_frag_own B_role)%I, (λ _ _, True)%I. *)
   iSplitR; [by iApply config_wp_correct|].
    iMod (socket_address_group_own_alloc_subseteq_pre _ (to_singletons A) (to_singletons obs_send_sas) with "Hauth")
     as "[Hauth Hown_send]".
@@ -586,9 +585,7 @@ Theorem strong_simulation_adequacy Σ
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
-  continued_simulation valid_state_evolution_fairness
-                       (trace_singleton ([e], σ))
-                       (trace_singleton st).
+  continued_simulation_init valid_state_evolution_fairness ([e], σ) st.
 Proof.
   intros ??? Hwp.
   eapply strong_simulation_adequacy_multiple; [done|simpl;lia|done|done|done|..].
@@ -598,20 +595,6 @@ Proof.
   simpl. iMod ("H" with "[$][$][$][$][$][$][$][$][$][$][$]").
   iModIntro. eauto.
 Qed.
-
-(** Existing approach
-- Prove [WP] for program
-- Obtain [continued_simulation valid_sim extr auxtr] from [adequacy]
-- Obtain [exaux_traces_match extr auxtr] from [continued_simulation valid_sim extr auxtr]
-  + NB: [exaux_traces_match] works on infinite traces ([extrace / mtrace]), while
-        [continued_simulation] works on finite traces ([execution_trace / auxillary_trace])
-- Assume [fair_ex extr], and derive [fair_model_trace mtr] from [exaux_traces_match extr mtr]
-- Derive [terminating_trace mtr] from [fair_model_trace mtr] (and FairTerminatingModel])
-- Derive [terminating_trace extr] from [terminating_trace mtr] and [exaux_traces_match extr auxtr]
-
-OBS: Translation between [finite_trace] and (infinite) [trace] happens via
-     taking the head element and the continued simulation.
-*)
 
 (* TODO: Should generalise this for more languages *)
 Definition fair_network_ex (extr : extrace aneris_lang) :=
@@ -691,6 +674,30 @@ Proof.
   destruct x. done.
 Qed.
 
+Definition tr_starts_in {S L} (tr : trace S L) (s : S) := trfirst tr = s.
+
+Definition trace_property {S L} (c : S) (Φ : trace S L → Prop) :=
+  ∀ extr, tr_starts_in extr c → Φ extr.
+
+Definition extrace_property {Λ} (c : cfg Λ) (Φ : extrace Λ → Prop) :=
+  ∀ extr, tr_starts_in extr c → extrace_valid extr → Φ extr.
+
+Definition extrace_matching_mtrace_exists st extr :=
+   ∃ mtr, trfirst mtr = st ∧ exmtr_traces_match extr mtr.
+
+Definition matching_mtrace_exists st c :=
+  extrace_property c (extrace_matching_mtrace_exists st).
+
+Lemma continued_simulation_traces_match_init c st :
+  continued_simulation_init valid_state_evolution_fairness c st →
+  matching_mtrace_exists st c.
+Proof.
+  intros Hsim extr <- Hvalid.
+  apply (continued_simulation_traces_match _ _ Hvalid) in Hsim
+      as [mtr [Hmtr Hmatch]].
+  by eexists mtr.
+Qed.
+
 Lemma traces_match_valid_preserved extr mtr :
   exmtr_traces_match extr mtr → mtrace_valid mtr.
 Proof.
@@ -701,104 +708,6 @@ Proof.
   specialize (CH _ _ H3).
   right. done.
 Qed.
-
-Lemma traces_match_flip {S1 S2 L1 L2}
-      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
-      (trans1: S1 -> L1 -> S1 -> Prop)
-      (trans2: S2 -> L2 -> S2 -> Prop)
-      tr1 tr2 :
-  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
-  traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
-Proof.
-  split.
-  - revert tr1 tr2. cofix CH.
-    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
-    { by constructor. }
-    constructor; [done..|].
-    by apply CH.
-  - revert tr1 tr2. cofix CH.
-    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
-    { by constructor. }
-    constructor; [done..|].
-    by apply CH.
-Qed.
-
-Lemma traces_match_traces_implies {S1 S2 L1 L2}
-      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
-      (trans1: S1 -> L1 -> S1 -> Prop)
-      (trans2: S2 -> L2 -> S2 -> Prop)
-      (P1 Q1 : S1 → option L1 → Prop)
-      (P2 Q2 : S2 → option L2 → Prop)
-      tr1 tr2 :
-  traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
-  (∀ s1 s2 oℓ1 oℓ2, Rs s1 s2 →
-                    match oℓ1, oℓ2 with
-                    | Some ℓ1, Some ℓ2 => Rℓ ℓ1 ℓ2
-                    | None, None => True
-                    | _, _ => False
-                    end →
-                    P2 s2 oℓ2 → P1 s1 oℓ1) →
-  (∀ s1 s2 oℓ1 oℓ2, Rs s1 s2 →
-                    match oℓ1, oℓ2 with
-                    | Some ℓ1, Some ℓ2 => Rℓ ℓ1 ℓ2
-                    | None, None => True
-                    | _, _ => False
-                    end → Q1 s1 oℓ1 → Q2 s2 oℓ2) →
-  trace_implies P1 Q1 tr1 → trace_implies P2 Q2 tr2.
-Proof.
-  intros Hmatch HP HQ Htr1.
-  intros n Hpred_at.
-  rewrite /pred_at in Hpred_at.
-  assert (traces_match (flip Rℓ)
-                       (flip Rs)
-                       trans2 trans1
-                       tr2 tr1) as Hmatch'.
-  { by rewrite -traces_match_flip. }
-  destruct (after n tr2) as [tr2'|] eqn:Htr2eq; [|done].
-  eapply (traces_match_after) in Hmatch as (tr1' & Htr1eq & Hmatch); [|done].
-  specialize (Htr1 n).
-  rewrite {1}/pred_at in Htr1.
-  rewrite Htr1eq in Htr1.
-  destruct tr1' as [|s ℓ tr']; inversion Hmatch; simplify_eq; try by done.
-  - assert (P1 s None) as HP1 by by eapply (HP _ _ _ None).
-    destruct (Htr1 HP1) as [m Htr1'].
-    exists m. rewrite pred_at_sum. rewrite pred_at_sum in Htr1'.
-    destruct (after n tr1) as [tr1'|] eqn:Htr1eq'; [|done].
-    eapply (traces_match_after) in Hmatch' as (tr2' & Htr2eq' & Hmatch'); [|done].
-    rewrite Htr2eq'.
-    rewrite /pred_at.
-    rewrite /pred_at in Htr1'.
-    destruct (after m tr1') as [tr1''|] eqn:Htr1eq''; [|done].
-    eapply (traces_match_after) in Hmatch' as (tr2'' & Htr2eq'' & Hmatch''); [|done].
-    rewrite Htr2eq''.
-    destruct tr1''; inversion Hmatch''; simplify_eq; try by done.
-    + by eapply (HQ _ _ None None).
-    + by (eapply (HQ _ _ (Some _) _)).
-  - assert (P1 s (Some ℓ)) as HP1 by by (eapply (HP _ _ _ (Some _))).
-    destruct (Htr1 HP1) as [m Htr1'].
-    exists m. rewrite pred_at_sum. rewrite pred_at_sum in Htr1'.
-    destruct (after n tr1) as [tr1'|] eqn:Htr1eq'; [|done].
-    eapply (traces_match_after) in Hmatch' as (tr2' & Htr2eq' & Hmatch'); [|done].
-    rewrite Htr2eq'.
-    rewrite /pred_at.
-    rewrite /pred_at in Htr1'.
-    destruct (after m tr1') as [tr1''|] eqn:Htr1eq''; [|done].
-    eapply (traces_match_after) in Hmatch' as (tr2'' & Htr2eq'' & Hmatch''); [|done].
-    rewrite Htr2eq''.
-    destruct tr1''; inversion Hmatch''; simplify_eq; try by done.
-    + by eapply (HQ _ _ None None).
-    + by (eapply (HQ _ _ (Some _) _)).
-Qed.
-
-(* TODO: Move this *)
-Definition simple_label_locale (ℓ : simple_role) : ex_label aneris_lang :=
-  match ℓ with
-  | A_role => inl ("0.0.0.0",0)
-  | B_role => inl ("0.0.0.1",0)
-  | Ndeliver => inr DeliverLabel
-  | Ndrop => inr DropLabel
-  | Ndup => inr DuplicateLabel
-  end.
 
 Lemma traces_match_fairness_preserved extr mtr :
   exmtr_traces_match extr mtr →
@@ -845,23 +754,6 @@ Proof.
       repeat case_match; simplify_eq.
 Qed.
 
-(* TODO: Move this *)
-Lemma traces_match_after_None {S1 S2 L1 L2}
-      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
-      (trans1: S1 -> L1 -> S1 -> Prop)
-      (trans2: S2 -> L2 -> S2 -> Prop)
-      tr1 tr2 n :
-  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ->
-  after n tr2 = None ->
-  after n tr1 = None.
-Proof.
-  revert tr1 tr2.
-  induction n; intros tr1 tr2; [done|].
-  move=> /= Hm Ha.
-  destruct tr1; first by inversion Hm.
-  inversion Hm; simplify_eq. by eapply IHn.
-Qed.
-
 Lemma traces_match_termination_preserved extr mtr :
   exmtr_traces_match extr mtr →
   terminating_trace mtr →
@@ -871,11 +763,10 @@ Proof.
   by eapply traces_match_after_None.
 Qed.
 
-Definition extrace_fairly_terminating extr :=
+Definition extrace_fairly_terminating (extr : extrace aneris_lang) :=
   extrace_valid extr → fair_ex extr → terminating_trace extr.
 
-Lemma traces_match_fair_termination_preserved
-      extr (mtr : mtrace simple_fair_model) :
+Lemma traces_match_fair_termination_preserved extr mtr :
   initial_reachable mtr →
   exmtr_traces_match extr mtr →
   extrace_fairly_terminating extr.
@@ -887,19 +778,44 @@ Proof.
       by eapply traces_match_fairness_preserved].
 Qed.
 
-Theorem continued_simulation_fair_termination_preserved
-        (extr : extrace aneris_lang) (mtr : mtrace simple_fair_model) :
-  initial_reachable mtr →
-  continued_simulation valid_state_evolution_fairness
-    ({tr[trfirst extr]}) ({tr[trfirst mtr]}) →
-  extrace_fairly_terminating extr.
+Definition init_state := model_draft.Start.
+
+Lemma extrace_property_impl {Λ} c (Φ Ψ : extrace Λ → Prop) :
+  extrace_property c Φ →
+  (∀ extr, tr_starts_in extr c → extrace_valid extr → Φ extr → Ψ extr) →
+  extrace_property c Ψ.
+Proof. intros HΦ Himpl extr Hstarts Hvalid. by apply Himpl, HΦ. Qed.
+
+Lemma initial_reachable_start mtr :
+  trfirst mtr = init_state → initial_reachable mtr.
 Proof.
-  intros Hinitial Hsim Hvalid Hfair.
-  apply continued_simulation_traces_match in Hsim as [mtr' [Hfst Hmatch]];
-    [|done].
-  eapply traces_match_fair_termination_preserved; [|done..].
-  (* TODO: Clean this up! *)
-  rewrite /initial_reachable. rewrite /initial_reachable in Hinitial.
-  destruct mtr, mtr'; rewrite /pred_at; rewrite /pred_at in Hinitial; simpl in *;
+  intros Hstart.
+  (* TODO: Clean this up *)
+  rewrite /initial_reachable. rewrite /initial_reachable in Hstart.
+  destruct mtr; rewrite /pred_at; rewrite /pred_at in Hstart; simpl in *;
                 by simplify_eq.
+Qed.
+
+Definition fairly_terminating (c : cfg aneris_lang) :=
+  extrace_property c extrace_fairly_terminating.
+
+Definition fair_simulation_exists (c : cfg aneris_lang) :=
+  continued_simulation_init valid_state_evolution_fairness c init_state.
+
+Lemma traces_match_fair_termination_preserved_init c :
+  matching_mtrace_exists init_state c → fairly_terminating c.
+Proof.
+  intros Hmatches.
+  eapply extrace_property_impl; [done|].
+  intros extr Hstart Hvalid (mtr & Hstart' & Hmtr) Hfair.
+  eapply traces_match_fair_termination_preserved; [|done..].
+  by apply initial_reachable_start.
+Qed.
+
+Theorem continued_simulation_fair_termination c :
+  fair_simulation_exists c → fairly_terminating c.
+Proof.
+  intros Hsim.
+  by apply traces_match_fair_termination_preserved_init,
+    continued_simulation_traces_match_init.
 Qed.

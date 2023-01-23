@@ -87,6 +87,113 @@ Proof.
     + by destruct tr; [by destruct Htr as [Htr|Htr]|apply IHn].
 Qed.
 
+
+Lemma traces_match_flip {S1 S2 L1 L2}
+      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+      (trans1: S1 -> L1 -> S1 -> Prop)
+      (trans2: S2 -> L2 -> S2 -> Prop)
+      tr1 tr2 :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
+  traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
+Proof.
+  split.
+  - revert tr1 tr2. cofix CH.
+    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
+    { by constructor. }
+    constructor; [done..|].
+    by apply CH.
+  - revert tr1 tr2. cofix CH.
+    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
+    { by constructor. }
+    constructor; [done..|].
+    by apply CH.
+Qed.
+
+Lemma traces_match_traces_implies {S1 S2 L1 L2}
+      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+      (trans1: S1 -> L1 -> S1 -> Prop)
+      (trans2: S2 -> L2 -> S2 -> Prop)
+      (P1 Q1 : S1 → option L1 → Prop)
+      (P2 Q2 : S2 → option L2 → Prop)
+      tr1 tr2 :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
+  (∀ s1 s2 oℓ1 oℓ2, Rs s1 s2 →
+                    match oℓ1, oℓ2 with
+                    | Some ℓ1, Some ℓ2 => Rℓ ℓ1 ℓ2
+                    | None, None => True
+                    | _, _ => False
+                    end →
+                    P2 s2 oℓ2 → P1 s1 oℓ1) →
+  (∀ s1 s2 oℓ1 oℓ2, Rs s1 s2 →
+                    match oℓ1, oℓ2 with
+                    | Some ℓ1, Some ℓ2 => Rℓ ℓ1 ℓ2
+                    | None, None => True
+                    | _, _ => False
+                    end → Q1 s1 oℓ1 → Q2 s2 oℓ2) →
+  trace_implies P1 Q1 tr1 → trace_implies P2 Q2 tr2.
+Proof.
+  intros Hmatch HP HQ Htr1.
+  intros n Hpred_at.
+  rewrite /pred_at in Hpred_at.
+  assert (traces_match (flip Rℓ)
+                       (flip Rs)
+                       trans2 trans1
+                       tr2 tr1) as Hmatch'.
+  { by rewrite -traces_match_flip. }
+  destruct (after n tr2) as [tr2'|] eqn:Htr2eq; [|done].
+  eapply (traces_match_after) in Hmatch as (tr1' & Htr1eq & Hmatch); [|done].
+  specialize (Htr1 n).
+  rewrite {1}/pred_at in Htr1.
+  rewrite Htr1eq in Htr1.
+  destruct tr1' as [|s ℓ tr']; inversion Hmatch; simplify_eq; try by done.
+  - assert (P1 s None) as HP1 by by eapply (HP _ _ _ None).
+    destruct (Htr1 HP1) as [m Htr1'].
+    exists m. rewrite pred_at_sum. rewrite pred_at_sum in Htr1'.
+    destruct (after n tr1) as [tr1'|] eqn:Htr1eq'; [|done].
+    eapply (traces_match_after) in Hmatch' as (tr2' & Htr2eq' & Hmatch'); [|done].
+    rewrite Htr2eq'.
+    rewrite /pred_at.
+    rewrite /pred_at in Htr1'.
+    destruct (after m tr1') as [tr1''|] eqn:Htr1eq''; [|done].
+    eapply (traces_match_after) in Hmatch' as (tr2'' & Htr2eq'' & Hmatch''); [|done].
+    rewrite Htr2eq''.
+    destruct tr1''; inversion Hmatch''; simplify_eq; try by done.
+    + by eapply (HQ _ _ None None).
+    + by (eapply (HQ _ _ (Some _) _)).
+  - assert (P1 s (Some ℓ)) as HP1 by by (eapply (HP _ _ _ (Some _))).
+    destruct (Htr1 HP1) as [m Htr1'].
+    exists m. rewrite pred_at_sum. rewrite pred_at_sum in Htr1'.
+    destruct (after n tr1) as [tr1'|] eqn:Htr1eq'; [|done].
+    eapply (traces_match_after) in Hmatch' as (tr2' & Htr2eq' & Hmatch'); [|done].
+    rewrite Htr2eq'.
+    rewrite /pred_at.
+    rewrite /pred_at in Htr1'.
+    destruct (after m tr1') as [tr1''|] eqn:Htr1eq''; [|done].
+    eapply (traces_match_after) in Hmatch' as (tr2'' & Htr2eq'' & Hmatch''); [|done].
+    rewrite Htr2eq''.
+    destruct tr1''; inversion Hmatch''; simplify_eq; try by done.
+    + by eapply (HQ _ _ None None).
+    + by (eapply (HQ _ _ (Some _) _)).
+Qed.
+
+
+(* TODO: Move this *)
+Lemma traces_match_after_None {S1 S2 L1 L2}
+      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+      (trans1: S1 -> L1 -> S1 -> Prop)
+      (trans2: S2 -> L2 -> S2 -> Prop)
+      tr1 tr2 n :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ->
+  after n tr2 = None ->
+  after n tr1 = None.
+Proof.
+  revert tr1 tr2.
+  induction n; intros tr1 tr2; [done|].
+  move=> /= Hm Ha.
+  destruct tr1; first by inversion Hm.
+  inversion Hm; simplify_eq. by eapply IHn.
+Qed.
+
 Section exec_trace.
   Context {Λ : language}.
   Context `{EqDecision (locale Λ)}.
