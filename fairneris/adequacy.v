@@ -676,9 +676,6 @@ Qed.
 
 Definition tr_starts_in {S L} (tr : trace S L) (s : S) := trfirst tr = s.
 
-Definition trace_property {S L} (c : S) (Φ : trace S L → Prop) :=
-  ∀ extr, tr_starts_in extr c → Φ extr.
-
 Definition extrace_property {Λ} (c : cfg Λ) (Φ : extrace Λ → Prop) :=
   ∀ extr, tr_starts_in extr c → extrace_valid extr → Φ extr.
 
@@ -764,14 +761,14 @@ Proof.
 Qed.
 
 Definition extrace_fairly_terminating (extr : extrace aneris_lang) :=
-  extrace_valid extr → fair_ex extr → terminating_trace extr.
+  fair_ex extr → terminating_trace extr.
 
 Lemma traces_match_fair_termination_preserved extr mtr :
   initial_reachable mtr →
   exmtr_traces_match extr mtr →
   extrace_fairly_terminating extr.
 Proof.
-  intros Hinitial Hsim Hvalid Hfair.
+  intros Hinitial Hsim Hfair.
   eapply traces_match_termination_preserved; [done|].
   eapply fair_terminating_traces_terminate;
     [done|by eapply traces_match_valid_preserved|
