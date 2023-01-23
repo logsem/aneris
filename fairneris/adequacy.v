@@ -37,7 +37,8 @@ Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
 Definition valid_state_evolution_fairness
            (extr : execution_trace aneris_lang)
            (auxtr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
-  labels_match_trace extr auxtr ∧ trace_steps simple_trans auxtr ∧
+  trace_steps simple_trans auxtr ∧ (* Well formedness of [auxtr] *)
+  labels_match_trace extr auxtr ∧
   live_tids (trace_last extr) (trace_last auxtr).
 
 Lemma rel_finitary_valid_state_evolution_fairness :
@@ -352,22 +353,11 @@ Definition continued_simulation_init {Λ M}
            (c : cfg Λ) (s : mstate M) :=
   continued_simulation ξ {tr[c]} {tr[s]}.
 
-Theorem strong_simulation_adequacy_multiple Σ
-    `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
-    (s : stuckness) (es : list aneris_expr) (σ : state) (st : simple_state)
-    A obs_send_sas obs_rec_sas IPs ip lbls :
-  length es ≥ 1 →
-  role_has_locale (es, σ) st →
-  state_ms σ = mABn (state_get_n st) →
-  (∃ shA shB : socket_handle,
-      state_sockets σ =
-      {[ipA := {[shA := (sA, [])]};
-        ipB := {[shB := (sB, mABm (state_get_m st))]}]}) →
-  (∀ (Hinv : anerisG (fair_model_to_model simple_fair_model) Σ),
-     ⊢ |={⊤}=>
+Definition wp_proto `{anerisPreG (fair_model_to_model simple_fair_model) Σ} IPs A
+           lbls obs_send_sas obs_rec_sas s es ip st :=
+  (∀ (aG : anerisG (fair_model_to_model simple_fair_model) Σ), ⊢ |={⊤}=>
      unallocated A -∗
-     ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas),
-                         bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
+     ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      live_roles_frag_own (simple_live_roles st ∖ config_roles) -∗
      dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∖ config_roles) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
@@ -379,7 +369,20 @@ Theorem strong_simulation_adequacy_multiple Σ
      observed_receive obs_rec_sas ={⊤}=∗
      wptp s es (map (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
                     (prefixes es))
-     (* OBS: Can add [always_holds ξ] here *)) →
+     (* OBS: Can add [always_holds ξ] here *)).
+
+Theorem strong_simulation_adequacy_multiple Σ
+    `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
+    (s : stuckness) (es : list aneris_expr) (σ : state) (st : simple_state)
+    A obs_send_sas obs_rec_sas IPs ip lbls :
+  length es ≥ 1 →
+  role_has_locale (es, σ) st →
+  state_ms σ = mABn (state_get_n st) →
+  (∃ shA shB : socket_handle,
+      state_sockets σ =
+      {[ipA := {[shA := (sA, [])]};
+        ipB := {[shB := (sB, mABm (state_get_m st))]}]}) →
+  wp_proto IPs A lbls obs_send_sas obs_rec_sas s es ip st →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   dom (state_ports_in_use σ) = IPs →
@@ -561,22 +564,7 @@ Theorem strong_simulation_adequacy Σ
       state_sockets σ =
       {[ipA := {[shA := (sA, [])]};
         ipB := {[shB := (sB, mABm (state_get_m st))]}]}) →
-  (∀ (Hinv : anerisG (fair_model_to_model simple_fair_model) Σ),
-     ⊢ |={⊤}=>
-     unallocated A -∗
-     ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas),
-                         bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
-     live_roles_frag_own (simple_live_roles st ∖ config_roles) -∗
-     dead_roles_frag_own ((all_roles ∖ simple_live_roles st) ∖ config_roles) -∗
-     ([∗ set] i ∈ IPs, free_ip i) -∗
-     is_node ip -∗
-     ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
-     ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
-     ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
-     observed_send obs_send_sas -∗
-     observed_receive obs_rec_sas ={⊤}=∗
-     WP e @ s; locale_of [] e; ⊤ {{ v, fork_post (locale_of [] e) v }}(*  ∗ *)
-     (* always_holds s valid_state_evolution_fairness ([e], σ) st *)) ->
+  wp_proto IPs A lbls obs_send_sas obs_rec_sas s [e] ip st →  
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   dom (state_ports_in_use σ) = IPs →
@@ -587,13 +575,7 @@ Theorem strong_simulation_adequacy Σ
   state_ms σ = ∅ →
   continued_simulation_init valid_state_evolution_fairness ([e], σ) st.
 Proof.
-  intros ??? Hwp.
-  eapply strong_simulation_adequacy_multiple; [done|simpl;lia|done|done|done|..].
-  iIntros (Hinv).
-  iMod (Hwp Hinv) as "H".
-  iIntros "!>???????????".
-  simpl. iMod ("H" with "[$][$][$][$][$][$][$][$][$][$][$]").
-  iModIntro. eauto.
+  intros ??? Hwp. by eapply strong_simulation_adequacy_multiple; [simpl;lia|..].
 Qed.
 
 (* TODO: Should generalise this for more languages *)
@@ -620,14 +602,14 @@ Proof.
   inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
   - inversion Hem; inversion Ham. econstructor; eauto.
     apply continued_simulation_rel in Hphi.
-    destruct Hphi as (Hmatch&Hsteps&Hlive).
+    destruct Hphi as (Hsteps&Hmatch&Hlive).
     by simplify_eq.
   - inversion Hem; inversion Ham. subst.
     pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
     apply continued_simulation_rel in Hphi.
     destruct Hphi as (Hmatch&Hsteps&Hlive).
     apply continued_simulation_rel in Hphi'.
-    destruct Hphi' as (Hmatch'&Hsteps'&Hlive').
+    destruct Hphi' as (Hsteps'&Hmatch'&Hlive').
     econstructor.
     + eauto.
     + eauto.
@@ -648,8 +630,7 @@ Lemma continued_simulation_traces_match extr st :
   extrace_valid extr →
   continued_simulation valid_state_evolution_fairness
                        {tr[trfirst extr]} {tr[st]} →
-  ∃ (mtr : mtrace simple_fair_model),
-    trfirst mtr = st ∧ exmtr_traces_match extr mtr.
+  ∃ mtr, trfirst mtr = st ∧ exmtr_traces_match extr mtr.
 Proof.
   intros Hvalid Hsim.
   assert (∃ iatr,
@@ -668,10 +649,7 @@ Proof.
   { eapply (valid_inf_system_trace_implies_traces_match); eauto.
     - by apply from_trace_spec.
     - by apply to_trace_spec. }
-  (* TODO: Clean this up *)
-  rewrite /trace_last.
-  destruct iatr; simpl. done.
-  destruct x. done.
+  destruct iatr; [done|by destruct x].
 Qed.
 
 Definition tr_starts_in {S L} (tr : trace S L) (s : S) := trfirst tr = s.
@@ -690,9 +668,8 @@ Lemma continued_simulation_traces_match_init c st :
   matching_mtrace_exists st c.
 Proof.
   intros Hsim extr <- Hvalid.
-  apply (continued_simulation_traces_match _ _ Hvalid) in Hsim
-      as [mtr [Hmtr Hmatch]].
-  by eexists mtr.
+  apply (continued_simulation_traces_match) in Hsim
+      as (mtr & Hmtr & Hmatch); [by eexists _|done].
 Qed.
 
 Lemma traces_match_valid_preserved extr mtr :
@@ -700,10 +677,8 @@ Lemma traces_match_valid_preserved extr mtr :
 Proof.
   revert extr mtr. pcofix CH. intros extr mtr Hmatch.
   inversion Hmatch; first by (pfold; constructor).
-  pfold.
-  constructor =>//.
-  specialize (CH _ _ H3).
-  right. done.
+  pfold. constructor =>//.
+  specialize (CH _ _ H3). by right.
 Qed.
 
 Lemma traces_match_fairness_preserved extr mtr :
@@ -726,11 +701,9 @@ Proof.
       by apply Hlabel.
     + intros s1 s2 oℓ1 oℓ2 Hlive HRℓ [Henabled|Henabled]; simpl in *.
       * left. intros Henabled'. apply Henabled.
-        apply Hlive in Hlabel.
-        by apply Hlabel.
-      * right.
-        rewrite Henabled in HRℓ. destruct oℓ2; [|done].
-        simplify_eq. rewrite Hlabel. rewrite HRℓ. done.
+        apply Hlive in Hlabel. by apply Hlabel.
+      * right. rewrite Henabled in HRℓ. destruct oℓ2; [|done].
+        simplify_eq. rewrite Hlabel. by rewrite HRℓ.
   - intros n. rewrite /pred_at.
     specialize (Hfairex_network n). rewrite /pred_at in Hfairex_network.
     destruct (after n extr) eqn:Heqn; [|done].
@@ -740,13 +713,10 @@ Proof.
     destruct t; inversion Hmatch; simplify_eq; [done|].
     destruct Hfairex_network as [Hdup Hdrop].
     split.
-    + rewrite H2.
-      intros Heq. apply Hdup. simplify_eq.
+    + rewrite H2. intros Heq. apply Hdup. simplify_eq.
       rewrite /locale_simple_label in Heq.
       repeat case_match; simplify_eq.
-    + rewrite H2. intros Heq.
-      apply Hdrop.
-      simplify_eq.
+    + rewrite H2. intros Heq. apply Hdrop. simplify_eq.
       rewrite /locale_simple_label in Heq.
       repeat case_match; simplify_eq.
 Qed.
@@ -796,9 +766,6 @@ Qed.
 Definition fairly_terminating (c : cfg aneris_lang) :=
   extrace_property c extrace_fairly_terminating.
 
-Definition fair_simulation_exists (c : cfg aneris_lang) :=
-  continued_simulation_init valid_state_evolution_fairness c init_state.
-
 Lemma traces_match_fair_termination_preserved_init c :
   matching_mtrace_exists init_state c → fairly_terminating c.
 Proof.
@@ -809,10 +776,15 @@ Proof.
   by apply initial_reachable_start.
 Qed.
 
+(** A continued simulation exists between some initial configuration [c]
+    and the initial state [init_state] of a fair model. *)
+Definition fair_simulation_exists (c : cfg aneris_lang) :=
+  continued_simulation_init valid_state_evolution_fairness c init_state.
+
 Theorem continued_simulation_fair_termination c :
   fair_simulation_exists c → fairly_terminating c.
 Proof.
-  intros Hsim.
+  intros ?.
   by apply traces_match_fair_termination_preserved_init,
     continued_simulation_traces_match_init.
 Qed.

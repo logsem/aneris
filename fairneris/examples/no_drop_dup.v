@@ -507,6 +507,7 @@ Proof.
     rewrite big_sepS_union; [|set_solver].
     iDestruct "Hrt" as "[HrtA HrtB]".
     rewrite !big_sepS_singleton.
+    rewrite /simple_live_roles=> /=.
     replace ({[A_role; B_role]} ∖ config_roles) with (({[A_role; B_role]}):gset _)
                                                      by set_solver.
     iDestruct (live_roles_own_split with "Hlive") as "[HliveA HliveB]";
