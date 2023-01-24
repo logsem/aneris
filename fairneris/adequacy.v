@@ -507,13 +507,7 @@ Proof.
     as "[Hauth Hown]"; [by set_solver|].
   iPoseProof (@aneris_state_interp_init _ _ dg IPs
                with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "Hinterp"; eauto.
-  { intros sag sa Hsag Hsa.
-    apply Hfixdom.
-    assert (is_singleton sag) as [sa' ->]; [by eapply elem_of_to_singletons_inv|].
-    apply elem_of_to_singletons in Hsag.
-    set_solver. }
-  { iPureIntro. apply to_singletons_fmap. intros x.
-    rewrite /is_ne. set_solver. }
+  { iPureIntro. apply to_singletons_fmap. intros x. rewrite /is_ne. set_solver. }
   iModIntro.
   iSplitR "Hwp".
   { iSplitR.
@@ -787,4 +781,30 @@ Proof.
   intros ?.
   by apply traces_match_fair_termination_preserved_init,
     continued_simulation_traces_match_init.
+Qed.
+
+Theorem strong_simulation_adequacy_multiple' Σ
+    `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
+    (s : stuckness) (es : list aneris_expr) (σ : state)
+    A obs_send_sas obs_rec_sas IPs ip lbls :
+  length es ≥ 1 →
+  role_has_locale (es, σ) init_state →
+  state_ms σ = mABn (state_get_n init_state) →
+  (∃ shA shB : socket_handle,
+      state_sockets σ =
+      {[ipA := {[shA := (sA, [])]};
+        ipB := {[shB := (sB, mABm (state_get_m init_state))]}]}) →
+  wp_proto IPs A lbls obs_send_sas obs_rec_sas s es ip init_state →
+  obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
+  ip ∉ IPs →
+  dom (state_ports_in_use σ) = IPs →
+  (∀ ip, ip ∈ IPs → state_ports_in_use σ !! ip = Some ∅) →
+  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
+  state_heaps σ = {[ip:=∅]} →
+  state_sockets σ = {[ip:=∅]} →
+  state_ms σ = ∅ →
+  fairly_terminating (es,σ).
+Proof.
+  intros. by eapply continued_simulation_fair_termination,
+            strong_simulation_adequacy_multiple.
 Qed.
