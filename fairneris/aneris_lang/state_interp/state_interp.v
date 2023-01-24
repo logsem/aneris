@@ -126,7 +126,13 @@ Section aneris_state_interpretation.
       rewrite fmap_empty. iFrame; iFrame "#"; eauto. }
     iSplitL "HipsCtx HPiu".
     (* free_ips_coh *)
-    { by iApply (free_ips_coh_init with "[$]"). }
+    { iApply (free_ips_coh_init with "[$]").
+      intros ip' Hip'.
+      assert (ip ≠ ip') by set_solver.
+      rewrite /ip_is_free. rewrite Hste Hsce.
+      rewrite !lookup_insert_ne; [|set_solver..].
+      do 2 split; [done|].
+      by apply Hpiiu. }
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
     iFrame "#".

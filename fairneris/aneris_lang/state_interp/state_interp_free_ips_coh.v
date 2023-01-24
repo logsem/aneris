@@ -17,25 +17,23 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Mdl Σ}.
 
+  Definition ip_is_free (ip : ip_address) (σ : state) : Prop :=
+    state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None ∧
+    state_ports_in_use σ !! ip = Some ∅.
+
   (** free_ips_coh *)
-  Lemma free_ips_coh_init ip ips σ :
-    ip ∉ ips →
-    dom (state_ports_in_use σ) = ips →
-    (∀ ip, ip ∈ ips → state_ports_in_use σ !! ip = Some ∅) →
-    state_heaps σ = {[ip:=∅]} →
-    state_sockets σ = {[ip:=∅]} →
-    state_ms σ = ∅ →
-    free_ips_auth ips ∗ free_ports_auth ∅ -∗ free_ips_coh σ.
+  Lemma free_ips_coh_init ips σ :
+    (∀ ip, ip ∈ ips → ip_is_free ip σ) →
+    free_ips_auth ips ∗ free_ports_auth ∅ -∗
+    free_ips_coh σ.
   Proof.
-    iIntros (??? Hste Hsce ?) "[HipsCtx HPiu]".
+    iIntros (Hip) "[HipsCtx HPiu]".
     iExists _, _; iFrame.
-    rewrite Hste Hsce.
     iPureIntro.
     do 2 (split; [set_solver|]).
     split; [|set_solver].
-    intros ip' ?.
-    assert (ip ≠ ip') by set_solver.
-    rewrite !lookup_insert_ne //.
+    intros ip' Hip'.
+    by destruct (Hip ip' Hip') as (-> & -> & _).
   Qed.
 
   Lemma free_ips_coh_free_ports_valid σ a :
