@@ -580,7 +580,7 @@ Definition fair_network_ex (extr : extrace aneris_lang) :=
 Definition fair_ex (extr : extrace aneris_lang) :=
   (∀ ζ, fair_scheduling_ex ζ extr) ∧ fair_network_ex extr.
 
-Definition exmtr_traces_match : extrace aneris_lang → mtrace simple_fair_model → Prop :=
+Definition live_traces_match : extrace aneris_lang → mtrace simple_fair_model → Prop :=
   traces_match labels_match live_tids language.locale_step simple_trans.
 
 (* TODO: Clean this up - Currently just ported directly from Fairness *)
@@ -589,7 +589,7 @@ Lemma valid_inf_system_trace_implies_traces_match
   exec_trace_match ex iex progtr ->
   exec_trace_match atr iatr auxtr ->
   valid_inf_system_trace (continued_simulation valid_state_evolution_fairness) ex atr iex iatr ->
-  exmtr_traces_match progtr auxtr.
+  live_traces_match progtr auxtr.
 Proof.
   revert ex atr iex iatr auxtr progtr. cofix IH.
   intros ex atr iex iatr auxtr progtr Hem Ham Hval.
@@ -624,7 +624,7 @@ Lemma continued_simulation_traces_match extr st :
   extrace_valid extr →
   continued_simulation valid_state_evolution_fairness
                        {tr[trfirst extr]} {tr[st]} →
-  ∃ mtr, trfirst mtr = st ∧ exmtr_traces_match extr mtr.
+  ∃ mtr, trfirst mtr = st ∧ live_traces_match extr mtr.
 Proof.
   intros Hvalid Hsim.
   assert (∃ iatr,
@@ -652,14 +652,18 @@ Definition extrace_property {Λ} (c : cfg Λ) (Φ : extrace Λ → Prop) :=
   ∀ extr, tr_starts_in extr c → extrace_valid extr → Φ extr.
 
 Definition extrace_matching_mtrace_exists st extr :=
-   ∃ mtr, trfirst mtr = st ∧ exmtr_traces_match extr mtr.
+   ∃ mtr, trfirst mtr = st ∧ live_traces_match extr mtr.
 
-Definition matching_mtrace_exists st c :=
+Definition matching_mtrace_exists c st :=
   extrace_property c (extrace_matching_mtrace_exists st).
 
+(** A continued simulation exists between some initial configuration [c]
+    and the initial state [init_state] of a fair model. *)
+Definition live_simulation (c : cfg aneris_lang) (st : simple_state) :=
+  continued_simulation_init valid_state_evolution_fairness c st.
+
 Lemma continued_simulation_traces_match_init c st :
-  continued_simulation_init valid_state_evolution_fairness c st →
-  matching_mtrace_exists st c.
+  live_simulation c st → matching_mtrace_exists c st.
 Proof.
   intros Hsim extr <- Hvalid.
   apply (continued_simulation_traces_match) in Hsim
@@ -667,7 +671,7 @@ Proof.
 Qed.
 
 Lemma traces_match_valid_preserved extr mtr :
-  exmtr_traces_match extr mtr → mtrace_valid mtr.
+  live_traces_match extr mtr → mtrace_valid mtr.
 Proof.
   revert extr mtr. pcofix CH. intros extr mtr Hmatch.
   inversion Hmatch; first by (pfold; constructor).
@@ -676,7 +680,7 @@ Proof.
 Qed.
 
 Lemma traces_match_fairness_preserved extr mtr :
-  exmtr_traces_match extr mtr →
+  live_traces_match extr mtr →
   fair_ex extr → mtrace_fair mtr.
 Proof.
   rewrite /fair_ex /mtrace_fair.
@@ -716,7 +720,7 @@ Proof.
 Qed.
 
 Lemma traces_match_termination_preserved extr mtr :
-  exmtr_traces_match extr mtr →
+  live_traces_match extr mtr →
   terminating_trace mtr →
   terminating_trace extr.
 Proof.
@@ -729,7 +733,7 @@ Definition extrace_fairly_terminating (extr : extrace aneris_lang) :=
 
 Lemma traces_match_fair_termination_preserved extr mtr :
   initial_reachable mtr →
-  exmtr_traces_match extr mtr →
+  live_traces_match extr mtr →
   extrace_fairly_terminating extr.
 Proof.
   intros Hinitial Hsim Hfair.
@@ -761,7 +765,7 @@ Definition fairly_terminating (c : cfg aneris_lang) :=
   extrace_property c extrace_fairly_terminating.
 
 Lemma traces_match_fair_termination_preserved_init c :
-  matching_mtrace_exists init_state c → fairly_terminating c.
+  matching_mtrace_exists c init_state → fairly_terminating c.
 Proof.
   intros Hmatches.
   eapply extrace_property_impl; [done|].
@@ -770,13 +774,8 @@ Proof.
   by apply initial_reachable_start.
 Qed.
 
-(** A continued simulation exists between some initial configuration [c]
-    and the initial state [init_state] of a fair model. *)
-Definition fair_simulation_exists (c : cfg aneris_lang) :=
-  continued_simulation_init valid_state_evolution_fairness c init_state.
-
 Theorem continued_simulation_fair_termination c :
-  fair_simulation_exists c → fairly_terminating c.
+  live_simulation c init_state → fairly_terminating c.
 Proof.
   intros ?.
   by apply traces_match_fair_termination_preserved_init,
