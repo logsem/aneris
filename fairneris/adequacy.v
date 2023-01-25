@@ -34,10 +34,13 @@ Definition live_tid (c : cfg aneris_lang) (δ : simple_state)
 Definition live_tids (c : cfg aneris_lang) (δ : simple_state) : Prop :=
   ∀ (ℓ:fmrole simple_fair_model) ζ, live_tid c δ ℓ ζ.
 
+Definition auxtr_valid auxtr :=
+  trace_steps simple_trans auxtr.
+
 Definition valid_state_evolution_fairness
            (extr : execution_trace aneris_lang)
            (auxtr : auxiliary_trace (fair_model_to_model simple_fair_model)) :=
-  trace_steps simple_trans auxtr ∧ (* Well formedness of [auxtr] *)
+  auxtr_valid auxtr ∧
   labels_match_trace extr auxtr ∧
   live_tids (trace_last extr) (trace_last auxtr).
 
@@ -54,8 +57,8 @@ Definition from_locale_no_val_no_enabled (c : cfg aneris_lang)
            (δ : simple_state) :=
   ∀ (ℓ:fmrole simple_fair_model) ζ,
   labels_match (inl ζ) ℓ →
-  ∀ e, from_locale c.1 ζ = Some e → language.to_val e ≠ None →
-  ¬ role_enabled_model ℓ δ.
+  ∀ e, from_locale c.1 ζ = Some e → is_Some (language.to_val e) →
+       ¬ role_enabled_model ℓ δ.
 
 Lemma derive_live_tid_inl (c : cfg aneris_lang) δ (ℓ : fmrole simple_fair_model) ζ :
   role_has_locale c δ →
@@ -68,10 +71,8 @@ Proof.
   split; [done|].
   destruct (language.to_val e) eqn:Heqn; [|done].
   specialize (Himpl2 _ _ Hmatch e He).
-  assert (language.to_val e ≠ None).
-  { intros Heq. simplify_eq. }
-  specialize (Himpl2 H).
-  done.
+  assert (is_Some $ language.to_val e) as Hsome by done.
+  by specialize (Himpl2 Hsome).
 Qed.
 
 Lemma derive_live_tid_inr (c : cfg aneris_lang) δ
@@ -528,8 +529,7 @@ Proof.
     iAssert (dead_role_frag_own ℓ)%I with "[Hposts]" as "H".
     { rewrite -map_app -prefixes_from_app.
       iDestruct (posts_of_length_drop with "Hposts") as "Hposts"; [done|].
-      assert (is_Some $ language.to_val e) as [v Hv].
-      { by apply not_eq_None_Some. }
+      destruct Hval as [v Hv].
       iDestruct (posts_of_idx with "Hposts") as (ℓ' Hmatch') "H"; [done|done|].
       rewrite /labels_match in Hmatch.
       rewrite /labels_match in Hmatch'.
@@ -782,7 +782,7 @@ Proof.
     continued_simulation_traces_match_init.
 Qed.
 
-Theorem strong_simulation_adequacy_multiple' Σ
+Theorem simulation_adequacy_multiple Σ
     `{!anerisPreG (fair_model_to_model simple_fair_model) Σ}
     (s : stuckness) (es : list aneris_expr) (σ : state)
     A obs_send_sas obs_rec_sas IPs ip lbls :
