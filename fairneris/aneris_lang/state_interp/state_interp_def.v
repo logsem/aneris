@@ -312,7 +312,8 @@ Section Aneris_AS.
     | _, _ => False
     end.
 
-  Definition role_has_locale (c : cfg aneris_lang) (δ : simple_state) :=
+  Definition role_enabled_locale_exists
+             (c : cfg aneris_lang) (δ : simple_state) :=
     ∀ (ℓ:fmrole simple_fair_model) ζ,
     labels_match (inl ζ) ℓ →
     role_enabled_model ℓ δ →
@@ -325,12 +326,15 @@ Section Aneris_AS.
       {[ ip_of_address saA := {[shA := (sA,[])]};
          ip_of_address saB := {[shB := (sB,mABm (state_get_m δ))]} ]}.
 
+  Definition auxtr_valid auxtr :=
+    trace_steps simple_trans auxtr.
+
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
       : Prop :=
-    trace_steps simple_trans atr ∧
+    auxtr_valid atr ∧
     labels_match_trace ex atr ∧
-    role_has_locale (trace_last ex) (trace_last atr) ∧
+    role_enabled_locale_exists (trace_last ex) (trace_last atr) ∧
     config_state_valid (trace_last ex) (trace_last atr).
 
   Definition config_roles : gset simple_role := {[ Ndup; Ndrop; Ndeliver ]}.

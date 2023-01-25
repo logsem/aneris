@@ -480,15 +480,12 @@ Definition initial_state shA shB :=
        state_ms := ∅; (* NB: Needs to be filled *) |}).
 
 Lemma no_drop_dup_continued_simulation shA shB :
-  continued_simulation
-    valid_state_evolution_fairness
-    (trace_singleton $ initial_state shA shB)
-    (trace_singleton init_state).
+  fairly_terminating (initial_state shA shB).
 Proof.
   assert (anerisPreG (fair_model_to_model simple_fair_model)
                      (anerisΣ (fair_model_to_model simple_fair_model))) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy_multiple _ _ _ _ _ {[saA;saB]});
+  eapply (simulation_adequacy_fair_termination_multiple _ _ _ _ _ {[saA;saB]});
     [simpl; lia| |set_solver|set_solver| |set_solver|set_solver|..| |]=> /=.
   { intros ℓ ζ Hmatch Henabled. rewrite /role_enabled_model in Henabled. simpl.
     assert (ℓ = A_role ∨ ℓ = B_role) as [Heq|Heq] by set_solver; simplify_eq.
@@ -522,11 +519,4 @@ Proof.
       iExists _. by iFrame. }
     done. }
   (* Needs to simplify requirements on initial node in Aneris adequacy *)
-  admit.
 Admitted.
-
-Theorem choose_nat_terminates shA shB :
-  fairly_terminating (initial_state shA shB).
-Proof.
-  apply continued_simulation_fair_termination, no_drop_dup_continued_simulation.
-Qed.
