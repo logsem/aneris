@@ -128,9 +128,7 @@ Section Server_resources.
       is_recv_lock srv_ip
          (endpoint_chan_name γe)
          (endpoint_recv_lock_name γe)
-         rlk rbuf ackIdLoc Right ∗
-      inv (chan_N (endpoint_chan_name γe))
-          (iProto_invariant (endpoint_chan_name γe)).
+         rlk rbuf ackIdLoc Right.
 
   (** The session_map resources state for each known client the following:
    1) there exists a unique session cookie number for which

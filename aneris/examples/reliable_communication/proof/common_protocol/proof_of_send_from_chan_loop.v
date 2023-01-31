@@ -38,9 +38,8 @@ Section Proof_of_send_loop.
          mono_nat_auth_own (lock_idx_name (endpoint_send_lock_name γe)) (1 / 2) (sidLB + length vs) ∗
          ([∗ list] i↦v ∈ vs, ∃ w : val, ⌜v = (#(sidLB + i), w)%V⌝ ∗
                                ⌜Serializable (side_elim s RCParams_clt_ser RCParams_srv_ser) w⌝ ∗
-                               frag_list
-                                 (side_elim s (chan_Tl_name (endpoint_chan_name γe))
-                                    (chan_Tr_name (endpoint_chan_name γe))) (sidLB + i) w) ∗
+                               ses_idx (chan_session_escrow_name
+                                          (endpoint_chan_name γe)) s (sidLB + i) w) ∗
         ⌜vs ≠ []⌝)%I
      }}}.
   Proof.
@@ -106,9 +105,8 @@ Section Proof_of_send_loop.
                                ⌜Serializable
                                   (side_elim s RCParams_clt_ser RCParams_srv_ser)
                                   w⌝ ∗
-                               frag_list
-                                 (side_elim s (chan_Tl_name γc) (chan_Tr_name γc))
-                                 (sidLB' + i) w)%I with "Hvs []") as "#Hvs'".
+                               ses_idx (chan_session_escrow_name
+                                          (endpoint_chan_name γe)) s (sidLB' + i) w)%I with "Hvs []") as "#Hvs'".
     { iIntros "!>" (i v Hlookup) "H".
       iSplit; [|done].
       iPureIntro.

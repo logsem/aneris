@@ -108,7 +108,7 @@ Section Proof_of_server_conn_step_3.
     iDestruct "Hpers" as
       (γs' serl serf sa sbuf slk rbuf rlk Hc) "Hpers".
     iDestruct "Hpers"
-      as "(%Hgeq & %Hgleq & %Hser' & #Htk' & #HaT & #HiT & Hslk & Hrlk & Hinv)".
+      as "(%Hgeq & %Hgleq & %Hser' & #Htk' & #HaT & #HiT & Hslk & Hrlk)".
     inversion Hchan.
     iDestruct (session_token_agree with "Htk0 Htk'") as "<-".
     wp_pures.
@@ -218,7 +218,7 @@ Section Proof_of_server_conn_step_3.
            iDestruct "Hpers" as
              (γs' ser' serf' sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
            iDestruct "Hpers"
-             as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk & Hinv)".
+             as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk)".
            inversion Hchan.
            iExists γi, cki. iSplitL "HCkFi". iFrame "#∗".
            destruct Hhst1i as (y0 & ? & ? & ? & ?).

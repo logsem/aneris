@@ -92,8 +92,7 @@ Section Proof_of_process_data_on_chan.
                    ∃ (n:nat), ⌜ackid = #n⌝ ∗
                               ack_interp_pers (side_elim s sa dst) n s) ∨
          (∃ (i:nat) w, ⌜mval = InjRV (#i, w)%V⌝ ∗
-                       frag_list (side_elim s (chan_Tr_name (endpoint_chan_name γe))
-                                     (chan_Tl_name (endpoint_chan_name γe))) i w ∗
+                       ses_idx (chan_session_escrow_name (endpoint_chan_name γe)) (dual_side s) i w ∗
                        mono_nat_lb_own
                          (side_elim
                             s (session_srv_idx_name γs) (session_clt_idx_name γs)) (S i))) ∗

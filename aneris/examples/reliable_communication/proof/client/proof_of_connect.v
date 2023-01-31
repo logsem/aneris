@@ -69,10 +69,10 @@ Section Proof_of_connect.
     wp_pures.
     rewrite Hn.
     set (skt := ((#(LitSocket h),
-                     (prelude.side_elim Left
+                     (side_elim Left
                         (s_ser (s_serializer (msg_serialization RCParams_clt_ser)))
                         (s_ser (s_serializer (msg_serialization RCParams_srv_ser))),
-                     prelude.side_elim Left
+                     side_elim Left
                        (s_deser (s_serializer (msg_serialization RCParams_srv_ser)))
                        (s_deser (s_serializer (msg_serialization RCParams_clt_ser)))),
                        s_ser (s_serializer RCParams_clt_ser)))%V).
@@ -120,7 +120,7 @@ Section Proof_of_connect.
     iAssert (session_token clt_addr γ) as "#Hst".
     { rewrite /can_init. by iDestruct "Hres" as "((#Hs & _) & _)". }
     iAssert (mono_nat_lb_own
-     (prelude.side_elim Left (session_srv_idx_name γ) (session_clt_idx_name γ))
+     (side_elim Left (session_srv_idx_name γ) (session_clt_idx_name γ))
      0) as "#Hmono".
     { rewrite /can_init. simpl. by iDestruct "Hres" as "((_ & _ & Hm & _) & _)". }
     iDestruct "Hres" as "(Hres & #Hsmode)".
@@ -133,9 +133,9 @@ Section Proof_of_connect.
       (γs sd serl serf sa dst sbuf slk rbuf rlk )
         "(%sidLBLoc & %ackIdLoc & %sidx & %ridx & Hhy)".
     iDestruct "Hhy"
-      as "(%Hc & %Heqc & %Heqg & Hserl & %Hserl & Hal1 & Hal2 & Hmn1 & Hmn2
+      as "(%Hc & %Heqc & %Heqg & Hserl & %Hserl & Hmn1 & Hmn2
                & #Hst' & #HaT' & #HsT' & #HlT'
-               & Hpown & #Hslk & #Hrlk & #Hpinv)".
+               & Hpown & #Hslk & #Hrlk)".
     simpl. destruct sd as [|]; last first.
     { by iDestruct (ChannelSideToken_agree with "[$HsT] [$HsT']") as "%". }
     simpl in *.

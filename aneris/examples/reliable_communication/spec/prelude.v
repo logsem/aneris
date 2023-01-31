@@ -1,5 +1,6 @@
 From aneris.aneris_lang Require Import lang.
 From actris.channel Require Import proto.
+From aneris.examples.reliable_communication.resources Require Export session_escrow.
 
 Set Default Proof Using "Type".
 
@@ -12,20 +13,10 @@ Notation iMsg Σ := (iMsg Σ val).
 
 (** =============================== GHOST NAMES ============================= *)
 
-(** Ghost names for channel data (buffers and counters) *)
-Record chan_logbuf_name := ChanLogBufName {
-  chan_logbuf_buf_name : gname;
-  chan_logbuf_cpt_name : gname
-}.
-
 (** Ghost names for channels, channel endpoint data, and channel session (shared data). *)
 Record chan_name :=
   ChanName {
-      chan_proto_name : proto_name;
-      chan_Tl_name : chan_logbuf_name;
-      chan_Tr_name : chan_logbuf_name;
-      chan_Rl_name : chan_logbuf_name;
-      chan_Rr_name : chan_logbuf_name;
+      chan_session_escrow_name : session_escrow_name;
       chan_N : namespace
     }.
 
@@ -57,29 +48,15 @@ Record session_name :=
 
 Notation socket_addressO := (leibnizO socket_address).
 
-
-Global Instance chan_logbuf_name_inhabited : Inhabited chan_logbuf_name :=
-  populate (ChanLogBufName inhabitant inhabitant).
-
-Global Instance chan_logbuf_name_eq_dec : EqDecision chan_logbuf_name.
-Proof. solve_decision. Qed.
-
-Global Instance chan_logbuf_name_countable : Countable chan_logbuf_name.
-Proof.
-  refine (inj_countable (λ '(ChanLogBufName γlbuf γcpt), (γlbuf,γcpt))
-    (λ '(γlbuf, γcpt), Some (ChanLogBufName γlbuf γcpt)) _); by intros [].
-Qed.
-
 Global Instance chan_name_inhabited : Inhabited chan_name :=
-  populate (ChanName inhabitant inhabitant inhabitant inhabitant inhabitant nroot).
+  populate (ChanName inhabitant nroot).
 Global Instance chan_name_eq_dec : EqDecision chan_name.
 Proof. solve_decision. Qed.
 Global Instance chan_name_countable : Countable chan_name.
 Proof.
-  refine (inj_countable (λ '(ChanName γp γTl γTr γRl γRr N),
-                           (γp, γTl, γTr, γRl, γRr, N))
-                        (λ '(γp, γTl, γTr, γRl, γRr, N),
-                           Some (ChanName γp γTl γTr γRl γRr N)) _); by intros [].
+  refine (inj_countable (λ '(ChanName γs N), (γs, N))
+                        (λ '(γs, N),
+                           Some (ChanName γs N)) _); by intros [].
 Qed.
 
 Global Instance lock_name_inhabited : Inhabited lock_name :=

@@ -26,20 +26,6 @@ Definition msg_serialization payload_ser :=
 Definition socket_address_to_str (sa : socket_address) : string :=
   match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
-(** Side switch. *)
-
-Definition side_elim {A} (s : side) (l r : A) : A :=
-  match s with
-  | Left => l
-  | Right => r
-  end.
-
-Definition dual_side (s : side) : side :=
-  match s with
-  | Left => Right
-  | Right => Left
-  end.
-
 (** ===================== INTERNAL GLOBAL SERVER GHOST NAMES  ===================== *)
 
 Class server_ghost_names :=
@@ -52,23 +38,6 @@ Class server_ghost_names :=
 
 (** ====================== INTERNAL ALGEBRA DEFINITIONS  ======================== *)
 
-Definition chan_msg_history (A : ofe) :=
-  authUR (@monotoneUR (listO A) (prefix)).
-Notation PrinCMH l := (principal prefix l).
-
-Class ChanMsgHist A Σ := {
-    CMH_msghΣ :> inG Σ (chan_msg_history A);
-    CMH_msgcΣ :> inG Σ (frac_authR natR)
-  }.
-
-Definition ChanMsgHistΣ A : gFunctors :=
-  #[GFunctor (chan_msg_history A);
-    GFunctor (frac_authR natR)].
-
-Global Instance subG_ChanMsgHistΣ A {Σ} :
-  subG (ChanMsgHistΣ A) Σ → ChanMsgHist A Σ.
-Proof. solve_inG. Qed.
-
 Definition session_names_mapUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO (session_name))).
 Definition session_names_map :=
@@ -76,11 +45,9 @@ Definition session_names_map :=
 
 Definition oneShotR := csumR (exclR unitO) (agreeR unitO).
 
-
 (** Algebras for tracking resources in the logic, including meta tokens. *)
 Class chanPreG Σ := {
-    chanGPreG_proto :> protoG Σ val;
-    chanGPreG_chan_logbuf :> ChanMsgHist valO Σ;
+    chanGPreG_session_escrow :> session_escrowG Σ val;
     chanGPreG_ids :> mono_natG Σ;
     chanGPreG_cookie :> inG Σ (frac_authR natR);
     chanGPreG_session_names_map :> inG Σ (authR session_names_mapUR);
@@ -92,8 +59,7 @@ Class chanPreG Σ := {
    }.
 
 Class chanG Σ := {
-    chanG_protoG :> protoG Σ val;
-    chanG_chan_logbufG :> ChanMsgHist valO Σ;
+    chanG_session_escrow :> session_escrowG Σ val;
     chanG_ids :> mono_natG Σ;
     chanG_cookie :> inG Σ (frac_authR natR);
     chanG_session_names_map :> inG Σ (authR session_names_mapUR);
@@ -105,8 +71,7 @@ Class chanG Σ := {
   }.
 
 Definition chanPreΣ : gFunctors :=
-  #[ protoΣ val;
-     ChanMsgHistΣ valO;
+  #[ session_escrowΣ val;
      mono_natΣ;
      GFunctor (frac_authR natR);
      GFunctor (authR session_names_mapUR);

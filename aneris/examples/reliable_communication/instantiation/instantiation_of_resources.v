@@ -14,22 +14,13 @@ From aneris.examples.reliable_communication.spec Require Import prelude ras.
 From aneris.examples.reliable_communication.resources Require Import prelude.
 
 Section RA_instantiation.
-
   Context `{!anerisG Mdl Σ}.
-  Context `{!SpecChanMsgHist valO Σ}.
   Context `{!SpecChanG Σ}.
-
- Local Instance: ChanMsgHist valO Σ :=
-    Build_ChanMsgHist
-      _ Σ
-      (@SpecCMH_msghΣ _ _ _)
-      (@SpecCMH_msgcΣ _ _ _).
 
   Global Instance chanG_instance_0 : chanG Σ :=
     Build_chanG
       Σ
-      SpecChanG_proto
-      _
+      SpecChanG_session_escrow
       SpecChanG_ids
       SpecChanG_cookie
       SpecChanG_session_names_map
@@ -41,8 +32,7 @@ Section RA_instantiation.
 
 End RA_instantiation.
 
-Arguments chanG_instance_0 {_ _ _}.
-
+Arguments chanG_instance_0 {_ _}.
 
 (* -------------------------------------------------------------------------- *)
 (** Instantiation of the dependent separation protocol `c ↣{ip, ser} p` using

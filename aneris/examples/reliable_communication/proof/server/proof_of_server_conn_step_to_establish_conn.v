@@ -297,9 +297,9 @@ Section Proof_of_server_conn_step_2.
         (γs'' sd ser serf sa dst sbuf slk rbuf rlk )
           "(%sidLBLoc & %ackIdLoc & %sidx & %ridx & Hhy)".
       iDestruct "Hhy"
-        as "(%Hc & %Heqc & %Heqg & Hl & %Hlser & Hal1 & Hal2 & Hmn1 & Hmn2
+        as "(%Hc & %Heqc & %Heqg & Hl & %Hlser & Hmn1 & Hmn2
                  & #Hst' & #HaT' & #HsT' & #HlT'
-                 & Hpown & #Hslk & #Hrlk & #Hpinv)".
+                 & Hpown & #Hslk & #Hrlk)".
       simpl. destruct sd as [|].
       - by iDestruct (ChannelSideToken_agree with "[$HsT] [$HsT']") as "%".
       - simpl in *.
@@ -383,19 +383,19 @@ Section Proof_of_server_conn_step_2.
           (* Release the lock by providing the channel mapsto. *)
           wp_apply (release_spec (RCParams_srv_N.@"qlk")
                                  srv_ip γqlk qlk (conn_queue_lock_def cql)
-                     with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown Hal1 Hal2 Hl]").
+                     with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown Hl]").
           { iFrame "Hlkd Hqlk".
             iExists rv, (vs ++ [(c, #(m_sender m))%V]).
             iFrame "Hql".
             iSplit; first done.
-            iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown Hal1 Hal2 Hl]").
+            iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown Hl]").
             iExists γe, c, (m_sender m).
             iSplit; first done.
             iFrame "#".
             rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
             iExists _, _, _, _, _, _, _.
             iExists _, _, _, _, _, _, _.
-            iFrame "Hslk Hrlk HsT HaT Hmn1 Hmn2 Hal1 Hal2 Hpown Hl".
+            iFrame "Hslk Hrlk HsT HaT Hmn1 Hmn2 Hpown Hl".
             iFrame "#∗".
             subst; eauto. }
           iIntros (? ->).
@@ -501,7 +501,7 @@ Section Proof_of_server_conn_step_2.
                 iDestruct "Hpers" as
                   (γsi ser' serf' sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
                 iDestruct "Hpers"
-                  as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk & Hinv)".
+                  as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk)".
                 iRight.
                 destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ?).
                 destruct Hhst4i as (y4 & ? & ? & ? & ? & ? & ?).

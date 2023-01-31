@@ -3,7 +3,7 @@ From iris.algebra.lib Require Import excl_auth mono_nat.
 From iris.base_logic.lib Require Import invariants mono_nat.
 From iris.proofmode Require Import tactics.
 From aneris.aneris_lang Require Import resources.
-From aneris.examples.reliable_communication.resources Require Export chan_logbuf_resources.
+From aneris.examples.reliable_communication.resources Require Export prelude.
 
 Set Default Proof Using "Type".
 
@@ -91,29 +91,15 @@ End OneShot.
 Section iProto_sessions.
   Context `{!anerisG Mdl Σ, !chanG Σ, !server_ghost_names}.
 
-  Definition iProto_invariant (γ : chan_name)  : iProp Σ :=
-    ∃ (Tl Tr Rl Rr : list val),
-      auth_list (chan_Tl_name γ) Tl ∗
-      auth_list (chan_Tr_name γ) Tr ∗
-      auth_list (chan_Rl_name γ) Rl ∗
-      auth_list (chan_Rr_name γ) Rr ∗
-      ⌜Rr `prefix_of` Tl⌝ ∗ ⌜Rl `prefix_of` Tr⌝ ∗
-      steps_lb (length Tl) ∗ steps_lb (length Tr) ∗
-      iProto_ctx (chan_proto_name γ)
-                 (list_minus Tl Rr)
-                 (list_minus Tr Rl).
-
   Definition can_init
     (γs : session_name) (clt_addr : socket_address) (p : iProto Σ) (s : side) : iProp Σ :=
     session_token clt_addr γs ∗
     mono_nat_auth_own (side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)) 1 0 ∗
     mono_nat_lb_own (side_elim s (session_srv_idx_name γs) (session_clt_idx_name γs)) 0 ∗
-    inv (chan_N (session_chan_name γs)) (iProto_invariant (session_chan_name γs)) ∗
-    alloc_at (side_elim s (chan_Tl_name (session_chan_name γs))
-                          (chan_Tr_name (session_chan_name γs))) 0 ∗
-    alloc_at (side_elim s (chan_Rl_name (session_chan_name γs))
-                          (chan_Rr_name (session_chan_name γs))) 0 ∗
-    iProto_own (chan_proto_name (session_chan_name γs)) s p%I.
+    inv (chan_N (session_chan_name γs))
+        (Ses_inv (chan_session_escrow_name (session_chan_name γs))) ∗
+    ses_own (chan_N (session_chan_name γs))
+            (chan_session_escrow_name (session_chan_name γs)) s 0 0 p.
 
   Definition CookieRes (sa : socket_address) (n : nat) : iProp Σ :=
     ∃ (γs : session_name),
@@ -160,12 +146,9 @@ Section iProto_sessions.
       can_init γ sa (iProto_dual p) Right.
     Proof.
     iIntros (Hfresh) "Hkn #Hlb".
-    iMod (iProto_init p) as (γ_p) "(Hp_auth & Hpl & Hpr)".
-    iMod (auth_list_alloc with "[//]") as (γ_Tl) "(HTl_auth & HTl_A)".
-    iMod (auth_list_alloc with "[//]") as (γ_Rl) "(HRl_auth & HRl_A)".
-    iMod (auth_list_alloc with "[//]") as (γ_Tr) "(HTr_auth & HTr_A)".
-    iMod (auth_list_alloc with "[//]") as (γ_Rr) "(HRr_auth & HRr_A)".
-    set (γ_chan := ChanName γ_p γ_Tl γ_Tr γ_Rl γ_Rr (N.@ (socket_address_to_str sa))).
+    iMod (Ses_init (N.@ (socket_address_to_str sa)) _ p with "Hlb")
+      as (γ_s) "(#Hses & Hownl & Hownr)".
+    set (γ_chan := ChanName γ_s (N.@ (socket_address_to_str sa))).
     iMod (mono_nat_own_alloc 0%nat) as (γ_srv_idx) "(Hsrv_idxA & Hsrv_idxF)".
     iMod (mono_nat_own_alloc 0%nat) as (γ_clt_idx) "(Hclt_idxA & Hclt_idxF)".
     iMod (own_alloc (● (to_agree <$> (∅: session_names_map) : session_names_mapUR)))
@@ -183,13 +166,13 @@ Section iProto_sessions.
            with "[$Hkn]") as "[HS #Hs]".
     { rewrite fmap_insert. apply auth_update_alloc, @alloc_local_update; last done.
       apply not_elem_of_dom; rewrite dom_fmap; done. }
-    iFrame "#∗".
-    iSplitL "HckF"; first eauto. simpl.
-    iSplitL "Hck"; first eauto. simpl.
-    iMod (inv_alloc (N.@socket_address_to_str sa) _ (iProto_invariant γ_chan)
-           with "[Hp_auth HTl_auth HRl_auth HTr_auth HRr_auth]") as "#Hinv".
-    { iNext. iFrame. iExists _, _, _, _. iFrame. simpl. by iFrame "#∗". }
-    by iFrame "#∗".
+    iModIntro.
+    iFrame.
+    iSplitR; [done|].
+    iSplitR; [done|].
+    iSplitL "HckF"; first by eauto.
+    iSplitL "Hck"; first by eauto.
+    iFrame "#".
   Qed.
 
 End iProto_sessions.

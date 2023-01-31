@@ -9,7 +9,7 @@ From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib Require Import assert_proof.
 From aneris.aneris_lang.lib Require Import pers_socket_proto lock_proof monitor_proof queue_proof.
 From aneris.aneris_lang.program_logic Require Import
-     aneris_weakestpre aneris_adequacy aneris_lifting.
+     aneris_weakestpre aneris_adequacy aneris_lifting step_update.
 From aneris.aneris_lang Require Import proofmode.
 From stdpp Require Import base tactics telescopes.
 From aneris.examples.reliable_communication Require Import client_server_code.
@@ -35,9 +35,9 @@ Section Proof_of_send.
     iDestruct "Hc"
       as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "(%Heqg & Hc)".
     iDestruct "Hc"
-      as "(Hl & %Hleq & HT_at & HR_at & Hsidx & Hridx
+      as "(Hl & %Hleq & Hsidx & Hridx
                  & #HsnT & #HaT & #HsT & #HidxsT
-                 & Hp & #Hslk & #Hrlk & #Hinv)".
+                 & Hp & #Hslk & #Hrlk)".
     wp_lam.
     wp_pures.
     wp_apply (monitor_acquire_spec with "Hslk").
@@ -49,10 +49,8 @@ Section Proof_of_send.
     iIntros (rv Hq').
     wp_pure _.
     wp_bind (Store _ _).
-    iInv (chan_N (endpoint_chan_name γe)) as "IH".
-    iDestruct "IH" as (Tl Tr Rl Rr) "(HTl & HTr & HRl & HRr & IH)".
-    iDestruct "IH" as "(>%Hpre1 & >%Hpre2 & >#Hlbl & >#Hlbr & Hctx)".
-    simplify_eq.
+    iApply (aneris_wp_step_update _ _ ∅ with "[Hp]"); [done| |].
+    { iApply (step_update_send with "Hp"); [done|by rewrite iMsg_base_eq]. }
     iDestruct (mono_nat_auth_own_agree with "Hsidx Hsidx'") as %[_ ->].
     (* TODO: Fix weird split behaviour *)
     iMod (mono_nat_own_update (sidLB + length vs + 1) with "[Hsidx Hsidx']")
@@ -60,87 +58,25 @@ Section Proof_of_send.
       [|iApply fractional_half;
          [apply mono_nat_auth_own_as_fractional|iFrame]|]; [lia|].
     iDestruct "Hsidx" as "[Hsidx Hsidx']".
-    destruct s.
-    - iApply (aneris_wp_lb_step with "Hlbr [Hctx Hp]"); [done| |].
-      { iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-        iIntros "!>!>".
-        iMod (iProto_send_l with "Hctx Hp []") as "[Hctx Hp]".
-        { rewrite iMsg_base_eq /=; auto. }
-        iApply step_fupdN_intro; [done|].
-        iIntros "!>". iApply (bi.laterN_le (length (list_minus Tr Rl)));
-          [rewrite list_minus_prefix_length; [lia|done]|].
-        iIntros "!>". iMod "Hclose". iModIntro.
-        iCombine "Hctx Hp" as "H". iExact "H". }
-      iApply (aneris_wp_lb_update with "Hlbl").
-      wp_store.
-      iIntros "#Hlbl' [Hctx Hp]".
-      iMod (auth_list_extend _ _ v with "HTl HT_at") as "(HTl & HT_at & Hfrag)".
-      iModIntro.
-      iSplitL "HTl HTr HRl HRr Hctx".
-      { iModIntro. iNext. iExists (Tl ++ [v]), Tr, Rl, Rr.
-        rewrite app_length. simpl.
-        replace (length Tl + 1) with (S (length Tl)) by lia.
-        iFrame "#∗".
-        rewrite list_minus_prefix_app; [|done]. iFrame.
-        iSplit; [|done].
-        iPureIntro. by apply prefix_app_r. }
-      iModIntro.
-      wp_smart_apply (monitor_signal_spec with "[Hlocked Hsbuf Hvs HsidLBLoc' Hsidx' Hfrag]").
-      { iFrame "#∗". iExists rv, (vs ++ [(#(sidLB + length vs), v)%V]), sidLB.
-        rewrite app_length /=.
-        replace (Z.of_nat (length vs + 1)%nat) with (length vs + 1)%Z by lia.
-        rewrite !Z.add_assoc !plus_assoc.
-        iFrame. iSplit; [done|]. iSplit; [|done].
-        iExists _. rewrite Nat.add_0_r. by eauto. }
-      iIntros "(Hlocked & Hsbufdef)".
-      wp_smart_apply (monitor_release_spec with "[$Hlocked Hsbufdef]").
-      { iFrame "#∗". }
-      iIntros (v'') "->".
-      iApply "HΦ".
-      iExists _, _, _, _, _, _, _, _.
-      iExists _, _, _, _, _, _.
-      iFrame. iSplit; [done|].
-      simpl. rewrite Nat.add_1_r. iFrame "#∗"; eauto.
-    - iApply (aneris_wp_lb_step with "Hlbl [Hctx Hp]"); [done| |].
-      { iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-        iIntros "!>!>".
-        iMod (iProto_send_r with "Hctx Hp []") as "[Hctx Hp]".
-        { rewrite iMsg_base_eq /=; auto. }
-        iApply step_fupdN_intro; [done|].
-        iIntros "!>". iApply (bi.laterN_le (length (list_minus Tl Rr)));
-          [rewrite list_minus_prefix_length; [lia|done]|].
-        iIntros "!>". iMod "Hclose". iModIntro.
-        iCombine "Hctx Hp" as "H". iExact "H". }
-      iApply (aneris_wp_lb_update with "Hlbr").
-      wp_store.
-      iIntros "#Hlbr' [Hctx Hp]".
-      iMod (auth_list_extend _ _ v with "HTr HT_at") as "(HTr & HT_at & Hfrag)".
-      iModIntro.
-      iSplitL "HTl HTr HRl HRr Hctx".
-      { iModIntro. iNext. iExists Tl, (Tr ++ [v]), Rl, Rr.
-        rewrite app_length /=.
-        replace (length Tr + 1) with (S (length Tr)) by lia.
-        iFrame "#∗".
-        rewrite list_minus_prefix_app; [|done].
-        iSplit; [done|]. iFrame.
-        iPureIntro. by apply prefix_app_r. }
-      iModIntro.
-      wp_smart_apply (monitor_signal_spec with "[Hlocked Hsbuf Hvs HsidLBLoc' Hsidx' Hfrag]").
-      { iFrame "#∗". iExists rv, (vs ++ [(#(sidLB + length vs), v)%V]), sidLB.
-        rewrite app_length /=.
-        replace (Z.of_nat (length vs + 1)%nat) with (length vs + 1)%Z by lia.
-        rewrite !Z.add_assoc !plus_assoc.
-        iFrame. iSplit; [done|]. iSplit; [|done].
-        iExists _. rewrite Nat.add_0_r. by eauto. }
-      iIntros "(Hlocked & Hsbufdef)".
-      wp_smart_apply (monitor_release_spec with "[$Hlocked Hsbufdef]").
-      { iFrame "#∗". }
-      iIntros (v'') "->".
-      iApply "HΦ".
-      iExists _, _, _, _, _, _, _, _.
-      iExists _, _, _, _, _, _.
-      iFrame. iSplit; [done|].
-      simpl. rewrite Nat.add_1_r. iFrame "#∗"; eauto.
+    wp_store.
+    iIntros "[Hp Hfrag] !>".
+    wp_pures.
+    wp_smart_apply (monitor_signal_spec with "[Hlocked Hsbuf Hvs HsidLBLoc' Hsidx' Hfrag]").
+    { iFrame "#∗". iExists rv, (vs ++ [(#(sidLB + length vs), v)%V]), sidLB.
+      rewrite app_length /=.
+      replace (Z.of_nat (length vs + 1)%nat) with (length vs + 1)%Z by lia.
+      rewrite !Z.add_assoc !plus_assoc.
+      iFrame. iSplit; [done|]. iSplit; [|done].
+      iExists _. rewrite Nat.add_0_r. by eauto. }
+    iIntros "(Hlocked & Hsbufdef)".
+    wp_smart_apply (monitor_release_spec with "[$Hlocked Hsbufdef]").
+    { iFrame "#∗". }
+    iIntros (v'') "->".
+    iApply "HΦ".
+    iExists _, _, _, _, _, _, _, _.
+    iExists _, _, _, _, _, _.
+    iFrame. iSplit; [done|].
+    simpl. rewrite Nat.add_1_r. iFrame "#∗"; eauto.
   Qed.
 
   Lemma send_spec_tele_internal {TT} γe c (tt : TT) (v : TT → val) (P : TT → iProp Σ)

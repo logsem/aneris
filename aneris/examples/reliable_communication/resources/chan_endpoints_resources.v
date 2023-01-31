@@ -64,9 +64,7 @@ Section iProto_endpoints.
         [∗ list] i↦v ∈ vs, ∃ (w:val),
            ⌜v = (#(sidLB+i), w)%V⌝ ∗
            ⌜Serializable ser w⌝ ∗
-            frag_list
-              (side_elim s (chan_Tl_name γc) (chan_Tr_name γc))
-              (sidLB+i) w.
+           ses_idx (chan_session_escrow_name γc) s (sidLB+i) w.
 
   Definition is_send_lock ip γc γ_slk slk sbuf ser sidLBLoc s :=
     is_monitor ((chan_N γc) .@ "slk") ip (lock_lock_name γ_slk) slk
@@ -80,9 +78,7 @@ Section iProto_endpoints.
         (* NB: Values are currently tagged - But we can remove it *)
         [∗ list] i↦v ∈ vs, ∃ (w:val),
            ⌜v = (#(ridx + i), w)%V⌝ ∗
-           frag_list
-             (side_elim s (chan_Tr_name γc) (chan_Tl_name γc))
-             (ridx+i) w.
+           ses_idx (chan_session_escrow_name γc) (dual_side s) (ridx+i) w.
 
   Definition is_recv_lock ip γc γ_rlk rlk rbuf ackIdLoc s :=
     is_lock ((chan_N γc) .@ "rlk") ip (lock_lock_name γ_rlk) rlk
@@ -106,14 +102,6 @@ Section iProto_endpoints.
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)⌝ ∗
       serl ↦[ip] serf ∗
       ⌜s_ser (s_serializer ser) = serf⌝ ∗
-      alloc_at
-        (side_elim s
-           (chan_Tl_name (endpoint_chan_name γe))
-           (chan_Tr_name (endpoint_chan_name γe))) sidx ∗
-      alloc_at
-        (side_elim s
-           (chan_Rl_name (endpoint_chan_name γe))
-           (chan_Rr_name (endpoint_chan_name γe))) ridx ∗
       mono_nat_auth_own
         (lock_idx_name (endpoint_send_lock_name γe)) (1/2) sidx ∗
       mono_nat_auth_own
@@ -122,7 +110,9 @@ Section iProto_endpoints.
       ChannelAddrToken γe (sa, dst) ∗
       ChannelSideToken γe s ∗
       ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
-      iProto_own (chan_proto_name (endpoint_chan_name γe)) s p ∗
+      ses_own
+           (chan_N (endpoint_chan_name γe))
+           (chan_session_escrow_name (endpoint_chan_name γe)) s sidx ridx p ∗
       is_send_lock ip
          (endpoint_chan_name γe)
          (endpoint_send_lock_name γe)
@@ -130,9 +120,7 @@ Section iProto_endpoints.
       is_recv_lock ip
          (endpoint_chan_name γe)
          (endpoint_recv_lock_name γe)
-         rlk rbuf ackIdLoc s ∗
-      inv (chan_N (endpoint_chan_name γe))
-          (iProto_invariant (endpoint_chan_name γe)).
+         rlk rbuf ackIdLoc s.
 
   Definition iProto_mapsto_aux : seal (@iProto_mapsto_def).
     by eexists. Qed.
@@ -144,6 +132,7 @@ Section iProto_endpoints.
   Global Instance: Params (@iProto_mapsto) 3 := {}.
   Notation "c ↣{ γe , ip , ser } p" := (iProto_mapsto γe c ip ser p)
                               (at level 20, format "c  ↣{ γe , ip , ser }  p").
+
   Global Instance iProto_mapsto_contractive γe c ip ser :
     Contractive (λ p, iProto_mapsto γe c ip ser p).
   Proof. rewrite iProto_mapsto_eq. solve_contractive. Qed.
@@ -153,7 +142,8 @@ Section iProto_endpoints.
   Proof. rewrite iProto_mapsto_eq. solve_proper. Qed.
   Global Instance iProto_mapsto_proper γe c ip ser
     : Proper ((≡) ==> (≡)) (λ p, iProto_mapsto γe c ip ser p).
-  Proof. apply (ne_proper _). Qed.
+  Proof. rewrite iProto_mapsto_eq. solve_proper. Qed.
+
   Lemma iProto_mapsto_le γe c ip ser p1 p2 :
     c ↣{ γe, ip, ser } p1 -∗ ▷ (p1 ⊑ p2) -∗ c ↣{ γe, ip, ser } p2.
   Proof.
@@ -162,16 +152,16 @@ Section iProto_endpoints.
     iDestruct "Hc" as (γs s serl serf sa dst) "Hc".
     iDestruct "Hc" as (sbuf slk rbuf rlk ackIdLoc sidLBLoc sidx ridx -> Heqc)
                         "(%Heq1 & Hc)".
-    iDestruct "Hc" as "(Hl & %Hsereq & HT_at & HR_at & Hsidx & Hridx
+    iDestruct "Hc" as "(Hl & %Hsereq & Hsidx & Hridx
                               & #HsT' & #HAddrT & #HsideT & #HidxT
-                              & Hp & #Hslk & #Hrlk & #Hinv)".
+                              & Hp & #Hslk & #Hrlk)".
     iIntros "Hle".
     iExists γs, s, serl, serf, sa, dst.
     iExists sbuf, slk, rbuf, rlk, ackIdLoc, sidLBLoc, sidx, ridx.
-    iDestruct (iProto_own_le with "Hp Hle") as "Hp".
-    iFrame "#∗". naive_solver.
+    iDestruct (ses_own_le with "Hp Hle") as "Hp". iFrame. iFrame "#". naive_solver.
   Qed.
-   Lemma iProto_mapsto_excl γe c ip ser p1 p2 :
+
+  Lemma iProto_mapsto_excl γe c ip ser p1 p2 :
     c ↣{ γe, ip, ser } p1 -∗ c ↣{ γe, ip, ser } p2 -∗ False.
   Proof.
     iIntros "Hc".
