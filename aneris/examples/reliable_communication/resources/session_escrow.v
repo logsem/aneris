@@ -125,8 +125,8 @@ Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iPro
   Qed.
 
   Lemma Ses_init E p :
-    ⊢ steps_lb 0 ={E}=∗
-          ∃ χ, Ses χ ∗ ses_own χ Left 0 0 p ∗ ses_own χ Right 0 0 (iProto_dual p).
+    ⊢ steps_lb 0 ={E}=∗ ∃ χ, Ses χ ∗ ses_own χ Left 0 0 p ∗
+                   ses_own χ Right 0 0 (iProto_dual p).
   Proof.
     iIntros "#Hsteps".
     iMod (iProto_init p) as (γc) "(Hctx & Hpl & Hpr)".
@@ -146,104 +146,118 @@ Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iPro
     iFrame "#∗".
   Qed.
 
-  Lemma step_update_send_l χ E n m pm v p :
-    ↑N ⊆ E →
-    ses_own χ Left n m (<!> pm)%proto -∗ iMsg_car pm v (Next p) -∗
-    |~{E}~> (ses_own χ Left (S n) m p ∗ ses_idx χ Left n v).
+  (* Have this lemma to make it consistent with the others of the ghost theory. *)
+  Lemma step_get_Ses_init E p :
+    ⊢ |~{E}~| ∃ χ, Ses χ ∗ ses_own χ Left 0 0 p ∗
+                   ses_own χ Right 0 0 (iProto_dual p).
   Proof.
-    iIntros (HE) "[#HI (Hp&HslF&HrlF)] Hpm".
-    iApply step_update_open.
-    iInv N as "H" "Hclose".
-    iDestruct "H" as (Tl Tr nl nr)
-                       "(>%Hle&>%Hle2&Hctx&>HTl&>HTr&
-                       >Hsl&>Hrl&>Hsr&>Hrr&#>HTllb&#>HTrlb)".
-    iApply step_update_impl; [iApply step_update_lb_update; iApply "HTllb"|].
-    iApply step_update_lb_step; [iApply "HTrlb"|]=> /=.
-    iIntros "!>!>!>".
-    iMod (iProto_send_l with "Hctx Hp Hpm") as "[Hctx Hp]".
+    iApply step_get_impl; [iApply step_get_lb_get|].
+    iIntros "#Hsteps".
+    iMod (iProto_init p) as (γc) "(Hctx & Hpl & Hpr)".
+    iMod (own_alloc (●ML [])) as (γl) "Hl"; [apply mono_list_auth_valid|].
+    iMod (own_alloc (●ML [])) as (γr) "Hr"; [apply mono_list_auth_valid|].
+    iMod (own_alloc (●E 0%nat ⋅ ◯E 0%nat)) as (γsl) "[HslA HslF]"; [apply excl_auth_valid|].
+    iMod (own_alloc (●E 0%nat ⋅ ◯E 0%nat)) as (γrl) "[HrlA HrlF]"; [apply excl_auth_valid|].
+    iMod (own_alloc (●E 0%nat ⋅ ◯E 0%nat)) as (γsr) "[HsrA HsrF]"; [apply excl_auth_valid|].
+    iMod (own_alloc (●E 0%nat ⋅ ◯E 0%nat)) as (γrr) "[HrrA HrrF]"; [apply excl_auth_valid|].
+    set (χ := SessionEscrowName γc γl γr γsl γrl γsr γrr).
+    iMod (inv_alloc N E (Ses_inv χ) with "[Hctx Hl Hr HslA HrlA HsrA HrrA]")
+      as "#H".
+    { iIntros "!>". iExists [], [], 0%nat, 0%nat. iFrame "#∗".
+      iSplit; iPureIntro; lia. }
+    iIntros (n) "Hauth". iApply fupd_mask_intro; [set_solver|].
+    iIntros "Hclose". iFrame. iMod "Hclose".
     iModIntro.
-    iApply step_fupdN_intro; [done|].
-    iApply (bi.laterN_le (length (drop nl Tr))); [rewrite drop_length; lia|].
-    iIntros "!> #HTllb'".
-    iDestruct (own_valid_2 with "Hsl HslF") as %Hvalid1%excl_auth_agree_L.
-    iDestruct (own_valid_2 with "Hrl HrlF") as %Hvalid2%excl_auth_agree_L.
-    iMod (own_update_2 _ _ _ (●E (S (length Tl)) ⋅ ◯E (S (length Tl)))
-           with "Hsl HslF") as "[Hsl HslF]"; [by apply excl_auth_update|].
-    iMod (own_update _ _ (●ML ((Tl ++ [v]):list (leibnizO A)))
-           with "HTl") as "HTl".
-    { apply mono_list_update. by apply prefix_app_r. }
-    rewrite mono_list_auth_lb_op.
-    iDestruct "HTl" as "[HTl HTl']".
-    iAssert (frag_list χ Left n v) with "[HTl']" as "Hidx".
-    { iExists _. iFrame. iPureIntro. rewrite -Hvalid1.
-      rewrite lookup_app_r; [|lia]. rewrite minus_diag. done. }
-    rewrite Hvalid1.
+    iExists χ.
     iFrame "#∗".
-    iApply "Hclose".
-    iIntros "!>".
-    rewrite -drop_app_le; [|lia].
-    iExists (Tl ++ [v]), Tr, nl, nr.
-    rewrite app_length. rewrite Hvalid1. simpl.
-    replace (S n) with (n + 1)%nat by lia.
-    iFrame "#∗".
-    iSplit; iPureIntro; lia.
   Qed.
 
-  Lemma step_update_send_r χ E n m pm v p :
-    ↑N ⊆ E →
-    ses_own χ Right n m (<!> pm)%proto -∗ iMsg_car pm v (Next p) -∗
-    |~{E}~> (ses_own χ Right (S n) m p ∗ ses_idx χ Right n v).
-  Proof.
-    iIntros (HE) "[#HI (Hp&HsrF&HrrF)] Hpm".
-    iApply step_update_open.
-    iInv N as "H" "Hclose".
-    iDestruct "H" as (Tl Tr nl nr)
-                       "(>%Hle&>%Hle2&Hctx&>HTl&>HTr&
-                       >Hsl&>Hrl&>Hsr&>Hrr&#>HTllb&#>HTrlb)".
-    iApply step_update_impl; [iApply step_update_lb_update; iApply "HTrlb"|].
-    iApply step_update_lb_step; [iApply "HTllb"|]=> /=.
-    iIntros "!>!>!>".
-    iMod (iProto_send_r with "Hctx Hp Hpm") as "[Hctx Hp]".
-    iModIntro.
-    iApply step_fupdN_intro; [done|].
-    iApply (bi.laterN_le (length (drop nr Tl))); [rewrite drop_length; lia|].
-    iIntros "!> #HTrlb'".
-    iDestruct (own_valid_2 with "Hsr HsrF") as %Hvalid1%excl_auth_agree_L.
-    iDestruct (own_valid_2 with "Hrr HrrF") as %Hvalid2%excl_auth_agree_L.
-    iMod (own_update_2 _ _ _ (●E (S (length Tr)) ⋅ ◯E (S (length Tr)))
-           with "Hsr HsrF") as "[Hsr HsrF]"; [by apply excl_auth_update|].
-    iMod (own_update _ _ (●ML ((Tr ++ [v]):list (leibnizO A)))
-           with "HTr") as "HTr".
-    { apply mono_list_update. by apply prefix_app_r. }
-    rewrite mono_list_auth_lb_op.
-    iDestruct "HTr" as "[HTr HTr']".
-    iAssert (frag_list χ Right n v) with "[HTr']" as "Hidx".
-    { iExists _. iFrame. iPureIntro. rewrite -Hvalid1.
-      rewrite lookup_app_r; [|lia]. rewrite minus_diag. done. }
-    rewrite !Hvalid1.
-    iFrame "#∗".
-    iApply "Hclose".
-    iIntros "!>".
-    rewrite -drop_app_le; [|lia].
-    iExists Tl, (Tr ++ [v]), nl, nr.
-    rewrite app_length.
-    iFrame "#∗".
-    rewrite Hvalid1. simpl. iFrame.
-    replace (S n) with (n + 1)%nat by lia.
-    iFrame "#∗".
-    iSplit; iPureIntro; lia.
-  Qed.
-
-  (* TODO: Unify the proof of the above rules into this one. *)
   Lemma step_update_send χ s E n m pm v p :
     ↑N ⊆ E →
     ses_own χ s n m (<!> pm)%proto -∗ iMsg_car pm v (Next p) -∗
     |~{E}~> (ses_own χ s (S n) m p ∗ ses_idx χ s n v).
   Proof.
-    iIntros (HE) "Hp Hpm".
+    iIntros (HE) "[#HI (Hp&HsF&HrF)] Hpm".
+    iApply step_update_open.
+    iInv N as "H" "Hclose".
+    iDestruct "H" as (Tl Tr nl nr)
+                       "(>%Hle&>%Hle2&Hctx&>HTl&>HTr&
+                       >Hsl&>Hrl&>Hsr&>Hrr&#>HTllb&#>HTrlb)".
     destruct s.
-    - by iApply (step_update_send_l with "Hp Hpm").
-    - by iApply (step_update_send_r with "Hp Hpm").
+    -  iDestruct (step_update_lb_step with "HTrlb [Hctx Hp Hpm]") as "Hctx".
+       { simpl. iIntros "!>!>".
+         iApply step_fupdN_intro; [done|].
+         iMod (iProto_send_l with "Hctx Hp Hpm") as "H". iModIntro.
+         iApply (bi.laterN_le (length (drop nl Tr)) with "[H]");
+           [rewrite drop_length; lia|].
+         iIntros "!>"=> /=. iExact "H". }
+       iDestruct (step_update_lb_update with "HTllb") as "HTllb'".
+       iDestruct (step_update_comm (E∖↑N) ∅ with "Hctx HTllb'") as "Hstep";
+         [set_solver|].
+       rewrite union_empty_r_L.
+       iModIntro.
+       iApply (step_update_mono with "Hstep"); [set_solver|]; iIntros "Hstep".
+       iDestruct "Hstep" as "[[Hctx Hp] #HTllb'']".
+       iModIntro.
+       iDestruct (own_valid_2 with "Hsl HsF") as %Hvalid1%excl_auth_agree_L.
+       iDestruct (own_valid_2 with "Hrl HrF") as %Hvalid2%excl_auth_agree_L.
+       iMod (own_update_2 _ _ _ (●E (S (length Tl)) ⋅ ◯E (S (length Tl)))
+              with "Hsl HsF") as "[Hsl HsF]"; [by apply excl_auth_update|].
+       iMod (own_update _ _ (●ML ((Tl ++ [v]):list (leibnizO A)))
+              with "HTl") as "HTl".
+       { apply mono_list_update. by apply prefix_app_r. }
+       rewrite mono_list_auth_lb_op.
+       iDestruct "HTl" as "[HTl HTl']".
+       iAssert (frag_list χ Left n v) with "[HTl']" as "Hidx".
+       { iExists _. iFrame. iPureIntro. rewrite -Hvalid1.
+         rewrite lookup_app_r; [|lia]. rewrite minus_diag. done. }
+       rewrite Hvalid1.
+       iFrame "#∗".
+       iApply "Hclose".
+       iIntros "!>".
+       rewrite -drop_app_le; [|lia].
+       iExists (Tl ++ [v]), Tr, nl, nr.
+       rewrite app_length. rewrite Hvalid1. simpl.
+       replace (S n) with (n + 1)%nat by lia.
+       iFrame "#∗".
+       iSplit; iPureIntro; lia.
+    -  iDestruct (step_update_lb_step with "HTllb [Hctx Hp Hpm]") as "Hctx".
+       { simpl. iIntros "!>!>".
+         iApply step_fupdN_intro; [done|].
+         iMod (iProto_send_r with "Hctx Hp Hpm") as "H". iModIntro.
+         iApply (bi.laterN_le (length (drop nr Tl)) with "[H]");
+           [rewrite drop_length; lia|].
+         iIntros "!>"=> /=. iExact "H". }
+       iDestruct (step_update_lb_update with "HTrlb") as "HTrlb'".
+       iDestruct (step_update_comm (E∖↑N) ∅ with "Hctx HTrlb'") as "Hstep";
+         [set_solver|].
+       rewrite union_empty_r_L.
+       iModIntro.
+       iApply (step_update_mono with "Hstep"); [set_solver|]; iIntros "Hstep".
+       iDestruct "Hstep" as "[[Hctx Hp] #HTrlb'']".
+       iModIntro.
+       iDestruct (own_valid_2 with "Hsr HsF") as %Hvalid1%excl_auth_agree_L.
+       iDestruct (own_valid_2 with "Hrr HrF") as %Hvalid2%excl_auth_agree_L.
+       iMod (own_update_2 _ _ _ (●E (S (length Tr)) ⋅ ◯E (S (length Tr)))
+              with "Hsr HsF") as "[Hs HsF]"; [by apply excl_auth_update|].
+       iMod (own_update _ _ (●ML ((Tr ++ [v]):list (leibnizO A)))
+              with "HTr") as "HTr".
+       { apply mono_list_update. by apply prefix_app_r. }
+       rewrite mono_list_auth_lb_op.
+       iDestruct "HTr" as "[HTr HTr']".
+       iAssert (frag_list χ Right n v) with "[HTr']" as "Hidx".
+       { iExists _. iFrame. iPureIntro. rewrite -Hvalid1.
+         rewrite lookup_app_r; [|lia]. rewrite minus_diag. done. }
+       rewrite Hvalid1.
+       iFrame "#∗".
+       iApply "Hclose".
+       iIntros "!>".
+       rewrite -drop_app_le; [|lia].
+       iExists Tl, (Tr ++ [v]), nl, nr.
+       rewrite app_length. rewrite Hvalid1. simpl.
+       replace (S n) with (n + 1)%nat by lia.
+       iFrame "#∗".
+       iSplit; iPureIntro; lia.
   Qed.
 
   Lemma step_update_recv_l χ E n m pm v :

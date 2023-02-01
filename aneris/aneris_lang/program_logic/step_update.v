@@ -21,14 +21,97 @@ Section with_Σ.
     iMod "HR". iMod "HQ". iIntros "!>!>". iMod "HR". iMod "HQ". by iFrame.
   Qed.
 
+  Definition step_get E1 E2 P : iProp Σ :=
+    ∀ n, steps_auth n ={E1,E2}=∗ steps_auth n ∗ (P n).
+
+  Notation "|~{ E1 , E2 }~| P" := (step_get E1 E2 (λ _, |={E2,E1}=> P))%I (at level 99, P at level 200, format "'[  ' |~{  E1  ,  E2  }~|  '/' P ']'").
+  Notation "|~{ E }~| P" := (|~{E,∅}~| P) (at level 99, P at level 200, format "'[  ' |~{  E  }~|  '/' P ']'").
+  Notation "|~~| P" := (|~{∅}~| P) (at level 99, P at level 200, format "'[  ' |~~|  '/' P ']'").
+
+  Lemma aneris_wp_step_get ip E e P Φ :
+    TCEq (to_val e) None →
+    (|~{E}~| P) -∗
+    (P -∗ WP e @[ip] E {{ Φ }}) -∗
+    WP e @[ip] E {{ Φ }}.
+  Proof.
+    iIntros (Hval) "HP Hwp".
+    rewrite !aneris_wp_unfold /aneris_wp_def.
+    iIntros (tid) "Hip".
+    rewrite !wp_unfold /wp_pre /= /aneris_to_val /= Hval.
+    iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
+            "(?&?&?&?&Hauth)".
+    iMod ("HP" with "Hauth") as "[Hauth HP]".
+    iMod "HP".
+    iDestruct ("Hwp" with "HP Hip") as "Hwp".
+    rewrite !wp_unfold /wp_pre /= /aneris_to_val /= Hval.
+    iMod ("Hwp" with "[//] [//] [//] [$]") as "[% H]".
+    iModIntro.
+    iSplit; [done|].
+    iIntros (e2 σ2 efs Hstep). simpl.
+    iMod ("H" with "[//]") as "H". iIntros "!> !>".
+    iMod "H" as "H". iIntros "!>".
+    iApply (step_fupdN_wand with "[H]"); first by iApply "H".
+    iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth) & H & Hefs)".
+    iModIntro.
+    iExists δ2, ℓ.
+    iFrame.
+  Qed.
+
+  Lemma step_get_impl E P Q :
+    (|~{E}~| P) -∗ (P -∗ |~{E}~| Q) -∗ |~{E}~| Q.
+  Proof.
+    iIntros "HP HPQ".
+    iIntros (n) "Hauth".
+    iMod ("HP" with "Hauth") as "[Hauth HP]".
+    iMod "HP". by iMod ("HPQ" with "HP Hauth") as "HPQ".
+  Qed.
+
+  Lemma step_get_intro E P :
+    P -∗ |~{E}~| P.
+  Proof.
+    iIntros "HP" (n) "Hauth". iApply fupd_mask_intro; [set_solver|].
+    iIntros "Hclose". iFrame. done.
+  Qed.
+
+  Lemma step_get_lb_get E :
+    ⊢ |~{E}~| steps_lb 0.
+  Proof.
+    iIntros (m) "Hauth".
+    iDestruct (steps_lb_get with "Hauth") as "#Hlb".
+    iDestruct (steps_lb_le with "Hlb") as "$"; [lia|].
+    iFrame. iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iMod "Hclose". by iModIntro.
+  Qed.
+
+  Lemma aneris_wp_lb_get ip E e Φ :
+    TCEq (to_val e) None →
+    (steps_lb 0 -∗ WP e @[ip] E {{ v, Φ v }}) -∗
+    WP e @[ip] E {{ Φ }}.
+  Proof.
+    iIntros (Hval) "Hwp".
+    iApply (aneris_wp_step_get); [|done]. iApply step_get_lb_get.
+  Qed.
+
   Definition step_update E1 E2 P : iProp Σ :=
-    ∀ n, steps_auth n ={E1,E2}=∗
-         (steps_auth n ∗ (|={∅}▷=>^(S n) (steps_auth (S n) ={E2,E1}=∗
-                                          steps_auth (S n) ∗ P))).
+    step_get E1 E2 (λ n, (|={∅}▷=>^(S n)
+                                   (steps_auth (S n) ={E2,E1}=∗
+                                    steps_auth (S n) ∗ P)))%I.
 
   Notation "|~{ E1 , E2 }~> P" := (step_update E1 E2 P) (at level 99, P at level 200, format "'[  ' |~{  E1  ,  E2  }~>  '/' P ']'").
   Notation "|~{ E }~> P" := (step_update E ∅ P) (at level 99, P at level 200, format "'[  ' |~{  E  }~>  '/' P ']'").
   Notation "|~~> P" := (|~{∅}~> P) (at level 99, P at level 200, format "'[  ' |~~>  '/' P ']'").
+
+  Lemma step_get_step_update E1 E2 P Q :
+    (|~{E1}~| P) -∗
+    (P -∗ |~{E1,E2}~> Q) -∗
+    |~{E1,E2}~> Q.
+  Proof.
+    iIntros "HP HPQ".
+    iIntros (n) "Hauth".
+    iMod ("HP" with "Hauth") as "[Hauth HP]".
+    iMod "HP".
+    iMod ("HPQ" with "HP Hauth") as "[Hauth HPQ]". by iFrame.
+  Qed.
 
   Lemma step_update_frame E1 E2 Ef P :
     E2 ⊆ E1 → E1 ## Ef →
@@ -107,6 +190,14 @@ Section with_Σ.
     by iApply (aneris_wp_step_update_strong with "Hstep").
   Qed.
 
+  Lemma step_update_intro E1 E2 P :
+    E2 ⊆ E1 → P -∗ |~{E1,E2}~> P.
+  Proof.
+    iIntros (HE) "HP". iIntros (n) "Hauth". iApply fupd_mask_intro; [set_solver|].
+    iIntros "Hclose". iFrame. iApply step_fupdN_intro; [set_solver|].
+    iIntros "!>!> Hauth". iMod "Hclose". iFrame. done.
+  Qed.
+
   Lemma step_update_frame_l E1 E2 P Q :
     (|~{E1,E2}~> P) -∗ (|={E1}=> Q) -∗ |~{E1,E2}~> (P ∗ Q).
   Proof.
@@ -118,20 +209,24 @@ Section with_Σ.
     iIntros "HP Hauth". iMod ("HP" with "Hauth") as "[Hauth HP]". by iFrame.
   Qed.
 
-  Lemma step_update_comm P Q :
-    (|~~> P) -∗ (|~~> Q) -∗ |~~> P ∗ Q.
+  Lemma step_update_comm E1 E2 P Q :
+    E1 ## E2 → (|~{E1}~> P) -∗ (|~{E2}~> Q) -∗ |~{E1 ∪ E2}~> P ∗ Q.
   Proof.
-    iIntros "HP HQ" (n) "Hauth".
-    iMod ("HP" with "Hauth") as "[Hauth HP]".
+    iIntros (HE) "HP HQ". iIntros (n) "Hauth".
+    iDestruct ("HP" with "Hauth") as "HP".
+    iDestruct (fupd_mask_frame_r E1 ∅ E2 with "HP") as "HP"; [done|].
+    iMod "HP" as "[Hauth HP]". rewrite union_empty_l_L.
     iMod ("HQ" with "Hauth") as "[Hauth HQ]".
     iIntros "!>". iFrame=> /=.
     iMod "HP". iMod "HQ". iIntros "!>!>". iMod "HP". iMod "HQ". iIntros "!>".
     iDestruct (step_fupdN_empty_sep with "[$HP $HQ]") as "HPQ".
     iApply (step_fupdN_wand with "[HPQ]"); first by iApply "HPQ".
     iIntros "[HP HQ] Hauth".
-    iMod ("HP" with "Hauth") as "[Hauth HP]".
     iMod ("HQ" with "Hauth") as "[Hauth HQ]".
-    by iFrame.
+    iDestruct ("HP" with "Hauth") as "HP".
+    iDestruct (fupd_mask_frame_r ∅ E1 E2 with "HP") as "HP"; [set_solver|].
+    rewrite union_empty_l_L.
+    iMod "HP". iFrame. done.
   Qed.
 
   Lemma step_update_impl E1 E2 P Q :
@@ -209,6 +304,10 @@ Section with_Σ.
   Qed.
 
 End with_Σ.
+
+Notation "|~{ E1 , E2 }~| P" := (step_get E1 E2 (λ _, |={E2,E1}=> P))%I (at level 99, P at level 200, format "'[  ' |~{  E1  ,  E2  }~|  '/' P ']'").
+Notation "|~{ E }~| P" := (|~{E,∅}~| P) (at level 99, P at level 200, format "'[  ' |~{  E  }~|  '/' P ']'").
+Notation "|~~| P" := (|~{∅}~| P) (at level 99, P at level 200, format "'[  ' |~~|  '/' P ']'").
 
 Notation "|~{ E1 , E2 }~> P" := (step_update E1 E2 P) (at level 99, P at level 200, format "'[  ' |~{  E1  ,  E2  }~>  '/' P ']'").
 Notation "|~{ E }~> P" := (step_update E ∅ P) (at level 99, P at level 200, format "'[  ' |~{  E  }~>  '/' P ']'").
