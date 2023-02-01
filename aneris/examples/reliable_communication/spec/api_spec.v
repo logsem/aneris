@@ -113,7 +113,6 @@ Section Init.
   Class Reliable_communication_init := {
       Reliable_communication_init_setup
         E (UP : Reliable_communication_service_params):
-      ↑RCParams_srv_N ⊆ E →
       ⊢ |={E}=>
         ∃ ( _ : Chan_mapsto_resource),
         ∃ (SnRes : SessionResources UP),

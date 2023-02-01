@@ -37,7 +37,7 @@ Section Proof_of_server_conn_step_1.
         is_conn_queue_lock γqlk qlk cql ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         m_sender m ⤇ client_interp ∗
-        inv (RCParams_srv_N.@"skt") (socket_inv_def h RCParams_srv_saddr sock Right) ∗
+        inv Nskt (socket_inv_def h RCParams_srv_saddr sock Right) ∗
         skl ↦[srv_ip]{1 / 3} InjRV (#cql, qlk) ∗
         cml ↦[srv_ip] cmv ∗
         known_sessions γM ∗
@@ -96,7 +96,7 @@ Section Proof_of_server_conn_step_1.
                iIntros (s1 Hs1). wp_pures.
                (* Sending "INIT-ACK, cookie" back. *)
                wp_bind (SendTo _ _ _).
-               iInv (RCParams_srv_N.@"skt")
+               iInv Nskt
                  as (R' T')
                       "(>Hh & >Hmh & >#HmRfrag & >HmTauth & #HmR')".
                wp_apply (aneris_wp_send srv_ip

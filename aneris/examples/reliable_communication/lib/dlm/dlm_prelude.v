@@ -4,5 +4,4 @@ From aneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 
 Class DL_params := {
     DL_server_addr : socket_address;
-    DL_namespace : namespace;
  }.

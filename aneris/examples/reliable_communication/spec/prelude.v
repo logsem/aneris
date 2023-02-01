@@ -15,11 +15,11 @@ Notation iMsg Σ := (iMsg Σ val).
 (** =============================== GHOST NAMES ============================= *)
 
 Definition Nsession_escrow := nroot .@ "session_escrow".
+Definition Nskt := nroot .@ "skt".
 
 Section iProto_sessions.
   Context `{!anerisG Mdl Σ, !session_escrowG Σ val}.
-  Context (N : namespace).
-  
+
   Definition ses_own := ses_own Nsession_escrow.
 End iProto_sessions.
 

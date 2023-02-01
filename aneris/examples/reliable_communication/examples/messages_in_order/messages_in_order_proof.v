@@ -38,8 +38,7 @@ Section proof_of_the_code.
   Context
     (srv_sa : socket_address)
     (A : gset socket_address)
-    (p : iProto Σ)
-    (N : namespace).
+    (p : iProto Σ).
 
   (* TODO: maybe use record mechanism instead of TC for user params. *)
   Global Instance hw_rcsparams
@@ -52,7 +51,6 @@ Section proof_of_the_code.
     RCParams_clt_ser_inj_alt := ser_inj.int_ser_is_ser_injective_alt;
     RCParams_srv_saddr := srv_sa;
     RCParams_protocol := proto_in_order;
-    RCParams_srv_N := N
   |}.
 
   Context (SnRes : SessionResources hw_rcsparams).
@@ -126,7 +124,7 @@ Section proof_of_the_main.
   Context `{!anerisG Mdl Σ, !SpecChanG Σ}.
 
   (** Concrete instance of the User Parameters. *)
-  Definition UP := hw_rcsparams srv_sa (nroot .@ "hw").
+  Definition UP := hw_rcsparams srv_sa.
 
   Context `{chn : @Chan_mapsto_resource Σ}.
   Context  (SnRes : SessionResources UP).
@@ -153,13 +151,13 @@ Section proof_of_the_main.
     iFrame "Hfree1".
     iSplitR "Hsa1 HSrvInit"; last first.
     { iNext. iIntros "Hfps".
-      iApply (@wp_server _ _ _ _ _ _ SnRes chn _ with "[-]"); last done. by iFrame "#∗". }
+      iApply (@wp_server _ _ _ _ _ SnRes chn _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     wp_apply aneris_wp_start; first done.
     iFrame "Hfree2".
     iSplit; first done.
     iNext. iIntros "Hfps".
-    iApply (@wp_client _ _ _ _ _ _ SnRes chn _ _ clt_sa with "[-]"); last done.
+    iApply (@wp_client _ _ _ _ _ SnRes chn _ _ clt_sa with "[-]"); last done.
     by iFrame "#∗".
   Qed.
 
@@ -216,7 +214,7 @@ Proof.
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   iMod (Reliable_communication_init_instance ⊤ UP)
-    as (chn sgn SnRes) "(HsrvInit & Hspecs)"; [ solve_ndisj|].
+    as (chn sgn SnRes) "(HsrvInit & Hspecs)".
   iDestruct "Hspecs"
     as "(
            %HmkClt & %HmkSrv

@@ -38,7 +38,6 @@ Section proof_of_code.
   Local Instance DLSrv : DL_params :=
     {|
       DL_server_addr := dlm_sa;
-      DL_namespace := (nroot .@ "DLInv");
     |}.
 
   Local Instance DBSrv : DB_params :=
@@ -482,8 +481,7 @@ Proof.
   iDestruct "Hspecs"
     as "((#HdbSrvS & #HdbCltS) & _)".
   iMod (dlinit.(DL_init_setup) ⊤ DLP ShRes)
-    as (DLRes) "(HdlInit & #HdlSrvS & #HdlCltS)";
-    [solve_ndisj| ].
+    as (DLRes) "(HdlInit & #HdlSrvS & #HdlCltS)".
   iMod (@main_spec
           _ _ _
           int_time leader_si leaderF_si init_leader DLRes DBRes) as "Hmain".

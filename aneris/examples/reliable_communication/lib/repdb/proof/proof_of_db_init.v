@@ -64,7 +64,6 @@ Section Init_setup_proof.
   Context `{!anerisG Mdl Σ, DB : !DB_params, !DBPreG Σ, ras.SpecChanG Σ}.
 
   Lemma init_setup_holds (E : coPset) :
-    ↑DB_InvName ⊆ E →
     DB_addr ∉ DB_followers →
     DB_addrF ∉ DB_followers →
     ⊢ |={E}=>
@@ -86,7 +85,7 @@ Section Init_setup_proof.
            (init_follower_spec fsa Init_follower f_si leaderF_si) ∗
            (init_client_proxy_follower_spec fsa f_si)).
   Proof.
-    iIntros (HE Hn1 Hn2).
+    iIntros (Hn1 Hn2).
     iMod (own_alloc
             (● (to_agree <$> ∅ : (gmapUR socket_address (agreeR gnameO))))) as
       (γFls) "Hgnames"; first by apply auth_auth_valid.
@@ -110,10 +109,8 @@ Section Init_setup_proof.
     iExists DBR.
     iMod (MTS_init_setup E MTSC)
       as (leader_si SrvInit MTRC) "(Hsinit & #HsrvS & #HcltS & #HreqS)".
-    { simplify_eq /=; solve_ndisj. }
     iMod (MTS_init_setup E MTSF)
       as (leaderF_si SrvInitF MTRF) "(HsinitF & #HsrvSF & #HcltSF & #HreqSF)".
-    { simplify_eq /=; solve_ndisj. }
      iAssert (([∗ map] sa↦γ ∈ N, known_replog_token sa γ)%I) as "#Htks".
     { iApply (big_sepM_mono with "[$Hmap]").
       by iIntros (sa γsa Hin) "(Hkn & _ & _)". }
@@ -189,7 +186,6 @@ Section Init_setup_proof.
          set (MTSFF := client_handler_at_follower_user_params γL γM N fsa).
          iMod (MTS_init_setup E MTSFF) as (f_si initF MTRFF)
                               "(HinitF & #HFsrvSF & #HFcltS & #HFreqS)".
-         { simplify_eq /=; solve_ndisj. }
          iModIntro.
          set (InitFRes := init_follower_res fsa γL γM N initF Fls).
          iExists f_si, InitFRes.
@@ -220,7 +216,7 @@ Global Instance db_init_instance
        `{!anerisG Mdl Σ, !DB_params, !DBPreG Σ, SpecChanG Σ}: DB_init.
   Proof.
     split. iIntros (E HE Hn1 Hn2).
-    iMod (init_setup_holds E HE Hn1 Hn2)
+    iMod (init_setup_holds E Hn1 Hn2)
       as "(%DBRes & %init & %lsi & %lsfi & Hinit)".
     iModIntro.
     iExists _, _, _, _. by iFrame.

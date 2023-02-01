@@ -33,8 +33,7 @@ Section proof_of_the_client_code.
     (srv_sa0 : socket_address)
     (srv_sa1 : socket_address)
     (A : gset socket_address)
-    (Hneq : srv_sa0 ≠ srv_sa1)
-    (N1 N2 : namespace).
+    (Hneq : srv_sa0 ≠ srv_sa1).
 
   (* TODO: maybe use record mechanism instead of TC for user params. *)
   Global Instance up0
@@ -47,7 +46,6 @@ Section proof_of_the_client_code.
     RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
     RCParams_srv_saddr := srv_sa0;
     RCParams_protocol := proto_hello_world;
-    RCParams_srv_N := N1
   |}.
 
   Global Instance up1
@@ -60,7 +58,6 @@ Section proof_of_the_client_code.
     RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
     RCParams_srv_saddr := srv_sa1;
     RCParams_protocol := proto_hello_world;
-    RCParams_srv_N := N2
   |}.
 
   Context (chn0 : @Chan_mapsto_resource Σ).
@@ -137,7 +134,6 @@ Section proof_of_the_server_code.
     RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
     RCParams_srv_saddr := srv_sa;
     RCParams_protocol := proto_hello_world;
-    RCParams_srv_N := N
   |}.
 
   Context (SnRes : SessionResources hw_rcsparams).
@@ -203,8 +199,8 @@ Section proof_of_the_main.
   Context `{!anerisG Mdl Σ, !SpecChanG Σ}.
 
   (** Concrete instances of the User Parameters. *)
-  Definition UP0 := hw_rcsparams srv_sa0 (nroot .@ "hw0").
-  Definition UP1 := hw_rcsparams srv_sa1 (nroot .@ "hw1").
+  Definition UP0 := hw_rcsparams srv_sa0.
+  Definition UP1 := hw_rcsparams srv_sa1.
 
   Context  (chn0 : @Chan_mapsto_resource Σ).
   Context  (chn1 : @Chan_mapsto_resource Σ).
@@ -243,21 +239,21 @@ Section proof_of_the_main.
     iFrame "Hfree0".
     iSplitR "Hsa0 HSrvInit0"; last first.
     { iNext. iIntros "Hfps".
-      iApply (@wp_server _ _ _ _ _ _ SnRes0 chn0 _ with "[-]"); last done. by iFrame "#∗". }
+      iApply (@wp_server _ _ _ _ _ SnRes0 chn0 _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     (* Server 2. *)
     wp_apply aneris_wp_start; first done.
     iFrame "Hfree1".
     iSplitR "Hsa1 HSrvInit1"; last first.
     { iNext. iIntros "Hfps".
-      iApply (@wp_server _ _ _ _ _ _ SnRes1 chn1 _ with "[-]"); last done. by iFrame "#∗". }
+      iApply (@wp_server _ _ _ _ _ SnRes1 chn1 _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
     iFrame "Hfree2".
     iSplit; first done.
     iNext. iIntros "Hfps".
     iDestruct (unallocated_split with "Hf") as "[Hf0 Hf1]"; [set_solver|].
-    iApply (wp_client srv_sa0 srv_sa1 _ _ chn0 SnRes0 _ _ chn1 SnRes1 _ _ clt_sa80 clt_sa81
+    iApply (wp_client srv_sa0 srv_sa1 chn0 SnRes0 _ _ chn1 SnRes1 _ _ clt_sa80 clt_sa81
              with "[Hsa2 Hsa3 Hfps Hf0 Hf1]"); last done.
     iSplit; first done. iFrame "#∗".
     iSplit; first done.
@@ -315,7 +311,7 @@ Proof.
   2:{ apply dummy_model_finitary . }
   iIntros (Hdg) "".
   iMod (Reliable_communication_init_instance ⊤ UP0)
-    as (chn0 sgn0 SnRes0) "(HsrvInit0 & Hspecs0)"; [ solve_ndisj|].
+    as (chn0 sgn0 SnRes0) "(HsrvInit0 & Hspecs0)".
   iDestruct "Hspecs0"
     as "(
            %HmkClt0 & %HmkSrv0
@@ -324,7 +320,7 @@ Proof.
          & %Hsend0 & %HsendTele0
          & %HtryRecv0 & %Hrecv0)".
   iMod (Reliable_communication_init_instance ⊤ UP1)
-    as (chn1 sgn1 SnRes1) "(HsrvInit1 & Hspecs1)"; [ solve_ndisj|].
+    as (chn1 sgn1 SnRes1) "(HsrvInit1 & Hspecs1)".
   iDestruct "Hspecs1"
     as "(
            %HmkClt1 & %HmkSrv1

@@ -17,7 +17,6 @@ Section Proof_of_send_loop.
             !chanG Σ,
             !lockG Σ}.
   Context `{!server_ghost_names}.
-  Context (N : namespace).
 
   Lemma while_empty_loop_spec ip sa
         (γs : session_name) (γe : endpoint_name) γc
@@ -69,7 +68,7 @@ Section Proof_of_send_loop.
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
     c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
     side_elim s dst sa = RCParams_srv_saddr →
-    {{{ socket_resource skt sa N s ∗
+    {{{ socket_resource skt sa s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
         is_send_lock
           ip (endpoint_session_escrow_name γe)
@@ -123,7 +122,7 @@ Section Proof_of_send_loop.
         iIntros (s His_ser).
         wp_pures.
         wp_bind (SendTo _ _ _).
-        iInv N as "IH".
+        iInv Nskt as "IH".
         iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
         wp_apply (aneris_wp_send with "[$Hsa $Hsh Hfrag]"); [done|done| |].
         { iFrame "Hdst".
@@ -153,7 +152,7 @@ Section Proof_of_send_loop.
         iIntros (s His_ser).
         wp_pures.
         wp_bind (SendTo _ _ _).
-        iInv N as "IH".
+        iInv Nskt as "IH".
         iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
         wp_apply (aneris_wp_send with "[$Hsa $Hsh Hfrag]"); [done|done| |].
         { iFrame "Hdst".

@@ -57,7 +57,6 @@ Section Init.
 
   Class DL_init := {
     DL_init_setup E (DLP : DL_params) (R: iProp Σ):
-    ↑DL_namespace ⊆ E →
     ⊢ |={E}=> ∃ (DLRS : DL_resources),
       dl_service_init ∗
         (dl_server_start_service_spec R) ∗

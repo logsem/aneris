@@ -74,7 +74,6 @@ Section MT_user_params.
       MTS_rep_ser_inj_alt := rep_f2c_ser_is_injective_alt;
       MTS_rep_data := RepData;
       MTS_saddr := sa;
-      MTS_mN := (DB_InvName.@socket_address_to_str sa);
       MTS_handler_pre  := ReqPre;
       MTS_handler_post := ReqPost;
     |}.

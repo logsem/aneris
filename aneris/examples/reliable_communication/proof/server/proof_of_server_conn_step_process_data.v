@@ -55,7 +55,7 @@ Section Proof_of_server_conn_step_3.
         is_conn_queue_lock γqlk qlk cql ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         m_sender m ⤇ client_interp ∗
-        inv (RCParams_srv_N.@"skt") (socket_inv_def h RCParams_srv_saddr sock Right) ∗
+        inv Nskt (socket_inv_def h RCParams_srv_saddr sock Right) ∗
         skl ↦[srv_ip]{1 / 3} InjRV (#cql, qlk) ∗
         cml ↦[srv_ip] cmv ∗
         known_sessions γM ∗
@@ -115,7 +115,6 @@ Section Proof_of_server_conn_step_3.
     rewrite -Hskt.
     (* We call the receiving packets processing function (common to the client/server). *)
     wp_apply (process_data_on_chan_spec
-                (RCParams_srv_N.@"skt")
                 c srv_ip skt _ _ γc _ _ sidLB_l ackId_l Right
                 mvalr sbuf (m_sender m) slk rbuf rlk sidLB_n ackId_n
                with "[$Hslk $Hrlk $Hsi $HsL $HaL $Hcsi Hsinv $Hmono $Htk0]"); [done ..| | ].
@@ -271,7 +270,7 @@ Section Proof_of_server_conn_step_3.
         is_conn_queue_lock γqlk qlk cql ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         m_sender m ⤇ client_interp ∗
-        inv (RCParams_srv_N.@"skt") (socket_inv_def h RCParams_srv_saddr sock Right) ∗
+        inv Nskt (socket_inv_def h RCParams_srv_saddr sock Right) ∗
         skl ↦[srv_ip]{1 / 3} InjRV (#cql, qlk) ∗
         cml ↦[srv_ip] cmv ∗
         known_sessions γM ∗
@@ -373,7 +372,7 @@ Section Proof_of_server_conn_step_3.
           assert (m_body mm = s1) as Hmbdy_eq.
           { subst. by apply (msg_ser_is_ser_injective_alt Right _ _ (InjLV (#"COOKIE-ACK", #0))). }
           wp_bind (SendTo _ _ _).
-          iInv (RCParams_srv_N.@"skt") as "HsockRes".
+          iInv Nskt as "HsockRes".
           iDestruct "HsockRes" as (R T) "(>Hsh & >Hsa & (>#HrR & >HrT & #HsockRes))". simpl.
           iDestruct "HrT" as (T1 HT1) "HrT".
           iAssert (⌜T0 ⊆ T1⌝)%I as "%HmhrRel".

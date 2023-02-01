@@ -53,7 +53,7 @@ Section Proof_of_server_conn_step_2.
         is_conn_queue_lock γqlk qlk cql ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         m_sender m ⤇ ψclt ∗
-        inv (RCParams_srv_N.@"skt") (socket_inv_def h RCParams_srv_saddr sock Right) ∗
+        inv Nskt (socket_inv_def h RCParams_srv_saddr sock Right) ∗
         skl ↦[srv_ip]{1 / 3} InjRV (#cql, qlk) ∗
         cml ↦[srv_ip] cmv ∗
         known_sessions γM ∗
@@ -138,7 +138,7 @@ Section Proof_of_server_conn_step_2.
       { subst. apply (msg_ser_is_ser_injective_alt Right _ _ (InjLV (#"INIT-ACK", #cookie ))).
         naive_solver. naive_solver. }
       wp_bind (SendTo _ _ _).
-      iInv (RCParams_srv_N.@"skt") as "HsockRes".
+      iInv Nskt as "HsockRes".
       iDestruct "HsockRes" as (R T) "(>Hsh & >Hsa & (>#HrR & >HrT & #HsockRes))". simpl.
       iDestruct "HrT" as (T1 HT1) "HrT".
       iAssert (⌜T0 ⊆ T1⌝)%I as "%HmhrRel".
@@ -333,7 +333,7 @@ Section Proof_of_server_conn_step_2.
             by iApply mono_nat.mono_nat_lb_own_get. }
           (* Sending "COOKIE-ACK, cookie" back. *)
           wp_bind (SendTo _ _ _).
-          iInv (RCParams_srv_N.@"skt")
+          iInv Nskt
                  as (R' T')
                       "(>Hh & >Hmh & >#HmRfrag & >HmTauth & #HmR')".
           wp_apply (aneris_wp_send srv_ip
@@ -529,9 +529,8 @@ Section Proof_of_server_conn_step_2.
           iExists _, _. subst; eauto.
         + iNext.
           simplify_eq.
-          iApply (send_from_chan_loop_spec
-                  (RCParams_srv_N.@"skt") _ _ _ _ _ _ _ _ Right with "[-]");
-          [done|done|done|done|done|iSplitL; eauto with iFrame|done].
+          iApply (send_from_chan_loop_spec _ _ _ _ _ _ _ _ Right with "[-]");
+            [done|done|done|done|done|iSplitL; eauto with iFrame|done].
           iExists _, _; subst; eauto.
           iFrame "#∗". iExists γs''. simpl. iFrame "#". }
   Qed.

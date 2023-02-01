@@ -26,7 +26,6 @@ Section Init_initialisation.
 
   Lemma Reliable_communication_init_instance
         E (UP : Reliable_communication_service_params) :
-    ↑RCParams_srv_N ⊆ E →
     ⊢ |={E}=>
         ∃ ( _ : Chan_mapsto_resource),
         ∃ ( _ : server_ghost_names),
@@ -42,7 +41,6 @@ Section Init_initialisation.
           ⌜try_recv_spec⌝ ∗
           ⌜recv_spec⌝.
   Proof.
-    iIntros (Hne).
     iMod (own_alloc (● ((to_agree <$> ∅) : session_names_mapUR)))
       as (γ_srv_kn_s_name) "Hkns"; first by apply auth_auth_valid.
     iMod (own_alloc (● (∅ : gsetUR message) ⋅ (◯ (∅ : gsetUR message))))
@@ -70,9 +68,9 @@ Section Init_initialisation.
   Global Instance relcom_init : @Reliable_communication_init _ _ _.
   Proof.
     split.
-    intros E UP Hn.
+    intros E Hn.
     iStartProof.
-    iMod (Reliable_communication_init_instance E UP Hn) as "Hinit".
+    iMod (Reliable_communication_init_instance E Hn) as "Hinit".
     iModIntro.
     iDestruct "Hinit" as (???) "Hinit".
     eauto with iFrame.

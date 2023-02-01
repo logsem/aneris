@@ -21,7 +21,6 @@ Section Proof_of_client_recv_loop.
             !chanG Σ,
             !lockG Σ}.
   Context `{!server_ghost_names}.
-  Context (N : namespace).
 
   Lemma client_recv_on_chan_loop_spec c ip skt sa
         (γs : session_name) (γe : endpoint_name)
@@ -32,7 +31,7 @@ Section Proof_of_client_recv_loop.
     endpoint_session_escrow_name γe = session_session_escrow_name γs →
     lock_idx_name (endpoint_send_lock_name γe) = (session_clt_idx_name γs) →
     c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
-    {{{ socket_resource skt sa N Left ∗
+    {{{ socket_resource skt sa Left ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         is_recv_lock
           ip (endpoint_session_escrow_name γe) (endpoint_recv_lock_name γe)
@@ -54,7 +53,7 @@ Section Proof_of_client_recv_loop.
     iLöb as "Hlob" forall (ridx ackId Φ).
     iDestruct "Hsidx" as "#Hsidx".
     wp_bind (ReceiveFrom _).
-    iInv N as (R T) "(Hsh & HRT & IH)".
+    iInv Nskt as (R T) "(Hsh & HRT & IH)".
     wp_apply (aneris_wp_receivefrom with "[$Hsh $HRT $Hinterp]"); [done..|].
     iIntros (m) "[%Hdest H]".
     iAssert (∃ R T, sh ↪[ ip_of_address sa] sock ∗ sa ⤳ ({[m]} ∪ R, T) ∗
@@ -96,7 +95,7 @@ Section Proof_of_client_recv_loop.
       iApply ("Hlob" with "HsidLB Hack Hsidx HΦ"). }
     iDestruct "Hmval" as "(#Hsmode & [Hmval | Hmval])".
     { iDestruct "Hmval" as (ackid) "[-> [%n [-> [%γ [Htok' Hsidx']]]]]". wp_pures.
-      wp_apply (process_data_on_chan_spec _ _ _ _ _ γs γe ser serf sidLBLoc ackIdLoc Left _
+      wp_apply (process_data_on_chan_spec _ _ _ _ γs γe ser serf sidLBLoc ackIdLoc Left _
                with "[$Hsrv $Hrlk $Hslk $HsidLB $Hack]");
       [done|done|done|done|done| | ].
       { iSplit; [by iFrame "#"; iExists _, _; iFrame "#"|].
@@ -113,7 +112,7 @@ Section Proof_of_client_recv_loop.
       iApply ("Hlob" with "HsidLB Hack Hsidx'' HΦ"). }
     iDestruct "Hmval" as (i w ->) "Hmval". wp_pures.
     wp_apply (process_data_on_chan_spec
-                _ _ _ _ _ γs γe ser serf sidLBLoc ackIdLoc Left _
+                _ _ _ _ γs γe ser serf sidLBLoc ackIdLoc Left _
                with "[$Hsrv $Hrlk $Hslk $HsidLB $Hack Hmval]");
       [done|done|done|done|done| |].
     { iSplit; [by iFrame "#"; iExists _, _; iFrame "#"|].

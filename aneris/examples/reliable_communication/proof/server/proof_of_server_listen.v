@@ -21,7 +21,6 @@ From aneris.examples.reliable_communication.proof.server Require Import
 Section Proof_of_server_listen.
   Context `{!anerisG Mdl Σ, !Reliable_communication_service_params, !chanG Σ, !lockG Σ}.
   Context `{!server_ghost_names}.
-  Context (N : namespace).
   Notation srv_ip := (ip_of_address RCParams_srv_saddr).
 
   Lemma server_recv_on_listening_skt_loop_spec (skt_passive : val) :
@@ -44,7 +43,7 @@ Section Proof_of_server_listen.
     wp_pures.
     wp_bind (ReceiveFrom _).
     (* Open the socket invariant and extract tracked message resources. *)
-    iInv (RCParams_srv_N.@"skt") as (R T)  "(>Hh & >Hmh & >HtrackedR & >HtrackedT & #HmR)".
+    iInv Nskt as (R T)  "(>Hh & >Hmh & >HtrackedR & >HtrackedT & #HmR)".
     iDestruct "HtrackedR" as (R1 Hsub1) "#HfragR1".
     iDestruct "HtrackedT" as (T1 Hsub2) "HauthT1".
     (* Receive a new message. *)
@@ -210,7 +209,7 @@ Section Proof_of_server_listen.
       wp_pures. wp_store. wp_pures.
       iDestruct "Hskt" as "(HisSkt & %Hsa & %Hsblk & Hh & #Hsi)".
       iMod ((inv_alloc
-               (RCParams_srv_N .@"skt")
+               Nskt
                _ (socket_inv_def h RCParams_srv_saddr s Right))
              with "[Hh Hmh HknT1]") as "#Hsock_inv".
       { iNext. iExists _, _. iFrame "#∗". simpl. iSplit; eauto. }

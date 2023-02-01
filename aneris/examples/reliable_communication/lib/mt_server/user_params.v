@@ -26,7 +26,6 @@ Class MTS_user_params `{ !anerisG Mdl Σ, !lockG Σ } :=
     MTS_handler_pre  : val → MTS_req_data → iProp Σ;
     MTS_handler_post : val → MTS_req_data → MTS_rep_data → iProp Σ;
     MTS_saddr : socket_address;
-    MTS_mN : namespace;
   }.
 
 Arguments MTS_user_params {_ _ _ _}.

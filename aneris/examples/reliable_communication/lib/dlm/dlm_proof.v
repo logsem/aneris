@@ -56,7 +56,6 @@ Section DL_proof_of_code.
       RCParams_clt_ser_inj_alt := ser_inj.string_ser_is_ser_injective_alt;
       RCParams_srv_saddr := DL_server_addr;
       RCParams_protocol := dlock_protocol true;
-      RCParams_srv_N := DL_namespace;
     |}.
 
   Context `{cmh: !@Chan_mapsto_resource Σ}.
@@ -267,19 +266,15 @@ Section DL_proof_of_the_init.
   Proof. apply _. Qed.
 
   Lemma init_setup_holds (E : coPset) (R : iProp Σ) :
-    ↑DL_namespace ⊆ E →
     ⊢ |={E}=>
           ∃ (DLRS : DL_resources),
             dl_service_init ∗
              (dl_server_start_service_spec R) ∗
              (dl_subscribe_client_spec R).
   Proof.
-    iIntros (HE).
     iMod (own_alloc (Excl ())) as (γdlk) "Hdlk"; first done.
     set (DLUP := UP (own γdlk (Excl ())) R).
-    assert (DL_namespace = DLUP.(RCParams_srv_N)) as Hnmeq by done.
-    rewrite Hnmeq in HE.
-    iMod (Reliable_communication_init_setup E DLUP HE)
+    iMod (Reliable_communication_init_setup E)
       as (chn sgn) "(Hinit & Hspecs)".
     iDestruct "Hspecs"
     as "(
@@ -337,8 +332,8 @@ Section DL_proof_of_the_init_class.
 
   Global Instance dlinit : DL_init.
   Proof.
-    split. iIntros (E DL R HE).
-    iMod (init_setup_holds E R HE) as  (dlr) "(Ha & Hb & Hc)".
+    split. iIntros (E DL R).
+    iMod (init_setup_holds E R) as  (dlr) "(Ha & Hb & Hc)".
     iModIntro.
     iExists dlr.
     by iFrame.

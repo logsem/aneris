@@ -19,7 +19,6 @@ Class Reliable_communication_service_params `{ !anerisG Mdl Σ } :=
     RCParams_clt_ser_inj_alt : ser_is_injective_alt RCParams_clt_ser;
     RCParams_srv_saddr : socket_address;
     RCParams_protocol : iProto Σ;
-    RCParams_srv_N : namespace
   }.
 
 Arguments Reliable_communication_service_params {_ _ _}.

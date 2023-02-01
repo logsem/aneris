@@ -16,7 +16,6 @@ Section Proof_of_process_data_on_chan.
             !chanG Σ,
             !lockG Σ,
             !server_ghost_names}.
-  Context (N : namespace).
 
   Lemma prune_sendbuf_at_ack_spec ip s γc γ_slk slk
         sbuf sidLBLoc ser (msg_ack sidLB : nat) :
@@ -76,7 +75,7 @@ Section Proof_of_process_data_on_chan.
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
     c = ((#sbuf, slk), (#rbuf, rlk), serf)%V →
     side_elim s dst sa = RCParams_srv_saddr →
-    {{{ socket_resource skt sa N s ∗
+    {{{ socket_resource skt sa s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
         is_recv_lock
           ip (endpoint_session_escrow_name γe) (endpoint_recv_lock_name γe) rlk rbuf ackIdLoc s ∗
@@ -171,7 +170,7 @@ Section Proof_of_process_data_on_chan.
         iIntros (s Hser).
         wp_pures.
         wp_bind (SendTo _ _ _).
-        iInv N as "IH".
+        iInv Nskt as "IH".
         iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
         wp_apply (aneris_wp_send with "[$Hsa $Hsh Hsidx']"); [done|done| |].
         { iFrame "Hdst".
@@ -204,7 +203,7 @@ Section Proof_of_process_data_on_chan.
       iIntros (s Hser).
       wp_pures.
       wp_bind (SendTo _ _ _).
-      iInv N as "IH".
+      iInv Nskt as "IH".
       iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
       wp_apply (aneris_wp_send with "[$Hsa $Hsh Hsidx']"); [done|done| |].
       { iFrame "Hdst".
@@ -238,7 +237,7 @@ Section Proof_of_process_data_on_chan.
       iIntros (s Hser).
       wp_pures.
       wp_bind (SendTo _ _ _).
-      iInv N as "IH".
+      iInv Nskt as "IH".
       iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
       wp_apply (aneris_wp_send with "[$Hsa $Hsh]"); [done|done| |].
       { iFrame "Hdst".
@@ -264,7 +263,7 @@ Section Proof_of_process_data_on_chan.
     iIntros (s Hser).
     wp_pures.
     wp_bind (SendTo _ _ _).
-    iInv N as "IH".
+    iInv Nskt as "IH".
     iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
     wp_apply (aneris_wp_send with "[$Hsa $Hsh]"); [done|done| |].
     { iFrame "Hdst".

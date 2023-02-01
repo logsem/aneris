@@ -235,13 +235,13 @@ Section SocketInterp.
    for the fraglists is existentially quantified in the idmsg_interp but is tied
    via the session_token clt_addr γ *)
   Definition socket_resource
-    (skt : val) (sa : socket_address) (N : namespace) (s : side) : iProp Σ :=
+    (skt : val) (sa : socket_address) (s : side) : iProp Σ :=
     ∃ (sh : socket_handle) (sock : socket),
       is_skt_val skt sh s ∗
       ⌜saddress sock = Some sa⌝ ∗
       ⌜sblock sock = true⌝ ∗
       sa ⤇ side_elim s client_interp server_interp ∗
-      inv N (socket_inv_def sh sa sock s).
+      inv Nskt (socket_inv_def sh sa sock s).
 
   Definition isSocket skt h s sa ϕ bflag (sd : side) : iProp Σ :=
     is_skt_val skt h sd ∗

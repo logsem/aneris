@@ -248,7 +248,7 @@ Section Server_resources.
       (* resources of the connection map *)
       conn_map_resources conn_map_l ∗
       (* socket invariant with message histories and persistent resources *)
-      socket_resource skt RCParams_srv_saddr (RCParams_srv_N .@ "skt") Right ∗
+      socket_resource skt RCParams_srv_saddr Right ∗
       (* resources of the established channel_descr queue  *)
       is_conn_queue_lock γ_qlk qlk chan_queue_l.
 

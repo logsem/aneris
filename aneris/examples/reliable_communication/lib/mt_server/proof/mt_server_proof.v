@@ -46,7 +46,6 @@ Section MTS_proof_of_code.
      RCParams_clt_ser_inj_alt := MTS_req_ser_inj_alt;
      RCParams_srv_saddr := MTS_saddr;
      RCParams_protocol := req_prot;
-     RCParams_srv_N := MTS_mN;
   |}.
 
   Context `{cmh: !@Chan_mapsto_resource Σ}.
@@ -207,7 +206,6 @@ Section MTS_proof_of_init.
   Context `{MTU : !MTS_user_params, !SpecChanG Σ}.
 
   Lemma MTS_init_setup_holds (E : coPset) :
-    ↑MTS_mN ⊆ E →
     ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ)
       (MTR : MTS_resources),
       SrvInit ∗
@@ -215,8 +213,7 @@ Section MTS_proof_of_init.
       (init_client_proxy_spec srv_si) ∗
       make_request_spec.
   Proof.
-    iIntros (HE).
-    iMod (Reliable_communication_init_setup E MT_UP HE)
+    iMod (Reliable_communication_init_setup E MT_UP)
       as (chn sgn) "(Hinit & Hspecs)".
     iDestruct "Hspecs"
       as "(
@@ -264,8 +261,8 @@ Section MTS_proof_of_the_init_class.
 
   Global Instance mts_init : MTS_init.
   Proof.
-    split. iIntros (E MTU HE).
-    iMod (MTS_init_setup_holds E HE)
+    split. iIntros (E MTU).
+    iMod (MTS_init_setup_holds E)
       as (srv_si SrvInit MTR) "(Hinit & Hspecs)".
     iModIntro.
     iExists _, SrvInit, MTR.

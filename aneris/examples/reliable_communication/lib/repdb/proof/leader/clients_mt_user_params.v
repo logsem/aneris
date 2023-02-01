@@ -80,7 +80,6 @@ Section MT_user_params.
       MTS_rep_ser_inj_alt := rep_l2c_ser_is_injective_alt;
       MTS_rep_data := RepData;
       MTS_saddr := DB_addr;
-      MTS_mN := (DB_InvName .@ "leader_main");
       MTS_handler_pre  := ReqPre;
       MTS_handler_post := ReqPost;
     |}.

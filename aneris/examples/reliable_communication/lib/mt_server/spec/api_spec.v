@@ -58,7 +58,6 @@ Section MTS_Init.
 
   Class MTS_init := {
     MTS_init_setup E (MTU : MTS_user_params) :
-    ↑MTS_mN ⊆ E →
     ⊢ |={E}=> ∃ (srv_si : message → iProp Σ) (SrvInit : iProp Σ)
       (MTR : MTS_resources),
       SrvInit ∗
