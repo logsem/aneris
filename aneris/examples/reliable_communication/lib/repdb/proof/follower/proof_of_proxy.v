@@ -80,7 +80,7 @@ Section Client_Proxy_Proof.
     iNext.
     iIntros (reqh) "Hreq".
     wp_pures.
-    wp_apply (newlock_spec (DB_InvName .@ "follower") with "Hreq").
+    wp_apply (newlock_spec with "Hreq").
     iIntros (lk γ) "#Hlk".
     wp_pures.
     iApply "HΦ".

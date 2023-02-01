@@ -66,8 +66,7 @@ Section Client_Proxy_Proof.
     Global_Inv γL γM N -∗
     DB_addr ⤇ srv_si -∗
     @make_request_spec _ _ _ _ MTC _ -∗
-    is_lock (DB_InvName.@"leader") ip γ lk
-            (MTSCanRequest ip reqh) -∗
+    is_lock ip γ lk (MTSCanRequest ip reqh) -∗
     write_spec_internal ip
       (λ: "k" "v",
        match: (λ: "req",
@@ -131,8 +130,7 @@ Section Client_Proxy_Proof.
     Global_Inv γL γM N -∗
     DB_addr ⤇ srv_si -∗
     @make_request_spec _ _ _ _ MTC _ -∗
-    is_lock (DB_InvName.@"leader") ip γ lk
-            (MTSCanRequest ip reqh) -∗
+    is_lock ip γ lk (MTSCanRequest ip reqh) -∗
     ∀ (k : Key) (q : Qp) (h : option write_event),
     read_spec_internal ip
       (λ: "k",
@@ -206,7 +204,7 @@ Section Client_Proxy_Proof.
     iNext.
     iIntros (reqh) "Hreq".
     wp_pures.
-    wp_apply (newlock_spec (DB_InvName .@ "leader") with "Hreq").
+    wp_apply (newlock_spec with "Hreq").
     iIntros (lk γ) "#Hlk".
     wp_pures.
     iApply "HΦ".

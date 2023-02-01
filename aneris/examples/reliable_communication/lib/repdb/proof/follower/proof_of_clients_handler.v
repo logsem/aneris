@@ -45,12 +45,11 @@ Section Clients_MT_spec_params.
   Lemma client_request_handler_at_follower_spec γF :
     ∀ reqv reqd,
     {{{ is_monitor
-           MTU.(MTS_mN)
-            (ip_of_address MTU.(MTS_saddr)) mγ mv
-            (known_replog_token sa γF ∗
-               log_monitor_inv_def
-                 (ip_of_address MTU.(MTS_saddr))
-                 γF ¼ logL (follower_local_res γL kvsL sa γF)) ∗
+          (ip_of_address MTU.(MTS_saddr)) mγ mv
+          (known_replog_token sa γF ∗
+           log_monitor_inv_def
+             (ip_of_address MTU.(MTS_saddr))
+             γF ¼ logL (follower_local_res γL kvsL sa γF)) ∗
           MTU.(MTS_handler_pre) reqv reqd }}}
       client_request_handler_at_follower #kvsL mv reqv @[ip_of_address MTU.(MTS_saddr)]
     {{{ repv repd, RET repv;

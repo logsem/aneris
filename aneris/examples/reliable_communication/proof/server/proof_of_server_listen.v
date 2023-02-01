@@ -203,7 +203,7 @@ Section Proof_of_server_listen.
     wp_alloc qLoc as "Hql".
     wp_pures.
     wp_apply
-      (newlock_spec (RCParams_srv_N .@ "qlk") srv_ip (conn_queue_lock_def qLoc)
+      (newlock_spec srv_ip (conn_queue_lock_def qLoc)
         with "[Hql] [Hml Hl Hskt Hmh Hkn HΦ HknR1 HknT1]").
     - iExists qv, []. iFrame "#∗"; eauto.
     - iNext. iIntros (qlk γ_qlk) "#Hqlk".

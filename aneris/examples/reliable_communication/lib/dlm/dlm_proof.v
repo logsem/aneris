@@ -30,7 +30,6 @@ Section DL_proof_of_code.
   Notation srv_sa := DL_server_addr.
   Notation srv_ip := (ip_of_address DL_server_addr).
   Notation srv_port := (port_of_address DL_server_addr).
-  Notation dlN := (DL_namespace .@ "lk").
 
   Definition dlock_protocol_aux (rec : bool -d> iProto Σ) : bool -d> iProto Σ :=
     λ b, if b then
@@ -66,7 +65,7 @@ Section DL_proof_of_code.
   Context `{HspecN : !Reliable_communication_Specified_API_network UP SnRes}.
 
   Definition is_dlock_lock ip γlk lk : iProp Σ :=
-    is_lock dlN ip γlk lk (R ∗ dl_locked_internal).
+    is_lock ip γlk lk (R ∗ dl_locked_internal).
 
   Definition is_dlock_server_connection_state
              (ip : ip_address) (γlk : gname) (c : val) (b : bool) : iProp Σ :=
@@ -139,7 +138,7 @@ Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
 
   Lemma wp_listen_to_client c lk γlk b :
     {{{ is_dlock_server_connection_state srv_ip γlk c b ∗
-         is_lock dlN srv_ip γlk lk (dl_locked_internal ∗ R) }}}
+         is_lock srv_ip γlk lk (dl_locked_internal ∗ R) }}}
       listen_to_client lk c @[ip_of_address RCParams_srv_saddr]
       {{{ v, RET v ; False }}}.
   Proof.
@@ -170,7 +169,7 @@ Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
   Lemma wp_connections_loop skt lk γlk :
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
           SrvListens skt ∗
-        is_lock dlN srv_ip γlk lk (dl_locked_internal ∗ R) }}}
+        is_lock srv_ip γlk lk (dl_locked_internal ∗ R) }}}
       connections_loop skt lk @[ip_of_address RCParams_srv_saddr]
       {{{ RET #(); False }}}.
   Proof.
@@ -205,7 +204,7 @@ Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
     wp_pures.
     wp_apply (RCSpec_make_server_skt_spec with "[$Hmh $Hsi $Hinit $Hfp][Hdlocked HR HΦ]").
     iNext. iIntros (skt) "Hcl". wp_pures.
-    wp_apply (newlock_spec dlN srv_ip (dl_locked_internal ∗ R) with "[$HR $Hdlocked]").
+    wp_apply (newlock_spec srv_ip (dl_locked_internal ∗ R) with "[$HR $Hdlocked]").
     iIntros (lk γlk) "#Hlk".
     wp_pures.
     wp_apply (RCSpec_server_listen_spec with "[$Hcl][HΦ]").

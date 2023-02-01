@@ -43,7 +43,7 @@ Section Local_invariant.
   Definition local_invariant
              (i : nat) (DB T InQueue OutQueue : loc) (lk : val)
              (γlk : gname) (z : socket_address) : iProp Σ :=
-    is_lock (nroot.@"lk") (ip_of_address z) γlk lk
+    is_lock (ip_of_address z) γlk lk
             (local_inv_def i DB T InQueue OutQueue).
 
   Instance local_invariant_persistent i DB IQ OQ T lk γLk z :

@@ -52,7 +52,6 @@ Proof. solve_inG. Qed.
 Section DL_resources_definition.
   Context `{!anerisG Mdl Σ, !@Chan_mapsto_resource Σ, !DL_params, !DlockG Σ, !lockG Σ}.
   Context (γdlk : gname).
-  Context (N : namespace).
   Context (dl_locked_internal : iProp Σ).
   Context (dl_locked_internal_exclusive : dl_locked_internal -∗ dl_locked_internal -∗ False).
   Context (R : iProp Σ).
@@ -74,7 +73,7 @@ Section DL_resources_definition.
     ([∗ list] c ∈ cl, ∃ s, server_resources_at_chan ip γdlk c s).
 
   Definition is_dlock_internal_server_is_lock ip γdlk lk cl : iProp Σ :=
-    is_lock N ip γdlk lk (dlock_server_inv ip γdlk cl).
+    is_lock ip γdlk lk (dlock_server_inv ip γdlk cl).
 
 End DL_resources_definition.
 

@@ -67,7 +67,7 @@ Section iProto_endpoints.
            ses_idx (chan_session_escrow_name γc) s (sidLB+i) w.
 
   Definition is_send_lock ip γc γ_slk slk sbuf ser sidLBLoc s :=
-    is_monitor ((chan_N γc) .@ "slk") ip (lock_lock_name γ_slk) slk
+    is_monitor ip (lock_lock_name γ_slk) slk
         (send_lock_def ip γc (lock_idx_name γ_slk) sbuf sidLBLoc ser s).
 
   Definition recv_lock_def ip γc γidx rbuf ackIdLoc s : iProp Σ :=
@@ -81,7 +81,7 @@ Section iProto_endpoints.
            ses_idx (chan_session_escrow_name γc) (dual_side s) (ridx+i) w.
 
   Definition is_recv_lock ip γc γ_rlk rlk rbuf ackIdLoc s :=
-    is_lock ((chan_N γc) .@ "rlk") ip (lock_lock_name γ_rlk) rlk
+    is_lock ip (lock_lock_name γ_rlk) rlk
               (recv_lock_def ip γc (lock_idx_name γ_rlk) rbuf ackIdLoc s).
 
   Definition iProto_mapsto_def

@@ -40,7 +40,7 @@ Section OpLib_Proof.
 
   Definition lock_inv (saddr : socket_address) (γ__lock : gname) (lockv : val)
                       (i : nat) (st_loc : loc) : iProp Σ :=
-    is_lock lock_inv_ns (ip_of_address saddr) γ__lock lockv (lock_inv_aux i st_loc).
+    is_lock (ip_of_address saddr) γ__lock lockv (lock_inv_aux i st_loc).
 
   (** * get_state spec *)
 
@@ -686,7 +686,7 @@ Section OpLib_Proof.
     iIntros (v) "%Hcoh".
     wp_alloc ℓst as "Hst".
     wp_pures.
-    wp_apply (newlock_spec lock_inv_ns _ (lock_inv_aux i ℓst) with "[Hlockw Hst]").
+    wp_apply (newlock_spec _ (lock_inv_aux i ℓst) with "[Hlockw Hst]").
     { rewrite /lock_inv_aux.
       iExists _, _, _, ∅, ∅.
       iFrame.

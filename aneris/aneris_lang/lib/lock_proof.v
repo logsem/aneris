@@ -12,7 +12,8 @@ Definition lockΣ : gFunctors := #[GFunctor (exclR unitO)].
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!anerisG Mdl Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Mdl Σ, !lockG Σ}.
+  Let N := nroot .@ "lock".
 
   Definition lock_inv (n : ip_address) (γ : gname) (l : loc) (R : iProp Σ) : iProp Σ :=
     (∃ b : bool, l ↦[n] #b ∗ if b then True else own γ (Excl ()) ∗ R)%I.

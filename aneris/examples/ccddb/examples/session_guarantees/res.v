@@ -171,8 +171,6 @@ End serialization.
 
 Section protocols.
 
-  Definition SM_N : namespace := nroot.@"SM".
-
   Context `{!anerisG Mdl Σ, !lockG Σ}.
   Context `{!DB_params}.
   Context `{!DB_time, !DB_events}.

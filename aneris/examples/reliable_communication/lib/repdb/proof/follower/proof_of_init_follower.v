@@ -98,8 +98,7 @@ Section Init_Follower_Proof.
     rewrite - {1} Qp.quarter_quarter.
     iDestruct (own_log_auth_split _ (1/4) (1/4) with "[$HownF]")
       as "(HownF1 & HownF2)".
-    wp_apply (new_monitor_spec
-                (DB_InvName.@socket_address_to_str f2csa) (ip_of_address f2csa)
+    wp_apply (new_monitor_spec (ip_of_address f2csa)
                 (log_monitor_inv_def
                    (ip_of_address f2csa) γF (1/4) logL
                    (follower_local_res γL kvsL f2csa γF))

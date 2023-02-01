@@ -93,8 +93,7 @@ Section proof.
     iIntros (oq) "%Hil_oq".
     wp_alloc ℓOQs as "HOQ".
     wp_pures.
-    wp_apply (newlock_spec
-                (nroot.@"lk") _ (local_inv_def γGsnap γLs i ℓT ℓSeen ℓIQ ℓOQs)
+    wp_apply (newlock_spec _ (local_inv_def γGsnap γLs i ℓT ℓSeen ℓIQ ℓOQs)
                 with "[Hliv Hseen HT HIQ HOQ]").
     { rewrite /local_inv_def.
       iExists _, _, _, oq, _, _, [], (replicate (length RCB_addresses) ([] : list global_event)).

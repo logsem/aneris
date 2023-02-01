@@ -11,13 +11,13 @@ From aneris.aneris_lang.lib Require Import lock_proof.
 (* Proof. econstructor; solve_inG. Qed. *)
 
 Section proof.
-  Context `{!anerisG Mdl Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Mdl Σ, !lockG Σ}.
 
   Definition monitor_inv (n : ip_address) (γ : gname) (l : loc) (R : iProp Σ) : iProp Σ :=
     lock_inv n γ l R.
 
   Definition is_monitor (n : ip_address) (γ : gname) (mon : val) (R : iProp Σ) : iProp Σ :=
-    ∃ (lk : val), ⌜mon = (#(), lk)%V⌝ ∗ (is_lock N n γ lk R)%I.
+    ∃ (lk : val), ⌜mon = (#(), lk)%V⌝ ∗ (is_lock n γ lk R)%I.
 
   Global Instance monitor_inv_ne n γ l : NonExpansive (monitor_inv n γ l).
   Proof. solve_proper. Qed.
@@ -33,7 +33,7 @@ Section proof.
     {{{ γ mon, RET mon; is_monitor ip γ mon R }}}.
   Proof.
     iIntros (Φ) "HR HΦ". rewrite /new_monitor seal_eq /new_monitor_def.
-    wp_lam. wp_apply (newlock_spec N _ R with "[$HR]").
+    wp_lam. wp_apply (newlock_spec _ R with "[$HR]").
     iIntros (mon γ) "#Hmon". wp_pures. iApply ("HΦ" $! γ). rewrite /is_monitor.
     iExists _; iSplit; first done. iFrame "#".
   Qed.
@@ -98,9 +98,9 @@ Section proof.
   Proof.
     iIntros (Φ) "((%lk & -> & #Hcv) & Hlkd & HR) HΦ".
     rewrite /monitor_wait seal_eq /monitor_wait_def.
-    wp_pures. wp_apply (release_spec N ip γ _ R with "[$Hlkd $HR $Hcv][HΦ]").
+    wp_pures. wp_apply (release_spec ip γ _ R with "[$Hlkd $HR $Hcv][HΦ]").
     iNext. iIntros. wp_pures.
-    wp_apply (acquire_spec N ip γ _ R with "[$Hcv][HΦ]").
+    wp_apply (acquire_spec ip γ _ R with "[$Hcv][HΦ]").
     iNext. by iApply "HΦ".
   Qed.
 

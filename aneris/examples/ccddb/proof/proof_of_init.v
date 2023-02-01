@@ -69,8 +69,7 @@ Section proof.
     iMod (observe_local_history with "Hinv Hliv") as "[Hliv #Hseen]";
       first done.
     iModIntro.
-    wp_apply (newlock_spec
-                (nroot.@"lk") _ (local_inv_def γGsnap γLs i ℓDB ℓT ℓIQ ℓOQ)
+    wp_apply (newlock_spec _ (local_inv_def γGsnap γLs i ℓDB ℓT ℓIQ ℓOQ)
                 with "[Hliv HDB HT HIQ HOQ]").
     {iExists _, _, _, _, ∅, _, [], []. iExists ∅, _; simpl; iFrame.
       repeat iSplit; [|done|done|done|done|done|done|]; iPureIntro.

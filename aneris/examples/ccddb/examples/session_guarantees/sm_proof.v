@@ -166,7 +166,7 @@ Section spec.
     in
     {{{ client_addr ⤇ client_si γ
         ∗ db_addr ⤇ (db_si db_id)
-        ∗ is_lock SM_N ip γ_lock lock (lock_inv seq_id γ sh)
+        ∗ is_lock ip γ_lock lock (lock_inv seq_id γ sh)
         ∗ PQ.1 }}}
 
       session_exec #(LitSocket sh) #seq_id lock #db_addr req_body @[ip]
@@ -177,7 +177,7 @@ Section spec.
     iIntros (Hraw PQ).
     iIntros (Φ) "(#Hcsi & #Hssi & #Hlock & HP) Hcont".
     rewrite /session_exec; wp_pures.
-    wp_apply (acquire_spec SM_N with "Hlock").
+    wp_apply (acquire_spec with "Hlock").
     iIntros (w) "(-> & Hlocked & Hlock_inv)"; wp_pures.
     iDestruct "Hlock_inv" as
         (n M R S) "(Hseqid & Hauth & #Hnotin & Hsh & Hrs & Hrinv)".
@@ -337,7 +337,7 @@ Section spec.
     iIntros "#Hclient".
     wp_socketbind.
     wp_alloc l as "Hl". wp_pures.
-    wp_apply (newlock_spec SM_N _ (lock_inv l γ sh) with "[Hown Hl Hsh Hrs]").
+    wp_apply (newlock_spec _ (lock_inv l γ sh) with "[Hown Hl Hsh Hrs]").
     { rewrite -/ip_of_address. iFrame "#".
       rewrite /lock_inv. iExists 0, ∅, ∅, ∅.
       iFrame. rewrite -ip_eq. iFrame "#".

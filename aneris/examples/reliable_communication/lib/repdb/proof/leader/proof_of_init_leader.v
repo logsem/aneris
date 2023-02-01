@@ -98,8 +98,7 @@ Section Init_Leader_Proof.
     rewrite {1} Qp.quarter_quarter.
     iDestruct (own_log_auth_split _ (1/4) (1/4) with "[$HownF]")
       as "(HownF1 & HownF2)".
-    wp_apply (new_monitor_spec
-                (DB_InvName .@ "leader_main") (ip_of_address DB_addr)
+    wp_apply (new_monitor_spec (ip_of_address DB_addr)
                 (log_monitor_inv_def
                    (ip_of_address DB_addr) γL (1/2) logL
                    (leader_local_main_res kvsL))
@@ -116,8 +115,7 @@ Section Init_Leader_Proof.
     wp_pures.
     symmetry in HipEq.
     rewrite {4 5} HipEq.
-    wp_apply (new_monitor_spec
-                (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF)
+    wp_apply (new_monitor_spec (ip_of_address DB_addrF)
                 (log_monitor_inv_def
                    (ip_of_address DB_addrF) γdbF (1/4) logLF
                    (leader_local_secondary_res γL γdbF))

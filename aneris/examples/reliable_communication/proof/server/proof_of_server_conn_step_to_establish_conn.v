@@ -371,7 +371,7 @@ Section Proof_of_server_conn_step_2.
             iExists ({[resp]} ∪ T00). eauto with set_solver. }
           iModIntro.
           wp_pures.
-          wp_apply (acquire_spec (RCParams_srv_N.@"qlk") with "Hqlk").
+          wp_apply (acquire_spec with "Hqlk").
           iIntros (qv) "(-> & Hlkd & Hqres)".
           iDestruct "Hqres" as (qv vs) "(Hql & %Hisq & Hqres)".
           wp_seq.
@@ -381,8 +381,7 @@ Section Proof_of_server_conn_step_2.
           iIntros (rv Hqrv).
           wp_store.
           (* Release the lock by providing the channel mapsto. *)
-          wp_apply (release_spec (RCParams_srv_N.@"qlk")
-                                 srv_ip γqlk qlk (conn_queue_lock_def cql)
+          wp_apply (release_spec srv_ip γqlk qlk (conn_queue_lock_def cql)
                      with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown Hl]").
           { iFrame "Hlkd Hqlk".
             iExists rv, (vs ++ [(c, #(m_sender m))%V]).

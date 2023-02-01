@@ -121,7 +121,7 @@ Section Clients_MT_spec_params.
         wp_apply (wp_log_add_entry _ _ _ lM a with "[$Hpl]"); [done|].
         iIntros (logV') "(%Hlog' & Hpl')". wp_pures.
         rewrite /leader_local_main_inv /log_monitor_inv.
-        wp_smart_apply (monitor_signal_spec _ _ mγ with "[$HKey $Hmon Hpm Hpl' HlogL]").
+        wp_smart_apply (monitor_signal_spec _ mγ with "[$HKey $Hmon Hpm Hpl' HlogL]").
         { iExists _, _. iFrame "#∗". iSplit; first done. iExists _. iFrame.
           iExists _. iSplit; first done. iPureIntro.
           apply valid_state_local_update; try eauto. apply _. }

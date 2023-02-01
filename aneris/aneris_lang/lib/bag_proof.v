@@ -7,7 +7,7 @@ From aneris.aneris_lang.lib Require Import lock_proof.
 From aneris.aneris_lang.lib Require Export bag_code.
 
 Section spec.
-  Context `{!anerisG Mdl Σ, !lockG Σ} (N : namespace).
+  Context `{!anerisG Mdl Σ, !lockG Σ}.
 
   Local Notation iProp := (iProp Σ).
 
@@ -21,7 +21,7 @@ Section spec.
   Definition isBag (n : ip_address)
              (v : val) (Ψ : val → iProp) :=
     (∃ (l : loc) v' γ, ⌜v = PairV #l v'⌝ ∗
-      is_lock N n γ v' (∃ u, l ↦[n] u ∗ bagList Ψ u))%I.
+      is_lock n γ v' (∃ u, l ↦[n] u ∗ bagList Ψ u))%I.
 
   Global Instance bag_persistent n v Ψ: Persistent (isBag n v Ψ).
   Proof. apply _. Qed.
@@ -32,7 +32,7 @@ Section spec.
     iIntros (Φ) "Hn HΦ".
     wp_lam; wp_alloc ℓ as "Hℓ"; wp_let.
     wp_bind (newlock _)%E.
-    iApply ((newlock_spec N ip (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u)%I) with "[Hn Hℓ]").
+    iApply ((newlock_spec ip (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u)%I) with "[Hn Hℓ]").
     - iFrame. iExists NONEV. iFrame.
     - iNext. iIntros (v γ) "IL". wp_pures.
       iApply "HΦ". iExists ℓ, v, γ. iSplit; auto.
@@ -44,12 +44,12 @@ Section spec.
     iIntros (Φ) "[#HC HΨ] HΦ".
     iDestruct "HC" as (ℓ u γ) "[% #HLock]"; subst.
     wp_lam. wp_pures. wp_bind (acquire _)%E.
-    iApply (acquire_spec _ _ _ _ (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u))%I;
+    iApply (acquire_spec _ _ _ (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u))%I;
       first by iFrame "#".
     iNext. iIntros (v) "(-> & HLocked &  HInv)".
     iDestruct "HInv" as (u') "[Hpt Hisbag]".
     wp_pures. wp_load. wp_store.
-    iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
+    iApply (release_spec _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
               with "[-HΦ]")%I.
     - iFrame; iFrame "#". iExists (SOMEV (e, u')) ; iFrame.
     - iNext. iIntros (?) "->". by iApply "HΦ".
@@ -63,14 +63,14 @@ Section spec.
     iIntros (Φ) "HC HΦ".
     iDestruct "HC" as (ℓ u γ) "[% #HLock]"; subst.
     wp_lam. wp_pures. wp_bind (acquire _)%E.
-    iApply (acquire_spec _ _ _ _ (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u))%I;
+    iApply (acquire_spec _ _ _ (∃ u, ℓ ↦[ip] u ∗ bagList Ψ u))%I;
       first by iFrame "#".
     iNext. iIntros (v) "(-> & HLocked &  HInv)".
     iDestruct "HInv" as (u') "[Hpt Hisbag]".
     wp_pures. wp_load. wp_pures.
     destruct u'; try (iDestruct "Hisbag" as "%" ; contradiction).
     - wp_pures. wp_bind (release _)%E.
-      iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
+      iApply (release_spec _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
                 with "[-HΦ]")%I; iFrame "#"; iFrame.
       + iExists (InjLV u') ; iFrame.
       + iNext. iIntros (v) "-> /=". wp_pures.
@@ -79,7 +79,7 @@ Section spec.
       destruct u'; try (iDestruct "Hisbag" as "%" ; contradiction).
       wp_pures; wp_store; wp_pures. wp_bind (release _)%E.
       iDestruct "Hisbag" as "[HΨ Hisbag]".
-      iApply (release_spec _ _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
+      iApply (release_spec _ _ _ (∃ u0, ℓ ↦[ip] u0 ∗ bagList Ψ u0)
                 with "[HLocked Hisbag Hpt]")%I; iFrame "#"; iFrame.
       + iExists u'2. iFrame.
       + iNext. iIntros (?) "-> /=". wp_pures.

@@ -134,7 +134,7 @@ Theorem install_proxy_spec
      wp_socketbind.
      wp_apply (aneris_wp_rcvtimeo_unblock with "[$Hsh]"); eauto with lia.
      iIntros "Hsh". wp_seq; simpl.
-     wp_apply (newlock_spec SM_N _ (lock_inv ip l sh)  with "[Hl Hsh Hrs]").
+     wp_apply (newlock_spec _ (lock_inv ip l sh)  with "[Hl Hsh Hrs]").
      { rewrite /lock_inv. iExists 0, ∅, ∅.
        rewrite -ip_eq. iFrame. }
      iIntros (lock γ_lock) "#Hislock". wp_pures.

@@ -70,9 +70,7 @@ Section Server_resources.
           ChannelAddrToken γe (RCParams_srv_saddr, sa)).
 
   Definition is_conn_queue_lock γ_qlk qlk qLoc :=
-    is_lock
-      (RCParams_srv_N .@ "qlk")
-      srv_ip γ_qlk qlk (conn_queue_lock_def qLoc).
+    is_lock srv_ip γ_qlk qlk (conn_queue_lock_def qLoc).
 
   (** Server socket predicate defined as a disjunction over whether the listen has been
       already called or not yet. *)

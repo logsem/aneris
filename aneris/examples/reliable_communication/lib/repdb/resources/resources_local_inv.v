@@ -34,8 +34,7 @@ Section Local_Invariants.
 
   Definition leader_local_main_inv
     (kvsL logL : loc) (mγ : gname) (mV : val) : iProp Σ :=
-    log_monitor_inv
-      (DB_InvName .@ "leader_main") (ip_of_address DB_addr) mγ mV
+    log_monitor_inv (ip_of_address DB_addr) mγ mV
       γL (1/2) logL (leader_local_main_res kvsL).
 
   Definition leader_local_secondary_res
@@ -44,8 +43,7 @@ Section Local_Invariants.
 
   Definition leader_local_secondary_inv
     (logFL : loc) (γF : gname) (mγ : gname) (mV : val) : iProp Σ :=
-    log_monitor_inv
-      (DB_InvName .@ "leader_secondary") (ip_of_address DB_addrF) mγ mV
+    log_monitor_inv (ip_of_address DB_addrF) mγ mV
       γF (1/4) logFL (leader_local_secondary_res γF).
 
   (* ------------------------------------------------------------------------ *)
@@ -63,8 +61,7 @@ Section Local_Invariants.
   Definition follower_local_inv (kvsL logL : loc)
     (sa : socket_address) (mγ : gname) (mV : val) : iProp Σ :=
     ∃ (γsa : gname),
-      log_monitor_inv
-        (DB_InvName.@socket_address_to_str sa) (ip_of_address sa) mγ mV
+      log_monitor_inv (ip_of_address sa) mγ mV
         γsa (1/4) logL
       (follower_local_res kvsL sa γsa).
 

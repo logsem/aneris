@@ -116,9 +116,9 @@ Lemma wp_log_get ip logL logV logM i q :
 
   Lemma wp_log_wait_until ip
     γlog q logM (* created at the logical setup *)
-    monN monγ monV monR logL logV i (* created at the allocation of physical data *):
+    monγ monV monR logL logV i (* created at the allocation of physical data *):
     {{{ ⌜i ≤ List.length logM⌝ ∗ ⌜is_log logM logV⌝ ∗
-        is_monitor monN ip monγ monV (log_monitor_inv_def ip γlog q logL monR) ∗
+        is_monitor ip monγ monV (log_monitor_inv_def ip γlog q logL monR) ∗
         locked monγ ∗ (monR logM) ∗ logL ↦[ip] logV ∗ own_log_auth γlog q logM }}}
       log_wait_until #logL monV #i @[ip]
     {{{ logV' logM', RET #();

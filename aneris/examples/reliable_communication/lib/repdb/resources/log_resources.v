@@ -158,7 +158,7 @@ Section Physical_Log_Spec.
       own_log_auth γlog q logM ∗
       Res logM.
 
-  Definition log_monitor_inv monN ip monγ monV γlog q logL monR :=
-    is_monitor monN ip monγ monV (log_monitor_inv_def ip γlog q logL monR).
+  Definition log_monitor_inv ip monγ monV γlog q logL monR :=
+    is_monitor ip monγ monV (log_monitor_inv_def ip γlog q logL monR).
 
 End Physical_Log_Spec.

@@ -57,7 +57,7 @@ Section Local_invariant.
   Definition local_invariant
              (i : nat) (T SeenLoc InQueue OutQueues : loc) (lk : val)
              (γlk : gname) (z : socket_address) : iProp Σ :=
-    is_lock (nroot.@"lk") (ip_of_address z) γlk lk
+    is_lock (ip_of_address z) γlk lk
             (local_inv_def i T SeenLoc InQueue OutQueues).
 
   Instance local_invariant_persistent i IQ OQ T SeenLoc lk γLk z :

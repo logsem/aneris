@@ -69,7 +69,7 @@ Section Proof_of_make_phys_resources.
     wp_alloc rbuf as "Hrb".
     wp_pures.
     iDestruct "Hinit" as "(#Hst & (HmonoF1 & HmonoF2) & #Hmono & Hchan_res)".
-    wp_apply (new_monitor_spec (chan_N γc .@ "slk") ip
+    wp_apply (new_monitor_spec ip
                 (send_lock_def ip γc γsidx sbuf sidLBLoc ser s)
                with "[Hsb HsidLBLoc HmonoF1]").
     { iExists _, [], 0. rewrite -(Nat2Z.inj_add 0 0).
@@ -81,9 +81,7 @@ Section Proof_of_make_phys_resources.
     iMod (own_alloc (to_agree s)) as (γ_side) "#Hside"; first done.
     iMod (own_alloc (to_agree (sidLBLoc, ackIdLoc))) as (γ_idxs) "#Hidxs"; first done.
     iModIntro.
-    wp_apply (newlock_spec
-                (chan_N γc .@ "rlk") ip
-                (recv_lock_def ip γc γridx rbuf ackIdLoc s)
+    wp_apply (newlock_spec ip (recv_lock_def ip γc γridx rbuf ackIdLoc s)
                with "[Hrb HackIdLoc HridxA1]").
     { iExists _, [], 0. rewrite -(Nat2Z.inj_add 0 0).
       simplify_eq /=. by iFrame "#∗". }
