@@ -13,7 +13,6 @@ From aneris.aneris_lang Require Import proofmode.
 From aneris.examples.reliable_communication Require Import user_params.
 From aneris.examples.reliable_communication.resources Require Export
      prelude
-     chan_logbuf_resources
      chan_session_resources
      chan_endpoints_resources
      socket_interp.
