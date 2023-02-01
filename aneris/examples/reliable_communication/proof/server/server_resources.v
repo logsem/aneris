@@ -112,18 +112,18 @@ Section Server_resources.
       (sbuf : loc) (slk : val)
       (rbuf : loc) (rlk : val),
       ⌜c = (((#sbuf, slk), (#rbuf, rlk)), #serl)%V⌝ ∗
-      ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
+      ⌜endpoint_session_escrow_name γe = session_session_escrow_name γs⌝ ∗
       ⌜lock_idx_name (endpoint_send_lock_name γe) = (session_srv_idx_name γs)⌝ ∗
       ⌜s_ser (s_serializer RCParams_srv_ser) = serf⌝ ∗
       session_token clt_addr γs ∗
       ChannelAddrToken γe (sa, clt_addr) ∗
       ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
       is_send_lock srv_ip
-         (endpoint_chan_name γe)
+         (endpoint_session_escrow_name γe)
          (endpoint_send_lock_name γe)
          slk sbuf RCParams_srv_ser sidLBLoc Right ∗
       is_recv_lock srv_ip
-         (endpoint_chan_name γe)
+         (endpoint_session_escrow_name γe)
          (endpoint_recv_lock_name γe)
          rlk rbuf ackIdLoc Right.
 

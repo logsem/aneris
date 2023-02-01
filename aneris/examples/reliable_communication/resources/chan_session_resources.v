@@ -96,10 +96,7 @@ Section iProto_sessions.
     session_token clt_addr γs ∗
     mono_nat_auth_own (side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)) 1 0 ∗
     mono_nat_lb_own (side_elim s (session_srv_idx_name γs) (session_clt_idx_name γs)) 0 ∗
-    inv (chan_N (session_chan_name γs))
-        (Ses_inv (chan_session_escrow_name (session_chan_name γs))) ∗
-    ses_own (chan_N (session_chan_name γs))
-            (chan_session_escrow_name (session_chan_name γs)) s 0 0 p.
+    ses_own (session_session_escrow_name γs) s 0 0 p.
 
   Definition CookieRes (sa : socket_address) (n : nat) : iProp Σ :=
     ∃ (γs : session_name),
@@ -146,9 +143,7 @@ Section iProto_sessions.
       can_init γ sa (iProto_dual p) Right.
     Proof.
     iIntros (Hfresh) "Hkn #Hlb".
-    iMod (Ses_init (N.@ (socket_address_to_str sa)) _ p with "Hlb")
-      as (γ_s) "(#Hses & Hownl & Hownr)".
-    set (γ_chan := ChanName γ_s (N.@ (socket_address_to_str sa))).
+    iMod (Ses_init _ _ p with "Hlb") as (γ_s) "(#Hses & Hownl & Hownr)".
     iMod (mono_nat_own_alloc 0%nat) as (γ_srv_idx) "(Hsrv_idxA & Hsrv_idxF)".
     iMod (mono_nat_own_alloc 0%nat) as (γ_clt_idx) "(Hclt_idxA & Hclt_idxF)".
     iMod (own_alloc (● (to_agree <$> (∅: session_names_map) : session_names_mapUR)))
@@ -157,7 +152,7 @@ Section iProto_sessions.
     iMod (own_alloc (A := frac_authR natR) (●F cookie ⋅ ◯F cookie)) as (γ_ck) "(HckF & Hck)".
     { by apply frac_auth_valid. }
     iMod (own_alloc (SM_opened)) as (γ_mode) "Hmode"; first done.
-    set (γ_session := SessionName γ_chan γ_clt_idx γ_srv_idx γ_ck γ_mode).
+    set (γ_session := SessionName γ_s γ_clt_idx γ_srv_idx γ_ck γ_mode).
     iExists γ_session.
     rewrite /known_sessions /CookieRes /CookieTokenFull.
     iMod (own_update

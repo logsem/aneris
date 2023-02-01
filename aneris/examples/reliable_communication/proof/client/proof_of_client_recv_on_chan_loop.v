@@ -29,16 +29,16 @@ Section Proof_of_client_recv_loop.
         (sidLBLoc ackIdLoc : loc) (sbuf : loc) slk (rbuf : loc) rlk
         (ridx ackId : nat) :
     ip_of_address sa = ip →
-    endpoint_chan_name γe = session_chan_name γs →
+    endpoint_session_escrow_name γe = session_session_escrow_name γs →
     lock_idx_name (endpoint_send_lock_name γe) = (session_clt_idx_name γs) →
     c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
     {{{ socket_resource skt sa N Left ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         is_recv_lock
-          ip (endpoint_chan_name γe) (endpoint_recv_lock_name γe)
+          ip (endpoint_session_escrow_name γe) (endpoint_recv_lock_name γe)
           rlk rbuf ackIdLoc Left ∗
         is_send_lock
-          ip (endpoint_chan_name γe) (endpoint_send_lock_name γe)
+          ip (endpoint_session_escrow_name γe) (endpoint_send_lock_name γe)
           slk sbuf ser sidLBLoc Left ∗
         sidLBLoc ↦[ip]{1/2} #ridx ∗
         ackIdLoc ↦[ip]{1/2} #ackId ∗

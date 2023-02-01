@@ -23,11 +23,11 @@ Section Proof_of_send_loop.
         (γs : session_name) (γe : endpoint_name) γc
         sidLBLoc s (sbuf : loc) (serf : val) slk :
     ip_of_address sa = ip →
-    γc = endpoint_chan_name γe →
-    {{{ is_send_lock (ip_of_address sa) (endpoint_chan_name γe) (endpoint_send_lock_name γe) slk sbuf
+    γc = endpoint_session_escrow_name γe →
+    {{{ is_send_lock (ip_of_address sa) (endpoint_session_escrow_name γe) (endpoint_send_lock_name γe) slk sbuf
              (side_elim s RCParams_clt_ser RCParams_srv_ser) sidLBLoc s ∗
         lock_proof.locked (lock_lock_name (endpoint_send_lock_name γe)) ∗
-        send_lock_def (ip_of_address sa) (endpoint_chan_name γe) (lock_idx_name (endpoint_send_lock_name γe)) sbuf
+        send_lock_def (ip_of_address sa) (endpoint_session_escrow_name γe) (lock_idx_name (endpoint_send_lock_name γe)) sbuf
             sidLBLoc (side_elim s RCParams_clt_ser RCParams_srv_ser) s }}}
        (rec: "while_empty_loop" "p" :=
         if: queue_is_empty (Fst ! "p") then monitor_wait slk;; "while_empty_loop" "p" else #())%V #sbuf @[ip]
@@ -38,8 +38,7 @@ Section Proof_of_send_loop.
          mono_nat_auth_own (lock_idx_name (endpoint_send_lock_name γe)) (1 / 2) (sidLB + length vs) ∗
          ([∗ list] i↦v ∈ vs, ∃ w : val, ⌜v = (#(sidLB + i), w)%V⌝ ∗
                                ⌜Serializable (side_elim s RCParams_clt_ser RCParams_srv_ser) w⌝ ∗
-                               ses_idx (chan_session_escrow_name
-                                          (endpoint_chan_name γe)) s (sidLB + i) w) ∗
+                               ses_idx (endpoint_session_escrow_name γe) s (sidLB + i) w) ∗
         ⌜vs ≠ []⌝)%I
      }}}.
   Proof.
@@ -65,7 +64,7 @@ Section Proof_of_send_loop.
         (γs : session_name) (γe : endpoint_name)
         sidLBLoc s (sbuf : loc) (serf : val) slk rbuf rlk :
     ip_of_address sa = ip →
-    endpoint_chan_name γe = session_chan_name γs →
+    endpoint_session_escrow_name γe = session_session_escrow_name γs →
     lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
     c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
@@ -73,7 +72,7 @@ Section Proof_of_send_loop.
     {{{ socket_resource skt sa N s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
         is_send_lock
-          ip (endpoint_chan_name γe)
+          ip (endpoint_session_escrow_name γe)
           (endpoint_send_lock_name γe)
           slk sbuf
           (side_elim s RCParams_clt_ser RCParams_srv_ser) sidLBLoc s ∗
@@ -92,7 +91,7 @@ Section Proof_of_send_loop.
     wp_apply (monitor_acquire_spec with "Hslk").
     iIntros (v) "(-> & Hlocked & Hlk)".
     do 2 wp_pure _.
-    set (γc := endpoint_chan_name γe).
+    set (γc := endpoint_session_escrow_name γe).
     wp_apply (while_empty_loop_spec _ sa γs γe γc sidLBLoc s with "[$Hlocked $Hlk $Hslk][]");[done|done|done|].
     iNext. iIntros  (q vs sidLB') "(Hlocked & Hsbuf & %Hq & HsidLBLoc' & Hsidx & #Hvs & %Hneq)".
     wp_pures.
@@ -105,8 +104,7 @@ Section Proof_of_send_loop.
                                ⌜Serializable
                                   (side_elim s RCParams_clt_ser RCParams_srv_ser)
                                   w⌝ ∗
-                               ses_idx (chan_session_escrow_name
-                                          (endpoint_chan_name γe)) s (sidLB' + i) w)%I with "Hvs []") as "#Hvs'".
+                               ses_idx (endpoint_session_escrow_name γe) s (sidLB' + i) w)%I with "Hvs []") as "#Hvs'".
     { iIntros "!>" (i v Hlookup) "H".
       iSplit; [|done].
       iPureIntro.

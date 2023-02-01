@@ -53,7 +53,7 @@ Section Proof_of_make_phys_resources.
      }}}.
   Proof.
     set (ip := ip_of_address lsa).
-    set (γc := session_chan_name γs).
+    set (γc := session_session_escrow_name γs).
     set (ser := side_elim s RCParams_clt_ser RCParams_srv_ser).
     set (src_sa := side_elim s sa RCParams_srv_saddr).
     set (dst_sa := side_elim s RCParams_srv_saddr sa).

@@ -34,7 +34,7 @@ Section SocketInterp.
   Definition idmsg_interp_pers clt_addr (i : nat) (v : val) (s : side) : iProp Σ :=
     ∃ (γs : session_name),
       session_token clt_addr γs ∗
-      ses_idx (chan_session_escrow_name (session_chan_name γs)) (dual_side s) i v ∗
+      ses_idx (session_session_escrow_name γs) (dual_side s) i v ∗
       mono_nat_lb_own (side_elim s (session_srv_idx_name γs)
                                    (session_clt_idx_name γs)) (i+1).
 

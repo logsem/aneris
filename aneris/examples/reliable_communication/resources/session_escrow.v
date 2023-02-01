@@ -74,7 +74,7 @@ Section iProto_sessions.
                          (χ.(session_escrow_Tr_name)))
               (◯ML (xs : list (leibnizO A))).
 
-Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iProp Σ :=
+  Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iProp Σ :=
     own (side_elim s χ.(session_escrow_sl_name) χ.(session_escrow_sr_name))
         (●E n).
   Definition auth_frag_sent (χ : session_escrow_name) (s : side) (n : nat) : iProp Σ :=

@@ -56,7 +56,7 @@ End Endpoint_MetaData.
 Section iProto_endpoints.
   Context `{!anerisG Mdl Σ, !chanG Σ, !lockG Σ, !server_ghost_names}.
 
-  Definition send_lock_def ip γc γidx sbuf sidLBLoc ser s : iProp Σ :=
+  Definition send_lock_def ip γs γidx sbuf sidLBLoc ser s : iProp Σ :=
     ∃ (q : val) (vs : list val) (sidLB : nat),
       sbuf ↦[ip] (q, #(sidLB + length vs)) ∗ ⌜is_queue vs q⌝ ∗
         sidLBLoc ↦[ip]{1/2} #sidLB ∗
@@ -64,13 +64,13 @@ Section iProto_endpoints.
         [∗ list] i↦v ∈ vs, ∃ (w:val),
            ⌜v = (#(sidLB+i), w)%V⌝ ∗
            ⌜Serializable ser w⌝ ∗
-           ses_idx (chan_session_escrow_name γc) s (sidLB+i) w.
+           ses_idx γs s (sidLB+i) w.
 
   Definition is_send_lock ip γc γ_slk slk sbuf ser sidLBLoc s :=
     is_monitor ip (lock_lock_name γ_slk) slk
         (send_lock_def ip γc (lock_idx_name γ_slk) sbuf sidLBLoc ser s).
 
-  Definition recv_lock_def ip γc γidx rbuf ackIdLoc s : iProp Σ :=
+  Definition recv_lock_def ip γs γidx rbuf ackIdLoc s : iProp Σ :=
     ∃ (q : val) (vs : list val) (ridx : nat),
       rbuf ↦[ip] q ∗ ⌜is_queue vs q⌝ ∗
         ackIdLoc ↦[ip]{1/2} #(ridx + length vs) ∗
@@ -78,7 +78,7 @@ Section iProto_endpoints.
         (* NB: Values are currently tagged - But we can remove it *)
         [∗ list] i↦v ∈ vs, ∃ (w:val),
            ⌜v = (#(ridx + i), w)%V⌝ ∗
-           ses_idx (chan_session_escrow_name γc) (dual_side s) (ridx+i) w.
+           ses_idx γs (dual_side s) (ridx+i) w.
 
   Definition is_recv_lock ip γc γ_rlk rlk rbuf ackIdLoc s :=
     is_lock ip (lock_lock_name γ_rlk) rlk
@@ -97,7 +97,7 @@ Section iProto_endpoints.
       (sidLBLoc ackIdLoc : loc)
       (sidx ridx : nat),
       ⌜c = (((#sbuf, smn), (#rbuf, rlk)), #serl)%V⌝ ∗
-      ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
+      ⌜endpoint_session_escrow_name γe = session_session_escrow_name γs⌝ ∗
       ⌜lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)⌝ ∗
       serl ↦[ip] serf ∗
@@ -110,15 +110,13 @@ Section iProto_endpoints.
       ChannelAddrToken γe (sa, dst) ∗
       ChannelSideToken γe s ∗
       ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
-      ses_own
-           (chan_N (endpoint_chan_name γe))
-           (chan_session_escrow_name (endpoint_chan_name γe)) s sidx ridx p ∗
+      ses_own (endpoint_session_escrow_name γe) s sidx ridx p ∗
       is_send_lock ip
-         (endpoint_chan_name γe)
+         (endpoint_session_escrow_name γe)
          (endpoint_send_lock_name γe)
          smn sbuf ser sidLBLoc s ∗
       is_recv_lock ip
-         (endpoint_chan_name γe)
+         (endpoint_session_escrow_name γe)
          (endpoint_recv_lock_name γe)
          rlk rbuf ackIdLoc s.
 

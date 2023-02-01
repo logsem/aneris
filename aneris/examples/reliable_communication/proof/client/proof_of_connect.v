@@ -110,12 +110,11 @@ Section Proof_of_connect.
     wp_alloc lAD as "(Hackid1 & Hackid2)".
     wp_pures.
     set (sock := {| saddress := saddress s; sblock := true |}).
-    iMod ((inv_alloc
-             (chan_N (session_chan_name γ))
+    iMod ((inv_alloc Nsession_escrow
             _ (socket_inv_def h clt_addr sock Left))
            with "[Hh Hmh]") as "#Hsock_inv".
     { iNext. iExists _, _. iFrame "#∗". }
-    iAssert (socket_resource skt clt_addr (chan_N (session_chan_name γ)) Left) as "#Hsinv".
+    iAssert (socket_resource skt clt_addr Nsession_escrow Left) as "#Hsinv".
     { iFrame "#∗". iExists h, sock; eauto. }
     iAssert (session_token clt_addr γ) as "#Hst".
     { rewrite /can_init. by iDestruct "Hres" as "((#Hs & _) & _)". }
@@ -161,7 +160,7 @@ Section Proof_of_connect.
                  with "[$Hsinv $Hst $Hslk $Hrlk $HsidLB2 $Hackid2]"); eauto.
     - simpl. simplify_eq.
       iApply (send_from_chan_loop_spec
-                (chan_N (session_chan_name γs)) _ _ _ _ _ _ _ _ Left with "[-]");
+                Nsession_escrow _ _ _ _ _ _ _ _ Left with "[-]");
         [done|done|done|done|done|iSplitL; eauto with iFrame|done].
   Qed.
 

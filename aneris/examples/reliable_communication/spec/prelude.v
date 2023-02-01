@@ -1,6 +1,7 @@
 From aneris.aneris_lang Require Import lang.
 From actris.channel Require Import proto.
 From aneris.examples.reliable_communication.resources Require Export session_escrow.
+From aneris Require Import aneris_weakestpre.
 
 Set Default Proof Using "Type".
 
@@ -13,12 +14,14 @@ Notation iMsg Σ := (iMsg Σ val).
 
 (** =============================== GHOST NAMES ============================= *)
 
-(** Ghost names for channels, channel endpoint data, and channel session (shared data). *)
-Record chan_name :=
-  ChanName {
-      chan_session_escrow_name : session_escrow_name;
-      chan_N : namespace
-    }.
+Definition Nsession_escrow := nroot .@ "session_escrow".
+
+Section iProto_sessions.
+  Context `{!anerisG Mdl Σ, !session_escrowG Σ val}.
+  Context (N : namespace).
+  
+  Definition ses_own := ses_own Nsession_escrow.
+End iProto_sessions.
 
 Record lock_name :=
   LockName {
@@ -28,7 +31,7 @@ Record lock_name :=
 
 Record endpoint_name :=
   EndpointName {
-      endpoint_chan_name : chan_name;
+      endpoint_session_escrow_name : session_escrow_name;
       endpoint_send_lock_name : lock_name;
       endpoint_recv_lock_name : lock_name;
       endpoint_address_name : gname;
@@ -39,7 +42,7 @@ Record endpoint_name :=
 
 Record session_name :=
   SessionName {
-      session_chan_name : chan_name;
+      session_session_escrow_name : session_escrow_name;
       session_clt_idx_name : gname;
       session_srv_idx_name : gname;
       session_srv_cookie_name : gname;
@@ -47,17 +50,6 @@ Record session_name :=
     }.
 
 Notation socket_addressO := (leibnizO socket_address).
-
-Global Instance chan_name_inhabited : Inhabited chan_name :=
-  populate (ChanName inhabitant nroot).
-Global Instance chan_name_eq_dec : EqDecision chan_name.
-Proof. solve_decision. Qed.
-Global Instance chan_name_countable : Countable chan_name.
-Proof.
-  refine (inj_countable (λ '(ChanName γs N), (γs, N))
-                        (λ '(γs, N),
-                           Some (ChanName γs N)) _); by intros [].
-Qed.
 
 Global Instance lock_name_inhabited : Inhabited lock_name :=
   populate (LockName inhabitant inhabitant).

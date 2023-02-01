@@ -71,7 +71,7 @@ Section Proof_of_process_data_on_chan.
         (sidLBLoc ackIdLoc : loc) s (mval : val) (sbuf : loc)
         (dst : socket_address) slk (rbuf : loc) rlk (ridx ackId : nat) :
     ip_of_address sa = ip →
-    endpoint_chan_name γe = session_chan_name γs →
+    endpoint_session_escrow_name γe = session_session_escrow_name γs →
     lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
     c = ((#sbuf, slk), (#rbuf, rlk), serf)%V →
@@ -79,9 +79,9 @@ Section Proof_of_process_data_on_chan.
     {{{ socket_resource skt sa N s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
         is_recv_lock
-          ip (endpoint_chan_name γe) (endpoint_recv_lock_name γe) rlk rbuf ackIdLoc s ∗
+          ip (endpoint_session_escrow_name γe) (endpoint_recv_lock_name γe) rlk rbuf ackIdLoc s ∗
         is_send_lock
-          ip (endpoint_chan_name γe) (endpoint_send_lock_name γe) slk sbuf ser sidLBLoc s ∗
+          ip (endpoint_session_escrow_name γe) (endpoint_send_lock_name γe) slk sbuf ser sidLBLoc s ∗
         session_token (side_elim s sa dst) γs ∗
         mono_nat_lb_own
           (side_elim
@@ -92,7 +92,7 @@ Section Proof_of_process_data_on_chan.
                    ∃ (n:nat), ⌜ackid = #n⌝ ∗
                               ack_interp_pers (side_elim s sa dst) n s) ∨
          (∃ (i:nat) w, ⌜mval = InjRV (#i, w)%V⌝ ∗
-                       ses_idx (chan_session_escrow_name (endpoint_chan_name γe)) (dual_side s) i w ∗
+                       ses_idx (endpoint_session_escrow_name γe) (dual_side s) i w ∗
                        mono_nat_lb_own
                          (side_elim
                             s (session_srv_idx_name γs) (session_clt_idx_name γs)) (S i))) ∗
