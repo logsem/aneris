@@ -333,50 +333,16 @@ End use_case_proof.
 
 Section program_proof.
   Context `{!anerisG M Σ} `{!inG Σ (exclR unitO)}.
-  Context `{!@StLibG (prodOp gctr_op gctr_op pnctr_op_pred) _ _ Σ}.
-  Context `{uig: !utils.Internal_StLibG (prodOp gctr_op gctr_op pnctr_op_pred) Σ}.
 
   Notation pnOp := (prodOp gctr_op gctr_op pnctr_op_pred).
   Notation pnSt := (prodSt gctr_st gctr_st).
   Notation pnParams := (prod_params gctr_op gctr_st gctr_op gctr_st pnctr_op_pred).
 
-  Definition Sn (n: nat) : (gset (fin n)).
-  Proof.
-    induction n.
-    + exact (∅: gset (fin O)).
-    + exact (( {[ nat_to_fin (Nat.lt_0_succ n)]}: gset (fin (S n)))
-            ∪ (set_map FS IHn)).
-  Defined.
-
-  Lemma Sn_prop: forall n, ∀ (f: fin n), f ∈ (Sn n).
-  Proof.
-    induction n; intros x; first inversion x.
-    destruct (resources_allocation.destruct_fin _ x) as [Hx | [x' Hx]];
-      simplify_eq/=; set_solver.
-  Qed.
-
-  Lemma S_to_Sn: forall n S, (∀ (f: fin n), f ∈ S) -> S = Sn n.
-  Proof.
-    induction n as [|n IHn]; simplify_eq/=; intros S HS; apply set_eq; intros x;
-      first by inversion x.
-    split; destruct (resources_allocation.destruct_fin _ x) as [Hx | [x' Hx]];
-      simplify_eq/=.
-    - set_solver.
-    - intros Hx'. apply elem_of_union_r, elem_of_map_2, Sn_prop.
-    - intros _. apply HS.
-    - intros [Himp|Hx']%elem_of_union; first set_solver. apply HS.
-  Qed.
-
-  Lemma S2_eq : forall S, (forall (f: fin 2), f ∈ S) -> S = ({[Ofin; Ifin]}: gset (fin 2)).
-  Proof.
-    intros S Hs.
-    rewrite (S_to_Sn 2 S Hs).
-    set_solver.
-  Qed.
+  Context `{!@StLibG pnOp _ _ Σ}.
 
   Lemma wp_use_case_program E:
     ⊢ |={E}=> ∃ Res : StLib_Res pnOp,
-         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) -∗
+         ([∗ list] z ∈ CRDT_Addresses, z ⤇ StLib_SocketProto) -∗
          free_ip "1.1.1.1" -∗
          free_ip "1.1.1.2" -∗
          SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) -∗
@@ -385,24 +351,28 @@ Section program_proof.
       {{ v, ⌜v = #()⌝ }}.
   Proof.
     iIntros "".
+
     iMod (@StLibSetup_Init
             pnOp pnSt
-            _ _ _ _ _ pnc_use_case_CRDT_Params (prod_lattice (vectn_le_lat ((length CRDT_Addresses))) (vectn_le_lat ((length CRDT_Addresses))))
-            pnParams  _ _ E with "[//]")
+            _ _ _ _ _
+            pnc_use_case_CRDT_Params
+            (prod_lattice
+               (vectn_le_lat ((length CRDT_Addresses)))
+               (vectn_le_lat ((length CRDT_Addresses))))
+            pnParams _ stlib_setup_instance E with "[//]")
       as (ResProd) "(#HGinvProd & HGsPRod & HtksProd & #HinitProd)".
     rewrite /init. simpl in *.
     iExists ResProd.
     iModIntro.
     iIntros "#Hprotos Hfip1 Hfip2 Hsa1 Hsa2".
-    iDestruct "HtksProd" as (S) "(%Hfin & HitksProd)".
-    simpl in *. simplify_eq /=.
-    rewrite (S2_eq _ Hfin).
-    Check FS.
-    iAssert (StLib_InitToken Ofin ∗ StLib_InitToken Ifin)%I with "[HitksProd]"
+    iAssert (StLib_InitToken Ofin ∗ StLib_InitToken Ifin)%I with "[HtksProd]"
       as "[Hitk1Prod Hitk2Prod]".
-    { iDestruct (big_sepS_union with "HitksProd") as "[H1 H2]"; first set_solver.
+    { iDestruct (big_sepS_union with "HtksProd") as "[H1 H2]"; first set_solver.
       iDestruct ((bi.equiv_entails_1_1 _ _ ( big_sepS_singleton  _ _)) with "H1")
         as "H1".
+      replace (set_map FS ({[0%fin]} ∪ set_map FS ∅))
+        with ({[1%fin]}: gset (fin 2));
+        last set_solver.
       iDestruct ((bi.equiv_entails_1_1 _ _ ( big_sepS_singleton  _ _)) with "H2")
         as "H2".
       iFrame. }
@@ -452,8 +422,9 @@ Definition Trivial_Mdl : resources.Model :=
 Lemma Trivial_Mdl_finitary : aneris_model_rel_finitary Trivial_Mdl.
 Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 
-
-Definition use_case_Σ := #[anerisΣ Trivial_Mdl;  @OPLIBΣ CtrOp _ _; GFunctor (exclR unitO)].
+Definition use_case_Σ := #[anerisΣ Trivial_Mdl;
+                           @STLIBΣ (prodOp gctr_op gctr_op pnctr_op_pred) _ _;
+                           GFunctor (exclR unitO)].
 
 Theorem use_case_program_adequate :
   aneris_adequate use_case_program "system" init_state (λ v, v = #()).
@@ -488,7 +459,4 @@ Proof.
   iAssert ([∗ list] i↦z ∈ addresses, z ⤇ (@StLib_SocketProto _ _ _ _ _ _ _ Res))%I as "Hprotos".
   { repeat iSplit; done. }
   wp_apply ("Hwp" with "Hprotos Hfip1 Hfip2 Hsa1 Hsa2").
-  Unshelve.
-  - apply subG_OPLIBΣ. admit.
-  - admit.
-Admitted.
+Qed.

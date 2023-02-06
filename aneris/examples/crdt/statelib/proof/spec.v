@@ -8,6 +8,7 @@ From aneris.examples.crdt.spec Require Import crdt_spec.
 From aneris.examples.crdt.statelib.STS Require Import lst.
 From aneris.examples.crdt.statelib.user_model
   Require Import model semi_join_lattices.
+From aneris.examples.crdt.statelib.resources Require Import utils.
 From aneris.examples.crdt.statelib.proof Require Import events.
 From aneris.examples.crdt.statelib.user_model Require Import params.
 From aneris.examples.crdt.statelib.proof Require Import utils.
@@ -180,9 +181,7 @@ Section StLibSetup.
       True ⊢ |={E}=> ∃ (Res : StLib_Res LogOp),
         GlobInv ∗
         GlobState ∅ ∗
-        (∃ (S: gset (fin (length CRDT_Addresses))),
-          (∀ i, ⌜i ∈ S⌝) ∗
-          [∗ set] i ∈ S, StLib_InitToken i) ∗
+        ([∗ set] i ∈ (Sn (length CRDT_Addresses)), StLib_InitToken i) ∗
         init_spec init.
 
 End StLibSetup.
@@ -192,24 +191,24 @@ Section RAs.
   Context `{LogOp: Type, LogSt : Type,
             !EqDecision LogOp, !Countable LogOp}.
 
-  Definition oneShotR := csumR (exclR unitO) (agreeR unitO).
+  Definition fracNatR := (prodR fracR (agreeR natO)).
 
   Class StLibG Σ := {
       StLibG_auth_gset_ev :> inG Σ (authUR (gsetUR (Event LogOp)));
       StLibG_frac_agree :> inG Σ (prodR fracR (agreeR (gsetO (Event LogOp))));
       StLibG_mono :> inG Σ (authUR (monotoneUR (@cc_subseteq LogOp _ _)));
       StLibG_lockG :> lockG Σ;
-      StLibG_oneshot :> inG Σ oneShotR;
+      StLibG_fracnat :> inG Σ fracNatR;
   }.
 
-  Definition OPLIBΣ  : gFunctors :=
+  Definition STLIBΣ  : gFunctors :=
     #[GFunctor (authUR (gsetUR (Event LogOp)));
       GFunctor (prodR fracR (agreeR (gsetO (Event LogOp))));
       GFunctor (authUR (monotoneUR (@cc_subseteq LogOp _ _)));
       lockΣ;
-      GFunctor oneShotR].
+      GFunctor fracNatR].
 
-  Global Instance subG_OPLIBΣ {Σ} : subG OPLIBΣ Σ → StLibG Σ.
+  Global Instance subG_STLIBΣ {Σ} : subG STLIBΣ Σ → StLibG Σ.
   Proof. constructor; solve_inG. Qed.
 
 End RAs.

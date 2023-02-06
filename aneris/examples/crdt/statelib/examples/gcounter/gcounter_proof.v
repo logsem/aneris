@@ -515,8 +515,8 @@ Section GCounter_Specs.
     - wp_match. iApply "Hφ". iPureIntro. exists st_log. split; first assumption.
       rewrite/st_crdtM_mut/StLib_Model/StLib_Params/gctr_params/gctr_model/gctr_mut.
       rewrite (gctr_st_coh_length st_log st_v Hst_coh) in Hlen.
-      destruct(decide (EV_Orig ev < length CRDT_Addresses))%nat;
-        [ lia | reflexivity ].
+      destruct(decide (EV_Orig ev < length CRDT_Addresses))%nat eqn:E;
+        [ lia | by rewrite E ].
     - assert (EV_Orig ev < length st_log)%nat as Hlen_lt;
         first (apply nth_error_Some; by rewrite Herr).
       wp_match.

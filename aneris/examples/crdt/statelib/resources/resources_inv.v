@@ -38,9 +38,7 @@ Section AboutGlobalInvariant.
     ∃ (g: Gst CRDT_Op), own γ_global ((1/3)%Qp, to_agree g.1)
       ∗ own γ_global_snap (● g.1)
       ∗ ⌜ Gst_Validity g ⌝
-      ∗ ∃ (S: gset (fRepId)),
-        (∀ (f: fRepId), ⌜f ∈ S⌝)
-        ∗ [∗ set] k ∈ S,
+      ∗ [∗ set] k ∈ (Sn (length CRDT_Addresses)),
           StLib_GlibInv_local_part k g.
 
   Definition StLib_GlobalInv : iProp Σ :=

@@ -57,10 +57,21 @@ Section Resources_updates.
       (%f & %Hf & _ & _ & Hst_own__local & Hst_own__sub & Hown_localsnap)
       (%f' & %Hf' & _ & _ & Hst_own__local' & Hst_own__foreign')".
     iInv "Hinv" as ">(%g & Hown_global & Hown_global_snap & %Hv & HS)" "Hclose".
-    iDestruct ((forall_fin i) with "HS")
-      as "[Hothers (%st_h__local' & %st_h__foreign' & %st_h__sub' & %Hst_proj &
-        %st_locisloc & %st_forisfor & %st_subisfor & %Hst_cc &
-        Hst_own__local'' & Hst_own__for'' & Hst_own__sub'' & Hst_own__cc'' & Hst_own__cc''')]".
+    iMod ((Sn_one i
+             _
+             ⌜True⌝
+             (StLib_OwnLocalState i st_h__local st_h__foreign
+                ∗ StLib_OwnLockInv i st_h__local st_h__foreign))
+           with "[Hst_own__local Hst_own__sub Hown_localsnap
+                Hst_own__local' Hst_own__foreign'] HS [//]")
+      as "[($&$) HS]"; last first.
+    { iMod ("Hclose" with "[HS Hown_global Hown_global_snap]") as "_"; last done.
+      iNext. iExists g. by iFrame. }
+
+    iIntros "(%st_h__local' & %st_h__foreign' & %st_h__sub' &
+            %Hst_proj & %st_locisloc & %st_forisfor & %st_subisfor &
+            %Hst_cc & Hst_own__local'' & Hst_own__for'' & Hst_own__sub'' &
+            Hst_own__cc'' & Hst_own__cc''')_".
     assert (i = f) as ->. { apply fin_to_nat_inj. by rewrite-Hf. }
     assert (f = f') as <-. { apply fin_to_nat_inj. by rewrite Hf'. }
 
@@ -87,16 +98,11 @@ Section Resources_updates.
       with "Hst_own__cc''")
       as ">[Hst_own_cc'' #Hfrag]"; first by apply monotone_update.
 
-    (** Closing the invariant *)
-    iDestruct ((forall_fin' f)
-      with "[$Hothers Hst_own__local'' Hst_own__foreign' Hst_own__sub'
-        Hst_own_cc'' Hst_own__cc''']") as "HS".
-    { iExists st_h__local, st_h__foreign, st_h__foreign. by iFrame. }
-    iMod ("Hclose" with "[Hown_global_snap Hown_global HS]") as "_";
-      last iModIntro.
-    { iNext. iExists g. by iFrame. }
+    iSplitR "Hown_localsnap Hst_own__local' Hst_own__local Hst_own__foreign' Hst_own__sub".
+    { iExists st_h__local, st_h__foreign, st_h__foreign.
+      by iFrame. }
 
-    iSplitR "Hst_own__for'' Hst_own__local'".
+    iSplitR "Hst_own__foreign' Hst_own__local'".
     - iExists f. rewrite/StLib_OwnLocalSnap. iFrame "%". iFrame.
       iExists f. by iFrame "#".
     - iExists f. by iFrame.
@@ -271,9 +277,7 @@ Section Resources_updates.
       vinsert f (g.2 !!! f ∪ {[fresh_event (g.2 !!! f) op f]}) g.2).
       simpl. rewrite Hfev_eq. iFrame. iSplit; first by rewrite -Hfev_eq.
       iApply (forall_fin' f). iSplitL "Hothers".
-      - iDestruct "Hothers" as "(%S & %HS_def & HS)".
-        iExists S. iSplit; first done.
-        iApply (big_sepS_mono with "HS").
+      - iApply (big_sepS_mono with "Hothers").
         iIntros (x Hx_in) "(%__local & %__foreign & %__sub & %__Hproj & %__islocal & %__isfor & %__issub & %__iscc & __ownloc & __own)".
         iExists __local, __foreign, __sub.
         repeat iSplit; try done.
@@ -481,10 +485,9 @@ Section Resources_updates.
        iExists (g.1,
         vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2).
       iFrame. iFrame "%".
-      iDestruct "Hothers" as "(%S & [%S_def %S_def'] & HS)".
       iDestruct (big_sepS_mono _
         (λ k, StLib_GlibInv_local_part k (g.1, vinsert f (g.2 !!! f ∪ (st'_h__local ∪ st'_h__foreign)) g.2))
-        with "HS")
+        with "Hothers")
         as "HS".
       { iIntros (x Hx_in) "(%h_loc & %h_for & %h_sub & Hx)".
         iExists h_loc, h_for, h_sub. simpl.
@@ -492,7 +495,7 @@ Section Resources_updates.
         iFrame. }
       iApply ((forall_fin' f)
         with "[HS Hst_own__local Hst_own__foreign Hst_own__sub Hst_own__cc Hst_own__cc']").
-      iSplitL "HS"; first (by iExists S; iFrame).
+      iSplitL "HS"; first by iFrame.
       iExists st_h__local, (st_h__foreign ∪ filtered_out), st_h__sub.
       assert(st_h__local ∪ (st_h__foreign ∪ filtered_out)
         = st_h__local ∪ st_h__foreign ∪ filtered_out) as <-; first set_solver.

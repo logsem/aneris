@@ -482,8 +482,8 @@ Section MapMutator.
           [ by apply lst_val_map |
             replace(sx ∪ {[map_event ev]}) with sxe;
             by apply lst_val_map
-            | | | by simplify_eq ].
-          intros (x&Hx_map_eq&[]%elem_of_filter)%gset_map_correct2.
+            | | | rewrite Hm'k in Hm'x; rewrite E in Hnew; by simplify_eq/= ].
+        * intros (x&Hx_map_eq&[]%elem_of_filter)%gset_map_correct2.
           assert(x = ev) as ->; last done.
           apply (VLst_ext_time' _ Hv');
             [ by apply elem_of_union_l
@@ -504,7 +504,8 @@ Section MapMutator.
           destruct E. set_solver. }
         simplify_eq/=.
         apply (st_crdtM_mut_coh ∅) with st_crdtM_init_st; try done;
-          [exact st_crdtM_init_st_coh | split; try by intros; try by left | | ].
+          [exact st_crdtM_init_st_coh | split; try by intros; try by left | |
+          | rewrite E in Hnew; rewrite Hm'k in Hm'x; by simplify_eq/= ].
         2: split; first by apply elem_of_union_r, elem_of_singleton.
         2: by intros?[?| ->%elem_of_singleton]%elem_of_union.
         split; try done.

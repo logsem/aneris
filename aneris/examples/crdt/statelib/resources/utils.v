@@ -12,6 +12,36 @@ Instance timetouse: Log_Time := timestamp_time.
 
 
 
+Section SetsUtils.
+  Definition Sn (n: nat) : (gset (fin n)).
+  Proof.
+    induction n.
+    + exact (∅: gset (fin O)).
+    + exact (( {[ nat_to_fin (Nat.lt_0_succ n)]}: gset (fin (S n)))
+            ∪ (set_map FS IHn)).
+  Defined.
+
+  Lemma Sn_prop: forall n, ∀ (f: fin n), f ∈ (Sn n).
+  Proof.
+    induction n; first (intros x; inversion x).
+    apply fin_S_inv;
+      simplify_eq/=; set_solver.
+  Qed.
+
+  Lemma S_to_Sn: forall n S, (∀ (f: fin n), f ∈ S) -> S = Sn n.
+  Proof.
+    induction n as [|n IHn]; simplify_eq/=; intros S HS; apply set_eq;
+      first (intros x; by inversion x).
+    apply fin_S_inv; split.
+    - set_solver.
+    - intros _. apply HS.
+    - intros Hx'. apply elem_of_union_r, elem_of_map_2, Sn_prop.
+    - intros [Himp|Hx']%elem_of_union; first set_solver. apply HS.
+  Qed.
+End SetsUtils.
+
+
+
 Section RequiredRAs.
   Context `{!anerisG Mdl Σ, !CRDT_Params,
             CRDT_Op: Type, !EqDecision CRDT_Op, !Countable CRDT_Op}.
@@ -38,6 +68,7 @@ Section RequiredRAs.
     γ_loc_cc : vec gname (length CRDT_Addresses);
     γ_loc_cc' : vec gname (length CRDT_Addresses);
   }.
+
 End RequiredRAs.
 Arguments Internal_StLibG (CRDT_Op) {_ _} (Σ).
 
@@ -90,49 +121,69 @@ Section Utils.
   Qed.
 
   Lemma forall_fin (f: fRepId) (P: fRepId → iProp Σ) :
-    (∃ S : gset fRepId, (∀ r : fRepId, ⌜r ∈ S⌝) ∗
-           ([∗ set] k ∈ S, P k))
-    -∗
-    ((∃ S : gset fRepId, (⌜ f ∉ S ⌝ ∗ ∀ r : fRepId, ⌜r ≠ f⌝ -∗ ⌜r ∈ S⌝) ∗ [∗ set] k ∈ S, P k)
-      ∗ P f).
+    ([∗ set] k ∈ (Sn (length CRDT_Addresses)), P k)
+    -∗ (([∗ set] k ∈ (Sn (length CRDT_Addresses)) ∖ {[ f ]}, P k) ∗ P f).
   Proof.
-    iIntros "(%S & %Hdef_S & HS)".
-    iApply bi.sep_exist_r.
-    iExists ( S ∖ {[ f ]} ).
+    iIntros "HS".
+    set S := Sn (length CRDT_Addresses).
     iPoseProof (big_sepS_union _ ( S ∖ {[ f ]} ) {[f]}) as "[Hsep _]"; first set_solver.
     assert ((S ∖ {[f]} ∪ {[f]}) = S) as ->.
-    { 
+    {
       assert (S ∪ {[f]} = S) as Heq.
       { assert (S ∪ {[f]} = {[f]} ∪ S) as ->; first set_solver.
-        by apply subseteq_union_1_L, elem_of_subseteq. }
+        apply subseteq_union_1_L, singleton_subseteq_l, Sn_prop. }
       pose proof (difference_union_L S {[f]}) as p.
       by rewrite Heq in p. }
     iDestruct ("Hsep" with "HS") as "[Hall Hone]".
-    iSplitR "Hone";
+    by iSplitR "Hone";
       last by iApply big_sepS_singleton.
-    iSplitR; [iPureIntro | iAssumption].
-    set_solver.
   Qed.
 
   Lemma forall_fin' (f: fRepId) (P: fRepId → iProp Σ) :
-    ((∃ S : gset fRepId, (⌜ f ∉ S ⌝ ∗ ∀ r : fRepId, ⌜r ≠ f⌝ -∗ ⌜r ∈ S⌝) ∗ [∗ set] k ∈ S, P k)
-      ∗ P f)
-    -∗
-    (∃ S : gset fRepId, (∀ r : fRepId, ⌜r ∈ S⌝) ∗
-           ([∗ set] k ∈ S, P k)).
+    (([∗ set] k ∈ (Sn (length CRDT_Addresses)) ∖ {[ f ]}, P k) ∗ P f)
+    -∗ ([∗ set] k ∈ (Sn (length CRDT_Addresses)), P k).
   Proof.
-    iIntros "[(%S & [%Hdef_S' %Hdef_S] & HS) Hone]".
-    iExists ( S ∪ {[ f ]} ).
-    iPoseProof (big_sepS_union _ S {[f]}) as "[_ Hsep]"; first set_solver.
+    iIntros "[HS Hone]".
+    set S := Sn (length CRDT_Addresses).
 
-    iDestruct ("Hsep" with "[HS Hone]") as "H".
-    { iFrame. by iApply big_sepS_singleton. }
-    iFrame.
+    assert (S = (S ∖ {[f]}) ∪ {[f]}) as ->.
+    {
+      assert (S ∪ {[f]} = S) as Heq.
+      { assert (S ∪ {[f]} = {[f]} ∪ S) as ->; first set_solver.
+        apply subseteq_union_1_L, singleton_subseteq_l, Sn_prop. }
+      pose proof (difference_union_L S {[f]}) as p.
+      by rewrite Heq in p. }
     
-    iPureIntro. intros r.
-    destruct (decide (r = f)).
-    - by apply elem_of_union_r, elem_of_singleton.
-    - by apply elem_of_union_l, Hdef_S.
+    iApply big_sepS_union; first set_solver.
+    iSplitL "HS"; last by iApply big_sepS_singleton.
+    assert (((S ∖ {[f]} ∪ {[f]}) ∖ {[f]}) = (S ∖ {[f]})) as ->;
+      [ set_solver | done ].
+  Qed.
+
+  Lemma Sn_one (f: fRepId) (P: fRepId -> iProp Σ) (ϕpre ϕpost: iProp Σ) E E' :
+    (P f -∗ ϕpre -∗ |={E,E'}=> (P f ∗ ϕpost))
+    -∗ ([∗ set] k ∈ (Sn (length CRDT_Addresses)), P k)
+    -∗ ϕpre -∗ |={E,E'}=> (ϕpost ∗ ([∗ set] k ∈ (Sn (length CRDT_Addresses)), P k)).
+  Proof.
+    iIntros "Hwand HS Hpre".
+    set S := Sn (length CRDT_Addresses).
+    iPoseProof (big_sepS_union _ ( S ∖ {[ f ]} ) {[f]}) as "[Hsep _]";
+      first set_solver.
+    assert (HS: (S ∖ {[f]} ∪ {[f]}) = S).
+    { 
+      assert (S ∪ {[f]} = S) as Heq.
+      { assert (S ∪ {[f]} = {[f]} ∪ S) as ->; first set_solver.
+        apply subseteq_union_1_L, elem_of_subseteq.
+        intros ? ->%elem_of_singleton. apply Sn_prop. }
+      pose proof (difference_union_L S {[f]}) as p.
+      by rewrite Heq in p. }
+    rewrite HS.
+    iDestruct ("Hsep" with "HS") as "[Hothers Hf]".
+    iDestruct ((big_sepS_singleton P f) with "Hf") as "Hf".
+    iMod ("Hwand" with "Hf Hpre") as "[Hf $]".
+    rewrite<- HS at 4; iApply (big_sepS_union with "[$Hothers Hf]");
+      first set_solver.
+    iApply ((big_sepS_singleton P f) with "Hf").
   Qed.
 
   Lemma both_agree_agree (γ: gname) (p q: Qp) (s s': event_set CRDT_Op):

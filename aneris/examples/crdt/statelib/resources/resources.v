@@ -33,21 +33,21 @@ Section AboutInv.
     iMod (own_update _ (●g.1) (●g.1 ⋅ ◯g.1) with "Hsnap_g") as "[Hsnap_g Hsnap']".
     { by apply auth_update_alloc, gset_local_update. }
     iFrame "Hsnap'".
-    iDestruct ((forall_fin f) with "Hloc") as "[Hloc Hlocf]".
-    iDestruct "Hlocf"
-      as "(%h__local & %h__foreign & %h__sub & %Hproj' & %Hislocal' &
-        %Hislocal & %Hisforeign & [%Hsub %Hcc] &
-        Hown_local & Hown_for & Hown_sub & Hown_cc & Hown_cc')".
-    iDestruct (princ_ev__subset_cc with "Hsnap Hown_cc") as "[%Hsub_ %Hcc_]".
-    iDestruct ((forall_fin' _ (λ f, StLib_GlibInv_local_part f g)) with "[Hloc Hown_local Hown_for Hown_sub Hown_cc Hown_cc']") as "Hloc";
-      first iFrame "Hloc".
-    { iExists h__local, h__foreign, h__sub. iFrame. by iPureIntro. }
-    iMod ("Hclose" with "[Hloc Hglobal Hsnap Hsnap_g]") as "_".
-    { iNext. iExists g. iFrame. iFrame "#". by iPureIntro. }
-    iPureIntro.
-
-    rewrite (VGst_incl_local _ Hv e). exists f.
-    rewrite Hproj'. by apply Hsub, Hsub_.
+    iMod ((Sn_one f
+             _
+             ⌜True⌝
+             ⌜e ∈ g.1⌝)
+            with "[] Hloc [//]") as "[%Hin Hloc]".
+    - iIntros "(%h__local & %h__foreign & %h__sub & %Hproj' & %Hislocal' &
+              %Hislocal & %Hisforeign & [%Hsub %Hcc] &
+              Hown_local & Hown_for & Hown_sub & Hown_cc & Hown_cc') _".
+      iDestruct (princ_ev__subset_cc with "Hsnap Hown_cc") as "[%Hsub_ %Hcc_]".
+      iApply fupd_frame_r; iSplit.
+      + iExists h__local, h__foreign, h__sub. by iFrame.
+      + iPureIntro. rewrite (VGst_incl_local _ Hv e). exists f.
+        rewrite Hproj'. by apply Hsub, Hsub_.
+    - iMod ("Hclose" with "[Hloc Hglobal Hsnap Hsnap_g]") as "_"; last done.
+      iNext. iExists g. iFrame. iFrame "#". by iPureIntro.
   Qed.
 
 
@@ -61,17 +61,24 @@ Section AboutInv.
     iIntros (Hincl) "#Hinv
       (%f & %Hf & %Hlocal & %Hforeign &
         Hown_local & Hown_foreign &
-        Hsnap)
+        #Hsnap)
       #Hsnap_global".
     iInv "Hinv" as ">(%g & Hglobal & Hsnap_g & %Hv & Hloc)" "Hclose".
-    iDestruct ((forall_fin f) with "Hloc")
-      as "[Hloc
-        (%h__local' & %h__foreign' & %h__sub' &
-          %Hproj' & %Hlocal' & %Hforeign' & %Hsub' & %Hcc &
-          Hown_local' & Hown_foreign' & Hown_sub' & Hown_cc')]".
-    iApply fupd_frame_r.
-    iSplit; last first.
-    - iIntros (e He_in He_orig).
+    iMod ((Sn_one f _
+             (own γ_global_snap (● g.1))
+             ((own γ_global_snap (● g.1))
+                ∗ (StLib_OwnLocalState i s1 s2)
+                ∗ ⌜∀ e : Event CRDT_Op, e ∈ h → EV_Orig e = i → e ∈ s1⌝))
+           with "[Hown_local Hown_foreign] Hloc Hsnap_g")
+           as "[(Hsnap_g&$&$) Hloc]"; last first.
+    { iMod ("Hclose" with "[Hglobal Hloc Hsnap_g]") as "_"; last done.
+      iNext. iExists g. by iFrame. }
+    iIntros "(%h__local' & %h__foreign' & %h__sub' &
+            %Hproj' & %Hlocal' & %Hforeign' & %Hsub' & %Hcc &
+            Hown_local' & Hown_foreign' & Hown_sub' & Hown_cc') Hsnap_g".
+    do 2 iApply bi.sep_assoc.
+    iApply fupd_frame_r. iSplit; last first.
+    + iIntros (e He_in He_orig).
       iCombine "Hsnap_g" "Hsnap_global" as "Hboth".
       iDestruct (own_valid with "Hboth") as "%Hvalid".
       apply auth_both_valid_discrete in Hvalid as [Hsub%gset_included _].
@@ -87,14 +94,11 @@ Section AboutInv.
       rewrite Hproj' in He_in'.
       apply elem_of_union in He_in' as [He_in' | Himp%Hforeign' ]; first exact He_in'.
       by destruct Himp.
-    - iExists f. iFrame "%". iFrame.
-      iMod ("Hclose" with "[Hglobal Hsnap_g Hloc Hown_local' Hown_foreign' Hown_sub' Hown_cc']") as "_"; last done.
-      iNext. iExists g.
-      iFrame. iFrame "%".
-      iApply (forall_fin' _ (λ f, StLib_GlibInv_local_part f g)  with "[Hloc Hown_local' Hown_foreign' Hown_sub' Hown_cc']");
-        first iFrame "Hloc".
-      iExists h__local', h__foreign', h__sub'.
-      iFrame. iFrame "%".
+    + iFrame "Hsnap_g".
+      iApply fupd_frame_l; iSplitR "Hown_local Hown_foreign".
+      * iExists h__local', h__foreign', h__sub'.
+        iFrame. by iFrame "%".
+      * iExists f. iFrame "%". iFrame "#". by iFrame.
   Qed.
 
   Lemma dep_closed_causally_closed (h s : event_set CRDT_Op) :
@@ -136,26 +140,28 @@ Section AboutInv.
         #Hsnap)
       #Hsnap_global".
     iInv "Hinv" as ">(%g & Hglobal & Hsnap_g & %Hv & Hloc)" "Hclose".
-    iDestruct ((forall_fin f) with "Hloc")
-      as "[Hloc
-        (%h__local & %h__foreign & %h__sub &
-          %Hproj' & %Hlocal' & %Hforeign' & %Hsub' & %Hcc &
-          Hown_local' & Hown_foreign' & Hown_sub' & Hown_cc')]".
-    iApply fupd_frame_r.
-    iSplit.
-    - iExists f. iFrame "%". iFrame.
-      iMod ("Hclose"
-        with "[Hglobal Hsnap_g Hloc
-          Hown_local' Hown_foreign' Hown_sub' Hown_cc']")
-        as "_"; last done.
-      iNext. iExists g.
-      iFrame. iFrame "%".
-      iApply ((forall_fin' f (λ f, StLib_GlibInv_local_part f g)) with "[Hloc Hown_local' Hown_foreign' Hown_sub' Hown_cc']").
-      iSplitL "Hloc"; first iFrame "Hloc".
-      iExists h__local, h__foreign, h__sub.
-      iFrame. iFrame "%".
-    - iIntros (e e' He_in He'_in Hlt_t).
-      iDestruct (both_agree_agree with "Hown_local Hown_local'")
+    iMod ((Sn_one f
+             _
+             (own γ_global_snap (● g.1))
+             ((StLib_OwnLocalState i s1 s2)
+                ∗ (own γ_global_snap (● g.1))
+                ∗ ⌜∀ a e : Event CRDT_Op, a ∈ h → e ∈ s1 ∪ s2 → a <_t e → a ∈ s1 ∪ s2⌝))
+           with "[Hown_local Hown_sub] Hloc Hsnap_g")
+      as "[($&Hsnap_g&$) Hloc]"; last first.
+    { iMod ("Hclose" with "[Hsnap_g Hglobal Hloc]") as "_"; last done.
+      iNext. iExists g. by iFrame. }
+    iIntros "(%h__local & %h__foreign & %h__sub &
+            %Hproj' & %Hlocal' & %Hforeign' & %Hsub' & %Hcc &
+            Hown_local' & Hown_foreign' & Hown_sub' & Hown_cc') Hsnap_g".
+    do 2 iApply bi.sep_assoc.
+    iApply fupd_frame_r. iSplit.
+    + iApply bi.sep_assoc.
+      iApply fupd_frame_l.
+       iSplitR "Hown_local Hown_sub Hsnap_g".
+       * iExists h__local, h__foreign, h__sub. by iFrame.
+       * iSplitR "Hsnap_g"; last by iFrame.
+         iExists f. iFrame. by iFrame "#".
+    + iDestruct (both_agree_agree with "Hown_local Hown_local'")
         as "(Hown_local & Hown_local' & %Heq)"; rewrite<- Heq.
       iDestruct (both_agree_agree with "Hown_sub Hown_sub'")
         as "(Hown_sub & Hown_sub' & %Heq')"; rewrite<- Heq'.
@@ -171,7 +177,7 @@ Section AboutInv.
         by rewrite -Hproj'. }
       iPureIntro.
       rewrite Heq Heq'.
-      rewrite Heq Heq' in He'_in.
+      intros e e' He_in He'_lt He'_in.
       destruct Hsubsetcc as [Hsubseteq Hcc'].
       apply (Hcc' e e'); eauto.
       by apply strict_include.
@@ -249,19 +255,27 @@ Section Utils.
   Proof.
     iIntros (Hincl) "#Hinv Hf_own_loc Hf_own_for".
     iInv "Hinv" as ">(%g & Hown_global & Hown_gsnap_auth &%Hv & HS)" "Hclose".
-    iDestruct ((forall_fin f) with "HS")
-      as "[Hothers (%h__loc & %h__for & %h__sub & %H_proj & %Hisloc & %Hisfor & %Hisfor' & %Hcc & Hf_own_local & Hf_own_foreign & Hf_own_sub & Hf_own_cc)]".
+    iMod ((Sn_one f
+             _
+             ⌜True⌝
+             (⌜Lst_Validity (st_h__local ∪ st_h__foreign)⌝
+                ∗ own (γ_loc_own !!! f) ((1 / 3)%Qp, to_agree st_h__local)
+                ∗ own (γ_loc_for !!! f) ((1 / 2)%Qp, to_agree st_h__foreign)))
+           with "[Hf_own_loc Hf_own_for] HS [//]")
+      as "[? HS]"; last first.
+    { iFrame.
+      iMod ("Hclose" with "[HS Hown_global Hown_gsnap_auth]") as "_"; last done.
+      iNext. iExists g. by iFrame. }
+    iIntros "(%h__loc & %h__for & %h__sub & %H_proj &
+            %Hisloc & %Hisfor & %Hisfor' & %Hcc &
+            Hf_own_local & Hf_own_foreign & Hf_own_sub & Hf_own_cc) _".
     iDestruct (both_agree_agree with "Hf_own_local Hf_own_loc")
       as "(Hf_own_local & Hf_own_loc & ->)".
     iDestruct (both_agree_agree with "Hf_own_foreign Hf_own_for")
       as "(Hf_own_foreign & Hf_own_for & ->)".
     assert (Hres: Lst_Validity (st_h__local ∪ st_h__foreign)).
     { rewrite -H_proj. exact (VGst_lhst_valid _ Hv f). }
-    iDestruct ((forall_fin' f) with "[Hf_own_local Hf_own_foreign Hf_own_sub Hf_own_cc $Hothers]") as "HS".
+    iApply fupd_frame_l; iSplitR "Hf_own_local Hf_own_foreign"; last by iFrame.
     { iExists st_h__local, st_h__foreign, h__sub. by iFrame. }
-    iMod ("Hclose" with "[HS Hown_global Hown_gsnap_auth]") as "_".
-    { iNext. iExists g. by iFrame. }
-    by iFrame.
   Qed.
 End Utils.
-

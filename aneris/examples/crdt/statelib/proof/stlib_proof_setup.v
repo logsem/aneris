@@ -45,21 +45,15 @@ Section StLibSetup.
     True ⊢ |={E}=> ∃ (GNames : StLib_GhostNames),
       StLib_GlobalInv ∗
       StLib_OwnGlobalState ∅ ∗
-      (∃ (S: gset (fin (length CRDT_Addresses))),
-        (∀ i, ⌜i ∈ S⌝)
-        ∗ [∗ set] f ∈ S, stlib_init_token f) ∗
+      ([∗ set] f ∈ (Sn (length CRDT_Addresses)), stlib_init_token f) ∗
       internal_init_spec.
   Proof.
     iIntros (_).
-    iMod (alloc_loc_own with "[//]") as (γ_own) "(%S & %HS_def & HS_own0 & HS_own1 & HS_own2)".
-    iMod (alloc_loc_for with "[//]") as (γ_for) "(%S' & %HS'_def & HS_for0 & HS_for1)".
-      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
-    iMod (alloc_loc_sub with "[//]") as (γ_sub) "(%S' & %HS'_def & HS_sub0 & HS_sub1)".
-      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
-    iMod (alloc_loc_cc  with "[//]") as (γ_cc)  "(%S' & %HS'_def & HS_cc_auth & #HS_cc_frag)".
-      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
-    iMod (alloc_loc_cc' with "[//]") as (γ_cc') "(%S' & %HS'_def & HS_cc'_auth & #HS_cc'_frag)".
-      assert(S' = S) as ->; [ by apply set_eq | clear HS'_def ].
+    iMod (alloc_loc_own with "[//]") as (γ_own) "(HS_own0 & HS_own1 & HS_own2)".
+    iMod (alloc_loc_for with "[//]") as (γ_for) "(HS_for0 & HS_for1)".
+    iMod (alloc_loc_sub with "[//]") as (γ_sub) "(HS_sub0 & HS_sub1)".
+    iMod (alloc_loc_cc  with "[//]") as (γ_cc)  "(HS_cc_auth & #HS_cc_frag)".
+    iMod (alloc_loc_cc' with "[//]") as (γ_cc') "(HS_cc'_auth & #HS_cc'_frag)".
     iMod (alloc_global  with "[//]") as (γ_global) "[Hglobal Hglobal']".
     iMod (alloc_global_snap  with "[//]") as (γ_global_snap) "[Hglobal_snap_auth #Hglobal_snap_snap]".
     set HNames := (Build_StLib_GhostNames γ_global γ_global_snap γ_own γ_for γ_sub γ_cc γ_cc').
@@ -70,12 +64,11 @@ Section StLibSetup.
     { iNext. iExists (∅, vreplicate (length CRDT_Addresses) ∅).
       iFrame.
       iSplit; first (iPureIntro; apply gst_init_valid).
-      iExists S; first iFrame"%".
-      rewrite /StLib_GlibInv_local_part.
       iDestruct (big_sepS_sep_2 with "HS_own1 HS_for1") as "HS".
       iDestruct (big_sepS_sep_2 with "HS_sub1 HS") as "HS".
       iDestruct (big_sepS_sep_2 with "HS_cc_auth HS") as "HS".
       iDestruct (big_sepS_sep_2 with "HS_cc'_auth HS") as "HS".
+      rewrite /StLib_GlibInv_local_part.
       iApply (big_sepS_mono with "HS").
       iIntros (x Hx_in) "(H0 & H1 & H2 & H3 & H4)".
       repeat iExists ∅. rewrite union_empty_R. iFrame.
@@ -87,7 +80,6 @@ Section StLibSetup.
     iDestruct (internal_init_spec_holds with "Hinv") as "#Hinit".
     iFrame "#". iFrame "Hglobal".
 
-    iExists S. iFrame "%".
     rewrite/stlib_init_token/locstate_tok/lockinv_tok.
     iDestruct (big_sepS_sep_2 with "HS_own0 HS_for0") as "HS".
     iDestruct (big_sepS_sep_2 with "HS_own2 HS") as "HS".
@@ -110,20 +102,30 @@ Section Instantiation.
 
   Context {LogOp LogSt : Type}.
   Context `{!anerisG Mdl Σ, !EqDecision LogOp, !Countable LogOp,
-            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt,
-            !Internal_StLibG LogOp Σ}.
+            !CRDT_Params, !Lattice LogSt, !StLib_Params LogOp LogSt}.
 
   Global Instance init_fun_instance : StLib_Init_Function := {
     init := statelib_init
       StLib_StSerialization.(s_serializer).(s_ser)
       StLib_StSerialization.(s_serializer).(s_deser) }.
 
+  Context `{!@StLibG LogOp _ _ Σ}.
+
+  (*Global Instance: Internal_StLibG LogOp Σ :=*)
+
+  Global Instance: Internal_StLibG LogOp Σ :=
+    mkInternalG Σ
+      (@StLibG_auth_gset_ev _ _ _ _ _)
+      (@StLibG_frac_agree _ _  _ _ _)
+      (@StLibG_mono _ _ _ _ _)
+      (@StLibG_lockG _ _ _ _ _)
+      (@StLibG_fracnat _ _ _ _ _).
+
   Global Instance stlib_res_instance `{!StLib_GhostNames}
     : StLib_Res LogOp := {
       StLib_InitToken := stlib_init_token;
       StLib_SocketProto := socket_proto;
   }.
-
 
   Global Instance stlib_setup_instance : StLibSetup.
   Proof.
