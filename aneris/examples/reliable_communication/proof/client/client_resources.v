@@ -137,7 +137,7 @@ Lemma resend_listen_spec ip P Q h s R T a mt handler φ ψ :
      iLöb as "IH".
      wp_rec.
      wp_bind (ReceiveFrom _).
-     wp_apply (aneris_wp_receivefrom_alt with "[$]"); [done|done|done|].
+     wp_apply (aneris_wp_receivefrom_nb with "[$]"); [done|done|done|].
      iIntros (r) "[(-> & Hs & Hh) | Hrd ]"; simpl.
      - wp_pures.
         wp_apply (aneris_wp_send_duplicate with "[$Hs $Hh $Hdstsi]");

@@ -38,7 +38,7 @@ Section library.
      iIntros (n Haddr Hsblock) "#Hhandler". iLöb as "IH".
      iModIntro. iIntros (Φ) "(HP & Hsocket & Hmh & #Hsi) HΦ".
      wp_rec. wp_let. rewrite /n. wp_bind (ReceiveFrom _).
-     wp_apply (aneris_wp_receivefrom_alt with "[$]"); [done|done|done|].
+     wp_apply (aneris_wp_receivefrom_nb with "[$]"); [done|done|done|].
      iIntros (r) "[(-> & Hs) | Hrd ]"; simpl.
      - wp_pures. iApply ("IH" with "[-HΦ]"); by iFrame "#∗".
      - iDestruct "Hrd" as (m Hdst ->) "[ (% & Hs & Hφ) | (% & Hs) ]"; wp_pures;
