@@ -45,6 +45,17 @@ Section lifting_pure_exec.
     induction n as [|n IH]; by rewrite //= -step_fupd_intro // IH.
   Qed.
 
+  (* Used in documentation *)
+  Lemma aneris_wp_pure_step_later_alt n E e1 e2 φ P Q :
+  PureExec φ 1 (mkExpr n e1) (mkExpr n e2) → 
+  φ → 
+  {{{ P }}} e2 @[n] E {{{ w, RET w; Q }}} →
+  {{{ ▷ P }}} e1 @[n] E {{{ w, RET w; Q }}}.
+  Proof.
+    intros. iIntros "HPre HPost". iApply aneris_wp_pure_step_later; try done.
+    iNext. iPoseProof H2 as "H2". by iApply ("H2" with "HPre"). 
+  Qed.
+
 End lifting_pure_exec.
 
 Section lifting_mdl.
@@ -145,6 +156,17 @@ Section lifting_node_local.
     auto.
   Qed.
 
+  (* Used in documentation *)
+  Lemma aneris_wp_fork_alt P n E e:
+  {{{ P }}} e @[n] {{{w, RET w; True }}} →
+  {{{ P }}} Fork e @[n] E {{{ RET #(); True }}}.
+  Proof.
+    intros. iIntros "HPre HPost". 
+    iApply aneris_wp_fork. iSplitL "HPost".
+    - iNext. iApply "HPost". done.
+    - iNext. iApply (H0 with "HPre"). done.
+  Qed. 
+    
   (** Heap *)
   Lemma aneris_wp_alloc ip E v :
     {{{ True }}} ref (Val v) @[ip] E {{{ l, RET #l; l ↦[ip] v }}}.
@@ -275,6 +297,23 @@ Section lifting_network.
     iIntros "%tid' Hin' Hfp".
     iApply wp_wand_r; iSplitL; first iApply ("He" with "Hfp Hin'").
     done.
+  Qed.
+
+  (* Used in documentation *)
+  Lemma aneris_wp_start_alt n P ports e E :
+  n ≠ "system" → 
+  {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
+  {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
+  Proof.
+    intros. iIntros "HPre HPost".
+    iApply aneris_wp_start.
+    - done.
+    - iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
+      iSplitL "HPost".
+        -- iNext. iApply "HPost". done.
+        -- iNext. iPoseProof H1 as "H1". iIntros "HFree". 
+        iApply (H1 with "[HP HFree]"); try done. iFrame.
+        Unshelve. done.
   Qed.
 
   Lemma aneris_wp_new_socket ip E :
