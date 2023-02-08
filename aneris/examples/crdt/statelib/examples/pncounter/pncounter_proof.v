@@ -1093,11 +1093,12 @@ Section pncounter_proof.
   (*      let: "n" := list_int_sum "nl" in *)
   (*      "p" - "n". *)
   Lemma pncounter_eval_spec (get_state_fn : val) repId addr:
+    GlobInv ⊢
     pn_prod_get_state_spec get_state_fn repId addr -∗
     pn_get_state_spec (λ:<>, pncounter_eval get_state_fn #()) repId addr.
   Proof.
     rewrite /pn_prod_get_state_spec/get_state_spec.
-    iIntros "#Hspec".
+    iIntros "#Hinv #Hspec".
     iIntros (Hin Φ) "!# Hvsh".
     wp_pures. wp_lam. wp_pures.
     wp_apply ("Hspec" $! Hin); try eauto.
@@ -1201,11 +1202,12 @@ Section pncounter_proof.
   (*      then  "upd" ("n", #0) *)
   (*      else  "upd" (#0, (- "n"))). *)
   Lemma pncounter_update_spec (upd_fn : val) repId addr:
+    GlobInv ⊢
     pn_prod_upd_spec upd_fn repId addr -∗
     pn_upd_spec (λ:"n", pncounter_update upd_fn "n") repId addr.
   Proof.
     rewrite /pn_prod_upd_spec/update_spec.
-    iIntros "#Hspec".
+    iIntros "#Hinv #Hspec".
     iIntros (v op Hin Hcoh).
     destruct op.
     rewrite /StLib_Op_Coh /= /Ctr_Op_Coh in Hcoh.
@@ -1218,15 +1220,21 @@ Section pncounter_proof.
       -- iPureIntro. simpl. rewrite /prodOp_coh /StLib_Op_Coh /= /gctr_op_coh /=.
          eexists #z, #0. split_and!; eauto.
          symmetry. f_equal. f_equal. by apply Z2Nat.id.
-      -- iMod "Hvsh". iModIntro.
+      -- iMod "Hvsh".
          iDestruct "Hvsh" as (h s1 s2) "((HGst & HLst) & Hvsh)".
          iExists (event_set_prod_of_Z h),
                    (event_set_prod_of_Z s1),
                      (event_set_prod_of_Z s2).
          iFrame.
+         iModIntro.
          iNext.
          iIntros (ep hp s1p s2p)
                  "(%He1 & %He2 & %He3 & %He4 & %He5 & %He6 & %He7 & %He8 & %He9 & HGst & HLst)".
+         iDestruct (LocState_TakeSnap with "HLst") as "(HLst & #Hsnap)".
+         iMod (LocSnap_Ext
+                         _ repId repId s1p s2p
+                        with "[$][$][$]") as "%Hext";
+             [solve_ndisj| ].
          iApply ("Hvsh" $!
                       (event_Z_of_prod ep)
                       (event_set_Z_of_prod hp)
@@ -1304,25 +1312,9 @@ Section pncounter_proof.
            rewrite -event_set_prod_of_Z_union in He8.
            by rewrite -event_set_prod_of_Z_compute_maximals. }
          iSplit.
-         {
-           iPureIntro.
-           apply event_set_maximal_helper.
-           { admit. }
-           done. }
+         { iPureIntro.
+           by apply event_set_maximal_helper. }
          by rewrite event_set_prod_of_Z_of_prod.
-        (*         destruct (bool_decide (0 ≤ ctr_payload (EV_Op e))%Z) eqn:Hle.
-         --- apply bool_decide_eq_true_1 in Hle. inversion He1 as [He11].
-             destruct (EV_Op e). rewrite /ctr_payload in He11, Hle.
-             apply Z2Nat.id in Hle, Hz.
-             (* rewrite -Hle -Hz He11. *)
-             simpl in He11.
-             admit.
-             (* iSplit; first done. *)
-         (*     iSplit; first done. *)
-         (*     iSplit; first done. *)
-         (*     iSplit; first done. *)
-         (* admit. *)
-         --- apply bool_decide_eq_false in Hle. inversion He1. admit. *)
     - wp_apply ("Hspec" $! (#0, #(-z))%V (pnop_right ((Z.to_nat (-z))))); try eauto.
       -- iPureIntro. simpl. rewrite /prodOp_coh /StLib_Op_Coh /= /gctr_op_coh /=.
          eexists #0, #(-z). split_and!; eauto.
@@ -1330,17 +1322,23 @@ Section pncounter_proof.
              assert (0 <= (- z))%Z by lia.
              unfold_prodOp_projs.
              apply Z2Nat.id. simplify_eq /=; eauto with lia.
-      -- iMod "Hvsh". iModIntro.
+      -- iMod "Hvsh".
          iDestruct "Hvsh" as (h s1 s2) "((HGst & HLst) & Hvsh)".
          iExists (event_set_prod_of_Z h),
                    (event_set_prod_of_Z s1),
                      (event_set_prod_of_Z s2).
          iFrame.
+         iModIntro.
          iNext.
          iIntros (ep hp s1p s2p)
                  "(%He1 & %He2 & %He3 & %He4 & %He5 & %He6 & %He7 & %He8 & %He9 & HGst & HLst)".
+         iDestruct (LocState_TakeSnap with "HLst") as "(HLst & #Hsnap)".
+         iMod (LocSnap_Ext
+                 _ repId repId s1p s2p
+                with "[$][$][$]") as "%Hext";
+           [solve_ndisj| ].
          iApply ("Hvsh" $!
-                      (event_Z_of_prod ep)
+                        (event_Z_of_prod ep)
                       (event_set_Z_of_prod hp)
                       (event_set_Z_of_prod s1p)
                       (event_set_Z_of_prod s2p)).
@@ -1412,11 +1410,9 @@ Section pncounter_proof.
            by rewrite -event_set_prod_of_Z_compute_maximals. }
          iSplit.
          { iPureIntro.
-           apply event_set_maximal_helper.
-           { admit. }
-           done. }
+           by apply event_set_maximal_helper. }
          by rewrite event_set_prod_of_Z_of_prod.
-  Admitted.
+  Qed.
 
 
   (* TODO: Prove: *)
@@ -1429,11 +1425,12 @@ Section pncounter_proof.
   (*    let: "upd" :=  (λ: "n", pncounter_update "upd_st" "n") in ("get", "upd"). *)
 
   Lemma pncounter_init_crdt_spec :
+    GlobInv ⊢
     pn_prod_init_crdt_spec pn_cpt_init -∗
     pn_init_crdt_spec pncounter_init.
   Proof.
     rewrite /pn_prod_init_crdt_spec /pn_init_crdt_spec /init_spec_for_specific_crdt.
-    iIntros "#Hspec".
+    iIntros "#Hinv #Hspec".
     iIntros (repId addr addrs_val Φ) "!#".
     iIntros "(%Hlst & %Hin & Hproto & Haddr & Hfps & Htk) HΦ".
     wp_lam.
@@ -1443,12 +1440,11 @@ Section pncounter_proof.
     wp_pures.
     iApply "HΦ".
     iFrame.
-    iPoseProof (pncounter_eval_spec gsv repId addr with "Hgspec") as "Hs1".
+    iPoseProof (pncounter_eval_spec gsv repId addr with "Hinv Hgspec") as "Hs1".
     rewrite /pn_get_state_spec.
-    iPoseProof (pncounter_update_spec updv repId addr with "Hupdspec") as "Hs2".
+    iPoseProof (pncounter_update_spec updv repId addr with "Hinv Hupdspec") as "Hs2".
     iFrame "#".
   Qed.
-
 
 End pncounter_proof.
 

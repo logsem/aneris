@@ -388,7 +388,8 @@ Section program_proof.
       iApply (wp_use_case_program1 with "[$Hsa1 $Hitk1Prod $Htk1 $Hfps][]"); last eauto.
       iFrame "#".
       iSplit.
-      iApply pncounter_init_crdt_spec. rewrite /pn_prod_init_crdt_spec.
+      iApply pncounter_init_crdt_spec. iFrame "#".
+      rewrite /pn_prod_init_crdt_spec.
       iApply pn_init_spec. iFrame "#". eauto. }
     iNext.
     wp_pures.
@@ -399,7 +400,8 @@ Section program_proof.
     iApply (wp_use_case_program2 with "[$Hsa2 $Htk2 $Hitk2Prod $Hfps][]"); last eauto.
       iFrame "#".
       iSplit.
-      iApply pncounter_init_crdt_spec. rewrite /pn_prod_init_crdt_spec.
+      iApply pncounter_init_crdt_spec. iFrame "#".
+      rewrite /pn_prod_init_crdt_spec.
       iApply pn_init_spec. iFrame "#". eauto.
   Qed.
 
