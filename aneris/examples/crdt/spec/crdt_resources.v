@@ -91,6 +91,12 @@ Section Resources.
       LocSnap i s1 s2 -∗ LocSnap i' s1' s2' ={E}=∗
       ⌜∀ e e', e ∈ s1 ∪ s2 -> e' ∈ s1' ∪ s2' -> e =_t e' -> e = e'⌝;
 
+    LocSnap_EV_Orig E i s1 s2 :
+      ↑CRDT_InvName ⊆ E ->
+      GlobInv ⊢
+      LocSnap i s1 s2 ={E}=∗
+      ⌜∀ e, e ∈ s1 ∪ s2 → e.(EV_Orig) < length CRDT_Addresses⌝;
+
     (** * Laws that connect local and global state *)
 
     (* All local events have been recorded globally *)

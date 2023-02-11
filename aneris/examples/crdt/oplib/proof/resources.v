@@ -1364,6 +1364,30 @@ Section Resources.
       apply (Hcc a e); eauto with set_solver.
   Qed.
 
+  Lemma oplib_loc_snap_EV_Orig E i s1 s2 :
+   ↑CRDT_InvName ⊆ E
+   → oplib_inv -∗
+     oplib_loc_snap_wrap i s1 s2 ={E}=∗
+     ⌜∀ e : Event LogOp, e ∈ s1 ∪ s2 → (EV_Orig e < length CRDT_Addresses)%Z⌝.
+  Proof.
+    iIntros (Hin) "[#Hrcb #Hinv] #Hsnap1".
+    iInv OpLib_InvName as "> Hprop" "Hclose".
+    rewrite /oplib_loc_snap_wrap /oplib_loc_snap.
+    iDestruct "Hsnap1"
+      as (γcc1 γinv1) "(%Hl1&%Hl2&%Hl3&%Hl4&#Hfrag1&#Hinvst1)".
+    (*
+    iPureIntro.
+    intros e [He|He]%elem_of_union.
+    - apply Hl3 in He as ->.
+      assert (i < length CRDT_Addresses).
+      { by eapply γ_cc_lookup_lt. }
+      by apply Nat2Z.inj_lt.
+    - apply Hl4 in He.
+      assert (i < length CRDT_Addresses).
+      { by eapply γ_cc_lookup_lt. }
+      by apply Nat2Z.inj_lt. *)
+  Admitted.
+
   Global Instance oplib_res : CRDT_Res_Mixin Mdl Σ LogOp := {
     GlobInv := oplib_inv;
     GlobInv_persistent := oplib_inv_persistent;
@@ -1392,6 +1416,7 @@ Section Resources.
     LocSnap_Union := oplib_loc_snap_union;
     LocSnap_LocState_Included_CC := oplib_loc_snap_loc_state_included_cc;
     LocSnap_Ext := oplib_loc_snap_ext;
+    LocSnap_EV_Orig := oplib_loc_snap_EV_Orig;
     LocSnap_GlobSnap_Provenance := oplib_loc_snap_glob_snap_provenance;
     LocState_GlobSnap_Provenance := oplib_loc_st_glob_snap_provenance;
     LocState_GlobSnap_Causality := oplib_loc_state_glob_snap_causality
@@ -2196,5 +2221,3 @@ Section Resources.
   Qed.
 
 End Resources.
-
-

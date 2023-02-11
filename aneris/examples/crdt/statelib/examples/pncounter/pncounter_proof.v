@@ -759,6 +759,19 @@ Section pn_CRDT_Res_Mixin_mapping.
     apply Hh; try apply event_set_prod_of_Z_in; eauto.
     Defined.
   Next Obligation.
+    iIntros (E i s1 s2 HE) "#Hinv #Hs".
+    iMod (pn.(LocSnap_EV_Orig) E i (event_set_prod_of_Z s1) (event_set_prod_of_Z s2) HE with
+           "[$][$]")
+      as "%Hh".
+    iModIntro.
+    rewrite -!event_set_prod_of_Z_union in Hh.
+    iPureIntro.
+    intros e He.
+    apply event_set_prod_of_Z_in in He.
+    assert (EV_Orig e = EV_Orig (event_prod_of_Z e)) as -> by set_solver.
+    by apply Hh.
+  Defined.
+  Next Obligation.
     iIntros (E i s1 s2 e HE He) "#Hinv #Hs".
     iMod (pn.(LocSnap_GlobSnap_Provenance) E _ (event_set_prod_of_Z s1) _ _ HE with "[$][$]")
       as "(%es & #Hsnap & %Hd)".
@@ -1083,7 +1096,7 @@ Section pncounter_proof.
       apply inhabitant.
   Qed.
 
-  (* TODO: Prove: *)
+   (* TODO: Prove: *)
   (* Definition pncounter_eval : val := *)
   (*   λ: "get_state" <>, *)
   (*      let: "st" := "get_state" #() in *)
@@ -1116,6 +1129,9 @@ Section pncounter_proof.
     destruct Hcoh as (v1 & v2 & <- & Hcoh1 & Hcoh2).
     rewrite /StLib_St_Coh /= /gctr_st_coh in Hcoh1, Hcoh2.
     rewrite Hcoh1 Hcoh2.
+    iDestruct (LocState_TakeSnap with "HLst") as "(HLst & #Hsnap)".
+    iMod (LocSnap_EV_Orig _ repId (event_set_prod_of_Z s1)
+                with "[][]") as "%Hasrt0"; [solve_ndisj|done | iFrame "#" |].
     iAssert (⌜s2 ⊆ event_set_Z_of_prod s2'p⌝ ∗
                LocState repId s1 (event_set_Z_of_prod s2'p) ∗
                ⌜@StLib_St_Coh CtrOp _ Ctr_Coh_Params (list_sum lv1 - list_sum lv2)%Z
@@ -1124,8 +1140,29 @@ Section pncounter_proof.
                 (list_sum lv1 - list_sum lv2)%Z⌝)%I
             with "[HLst]"
             as "Hh".
-    { simpl.
-      rewrite event_set_prod_of_Z_of_prod.
+    { iAssert (⌜∀ a : Event gctr_op,
+                 a ∈ gset_map
+                   (λ x : Event (prodOp gctr_op gctr_op pnctr_op_pred),
+                      event_map prodOp_fst x)
+                   (event_set_prod_of_Z (s1 ∪ event_set_Z_of_prod s2'p))
+                 → (EV_Orig a < length CRDT_Addresses)⌝)%I as "%Hasrt1".
+      { iPureIntro.
+        intros a Ha.
+        apply gset_map_correct2 in Ha as (e & -> & He).
+        specialize (Hasrt0 e). simpl. apply Nat2Z.inj_lt. apply Hasrt0.
+        by rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod in He. }
+      iAssert (⌜∀ a : Event gctr_op,
+                 a ∈ gset_map
+                   (λ x : Event (prodOp gctr_op gctr_op pnctr_op_pred),
+                      event_map prodOp_snd x)
+                   (event_set_prod_of_Z (s1 ∪ event_set_Z_of_prod s2'p))
+                 → (EV_Orig a < length CRDT_Addresses)⌝)%I as "%Hasrt2".
+      { iPureIntro.
+        intros a Ha.
+        apply gset_map_correct2 in Ha as (e & -> & He).
+        specialize (Hasrt0 e). simpl. apply Nat2Z.inj_lt. apply Hasrt0.
+        by rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod in He. }
+      simpl. rewrite event_set_prod_of_Z_of_prod.
       iFrame.
       iPureIntro.
       split_and!; [|done|].
@@ -1149,16 +1186,15 @@ Section pncounter_proof.
            last by rewrite gset_map_comp; f_equal.
           rewrite ctr_value_fold_sum.
           erewrite (list_sum_fold_sum (length CRDT_Addresses) (length CRDT_Addresses));
-            [done|reflexivity| |by rewrite vec_to_list_length|].
-          * admit.
-          * intros i Hi.
+            [done|reflexivity|done|by rewrite vec_to_list_length|].
+          { intros i Hi.
             specialize (Hdenot1 (nat_to_fin Hi)).
             apply vlookup_lookup in Hdenot1.
             rewrite fin_to_nat_to_fin in Hdenot1.
             apply list_lookup_total_correct in Hdenot1.
             rewrite Hdenot1.
             repeat f_equal.
-            rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod //.
+            rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod //. }
         + rewrite /fst_map.
            transitivity (ctr_value
                            (elements
@@ -1168,16 +1204,15 @@ Section pncounter_proof.
            last by rewrite gset_map_comp; f_equal.
           rewrite ctr_value_fold_sum.
           erewrite (list_sum_fold_sum (length CRDT_Addresses) (length CRDT_Addresses));
-            [done|reflexivity| |by rewrite vec_to_list_length|].
-          * admit.
-          * intros i Hi.
+            [done|reflexivity|done |by rewrite vec_to_list_length|].
+          { intros i Hi.
             specialize (Hdenot2 (nat_to_fin Hi)).
             apply vlookup_lookup in Hdenot2.
             rewrite fin_to_nat_to_fin in Hdenot2.
             apply list_lookup_total_correct in Hdenot2.
             rewrite Hdenot2.
             repeat f_equal.
-            rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod //. }
+            rewrite event_set_prod_of_Z_union event_set_prod_of_Z_of_prod //. } }
     iMod ("Hvsh" $! (event_set_Z_of_prod s2'p)
                       #(list_sum lv1 - list_sum lv2)
                       (list_sum lv1 - list_sum lv2)%Z with "[$Hh]") as "HΦ".
@@ -1193,7 +1228,7 @@ Section pncounter_proof.
     iIntros (n ->).
     wp_pures.
     done.
-  Admitted.
+  Qed.
 
   (* TODO: Prove: *)
   (* Definition pncounter_update : val := *)
@@ -1448,12 +1483,7 @@ Section pncounter_proof.
 
 End pncounter_proof.
 
-(* Lemma elements_event_set_prod_of_Z (s : event_set CtrOp) :
-    elements (event_set_prod_of_Z s) = event_prod_of_Z <$> elements s.
-  Proof.
-  Admitted.
-
-  Lemma event_set_prod_of_Z_compute_maximum (s : event_set CtrOp) :
+(* Lemma event_set_prod_of_Z_compute_maximum (s : event_set CtrOp) :
     maximality.compute_maximum (event_set_prod_of_Z s) =
       event_prod_of_Z <$> (maximality.compute_maximum s).
   Proof.
@@ -1503,8 +1533,4 @@ End pncounter_proof.
            inversion Hmax.
         * done.
   Qed.
-
-  Lemma event_set_Z_of_prod_compute_maximum (s : event_set pn_prod_Op) :
-    maximality.compute_maximum (event_set_Z_of_prod s) = event_Z_of_prod <$> (maximality.compute_maximum s).
-  Proof.
-  Admitted. *)
+ *)

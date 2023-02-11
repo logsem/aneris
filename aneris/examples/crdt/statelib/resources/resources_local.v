@@ -229,5 +229,12 @@ Section AboutLocal.
     apply (VLst_ext_time _ (VGst_hst_valid _ Hv'')); assumption.
   Qed.
 
-End AboutLocal.
+  Lemma StLib_OwnLocalSnap_EV_Orig E i s1 s2 :
+    ↑CRDT_InvName ⊆ E ->
+    StLib_GlobalInv ⊢
+    StLib_OwnLocalSnap i s1 s2 ={E}=∗
+    ⌜∀ e, e ∈ s1 ∪ s2 → (EV_Orig e < length CRDT_Addresses)%Z⌝.
+  Proof.
+  Admitted.
 
+End AboutLocal.

@@ -171,7 +171,7 @@ Section AboutInv.
         - apply VGst_hst_valid; done.
         - intros x Hx_in.
           apply (VGst_incl_local _ Hv x); eauto.
-        - apply (VLst_dep_closed _ (VGst_lhst_valid _ Hv f)). }          
+        - apply (VLst_dep_closed _ (VGst_lhst_valid _ Hv f)). }
       assert ( h__local ∪ h__sub ⊆_cc g.1 ) as Hsubsetcc.
       { apply (subseteqcc_trans _ (h__local ∪ h__foreign)); [done|].
         by rewrite -Hproj'. }
@@ -225,6 +225,7 @@ Section Resources.
     LocSnap_LocState_Included_CC
                         := StLib_OwnLocalSnap_LocState_Included_CC;
     LocSnap_Ext         := StLib_OwnLocalSnap_Ext;
+    LocSnap_EV_Orig     := StLib_OwnLocalSnap_EV_Orig;
     LocState_GlobSnap_Provenance
                         := StLib_OwnLocalState_GlobSnap_Provenance;
     LocSnap_GlobSnap_Provenance
