@@ -95,7 +95,6 @@ Section Proof_of_make_phys_resources.
     wp_pures.
     iApply ("HΦ" $! γe with "[-]"). simpl in *. iFrame "#".
     iSplit; first by destruct s; eauto.
-    iDestruct "Hchan_res" as "(#Hinv & Ha1 & Ha2 & Hp)".
     rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
     iExists γs, s, serl, _.
     iExists src_sa, dst_sa.

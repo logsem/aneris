@@ -71,16 +71,16 @@ Section Proof_of_server_conn_step_1.
          (* The message is (INIT,0). *)
          --- wp_pures.
              (* Creating the session opening ghost and physical resources. *)
-             wp_apply aneris_wp_lb_get. iIntros "Hstep".
              wp_apply aneris_wp_rand; first by iPureIntro; lia.
              iIntros (ck) "(%Hck1 & %Hck2)".
              pose (ckn := Z.to_nat ck).
              replace ck with (Z.of_nat ckn); last by lia.
-             wp_apply fupd_aneris_wp.
-             iMod (session_map_update _ _ RCParams_protocol ckn (nroot : namespace) (⊤ :coPset)
-                    with "[] [$HknM] [$Hstep]") as "HupdRes";
-               [ by rewrite -Hdom in Hdomc |].
-             iModIntro.
+             iApply (aneris_wp_step_get with "[HknM]").
+             { iApply (session_map_update _ _ RCParams_protocol ckn
+                                          (nroot : namespace) (⊤ :coPset)
+                        with "[] [$HknM]").
+               by rewrite -Hdom in Hdomc. }
+             iIntros "HupdRes".
              iDestruct "HupdRes"
                as (γs) "(HknM & #Hstk & Hhopened & HckF & HckRes & HcanInit1 & HcanInit2)".
              wp_let. wp_load. wp_pures.

@@ -5,8 +5,7 @@ From iris.base_logic.lib Require Import mono_nat.
 From aneris.aneris_lang Require Import lang.
 From aneris.aneris_lang.lib Require Export inject.
 From aneris.aneris_lang.lib.serialization Require Export serialization_proof.
-From actris.channel Require Export proto.
-From aneris.examples.reliable_communication.prelude Require Export ser_inj list_minus.
+From aneris.examples.reliable_communication.prelude Require Export ser_inj.
 From aneris.examples.reliable_communication.spec Require Export prelude.
 
 (** Serialization. *)

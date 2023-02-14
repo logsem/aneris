@@ -96,8 +96,6 @@ Section iProto_sessions.
     session_token clt_addr γs ∗
     mono_nat_auth_own (side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)) 1 0 ∗
     mono_nat_lb_own (side_elim s (session_srv_idx_name γs) (session_clt_idx_name γs)) 0 ∗
-    inv (chan_N (session_chan_name γs))
-        (Ses_inv (chan_session_escrow_name (session_chan_name γs))) ∗
     ses_own (chan_N (session_chan_name γs))
             (chan_session_escrow_name (session_chan_name γs)) s 0 0 p.
 
@@ -129,14 +127,12 @@ Section iProto_sessions.
     by apply frac_auth.frac_auth_agree_L in Hvl.
   Qed.
 
-
   Lemma session_map_update
         (M : session_names_map) (sa : socket_address) (p : iProto Σ)
         (cookie : nat) (N: namespace) (E : coPset) :
     ⌜sa ∉ dom M⌝ -∗
     known_sessions M -∗
-    steps_lb 0 ={E}=∗
-    ∃ (γ : session_name),
+    |~{E}~| ∃ (γ : session_name),
       (known_sessions (<[sa := γ]>M)) ∗
       session_token sa γ ∗
       session_half_opened sa γ ∗
@@ -145,10 +141,11 @@ Section iProto_sessions.
       can_init γ sa p Left ∗
       can_init γ sa (iProto_dual p) Right.
     Proof.
-    iIntros (Hfresh) "Hkn #Hlb".
-    iMod (Ses_init (N.@ (socket_address_to_str sa)) _ p with "Hlb")
-      as (γ_s) "(#Hses & Hownl & Hownr)".
+    iIntros (Hfresh) "Hkn".
+    iApply step_get_impl; [iApply (step_get_Ses_init (N.@ (socket_address_to_str sa)) _ p)|].
+    iDestruct 1 as (γ_s) "(#Hses & Hownl & Hownr)".
     set (γ_chan := ChanName γ_s (N.@ (socket_address_to_str sa))).
+    iApply step_get_open.
     iMod (mono_nat_own_alloc 0%nat) as (γ_srv_idx) "(Hsrv_idxA & Hsrv_idxF)".
     iMod (mono_nat_own_alloc 0%nat) as (γ_clt_idx) "(Hclt_idxA & Hclt_idxF)".
     iMod (own_alloc (● (to_agree <$> (∅: session_names_map) : session_names_mapUR)))
@@ -158,21 +155,17 @@ Section iProto_sessions.
     { by apply frac_auth_valid. }
     iMod (own_alloc (SM_opened)) as (γ_mode) "Hmode"; first done.
     set (γ_session := SessionName γ_chan γ_clt_idx γ_srv_idx γ_ck γ_mode).
-    iExists γ_session.
-    rewrite /known_sessions /CookieRes /CookieTokenFull.
     iMod (own_update
             _ _ (● (to_agree <$>
             ((<[sa := γ_session]>M)) : session_names_mapUR) ⋅ (◯ {[sa := to_agree γ_session]}))
            with "[$Hkn]") as "[HS #Hs]".
     { rewrite fmap_insert. apply auth_update_alloc, @alloc_local_update; last done.
       apply not_elem_of_dom; rewrite dom_fmap; done. }
-    iModIntro.
-    iFrame.
-    iSplitR; [done|].
-    iSplitR; [done|].
-    iSplitL "HckF"; first by eauto.
-    iSplitL "Hck"; first by eauto.
-    iFrame "#".
+    iModIntro. iApply step_get_intro. iModIntro.
+    iExists γ_session.
+    rewrite /known_sessions /CookieRes /CookieTokenFull.
+    iFrame "#∗".
+    iSplitL "HckF"; by eauto.
   Qed.
 
 End iProto_sessions.

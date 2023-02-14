@@ -73,6 +73,15 @@ Section with_Σ.
     iIntros "Hclose". iFrame. done.
   Qed.
 
+  Lemma step_get_open E1 E2 E3 P :
+    (|={E1,E2}=> |~{E2,E3}~| (|={E2, E1}=> P)) -∗ |~{E1,E3}~| P.
+  Proof.
+    iIntros "Hstep" (n) "Hauth".
+    iMod "Hstep". iMod ("Hstep" with "Hauth") as "[Hauth Hstep]".
+    iIntros "!>". iFrame=> /=.
+    by iMod "Hstep".
+  Qed.
+
   Lemma step_get_lb_get E :
     ⊢ |~{E}~| steps_lb 0.
   Proof.
