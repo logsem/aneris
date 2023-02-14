@@ -749,7 +749,6 @@ Section Gst_mutator_local_valid.
     - by apply mutator_local_orig_lt_len_preservation.
     - by apply mutator_local_orig_deps_seq_preservation.
     - by apply mutator_local_seqnum_non_O_preservation.
-    - by apply mutator_local_orig_max_len_preservation.
     - by apply mutator_local_evid_mon_preservation.
     - by apply mutator_local_evid_incl_event.
     - intros ev ev'
@@ -782,7 +781,6 @@ Section Gst_mutator_local_valid.
     - by apply mutator_orig_lt_len_preservation.
     - by apply mutator_orig_deps_seq_preservation.
     - by apply mutator_seqnum_non_O_preservation.
-    - by apply mutator_orig_max_len_preservation.
     - by apply mutator_evid_mon_preservation.
     - by apply mutator_evid_incl_event_preservation.
     - simpl.
@@ -864,4 +862,3 @@ Section Gst_mutator_local_valid.
   Qed.
 
 End Gst_mutator_local_valid.
-

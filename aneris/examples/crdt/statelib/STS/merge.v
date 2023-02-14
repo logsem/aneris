@@ -59,51 +59,12 @@ Section Gst_merge_local_valid.
     - intros ev [Hev_in | Hev_in]%elem_of_union.
       + by apply (VLst_seqnum_non_O _ (VGst_lhst_valid _ Hv i)).
       + by apply (VLst_seqnum_non_O _ (VGst_lhst_valid _ Hv j)), Hs_incl.
-    - intros rid Hrid.
-      destruct (set_choose_or_empty (hproj rid (g.2 !!! i ∪ s)))
-        as [(a & Ha) | <-]; last by left.
-      right.
-      pose proof (compute_maximals_non_empty Ha) as
-        [elt
-          [[Helt_orig Helt_in]%elem_of_filter
-          Helt_max]%compute_maximals_correct]%set_choose_L.
-      exists elt. split; first assumption.
-      unfold compute_maximum.
-      assert (compute_maximals (hproj rid (g.2 !!! i ∪ s)) = {[ elt ]})
-        as Heq.
-      { apply set_eq. intros x.
-        split.
-        - intros [[Hx_orig Hx_in]%elem_of_filter Hx_max]%compute_maximals_correct;
-          apply elem_of_singleton.
-          destruct (VLst_same_orig_comp g.1 Hvloc x elt) as [Hlt | [Heq | Hlt] ].
-          + apply elem_of_union in Hx_in as [?|?];
-            [by apply (gst_valid_inclusion g i)
-              | by apply (gst_valid_inclusion g j), Hs_incl].
-          + apply elem_of_union in Helt_in as [?|?];
-            [by apply (gst_valid_inclusion g i)
-              |by apply (gst_valid_inclusion g j), Hs_incl].
-          + by rewrite Helt_orig Hx_orig.
-          + exfalso.
-            apply (Hx_max elt); last assumption.
-            by apply elem_of_filter.
-          + apply (VLst_ext_time g.1 Hvloc x elt); try done;
-            [ apply elem_of_union in Hx_in as [?|?]
-            | apply elem_of_union in Helt_in as [?|?] ].
-            1, 3: by apply (gst_valid_inclusion g i).
-            all: by apply (gst_valid_inclusion g j), Hs_incl.
-          + exfalso.
-            apply (Helt_max x); last assumption.
-            by apply elem_of_filter.
-        - intros<-%elem_of_singleton. apply compute_maximals_correct. split.
-          + by apply elem_of_filter.
-          + intros y Hy. by apply Helt_max. }
-      by rewrite Heq elements_singleton.
     - intros e e'
         [He_in%(gst_valid_inclusion g _ Hv)
           | He_in%Hs_incl%(gst_valid_inclusion g _ Hv)]%elem_of_union
         [He'_in%(gst_valid_inclusion g _ Hv)
           | He'_in%Hs_incl%(gst_valid_inclusion g _ Hv)]%elem_of_union;
-      destruct Hvloc as [_ _ _ _ _ _ _ _ H']; by apply H'.
+      destruct Hvloc as [_ _ _ _ _ _ _ H' _]; by apply H'.
     - intros ev [Hev_in | Hev_in%(iffLR (elem_of_subseteq s (g.2 !!! j)) Hs_incl)]%elem_of_union.
       + by apply (VLst_evid_incl_event _ (VGst_lhst_valid g Hv i)).
       + by apply (VLst_evid_incl_event _ (VGst_lhst_valid g Hv j)).
@@ -172,4 +133,3 @@ Section Gst_merge_local_valid.
         apply elem_of_vlookup. by exists i.
   Qed.
 End Gst_merge_local_valid.
-

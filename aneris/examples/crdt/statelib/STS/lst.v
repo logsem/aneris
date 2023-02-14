@@ -43,12 +43,37 @@ Section Lst_definition.
       VLst_orig : event_set_orig_lt_len ls;
       VLst_orig_deps_seq : event_set_orig_deps_seq ls;
       VLst_seqnum_non_O : event_set_seqnum_non_O ls;
-      VLst_orig_max : event_set_orig_max_len ls;
       VLst_evid_mon : event_set_evid_mon ls;
       VLst_evid_incl_event: event_set_evid_incl_event ls;
       VLst_evid_incl_time_le: ∀ ev ev', ev ∈ ls → ev' ∈ ls → get_evid ev' ∈ EV_Time ev → ev' ≤_t ev;
     }.
     Arguments VLst_orig {_ _ _} ls.
+
+    Lemma VLst_orig_max {ls} : Lst_Validity ls -> event_set_orig_max_len ls.
+    Proof.
+      intros Hval.
+      pose proof (VLst_same_orig_comp ls Hval) as Hto.
+      pose proof (VLst_ext_time ls Hval) as Hext_t.
+      unfold event_set_orig_max_len.
+
+      unfold event_set_orig_max.
+      intros i Hi.
+      unshelve epose proof (compute_maximum_non_empty (hproj i ls) _ _) as Hmax.
+      { intros x y [Hxorig Hxin]%elem_of_filter [Hyorig Hyin]%elem_of_filter.
+        rewrite<- Hxorig in Hyorig.
+        by apply Hto. }
+      { intros x y [_ Hxin]%elem_of_filter [_ Hyin]%elem_of_filter Hxy_teq.
+        by apply Hext_t. }
+
+      destruct (set_choose_or_empty (hproj i ls)) as [ [m Hm] | -> ].
+      - right.
+        assert(hproj i ls ≠ ∅) as Hnonempty; first set_solver.
+        pose proof ((iffLR Hmax) Hnonempty) as (m' & Hm').
+        exists m'. split; last assumption.
+        by apply compute_maximum_correct in Hm' as [[]%elem_of_filter _];
+        last (intros??[??]%elem_of_filter[??]%elem_of_filter?; apply Hext_t).
+      - left. reflexivity.
+    Qed.
 
 End Lst_definition.
 Arguments Lst (Op) {_ _}.
@@ -67,10 +92,7 @@ Section Lst_helper.
 
   Lemma lst_init_valid:
     Lst_Validity (∅: Lst Op).
-  Proof.
-    split; try done.
-    intros??. by left.
-  Qed.
+  Proof. by split. Qed.
 
   Definition fil (s: event_set Op) (i: nat) : event_set Op :=
     filter (λ ev: Event Op, EV_Orig ev = i) s.
@@ -258,7 +280,7 @@ Section Lst_helper.
         (s : gset (Event Op))  (f : Op → Op') :
     Lst_Validity s  → Lst_Validity (gset_map (event_map f) s).
   Proof.
-    destruct 1 as [Hl1 Hl2 Hl3 Hl4 Hl5 Hl6 Hl7 Hl8 Hl9 Hl10 Hl11].
+    destruct 1 as [Hl1 Hl2 Hl3 Hl4 Hl5 Hl6 Hl7 Hl8 Hl9 Hl10].
     split.
     - intros ev id Hev Hid.
       pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
@@ -304,69 +326,22 @@ Section Lst_helper.
       destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
       assert (get_seqnum ev = get_seqnum ev0) as -> by naive_solver.
       by apply Hl7.
-    - intros i Hi.
-      specialize (Hl8 i Hi) as [Hl8|Hl8].
-      -- left. set_solver.
-      -- right.
-         destruct Hl8 as (m & Hm & Hmm).
-         assert ((event_map f m) ∈ gset_map (event_map f) s ∧ EV_Orig ((event_map f m)) = i)
-           as Hfm.
-         {  split; first by set_solver.
-             destruct (event_map_inv f m (event_map f m)) as (Heq1 & Heq2 & Heq3); first done.
-             rewrite -Heq2.
-             apply compute_maximum_correct in Hmm.
-             -- destruct Hmm as (Hmm0 & Hmm1).
-                set_solver.
-             -- intros x y Hx Hy Ht. apply Hl4; set_solver. }
-         assert (∃ m0 : Event Op', compute_maximum (hproj i (gset_map (event_map f) s)) = Some m0)
-           as (m0 & Hm0).
-         { apply (event_set_maximum_exists (gset_map (event_map f) s) i).
-           - exists (event_map f m). apply Hfm.
-           - intros ev0 ev1 Hev0 Hev1 Heq1.
-             pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
-             pose proof (event_map_elem_of f ev1 s Hev1) as (ev' & Hin' & Hev').
-             destruct (event_map_inv f ev ev0 Hev) as (HevEq1 & HevEq2 & HevEq3).
-             destruct (event_map_inv f ev' ev1 Hev') as (Hev'Eq1 & Hev'Eq2 & Hev'Eq3).
-             assert (EV_Orig ev = EV_Orig ev') as HeqOrig by naive_solver.
-             specialize (Hl2 ev ev' Hin Hin' HeqOrig).
-             set_solver.
-           -  intros ev0 ev1 Hev0 Hev1 Heq.
-              pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
-              pose proof (event_map_elem_of f ev1 s Hev1) as (ev' & Hin' & Hev').
-              destruct (event_map_inv f ev ev0 Hev) as (HevEq1 & HevEq2 & HevEq3).
-              destruct (event_map_inv f ev' ev1 Hev') as (Hev'Eq1 & Hev'Eq2 & Hev'Eq3).
-              assert (EV_Time ev = EV_Time ev') as HeqTime by naive_solver.
-              specialize (Hl4 ev ev' Hin Hin' HeqTime).
-              by subst. }
-         assert ((event_map f) <$> (compute_maximum (hproj i s)) = Some (event_map f m)) as Heq1.
-         by rewrite Hmm.
-         exists m0. split; last done.
-         assert ( ∀ (X : gset (Event Op')) e, compute_maximum X = Some e → e ∈ X) as HeX.
-         { intros X e Hmax.
-           apply elem_of_compute_maximals.
-           rewrite /compute_maximum in Hmax.
-           apply elem_of_elements.
-           destruct (elements (compute_maximals X)) as [|x [|]]; try naive_solver.
-           set_solver.
-         }
-         pose proof (HeX _ m0 Hm0).
-         set_solver.
     - intros ev0 ev1 Hev0 Hev1 Heq.
       pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
       pose proof (event_map_elem_of f ev1 s Hev1) as (ev' & Hin' & Hev').
       destruct (event_map_inv f ev ev0 Hev) as (HevEq1 & HevEq2 & HevEq3).
       destruct (event_map_inv f ev' ev1 Hev') as (Hev'Eq1 & Hev'Eq2 & Hev'Eq3).
       assert (EV_Orig ev = EV_Orig ev') as HeqOrig by naive_solver.
-      specialize (Hl9 ev ev' Hin Hin' HeqOrig).
+      specialize (Hl8 ev ev' Hin Hin' HeqOrig).
       by subst.
     - intros ev Hev.
       pose proof (event_map_elem_of f ev s Hev) as (ev0 & Hin0 & Hev0).
       destruct (event_map_inv f ev0 ev Hev0) as (Heq1 & Heq2 & Heq3).
-      specialize (Hl10 ev0 Hin0).
+      specialize (Hl9 ev0 Hin0).
       assert (get_evid ev0 = get_evid ev) as Heqg.
       { rewrite /get_evid. f_equal; first by naive_solver.
         rewrite /get_seqnum. naive_solver. }
-      rewrite Heqg in Hl10.
+      rewrite Heqg in Hl9.
       set_solver.
     - intros ev0 ev1 Hev0 Hev1 Heq.
       pose proof (event_map_elem_of f ev0 s Hev0) as (ev & Hin & Hev).
@@ -418,8 +393,8 @@ Section Lst_helper.
     Lst_Validity ls → Lst_Validity' ls.
   Proof.
     intros[]. repeat split; try assumption.
+    by apply VLst_orig_max.
     by apply VLst_evid_mon0.
   Qed.
 
 End Lst_helper.
-
