@@ -224,7 +224,6 @@ Definition incr_sim ip (ex : execution_trace aneris_lang) (atr : finite_trace na
 Definition init_state ip := {|
   state_heaps :=  {[ip := ∅ ]};
   state_sockets := {[ip := ∅ ]};
-  state_ports_in_use := ∅;
   state_ms := ∅; |}.
 
 Lemma incr_exampleM_finitary : aneris_model_rel_finitary incr_exampleM.
@@ -245,8 +244,6 @@ Proof.
   { set_solver. }
   { set_solver. }
   { apply aneris_sim_rel_finitary, incr_exampleM_finitary. }
-  { set_solver. }
-  { set_solver. }
   { set_solver. }
   { set_solver. }
   { set_solver. }

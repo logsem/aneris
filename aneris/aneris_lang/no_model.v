@@ -24,17 +24,15 @@ Theorem adequacy_hoare_no_model Σ `{anerisPreG Σ unit_model} IPs A lbls obs_se
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →
   ip ∉ IPs →
-  dom (state_ports_in_use σ) = IPs →
-  (∀ i, i ∈ IPs → state_ports_in_use σ !! i = Some ∅) →
   (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros ?? Hspec ???????.
+  intros ?? Hspec ?????.
   eapply (adequacy_hoare Σ _ IPs A lbls obs_send_sas obs_rec_sas);
-    [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done|done|done].
+    [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done].
   { apply unit_model_rel_finitary. }
   iIntros (? Φ) "!# (?&?&?&?&?&?&?&?&?) HΦ".
   iApply (Hspec with "[-HΦ]"); [|done].

@@ -187,8 +187,6 @@ Definition ping_pong_is :=
   {|
     state_heaps :=  {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
-    state_ports_in_use :=
-      <["0.0.0.0" := ∅ ]> $ <["0.0.0.1" := ∅ ]> $ ∅;
     state_ms := ∅;
   |}.
 
@@ -199,7 +197,7 @@ Theorem ping_pong_safe :
 Proof.
   set (Σ := #[anerisΣ unit_model]).
   apply (adequacy_hoare_no_model Σ ips {[ pong_addr; ping_addr ]} ∅ ∅ ∅);
-    [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done|done|done].
+    [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done].
   iIntros (dinvG).
   iIntros (?) "!# (Hf & Hhist & Hips & _) HΦ".
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].

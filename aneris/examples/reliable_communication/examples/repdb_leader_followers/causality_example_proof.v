@@ -445,11 +445,6 @@ Definition init_state :=
   {|
     state_heaps := {[ "system" := ∅ ]};
     state_sockets := {[ "system" := ∅ ]};
-    state_ports_in_use :=
-      <["0.0.0.0" := ∅ ]> $
-      <["0.0.0.1" := ∅ ]> $
-      <["0.0.0.2" := ∅ ]> $
-      <["0.0.0.3" := ∅ ]> $ ∅;
     state_ms := ∅;
   |}.
 

@@ -27,7 +27,6 @@ Section definitions.
   Implicit Types H : gmap ip_address heap.
   Implicit Types S : gmap ip_address sockets.
   Implicit Types Sn : sockets.
-  Implicit Types P : ports_in_use.
   Implicit Types ps : gset port.
   Implicit Types ips : gset ip_address.
   Implicit Types M : message_multi_soup.
@@ -85,30 +84,22 @@ Section definitions.
     (∃ free_ips free_ports,
         (* the domains of [free_ips] and [free_ports] are disjoint *)
         (⌜dom free_ports ## free_ips ∧
-         (* if the ip [ip] is free, no ports have been bound  *)
-         (∀ ip, ip ∈ free_ips → state_ports_in_use σ !! ip = Some ∅) ∧
          (* if the ip [ip] is free, neither a heap nor a socket map has been
             allocated *)
          (∀ ip, ip ∈ free_ips →
                 state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None) ∧
-         (* free ports and bound ports are disjoint *)
-         (∀ ip ps, free_ports !! ip = Some (GSet ps) →
-                   ∃ bound_ports,
-                     (state_ports_in_use σ) !! ip = Some bound_ports ∧
-                     ps ## bound_ports )⌝) ∗
+        (* free ports and bound ports are disjoint *)     
+        (∀ ip ps, free_ports !! ip = Some (GSet ps) →
+        ∀ Sn sh skt r sa, (state_sockets σ) !! ip = Some Sn →
+        Sn !! sh = Some(skt, r) →   
+        saddress skt = Some sa →             
+        ps ## {[port_of_address sa]})⌝) ∗   
         (* we have the auth parts of the resources for free ips and ports *)
         free_ips_auth free_ips ∗
         free_ports_auth free_ports)%I.
 
-  (** Network sockets coherence for bound ports, socket handlers,
+  (** Network sockets coherence for socket handlers,
       receive buffers, and socket addresses *)
-  (* The ports of all bound addresses in [Sn] are also in [P] *)
-  Definition bound_ports_coh Sn P :=
-    ∀ sh skt a ps r,
-    Sn !! sh = Some (skt, r) →
-    saddress skt = Some a →
-    P !! ip_of_address a = Some ps →
-    port_of_address a ∈ ps.
 
   (* All sockets in [Sn] with the same address have the same handler *)
   Definition socket_handlers_coh Sn :=
@@ -140,10 +131,9 @@ Section definitions.
     saddress skt = None →
     r = [].
 
-  Definition network_sockets_coh S P :=
+  Definition network_sockets_coh S :=
     ∀ ip Sn,
     S !! ip = Some Sn →
-    bound_ports_coh Sn P ∧
     socket_handlers_coh Sn ∧
     socket_messages_coh Sn ∧
     socket_addresses_coh Sn ip ∧
@@ -201,7 +191,7 @@ Section definitions.
     (∃ γm mhm,
         ⌜messages_received_sent mhm = rt⌝ ∗
         ⌜gnames_coh γm (state_heaps σ) (state_sockets σ)⌝ ∗
-        ⌜network_sockets_coh (state_sockets σ) (state_ports_in_use σ)⌝ ∗
+        ⌜network_sockets_coh (state_sockets σ)⌝ ∗
         ⌜messages_history_coh (state_ms σ) (state_sockets σ) mhm⌝ ∗
         node_gnames_auth γm ∗
         socket_interp_coh ∗

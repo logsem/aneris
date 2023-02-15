@@ -28,7 +28,7 @@ Section crdt_convergence.
 
   Definition initial_state :=
     ([mkExpr "system" (runner gcdata 0 (progs ps) $(gcd_addr_list gcdata))],
-     init_state gcdata).
+     init_state).
 
   (** The system is eventully consistent if whenever network fairness hodls and there is a *)
   (** stability point in the system, there also is a convergence point. *)
