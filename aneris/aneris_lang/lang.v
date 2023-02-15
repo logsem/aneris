@@ -691,7 +691,7 @@ Definition aneris_to_val e : option aneris_val :=
 Definition heap := gmap loc val.
 Definition sockets := gmap socket_handle (socket * list message).
 
-(* Definitions for helping us decide wheter ports are free *)
+(* Definition for helping us decide wheter ports are free *)
 Definition port_not_in_use p (sockets : gmap socket_handle (socket * list message)) := 
   ∀ sh skt a r,
   sockets !! sh = Some (skt, r) →

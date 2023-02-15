@@ -137,21 +137,15 @@ Section state_interpretation.
     - intros ip ?.
     destruct (decide (ip = ip_of_address a)); simplify_eq; [set_solver|].
     rewrite lookup_insert_ne //. by apply HFip.
-    - destruct HFip as [? HFip]. intros ip ps ?????????.
+    - intros ip ps ?????????.
       destruct (decide ((ip_of_address a) = ip)).
-      -- subst. specialize (HFip (ip_of_address a)).
-      simplify_map_eq. 
-      specialize (HFip ps' Hps'). 
-      specialize (HFip Sn sh0 skt0 r sa). 
-      specialize (HFip H).
-      destruct (decide (sh = sh0)).
+      -- simplify_map_eq. subst. destruct (decide (sh = sh0)).
         + subst. apply (lookup_insert_rev Sn sh0 
-        ({| saddress := Some a; sblock := sblock skt |}, []) (skt0, r))  in H3.
-        inversion H3. subst. simpl in H4. inversion H4. set_solver. 
+        ({| saddress := Some a; sblock := sblock skt |}, []) (skt0, r)) in H2.
+        set_solver.
         + apply (lookup_insert_ne Sn sh sh0 
         ({| saddress := Some a; sblock := sblock skt |}, []))  in n. 
-        rewrite n in H3.
-        specialize (HFip H3 H4). set_solver.
+        rewrite n in H2. set_solver.
       -- simplify_map_eq. eapply HFip; eauto.
   Qed. 
 
@@ -171,17 +165,16 @@ Section state_interpretation.
       - intros ip ?. split; [set_solver|].
         destruct (decide (ip = ip_of_address a)); simplify_map_eq; [set_solver|].
         by apply HFip.
-      - intros ip ??????????. destruct HFip as [? HFip].
-        destruct (decide ((ip_of_address a) = ip)).
-        --- subst. simpl_map. inversion H2. subst.
-        destruct (decide (sh = sh0)).
-          + subst. apply (lookup_insert_rev Sn sh0 
-          (skt, r) (skt0, r0)) in H3. 
-          inversion H3. rewrite -H7 in H4.
-          eapply HFip; eauto. 
-          + apply (lookup_insert_ne Sn sh sh0 (skt, r))  in n. 
-          rewrite n in H3. eapply HFip; eauto.  
-        --- simplify_map_eq. eapply HFip; eauto.   
+      - intros ip ??????????. destruct (decide ((ip_of_address a) = ip)).
+        -- subst. simpl_map. inversion H2. subst. 
+           destruct (decide (sh = sh0)).
+           + subst. apply (lookup_insert_rev Sn sh0 
+           (skt, r) (skt0, r0)) in H3. 
+           inversion H3. rewrite -H6 in H4.
+           eapply HFip; eauto.
+           + apply (lookup_insert_ne Sn sh sh0 (skt, r))  in n. 
+           rewrite n in H3. eapply HFip; eauto.  
+        -- simplify_map_eq. eapply HFip; eauto.
   Qed.
 
   (* !!! gør den her pænere *)
@@ -209,16 +202,14 @@ Section state_interpretation.
     - intros ip' ??????????.
       destruct (decide (ip = ip')).
       -- subst. simpl_map. inversion H5. rewrite -H8 in H6.
-      destruct HFip as [? HFip].
-      specialize (HFip ip' ps H4). 
-      destruct (decide (sh = sh0)).
-      + subst. apply (lookup_insert_rev Sn sh0 
-      (skt, m :: R) (skt0, r)) in H6. inversion H6. rewrite -H9 in H7.
-      eapply HFip; eauto. 
-      + apply (lookup_insert_ne Sn sh sh0 
-      (skt, m :: R)) in n. rewrite n in H6.
-      eapply HFip; eauto.  
-      -- simplify_map_eq. eapply HFip; eauto.
+         destruct (decide (sh = sh0)).
+         + subst. apply (lookup_insert_rev Sn sh0 
+         (skt, m :: R) (skt0, r)) in H6. inversion H6. 
+         rewrite -H8 in H7. eapply HFip; eauto. 
+         + apply (lookup_insert_ne Sn sh sh0 
+         (skt, m :: R)) in n. rewrite n in H6.
+         eapply HFip; eauto.  
+      -- simplify_map_eq. eapply HFip; eauto. 
   Qed.      
 
   (* !!! gør den her pænere *)
@@ -237,20 +228,17 @@ Section state_interpretation.
     - intros ip' Hip'.
     simplify_map_eq. subst S.
     ddeq ip ip'; set_solver.
-    - intros ip' ??????????.
-      destruct HFip as [? HFip].
-      specialize (HFip ip' ps H1).
-      unfold S in H2.
+    - intros ip' ??????????. unfold S in H2.
       destruct (decide (ip = ip')).
-      -- subst. simpl_map. inversion H2. rewrite -H7 in H3.
+      -- subst. simpl_map. inversion H2. rewrite -H6 in H3.
       destruct (decide (sh = sh0)).
       + subst. apply (lookup_insert_rev Sn sh0 
       ({| saddress := saddress skt; sblock := b |}, r) (skt0, r0)) in H3. 
-      inversion H3. rewrite -H7 in H4. simpl in H4.
+      inversion H3. rewrite -H6 in H4. simpl in H4.
       eapply HFip; eauto. 
       + apply (lookup_insert_ne Sn sh sh0 
-      ({| saddress := saddress skt; sblock := b |}, r)) in n. rewrite n in H3.
-      eapply HFip; eauto.  
+      ({| saddress := saddress skt; sblock := b |}, r)) in n. 
+      rewrite n in H3. eapply HFip; eauto.  
       -- simplify_map_eq. eapply HFip; eauto.
   Qed.
       
