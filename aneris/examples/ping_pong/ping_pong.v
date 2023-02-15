@@ -196,10 +196,9 @@ Theorem ping_pong_safe :
   aneris_adequate ping_pong_runner "system" ping_pong_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (adequacy_hoare_no_model Σ ips {[ pong_addr; ping_addr ]} ∅ ∅ ∅);
-    [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done].
+  apply (no_model.adequacy_hoare_no_model_simpl Σ ips {[ pong_addr; ping_addr ]}); try set_solver.
   iIntros (dinvG).
-  iIntros (?) "!# (Hf & Hhist & Hips & _) HΦ".
+  iIntros (?) "!# (Hf & Hhist & Hips) HΦ".
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
   rewrite (big_sepS_delete _ _ "0.0.0.0"); [|set_solver].
   rewrite (big_sepS_delete _ _ "0.0.0.1"); [|set_solver].

@@ -45,6 +45,17 @@ Section lifting_pure_exec.
     induction n as [|n IH]; by rewrite //= -step_fupd_intro // IH.
   Qed.
 
+  (* Used in documentation *)
+  Lemma aneris_wp_pure_step_later_alt n E e1 e2 φ P Q :
+  PureExec φ 1 (mkExpr n e1) (mkExpr n e2) → 
+  φ → 
+  {{{ P }}} e2 @[n] E {{{ w, RET w; Q }}} →
+  {{{ ▷ P }}} e1 @[n] E {{{ w, RET w; Q }}}.
+  Proof.
+    intros. iIntros "HPre HPost". iApply aneris_wp_pure_step_later; try done.
+    iNext. iPoseProof H2 as "H2". by iApply ("H2" with "HPre"). 
+  Qed.
+
 End lifting_pure_exec.
 
 Section lifting_mdl.
@@ -145,6 +156,17 @@ Section lifting_node_local.
     auto.
   Qed.
 
+  (* Used in documentation *)
+  Lemma aneris_wp_fork_alt P n E e:
+  {{{ P }}} e @[n] {{{w, RET w; True }}} →
+  {{{ P }}} Fork e @[n] E {{{ RET #(); True }}}.
+  Proof.
+    intros. iIntros "HPre HPost". 
+    iApply aneris_wp_fork. iSplitL "HPost".
+    - iNext. iApply "HPost". done.
+    - iNext. iApply (H0 with "HPre"). done.
+  Qed. 
+    
   (** Heap *)
   Lemma aneris_wp_alloc ip E v :
     {{{ True }}} ref (Val v) @[ip] E {{{ l, RET #l; l ↦[ip] v }}}.
@@ -275,6 +297,21 @@ Section lifting_network.
     iIntros "%tid' Hin' Hfp".
     iApply wp_wand_r; iSplitL; first iApply ("He" with "Hfp Hin'").
     done.
+  Qed.
+
+  (* Used in documentation *)
+  Lemma aneris_wp_start_alt n P ports e E :
+  n ≠ "system" → 
+  {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
+  {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
+  Proof.
+    intros ? Ht ?. iIntros "HPre HPost".
+    iApply aneris_wp_start; try done. 
+    iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
+    iSplitL "HPost".
+    - iNext. by iApply "HPost". 
+    - iNext. iIntros "HFree". 
+    iApply (Ht with "[HP HFree]"); try done. iFrame.
   Qed.
 
   Lemma aneris_wp_new_socket ip E :
@@ -591,36 +628,6 @@ Section lifting_network.
     iApply "HΦ"; iFrame.
   Qed.
 
-  Lemma aneris_wp_receivefrom_nb_gen
-        (Ψ : socket_interp Σ) ip a E h s R T :
-    ip_of_address a = ip →
-    saddress s = Some a →
-    sblock s = false →
-    {{{ ▷ h ↪[ip_of_address a] s ∗
-        ▷ a ⤳ (R, T) ∗
-        a ⤇ Ψ }}}
-      (ReceiveFrom (Val $ LitV $ LitSocket h)) @[ip] E
-    {{{ r, RET r;
-        ((⌜r = NONEV⌝ ∗ h ↪[ip_of_address a] s ∗ a ⤳ (R, T) ∨
-        (∃ msg,
-          ⌜m_destination msg = a⌝ ∗
-          ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
-                  (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ h ↪[ip_of_address a] s ∗ a ⤳ ({[ msg ]} ∪ R, T) ∗
-             Ψ msg) ∨
-            ⌜msg ∈ R⌝ ∗ h ↪[ip_of_address a] s ∗ a ⤳ (R, T))))) }}}.
-  Proof.
-    iIntros (Hip Hskt Hblock Φ) "Hshprot HΦ".
-    rewrite !aneris_wp_unfold /aneris_wp_def.
-    iIntros "%tid #Hin".
-    rewrite -Hip.
-    iApply (wp_receivefrom_nb_gen with "[$Hshprot]"); [done|done|].
-    iNext.
-    iIntros (r) "Hr".
-    iExists _; iSplit; first done.
-    iApply "HΦ"; iFrame.
-  Qed.
-
   Lemma aneris_wp_receivefrom_nb_groups ip sa sag E h s R T :
     ip_of_address sa = ip →
     saddress s = Some sa →
@@ -661,9 +668,15 @@ Section lifting_network.
           ((⌜msg ∉ R⌝ ∗ h ↪[ip] s ∗ a ⤳ ({[ msg ]} ∪ R, T) ∗ φ msg) ∨
            ⌜msg ∈ R⌝ ∗ h ↪[ip] s ∗ a ⤳ (R, T))) }}}.
   Proof.
-    iIntros (Hip Hs Hb Φ) "(Hsh & Hm) HΦ".
+    iIntros (Hip Hskt Hblock Φ) "Hshprot HΦ".
+    rewrite !aneris_wp_unfold /aneris_wp_def.
+    iIntros "%tid #Hin".
     rewrite -Hip.
-    iApply (aneris_wp_receivefrom_nb_gen φ with "[$]"); eauto.
+    iApply (wp_receivefrom_nb_gen with "[$Hshprot]"); [done|done|].
+    iNext.
+    iIntros (r) "Hr".
+    iExists _; iSplit; first done.
+    iApply "HΦ"; iFrame.
   Qed.
 
   Lemma aneris_wp_receivefrom_alt_group ip sa sag E sh s R T φ :
@@ -687,26 +700,6 @@ Section lifting_network.
   Proof.
     iIntros (Hip Hs Hb Φ) "Hsh HΦ". rewrite -Hip.
     iApply (aneris_wp_receivefrom_nb_gen_groups (Some φ) with "[$]"); eauto.
-  Qed.
-
-  (* TODO: same as non-alt - Delete? *)
-  Lemma aneris_wp_receivefrom_alt ip a E sh s R T φ :
-    ip_of_address a = ip →
-    saddress s = Some a →
-    sblock s = false →
-    {{{ ▷ sh ↪[ip] s ∗ ▷ a ⤳ (R, T) ∗ a ⤇ φ }}}
-      ReceiveFrom (Val $ LitV $ LitSocket sh) @[ip] E
-    {{{ r, RET r;
-        (⌜r = NONEV⌝ ∗ sh ↪[ip] s ∗ a ⤳ (R, T)) ∨
-        ∃ msg,
-          ⌜m_destination msg = a⌝ ∗
-          ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
-                            (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
-          ((⌜msg ∉ R⌝ ∗ sh ↪[ip] s ∗ a ⤳ ({[ msg ]} ∪ R, T) ∗ φ msg) ∨
-            ⌜msg ∈ R⌝ ∗ sh ↪[ip] s ∗ a ⤳ (R, T)) }}}.
-  Proof.
-    iIntros (Hip Hs Hb Φ) "Hsh HΦ". rewrite -Hip.
-    iApply (aneris_wp_receivefrom_nb_gen φ with "[$]"); eauto.
   Qed.
 
   Lemma aneris_wp_receivefrom_groups ip sa sag E h s R T φ :
