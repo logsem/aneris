@@ -61,12 +61,11 @@ obs_rec_sas ⊆ A ∧
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}).
 Proof.
-  intros. exists ∅, ∅, ∅. 
-  split; try done. split; try done.
+  intros Ht. exists ∅, ∅, ∅. 
+  do 2 (split; try done).
   iIntros (? ?) "!# HPre HPost". 
-  iApply (H0 with "[HPre] [HPost]"); try done.
-  iDestruct "HPre" as "[H1 [H2 [H3 H4]]]".
-  iFrame.
+  iApply (Ht with "[HPre] [HPost]"); try done.
+  iDestruct "HPre" as "[? [? [? ?]]]". iFrame.
 Qed.     
 
 Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs A e σ φ ip :
@@ -83,8 +82,8 @@ Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs A e σ 
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros. 
-  apply adequacy_hoare_no_model_simpl_helper in H0; try done.
-  destruct H0 as [lbls[obs_send_sas[obs_rec_sas[HSend [HRec H0]]]]].
+  intros Ht ???????. 
+  apply adequacy_hoare_no_model_simpl_helper in Ht; try done.
+  destruct Ht as [lbls[obs_send_sas[obs_rec_sas[HSend [HRec Ht]]]]].
   by eapply (adequacy_hoare_no_model Σ IPs A lbls obs_send_sas obs_rec_sas).
 Qed.

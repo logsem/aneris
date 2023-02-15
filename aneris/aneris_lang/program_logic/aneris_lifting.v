@@ -305,13 +305,13 @@ Section lifting_network.
   {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
   {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
   Proof.
-    intros. iIntros "HPre HPost".
+    intros ? Ht ?. iIntros "HPre HPost".
     iApply aneris_wp_start; try done. 
     iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
     iSplitL "HPost".
     - iNext. by iApply "HPost". 
     - iNext. iIntros "HFree". 
-    iApply (H1 with "[HP HFree]"); try done. iFrame.
+    iApply (Ht with "[HP HFree]"); try done. iFrame.
   Qed.
 
   Lemma aneris_wp_new_socket ip E :
