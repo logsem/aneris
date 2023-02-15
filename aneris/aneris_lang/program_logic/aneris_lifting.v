@@ -306,14 +306,12 @@ Section lifting_network.
   {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
   Proof.
     intros. iIntros "HPre HPost".
-    iApply aneris_wp_start.
-    - done.
-    - iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
-      iSplitL "HPost".
-        -- iNext. iApply "HPost". done.
-        -- iNext. iPoseProof H1 as "H1". iIntros "HFree". 
-        iApply (H1 with "[HP HFree]"); try done. iFrame.
-        Unshelve. done.
+    iApply aneris_wp_start; try done. 
+    iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
+    iSplitL "HPost".
+    - iNext. by iApply "HPost". 
+    - iNext. iIntros "HFree". 
+    iApply (H1 with "[HP HFree]"); try done. iFrame.
   Qed.
 
   Lemma aneris_wp_new_socket ip E :

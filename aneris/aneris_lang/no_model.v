@@ -40,3 +40,51 @@ Proof.
   iApply (Hspec with "[-HΦ]"); [|done].
   iFrame.
 Qed.
+
+Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs A e φ ip: 
+(∀ `{anerisG Σ}, ⊢
+{{{ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip)}}}
+    e @[ip]
+{{{ v, RET v; ⌜φ v⌝ }}}) →
+∃ lbls obs_send_sas obs_rec_sas, 
+obs_send_sas ⊆ A ∧ 
+obs_rec_sas ⊆ A ∧
+(∀ `{anerisG Σ}, ⊢
+          {{{ unallocated A ∗
+              ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
+              ([∗ set] ip ∈ IPs, free_ip ip) ∗
+              ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
+              ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) ∗
+              ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) ∗
+              observed_send obs_send_sas ∗
+              observed_receive obs_rec_sas }}}
+          e @[ip]
+      {{{ v, RET v; ⌜φ v⌝ }}}).
+Proof.
+  intros. exists ∅, ∅, ∅. 
+  split; try done. split; try done.
+  iIntros (? ?) "!# HPre HPost". 
+  iApply (H0 with "[HPre] [HPost]"); try done.
+  iDestruct "HPre" as "[H1 [H2 [H3 H4]]]".
+  iFrame.
+Qed.     
+
+Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs A e σ φ ip :
+  (∀ `{anerisG Σ}, ⊢
+      {{{ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip)}}}
+          e @[ip]
+      {{{ v, RET v; ⌜φ v⌝ }}}) →
+  ip ∉ IPs →
+  dom (state_ports_in_use σ) = IPs →
+  (∀ i, i ∈ IPs → state_ports_in_use σ !! i = Some ∅) →
+  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
+  state_heaps σ = {[ip:=∅]} →
+  state_sockets σ = {[ip:=∅]} →
+  state_ms σ = ∅ →
+  aneris_adequate e ip σ φ.
+Proof.
+  intros. 
+  apply adequacy_hoare_no_model_simpl_helper in H0; try done.
+  destruct H0 as [lbls[obs_send_sas[obs_rec_sas[HSend [HRec H0]]]]].
+  by eapply (adequacy_hoare_no_model Σ IPs A lbls obs_send_sas obs_rec_sas).
+Qed.
