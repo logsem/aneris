@@ -82,21 +82,20 @@ Section definitions.
   (* Free ips have no bound ports, no heap, and no sockets  *)
   Definition free_ips_coh σ :=
     (∃ free_ips free_ports,
-        (* the domains of [free_ips] and [free_ports] are disjoint *)
-        (⌜dom free_ports ## free_ips ∧
-         (* if the ip [ip] is free, neither a heap nor a socket map has been
-            allocated *)
-         (∀ ip, ip ∈ free_ips →
-                state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None) ∧
-        (* free ports and bound ports are disjoint *)     
-        (∀ ip ps, free_ports !! ip = Some (GSet ps) →
-        ∀ Sn sh skt r sa, (state_sockets σ) !! ip = Some Sn →
-        Sn !! sh = Some(skt, r) →   
-        saddress skt = Some sa →             
-        ps ## {[port_of_address sa]})⌝) ∗   
-        (* we have the auth parts of the resources for free ips and ports *)
-        free_ips_auth free_ips ∗
-        free_ports_auth free_ports)%I.
+      (* the domains of [free_ips] and [free_ports] are disjoint *)
+      (⌜dom free_ports ## free_ips ∧
+      (* if the ip [ip] is free, neither a heap nor a socket map has been
+          allocated *)
+      (∀ ip, ip ∈ free_ips →
+              state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None) ∧
+      (* free ports and bound ports are disjoint *)     
+      (∀ ip ps, free_ports !! ip = Some (GSet ps) →
+      ∀ Sn, (state_sockets σ) !! ip = Some Sn →
+      ∀ p, p ∈ ps → port_not_in_use p Sn)⌝) ∗   
+      (* we have the auth parts of the resources for free ips and ports *)
+      free_ips_auth free_ips ∗
+      free_ports_auth free_ports)%I.
+
 
   (** Network sockets coherence for socket handlers,
       receive buffers, and socket addresses *)
