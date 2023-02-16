@@ -84,7 +84,6 @@ Section state_interpretation.
     by apply HFip.
   Qed.
 
-  (* !!! gør den her pænere *)
   Lemma free_ips_coh_alloc_socket σ ip Sn sh s:
     let σ' :=
         σ <| state_sockets := <[ip:=<[sh:=(s, [])]> Sn]> (state_sockets σ) |> in
@@ -95,23 +94,19 @@ Section state_interpretation.
   Proof.
     iIntros (????).
     iDestruct 1 as (Fip Piu (Hdsj & HFip)) "[HfCtx HpCtx]".
-    iExists _, _. simpl. iFrame. iPureIntro.
-    split; auto. split.
-    - intros ip' ?.
-    split; [by eapply HFip|].
-    destruct (decide (ip = ip')); simplify_map_eq; [set_solver|].
-    by apply HFip.
+    iExists _, _. iFrame. iPureIntro.
+    split; [done|]. simpl. split.
+    - intros ip' ?. split; [by eapply HFip|].
+      destruct (decide (ip = ip')); simplify_map_eq; [set_solver|].
+      by apply HFip.
     - intros ip' ??????????.
-      destruct (decide (ip = ip')).
-      -- subst. simpl_map. inversion H3.
-        destruct (decide (sh = sh0)).
-        + subst. intros. apply (lookup_insert_rev Sn sh0 
-        (s, []) (skt, r)) in H5. 
-        inversion H5. rewrite -H8 in H6. set_solver. 
-        + intros. apply (lookup_insert_ne Sn sh sh0 (s, [])) in n. 
-        rewrite n in H5. destruct HFip as [? HFip].
-        eapply HFip; eauto. 
-      -- simplify_map_eq. eapply HFip; eauto.
+      destruct (decide (ip = ip')) as [->|Hipneq].
+      + simplify_map_eq.
+        destruct (decide (sh = sh0)) as [->|Hshneq].
+        * intros Hip ?. rewrite lookup_insert in Hip. by simplify_eq.
+        * intros Hip ?. apply (lookup_insert_ne Sn sh sh0 (s, [])) in Hshneq.
+          rewrite Hshneq in Hip. destruct HFip as [? HFip]. by eapply HFip.
+      + simplify_map_eq. by eapply HFip.
   Qed.
 
   (* !!! gør den her pænere *)
