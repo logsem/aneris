@@ -445,9 +445,9 @@ Qed.
 
 (* Used in documentation *)
 Lemma aneris_wp_socket_interp_alloc_singleton_alt Ψ n E e Q P sa : 
-TCEq (to_val e) None →
-{{{ P ∗ sa ⤇ Ψ }}} e @[n] E {{{ w, RET w; Q }}} →
-{{{ P ∗ unallocated {[sa]} }}} e @[n] E {{{ w, RET w; Q }}}.
+  TCEq (to_val e) None →
+  {{{ P ∗ sa ⤇ Ψ }}} e @[n] E {{{ w, RET w; Q }}} →
+  {{{ P ∗ unallocated {[sa]} }}} e @[n] E {{{ w, RET w; Q }}}.
 Proof.
   intros. iIntros "HPre HPost". iDestruct "HPre" as "[HPre HUnAloc]".  
   iApply (aneris_wp_socket_interp_alloc_singleton with "HUnAloc"). 

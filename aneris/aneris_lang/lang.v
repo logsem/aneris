@@ -692,7 +692,7 @@ Definition heap := gmap loc val.
 Definition sockets := gmap socket_handle (socket * list message).
 
 (* Definition for helping us decide wheter ports are free *)
-Definition port_not_in_use p (sockets : gmap socket_handle (socket * list message)) := 
+Definition port_not_in_use (p : port) (sockets : gmap socket_handle (socket * list message)) : Prop := 
   ∀ sh skt a r,
   sockets !! sh = Some (skt, r) →
   saddress skt = Some a →

@@ -140,9 +140,7 @@ Section state_interpretation.
     - intros ip ps ?????????.
       destruct (decide ((ip_of_address a) = ip)).
       -- simplify_map_eq. subst. destruct (decide (sh = sh0)).
-        + subst. apply (lookup_insert_rev Sn sh0 
-        ({| saddress := Some a; sblock := sblock skt |}, []) (skt0, r)) in H2.
-        set_solver.
+        + subst. apply lookup_insert_rev in H2. set_solver.
         + apply (lookup_insert_ne Sn sh sh0 
         ({| saddress := Some a; sblock := sblock skt |}, []))  in n. 
         rewrite n in H2. set_solver.

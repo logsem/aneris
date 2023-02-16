@@ -47,10 +47,10 @@ Section lifting_pure_exec.
 
   (* Used in documentation *)
   Lemma aneris_wp_pure_step_later_alt n E e1 e2 φ P Q :
-  PureExec φ 1 (mkExpr n e1) (mkExpr n e2) → 
-  φ → 
-  {{{ P }}} e2 @[n] E {{{ w, RET w; Q }}} →
-  {{{ ▷ P }}} e1 @[n] E {{{ w, RET w; Q }}}.
+    PureExec φ 1 (mkExpr n e1) (mkExpr n e2) → 
+    φ → 
+    {{{ P }}} e2 @[n] E {{{ w, RET w; Q }}} →
+    {{{ ▷ P }}} e1 @[n] E {{{ w, RET w; Q }}}.
   Proof.
     intros. iIntros "HPre HPost". iApply aneris_wp_pure_step_later; try done.
     iNext. iPoseProof H2 as "H2". by iApply ("H2" with "HPre"). 
@@ -158,8 +158,8 @@ Section lifting_node_local.
 
   (* Used in documentation *)
   Lemma aneris_wp_fork_alt P n E e:
-  {{{ P }}} e @[n] {{{w, RET w; True }}} →
-  {{{ P }}} Fork e @[n] E {{{ RET #(); True }}}.
+    {{{ P }}} e @[n] {{{w, RET w; True }}} →
+    {{{ P }}} Fork e @[n] E {{{ RET #(); True }}}.
   Proof.
     intros. iIntros "HPre HPost". 
     iApply aneris_wp_fork. iSplitL "HPost".
@@ -301,9 +301,9 @@ Section lifting_network.
 
   (* Used in documentation *)
   Lemma aneris_wp_start_alt n P ports e E :
-  n ≠ "system" → 
-  {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
-  {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
+    n ≠ "system" → 
+    {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
+    {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
   Proof.
     intros ? Ht ?. iIntros "HPre HPost".
     iApply aneris_wp_start; try done. 
