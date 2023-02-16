@@ -235,6 +235,40 @@ Section AboutLocal.
     StLib_OwnLocalSnap i s1 s2 ={E}=∗
     ⌜∀ e, e ∈ s1 ∪ s2 → (EV_Orig e < length CRDT_Addresses)%Z⌝.
   Proof.
-  Admitted.
+     iIntros (Hname) "#Hinv #Hsnap".
+     rewrite /StLib_OwnLocalSnap.
+     iInv CRDT_InvName as "> Hprop" "Hclose".
+     iDestruct "Hprop" as (g) "(HownG & HownGs & %Hgstv & HownLS)".
+     iDestruct "Hsnap" as (k Heq) "(%Hlevs & %Hfevs & Hownloc)".
+     subst.
+     iDestruct (forall_fin k with "HownLS") as "(Hacc & HkRes)".
+     iDestruct "HkRes" as (h__own h__for h__forsub) "Hwrap".
+     iDestruct "Hwrap"
+       as "(%HkLst & %Hlevs' & %Hfevs' & %Hfevs''
+         & %Hsub & Ho & Hf & Hr & Hev1 &Hev1')".
+     iDestruct (princ_ev__subset_cc' with "[$Hownloc][$Hev1]")
+       as "(Hev1 & %Hsub')".
+     assert (s1 ∪ s2 ⊆ h__own ∪ h__for) as Hsubset.
+     { destruct Hsub as (Hs1 & _).
+       destruct Hsub' as (Hs2 & _).
+       intros elt Helt.
+       assert (elt ∈ h__own ∪ h__forsub) by set_solver.
+       set_solver. }
+     inversion Hgstv as [_ _ _ Hlstv].
+     specialize (Hlstv k).
+     rewrite HkLst in Hlstv.
+     destruct Hlstv as [_ _ _ _ Hlt _ _ _ _ _ _].
+     iDestruct (forall_fin' k with "[-Hclose HownG HownGs]") as "Hres".
+     { iFrame. iExists _, _, _. iFrame. eauto. }
+     iMod ("Hclose" with "[-]") as "_".
+     { iModIntro.
+       iExists _.
+       eauto with iFrame. }
+     iModIntro.
+     iPureIntro.
+     intros e He.
+     apply Hlt.
+     set_solver.
+  Qed.
 
 End AboutLocal.
