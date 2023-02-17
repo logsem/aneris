@@ -103,13 +103,12 @@ Section state_interpretation.
       destruct (decide (ip = ip')) as [->|Hipneq].
       + simplify_map_eq.
         destruct (decide (sh = sh0)) as [->|Hshneq].
-        * intros Hip ?. rewrite lookup_insert in Hip. by simplify_eq.
-        * intros Hip ?. apply (lookup_insert_ne Sn sh sh0 (s, [])) in Hshneq.
-          rewrite Hshneq in Hip. destruct HFip as [? HFip]. by eapply HFip.
+        * intros Hsocket ?. rewrite lookup_insert in Hsocket. by simplify_eq.
+        * intros Hsocket ?. apply (lookup_insert_ne Sn sh sh0 (s, [])) in Hshneq.
+          rewrite Hshneq in Hsocket. by eapply HFip.
       + simplify_map_eq. by eapply HFip.
   Qed.
 
-  (* !!! gør den her pænere *)
   Lemma free_ips_coh_dealloc σ1 a sh skt Sn :
     let ip := ip_of_address a in
     let S' := <[ip := <[sh:=(skt<| saddress := Some a |>, [])]> Sn]>
@@ -130,18 +129,17 @@ Section state_interpretation.
     - intros ip ?.
     destruct (decide (ip = ip_of_address a)); simplify_eq; [set_solver|].
     rewrite lookup_insert_ne //. by apply HFip.
-    - intros ip ps ?????????.
-      destruct (decide ((ip_of_address a) = ip)).
-      -- simplify_map_eq. subst. destruct (decide (sh = sh0)).
-        + subst. intros. apply lookup_insert_rev in H0. set_solver.
-        + apply (lookup_insert_ne Sn sh sh0 
-        ({| saddress := Some a; sblock := sblock skt |}, []))  in n. 
-        intros. rewrite n in H0. set_solver.
-      -- simplify_map_eq. eapply HFip; eauto.
-  Qed. 
+    - intros ip ??????????.
+      destruct (decide (ip= (ip_of_address a))) as [->|Hipneq].
+      + simplify_map_eq. destruct (decide (sh = sh0)) as [->|Hsneq].
+        * intros Hsockets ?. apply lookup_insert_rev in Hsockets. set_solver.
+        * apply (lookup_insert_ne Sn sh sh0 
+        ({| saddress := Some a; sblock := sblock skt |}, []))  in Hsneq. 
+        intros Hsockets ?. rewrite Hsneq in Hsockets. set_solver.
+      + simplify_map_eq. eapply HFip; eauto.
+  Qed.
 
-  (* !!! gør den her pænere *)
-  Lemma free_ips_coh_update_msg sh a skt Sn r m σ1 :
+Lemma free_ips_coh_update_msg sh a skt Sn r m σ1 :
     let ip := ip_of_address a in
     let S' := <[ip := <[sh:=(skt, r)]> Sn]> (state_sockets σ1) in
     let σ2 := σ1 <| state_sockets := S' |> in
@@ -156,19 +154,17 @@ Section state_interpretation.
       - intros ip ?. split; [set_solver|].
         destruct (decide (ip = ip_of_address a)); simplify_map_eq; [set_solver|].
         by apply HFip.
-      - intros ip ??????????. destruct (decide ((ip_of_address a) = ip)).
-        -- subst. simpl_map. inversion H2. subst. 
-           destruct (decide (sh = sh0)).
-           + subst. intros. apply (lookup_insert_rev Sn sh0 
-           (skt, r) (skt0, r0)) in H4. 
-           inversion H4. rewrite -H7 in H5.
+      - intros ip ??????????. destruct (decide (ip = (ip_of_address a))) as [->|Hipneq].
+        + simpl_map. simplify_eq. intros Hsockets ?. 
+           destruct (decide (sh = sh0)) as [->|Hshneq].
+           * apply (lookup_insert_rev Sn sh0 
+           (skt, r) (skt0, r0)) in Hsockets. simplify_eq. 
            eapply HFip; eauto.
-           + apply (lookup_insert_ne Sn sh sh0 (skt, r))  in n. 
-           intros. rewrite n in H4. eapply HFip; eauto.  
-        -- simplify_map_eq. eapply HFip; eauto.
+           * apply (lookup_insert_ne Sn sh sh0 (skt, r))  in Hshneq. 
+           rewrite Hshneq in Hsockets. eapply HFip; eauto.  
+        + simplify_map_eq. eapply HFip; eauto.
   Qed.
 
-  (* !!! gør den her pænere *)
   Lemma free_ips_coh_deliver_message σ M Sn Sn' ip sh skt a R m :
     m ∈ messages_to_receive_at a M →
     (state_sockets σ) !! ip = Some Sn →
@@ -187,23 +183,22 @@ Section state_interpretation.
     split; [auto|]. split.
     - intros ip' ?.
       ddeq ip ip'.
-      -- naive_solver.
-      -- destruct (decide (ip' = ip_of_address a)); simplify_map_eq; [set_solver|].
+      + naive_solver.
+      + destruct (decide (ip' = ip_of_address a)); simplify_map_eq; [set_solver|].
         by apply HFip.
     - intros ip' ??????????.
-      destruct (decide (ip = ip')).
-      -- subst. simpl_map. inversion H5. intros.
-         destruct (decide (sh = sh0)).
-         + subst. apply (lookup_insert_rev Sn sh0 
-         (skt, m :: R) (skt0, r)) in H2. inversion H2. 
-         rewrite -H9 in H8. eapply HFip; eauto. 
-         + apply (lookup_insert_ne Sn sh sh0 
-         (skt, m :: R)) in n. rewrite n in H2.
+      destruct (decide (ip = ip')) as [->|Hipneq].
+      + simpl_map. simplify_eq. intros Hsockets ?.
+         destruct (decide (sh = sh0)) as [->|Hshneq].
+         * apply (lookup_insert_rev Sn sh0 
+         (skt, m :: R) (skt0, r)) in Hsockets.  
+         simplify_eq. eapply HFip; eauto. 
+         * apply (lookup_insert_ne Sn sh sh0 
+         (skt, m :: R)) in Hshneq. rewrite Hshneq in Hsockets.
          eapply HFip; eauto.  
-      -- simplify_map_eq. eapply HFip; eauto. 
-  Qed.      
+      + simplify_map_eq. eapply HFip; eauto. 
+  Qed.
 
-  (* !!! gør den her pænere *)
   Lemma free_ips_coh_update_sblock σ1 a Sn sh skt b r :
     let ip := ip_of_address a in
     let S := <[ip := <[sh:= (skt<| sblock := b|>, r)]> Sn]>(state_sockets σ1) in
@@ -220,16 +215,15 @@ Section state_interpretation.
     simplify_map_eq. subst S.
     ddeq ip ip'; set_solver.
     - intros ip' ??????????. unfold S in H2.
-      destruct (decide (ip = ip')).
-      -- subst. simpl_map. inversion H2. intros.
-      destruct (decide (sh = sh0)).
-      + subst. apply (lookup_insert_rev Sn sh0 
-      ({| saddress := saddress skt; sblock := b |}, r) (skt0, r0)) in H4. 
-      inversion H4. rewrite -H7 in H6. simpl in H6.
-      eapply HFip; eauto. 
+      destruct (decide (ip = ip')) as [->|Hipneq].
+      -- simpl_map. simplify_eq. intros Hsockets ?.
+      destruct (decide (sh = sh0)) as [->|Hshneq].
+      + apply (lookup_insert_rev Sn sh0 
+      ({| saddress := saddress skt; sblock := b |}, r) (skt0, r0)) in Hsockets. 
+      simplify_eq. eapply HFip; eauto. 
       + apply (lookup_insert_ne Sn sh sh0 
-      ({| saddress := saddress skt; sblock := b |}, r)) in n. 
-      rewrite n in H4. eapply HFip; eauto.  
+      ({| saddress := saddress skt; sblock := b |}, r)) in Hshneq. 
+      rewrite Hshneq in Hsockets. eapply HFip; eauto.  
       -- simplify_map_eq. eapply HFip; eauto.
   Qed.
       
