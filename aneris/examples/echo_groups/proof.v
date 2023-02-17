@@ -473,8 +473,6 @@ Definition echo_is :=
   {|
     state_heaps :=  {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
-    state_ports_in_use :=
-      <["0.0.0.0" := ∅ ]> $ <["0.0.0.1" := ∅ ]> $ <["0.0.0.2" := ∅ ]> $ ∅;
     state_ms := ∅;
   |}.
 

@@ -275,8 +275,7 @@ Record programs_using_gcounters {gcdata : GCData} :=
 
 Arguments programs_using_gcounters _ : clear implicits.
 
-Definition init_state gcdata := {|
+Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ports_in_use := foldr (λ sa piu, <[ip_of_address sa := ∅]>piu) ∅ (gcd_addr_list gcdata);
   state_ms := ∅; |}.

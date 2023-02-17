@@ -359,7 +359,7 @@ Qed.
 (*                      @[ip] E {{ Φ }}). *)
 (* Proof. *)
 (*   rewrite envs_entails_unseal=> <- ??? Hnone Hsome. rewrite -aneris_wp_bind. *)
-(*   eapply wand_apply; first by eapply aneris_wp_receivefrom_alt. *)
+(*   eapply wand_apply; first by eapply aneris_wp_receivefrom_nb. *)
 (*   rewrite envs_lookup_intuitionistic_sound //; simpl. *)
 (*   rewrite intuitionistically_elim. *)
 (*   iIntros "[? HΔ]". *)

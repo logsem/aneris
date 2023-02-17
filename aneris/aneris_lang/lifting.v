@@ -27,7 +27,7 @@ Ltac inv_head_step :=
     | H : head_step ?e _ _ _ _ |- _ =>
       try (is_var e; fail 1);
       inversion H; subst; clear H
-    | H: socket_step _ ?e _ _ _ _ _ _ _ |- _ =>
+    | H: socket_step _ ?e _ _ _ _ _ |- _ =>
       try (is_var e; fail 1);
       inversion H; subst; clear H
     end.
@@ -47,7 +47,7 @@ Local Ltac solve_exec_puredet :=
                      rewrite to_of_val in H; simplify_eq
                    end);
   try by match goal with
-         | H : socket_step _ _ _ _ _ _ _ _ _ |- _ =>
+         | H : socket_step _ _ _ _ _ _ _ |- _ =>
            inversion H
          end.
 Local Ltac solve_pure_exec :=
@@ -71,7 +71,7 @@ Proof. by exists v. Qed.
 
 Local Ltac solve_atomic :=
   apply strongly_atomic_atomic, ectx_language_atomic;
-    [inversion 1; inv_head_step; naive_solver
+    [inversion 1; inv_head_step; try naive_solver
     |apply ectxi_language_sub_redexes_are_values; intros [] **; inv_head_step;
        rewrite /aneris_to_val /is_Some /=; eexists; by
          match goal with
@@ -547,7 +547,7 @@ Section primitive_laws.
     iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
       first set_solver; auto.
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
-      as "(% & % & %)".
+      as "(% & %)".
     iModIntro; iSplit.
     { iPureIntro. do 3 eexists. apply AssignNewIpStepS; eauto. }
     iNext. iIntros (e2 σ2 efs Hstep). iMod "Hmk" as "_".
@@ -566,7 +566,7 @@ Section primitive_laws.
     iSplit; [ iPureIntro; apply user_model_evolution_id |].
     iSplitL "HΦ"; [by iApply wp_value|].
     iSplitL; [ by iApply ("Hwp" with "[$] [$]")|done].
-  Qed.
+  Qed. 
 
   Lemma wp_new_socket ip s E ζ :
     {{{ ▷ is_node ip }}}
@@ -601,7 +601,7 @@ Section primitive_laws.
     iSplit; [ iPureIntro; apply user_model_evolution_id |].
     iApply "HΦ"; done.
   Qed.
-    
+
   Lemma wp_socketbind_groups
         E ζ sh skt k sa :
     saddress skt = None →
@@ -619,9 +619,9 @@ Section primitive_laws.
             "(Hevs & Hσ & Hm & % & Hauth) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
-      as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
-      as (?) "[% %]".
+      as (Sn r) "[%HSn (%Hr & %Hreset)]". 
+    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    apply HSn.     
     iSplit.
     { iPureIntro; do 3 eexists.
       eapply SocketStepS; eauto.
@@ -660,8 +660,8 @@ Section primitive_laws.
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp")
-      as (?) "[% %]".
+    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    apply HSn.   
     iSplit.
     { iPureIntro; do 3 eexists.
       eapply SocketStepS; eauto.

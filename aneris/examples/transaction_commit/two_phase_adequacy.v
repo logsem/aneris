@@ -7,9 +7,6 @@ From aneris.examples.transaction_commit Require Import
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ports_in_use :=
-    <["tm" := ∅ ]> $ <["rm.01" := ∅ ]> $
-    <["rm.02" := ∅ ]> $ <["rm.03" := ∅ ]> $ ∅;
   state_ms := ∅; |}.
 
 Definition runner_expr := mkExpr "system" runner.
@@ -43,7 +40,7 @@ Proof.
   set (Σ := #[anerisΣ (TC_model rms); tcΣ]).
   eapply (@adequacy_safe Σ (TC_model rms) _ _ ips addrs ∅ ∅ ∅);
     [| |set_solver|set_solver|set_solver|set_solver|set_solver|set_solver|
-      done|done|done].
+      done].
   { apply tc_model_finitary. }
   iIntros (anG).
   iMod pending_alloc as (γ) "Hpend".

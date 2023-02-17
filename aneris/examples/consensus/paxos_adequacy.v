@@ -8,10 +8,6 @@ From aneris.aneris_lang Require Import tactics proofmode.
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ports_in_use :=
-    {[ "p1" := ∅; "p2" := ∅;
-       "a1" := ∅; "a2" := ∅; "a3" := ∅;
-       "l1" := ∅; "l2" := ∅; "c" := ∅ ]};
   state_ms := ∅; |}.
 
 Definition socket_interp `{!paxosG Σ params} sa : socket_interp Σ :=
@@ -307,8 +303,6 @@ Proof.
   { set_solver. }
   { set_solver. }
   { set_solver. }
-  { done. }
-  { done. }
   { done. }
   iIntros (anG).
   iMod paxos_res_alloc as

@@ -10,21 +10,7 @@ From aneris.aneris_lang.lib Require Import inject list_proof vector_clock_proof.
 From aneris.examples.gcounter_convergence Require Import
      crdt_model crdt_resources crdt_proof crdt_main_rel crdt_runner.
 
-
-Lemma Helper1 gcdata (ip : ip_address) :
-  ip ∈ list_to_set (C := gset _) (ip_of_address <$> gcd_addr_list gcdata) →
-  state_ports_in_use (init_state gcdata) !! ip = Some ∅.
-Proof.
-  revert ip; rewrite /=.
-  induction (gcd_addr_list gcdata) as [|sa l IHl]; simpl; first done.
-  intros ip [->%elem_of_singleton_1 |]%elem_of_union.
-  - rewrite lookup_insert; done.
-  - destruct (decide (ip = ip_of_address sa)) as [->|]; first by rewrite lookup_insert.
-    rewrite lookup_insert_ne; last by auto.
-    apply IHl; done.
-Qed.
-
-Lemma Helper2 gcdata (ps : programs_using_gcounters gcdata) :
+Lemma helper gcdata (ps : programs_using_gcounters gcdata) :
   ∀ a : socket_address,
     a ∈ list_to_set (C := gset _) (gcd_addr_list gcdata) ∪ Aprogs ps
     → ip_of_address a ∈ list_to_set (C := gset _) (ip_of_address <$> gcd_addr_list gcdata).
@@ -44,7 +30,7 @@ Proof.
 Qed.
 
 Lemma gcounter_safety gcdata (ps : programs_using_gcounters gcdata) :
-  safe (mkExpr "system" (runner gcdata 0 (progs ps) $(gcd_addr_list gcdata))) (init_state gcdata).
+  safe (mkExpr "system" (runner gcdata 0 (progs ps) $(gcd_addr_list gcdata))) init_state.
 Proof.
   eapply (@adequacy_safe
             #[anerisΣ (GCounterM gcdata); GCounterΣ gcdata; progs_Σ ps]
@@ -84,9 +70,7 @@ Proof.
   { set_solver. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
-  { rewrite /=; induction (gcd_addr_list gcdata); set_solver. }
-  { apply Helper1. }
-  { apply Helper2. }
+  { apply helper. } 
   { done. }
   { done. }
   { done. }
@@ -96,7 +80,7 @@ Lemma gcounter_adequacy gcdata (ps : programs_using_gcounters gcdata) :
   @continued_simulation aneris_lang (aneris_to_trace_model (GCounterM gcdata))
     (crdt_main_rel gcdata)
     {tr[ ([mkExpr "system" (runner gcdata 0 (progs ps) $(gcd_addr_list gcdata))],
-          init_state gcdata) ]}
+          init_state) ]}
     {tr[ initial_crdt_state (GClen gcdata) ]}.
 Proof.
   eapply (simulation_adequacy
@@ -108,15 +92,13 @@ Proof.
             (list_to_set (gcd_addr_list gcdata) ∪ (Aprogs ps))
             (list_to_set (gcd_addr_list gcdata))
             (list_to_set (gcd_addr_list gcdata))
-            (λ _, True) _ _ _ (init_state gcdata)).
+            (λ _, True) _ _ _ (init_state)).
   { set_solver. }
   { set_solver. }
   { apply aneris_sim_rel_finitary, GcounterM_rel_finitary. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
-  { rewrite /=; induction (gcd_addr_list gcdata); set_solver. }
-  { apply Helper1. }
-  { apply Helper2. }
+  { apply helper. }
   { done. }
   { done. }
   { done. }

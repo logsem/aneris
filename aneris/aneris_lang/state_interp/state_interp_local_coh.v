@@ -120,21 +120,19 @@ Section state_interpretation.
     eauto with iFrame.
   Qed.
 
-  Lemma local_state_coh_socketbind σ1 γs sh skt a Sn ps r :
+  Lemma local_state_coh_socketbind σ1 γs sh skt a Sn r :
     let ip := ip_of_address a in
     let S' :=
         <[ip :=
             <[sh:=(skt<| saddress := Some a |>, r)]> Sn]> (state_sockets σ1) in
-    let P' := <[ip := {[port_of_address a]} ∪ ps]> (state_ports_in_use σ1) in
-    let σ2 := σ1 <| state_sockets := S' |> <| state_ports_in_use := P' |> in
+    let σ2 := σ1 <| state_sockets := S' |> in
     state_sockets σ1 !! ip = Some Sn →
     Sn !! sh = Some (skt, r) →
-    state_ports_in_use σ1 !! ip = Some ps →
     saddress skt = None →
     local_state_coh σ1 ip γs ∗ sh ↪[ip] skt ==∗
     local_state_coh σ2 ip γs ∗ sh ↪[ip] (skt<| saddress := Some a |>).
   Proof.
-    simpl. iIntros (????) "[Hlcoh Hsh]".
+    simpl. iIntros (???) "[Hlcoh Hsh]".
     iDestruct "Hlcoh" as (h' S Hh Hs) "(#Hn & ? & Hsock)".
     iDestruct "Hsh" as (γs') "[Hn' Hsh]".
     iDestruct (mapsto_node_agree with "Hn Hn'") as %<-.
@@ -265,7 +263,6 @@ Section state_interpretation.
     [∗ map] ip0↦γs ∈ γm, local_state_coh
                            {| state_heaps := state_heaps σ;
                               state_sockets := <[ip:=Sn']> (state_sockets σ);
-                              state_ports_in_use := state_ports_in_use σ;
                               state_ms := state_ms σ |} ip0 γs.
   Proof.
     iIntros (HM Hσ Hsh -> Hskt) "Hγm".

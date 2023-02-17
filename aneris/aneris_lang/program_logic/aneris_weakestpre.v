@@ -443,6 +443,18 @@ Proof.
   by rewrite /unallocated /to_singletons gset_map.gset_map_singleton.
 Qed.
 
+(* Used in documentation *)
+Lemma aneris_wp_socket_interp_alloc_singleton_alt Ψ n E e Q P sa : 
+  TCEq (to_val e) None →
+  {{{ P ∗ sa ⤇ Ψ }}} e @[n] E {{{ w, RET w; Q }}} →
+  {{{ P ∗ unallocated {[sa]} }}} e @[n] E {{{ w, RET w; Q }}}.
+Proof.
+  intros. iIntros "HPre HPost". iDestruct "HPre" as "[HPre HUnAloc]".  
+  iApply (aneris_wp_socket_interp_alloc_singleton with "HUnAloc"). 
+  iIntros "HSoc". iPoseProof H0 as "H0".
+  iApply ("H0" with "[HPre HSoc]"); try done. iFrame.
+Qed.
+
 Lemma aneris_wp_socket_interp_alloc_fun f ip E e Φ sas :
   TCEq (to_val e) None →
   unallocated sas -∗

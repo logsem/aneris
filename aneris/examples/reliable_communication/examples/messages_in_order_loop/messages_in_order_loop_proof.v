@@ -236,8 +236,6 @@ Definition init_state :=
   {|
     state_heaps := {[ "system" := ∅ ]};
     state_sockets := {[ "system" := ∅ ]};
-    state_ports_in_use :=
-      <["0.0.0.0" := ∅ ]> $ <["0.0.0.1" := ∅ ]> $ <["0.0.0.2" := ∅ ]> $ ∅;
     state_ms := ∅;
   |}.
 
@@ -272,9 +270,6 @@ Proof.
   eapply (@adequacy Σ dummy_model _ _ ips {[clt_sa0; clt_sa1; srv_sa]} ∅ ∅ ∅);
     try done; last first.
   { set_solver. }
-  { intros i. rewrite /ips !elem_of_union !elem_of_singleton.
-    intros [[|]|]; subst; simpl; set_solver. }
-  { rewrite /ips /= !dom_insert_L dom_empty_L right_id_L //. set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   iMod (Reliable_communication_init_instance ⊤ UP)

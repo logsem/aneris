@@ -523,7 +523,7 @@ Section crdt_main_rel.
   Lemma crdt_main_rel_initially (ps : programs_using_gcounters gcdata) v :
     crdt_main_rel
        {tr[ ([{| expr_n := "system"; expr_e := runner gcdata 0 (progs ps) v |}],
-             init_state gcdata) ]}
+             init_state) ]}
        {tr[ initial_crdt_state (GClen gcdata) ]}.
   Proof.
     rewrite /crdt_main_rel /=; split_and!.
@@ -555,7 +555,7 @@ Section crdt_main_rel.
     trace_contract atr ℓ atr' →
     crdt_main_rel ex' atr' →
     trace_starts_in ex
-      ([{| expr_n := "system"; expr_e := runner gcdata 0 (progs ps) v |}], init_state gcdata) →
+      ([{| expr_n := "system"; expr_e := runner gcdata 0 (progs ps) v |}], init_state) →
     trace_starts_in atr (initial_crdt_state (GClen gcdata)) →
     valid_state_evolution (ex' :tr[oζ]: trace_last ex) (atr' :tr[ℓ]: trace_last atr) →
     (∀ i : fin (length (gcd_addr_list gcdata)),

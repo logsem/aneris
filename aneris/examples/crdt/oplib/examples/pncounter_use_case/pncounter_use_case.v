@@ -355,7 +355,6 @@ Definition init_state :=
   {|
     state_heaps := {[ "system" := ∅ ]};
     state_sockets := {[ "system" := ∅ ]};
-    state_ports_in_use := {["1.1.1.1" := ∅; "1.1.1.2" := ∅ ]};
     state_ms := ∅;
   |}.
 
