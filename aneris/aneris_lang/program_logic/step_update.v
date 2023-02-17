@@ -4,15 +4,6 @@ From aneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 Section with_Σ.
   Context `{!anerisG Mdl Σ}.
 
-  (* TODO: Move/Rename these *)
-  Lemma step_fupdN_frame_l' Eo Ei n (R Q : iProp Σ) :
-    (▷^n R ∗ |={Eo}[Ei]▷=>^n Q) -∗ |={Eo}[Ei]▷=>^n (R ∗ Q).
-  Proof.
-    induction n as [|n IH]; simpl; [done|].
-    iIntros "[HR HQ]".
-    iApply IH. by iFrame.
-  Qed.
-
   Lemma step_fupdN_empty_sep n (R Q : iProp Σ) :
     (|={∅}▷=>^n R) ∗ (|={∅}▷=>^n Q) -∗ |={∅}▷=>^n (R ∗ Q).
   Proof.
@@ -57,6 +48,13 @@ Section with_Σ.
     iFrame.
   Qed.
 
+  Lemma step_get_intro E P :
+    P -∗ |~{E}~| P.
+  Proof.
+    iIntros "HP" (n) "Hauth". iApply fupd_mask_intro; [set_solver|].
+    iIntros "Hclose". iFrame. done.
+  Qed.
+
   Lemma step_get_impl E P Q :
     (|~{E}~| P) -∗ (P -∗ |~{E}~| Q) -∗ |~{E}~| Q.
   Proof.
@@ -66,11 +64,11 @@ Section with_Σ.
     iMod "HP". by iMod ("HPQ" with "HP Hauth") as "HPQ".
   Qed.
 
-  Lemma step_get_intro E P :
-    P -∗ |~{E}~| P.
+  Lemma step_get_wand E P Q :
+    (|~{E}~| P) -∗ (P -∗ Q) -∗ |~{E}~| Q.
   Proof.
-    iIntros "HP" (n) "Hauth". iApply fupd_mask_intro; [set_solver|].
-    iIntros "Hclose". iFrame. done.
+    iIntros "HP HPQ". iApply (step_get_impl with "HP").
+    iIntros "HP". iApply step_get_intro. by iApply "HPQ".
   Qed.
 
   Lemma step_get_open E1 E2 E3 P :
