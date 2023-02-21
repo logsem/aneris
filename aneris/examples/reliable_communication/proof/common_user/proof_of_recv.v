@@ -30,11 +30,11 @@ Section Proof_of_recv.
   Proof.
     iIntros (Φ) "Hc HΦ".
     rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s serl _serf sa dst) "Hc".
+    iDestruct "Hc" as (γs s sa dst) "Hc".
     iDestruct "Hc"
-      as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "(%Heqg & Hc)".
+      as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "Hc".
     iDestruct "Hc"
-      as "(Hl & %Hleq & Hsidx & Hridx
+      as "(%Hleq & Hsidx & Hridx
                  & #HsnT & #HaT & #HsT & #HidxsT
                  & Hp & #Hslk & #Hrlk)".
     wp_lam.
@@ -51,7 +51,7 @@ Section Proof_of_recv.
       { iExists _, _, _. by iFrame. }
       iIntros (w' ->). wp_pures. iApply "HΦ".
       iLeft. iSplitR; [done|].
-      iExists _, _, _, _, _, _, _, _.
+      iExists _, _, _, _, _, _.
       iExists _, _, _, _, _, _.
       iFrame. iFrame "#". eauto. }
     destruct Hqeq as (h & t & tv & -> & -> & Hq').
@@ -93,7 +93,7 @@ Section Proof_of_recv.
     rewrite -Heq''.
     iExists _. iSplit; [done|].
     iFrame.
-    iExists _, _, _, _, _, _, _, _.
+    iExists _, _, _, _, _, _.
     iExists _, _, _, _, _, _.
     iSplit; [done|].
     rewrite Nat.add_1_r.

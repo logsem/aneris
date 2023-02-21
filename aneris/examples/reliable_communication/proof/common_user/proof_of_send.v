@@ -31,11 +31,11 @@ Section Proof_of_send.
   Proof.
     iIntros (Φ) "(Hc & %Hser) HΦ".
     rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s ser _serf sa dst) "Hc".
+    iDestruct "Hc" as (γs s sa dst) "Hc".
     iDestruct "Hc"
-      as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "(%Heqg & Hc)".
+      as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "Hc".
     iDestruct "Hc"
-      as "(Hl & %Hleq & Hsidx & Hridx
+      as "(%Hleq & Hsidx & Hridx
                  & #HsnT & #HaT & #HsT & #HidxsT
                  & Hp & #Hslk & #Hrlk)".
     wp_lam.
@@ -72,7 +72,7 @@ Section Proof_of_send.
     { iFrame "#∗". }
     iIntros (v'') "->".
     iApply "HΦ".
-    iExists _, _, _, _, _, _, _, _.
+    iExists _, _, _, _, _, _.
     iExists _, _, _, _, _, _.
     iFrame. iSplit; [done|].
     simpl. rewrite Nat.add_1_r. iFrame "#∗"; eauto.

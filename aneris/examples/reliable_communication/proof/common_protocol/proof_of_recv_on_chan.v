@@ -65,14 +65,14 @@ Section Proof_of_process_data_on_chan.
     iApply "HΦ". iFrame. iPureIntro. lia.
   Qed.
 
-  Lemma process_data_on_chan_spec c ip skt sa γs γe ser serf
+  Lemma process_data_on_chan_spec c ip skt sa γs γe ser
         (sidLBLoc ackIdLoc : loc) s (mval : val) (sbuf : loc)
         (dst : socket_address) slk (rbuf : loc) rlk (ridx ackId : nat) :
     ip_of_address sa = ip →
     endpoint_chan_name γe = session_chan_name γs →
     lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
-    c = ((#sbuf, slk), (#rbuf, rlk), serf)%V →
+    c = ((#sbuf, slk), (#rbuf, rlk))%V →
     side_elim s dst sa = RCParams_srv_saddr →
     {{{ socket_resource skt sa N s ∗
         dst ⤇ side_elim s server_interp client_interp ∗

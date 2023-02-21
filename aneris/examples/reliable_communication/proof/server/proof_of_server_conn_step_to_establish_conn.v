@@ -40,7 +40,6 @@ Section Proof_of_server_conn_step_2.
       (skl : loc) (skt_passive : val) skt sock h (cml : loc) cmv (cql : loc) qlk γqlk mval m
        (cM :gmap socket_address conn_state)
        (γM : session_names_map) ψclt (R0 T0 : gset message) (cookie : nat) :
-
     skt_passive = (skt, #cml, (#cql, qlk))%V →
     dom γM = dom cM →
     m_sender m ∈ dom cM →
@@ -294,10 +293,10 @@ Section Proof_of_server_conn_step_2.
       (* Unfolding the definition to get the persistent knowledge(send/recv locks, etc.) *)
       rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
       iDestruct "Hchan" as
-        (γs'' sd ser serf sa dst sbuf slk rbuf rlk )
+        (γs'' sd sa dst sbuf slk rbuf rlk )
           "(%sidLBLoc & %ackIdLoc & %sidx & %ridx & Hhy)".
       iDestruct "Hhy"
-        as "(%Hc & %Heqc & %Heqg & Hl & %Hlser & Hmn1 & Hmn2
+        as "(%Hc & %Heqc & %Heqg & Hmn1 & Hmn2
                  & #Hst' & #HaT' & #HsT' & #HlT'
                  & Hpown & #Hslk & #Hrlk)".
       simpl. destruct sd as [|].
@@ -383,19 +382,19 @@ Section Proof_of_server_conn_step_2.
           (* Release the lock by providing the channel mapsto. *)
           wp_apply (release_spec (RCParams_srv_N.@"qlk")
                                  srv_ip γqlk qlk (conn_queue_lock_def cql)
-                     with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown Hl]").
+                     with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown]").
           { iFrame "Hlkd Hqlk".
             iExists rv, (vs ++ [(c, #(m_sender m))%V]).
             iFrame "Hql".
             iSplit; first done.
-            iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown Hl]").
+            iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown]").
             iExists γe, c, (m_sender m).
             iSplit; first done.
             iFrame "#".
             rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-            iExists _, _, _, _, _, _, _.
-            iExists _, _, _, _, _, _, _.
-            iFrame "Hslk Hrlk HsT HaT Hmn1 Hmn2 Hpown Hl".
+            iExists _, _, _, _, _, _.
+            iExists _, _, _, _, _, _.
+            iFrame "Hslk Hrlk HsT HaT Hmn1 Hmn2 Hpown".
             iFrame "#∗".
             subst; eauto. }
           iIntros (? ->).
@@ -474,8 +473,7 @@ Section Proof_of_server_conn_step_2.
                iSplit; first done.
                iSplit; first by iFrame "#".
                subst; eauto.
-               iExists _, _, _, _, _, _.
-               iExists _, _. iFrame "#∗".
+               iExists _, _, _, _, _, _. iFrame "#∗".
                iPureIntro; split_and!; eauto. }
             iApply (big_sepM_mono with "[$HknResAcc]").
             iIntros (k x Hkx) "HchanRes".
@@ -499,9 +497,9 @@ Section Proof_of_server_conn_step_2.
                 iDestruct "HchanRes"
                   as "(%Hhst3i & %Hhst4i & %Hchan' & #Hopened & Hckf & HsL & HaL & #Hmono & #Hpers)".
                 iDestruct "Hpers" as
-                  (γsi ser' serf' sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
+                  (γsi sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
                 iDestruct "Hpers"
-                  as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk)".
+                  as "(%Hgeq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk)".
                 iRight.
                 destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ?).
                 destruct Hhst4i as (y4 & ? & ? & ? & ? & ? & ?).
@@ -517,7 +515,7 @@ Section Proof_of_server_conn_step_2.
                 iSplit.
                 { iDestruct "Hopened" as "(H1 & H2)". iFrame "#". }
                 iFrame "#".
-                iExists _, _, _, _, _, _, _, _. iFrame "#"; eauto. }
+                iExists _, _, _, _, _, _. iFrame "#"; eauto. }
               iExists γi, cki. iSplitL "HCkFi". iFrame "#∗".
               destruct Hhst1i as (y0 & ? & ? & ? & ?).
               destruct Hhst2i as (y1 & ? & ? & ? & ?).

@@ -130,10 +130,10 @@ Section Proof_of_connect.
     iIntros (γe c) "(#HaT & #HsT & #HlT & Hchan)". wp_pures.
     rewrite{2} /iProto_mapsto seal_eq /iProto_mapsto_def.
     iDestruct "Hchan" as
-      (γs sd serl serf sa dst sbuf slk rbuf rlk )
+      (γs sd sa dst sbuf slk rbuf rlk )
         "(%sidLBLoc & %ackIdLoc & %sidx & %ridx & Hhy)".
     iDestruct "Hhy"
-      as "(%Hc & %Heqc & %Heqg & Hserl & %Hserl & Hmn1 & Hmn2
+      as "(%Hc & %Heqc & %Heqg & Hmn1 & Hmn2
                & #Hst' & #HaT' & #HsT' & #HlT'
                & Hpown & #Hslk & #Hrlk)".
     simpl. destruct sd as [|]; last first.
@@ -151,13 +151,13 @@ Section Proof_of_connect.
       iSplitR "HsidLB2 Hackid2".
       + iNext; wp_seq; iApply "HΦ"; iFrame "#∗".
         rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-        iExists _, Left, _, _, _, _, _, _.
+        iExists _, Left, _, _, _, _.
         iExists _, _, _, _, _, _.
         simpl. iFrame "#∗"; eauto.
       + replace (LitInt (Z.of_nat 0)) with (LitInt 0) by eauto with lia.
         simpl in *.
         iApply (client_recv_on_chan_loop_spec
-                 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 0 0
+                 _ _ _ _ _ _ _ _ _ _ _ _ _ _ 0 0
                  with "[$Hsinv $Hst $Hslk $Hrlk $HsidLB2 $Hackid2]"); eauto.
     - simpl. simplify_eq.
       iApply (send_from_chan_loop_spec

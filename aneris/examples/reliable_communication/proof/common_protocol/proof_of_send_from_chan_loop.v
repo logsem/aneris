@@ -62,12 +62,12 @@ Section Proof_of_send_loop.
 
   Lemma send_from_chan_loop_spec c ip skt sa dst
         (γs : session_name) (γe : endpoint_name)
-        sidLBLoc s (sbuf : loc) (serf : val) slk rbuf rlk :
+        sidLBLoc s (sbuf : loc) slk rbuf rlk :
     ip_of_address sa = ip →
     endpoint_chan_name γe = session_chan_name γs →
     lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
-    c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
+    c = (((#sbuf, slk), (#rbuf, rlk)))%V →
     side_elim s dst sa = RCParams_srv_saddr →
     {{{ socket_resource skt sa N s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
@@ -84,7 +84,7 @@ Section Proof_of_send_loop.
     iIntros (<- Heqc Heqg -> Hsrv Φ) "(Hskt & #Hdst & #Hslk & #Htok & #Hsmode) HΦ".
     iDestruct "Hskt" as (sh sock -> Haddr Hblock) "[#Hinterp #Hsk]".
     wp_lam.
-    do 44 wp_pure _.
+    do 43 wp_pure _.
     iLöb as "Ilob".
     wp_pures.
     wp_apply (monitor_acquire_spec with "Hslk").

@@ -108,15 +108,12 @@ Section Server_resources.
     γe (c : val)
     (sidLBLoc ackIdLoc : loc) (clt_addr : socket_address) : iProp Σ :=
     ∃ (γs : session_name)
-      (serl : loc)
-      (serf : val)
       (sa : socket_address)
       (sbuf : loc) (slk : val)
       (rbuf : loc) (rlk : val),
-      ⌜c = (((#sbuf, slk), (#rbuf, rlk)), #serl)%V⌝ ∗
+      ⌜c = ((#sbuf, slk), (#rbuf, rlk))%V⌝ ∗
       ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
       ⌜lock_idx_name (endpoint_send_lock_name γe) = (session_srv_idx_name γs)⌝ ∗
-      ⌜s_ser (s_serializer RCParams_srv_ser) = serf⌝ ∗
       session_token clt_addr γs ∗
       ChannelAddrToken γe (sa, clt_addr) ∗
       ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗

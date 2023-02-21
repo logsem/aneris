@@ -86,19 +86,15 @@ Section iProto_endpoints.
             (ip : ip_address) (ser : serialization) (p : iProto Σ): iProp Σ :=
     ∃ (γs : session_name)
       (s : side)
-      (serl : loc)
-      (serf : val)
       (sa dst : socket_address)
       (sbuf : loc) (smn : val)
       (rbuf : loc) (rlk : val)
       (sidLBLoc ackIdLoc : loc)
       (sidx ridx : nat),
-      ⌜c = (((#sbuf, smn), (#rbuf, rlk)), #serl)%V⌝ ∗
+      ⌜c = (((#sbuf, smn), (#rbuf, rlk)))%V⌝ ∗
       ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
       ⌜lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)⌝ ∗
-      serl ↦[ip] serf ∗
-      ⌜s_ser (s_serializer ser) = serf⌝ ∗
       mono_nat_auth_own
         (lock_idx_name (endpoint_send_lock_name γe)) (1/2) sidx ∗
       mono_nat_auth_own
@@ -146,37 +142,16 @@ Section iProto_endpoints.
   Proof.
     iIntros "Hc".
     rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s serl serf sa dst) "Hc".
+    iDestruct "Hc" as (γs s sa dst) "Hc".
     iDestruct "Hc" as (sbuf slk rbuf rlk ackIdLoc sidLBLoc sidx ridx -> Heqc)
                         "(%Heq1 & Hc)".
-    iDestruct "Hc" as "(Hl & %Hsereq & Hsidx & Hridx
+    iDestruct "Hc" as "(Hsidx & Hridx
                               & #HsT' & #HAddrT & #HsideT & #HidxT
                               & Hp & #Hslk & #Hrlk)".
     iIntros "Hle".
-    iExists γs, s, serl, serf, sa, dst.
+    iExists γs, s, sa, dst.
     iExists sbuf, slk, rbuf, rlk, ackIdLoc, sidLBLoc, sidx, ridx.
     iDestruct (ses_own_le with "Hp Hle") as "Hp". iFrame. iFrame "#". naive_solver.
-  Qed.
-
-  Lemma iProto_mapsto_excl γe c ip ser p1 p2 :
-    c ↣{ γe, ip, ser } p1 -∗ c ↣{ γe, ip, ser } p2 -∗ False.
-  Proof.
-    iIntros "Hc".
-    rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s serl serf sa dst) "Hc".
-    iDestruct "Hc" as (sbuf slk rbuf rlk ackIdLoc sidLBLoc sidx ridx Heqc)
-                        "(_ & _ & Hl & _)".
-    iIntros "Hc'".
-    iDestruct "Hc'" as (γs' s' serl' serf' sa' dst') "Hc'".
-    iDestruct "Hc'" as (sbuf' slk' rbuf' rlk' ackIdLoc' sidLBLoc' sidx' ridx' Heqc')
-                        "(_ & _ & Hl' & _ )".
-    iDestruct "Hl" as  (?) "(Hn & Hl)".
-    iDestruct "Hl'" as  (?) "(Hn' & Hl')".
-    rewrite Heqc in Heqc'. inversion Heqc'.
-    iDestruct (mapsto_node_agree with "Hn Hn'") as "->".
-    iDestruct (gen_heap_light.lmapsto_valid_2 serl' (heap_name γn0) 1 1 serf serf'
-                with "[$Hl][$Hl']") as "%Habs".
-    by rewrite frac_valid in Habs.
   Qed.
 
 End iProto_endpoints.

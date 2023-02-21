@@ -90,18 +90,16 @@ Section Proof_of_make_phys_resources.
     set (γslk := LockName γ_slk γsidx).
     set (γrlk := LockName γ_rlk γridx).
     set (γe := EndpointName γc γslk γrlk γ_addr γ_side γ_idxs).
-    wp_alloc serl as "Hserl".
     wp_pures.
     iApply ("HΦ" $! γe with "[-]"). simpl in *. iFrame "#".
     iSplit; first by destruct s; eauto.
     rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-    iExists γs, s, serl, _.
+    iExists γs, s.
     iExists src_sa, dst_sa.
     iExists sbuf, slk, rbuf.
     iExists rlk, sidLBLoc, ackIdLoc, 0, 0.
     do 3 (iSplit; first done).
     iFrame "#∗".
-    iSplit; first by destruct s; iFrame "#∗".
     destruct s; eauto.
   Qed.
 

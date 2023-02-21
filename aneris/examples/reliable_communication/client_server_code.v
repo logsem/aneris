@@ -44,18 +44,18 @@ Definition make_server_skt ser deser : val :=
             ref (InjL "skt").
 
 Definition make_new_channel_descr : val :=
-  λ: "ser",
+  λ: "<>",
   let: "sbuf" := ref (queue_empty #()) in
   let: "rbuf" := ref (queue_empty #()) in
   let: "smon" := new_monitor #() in
   let: "rlk" := newlock #() in
-  ("sbuf", "smon", ("rbuf", "rlk"), ref "ser").
+  ("sbuf", "smon", ("rbuf", "rlk")).
 
 (**  *********************** AUXIALIARY FUNCTIONS *************************** * *)
 
 Definition send_from_chan_loop : val :=
   λ: "skt" "sa" "sidLBloc" "c",
-  let: "sdata" := Fst (Fst "c") in
+  let: "sdata" := Fst "c" in
   let: "sbuf" := Fst "sdata" in
   let: "smon" := Snd "sdata" in
   let: "sh" := Fst (Fst "skt") in
@@ -95,11 +95,10 @@ Definition prune_sendbuf_at_ack : val :=
 
 Definition process_data_on_chan : val :=
   λ: "skt" "sa" "sidLB" "ackId" "c" "msg",
-  let: "cdata" := Fst "c" in
-  let: "sbuf" := Fst (Fst "cdata") in
-  let: "smon" := Snd (Fst "cdata") in
-  let: "rbuf" := Fst (Snd "cdata") in
-  let: "rlk" := Snd (Snd "cdata") in
+  let: "sbuf" := Fst (Fst "c") in
+  let: "smon" := Snd (Fst "c") in
+  let: "rbuf" := Fst (Snd "c") in
+  let: "rlk" := Snd (Snd "c") in
   let: "sh" := Fst (Fst "skt") in
   let: "ser" := Fst (Snd (Fst "skt")) in
   let: "_deser" := Snd (Snd (Fst "skt")) in
@@ -356,7 +355,7 @@ Definition connect : val :=
 
 Definition send : val :=
   λ: "c" "mbody",
-  let: "sdata" := Fst (Fst "c") in
+  let: "sdata" := Fst "c" in
   let: "sbuf" := Fst "sdata" in
   let: "smon" := Snd "sdata" in
   monitor_acquire "smon";;
@@ -367,7 +366,7 @@ Definition send : val :=
 
 Definition try_recv : val :=
   λ: "c",
-  let: "rdata" := Snd (Fst "c") in
+  let: "rdata" := Snd "c" in
   let: "rbuf" := Fst "rdata" in
   let: "rlk" := Snd "rdata" in
   acquire "rlk";;
