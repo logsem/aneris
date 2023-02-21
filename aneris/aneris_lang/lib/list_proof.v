@@ -219,6 +219,53 @@ Section list_specs.
     by iFrame.
   Qed.
 
+  Lemma wp_list_iteri_loop
+        (k : nat) (l : list A) (fv lv : val)
+        (P : iProp Σ) (Φ Ψ : nat -> A -> iProp Σ) ip :
+    is_list l lv →
+    (∀ (i : nat) (x : A),
+      {{{ P ∗ Φ i x }}} fv #i $x @[ip] {{{ v, RET v; P ∗ Ψ i x }}}) -∗
+    {{{ P ∗ ([∗ list] i ↦ a ∈ l, Φ (k+i)%nat a) }}}
+      list_iteri_loop fv #k lv @[ip]
+    {{{ RET #(); P ∗ [∗ list] i ↦ a ∈ l, Ψ (k+i)%nat a }}}.
+  Proof.
+    iIntros (Hl) "#Hf".
+    iIntros (Φ') "!> [HP Hl] HΦ".
+    iInduction l as [ | h l] "IH" forall (lv k Hl).
+    { wp_lam. rewrite Hl. wp_pures. iApply "HΦ". by iFrame. }
+    wp_lam. destruct Hl as [l' [-> Hl']]. wp_pures.
+    iDestruct "Hl" as "[Ha Hl']". rewrite right_id_L.
+    wp_apply ("Hf" with "[$HP $Ha]"). iIntros (v) "[HP HΨ]".
+    wp_pures.
+    replace (Z.add (Z.of_nat k) (Zpos xH)) with (Z.of_nat (k + 1)) by lia.
+    iApply ("IH" $!l' (k+1)%nat with "[//] HP [Hl'] [HΨ HΦ]").
+    { iApply (big_sepL_impl with "Hl'").
+      iIntros "!>" (i x HSome) "HΦ".
+      replace (k + S i)%nat with (k + 1 + i)%nat by lia. done. }
+    iIntros "!> [HP Hl]".
+    iApply "HΦ"=> /=. rewrite right_id_L. iFrame.
+    iApply (big_sepL_impl with "Hl").
+    iIntros "!>" (i x HSome) "HΦ".
+    by replace (k + S i)%nat with (k + 1 + i)%nat by lia.
+  Qed.
+
+  Lemma wp_list_iteri
+        (l : list A) (fv lv : val)
+        (P : iProp Σ) (Φ Ψ : nat -> A -> iProp Σ) ip :
+    is_list l lv →
+    (∀ (i : nat) (x : A),
+      {{{ P ∗ Φ i x }}} fv #i $x @[ip] {{{ v, RET v; P ∗ Ψ i x }}}) -∗
+    {{{ P ∗ ([∗ list] i ↦ a ∈ l, Φ i a) }}}
+      list_iteri fv lv @[ip]
+    {{{ RET #(); P ∗ [∗ list] i ↦ a ∈ l, Ψ i a }}}.
+  Proof.
+    iIntros (Hl) "#Hf". iIntros (Φ') "!>[HP Hown] HΦ".
+    wp_lam. wp_pures.
+    iAssert (⌜#0 = #(0%nat)⌝%I) as %->; [done |].
+    iApply (wp_list_iteri_loop 0 l with "Hf [$HP $Hown]"); [done|].
+    by iFrame.
+  Qed.
+
   Lemma wp_list_fold P Φ Ψ ip handler (l : list A) acc lv :
     (∀ (a : A) acc lacc lrem,
         {{{ ⌜l = lacc ++ a :: lrem⌝ ∗ P lacc acc ∗ Φ a }}}

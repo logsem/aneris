@@ -54,7 +54,7 @@ Definition make_new_channel_descr : val :=
 (**  *********************** AUXIALIARY FUNCTIONS *************************** * *)
 
 Definition send_from_chan_loop : val :=
-  λ: "skt" "sa" "sidLBLoc" "c",
+  λ: "skt" "sa" "sidLBloc" "c",
   let: "sdata" := Fst (Fst "c") in
   let: "sbuf" := Fst "sdata" in
   let: "smon" := Snd "sdata" in
@@ -62,12 +62,12 @@ Definition send_from_chan_loop : val :=
   let: "ser" := Fst (Snd (Fst "skt")) in
   let: "_deser" := Snd (Snd (Fst "skt")) in
   let: "_s" := Snd "skt" in
-  let: "send_msg" := (λ: "lb" "m" "i",
-                       let: "msg" := "ser" (InjR (InjR ("m","lb"+"i"))) in
-                       SendTo "sh" "msg" "sa");;
-  #() (* unsafe (__print_send_msg ser sa (InjR (InjR m))); *) in
+  let: "send_msg" := (λ: "lb" "i" "m",
+                       let: "msg" := "ser" (InjR (InjR ("lb"+"i", "m"))) in
+                       SendTo "sh" "msg" "sa") in
+  #();; (* unsafe (__print_send_msg ser sa (InjR (InjR m))); *)
   letrec: "while_empty_loop" "p" :=
-    (if: queue_is_empty (Fst ! "p")
+    (if: queue_is_empty (! "p")
      then monitor_wait "smon";;
           "while_empty_loop" "p"
      else #()) in
@@ -113,7 +113,7 @@ Definition process_data_on_chan : val :=
       let: "<>" := (if: "mid" = "ackid"
        then
          acquire "rlk";;
-         "rbuf" <- (queue_add ("mid", "mbody") ! "rbuf");;
+         "rbuf" <- (queue_add "mbody" ! "rbuf");;
          "ackId" <- ("mid" + #1);;
          release "rlk"
        else  #()) in
@@ -378,7 +378,7 @@ Definition try_recv : val :=
       let: "msg" := Fst "p" in
       let: "tl" := Snd "p" in
       "rbuf" <- "tl";;
-      SOME (Snd "msg")
+      SOME "msg"
   end in
   release "rlk";;
   "res".

@@ -72,8 +72,7 @@ Section Proof_of_make_phys_resources.
     wp_apply (new_monitor_spec (chan_N γc .@ "slk") ip
                 (send_lock_def ip γc γsidx sbuf sidLBLoc ser s)
                with "[Hsb HsidLBLoc HmonoF1]").
-    { iExists _, [], 0. rewrite -(Nat2Z.inj_add 0 0).
-      simplify_eq /=. by iFrame "#∗". }
+    { iExists _, [], 0. simplify_eq /=. by iFrame "#∗". }
     iIntros (γ_slk slk) "Hslk". wp_pures.
     wp_apply fupd_aneris_wp.
     iMod (mono_nat_own_alloc 0%nat) as (γridx) "((HridxA1 & HrdixA2) & HridxF)".

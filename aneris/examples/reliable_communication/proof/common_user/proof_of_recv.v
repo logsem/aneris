@@ -55,7 +55,7 @@ Section Proof_of_recv.
       iExists _, _, _, _, _, _.
       iFrame. iFrame "#". eauto. }
     destruct Hqeq as (h & t & tv & -> & -> & Hq').
-    iDestruct "Hvs" as "[(%w' & -> & Hfrag) Hvs]".
+    iDestruct "Hvs" as "[Hfrag Hvs]".
     wp_pures.
     wp_bind (Store _ _).
     iDestruct (mono_nat_auth_own_agree with "Hridx Hridx'") as %[_ <-].
@@ -81,7 +81,6 @@ Section Proof_of_recv.
       iApply (big_sepL_impl with "Hvs").
       iIntros "!>" (k x Hlookup) "Hv".
       rewrite Nat.add_succ_comm.
-      rewrite -!Nat2Z.inj_add.
       rewrite -Nat.add_succ_comm.
       done. }
     iIntros (w'' ->).

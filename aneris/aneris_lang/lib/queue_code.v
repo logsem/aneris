@@ -65,4 +65,4 @@ Definition queue_iter : val :=
 
 Definition queue_iteri : val :=
   λ: "f" "q", list_iteri "f" (Fst "q");;
-               list_iteri "f" (list_rev (Snd "q")).
+               list_iteri_loop "f" (list_length (Fst "q")) (list_rev (Snd "q")).

@@ -41,7 +41,7 @@ Section Proof_of_process_data_on_chan.
       as "HsidLBloc".
     { by iSplitL "HsidLBLoc". }
     wp_store. wp_pures. wp_bind (queue_drop _ _).
-    rewrite -!Nat2Z.inj_add. rewrite -Nat2Z.inj_sub; [|lia].
+    rewrite -Nat2Z.inj_sub; [|lia].
     wp_apply wp_queue_drop; [done|].
     iIntros (rv Hrv).
     wp_pures. wp_store.
@@ -51,7 +51,6 @@ Section Proof_of_process_data_on_chan.
     wp_apply (monitor_release_spec with "[$Hslk $Hlocked Hsbuf HsidLBLoc' Hsidx' Hvs]").
     { iExists rv, (drop (msg_ack - sidLB) vs), msg_ack.
       rewrite skipn_length.
-      rewrite -!Nat2Z.inj_add.
       replace (msg_ack + (length vs - (msg_ack - sidLB)))
         with (sidLB + length vs) by lia.
       iFrame.
@@ -60,7 +59,6 @@ Section Proof_of_process_data_on_chan.
       iDestruct "Hvs" as "[_ Hvs]".
       iApply (big_sepL_impl with "Hvs").
       iIntros "!>" (k v Hlookup) "Hv".
-      rewrite -!Nat2Z.inj_add.
       replace (sidLB + (msg_ack - sidLB + k)) with (msg_ack + k) by lia.
       done. }
     iIntros (v ->). wp_pures.
@@ -152,15 +150,13 @@ Section Proof_of_process_data_on_chan.
       iDestruct "HackId" as "[HackId HackId']".
       wp_apply (release_spec with
                  "[$Hrlk $Hlocked Hrbuf Hridx Hvs Hfrag HackId']").
-      { iExists q', (vs ++ [(#i, w)%V]), ridx'. iFrame.
+      { iExists q', (vs ++ [w]), ridx'. iFrame.
         iSplit; [done|].
         subst. replace (1)%Z with (Z.of_nat 1%nat) by lia.
         rewrite app_length /= -!Nat2Z.inj_add.
         rewrite Nat.add_assoc. iFrame "HackId'".
         iSplit; [|done].
-        iExists w.
-        replace (length vs + 0) with (length vs) by lia.
-        by iSplit. }
+        by replace (length vs + 0) with (length vs) by lia. }
       iIntros (v) "->".
       wp_pures.
       wp_load. wp_pures.

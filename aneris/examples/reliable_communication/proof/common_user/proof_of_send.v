@@ -47,7 +47,6 @@ Section Proof_of_send.
     wp_load. wp_pures.
     wp_apply (wp_queue_add); [done|].
     iIntros (rv Hq').
-    wp_pure _.
     wp_bind (Store _ _).
     iApply (aneris_wp_step_update _ _ ∅ with "[Hp]"); [done| |].
     { iApply (step_update_send with "Hp"); [done|by rewrite iMsg_base_eq]. }
@@ -62,12 +61,12 @@ Section Proof_of_send.
     iIntros "[Hp Hfrag] !>".
     wp_pures.
     wp_smart_apply (monitor_signal_spec with "[Hlocked Hsbuf Hvs HsidLBLoc' Hsidx' Hfrag]").
-    { iFrame "#∗". iExists rv, (vs ++ [(#(sidLB + length vs), v)%V]), sidLB.
+    { iFrame "#∗". iExists rv, (vs ++ [v]), sidLB.
       rewrite app_length /=.
       replace (Z.of_nat (length vs + 1)%nat) with (length vs + 1)%Z by lia.
-      rewrite !Z.add_assoc !plus_assoc.
+      rewrite !plus_assoc.
       iFrame. iSplit; [done|]. iSplit; [|done].
-      iExists _. rewrite Nat.add_0_r. by eauto. }
+      rewrite Nat.add_0_r. by eauto. }
     iIntros "(Hlocked & Hsbufdef)".
     wp_smart_apply (monitor_release_spec with "[$Hlocked Hsbufdef]").
     { iFrame "#∗". }
