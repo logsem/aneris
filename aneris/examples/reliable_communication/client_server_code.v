@@ -45,7 +45,7 @@ Definition make_server_skt ser deser : val :=
 
 Definition make_new_channel_descr : val :=
   λ: "ser",
-  let: "sbuf" := ref ((queue_empty #()), #0) in
+  let: "sbuf" := ref (queue_empty #()) in
   let: "rbuf" := ref (queue_empty #()) in
   let: "smon" := new_monitor #() in
   let: "rlk" := newlock #() in
@@ -54,7 +54,7 @@ Definition make_new_channel_descr : val :=
 (**  *********************** AUXIALIARY FUNCTIONS *************************** * *)
 
 Definition send_from_chan_loop : val :=
-  λ: "skt" "sa" "c",
+  λ: "skt" "sa" "sidLBLoc" "c",
   let: "sdata" := Fst (Fst "c") in
   let: "sbuf" := Fst "sdata" in
   let: "smon" := Snd "sdata" in
@@ -62,20 +62,20 @@ Definition send_from_chan_loop : val :=
   let: "ser" := Fst (Snd (Fst "skt")) in
   let: "_deser" := Snd (Snd (Fst "skt")) in
   let: "_s" := Snd "skt" in
-  let: "send_msg" := λ: "m",
-  let: "msg" := "ser" (InjR (InjR "m")) in
-  SendTo "sh" "msg" "sa";;
-  #();;
+  let: "send_msg" := (λ: "lb" "m" "i",
+                       let: "msg" := "ser" (InjR (InjR ("m","lb"+"i"))) in
+                       SendTo "sh" "msg" "sa");;
   #() (* unsafe (__print_send_msg ser sa (InjR (InjR m))); *) in
   letrec: "while_empty_loop" "p" :=
     (if: queue_is_empty (Fst ! "p")
-     then  monitor_wait "smon";;
-           "while_empty_loop" "p"
-     else  #()) in
+     then monitor_wait "smon";;
+          "while_empty_loop" "p"
+     else #()) in
     letrec: "loop" <> :=
       monitor_acquire "smon";;
       "while_empty_loop" "sbuf";;
-      queue_iter "send_msg" (Fst ! "sbuf");;
+      let: "send_msg'" := "send_msg" (!"sidLBloc") in
+      queue_iteri ("send_msg'") (! "sbuf");;
       monitor_release "smon";;
       #() (* unsafe (fun () -> Unix.sleepf 0.35); *);;
       "loop" #() in
@@ -88,11 +88,9 @@ Definition prune_sendbuf_at_ack : val :=
    then  #()
    else
      monitor_acquire "smon";;
-     let: "p" := ! "sendbuf" in
-     let: "qe" := Fst "p" in
-     let: "ub" := Snd "p" in
+     let: "qe" := ! "sendbuf" in
      "sidLBloc" <- "msg_ack";;
-     "sendbuf" <- ((queue_drop "qe" ("msg_ack" - "sidLB")), "ub");;
+     "sendbuf" <- (queue_drop "qe" ("msg_ack" - "sidLB"));;
      monitor_release "smon").
 
 Definition process_data_on_chan : val :=
@@ -222,7 +220,7 @@ Definition server_conn_step_to_establish_conn : val :=
        let: "sidLB" := ref #0 in
        let: "ackId" := ref #0 in
        let: "chan_descr" := make_new_channel_descr "serf" in
-       Fork (send_from_chan_loop "skt" "clt_addr" "chan_descr");;
+       Fork (send_from_chan_loop "skt" "clt_addr" "sidLB" "chan_descr");;
        "connMap" <- (map_insert "clt_addr"
                      (InjR ("chan_descr", "cookie", ("sidLB", "ackId")))
                      ! "connMap");;
@@ -350,7 +348,7 @@ Definition connect : val :=
   let: "sidLB" := ref #0 in
   let: "ackId" := ref #0 in
   let: "c" := make_new_channel_descr (Snd "skt") in
-  Fork (send_from_chan_loop "skt" "srv_addr" "c");;
+  Fork (send_from_chan_loop "skt" "srv_addr" "sidLB" "c");;
   Fork (client_recv_on_chan_loop "skt" "srv_addr" "sidLB" "ackId" "c");;
   "c".
 
@@ -362,10 +360,8 @@ Definition send : val :=
   let: "sbuf" := Fst "sdata" in
   let: "smon" := Snd "sdata" in
   monitor_acquire "smon";;
-  let: "p" := ! "sbuf" in
-  let: "qe" := Fst "p" in
-  let: "ub" := Snd "p" in
-  "sbuf" <- ((queue_add ("ub", "mbody") "qe"), ("ub" + #1));;
+  let: "qe" := ! "sbuf" in
+  "sbuf" <- (queue_add "mbody" "qe");;
   monitor_signal "smon";;
   monitor_release "smon".
 
