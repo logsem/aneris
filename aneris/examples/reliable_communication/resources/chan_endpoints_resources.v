@@ -61,8 +61,9 @@ Section iProto_endpoints.
       sbuf ↦[ip] q ∗ ⌜is_queue vs q⌝ ∗
       sidLBLoc ↦[ip]{1/2} #sidLB ∗
       mono_nat_auth_own γidx (1/2) (sidLB + length vs) ∗
-      [∗ list] i↦v ∈ vs,  ⌜Serializable ser v⌝ ∗
-                          ses_idx (chan_session_escrow_name γc) s (sidLB+i) v.
+      [∗ list] i↦v ∈ vs,
+        ⌜Serializable ser v⌝ ∗
+        ses_idx (chan_session_escrow_name γc) s (sidLB+i) v.
 
   Definition is_send_lock ip γc γ_slk slk sbuf ser sidLBLoc s :=
     is_monitor ((chan_N γc) .@ "slk") ip (lock_lock_name γ_slk) slk
@@ -73,8 +74,8 @@ Section iProto_endpoints.
       rbuf ↦[ip] q ∗ ⌜is_queue vs q⌝ ∗
       ackIdLoc ↦[ip]{1/2} #(ridx + length vs) ∗
       mono_nat_auth_own γidx (1/2) ridx ∗
-      [∗ list] i↦v ∈ vs, ses_idx (chan_session_escrow_name γc) (dual_side s)
-                                 (ridx+i) v.
+      [∗ list] i↦v ∈ vs,
+        ses_idx (chan_session_escrow_name γc) (dual_side s) (ridx+i) v.
 
   Definition is_recv_lock ip γc γ_rlk rlk rbuf ackIdLoc s :=
     is_lock ((chan_N γc) .@ "rlk") ip (lock_lock_name γ_rlk) rlk
