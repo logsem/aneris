@@ -534,7 +534,7 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_start ip ports k E ζ e Φ :
-    ip ≠ "system" →
+    ▷ is_node "system" ∗
     ▷ free_ip ip ∗
     ▷ Φ (mkVal "system" #()) ∗
     ▷ (∀ tid, is_node ip -∗ free_ports ip ports -∗ WP (mkExpr ip e) @ k; (ip, tid); ⊤ {{ _, True }})
