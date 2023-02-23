@@ -32,7 +32,7 @@ Section main_spec.
       first set_solver.
 
     unfold main.
-    wp_apply (aneris_wp_start with "[- $Hz0]"); first done.
+    wp_apply (aneris_wp_start with "[- $Hz0]").
     iSplitR "Hitk0 Hstk1 Hstk2 Hmsg_z0"; last first.
     { iIntros "!> Hfree".
       wp_apply ("Hinit" $! 0%nat z0 with "[] [] [$]");
@@ -43,7 +43,7 @@ Section main_spec.
       auto.
     }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start with "[- $Hz1]"); first done.
+    wp_apply (aneris_wp_start with "[- $Hz1]").
     iSplitR; last first.
     { iIntros "!> Hfree".
       wp_apply ("Hinit" $! 1%nat z1 with "[] [] [$]");

@@ -335,14 +335,14 @@ Section use_case_proof.
     iMod (own_alloc (Excl ())) as (γ2) "Htk2"; first done.
     iMod (inv_alloc use_case_inv_name _ (use_case_inv γ1 γ2) with "[HGs]") as "#Hinv".
     { iNext; iExists _; iFrame. iLeft; done. }
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iSplitL "Hfip1"; first by iNext.
     iSplitR "Hitk1 Hsa1 Htk1"; last first.
     { iNext. iIntros "Hfps".
       iApply (wp_use_case_program1 with "[$]"); done. }
     iNext.
     wp_pures.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iSplitL "Hfip2"; first by iNext.
     iSplit; first done.
     iNext. iIntros "Hfps".

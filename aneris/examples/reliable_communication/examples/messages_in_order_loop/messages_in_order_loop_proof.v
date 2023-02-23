@@ -204,18 +204,18 @@ Section proof_of_the_main.
     iModIntro.
     iIntros "#Hsrv Hf Hfree1 Hfree2 Hfree3 Hsa1 Hsa2 Hsa3 HSrvInit".
     rewrite /main.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree1".
     iSplitR "Hsa1 HSrvInit"; last first.
     { iNext. iIntros "Hfps".
       iApply (@wp_server _ _ _ _ _ _ SnRes chn _ with "[-]"); last done.
     by iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree2".
     iDestruct (unallocated_split with "Hf") as "[Hf0 Hf1]"; [set_solver|].
     iSplitL "Hfree3 Hsa3 Hf1".
-    - iNext. wp_pures. wp_apply aneris_wp_start; first done.
+    - iNext. wp_pures. wp_apply aneris_wp_start.
       + iFrame. iSplit; first done.
         iNext. iIntros "Hfps".
         iApply (@wp_client _ _ _ _ _ _ SnRes chn _ _ clt_sa1 with "[-]"); last done.

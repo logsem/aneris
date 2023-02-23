@@ -394,7 +394,7 @@ Section proof_of_main.
     iIntros "Hsa0 Hsa1 Hsa2 Hsa3 Hsa4 Hsa5 HInitL HInitF".
     iIntros "Hx".
     rewrite /main.
-    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}).
     iFrame "Hfree0".
     iSplitR "Hsa0 Hsa1 HInitL"; last first.
     { iNext. iIntros "Hfps".
@@ -405,7 +405,7 @@ Section proof_of_main.
                     {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iFrame "#∗". iApply "Hfp1". iFrame. }
     iNext. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive;81%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive;81%positive]}).
     iFrame "Hfree1".
     iDestruct (unallocated_split with "Hf") as "[Hf Hf1]"; [set_solver|].
     iDestruct (unallocated_split with "Hf") as "[Hff2lsa Hf0]"; [set_solver|].
@@ -419,7 +419,7 @@ Section proof_of_main.
         as "(Hfp1 & Hfp2)"; [set_solver|].
       iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive]}).
     iFrame "Hfree2".
     iSplitR "Hsa4 Hx Hf0"; last first.
     { iNext. iIntros "Hfps".
@@ -428,7 +428,7 @@ Section proof_of_main.
         [ |done].
       iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive]}).
     iFrame "Hfree3".
     iSplitR "Hsa5 Hf1"; last first.
     { iNext. iIntros "Hfps".

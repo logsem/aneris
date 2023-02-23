@@ -59,28 +59,28 @@ Section runner.
     iDestruct (big_sepS_delete _ _ 2 with "Hpend") as "(Hp3 & Hpend)"; [set_solver|].
     iDestruct (big_sepS_delete _ _ 3 with "Hpend") as "(Ht & _)"; [set_solver|].
     rewrite -RMs_size.
-    wp_apply (aneris_wp_start {[port_of_address rm1_addr]}); [done|]; iFrame.
+    wp_apply (aneris_wp_start {[port_of_address rm1_addr]}); iFrame.
     iSplitR "Hw1 Hp1"; last first.
     { iIntros "!> Hport".
       wp_apply (resource_manager_spec rm1_addr with "[$] [$] [] [$] [$]");
         [set_solver| |done].
       iApply (big_sepS_elem_of with "Hrms_si"); set_solver. }
     iModIntro; wp_seq.
-    wp_apply (aneris_wp_start {[port_of_address rm2_addr]}); [done|]; iFrame.
+    wp_apply (aneris_wp_start {[port_of_address rm2_addr]}); iFrame.
     iSplitR "Hw2 Hp2"; last first.
     { iIntros "!> Hport".
       wp_apply (resource_manager_spec rm2_addr with "[$] [$] [] [$] [$] ");
         [set_solver| |done].
       iApply (big_sepS_elem_of with "Hrms_si"); set_solver. }
     iModIntro; wp_seq.
-    wp_apply (aneris_wp_start {[port_of_address rm3_addr]}); [done|]; iFrame.
+    wp_apply (aneris_wp_start {[port_of_address rm3_addr]}); iFrame.
     iSplitR "Hw3 Hp3"; last first.
     { iIntros "!> Hport".
       wp_apply (resource_manager_spec rm3_addr with "[$] [$] [] [$] [$] ");
         [set_solver| |done].
       iApply (big_sepS_elem_of with "Hrms_si"); set_solver. }
     iModIntro; wp_seq.
-    wp_apply (aneris_wp_start {[port_of_address tm_addr]}); [done|]; iFrame.
+    wp_apply (aneris_wp_start {[port_of_address tm_addr]}); iFrame.
     iSplitL "HΦ"; [by iApply "HΦ"|].
     iIntros "!> Hport".
     wp_apply aneris_wp_wand_r; iSplitL.

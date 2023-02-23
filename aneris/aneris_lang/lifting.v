@@ -540,16 +540,18 @@ Section primitive_laws.
     ▷ (∀ tid, is_node ip -∗ free_ports ip ports -∗ WP (mkExpr ip e) @ k; (ip, tid); ⊤ {{ _, True }})
     ⊢ WP mkExpr "system" (Start (LitString ip) e) @ k; ζ; E {{ Φ }}.
   Proof.
-    iIntros (?) "(>Hfip & HΦ & Hwp)".
+    iIntros "(>Hnode & >Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iDestruct (is_node_heap_valid with "Hσ Hnode") as %[h Hsome].
+    iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip") as %[Hnone _].
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
       first set_solver; auto.
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip")
       as "(% & %)".
     iModIntro; iSplit.
-    { iPureIntro. do 3 eexists. apply AssignNewIpStepS; eauto. }
+    { iPureIntro. do 3 eexists. apply AssignNewIpStepS; eauto. set_solver. }
     iNext. iIntros (e2 σ2 efs Hstep). iMod "Hmk" as "_".
     pose proof Hex as Htrig.
     eapply aneris_events_state_interp_no_triggered in Htrig;
