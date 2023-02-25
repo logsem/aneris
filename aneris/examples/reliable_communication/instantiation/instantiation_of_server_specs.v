@@ -69,7 +69,6 @@ Section Server_API_spec_instantiation.
     iApply "HΦ".
     rewrite /SrvListens.
     iFrame.
-    iExists _; iFrame.
   Qed.
 
 End Server_API_spec_instantiation.

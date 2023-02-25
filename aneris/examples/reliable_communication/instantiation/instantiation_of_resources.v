@@ -54,7 +54,7 @@ Section Chan_mapsto_intantiation.
   Context `{!chanG Σ}.
 
   Definition chan_mapsto_instance_def (c : val) (p : iProto Σ) ip ser : iProp Σ :=
-    ∃ γe, c ↣{γe, ip, ser} p.
+    c ↣{ip, ser} p.
 
   Lemma chan_mapsto_instance_def_contractive :
      ∀ (c : val) (ip : ip_address) (ser : serialization)
@@ -88,11 +88,10 @@ Section Chan_mapsto_intantiation.
     chan_mapsto_instance_def c p1 ip ser  -∗ ▷ (p1 ⊑ p2) -∗ chan_mapsto_instance_def c p2 ip ser.
   Proof.
     iIntros (c ip ser p1 p2).
-    iDestruct 1 as (γe1) "Hc1".
+    iDestruct 1 as "Hc1".
     iIntros "Hle".
-    iExists γe1.
-    iDestruct (iProto_mapsto_le γe1 c ip ser p1 p2 with "[Hc1][$Hle]" ) as "Hle";
-      by rewrite iProto_mapsto_eq.
+    iDestruct (iProto_mapsto_le c ip ser p1 p2 with "[Hc1][$Hle]" ) as "Hle";
+      by done.
   Qed.
 
   Global Instance chan_mapsto_resource_instance : @Chan_mapsto_resource Σ :=
@@ -106,7 +105,7 @@ Section Chan_mapsto_intantiation.
 
 End Chan_mapsto_intantiation.
 
-Arguments chan_mapsto_resource_instance {_ _ _ _ _ _}.
+Arguments chan_mapsto_resource_instance {_ _ _ _ _}.
 
 (* -------------------------------------------------------------------------- *)
 (** Instantiation of the Session Resources using client and server concrete

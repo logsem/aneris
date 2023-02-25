@@ -75,9 +75,7 @@ Section Proof_of_server_conn_step_3.
                 ∨ (∃ (i : Z) (w : val), ⌜mval = InjRV (InjRV (#i, w))⌝ ∗
                      (∃ n : nat, ⌜Z.of_nat n = i⌝ ∗ idmsg_interp_pers (m_sender m) n w Right)))) ∗
         (⌜m ∈ R0⌝ ∨ (server_interp m)) ∗
-        (∃ mvalr, ⌜mval = InjRV mvalr⌝)
-
-    }}}
+        (∃ mvalr, ⌜mval = InjRV mvalr⌝) }}}
       server_conn_step_process_data (skt, #cml, (#cql, qlk))%V
        (cdata, #ck, (#ackId, #sidLBid))%V mval #(m_sender m) @[srv_ip]
     {{{ v, RET v; ⌜v = #()⌝ ∗ isServer_listening_loop_resources skt_passive }}}.
@@ -118,7 +116,7 @@ Section Proof_of_server_conn_step_3.
                 (RCParams_srv_N.@"skt")
                 c srv_ip skt _ _ γc _ sidLB_l ackId_l Right
                 mvalr sbuf (m_sender m) slk rbuf rlk sidLB_n ackId_n
-               with "[$Hslk $Hrlk $Hsi $HsL $HaL $Hcsi Hsinv $Hmono $Htk0]"); [done ..| | ].
+               with "[$Hslk $Hrlk $Hsi $HsL $HaL $Hcsi Hsinv $Hmono $Htk0]"); [done ..| |].
     iSplit; [by iFrame "#"; iExists _, _; iFrame "#"|].
     iDestruct "HmvalRes" as "(_ & [HlRes|HrRes])".
     { iDestruct "HlRes" as (ackid) "[%Hreq [%n [-> [%γ [Htok' Hsidx']]]]]".

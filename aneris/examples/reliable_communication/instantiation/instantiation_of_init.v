@@ -51,7 +51,7 @@ Section Init_initialisation.
       as (γ_srv_kn_mt_name) "(HknT & Hknt)"; first by apply auth_both_dfrac_valid_2.
     set (γSgn := ServerGhostNames
                    γ_srv_kn_s_name γ_srv_kn_mr_name γ_srv_kn_mt_name).
-    iExists (@chan_mapsto_resource_instance _ _ _ _ _ chanG_instance_0).
+    iExists (@chan_mapsto_resource_instance _ _ _ _ chanG_instance_0).
     iExists γSgn.
     iExists (@session_resources_instance Mdl Σ _ _ chanG_instance_0 _ _).
     iFrame.

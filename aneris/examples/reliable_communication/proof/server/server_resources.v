@@ -66,7 +66,7 @@ Section Server_resources.
         ∃ (γe : endpoint_name) (c : val) (sa : socket_address),
           ⌜v = (c, #sa)%V⌝ ∗
          (* The fact that we get the initial proto is a bit subtle. *)
-          c  ↣{ γe , srv_ip, RCParams_srv_ser } iProto_dual RCParams_protocol ∗
+          c  ↣{ srv_ip, RCParams_srv_ser } iProto_dual RCParams_protocol ∗
           ChannelAddrToken γe (RCParams_srv_saddr, sa)).
 
   Definition is_conn_queue_lock γ_qlk qlk qLoc :=

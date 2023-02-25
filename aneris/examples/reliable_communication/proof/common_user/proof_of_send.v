@@ -24,20 +24,15 @@ Section Proof_of_send.
   Implicit Types p : iProto Σ.
   Implicit Types TT : tele.
 
-  Lemma send_spec_internal γe (c : val) v p ip serA :
-    {{{ c ↣{ γe, ip, serA } (<!> MSG v; p)%proto ∗ ⌜Serializable serA v⌝ }}}
+  Lemma send_spec_internal (c : val) v p ip serA :
+    {{{ c ↣{ ip, serA } (<!> MSG v; p)%proto ∗ ⌜Serializable serA v⌝ }}}
       send c v @[ip]
-    {{{ RET #(); c ↣{ γe, ip, serA } p }}}.
+    {{{ RET #(); c ↣{ ip, serA } p }}}.
   Proof.
     iIntros (Φ) "(Hc & %Hser) HΦ".
     rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s sa dst) "Hc".
-    iDestruct "Hc"
-      as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "Hc".
-    iDestruct "Hc"
-      as "(%Hleq & Hsidx & Hridx
-                 & #HsnT & #HaT & #HsT & #HidxsT
-                 & Hp & #Hslk & #Hrlk)".
+    iDestruct "Hc" as (s sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx γe) "Hc".
+    iDestruct "Hc" as (->) "(Hsidx & Hridx & Hp & #Hslk & #Hrlk)".
     wp_lam.
     wp_pures.
     wp_apply (monitor_acquire_spec with "Hslk").
@@ -72,21 +67,20 @@ Section Proof_of_send.
     { iFrame "#∗". }
     iIntros (v'') "->".
     iApply "HΦ".
-    iExists _, _, _, _, _, _.
-    iExists _, _, _, _, _, _.
+    iExists _, _, _, _, _, _, _, _. iExists _, _.
     iFrame. iSplit; [done|].
     simpl. rewrite Nat.add_1_r. iFrame "#∗"; eauto.
   Qed.
 
-  Lemma send_spec_tele_internal {TT} γe c (tt : TT) (v : TT → val) (P : TT → iProp Σ)
+  Lemma send_spec_tele_internal {TT} c (tt : TT) (v : TT → val) (P : TT → iProp Σ)
         (p : TT → iProto Σ) ip serA :
-    {{{ c ↣{ γe, ip, serA } (<!.. (x : TT) > MSG (v x) {{ P x }}; p x)%proto ∗ P tt ∗
+    {{{ c ↣{ ip, serA } (<!.. (x : TT) > MSG (v x) {{ P x }}; p x)%proto ∗ P tt ∗
           ⌜Serializable serA (v tt)⌝ }}}
       send c (v tt) @[ip]
-    {{{ RET #(); c ↣{ γe, ip, serA } (p tt)%proto }}}.
+    {{{ RET #(); c ↣{ ip, serA } (p tt)%proto }}}.
   Proof.
     iIntros (Φ) "(Hc & HP & Hser) HΦ".
-    iDestruct (iProto_mapsto_le _ _ _ _ _ (<!> MSG v tt; p tt)%proto with "Hc [HP]")
+    iDestruct (iProto_mapsto_le _ _ _ _ (<!> MSG v tt; p tt)%proto with "Hc [HP]")
       as "Hc".
     { iIntros "!>". iApply iProto_le_trans. iApply iProto_le_texist_intro_l.
       by iFrame "HP". }

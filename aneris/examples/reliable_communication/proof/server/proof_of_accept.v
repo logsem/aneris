@@ -33,7 +33,7 @@ Section Proof_of_accept.
       accept skt @[ip_of_address RCParams_srv_saddr]
     {{{ γe c (clt_addr: socket_address), RET (c, #clt_addr);
         (isServerSocketInternal skt true) ∗
-        c ↣{ γe, ip_of_address RCParams_srv_saddr, RCParams_srv_ser} iProto_dual RCParams_protocol ∗
+        c ↣{ ip_of_address RCParams_srv_saddr, RCParams_srv_ser} iProto_dual RCParams_protocol ∗
         ChannelAddrToken γe (RCParams_srv_saddr, clt_addr) }}}.
   Proof.
     iIntros (Φ) "HisServer HΦ".

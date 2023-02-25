@@ -38,19 +38,35 @@ Section Proof_of_make_phys_resources.
       serf = side_elim s
                (s_ser (s_serializer RCParams_clt_ser))
                (s_ser (s_serializer RCParams_srv_ser)) →
-    {{{
-        can_init γs sa p s ∗
+    {{{ can_init γs sa p s ∗
         ackIdLoc ↦[ip_of_address lsa]{1/2} #0 ∗
-        sidLBLoc ↦[ip_of_address lsa]{1/2} #0}}}
+        sidLBLoc ↦[ip_of_address lsa]{1/2} #0 }}}
        make_new_channel_descr serf
        @[ip_of_address lsa]
-     {{{ γe c, RET c;
+     {{{ γe c (sbuf : loc) smn (rbuf : loc) rlk, RET c;
+         ⌜c = (((#sbuf, smn), (#rbuf, rlk)))%V⌝ ∗
+         ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
+         ⌜lock_idx_name (endpoint_send_lock_name γe) =
+           side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)⌝ ∗
+         mono_nat_auth_own
+           (lock_idx_name (endpoint_send_lock_name γe)) (1/2) 0 ∗
+         mono_nat_auth_own
+           (lock_idx_name (endpoint_recv_lock_name γe)) (1/2) 0 ∗
          ChannelAddrToken
            γe (side_elim s (sa, RCParams_srv_saddr) (RCParams_srv_saddr, sa)) ∗
          ChannelSideToken γe s ∗
          ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
-         c ↣{ γe, ip_of_address lsa, (side_elim s RCParams_clt_ser RCParams_srv_ser)} p
-     }}}.
+         ses_own
+           (chan_N (endpoint_chan_name γe))
+           (chan_session_escrow_name (endpoint_chan_name γe)) s 0 0 p ∗
+         is_send_lock (ip_of_address lsa)
+           (endpoint_chan_name γe)
+           (endpoint_send_lock_name γe)
+           smn sbuf (side_elim s RCParams_clt_ser RCParams_srv_ser) sidLBLoc s ∗
+        is_recv_lock (ip_of_address lsa)
+           (endpoint_chan_name γe)
+           (endpoint_recv_lock_name γe)
+           rlk rbuf ackIdLoc s }}}.
   Proof.
     set (ip := ip_of_address lsa).
     set (γc := session_chan_name γs).
@@ -91,16 +107,10 @@ Section Proof_of_make_phys_resources.
     set (γrlk := LockName γ_rlk γridx).
     set (γe := EndpointName γc γslk γrlk γ_addr γ_side γ_idxs).
     wp_pures.
-    iApply ("HΦ" $! γe with "[-]"). simpl in *. iFrame "#".
+    iApply ("HΦ" $! γe with "[-]").
+    simpl in *. iFrame "#".
     iSplit; first by destruct s; eauto.
-    rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-    iExists γs, s.
-    iExists src_sa, dst_sa.
-    iExists sbuf, slk, rbuf.
-    iExists rlk, sidLBLoc, ackIdLoc, 0, 0.
-    do 3 (iSplit; first done).
-    iFrame "#∗".
-    destruct s; eauto.
+    iFrame "#∗". destruct s; eauto.
   Qed.
 
 End Proof_of_make_phys_resources.

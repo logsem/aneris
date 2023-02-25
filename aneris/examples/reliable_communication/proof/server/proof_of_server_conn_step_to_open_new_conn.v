@@ -239,7 +239,7 @@ Section Proof_of_server_conn_step_1.
                (* Finally, show that socket and connection queue invariants are preserved. *)
                iSplitL. iExists _, _. by iFrame "#∗"; eauto. eauto.
          (* Ignore the message otherwise. *)
-         ---  wp_pure _. by iDestruct "HRes" as "[(-> & _ & -> & _)|(-> & _) ]".
+         --- wp_pure _. by iDestruct "HRes" as "[(-> & _ & -> & _)|(-> & _) ]".
       (* Show that other cases are absurd. *)
       -- do 2 wp_pure _.
          iDestruct "HRes" as "[(-> & _ & -> & _)|(-> & -> & Hck & (%γs & #Htk) & _)]"; first done.
@@ -266,6 +266,8 @@ Section Proof_of_server_conn_step_1.
         apply singleton_subseteq_l in Hsubl.
         rewrite -Hdom in Hdomc.
         set_solver.
+        (* TODO: Where do these come from? *)
+        Unshelve. all: eauto.
   Qed.
 
 End Proof_of_server_conn_step_1.

@@ -71,7 +71,6 @@ Section SocketInterp.
                   ∃ (n : nat), ⌜Z.of_nat n = i⌝ ∗
                                idmsg_interp_pers (m_destination m) n w Left)))))%I.
 
-
   (* ------------------------------------------------------------------------- *)
   (** Server socket interpretation. *)
   (* ------------------------------------------------------------------------- *)

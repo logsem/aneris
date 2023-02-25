@@ -82,27 +82,18 @@ Section iProto_endpoints.
               (recv_lock_def ip γc (lock_idx_name γ_rlk) rbuf ackIdLoc s).
 
   Definition iProto_mapsto_def
-            (γe : endpoint_name) (c : val)
-            (ip : ip_address) (ser : serialization) (p : iProto Σ): iProp Σ :=
-    ∃ (γs : session_name)
-      (s : side)
-      (sa dst : socket_address)
+    (c : val) (ip : ip_address) (ser : serialization) (p : iProto Σ): iProp Σ :=
+    ∃ (s : side)
       (sbuf : loc) (smn : val)
       (rbuf : loc) (rlk : val)
       (sidLBLoc ackIdLoc : loc)
-      (sidx ridx : nat),
+      (sidx ridx : nat)
+      γe,
       ⌜c = (((#sbuf, smn), (#rbuf, rlk)))%V⌝ ∗
-      ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
-      ⌜lock_idx_name (endpoint_send_lock_name γe) =
-      side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)⌝ ∗
       mono_nat_auth_own
         (lock_idx_name (endpoint_send_lock_name γe)) (1/2) sidx ∗
       mono_nat_auth_own
         (lock_idx_name (endpoint_recv_lock_name γe)) (1/2) ridx ∗
-      session_token (side_elim s sa dst) γs ∗
-      ChannelAddrToken γe (sa, dst) ∗
-      ChannelSideToken γe s ∗
-      ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
       ses_own
            (chan_N (endpoint_chan_name γe))
            (chan_session_escrow_name (endpoint_chan_name γe)) s sidx ridx p ∗
@@ -123,39 +114,36 @@ Section iProto_endpoints.
     seal_eq iProto_mapsto_aux.
   Arguments iProto_mapsto _ _ _ _%proto.
   Global Instance: Params (@iProto_mapsto) 3 := {}.
-  Notation "c ↣{ γe , ip , ser } p" := (iProto_mapsto γe c ip ser p)
-                              (at level 20, format "c  ↣{ γe , ip , ser }  p").
+  Notation "c ↣{ ip , ser } p" := (iProto_mapsto c ip ser p)
+                              (at level 20, format "c  ↣{ ip , ser }  p").
 
-  Global Instance iProto_mapsto_contractive γe c ip ser :
-    Contractive (λ p, iProto_mapsto γe c ip ser p).
+  Global Instance iProto_mapsto_contractive c ip ser :
+    Contractive (λ p, iProto_mapsto c ip ser p).
   Proof. rewrite iProto_mapsto_eq. solve_contractive. Qed.
 
-  Global Instance iProto_mapsto_ne γe c ip ser :
-    NonExpansive (λ p, iProto_mapsto γe c ip ser p).
+  Global Instance iProto_mapsto_ne c ip ser :
+    NonExpansive (λ p, iProto_mapsto c ip ser p).
   Proof. rewrite iProto_mapsto_eq. solve_proper. Qed.
-  Global Instance iProto_mapsto_proper γe c ip ser
-    : Proper ((≡) ==> (≡)) (λ p, iProto_mapsto γe c ip ser p).
+  Global Instance iProto_mapsto_proper c ip ser
+    : Proper ((≡) ==> (≡)) (λ p, iProto_mapsto c ip ser p).
   Proof. rewrite iProto_mapsto_eq. solve_proper. Qed.
 
-  Lemma iProto_mapsto_le γe c ip ser p1 p2 :
-    c ↣{ γe, ip, ser } p1 -∗ ▷ (p1 ⊑ p2) -∗ c ↣{ γe, ip, ser } p2.
+  Lemma iProto_mapsto_le c ip ser p1 p2 :
+    c ↣{ ip, ser } p1 -∗ ▷ (p1 ⊑ p2) -∗ c ↣{ ip, ser } p2.
   Proof.
     iIntros "Hc".
     rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s sa dst) "Hc".
-    iDestruct "Hc" as (sbuf slk rbuf rlk ackIdLoc sidLBLoc sidx ridx -> Heqc)
-                        "(%Heq1 & Hc)".
-    iDestruct "Hc" as "(Hsidx & Hridx
-                              & #HsT' & #HAddrT & #HsideT & #HidxT
-                              & Hp & #Hslk & #Hrlk)".
+    iDestruct "Hc" as (s sbuf slk rbuf rlk ackIdLoc sidLBLoc sidx ridx γe) "Hc".
+    iDestruct "Hc" as (Heqc) "(Hsidx & Hridx &
+                               Hp & #Hslk & #Hrlk)".
     iIntros "Hle".
-    iExists γs, s, sa, dst.
-    iExists sbuf, slk, rbuf, rlk, ackIdLoc, sidLBLoc, sidx, ridx.
+    iExists s, sbuf, slk, rbuf, rlk, ackIdLoc, sidLBLoc, sidx.
+    iExists ridx, γe.
     iDestruct (ses_own_le with "Hp Hle") as "Hp". iFrame. iFrame "#". naive_solver.
   Qed.
 
 End iProto_endpoints.
 
-Notation "c ↣{ γe , ip , ser } p" :=
-  (iProto_mapsto γe c ip ser p)
-    (at level 20, format "c  ↣{ γe , ip , ser }  p") : bi_scope.
+Notation "c ↣{ ip , ser } p" :=
+  (iProto_mapsto c ip ser p)
+    (at level 20, format "c  ↣{ ip , ser }  p") : bi_scope.
