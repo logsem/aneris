@@ -285,7 +285,7 @@ Section Proof_of_server_conn_step_2.
         (make_new_channel_descr_spec γs (m_sender m) (iProto_dual RCParams_protocol) Right lAD lLB
           with "[$HsidLB1 $Hackid1 $Hc2]"); [done|done|done | ].
       iIntros (γe c sbuf smn rbuf rlk)
-              "(%Hc & %Hγeq & %Hlkeq & Hmn1 & Hmn2 & #Haddr & #Hside & #Hidxs & Hpown & #Hslk & #Hrlk)".
+              "(%Hc & %Hγeq & %Hlkeq & Hmn1 & Hmn2 & Hpown & #Hslk & #Hrlk)".
       simpl in *.
       wp_pures.
       (* Unfolding the definition to get the persistent knowledge (send/recv locks, etc.) *)
@@ -366,7 +366,7 @@ Section Proof_of_server_conn_step_2.
           iFrame "Hql".
           iSplit; first done.
           iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown]").
-          iExists γe, c, (m_sender m).
+          iExists c, (m_sender m).
           iSplit; first done.
           iFrame "#".
           rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
@@ -448,7 +448,7 @@ Section Proof_of_server_conn_step_2.
              iSplit; first done.
              iSplit; first by iFrame "#".
              subst; eauto.
-             iExists _, _, _, _, _, _. iFrame "#∗". done. }
+             iExists _, _, _, _, _. iFrame "#∗". done. }
           iApply (big_sepM_mono with "[$HknResAcc]").
           iIntros (k x Hkx) "HchanRes".
           destruct (bool_decide (m_sender m = k)) eqn:Hkm.
@@ -488,7 +488,7 @@ Section Proof_of_server_conn_step_2.
               iSplit.
               { iDestruct "Hopened" as "(H1 & H2)". iFrame "#". }
               iFrame "#".
-              iExists _, _, _, _, _, _. iFrame "#"; eauto. }
+              iExists _, _, _, _, _. iFrame "#"; eauto. }
             iExists γi, cki. iSplitL "HCkFi". iFrame "#∗".
             destruct Hhst1i as (y0 & ? & ? & ? & ?).
             destruct Hhst2i as (y1 & ? & ? & ? & ?).

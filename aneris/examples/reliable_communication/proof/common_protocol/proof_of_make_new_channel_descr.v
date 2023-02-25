@@ -52,10 +52,6 @@ Section Proof_of_make_phys_resources.
            (lock_idx_name (endpoint_send_lock_name γe)) (1/2) 0 ∗
          mono_nat_auth_own
            (lock_idx_name (endpoint_recv_lock_name γe)) (1/2) 0 ∗
-         ChannelAddrToken
-           γe (side_elim s (sa, RCParams_srv_saddr) (RCParams_srv_saddr, sa)) ∗
-         ChannelSideToken γe s ∗
-         ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
          ses_own
            (chan_N (endpoint_chan_name γe))
            (chan_session_escrow_name (endpoint_chan_name γe)) s 0 0 p ∗
@@ -92,9 +88,6 @@ Section Proof_of_make_phys_resources.
     iIntros (γ_slk slk) "Hslk". wp_pures.
     wp_apply fupd_aneris_wp.
     iMod (mono_nat_own_alloc 0%nat) as (γridx) "((HridxA1 & HrdixA2) & HridxF)".
-    iMod (own_alloc (@to_agree _ (src_sa, dst_sa))) as (γ_addr) "#Haddr"; first done.
-    iMod (own_alloc (to_agree s)) as (γ_side) "#Hside"; first done.
-    iMod (own_alloc (to_agree (sidLBLoc, ackIdLoc))) as (γ_idxs) "#Hidxs"; first done.
     iModIntro.
     wp_apply (newlock_spec
                 (chan_N γc .@ "rlk") ip
@@ -105,7 +98,7 @@ Section Proof_of_make_phys_resources.
     iIntros (rlk γ_rlk) "Hrlk". wp_let.
     set (γslk := LockName γ_slk γsidx).
     set (γrlk := LockName γ_rlk γridx).
-    set (γe := EndpointName γc γslk γrlk γ_addr γ_side γ_idxs).
+    set (γe := EndpointName γc γslk γrlk).
     wp_pures.
     iApply ("HΦ" $! γe with "[-]").
     simpl in *. iFrame "#".

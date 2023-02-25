@@ -99,7 +99,7 @@ Section Proof_of_connect.
     iDestruct "HconnPost"
        as (m2 n2 mt2) "(-> & HconnPost)".
     iDestruct "HconnPost" as "(%Hm2 & %Hser2 & %Hdst2 & HisClt & (%γ & Hres) & _)".
-     iDestruct "HisClt" as "(#Hsrv_si2 & HisClt & (Hmh & #HmhR2))".
+    iDestruct "HisClt" as "(#Hsrv_si2 & HisClt & (Hmh & #HmhR2))".
     iDestruct "HisClt" as (? Hsaddr2 Hsblock2) "(Hh & #Hsi2)".
     wp_pures.
     wp_apply (aneris_wp_rcvtimeo_block with "[$Hh]"); eauto with lia.
@@ -126,7 +126,7 @@ Section Proof_of_connect.
       (make_new_channel_descr_spec γ _ _ Left lAD lLB _ with "[$Hres $HsidLB1 $Hackid1]");
       [done|done|done | ].
     iIntros (γe c sbuf slk rbuf rlk)
-            "(%Hc & %Hγeq & %Hlkeq' & Hmn1 & Hmn2 & #Haddr & #Hside & #Hidxs & Hpown & #Hslk & #Hrlk)".
+            "(%Hc & %Hγeq & %Hlkeq' & Hmn1 & Hmn2 & Hpown & #Hslk & #Hrlk)".
     wp_pures.
     simpl.
     wp_apply (aneris_wp_fork with "[-]").

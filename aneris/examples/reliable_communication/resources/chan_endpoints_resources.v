@@ -13,46 +13,6 @@ Set Default Proof Using "Type".
 (** Note that this file does not import user params, i.e.
     the definitions below are independent w.r.t. concrete physical/logical user parameters.  *)
 
-(** Meta token tracking for each physical channel the corresponding endpoint ghost name. *)
-(* TODO: define auth part, update, and alloc lemmas from all resources below. *)
-Section Endpoint_MetaData.
-  Context `{!anerisG Mdl Σ, !chanG Σ}.
-
-  (** Meta token tracking for each physical channel the socket_address of the destination endpoint. *)
-  Definition ChannelAddrToken
-    (γe : endpoint_name) (sas : socket_address * socket_address) : iProp Σ :=
-    own (endpoint_address_name γe) (to_agree sas).
-
-  Lemma ChannelAddrToken_agree γe sa1 sa2 :
-    ChannelAddrToken γe sa1 -∗ ChannelAddrToken γe sa2 -∗ ⌜sa1 = sa2⌝.
-  Proof.
-    iIntros "HA HB". iDestruct (own_valid_2 with "HA HB") as %Hval.
-    iPureIntro. by apply (to_agree_op_inv_L (A:= _ )) in Hval.
-  Qed.
-
-  Definition ChannelSideToken (γe : endpoint_name) (s : side) : iProp Σ :=
-    own (endpoint_side_name γe) (to_agree s).
-
-  Lemma ChannelSideToken_agree γe s1 s2 :
-    ChannelSideToken γe s1 -∗ ChannelSideToken γe s2 -∗ ⌜s1 = s2⌝.
-  Proof.
-    iIntros "HA HB". iDestruct (own_valid_2 with "HA HB") as %Hval.
-    iPureIntro. by apply (to_agree_op_inv_L (A:=leibnizO _ )) in Hval.
-  Qed.
-
-  Definition ChannelIdxsToken (γe : endpoint_name) (pl : loc * loc) : iProp Σ :=
-    own (endpoint_idxs_name γe) (to_agree pl).
-
-  Lemma ChannelIdxsToken_agree γe pl1 pl2 :
-    ChannelIdxsToken γe pl1 -∗ ChannelIdxsToken γe pl2 -∗ ⌜pl1 = pl2⌝.
-  Proof.
-    iIntros "HA HB". iDestruct (own_valid_2 with "HA HB") as %Hval.
-    iPureIntro. destruct pl1. destruct pl2. simpl.
-    by apply (to_agree_op_inv_L (A:= _ )) in Hval.
-  Qed.
-
-End Endpoint_MetaData.
-
 Section iProto_endpoints.
   Context `{!anerisG Mdl Σ, !chanG Σ, !lockG Σ, !server_ghost_names}.
 

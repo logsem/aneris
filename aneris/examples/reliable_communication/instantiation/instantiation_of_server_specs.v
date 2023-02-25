@@ -65,7 +65,7 @@ Section Server_API_spec_instantiation.
     iIntros (skt Φ) "Hyp HΦ".
     iApply (accept_internal_spec with "[$Hyp][HΦ]").
     iNext.
-    iIntros (γe c clt_addr) "(H1 & H2 & _)".
+    iIntros (c clt_addr) "(H1 & H2)".
     iApply "HΦ".
     rewrite /SrvListens.
     iFrame.

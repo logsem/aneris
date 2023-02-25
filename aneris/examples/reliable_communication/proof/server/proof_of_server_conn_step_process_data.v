@@ -103,10 +103,7 @@ Section Proof_of_server_conn_step_3.
     iDestruct "HchanRes" as (γc c sidLB_l sidLB_n ackId_l ackId_n) "HchanRes".
     iDestruct "HchanRes" as
       "(%Hhst3 & %Hhst4 & %Hchan & #Hopened & Hckf & HsL & HaL & #Hmono & #Hpers)".
-    iDestruct "Hpers" as
-      (γs' sa sbuf slk rbuf rlk Hc) "Hpers".
-    iDestruct "Hpers"
-      as "(%Hgeq & %Hgleq & #Htk' & #HaT & #HiT & Hslk & Hrlk)".
+    iDestruct "Hpers" as (γs sbuf slk rbuf rlk Hc) "(%Hgeq & %Hgleq & #Htk' & Hslk & Hrlk)".
     inversion Hchan.
     iDestruct (session_token_agree with "Htk0 Htk'") as "<-".
     wp_pures.
@@ -165,7 +162,7 @@ Section Proof_of_server_conn_step_3.
         subst; iFrame; eauto. do 3 (iSplit; first done).
         iFrame "#∗".
         iSplit; first by iDestruct "Hopened" as "(_ & Hp)".
-        iExists _, _, _, _, _, _. iFrame "#∗"; eauto. }
+        iExists _, _, _, _, _. iFrame "#∗"; eauto. }
       iFrame "#∗".
       iExists _, _. iFrame; eauto. }
     apply bool_decide_eq_false_1 in HmR0.
@@ -213,10 +210,8 @@ Section Proof_of_server_conn_step_3.
         -  iDestruct "HchanRes" as (γc' c' sidLB_l' sidLB_n' ackId_l' ackId_n') "HchanRes".
            iDestruct "HchanRes"
              as "(%Hhst3i & %Hhst4i & %Hchan' & #Hopened & Hckf & HsL & HaL & #Hmono & #Hpers)".
-           iDestruct "Hpers" as
-             (γs' sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
-           iDestruct "Hpers"
-             as "(%Hgeq' & %Hgleq' & HcT & HaT & HiT & Hslk & Hrlk)".
+           iDestruct "Hpers" as (γs' sbuf' slk' rbuf' rlk' Hc')
+                                  "(%Hgeq' & %Hgleq' & HcT & Hslk & Hrlk)".
            inversion Hchan.
            iExists γi, cki. iSplitL "HCkFi". iFrame "#∗".
            destruct Hhst1i as (y0 & ? & ? & ? & ?).
@@ -236,7 +231,7 @@ Section Proof_of_server_conn_step_3.
            iSplit.
            { iExists y4, _. by eauto with set_solver. }
             iSplit; first done.
-            subst. iExists _, _, _, _, _, _. iFrame "#"; eauto. }
+            subst. iExists _, _, _, _, _. iFrame "#"; eauto. }
       iApply "Hmono_smr".
       iApply "HknResAcc".
       iExists _, ck1. iFrame "Hopened".
@@ -246,7 +241,7 @@ Section Proof_of_server_conn_step_3.
       iExists γc, _, _, _, _, _. iFrame "HsidLB Hack".
       do 3 (iSplit; first done). subst; iFrame; eauto.
       iFrame "#∗".
-      iExists _, _, _, _, _, _. iFrame "#∗"; eauto. }
+      iExists _, _, _, _, _. iFrame "#∗"; eauto. }
     iFrame "#∗".
     iExists _, _. iFrame; eauto.
   Qed.
