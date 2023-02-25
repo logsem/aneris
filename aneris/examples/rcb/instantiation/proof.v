@@ -33,7 +33,7 @@ Section proof.
        OwnGlobal_Exclusive := own_global_user_excl γGauth γGsnap;
        OwnGlobalSnapshot_union := own_global_snap_union γGsnap;
        OwnGlobalSnapshot_included :=
-         own_global_snap_included γGauth γGsnap γLs;
+        own_global_snap_included γGauth γGsnap γLs;
        User_Snapshot := own_global_user_snap γGauth γGsnap;
        Snapshot_ext := own_global_snap_ext γGauth γGsnap γLs;
        OwnLocal := lhst_user γLs;
@@ -45,9 +45,11 @@ Section proof.
        OwnLocal_provenance :=
          lhst_user_provenance γGauth γGsnap γLs;
        OwnGlobalSnapshot_provenance :=
-         global_snap_provenance γGauth γGsnap γLs;
+        global_snap_provenance γGauth γGsnap γLs;
+       OwnGlobalSnapshot_origin :=
+         own_global_snap_origin γGsnap; 
        Causality := causality γGauth γGsnap γLs;
-       RCB_socket_proto := socket_proto γGsnap |}.
+      RCB_socket_proto := socket_proto γGsnap |}.
 
   Lemma replicate_init_lhst (l : list socket_address) :
     replicate (length l) ∅ = (λ _ : socket_address, (∅ : (gset le))) <$> l.

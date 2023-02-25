@@ -24,14 +24,17 @@ Section Global_resources.
 
     (* The user component needs to have 2/3 as the fraction so that it's exclusive. *)
     Definition own_global_user (h : gset global_event) : iProp Σ :=
+      ⌜∀ e, e ∈ h -> (ge_orig e) < length RCB_addresses⌝ ∗
       own γGown (mk_hist (2/3)%Qp h) ∗ own γGsnap (◯ h).
 
     (* The γGsnap fragment is needed so we can get a snapshot without a view shift
        (c.f. own_global_sys_snapshot). *)
     Definition own_global_sys (h : gset global_event) : iProp Σ :=
+      ⌜∀ e, e ∈ h -> (ge_orig e) < length RCB_addresses⌝ ∗
       own γGown (mk_hist (1/3)%Qp h) ∗ own γGsnap (● h) ∗ own γGsnap (◯ h).
 
     Definition own_global_snap (h : gset global_event) : iProp Σ :=
+      ⌜∀ e, e ∈ h -> (ge_orig e) < length RCB_addresses⌝ ∗
       own γGsnap (◯ h).
 
      (** Properties of global history resources. *)
@@ -48,14 +51,14 @@ Section Global_resources.
     Lemma own_global_snap_lookup G h :
       own_global_sys G ⊢ own_global_snap h -∗ ⌜h ⊆ G⌝.
     Proof.
-      iIntros "[? [Hauth ?]] Hsnap".
+      iIntros "[% [? [Hauth ?]]] [_ Hsnap]".
       iApply (snap_lookup with "Hauth Hsnap").
     Qed.
 
     Lemma own_global_user_excl h h' :
       own_global_user h ⊢ own_global_user h' -∗ False.
     Proof.
-      iIntros "[H1 _] [H2 _]".
+      iIntros "[_ [H1 _]] [_ [H2 _]]".
       iDestruct (own_valid_2 with "H1 H2") as %Hvl.
       exfalso.
       eapply frac_pair_valid_implies_false; [done | by compute ].
@@ -68,7 +71,14 @@ Section Global_resources.
     Lemma own_global_snap_union h h' :
       own_global_snap h ⊢
         own_global_snap h' -∗ own_global_snap (h ∪ h').
-    Proof. by iIntros "H1 H2"; iCombine "H1" "H2" as "H". Qed.
+    Proof.
+      iIntros "[%Ho1 H1] [%Ho2 H2]".
+      rewrite /own_global_snap.
+      iCombine "H1" "H2" as "H".
+      iFrame.
+      iPureIntro.
+      intros e [Hl | Hr]%elem_of_union; eauto.
+    Qed.
 
     Lemma own_global_snap_weaken h h' :
       h ⊆ h' →
@@ -76,15 +86,21 @@ Section Global_resources.
     Proof.
       iIntros ((h'' & -> & _)%subseteq_disjoint_union_L) "H".
       rewrite /own_global_snap -gset_op auth_frag_op own_op.
-      iDestruct "H" as "[$ _]".
+      iDestruct "H" as "(%Ho & $ & _)".
+      iPureIntro.
+      intros e Hin.
+      apply Ho.
+      set_solver.
     Qed.
 
-    Lemma own_global_update h h': h ⊆ h' →
+    Lemma own_global_update h h':
+      h ⊆ h' →
+      (∀ e, e ∈ h' -> (ge_orig e) < length RCB_addresses) ->                            
       own_global_user h ⊢
         own_global_sys h ==∗ own_global_user h' ∗ own_global_sys h'.
     Proof.
-      iIntros (Hh) "[H11 #H12] H2".
-      iDestruct "H2" as "[H21 [H22 _]]".
+      iIntros (Hh Horig) "(%Ho & H11 & #H12) H2".
+      iDestruct "H2" as "[%Ho2 [H21 [H22 _]]]".
       iMod (own_update_2 _ _ _
                          (mk_hist (2/3)%Qp h' ⋅ mk_hist (1/3)%Qp h')
               with "H21 H11") as "[H21 H11]".
@@ -105,13 +121,13 @@ Section Global_resources.
         apply (gset_local_update h h h'); done. }
       iModIntro.
       iFrame; iFrame "#".
+      done.
     Qed.
 
     Lemma own_global_user_sys_agree h h' :
       own_global_user h ⊢ own_global_sys h' -∗ ⌜h = h'⌝.
     Proof.
-      iIntros "[H11 H12] H2".
-      iDestruct "H2" as "[H21 H22]".
+      iIntros "[%Ho [H11 H12]] [%Ho2 [H21 H22]]".
       iDestruct (own_valid_2 with "H21 H11") as %Hv.
       iPureIntro.
       rewrite -pair_op frac_op in Hv.
@@ -122,22 +138,36 @@ Section Global_resources.
 
     Lemma own_global_user_snap h :
       own_global_user h ⊢ own_global_user h ∗ own_global_snap h.
-    Proof. iIntros "[? #?]"; iFrame; iFrame "#". Qed.
+    Proof.
+      iIntros "[% [? #?]]"; iFrame; iFrame "#".
+      iPureIntro; done.
+    Qed.
 
     Lemma own_global_sys_snap h :
       own_global_sys h ⊢ own_global_sys h ∗ own_global_snap h.
     Proof.
-      iDestruct 1 as "(Hexcl & Hauth & #Hsnap)".
-      iSplitL; iFrame; iFrame "#".
+      iDestruct 1 as "(% & Hexcl & Hauth & #Hsnap)".
+      iSplitL; iFrame; iFrame "#"; by iPureIntro.
     Qed.
 
     Lemma get_snap h :
+      (∀ e, e ∈ h -> (ge_orig e) < length RCB_addresses) ->
       own γGsnap (● h) ⊢ |==> own γGsnap (● h) ∗ own_global_snap h.
     Proof.
-      iIntros "H".
+      iIntros (Horig) "H".
       iMod (own_update _ _ (● h ⋅ ◯ h) with "H") as "[$ $]"; last done.
       apply auth_update_alloc.
       apply gset_local_update; by set_solver.
+    Qed.
+
+    Lemma own_global_snap_origin h :
+      own_global_snap h -∗ ⌜∀ e, e ∈ h -> (ge_orig e) < length RCB_addresses⌝%Z.
+    Proof.
+      iIntros "[% _]".
+      iPureIntro.
+      intros e Hin.
+      assert ((ge_orig e < length RCB_addresses) -> (ge_orig e < length RCB_addresses)%Z) by lia.
+      auto.
     Qed.
 
   End Predicates.
@@ -161,6 +191,9 @@ Section Global_resources.
       iMod (own_alloc (● empty_ghst)) as (γ2) "H2";
         first by (apply auth_auth_valid).
       iMod (get_snap with "H2") as "[Hauth #Hsnap]".
+      { intros e Hin.
+        exfalso.
+        set_solver. }
       iModIntro. iExists γ1, γ2.
       iFrame; iFrame "#".
     Qed.

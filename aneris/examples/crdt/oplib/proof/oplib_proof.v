@@ -433,8 +433,16 @@ Section OpLib_Proof.
       rewrite erasure_payload in Hopcoh'.
       subst.
       iMod (OwnLocal_local_ext' with "Hrcbinv Hownloc") as "[Hownloc %Hext]"; [done |].
+      iDestruct (OwnGlobalSnapshot_origin with "Hglobsnap") as "%Hsnaporig".
+      assert (LE_origin a < length CRDT_Addresses) as Horiglt.
+      { rewrite -erasure_origin.
+        assert (length CRDT_Addresses = length RCB_addresses) as ->; [done|].
+        assert ((GE_origin (erasure a) < length RCB_addresses)%Z -> GE_origin (erasure a) < length RCB_addresses) as Himpl; [lia|].
+        apply Himpl.
+        apply Hsnaporig.
+        apply elem_of_singleton; done. }
       iMod ("Hacc" $! a (EV_Op e) with "[$Hownloc]") as
-        (e') "(%Hloccoh&%Henotin&%Hemaxi&Hlock&Hinv')"; [eauto |].
+        (e') "(%Hloccoh&%Henotin&%Hemaxi&Hlock&Hinv')"; [eauto|].
       assert (e = e') as ->.
       { apply loc_st_coh_glob_st_coh in Hloccoh.
         eapply glob_st_coh_inj; done. }
@@ -592,7 +600,7 @@ Section OpLib_Proof.
     iDestruct (oplib_inv_lookup_acc' with "Hinvp [//]") as
           (hown hfor hsub hglob) "(Hinvwrap & Hglob & Hacc)".
     iDestruct "Hinvwrap" as (γown' γfor' γsub' γcc' γinv' s)
-                              "(%&%&%&%&%&%Hcoh&%&%&%&%&Hopt&Hown&Hfor&Hsub&Hcc)".
+                              "(%&%&%&%&%&%Hcoh&%&%&%&%&%&Hopt&Hown&Hfor&Hsub&Hcc)".
     (* prove that s is the empty set *)
     iAssert (⌜s = ∅⌝%I) with "[Hlock Hown Hfor]" as "%Hseq".
     { iDestruct "Hlock" as "(%&%&Hown'&Hfor')".

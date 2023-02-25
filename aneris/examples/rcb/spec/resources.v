@@ -72,6 +72,8 @@ Section Predicates.
                 -∗ OwnLocal n s
                 ={E}=∗ ⌜∀ a, a ∈ h -> (GE_origin a) = n -> ∃ e, e ∈ s ∧ erasure e = a⌝;
 
+    OwnGlobalSnapshot_origin h :
+      OwnGlobalSnapshot h -∗ ⌜∀ a, a ∈ h -> (GE_origin a) < length RCB_addresses⌝;  
 
     (** Causality property *)
 

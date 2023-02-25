@@ -300,6 +300,7 @@ Section Resources.
              (i : nat) (h__own h__for : gset (Event LogOp)) : iProp Σ :=
     ⌜own_orig i h__own⌝ ∗
     ⌜foreign_orig i h__for⌝ ∗
+    ⌜∀ e, e ∈ h__own ∪ h__for -> (EV_Orig e) < length CRDT_Addresses⌝ ∗  
     own γ_cc (◯ (princ_ev (h__own ∪ h__for))) ∗
     own γ_inv inv_init.
 
@@ -375,6 +376,7 @@ Section Resources.
       ⌜foreign_orig i h__for⌝ ∗
       ⌜foreign_orig i h__sub⌝ ∗
       ⌜cc_subseteq (h__own ∪ h__sub) (h__own ∪ h__for)⌝ ∗
+      ⌜∀ e, e ∈ h__own ∪ h__for -> (EV_Orig e) < length CRDT_Addresses⌝ ∗
       OwnLocalOpt γinv i s ∗
       own γown ((1/3)%Qp, to_agree h__own) ∗
       own γfor ((1/2)%Qp, to_agree h__for) ∗
@@ -909,7 +911,7 @@ Section Resources.
     - iExists γ1, γ2, γ3, γ4.
       rewrite /oplib_loc_st_user.
       repeat (iSplitL ""; [done |]).
-      iDestruct "Hsnap" as "(?&?&?&?)".
+      iDestruct "Hsnap" as "(?&?&?&?&?)".
       iFrame. iFrame "#".
     - iExists γ3, γ4.
       auto.
@@ -946,6 +948,10 @@ Section Resources.
     by iApply own_op.
   Qed.
 
+  Lemma oplib_loc_snap_union_helper e (s1 s2 : gset (Event LogOp)) :
+    e ∈ s1 ∨ e ∈ s2 -> e ∈ s1 ∪ s2.
+  Proof. set_solver. Qed.
+
   Lemma oplib_loc_snap_union (E : coPset) i (h1 h2 h1' h2' : gset (Event LogOp)) :
     ↑CRDT_InvName ⊆ E ->
     oplib_inv ⊢
@@ -959,8 +965,8 @@ Section Resources.
     rewrite_lookup.
     iExists γcc', γinv'.
     rewrite /oplib_loc_snap.
-    iDestruct "Hsnap" as "(% & % & #Hfrag1 & #Hinvst)".
-    iDestruct "Hsnap'" as "(% & % & #Hfrag2 & #Hinvst')".
+    iDestruct "Hsnap" as "(% & % & % & #Hfrag1 & #Hinvst)".
+    iDestruct "Hsnap'" as "(% & % & % & #Hfrag2 & #Hinvst')".
     assert (own_orig i (h1 ∪ h1')) as ? by (apply own_orig_union; done).
     assert (foreign_orig i (h2 ∪ h2')) as ? by (apply foreign_orig_union; done).
     iAssert (|={ E }=> own γcc' (◯ princ_ev (h1 ∪ h1' ∪ (h2 ∪ h2'))))%I as "> #Hmono".
@@ -969,7 +975,7 @@ Section Resources.
       iDestruct "Hlookup" as (h__own h__for h__forsub) "[H1 H2]".
       iDestruct "H1" as (? ? ? γcc ? ?) "(%&%&%&%&%&H1)".
       rewrite_lookup.
-      iDestruct "H1" as "(?&?&?&?&?&?&?&?&?&Hauth)".
+      iDestruct "H1" as "(?&?&?&?&?&?&?&?&?&?&Hauth)".
       iMod (oplib_cc_snap_union with "Hauth Hfrag1 Hfrag2") as "[Hauth Hfrag]".
       assert (h1 ∪ h2 ∪ (h1' ∪ h2') = h1 ∪ h1' ∪ (h2 ∪ h2')) as ->; [set_solver |].
       iFrame.
@@ -980,7 +986,10 @@ Section Resources.
       eauto 15 with iFrame. }
     iModIntro.
     iFrame "#".
-    by iPureIntro.
+    iPureIntro.
+    repeat split; eauto.
+    intros e [[? | ?]%elem_of_union | [? | ?]%elem_of_union]%elem_of_union;
+      auto using oplib_loc_snap_union_helper.
   Qed.
 
   Lemma oplib_loc_snap_loc_state_included_cc E i h1 h2 h1' h2' :
@@ -994,7 +1003,7 @@ Section Resources.
     iIntros (Hin) "[_ #Hinv] #Hsnap Hloc".
     iInv OpLib_InvName as "> Hprop" "Hclose".
     rewrite /oplib_loc_snap_wrap /oplib_loc_snap.
-    iDestruct "Hsnap" as (γcc γinv) "(%&%&%&%&#Hfrag&#Hinvst)".
+    iDestruct "Hsnap" as (γcc γinv) "(%&%&%&%&%&#Hfrag&#Hinvst)".
     rewrite /oplib_loc_st_user_wrap.
     iDestruct "Hloc" as (γown γsub γcc' γinv') "(%&%&%&%&Hloc)".
     rewrite /oplib_loc_st_user.
@@ -1004,7 +1013,7 @@ Section Resources.
       (h__own h__for h__sub) "[Hloc_inv Hacc]".
     iDestruct "Hloc_inv" as (γown'' γfor'' γsub'' γcc'' γinv'' s) "(%&%&%&%&%&Hloc_inv)".
     rewrite_lookup.
-    iDestruct "Hloc_inv" as "(%&%&%&%&%&HS&Hown'&Hfor&Hsub'&Hauth)".
+    iDestruct "Hloc_inv" as "(%&%&%&%&%&%&HS&Hown'&Hfor&Hsub'&Hauth)".
     iDestruct (pair_agree with "Hown Hown'") as %->.
     iDestruct (pair_agree with "Hsub Hsub'") as %->.
     iDestruct (princ_ev_own_both with "Hauth Hfrag") as %Hsubseteq.
@@ -1012,7 +1021,7 @@ Section Resources.
     { iExists _, _, _, _, _, _.
       rewrite /oplib_loc_st_inv.
       iFrame. iPureIntro.
-      eauto 10. }
+      eauto 15. }
     iMod ("Hclose" with "[$Hacc]") as "_".
     iModIntro.
     iSplitL ""; [by iPureIntro|].
@@ -1042,8 +1051,8 @@ Section Resources.
     iIntros (Hin) "[#Hrcb #Hinv] #Hsnap1 #Hsnap2".
     iInv OpLib_InvName as "> Hprop" "Hclose".
     rewrite /oplib_loc_snap_wrap /oplib_loc_snap.
-    iDestruct "Hsnap1" as (γcc1 γinv1) "(%Hl1&%&%&%&#Hfrag1&#Hinvst1)".
-    iDestruct "Hsnap2" as (γcc2 γinv2) "(%Hl2&%&%&%&#Hfrag2&#Hinvst2)".
+    iDestruct "Hsnap1" as (γcc1 γinv1) "(%Hl1&%&%&%&%&#Hfrag1&#Hinvst1)".
+    iDestruct "Hsnap2" as (γcc2 γinv2) "(%Hl2&%&%&%&%&#Hfrag2&#Hinvst2)".
     destruct (decide (i = i')) as [-> | Hne].
     - (* same node id *)
       iDestruct (oplib_inv_lookup_acc_γcc with "Hprop []") as
@@ -1053,7 +1062,7 @@ Section Resources.
       rewrite_lookup.
       iDestruct "Hloc_inv" as (γown γfor γsub γcc γinv s) "(%&%&%&%&%&Hloc_inv)".
       rewrite_lookup.
-      iDestruct "Hloc_inv" as "(%coh&%&%&%&%Hsub&HS&Hown&Hfor&Hsub&Hauth)".
+      iDestruct "Hloc_inv" as "(%coh&%&%&%&%Hsub&%&HS&Hown&Hfor&Hsub&Hauth)".
       iDestruct (princ_ev_own_both with "Hauth Hfrag1") as %[Hsubseteq1 _].
       iDestruct (princ_ev_own_both with "Hauth Hfrag2") as %[Hsubseteq2 _].
       rewrite_lookup.
@@ -1103,10 +1112,10 @@ Section Resources.
       + done.
       + iDestruct "Hinv1" as (γown' γfor' γsub' γcc' γinv' s') "(%&%&%&%&%&Hinv1)".
         rewrite_lookup.
-        iDestruct "Hinv1" as "(%coh1&%&%&%&%Hsub1&HS1&Hown1&Hfor1&Hsub1&Hauth1)".
+        iDestruct "Hinv1" as "(%coh1&%&%&%&%Hsub1&%&HS1&Hown1&Hfor1&Hsub1&Hauth1)".
         iDestruct "Hinv2" as (γown'' γfor'' γsub'' γcc'' γinv'' s'') "(%&%&%&%&%&Hinv2)".
         rewrite_lookup.
-        iDestruct "Hinv2" as "(%coh2&%&%&%&%Hsub2&HS2&Hown2&Hfor2&Hsub2&Hauth2)".
+        iDestruct "Hinv2" as "(%coh2&%&%&%&%Hsub2&%&HS2&Hown2&Hfor2&Hsub2&Hauth2)".
         own_local_opt_init γinv'.
         own_local_opt_init γinv''.
         iMod (OwnLocal_ext' with "Hrcb HS1 HS2") as "(HS1 & HS2 & %Hext)"; [auto |].
@@ -1168,14 +1177,14 @@ Section Resources.
     oplib_loc_snap_wrap i s1 s2 ={E}=∗ ∃ h, oplib_glob_snap h ∗ ⌜e ∈ h⌝.
   Proof.
     iIntros (Hname Hin) "[#Hrcbinv #Hinv] #Hwrap".
-    iDestruct "Hwrap" as (γ γinv Hi Hinv) "(%Horig & %Hfor & #Hfrag & Hinvst)".
+    iDestruct "Hwrap" as (γ γinv Hi Hinv) "(%Horig & %Hfor & % & #Hfrag & Hinvst)".
     iInv OpLib_InvName as "> Hprop" "Hclose".
     iDestruct (oplib_inv_lookup_acc with "Hprop []") as "Hres".
     { apply γ_cc_lookup_lt in Hi. done. }
     iDestruct "Hres" as (hown hfor hsub) "[Hinvwrap Hacc]".
     rewrite /oplib_loc_st_inv_wrap.
     iDestruct "Hinvwrap" as (γown γfor γsub γcc γinv' s)
-                              "(%&%&%&%&%&%Hcoh&%&%&%&%Hsub&Hloc&?&?&?&Hauth)".
+                              "(%&%&%&%&%&%Hcoh&%&%&%&%Hsub&%&Hloc&?&?&?&Hauth)".
     rewrite_lookup.
     iDestruct (princ_ev_own_both with "Hauth Hfrag") as "%Hsub'".
     assert (e ∈ hown ∪ hfor) as [q [Hqin Hqcoh]]%Hcoh.
@@ -1214,7 +1223,7 @@ Section Resources.
   Proof.
     iIntros (Hin) "#Hrcbinv Hinv Hlock Hglob".
     iDestruct "Hinv" as (γown γfor γsub γcc γinv s) "(%&%&%&%&%&Hinv)".
-    iDestruct "Hinv" as "(%Hcoh&%&%&%&%&Hloc&Howni&Hfori&Hsubi&Hcci)".
+    iDestruct "Hinv" as "(%Hcoh&%&%&%&%&%&Hloc&Howni&Hfori&Hsubi&Hcci)".
     iDestruct "Hlock" as (γown' γfor' γinv') "(%&%&%&%&%&Hownl&Hforl&#?)".
     rewrite_lookup.
     own_local_opt_init γinv'.
@@ -1264,7 +1273,7 @@ Section Resources.
     { iPureIntro; eapply γ_cc_lookup_lt. eauto. }
     iDestruct "Hres" as (hown hfor hsub) "[Hinvwrap Hacc]".
     iDestruct "Hinvwrap" as (γown' γfor' γsub' γcc' γinv' s)
-                              "(%&%&%&%&%&%Hcoh&%&%Hfor&%&%Hsub&Hloc&Hown'&Hfor'&Hsub'&Hauth)".
+                              "(%&%&%&%&%&%Hcoh&%&%Hfor&%&%Hsub&%&Hloc&Hown'&Hfor'&Hsub'&Hauth)".
     rewrite_lookup.
     iDestruct "Hglobsnap" as (s__super s__sub) "(#Hgsnap & %Hgsub & %Hgcoh)".
     own_local_opt_init γinv'.
@@ -1324,7 +1333,7 @@ Section Resources.
     { iPureIntro; eapply γ_cc_lookup_lt. eauto. }
     iDestruct "Hres" as (hown hfor hsub) "[Hinvwrap Hacc]".
     iDestruct "Hinvwrap" as (γown' γfor' γsub' γcc' γinv' s)
-                              "(%&%&%&%&%&%Hcoh&%Hown&%Hfor&%&%Hsub&Hloc&Hown'&Hfor'&Hsub'&Hauth)".
+                              "(%&%&%&%&%&%Hcoh&%Hown&%Hfor&%&%Hsub&%&Hloc&Hown'&Hfor'&Hsub'&Hauth)".
     rewrite_lookup.
     own_local_opt_init γinv'.
     iDestruct "Hglobsnap" as (ssup ssub) "(#Hglobsnap&%Hsubset&%Hglobcoh)".
@@ -1370,23 +1379,13 @@ Section Resources.
      oplib_loc_snap_wrap i s1 s2 ={E}=∗
      ⌜∀ e : Event LogOp, e ∈ s1 ∪ s2 → (EV_Orig e < length CRDT_Addresses)%Z⌝.
   Proof.
-    iIntros (Hin) "[#Hrcb #Hinv] #Hsnap1".
-    iInv OpLib_InvName as "> Hprop" "Hclose".
-    rewrite /oplib_loc_snap_wrap /oplib_loc_snap.
-    iDestruct "Hsnap1"
-      as (γcc1 γinv1) "(%Hl1&%Hl2&%Hl3&%Hl4&#Hfrag1&#Hinvst1)".
-    (*
+    iIntros (Hin) "[#Hrcb #Hinv] #Hsnap".
+    iDestruct "Hsnap" as (????) "(_&_&%&_)".
+    iModIntro.
     iPureIntro.
-    intros e [He|He]%elem_of_union.
-    - apply Hl3 in He as ->.
-      assert (i < length CRDT_Addresses).
-      { by eapply γ_cc_lookup_lt. }
-      by apply Nat2Z.inj_lt.
-    - apply Hl4 in He.
-      assert (i < length CRDT_Addresses).
-      { by eapply γ_cc_lookup_lt. }
-      by apply Nat2Z.inj_lt. *)
-  Admitted.
+    intros e Hin'.
+    assert ((EV_Orig e < length CRDT_Addresses) -> (EV_Orig e < length CRDT_Addresses)%Z) as Himpl; [lia |by auto].
+  Qed.
 
   Global Instance oplib_res : CRDT_Res_Mixin Mdl Σ LogOp := {
     GlobInv := oplib_inv;
@@ -1430,7 +1429,7 @@ Section Resources.
     ⌜hown = hown' ∧ hsub = hsub'⌝.
   Proof.
     iIntros "Hinv Huser".
-    iDestruct "Hinv" as "(_&_&_&_&_&_&Hown&_&Hsub&_)".
+    iDestruct "Hinv" as "(_&_&_&_&_&_&_&Hown&_&Hsub&_)".
     iDestruct "Huser" as "(_&_&Hown'&Hsub'&_)".
     iDestruct (pair_agree with "Hown Hown'") as "%".
     iDestruct (pair_agree with "Hsub Hsub'") as "%".
@@ -1455,7 +1454,7 @@ Section Resources.
     ⌜hown = hown' ∧ hfor = hfor'⌝.
   Proof.
     iIntros "Hinv Hlock".
-    iDestruct "Hinv" as "(_&_&_&_&_&_&Hown&Hfor&_&_)".
+    iDestruct "Hinv" as "(_&_&_&_&_&_&_&Hown&Hfor&_&_)".
     iDestruct "Hlock" as "(_&_&Hown'&Hfor'&_)".
     iDestruct (pair_agree with "Hown Hown'") as "%".
     iDestruct (pair_agree with "Hfor Hfor'") as "%".
@@ -1481,7 +1480,7 @@ Section Resources.
       oplib_loc_st_user γown γsub γcc γinv i hown hfor.
   Proof.
     iIntros "Hinv Huser".
-    iDestruct "Hinv" as "(%&%&%&%&%&Hloc&Hown&Hfor&Hsub&Hprinc)".
+    iDestruct "Hinv" as "(%&%&%&%&%&%&Hloc&Hown&Hfor&Hsub&Hprinc)".
     iDestruct "Huser" as "(%&%&Hown'&Hsub'&#Hsnap&#Hinvst)".
     iAssert (|==> own γsub ((1/3)%Qp, to_agree hfor) ∗
                   own γsub ((2/3)%Qp, to_agree hfor))%I with "[Hsub Hsub']" as
@@ -1853,7 +1852,7 @@ Section Resources.
     rewrite /oplib_loc_st_lock_wrap /oplib_loc_st_lock.
     rewrite /oplib_loc_st_inv_wrap /oplib_loc_st_inv.
     iDestruct "Hglobi" as (s) "(Hglob & Hglobi & %Hglobcoh & %Htotal)".
-    iDestruct "Hinv" as (γown γfor γsub γcc γinv s') "(%&%&%&%&%&%Hcoh&%Hownorig&%Hfor1&%Hfor2&%Hsub&Hloc&Hown&Hfor1&Hfor2&Hcc)".
+    iDestruct "Hinv" as (γown γfor γsub γcc γinv s') "(%&%&%&%&%&%Hcoh&%Hownorig&%Hfor1&%Hfor2&%Hsub&%&Hloc&Hown&Hfor1&Hfor2&Hcc)".
     iExists s, s'.
     iFrame "Hglob".
     iDestruct (oplib_loc_st_lock_wrap_inv_st with "Hlock") as (γinv') "(Hlock&%&#Hinvinit)".
@@ -2038,6 +2037,17 @@ Section Resources.
     assert (own_orig (LE_origin a) hown') as Hown'orig.
     { subst hown'.
       apply own_orig_union; auto. }
+    assert ( ∀ e : Event LogOp, e ∈ hown' ∪ hfor → EV_Orig e < length CRDT_Addresses) as Hltaddr.
+    { intros e [[Hin1 | ->%elem_of_singleton ]%elem_of_union | Hin2]%elem_of_union.
+        - apply H7.
+          set_solver.
+        - assert (EV_Orig (to_event op a) = LE_origin a) as ->; [done|].
+          assert (LE_origin a < length γ_cc) as Hlt.
+          { apply lookup_lt_is_Some; done. }
+          rewrite γ_cc_len in Hlt.
+          done.
+        - apply H7.
+          set_solver. }
     iSplitL "Hglobu"; [iFrame |].
     iSplitL "Huown Husub".
     { iExists _, _, _, _.
@@ -2045,7 +2055,7 @@ Section Resources.
       { rewrite /oplib_loc_snap.
         iFrame "#".
         iPureIntro.
-        auto. }
+        repeat split; auto. }
       iFrame.
       iFrame "#".
       iPureIntro.
@@ -2070,8 +2080,9 @@ Section Resources.
         ⌜loc_st_set_coh (hown ∪ hfor) s⌝ ∗
         ((∀ a op,
                 ⌜a ∉ s⌝ ∗
-                 ⌜a ∈ compute_maximals LE_vc (s ∪ {[a]})⌝ ∗
+                ⌜a ∈ compute_maximals LE_vc (s ∪ {[a]})⌝ ∗
                 ⌜(LE_origin a) ≠ i⌝ ∗
+                ⌜(LE_origin a) < length CRDT_Addresses⌝ ∗ 
                 ⌜OpLib_Op_Coh op (LE_payload a)⌝ ∗
                 ⌜lstate_ext (s ∪ {[ a ]})⌝ ∗
                 OwnLocal i (s ∪ {[ a ]}) ==∗
@@ -2087,7 +2098,7 @@ Section Resources.
            oplib_loc_st_inv_wrap i hown hfor hsub))).
   Proof.
     iIntros "Hlockwrap Hinvwrap".
-    iDestruct "Hinvwrap" as (γown γfor γsub γcc γinv s') "(%&%&%&%&%&%Hcoh&%Hownorig&%Hfor1&%Hfor2&%Hsub&Hloc&Hown&Hfor1&Hfor2&Hcc)".
+    iDestruct "Hinvwrap" as (γown γfor γsub γcc γinv s') "(%&%&%&%&%&%Hcoh&%Hownorig&%Hfor1&%Hfor2&%Hsub&%&Hloc&Hown&Hfor1&Hfor2&Hcc)".
     iDestruct "Hlockwrap" as (γown1 γfor1 γinv1) "(%&%&%&%Hlorig&%Hlfor&Hlown&Hlfor&#Hinvst)".
     rewrite_lookup.
     own_local_opt_init γinv1.
@@ -2095,7 +2106,7 @@ Section Resources.
     iFrame "Hloc".
     iSplitL ""; [by iPureIntro|].
     iSplit.
-    - iIntros (a op) "(%Hnotin&%Hamax&%Haorig&%Hopcoh&%Hstext&Hloc)".
+    - iIntros (a op) "(%Hnotin&%Hamax&%Haorig&%Haoriglt&%Hopcoh&%Hstext&Hloc)".
       iMod (pair_update _ _ _ _ (hfor ∪ {[(to_event op a)]}) with "Hlfor Hfor1") as
         "[Hlfor Hfor1]".
       { compute_done. }
@@ -2202,6 +2213,10 @@ Section Resources.
                  apply Maximals_correct in Hmax' as [_ Hmax'].
                  apply (Hmax' e'); [ | done].
                  set_solver.
+        * intros e [? | ->%elem_of_singleton]%elem_of_union.
+          ** apply H7. done.
+          ** assert (EV_Orig (to_event op a) = LE_origin a) as ->; [|done].
+             done.
     - iIntros "Hloc".
       iSplitL "Hlown Hlfor".
       + rewrite /oplib_loc_st_lock_wrap /oplib_loc_st_lock.

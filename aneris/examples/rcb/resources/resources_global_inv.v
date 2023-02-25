@@ -30,9 +30,9 @@ Section Global_invariant.
       own_global_snap γSnap h' ={E}=∗
         ⌜∀ a a', a ∈ h → a' ∈ h' → ge_time a = ge_time a' → a = a'⌝.
     Proof.
-      iIntros (?) "#Hinv Hh Hh'".
+      iIntros (?) "#Hinv [_ Hh] [_ Hh']".
       rewrite /Global_Inv /own_global_snap.
-      iInv RCB_InvName as (G Ss) "(>%&>(?&HG&?)&?&>%Hv)" "Hcl".
+      iInv RCB_InvName as (G Ss) "(>%&>(?&?&HG&?)&?&>%Hv)" "Hcl".
       iDestruct (snap_lookup with "HG Hh") as "%Hh1".
       iDestruct (snap_lookup with "HG Hh'") as "%Hh2".
       iMod ("Hcl" with "[-]") as "_".

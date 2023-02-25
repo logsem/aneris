@@ -371,7 +371,8 @@ Section proof.
          rewrite Heq in His.
          eauto. }
        iLeft.
-       iExists _, _, _.
+       iExists _, _, ge.
+       iFrame "Hsnap".
        repeat iSplitL ""; eauto.
        simpl in *; destruct ge; eauto. }
      iInv RCB_InvName as "> HInv" "Hcl".

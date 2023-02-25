@@ -44,6 +44,12 @@ Section proof.
             lhst_user γLs i s' >>>.
 
 
+  Lemma own_global_user_orig γ γ' G :
+    own_global_user γ γ' G -∗ ⌜∀ e, e ∈ G -> (ge_orig e) < length RCB_addresses⌝%nat.
+  Proof.
+    by iDestruct 1 as "(%&_)".
+  Qed.
+  
   Lemma broadcast_ghost_update i t Su Sl h v :
     RCBM_Lst_valid i {| Lst_time := t; Lst_hst := Su |} ->
     Global_Inv γGown γGsnap γLs  ⊢
@@ -87,8 +93,18 @@ Section proof.
     {  apply (RCBM_system_write_update_gst v i _ _ HLvalid HGv Hlookup_i). }
     iMod (lhst_update _ _ _ _ e with "Huser Hlock HL") as "(Huser & Hlock & HL)".
     iDestruct (own_global_user_sys_agree with "Hglob Hsys") as %->.
+    iDestruct (own_global_user_orig with "Hglob") as "%Horig".
     iMod ((own_global_update _ _ _(G ∪ {[ erase e ]})) with "Hglob Hsys") as "[Hglob Hsys]";
-      [set_solver |].
+      [set_solver | |].
+    { intros e' [Hl | ->%elem_of_singleton]%elem_of_union; [auto|].
+      subst e.
+      simpl.
+      assert (length RCB_addresses = length Ss) as ->; last first.
+      { apply lookup_lt_is_Some; auto. }
+      symmetry.
+      assert (Ss = {| Gst_ghst := G; Gst_hst := Ss |}.(Gst_hst)) as ->; [done|].
+      apply RCBM_GstValid_lhst_size.
+      done. }
     iDestruct (own_global_sys_snap with "Hsys") as "[Hsys #Hsnap]".
     iMod ("Hcl" with "[HL Hsys]") as "_".
     { replace (G ∪ {[ erase e ]}) with ({[ erase e ]} ∪ G); [ | set_solver].
