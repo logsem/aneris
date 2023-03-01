@@ -72,8 +72,7 @@ Section Proof_of_connect.
                         (s_ser (s_serializer (msg_serialization RCParams_srv_ser))),
                      side_elim Left
                        (s_deser (s_serializer (msg_serialization RCParams_srv_ser)))
-                       (s_deser (s_serializer (msg_serialization RCParams_clt_ser)))),
-                       s_ser (s_serializer RCParams_clt_ser)))%V).
+                       (s_deser (s_serializer (msg_serialization RCParams_clt_ser))))))%V).
     wp_apply (client_conn_step_2_spec skt _ _ clt_addr R _ n1
                with "[$Hh1 $Hmh1 Hpost $Hcnd2] [HΦ]").
     { rewrite /isClientSocketInternal /isSocket /is_skt_val /=.
@@ -124,7 +123,7 @@ Section Proof_of_connect.
     iDestruct "Hres" as "(Hres & #Hsmode)".
     wp_apply
       (make_new_channel_descr_spec γ _ _ Left lAD lLB _ with "[$Hres $HsidLB1 $Hackid1]");
-      [done|done|done | ].
+      [done|done| ].
     iIntros (γe c sbuf slk rbuf rlk)
             "(%Hc & %Hγeq & %Hlkeq' & Hmn1 & Hmn2 & Hpown & #Hslk & #Hrlk)".
     wp_pures.

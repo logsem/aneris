@@ -195,9 +195,7 @@ Section SocketInterp.
                 (side_elim s (s_ser (s_serializer (msg_serialization RCParams_clt_ser)))
                              (s_ser (s_serializer (msg_serialization RCParams_srv_ser))),
                  side_elim s (s_deser (s_serializer (msg_serialization RCParams_srv_ser)))
-                             (s_deser (s_serializer (msg_serialization RCParams_clt_ser))))),
-          side_elim s (s_ser (s_serializer RCParams_clt_ser))
-                      (s_ser (s_serializer RCParams_srv_ser)))%V⌝.
+                             (s_deser (s_serializer (msg_serialization RCParams_clt_ser))))))%V⌝.
 
   (** In the definition below, for the server side we are tracking message histories
       in the following way:

@@ -51,3 +51,7 @@ let rec queue_drop q n =
 let queue_iter f q =
   list_iter f (fst q);
   list_iter f (list_rev (snd q))
+
+let queue_iteri f (q : 'a queue) =
+  list_iteri f (fst q);
+  list_iteri_loop f (list_length (fst q)) (list_rev (snd q))

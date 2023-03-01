@@ -84,7 +84,7 @@ Section Proof_of_send_loop.
     iIntros (<- Heqc Heqg -> Hsrv Φ) "(Hskt & #Hdst & #Hslk & #Htok & #Hsmode) HΦ".
     iDestruct "Hskt" as (sh sock -> Haddr Hblock) "[#Hinterp #Hsk]".
     wp_lam.
-    do 43 wp_pure _.
+    do 36 wp_pure _.
     iLöb as "Ilob".
     wp_pures.
     wp_apply (monitor_acquire_spec with "Hslk").
@@ -122,6 +122,7 @@ Section Proof_of_send_loop.
           split; [|done]. eexists _. done. }
         iIntros (s His_ser).
         wp_pures.
+        wp_bind (SendTo _ _ _).
         iInv N as "IH".
         iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
         wp_apply (aneris_wp_send with "[$Hsa $Hsh Hfrag]"); [done|done| |].
@@ -151,6 +152,7 @@ Section Proof_of_send_loop.
           split; [|done]. eexists _. done. }
         iIntros (s His_ser).
         wp_pures.
+        wp_bind (SendTo _ _ _).
         iInv N as "IH".
         iDestruct "IH" as (R T) "(Hsh & Hsa & IH)".
         wp_apply (aneris_wp_send with "[$Hsa $Hsh Hfrag]"); [done|done| |].
@@ -180,7 +182,7 @@ Section Proof_of_send_loop.
     wp_apply (monitor_release_spec with "[$Hlocked $Hslk Hsbuf HsidLBLoc' Hsidx]").
     iExists _, _, _. iFrame "#∗"; eauto.
     iIntros (v ->).
-    do 4 wp_pure _.
+    do 5 wp_pure _.
     iApply "Ilob". by iIntros.
   Qed.
 

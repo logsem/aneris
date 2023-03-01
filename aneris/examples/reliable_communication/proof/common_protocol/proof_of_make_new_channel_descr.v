@@ -32,16 +32,13 @@ Section Proof_of_make_phys_resources.
     Qed.
 
     Lemma make_new_channel_descr_spec
-          (γs : session_name) sa (p : iProto Σ) s ackIdLoc sidLBLoc (serf : val) lsa :
+          (γs : session_name) sa (p : iProto Σ) s ackIdLoc sidLBLoc lsa :
       lsa = side_elim s sa RCParams_srv_saddr →
       p = side_elim s RCParams_protocol (iProto_dual RCParams_protocol) →
-      serf = side_elim s
-               (s_ser (s_serializer RCParams_clt_ser))
-               (s_ser (s_serializer RCParams_srv_ser)) →
-    {{{ can_init γs sa p s ∗
+       {{{ can_init γs sa p s ∗
         ackIdLoc ↦[ip_of_address lsa]{1/2} #0 ∗
         sidLBLoc ↦[ip_of_address lsa]{1/2} #0 }}}
-       make_new_channel_descr serf
+       make_new_channel_descr #()
        @[ip_of_address lsa]
      {{{ γe c (sbuf : loc) smn (rbuf : loc) rlk, RET c;
          ⌜c = (((#sbuf, smn), (#rbuf, rlk)))%V⌝ ∗
@@ -70,7 +67,7 @@ Section Proof_of_make_phys_resources.
     set (src_sa := side_elim s sa RCParams_srv_saddr).
     set (dst_sa := side_elim s RCParams_srv_saddr sa).
     set (γsidx := side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs)).
-    iIntros (Hp Hserf -> Φ) "(Hinit & HackIdLoc & HsidLBLoc) HΦ".
+    iIntros (Hp -> Φ) "(Hinit & HackIdLoc & HsidLBLoc) HΦ".
     wp_lam.
     wp_apply wp_queue_empty; first done.
     iIntros (v) "%Hq".

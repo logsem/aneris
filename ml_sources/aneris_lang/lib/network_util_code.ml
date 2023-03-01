@@ -23,6 +23,9 @@ let wait_receivefrom skt test =
      if test msg then msg else loop () in
   loop ()
 
+let wait_receivefresh skt ms =
+  wait_receivefrom skt (fun m -> not (list_mem m ms))
+
 let sendto_all_set =
   fun skt x msg ->
   set_iter (fun n -> let _l = sendTo skt msg n in ()) x

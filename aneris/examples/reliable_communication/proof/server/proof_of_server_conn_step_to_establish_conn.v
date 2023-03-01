@@ -283,7 +283,7 @@ Section Proof_of_server_conn_step_2.
       iDestruct (session_token_agree with "[$Htk0][$Htk]") as "->".
       wp_apply
         (make_new_channel_descr_spec γs (m_sender m) (iProto_dual RCParams_protocol) Right lAD lLB
-          with "[$HsidLB1 $Hackid1 $Hc2]"); [done|done|done | ].
+          with "[$HsidLB1 $Hackid1 $Hc2]"); [done|done | ].
       iIntros (γe c sbuf smn rbuf rlk)
               "(%Hc & %Hγeq & %Hlkeq & Hmn1 & Hmn2 & Hpown & #Hslk & #Hrlk)".
       simpl in *.

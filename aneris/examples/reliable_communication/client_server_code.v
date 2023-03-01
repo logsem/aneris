@@ -28,7 +28,7 @@ Definition make_skt ser deser : val :=
   λ: "sa",
   let: "sh" := NewSocket #() in
   SocketBind "sh" "sa";;
-  ("sh", ((gen_msg_ser ser).(s_ser), (gen_msg_ser deser).(s_deser)), ser.(s_ser)).
+  ("sh", ((gen_msg_ser ser).(s_ser), (gen_msg_ser deser).(s_deser))).
 
 (**  Client socket is just a alias of skt, with purpose to make the API
     more clear w.r. to distinction with server_socket (passive socket).  *)
@@ -44,7 +44,7 @@ Definition make_server_skt ser deser : val :=
             ref (InjL "skt").
 
 Definition make_new_channel_descr : val :=
-  λ: "<>",
+  λ: <>,
   let: "sbuf" := ref (queue_empty #()) in
   let: "rbuf" := ref (queue_empty #()) in
   let: "smon" := new_monitor #() in
@@ -58,24 +58,24 @@ Definition send_from_chan_loop : val :=
   let: "sdata" := Fst "c" in
   let: "sbuf" := Fst "sdata" in
   let: "smon" := Snd "sdata" in
-  let: "sh" := Fst (Fst "skt") in
-  let: "ser" := Fst (Snd (Fst "skt")) in
-  let: "_deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
-  let: "send_msg" := (λ: "lb" "i" "m",
-                       let: "msg" := "ser" (InjR (InjR ("lb"+"i", "m"))) in
-                       SendTo "sh" "msg" "sa") in
-  #();; (* unsafe (__print_send_msg ser sa (InjR (InjR m))); *)
+  let: "sh" := Fst "skt" in
+  let: "ser" := Fst (Snd "skt") in
+  let: "_deser" := Snd (Snd "skt") in
+  let: "send_msg" := λ: "lb" "i" "m",
+  let: "msg" := "ser" (InjR (InjR (("lb" + "i"), "m"))) in
+  SendTo "sh" "msg" "sa";;
+  #();;
+  #() (* unsafe (__print_send_msg ser sa (InjR (InjR (lb+i, m)))); *) in
   letrec: "while_empty_loop" "p" :=
-    (if: queue_is_empty (! "p")
-     then monitor_wait "smon";;
-          "while_empty_loop" "p"
-     else #()) in
+    (if: queue_is_empty ! "p"
+     then  monitor_wait "smon";;
+           "while_empty_loop" "p"
+     else  #()) in
     letrec: "loop" <> :=
       monitor_acquire "smon";;
       "while_empty_loop" "sbuf";;
-      let: "send_msg'" := "send_msg" (!"sidLBloc") in
-      queue_iteri ("send_msg'") (! "sbuf");;
+      let: "send_msg'" := "send_msg" ! "sidLBloc" in
+      queue_iteri "send_msg'" ! "sbuf";;
       monitor_release "smon";;
       #() (* unsafe (fun () -> Unix.sleepf 0.35); *);;
       "loop" #() in
@@ -99,10 +99,9 @@ Definition process_data_on_chan : val :=
   let: "smon" := Snd (Fst "c") in
   let: "rbuf" := Fst (Snd "c") in
   let: "rlk" := Snd (Snd "c") in
-  let: "sh" := Fst (Fst "skt") in
-  let: "ser" := Fst (Snd (Fst "skt")) in
-  let: "_deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "ser" := Fst (Snd "skt") in
+  let: "_deser" := Snd (Snd "skt") in
   let: "ackid" := ! "ackId" in
   match: "msg" with
     InjL "id" => prune_sendbuf_at_ack "smon" "sidLB" "sbuf" "id"
@@ -124,10 +123,9 @@ Definition process_data_on_chan : val :=
 
 Definition client_recv_on_chan_loop : val :=
   λ: "skt" "sa" "sidLB" "ackId" "c",
-  let: "sh" := Fst (Fst "skt") in
-  let: "_ser" := Fst (Snd (Fst "skt")) in
-  let: "deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "_ser" := Fst (Snd "skt") in
+  let: "deser" := Snd (Snd "skt") in
   letrec: "loop" <> :=
     let: "msg" := unSOME (ReceiveFrom "sh") in
     assert: ("sa" = (Snd "msg"));;
@@ -157,10 +155,9 @@ Definition resend_listen : val :=
 
 Definition client_conn_step : val :=
   λ: "skt" "req" "repl_tag" "saddr",
-  let: "sh" := Fst (Fst "skt") in
-  let: "ser" := Fst (Snd (Fst "skt")) in
-  let: "deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "ser" := Fst (Snd "skt") in
+  let: "deser" := Snd (Snd "skt") in
   let: "req_msg" := "ser" (InjL "req") in
   SendTo "sh" "req_msg" "saddr";;
   #();;
@@ -184,10 +181,9 @@ Definition server_conn_step_to_open_new_conn : val :=
   let: "connMap" := Snd (Fst "srv_skt") in
   let: "_chanQueue" := Fst (Snd "srv_skt") in
   let: "_connlk" := Snd (Snd "srv_skt") in
-  let: "sh" := Fst (Fst "skt") in
-  let: "ser" := Fst (Snd (Fst "skt")) in
-  let: "_deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "ser" := Fst (Snd "skt") in
+  let: "_deser" := Snd (Snd "skt") in
   match: "bdy" with
     InjL "im" =>
     (if: ((Fst "im") = #"INIT") && ((Snd "im") = #0)
@@ -208,17 +204,16 @@ Definition server_conn_step_to_establish_conn : val :=
   let: "connMap" := Snd (Fst "srv_skt") in
   let: "chanQueue" := Fst (Snd "srv_skt") in
   let: "connlk" := Snd (Snd "srv_skt") in
-  let: "sh" := Fst (Fst "skt") in
-  let: "ser" := Fst (Snd (Fst "skt")) in
-  let: "_deser" := Snd (Snd (Fst "skt")) in
-  let: "serf" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "ser" := Fst (Snd "skt") in
+  let: "_deser" := Snd (Snd "skt") in
   match: "bdy" with
     InjL "im" =>
     (if: ((Fst "im") = #"COOKIE") && ((Snd "im") = "cookie")
      then
        let: "sidLB" := ref #0 in
        let: "ackId" := ref #0 in
-       let: "chan_descr" := make_new_channel_descr "serf" in
+       let: "chan_descr" := make_new_channel_descr #() in
        Fork (send_from_chan_loop "skt" "clt_addr" "sidLB" "chan_descr");;
        "connMap" <- (map_insert "clt_addr"
                      (InjR ("chan_descr", "cookie", ("sidLB", "ackId")))
@@ -245,10 +240,9 @@ Definition server_conn_step_to_establish_conn : val :=
 Definition server_conn_step_process_data : val :=
   λ: "srv_skt" "chan_data" "bdy" "clt_addr",
   let: "skt" := Fst (Fst "srv_skt") in
-  let: "sh" := Fst (Fst "skt") in
-  let: "ser" := Fst (Snd (Fst "skt")) in
-  let: "_deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "ser" := Fst (Snd "skt") in
+  let: "_deser" := Snd (Snd "skt") in
   let: "chan_descr" := Fst (Fst "chan_data") in
   let: "cookie" := Snd (Fst "chan_data") in
   let: "sidLB" := Fst (Snd "chan_data") in
@@ -273,10 +267,9 @@ Definition server_recv_on_listening_skt_loop : val :=
   let: "skt" := Fst (Fst "srv_skt") in
   let: "connMap" := Snd (Fst "srv_skt") in
   let: "_conn_data" := Snd "srv_skt" in
-  let: "sh" := Fst (Fst "skt") in
-  let: "_ser" := Fst (Snd (Fst "skt")) in
-  let: "deser" := Snd (Snd (Fst "skt")) in
-  let: "_s" := Snd "skt" in
+  let: "sh" := Fst "skt" in
+  let: "_ser" := Fst (Snd "skt") in
+  let: "deser" := Snd (Snd "skt") in
   letrec: "loop" <> :=
     let: "msg" := unSOME (ReceiveFrom "sh") in
     let: "m" := Fst "msg" in
@@ -338,15 +331,15 @@ Definition accept : val :=
 
 Definition connect : val :=
   λ: "skt" "srv_addr",
-  SetReceiveTimeout (Fst (Fst "skt")) #1 #0;;
+  SetReceiveTimeout (Fst "skt") #1 #0;;
   let: "cookie" := client_conn_step "skt" (#"INIT", #0) #"INIT-ACK"
                    "srv_addr" in
   let: "_ack" := client_conn_step "skt" (#"COOKIE", "cookie") #"COOKIE-ACK"
                  "srv_addr" in
-  SetReceiveTimeout (Fst (Fst "skt")) #0 #0;;
+  SetReceiveTimeout (Fst "skt") #0 #0;;
   let: "sidLB" := ref #0 in
   let: "ackId" := ref #0 in
-  let: "c" := make_new_channel_descr (Snd "skt") in
+  let: "c" := make_new_channel_descr #() in
   Fork (send_from_chan_loop "skt" "srv_addr" "sidLB" "c");;
   Fork (client_recv_on_chan_loop "skt" "srv_addr" "sidLB" "ackId" "c");;
   "c".
