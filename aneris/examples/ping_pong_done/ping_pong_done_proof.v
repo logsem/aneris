@@ -222,11 +222,13 @@ Section proof.
         (* A contain static addresses, and the ips we use are free *)
         ∗ unallocated {[ping_addr]}
         ∗ ([∗ set] ip ∈ ips, free_ip ip)
+        ∗ free_ports (ip_of_address pong_addr) {[port_of_address pong_addr]}
+        ∗ free_ports (ip_of_address ping_addr) {[port_of_address ping_addr]}
         ∗ last_message γpong NONE ∗ last_message γpong NONE }}}
     ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunallocated & Hips & Hγpong & Hγpong') HΦ".
+    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunallocated & Hips & Hppong & Hpping & Hγpong & Hγpong') HΦ".
     unfold ping_pong_runner.
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hpong & Hips)";
       first set_solver.
@@ -235,16 +237,16 @@ Section proof.
     wp_pures.
     wp_apply aneris_wp_start.
     iFrame.
-    iSplitR "Hγpong Hponga"; last first.
-    { iIntros "!> Hfree".
+    iSplitR "Hppong Hγpong Hponga"; last first.
+    { iIntros "!>".
       iApply (pong_spec with "[$] []"); done.
     }
     iModIntro.
     wp_seq.
     wp_apply aneris_wp_start.
     iFrame.
-    iSplitR "Hγpong' Hpinga Hunallocated"; last first.
-    { iIntros "!> Hfree".
+    iSplitR "Hpping Hγpong' Hpinga Hunallocated"; last first.
+    { iIntros "!>".
       iApply (ping_spec with "[$] Hunallocated [$] [$Hpinga] [$Hγpong']"); eauto.
     }
     iModIntro.

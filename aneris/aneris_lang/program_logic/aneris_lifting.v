@@ -280,9 +280,9 @@ Section lifting_network.
   Implicit Types e : expr.
 
   (** Network *)
-  Lemma aneris_wp_start ports ip E e Ψ :
+  Lemma aneris_wp_start ip E e Ψ :
     ▷ free_ip ip ∗ ▷ Ψ #() ∗
-    ▷ (free_ports ip ports -∗ WP e @[ip] ⊤ {{ _, True }}) ⊢
+    ▷ (WP e @[ip] ⊤ {{ _, True }}) ⊢
     WP (Start (LitString ip) e) @["system"] E {{ Ψ }}.
   Proof.
     iIntros "(Hip & HΦ & He)".
@@ -293,14 +293,14 @@ Section lifting_network.
     iSplitL "HΦ".
     { iNext. iExists _. eauto. }
     iNext.
-    iIntros "%tid' Hin' Hfp".
-    iApply wp_wand_r; iSplitL; first iApply ("He" with "Hfp Hin'").
+    iIntros "%tid' Hin'".
+    iApply wp_wand_r; iSplitL; first iApply ("He" with "Hin'").
     done.
   Qed.
 
   (* Used in documentation *)
-  Lemma aneris_wp_start_alt n P ports e E :
-    {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
+  Lemma aneris_wp_start_alt n P e E :
+    {{{ P }}} e @[n] {{{w, RET w; True }}} →
     {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
   Proof.
     intros Ht ?. iIntros "HPre HPost".
@@ -308,8 +308,7 @@ Section lifting_network.
     iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
     iSplitL "HPost".
     - iNext. by iApply "HPost". 
-    - iNext. iIntros "HFree". 
-    iApply (Ht with "[HP HFree]"); try done. iFrame.
+    - iNext. by iApply (Ht with "[HP]").
   Qed.
 
   Lemma aneris_wp_new_socket ip E :

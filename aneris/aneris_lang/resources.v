@@ -221,8 +221,9 @@ Section definitions.
     own aneris_freeips_name (◯ GSet {[ ip ]}).
 
   (** Free ports *)
-  Definition free_ports_auth (P : gmap ip_address (gset_disjUR port)) : iProp Σ :=
-    own aneris_freeports_name (● P).
+
+  Definition free_ports_auth (P : gmap ip_address (gset port)) : iProp Σ :=
+    own aneris_freeports_name (● ((GSet <$> P) : gmap ip_address (gset_disjUR port))).
 
   Definition free_ports (ip : ip_address) (ports : gset port) : iProp Σ :=
     own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
@@ -555,9 +556,38 @@ Lemma allocated_address_groups_init `{anerisPreG Σ Mdl} A :
 Proof. by apply own_alloc. Qed.
 
 (** Free ports lemmas *)
-Lemma free_ports_auth_init `{anerisPreG Σ Mdl} :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● ∅).
+Lemma free_ports_auth_init_pre `{anerisPreG Σ Mdl} :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> ∅)).
 Proof. apply own_alloc. by apply auth_auth_valid. Qed.
+
+Lemma free_ports_alloc_pre `{anerisPreG Σ Mdl} γ ip ps P :
+  P !! ip = None →
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> P)) ==∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> <[ip := ps]>P)) ∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (◯ ({[ ip := (GSet ps)]})).
+Proof.
+  iIntros (HNone) "HP".
+  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ps)]}) with "HP")
+    as "[HP Hip]"; last by iFrame.
+  rewrite !fmap_insert.
+  apply auth_update_alloc, alloc_singleton_local_update; last done.
+  apply (not_elem_of_dom (D := gset ip_address)).
+  apply (not_elem_of_dom (D := gset ip_address)) in HNone.
+  by rewrite dom_fmap_L.
+Qed.
+
+Lemma free_ports_auth_init_multiple_pre `{anerisPreG Σ Mdl} ports :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> ports)) ∗
+              [∗ map] ip ↦ p ∈ ports,
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (◯ ({[ ip := (GSet p)]})).
+Proof.
+  iInduction ports as [|ip p ports HNone] "IHports" using map_ind.
+  { iMod free_ports_auth_init_pre as (γ) "?".
+    iExists _. iFrame. by rewrite big_sepM_empty. }
+  iMod "IHports" as (γ) "[HP Hps]".
+  iMod (free_ports_alloc_pre with "HP") as "[HP Hp]"; [done|].
+  iModIntro. iExists _. rewrite big_sepM_insert; [|done]. iFrame.
+Qed.
 
 Lemma free_ips_init `{anerisPreG Σ Mdl} (ips : gset ip_address) :
   ⊢ |==> ∃ γ, own γ (● GSet ips) ∗ [∗ set] ip ∈ ips, own γ (◯ GSet {[ ip ]}).
@@ -1292,7 +1322,7 @@ Section resource_lemmas.
   Lemma free_ports_included P ip ports :
     free_ports_auth P -∗
     free_ports ip ports -∗
-    ∃ ports', ⌜P !! ip = Some (GSet ports') ∧ ports ⊆ ports'⌝.
+    ∃ ports', ⌜P !! ip = Some ports' ∧ ports ⊆ ports'⌝.
   Proof.
     iIntros "HP Hip"; rewrite /free_ports_auth /free_ports.
     iDestruct (own_valid_2 with "HP Hip") as
@@ -1301,7 +1331,8 @@ Section resource_lemmas.
     iPureIntro.
     revert Hy2; rewrite Some_included_total.
     destruct y as [ports'|].
-    - eexists; split; first by rewrite Hy1.
+    - apply lookup_fmap_Some in Hy1 as [x [Heq Hy1]]; simplify_eq.
+      eexists; split; first by rewrite Hy1.
       by apply gset_disj_included.
     - by specialize (Hv ip); rewrite Hy1 in Hv.
   Qed.
@@ -1319,34 +1350,35 @@ Section resource_lemmas.
   Lemma free_ports_alloc P ip ports :
     ip ∉ (dom P) →
     free_ports_auth P ==∗
-    free_ports_auth (<[ ip := GSet ports ]>P) ∗ free_ports ip ports.
+    free_ports_auth (<[ ip := ports ]>P) ∗ free_ports ip ports.
   Proof.
     iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
+    rewrite fmap_insert.
     iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
       as "[HP Hip]"; last by iFrame.
     apply auth_update_alloc, alloc_singleton_local_update; last done.
-    by eapply (not_elem_of_dom (D := gset ip_address)).
+    eapply (not_elem_of_dom (D := gset ip_address)). by rewrite dom_fmap_L.
   Qed.
 
   Lemma free_ports_dealloc P ip ports :
     free_ports_auth P -∗
     free_ports ip ports ==∗
-    ∃ ports', ⌜P !! ip = Some (GSet ports') ∧
+    ∃ ports', ⌜P !! ip = Some ports' ∧
               ports ⊆ ports'⌝ ∗
-              free_ports_auth (<[ip := GSet (ports' ∖ ports)]> P).
+              free_ports_auth (<[ip := ports' ∖ ports]> P).
   Proof.
-    iIntros "HP Hip".
+    iIntros "HP Hip". rewrite /free_ports_auth /free_ports.
     iDestruct (free_ports_included with "HP Hip") as (ports') "[% %]".
     iMod (own_update_2 _ _ _
-                       (● <[ip := GSet (ports' ∖ ports)]>P ⋅
+                       (● ((<[ip := GSet (ports' ∖ ports)]> (GSet <$> P)):gmap ip_address (gset_disjUR port)) ⋅
                         ◯ <[ ip := GSet ∅ ]>{[ ip := (GSet ports)]})
-            with "HP Hip")
-      as "[? ?]".
+            with "HP Hip") as "[? ?]".
     { apply auth_update.
       eapply insert_local_update;
-        [done|eapply (lookup_singleton (M := gmap _))|].
+        [by apply lookup_fmap_Some; eauto|
+          eapply (lookup_singleton (M := gmap _))|].
       apply gset_disj_dealloc_local_update. }
-    by iExists _; iFrame.
+    rewrite -fmap_insert. by iExists _; iFrame.
   Qed.
 
   Lemma socket_interp_alloc sag φ sis :

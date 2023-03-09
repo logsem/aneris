@@ -239,8 +239,7 @@ Lemma gcounter_adequacy ip :
     {tr[ ([mkExpr ip incr_example], init_state ip) ]}
     {tr[ 0%nat ]}.
 Proof.
-  eapply (simulation_adequacy #[anerisΣ incr_exampleM; GFunctor incr_res] incr_exampleM
-                              NotStuck ∅ {["s"]} ∅ ∅ ∅ (λ _, True) _ ip).
+  eapply (simulation_adequacy #[anerisΣ incr_exampleM; GFunctor incr_res] incr_exampleM NotStuck ∅ {["s"]} ∅ ∅ ∅ ∅ (λ _, True) _ ip).
   { set_solver. }
   { set_solver. }
   { apply aneris_sim_rel_finitary, incr_exampleM_finitary. }
@@ -251,7 +250,7 @@ Proof.
   { set_solver. }
   iIntros (?) "!#".
   iExists (λ _, True)%I.
-  iIntros "_ _ _ #? Hevs _ _ _ _ Hfg".
+  iIntros "_ _ _ _ #? Hevs _ _ _ _ Hfg".
   rewrite big_sepS_singleton.
   assert (inG #[ anerisΣ incr_exampleM; GFunctor incr_res] incr_res).
   { assert (subG (GFunctor incr_res) #[ anerisΣ incr_exampleM; GFunctor incr_res]).
