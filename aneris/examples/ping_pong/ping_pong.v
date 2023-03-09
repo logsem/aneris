@@ -157,27 +157,29 @@ Section ping_pong_runner.
          ∗ unallocated {[ping_addr]}
          (* the ips are free *)
          ∗ free_ip (ip_of_address pong_addr)
-         ∗ free_ip (ip_of_address ping_addr) }}}
+         ∗ free_ports (ip_of_address pong_addr) {[(port_of_address pong_addr)]}
+         ∗ free_ip (ip_of_address ping_addr)
+         ∗ free_ports (ip_of_address ping_addr) {[(port_of_address ping_addr)]} }}}
       ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(Hponga & Hpinga & Hpo & Hpi & Hpongip & Hpingip) HΦ".
+    iIntros (Φ) "(Hponga & Hpinga & Hpo & Hpi & Hpongip & Hpongport & Hpingip & Hpingport) HΦ".
     rewrite /ping_pong_runner.
     wp_pures.
     (* allocate [pong]'s socket protocol  *)
     wp_apply (aneris_wp_socket_interp_alloc_singleton pong_protocol with "Hpo").
     iIntros "#Hpong".
-    wp_apply (aneris_wp_start {[80%positive]}); eauto.
+    wp_apply (aneris_wp_start); eauto.
     iFrame.
-    iSplitR "Hponga".
-    2: { iIntros "!> Hp". wp_apply (pong_spec with "[$Hp $Hponga $Hpong]"); done. }
+    iSplitR "Hponga Hpongport".
+    2: { iIntros "!>". wp_apply (pong_spec with "[$Hpongport $Hponga $Hpong]"); done. }
     iModIntro. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive : port]}); eauto.
+    wp_apply (aneris_wp_start); eauto.
     iFrame.
     iSplitL "HΦ".
     { by iApply "HΦ". }
-    iIntros "!> Hp".
-    iApply (ping_spec with "[$Hp $Hpi $Hpinga] []"); eauto.
+    iIntros "!>".
+    iApply (ping_spec with "[$Hpingport $Hpi $Hpinga] []"); eauto.
   Qed.
 
 End ping_pong_runner.
@@ -196,9 +198,12 @@ Theorem ping_pong_safe :
   aneris_adequate ping_pong_runner "system" ping_pong_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (no_model.adequacy_hoare_no_model_simpl Σ ips {[ pong_addr; ping_addr ]}); try set_solver.
+  apply (no_model.adequacy_hoare_no_model_simpl Σ ips
+    (<[ ip_of_address pong_addr := {[port_of_address pong_addr]} ]>
+     (<[ ip_of_address ping_addr := {[port_of_address ping_addr]} ]>∅))
+    {[ pong_addr; ping_addr ]}); try set_solver.
   iIntros (dinvG).
-  iIntros (?) "!# (Hf & Hhist & Hips) HΦ".
+  iIntros (?) "!# (Hf & Hhist & Hports & Hips) HΦ".
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
   rewrite (big_sepS_delete _ _ "0.0.0.0"); [|set_solver].
   rewrite (big_sepS_delete _ _ "0.0.0.1"); [|set_solver].
@@ -206,5 +211,8 @@ Proof.
   rewrite (big_sepS_delete _ _ pong_addr); [|set_solver].
   rewrite (big_sepS_delete _ _ ping_addr); [|set_solver].
   iDestruct "Hhist" as "(Hpong & Hping & _)".
+  rewrite (big_sepM_delete _ _ (ip_of_address pong_addr)); [|set_solver].
+  rewrite (big_sepM_delete _ _ (ip_of_address ping_addr)); [|set_solver].
+  iDestruct "Hports" as "(Hppong & Hpping & _)".
   wp_apply (ping_pong_runner_spec with "[$] [$]").
 Qed.
