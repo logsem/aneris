@@ -40,18 +40,17 @@ Section pong.
           (* the sender's protocol is satisfied with a 'PONG' response *)
           ∗ (<pers> ∀ m', ⌜m_body m' = "PONG"⌝ → ϕ m'))%I.
 
-  Lemma pong_spec a ip port :
+  Lemma pong_spec a ip :
     ip = ip_of_address a →
-    port = port_of_address a →
     {{{ (* the address [a] is governed by [pong_protocol] *)
         a ⤇ pong_protocol ∗
         (* the socket address [a] is free  *)
-        free_ports ip {[port]} ∗
+        free_ports {[a]} ∗
         (* exclusive ownership of the history of sent and received messages on [a] *)
         a ⤳ (∅, ∅) }}}
       pong #a @[ip] {{{ RET #(String.length "PONG"); True }}}.
   Proof.
-    iIntros (-> -> Φ) "(#Hpong & Hp & Ha) HΦ".
+    iIntros (-> Φ) "(#Hpong & Hp & Ha) HΦ".
     wp_lam.
     wp_socket h as "Hh".
     wp_let.
@@ -88,22 +87,21 @@ Section ping.
     (* We're satisfied with just a 'PONG' response  *)
     (λ msg, ⌜m_body msg = "PONG"⌝)%I.
 
-  Lemma ping_spec a b ip port :
+  Lemma ping_spec a b ip :
     ip = ip_of_address a →
-    port = port_of_address a →
     {{{ (* the [b] address is governed by [pong_sprotocol] *)
         b ⤇ pong_protocol
         (* the socket protocol has not yet been allocated for the address [a] *)
         ∗ unallocated {[a]}
         (* the socket address [a] is free *)
-        ∗ free_ports ip {[port]}
+        ∗ free_ports {[a]}
         (* the history of sent and received messages on [a] *)
         ∗ a ⤳ (∅, ∅) }}}
       ping #a #b @[ip]
     {{{ v m, RET #"PONG";
         ⌜v = #(m_body m)⌝ ∗ a ⤳ ({[m]}, {[ mkMessage a b "PING" ]})}}}.
   Proof.
-    iIntros (-> -> Φ) "(#Hpong & Hunallocated & Hip & Ha) HΦ".
+    iIntros (-> Φ) "(#Hpong & Hunallocated & Hip & Ha) HΦ".
     wp_lam.
     wp_let.
     wp_socket sh as "Hh".
@@ -157,9 +155,9 @@ Section ping_pong_runner.
          ∗ unallocated {[ping_addr]}
          (* the ips are free *)
          ∗ free_ip (ip_of_address pong_addr)
-         ∗ free_ports (ip_of_address pong_addr) {[(port_of_address pong_addr)]}
+         ∗ free_ports {[pong_addr]}
          ∗ free_ip (ip_of_address ping_addr)
-         ∗ free_ports (ip_of_address ping_addr) {[(port_of_address ping_addr)]} }}}
+         ∗ free_ports {[ping_addr]} }}}
       ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
@@ -199,20 +197,16 @@ Theorem ping_pong_safe :
 Proof.
   set (Σ := #[anerisΣ unit_model]).
   apply (no_model.adequacy_hoare_no_model_simpl Σ ips
-    (<[ ip_of_address pong_addr := {[port_of_address pong_addr]} ]>
-     (<[ ip_of_address ping_addr := {[port_of_address ping_addr]} ]>∅))
-    {[ pong_addr; ping_addr ]}); try set_solver.
+           {[ pong_addr; ping_addr ]}); try set_solver.
   iIntros (dinvG).
-  iIntros (?) "!# (Hf & Hhist & Hports & Hips) HΦ".
+  iIntros (?) "!# (Hf & Hports & Hhist & Hips) HΦ".
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
-  rewrite (big_sepS_delete _ _ "0.0.0.0"); [|set_solver].
-  rewrite (big_sepS_delete _ _ "0.0.0.1"); [|set_solver].
-  iDestruct "Hips" as "(? & ? & _)".
+  iDestruct (free_ports_split with "Hports") as "[Hp1 Hp2]"; [set_solver|].
   rewrite (big_sepS_delete _ _ pong_addr); [|set_solver].
   rewrite (big_sepS_delete _ _ ping_addr); [|set_solver].
   iDestruct "Hhist" as "(Hpong & Hping & _)".
-  rewrite (big_sepM_delete _ _ (ip_of_address pong_addr)); [|set_solver].
-  rewrite (big_sepM_delete _ _ (ip_of_address ping_addr)); [|set_solver].
-  iDestruct "Hports" as "(Hppong & Hpping & _)".
+  rewrite (big_sepS_delete _ _ "0.0.0.0"); [|set_solver].
+  rewrite (big_sepS_delete _ _ "0.0.0.1"); [|set_solver].
+  iDestruct "Hips" as "(? & ? & _)".
   wp_apply (ping_pong_runner_spec with "[$] [$]").
 Qed.

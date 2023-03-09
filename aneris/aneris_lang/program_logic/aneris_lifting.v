@@ -330,7 +330,7 @@ Section lifting_network.
   Lemma aneris_wp_socketbind_groups ip E h s sa :
     ip_of_address sa = ip →
     saddress s = None →
-    {{{ ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+    {{{ ▷ free_ports {[sa]} ∗
         ▷ h ↪[ip_of_address sa] s }}}
       SocketBind
       (Val $ LitV $ LitSocket h)
@@ -352,7 +352,7 @@ Section lifting_network.
   Lemma aneris_wp_socketbind ip E h s a :
     ip_of_address a = ip →
     saddress s = None →
-    {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+    {{{ ▷ free_ports {[a]} ∗
         ▷ h ↪[ip_of_address a] s }}}
       SocketBind
       (Val $ LitV $ LitSocket h)

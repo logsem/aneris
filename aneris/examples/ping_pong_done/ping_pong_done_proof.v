@@ -81,21 +81,20 @@ Section proof.
              (⌜m_body msg = "DONE"⌝ ∗ last_message γpong PING))
       )%I.
 
-  Lemma pong_spec a ip port :
+  Lemma pong_spec a ip :
     ip = ip_of_address a →
-    port = port_of_address a →
     (* a is static *)
     (* the address [a] is governed by the pong_si socket protocol *)
     {{{ a ⤇ pong_si
     (* A should contain static addresses & the port should be free *)
-      ∗ free_ports ip {[port]}
+      ∗ free_ports {[a]}
     (* exclusive ownership of the [a], no messages have been sent nor received. *)
       ∗ a ⤳ (∅, ∅)
       ∗ last_message γpong NONE
     (* pong terminates the last (non ping) received message, that is "DONE" *)
     }}} (pong #a) @[ip] {{{ RET #"DONE"; True }}}.
   Proof.
-    iIntros (-> -> Ψ) "(#Hsi & Hport & Ha & Hγpong) HΨ".
+    iIntros (-> Ψ) "(#Hsi & Hport & Ha & Hγpong) HΨ".
     wp_lam.
     wp_socket h as "Hh".
     wp_let.
@@ -164,7 +163,7 @@ Section proof.
     b ⤇ pong_si -∗
     (* A should contain static addresses & the port should be free *)
     unallocated {[a]} -∗
-    free_ports ip {[port]} -∗
+    free_ports {[a]} -∗
     (* exclusive ownership of the [a] and its sent and received messages *)
     a ⤳ (∅, ∅) -∗
     last_message γpong NONE -∗
@@ -222,8 +221,8 @@ Section proof.
         (* A contain static addresses, and the ips we use are free *)
         ∗ unallocated {[ping_addr]}
         ∗ ([∗ set] ip ∈ ips, free_ip ip)
-        ∗ free_ports (ip_of_address pong_addr) {[port_of_address pong_addr]}
-        ∗ free_ports (ip_of_address ping_addr) {[port_of_address ping_addr]}
+        ∗ free_ports {[pong_addr]}
+        ∗ free_ports {[ping_addr]}
         ∗ last_message γpong NONE ∗ last_message γpong NONE }}}
     ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.

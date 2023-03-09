@@ -606,7 +606,7 @@ Section primitive_laws.
   Lemma wp_socketbind_groups
         E ζ sh skt k sa :
     saddress skt = None →
-    {{{ ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+    {{{ ▷ free_ports {[sa]} ∗
         ▷ sh ↪[ip_of_address sa] skt }}}
       (mkExpr (ip_of_address sa)
               (SocketBind (Val $ LitV $ LitSocket sh)
@@ -646,7 +646,7 @@ Section primitive_laws.
 
   Lemma wp_socketbind A E ζ sh skt k a :
     saddress skt = None →
-    {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+    {{{ ▷ free_ports {[a]} ∗
         ▷ sh ↪[ip_of_address a] skt }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)

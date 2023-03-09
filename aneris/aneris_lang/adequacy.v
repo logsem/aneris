@@ -13,15 +13,15 @@ Set Default Proof Using "Type".
 Definition aneris_model_rel_finitary (Mdl : Model) :=
   ∀ mdl : Mdl, smaller_card {mdl' : Mdl | Mdl mdl mdl'} nat.
 
-Definition wp_group_proto `{anerisPreG Σ Mdl} IPs ports A
+Definition wp_group_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address_group) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unallocated_groups A -∗
+     free_ports (union_set A) -∗
      ([∗ set] sag ∈ A, sag ⤳*[bool_decide (sag ∈ obs_send_sas), bool_decide (sag ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
-     ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
      is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sag ∈ obs_send_sas, sendon_evs_groups sag []) -∗
@@ -30,15 +30,15 @@ Definition wp_group_proto `{anerisPreG Σ Mdl} IPs ports A
      observed_receive_groups obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip, 0); ⊤ {{v, ⌜φ v⌝ }}).
 
-Definition wp_group_single_proto `{anerisPreG Σ Mdl} IPs ports A
+Definition wp_group_single_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unallocated A -∗
+     free_ports A -∗
      ([∗ set] a ∈ A, a ⤳1[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
-     ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
      is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
@@ -47,15 +47,15 @@ Definition wp_group_single_proto `{anerisPreG Σ Mdl} IPs ports A
      observed_receive obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip,0); ⊤ {{v, ⌜φ v⌝ }}).
 
-Definition wp_proto `{anerisPreG Σ Mdl} IPs ports A
+Definition wp_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address) s e ip φ :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unallocated A -∗
+     free_ports A -∗
      ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) -∗
      frag_st Mdl.(model_state_initial) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
-     ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
      is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
@@ -64,7 +64,7 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs ports A
      observed_receive obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip,0); ⊤ {{v, ⌜φ v⌝ }}).
 
-Theorem adequacy_groups `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs ports A
+Theorem adequacy_groups `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs A
         (lbls: gset string)
         (obs_send_sas obs_rec_sas : gset socket_address_group)
         s e ip σ φ :
@@ -72,7 +72,7 @@ Theorem adequacy_groups `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model
   set_Forall is_ne A →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   aneris_model_rel_finitary Mdl →
-  wp_group_proto IPs ports A lbls obs_send_sas obs_rec_sas s e ip φ →
+  wp_group_proto IPs A lbls obs_send_sas obs_rec_sas s e ip φ →
   ip ∉ IPs →
   (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
@@ -90,7 +90,7 @@ Proof.
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
-  iMod (free_ports_auth_init_multiple_pre ports) as (γpiu) "[HPiu HPs]".
+  iMod (free_ports_init_pre (union_set A)) as (γpiu) "[HPiu HPs]".
   iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
   iMod (allocated_address_groups_init obs_rec_sas) as
@@ -149,9 +149,9 @@ Proof.
   iDestruct (socket_address_group_own_big_sepS with "Hown_recv") as "Hown_recv".
   iSplitR.
   { eauto. }
-  iSplitR "Hwp Hunallocated HIPs HPs HB Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
+  iSplitR "Hwp Hunallocated HPs HIPs HB Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
   {
-    iDestruct ("Hwp" with "Hunallocated HB [$Hmfrag //] HIPs HPs Hn Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
+    iDestruct ("Hwp" with "Hunallocated HPs HB [$Hmfrag //] HIPs Hn Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
     { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
     { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
     iMod "Hwp". iModIntro. iFrame.
@@ -172,12 +172,12 @@ Proof.
   done.
 Qed.
 
-Theorem adequacy1 `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs ports A
+Theorem adequacy1 `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs A
         (lbls: gset string)
         (obs_send_sas obs_rec_sas : gset socket_address)
         s e ip σ φ :
   aneris_model_rel_finitary Mdl →
-  wp_group_single_proto IPs ports A lbls obs_send_sas obs_rec_sas s e ip φ →
+  wp_group_single_proto IPs A lbls obs_send_sas obs_rec_sas s e ip φ →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
@@ -187,7 +187,7 @@ Theorem adequacy1 `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros HMdlfin Hwp Hsendle Hrecvle Hip Hfixdom Hste Hsce Hmse.
-  eapply (adequacy_groups _ _
+  eapply (adequacy_groups _
                          (to_singletons A)
                          _
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)
@@ -199,8 +199,9 @@ Proof.
   iIntros (Mdl').
   iMod (Hwp Mdl') as "Hwp".
   iModIntro.
-  iIntros "Hfix HA Hfrag HIP Hports Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs".
-  iApply ("Hwp" with "Hfix [HA] Hfrag HIP Hports Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs").
+  iIntros "Hfix HPs HA Hfrag HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs".
+  rewrite union_set_to_singletons.
+  iApply ("Hwp" with "Hfix HPs [HA] Hfrag HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs").
   { iDestruct (big_sepS_to_singletons _
       (λ xs, xs ⤳*[ bool_decide (xs ∈ to_singletons obs_send_sas),
                     bool_decide (xs ∈ to_singletons obs_rec_sas)] (∅, ∅))%I
@@ -229,12 +230,12 @@ Proof.
   set_solver.
 Qed.
 
-Theorem adequacy `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs ports A
+Theorem adequacy `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs A
         (lbls: gset string)
         (obs_send_sas obs_rec_sas : gset socket_address)
         s e ip σ φ :
   aneris_model_rel_finitary Mdl →
-  wp_proto IPs ports A lbls obs_send_sas obs_rec_sas s e ip φ →
+  wp_proto IPs A lbls obs_send_sas obs_rec_sas s e ip φ →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
@@ -244,7 +245,7 @@ Theorem adequacy `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} 
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros HMdlfin Hwp Hsendle Hrecvle Hip Hfixdom Hste Hsce Hmse.
-  eapply (adequacy_groups _ _
+  eapply (adequacy_groups _
                          (to_singletons A)
                          _
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)
@@ -256,8 +257,9 @@ Proof.
   iIntros (Mdl').
   iMod (Hwp Mdl') as "Hwp".
   iModIntro.
-  iIntros "Hfix HA Hfrag HIP Hports Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs".
-  iApply ("Hwp" with "Hfix [HA] Hfrag HIP Hports Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs").
+  rewrite union_set_to_singletons.
+  iIntros "Hfix HPs HA Hfrag HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs".
+  iApply ("Hwp" with "Hfix HPs [HA] Hfrag HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs").
   { iDestruct (big_sepS_to_singletons _
       (λ xs, xs ⤳*[ bool_decide (xs ∈ to_singletons obs_send_sas),
                    bool_decide (xs ∈ to_singletons obs_rec_sas)] (∅, ∅))%I
@@ -290,12 +292,12 @@ Qed.
 Definition safe e σ := @adequate aneris_lang NotStuck e σ (λ _ _, True).
 
 Theorem adequacy_groups_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
-        IPs ports A lbls obs_send_sas obs_rec_sas e ip σ :
+        IPs A lbls obs_send_sas obs_rec_sas e ip σ :
   all_disjoint A →
   set_Forall (λ sag, sag ≠ ∅) A →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   aneris_model_rel_finitary Mdl →
-  wp_group_proto IPs ports A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
+  wp_group_proto IPs A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
   ip ∉ IPs →
   (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
@@ -305,9 +307,9 @@ Theorem adequacy_groups_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_
 Proof. by apply adequacy_groups. Qed.
 
 Theorem adequacy1_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
-        IPs ports A lbls obs_send_sas obs_rec_sas e ip σ :
+        IPs A lbls obs_send_sas obs_rec_sas e ip σ :
   aneris_model_rel_finitary Mdl →
-  wp_group_single_proto IPs ports A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
+  wp_group_single_proto IPs A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
@@ -318,9 +320,9 @@ Theorem adequacy1_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model 
 Proof. by apply adequacy1. Qed.
 
 Theorem adequacy_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
-        IPs ports A lbls obs_send_sas obs_rec_sas e ip σ :
+        IPs A lbls obs_send_sas obs_rec_sas e ip σ :
   aneris_model_rel_finitary Mdl →
-  wp_proto IPs ports A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
+  wp_proto IPs A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
   (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
@@ -334,7 +336,6 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
            (s: stuckness)
            (IPs: gset ip_address)
            (lbls : gset string)
-           ports
            (A obs_send_sas obs_rec_sas : gset socket_address_group)
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
            (φ: language.val aneris_lang → Prop)
@@ -358,9 +359,9 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
        (Φ : language.val aneris_lang → iProp Σ),
      (* Given resources reflecting initial configuration, we need to prove two goals *)
      unallocated_groups A -∗
+     free_ports (union_set A) -∗
      ([∗ set] b ∈ A, b ⤳*[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
-     ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
      is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sa ∈ obs_send_sas, sendon_evs_groups sa []) -∗
@@ -401,7 +402,7 @@ Proof.
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
-  iMod (free_ports_auth_init_multiple_pre ports) as (γpiu) "[HPiu HPs]".
+  iMod (free_ports_init_pre (union_set A)) as (γpiu) "[HPiu HPs]".
   iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
   iMod (allocated_address_groups_init obs_rec_sas) as
@@ -475,7 +476,6 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
            (s: stuckness)
            (IPs: gset ip_address)
            (lbls : gset string)
-           ports
            (A obs_send_sas obs_rec_sas : gset socket_address)
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
            (φ: language.val aneris_lang → Prop)
@@ -498,9 +498,9 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
        (Φ : language.val aneris_lang → iProp Σ),
        (* Given resources reflecting initial configuration, we need to prove two goals *)
        unallocated A -∗
+       free_ports A -∗
        ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
        ([∗ set] i ∈ IPs, free_ip i) -∗
-       ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
        is_node ip -∗
        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
        ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
@@ -531,7 +531,7 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
   intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
-  eapply (simulation_adequacy_with_trace_inv_groups _ _ _ _
+  eapply (simulation_adequacy_with_trace_inv_groups _ _ _
                          (to_singletons A)
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)); eauto.
   { apply to_singletons_all_disjoint. }
@@ -548,8 +548,9 @@ Proof.
   iMod (Hwp Mdl') as (trace_inv Φ) "Hwp".
   iModIntro.
   iExists trace_inv, Φ.
-  iIntros "Hfix HA HIP HPs Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag".
-  iApply ("Hwp" with "Hfix [HA] HIP HPs Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag").
+  iIntros "Hfix HPs HA HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag".
+  rewrite union_set_to_singletons.
+  iApply ("Hwp" with "Hfix HPs [HA] HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag").
   { iDestruct (big_sepS_to_singletons _
       (λ xs, xs ⤳*[ bool_decide (xs ∈ to_singletons obs_send_sas),
                     bool_decide (xs ∈ to_singletons obs_rec_sas)] (∅, ∅))%I
@@ -577,7 +578,6 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
            (s: stuckness)
            (IPs: gset ip_address)
            (lbls : gset string)
-           ports
            (A obs_send_sas obs_rec_sas : gset socket_address)
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
            (φ: language.val aneris_lang → Prop)
@@ -600,9 +600,9 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
        (Φ : language.val aneris_lang → iProp Σ),
        (* Given resources reflecting initial configuration, we need to prove two goals *)
        unallocated A -∗
+       free_ports A -∗
        ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
        ([∗ set] i ∈ IPs, free_ip i) -∗
-       ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
        is_node ip -∗
        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
        ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
@@ -633,7 +633,7 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
    adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
   intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
-  eapply (simulation_adequacy_with_trace_inv_groups _ _ _ _
+  eapply (simulation_adequacy_with_trace_inv_groups _ _ _
                          (to_singletons A)
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)
          ); eauto.
@@ -651,8 +651,9 @@ Proof.
   iMod (Hwp Mdl') as (trace_inv Φ) "Hwp".
   iModIntro.
   iExists trace_inv, Φ.
-  iIntros "Hfix HA HIP HPs Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag".
-  iApply ("Hwp" with "Hfix [HA] HIP HPs Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag").
+  rewrite union_set_to_singletons.
+  iIntros "Hfix HPs HA HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag".
+  iApply ("Hwp" with "Hfix HPs [HA] HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag").
   { iDestruct (big_sepS_to_singletons _
       (λ xs, xs ⤳*[ bool_decide (xs ∈ to_singletons obs_send_sas),
                     bool_decide (xs ∈ to_singletons obs_rec_sas)] (∅, ∅))%I
@@ -681,7 +682,6 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
            (s: stuckness)
            (IPs: gset ip_address)
            (lbls : gset string)
-           ports
            (A obs_send_sas obs_rec_sas : gset socket_address_group)
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
            ip e1 σ1 :
@@ -706,9 +706,9 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
        unallocated_groups A -∗
+       free_ports (union_set A) -∗
        ([∗ set] b ∈ A, b ⤳*[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
        ([∗ set] i ∈ IPs, free_ip i) -∗
-       ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
        is_node ip -∗
        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
        ([∗ set] sa ∈ obs_send_sas, sendon_evs_groups sa []) -∗
@@ -736,7 +736,7 @@ Proof.
   intros Hdisj Hne Hsendle Hrecvle.
   intros Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups
-          _ _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True)) =>//.
+          _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True)) =>//.
   iIntros (?) "".
   iMod Hwp as (Φ f) "Hwp".
   iModIntro.
@@ -755,7 +755,6 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
            (s: stuckness)
            (IPs: gset ip_address)
            (lbls : gset string)
-           ports
            (A obs_send_sas obs_rec_sas : gset socket_address)
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
            ip e1 σ1 :
@@ -778,9 +777,9 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
      unallocated A -∗
+     free_ports A -∗
      ([∗ set] b ∈ A, b ⤳1[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
-     ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
      is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
@@ -807,7 +806,7 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
 Proof.
   intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy1_with_trace_inv
-          _ _ _ _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True))=>//.
+          _ _ _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True))=>//.
   iIntros (?) "".
   iMod Hwp as (Φ f) "Hwp".
   iModIntro.
@@ -826,7 +825,6 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
            (s: stuckness)
            (IPs: gset ip_address)
            (lbls : gset string)
-           ports
            (A obs_send_sas obs_rec_sas : gset socket_address)
            (φ : language.val aneris_lang → Prop)
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
@@ -849,9 +847,9 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
      unallocated A -∗
+     free_ports A -∗
      ([∗ set] b ∈ A, b ⤳[bool_decide (b ∈ obs_send_sas), bool_decide (b ∈ obs_rec_sas)] (∅, ∅)) -∗
      ([∗ set] i ∈ IPs, free_ip i) -∗
-     ([∗ map] ip↦p ∈ ports, free_ports ip p) -∗
      is_node ip -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
@@ -880,7 +878,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
 Proof.
   intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy_with_trace_inv
-          _ _ _ _ A obs_send_sas obs_rec_sas)=>//.
+          _ _ _ A obs_send_sas obs_rec_sas)=>//.
   iIntros (?) "".
   iMod Hwp as (Φ) "Hwp".
   iModIntro.

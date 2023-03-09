@@ -131,7 +131,7 @@ Section state_interpretation.
       rewrite !lookup_insert_ne; [|set_solver..]. set_solver. }
     iSplitL "HPiu".
     { iApply (free_ports_coh_init with "[$]").
-      intros ip' ports' Hports' Sn HSn. rewrite Hsce in HSn.
+      intros [ip' p] Hin Sn HSn. rewrite Hsce in HSn.
       destruct (decide (ip = ip')) as [<-|Hneq]; by simplify_map_eq. }
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
@@ -171,7 +171,7 @@ Section state_interpretation.
   Lemma aneris_state_interp_free_ports_valid σ a mh Sn:
     state_sockets σ !! ip_of_address a = Some Sn → 
     aneris_state_interp σ mh -∗
-    free_ports (ip_of_address a) {[port_of_address a]} -∗
+    free_ports {[a]} -∗
     ⌜port_not_in_use (port_of_address a) Sn⌝.      
   Proof.
     iDestruct 1 as (mγ mn) "(?&?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ?)".
@@ -475,7 +475,7 @@ Section state_interpretation.
     saddress skt = None →
     aneris_state_interp σ1 mh -∗
     sh ↪[ip_of_address sa] skt -∗
-    free_ports ip {[port_of_address sa]} ==∗
+    free_ports {[sa]} ==∗
     aneris_state_interp σ2 mh ∗ sh ↪[ip] (skt<| saddress := Some sa |>).
   Proof.
     simpl. iIntros (????) "Hσ Hsh Hp".

@@ -249,7 +249,7 @@ Lemma tac_wp_socketbind Δ Δ1 Δ2 Δ3 E i k K ip skt sh a Φ :
   saddress skt = None →
   MaybeIntoLaterNEnvs 1 Δ Δ1 →
   envs_lookup_delete false k Δ1 =
-    Some (false, free_ports ip {[port_of_address a]}, Δ2) →
+    Some (false, free_ports {[a]}, Δ2) →
   envs_lookup i Δ2 = Some (false, sh ↪[ip] skt)%I →
   envs_simple_replace i false (Esnoc Enil i
     (sh ↪[ip] (skt <| saddress := Some a |>))) Δ2 = Some Δ3 →
@@ -555,7 +555,7 @@ Tactic Notation "wp_socketbind" :=
   let solve_unbound :=
       done || fail "wp_socketbind: socket is already bound" in
   let solve_free_port ip :=
-      let p := match goal with |- _ = Some (_, free_ports ip ?p%I, _) => p end in
+      let p := match goal with |- _ = Some (_, free_ports ?p%I, _) => p end in
       iAssumptionCore || fail "wp_socketbind: cannot find free_ports " ip " {[ " p " ]}" in
   let solve_socket_mapsto ip :=
       let sh := match goal with |- _ = Some (_, (?sh ↪[ip] _)%I) => sh end in
@@ -681,7 +681,7 @@ Qed.
 
 Local Lemma tac_socketbind_test `{anerisG Mdl Σ} E h s a :
   saddress s = None →
-  {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+  {{{ ▷ free_ports {[a]} ∗
       ▷ h ↪[ip_of_address a] s }}}
     SocketBind
       (Val $ LitV $ LitSocket h)

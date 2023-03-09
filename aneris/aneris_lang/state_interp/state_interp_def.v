@@ -92,10 +92,10 @@ Section definitions.
   (* Free ports are not in use *)
   Definition free_ports_coh σ : iProp Σ :=
     ∃ free_ports,
-      ⌜map_Forall (λ ip ports,
-                     (∀ Sn, (state_sockets σ) !! ip = Some Sn →
-                            set_Forall (λ p, port_not_in_use p Sn) ports))
-                  free_ports⌝ ∗
+      ⌜set_Forall
+        (λ sa,
+           (∀ Sn, (state_sockets σ) !! (ip_of_address sa) = Some Sn →
+                  port_not_in_use (port_of_address sa) Sn)) free_ports⌝ ∗
       free_ports_auth free_ports.
 
   (** Network sockets coherence for socket handlers,

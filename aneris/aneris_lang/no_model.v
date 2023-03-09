@@ -9,14 +9,14 @@ Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 
 #[global] Notation anerisG Σ := (anerisG unit_model Σ).
 
-Theorem adequacy_hoare_no_model Σ `{anerisPreG Σ unit_model} IPs ports A lbls obs_send_sas obs_rec_sas e σ φ ip :
+Theorem adequacy_hoare_no_model Σ `{anerisPreG Σ unit_model} IPs A lbls obs_send_sas obs_rec_sas e σ φ ip :
   obs_send_sas ⊆ A →
   obs_rec_sas ⊆ A →
   (∀ `{anerisG Σ}, ⊢
           {{{ unallocated A ∗
+              free_ports A ∗
               ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
               ([∗ set] ip ∈ IPs, free_ip ip) ∗
-              ([∗ map] ip↦p ∈ ports, free_ports ip p) ∗
               ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
               ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) ∗
               ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) ∗
@@ -32,7 +32,7 @@ Theorem adequacy_hoare_no_model Σ `{anerisPreG Σ unit_model} IPs ports A lbls 
   aneris_adequate e ip σ φ.
 Proof.
   intros ?? Hspec ?????.
-  eapply (adequacy_hoare Σ _ IPs ports A lbls obs_send_sas obs_rec_sas);
+  eapply (adequacy_hoare Σ _ IPs A lbls obs_send_sas obs_rec_sas);
     [set_solver|set_solver|..|done|set_solver|set_solver|set_solver|done].
   { apply unit_model_rel_finitary. }
   iIntros (? Φ) "!# (?&?&?&?&?&?&?&?&?&?) HΦ".
@@ -40,10 +40,9 @@ Proof.
   iFrame.
 Qed.
 
-Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs ports A e φ ip: 
+Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs A e φ ip: 
   (∀ `{anerisG Σ}, ⊢
-                   {{{ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
-                       ([∗ map] ip↦p ∈ ports, free_ports ip p) ∗
+                   {{{ unallocated A ∗ free_ports A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
                        ([∗ set] ip ∈ IPs, free_ip ip) }}}
                      e @[ip]
                      {{{ v, RET v; ⌜φ v⌝ }}}) →
@@ -52,10 +51,10 @@ Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs po
     obs_rec_sas ⊆ A ∧
     (∀ `{anerisG Σ}, ⊢
       {{{ unallocated A ∗
+          free_ports A ∗
           ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas),
                               bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
           ([∗ set] ip ∈ IPs, free_ip ip) ∗
-          ([∗ map] ip↦p ∈ ports, free_ports ip p) ∗
           ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
           ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) ∗
           ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) ∗
@@ -71,10 +70,9 @@ Proof.
   iDestruct "HPre" as "(?&?&?&?&?&?)". iFrame.
 Qed.     
 
-Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs ports A e σ φ ip :
+Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs A e σ φ ip :
   (∀ `{anerisG Σ}, ⊢
-      {{{ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
-          ([∗ map] ip↦p ∈ ports, free_ports ip p) ∗
+      {{{ unallocated A ∗ free_ports A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
           ([∗ set] ip ∈ IPs, free_ip ip) }}}
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →
@@ -88,5 +86,5 @@ Proof.
   intros Ht ?????. 
   apply adequacy_hoare_no_model_simpl_helper in Ht; try done.
   destruct Ht as [lbls[obs_send_sas[obs_rec_sas[HSend [HRec Ht]]]]].
-  by eapply (adequacy_hoare_no_model Σ IPs ports A lbls obs_send_sas obs_rec_sas).
+  by eapply (adequacy_hoare_no_model Σ IPs A lbls obs_send_sas obs_rec_sas).
 Qed.
