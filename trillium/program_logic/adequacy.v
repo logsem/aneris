@@ -1624,7 +1624,7 @@ Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), 
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        ⌜length φs = length Φs⌝ ∗
        config_wp ∗
-       ([∗ list] Φφ ∈ zip Φs φs, ∀ v, Φφ.1 v -∗ ⌜Φφ.2 v⌝) ∗
+       ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
        wptp s es Φs ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
@@ -1747,7 +1747,7 @@ Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mla
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        ⌜length φs = length Φs⌝ ∗
        config_wp ∗
-       ([∗ list] Φφ ∈ zip Φs φs, ∀ v, Φφ.1 v -∗ ⌜Φφ.2 v⌝) ∗
+       ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
        wptp s es Φs ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
