@@ -105,7 +105,7 @@ Section MTS_proof_of_code.
 
   Definition run_server_internal_spec handler : iProp Σ :=
     handler_spec handler -∗
-    {{{ free_ports (ip_of_address MTS_saddr) {[port_of_address MTS_saddr]} ∗
+    {{{ unbound (ip_of_address MTS_saddr) {[port_of_address MTS_saddr]} ∗
         MTS_saddr ⤇ reserved_server_socket_interp ∗
         MTS_saddr ⤳ (∅, ∅) ∗
         SrvInit }}}
@@ -161,7 +161,7 @@ Section MTS_proof_of_code.
 
   Definition init_client_proxy_internal_spec sa : iProp Σ :=
     {{{ unallocated {[sa]} ∗
-        free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
+        unbound (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
         MTS_saddr ⤇ reserved_server_socket_interp }}}
       init_client_proxy
         (s_serializer MTS_req_ser)

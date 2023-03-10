@@ -63,7 +63,7 @@ Section echo.
   Lemma server_spec1 saR ip port Φ :
     ip = ip_of_address saR →
     port = port_of_address saR →
-    free_ports ip {[port]} -∗
+    unbound ip {[port]} -∗
     (* post condition includes the newly allocated socket handler *)
     (∀ sh,
         sh ↪[ ip_of_address saR] RecordSet.set saddress
@@ -329,7 +329,7 @@ Section echo.
     port = port_of_address saR →
     saR ∈g sagR -∗
     sagR ⤇* server_si γe saT -∗
-    free_ports ip {[port]} -∗
+    unbound ip {[port]} -∗
     saT ⤇1 client_si γe -∗
     inv N (echo_inv γe γi saT sagR) -∗
     WP (server #saR) @[ip] {{ v, True }}.
@@ -356,7 +356,7 @@ Section echo.
     saT ⤇1 client_si γe -∗
     sagR ⤇* server_si γe saT -∗
     Do γe -∗
-    free_ports ip {[port]} -∗
+    unbound ip {[port]} -∗
     saT ⤳1 (∅,∅) -∗
     (Done γe -∗ Φ) -∗
     WP (client #saT #saR1 #saR2) @[ip] {{ v, Φ }}.

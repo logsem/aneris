@@ -31,7 +31,7 @@ Section API_spec.
   Definition make_client_skt_spec : Prop :=
     ∀ (clt_addr : socket_address),
     {{{ clt_addr ⤳ (∅, ∅)  ∗
-        free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
+        unbound (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
         RCParams_srv_saddr ⤇ srv_si ∗
         unallocated {[clt_addr]} }}}
        make_client_skt (s_serializer clt_ser) (s_serializer srv_ser) #clt_addr
@@ -41,7 +41,7 @@ Section API_spec.
   Definition make_server_skt_spec : Prop :=
     {{{ srv_saddr ⤇ srv_si ∗
         RCParams_srv_saddr ⤳ (∅, ∅) ∗
-        free_ports (srv_ip) {[port_of_address srv_saddr]} ∗
+        unbound (srv_ip) {[port_of_address srv_saddr]} ∗
         SrvInit }}}
        make_server_skt (s_serializer srv_ser) (s_serializer clt_ser) #RCParams_srv_saddr
        @[srv_ip]

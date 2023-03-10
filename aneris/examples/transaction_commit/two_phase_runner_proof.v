@@ -30,6 +30,7 @@ Section runner.
   Lemma runner_spec :
     {{{ inv tcN tc_inv ∗
         tm_addr ⤇ tm_si ∗
+        unbound {[rm1_addr;rm2_addr;rm3_addr;tm_addr]} ∗
         tm_addr ⤳ (∅, ∅) ∗
         ([∗ set] rm ∈ rms, rm ⤇ rm_si) ∗
         ([∗ set] rm ∈ rms, rm ↦●{1/2} WORKING) ∗
@@ -38,7 +39,7 @@ Section runner.
       runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & #Htm_si & Htm_a & #Hrms_si & Hwork & Hips & Hpend) HΦ".
+    iIntros (Φ) "(#Hinv & #Htm_si & Hunbound & Htm_a & #Hrms_si & Hwork & Hips & Hpend) HΦ".
     rewrite /runner.
     do 4 (wp_makeaddress; wp_let).
     wp_apply (wp_set_empty socket_address); [done|]; iIntros (?) "%H".
@@ -59,30 +60,33 @@ Section runner.
     iDestruct (big_sepS_delete _ _ 2 with "Hpend") as "(Hp3 & Hpend)"; [set_solver|].
     iDestruct (big_sepS_delete _ _ 3 with "Hpend") as "(Ht & _)"; [set_solver|].
     rewrite -RMs_size.
-    wp_apply (aneris_wp_start {[port_of_address rm1_addr]}); iFrame.
-    iSplitR "Hw1 Hp1"; last first.
-    { iIntros "!> Hport".
+    iDestruct (unbound_split with "Hunbound") as "[Hunbound Htm_b]"; [set_solver|].
+    iDestruct (unbound_split with "Hunbound") as "[Hunbound Hrm3_b]"; [set_solver|].
+    iDestruct (unbound_split with "Hunbound") as "[Hrm1_b Hrm2_b]"; [set_solver|].
+    wp_apply aneris_wp_start; iFrame.
+    iSplitR "Hw1 Hp1 Hrm1_b"; last first.
+    { iIntros "!>".
       wp_apply (resource_manager_spec rm1_addr with "[$] [$] [] [$] [$]");
         [set_solver| |done].
       iApply (big_sepS_elem_of with "Hrms_si"); set_solver. }
     iModIntro; wp_seq.
-    wp_apply (aneris_wp_start {[port_of_address rm2_addr]}); iFrame.
-    iSplitR "Hw2 Hp2"; last first.
-    { iIntros "!> Hport".
+    wp_apply aneris_wp_start; iFrame.
+    iSplitR "Hw2 Hp2 Hrm2_b"; last first.
+    { iIntros "!>".
       wp_apply (resource_manager_spec rm2_addr with "[$] [$] [] [$] [$] ");
         [set_solver| |done].
       iApply (big_sepS_elem_of with "Hrms_si"); set_solver. }
     iModIntro; wp_seq.
-    wp_apply (aneris_wp_start {[port_of_address rm3_addr]}); iFrame.
-    iSplitR "Hw3 Hp3"; last first.
-    { iIntros "!> Hport".
+    wp_apply aneris_wp_start; iFrame.
+    iSplitR "Hw3 Hp3 Hrm3_b"; last first.
+    { iIntros "!>".
       wp_apply (resource_manager_spec rm3_addr with "[$] [$] [] [$] [$] ");
         [set_solver| |done].
       iApply (big_sepS_elem_of with "Hrms_si"); set_solver. }
     iModIntro; wp_seq.
-    wp_apply (aneris_wp_start {[port_of_address tm_addr]}); iFrame.
+    wp_apply aneris_wp_start; iFrame.
     iSplitL "HΦ"; [by iApply "HΦ"|].
-    iIntros "!> Hport".
+    iIntros "!>".
     wp_apply aneris_wp_wand_r; iSplitL.
     { wp_apply (transaction_manager_spec
                   with "[$] [$] [$] [$] [$]").

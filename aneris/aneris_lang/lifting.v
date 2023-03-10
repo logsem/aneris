@@ -533,11 +533,11 @@ Section primitive_laws.
     iApply "HΦ"; done.
   Qed.
 
-  Lemma wp_start ip ports k E ζ e Φ :
+  Lemma wp_start ip k E ζ e Φ :
     ▷ is_node "system" ∗
     ▷ free_ip ip ∗
     ▷ Φ (mkVal "system" #()) ∗
-    ▷ (∀ tid, is_node ip -∗ free_ports ip ports -∗ WP (mkExpr ip e) @ k; (ip, tid); ⊤ {{ _, True }})
+    ▷ (∀ tid, is_node ip -∗ WP (mkExpr ip e) @ k; (ip, tid); ⊤ {{ _, True }})
     ⊢ WP mkExpr "system" (Start (LitString ip) e) @ k; ζ; E {{ Φ }}.
   Proof.
     iIntros "(>Hnode & >Hfip & HΦ & Hwp)".
@@ -557,8 +557,7 @@ Section primitive_laws.
     eapply aneris_events_state_interp_no_triggered in Htrig;
       [|done|done|done|done|done].
     inv_head_step.
-    iMod (aneris_state_interp_alloc_node _ _ ports with "[$]")
-      as "(%Hcoh & Hn & Hports & Hσ)".
+    iMod (aneris_state_interp_alloc_node with "[$]") as "(%Hcoh & Hn & Hσ)".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     iModIntro.
     simplify_eq /=.
@@ -567,7 +566,7 @@ Section primitive_laws.
     rewrite Htrig; iFrame.
     iSplit; [ iPureIntro; apply user_model_evolution_id |].
     iSplitL "HΦ"; [by iApply wp_value|].
-    iSplitL; [ by iApply ("Hwp" with "[$] [$]")|done].
+    iSplitL; [ by iApply ("Hwp" with "[$]")|done].
   Qed. 
 
   Lemma wp_new_socket ip s E ζ :
@@ -607,7 +606,7 @@ Section primitive_laws.
   Lemma wp_socketbind_groups
         E ζ sh skt k sa :
     saddress skt = None →
-    {{{ ▷ free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+    {{{ ▷ unbound {[sa]} ∗
         ▷ sh ↪[ip_of_address sa] skt }}}
       (mkExpr (ip_of_address sa)
               (SocketBind (Val $ LitV $ LitSocket sh)
@@ -622,7 +621,7 @@ Section primitive_laws.
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]". 
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    iDestruct (aneris_state_interp_unbound_valid with "Hσ Hp") as "%HP".
     apply HSn.     
     iSplit.
     { iPureIntro; do 3 eexists.
@@ -647,7 +646,7 @@ Section primitive_laws.
 
   Lemma wp_socketbind A E ζ sh skt k a :
     saddress skt = None →
-    {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗
+    {{{ ▷ unbound {[a]} ∗
         ▷ sh ↪[ip_of_address a] skt }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
@@ -662,7 +661,7 @@ Section primitive_laws.
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    iDestruct (aneris_state_interp_unbound_valid with "Hσ Hp") as "%HP".
     apply HSn.   
     iSplit.
     { iPureIntro; do 3 eexists.

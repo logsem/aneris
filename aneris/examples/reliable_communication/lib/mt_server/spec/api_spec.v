@@ -19,7 +19,7 @@ Section Spec.
     handler_spec handler -∗
     {{{ MTS_saddr ⤇ srv_si ∗
         MTS_saddr ⤳ (∅,∅) ∗
-        free_ports (srv_ip) {[port_of_address MTS_saddr]} ∗
+        unbound (srv_ip) {[port_of_address MTS_saddr]} ∗
         SrvInit }}}
       run_server
         (s_serializer MTS_rep_ser)
@@ -41,7 +41,7 @@ Section Spec.
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ sa,
     {{{ unallocated {[sa]} ∗
-        free_ports (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
+        unbound (ip_of_address sa) {[port_of_address sa]} ∗ sa ⤳ (∅, ∅) ∗
         MTS_saddr ⤇ srv_si }}}
       init_client_proxy
         (s_serializer MTS_req_ser)

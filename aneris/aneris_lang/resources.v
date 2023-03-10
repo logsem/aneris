@@ -47,8 +47,7 @@ Definition local_heapUR : ucmra :=
 Definition local_socketsUR : ucmra := gen_heapUR socket_handle socket.
 Definition free_ipsUR : ucmra :=
   (gset_disjUR ip_address).
-Definition free_portsUR : ucmra :=
-  gmapUR ip_address (gset_disjUR port).
+Definition unboundUR : ucmra := gset_disjUR socket_address.
 Definition socket_interpUR : ucmra :=
   gmapUR socket_address_group (agreeR (leibnizO gname)).
 Definition socket_address_groupUR : ucmra :=
@@ -90,7 +89,7 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_freeipsG :> inG Σ (authUR free_ipsUR);
       aneris_freeips_name : gname;
       (** free ports  *)
-      aneris_freeportsG :> inG Σ (authUR free_portsUR);
+      aneris_freeportsG :> inG Σ (authUR unboundUR);
       aneris_freeports_name : gname;
       (** groups *)
       aneris_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
@@ -133,7 +132,7 @@ Class anerisPreG Σ (Mdl : Model) :=
       anerisPre_heapG :> inG Σ (authR local_heapUR);
       anerisPre_socketG :> inG Σ (authR local_socketsUR);
       anerisPre_freeipsG :> inG Σ (authUR free_ipsUR);
-      anerisPre_freeportsG :> inG Σ (authUR free_portsUR);
+      anerisPre_freeportsG :> inG Σ (authUR unboundUR);
       anerisPre_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       anerisPre_siG :> inG Σ (authR socket_interpUR);
       anerisPre_savedPredG :> savedPredG Σ message;
@@ -156,7 +155,7 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (authR local_heapUR);
    GFunctor (authR local_socketsUR);
    GFunctor (authUR free_ipsUR);
-   GFunctor (authUR free_portsUR);
+   GFunctor (authUR unboundUR);
    GFunctor (authUR socket_address_groupUR);
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
@@ -221,11 +220,12 @@ Section definitions.
     own aneris_freeips_name (◯ GSet {[ ip ]}).
 
   (** Free ports *)
-  Definition free_ports_auth (P : gmap ip_address (gset_disjUR port)) : iProp Σ :=
-    own aneris_freeports_name (● P).
 
-  Definition free_ports (ip : ip_address) (ports : gset port) : iProp Σ :=
-    own aneris_freeports_name (◯ ({[ ip := (GSet ports)]})).
+  Definition unbound_auth (A : gset socket_address) : iProp Σ :=
+    own aneris_freeports_name (● (GSet A)).
+
+  Definition unbound (A : gset socket_address) : iProp Σ :=
+    own aneris_freeports_name (◯ (GSet A)).
 
   Definition socket_address_groups_own (sags : gset socket_address_group)
     : iProp Σ :=
@@ -555,9 +555,15 @@ Lemma allocated_address_groups_init `{anerisPreG Σ Mdl} A :
 Proof. by apply own_alloc. Qed.
 
 (** Free ports lemmas *)
-Lemma free_ports_auth_init `{anerisPreG Σ Mdl} :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● ∅).
-Proof. apply own_alloc. by apply auth_auth_valid. Qed.
+Lemma unbound_init_pre `{anerisPreG Σ Mdl} A :
+  ⊢ |==> ∃ γ,
+    own (A:=authUR (gset_disjUR socket_address)) γ (● (GSet A)) ∗
+    own (A:=authUR (gset_disjUR socket_address)) γ (◯ (GSet A)).
+Proof.
+  iMod (own_alloc (● (GSet A) ⋅ ◯ (GSet A))) as (γ) "[H1 H2]";
+    [|by iExists _; iFrame].
+  apply auth_both_valid_2; done.
+Qed.
 
 Lemma free_ips_init `{anerisPreG Σ Mdl} (ips : gset ip_address) :
   ⊢ |==> ∃ γ, own γ (● GSet ips) ∗ [∗ set] ip ∈ ips, own γ (◯ GSet {[ ip ]}).
@@ -1289,64 +1295,41 @@ Section resource_lemmas.
     by apply gset_disj_dealloc_empty_local_update.
   Qed.
 
-  Lemma free_ports_included P ip ports :
-    free_ports_auth P -∗
-    free_ports ip ports -∗
-    ∃ ports', ⌜P !! ip = Some (GSet ports') ∧ ports ⊆ ports'⌝.
+  Lemma unbound_included A B :
+    unbound_auth A -∗ unbound B -∗ ⌜B ⊆ A⌝.
   Proof.
-    iIntros "HP Hip"; rewrite /free_ports_auth /free_ports.
-    iDestruct (own_valid_2 with "HP Hip") as
-        %[[y [Hy1%leibniz_equiv Hy2]]%singleton_included_l Hv]
-         %auth_both_valid_discrete.
-    iPureIntro.
-    revert Hy2; rewrite Some_included_total.
-    destruct y as [ports'|].
-    - eexists; split; first by rewrite Hy1.
-      by apply gset_disj_included.
-    - by specialize (Hv ip); rewrite Hy1 in Hv.
+    iIntros "HA HB".
+    by iDestruct (own_valid_2 with "HA HB") as
+      %[Hvalid%gset_disj_included _]%auth_both_valid_discrete.
   Qed.
 
-  Lemma free_ports_split ip ports ports' :
+  Lemma unbound_split ports ports' :
     ports ## ports' →
-    free_ports ip (ports ∪ ports') ⊣⊢
-    free_ports ip ports ∗ free_ports ip ports'.
+    unbound (ports ∪ ports') ⊣⊢
+    unbound ports ∗ unbound ports'.
   Proof.
     intros ?.
-    by rewrite /free_ports -gset_disj_union //
-    -own_op -auth_frag_op singleton_op.
+    by rewrite /unbound -gset_disj_union // -own_op.
   Qed.
 
-  Lemma free_ports_alloc P ip ports :
-    ip ∉ (dom P) →
-    free_ports_auth P ==∗
-    free_ports_auth (<[ ip := GSet ports ]>P) ∗ free_ports ip ports.
+  Lemma unbound_alloc P ports :
+    ports ## P →
+    unbound_auth P ==∗
+    unbound_auth (ports ∪ P) ∗ unbound ports.
   Proof.
-    iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
-    iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
+    iIntros (?) "HP".
+    iMod (own_update _ _ (● _ ⋅ ◯ GSet ports) with "HP")
       as "[HP Hip]"; last by iFrame.
-    apply auth_update_alloc, alloc_singleton_local_update; last done.
-    by eapply (not_elem_of_dom (D := gset ip_address)).
+    by apply auth_update_alloc, gset_disj_alloc_empty_local_update.
   Qed.
 
-  Lemma free_ports_dealloc P ip ports :
-    free_ports_auth P -∗
-    free_ports ip ports ==∗
-    ∃ ports', ⌜P !! ip = Some (GSet ports') ∧
-              ports ⊆ ports'⌝ ∗
-              free_ports_auth (<[ip := GSet (ports' ∖ ports)]> P).
+  Lemma unbound_dealloc P ports :
+    unbound_auth P -∗ unbound ports ==∗ unbound_auth (P ∖ ports).
   Proof.
-    iIntros "HP Hip".
-    iDestruct (free_ports_included with "HP Hip") as (ports') "[% %]".
-    iMod (own_update_2 _ _ _
-                       (● <[ip := GSet (ports' ∖ ports)]>P ⋅
-                        ◯ <[ ip := GSet ∅ ]>{[ ip := (GSet ports)]})
-            with "HP Hip")
-      as "[? ?]".
-    { apply auth_update.
-      eapply insert_local_update;
-        [done|eapply (lookup_singleton (M := gmap _))|].
-      apply gset_disj_dealloc_local_update. }
-    by iExists _; iFrame.
+    iIntros "HP Hp".
+    iDestruct (unbound_included with "HP Hp") as "%".
+    iMod (own_update_2 with "HP Hp") as "$"; [|done].
+    by apply auth_update_dealloc, gset_disj_dealloc_local_update.
   Qed.
 
   Lemma socket_interp_alloc sag φ sis :

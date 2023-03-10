@@ -42,7 +42,7 @@ Section MonotonicWrites.
           (db_id1 : rep_id) :
     {{{ sa1 ⤇ (db_si db_id1)
         ∗ unallocated {[ca]}
-        ∗ free_ports (ip_of_address ca) {[ port_of_address ca ]}
+        ∗ unbound (ip_of_address ca) {[ port_of_address ca ]}
         ∗  ca ⤳ (∅, ∅)
     }}}
 

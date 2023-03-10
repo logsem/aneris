@@ -78,7 +78,7 @@ Section spec.
   Definition init_resources z i : iProp Σ :=
     (([∗ list] z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
                z ⤳ (∅, ∅) ∗
-               free_ports (ip_of_address z) {[port_of_address z]} ∗
+               unbound (ip_of_address z) {[port_of_address z]} ∗
                init_token i).
 
   Lemma Causality_2 e a s i k h E :

@@ -81,21 +81,20 @@ Section proof.
              (⌜m_body msg = "DONE"⌝ ∗ last_message γpong PING))
       )%I.
 
-  Lemma pong_spec a ip port :
+  Lemma pong_spec a ip :
     ip = ip_of_address a →
-    port = port_of_address a →
     (* a is static *)
     (* the address [a] is governed by the pong_si socket protocol *)
     {{{ a ⤇ pong_si
     (* A should contain static addresses & the port should be free *)
-      ∗ free_ports ip {[port]}
+      ∗ unbound {[a]}
     (* exclusive ownership of the [a], no messages have been sent nor received. *)
       ∗ a ⤳ (∅, ∅)
       ∗ last_message γpong NONE
     (* pong terminates the last (non ping) received message, that is "DONE" *)
     }}} (pong #a) @[ip] {{{ RET #"DONE"; True }}}.
   Proof.
-    iIntros (-> -> Ψ) "(#Hsi & Hport & Ha & Hγpong) HΨ".
+    iIntros (-> Ψ) "(#Hsi & Hport & Ha & Hγpong) HΨ".
     wp_lam.
     wp_socket h as "Hh".
     wp_let.
@@ -164,7 +163,7 @@ Section proof.
     b ⤇ pong_si -∗
     (* A should contain static addresses & the port should be free *)
     unallocated {[a]} -∗
-    free_ports ip {[port]} -∗
+    unbound {[a]} -∗
     (* exclusive ownership of the [a] and its sent and received messages *)
     a ⤳ (∅, ∅) -∗
     last_message γpong NONE -∗
@@ -222,11 +221,13 @@ Section proof.
         (* A contain static addresses, and the ips we use are free *)
         ∗ unallocated {[ping_addr]}
         ∗ ([∗ set] ip ∈ ips, free_ip ip)
+        ∗ unbound {[pong_addr]}
+        ∗ unbound {[ping_addr]}
         ∗ last_message γpong NONE ∗ last_message γpong NONE }}}
     ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunallocated & Hips & Hγpong & Hγpong') HΦ".
+    iIntros (Φ) "(#Hsi & Hponga & Hpinga & Hunallocated & Hips & Hppong & Hpping & Hγpong & Hγpong') HΦ".
     unfold ping_pong_runner.
     iDestruct (big_sepS_delete _ _ "0.0.0.0" with "Hips") as "(Hpong & Hips)";
       first set_solver.
@@ -235,16 +236,16 @@ Section proof.
     wp_pures.
     wp_apply aneris_wp_start.
     iFrame.
-    iSplitR "Hγpong Hponga"; last first.
-    { iIntros "!> Hfree".
+    iSplitR "Hppong Hγpong Hponga"; last first.
+    { iIntros "!>".
       iApply (pong_spec with "[$] []"); done.
     }
     iModIntro.
     wp_seq.
     wp_apply aneris_wp_start.
     iFrame.
-    iSplitR "Hγpong' Hpinga Hunallocated"; last first.
-    { iIntros "!> Hfree".
+    iSplitR "Hpping Hγpong' Hpinga Hunallocated"; last first.
+    { iIntros "!>".
       iApply (ping_spec with "[$] Hunallocated [$] [$Hpinga] [$Hγpong']"); eauto.
     }
     iModIntro.

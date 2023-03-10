@@ -187,7 +187,7 @@ Section Client_Proxy_Proof.
         sa ⤳ (∅, ∅) ∗
         (@init_client_proxy_spec _ _ _ _ MTC _ srv_si) ∗
         (@make_request_spec _ _ _ _ MTC _) ∗
-        free_ports (ip_of_address sa) {[port_of_address sa]} }}}
+        unbound (ip_of_address sa) {[port_of_address sa]} }}}
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
     {{{ wr rd, RET (wr, rd);

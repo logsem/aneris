@@ -62,7 +62,7 @@ Section proof_of_the_code.
  Lemma wp_server :
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
           RCParams_srv_saddr ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address RCParams_srv_saddr)
+        unbound (ip_of_address RCParams_srv_saddr)
                    {[port_of_address RCParams_srv_saddr]} ∗
         SrvInit }}}
        server #RCParams_srv_saddr @[ip_of_address RCParams_srv_saddr]
@@ -85,7 +85,7 @@ Section proof_of_the_code.
   Lemma wp_client clt_addr :
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
         clt_addr ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
+        unbound (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
         unallocated {[clt_addr]} }}}
        client #clt_addr #srv_sa @[ip_of_address clt_addr]
     {{{ skt, RET skt; True }}}.

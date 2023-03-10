@@ -69,8 +69,8 @@ Section Init_Follower_Proof.
         init_follower_res ∗
         f2csa ⤳ (∅, ∅) ∗
         f2lsa ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address f2csa) {[port_of_address f2csa]} ∗
-        free_ports (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
+        unbound (ip_of_address f2csa) {[port_of_address f2csa]} ∗
+        unbound (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
       init_follower (s_serializer DB_serialization)
       #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
     {{{ RET #(); True }}}.

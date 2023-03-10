@@ -223,7 +223,7 @@ Section proof_of_code.
         (* preconditions for subscribing client to dlock. *)
         dl_subscribe_client_spec SharedRes ∗
         unallocated {[clt_00]} ∗
-        free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
+        unbound (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
@@ -231,7 +231,7 @@ Section proof_of_code.
         unallocated {[clt_01]} ∗
         db_sa ⤇ leader_si ∗
         clt_01 ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address clt_01) {[port_of_address clt_01]}
+        unbound (ip_of_address clt_01) {[port_of_address clt_01]}
     }}}
       node0 #clt_00 #clt_01 #dlm_sa #db_sa @[ip_of_address clt_00]
     {{{ RET #(); True }}}.
@@ -262,7 +262,7 @@ Section proof_of_code.
         (* preconditions for subscribing client to dlock. *)
         dl_subscribe_client_spec SharedRes ∗
         unallocated {[clt_10]} ∗
-        free_ports (ip_of_address clt_10) {[port_of_address clt_10]} ∗
+        unbound (ip_of_address clt_10) {[port_of_address clt_10]} ∗
         clt_10 ⤳ (∅, ∅) ∗
         dlm_sa ⤇ dl_reserved_server_socket_interp ∗
         (* preconditions to start a client proxy for the database. *)
@@ -270,7 +270,7 @@ Section proof_of_code.
         unallocated {[clt_11]} ∗
         db_sa ⤇ leader_si ∗
         clt_11 ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address clt_11) {[port_of_address clt_11]}
+        unbound (ip_of_address clt_11) {[port_of_address clt_11]}
     }}}
       node1 #clt_10 #clt_11 #dlm_sa #db_sa @[ip_of_address clt_10]
     {{{ v, RET v; ⌜v = SOMEV #1⌝ }}}.
@@ -373,7 +373,7 @@ Section proof_of_main.
     { iNext. iIntros "Hfps".
       iApply ("HdbSrvS"
                with "[][][HSrvInit1 Hfps Hsa0 Hsa1]"); [eauto .. | | done ].
-      iDestruct (free_ports_split
+      iDestruct (unbound_split
                     "0.0.0.0"
                     {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iFrame "#∗". iApply "Hfp1". iFrame. }
@@ -392,7 +392,7 @@ Section proof_of_main.
       iApply (proof_of_node0 leader_si db_sa db_Fsa dlm_sa clt_sa00 clt_sa01
                with "[$HGinv $Hsa3 $Hsa4 Hfps $Hf00 $Hf01]"); [done| |done].
       iFrame "#∗".
-      iDestruct (free_ports_split
+      iDestruct (unbound_split
                    "0.0.0.2"
                    {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".
@@ -404,7 +404,7 @@ Section proof_of_main.
     { iNext. iIntros "Hfps".
       iApply (proof_of_node1 leader_si db_sa db_Fsa dlm_sa clt_sa10 clt_sa11
                with "[$HGinv $Hsa5 $Hsa6 Hfps $Hf10 Hf11]"); [done| |done].
-      iDestruct (free_ports_split
+      iDestruct (unbound_split
                    "0.0.0.3"
                    {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".

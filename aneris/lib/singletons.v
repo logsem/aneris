@@ -23,6 +23,52 @@ Definition union_set `{Countable A} `{Empty A} `{Union A} (s : gset A) : A :=
   union_list (elements s).
 Notation "⋃ₛ s" := (union_set s) (at level 20, format "⋃ₛ  s") : stdpp_scope.
 
+Lemma union_set_singleton `{Countable K} (A : gset K) :
+  union_set ({[A]}) = A.
+Proof. rewrite /union_set elements_singleton. set_solver. Qed.
+
+(* TODO: Clean this up *)
+Lemma union_set_id `{Countable K} (A : gset $ gset K) a :
+  a ∈ A → union_set A ∪ a = union_set A.
+Proof.
+  revert a.
+  induction A as [|b A Hnin IHA] using set_ind_L; [set_solver|].
+  intros a [Hin|Hin]%elem_of_union.
+  - apply elem_of_singleton in Hin as <-.
+    rewrite /union_set. rewrite elements_disj_union; [|set_solver].
+    rewrite union_list_app_L.
+    replace (⋃ elements {[a]}) with (union_set {[a]}) by done.
+    rewrite (union_set_singleton a).
+    set_solver.
+  - rewrite /union_set.
+    rewrite elements_union_singleton; [|done].
+    simpl. rewrite -union_assoc_L. f_equiv. by apply IHA.
+Qed.
+
+Lemma union_set_union `{Countable K} (A B : gset $ gset K) :
+  union_set (A ∪ B) = union_set A ∪ union_set B.
+Proof.
+  induction A as [|a A Hnin IHA] using set_ind_L.
+  { by rewrite /union_set elements_empty !union_empty_l_L. }
+  destruct (decide (a ∈ B)).
+  - rewrite -union_assoc_L. rewrite union_comm_L.
+    rewrite -union_assoc_L.
+    replace (B ∪ {[a]}) with B by set_solver.
+    rewrite /union_set.
+    rewrite elements_union_singleton; [|done].
+    simpl.
+    rewrite -union_assoc_L (union_comm_L a) -union_assoc_L.
+    rewrite /union_set in IHA. rewrite IHA. f_equiv.
+    by rewrite union_set_id.
+  - rewrite /union_set.
+    rewrite elements_union_singleton; [|done].
+    simpl.
+    rewrite -(union_assoc_L a _).
+    rewrite -IHA.
+    rewrite -union_assoc_L.
+    by rewrite elements_union_singleton; [|set_solver].
+Qed.
+
 Section with_K.
   Context `{Countable K}.
 
@@ -129,6 +175,14 @@ Section with_K.
   Lemma to_singletons_inv (x : K) :
     to_singletons {[x]} = {[{[x]}]}.
   Proof. rewrite /to_singletons. by rewrite gset_map_singleton. Qed.
+
+  Lemma union_set_to_singletons (A : gset K) :
+    union_set $ to_singletons A = A.
+  Proof.
+    induction A as [|a A Hin] using set_ind_L; [done|].
+    rewrite to_singletons_union. rewrite to_singletons_inv.
+    by rewrite union_set_union union_set_singleton IHA.
+  Qed.
 
   Lemma elem_of_to_singletons
         (X : gset K) x :

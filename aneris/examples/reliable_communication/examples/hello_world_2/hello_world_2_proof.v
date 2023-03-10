@@ -77,11 +77,11 @@ Section proof_of_the_client_code.
         up1.(RCParams_srv_saddr) ⤇ @reserved_server_socket_interp _ _ _ up1 SnRes1 ∗
         ⌜ip_of_address clt_addr0 = ip_of_address clt_addr1⌝ ∗
         clt_addr0 ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address clt_addr0)
+        unbound (ip_of_address clt_addr0)
                    {[port_of_address clt_addr0]} ∗
         unallocated {[clt_addr0]} ∗
         clt_addr1 ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address clt_addr1)
+        unbound (ip_of_address clt_addr1)
                    {[port_of_address clt_addr1]} ∗
         unallocated {[clt_addr1]} }}}
        client #clt_addr0 #clt_addr1 #srv_sa0 #srv_sa1 @[ip_of_address clt_addr0]
@@ -147,7 +147,7 @@ Section proof_of_the_server_code.
  Lemma wp_server :
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
           RCParams_srv_saddr ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address RCParams_srv_saddr)
+        unbound (ip_of_address RCParams_srv_saddr)
                    {[port_of_address RCParams_srv_saddr]} ∗
         SrvInit }}}
        server #RCParams_srv_saddr @[ip_of_address RCParams_srv_saddr]
@@ -261,7 +261,7 @@ Section proof_of_the_main.
              with "[Hsa2 Hsa3 Hfps Hf0 Hf1]"); last done.
     iSplit; first done. iFrame "#∗".
     iSplit; first done.
-    iPoseProof (free_ports_split "0.0.0.2" {[80%positive]} {[81%positive]})  as "(Hlm1 & _)"; first by set_solver.
+    iPoseProof (unbound_split "0.0.0.2" {[80%positive]} {[81%positive]})  as "(Hlm1 & _)"; first by set_solver.
     iDestruct ("Hlm1" with "[$Hfps]") as "(Hf1 & Hf2)".
     iFrame; eauto.    
   Qed.

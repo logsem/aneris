@@ -139,7 +139,7 @@ Section spec.
     (port_of_address db_addr) ≠ (port_of_address req_addr) ->
     {{{ req_addr ⤇ db_si db_id
         ∗ req_addr ⤳ (∅, ∅)
-        ∗ free_ports (ip req_addr) {[port_of_address req_addr]}
+        ∗ unbound (ip req_addr) {[port_of_address req_addr]}
         ∗ GlobalInv
         ∗ init_spec init
         ∗ init_resources db_addr db_id

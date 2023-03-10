@@ -286,7 +286,7 @@ Section proof_of_code.
     Obs db_l2csa [] -∗
     inv N inv_def -∗
     {{{ unallocated {[clt_00]} ∗
-        free_ports (ip_of_address clt_00) {[port_of_address clt_00]} ∗
+        unbound (ip_of_address clt_00) {[port_of_address clt_00]} ∗
         clt_00 ⤳ (∅, ∅) ∗
         db_l2csa ⤇ leader_si ∗
         "x" ↦ₖ None }}}
@@ -309,7 +309,7 @@ Section proof_of_code.
     Obs db_f2csa [] -∗
     inv N inv_def -∗
     {{{ unallocated {[clt_01]} ∗
-        free_ports (ip_of_address clt_01) {[port_of_address clt_01]} ∗
+        unbound (ip_of_address clt_01) {[port_of_address clt_01]} ∗
         clt_01 ⤳ (∅, ∅) ∗
         db_f2csa ⤇ follower_si }}}
       node1 #clt_01 #db_f2csa @[ip_of_address clt_01]
@@ -400,7 +400,7 @@ Section proof_of_main.
     { iNext. iIntros "Hfps".
       iApply ("HdbSrvS"
                with "[][][HInitL Hsa0 Hfps Hsa1]"); [eauto .. | | done ].
-      iDestruct (free_ports_split
+      iDestruct (unbound_split
                     "0.0.0.0"
                     {[80%positive]} {[81%positive]}) as "(Hfp1 & _)"; [set_solver|].
       iFrame "#∗". iApply "Hfp1". iFrame. }
@@ -413,7 +413,7 @@ Section proof_of_main.
     { iNext. iIntros "Hfps".
       iApply ("HdbFS" $! db_f2lsa with "[//][][Hfps HInitF Hsa2 Hsa3 Hff2lsa]");
         [iPureIntro; set_solver| |done].
-      iDestruct (free_ports_split
+      iDestruct (unbound_split
                    "0.0.0.1"
                    {[80%positive]} {[81%positive]} with "Hfps")
         as "(Hfp1 & Hfp2)"; [set_solver|].
