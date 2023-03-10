@@ -111,7 +111,7 @@ Section DL_proof_of_code.
 
 Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
     {{{ unallocated {[sa]} ∗
-        free_ports (ip_of_address sa) {[port_of_address sa]} ∗
+        unbound (ip_of_address sa) {[port_of_address sa]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         sa ⤳ (∅, ∅) }}}
       dlock_subscribe_client #sa #DL_server_addr @[ip_of_address sa]
@@ -189,7 +189,7 @@ Definition dl_subscribe_client_internal_spec sa : iProp Σ :=
   Qed.
 
   Definition dl_server_start_service_internal_spec : Prop :=
-    {{{ free_ports srv_ip {[srv_port]} ∗
+    {{{ unbound srv_ip {[srv_port]} ∗
         DL_server_addr ⤇ reserved_server_socket_interp ∗
         srv_sa ⤳ (∅, ∅) ∗
         SrvInit ∗

@@ -8,7 +8,7 @@ From aneris.aneris_lang.state_interp Require Import
      state_interp_local_coh
      state_interp_gnames_coh
      state_interp_free_ips_coh
-     state_interp_free_ports_coh
+     state_interp_unbound_coh
      state_interp_network_sockets_coh
      state_interp_socket_interp_coh
      state_interp_messages_resource_coh
@@ -69,7 +69,7 @@ Section state_interpretation.
         [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
       iSplitL "Hfreeips";
         [by iApply free_ips_coh_ms; iApply free_ips_coh_update_sockets|].
-      by iApply free_ports_coh_update; iApply free_ports_coh_update_socket.
+      by iApply unbound_coh_update; iApply unbound_coh_update_socket.
     - iFrame.
       iSplit.
       { iPureIntro.

@@ -87,7 +87,7 @@ Section proof.
     (* the address [a] is governed by the pong_si socket protocol *)
     {{{ a ⤇ pong_si
     (* A should contain static addresses & the port should be free *)
-      ∗ free_ports {[a]}
+      ∗ unbound {[a]}
     (* exclusive ownership of the [a], no messages have been sent nor received. *)
       ∗ a ⤳ (∅, ∅)
       ∗ last_message γpong NONE
@@ -163,7 +163,7 @@ Section proof.
     b ⤇ pong_si -∗
     (* A should contain static addresses & the port should be free *)
     unallocated {[a]} -∗
-    free_ports {[a]} -∗
+    unbound {[a]} -∗
     (* exclusive ownership of the [a] and its sent and received messages *)
     a ⤳ (∅, ∅) -∗
     last_message γpong NONE -∗
@@ -221,8 +221,8 @@ Section proof.
         (* A contain static addresses, and the ips we use are free *)
         ∗ unallocated {[ping_addr]}
         ∗ ([∗ set] ip ∈ ips, free_ip ip)
-        ∗ free_ports {[pong_addr]}
-        ∗ free_ports {[ping_addr]}
+        ∗ unbound {[pong_addr]}
+        ∗ unbound {[ping_addr]}
         ∗ last_message γpong NONE ∗ last_message γpong NONE }}}
     ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.

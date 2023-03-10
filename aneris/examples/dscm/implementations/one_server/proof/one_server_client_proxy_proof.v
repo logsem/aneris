@@ -109,7 +109,7 @@ Section Spec.
 
 Theorem install_proxy_spec
         (srv_addr : socket_address):
-    {{{ free_ports ip {[ port_of_address client_addr ]} ∗
+    {{{ unbound ip {[ port_of_address client_addr ]} ∗
         unallocated {[client_addr]} ∗
         ⌜client_addr ∉ DB_addresses⌝ ∗
         ⌜DB_addresses = [srv_addr]⌝ ∗
@@ -292,7 +292,7 @@ Definition client_si' (γ : gname) : socket_interp Σ :=
 (* Theorem install_proxy_spec *)
 (*         (A : gset socket_address) *)
 (*         (srv_addr : socket_address): *)
-(*     {{{ free_ports ip {[ port_of_address client_addr ]} ∗ *)
+(*     {{{ unbound ip {[ port_of_address client_addr ]} ∗ *)
 (*         fixed A ∗ *)
 (*         ⌜client_addr ∉ A⌝ ∗ *)
 (*         ⌜client_addr ∉ DB_addresses⌝ ∗ *)

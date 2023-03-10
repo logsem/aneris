@@ -265,7 +265,7 @@
 (*     st.(handle) ↪[ip_of_address a] st.(skt) ∗ a ⤳ (st.(recv), st.(sent)). *)
 
 (*   Definition free_addrs (F : gset socket_address) : iProp Σ := *)
-(*     [∗ set] a ∈ F, free_ports (ip_of_address a) {[port_of_address a]}. *)
+(*     [∗ set] a ∈ F, unbound (ip_of_address a) {[port_of_address a]}. *)
 
 (*   Definition mapsto_handles (hs : handle_map) : iProp Σ := *)
 (*     ([∗ map] a ↦ st ∈ hs, handle_st_to_mapsto a st). *)
@@ -722,7 +722,7 @@
 (*     inv inv_ns ping_pong_inv -∗ *)
 (*     fixed n_all -∗ *)
 (*     ufree client_addr -∗ *)
-(*     free_ports (ip_of_address client_addr) {[ port_of_address client_addr ]} -∗ *)
+(*     unbound (ip_of_address client_addr) {[ port_of_address client_addr ]} -∗ *)
 (*     client_addr ⤇ client_si client_addr -∗ *)
 (*     client_addr ⤳ (∅, ∅) -∗ *)
 (*     WP client #client_addr @[ip] {{ v, True }}. *)
@@ -949,7 +949,7 @@
 (*     ip = ip_of_address n_server → *)
 (*     {{{ inv inv_ns ping_pong_inv ∗ *)
 (*         fixed n_all ∗ *)
-(*         free_ports (ip_of_address n_server) {[ port_of_address n_server ]} ∗ *)
+(*         unbound (ip_of_address n_server) {[ port_of_address n_server ]} ∗ *)
 (*         ufree n_server ∗ *)
 (*         n_server ⤇ server_si ∗ *)
 (*         ([∗ set] a ∈ n_clients, a ⤇ client_si a) ∗ *)

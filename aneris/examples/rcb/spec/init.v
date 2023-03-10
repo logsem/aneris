@@ -57,7 +57,7 @@ Section Specification.
         ⌜RCB_addresses !! i = Some z⌝ →
         {{{  ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ RCB_socket_proto i) ∗
              z ⤳ (∅, ∅) ∗
-             free_ports (ip_of_address z) {[port_of_address z]} ∗
+             unbound (ip_of_address z) {[port_of_address z]} ∗
             init_token i}}}
           init v #i @[ip_of_address z]
         {{{ deliver broadcast, RET (deliver, broadcast);

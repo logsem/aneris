@@ -67,8 +67,8 @@ Section Init_Leader_Proof.
         init_leader_res ∗
         DB_addr ⤳ (∅, ∅) ∗
         DB_addrF ⤳ (∅, ∅) ∗
-        free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-        free_ports (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
+        unbound (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
+        unbound (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
       init_leader (s_serializer DB_serialization)
       #DB_addr #DB_addrF @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.

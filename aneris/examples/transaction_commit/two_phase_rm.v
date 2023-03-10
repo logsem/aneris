@@ -109,7 +109,7 @@ Section resource_manager.
   (** * Resource manager spec *)
   Lemma resource_manager_spec rm :
     rm ∈ RMs →
-    free_ports (ip_of_address rm) {[port_of_address rm]} -∗
+    unbound (ip_of_address rm) {[port_of_address rm]} -∗
     inv tcN tc_inv -∗
     rm ⤇ rm_si -∗
     tm ⤇ tm_si -∗

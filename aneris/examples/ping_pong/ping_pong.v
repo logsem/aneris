@@ -45,7 +45,7 @@ Section pong.
     {{{ (* the address [a] is governed by [pong_protocol] *)
         a ⤇ pong_protocol ∗
         (* the socket address [a] is free  *)
-        free_ports {[a]} ∗
+        unbound {[a]} ∗
         (* exclusive ownership of the history of sent and received messages on [a] *)
         a ⤳ (∅, ∅) }}}
       pong #a @[ip] {{{ RET #(String.length "PONG"); True }}}.
@@ -94,7 +94,7 @@ Section ping.
         (* the socket protocol has not yet been allocated for the address [a] *)
         ∗ unallocated {[a]}
         (* the socket address [a] is free *)
-        ∗ free_ports {[a]}
+        ∗ unbound {[a]}
         (* the history of sent and received messages on [a] *)
         ∗ a ⤳ (∅, ∅) }}}
       ping #a #b @[ip]
@@ -155,9 +155,9 @@ Section ping_pong_runner.
          ∗ unallocated {[ping_addr]}
          (* the ips are free *)
          ∗ free_ip (ip_of_address pong_addr)
-         ∗ free_ports {[pong_addr]}
+         ∗ unbound {[pong_addr]}
          ∗ free_ip (ip_of_address ping_addr)
-         ∗ free_ports {[ping_addr]} }}}
+         ∗ unbound {[ping_addr]} }}}
       ping_pong_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
@@ -201,7 +201,7 @@ Proof.
   iIntros (dinvG).
   iIntros (?) "!# (Hf & Hports & Hhist & Hips) HΦ".
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
-  iDestruct (free_ports_split with "Hports") as "[Hp1 Hp2]"; [set_solver|].
+  iDestruct (unbound_split with "Hports") as "[Hp1 Hp2]"; [set_solver|].
   rewrite (big_sepS_delete _ _ pong_addr); [|set_solver].
   rewrite (big_sepS_delete _ _ ping_addr); [|set_solver].
   iDestruct "Hhist" as "(Hpong & Hping & _)".

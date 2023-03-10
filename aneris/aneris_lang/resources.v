@@ -47,7 +47,7 @@ Definition local_heapUR : ucmra :=
 Definition local_socketsUR : ucmra := gen_heapUR socket_handle socket.
 Definition free_ipsUR : ucmra :=
   (gset_disjUR ip_address).
-Definition free_portsUR : ucmra := gset_disjUR socket_address.
+Definition unboundUR : ucmra := gset_disjUR socket_address.
 Definition socket_interpUR : ucmra :=
   gmapUR socket_address_group (agreeR (leibnizO gname)).
 Definition socket_address_groupUR : ucmra :=
@@ -89,7 +89,7 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_freeipsG :> inG Σ (authUR free_ipsUR);
       aneris_freeips_name : gname;
       (** free ports  *)
-      aneris_freeportsG :> inG Σ (authUR free_portsUR);
+      aneris_freeportsG :> inG Σ (authUR unboundUR);
       aneris_freeports_name : gname;
       (** groups *)
       aneris_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
@@ -132,7 +132,7 @@ Class anerisPreG Σ (Mdl : Model) :=
       anerisPre_heapG :> inG Σ (authR local_heapUR);
       anerisPre_socketG :> inG Σ (authR local_socketsUR);
       anerisPre_freeipsG :> inG Σ (authUR free_ipsUR);
-      anerisPre_freeportsG :> inG Σ (authUR free_portsUR);
+      anerisPre_freeportsG :> inG Σ (authUR unboundUR);
       anerisPre_socket_address_groupG :> inG Σ (authR socket_address_groupUR);
       anerisPre_siG :> inG Σ (authR socket_interpUR);
       anerisPre_savedPredG :> savedPredG Σ message;
@@ -155,7 +155,7 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (authR local_heapUR);
    GFunctor (authR local_socketsUR);
    GFunctor (authUR free_ipsUR);
-   GFunctor (authUR free_portsUR);
+   GFunctor (authUR unboundUR);
    GFunctor (authUR socket_address_groupUR);
    GFunctor (authR socket_interpUR);
    savedPredΣ message;
@@ -221,10 +221,10 @@ Section definitions.
 
   (** Free ports *)
 
-  Definition free_ports_auth (A : gset socket_address) : iProp Σ :=
+  Definition unbound_auth (A : gset socket_address) : iProp Σ :=
     own aneris_freeports_name (● (GSet A)).
 
-  Definition free_ports (A : gset socket_address) : iProp Σ :=
+  Definition unbound (A : gset socket_address) : iProp Σ :=
     own aneris_freeports_name (◯ (GSet A)).
 
   Definition socket_address_groups_own (sags : gset socket_address_group)
@@ -555,7 +555,7 @@ Lemma allocated_address_groups_init `{anerisPreG Σ Mdl} A :
 Proof. by apply own_alloc. Qed.
 
 (** Free ports lemmas *)
-Lemma free_ports_init_pre `{anerisPreG Σ Mdl} A :
+Lemma unbound_init_pre `{anerisPreG Σ Mdl} A :
   ⊢ |==> ∃ γ,
     own (A:=authUR (gset_disjUR socket_address)) γ (● (GSet A)) ∗
     own (A:=authUR (gset_disjUR socket_address)) γ (◯ (GSet A)).
@@ -1295,27 +1295,27 @@ Section resource_lemmas.
     by apply gset_disj_dealloc_empty_local_update.
   Qed.
 
-  Lemma free_ports_included A B :
-    free_ports_auth A -∗ free_ports B -∗ ⌜B ⊆ A⌝.
+  Lemma unbound_included A B :
+    unbound_auth A -∗ unbound B -∗ ⌜B ⊆ A⌝.
   Proof.
     iIntros "HA HB".
     by iDestruct (own_valid_2 with "HA HB") as
       %[Hvalid%gset_disj_included _]%auth_both_valid_discrete.
   Qed.
 
-  Lemma free_ports_split ports ports' :
+  Lemma unbound_split ports ports' :
     ports ## ports' →
-    free_ports (ports ∪ ports') ⊣⊢
-    free_ports ports ∗ free_ports ports'.
+    unbound (ports ∪ ports') ⊣⊢
+    unbound ports ∗ unbound ports'.
   Proof.
     intros ?.
-    by rewrite /free_ports -gset_disj_union // -own_op.
+    by rewrite /unbound -gset_disj_union // -own_op.
   Qed.
 
-  Lemma free_ports_alloc P ports :
+  Lemma unbound_alloc P ports :
     ports ## P →
-    free_ports_auth P ==∗
-    free_ports_auth (ports ∪ P) ∗ free_ports ports.
+    unbound_auth P ==∗
+    unbound_auth (ports ∪ P) ∗ unbound ports.
   Proof.
     iIntros (?) "HP".
     iMod (own_update _ _ (● _ ⋅ ◯ GSet ports) with "HP")
@@ -1323,11 +1323,11 @@ Section resource_lemmas.
     by apply auth_update_alloc, gset_disj_alloc_empty_local_update.
   Qed.
 
-  Lemma free_ports_dealloc P ports :
-    free_ports_auth P -∗ free_ports ports ==∗ free_ports_auth (P ∖ ports).
+  Lemma unbound_dealloc P ports :
+    unbound_auth P -∗ unbound ports ==∗ unbound_auth (P ∖ ports).
   Proof.
     iIntros "HP Hp".
-    iDestruct (free_ports_included with "HP Hp") as "%".
+    iDestruct (unbound_included with "HP Hp") as "%".
     iMod (own_update_2 with "HP Hp") as "$"; [|done].
     by apply auth_update_dealloc, gset_disj_dealloc_local_update.
   Qed.

@@ -759,7 +759,7 @@ Section proof.
     gcd_addr_list gcdata !! i = Some a →
     {{{ Global_Inv ∗ GCunallocated i ∗
         ([∗ list] i ↦ a ∈ gcd_addr_list gcdata, a ⤇ GCounter_socket_proto) ∗
-        free_ports (ip_of_address a) {[port_of_address a]} ∗
+        unbound (ip_of_address a) {[port_of_address a]} ∗
         sendevs_frag i [] ∗ recevs_frag i [] }}}
       gcounter_install (StringOfZ i) v #i @[ip_of_address a]
     {{{ (GCounter : nat → nat → iProp Σ) query incr, RET (query, incr);

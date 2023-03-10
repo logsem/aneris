@@ -44,7 +44,7 @@ Section runner_spec_helper.
       GCounter i 0 -∗
       query_spec GCounter query i a -∗
       incr_spec GCounter incr i a -∗
-      free_ports (ip_of_address a) ports -∗
+      unbound (ip_of_address a) ports -∗
       ([∗ set] a ∈ A, a ⤇ f a) -∗
       ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗
       WP prog query incr @[ip_of_address a] {{_, True}}.
@@ -97,7 +97,7 @@ Section runner_spec_helper.
     iIntros "Hfps".
     erewrite list_lookup_total_correct; last by eauto.
     iDestruct "Hprog" as "[% Hprog]".
-    rewrite free_ports_split; last by apply disjoint_singleton_r.
+    rewrite unbound_split; last by apply disjoint_singleton_r.
     iDestruct "Hfps" as "[Hfps Hfsa]".
     wp_apply (install_proof with "[$Hua $Hfsa $Hsev $Hrev]");
       [done|done|by iFrame "#"|].

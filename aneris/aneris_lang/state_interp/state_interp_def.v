@@ -90,13 +90,13 @@ Section definitions.
 
   (** Free ports coherence *)
   (* Free ports are not in use *)
-  Definition free_ports_coh σ : iProp Σ :=
-    ∃ free_ports,
+  Definition unbound_coh σ : iProp Σ :=
+    ∃ unbound,
       ⌜set_Forall
         (λ sa,
            (∀ Sn, (state_sockets σ) !! (ip_of_address sa) = Some Sn →
-                  port_not_in_use (port_of_address sa) Sn)) free_ports⌝ ∗
-      free_ports_auth free_ports.
+                  port_not_in_use (port_of_address sa) Sn)) unbound⌝ ∗
+      unbound_auth unbound.
 
   (** Network sockets coherence for socket handlers,
       receive buffers, and socket addresses *)
@@ -196,7 +196,7 @@ Section definitions.
         socket_interp_coh ∗
         ([∗ map] ip ↦ γs ∈ γm, local_state_coh σ ip γs) ∗
         free_ips_coh σ ∗
-        free_ports_coh σ ∗
+        unbound_coh σ ∗
         messages_ctx mhm ∗
         messages_resource_coh mhm)%I.
 

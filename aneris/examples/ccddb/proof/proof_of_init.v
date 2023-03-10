@@ -30,7 +30,7 @@ Section proof.
       ⌜DB_addresses !! i = Some z⌝ →
       {{{ ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ socket_proto γGsnap) ∗
           z ⤳ (∅, ∅) ∗
-          free_ports (ip_of_address z) {[port_of_address z]} ∗
+          unbound (ip_of_address z) {[port_of_address z]} ∗
           local_history_Local_inv γLs i ∅ }}}
         ccddb_init
         DB_serialization.(s_serializer).(s_ser) DB_serialization.(s_serializer).(s_deser) v #i

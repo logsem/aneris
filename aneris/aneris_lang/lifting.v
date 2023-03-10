@@ -606,7 +606,7 @@ Section primitive_laws.
   Lemma wp_socketbind_groups
         E ζ sh skt k sa :
     saddress skt = None →
-    {{{ ▷ free_ports {[sa]} ∗
+    {{{ ▷ unbound {[sa]} ∗
         ▷ sh ↪[ip_of_address sa] skt }}}
       (mkExpr (ip_of_address sa)
               (SocketBind (Val $ LitV $ LitSocket sh)
@@ -621,7 +621,7 @@ Section primitive_laws.
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]". 
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    iDestruct (aneris_state_interp_unbound_valid with "Hσ Hp") as "%HP".
     apply HSn.     
     iSplit.
     { iPureIntro; do 3 eexists.
@@ -646,7 +646,7 @@ Section primitive_laws.
 
   Lemma wp_socketbind A E ζ sh skt k a :
     saddress skt = None →
-    {{{ ▷ free_ports {[a]} ∗
+    {{{ ▷ unbound {[a]} ∗
         ▷ sh ↪[ip_of_address a] skt }}}
       (mkExpr (ip_of_address a)
               (SocketBind (Val $ LitV $ LitSocket sh)
@@ -661,7 +661,7 @@ Section primitive_laws.
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    iDestruct (aneris_state_interp_unbound_valid with "Hσ Hp") as "%HP".
     apply HSn.   
     iSplit.
     { iPureIntro; do 3 eexists.

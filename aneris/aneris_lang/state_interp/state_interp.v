@@ -14,7 +14,7 @@ From aneris.aneris_lang.state_interp Require Export
      state_interp_local_coh
      state_interp_gnames_coh
      state_interp_free_ips_coh
-     state_interp_free_ports_coh
+     state_interp_unbound_coh
      state_interp_network_sockets_coh
      state_interp_socket_interp_coh
      state_interp_messages_resource_coh
@@ -90,7 +90,7 @@ Section state_interpretation.
     unallocated_groups_auth A -∗
     saved_si_auth ∅ -∗
     free_ips_auth ips -∗
-    free_ports_auth ports -∗
+    unbound_auth ports -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
     iIntros (Hfixdom Hste Hsce Hmse Hip)
@@ -130,7 +130,7 @@ Section state_interpretation.
       rewrite /ip_is_free. rewrite Hste Hsce.
       rewrite !lookup_insert_ne; [|set_solver..]. set_solver. }
     iSplitL "HPiu".
-    { iApply (free_ports_coh_init with "[$]").
+    { iApply (unbound_coh_init with "[$]").
       intros [ip' p] Hin Sn HSn. rewrite Hsce in HSn.
       destruct (decide (ip = ip')) as [<-|Hneq]; by simplify_map_eq. }
     (* messages_resource_coh *)
@@ -168,14 +168,14 @@ Section state_interpretation.
     iIntros "Hfip". by iApply (free_ips_coh_valid with "Hfreeips Hfip").
   Qed.
 
-  Lemma aneris_state_interp_free_ports_valid σ a mh Sn:
+  Lemma aneris_state_interp_unbound_valid σ a mh Sn:
     state_sockets σ !! ip_of_address a = Some Sn → 
     aneris_state_interp σ mh -∗
-    free_ports {[a]} -∗
+    unbound {[a]} -∗
     ⌜port_not_in_use (port_of_address a) Sn⌝.      
   Proof.
     iDestruct 1 as (mγ mn) "(?&?&?&%&?&?& Hsi & Hlcoh & Hfreeips & ?)".
-    by iApply free_ports_coh_free_ports_valid.
+    by iApply unbound_coh_unbound_valid.
   Qed. 
 
   Lemma aneris_state_interp_alloc_node σ ip mh :
@@ -212,7 +212,7 @@ Section state_interpretation.
     iSplitR.
     { iPureIntro. by apply messages_history_coh_alloc_node. }
     iSplitR "Hfreeports"; last first.
-    { by iApply free_ports_coh_update; iApply free_ports_coh_alloc_node. }
+    { by iApply unbound_coh_update; iApply unbound_coh_alloc_node. }
     iApply (big_sepM_local_state_coh_insert ip γn
               with "[Hh Hs] [Hlcoh]").
     - rewrite lookup_insert //.
@@ -365,7 +365,7 @@ Section state_interpretation.
     iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh")
       as "Hlcoh"; [done|].
     iDestruct (free_ips_coh_update_sockets with "Hfreeips") as "Hfreeips"; [done|].
-    iDestruct (free_ports_coh_update_sblock with "Hfreeports")
+    iDestruct (unbound_coh_update_sblock with "Hfreeports")
       as "Hfreeports"; [done..|].
     iModIntro. iExists mγ, _.
     iFrame "Hnauth Hsi Hmres Hlcoh Hfreeips". iFrame "Hmctx".
@@ -418,7 +418,7 @@ Section state_interpretation.
       eauto using receive_buffers_coh_alloc_socket. }
     iSplitL "Hfreeips".
     { by iApply free_ips_coh_update_sockets. }
-    by iApply free_ports_coh_alloc_socket.
+    by iApply unbound_coh_alloc_socket.
   Qed.
 
   Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sag φ :
@@ -475,7 +475,7 @@ Section state_interpretation.
     saddress skt = None →
     aneris_state_interp σ1 mh -∗
     sh ↪[ip_of_address sa] skt -∗
-    free_ports {[sa]} ==∗
+    unbound {[sa]} ==∗
     aneris_state_interp σ2 mh ∗ sh ↪[ip] (skt<| saddress := Some sa |>).
   Proof.
     simpl. iIntros (????) "Hσ Hsh Hp".
@@ -495,7 +495,7 @@ Section state_interpretation.
     { apply lookup_delete. }
     iDestruct (big_sepM_local_state_coh_insert with "Hstate' Hlcoh")
       as "Hlcoh"; [done|].
-    iMod (free_ports_coh_bind_socket with "Hfreeports Hp")
+    iMod (unbound_coh_bind_socket with "Hfreeports Hp")
       as "Hfreeports"; [done..|].
     iModIntro. iExists mγ, _. iFrame. rewrite /set /=.
     iSplit.
@@ -819,7 +819,7 @@ Section state_interpretation.
         set_solver. }
       iPoseProof (free_ips_coh_update_sockets with "Hfreeips") as "Hfreeips";
         [done|].
-      iPoseProof (free_ports_coh_update_socket with "Hfreeports") as "Hfreeports";
+      iPoseProof (unbound_coh_update_socket with "Hfreeports") as "Hfreeports";
         [done..|].
       iFrame.
       iPureIntro.
@@ -886,7 +886,7 @@ Section state_interpretation.
       { iPureIntro. by eapply messages_history_coh_receive_2; eauto. }
       iSplitL "Hfreeips".
       { by iApply free_ips_coh_update_sockets. }
-      by iApply free_ports_coh_update_socket.
+      by iApply unbound_coh_update_socket.
   Qed.
 
   Lemma aneris_state_interp_model_agree m ex atr :

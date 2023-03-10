@@ -38,7 +38,7 @@ Section ReadYourWrites.
   Theorem ryw_example_spec (A : gset socket_address) (ca sa : socket_address) (db_id : rep_id) :
     {{{ sa ⤇ (db_si db_id)
         ∗ unallocated {[ca]}
-        ∗ free_ports (ip_of_address ca) {[ port_of_address ca ]}
+        ∗ unbound (ip_of_address ca) {[ port_of_address ca ]}
         ∗ ca ⤳ (∅, ∅)
     }}}
 

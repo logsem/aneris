@@ -62,7 +62,7 @@ Section Specification.
         ⌜DB_addresses !! i = Some z⌝ →
         {{{  ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
              z ⤳ (∅, ∅) ∗
-             free_ports (ip_of_address z) {[port_of_address z]} ∗
+             unbound (ip_of_address z) {[port_of_address z]} ∗
             init_token i}}}
           init v #i @[ip_of_address z]
         {{{ rd wr, RET (rd, wr);

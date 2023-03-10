@@ -505,7 +505,7 @@ Section map_proof.
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
-            free_ports (ip_of_address addr) {[port_of_address addr]} ∗
+            unbound (ip_of_address addr) {[port_of_address addr]} ∗
             OpLib_InitToken repId
         }}}
           map_comb_init' crdt addrs_val #repId @[ip_of_address addr]

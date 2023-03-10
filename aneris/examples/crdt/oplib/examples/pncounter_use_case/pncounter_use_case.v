@@ -85,7 +85,7 @@ Section use_case_proof.
   Lemma wp_use_case_program1 `{!OpLib_Res CtrOp} γ1 γ2 :
     {{{ GlobInv ∗ OpLib_InitToken 0 ∗ init_spec init ∗
         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
-        SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) ∗ free_ports "1.1.1.1" {[100%positive]} ∗
+        SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) ∗ unbound "1.1.1.1" {[100%positive]} ∗
         inv use_case_inv_name (use_case_inv γ1 γ2) ∗ own γ1 (Excl ()) }}}
       use_case_program1 @["1.1.1.1"]
     {{{ RET #(); True }}}.
@@ -200,7 +200,7 @@ Section use_case_proof.
   Lemma wp_use_case_program2 `{!OpLib_Res CtrOp} γ1 γ2 :
     {{{ GlobInv ∗ OpLib_InitToken 1 ∗ init_spec init ∗
         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
-        SocketAddressInet "1.1.1.2" 100 ⤳ (∅, ∅) ∗ free_ports "1.1.1.2" {[100%positive]} ∗
+        SocketAddressInet "1.1.1.2" 100 ⤳ (∅, ∅) ∗ unbound "1.1.1.2" {[100%positive]} ∗
         inv use_case_inv_name (use_case_inv γ1 γ2) ∗ own γ2 (Excl ()) }}}
       use_case_program2 @["1.1.1.2"]
     {{{ RET #(); True }}}.

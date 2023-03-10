@@ -60,7 +60,7 @@ Section Client_Proxy_Proof.
         csa ⤳ (∅, ∅) ∗
         (@init_client_proxy_spec _ _ _ _ MTC _ follower_si) ∗
         (@make_request_spec _ _ _ _ MTC _) ∗
-        free_ports (ip_of_address csa) {[port_of_address csa]} }}}
+        unbound (ip_of_address csa) {[port_of_address csa]} }}}
       init_client_follower_proxy (s_serializer DB_serialization)
       #csa #fsa @[ip_of_address csa]
     {{{ rd, RET rd;

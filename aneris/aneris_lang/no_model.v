@@ -14,7 +14,7 @@ Theorem adequacy_hoare_no_model Σ `{anerisPreG Σ unit_model} IPs A lbls obs_se
   obs_rec_sas ⊆ A →
   (∀ `{anerisG Σ}, ⊢
           {{{ unallocated A ∗
-              free_ports A ∗
+              unbound A ∗
               ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
               ([∗ set] ip ∈ IPs, free_ip ip) ∗
               ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
@@ -42,7 +42,7 @@ Qed.
 
 Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs A e φ ip: 
   (∀ `{anerisG Σ}, ⊢
-                   {{{ unallocated A ∗ free_ports A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
+                   {{{ unallocated A ∗ unbound A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
                        ([∗ set] ip ∈ IPs, free_ip ip) }}}
                      e @[ip]
                      {{{ v, RET v; ⌜φ v⌝ }}}) →
@@ -51,7 +51,7 @@ Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs A 
     obs_rec_sas ⊆ A ∧
     (∀ `{anerisG Σ}, ⊢
       {{{ unallocated A ∗
-          free_ports A ∗
+          unbound A ∗
           ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas),
                               bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
           ([∗ set] ip ∈ IPs, free_ip ip) ∗
@@ -72,7 +72,7 @@ Qed.
 
 Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs A e σ φ ip :
   (∀ `{anerisG Σ}, ⊢
-      {{{ unallocated A ∗ free_ports A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
+      {{{ unallocated A ∗ unbound A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗
           ([∗ set] ip ∈ IPs, free_ip ip) }}}
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →

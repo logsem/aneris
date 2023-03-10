@@ -22,7 +22,7 @@ Section echo_server_proof.
                  (∀ m', ⌜m.(m_body) = m'.(m_body)⌝ ∗ P m -∗ Ψ m'))%I.
 
   Lemma echo_server_spec (sa : socket_address) :
-    {{{ free_ports (ip_of_address sa) {[(port_of_address sa)]} ∗
+    {{{ unbound (ip_of_address sa) {[(port_of_address sa)]} ∗
         sa ⤳ (∅, ∅) ∗ sa ⤇ srv_si }}}
       echo_server #sa @[ip_of_address sa]
     {{{ RET #(); False }}}.
@@ -97,7 +97,7 @@ Section echo_client_proof.
 
   Lemma echo_client_spec (sa srv_sa : socket_address) :
     {{{ unallocated {[sa]} ∗
-        free_ports (ip_of_address sa) {[(port_of_address sa)]} ∗
+        unbound (ip_of_address sa) {[(port_of_address sa)]} ∗
         sa ⤳ (∅, ∅) ∗ srv_sa ⤇ srv_si }}}
       echo_client #sa #srv_sa @[ip_of_address sa]
     {{{ RET #(); True }}}.
