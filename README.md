@@ -7,6 +7,8 @@ verification of partial correctness properties and refinement. The logic is
 built using the [Iris](https://iris-project.org) program logic framework and
 mechanized in the [Coq proof assistant](https://coq.inria.fr/).
 
+Recent documentation of Aneris is available [`here`](documentation.pdf). 
+
 ## Compiling
 
 The project maintains compatibility with Coq 8.15 and relies on `coqc` being
