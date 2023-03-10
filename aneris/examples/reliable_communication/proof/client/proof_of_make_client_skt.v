@@ -24,7 +24,7 @@ Section Proof_of_make_client_skt.
 
   Definition make_client_skt_internal_spec
     (clt_addr : socket_address) : iProp Σ :=
-    {{{ unbound (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
+    {{{ unbound {[clt_addr]} ∗
         clt_addr ⤳ (∅, ∅) ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         unallocated {[clt_addr]}

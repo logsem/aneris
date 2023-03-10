@@ -37,14 +37,14 @@ Qed.
 Section runner_spec_helper.
   Context `{!anerisG (GCounterM gcdata) Σ, !GCounterG Σ gcdata}.
 
-  Definition prog_spec i a ports A (B : gset socket_address)
+  Definition prog_spec i a A (B : gset socket_address)
              (f : socket_address → socket_interp Σ) (prog : val) : iProp Σ :=
-    ⌜port_of_address a ∉ ports⌝ ∧
+    ⌜a ∉ B⌝ ∧
     ∀ GCounter query incr,
       GCounter i 0 -∗
       query_spec GCounter query i a -∗
       incr_spec GCounter incr i a -∗
-      unbound (ip_of_address a) ports -∗
+      unbound B -∗
       ([∗ set] a ∈ A, a ⤇ f a) -∗
       ([∗ set] b ∈ B, b ⤳ (∅, ∅)) -∗
       WP prog query incr @[ip_of_address a] {{_, True}}.
@@ -53,7 +53,7 @@ Section runner_spec_helper.
 
   Lemma runner_spec_helper
         k (A Aprogs : gset socket_address)
-        (portssocks : list ((gset port) * (gset socket_address)))
+        (portssocks : list (gset socket_address))
         (f : socket_address → socket_interp Σ)
         (progs : list val) v :
     k + length progs ≤ GClen gcdata →
@@ -68,8 +68,8 @@ Section runner_spec_helper.
     ([∗ list] i ∈ seq k (length progs), sendevs_frag i []) -∗
     ([∗ list] i ∈ seq k (length progs), recevs_frag i []) -∗
     ([∗ list] i ↦ prtsas; prog ∈ portssocks; progs,
-       ([∗ set] b ∈ prtsas.2, b ⤳ (∅, ∅)) ∗
-       prog_spec (k + i) (ith_sa (k + i)) prtsas.1 Aprogs prtsas.2 f prog) -∗
+       ([∗ set] b ∈ prtsas, b ⤳ (∅, ∅)) ∗
+       prog_spec (k + i) (ith_sa (k + i)) prtsas Aprogs f prog) -∗
     WP runner gcdata k progs v @["system"] {{ v, ⌜v = #()⌝ }}.
   Proof.
     iIntros (Hprgslen Hv HA HAprogs)

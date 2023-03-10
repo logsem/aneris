@@ -347,7 +347,7 @@ Section prod_proof.
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
-            unbound (ip_of_address addr) {[port_of_address addr]} ∗
+            unbound {[addr]} ∗
             OpLib_InitToken repId
         }}}
           prod_comb_init' crdtA crdtB addrs_val #repId @[ip_of_address addr]

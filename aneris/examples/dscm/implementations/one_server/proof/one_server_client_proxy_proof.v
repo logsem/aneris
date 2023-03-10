@@ -109,7 +109,7 @@ Section Spec.
 
 Theorem install_proxy_spec
         (srv_addr : socket_address):
-    {{{ unbound ip {[ port_of_address client_addr ]} ∗
+    {{{ unbound {[client_addr]} ∗
         unallocated {[client_addr]} ∗
         ⌜client_addr ∉ DB_addresses⌝ ∗
         ⌜DB_addresses = [srv_addr]⌝ ∗

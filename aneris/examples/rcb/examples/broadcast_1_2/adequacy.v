@@ -36,17 +36,18 @@ Proof.
   iIntros (dInvG).
   iMod (main_spec) as (RCBRS) "Hmain".
   iModIntro.
-  iIntros "Hf Hsoups _ Hfree _ _ _ _ _".
+  iIntros "Hf Hb Hsoups _ Hfree _ _ _ _ _".
   iDestruct (big_sepS_delete _ _ z0 with "Hsoups") as "[Hz0 Hsoups]"; first set_solver.
   iDestruct (big_sepS_delete _ _ z1 with "Hsoups") as "[Hz1 _]"; first set_solver.
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].
+  iDestruct (unbound_split with "Hb") as "[Hb1 Hb2]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton (RCB_socket_proto 0)
     with "Hf1").
   iIntros "#Hsi1".
   iApply (aneris_wp_socket_interp_alloc_singleton (RCB_socket_proto 1)
     with "Hf2").
   iIntros "#Hsi2".
-  iApply ("Hmain" with "[] [$Hz0] [$Hz1] [$Hfree]").
+  iApply ("Hmain" with "[] Hb1 Hb2 Hz0 Hz1 Hfree").
   repeat iSplitL; last done.
   - iApply "Hsi1".
   - iApply "Hsi2".

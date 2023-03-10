@@ -85,7 +85,7 @@ Section use_case_proof.
   Lemma wp_use_case_program1 `{!OpLib_Res CtrOp} γ1 γ2 :
     {{{ GlobInv ∗ OpLib_InitToken 0 ∗ init_spec init ∗
         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
-        SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) ∗ unbound "1.1.1.1" {[100%positive]} ∗
+        SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) ∗ unbound {[SocketAddressInet "1.1.1.1" 100]} ∗
         inv use_case_inv_name (use_case_inv γ1 γ2) ∗ own γ1 (Excl ()) }}}
       use_case_program1 @["1.1.1.1"]
     {{{ RET #(); True }}}.
@@ -200,7 +200,7 @@ Section use_case_proof.
   Lemma wp_use_case_program2 `{!OpLib_Res CtrOp} γ1 γ2 :
     {{{ GlobInv ∗ OpLib_InitToken 1 ∗ init_spec init ∗
         ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
-        SocketAddressInet "1.1.1.2" 100 ⤳ (∅, ∅) ∗ unbound "1.1.1.2" {[100%positive]} ∗
+        SocketAddressInet "1.1.1.2" 100 ⤳ (∅, ∅) ∗ unbound {[SocketAddressInet "1.1.1.2" 100]} ∗
         inv use_case_inv_name (use_case_inv γ1 γ2) ∗ own γ2 (Excl ()) }}}
       use_case_program2 @["1.1.1.2"]
     {{{ RET #(); True }}}.
@@ -319,6 +319,8 @@ Section use_case_proof.
          ([∗ list] i↦z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) -∗
          free_ip "1.1.1.1" -∗
          free_ip "1.1.1.2" -∗
+         unbound {[SocketAddressInet "1.1.1.1" 100]} -∗
+         unbound {[SocketAddressInet "1.1.1.2" 100]} -∗
          SocketAddressInet "1.1.1.1" 100 ⤳ (∅, ∅) -∗
          SocketAddressInet "1.1.1.2" 100 ⤳ (∅, ∅) -∗
          WP use_case_program @["system"]
@@ -328,7 +330,7 @@ Section use_case_proof.
     iMod (OpLibSetup_Init with "[//]") as (Res) "(#HGinv & HGs & Htks & #Hinit)".
     iModIntro.
     iExists Res.
-    iIntros "#Hprotos Hfip1 Hfip2 Hsa1 Hsa2".
+    iIntros "#Hprotos Hfip1 Hfip2 Hb1 Hb2 Hsa1 Hsa2".
     iDestruct "Htks" as "(Hitk1 & Hitk2 & _)".
     rewrite /use_case_program.
     iMod (own_alloc (Excl ())) as (γ1) "Htk1"; first done.
@@ -337,15 +339,14 @@ Section use_case_proof.
     { iNext; iExists _; iFrame. iLeft; done. }
     wp_apply aneris_wp_start.
     iSplitL "Hfip1"; first by iNext.
-    iSplitR "Hitk1 Hsa1 Htk1"; last first.
-    { iNext. iIntros "Hfps".
-      iApply (wp_use_case_program1 with "[$]"); done. }
+    iSplitR "Hitk1 Hb1 Hsa1 Htk1"; last first.
+    { iNext. iApply (wp_use_case_program1 with "[$]"); done. }
     iNext.
     wp_pures.
     wp_apply aneris_wp_start.
     iSplitL "Hfip2"; first by iNext.
     iSplit; first done.
-    iNext. iIntros "Hfps".
+    iNext.
     iApply (wp_use_case_program2 with "[$]"); done.
   Qed.
 
@@ -378,7 +379,7 @@ Proof.
     [apply Trivial_Mdl_finitary| |set_solver..|done|done].
   iIntros (HanerisG) "".
   iModIntro.
-  iIntros "Hfx Hsas _ Hfips _ _ _ _ _".
+  iIntros "Hfx Hunbound Hsas _ Hfips _ _ _ _ _".
   rewrite big_sepS_union; last set_solver.
   rewrite !big_sepS_singleton.
   unfold addresses.
@@ -393,6 +394,8 @@ Proof.
   iMod wp_use_case_program as (Res) "Hwp".  
   iDestruct (unallocated_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
   iDestruct (unallocated_split with "Hfx") as "[Hfx1 _]"; [set_solver|].
+  iDestruct (unbound_split with "Hunbound") as "[Hb1 Hb2]"; [set_solver|].
+  iDestruct (unbound_split with "Hb2") as "[Hb2 _]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton
             (@OpLib_SocketProto _ _ _ _ _ _ _ Res 0) with "Hfx0").
   iIntros "#Hsi0".
@@ -401,5 +404,5 @@ Proof.
   iIntros "#Hsi1".
   iAssert ([∗ list] i↦z ∈ addresses, z ⤇ (@OpLib_SocketProto _ _ _ _ _ _ _ Res i))%I as "Hprotos".
   { repeat iSplit; done. }
-  wp_apply ("Hwp" with "Hprotos Hfip1 Hfip2 Hsa1 Hsa2").
+  wp_apply ("Hwp" with "Hprotos Hfip1 Hfip2 Hb1 Hb2 Hsa1 Hsa2").
 Qed.

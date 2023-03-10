@@ -60,7 +60,7 @@ Section transaction_manager.
   (** * Transaction manager spec *)
   Lemma transaction_manager_spec vRMs :
     is_set RMs vRMs →
-    unbound (ip_of_address tm) {[port_of_address tm]} -∗
+    unbound {[tm]} -∗
     ([∗ set] rm ∈ RMs, rm ⤇ rm_si) -∗
     tm ⤇ tm_si -∗
     tm ⤳ (∅, ∅) -∗

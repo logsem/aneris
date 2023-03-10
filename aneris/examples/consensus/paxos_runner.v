@@ -64,7 +64,7 @@ Section runner.
     {{{ v, RET v; True }}}.
   Proof.
     iIntros (Φ) "(#Hinv & #Has_si & #Hps_si & #Hls_si & #Hc_si &
-                  Hls & Hch & Hips & Hfrags & Hpend0 & Hpend1) HΦ".
+                  Hls & Hport & Hch & Hips & Hfrags & Hpend0 & Hpend1) HΦ".
     rewrite /runner.
     do 8 (wp_makeaddress; wp_let).
     wp_apply (wp_set_empty socket_address); [done|]; iIntros (??).
@@ -98,9 +98,9 @@ Section runner.
     iDestruct (big_sepS_delete _ _ a1_addr with "Hfrags") as "((% & Ha1_frag1 & Ha1_frag2) & Hfrags)"; [set_solver|].
     iDestruct (big_sepS_delete _ _ a2_addr with "Hfrags") as "((% & Ha2_frag1 & Ha2_frag2) & Hfrags)"; [set_solver|].
     iDestruct (big_sepS_delete _ _ a3_addr with "Hfrags") as "((% & Ha3_frag1 & Ha3_frag2) & _)"; [set_solver|].
-    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Ha1".
+    wp_apply (aneris_wp_start). iFrame "Ha1".
     iSplitR "Ha1_frag1 Ha1_frag2"; last first.
-    { iIntros "!> Hport".
+    { iIntros "!>".
       wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha1_si Hport Ha1_frag1 Ha1_frag2");
         [done|..]. }
     iModIntro. wp_seq.

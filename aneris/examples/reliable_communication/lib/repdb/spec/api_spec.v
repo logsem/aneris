@@ -125,8 +125,8 @@ Section API_spec.
         Init_leader ∗
         DB_addr ⤳ (∅, ∅) ∗
         DB_addrF ⤳ (∅, ∅) ∗
-        unbound (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-        unbound (ip_of_address DB_addrF) {[port_of_address DB_addrF]} }}}
+        unbound {[DB_addr]} ∗
+        unbound {[DB_addrF]} }}}
       init_leader (s_serializer DB_serialization)
       #DB_addr #DB_addrF @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
@@ -141,8 +141,8 @@ Section API_spec.
         initF ∗
         f2csa ⤳ (∅, ∅) ∗
         f2lsa ⤳ (∅, ∅) ∗
-        unbound (ip_of_address f2csa) {[port_of_address f2csa]} ∗
-        unbound (ip_of_address f2lsa) {[port_of_address f2lsa]} }}}
+        unbound {[f2csa]} ∗
+        unbound {[f2lsa]} }}}
       init_follower (s_serializer DB_serialization)
       #DB_addrF #f2lsa #f2csa @[ip_of_address f2csa]
     {{{ RET #(); True }}}.
@@ -152,7 +152,7 @@ Section API_spec.
     {{{ unallocated {[sa]} ∗
         DB_addr ⤇ leader_si ∗
         sa ⤳ (∅, ∅) ∗
-        unbound (ip_of_address sa) {[port_of_address sa]} }}}
+        unbound {[sa]} }}}
       init_client_leader_proxy (s_serializer DB_serialization)
                                #sa #DB_addr @[ip_of_address sa]
     {{{ wr rd, RET (wr, rd);
@@ -163,7 +163,7 @@ Section API_spec.
     {{{ unallocated {[csa]} ∗
         f2csa ⤇ f_si ∗
         csa ⤳ (∅, ∅) ∗
-        unbound (ip_of_address csa) {[port_of_address csa]} }}}
+        unbound {[csa]} }}}
       init_client_follower_proxy (s_serializer DB_serialization)
       #csa #f2csa @[ip_of_address csa]
       {{{ rd, RET rd;

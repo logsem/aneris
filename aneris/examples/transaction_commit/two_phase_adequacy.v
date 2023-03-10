@@ -39,8 +39,7 @@ Theorem tpc_safe :
 Proof.
   set (Σ := #[anerisΣ (TC_model rms); tcΣ]).
   eapply (@adequacy_safe Σ (TC_model rms) _ _ ips addrs ∅ ∅ ∅);
-    [| |set_solver|set_solver|set_solver|set_solver|set_solver|set_solver|
-      done].
+    [| |set_solver|set_solver|set_solver|set_solver|set_solver|done].
   { apply tc_model_finitary. }
   iIntros (anG).
   iMod pending_alloc as (γ) "Hpend".
@@ -53,7 +52,7 @@ Proof.
   rewrite big_sepS_sep. iDestruct "He" as "[Hwork1 Hwork2]".
   set (tcGI := MkTcG Σ _ _ γ).
   iIntros "!#".
-  iIntros "Hunallocated Hhist Hfrag ? #Hnode _ _ _ _ _".
+  iIntros "Hunallocated Hunbound Hhist Hfrag ? #Hnode _ _ _ _ _".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
   iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.
@@ -61,7 +60,6 @@ Proof.
   iMod (@tc_inv_alloc my_topo _ anG tcGI with "[$Hfrag $Hhist $Hwork2]")
     as "#Hinv".
   iModIntro.
-  rewrite /addrs /rms.
   iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated1 Hunallocated]";
     [set_solver|].
   iModIntro.
@@ -74,7 +72,7 @@ Proof.
   iApply (aneris_wp_socket_interp_alloc (@rm_si my_topo _ _) with "Hunallocated").
   iIntros "#Hrm".
   iPoseProof (runner_spec with "[-]") as "Hspec".
-  { iFrame "∗#". }
+  { iFrame "∗#". rewrite /addrs. rewrite union_comm_L. iFrame. }
   iApply ("Hspec" with "[]"); auto.
 Qed.
 
@@ -130,7 +128,7 @@ Proof.
   iIntros "!#".
   iExists (* (λ _ atr, ⌜trace_steps (λ δ _ δ', δ = δ' ∨ TCNext rms δ δ') atr⌝%I) *)
     (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
-  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
+  iIntros "Hf Hb Hhist ? #Hnode _ _ _ _ _ Hfrag".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
   iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.
@@ -148,7 +146,7 @@ Proof.
     iApply (aneris_wp_socket_interp_alloc (@rm_si my_topo _ _) with "Hfrm").
     iIntros "#Hrm".    
     iPoseProof (runner_spec with "[-]") as "Hspec".
-    { iFrame "∗#". }
+    { iFrame "∗#". rewrite /addrs. rewrite union_comm_L. iFrame. }
     iApply ("Hspec" with "[]"); auto. }
   iIntros (ex atr c Hval Hexst Hauxst Hexend Hauxend Hstuck) "Hsi _".
   iInv tcN as (mdl) ">[Hfrag HrmI]" "_".

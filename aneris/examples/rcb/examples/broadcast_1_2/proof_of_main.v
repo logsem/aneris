@@ -14,13 +14,14 @@ Section main_spec.
   Theorem main_spec :
      ⊢ |={⊤}=> ∃ (_ : RCB_resources Mdl Σ),
     ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ RCB_socket_proto i) -∗
+    unbound {[z0]} -∗ unbound {[z1]} -∗
     z0 ⤳ (∅, ∅) -∗ z1 ⤳ (∅, ∅) -∗
     ([∗ set] ip ∈ ips, free_ip ip) -∗
     WP main @["system"] {{ v, True }}.
   Proof.
     iMod (RCB_init_setup ⊤ with "[//]") as (RCBRS) "(#HGlobinv & Hitks & HGlob & #Hinit)".
     iModIntro. iExists RCBRS.
-    iIntros "#Hsis Hmsg_z0 Hmsg_z1 Hips".
+    iIntros "#Hsis Hunbound_z0 Hunbound_z1 Hmsg_z0 Hmsg_z1 Hips".
     iDestruct "Hitks" as "(Hitk0 & Hitk1 & _)".
     iMod (own_alloc (Excl ())) as (γS1) "Hstk1"; first done.
     iMod (own_alloc (Excl ())) as (γS2) "Hstk2"; first done.
@@ -33,8 +34,8 @@ Section main_spec.
 
     unfold main.
     wp_apply (aneris_wp_start with "[- $Hz0]").
-    iSplitR "Hitk0 Hstk1 Hstk2 Hmsg_z0"; last first.
-    { iIntros "!> Hfree".
+    iSplitR "Hitk0 Hstk1 Hstk2 Hunbound_z0 Hmsg_z0"; last first.
+    { iIntros "!>".
       wp_apply ("Hinit" $! 0%nat z0 with "[] [] [$]");
         [ iPureIntro; by apply is_list_inject | done | ].
       iIntros (deliver broadcast) "(HLoc & _ & Hbroadcast)".
@@ -45,7 +46,7 @@ Section main_spec.
     iModIntro. wp_seq.
     wp_apply (aneris_wp_start with "[- $Hz1]").
     iSplitR; last first.
-    { iIntros "!> Hfree".
+    { iIntros "!>".
       wp_apply ("Hinit" $! 1%nat z1 with "[] [] [$]");
         [ iPureIntro; by apply is_list_inject | done | ].
       iIntros (deliver broadcast) "(HLoc & Hdeliver & _)".

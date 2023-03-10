@@ -144,7 +144,7 @@ Section Specification.
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
-            unbound (ip_of_address addr) {[port_of_address addr]} ∗
+            unbound {[addr]} ∗
             OpLib_InitToken repId
         }}}
           init addrs_val #repId @[ip_of_address addr]
@@ -161,7 +161,7 @@ Section Specification.
             ⌜CRDT_Addresses !! repId = Some addr⌝ ∗
             ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ OpLib_SocketProto i) ∗
             addr ⤳ (∅, ∅) ∗
-            unbound (ip_of_address addr) {[port_of_address addr]} ∗
+            unbound {[addr]} ∗
             OpLib_InitToken repId ∗
             crdt_fun_spec crdt_val
         }}}

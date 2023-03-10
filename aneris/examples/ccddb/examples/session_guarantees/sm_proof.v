@@ -316,7 +316,7 @@ Section spec.
       {{{ RET #(); write_post db_id k v s h }}}.
 
   Theorem sm_setup_spec :
-    {{{ unbound ip {[ port_of_address client_addr ]} ∗
+    {{{ unbound {[ client_addr ]} ∗
         unallocated {[client_addr]} ∗
         client_addr ⤳ (∅, ∅) }}}
       sm_setup #client_addr @[ip]

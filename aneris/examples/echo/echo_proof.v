@@ -22,8 +22,7 @@ Section echo_server_proof.
                  (∀ m', ⌜m.(m_body) = m'.(m_body)⌝ ∗ P m -∗ Ψ m'))%I.
 
   Lemma echo_server_spec (sa : socket_address) :
-    {{{ unbound (ip_of_address sa) {[(port_of_address sa)]} ∗
-        sa ⤳ (∅, ∅) ∗ sa ⤇ srv_si }}}
+    {{{ unbound {[sa]} ∗ sa ⤳ (∅, ∅) ∗ sa ⤇ srv_si }}}
       echo_server #sa @[ip_of_address sa]
     {{{ RET #(); False }}}.
   Proof.
@@ -97,8 +96,7 @@ Section echo_client_proof.
 
   Lemma echo_client_spec (sa srv_sa : socket_address) :
     {{{ unallocated {[sa]} ∗
-        unbound (ip_of_address sa) {[(port_of_address sa)]} ∗
-        sa ⤳ (∅, ∅) ∗ srv_sa ⤇ srv_si }}}
+        unbound {[sa]} ∗ sa ⤳ (∅, ∅) ∗ srv_sa ⤇ srv_si }}}
       echo_client #sa #srv_sa @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof using Mdl dG strG Σ.
@@ -186,8 +184,10 @@ Proof.
   apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); try set_solver.
   { apply unit_model_rel_finitary. }
   iIntros (dinvG).
-  iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
+  iIntros "!> Hunallocated Hunbound Hhist Hfrag Hips Hlbl _ _ _ _".
   iDestruct (unallocated_split with "Hunallocated") as "[Hsrv Hclt]";
+    [set_solver|].
+  iDestruct (unbound_split with "Hunbound") as "[Hbsrv Hbclt]";
     [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton srv_si with "Hsrv").
   iIntros "#Hsrv_si".
@@ -199,21 +199,19 @@ Proof.
   iDestruct "Hips" as "[Hip_srv Hip_clt]".
   rewrite /echo_runner.
   wp_pures.
-  wp_apply (aneris_wp_start {[80%positive : port]}); eauto.
+  wp_apply aneris_wp_start; eauto.
   iSplitL "Hip_srv"; [done|].
-  iSplitR "Hhist_srv"; last first.
-  { iIntros "!> Hfree".
+  iSplitR "Hhist_srv Hbsrv"; last first.
+  { iIntros "!>".
     replace ("0.0.0.0") with (ip_of_address (SocketAddressInet "0.0.0.0" 80))
       by eauto.
-    iApply (echo_server_spec with "[Hfree $Hhist_srv $Hsrv_si]"); [|done].
-    iFrame. }
+    by iApply (echo_server_spec with "[$Hbsrv $Hhist_srv $Hsrv_si]"). }
   iIntros "!>". wp_pures.
-  wp_apply (aneris_wp_start {[80%positive : port]}); eauto.
+  wp_apply aneris_wp_start; eauto.
   iSplitL "Hip_clt"; [done|].
-  iSplitR "Hhist_clt Hclt"; [done|].
-  iIntros "!> Hfree".
+  iSplitR "Hhist_clt Hbclt Hclt"; [done|].
+  iIntros "!>".
   replace ("0.0.0.1") with (ip_of_address (SocketAddressInet "0.0.0.1" 80))
                            by eauto.
-  iApply (echo_client_spec with "[Hfree $Hhist_clt $Hclt $Hsrv_si]"); [|done].
-  iFrame.
+  by iApply (echo_client_spec with "[$Hbclt $Hhist_clt $Hclt $Hsrv_si]").
 Qed.

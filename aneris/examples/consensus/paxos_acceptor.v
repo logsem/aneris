@@ -171,7 +171,7 @@ Section paxos_acceptor.
     ([∗ set] a ∈ Learners, a ⤇ learner_si) -∗
     ([∗ set] p ∈ Proposers, p ⤇ proposer_si) -∗
     (`a) ⤇ acceptor_si -∗
-    unbound ip {[ port_of_address (`a) ]} -∗
+    unbound {[ (`a) ]} -∗
     maxBal_frag a None -∗
     maxVal_frag a None -∗
     WP acceptor int_serializer lv #(`a) @[ip] {{ v, True }}.

@@ -168,7 +168,7 @@ Section Specification.
         {{{ unallocated {[sa]} ∗
              ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) ∗
              sa ⤳ (∅, ∅) ∗
-             unbound (ip_of_address sa) {[port_of_address sa]} }}}
+             unbound {[sa]} }}}
           init #sa srvl @[ip_of_address sa]
         {{{ rd wr, RET (rd, wr);
             Obs [] ∗

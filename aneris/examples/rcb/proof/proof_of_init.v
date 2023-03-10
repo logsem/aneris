@@ -52,7 +52,7 @@ Section proof.
       ⌜RCB_addresses !! i = Some z⌝ →
       {{{ ([∗ list] i ↦ z ∈ RCB_addresses, z ⤇ socket_proto γGsnap i) ∗
           z ⤳ (∅, ∅) ∗
-          unbound (ip_of_address z) {[port_of_address z]} ∗
+          unbound {[z]} ∗
           lhst_lock γLs i ∅ ∗
           lhst_user γLs i ∅
       }}}

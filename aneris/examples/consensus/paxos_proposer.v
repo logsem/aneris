@@ -419,7 +419,7 @@ Section paxos_proposer.
     is_set Acceptors av →
     inv paxosN paxos_inv -∗
     ([∗ set] a ∈ Acceptors, a ⤇ acceptor_si) -∗
-    unbound (ip_of_address (`p)) {[port_of_address (`p)]} -∗
+    unbound {[(`p)]} -∗
     (`p) ⤇ proposer_si -∗
     pending_class i 0 -∗
     WP proposer' int_serializer av #(`p) #i #(size Proposers) #`z

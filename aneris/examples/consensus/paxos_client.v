@@ -16,7 +16,7 @@ Section paxos_client.
   Lemma client_spec c R T :
     inv paxosN paxos_inv -∗
     c ⤇ client_si -∗
-    unbound (ip_of_address c) {[ port_of_address c ]} -∗
+    unbound {[c]} -∗
     c @ client_si ⤳# (R, T) -∗
     WP client int_serializer #c
        @[ip_of_address c] {{ v, ∃ (z : Value), ⌜v = $z⌝ }}.
@@ -73,7 +73,7 @@ Section paxos_client.
     is_set Acceptors av →
     `l ⤇ learner_si -∗
     c ⤇ client_si -∗
-    unbound ip {[ port_of_address (`l) ]} -∗
+    unbound {[ (`l) ]} -∗
     `l @ learner_si ⤳# (R, T) -∗
     WP learner' int_serializer av #(`l) #c @[ip] {{ v, True }}.
   Proof.

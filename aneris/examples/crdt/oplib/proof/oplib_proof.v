@@ -643,7 +643,7 @@ Section OpLib_Proof.
          ⌜CRDT_Addresses !! i = Some addr⌝ ∗
          ([∗ list] i ↦ z ∈ CRDT_Addresses, z ⤇ RCB_socket_proto i) ∗
          addr ⤳ (∅, ∅) ∗
-         unbound (ip_of_address addr) {[port_of_address addr]} ∗
+         unbound {[addr]} ∗
          (∃ γown γfor γsub γcc,
              init_token i ∗
              user_tok i γown γsub γcc ∗

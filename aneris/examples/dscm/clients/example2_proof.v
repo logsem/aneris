@@ -247,7 +247,7 @@ Section with_Σ.
     unallocated {[sa1]} -∗
     ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) -∗
     sa1 ⤳ (∅, ∅) -∗
-    unbound (ip_of_address sa1) {[port_of_address sa1]} -∗
+    unbound {[sa1]} -∗
     init_spec init -∗
     WP thread init sa1 k n1 dbsv @[ip_of_address sa1]
        {{ v, ∃ h2f1 h1f we1 h2f2,
@@ -297,8 +297,8 @@ Section with_Σ.
     GlobalInv -∗
     init_spec init -∗
     {{{ sa1 ⤳ (∅, ∅) ∗ sa2 ⤳ (∅, ∅) ∗
-        unbound (ip_of_address sa1) {[port_of_address sa1]} ∗
-        unbound (ip_of_address sa2) {[port_of_address sa2]} ∗
+        unbound {[sa1]} ∗
+        unbound {[sa2]} ∗
         k ↦ₖ None ∗ unallocated {[sa1;sa2]} ∗
         ([∗ list] i ↦ z ∈ DB_addresses, z ⤇ DB_socket_proto) }}}
       prog init sa1 sa2 k n1 n2 dbsv @[ip]
