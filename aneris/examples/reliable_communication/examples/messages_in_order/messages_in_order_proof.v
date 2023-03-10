@@ -62,8 +62,7 @@ Section proof_of_the_code.
  Lemma wp_server :
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
           RCParams_srv_saddr ⤳ (∅, ∅) ∗
-        unbound (ip_of_address RCParams_srv_saddr)
-                   {[port_of_address RCParams_srv_saddr]} ∗
+        unbound {[RCParams_srv_saddr]} ∗
         SrvInit }}}
        server #RCParams_srv_saddr @[ip_of_address RCParams_srv_saddr]
     {{{ skt, RET skt; True }}}.
@@ -85,7 +84,7 @@ Section proof_of_the_code.
   Lemma wp_client clt_addr :
     {{{ RCParams_srv_saddr ⤇ reserved_server_socket_interp ∗
         clt_addr ⤳ (∅, ∅) ∗
-        unbound (ip_of_address clt_addr) {[port_of_address clt_addr]} ∗
+        unbound {[clt_addr]} ∗
         unallocated {[clt_addr]} }}}
        client #clt_addr #srv_sa @[ip_of_address clt_addr]
     {{{ skt, RET skt; True }}}.
@@ -136,6 +135,7 @@ Section proof_of_the_main.
     ⊢ |={⊤}=>
          srv_sa ⤇ @reserved_server_socket_interp _ _ _ UP SnRes -∗
          unallocated {[clt_sa]} -∗
+         unbound {[srv_sa;clt_sa]} -∗
          free_ip "0.0.0.0" -∗
          free_ip "0.0.0.1" -∗
          SocketAddressInet "0.0.0.0" 80 ⤳ (∅, ∅) -∗
@@ -147,18 +147,19 @@ Section proof_of_the_main.
     destruct HsAPIn, HsAPIs.
     iIntros "".
     iModIntro.
-    iIntros "#Hsrv Hf Hfree1 Hfree2 Hsa1 Hsa2 HSrvInit".
+    iIntros "#Hsrv Hf Hb Hfree1 Hfree2 Hsa1 Hsa2 HSrvInit".
     rewrite /main.
+    iDestruct (unbound_split with "Hb") as "[Hb_srv Hb_clt]"; [set_solver|].
     wp_apply aneris_wp_start.
     iFrame "Hfree1".
-    iSplitR "Hsa1 HSrvInit"; last first.
-    { iNext. iIntros "Hfps".
+    iSplitR "Hsa1 HSrvInit Hb_srv"; last first.
+    { iNext.
       iApply (@wp_server _ _ _ _ _ _ SnRes chn _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     wp_apply aneris_wp_start.
     iFrame "Hfree2".
     iSplit; first done.
-    iNext. iIntros "Hfps".
+    iNext.
     iApply (@wp_client _ _ _ _ _ _ SnRes chn _ _ clt_sa with "[-]"); last done.
     by iFrame "#∗".
   Qed.
@@ -207,7 +208,6 @@ Proof.
   set (Σ := #[anerisΣ dummy_model; SpecChanΣ]).
   eapply (@adequacy Σ dummy_model _ _ ips {[srv_sa; clt_sa]} ∅ ∅ ∅);
     try done; last first.
-  { set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   iMod (Reliable_communication_init_instance ⊤ UP)
@@ -223,7 +223,7 @@ Proof.
   split; try done.
   split; try done.
   iModIntro.
-  iIntros "Hf Hb Hfg Hips _ _ _ _ _".
+  iIntros "Hf Hunbound Hb Hfg Hips _ _ _ _ _".
   simpl in *.
   iDestruct (unallocated_split with "Hf") as "[Hf_srv Hf]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton
@@ -237,5 +237,5 @@ Proof.
     first set_solver.
   iDestruct (big_sepS_delete _ _ clt_sa with "Hms") as "[Hm1 _]";
     first set_solver.
-  iApply ("Hmain" with "[$Hsi][$Hf][$Hip0][$Hip1][$Hm0][$Hm1][$HsrvInit]").
+  iApply ("Hmain" with "[$Hsi][$Hf][$Hunbound][$Hip0][$Hip1][$Hm0][$Hm1][$HsrvInit]").
 Qed.
