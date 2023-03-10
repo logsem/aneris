@@ -26,16 +26,15 @@ Theorem adequacy_groups Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trac
      observed_receive_groups obs_rec_sas -∗
      WP e @[ip] ⊤ {{ v, ⌜φ v⌝ }}) →
   ip ∉ IPs →
-  (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hip Hfixdom Hste Hsce Hmse.
+  intros HMdlfin Hwp Hip Hste Hsce Hmse.
   eapply (adequacy_groups _ A _ obs_send_sas obs_rec_sas);
-    [done|done|done|done|done| |done|done|done|done|done].
+    [done|done|done|done|done| |done|done|done|done].
   intros dg.
   iMod (Hwp dg) as "Hwp".
   iModIntro. iIntros "?????????? /=".
@@ -61,14 +60,13 @@ Theorem adequacy1 Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_mode
      WP e @[ip] ⊤ {{ v, ⌜φ v⌝ }}) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros HMdlfin Hwp Hsendle Hrecvle Hip Hfixdom Hste Hsce Hmse.
-  eapply adequacy1; [done| |apply Hsendle|done|done|done|done|done|done].
+  intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
+  eapply adequacy1; [done| |apply Hsendle|done|done|done|done|done].
   intros dg.
   iMod (Hwp dg) as "Hwp".
   iModIntro. iIntros "?????????? /=".
@@ -94,14 +92,13 @@ Theorem adequacy Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model
      WP e @[ip] ⊤ {{ v, ⌜φ v⌝ }}) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros HMdlfin Hwp Hsendle Hrecvle Hip Hfixdom Hste Hsce Hmse.
-  eapply adequacy; [done| |apply Hsendle|done|done|done|done|done|done].
+  intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
+  eapply adequacy; [done| |apply Hsendle|done|done|done|done|done].
   intros dg.
   iMod (Hwp dg) as "Hwp".
   iModIntro. iIntros "?????????? /=".
@@ -130,14 +127,13 @@ Theorem adequacy_hoare_groups Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_t
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →
   ip ∉ IPs →
-  (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros ? Hwp ?????.
+  intros ? Hwp ????.
   eapply (adequacy_groups _ _ _ A _ obs_send_sas obs_rec_sas); eauto.
   intros ?. iModIntro.
   iDestruct Hwp as "#Hwp".
@@ -162,13 +158,12 @@ Theorem adequacy1_hoare Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trac
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros ??? Hwp ?????.
+  intros ??? Hwp ????.
   eapply (adequacy1 _ _ _ _ _ obs_send_sas obs_rec_sas); eauto.
   intros ?. iModIntro.
   iDestruct Hwp as "#Hwp".
@@ -193,13 +188,12 @@ Theorem adequacy_hoare Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace
           e @[ip]
       {{{ v, RET v; ⌜φ v⌝ }}}) →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   aneris_adequate e ip σ φ.
 Proof.
-  intros ??? Hwp ?????.
+  intros ??? Hwp ????.
   eapply (adequacy _ _ _ _ _ obs_send_sas obs_rec_sas); eauto.
   intros ?. iModIntro.
   iDestruct Hwp as "#Hwp".

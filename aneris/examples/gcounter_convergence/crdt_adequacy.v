@@ -70,7 +70,6 @@ Proof.
   { set_solver. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
-  { apply helper. } 
   { done. }
   { done. }
   { done. }
@@ -98,7 +97,6 @@ Proof.
   { apply aneris_sim_rel_finitary, GcounterM_rel_finitary. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
-  { apply helper. }
   { done. }
   { done. }
   { done. }

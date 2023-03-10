@@ -269,7 +269,6 @@ Proof.
   set (Σ := #[anerisΣ dummy_model; SpecChanΣ]).
   eapply (@adequacy Σ dummy_model _ _ ips {[clt_sa0; clt_sa1; srv_sa]} ∅ ∅ ∅);
     try done; last first.
-  { set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   iMod (Reliable_communication_init_instance ⊤ UP)
