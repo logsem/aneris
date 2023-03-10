@@ -76,7 +76,6 @@ Section state_interpretation.
 
   (* aneris_state_interp *)
   Lemma aneris_state_interp_init ips ports A σ γs ip :
-    (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ ips) →
     state_heaps σ = {[ip:=∅]} →
     state_sockets σ = {[ip:=∅]} →
     state_ms σ = ∅ →
@@ -93,7 +92,7 @@ Section state_interpretation.
     unbound_auth ports -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
-    iIntros (Hfixdom Hste Hsce Hmse Hip)
+    iIntros (Hste Hsce Hmse Hip)
             "Hmp #Hn Hh Hs Hm Hsags Hunallocated Hsif HipsCtx HPiu".
     iDestruct (socket_address_group_ctx_valid with "Hsags") as %[Hdisj Hne].
     iExists _, _; iFrame.

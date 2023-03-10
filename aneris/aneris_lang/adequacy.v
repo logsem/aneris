@@ -74,14 +74,13 @@ Theorem adequacy_groups `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model
   aneris_model_rel_finitary Mdl →
   wp_group_proto IPs A lbls obs_send_sas obs_rec_sas s e ip φ →
   ip ∉ IPs →
-  (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hip Hfixdom Hste Hsce Hmse.
+  intros HMdlfin Hwp Hip Hste Hsce Hmse.
   eapply (adequacy_xi _ _ _ _ (sim_rel (λ _ _, True))  _ _ _
                       (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))).
   { by eapply aneris_sim_rel_finitary. }
@@ -180,13 +179,12 @@ Theorem adequacy1 `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
   wp_group_single_proto IPs A lbls obs_send_sas obs_rec_sas s e ip φ →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros HMdlfin Hwp Hsendle Hrecvle Hip Hfixdom Hste Hsce Hmse.
+  intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
   eapply (adequacy_groups _
                          (to_singletons A)
                          _
@@ -223,11 +221,6 @@ Proof.
       (λ x, receiveon_evs x [])%I
                  with "[] Hrecv") as "$".
     iIntros "!>" (x) "Hx". eauto. }
-  intros sag sa Hsag Hsa.
-  assert (sag = {[sa]}) as ->.
-  { pose proof (elem_of_to_singletons_inv A _ Hsag) as [sag' Hsag'].
-    set_solver. }
-  set_solver.
 Qed.
 
 Theorem adequacy `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs A
@@ -238,13 +231,12 @@ Theorem adequacy `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} 
   wp_proto IPs A lbls obs_send_sas obs_rec_sas s e ip φ →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros HMdlfin Hwp Hsendle Hrecvle Hip Hfixdom Hste Hsce Hmse.
+  intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
   eapply (adequacy_groups _
                          (to_singletons A)
                          _
@@ -281,12 +273,6 @@ Proof.
       (λ x, receiveon_evs x [])%I
                  with "[] Hrecv") as "$".
     iIntros "!>" (x) "Hx". eauto. }
-  intros sag sa Hsag Hsa.
-  apply Hfixdom.
-  assert (sag = {[sa]}) as ->.
-  { pose proof (elem_of_to_singletons_inv A _ Hsag) as [sag' Hsag'].
-    set_solver. }
-  set_solver.
 Qed.
 
 Definition safe e σ := @adequate aneris_lang NotStuck e σ (λ _ _, True).
@@ -299,7 +285,6 @@ Theorem adequacy_groups_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_
   aneris_model_rel_finitary Mdl →
   wp_group_proto IPs A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
   ip ∉ IPs →
-  (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
@@ -312,7 +297,6 @@ Theorem adequacy1_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model 
   wp_group_single_proto IPs A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
@@ -325,7 +309,6 @@ Theorem adequacy_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model M
   wp_proto IPs A lbls obs_send_sas obs_rec_sas NotStuck e ip (λ _, True) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
@@ -341,12 +324,11 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
            (φ: language.val aneris_lang → Prop)
            ip e1 σ1 :
   all_disjoint A →
-  set_Forall (λ sag, sag ≠ ∅) A →
+  set_Forall is_ne A →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   rel_finitary (sim_rel ξ) ->
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
-  (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
@@ -391,7 +373,7 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
+  intros Hsc Hips Hheaps Hsockets Hms Hwp.
   epose proof (sim_and_adequacy_xi _ _ Σ s (sim_rel ξ) φ (mkExpr ip e1) σ1 Mdl.(model_state_initial) Hsc _)
     as [? ?] =>//.
   split; [|done].
@@ -485,7 +467,6 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
   rel_finitary (sim_rel ξ) →
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
@@ -530,7 +511,7 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
                           (trace_singleton Mdl.(model_state_initial)) ∧
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups _ _ _
                          (to_singletons A)
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)); eauto.
@@ -538,12 +519,6 @@ Proof.
   { apply to_singletons_is_ne. }
   { set_solver. }
   { set_solver. }
-  { intros sag sa Hsag Hsa'.
-    apply Hsa.
-    assert (sag = {[sa]}) as ->.
-    { pose proof (elem_of_to_singletons_inv A _ Hsag) as [sag' Hsag'].
-      set_solver. }
-    by rewrite elem_of_to_singletons. }
   iIntros (Mdl').
   iMod (Hwp Mdl') as (trace_inv Φ) "Hwp".
   iModIntro.
@@ -587,7 +562,6 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
   rel_finitary (sim_rel ξ) ->
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
@@ -632,7 +606,7 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
                           (trace_singleton Mdl.(model_state_initial)) ∧
    adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups _ _ _
                          (to_singletons A)
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)
@@ -641,12 +615,6 @@ Proof.
   { apply to_singletons_is_ne. }
   { set_solver. }
   { set_solver. }
-  { intros sag sa Hsag Hsa'.
-    apply Hsa.
-    assert (sag = {[sa]}) as ->.
-    { pose proof (elem_of_to_singletons_inv A _ Hsag) as [sag' Hsag'].
-      set_solver. }
-    by rewrite elem_of_to_singletons. }
   iIntros (Mdl').
   iMod (Hwp Mdl') as (trace_inv Φ) "Hwp".
   iModIntro.
@@ -686,13 +654,12 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
            (ξ: execution_trace aneris_lang → auxiliary_trace (aneris_to_trace_model Mdl) → Prop)
            ip e1 σ1 :
   all_disjoint A →
-  set_Forall (λ sag, sag ≠ ∅) A →
+  set_Forall is_ne A →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   (* The model has finite branching *)
   rel_finitary (sim_rel ξ) →
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
-  (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ IPs) →
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
@@ -734,7 +701,7 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
     (trace_singleton Mdl.(model_state_initial)).
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
+  intros Hsc Hips Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups
           _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True)) =>//.
   iIntros (?) "".
@@ -763,7 +730,6 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
   rel_finitary (sim_rel ξ) →
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
@@ -804,7 +770,7 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
     (trace_singleton ([(mkExpr ip e1)], σ1))
     (trace_singleton Mdl.(model_state_initial)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy1_with_trace_inv
           _ _ _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True))=>//.
   iIntros (?) "".
@@ -834,7 +800,6 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
   rel_finitary (sim_rel ξ) →
   (* The initial configuration satisfies certain properties *)
   ip ∉ IPs →
-  (∀ a, a ∈ A → ip_of_address a ∈ IPs) →
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
@@ -876,7 +841,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
     (trace_singleton Mdl.(model_state_initial)) ∧
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hsa Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
   eapply (simulation_adequacy_with_trace_inv
           _ _ _ A obs_send_sas obs_rec_sas)=>//.
   iIntros (?) "".
