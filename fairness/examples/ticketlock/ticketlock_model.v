@@ -44,6 +44,19 @@ Section GsetMap.
 
 End GsetMap.
 
+
+Section GsetMapProperties.
+
+  Lemma gset_map_compose {M N T} 
+    `{EqDecision M} `{EqDecision N} `{EqDecision T}
+    `{Countable M} `{Countable N} `{Countable T}
+    (f: M -> N) (g: T -> M) m:
+    gset_map (f ∘ g) m = gset_map f (gset_map g m). 
+  Proof using. set_solver. Qed. 
+
+End GsetMapProperties.
+
+
 (* TODO: ? generalize to Model *)
 Section ExtModels2.
   Context (M: FairModel).
@@ -53,9 +66,12 @@ Section ExtModels2.
   (* ext transitions index *)
   Context {EI: Type} {DecEI: EqDecision EI} {CntEI: Countable EI}.
   Context (ETs: EI -> option (fmstate M -> fmstate M -> Prop)).
-  Hypothesis next_ext_dec:
-    forall i rel st (EXTi: ETs i = Some rel),
-      Decision (∃ st', rel st st'). 
+  (* Hypothesis next_ext_dec: *)
+  (*   forall i rel st (EXTi: ETs i = Some rel), *)
+  (*     Decision (∃ st', rel st st').  *)
+  Context (active_exts: fmstate M -> gset EI).
+  Hypothesis (active_exts_spec: forall st ι, ι ∈ active_exts st <-> 
+                                          ∃ st' rel, ETs ι = Some rel /\ rel st st').
 
 
   (* Definition add_indices := {i: nat | i < length ETs}.  *)
@@ -65,11 +81,10 @@ Section ExtModels2.
   Definition ext_role: Type := (fmrole M + env_role). 
 
   Global Instance env_role_EqDec: EqDecision env_role. 
-  Proof using DecEI. solve_decision. Qed. 
+  Proof using -DecEI. clear -DecEI. solve_decision. Qed. 
 
   Global Instance env_role_cnt: Countable env_role. 
-  Proof using CntEI.
-    destruct CntEI.
+  Proof.
     refine {| 
         encode r := match r with | env i => encode i end;
         decode i := match (decode i) with | Some r => Some (env r) | None => None end
@@ -88,26 +103,27 @@ Section ExtModels2.
   (* Definition env_role': gset env_role := *)
   (*   list_to_set (map env (seq 0 (length ETs))). *)
   
-  Instance next_ext_dec':
-    ∀ st x, Decision ((λ ρ, ∃ st', ext_trans st (Some (inr ρ)) st') x).
-  Proof using next_ext_dec. 
-    intros st [i].
-    destruct (ETs i) eqn:RELi.
-    2: { right. intros [st' STEP]. inversion STEP. congruence. }
-    specialize (@next_ext_dec i P st RELi).
-    destruct next_ext_dec as [EX | NEX]; auto. 
-    - left. destruct EX as [st' TRANS].
-      exists st'. econstructor; eauto.
-    - right. intros [st' TRANS]. destruct NEX.
-      inversion TRANS. subst. 
-      exists st'. congruence. 
-  Qed.
+  (* Instance next_ext_dec': *)
+  (*   ∀ st x, Decision ((λ ρ, ∃ st', ext_trans st (Some (inr ρ)) st') x). *)
+  (* Proof using next_ext_dec.  *)
+  (*   intros st [i]. *)
+  (*   destruct (ETs i) eqn:RELi. *)
+  (*   2: { right. intros [st' STEP]. inversion STEP. congruence. } *)
+  (*   specialize (@next_ext_dec i P st RELi). *)
+  (*   destruct next_ext_dec as [EX | NEX]; auto.  *)
+  (*   - left. destruct EX as [st' TRANS]. *)
+  (*     exists st'. econstructor; eauto. *)
+  (*   - right. intros [st' TRANS]. destruct NEX. *)
+  (*     inversion TRANS. subst.  *)
+  (*     exists st'. congruence.  *)
+  (* Qed. *)
 
   (* TODO: is it possible to express the inr lifting 
      without requiring the decidability above? *)
   Definition ext_live_roles (st: fmstate M): gset ext_role :=
     gset_map inl (live_roles M st) ∪
-    gset_map inr (filter (fun ρ => exists st', ext_trans st (Some (inr ρ)) st') env_role').
+      (* gset_map inr (filter (fun ρ => exists st', ext_trans st (Some (inr ρ)) st') env_role'). *)
+      gset_map (inr ∘ env) (active_exts st). 
 
   Lemma ext_live_spec:
     ∀ s ρ s', ext_trans s (Some ρ) s' → ρ ∈ ext_live_roles s.
@@ -116,17 +132,13 @@ Section ExtModels2.
     inversion TRANS; subst; simpl in *.
     - apply elem_of_union_l. apply gset_map_in.
       eapply fm_live_spec; eauto. 
-    - apply elem_of_union_r. apply gset_map_in.
-      apply elem_of_filter.
-      split.
-      { exists s'. eauto. }
-      unfold env_role'. apply elem_of_list_to_set.
-      apply elem_of_list_fmap_1. apply elem_of_seq.
-      apply lookup_lt_Some in EXTi. lia.
+    - apply elem_of_union_r.
+      rewrite gset_map_compose. do 2 apply gset_map_in.
+      apply active_exts_spec. eauto.
   Qed.
-                      
+  
   Definition ext_model: FairModel.
-  Proof using next_ext_dec M ETs.
+  Proof using All. 
     refine({|
               fmstate := fmstate M;
               fmrole := ext_role;
@@ -141,7 +153,7 @@ End ExtModels2.
 
 
 Section SetFairness.
- 
+  
   Definition set_fair_model_trace {M} (T: gset (fmrole M)) tr :=
     forall ρ (Tρ: ρ ∈ T), fair_model_trace ρ tr. 
 
@@ -162,10 +174,10 @@ Section Model.
   Let tl_role_map := gmap tl_role tl_role_st. 
 
   Record tl_st := mkTlSt {
-      owner: nat;
-      ticket: nat;
-      role_map: tl_role_map
-    }. 
+                      owner: nat;
+                      ticket: nat;
+                      role_map: tl_role_map
+                    }. 
 
   #[global] Instance tl_role_stage_eqdec: EqDecision tl_role_stage. 
   Proof using. solve_decision. Qed. 
@@ -256,27 +268,71 @@ Section Model.
             |}).
   Defined.
 
-  Inductive allows_unlock : tl_st -> tl_st -> Prop :=
-  | adds_unlock_step o t ρ rm (LOCK: rm !! ρ = Some (tl_U o, false)):
-    allows_unlock (mkTlSt o t rm) (mkTlSt o t (<[ρ := (tl_U o, true)]> rm))
-  .
 
-  Definition tl_ext_trans := [allows_unlock]. 
+  Section TlExtTrans.
 
-  Lemma tl_next_ext_dec: 
-    ∀ i rel st, tl_ext_trans !! i = Some rel → Decision (∃ st', rel st st').
-  Proof using. 
-    unfold tl_ext_trans. intros ? ? ? RELi.
-    destruct i; try done. simpl in *. inversion RELi. subst. clear RELi.
-    destruct st as [o t rm]. 
-    destruct (role_of_dec rm (tl_U o, false)) as [[r LOCK] | FREE].
-    - left. eexists. econstructor. eauto.
-    - right. intros [st' TRANS]. inversion TRANS. subst.
-      edestruct FREE; eauto.
-  Qed. 
-  
+    Inductive allows_unlock : tl_st -> tl_st -> Prop :=
+    | adds_unlock_step o t ρ rm (LOCK: rm !! ρ = Some (tl_U o, false)):
+      allows_unlock (mkTlSt o t rm) (mkTlSt o t (<[ρ := (tl_U o, true)]> rm))
+    .
+
+
+    Inductive tl_EI := eiU | eiR (ρ: tl_role).
+
+    Definition tl_ETs (ι: tl_EI) := 
+      match ι with
+      | eiU => Some allows_unlock
+      | _ => None
+      end. 
+
+    Global Instance tl_EI_dec: EqDecision tl_EI. 
+    Proof using. solve_decision. Qed. 
+
+    Global Instance tl_EI_cnt: Countable tl_EI. 
+    Proof using.
+    Admitted.
+
+      (* Lemma tl_next_ext_dec:  *)
+      (*   ∀ i rel st, tl_ETs i = Some rel → Decision (∃ st', rel st st'). *)
+      (* Proof using.  *)
+      (*   unfold tl_ext_trans. intros ? ? ? RELi. *)
+      (*   destruct i; try done. simpl in *. inversion RELi. subst. clear RELi. *)
+      (*   destruct st as [o t rm].  *)
+      (*   destruct (role_of_dec rm (tl_U o, false)) as [[r LOCK] | FREE]. *)
+      (*   - left. eexists. econstructor. eauto. *)
+      (*   - right. intros [st' TRANS]. inversion TRANS. subst. *)
+      (*     edestruct FREE; eauto. *)
+      (* Qed.  *)
+
+    Lemma allows_unlock_ex_dec: 
+      forall st, Decision (∃ st', allows_unlock st st'). 
+    Proof using. 
+      intros [o t rm]. 
+      destruct (role_of_dec rm (tl_U o, false)) as [[r LOCK] | FREE].
+      - left. eexists. econstructor. eauto.
+      - right. intros [st' TRANS]. inversion TRANS. subst.
+        edestruct FREE; eauto.
+    Qed. 
+
+    Definition tl_active_exts st: gset tl_EI := 
+      if (allows_unlock_ex_dec st) then {[ eiU ]} else ∅. 
+
+    Lemma tl_active_exts_spec st ι:
+      ι ∈ tl_active_exts st <-> ∃ st' rel, tl_ETs ι = Some rel /\ rel st st'.
+    Proof using. 
+      unfold tl_active_exts. destruct ι; simpl in *.
+      2: { admit. }
+      destruct (allows_unlock_ex_dec st).
+      2: { split; [set_solver| ]. intros [st' [rel [UNL REL]]].
+           destruct n. exists st'. congruence. }
+      destruct e as [st' UNL]. etransitivity; [apply elem_of_singleton| ].
+      split; auto. intros _. eauto.
+    Admitted. 
+    
+  End TlExtTrans.  
+
   Section ProgressProperties.
-    Context {tr: mtrace (ext_model tl_fair_model [allows_unlock] tl_next_ext_dec)}. 
+    Context {tr: mtrace (ext_model tl_fair_model _ _ tl_active_exts_spec)}. 
 
   End ProgressProperties. 
 
