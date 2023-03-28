@@ -49,50 +49,52 @@ Section ExtModels2.
   Context (M: FairModel).
   (* TODO: ??? *)
   (* Context (ETs: list (relation (fmstate M))). *)
-  Context (ETs: list (fmstate M -> fmstate M -> Prop)).
+  (* Context {EI: Type} (ETs: EI -> (fmstate M -> fmstate M -> Prop)). *)
+  (* ext transitions index *)
+  Context {EI: Type} {DecEI: EqDecision EI} {CntEI: Countable EI}.
+  Context (ETs: EI -> option (fmstate M -> fmstate M -> Prop)).
   Hypothesis next_ext_dec:
-    forall i rel st (EXTi: ETs !! i = Some rel),
+    forall i rel st (EXTi: ETs i = Some rel),
       Decision (∃ st', rel st st'). 
 
 
   (* Definition add_indices := {i: nat | i < length ETs}.  *)
   (* TODO: rename? *)
-  Inductive env_role := env (i: nat). 
+  (* Inductive env_role := env (i: nat).  *)
+  Inductive env_role := env (i: EI).
   Definition ext_role: Type := (fmrole M + env_role). 
 
   Global Instance env_role_EqDec: EqDecision env_role. 
-  Proof using. solve_decision. Qed. 
+  Proof using DecEI. solve_decision. Qed. 
 
   Global Instance env_role_cnt: Countable env_role. 
-  Proof using.
+  Proof using CntEI.
+    destruct CntEI.
     refine {| 
-        encode r := match r with | env i => Pos.of_nat (i + 1) end;
-        decode i := Some (env (Pos.to_nat i - 1))
+        encode r := match r with | env i => encode i end;
+        decode i := match (decode i) with | Some r => Some (env r) | None => None end
       |}.
-    intros. destruct x. simpl.
-    rewrite Nat2Pos.id; [| lia].
-    repeat f_equal. lia.
+    intros. destruct x.
+    by rewrite decode_encode.
   Qed.
 
   Inductive ext_trans: fmstate M -> option ext_role -> fmstate M -> Prop :=
   | ext_model_step s1 ρ s2 (STEP: fmtrans M s1 (Some ρ) s2):
     ext_trans s1 (Some (inl ρ)) s2
-  | ext_ext_step s1 s2 i rel (EXTi: ETs !! i = Some rel) (REL: (rel s1 s2: Prop)):
+  | ext_ext_step s1 s2 i rel (EXTi: ETs i = Some rel) (REL: (rel s1 s2: Prop)):
     ext_trans s1 (Some (inr (env i))) s2. 
 
-  (* TODO: rename? *)
-  Definition env_role': gset env_role :=
-    list_to_set (map env (seq 0 (length ETs))).
+  (* (* TODO: rename? *) *)
+  (* Definition env_role': gset env_role := *)
+  (*   list_to_set (map env (seq 0 (length ETs))). *)
   
   Instance next_ext_dec':
     ∀ st x, Decision ((λ ρ, ∃ st', ext_trans st (Some (inr ρ)) st') x).
   Proof using next_ext_dec. 
     intros st [i].
-    destruct (le_lt_dec (length ETs) i) as [GE | LT]. 
-    { right. intros [st' STEP]. inversion STEP. subst.
-      apply lookup_lt_Some in EXTi. lia. }
-    specialize (@next_ext_dec i (ETs !!! i) st).
-    epose proof (@list_lookup_lookup_total_lt _ _ _ _ LT) as EQi.      
+    destruct (ETs i) eqn:RELi.
+    2: { right. intros [st' STEP]. inversion STEP. congruence. }
+    specialize (@next_ext_dec i P st RELi).
     destruct next_ext_dec as [EX | NEX]; auto. 
     - left. destruct EX as [st' TRANS].
       exists st'. econstructor; eauto.
