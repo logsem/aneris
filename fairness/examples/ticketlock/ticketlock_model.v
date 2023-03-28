@@ -254,9 +254,27 @@ Section Model.
             |}).
   Defined.
 
+  Inductive allows_unlock : tl_st -> tl_st -> Prop :=
+  | adds_unlock_step o t ρ rm (LOCK: rm !! ρ = Some (tl_U o, false)):
+    allows_unlock (mkTlSt o t rm) (mkTlSt o t (<[ρ := (tl_U o, true)]> rm))
+  .
+
+  Definition tl_ext_trans := [allows_unlock]. 
+
+  Lemma tl_next_ext_dec: 
+    ∀ i rel st, tl_ext_trans !! i = Some rel → Decision (∃ st', rel st st').
+  Proof using. 
+    unfold tl_ext_trans. intros ? ? ? RELi.
+    destruct i; try done. simpl in *. inversion RELi. subst. clear RELi.
+    destruct st as [o t rm]. 
+    destruct (role_of_dec rm (tl_U o, false)) as [[r LOCK] | FREE].
+    - left. eexists. econstructor. eauto.
+    - right. intros [st' TRANS]. inversion TRANS. subst.
+      edestruct FREE; eauto.
+  Qed. 
   
   Section ProgressProperties.
-    Context {tr: mtrace (ext_model 
+    Context {tr: mtrace (ext_model tl_fair_model [allows_unlock] tl_next_ext_dec)}. 
 
   End ProgressProperties. 
 
