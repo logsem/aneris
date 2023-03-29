@@ -42,6 +42,14 @@ Section GsetMap.
     apply elem_of_list_fmap_1. apply elem_of_elements; auto.
   Qed. 
 
+  Lemma gset_map_in_inj (f: M -> N) m a (INJ: injective f):
+    a ∈ m <-> f a ∈ gset_map f m.
+  Proof using.
+    split; [apply gset_map_in| ]. intros IN.
+    apply gset_map_spec in IN as [b [IN EQ]].
+    apply INJ in EQ. congruence.
+  Qed. 
+
 End GsetMap.
 
 
@@ -272,17 +280,21 @@ Section Model.
   Section TlExtTrans.
 
     Inductive allows_unlock : tl_st -> tl_st -> Prop :=
-    | adds_unlock_step o t ρ rm (LOCK: rm !! ρ = Some (tl_U o, false)):
+    | allows_unlock_step o t ρ rm (LOCK: rm !! ρ = Some (tl_U o, false)):
       allows_unlock (mkTlSt o t rm) (mkTlSt o t (<[ρ := (tl_U o, true)]> rm))
     .
 
+    Inductive allows_lock ρ : tl_st -> tl_st -> Prop :=
+    | allows_lock_step t o rm (LOCK: rm !! ρ = Some (tl_L, false)):
+      allows_lock ρ (mkTlSt o t rm) (mkTlSt o t (<[ρ := (tl_L, true)]> rm))
+    .
 
-    Inductive tl_EI := eiU | eiR (ρ: tl_role).
+    Inductive tl_EI := eiU | eiL (ρ: tl_role).
 
     Definition tl_ETs (ι: tl_EI) := 
       match ι with
       | eiU => Some allows_unlock
-      | _ => None
+      | eiL ρ => Some (allows_lock ρ) 
       end. 
 
     Global Instance tl_EI_dec: EqDecision tl_EI. 
@@ -314,25 +326,53 @@ Section Model.
         edestruct FREE; eauto.
     Qed. 
 
+    Instance allows_lock_ex_dec:
+      forall st ρ, Decision (∃ st', allows_lock ρ st st'). 
+    Proof using.
+      intros [o t rm] ρ.
+      destruct (decide (rm !! ρ = Some (tl_L, false))).
+      - left. eexists. econstructor; eauto.
+      - right. intros [st' L]. inversion L. congruence. 
+    Qed. 
+
     Definition tl_active_exts st: gset tl_EI := 
-      if (allows_unlock_ex_dec st) then {[ eiU ]} else ∅. 
+      (if (allows_unlock_ex_dec st) then {[ eiU ]} else ∅) ∪
+      gset_map eiL (filter (fun ρ => exists st', allows_lock ρ st st') 
+                   (dom (role_map st))). 
+                                                           
 
     Lemma tl_active_exts_spec st ι:
       ι ∈ tl_active_exts st <-> ∃ st' rel, tl_ETs ι = Some rel /\ rel st st'.
     Proof using. 
-      unfold tl_active_exts. destruct ι; simpl in *.
-      2: { admit. }
-      destruct (allows_unlock_ex_dec st).
-      2: { split; [set_solver| ]. intros [st' [rel [UNL REL]]].
-           destruct n. exists st'. congruence. }
-      destruct e as [st' UNL]. etransitivity; [apply elem_of_singleton| ].
-      split; auto. intros _. eauto.
-    Admitted. 
+      unfold tl_active_exts.
+      etransitivity; [apply elem_of_union| ].
+      destruct ι; simpl in *.
+      - etransitivity; [| etransitivity]; [| eapply or_False |].
+        { eapply Morphisms_Prop.or_iff_morphism; set_solver. }
+        destruct (allows_unlock_ex_dec st).
+        2: { split; [set_solver| ]. intros [st' [rel [UNL REL]]].
+             destruct n. exists st'. congruence. }
+        destruct e as [st' UNL]. etransitivity; [apply elem_of_singleton| ].
+        split; auto. intros _. eauto.
+      - etransitivity; [| etransitivity]; [| eapply False_or |].
+        { eapply Morphisms_Prop.or_iff_morphism; destruct (allows_unlock_ex_dec st); set_solver. }
+        etransitivity.
+        { symmetry. apply @gset_map_in_inj with (f := eiL).
+          red. intros. congruence. }
+        etransitivity; [apply elem_of_filter| ].
+        simpl.  
+        split; [intros [[? ?] ?] | intros [? [? [[=] FF]]]].
+        + eauto. 
+        + subst. split; eauto.
+          inversion FF. simpl. eapply elem_of_dom_2; eauto.  
+    Qed. 
     
   End TlExtTrans.  
 
   Section ProgressProperties.
-    Context {tr: mtrace (ext_model tl_fair_model _ _ tl_active_exts_spec)}. 
+    Context {tr: mtrace (ext_model tl_fair_model _ _ tl_active_exts_spec)}.
+
+    
 
   End ProgressProperties. 
 
