@@ -98,21 +98,6 @@ End TraceHelpers0.
     (*   infinite_trace tr.  *)
     
 
-    (* to avoid referring to classical logic*)
-    Lemma min_prop_dec (P: nat -> Prop) (DEC: forall n, Decision (P n)):
-      ClassicalFacts.Minimization_Property P.
-    Proof using. 
-      red. intros n Pn.
-      set (cands := filter P (seq 0 (n + 1))).
-      destruct cands eqn:C; simpl.
-      { subst cands.
-        pose proof (@filter_nil_not_elem_of _ _ DEC _ _ C Pn).
-        destruct H. apply elem_of_seq. lia. } 
-      (* exists n0. split. *)
-      (* { eapply proj1. eapply elem_of_list_filter. *)
-      (*   apply elem_of_list_filter.  *)
-    Admitted.
-
 
     (* From Paco Require Import pacotac. *)
     Lemma mtrace_valid_steps (tr: mtrace M) i ℓ st tr'
@@ -165,14 +150,6 @@ End TraceHelpers0.
       rewrite /pred_at. intros. destruct (after i tr); [destruct t| ]; auto.
     Qed.       
     
-
-    Instance Minimal_proper: 
-      Proper (pointwise_relation nat iff ==> eq ==> iff) ClassicalFacts.Minimal.
-    Proof using.
-      red. red. intros. red. intros. subst. red in H. 
-      split; intros [P MIN].
-      all: split; [| intros; apply MIN]; apply H; auto.
-    Qed. 
 
     Definition strong_fair_model_trace (tr: mtrace M) (ρ: fmrole M) :=
       forall n (EN: pred_at tr n (λ δ _, role_enabled_model ρ δ)),
