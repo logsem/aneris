@@ -202,7 +202,36 @@ Section TraceLen.
     - rewrite GT. split; intros; [by inversion H| ]. 
       destruct len; simpl in *; try done. lia. 
   Qed. 
+
+  Lemma state_lookup_prev (tr: trace St L) (len: nat_omega) (LEN: trace_len_is tr len)
+    i (DOM: is_Some (tr S!! i)):
+    forall j (LE: j <= i), is_Some (tr S!! j). 
+  Proof using. 
+    intros. eapply state_lookup_dom in DOM; eauto.
+    eapply state_lookup_dom; eauto. destruct len; eauto. simpl in *. lia. 
+  Qed.  
     
+  Lemma label_lookup_states (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, is_Some (tr L!! i) <-> is_Some (tr S!! i) /\ is_Some (tr S!! (i + 1)). 
+  Proof using. 
+    intros. etransitivity; [apply label_lookup_dom| ]; eauto.
+    etransitivity; [symmetry; eapply state_lookup_dom| ]; eauto.
+    split; try tauto. intros. split; auto. 
+    eapply state_lookup_prev; eauto. lia.    
+  Qed.     
+
+  Lemma pred_at_trace_lookup (tr: trace St L) (i: nat) P:
+      pred_at tr i P <-> exists st, tr S!! i = Some st /\ P st (tr L!! i). 
+  Proof using.
+    destruct (trace_has_len tr) as [len LEN].
+    rewrite /state_lookup /label_lookup /lookup /trace_lookup.
+    rewrite /pred_at. destruct (after i tr) eqn:Ai.
+    2: { split; intros; try done. by destruct H as [? [[=] ?]]. }
+    destruct t; split; intros; eauto; destruct H as [? [[=] ?]]; congruence.
+  Qed. 
+
+
 End TraceLen.
 
 Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
