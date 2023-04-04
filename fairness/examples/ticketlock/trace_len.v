@@ -8,11 +8,12 @@ From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 Import derived_laws_later.bi.
 Require Import Coq.Logic.Classical.
-From trillium.fairness.examples.ticketlock Require Export lemmas.
+From trillium.fairness.examples.ticketlock Require Import lemmas.
 
 Section TraceLen.
   From hahn Require Import HahnBase.
-  From hahn Require Import HahnOmega.
+  (* From hahn Require Import HahnOmega. *)
+  From trillium.fairness.examples.ticketlock Require Import my_omega. 
 
   Context {St L: Type}. 
 
@@ -55,34 +56,89 @@ Section TraceLen.
   - exact (Some (s, Some (ℓ, trfirst t))).
   Defined. 
 
-  Lemma trace_lookup_len_strong (tr: trace St L) (len: nat_omega)
-    (LEN: trace_len_is tr len):
-    forall i, (exists st ℓ st', tr !! i = Some (st, Some (ℓ, st'))) <-> NOmega.lt_nat_l (i + 1) len.
+  Lemma NOmega_trichotomy (x y: nat_omega):
+    NOmega.lt x y \/ x = y \/ NOmega.lt y x. 
   Proof using. 
-    intros. etransitivity.
-    2: { apply LEN. }
-    rewrite /lookup /trace_lookup. 
-    rewrite after_sum'. destruct (after i tr).
-    2: { split; intros; desc; try done. by destruct H. }
-    destruct t.
-    { split; intros; desc; try done. by destruct H. }
-    split; intros; desc; eauto. 
+    destruct x, y; simpl; try lia; eauto.
+    pose proof (PeanoNat.Nat.lt_trichotomy n n0).
+    destruct H as [? | [? | ?]]; auto. 
   Qed. 
 
-  (* TODO: impossible to reuse previous proof? *)
-  Lemma trace_lookup_len (tr: trace St L) (len: nat_omega)
+  Instance nat_omega_eq_dec: EqDecision nat_omega.
+  Proof using. solve_decision. Qed.     
+
+  Lemma trace_lookup_trichotomy (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, (exists st ℓ st', tr !! i = Some (st, Some (ℓ, st')) /\ NOmega.lt_nat_l (i + 1) len) \/
+         (exists st, tr !! i = Some (st, None) /\ len = NOnum (i + 1)) \/
+         (tr !! i = None /\ NOmega.le len (NOnum i)). 
+  Proof using. 
+    intros.
+    pose proof (LEN i) as Ai. pose proof (LEN (i + 1)) as Ai'.
+    rewrite after_sum' in Ai'. 
+    destruct (NOmega_lt_le (NOnum i) len).
+    2: { right. right. apply not_iff_compat, proj2 in Ai, Ai'.
+         destruct len; simpl in *; try done.  
+         specialize_full Ai; [lia| ]. specialize_full Ai'; [lia| ].
+         split; [| lia].
+         apply eq_None_not_Some in Ai. 
+         rewrite /lookup /trace_lookup. by rewrite Ai. }
+    apply proj2 in Ai. specialize_full Ai; [destruct len; try done; lia| ].
+    destruct Ai as [ti Ai]. rewrite Ai in Ai'.   
+    destruct (decide (NOnum (i + 1) = len)) eqn:EQ'.
+    { right. left. subst. simpl in *. clear EQ'.
+      apply not_iff_compat, proj2 in Ai'. specialize_full Ai'; [lia| ].
+      apply eq_None_not_Some in Ai'. 
+      rewrite /lookup /trace_lookup. rewrite Ai. destruct ti; eauto. congruence. }
+    assert (NOmega.lt_nat_l (i + 1) len) as LT'.
+    { destruct len; try done; simpl in *.
+      destruct (decide (i + 1 < n0)); auto. destruct n. f_equal. lia. }
+    left.
+    apply proj2 in Ai'. specialize_full Ai'; auto. destruct Ai' as [ti' Ai']. 
+    rewrite /lookup /trace_lookup. rewrite Ai. 
+    destruct ti; simpl in *; eauto. congruence. 
+  Qed. 
+
+  Lemma trace_lookup_dom (tr: trace St L) (len: nat_omega)
     (LEN: trace_len_is tr len):
     forall i, is_Some (tr !! i) <-> NOmega.lt_nat_l i len.
   Proof using. 
-    intros. etransitivity.
-    2: { apply LEN. }
-    rewrite /lookup /trace_lookup. 
-    destruct (after i tr).
-    2: { split; intros; desc; by destruct H. }
-    destruct t.
-    { split; intros; desc; done. }
-    split; intros; desc; eauto.
+    intros i. destruct (trace_lookup_trichotomy _ _ LEN i) as [LT | [EQ | GT]].
+    - desc. rewrite LT. split; intros; auto.
+      destruct len; simpl in *; try lia. 
+    - desc. subst. rewrite EQ. split; simpl in *; intros; auto. lia. 
+    - desc. split; intros.
+      + rewrite GT in H. by destruct H.
+      + destruct len; simpl in *; try lia. 
   Qed. 
+
+  Lemma trace_lookup_dom_strong (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, (exists st ℓ st', tr !! i = Some (st, Some (ℓ, st'))) <-> NOmega.lt_nat_l (i + 1) len.
+  Proof using. 
+    intros i. destruct (trace_lookup_trichotomy _ _ LEN i) as [LT | [EQ | GT]].
+    - desc. rewrite LT. split; intros; eauto. 
+    - desc. subst. split; intros; desc.
+      + congruence. 
+      + simpl in *; lia.
+    - desc. destruct len; try done; simpl in *. split; intros.
+      + desc. congruence. 
+      + lia. 
+  Qed.
+
+  Lemma trace_lookup_dom_eq (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, (exists st, tr !! i = Some (st, None)) <-> len = NOnum (i + 1). 
+  Proof using.
+    intros i. destruct (trace_lookup_trichotomy _ _ LEN i) as [LT | [EQ | GT]].
+    - desc. subst. split; intros; desc.
+      + congruence. 
+      + subst. simpl in *; lia.
+    - desc. split; intros; eauto.
+    - desc. destruct len; try done; simpl in *. split; intros.
+      + desc. congruence. 
+      + inversion H. lia.
+  Qed.
 
   Definition state_lookup (tr: trace St L) (i: nat): option St := 
     match tr !! i with
@@ -95,6 +151,16 @@ Section TraceLen.
     | Some (_, Some (ℓ, _)) => Some ℓ
     | _ => None
     end.
+
+  Global Instance state_lookup_Lookup: 
+    Lookup nat St (trace St L).
+  intros i tr. exact (state_lookup tr i). 
+  Defined. 
+
+  Global Instance label_lookup_Lookup: 
+    Lookup nat L (trace St L).
+  intros i tr. exact (label_lookup tr i). 
+  Defined.
 
   Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
   Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
@@ -114,18 +180,30 @@ Section TraceLen.
     - inversion H. subst. split; auto. destruct t; auto. 
     - destruct t; destruct H as ([=] & [=] & [=]); subst; auto. 
   Qed. 
+
+  Lemma state_lookup_dom (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, is_Some (tr S!! i) <-> NOmega.lt_nat_l i len.
+  Proof using. 
+    intros. etransitivity; [| apply trace_lookup_dom]; eauto.
+    rewrite /state_lookup. destruct (tr !! i) as [[x y] | ?]; try done.
+    (* TODO: why it's not solved automatically? *)
+    split; intros X; by destruct X. 
+  Qed. 
+  
+  Lemma label_lookup_dom (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, is_Some (tr L!! i) <-> NOmega.lt_nat_l (i + 1) len.
+  Proof using. 
+    intros. rewrite /label_lookup.
+    destruct (trace_lookup_trichotomy _ _ LEN i) as [LT | [EQ | GT]]; desc. 
+    - rewrite LT. done.
+    - subst. rewrite EQ. simpl. split; intros; [by inversion H|lia].
+    - rewrite GT. split; intros; [by inversion H| ]. 
+      destruct len; simpl in *; try done. lia. 
+  Qed. 
     
-  (* Definition len_of_tr: nat_omega. *)
-  (*   destruct (excluded_middle_informative (terminating_trace tr)). *)
-  (*   2: { exact NOinfinity. } *)
-  (*   red in t. apply constructive_indefinite_description in t as [n N]. *)
-  (*   exact (NOnum n). *)
-  (* Defined. *)
-
-  (* CoFixpoint trace_length (tr: trace St L): nat_omega := *)
-  (*   match tr with *)
-  (*   | tr_singl _ => NOnum 1 *)
-  (*   | tr_cons _ _ tr' => NOmega.add (NOnum 1) (trace_length tr') *)
-  (*   end.  *)
-
 End TraceLen.
+
+Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
+Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
