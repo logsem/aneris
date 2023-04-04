@@ -105,19 +105,6 @@ End TraceHelpers0.
     (* Admitted.  *)
 
     
-    (* From Paco Require Import pacotac. *)
-    Lemma mtrace_valid_steps (tr: mtrace M) i ℓ st tr'
-      (VALID: mtrace_valid tr)
-      (ITH: after i tr = Some (st -[ ℓ ]-> tr')):
-      fmtrans _ st ℓ (trfirst tr').
-    Proof using.
-      generalize dependent tr'. generalize dependent ℓ.
-      generalize dependent st. generalize dependent tr. 
-      induction i.
-      (* { simpl. intros. punfold VALID. inversion VALID; subst; congruence. } *)
-      (* intros. *)
-    Admitted. 
-      
       
     (* Definition fair_model_trace_strong ρ (mtr: mtrace M): Prop  := *)
     (*   forall n, pred_at mtr n (λ δ _, role_enabled_model ρ δ) -> *)
@@ -212,19 +199,16 @@ End TraceHelpers0.
         intros. apply MIN. apply pred_at_trace_lookup.
         destruct H as [DIS | STEP].
         { desc. exists st'. eauto. }
-        forward eapply (@label_lookup_states _ _ _ _ LEN) as [ST _]; eauto.
-        specialize_full ST; eauto. apply proj1 in ST as [st' ST']. eauto. 
+        forward eapply (proj1 (label_lookup_states tr (n + k))) as [[st' ST'] _]; eauto.
       - apply pred_at_trace_lookup in EN. desc. 
         specialize (H _ _ EN EN0). desc. destruct H as [PROP MIN].  
         exists m. split.
         + apply pred_at_trace_lookup. destruct PROP as [DIS | STEP]; desc; eauto.
-          forward eapply (@label_lookup_states _ _ _ _ LEN) as [ST _]; eauto.
-          specialize_full ST; eauto. apply proj1 in ST as [st' ST']. eauto.
+          forward eapply (proj1 (label_lookup_states tr (n + m))) as [[st' ST'] _]; eauto.
         + intros. apply MIN. apply pred_at_or in H. destruct H as [DIS | STEP].
           * left. apply pred_at_trace_lookup in DIS. eauto. 
           * right. apply pred_at_trace_lookup in STEP. desc. eauto. 
-    Qed.
-        
+    Qed.        
         
 
   End TraceDefinitions.   
@@ -576,7 +560,8 @@ Section Model.
 
     Let ExtTL := ext_model tl_fair_model _ _ tl_active_exts_spec. 
 
-    Context {tr: mtrace ExtTL}.
+    Context (tr: mtrace ExtTL).
+    Context (len: my_omega.nat_omega) (LEN: trace_len_is tr len).
     Hypothesis (VALID: mtrace_valid tr).
     Hypothesis (FAIR: set_fair_model_trace (fun (ρ: fmrole ExtTL) => 
                                               exists r, ρ = inl r) tr).
@@ -588,7 +573,8 @@ Section Model.
 
     Definition role_state_kept (P: tl_role_st -> Prop) :=
       forall st ρ s (RMρ: role_map st !! ρ = Some s) (Ps: P s),      
-        forall st' (oeρ: option (fmrole ExtTL)) (OTHER: oeρ ≠ Some (inl ρ)) (STEP: fmtrans ExtTL st oeρ st'),
+        forall st' (oeρ: option (fmrole ExtTL)) (OTHER: oeρ ≠ Some (inl ρ))
+          (STEP: fmtrans ExtTL st oeρ st'),
           ∃ s', role_map st' !! ρ = Some s' /\ P s'.
 
     Lemma lock_compete_kept: role_state_kept (eq (tl_L, true)).
@@ -611,39 +597,41 @@ Section Model.
       - destruct ι; inversion REL; subst; simpl in *.
         all: rewrite lookup_insert_ne; auto; 
           intros ->; rewrite RMρ in LOCK; congruence.
-    Qed. 
-          
+    Qed.
+
+    (* From Paco Require Import pacotac. *)
+    Lemma mtrace_valid_steps' i st ℓ st'
+      (ITH: tr !! i = Some (st, Some (ℓ, st'))):
+      fmtrans _ st ℓ st'. 
+    Proof using.
+      generalize dependent st. generalize dependent ℓ. generalize dependent st'. 
+      induction i.
+      (* { simpl. intros. punfold VALID. inversion VALID; subst; congruence. } *)
+      (* intros. *)
+    Admitted. 
+
     Lemma steps_keep_state ρ (i: nat) (P: tl_role_st -> Prop) (j: nat)
-      (Pi: pred_at tr i (fun st _ => exists s, role_map st !! ρ = Some s /\ P s))
-      (DOMj: pred_at tr j (fun _ _ => True))
+      (Pi: exists st s, tr S!! i = Some st /\ role_map st !! ρ = Some s /\ P s)
+      (DOMj: my_omega.NOmega.lt_nat_l j len)
       (P_KEPT: role_state_kept P)
-      (NOρ: forall (k: nat) (IKJ: i <= k < j), pred_at tr k (fun _ ro => ro ≠ Some $ Some $ inl ρ)):
+      (NOρ: forall (k: nat) ℓ (IKJ: i <= k < j),
+          tr L!! k = Some ℓ -> ℓ ≠ Some (inl ρ)):
       forall (k: nat) (IKJ: i <= k <= j), 
-        pred_at tr k (fun st _ => exists s, role_map st !! ρ = Some s /\ P s).
-    Proof using VALID. 
+        exists st s, tr S!! k = Some st /\ role_map st !! ρ = Some s /\ P s.
+    Proof using VALID LEN. 
       intros k [IK KJ]. apply Nat.le_sum in IK as [d ->]. induction d.
       { by rewrite Nat.add_0_r. }
-      assert (i + d <= j) as KJ' by lia. specialize (IHd KJ'). clear KJ'.
-      rewrite Nat.add_succ_r -Nat.add_1_r. 
-      rewrite /pred_at. rewrite /pred_at in IHd.
-      rewrite after_sum'.
-      destruct (after (i + d) tr) eqn:aft; auto.
-      destruct t; simpl in *.
-      2: { assert (i <= i + d < j) as D by lia. specialize (NOρ _ D). clear D.
-           rewrite /pred_at in NOρ. rewrite aft in NOρ.
-           rename s into st. rename t into t'. 
-           destruct IHd as [s [RMs Ps]].
-           red in P_KEPT. specialize (P_KEPT _ _ _ RMs Ps).
-           specialize (P_KEPT (trfirst t') ℓ).
-           destruct P_KEPT as [s' [RM' P']].
-           { by intros ->. }
-           2: { destruct t'; eauto. }
-           eapply @mtrace_valid_steps; eauto. }
-      clear -DOMj aft KJ.
-      assert (S (i + d) <= j) as KJ' by lia.  
-      apply Nat.le_sum in KJ' as [p ->]. rewrite PeanoNat.Nat.add_succ_comm in DOMj.
-      apply pred_at_sum in DOMj. rewrite aft in DOMj. done.
-    Qed. 
+      specialize_full IHd; [lia| ]. desc.
+      forward eapply (proj2 (trace_lookup_dom_strong  _ _ LEN (i + d))) as [st_ CUR].
+      { destruct len; auto. simpl in *. lia. }
+      desc. apply state_label_lookup in CUR. desc.
+      assert (st_ = st) as -> by congruence.
+      red in P_KEPT. specialize (P_KEPT _ _ _ IHd0 IHd1). specialize_full P_KEPT.
+      2: { eapply mtrace_valid_steps'. apply state_label_lookup. eauto. }
+      { eapply NOρ; eauto. lia. }
+      rewrite Nat.add_succ_r -Nat.add_1_r.
+      desc. eauto. 
+    Qed.
       
 
     (* TODO: can be generalized for the finite case *)
@@ -661,14 +649,14 @@ Section Model.
                  ¬ active_st ρ st'.
     Proof using.
       red in CAN_LOCK. destruct CAN_LOCK as [e RMρ].
-      (* red in ACT. destruct ACT as [r_ RMρ_]. rewrite RMρ_ in RMρ. *)
       assert (e = true) as -> by (destruct ACT; congruence). 
-      specialize (FAIR (inl ρ)). specialize (@FAIR (ex_intro _ _ eq_refl)).
-      apply fair_model_trace_defs_equiv, strong_fair_model_trace_alt_defs_equiv in FAIR. 
-      red in FAIR. edestruct FAIR as [d [STEP MIN]]; [eauto| ..].
+      pose proof (FAIR (inl ρ)) as FAIRρ. specialize_full FAIRρ; [by eauto| ].  
+      apply fair_model_trace_defs_equiv, strong_fair_model_trace_alt_defs_equiv in FAIRρ. 
+      red in FAIRρ. edestruct FAIRρ as [d [STEP MIN]]; [eauto| ..].
       { red. simpl. simpl. rewrite /ext_live_roles.
         apply elem_of_union_l. apply gset_map_in.
         by apply active_st_enabled. }
+      clear FAIRρ. 
 
       (* destruct (@decide (exists d', d' < d /\ pred_at tr (i + d')  *)
       (*                                     (λ _ ℓ, ℓ = Some (Some (inl ρ))))). *)
@@ -680,8 +668,15 @@ Section Model.
       (* pose proof (@not_exists_forall_not _ _ NOSTEP'') as NOSTEP'. clear NOSTEP''. *)
       (* simpl in NOSTEP'. *)
 
-      forward eapply steps_keep_state as NEXT_EN.
-      { eapply mtrace_nth_pred_at; eauto. intros _.
+      forward eapply steps_keep_state with (j := i + d) (k := i + d) as NEXT_EN. 
+      3: { apply lock_compete_kept. }
+      { eauto. }
+      3: { lia. }
+      { admit. }
+      { intros. destruct IKJ as [[v ->]%Nat.le_sum KJ]. 
+        intros ->. enough (d <= v); [lia| ]. apply MIN. eauto. }  
+      
+        eapply mtrace_nth_pred_at; eauto. intros _.
         eexists. split; [eauto| ]. exact eq_refl. }
       { eapply pred_at_mono; [| apply STEP]. auto. }
       { apply lock_compete_kept. }

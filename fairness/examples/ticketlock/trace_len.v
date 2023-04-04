@@ -165,7 +165,7 @@ Section TraceLen.
   Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
   Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
 
-  Lemma state_label_lookup (tr: trace St L) (len: nat_omega):
+  Lemma state_label_lookup (tr: trace St L):
     forall i st st' ℓ, 
       tr !! i = Some (st, Some (ℓ, st')) <->
       (tr S!! i = Some st /\ tr S!! (i + 1) = Some st' /\ tr L!! i = Some ℓ).
@@ -203,18 +203,18 @@ Section TraceLen.
       destruct len; simpl in *; try done. lia. 
   Qed. 
 
-  Lemma state_lookup_prev (tr: trace St L) (len: nat_omega) (LEN: trace_len_is tr len)
-    i (DOM: is_Some (tr S!! i)):
+  Lemma state_lookup_prev (tr: trace St L) i (DOM: is_Some (tr S!! i)):
     forall j (LE: j <= i), is_Some (tr S!! j). 
   Proof using. 
-    intros. eapply state_lookup_dom in DOM; eauto.
+    intros. pose proof trace_has_len as [len ?].
+    eapply state_lookup_dom in DOM; eauto.
     eapply state_lookup_dom; eauto. destruct len; eauto. simpl in *. lia. 
   Qed.  
     
-  Lemma label_lookup_states (tr: trace St L) (len: nat_omega)
-    (LEN: trace_len_is tr len):
+  Lemma label_lookup_states (tr: trace St L):
     forall i, is_Some (tr L!! i) <-> is_Some (tr S!! i) /\ is_Some (tr S!! (i + 1)). 
   Proof using. 
+    pose proof trace_has_len as [len ?].
     intros. etransitivity; [apply label_lookup_dom| ]; eauto.
     etransitivity; [symmetry; eapply state_lookup_dom| ]; eauto.
     split; try tauto. intros. split; auto. 
