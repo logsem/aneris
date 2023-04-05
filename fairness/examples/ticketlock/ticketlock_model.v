@@ -391,16 +391,19 @@ Section Model.
         end.
 
   Inductive tl_trans: tl_st -> option tl_role -> tl_st -> Prop :=
-  | tl_acquire_lock o rm r (R: rm !! r = Some (tl_L, true)):
-    tl_trans (mkTlSt o o rm) (Some r) (mkTlSt o (o + 1) (<[r := (tl_U o, false)]> rm))
-  | tl_acquire_wait (o t: nat) rm r (LT: o < t) (R: rm !! r = Some (tl_L, true)):
-    tl_trans (mkTlSt o t rm) (Some r) (mkTlSt o (t + 1) (<[r := (tl_U t, true)]> rm))    
+  (* | tl_acquire_lock o rm r (R: rm !! r = Some (tl_L, true)): *)
+  (*   tl_trans <{o, o, rm}> (Some r) <{o, o + 1, <[r := (tl_U o, false)]> rm }> *)
+  (* | tl_acquire_wait (o t: nat) rm r (LT: o < t) (R: rm !! r = Some (tl_L, true)): *)
+  (*   tl_trans <{o, t, rm}> (Some r) <{o, t + 1, <[r := (tl_U t, true)]> rm}> *)
+  | tl_take_ticket o t rm r (R: rm !! r = Some (tl_L, true)):
+    let next_en := if decide (o = t) then false else true in
+    tl_trans <{o, t, rm}> (Some r) <{o, t + 1, <[r := (tl_U t, next_en)]> rm}>
   | tl_spin (o t k: nat) rm r (LT: o < k) (R: rm !! r = Some (tl_U k, true)):
-    tl_trans (mkTlSt o t rm) (Some r) (mkTlSt o t rm)
+    tl_trans <{o, t, rm}> (Some r) <{o, t, rm}>
   | tl_unlock o t rm r (R: rm !! r = Some (tl_U o, true)):
-    let st' := (mkTlSt (o + 1) t (<[r := (tl_L, false)]> rm)) in
+    let st' := <{o + 1, t, <[r := (tl_L, false)]> rm}> in
     let st'' := advance_next st' in
-    tl_trans (mkTlSt o t rm) (Some r) st''
+    tl_trans <{o, t, rm}> (Some r) st''
   .
 
   Definition tl_live_roles (st: tl_st): gset tl_role :=
@@ -442,6 +445,10 @@ Section Model.
     active_st ρ st <-> @role_enabled_model tl_fair_model ρ st.
   Proof using. 
   Admitted. 
+
+  Definition tl_init_st (n: nat): tl_st :=
+    let rm := gset_to_gmap (tl_L, true) (set_seq 0 n) in
+    <{ 0, 0, rm }>.
 
 
   Section TlExtTrans.
@@ -537,27 +544,6 @@ Section Model.
   End TlExtTrans.  
 
 
-  (* Require Import Coq.Logic.Classical. *)
-  (* Section infinite_or_finite_exact. *)
-  (*   Context {St L: Type}. *)
-  
-  (*   Definition terminating_trace' (tr: trace St L) len := after len tr = None. *)
-
-  (*   Lemma infinite_or_finite_exact (tr: trace St L): *)
-  (*     infinite_trace tr ∨ terminating_trace tr. *)
-  (*   Proof. *)
-  (*     destruct (classic (infinite_trace tr)) as [|Hni]; first by eauto. *)
-  (*     rewrite /infinite_trace in Hni. *)
-  (*     apply not_all_ex_not in Hni. destruct Hni as [n Hni%eq_None_not_Some]. *)
-  (*     by right; exists n. *)
-  (*   Qed. *)
-  
-  (* End infinite_or_finite. *)
-
-  (* TODO: move, look for alternatives? *)
-
-
-
   Section ProgressProperties.
 
     Let ExtTL := ext_model tl_fair_model _ _ tl_active_exts_spec. 
@@ -567,9 +553,11 @@ Section Model.
       Context (tr: mtrace ExtTL).
       Context (len: my_omega.nat_omega) (LEN: trace_len_is tr len).
       Hypothesis (VALID: mtrace_valid tr).
+      Hypothesis (FROM_INIT: exists n, tr S!! 0 = Some (tl_init_st n)). 
       Hypothesis (FAIR: set_fair_model_trace (fun (ρ: fmrole ExtTL) => 
                                                 exists r, ρ = inl r) tr).
       
+      Local Ltac gd t := generalize dependent t.
       (* Lemma lock_role_stays_enabled_step ρ i st ρ' st' *)
       (*   (ITH: mtrace_nth tr i = Some st) *)
       (*   (RMρ: role_map st !! ρ = Some (tl_L, e)) *)
@@ -602,7 +590,7 @@ Section Model.
           all: rewrite lookup_insert_ne; auto; 
             intros ->; rewrite RMρ in LOCK; congruence.
       Qed.
-
+      
       (* From Paco Require Import pacotac. *)
       Lemma mtrace_valid_steps' i st ℓ st'
         (ITH: tr !! i = Some (st, Some (ℓ, st'))):
@@ -612,7 +600,97 @@ Section Model.
         induction i.
         (* { simpl. intros. punfold VALID. inversion VALID; subst; congruence. } *)
         (* intros. *)
+      Admitted.
+      
+      (* Lemma owner_le_ticket i st (ITH: tr S!! i = Some st): *)
+      (*   owner st <= ticket st.  *)
+      (* Proof using.  *)
+      (*   gd st. induction i.  *)
+      (*   { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT. *)
+      (*     rewrite /tl_init_st in INIT. inversion INIT. subst. simpl. lia. } *)
+      (*   rewrite -Nat.add_1_r. intros st' ITH'.  *)
+      (*   forward eapply trace_lookup_dom_strong with (i := i) as [_ ITH]; eauto. *)
+      (*   specialize_full ITH; [eapply state_lookup_dom; eauto| ]. desc. *)
+      (*   pose proof (mtrace_valid_steps' _ _ _ _ ITH) as STEP. *)
+      (*   apply state_label_lookup in ITH. desc. *)
+      (*   specialize (IHi _ ITH).  *)
+      (*   rewrite ITH0 in ITH'. inversion ITH'. subst. clear ITH'. *)
+      (*   inversion STEP; subst. *)
+      (*   2: { destruct ι; simpl in *; inversion REL; subst; auto. } *)
+      (*   inversion STEP0; subst; simpl in *. *)
+      (*   all: try by lia. *)
+      (*   subst st'' st'0. rewrite /advance_next. simpl.  *)
+
+
+      Lemma tl_valid_trace_states i o t rm (ITH: tr S!! i = Some <{o, t, rm}>):
+        o <= t /\
+        (o < t <-> (exists ρ e, rm !! ρ = Some (tl_U o, e))) /\
+        (forall k, o < k < t <-> exists ρ, rm !! ρ = Some (tl_U k, true)) /\
+        (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1)) 
+           (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2)
+             (* exists ρ, (unique (fun ρ_ => exists e, rm !! ρ_ = Some (tl_U k, e)) ρ) /\ *)
+             (*      (o < k -> rm !! ρ = Some (tl_U k, true)). *)
+          (* TODO: add uniqueness condition? *)
+          . 
+      Proof using. 
+        gd o. gd t. gd rm. induction i.
+        { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT.
+          rewrite /tl_init_st in INIT. inversion INIT. subst.
+          splits; auto. 
+          - split; [lia| ]. intros [ρ [e [RMρ Et]]]. desc.
+            apply lookup_gset_to_gmap_Some in RMρ. desc. congruence.
+          - intros. desc. rewrite lookup_gset_to_gmap_Some in R1. by desc. }
+        intros rm' t' o'. rewrite -Nat.add_1_r. intros ITH'.
+        forward eapply trace_lookup_dom_strong with (i := i) as [_ ITH]; eauto.
+        specialize_full ITH; [eapply state_lookup_dom; eauto| ]. desc.
+        pose proof (mtrace_valid_steps' _ _ _ _ ITH) as STEP.
+        apply state_label_lookup in ITH. desc.
+        rewrite ITH' in ITH0. inversion ITH0. subst. clear ITH0.
+        destruct st as [o t rm].
+        specialize (IHi _ _ _ ITH) as (IHle & IHtks & IHuniq).
+        inversion STEP; subst.
+        - inversion STEP0; subst; simpl in *; auto. 
+          + splits; [lia| ..].
+            2: { intros.
+                 destruct (decide (ρ1 = ρ)) as [-> | ?].
+                 - rewrite lookup_insert in R1. inversion R1. subst.
+                   destruct (decide (ρ2 = ρ)) as [-> | ?].
+                   + done.
+                   + rewrite lookup_insert_ne in R2; auto. congruence.  
+            intros.
+            specialize (IHtks k).
+            destruct (decide (k = t)) as [-> | NEQ].
+            * split; [| lia].
+              intros T. exists ρ. eexists. rewrite lookup_insert. split; eauto. 
+              destruct (decide (o' = t)); [lia|]. auto.
+            * etransitivity.
+              { etransitivity; [| apply IHtks]. lia. }              
+              split; intros; desc.
+              ** do 2 eexists. split; [| apply H0]. 
+                 rewrite lookup_insert_ne; eauto.
+                 intros <-. congruence.
+              ** do 2 eexists. split; [| apply H0].
+                 rewrite <- H. symmetry. apply lookup_insert_ne. 
+                 intros <-. rewrite lookup_insert in H. congruence.
+           + subst st'3 st'' st'. rewrite /advance_next in H4. simpl in *.
+             assert (o' = o + 1 /\ t' = t) as [-> ->].
+             { destruct (role_of_dec _ _) as [[? ?] | ?] ; by inversion H4. }
+             destruct (decide (o = t)) as [<- | NEQ].
+             { specialize (IHtks o). apply proj2 in IHtks. 
+               destruct IHtks; [eauto | lia]. }
+             split; [lia| ].
+             intros. specialize (IHtks k).
+             destruct (decide (k = o)) as [-> | NEQko].
+             { split; intros; [lia| ]. desc. lia. 
+
+
+
+             etransitivity; [| etransitivity]; [| apply IHtks|].
+             { 
+
+
       Admitted. 
+
 
       Lemma steps_keep_state ρ (i: nat) (P: tl_role_st -> Prop) (j: nat)
         (Pi: exists st s, tr S!! i = Some st /\ role_map st !! ρ = Some s /\ P s)
@@ -639,11 +717,16 @@ Section Model.
       
       Lemma lock_eventually_acquired o t rm ρ i wt 
         (ST: tr S!! i = Some <{ o, t, rm }>)
-        (LT: o < t) (* can be inferred, but we have this fact already *)
+        (WAIT: o ≠ wt)
         (R: rm !! ρ = Some (tl_U wt, true)):
         ∃ (n : nat) (st' : tl_st),
           i < n ∧ tr S!! n = Some st' ∧ has_lock_st ρ st' ∧ ¬ active_st ρ st'.
-      Proof using. 
+      Proof using.
+        (* red in WAIT. apply Nat.le_sum in WAIT as [d ->]. *)
+        (* gd o. gd t. gd i. gd rm. *)
+        (* induction d. *)
+        (* { intros. rewrite Nat.add_0_r in R. *)
+        
       Admitted. 
 
       Theorem tl_progress ρ i st
@@ -695,6 +778,7 @@ Section Model.
         simpl in TRANS. inversion TRANS as [? ? ? TRANS'| ]; subst.
         inversion TRANS'; subst; simpl in *.
         all: try by rewrite NEXT_EN0 in R.
+        destruct (decide (o = t)) as [<- | WAIT]. 
         { exists (i + d + 1). eexists. splits; [lia|..]; try by eauto.
           - red. eexists. simpl. rewrite lookup_insert. eauto. 
           - rewrite /active_st. simpl. rewrite lookup_insert. intros [? [=]]. }
@@ -703,7 +787,7 @@ Section Model.
         eapply lock_eventually_acquired in ST'''.
         - desc. do 2 eexists. splits.
           2-4: by eauto. lia. 
-        - lia. 
+        - apply WAIT. 
         - rewrite lookup_insert. eauto. 
       Qed. 
 
