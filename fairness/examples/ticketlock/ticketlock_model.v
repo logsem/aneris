@@ -817,6 +817,34 @@ Section Model.
       Qed. 
 
 
+      Ltac simpl_li_eq := match goal with
+                          | H: <[?x:=?y]> ?m !! ?x = ?r |- _
+                            => rewrite lookup_insert in H
+                          end.
+      Ltac simpl_li_eq' := match goal with
+                           | |- <[?x:=?y]> ?m !! ?x = ?r
+                             => rewrite lookup_insert
+                           end.
+      
+      Ltac simpl_li_neq := match goal with
+                           | H: <[?x:=?y]> ?m !! ?x' = ?r, NE: ?x ≠ ?x' |- _ => 
+                               rewrite lookup_insert_ne in H; [| by apply NE]
+                           | H: <[?x:=?y]> ?m !! ?x' = ?r, NE: ?x' ≠ ?x |- _ =>
+                               rewrite lookup_insert_ne in H;
+                               [| by apply not_eq_sym; apply NE]
+                           end.
+      Ltac simpl_li_neq' := match goal with
+                           | NE: ?x ≠ ?x' |- <[?x:=?y]> ?m !! ?x' = ?r => 
+                               rewrite lookup_insert_ne; [| by apply NE]
+                           | NE: ?x' ≠ ?x |- <[?x:=?y]> ?m !! ?x' = ?r => 
+                               rewrite lookup_insert_ne;
+                               [| by apply not_eq_sym; apply NE]
+                           end.
+      
+      Ltac simpl_li := (repeat simpl_li_eq); (repeat simpl_li_neq);
+                       (try simpl_li_eq'); (try simpl_li_neq'). 
+      
+
       Lemma tl_valid_trace_states i o t rm (ITH: tr S!! i = Some <{o, t, rm}>):
         o <= t /\
         (forall k, o <= k < t <-> exists ρ e, rm !! ρ = Some (tl_U k, e)) /\
@@ -962,8 +990,42 @@ Section Model.
                eapply advance_next_helper_U in R1, R2; auto. desc.
                destruct R0, R3; desc; subst.
                all: lia || eapply IHuniq; eauto.
-        - destruct ι; simpl in REL. 
-                   
+        - destruct ι; simpl in REL; inversion REL; subst o0 t0 rm0 o' t' rm'.
+          + split; auto. splits.
+            * intros. etransitivity; [etransitivity|]; [| apply IHtks |]; [reflexivity|..].
+              split; intros; desc.
+              ** destruct (decide (ρ0 = ρ)) as [-> | NEQ].
+                 *** exists ρ, true. rewrite lookup_insert. congruence.
+                 *** exists ρ0, e. rewrite lookup_insert_ne; auto.
+              ** destruct (decide (ρ0 = ρ)) as [-> | NEQ].
+                 *** rewrite lookup_insert in H.
+                     exists ρ, false. congruence.
+                 *** rewrite lookup_insert_ne in H; auto.
+                     eauto.
+            * intros. eapply IHtko; eauto. rewrite -H.
+              symmetry. apply lookup_insert_ne.
+              intros ->. rewrite lookup_insert in H. congruence.
+            * intros.
+              destruct (decide (ρ1 = ρ)), (decide (ρ2 = ρ)).
+              all: subst; simpl_li; inversion R1; inversion R2; subst; auto. 
+              all: eapply IHuniq; eauto.
+          + split; auto. splits.
+            * intros. etransitivity; [etransitivity|]; [| apply IHtks |]; [reflexivity|..].
+              split; intros; desc.
+              ** exists ρ0, e. destruct (decide (ρ0 = ρ)); 
+                   subst; simpl_li; [congruence| auto]. 
+              ** destruct (decide (ρ0 = ρ)); subst; simpl_li; inversion H; eauto.
+            * intros. destruct (decide (ρ0 = ρ)); subst; simpl_li; try congruence.
+              eapply IHtko; eauto.
+            * intros.
+              destruct (decide (ρ1 = ρ)), (decide (ρ2 = ρ)).
+              all: subst; simpl_li; inversion R1; inversion R2; subst; auto. 
+              all: eapply IHuniq; eauto.
+      Qed.
+
+
+                 
+              
                  
 
 
