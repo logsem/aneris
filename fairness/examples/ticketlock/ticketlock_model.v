@@ -621,26 +621,374 @@ Section Model.
       (*   all: try by lia. *)
       (*   subst st'' st'0. rewrite /advance_next. simpl.  *)
 
+      
+      (* Lemma tickets_bound o t (rm: tl_role_map) *)
+      (*   (TKS: forall k, o <= k < t <-> *)
+      (*                (exists ρ e, rm !! ρ = Some (tl_U k, e) /\ *)
+      (*                          (o < k -> e = true))): *)
+      (*   forall ρ k e, rm !! ρ = Some (tl_U k, e) -> o <= k < t. *)
+      (* Proof using.  *)
+      (*   intros.  *)
+
+
+      (* Lemma disabled_unlock_owner o t (rm: tl_role_map) *)
+      (*   (TKS: forall k, o <= k < t <-> *)
+      (*                (exists ρ e, rm !! ρ = Some (tl_U k, e) /\ *)
+      (*                          (o < k -> e = true))): *)
+      (*     forall ρ k, rm !! ρ = Some (tl_U k, false) -> k = o. *)
+      (* Proof using. *)
+      (*   intros. specialize (TKS k). *)
+      (*   destruct (Nat.lt_trichotomy k o) as [LT | [? | GT]]; auto. *)
+      (*   - apply not_iff_compat, proj1 in TKS. specialize_full TKS; [lia| ]. *)
+      (*     destruct TKS. do 2 eexists. split; eauto. lia. *)
+      (*   - apply proj1 in TKS. specialize_full TKS; [lia| ]. *)
+      
+      Lemma ticket_numbers o t (rm: tl_role_map)
+        (TKo: o < t <-> exists ρ e, rm !! ρ = Some (tl_U o, e))
+        (TKs: forall k, o < k < t <-> exists ρ, rm !! ρ = Some (tl_U k, true)):
+        forall k, o <= k < t <->exists ρ e, rm !! ρ = Some (tl_U k, e).
+      Proof using. 
+        intros. split.
+        - intros [[GT | ->]%Nat.le_lteq LT].
+          + specialize (TKs k) as [TKs _]. 
+            specialize_full TKs; [lia| ]. desc. eauto.
+          + apply proj1 in TKo. specialize (TKo LT). eauto.
+        - intros (ρ & e & RMρ).
+      Abort. 
+          
+          
+
+      (* Lemma tl_valid_trace_states i o t rm (ITH: tr S!! i = Some <{o, t, rm}>): *)
+      (*   o <= t /\ *)
+      (*   (* (forall k, o <= k < t <->  *) *)
+      (*   (*       (exists ρ e, rm !! ρ = Some (tl_U k, e) /\  *) *)
+      (*   (*               (o < k -> e = true))) /\ *) *)
+      (*   (o < t <-> exists ρ e, rm !! ρ = Some (tl_U o, e)) /\ *)
+      (*   (forall k, o < k < t <-> exists ρ, rm !! ρ = Some (tl_U k, true)) /\ *)
+      (*   (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1))  *)
+      (*      (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2) *)
+      (*        (* exists ρ, (unique (fun ρ_ => exists e, rm !! ρ_ = Some (tl_U k, e)) ρ) /\ *) *)
+      (*        (*      (o < k -> rm !! ρ = Some (tl_U k, true)). *) *)
+      (*     (* TODO: add uniqueness condition? *) *)
+      (*     .  *)
+      (* Proof using.  *)
+      (*   gd o. gd t. gd rm. induction i. *)
+      (*   { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT. *)
+      (*     rewrite /tl_init_st in INIT. inversion INIT. subst. *)
+      (*     splits; auto. *)
+      (*     - split; [lia| ]. intros. desc. *)
+      (*       rewrite lookup_gset_to_gmap_Some in H. desc. congruence.   *)
+      (*     - split; [lia| ]. intros [ρ RMρ]. desc. *)
+      (*       apply lookup_gset_to_gmap_Some in RMρ. desc. congruence. *)
+      (*     - intros. desc. rewrite lookup_gset_to_gmap_Some in R1. by desc. } *)
+      (*   intros rm' t' o'. rewrite -Nat.add_1_r. intros ITH'. *)
+      (*   forward eapply trace_lookup_dom_strong with (i := i) as [_ ITH]; eauto. *)
+      (*   specialize_full ITH; [eapply state_lookup_dom; eauto| ]. desc. *)
+      (*   pose proof (mtrace_valid_steps' _ _ _ _ ITH) as STEP. *)
+      (*   apply state_label_lookup in ITH. desc. *)
+      (*   rewrite ITH' in ITH0. inversion ITH0. subst. clear ITH0. *)
+      (*   destruct st as [o t rm]. *)
+      (*   specialize (IHi _ _ _ ITH) as (IHle & IHtko & IHtks & IHuniq). *)
+      (*   inversion STEP; subst. *)
+      (*   - inversion STEP0; subst; simpl in *; auto.  *)
+      (*     + rename o' into o.  *)
+      (*       splits; [lia| ..]. *)
+      (*       { split; [| lia]. intros _. *)
+      (*         apply le_lt_eq_dec in IHle as [LTot | ->]. *)
+      (*         - apply proj1 in IHtko. specialize (IHtko LTot). desc. *)
+      (*           exists ρ0, e. rewrite lookup_insert_ne; eauto. congruence.  *)
+      (*         - exists ρ. eexists. rewrite lookup_insert. eauto. } *)
+      (*       2: { intros. *)
+      (*            destruct (decide (ρ1 = ρ)) as [-> | ?]. *)
+      (*            - rewrite lookup_insert in R1. inversion R1. subst. *)
+      (*              destruct (decide (ρ2 = ρ)) as [-> | ?]. *)
+      (*              + done. *)
+      (*              + rewrite lookup_insert_ne in R2; auto. *)
+      (*                rename k into t.  *)
+      (*                enough (t < t); [lia| ]. apply IHtks. *)
+      (*                (* destruct (decide (o = t)); [lia| ]. subst next_en0. *) *)
+ 
+      (*                do 2 eexists. split; eauto. *)
+      (*                intros.  *)
+      (*                eapply IHuniq;   *)
+      (*                foobar. move e = true condition outside of <-> ?  *)
+      (*                congruence.   *)
+      (*       intros. *)
+      (*       specialize (IHtks k). *)
+      (*       destruct (decide (k = t)) as [-> | NEQ]. *)
+      (*       * split; [| lia]. *)
+      (*         intros T. exists ρ. eexists. rewrite lookup_insert. split; eauto.  *)
+      (*         destruct (decide (o' = t)); [lia|]. auto. *)
+      (*       * etransitivity. *)
+      (*         { etransitivity; [| apply IHtks]. lia. }               *)
+      (*         split; intros; desc. *)
+      (*         ** do 2 eexists. split; [| apply H0].  *)
+      (*            rewrite lookup_insert_ne; eauto. *)
+      (*            intros <-. congruence. *)
+      (*         ** do 2 eexists. split; [| apply H0]. *)
+      (*            rewrite <- H. symmetry. apply lookup_insert_ne.  *)
+      (*            intros <-. rewrite lookup_insert in H. congruence. *)
+      (*      + subst st'3 st'' st'. rewrite /advance_next in H4. simpl in *. *)
+      (*        assert (o' = o + 1 /\ t' = t) as [-> ->]. *)
+      (*        { destruct (role_of_dec _ _) as [[? ?] | ?] ; by inversion H4. } *)
+      (*        destruct (decide (o = t)) as [<- | NEQ]. *)
+      (*        { specialize (IHtks o). apply proj2 in IHtks.  *)
+      (*          destruct IHtks; [eauto | lia]. } *)
+      (*        split; [lia| ]. *)
+      (*        intros. specialize (IHtks k). *)
+      (*        destruct (decide (k = o)) as [-> | NEQko]. *)
+      (*        { split; intros; [lia| ]. desc. lia.  *)
+
+
+
+      (*        etransitivity; [| etransitivity]; [| apply IHtks|]. *)
+      (*        {  *)
+
+
+      (* Admitted.  *)
+
+      Lemma advance_next_helper_L o t (rm: tl_role_map) ρo ρ:
+        role_map (advance_next (<{o + 1, t, <[ρo := (tl_L, false)]> rm}>)) !! ρ = Some (tl_L, false) <-> (rm !! ρ = Some (tl_L, false) \/ ρ = ρo).
+      Proof using.      
+        rewrite /advance_next.
+        destruct role_of_dec as [[? ?] | ?]; simpl in *.
+        - assert (x ≠ ρo) as NEQ.
+          { intros ->. rewrite lookup_insert in e. congruence. }
+          rewrite lookup_insert_ne in e; auto.
+          destruct (decide (x = ρ)) as [-> | NEQ'].
+          { rewrite lookup_insert. split; [congruence| ].
+            intros [? | ->]; try congruence. rewrite e in H. congruence. }
+          rewrite lookup_insert_ne; auto.
+          destruct (decide (ρo = ρ)) as [-> | NEQ''].
+          { rewrite /advance_next. rewrite lookup_insert. tauto. }
+          rewrite lookup_insert_ne; auto. split; auto.
+          intros [? | ?]; done.
+        - destruct (decide (ρo = ρ)) as [-> | NEQ''].
+          { rewrite /advance_next. rewrite lookup_insert. tauto. }
+          rewrite lookup_insert_ne; auto. split; auto.
+          intros [? | ?]; done.
+      Qed. 
+
+      Lemma advance_next_helper_U o t (rm: tl_role_map) ρo ρ k b
+        (RMρo: rm !! ρo = Some (tl_U o, true))
+        (UNIQ: forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1))
+                 (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2)
+        (TKo: forall ρ k, rm !! ρ = Some (tl_U k, false) -> k = o):
+        role_map (advance_next (<{o + 1, t, <[ρo := (tl_L, false)]> rm}>)) !! ρ = Some (tl_U k, b) <-> (exists b', rm !! ρ = Some (tl_U k, b') /\ 
+                    (k = o + 1 /\ b = false /\ b' = true \/
+                     k ≠ o /\ k ≠ (o + 1) /\ b' = b)). 
+      Proof using.
+        rewrite /advance_next.
+        destruct role_of_dec as [[? ?] | ?]; simpl in *.
+        - assert (x ≠ ρo) as NEQ.
+          { intros ->. rewrite lookup_insert in e. congruence. }
+          rewrite lookup_insert_ne in e; auto.
+          destruct (decide (x = ρ)) as [-> | NEQ'].
+          { rewrite lookup_insert. split.
+            - intros. inversion H. eexists. eauto.
+            - intros. desc. destruct H0; desc; subst; rewrite e in H; congruence. }
+          rewrite lookup_insert_ne; auto.
+          destruct (decide (ρo = ρ)) as [-> | NEQ''].
+          { rewrite lookup_insert. rewrite RMρo. split; intros; desc. 
+            - congruence.
+            - destruct H0; desc; subst.
+              + inversion H. lia.
+              + congruence. }
+          rewrite lookup_insert_ne; auto. split; intros; desc.
+          + exists b. split; auto. right. splits; auto; intros ->.
+            * destruct NEQ''. eapply UNIQ; eauto.
+            * destruct NEQ'. eapply UNIQ; eauto.
+          + rewrite H. repeat f_equal. destruct H0; desc; subst; auto.
+            destruct NEQ'. eapply UNIQ; eauto. 
+        - destruct (decide (ρo = ρ)) as [-> | NEQ''].
+          { rewrite /advance_next. rewrite lookup_insert.
+            rewrite RMρo. split; intros; desc; try congruence.
+            destruct H0; desc; subst.
+            - inversion H. lia.
+            - congruence. } 
+          rewrite lookup_insert_ne; auto. split; intros; desc; auto.
+          + exists b. split; auto. right. splits; auto. 
+            * intros ->. destruct NEQ''; eapply UNIQ; eauto.
+            * intros ->. destruct b.
+              ** destruct (n ρ). rewrite lookup_insert_ne; auto.
+              ** apply TKo in H. lia.
+          + destruct H0; desc; subst; auto.
+            destruct (n ρ). rewrite lookup_insert_ne; auto.
+      Qed. 
+
 
       Lemma tl_valid_trace_states i o t rm (ITH: tr S!! i = Some <{o, t, rm}>):
         o <= t /\
-        (o < t <-> (exists ρ e, rm !! ρ = Some (tl_U o, e))) /\
-        (forall k, o < k < t <-> exists ρ, rm !! ρ = Some (tl_U k, true)) /\
-        (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1)) 
+        (forall k, o <= k < t <-> exists ρ e, rm !! ρ = Some (tl_U k, e)) /\
+        (forall ρ k, rm !! ρ = Some (tl_U k, false) -> k = o) /\
+        (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1))
            (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2)
              (* exists ρ, (unique (fun ρ_ => exists e, rm !! ρ_ = Some (tl_U k, e)) ρ) /\ *)
              (*      (o < k -> rm !! ρ = Some (tl_U k, true)). *)
           (* TODO: add uniqueness condition? *)
-          . 
-      Proof using. 
+          .
+      Proof using.
         gd o. gd t. gd rm. induction i.
         { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT.
           rewrite /tl_init_st in INIT. inversion INIT. subst.
-          splits; auto. 
-          - split; [lia| ]. intros [ρ [e [RMρ Et]]]. desc.
+          splits; auto.
+          - split; [lia| ]. intros [ρ RMρ]. desc.
+            apply lookup_gset_to_gmap_Some in RMρ. desc. congruence.
+          - intros. rewrite lookup_gset_to_gmap_Some in H. by desc.
+          - intros. rewrite lookup_gset_to_gmap_Some in R1. by desc. }
+
+        intros rm' t' o'. rewrite -Nat.add_1_r. intros ITH'.
+        forward eapply trace_lookup_dom_strong with (i := i) as [_ ITH]; eauto.
+        specialize_full ITH; [eapply state_lookup_dom; eauto| ]. desc.
+        pose proof (mtrace_valid_steps' _ _ _ _ ITH) as STEP.
+        apply state_label_lookup in ITH. desc.
+        rewrite ITH' in ITH0. inversion ITH0. subst. clear ITH0.
+        destruct st as [o t rm].
+        specialize (IHi _ _ _ ITH) as (IHle & IHtks & IHtko & IHuniq).
+        inversion STEP; subst.
+        - inversion STEP0; subst; simpl in *; auto.
+          + rename o' into o.
+            splits; [lia| ..].
+            * intros. specialize (IHtks k).
+              destruct (decide (k = t)) as [-> | NEQ].
+              { split; [| lia]. intros T.
+                exists ρ. eexists. rewrite lookup_insert. split; eauto. }
+              etransitivity.
+              { etransitivity; [| apply IHtks]. lia. }
+              split; intros; desc.
+              ** do 2 eexists. rewrite lookup_insert_ne; eauto.
+                 intros <-. congruence.
+              ** do 2 eexists.
+                 rewrite <- H. symmetry. apply lookup_insert_ne.
+                 intros <-. rewrite lookup_insert in H. congruence.
+            * intros.
+              destruct (decide (ρ0 = ρ)) as [-> | NEQ].
+              2: { rewrite lookup_insert_ne in H; eauto. } 
+              rewrite lookup_insert in H. inversion H.
+              subst k next_en0.
+              destruct (decide (o = t)); congruence.
+            * intros. destruct (decide (ρ1 = ρ)), (decide (ρ2 = ρ)).
+              { congruence. }
+              all: try (subst ρ1; rewrite lookup_insert in R1; inversion R1; subst k). 
+              all: try (subst ρ2; rewrite lookup_insert in R2; inversion R2; subst k).
+              all: try rewrite lookup_insert_ne in R1; auto.
+              all: try rewrite lookup_insert_ne in R2; auto.
+              1, 2: enough (t < t); [lia| ]; apply IHtks; by eauto.
+              eapply IHuniq; eauto.
+          + subst st'' st'3 st'2 st'0 st' st'1.
+             assert (o' = o + 1 /\ t' = t) as [-> ->].
+             { rewrite /advance_next in H4.
+               destruct (role_of_dec _ _) as [[? ?] | ?]; by inversion H4. }
+             apply Nat.le_lteq in IHle as [LT | ->].
+             2: { enough (t < t); [lia| ]. apply IHtks. eauto. }
+             splits; [lia| ..].
+             * intros.
+
+
+               rewrite /advance_next in H4.
+               destruct (role_of_dec) as [[? ?] | ?]; simpl in *;
+                 inversion H4; subst rm'; clear H4.
+               ** destruct (decide (ρ = x)).
+                  { subst x. rewrite lookup_insert in e. congruence. }
+                  rewrite lookup_insert_ne in e; auto.
+                  destruct (decide (k = o)) as [-> | NEQ].
+                  { split; [lia| ]. intros (ρ' & e' & RMρ'). 
+                    destruct (decide (ρ' = ρ)).
+                    { subst ρ'. rewrite lookup_insert_ne in RMρ'; auto.
+                      rewrite lookup_insert in RMρ'. congruence. }
+                    destruct (decide (x = ρ')).
+                    { subst x. rewrite lookup_insert in RMρ'.
+                      inversion RMρ'. lia. }
+                    rewrite !lookup_insert_ne in RMρ'; auto.
+                    destruct n0. eapply IHuniq; eauto. }
+                  etransitivity; [etransitivity| ]; [| by apply (IHtks k) |].
+                  { lia. }
+                  split.
+                  *** intros. desc. 
+                      destruct (decide (k = o + 1)).
+                      **** subst. exists x, false. by rewrite lookup_insert.
+                      **** exists ρ0, e0.
+                           rewrite !lookup_insert_ne; [by apply H| ..].
+                           { congruence. }
+                           intros <-. rewrite e in H. congruence.
+                  *** intros. desc.
+                      destruct (decide (k = o + 1)).
+                      **** subst. eauto.
+                      **** destruct (decide (x = ρ0)) as [-> | ?].
+                           { rewrite lookup_insert in H. congruence. }
+                           rewrite lookup_insert_ne in H; auto.
+                           destruct (decide (ρ = ρ0)) as [-> | ?].
+                           { rewrite lookup_insert in H. congruence. }
+                           rewrite lookup_insert_ne in H; auto.
+                           eauto.
+               ** specialize (IHtks k). 
+                  split.
+                  *** intros [GEk LTk].
+                      apply proj1 in IHtks.
+                      specialize_full IHtks; [lia| ]. desc.
+                      do 2 eexists. rewrite lookup_insert_ne; eauto.
+                      intros <-. rewrite R in IHtks.
+                      inversion IHtks. lia.
+                  *** intros. desc.
+                      destruct (decide (ρ = ρ0)) as [-> | ?].
+                      { rewrite lookup_insert in H. congruence. }
+                      destruct (decide (k = o)) as [-> | NEQko].
+                      **** rewrite lookup_insert_ne in H; auto. 
+                           destruct n0. eapply IHuniq; eauto. 
+                      **** enough (o <= k < t); [lia| ]. apply IHtks.
+                           rewrite lookup_insert_ne in H; eauto.
+             * intros. rewrite /advance_next in H4.
+               destruct role_of_dec as [[? ?] | ?]; simpl in *; 
+                 inversion H4; subst rm'; clear H4.
+               ** destruct (decide (ρ0 = x)) as [-> | ?].
+                  { rewrite lookup_insert in H. congruence. }
+                  rewrite lookup_insert_ne in H; auto.
+                  destruct (decide (x = ρ)) as [-> | ?].
+                  { rewrite lookup_insert in e. congruence. }
+                  rewrite lookup_insert_ne in e; auto.
+                  destruct (decide (ρ0 = ρ)) as [-> | ?].
+                  { rewrite lookup_insert in H. congruence. }
+                  rewrite lookup_insert_ne in H; auto.
+                  specialize (IHtko _ _ H). subst k.
+                  destruct n1. eapply IHuniq; eauto.
+               ** destruct (decide (ρ0 = ρ)) as [-> | ?].
+                  { rewrite lookup_insert in H. congruence. }
+                  rewrite lookup_insert_ne in H; auto. 
+                  specialize (IHtko _ _ H). subst k.
+                  destruct n0. eapply IHuniq; eauto.
+             * intros.
+               pose proof H4 as rm'_eq. apply (f_equal role_map) in rm'_eq. simpl in rm'_eq.
+               rewrite -rm'_eq in R1 R2. 
+               eapply advance_next_helper_U in R1, R2; auto. desc.
+               destruct R0, R3; desc; subst.
+               all: lia || eapply IHuniq; eauto.
+        - destruct ι; simpl in REL. 
+                   
+                 
+
+
+
+                          Lemma tl_valid_trace_states i o t rm (ITH: tr S!! i = Some <{o, t, rm}>):
+        o <= t /\
+        (forall k, o <= k < t <-> exists ρ e, rm !! ρ = Some (tl_U k, e)) /\
+        (* (o < t <-> exists ρ e, rm !! ρ = Some (tl_U o, e)) /\ *)
+        (* (forall k, o < k < t <-> exists ρ, rm !! ρ = Some (tl_U k, true)) /\ *)
+        (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1))
+           (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2)
+             (* exists ρ, (unique (fun ρ_ => exists e, rm !! ρ_ = Some (tl_U k, e)) ρ) /\ *)
+             (*      (o < k -> rm !! ρ = Some (tl_U k, true)). *)
+          (* TODO: add uniqueness condition? *)
+          .
+      Proof using.
+        gd o. gd t. gd rm. induction i.
+        { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT.
+          rewrite /tl_init_st in INIT. inversion INIT. subst.
+          splits; auto.
+          - split; [lia| ]. intros [ρ RMρ]. desc.
             apply lookup_gset_to_gmap_Some in RMρ. desc. congruence.
           - intros. desc. rewrite lookup_gset_to_gmap_Some in R1. by desc. }
         intros rm' t' o'. rewrite -Nat.add_1_r. intros ITH'.
+
         forward eapply trace_lookup_dom_strong with (i := i) as [_ ITH]; eauto.
         specialize_full ITH; [eapply state_lookup_dom; eauto| ]. desc.
         pose proof (mtrace_valid_steps' _ _ _ _ ITH) as STEP.
@@ -649,47 +997,62 @@ Section Model.
         destruct st as [o t rm].
         specialize (IHi _ _ _ ITH) as (IHle & IHtks & IHuniq).
         inversion STEP; subst.
-        - inversion STEP0; subst; simpl in *; auto. 
-          + splits; [lia| ..].
+        - inversion STEP0; subst; simpl in *; auto.
+          + rename o' into o.
+            splits; [lia| ..].
             2: { intros.
                  destruct (decide (ρ1 = ρ)) as [-> | ?].
                  - rewrite lookup_insert in R1. inversion R1. subst.
                    destruct (decide (ρ2 = ρ)) as [-> | ?].
                    + done.
-                   + rewrite lookup_insert_ne in R2; auto. congruence.  
+                   + rewrite lookup_insert_ne in R2; auto.
+                     rename k into t.
+                     enough (t < t); [lia| ]. apply IHtks.
+                     do 2 eexists. split; eauto.
+                     intros. destruct (decide (o = t)); [lia| ]. subst next_en0.
+                     
+                     
+                     destruct e2; auto.
+                     specialize (IHtks o). apply proj1 in IHtks.
+                     specialize_full IHtks; [lia| ].
+                     eapply IHuniq;
+                     foobar. move e = true condition outside of <-> ?
+                     congruence.
             intros.
             specialize (IHtks k).
             destruct (decide (k = t)) as [-> | NEQ].
             * split; [| lia].
-              intros T. exists ρ. eexists. rewrite lookup_insert. split; eauto. 
+              intros T. exists ρ. eexists. rewrite lookup_insert. split; eauto.
               destruct (decide (o' = t)); [lia|]. auto.
             * etransitivity.
-              { etransitivity; [| apply IHtks]. lia. }              
+              { etransitivity; [| apply IHtks]. lia. }
               split; intros; desc.
-              ** do 2 eexists. split; [| apply H0]. 
+              ** do 2 eexists. split; [| apply H0].
                  rewrite lookup_insert_ne; eauto.
                  intros <-. congruence.
               ** do 2 eexists. split; [| apply H0].
-                 rewrite <- H. symmetry. apply lookup_insert_ne. 
+                 rewrite <- H. symmetry. apply lookup_insert_ne.
                  intros <-. rewrite lookup_insert in H. congruence.
            + subst st'3 st'' st'. rewrite /advance_next in H4. simpl in *.
              assert (o' = o + 1 /\ t' = t) as [-> ->].
              { destruct (role_of_dec _ _) as [[? ?] | ?] ; by inversion H4. }
              destruct (decide (o = t)) as [<- | NEQ].
-             { specialize (IHtks o). apply proj2 in IHtks. 
+             { specialize (IHtks o). apply proj2 in IHtks.
                destruct IHtks; [eauto | lia]. }
              split; [lia| ].
              intros. specialize (IHtks k).
              destruct (decide (k = o)) as [-> | NEQko].
-             { split; intros; [lia| ]. desc. lia. 
+             { split; intros; [lia| ]. desc. lia.
 
 
 
              etransitivity; [| etransitivity]; [| apply IHtks|].
-             { 
+             {
 
 
-      Admitted. 
+      Admitted.
+
+
 
 
       Lemma steps_keep_state ρ (i: nat) (P: tl_role_st -> Prop) (j: nat)
