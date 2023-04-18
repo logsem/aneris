@@ -227,7 +227,8 @@ Section TraceDefinitions.
     (FAIRρ: fair_model_trace ρ tr)
     (VALID: mtrace_valid tr):
     forall i st (ITH: tr S!! i = Some st) (Pst: P st),
-    exists j st', i <= j /\ tr S!! j = Some st' /\ tr L!! j = Some $ Some ρ /\ P st'.
+    exists j st', ClassicalFacts.Minimal (fun j => i <= j /\ tr L!! j = Some $ Some ρ) j /\
+             tr S!! j = Some st' /\ P st'.
   Proof using. 
     intros. 
     apply fair_model_trace_defs_equiv, strong_fair_model_trace_alt_defs_equiv in FAIRρ.         
@@ -249,9 +250,12 @@ Section TraceDefinitions.
     { lia. }
     
     destruct STEP as [(st'_ & ST' & DIS') | STEP].
-    2: { exists (i + d), st'. split; eauto. lia. }
-    assert (st'_ = st') as -> by congruence. 
-    destruct DIS'. apply P_EN. eauto. 
+    { assert (st'_ = st') as -> by congruence. 
+      destruct DIS'. apply P_EN. eauto. }
+    exists (i + d), st'. split; eauto.
+    red. split; [split; [lia| eauto]| ].
+    intros k [LE' STEP']. apply Nat.le_sum in LE' as [d' ->].
+    enough (d <= d'); [lia| ]. apply MIN. eauto.
   Qed.
 
 End TraceDefinitions.   
@@ -992,27 +996,26 @@ Section Model.
             intros ->. congruence.
       Qed.
 
-      Lemma lock_wait_kept (ρ ρo: tl_role) n:
+      Lemma lock_wait_kept (ρ ρo: tl_role) o n:
         @label_kept_state ExtTL 
           (fun st => exists b bo, tl_state_wf st /\ 
                    role_map st !! ρ = Some (tl_U n, b) /\ 
-                   role_map st !! ρo = Some (tl_U (owner st), bo)) (inl ρo).
+                   role_map st !! ρo = Some (tl_U o, bo) /\
+                   owner st = o) (inl ρo).
       Proof using LEN FROM_INIT.
-        red. intros. destruct Ps as (b & bo & WF & TKn & OWNER).
-        (* eapply has_lock_kept in STEP as (WF' & OWNER' & LOCK'); eauto.  *)
-        (* 2: { splits; eauto. red. eauto. } *)
+        red. intros. destruct Ps as (b & bo & WF & TKn & OWNER & OWo).
         forward eapply (has_lock_kept ρo (owner st) _ _ _ _ _ STEP). Unshelve.
         3: { eauto. }
-        2: { splits; eauto. red. eauto. }
+        2: { splits; eauto. red. eauto. rewrite OWo. eauto. }
         intros (WF' & OWNER' & LOCK'). 
         
         destruct (decide (ρo = ρ)) as [-> | NEQ].
         { assert (n = owner st /\ bo = b) as [-> ->] by (split; congruence). 
           red in LOCK'. desc. 
-          exists e, e. splits; eauto. congruence. }
+          exists e, e. splits; eauto; congruence. }
 
         assert (owner st < n /\ b = true) as [LT ->].
-        { destruct st as [o t rm]. simpl in *. 
+        { destruct st as [o_ t rm]. simpl in *. subst o_.  
           destruct WF as (LE & TKS & TKO & UNIQ).
           destruct (decide (n = o)) as [-> | NEQ'].
           { destruct NEQ. eapply UNIQ; eauto. }
@@ -1021,7 +1024,7 @@ Section Model.
           by apply TKO in TKn. }
 
         destruct LOCK' as [bo' LOCK'].
-        exists true, bo'. splits; eauto. 
+        exists true, bo'. splits; eauto; try congruence.  
 
         inversion STEP; subst.
         - inversion STEP0; subst; simpl in *.
@@ -1033,6 +1036,50 @@ Section Model.
         - destruct ι; simpl in REL; inversion REL; subst; simpl in *. 
           all: rewrite lookup_insert_ne; eauto; intros ->; congruence.
       Qed.
+
+      Lemma lock_wait_active_kept (ρ ρo: tl_role) o n:
+        @label_kept_state ExtTL 
+          (fun st => exists b, tl_state_wf st /\ 
+                   role_map st !! ρ = Some (tl_U n, b) /\ 
+                   role_map st !! ρo = Some (tl_U o, true) /\
+                   owner st = o) (inl ρo).
+      Proof using LEN FROM_INIT.
+        red. intros. destruct Ps as (b & WF & TKn & OWNER & OWo).
+        forward eapply (has_lock_active_kept ρo (owner st) _ _ _ _ _ STEP). Unshelve.
+        3: { eauto. }
+        2: { splits; eauto. rewrite OWo. eauto. }
+        intros (WF' & OWNER' & LOCK'). 
+        
+        destruct (decide (ρo = ρ)) as [-> | NEQ].
+        { assert (n = owner st) as -> by congruence.
+          exists true. splits; eauto; congruence. } 
+
+        assert (owner st < n /\ b = true) as [LT ->].
+        { destruct st as [o_ t rm]. simpl in *. subst o_.  
+          destruct WF as (LE & TKS & TKO & UNIQ).
+          destruct (decide (n = o)) as [-> | NEQ'].
+          { destruct NEQ. eapply UNIQ; eauto. }
+          specialize (TKS n). apply proj2 in TKS. specialize_full TKS; [eauto|]. 
+          destruct b; [split; [lia|auto]| ].
+          by apply TKO in TKn. }
+
+        destruct LOCK' as [bo' LOCK'].
+        exists true. split; eauto; try congruence. apply and_assoc. split; [| congruence].
+
+        inversion STEP; subst.
+        - inversion STEP0; subst; simpl in *.
+          + assert (ρ0 ≠ ρ) by congruence. 
+            rewrite lookup_insert_ne; auto. 
+            split; auto. 
+            rewrite lookup_insert_ne; auto. 
+            intros ->. congruence.
+          + split; auto. 
+          + subst st''.
+            rewrite advance_next_owner in OWNER'.  subst st'0. simpl in *. lia.
+        - destruct ι; simpl in REL; inversion REL; subst; simpl in *. 
+          all: split; auto; rewrite lookup_insert_ne; eauto; intros ->; congruence.
+      Qed.
+
 
       Lemma eventual_release_strenghten ρ i
         (EV_REL: eventual_release ρ i):
@@ -1060,9 +1107,9 @@ Section Model.
         (ITH: tr S!! i = Some st)
         (LOCK: has_lock_st ρ st)
         (R0: ρ = ρ0 -> i < m):
-        ∃ n st',
+        ∃ n st', 
           i < n ∧ tr S!! n = Some st' ∧ owner st' = owner st + 1 /\
-          can_lock_st ρ st' ∧ ¬ active_st ρ st'.
+          can_lock_st ρ st' ∧ ¬ active_st ρ st'. 
       Proof using VALID LEN FROM_INIT FAIR.
         destruct st as [o t rm].
         pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ITH LOCK) as HH.
@@ -1093,7 +1140,8 @@ Section Model.
         { simpl. intros. red. simpl. apply elem_of_union_l. apply gset_map_in.
           apply active_st_enabled. red. destruct Pst as (_ & _ & ?). eauto. }
         { splits; eauto. destruct LOCK', ENρo. congruence. }
-        intros (j & st'' & LEkj & JTH & STEP & (WF'' & OW''o & RM''ρo)).
+        intros (j & st'' & HH & JTH & WF & OW''o & RM''ρo).
+        destruct HH as [[LEkj STEP] MIN']. 
         
         forward eapply (proj1 (label_lookup_states tr j)) as [_ [st''' J'TH]]; eauto.
         forward eapply (mtrace_valid_steps' tr j) as STEP''.
@@ -1120,191 +1168,223 @@ Section Model.
       Qed.
 
 
-      (* TODO: remove? *)
-      Lemma lock_eventually_released_strong i ρ st ρ0 m
-        (EV_REL: eventual_release ρ0 m)
-        (ITH: tr S!! i = Some st)
-        (LOCK: has_lock_st ρ st)
-        (R0: ρ = ρ0 -> i < m):
-        ∃ n st',
-          i < n ∧ tr S!! n = Some st' ∧ owner st' = owner st + 1 /\
-          can_lock_st ρ st' ∧ ¬ active_st ρ st' /\
-          (owner st' < ticket st' -> exists ρ', 
-              role_map st' !! ρ' = Some (tl_U $ owner st', false)).
+      (* (* TODO: remove? *) *)
+      (* Lemma lock_eventually_released_strong i ρ st ρ0 m *)
+      (*   (EV_REL: eventual_release ρ0 m) *)
+      (*   (ITH: tr S!! i = Some st) *)
+      (*   (LOCK: has_lock_st ρ st) *)
+      (*   (R0: ρ = ρ0 -> i < m): *)
+      (*   ∃ n st', *)
+      (*     i < n ∧ tr S!! n = Some st' ∧ owner st' = owner st + 1 /\ *)
+      (*     can_lock_st ρ st' ∧ ¬ active_st ρ st' /\ *)
+      (*     (owner st' < ticket st' -> exists ρ',  *)
+      (*         role_map st' !! ρ' = Some (tl_U $ owner st', false)). *)
+      (* Proof using VALID LEN FROM_INIT FAIR. *)
+      (*   destruct st as [o t rm]. *)
+      (*   pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ITH LOCK) as HH. *)
+      (*   rename HH into EV_REL'. specialize_full EV_REL'. *)
+      (*   { intros ->. auto. } *)
+      (*   destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MIN). *)
+        
+      (*   forward eapply steps_keep_state with (i := i) (j := k) (k := k) as LOCK'. *)
+      (*   3: { apply has_lock_kept. } *)
+      (*   all: eauto.  *)
+      (*   { eexists. split; [apply ITH|]. split; eauto. *)
+      (*     eapply tl_valid_trace_states; eauto. }  *)
+      (*   { intros. destruct IKJ as [[v ->]%Nat.le_sum KJ].  *)
+      (*     intros ->. enough (k <= i + v); [lia| ]. apply MIN. *)
+      (*     forward eapply (proj1 (label_lookup_states tr (i + v))) as HH; eauto. *)
+      (*     destruct HH as [[st1 ST1] [st2 ST2]]. *)
+      (*     eexists. splits; [eauto| lia|]. *)
+      (*     forward eapply (mtrace_valid_steps' tr (i + v)) as STEP; eauto. *)
+      (*     { eapply state_label_lookup; eauto. } *)
+      (*     inversion STEP; subst.  *)
+      (*     apply active_st_enabled. *)
+      (*     eapply fm_live_spec; eauto. } *)
+      (*   destruct LOCK' as (WF' & OW'o & LOCK'). simpl in *. *)
+        
+      (*   forward eapply (kept_state_fair_step tr).   *)
+      (*   { apply (has_lock_active_kept ρ o). } *)
+      (*   all: eauto. *)
+      (*   { simpl. intros. red. simpl. apply elem_of_union_l. apply gset_map_in. *)
+      (*     apply active_st_enabled. red. destruct Pst as (_ & _ & ?). eauto. } *)
+      (*   { splits; eauto. destruct LOCK', ENρo. congruence. } *)
+      (*   intros (j & st'' & LEkj & JTH & STEP & (WF'' & OW''o & RM''ρo)). *)
+        
+      (*   forward eapply (proj1 (label_lookup_states tr j)) as [_ [st''' J'TH]]; eauto. *)
+      (*   forward eapply (mtrace_valid_steps' tr j) as STEP''. *)
+      (*   { eapply state_label_lookup; eauto. } *)
+
+      (*   exists (j + 1), st'''. split; [lia| ]. split; auto. *)
+      (*   inversion STEP''; subst. inversion STEP0; subst; simpl in *. *)
+      (*   { congruence. } *)
+      (*   { rewrite RM''ρo in R. inversion R. lia. } *)
+      (*   assert (role_map st''0 !! ρ = Some (tl_L, false)) as R'. *)
+      (*   { subst st'1 st'0 st''0. simpl in *. *)
+      (*     rewrite /advance_next. simpl. *)
+      (*     destruct role_of_dec as [[? ?] | ?].  *)
+      (*     2: { simpl. by rewrite lookup_insert. } *)
+      (*     simpl. rewrite lookup_insert_ne. *)
+      (*     2: { intros ->. rewrite lookup_insert in e. congruence. } *)
+      (*     by rewrite lookup_insert. } *)
+      (*   rewrite /can_lock_st /active_st. rewrite R'. splits. *)
+      (*   { subst st'1 st'0 st''0. simpl in *. *)
+      (*     rewrite /advance_next. simpl. *)
+      (*     destruct role_of_dec as [[? ?] | ?]; simpl; lia. } *)
+      (*   { eauto. } *)
+      (*   { intros [? ?]. congruence. } *)
+
+      (*   intros. *)
+      (*   assert (exists ρ', rm0 !! ρ' = Some (tl_U (o + 1), true)) as [ρ' OW'']. *)
+      (*   { destruct WF'' as (_ & TKS & TKo & _). *)
+      (*     specialize (TKS (o + 1)). apply proj1 in TKS. specialize_full TKS. *)
+      (*     { rewrite /st''0 advance_next_owner advance_next_ticket in H. *)
+      (*       subst st'0. simpl in *. lia. } *)
+      (*     desc. destruct e; eauto.  *)
+      (*     apply TKo in TKS. lia. } *)
+      (*   exists ρ'. subst st'1 st'0 st''0. simpl in *. *)
+      (*   assert (ρ ≠ ρ') as NEQ.  *)
+      (*   { intros ->. rewrite R in OW''. inversion OW''. lia. } *)
+      (*   rewrite /advance_next. destruct role_of_dec as [[? ?] | ?]; simpl in *. *)
+      (*   2: { destruct (n ρ'). rewrite lookup_insert_ne; auto. } *)
+      (*   assert (x ≠ ρ) as NEQ'. *)
+      (*   { intros ->. simpl_li. congruence. } *)
+      (*   destruct (decide (x = ρ')) as [-> | NEQ'']; simpl_li; auto. *)
+      (*   destruct NEQ''. destruct WF'' as (_ & _ & _ & UNIQ).  *)
+      (*   eapply UNIQ; eauto.  *)
+      (* Qed. *)
+
+      Lemma lock_eventually_acquired_iteration o t rm ρ i d
+        (ST: tr S!! i = Some <{ o, t, rm }>)
+        (R: rm !! ρ = Some (tl_U (S o + d), true))
+        (EV_REL: eventual_release ρ i):
+        ∃ (n : nat) (st': tl_st),
+          let e' := if (decide (d = 0)) then false else true in
+          i < n ∧ tr S!! n = Some st' ∧ owner st' = o + 1 /\
+          role_map st' !! ρ = Some (tl_U (S o + d), e'). 
       Proof using VALID LEN FROM_INIT FAIR.
-        destruct st as [o t rm].
-        pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ITH LOCK) as HH.
+        assert (exists ρo, has_lock_st ρo <{ o, t, rm }>) as [ρo LOCK].
+        { apply tl_valid_trace_states in ST as (LE & TKS & _).
+          apply Lt.le_lt_or_eq_stt in LE as [LT | ->].
+          2: { enough (S t + d < t); [lia| ]. apply TKS. eauto. }
+          specialize (TKS o). apply proj1 in TKS. specialize_full TKS; auto. }
+        assert (ρo ≠ ρ) as NEQ.
+        { intros ->. red in LOCK. desc. rewrite R in LOCK.
+          inversion LOCK. lia. }
+        
+        pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ST LOCK) as HH.
         rename HH into EV_REL'. specialize_full EV_REL'.
-        { intros ->. auto. }
-        destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MIN).
+        { intros ->. rewrite /has_lock_st in LOCK. destruct LOCK.
+          simpl in H. rewrite R in H. inversion H. lia. }
+        destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MINk).
         
         forward eapply steps_keep_state with (i := i) (j := k) (k := k) as LOCK'.
-        3: { apply has_lock_kept. }
-        all: eauto. 
-        { eexists. split; [apply ITH|]. split; eauto.
-          eapply tl_valid_trace_states; eauto. } 
-        { intros. destruct IKJ as [[v ->]%Nat.le_sum KJ]. 
-          intros ->. enough (k <= i + v); [lia| ]. apply MIN.
+        3: { apply (lock_wait_kept ρ ρo). }
+        all: eauto.
+        { eexists. split; [apply ST|]. 
+          red in LOCK. desc. do 2 eexists. splits; eauto. 
+          eapply tl_valid_trace_states; eauto. }
+        { intros. destruct IKJ as [[v ->]%Nat.le_sum KJ].
+          intros ->. enough (k <= i + v); [lia| ]. apply MINk.
           forward eapply (proj1 (label_lookup_states tr (i + v))) as HH; eauto.
           destruct HH as [[st1 ST1] [st2 ST2]].
           eexists. splits; [eauto| lia|].
           forward eapply (mtrace_valid_steps' tr (i + v)) as STEP; eauto.
           { eapply state_label_lookup; eauto. }
-          inversion STEP; subst. 
+          inversion STEP; subst.
           apply active_st_enabled.
           eapply fm_live_spec; eauto. }
-        destruct LOCK' as (WF' & OW'o & LOCK'). simpl in *.
+        simpl in LOCK'. destruct LOCK' as (b & bo & WF' & R' & Ro' & OW').
+        assert (bo = true) as ->.
+        { red in ENρo. destruct ENρo. congruence. }
         
-        forward eapply (kept_state_fair_step tr).  
-        { apply (has_lock_active_kept ρ o). }
+        forward eapply (kept_state_fair_step tr) with (i := k).
+        { apply (lock_wait_active_kept ρ ρo). }
         all: eauto.
         { simpl. intros. red. simpl. apply elem_of_union_l. apply gset_map_in.
-          apply active_st_enabled. red. destruct Pst as (_ & _ & ?). eauto. }
-        { splits; eauto. destruct LOCK', ENρo. congruence. }
-        intros (j & st'' & LEkj & JTH & STEP & (WF'' & OW''o & RM''ρo)).
-        
+          apply active_st_enabled. red. desc. eauto. }
+        { splits; eauto. }
+        intros (j & st'' & [[LEkj STEPj] MINj] & JTH & b_ & WF'' & RMρ'' & RMρo'' & OW'').
+        assert (b_ = true) as ->.
+        { destruct b_; auto.
+          destruct st''; simpl in *. destruct WF'' as (? & ? & TKo'' & _).
+          apply TKo'' in RMρ''. lia. }
+
         forward eapply (proj1 (label_lookup_states tr j)) as [_ [st''' J'TH]]; eauto.
-        forward eapply (mtrace_valid_steps' tr j) as STEP''.
+        exists (j + 1), st'''. split; [lia| ]. split; [auto| ].
+        forward eapply (mtrace_valid_steps' tr j) as STEP; eauto.
         { eapply state_label_lookup; eauto. }
-
-        exists (j + 1), st'''. split; [lia| ]. split; auto.
-        inversion STEP''; subst. inversion STEP0; subst; simpl in *.
+        inversion STEP; subst. inversion STEP0; subst; simpl in *.
         { congruence. }
-        { rewrite RM''ρo in R. inversion R. lia. }
-        assert (role_map st''0 !! ρ = Some (tl_L, false)) as R'.
-        { subst st'1 st'0 st''0. simpl in *.
-          rewrite /advance_next. simpl.
-          destruct role_of_dec as [[? ?] | ?]. 
-          2: { simpl. by rewrite lookup_insert. }
-          simpl. rewrite lookup_insert_ne.
-          2: { intros ->. rewrite lookup_insert in e. congruence. }
-          by rewrite lookup_insert. }
-        rewrite /can_lock_st /active_st. rewrite R'. splits.
-        { subst st'1 st'0 st''0. simpl in *.
-          rewrite /advance_next. simpl.
-          destruct role_of_dec as [[? ?] | ?]; simpl; lia. }
-        { eauto. }
-        { intros [? ?]. congruence. }
+        { rewrite RMρo'' in R0. inversion R0. lia. }
+        subst st''0. split.
+        { rewrite advance_next_owner. subst st'0. simpl. lia. }
 
-        intros.
-        assert (exists ρ', rm0 !! ρ' = Some (tl_U (o + 1), true)) as [ρ' OW''].
-        { destruct WF'' as (_ & TKS & TKo & _).
-          specialize (TKS (o + 1)). apply proj1 in TKS. specialize_full TKS.
-          { rewrite /st''0 advance_next_owner advance_next_ticket in H.
-            subst st'0. simpl in *. lia. }
-          desc. destruct e; eauto. 
-          apply TKo in TKS. lia. }
-        exists ρ'. subst st'1 st'0 st''0. simpl in *.
-        assert (ρ ≠ ρ') as NEQ. 
-        { intros ->. rewrite R in OW''. inversion OW''. lia. }
-        rewrite /advance_next. destruct role_of_dec as [[? ?] | ?]; simpl in *.
+        assert (exists ρ', rm0 !! ρ' = Some (tl_U (S (owner st')), true)) as [ρ' RM'].
+        { destruct WF'' as (? & ? & ? & ?).          
+          pose proof (H0 (S o + d)) as B. apply proj2 in B. specialize_full B.
+          { rewrite OW''. eauto. }
+          pose proof (H0 (S o)) as RR. apply proj1 in RR. specialize_full RR.
+          { lia. }
+          destruct RR as (ρ' & b' & R'_).
+          exists ρ'. rewrite <- OW''. destruct b'; auto.
+          apply H1 in R'_. lia. }
+        rewrite -OW'' -Nat.add_1_r in RM'.
+        assert (ρo ≠ ρ') as NEQ'.
+        { intros <-. rewrite RMρo'' in RM'. inversion RM'. lia. }
+        subst st'0. simpl. rewrite /advance_next.
+        destruct role_of_dec as [[? ?] | ?]; simpl in *.
         2: { destruct (n ρ'). rewrite lookup_insert_ne; auto. }
-        assert (x ≠ ρ) as NEQ'.
-        { intros ->. simpl_li. congruence. }
-        destruct (decide (x = ρ')) as [-> | NEQ'']; simpl_li; auto.
-        destruct NEQ''. destruct WF'' as (_ & _ & _ & UNIQ). 
-        eapply UNIQ; eauto. 
+        assert (x ≠ ρo) as NEQ''.
+        { intros ->. rewrite lookup_insert in e. congruence. }
+        rewrite lookup_insert_ne in e; auto.
+        assert (x = ρ') as -> by (eapply WF''; eauto).
+        destruct (decide (ρ = ρ')) as [-> | ?].
+        { rewrite lookup_insert.
+          rewrite RMρ'' in e. inversion e. 
+          destruct (decide (d = 0)) as [-> | ?]; [| lia]; auto. }
+        do 2 (rewrite lookup_insert_ne; auto).
+        destruct (decide (d = 0)) as [-> | ?]; auto.
+        rewrite Nat.add_0_r -Nat.add_1_r -OW'' in RMρ''.
+        destruct n. eapply WF''; eauto.
       Qed.
 
+      (* Lemma ev_rel_closed ρ i j (LE: i <= j) *)
+      (*   (EV_REL: eventual_release ρ i): *)
+      (*   eventual_release ρ j. *)
+      (* Proof using. *)
+      (*   rewrite /eventual_release. rewrite /eventual_release in EV_REL. *)
+      (*   intros. eapply EV_REL; eauto. *)
+      (*   intros. specialize (PREVr H).  *)
 
+        
       Lemma lock_eventually_acquired o t rm ρ i wt 
         (ST: tr S!! i = Some <{ o, t, rm }>)
         (WAIT: o ≠ wt)
         (R: rm !! ρ = Some (tl_U wt, true))
-        (EV_REL: eventual_release ρ i):
+        (EV_REL: forall j (LE: i <= j), eventual_release ρ j):
         ∃ (n : nat) (st' : tl_st),
           i < n ∧ tr S!! n = Some st' ∧ has_lock_st ρ st' ∧ ¬ active_st ρ st'.
-      Proof using.
+      Proof using VALID LEN FROM_INIT FAIR.
         assert (o < wt) as LT.
         { apply PeanoNat.Nat.le_neq. split; auto. 
           apply tl_valid_trace_states in ST. apply ST. eauto. }
         apply Nat.le_succ_l in LT. apply Nat.le_sum in LT as [d ->]. clear WAIT.
         gd i. gd o. gd rm. gd t. induction d.
-        { intros. rewrite Nat.add_0_r in R.
-          assert (exists ρo, has_lock_st ρo <{ o, t, rm }>) as [ρo LOCK].
-          { apply tl_valid_trace_states in ST as (LE & TKS & _).
-            apply Lt.le_lt_or_eq_stt in LE as [LT | ->].
-            2: { enough (S t < t); [lia| ]. apply TKS. eauto. }
-            specialize (TKS o). apply proj1 in TKS. specialize_full TKS; auto. }
-
-          
-
-
-
-
-
-
-
-
-
-          forward eapply lock_eventually_released; eauto. 
-          { intros ->. red in LOCK. desc. simpl in LOCK.
-            rewrite R in LOCK. inversion LOCK. lia. }
-          intros [n_ REL]. pattern n_ in REL.
-          eapply min_prop_dec in REL; eauto.
-          2: { intros m.
-               destruct (tr S!! m) as [st | ] eqn:MTH.
-               2: { right. intros (? & ? & ? & ?). congruence. }
-               destruct (decide (i < m)).
-               2: { right. intros (? & ? & ?). lia. }
-               destruct (decide (owner st = owner <{ o, t, rm }> + 1)).
-               2: { right. intros (? & ? & ? & ? & ?). congruence. }
-               destruct (@decide (can_lock_st ρo st ∧ ¬ active_st ρo st)).
-               { apply and_dec; eauto. all: admit. }
-               2: { right. intros (? & ? & ? & ? & ?). congruence. }
-               left. eauto. }
-          clear n_. destruct REL as (n & [st' PROP] & MIN).
-          red in LOCK. desc. simpl in LOCK.
-          forward eapply steps_keep_state with (i := i) (j := n) (k := n) as R'.
-          3: { apply lock_wait_kept. }
-          all: eauto.
-          { eexists. split; eauto. do 2 eexists. split.
-            { eapply tl_valid_trace_states; eauto. }
-            simpl. split; [apply R| eauto]. }
-          { (* TODO: extract this and similar subproof before? *)
-            (* foobar. prove by induction? *)
-            intros. destruct IKJ as [[v ->]%Nat.le_sum KJ]. 
-            intros ->. enough (n <= i + v); [lia| ]. apply MIN.
-            forward eapply (proj1 (label_lookup_states tr (i + v))) as HH; eauto.
-            destruct HH as [[st1 ST1] [st2 ST2]].
-            forward eapply (mtrace_valid_steps' tr (i + v)) as STEP; eauto.
-            { eapply state_label_lookup; eauto. }
-            inversion STEP; subst.
-            inversion STEP0; subst; simpl in *. 
-            apply active_st_enabled.
-            eapply fm_live_spec; eauto. 
-
-
-}
-            
-            
-
-               
-               destruct (active_st_dec ρ' st).
-               - left. eauto.
-               - right. intros (? & ? & ? & ?). congruence.
-  
-
-
-
-
-          intros (j & st' & LTij & JTH & OW' & UNLOCKρo & NENρo & LOCKρ).
-          simpl in OW'. 
-          specialize_full LOCKρ.
-          { rewrite OW'. simpl.
-            apply Nat.lt_le_trans with (m := t).
-            2: { forward eapply (trace_counters_mono i j); eauto; [lia| ].
-                 intros. simpl in *. lia. }
-            apply (tl_valid_trace_states _ _ ST).
-            rewrite PeanoNat.Nat.add_1_r. eauto. }
-          destruct LOCKρ as [ρ_ LOCKρ].
-          
-
-          assert (role_map st' !! ρ = Some (tl_U (S o), false)) as RMρ'.
-          { 
-          
-
-      Admitted.
+        { intros. eapply lock_eventually_acquired_iteration in ST; eauto.
+          simpl in ST. desc. rewrite Nat.add_0_r -Nat.add_1_r in ST2. 
+          rewrite /has_lock_st /active_st. 
+          exists n, st'. rewrite ST1. splits; eauto.
+          intros [? ?]. eauto. rewrite ST2 in H. congruence. }
+        intros. eapply lock_eventually_acquired_iteration in ST; eauto.
+        simpl in ST. desc.
+        destruct st'. simpl in *.
+        replace (S (o + S d)) with (S (S o) + d) in ST2 by lia.
+        eapply IHd in ST2.
+        2: { rewrite -Nat.add_1_r -ST1. eauto. }
+        2: { intros. apply EV_REL. lia. }
+        desc. exists n0, st'. splits; eauto. lia. 
+      Qed.
 
 
 
@@ -1312,14 +1392,14 @@ Section Model.
         (ITH: tr S!! i = Some st)
         (CAN_LOCK: can_lock_st ρ st)
         (ACT: active_st ρ st)
-        (EV_REL: eventual_release ρ i):
+        (EV_REL: forall j (LE: i <= j), eventual_release ρ j):
         exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\
                    ¬ active_st ρ st'.
-      Proof using VALID LEN FAIR.
+      Proof using VALID LEN FAIR FROM_INIT.
         red in CAN_LOCK. destruct CAN_LOCK as [e RMρ].
         assert (e = true) as -> by (destruct ACT; congruence). 
 
-        forward eapply (kept_state_fair_step tr (inl ρ)) as (j & st' & LEij & ITH' & STEP & RMρ').
+        forward eapply (kept_state_fair_step tr (inl ρ)) as (j & st' & [[LEij ITH'] MIN] & STEP & RMρ').
         { apply lock_compete_kept. }
         all: eauto.
         { clear dependent st. simpl. intros st STρ. 
@@ -1327,6 +1407,7 @@ Section Model.
           apply elem_of_union_l. apply gset_map_in.
           simpl. rewrite /tl_live_roles.
           apply elem_of_dom. eexists. apply map_filter_lookup_Some_2; done. }
+        
         simpl in RMρ'. 
 
         apply Nat.le_sum in LEij as [d ->]. 
@@ -1350,9 +1431,8 @@ Section Model.
           2-4: by eauto. lia. 
         - apply WAIT.
         - rewrite lookup_insert. eauto.
-        - (* TODO: show that eventual_release ρ i is enough *)
-          admit. 
-      Admitted. 
+        - intros. apply EV_REL. lia. 
+      Qed. 
 
     End ProgressPropertiesImpl. 
 
