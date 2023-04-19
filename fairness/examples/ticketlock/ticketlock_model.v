@@ -304,31 +304,9 @@ Section ExtModels2.
   | ext_ext_step s1 s2 ι (REL: ETs ι s1 s2):
     ext_trans s1 (Some (inr (env ι))) s2. 
 
-  (* (* TODO: rename? *) *)
-  (* Definition env_role': gset env_role := *)
-  (*   list_to_set (map env (seq 0 (length ETs))). *)
-  
-  (* Instance next_ext_dec': *)
-  (*   ∀ st x, Decision ((λ ρ, ∃ st', ext_trans st (Some (inr ρ)) st') x). *)
-  (* Proof using next_ext_dec.  *)
-  (*   intros st [i]. *)
-  (*   destruct (ETs i) eqn:RELi. *)
-  (*   2: { right. intros [st' STEP]. inversion STEP. congruence. } *)
-  (*   specialize (@next_ext_dec i P st RELi). *)
-  (*   destruct next_ext_dec as [EX | NEX]; auto.  *)
-  (*   - left. destruct EX as [st' TRANS]. *)
-  (*     exists st'. econstructor; eauto. *)
-  (*   - right. intros [st' TRANS]. destruct NEX. *)
-  (*     inversion TRANS. subst.  *)
-  (*     exists st'. congruence.  *)
-  (* Qed. *)
-
-  (* TODO: is it possible to express the inr lifting 
-     without requiring the decidability above? *)
   Definition ext_live_roles (st: fmstate M): gset ext_role :=
     gset_map inl (live_roles M st) ∪
-      (* gset_map inr (filter (fun ρ => exists st', ext_trans st (Some (inr ρ)) st') env_role'). *)
-      gset_map (inr ∘ env) (active_exts st). 
+    gset_map (inr ∘ env) (active_exts st). 
 
   Lemma ext_live_spec:
     ∀ s ρ s', ext_trans s (Some ρ) s' → ρ ∈ ext_live_roles s.
@@ -394,28 +372,7 @@ Section Model.
 
   #[global] Instance tl_st_eqdec: EqDecision tl_st. 
   Proof using. solve_decision. Qed. 
-  
-  (* #[global] Instance YN_countable: Countable YN. *)
-  (* Proof. *)
-  (*   refine ({| *)
-  (*              encode yn := match yn with Y => 1 | No => 2 end; *)
-  (*              decode p := match p with 1 => Some Y | 2 => Some No | _ => None end; *)
-  (*            |})%positive. *)
-  (*   intros yn. by destruct yn. *)
-  (* Qed. *)
-
-  (* #[global] Instance YN_inhabited: Inhabited YN. *)
-  (* Proof. exact (populate Y). Qed. *)
-
-  (* Global Instance lookup_tl_role_map: *)
-  (*   Lookup tl_role (tl_role_stage * bool) tl_role_map.  *)
-  (* Proof using.  *)
-  (*   red. intros r rm. *)
-  (*   set (o := rm !! r).  *)
-
-  (* Lemma foo (rm: tl_role_map) (r: tl_role): *)
-  (*   rm !! r = Some (tl_L, true).  *)
-  
+    
   Lemma role_of_dec (rm: tl_role_map) (s: tl_role_st):
     {r | rm !! r = Some s} + (forall r, rm !! r ≠ Some s). 
   Proof using.
@@ -438,14 +395,10 @@ Section Model.
         end.
 
   Inductive tl_trans: tl_st -> option tl_role -> tl_st -> Prop :=
-  (* | tl_acquire_lock o rm r (R: rm !! r = Some (tl_L, true)): *)
-  (*   tl_trans <{o, o, rm}> (Some r) <{o, o + 1, <[r := (tl_U o, false)]> rm }> *)
-  (* | tl_acquire_wait (o t: nat) rm r (LT: o < t) (R: rm !! r = Some (tl_L, true)): *)
-  (*   tl_trans <{o, t, rm}> (Some r) <{o, t + 1, <[r := (tl_U t, true)]> rm}> *)
   | tl_take_ticket o t rm r (R: rm !! r = Some (tl_L, true)):
     let next_en := if decide (o = t) then false else true in
     tl_trans <{o, t, rm}> (Some r) <{o, t + 1, <[r := (tl_U t, next_en)]> rm}>
-  | tl_spin (o t k: nat) rm r (LT: o < k) (R: rm !! r = Some (tl_U k, true)):
+  | tl_spin (o t k: nat) rm r (LT: o ≠ k) (R: rm !! r = Some (tl_U k, true)):
     tl_trans <{o, t, rm}> (Some r) <{o, t, rm}>
   | tl_unlock o t rm r (R: rm !! r = Some (tl_U o, true)):
     let st' := <{o + 1, t, <[r := (tl_L, false)]> rm}> in
@@ -490,8 +443,19 @@ Section Model.
 
   Lemma active_st_enabled (ρ: tl_role) (st: tl_st):
     active_st ρ st <-> @role_enabled_model tl_fair_model ρ st.
-  Proof using. 
-  Admitted. 
+  Proof using.
+    destruct st as [o t rm].
+    rewrite /active_st /role_enabled_model. split.
+    - intros [r RMρ]. destruct r.
+      + eapply fm_live_spec. apply tl_take_ticket. eauto.
+      + destruct (decide (o = t0)); eapply fm_live_spec. 
+        * eapply tl_unlock; eauto. rewrite RMρ. congruence.
+        * eapply tl_spin; eauto.
+    - intros LIVE. simpl in LIVE. rewrite /tl_live_roles in LIVE.
+      apply elem_of_dom in LIVE as [r LIVE]. eauto.
+      apply map_filter_lookup_Some in LIVE as [? ?].
+      destruct r. subst. eauto.      
+  Qed. 
 
   Lemma active_st_dec (ρ: tl_role) (st: tl_st):
     Decision (active_st ρ st).
@@ -535,19 +499,11 @@ Section Model.
 
     Global Instance tl_EI_cnt: Countable tl_EI. 
     Proof using.
-    Admitted.
-
-    (* Lemma tl_next_ext_dec:  *)
-    (*   ∀ i rel st, tl_ETs i = Some rel → Decision (∃ st', rel st st'). *)
-    (* Proof using.  *)
-    (*   unfold tl_ext_trans. intros ? ? ? RELi. *)
-    (*   destruct i; try done. simpl in *. inversion RELi. subst. clear RELi. *)
-    (*   destruct st as [o t rm].  *)
-    (*   destruct (role_of_dec rm (tl_U o, false)) as [[r LOCK] | FREE]. *)
-    (*   - left. eexists. econstructor. eauto. *)
-    (*   - right. intros [st' TRANS]. inversion TRANS. subst. *)
-    (*     edestruct FREE; eauto. *)
-    (* Qed.  *)
+      eapply inj_countable' with 
+        (f := fun ι => match ι with | eiU => 0 | eiL ρ => S (ρ: nat) end)
+        (g := fun n => match n with | 0 => eiU | S n' => eiL (n': tl_role) end).
+      intros. destruct x; auto.
+    Qed.
 
     Lemma allows_unlock_ex_dec: 
       forall st, Decision (∃ st', allows_unlock st st'). 
@@ -1167,93 +1123,6 @@ Section Model.
         intros [? ?]. congruence. 
       Qed.
 
-
-      (* (* TODO: remove? *) *)
-      (* Lemma lock_eventually_released_strong i ρ st ρ0 m *)
-      (*   (EV_REL: eventual_release ρ0 m) *)
-      (*   (ITH: tr S!! i = Some st) *)
-      (*   (LOCK: has_lock_st ρ st) *)
-      (*   (R0: ρ = ρ0 -> i < m): *)
-      (*   ∃ n st', *)
-      (*     i < n ∧ tr S!! n = Some st' ∧ owner st' = owner st + 1 /\ *)
-      (*     can_lock_st ρ st' ∧ ¬ active_st ρ st' /\ *)
-      (*     (owner st' < ticket st' -> exists ρ',  *)
-      (*         role_map st' !! ρ' = Some (tl_U $ owner st', false)). *)
-      (* Proof using VALID LEN FROM_INIT FAIR. *)
-      (*   destruct st as [o t rm]. *)
-      (*   pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ITH LOCK) as HH. *)
-      (*   rename HH into EV_REL'. specialize_full EV_REL'. *)
-      (*   { intros ->. auto. } *)
-      (*   destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MIN). *)
-        
-      (*   forward eapply steps_keep_state with (i := i) (j := k) (k := k) as LOCK'. *)
-      (*   3: { apply has_lock_kept. } *)
-      (*   all: eauto.  *)
-      (*   { eexists. split; [apply ITH|]. split; eauto. *)
-      (*     eapply tl_valid_trace_states; eauto. }  *)
-      (*   { intros. destruct IKJ as [[v ->]%Nat.le_sum KJ].  *)
-      (*     intros ->. enough (k <= i + v); [lia| ]. apply MIN. *)
-      (*     forward eapply (proj1 (label_lookup_states tr (i + v))) as HH; eauto. *)
-      (*     destruct HH as [[st1 ST1] [st2 ST2]]. *)
-      (*     eexists. splits; [eauto| lia|]. *)
-      (*     forward eapply (mtrace_valid_steps' tr (i + v)) as STEP; eauto. *)
-      (*     { eapply state_label_lookup; eauto. } *)
-      (*     inversion STEP; subst.  *)
-      (*     apply active_st_enabled. *)
-      (*     eapply fm_live_spec; eauto. } *)
-      (*   destruct LOCK' as (WF' & OW'o & LOCK'). simpl in *. *)
-        
-      (*   forward eapply (kept_state_fair_step tr).   *)
-      (*   { apply (has_lock_active_kept ρ o). } *)
-      (*   all: eauto. *)
-      (*   { simpl. intros. red. simpl. apply elem_of_union_l. apply gset_map_in. *)
-      (*     apply active_st_enabled. red. destruct Pst as (_ & _ & ?). eauto. } *)
-      (*   { splits; eauto. destruct LOCK', ENρo. congruence. } *)
-      (*   intros (j & st'' & LEkj & JTH & STEP & (WF'' & OW''o & RM''ρo)). *)
-        
-      (*   forward eapply (proj1 (label_lookup_states tr j)) as [_ [st''' J'TH]]; eauto. *)
-      (*   forward eapply (mtrace_valid_steps' tr j) as STEP''. *)
-      (*   { eapply state_label_lookup; eauto. } *)
-
-      (*   exists (j + 1), st'''. split; [lia| ]. split; auto. *)
-      (*   inversion STEP''; subst. inversion STEP0; subst; simpl in *. *)
-      (*   { congruence. } *)
-      (*   { rewrite RM''ρo in R. inversion R. lia. } *)
-      (*   assert (role_map st''0 !! ρ = Some (tl_L, false)) as R'. *)
-      (*   { subst st'1 st'0 st''0. simpl in *. *)
-      (*     rewrite /advance_next. simpl. *)
-      (*     destruct role_of_dec as [[? ?] | ?].  *)
-      (*     2: { simpl. by rewrite lookup_insert. } *)
-      (*     simpl. rewrite lookup_insert_ne. *)
-      (*     2: { intros ->. rewrite lookup_insert in e. congruence. } *)
-      (*     by rewrite lookup_insert. } *)
-      (*   rewrite /can_lock_st /active_st. rewrite R'. splits. *)
-      (*   { subst st'1 st'0 st''0. simpl in *. *)
-      (*     rewrite /advance_next. simpl. *)
-      (*     destruct role_of_dec as [[? ?] | ?]; simpl; lia. } *)
-      (*   { eauto. } *)
-      (*   { intros [? ?]. congruence. } *)
-
-      (*   intros. *)
-      (*   assert (exists ρ', rm0 !! ρ' = Some (tl_U (o + 1), true)) as [ρ' OW'']. *)
-      (*   { destruct WF'' as (_ & TKS & TKo & _). *)
-      (*     specialize (TKS (o + 1)). apply proj1 in TKS. specialize_full TKS. *)
-      (*     { rewrite /st''0 advance_next_owner advance_next_ticket in H. *)
-      (*       subst st'0. simpl in *. lia. } *)
-      (*     desc. destruct e; eauto.  *)
-      (*     apply TKo in TKS. lia. } *)
-      (*   exists ρ'. subst st'1 st'0 st''0. simpl in *. *)
-      (*   assert (ρ ≠ ρ') as NEQ.  *)
-      (*   { intros ->. rewrite R in OW''. inversion OW''. lia. } *)
-      (*   rewrite /advance_next. destruct role_of_dec as [[? ?] | ?]; simpl in *. *)
-      (*   2: { destruct (n ρ'). rewrite lookup_insert_ne; auto. } *)
-      (*   assert (x ≠ ρ) as NEQ'. *)
-      (*   { intros ->. simpl_li. congruence. } *)
-      (*   destruct (decide (x = ρ')) as [-> | NEQ'']; simpl_li; auto. *)
-      (*   destruct NEQ''. destruct WF'' as (_ & _ & _ & UNIQ).  *)
-      (*   eapply UNIQ; eauto.  *)
-      (* Qed. *)
-
       Lemma lock_eventually_acquired_iteration o t rm ρ i d
         (ST: tr S!! i = Some <{ o, t, rm }>)
         (R: rm !! ρ = Some (tl_U (S o + d), true))
@@ -1348,15 +1217,6 @@ Section Model.
         rewrite Nat.add_0_r -Nat.add_1_r -OW'' in RMρ''.
         destruct n. eapply WF''; eauto.
       Qed.
-
-      (* Lemma ev_rel_closed ρ i j (LE: i <= j) *)
-      (*   (EV_REL: eventual_release ρ i): *)
-      (*   eventual_release ρ j. *)
-      (* Proof using. *)
-      (*   rewrite /eventual_release. rewrite /eventual_release in EV_REL. *)
-      (*   intros. eapply EV_REL; eauto. *)
-      (*   intros. specialize (PREVr H).  *)
-
         
       Lemma lock_eventually_acquired o t rm ρ i wt 
         (ST: tr S!! i = Some <{ o, t, rm }>)
