@@ -12,7 +12,6 @@ From trillium.fairness.examples.ticketlock Require Import lemmas.
 
 Section TraceLen.
   From hahn Require Import HahnBase.
-  (* From hahn Require Import HahnOmega. *)
   From trillium.fairness.examples.ticketlock Require Import my_omega. 
 
   Context {St L: Type}. 

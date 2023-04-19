@@ -19,59 +19,30 @@ From trillium.fairness.examples.ticketlock Require Import trace_len.
 Close Scope Z_scope. 
 
 
-(* TODO: is it already done somewhere? *)
-Section GsetMap.
-  Context {M N} `{EqDecision M} `{EqDecision N} `{Countable M} `{Countable N}. 
+(* TODO: move into stdpp *)
+Section SetMapProperties.
 
-  Definition gset_map (f: M -> N) (m: gset M): gset N :=
-    list_to_set (f <$> elements m).
-
-  Lemma gset_map_spec (f: M -> N) (m: gset M):
-    forall b, b ∈ gset_map f m <-> exists a, a ∈ m /\ f a = b.
+  Lemma set_map_compose_gset {A1 A2 A3: Type}
+    `{EqDecision A1} `{EqDecision A2} `{EqDecision A3}
+    `{Countable A1} `{Countable A2} `{Countable A3}
+    (f: A2 -> A3) (g: A1 -> A2) (m: gset A1):
+    set_map (f ∘ g) m (D:=gset _) = set_map f (set_map g m (D:= gset _)).
   Proof using.
-    intros. unfold gset_map. split; intros. 
-    - apply elem_of_list_to_set in H1.
-      apply elem_of_list_fmap_2 in H1 as [a [-> IN]].
-      eexists. split; eauto. eapply elem_of_elements; eauto.
-    - destruct H1 as [a [IN <-]].
-      apply elem_of_list_to_set. apply elem_of_list_fmap_1.
-      eapply elem_of_elements; eauto.
+    set_solver. 
   Qed. 
 
-  (* TODO: only holds for injective functions *)
-  (* Lemma gset_map_spec' (f: M -> N) (m: gset M): *)
-  (*   forall a, f a ∈ gset_map f m <-> a ∈ m.  *)
-
-  Lemma gset_map_in (f: M -> N) m a (IN: a ∈ m):
-    f a ∈ gset_map f m.
+  Lemma elem_of_map_inj_gset {A B} 
+    `{EqDecision A} `{Countable A}
+    `{EqDecision B} `{Countable B}
+    (f: A -> B) (m: gset A) (a: A) (INJ: injective f):
+    a ∈ m <-> f a ∈ set_map f m (D := gset _).
   Proof using.
-    unfold gset_map. apply elem_of_list_to_set.
-    apply elem_of_list_fmap_1. apply elem_of_elements; auto.
-  Qed. 
-
-  Lemma gset_map_in_inj (f: M -> N) m a (INJ: injective f):
-    a ∈ m <-> f a ∈ gset_map f m.
-  Proof using.
-    split; [apply gset_map_in| ]. intros IN.
-    apply gset_map_spec in IN as [b [IN EQ]].
-    apply INJ in EQ. congruence.
-  Qed. 
-
-End GsetMap.
-
-
-Section GsetMapProperties.
-
-  Lemma gset_map_compose {M N T} 
-    `{EqDecision M} `{EqDecision N} `{EqDecision T}
-    `{Countable M} `{Countable N} `{Countable T}
-    (f: M -> N) (g: T -> M) m:
-    gset_map (f ∘ g) m = gset_map f (gset_map g m). 
-  Proof using.
-    set_solver.
-  Qed. 
-  
-End GsetMapProperties.
+    split; [apply elem_of_map_2| ].
+    intros IN. apply elem_of_map_1 in IN as (a' & EQ & IN).
+    apply INJ in EQ. congruence. 
+  Qed.
+    
+End SetMapProperties.
 
 
 Section TraceHelpers0.
@@ -86,16 +57,6 @@ Section TraceHelpers0.
     solve_decision.
   Qed.
 
-  (* Lemma trace_lookup_dec {St L: Type} (P: St → option L → Prop) *)
-  (*   (DEC: forall st ro, Decision (P st ro)): *)
-  (*   forall i tr, Decision (pred_at tr i P). *)
-  (* Proof using. *)
-  (*   intros i tr. unfold pred_at. *)
-  (*   destruct (after i tr); [destruct t| ]; auto. *)
-  (*   solve_decision. *)
-  (* Qed. *)
-
-  
 End TraceHelpers0. 
 
 Section TraceDefinitions.
@@ -183,17 +144,25 @@ Section TraceDefinitions.
         * right. apply pred_at_trace_lookup in STEP. desc. eauto. 
   Qed.        
   
-  (* From Paco Require Import pacotac. *)
+  From Paco Require Import pacotac.
   Lemma mtrace_valid_steps' (tr: mtrace M) i st ℓ st'
-    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
+    (ITH: tr !! i = Some (st, Some (ℓ, st')))
+    (VALID: mtrace_valid tr):
     fmtrans _ st ℓ st'. 
   Proof using.
-    generalize dependent st. generalize dependent ℓ. generalize dependent st'. 
-    induction i.
-    (* { simpl. intros. punfold VALID. inversion VALID; subst; congruence. } *)
-    (* intros. *)
-  Admitted.
-            
+    generalize dependent st. generalize dependent ℓ. generalize dependent st'. generalize dependent tr. 
+    induction i. 
+    { simpl. intros. punfold VALID. inversion VALID.
+      - subst. done.
+      - subst. inversion ITH. by subst. }
+    intros. simpl in ITH.
+    destruct tr.
+    { inversion ITH. }
+    punfold VALID. inversion_clear VALID; pclearbot; auto.
+    eapply IHi; eauto. 
+  Qed.
+    
+  
   Definition label_kept_state (P: St -> Prop) (ℓ: L) :=
     forall st oℓ' st' (Ps: P st) (OTHER: oℓ' ≠ Some ℓ) (STEP: fmtrans _ st oℓ' st'), P st'.
  
@@ -217,7 +186,8 @@ Section TraceDefinitions.
     red in P_KEPT. eapply P_KEPT.
     - apply IHd; [lia| eauto].
     - eapply NOρ; eauto. lia.
-    - eapply mtrace_valid_steps'. apply state_label_lookup. eauto. 
+    - eapply mtrace_valid_steps'; eauto. 
+      apply state_label_lookup. eauto. 
   Qed.
   
   (* TODO: rename *)
@@ -305,18 +275,19 @@ Section ExtModels2.
     ext_trans s1 (Some (inr (env ι))) s2. 
 
   Definition ext_live_roles (st: fmstate M): gset ext_role :=
-    gset_map inl (live_roles M st) ∪
-    gset_map (inr ∘ env) (active_exts st). 
+    set_map inl (live_roles M st) ∪
+    set_map (inr ∘ env) (active_exts st). 
 
   Lemma ext_live_spec:
     ∀ s ρ s', ext_trans s (Some ρ) s' → ρ ∈ ext_live_roles s.
   Proof using.
     intros s ρ s' TRANS. unfold ext_live_roles.
     inversion TRANS; subst; simpl in *.
-    - apply elem_of_union_l. apply gset_map_in.
+    - apply elem_of_union_l. apply elem_of_map_2. 
       eapply fm_live_spec; eauto. 
     - apply elem_of_union_r.
-      rewrite gset_map_compose. do 2 apply gset_map_in.
+      rewrite set_map_compose_gset. 
+      do 2 apply elem_of_map_2.
       apply active_exts_spec. eauto.
   Qed.
   
@@ -363,6 +334,9 @@ Section Model.
                     }. 
 
   Notation "<{ o , t , rm }>" := (mkTlSt o t rm).
+
+  #[global] Instance tl_role_eqdec: EqDecision tl_role.
+  Proof using. solve_decision. Qed. 
 
   #[global] Instance tl_role_stage_eqdec: EqDecision tl_role_stage. 
   Proof using. solve_decision. Qed. 
@@ -526,8 +500,8 @@ Section Model.
 
     Definition tl_active_exts st: gset tl_EI := 
       (if (allows_unlock_ex_dec st) then {[ eiU ]} else ∅) ∪
-        gset_map eiL (filter (fun ρ => exists st', allows_lock ρ st st') 
-                        (dom (role_map st))). 
+      set_map eiL (filter (fun ρ => exists st', allows_lock ρ st st')
+                          (dom (role_map st))).
     
 
     Lemma tl_active_exts_spec st ι:
@@ -546,7 +520,7 @@ Section Model.
       - etransitivity; [| etransitivity]; [| eapply False_or |].
         { eapply Morphisms_Prop.or_iff_morphism; destruct (allows_unlock_ex_dec st); set_solver. }
         etransitivity.
-        { symmetry. apply @gset_map_in_inj with (f := eiL).
+        { symmetry. apply elem_of_map_inj_gset with (f := eiL).
           red. intros. congruence. }
         etransitivity; [apply elem_of_filter| ].
         simpl.  
@@ -863,7 +837,7 @@ Section Model.
 
       Lemma tl_valid_trace_states i st (ITH: tr S!! i = Some st):
         tl_state_wf st. 
-      Proof using LEN FROM_INIT.
+      Proof using LEN FROM_INIT VALID.
         gd st. induction i.
         { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT.
           rewrite /tl_init_st in INIT. inversion INIT. subst.
@@ -895,7 +869,7 @@ Section Model.
       Lemma trace_counters_mono i j st st'
         (ITH: tr S!! i = Some st) (JTH: tr S!! j = Some st') (LE: i <= j):
         owner st <= owner st' /\ ticket st <= ticket st'.
-      Proof using LEN.
+      Proof using LEN VALID.
         apply Nat.le_sum in LE as [d ->].
         gd i. gd st. gd st'. induction d.
         { intros. rewrite Nat.add_0_r in JTH.
@@ -904,11 +878,11 @@ Section Model.
         forward eapply trace_lookup_dom_strong with (i := (i + d)) as [_ J'TH]; eauto.
         specialize_full J'TH; [eapply state_lookup_dom; eauto| ]. desc.
         pose proof (mtrace_valid_steps' _ _ _ _ _ J'TH) as STEP.
-        apply step_counters_mono in STEP. 
+        apply step_counters_mono in STEP; auto.  
         apply state_label_lookup in J'TH as (J'TH_ & JTH_ & LBL).
         assert (st'0 = st') as -> by congruence.
         specialize (IHd _ _ _ ITH J'TH_). lia. 
-      Qed. 
+      Qed.
       
       Lemma has_lock_kept (ρ: tl_role) (o: nat):
         @label_kept_state ExtTL 
@@ -1093,7 +1067,7 @@ Section Model.
         forward eapply (kept_state_fair_step tr).  
         { apply (has_lock_active_kept ρ o). }
         all: eauto.
-        { simpl. intros. red. simpl. apply elem_of_union_l. apply gset_map_in.
+        { simpl. intros. red. simpl. apply elem_of_union_l. apply elem_of_map_2.
           apply active_st_enabled. red. destruct Pst as (_ & _ & ?). eauto. }
         { splits; eauto. destruct LOCK', ENρo. congruence. }
         intros (j & st'' & HH & JTH & WF & OW''o & RM''ρo).
@@ -1102,6 +1076,7 @@ Section Model.
         forward eapply (proj1 (label_lookup_states tr j)) as [_ [st''' J'TH]]; eauto.
         forward eapply (mtrace_valid_steps' tr j) as STEP''.
         { eapply state_label_lookup; eauto. }
+        { auto. }
 
         exists (j + 1), st'''. split; [lia| ]. split; auto.
         inversion STEP''; subst. inversion STEP0; subst; simpl in *.
@@ -1170,7 +1145,7 @@ Section Model.
         forward eapply (kept_state_fair_step tr) with (i := k).
         { apply (lock_wait_active_kept ρ ρo). }
         all: eauto.
-        { simpl. intros. red. simpl. apply elem_of_union_l. apply gset_map_in.
+        { simpl. intros. red. simpl. apply elem_of_union_l. apply elem_of_map_2.
           apply active_st_enabled. red. desc. eauto. }
         { splits; eauto. }
         intros (j & st'' & [[LEkj STEPj] MINj] & JTH & b_ & WF'' & RMρ'' & RMρo'' & OW'').
@@ -1235,17 +1210,18 @@ Section Model.
           simpl in ST. desc. rewrite Nat.add_0_r -Nat.add_1_r in ST2. 
           rewrite /has_lock_st /active_st. 
           exists n, st'. rewrite ST1. splits; eauto.
-          intros [? ?]. eauto. rewrite ST2 in H. congruence. }
+          intros [? ?]. rewrite ST2 in H.
+          rewrite decide_True in H; done. }
         intros. eapply lock_eventually_acquired_iteration in ST; eauto.
         simpl in ST. desc.
         destruct st'. simpl in *.
         replace (S (o + S d)) with (S (S o) + d) in ST2 by lia.
+        rewrite decide_False in ST2; [| lia]. 
         eapply IHd in ST2.
         2: { rewrite -Nat.add_1_r -ST1. eauto. }
         2: { intros. apply EV_REL. lia. }
         desc. exists n0, st'. splits; eauto. lia. 
       Qed.
-
 
 
       Theorem tl_progress ρ i st
@@ -1264,7 +1240,7 @@ Section Model.
         all: eauto.
         { clear dependent st. simpl. intros st STρ. 
           red. rewrite /ext_live_roles. simpl.
-          apply elem_of_union_l. apply gset_map_in.
+          apply elem_of_union_l. apply elem_of_map_2.
           simpl. rewrite /tl_live_roles.
           apply elem_of_dom. eexists. apply map_filter_lookup_Some_2; done. }
         
@@ -1275,7 +1251,7 @@ Section Model.
         forward eapply (proj1 (label_lookup_states tr (i + d))); [eauto| ].
         intros [_ [s'_ S'_]].
         assert (s'_ = st'') as -> by congruence. clear S'_. 
-        forward eapply (mtrace_valid_steps' tr (i + d)) as TRANS.
+        forward eapply (mtrace_valid_steps' tr (i + d)) as TRANS; auto. 
         { by eapply state_label_lookup. }
           
         simpl in TRANS. inversion TRANS as [? ? ? TRANS'| ]; subst.
