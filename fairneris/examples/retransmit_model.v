@@ -150,12 +150,6 @@ Definition retransmit_network_fair_delivery
       let delivers := count_delivers msg (trace_take n tr) in
       f1 delivers ≤ sends ≤ f2 delivers.
 
-Lemma retransmit_network_fair_delivery_after tr tr' k :
-  after k tr = Some tr' →
-  retransmit_network_fair_delivery tr →
-  retransmit_network_fair_delivery tr'.
-Proof. Admitted.
-
 (* TODO: This computation is a bit odd *)
 Definition retransmit_live_roles (s : retransmit_state) : gset retransmit_role :=
   {[inl Arole]} ∪
@@ -163,9 +157,10 @@ Definition retransmit_live_roles (s : retransmit_state) : gset retransmit_role :
    else {[inr Ndup;inr Ndrop;inr Ndeliver]}) ∪
   (match s.1.1 with Start => {[inl Brole]} | _ => ∅ end).
 
-Lemma retransmit_live_spec_holds s ρ s' :
-  retransmit_trans s ρ s' → label_role ρ ∈ retransmit_live_roles s.
-Proof. Admitted.
+(* TODO: We might need this later *)
+(* Lemma retransmit_live_spec_holds s ρ s' : *)
+(*   retransmit_trans s ρ s' → label_role ρ ∈ retransmit_live_roles s. *)
+(* Proof. Admitted. *)
 
 (* TODO: This should be generalised, and lifted to multiple roles *)
 Definition retransmit_terminating_role
@@ -184,10 +179,10 @@ Definition retransmit_fair_scheduling_mtr ρ : mtrace → Prop :=
   trace_implies (λ δ _, retransmit_role_enabled_model ρ δ)
                 (λ δ ℓ, ¬ retransmit_role_enabled_model ρ δ ∨ ℓ = Some ρ).
 
-(* Lemma retransmit_fair_scheduling_mtr_after ℓ tr tr' k: *)
-(*   after k tr = Some tr' → *)
-(*   fair_scheduling_mtr ℓ tr → fair_scheduling_mtr ℓ tr'. *)
-(* Proof. apply trace_implies_after. Qed. *)
+Lemma retransmit_fair_scheduling_mtr_after ℓ tr tr' k:
+  after k tr = Some tr' →
+  retransmit_fair_scheduling_mtr ℓ tr → retransmit_fair_scheduling_mtr ℓ tr'.
+Proof. apply trace_implies_after. Qed.
 
 (* Lemma fair_scheduling_mtr_cons ℓ δ ℓ' r: *)
 (*   fair_scheduling_mtr ℓ (δ -[ℓ']-> r) → fair_scheduling_mtr ℓ r. *)
@@ -199,13 +194,22 @@ Definition retransmit_fair_scheduling_mtr ρ : mtrace → Prop :=
 
 Definition retransmit_fair_scheduling mtr :=
   ∀ ρ, retransmit_fair_scheduling_mtr ρ mtr.
+
+Lemma retransmit_fair_scheduling_after tr tr' k:
+  after k tr = Some tr' →
+  retransmit_fair_scheduling tr → retransmit_fair_scheduling tr'.
+Proof.
+  intros Hafter Hfair ℓ. specialize (Hfair ℓ).
+  by eapply retransmit_fair_scheduling_mtr_after.
+Qed.
+
 Definition mtrace_fair mtr :=
   retransmit_fair_scheduling mtr ∧ retransmit_network_fair_delivery mtr.
 
-Lemma mtrace_fair_after tr tr' k:
-  after k tr = Some tr' →
-  mtrace_fair tr → mtrace_fair tr'.
-Proof. Admitted.
+(* Lemma mtrace_fair_after tr tr' k: *)
+(*   after k tr = Some tr' → *)
+(*   mtrace_fair tr → mtrace_fair tr'. *)
+(* Proof. Admitted. *)
 
 Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace → Prop) :
   mtrace → Prop :=
@@ -237,10 +241,9 @@ Proof.
 Qed.
 
 Lemma retransmit_fair_traces_terminate_aux (mtr: mtrace) :
-  (trfirst mtr).1.1 = Received → mtrace_valid mtr → mtrace_fair mtr →
-  retransmit_terminating_role (inl Brole) mtr.
+  (trfirst mtr).1.1 = Received → retransmit_terminating_role (inl Brole) mtr.
 Proof.
-  intros Htrfirst Hvalid Hfair.
+  intros Htrfirst.
   exists 0. rewrite /pred_at=> /=. simpl in *.
   destruct mtr as [s|s mtr].
   - rewrite /pred_at=> /=. simpl in *. destruct s as [[??]?]. simpl in *.
@@ -292,11 +295,25 @@ Lemma retransmit_trace_delivers_0 msg (mtr : mtrace) n :
   count_delivers msg (trace_take n mtr) = 0.
 Proof. Admitted.
 
+Lemma A_always_live (mtr : mtrace) n m :
+  infinite_trace mtr →
+  pred_at mtr n (λ s _,
+                   retransmit_role_enabled_model (inl (Arole, Some m)) s).
+Proof. Admitted.
+
 Lemma retransmit_fair_traces_eventually_A (mtr : mtrace) :
   infinite_trace mtr →
-  mtrace_valid mtr → mtrace_fair mtr →
+  mtrace_valid mtr → retransmit_fair_scheduling mtr →
   ∃ n, pred_at mtr n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)).
-Proof. Admitted.
+Proof. 
+  intros Hinf Hvalid Hfair.
+  pose proof A_always_live as HA.
+  specialize (HA mtr 0 mAB Hinf).
+  apply Hfair in HA as [m HA].
+  apply pred_at_or in HA as [HA|HA].
+  - admit.
+  - admit.
+Admitted.
 
 (* Lemma pred_at_take n tr tr' : *)
 (*   pred_at tr n = trace_take n $ pred_at tr n.  *)
@@ -324,19 +341,17 @@ Proof. Admitted.
 
 Lemma infinite_trace_after' {S T} n (tr : trace S T) :
   infinite_trace tr -> ∃ tr', after n tr = Some tr' ∧ infinite_trace tr'.
-Proof.
-Admitted.
+Proof. Admitted.
 
 (* Any fair infinite trace grow the number of sends indefinitely *)
 Lemma retransmit_trace_sends_grows (mtr : mtrace) x :
   infinite_trace mtr →
-  mtrace_valid mtr → mtrace_fair mtr →
+  mtrace_valid mtr → retransmit_fair_scheduling mtr →
   ∃ n, x < count_sends mAB (trace_take n mtr).
 Proof.
   intros Hafter Hvalid Hfair.
   induction x.
-  {
-    assert (∃ n, pred_at mtr n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)))
+  { assert (∃ n, pred_at mtr n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)))
       as [n Hn].
     { by apply retransmit_fair_traces_eventually_A. }
     exists n.
@@ -347,7 +362,7 @@ Proof.
     as [m Hm].
   { apply retransmit_fair_traces_eventually_A;
       [done|by eapply mtrace_valid_after|
-      by eapply mtrace_fair_after]. }
+        by eapply retransmit_fair_scheduling_after]. }
   assert (0 < count_sends mAB (trace_take m mtr')).
   { eapply count_sends_pred_at; [|done].
     rewrite /send_filter. naive_solver. }
@@ -382,7 +397,7 @@ Proof.
   assert (∀ n, count_delivers mAB (trace_take n mtr) = 0) as Hdelivers.
   { intros ?. by apply retransmit_trace_delivers_0. }
   assert (∀ x, ∃ n, x < count_sends mAB (trace_take n mtr)) as Hsends.
-  { intros ?. by apply retransmit_trace_sends_grows. }
+  { intros ?. destruct Hfair as [Hfair _]. by apply retransmit_trace_sends_grows. }
   destruct Hfair as [Hfair_sched Hfair_network].
   destruct Hfair_network as (f1 & f2 & ? & ? & Hfair_network).
   assert (∃ n : nat, True) as [n _].
@@ -396,12 +411,18 @@ Proof.
 Qed.
 
 Lemma Ndeliver_adds_to_buffer msg s bs (tr:mtrace) :
-  mtrace_valid tr →
+  mtrace_valid (s -[inr (Ndeliver,msg)]-> tr) →
   (trfirst (s -[inr (Ndeliver,msg)]-> tr)).2 !!! (m_destination msg) = bs →
-  (trfirst tr).2 !!! (m_destination msg) = (bs ++ [msg]).
-  (* (trfirst tr).2 = (trfirst (s -[inr (Ndeliver,msg)]-> tr)).2 ++ [msg]. *)
+  (trfirst tr).2 !!! (m_destination msg) = (msg :: bs).
 Proof.
-Admitted.
+  intros Hvalid <-.
+  simpl.
+  pinversion Hvalid; simplify_eq.
+  inversion H1; simplify_eq.
+  simpl in *.
+  rewrite lookup_total_insert.
+  done.
+Qed.
 
 Fixpoint finite_trace_to_trace {S L} (tr : finite_trace S L) : trace S L :=
   match tr with
@@ -444,7 +465,8 @@ Proof.
   eapply not_forall_exists_not in HP as [n' HP].
   apply Classical_Prop.imply_to_and in HP as [Hlt HP].
   apply pred_at_neg in HP; last first.
-  { eapply after_is_Some_le; [|by eapply pred_at_after_is_Some]. lia. }             eapply pred_at_impl in HP; last first.
+  { eapply after_is_Some_le; [|by eapply pred_at_after_is_Some]. lia. }
+  eapply pred_at_impl in HP; last first.
   { intros s l H. apply NNP_P. apply H. }
   specialize (IHn n' Hlt HP) as [n'' [H' H'']].
   exists n''. done.
@@ -496,13 +518,13 @@ Proof.
   { by apply retransmit_fair_trace_eventually_NDeliver. }
   rewrite /pred_at in Hn.
   apply (infinite_trace_after' n) in Hafter as [mtr' [Hmtr' Hafter]].
-  assert (mtrace_fair mtr') as Hfair'.
-  { by eapply mtrace_fair_after. }
+  destruct Hfair as [Hfair1 Hfair2].
+  assert (retransmit_fair_scheduling mtr') as Hfair1'.
+  { by eapply retransmit_fair_scheduling_after. }
   rewrite Hmtr' in Hn.
   destruct mtr' as [mtr'|]; [done|].
   simplify_eq.
-  destruct Hfair' as [Hfair1 Hfair2].
-  rewrite /retransmit_fair_scheduling in Hfair1.
+  rewrite /retransmit_fair_scheduling in Hfair1'.
   assert ((pred_at (s -[ inr (Ndeliver, mAB) ]-> mtr') 0
                    (λ δ _, retransmit_role_enabled_model (inl (Brole, None)) δ)) ∨
             ¬ pred_at (s -[ inr (Ndeliver, mAB) ]-> mtr') 0
@@ -518,7 +540,7 @@ Proof.
     simpl in *.
     destruct s as [[[] s2] s3]; [|done].
     set_solver. }
-  apply Hfair1 in Hrole as [m Hm]. simpl in *.
+  apply Hfair1' in Hrole as [m Hm]. simpl in *.
   apply pred_at_or in Hm as [Hm|Hm].
   - exists (n+m).
     rewrite pred_at_sum. rewrite Hmtr'.
@@ -571,7 +593,6 @@ Proof.
     + destruct s0 as [[]]. simplify_eq. simpl in *.
       destruct H as [? H]. rewrite H in H3.
       apply app_eq_nil in H3 as [_ H3]. 
-      apply app_eq_nil in H3. 
       set_solver.
     + simpl in *. simplify_eq. destruct t=> /=; simpl in *; simplify_eq; done.
 Qed.
@@ -597,10 +618,6 @@ Proof.
   rewrite Hmtr' in Hn.
   assert ((trfirst mtr').1.1 = Received).
   { by destruct mtr'. }
-  assert (mtrace_valid mtr') as Hvalid'.
-  { by eapply mtrace_valid_after. }
-  assert (mtrace_fair mtr') as Hfair'.
-  { by eapply mtrace_fair_after. }
   assert (retransmit_terminating_role (inl Brole) mtr') as [m Hterminates].
   { by apply retransmit_fair_traces_terminate_aux. }
   exists (m+n). rewrite pred_at_sum'. rewrite after_sum. by rewrite Hmtr'.
