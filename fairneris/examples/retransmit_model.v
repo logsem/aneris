@@ -89,7 +89,7 @@ Inductive retransmit_trans
                    (st, ms ∖ {[+ msg +]}, bs)
 | N_Deliver st ms ms' bs msg :
   msg ∈ ms →
-  bs !! m_destination msg = Some ms' →
+  bs !!! m_destination msg = ms' →
   retransmit_trans (st, ms, bs)
                    (inr (Ndeliver, msg))
                    (st, ms ∖ {[+ msg +]}, <[m_destination msg := msg::ms']>bs)
@@ -260,15 +260,15 @@ Proof.
 Qed.
 
 Lemma pred_at_neg {S L} (tr:trace S L) n (P : S → option L → Prop) :
-  (∀ n, is_Some (after n tr)) →
+  is_Some (after n tr) →
   ¬ pred_at tr n P ↔ pred_at tr n (λ s l, ¬ P s l).
 Proof.
   rewrite /pred_at. intros Hafter. split.
-  - intros HP. specialize (Hafter n).
+  - intros HP.
     destruct (after n tr).
     + by destruct t.
     + by apply is_Some_None in Hafter.
-  - intros HP. specialize (Hafter n).
+  - intros HP.
     destruct (after n tr).
     + by destruct t.
     + by apply is_Some_None in Hafter.
@@ -400,7 +400,8 @@ Lemma Ndeliver_adds_to_buffer msg s bs (tr:mtrace) :
   (trfirst (s -[inr (Ndeliver,msg)]-> tr)).2 !!! (m_destination msg) = bs →
   (trfirst tr).2 !!! (m_destination msg) = (bs ++ [msg]).
   (* (trfirst tr).2 = (trfirst (s -[inr (Ndeliver,msg)]-> tr)).2 ++ [msg]. *)
-Proof. Admitted.
+Proof.
+Admitted.
 
 Fixpoint finite_trace_to_trace {S L} (tr : finite_trace S L) : trace S L :=
   match tr with
@@ -408,35 +409,81 @@ Fixpoint finite_trace_to_trace {S L} (tr : finite_trace S L) : trace S L :=
   | tr :tr[ℓ]: s => s -[ℓ]-> (finite_trace_to_trace tr)
   end.
 
+Definition trace_now {S T} (tr : trace S T) P := pred_at tr 0 P.
 Definition trace_always {S T} (tr : trace S T) P := ∀ n, pred_at tr n P.
 Definition trace_eventually {S T} (tr : trace S T) P := ∃ n, pred_at tr n P.
 Definition trace_until {S T} (tr : trace S T) P Q :=
-  ∃ n, pred_at tr n P ∧
-       trace_always (finite_trace_to_trace $ trace_take n tr) Q.
+  ∃ n, pred_at tr n Q ∧ ∀ m, m < n → pred_at tr m P.
 
-Lemma AminsTheorem {S T} (tr : trace S T) P :
-  trace_eventually tr P → trace_until tr P (λ s l, ¬ P s l).
-Proof. Admitted.
+Lemma pred_at_after_is_Some {S T} (tr : trace S T) n P :
+  pred_at tr n P → is_Some $ after n tr.
+Proof. rewrite /pred_at. by case_match. Qed.
 
-Lemma retransmit_fair_trace_buffer_grows (mtr : mtrace) bs n mtr' :
-  (trfirst mtr).2 !!! saB = bs →
-  trace_always mtr (λ (_ : retransmit_state) (l : option retransmit_label),
-                      l ≠ Some (inl (Brole, None))) →
+Lemma after_is_Some_le {S T} (tr : trace S T) n m :
+  m ≤ n → is_Some $ after n tr → is_Some $ after m tr.
+Proof.
+  revert tr m.
+  induction n; intros tr m Hle.
+  { intros. assert (m = 0) as -> by lia. done. }
+  intros.
+  destruct m; [done|].
+  simpl in *.
+  destruct tr; [done|].
+  apply IHn. lia. done.
+Qed.
+
+Lemma trace_eventually_until {S T} (tr : trace S T) P :
+  trace_eventually tr P → trace_until tr (λ s l, ¬ P s l) P.
+Proof.
+  intros [n Hn].
+  induction n as [n IHn] using lt_wf_ind.
+  assert ((∀ m, m < n → pred_at tr m (λ s l, ¬ P s l)) ∨
+            ¬ (∀ m, m < n → pred_at tr m (λ s l, ¬ P s l))) as [HP|HP];
+    [|by eexists _|].
+  { apply ExcludedMiddle. }
+  eapply not_forall_exists_not in HP as [n' HP].
+  apply Classical_Prop.imply_to_and in HP as [Hlt HP].
+  apply pred_at_neg in HP; last first.
+  { eapply after_is_Some_le; [|by eapply pred_at_after_is_Some]. lia. }             eapply pred_at_impl in HP; last first.
+  { intros s l H. apply NNP_P. apply H. }
+  specialize (IHn n' Hlt HP) as [n'' [H' H'']].
+  exists n''. done.
+Qed.
+
+Lemma prefix_trans {A} (l1 l2 l3 : list A) :
+  l1 `prefix_of` l2 → l2 `prefix_of` l3 → l1 `prefix_of` l3.
+Proof. intros [l1' ->] [l2' ->]. by do 2 apply prefix_app_r. Qed.
+
+Lemma suffix_trans {A} (l1 l2 l3 : list A) :
+  l1 `suffix_of` l2 → l2 `suffix_of` l3 → l1 `suffix_of` l3.
+Proof. intros [l1' ->] [l2' ->]. by do 2 apply suffix_app_r. Qed.
+
+Lemma retransmit_fair_trace_buffer_grows (mtr : mtrace) n mtr' :
+  mtrace_valid mtr →
+  (∀ m, m < n → pred_at mtr m (λ _ l, l ≠ Some (inl (Brole, None)))) →
   after n mtr = Some mtr' →
-  ∃ bs', (trfirst mtr').2 !!! saB = bs' ∧ prefix bs bs'.
-Proof. Admitted.
-
-Lemma trace_take_after {S T} n m (tr tr' : trace S T) :
-  n ≤ m →
-  after n tr = Some tr' →
-  after n (finite_trace_to_trace $ trace_take m tr) =
-  Some (finite_trace_to_trace $ trace_take (m-n) tr').
-Proof. Admitted.
-
-Lemma trace_take_trfirst {S T} n (mtr : trace S T) :
-  trfirst (finite_trace_to_trace (trace_take n mtr)) = trfirst mtr.
-Proof. Admitted.
-
+  suffix ((trfirst mtr).2 !!! saB) ((trfirst mtr').2 !!! saB).
+Proof. 
+  revert mtr mtr'. 
+  induction n as [|n IHn];
+    intros mtr mtr' Hvalid Halways Hafter.
+  { simpl in *. by simplify_eq. }
+  simpl in *.
+  destruct mtr as [|s l mtr]; [done|].
+  eapply suffix_trans; last first.
+  { apply IHn; [| |done]. 
+    - eapply (mtrace_valid_after _ mtr 1); [|done]. done.
+    - intros. specialize (Halways (S m)). rewrite pred_at_S in Halways.
+      apply Halways. lia. }
+  punfold Hvalid. inversion Hvalid. simplify_eq.
+  inversion H1; simplify_eq; try set_solver.
+  - destruct (decide (m_destination msg = saB)) as [->|Hneq].
+    + rewrite lookup_total_insert. apply suffix_cons_r. set_solver.
+    + by rewrite lookup_total_insert_ne.
+  - simpl in *.
+    assert (0 < S n) as H0 by lia.
+    specialize (Halways 0 H0). rewrite pred_at_0 in Halways. simplify_eq.
+Qed.
 
 (* Any fair trace eventually ends in the receive state *)
 Lemma retransmit_fair_trace_eventually_Received (mtr : mtrace) :
@@ -493,25 +540,22 @@ Proof.
     rewrite pred_at_S in Hm.
     assert (∃ n', pred_at mtr' n' (λ _ l, l = Some $ inl (Brole, None))).
     { exists m. done. }
-    apply AminsTheorem in H as [n' [Hn' Hn'']].
+    apply trace_eventually_until in H as [n' [Hn' Hn'']].
     exists (n+(S $ S n')).
     rewrite pred_at_sum. rewrite Hmtr'.
     rewrite pred_at_S.
     assert (pred_at mtr' n' (λ (s : retransmit_state) (_ : option retransmit_label),
-             prefix ((trfirst mtr').2 !!! saB) (s.2 !!! saB))).
+             suffix ((trfirst mtr').2 !!! saB) (s.2 !!! saB))).
     { assert (∃ mtr'', after n' mtr' = Some mtr'').
       { apply (infinite_trace_after' (S n')) in Hafter as [mtr'' [Hmtr'' _]].
         simpl in Hmtr''. eauto. }
       destruct H as [mtr'' Hmtr''].
-      assert (after n' mtr' = Some mtr'') as Hmtr''' by done.
-      apply (trace_take_after _ n') in Hmtr''; [|lia].
-      eapply (retransmit_fair_trace_buffer_grows _ _ n' (finite_trace_to_trace (trace_take (n' - n') mtr''))) in Hn'' as [bs' [Hbs' Hbs'']];
-        try done.
+      eapply (retransmit_fair_trace_buffer_grows _ _ mtr'') in Hn'' as Hbs';
+        try done; last first.
+      { by eapply mtrace_valid_after. }
       rewrite /pred_at.
-      rewrite Hmtr'''.
-      rewrite -Hbs' in Hbs''.
-      rewrite !trace_take_trfirst in Hbs''.
-      by destruct mtr''. }
+      rewrite Hmtr''.
+      destruct mtr''; done. }
     replace (S n') with (n' + 1) by lia.
     rewrite pred_at_sum.
     rewrite /pred_at in H. rewrite /pred_at in Hn'.
@@ -526,8 +570,9 @@ Proof.
     inversion H2.
     + destruct s0 as [[]]. simplify_eq. simpl in *.
       destruct H as [? H]. rewrite H in H3.
-      rewrite -app_assoc in H3. Search app nil.
-      apply app_eq_nil in H3. set_solver.
+      apply app_eq_nil in H3 as [_ H3]. 
+      apply app_eq_nil in H3. 
+      set_solver.
     + simpl in *. simplify_eq. destruct t=> /=; simpl in *; simplify_eq; done.
 Qed.
 
