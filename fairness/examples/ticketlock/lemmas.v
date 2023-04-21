@@ -9,15 +9,21 @@ Lemma min_prop_dec (P: nat -> Prop) (DEC: forall n, Decision (P n)):
   ClassicalFacts.Minimization_Property P.
 Proof using. 
   red. intros n Pn.
-  set (cands := filter P (seq 0 (n + 1))).
-  destruct cands eqn:C; simpl.
-  { subst cands.
-    pose proof (@filter_nil_not_elem_of _ _ DEC _ _ C Pn).
-    destruct H. apply elem_of_seq. lia. } 
-  (* exists n0. split. *)
-  (* { eapply proj1. eapply elem_of_list_filter. *)
-  (*   apply elem_of_list_filter.  *)
-Admitted.
+
+  assert (forall p, p <= n + 1 -> ((∃ m, Minimal P m) \/ forall k, k < p -> ¬ P k)) as MIN'.
+  2: { destruct (MIN' (n + 1)); eauto. edestruct H; eauto. lia. }
+
+  induction p.
+  { intros. right. lia. }
+  intros. destruct IHp; [lia| auto| ].
+  rewrite Nat.add_1_r in H. apply le_S_n in H. 
+  destruct (DEC p).
+  - left. exists p. split; auto. intros.
+    destruct (decide (p <= k)); auto.
+    destruct (H0 k); auto. lia.
+  - right. intros. destruct (decide (k = p)); [congruence| ].
+    apply H0. lia.
+Qed.
 
 
 Instance Minimal_proper: 
