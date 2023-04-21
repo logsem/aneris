@@ -11,7 +11,7 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 Import derived_laws_later.bi.
-From trillium.fairness.examples.ticketlock Require Import lemmas trace_len set_map_properties ext_models trace_helpers. 
+From trillium.fairness.examples.ticketlock Require Import lemmas trace_len set_map_properties ext_models trace_helpers fair_lock.
 
 
 (* TODO: inherited from hahn? *)
@@ -234,33 +234,38 @@ Section Model.
         + eexists. econstructor; eauto.
         + eapply elem_of_dom_2; eauto.  
     Qed. 
+
+    Instance ExtTL: ExtModel := 
+      Build_ExtModel tl_fair_model _ _ _ _ _ tl_active_exts_spec.       
     
   End TlExtTrans.  
 
 
   Section ProgressProperties.
 
-    Let ExtTL := ext_model tl_fair_model _ _ tl_active_exts_spec. 
+    Let ExtTL_FM := ext_model_FM ExtTL. 
 
     Section ProgressPropertiesImpl.
 
-      Context (tr: mtrace ExtTL).
+      Context (tr: mtrace ExtTL_FM).
       Context (len: my_omega.nat_omega) (LEN: trace_len_is tr len).
       Hypothesis (VALID: mtrace_valid tr).
-      Hypothesis (FROM_INIT: exists n, tr S!! 0 = Some (tl_init_st n)). 
-      Hypothesis (FAIR: set_fair_model_trace (fun (ρ: fmrole ExtTL) => 
+      Hypothesis (FROM_INIT: forall st (INIT: tr S!! 0 = Some st),
+                  exists n, st = tl_init_st n). 
+      Hypothesis (FAIR: set_fair_model_trace (fun (ρ: fmrole ExtTL_FM) => 
                                                 exists r, ρ = inl r) tr).
 
-      Let eventual_release ρ i := 
-            forall ρ' j st' (JTH: tr S!! j = Some st')
-              (HAS_LOCK: has_lock_st ρ' st')
-              (PREVr: ρ' = ρ -> j < i),
-            exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''.
+      (* Let eventual_release ρ i :=  *)
+      (*       forall ρ' j st' (JTH: tr S!! j = Some st') *)
+      (*         (HAS_LOCK: has_lock_st ρ' st') *)
+      (*         (PREVr: ρ' = ρ -> j < i), *)
+      (*       exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''. *)
 
       Local Ltac gd t := generalize dependent t.
       
       Lemma lock_compete_kept (ρ: tl_role):
-        @label_kept_state ExtTL (fun st => role_map st !! ρ = Some (tl_L, true)) (inl ρ).
+        @label_kept_state ExtTL_FM 
+          (fun st => role_map st !! ρ = Some (tl_L, true)) (inl ρ).
       Proof using. 
         red. intros.
         inversion STEP; subst.
@@ -296,7 +301,7 @@ Section Model.
       Lemma advance_next_helper_L o t (rm: tl_role_map) ρo ρ:
         role_map (advance_next (<{o + 1, t, <[ρo := (tl_L, false)]> rm}>)) !! ρ = Some (tl_L, false) <-> (rm !! ρ = Some (tl_L, false) \/ ρ = ρo).
       Proof using.
-        clear eventual_release. 
+        (* clear eventual_release.  *)
         rewrite /advance_next.
         destruct role_of_dec as [[? ?] | ?]; simpl in *.
         - assert (x ≠ ρo) as NEQ.
@@ -399,7 +404,7 @@ Section Model.
            (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2).        
       
       Lemma step_preserves_tl_state_wf st ℓ st'
-        (WF: tl_state_wf st) (STEP: fmtrans ExtTL st ℓ st'):
+        (WF: tl_state_wf st) (STEP: fmtrans ExtTL_FM st ℓ st'):
         tl_state_wf st'.
       Proof using. 
         destruct st as [o t rm]. destruct st' as [o' t' rm'].
@@ -544,8 +549,9 @@ Section Model.
         tl_state_wf st. 
       Proof using LEN FROM_INIT VALID.
         gd st. induction i.
-        { intros. destruct FROM_INIT as [n INIT]. rewrite ITH in INIT.
-          rewrite /tl_init_st in INIT. inversion INIT. subst.
+        { intros.
+          destruct (FROM_INIT _ ITH) as [n ->].
+          rewrite /tl_init_st. 
           red. splits; auto.
           - split; [lia| ]. intros [ρ RMρ]. desc.
             apply lookup_gset_to_gmap_Some in RMρ. desc. congruence.
@@ -561,7 +567,7 @@ Section Model.
         eapply step_preserves_tl_state_wf; eauto.
       Qed.
 
-      Lemma step_counters_mono st ℓ st' (STEP: fmtrans ExtTL st ℓ st'):
+      Lemma step_counters_mono st ℓ st' (STEP: fmtrans ExtTL_FM st ℓ st'):
         owner st <= owner st' /\ ticket st <= ticket st'.
       Proof using.
         inversion STEP; subst.
@@ -590,7 +596,7 @@ Section Model.
       Qed.
       
       Lemma has_lock_kept (ρ: tl_role) (o: nat):
-        @label_kept_state ExtTL 
+        @label_kept_state ExtTL_FM 
           (fun st => tl_state_wf st /\ owner st = o /\ has_lock_st ρ st) (inl ρ).
       Proof using LEN FROM_INIT.
         red. intros. destruct Ps as (WF & OW & [b OWNER]).
@@ -611,7 +617,7 @@ Section Model.
 
       (* it turns out shorter to just repeat the previous proof *)
       Lemma has_lock_active_kept (ρ: tl_role) (o: nat):
-        @label_kept_state ExtTL 
+        @label_kept_state ExtTL_FM 
           (fun st => tl_state_wf st /\ owner st = o /\
                     role_map st !! ρ = Some (tl_U o, true)) (inl ρ).
       Proof using LEN FROM_INIT.
@@ -632,7 +638,7 @@ Section Model.
       Qed.
 
       Lemma lock_wait_kept (ρ ρo: tl_role) o n:
-        @label_kept_state ExtTL 
+        @label_kept_state ExtTL_FM 
           (fun st => exists b bo, tl_state_wf st /\ 
                    role_map st !! ρ = Some (tl_U n, b) /\ 
                    role_map st !! ρo = Some (tl_U o, bo) /\
@@ -673,7 +679,7 @@ Section Model.
       Qed.
 
       Lemma lock_wait_active_kept (ρ ρo: tl_role) o n:
-        @label_kept_state ExtTL 
+        @label_kept_state ExtTL_FM 
           (fun st => exists b, tl_state_wf st /\ 
                    role_map st !! ρ = Some (tl_U n, b) /\ 
                    role_map st !! ρo = Some (tl_U o, true) /\
@@ -715,30 +721,12 @@ Section Model.
           all: split; auto; rewrite lookup_insert_ne; eauto; intros ->; congruence.
       Qed.
 
+      
+      Let tl_eventual_release := eventual_release ExtTL has_lock_st active_st.
 
-      Lemma eventual_release_strenghten ρ i
-        (EV_REL: eventual_release ρ i):
-        forall ρ' j st' (JTH: tr S!! j = Some st')
-          (HAS_LOCK: has_lock_st ρ' st')
-          (PREVr: ρ' = ρ -> j < i),
-        exists k, ClassicalFacts.Minimal 
-               (fun k => exists st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st'') k.
-      Proof using. 
-        intros. red in EV_REL. specialize (EV_REL _ _ _ JTH HAS_LOCK PREVr).
-        destruct EV_REL as [k EV_REL]. pattern k in EV_REL. 
-        eapply min_prop_dec in EV_REL; eauto.
-        intros.
-        destruct (tr S!! n) as [st | ] eqn:NTH.
-        2: { right. intros (? & ? & ?). congruence. }
-        destruct (decide (j <= n)).
-        2: { right. intros (? & ? & ?). lia. }
-        destruct (active_st_dec ρ' st).
-        - left. eauto.
-        - right. intros (? & ? & ? & ?). congruence.
-      Qed.
 
       Lemma lock_eventually_released i ρ st ρ0 m
-        (EV_REL: eventual_release ρ0 m)
+        (EV_REL: tl_eventual_release tr ρ0 m)
         (ITH: tr S!! i = Some st)
         (LOCK: has_lock_st ρ st)
         (R0: ρ = ρ0 -> i < m):
@@ -747,9 +735,12 @@ Section Model.
           can_lock_st ρ st' ∧ ¬ active_st ρ st'. 
       Proof using VALID LEN FROM_INIT FAIR.
         destruct st as [o t rm].
-        pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ITH LOCK) as HH.
-        rename HH into EV_REL'. specialize_full EV_REL'.
-        { intros ->. auto. }
+        (* pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ITH LOCK) as HH. *)
+        forward eapply eventual_release_strenghten as HH; eauto.
+        { apply active_st_dec. }
+        rename HH into EV_REL'.
+        (* specialize_full EV_REL'. *)
+        (* { intros ->. auto. } *)
         destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MIN).
         
         forward eapply steps_keep_state with (i := i) (j := k) (k := k) as LOCK'.
@@ -772,7 +763,8 @@ Section Model.
         forward eapply (kept_state_fair_step VALID).
         { apply (has_lock_active_kept ρ o). }
         all: eauto.
-        { simpl. intros. red. simpl. apply elem_of_union_l. apply elem_of_map_2.
+        { simpl. intros. red. simpl.
+          rewrite /ext_live_roles. apply elem_of_union_l. apply elem_of_map_2.
           apply active_st_enabled. red. destruct Pst as (_ & _ & ?). eauto. }
         { splits; eauto. destruct LOCK', ENρo. congruence. }
         intros (j & st'' & HH & JTH & WF & OW''o & RM''ρo).
@@ -805,7 +797,7 @@ Section Model.
       Lemma lock_eventually_acquired_iteration o t rm ρ i d
         (ST: tr S!! i = Some <{ o, t, rm }>)
         (R: rm !! ρ = Some (tl_U (S o + d), true))
-        (EV_REL: eventual_release ρ i):
+        (EV_REL: tl_eventual_release tr ρ i):
         ∃ (n : nat) (st': tl_st),
           let e' := if (decide (d = 0)) then false else true in
           i < n ∧ tr S!! n = Some st' ∧ owner st' = o + 1 /\
@@ -820,10 +812,14 @@ Section Model.
         { intros ->. red in LOCK. desc. rewrite R in LOCK.
           inversion LOCK. lia. }
         
-        pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ST LOCK) as HH.
+        (* pose proof (eventual_release_strenghten _ _ EV_REL _ _ _ ST LOCK) as HH. *)
+        forward eapply eventual_release_strenghten as HH; eauto.
+        { apply active_st_dec. }
+        { congruence. }        
+
         rename HH into EV_REL'. specialize_full EV_REL'.
-        { intros ->. rewrite /has_lock_st in LOCK. destruct LOCK.
-          simpl in H. rewrite R in H. inversion H. lia. }
+        (* { intros ->. rewrite /has_lock_st in LOCK. destruct LOCK. *)
+        (*   simpl in H. rewrite R in H. inversion H. lia. } *)
         destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MINk).
         
         forward eapply steps_keep_state with (i := i) (j := k) (k := k) as LOCK'.
@@ -850,7 +846,8 @@ Section Model.
         forward eapply (kept_state_fair_step VALID) with (i := k). 
         { apply (lock_wait_active_kept ρ ρo). }
         all: eauto.
-        { simpl. intros. red. simpl. apply elem_of_union_l. apply elem_of_map_2.
+        { simpl. intros. red. simpl. rewrite /ext_live_roles. 
+          apply elem_of_union_l. apply elem_of_map_2.
           apply active_st_enabled. red. desc. eauto. }
         { splits; eauto. }
         intros (j & st'' & [[LEkj STEPj] MINj] & JTH & b_ & WF'' & RMρ'' & RMρo'' & OW'').
@@ -902,7 +899,7 @@ Section Model.
         (ST: tr S!! i = Some <{ o, t, rm }>)
         (WAIT: o ≠ wt)
         (R: rm !! ρ = Some (tl_U wt, true))
-        (EV_REL: forall j (LE: i <= j), eventual_release ρ j):
+        (EV_REL: forall j (LE: i <= j), tl_eventual_release tr ρ j):
         ∃ (n : nat) (st' : tl_st),
           i < n ∧ tr S!! n = Some st' ∧ has_lock_st ρ st' ∧ ¬ active_st ρ st'.
       Proof using VALID LEN FROM_INIT FAIR.
@@ -933,7 +930,7 @@ Section Model.
         (ITH: tr S!! i = Some st)
         (CAN_LOCK: can_lock_st ρ st)
         (ACT: active_st ρ st)
-        (EV_REL: forall j (LE: i <= j), eventual_release ρ j):
+        (EV_REL: forall j (LE: i <= j), tl_eventual_release tr ρ j):
         exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\
                    ¬ active_st ρ st'.
       Proof using VALID LEN FAIR FROM_INIT.
@@ -944,7 +941,7 @@ Section Model.
         { apply lock_compete_kept. }
         all: eauto.
         { clear dependent st. simpl. intros st STρ. 
-          red. rewrite /ext_live_roles. simpl.
+          red. rewrite /ext_live_roles. simpl. rewrite /ext_live_roles. 
           apply elem_of_union_l. apply elem_of_map_2.
           simpl. rewrite /tl_live_roles.
           apply elem_of_dom. eexists. apply map_filter_lookup_Some_2; done. }
@@ -976,7 +973,16 @@ Section Model.
 
     End ProgressPropertiesImpl. 
 
-      
+    Let tl_is_init st := exists n, st = tl_init_st n. 
+    
+    Instance TLFairLock: 
+      FairLock ExtTL can_lock_st has_lock_st active_st tl_is_init.
+    Proof.
+      constructor. red. intros.
+      pose proof (trace_has_len tr) as [len LEN]. 
+      eapply tl_progress; eauto.
+    Qed.     
+
   End ProgressProperties. 
 
 End Model.
