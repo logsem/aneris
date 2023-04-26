@@ -73,9 +73,9 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
       eapply (tac_wp_pure _ _ _ _ (@fill base_ectxi_lang K e'));
-      [iSolveTC                       (* PureExec *)
+      [tc_solve                       (* PureExec *)
       |try solve_vals_compare_safe    (* The pure condition for PureExec *)
-      |iSolveTC                       (* IntoLaters *)
+      |tc_solve                       (* IntoLaters *)
       |wp_finish                      (* new goal *)
       ])
     || fail "wp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
@@ -452,7 +452,7 @@ Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
         first [
             reshape_expr e ltac:(fun K e' => eapply (tac_wp_alloc _ _ ip _ Htmp K))
            |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
-        [iSolveTC
+        [tc_solve
         |finish()]
     in (process_single ())
   | _ => fail "wp_alloc: not a 'wp'"
@@ -487,7 +487,7 @@ Tactic Notation "wp_store" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_store _ _ _ _ _ K))
       |fail 1 "wp_store: cannot find 'Store' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ip
     |pm_reflexivity
     |first [wp_seq|wp_finish]]
@@ -545,7 +545,7 @@ Tactic Notation "wp_socket"  ident(l) "as" constr(H) :=
         first [
             reshape_expr e ltac:(fun K e' => eapply (tac_wp_socket _ _ _ Htmp K ip))
            |fail 1 "wp_socket: cannot find 'NewSocket #()' in" e];
-        [iSolveTC
+        [tc_solve
         |finish()]
     in (process_single ())
   | _ => fail "wp_socket: not a 'wp'"
@@ -567,7 +567,7 @@ Tactic Notation "wp_socketbind" :=
                               eapply (tac_wp_socketbind _ _ _ _ _ _ _ K))
       |fail 1 "wp_socketbind: cannot find 'SocketBind' in" e];
     [done|
-     |iSolveTC
+     |tc_solve
      |solve_free_port ip
      |solve_socket_mapsto ip
      |pm_reflexivity
@@ -595,7 +595,7 @@ Tactic Notation "wp_send" constr(Hs) :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send _ _ _ _ _ _ _ _ _ _ K))
       |fail 1 "wp_send: cannot find 'SendTo' in" e];
-    [done| |iSolveTC |solve_socket_interp()
+    [done| |tc_solve |solve_socket_interp()
      | (* socket_mapsto *)
      | (* message_mapsto *)
      | solve_split () |..];
@@ -627,7 +627,7 @@ Tactic Notation "wp_send_duplicate" :=
       |fail 1 "wp_send_duplicate: cannot find 'SendTo' in" e];
       [done|done
        |solve_msg_send ()
-       |iSolveTC
+       |tc_solve
        |iAssumptionCore
        (* |solve_message_mapsto ()    (* TODO: Why does this not work now? *) *)
        |iAssumptionCore

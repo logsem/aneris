@@ -68,7 +68,7 @@ Section proof.
   Lemma own_lhst_glob_lhst_glob_aux (l : list socket_address) (γLs : list gname) :
      length l = length γLs ->
      ([∗ list] i↦_ ∈ l, lhst_glob γLs i ∅) ⊢
-     ([∗ list] γs;S ∈ γLs;replicate (length l) ∅, lhst_glob_aux γs S)%I.
+     ([∗ list] γs;T ∈ γLs;replicate (length l) ∅, lhst_glob_aux γs T)%I.
   Proof.
     intros Hlen.
     iInduction l as [| h t IH] "IH" forall (γLs Hlen).
@@ -141,7 +141,7 @@ Section proof.
             (∃ G Ss,
               ⌜length γLs = length RCB_addresses⌝ ∗
               own_global_sys γGauth γGsnap G ∗
-              ([∗ list] γs; S ∈ γLs; Ss, lhst_glob_aux γs S) ∗
+              ([∗ list] γs; T ∈ γLs; Ss, lhst_glob_aux γs T) ∗
               ⌜RCBM_GstValid {| Gst_ghst := G; Gst_hst := Ss|}⌝)%I
             with  "[HGsys HLglob]") as "#Hinv".
     { iModIntro.

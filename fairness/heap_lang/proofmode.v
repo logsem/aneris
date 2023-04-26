@@ -212,7 +212,7 @@ Tactic Notation "solve_pure_exec" :=
     let e := eval simpl in e in
     reshape_expr e ltac:(fun K e' =>
       eapply (pure_exec_fill K _ _ e');
-      [iSolveTC                       (* PureExec *)
+      [tc_solve                       (* PureExec *)
       (* |try solve_vals_compare_safe    (* The pure condition for PureExec -- handles trivial goals, including [vals_compare_safe] *) *)
       ])
     || fail "failed :("
@@ -247,11 +247,11 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
       eapply (tac_wp_pure _ _ _ _ _ K e');
         [
         |
-        | iSolveTC
+        | tc_solve
         | trivial
         | let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
           iAssumptionCore || fail "wp_pures: cannot find" fs
-        |iSolveTC
+        |tc_solve
         | pm_reduce;
           simpl_has_fuels;
           wp_finish
@@ -534,7 +534,7 @@ Tactic Notation "wp_load" :=
       |
       | let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
           iAssumptionCore || fail "wp_load: cannot find" fs
-      | iSolveTC
+      | tc_solve
       | let fs := match goal with |- _ = Some (_, ?l ↦{_} _)%I => l end in
           iAssumptionCore || fail "wp_load: cannot find" fs
       | pm_reduce;
@@ -566,7 +566,7 @@ Tactic Notation "wp_store" :=
       |
       | let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
           iAssumptionCore || fail "wp_store: cannot find" fs
-      | iSolveTC
+      | tc_solve
       | let fs := match goal with |- _ = Some (_, ?l ↦{_} _)%I => l end in
           iAssumptionCore || fail "wp_store: cannot find" fs
       | split; [done | pm_reduce;
@@ -832,14 +832,14 @@ Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
         first
           [reshape_expr e ltac:(fun K e' => eapply (tac_wp_alloc _ _ _ _ Htmp K))
           |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
-        [iSolveTC
+        [tc_solve
         |finish ()]
     in
     let process_array _ :=
         first
           [reshape_expr e ltac:(fun K e' => eapply (tac_wp_allocN _ _ _ _ Htmp K))
           |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
-        [idtac|iSolveTC
+        [idtac|tc_solve
          |finish ()]
     in (process_single ()) || (process_array ())
   | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
@@ -872,7 +872,7 @@ Tactic Notation "wp_free" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_free _ _ _ _ _ K))
       |fail 1 "wp_free: cannot find 'Free' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |pm_reduce; wp_finish]
   | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
@@ -894,7 +894,7 @@ Tactic Notation "wp_store" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_store _ _ _ _ _ K))
       |fail 1 "wp_store: cannot find 'Store' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |pm_reduce; first [wp_seq|wp_finish]]
   | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
@@ -916,7 +916,7 @@ Tactic Notation "wp_xchg" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_xchg _ _ _ _ _ K))
       |fail 1 "wp_xchg: cannot find 'Xchg' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |pm_reduce; first [wp_seq|wp_finish]]
   | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
@@ -938,7 +938,7 @@ Tactic Notation "wp_cmpxchg" "as" simple_intropattern(H1) "|" simple_intropatter
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_cmpxchg _ _ _ _ _ K))
       |fail 1 "wp_cmpxchg: cannot find 'CmpXchg' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |try solve_vals_compare_safe
     |pm_reduce; intros H1; wp_finish
@@ -964,7 +964,7 @@ Tactic Notation "wp_cmpxchg_fail" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_cmpxchg_fail _ _ _ _ _ K))
       |fail 1 "wp_cmpxchg_fail: cannot find 'CmpXchg' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |try (simpl; congruence) (* value inequality *)
     |try solve_vals_compare_safe
@@ -990,7 +990,7 @@ Tactic Notation "wp_cmpxchg_suc" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_cmpxchg_suc _ _ _ _ _ K))
       |fail 1 "wp_cmpxchg_suc: cannot find 'CmpXchg' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |try (simpl; congruence) (* value equality *)
     |try solve_vals_compare_safe
@@ -1016,7 +1016,7 @@ Tactic Notation "wp_faa" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_faa _ _ _ _ _ K))
       |fail 1 "wp_faa: cannot find 'FAA' in" e];
-    [iSolveTC
+    [tc_solve
     |solve_mapsto ()
     |pm_reduce; wp_finish]
   | |- envs_entails _ (twp ?s ?E ?e ?Q) =>

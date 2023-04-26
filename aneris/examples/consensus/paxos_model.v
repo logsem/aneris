@@ -494,7 +494,8 @@ Section model_correctness.
     ShowsSafeAt s Q bal val →
     ShowsSafeAt (s <| msgs ::= (λ ms, ms ∪ {[msg1a bal0]}) |>) Q bal val.
   Proof.
-    intros (HQb & HQ1bv). split; [set_solver +HQb| set_solver +HQ1bv].
+    intros (HQb & HQ1bv).
+    split; [set_solver +HQb by idtac| set_solver +HQ1bv].
   Qed.
 
   Lemma ShowsSafeAt_1b s Q a bal0 bal val mv :
@@ -505,7 +506,7 @@ Section model_correctness.
                    <| msgs   ::= (λ ms, ms ∪ {[msg1b a bal0 mv]}) |>) Q bal val.
   Proof.
     intros Hrtc Hmb (HQb & HQ1bv). split.
-    { set_solver +HQb. }
+    { set_solver +HQb by idtac. }
     destruct HQ1bv as [Hempty | Hmax].
     - left. set_unfold.
       intros m (([|] & H1b) & H1bSome); [by eapply Hempty|].
@@ -531,7 +532,7 @@ Section model_correctness.
     ShowsSafeAt (s <| msgs ::= (λ ms, ms ∪ {[msg2a bal0 val0]}) |>) Q bal val.
   Proof.
     intros (HQb & HQ1bv). split.
-    { set_solver +HQb. }
+    { set_solver +HQb by idtac. }
     destruct HQ1bv as [Hempty | Hmax].
     - left. set_unfold.
       intros m (([|] & H1b) & H1bSome); [by eapply Hempty|].
@@ -552,7 +553,7 @@ Section model_correctness.
          <| maxVal ::= (λ mv, <[a:=Some (bal0, val0)]> mv) |>
          <| msgs   ::= (λ ms, ms ∪ {[msg2b a bal0 val0]}) |>) Q bal val.
   Proof.
-    intros (HQb & HQ1bv). split; [set_solver +HQb| set_solver +HQ1bv].
+    intros (HQb & HQ1bv). split; [set_solver +HQb by idtac| set_solver +HQ1bv].
   Qed.
 
   Lemma msg2a_inv s bal val :

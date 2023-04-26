@@ -36,7 +36,7 @@ Section Local_history.
 
     Lemma seen_lookup i γs s Ss :
       γLs !! i = Some γs →
-      ([∗ list] γs';S ∈ γLs;Ss, local_history_Global_inv γs' S) ⊢
+      ([∗ list] γs';T ∈ γLs;Ss, local_history_Global_inv γs' T) ⊢
       own γs.1 (◯ (PrinSeen s)) -∗
       ∃ s', ⌜seen_relation s s' ∧ Ss !! i = Some s'⌝.
     Proof.
@@ -51,7 +51,7 @@ Section Local_history.
     Qed.
 
     Lemma local_history_invs_agree i s Ss :
-      ([∗ list] γs;S ∈ γLs;Ss, local_history_Global_inv γs S) ⊢
+      ([∗ list] γs;T ∈ γLs;Ss, local_history_Global_inv γs T) ⊢
       local_history_Local_inv i s -∗ ⌜Ss !! i = Some s⌝.
     Proof.
       iIntros "HL Hs".
@@ -98,9 +98,9 @@ Section Local_history.
       (∀ (e' : apply_event),
           e' ∈ s → vector_clock_lt (ae_time e) (ae_time e') → False) →
       local_history_Local_inv i s ⊢
-      ([∗ list] γs;S ∈ γLs;Ss, local_history_Global_inv γs S) ==∗
-      ([∗ list] γs;S ∈ γLs; <[i := s ∪ {[e]} ]> Ss,
-        local_history_Global_inv γs S) ∗
+      ([∗ list] γs;T ∈ γLs;Ss, local_history_Global_inv γs T) ==∗
+      ([∗ list] γs;T ∈ γLs; <[i := s ∪ {[e]} ]> Ss,
+        local_history_Global_inv γs T) ∗
       local_history_Local_inv i (s ∪ {[e]}).
     Proof.
       iIntros (He) "Hs HL".
@@ -138,7 +138,7 @@ Section Local_history.
     True ⊢ |==>
       ∃ γLs,
         ⌜length γLs = length DB_addresses⌝ ∗
-        ([∗ list] γs; S ∈ γLs; empty_lhsts, local_history_Global_inv γs S) ∗
+        ([∗ list] γs; T ∈ γLs; empty_lhsts, local_history_Global_inv γs T) ∗
         ([∗ list] i ↦ _ ∈ DB_addresses, local_history_Local_inv γLs i ∅).
   Proof.
     iIntros (_).
