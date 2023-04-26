@@ -136,11 +136,17 @@ Proof. apply make_decision. Qed.
 Class Monotone (f : nat → nat) :=
   { mono_incr : ∀ n m, n ≤ m → f n ≤ f m; }.
 
+Fixpoint count_labels {S L} (ft : finite_trace S L) : nat :=
+  match ft with
+  | {tr[_]} => 0
+  | ft' :tr[_]: _ => Datatypes.S (count_labels ft')
+  end.
+
 Definition count_sends (msg : message) tr : nat :=
-  trace_length (trace_filter (send_filter msg) tr).
+  count_labels (trace_filter (send_filter msg) tr).
 
 Definition count_delivers (msg : message) tr : nat :=
-  trace_length (trace_filter (deliver_filter msg) tr).
+  count_labels (trace_filter (deliver_filter msg) tr).
 
 Definition retransmit_network_fair_delivery
            (tr:trace retransmit_state retransmit_label) : Prop :=
@@ -285,24 +291,107 @@ Qed.
 (*   ∃ m, count_sends msg (trace_take n mtr) < count_sends msg (trace_take m mtr). *)
 (* Proof. Admitted. *)
 
+Lemma count_labels_sum {S L} (P : S → L → Prop)
+           `{∀ s l, Decision (P s l)} n m mtr mtr' :
+  after n mtr = Some mtr' →
+  count_labels (trace_filter P $ trace_take (n+m) mtr) =
+  count_labels ((trace_filter P $ trace_take n mtr)) +
+    count_labels ((trace_filter P $ trace_take m mtr')).
+Proof.
+  revert mtr mtr'.
+  induction n=> /=; intros mtr mtr' Hafter.
+  { simplify_eq. by destruct mtr'. }
+  destruct mtr; [done|]. simpl.
+  case_bool_decide.
+  - simpl. f_equiv. by apply IHn.
+  - by apply IHn.
+Qed.
+
+(* Lemma count_sends_sum msg n m mtr mtr' : *)
+(*   after n mtr = Some mtr' → *)
+(*   count_sends msg (trace_take (n+m) mtr) = *)
+(*   count_sends msg (trace_take n mtr) + count_sends msg (trace_take m mtr'). *)
+(* Proof. Admitted. *)
+
+
+Lemma infinite_trace_after' {S T} n (tr : trace S T) :
+  infinite_trace tr -> ∃ tr', after n tr = Some tr' ∧ infinite_trace tr'.
+Proof. 
+  revert tr.
+  induction n; intros tr Hinf.
+  { exists tr. done. }
+  pose proof (IHn _ Hinf) as [tr' [Hafter Hinf']].
+  pose proof (Hinf' 1) as [tr'' Htr'].
+  exists tr''.
+  replace (Datatypes.S n) with (n + 1) by lia.
+  rewrite after_sum'. rewrite Hafter. split; [done|].
+  intros n'.
+  specialize (Hinf' (Datatypes.S n')).
+  destruct tr'; [done|].
+  simpl in *. simplify_eq. done.
+Qed.
+
 (* TODO: Might need n < m *)
 (* OBS: Not correct - Counting of delivers is incorrect. *)
-Lemma retransmit_trace_delivers_0 msg (mtr : mtrace) n :
-  infinite_trace mtr →
+Lemma retransmit_trace_delivers_0 (mtr : mtrace) n :
   (∀ n : nat,
      pred_at mtr n
              (λ (_ : retransmit_state) (l : option retransmit_label),
                 l ≠ Some (inr (Ndeliver, mAB)))) →
-  mtrace_valid mtr → mtrace_fair mtr →
-  count_delivers msg (trace_take n mtr) = 0.
+  (* mtrace_valid mtr → (* mtrace_fair mtr → *) *)
+  count_delivers mAB (trace_take n mtr) = 0.
 Proof.
   revert mtr.
-  induction n; intros mtr Hinf Hpred Hvalid Hfair.
+  induction n; intros mtr Hpred.
   { simpl. specialize (Hpred 0).
     destruct mtr; simpl in *.
     - rewrite /pred_at in Hpred. simpl in *.
-      rewrite /count_delivers. simpl.
-Admitted.
+      rewrite /count_delivers. done.
+    - rewrite /pred_at in Hpred. simpl in *.
+      rewrite /count_delivers. done.
+  }
+  simpl in *.
+  destruct mtr; [done|].
+  rewrite /count_delivers. simpl.
+  case_bool_decide.
+  - specialize (Hpred 0). rewrite pred_at_0 in Hpred. rewrite /deliver_filter in H.
+    simplify_eq. 
+  - apply IHn.
+    intros n'. specialize (Hpred (S n')). rewrite pred_at_S in Hpred. done.
+Qed.
+
+(* (* TODO: Might need n < m *) *)
+(* (* OBS: Not correct - Counting of delivers is incorrect. *) *)
+(* Lemma retransmit_trace_delivers_0 (mtr : mtrace) n : *)
+(*   infinite_trace mtr → *)
+(*   (∀ n : nat, *)
+(*      pred_at mtr n *)
+(*              (λ (_ : retransmit_state) (l : option retransmit_label), *)
+(*                 l ≠ Some (inr (Ndeliver, mAB)))) → *)
+(*   (* mtrace_valid mtr → (* mtrace_fair mtr → *) *) *)
+(*   count_delivers mAB (trace_take n mtr) = 0. *)
+(* Proof. *)
+(*   revert mtr. *)
+(*   induction n; intros mtr Hinf Hpred. *)
+(*   { simpl. specialize (Hpred 0). *)
+(*     destruct mtr; simpl in *. *)
+(*     - rewrite /pred_at in Hpred. simpl in *. *)
+(*       rewrite /count_delivers. done. *)
+(*     - rewrite /pred_at in Hpred. simpl in *. *)
+(*       rewrite /count_delivers. done. *)
+(*   } *)
+(*   simpl in *. *)
+(*   destruct mtr; [done|]. *)
+(*   (* specialize (Hpred (S n)). *) *)
+(*   (* rewrite pred_at_S in Hpred. *) *)
+(*   rewrite /count_delivers. simpl. *)
+(*   case_bool_decide. *)
+(*   - specialize (Hpred 0). rewrite pred_at_0 in Hpred. rewrite /deliver_filter in H. *)
+(*     simplify_eq.  *)
+(*   - apply IHn. *)
+(*     + by eapply infinite_cons. *)
+(*     + intros n'. specialize (Hpred (S n')). rewrite pred_at_S in Hpred. done. *)
+(* Qed. *)
 
 Lemma A_always_live (mtr : mtrace) n :
   infinite_trace mtr →
@@ -346,8 +435,19 @@ Proof.
   - specialize (HA' mtr m Hinf). simpl in *.
     apply pred_at_neg in HA; done.
   - exists m.
-    eapply pred_at_impl; [|apply HA].
-Admitted.
+    specialize (Hinf m) as [mtr' Hafter].
+    eapply mtrace_valid_after in Hvalid; [|done].
+    simpl in *.
+    rewrite /pred_at in HA. rewrite Hafter in HA.
+    rewrite /pred_at. rewrite Hafter.
+    destruct mtr'; [done|].
+    destruct ℓ; [|done].
+    simpl in *. simplify_eq.
+    destruct r=> /=. simpl in *. simplify_eq.
+    pinversion Hvalid. simplify_eq.
+    inversion H1. simplify_eq.
+    exists Arole. done.
+Qed.
 
 (* Lemma pred_at_take n tr tr' : *)
 (*   pred_at tr n = trace_take n $ pred_at tr n.  *)
@@ -355,27 +455,49 @@ Admitted.
 (*   after n tr = Some tr' → *)
 (*   trace_take n tr = tr'. *)
 
-Lemma count_sends_sum msg n m mtr mtr' :
-  after n mtr = Some mtr' →
-  count_sends msg (trace_take (n+m) mtr) =
-  count_sends msg (trace_take n mtr) + count_sends msg (trace_take m mtr').
-Proof. Admitted.
+Lemma count_sends_pred_at n tr :
+  pred_at tr n (λ (_ : retransmit_state) (l : option retransmit_label),
+            ∃ r : retransmit_node_role,
+              l = Some (inl (r, Some mAB))) →
+  0 < count_labels $ trace_filter (send_filter mAB) (trace_take (S n) tr).
+Proof.
+  revert tr.
+  induction n=> /=; intros tr Hpred_at.
+  { rewrite /pred_at in Hpred_at.    
+    destruct tr; simpl in *.
+    - destruct Hpred_at as [? ?]. done.
+    - destruct Hpred_at as [? ?].
+      case_bool_decide.
+      + simpl. lia.
+      + destruct ℓ; [|done]. simplify_eq. rewrite /send_filter in H0.
+        eapply not_exists_forall_not in H0. done. }
+  simpl in *.
+  destruct tr; [done|].
+  simpl in *.
+  case_bool_decide.
+  - simpl. lia.
+  - apply IHn. done.
+Qed.
 
-Lemma count_sends_pred_at {S L} (P : S → option L → Prop) (Q : S → L → Prop)
-           `{∀ s l, Decision (Q s l)} n tr :
-  (∀ s l, P s (Some l) ↔ Q s l) → pred_at tr n P →
-  0 < trace_length $ trace_filter Q (trace_take n tr).
-Proof. Admitted.
+(* Lemma count_labels_pred_at {S L} (P : S → option L → Prop) (Q : S → L → Prop) *)
+(*            `{∀ s l, Decision (Q s l)} n tr : *)
+(*   (∀ s l, P s (Some l) ↔ Q s l) → pred_at tr n P → *)
+(*   0 < count_labels $ trace_filter Q (trace_take n tr). *)
+(* Proof. *)
+  
+(* Admitted. *)
+
+(* Lemma count_sends_pred_at {S L} (P : S → option L → Prop) (Q : S → L → Prop) *)
+(*            `{∀ s l, Decision (Q s l)} n tr : *)
+(*   (∀ s l, P s (Some l) ↔ Q s l) → pred_at tr n P → *)
+(*   0 < count_labels $ trace_filter Q (trace_take n tr). *)
+(* Proof. Admitted. *)
 
 (* Lemma count_sends_pred_at {S L} (P : S → option L → Prop) *)
 (*            `{∀ s l, Decision (P s l)} n tr : *)
 (*   pred_at tr n P → *)
 (*   0 < trace_length $ trace_filter (λ s l, P s (Some l)) (trace_take n tr). *)
 (* Proof. Admitted. *)
-
-Lemma infinite_trace_after' {S T} n (tr : trace S T) :
-  infinite_trace tr -> ∃ tr', after n tr = Some tr' ∧ infinite_trace tr'.
-Proof. Admitted.
 
 (* Any fair infinite trace grow the number of sends indefinitely *)
 Lemma retransmit_trace_sends_grows (mtr : mtrace) x :
@@ -388,8 +510,8 @@ Proof.
   { assert (∃ n, pred_at mtr n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)))
       as [n Hn].
     { by apply retransmit_fair_traces_eventually_mAB. }
-    exists n.
-    eapply count_sends_pred_at; [|done]. rewrite /send_filter. naive_solver. }
+    exists (S n).
+    by eapply count_sends_pred_at. }
   destruct IHx as [n IHn].
   apply (infinite_trace_after' n) in Hafter as (mtr' & Hmtr' & Hafter).
   assert (∃ n, pred_at mtr' n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)))
@@ -397,13 +519,42 @@ Proof.
   { apply retransmit_fair_traces_eventually_mAB;
       [done|by eapply mtrace_valid_after|
         by eapply retransmit_fair_scheduling_after]. }
-  assert (0 < count_sends mAB (trace_take m mtr')).
-  { eapply count_sends_pred_at; [|done].
-    rewrite /send_filter. naive_solver. }
-  exists (n+m).
-  rewrite (count_sends_sum _ _ _ _ mtr'); [|done].
+  assert (0 < count_sends mAB (trace_take (S m) mtr')).
+  { eapply count_sends_pred_at. done. }
+  exists (n+(S m)).
+  rewrite /count_sends. rewrite /count_sends in H. rewrite /count_sends in IHn.
+  rewrite (count_labels_sum _ _ _ _ mtr'); [|done].  
   lia.
 Qed.
+
+(* (* Any fair infinite trace grow the number of sends indefinitely *) *)
+(* Lemma retransmit_trace_sends_grows (mtr : mtrace) x : *)
+(*   infinite_trace mtr → *)
+(*   mtrace_valid mtr → retransmit_fair_scheduling mtr → *)
+(*   ∃ n, x < count_sends mAB (trace_take n mtr). *)
+(* Proof. *)
+(*   intros Hafter Hvalid Hfair. *)
+(*   induction x. *)
+(*   { assert (∃ n, pred_at mtr n (λ st l, ∃ r, l = Some $ inl (r,Some mAB))) *)
+(*       as [n Hn]. *)
+(*     { by apply retransmit_fair_traces_eventually_mAB. } *)
+(*     exists n. *)
+(*     eapply count_labels_pred_at; [|done]. rewrite /send_filter. naive_solver. } *)
+(*   destruct IHx as [n IHn]. *)
+(*   apply (infinite_trace_after' n) in Hafter as (mtr' & Hmtr' & Hafter). *)
+(*   assert (∃ n, pred_at mtr' n (λ st l, ∃ r, l = Some $ inl (r,Some mAB))) *)
+(*     as [m Hm]. *)
+(*   { apply retransmit_fair_traces_eventually_mAB; *)
+(*       [done|by eapply mtrace_valid_after| *)
+(*         by eapply retransmit_fair_scheduling_after]. } *)
+(*   assert (0 < count_sends mAB (trace_take m mtr')). *)
+(*   { eapply count_labels_pred_at; [|done]. *)
+(*     rewrite /send_filter. naive_solver. } *)
+(*   exists (n+m). *)
+(*   rewrite /count_sends. rewrite /count_sends in H. rewrite /count_sends in IHn. *)
+(*   rewrite (count_labels_sum _ _ _ _ mtr'); [|done].   *)
+(*   lia. *)
+(* Qed. *)
 
 (* Any fair trace eventually delivers a message *)
 Lemma retransmit_fair_trace_eventually_NDeliver (mtr : mtrace) :
