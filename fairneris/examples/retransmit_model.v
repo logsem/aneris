@@ -1,5 +1,4 @@
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-(* From fairneris Require Import fairness. *)
 From Paco Require Import paco1 paco2 pacotac.
 From fairneris Require Export trace_utils.
 From fairneris.aneris_lang Require Import ast network.
@@ -36,17 +35,22 @@ Definition retransmit_role : Set :=
   retransmit_node_role + retransmit_network_role.
 
 Definition retransmit_node_action : Set := option message.
+Definition retransmit_network_action : Set := message.
+Definition retransmit_action : Set :=
+  retransmit_node_action + retransmit_network_action.
+
 Definition retransmit_node_label : Set :=
   retransmit_node_role * retransmit_node_action.
-Definition retransmit_network_action : Set := message.
 Definition retransmit_network_label : Set :=
   retransmit_network_role * retransmit_network_action.
-
 Definition retransmit_label : Set :=
   retransmit_node_label + retransmit_network_label.
 
 Definition label_role (l : retransmit_label) : retransmit_role :=
   sum_map fst fst l.
+
+Definition label_action (l : retransmit_label) : retransmit_action :=
+  sum_map snd snd l.
 
 #[global] Instance retransmit_role_eqdec : EqDecision retransmit_role.
 Proof. intros ??. apply make_decision. Qed.
@@ -111,7 +115,7 @@ Inductive retransmit_trans : retransmit_state → retransmit_label → retransmi
                    (Received, ms, <[saB := ms']>bs).
 
 Definition send_filter msg : retransmit_state → retransmit_label → Prop :=
-  λ _ l, ∃ r, l = inl (r,Some(msg)).
+  λ _ l, label_action l = inl $ Some msg.
 Instance send_filter_decision msg st l : Decision (send_filter msg st l).
 Proof. apply make_decision. Qed.
 
@@ -259,7 +263,7 @@ Qed.
 Lemma retransmit_fair_traces_eventually_mAB (mtr : mtrace) :
   infinite_trace mtr →
   mtrace_valid mtr → retransmit_fair_scheduling mtr →
-  ∃ n, pred_at mtr n (λ _ ℓ, ∃ r, ℓ = Some $ inl (r,Some mAB)).
+  ∃ n, pred_at mtr n (λ st l, option_map label_action l = Some $ inl $ Some mAB).
 Proof. 
   intros Hinf Hvalid Hfair.
   pose proof A_always_live as HA.
@@ -280,25 +284,24 @@ Proof.
     simpl in *. simplify_eq.
     destruct r=> /=. simpl in *. simplify_eq.
     pinversion Hvalid. simplify_eq.
-    inversion H1. simplify_eq.
-    exists Arole. done.
+    inversion H1. simplify_eq. done.
 Qed.
 
 (* TODO: This can possibly be generalised *)
 Lemma count_sends_pred_at n tr :
-  pred_at tr n (λ _ l, ∃ r : retransmit_node_role, l = Some (inl (r, Some mAB))) →
+  pred_at tr n (λ _ l, option_map label_action l = Some $ inl $ Some mAB) →
   0 < count_sends mAB (trace_take (S n) tr).
 Proof.
   revert tr.
   induction n=> /=; intros tr Hpred_at.
   { rewrite /pred_at in Hpred_at.    
     destruct tr; simpl in *.
-    - destruct Hpred_at as [? ?]. done.
-    - destruct Hpred_at as [? ?]. rewrite /count_sends=> /=.
+    - done.
+    - rewrite /count_sends=> /=.
       case_bool_decide.
       + simpl. lia.
-      + destruct ℓ; [|done]. simplify_eq. rewrite /send_filter in H0.
-        eapply not_exists_forall_not in H0. done. }
+      + destruct ℓ; [|done]. simplify_eq. rewrite /send_filter in H.
+        destruct r. simpl in *. simplify_eq. }
   simpl in *.
   destruct tr; [done|].
   simpl in *. rewrite /count_sends=> /=.
@@ -315,14 +318,14 @@ Lemma retransmit_trace_sends_grows (mtr : mtrace) x :
 Proof.
   intros Hafter Hvalid Hfair.
   induction x.
-  { assert (∃ n, pred_at mtr n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)))
+  { assert (∃ n, pred_at mtr n (λ st l, option_map label_action l = Some $ inl $ Some mAB))
       as [n Hn].
     { by apply retransmit_fair_traces_eventually_mAB. }
     exists (S n).
     by eapply count_sends_pred_at. }
   destruct IHx as [n IHn].
   apply (infinite_trace_after' n) in Hafter as (mtr' & Hmtr' & Hafter).
-  assert (∃ n, pred_at mtr' n (λ st l, ∃ r, l = Some $ inl (r,Some mAB)))
+  assert (∃ n, pred_at mtr' n (λ st l, option_map label_action l = Some $ inl $ Some mAB))
     as [m Hm].
   { apply retransmit_fair_traces_eventually_mAB;
       [done|by eapply mtrace_valid_after|
