@@ -108,8 +108,10 @@ Proof.
   do 3 f_equiv.
   apply wp_contractive.
   - rewrite /= /aneris_to_val Htv //.
-  - destruct k; first done.
-    solve_proper.
+  - econstructor. intros.
+    apply bi.exist_ne.
+    red. intros.
+    apply bi.sep_ne; eauto. by apply HΦ. 
 Qed.
 
 Lemma aneris_wp_value' ip E Φ v : Φ v ⊢ WP of_val v @[ip] E {{ Φ }}.

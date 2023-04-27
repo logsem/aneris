@@ -70,7 +70,8 @@ Definition Gsim_pre Σ {Λ} (M : Model) (s : stuckness)
   Contractive (@Gsim_pre Σ M Λ s ξ).
 Proof.
   rewrite /Gsim_pre=> n wp wp' HGsm ex sm.
-  repeat (f_contractive || f_equiv); repeat (apply dist_S; try apply HGsm).
+  repeat (f_contractive || f_equiv).
+  repeat (eapply dist_lt; try apply HGsm). auto. 
 Qed.
 
 Definition Gsim Σ {Λ} (M : Model) (s : stuckness)

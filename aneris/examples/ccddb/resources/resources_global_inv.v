@@ -24,7 +24,7 @@ Section Global_invariant.
               own γGsnap (● M) ∗
               own γGkeep (● (make_global_mem M)) ∗
               own γGkeep (◯ (make_global_mem M)) ∗
-              ([∗ list] γs; S ∈ γLs; Ss, local_history_Global_inv γs S)
+              ([∗ list] γs; T ∈ γLs; Ss, local_history_Global_inv γs T)
               ∗ ⌜DBM_GstValid {| Gst_mem := M; Gst_hst := Ss|}⌝
           ).
 
@@ -184,10 +184,10 @@ Section Global_invariant.
 
     Lemma observe_local_history_internal (M : gmap Key (gset write_event)) Ss n s :
       own γGsnap (● M) ⊢
-      ([∗ list] γs;S ∈ γLs;Ss, own γs.1 (● PrinSeen S) ∗ own γs.2 (◯ S)) -∗
+      ([∗ list] γs;T ∈ γLs;Ss, own γs.1 (● PrinSeen T) ∗ own γs.2 (◯ T)) -∗
       local_history_Local_inv γLs n s ==∗
       own γGsnap (● M) ∗
-      ([∗ list] γs;S ∈ γLs;Ss, own γs.1 (● PrinSeen S) ∗ own γs.2 (◯ S)) ∗
+      ([∗ list] γs;T ∈ γLs;Ss, own γs.1 (● PrinSeen T) ∗ own γs.2 (◯ T)) ∗
       local_history_Local_inv γLs n s ∗
       local_history_seen γLs n s.
     Proof.

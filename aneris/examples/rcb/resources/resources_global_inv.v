@@ -20,7 +20,7 @@ Section Global_invariant.
           (∃ G Ss,
               ⌜length γLs = length RCB_addresses⌝ ∗
               own_global_sys γOwn γSnap G ∗
-              ([∗ list] γs; S ∈ γLs; Ss, lhst_glob_aux γs S)
+              ([∗ list] γs; T ∈ γLs; Ss, lhst_glob_aux γs T)
               ∗ ⌜RCBM_GstValid {| Gst_ghst := G; Gst_hst := Ss|}⌝
           ).
 

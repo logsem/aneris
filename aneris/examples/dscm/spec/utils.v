@@ -69,7 +69,7 @@ Section with_Σ.
     eapply elem_of_list_lookup in Hin.
     destruct Hin as [i Hin].
     eapply elem_of_list_lookup_2.
-    eapply prefix_lookup; [|done].
+    eapply prefix_lookup_Some; [|done].
     apply Hin.
   Qed.
 

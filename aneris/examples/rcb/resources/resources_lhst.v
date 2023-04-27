@@ -124,7 +124,7 @@ Section Local_history.
     Qed.
 
     Lemma lhst_user_lookup i s Ss :
-      ([∗ list] γs';S ∈ γLs;Ss, lhst_glob_aux γs' S) ⊢
+      ([∗ list] γs';T ∈ γLs;Ss, lhst_glob_aux γs' T) ⊢
       lhst_user i s -∗
       ⌜Ss !! i = Some s⌝.
     Proof.
@@ -139,7 +139,7 @@ Section Local_history.
     Qed.
 
     Lemma lhst_lock_lookup i s Ss :
-      ([∗ list] γs';S ∈ γLs;Ss, lhst_glob_aux γs' S) ⊢
+      ([∗ list] γs';T ∈ γLs;Ss, lhst_glob_aux γs' T) ⊢
       lhst_lock i s -∗
       ⌜Ss !! i = Some s⌝.
     Proof.
@@ -190,10 +190,10 @@ Section Local_history.
     Lemma lhst_update i s Ss e:
       lhst_user i s ⊢
       lhst_lock i s -∗
-      ([∗ list] γs;S ∈ γLs;Ss, lhst_glob_aux γs S) ==∗
+      ([∗ list] γs;T ∈ γLs;Ss, lhst_glob_aux γs T) ==∗
       lhst_user i (s ∪ {[ e ]}) ∗
       lhst_lock i (s ∪ {[ e ]}) ∗
-      ([∗ list] γs;S ∈ γLs; <[i := s ∪ {[ e ]} ]> Ss, lhst_glob_aux γs S).
+      ([∗ list] γs;T ∈ γLs; <[i := s ∪ {[ e ]} ]> Ss, lhst_glob_aux γs T).
     Proof.
       iIntros "Hu Hl HL".
       iDestruct "Hu" as (γu) "[%Hlu Hu]".
