@@ -209,82 +209,49 @@ Proof.
   by inversion Hval'.
 Qed.
 
-Lemma retransmit_trace_delivers_0 (mtr : mtrace) n :
-  (∀ n : nat, pred_at mtr n (λ _ l, l ≠ Some (inr (Ndeliver, mAB)))) →
+Lemma retransmit_trace_delivers_0 mtr n :
+  (∀ n, pred_at mtr n (λ _ l, l ≠ Some $ inr (Ndeliver, mAB))) →
   count_delivers mAB (trace_take n mtr) = 0.
 Proof.
   revert mtr.
-  induction n; intros mtr Hpred.
-  { simpl. specialize (Hpred 0).
-    destruct mtr; simpl in *.
-    - rewrite /pred_at in Hpred. simpl in *.
-      rewrite /count_delivers. done.
-    - rewrite /pred_at in Hpred. simpl in *.
-      rewrite /count_delivers. done.
-  }
-  simpl in *.
-  destruct mtr; [done|].
-  rewrite /count_delivers. simpl.
-  case_bool_decide.
-  - specialize (Hpred 0). rewrite pred_at_0 in Hpred. rewrite /deliver_filter in H.
-    simplify_eq. 
-  - apply IHn.
-    intros n'. specialize (Hpred (S n')). rewrite pred_at_S in Hpred. done.
+  induction n as [|n IHn]; intros mtr Hpred=> /=; [by destruct mtr|].
+  destruct mtr as [|s l mtr]; [done|]. rewrite /count_delivers=> /=.
+  case_bool_decide as Hb.
+  - specialize (Hpred 0). rewrite pred_at_0 in Hpred.
+    rewrite /deliver_filter in Hb. by simplify_eq.
+  - apply IHn. intros n'. specialize (Hpred (S n')).
+    by rewrite pred_at_S in Hpred.
 Qed.
 
 Lemma A_always_live (mtr : mtrace) n :
   infinite_trace mtr →
   pred_at mtr n (λ s _, retransmit_role_enabled_model (inl Arole) s).
 Proof.
-  intros Hinf.
-  rewrite /pred_at. rewrite /infinite_trace in Hinf.
-  destruct (Hinf n) as [mtr' ->].
-  destruct mtr'.
-  - rewrite /retransmit_role_enabled_model. destruct s as [[[]?]?]; set_solver.
-  - rewrite /retransmit_role_enabled_model. destruct s as [[[]?]?]; set_solver.
+  rewrite /pred_at /retransmit_role_enabled_model. intros [mtr' ->].
+  by destruct mtr'; set_solver.
 Qed.
 
-Lemma retransmit_fair_traces_eventually_A (mtr : mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr → retransmit_fair_scheduling mtr →
+Lemma retransmit_fair_traces_eventually_A mtr :
+  infinite_trace mtr → retransmit_fair_scheduling mtr →
   ∃ n, pred_at mtr n (λ _ ℓ, option_map label_role ℓ = Some $ inl Arole).
 Proof.
-  intros Hinf Hvalid Hfair.
-  pose proof A_always_live as HA.
-  pose proof A_always_live as HA'.
-  specialize (HA mtr 0 Hinf).
-  apply Hfair in HA as [m HA].
-  apply pred_at_or in HA as [HA|HA].
-  - specialize (HA' mtr m Hinf). simpl in *.
-    apply pred_at_neg in HA; done.
-  - exists m. done.
+  intros Hinf Hfair.
+  pose proof (A_always_live mtr 0 Hinf) as HA.
+  apply Hfair in HA as [m HA]. apply pred_at_or in HA as [HA|HA]; [|by exists m].
+  pose proof (A_always_live mtr m Hinf) as HA'. by apply pred_at_neg in HA.
 Qed.
 
-Lemma retransmit_fair_traces_eventually_mAB (mtr : mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr → retransmit_fair_scheduling mtr →
+Lemma retransmit_fair_traces_eventually_mAB mtr :
+  infinite_trace mtr → mtrace_valid mtr → retransmit_fair_scheduling mtr →
   ∃ n, pred_at mtr n (λ st l, option_map label_action l = Some $ inl $ Some mAB).
-Proof. 
+Proof.
   intros Hinf Hvalid Hfair.
-  pose proof A_always_live as HA.
-  pose proof A_always_live as HA'.
-  specialize (HA mtr 0 Hinf).
-  apply Hfair in HA as [m HA].
-  apply pred_at_or in HA as [HA|HA].
-  - specialize (HA' mtr m Hinf). simpl in *.
-    apply pred_at_neg in HA; done.
-  - exists m.
-    specialize (Hinf m) as [mtr' Hafter].
-    eapply mtrace_valid_after in Hvalid; [|done].
-    simpl in *.
-    rewrite /pred_at in HA. rewrite Hafter in HA.
-    rewrite /pred_at. rewrite Hafter.
-    destruct mtr'; [done|].
-    destruct ℓ; [|done].
-    simpl in *. simplify_eq.
-    destruct r=> /=. simpl in *. simplify_eq.
-    pinversion Hvalid. simplify_eq.
-    inversion H1. simplify_eq. done.
+  pose proof (retransmit_fair_traces_eventually_A mtr) as [m HA]; [done..|].
+  exists m. specialize (Hinf m) as [mtr' Hafter].
+  eapply mtrace_valid_after in Hvalid; [|done].
+  rewrite /pred_at Hafter in HA. rewrite /pred_at Hafter.
+  destruct mtr'; [done|]. destruct ℓ; [|done]. destruct r. simpl in *.
+  simplify_eq. pinversion Hvalid. inversion H1. by simplify_eq.
 Qed.
 
 (* TODO: This can possibly be generalised *)
@@ -292,262 +259,193 @@ Lemma count_sends_pred_at n tr :
   pred_at tr n (λ _ l, option_map label_action l = Some $ inl $ Some mAB) →
   0 < count_sends mAB (trace_take (S n) tr).
 Proof.
-  revert tr.
-  induction n=> /=; intros tr Hpred_at.
-  { rewrite /pred_at in Hpred_at.    
-    destruct tr; simpl in *.
-    - done.
-    - rewrite /count_sends=> /=.
-      case_bool_decide.
-      + simpl. lia.
-      + destruct ℓ; [|done]. simplify_eq. rewrite /send_filter in H.
-        destruct r. simpl in *. simplify_eq. }
-  simpl in *.
-  destruct tr; [done|].
-  simpl in *. rewrite /count_sends=> /=.
-  case_bool_decide.
-  - simpl. lia.
-  - apply IHn. done.
+  revert tr. induction n as [|n IHn]=> /=; intros tr Hpred_at.
+  { rewrite /pred_at in Hpred_at. destruct tr; [done|].
+    rewrite /count_sends=> /=.
+    case_bool_decide as Hb; [by simpl; lia|].
+    destruct ℓ; [|done]. rewrite /send_filter in Hb.
+    destruct r. simpl in *. simplify_eq. }
+  destruct tr; [done|]. rewrite /count_sends=> /=.
+  case_bool_decide as Hb; [simpl; lia|by apply IHn].
 Qed.
 
 (* Any fair infinite trace grow the number of sends indefinitely *)
-Lemma retransmit_trace_sends_grows (mtr : mtrace) x :
-  infinite_trace mtr →
-  mtrace_valid mtr → retransmit_fair_scheduling mtr →
+Lemma retransmit_trace_sends_grows mtr x :
+  infinite_trace mtr → mtrace_valid mtr → retransmit_fair_scheduling mtr →
   ∃ n, x < count_sends mAB (trace_take n mtr).
 Proof.
   intros Hafter Hvalid Hfair.
-  induction x.
-  { assert (∃ n, pred_at mtr n (λ st l, option_map label_action l = Some $ inl $ Some mAB))
-      as [n Hn].
-    { by apply retransmit_fair_traces_eventually_mAB. }
-    exists (S n).
-    by eapply count_sends_pred_at. }
-  destruct IHx as [n IHn].
+  induction x as [|x IHx].
+  { pose proof (retransmit_fair_traces_eventually_mAB) as [n Hn]; [done..|].
+    exists (S n). by eapply count_sends_pred_at. }
+  destruct IHx as [n Hn].
   apply (infinite_trace_after' n) in Hafter as (mtr' & Hmtr' & Hafter).
-  assert (∃ n, pred_at mtr' n (λ st l, option_map label_action l = Some $ inl $ Some mAB))
-    as [m Hm].
-  { apply retransmit_fair_traces_eventually_mAB;
-      [done|by eapply mtrace_valid_after|
-        by eapply retransmit_fair_scheduling_after]. }
-  assert (0 < count_sends mAB (trace_take (S m) mtr')).
-  { eapply count_sends_pred_at. done. }
+  apply (mtrace_valid_after _ mtr' n) in Hvalid; [|done].
+  apply (retransmit_fair_scheduling_after _ mtr' n) in Hfair; [|done].
+  pose proof (retransmit_fair_traces_eventually_mAB) as [m Hm]; [done..|].
+  assert (0 < count_sends mAB (trace_take (S m) mtr')) as Hcount.
+  { by eapply count_sends_pred_at. }
   exists (n+(S m)).
-  rewrite /count_sends. rewrite /count_sends in H. rewrite /count_sends in IHn.
-  rewrite (count_labels_sum _ _ _ _ mtr'); [|done].  
-  lia.
+  rewrite /count_sends. rewrite /count_sends in Hcount.
+  rewrite /count_sends in Hn. rewrite (count_labels_sum _ _ _ _ mtr'); [lia|done].
 Qed.
 
 (* Any fair trace eventually delivers a message *)
-Lemma retransmit_fair_trace_eventually_Ndeliver (mtr : mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr → mtrace_fair mtr →
+Lemma retransmit_fair_trace_eventually_Ndeliver mtr :
+  infinite_trace mtr → mtrace_valid mtr → mtrace_fair mtr →
   ∃ n, pred_at mtr n (λ st l, l = Some $ inr (Ndeliver,mAB)).
 Proof.
   intros Hafter Hvalid Hfair.
-  assert (
-      (∃ n, pred_at mtr n
-                       (λ (_ : retransmit_state) (l : option retransmit_label),
-                          l = Some (inr (Ndeliver, mAB)))) ∨
-      ¬ ∃ n, pred_at mtr n
-                     (λ (_ : retransmit_state) (l : option retransmit_label),
-                        l = Some (inr (Ndeliver, mAB)))).
+  assert ((∃ n, pred_at mtr n (λ _ l, l = Some (inr (Ndeliver, mAB)))) ∨
+            ¬ ∃ n, pred_at mtr n (λ _ l, l = Some (inr (Ndeliver, mAB))))
+    as Hpred_at.
   { apply ExcludedMiddle. }
-  destruct H; [eauto|].
-  assert (∀ n : nat,
-           pred_at mtr n
-             (λ (_ : retransmit_state) (l : option retransmit_label),
-                l ≠ Some (inr (Ndeliver, mAB)))) as Hneq.
-  { intros n. apply pred_at_neg; [done|].
-    by eapply not_exists_forall_not in H. }
-  clear H.
-  assert (∀ n, count_delivers mAB (trace_take n mtr) = 0) as Hdelivers.
-  { intros ?. by apply retransmit_trace_delivers_0. }
-  assert (∀ x, ∃ n, x < count_sends mAB (trace_take n mtr)) as Hsends.
-  { intros ?. destruct Hfair as [Hfair _]. by apply retransmit_trace_sends_grows. }
+  destruct Hpred_at as [Hpred_at|Hpred_at]; [done|].
+  assert False; [|done].
   destruct Hfair as [Hfair_sched Hfair_network].
-  destruct Hfair_network as (f1 & f2 & ? & ? & Hfair_network).
-  assert (∃ n : nat, True) as [n _].
-  { exists 0. done. }
-  specialize (Hsends (f2 $ count_delivers mAB (trace_take n mtr))) as [m H].
+  destruct Hfair_network as (f1&f2&?&?&Hfair_network).
+  pose proof (retransmit_trace_sends_grows mtr (f2 0)) as [m Hm]; [done..|].
   specialize (Hfair_network mAB m).
-  destruct Hfair_network as [Hfair_network1 Hfair_network2].
-  rewrite Hdelivers in H.
-  rewrite Hdelivers in Hfair_network2.
-  lia.
+  destruct Hfair_network as [_ Hfair_network2].
+  rewrite retransmit_trace_delivers_0 in Hfair_network2; [lia|].
+  intros n. apply pred_at_neg; [done|].
+  by eapply not_exists_forall_not in Hpred_at.
 Qed.
 
-Lemma Ndeliver_adds_to_buffer msg s bs (tr:mtrace) :
-  mtrace_valid (s -[inr (Ndeliver,msg)]-> tr) →
-  (trfirst (s -[inr (Ndeliver,msg)]-> tr)).2 !!! (m_destination msg) = bs →
-  (trfirst tr).2 !!! (m_destination msg) = (msg :: bs).
+Lemma Ndeliver_adds_to_buffer msg s bs (mtr:mtrace) :
+  mtrace_valid (s -[inr (Ndeliver,msg)]-> mtr) →
+  (trfirst (s -[inr (Ndeliver,msg)]-> mtr)).2 !!! m_destination msg = bs →
+  (trfirst mtr).2 !!! (m_destination msg) = msg :: bs.
 Proof.
-  intros Hvalid <-.
-  simpl.
-  pinversion Hvalid; simplify_eq.
-  inversion H1; simplify_eq.
-  simpl in *.
-  rewrite lookup_total_insert.
-  done.
+  intros Hvalid <-. pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
+  by rewrite lookup_total_insert.
 Qed.
 
-Lemma retransmit_fair_trace_buffer_grows (mtr : mtrace) n mtr' :
+Lemma retransmit_fair_trace_buffer_grows mtr n mtr' :
   mtrace_valid mtr →
-  (∀ m, m < n → pred_at mtr m (λ _ l, ¬ option_map label_role l = Some $ inl Brole)) →
+  (∀ m, m < n → pred_at mtr m
+                  (λ _ l, option_map label_role l ≠ Some $ inl Brole)) →
   after n mtr = Some mtr' →
   suffix ((trfirst mtr).2 !!! saB) ((trfirst mtr').2 !!! saB).
-Proof. 
-  revert mtr mtr'. 
-  induction n as [|n IHn];
-    intros mtr mtr' Hvalid Halways Hafter.
+Proof.
+  revert mtr. induction n as [|n IHn]; intros mtr Hvalid Halways Hafter.
   { simpl in *. by simplify_eq. }
-  simpl in *.
   destruct mtr as [|s l mtr]; [done|].
   eapply suffix_trans; last first.
-  { apply IHn; [| |done]. 
-    - eapply (mtrace_valid_after _ mtr 1); [|done]. done.
-    - intros. specialize (Halways (S m)). rewrite pred_at_S in Halways.
-      apply Halways. lia. }
+  { apply IHn; [| |done].
+    { by eapply (mtrace_valid_after _ mtr 1); [|done]. }
+    intros m Hlt. specialize (Halways (S m)). rewrite pred_at_S in Halways.
+    apply Halways. lia. }
   punfold Hvalid. inversion Hvalid. simplify_eq.
   inversion H1; simplify_eq; try set_solver.
   - destruct (decide (m_destination msg = saB)) as [->|Hneq].
     + rewrite lookup_total_insert. apply suffix_cons_r. set_solver.
     + by rewrite lookup_total_insert_ne.
-  - simpl in *.
-    assert (0 < S n) as H0 by lia.
-    specialize (Halways 0 H0). rewrite pred_at_0 in Halways. simplify_eq.
+  - assert (0 < S n) as Hlt by lia.
+    specialize (Halways 0 Hlt). rewrite pred_at_0 in Halways. simplify_eq.
 Qed.
 
+
+(* TODO: Could use more polish. Might simplify proof as well *)
 (* Any fair trace eventually ends in the receive state *)
-Lemma retransmit_fair_trace_eventually_Received (mtr : mtrace) :
-  infinite_trace mtr →
-  (trfirst mtr).1.1 = Start → mtrace_valid mtr → mtrace_fair mtr →
+Lemma retransmit_fair_trace_eventually_Received mtr :
+  (trfirst mtr).1.1 = Start →
+  infinite_trace mtr → mtrace_valid mtr → mtrace_fair mtr →
   ∃ n, pred_at mtr n (λ st _, st.1.1 = Received).
 Proof.
-  intros Hafter Htrfirst Hvalid Hfair.
-  assert (∃ n, pred_at mtr n (λ st l, l = Some $ inr (Ndeliver,mAB))) as [n Hn].
-  { by apply retransmit_fair_trace_eventually_Ndeliver. }
+  intros Htrfirst Hafter Hvalid Hfair.
+  pose proof (retransmit_fair_trace_eventually_Ndeliver) as [n Hn]; [done..|].
   rewrite /pred_at in Hn.
   apply (infinite_trace_after' n) in Hafter as [mtr' [Hmtr' Hafter]].
   destruct Hfair as [Hfair1 Hfair2].
   assert (retransmit_fair_scheduling mtr') as Hfair1'.
   { by eapply retransmit_fair_scheduling_after. }
-  rewrite Hmtr' in Hn.
-  destruct mtr' as [mtr'|]; [done|].
-  simplify_eq.
-  rewrite /retransmit_fair_scheduling in Hfair1'.
+  rewrite Hmtr' in Hn. destruct mtr' as [mtr'|]; [done|].
+  simplify_eq. rewrite /retransmit_fair_scheduling in Hfair1'.
   assert ((pred_at (s -[ inr (Ndeliver, mAB) ]-> mtr') 0
                    (λ δ _, retransmit_role_enabled_model (inl Brole) δ)) ∨
             ¬ pred_at (s -[ inr (Ndeliver, mAB) ]-> mtr') 0
-              (λ δ _, retransmit_role_enabled_model (inl Brole) δ)) as Hrole.
+                   (λ δ _, retransmit_role_enabled_model (inl Brole) δ)) as Hrole.
   { eapply ExcludedMiddle. }
   destruct Hrole as [Hrole|Hrole]; last first.
-  { apply pred_at_neg in Hrole; [|done].
-    rewrite /pred_at in Hrole. simpl in *.
+  { apply pred_at_neg in Hrole; [|done]. rewrite /pred_at in Hrole.
     exists n. rewrite /pred_at. rewrite Hmtr'.
-    rewrite /retransmit_role_enabled_model in Hrole.
-    rewrite /retransmit_live_roles in Hrole.
-    rewrite /label_role in Hrole.
-    simpl in *.
-    destruct s as [[[] s2] s3]; [|done].
-    set_solver. }
-  apply Hfair1' in Hrole as [m Hm]. simpl in *.
+    rewrite /retransmit_role_enabled_model /retransmit_live_roles in Hrole.
+    destruct s as [[[]]]; [by set_solver|done]. }
+  apply Hfair1' in Hrole as [m Hm].
   apply pred_at_or in Hm as [Hm|Hm].
-  - exists (n+m).
-    rewrite pred_at_sum. rewrite Hmtr'.
-    eapply pred_at_impl; eauto.
-    intros ?? Hsl. destruct s0; eauto. destruct p; eauto. destruct r; eauto.
-    rewrite /retransmit_role_enabled_model in Hsl.
-    rewrite /label_role in Hsl. simpl in *.
-    rewrite /retransmit_live_roles in Hsl. simpl in *.
-    set_solver.
-  - assert (∃ bs, (trfirst (s -[ inr (Ndeliver, mAB) ]-> mtr')).2 !!!
-                          (m_destination mAB) = bs) as [bs Hbs].
-    { by eexists _. }
-    assert (after (S n) mtr = Some mtr') as Hmtr'2.
-    { replace (S n) with (n + 1) by lia. rewrite after_sum'.
-      rewrite Hmtr'. simpl. done. }
-    apply Ndeliver_adds_to_buffer in Hbs; last first.
-    { by eapply mtrace_valid_after. }
-    destruct m as [|m]; [done|].
-    rewrite pred_at_S in Hm.
-    assert (∃ n', pred_at mtr' n' (λ _ ℓ,
-                                     option_map label_role ℓ = Some $ inl Brole)).
-    { exists m. done. }
-    apply trace_eventually_until in H as [n' [Hn' Hn'']].
-    exists (n+(S $ S n')).
-    rewrite pred_at_sum. rewrite Hmtr'.
-    rewrite pred_at_S.
-    assert (pred_at mtr' n' (λ (s : retransmit_state) (_ : option retransmit_label),
-             suffix ((trfirst mtr').2 !!! saB) (s.2 !!! saB))).
-    { assert (∃ mtr'', after n' mtr' = Some mtr'').
-      { apply (infinite_trace_after' (S n')) in Hafter as [mtr'' [Hmtr'' _]].
-        simpl in Hmtr''. eauto. }
-      destruct H as [mtr'' Hmtr''].
-      eapply (retransmit_fair_trace_buffer_grows _ _ mtr'') in Hn'' as Hbs';
-        try done; last first.
-      { by eapply mtrace_valid_after. }
-      rewrite /pred_at.
-      rewrite Hmtr''.
-      destruct mtr''; done. }
-    replace (S n') with (n' + 1) by lia.
-    rewrite pred_at_sum.
-    rewrite /pred_at in H. rewrite /pred_at in Hn'.
-    destruct (after n' mtr') eqn:Heqn; [|done].
-    assert (mtrace_valid t) as Hvalid'.
-    { eapply mtrace_valid_after; [done|]. by eapply mtrace_valid_after. }
-    destruct t; [naive_solver|].
-    rewrite pred_at_S. rewrite /pred_at. simpl.
-    simplify_eq.
-    rewrite Hbs in H.
-    inversion Hn'.
-    assert (∃ a, ℓ = inl (Brole,a)) as [a ->].
-    { destruct ℓ; try naive_solver. destruct r; try naive_solver. }
-    punfold Hvalid'. inversion Hvalid'. simplify_eq.
-    inversion H3.
-    + destruct s0 as [[]]. simplify_eq. simpl in *.
-      destruct H as [? H].
-      rewrite H in H6. apply app_eq_nil in H6. set_solver.
-    + simpl in *. simplify_eq. destruct t=> /=; simpl in *; simplify_eq; set_solver.
+  { exists (n+m). rewrite pred_at_sum Hmtr'. eapply pred_at_impl; [|done].
+    intros [[[]]] l Hsl; [|done].
+    rewrite /retransmit_role_enabled_model /retransmit_live_roles in Hsl.
+    set_solver. }
+  assert (∃ bs, (trfirst (s -[ inr (Ndeliver, mAB) ]-> mtr')).2 !!!
+                  m_destination mAB = bs) as [bs Hbs].
+  { by eexists _. }
+  assert (after (S n) mtr = Some mtr') as Hmtr'2.
+  { replace (S n) with (n + 1) by lia. rewrite after_sum'. by rewrite Hmtr'. }
+  apply Ndeliver_adds_to_buffer in Hbs; [|by eapply mtrace_valid_after].
+  destruct m as [|m]; [done|]. rewrite pred_at_S in Hm.
+  pose proof (trace_eventually_until mtr') as [n' [Hn' Hn'']]; [by exists m|].
+  exists (n+(S $ S n')).
+  rewrite pred_at_sum Hmtr' pred_at_S.
+  assert (pred_at mtr' n'
+                  (λ s _, suffix ((trfirst mtr').2 !!! saB) (s.2 !!! saB)))
+    as H.
+  { assert (∃ mtr'', after n' mtr' = Some mtr'') as H.
+    { apply (infinite_trace_after' (S n')) in Hafter as [mtr'' [Hmtr'' _]].
+      simpl in *. by eauto. }
+    destruct H as [mtr'' Hmtr''].
+    eapply (retransmit_fair_trace_buffer_grows _ _ mtr'') in Hn'' as Hbs';
+      [|by eapply mtrace_valid_after|done].
+    rewrite /pred_at Hmtr''. by destruct mtr''. }
+  replace (S n') with (n' + 1) by lia.
+  rewrite pred_at_sum. rewrite /pred_at in H. rewrite /pred_at in Hn'.
+  destruct (after n' mtr') as [mtr''|] eqn:Heqn; [|done].
+  assert (mtrace_valid mtr'') as Hvalid'.
+  { eapply mtrace_valid_after; [done|]. by eapply mtrace_valid_after. }
+  destruct mtr''; [naive_solver|].
+  rewrite pred_at_S /pred_at. rewrite Hbs in H.
+  inversion Hn'.
+  assert (label_role ℓ = inl Brole) as Heq.
+  { destruct ℓ; try naive_solver. }
+  destruct ℓ; simpl in *; simplify_eq. destruct r; simpl in *; simplify_eq.
+  punfold Hvalid'. inversion Hvalid'. simplify_eq.
+  inversion H2.
+  + destruct s0 as [[]]. simplify_eq. simpl in *.
+    destruct H as [? H]. rewrite H in H5. apply app_eq_nil in H5. set_solver.
+  + destruct mtr''=> /=; simpl in *; simplify_eq; set_solver.
 Qed.
 
 (* A trace starting in the receive role has partially terminated for the Brole *)
-Lemma retransmit_fair_traces_terminate_aux (mtr: mtrace) :
+Lemma retransmit_fair_traces_terminate_aux mtr :
   (trfirst mtr).1.1 = Received → retransmit_terminating_role (inl Brole) mtr.
 Proof.
   intros Htrfirst.
-  exists 0. rewrite /pred_at=> /=. simpl in *.
-  destruct mtr as [s|s mtr].
-  - rewrite /pred_at=> /=. simpl in *. destruct s as [[??]?]. simpl in *.
-    simplify_eq. rewrite /retransmit_live_roles. simpl in *.
-    case_decide; set_solver.
-  - rewrite /pred_at=> /=. simpl in *. destruct s as [[??]?]. simpl in *.
-    simplify_eq. rewrite /retransmit_live_roles. simpl in *.
+  exists 0. rewrite /pred_at=> /=.
+  destruct mtr as [[[]]|[[]] l mtr];
+    simpl in *; simplify_eq; rewrite /retransmit_live_roles;
     case_decide; set_solver.
 Qed.
 
 (* Any fair trace terminates on role B *)
-Lemma retransmit_fair_traces_terminate (mtr : mtrace) :
+Lemma retransmit_fair_traces_terminate mtr :
   (trfirst mtr).1.1 = Start → mtrace_valid mtr → mtrace_fair mtr →
   retransmit_terminating_role (inl Brole) mtr.
 Proof.
   intros ???.
-  assert (infinite_trace mtr ∨ ¬ infinite_trace mtr) as Hafter.
-  { by apply ExcludedMiddle. }
-  destruct Hafter as [Hafter|Hafter]; last first.
+  assert (infinite_trace mtr ∨ ¬ infinite_trace mtr) as [Hafter|Hafter];
+    [by apply ExcludedMiddle| |]; last first.
   { apply not_forall_exists_not in Hafter as [n Hafter].
     destruct (after n mtr) eqn:Heqn; [by naive_solver|].
-    rewrite /retransmit_terminating_role. exists n.
-    left. done. }
+    exists n. by left. }
   assert (∃ n, pred_at mtr n (λ st _, st.1.1 = Received)) as [n Hn].
   { by apply retransmit_fair_trace_eventually_Received. }
   rewrite /pred_at in Hn.
   assert (∃ mtr', after n mtr = Some mtr') as [mtr' Hmtr'].
   { destruct (after n mtr) as [mtr'|]; [|done]. by exists mtr'. }
   rewrite Hmtr' in Hn.
-  assert ((trfirst mtr').1.1 = Received).
-  { by destruct mtr'. }
-  assert (retransmit_terminating_role (inl Brole) mtr') as [m Hterminates].
-  { by apply retransmit_fair_traces_terminate_aux. }
-  exists (m+n). rewrite pred_at_sum'. rewrite after_sum. by rewrite Hmtr'.
+  assert ((trfirst mtr').1.1 = Received); [by destruct mtr'|].
+  assert (retransmit_terminating_role (inl Brole) mtr') as [m Hterminates];
+    [by apply retransmit_fair_traces_terminate_aux|].
+  exists (m+n). by rewrite pred_at_sum' after_sum Hmtr'.
 Qed.
