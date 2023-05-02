@@ -16,22 +16,51 @@ Section FairLock.
   Context (is_init_st: St -> Prop). 
   
 
+  (* Definition eventual_release (tr: mtrace EFM) (ρ: R) (i: nat) := *)
+  (*   forall (ρ': R) j st' (JTH: tr S!! j = Some st') *)
+  (*     (HAS_LOCK: has_lock_st ρ' st') *)
+  (*     (PREVr: ρ' = ρ -> j < i), *)
+  (*   exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''. *)
+  (* Definition eventual_release (tr: mtrace EFM) (ρ: R) (i: nat) := *)
+  (*   forall (ρ': R) j st' (JTH: tr S!! j = Some st') *)
+  (*     (HAS_LOCK: has_lock_st ρ' st'), *)
+  (*   exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''. *)
   Definition eventual_release (tr: mtrace EFM) (ρ: R) (i: nat) :=
     forall (ρ': R) j st' (JTH: tr S!! j = Some st')
       (HAS_LOCK: has_lock_st ρ' st')
-      (PREVr: ρ' = ρ -> j < i),
-    exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''.
+      (AFTER: i <= j -> (ρ' ≠ ρ /\ forall k st_k (BETWEEN: i <= k <= j) (KTH: tr S!! k = Some st_k), ¬ has_lock_st ρ st_k)),
+      exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''.
 
-  Lemma eventual_release_strenghten tr ρ i
-    (EV_REL: eventual_release tr ρ i):
-    forall ρ' j st' (JTH: tr S!! j = Some st')
+  (* Lemma eventual_release_strenghten tr ρ i *)
+  (*   (EV_REL: eventual_release tr ρ i): *)
+  (*   forall ρ' j st' (JTH: tr S!! j = Some st') *)
+  (*     (HAS_LOCK: has_lock_st ρ' st') *)
+  (*     (PREVr: ρ' = ρ -> j < i), *)
+  (*   exists k, ClassicalFacts.Minimal  *)
+  (*          (fun k => exists st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st'') k. *)
+  (* Proof using active_st_Dec.  *)
+  (*   intros. red in EV_REL. specialize (EV_REL _ _ _ JTH HAS_LOCK PREVr). *)
+  (*   destruct EV_REL as [k EV_REL]. pattern k in EV_REL.  *)
+  (*   eapply min_prop_dec in EV_REL; eauto. *)
+  (*   intros. *)
+  (*   destruct (tr S!! n) as [st | ] eqn:NTH. *)
+  (*   2: { right. intros (? & ? & ?). congruence. } *)
+  (*   destruct (decide (j <= n)). *)
+  (*   2: { right. intros (? & ? & ?). lia. } *)
+  (*   destruct (active_st_Dec ρ' st). *)
+  (*   - left. eauto. *)
+  (*   - right. intros (? & ? & ? & ?). congruence. *)
+  (* Qed. *)
+
+  Lemma eventual_release_strenghten tr ρ i (EV_REL: eventual_release tr ρ i):
+    forall (ρ': R) j st' (JTH: tr S!! j = Some st')
       (HAS_LOCK: has_lock_st ρ' st')
-      (PREVr: ρ' = ρ -> j < i),
-    exists k, ClassicalFacts.Minimal 
+      (AFTER: i <= j -> (ρ' ≠ ρ /\ forall k st_k (BETWEEN: i <= k <= j) (KTH: tr S!! k = Some st_k), ¬ has_lock_st ρ st_k)),
+    exists k, ClassicalFacts.Minimal
            (fun k => exists st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st'') k.
-  Proof using active_st_Dec. 
-    intros. red in EV_REL. specialize (EV_REL _ _ _ JTH HAS_LOCK PREVr).
-    destruct EV_REL as [k EV_REL]. pattern k in EV_REL. 
+  Proof using active_st_Dec.
+    intros. red in EV_REL. specialize (EV_REL _ _ _ JTH HAS_LOCK AFTER).
+    destruct EV_REL as [k EV_REL]. pattern k in EV_REL.
     eapply min_prop_dec in EV_REL; eauto.
     intros.
     destruct (tr S!! n) as [st | ] eqn:NTH.
@@ -42,6 +71,7 @@ Section FairLock.
     - left. eauto.
     - right. intros (? & ? & ? & ?). congruence.
   Qed.
+      
 
   Definition fair_lock_progress :=
     forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
@@ -51,7 +81,7 @@ Section FairLock.
       (ITH: tr S!! i = Some st)
       (CAN_LOCK: can_lock_st ρ st)
       (ACT: active_st ρ st)
-      (EV_REL: forall j (LE: i <= j), eventual_release tr ρ j),
+      (EV_REL: eventual_release tr ρ i),
     exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\ ¬ active_st ρ st'.
 
       

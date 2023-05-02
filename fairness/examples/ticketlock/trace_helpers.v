@@ -130,6 +130,16 @@ Section FMTraceHelpers.
       eapply IHi; eauto. 
     Qed.
     
+    Lemma mtrace_valid_steps'' i st ℓ st'
+      (ST1: tr S!! i = Some st)
+      (ST2: tr S!! (i + 1) = Some st')
+      (LBL: tr L!! i = Some ℓ):
+      fmtrans _ st ℓ st'. 
+    Proof using VALID.
+      eapply mtrace_valid_steps'.
+      apply state_label_lookup. eauto.
+    Qed. 
+    
     Definition label_kept_state (P: St -> Prop) (ℓ: L) :=
       forall st oℓ' st' (Ps: P st) (OTHER: oℓ' ≠ Some ℓ) (STEP: fmtrans _ st oℓ' st'), 
         P st'.
