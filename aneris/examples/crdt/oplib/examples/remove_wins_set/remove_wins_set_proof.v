@@ -106,11 +106,11 @@ Section OpRws.
                as [([r_w r_tm] & Hrel & Hrval & Hrlt)|Hnor].
              ++ simplify_eq.
                 rewrite bool_decide_eq_true_2 in Hup; last by eauto.
-                apply Hcnts in Hup as (?&?&?&?&?); set_solver.
+                apply Hcnts in Hup as (?&?&?&?&?); set_solver by idtac. 
             ++ rewrite bool_decide_eq_false_2 in Hup; last done.
                rewrite elem_of_union elem_of_singleton in Hup.
                destruct Hup as [Hup|Hup]; last first.
-               { apply Hcnts in Hup as (?&?&?&?&?); set_solver. }
+               { apply Hcnts in Hup as (?&?&?&?&?); set_solver by idtac. }
                simplify_eq.
                exists ({|EV_Op := Add add_vl; EV_Orig := evorig; EV_Time := evtm|});
                  split_and!; [clear; set_solver|done|done|].
@@ -189,7 +189,7 @@ Section OpRws.
         * destruct (decide (∃ r, r ∈ elements rms ∧ r.1 = v ∧ ¬ TM_lt r.2 w_tm))
             as [(rm_ev & Hrm_ev_in & Hrm_ev_val & Hrm_ev_tm)|Hnorm].
           -- rewrite bool_decide_eq_true_2; last by eauto.
-             rewrite Hcnts Hcnts'; clear; set_solver.
+             rewrite Hcnts Hcnts'; clear; set_solver by idtac.
           -- rewrite bool_decide_eq_false_2; last done.
              rewrite elem_of_union elem_of_singleton; intros [|Hincnt].
              ++ simplify_eq.
@@ -200,7 +200,7 @@ Section OpRws.
                 destruct (decide (TM_lt (EV_Time rm_ev) w_tm)) as [|Hnlt]; first done.
                 exfalso; apply Hnorm.
                 set_solver.
-             ++ revert Hincnt. rewrite Hcnts Hcnts'; clear; set_solver.
+             ++ revert Hincnt. rewrite Hcnts Hcnts'; clear; set_solver by idtac.
       + f_equal; last first.
         { apply set_eq; intros []; rewrite elem_of_union Hrms Hrms'; clear.
           setoid_rewrite elem_of_union. setoid_rewrite elem_of_singleton.

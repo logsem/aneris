@@ -223,9 +223,9 @@ Tactic Notation "wp_recv_core" tactic3(tac_intros) "as" tactic3(tac) :=
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_recv _ _ _ Hnew K))
       |fail 1 "wp_recv: cannot find 'recv' in" e];
     [solve_mapsto ()
-       |iSolveTC || fail 1 "wp_recv: protocol not of the shape <?>"
-    |iSolveTC || fail 1 "wp_recv: cannot convert to telescope"
-    |iSolveTC
+       |tc_solve || fail 1 "wp_recv: protocol not of the shape <?>"
+    |tc_solve || fail 1 "wp_recv: cannot convert to telescope"
+    |tc_solve
     |pm_reduce; simpl; tac_intros;
      tac Hnew;
      wp_finish]
@@ -281,9 +281,9 @@ Tactic Notation "wp_recv_core_chan" constr(H) tactic3(tac_intros) "as" tactic3(t
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_recv H _ _ Hnew K))
       |fail 1 "wp_recv: cannot find 'recv' in" e];
     [solve_mapsto ()
-       |iSolveTC || fail 1 "wp_recv: protocol not of the shape <?>"
-    |iSolveTC || fail 1 "wp_recv: cannot convert to telescope"
-    |iSolveTC
+       |tc_solve || fail 1 "wp_recv: protocol not of the shape <?>"
+    |tc_solve || fail 1 "wp_recv: cannot convert to telescope"
+    |tc_solve
     |pm_reduce; simpl; tac_intros;
      tac Hnew;
      wp_finish]
@@ -398,11 +398,11 @@ Tactic Notation "wp_send_core" tactic3(tac_exist) "with" constr(pat) :=
          [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send _ _ neg _ Hs' K))
          |fail 1 "wp_send: cannot find 'send' in" e];
        [solve_mapsto ()
-       |iSolveTC || fail 1 "wp_send: protocol not of the shape <!>"
-       |iSolveTC || fail 1 "wp_send: cannot convert to telescope"
+       |tc_solve || fail 1 "wp_send: protocol not of the shape <!>"
+       |tc_solve || fail 1 "wp_send: cannot convert to telescope"
        (* |try solve_serializer ()  *)
-       (* |iSolveTC || fail 1 "wp_send: serializer does not match" *)
-       |try (simplify_eq; iSolveTC)            (* Serializer happens here *)
+       (* |tc_solve || fail 1 "wp_send: serializer does not match" *)
+       |try (simplify_eq; tc_solve)            (* Serializer happens here *)
        |pm_reduce; simpl; tac_exist;
         repeat lazymatch goal with
         | |- ∃ _, _ => eexists _
@@ -474,11 +474,11 @@ Tactic Notation "wp_send_core_chan" constr(H) tactic3(tac_exist) "with" constr(p
          [reshape_expr e ltac:(fun K e' => eapply (tac_wp_send H _ neg _ Hs' K))
          |fail 1 "wp_send: cannot find 'send' in" e];
        [solve_mapsto ()
-       |iSolveTC || fail 1 "wp_send: protocol not of the shape <!>"
-       |iSolveTC || fail 1 "wp_send: cannot convert to telescope"
+       |tc_solve || fail 1 "wp_send: protocol not of the shape <!>"
+       |tc_solve || fail 1 "wp_send: cannot convert to telescope"
        (* |try solve_serializer ()  *)
-       (* |iSolveTC || fail 1 "wp_send: serializer does not match" *)
-       |try (simplify_eq; iSolveTC)            (* Serializer happens here *)
+       (* |tc_solve || fail 1 "wp_send: serializer does not match" *)
+       |try (simplify_eq; tc_solve)            (* Serializer happens here *)
        |pm_reduce; simpl; tac_exist;
         repeat lazymatch goal with
         | |- ∃ _, _ => eexists _

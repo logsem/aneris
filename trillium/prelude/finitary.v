@@ -123,7 +123,7 @@ Section smaller_card_nat_finite.
         rewrite Hk, Hl in Hfnm; simpl in Hfnm; simplify_eq.
         apply (NoDup_lookup (no_fin_make_list [] (S m)) n m l); [| |done].
         - apply no_fin_make_list_NoDup, NoDup_nil_2.
-        - apply  (prefix_lookup
+        - apply  (prefix_lookup_Some
                     (no_fin_make_list [] (S n)) (no_fin_make_list [] (S m)) n l);
             [done|].
           apply no_fin_make_list_prefix; lia.

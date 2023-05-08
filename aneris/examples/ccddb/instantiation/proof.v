@@ -74,7 +74,7 @@ Section proof.
               own γGsnap (● M) ∗
               own γGkeep (● (make_global_mem M)) ∗
               own γGkeep (◯ (make_global_mem M)) ∗
-              ([∗ list] γs; S ∈ γLs; Ss, local_history_Global_inv γs S) ∗
+              ([∗ list] γs; T ∈ γLs; Ss, local_history_Global_inv γs T) ∗
               ⌜DBM_GstValid {| Gst_mem := M; Gst_hst := Ss|}⌝)%I
             with  "[HG1 HG2 HG3 HG4 HLG]") as "#Hinv".
     { iNext; iExists empty_gmem, empty_lhsts; iFrame.

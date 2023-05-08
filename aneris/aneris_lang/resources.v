@@ -1251,9 +1251,11 @@ Section resource_lemmas.
            (@saved_pred_own Σ A _ γ dq : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof.
     intros Φ Ψ Hps.
-    f_equiv. destruct n; [done|].
-    by apply dist_S.
+    f_equiv.
+    destruct n; [apply dist_later_0| ]. 
+    apply dist_later_S. eapply dist_lt; eauto.
   Qed.
+
   #[global] Instance saved_pred_proper' `{savedPredG Σ A} γ dq :
     Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ dq
                           : (A -d> iPropO Σ) -d> iPropO Σ).

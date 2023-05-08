@@ -69,8 +69,8 @@ Section Local_history_section_valid.
   Proof.
     intros Hl.
     symmetry.
-    apply submseteq_Permutation_length_eq.
-    { by rewrite seq_length. }
+    apply submseteq_length_Permutation.
+    2: { by rewrite seq_length. }
     apply NoDup_submseteq; first by apply NoDup_ListNoDup, seq_NoDup.
     intros x Hx.
     apply Hl.
