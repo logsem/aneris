@@ -53,6 +53,9 @@ ML_SOURCES:
 	examples/reliable_communication/lib/mt_server/mt_server_code.ml
 	examples/reliable_communication/lib/repdb/log_code.ml
 	examples/reliable_communication/lib/repdb/repdb_code.ml
+	examples/reliable_communication/lib/kv_transactions/mcc_timestamp_version_code.ml
+	examples/reliable_communication/lib/kv_transactions/lock_version_code.ml
+	examples/reliable_communication/lib/kv_transactions/fine_grained_lock_version_code.ml
   	examples/reliable_communication/examples/dlm_db_example/dlm_db_example_code.ml
   	examples/reliable_communication/examples/repdb_leader_followers/causality_example_code.ml
 	examples/reliable_communication/examples/hello_world/hello_world_code.ml

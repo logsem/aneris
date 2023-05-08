@@ -1,0 +1,4 @@
+(executable
+  (name examples_runner)
+  (flags :standard -rectypes)
+  (libraries aneris mt_server_code))
