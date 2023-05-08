@@ -367,7 +367,7 @@ Section proof_of_main.
     iDestruct (unallocated_split with "Hf") as "[Hf Hf10]"; [set_solver|].
     iDestruct (unallocated_split with "Hf") as "[Hf00 Hf01]"; [set_solver|].
     (* Server 1. *)
-    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}).
     iFrame "Hfree0".
     iSplitR "Hsa0 Hsa1 HSrvInit1 HdbSrvS"; last first.
     { iNext. iIntros "Hfps".
@@ -379,13 +379,13 @@ Section proof_of_main.
       iFrame "#∗". iApply "Hfp1". iFrame. }
     iNext. wp_pures.
     (* Server 2. *)
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree1".
     iSplitR "Hsa2 HSrvInit0 HdlSrvS HR"; last first.
     { iNext. iIntros "Hfps".
       iApply ("HdlSrvS" with "[Hfps HSrvInit0 Hsa2 HR]"); last done. iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}).
     iFrame "Hfree2".
     iSplitR "Hsa3 Hsa4 Hf00 Hf01"; last first.
     { iNext. iIntros "Hfps".
@@ -398,7 +398,7 @@ Section proof_of_main.
       iDestruct ("Hfp1" with "Hfps") as "(Hfp & Hfp')".
       iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}).
     iFrame "Hfree3".
     iSplitR "Hsa5 Hsa6 Hf10 Hf11"; last first.
     { iNext. iIntros "Hfps".

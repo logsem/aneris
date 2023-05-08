@@ -58,7 +58,6 @@ Proof.
  set (Σ := #[anerisΣ dummy_model; mpΣ; DBΣ]).
  eapply (@adequacy Σ dummy_model _ _ ips sa_dom ∅ ∅ ∅);
    try done; last first.
-  { set_solver. }
   2: { apply dummy_model_finitary. }
   iIntros (Hdg) "".
   iPoseProof (main_spec sa_dom) as "Hmain".

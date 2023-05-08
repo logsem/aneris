@@ -518,8 +518,4 @@ Proof.
     iIntros "Hsrv".
     iDestruct "Hhist" as "[Hhistc Hhists]".
     wp_apply (echo_runner_spec with "[$]"); [try set_solver..|eauto]. }
-  rewrite /ips /sa_dom.
-  intros sag sa Hsag Hsa.
-  apply elem_of_union in Hsag.
-  destruct Hsag as [Hsag|Hsag]; apply elem_of_singleton in Hsag; set_solver.
 Qed.

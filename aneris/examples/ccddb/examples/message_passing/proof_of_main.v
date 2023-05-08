@@ -48,7 +48,7 @@ Section ProofOfMain.
       iIntros (? [? ?]); set_solver. }
     iModIntro.
     rewrite /main.
-    wp_apply (aneris_wp_start with "[-]"); first done.
+    wp_apply (aneris_wp_start with "[-]").
     iFrame.
     iSplitR "Hitk0 Hx Hrs0"; last first.
     - iNext. iIntros "Hn".
@@ -57,7 +57,7 @@ Section ProofOfMain.
       iApply (z0_node_spec with "[] [] [$Hn $Hitk0 $Hx $Hrs0]"); simpl;
         [done|done|iFrame "#"|done].
     - iNext. wp_seq.
-      wp_apply (aneris_wp_start with "[-]"); first done.
+      wp_apply (aneris_wp_start with "[-]").
       iFrame.
       iSplitR; first done.
       iNext. iIntros "Hn".

@@ -81,8 +81,7 @@ Section runner_spec_helper.
       first by simpl in *; lia.
     erewrite list_lookup_total_correct; last by eauto.
     iDestruct (big_sepL2_cons_inv_r with "Hprogs") as (ports portss' ->) "[[Hprgsas Hprog] Hprogs]".
-    wp_apply (aneris_wp_start (ports.1 ∪ {[port_of_address sa]}));
-      first by eapply gcd_addr_list_nonSys; eauto.
+    wp_apply (aneris_wp_start (ports.1 ∪ {[port_of_address sa]})).
     iDestruct "Hfips" as "[$ Hfips]".
     iDestruct "Huas" as "[Hua Huas]".
     iDestruct "Hsevs" as "[Hsev Hsevs]".

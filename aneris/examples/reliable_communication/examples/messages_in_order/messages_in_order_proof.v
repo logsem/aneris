@@ -149,13 +149,13 @@ Section proof_of_the_main.
     iModIntro.
     iIntros "#Hsrv Hf Hfree1 Hfree2 Hsa1 Hsa2 HSrvInit".
     rewrite /main.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree1".
     iSplitR "Hsa1 HSrvInit"; last first.
     { iNext. iIntros "Hfps".
       iApply (@wp_server _ _ _ _ _ _ SnRes chn _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree2".
     iSplit; first done.
     iNext. iIntros "Hfps".
@@ -207,7 +207,6 @@ Proof.
   set (Σ := #[anerisΣ dummy_model; SpecChanΣ]).
   eapply (@adequacy Σ dummy_model _ _ ips {[srv_sa; clt_sa]} ∅ ∅ ∅);
     try done; last first.
-  { set_solver. }
   iIntros (Hdg) "".
   2:{ apply dummy_model_finitary . }
   iMod (Reliable_communication_init_instance ⊤ UP)

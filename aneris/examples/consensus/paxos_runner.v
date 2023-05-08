@@ -98,25 +98,25 @@ Section runner.
     iDestruct (big_sepS_delete _ _ a1_addr with "Hfrags") as "((% & Ha1_frag1 & Ha1_frag2) & Hfrags)"; [set_solver|].
     iDestruct (big_sepS_delete _ _ a2_addr with "Hfrags") as "((% & Ha2_frag1 & Ha2_frag2) & Hfrags)"; [set_solver|].
     iDestruct (big_sepS_delete _ _ a3_addr with "Hfrags") as "((% & Ha3_frag1 & Ha3_frag2) & _)"; [set_solver|].
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Ha1".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Ha1".
     iSplitR "Ha1_frag1 Ha1_frag2"; last first.
     { iIntros "!> Hport".
       wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha1_si Hport Ha1_frag1 Ha1_frag2");
         [done|..]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Ha2".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Ha2".
     iSplitR "Ha2_frag1 Ha2_frag2"; last first.
     { iIntros "!> Hport".
       wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha2_si Hport Ha2_frag1 Ha2_frag2");
         [done|..]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Ha3".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Ha3".
     iSplitR "Ha3_frag1 Ha3_frag2"; last first.
     { iIntros "!> Hport".
       wp_apply (acceptor_spec (_ ↾ _) with "Hinv Hls_si Hps_si Ha3_si Hport Ha3_frag1 Ha3_frag2");
         [done|..]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hl1".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Hl1".
     iSplitR "Hl1h"; last first.
     { iIntros "!> Hport".
       assert (l1_addr ∈ Learners) as Hin by set_solver.
@@ -124,7 +124,7 @@ Section runner.
       wp_apply (learner'_spec (l1_addr ↾ Hin) with "Hl1_si Hc_si Hport Hl1h");
         [done|..]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hl2".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Hl2".
     iSplitR "Hl2h"; last first.
     { iIntros "!> Hport".
       assert (l2_addr ∈ Learners) as Hin by set_solver.
@@ -132,7 +132,7 @@ Section runner.
       wp_apply (learner'_spec (l2_addr ↾ Hin) with "Hl2_si Hc_si Hport Hl2h");
         [done|..]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hp1".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Hp1".
     iSplitR "Hpend0"; last first.
     { iIntros "!> Hport".
       assert (p1_addr ∈ Proposers) as Hin by set_solver.
@@ -142,7 +142,7 @@ Section runner.
         [|done].
       rewrite ?size_union ?size_singleton; [lia|set_solver]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hp2".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Hp2".
     iSplitR "Hpend1"; last first.
     { iIntros "!> Hport".
       assert (p2_addr ∈ Proposers) as Hin by set_solver.
@@ -152,7 +152,7 @@ Section runner.
         [|done].
       rewrite ?size_union ?size_singleton; [lia|set_solver]. }
     iModIntro. wp_seq.
-    wp_apply (aneris_wp_start {[80]}%positive); [done|]. iFrame "Hc".
+    wp_apply (aneris_wp_start {[80]}%positive). iFrame "Hc".
     iSplitR "Hch"; last first.
     { iIntros "!> Hport".
       iPoseProof (mapsto_messages_pers_alloc _ client_si with "Hch []") as "Hch"; [done|].

@@ -239,20 +239,20 @@ Section proof_of_the_main.
     iIntros "#Hsrv0 #Hsrv1 Hf Hfree0 Hfree1 Hfree2 Hsa0 Hsa1 Hsa2 Hsa3 HSrvInit0 HSrvInit1".
     rewrite /main.
     (* Server 1. *)
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree0".
     iSplitR "Hsa0 HSrvInit0"; last first.
     { iNext. iIntros "Hfps".
       iApply (@wp_server _ _ _ _ _ _ SnRes0 chn0 _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
     (* Server 2. *)
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame "Hfree1".
     iSplitR "Hsa1 HSrvInit1"; last first.
     { iNext. iIntros "Hfps".
       iApply (@wp_server _ _ _ _ _ _ SnRes1 chn1 _ with "[-]"); last done. by iFrame "#∗". }
     iNext. wp_pures.
-    wp_apply (aneris_wp_start {[80%positive; 81%positive]}); first done.
+    wp_apply (aneris_wp_start {[80%positive; 81%positive]}).
     iFrame "Hfree2".
     iSplit; first done.
     iNext. iIntros "Hfps".

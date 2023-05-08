@@ -233,7 +233,7 @@ Section proof.
     iDestruct (big_sepS_delete _ _ "0.0.0.1" with "Hips") as "(Hping & _)";
       first set_solver.
     wp_pures.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame.
     iSplitR "Hγpong Hponga"; last first.
     { iIntros "!> Hfree".
@@ -241,7 +241,7 @@ Section proof.
     }
     iModIntro.
     wp_seq.
-    wp_apply aneris_wp_start; first done.
+    wp_apply aneris_wp_start.
     iFrame.
     iSplitR "Hγpong' Hpinga Hunallocated"; last first.
     { iIntros "!> Hfree".

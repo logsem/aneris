@@ -281,16 +281,15 @@ Section lifting_network.
 
   (** Network *)
   Lemma aneris_wp_start ports ip E e Ψ :
-    ip ≠ "system" →
     ▷ free_ip ip ∗ ▷ Ψ #() ∗
     ▷ (free_ports ip ports -∗ WP e @[ip] ⊤ {{ _, True }}) ⊢
     WP (Start (LitString ip) e) @["system"] E {{ Ψ }}.
   Proof.
-    iIntros (Hip) "(Hip & HΦ & He)".
+    iIntros "(Hip & HΦ & He)".
     rewrite !aneris_wp_unfold /aneris_wp_def.
     iIntros "%tid #Hin".
-    iApply wp_start; [done|].
-    iFrame.
+    iApply wp_start.
+    iFrame "#∗".
     iSplitL "HΦ".
     { iNext. iExists _. eauto. }
     iNext.
@@ -301,11 +300,10 @@ Section lifting_network.
 
   (* Used in documentation *)
   Lemma aneris_wp_start_alt n P ports e E :
-    n ≠ "system" → 
     {{{ P ∗ free_ports n ports}}} e @[n] {{{w, RET w; True }}} →
     {{{ P ∗ free_ip n}}} (Start (LitString n) e) @["system"] E {{{ RET #(); True }}}.
   Proof.
-    intros ? Ht ?. iIntros "HPre HPost".
+    intros Ht ?. iIntros "HPre HPost".
     iApply aneris_wp_start; try done. 
     iDestruct "HPre" as "[HP HFree]". iSplitL "HFree"; try done.
     iSplitL "HPost".
