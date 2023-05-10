@@ -43,6 +43,15 @@ Section ltl_constructors.
   Definition trace_weak_until (P Q : trace S L → Prop) : ltl_pred :=
     trace_or (trace_until P Q) (trace_always P).
 
+  (* Custom constructors *)
+  Definition trace_always_eventually_implies
+             (P Q : trace S L → Prop) : ltl_pred :=
+    trace_always (trace_implies P (trace_eventually Q)).
+
+  Definition trace_always_eventually_implies_now
+             (P Q : S → option L → Prop) : ltl_pred :=
+    trace_always_eventually_implies (trace_now P) (trace_now Q).
+
 End ltl_constructors.
 
 Notation "○ P" := (trace_next P) (at level 20, right associativity) : trace_scope.
@@ -55,22 +64,6 @@ Notation "P → Q" := (trace_implies P Q)
 
 Section ltl_lemmas.
   Context {S L : Type}.
-
-  Notation ltl_pred := (ltl_pred S L).
-
-  Definition trace_always_eventually_implies
-             (P Q : trace S L → Prop) : ltl_pred :=
-    □ (trace_implies P (◊ Q)).
-
-  Definition trace_always_eventually_implies_now
-             (P Q : S → option L → Prop) : ltl_pred :=
-    trace_always_eventually_implies (↓ P) (↓ Q).
-
-  Parameter role_enabled : S → L → Prop.
-
-  Definition scheduling_fairness ρ : ltl_pred :=
-    trace_always_eventually_implies_now
-      (λ s _, role_enabled s ρ) (λ s l, ¬ role_enabled s ρ ∨ l = Some ρ).
 
   Lemma trace_not_not (tr:trace S L) P :
     ¬ P tr ↔ trace_not P tr.
