@@ -129,7 +129,7 @@ Notation mtrace := (trace retransmit_state retransmit_label).
 (* Definition retransmit_fair_network_delivery msg : mtrace → Prop := *)
 (*   □ (□◊↓send_filter msg → ◊↓deliver_filter msg). *)
 Definition retransmit_fair_network_delivery msg : mtrace → Prop :=
-  □ ((trace_weak_until (□◊↓send_filter msg) (↓deliver_filter msg)) → ◊↓deliver_filter msg).
+  □ (□◊↓send_filter msg → ◊↓deliver_filter msg).
 
 Definition retransmit_fair_network (mtr : mtrace) : Prop :=
   ∀ msg, retransmit_fair_network_delivery msg mtr.
@@ -155,21 +155,21 @@ Definition retransmit_fair_scheduling_mtr (ρ : retransmit_role) : mtrace → Pr
     (λ δ ℓ, ¬ retransmit_role_enabled_model ρ δ ∨
               option_map label_role ℓ = Some ρ).
 
-Lemma retransmit_fair_scheduling_mtr_after ℓ tr tr' k :
-  after k tr = Some tr' →
-  retransmit_fair_scheduling_mtr ℓ tr → retransmit_fair_scheduling_mtr ℓ tr'.
-Proof. Admitted.
+(* Lemma retransmit_fair_scheduling_mtr_after ℓ tr tr' k : *)
+(*   after k tr = Some tr' → *)
+(*   retransmit_fair_scheduling_mtr ℓ tr → retransmit_fair_scheduling_mtr ℓ tr'. *)
+(* Proof. Admitted. *)
 
 Definition retransmit_fair_scheduling (mtr : mtrace) : Prop :=
   ∀ ρ, retransmit_fair_scheduling_mtr ρ mtr.
 
-Lemma retransmit_fair_scheduling_after tr tr' k :
-  after k tr = Some tr' →
-  retransmit_fair_scheduling tr → retransmit_fair_scheduling tr'.
-Proof.
-  intros Hafter Hfair ℓ. specialize (Hfair ℓ).
-  by eapply retransmit_fair_scheduling_mtr_after.
-Qed.
+(* Lemma retransmit_fair_scheduling_after tr tr' k : *)
+(*   after k tr = Some tr' → *)
+(*   retransmit_fair_scheduling tr → retransmit_fair_scheduling tr'. *)
+(* Proof. *)
+(*   intros Hafter Hfair ℓ. specialize (Hfair ℓ). *)
+(*   by eapply retransmit_fair_scheduling_mtr_after. *)
+(* Qed. *)
 
 Definition mtrace_fair (mtr : mtrace) : Prop :=
   retransmit_fair_scheduling mtr ∧ retransmit_fair_network mtr.
@@ -194,7 +194,7 @@ Proof. intros (l'&Hl'&HP). by simplify_eq. Qed.
 
 Lemma A_always_live (mtr : mtrace) :
   trace_always (trace_now (λ s _, retransmit_role_enabled_model (inl Arole) s)) mtr.
-Proof. apply trace_always_universal. 
+Proof. apply trace_always_universal.
   rewrite /pred_at /retransmit_role_enabled_model. intros mtr'.
   by destruct mtr'; set_solver.
 Qed.
@@ -207,7 +207,7 @@ Proof.
   pose proof (A_always_live mtr) as HA.
   eapply trace_always_eventually_always_implies; [|done].
   eapply trace_always_eventually_always_mono; [| |apply Hfair].
-  - intros Htr. apply trace_implies_refl. 
+  - intros Htr. apply trace_implies_refl.
   - intros tr.
     apply trace_implies_implies.
     apply trace_now_mono.
@@ -227,17 +227,23 @@ Proof.
   apply trace_always_elim in Hvalid.
   destruct tr' as [s|s l tr']; [done|].
   apply trace_now_mono_strong.
-  intros ???? HP; simplify_eq.  
+  intros ???? HP; simplify_eq.
   destruct l; [|done]. destruct r. simpl in *.
   simplify_eq. inversion Hvalid. inversion H1. by simplify_eq.
 Qed.
 
+(* Proof by the fact that A is always live, and will eventually be scheduled.
+   Needs fairness assumptions *)
 Lemma retransmit_fair_traces_always_eventually_mAB mtr :
   mtrace_valid mtr → retransmit_fair_scheduling_mtr (inl $ Arole) mtr →
   (□ ◊ ↓ send_filter mAB) mtr.
-Proof. Admitted.
+Proof.
+  intros Hvalid Hfair. eapply trace_always_implies_always;
+    [|apply trace_always_and; split; [apply Hvalid|apply Hfair]].
+  intros tr' [Hvalid' Hfair']%trace_always_and.
+  by apply retransmit_fair_traces_eventually_mAB.
+Qed.
 
-(* Any fair trace eventually delivers a message *)
 Lemma eventually_send_eventually_deliver mtr :
   retransmit_fair_network mtr →
   (□ ◊ ↓ send_filter mAB) mtr →
@@ -245,36 +251,33 @@ Lemma eventually_send_eventually_deliver mtr :
 Proof.
   intros Hfair_network Hsend.
   pose proof (Hfair_network mAB). apply trace_always_elim in H.
-  rewrite trace_implies_implies in H. apply H.
-  apply trace_weak_until_always. apply trace_always_idemp. done.
+  rewrite trace_implies_implies in H. apply H. done.
 Qed.
 
-(* (* Any fair trace eventually delivers a message *) *)
-(* Lemma retransmit_fair_trace_eventually_Ndeliver mtr : *)
-(*   mtrace_valid mtr → mtrace_fair mtr → *)
-(*   (◊ ↓ deliver_filter mAB) mtr. *)
-(* Proof. *)
-(*   intros Hvalid Hfair. *)
-(*   destruct Hfair as [Hfair_sched Hfair_network]. *)
-(*   pose proof (Hfair_network mAB). apply trace_always_elim in H. *)
-(*   rewrite trace_implies_implies in H. *)
-(*   apply H. apply trace_weak_until_always. apply trace_always_idemp. *)
-(*   by apply retransmit_fair_traces_always_eventually_mAB. *)
-(* Qed. *)
-
+(* If a message is delivered, the next state has a message in the buffer *)
+(* Proof by validity relation of the model *)
 Lemma deliver_next_buffer msg mtr :
   mtrace_valid mtr →
   (↓ deliver_filter msg) mtr →
   (○ ↓ λ s _, ∃ bs, s.2 !!! (m_destination msg) = msg :: bs) mtr.
-Proof. Admitted.
+Proof.
+  intros Hvalid%trace_always_elim Hdeliver.
+  destruct mtr; [done|].
+  exists mtr. split; [done|].
+  rewrite /trace_now /deliver_filter /pred_at in Hdeliver.
+  simpl in *. simplify_eq.
+  inversion Hvalid. simplify_eq.
+  destruct mtr.
+  - rewrite /trace_now /pred_at. simpl in *. simplify_eq.
+    exists (bs !!! m_destination msg).
+    simpl. by rewrite lookup_total_insert.
+  - rewrite /trace_now /pred_at. simpl in *. simplify_eq.
+    exists (bs !!! m_destination msg).
+    simpl. by rewrite lookup_total_insert.
+Qed.
 
-Lemma successful_receive msg mtr :
-  mtrace_valid mtr →
-  (↓ λ s _, ∃ bs, s.2 !!! (m_destination msg) = msg :: bs) mtr →
-  (↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr →
-  (○ ↓ λ s _, s.1.1 = Received) mtr.
-Proof. Admitted.
-
+(* The buffers will only grow until B is scheduled *)
+(* Proof by validity relation of the model *)
 Lemma retransmit_fair_trace_buffer_grows mtr bs P :
   mtrace_valid mtr →
   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr →
@@ -282,13 +285,40 @@ Lemma retransmit_fair_trace_buffer_grows mtr bs P :
   (◊ trace_and (↓ λ s _, suffix bs (s.2 !!! (m_destination mAB))) P) mtr.
 Proof. Admitted.
 
+(* A scheduled B will succeed if there is something in the buffer *)
+(* Proof by validity relation of the model *)
+(* Lemma successful_receive msg mtr : *)
+(*   mtrace_valid mtr → *)
+(*   (↓ λ s _, ∃ bs, s.2 !!! (m_destination msg) = msg :: bs) mtr → *)
+(*   (↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr → *)
+(*   (○ ↓ λ s _, s.1.1 = Received) mtr. *)
+(* Proof. Admitted. *)
+
+(* A scheduled B will succeed if there is something in the buffer *)
+(* Proof by validity relation of the model *)
 Lemma successful_deliver_received bs (mtr : mtrace) :
+  mtrace_valid mtr →
   (↓ (λ s _, mAB :: bs `suffix_of` s.2 !!! (m_destination mAB))) mtr →
   (↓ (λ _ l, option_map label_role l = Some (inl Brole))) mtr →
   (○ ↓ (λ s _, s.1.1 = Received)) mtr.
-Proof. Admitted.
+Proof.
+  intros Hvalid%trace_always_elim Hbs HB.
+  destruct mtr as [?|s l mtr]; [done|].
+  simpl in *. destruct l as [|]; [|done].
+  exists mtr. split; [done|].
+  rewrite /trace_now /pred_at in HB.
+  simpl in *. simplify_eq.
+  destruct r. simpl in *. simplify_eq.
+  inversion Hvalid; simplify_eq; [|]; last first.
+  { destruct mtr as [[]|[]]; simpl in *; simplify_eq; done. }
+    rewrite /trace_now /pred_at in Hbs. simpl in *.
+  rewrite H2 in Hbs. by apply suffix_cons_nil_inv in Hbs.
+Qed.
 
 (* OBS: Will need scheduling fairness *)
+(* Proof by EM on whether B is live.
+   - If it is not, we are in Received
+   - if It is, B will eventually be scheduled, by fairness *)
 Lemma received_or_eventually_B (mtr : mtrace) :
   (↓ λ s _, s.1.1 = Received) mtr ∨
   (◊↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr.
@@ -339,8 +369,9 @@ Proof.
   apply trace_eventually_until in H.
   pose proof (retransmit_fair_trace_buffer_grows _ (mAB :: bs) _ Hvalid' Hdeliver H) as H'.
   revert H'.
-  apply trace_eventually_mono.
-  intros mtr'' [Hmtr1'' Hmtr2'']%trace_andI.
+  apply trace_eventually_mono_strong.
+  intros mtr'' Hsuffix' [Hmtr1'' Hmtr2'']%trace_andI.
+  assert (mtrace_valid mtr'') by by eapply trace_always_suffix_of.
   by eapply successful_deliver_received.
 Qed.
 

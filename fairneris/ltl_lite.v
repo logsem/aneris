@@ -392,4 +392,11 @@ Section ltl_lemmas.
     P tr → (○ P) (s -[l]-> tr).
   Proof. intros ?. exists tr. simpl in *. by simplify_eq. Qed.
 
+  Lemma trace_always_implies_always (P Q : trace S L → Prop) (tr : trace S L) :
+    (∀ tr, (□P) tr → Q tr) → ((□P) tr → (□ Q) tr).
+  Proof.
+    intros HPQ HP%trace_always_idemp. eapply trace_always_mono; [|done].
+    intros ?. apply trace_implies_implies, HPQ.
+  Qed.
+
 End ltl_lemmas.
