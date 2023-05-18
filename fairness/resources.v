@@ -761,7 +761,123 @@ Section model_state_lemmas.
     rewrite Hfuelρ Hfs //.
   Qed.
 
-  Lemma update_no_step_enough_fuel extr (auxtr : auxiliary_trace LM) rem c2 fs ζ:
+End model_state_lemmas.
+
+
+Section AuxDefs.
+  Context `{LM: LiveModel Λ M}.
+
+  Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole M) nat) (s1 s2: M) (ρ: fmrole M) :=
+    (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(lm_fl) s2))) ∧
+    (ρ ∉ live_roles _ s2 -> ρ ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ) (fs1 !! ρ)) ∧
+    ρ ∈ dom fs1 ∧
+    (forall ρ', ρ' ∈ dom fs2 ∖ dom fs1 -> oleq (fs2 !! ρ') (Some $ LM.(lm_fl) s2)) ∧
+    (forall ρ', ρ ≠ ρ' -> ρ' ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ') (fs1 !! ρ')) ∧
+    (dom fs1 ∖ {[ ρ ]}) ∪ (live_roles _ s2 ∖ live_roles _ s1) ⊆ dom fs2 ∧
+    dom fs2 ⊆
+      (* new roles *) (live_roles _ s2 ∖ live_roles _ s1) ∪
+      (* surviving roles *) (live_roles _ s2 ∩ live_roles _ s1 ∩ dom fs1) ∪
+      (* already dead *) (dom fs1 ∖ live_roles _ s1) ∪
+      (* new deads *) ((live_roles _ s1 ∖ live_roles _ s2) ∩ dom fs1).
+
+End AuxDefs.
+
+Section PartialOwnership.
+
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
+  Context `{iLM: LiveModel Λ iM}. (* fuel construction over inner model *)
+
+
+  (* TODO: rename *)
+  Class PartialModelPredicates := {
+      partial_model_is: fmstate iM -> iProp Σ;
+      partial_free_roles_are: gset (fmrole iM) → iProp Σ;
+      partial_fuel_is: locale Λ → fmrole iM → nat → iProp Σ;
+      partial_fuels_are: locale Λ → gmap (fmrole iM) nat → iProp Σ;
+      project_inner: M -> iM;
+
+      (* TODO: reintroduce 'rem' parameter to support
+         wp_lift_pure_step_no_fork_remove_role ? *)
+      update_no_step_enough_fuel: 
+        forall extr (auxtr : auxiliary_trace LM)
+          (* rem *)
+          c2
+          (fs: gmap (fmrole iM) nat)
+          ζ,
+          (dom fs ≠ ∅) ->
+          (* (live_roles _ (trace_last auxtr)) ∩ rem = ∅ → *)
+          (* rem ⊆ dom fs → *)
+          locale_step (trace_last extr) (Some ζ) c2 ->
+          (* partial_fuels_are_S ζ fs -∗ *)
+          partial_fuels_are ζ (S <$> fs) -∗
+          model_state_interp (trace_last extr).1 (trace_last auxtr)
+          ==∗
+          ∃ δ2 (ℓ : mlabel LM),
+          ⌜labels_match (LM:=LM) (Some ζ) ℓ ∧
+            valid_state_evolution_fairness (extr :tr[Some ζ]: c2) (auxtr :tr[ℓ]: δ2)⌝ ∗
+          (* has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗ *)
+          partial_fuels_are ζ (fs ⇂ (dom fs ∖ ∅)) ∗
+          model_state_interp c2.1 δ2;
+
+      update_fork_split: 
+      forall R1 R2 tp1 tp2
+        (fs: gmap (fmrole iM) nat)
+        (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 (Hdisj: R1 ## R2),
+    fs ≠ ∅ ->
+    R1 ∪ R2 = dom fs ->
+    trace_last extr = (tp1, σ1) ->
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
+    (∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1) ->
+    (* partial_fuels_are_S ζ fs -∗ *)
+    partial_fuels_are ζ (S <$> fs) -∗
+      model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
+      ∃ δ2, partial_fuels_are (locale_of tp1 efork) (fs ⇂ R2) ∗ partial_fuels_are ζ (fs ⇂ R1) ∗ model_state_interp tp2 δ2
+        ∧ ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝;
+
+     update_step_still_alive: 
+        forall (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM)
+        tp1 tp2 σ1 σ2
+        (s1 s2: iM)
+        (fs1 fs2: gmap (fmrole iM) nat)
+        ρ (δ1 : LM) ζ fr1,
+    (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ->
+    trace_last extr = (tp1, σ1) →
+    trace_last auxtr = δ1 ->
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
+    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 (project_inner δ1) s2 ρ (LM := iLM) ->
+    partial_fuels_are ζ fs1 -∗ partial_model_is s1 -∗ model_state_interp tp1 δ1 -∗
+    partial_free_roles_are fr1
+    ==∗ ∃ (δ2: LM) ℓ,
+        ⌜labels_match (Some ζ) ℓ
+        ∧ valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝
+        ∗ partial_fuels_are ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
+        partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1))           
+  }.
+
+  Section DerivedDefs.
+    Context {PMP: PartialModelPredicates}. 
+
+    (* TODO: is it possible to use it already in class definition? *)
+    Definition partial_fuels_are_S ζ fs := partial_fuels_are ζ (S <$> fs).
+
+  End DerivedDefs.
+  
+End PartialOwnership.
+
+
+Section ActualOwnershipImpl.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context `{EqDecision (expr Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
+
+  Lemma actual_update_no_step_enough_fuel extr (auxtr : auxiliary_trace LM) rem c2 fs ζ:
     (dom fs ≠ ∅) ->
     (live_roles _ (trace_last auxtr)) ∩ rem = ∅ →
     rem ⊆ dom fs →
@@ -923,7 +1039,7 @@ Section model_state_lemmas.
       by destruct Hin.
   Qed.
 
-  Lemma update_fork_split R1 R2 tp1 tp2 fs (extr : execution_trace Λ)
+  Lemma actual_update_fork_split R1 R2 tp1 tp2 fs (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
@@ -1166,25 +1282,12 @@ Section model_state_lemmas.
     by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)).
   Qed.
 
-  Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole M) nat) (s1 s2: M) (ρ: fmrole M) :=
-    (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(lm_fl) s2))) ∧
-    (ρ ∉ live_roles _ s2 -> ρ ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ) (fs1 !! ρ)) ∧
-    ρ ∈ dom fs1 ∧
-    (forall ρ', ρ' ∈ dom fs2 ∖ dom fs1 -> oleq (fs2 !! ρ') (Some $ LM.(lm_fl) s2)) ∧
-    (forall ρ', ρ ≠ ρ' -> ρ' ∈ dom fs1 ∩ dom fs2 -> oless (fs2 !! ρ') (fs1 !! ρ')) ∧
-    (dom fs1 ∖ {[ ρ ]}) ∪ (live_roles _ s2 ∖ live_roles _ s1) ⊆ dom fs2 ∧
-    dom fs2 ⊆
-      (* new roles *) (live_roles _ s2 ∖ live_roles _ s1) ∪
-      (* surviving roles *) (live_roles _ s2 ∩ live_roles _ s1 ∩ dom fs1) ∪
-      (* already dead *) (dom fs1 ∖ live_roles _ s1) ∪
-      (* new deads *) ((live_roles _ s1 ∖ live_roles _ s2) ∩ dom fs1).
-
   Ltac by_contradiction :=
     match goal with
     | |- ?goal => destruct_decide (decide (goal)); first done; exfalso
     end.
 
-  Lemma update_step_still_alive
+  Lemma actual_update_step_still_alive
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM)
         tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ (δ1 : LM) ζ fr1:
@@ -1192,7 +1295,7 @@ Section model_state_lemmas.
     trace_last extr = (tp1, σ1) →
     trace_last auxtr = δ1 ->
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
-    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 δ1 s2 ρ ->
+    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 δ1 s2 ρ (LM := LM) ->
     has_fuels ζ fs1 -∗ frag_model_is s1 -∗ model_state_interp tp1 δ1 -∗
     frag_free_roles_are fr1
     ==∗ ∃ (δ2: LM) ℓ,
@@ -1468,4 +1571,21 @@ Section model_state_lemmas.
       * assert (ρ' ∈ dom (ls_fuel δ1)) as Hin' by set_solver -Hsamedoms Hnewdom Hfueldom. apply elem_of_dom in Hin' as [? ->]. done. }
 Qed.
 
-End model_state_lemmas.
+  Global Instance ActualOwnershipPartial:
+    @PartialModelPredicates _ _ LM _ _ _ _ _ LM. 
+      (* frag_model_is frag_free_roles_are (* has_fuel *) has_fuels id. *)
+  Proof.
+    refine {|
+        partial_model_is := frag_model_is;
+        partial_free_roles_are := frag_free_roles_are;
+        partial_fuel_is := has_fuel;
+        partial_fuels_are := has_fuels;
+        project_inner := id;
+      |}. 
+    - intros. iIntros "FUEL ?".
+      iApply (actual_update_no_step_enough_fuel with "FUEL"); set_solver. 
+    - intros. iApply actual_update_fork_split; done. 
+    - intros. iApply actual_update_step_still_alive; done.
+  Qed.
+
+End ActualOwnershipImpl.
