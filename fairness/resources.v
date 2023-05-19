@@ -797,6 +797,7 @@ Section PartialOwnership.
       partial_free_roles_are: gset (fmrole iM) → iProp Σ;
       partial_fuel_is: locale Λ → fmrole iM → nat → iProp Σ;
       partial_fuels_are: locale Λ → gmap (fmrole iM) nat → iProp Σ;
+      partial_thread_disabled: locale Λ → iProp Σ;
       project_inner: M -> iM;
 
       (* TODO: reintroduce 'rem' parameter to support
@@ -856,7 +857,19 @@ Section PartialOwnership.
         ⌜labels_match (Some ζ) ℓ
         ∧ valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝
         ∗ partial_fuels_are ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
-        partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1))           
+        partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1));
+
+    partial_fuels_are_Proper: Proper (equiv ==> equiv ==> equiv) partial_fuels_are;
+    partial_fuel_fuels: forall ζ ρ f, partial_fuel_is ζ ρ f ⊣⊢ partial_fuels_are ζ {[ρ := f]};
+    partial_model_agree': forall n δ1 s2,
+        model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = s2⌝;
+    partial_no_fuels_disabled:
+        forall tid, partial_fuels_are tid ∅ -∗ partial_thread_disabled tid;
+
+    partial_model_is_Timeless :> forall s, Timeless (partial_model_is s);
+    partial_fuel_is_Timeless :> forall τ ρ f, Timeless (partial_fuel_is τ ρ f);
+    partial_fuels_are_Timeless :> forall τ fs, Timeless (partial_fuels_are τ fs);
+    partial_free_roles_are_Timeless :> forall s, Timeless (partial_free_roles_are s);
   }.
 
   Section DerivedDefs.
@@ -864,6 +877,14 @@ Section PartialOwnership.
 
     (* TODO: is it possible to use it already in class definition? *)
     Definition partial_fuels_are_S ζ fs := partial_fuels_are ζ (S <$> fs).
+
+    Lemma partial_fuel_fuels_S:
+      forall ζ ρ f, partial_fuel_is ζ ρ (S f) ⊣⊢ partial_fuels_are_S ζ {[ρ := f]}.
+    Proof using. 
+      intros. rewrite /partial_fuels_are_S.
+      rewrite partial_fuel_fuels.
+      rewrite map_fmap_singleton //.
+    Qed. 
 
   End DerivedDefs.
   
@@ -1581,11 +1602,15 @@ Qed.
         partial_fuel_is := has_fuel;
         partial_fuels_are := has_fuels;
         project_inner := id;
+        partial_thread_disabled := fun τ => τ ↦M ∅;
       |}. 
     - intros. iIntros "FUEL ?".
       iApply (actual_update_no_step_enough_fuel with "FUEL"); set_solver. 
     - intros. iApply actual_update_fork_split; done. 
     - intros. iApply actual_update_step_still_alive; done.
+    - apply has_fuel_fuels. 
+    - intros. iIntros "MSI ?". by iApply (model_agree' with "MSI"). 
+    - intros. iIntros "[Hf _]". rewrite dom_empty_L //.
   Qed.
 
 End ActualOwnershipImpl.
