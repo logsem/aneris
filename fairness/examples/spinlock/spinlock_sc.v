@@ -243,7 +243,6 @@ Section ClientProofs.
     iCombine "AUTH FRAG" as "OWN". 
     iDestruct (own_valid with "OWN") as "%VALID".
     iPureIntro. by apply excl_auth_agree_L.
-    Show Proof. 
   Qed.
   
 
