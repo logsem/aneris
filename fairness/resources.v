@@ -859,7 +859,7 @@ Section PartialOwnership.
         ∗ partial_fuels_are ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
         partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1));
 
-    partial_fuels_are_Proper: Proper (equiv ==> equiv ==> equiv) partial_fuels_are;
+    partial_fuels_are_Proper :> Proper (equiv ==> equiv ==> equiv) partial_fuels_are;
     partial_fuel_fuels: forall ζ ρ f, partial_fuel_is ζ ρ f ⊣⊢ partial_fuels_are ζ {[ρ := f]};
     partial_model_agree': forall n δ1 s2,
         model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = s2⌝;
@@ -877,6 +877,32 @@ Section PartialOwnership.
 
     (* TODO: is it possible to use it already in class definition? *)
     Definition partial_fuels_are_S ζ fs := partial_fuels_are ζ (S <$> fs).
+
+    Definition partial_fuels_are_plus n ζ (fs: gmap (fmrole iM) nat): iProp Σ :=
+      partial_fuels_are ζ (fmap (fun m => n+m) fs).
+
+    Lemma partial_fuel_fuels_plus_1 (ζ: locale Λ) fs:
+      partial_fuels_are_plus 1 ζ fs ⊣⊢ partial_fuels_are_S ζ fs.
+    Proof.
+      rewrite /partial_fuels_are_plus /partial_fuels_are_S. do 2 f_equiv.
+      intros m m' ->. apply leibniz_equiv_iff. lia.
+    Qed.
+
+    Lemma partial_fuel_fuels_plus_0 (ζ: locale Λ) fs:
+      partial_fuels_are_plus 0 ζ fs ⊣⊢ partial_fuels_are ζ fs.
+    Proof.
+      rewrite /partial_fuels_are_plus /=.  f_equiv. intros ?.
+      rewrite lookup_fmap. apply leibniz_equiv_iff.
+      destruct (fs !! i) eqn:Heq; rewrite Heq //.
+    Qed.
+
+    Lemma partial_fuels_are_plus_split_S n (ζ: locale Λ) fs:
+      partial_fuels_are_plus (S n) ζ fs ⊣⊢ partial_fuels_are_S ζ ((λ m, n + m) <$> fs).
+    Proof.
+      rewrite /partial_fuels_are_plus /partial_fuels_are_S. f_equiv.
+      rewrite -map_fmap_compose /= => ρ.
+      rewrite !lookup_fmap //.
+    Qed.
 
     Lemma partial_fuel_fuels_S:
       forall ζ ρ f, partial_fuel_is ζ ρ (S f) ⊣⊢ partial_fuels_are_S ζ {[ρ := f]}.
