@@ -27,8 +27,8 @@ Lemma tac_wp_pure_helper `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  ( ▷^n (partial_fuels_are tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
-  partial_fuels_are_plus n tid fs -∗
+  ( ▷^n (partial_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  partial_fuels_plus n tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof. 
   intros Hne HPE Hφ. specialize (HPE Hφ).
@@ -38,7 +38,7 @@ Proof.
   inversion HPE; simplify_eq.
 
   iIntros "H Hf".
-  rewrite partial_fuels_are_plus_split_S.
+  rewrite partial_fuels_plus_split_S.
 
   iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
   { by intros ?%fmap_empty_inv. }
@@ -66,21 +66,21 @@ Proof.
 Qed.
 
 (* TODO: move to resources.v *)
-Lemma partial_fuels_are_gt_n 
+Lemma partial_fuels_gt_n 
   `{LM : LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
   (fs: gmap (fmrole M) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
-  partial_fuels_are tid fs ⊣⊢ partial_fuels_are tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
+  partial_fuels tid fs ⊣⊢ partial_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 
-Lemma partial_fuels_are_gt_1 
+Lemma partial_fuels_gt_1 
   `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
   (fs: gmap (fmrole M) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
-  partial_fuels_are tid fs ⊣⊢ partial_fuels_are_S tid (((λ m, m - 1)%nat <$> fs)).
-Proof. intros ?. by rewrite partial_fuels_are_gt_n //. Qed.
+  partial_fuels tid fs ⊣⊢ partial_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
+Proof. intros ?. by rewrite partial_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 
   `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
@@ -90,12 +90,12 @@ Lemma tac_wp_pure_helper_2
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  ( ▷^n ((partial_fuels_are tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
-  partial_fuels_are tid fs -∗
+  ( ▷^n ((partial_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  partial_fuels tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof.
   iIntros (Hfs Hne Hpe Hphi) "H Hf".
-  rewrite (partial_fuels_are_gt_n fs n) //.
+  rewrite (partial_fuels_gt_n fs n) //.
   iApply (tac_wp_pure_helper with "H [Hf]") =>//.
   by intros ?%fmap_empty_inv.
 Qed.
@@ -158,10 +158,10 @@ Lemma tac_wp_pure
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  envs_lookup i Δ = Some (false, partial_fuels_are tid fs)%I →
+  envs_lookup i Δ = Some (false, partial_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs n Δother Δ'other →
-  let Δ' := envs_snoc Δ'other false i (partial_fuels_are tid ((λ m, m - n)%nat <$> fs)) in
+  let Δ' := envs_snoc Δ'other false i (partial_fuels tid ((λ m, m - n)%nat <$> fs)) in
   envs_entails Δ' (WP (fill K e2) @ tid; E {{ Φ }}) →
   envs_entails Δ (WP (fill K e1) @ tid; E {{ Φ }}).
 Proof.
@@ -244,10 +244,10 @@ Ltac solve_fuel_positive :=
              rewrite lookup_insert_ne; [ try done | done]]
         end.
 Ltac simpl_partial_fuels :=
-  iEval (rewrite ?[in partial_fuels_are _ _]fmap_insert ?[in partial_fuels_are _ _]/= ?[in partial_fuels_are _ _]fmap_empty) in "#∗".
+  iEval (rewrite ?[in partial_fuels _ _]fmap_insert ?[in partial_fuels _ _]/= ?[in partial_fuels _ _]fmap_empty) in "#∗".
 Tactic Notation "wp_pure" open_constr(efoc) :=
   let solve_fuel _ :=
-    let fs := match goal with |- _ = Some (_, partial_fuels_are _ ?fs) => fs end in
+    let fs := match goal with |- _ = Some (_, partial_fuels _ ?fs) => fs end in
     iAssumptionCore || fail "wp_pure: cannot find" fs in
   iStartProof;
   rewrite ?partial_fuel_fuels;
@@ -261,7 +261,7 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
         |
         | tc_solve
         | trivial
-        | let fs := match goal with |- _ = Some (_, partial_fuels_are _ ?fs) => fs end in
+        | let fs := match goal with |- _ = Some (_, partial_fuels _ ?fs) => fs end in
           iAssumptionCore || fail "wp_pures: cannot find" fs
         |tc_solve
         | pm_reduce;
@@ -449,11 +449,11 @@ Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
   (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
-  envs_lookup i Δ = Some (false, partial_fuels_are tid fs)%I →
+  envs_lookup i Δ = Some (false, partial_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
   envs_lookup j Δ'other = Some (false,  l ↦{q} v)%I →
-  let Δ' := envs_snoc Δ'other false i (partial_fuels_are tid ((λ m, m - 1)%nat <$> fs)) in
+  let Δ' := envs_snoc Δ'other false i (partial_fuels tid ((λ m, m - 1)%nat <$> fs)) in
   envs_entails Δ' (WP fill K (Val v) @ tid; E {{ Φ }}) →
   envs_entails Δ (WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
 Proof.
@@ -471,7 +471,7 @@ Proof.
   pose Δ'' := envs_delete true j false Δ'other. rewrite -/Δ''.
   iDestruct "H2" as "[H2 H3]".
 
-  rewrite partial_fuels_are_gt_1 //.
+  rewrite partial_fuels_gt_1 //.
   iApply (wp_load_nostep with "[H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
   iIntros "!> [Hl Hf]". iApply Hccl. rewrite /Δ' /=.
   iApply (envs_snoc_sound Δ'other false i with "[H3 Hl] [Hf]") =>//.
@@ -487,13 +487,13 @@ Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
   (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
-  envs_lookup i Δ = Some (false, partial_fuels_are tid fs)%I →
+  envs_lookup i Δ = Some (false, partial_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
   envs_lookup j Δ'other  = Some (false, (l ↦ v)%I) ->
   match envs_simple_replace j false (Esnoc Enil j (l ↦ v')%I) Δ'other  with
   | Some Δ'other2 =>
-      let Δ' := envs_snoc Δ'other2 false i (partial_fuels_are tid ((λ m, m - 1)%nat <$> fs)) in
+      let Δ' := envs_snoc Δ'other2 false i (partial_fuels tid ((λ m, m - 1)%nat <$> fs)) in
       envs_lookup i Δ'other2 = None (* redondent but easier than  proving it. *) ∧
       envs_entails Δ' (WP fill K (Val $ LitV LitUnit) @ tid; E {{ Φ }})
   | None => False
@@ -517,10 +517,10 @@ Proof.
   pose Δ'' := envs_delete true j false Δ'other. rewrite -/Δ''.
   iDestruct "H2" as "[H2 H3]".
 
-  rewrite partial_fuels_are_gt_1 //.
+  rewrite partial_fuels_gt_1 //.
   iApply (wp_store_nostep with "[H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
   iIntros "!> [Hl Hf]".
-  set Δ' := envs_snoc Δ'other2 false i (partial_fuels_are tid ((λ m, m - 1)%nat <$> fs)).
+  set Δ' := envs_snoc Δ'other2 false i (partial_fuels tid ((λ m, m - 1)%nat <$> fs)).
   fold Δ' in Hccl.
 
   iApply Hccl. unfold Δ'.
@@ -533,7 +533,7 @@ End heap.
 
 Tactic Notation "wp_load" :=
   let solve_fuel _ :=
-    let fs := match goal with |- _ = Some (_, partial_fuels_are _ ?fs) => fs end in
+    let fs := match goal with |- _ = Some (_, partial_fuels _ ?fs) => fs end in
     iAssumptionCore || fail "wp_load: cannot find" fs in
   let solve_mapsto _ :=
     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
@@ -547,7 +547,7 @@ Tactic Notation "wp_load" :=
       [ (* dealt with later *)
       |
       |
-      | let fs := match goal with |- _ = Some (_, partial_fuels_are _ ?fs) => fs end in
+      | let fs := match goal with |- _ = Some (_, partial_fuels _ ?fs) => fs end in
           iAssumptionCore || fail "wp_load: cannot find" fs
       | tc_solve
       | let fs := match goal with |- _ = Some (_, ?l ↦{_} _)%I => l end in
@@ -565,7 +565,7 @@ Tactic Notation "wp_load" :=
 
 Tactic Notation "wp_store" :=
   let solve_fuel _ :=
-    let fs := match goal with |- _ = Some (_, partial_fuels_are _ ?fs) => fs end in
+    let fs := match goal with |- _ = Some (_, partial_fuels _ ?fs) => fs end in
     iAssumptionCore || fail "wp_store: cannot find" fs in
   let solve_mapsto _ :=
     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
@@ -579,7 +579,7 @@ Tactic Notation "wp_store" :=
       [ (* dealt with later *)
       |
       |
-      | let fs := match goal with |- _ = Some (_, partial_fuels_are _ ?fs) => fs end in
+      | let fs := match goal with |- _ = Some (_, partial_fuels _ ?fs) => fs end in
           iAssumptionCore || fail "wp_store: cannot find" fs
       | tc_solve
       | let fs := match goal with |- _ = Some (_, ?l ↦{_} _)%I => l end in

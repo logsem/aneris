@@ -697,7 +697,7 @@ Lemma wp_lift_pure_step_no_fork tid E E' Φ e1 e2 fs ϕ:
   fs ≠ ∅ ->
   PureExec ϕ 1 e1 e2 ->
   ϕ ->
-  (|={E}[E']▷=> partial_fuels_are_S tid fs ∗ ((partial_fuels_are tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (|={E}[E']▷=> partial_fuels_S tid fs ∗ ((partial_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using PMP. 
   intros NnO Hpe Hϕ.
@@ -728,7 +728,7 @@ Proof using PMP.
   - iPureIntro. destruct ℓ =>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iApply "Hkont". iApply (partial_fuels_are_Proper with "Hfuels") =>//.
+  - iApply "Hkont". iApply (partial_fuels_Proper with "Hfuels") =>//.
     rewrite map_filter_id //. intros ?? ?%elem_of_dom_2; set_solver.
 Qed.
 
@@ -784,7 +784,7 @@ Qed.
 Lemma wp_lift_pure_step_no_fork' fs tid E E' Φ e1 e2:
   fs ≠ ∅ ->
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> partial_fuels_are_S tid fs ∗ ((partial_fuels_are tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (|={E}[E']▷=> partial_fuels_S tid fs ∗ ((partial_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using PMP. 
   intros. by iApply wp_lift_pure_step_no_fork.
@@ -792,7 +792,7 @@ Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole tid E E' Φ e1 e2 ρ f φ:
   PureExec φ 1 e1 e2 -> φ ->
-  (|={E}[E']▷=> partial_fuel_is tid ρ (S f) ∗ ((partial_fuel_is tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (|={E}[E']▷=> partial_fuel tid ρ (S f) ∗ ((partial_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using. 
   iIntros (??) "H". rewrite partial_fuel_fuels_S.
@@ -805,9 +805,9 @@ Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' fs1 fs2 fr1 Φ e1 e2 ρ
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
   live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> partial_model_is s1 ∗ partial_fuels_are tid fs1 ∗ partial_free_roles_are fr1 ∗
+  (|={E}[E']▷=> partial_model_is s1 ∗ partial_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
-                  -∗ (partial_fuels_are tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
+                  -∗ (partial_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using. 
   iIntros (Hpe Hφ Hval Hfr Htrans).
@@ -847,8 +847,8 @@ Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' (f1 f2: nat)
   PureExec φ 1 e1 e2 -> φ ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   (f2 ≤ iLM.(lm_fl) s2)%nat -> iM.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ partial_fuel_is tid ρ f1 ∗
-   (partial_model_is s2 -∗ partial_free_roles_are fr -∗ (if decide (ρ ∈ live_roles iM s2) then partial_fuel_is tid ρ f2 else partial_thread_disabled tid) -∗
+  (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ partial_fuel tid ρ f1 ∗
+   (partial_model_is s2 -∗ partial_free_roles_are fr -∗ (if decide (ρ ∈ live_roles iM s2) then partial_fuel tid ρ f2 else partial_thread_disabled tid) -∗
                                WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using.
@@ -878,7 +878,7 @@ Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole' tid E E' Φ e1 e2 ρ f:
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> partial_fuel_is tid ρ (S f) ∗ ((partial_fuel_is tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (|={E}[E']▷=> partial_fuel tid ρ (S f) ∗ ((partial_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof.
   iIntros (?) "H". rewrite partial_fuel_fuels_S.
@@ -891,9 +891,9 @@ Qed.
    since after forking we know a stronger fact *)
 Lemma wp_fork_nostep s tid E e Φ R1 R2 fs (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
   R1 ∪ R2 = dom fs ->
-  (∀ tid', ▷ (partial_fuels_are tid' (fs ⇂ R2) -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅  }})) -∗
-     ▷ (partial_fuels_are tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
-     partial_fuels_are_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
+  (∀ tid', ▷ (partial_fuels tid' (fs ⇂ R2) -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅  }})) -∗
+     ▷ (partial_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
+     partial_fuels_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros (Hunioneq) "He HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
@@ -954,8 +954,8 @@ Qed.
 Lemma wp_allocN_seq_nostep s tid E v n fs:
   fs ≠ ∅ ->
   0 < n →
-  {{{ partial_fuels_are_S tid fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
-  {{{ l, RET LitV (LitLoc l); partial_fuels_are tid fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
+  {{{ partial_fuels_S tid fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
+  {{{ l, RET LitV (LitLoc l); partial_fuels tid fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof using. 
   iIntros (HnO Hn Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -975,7 +975,7 @@ Proof using.
   rewrite Hexend //=. iFrame "Hmi Hsi".
   repeat iSplit =>//.
   iApply "HΦ". iSplitL "Hfuel".
-  { iApply (partial_fuels_are_Proper with "Hfuel") =>//.
+  { iApply (partial_fuels_Proper with "Hfuel") =>//.
     rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver. }
   iApply big_sepL_sep. iSplitL "Hl".
   + by iApply heap_array_to_seq_mapsto.
@@ -984,7 +984,7 @@ Qed.
 
 Lemma wp_alloc_nostep s tid E v fs :
   fs ≠ ∅ ->
-  {{{ partial_fuels_are_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ partial_fuels_are tid fs }}}.
+  {{{ partial_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ partial_fuels tid fs }}}.
 Proof using. 
   iIntros (? Φ) "HfuelS HΦ". iApply (wp_allocN_seq_nostep with "HfuelS"); auto with lia.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
@@ -992,9 +992,9 @@ Qed.
 
 Lemma wp_choose_nat_nostep s tid E fs :
   fs ≠ ∅ ->
-  {{{ partial_fuels_are_S tid fs }}}
+  {{{ partial_fuels_S tid fs }}}
     ChooseNat @ s; tid; E
-  {{{ (n:nat), RET LitV (LitInt n); partial_fuels_are tid fs }}}.
+  {{{ (n:nat), RET LitV (LitInt n); partial_fuels tid fs }}}.
 Proof using. 
   iIntros (? Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
@@ -1010,13 +1010,13 @@ Proof using.
   rewrite Hexend //=. iFrame "Hmi Hsi".
   repeat iSplit =>//.
   iApply "HΦ".
-  iApply (partial_fuels_are_Proper with "Hfuel") =>//.
+  iApply (partial_fuels_Proper with "Hfuel") =>//.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
 Lemma wp_load_nostep s tid E l q v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦{q} v ∗ partial_fuels_are_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ partial_fuels_are tid fs }}}.
+  {{{ ▷ l ↦{q} v ∗ partial_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ partial_fuels tid fs }}}.
 Proof using. 
   iIntros (? Φ) "[>Hl HfuelS] HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
@@ -1029,15 +1029,15 @@ Proof using.
   iModIntro; iExists _,_.
   rewrite Hexend //=. iFrame "Hsi Hmod".
   do 2 (iSplit=>//).
-  iApply "HΦ". iFrame. iApply (partial_fuels_are_Proper with "Hfuel") =>//.
+  iApply "HΦ". iFrame. iApply (partial_fuels_Proper with "Hfuel") =>//.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
 Lemma wp_store_nostep s tid E l v' v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ partial_fuels_are_S tid fs }}}
+  {{{ ▷ l ↦ v' ∗ partial_fuels_S tid fs }}}
     Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
-  {{{ RET LitV LitUnit; l ↦ v ∗ partial_fuels_are tid fs }}}.
+  {{{ RET LitV LitUnit; l ↦ v ∗ partial_fuels tid fs }}}.
 Proof using. 
   iIntros (? Φ) "[>Hl HfuelS] HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -1052,7 +1052,7 @@ Proof using.
   iModIntro; iExists _,_.
   rewrite Hexend //=. iFrame "Hsi Hmod".
   do 2 (iSplit=>//).
-  iApply "HΦ". iFrame. iApply (partial_fuels_are_Proper with "Hfuel") =>//.
+  iApply "HΦ". iFrame. iApply (partial_fuels_Proper with "Hfuel") =>//.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
@@ -1060,10 +1060,10 @@ Qed.
 Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel_is tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
+  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles iM s2) then partial_fuel_is tid ρ f2 else partial_thread_disabled tid ) }}}.
+      (if decide (ρ ∈ live_roles iM s2) then partial_fuel tid ρ f2 else partial_thread_disabled tid ) }}}.
 Proof using. 
   iIntros (Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -1103,9 +1103,9 @@ Qed.
 Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l q v' v1 v2:
   v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦{q} v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel_is tid ρ f1 ∗ ▷ partial_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
+  {{{ ▷ l ↦{q} v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles iM s2) then partial_fuel_is tid ρ f2 else partial_thread_disabled tid ) }}}.
+      (if decide (ρ ∈ live_roles iM s2) then partial_fuel tid ρ f2 else partial_thread_disabled tid ) }}}.
 Proof using. 
   iIntros (?? Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
@@ -1143,10 +1143,10 @@ Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E
   ρ ∉ live_roles _ s2 →
   v' = v1 → vals_compare_safe v' v1 → f2 < f1 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel_is tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
+  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
-      partial_fuel_is tid ρ f2 }}}.
+      partial_fuel tid ρ f2 }}}.
 Proof using.
   iIntros (??? Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -1177,10 +1177,10 @@ Qed.
 Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v1 v2:
   v' = v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel_is tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
+  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ partial_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles iM s2) then partial_fuel_is tid ρ f2 else partial_thread_disabled tid ) }}}.
+      (if decide (ρ ∈ live_roles iM s2) then partial_fuel tid ρ f2 else partial_thread_disabled tid ) }}}.
 Proof using. 
   iIntros (?? Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
