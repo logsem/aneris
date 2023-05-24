@@ -30,16 +30,15 @@ Section Proof_of_send_loop.
         send_lock_def (ip_of_address sa) (endpoint_chan_name γe) (lock_idx_name (endpoint_send_lock_name γe)) sbuf
             sidLBLoc (side_elim s RCParams_clt_ser RCParams_srv_ser) s }}}
        (rec: "while_empty_loop" "p" :=
-        if: queue_is_empty (Fst ! "p") then monitor_wait slk;; "while_empty_loop" "p" else #())%V #sbuf @[ip]
+        if: queue_is_empty (! "p") then monitor_wait slk;; "while_empty_loop" "p" else #())%V #sbuf @[ip]
     {{{ (q : val) (vs : list val) (sidLB : nat), RET #();
         lock_proof.locked (lock_lock_name (endpoint_send_lock_name γe)) ∗
-        (sbuf ↦[ip] (q, #(sidLB + length vs)) ∗ ⌜is_queue vs q⌝ ∗
+        (sbuf ↦[ip] q ∗ ⌜is_queue vs q⌝ ∗
          sidLBLoc ↦[ip]{1 / 2} #sidLB ∗
          mono_nat_auth_own (lock_idx_name (endpoint_send_lock_name γe)) (1 / 2) (sidLB + length vs) ∗
-         ([∗ list] i↦v ∈ vs, ∃ w : val, ⌜v = (#(sidLB + i), w)%V⌝ ∗
-                               ⌜Serializable (side_elim s RCParams_clt_ser RCParams_srv_ser) w⌝ ∗
-                               ses_idx (chan_session_escrow_name
-                                          (endpoint_chan_name γe)) s (sidLB + i) w) ∗
+         ([∗ list] i↦v ∈ vs, ⌜Serializable (side_elim s RCParams_clt_ser RCParams_srv_ser) v⌝ ∗
+                             ses_idx (chan_session_escrow_name
+                                        (endpoint_chan_name γe)) s (sidLB + i) v) ∗
         ⌜vs ≠ []⌝)%I
      }}}.
   Proof.
@@ -63,12 +62,12 @@ Section Proof_of_send_loop.
 
   Lemma send_from_chan_loop_spec c ip skt sa dst
         (γs : session_name) (γe : endpoint_name)
-        sidLBLoc s (sbuf : loc) (serf : val) slk rbuf rlk :
+        sidLBLoc s (sbuf : loc) slk rbuf rlk :
     ip_of_address sa = ip →
     endpoint_chan_name γe = session_chan_name γs →
     lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
-    c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
+    c = (((#sbuf, slk), (#rbuf, rlk)))%V →
     side_elim s dst sa = RCParams_srv_saddr →
     {{{ socket_resource skt sa N s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
@@ -79,14 +78,13 @@ Section Proof_of_send_loop.
           (side_elim s RCParams_clt_ser RCParams_srv_ser) sidLBLoc s ∗
         session_token (side_elim s sa dst) γs ∗
         (∃ γs0 : session_name, session_connected (side_elim s sa dst) γs0)}}}
-      send_from_chan_loop skt #dst c @[ip]
+      send_from_chan_loop skt #dst #sidLBLoc c @[ip]
     {{{ w, RET w; False }}}.
   Proof.
     iIntros (<- Heqc Heqg -> Hsrv Φ) "(Hskt & #Hdst & #Hslk & #Htok & #Hsmode) HΦ".
     iDestruct "Hskt" as (sh sock -> Haddr Hblock) "[#Hinterp #Hsk]".
     wp_lam.
-    do 39 wp_pure _.
-    wp_lam.
+    do 36 wp_pure _.
     iLöb as "Ilob".
     wp_pures.
     wp_apply (monitor_acquire_spec with "Hslk").
@@ -94,30 +92,30 @@ Section Proof_of_send_loop.
     do 2 wp_pure _.
     set (γc := endpoint_chan_name γe).
     wp_apply (while_empty_loop_spec _ sa γs γe γc sidLBLoc s with "[$Hlocked $Hlk $Hslk][]");[done|done|done|].
-    iNext. iIntros  (q vs sidLB') "(Hlocked & Hsbuf & %Hq & HsidLBLoc' & Hsidx & #Hvs & %Hneq)".
+    iNext. iIntros (q vs sidLB') "(Hlocked & Hsbuf & %Hq & HsidLBLoc' & Hsidx & #Hvs & %Hneq)".
     wp_pures.
     iDestruct (mono_nat_lb_own_get with "Hsidx") as "#Hsidx'".
     wp_pures. wp_load. wp_pures.
     iDestruct (big_sepL_impl _
                 (λ i v,
                    ⌜i < length vs⌝ ∗
-                   ∃ w : val, ⌜v = (#(sidLB' + i), w)%V⌝ ∗
-                               ⌜Serializable
-                                  (side_elim s RCParams_clt_ser RCParams_srv_ser)
-                                  w⌝ ∗
-                               ses_idx (chan_session_escrow_name
-                                          (endpoint_chan_name γe)) s (sidLB' + i) w)%I with "Hvs []") as "#Hvs'".
+                   ⌜Serializable
+                     (side_elim s RCParams_clt_ser RCParams_srv_ser)
+                     v⌝ ∗
+                   ses_idx (chan_session_escrow_name
+                              (endpoint_chan_name γe)) s (sidLB' + i) v)%I with "Hvs []") as "#Hvs'".
     { iIntros "!>" (i v Hlookup) "H".
       iSplit; [|done].
       iPureIntro.
       apply lookup_lt_Some in Hlookup.
       lia. }
-      wp_apply (wp_queue_iter_idx _ (λ _ _, True)%I True%I _ vs with "[] [$Hvs']");
-        [|done|].
+    wp_load.
+    wp_apply (wp_queue_iteri _ (λ _ _, True)%I True%I with "[] [$Hvs']");
+      [done| |].
     { iIntros (i v). iIntros (Φ') "!> [_ [%Hle Hv]] HΦ'".
-      iDestruct "Hv" as (w) "(-> & %Hser & Hfrag)".
+      iDestruct "Hv" as "(%Hser & Hfrag)".
       wp_pures.
-      destruct s.
+      destruct s=> /=.
       - wp_apply (s_ser_spec (msg_serialization RCParams_clt_ser)).
         { iPureIntro. eexists _. right. split; [done|].
           eexists _. right. split; [done|]. eexists _, _. split; [done|].
@@ -184,7 +182,7 @@ Section Proof_of_send_loop.
     wp_apply (monitor_release_spec with "[$Hlocked $Hslk Hsbuf HsidLBLoc' Hsidx]").
     iExists _, _, _. iFrame "#∗"; eauto.
     iIntros (v ->).
-    do 4 wp_pure _.
+    do 5 wp_pure _.
     iApply "Ilob". by iIntros.
   Qed.
 

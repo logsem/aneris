@@ -37,9 +37,7 @@ Section Proof_of_server_listen.
     wp_lam.
     wp_pures.
     rewrite Hskt.
-    do 17 wp_pure _.
-    wp_pure _.
-    wp_let.
+    do 14 wp_pure _.
     iLöb as "IH" forall (skl cml Hsktsrv).
     wp_pures.
     wp_bind (ReceiveFrom _).

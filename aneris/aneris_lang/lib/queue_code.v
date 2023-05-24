@@ -62,3 +62,8 @@ Definition queue_drop : val :=
 Definition queue_iter : val :=
   λ: "f" "q", list_iter "f" (Fst "q");;
                list_iter "f" (list_rev (Snd "q")).
+
+Definition queue_iteri : val :=
+  λ: "f" "q",
+  list_iteri "f" (Fst "q");;
+  list_iteri_loop "f" (list_length (Fst "q")) (list_rev (Snd "q")).

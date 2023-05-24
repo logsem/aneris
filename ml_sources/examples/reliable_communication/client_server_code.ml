@@ -18,20 +18,18 @@ let gen_msg_ser (ser[@metavar]) =
 
 type 'a sid_message  = int * 'a
 type init_message    = string * int
-type 'a messageQueueOut = 'a sid_message queue * int
-type 'a messageQueueIn = 'a sid_message queue
+type 'a messageQueueOut = 'a queue
+type 'a messageQueueIn = 'a queue
 
 type 'a gen_message  = (init_message, (int, 'a sid_message) sumTy) sumTy
 
 type 'a msg_ser_ser = 'a gen_message -> string
 type 'b msg_ser_deser = string -> 'b gen_message
-type ('a, 'b) skt =
-  ((Unix.file_descr * ('a msg_ser_ser * 'b msg_ser_deser)) * ('a -> string))
+type ('a, 'b) skt = (Unix.file_descr * ('a msg_ser_ser * 'b msg_ser_deser))
 
 type ('a, 'b) chan_descr =
   ((('a messageQueueOut Atomic.t * monitor) *
-   ('b messageQueueIn Atomic.t * Mutex.t)) *
-   (('a -> string) Atomic.t))
+   ('b messageQueueIn Atomic.t * Mutex.t)))
 
 type ('a, 'b) conn_state = (int, ((('a, 'b) chan_descr * int) * (int Atomic.t * int Atomic.t))) sumTy
 type ('a, 'b) conn_map = (saddr, ('a, 'b) conn_state) amap
@@ -40,10 +38,10 @@ type ('a, 'b) conn_queue = (('a, 'b) chan_descr * saddr) queue
 type ('a, 'b) client_skt = ('a, 'b) skt
 
 type ('a, 'b) server_skt_passive_data =
-  (('a, 'b) skt * ('a, 'b) conn_map Atomic.t) * (('a, 'b) conn_queue Atomic.t * Mutex.t)
+  ((Unix.file_descr * ('a msg_ser_ser * 'b msg_ser_deser)) * ('a, 'b) conn_map Atomic.t) * (('a, 'b) conn_queue Atomic.t * Mutex.t)
 
 type ('a, 'b) server_skt =
-  (('a, 'b) skt, (('a, 'b) conn_queue Atomic.t * Mutex.t)) sumTy Atomic.t
+  ((Unix.file_descr * ('a msg_ser_ser * 'b msg_ser_deser)), (('a, 'b) conn_queue Atomic.t * Mutex.t)) sumTy Atomic.t
 
 
 (** ********************** CLIENT AND SERVER SOCKETS *********************** **)
@@ -58,7 +56,7 @@ type ('a, 'b) server_skt =
 let make_skt (ser[@metavar]) (deser[@metavar]) (sa : saddr) : ('a, 'b) skt =
   let sh = udp_socket () in
   socketBind sh sa;
-  ((sh, ((gen_msg_ser ser).s_ser, (gen_msg_ser deser).s_deser)), ser.s_ser)
+  ((sh, ((gen_msg_ser ser).s_ser, (gen_msg_ser deser).s_deser)))
 
 (** Client socket is just a alias of skt, with purpose to make the API
     more clear w.r. to distinction with server_socket (passive socket). *)
@@ -75,34 +73,35 @@ let make_server_skt (ser[@metavar]) (deser[@metavar]) (sa : saddr) : ('a, 'b) se
   ref (InjL skt)
 
 (** New channel_descriptor *)
-let make_new_channel_descr (ser : 'a -> string) : ('a, 'b) chan_descr =
-  let sbuf = ref (queue_empty (), 0) in
+let make_new_channel_descr () : ('a, 'b) chan_descr =
+  let sbuf = ref (queue_empty ()) in
   let rbuf = ref (queue_empty ()) in
   let smon = new_monitor () in
   let rlk = newlock () in
-  (((sbuf, smon), (rbuf, rlk)), ref ser)
+  ((sbuf, smon), (rbuf, rlk))
 
 
 (** *********************** AUXIALIARY FUNCTIONS *************************** **)
 
 let send_from_chan_loop
-    (skt : ('a, 'b) skt) (sa : saddr) (c : ('a, 'b) chan_descr) : unit =
-  let sdata = fst (fst c) in
+    (skt : ('a, 'b) client_skt) (sa : saddr) sidLBloc (c : ('a, 'b) chan_descr) : unit =
+  let sdata = fst c in
   let (sbuf, smon) = sdata in
-  let ((sh, (ser, _deser)), _s) = skt in
-  let send_msg m =
-    let msg = ser (InjR (InjR m)) in
+  let ((sh, (ser, _deser))) = skt in
+  let send_msg lb i m =
+    let msg = ser (InjR (InjR (lb + i, m))) in
     ignore(sendTo sh msg sa);
-    unsafe (__print_send_msg ser sa (InjR (InjR m)));
+    unsafe (__print_send_msg ser sa (InjR (InjR (lb+i, m))));
   in
   let rec while_empty_loop p =
-    if queue_is_empty (fst !p)
+    if queue_is_empty !p
     then (monitor_wait smon; while_empty_loop p)
     else () in
   let rec loop () =
     monitor_acquire smon;
     while_empty_loop sbuf;
-    queue_iter send_msg (fst !sbuf);
+    let send_msg' = send_msg (!sidLBloc) in
+    queue_iteri send_msg' !sbuf;
     monitor_release smon;
     unsafe (fun () -> Unix.sleepf 0.35);
     loop ()
@@ -119,11 +118,9 @@ let prune_sendbuf_at_ack
   else      (* If the incoming ack number is more recent than local ackid, *)
     begin   (* then update the ackid and the outbuf. *)
       monitor_acquire smon;
-      let p = !sendbuf in
-      let (qe, ub) = p in
-      (* TODO: Guarantee this check in the logic instead *)
+      let qe = !sendbuf in
       sidLBloc := msg_ack;
-      sendbuf := (queue_drop qe (msg_ack - sidLB), ub);
+      sendbuf := (queue_drop qe (msg_ack - sidLB));
       monitor_release smon
     end
 
@@ -135,9 +132,8 @@ let process_data_on_chan
     (ackId : int Atomic.t)
     (c : ('a, 'b) chan_descr)
     (msg : (int, 'b sid_message) sumTy) : unit =
-  let cdata = fst c in
-  let ((sbuf, smon), (rbuf, rlk)) = cdata in
-  let ((sh, (ser, _deser)), _s) = skt in
+  let ((sbuf, smon), (rbuf, rlk)) = c in
+  let ((sh, (ser, _deser))) = skt in
   let ackid = !ackId in
   begin match msg with
     | InjL id -> prune_sendbuf_at_ack smon sidLB sbuf id
@@ -150,7 +146,7 @@ let process_data_on_chan
         then    (* then update ackid and enqueue the message *)
           begin
             acquire rlk;
-            rbuf := queue_add (mid, mbody) !rbuf;
+            rbuf := queue_add mbody !rbuf;
             ackId := mid + 1;
             release rlk;
           end
@@ -169,7 +165,7 @@ let client_recv_on_chan_loop
     (sidLB : int Atomic.t)
     (ackId : int Atomic.t)
     (c : ('a, 'b) chan_descr) : unit =
-  let ((sh, (_ser, deser)), _s) = skt in
+  let ((sh, (_ser, deser))) = skt in
   let rec loop () =
     let msg = unSOME (receiveFrom sh) in
     assert (sa = snd msg);
@@ -197,7 +193,7 @@ let resend_listen skt dst req handler =
 
 let client_conn_step
     (skt : ('a, 'b) client_skt) (req : init_message) (repl_tag : string) (saddr : saddr) =
-  let ((sh, (ser, deser)), _s) = skt in
+  let ((sh, (ser, deser))) = skt in
   let req_msg = ser (InjL req) in
   ignore (sendTo sh req_msg saddr);
   unsafe (__print_send_msg ser saddr (InjL req));
@@ -214,9 +210,9 @@ let client_conn_step
       resend_listen sh saddr req_msg handler
   in resend_listen sh saddr req_msg handler
 
-let server_conn_step_to_open_new_conn srv_skt bdy clt_addr =
+let server_conn_step_to_open_new_conn (srv_skt : ('a, 'b) server_skt_passive_data) bdy clt_addr =
   let ((skt, connMap), (_chanQueue, _connlk)) = srv_skt in
-  let ((sh, (ser, _deser)), _s) = skt in
+  let ((sh, (ser, _deser))) = skt in
   match bdy with
   | InjL im ->
     if (fst im = "INIT" && snd im = 0)
@@ -230,17 +226,17 @@ let server_conn_step_to_open_new_conn srv_skt bdy clt_addr =
     else assert false
   | InjR _abs -> assert false
 
-let server_conn_step_to_establish_conn srv_skt cookie bdy clt_addr =
+let server_conn_step_to_establish_conn (srv_skt : ('a, 'b) server_skt_passive_data) cookie bdy clt_addr =
   let ((skt, connMap), (chanQueue, connlk)) = srv_skt in
-  let ((sh, (ser, _deser)), serf) = skt in
+  let ((sh, (ser, _deser))) = skt in
   match bdy with
   | InjL im ->
     if ((fst im = "COOKIE") && (snd im = cookie))
     then begin
       let sidLB = ref 0 in
       let ackId = ref 0 in
-      let chan_descr = make_new_channel_descr serf in
-      fork (send_from_chan_loop skt clt_addr) chan_descr;
+      let chan_descr = make_new_channel_descr () in
+      fork (send_from_chan_loop skt clt_addr sidLB) chan_descr;
       connMap := map_insert clt_addr
           (InjR ((chan_descr, cookie), (sidLB, ackId))) !connMap;
       let cookie_ack = ser (InjL ("COOKIE-ACK", 0)) in
@@ -262,9 +258,9 @@ let server_conn_step_to_establish_conn srv_skt cookie bdy clt_addr =
     else assert false
   | InjR _abs -> assert false
 
-let server_conn_step_process_data srv_skt chan_data bdy clt_addr =
+let server_conn_step_process_data ( srv_skt : ('a, 'b) server_skt_passive_data) chan_data bdy clt_addr =
   let skt = fst (fst srv_skt) in
-  let ((sh, (ser, _deser)), _s) = skt in
+  let ((sh, (ser, _deser))) = skt in
   let ((chan_descr, cookie), (sidLB, ackId)) = chan_data in (* Completed connection *)
   match bdy with
   | InjL im ->
@@ -282,7 +278,7 @@ let server_conn_step_process_data srv_skt chan_data bdy clt_addr =
 
 let server_recv_on_listening_skt_loop (srv_skt : ('a, 'b) server_skt_passive_data) : unit =
   let ((skt, connMap), _conn_data) = srv_skt in
-  let ((sh, (_ser, deser)), _s) = skt in
+  let ((sh, (_ser, deser))) = skt in
   let rec loop () =
     let msg = unSOME (receiveFrom sh) in
     let (m, clt_addr) = msg in
@@ -333,31 +329,30 @@ let accept (srv_skt : ('a, 'b) server_skt) : ('a, 'b) chan_descr * saddr =
     in aux ()
 
 let connect (skt : ('a, 'b) client_skt) (srv_addr : saddr) : ('a, 'b) chan_descr =
-  setReceiveTimeout (fst (fst skt)) 1 0;
+  setReceiveTimeout (fst skt) 1 0;
   let cookie = client_conn_step skt ("INIT", 0) "INIT-ACK" srv_addr in
   let _ack = client_conn_step skt ("COOKIE", cookie) "COOKIE-ACK" srv_addr in
-  setReceiveTimeout (fst (fst skt)) 0 0;
+  setReceiveTimeout (fst skt) 0 0;
   let sidLB = ref 0 in
   let ackId = ref 0 in
-  let c = make_new_channel_descr (snd skt) in
-  fork (send_from_chan_loop skt srv_addr) c;
+  let c = make_new_channel_descr () in
+  fork (send_from_chan_loop skt srv_addr sidLB) c;
   fork (client_recv_on_chan_loop skt srv_addr sidLB ackId) c;
   c
 
 (** ******************* DATA TRANSFER (send, try_recv, recv) *************** **)
 
 let send (c : ('a, 'b) chan_descr) (mbody : 'a) =
-  let sdata = fst (fst c) in
+  let sdata = fst c in
   let (sbuf, smon) = sdata in
   monitor_acquire smon;
-  let p = !sbuf in
-  let (qe, ub) = p in
-  sbuf := (queue_add (ub, mbody) qe, ub + 1);
+  let qe = !sbuf in
+  sbuf := queue_add mbody qe;
   monitor_signal smon;
   monitor_release smon
 
 let try_recv (c : ('a, 'b) chan_descr) : 'b option =
-  let rdata = snd (fst c) in
+  let rdata = snd c in
   let (rbuf, rlk) = rdata in
   acquire rlk;
   let mo = queue_take_opt !rbuf in
@@ -367,7 +362,7 @@ let try_recv (c : ('a, 'b) chan_descr) : 'b option =
       | Some p ->
         let (msg, tl) = p in
         rbuf := tl;
-        Some (snd msg)
+        Some msg
     end in
   release rlk;
   res

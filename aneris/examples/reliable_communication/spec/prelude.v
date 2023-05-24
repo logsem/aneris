@@ -31,9 +31,6 @@ Record endpoint_name :=
       endpoint_chan_name : chan_name;
       endpoint_send_lock_name : lock_name;
       endpoint_recv_lock_name : lock_name;
-      endpoint_address_name : gname;
-      endpoint_side_name : gname;
-      endpoint_idxs_name : gname;
       (* can be later generalized to the endpoint_endpoint_name *)
     }.
 

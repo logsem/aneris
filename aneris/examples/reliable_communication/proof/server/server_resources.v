@@ -63,11 +63,10 @@ Section Server_resources.
     ∃ (qv : val) (vs : list val),
      qLoc ↦[srv_ip] qv ∗ ⌜is_queue vs qv⌝ ∗
      ([∗ list] i ↦ v ∈ vs,
-        ∃ (γe : endpoint_name) (c : val) (sa : socket_address),
+        ∃ (c : val) (sa : socket_address),
           ⌜v = (c, #sa)%V⌝ ∗
          (* The fact that we get the initial proto is a bit subtle. *)
-          c  ↣{ γe , srv_ip, RCParams_srv_ser } iProto_dual RCParams_protocol ∗
-          ChannelAddrToken γe (RCParams_srv_saddr, sa)).
+          c  ↣{ srv_ip, RCParams_srv_ser } iProto_dual RCParams_protocol).
 
   Definition is_conn_queue_lock γ_qlk qlk qLoc :=
     is_lock
@@ -108,18 +107,12 @@ Section Server_resources.
     γe (c : val)
     (sidLBLoc ackIdLoc : loc) (clt_addr : socket_address) : iProp Σ :=
     ∃ (γs : session_name)
-      (serl : loc)
-      (serf : val)
-      (sa : socket_address)
       (sbuf : loc) (slk : val)
       (rbuf : loc) (rlk : val),
-      ⌜c = (((#sbuf, slk), (#rbuf, rlk)), #serl)%V⌝ ∗
+      ⌜c = ((#sbuf, slk), (#rbuf, rlk))%V⌝ ∗
       ⌜endpoint_chan_name γe = session_chan_name γs⌝ ∗
       ⌜lock_idx_name (endpoint_send_lock_name γe) = (session_srv_idx_name γs)⌝ ∗
-      ⌜s_ser (s_serializer RCParams_srv_ser) = serf⌝ ∗
       session_token clt_addr γs ∗
-      ChannelAddrToken γe (sa, clt_addr) ∗
-      ChannelIdxsToken γe (sidLBLoc, ackIdLoc) ∗
       is_send_lock srv_ip
          (endpoint_chan_name γe)
          (endpoint_send_lock_name γe)

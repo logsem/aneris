@@ -60,8 +60,8 @@ Section Client_API_spec_instantiation.
     iIntros (skt clt_addr Φ) "(%h & %s & Hres) HΦ".
     iApply (connect_internal_spec with "[Hres][HΦ]").
     - iExists _, _. iFrame.
-    - iNext. iIntros (γe c) "(Hpost & _)".
-      iApply "HΦ". iExists _. iFrame.
+    - iNext. iIntros (c) "Hpost".
+      iApply "HΦ". iFrame.
   Qed.
 
 End Client_API_spec_instantiation.

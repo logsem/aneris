@@ -25,13 +25,13 @@ Section Proof_of_client_recv_loop.
 
   Lemma client_recv_on_chan_loop_spec c ip skt sa
         (γs : session_name) (γe : endpoint_name)
-        ser serf
+        ser
         (sidLBLoc ackIdLoc : loc) (sbuf : loc) slk (rbuf : loc) rlk
         (ridx ackId : nat) :
     ip_of_address sa = ip →
     endpoint_chan_name γe = session_chan_name γs →
     lock_idx_name (endpoint_send_lock_name γe) = (session_clt_idx_name γs) →
-    c = (((#sbuf, slk), (#rbuf, rlk)), serf)%V →
+    c = ((#sbuf, slk), (#rbuf, rlk))%V →
     {{{ socket_resource skt sa N Left ∗
         RCParams_srv_saddr ⤇ server_interp ∗
         is_recv_lock
@@ -96,7 +96,7 @@ Section Proof_of_client_recv_loop.
       iApply ("Hlob" with "HsidLB Hack Hsidx HΦ"). }
     iDestruct "Hmval" as "(#Hsmode & [Hmval | Hmval])".
     { iDestruct "Hmval" as (ackid) "[-> [%n [-> [%γ [Htok' Hsidx']]]]]". wp_pures.
-      wp_apply (process_data_on_chan_spec _ _ _ _ _ γs γe ser serf sidLBLoc ackIdLoc Left _
+      wp_apply (process_data_on_chan_spec _ _ _ _ _ γs γe ser sidLBLoc ackIdLoc Left _
                with "[$Hsrv $Hrlk $Hslk $HsidLB $Hack]");
       [done|done|done|done|done| | ].
       { iSplit; [by iFrame "#"; iExists _, _; iFrame "#"|].
@@ -113,7 +113,7 @@ Section Proof_of_client_recv_loop.
       iApply ("Hlob" with "HsidLB Hack Hsidx'' HΦ"). }
     iDestruct "Hmval" as (i w ->) "Hmval". wp_pures.
     wp_apply (process_data_on_chan_spec
-                _ _ _ _ _ γs γe ser serf sidLBLoc ackIdLoc Left _
+                _ _ _ _ _ γs γe ser sidLBLoc ackIdLoc Left _
                with "[$Hsrv $Hrlk $Hslk $HsidLB $Hack Hmval]");
       [done|done|done|done|done| |].
     { iSplit; [by iFrame "#"; iExists _, _; iFrame "#"|].

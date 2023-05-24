@@ -41,7 +41,7 @@ Section Proof_of_process_data_on_chan.
       as "HsidLBloc".
     { by iSplitL "HsidLBLoc". }
     wp_store. wp_pures. wp_bind (queue_drop _ _).
-    rewrite -!Nat2Z.inj_add. rewrite -Nat2Z.inj_sub; [|lia].
+    rewrite -Nat2Z.inj_sub; [|lia].
     wp_apply wp_queue_drop; [done|].
     iIntros (rv Hrv).
     wp_pures. wp_store.
@@ -51,7 +51,6 @@ Section Proof_of_process_data_on_chan.
     wp_apply (monitor_release_spec with "[$Hslk $Hlocked Hsbuf HsidLBLoc' Hsidx' Hvs]").
     { iExists rv, (drop (msg_ack - sidLB) vs), msg_ack.
       rewrite skipn_length.
-      rewrite -!Nat2Z.inj_add.
       replace (msg_ack + (length vs - (msg_ack - sidLB)))
         with (sidLB + length vs) by lia.
       iFrame.
@@ -60,21 +59,20 @@ Section Proof_of_process_data_on_chan.
       iDestruct "Hvs" as "[_ Hvs]".
       iApply (big_sepL_impl with "Hvs").
       iIntros "!>" (k v Hlookup) "Hv".
-      rewrite -!Nat2Z.inj_add.
       replace (sidLB + (msg_ack - sidLB + k)) with (msg_ack + k) by lia.
       done. }
     iIntros (v ->). wp_pures.
     iApply "HΦ". iFrame. iPureIntro. lia.
   Qed.
 
-  Lemma process_data_on_chan_spec c ip skt sa γs γe ser serf
+  Lemma process_data_on_chan_spec c ip skt sa γs γe ser
         (sidLBLoc ackIdLoc : loc) s (mval : val) (sbuf : loc)
         (dst : socket_address) slk (rbuf : loc) rlk (ridx ackId : nat) :
     ip_of_address sa = ip →
     endpoint_chan_name γe = session_chan_name γs →
     lock_idx_name (endpoint_send_lock_name γe) =
       side_elim s (session_clt_idx_name γs) (session_srv_idx_name γs) →
-    c = ((#sbuf, slk), (#rbuf, rlk), serf)%V →
+    c = ((#sbuf, slk), (#rbuf, rlk))%V →
     side_elim s dst sa = RCParams_srv_saddr →
     {{{ socket_resource skt sa N s ∗
         dst ⤇ side_elim s server_interp client_interp ∗
@@ -152,15 +150,13 @@ Section Proof_of_process_data_on_chan.
       iDestruct "HackId" as "[HackId HackId']".
       wp_apply (release_spec with
                  "[$Hrlk $Hlocked Hrbuf Hridx Hvs Hfrag HackId']").
-      { iExists q', (vs ++ [(#i, w)%V]), ridx'. iFrame.
+      { iExists q', (vs ++ [w]), ridx'. iFrame.
         iSplit; [done|].
         subst. replace (1)%Z with (Z.of_nat 1%nat) by lia.
         rewrite app_length /= -!Nat2Z.inj_add.
         rewrite Nat.add_assoc. iFrame "HackId'".
         iSplit; [|done].
-        iExists w.
-        replace (length vs + 0) with (length vs) by lia.
-        by iSplit. }
+        by replace (length vs + 0) with (length vs) by lia. }
       iIntros (v) "->".
       wp_pures.
       wp_load. wp_pures.

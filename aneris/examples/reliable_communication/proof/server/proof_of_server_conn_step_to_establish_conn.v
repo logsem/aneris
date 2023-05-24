@@ -40,7 +40,6 @@ Section Proof_of_server_conn_step_2.
       (skl : loc) (skt_passive : val) skt sock h (cml : loc) cmv (cql : loc) qlk γqlk mval m
        (cM :gmap socket_address conn_state)
        (γM : session_names_map) ψclt (R0 T0 : gset message) (cookie : nat) :
-
     skt_passive = (skt, #cml, (#cql, qlk))%V →
     dom γM = dom cM →
     m_sender m ∈ dom cM →
@@ -88,10 +87,6 @@ Section Proof_of_server_conn_step_2.
       "(Hskl & Hcml & HknM & #HmRFrag & HmRFull & #HmTfrag & #HdomR & #HmsgRres
              & HknRes & %Hser & HmvalRes & Hres)".
     wp_lam. rewrite Hskt. wp_pures.
-    assert (∃ γs', γM !! (m_sender m) = Some γs') as (γs' & Hmγs).
-    { assert (is_Some (γM !! (m_sender m))).
-      { apply elem_of_dom. by rewrite Hdom. }
-      naive_solver. }
     iDestruct "HmvalRes" as "[#HlRes|#HrRes]"; last first.
     (* ===================================================================== *)
     (* Case 1. The message is ACKID or MSGID. (Absurd). *)
@@ -288,253 +283,231 @@ Section Proof_of_server_conn_step_2.
       iDestruct (session_token_agree with "[$Htk0][$Htk]") as "->".
       wp_apply
         (make_new_channel_descr_spec γs (m_sender m) (iProto_dual RCParams_protocol) Right lAD lLB
-          with "[$HsidLB1 $Hackid1 $Hc2]"); [done|done|done | ].
-      iIntros (γe c) "(#HaT & #HsT & #HlT & Hchan)". simpl in *.
+          with "[$HsidLB1 $Hackid1 $Hc2]"); [done|done | ].
+      iIntros (γe c sbuf smn rbuf rlk)
+              "(%Hc & %Hγeq & %Hlkeq & Hmn1 & Hmn2 & Hpown & #Hslk & #Hrlk)".
+      simpl in *.
       wp_pures.
-      (* Unfolding the definition to get the persistent knowledge(send/recv locks, etc.) *)
-      rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-      iDestruct "Hchan" as
-        (γs'' sd ser serf sa dst sbuf slk rbuf rlk )
-          "(%sidLBLoc & %ackIdLoc & %sidx & %ridx & Hhy)".
-      iDestruct "Hhy"
-        as "(%Hc & %Heqc & %Heqg & Hl & %Hlser & Hmn1 & Hmn2
-                 & #Hst' & #HaT' & #HsT' & #HlT'
-                 & Hpown & #Hslk & #Hrlk)".
-      simpl. destruct sd as [|].
-      - by iDestruct (ChannelSideToken_agree with "[$HsT] [$HsT']") as "%".
-      - simpl in *.
-        iDestruct (ChannelIdxsToken_agree with "[$HlT] [$HlT']") as "%Heql".
-        inversion Heql as ((Heql1 & Heql2)).
-        iDestruct (ChannelAddrToken_agree with "[$HaT] [$HaT']") as "%Heqa".
-        inversion Heqa as ((Heqa1 & Heqa2)).
-        iDestruct (session_token_agree with "[$Htk0] [$Hst']") as "->".
-      (* Updating the ghost resources. *)
-        iApply fupd_aneris_wp.
-        iDestruct "Habs2" as "(#Htk2 & Hsmoderes)".
-        iMod (SM_own_update with "[$Hsmoderes]") as "#Hopened".
+      (* Unfolding the definition to get the persistent knowledge (send/recv locks, etc.) *)
+      simpl.
+      iApply fupd_aneris_wp.
+      iDestruct "Habs2" as "(#Htk2 & Hsmoderes)".
+      iMod (SM_own_update with "[$Hsmoderes]") as "#Hopened".
+      iModIntro.
+      wp_apply (aneris_wp_fork with "[-]").
+      iSplitL.
+      + iNext. wp_pures.
+        wp_load. wp_pures.
+        wp_apply (@wp_map_insert
+                    _ _ _ _ _ _ Inject_socket_address _
+                    Inject_conn_state srv_ip ( (m_sender m))
+                    ((Connected ((c, cookie), (lLB, lAD)))) cmv cM $! Hmap).
+        iIntros (cmv' Hmap').
+        wp_store.
+        wp_pures.
+        wp_apply (s_ser_spec (msg_serialization RCParams_srv_ser)).
+        { eauto. iPureIntro. apply (serInit _ 0 Right). }
+        iIntros (s1 Hs1). wp_pures.
+        iAssert (mono_nat.mono_nat_lb_own (session_clt_idx_name γs) 0) as "#Hmono".
+        { rewrite /can_init. simpl.
+          iDestruct "Hc1" as "(_ & Hmono & _)".
+          iApply mono_nat.mono_nat_lb_own_get. done. }
+        (* Sending "COOKIE-ACK, cookie" back. *)
+        wp_bind (SendTo _ _ _).
+        iInv (RCParams_srv_N.@"skt")
+          as (R' T')
+               "(>Hh & >Hmh & >#HmRfrag & >HmTauth & #HmR')".
+        wp_apply (aneris_wp_send srv_ip
+                   with "[$Hh $Hmh Hc1]"); [done|done|  | ].
+        { iSplit; iNext; first done. inversion Hckeq as (Hseqv).
+          iExists (InjLV (#"COOKIE-ACK", #0)).
+          do 2 (iSplit; first done).
+          iLeft.
+          iExists _, _.
+          iSplit; first done.
+          iExists 0, γs. simpl.
+          iSplit; first done. iFrame "#".
+          iRight. iSplit; first done.
+          iExists γs. iFrame "Hc1". iFrame "#". }
+        iIntros "(Hh & Hmh)".
+        set (resp := {|
+                      m_sender := RCParams_srv_saddr;
+                      m_destination := m_sender m;
+                      m_body := s1
+                    |}).
+        iDestruct "HmTauth" as (T00 HsubT00) "HmTauth".
+        iAssert (⌜T0 ⊆ T00⌝)%I as "%HmhrRel".
+        {  iDestruct (own_valid_2 with "HmTauth HmTfrag")
+            as %[Hv1%gset_included Hv2]%auth_both_valid_discrete.
+           iPureIntro. set_solver. }
+        iMod (own_update _ _ ((● ({[resp]} ∪ T00)) ⋅ (◯ ({[resp]} ∪ T00)))
+               with "HmTauth")
+          as "[HmTauth #HTfrag]".
+        { apply auth_update_alloc. apply gset_local_update. set_solver. }
+        iSplitL "Hh Hmh HmTauth".
+        { iModIntro. iNext. iExists R', ({[resp]} ∪ T').
+          iFrame; eauto. iSplit; first eauto. iSplitL; last done.
+          iExists ({[resp]} ∪ T00). eauto with set_solver. }
         iModIntro.
-        wp_apply (aneris_wp_fork with "[-]").
+        wp_pures.
+        wp_apply (acquire_spec (RCParams_srv_N.@"qlk") with "Hqlk").
+        iIntros (qv) "(-> & Hlkd & Hqres)".
+        iDestruct "Hqres" as (qv vs) "(Hql & %Hisq & Hqres)".
+        wp_seq.
+        wp_load.
+        wp_pures.
+        wp_apply (@wp_queue_add _ _ _ _ _ vs qv (c, #(m_sender m))%V srv_ip $! Hisq).
+        iIntros (rv Hqrv).
+        wp_store.
+        (* Release the lock by providing the channel mapsto. *)
+        wp_apply (release_spec with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown]").
+        { iFrame "Hlkd Hqlk".
+          iExists rv, (vs ++ [(c, #(m_sender m))%V]).
+          iFrame "Hql".
+          iSplit; first done.
+          iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown]").
+          iExists c, (m_sender m).
+          iSplit; first done.
+          iFrame "#".
+          rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
+          iExists _, _, _, _, _, _, _, _. iExists _, _.
+          iFrame "Hslk Hrlk Hmn1 Hmn2 Hpown". subst; eauto. }
+        iIntros (? ->).
+        wp_pures. iApply "HΦ".
+        iSplit; first done.
+        (* Restore the loop invariant. *)
+        iExists _, _, _, _, _, _.
+        iSplit; first done.
+        iFrame "Hskl".
         iSplitL.
-        + iNext. wp_pures.
-          wp_load. wp_pures.
-          wp_apply (@wp_map_insert
-                      _ _ _ _ _ _ Inject_socket_address _
-                      Inject_conn_state srv_ip ( (m_sender m))
-                      ( (Connected ((c, cookie), (sidLBLoc, ackIdLoc)))) cmv cM $! Hmap).
-          iIntros (cmv' Hmap').
-          wp_store.
-          wp_pures.
-          wp_apply (s_ser_spec (msg_serialization RCParams_srv_ser)).
-          { eauto. iPureIntro. apply (serInit _ 0 Right). }
-          iIntros (s1 Hs1). wp_pures.
-          iAssert (mono_nat.mono_nat_lb_own (session_clt_idx_name γs'') 0) as "#Hmono".
-          { rewrite /can_init. simpl.
-            iDestruct "Hc1" as "(_ & Hmono & _)".
-            by iApply mono_nat.mono_nat_lb_own_get. }
-          (* Sending "COOKIE-ACK, cookie" back. *)
-          wp_bind (SendTo _ _ _).
-          iInv (RCParams_srv_N.@"skt")
-                 as (R' T')
-                      "(>Hh & >Hmh & >#HmRfrag & >HmTauth & #HmR')".
-          wp_apply (aneris_wp_send srv_ip
-                     with "[$Hh $Hmh Hc1]"); [done|done|  | ].
-          { iSplit; iNext; first done. inversion Hckeq as (Hseqv).
-            iExists (InjLV (#"COOKIE-ACK", #0)).
-            do 2 (iSplit; first done).
-            iLeft.
-            iExists _, _.
-            iSplit; first done.
-            iExists 0, γs''. simpl.
-            iSplit; first done.
-            iSplit; first eauto.
-            iRight. iSplit; first done.
-            iExists γs''. iSplit; last by iFrame "Htk2 Hopened".
-            by iFrame. }
-          iIntros "(Hh & Hmh)".
-          set (resp := {|
-                        m_sender := RCParams_srv_saddr;
-                        m_destination := m_sender m;
-                        m_body := s1
-                      |}).
-          iDestruct "HmTauth" as (T00 HsubT00) "HmTauth".
-          iAssert (⌜T0 ⊆ T00⌝)%I as "%HmhrRel".
-          {  iDestruct (own_valid_2 with "HmTauth HmTfrag")
-              as %[Hv1%gset_included Hv2]%auth_both_valid_discrete.
-             iPureIntro. set_solver. }
-          iMod (own_update _ _ ((● ({[resp]} ∪ T00)) ⋅ (◯ ({[resp]} ∪ T00)))
-                 with "HmTauth")
-            as "[HmTauth #HTfrag]".
-          { apply auth_update_alloc. apply gset_local_update. set_solver. }
-          iSplitL "Hh Hmh HmTauth".
-          { iModIntro. iNext. iExists R', ({[resp]} ∪ T').
-            iFrame; eauto. iSplit; first eauto. iSplitL; last done.
-            iExists ({[resp]} ∪ T00). eauto with set_solver. }
-          iModIntro.
-          wp_pures.
-          wp_apply (acquire_spec (RCParams_srv_N.@"qlk") with "Hqlk").
-          iIntros (qv) "(-> & Hlkd & Hqres)".
-          iDestruct "Hqres" as (qv vs) "(Hql & %Hisq & Hqres)".
-          wp_seq.
-          wp_load.
-          wp_pures.
-          wp_apply (@wp_queue_add _ _ _ _ _ vs qv (c, #(m_sender m))%V srv_ip $! Hisq).
-          iIntros (rv Hqrv).
-          wp_store.
-          (* Release the lock by providing the channel mapsto. *)
-          wp_apply (release_spec (RCParams_srv_N.@"qlk")
-                                 srv_ip γqlk qlk (conn_queue_lock_def cql)
-                     with "[Hlkd Hql Hqres Hmn1 Hmn2 Hpown Hl]").
-          { iFrame "Hlkd Hqlk".
-            iExists rv, (vs ++ [(c, #(m_sender m))%V]).
-            iFrame "Hql".
-            iSplit; first done.
-            iApply (big_sepL_snoc with "[$Hqres Hmn1 Hmn2 Hpown Hl]").
-            iExists γe, c, (m_sender m).
-            iSplit; first done.
-            iFrame "#".
-            rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-            iExists _, _, _, _, _, _, _.
-            iExists _, _, _, _, _, _, _.
-            iFrame "Hslk Hrlk HsT HaT Hmn1 Hmn2 Hpown Hl".
-            iFrame "#∗".
-            subst; eauto. }
-          iIntros (? ->).
-          wp_pures. iApply "HΦ".
+        { iExists ({[m]} ∪ R0), ({[resp]} ∪ T00), cmv', γM.
+          iExists (<[m_sender m:=Connected (c, cookie, (lLB, lAD))]> cM).
           iSplit; first done.
-          (* Restore the loop invariant. *)
-          iExists _, _, _, _, _, _.
-          iSplit; first done.
-          iFrame "Hskl".
-          iSplitL.
-          { iExists ({[m]} ∪ R0), ({[resp]} ∪ T00), cmv', γM.
-            iExists (<[m_sender m:=Connected (c, cookie, (sidLBLoc, ackIdLoc))]> cM).
-            iSplit; first done.
-            iFrame "#∗".
+          iFrame "#∗".
+          iSplit.
+          { iPureIntro. rewrite Hdom. set_solver. }
+          iSplit.
+          { iApply (big_sepS_insert with "[$HdomR]"); first done.
+            iPureIntro. rewrite Hdom. set_solver.  }
+          iSplit.
+          { iApply (big_sepS_insert with "[HmsgRres]"); first done.
             iSplit.
-            { iPureIntro. rewrite Hdom. set_solver. }
-            iSplit.
-            { iApply (big_sepS_insert with "[$HdomR]"); first done.
-              iPureIntro. rewrite Hdom. set_solver.  }
-            iSplit.
-            { iApply (big_sepS_insert with "[HmsgRres]"); first done.
-              iSplit.
-              - iExists γs'', (InjLV (#"COOKIE", #n)), n.
-                iSplit; first done.
-                iFrame "Htk0".
-                iRight.
-                iExists c, sidLBLoc, ackIdLoc.
-                rewrite lookup_insert. naive_solver.
-              - iApply (big_sepS_mono _ _ _ with "HmsgRres").
-                iIntros (m0 Hm0) "#Hres".
-                destruct (bool_decide (m_sender m = m_sender m0)) eqn:Hmeq.
-                + apply bool_decide_eq_true_1 in Hmeq.
-                  iDestruct "Hres"
-                    as (γs0 mval0 n0 Hser0) "(#Htk0 & [#(%Hl & %Hl2) | #Hr])".
-                  ++ rewrite Hmeq. rewrite -Hmeq in Hl2.
-                     iExists γs0, (InjLV (#"INIT", #0)), n.
-                     iSplit; first (subst; done).
-                     iFrame "Htk0".
-                     iRight.
-                     iExists c, sidLBLoc, ackIdLoc.
-                     rewrite lookup_insert. naive_solver.
-                  ++ iDestruct "Hr" as (???) "%Habs".
-                     rewrite -Hmeq in Habs. naive_solver.
-                + apply bool_decide_eq_false_1 in Hmeq.
-                  iDestruct "Hres"
-                    as (γs0 mval0 n0 Hser0) "(#Htk0 & [#(%Hl & %Hl2) | #Hr])".
-                  * iExists γs0, _, _. iFrame "#∗". iSplit; first done.
-                    iLeft. by rewrite lookup_insert_ne.
-                  * iDestruct "Hr" as (???) "%Habs".
-                    iExists γs0, _, n0. iFrame "#∗". iSplit; first done.
-                    iRight. rewrite lookup_insert_ne; subst; eauto. }
-            iApply big_sepM_insert_delete.
-            iSplitR "HknResAcc".
-            assert (n = ck0) as -> by naive_solver.
-            assert (ck0 = cookie) as -> by naive_solver.
-            {  iExists γs'', cookie. iFrame "HCkF".
-               iSplitR.
-               { iSplit; first done.
-                 destruct Hhst1 as (y0 & ? & ? & ? & ?).
-                 destruct Hhst2 as (y1 & ? & ? & ? & ?).
-                 iSplit.
-                 { simpl in *. subst.
-                   iExists y0, _; eauto with set_solver. }
-                 iExists y1, _; eauto with set_solver. }
-               iRight.
-               iExists γe, c, _, 0, _, 0.
-               iFrame "HsidLB2 Hackid2 Hck Hmono".
+            - iExists γs, (InjLV (#"COOKIE", #n)), n.
+              iSplit; first done.
+              iFrame "Htk0".
+              iRight.
+              iExists c, lLB, lAD.
+              rewrite lookup_insert. naive_solver.
+            - iApply (big_sepS_mono _ _ _ with "HmsgRres").
+              iIntros (m0 Hm0) "#Hres".
+              destruct (bool_decide (m_sender m = m_sender m0)) eqn:Hmeq.
+              + apply bool_decide_eq_true_1 in Hmeq.
+                iDestruct "Hres"
+                  as (γs0 mval0 n0 Hser0) "(#Htk0 & [#(%Hl & %Hl2) | #Hr])".
+                ++ rewrite Hmeq. rewrite -Hmeq in Hl2.
+                   iExists γs0, (InjLV (#"INIT", #0)), n.
+                   iSplit; first (subst; done).
+                   iFrame "Htk0".
+                   iRight.
+                   iExists c, lLB, lAD.
+                   rewrite lookup_insert. naive_solver.
+                ++ iDestruct "Hr" as (???) "%Habs".
+                   rewrite -Hmeq in Habs. naive_solver.
+              + apply bool_decide_eq_false_1 in Hmeq.
+                iDestruct "Hres"
+                  as (γs0 mval0 n0 Hser0) "(#Htk0 & [#(%Hl & %Hl2) | #Hr])".
+                * iExists γs0, _, _. iFrame "#∗". iSplit; first done.
+                  iLeft. by rewrite lookup_insert_ne.
+                * iDestruct "Hr" as (???) "%Habs".
+                  iExists γs0, _, n0. iFrame "#∗". iSplit; first done.
+                  iRight. rewrite lookup_insert_ne; subst; eauto. }
+          iApply big_sepM_insert_delete.
+          iSplitR "HknResAcc".
+          assert (n = ck0) as -> by naive_solver.
+          assert (ck0 = cookie) as -> by naive_solver.
+          {  iExists γs, cookie. iFrame "HCkF".
+             iSplitR.
+             { iSplit; first done.
+               destruct Hhst1 as (y0 & ? & ? & ? & ?).
+               destruct Hhst2 as (y1 & ? & ? & ? & ?).
                iSplit.
-               { iExists m, _. iPureIntro.
-                 split; first by set_solver.
-                 split_and!; eauto. }
-               iSplit.
-               { iExists resp, _. iPureIntro.
-                 split; first by set_solver.
-                 split_and!; eauto. }
-               iSplit; first done.
-               iSplit; first by iFrame "#".
-               subst; eauto.
-               iExists _, _, _, _, _, _.
-               iExists _, _. iFrame "#∗".
-               iPureIntro; split_and!; eauto. }
-            iApply (big_sepM_mono with "[$HknResAcc]").
-            iIntros (k x Hkx) "HchanRes".
-            destruct (bool_decide (m_sender m = k)) eqn:Hkm.
-            - apply bool_decide_eq_true_1 in Hkm.
-              rewrite -Hkm in Hkx. by rewrite lookup_delete in Hkx.
-            - apply bool_decide_eq_false_1 in Hkm.
-              rewrite lookup_delete_ne in Hkx; last done.
-              iDestruct "HchanRes" as (γi cki) "((#Htk0i & HCkFi & %Hhst1i & %Hhst2i) & HchanRes)".
-              iDestruct "HchanRes" as "[(%Hb & Hsmode' & Hc1 & Hc2)|HchanRes]"; last first.
-              { iExists γi, cki. iFrame "HCkFi Htk0i".
-                simpl in *.
-                iSplitR.
-                destruct Hhst1i as (y0 & ? & ? & ? & ?).
-                destruct Hhst2i as (y1 & ? & ? & ? & ?).
-                iSplit.
-                { simpl in *. subst.
-                  iExists y0, _; eauto with set_solver. }
-                iExists y1, _; eauto with set_solver.
-                iDestruct "HchanRes" as (γc' c' sidLB_l' sidLB_n' ackId_l' ackId_n') "HchanRes".
-                iDestruct "HchanRes"
-                  as "(%Hhst3i & %Hhst4i & %Hchan' & #Hopened & Hckf & HsL & HaL & #Hmono & #Hpers)".
-                iDestruct "Hpers" as
-                  (γsi ser' serf' sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
-                iDestruct "Hpers"
-                  as "(%Hgeq' & %Hgleq' & Htk' & HcT & HaT & HiT & Hslk & Hrlk)".
-                iRight.
-                destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ?).
-                destruct Hhst4i as (y4 & ? & ? & ? & ? & ? & ?).
-                subst.
-                iExists γc', _, _, _, _, _.
-                iFrame "HsL HaL Hckf".
-                iSplit.
-                { iExists y3, (InjLV (#"COOKIE", #cki)). by eauto with set_solver. }
-                iSplit.
-                { iExists y4, _. by eauto with set_solver. }
-                iSplit; first done.
-                subst.
-                iSplit.
-                { iDestruct "Hopened" as "(H1 & H2)". iFrame "#". }
-                iFrame "#".
-                iExists _, _, _, _, _, _, _, _. iFrame "#"; eauto. }
-              iExists γi, cki. iSplitL "HCkFi". iFrame "#∗".
+               { simpl in *. subst.
+                 iExists y0, _; eauto with set_solver. }
+               iExists y1, _; eauto with set_solver. }
+             iRight.
+             iExists γe, c, _, 0, _, 0.
+             iFrame "HsidLB2 Hackid2 Hck Hmono".
+             iSplit.
+             { iExists m, _. iPureIntro.
+               split; first by set_solver.
+               split_and!; eauto. }
+             iSplit.
+             { iExists resp, _. iPureIntro.
+               split; first by set_solver.
+               split_and!; eauto. }
+             iSplit; first done.
+             iSplit; first by iFrame "#".
+             subst; eauto.
+             iExists _, _, _, _, _. iFrame "#∗". done. }
+          iApply (big_sepM_mono with "[$HknResAcc]").
+          iIntros (k x Hkx) "HchanRes".
+          destruct (bool_decide (m_sender m = k)) eqn:Hkm.
+          - apply bool_decide_eq_true_1 in Hkm.
+            rewrite -Hkm in Hkx. by rewrite lookup_delete in Hkx.
+          - apply bool_decide_eq_false_1 in Hkm.
+            rewrite lookup_delete_ne in Hkx; last done.
+            iDestruct "HchanRes" as (γi cki) "((#Htk0i & HCkFi & %Hhst1i & %Hhst2i) & HchanRes)".
+            iDestruct "HchanRes" as "[(%Hb & Hsmode' & Hc1 & Hc2)|HchanRes]"; last first.
+            { iExists γi, cki. iFrame "HCkFi Htk0i".
+              simpl in *.
+              iSplitR.
               destruct Hhst1i as (y0 & ? & ? & ? & ?).
               destruct Hhst2i as (y1 & ? & ? & ? & ?).
               iSplit.
               { simpl in *. subst.
                 iExists y0, _; eauto with set_solver. }
               iExists y1, _; eauto with set_solver.
-              iLeft; first by iFrame. }
-          iFrame "Hqlk".
-          iExists _, _. subst; eauto.
-        + iNext.
-          simplify_eq.
-          iApply (send_from_chan_loop_spec
+              iDestruct "HchanRes" as (γc' c' sidLB_l' sidLB_n' ackId_l' ackId_n') "HchanRes".
+              iDestruct "HchanRes"
+                as "(%Hhst3i & %Hhst4i & %Hchan' & #Hopened & Hckf & HsL & HaL & #Hmono & #Hpers)".
+              iDestruct "Hpers" as
+                (γsi sa' sbuf' slk' rbuf' rlk' Hc') "Hpers".
+              iDestruct "Hpers" as "(%Hc'' & Hslk & Hrlk)".
+              iRight.
+              destruct Hhst3i as (y3 & ? & ? & ? & ? & ? & ?).
+              destruct Hhst4i as (y4 & ? & ? & ? & ? & ? & ?).
+              subst.
+              iExists γc', _, _, _, _, _.
+              iFrame "HsL HaL Hckf".
+              iSplit.
+              { iExists y3, (InjLV (#"COOKIE", #cki)). by eauto with set_solver. }
+              iSplit.
+              { iExists y4, _. by eauto with set_solver. }
+              iSplit; first done.
+              subst.
+              iSplit.
+              { iDestruct "Hopened" as "(H1 & H2)". iFrame "#". }
+              iFrame "#".
+              iExists _, _, _, _, _. iFrame "#"; eauto. }
+            iExists γi, cki. iSplitL "HCkFi". iFrame "#∗".
+            destruct Hhst1i as (y0 & ? & ? & ? & ?).
+            destruct Hhst2i as (y1 & ? & ? & ? & ?).
+            iSplit.
+            { simpl in *. subst.
+              iExists y0, _; eauto with set_solver. }
+            iExists y1, _; eauto with set_solver.
+            iLeft; first by iFrame. }
+        iFrame "Hqlk".
+        iExists _, _. subst; eauto.
+      + iNext.
+        simplify_eq.
+        iApply (send_from_chan_loop_spec
                   (RCParams_srv_N.@"skt") _ _ _ _ _ _ _ _ Right with "[-]");
           [done|done|done|done|done|iSplitL; eauto with iFrame|done].
-          iExists _, _; subst; eauto.
-          iFrame "#∗". iExists γs''. simpl. iFrame "#". }
+        iExists _, _; subst; eauto.
+        iFrame "#∗". iExists γs. simpl. iFrame "#". }
+    (* Todo: Where do these come from? *)
+    Unshelve. all: by eauto.
   Qed.
 
 End Proof_of_server_conn_step_2.

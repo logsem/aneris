@@ -21,7 +21,6 @@ Section Chan_Mapsto_Resources.
       chan_mapsto_nonExpansive c ip ser :> NonExpansive (λ p, chan_mapsto c p ip ser);
       chan_mapsto_proper c ip ser :> Proper ((≡) ==> (≡)) (λ p, chan_mapsto c p ip ser);
       chan_mapsto_le c ip ser p1 p2 : c ↣{ ip, ser } p1 -∗ ▷ (p1 ⊑ p2) -∗ c ↣{ ip, ser } p2;
-      chan_mapsto_exclusive c ip ser p1 p2 : c ↣{ ip, ser } p1 -∗ c ↣{ ip, ser } p2 -∗ False;
     }.
 
 End Chan_Mapsto_Resources.

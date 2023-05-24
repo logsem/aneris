@@ -284,6 +284,28 @@ Section queue_specs.
     by iFrame.
   Qed.
 
+  Lemma wp_queue_iteri Φ Ψ P ip q qv (fv : val) :
+    is_queue q qv →
+    (∀ (i : nat) (a : A),
+        {{{ P ∗ Φ i a }}} fv #i (Val $ a) @[ip] {{{ v, RET v; P ∗ Ψ i a }}}) -∗
+    {{{ P ∗ [∗ list] i↦a ∈ q, Φ i a }}}
+      queue_iteri fv qv @[ip]
+    {{{ RET #(); P ∗ [∗ list] i↦a ∈ q, Ψ i a }}}.
+  Proof.
+    iIntros (Hq) "#Hq".
+    iIntros (Φ') "!> (HP & Hqs) HΦ".
+    wp_lam. destruct Hq as (f & b & lf & lb & [-> (Hlf & Hlb & ->)]).
+    wp_pures.
+    rewrite big_sepL_app. iDestruct "Hqs" as "[Hqs1 Hqs2]".
+    wp_smart_apply (wp_list_iteri with "Hq [$HP $Hqs1]"); [done|].
+    iIntros "[HP Hqs1]".
+    wp_smart_apply (wp_list_rev with "[//]"). iIntros (v Hrev).
+    wp_smart_apply (wp_list_length); [done|]. iIntros (n ->).
+    iApply (wp_list_iteri_loop with "Hq [$HP $Hqs2]"); [done|].
+    iIntros "!> [HP Hqs]".
+    iApply "HΦ". by iFrame.
+  Qed.
+
 End queue_specs.
 
 Global Arguments is_queue {A} {_} _ _.

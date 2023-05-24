@@ -64,12 +64,8 @@ let[@builtinAtom "i2s"] i2s = string_of_int
 let[@builtinAtom "s2i"] s2i = int_of_string_opt
 
 
-type protocol = IPPROTO_UDP
 
 type saddr = SADDR of (string * int)
-
-let num_of_protocol = function
-  | IPPROTO_UDP -> 0
 
 let to_saddr s =
   match s with
@@ -105,7 +101,7 @@ let[@builtinAtom "MakeAddress"] makeAddress (ip : string) (port : int) =
 let[@builtinAtom "GetAddrInfo"] get_address_info (s : saddr) =
   match s with | SADDR (ip, p) -> (ip, p)
 
-let[@builtinAtom "NewSocket"] udp_socket () = socket PF_INET SOCK_DGRAM IPPROTO_UDP
+let[@builtinAtom "NewSocket"] udp_socket () = socket PF_INET SOCK_DGRAM 0
 
 let[@builtinAtom "ReceiveFrom"] receiveFrom skt =
   let buffer = Bytes.create 65536 in

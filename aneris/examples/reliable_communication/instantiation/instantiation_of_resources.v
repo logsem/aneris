@@ -54,7 +54,7 @@ Section Chan_mapsto_intantiation.
   Context `{!chanG Σ}.
 
   Definition chan_mapsto_instance_def (c : val) (p : iProto Σ) ip ser : iProp Σ :=
-    ∃ γe, c ↣{γe, ip, ser} p.
+    c ↣{ip, ser} p.
 
   Lemma chan_mapsto_instance_def_contractive :
      ∀ (c : val) (ip : ip_address) (ser : serialization)
@@ -83,49 +83,15 @@ Section Chan_mapsto_intantiation.
     rewrite /chan_mapsto_instance_def iProto_mapsto_eq /iProto_mapsto_def; solve_proper.
   Qed.
 
-  Lemma chan_mapsto_instance_def_excl :
-    (∀ (c : val) (ip : ip_address) (ser : serialization) (p1 p2 : iProto Σ),
-       (λ (c0 : val) (p : iProto Σ) (ip0 : ip_address) (ser0 : serialization),
-          chan_mapsto_instance_def c0 p ip0 ser0) c p1 ip ser -∗
-       (λ (c0 : val) (p : iProto Σ) (ip0 : ip_address) (ser0 : serialization),
-          chan_mapsto_instance_def c0 p ip0 ser0) c p2 ip ser -∗
-       False).
-  Proof.
-     iIntros (c ip ser p1 p2).
-    iDestruct 1 as (γe1) "Hc1".
-    iDestruct 1 as (γe2) "Hc2".
-    rewrite iProto_mapsto_eq /iProto_mapsto_def.
-    iDestruct "Hc1" as
-      (γs1 s1 serl1 serf1 sa1 dst1 sbuf1 slk1 rbuf1 rlk1) "Hc1".
-    iDestruct "Hc1" as
-      (sidLBLoc1 ackIdLoc1 sidx1 ridx1 Hc1 He11 He12) "Hc1".
-    iDestruct "Hc1" as "(Hl1 & _)".
-    iDestruct "Hc2" as
-      (γs2 s2 serl2 serf2 sa2 dst2 sbuf2 slk2 rbuf2 rlk2) "Hc2".
-    iDestruct "Hc2" as
-      (sidLBLoc2 ackIdLoc2 sidx2 ridx2 Hc2 He21 He22) "Hc2".
-    iDestruct "Hc2" as "(Hl2 & _ )".
-    rewrite Hc1 in Hc2.
-    inversion Hc2.
-    iDestruct "Hl1" as (b1) "(Hn1 & Hl1)".
-    iDestruct "Hl2" as (b2) "(Hn2 & Hl2)".
-    simplify_eq.
-    iDestruct (mapsto_node_agree with "Hn1 Hn2") as "->".
-    iDestruct (gen_heap_light.lmapsto_valid_2 serl2 (heap_name b2) 1 1 serf1 serf2
-                with "[$Hl1][$Hl2]") as "%Habs".
-    by rewrite iris.algebra.frac.frac_valid in Habs.
-  Qed.
-
   Lemma chan_mapsto_instance_def_le :
     ∀ (c : val) (ip : ip_address) (ser : serialization) (p1 p2 : iProto Σ),
     chan_mapsto_instance_def c p1 ip ser  -∗ ▷ (p1 ⊑ p2) -∗ chan_mapsto_instance_def c p2 ip ser.
   Proof.
     iIntros (c ip ser p1 p2).
-    iDestruct 1 as (γe1) "Hc1".
+    iDestruct 1 as "Hc1".
     iIntros "Hle".
-    iExists γe1.
-    iDestruct (iProto_mapsto_le γe1 c ip ser p1 p2 with "[Hc1][$Hle]" ) as "Hle";
-      by rewrite iProto_mapsto_eq.
+    iDestruct (iProto_mapsto_le c ip ser p1 p2 with "[Hc1][$Hle]" ) as "Hle";
+      by done.
   Qed.
 
   Global Instance chan_mapsto_resource_instance : @Chan_mapsto_resource Σ :=
@@ -134,13 +100,12 @@ Section Chan_mapsto_intantiation.
       chan_mapsto_nonExpansive := chan_mapsto_instance_def_ne;
       chan_mapsto_proper := chan_mapsto_instance_def_proper;
       chan_mapsto_le := chan_mapsto_instance_def_le;
-      chan_mapsto_exclusive := chan_mapsto_instance_def_excl
     |}.
 
 
 End Chan_mapsto_intantiation.
 
-Arguments chan_mapsto_resource_instance {_ _ _ _ _ _}.
+Arguments chan_mapsto_resource_instance {_ _ _ _ _}.
 
 (* -------------------------------------------------------------------------- *)
 (** Instantiation of the Session Resources using client and server concrete

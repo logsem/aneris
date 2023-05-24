@@ -21,22 +21,17 @@ Section Proof_of_recv.
   Implicit Types p : iProto Σ.
   Implicit Types TT : tele.
 
-  Lemma try_recv_spec_internal {TT} γe (c : val) (v : TT → val) (P : TT → iProp Σ)
+  Lemma try_recv_spec_internal {TT} (c : val) (v : TT → val) (P : TT → iProp Σ)
         (p : TT → iProto Σ) ip ser :
-    {{{ c ↣{ γe, ip, ser } (<?.. x> MSG (v x) {{ P x }}; p x)%proto }}}
+    {{{ c ↣{ ip, ser } (<?.. x> MSG (v x) {{ P x }}; p x)%proto }}}
       try_recv c @[ip]
-    {{{ w, RET w; (⌜w = NONEV⌝ ∗ c ↣{ γe, ip, ser } (<?.. x> MSG (v x) {{ P x }}; p x)%proto) ∨
-                   (∃ x : TT,  ⌜w = SOMEV (v x)⌝ ∗ c ↣{ γe, ip, ser } (p x)%proto ∗ P x) }}}.
+    {{{ w, RET w; (⌜w = NONEV⌝ ∗ c ↣{ ip, ser } (<?.. x> MSG (v x) {{ P x }}; p x)%proto) ∨
+                   (∃ x : TT,  ⌜w = SOMEV (v x)⌝ ∗ c ↣{ ip, ser } (p x)%proto ∗ P x) }}}.
   Proof.
     iIntros (Φ) "Hc HΦ".
     rewrite iProto_mapsto_eq.
-    iDestruct "Hc" as (γs s serl _serf sa dst) "Hc".
-    iDestruct "Hc"
-      as (sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx -> Heqc) "(%Heqg & Hc)".
-    iDestruct "Hc"
-      as "(Hl & %Hleq & Hsidx & Hridx
-                 & #HsnT & #HaT & #HsT & #HidxsT
-                 & Hp & #Hslk & #Hrlk)".
+    iDestruct "Hc" as (s sbuf slk rbuf rlk sidLBLoc ackIdLoc sidx ridx γe) "Hc".
+    iDestruct "Hc" as (->) "(Hsidx & Hridx & Hp & #Hslk & #Hrlk)".
     wp_lam.
     wp_pures.
     wp_apply (acquire_spec with "Hrlk").
@@ -51,11 +46,10 @@ Section Proof_of_recv.
       { iExists _, _, _. by iFrame. }
       iIntros (w' ->). wp_pures. iApply "HΦ".
       iLeft. iSplitR; [done|].
-      iExists _, _, _, _, _, _, _, _.
-      iExists _, _, _, _, _, _.
+      iExists _, _, _, _, _, _, _, _. iExists _, _.
       iFrame. iFrame "#". eauto. }
     destruct Hqeq as (h & t & tv & -> & -> & Hq').
-    iDestruct "Hvs" as "[(%w' & -> & Hfrag) Hvs]".
+    iDestruct "Hvs" as "[Hfrag Hvs]".
     wp_pures.
     wp_bind (Store _ _).
     iDestruct (mono_nat_auth_own_agree with "Hridx Hridx'") as %[_ <-].
@@ -81,7 +75,6 @@ Section Proof_of_recv.
       iApply (big_sepL_impl with "Hvs").
       iIntros "!>" (k x Hlookup) "Hv".
       rewrite Nat.add_succ_comm.
-      rewrite -!Nat2Z.inj_add.
       rewrite -Nat.add_succ_comm.
       done. }
     iIntros (w'' ->).
@@ -94,8 +87,7 @@ Section Proof_of_recv.
     rewrite -Heq''.
     iExists _. iSplit; [done|].
     iFrame.
-    iExists _, _, _, _, _, _, _, _.
-    iExists _, _, _, _, _, _.
+    iExists _, _, _, _, _, _, _, _. iExists _, _.
     iSplit; [done|].
     rewrite Nat.add_1_r.
     iFrame=> /=.
@@ -103,11 +95,11 @@ Section Proof_of_recv.
     iFrame. by iFrame "#".
   Qed.
 
-  Lemma recv_spec_internal {TT} γe c (v : TT → val) (P : TT → iProp Σ)
+  Lemma recv_spec_internal {TT} c (v : TT → val) (P : TT → iProp Σ)
              (p : TT → iProto Σ) ip ser :
-    {{{ c ↣{ γe, ip, ser } (<?.. x> MSG (v x) {{ ▷ P x }}; p x)%proto }}}
+    {{{ c ↣{ ip, ser } (<?.. x> MSG (v x) {{ ▷ P x }}; p x)%proto }}}
       recv c @[ip]
-    {{{ x, RET v x; c ↣{ γe, ip, ser } p x ∗ P x }}}.
+    {{{ x, RET v x; c ↣{ ip, ser } p x ∗ P x }}}.
   Proof.
     iIntros (Φ) "Hc HΦ".
     wp_lam.

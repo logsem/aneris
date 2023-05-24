@@ -28,13 +28,11 @@ Section Proof_of_connect.
             !lockG Σ}.
   Context `{!server_ghost_names}.
 
-
   Lemma connect_internal_spec (skt : val) (clt_addr : socket_address) :
     {{{ ∃ h s, isClientSocketInternal skt h s clt_addr true ∅ ∅}}}
       connect skt #RCParams_srv_saddr @[ip_of_address clt_addr]
-      {{{ γe c, RET c;
-          c ↣{ γe, ip_of_address clt_addr, RCParams_clt_ser} RCParams_protocol ∗
-            ChannelAddrToken γe (clt_addr, RCParams_srv_saddr) }}}.
+    {{{ c, RET c;
+        c ↣{ ip_of_address clt_addr, RCParams_clt_ser} RCParams_protocol }}}.
   Proof.
     iIntros (Φ) "HisClt HΦ".
     wp_lam. wp_let.
@@ -74,8 +72,7 @@ Section Proof_of_connect.
                         (s_ser (s_serializer (msg_serialization RCParams_srv_ser))),
                      side_elim Left
                        (s_deser (s_serializer (msg_serialization RCParams_srv_ser)))
-                       (s_deser (s_serializer (msg_serialization RCParams_clt_ser)))),
-                       s_ser (s_serializer RCParams_clt_ser)))%V).
+                       (s_deser (s_serializer (msg_serialization RCParams_clt_ser))))))%V).
     wp_apply (client_conn_step_2_spec skt _ _ clt_addr R _ n1
                with "[$Hh1 $Hmh1 Hpost $Hcnd2] [HΦ]").
     { rewrite /isClientSocketInternal /isSocket /is_skt_val /=.
@@ -101,7 +98,7 @@ Section Proof_of_connect.
     iDestruct "HconnPost"
        as (m2 n2 mt2) "(-> & HconnPost)".
     iDestruct "HconnPost" as "(%Hm2 & %Hser2 & %Hdst2 & HisClt & (%γ & Hres) & _)".
-     iDestruct "HisClt" as "(#Hsrv_si2 & HisClt & (Hmh & #HmhR2))".
+    iDestruct "HisClt" as "(#Hsrv_si2 & HisClt & (Hmh & #HmhR2))".
     iDestruct "HisClt" as (? Hsaddr2 Hsblock2) "(Hh & #Hsi2)".
     wp_pures.
     wp_apply (aneris_wp_rcvtimeo_block with "[$Hh]"); eauto with lia.
@@ -126,24 +123,11 @@ Section Proof_of_connect.
     iDestruct "Hres" as "(Hres & #Hsmode)".
     wp_apply
       (make_new_channel_descr_spec γ _ _ Left lAD lLB _ with "[$Hres $HsidLB1 $Hackid1]");
-      [done|done|done | ].
-    iIntros (γe c) "(#HaT & #HsT & #HlT & Hchan)". wp_pures.
-    rewrite{2} /iProto_mapsto seal_eq /iProto_mapsto_def.
-    iDestruct "Hchan" as
-      (γs sd serl serf sa dst sbuf slk rbuf rlk )
-        "(%sidLBLoc & %ackIdLoc & %sidx & %ridx & Hhy)".
-    iDestruct "Hhy"
-      as "(%Hc & %Heqc & %Heqg & Hserl & %Hserl & Hmn1 & Hmn2
-               & #Hst' & #HaT' & #HsT' & #HlT'
-               & Hpown & #Hslk & #Hrlk)".
-    simpl. destruct sd as [|]; last first.
-    { by iDestruct (ChannelSideToken_agree with "[$HsT] [$HsT']") as "%". }
-    simpl in *.
-    iDestruct (ChannelIdxsToken_agree with "[$HlT] [$HlT']") as "%Heql".
-    inversion Heql as ((Heql1 & Heql2)).
-    iDestruct (ChannelAddrToken_agree with "[$HaT] [$HaT']") as "%Heqa".
-    inversion Heqa as ((Heqa1 & Heqa2)).
-    iDestruct (session_token_agree with "[$Hst] [$Hst']") as "->".
+      [done|done| ].
+    iIntros (γe c sbuf slk rbuf rlk)
+            "(%Hc & %Hγeq & %Hlkeq' & Hmn1 & Hmn2 & Hpown & #Hslk & #Hrlk)".
+    wp_pures.
+    simpl.
     wp_apply (aneris_wp_fork with "[-]").
     iSplitL.
     - iNext. wp_pures.
@@ -151,17 +135,14 @@ Section Proof_of_connect.
       iSplitR "HsidLB2 Hackid2".
       + iNext; wp_seq; iApply "HΦ"; iFrame "#∗".
         rewrite{1} /iProto_mapsto seal_eq /iProto_mapsto_def.
-        iExists _, Left, _, _, _, _, _, _.
-        iExists _, _, _, _, _, _.
-        simpl. iFrame "#∗"; eauto.
+        iExists Left, _, _, _, _, _, _, _. iExists _, γe.
+        simpl. iFrame. iSplit; [done|]. iFrame "#".
       + replace (LitInt (Z.of_nat 0)) with (LitInt 0) by eauto with lia.
         simpl in *.
-        iApply (client_recv_on_chan_loop_spec
-                 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 0 0
+        iApply (client_recv_on_chan_loop_spec _ _ _ _ _ _ _ _ _ _ _ _ _ _ 0 0
                  with "[$Hsinv $Hst $Hslk $Hrlk $HsidLB2 $Hackid2]"); eauto.
     - simpl. simplify_eq.
-      iApply (send_from_chan_loop_spec
-                (chan_N (session_chan_name γs)) _ _ _ _ _ _ _ _ Left with "[-]");
+      iApply (send_from_chan_loop_spec _ _ _ _ _ _ _ _ _ Left with "[-]");
         [done|done|done|done|done|iSplitL; eauto with iFrame|done].
   Qed.
 

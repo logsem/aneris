@@ -38,10 +38,8 @@ Section Send_Recv_API_spec_instantiation.
   Proof.
     rewrite /send_spec.
     iIntros (c v p ip serA Φ) "(H1 & H2) HΦ".
-    iDestruct "H1" as (γe) "H1".
-    iApply (send_spec_internal _ _ _ p with "[$][HΦ]").
-    iNext. iIntros "Hc". iApply "HΦ".
-    iExists _. iFrame.
+    iApply (send_spec_internal _ _ p with "[$][HΦ]").
+    iNext. iIntros "Hc". iApply "HΦ". iFrame.
   Qed.
 
   Lemma send_tele_spec_holds :
@@ -49,11 +47,9 @@ Section Send_Recv_API_spec_instantiation.
   Proof.
     rewrite /send_spec_tele.
     iIntros (TT c tt v P p ip serA Φ) "(H1 & Hp & H2) HΦ".
-    iDestruct "H1" as (γe) "H1".
     iApply (send_spec_tele_internal _ _ _ _ _ _ with "[-HΦ][HΦ]").
     - by iFrame.
-    - iNext. iIntros "Hc". iApply "HΦ".
-    iExists _. iFrame.
+    - iNext. iIntros "Hc". iApply "HΦ". iFrame.
   Qed.
 
   Lemma try_recv_spec_holds :
@@ -61,17 +57,14 @@ Section Send_Recv_API_spec_instantiation.
   Proof.
     rewrite /try_recv_spec.
     iIntros (TT c v P p ip ser Φ) "H1 HΦ".
-    iDestruct "H1" as (γe) "H1".
     iApply (try_recv_spec_internal _ _ _  with "[$][HΦ]").
     iNext. iIntros (w) "Hc". iApply "HΦ".
     iDestruct "Hc" as "[(-> & Hc)|(%tt & -> & Hc & Hp)]".
-    - iLeft. iSplit; first done.
-      iExists _. iFrame.
+    - iLeft. iSplit; first done. iFrame.
     - iRight.
       iExists _.
       iSplit; first done.
       iFrame.
-      iExists _. iFrame.
   Qed.
 
   Lemma recv_spec_holds :
@@ -79,10 +72,8 @@ Section Send_Recv_API_spec_instantiation.
   Proof.
     rewrite /recv_spec.
     iIntros (TT c v P p ip ser Φ) "H1 HΦ".
-    iDestruct "H1" as (γe) "H1".
     iApply (recv_spec_internal _ _ _  with "[$][HΦ]").
     iNext. iIntros (w) "(Hc & Hp)". iApply "HΦ". iFrame.
-    iExists _. iFrame.
   Qed.
 
 End Send_Recv_API_spec_instantiation.
