@@ -19,11 +19,20 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
       [let x := fresh in intros x; t; unfold x; notypeclasses refine eq_refl|]
   | _ => fail "wp_expr_eval: not a 'wp'"
   end.
-Ltac wp_expr_simpl := wp_expr_eval simpl.
+Ltac wp_expr_simpl := wp_expr_eval simpl. 
 
-Lemma tac_wp_pure_helper `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
-                         `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
-  tid E K e1 e2 fs  φ n Φ :
+(* Section tac_helpers. *)
+(*   Context  *)
+
+Lemma tac_wp_pure_helper
+  `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
+  `{iLM: LiveModel heap_lang iM}
+  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
+  `{PMP: @PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP}
+  tid E K e1 e2
+  (fs: gmap (fmrole iM) nat)
+  (* fs *)
+  φ n Φ :
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
@@ -69,7 +78,7 @@ Qed.
 Lemma has_fuels_gt_n 
   `{LM : LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
-  (fs: gmap (fmrole M) _) n tid:
+  (fs: gmap (fmrole iM) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
@@ -77,15 +86,19 @@ Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 Lemma has_fuels_gt_1 
   `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
-  (fs: gmap (fmrole M) _) tid:
+  (fs: gmap (fmrole iM) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 
-  `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
-  tid E K e1 e2 fs  φ n Φ :
+  `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
+  `{iLM: LiveModel heap_lang iM}
+  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
+  `{PMP: @PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP}
+  tid E K e1 e2
+  (fs: gmap (fmrole iM) nat)
+  φ n Φ :
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
@@ -151,10 +164,14 @@ Proof.
 Qed.
 
 Lemma tac_wp_pure
-  `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM} `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}
-  Δ Δ'other tid E i K e1 e2 φ n Φ fs :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
+  `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
+  `{iLM: LiveModel heap_lang iM}
+  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
+  `{PMP: @PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP}
+  Δ Δ'other tid E i K e1 e2 φ n Φ
+  (fs: gmap (fmrole iM) nat)
+  :
+  (∀ (ρ: fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
@@ -343,7 +360,10 @@ Implicit Types v : val.
 Implicit Types tid : locale heap_lang.
 
 Context `{iLM: LiveModel heap_lang iM}.
-Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}. 
+(* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
+Context
+  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
+  `{PMP: @PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP}. 
 
 (* Lemma tac_wp_allocN Δ Δ' s E j K v n Φ : *)
 (*   (0 < n)%Z → *)
@@ -445,8 +465,8 @@ Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (
 (*   apply sep_mono_r, wand_intro_r. rewrite right_id //. *)
 (* Qed. *)
 
-Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
+Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E i j l q v Φ :
+  (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
@@ -456,7 +476,7 @@ Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
   envs_entails Δ' (WP fill K (Val v) @ tid; E {{ Φ }}) →
   envs_entails Δ (WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
-Proof.
+Proof using PMP.
   intros ?? Hij ?.
   rewrite envs_entails_unseal=> Δother ?? Δ' Hccl.
   rewrite -wp_bind.
@@ -483,8 +503,8 @@ Proof.
 Qed.
 
 
-Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
+Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E i j l v v' Φ :
+  (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
@@ -499,7 +519,7 @@ Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
   | None => False
   end →
   envs_entails Δ (WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
-Proof.
+Proof using PMP.
   intros ?? Hij ?.
   rewrite envs_entails_unseal=> Δother ??.
   destruct (envs_simple_replace j false (Esnoc Enil j (l ↦ v'))%I Δ'other) as [Δ'other2|] eqn:Heq; last done.
