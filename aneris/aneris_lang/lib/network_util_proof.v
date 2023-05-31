@@ -502,8 +502,7 @@ Section library.
     assert (valid_tag "") as Hemp by done; revert Hemp.
     apply (λ H, N.strong_right_induction
                   (λ n, ∀ s, valid_tag s → valid_tag (pretty_N_go n s))
-                  H 0%N); last done.
-    { by intros ??->. }
+                  0%N H); last done.
     intros n Hn IH s Hs.
     destruct (decide (n = 0%N)); first by subst.
     rewrite pretty_N_go_step; last lia.

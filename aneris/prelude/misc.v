@@ -206,7 +206,7 @@ Qed.
 
 Lemma gt_exists_S_n n m :
   n < m → ∃ m', m = S m'.
-Proof. destruct n, m; eauto with lia. Qed.
+Proof. destruct n, m; [lia|eauto with lia|lia|eauto with lia]. Qed.
 
 Lemma rt_rtc_same {A} (R : relation A) `{!Reflexive R, !Transitive R} : ∀ x y, rtc R x y ↔ R x y.
 Proof. intros ??; split; last by apply rtc_once. induction 1; first done. etrans; eauto. Qed.

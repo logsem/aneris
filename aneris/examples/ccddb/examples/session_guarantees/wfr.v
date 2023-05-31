@@ -62,20 +62,20 @@ Section WritesFollowReads.
                     ∗ (⌜e1 ∈ s1⌝)
                     ∗ (⌜AE_key e1 = key1⌝)
                     ∗ (⌜AE_val e1 = v⌝)
-                    ∗ (⌜e1 <ₜe2⌝)
+                    ∗ (⌜e1 <ₜ e2⌝)
               (* If sufficient time passes, then the two events
                  are propagated to db2 in the same order. *)
                     ∗ (∀ e s2 db_id2,
                           ((Seen db_id2 s2)
                             ∗ (⌜e ∈ s2⌝)
-                            ∗ (⌜e2 ≤ₜe⌝))
+                            ∗ (⌜e2 ≤ₜ e⌝))
                           ={⊤}=∗
                               ∃ e1' e2',
                                 (⌜erasure e1' = erasure e1⌝)
                                   ∗ (⌜erasure e2' = erasure e2⌝)
                                   ∗ ⌜e1' ∈ s2⌝
                                   ∗ ⌜e2' ∈ s2⌝
-                                  ∗ ⌜e1' <ₜe2'⌝)
+                                  ∗ ⌜e1' <ₜ e2'⌝)
                       )
             )
    }}}.
@@ -192,7 +192,7 @@ Section WritesFollowReads.
       rewrite -(erasure_time er').
       by rewrite Her_erase_eq.
     - (* e2 happens before ef *)
-      assert (erasure e2 <ₜef) as He2_erasure_lt;
+      assert (erasure e2 <ₜ ef) as He2_erasure_lt;
         [by (rewrite erasure_time)|].
       destruct (Hcaus2 _ _ He2h2' Hefs He2_erasure_lt) as (e2' & He2'_in_sf & He2'_erasure_eq).
       apply elem_of_filter in He2'_in_sf.
