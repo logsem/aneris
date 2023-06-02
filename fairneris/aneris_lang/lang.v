@@ -95,6 +95,9 @@ Proof.
         | SendTo e0 e1 e2, SendTo e0' e1' e2' =>
           cast_if_and3
             (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+        | SendToRepeat e0 e1 e2, SendToRepeat e0' e1' e2' =>
+          cast_if_and3
+            (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | ReceiveFrom e, ReceiveFrom e' => cast_if (decide (e = e'))
         | SetReceiveTimeout e0 e1 e2,  SetReceiveTimeout e0' e1' e2' =>
           cast_if_and3
@@ -236,6 +239,7 @@ Proof.
      | CAS e1 e2 e3 => GenNode 25 [go e1; go e2; go e3]
      | GetAddressInfo e => GenNode 26 [go e]
      | Rand e => GenNode 27 [go e]
+     | SendToRepeat e1 e2 e3 => GenNode 28 [go e1; go e2; go e3]
      end
    with gov v :=
      match v with
@@ -282,6 +286,7 @@ Proof.
      | GenNode 25 [e1; e2; e3] => CAS (go e1) (go e2) (go e3)
      | GenNode 26 [e] => GetAddressInfo (go e)
      | GenNode 27 [e] => Rand (go e)
+     | GenNode 28 [e1; e2; e3] => SendToRepeat (go e1) (go e2) (go e3)
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -429,6 +434,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | NewSocket e => NewSocket (subst x v e)
   | SocketBind e1 e2 => SocketBind (subst x v e1) (subst x v e2)
   | SendTo e0 e1 e2 => SendTo (subst x v e0) (subst x v e1) (subst x v e2)
+  | SendToRepeat e0 e1 e2 => SendToRepeat (subst x v e0) (subst x v e1) (subst x v e2)
   | SetReceiveTimeout e0 e1 e2 =>
     SetReceiveTimeout (subst x v e0) (subst x v e1) (subst x v e2)
   | ReceiveFrom e => ReceiveFrom (subst x v e)
@@ -780,6 +786,23 @@ Inductive socket_step ip :
       Sn P M
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
+      Sn P ({[+ new_message +]} ⊎ M)
+| SendToRepeatS sh a mbody r skt Sn P M f :
+    (* There is a socket that has been allocated for the handle *)
+    Sn !! sh = Some (skt, r) →
+    (* The socket has an assigned address *)
+    saddress skt = Some f ->
+    let new_message := mkMessage f a mbody in
+    socket_step
+      ip
+      (SendToRepeat (Val $ LitV $ LitSocket sh)
+              (Val $ LitV $ LitString mbody)
+              (Val $ LitV $ LitSocketAddress a))
+      Sn P M
+      (* reduces to *)
+      (SendToRepeat (Val $ LitV $ LitSocket sh)
+              (Val $ LitV $ LitString mbody)
+              (Val $ LitV $ LitSocketAddress a))
       Sn P ({[+ new_message +]} ⊎ M)
 | ReceiveFromSomeS sh r skt a m Sn P M :
     (* The socket handle is bound to a socket with a message *)

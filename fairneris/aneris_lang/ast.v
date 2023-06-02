@@ -82,6 +82,7 @@ Inductive expr :=
 | NewSocket (e : expr)
 | SocketBind (e1 : expr) (e2 : expr)
 | SendTo (e1 : expr) (e2 : expr) (e3 : expr)
+| SendToRepeat (e1 : expr) (e2 : expr) (e3 : expr)
 | ReceiveFrom (e1 : expr)
 | SetReceiveTimeout (e1 : expr) (e2 e3 : expr)
 | Start (ip : base_lit) (e : expr)
