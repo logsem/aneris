@@ -82,10 +82,10 @@ Proof.
 Qed.
 
 (* TODO: deduplicate all the subseteq lemmas in this file. *)
-Lemma buffers_subseteq_new_socket S Sn ip sh f t p:
+Lemma buffers_subseteq_new_socket S Sn ip sh :
   S !! ip = Some Sn →
   Sn !! sh = None →
-  buffers S ⊆ buffers (<[ip:=<[sh:=(mkSocket f t p None true, [])]> Sn]> S).
+  buffers S ⊆ buffers (<[ip:=<[sh:=(mkSocket None true, [])]> Sn]> S).
 Proof.
   intros HSn Hsh.
   apply multi_collect_subseteq.
@@ -153,11 +153,11 @@ Proof.
   by eapply buffers_subseteq_update_socket_sblock.
 Qed.
 
-Lemma message_history_evolution_new_socket S Sn ip M mh sh f t p:
+Lemma message_history_evolution_new_socket S Sn ip M mh sh :
   S !! ip = Some Sn →
   Sn !! sh = None →
   mh = message_history_evolution
-         M M S (<[ip:=<[sh:=(mkSocket f t p None true, [])]> Sn]> S) mh.
+         M M S (<[ip:=<[sh:=(mkSocket None true, [])]> Sn]> S) mh.
 Proof.
   intros ??. rewrite /message_history_evolution.
   destruct mh as (R,T).

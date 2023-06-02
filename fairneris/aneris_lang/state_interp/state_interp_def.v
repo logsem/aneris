@@ -249,17 +249,17 @@ Section Aneris_AS.
 
   Definition ipA := "0.0.0.0".
   Definition saA := SocketAddressInet ipA 80.
-  Definition sA := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saA) true.
+  Definition sA := mkSocket (Some saA) true.
   Definition tidA := 0.
   Definition localeA := (ipA, tidA).
 
   Definition ipB := "0.0.0.1".
   Definition saB := SocketAddressInet ipB 80.
-  Definition sB := mkSocket PF_INET SOCK_DGRAM IPPROTO_UDP (Some saB) true.
+  Definition sB := mkSocket (Some saB) true.
   Definition tidB := 0.
   Definition localeB := (ipB, tidB).
 
-  Definition mAB := mkMessage saA saB IPPROTO_UDP "Hello".
+  Definition mAB := mkMessage saA saB "Hello".
 
   Definition state_get_n s :=
     match s with
