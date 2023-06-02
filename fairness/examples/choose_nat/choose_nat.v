@@ -145,8 +145,17 @@ Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
 (* Set up necessary RA constructions *)
 Class choose_natG Σ := ChooseNatG { choose_nat_G :> inG Σ (excl_authR ZO) }.
 
+Canonical Structure cn_RA: cmra := exclR (leibnizO cn_fair_model).
+
+Instance cn_RA_lifting: ModelRALifting cn_fair_model cn_RA.
+Proof. 
+  refine {| mrl_lift := fun s => Excl s |}.
+  { done. }
+  intros. by apply Excl_inj in H.
+Qed. 
+
 Definition choose_natΣ : gFunctors :=
-  #[ heapΣ cn_fair_model; GFunctor (excl_authR ZO) ].
+  #[ heapΣ cn_fair_model cn_RA; GFunctor (excl_authR ZO) ].
 
 Global Instance subG_choosenatΣ {Σ} : subG choose_natΣ Σ → choose_natG Σ.
 Proof. solve_inG. Qed.
@@ -154,27 +163,92 @@ Proof. solve_inG. Qed.
 Definition Ns := nroot .@ "choose_nat".
 
 Section proof.
-  Context `{!heapGS Σ cn_model, choose_natG Σ}.
+  (* Context `{!heapGS Σ cn_model, choose_natG Σ}. *)
+  Context `{LM: LiveModel heap_lang M} `{!heapGS Σ LM, choose_natG Σ}.
+  Context `{PMPP: @PartialModelPredicatesPre _ M _ _ Σ cn_fair_model}.
+  Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ cn_model PMPP}.
+
 
   (** Determine invariant so we can eventually derive ξ_cn from it *)
   Definition choose_nat_inv_inner (γ : gname) (l:loc) : iProp Σ :=
-    ∃ (cn:CN), frag_model_is cn ∗ l ↦ #(CN_Z cn) ∗ own γ (●E (CN_Z cn)).
+    ∃ (cn:CN), partial_model_is cn ∗ l ↦ #(CN_Z cn) ∗ own γ (●E (CN_Z cn)).
 
   Definition choose_nat_inv (γ : gname) (l:loc) :=
     inv Ns (choose_nat_inv_inner γ l).
 
+  (* TODO: decide what to do with notations *)
+  Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
+  Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+  Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
+(* From iris.proofmode Require Export tactics. *)
+(* From iris.proofmode Require Import coq_tactics reduction spec_patterns. *)
+
+
+(*   Let myfun: val := λ: <>, #().  *)
+
+(*   Lemma debug_step tid: *)
+(*     {{{ has_fuel tid () 1 ∗ frag_free_roles_are ∅ }}} *)
+(*          myfun #() @ tid; ⊤ *)
+(*     {{{ RET #(); tid ↦M ∅ }}}. *)
+(*   Proof using. *)
+(*     iIntros (Φ) "[FUEL ROLE] JJ". *)
+(*     wp_lam.  *)
+    
+(*     Set Ltac Backtrace. *)
+(*     (* Info 5 wp_pure .  *) *)
+(*     iStartProof.  *)
+(*     rewrite ?has_fuel_fuels.  *)
+(*     Set Ltac Debug.  *)
+
+(* (* Info 5 *) *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) => *)
+(*     let e := eval simpl in e in *)
+(*     reshape_expr e ltac:(fun K e' => *)
+(*       unify e' (App _ _); *)
+(*       eapply (tac_wp_pure _ _ _ _ _ K e'); *)
+(*         [ *)
+(*         | *)
+(*         | tc_solve *)
+(*         | trivial *)
+(*         | let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in *)
+(*           iAssumptionCore || fail "wp_pures: cannot find" fs *)
+(*         |tc_solve *)
+(*         | pm_reduce; *)
+(*           simpl_has_fuels; *)
+(*           wp_finish *)
+(*         ] ; [ solve_fuel_positive *)
+(*             | try apply map_non_empty_singleton; try apply insert_non_empty; try done *)
+(*             |]) *)
+(*     (* || fail "wp_pure: cannot find" efoc "in" e "or" efoc "is not a redex" *) *)
+(*   (* | _ => fail "wp_pure: not a 'wp'" *) *)
+(*   end. *)
+
+
+
   Lemma decr_loop_spec γ tid l (n:nat) (f:nat) :
     7 ≤ f → f ≤ 38 →
     choose_nat_inv γ l -∗
-    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗
+    {{{ has_fuel tid () f ∗ partial_free_roles_are ∅ ∗
         own γ (◯E (Z.of_nat (S n))) }}}
       decr_loop_prog l #() @ tid ; ⊤
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof.
+  Proof using PMP.
     iIntros (Hle1 Hle2) "#IH".
     iIntros "!>" (Φ) "(Hf & Hr & Hm) HΦ".
     iInduction n as [|n] "IHn".
-    { wp_lam.
+    {
+      (* (* Set Printing All. *) *)
+      (* (* wp_lam. *) *)
+      (* (* let H := fresh in *) *)
+      (* (* assert (H := AsRecV_recv).  *) *)
+      (* Set Ltac Backtrace. *)
+      (* (* rewrite /decr_loop_prog.  *) *)
+      (* Info 3 wp_pure (App _ _).  *)
+      (* clear H. *)
+      wp_lam.       
+
       (* Load - with invariant *)
       wp_bind (Load _).
       iApply wp_atomic.
@@ -264,10 +338,10 @@ Section proof.
   Lemma choose_nat_spec γ l tid (f:nat) :
     12 ≤ f → f ≤ 40 →
     choose_nat_inv γ l -∗
-    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
+    {{{ has_fuel tid () f ∗ partial_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
       choose_nat_prog l #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof.
+  Proof using PMP.
     iIntros (Hle1 Hle2) "#IH".
     iIntros "!>" (Φ) "(Hf & Hr & Hm) HΦ".
     wp_lam.
@@ -358,8 +432,12 @@ Proof.
   { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
   iModIntro.
   iSplitL.
-  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
+  {
+    (* Print Instances PartialModelPredicates.  *)
+    Set Typeclasses Debug. 
+    iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
       [lia|lia| |by eauto]=> /=.
+    Unset Typeclasses Debug. 
     replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
     rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
   iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
