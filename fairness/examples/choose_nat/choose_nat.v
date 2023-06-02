@@ -432,12 +432,8 @@ Proof.
   { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
   iModIntro.
   iSplitL.
-  {
-    (* Print Instances PartialModelPredicates.  *)
-    Set Typeclasses Debug. 
-    iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
+  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
       [lia|lia| |by eauto]=> /=.
-    Unset Typeclasses Debug. 
     replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
     rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
   iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
