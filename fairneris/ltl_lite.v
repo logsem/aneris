@@ -21,10 +21,14 @@ Section ltl_constructors.
   (*   ∀ tr', after 1 tr  = Some tr' → P tr'.  *)
   Definition trace_next P : ltl_pred :=
     λ tr, ∃ tr', after 1 tr = Some tr' ∧ P tr'.
-  Definition trace_until P Q : ltl_pred :=
-    λ tr, ∃ n, (∃ tr', after n tr = Some tr' ∧ Q tr') ∧
-               ∀ m, m < n → ∃ tr', after m tr = Some tr' ∧ P tr'.
-  
+  Inductive trace_until P Q : ltl_pred :=
+  | trace_until_here tr : Q tr -> trace_until P Q tr
+  | trace_until_next s l tr : P (s -[l]-> tr) → trace_until P Q tr → trace_until P Q (s -[l]-> tr).
+
+  (* Definition trace_until P Q : ltl_pred := *)
+  (*   λ tr, ∃ n, (∃ tr', after n tr = Some tr' ∧ Q tr') ∧ *)
+  (*              ∀ m, m < n → ∃ tr', after m tr = Some tr' ∧ P tr'. *)
+
   (* Definition trace_always P : ltl_pred := *)
   (*   λ tr, ∀ n, ∃ tr', after n tr = Some tr' ∧ P tr'. *)
   (* Definition trace_eventually P : ltl_pred := *)
@@ -52,7 +56,19 @@ Section ltl_constructors.
              (P Q : S → option L → Prop) : ltl_pred :=
     trace_always_eventually_implies (trace_now P) (trace_now Q).
 
+  Lemma trace_eventually_ind (P P0 : trace S L → Prop) :
+    (∀ tr : trace S L, P tr → P0 tr) →
+    (∀ (s : S) (l : L) (tr : trace S L),
+         trace_eventually P tr → P0 tr → P0 (s -[ l ]-> tr)) →
+    ∀ t : trace S L, trace_eventually P t → P0 t.
+  Proof.
+    intros ? IH ??.
+    eapply (trace_until_ind trace_true); [done|by intros; apply IH|done].
+  Qed.
+
 End ltl_constructors.
+
+Arguments trace_eventually_ind : clear implicits.
 
 Notation "○ P" := (trace_next P) (at level 20, right associativity) : trace_scope.
 Notation "□ P" := (trace_always P) (at level 20, right associativity) : trace_scope.
@@ -65,7 +81,7 @@ Notation "P → Q" := (trace_implies P Q)
 Section ltl_lemmas.
   Context {S L : Type}.
 
-  Lemma trace_not_not (tr:trace S L) P :
+  Lemma trace_not_not (tr:trace S L) (P : trace S L → Prop) :
     ¬ P tr ↔ trace_not P tr.
   Proof. done. Qed.
 
@@ -82,37 +98,20 @@ Section ltl_lemmas.
     apply IHn. lia. done.
   Qed.
 
-  Lemma trace_eventually_until (tr : trace S L) P :
-    (◊↓P) tr →
-    trace_until (trace_not (↓P)) (↓P) tr.
+  Lemma trace_eventually_until (P : trace S L → Prop) (tr : trace S L) :
+    (◊P) tr →
+    trace_until (trace_not P) (P) tr.
   Proof.
-    intros [n [Hn _]].
-    induction n as [n IHn] using lt_wf_ind.
-    assert ((∀ m, m < n → ∃ tr', after m tr = Some tr' ∧ (trace_not (↓ P)) tr') ∨
-              ¬ (∀ m, m < n → ∃ tr', after m tr = Some tr' ∧ (trace_not (↓ P)) tr')) as [HP|HP];
-      [by apply ExcludedMiddle|by exists n|].
-    eapply not_forall_exists_not in HP as [n' HP].
-    apply Classical_Prop.imply_to_and in HP as [Hlt HP].
-    destruct Hn as [tr' [Hafter' Htr']].
-    assert (∃ tr'', after n' tr = Some tr'') as [tr'' Hafter].
-    { apply (after_is_Some_le _ n n'); [lia|]. eexists _. done. }
-    eapply not_exists_forall_not in HP.
-    apply Classical_Prop.not_and_or in HP as [HP|HP]; [done|].
-    rewrite -trace_not_not in HP.
-    apply NNP_P in HP.
-    eapply IHn; [done|]. eexists _. done.
+    assert (∀ tr, P tr ∨ ¬ P tr) as Hdec by by intros; apply ExcludedMiddle.
+    induction 1; [by constructor|].
+    specialize (Hdec (s -[l]-> tr)) as [H1|H2].
+    - by apply trace_until_here.
+    - by apply trace_until_next.
   Qed.
 
   Lemma trace_eventually_cons (P : trace S L → Prop) s l (tr : trace S L) :
     (◊ P) tr → (◊ P) (s -[l]-> tr).
-  Proof.
-    intros [n [Htr1 Htr2]].
-    exists (Datatypes.S n).
-    split; [done|]. clear Htr1.
-    intros m Hm.
-    destruct m; [by eexists _|].
-    apply Htr2. lia.
-  Qed.
+  Proof. intros. by constructor 2. Qed.
 
   Lemma trace_always_cons (P : trace S L → Prop) s l (tr : trace S L) :
     (□ P) (s -[l]-> tr) → (□ P) tr.
@@ -126,13 +125,6 @@ Section ltl_lemmas.
     (□↓P) (s -[l]-> tr) → P s (Some l).
   Proof. Admitted.
 
-  Lemma trace_eventually_mono (P Q : trace S L → Prop) tr :
-    (∀ tr, P tr → Q tr) → (◊P) tr → (◊Q) tr.
-  Proof.
-    intros HPQ (n&(tr'&Htr1&Htr2)&H2).
-    exists n. split; [|done]. exists tr'. split; [done|]. by apply HPQ.
-  Qed.
-
   Definition trace_suffix_of (tr1 tr2 : trace S L) : Prop :=
     ∃ n, after n tr2 = Some tr1.
 
@@ -140,13 +132,29 @@ Section ltl_lemmas.
     trace_suffix_of tr tr.
   Proof. by exists 0. Qed.
 
+  Lemma trace_eventually_intro P (tr : trace S L) :
+    P tr → (◊ P) tr.
+  Proof. by constructor 1. Qed.
+
   Lemma trace_eventually_mono_strong (P Q : trace S L → Prop) tr :
     (∀ tr', trace_suffix_of tr' tr → P tr' → Q tr') →
     (◊P) tr → (◊Q) tr.
   Proof.
-    intros HPQ (n&(tr'&Htr1&Htr2)&H2).
-    exists n. split; [|done]. exists tr'. split; [done|]. apply HPQ; [|done].
-    exists n. done.
+    intros HPQ.
+    induction 1.
+    { apply HPQ, trace_eventually_intro in H. done. apply trace_suffix_of_refl. }
+    constructor 2; [done|].
+    apply IHtrace_until.
+    intros tr' Hsuffix HP.
+    apply HPQ; [|done].
+    destruct Hsuffix as [n Heq].
+    exists (Datatypes.S n). done.
+  Qed.
+
+  Lemma trace_eventually_mono (P Q : trace S L → Prop) tr :
+    (∀ tr, P tr → Q tr) → (◊P) tr → (◊Q) tr.
+  Proof.
+    intros. eapply trace_eventually_mono_strong; [|done]. intros. by apply H.
   Qed.
 
   Lemma trace_implies_implies (P Q : trace S L → Prop) tr :
@@ -173,7 +181,7 @@ Section ltl_lemmas.
   Proof.
     intros HPQ HP HQ. apply HP. eapply trace_eventually_mono_strong; [|done].
     clear HP HQ. intros tr' Htr' HP HQ. apply HP.
-    specialize (HPQ tr'). rewrite trace_implies_implies in HPQ. by apply HPQ.  
+    specialize (HPQ tr'). rewrite trace_implies_implies in HPQ. by apply HPQ.
   Qed.
 
   Lemma after_is_Some_lt (tr : trace S L) n m :
@@ -192,24 +200,24 @@ Section ltl_lemmas.
   (* TODO: Improve this proof *)
   Lemma trace_alwaysI (P : trace S L → Prop) tr :
     (□P) tr ↔ (∀ tr', trace_suffix_of tr' tr → (□P) tr').
-  Proof.
-    split.
-    - rewrite /trace_always. 
-      intros Halways tr' [n Hafter] HP. apply Halways.
-      destruct HP as [m [HP HP']].
-      destruct HP as [tr'' [Htr'' Hnot]].
-      exists (n + m).
-      split.
-      + exists tr''. rewrite after_sum'. rewrite Hafter. done.
-      + intros m' Hlt.
-        assert (after (n+m) tr = Some tr'').
-        { rewrite after_sum'. rewrite Hafter. done. } 
-        assert (is_Some $ after m' tr) as [tr''' Htr'''].
-        { by eapply after_is_Some_lt. }
-        exists tr'''. split; [done|].
-        by destruct tr'''.
-    - intros Halways. eapply (Halways). apply trace_suffix_of_refl.
-  Qed.
+  Proof. Admitted.
+  (*   split. *)
+  (*   - rewrite /trace_always.  *)
+  (*     intros Halways tr' [n Hafter] HP. apply Halways. *)
+  (*     destruct HP as [m [HP HP']]. *)
+  (*     destruct HP as [tr'' [Htr'' Hnot]]. *)
+  (*     exists (n + m). *)
+  (*     split. *)
+  (*     + exists tr''. rewrite after_sum'. rewrite Hafter. done. *)
+  (*     + intros m' Hlt. *)
+  (*       assert (after (n+m) tr = Some tr''). *)
+  (*       { rewrite after_sum'. rewrite Hafter. done. }  *)
+  (*       assert (is_Some $ after m' tr) as [tr''' Htr''']. *)
+  (*       { by eapply after_is_Some_lt. } *)
+  (*       exists tr'''. split; [done|]. *)
+  (*       by destruct tr'''. *)
+  (*   - intros Halways. eapply (Halways). apply trace_suffix_of_refl. *)
+  (* Qed. *)
 
   Lemma trace_always_suffix_of (P : trace S L → Prop) tr1 tr2 :
     trace_suffix_of tr2 tr1 → (□P) tr1 → (□P) tr2.
@@ -217,7 +225,10 @@ Section ltl_lemmas.
 
   Lemma trace_always_universal (P : trace S L → Prop) (tr : trace S L) :
     (∀ tr, P tr) → (□P) tr.
-  Proof. by intros ?(?&(?&_&?)&_); eauto. Qed.
+  Proof.
+    intros ? H. induction H using trace_eventually_ind; [|done].
+    simplify_eq. specialize (H0 tr). done.
+  Qed.
 
   Lemma trace_not_idemp (P : trace S L → Prop) (tr : trace S L) :
     trace_not (trace_not P) tr ↔ P tr.
@@ -229,17 +240,17 @@ Section ltl_lemmas.
 
   Lemma trace_always_elim (P : trace S L → Prop) (tr : trace S L) :
     (□P) tr → P tr.
-  Proof.
-    intros Htr.
-    eapply (not_exists_forall_not_alt _ 0) in Htr.
-    apply Classical_Prop.not_and_or in Htr as [Htr|Htr].
-    { eapply (not_exists_forall_not_alt _ tr) in Htr.
-      apply Classical_Prop.not_and_or in Htr as [Htr|Htr]; [done|].
-      apply trace_not_not in Htr. by rewrite trace_not_idemp in Htr. }
-    eapply not_forall_exists_not in Htr as [x Htr].
-    eapply Classical_Prop.imply_to_and in Htr as [Hx Htr].
-    lia.
-  Qed.
+  Proof. Admitted.
+  (*   intros Htr. *)
+  (*   eapply (not_exists_forall_not_alt _ 0) in Htr. *)
+  (*   apply Classical_Prop.not_and_or in Htr as [Htr|Htr]. *)
+  (*   { eapply (not_exists_forall_not_alt _ tr) in Htr. *)
+  (*     apply Classical_Prop.not_and_or in Htr as [Htr|Htr]; [done|]. *)
+  (*     apply trace_not_not in Htr. by rewrite trace_not_idemp in Htr. } *)
+  (*   eapply not_forall_exists_not in Htr as [x Htr]. *)
+  (*   eapply Classical_Prop.imply_to_and in Htr as [Hx Htr]. *)
+  (*   lia. *)
+  (* Qed. *)
 
   (* TODO: This is a bit of a weird statement *)
   Lemma trace_always_implies (P Q : trace S L → Prop) tr :
@@ -258,7 +269,7 @@ Section ltl_lemmas.
     intros HPQ HP.
     eapply trace_always_implies in HP; [|done].
     by apply trace_always_elim.
-  Qed.  
+  Qed.
 
   Lemma trace_always_eventually_always_mono (P1 P2 Q1 Q2 : trace S L → Prop) tr :
     (∀ tr, trace_implies P2 P1 tr) → (∀ tr, trace_implies Q1 Q2 tr) →
@@ -301,11 +312,11 @@ Section ltl_lemmas.
   Proof. intros. eapply trace_now_mono_strong; [|done]. by eauto. Qed.
 
   Lemma trace_always_idemp P (tr : trace S L) :
-    (□ P) tr → (□ □ P) tr. 
+    (□ P) tr → (□ □ P) tr.
   Proof. Admitted.
 
   Lemma trace_always_and P Q (tr : trace S L) :
-    ((□ P) tr ∧ (□ Q) tr) ↔ (□ trace_and P Q) tr. 
+    ((□ P) tr ∧ (□ Q) tr) ↔ (□ trace_and P Q) tr.
   Proof. Admitted.
 
   Lemma trace_or_l (P Q : trace S L → Prop) (tr : trace S L) :
@@ -340,31 +351,31 @@ Section ltl_lemmas.
 
   Lemma trace_eventually_suffix_of (P : trace S L → Prop) tr1 tr2 :
     trace_suffix_of tr1 tr2 → (◊P) tr1 → (◊P) tr2.
-  Proof.
-    intros [n Hsuffix] [m [[tr' [Hafter HP]] Htrue]].
-    exists (n + m).
-    rewrite after_sum'. rewrite Hsuffix Hafter.
-    split.
-    - exists tr'. done.
-    - intros m' Hm.
-      assert (after (n + m) tr2 = Some tr').
-      { rewrite after_sum'. rewrite Hsuffix Hafter. done. }
-      assert (is_Some (after m' tr2)) as [tr'' Htr'].
-      { by eapply after_is_Some_lt. }
-      exists tr''. split; [done| apply trace_trueI].
-  Qed.
+  Proof. Admitted.
+  (*   intros [n Hsuffix] [m [[tr' [Hafter HP]] Htrue]]. *)
+  (*   exists (n + m). *)
+  (*   rewrite after_sum'. rewrite Hsuffix Hafter. *)
+  (*   split. *)
+  (*   - exists tr'. done. *)
+  (*   - intros m' Hm. *)
+  (*     assert (after (n + m) tr2 = Some tr'). *)
+  (*     { rewrite after_sum'. rewrite Hsuffix Hafter. done. } *)
+  (*     assert (is_Some (after m' tr2)) as [tr'' Htr']. *)
+  (*     { by eapply after_is_Some_lt. } *)
+  (*     exists tr''. split; [done| apply trace_trueI]. *)
+  (* Qed. *)
 
   Lemma trace_eventually_thing_strong (P Q : trace S L → Prop) (tr : trace S L) :
     (∀ tr', trace_suffix_of tr' tr → P tr' → (◊ Q) tr') → (◊ P) tr → (◊ Q) tr.
-  Proof.
-    intros HPQ HP.
-    destruct HP as [n [[tr' [Hafter HP]] Htrue]].
-    apply HPQ in HP; [|by exists n].
-    eapply trace_eventually_suffix_of; [|done].
-    by exists n.
-  Qed.
+  Proof. Admitted.
+  (*   intros HPQ HP. *)
+  (*   destruct HP as [n [[tr' [Hafter HP]] Htrue]]. *)
+  (*   apply HPQ in HP; [|by exists n]. *)
+  (*   eapply trace_eventually_suffix_of; [|done]. *)
+  (*   by exists n. *)
+  (* Qed. *)
 
-  Lemma trace_not_eventually_always_not P (tr : trace S L) :
+  Lemma trace_not_eventually_always_not (P : trace S L → Prop) (tr : trace S L) :
     trace_not (◊ P) tr ↔ (□ (trace_not P)) tr.
   Proof. Admitted.
 

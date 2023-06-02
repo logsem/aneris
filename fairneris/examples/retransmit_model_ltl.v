@@ -276,14 +276,23 @@ Proof.
     simpl. by rewrite lookup_total_insert.
 Qed.
 
-(* The buffers will only grow until B is scheduled *)
-(* Proof by validity relation of the model *)
-Lemma retransmit_fair_trace_buffer_grows mtr bs P :
-  mtrace_valid mtr →
-  (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr →
-  (trace_until (trace_not (↓ λ _ l, option_map label_role l = Some $ inl Brole)) P) mtr →
-  (◊ trace_and (↓ λ s _, suffix bs (s.2 !!! (m_destination mAB))) P) mtr.
-Proof. Admitted.
+(* (* The buffers will only grow until B is scheduled *) *)
+(* (* Proof by validity relation of the model *) *)
+(* Lemma retransmit_fair_trace_buffer_grows mtr bs : *)
+(*   mtrace_valid mtr → *)
+(*   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr → *)
+(*   (trace_until (↓ λ s _, suffix bs (s.2 !!! (m_destination mAB))) *)
+(*                (↓ λ _ l, option_map label_role l = Some $ inl Brole)) mtr. *)
+(* Proof. Admitted. *)
+
+(* (* The buffers will only grow until B is scheduled *) *)
+(* (* Proof by validity relation of the model *) *)
+(* Lemma retransmit_fair_trace_buffer_grows mtr bs P : *)
+(*   mtrace_valid mtr → *)
+(*   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr → *)
+(*   (trace_until (trace_not (↓ λ _ l, option_map label_role l = Some $ inl Brole)) P) mtr → *)
+(*   (◊ trace_and (↓ λ s _, suffix bs (s.2 !!! (m_destination mAB))) P) mtr. *)
+(* Proof. Admitted. *)
 
 (* A scheduled B will succeed if there is something in the buffer *)
 (* Proof by validity relation of the model *)
@@ -348,6 +357,57 @@ Proof.
   (*     admit. }                  (* Derp need EM on whether B is live. *) *)
 Admitted.
 
+Lemma trace_and_now {S L} P Q (tr : trace S L) :
+  trace_and (↓P) (↓Q) tr ↔ (↓ (λ s l, P s l ∧ Q s l)) tr.
+Proof. Admitted.
+
+Lemma trace_now_split {S L} P Q (tr : trace S L) :
+  (↓ P) tr → (↓ Q) tr → (↓ (λ s l, P s l ∧ Q s l)) tr.
+Proof. Admitted.
+
+Lemma trace_eventually_thing {S L} P s l (tr : trace S L) :
+  (◊ P) tr → (◊ P) (s -[l]-> tr).
+Proof. Admitted.
+
+(* The buffers will only grow until B is scheduled *)
+(* Proof by validity relation of the model *)
+Lemma retransmit_fair_trace_buffer_grows mtr bs :
+  mtrace_valid mtr →
+  (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr →
+  (◊trace_and
+     (↓ (λ s _, suffix bs (s.2 !!! (m_destination mAB))))
+     (↓ (λ _ l, option_map label_role l = Some $ inl Brole))) mtr.
+Proof.
+  intros Hvalid Hnow.
+  pose proof (received_or_eventually_B mtr) as [Hreceived|HB].
+  { admit. }
+  induction HB using trace_eventually_ind.
+  { eapply trace_eventually_mono; [apply trace_and_now|].
+    apply trace_eventually_now.
+    pose proof (trace_now_split _ _ _ Hnow H) as Hnow'.
+    revert Hnow'. apply trace_now_mono.
+    intros s l [H1 H2]. split; [|done]. set_solver. }
+  apply trace_eventually_thing.
+  apply IHHB.
+  { by eapply trace_always_cons. }
+Admitted.
+
+(* (* The buffers will only grow until B is scheduled *) *)
+(* (* Proof by validity relation of the model *) *)
+(* Lemma retransmit_fair_trace_buffer_grows mtr bs : *)
+(*   mtrace_valid mtr → *)
+(*   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr → *)
+(*   (◊trace_and *)
+(*      (↓ (λ s _, suffix bs (s.2 !!! (m_destination mAB)))) *)
+(*      (↓ (λ _ l, option_map label_role l = Some $ inl Brole))) mtr. *)
+(* Proof. *)
+(*   intros Hvalid Hnow. *)
+(*   pose proof (received_or_eventually_B mtr) as [Hreceived|HB]. *)
+(*   { admit. } *)
+(*   rewrite /trace_eventually in HB. rewrite /trace_until in HB. *)
+(*   induction HB. *)
+(* Admitted. *)
+
 Lemma eventually_deliver_eventually_received mtr :
   mtrace_valid mtr → mtrace_fair mtr →
   (◊ ↓ deliver_filter mAB) mtr →
@@ -363,11 +423,11 @@ Proof.
   apply trace_now_exists in Hdeliver as [bs Hdeliver].
   assert (mtrace_valid mtr') as Hvalid'.
   { by eapply trace_always_suffix_of. }
-  pose proof (received_or_eventually_B) as [H|H].
-  { by apply trace_eventually_now. }
+  (* pose proof (received_or_eventually_B) as [H|H]. *)
+  (* { by apply trace_eventually_now. } *)
   apply trace_eventually_next.
-  apply trace_eventually_until in H.
-  pose proof (retransmit_fair_trace_buffer_grows _ (mAB :: bs) _ Hvalid' Hdeliver H) as H'.
+  (* apply trace_eventually_until in H. *)
+  pose proof (retransmit_fair_trace_buffer_grows _ (mAB :: bs) Hvalid' Hdeliver) as H'.
   revert H'.
   apply trace_eventually_mono_strong.
   intros mtr'' Hsuffix' [Hmtr1'' Hmtr2'']%trace_andI.
