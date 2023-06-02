@@ -256,8 +256,8 @@ Section locales_helpers.
     destruct t1 as [|e1 t1]; try by inversion Hequiv1; simplify_eq.
     simpl; constructor; first by etransitivity; [inversion Hequiv1 | inversion Hequiv2].
     eapply (IHt3 _ (s2 ++ [e2]) _ _ t2).
-    - inversion Hequiv1; simplify_eq =>//. apply locales_equiv_snoc =>//. constructor.
-    - inversion Hequiv2; simplify_eq =>//. apply locales_equiv_snoc =>//. constructor.
+    - inversion Hequiv1; simplify_eq =>//. apply locales_equiv_snoc =>//.
+    - inversion Hequiv2; simplify_eq =>//. apply locales_equiv_snoc =>//.
     - inversion Hequiv1 =>//.
     - inversion Hequiv2 => //.
   Qed.
@@ -342,7 +342,7 @@ Section from_locale.
       apply Forall2_cons_1 in Heq as [Hlocs ?].
       rewrite decide_False // in Heζ; last by erewrite Hlocs, <-locale_equiv =>//.
       apply (IH (tp0 ++ [e])); eauto.
-      apply locales_equiv_snoc =>//. constructor.
+      apply locales_equiv_snoc =>//.
   Qed.
 
   Lemma from_locale_step tp1 tp2 ζ oζ σ1 σ2 :
@@ -621,7 +621,7 @@ Section adequacy_helper_lemmas.
     simpl.
     iDestruct (big_sepL2_cons_inv_l with "H") as (Φ Φs' ->) "[??]".
     rewrite big_sepL2_cons. simpl. erewrite <-locale_equiv =>//. iFrame.
-    iApply IHtp =>//. apply locales_equiv_snoc =>//; [constructor|].
+    iApply IHtp =>//. apply locales_equiv_snoc =>//.
     apply locale_equiv =>//.
   Qed.
 
@@ -741,7 +741,7 @@ Section adequacy_helper_lemmas.
         specialize (IHt (t0 ++ [a]) (t0' ++ [a]) _ _ Hlen1).
         simpl in IHt. rewrite !drop_0 in IHt. apply IHt.
         * rewrite !app_length. lia.
-        * apply locales_equiv_snoc =>//; first constructor.
+        * apply locales_equiv_snoc =>//.
           list_simplifier. apply locale_equiv =>//.
       + simpl. apply IHt =>//. simpl in Hlen1. lia.
   Qed.
