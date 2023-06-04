@@ -52,7 +52,7 @@ Section Specification.
       commit rpc #() @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
           CanStart sa rpc ∗
-          (⌜b = true⌝ ∗ ⌜can_commit hs m hg = True⌝ ∗
+          (⌜b = true⌝ ∗ ⌜can_commit hs m hg⌝ ∗
             GHist ((sa, m) :: hg) ∗ LHist rpc sa ((sa, m) :: hl)) ∨
           (⌜b = false⌝ ∗ GHist hg ∗ LHist rpc sa hl) >>>.
 
