@@ -48,7 +48,7 @@ Section Specification.
    ∀ (rpc : val) (sa : socket_address) (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (hl hs hg: THst) (m : gmap Key val),
-    LHist rpc sa hl ∗ TState rpc hs m ∗ GHist hg >>>
+    LHist rpc sa hl ∗ GHist hg ∗ TState rpc hs m >>>
       commit rpc #() @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
           CanStart sa rpc ∗
@@ -64,20 +64,23 @@ Section Specification.
 Definition run_spec : Prop :=
     ∀ (rpc : val) (tbody : val)
       (sa : socket_address) (E : coPset)
-      (m : gmap Key val) (h: THst)
+      (m : gmap Key val) (h: THst) (hl : THst)
       (P : THst → iProp Σ)
       (Q : THst → gmap Key val → iProp Σ),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜↑KVS_InvName ⊆ E⌝
+    -∗
     {{{ TState rpc h ∅ ∗ P h }}}
       tbody rpc #() @[ip_of_address sa] E
-    {{{ RET #(); TState rpc h m ∗ Q h m }}} →
-    <<< ∀∀ h0, ⌜h0 = h⌝ ∗ (* FIXME: here only for parsing, remove it *)
-        CanStart sa rpc ∗ GHist h ∗ LHist rpc sa h ∗ P h >>>
+    {{{ RET #(); TState rpc h m ∗ Q h m }}}
+    →
+    <<< ∀∀ (x : unit), CanStart sa rpc ∗ GHist h ∗ LHist rpc sa hl ∗ P h >>>
            run rpc tbody #() @[ip_of_address sa] E
-    <<<▷∃∃ b,  RET #b;
+    <<<▷∃∃ b h',  RET #b;
+        ⌜h ≤ₚ h'⌝ ∗
         CanStart sa rpc ∗
-        (⌜b = true⌝ ∗ GHist ((sa, m) :: h) ∗ LHist rpc sa ((sa, m) :: h)) ∨
-        (⌜b = false⌝ ∗ GHist h ∗ LHist rpc sa h) >>>.
+        (⌜b = true⌝ ∗ ⌜can_commit h m h'⌝ ∗
+                      GHist ((sa, m) :: h') ∗ LHist rpc sa ((sa, m) :: hl)) ∨
+        (⌜b = false⌝ ∗ GHist h' ∗ LHist rpc sa hl) >>>.
 
   Definition init_client_proxy_spec : Prop :=
     ∀ (sa : socket_address),
@@ -116,7 +119,6 @@ Proof. econstructor; solve_inG. Qed.
 
 Section SI_Module.
   Context `{!anerisG Mdl Σ}.
-  Context (CanStart : socket_address → val → iProp Σ).
 
   Class SI_init `{!User_params} := {
      SI_init_module E :
@@ -132,3 +134,31 @@ Section SI_Module.
        ⌜run_spec⌝ }.
 
 End SI_Module.
+
+(* TODO: REMOVE THIS LATER, it's just an example of usage. *)
+Section Prove_of_t_body_of_some_example.
+  Context `{!anerisG Mdl Σ}.
+  Context `{!User_params, !SI_resources Mdl Σ}.
+  Context (wr_spec : read_spec).
+
+  Definition code_snippet : val :=
+    λ: "rpc" "k", read "rpc" "k".
+
+  Lemma code_snippet_proof sa (rpc : val) h m (k : Key) :
+     {{{ ⌜k ∈ KVS_keys⌝ ∗
+           TState rpc h (<[k:=#42]> m)}}}
+       code_snippet rpc #k @[ip_of_address sa]
+     {{{ vo, RET vo; ⌜vo = $(Some 42)⌝ }}}.
+ Proof.
+   rewrite /code_snippet.
+   iIntros (Φ) "(Hkey & HTState) HΦ".
+   wp_pures.
+   iApply (wr_spec with "[$][$HTState]").
+   iNext.
+   iIntros (vo) "(_ & [%Habs | %Hpost])"; iApply "HΦ";
+     first by set_solver.
+   destruct Hpost as (v & Hv & Hvo).
+   by simplify_map_eq /=.
+ Qed.
+
+End Prove_of_t_body_of_some_example.
