@@ -6,17 +6,11 @@ From aneris.aneris_lang.lib Require Import
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
+From aneris.examples.snapshot_isolation
+     Require Import snapshot_isolation_code.
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources.
 
-(* TODO : IMPLEMENT THOSE IN OCAML AND TRANSLATE TO COQ *)
-Definition init_kvs (s : serializer) : val := NONEV.
-Definition init_client (s : serializer) : val := NONEV.
-Definition read : val := NONEV.
-Definition write : val := NONEV.
-Definition start : val := NONEV.
-Definition commit : val := NONEV.
-Definition run : val := NONEV.
 
 (** Specifications for read and write operations.  *)
 Section Specification.
@@ -62,6 +56,11 @@ Section Specification.
             GHist ((sa, m) :: hg) ∗ LHist rpc sa ((sa, m) :: hl)) ∨
           (⌜b = false⌝ ∗ GHist hg ∗ LHist rpc sa hl) >>>.
 
+(** TODO: Read only transaction *)
+
+(** Fixme *)
+(* I think that this spec is wrong! Because h in pre and post of atomic triple
+   should not be the same. *)
 Definition run_spec : Prop :=
     ∀ (rpc : val) (tbody : val)
       (sa : socket_address) (E : coPset)
