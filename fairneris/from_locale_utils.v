@@ -47,7 +47,7 @@ Lemma from_locale_elem_of' tp ζ e :
 Proof. apply from_locale_from_elem_of'. Qed.
 
 Lemma posts_of_idx
-      `{!anerisG (fair_model_to_model simple_fair_model) Σ}
+      `{!anerisG simple_fair_model Σ}
       (e : aneris_expr) v (tp : list aneris_expr) ζ :
   from_locale tp ζ = Some e → aneris_to_val e = Some v →
   posts_of tp
@@ -58,7 +58,7 @@ Proof.
   apply from_locale_elem_of' in Hlocale as [i [Hlookup Hlocale]].
   iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H".
   { rewrite elem_of_list_omap.
-    eexists (e, (λ _, ∃ ℓ : simple_role, ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ)%I).
+    eexists (e, (λ _, ∃ (ℓ : fmrole simple_fair_model), ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ)%I).
     split; last first.
     - simpl. apply fmap_Some. exists v. split; done.
     - destruct tp as [|e1' tp]; [set_solver|]. simpl.
@@ -127,7 +127,7 @@ Proof.
 Qed.
 
 Lemma locales_of_list_from_drop Σ
-    `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
+    `{!anerisG simple_fair_model Σ} es es' tp :
   locales_equiv_prefix_from es' es tp →
   (λ '(t,e) v, fork_post (locale_of t e) v) <$>
       (prefixes_from es' tp) =
@@ -139,7 +139,7 @@ Proof.
 Qed.
 
 Lemma posts_of_length_drop Σ
-    `{!anerisG (fair_model_to_model simple_fair_model) Σ} es es' tp :
+    `{!anerisG simple_fair_model Σ} es es' tp :
   locales_equiv_prefix_from es' es tp →
   posts_of tp ((λ '(t,e) v, fork_post (locale_of t e) v) <$>
                    (prefixes_from es' (es ++ drop (length es) tp))) -∗

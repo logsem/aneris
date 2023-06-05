@@ -23,7 +23,7 @@ Import uPred.
 Import RecordSetNotations.
 
 Section definitions.
-  Context `{anerisG Mdl Σ}.
+  Context `{anerisG FM Σ}.
   Implicit Types σ : state.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
@@ -245,7 +245,7 @@ Section definitions.
 End definitions.
 
 Section Aneris_AS.
-  Context `{aG : !anerisG (fair_model_to_model simple_fair_model) Σ}.
+  Context `{aG : !anerisG simple_fair_model Σ}.
 
   Definition ipA := "0.0.0.0".
   Definition saA := SocketAddressInet ipA 80.

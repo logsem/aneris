@@ -10,15 +10,15 @@ From fairneris.aneris_lang Require Export lifting.
 
 Set Default Proof Using "Type".
 
-Definition aneris_wp_def `{!anerisG (fair_model_to_model simple_fair_model) Σ} (ip : ip_address) (E : coPset)
+Definition aneris_wp_def `{!anerisG simple_fair_model Σ} (ip : ip_address) (E : coPset)
            (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
   (∀ tid, is_node ip -∗
    wp NotStuck E (ip, tid) (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!anerisG (fair_model_to_model simple_fair_model) Σ} : seal (@aneris_wp_def Σ _).
+Definition aneris_wp_aux `{!anerisG simple_fair_model Σ} : seal (@aneris_wp_def Σ _).
 Proof. by eexists. Qed.
-Definition aneris_wp `{!anerisG (fair_model_to_model simple_fair_model) Σ} := aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!anerisG (fair_model_to_model simple_fair_model) Σ} : aneris_wp = @aneris_wp_def Σ _ :=
+Definition aneris_wp `{!anerisG simple_fair_model Σ} := aneris_wp_aux.(unseal).
+Definition aneris_wp_eq `{!anerisG simple_fair_model Σ} : aneris_wp = @aneris_wp_def Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Notation "'WP' e '@[' ip ] E {{ Φ } }" := (aneris_wp ip E e%E Φ)
@@ -75,7 +75,7 @@ Notation "'{{{' P } } } e '@[' ip ] {{{ 'RET' pat ; Q } } }" :=
      format "{{{  P  } } }  e  '@[' ip ]  {{{  RET  pat ;  Q } } }") : stdpp_scope.
 
 Section aneris_wp.
-Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
+Context `{!anerisG simple_fair_model Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -620,7 +620,7 @@ End aneris_wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
+  Context `{!anerisG simple_fair_model Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 

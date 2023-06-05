@@ -8,7 +8,7 @@ From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Export aneris_lang network.
 From fairneris.algebra Require Import disj_gsets.
 From trillium.events Require Import event.
-From fairneris Require Import model_draft.
+From fairneris Require Import fairness.
 From fairneris.aneris_lang Require Import events.
 From fairneris.prelude Require Import gset_map.
 From fairneris.lib Require Export singletons.
@@ -77,14 +77,15 @@ Definition aneris_events := event_obs aneris_lang.
 Canonical Structure aneris_eventsO := leibnizO aneris_events.
 
 Definition aneris_localeO := leibnizO aneris_locale.
-Definition simple_roleO := leibnizO simple_role.
+(* Definition simple_roleO := leibnizO simple_role. *)
 
 (* Definition live_roleUR := authUR (gmapUR aneris_localeO *)
 (*                                          (exclR (optionO simple_roleO))). *)
-Definition live_roleUR := authUR (gset_disjUR $ simple_roleO).
+Definition live_roleUR (FM : FairModel) :=
+  authUR (gset_disjUR $ FM.(fmrole)).
 
 (** The system CMRA *)
-Class anerisG (Mdl : Model) Σ :=
+Class anerisG (FM : FairModel) Σ :=
   AnerisG {
       aneris_invG :> invGS_gen HasNoLc Σ;
       (** global tracking of the ghost names of node-local heaps *)
@@ -119,11 +120,11 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_messages_name : gname;
       (** model *)
       aneris_model_name : gname;
-      anerisG_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
+      anerisG_model :> inG Σ (authUR (optionUR (exclR (ModelO (fair_model_to_model FM)))));
       (** live and dead roles *)
       aneris_live_roles_name : gname;
       aneris_dead_roles_name : gname;
-      anerisG_live_roles :> inG Σ live_roleUR;
+      anerisG_live_roles :> inG Σ (live_roleUR FM);
       (** steps *)
       aneris_steps_name : gname;
       anerisG_steps :> mono_natG Σ;
@@ -138,7 +139,7 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_observed_recv_name : gname;
     }.
 
-Class anerisPreG (Mdl : Model) Σ :=
+Class anerisPreG (FM : FairModel) Σ :=
   AnerisPreG {
       anerisPre_invGS :> invGpreS Σ;
       anerisPre_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
@@ -154,8 +155,8 @@ Class anerisPreG (Mdl : Model) Σ :=
       anerisPre_tracked_socket_address_groupsG :>
         inG Σ (tracked_socket_address_groupsUR);
       anerisPre_messagesG :> inG Σ (authR messagesUR);
-      anerisPre_model :> inG Σ (authUR (optionUR (exclR (ModelO Mdl))));
-      anerisPre_live_roles :> inG Σ live_roleUR;
+      anerisPre_model :> inG Σ (authUR (optionUR (exclR (ModelO (fair_model_to_model FM)))));
+      anerisPre_live_roles :> inG Σ (live_roleUR FM);
       anerisPre_steps :> mono_natG Σ;
       anerisPre_allocEVSG :>
         inG Σ (authUR (gmapUR string (exclR aneris_eventsO)));
@@ -163,7 +164,7 @@ Class anerisPreG (Mdl : Model) Σ :=
         inG Σ (authUR (gmapUR socket_address_group (exclR aneris_eventsO)));
     }.
 
-Definition anerisΣ (Mdl : Model) : gFunctors :=
+Definition anerisΣ (FM : FairModel) : gFunctors :=
   #[invΣ;
    GFunctor (authR node_gnames_mapUR);
    GFunctor (authR local_heapUR);
@@ -176,8 +177,8 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (unallocated_socket_address_groupsUR);
    GFunctor (tracked_socket_address_groupsUR);
    GFunctor (authR messagesUR);
-   GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
-   GFunctor live_roleUR;
+   GFunctor (authUR (optionUR (exclR (ModelO (fair_model_to_model FM)))));
+   GFunctor (live_roleUR FM);
    mono_natΣ;
    GFunctor (authUR (gmapUR string (exclR aneris_eventsO)));
    GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
@@ -188,12 +189,12 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
 Proof. solve_inG. Qed.
 
 Section definitions.
-  Context `{aG : !anerisG Mdl Σ}.
+  Context `{aG : !anerisG FM Σ}.
 
-  Definition auth_st (st : Mdl) : iProp Σ :=
+  Definition auth_st (st : fair_model_to_model FM) : iProp Σ :=
     (* own aneris_model_name (● Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
     own aneris_model_name (● Excl' st).
-  Definition frag_st (st : Mdl) : iProp Σ :=
+  Definition frag_st (st : fair_model_to_model FM) : iProp Σ :=
     own aneris_model_name (◯ Excl' st).
     (* own aneris_model_name (◯ Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
 
@@ -450,18 +451,18 @@ Section definitions.
         (* aneris_live_roles_name (◯ {[ tid := Excl role ]}). *)
 
   (** Live roles *)
-  Definition live_roles_auth_own (A : gset simple_role) : iProp Σ :=
-    own (A := live_roleUR) aneris_live_roles_name (● GSet A).
-  Definition live_roles_frag_own (roles : gset simple_role) : iProp Σ :=
-    own (A := live_roleUR) aneris_live_roles_name (◯ GSet roles).
-  Definition live_role_frag_own (role : simple_role) : iProp Σ :=
+  Definition live_roles_auth_own (A : gset $ FM.(fmrole)) : iProp Σ :=
+    own (A := live_roleUR FM) aneris_live_roles_name (● GSet A).
+  Definition live_roles_frag_own (roles : gset $ FM.(fmrole)) : iProp Σ :=
+    own (A := live_roleUR FM) aneris_live_roles_name (◯ GSet roles).
+  Definition live_role_frag_own (role : FM.(fmrole)) : iProp Σ :=
     live_roles_frag_own {[role]}.
 
-  Definition dead_roles_auth_own (A : gset simple_role) : iProp Σ :=
-    own (A := live_roleUR) aneris_dead_roles_name (● GSet A).
-  Definition dead_roles_frag_own (roles : gset simple_role) : iProp Σ :=
-    own (A := live_roleUR) aneris_dead_roles_name (◯ GSet roles).
-  Definition dead_role_frag_own (role : simple_role) : iProp Σ :=
+  Definition dead_roles_auth_own (A : gset FM.(fmrole)) : iProp Σ :=
+    own (A := live_roleUR FM) aneris_dead_roles_name (● GSet A).
+  Definition dead_roles_frag_own (roles : gset FM.(fmrole)) : iProp Σ :=
+    own (A := live_roleUR FM) aneris_dead_roles_name (◯ GSet roles).
+  Definition dead_role_frag_own (role : FM.(fmrole)) : iProp Σ :=
     dead_roles_frag_own {[role]}.
 
 
@@ -758,7 +759,7 @@ Proof.
   rewrite !bool_decide_eq_true; eauto.
 Qed.
 
-Lemma model_init `{anerisPreG Mdl Σ} (st : Mdl) :
+Lemma model_init `{anerisPreG FM Σ} (st : fair_model_to_model FM) :
   ⊢ |==> ∃ γ, own γ (● Excl' st) ∗ own γ (◯ Excl' st).
 Proof.
   iMod (own_alloc (● Excl' st ⋅ ◯ Excl' st)) as (γ) "[Hfl Hfr]".
@@ -766,21 +767,21 @@ Proof.
   iExists _. by iFrame.
 Qed.
 
-Lemma steps_init `{anerisPreG Mdl Σ} n :
+Lemma steps_init `{anerisPreG FM Σ} n :
   ⊢ |==> ∃ γ, mono_nat_auth_own γ 1 n ∗ mono_nat_lb_own γ n.
 Proof. iApply mono_nat_own_alloc. Qed.
 
 (* Lemma live_roles_init `{anerisPreG Mdl Σ} M : *)
-(*   ⊢ |==> ∃ γ, own (A := authUR (gmapUR nat (exclR $ leibnizO simple_role))) *)
+(*   ⊢ |==> ∃ γ, own (A := authUR (gmapUR nat (exclR $ leibnizO FM.(fmrole)))) *)
 (*                   γ (● (Excl <$> M)) ∗   *)
-(*               [∗ map] tid ↦ role ∈ M, own (A := authUR (gmapUR nat (exclR $ leibnizO simple_role))) γ (● (Excl <$> M)). *)
+(*               [∗ map] tid ↦ role ∈ M, own (A := authUR (gmapUR nat (exclR $ leibnizO FM.(fmrole)))) γ (● (Excl <$> M)). *)
 (* Proof. Admitted. *)
 
-Local Lemma roles_auth_extend_pre `{anerisPreG Mdl Σ} γ A roles :
+Local Lemma roles_auth_extend_pre `{anerisPreG FM Σ} γ A roles :
   roles ## A →
-  own (A := live_roleUR) γ (● GSet A) ==∗
-  own (A := live_roleUR) γ (● GSet (roles ∪ A)) ∗
-  own (A := live_roleUR) γ (◯ GSet roles).
+  own (A := live_roleUR FM) γ (● GSet A) ==∗
+  own (A := live_roleUR FM) γ (● GSet (roles ∪ A)) ∗
+  own (A := live_roleUR FM) γ (◯ GSet roles).
 Proof.
   iIntros (Hnin) "Hauth".
   iMod (own_update with "Hauth") as "[$ $]"; [|done].
@@ -789,18 +790,18 @@ Proof.
   set_solver.
 Qed.
 
-Lemma roles_init `{anerisPreG Mdl Σ} A :
-  ⊢ |==> ∃ γ, own (A := live_roleUR) γ (● GSet A) ∗
-              own (A := live_roleUR) γ (◯ GSet A).
+Lemma roles_init `{anerisPreG FM Σ} A :
+  ⊢ |==> ∃ γ, own (A := live_roleUR FM) γ (● GSet A) ∗
+              own (A := live_roleUR FM) γ (◯ GSet A).
 Proof.
-  iMod (own_alloc (● GSet (∅:gset simple_roleO))) as (γ) "Hauth";
+  iMod (own_alloc (● GSet (∅:gset $ FM.(fmrole)))) as (γ) "Hauth";
     [by apply auth_auth_valid|].
   iExists γ.
   iMod (roles_auth_extend_pre with "Hauth") as "[Hauth $]"; [set_solver|].
   by rewrite union_empty_r_L.
 Qed.
 
-Lemma unallocated_init `{anerisPreG Mdl Σ} (A : gset socket_address_group) :
+Lemma unallocated_init `{anerisPreG FM Σ} (A : gset socket_address_group) :
   ⊢ |==> ∃ γ, own γ (● (GSet A)) ∗ own γ (◯ (GSet A)).
 Proof.
   iMod (own_alloc (● (GSet (∅:gset socket_address_group)) ⋅ ◯ (GSet ∅))) as (γ) "[Ha Hf]".
@@ -912,7 +913,7 @@ Proof.
 Qed.
 
 Section resource_lemmas.
-  Context `{aG : !anerisG Mdl Σ}.
+  Context `{aG : !anerisG FM Σ}.
 
   #[global] Instance mapsto_node_persistent ip γn : Persistent (mapsto_node ip γn).
   Proof. rewrite mapsto_node_eq /mapsto_node_def. apply _. Qed.
@@ -985,10 +986,12 @@ Section resource_lemmas.
     iDestruct "H" as %HvalidR. iPureIntro.
     revert HvalidR.
     rewrite comm auth_both_valid_discrete.
-    rewrite singleton_included_l=> -[[y [Hlookup Hless]] Hvalid].
+    rewrite singleton_included_l.
+    intros [[y [Hlookup Hless]] Hvalid].
     assert (Hvalidy := lookup_valid_Some _ ip y Hvalid Hlookup).
     revert Hlookup.
-    rewrite lookup_fmap fmap_Some_equiv=> -[v' [Hl Heq]]. revert Hless Heq.
+    rewrite lookup_fmap fmap_Some_equiv.
+    intros [v' [Hl Heq]]. revert Hless Heq.
     rewrite Some_included_total.
     destruct (to_agree_uninj y Hvalidy) as [y' <-].
     rewrite to_agree_included.

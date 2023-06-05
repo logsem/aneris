@@ -24,7 +24,7 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
+  Context `{!anerisG simple_fair_model Σ}.
 
   (* TODO: Move this elsehwere and use it where we now use ad hoc induction *)
   Lemma fupd_elim_laterN E1 E2 n (P:iProp Σ) :

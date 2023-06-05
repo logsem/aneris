@@ -893,7 +893,7 @@ Section aneris_state_interpretation.
 End aneris_state_interpretation.
 
 Section state_interpretation.
-  Context `{!anerisG (fair_model_to_model simple_fair_model) Σ}.
+  Context `{!anerisG simple_fair_model Σ}.
 
   (* Lemma aneris_state_interp_model_agree m ex atr : *)
   (*   state_interp ex atr -∗ frag_st m -∗ ⌜(trace_last atr) = m⌝. *)

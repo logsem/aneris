@@ -12,7 +12,7 @@ Definition Aprog shA : expr := SendTo #(LitSocket shA) #"Hello" #saB.
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
 
 Section with_Σ.
-  Context `{anerisG (fair_model_to_model simple_fair_model) Σ}.
+  Context `{anerisG simple_fair_model Σ}.
 
   Lemma wp_A s E shA :
     {{{ shA ↪[ip_of_address saA] sA ∗ saA ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗
@@ -354,7 +354,7 @@ Section with_Σ.
           destruct Hr as [Hr|Hr]; set_solver. }
       iMod (live_roles_auth_delete with "Hlive_auth HB") as "Hlive_auth".
       rewrite Hs.
-      iMod (dead_role_auth_extend _ B_role with "Hdead_auth")
+      iMod (dead_role_auth_extend _ (B_role : fmrole simple_fair_model) with "Hdead_auth")
         as "[Hdead_auth Hdead_own]"; [destruct x; set_solver|].
       iModIntro.
       iExists (Received x y), B_role.
@@ -482,8 +482,7 @@ Definition initial_state shA shB :=
 Lemma no_drop_dup_continued_simulation shA shB :
   fairly_terminating (initial_state shA shB).
 Proof.
-  assert (anerisPreG (fair_model_to_model simple_fair_model)
-                     (anerisΣ (fair_model_to_model simple_fair_model))) as HPreG.
+  assert (anerisPreG simple_fair_model (anerisΣ simple_fair_model)) as HPreG.
   { apply _. }
   eapply (simulation_adequacy_fair_termination_multiple _ _ _ _ _ {[saA;saB]});
     [simpl; lia| |set_solver|set_solver| |set_solver|set_solver|..| |]=> /=.
