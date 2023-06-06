@@ -144,7 +144,7 @@ Definition retransmit_live_roles (s : retransmit_state) : gset retransmit_role :
 
 (* TODO: This should be generalised, and lifted to multiple roles *)
 Definition retransmit_terminating_role (ρ : retransmit_role) (tr : mtrace) : Prop :=
-  (◊ ↓ (λ st _, ρ ∉ retransmit_live_roles st)) tr.
+  (◊↓λ st _, ρ ∉ retransmit_live_roles st) tr ∨ ¬ infinite_trace tr.
 
 Definition retransmit_role_enabled_model (ρ : retransmit_role) (s : retransmit_state) : Prop :=
   ρ ∈ retransmit_live_roles s.
@@ -173,6 +173,10 @@ Definition retransmit_fair_scheduling (mtr : mtrace) : Prop :=
 
 Definition mtrace_fair (mtr : mtrace) : Prop :=
   retransmit_fair_scheduling mtr ∧ retransmit_fair_network mtr.
+
+Lemma mtrace_fair_always mtr :
+  mtrace_fair mtr ↔ (□ mtrace_fair) mtr.
+Proof. Admitted.
 
 (* Good definition? *)
 Definition trans_valid (mtr : mtrace) :=
@@ -276,33 +280,6 @@ Proof.
     simpl. by rewrite lookup_total_insert.
 Qed.
 
-(* (* The buffers will only grow until B is scheduled *) *)
-(* (* Proof by validity relation of the model *) *)
-(* Lemma retransmit_fair_trace_buffer_grows mtr bs : *)
-(*   mtrace_valid mtr → *)
-(*   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr → *)
-(*   (trace_until (↓ λ s _, suffix bs (s.2 !!! (m_destination mAB))) *)
-(*                (↓ λ _ l, option_map label_role l = Some $ inl Brole)) mtr. *)
-(* Proof. Admitted. *)
-
-(* (* The buffers will only grow until B is scheduled *) *)
-(* (* Proof by validity relation of the model *) *)
-(* Lemma retransmit_fair_trace_buffer_grows mtr bs P : *)
-(*   mtrace_valid mtr → *)
-(*   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr → *)
-(*   (trace_until (trace_not (↓ λ _ l, option_map label_role l = Some $ inl Brole)) P) mtr → *)
-(*   (◊ trace_and (↓ λ s _, suffix bs (s.2 !!! (m_destination mAB))) P) mtr. *)
-(* Proof. Admitted. *)
-
-(* A scheduled B will succeed if there is something in the buffer *)
-(* Proof by validity relation of the model *)
-(* Lemma successful_receive msg mtr : *)
-(*   mtrace_valid mtr → *)
-(*   (↓ λ s _, ∃ bs, s.2 !!! (m_destination msg) = msg :: bs) mtr → *)
-(*   (↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr → *)
-(*   (○ ↓ λ s _, s.1.1 = Received) mtr. *)
-(* Proof. Admitted. *)
-
 (* A scheduled B will succeed if there is something in the buffer *)
 (* Proof by validity relation of the model *)
 Lemma successful_deliver_received bs (mtr : mtrace) :
@@ -324,96 +301,155 @@ Proof.
   rewrite H2 in Hbs. by apply suffix_cons_nil_inv in Hbs.
 Qed.
 
+Lemma B_enabled_not_received s :
+  retransmit_role_enabled_model (inl Brole) s ↔ s.1.1 ≠ Received.
+Proof.
+  rewrite /retransmit_role_enabled_model /retransmit_live_roles.
+  split.
+  - intros. destruct s as [[??]?]. simpl in *. intros ->.
+    case_decide; set_solver.
+  - intros. destruct s as [[??]?]. simpl in *.
+    apply elem_of_union. right. destruct r; set_solver.
+Qed.
+
+Lemma not_B_enabled_received s :
+  ¬ retransmit_role_enabled_model (inl Brole) s ↔ s.1.1 = Received.
+Proof.
+  rewrite /retransmit_role_enabled_model /retransmit_live_roles.
+  split.
+  - intros. destruct s as [[??]?]. simpl in *. destruct r; set_solver.
+  - intros. destruct s as [[??]?]. simpl in *. intros Helem.
+    simplify_eq. case_decide; set_solver.
+Qed.
+
 (* OBS: Will need scheduling fairness *)
-(* Proof by EM on whether B is live.
-   - If it is not, we are in Received
-   - if It is, B will eventually be scheduled, by fairness *)
+(* Proof by EM on whether B is live. *)
+(*    - If it is not, we are in Received *)
+(*    - if it is, B will eventually be scheduled, by fairness *)
 Lemma received_or_eventually_B (mtr : mtrace) :
-  (↓ λ s _, s.1.1 = Received) mtr ∨
+  mtrace_fair mtr →
+  (◊↓ λ s _, s.1.1 = Received) mtr ∨
   (◊↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr.
 Proof.
-  (* TODO: you are here. Time to do fairness stuff. Can we avoid this with LTL? *)
-  (* assert ((◊ ↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr' ∨ *)
-  (*        ¬ (◊ ↓ λ _ l, option_map label_role l = Some $ inl Brole) mtr'). *)
-  (* { apply ExcludedMiddle. } *)
-  (* destruct H as [H|H]; last first. *)
-  (* { apply trace_not_not in H. *)
-  (*   apply trace_not_eventually_always_not in H. *)
-  (*   apply trace_always_eventually in H. *)
-  (*   revert H. apply trace_eventually_mono_strong. *)
-  (*   intros mtr'' Hsuffix' Htr'. *)
-  (*   apply trace_not_now in Htr'. *)
-  (*   revert Htr'. *)
-  (*   apply trace_now_mono_strong. *)
-  (*   intros s l Hs Hl H. *)
-  (*   simplify_eq. *)
-  (*   assert (mtrace_valid mtr''). *)
-  (*   { eapply trace_always_suffix_of; [done|]. by eapply trace_always_suffix_of. } *)
-  (*   apply trace_always_elim in H0. *)
-  (*   rewrite /trans_valid in H0. *)
-  (*   destruct mtr''. *)
-  (*   - admit.                    (* Need infinite trace property *) *)
-  (*   - simpl in *. destruct s. destruct p. simpl in *. simplify_eq. *)
-  (*     admit. }                  (* Derp need EM on whether B is live. *) *)
-Admitted.
+  intros Hfair.
+  assert ((↓ λ s _, s.1.1 = Received) mtr ∨
+         ¬ (↓ λ s _, s.1.1 = Received) mtr).
+  { apply ExcludedMiddle. }
+  destruct H as [H|H].
+  { left. apply trace_eventually_intro. done. }
+  apply trace_not_not in H. apply trace_not_now in H.
+  assert ((↓ (λ s _, retransmit_role_enabled_model (inl Brole) s)) mtr) as HB.
+  { revert H. apply trace_now_mono.
+    intros. by apply B_enabled_not_received. }
+  destruct Hfair as [Hfair _].
+  specialize (Hfair (inl Brole)).
+  apply trace_always_elim in Hfair.
+  rewrite trace_implies_implies in Hfair.
+  apply Hfair in HB.
+  apply trace_eventually_or. revert HB.
+  apply trace_eventually_mono.
+  intros tr Htr.
+  apply trace_now_or in Htr.
+  destruct Htr as [Htr|Htr].
+  - left. revert Htr. apply trace_now_mono. intros.
+    by apply not_B_enabled_received.
+  - by right.
+Qed.
 
-Lemma trace_and_now {S L} P Q (tr : trace S L) :
-  trace_and (↓P) (↓Q) tr ↔ (↓ (λ s l, P s l ∧ Q s l)) tr.
-Proof. Admitted.
-
-Lemma trace_now_split {S L} P Q (tr : trace S L) :
-  (↓ P) tr → (↓ Q) tr → (↓ (λ s l, P s l ∧ Q s l)) tr.
-Proof. Admitted.
-
-Lemma trace_eventually_thing {S L} P s l (tr : trace S L) :
-  (◊ P) tr → (◊ P) (s -[l]-> tr).
-Proof. Admitted.
+(* Need to assume that trace is infinite *)
+Lemma retransmit_fair_trace_buffer_grow_next mtr bs :
+  infinite_trace mtr →
+  mtrace_valid mtr →
+  (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr →
+  (↓ λ _ l, option_map label_role l ≠ Some $ inl Brole) mtr →
+  (○ (↓ (λ s _, ∃ bs', bs `suffix_of` bs' ∧
+                       s.2 !!! m_destination mAB = bs'))) mtr.
+Proof.
+  intros Hinf Hvalid Hbs HBrole.
+  apply trace_always_elim in Hvalid.
+  destruct mtr.
+  { specialize (Hinf 1). by apply is_Some_None in Hinf. }
+  destruct mtr.
+  { specialize (Hinf 2). by apply is_Some_None in Hinf. }
+  destruct s as [[??]?].
+  rewrite /trace_now /pred_at.
+  rewrite /trace_now /pred_at in Hbs.
+  rewrite /trace_now /pred_at in HBrole.
+  simpl in *.
+  apply trace_nextI.
+  inversion Hvalid; simplify_eq.
+  - exists (g !!! m_destination mAB). set_solver.
+  - exists (g !!! m_destination mAB). set_solver.
+  - exists (g !!! m_destination mAB). set_solver.
+  - destruct (decide (m_destination msg = saB)) as [->|Hneq].
+    + exists (msg :: g !!! m_destination mAB).
+      split; [by apply suffix_cons_r|].
+      simpl. rewrite lookup_total_insert. done.
+    + exists (g !!! m_destination mAB).
+      simpl. rewrite lookup_total_insert_ne; [|done].
+      set_solver.
+Qed.
 
 (* The buffers will only grow until B is scheduled *)
 (* Proof by validity relation of the model *)
 Lemma retransmit_fair_trace_buffer_grows mtr bs :
+  infinite_trace mtr →
   mtrace_valid mtr →
+  mtrace_fair mtr →
   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr →
-  (◊trace_and
+  ((◊trace_and
      (↓ (λ s _, suffix bs (s.2 !!! (m_destination mAB))))
-     (↓ (λ _ l, option_map label_role l = Some $ inl Brole))) mtr.
+     (↓ (λ _ l, option_map label_role l = Some $ inl Brole))) mtr) ∨
+  ((◊↓ λ s _, s.1.1 = Received) mtr).
 Proof.
-  intros Hvalid Hnow.
-  pose proof (received_or_eventually_B mtr) as [Hreceived|HB].
-  { admit. }
-  induction HB using trace_eventually_ind.
+  intros Hinf Hvalid Hfair Hnow.
+  (* TODO: Need to assume not received instead *)
+  pose proof (received_or_eventually_B mtr Hfair) as [Hreceived|HB].
+  { right. done. }
+  left.
+  revert bs Hnow.
+  apply trace_eventually_until in HB.
+  induction HB; intros bs Hnow.
   { eapply trace_eventually_mono; [apply trace_and_now|].
     apply trace_eventually_now.
     pose proof (trace_now_split _ _ _ Hnow H) as Hnow'.
     revert Hnow'. apply trace_now_mono.
     intros s l [H1 H2]. split; [|done]. set_solver. }
-  apply trace_eventually_thing.
-  apply IHHB.
-  { by eapply trace_always_cons. }
-Admitted.
-
-(* (* The buffers will only grow until B is scheduled *) *)
-(* (* Proof by validity relation of the model *) *)
-(* Lemma retransmit_fair_trace_buffer_grows mtr bs : *)
-(*   mtrace_valid mtr → *)
-(*   (↓ λ s _, s.2 !!! (m_destination mAB) = bs) mtr → *)
-(*   (◊trace_and *)
-(*      (↓ (λ s _, suffix bs (s.2 !!! (m_destination mAB)))) *)
-(*      (↓ (λ _ l, option_map label_role l = Some $ inl Brole))) mtr. *)
-(* Proof. *)
-(*   intros Hvalid Hnow. *)
-(*   pose proof (received_or_eventually_B mtr) as [Hreceived|HB]. *)
-(*   { admit. } *)
-(*   rewrite /trace_eventually in HB. rewrite /trace_until in HB. *)
-(*   induction HB. *)
-(* Admitted. *)
+  apply trace_eventually_cons_2.
+  assert (∃ bs', bs `suffix_of` bs' ∧
+             (↓ (λ s _ , s.2 !!! m_destination mAB = bs'))
+               tr) as [bs' [Hbs' Hnow']].
+  { assert ((↓ (λ s _, ∃ bs', bs `suffix_of` bs' ∧ s.2 !!! m_destination mAB = bs'))
+               tr) as H'; last first.
+    { apply trace_now_exists in H' as [bs' H'].
+      exists bs'.
+      rewrite /trace_now /pred_at.
+      rewrite /trace_now /pred_at in H'.
+      destruct tr; simpl in *; done. }
+    eapply trace_next_cons.
+    by apply retransmit_fair_trace_buffer_grow_next. }
+    eapply trace_eventually_mono; last first.
+  { assert (mtrace_valid tr) as Hvalid' by by eapply trace_always_cons.
+    apply mtrace_fair_always in Hfair.
+    assert (mtrace_fair tr) as Hfair'.
+    { apply mtrace_fair_always. by eapply trace_always_cons. }
+    assert (infinite_trace tr) as Hinf'.
+    { by eapply infinite_cons. }
+    apply (IHHB Hinf' Hvalid' Hfair' bs').
+    done. }
+  intros tr' H'. apply trace_andI. apply trace_andI in H'.
+  destruct H' as [H1 H2].
+  split; [|done].
+  revert H1. apply trace_now_mono.
+  intros ???. by etransitivity.
+Qed.
 
 Lemma eventually_deliver_eventually_received mtr :
-  mtrace_valid mtr → mtrace_fair mtr →
+  infinite_trace mtr → mtrace_valid mtr → mtrace_fair mtr →
   (◊ ↓ deliver_filter mAB) mtr →
   (◊ ↓ λ s _, s.1.1 = Received) mtr.
 Proof.
-  intros Hvalid Hfair Hdeliver.
+  intros Hinf Hvalid Hfair Hdeliver.
   eapply trace_eventually_mono_strong in Hdeliver; last first.
   { intros tr' Hsuffix. apply deliver_next_buffer. by eapply trace_always_suffix_of. }
   apply trace_eventually_next in Hdeliver.
@@ -421,13 +457,18 @@ Proof.
   apply trace_eventually_thing_strong.
   intros mtr' Hsuffix Hdeliver.
   apply trace_now_exists in Hdeliver as [bs Hdeliver].
+  assert (infinite_trace mtr') as Hinf'.
+  { destruct Hsuffix as [n Hn].
+    eapply (infinite_trace_after n) in Hinf.
+    by rewrite Hn in Hinf. }
   assert (mtrace_valid mtr') as Hvalid'.
   { by eapply trace_always_suffix_of. }
-  (* pose proof (received_or_eventually_B) as [H|H]. *)
-  (* { by apply trace_eventually_now. } *)
+  assert (mtrace_fair mtr') as Hfair'.
+  { apply mtrace_fair_always in Hfair.
+    apply mtrace_fair_always. by eapply trace_always_suffix_of. }
+  pose proof (retransmit_fair_trace_buffer_grows _ (mAB :: bs) Hinf' Hvalid' Hfair' Hdeliver) as [H'|H']; last first.
+  { done. }
   apply trace_eventually_next.
-  (* apply trace_eventually_until in H. *)
-  pose proof (retransmit_fair_trace_buffer_grows _ (mAB :: bs) Hvalid' Hdeliver) as H'.
   revert H'.
   apply trace_eventually_mono_strong.
   intros mtr'' Hsuffix' [Hmtr1'' Hmtr2'']%trace_andI.
@@ -441,10 +482,15 @@ Lemma retransmit_fair_traces_terminate mtr :
   retransmit_terminating_role (inl Brole) mtr.
 Proof.
   intros Hvalid [Hfair1 Hfair2].
+  assert (infinite_trace mtr ∨ ¬ infinite_trace mtr) as [Hafter|Hafter];
+    [by apply ExcludedMiddle| |]; last first.
+  { by right. }
+  left.
   pose proof (retransmit_fair_traces_always_eventually_mAB mtr Hvalid (Hfair1 _)).
   apply (eventually_send_eventually_deliver _ Hfair2) in H.
   apply (eventually_deliver_eventually_received) in H; [|done..].
   revert H. apply trace_eventually_mono.
   intros tr. apply trace_now_mono. intros [[]] _ Hreceived.
-  rewrite /retransmit_live_roles. simpl in *. simplify_eq. case_decide; set_solver.
+  rewrite /retransmit_live_roles. simpl in *.
+  simplify_eq. case_decide; set_solver.
 Qed.

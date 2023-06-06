@@ -410,4 +410,37 @@ Section ltl_lemmas.
     intros ?. apply trace_implies_implies, HPQ.
   Qed.
 
+  Lemma trace_eventually_or (P Q : trace S L → Prop) tr :
+    (◊ (P \1/ Q)) tr →
+    (◊ P) tr ∨ (◊ Q) tr.
+  Proof.
+    intros Hdisj.
+    induction Hdisj.
+    { inversion H; [left; by constructor|right; by constructor]. }
+    inversion IHHdisj.
+    - left. by constructor 2.
+    - right. by constructor 2.
+  Qed.
+
+  Lemma trace_now_or (P Q : S → option L → Prop) tr :
+    (↓ (P \2/ Q)) tr →
+    (↓ P) tr ∨ (↓ Q) tr.
+  Proof. rewrite /trace_now /pred_at. by destruct tr=>/=. Qed.
+
+  Lemma trace_and_now P Q (tr : trace S L) :
+    trace_and (↓P) (↓Q) tr ↔ (↓ (λ s l, P s l ∧ Q s l)) tr.
+  Proof. Admitted.
+
+  Lemma trace_now_split P Q (tr : trace S L) :
+    (↓ P) tr → (↓ Q) tr → (↓ (λ s l, P s l ∧ Q s l)) tr.
+  Proof. Admitted.
+
+  Lemma trace_eventually_cons_2 P s l (tr : trace S L) :
+    (◊ P) tr → (◊ P) (s -[l]-> tr).
+  Proof. intros. constructor 2; done. Qed.
+
+  Lemma trace_next_cons (P : trace S L → Prop) s l tr : 
+    (○ P) (s -[l]-> tr) → P tr.
+  Proof. Admitted.
+
 End ltl_lemmas.
