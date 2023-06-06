@@ -212,15 +212,15 @@ Proof.
     apply trace_always_idemp in H.
     revert H. apply trace_always_mono.
     intros tr.
-    apply trace_implies_implies.
+    apply trace_impliesI.
     intros Htr.
     apply trace_always_and in Htr as [Htr1 Htr2].
     split.
     + intros x. revert Htr1. 
-      apply trace_always_mono. intros tr'. apply trace_implies_implies.
+      apply trace_always_mono. intros tr'. apply trace_impliesI.
       intros Htr'. done.
     + intros x. revert Htr2. 
-      apply trace_always_mono. intros tr'. apply trace_implies_implies.
+      apply trace_always_mono. intros tr'. apply trace_impliesI.
       intros Htr'. done.
   - by intros Hfair%trace_always_elim.
 Qed.
@@ -260,7 +260,7 @@ Proof.
   eapply trace_always_eventually_always_mono; [| |apply Hfair].
   - intros Htr. apply trace_implies_refl.
   - intros tr.
-    apply trace_implies_implies.
+    apply trace_impliesI.
     apply trace_now_mono.
     intros s l. intros [Htr|Htr]; [|done].
     rewrite /retransmit_role_enabled_model in Htr. set_solver.
@@ -302,7 +302,7 @@ Lemma eventually_send_eventually_deliver mtr :
 Proof.
   intros Hfair_network Hsend.
   pose proof (Hfair_network mAB). apply trace_always_elim in H.
-  rewrite trace_implies_implies in H. apply H. done.
+  rewrite trace_impliesI in H. apply H. done.
 Qed.
 
 (* If a message is delivered, the next state has a message in the buffer *)
@@ -384,14 +384,14 @@ Proof.
   { apply ExcludedMiddle. }
   destruct H as [H|H].
   { left. apply trace_eventually_intro. done. }
-  apply trace_not_not in H. apply trace_not_now in H.
+  apply trace_notI in H. apply trace_now_not in H.
   assert ((↓ (λ s _, retransmit_role_enabled_model (inl Brole) s)) mtr) as HB.
   { revert H. apply trace_now_mono.
     intros. by apply B_enabled_not_received. }
   destruct Hfair as [Hfair _].
   specialize (Hfair (inl Brole)).
   apply trace_always_elim in Hfair.
-  rewrite trace_implies_implies in Hfair.
+  rewrite trace_impliesI in Hfair.
   apply Hfair in HB.
   apply trace_eventually_or. revert HB.
   apply trace_eventually_mono.
@@ -423,7 +423,7 @@ Proof.
   rewrite /trace_now /pred_at in Hbs.
   rewrite /trace_now /pred_at in HBrole.
   simpl in *.
-  apply trace_nextI.
+  apply trace_next_intro.
   inversion Hvalid; simplify_eq.
   - exists (g !!! m_destination mAB). set_solver.
   - exists (g !!! m_destination mAB). set_solver.
@@ -457,12 +457,12 @@ Proof.
   revert bs Hnow.
   apply trace_eventually_until in HB.
   induction HB; intros bs Hnow.
-  { eapply trace_eventually_mono; [apply trace_and_now|].
+  { eapply trace_eventually_mono; [apply trace_now_and|].
     apply trace_eventually_intro.
     pose proof (trace_now_split _ _ _ Hnow H) as Hnow'.
     revert Hnow'. apply trace_now_mono.
     intros s l [H1 H2]. split; [|done]. set_solver. }
-  apply trace_eventually_cons_2.
+  apply trace_eventually_cons.
   assert (∃ bs', bs `suffix_of` bs' ∧
              (↓ (λ s _ , s.2 !!! m_destination mAB = bs'))
                tr) as [bs' [Hbs' Hnow']].
@@ -473,7 +473,7 @@ Proof.
       rewrite /trace_now /pred_at.
       rewrite /trace_now /pred_at in H'.
       destruct tr; simpl in *; done. }
-    eapply trace_next_cons.
+    eapply trace_next_elim.
     by apply retransmit_fair_trace_buffer_grow_next. }
     eapply trace_eventually_mono; last first.
   { assert (mtrace_valid tr) as Hvalid' by by eapply trace_always_cons.
