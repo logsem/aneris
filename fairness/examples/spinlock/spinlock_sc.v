@@ -150,7 +150,7 @@ Section SpinlockDefs.
 
   Definition spinlock_model: LiveModel heap_lang spinlock_model_impl :=
     {|
-      lm_fl (x: fmstate spinlock_model_impl) := 25%nat;
+      lm_fl (x: fmstate spinlock_model_impl) := 27%nat;
     |}.
   
         
@@ -617,6 +617,7 @@ Section MainProof.
   Let Ns := nroot .@ "spinlock".
 
   Definition program: expr :=
+    λ: <>,
     let: "l" := newlock #() in
     ((Fork (client "l") ) ;; (Fork (client "l") )).
 
@@ -795,15 +796,35 @@ Section MainProof.
   Lemma program_spec tid (P: iProp Σ):
     (* {{{ partial_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
     {{{ partial_model_is [2; 2] ∗ partial_free_roles_are ∅ ∗ P ∗ 
-      has_fuels tid {[ 0:=25; 1:=25 ]} }}}
-      program @ tid
+      has_fuels tid {[ 0:=27; 1:=27 ]} }}}
+      program #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.
     iIntros (Φ) "(ST & NOFREE & P & FUELS) Kont". rewrite /program.
 
+    (* TODO: refactor this *)
+    iDestruct ((has_fuels_ge_S_exact 26) with "FUELS") as "FUELS"; eauto.
+    { do 2 (apply fuels_ge_helper; [| lia]). done. }
+    iApply wp_lift_pure_step_no_fork; auto.
+    2: do 3 iModIntro; iFrame. 
+    1: set_solver. 
+    iIntros "FUELS"; simpl.
+    repeat rewrite fmap_insert. simpl. rewrite fmap_empty. simpl.
+
+    iDestruct ((has_fuels_ge_S_exact 25) with "FUELS") as "FUELS"; eauto.
+    { do 2 (apply fuels_ge_helper; [| lia]). done. }
+    iApply wp_lift_pure_step_no_fork; auto.
+    2: do 3 iModIntro; iFrame. 
+    1: set_solver. 
+    iIntros "FUELS"; simpl.
+    repeat rewrite fmap_insert. simpl. rewrite fmap_empty. simpl.
+
+    (* TODO: is it necessary? *)
+    iAssert (has_fuels tid {[ 0:=25; 1:=25 ]})%I with "FUELS" as "FUELS". 
+
     wp_bind (newlock #())%E.
     iApply (newlock_spec tid P with "[P FUELS ST NOFREE]"); eauto.
-    3: { iFrame.
+    3: { iFrame. 
          replace (size (dom {[0 := 25; 1 := 25]})) with 2; auto. }
     { set_solver. }
     { do 2 (apply fuels_ge_helper; [| lia]). done. }

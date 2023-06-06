@@ -408,7 +408,7 @@ End SpinlockRA.
 Theorem spinlock_terminates
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
-        (Hexfirst : (trfirst extr).1 = [program]):
+        (Hexfirst : (trfirst extr).1 = [program #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
   set (spinlockΣ' := spinlockΣ spinlock_model_impl spinlock_RA). 
