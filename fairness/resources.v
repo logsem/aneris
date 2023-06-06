@@ -10,10 +10,10 @@ Class ModelRALifting (M: FairModel) (MA: cmra) := {
     mrl_lift: M -> MA;
     mrl_valid: forall s, ✓ (mrl_lift s);
     mrl_excl: forall s, Exclusive (mrl_lift s);
-    mrl_inj: forall s1 s2, mrl_lift s1 ≡ mrl_lift s2 -> s1 = s2;
-    mrl_discrete :> CmraDiscrete MA;
+    (* mrl_lequiv :> LeibnizEquiv M; *)
+    mrl_inj: Inj eq equiv mrl_lift;
+    mrl_m_discrete :> CmraDiscrete MA;
 }.
-
 
 (* TODO: why require LiveModel here? *)
 Class fairnessGpreS `(LM: LiveModel Λ M)
@@ -428,7 +428,10 @@ Section PartialOwnership.
     (* has_fuels_S ζ fs -∗ *)
     has_fuels ζ (S <$> fs) -∗
       model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
-      ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗ model_state_interp tp2 δ2
+      ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗
+            has_fuels ζ (fs ⇂ R1) ∗
+            (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]}) ∗
+            model_state_interp tp2 δ2
         ∧ ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝;
 
      update_step_still_alive: 
@@ -622,7 +625,7 @@ Section model_state_lemmas.
       as %[LE _]%auth_both_valid_discrete.
     iDestruct (own_valid_2 with "Ha Hf") as "VALID".
     apply Some_included_exclusive in LE; try by apply fairnessGpreS_mrl.
-    by apply mrl_inj in LE. 
+    by apply mrl_inj in LE.
   Qed.
 
   Lemma model_agree' δ1 s2 n:
@@ -1112,7 +1115,7 @@ Section ActualOwnershipImpl.
       rewrite /new_mapping map_filter_lookup_Some in Hin.
       by destruct Hin.
   Qed.
-
+ 
   Lemma actual_update_fork_split R1 R2 tp1 tp2 fs (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
@@ -1121,7 +1124,9 @@ Section ActualOwnershipImpl.
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
     (∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1) ->
     has_fuels_S ζ fs -∗ model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
-      ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗ model_state_interp tp2 δ2
+      ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
+            (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]}) ∗
+            model_state_interp tp2 δ2
         ∧ ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝.
   Proof.
     iIntros (Hnemp Hunioneq -> Hstep Htlen) "Hf Hmod".
@@ -1186,14 +1191,15 @@ Section ActualOwnershipImpl.
         [|set_solver -Hsamedoms Hsamedoms Hfueldom Hlocincl Hdomincl].
       iFrame.
       iApply (big_sepS_impl with "Hf2"). iIntros "!#" (x Hin) "(%f&%&?)".
-      iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }
+      iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }    
     iSplitL "Hf1 HR1".
     { unfold has_fuels.
       rewrite dom_domain_restrict;
         [|set_solver -Hsamedoms Hsamedoms Hfueldom Hlocincl Hdomincl].
       iFrame.
       iApply (big_sepS_impl with "Hf1"). iIntros "!#" (x Hin) "(%f&%&?)".
-      iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }
+      iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }    
+    iSplitR; [iIntros; by iFrame | ].  
     iSplitL "Ham Haf Hamod HFR".
     { iExists _, FR; simpl. iFrame "Ham Hamod HFR".
       iSplit.

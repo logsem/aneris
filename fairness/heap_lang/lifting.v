@@ -10,7 +10,7 @@ From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
 Set Default Proof Using "Type".
 
-Canonical Structure ModelO (M : FairModel) := leibnizO M.
+(* Canonical Structure ModelO (M : FairModel) := leibnizO M. *)
 Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)).
 
 Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
@@ -753,15 +753,18 @@ Proof using PMP.
     rewrite map_filter_id //. intros ?? ?%elem_of_dom_2; set_solver.
 Qed.
 
-(* TODO: restore if needed *)
-(* Lemma wp_lift_pure_step_no_fork_remove_role rem s tid E E' Φ e1 e2 fs ϕ: *)
+(* (* TODO: restore if needed *)  *)
+(* Lemma wp_lift_pure_step_no_fork_remove_role *)
+(*   rem s tid E E' Φ e1 e2 *)
+(*   (fs: gmap (fmrole iM) nat) *)
+(*   ϕ: *)
 (*   fs ≠ ∅ -> *)
 (*   rem ⊆ dom fs → *)
 (*   rem ∩ live_roles _ s = ∅ → *)
 (*   PureExec ϕ 1 e1 e2 -> *)
 (*   ϕ -> *)
-(*   (|={E}[E']▷=> frag_model_is s ∗ has_fuels_S tid fs ∗ *)
-(*                  (frag_model_is s -∗ (has_fuels tid (fs ⇂ (dom fs ∖ rem))) -∗ WP e2 @ tid; E {{ Φ }})) *)
+(*   (|={E}[E']▷=> partial_model_is s ∗ has_fuels_S tid fs ∗ *)
+(*                  (partial_model_is s -∗ (has_fuels tid (fs ⇂ (dom fs ∖ rem))) -∗ WP e2 @ tid; E {{ Φ }})) *)
 (*   ⊢ WP e1 @ tid; E {{ Φ }}. *)
 (* Proof. *)
 (*   intros NnO Hincl Hdisj Hpe Hϕ. *)
@@ -777,8 +780,9 @@ Qed.
 (*   simplify_eq. iMod "Hclose" as "_". iMod "H" as "(Hmod & Hfuels & Hkont)". *)
 (*   rewrite !app_nil_r. *)
 (*   iDestruct "Hsi" as "(%&Hgh&Hmi)". *)
-(*   iDestruct (model_agree' with "Hmi Hmod") as %Heq. *)
+(*   iDestruct (partial_model_agree' with "Hmi Hmod") as %Heq. *)
 
+(*   (* TODO: restore 'rem' parameter in the lemma below *) *)
 (*   iMod (update_no_step_enough_fuel _ _ rem with "Hfuels Hmi") as "H"; eauto; *)
 (*     [by intros X%dom_empty_inv_L | set_solver | econstructor =>//; by apply fill_step |]. *)
 (*   iModIntro. *)
@@ -905,24 +909,28 @@ Proof using PMP.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
+(* Let has_fuels_actual := has_fuels (PMPP := ActualOwnershipPartialPre).  *)
+(* Let has_fuels_partial := has_fuels (PMPP := PMPP). *)
+(* Let has_fuels_S_partial := has_fuels_S (PMPP := PMPP). *)
+
+(* Unset Printing Notations. *)
+(* Set Printing Implicit.  *)
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
-(* TODO: not using partial_thread_disabled,
-   since after forking we know a stronger fact *)
-Lemma wp_fork_nostep s tid E e Φ R1 R2 fs (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
+Lemma wp_fork_nostep s tid E e Φ R1 R2
+  (fs: gmap (fmrole iM) nat) (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
   R1 ∪ R2 = dom fs ->
   (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
-                (* WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅  }}) *)
-                WP e @ s; tid'; ⊤ {{ _, frag_mapping_is {[ tid' := ∅ ]}  }})
-                        
+                WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
   ) -∗
      ▷ (has_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
      has_fuels_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
 Proof using PMP.
+  
   iIntros (Hunioneq) "He HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iMod (update_fork_split R1 R2 _
        (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "Htid Hmi") as
-       (δ2) "(Hfuels2 & Hfuels1 & Hσ & %Hvse)" => //.
+       (δ2) "(Hfuels2 & Hfuels1 & Hterm & Hσ & %Hvse)" => //.
   { rewrite -Hloc. rewrite -(language.locale_fill _ _ K). econstructor 1 =>//.
     apply fill_step, head_prim_step. econstructor. }
   { list_simplifier. exists (tp1 ++ fill K #() :: tp2). split; first by list_simplifier.
@@ -934,7 +942,14 @@ Proof using PMP.
   rewrite Hexend /=. iFrame "Hsi".
   iSplit; first by iPureIntro.
   iSplit; [|done].
-  iApply "He". by list_simplifier.
+  simpl. 
+
+  list_simplifier.
+  iApply (wp_strong_mono with "[Hfuels2 He] [Hterm]").
+  1, 2: by reflexivity.
+  { iApply "He". iFrame. }
+  iIntros. iModIntro.
+  by iApply "Hterm". 
 Qed.
 
 (** Heap *)

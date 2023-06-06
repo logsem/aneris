@@ -170,9 +170,19 @@ Section SpinlockDefs.
     
     thread_gnames: list gname;
   }.
+
+  Canonical Structure spinlock_RA: cmra := exclR (leibnizO spinlock_model_impl).
+
+  (* TODO: generalize *)
+  Instance spinlock_RA_lifting: ModelRALifting spinlock_model_impl spinlock_RA.
+  Proof.
+    refine {| mrl_lift := fun s => (Excl s): spinlock_RA |}.
+    { done. }
+    by intros ?? ?%@Excl_inj.
+  Qed.
    
   Definition spinlockΣ : gFunctors :=
-    #[ heapΣ spinlock_model_impl; GFunctor (exclR unitR);
+    #[ heapΣ spinlock_model_impl spinlock_RA; GFunctor (exclR unitR);
       GFunctor (excl_authR natO) ].
   
   Global Instance subG_spinlockΣ {Σ} : subG spinlockΣ Σ → spinlockPreG Σ.
@@ -181,7 +191,16 @@ Section SpinlockDefs.
 End SpinlockDefs. 
 
 Section ClientProofs.
-  Context `{!heapGS Σ spinlock_model, !spinlockG Σ}.
+  (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
+  Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM, spinlockG Σ}.
+  Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ spinlock_model_impl}.
+  Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}.
+
+  (* TODO: decide what to do with notations *)
+  Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
+  Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+  Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
   Let Ns := nroot .@ "spinlock".
 
   Definition thst_auth (i v: nat): iProp Σ :=
@@ -191,8 +210,8 @@ Section ClientProofs.
     ∃ (tgn: gname), ⌜thread_gnames !! i = Some tgn⌝ ∗ own tgn (◯E v).
   
   Definition model_inv_impl (st: list nat) : iProp Σ :=
-      frag_model_is st ∗ 
-      frag_free_roles_are ∅ ∗
+      partial_model_is st ∗ 
+      partial_free_roles_are ∅ ∗
       ([∗ set] i ∈ list_to_set (seq 0 (length thread_gnames)), 
        ∃ v, ⌜st !! i = Some v⌝ ∗ thst_auth i v) ∗
       ⌜length st = length thread_gnames⌝.
@@ -283,8 +302,8 @@ Section ClientProofs.
         (LENGTHS: length st = length thread_gnames):
     (([∗ set] y ∈ (list_to_set (seq 0 (length thread_gnames)) ∖ {[th]}),
      ∃ v, ⌜st !! y = Some v⌝ ∗ thst_auth y v) ∗
-    frag_model_is st ∗
-    frag_free_roles_are ∅ ∗
+    partial_model_is st ∗
+    partial_free_roles_are ∅ ∗
     ⌜st !! th = Some v'⌝ ∗
     thst_auth th v') -∗
     model_inv_impl st.
@@ -307,11 +326,11 @@ Section ClientProofs.
         (LENGTHS: length st = length thread_gnames):
     ([∗ set] y ∈ (list_to_set (seq 0 (length thread_gnames)) ∖ {[th]}),
      ∃ v, ⌜st !! y = Some v⌝ ∗ thst_auth y v) ∗
-    frag_model_is (<[th:=v']> st) ∗ 
-    frag_free_roles_are ∅ ∗
+    partial_model_is (<[th:=v']> st) ∗ 
+    partial_free_roles_are ∅ ∗
     thst_auth th v' -∗
     model_inv_impl (<[th:=v']> st).
-  Proof.
+  Proof using PMP.
     iIntros "(AUTHS' & ST & NOFREE & AUTH)".
     iApply (model_inv_helper with "[AUTHS' ST NOFREE AUTH]").
     { by rewrite insert_length. }
@@ -345,9 +364,8 @@ Section ClientProofs.
     destruct (dec_eq_nat j th) as [-> | ?].
     { rewrite list_lookup_insert in JV; auto. inversion JV. auto. } 
     rewrite list_lookup_insert_ne in JV; auto.
-    destruct LOCKED. eapply H1; eauto.
+    eapply LOCKED; eauto. 
   Qed. 
-
 
   Ltac pure_step_burn_fuel f :=
     destruct f; [lia| ]; 
@@ -370,7 +388,7 @@ Section ClientProofs.
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2 }}}
       acquire #l @ tid
     {{{ RET #(); P ∗ locked γ ∗ thst_frag th 1 ∗ ∃ f, has_fuel tid th f ∗ ⌜f > 4 ⌝}}}.
-  Proof.
+  Proof using PMP.
     iLöb as "IH" forall (f FUEL). 
     iIntros (Φ) "(#INV & FUEL & THST_FRAG) Kont".
     rewrite {2}/acquire.
@@ -464,11 +482,16 @@ Section ClientProofs.
     specialize (NOT1 _ _ TH_V). lia.   
   Qed. 
 
+  (* TODO: decide what to do with notations *)
+  Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
+  Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+  Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
   Lemma release_spec_term tid l γ P f (FUEL: f > 2) (th: fmrole spinlock_model_impl):
     {{{ spinlock_inv l γ P ∗ P ∗ locked γ ∗ thst_frag th 1 ∗ has_fuel tid th f }}}
       release #l @ tid
     {{{ RET #(); tid ↦M ∅ ∗ thst_frag th 0 }}}.
-  Proof. 
+  Proof using PMP. 
     iIntros (Φ) "(#INV & P & LOCKED & THST_FRAG & FUEL) Kont". rewrite /release.
     iDestruct (thst_frag_bound with "THST_FRAG") as "%TH_BOUND".
 
@@ -503,7 +526,8 @@ Section ClientProofs.
     all: eauto.
     { simpl. lia. }
     { by econstructor. }
-    { apply live_roles_preservation. destruct ST_LOCKED. rewrite H. simpl. lia. }
+    { apply live_roles_preservation.
+      destruct ST_LOCKED as [EQ _]. rewrite EQ /=. lia. }
     do 2 iModIntro. iIntros "(L & ST & NOFREE & FUEL)".
     rewrite decide_False.
     2: { simpl. unfold spinlock_lr. intros IN.
@@ -535,7 +559,7 @@ Section ClientProofs.
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2}}}
       client #l @ tid
     {{{ RET #(); tid ↦M ∅  }}}.
-  Proof.
+  Proof using PMP.
     iIntros (Φ) "(#INV & FUEL & FRAG) Kont".
     rewrite /client.
     pure_step_burn_fuel f.
@@ -598,7 +622,15 @@ Section ClientProofs.
 End ClientProofs.
 
 Section MainProof.
-  Context `{!heapGS Σ spinlock_model, !spinlockPreG Σ}.
+  (* Context `{!heapGS Σ spinlock_model, !spinlockPreG Σ}. *)
+  Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM} {SL_PRE: spinlockPreG Σ}.
+  Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ spinlock_model_impl}.
+  Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}.
+
+  Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
+  Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+  Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
   Let Ns := nroot .@ "spinlock".
 
   Definition program: expr :=
@@ -610,7 +642,8 @@ Section MainProof.
     ⊢ (|==> ∃ (tgns: list gname), ⌜length tgns = n⌝ ∗
         ([∗ set] i ∈ list_to_set (seq 0 n), 
          ∃ γ, ⌜tgns !! i = Some γ⌝ ∗ own γ (●E v) ∗ own γ (◯E v)))%I.
-  Proof.
+  Proof using. 
+    clear PMP PMPP. 
     iInduction n as [| n'] "IH".
     { iModIntro. iExists []. iSplit; done. }
     iMod (own_alloc (●E v  ⋅ ◯E v)) as (γ) "[AUTH FRAG]".
@@ -664,8 +697,8 @@ Section MainProof.
   Lemma newlock_spec tid P fs
         (FSne: fs ≠ ∅) (FUELS: fuels_ge fs 20):
     {{{ P ∗ has_fuels tid fs ∗
-          frag_model_is (repeat 2 (size (dom fs)) ) ∗ 
-          frag_free_roles_are ∅}}}
+          partial_model_is (repeat 2 (size (dom fs)) ) ∗ 
+          partial_free_roles_are ∅}}}
       newlock #() @ tid
     {{{ l, RET #l; ∃ γ (slG: spinlockG Σ),
           spinlock_inv l γ P ∗
@@ -673,7 +706,7 @@ Section MainProof.
           (* (∃ fs, has_fuels tid (list_to_set ths) fs ∗ ⌜fuels_ge fs 18⌝) }}}. *)
           (has_fuels tid ((fun f => f - 2) <$> fs)) }}}.
   (* Proof. *)
-  Proof using Ns heapGS0 spinlockPreG0 Σ. 
+  Proof using PMP SL_PRE.
     iIntros (Φ) "(P & FUELS & ST & NOFREE) Kont". rewrite /newlock.
     (* remember (list_to_set ths) as ths_set. *)
     (* assert (ths_set ≠ ∅) as THSn0'. *)
@@ -709,8 +742,8 @@ Section MainProof.
 
     iMod (thread_gnames_allocation (size (dom fs)) 2) as "[%tgns [%TGNS_LEN TGNS]]".
 
-    set (slg := {| thread_gnames := tgns; threadG := @thread_preG _ spinlockPreG0;
-                   lockG := @lock_preG _ spinlockPreG0 |}).
+    set (slg := {| thread_gnames := tgns; threadG := @thread_preG _ SL_PRE;
+                   lockG := @lock_preG _ SL_PRE |}).
     
     iAssert (([∗ set] i ∈ list_to_set (seq 0 (size (dom fs))), thst_frag i 2) ∗
              ([∗ set] i ∈ list_to_set (seq 0 (size (dom fs))), thst_auth i 2))%I with "[TGNS]" as "[FRAGS AUTHS]". 
@@ -777,8 +810,8 @@ Section MainProof.
   Qed. 
     
   Lemma program_spec tid (P: iProp Σ):
-    (* {{{ frag_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
-    {{{ frag_model_is [2; 2] ∗ frag_free_roles_are ∅ ∗ P ∗ 
+    (* {{{ partial_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
+    {{{ partial_model_is [2; 2] ∗ partial_free_roles_are ∅ ∗ P ∗ 
       has_fuels tid {[ 0:=25; 1:=25 ]} }}}
       program @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
@@ -822,9 +855,11 @@ Section MainProof.
     iDestruct ((has_fuels_ge_S_exact 20) with "FUELS") as "FUELS"; eauto.
     { do 2 (apply fuels_ge_helper; [| lia]). done. }
     repeat rewrite fmap_insert. simpl. rewrite fmap_empty. simpl.
-    
+
+    (* Set Printing Implicit.  *)
+
     iApply (wp_fork_nostep _ tid _ _ _ {[ 1 ]} {[ 0 ]} (<[0:=20]> (<[1:=20]> ∅)) with "[FRAG0] [-FUELS] [FUELS]").
-    6: { rewrite /has_fuels_S. auto. }
+    6: { done. }
     { set_solver. }
     { done. }
     { set_solver. }
@@ -841,7 +876,7 @@ Section MainProof.
       iApply (client_terminates with "[-]"); last by auto.
       2: { iFrame. eauto. }
       lia. }
-
+    
     (* TODO: unify these proofs *)
     
     iNext. iIntros "FUEL".
