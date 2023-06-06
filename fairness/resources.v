@@ -391,6 +391,50 @@ Section PartialOwnership.
         iIntros "!#" (ρ f Hin)  "?". iExists f. iSplit; done.
     Qed.
 
+    Definition fuels_ge (fs: gmap Role nat) b :=
+      forall ρ f (FUEL: fs !! ρ = Some f), f >= b. 
+    
+    Lemma has_fuels_ge_S_exact b tid (fs: gmap Role nat)
+      (FUELS_GE: fuels_ge fs (S b)):
+      has_fuels tid fs -∗
+      has_fuels_S tid (fmap (fun f => f - 1) fs). 
+    Proof.
+      iIntros "FUELS".
+      rewrite /has_fuels_S /has_fuels.
+      do 2 rewrite dom_fmap_L. 
+      iDestruct "FUELS" as "(T & FUELS)". iFrame.
+      
+      iApply (big_sepS_impl with "[$]").
+      
+      iModIntro. iIntros (ρ) "%DOMρ [%f [%TT Fρ]]".
+      iExists _. iFrame. iPureIntro.
+      apply lookup_fmap_Some. exists (f - 1). split.
+      { red in FUELS_GE. specialize (FUELS_GE _ _ TT). lia. }
+      apply lookup_fmap_Some. eauto.
+    Qed.
+
+    Lemma fuels_ge_minus1 fs b (FUELS_GE: fuels_ge fs (S b)):
+      fuels_ge ((λ f, f - 1) <$> fs) b.
+    Proof. 
+      red. intros.
+      pose proof (elem_of_dom_2 _ _ _ FUEL) as DOM.
+      rewrite dom_fmap_L in DOM.
+      simpl in FUEL.
+      apply lookup_fmap_Some in FUEL as (f' & <- & FUEL).
+      red in FUELS_GE. specialize (FUELS_GE _ _ FUEL). lia.
+    Qed. 
+    
+    Lemma has_fuels_ge_S b tid (fs: gmap Role nat)
+      (FUELS_GE: fuels_ge fs (S b)):
+      has_fuels tid fs -∗
+      ∃ fs', has_fuels_S tid fs' ∗ ⌜fuels_ge fs' b⌝.
+    Proof.
+      iIntros "FUELS".
+      iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS"; eauto.
+      iExists _. iFrame. 
+      iPureIntro. by apply fuels_ge_minus1. 
+    Qed.
+
     Class PartialModelPredicates := {
       (* TODO: reintroduce 'rem' parameter to support
          wp_lift_pure_step_no_fork_remove_role ? *)

@@ -558,49 +558,6 @@ Section ClientProofs.
     { lia. }
     iNext. iIntros "[FIN FRAG]". by iApply "Kont".
   Qed.
-
-  Definition fuels_ge (fs: gmap (fmrole spinlock_model_impl) nat) b :=
-    forall ρ f (FUEL: fs !! ρ = Some f), f >= b. 
-    
-  Lemma has_fuels_ge_S_exact b tid (fs: gmap (fmrole spinlock_model_impl) nat)
-        (FUELS_GE: fuels_ge fs (S b)):
-    has_fuels tid fs -∗
-    has_fuels_S tid (fmap (fun f => f - 1) fs). 
-  Proof.
-    iIntros "FUELS".
-    rewrite /has_fuels_S /has_fuels.
-    do 2 rewrite dom_fmap_L. 
-    iDestruct "FUELS" as "(T & FUELS)". iFrame.
-
-    iApply (big_sepS_impl with "[$]").
-
-    iModIntro. iIntros (ρ) "%DOMρ [%f [%TT Fρ]]".
-    iExists _. iFrame. iPureIntro.
-    apply lookup_fmap_Some. exists (f - 1). split.
-    { red in FUELS_GE. specialize (FUELS_GE _ _ TT). lia. }
-    apply lookup_fmap_Some. eauto.
-  Qed.
-
-  Lemma fuels_ge_minus1 fs b (FUELS_GE: fuels_ge fs (S b)):
-    fuels_ge ((λ f, f - 1) <$> fs) b.
-  Proof. 
-    red. intros.
-    pose proof (elem_of_dom_2 _ _ _ FUEL) as DOM.
-    rewrite dom_fmap_L in DOM.
-    simpl in FUEL.
-    apply lookup_fmap_Some in FUEL as (f' & <- & FUEL).
-    red in FUELS_GE. specialize (FUELS_GE _ _ FUEL). lia.
-  Qed. 
-    
-  Lemma has_fuels_ge_S b tid (fs: gmap (fmrole spinlock_model_impl) nat)
-        (FUELS_GE: fuels_ge fs (S b)):
-    has_fuels tid fs -∗ ∃ fs', has_fuels_S tid fs' ∗ ⌜fuels_ge fs' b⌝.
-  Proof.
-    iIntros "FUELS".
-    iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS"; eauto.
-    iExists _. iFrame. 
-    iPureIntro. by apply fuels_ge_minus1. 
-  Qed.
           
 End ClientProofs.
 
@@ -710,7 +667,7 @@ Section MainProof.
     iMod (own_alloc (Excl ())) as (γ) "LOCK"; [done| ].
     
     iDestruct (has_fuels_ge_S_exact 18 with "FUELS") as "FUELS"; eauto.
-    { by apply fuels_ge_minus1. }
+    { eapply @fuels_ge_minus1. done. }
     (* TODO: fupd in goal is needed to create invariant *)
     wp_bind (Alloc _)%E.
     iApply (wp_alloc_nostep with "[FUELS]").
@@ -776,7 +733,7 @@ Section MainProof.
   Ltac pure_step_burn_fuel f := destruct f; [lia| ]; pure_step_burn_fuel_impl.
 
   Lemma fuels_ge_helper fs b th f (REC: fuels_ge fs b) (GE: f >= b):
-    fuels_ge (<[th:=f]> fs) b.
+    fuels_ge (<[th:=f]> fs) b (iM := spinlock_model_impl).
   Proof.
     unfold fuels_ge. intros.
     pose proof FUEL as FUEL_. apply elem_of_dom_2 in FUEL.
