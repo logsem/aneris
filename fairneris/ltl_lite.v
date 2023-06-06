@@ -132,6 +132,22 @@ Section ltl_lemmas.
     trace_suffix_of tr tr.
   Proof. by exists 0. Qed.
 
+  Lemma trace_suffix_of_cons_l s l (tr tr' : trace S L) :
+    trace_suffix_of (s -[l]-> tr) tr' → trace_suffix_of tr tr'.
+  Proof.
+    intros [n Hafter].
+    exists (Datatypes.S n).
+    replace (Datatypes.S n) with (n + 1) by lia.
+    rewrite after_sum'. rewrite Hafter. done.
+  Qed.
+
+  Lemma trace_suffix_of_cons_r s l (tr tr' : trace S L) :
+    trace_suffix_of tr tr' → trace_suffix_of tr (s -[l]-> tr').
+  Proof.
+    intros [n Hafter].
+    exists (Datatypes.S n). simpl. done.
+  Qed.
+
   Lemma trace_eventually_intro P (tr : trace S L) :
     P tr → (◊ P) tr.
   Proof. by constructor 1. Qed.
@@ -197,27 +213,50 @@ Section ltl_lemmas.
     apply IHn. lia. done.
   Qed.
 
+  Lemma trace_eventuallyI (P : trace S L → Prop) tr :
+    (◊ P) tr ↔ (∃ tr', trace_suffix_of tr' tr ∧ (◊ P) tr').
+  Proof.
+    split.
+    - intros Heventually.
+      induction Heventually using trace_eventually_ind.
+      { exists tr. split; [apply trace_suffix_of_refl|].
+        by apply trace_eventually_intro. }
+      destruct IHHeventually as [tr' [Hsuffix HP]].
+      exists tr'.
+      split; [|done].
+      by apply trace_suffix_of_cons_r.
+    - intros [tr' [Hsuffix Htr']].
+      induction Htr' using trace_eventually_ind.
+      { destruct Hsuffix as [n Hafter].
+        revert tr tr0 Hafter H.
+        induction n; intros tr tr0 Hafter HP.
+        { simpl in *. simplify_eq. by apply trace_eventually_intro. }
+        destruct tr; [done|].
+        constructor 2; [done|].
+        by eapply IHn. }
+      apply IHHtr'.
+      by eapply trace_suffix_of_cons_l.
+  Qed.
+
   (* TODO: Improve this proof *)
   Lemma trace_alwaysI (P : trace S L → Prop) tr :
     (□P) tr ↔ (∀ tr', trace_suffix_of tr' tr → (□ P) tr').
-  Proof. Admitted.
-  (*   split. *)
-  (*   - rewrite /trace_always.  *)
-  (*     intros Halways tr' [n Hafter] HP. apply Halways. *)
-  (*     destruct HP as [m [HP HP']]. *)
-  (*     destruct HP as [tr'' [Htr'' Hnot]]. *)
-  (*     exists (n + m). *)
-  (*     split. *)
-  (*     + exists tr''. rewrite after_sum'. rewrite Hafter. done. *)
-  (*     + intros m' Hlt. *)
-  (*       assert (after (n+m) tr = Some tr''). *)
-  (*       { rewrite after_sum'. rewrite Hafter. done. }  *)
-  (*       assert (is_Some $ after m' tr) as [tr''' Htr''']. *)
-  (*       { by eapply after_is_Some_lt. } *)
-  (*       exists tr'''. split; [done|]. *)
-  (*       by destruct tr'''. *)
-  (*   - intros Halways. eapply (Halways). apply trace_suffix_of_refl. *)
-  (* Qed. *)
+  Proof.
+    split.
+    - intros Htr tr' Hsuffix Htr'.
+      apply Htr.
+      induction Htr' using trace_eventually_ind.
+      { eapply trace_eventuallyI. exists tr0. split; [done|].
+        by apply trace_eventually_intro. }
+      apply IHHtr'. by eapply trace_suffix_of_cons_l.
+    - intros Htr' Htr.
+      induction Htr.
+      { specialize (Htr' tr). apply Htr'.
+        { apply trace_suffix_of_refl. }
+        by apply trace_eventually_intro. }
+      apply IHHtr. intros tr' Htsuffix. apply Htr'.
+      by eapply trace_suffix_of_cons_r.
+  Qed.
 
   Lemma trace_always_idemp P (tr : trace S L) :
     (□ P) tr → (□ □ P) tr.
@@ -316,17 +355,56 @@ Section ltl_lemmas.
     (∀ s l, P s l → Q s l) → (↓P) tr → (↓Q) tr.
   Proof. intros. eapply trace_now_mono_strong; [|done]. by eauto. Qed.
 
+  Lemma trace_not_mono (P Q : trace S L → Prop) tr :
+    (Q tr → P tr) → trace_not P tr → trace_not Q tr.
+  Proof. intros HQP HP HQ. apply HP. by apply HQP. Qed.
+
+  Lemma trace_or_l (P Q : trace S L → Prop) (tr : trace S L) :
+    P tr → trace_or P Q tr.
+  Proof. intros HP. by left. Qed.
+
+  Lemma trace_or_r (P Q : trace S L → Prop) (tr : trace S L) :
+    Q tr → trace_or P Q tr.
+  Proof. intros HP. by right. Qed.
+
   Lemma trace_andI (P Q : trace S L → Prop) (tr : trace S L) :
     trace_and P Q tr ↔ P tr ∧ Q tr.
-  Proof. Admitted.
+  Proof.
+    split.
+    - intros HPQ.
+      assert (P tr ∨ ¬ P tr) as [HP|HP] by apply ExcludedMiddle; last first.
+      { eapply trace_not_mono in HPQ; [|by apply trace_or_l]. done. }
+      assert (Q tr ∨ ¬ Q tr) as [HQ|HQ] by apply ExcludedMiddle; last first.
+      { eapply trace_not_mono in HPQ; [|by apply trace_or_r]. done. }
+      done.
+    - intros [HP HQ] [HP'|HQ']; done.
+  Qed.
 
   Lemma trace_not_eventually_always_not (P : trace S L → Prop) (tr : trace S L) :
     trace_not (◊ P) tr ↔ (□ (trace_not P)) tr.
-  Proof. Admitted.
-  
+  Proof.
+    split.
+    - intros Heventually Halways.
+      induction Halways using trace_eventually_ind.
+      { apply Heventually. apply trace_eventually_intro.
+        eapply trace_not_mono in Heventually; [|by apply trace_eventually_intro].
+        done. }
+      apply IHHalways.
+      intros Heventually'. apply Heventually. by apply trace_eventually_cons.
+    - intros Halways Heventually.
+      induction Heventually.
+      { apply Halways. apply trace_eventually_intro. by apply P_NNP. }
+      apply IHHeventually.
+      by apply trace_always_cons in Halways.
+  Qed.
+
   Lemma trace_eventually_not_not_always (P : trace S L → Prop) (tr : trace S L) :
     (◊ trace_not P) tr ↔ (trace_not (□ P)) tr.
-  Proof. Admitted.
+  Proof.
+    split.
+    - intros Heventually. apply P_NNP. done.
+    - intros Halways. apply NNP_P in Halways. done.
+  Qed.
 
   Lemma trace_always_and P Q (tr : trace S L) :
     ((□ P) tr ∧ (□ Q) tr) ↔ (□ trace_and P Q) tr.
@@ -355,73 +433,71 @@ Section ltl_lemmas.
       done.
   Qed.
 
-  Lemma trace_or_l (P Q : trace S L → Prop) (tr : trace S L) :
-    P tr → trace_or P Q tr.
-  Proof. intros HP. by left. Qed.
-
-  Lemma trace_or_r (P Q : trace S L → Prop) (tr : trace S L) :
-    Q tr → trace_or P Q tr.
-  Proof. intros HP. by right. Qed.
-
   Lemma trace_weak_until_always P Q (tr : trace S L) :
     (□P) tr → trace_weak_until P Q tr.
   Proof. intros HP. by apply trace_or_r. Qed.
 
+  Lemma trace_next_cons (P : trace S L → Prop) s l tr :
+    (○ P) (s -[l]-> tr) → P tr.
+  Proof. inversion 1. naive_solver. Qed.
 
   Lemma trace_eventually_next (P : trace S L → Prop) (tr : trace S L) :
     (◊ ○ P) tr → (◊ P) tr.
   Proof.
-    (* destruct 1 as [n [HP HP']]. *)
-    (* destruct HP as [tr' [HP1 HP2]]. *)
-    (* destruct tr. *)
-    (* - admit. *)
-    (* - simpl in *. *)
-    (*   destruct n; simpl in *. *)
-    (*   + simplify_eq. exists 0.  split. *)
-    (*   + exists tr'. simpl in *. done. *)
-  Admitted.
+    intros Hnext.
+    induction Hnext.
+    { destruct tr; [inversion H; naive_solver|].
+      constructor 2; [done|]. constructor. by eapply trace_next_cons. }
+    constructor 2; [done|]. apply IHHnext.
+  Qed.
 
   Lemma trace_trueI (tr : trace S L) :
     trace_true tr.
   Proof. destruct tr; done. Qed.
 
-  Lemma trace_eventually_suffix_of (P : trace S L → Prop) tr1 tr2 :
-    trace_suffix_of tr1 tr2 → (◊P) tr1 → (◊P) tr2.
-  Proof. Admitted.
-  (*   intros [n Hsuffix] [m [[tr' [Hafter HP]] Htrue]]. *)
-  (*   exists (n + m). *)
-  (*   rewrite after_sum'. rewrite Hsuffix Hafter. *)
-  (*   split. *)
-  (*   - exists tr'. done. *)
-  (*   - intros m' Hm. *)
-  (*     assert (after (n + m) tr2 = Some tr'). *)
-  (*     { rewrite after_sum'. rewrite Hsuffix Hafter. done. } *)
-  (*     assert (is_Some (after m' tr2)) as [tr'' Htr']. *)
-  (*     { by eapply after_is_Some_lt. } *)
-  (*     exists tr''. split; [done| apply trace_trueI]. *)
-  (* Qed. *)
+  (* Lemma trace_eventually_suffix_of (P : trace S L → Prop) tr1 tr2 : *)
+  (*   trace_suffix_of tr1 tr2 → (◊P) tr1 → (◊P) tr2. *)
+  (* Proof. Admitted. *)
+  (* (*   intros [n Hsuffix] [m [[tr' [Hafter HP]] Htrue]]. *) *)
+  (* (*   exists (n + m). *) *)
+  (* (*   rewrite after_sum'. rewrite Hsuffix Hafter. *) *)
+  (* (*   split. *) *)
+  (* (*   - exists tr'. done. *) *)
+  (* (*   - intros m' Hm. *) *)
+  (* (*     assert (after (n + m) tr2 = Some tr'). *) *)
+  (* (*     { rewrite after_sum'. rewrite Hsuffix Hafter. done. } *) *)
+  (* (*     assert (is_Some (after m' tr2)) as [tr'' Htr']. *) *)
+  (* (*     { by eapply after_is_Some_lt. } *) *)
+  (* (*     exists tr''. split; [done| apply trace_trueI]. *) *)
+  (* (* Qed. *) *)
+
+  Lemma trace_eventually_idemp (P : trace S L → Prop) (tr : trace S L) :
+    (◊ ◊ P) tr → (◊ P) tr.
+  Proof.
+    intros Htr. induction Htr using trace_eventually_ind; [done|].
+    apply trace_eventually_cons. done.
+  Qed.
 
   Lemma trace_eventually_thing_strong (P Q : trace S L → Prop) (tr : trace S L) :
     (∀ tr', trace_suffix_of tr' tr → P tr' → (◊ Q) tr') → (◊ P) tr → (◊ Q) tr.
-  Proof. Admitted.
-  (*   intros HPQ HP. *)
-  (*   destruct HP as [n [[tr' [Hafter HP]] Htrue]]. *)
-  (*   apply HPQ in HP; [|by exists n]. *)
-  (*   eapply trace_eventually_suffix_of; [|done]. *)
-  (*   by exists n. *)
-  (* Qed. *)
+  Proof.
+    intros HPQ HP. apply trace_eventually_idemp.
+    by eapply trace_eventually_mono_strong.
+  Qed.
 
-  Lemma trace_always_eventually P (tr : trace S L) :
-    (□ P) tr → (◊ P) tr.
-  Proof. Admitted.
+  (* TODO: This would be a good lemma to have *)
+  (* Lemma trace_always_eventually P (tr : trace S L) : *)
+  (*   (□ P) tr → (◊ P) tr. *)
+  (* Proof. Admitted. *)
 
   Lemma trace_not_now P (tr : trace S L) :
     trace_not (↓ P) tr ↔ (↓ (λ s l, ¬ P s l)) tr.
-  Proof. Admitted.
+  Proof. by destruct tr. Qed.
 
+  (* TODO: remove *)
   Lemma trace_eventually_now P (tr : trace S L) :
     (↓ P) tr → (◊ ↓ P) tr.
-  Proof. Admitted.
+  Proof. apply trace_eventually_intro. Qed.
 
   Lemma trace_now_exists {A} (P : A → S → option L → Prop) (tr : trace S L) :
     (↓ (λ s l, ∃ (x:A), P x s l)) tr → ∃ (x:A), (↓ P x) tr.
@@ -456,19 +532,16 @@ Section ltl_lemmas.
   Proof. rewrite /trace_now /pred_at. by destruct tr=>/=. Qed.
 
   Lemma trace_and_now P Q (tr : trace S L) :
-    trace_and (↓P) (↓Q) tr ↔ (↓ (λ s l, P s l ∧ Q s l)) tr.
-  Proof. Admitted.
+    trace_and (↓P) (↓Q) tr ↔ (↓ (P /2\ Q)) tr.
+  Proof. rewrite trace_andI. destruct tr; done. Qed.
 
+  (* TODO: Maybe remove *)
   Lemma trace_now_split P Q (tr : trace S L) :
-    (↓ P) tr → (↓ Q) tr → (↓ (λ s l, P s l ∧ Q s l)) tr.
-  Proof. Admitted.
+    (↓ P) tr → (↓ Q) tr → (↓ (P /2\ Q)) tr.
+  Proof. intros. apply trace_and_now. rewrite trace_andI. done. Qed.
 
   Lemma trace_eventually_cons_2 P s l (tr : trace S L) :
     (◊ P) tr → (◊ P) (s -[l]-> tr).
   Proof. intros. constructor 2; done. Qed.
-
-  Lemma trace_next_cons (P : trace S L → Prop) s l tr : 
-    (○ P) (s -[l]-> tr) → P tr.
-  Proof. Admitted.
 
 End ltl_lemmas.
