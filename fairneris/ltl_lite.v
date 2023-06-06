@@ -1,5 +1,4 @@
-From stdpp Require Import option.
-From Paco Require Import paco1 paco2 pacotac.
+From Paco Require Import paconotation.
 From trillium.fairness Require Export inftraces.
 
 Declare Scope trace_scope.
