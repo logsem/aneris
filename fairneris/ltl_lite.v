@@ -286,7 +286,7 @@ Section ltl_lemmas.
     (◊P) tr → trace_until (trace_not P) (P) tr.
   Proof.
     assert (∀ tr, P tr ∨ ¬ P tr) as Hdec by by intros; apply ExcludedMiddle.
-    induction 1; [by constructor|].
+    induction 1 using trace_eventually_ind; [by constructor|].
     specialize (Hdec (s -[l]-> tr)) as [H1|H2].
     - by apply trace_until_here.
     - by apply trace_until_next.
@@ -296,10 +296,10 @@ Section ltl_lemmas.
     (∀ tr', trace_suffix_of tr' tr → P tr' → Q tr') → (◊P) tr → (◊Q) tr.
   Proof.
     intros HPQ.
-    induction 1.
+    induction 1 using trace_eventually_ind.
     { apply HPQ, trace_eventually_intro in H. done. apply trace_suffix_of_refl. }
     constructor 2; [done|].
-    apply IHtrace_until.
+    apply IHtrace_eventually.
     intros tr' Hsuffix HP.
     apply HPQ; [|done].
     destruct Hsuffix as [n Heq].
@@ -316,7 +316,7 @@ Section ltl_lemmas.
     (◊ ○ P) tr → (◊ P) tr.
   Proof.
     intros Hnext.
-    induction Hnext.
+    induction Hnext using trace_eventually_ind.
     { destruct tr; [inversion H; naive_solver|].
       constructor 2; [done|]. constructor. by eapply trace_next_elim. }
     constructor 2; [done|]. apply IHHnext.
@@ -330,7 +330,7 @@ Section ltl_lemmas.
     (◊ (P \1/ Q)) tr → (◊ P) tr ∨ (◊ Q) tr.
   Proof.
     intros Hdisj.
-    induction Hdisj.
+    induction Hdisj using trace_eventually_ind.
     { inversion H; [left; by constructor|right; by constructor]. }
     inversion IHHdisj.
     - left. by constructor 2.
@@ -390,12 +390,29 @@ Section ltl_lemmas.
         by apply trace_eventually_intro. }
       apply IHHtr'. by eapply trace_suffix_of_cons_l.
     - intros Htr' Htr.
-      induction Htr.
+      induction Htr using trace_eventually_ind.
       { specialize (Htr' tr). apply Htr'.
         { apply trace_suffix_of_refl. }
         by apply trace_eventually_intro. }
       apply IHHtr. intros tr' Htsuffix. apply Htr'.
       by eapply trace_suffix_of_cons_r.
+  Qed.
+
+  Lemma trace_always_forall {A} (P : A → trace S L → Prop) tr :
+    (∀ (x:A), (□ (P x)) tr) ↔ (□ (λ tr', ∀ x, P x tr')) tr.
+  Proof.
+    split.
+    - intros Htr Htr'.
+      induction Htr' using trace_eventually_ind.
+      { apply H. intros x. specialize (Htr x).
+        apply trace_always_elim in Htr. apply Htr. }
+      apply IHHtr'.
+      intros x. specialize (Htr x).
+      by apply trace_always_cons in Htr.
+    - intros Htr x Htr'.
+      induction Htr' using trace_eventually_ind.
+      { apply H. apply trace_always_elim in Htr. apply Htr. }
+      apply IHHtr'. by apply trace_always_cons in Htr.
   Qed.
 
   Lemma trace_always_suffix_of (P : trace S L → Prop) tr1 tr2 :

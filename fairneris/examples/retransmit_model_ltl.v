@@ -174,27 +174,6 @@ Definition retransmit_fair_scheduling (mtr : mtrace) : Prop :=
 Definition mtrace_fair (mtr : mtrace) : Prop :=
   retransmit_fair_scheduling mtr ∧ retransmit_fair_network mtr.
 
-Lemma trace_always_forall {S L} {A} (P : A → trace S L → Prop) tr :
-  (∀ (x:A), (□ (P x)) tr) ↔ (□ (λ tr', ∀ x, P x tr')) tr.
-Proof.
-  split.
-  - intros Htr.
-    intros Htr'.
-    induction Htr'.
-    { apply H. intros x. specialize (Htr x).
-      apply trace_always_elim in Htr. apply Htr. }
-    apply IHHtr'.
-    intros x. specialize (Htr x).
-    apply trace_always_cons in Htr.
-    done.
-  - intros Htr x Htr'.
-    induction Htr'.
-    { apply H. apply trace_always_elim in Htr. apply Htr. }
-    apply IHHtr'.
-    apply trace_always_cons in Htr.
-    done.
-Qed.
-
 Lemma mtrace_fair_always mtr :
   mtrace_fair mtr ↔ (□ mtrace_fair) mtr.
 Proof. 
