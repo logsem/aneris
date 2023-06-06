@@ -171,23 +171,6 @@ Section SpinlockDefs.
     thread_gnames: list gname;
   }.
 
-  Canonical Structure spinlock_RA: cmra := exclR (leibnizO spinlock_model_impl).
-
-  (* TODO: generalize *)
-  Global Instance spinlock_RA_lifting: ModelRALifting spinlock_model_impl spinlock_RA.
-  Proof.
-    refine {| mrl_lift := fun s => (Excl s): spinlock_RA |}.
-    { done. }
-    by intros ?? ?%@Excl_inj.
-  Qed.
-   
-  Definition spinlockΣ : gFunctors :=
-    #[ heapΣ spinlock_model_impl spinlock_RA; GFunctor (exclR unitR);
-      GFunctor (excl_authR natO) ].
-  
-  Global Instance subG_spinlockΣ {Σ} : subG spinlockΣ Σ → spinlockPreG Σ.
-  Proof. solve_inG. Qed.
-    
 End SpinlockDefs. 
 
 Section ClientProofs.
@@ -919,4 +902,4 @@ Section MainProof.
     rewrite dom_empty_L. iDestruct "FUELS" as "[? ?]". done.
   Qed.
 
-End MainProof. 
+End MainProof.
