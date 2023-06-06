@@ -458,7 +458,7 @@ Proof.
   apply trace_eventually_until in HB.
   induction HB; intros bs Hnow.
   { eapply trace_eventually_mono; [apply trace_and_now|].
-    apply trace_eventually_now.
+    apply trace_eventually_intro.
     pose proof (trace_now_split _ _ _ Hnow H) as Hnow'.
     revert Hnow'. apply trace_now_mono.
     intros s l [H1 H2]. split; [|done]. set_solver. }
@@ -500,8 +500,9 @@ Proof.
   eapply trace_eventually_mono_strong in Hdeliver; last first.
   { intros tr' Hsuffix. apply deliver_next_buffer. by eapply trace_always_suffix_of. }
   apply trace_eventually_next in Hdeliver.
+  apply trace_eventually_idemp.
   revert Hdeliver.
-  apply trace_eventually_thing_strong.
+  apply trace_eventually_mono_strong.
   intros mtr' Hsuffix Hdeliver.
   apply trace_now_exists in Hdeliver as [bs Hdeliver].
   assert (infinite_trace mtr') as Hinf'.
