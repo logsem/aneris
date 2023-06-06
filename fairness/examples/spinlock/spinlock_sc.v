@@ -174,7 +174,7 @@ Section SpinlockDefs.
   Canonical Structure spinlock_RA: cmra := exclR (leibnizO spinlock_model_impl).
 
   (* TODO: generalize *)
-  Instance spinlock_RA_lifting: ModelRALifting spinlock_model_impl spinlock_RA.
+  Global Instance spinlock_RA_lifting: ModelRALifting spinlock_model_impl spinlock_RA.
   Proof.
     refine {| mrl_lift := fun s => (Excl s): spinlock_RA |}.
     { done. }

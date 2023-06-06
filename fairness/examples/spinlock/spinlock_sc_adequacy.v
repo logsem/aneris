@@ -369,7 +369,7 @@ Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple
         frag_model_is s1 -∗
         frag_free_roles_are (FR ∖ live_roles _ s1) -∗
         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
-        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
+        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, frag_mapping_is {[ 0%nat := ∅ ]} }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
   extrace_fairly_terminating extr.
@@ -384,7 +384,7 @@ Qed.
 (* TODO: how to correctly pass P premise to proof? 
    So far we only substitute True for P.
    It's better to parametrize the theorem with "P is available" premise *)
-  
+
 Theorem spinlock_terminates
         (* (N : nat) *)
         (* (HN: N > 0) *)
