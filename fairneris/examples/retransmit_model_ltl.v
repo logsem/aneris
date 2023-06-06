@@ -174,9 +174,56 @@ Definition retransmit_fair_scheduling (mtr : mtrace) : Prop :=
 Definition mtrace_fair (mtr : mtrace) : Prop :=
   retransmit_fair_scheduling mtr ∧ retransmit_fair_network mtr.
 
+Lemma trace_always_forall {S L} {A} (P : A → trace S L → Prop) tr :
+  (∀ (x:A), (□ (P x)) tr) ↔ (□ (λ tr', ∀ x, P x tr')) tr.
+Proof.
+  split.
+  - intros Htr.
+    intros Htr'.
+    induction Htr'.
+    { apply H. intros x. specialize (Htr x).
+      apply trace_always_elim in Htr. apply Htr. }
+    apply IHHtr'.
+    intros x. specialize (Htr x).
+    apply trace_always_cons in Htr.
+    done.
+  - intros Htr x Htr'.
+    induction Htr'.
+    { apply H. apply trace_always_elim in Htr. apply Htr. }
+    apply IHHtr'.
+    apply trace_always_cons in Htr.
+    done.
+Qed.
+
 Lemma mtrace_fair_always mtr :
   mtrace_fair mtr ↔ (□ mtrace_fair) mtr.
-Proof. Admitted.
+Proof. 
+  split.
+  - rewrite /mtrace_fair.
+    intros [Hmtr1 Hmtr2].
+    rewrite /retransmit_fair_scheduling in Hmtr1.
+    rewrite /retransmit_fair_network in Hmtr2.
+    rewrite /retransmit_fair_scheduling_mtr in Hmtr1.
+    rewrite /retransmit_fair_network_delivery in Hmtr2.
+    apply trace_always_forall in Hmtr1.
+    apply trace_always_forall in Hmtr2.
+    eassert ((□ trace_and _ _) mtr).
+    { apply trace_always_and. split; [apply Hmtr1|apply Hmtr2]. }
+    apply trace_always_idemp in H.
+    revert H. apply trace_always_mono.
+    intros tr.
+    apply trace_implies_implies.
+    intros Htr.
+    apply trace_always_and in Htr as [Htr1 Htr2].
+    split.
+    + intros x. revert Htr1. 
+      apply trace_always_mono. intros tr'. apply trace_implies_implies.
+      intros Htr'. done.
+    + intros x. revert Htr2. 
+      apply trace_always_mono. intros tr'. apply trace_implies_implies.
+      intros Htr'. done.
+  - by intros Hfair%trace_always_elim.
+Qed.
 
 (* Good definition? *)
 Definition trans_valid (mtr : mtrace) :=
