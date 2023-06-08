@@ -518,7 +518,7 @@ Section Resources_alloc.
     iSpecialize ("IH" with "H").
     iApply (big_sepL_impl with "IH").
     iIntros "!#" (??) "? ?".
-    rewrite plus_Snm_nSm; iFrame.
+    rewrite Nat.add_succ_comm; iFrame.
   Qed.
 
   Lemma locations_coh_init :

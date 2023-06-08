@@ -128,8 +128,7 @@ Section proof.
     wp_socketbind.
     iApply fupd_aneris_wp.
     iAssert (|={⊤}=> socket_inv γGsnap z h _ i)%I with "[Hh Hrs]" as ">#Hsocketinv".
-    { rewrite Heqip.
-      iApply inv_alloc. iNext. iExists _, _; iFrame.
+    { iApply inv_alloc. iNext. iExists _, _; iFrame.
       rewrite big_sepS_empty; done. }
     iModIntro.
     wp_apply aneris_wp_fork.

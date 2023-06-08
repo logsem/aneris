@@ -79,7 +79,7 @@ Section Lst_update.
           eapply DBM_Lst_valid_time_le; eauto.
       + intros e' He' He'e.
           rewrite Hid.
-          eapply le_lt_trans;
+          eapply Nat.le_lt_trans;
             first apply (DBM_LHV_seqids (DBM_LSTV_hst_valid Hvl) e');
             last by simpl; lia.
           rewrite restrict_key_union restrict_key_singleton_in in He';

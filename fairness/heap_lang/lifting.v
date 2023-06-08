@@ -100,7 +100,7 @@ Proof.
       simpl. rewrite decide_False //. apply IH. split.
       * assert (tid - length tp0 = S ((tid - 1) - length tp0))%nat as Heq by lia.
         rewrite Heq /= in Hlk. rewrite -Hlk app_length /=. f_equal; lia.
-      * rewrite app_length /=. apply lt_le_S in Hle. rewrite Nat.add_comm //.
+      * rewrite app_length /=. apply Nat.le_succ_l in Hle. rewrite Nat.add_comm //.
 Qed.
 
 Lemma from_locale_lookup tp tid e :

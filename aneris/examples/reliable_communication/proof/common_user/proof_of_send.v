@@ -59,7 +59,7 @@ Section Proof_of_send.
     { iFrame "#∗". iExists rv, (vs ++ [v]), sidLB.
       rewrite app_length /=.
       replace (Z.of_nat (length vs + 1)%nat) with (length vs + 1)%Z by lia.
-      rewrite !plus_assoc.
+      rewrite !Nat.add_assoc.
       iFrame. iSplit; [done|]. iSplit; [|done].
       rewrite Nat.add_0_r. by eauto. }
     iIntros "(Hlocked & Hsbufdef)".

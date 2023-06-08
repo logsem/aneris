@@ -186,7 +186,7 @@ Section Local_history_section_valid.
     DBM_lsec j s = ∅ → DBM_lsec_latest_in_frame j s x = 0.
   Proof.
     intros Hsec.
-    symmetry; apply le_n_0_eq.
+    apply Nat.le_0_r.
     rewrite /DBM_lsec_latest_in_frame.
     apply nat_sup_LUB.
     intros a.

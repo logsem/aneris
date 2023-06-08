@@ -372,12 +372,12 @@ Proof.
             (* lia bug!? *)
             apply PeanoNat.Nat.lt_le_pred.
             apply Nat.le_neq; split; last done.
-            apply lt_n_Sm_le; done.
+            apply Nat.lt_succ_r; done.
           - done.
           - rewrite trace_lookup_extend_lt; last first.
-            { apply lt_pred_n_n. eauto. }
+            { apply Nat.lt_pred_l, Nat.neq_0_lt_0. eauto. }
             rewrite trace_lookup_last; [done|].
-            rewrite -(S_pred _ 0) //. }
+            rewrite (Nat.lt_succ_pred 0)=> //. }
         destruct Haevvl as [Haevvl1 Haevvl2].
         specialize (Hheaps _ _ _ Hh' Haevvl1).
         assert (is_Some (h !! l)) as [? ?]; last by simplify_eq.
@@ -404,7 +404,7 @@ Proof.
            eauto with lia.
         -- pose proof (trace_lookup_lt_Some_1 _ _ _ Hc''); simpl in *.
            assert (i = trace_length ex) as ->. (* lia bug! *)
-           { assert (i ≤ trace_length ex) by by apply lt_n_Sm_le. lia. }
+           { assert (i ≤ trace_length ex) by by apply Nat.lt_succ_r. lia. }
            rewrite trace_lookup_extend; last by simpl in *; lia.
            rewrite trace_lookup_extend in Hc''; last done.
            simplify_eq; eauto.
