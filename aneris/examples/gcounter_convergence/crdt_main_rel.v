@@ -938,14 +938,14 @@ Section crdt_main_rel.
         rewrite trace_last_of_append_list_map //.
       + rewrite Nat.add_comm /= Nat.add_comm.
         rewrite map_app lookup_app_r; last by rewrite map_length; lia.
-        rewrite map_length minus_plus; done.
+        rewrite map_length Nat.add_comm Nat.add_sub; done.
     - destruct j as [|j]; simpl in *.
       + rewrite map_app (lookup_app_l (_ :: _)); last by rewrite /= map_length /=; lia.
         rewrite Nat.add_0_r.
         rewrite trace_last_of_append_list_map; done.
       + rewrite Nat.add_comm /= Nat.add_comm.
         rewrite map_app lookup_app_r; last by rewrite map_length; lia.
-        rewrite map_length minus_plus; done.
+        rewrite map_length Nat.add_comm Nat.add_sub; done.
   Qed.
 
   Definition closed_model_relation locs ex mtr iex imtr :=

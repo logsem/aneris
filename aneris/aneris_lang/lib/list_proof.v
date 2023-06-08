@@ -636,7 +636,7 @@ Section list_specs_extra.
     - destruct i as [ | i']; simpl.
       { exists h, (f k h).
         replace (k + 0)%nat with k; auto. }
-      apply lt_S_n in Hlt.
+      apply Nat.succ_lt_mono in Hlt.
       pose proof (IH (S k) i' Hlt) as (v & w & -> & -> & Heq).
       replace (k + S i')%nat with (S k + i')%nat by lia.
       eauto.

@@ -305,7 +305,7 @@ Section prod_serialization.
                         (StringOfZ (Z.of_nat (String.length s1))) + 1 +
                       String.length s1)%nat by lia
     end.
-    rewrite -plus_assoc substring_add_length_app /= substring_length_append.
+    rewrite -Nat.add_assoc substring_add_length_app /= substring_length_append.
     wp_pures.
     wp_apply (s_deser_spec A); first done.
     iIntros "_"; simpl.

@@ -231,8 +231,7 @@ Section paxos_prelude.
 
   Lemma Acceptors_choose : ∃ a, a ∈ Acceptors.
   Proof.
-    apply size_pos_elem_of, neq_0_lt, Nat.neq_sym.
-    apply Acceptors_size_nonzero.
+    apply size_pos_elem_of, Nat.neq_0_lt_0. apply Acceptors_size_nonzero.
   Qed.
 
   Lemma Learners_nonempty : Learners ≢ ∅.

@@ -186,7 +186,7 @@ Section library.
         inversion_clear Heq.
         iSplit; [|done].
         iPureIntro.
-        rewrite Hlength -plus_n_O lookup_app_r // -minus_diag_reverse //.
+        rewrite Hlength -plus_n_O lookup_app_r // Nat.sub_diag //.
       + wp_if.
         iApply ("IH" with "[-HΨ]").
         { iExists _, _. by iFrame. }
@@ -268,7 +268,7 @@ Section library.
           inversion_clear Heq.
           iSplit; [|done].
           iPureIntro.
-          rewrite Hlength -plus_n_O lookup_app_r // -minus_diag_reverse //.
+          rewrite Hlength -plus_n_O lookup_app_r // Nat.sub_diag //.
         * wp_if.
           iApply ("IH" with "[-HΦ']").
           { iExists _, _. by iFrame. }
@@ -513,7 +513,7 @@ Section library.
       rewrite /pretty_N_char.
       repeat case_match; done.
     - apply IH; first apply N.le_0_l.
-      + eapply N.lt_le_trans; last apply (N.mul_div_le _ 10); last done.
+      + eapply N.lt_le_trans; last by apply (N.Div0.mul_div_le _ 10).
         assert (n `div` 10 ≠ 0)%N.
         { by intros ?%N.div_small_iff. }
         assert (0 < n `div` 10)%N by by apply N.div_str_pos; auto with lia.
@@ -562,7 +562,7 @@ Section library.
     { repeat split; eauto.
       instantiate (1:=(String.length t + 1)%nat). apply Nat2Z.inj_add.
       instantiate (1:=(String.length v)%nat).
-      rewrite !length_app plus_assoc length_Sn /= !Nat2Z.inj_add. ring. }
+      rewrite !length_app Nat.add_assoc length_Sn /= !Nat2Z.inj_add. ring. }
     rewrite substring_add_length_app substring_Sn substring_0_length.
       by iApply "HΦ".
   Qed.

@@ -550,7 +550,7 @@ Section addition_monoid.
     rewrite lookup_insert in Hol.
     destruct (Y!!k) as [v'|] eqn:Heq; last done.
     rewrite (big_opM_delete _ Y k v') //.
-    apply plus_le_compat=>//.
+    apply Nat.add_le_mono=>//.
     apply IH=> k' Hin.
     have ?: k ≠ k'.
     { intros ->. apply elem_of_dom in Hin. rewrite HXk in Hin. by destruct Hin. }
