@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         coq_version:
-          - '8.16.1'
+          - '8.17'
       max-parallel: 4
       # don't cancel all in-progress jobs if one matrix job fails:
       fail-fast: false
