@@ -213,7 +213,7 @@ Proof.
       setoid_rewrite lookup_singleton_Some. split; naive_solver.
     - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
     - rewrite dom_gset_to_gmap. set_solver. }
-  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
+  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Hequiv) "Hsi Hposts".
 
   assert ( ∀ (ex' : finite_trace (cfg heap_lang) (olocale heap_lang)) (atr' : auxiliary_trace LM) (oζ : olocale heap_lang) (ℓ : mlabel LM),
    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')) as Hcontr'.

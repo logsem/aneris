@@ -164,7 +164,7 @@ Section locales_helpers.
         apply IHt2'; first by simpl in Hlen; lia. done.
   Qed.
 
-  Lemma locales_from_equiv_refl (t0 t0' t: list (expr Λ)):
+  Lemma locales_equiv_from_refl (t0 t0' t: list (expr Λ)):
     locales_equiv t0 t0' ->
     locales_equiv_from t0 t0' t t.
   Proof.
@@ -176,7 +176,7 @@ Section locales_helpers.
 
   Lemma locales_equiv_refl (t: list (expr Λ)):
     locales_equiv t t.
-  Proof. apply locales_from_equiv_refl. constructor. Qed.
+  Proof. apply locales_equiv_from_refl. constructor. Qed.
 
   Lemma locales_equiv_snoc t0 t0' (e e' : expr Λ) t1 t1':
     locales_equiv t0 t0' ->
@@ -193,7 +193,7 @@ Section locales_helpers.
     locale_of (t0 ++ t1) e = locale_of (t0 ++ t1) e' ->
     locales_equiv_from t0 t0 (t1 ++ [e]) (t1 ++ [e']).
   Proof.
-    intros ?. apply locales_equiv_snoc =>//; apply locales_from_equiv_refl; apply locales_equiv_refl.
+    intros ?. apply locales_equiv_snoc =>//; apply locales_equiv_from_refl; apply locales_equiv_refl.
   Qed.
 
   Lemma locales_equiv_from_middle t0 (e e' : expr Λ) t1 t2:
@@ -202,10 +202,10 @@ Section locales_helpers.
   Proof.
     intros ?.
     apply locales_equiv_from_app.
-    - apply locales_from_equiv_refl. apply locales_equiv_refl.
+    - apply locales_equiv_from_refl. apply locales_equiv_refl.
     - simpl. constructor; first done.
       apply locales_equiv_from_impl =>//=.
-      constructor =>//. apply locales_from_equiv_refl.
+      constructor =>//. apply locales_equiv_from_refl.
       apply locales_equiv_snoc_same. by list_simplifier.
   Qed.
 
@@ -230,7 +230,7 @@ Section locales_helpers.
     - rewrite take_ge =>//. apply locales_equiv_refl.
   Qed.
 
-  Lemma locale_equiv_from_take (t0 t0' t1 t1' : list $ expr Λ) n:
+  Lemma locales_equiv_from_take (t0 t0' t1 t1' : list $ expr Λ) n:
     locales_equiv_from t0 t0' t1 t1' ->
     locales_equiv_from t0 t0' (take n t1) (take n t1').
   Proof.
@@ -240,12 +240,12 @@ Section locales_helpers.
     apply IHn. by inversion Hequiv.
   Qed.
 
-  Lemma locale_equiv_take (t1 t2 : list $ expr Λ) n:
+  Lemma locales_equiv_take (t1 t2 : list $ expr Λ) n:
     locales_equiv t1 t2 ->
     locales_equiv (take n t1) (take n t2).
-  Proof. apply locale_equiv_from_take. Qed.
+  Proof. apply locales_equiv_from_take. Qed.
 
-  Lemma locale_equiv_from_transitive (s1 s2 s3 t1 t2 t3 : list $ expr Λ):
+  Lemma locales_equiv_from_transitive (s1 s2 s3 t1 t2 t3 : list $ expr Λ):
     locales_equiv s1 s2 ->
     locales_equiv s2 s3 ->
     locales_equiv_from s1 s2 t1 t2 ->
@@ -263,11 +263,11 @@ Section locales_helpers.
     - inversion Hequiv2 => //.
   Qed.
 
-  Lemma locale_equiv_transitive (t1 t2 t3 : list $ expr Λ):
+  Lemma locales_equiv_transitive (t1 t2 t3 : list $ expr Λ):
     locales_equiv t1 t2 ->
     locales_equiv t2 t3 ->
     locales_equiv t1 t3.
-  Proof. apply locale_equiv_from_transitive; constructor. Qed.
+  Proof. apply locales_equiv_from_transitive; constructor. Qed.
 
   Lemma locale_valid_exec ex (tp1 tp2 : list $ expr Λ) σ1 σ2:
     valid_exec ex ->
@@ -280,12 +280,12 @@ Section locales_helpers.
       rewrite take_ge //. apply locales_equiv_refl.
     - intros Hval Hstarts Hends.
       inversion Hval as [A B|A [tp' σ'] C D E Hstep]. simplify_eq.
-      eapply locale_equiv_transitive.
+      eapply locales_equiv_transitive.
       eapply IH =>//.
       pose proof (locale_step_equiv _ _ _ Hstep) as Hequiv.
       rewrite /trace_ends_in /trace_last in Hends.
       rewrite Hends in Hequiv.
-      apply (locale_equiv_take _ _ (length tp1)) in Hequiv.
+      apply (locales_equiv_take _ _ (length tp1)) in Hequiv.
       rewrite take_take in Hequiv.
       assert (length tp1 ≤ length tp').
       { eapply (valid_exec_length ex ) =>//. }
@@ -373,6 +373,26 @@ Section from_locale.
 
 End from_locale.
 
+(* TODO: Move *)
+Lemma Forall2_eq {A B} (f : A → B) xs ys :
+  Forall2 (λ x y, f x = f y) xs ys ↔ f <$> xs = f <$> ys.
+Proof.
+  split.
+  - revert ys.
+    induction xs as [|x xs IHxs]; intros ys Hforall.
+    { eapply Forall2_nil_inv_l in Hforall. by simplify_eq. }
+    destruct ys as [|y ys].
+    { by apply Forall2_cons_nil_inv in Hforall. }
+    apply Forall2_cons_1 in Hforall as [Hf Hforall]=> /=.
+    f_equiv; [done|by apply IHxs].
+  - revert ys.
+    induction xs as [|x xs IHxs]; intros ys Hf.
+    { rewrite fmap_nil comm in Hf. eapply fmap_nil_inv in Hf. by simplify_eq. }
+    rewrite fmap_cons comm in Hf.
+    apply fmap_cons_inv in Hf as (y & ys' & Hfxy & Hf & ->).
+    apply Forall2_cons. split; [done|by apply IHxs].
+Qed.
+
 Section locales_utils.
   Context {Λ: language}.
 
@@ -380,20 +400,22 @@ Section locales_utils.
     (λ '(t, e), locale_of t e) <$> (prefixes_from tp0 tp).
   Notation locales_of_list tp := (locales_of_list_from [] tp).
 
-  Lemma locales_of_list_equiv tp0 tp0' tp1 tp2:
-    locales_equiv_from tp0 tp0' tp1 tp2 →
+  Lemma locales_of_list_equiv (tp0 tp0' tp1 tp2 : list $ expr Λ) :
+    locales_equiv_from tp0 tp0' tp1 tp2 ↔
     locales_of_list_from tp0 tp1 = locales_of_list_from tp0' tp2.
   Proof.
-    revert tp0 tp0' tp1. induction tp2; intros tp0 tp0' tp1 H;
-    destruct tp1 as [|e1 tp1]; try by apply Forall2_length in H.
-    unfold locales_of_list_from. simpl.
-    simpl in H. apply Forall2_cons_1 in H as [??]. f_equal =>//.
-    apply IHtp2 =>//.
+    split; intros Heq.
+    - apply (Forall2_impl _ (λ x y, uncurry locale_of x = uncurry locale_of y))
+        in Heq; [|by intros [] [] HP].
+      by rewrite Forall2_eq in Heq.
+    - apply (Forall2_impl (λ x y, uncurry locale_of x = uncurry locale_of y));
+        [|by intros [] [] HP].
+      by rewrite Forall2_eq.
   Qed.
 
   Lemma locales_of_list_step_incl σ1 σ2 oζ tp1 tp2 :
-      locale_step (tp1, σ1) oζ (tp2, σ2) ->
-      locales_of_list tp1 ⊆ locales_of_list tp2.
+    locale_step (tp1, σ1) oζ (tp2, σ2) ->
+    locales_of_list tp1 ⊆ locales_of_list tp2.
   Proof.
     intros H. inversion H; simplify_eq=>//.
     replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs); last by list_simplifier.
@@ -414,9 +436,175 @@ Section locales_utils.
     apply elem_of_cons; right. apply IH. eauto.
   Qed.
 
+  Definition locales_equiv_prefix_from {Λ} (tp0 tp1 tp2 : list $ expr Λ) :=
+    locales_equiv_from tp0 tp0 tp1 (take (length tp1) tp2).
+  Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
+
+  Lemma locales_equiv_from_length (tp0 tp0' tp1 tp2 : list $ expr Λ) :
+    locales_equiv_from tp0 tp0' tp1 tp2 → length tp1 = length tp2.
+  Proof. intros Heq%Forall2_length. by rewrite !prefixes_from_length in Heq. Qed.
+
+  Lemma locales_equiv_prefix_from_length (tp0 tp1 tp2 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 → length tp1 ≤ length tp2.
+  Proof.
+    rewrite /locales_equiv_prefix_from.
+    intros ->%locales_equiv_from_length.
+    revert tp2. induction tp1; [simpl; lia|].
+    destruct tp2; [done|by apply le_n_S].
+  Qed.
+
+  Lemma locales_equiv_prefix_from_trans (tp0 tp1 tp2 tp3 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 →
+    locales_equiv_prefix_from tp0 tp2 tp3 →
+    locales_equiv_prefix_from tp0 tp1 tp3.
+  Proof.
+    rewrite /locales_equiv_prefix_from. intros.
+    assert (length tp1 ≤ length tp2);
+      [by eapply locales_equiv_prefix_from_length|].
+    eapply locales_equiv_from_transitive;
+      [apply locales_equiv_refl..|done|].
+    assert (length tp1 = length tp1 `min` length tp2) as Heq by lia.
+    rewrite {2}Heq -take_take. by apply locales_equiv_from_take.
+  Qed.
+
+  Lemma locales_equiv_prefix_trans (tp1 tp2 tp3 : list $ expr Λ) :
+    locales_equiv_prefix tp1 tp2 →
+    locales_equiv_prefix tp2 tp3 →
+    locales_equiv_prefix tp1 tp3.
+  Proof. intros. by eapply locales_equiv_prefix_from_trans. Qed.
+
+  Lemma locales_equiv_from_comm (tp0 tp0' tp1 tp2 : list $ expr Λ) :
+    locales_equiv_from tp0 tp0' tp1 tp2 →
+    locales_equiv_from tp0' tp0 tp2 tp1.
+  Proof. by rewrite !locales_of_list_equiv. Qed.
+
+  Lemma locales_equiv_from_locale_of (tp0 tp0' tp1 tp2 tp3 : list $ expr Λ) :
+    locales_equiv tp0 tp0' →
+    locales_equiv_from tp0 tp1 tp2 tp3 ↔
+    locales_equiv_from tp0' tp1 tp2 tp3.
+  Proof.
+    rewrite !locales_of_list_equiv. intros Heq.
+    split.
+    - intros <-.
+      rewrite -locales_of_list_equiv.
+      rewrite -locales_of_list_equiv in Heq.
+      apply locales_equiv_from_refl.
+      by apply locales_equiv_from_comm.
+    - intros <-.
+      rewrite -locales_of_list_equiv.
+      rewrite -locales_of_list_equiv in Heq.
+      by apply locales_equiv_from_refl.
+  Qed.
+
+  Lemma locales_equiv_prefix_from_drop (tp0 tp1 tp2 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 →
+    locales_equiv_from tp0 tp0 tp2 (tp1 ++ (drop (length tp1) tp2)).
+  Proof.
+    revert tp0 tp2.
+    induction tp1 as [|e1 tp1 IHtp1]; intros tp0 tp2 Heq.
+    { by rewrite /locales_equiv_prefix_from !locales_of_list_equiv. }
+    destruct tp2 as [|e2 tp2].
+    { by rewrite /locales_equiv_prefix_from !locales_of_list_equiv
+        /locales_of_list_from in Heq. }
+    rewrite /locales_equiv_prefix_from !locales_of_list_equiv
+      /locales_of_list_from in Heq.
+    rewrite /locales_of_list_from=> /=.
+    inversion Heq as [[Hlocale Htail]].
+    f_equiv; [done|].
+    rewrite /locales_of_list_from in IHtp1.
+    eapply (locales_equiv_from_locale_of _ (tp0 ++ [e1])).
+    { apply locales_equiv_from_app;
+        [by apply locales_equiv_refl|by apply Forall2_cons]. }
+    apply IHtp1, locales_equiv_from_comm.
+    apply (locales_equiv_from_locale_of (tp0 ++ [e1]) (tp0 ++ [e2])).
+    { apply locales_equiv_from_app;
+        [by apply locales_equiv_refl|by apply Forall2_cons]. }
+    apply locales_equiv_from_comm.
+    rewrite /locales_equiv_prefix_from locales_of_list_equiv
+            /locales_of_list_from.
+    by apply Htail.
+  Qed.
+
+  Lemma locales_equiv_from_drop (t0 t1 t2 t2' : list $ expr Λ) :
+    locales_equiv_prefix_from t0 t1 t2 →
+    locales_equiv_prefix_from t0 t1 t2' →
+    locales_equiv_from t0 t0 t2 t2' →
+    locales_equiv_from (t0++t1) (t0++t1) (drop (length t1) t2) (drop (length t1) t2').
+  Proof.
+    intros Hprefix1 Hprefix2 Hequiv.
+    apply locales_equiv_from_impl.
+    { apply Forall2_length in Hequiv. rewrite !prefixes_from_length in Hequiv.
+      by rewrite !skipn_length Hequiv. }
+    apply locales_equiv_prefix_from_drop in Hprefix1.
+    apply locales_equiv_prefix_from_drop in Hprefix2.
+    apply locales_equiv_from_comm in Hprefix1.
+    assert (locales_equiv_from t0 t0 (t1 ++ drop (length t1) t2) t2').
+    { eapply locales_equiv_from_transitive.
+      - apply locales_equiv_refl.
+      - apply locales_equiv_refl.
+      - apply Hprefix1.
+      - apply Hequiv. }
+    assert (locales_equiv_from t0 t0 (t1 ++ drop (length t1) t2) (t1 ++ drop (length t1) t2')).
+    { eapply locales_equiv_from_transitive.
+      - apply locales_equiv_refl.
+      - apply locales_equiv_refl.
+      - apply H.
+      - apply Hprefix2. }
+    done.
+  Qed.
+
+  (* TODO: Find an alternative to this. Used to resolve coercions. *)
+  Lemma fmap_fmap : forall (A B C:Type)(f:A->B)(g:B->C) (l : list A),
+    g <$> (f <$> l) = (fun x => g (f x)) <$> l.
+  Proof. apply map_map. Qed.
+
+  (* TODO: this can likely be removed by redefining [locale_of]
+   to take one argument *)
+  Lemma locales_of_list_from_fork_post `{!irisG Λ M Σ}
+        (xs ys : list ((list $ expr Λ) * (expr Λ))) :
+    (λ '(t,e), locale_of t e) <$> xs =
+    (λ '(t,e), locale_of t e) <$> ys →
+    (λ '(t,e) v, fork_post (locale_of t e) v) <$> xs =
+    (λ '(t,e) v, fork_post (locale_of t e) v) <$> ys.
+  Proof.
+    intros.
+    set f := locale_of.
+    set g := (λ ζ, λ v, flip weakestpre.fork_post v ζ).
+    assert (∀ (xs : list ((list $ expr Λ) * (expr Λ))),
+              g <$> ((λ '(x,y), f x y) <$> xs) =
+              ((λ '(x,y), g (f x y)) <$> xs)) as Hmap.
+    { intros. rewrite fmap_fmap. f_equiv. apply FunExt. by intros []. }
+    rewrite /f /g in Hmap. rewrite -!Hmap. clear Hmap. by f_equiv.
+  Qed.
+
+  Lemma locales_equiv_prefix_from_drop_alt (tp0 tp1 tp2 : list $ expr Λ) :
+    locales_equiv_prefix_from tp0 tp1 tp2 →
+    (λ '(t, e), locale_of t e) <$> prefixes_from (tp0 ++ tp1) (drop (length tp1) tp2) =
+    drop (length tp1) ((λ '(t, e), locale_of t e) <$> prefixes_from tp0 tp2).
+  Proof.
+    revert tp0 tp2.
+    induction tp1; intros tp0 tp2 Hprefix; [by rewrite right_id|].
+    destruct tp2; [done|].
+    rewrite /locales_equiv_prefix_from in Hprefix. simpl in *.
+    apply Forall2_cons in Hprefix as [Hlocale Hprefix].
+    rewrite -IHtp1; last first.
+    { eapply locales_equiv_from_locale_of;
+        [by apply locales_equiv_snoc_same|done]. }
+    rewrite -locales_of_list_equiv.
+    eapply locales_equiv_from_locale_of;
+      [|apply locales_equiv_from_refl, locales_equiv_refl].
+    rewrite -assoc. by eapply locales_equiv_middle.
+  Qed.
+
+  Lemma locales_equiv_prefix_drop_alt (tp0 tp1 : list $ expr Λ) :
+    locales_equiv_prefix tp0 tp1 →
+    (λ '(t, e), locale_of t e) <$> prefixes_from tp0 (drop (length tp0) tp1) =
+    drop (length tp0) ((λ '(t, e), locale_of t e) <$> prefixes tp1).
+  Proof. apply (locales_equiv_prefix_from_drop_alt []). Qed.
+
 End locales_utils.
 Notation locales_of_list tp := (locales_of_list_from [] tp).
-
+Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
 
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
@@ -582,15 +770,15 @@ Section adequacy_helper_lemmas.
 
   Notation newelems t t' := (drop (length t) t').
   Notation newposts t t' :=
-    (map (λ '(tnew, e), fork_post (locale_of tnew e))
+    ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
         (prefixes_from t (newelems t t'))).
 
   Lemma newposts_locales_equiv_helper (t0 t0' t1 t1' t : list (expr Λ)):
     length t1 = length t1' ->
     locales_equiv t0 t0' ->
-    map (λ '(tnew, e0), fork_post (locale_of tnew e0))
+    (λ '(tnew, e0), fork_post (locale_of tnew e0)) <$>
         (prefixes_from t0 (newelems t1 t)) =
-    map (λ '(tnew, e0), fork_post (locale_of tnew e0))
+    (λ '(tnew, e0), fork_post (locale_of tnew e0)) <$>
         (prefixes_from t0' (newelems t1' t)).
   Proof.
     intros Hlen1 H.
@@ -609,9 +797,9 @@ Section adequacy_helper_lemmas.
 
   Lemma forkposts_locales_equiv (t0 t0' t1 t1' : list (expr Λ)):
     locales_equiv_from t0 t0' t1 t1' ->
-    map (λ '(tnew, e0), fork_post (locale_of tnew e0))
+    (λ '(tnew, e0), fork_post (locale_of tnew e0)) <$>
         (prefixes_from t0 t1) =
-    map (λ '(tnew, e0), fork_post (locale_of tnew e0))
+    (λ '(tnew, e0), fork_post (locale_of tnew e0)) <$>
         (prefixes_from t0' t1').
   Proof.
     intros H.
@@ -803,37 +991,43 @@ Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
   (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
 Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
 
-Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
+Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
-        e1 σ1 δ:
+        es σ δ:
+  length es ≥ 1 →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
-         (Φ : val Λ → iProp Σ)
+         (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
+       wptp s es Φs ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
          ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
+         ⌜trace_starts_in ex (es, σ)⌝ -∗
          ⌜trace_starts_in atr δ⌝ -∗
          ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' →
+                           trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
          stateI ex atr -∗
-         posts_of c.1 (Φ  :: (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
+                              (prefixes_from es (drop (length es) c.1)))) -∗
          □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+            (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ →
+                              ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
             ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
          ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+             ⌜trace_contract ex oζ ex'⌝ →
+             ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
           ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
-  ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
+  ⊢ Gsim Σ M s ξ (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
-  intros Hwp.
+  intros Hes Hwp.
   apply extract_except_0.
   iApply fupd_to_bupd_soundness_no_lc'.
   iIntros (Hinv) "HFtB".
@@ -841,41 +1035,50 @@ Proof.
   iApply bupd_plain.
   iApply "HFtB".
   iPoseProof (Hwp Hinv) as "Hwp".
-  iMod "Hwp" as (stateI trace_inv Φ fork_post) "(#config_wp & HSI & Hwp & Hstep)".
+  iMod "Hwp" as (stateI trace_inv Φs fork_post)
+                  "(#config_wp & HSI & Hwp & Hstep)".
   clear Hwp.
   set (IrisG Λ M Σ Hinv stateI fork_post).
   iAssert (∃ ex atr c1 δ1,
-              ⌜trace_singleton ([e1], σ1) = ex⌝ ∗
+              ⌜trace_singleton (es, σ) = ex⌝ ∗
               ⌜trace_singleton δ = atr⌝ ∗
-              ⌜([e1], σ1) = c1⌝ ∗
+              ⌜(es, σ) = c1⌝ ∗
               ⌜δ = δ1⌝ ∗
               ⌜length c1.1 ≥ 1⌝ ∗
               stateI ex atr ∗
               (∀ ex' atr' oζ ℓ,
-                  ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') ∗
-              wptp s c1.1 (Φ :: map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop 1 c1.1))))%I
+                  ⌜trace_contract ex oζ ex'⌝ →
+                  ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') ∗
+              wptp s c1.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
+                                  (prefixes_from es (drop (length es) c1.1)))))%I
     with "[HSI Hwp]" as "Hex".
-  { iExists (trace_singleton ([e1], σ1)), (trace_singleton δ), ([e1], σ1), δ; simpl.
+  { iExists (trace_singleton (es, σ)), (trace_singleton δ), (es, σ), δ; simpl.
+    rewrite drop_ge; [|lia]. rewrite right_id.
     iFrame.
     repeat (iSplit; first by auto).
     iIntros (???? ?%not_trace_contract_singleton); done. }
   iDestruct "Hex" as (ex atr c1 δ1 Hexsing Hatrsing Hc1 Hδ1 Hlen) "(HSI & HTI & Htp)".
   assert
     (valid_system_trace ex atr ∧
-     trace_starts_in ex ([e1], σ1) ∧
+     trace_starts_in ex (es, σ) ∧
      trace_ends_in ex c1 ∧
      trace_starts_in atr δ ∧
      (∀ ex' atr' oζ ℓ,
-         trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'))
+         trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr') ∧
+    locales_equiv es (take (length es) c1.1) ∧
+    length es ≤ length c1.1)
     as Hextras.
   { rewrite -Hexsing -Hatrsing -Hc1.
     split; first apply valid_system_trace_singletons.
     repeat (split; first done).
-    intros ? ? ? ? ? ?%not_trace_contract_singleton; done. }
+    split; [intros ? ? ? ? ? ?%not_trace_contract_singleton; done|].
+    split; [|done].
+    rewrite take_ge; [apply locales_equiv_refl|done].
+  }
   clear Hc1 Hδ1.
   rewrite Hexsing Hatrsing; clear Hexsing Hatrsing.
   iLöb as "IH" forall (ex atr c1 Hextras Hlen) "HSI HTI Htp".
-  destruct Hextras as (Hv & Hex & Hc1 & Hatr & Hξ).
+  destruct Hextras as (Hv & Hex & Hc1 & Hatr & Hξ & Htake & Htakelen).
   rewrite {2}/Gsim (fixpoint_unfold (Gsim_pre _ _ _ _) _ _).
   destruct c1 as [tp σ1'].
   assert (valid_exec ex) as Hexv.
@@ -893,14 +1096,16 @@ Proof.
     iCombine "HSI" "HS" as "HS".
     iApply fupd_plain_keep_l; iSplitR; [|iExact "HS"].
     iIntros "(HSI & Hpost & HTI & Hstep)".
-    iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
+    iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
     iApply fupd_plain_mask.
     iMod ("Hξ" with "HTI") as "%"; auto. }
   iAssert (□ (stateI ex atr -∗
              (∀ ex' atr' oζ ℓ,
-                 ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+                 ⌜trace_contract ex oζ ex'⌝ →
+                 ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
                  ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
-  { iDestruct ("Hstep" with "[] [] [] [] [] [] HSI Hpost") as "[#Hext _]"; auto.
+  { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]";
+      auto.
     iModIntro.
     iIntros "HSI HTI".
     iApply ("Hext" with "[$HSI $HTI]"). }
@@ -932,6 +1137,7 @@ Proof.
   iMod "Hstp".
   iModIntro.
   iIntros "HFtB".
+  (* TODO: This should be generalisable in a lemma *)
   iInduction n as [|n] "IHlen"; simpl; last first.
   { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iApply except_0_later.
@@ -959,55 +1165,38 @@ Proof.
   iIntros "HFtB".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
   iSpecialize ("Hback" with "Hpost").
-  assert (Hlocales: map (λ '(tnew, e), weakestpre.fork_post (locale_of tnew e))
-                    (prefixes_from [e1] (drop 1 tp)) ++
-                  map (λ '(tnew, e), weakestpre.fork_post (locale_of tnew e))
-                  (prefixes_from tp (drop (length tp) c'.1))
-         = map (λ '(tnew, e), weakestpre.fork_post (locale_of tnew e))
-                    (prefixes_from [e1] (drop 1 c'.1)) ).
-  { pose proof (locale_valid_exec _ _ _ _ _ Hexv Hex Hc) as Hequivex.
-    destruct c'.1 as [|e3 tp3_rest] eqn:Heq.
-    { exfalso. pose proof (step_tp_length _ _ _ Hstep). rewrite ->Heq in *. simpl in *. lia. }
-    destruct tp as [|e2 tp2_rest] eqn:Heq'.
-    { simpl in Hlen; lia. }
-    change fork_post with weakestpre.fork_post.
-    assert (locale_of [] e1 = locale_of [] e2); first by inversion Hequivex.
-    change 1 with (length [e1]).
-    rewrite !(newposts_locales_equiv [e1] [e2]); [| by constructor =>// | by constructor =>//].
-    rewrite ![drop _ _]/=.
-    rewrite drop_0.
-    assert (Hequiv: locales_equiv (e2 :: tp2_rest) (take (length (e2 :: tp2_rest)) (e3 :: tp3_rest))).
-    { pose proof (locale_step_equiv _ _ _ Hstep) as Hequiv.
-      rewrite Heq // in Hequiv. }
-    assert (Hequiv_from: locales_equiv_from [e2] [e3] tp2_rest (take (length tp2_rest) tp3_rest)).
-    { change [e2] with ([] ++ [e2]).
-      change [e3] with ([] ++ [e3]).
-      change (e2 :: tp2_rest) with ([e2] ++ tp2_rest) in Hequiv.
-      rewrite [take _ _]/= in Hequiv.
-      change (e3 :: take (length tp2_rest) tp3_rest) with ([e3] ++ take (length tp2_rest) tp3_rest) in Hequiv.
-      assert (length tp2_rest = length (take (length tp2_rest) tp3_rest)) as Hlen'.
-      { rewrite take_length. pose proof (step_tp_length _ _ _ Hstep) as Hdec.
-        rewrite Heq /= in Hdec. lia. }
-      apply (locales_equiv_from_impl _ _ _ _ _ _ Hlen' Hequiv) =>//. }
-    erewrite forkposts_locales_equiv; last done.
-    assert (Hequiv_from': forall t, locales_equiv_from (e2 :: tp2_rest) (e3 :: take (length tp2_rest) tp3_rest) t t).
-    { intros t. by apply locales_from_equiv_refl. }
-    erewrite (forkposts_locales_equiv (e2 :: tp2_rest)); last first.
-    { eauto using Hequiv_from'. }
-    assert (Hequiv_from'': forall t, locales_equiv_from [e2] [e3] t t).
-    { intros t. apply locales_from_equiv_refl. constructor =>//. by inversion Hequiv. }
-    erewrite (forkposts_locales_equiv [e2]); last by eauto.
-    rewrite -map_app -prefixes_from_app take_drop.
-    rewrite [drop _ _]/= drop_0 //. }
+  (* TODO: Generalise this as its own lemma *)
+  assert (Hlocales: ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>
+                     (prefixes_from es (drop (length es) tp))) ++
+                    ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>
+                     (prefixes_from tp (drop (length tp) c'.1))) =
+                    ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>
+                     (prefixes_from es (drop (length es) c'.1)))).
+  { rewrite -fmap_app. apply locales_of_list_from_fork_post. rewrite fmap_app.
+    apply locale_step_equiv in Hstep.
+    rewrite (locales_equiv_prefix_drop_alt _ tp); [|done].
+    rewrite -drop_app_le; last first.
+    { rewrite fmap_length. rewrite prefixes_from_length. lia. }
+    rewrite (locales_equiv_prefix_drop_alt es c'.1);
+      [|by eapply locales_equiv_prefix_trans].
+    f_equiv.
+    rewrite -fmap_app -prefixes_from_app -locales_of_list_equiv.
+    by apply locales_equiv_from_comm, locales_equiv_prefix_from_drop. }
   iAssert (▷ ⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'')⌝)%I as "#Hextend'".
-  { iDestruct ("Hstep" with "[] [] [] [] [] [] HSI") as "H"; [iPureIntro..|].
+  { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI") as "H"; [iPureIntro..|].
     - eapply valid_system_trace_extend; eauto.
     - eapply trace_extend_starts_in; eauto.
     - eapply trace_extend_starts_in; eauto.
     - eapply trace_extend_ends_in; eauto.
     - by intros ? ? ? ? [-> ->]%trace_contract_of_extend [-> ->]%trace_contract_of_extend.
     - done.
-    - rewrite Hlocales.
+    - eapply locales_equiv_from_transitive;
+        [by apply locales_equiv_refl|by apply locales_equiv_refl|done|].
+      apply locale_step_equiv in Hstep.
+      eapply (locales_equiv_from_take _ _ _ _ (length es)) in Hstep.
+      rewrite !firstn_firstn in Hstep.
+      rewrite !min_l in Hstep; [done|simpl; lia].
+    - rewrite -app_assoc Hlocales.
       iPoseProof (wptp_of_val_post with "Hback") as "Hback".
       rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
       iApply except_0_later.
@@ -1033,11 +1222,56 @@ Proof.
     + eapply trace_extend_starts_in; eauto.
     + by intros ???? [-> ->]%trace_contract_of_extend
                 [-> ->]%trace_contract_of_extend.
+    + eapply locales_equiv_from_transitive;
+        [by apply locales_equiv_refl|by apply locales_equiv_refl|done|].
+      apply locale_step_equiv in Hstep.
+      eapply (locales_equiv_from_take _ _ _ _ (length es)) in Hstep.
+      rewrite !firstn_firstn in Hstep.
+      rewrite !min_l in Hstep; [done|simpl; lia].
+    + eapply step_tp_length in Hstep. by etransitivity.
   - iPureIntro. pose proof (step_tp_length _ _ _ Hstep). simpl in *. lia.
   - iIntros (???? [-> ->]%trace_contract_of_extend
                   [-> ->]%trace_contract_of_extend); done.
-  - rewrite Hlocales //.
+  - rewrite -app_assoc Hlocales //.
   - iModIntro. iIntros "HFtB". iNext. iApply "IH'"; done.
+Qed.
+
+Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
+        (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        e1 σ1 δ:
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
+    ⊢ |={⊤}=> ∃
+         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (Φ : val Λ → iProp Σ)
+         (fork_post : locale Λ → val Λ → iProp Σ),
+       let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
+       config_wp ∗
+       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ) ∗
+       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
+         ⌜trace_starts_in atr δ⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
+         stateI ex atr -∗
+         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
+         □ (stateI ex atr ∗
+             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
+         ((∀ ex' atr' oζ ℓ,
+              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+  ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
+Proof.
+  intros Hwp. apply wp_strong_adequacy_multiple_helper; [done|simpl;lia|].
+  iIntros (Hinv).
+  iMod (Hwp Hinv) as (stateI trace_inv Φs fork_post)
+                       "(#config_wp & HSI & Hwp & Hstep)".
+  iIntros "!>". iExists stateI, trace_inv, [Φs], fork_post. by iFrame "#∗".
 Qed.
 
 Definition rel_finitary {A B C D}
@@ -1071,13 +1305,13 @@ End finitary_lemma.
 
 (** We can extract the simulation correspondence in the meta-logic
     from a proof of the simulation correspondence in the object-logic. *)
-Theorem simulation_correspondence Λ M Σ `{!invGpreS Σ}
+Theorem simulation_correspondence_multiple Λ M Σ `{!invGpreS Σ}
         (s: stuckness)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
-        e1 σ1 δ1 :
+        es σ δ :
   rel_finitary ξ →
-  (⊢ Gsim Σ M s ξ {tr[ ([e1], σ1) ]} {tr[ δ1 ]}) →
-  continued_simulation ξ {tr[ ([e1], σ1) ]} {tr[δ1]}.
+  (⊢ Gsim Σ M s ξ {tr[ (es, σ) ]} {tr[ δ ]}) →
+  continued_simulation ξ {tr[ (es, σ) ]} {tr[δ]}.
 Proof.
   intros Hsc Hwptp.
   exists (λ exatr, ⊢ Gsim Σ M s ξ exatr.1 exatr.2); split; first done.
@@ -1118,6 +1352,55 @@ Proof.
   intros [_ ?]; done.
 Qed.
 
+(** We can extract the simulation correspondence in the meta-logic
+    from a proof of the simulation correspondence in the object-logic. *)
+Theorem simulation_correspondence Λ M Σ `{!invGpreS Σ}
+        (s: stuckness)
+        (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        e1 σ1 δ1 :
+  rel_finitary ξ →
+  (⊢ Gsim Σ M s ξ {tr[ ([e1], σ1) ]} {tr[ δ1 ]}) →
+  continued_simulation ξ {tr[ ([e1], σ1) ]} {tr[δ1]}.
+Proof. by apply simulation_correspondence_multiple. Qed.
+
+Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
+        (s: stuckness)
+        (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        es σ δ :
+  length es ≥ 1 →
+  rel_finitary ξ →
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
+    ⊢ |={⊤}=> ∃
+         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (Φs : list (val Λ → iProp Σ))
+         (fork_post : locale Λ → val Λ → iProp Σ),
+       let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
+       config_wp ∗
+       stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
+       wptp s es Φs ∗
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) (c : cfg Λ),
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex (es, σ)⌝ -∗
+         ⌜trace_starts_in atr δ⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
+         stateI ex atr -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
+         □ (stateI ex atr ∗
+             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
+         ((∀ ex' atr' oζ ℓ,
+              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+  continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
+Proof.
+  intros Hlen Hsc Hwptp%wp_strong_adequacy_multiple_helper; [|by done..].
+  by eapply simulation_correspondence_multiple.
+Qed.
+
 Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
         (s: stuckness)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -1140,8 +1423,9 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
          ⌜trace_ends_in ex c⌝ -∗
          ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
          stateI ex atr -∗
-         posts_of c.1 (Φ  :: (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
+         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
          □ (stateI ex atr ∗
              (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
             ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
@@ -1152,6 +1436,46 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
 Proof.
   intros Hsc Hwptp%wp_strong_adequacy_helper; last done.
   by eapply simulation_correspondence.
+Qed.
+
+Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
+        (s: stuckness)
+        (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        es σ δ :
+  length es ≥ 1 →
+  rel_finitary ξ →
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
+    ⊢ |={⊤}=> ∃
+         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (Φs : list (val Λ → iProp Σ))
+         (fork_post : locale Λ → val Λ → iProp Σ),
+       let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
+       config_wp ∗
+       stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
+       wptp s es Φs ∗
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex (es, σ)⌝ -∗
+         ⌜trace_starts_in atr δ⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
+         stateI ex atr -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
+         |={⊤, ∅}=> ⌜ξ ex atr⌝)) ->
+  continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
+Proof.
+  intros Hlen Hsc Hwptp.
+  eapply wp_strong_adequacy_multiple_with_trace_inv; [done|done|done|].
+  iIntros (Hinv) "".
+  iMod (Hwptp Hinv) as (stateI Φ fork_post) "(Hwpcfg & HSI & Hwp & Hstep)".
+  iModIntro.
+  iExists stateI, (λ _ _, True)%I, Φ, fork_post; iFrame "Hwpcfg HSI Hwp".
+  iIntros (ex atr c ? ? ? ? ? ? ?) "HSI Hposts".
+  iSplit; last first.
+  { iIntros "?". iApply ("Hstep" with "[] [] [] [] [] [] [] HSI"); eauto. }
+  iModIntro; iIntros "[$ ?]"; done.
 Qed.
 
 Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
@@ -1175,8 +1499,9 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
          ⌜trace_ends_in ex c⌝ -∗
          ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
          stateI ex atr -∗
-         posts_of c.1 (Φ  :: (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
+         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
          |={⊤, ∅}=> ⌜ξ ex atr⌝)) ->
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
@@ -1186,36 +1511,43 @@ Proof.
   iMod (Hwptp Hinv) as (stateI Φ fork_post) "(Hwpcfg & HSI & Hwp & Hstep)".
   iModIntro.
   iExists stateI, (λ _ _, True)%I, Φ, fork_post; iFrame "Hwpcfg HSI Hwp".
-  iIntros (ex atr c ? ? ? ? ? ?) "HSI Hposts".
+  iIntros (ex atr c ? ? ? ? ? ? ?) "HSI Hposts".
   iSplit; last first.
-  { iIntros "?". iApply ("Hstep" with "[] [] [] [] [] [] HSI"); eauto. }
+  { iIntros "?". iApply ("Hstep" with "[] [] [] [] [] [] [] HSI"); eauto. }
   iModIntro; iIntros "[$ ?]"; done.
 Qed.
 
 (** Since the full adequacy statement is quite a mouthful, we prove some more
 intuitive and simpler corollaries. These lemmas are morover stated in terms of
 [rtc erased_step] so one does not have to provide the trace. *)
-Record adequate {Λ} (s : stuckness) (e1 : expr Λ) (σ1 : state Λ)
-    (φ : val Λ → state Λ → Prop) : Prop := {
-  adequate_result ex t2 σ2 v2 :
+Record adequate_multiple {Λ} (s : stuckness) (es : list $ expr Λ) (σ1 : state Λ)
+    (φs : list (val Λ → state Λ → Prop)) : Prop := {
+  adequate_result ex t2 σ2 vs :
+    length vs = length es →
     valid_exec ex →
-   trace_starts_in ex ([e1], σ1) →
-   trace_ends_in ex (of_val v2 :: t2, σ2) →
-   φ v2 σ2;
+    trace_starts_in ex (es, σ1) →
+    trace_ends_in ex (of_val <$> vs ++ t2, σ2) →
+    Forall (λ vφ, vφ.2 vφ.1 σ2) (zip vs φs);
   adequate_not_stuck ex t2 σ2 e2 :
-   s = NotStuck →
-   valid_exec ex →
-   trace_starts_in ex ([e1], σ1) →
-   trace_ends_in ex (t2, σ2) →
-   e2 ∈ t2 → not_stuck e2 σ2
+    s = NotStuck →
+    valid_exec ex →
+    trace_starts_in ex (es, σ1) →
+    trace_ends_in ex (t2, σ2) →
+    e2 ∈ t2 → not_stuck e2 σ2
 }.
 
-Lemma adequate_alt {Λ} s e1 σ1 (φ : val Λ → state Λ → Prop) :
-  adequate s e1 σ1 φ ↔ ∀ ex t2 σ2,
+Definition adequate {Λ} (s : stuckness) (e : expr Λ) (σ1 : state Λ)
+    (φ : val Λ → state Λ → Prop) : Prop :=
+  adequate_multiple s [e] σ1 [φ].
+
+Lemma adequate_multiple_alt {Λ} s es σ1 (φs : list (val Λ → state Λ → Prop)) :
+  adequate_multiple s es σ1 φs ↔ ∀ ex t2 σ2,
       valid_exec ex →
-      trace_starts_in ex ([e1], σ1) →
+      trace_starts_in ex (es, σ1) →
       trace_ends_in ex (t2, σ2) →
-      (∀ v2 t2', t2 = of_val v2 :: t2' → φ v2 σ2) ∧
+      (∀ vs t2', length vs = length es →
+                 t2 = of_val <$> vs ++ t2' →
+                 Forall (λ vφ, vφ.2 vφ.1 σ2) (zip vs φs)) ∧
       (∀ e2, s = NotStuck → e2 ∈ t2 → not_stuck e2 σ2).
 Proof.
   split.
@@ -1223,17 +1555,17 @@ Proof.
   - constructor; naive_solver.
 Qed.
 
-Theorem adequate_tp_safe {Λ} (e1 : expr Λ) ex t2 σ1 σ2 φ :
-  adequate NotStuck e1 σ1 φ →
+Theorem adequate_multiple_tp_safe {Λ} (es : list $ expr Λ) ex t2 σ1 σ2 φs :
+  adequate_multiple NotStuck es σ1 φs →
   valid_exec ex →
-  trace_starts_in ex ([e1], σ1) →
+  trace_starts_in ex (es, σ1) →
   trace_ends_in ex (t2, σ2) →
   Forall (λ e, is_Some (to_val e)) t2 ∨ ∃ t3 σ3, step (t2, σ2) (t3, σ3).
 Proof.
   intros Had ? ? ?.
   destruct (decide (Forall (λ e, is_Some (to_val e)) t2)) as [|Ht2]; [by left|].
   apply (not_Forall_Exists _), Exists_exists in Ht2; destruct Ht2 as (e2&?&He2).
-  destruct (adequate_not_stuck NotStuck e1 σ1 φ Had ex t2 σ2 e2)
+  destruct (adequate_not_stuck NotStuck es σ1 φs Had ex t2 σ2 e2)
     as [?|(e3&σ3&efs&?)];
     rewrite ?eq_None_not_Some; auto.
   { exfalso. eauto. }
@@ -1241,27 +1573,113 @@ Proof.
   right; exists (t2' ++ e3 :: t2'' ++ efs), σ3; econstructor; eauto.
 Qed.
 
-Local Definition wp_adequacy_relation Λ M s (φ : val Λ → Prop)
+Local Definition wp_adequacy_relation Λ M s (φs : list (val Λ → Prop))
            (ex : execution_trace Λ) (atr : auxiliary_trace M) : Prop :=
   ∀ c, trace_ends_in ex c →
-       (∀ v2 t2', c.1 = of_val v2 :: t2' → φ v2) ∧
+       (∀ vs t2', c.1 = of_val <$> vs ++ t2' →
+                  Forall (λ vφ, vφ.2 vφ.1) (zip vs φs)) ∧
        (∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2).
 
-Local Lemma wp_adequacy_relation_adequacy {Λ M} s e σ δ φ (ξ : _ -> _ -> Prop):
-  (forall ex aux, ξ ex aux -> wp_adequacy_relation Λ M s φ ex aux) ->
+Local Lemma wp_adequacy_relation_adequacy_multiple {Λ M} s es σ δ φs (ξ : _ -> _ -> Prop):
+  (forall ex aux, ξ ex aux -> wp_adequacy_relation Λ M s φs ex aux) ->
   continued_simulation
     ξ
-    (trace_singleton ([e], σ))
+    (trace_singleton (es, σ))
     (trace_singleton δ) →
-  adequate s e σ (λ v _, φ v).
+  adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
-  intros Himpl Hsm; apply adequate_alt.
+  intros Himpl Hsm; apply adequate_multiple_alt.
   intros ex t2 σ2 Hex Hexstr Hexend.
   eapply simulation_does_continue in Hex as [atr [? Hatr]]; eauto.
   rewrite -> continued_simulation_unfold in Hatr.
   destruct Hatr as (Hψ & Hatr).
   apply Himpl in Hψ.
-  apply (Hψ (t2, σ2)); done.
+  specialize (Hψ (t2, σ2)) as [Hsafe Hstuck]; [done|].
+  split; [|done].
+  intros vs t2' Hlen Ht2. specialize (Hsafe vs t2' Ht2).
+  clear Himpl Ht2 Hsm Hexstr. revert es vs Hlen Hsafe.
+  induction φs as [|φ φs Hφs]; intros es vs Hlen Hsafe;
+    [by rewrite zip_with_nil_r Forall_nil|].
+  destruct vs as [|v vs]; [rewrite Forall_nil; done|].
+  destruct es as [|e es]; [done|].
+  simpl in *. rewrite Forall_cons. rewrite Forall_cons in Hsafe.
+  destruct Hsafe as [Hφ Hsafe].
+  split; [done|].
+  eapply Hφs; [by simplify_eq|done].
+Qed.
+
+Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
+        (s: stuckness)
+        (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        (φs : list (val Λ → Prop))
+        es σ1 δ1 :
+  length es ≥ 1 →
+  rel_finitary ξ →
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
+    ⊢ |={⊤}=> ∃
+         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (Φs : list (val Λ → iProp Σ))
+         (fork_post : locale Λ → val Λ → iProp Σ),
+       let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
+       ⌜length φs = length Φs⌝ ∗
+       config_wp ∗
+       ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
+       stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
+       wptp s es Φs ∗
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex (es, σ1)⌝ -∗
+         ⌜trace_starts_in atr δ1⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
+         stateI ex atr -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
+         □ (stateI ex atr ∗
+             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
+         ((∀ ex' atr' oζ ℓ,
+              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+  adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs).
+Proof.
+  pose (ξ' := λ ex aux, ξ ex aux ∧ wp_adequacy_relation Λ M s φs ex aux).
+  intros ?? Hwp; apply (wp_adequacy_relation_adequacy_multiple (M := M) _ _ _ δ1 _ ξ').
+  { by intros ??[??]. }
+  apply (wp_strong_adequacy_multiple_with_trace_inv Λ M Σ s); [done|..].
+  { apply (rel_finitary_impl ξ' ξ) =>//. by intros ??[??]. }
+  iIntros (?) "".
+  iMod Hwp as (stateI post Φs fork_post) "(%Hlen & config_wp & HΦs & HSI & Hwp & H)".
+  iModIntro; iExists _, _, _, _. iFrame "config_wp HSI Hwp".
+  iIntros (ex atr c Hvlt Hexs Hexe Hatre Hψ Hnst Hlocale) "HSI Hposts".
+  iSpecialize ("H" with "[//] [//] [//] [//] [] [//] [//]").
+  - iPureIntro. intros ??????. by eapply Hψ.
+  - simpl.
+    iAssert (⌜∀ vs t2', c.1 = of_val <$> vs ++ t2' →
+                        Forall (λ vφ, vφ.2 vφ.1) (zip vs φs)⌝)%I as "%Hφ".
+    { iIntros (vs ts ->).
+      iClear "H HSI".
+      clear Hwp ξ' Hψ.
+      assert (∃ ws, vs = ws) as [ws Heq] by eauto.
+      rewrite {2}Heq. clear Heq.
+      iInduction φs as [|φ φs] "IHφs" forall (vs ws Φs Hlen).
+      { by rewrite !zip_with_nil_r Forall_nil. }
+      destruct Φs as [|Φ Φs]; [done|].
+      destruct vs as [|v vs]; [by rewrite Forall_nil|].
+      iEval (simpl) in "HΦs".
+      iDestruct "HΦs" as "[HΦ HΦs]".
+      rewrite /= to_of_val /=.
+      iDestruct "Hposts" as "[Hpost Hposts]".
+      rewrite Forall_cons.
+      iSplitL "HΦ Hpost"; [by iApply "HΦ"|].
+      iApply ("IHφs" with "[] HΦs Hposts").
+      by simplify_eq. }
+    iDestruct ("H" with "HSI Hposts") as "[? H]". iSplit =>//.
+    iIntros "H1". iMod ("H" with "H1"). iModIntro. iSplit=>//.
+    iIntros (c' Hc').
+    assert (c' = c) as -> by by eapply trace_ends_in_inj. eauto.
 Qed.
 
 Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
@@ -1288,8 +1706,9 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
          ⌜trace_ends_in ex c⌝ -∗
          ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
          stateI ex atr -∗
-         posts_of c.1 (Φ  :: (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
+         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
          □ (stateI ex atr ∗
              (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
             ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
@@ -1298,25 +1717,62 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
           ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
   adequate s e1 σ1 (λ v _, φ v).
 Proof.
-  pose (ξ' := λ ex aux, ξ ex aux ∧ wp_adequacy_relation Λ M s φ ex aux).
-  intros ? Hwp; apply (wp_adequacy_relation_adequacy (M := M) _ _ _ δ1 _ ξ').
-  { by intros ??[??]. }
-  apply (wp_strong_adequacy_with_trace_inv Λ M Σ s).
-  { apply (rel_finitary_impl ξ' ξ) =>//. by intros ??[??]. }
-  iIntros (?) "".
-  iMod Hwp as (stateI post Φ fork_post) "(config_wp & HΦ & HSI & Hwp & H)".
-  iModIntro; iExists _, _, _, _. iFrame "config_wp HSI Hwp".
-  iIntros (ex atr c Hvlt Hexs Hexe Hatre Hψ Hnst) "HSI Hposts".
-  iSpecialize ("H" with "[//] [//] [//] [//] [] [//]").
-  - iPureIntro. intros ??????. by eapply Hψ.
-  - simpl.
-    iAssert (⌜∀ v t, c.1 = of_val v :: t → φ v⌝)%I as "%Hφ".
-    { iIntros (?? ->). rewrite /= to_of_val /=.
-      iApply "HΦ". iDestruct "Hposts" as "[$ ?]". }
-    iDestruct ("H" with "HSI Hposts") as "[? H]". iSplit =>//.
-    iIntros "H1". iMod ("H" with "H1"). iModIntro. iSplit=>//.
-    iIntros (c' Hc').
-    assert (c' = c) as -> by by eapply trace_ends_in_inj. eauto.
+  intros Hsc Hwptp.
+  rewrite /adequate.
+  assert ([λ (v : val Λ) (_ : state Λ), φ v] =
+          (λ φ (v : val Λ) (_ : state Λ), φ v) <$> [φ]) as -> by done.
+  eapply adequacy_multiple_xi; [done|done|done|eauto|done|].
+  iIntros (Hinv) "".
+  iMod (Hwptp Hinv) as (stateI trace_inv Φ fork_post) "(Hwpcfg & HΦ & HSI & Hwp & Hstep)".
+  iModIntro.
+  iExists stateI, trace_inv, [Φ], fork_post; iFrame "Hwpcfg HΦ HSI Hwp".
+  iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
+  iIntros (ex atr c ? ? ? ? ? ? ?) "HSI Hposts".
+  iApply ("Hstep" with "[] [] [] [] [] [] [] HSI"); eauto.
+Qed.
+
+Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
+        (s: stuckness)
+        (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        (φs : list (val Λ → Prop))
+        es σ1 δ1 :
+  length es ≥ 1 →
+  rel_finitary ξ →
+  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
+    ⊢ |={⊤}=> ∃
+         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (Φs : list (val Λ → iProp Σ))
+         (fork_post : locale Λ → val Λ → iProp Σ),
+       let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
+       ⌜length φs = length Φs⌝ ∗
+       config_wp ∗
+       ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
+       stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
+       wptp s es Φs ∗
+       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex (es, σ1)⌝ -∗
+         ⌜trace_starts_in atr δ1⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
+         stateI ex atr -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
+         □ (stateI ex atr ∗
+             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
+         ((∀ ex' atr' oζ ℓ,
+              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+  (continued_simulation ξ (trace_singleton (es, σ1)) (trace_singleton δ1) ∧
+     adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs)).
+Proof.
+  intros ?? Hwp. split; eauto using adequacy_multiple_xi.
+  eapply wp_strong_adequacy_multiple_with_trace_inv; [done|done|done|].
+  iIntros (?). iMod Hwp as (? ? ? ?) "(?&?&?&?&?)".
+  iModIntro. iExists _, _, _, _. iFrame.
 Qed.
 
 Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
@@ -1343,8 +1799,9 @@ Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), E
          ⌜trace_ends_in ex c⌝ -∗
          ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
          stateI ex atr -∗
-         posts_of c.1 (Φ  :: (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
+         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
          □ (stateI ex atr ∗
              (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
             ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
