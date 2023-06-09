@@ -148,10 +148,15 @@ Section SpinlockDefs.
     (*   inversion H; subst; auto; symmetry; by apply list_lookup_insert_ne. } *)
   Defined. 
 
+  Definition sm_fuel := 27.
+
   Definition spinlock_model: LiveModel heap_lang spinlock_model_impl :=
     {|
-      lm_fl (x: fmstate spinlock_model_impl) := 27%nat;
+      lm_fl (x: fmstate spinlock_model_impl) := sm_fuel; 
     |}.
+
+  Lemma sm_fuel_max: forall st, lm_fl spinlock_model st <= sm_fuel.
+  Proof. done. Qed. 
   
         
 (* End SpinlockModel.  *)
@@ -401,7 +406,7 @@ Section ClientProofs.
 
       (* iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat st (<[th:=1]> st)) with "[$]"). *)
       iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat _ st (<[th:=1]> st)) with "[$]"); eauto. 
-      { simpl. lia. }
+      { done. }
       { econstructor; eauto. }
       { apply live_roles_preservation. rewrite THST_V. simpl. lia. }
 
@@ -427,7 +432,7 @@ Section ClientProofs.
     - iDestruct "LOCK" as "[>L [[>-> _] | >->]]"; [done| ].
       iApply ((wp_cmpxchg_fail_step_singlerole _ tid th _ 10%nat _ st st) with "[$]").
       all: eauto. 
-      { simpl. lia. }
+      { done. }
       { econstructor; eauto. }
       do 2 iModIntro. iIntros "(L & ST & NOFREE & FUEL)".
       rewrite decide_True.
@@ -507,7 +512,7 @@ Section ClientProofs.
     rewrite {2}/model_inv_impl. iDestruct "MODEL" as "(ST & NOFREE & AUTHS & %LENGTH)". 
     iApply ((wp_store_step_singlerole _ tid th _ 10%nat _ st (<[th:=0]> st)) with "[$]").
     all: eauto.
-    { simpl. lia. }
+    { done. }
     { by econstructor. }
     { apply live_roles_preservation.
       destruct ST_LOCKED as [EQ _]. rewrite EQ /=. lia. }
@@ -748,16 +753,32 @@ Section MainProof.
     has_fuels_S tid (<[r := f]> fm') -∗ ⌜ (<[r := f]> fm') ≠ ∅ ⌝.
   Proof using.
     iIntros "?". iPureIntro. apply insert_non_empty. 
-  Qed. 
+  Qed.
+
+  Definition program_init_fuels: gmap (fmrole spinlock_model_impl) nat :=
+    {[ 0:=sm_fuel; 1:=sm_fuel ]}.
+
+  Lemma program_init_fuels_max:
+    forall ρ f, program_init_fuels !! ρ = Some f -> f <= sm_fuel.
+  Proof.
+    clear. 
+    rewrite /program_init_fuels. intros ?? FUEL.
+    destruct ρ; [| destruct ρ].
+    1, 2: by inversion FUEL.
+    apply elem_of_dom_2 in FUEL. set_solver.
+  Qed.    
+
+  Definition program_init_state: fmstate spinlock_model_impl := [2; 2].
     
   Lemma program_spec tid (P: iProp Σ):
     (* {{{ partial_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
-    {{{ partial_model_is [2; 2] ∗ partial_free_roles_are ∅ ∗ P ∗ 
-      has_fuels tid {[ 0:=27; 1:=27 ]} }}}
+    {{{ partial_model_is program_init_state ∗ partial_free_roles_are ∅ ∗ P ∗ 
+      has_fuels tid program_init_fuels }}}
       program #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.
-    iIntros (Φ) "(ST & NOFREE & P & FUELS) Kont". rewrite /program.
+    iIntros (Φ) "(ST & NOFREE & P & FUELS) Kont".
+    rewrite /program /program_init_fuels /sm_fuel. 
 
     (* TODO: refactor this *)
     iDestruct ((has_fuels_ge_S_exact 26) with "FUELS") as "FUELS"; eauto.

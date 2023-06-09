@@ -15,6 +15,9 @@ Close Scope Z_scope.
 Opaque spinlock_model_impl.
 Opaque spinlock_model.
 Opaque program. 
+Opaque program_init_fuels.
+Opaque spinlock_model_impl. 
+Opaque sm_fuel. 
 
 Section LocksCompositionModel.
 
@@ -96,8 +99,9 @@ Section LocksCompositionModel.
     all: apply elem_of_union_r; rewrite orb_true_intro; set_solver. 
   Defined.
 
+  (* TODO: generalize? *)
   Definition comp_model: LiveModel heap_lang comp_model_impl :=
-    {| lm_fl _ := 2%nat; |}.  
+    {| lm_fl _ := max 5 sm_fuel; |}.  
 
   (* Definition comp_st_init (n: nat): fmstate comp_model_impl :=  *)
   (*   (None: option sl_st, None: option sl_st, n).  *)
@@ -114,9 +118,10 @@ Section LocksCompositionCode.
   Definition comp: val :=
   λ: <>,
     let: "x" := ref #1 in
+    Skip ;;
     (Fork (program #()) ;;
-     Fork (program #())) ;;
-    "x" <- #2.
+     Fork (program #()) ;;
+     "x" <- #2).
 
   Class compPreG Σ := {
      sl1PreG :> spinlockPreG Σ;
@@ -176,24 +181,115 @@ Section LocksCompositionProofs.
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
   Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
+  Definition comp_free_roles_init: gset (fmrole comp_model_impl) :=
+    set_map (inl ∘ inl) (dom program_init_fuels) ∪
+    set_map (inl ∘ inr) (dom program_init_fuels).
+
+(*   Print Instances cmra.  *)
+(* big_opM op *)
+  (* Let foo_big_opM_singletons := gmap.big_opM_singletons (K := fmrole spinlock_model_impl) (A := nat). *)
+
+  (* Lemma rsmi_ofe: Ofe *)
+
+  (* Instance foo: Countable (fmrole spinlock_model_impl). *)
+  (* Proof. Admitted.  *)
+  (* Canonical Structure rsmiO := *)
+  (*   leibnizO (fmrole spinlock_model_impl). *)
+
+  (* Let add_roles: gmap (fmrole spinlock_model_impl) nat := *)
+  (*       [^ op map] ρ ↦ f ∈ program_init_fuels, ({[ ρ := f ]}). *)
+  (*       (* ([^ op map] k↦x ∈ program_init_fuels, {[k := x]}).  *) *)
+  (*       (* big_opM op gmap *)         *)
+
+
+  Let add_roles (key_lift: fmrole spinlock_model_impl -> fmrole comp_model_impl):
+    gmap (fmrole comp_model_impl) nat :=
+        list_to_map $ (fun '(k, v) => (key_lift k, v)) <$> map_to_list program_init_fuels.
+
+  Lemma add_roles_equiv ρ f lift (INJ: Inj eq eq lift):
+    (add_roles lift) !! (lift ρ) = Some f <-> program_init_fuels !! ρ = Some f.
+  Proof using.
+    assert (Inj eq eq (fun '(k, v) => (lift k, v: nat))) as INJ'.
+    { intros [??][??] [=]. subst. apply INJ in H0. congruence. }
+    rewrite /add_roles. etransitivity.
+    { symmetry. apply elem_of_list_to_map.
+      apply NoDup_fmap_fst.
+      - intros. apply elem_of_list_fmap_2 in H as ([??] & [=] & ?), H0 as ([??] & [=] & ?).
+        subst. apply INJ in H0. subst.
+        (* eapply map_to_list_unique; eauto. *)
+        eapply map_to_list_unique in H3; eauto.
+      - apply NoDup_fmap_2; auto. apply NoDup_map_to_list. }
+    etransitivity.
+    2: { apply elem_of_map_to_list. } 
+    (* TODO: why direct application doesn't work? *)
+    pose proof (@elem_of_list_fmap_inj _ _ _ INJ' (map_to_list program_init_fuels) (ρ, f)). apply H.
+  Qed.
+
   Lemma comp_spec tid (P: iProp Σ):
     {{{ partial_model_is (None, None, 2)  ∗ 
-        partial_free_roles_are ∅ ∗ 
-        has_fuels tid {[ inr ρc:=2 ]} (PMPP := PMPP) }}}
+        partial_free_roles_are comp_free_roles_init ∗ 
+        has_fuels tid {[ inr ρc:=5 ]} (PMPP := PMPP) }}}
       comp #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using. 
     iIntros (Φ) "(ST & NOFREE & FUELS) POST". rewrite /comp.
 
-    (* iDestruct ((has_fuels_ge_S_exact 1) with "FUELS") as "FUELS".  *)
-    iDestruct (has_fuels_ge_S_exact 1 with "FUELS") as "FUELS".
-    { compute_done. }
-    foobar. 
-    iApply wp_lift_pure_step_no_fork; auto.
-    2: do 3 iModIntro; iFrame. 
-    1: set_solver. 
-    iIntros "FUELS"; simpl.
-    repeat rewrite fmap_insert. simpl. rewrite fmap_empty. simpl.
+    (* iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS". *)
+    (* { compute_done. } *)
+    
+    iApply wp_lift_pure_step_no_fork; auto. 
+    2: do 3 iModIntro; iSplitL "FUELS".
+    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
+    { set_solver. }
+    iIntros "FUELS".
+    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+
+    wp_bind (ref #1)%E.
+    iApply (wp_alloc_nostep with "[FUELS]").
+    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
+    { set_solver. }
+    iNext. iIntros (l) "(L & MT & FUELS)".
+    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+    
+    iApply wp_lift_pure_step_no_fork; auto. 
+    2: do 3 iModIntro; iSplitL "FUELS".
+    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
+    { set_solver. }
+    iIntros "FUELS".
+    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+
+    iApply wp_lift_pure_step_no_fork; auto. 
+    2: do 3 iModIntro; iSplitL "FUELS".
+    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
+    { set_solver. }
+    iIntros "FUELS".
+    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+
+    (* Set Printing Implicit. *)
+
+    (* wp_bind (_ <- _)%E. *)
+    (* iApply wp_store_step_singlerole. (fs2 := ({[ ρc := 1 ]} ∪  *)
+    (*                                            ([∗ map] k↦x ∈ program_init_fuels, ⌜ True ⌝))).  *)
+    (*   model_state_interp *)
+    wp_bind Skip. 
+    iApply wp_lift_pure_step_no_fork_take_step; [done| ..].
+    3: { eapply (cl_sl_init _ program_init_state program_init_state). }
+    3: do 3 iModIntro; iFrame.
+    { Unshelve. 2: exact ({[ inr ρc:=2 ]} ∪ add_roles (inl ∘ inl) ∪ add_roles (inl ∘ inr)).
+      red. repeat split.
+      - simpl. intros _.
+        erewrite lookup_union_Some_l; try set_solver.
+        simpl. lia.
+      - intros. set_solver.
+      - intros ?[IN NIN]%elem_of_difference.
+        repeat (rewrite dom_union in IN; apply elem_of_union in IN as [IN|IN]).
+        { done. }
+        + apply elem_of_dom in IN as [f IN]. simpl. 
+          erewrite lookup_union_Some_l; [| erewrite lookup_union_Some_r]; eauto.
+          * red. etransitivity; [apply sm_fuel_max| ].
+    
+    
+    
     
     
 
