@@ -59,12 +59,12 @@ Section crdt_model.
         * rewrite !vlookup_insert; done.
         * rewrite (vlookup_insert_ne i l); last by auto.
           rewrite /vc_merge vlookup_zip_with.
-          etrans; last apply Max.le_max_l; auto.
+          etrans; last apply Nat.le_max_l; auto.
       + destruct (decide (l = i)) as [->|].
         * rewrite !vlookup_insert.
           rewrite !vlookup_insert_ne; last by auto.
           rewrite /vc_merge vlookup_zip_with.
-          apply Max.max_lub; first done.
+          apply Nat.max_lub; first done.
           etrans; first by apply Hle.
           done.
         * rewrite !vlookup_insert_ne; auto.
