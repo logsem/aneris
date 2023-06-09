@@ -1,37 +1,32 @@
 From stdpp Require Import finite.
-From iris.algebra Require Import auth.
+From iris.algebra Require Import auth gmap.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers classical_instances finitary.
 From trillium.program_logic Require Export weakestpre adequacy.
 From aneris.lib Require Import gen_heap_light.
 From aneris.prelude Require Export gmultiset.
-From aneris.aneris_lang.state_interp Require Export state_interp.
-From aneris.aneris_lang Require Export lang resources network.
+From aneris.lib Require Import singletons.
 From aneris.algebra Require Import disj_gsets.
+From aneris.aneris_lang Require Export lang resources network.
+From aneris.aneris_lang.state_interp Require Export state_interp.
 Set Default Proof Using "Type".
 
 Definition aneris_model_rel_finitary (Mdl : Model) :=
   ∀ mdl : Mdl, smaller_card {mdl' : Mdl | Mdl mdl mdl'} nat.
 
 Definition get_ips (eφs : list (aneris_expr * (aneris_val → Prop))) : gset ip_address :=
-  ∅.
-
-Definition addrs_to_ip_ports_map (A : gset socket_address) :
-  gmap ip_address (gset port) :=
-  ∅.
-
-From aneris.lib Require Import singletons.  
+  list_to_set $ expr_n <$> (fst <$> eφs).
 
 Definition wp_group_proto_strong `{anerisPreG Σ Mdl} A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address_group)
-           (* σ *) s (eφs : list (aneris_expr * (aneris_val → Prop))) :=
+           σ s (eφs : list (aneris_expr * (aneris_val → Prop))) :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unallocated_groups A -∗
      ([∗ set] sag ∈ A, sag ⤳*[bool_decide (sag ∈ obs_send_sas), bool_decide (sag ∈ obs_rec_sas)] (∅, ∅)) -∗
-     (* ([∗ set] ip ∈ get_ips eφs, *)
-     (*    ([∗ map] l ↦ v ∈ (state_heaps σ !!! ip), l ↦[ip] v) ∗ *)
-     (*    ([∗ map] sh ↦ s ∈ (state_sockets σ !!! ip), sh ↪[ip] s.1)) -∗ *)
+     ([∗ set] ip ∈ get_ips eφs,
+        ([∗ map] l ↦ v ∈ (state_heaps σ !!! ip), l ↦[ip] v) ∗
+        ([∗ map] sh ↦ s ∈ (state_sockets σ !!! ip), sh ↪[ip] s.1)) -∗
      ([∗ map] ip ↦ ports ∈ addrs_to_ip_ports_map (union_set A),
         free_ports ip ports)%I -∗
      frag_st Mdl.(model_state_initial) -∗
@@ -104,27 +99,45 @@ Proof.
   iExists _. iFrame. iExists _. by iFrame.
 Qed.
 
-Lemma is_node_alloc_multiple `{anerisG Σ Mdl} ips :
-  node_gnames_auth ∅ ==∗
-  ∃ σ, node_gnames_auth σ ∗ [∗ set] ip ∈ ips, is_node ip.
+(* TODO: Trivial from potential new free_ports approach *)
+Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                  (● (GSet <$> P)) ∗
+              [∗ map] ip ↦ ports ∈ P,
+                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                    (◯ ({[ ip := GSet ports]})).
 Proof.
-  assert (∃ (σ0 : gmap ip_address node_gnames),
-             ∅ = σ0 ∧ set_Forall (λ ip, σ0 !! ip = None) ips) as [σ0 [-> Hσ0]].
-  { exists ∅. split; [done|]. by induction ips. }
-  revert σ0 Hσ0.
-  induction ips as [|ip ips Hnin IHips] using set_ind_L.
-  { iIntros (σ0 Hσ0) "Hσ0". iExists σ0. rewrite big_sepS_empty. by iFrame. }
-  iIntros (σ0 Hσ0) "Hσ0".
-  iMod (is_node_alloc _ ip with "Hσ0") as (γn) "[Hσ0 Hnode]".
-  { apply Hσ0. set_solver. }
-  iMod (IHips with "Hσ0") as (σ) "[Hσ Hips]".
-  { intros ip' Hin.
-    rewrite lookup_insert_ne; [|set_solver]. apply Hσ0. set_solver. }
-  iExists _. iFrame. rewrite big_sepS_union; [|set_solver].
-  rewrite big_sepS_singleton. by iFrame.
-Qed.
+  iMod (free_ports_auth_init) as (γ) "HP".
+Admitted.
 
-From iris.algebra Require Import gmap.
+(* TODO: Annoying, but trivial ghost allocation stuff *)
+Lemma is_node_alloc_multiple `{anerisG Σ Mdl} ips σ :
+  node_gnames_auth ∅ ==∗
+  ∃ γs, ⌜dom γs = ips⌝ ∗
+        ⌜dom γs = dom $ state_heaps σ⌝ ∗ ⌜dom γs = dom $ state_sockets σ⌝ ∗
+    node_gnames_auth γs ∗
+    ([∗ set] ip ∈ ips, is_node ip) ∗
+    ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
+                        heap_ctx γ (state_heaps σ !!! ip) ∗
+                        sockets_ctx γ (fst <$> (state_sockets σ !!! ip))) ∗
+    ([∗ set] ip ∈ ips, ([∗ map] l ↦ v ∈ state_heaps σ !!! ip, l ↦[ip] v) ∗
+                       ([∗ map] sh ↦ sb ∈ state_sockets σ !!! ip, sh ↪[ip] sb.1)).
+Proof. Admitted.
+(*   assert (∃ (σ0 : gmap ip_address node_gnames), *)
+(*              ∅ = σ0 ∧ set_Forall (λ ip, σ0 !! ip = None) ips) as [σ0 [-> Hσ0]]. *)
+(*   { exists ∅. split; [done|]. by induction ips. } *)
+(*   revert σ0 Hσ0. *)
+(*   induction ips as [|ip ips Hnin IHips] using set_ind_L. *)
+(*   { iIntros (σ0 Hσ0) "Hσ0". iExists σ0. rewrite big_sepS_empty. by iFrame. } *)
+(*   iIntros (σ0 Hσ0) "Hσ0". *)
+(*   iMod (is_node_alloc _ ip with "Hσ0") as (γn) "[Hσ0 Hnode]". *)
+(*   { apply Hσ0. set_solver. } *)
+(*   iMod (IHips with "Hσ0") as (σ) "[Hσ Hips]". *)
+(*   { intros ip' Hin. *)
+(*     rewrite lookup_insert_ne; [|set_solver]. apply Hσ0. set_solver. } *)
+(*   iExists _. iFrame. rewrite big_sepS_union; [|set_solver]. *)
+(*   rewrite big_sepS_singleton. by iFrame. *)
+(* Qed. *)
 
 Lemma free_ports_alloc `{anerisPreG Σ Mdl} γ P ip ports :
   P !! ip = None →
@@ -138,16 +151,6 @@ Proof.
   by apply auth_update_alloc, alloc_singleton_local_update.
 Qed.
 
-Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                  (● (GSet <$> P)) ∗
-              [∗ map] ip ↦ ports ∈ P,
-                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                    (◯ ({[ ip := GSet ports]})).
-Proof.
-  iMod (free_ports_auth_init) as (γ) "HP".
-Admitted.
-
 Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
         `{EqDecision (aneris_to_trace_model Mdl)} A
         (lbls: gset string)
@@ -158,19 +161,23 @@ Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
   set_Forall is_ne A →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   aneris_model_rel_finitary Mdl →
-  wp_group_proto_strong A lbls obs_send_sas obs_rec_sas (* σ *) s eφs →
+  wp_group_proto_strong A lbls obs_send_sas obs_rec_sas σ s eφs →
   (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ get_ips eφs) →
-  (∀ ip, ip ∈ get_ips eφs → is_Some ((state_heaps σ) !! ip)) →
-  (∀ ip, ip ∈ get_ips eφs → (state_sockets σ) !! ip = Some ∅) →
-  (* (∀ ip, ip ∈ get_ips eφs → *)
-  (*        (∃ Sn, (state_sockets σ) !! ip = Some Sn → *)
-  (*               (∀ sh s b, Sn !! sh = Some (s,b) → b = []))) → *)
+  dom $ state_heaps σ = get_ips eφs →
+  dom $ state_sockets σ = get_ips eφs →
+  (* (∀ ip, ip ∈ get_ips eφs → is_Some ((state_heaps σ) !! ip)) → *)
+  (* (∀ ip, ip ∈ get_ips eφs → (state_sockets σ) !! ip = Some ∅) → *)
+  (* Socket buffers are initially empty *)
+  map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
+  map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) →
+  map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
+  (* Message soup is initially empty *)
   state_ms σ = ∅ →
   adequate_multiple s (eφs.*1) σ ((λ φ v _, φ v) <$> eφs.*2).
 Proof.
   intros Hlen Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hip Hσ Hsockets Hms. simpl.
-  eapply (adequacy_multiple_xi _ _ _ _ (sim_rel (λ _ _, True))  _ _ _
+  intros HMdlfin Hwp Hip Hheaps_dom Hsockets_dom Hsockets Hsockets_coh1 Hsockets_coh2 Hms. simpl.
+  eapply (adequacy_multiple_xi _ _ _ _ (sim_rel (λ _ _, True)) _ _ _
                       (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))); [by rewrite fmap_length| |].
   { by eapply aneris_sim_rel_finitary. }
   iIntros (?) "/=".
@@ -216,7 +223,8 @@ Proof.
          |}).
   iMod (Hwp dg) as "Hwp".
   (* iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]". *)
-  iMod (is_node_alloc_multiple with "[Hmp]") as (m') "[Hmp #Hn]"; [done|].
+  iMod (is_node_alloc_multiple (get_ips eφs) σ with "[Hmp]")
+    as (γs Hips Hheaps_dom' Hsockets_dom') "[Hγs [#Hn [Hσctx Hσ]]]"; [done|].
   iExists
     (λ ex atr,
       aneris_events_state_interp ex ∗
@@ -239,13 +247,14 @@ Proof.
   { iModIntro. rewrite big_sepL2_fmap_l.
     iApply big_sepL2_intro; [by rewrite !fmap_length|].
     iIntros "!>" (k x1 x2 Heq1 Heq2). simplify_eq. by eauto. }
-  iSplitR "Hwp Hunallocated HB HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
-  { iSplitL "Hwp Hunallocated HB HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
-    { (* Intros (???) "% % % % % % % (?& Hsi & Htr & % & Hauth) Hpost". iSplit; last first. *)
-    (* { iIntros (?). iApply fupd_mask_intro_discard; done. } *)
-    (* iIntros "!> ((?&?&?&%&?) &?) /=". iFrame. done. } *)
-      admit. }
-    iDestruct ("Hwp" with "Hunallocated HB HPs [$Hmfrag //] Hn Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
+  iSplitR "Hwp Hunallocated HB Hσ HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
+  { iSplitL "Hwp Hunallocated HB Hσ HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
+
+    { iModIntro. iIntros (???) "% % % % % % % (?& Hsi & Htr & % & Hauth) Hpost".
+      iSplit; last first.
+      { iIntros (?). iApply fupd_mask_intro_discard; done. }
+      iIntros "!> ((?&?&?&%&?) &?) /=". iFrame. done. }
+    iDestruct ("Hwp" with "Hunallocated HB Hσ HPs [$Hmfrag //] Hn Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
     { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
     { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
     iMod "Hwp". iModIntro. iFrame. }
@@ -253,16 +262,18 @@ Proof.
     as "[Hauth Hown_send_recv]"; [by set_solver|].
   iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$".
   simpl.
-  (* rewrite Hmse gset_of_gmultiset_empty. *)
+  rewrite Hms gset_of_gmultiset_empty.
   iMod (socket_address_group_own_alloc_subseteq_pre _ A A with "Hauth")
     as "[Hauth Hown]"; [by set_solver|].
-  iPoseProof (@aneris_state_interp_init _ _ dg ∅
-               with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "$"; eauto.
+  iPoseProof (@aneris_state_interp_init_strong _ _ dg ∅
+               with "Hγs Hσctx Hms [$Hauth $Hown]
+               Hunallocated_auth Hsi HIPsCtx HPiu") as "$";
+    [set_solver|set_solver|set_solver|set_solver|set_solver|
+      done|done|done|done|done|..].
   simpl.
   iFrame "Hmfull Hsteps".
   done.
 Qed.
-
 
 Theorem adequacy_groups `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} IPs A
         (lbls: gset string)
