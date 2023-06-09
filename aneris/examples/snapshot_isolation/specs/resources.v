@@ -65,4 +65,4 @@ Section Resources.
 End Resources.
 (* Arguments SI_resources _ _ : clear implicits. *)
 
-Notation "k ↦ₖ v" := (OwnMemKey k 1 v) (at level 20).
+Notation "k ↦ₖ v" := (OwnMemKey k v) (at level 20).

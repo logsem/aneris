@@ -46,15 +46,15 @@ Section Specification.
 
   Definition start_spec : Prop :=
     ∀ (rpc : val) (sa : socket_address)
-       (q : frac) (E : coPset),
+       (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m : gmap Key (option we)),
        ConnectionState rpc CanStart ∗
-       [∗ map] k ↦ eo ∈ m, k ↦ₖ{q} eo >>>
+       [∗ map] k ↦ eo ∈ m, k ↦ₖ eo >>>
       start rpc #() @[ip_of_address sa] E
     <<<▷ RET #();
        ConnectionState rpc (Active m ∅) ∗
-       [∗ map] k ↦ eo ∈ m, k ↦ₖ{q} eo >>>.
+       [∗ map] k ↦ eo ∈ m, k ↦ₖ eo >>>.
 
   Definition can_commit
     (m ms : gmap Key (option we))
