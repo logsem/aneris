@@ -110,7 +110,23 @@ Proof.
   iMod (free_ports_auth_init) as (γ) "HP".
 Admitted.
 
+Lemma gen_heap_light_init_strong `{Countable L, !inG Σ (authR (gen_heapUR L V))} σ :
+  ⊢ |==>
+        ∃ (γ : gname), gen_heap_light_ctx γ σ ∗
+                       ([∗ map] l ↦ v ∈ σ, lmapsto γ l 1 v).
+Proof.
+  iInduction σ as [|σ Hnin] "IHσ" using map_ind.
+  { iMod (gen_heap_light_init ∅) as (γ) "Hγ".
+    iExists γ. iModIntro. iFrame. rewrite big_sepM_empty. done. }
+  iMod "IHσ" as (γ) "[Hσ Hσs]".
+  iMod (gen_heap_light_alloc with "Hσ") as "[Hσ Hs]"; [done|].
+  iModIntro. iExists _.
+  rewrite big_sepM_insert; [|done].
+  iFrame.
+Qed.
+
 Lemma node_gnames_alloc_strong `{anerisG Σ Mdl} γs ip σ s :
+  γs !! ip = None →
   node_gnames_auth γs ==∗ ∃ (γn : node_gnames),
       node_gnames_auth (<[ip:=γn]>γs) ∗
       mapsto_node ip γn ∗
@@ -118,7 +134,19 @@ Lemma node_gnames_alloc_strong `{anerisG Σ Mdl} γs ip σ s :
       ([∗ map] l ↦ v ∈ σ, l ↦[ip] v) ∗
       sockets_ctx γn s ∗
       ([∗ map] sh ↦ sb ∈ s, sh ↪[ip] sb).
-Proof. Admitted.
+Proof.
+  iIntros (HNone) "Hγs".
+  iMod (gen_heap_light_init_strong σ) as (γσ) "[Hσ Hσs]".
+  iMod (gen_heap_light_init_strong s) as (γss) "[Hs Hss]".
+  set (γn := Node_gname γσ γss).
+  iMod (node_gnames_alloc γn with "Hγs") as "[Hγs #Hγ]"; [done|].
+  iModIntro. iExists γn. iFrame "#∗".
+  iSplitL "Hσs".
+  - iApply (big_sepM_impl with "Hσs").
+    iIntros "!>" (k x HSome) "Hmapsto". iExists γn. iFrame "#∗".
+  - iApply (big_sepM_impl with "Hss").
+    iIntros "!>" (k x HSome) "Hmapsto". iExists γn. iFrame "#∗".
+Qed.
 
 Lemma node_gnames_alloc_strong_multiple `{anerisG Σ Mdl} σ γs' :
   dom $ state_heaps σ = dom $ state_sockets σ →
@@ -144,8 +172,11 @@ Proof.
     iFrame. rewrite -!Hdom1.
     rewrite !big_sepS_empty.
     rewrite !big_sepM_empty. done. }
+  assert (γs' !! ip = None).
+  { simpl in *.
+    apply not_elem_of_dom. rewrite -Hdom1 in Hdom3. set_solver. }
   iMod (node_gnames_alloc_strong _ ip with "Hγs")
-    as (γn) "(Hγs & #Hip & Hσ & Hσs & Hs & Hss)".
+    as (γn) "(Hγs & #Hip & Hσ & Hσs & Hs & Hss)"; [done|].
   iMod ("IHips" $! _
                 (mkState (delete ip $ state_heaps σ)
                          (delete ip $ state_sockets σ)
@@ -165,7 +196,11 @@ Proof.
     replace ({[ip := γn]} ∪ γs' ∪ γs) with (γs' ∪ ({[ip := γn]} ∪ γs)).
     iFrame.
     rewrite assoc. f_equiv.
-    admit.                      (* Weird typeclass bug on trivial goal *) }
+    rewrite map_union_comm; [done|].
+    apply map_disjoint_alt. intros.
+    destruct (decide (ip = i)).
+    - set_solver.
+    - right. by rewrite lookup_insert_ne. }
   rewrite !dom_delete_L. rewrite -!Hdom1.
   replace (({[ip]} ∪ ips) ∖ {[ip]}) with ips by set_solver.
   rewrite !big_sepS_union; [|set_solver|set_solver].
@@ -190,9 +225,8 @@ Proof.
   rewrite lookup_total_delete_ne; [|done].
   rewrite lookup_total_delete_ne; [|done].
   iFrame.
-Admitted.
+Qed.
 
-(* TODO: Annoying, but trivial ghost allocation stuff *)
 Lemma is_node_alloc_multiple `{anerisG Σ Mdl} σ :
   dom (state_heaps σ) = dom (state_sockets σ) →
   node_gnames_auth ∅ ==∗
