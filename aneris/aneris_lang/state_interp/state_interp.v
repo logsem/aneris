@@ -84,11 +84,9 @@ Section state_interpretation.
     (∀ ip : ip_address, ip ∈ fips → ip_is_free ip σ) →
     dom (state_heaps σ) = dom γs →
     dom (state_sockets σ) = dom γs →
-    (* map_Forall (λ _ σh, σh = ∅) (state_heaps σ) → *)
     map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
     map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) →
     map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
-    (* map_Forall (λ _ skts, skts = ∅) (state_sockets σ) → *)
     state_ms σ = ∅ →
     node_gnames_auth γs -∗
     ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
@@ -100,8 +98,6 @@ Section state_interpretation.
     saved_si_auth ∅ -∗
     free_ips_auth fips -∗
     free_ports_auth (GSet <$> addrs_to_ip_ports_map (union_set A)) -∗
-    (* ([∗ map] ip ↦ ports ∈ addrs_to_ip_ports_map (union_set A), *)
-    (*    free_ports ip ports)%I -∗ *)
     aneris_state_interp σ (∅, ∅).
   Proof.
      iIntros (Hfips Hfips' Hfips'' Hheap Hskt Hskts Hskts_coh1 Hskts_coh2 Hms)

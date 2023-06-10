@@ -88,41 +88,27 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs A
      observed_receive obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip,0); ⊤ {{v, ⌜φ v⌝ }}).
 
-Lemma is_node_alloc `{anerisG Σ Mdl} σ ip :
-  σ !! ip = None →
-  node_gnames_auth σ ==∗
-  ∃ γn, node_gnames_auth (<[ip := γn]>σ) ∗ is_node ip.
-Proof.
-  iIntros (Hnone) "Hauth".
-  iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
-  iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp Hγn]"; [done|].
-  iExists _. iFrame. iExists _. by iFrame.
-Qed.
+(* TODO: Prove and use this lemma when using proper port map *)
+(* Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P : *)
+(*   ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ *)
+(*                   (● (GSet <$> P)) ∗ *)
+(*               [∗ map] ip ↦ ports ∈ P, *)
+(*                 own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ *)
+(*                     (◯ ({[ ip := GSet ports]})). *)
+(* Proof. *)
+(*   iMod (free_ports_auth_init) as (γ) "HP". *)
+(* Admitted. *)
 
-(* TODO: Trivial from potential new free_ports approach *)
-Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                  (● (GSet <$> P)) ∗
-              [∗ map] ip ↦ ports ∈ P,
-                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                    (◯ ({[ ip := GSet ports]})).
+Lemma free_ports_alloc `{anerisPreG Σ Mdl} γ P ip ports :
+  P !! ip = None →
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● P) ==∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● <[ip := GSet ports]>P) ∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (◯ ({[ ip := GSet ports]})).
 Proof.
-  iMod (free_ports_auth_init) as (γ) "HP".
-Admitted.
-
-Lemma gen_heap_light_init_strong `{Countable L, !inG Σ (authR (gen_heapUR L V))} σ :
-  ⊢ |==>
-        ∃ (γ : gname), gen_heap_light_ctx γ σ ∗
-                       ([∗ map] l ↦ v ∈ σ, lmapsto γ l 1 v).
-Proof.
-  iInduction σ as [|σ Hnin] "IHσ" using map_ind.
-  { iMod (gen_heap_light_init ∅) as (γ) "Hγ".
-    iExists γ. iModIntro. iFrame. rewrite big_sepM_empty. done. }
-  iMod "IHσ" as (γ) "[Hσ Hσs]".
-  iMod (gen_heap_light_alloc with "Hσ") as "[Hσ Hs]"; [done|].
-  iModIntro. iExists _.
-  rewrite big_sepM_insert; [|done].
-  iFrame.
+  iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
+  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
+    as "[HP Hip]"; last by iFrame.
+  by apply auth_update_alloc, alloc_singleton_local_update.
 Qed.
 
 Lemma node_gnames_alloc_strong `{anerisG Σ Mdl} γs ip σ s :
@@ -227,6 +213,17 @@ Proof.
   iFrame.
 Qed.
 
+Lemma is_node_alloc `{anerisG Σ Mdl} σ ip :
+  σ !! ip = None →
+  node_gnames_auth σ ==∗
+  ∃ γn, node_gnames_auth (<[ip := γn]>σ) ∗ is_node ip.
+Proof.
+  iIntros (Hnone) "Hauth".
+  iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
+  iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp Hγn]"; [done|].
+  iExists _. iFrame. iExists _. by iFrame.
+Qed.
+
 Lemma is_node_alloc_multiple `{anerisG Σ Mdl} σ :
   dom (state_heaps σ) = dom (state_sockets σ) →
   node_gnames_auth ∅ ==∗
@@ -246,16 +243,12 @@ Proof.
   iModIntro. iExists γs. done.
 Qed.
 
-Lemma free_ports_alloc `{anerisPreG Σ Mdl} γ P ip ports :
-  P !! ip = None →
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● P) ==∗
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● <[ip := GSet ports]>P) ∗
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (◯ ({[ ip := GSet ports]})).
+Lemma free_ports_auth_init_strong `{anerisPreG Σ Mdl} Ps :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> Ps)).
 Proof.
-  iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
-  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
-    as "[HP Hip]"; last by iFrame.
-  by apply auth_update_alloc, alloc_singleton_local_update.
+  apply own_alloc. apply auth_auth_valid.
+  induction Ps using map_ind; [done|].
+  rewrite fmap_insert. by apply insert_valid.
 Qed.
 
 Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
@@ -272,8 +265,6 @@ Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
   (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ get_ips eφs) →
   dom $ state_heaps σ = get_ips eφs →
   dom $ state_sockets σ = get_ips eφs →
-  (* (∀ ip, ip ∈ get_ips eφs → is_Some ((state_heaps σ) !! ip)) → *)
-  (* (∀ ip, ip ∈ get_ips eφs → (state_sockets σ) !! ip = Some ∅) → *)
   (* Socket buffers are initially empty *)
   map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
   map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) →
@@ -292,7 +283,13 @@ Proof.
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init ∅) as (γips) "[HIPsCtx _]".
-  iMod (free_ports_auth_init_multiple) as (γpiu) "[HPiu HPs]".
+  (* iMod (free_ports_auth_init_multiple) as (γpiu) "[HPiu HPs]". *)
+  (* TODO: Use proper port map - Currently relies on definition being empty *)
+  iMod (free_ports_auth_init_strong (addrs_to_ip_ports_map (union_set A))) as (γpiu) "HPiu".
+  iAssert ([∗ map] ip ↦ ports ∈ addrs_to_ip_ports_map (union_set A),
+                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γpiu
+                    (◯ ({[ ip := GSet ports]})))%I as "HPs".
+  { rewrite /addrs_to_ip_ports_map big_sepM_empty. done. }
   iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
   iMod (allocated_address_groups_init obs_rec_sas) as
