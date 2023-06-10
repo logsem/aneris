@@ -53,18 +53,27 @@ let kvs_get_last k (kvs : 'a kvsTy) : 'a option =
      let ((v,_t), _oldl) = vl in Some v
 
 
-(* Assumes tc < ts *)
 let check_at_key
     (ts : int) (tc : int)
-    (_k : string) (vlst : (('a * int) alist)) =
-  match vlst with
-  | None -> true
-  | Some l ->
-    let (vlast, _hd) = l in
-    let (_v, t) = vlast in
-    if t = tc || t = ts || tc < t
-    then assert false
-    else t < ts
+    (k : string) (cache : 'a cacheTy) (vlst : (('a * int) alist)) =
+  assert (ts < tc);
+  if map_mem k cache then
+    match vlst with
+    | None -> true
+    | Some l ->
+      let (vlast, _hd) = l in
+      let (_v, t) = vlast in
+      if t = tc || t = ts || tc < t
+      then assert false
+      else
+        let b = t < ts in
+        let () =
+          if b then ()
+          else unsafe
+              (fun () ->
+                 Printf.printf "%s told=%d tstart=%d \n %!" k t ts)
+        in b
+  else true
 
 
 let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
@@ -91,7 +100,7 @@ let commit_handler
   let tc = !vnum + 1 in
   let kvs_t = !kvs in
   let (ts, cache) = cdata in
-  let b = map_forall (fun k vlst -> check_at_key ts tc k vlst) kvs_t in
+  let b = map_forall (fun k vlst -> check_at_key ts tc k cache vlst) kvs_t in
   if b
   then
     begin

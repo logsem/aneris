@@ -40,18 +40,29 @@ Definition kvs_get_last : val :=
   end.
 
 Definition check_at_key : val :=
-  λ: "ts" "tc" "_k" "vlst",
-  match: "vlst" with
-    NONE => #true
-  | SOME "l" =>
-      let: "vlast" := Fst "l" in
-      let: "_hd" := Snd "l" in
-      let: "_v" := Fst "vlast" in
-      let: "t" := Snd "vlast" in
-      (if: ("t" = "tc") || (("t" = "ts") || ("tc" < "t"))
-       then  assert: #false
-       else  "t" < "ts")
-  end.
+  λ: "ts" "tc" "k" "cache" "vlst",
+  assert: ("ts" < "tc");;
+  (if: map_mem "k" "cache"
+   then
+     match: "vlst" with
+      NONE => #true
+    | SOME "l" =>
+        let: "vlast" := Fst "l" in
+        let: "_hd" := Snd "l" in
+        let: "_v" := Fst "vlast" in
+        let: "t" := Snd "vlast" in
+        (if: ("t" = "tc") || (("t" = "ts") || ("tc" < "t"))
+         then  assert: #false
+         else
+           let: "b" := "t" < "ts" in
+           let: "<>" := (if: "b"
+            then  #()
+            else
+              #() (* unsafe (fun () ->
+                 Printf.printf "%s told=%d tstart=%d \n %!" k t ts *)) in
+           "b")
+    end
+   else  #true).
 
 Definition update_kvs : val :=
   λ: "kvs" "cache" "tc",
@@ -77,7 +88,8 @@ Definition commit_handler : val :=
   let: "kvs_t" := ! "kvs" in
   let: "ts" := Fst "cdata" in
   let: "cache" := Snd "cdata" in
-  let: "b" := map_forall (λ: "k" "vlst", check_at_key "ts" "tc" "k" "vlst")
+  let: "b" := map_forall (λ: "k" "vlst",
+                          check_at_key "ts" "tc" "k" "cache" "vlst")
               "kvs_t" in
   (if: "b"
    then  "vnum" <- "tc";;

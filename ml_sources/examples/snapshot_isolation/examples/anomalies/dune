@@ -1,0 +1,4 @@
+(executable
+  (name anomalie_1_runner)
+  (flags :standard -rectypes)
+  (libraries client_server_code snapshot_isolation_code aneris))
