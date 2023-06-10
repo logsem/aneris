@@ -88,16 +88,40 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs A
      observed_receive obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip,0); ⊤ {{v, ⌜φ v⌝ }}).
 
-(* TODO: Prove and use this lemma when using proper port map *)
-(* Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P : *)
-(*   ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ *)
-(*                   (● (GSet <$> P)) ∗ *)
-(*               [∗ map] ip ↦ ports ∈ P, *)
-(*                 own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ *)
-(*                     (◯ ({[ ip := GSet ports]})). *)
-(* Proof. *)
-(*   iMod (free_ports_auth_init) as (γ) "HP". *)
-(* Admitted. *)
+  Lemma free_ports_alloc_pre `{anerisPreG Σ Mdl} γ P ip ports :
+    ip ∉ (dom P) →
+    own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                  (● (GSet <$> P)) ==∗
+    own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                  (● (GSet <$> <[ ip := ports ]> P)) ∗
+    own γ (◯ ({[ ip := (GSet ports)]})).
+  Proof.
+    iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
+    iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
+      as "[HP Hip]"; last by iFrame.
+    apply auth_update_alloc. rewrite fmap_insert.
+    apply alloc_singleton_local_update; last done.
+    rewrite lookup_fmap.
+    apply not_elem_of_dom in H0. rewrite H0. set_solver.
+  Qed.
+
+Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                  (● (GSet <$> P)) ∗
+              [∗ map] ip ↦ ports ∈ P,
+                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                    (◯ ({[ ip := GSet ports]})).
+Proof.
+  iInduction P as [|ip ps P Hnin] "IHP" using map_ind.
+  { iMod free_ports_auth_init as (γ) "Hγ". iModIntro. iExists _.
+    rewrite fmap_empty. iFrame.
+    rewrite big_sepM_empty. done. }
+  iMod "IHP" as (γ) "[HP Hps]".
+  iMod (free_ports_alloc_pre γ P ip ps with "HP") as "[HP Hp]".
+  { apply not_elem_of_dom. set_solver. }
+  iModIntro. iExists γ. rewrite fmap_insert.
+  iFrame. rewrite big_sepM_insert; [|done]. iFrame.
+Qed.
 
 Lemma free_ports_alloc `{anerisPreG Σ Mdl} γ P ip ports :
   P !! ip = None →
@@ -265,6 +289,10 @@ Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
   (∀ sag sa, sag ∈ A → sa ∈ sag → ip_of_address sa ∈ get_ips eφs) →
   dom $ state_heaps σ = get_ips eφs →
   dom $ state_sockets σ = get_ips eφs →
+  (* Port coherence *)
+  ((∀ ip ps, (GSet <$> addrs_to_ip_ports_map (union_set A)) !! ip = Some (GSet ps) →
+             ∀ Sn, (state_sockets σ) !! ip = Some Sn →
+                   ∀ p, p ∈ ps → port_not_in_use p Sn)) →
   (* Socket buffers are initially empty *)
   map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
   map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) →
@@ -274,7 +302,7 @@ Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
   adequate_multiple s (eφs.*1) σ ((λ φ v _, φ v) <$> eφs.*2).
 Proof.
   intros Hlen Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hip Hheaps_dom Hsockets_dom Hsockets Hsockets_coh1 Hsockets_coh2 Hms. simpl.
+  intros HMdlfin Hwp Hip Hheaps_dom Hsockets_dom Hportts Hsockets Hsockets_coh1 Hsockets_coh2 Hms. simpl.
   eapply (adequacy_multiple_xi _ _ _ _ (sim_rel (λ _ _, True)) _ _ _
                       (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))); [by rewrite fmap_length| |].
   { by eapply aneris_sim_rel_finitary. }
@@ -283,13 +311,7 @@ Proof.
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init ∅) as (γips) "[HIPsCtx _]".
-  (* iMod (free_ports_auth_init_multiple) as (γpiu) "[HPiu HPs]". *)
-  (* TODO: Use proper port map - Currently relies on definition being empty *)
-  iMod (free_ports_auth_init_strong (addrs_to_ip_ports_map (union_set A))) as (γpiu) "HPiu".
-  iAssert ([∗ map] ip ↦ ports ∈ addrs_to_ip_ports_map (union_set A),
-                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γpiu
-                    (◯ ({[ ip := GSet ports]})))%I as "HPs".
-  { rewrite /addrs_to_ip_ports_map big_sepM_empty. done. }
+  iMod (free_ports_auth_init_multiple) as (γpiu) "[HPiu HPs]".
   iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
   iMod (allocated_address_groups_init obs_rec_sas) as
@@ -376,7 +398,7 @@ Proof.
                with "Hγs Hσctx Hms [$Hauth $Hown]
                Hunallocated_auth Hsi HIPsCtx HPiu") as "$";
     [set_solver|set_solver|set_solver|set_solver|set_solver|
-      done|done|done|done|done|..].
+      done|done|done|done|done|done|..].
   simpl.
   iFrame "Hmfull Hsteps".
   done.

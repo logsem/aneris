@@ -73,15 +73,25 @@ Section state_interpretation.
     iApply (mapsto_node_valid_sockets with "[$] [$]").
   Qed.
 
-  (* TODO: define this - Becomes trivial with new approach to ports *)
-  Definition addrs_to_ip_ports_map (A : gset socket_address) :
-    gmap ip_address (gset port) := ∅.
+  Definition addrs_to_ip_ports_map (A : gset socket_address) : gmap ip_address (gset port) :=
+    fold_right union ∅ $
+      (λ sa, {[ip_of_address sa := {[port_of_address sa]}]}) <$> (elements A).
+
+  (* Definition addrs_to_ip_ports_map (A : gset socket_address) : *)
+  (*   gmap ip_address (gset port) := *)
+  (*   list_to_map $ *)
+  (*               (λ sa, {[ip_of_address sa := port_of_address sa]}:gmap ip_address (gset port)) <$> (elements A). *)
+  (* . *)
 
   (* aneris_state_interp *)
   Lemma aneris_state_interp_init_strong fips A σ γs :
     fips ## dom γs →
     fips ## dom (addrs_to_ip_ports_map (union_set A)) →
     (∀ ip : ip_address, ip ∈ fips → ip_is_free ip σ) →
+    (* Port coherence *)
+    ((∀ ip ps, (GSet <$> addrs_to_ip_ports_map (union_set A)) !! ip = Some (GSet ps) →
+               ∀ Sn, (state_sockets σ) !! ip = Some Sn →
+                     ∀ p, p ∈ ps → port_not_in_use p Sn)) →
     dom (state_heaps σ) = dom γs →
     dom (state_sockets σ) = dom γs →
     map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
@@ -100,7 +110,7 @@ Section state_interpretation.
     free_ports_auth (GSet <$> addrs_to_ip_ports_map (union_set A)) -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
-     iIntros (Hfips Hfips' Hfips'' Hheap Hskt Hskts Hskts_coh1 Hskts_coh2 Hms)
+     iIntros (Hfips Hfips' Hfips'' Hports Hheap Hskt Hskts Hskts_coh1 Hskts_coh2 Hms)
             "Hγs_auth Hγs Hm Hsags Hunallocated Hsif HipsCtx HPiu_auth".
     iDestruct (socket_address_group_ctx_valid with "Hsags") as %[Hdisj Hne].
     iExists _, _; iFrame.
@@ -173,7 +183,7 @@ Section state_interpretation.
       iFrame. }
     iSplitL "HipsCtx HPiu_auth".
     (* free_ips_coh *)
-    { by iApply (free_ips_coh_init_strong with "[$]"). }
+    { iApply (free_ips_coh_init_strong with "[$]"); [set_solver|done..]. }
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
     iFrame "#".
