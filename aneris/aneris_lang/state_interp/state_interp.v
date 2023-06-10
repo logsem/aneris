@@ -73,23 +73,13 @@ Section state_interpretation.
     iApply (mapsto_node_valid_sockets with "[$] [$]").
   Qed.
 
-  Definition addrs_to_ip_ports_map (A : gset socket_address) : gmap ip_address (gset port) :=
-    fold_right union ∅ $
-      (λ sa, {[ip_of_address sa := {[port_of_address sa]}]}) <$> (elements A).
-
-  (* Definition addrs_to_ip_ports_map (A : gset socket_address) : *)
-  (*   gmap ip_address (gset port) := *)
-  (*   list_to_map $ *)
-  (*               (λ sa, {[ip_of_address sa := port_of_address sa]}:gmap ip_address (gset port)) <$> (elements A). *)
-  (* . *)
-
   (* aneris_state_interp *)
-  Lemma aneris_state_interp_init_strong fips A σ γs :
+  Lemma aneris_state_interp_init_strong fips A Ps σ γs :
     fips ## dom γs →
-    fips ## dom (addrs_to_ip_ports_map (union_set A)) →
+    fips ## dom Ps →
     (∀ ip : ip_address, ip ∈ fips → ip_is_free ip σ) →
     (* Port coherence *)
-    ((∀ ip ps, (GSet <$> addrs_to_ip_ports_map (union_set A)) !! ip = Some (GSet ps) →
+    ((∀ ip ps, (GSet <$> Ps) !! ip = Some (GSet ps) →
                ∀ Sn, (state_sockets σ) !! ip = Some Sn →
                      ∀ p, p ∈ ps → port_not_in_use p Sn)) →
     dom (state_heaps σ) = dom γs →
@@ -107,7 +97,7 @@ Section state_interpretation.
     unallocated_groups_auth A -∗
     saved_si_auth ∅ -∗
     free_ips_auth fips -∗
-    free_ports_auth (GSet <$> addrs_to_ip_ports_map (union_set A)) -∗
+    free_ports_auth (GSet <$> Ps) -∗
     aneris_state_interp σ (∅, ∅).
   Proof.
      iIntros (Hfips Hfips' Hfips'' Hports Hheap Hskt Hskts Hskts_coh1 Hskts_coh2 Hms)
