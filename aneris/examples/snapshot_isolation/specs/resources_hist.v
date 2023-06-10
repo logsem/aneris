@@ -103,9 +103,9 @@ Section Resources.
       GlobalInv ⊢ TState r h m ={E}=∗ ⌜dom m ⊆ KVS_keys⌝;
 
     (* This law is probably not needed. *)
-    (* GHist_LState_relation E rpc h h' s :
+    (* GHist_LState_relation E cstate h h' s :
     ↑KVS_InvName ⊆ E ->
-    GlobalInv ⊢ TState rpc h' s -∗ GHist h ={E}=∗
+    GlobalInv ⊢ TState cstate h' s -∗ GHist h ={E}=∗
     ⌜h ≤ₚ h'⌝; *)
 
    }.

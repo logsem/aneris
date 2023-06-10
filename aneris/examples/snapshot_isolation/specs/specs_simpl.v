@@ -9,17 +9,17 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params time events resources.
+     Require Import user_params resources_simpl.
 
 
 (** Specifications for read and write operations.  *)
 Section Specification.
-  Context `{!anerisG Mdl Σ, !User_params, !KVS_time,
-            !KVS_snapshot_isolation_api, !SI_resources Mdl Σ}.
+  Context `{!anerisG Mdl Σ, !User_params, !KVS_snapshot_isolation_api,
+            !SI_resources Mdl Σ}.
 
   Definition write_spec : Prop :=
     ∀ (cstate : val) (sa : socket_address)
-      (ms : gmap Key (option we))
+      (ms : gmap Key (option val))
       (mc : gmap Key val) E
       (k : Key) (v : SerializableVal),
     ⌜k ∈ KVS_keys⌝ -∗
@@ -30,56 +30,47 @@ Section Specification.
 
   Definition read_spec : Prop :=
     ∀ (cstate : val) (sa : socket_address)
-      (ms : gmap Key (option we))
+      (ms : gmap Key (option val))
       (mc : gmap Key val)
-      (eo : option we) E
-     (k : Key), ⌜ms !! k = Some eo⌝ -∗
+      (vo : option val) E
+     (k : Key), ⌜ms !! k = Some vo⌝ -∗
     {{{ ConnectionState cstate (Active ms mc) }}}
       SI_read cstate #k @[ip_of_address sa] E
-    {{{ (ro : val), RET $ro; ConnectionState cstate (Active ms mc) ∗
+    {{{ wo, RET $wo; ConnectionState cstate (Active ms mc) ∗
         ⌜(k ∉ dom mc ∧
-        match eo with
-           | (Some we) => ro = SOMEV we.(we_val)
-           | None => ro = NONEV
+        match vo with
+           | (Some v) => wo = SOMEV v
+           | None => wo = NONEV
          end) ∨
-        ∃ v, Some v = (mc !! k) ∧ ro = $(Some v)⌝ }}}.
+        ∃ v, Some v = (mc !! k) ∧ wo = $(Some v)⌝ }}}.
 
   Definition start_spec : Prop :=
     ∀ (cstate : val) (sa : socket_address)
        (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    <<< ∀∀ (m : gmap Key (option we)),
+    <<< ∀∀ (m : gmap Key (option val)),
        ConnectionState cstate CanStart ∗
-       [∗ map] k ↦ eo ∈ m, k ↦ₖ eo >>>
+       [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>
       SI_start cstate @[ip_of_address sa] E
     <<<▷ RET #();
        ConnectionState cstate (Active m ∅) ∗
-       [∗ map] k ↦ eo ∈ m, k ↦ₖ eo >>>.
-
-  Definition can_commit
-    (m ms : gmap Key (option we))
-    (mc : gmap Key val) : Prop :=
-    ∀ k, is_Some (mc !! k) → ms !! k = m !! k.
-
-  Definition max_timestamp t (m : gmap Key (option we)) : Prop :=
-    ∀ k (e : we), m !! k = Some (Some e) → TM_lt e.(we_time) t.
+       [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>.
 
   Definition commit_spec : Prop :=
    ∀ (cstate : val) (sa : socket_address)
-     (P :  gmap Key (option we) → iProp Σ)
-     (Q :  gmap Key (option we) → gmap Key val → iProp Σ)
-     (E : coPset),
+    (P :  gmap Key (option val) → iProp Σ)
+    (Q :  gmap Key (option val) → gmap Key val → iProp Σ)
+    (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    <<< ∀∀ (m ms: gmap Key (option we)) (mc : gmap Key val),
-        ConnectionState cstate (Active ms mc) ∗
-        [∗ map] k ↦ eo ∈ m, k ↦ₖ eo ∗ P ms >>>
+    <<< ∀∀ (m ms: gmap Key (option val)) (mc : gmap Key val),
+        ConnectionState cstate (Active ms mc) ∗ P ms ∗
+        [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>
       SI_commit cstate @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
         ConnectionState cstate CanStart ∗
         (** Transaction has been commited. *)
-        (⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
-          ∃ (t: Time),
-            (** Pointers that have been only read *)
+        (⌜b = true⌝ ∗
+           (** Pointers that have been only read *)
            ([∗ set] k ∈ (dom m) ∖ (dom mc),
               let weo :=
               match (m !! k) with
@@ -87,35 +78,31 @@ Section Specification.
                 | Some weo => weo
               end in k ↦ₖ weo) ∗
             (** Pointers that have been written to *)
-            ([∗ map] k↦v ∈ mc,
-               k ↦ₖ Some {| we_key := k; we_val := v; we_time := t |}) ∗
-             ⌜max_timestamp t m⌝ ∗ Q ms mc) ∨
+            ([∗ map] k↦v ∈ mc, k ↦ₖ Some v) ∗ Q ms mc) ∨
         (** Transaction has been aborted. *)
-         (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
-           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo) >>>.
+         (⌜b = false⌝ ∗ [∗ map] k ↦ vo ∈ m, k ↦ₖ vo) >>>.
 
 Definition run_spec : Prop :=
     ∀ (cstate : val) (tbody : val)
       (sa : socket_address) (E : coPset)
-      (ms : gmap Key (option we)) (mc : gmap Key val)
-      (P :  gmap Key (option we) → iProp Σ)
-      (Q :  gmap Key (option we) → gmap Key val → iProp Σ),
+      (ms : gmap Key (option val)) (mc : gmap Key val)
+      (P :  gmap Key (option val) → iProp Σ)
+      (Q :  gmap Key (option val) → gmap Key val → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝
     -∗
     {{{ ConnectionState cstate (Active ms ∅) ∗ P ms }}}
       tbody cstate #() @[ip_of_address sa] E
-    {{{ RET #(); ConnectionState cstate (Active ms mc) ∗ Q ms mc }}}
+    {{{ RET #(); ConnectionState cstate (Active ms mc) ∗ Q ms mc}}}
     →
     <<< ∀∀ m,
         ConnectionState cstate CanStart ∗ P ms ∗
-          [∗ map] k ↦ eo ∈ m, k ↦ₖ eo >>>
+          [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>
            SI_run cstate tbody @[ip_of_address sa] E
     <<<▷∃∃ b,  RET #b;
         ConnectionState cstate CanStart ∗
         (** Transaction has been commited. *)
-        (⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
-          ∃ (t: Time),
-            (** Pointers that have been only read *)
+        (⌜b = true⌝ ∗
+           (** Pointers that have been only read *)
            ([∗ set] k ∈ (dom m) ∖ (dom mc),
               let weo :=
               match (m !! k) with
@@ -123,12 +110,45 @@ Definition run_spec : Prop :=
                 | Some weo => weo
               end in k ↦ₖ weo) ∗
             (** Pointers that have been written to *)
-            ([∗ map] k↦v ∈ mc,
-               k ↦ₖ Some {| we_key := k; we_val := v; we_time := t |}) ∗
-             ⌜max_timestamp t m⌝ ∗ Q ms mc) ∨
+            ([∗ map] k↦v ∈ mc, k ↦ₖ Some v) ∗ Q ms mc) ∨
         (** Transaction has been aborted. *)
-         (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
-           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo) >>>.
+         (⌜b = false⌝ ∗ [∗ map] k ↦ vo ∈ m, k ↦ₖ vo) >>>.
+
+
+ Definition read_only_commit_spec : Prop :=
+   ∀ (cstate : val) (sa : socket_address)
+    (P :  gmap Key (option val) → iProp Σ)
+    (Q :  gmap Key (option val) → iProp Σ)
+    (E : coPset),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    <<< ∀∀ (m ms: gmap Key (option val)),
+        ConnectionState cstate (Active ms ∅) ∗ P ms ∗
+        [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>
+      SI_commit cstate @[ip_of_address sa] E
+    <<<▷∃∃ b, RET b; ⌜b = #true⌝ ∗
+        ConnectionState cstate CanStart ∗ Q ms ∗
+        [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>.
+
+  Definition run_read_only_spec : Prop :=
+    ∀ (cstate : val) (tbody : val)
+      (sa : socket_address) (E : coPset)
+      (ms : gmap Key (option val)) (mc : gmap Key val)
+      (P :  gmap Key (option val) → iProp Σ)
+      (Q :  gmap Key (option val) → iProp Σ),
+    ⌜↑KVS_InvName ⊆ E⌝
+    -∗
+    {{{ ConnectionState cstate (Active ms ∅) ∗ P ms }}}
+      tbody cstate #() @[ip_of_address sa] E
+    {{{ RET #(); ConnectionState cstate (Active ms ∅) ∗ Q ms}}}
+    →
+    <<< ∀∀ m,
+        ConnectionState cstate CanStart ∗ P ms ∗
+          [∗ map] k ↦ vo ∈ m, k ↦ₖ vo >>>
+           SI_run cstate tbody @[ip_of_address sa] E
+    <<<▷∃∃ b, RET #b;
+        ConnectionState cstate CanStart ∗
+        (** Transaction has been commited. *)
+        (⌜b = true⌝ ∗ ([∗ map] k↦vo ∈ m, k ↦ₖ vo) ∗ Q ms) >>>.
 
   Definition init_client_proxy_spec : Prop :=
     ∀ (sa : socket_address),

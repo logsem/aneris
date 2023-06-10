@@ -5,25 +5,25 @@ From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
 From aneris.examples.snapshot_isolation.specs
-     Require Export user_params time events.
+     Require Export user_params.
 
 Section Resources.
 
   Reserved Notation "k ↦ₖ e" (at level 20).
 
-  Inductive local_state `{!KVS_time}: Type :=
+  Inductive local_state : Type :=
    | CanStart
-   | Active (ms : gmap Key (option we)) (mc : gmap Key val).
+   | Active (ms : gmap Key (option val)) (mc : gmap Key val).
 
   Class SI_resources Mdl Σ
-        `{!anerisG Mdl Σ, !KVS_time, !User_params}:= {
+        `{!anerisG Mdl Σ, !User_params}:= {
 
     (** System global invariant *)
     GlobalInv : iProp Σ;
     GlobalInvPersistent :> Persistent GlobalInv;
 
     (** Logical points-to connective *)
-    OwnMemKey : Key → option we → iProp Σ
+    OwnMemKey : Key → option val → iProp Σ
     where "k ↦ₖ v" := (OwnMemKey k v);
 
     (** Logical points-to connective *)
@@ -35,19 +35,8 @@ Section Resources.
     OwnMemKey_timeless k v :> Timeless (k ↦ₖ v);
     OwnMemKey_exclusive k v v' :
       k ↦ₖ v ⊢ k ↦ₖ v' -∗ False;
-    OwnMemKey_key k we E :
-      nclose KVS_InvName ⊆ E →
-      GlobalInv ⊢
-      k ↦ₖ Some we ={E}=∗
-      k ↦ₖ Some we ∗ ⌜we_key we = k⌝;
 
     (** Laws *)
-    ConnectionState_relation E k r ms mc we :
-    ↑KVS_InvName ⊆ E ->
-    GlobalInv ⊢
-    ConnectionState r (Active ms mc) -∗ k ↦ₖ Some we ={E}=∗
-    ⌜k ∈ dom ms →
-    ∀ we', ms !! k = Some (Some we') → we' ≤ₜ we ⌝;
 
     ConnectionState_Keys E r ms mc :
     ↑KVS_InvName ⊆ E ->
