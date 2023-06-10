@@ -138,7 +138,7 @@ Definition run_spec : Prop :=
         KVS_address ⤇ KVS_si ∗
         sa ⤳ (∅, ∅) ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
-      init_client (s_serializer KVS_serialization)
+      init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ rpc, RET rpc; ConnectionState rpc CanStart }}}.
 
@@ -147,7 +147,7 @@ Definition init_kvs_spec : Prop :=
         KVS_address ⤳ (∅,∅) ∗
         free_ports (ip_of_address KVS_address)
                    {[port_of_address KVS_address]} }}}
-      init_kvs (s_serializer KVS_serialization)
+      init_server (s_serializer KVS_serialization)
         #KVS_address
         @[(ip_of_address KVS_address)]
     {{{ RET #(); True }}}.
