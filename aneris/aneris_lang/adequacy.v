@@ -88,22 +88,21 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs A
      observed_receive obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip,0); ⊤ {{v, ⌜φ v⌝ }}).
 
-  Lemma free_ports_alloc_pre `{anerisPreG Σ Mdl} γ P ip ports :
-    ip ∉ (dom P) →
-    own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                  (● (GSet <$> P)) ==∗
-    own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                  (● (GSet <$> <[ ip := ports ]> P)) ∗
-    own γ (◯ ({[ ip := (GSet ports)]})).
-  Proof.
-    iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
-    iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
-      as "[HP Hip]"; last by iFrame.
-    apply auth_update_alloc. rewrite fmap_insert.
-    apply alloc_singleton_local_update; last done.
-    rewrite lookup_fmap.
-    apply not_elem_of_dom in H0. rewrite H0. set_solver.
-  Qed.
+Lemma free_ports_alloc_pre `{anerisPreG Σ Mdl} γ P ip ports :
+  ip ∉ (dom P) →
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+      (● (GSet <$> P)) ==∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+      (● (GSet <$> <[ ip := ports ]> P)) ∗
+  own γ (◯ ({[ ip := (GSet ports)]})).
+Proof.
+  iIntros (Hnin) "HP"; rewrite /free_ports_auth /free_ports.
+  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
+    as "[HP Hip]"; last by iFrame.
+  apply auth_update_alloc. rewrite fmap_insert.
+  apply alloc_singleton_local_update; last done.  
+  rewrite lookup_fmap. apply not_elem_of_dom in Hnin. rewrite Hnin. set_solver.
+Qed.
 
 Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
   ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
