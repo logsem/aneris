@@ -388,11 +388,8 @@ Proof.
            aneris_observed_recv_name := γobserved_receive;
          |}).
   iMod (Hwp dg) as "Hwp".
-  (* iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]". *)
   iMod (is_node_alloc_multiple σ with "[Hmp]")
     as (γs Hheaps_dom' Hsockets_dom') "[Hγs [#Hn [Hσctx Hσ]]]"; [set_solver|done|].
-  (* iMod (is_node_alloc_multiple (get_ips eφs) σ with "[Hmp]") *)
-  (*   as (γs Hips Hheaps_dom' Hsockets_dom') "[Hγs [#Hn [Hσctx Hσ]]]"; [done|]. *)
   iExists
     (λ ex atr,
       aneris_events_state_interp ex ∗
@@ -442,46 +439,6 @@ Proof.
   simpl.
   iFrame "Hmfull Hsteps".
   done.
-Qed.
-
-(* TODO: Move all of this *)
-Lemma union_set_empty `{Countable K} `{Empty K} `{Union K} :
-  ⋃ₛ (∅:gset K) = ∅.
-Proof. done. Qed.
-
-Lemma union_set_singleton `{Countable K} (a : gset K) :
-  ⋃ₛ {[a]} = a.
-Proof.
-  rewrite /union_set. rewrite elements_singleton.
-  simpl. rewrite right_id_L. done.
-Qed.
-
-Lemma union_set_union `{Countable K} (A B : gset $ gset K) :
-  A ## B → ⋃ₛ (A ∪ B) = (⋃ₛ A) ∪ (⋃ₛ B).
-Proof.
-  intros Hdisj. rewrite /union_set.
-  rewrite elements_disj_union; [|set_solver].
-  rewrite union_list_app_L. done.
-Qed.
-
-Lemma to_singletons_singleton `{Countable K} (a : K) :
-  to_singletons {[a]} = {[{[a]}]}.
-Proof. rewrite /to_singletons. by rewrite gset_map.gset_map_singleton. Qed.
-
-(* OBS: This can be made stronger *)
-Lemma to_singletons_disj `{Countable K} (A B : gset K) :
-  A ## B → to_singletons A ## to_singletons B.
-Proof. rewrite /to_singletons. apply gset_map.gset_map_disj_union. apply _. Qed.
-
-Lemma union_set_to_singletons `{Countable K} (A : gset K) :
-  ⋃ₛ to_singletons A = A.
-Proof.
-  induction A using set_ind_L; [done|].
-  rewrite to_singletons_union.
-  rewrite union_set_union; last first.
-  { apply to_singletons_disj. set_solver. }
-  rewrite IHA. f_equiv.
-  rewrite to_singletons_singleton. by rewrite union_set_singleton.
 Qed.
 
 Theorem adequacy_strong `{anerisPreG Σ Mdl}
