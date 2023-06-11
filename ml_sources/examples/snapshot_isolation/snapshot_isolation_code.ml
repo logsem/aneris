@@ -1,6 +1,7 @@
 open Ast
 open List_code
 open Map_code
+open Network_util_code
 open Serialization_code
 open Mt_server_code
 
@@ -14,7 +15,7 @@ type 'a kvsTy = ((string, (('a * int) alist)) amap)
     Simplification: there is only one global cache for all clients.
     Therefore, no concurrent accesses to disjoint keys) *)
 type 'a cacheTy = ((string, 'a) amap)
-type 'a reqTy = (string, (unit, int * 'a cacheTy) sumTy) sumTy
+type 'a reqTy = ((string * int), (unit, int * 'a cacheTy) sumTy) sumTy
 type 'a replTy = ('a option, (int, bool) sumTy) sumTy
 type 'a connection_state =
   ('a reqTy, 'a replTy) rpc *
@@ -23,7 +24,7 @@ type 'a connection_state =
 (** Serializers *)
 let req_ser (val_ser[@metavar]) =
   sum_serializer
-    string_serializer
+    (prod_serializer string_serializer int_serializer)
     (sum_serializer
        unit_serializer
        (prod_serializer
@@ -40,41 +41,19 @@ let repl_ser (val_ser[@metavar]) =
 let kvs_get k kvs =
   match map_lookup k kvs with
   | None -> list_nil
-  | Some vlst ->
-    assert (not (vlst = None));
-    vlst
+  | Some vlst -> assert (not (vlst = None)); vlst
 
-
-let kvs_get_last k (kvs : 'a kvsTy) : 'a option =
-  let vlst = kvs_get k kvs in
-  match vlst with
-   | None -> None
-   | Some vl ->
-     let ((v,_t), _oldl) = vl in Some v
-
-
-let check_at_key
-    (ts : int) (tc : int)
-    (k : string) (cache : 'a cacheTy) (vlst : (('a * int) alist)) =
-  assert (ts < tc);
-  if map_mem k cache then
-    match vlst with
-    | None -> true
-    | Some l ->
-      let (vlast, _hd) = l in
-      let (_v, t) = vlast in
-      if t = tc || t = ts || tc < t
-      then assert false
-      else
-        let b = t < ts in
-        let () =
-          if b then ()
-          else unsafe
-              (fun () ->
-                 Printf.printf "%s told=%d tstart=%d \n %!" k t ts)
-        in b
-  else true
-
+let kvs_get_last kt (kvs : 'a kvsTy) : 'a option =
+  let (k, t) = kt in
+  let rec aux l =
+    match l with
+    | None -> None
+    | Some p ->
+      let ((v, tv), tl) = p in
+      if tv = t then assert false
+      else if tv < t then Some v
+      else aux tl
+  in aux (kvs_get k kvs)
 
 let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
   : 'a kvsTy =
@@ -91,7 +70,20 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
       upd kvs_t' cache_l
   in upd kvs cache
 
-
+let check_at_key k (ts : int) (tc : int) (vlst : (('a * int) alist)) =
+  assert (ts < tc);
+  match vlst with
+  | None -> true
+  | Some l ->
+    let (vlast, _hd) = l in
+    let (_v, t) = vlast in
+    if tc <= t || t = ts then assert false
+    else
+    let b = t < ts in
+      let () =
+        if b then ()
+        else unsafe (fun () -> Printf.printf "%s last_t=%d snap_t=%d\n%!" k t ts)
+      in b
 
 let commit_handler
     (kvs : 'a kvsTy Atomic.t)
@@ -100,14 +92,16 @@ let commit_handler
   let tc = !vnum + 1 in
   let kvs_t = !kvs in
   let (ts, cache) = cdata in
-  let b = map_forall (fun k vlst -> check_at_key ts tc k cache vlst) kvs_t in
-  if b
-  then
-    begin
-      vnum := tc;
-      kvs := update_kvs kvs_t cache tc;
-      true
-    end
+  let b = map_forall
+      (fun k _v ->
+         let vlsto = (map_lookup k kvs_t) in
+         let vs = if vlsto = None then list_nil else unSOME vlsto in
+         check_at_key k ts tc vs) cache in
+  if b then begin
+    vnum := tc;
+    kvs := update_kvs kvs_t cache tc;
+    true
+  end
   else false
 
 
@@ -117,8 +111,8 @@ let lk_handle lk handler =
   release lk;
   res
 
-let read_handler (kvs : 'a kvsTy Atomic.t) k () =
-  kvs_get_last k !kvs
+let read_handler (kvs : 'a kvsTy Atomic.t) tk () =
+  kvs_get_last tk !kvs
 
 let start_handler (vnum : int Atomic.t) () =
   let vnext = !vnum + 1 in
@@ -132,8 +126,8 @@ let client_request_handler
   let res =
     match req with
     (* READ request *)
-    | InjL k ->
-      InjL (lk_handle lk (read_handler kvs k))
+    | InjL tk ->
+      InjL (lk_handle lk (read_handler kvs tk))
     (* START or COMMIT request *)
     | InjR r ->
       begin match r with
@@ -180,11 +174,11 @@ let read (cst : 'a connection_state) k : 'a option =
   match !tst with
   | None -> assert false
   | Some st ->
-    let (_ts, cache) = st in
+    let (ts, cache) = st in
     match map_lookup k !cache with
     | Some v -> Some v
     | None ->
-      let repl = make_request rpc (InjL k) in
+      let repl = make_request rpc (InjL (k, ts)) in
       match repl with
       | InjL vo -> vo
       | InjR _abs -> assert false
@@ -203,7 +197,10 @@ let commit (cst : 'a connection_state) : bool =
   | None -> assert false
   | Some st ->
     let (ts, cache) = st in
-    let repl = make_request rpc (InjR (InjR (ts, !cache))) in
+    let repl =
+      let cch = !cache in
+      if cch = None then InjR (InjR true)
+      else make_request rpc (InjR (InjR (ts, cch))) in
     match repl with
     | InjL _abs -> assert false
     | InjR r ->

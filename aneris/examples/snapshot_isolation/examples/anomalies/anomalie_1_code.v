@@ -44,7 +44,8 @@ Definition tbody_xy : val :=
        then
          write "s" #"y" #(-1);;
          write "s" #"s1" #1;;
-         #() (* unsafe (fun () -> Printf.printf "Set y to -1 \n%!"); *)
+         #() (* unsafe (fun () -> Printf.printf "Set y to -1 \n%!"); *);;
+         #() (* unsafe (fun () -> Unix.sleepf 0.5); *)
        else  #())
   end.
 
@@ -58,14 +59,19 @@ Definition tbody_yx : val :=
        then
          write "s" #"x" #(-1);;
          write "s" #"s2" #1;;
-         #() (* unsafe (fun () -> Printf.printf "Set x to -1 \n%!"); *)
+         #() (* unsafe (fun () -> Printf.printf "Set x to -1 \n%!"); *);;
+         #() (* unsafe (fun () -> Unix.sleepf 0.5); *)
        else  #())
   end.
 
 Definition tbody_read : val :=
   λ: "s",
+  #() (* unsafe (fun () ->
+      Random.self_init ();
+      let r = Random.int 5 in
+      Printf.printf "%d\n%!" r;
+      Unix.sleep r *);;
   wait_s0 "s";;
-  #() (* unsafe (fun () -> Unix.sleepf 2.0); *);;
   let: "vx" := read "s" #"x" in
   let: "vy" := read "s" #"y" in
   match: "vx" with

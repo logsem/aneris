@@ -4,13 +4,14 @@
 From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib Require Import list_code.
 From aneris.aneris_lang.lib Require Import map_code.
+From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.examples.reliable_communication.lib.mt_server Require Import mt_server_code.
 
 (**  The internal state of the server  *)
 
 Definition req_ser val_ser :=
-  sum_serializer string_serializer
+  sum_serializer (prod_serializer string_serializer int_serializer)
   (sum_serializer unit_serializer
    (prod_serializer int_serializer
     (list_serializer (prod_serializer string_serializer val_ser)))).
@@ -28,41 +29,23 @@ Definition kvs_get : val :=
   end.
 
 Definition kvs_get_last : val :=
-  λ: "k" "kvs",
-  let: "vlst" := kvs_get "k" "kvs" in
-  match: "vlst" with
-    NONE => NONE
-  | SOME "vl" =>
-      let: "v" := Fst (Fst "vl") in
-      let: "_t" := Snd (Fst "vl") in
-      let: "_oldl" := Snd "vl" in
-      SOME "v"
-  end.
-
-Definition check_at_key : val :=
-  λ: "ts" "tc" "k" "cache" "vlst",
-  assert: ("ts" < "tc");;
-  (if: map_mem "k" "cache"
-   then
-     match: "vlst" with
-      NONE => #true
-    | SOME "l" =>
-        let: "vlast" := Fst "l" in
-        let: "_hd" := Snd "l" in
-        let: "_v" := Fst "vlast" in
-        let: "t" := Snd "vlast" in
-        (if: ("t" = "tc") || (("t" = "ts") || ("tc" < "t"))
+  λ: "kt" "kvs",
+  let: "k" := Fst "kt" in
+  let: "t" := Snd "kt" in
+  letrec: "aux" "l" :=
+    match: "l" with
+      NONE => NONE
+    | SOME "p" =>
+        let: "v" := Fst (Fst "p") in
+        let: "tv" := Snd (Fst "p") in
+        let: "tl" := Snd "p" in
+        (if: "tv" = "t"
          then  assert: #false
-         else
-           let: "b" := "t" < "ts" in
-           let: "<>" := (if: "b"
-            then  #()
-            else
-              #() (* unsafe (fun () ->
-                 Printf.printf "%s told=%d tstart=%d \n %!" k t ts *)) in
-           "b")
-    end
-   else  #true).
+         else  (if: "tv" < "t"
+           then  SOME "v"
+           else  "aux" "tl"))
+    end in
+    "aux" (kvs_get "k" "kvs").
 
 Definition update_kvs : val :=
   λ: "kvs" "cache" "tc",
@@ -82,15 +65,40 @@ Definition update_kvs : val :=
     end in
     "upd" "kvs" "cache".
 
+Definition check_at_key : val :=
+  λ: "k" "ts" "tc" "vlst",
+  assert: ("ts" < "tc");;
+  match: "vlst" with
+    NONE => #true
+  | SOME "l" =>
+      let: "vlast" := Fst "l" in
+      let: "_hd" := Snd "l" in
+      let: "_v" := Fst "vlast" in
+      let: "t" := Snd "vlast" in
+      (if: ("tc" ≤ "t") || ("t" = "ts")
+       then  assert: #false
+       else
+         let: "b" := "t" < "ts" in
+         let: "<>" := (if: "b"
+          then  #()
+          else
+            #() (* unsafe (fun () -> Printf.printf "%s last_t=%d snap_t=%d\n%!" k t ts) *)) in
+         "b")
+  end.
+
 Definition commit_handler : val :=
   λ: "kvs" "cdata" "vnum" <>,
   let: "tc" := ! "vnum" + #1 in
   let: "kvs_t" := ! "kvs" in
   let: "ts" := Fst "cdata" in
   let: "cache" := Snd "cdata" in
-  let: "b" := map_forall (λ: "k" "vlst",
-                          check_at_key "ts" "tc" "k" "cache" "vlst")
-              "kvs_t" in
+  let: "b" := map_forall (λ: "k" "_v",
+                          let: "vlsto" := map_lookup "k" "kvs_t" in
+                          let: "vs" := (if: "vlsto" = NONE
+                           then  []
+                           else  unSOME "vlsto") in
+                          check_at_key "k" "ts" "tc" "vs")
+              "cache" in
   (if: "b"
    then  "vnum" <- "tc";;
          "kvs" <- (update_kvs "kvs_t" "cache" "tc");;
@@ -104,7 +112,8 @@ Definition lk_handle : val :=
   release "lk";;
   "res".
 
-Definition read_handler : val := λ: "kvs" "k" <>, kvs_get_last "k" ! "kvs".
+Definition read_handler : val :=
+  λ: "kvs" "tk" <>, kvs_get_last "tk" ! "kvs".
 
 Definition start_handler : val :=
   λ: "vnum" <>, let: "vnext" := ! "vnum" + #1 in
@@ -114,7 +123,7 @@ Definition start_handler : val :=
 Definition client_request_handler : val :=
   λ: "lk" "kvs" "vnum" "req",
   let: "res" := match: "req" with
-    InjL "k" => InjL (lk_handle "lk" (read_handler "kvs" "k"))
+    InjL "tk" => InjL (lk_handle "lk" (read_handler "kvs" "tk"))
   | InjR "r" =>
       match: "r" with
         InjL "_tt" => InjR (InjL (lk_handle "lk" (start_handler "vnum")))
@@ -167,12 +176,12 @@ Definition read : val :=
   match: ! "tst" with
     NONE => assert: #false
   | SOME "st" =>
-      let: "_ts" := Fst "st" in
+      let: "ts" := Fst "st" in
       let: "cache" := Snd "st" in
       match: map_lookup "k" ! "cache" with
         SOME "v" => SOME "v"
       | NONE =>
-          let: "repl" := make_request "rpc" (InjL "k") in
+          let: "repl" := make_request "rpc" (InjL ("k", "ts")) in
           match: "repl" with
             InjL "vo" => "vo"
           | InjR "_abs" => assert: #false
@@ -201,7 +210,10 @@ Definition commit : val :=
   | SOME "st" =>
       let: "ts" := Fst "st" in
       let: "cache" := Snd "st" in
-      let: "repl" := make_request "rpc" (InjR (InjR ("ts", ! "cache"))) in
+      let: "repl" := let: "cch" := ! "cache" in
+                     (if: "cch" = NONE
+                      then  InjR (InjR #true)
+                      else  make_request "rpc" (InjR (InjR ("ts", "cch")))) in
       match: "repl" with
         InjL "_abs" => assert: #false
       | InjR "r" =>
