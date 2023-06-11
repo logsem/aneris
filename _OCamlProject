@@ -60,7 +60,8 @@ ML_SOURCES:
 	examples/reliable_communication/examples/messages_in_order/messages_in_order_code.ml
 	examples/reliable_communication/examples/messages_in_order_loop/messages_in_order_loop_code.ml
   	examples/snapshot_isolation/snapshot_isolation_code.ml
-  	examples/snapshot_isolation/examples/anomalies/anomalie_1_code.ml
+  	examples/snapshot_isolation/examples/anomalies/anomalie_1/anomalie_1_code.ml
+  	examples/snapshot_isolation/examples/anomalies/anomalie_2/anomalie_2_code.ml
 
 ML_DEPENDENCIES:
 

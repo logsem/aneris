@@ -1,5 +1,6 @@
 open !Ast
 open Serialization_code
+open Network_util_code
 open Snapshot_isolation_code
 
 let run_client caddr kvs_addr tbody =
@@ -28,32 +29,28 @@ let rec wait_s0 (s : int connection_state) =
 
 let tbody_xy (s : int connection_state) : unit =
   wait_s0 s;
-  match read s "x" with
-  | None -> assert false;
-  | Some n ->
-    if 0 < n then
-      begin
-        write s "y" (-1);
-        write s "s1" 1;
-        unsafe (fun () -> Printf.printf "Set y to -1 \n%!");
-        unsafe (fun () -> Unix.sleepf 0.5);
-      end
-    else ()
+  let n = unSOME (read s "x") in
+  if 0 < n then
+    begin
+      write s "y" (-1);
+      write s "s1" 1;
+      unsafe (fun () -> Printf.printf "Set y to -1 \n%!");
+      unsafe (fun () -> Unix.sleepf 0.5);
+    end
+  else ()
 
 
 let tbody_yx (s : int connection_state) : unit =
   wait_s0 s;
-  match read s "y" with
-  | None -> assert false;
-  | Some n ->
-    if 0 < n then
-      begin
-        write s "x" (-1);
-        write s "s2" 1;
-        unsafe (fun () -> Printf.printf "Set x to -1 \n%!");
-        unsafe (fun () -> Unix.sleepf 0.5);
-      end
-    else ()
+  let n = unSOME (read s "y") in
+  if 0 < n then
+    begin
+      write s "x" (-1);
+      write s "s2" 1;
+      unsafe (fun () -> Printf.printf "Set x to -1 \n%!");
+      unsafe (fun () -> Unix.sleepf 0.5);
+    end
+  else ()
 
 let tbody_read (s : int connection_state) : unit =
   unsafe (fun () ->
@@ -62,22 +59,15 @@ let tbody_read (s : int connection_state) : unit =
       Printf.printf "%d\n%!" r;
       Unix.sleep r);
   wait_s0 s;
-  let vx = read s "x" in
-  let vy = read s "y" in
-  match vx with
-  | Some n1 ->
-    begin match vy with
-      | Some n2 ->
-        let vs1 = read s "s1" in
-        let vs2 = read s "s2" in
-        unsafe (fun () -> Printf.printf "(x,y) = (%d, %d) \n%!" n1 n2);
-        let b = 0 <= (n1 + n2) in
-        if (vs1 = Some 1 && vs2 = Some 1)
-        then assert (not b)
-        else (assert b);
-      | None -> assert false
-    end
-  | None -> assert false
+  let n1 = unSOME (read s "x") in
+  let n2 = unSOME (read s "y") in
+  let vs1 = read s "s1" in
+  let vs2 = read s "s2" in
+  let b = (0 <= (n1 + n2)) in
+  let _check =
+    if (vs1 = Some 1 && vs2 = Some 1) then assert (not b)
+    else (assert b) in
+  unsafe (fun () -> Printf.printf "(x,y) = (%d, %d) \n%!" n1 n2)
 
 let node_init caddr kvs_addr =
   run_client caddr kvs_addr tbody_init
