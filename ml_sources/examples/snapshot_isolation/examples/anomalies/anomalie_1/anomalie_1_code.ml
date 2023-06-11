@@ -2,30 +2,13 @@ open !Ast
 open Serialization_code
 open Network_util_code
 open Snapshot_isolation_code
-
-let run_client caddr kvs_addr tbody =
-  unsafe (fun () -> Printf.printf "Start client.\n%!");
-  let cst = init_client_proxy int_serializer caddr kvs_addr in
-  unsafe (fun () -> Printf.printf "Client started.\n%!");
-  let b = run cst tbody in
-  unsafe (fun () -> Printf.printf "Transaction %s.\n%!"
-             (if b then "committed" else "aborted"))
-
+open Util_code
 
 let tbody_init (s : int connection_state) : unit =
   write s "x" 1; write s "y" 1; write s "s0" 1
 
-let rec wait_s0 (s : int connection_state) =
-  match read s "s0" with
-  | None ->
-    let _b = commit s in
-    start s; wait_s0 s
-  | Some v ->
-    if v = 1
-    then (let _b = commit s in start s)
-    else
-      let _b = commit s in
-      start s; wait_s0 s
+let wait_s0 (s : int connection_state) =
+  wait_on_key s (fun v -> v = 1) "s0"
 
 let tbody_xy (s : int connection_state) : unit =
   wait_s0 s;

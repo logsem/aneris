@@ -59,9 +59,13 @@ ML_SOURCES:
 	examples/reliable_communication/examples/hello_world_2/hello_world_2_code.ml
 	examples/reliable_communication/examples/messages_in_order/messages_in_order_code.ml
 	examples/reliable_communication/examples/messages_in_order_loop/messages_in_order_loop_code.ml
-  	examples/snapshot_isolation/snapshot_isolation_code.ml
+	examples/snapshot_isolation/snapshot_isolation_code.ml
+  	examples/snapshot_isolation/util/util_code.ml
   	examples/snapshot_isolation/examples/anomalies/anomalie_1/anomalie_1_code.ml
   	examples/snapshot_isolation/examples/anomalies/anomalie_2/anomalie_2_code.ml
+  	examples/snapshot_isolation/examples/regular/example1/example1_code.ml
+  	examples/snapshot_isolation/examples/regular/example2/example2_code.ml
+  	examples/snapshot_isolation/examples/no_conflicts/no_conflicts_code.ml
 
 ML_DEPENDENCIES:
 
@@ -86,3 +90,4 @@ ML_DEPENDENCIES:
 	examples/reliable_communication/lib/mt_server/
 	examples/reliable_communication/lib/repdb/
 	examples/snapshot_isolation/
+	examples/snapshot_isolation/util/

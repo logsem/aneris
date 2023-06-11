@@ -6,6 +6,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib Require Import par_code.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
+From aneris.examples.snapshot_isolation.util Require Import util_code.
 
 (**  From the paper https://www.cs.umb.edu/~poneil/ROAnom.pdf
     A Read-Only Transaction Anomaly Under Snapshot Isolation
@@ -55,34 +56,13 @@ From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
 
  *)
 
-Definition run_client : val :=
-  λ: "caddr" "kvs_addr" "tbody",
-  #() (* unsafe (fun () -> Printf.printf "Start client.\n%!"); *);;
-  let: "cst" := init_client_proxy int_serializer "caddr" "kvs_addr" in
-  #() (* unsafe (fun () -> Printf.printf "Client started.\n%!"); *);;
-  let: "b" := run "cst" "tbody" in
-  #() (* unsafe (fun () -> Printf.printf "Transaction %s.\n%!"
-             (if b then "committed" else "aborted") *).
-
 Definition tbody_init : val :=
   λ: "s", write "s" #"x" #0;;
            write "s" #"y" #0;;
            write "s" #"s0" #1.
 
 Definition wait_s0 : val :=
-  rec: "wait_s0" "s" :=
-  match: read "s" #"s0" with
-    NONE => let: "_b" := commit "s" in
-            start "s";;
-            "wait_s0" "s"
-  | SOME "v" =>
-      (if: "v" = #1
-       then  let: "_b" := commit "s" in
-             start "s"
-       else  let: "_b" := commit "s" in
-             start "s";;
-             "wait_s0" "s")
-  end.
+  λ: "s", wait_on_key "s" (λ: "v", "v" = #1) #"s0".
 
 Definition tbody_withdraw_ten : val :=
   λ: "s",
