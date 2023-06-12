@@ -53,6 +53,8 @@ ML_SOURCES:
 	examples/reliable_communication/lib/mt_server/mt_server_code.ml
 	examples/reliable_communication/lib/repdb/log_code.ml
 	examples/reliable_communication/lib/repdb/repdb_code.ml
+	examples/reliable_communication/lib/sharding/sharding_code.ml
+	examples/reliable_communication/examples/sharding_examples/causality_example_code.ml
   	examples/reliable_communication/examples/dlm_db_example/dlm_db_example_code.ml
   	examples/reliable_communication/examples/repdb_leader_followers/causality_example_code.ml
 	examples/reliable_communication/examples/hello_world/hello_world_code.ml
@@ -82,3 +84,4 @@ ML_DEPENDENCIES:
 	examples/reliable_communication/lib/dlm/
 	examples/reliable_communication/lib/mt_server/
 	examples/reliable_communication/lib/repdb/
+	examples/reliable_communication/lib/sharding/

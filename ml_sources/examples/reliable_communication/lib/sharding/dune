@@ -1,0 +1,4 @@
+(library
+(name sharding_code)
+(flags :standard -rectypes)
+(libraries aneris mt_server_code))
