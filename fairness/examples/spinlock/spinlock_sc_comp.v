@@ -101,7 +101,7 @@ Section LocksCompositionModel.
 
   (* TODO: generalize? *)
   Definition comp_model: LiveModel heap_lang comp_model_impl :=
-    {| lm_fl _ := max 5 sm_fuel; |}.  
+    {| lm_fl _ := max 5 (S sm_fuel); |}.  
 
   (* Definition comp_st_init (n: nat): fmstate comp_model_impl :=  *)
   (*   (None: option sl_st, None: option sl_st, n).  *)
@@ -118,7 +118,6 @@ Section LocksCompositionCode.
   Definition comp: val :=
   λ: <>,
     let: "x" := ref #1 in
-    Skip ;;
     (Fork (program #()) ;;
      Fork (program #()) ;;
      "x" <- #2).
@@ -182,8 +181,9 @@ Section LocksCompositionProofs.
   Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
   Definition comp_free_roles_init: gset (fmrole comp_model_impl) :=
-    set_map (inl ∘ inl) (dom program_init_fuels) ∪
-    set_map (inl ∘ inr) (dom program_init_fuels).
+    let sl_roles := live_roles _ program_init_state in
+    set_map (inl ∘ inl) sl_roles ∪
+    set_map (inl ∘ inr) sl_roles.
 
 (*   Print Instances cmra.  *)
 (* big_opM op *)
@@ -201,17 +201,19 @@ Section LocksCompositionProofs.
   (*       (* ([^ op map] k↦x ∈ program_init_fuels, {[k := x]}).  *) *)
   (*       (* big_opM op gmap *)         *)
 
+  (* TODO: exists? *)
+  (* Definition gmap_map_keys {A B: Type} (m: gmap A B) *)
 
-  Let add_roles (key_lift: fmrole spinlock_model_impl -> fmrole comp_model_impl):
+  Let prog_fuels (key_lift: fmrole spinlock_model_impl -> fmrole comp_model_impl):
     gmap (fmrole comp_model_impl) nat :=
         list_to_map $ (fun '(k, v) => (key_lift k, v)) <$> map_to_list program_init_fuels.
 
-  Lemma add_roles_equiv ρ f lift (INJ: Inj eq eq lift):
-    (add_roles lift) !! (lift ρ) = Some f <-> program_init_fuels !! ρ = Some f.
+  Lemma prog_fuels_equiv ρ f lift (INJ: Inj eq eq lift):
+    (prog_fuels lift) !! (lift ρ) = Some f <-> program_init_fuels !! ρ = Some f.
   Proof using.
     assert (Inj eq eq (fun '(k, v) => (lift k, v: nat))) as INJ'.
     { intros [??][??] [=]. subst. apply INJ in H0. congruence. }
-    rewrite /add_roles. etransitivity.
+    rewrite /prog_fuels. etransitivity.
     { symmetry. apply elem_of_list_to_map.
       apply NoDup_fmap_fst.
       - intros. apply elem_of_list_fmap_2 in H as ([??] & [=] & ?), H0 as ([??] & [=] & ?).
@@ -225,6 +227,11 @@ Section LocksCompositionProofs.
     pose proof (@elem_of_list_fmap_inj _ _ _ INJ' (map_to_list program_init_fuels) (ρ, f)). apply H.
   Qed.
 
+  (* TODO: make a premise of PMPP *)
+  Lemma partial_free_roles_are_Proper: 
+    Proper (equiv ==> equiv) partial_free_roles_are.
+  Proof. Admitted. 
+
   Lemma comp_spec tid (P: iProp Σ):
     {{{ partial_model_is (None, None, 2)  ∗ 
         partial_free_roles_are comp_free_roles_init ∗ 
@@ -232,7 +239,7 @@ Section LocksCompositionProofs.
       comp #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using. 
-    iIntros (Φ) "(ST & NOFREE & FUELS) POST". rewrite /comp.
+    iIntros (Φ) "(ST & FREE & FUELS) POST". rewrite /comp.
 
     (* iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS". *)
     (* { compute_done. } *)
@@ -258,12 +265,12 @@ Section LocksCompositionProofs.
     iIntros "FUELS".
     simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
 
-    iApply wp_lift_pure_step_no_fork; auto. 
-    2: do 3 iModIntro; iSplitL "FUELS".
-    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
-    { set_solver. }
-    iIntros "FUELS".
-    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+    (* iApply wp_lift_pure_step_no_fork; auto.  *)
+    (* 2: do 3 iModIntro; iSplitL "FUELS". *)
+    (* 2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. } *)
+    (* { set_solver. } *)
+    (* iIntros "FUELS". *)
+    (* simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl. *)
 
     (* Set Printing Implicit. *)
 
@@ -271,27 +278,56 @@ Section LocksCompositionProofs.
     (* iApply wp_store_step_singlerole. (fs2 := ({[ ρc := 1 ]} ∪  *)
     (*                                            ([∗ map] k↦x ∈ program_init_fuels, ⌜ True ⌝))).  *)
     (*   model_state_interp *)
-    wp_bind Skip. 
     iApply wp_lift_pure_step_no_fork_take_step; [done| ..].
     3: { eapply (cl_sl_init _ program_init_state program_init_state). }
     3: do 3 iModIntro; iFrame.
-    { Unshelve. 2: exact ({[ inr ρc:=2 ]} ∪ add_roles (inl ∘ inl) ∪ add_roles (inl ∘ inr)).
-      red. repeat split.
+    { Unshelve. 2: exact ({[ inr ρc:=2 ]} ∪ (S <$> prog_fuels (inl ∘ inl)) ∪ (S <$> prog_fuels (inl ∘ inr))).
+      red. repeat split; try set_solver. 
       - simpl. intros _.
         erewrite lookup_union_Some_l; try set_solver.
         simpl. lia.
-      - intros. set_solver.
-      - intros ?[IN NIN]%elem_of_difference.
+      - intros ρ [IN NIN]%elem_of_difference.
         repeat (rewrite dom_union in IN; apply elem_of_union in IN as [IN|IN]).
         { done. }
-        + apply elem_of_dom in IN as [f IN]. simpl. 
+        + apply elem_of_dom in IN as [f' IN].          
           erewrite lookup_union_Some_l; [| erewrite lookup_union_Some_r]; eauto.
-          * red. etransitivity; [apply sm_fuel_max| ].
+          * apply lookup_fmap_Some in IN as [f [<- IN]]. 
+            assert (exists ρ0, ρ = (inl ∘ inl) ρ0) as [ρ0 ->] by admit.
+            apply prog_fuels_equiv in IN; [| rewrite /compose; congruence].
+            apply program_init_fuels_max in IN. simpl. lia. 
+          * rewrite /prog_fuels. admit.
+        (* TODO: refactor *)
+        + apply elem_of_dom in IN as [f' IN]. simpl. 
+          erewrite lookup_union_Some_r; eauto.
+          * apply lookup_fmap_Some in IN as [f [<- IN]]. 
+            assert (exists ρ0, ρ = (inl ∘ inr) ρ0) as [ρ0 ->] by admit.
+            apply prog_fuels_equiv in IN; [| rewrite /compose; congruence].
+            apply program_init_fuels_max in IN. simpl. lia.
+          * rewrite /prog_fuels. admit. }
+    { set_solver. }
+    iIntros "ST FREE FUELS".
     
-    
-    
-    
-    
+    iDestruct (partial_free_roles_are_Proper with "FREE") as "FREE".
+    { Unshelve. 2: exact ∅.
+      simpl. rewrite /comp_free_roles_init. set_solver. }
+
+    simpl. wp_bind (Fork _).
+    iApply (wp_fork_nostep_alt with "[] [] [FUELS]").
+    (* TODO: split the model state*)
+    5: { iDestruct (has_fuels_gt_1 with "FUELS") as "FUELS".
+         2: { rewrite !map_fmap_union.
+              rewrite map_fmap_singleton.
+              do 2 rewrite -map_fmap_compose.
+              rewrite !(map_fmap_ext _ id).
+              2, 3: simpl; lia.
+              simpl. rewrite !map_fmap_id.  
+              iFrame. }
+         intros. admit. }
+    { admit. }
+    { set_solver. }
+    { iIntros (tid'). iNext. iIntros "FUELS". simpl.
+      
+      
 
 
 End LocksCompositionProofs.
