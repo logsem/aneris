@@ -282,7 +282,7 @@ Section crdt_convergence_lemmas.
     specialize (Hsr _ _ ns (length (events_of_trace (sendonEV (ith_sa (fin_to_nat i))) ex) + z2)
                     ev' (fin_to_nat_lt i) (fin_to_nat_lt j) Hneq').
     rewrite Happ lookup_app_r in Hsr; last lia.
-    rewrite minus_plus in Hsr.
+    rewrite Nat.add_comm Nat.add_sub in Hsr.
     specialize (Hsr Hz2 Hev')
       as (nss & zss & msg & evss & evr & Hz'zss & Hssevs & Hssismsg & Hevr & Hevrirmsg).
     assert (∃ vc' : vector_clock (GClen gcdata),
@@ -308,7 +308,7 @@ Section crdt_convergence_lemmas.
       { assert (z1 < length psevs) by by eapply lookup_lt_Some; eauto.
         rewrite lookup_app_l; last by rewrite !app_length; lia.
         rewrite lookup_app_r; last lia.
-        rewrite minus_plus; done. }
+        rewrite Nat.add_comm Nat.add_sub; done. }
       destruct Hcorr1 as (?&?&?&?&?&?&?&?&?&?&?&?&Hheap&?).
       destruct Hev as (?&?&?&?&?&?&?&?&?&?&?&?&?&?&?).
       destruct Hev' as (?&?&?&?&?&?&?&?&?&?&?&?&?&?&?).

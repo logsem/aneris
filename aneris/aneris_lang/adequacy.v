@@ -151,7 +151,7 @@ Proof.
     { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
     { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
     iMod "Hwp". iModIntro. iFrame.
-    iIntros (???) "% % % % % % (?& Hsi & Htr & % & Hauth) Hpost". iSplit; last first.
+    iIntros (???) "% % % % % % % (?& Hsi & Htr & % & Hauth) Hpost". iSplit; last first.
     { iIntros (?). iApply fupd_mask_intro_discard; done. }
     iIntros "!> ((?&?&?&%&?) &?) /=". iFrame. done. }
   iMod (socket_address_group_own_alloc_subseteq_pre _ A (obs_send_sas ∪ obs_rec_sas) with "Hauth")
@@ -440,7 +440,7 @@ Proof.
                with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "Hsi"; eauto; [].
   rewrite /= Hms gset_of_gmultiset_empty.
   iFrame. iSplit; [done|].
-  iIntros (??????? Hcontr ?) "(Hev & Hsi & Hauth & % & Hsteps) Hpost".
+  iIntros (??????? Hcontr ??) "(Hev & Hsi & Hauth & % & Hsteps) Hpost".
   iDestruct ("Himpl" with "[//] [//] [//] [//] [] [//] [$Hev $Hsi $Hauth $Hsteps //] [$Hpost]") as "[$ Hrel]".
   { iPureIntro. intros ??????. by eapply Hcontr. }
   iIntros "Hct". iMod ("Hrel" with "Hct") as "%".

@@ -58,19 +58,19 @@ Section MonotonicWrites.
            ∗ Seen db_id1 s1
            ∗ ⌜e1 ∈ s1⌝
            ∗ ⌜e2 ∈ s1⌝
-           ∗ (⌜e1 <ₜe2⌝)
+           ∗ (⌜e1 <ₜ e2⌝)
            (* If sufficient time passes, then the writes
               are propagated to db2 in the same order. *)
            ∗ (∀ e s2 db_id2,
                  (Seen db_id2 s2
                        ∗ ⌜e ∈ s2⌝
-                       ∗ ⌜e2 ≤ₜe⌝) ={⊤}=∗
+                       ∗ ⌜e2 ≤ₜ e⌝) ={⊤}=∗
                                    ∃ e1' e2',
                                      (⌜erasure e1' = erasure e1⌝)
                                        ∗ (⌜erasure e2' = erasure e2⌝)
                                        ∗ ⌜e1' ∈ s2⌝
                                        ∗ ⌜e2' ∈ s2⌝
-                                       ∗ ⌜e1' <ₜe2'⌝)
+                                       ∗ ⌜e1' <ₜ e2'⌝)
    }}}.
   Proof.
     iIntros (ϕ) "(#Hsi1 & Hca & Hfree & Hrs) Hcont".

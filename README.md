@@ -11,7 +11,7 @@ Recent documentation of Aneris is available [`here`](documentation.pdf).
 
 ## Compiling
 
-The project maintains compatibility with Coq 8.15 and relies on `coqc` being
+The project maintains compatibility with Coq 8.17 and relies on `coqc` being
 available in your shell. Clone the external git submodule dependencies using
 
     git submodule update --init --recursive

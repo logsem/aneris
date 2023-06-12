@@ -1128,7 +1128,7 @@ Section model_state_lemmas.
             last by list_simplifier.
           assert (locales_equiv (t1 ++ e1 :: t2) (t1 ++ e2 :: t2)).
           { apply locales_equiv_middle. eapply locale_step_preserve =>//. }
-          apply locales_equiv_from_app =>//. by eapply locales_from_equiv_refl.
+          apply locales_equiv_from_app =>//. by eapply locales_equiv_from_refl.
       - intros ?; simplify_eq.
         assert (is_Some (from_locale tp1 ζ')) by eauto.
         eapply from_locale_step =>//. }

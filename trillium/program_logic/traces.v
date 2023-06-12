@@ -179,9 +179,9 @@ Section simulation.
     by eexists (_,_).
   Qed.
 
-  Lemma simulation_does_continue e σ δ φ :
-    continued_simulation φ (trace_singleton ([e], σ)) (trace_singleton δ) →
-    ∀ ex, trace_starts_in ex ([e], σ) →
+  Lemma simulation_does_continue es σ δ φ :
+    continued_simulation φ (trace_singleton (es, σ)) (trace_singleton δ) →
+    ∀ ex, trace_starts_in ex (es, σ) →
           valid_exec ex →
           ∃ atr, trace_starts_in atr δ ∧ continued_simulation φ ex atr.
   Proof.

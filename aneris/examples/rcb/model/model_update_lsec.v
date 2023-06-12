@@ -208,7 +208,7 @@ Section Lsec_udpate.
              erewrite elem_of_elements in Hej1.
              apply elem_of_filter in Hej1 as [? Hej1].
              pose proof RCBM_LHV_seqids His ej Hej1.
-             rewrite Hseq. by apply le_lt_n_Sm.
+             rewrite Hseq. by apply Nat.lt_succ_r.
   Qed.
 
   Lemma RCBM_lhst_lsec_update e i t s :

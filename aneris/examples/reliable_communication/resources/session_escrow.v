@@ -180,7 +180,7 @@ Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iPro
       iDestruct "HTl" as "[HTl HTl']".
       iAssert (frag_list χ Left n v) with "[HTl']" as "Hidx".
       { iExists _. iFrame. iPureIntro. rewrite -Hvalid1.
-        rewrite lookup_app_r; [|lia]. rewrite minus_diag. done. }
+        rewrite lookup_app_r; [|lia]. rewrite Nat.sub_diag. done. }
       rewrite Hvalid1.
       iFrame "#∗".
       iApply "Hclose".
@@ -207,7 +207,7 @@ Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iPro
       iDestruct "HTr" as "[HTr HTr']".
       iAssert (frag_list χ Right n v) with "[HTr']" as "Hidx".
       { iExists _. iFrame. iPureIntro. rewrite -Hvalid1.
-        rewrite lookup_app_r; [|lia]. rewrite minus_diag. done. }
+        rewrite lookup_app_r; [|lia]. rewrite Nat.sub_diag. done. }
       rewrite Hvalid1.
       iFrame "#∗".
       iApply "Hclose".
@@ -252,7 +252,7 @@ Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iPro
     iMod ("Hclose" with "[-Hp HP HslF HrlF]") as "_".
     { iNext. iExists Tl,((r::Tr')++Tr''),(S m),nr. iFrame "#∗".
       rewrite drop_app_le; last first.
-      { apply lt_n_Sm_le, le_n_S. done. }
+      { rewrite -Nat.lt_succ_r. apply le_n_S. done. }
       iFrame.
       iSplit; iPureIntro.
       - done.
@@ -296,7 +296,7 @@ Definition auth_auth_sent (χ : session_escrow_name) (s : side) (n : nat) : iPro
     iMod ("Hclose" with "[-Hp HP HsrF HrrF]") as "_".
     { iNext. iExists ((l::Tl')++Tl''),Tr,nl,(S m). iFrame "#∗".
       rewrite drop_app_le; last first.
-      { apply lt_n_Sm_le, le_n_S. done. }
+      { rewrite -Nat.lt_succ_r. apply le_n_S. done. }
       iFrame.
       iSplit; iPureIntro.
       - rewrite app_length.
