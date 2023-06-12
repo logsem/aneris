@@ -14,8 +14,8 @@ Set Default Proof Using "Type".
 Definition aneris_model_rel_finitary (Mdl : Model) :=
   ∀ mdl : Mdl, smaller_card {mdl' : Mdl | Mdl mdl mdl'} nat.
 
-Definition get_ips (eφs : list (aneris_expr * (aneris_val → Prop))) : gset ip_address :=
-  list_to_set $ expr_n <$> (fst <$> eφs).
+Definition get_ips (es : list aneris_expr) : gset ip_address :=
+  list_to_set $ expr_n <$> es.
 
 Definition addrs_to_ip_ports_map (A : gset socket_address) : gmap ip_address (gset port) :=
   fold_right union ∅ $
@@ -32,52 +32,48 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
 Definition wp_group_proto_strong `{anerisPreG Σ Mdl} A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address_group)
-           σ s (eφs : list (aneris_expr * (aneris_val → Prop))) :=
+           σ s (es : list aneris_expr) (φs : list (aneris_val → Prop)) :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unallocated_groups A -∗
      ([∗ set] sag ∈ A, sag ⤳*[bool_decide (sag ∈ obs_send_sas),
                               bool_decide (sag ∈ obs_rec_sas)] (∅, ∅)) -∗
-     ([∗ set] ip ∈ get_ips eφs,
+     ([∗ set] ip ∈ get_ips es,
         ([∗ map] l ↦ v ∈ (state_heaps σ !!! ip), l ↦[ip] v) ∗
         ([∗ map] sh ↦ s ∈ (state_sockets σ !!! ip), sh ↪[ip] s.1)) -∗
      ([∗ map] ip ↦ ports ∈ (addrs_to_ip_ports_map
                               ((union_set A) ∖ (ports_in_use $ state_sockets σ))),
         free_ports ip ports)%I -∗
      frag_st Mdl.(model_state_initial) -∗
-     ([∗ set] ip ∈ get_ips eφs, is_node ip) -∗
+     ([∗ set] ip ∈ get_ips es, is_node ip) -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sag ∈ obs_send_sas, sendon_evs_groups sag []) -∗
      ([∗ set] sag ∈ obs_rec_sas, receiveon_evs_groups sag []) -∗
      observed_send_groups obs_send_sas -∗
      observed_receive_groups obs_rec_sas ={⊤}=∗
-     wptp s
-          (fst <$> eφs)
-          ((λ φ, (λ v, ⌜φ v⌝):aneris_val → iProp Σ) <$> (snd <$> eφs))).
+     wptp s es ((λ φ, (λ v, ⌜φ v⌝):aneris_val → iProp Σ) <$> φs)).
 
 Definition wp_proto_strong `{anerisPreG Σ Mdl} A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address)
-           σ s (eφs : list (aneris_expr * (aneris_val → Prop))) :=
+           σ s (es : list aneris_expr) (φs : list (aneris_val → Prop)) :=
   (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
      unallocated A -∗
      ([∗ set] sa ∈ A, sa ⤳[bool_decide (sa ∈ obs_send_sas),
                            bool_decide (sa ∈ obs_rec_sas)] (∅, ∅)) -∗
-     ([∗ set] ip ∈ get_ips eφs,
+     ([∗ set] ip ∈ get_ips es,
         ([∗ map] l ↦ v ∈ (state_heaps σ !!! ip), l ↦[ip] v) ∗
         ([∗ map] sh ↦ s ∈ (state_sockets σ !!! ip), sh ↪[ip] s.1)) -∗
      ([∗ map] ip ↦ ports ∈ (addrs_to_ip_ports_map
                               (A ∖ (ports_in_use $ state_sockets σ))),
         free_ports ip ports)%I -∗
      frag_st Mdl.(model_state_initial) -∗
-     ([∗ set] ip ∈ get_ips eφs, is_node ip) -∗
+     ([∗ set] ip ∈ get_ips es, is_node ip) -∗
      ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
      observed_receive obs_rec_sas ={⊤}=∗
-     wptp s
-          (fst <$> eφs)
-          ((λ φ, (λ v, ⌜φ v⌝):aneris_val → iProp Σ) <$> (snd <$> eφs))).
+     wptp s es ((λ φ, (λ v, ⌜φ v⌝):aneris_val → iProp Σ) <$> φs)).
 
 Definition wp_group_proto `{anerisPreG Σ Mdl} IPs A
            (lbls: gset string)
@@ -317,15 +313,15 @@ Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
         `{EqDecision (aneris_to_trace_model Mdl)} A
         (lbls: gset string)
         (obs_send_sas obs_rec_sas : gset socket_address_group)
-        s (eφs : list (aneris_expr * (aneris_val → Prop))) σ :
-  length eφs >= 1 →
+        s (es : list aneris_expr) σ (φs : list (aneris_val → Prop)) :
+  length es >= 1 →
   all_disjoint A →
   set_Forall is_ne A →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   aneris_model_rel_finitary Mdl →
-  wp_group_proto_strong A lbls obs_send_sas obs_rec_sas σ s eφs →
-  dom $ state_heaps σ = get_ips eφs →
-  dom $ state_sockets σ = get_ips eφs →
+  wp_group_proto_strong A lbls obs_send_sas obs_rec_sas σ s es φs →
+  dom $ state_heaps σ = get_ips es →
+  dom $ state_sockets σ = get_ips es →
   (* Port coherence *)
   ((∀ ip ps, (GSet <$> (addrs_to_ip_ports_map
                               ((union_set A) ∖
@@ -339,12 +335,12 @@ Theorem adequacy_strong_groups `{anerisPreG Σ Mdl}
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
-  adequate_multiple s (eφs.*1) σ ((λ φ v _, φ v) <$> eφs.*2).
+  adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
   intros Hlen Hdisj Hne Hsendle Hrecvle.
   intros HMdlfin Hwp Hheaps_dom Hsockets_dom Hportts Hsockets Hsockets_coh1 Hsockets_coh2 Hms. simpl.
   eapply (adequacy_multiple_xi _ _ _ _ (sim_rel (λ _ _, True)) _ _ _
-                      (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))); [by rewrite fmap_length| |].
+                      (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))); [done| |].
   { by eapply aneris_sim_rel_finitary. }
   iIntros (?) "/=".
   iMod node_gnames_auth_init as (γmp) "Hmp".
@@ -399,7 +395,7 @@ Proof.
       auth_st (trace_last atr) ∗
         ⌜valid_state_evolution ex atr⌝ ∗
         steps_auth (trace_length ex))%I, (λ _ _, True)%I,
-      ((λ φ v, ⌜φ v⌝)%I <$> eφs.*2), (λ _ _, True)%I.
+      ((λ φ v, ⌜φ v⌝)%I <$> φs), (λ _ _, True)%I.
   iSplitR; [by rewrite !fmap_length|].
   iSplitR; [iApply config_wp_correct|].
   iMod (socket_address_group_own_alloc_subseteq_pre _ A obs_send_sas with "Hauth")
@@ -410,7 +406,7 @@ Proof.
   iDestruct (socket_address_group_own_big_sepS with "Hown_recv") as "Hown_recv".
   iSplitR.
   { iModIntro. rewrite big_sepL2_fmap_l.
-    iApply big_sepL2_intro; [by rewrite !fmap_length|].
+    iApply big_sepL2_intro; [done|].
     iIntros "!>" (k x1 x2 Heq1 Heq2). simplify_eq. by eauto. }
   iSplitR "Hwp Hunallocated HB Hσ HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
   { iSplitL "Hwp Hunallocated HB Hσ HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
@@ -445,13 +441,13 @@ Theorem adequacy_strong `{anerisPreG Σ Mdl}
         `{EqDecision (aneris_to_trace_model Mdl)} A
         (lbls: gset string)
         (obs_send_sas obs_rec_sas : gset socket_address)
-        s (eφs : list (aneris_expr * (aneris_val → Prop))) σ :
-  length eφs >= 1 →
+        s (es : list aneris_expr) σ (φs : list (aneris_val → Prop)) :
+  length es >= 1 →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   aneris_model_rel_finitary Mdl →
-  wp_proto_strong A lbls obs_send_sas obs_rec_sas σ s eφs →
-  dom $ state_heaps σ = get_ips eφs →
-  dom $ state_sockets σ = get_ips eφs →
+  wp_proto_strong A lbls obs_send_sas obs_rec_sas σ s es φs →
+  dom $ state_heaps σ = get_ips es →
+  dom $ state_sockets σ = get_ips es →
   (* Port coherence *)
   ((∀ ip ps, (GSet <$> (addrs_to_ip_ports_map
                               (A ∖ (ports_in_use $ state_sockets σ))))
@@ -464,7 +460,7 @@ Theorem adequacy_strong `{anerisPreG Σ Mdl}
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
-  adequate_multiple s (eφs.*1) σ ((λ φ v _, φ v) <$> eφs.*2).
+  adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
   intros Hlen Hsendle Hrecvle.
   intros HMdlfin Hwp Hheaps_dom Hsockets_dom Hportts Hsockets Hsockets_coh1 Hsockets_coh2 Hms. simpl.
