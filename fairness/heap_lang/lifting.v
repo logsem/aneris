@@ -952,6 +952,64 @@ Proof using PMP.
   by iApply "Hterm". 
 Qed.
 
+(* TODO: upstream? *)
+Lemma gmap_filter_dom_id {K A: Type} `{Countable K} (m: gmap K A):
+  filter (fun '(k, _) => k ∈ dom m) m = m.
+Proof.
+  rewrite map_filter_id; [done| ].
+  intros. by eapply elem_of_dom_2. 
+Qed. 
+
+(* TODO: upstream? *)
+Lemma gmap_empty_subseteq_equiv {K A: Type} `{Countable K} (m: gmap K A):
+  m ⊆ ∅ <-> m = ∅. 
+Proof.
+  clear.
+  split; [| set_solver].
+  intros E. destruct (map_eq_dec_empty m); try set_solver.
+  apply map_choose in n as (?&?&?).
+  eapply lookup_weaken in E; set_solver. 
+Qed. 
+
+(* TODO: upstream? *)
+Lemma gmap_filter_disj_id {K A: Type} `{Countable K} (m1 m2: gmap K A)
+                          (DISJ: m1 ##ₘ m2):
+  m1 = filter (λ '(k, _), k ∈ dom m1) (m1 ∪ m2).
+Proof.
+  rewrite map_filter_union; auto.
+  rewrite map_union_comm; [| by apply map_disjoint_filter]. 
+  rewrite gmap_filter_dom_id.
+  symmetry. apply map_subseteq_union. etransitivity; [| apply map_empty_subseteq].
+  apply gmap_empty_subseteq_equiv. 
+  eapply map_filter_empty_iff. apply map_Forall_lookup_2.
+  intros. intros [? ?]%elem_of_dom. eapply map_disjoint_spec; eauto.
+Qed. 
+  
+
+Lemma wp_fork_nostep_alt s tid E e Φ
+  (fs1 fs2: gmap (fmrole iM) nat)
+  (DISJ: fs1 ##ₘ fs2)
+  (NE: fs1 ∪ fs2 ≠ ∅):
+  (∀ tid', ▷ (has_fuels tid' fs2 -∗
+                WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
+  ) -∗
+     ▷ (has_fuels tid fs1 ={E}=∗ Φ (LitV LitUnit)) -∗
+     has_fuels_S tid (fs1 ∪ fs2) -∗ WP Fork e @ s; tid; E {{ Φ }}.
+Proof using PMP.
+  iIntros "FORK FUEL1 FUEL".
+  iApply (wp_fork_nostep with "[FORK] [FUEL1]").
+  { by eapply map_disjoint_dom_1. }
+  all: try set_solver. 
+  { iIntros (?). iNext. iIntros "FUEL". iApply "FORK".
+    iApply has_fuels_proper; [reflexivity| | iFrame].
+    rewrite map_union_comm; auto.
+    by apply leibniz_equiv_iff, gmap_filter_disj_id. }
+  iNext. iIntros "FUEL". iApply "FUEL1".
+  iApply has_fuels_proper; [reflexivity| | iFrame].
+  by apply leibniz_equiv_iff, gmap_filter_disj_id.
+Qed.   
+
+
 (** Heap *)
 (** The usable rules for [allocN] stated in terms of the [array] proposition
 are derived in te file [array]. *)
