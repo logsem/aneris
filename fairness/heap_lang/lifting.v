@@ -857,7 +857,7 @@ Proof using PMP.
   { econstructor =>//.
     - rewrite Hexend //=.
     - by apply fill_step. }
-  { rewrite Hmeq. apply Hval. }
+  (* { rewrite Hmeq. apply Hval. } *)
   iModIntro. iDestruct "H" as (δ2 ℓ [Hlabels Hvse]) "(Hfuels&Hmod&Hmi&Hfr)".
   iExists δ2, ℓ.
   rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".

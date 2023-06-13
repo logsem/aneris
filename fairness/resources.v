@@ -489,7 +489,7 @@ Section PartialOwnership.
     trace_last extr = (tp1, σ1) →
     trace_last auxtr = δ1 ->
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
-    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 (project_inner δ1) s2 ρ (LM := iLM) ->
+    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM) ->
     has_fuels ζ fs1 -∗ partial_model_is s1 -∗ model_state_interp tp1 δ1 -∗
     partial_free_roles_are fr1
     ==∗ ∃ (δ2: LM) ℓ,
@@ -1419,7 +1419,7 @@ Section ActualOwnershipImpl.
     trace_last extr = (tp1, σ1) →
     trace_last auxtr = δ1 ->
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
-    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 δ1 s2 ρ (LM := LM) ->
+    fmtrans _ s1 (Some ρ) s2 -> valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := LM) ->
     has_fuels ζ fs1 -∗ frag_model_is s1 -∗ model_state_interp tp1 δ1 -∗
     frag_free_roles_are fr1
     ==∗ ∃ (δ2: LM) ℓ,
