@@ -11,138 +11,136 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params time events resources.
 
-Definition cache_commit `{!KVS_time}  c k t : option write_event :=
-    match c.(cache_newv) with
-      | None => c.(cache_snap)
-      | Some v => Some {| we_key := k;  we_val := v; we_time := t; |}
-    end.
+Definition can_commit_set `{!KVS_time}
+ (m ms : gmap Key (option write_event)) (s : gset Key) : Prop :=
+  ∀ (k : Key), k ∈ s → m !! k = ms !! k.
+
+Definition can_commit `{!KVS_time}
+ (m ms : gmap Key (option write_event)) (mc : gmap Key (option val * bool)) : Prop :=
+  ∀ (k : Key) (v: val), mc !! k = Some (Some v, true) → m !! k = ms !! k.
 
 Definition max_timestamp `{!KVS_time} t (m : gmap Key (option write_event)) : Prop :=
     ∀ k (e : write_event), m !! k = Some (Some e) → TM_lt e.(we_time) t.
 
-Definition can_commit `{!KVS_time}
-    (m : gmap Key (option write_event))
-    (mc : gmap Key cache_event) : Prop :=
-    ∀ (k : Key) (ce : cache_event),
-       k ∈ dom m → (mc !! k) = Some ce → is_Some (ce.(cache_newv)) →
-       m !! k = Some ce.(cache_snap).
-
-Definition cache_updv `{!KVS_time} (c : cache_event) (v : val) : cache_event :=
-  {|cache_snap := c.(cache_snap); cache_newv := Some v |}.
-
-Definition cache_getv `{!KVS_time} (c : cache_event) : option val :=
-  match c.(cache_newv) with
-  | Some v => Some v
-  | None =>
-      match c.(cache_snap) with
-      | Some we => Some we.(we_val)
+Definition weo_val `{!KVS_time} (weo : option write_event) :=
+    match weo with
       | None => None
-      end
-  end.
+      | Some we => Some we.(we_val)
+    end.
 
-Definition cache_make `{!KVS_time} (we : option write_event) : cache_event :=
-  {|cache_snap := we; cache_newv := None |}.
-
-Definition kvs_snap_coh `{!KVS_time}
-  (ms m : gmap Key (option write_event)) : Prop :=
-  dom m = dom ms ∧
-    ∀ k we, k ∈ dom ms →
-       ms !! k = Some (Some we) →
-      ∃ we', m !! k = Some (Some we') ∧ we ≤ₜ we'.
-
-Definition snap_cache_coh `{!KVS_time}
-  (ms : gmap Key (option write_event)) (mc : gmap Key cache_event) : Prop :=
-  dom ms = dom mc ∧
-    ∀ k (wo : option write_event), k ∈ dom ms →
-       ms !! k = Some wo →
-      ∃ c, mc !! k = Some c ∧ c.(cache_snap) = wo.
-
+Definition commit_event `{!KVS_time}
+  (k : Key) (t : Time) (p : option val * bool) (eo : option write_event) :=
+    match p with
+    | (Some v, true) => Some {|we_key:=k; we_val:=v; we_time:=t|}
+    | _              => eo
+    end.
 
 (** Specifications for read and write operations.  *)
 Section Specification.
   Context `{!anerisG Mdl Σ, !User_params, !KVS_time,
             !KVS_snapshot_isolation_api, !SI_resources Mdl Σ}.
 
-
   Definition write_spec : iProp Σ :=
-    ∀ (cstate : val) (sa : socket_address)
-      (c : cache_event)
-      (k : Key) (v : SerializableVal) E,
+    ∀ (c : val) (sa : socket_address)
+      (vo : option val)
+      (k : Key) (v : SerializableVal) (b : bool) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ k ↦ₜ c }}}
-      SI_write cstate #k v @[ip_of_address sa] E
-    {{{ RET #(); k ↦ₜ cache_updv c v }}}.
+    {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
+      SI_write c #k v @[ip_of_address sa] E
+    {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
   Definition read_spec : iProp Σ :=
-    ∀ (cstate : val) (sa : socket_address)
-      (k : Key) (c : cache_event) E,
-    {{{ k ↦ₜ c }}}
-      SI_read cstate #k @[ip_of_address sa] E
-    {{{ vo, RET vo; ⌜vo = $(cache_getv c)⌝ ∗ k ↦ₜ c }}}.
+    ∀ (c : val) (sa : socket_address)
+      (k : Key) (vo : option val) E,
+    ⌜k ∈ KVS_keys⌝ -∗
+    {{{ k ↦{c} vo }}}
+      SI_read c #k @[ip_of_address sa] E
+    {{{ RET $vo; k ↦{c} vo }}}.
 
-  Definition start_spec : iProp Σ :=
-    ∀ (cstate : val) (sa : socket_address)
+   Definition start_spec : iProp Σ :=
+    ∀ (c : val) (sa : socket_address)
        (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m : gmap Key (option write_event)),
-       ConnectionState cstate CanStart ∗
+       ConnectionState c CanStart ∗
        [∗ map] k ↦ eo ∈ m, k ↦ₖ eo >>>
-      SI_start cstate @[ip_of_address sa] E
+      SI_start c @[ip_of_address sa] E
     <<<▷ RET #();
-       ConnectionState cstate (Active m) ∗
+       ConnectionState c (Active m) ∗
        ([∗ map] k ↦ eo ∈ m, k ↦ₖ eo) ∗
-       ([∗ map] k ↦ eo ∈ m, k ↦ₜ cache_make eo) >>>.
+       ([∗ map] k ↦ eo ∈ m, k ↦{c} (weo_val eo) ∗ KeyUpdStatus c k false)>>>.
+
+
 
   Definition commit_spec : iProp Σ :=
-   ∀ (cstate : val) (sa : socket_address)
-     (P :  gmap Key (option write_event) → iProp Σ)
-     (Q :  gmap Key (option write_event) → gmap Key cache_event → iProp Σ)
+   ∀ (c : val) (sa : socket_address)
      (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m ms: gmap Key (option write_event))
-           (mc : gmap Key cache_event),
-        ConnectionState cstate (Active ms) ∗
-        ⌜snap_cache_coh m mc⌝ ∗
+           (mc : gmap Key (option val * bool)),
+        ConnectionState c (Active ms) ∗
+        ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ eo ∈ m, k ↦ₖ eo) ∗
-        ([∗ map] k ↦ c ∈ mc, k ↦ₜ c) ∗
-        P ms >>>
-      SI_commit cstate @[ip_of_address sa] E
+        ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1  ∗ KeyUpdStatus c k p.2) >>>
+      SI_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
-        ConnectionState cstate CanStart ∗
-         ⌜kvs_snap_coh ms m⌝ ∗
+        ConnectionState c CanStart ∗
         (** Transaction has been commited. *)
-        (⌜b = true⌝ ∗ ⌜can_commit m mc⌝ ∗
-          ∃ (t: Time), ⌜max_timestamp t m⌝ ∗
-            ([∗ map] k↦c ∈ mc,  k ↦ₖ cache_commit c k t) ∗ Q ms mc) ∨
+        (⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
+         ∃ (t: Time), ⌜max_timestamp t m⌝ ∗
+          ([∗ map] k↦ eo;p ∈ m; mc, k ↦ₖ commit_event k t p eo)) ∨
         (** Transaction has been aborted. *)
-         (⌜b = false⌝ ∗ ⌜¬ can_commit m mc⌝ ∗
+         (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
            [∗ map] k ↦ eo ∈ m, k ↦ₖ eo) >>>.
 
 Definition run_spec : iProp Σ :=
-    ∀ (cstate : val) (tbody : val)
+    ∀ (c : val) (tbody : val)
       (sa : socket_address) (E : coPset)
       (P :  gmap Key (option write_event) → iProp Σ)
-      (Q :  gmap Key (option write_event) → gmap Key cache_event → iProp Σ),
+      (Q :  gmap Key (option write_event) → gmap Key (option val * bool) → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-      (∀ (m0 : gmap Key (option write_event)) (mc : gmap Key cache_event),
-         {{{ ([∗ map] k ↦ wo ∈ m0, k ↦ₜ cache_make wo) ∗ P m0 }}}
-           tbody cstate #() @[ip_of_address sa] E
-         {{{ RET #(); ([∗ map] k ↦ c ∈ mc, k ↦ₜ c) ∗ Q m0 mc }}})
+      (∀ (m0 : gmap Key (option write_event)) (mc : gmap Key (option val * bool)),
+         {{{ ([∗ map] k ↦ eo ∈ m0, k ↦{c} (weo_val eo) ∗ KeyUpdStatus c k false) ∗ P m0 }}}
+           tbody c #() @[ip_of_address sa] E
+         {{{ RET #(); ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗ Q m0 mc }}})
     →
-    <<< ∀∀ m0, ConnectionState cstate CanStart ∗
+    <<< ∀∀ m0, ConnectionState c CanStart ∗
                P m0 ∗
                [∗ map] k ↦ eo ∈ m0, k ↦ₖ eo >>>
-           SI_run cstate tbody @[ip_of_address sa] E
+           SI_run c tbody @[ip_of_address sa] E
     <<<▷∃∃ m1 mc b, RET #b;
-               ConnectionState cstate CanStart ∗
-               ⌜kvs_snap_coh m0 m1⌝ ∗
+               ConnectionState c CanStart ∗
                (** Transaction has been commited. *)
-               (⌜b = true⌝ ∗ ⌜can_commit m1 mc⌝ ∗
+               (⌜b = true⌝ ∗ ⌜can_commit m1 m0 mc⌝ ∗ Q m0 mc ∗
                 ∃ (t: Time), ⌜max_timestamp t m1⌝ ∗
-                  ([∗ map] k↦c ∈ mc,  k ↦ₖ cache_commit c k t) ∗ Q m0 mc) ∨
+                   ([∗ map] k↦ eo;p ∈ m1; mc, k ↦ₖ commit_event k t p eo)) ∨
                (** Transaction has been aborted. *)
-               (⌜b = false⌝ ∗ ⌜¬ can_commit m1 mc⌝ ∗
+               (⌜b = false⌝ ∗ ⌜¬ can_commit m1 m0 mc⌝ ∗
                 [∗ map] k ↦ eo ∈ m1, k ↦ₖ eo) >>>.
+
+ Definition commit_spec_alt : iProp Σ :=
+   ∀ (c : val) (sa : socket_address)
+     (E : coPset),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    <<< ∀∀ (m ms: gmap Key (option write_event))
+           (mcr : gmap Key (option val))
+           (mcw : gmap Key val),
+        ConnectionState c (Active ms) ∗
+        ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mcr ∪ dom mcw⌝ ∗ ⌜dom mcr ## dom mcw⌝ ∗
+        ([∗ map] k ↦ eo ∈ m, k ↦ₖ eo) ∗
+        ([∗ map] k ↦ vo ∈ mcr, k ↦{c}  vo    ∗ KeyUpdStatus c k false) ∗
+        ([∗ map] k ↦ v  ∈ mcw, k ↦{c} Some v ∗ KeyUpdStatus c k true) >>>
+      SI_commit c @[ip_of_address sa] E
+    <<<▷∃∃ b, RET #b;
+        ConnectionState c CanStart ∗
+        (** Transaction has been commited. *)
+        (⌜b = true⌝ ∗ ⌜can_commit_set m ms (dom mcw)⌝ ∗
+         ∃ (t: Time), ⌜max_timestamp t m⌝ ∗
+          ([∗ map] k↦_ ∈ mcr, ∃ eo, ⌜m !! k = Some eo⌝ ∗ k ↦ₖ eo) ∗
+          ([∗ map] k↦v ∈ mcw, k ↦ₖ Some {|we_key:=k; we_val:=v; we_time:=t|})) ∨
+        (** Transaction has been aborted. *)
+         (⌜b = false⌝ ∗ ⌜¬ can_commit_set m ms (dom mcw)⌝ ∗
+           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo) >>>.
 
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ (sa : socket_address),

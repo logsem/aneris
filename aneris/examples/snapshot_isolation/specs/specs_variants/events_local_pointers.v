@@ -1,7 +1,7 @@
 
 From aneris.aneris_lang Require Import lang.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params  time.
+     Require Import user_params time.
 
 (** Write and apply events *)
 
@@ -16,6 +16,12 @@ Section Events.
       we_key : Key;
       we_val : val;
       we_time : Time;
+    }.
+ (** Cache event *)
+  Record cache_event :=
+   {
+     cache_snap : option write_event;
+     cache_newv : option val;
     }.
 
 End Events.
@@ -43,6 +49,21 @@ Section Events_lemmas.
                                we_time := x.2; |}) <$>
                         @decode
                         (Key * val * Time)%type
+                        _ _ n
+           |}.
+    by intros []; rewrite /= decode_encode /=.
+  Qed.
+
+  Global Instance cahce_event_dec : EqDecision cache_event.
+  Proof. solve_decision. Qed.
+
+  Global Instance cache_event_countable : Countable cache_event.
+  Proof.
+    refine {| encode := λ a, encode (cache_snap a, cache_newv a);
+              decode := λ n,
+                      (λ x, {| cache_snap := x.1; cache_newv := x.2; |}) <$>
+                        @decode
+                        (option write_event * option val)%type
                         _ _ n
            |}.
     by intros []; rewrite /= decode_encode /=.
