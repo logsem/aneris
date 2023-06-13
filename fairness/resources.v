@@ -302,7 +302,7 @@ Section PartialOwnership.
       partial_free_roles_are: gset (fmrole iM) → iProp Σ;
       partial_fuel_is: gmap (fmrole iM) nat → iProp Σ;
       partial_mapping_is: gmap (locale Λ) (gset (fmrole iM)) → iProp Σ;
-      project_inner: M -> iM;
+      project_inner: M -> option iM;
       
       partial_model_is_Timeless :> forall s, Timeless (partial_model_is s);
       partial_fuel_is_Timeless :> forall fs, Timeless (partial_fuel_is fs);
@@ -499,7 +499,7 @@ Section PartialOwnership.
         partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1));
 
     partial_model_agree': forall n δ1 s2,
-        model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = s2⌝;
+        model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = Some s2⌝;
     (* partial_no_fuels_disabled: *)
     (*     forall tid, has_fuels tid ∅ -∗ partial_thread_disabled tid; *)
   }.
@@ -893,7 +893,7 @@ Section model_state_lemmas.
         partial_free_roles_are := frag_free_roles_are;
         partial_fuel_is := frag_fuel_is;
         partial_mapping_is := frag_mapping_is;
-        project_inner := id;
+        project_inner := Some;
       |}.
   Defined. 
 
@@ -1703,7 +1703,8 @@ Qed.
       iApply (actual_update_no_step_enough_fuel with "FUEL"); set_solver. 
     - intros. iApply actual_update_fork_split; done. 
     - intros. iApply actual_update_step_still_alive; done.
-    - intros. iIntros "MSI ?". by iApply (model_agree' with "MSI"). 
+    - intros. iIntros "MSI ST".
+      by iDestruct (model_agree' with "MSI ST") as "->".
   Defined. 
 
 End ActualOwnershipImpl.

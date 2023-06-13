@@ -1261,7 +1261,8 @@ Proof using PMP.
   - repeat (split; try done); [|set_solver|set_solver|set_solver| set_solver |].
     + intros ??. rewrite !lookup_singleton /=. lia.
     + rewrite dom_singleton singleton_subseteq_l. simplify_eq.
-      destruct (decide (ρ ∈ live_roles _ (project_inner (trace_last atr)))); set_solver.
+      (* destruct (decide (ρ ∈ live_roles _ (project_inner (trace_last atr)))); set_solver. *)
+      destruct (decide (ρ ∈ live_roles _ s1)); set_solver.
   - rewrite -> bool_decide_eq_true_2 in *; eauto.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
