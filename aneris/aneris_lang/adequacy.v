@@ -49,7 +49,9 @@ Definition wp_group_proto_strong `{anerisPreG Σ Mdl} A
      ([∗ set] sag ∈ obs_send_sas, sendon_evs_groups sag []) -∗
      ([∗ set] sag ∈ obs_rec_sas, receiveon_evs_groups sag []) -∗
      observed_send_groups obs_send_sas -∗
-     observed_receive_groups obs_rec_sas ={⊤}=∗
+     observed_receive_groups obs_rec_sas -∗
+     aneris_state_interp σ (∅, ∅) ={⊤}=∗
+     aneris_state_interp σ (∅, ∅) ∗
      wptp s es ((λ φ, (λ v, ⌜φ v⌝):aneris_val → iProp Σ) <$> φs)).
 
 Definition wp_proto_strong `{anerisPreG Σ Mdl} A
@@ -72,7 +74,9 @@ Definition wp_proto_strong `{anerisPreG Σ Mdl} A
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
-     observed_receive obs_rec_sas ={⊤}=∗
+     observed_receive obs_rec_sas -∗
+     aneris_state_interp σ (∅, ∅) ={⊤}=∗
+     aneris_state_interp σ (∅, ∅) ∗
      wptp s es ((λ φ, (λ v, ⌜φ v⌝):aneris_val → iProp Σ) <$> φs)).
 
 Definition wp_group_proto `{anerisPreG Σ Mdl} IPs A
@@ -408,18 +412,6 @@ Proof.
   { iModIntro. rewrite big_sepL2_fmap_l.
     iApply big_sepL2_intro; [done|].
     iIntros "!>" (k x1 x2 Heq1 Heq2). simplify_eq. by eauto. }
-  iSplitR "Hwp Hunallocated HB Hσ HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
-  { iSplitL "Hwp Hunallocated HB Hσ HPs Hmfrag Halobs Hsendevs Hreceiveevs Hown_send Hown_recv"; last first.
-    { iModIntro. iIntros (???) "% % % % % % % (?& Hsi & Htr & % & Hauth) Hpost".
-      iSplit; last first.
-      { iIntros (?). iApply fupd_mask_intro_discard; done. }
-      iIntros "!> ((?&?&?&%&?) &?) /=". iFrame. done. }
-    iDestruct ("Hwp" with "Hunallocated HB [Hσ] HPs [$Hmfrag //] [Hn] Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive") as "Hwp".
-    { rewrite Hheaps_dom. done. }
-    { rewrite Hheaps_dom. done. }
-    { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
-    { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
-    iMod "Hwp". iModIntro. iFrame. }
   iMod (socket_address_group_own_alloc_subseteq_pre _ A (obs_send_sas ∪ obs_rec_sas) with "Hauth")
     as "[Hauth Hown_send_recv]"; [by set_solver|].
   iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$".
@@ -427,14 +419,22 @@ Proof.
   rewrite Hms gset_of_gmultiset_empty.
   iMod (socket_address_group_own_alloc_subseteq_pre _ A A with "Hauth")
     as "[Hauth Hown]"; [by set_solver|].
-  iPoseProof (@aneris_state_interp_init_strong _ _ dg ∅
+  iPoseProof (@aneris_state_interp_init_strong _ _ dg ∅ _ (addrs_to_ip_ports_map (⋃ₛ A ∖ ports_in_use (state_sockets σ)))
                with "Hγs Hσctx Hms [$Hauth $Hown]
-               Hunallocated_auth Hsi HIPsCtx HPiu") as "$";
+               Hunallocated_auth Hsi HIPsCtx HPiu") as "Hinterp";
     [set_solver|set_solver|set_solver|set_solver|set_solver|
       done|done|done|done|done|done|..].
-  simpl.
-  iFrame "Hmfull Hsteps".
-  done.
+  iMod ("Hwp" with "Hunallocated HB [Hσ] HPs [$Hmfrag //] [Hn] Halobs [Hsendevs Hown_send] [Hreceiveevs Hown_recv] Hobserved_send Hobserved_receive Hinterp") as "[Hinterp Hwp]".
+  { rewrite Hheaps_dom. done. }
+  { rewrite Hheaps_dom. done. }
+  { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
+  { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
+  iFrame.
+  iSplitR; [done|].
+  iModIntro. iIntros (???) "% % % % % % % (?& Hsi & Htr & % & Hauth) Hpost".
+  iSplit; last first.
+  { iIntros (?). iApply fupd_mask_intro_discard; done. }
+  iIntros "!> ((?&?&?&%&?) &?) /=". iFrame. done.
 Qed.
 
 Theorem adequacy_strong `{anerisPreG Σ Mdl}

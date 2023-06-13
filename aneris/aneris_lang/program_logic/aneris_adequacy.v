@@ -44,7 +44,9 @@ Theorem adequacy_strong Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trac
      ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
-     observed_receive obs_rec_sas ={⊤}=∗
+     observed_receive obs_rec_sas -∗
+     aneris_state_interp σ (∅,∅) ={⊤}=∗
+     aneris_state_interp σ (∅,∅) ∗
      aneris_wptp es ((λ φ, (λ v, ⌜φ v⌝):val → iProp Σ) <$> φs)) →
   obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
   dom $ state_heaps σ = get_ips es →
@@ -70,9 +72,9 @@ Proof.
     [done|done|done|done| |done..].
   intros dg.
   iMod (Hwp dg) as "Hwp".
-  iModIntro. iIntros "????? #Hns ????? /=".
-  iSpecialize ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$]").
-  iMod "Hwp". iModIntro. clear Hwp Hlen Hσ Hskts.
+  iModIntro. iIntros "????? #Hns ?????? /=".
+  iSpecialize ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]").
+  iMod "Hwp" as "[$ Hwp]". iModIntro. clear Hwp Hlen Hσ Hskts.
   setoid_rewrite aneris_wp_unfold. rewrite /aneris_wp_def.
   assert (∃ es', [] = es') as [es' ->] by eauto.
   iDestruct (big_sepL_prefixes_l _ es' with "Hwp") as "Hwp".
