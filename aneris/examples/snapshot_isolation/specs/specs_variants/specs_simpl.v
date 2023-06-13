@@ -9,7 +9,9 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params resources_simpl.
+     Require Import user_params.
+From aneris.examples.snapshot_isolation.specs.specs_variants
+     Require Import resources_simpl.
 
 
 (** Specifications for read and write operations.  *)

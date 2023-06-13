@@ -10,26 +10,21 @@ From aneris.examples.snapshot_isolation.specs
 Section Resources.
 
   Reserved Notation "k ↦ₖ e" (at level 20).
-  Reserved Notation "k ↦ₜ c" (at level 20).
 
   Inductive local_state `{!KVS_time}: Type :=
    | CanStart
-   | Active (ms : gmap Key (option write_event)).
+   | Active (ms : gmap Key (option write_event)) (mc : gmap Key val).
 
   Class SI_resources Mdl Σ
-    `{!anerisG Mdl Σ, !KVS_time, !User_params}:= {
+        `{!anerisG Mdl Σ, !KVS_time, !User_params}:= {
 
     (** System global invariant *)
     GlobalInv : iProp Σ;
     GlobalInvPersistent :> Persistent GlobalInv;
 
-    (** Logical global points-to connective *)
+    (** Logical points-to connective *)
     OwnMemKey : Key → option write_event → iProp Σ
     where "k ↦ₖ v" := (OwnMemKey k v);
-
-   (** Logical Local points-to connective *)
-    OwnLocalKey : Key → cache_event → iProp Σ
-    where "k ↦ₜ c" := (OwnLocalKey k c);
 
     (** Logical points-to connective *)
     ConnectionState : val → local_state → iProp Σ;
@@ -40,35 +35,25 @@ Section Resources.
     OwnMemKey_timeless k v :> Timeless (k ↦ₖ v);
     OwnMemKey_exclusive k v v' :
       k ↦ₖ v ⊢ k ↦ₖ v' -∗ False;
-    OwnMemKey_key k we E :
+    OwnMemKey_key k write_event E :
       nclose KVS_InvName ⊆ E →
       GlobalInv ⊢
-      k ↦ₖ Some we ={E}=∗
-      k ↦ₖ Some we ∗ ⌜we_key we = k⌝;
-
-(** Properties of local points-to connective *)
-    OwnLocalKey_timeless k v :> Timeless (k ↦ₜ v);
-    OwnLocalKey_exclusive k v v' :
-      k ↦ₜ v ⊢ k ↦ₜ v' -∗ False;
+      k ↦ₖ Some write_event ={E}=∗
+      k ↦ₖ Some write_event ∗ ⌜we_key write_event = k⌝;
 
     (** Laws *)
-    ConnectionState_relation E k r ms we :
+    ConnectionState_relation E k r ms mc write_event :
     ↑KVS_InvName ⊆ E ->
     GlobalInv ⊢
-    ConnectionState r (Active ms) -∗ k ↦ₖ Some we ={E}=∗
+    ConnectionState r (Active ms mc) -∗ k ↦ₖ Some write_event ={E}=∗
     ⌜k ∈ dom ms →
-    ∀ we', ms !! k = Some (Some we') → we' ≤ₜ we ⌝;
+    ∀ write_event', ms !! k = Some (Some write_event') → write_event' ≤ₜ write_event ⌝;
 
-   OwnMemKey_OwnLocalKey_coh k we c E :
-      GlobalInv ⊢
-      k ↦ₖ Some we -∗ k ↦ₜ c ={E}=∗
-      ∃ we', ⌜c.(cache_snap) = Some we'⌝ ∗ ⌜we' ≤ₜ we⌝;
-
-   ConnectionState_Keys E r ms :
+    ConnectionState_Keys E r ms mc :
     ↑KVS_InvName ⊆ E ->
       GlobalInv ⊢
-      ConnectionState r (Active ms) ={E}=∗
-      ⌜dom ms ⊆ KVS_keys⌝;
+      ConnectionState r (Active ms mc) ={E}=∗
+      ⌜dom ms ⊆ KVS_keys⌝ ∧ ⌜dom mc ⊆ dom ms⌝;
 
   (* ... about keys in domains *)
   }.
@@ -76,5 +61,4 @@ Section Resources.
 End Resources.
 (* Arguments SI_resources _ _ : clear implicits. *)
 
-Notation "k ↦ₖ e" := (OwnMemKey k e) (at level 20).
-Notation "k ↦ₜ c" := (OwnLocalKey k c) (at level 20).
+Notation "k ↦ₖ v" := (OwnMemKey k v) (at level 20).
