@@ -155,7 +155,7 @@ Definition init_kvs_spec : iProp Σ :=
         KVS_address ⤳ (∅,∅) ∗
         free_ports (ip_of_address KVS_address)
                    {[port_of_address KVS_address]} ∗
-      KVS_Init_Srv }}}
+      KVS_Init }}}
       SI_init_server (s_serializer KVS_serialization)
         #KVS_address
         @[(ip_of_address KVS_address)]
@@ -185,7 +185,7 @@ Section SI_Module.
        GlobalInv ∗
        ([∗ set] k ∈ KVS_keys, k ↦ₖ None) ∗
        init_kvs_spec ∗
-       KVS_Init_Srv ∗
+       KVS_Init ∗
        init_client_proxy_spec ∗
        read_spec ∗
        write_spec ∗

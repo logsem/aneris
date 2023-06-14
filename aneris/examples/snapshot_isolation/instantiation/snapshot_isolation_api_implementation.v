@@ -22,9 +22,6 @@ Section implementation.
 
   Context `{!anerisG Mdl Σ, !User_params, !KVS_time}.
 
-  Context (KVS_ser_inj : ser_is_injective KVS_serialization).
-  Context (KVS_ser_inj_alt : ser_is_injective_alt KVS_serialization).
-
   Global Instance SI_implementation_init : SI_init.
   Proof.
     (* TODO *)
