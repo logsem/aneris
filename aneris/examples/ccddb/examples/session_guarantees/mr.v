@@ -75,7 +75,7 @@ Section MonotonicReads.
                     ∗ (⌜AE_key e2 = key⌝)
                     ∗ (⌜AE_val e2 = v2⌝)
                     ∗ (⌜e2 ∈ Maximals (restrict_key key s)⌝)
-                    ∗ (⌜¬ (e2 <ₜe1)⌝)
+                    ∗ (⌜¬ (e2 <ₜ e1)⌝)
               )
    ) }}}.
   Proof.

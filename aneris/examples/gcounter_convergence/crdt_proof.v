@@ -649,7 +649,7 @@ Section proof.
   Proof.
     revert i; induction l as [|a l IHl]; intros i Hli; simpl in *; first lia.
     destruct i; simpl; first lia.
-    apply plus_lt_compat_l; apply IHl; lia.
+    apply Nat.add_lt_mono_l; apply IHl; lia.
   Qed.
 
   Lemma gcounter_incr_proof l (i : nat) a :
@@ -732,7 +732,7 @@ Section proof.
       iExists (list_sum (vc_incr fi (st' !!! fi))); iFrame "#".
       iSplit; last by iExists _; iFrame "Hsnap'".
       iPureIntro.
-      eapply le_lt_trans; first by apply vc_le_sum.
+      eapply Nat.le_lt_trans; first by apply vc_le_sum.
       rewrite vec_to_list_vc_incr Heq.
       apply list_sum_incr_time.
       rewrite vec_to_list_length; done.

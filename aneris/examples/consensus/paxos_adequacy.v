@@ -146,7 +146,7 @@ Proof.
   rewrite /inl_deser /nat_deser /int_ser_str /inl_ser_str /int_deser.
   replace 2 with (String.length "L_") by done.
   rewrite substring_0_length_append /=.
-  rewrite -minus_n_O substring_0_length.
+  rewrite Nat.sub_0_r substring_0_length.
   rewrite ZOfString_inv /=.
   f_equal. lia.
 Qed.
@@ -158,7 +158,7 @@ Proof.
   rewrite /inr_deser /inr_ser_str.
   replace 2 with (String.length "R_") by done.
   rewrite substring_0_length_append /=.
-  rewrite -minus_n_O substring_0_length.
+  rewrite Nat.sub_0_r substring_0_length.
   rewrite /prod_deser /prod_ser_str.
   erewrite (index_0_append_char); [|done|]; last first.
   { apply valid_tag_stringOfZ. }
@@ -171,7 +171,7 @@ Proof.
   rewrite substring_0_length_append.
   rewrite /int_ser_str.
   rewrite ZOfString_inv /=.
-  rewrite -plus_assoc substring_add_length_app /=.
+  rewrite -Nat.add_assoc substring_add_length_app /=.
   rewrite !length_app /=.
   match goal with
     | |- context [substring _ ?X _] =>

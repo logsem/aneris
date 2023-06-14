@@ -53,7 +53,7 @@ Section ReadYourWrites.
                  ∗ Seen db_id s
                  ∗ ⌜e ∈ s⌝
                  ∗ ⌜e' ∈ s⌝
-                 ∗ ⌜¬ (e <ₜe')⌝
+                 ∗ ⌜¬ (e <ₜ e')⌝
    }}}.
   Proof.
     iIntros (ϕ) "(#Hsi & Hca & Hfree & Hrs) Hcont".

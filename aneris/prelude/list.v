@@ -53,7 +53,7 @@ Proof.
   exists (length l1), (length l1 + S (length l3)); split_and!; [lia| | |done|done].
   - rewrite lookup_app_r; first done. rewrite Nat.sub_diag; done.
   - rewrite lookup_app_r; first lia.
-    rewrite minus_plus /=.
+    rewrite Nat.add_comm Nat.add_sub /=.
     rewrite lookup_app_r; first done. rewrite Nat.sub_diag; done.
 Qed.
 

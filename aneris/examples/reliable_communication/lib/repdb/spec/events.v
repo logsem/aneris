@@ -321,7 +321,8 @@ Section Events_lemmas.
     assert (i = length h + j)%nat; last lia.
     eapply NoDup_alt; [exact Hnd| |].
     { rewrite lookup_app_l; done. }
-    { rewrite lookup_app_r; last lia. rewrite minus_plus; done. }
+    { rewrite lookup_app_r; last lia. rewrite Nat.add_comm.
+      rewrite Nat.add_sub; done. }
   Qed.
 
 End Events_lemmas.

@@ -361,7 +361,7 @@ Lemma append_length_gt (n : nat) s1 s2 :
   String.length s1 < n → get n (s1 +:+ s2) = get (n - String.length s1) s2.
 Proof.
   revert s2 n; induction s1; intros s2 n Hgt.
-  - rewrite append_nil_l -minus_n_O //.
+  - rewrite append_nil_l Nat.sub_0_r //.
   - destruct (gt_exists_S_n _ _ Hgt) as [m ->].
     rewrite -append_cons.
     simpl in *. apply IHs1. lia.
@@ -415,7 +415,7 @@ Proof.
   - rewrite (append_length_gt _ s2) // in Hget.
     destruct (gt_exists_S_n _ _ Hgt) as [n Hn].
     rewrite Hn in Hget.
-    rewrite -minus_Sn_m in Hget; [|lia].
+    rewrite Nat.sub_succ_l in Hget; [|lia].
     simpl in Hget. symmetry in Hget.
     by apply Hs2' in Hget.
 Qed.

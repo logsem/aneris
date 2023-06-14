@@ -30,8 +30,7 @@ Section arith_lemmas.
   Proof. auto with lia. Qed.
 
   Lemma plus_lt_reg_r n m p : n + p < m + p -> n < m.
-  Proof.
-    rewrite 2!(plus_comm _ p). apply plus_lt_reg_l.
+  Proof. rewrite 2!(Nat.add_comm _ p). apply Nat.add_lt_mono_l.
   Qed.
 
   Lemma mod_lowerbound_incr b b' i N :
@@ -44,7 +43,7 @@ Section arith_lemmas.
     rewrite mod_exists // => ->.
     have: 0 < N by lia.
     move=> Hlt /plus_lt_reg_r /(Nat.mul_lt_mono_pos_r N b _ Hlt) ?.
-    apply plus_le_compat_r, Nat.mul_le_mono_r.
+    apply Nat.add_le_mono_r, Nat.mul_le_mono_r.
     lia.
   Qed.
 
@@ -94,7 +93,7 @@ Section ra.
               intros [[? ?] ?]; lia.
     - intros x; rewrite elem_of_filter elem_of_set_seq elem_of_singleton /=.
       intros ->; split_and!; [done| |lia|lia].
-      apply Nat.mod_le; done.
+      apply Nat.Div0.mod_le; done.
   Qed.
 
   Lemma big_opS_apply (g : gset nat) (f : nat → ballot_oneshotUR A) (b : nat) :
@@ -151,11 +150,11 @@ Section ra.
     rewrite discrete_fun_lookup_op.
     destruct ((b' `mod` N =? i) && (b * N + i <=? b')) eqn:Heq.
     - apply andb_true_iff in Heq.
-      destruct Heq as [Hmod%beq_nat_true ?%leb_complete]; simpl.
+      destruct Heq as [Hmod%Nat.eqb_eq ?%leb_complete]; simpl.
       rewrite Hmod Nat.eqb_refl /=.
       destruct (b' =? b * N + i) eqn:Heq.
-      { apply beq_nat_true in Heq. by autorewrite with natb. }
-      apply beq_nat_false in Heq.
+      { apply Nat.eqb_eq in Heq. by autorewrite with natb. }
+      apply Nat.eqb_neq in Heq.
       assert ((b + 1) * N + i <=? b' = true) as ->; [|done].
       apply leb_correct.
       assert (b * N + i < b') by lia.
@@ -163,17 +162,17 @@ Section ra.
     - apply andb_false_iff in Heq.
       destruct Heq as [Heq | Heq]; simpl.
       + rewrite Heq /=.
-        apply beq_nat_false in Heq.
+        apply Nat.eqb_neq in Heq.
         assert (b' =? b * N + i = false) as ->; [|done].
-        apply beq_nat_false_iff. intros ->.
-        rewrite -{2}(Nat.mod_small _ _ Hlt) plus_comm
-                    (Nat.mod_add i _ _ Hneq) // in Heq.
+        apply Nat.eqb_neq. intros ->.
+        rewrite -{2}(Nat.mod_small _ _ Hlt) Nat.add_comm
+                    Nat.Div0.mod_add // in Heq.
      + apply leb_iff_conv in Heq.
        assert ((b + 1) * N + i <=? b' = false) as ->.
        { by autorewrite with natb. }
        rewrite andb_false_r.
        assert (b' =? b * N + i = false) as ->; [|done].
-       apply beq_nat_false_iff. lia.
+       apply Nat.eqb_neq. lia.
   Qed.
 
   Lemma ballot_update b v :
@@ -194,7 +193,7 @@ Section ra.
     ✓ (pending_ballot b ⋅ shot_ballot b v) → False.
   Proof.
     rewrite /pending_ballot /shot_ballot=> /(_ b).
-    rewrite discrete_fun_lookup_op -beq_nat_refl //.
+    rewrite discrete_fun_lookup_op Nat.eqb_refl //.
   Qed.
 
   Lemma shot_shot_valid b v1 v2:
@@ -202,7 +201,7 @@ Section ra.
   Proof.
     rewrite /shot_ballot. split.
     - move=> /(_ b).
-      rewrite discrete_fun_lookup_op -beq_nat_refl.
+      rewrite discrete_fun_lookup_op Nat.eqb_refl.
       rewrite -Some_op -Cinr_op Some_valid Cinr_valid.
       move=> /agree_op_inv /(inj to_agree _ _) //.
     - move=> Heq b'.

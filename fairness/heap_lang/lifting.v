@@ -100,7 +100,7 @@ Proof.
       simpl. rewrite decide_False //. apply IH. split.
       * assert (tid - length tp0 = S ((tid - 1) - length tp0))%nat as Heq by lia.
         rewrite Heq /= in Hlk. rewrite -Hlk app_length /=. f_equal; lia.
-      * rewrite app_length /=. apply lt_le_S in Hle. rewrite Nat.add_comm //.
+      * rewrite app_length /=. apply Nat.le_succ_l in Hle. rewrite Nat.add_comm //.
 Qed.
 
 Lemma from_locale_lookup tp tid e :
@@ -213,7 +213,7 @@ Proof.
       setoid_rewrite lookup_singleton_Some. split; naive_solver.
     - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
     - rewrite dom_gset_to_gmap. set_solver. }
-  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck) "Hsi Hposts".
+  iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Hequiv) "Hsi Hposts".
 
   assert ( ∀ (ex' : finite_trace (cfg heap_lang) (olocale heap_lang)) (atr' : auxiliary_trace LM) (oζ : olocale heap_lang) (ℓ : mlabel LM),
    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')) as Hcontr'.

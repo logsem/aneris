@@ -80,7 +80,7 @@ Section Local_history_valid.
       pose proof (DBM_LSV_caus Hesecvl j' e Hj'lt) as Hvlirrefl.
       rewrite Hk /= in Hvlirrefl.
       rewrite DBM_lsec_latest_in_frame_empty in Hvlirrefl; last done.
-      f_equal; symmetry; apply le_n_0_eq.
+      f_equal; apply Nat.le_0_r.
       apply Hvlirrefl; auto.
     - destruct (decide (DBM_lsec j' s = ∅)) as [|Hne]; first done.
       apply set_choose_L in Hne as [x Hx].

@@ -132,7 +132,7 @@ Section runner_spec.
       intros Hsa1 [? [(PB & -> & HPB)%elem_of_list_fmap_2 Hsa2]].
       apply elem_of_list_lookup in HPB as [j Hj].
       eapply (Hportssocks 0 (S j)); eauto. }
-    setoid_rewrite <- plus_Snm_nSm.
+    setoid_rewrite <- Nat.add_succ_comm.
     iApply ("IH" with "[] Hprogs Hsocks"); auto.
     iPureIntro.
     intros i j; apply (Hportssocks (S i) (S j)).
