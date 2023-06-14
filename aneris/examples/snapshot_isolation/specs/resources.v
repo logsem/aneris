@@ -35,6 +35,7 @@ Section Resources.
     ConnectionState : val → local_state → iProp Σ;
 
     KVS_si : message → iProp Σ;
+    KVS_Init_Srv : iProp Σ;
 
    (** Cache Key Status *)
     KeyUpdStatus : val → Key → bool → iProp Σ;

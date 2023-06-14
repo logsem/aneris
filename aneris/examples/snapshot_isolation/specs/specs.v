@@ -70,8 +70,6 @@ Section Specification.
        ([∗ map] k ↦ eo ∈ m, k ↦ₖ eo) ∗
        ([∗ map] k ↦ eo ∈ m, k ↦{c} (weo_val eo) ∗ KeyUpdStatus c k false)>>>.
 
-
-
   Definition commit_spec : iProp Σ :=
    ∀ (c : val) (sa : socket_address)
      (E : coPset),
@@ -156,7 +154,8 @@ Definition init_kvs_spec : iProp Σ :=
   {{{ KVS_address ⤇ KVS_si ∗
         KVS_address ⤳ (∅,∅) ∗
         free_ports (ip_of_address KVS_address)
-                   {[port_of_address KVS_address]} }}}
+                   {[port_of_address KVS_address]} ∗
+      KVS_Init_Srv }}}
       SI_init_server (s_serializer KVS_serialization)
         #KVS_address
         @[(ip_of_address KVS_address)]
@@ -174,7 +173,7 @@ Class KVSG  Σ :=
 Definition KVSΣ : gFunctors :=
   #[ (* TODO ... ; *) lockΣ].
 
-Instance subG_DBΣ {Σ} : subG KVSΣ Σ → KVSG Σ.
+Instance subG_KVSΣ {Σ} : subG KVSΣ Σ → KVSG Σ.
 Proof. econstructor; solve_inG. Qed.
 
 Section SI_Module.
@@ -186,6 +185,7 @@ Section SI_Module.
        GlobalInv ∗
        ([∗ set] k ∈ KVS_keys, k ↦ₖ None) ∗
        init_kvs_spec ∗
+       KVS_Init_Srv ∗
        init_client_proxy_spec ∗
        read_spec ∗
        write_spec ∗
