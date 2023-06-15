@@ -84,12 +84,12 @@ Section Specification.
     <<<▷∃∃ b, RET #b;
         ConnectionState c CanStart ∗
         (** Transaction has been commited. *)
-        (⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
+        ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
          ∃ (t: Time), ⌜max_timestamp t m⌝ ∗
           ([∗ map] k↦ eo;p ∈ m; mc, k ↦ₖ commit_event k t p eo)) ∨
         (** Transaction has been aborted. *)
          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
-           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo) >>>.
+           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo)) >>>.
 
 Definition run_spec : iProp Σ :=
     ∀ (c : val) (tbody : val)
@@ -109,12 +109,12 @@ Definition run_spec : iProp Σ :=
     <<<▷∃∃ m1 mc b, RET #b;
                ConnectionState c CanStart ∗
                (** Transaction has been commited. *)
-               (⌜b = true⌝ ∗ ⌜can_commit m1 m0 mc⌝ ∗ Q m0 mc ∗
+               ((⌜b = true⌝ ∗ ⌜can_commit m1 m0 mc⌝ ∗ Q m0 mc ∗
                 ∃ (t: Time), ⌜max_timestamp t m1⌝ ∗
                    ([∗ map] k↦ eo;p ∈ m1; mc, k ↦ₖ commit_event k t p eo)) ∨
                (** Transaction has been aborted. *)
                (⌜b = false⌝ ∗ ⌜¬ can_commit m1 m0 mc⌝ ∗
-                [∗ map] k ↦ eo ∈ m1, k ↦ₖ eo) >>>.
+                [∗ map] k ↦ eo ∈ m1, k ↦ₖ eo)) >>>.
 
  Definition commit_spec_alt : iProp Σ :=
    ∀ (c : val) (sa : socket_address)
@@ -132,13 +132,13 @@ Definition run_spec : iProp Σ :=
     <<<▷∃∃ b, RET #b;
         ConnectionState c CanStart ∗
         (** Transaction has been commited. *)
-        (⌜b = true⌝ ∗ ⌜can_commit_set m ms (dom mcw)⌝ ∗
+        ((⌜b = true⌝ ∗ ⌜can_commit_set m ms (dom mcw)⌝ ∗
          ∃ (t: Time), ⌜max_timestamp t m⌝ ∗
           ([∗ map] k↦_ ∈ mcr, ∃ eo, ⌜m !! k = Some eo⌝ ∗ k ↦ₖ eo) ∗
           ([∗ map] k↦v ∈ mcw, k ↦ₖ Some {|we_key:=k; we_val:=v; we_time:=t|})) ∨
         (** Transaction has been aborted. *)
          (⌜b = false⌝ ∗ ⌜¬ can_commit_set m ms (dom mcw)⌝ ∗
-           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo) >>>.
+           [∗ map] k ↦ eo ∈ m, k ↦ₖ eo)) >>>.
 
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ (sa : socket_address),
