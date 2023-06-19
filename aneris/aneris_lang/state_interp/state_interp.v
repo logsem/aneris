@@ -517,7 +517,7 @@ Section state_interpretation.
     { by iApply free_ips_coh_alloc_socket. }
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sag φ :
+  Lemma aneris_state_interp_socket_interp_allocate_singleton_groups σ mh sag φ :
     aneris_state_interp σ mh -∗ unallocated_groups {[sag]} ==∗
     aneris_state_interp σ mh ∗ sag ⤇* φ.
   Proof.
@@ -531,7 +531,17 @@ Section state_interpretation.
     iModIntro. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate_fun σ mh sags f :
+  Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sa φ :
+    aneris_state_interp σ mh -∗ unallocated {[sa]} ==∗
+    aneris_state_interp σ mh ∗ sa ⤇ φ.
+  Proof.
+    iIntros "Hσ Hunallocated".
+    iMod (aneris_state_interp_socket_interp_allocate_singleton_groups
+           with "Hσ [Hunallocated]") as "$"; [|done].
+    by rewrite /unallocated to_singletons_singleton.
+  Qed.
+
+  Lemma aneris_state_interp_socket_interp_allocate_fun_groups σ mh sags f :
     aneris_state_interp σ mh -∗ unallocated_groups sags ==∗
     aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* f sag.
   Proof.
@@ -545,7 +555,7 @@ Section state_interpretation.
     iModIntro. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate σ mh sags φ :
+  Lemma aneris_state_interp_socket_interp_allocate_groups σ mh sags φ :
     aneris_state_interp σ mh -∗ unallocated_groups sags ==∗
     aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
   Proof.

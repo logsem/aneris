@@ -25,7 +25,7 @@ Proof.
   by iApply "IHxs".
 Qed.
 
-Theorem adequacy_strong Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
+Theorem adequacy_multiple_strong Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
         A lbls obs_send_sas obs_rec_sas (es : list aneris_expr) σ (φs : list (val → Prop)) :
   length es >= 1 →
   aneris_model_rel_finitary Mdl →
@@ -68,12 +68,66 @@ Proof.
   intros Hlen HMdlfin Hwp Hsendle Hrecvle Hσ Hskts Hports Hbs Hcoh1 Hcoh2 Hms.
   rewrite /aneris_adequate_multiple.
   rewrite /aneris_adequate_multiple. simpl.
-  eapply (adequacy_strong A _ obs_send_sas obs_rec_sas);
+  eapply (adequacy_multiple_strong A _ obs_send_sas obs_rec_sas);
     [done|done|done|done| |done..].
   intros dg.
   iMod (Hwp dg) as "Hwp".
   iModIntro. iIntros "????? #Hns ?????? /=".
   iSpecialize ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]").
+  iMod "Hwp" as "[$ Hwp]". iModIntro. clear Hwp Hlen Hσ Hskts.
+  setoid_rewrite aneris_wp_unfold. rewrite /aneris_wp_def.
+  assert (∃ es', [] = es') as [es' ->] by eauto.
+  iDestruct (big_sepL_prefixes_l _ es' with "Hwp") as "Hwp".
+  iInduction es as [|e es] "IHes" forall (φs es'); [done|].
+  destruct φs; [done|].
+  rewrite /get_ips.
+  simpl.
+  iDestruct "Hwp" as "[Hwp Hwps]".
+  iDestruct (big_sepS_elem_of _ _ (expr_n e) with "Hns") as "Hn";
+    [set_solver|].
+  iSplitL "Hwp Hn".
+  { rewrite /locale_of. simpl.
+    destruct e; simpl.
+    iSpecialize ("Hwp" with "[$]").
+    iApply (wp_wand with "Hwp"). by eauto. }
+  iDestruct (big_sepS_subseteq _ _ (list_to_set
+                            (list_fmap aneris_expr ip_address expr_n es)) with "Hns") as "Hns'"; [set_solver|].
+  iDestruct ("IHes" with "Hns' Hwps") as "Hwps".
+  iApply (big_sepL2_impl with "Hwps").
+  by iIntros "!>" (i eφs1 eφs2 HSome1 HSome2) "Hwp".
+Qed.
+
+Theorem adequacy_multiple Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
+        A lbls obs_send_sas obs_rec_sas (es : list aneris_expr) σ (φs : list (val → Prop)) :
+  length es >= 1 →
+  aneris_model_rel_finitary Mdl →
+  (∀ (aG : anerisG Mdl Σ), ⊢ |={⊤}=>
+     unallocated A -∗
+     ([∗ set] sa ∈ A, sa ⤳[bool_decide (sa ∈ obs_send_sas),
+                           bool_decide (sa ∈ obs_rec_sas)] (∅, ∅)) -∗
+     ([∗ map] ip ↦ ports ∈ addrs_to_ip_ports_map A, free_ports ip ports)%I -∗
+     frag_st Mdl.(model_state_initial) -∗
+     ([∗ set] lbl ∈ lbls, alloc_evs lbl []) -∗
+     ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) -∗
+     ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
+     observed_send obs_send_sas -∗
+     observed_receive obs_rec_sas -∗
+     aneris_state_interp σ (∅,∅) ={⊤}=∗
+     aneris_state_interp σ (∅,∅) ∗
+     aneris_wptp es ((λ φ, (λ v, ⌜φ v⌝):val → iProp Σ) <$> φs)) →
+  obs_send_sas ⊆ A → obs_rec_sas ⊆ A →
+  state_heaps σ = gset_to_gmap ∅ $ get_ips es →
+  state_sockets σ = gset_to_gmap ∅ $ get_ips es →
+  state_ms σ = ∅ →
+  aneris_adequate_multiple es σ φs.
+Proof.
+  intros Hlen HMdlfin Hwp Hsendle Hrecvle Hσ Hskts Hms.
+  eapply (adequacy_multiple A _ obs_send_sas obs_rec_sas);
+    [done|done|done|done| |done..].
+  intros dg.
+  iMod (Hwp dg) as "Hwp".
+  iModIntro. iIntros "???? #Hns ?????? /=".
+  iSpecialize ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$]").
   iMod "Hwp" as "[$ Hwp]". iModIntro. clear Hwp Hlen Hσ Hskts.
   setoid_rewrite aneris_wp_unfold. rewrite /aneris_wp_def.
   assert (∃ es', [] = es') as [es' ->] by eauto.
