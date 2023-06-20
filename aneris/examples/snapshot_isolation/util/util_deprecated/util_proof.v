@@ -1,7 +1,10 @@
-From aneris.examples.snapshot_isolation.util Require Import util_code.
+From aneris.examples.snapshot_isolation.util.util_deprecated Require Import util_code.
 From aneris.aneris_lang Require Import tactics adequacy proofmode.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params time events resources specs.
+     Require Import user_params.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Import time events resources_points_to_with_key_status specs_points_to_with_key_status.
+
 From aneris.examples.snapshot_isolation.instantiation
       Require Import snapshot_isolation_api_implementation.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.

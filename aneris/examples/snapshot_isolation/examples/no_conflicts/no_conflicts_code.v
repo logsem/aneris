@@ -5,7 +5,7 @@ From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
-From aneris.examples.snapshot_isolation.util Require Import util_code.
+From aneris.examples.snapshot_isolation.util.util_deprecated Require Import util_code.
 
 Definition example1_transaction_succeeds : val :=
   λ: "cst",

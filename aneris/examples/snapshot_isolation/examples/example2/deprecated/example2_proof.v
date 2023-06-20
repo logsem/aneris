@@ -2,15 +2,17 @@ From aneris.aneris_lang Require Import tactics adequacy proofmode.
 From iris.algebra Require Import excl.
 From aneris.examples.snapshot_isolation.examples.example2
         Require Import example2_code.
-From aneris.examples.snapshot_isolation.specs
-     Require Import user_params time events resources specs.
+ From aneris.examples.snapshot_isolation.specs
+     Require Import user_params.       
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Import time events resources_points_to_with_key_status specs_points_to_with_key_status.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From iris.base_logic.lib Require Import invariants.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.instantiation
       Require Import snapshot_isolation_api_implementation.
-From aneris.examples.snapshot_isolation.util Require Import util_proof.
+From aneris.examples.snapshot_isolation.util.util_deprecated Require Import util_proof.
 From aneris.aneris_lang.program_logic
      Require Import aneris_weakestpre aneris_lifting aneris_adequacy.
 Import ser_inj.

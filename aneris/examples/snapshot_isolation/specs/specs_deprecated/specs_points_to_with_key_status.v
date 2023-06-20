@@ -9,7 +9,9 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params time events resources.
+     Require Import user_params resources_points_to_with_key_status.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Import time events.
 
 Definition can_commit_set `{!KVS_time}
  (m ms : gmap Key (option write_event)) (s : gset Key) : Prop :=

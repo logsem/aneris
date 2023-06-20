@@ -1,8 +1,9 @@
 
 From aneris.aneris_lang Require Import lang.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params  time.
-
+     Require Import user_params.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Import time.
 (** Write and apply events *)
 
 Section Events.

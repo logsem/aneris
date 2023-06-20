@@ -5,8 +5,10 @@ From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
 From aneris.examples.snapshot_isolation.specs
-     Require Export user_params time events.
-
+     Require Export user_params.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Export time events.
+     
 Section Resources.
 
   Reserved Notation "k ↦ₖ e" (at level 20).

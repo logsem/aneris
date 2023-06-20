@@ -9,9 +9,9 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params time.
-From aneris.examples.snapshot_isolation.specs.specs_variants
-     Require Import events_local_pointers resources_local_pointers.
+     Require Import user_params.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Import events_local_pointers resources_local_pointers time.
 
 Definition cache_commit `{!KVS_time}  c k t : option write_event :=
     match c.(cache_newv) with

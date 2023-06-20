@@ -5,9 +5,9 @@ From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
 From aneris.examples.snapshot_isolation.specs
-     Require Export user_params time.
-From aneris.examples.snapshot_isolation.specs.specs_variants
-     Require Export events_local_pointers.
+     Require Export user_params.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Export events_local_pointers time.
 
 Section Resources.
 

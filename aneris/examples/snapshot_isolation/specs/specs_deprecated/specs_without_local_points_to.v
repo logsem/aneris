@@ -9,9 +9,9 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params time events.
-From aneris.examples.snapshot_isolation.specs.specs_variants
-     Require Import resources_without_local_points_to.
+     Require Import user_params.
+From aneris.examples.snapshot_isolation.specs.specs_deprecated
+     Require Import time events resources_without_local_points_to.
 
 
 (** Specifications for read and write operations.  *)
