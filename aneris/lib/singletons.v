@@ -251,4 +251,43 @@ Section with_K.
     set_solver.
   Qed.
 
+  Lemma union_set_empty :
+    ⋃ₛ (∅:gset $ gset K) = ∅.
+  Proof. done. Qed.
+
+  Lemma union_set_singleton (a : gset K) :
+    ⋃ₛ {[a]} = a.
+  Proof.
+    rewrite /union_set. rewrite elements_singleton.
+    simpl. rewrite right_id_L. done.
+  Qed.
+
+  Lemma union_set_union (A B : gset $ gset K) :
+    A ## B → ⋃ₛ (A ∪ B) = (⋃ₛ A) ∪ (⋃ₛ B).
+  Proof.
+    intros Hdisj. rewrite /union_set.
+    rewrite elements_disj_union; [|set_solver].
+    rewrite union_list_app_L. done.
+  Qed.
+
+  Lemma to_singletons_singleton (a : K) :
+    to_singletons {[a]} = {[{[a]}]}.
+  Proof. rewrite /to_singletons. by rewrite gset_map.gset_map_singleton. Qed.
+
+  (* OBS: This can be made stronger *)
+  Lemma to_singletons_disj (A B : gset K) :
+    A ## B → to_singletons A ## to_singletons B.
+  Proof. rewrite /to_singletons. apply gset_map.gset_map_disj_union. apply _. Qed.
+
+  Lemma union_set_to_singletons (A : gset K) :
+    ⋃ₛ to_singletons A = A.
+  Proof.
+    induction A using set_ind_L; [done|].
+    rewrite to_singletons_union.
+    rewrite union_set_union; last first.
+    { apply to_singletons_disj. set_solver. }
+    rewrite IHA. f_equiv.
+    rewrite to_singletons_singleton. by rewrite union_set_singleton.
+  Qed.
+
 End with_K.

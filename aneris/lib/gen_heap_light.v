@@ -59,14 +59,6 @@ Local Notation "l ; γ ↦{ q } -" := (∃ v, l ; γ ↦{q} v)%I
   (at level 20, q at level 50, format "l  ;  γ  ↦{ q }  -") : bi_scope.
 Local Notation "l ; γ ↦ -" := (l ; γ ↦{1} -)%I (at level 20) : bi_scope.
 
-Lemma gen_heap_light_init `{Countable L, !inG Σ (authR (gen_heapUR L V))} σ :
-  ⊢ |==> ∃ (γ : gname), gen_heap_light_ctx γ σ.
-Proof.
-  iMod (own_alloc (● to_gen_heap σ)) as (γ) "Hh".
-  { rewrite auth_auth_valid. exact: to_gen_heap_valid. }
-  eauto.
-Qed.
-
 Section gen_heap_light.
   Context {L V} `{Countable L, !inG Σ (authR (gen_heapUR L V))}.
   Implicit Types σ : gmap L V.
@@ -84,6 +76,14 @@ Section gen_heap_light.
   Global Instance lmapsto_as_fractional l γ q v :
     AsFractional (l ; γ ↦{q} v) (λ q, l ; γ ↦{q} v)%I q.
   Proof. split; [done|]. apply _. Qed.
+
+  Lemma gen_heap_light_init σ :
+    ⊢ |==> ∃ (γ : gname), gen_heap_light_ctx γ σ.
+  Proof.
+    iMod (own_alloc (● to_gen_heap σ)) as (γ) "Hh".
+    { rewrite auth_auth_valid. exact: to_gen_heap_valid. }
+    eauto.
+  Qed.
 
   Lemma lmapsto_agree l γ q1 q2 v1 v2 :
     l ; γ ↦{q1} v1 -∗ l ; γ ↦{q2} v2 -∗ ⌜v1 = v2⌝.
@@ -187,4 +187,17 @@ Section gen_heap_light.
       by rewrite /to_gen_heap lookup_fmap Hl. }
     iModIntro. iFrame "Hl". rewrite to_gen_heap_insert. iFrame.
   Qed.
+
+  Lemma gen_heap_light_init_strong σ :
+    ⊢ |==> ∃ γ, gen_heap_light_ctx γ σ ∗ 
+                [∗ map] l ↦ v ∈ σ, lmapsto γ l 1 v.
+  Proof.
+    iInduction σ as [|σ Hnin] "IHσ" using map_ind.
+    { iMod (gen_heap_light_init ∅) as (γ) "Hγ".
+      iExists γ. rewrite big_sepM_empty. by iFrame. }
+    iMod "IHσ" as (γ) "[Hσ Hσs]".
+    iMod (gen_heap_light_alloc with "Hσ") as "[Hσ Hs]"; [done|].
+    iModIntro. iExists γ. rewrite big_sepM_insert; [|done]. by iFrame.
+  Qed.
+
 End gen_heap_light.

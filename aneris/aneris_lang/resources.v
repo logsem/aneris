@@ -555,9 +555,43 @@ Lemma allocated_address_groups_init `{anerisPreG Σ Mdl} A :
 Proof. by apply own_alloc. Qed.
 
 (** Free ports lemmas *)
-Lemma free_ports_auth_init `{anerisPreG Σ Mdl} :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● ∅).
-Proof. apply own_alloc. by apply auth_auth_valid. Qed.
+Lemma free_ports_auth_init `{anerisPreG Σ Mdl} Ps :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> Ps)).
+Proof.
+  apply own_alloc. apply auth_auth_valid.
+  induction Ps using map_ind; [done|].
+  rewrite fmap_insert. by apply insert_valid.
+Qed.
+
+Lemma free_ports_alloc_pre `{anerisPreG Σ Mdl} γ P ip ports :
+  P !! ip = None →
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● P) ==∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● <[ip := GSet ports]>P) ∗
+  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (◯ ({[ ip := GSet ports]})).
+Proof.
+  iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
+  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
+    as "[HP Hip]"; last by iFrame.
+  by apply auth_update_alloc, alloc_singleton_local_update.
+Qed.
+
+Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
+  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                  (● (GSet <$> P)) ∗
+              [∗ map] ip ↦ ports ∈ P,
+                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
+                    (◯ ({[ ip := GSet ports]})).
+Proof.
+  iInduction P as [|ip ps P Hnin] "IHP" using map_ind.
+  { iMod (free_ports_auth_init ∅) as (γ) "Hγ". iModIntro. iExists _.
+    rewrite fmap_empty. iFrame.
+    rewrite big_sepM_empty. done. }
+  iMod "IHP" as (γ) "[HP Hps]".
+  iMod (free_ports_alloc_pre γ (GSet <$> P) ip ps with "HP") as "[HP Hp]".
+  { rewrite lookup_fmap. rewrite Hnin. done. }
+  iModIntro. iExists γ. rewrite fmap_insert.
+  iFrame. rewrite big_sepM_insert; [|done]. iFrame.
+Qed.
 
 Lemma free_ips_init `{anerisPreG Σ Mdl} (ips : gset ip_address) :
   ⊢ |==> ∃ γ, own γ (● GSet ips) ∗ [∗ set] ip ∈ ips, own γ (◯ GSet {[ ip ]}).
@@ -922,6 +956,147 @@ Section resource_lemmas.
     iModIntro. iFrame.
   Qed.
 
+  Lemma node_gnames_alloc_strong γs ip σ s :
+    γs !! ip = None →
+    node_gnames_auth γs ==∗ ∃ (γn : node_gnames),
+        node_gnames_auth (<[ip:=γn]>γs) ∗
+        mapsto_node ip γn ∗
+        heap_ctx γn σ ∗
+        ([∗ map] l ↦ v ∈ σ, l ↦[ip] v) ∗
+        sockets_ctx γn s ∗
+        ([∗ map] sh ↦ sb ∈ s, sh ↪[ip] sb).
+  Proof.
+    iIntros (HNone) "Hγs".
+    iMod (gen_heap_light_init_strong σ) as (γσ) "[Hσ Hσs]".
+    iMod (gen_heap_light_init_strong s) as (γss) "[Hs Hss]".
+    set (γn := Node_gname γσ γss).
+    iMod (node_gnames_alloc γn with "Hγs") as "[Hγs #Hγ]"; [done|].
+    iModIntro. iExists γn. iFrame "#∗".
+    iSplitL "Hσs".
+    - iApply (big_sepM_impl with "Hσs").
+      iIntros "!>" (k x HSome) "Hmapsto". iExists γn. iFrame "#∗".
+    - iApply (big_sepM_impl with "Hss").
+      iIntros "!>" (k x HSome) "Hmapsto". iExists γn. iFrame "#∗".
+  Qed.
+
+  Lemma node_gnames_alloc_strong_multiple σ γs' :
+    dom $ state_heaps σ = dom $ state_sockets σ →
+    dom γs' ## dom $ state_heaps σ →
+    node_gnames_auth γs' ==∗
+    ∃ γs, ⌜dom γs = dom $ state_heaps σ⌝ ∗ ⌜dom γs = dom $ state_sockets σ⌝ ∗
+          node_gnames_auth (γs' ∪ γs) ∗
+          ([∗ set] ip ∈ dom $ state_heaps σ, is_node ip) ∗
+          ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
+                              heap_ctx γ (state_heaps σ !!! ip) ∗
+                              sockets_ctx γ (fst <$> (state_sockets σ !!! ip))) ∗
+          ([∗ set] ip ∈ dom $ state_heaps σ, ([∗ map] l ↦ v ∈ state_heaps σ !!! ip, l ↦[ip] v) ∗
+                                             ([∗ map] sh ↦ sb ∈ state_sockets σ !!! ip, sh ↪[ip] sb.1)).
+  Proof.
+    assert (∃ ips, ips = dom $ state_heaps σ) as [ips Hips]; [by eexists|].
+    revert Hips.
+    iInduction ips as [|ip ips Hnin] "IHips" using set_ind_L forall (γs' σ);
+      iIntros (Hdom1 Hdom2 Hdom3) "Hγs".
+    { iModIntro. iExists ∅.
+      rewrite right_id_L.
+      iSplit; [iPureIntro; set_solver|].
+      iSplit; [iPureIntro; set_solver|].
+      iFrame. rewrite -!Hdom1.
+      rewrite !big_sepS_empty.
+      rewrite !big_sepM_empty. done. }
+    assert (γs' !! ip = None).
+    { simpl in *.
+      apply not_elem_of_dom. rewrite -Hdom1 in Hdom3. set_solver. }
+    iMod (node_gnames_alloc_strong _ ip with "Hγs")
+      as (γn) "(Hγs & #Hip & Hσ & Hσs & Hs & Hss)"; [done|].
+    iMod ("IHips" $! _
+                  (mkState (delete ip $ state_heaps σ)
+                           (delete ip $ state_sockets σ)
+                           (state_ms σ)) with "[] [] [] Hγs") as "Hγs".
+    { iPureIntro. set_solver. }
+    { iPureIntro. set_solver. }
+    { iPureIntro. set_solver. }
+    iDestruct "Hγs" as (γs Hdom1' Hdom2') "(Hγs & #Hip' & Hσ' & Hσs')".
+    simpl.
+    iModIntro. iExists (<[ip:=γn]> γs).
+    iSplit.
+    { iPureIntro. rewrite -Hdom1. set_solver. }
+    iSplit.
+    { iPureIntro. rewrite -Hdom2 -Hdom1. set_solver. }
+    iSplitL "Hγs".
+    { rewrite !insert_union_singleton_l.
+      replace ({[ip := γn]} ∪ γs' ∪ γs) with (γs' ∪ ({[ip := γn]} ∪ γs)).
+      iFrame.
+      rewrite assoc. f_equiv.
+      rewrite map_union_comm; [done|].
+      apply map_disjoint_alt. intros.
+      destruct (decide (ip = i)).
+      - set_solver.
+      - right. by rewrite lookup_insert_ne. }
+    rewrite !dom_delete_L. rewrite -!Hdom1.
+    replace (({[ip]} ∪ ips) ∖ {[ip]}) with ips by set_solver.
+    rewrite !big_sepS_union; [|set_solver|set_solver].
+    rewrite !big_sepS_singleton.
+    assert (γs !! ip = None).
+    { simpl in *. rewrite dom_delete_L in Hdom1'.
+      apply not_elem_of_dom. rewrite Hdom1'. set_solver. }
+    rewrite big_sepM_insert; [|done].
+    iFrame "#∗".
+    iSplit; [iExists _; iFrame "#"|].
+    iSplitL "Hσ'".
+    { iApply (big_sepM_impl with "Hσ'").
+      iIntros "!>" (k x HSome) "[Hnode [Hheap Hsocket]]".
+      simpl in *. assert (k ≠ ip) by set_solver.
+      rewrite lookup_total_delete_ne; [|done].
+      rewrite lookup_total_delete_ne; [|done]. iFrame. }
+    iSplitL "Hss".
+    { rewrite big_sepM_fmap. iFrame. }
+    iApply (big_sepS_impl with "Hσs'").
+    iIntros "!>" (x Hin) "[Hσ Hs]".
+    assert (x ≠ ip) by set_solver.
+    rewrite lookup_total_delete_ne; [|done].
+    rewrite lookup_total_delete_ne; [|done].
+    iFrame.
+  Qed.
+
+  Lemma node_ctx_init σ s :
+    ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
+  Proof.
+    iMod (gen_heap_light_init σ) as (γh) "Hh".
+    iMod (gen_heap_light_init s) as (γs) "Hs".
+    iExists {| heap_name := γh; sockets_name := γs |}.
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma is_node_alloc σ ip :
+    σ !! ip = None →
+    node_gnames_auth σ ==∗
+    ∃ γn, node_gnames_auth (<[ip := γn]>σ) ∗ is_node ip.
+  Proof.
+    iIntros (Hnone) "Hauth".
+    iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
+    iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp Hγn]"; [done|].
+    iExists _. iFrame. iExists _. by iFrame.
+  Qed.
+
+  Lemma is_node_alloc_multiple σ :
+    dom (state_heaps σ) = dom (state_sockets σ) →
+    node_gnames_auth ∅ ==∗
+    ∃ γs, ⌜dom γs = dom $ state_heaps σ⌝ ∗ ⌜dom γs = dom $ state_sockets σ⌝ ∗
+          node_gnames_auth γs ∗
+          ([∗ set] ip ∈ (dom $ state_heaps σ), is_node ip) ∗
+          ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
+                              heap_ctx γ (state_heaps σ !!! ip) ∗
+                              sockets_ctx γ (fst <$> (state_sockets σ !!! ip))) ∗
+          ([∗ set] ip ∈ (dom $ state_heaps σ), ([∗ map] l ↦ v ∈ state_heaps σ !!! ip, l ↦[ip] v) ∗
+                                               ([∗ map] sh ↦ sb ∈ state_sockets σ !!! ip, sh ↪[ip] sb.1)).
+  Proof.
+    iIntros (Hdom) "Hγs".
+    iMod (node_gnames_alloc_strong_multiple σ ∅ with "Hγs") as (γs) "H";
+      [done|set_solver|].
+    rewrite left_id_L.
+    iModIntro. iExists γs. done.
+  Qed.
+
   #[global] Instance mapsto_heap_timeless l ip q v :
     Timeless (l ↦[ip]{q} v).
   Proof. apply _. Qed.
@@ -1168,16 +1343,6 @@ Section resource_lemmas.
     { destruct bs; destruct bs'; destruct br; destruct br'; intuition done. }
     iDestruct (lmapsto_agree with "Ha1 Ha2") as %?.
     by simplify_eq.
-  Qed.
-
-  Lemma node_ctx_init σ s :
-    ⊢ |==> ∃ (γn : node_gnames), heap_ctx γn σ ∗ sockets_ctx γn s.
-
-  Proof.
-    iMod (gen_heap_light_init σ) as (γh) "Hh".
-    iMod (gen_heap_light_init s) as (γs) "Hs".
-    iExists {| heap_name := γh; sockets_name := γs |}.
-    iModIntro. iFrame.
   Qed.
 
   Lemma unallocated_groups_split A1 A2 :

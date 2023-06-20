@@ -74,6 +74,112 @@ Section state_interpretation.
   Qed.
 
   (* aneris_state_interp *)
+  Lemma aneris_state_interp_init_strong fips A Ps σ γs :
+    fips ## dom γs →
+    fips ## dom Ps →
+    (∀ ip : ip_address, ip ∈ fips → ip_is_free ip σ) →
+    (* Port coherence *)
+    ((∀ ip ps, (GSet <$> Ps) !! ip = Some (GSet ps) →
+               ∀ Sn, (state_sockets σ) !! ip = Some Sn →
+                     ∀ p, p ∈ ps → port_not_in_use p Sn)) →
+    dom (state_heaps σ) = dom γs →
+    dom (state_sockets σ) = dom γs →
+    map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
+    map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) →
+    map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
+    state_ms σ = ∅ →
+    node_gnames_auth γs -∗
+    ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
+                        heap_ctx γ (state_heaps σ !!! ip) ∗
+                        sockets_ctx γ (fst <$> (state_sockets σ !!! ip))) -∗
+    messages_ctx (gset_to_gmap (∅, ∅) A)  -∗
+    socket_address_group_ctx A -∗
+    unallocated_groups_auth A -∗
+    saved_si_auth ∅ -∗
+    free_ips_auth fips -∗
+    free_ports_auth (GSet <$> Ps) -∗
+    aneris_state_interp σ (∅, ∅).
+  Proof.
+     iIntros (Hfips Hfips' Hfips'' Hports Hheap Hskt Hskts Hskts_coh1 Hskts_coh2 Hms)
+            "Hγs_auth Hγs Hm Hsags Hunallocated Hsif HipsCtx HPiu_auth".
+    iDestruct (socket_address_group_ctx_valid with "Hsags") as %[Hdisj Hne].
+    iExists _, _; iFrame.
+    iSplit.
+    (* messages_received_sent *)
+    { iPureIntro. apply messages_received_sent_init. }
+    iSplit.
+    (* gnames_coh *)
+    { iPureIntro.
+      (* TODO: Dont break abstraction here. *)
+      by rewrite /gnames_coh Hheap Hskt. }
+    iSplitR.
+    (* network_sockets_coh *)
+    { iPureIntro.
+      (* TODO: Dont break abstraction here. *)
+      rewrite /network_sockets_coh.
+      intros ip Sn HSome.
+      split.
+      { by apply Hskts_coh1 in HSome. } (* TODO: Dont take as input *)
+      split.
+      { apply Hskts in HSome.
+        rewrite /socket_messages_coh.
+        intros sh skt r sa HSn. apply HSome in HSn. simpl in *.
+        simplify_eq. set_solver. }
+      split.
+      { by apply Hskts_coh2 in HSome. } (* TODO: Dont take as input *)
+      apply Hskts in HSome.
+      rewrite /socket_unbound_empty_buf_coh.
+      intros sh skt r HSn. apply HSome in HSn. simpl in *.
+      simplify_eq. done. }
+    iSplitR.
+    (* messages_history_coh *)
+    { iPureIntro.
+      (* TODO: Dont break abstraction here. *)
+      rewrite /messages_history_coh. rewrite Hms.
+      split.
+      { rewrite /message_soup_coh. set_solver. }
+      split.
+      { rewrite /receive_buffers_coh.
+        intros ip Sn sh skt r m HSome. apply Hskts in HSome.
+        intro HSn. apply HSome in HSn.
+        set_solver. }
+      split.
+      { rewrite /messages_addresses_coh.
+        rewrite dom_gset_to_gmap.
+        split; [done|].
+        split; [set_solver|].
+        intros sag R T HSome. rewrite lookup_gset_to_gmap_Some in HSome.
+        destruct HSome. set_solver. }
+      rewrite /messages_received_from_sent_coh.
+      rewrite messages_received_init messages_sent_init. set_solver. }
+    (* socket_interp_coh *)
+    iDestruct (socket_address_groups_ctx_own with "Hsags") as "#Hsags'".
+    iSplitL "Hsags Hunallocated Hsif".
+    { by iApply (socket_interp_coh_init with "Hsags Hunallocated Hsif"). }
+    iSplitL "Hγs".
+    (* local_state_coh *)
+    { iApply (big_sepM_impl with "Hγs").
+      iIntros "!>" (k x HSome) "(Hnode & Hheap & Hskt)".
+      assert (is_Some ((state_heaps σ) !! k)) as [y HSomey].
+      { apply elem_of_dom. rewrite Hheap. apply elem_of_dom. by exists x. }
+      assert (is_Some ((state_sockets σ) !! k)) as [z HSomez].
+      { apply elem_of_dom. rewrite Hskt. apply elem_of_dom. by exists x. }
+      iExists _, _.
+      iSplit; [done|].
+      iSplit; [done|].
+      apply lookup_total_correct in HSomey.
+      apply lookup_total_correct in HSomez.
+      simplify_eq.
+      iFrame. }
+    iSplitL "HipsCtx HPiu_auth".
+    (* free_ips_coh *)
+    { iApply (free_ips_coh_init_strong with "[$]"); [set_solver|done..]. }
+    (* messages_resource_coh *)
+    iApply messages_resource_coh_init.
+    iFrame "#".
+  Qed.
+
+  (* aneris_state_interp *)
   Lemma aneris_state_interp_init ips A σ γs ip :
     state_heaps σ = {[ip:=∅]} →
     state_sockets σ = {[ip:=∅]} →
@@ -122,7 +228,9 @@ Section state_interpretation.
       rewrite fmap_empty. iFrame; iFrame "#"; eauto. }
     iSplitL "HipsCtx HPiu".
     (* free_ips_coh *)
-    { by iApply (free_ips_coh_init with "[$]"). }
+    { iApply (free_ips_coh_init with "[$]").
+      rewrite /ip_is_free. intros. assert (ip ≠ ip0) by set_solver.
+      rewrite Hste Hsce. rewrite !lookup_insert_ne; set_solver. }
     (* messages_resource_coh *)
     iApply messages_resource_coh_init.
     iFrame "#".
@@ -409,7 +517,7 @@ Section state_interpretation.
     { by iApply free_ips_coh_alloc_socket. }
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sag φ :
+  Lemma aneris_state_interp_socket_interp_allocate_singleton_groups σ mh sag φ :
     aneris_state_interp σ mh -∗ unallocated_groups {[sag]} ==∗
     aneris_state_interp σ mh ∗ sag ⤇* φ.
   Proof.
@@ -423,7 +531,17 @@ Section state_interpretation.
     iModIntro. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate_fun σ mh sags f :
+  Lemma aneris_state_interp_socket_interp_allocate_singleton σ mh sa φ :
+    aneris_state_interp σ mh -∗ unallocated {[sa]} ==∗
+    aneris_state_interp σ mh ∗ sa ⤇ φ.
+  Proof.
+    iIntros "Hσ Hunallocated".
+    iMod (aneris_state_interp_socket_interp_allocate_singleton_groups
+           with "Hσ [Hunallocated]") as "$"; [|done].
+    by rewrite /unallocated to_singletons_singleton.
+  Qed.
+
+  Lemma aneris_state_interp_socket_interp_allocate_fun_groups σ mh sags f :
     aneris_state_interp σ mh -∗ unallocated_groups sags ==∗
     aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* f sag.
   Proof.
@@ -437,7 +555,7 @@ Section state_interpretation.
     iModIntro. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
-  Lemma aneris_state_interp_socket_interp_allocate σ mh sags φ :
+  Lemma aneris_state_interp_socket_interp_allocate_groups σ mh sags φ :
     aneris_state_interp σ mh -∗ unallocated_groups sags ==∗
     aneris_state_interp σ mh ∗ [∗ set] sag ∈ sags, sag ⤇* φ.
   Proof.

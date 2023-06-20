@@ -1521,13 +1521,15 @@ Qed.
 intuitive and simpler corollaries. These lemmas are morover stated in terms of
 [rtc erased_step] so one does not have to provide the trace. *)
 Record adequate_multiple {Λ} (s : stuckness) (es : list $ expr Λ) (σ1 : state Λ)
-    (φs : list (val Λ → state Λ → Prop)) : Prop := {
-  adequate_result ex t2 σ2 vs :
-    length vs = length es →
-    valid_exec ex →
+       (φs : list (val Λ → state Λ → Prop)) : Prop := {
+  adequate_result ex t2 σ2 i v :
+    i < length es →
+    i < length φs →
+    valid_exec ex  →
     trace_starts_in ex (es, σ1) →
-    trace_ends_in ex (of_val <$> vs ++ t2, σ2) →
-    Forall (λ vφ, vφ.2 vφ.1 σ2) (zip vs φs);
+    trace_ends_in ex (t2, σ2) →
+    t2 !! i ≫= to_val = Some v →
+    from_option (λ φ, φ v σ2) False (φs !! i);
   adequate_not_stuck ex t2 σ2 e2 :
     s = NotStuck →
     valid_exec ex →
@@ -1545,9 +1547,11 @@ Lemma adequate_multiple_alt {Λ} s es σ1 (φs : list (val Λ → state Λ → P
       valid_exec ex →
       trace_starts_in ex (es, σ1) →
       trace_ends_in ex (t2, σ2) →
-      (∀ vs t2', length vs = length es →
-                 t2 = of_val <$> vs ++ t2' →
-                 Forall (λ vφ, vφ.2 vφ.1 σ2) (zip vs φs)) ∧
+      (∀ i v,
+         i < length es →
+         i < length φs →
+         t2 !! i ≫= to_val = Some v →
+         from_option (λ φ, φ v σ2) False (φs !! i)) ∧
       (∀ e2, s = NotStuck → e2 ∈ t2 → not_stuck e2 σ2).
 Proof.
   split.
@@ -1576,8 +1580,10 @@ Qed.
 Local Definition wp_adequacy_relation Λ M s (φs : list (val Λ → Prop))
            (ex : execution_trace Λ) (atr : auxiliary_trace M) : Prop :=
   ∀ c, trace_ends_in ex c →
-       (∀ vs t2', c.1 = of_val <$> vs ++ t2' →
-                  Forall (λ vφ, vφ.2 vφ.1) (zip vs φs)) ∧
+       (∀ i v,
+          i < length φs →
+          c.1 !! i ≫= to_val = Some v →
+          from_option (λ φ, φ v) False (φs !! i)) ∧
        (∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2).
 
 Local Lemma wp_adequacy_relation_adequacy_multiple {Λ M} s es σ δ φs (ξ : _ -> _ -> Prop):
@@ -1596,16 +1602,14 @@ Proof.
   apply Himpl in Hψ.
   specialize (Hψ (t2, σ2)) as [Hsafe Hstuck]; [done|].
   split; [|done].
-  intros vs t2' Hlen Ht2. specialize (Hsafe vs t2' Ht2).
-  clear Himpl Ht2 Hsm Hexstr. revert es vs Hlen Hsafe.
-  induction φs as [|φ φs Hφs]; intros es vs Hlen Hsafe;
-    [by rewrite zip_with_nil_r Forall_nil|].
-  destruct vs as [|v vs]; [rewrite Forall_nil; done|].
-  destruct es as [|e es]; [done|].
-  simpl in *. rewrite Forall_cons. rewrite Forall_cons in Hsafe.
-  destruct Hsafe as [Hφ Hsafe].
-  split; [done|].
-  eapply Hφs; [by simplify_eq|done].
+  intros i v Hlen1 Hlen2 Ht2.
+  rewrite fmap_length in Hlen2.
+  specialize (Hsafe i v Hlen2 Ht2).
+  clear Himpl Ht2 Hsm Hexstr. revert i es Hlen1 Hlen2 Hsafe.
+  induction φs as [|φ φs Hφs]; intros i es Hlen1 Hlen2 Hsafe; [done|].
+  destruct es as [|e es]; [simpl in *;lia|].
+  rewrite fmap_cons. destruct i; [done|]. simpl in *.
+  eapply (Hφs _ es); [lia|lia|done].
 Qed.
 
 Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
@@ -1656,26 +1660,27 @@ Proof.
   iIntros (ex atr c Hvlt Hexs Hexe Hatre Hψ Hnst Hlocale) "HSI Hposts".
   iSpecialize ("H" with "[//] [//] [//] [//] [] [//] [//]").
   - iPureIntro. intros ??????. by eapply Hψ.
-  - simpl.
-    iAssert (⌜∀ vs t2', c.1 = of_val <$> vs ++ t2' →
-                        Forall (λ vφ, vφ.2 vφ.1) (zip vs φs)⌝)%I as "%Hφ".
-    { iIntros (vs ts ->).
+  - iAssert (⌜∀ i v,
+          i < length φs →
+          c.1 !! i ≫= to_val = Some v →
+          from_option (λ φ, φ v) False (φs !! i)⌝)%I
+      as %Hφ.
+    { iIntros (i v Hi HSome).
       iClear "H HSI".
       clear Hwp ξ' Hψ.
-      assert (∃ ws, vs = ws) as [ws Heq] by eauto.
-      rewrite {2}Heq. clear Heq.
-      iInduction φs as [|φ φs] "IHφs" forall (vs ws Φs Hlen).
-      { by rewrite !zip_with_nil_r Forall_nil. }
-      destruct Φs as [|Φ Φs]; [done|].
-      destruct vs as [|v vs]; [by rewrite Forall_nil|].
-      iEval (simpl) in "HΦs".
-      iDestruct "HΦs" as "[HΦ HΦs]".
-      rewrite /= to_of_val /=.
-      iDestruct "Hposts" as "[Hpost Hposts]".
-      rewrite Forall_cons.
-      iSplitL "HΦ Hpost"; [by iApply "HΦ"|].
-      iApply ("IHφs" with "[] HΦs Hposts").
-      by simplify_eq. }
+      rewrite big_sepL_omap big_sepL_zip_with.
+      assert (∃ e, c.1 !! i = Some e ∧ to_val e = Some v) as [e [HSome' Hv]].
+      { by apply bind_Some. }
+      iDestruct (big_sepL_lookup with "Hposts") as "Hposts"; [done|].
+      rewrite lookup_app_l; [|lia].
+      assert (∃ φ, φs !! i = Some φ) as [φ Heqφ].
+      { by apply lookup_lt_is_Some_2. }
+      assert (∃ Φ, Φs !! i = Some Φ) as [Φ HeqΦ].
+      { rewrite Hlen in Hi. by apply lookup_lt_is_Some_2. }
+      rewrite HeqΦ Hv /=.
+      iDestruct (big_sepL2_insert_acc with "HΦs") as "[HΦs _]"; [done|done|].
+      iDestruct ("HΦs" with "Hposts") as "Hφ".
+      by rewrite Heqφ. }
     iDestruct ("H" with "HSI Hposts") as "[? H]". iSplit =>//.
     iIntros "H1". iMod ("H" with "H1"). iModIntro. iSplit=>//.
     iIntros (c' Hc').
