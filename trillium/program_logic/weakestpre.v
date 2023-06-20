@@ -84,7 +84,7 @@ Proof.
   do 29 (f_contractive || f_equiv).
   induction trace_length as [|k IHk]; simpl; [|by rewrite IHk].
   do 7 (f_contractive || f_equiv).
-  rewrite IH; [done|lia|]. intros v. eapply dist_S, HΦ.
+  rewrite IH; [done|lia|]. intros v. eapply dist_lt; eauto.
 Qed.
 #[global] Instance wp_proper s E ζ e :
   Proper (pointwise_relation _ (≡) ==> (≡)) (wp (PROP:=iProp Σ) s E ζ e).
