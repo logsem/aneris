@@ -661,6 +661,31 @@ Section model_state_lemmas.
       do 2 f_equiv. set_solver.
   Qed.
 
+  Lemma update_free_roles_strong fr1 fr2 FR'
+    (DISJ1: fr1 ## FR') (DISJ2: fr2 ## FR'):
+    auth_free_roles_are (fr1 ∪ FR') -∗
+    frag_free_roles_are fr1 ==∗
+    auth_free_roles_are (fr2 ∪ FR') ∗
+    frag_free_roles_are fr2.
+  Proof.
+    iIntros "HFR Hfr1".
+    iApply own_op. 
+    iMod (own_update with "[Hfr1 HFR]") as "?".
+    3: { done. }
+    2: { iApply own_op. iFrame. }
+    apply auth_update.
+    etrans.
+    { apply gset_disj_dealloc_local_update. }
+    rewrite difference_union_distr_l_L difference_diag_L union_empty_l_L.
+    rewrite difference_disjoint_L; auto.
+    etrans. 
+    - by apply gset_disj_alloc_local_update with (Z := fr2).
+    - eapply local_update_proper.
+      1: rewrite union_empty_r_L.
+      all: reflexivity.
+  Qed. 
+
+
   Lemma model_agree s1 s2:
     auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1 = s2 ⌝.
   Proof.
