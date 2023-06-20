@@ -29,6 +29,17 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              | None => ∅
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
 
+(* TODO: Can this be generalised? *)
+Lemma ports_in_use_empty_map M :
+  ports_in_use (gset_to_gmap ∅ M) = ∅.
+Proof.
+  induction M as [|m M Hnin IHM] using set_ind_L; [done|].
+  rewrite /ports_in_use.
+  rewrite gset_to_gmap_union_singleton.
+  rewrite map_fold_insert_L;
+    [set_solver|set_solver|by rewrite lookup_gset_to_gmap_None].
+Qed.
+
 Definition wp_group_proto_multiple_strong `{anerisPreG Σ Mdl} A
            (lbls: gset string)
            (obs_send_sas obs_rec_sas : gset socket_address_group)
@@ -168,192 +179,6 @@ Definition wp_proto `{anerisPreG Σ Mdl} IPs A
      observed_receive obs_rec_sas ={⊤}=∗
      WP (mkExpr ip e) @ s; (ip,0); ⊤ {{v, ⌜φ v⌝ }}).
 
-Lemma free_ports_alloc_pre `{anerisPreG Σ Mdl} γ P ip ports :
-  ip ∉ (dom P) →
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-      (● (GSet <$> P)) ==∗
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-      (● (GSet <$> <[ ip := ports ]> P)) ∗
-  own γ (◯ ({[ ip := (GSet ports)]})).
-Proof.
-  iIntros (Hnin) "HP"; rewrite /free_ports_auth /free_ports.
-  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
-    as "[HP Hip]"; last by iFrame.
-  apply auth_update_alloc. rewrite fmap_insert.
-  apply alloc_singleton_local_update; last done.  
-  rewrite lookup_fmap. apply not_elem_of_dom in Hnin. rewrite Hnin. set_solver.
-Qed.
-
-Lemma free_ports_auth_init_multiple `{anerisPreG Σ Mdl} P :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                  (● (GSet <$> P)) ∗
-              [∗ map] ip ↦ ports ∈ P,
-                own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ
-                    (◯ ({[ ip := GSet ports]})).
-Proof.
-  iInduction P as [|ip ps P Hnin] "IHP" using map_ind.
-  { iMod free_ports_auth_init as (γ) "Hγ". iModIntro. iExists _.
-    rewrite fmap_empty. iFrame.
-    rewrite big_sepM_empty. done. }
-  iMod "IHP" as (γ) "[HP Hps]".
-  iMod (free_ports_alloc_pre γ P ip ps with "HP") as "[HP Hp]".
-  { apply not_elem_of_dom. set_solver. }
-  iModIntro. iExists γ. rewrite fmap_insert.
-  iFrame. rewrite big_sepM_insert; [|done]. iFrame.
-Qed.
-
-Lemma free_ports_alloc `{anerisPreG Σ Mdl} γ P ip ports :
-  P !! ip = None →
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● P) ==∗
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● <[ip := GSet ports]>P) ∗
-  own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (◯ ({[ ip := GSet ports]})).
-Proof.
-  iIntros (?) "HP"; rewrite /free_ports_auth /free_ports.
-  iMod (own_update _ _ (● _ ⋅ ◯ {[ ip := (GSet ports)]}) with "HP")
-    as "[HP Hip]"; last by iFrame.
-  by apply auth_update_alloc, alloc_singleton_local_update.
-Qed.
-
-Lemma node_gnames_alloc_strong `{anerisG Σ Mdl} γs ip σ s :
-  γs !! ip = None →
-  node_gnames_auth γs ==∗ ∃ (γn : node_gnames),
-      node_gnames_auth (<[ip:=γn]>γs) ∗
-      mapsto_node ip γn ∗
-      heap_ctx γn σ ∗
-      ([∗ map] l ↦ v ∈ σ, l ↦[ip] v) ∗
-      sockets_ctx γn s ∗
-      ([∗ map] sh ↦ sb ∈ s, sh ↪[ip] sb).
-Proof.
-  iIntros (HNone) "Hγs".
-  iMod (gen_heap_light_init_strong σ) as (γσ) "[Hσ Hσs]".
-  iMod (gen_heap_light_init_strong s) as (γss) "[Hs Hss]".
-  set (γn := Node_gname γσ γss).
-  iMod (node_gnames_alloc γn with "Hγs") as "[Hγs #Hγ]"; [done|].
-  iModIntro. iExists γn. iFrame "#∗".
-  iSplitL "Hσs".
-  - iApply (big_sepM_impl with "Hσs").
-    iIntros "!>" (k x HSome) "Hmapsto". iExists γn. iFrame "#∗".
-  - iApply (big_sepM_impl with "Hss").
-    iIntros "!>" (k x HSome) "Hmapsto". iExists γn. iFrame "#∗".
-Qed.
-
-Lemma node_gnames_alloc_strong_multiple `{anerisG Σ Mdl} σ γs' :
-  dom $ state_heaps σ = dom $ state_sockets σ →
-  dom γs' ## dom $ state_heaps σ →
-  node_gnames_auth γs' ==∗
-  ∃ γs, ⌜dom γs = dom $ state_heaps σ⌝ ∗ ⌜dom γs = dom $ state_sockets σ⌝ ∗
-    node_gnames_auth (γs' ∪ γs) ∗
-    ([∗ set] ip ∈ dom $ state_heaps σ, is_node ip) ∗
-    ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
-                        heap_ctx γ (state_heaps σ !!! ip) ∗
-                        sockets_ctx γ (fst <$> (state_sockets σ !!! ip))) ∗
-    ([∗ set] ip ∈ dom $ state_heaps σ, ([∗ map] l ↦ v ∈ state_heaps σ !!! ip, l ↦[ip] v) ∗
-                       ([∗ map] sh ↦ sb ∈ state_sockets σ !!! ip, sh ↪[ip] sb.1)).
-Proof.
-  assert (∃ ips, ips = dom $ state_heaps σ) as [ips Hips]; [by eexists|].
-  revert Hips.
-  iInduction ips as [|ip ips Hnin] "IHips" using set_ind_L forall (γs' σ);
-    iIntros (Hdom1 Hdom2 Hdom3) "Hγs".
-  { iModIntro. iExists ∅.
-    rewrite right_id_L.
-    iSplit; [iPureIntro; set_solver|].
-    iSplit; [iPureIntro; set_solver|].
-    iFrame. rewrite -!Hdom1.
-    rewrite !big_sepS_empty.
-    rewrite !big_sepM_empty. done. }
-  assert (γs' !! ip = None).
-  { simpl in *.
-    apply not_elem_of_dom. rewrite -Hdom1 in Hdom3. set_solver. }
-  iMod (node_gnames_alloc_strong _ ip with "Hγs")
-    as (γn) "(Hγs & #Hip & Hσ & Hσs & Hs & Hss)"; [done|].
-  iMod ("IHips" $! _
-                (mkState (delete ip $ state_heaps σ)
-                         (delete ip $ state_sockets σ)
-                         (state_ms σ)) with "[] [] [] Hγs") as "Hγs".
-  { iPureIntro. set_solver. }
-  { iPureIntro. set_solver. }
-  { iPureIntro. set_solver. }
-  iDestruct "Hγs" as (γs Hdom1' Hdom2') "(Hγs & #Hip' & Hσ' & Hσs')".
-  simpl.
-  iModIntro. iExists (<[ip:=γn]> γs).
-  iSplit.
-  { iPureIntro. rewrite -Hdom1. set_solver. }
-  iSplit.
-  { iPureIntro. rewrite -Hdom2 -Hdom1. set_solver. }
-  iSplitL "Hγs".
-  { rewrite !insert_union_singleton_l.
-    replace ({[ip := γn]} ∪ γs' ∪ γs) with (γs' ∪ ({[ip := γn]} ∪ γs)).
-    iFrame.
-    rewrite assoc. f_equiv.
-    rewrite map_union_comm; [done|].
-    apply map_disjoint_alt. intros.
-    destruct (decide (ip = i)).
-    - set_solver.
-    - right. by rewrite lookup_insert_ne. }
-  rewrite !dom_delete_L. rewrite -!Hdom1.
-  replace (({[ip]} ∪ ips) ∖ {[ip]}) with ips by set_solver.
-  rewrite !big_sepS_union; [|set_solver|set_solver].
-  rewrite !big_sepS_singleton.
-  assert (γs !! ip = None).
-  { simpl in *. rewrite dom_delete_L in Hdom1'.
-    apply not_elem_of_dom. rewrite Hdom1'. set_solver. }
-  rewrite big_sepM_insert; [|done].
-  iFrame "#∗".
-  iSplit; [iExists _; iFrame "#"|].
-  iSplitL "Hσ'".
-  { iApply (big_sepM_impl with "Hσ'").
-    iIntros "!>" (k x HSome) "[Hnode [Hheap Hsocket]]".
-    simpl in *. assert (k ≠ ip) by set_solver.
-    rewrite lookup_total_delete_ne; [|done].
-    rewrite lookup_total_delete_ne; [|done]. iFrame. }
-  iSplitL "Hss".
-  { rewrite big_sepM_fmap. iFrame. }
-  iApply (big_sepS_impl with "Hσs'").
-  iIntros "!>" (x Hin) "[Hσ Hs]".
-  assert (x ≠ ip) by set_solver.
-  rewrite lookup_total_delete_ne; [|done].
-  rewrite lookup_total_delete_ne; [|done].
-  iFrame.
-Qed.
-
-Lemma is_node_alloc `{anerisG Σ Mdl} σ ip :
-  σ !! ip = None →
-  node_gnames_auth σ ==∗
-  ∃ γn, node_gnames_auth (<[ip := γn]>σ) ∗ is_node ip.
-Proof.
-  iIntros (Hnone) "Hauth".
-  iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
-  iMod (node_gnames_alloc γn _ ip with "[$]") as "[Hmp Hγn]"; [done|].
-  iExists _. iFrame. iExists _. by iFrame.
-Qed.
-
-Lemma is_node_alloc_multiple `{anerisG Σ Mdl} σ :
-  dom (state_heaps σ) = dom (state_sockets σ) →
-  node_gnames_auth ∅ ==∗
-  ∃ γs, ⌜dom γs = dom $ state_heaps σ⌝ ∗ ⌜dom γs = dom $ state_sockets σ⌝ ∗
-    node_gnames_auth γs ∗
-    ([∗ set] ip ∈ (dom $ state_heaps σ), is_node ip) ∗
-    ([∗ map] ip↦γ ∈ γs, mapsto_node ip γ ∗
-                        heap_ctx γ (state_heaps σ !!! ip) ∗
-                        sockets_ctx γ (fst <$> (state_sockets σ !!! ip))) ∗
-    ([∗ set] ip ∈ (dom $ state_heaps σ), ([∗ map] l ↦ v ∈ state_heaps σ !!! ip, l ↦[ip] v) ∗
-                       ([∗ map] sh ↦ sb ∈ state_sockets σ !!! ip, sh ↪[ip] sb.1)).
-Proof.
-  iIntros (Hdom) "Hγs".
-  iMod (node_gnames_alloc_strong_multiple σ ∅ with "Hγs") as (γs) "H";
-    [done|set_solver|].
-  rewrite left_id_L.
-  iModIntro. iExists γs. done.
-Qed.
-
-Lemma free_ports_auth_init_strong `{anerisPreG Σ Mdl} Ps :
-  ⊢ |==> ∃ γ, own (A:=authUR (gmapUR ip_address (gset_disjUR port))) γ (● (GSet <$> Ps)).
-Proof.
-  apply own_alloc. apply auth_auth_valid.
-  induction Ps using map_ind; [done|].
-  rewrite fmap_insert. by apply insert_valid.
-Qed.
-
 Theorem adequacy_multiple_strong_groups `{anerisPreG Σ Mdl}
         `{EqDecision (aneris_to_trace_model Mdl)} A
         (lbls: gset string)
@@ -476,17 +301,6 @@ Proof.
   iSplit; last first.
   { iIntros (?). iApply fupd_mask_intro_discard; done. }
   iIntros "!> ((?&?&?&%&?) &?) /=". iFrame. done.
-Qed.
-
-(* TODO: Can this be generalised? *)
-Lemma ports_in_use_empty_map M :
-  ports_in_use (gset_to_gmap ∅ M) = ∅.
-Proof.
-  induction M as [|m M Hnin IHM] using set_ind_L; [done|].
-  rewrite /ports_in_use.
-  rewrite gset_to_gmap_union_singleton.
-  rewrite map_fold_insert_L;
-    [set_solver|set_solver|by rewrite lookup_gset_to_gmap_None].
 Qed.
 
 Theorem adequacy_multiple_groups `{anerisPreG Σ Mdl}
@@ -664,7 +478,7 @@ Proof.
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
-  iMod free_ports_auth_init as (γpiu) "HPiu".
+  iMod (free_ports_auth_init ∅) as (γpiu) "HPiu". rewrite (fmap_empty GSet).
   iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
   iMod (allocated_address_groups_init obs_rec_sas) as
@@ -955,7 +769,7 @@ Proof.
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
   iMod (unallocated_init A) as (γsif) "[Hunallocated_auth Hunallocated]".
   iMod (free_ips_init IPs) as (γips) "[HIPsCtx HIPs]".
-  iMod free_ports_auth_init as (γpiu) "HPiu".
+  iMod (free_ports_auth_init ∅) as (γpiu) "HPiu". rewrite (fmap_empty GSet).
   iMod (allocated_address_groups_init obs_send_sas) as
       (γobserved_send) "#Hobserved_send".
   iMod (allocated_address_groups_init obs_rec_sas) as
