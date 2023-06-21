@@ -228,21 +228,6 @@ Section LocksCompositionProofs.
     pose proof (@elem_of_list_fmap_inj _ _ _ INJ' (map_to_list program_init_fuels) (ρ, f)). apply H.
   Qed.
 
-  (* TODO: make a premise of PMPP *)
-  Lemma partial_free_roles_are_Proper: 
-    Proper (equiv ==> equiv) partial_free_roles_are.
-  Proof. Admitted. 
-
-  (* TODO: make a premise of PMPP *)
-  Lemma partial_mapping_is_Proper: 
-    Proper (equiv ==> equiv) partial_mapping_is. 
-  Proof. Admitted. 
-
-  (* TODO: make a premise of PMPP *)
-  Lemma partial_fuels_is_sep fs:
-    partial_fuel_is fs ⊣⊢ [∗ map] ρ↦f ∈ fs, partial_fuel_is {[ ρ := f ]}.
-  Proof. Admitted. 
-
   Let lift_sl_st_left (s: fmstate spinlock_model_impl): fmstate comp_model_impl := 
         (Some s, None, None). 
   Let lift_sl_role_left (ρ: fmrole spinlock_model_impl): fmrole comp_model_impl := 

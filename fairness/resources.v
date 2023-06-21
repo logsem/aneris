@@ -255,6 +255,14 @@ Section model_state_interp.
       apply elem_of_list_fmap in Hin' as [[tp' e'] [-> Hin']].
       unfold from_locale. exists e'. by apply from_locale_from_Some.
   Qed.
+  
+  Global Instance frag_free_roles_are_proper: Proper (equiv ==> equiv) frag_free_roles_are.
+  Proof. intros ???. set_solver. Qed.    
+
+  Global Instance frag_mapping_is_proper: Proper (equiv ==> equiv) frag_mapping_is.
+  Proof. intros ???. set_solver. Qed. 
+
+
 End model_state_interp.
 
 Lemma own_proper `{inG Σ X} γ (x y: X):
@@ -308,6 +316,15 @@ Section PartialOwnership.
       partial_fuel_is_Timeless :> forall fs, Timeless (partial_fuel_is fs);
       partial_mapping_is_Timeless :> forall rs, Timeless (partial_mapping_is rs);
       partial_free_roles_are_Timeless :> forall s, Timeless (partial_free_roles_are s);
+
+      partial_free_roles_are_Proper :> Proper (equiv ==> equiv) partial_free_roles_are;
+      partial_mapping_is_Proper :> Proper (equiv ==> equiv) partial_mapping_is;
+
+      (* partial_fuels_is_sep: forall fs, partial_fuel_is fs ⊣⊢ [∗ map] ρ↦f ∈ fs, partial_fuel_is {[ ρ := f ]}; *)
+      partial_fuels_is_sep: forall fs1 fs2 (DISJ: fs1 ##ₘ fs2),
+        partial_fuel_is (fs1 ∪ fs2) ⊣⊢ partial_fuel_is fs1 ∗ partial_fuel_is fs2;
+      partial_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
+        partial_free_roles_are (fr1 ∪ fr2) ⊣⊢ partial_free_roles_are fr1 ∗ partial_free_roles_are fr2;
   }.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
@@ -913,6 +930,19 @@ Section model_state_lemmas.
     eauto using update_mapping.
   Qed.
 
+  (* TODO: upstream *)
+  Lemma gmap_disj_op_union:
+  ∀ {K : Type} {EqDecision0 : EqDecision K} 
+    {H : Countable K} {A : cmra} (m1 m2 : gmap K A),
+    map_disjoint m1 m2 -> m1 ⋅ m2 = m1 ∪ m2. 
+  Proof using. 
+    intros. apply map_eq. intros.
+    rewrite lookup_op lookup_union.
+    destruct (m1 !! i) eqn:L1, (m2 !! i) eqn:L2; try done.
+    eapply map_disjoint_spec in H1; done.
+  Qed.     
+
+
   Global Instance ActualOwnershipPartialPre:
     @PartialModelPredicatesPre _ M _ _ Σ M. 
   Proof.
@@ -923,6 +953,13 @@ Section model_state_lemmas.
         partial_mapping_is := frag_mapping_is;
         project_inner := Some;
       |}.
+    - intros. rewrite /frag_fuel_is.
+      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
+      2: { by apply map_disjoint_fmap. }
+      by rewrite auth_frag_op own_op.
+    - intros. rewrite /frag_free_roles_are.
+      rewrite -gset_disj_union; auto.  
+      by rewrite auth_frag_op own_op.
   Defined. 
 
   Lemma update_has_fuels ζ fs fs' F m :
