@@ -121,7 +121,7 @@ Section ltl_lemmas.
   Proof. intros [n Hafter]. by exists (Datatypes.S n). Qed.
 
   (** trace_true lemmas *)
-  
+
   Lemma trace_trueI (tr : trace S L) : trace_true tr.
   Proof. destruct tr; done. Qed.
 
@@ -138,7 +138,7 @@ Section ltl_lemmas.
   Lemma trace_not_mono (P Q : trace S L → Prop) tr :
     (Q tr → P tr) → trace_not P tr → trace_not Q tr.
   Proof. intros HQP HP HQ. apply HP. by apply HQP. Qed.
-  
+
   (** trace_next lemmas *)
 
   Lemma trace_next_intro (P : trace S L → Prop) s l (tr : trace S L) :
@@ -519,11 +519,11 @@ Section ltl_lemmas.
 
   Lemma trace_always_eventually P (tr : trace S L) :
     (□ P) tr → (◊ P) tr.
-  Proof. 
+  Proof.
     intros Halways. eapply trace_eventuallyI. exists tr.
     split; [apply trace_suffix_of_refl|]. apply trace_eventually_intro.
     by apply trace_always_elim in Halways.
-  Qed.    
+  Qed.
 
   (* TODO: Remove? *)
   Lemma trace_always_implies_always (P Q : trace S L → Prop) (tr : trace S L) :
@@ -533,4 +533,69 @@ Section ltl_lemmas.
     intros ?. apply trace_impliesI, HPQ.
   Qed.
 
+  Lemma trace_eventually' (P : trace S L → Prop) tr :
+    (◊ P) tr ↔ (∃ tr', trace_suffix_of tr' tr ∧ P tr').
+  Proof.
+    split.
+    - intros Heventually.
+      induction Heventually using trace_eventually_ind.
+      { exists tr. split; [apply trace_suffix_of_refl|]. done. }
+      destruct IHHeventually as [tr' [Hsuffix HP]].
+      exists tr'.
+      split; [|done].
+      by apply trace_suffix_of_cons_r.
+    - intros [tr' [Hsuffix Htr']].
+      apply trace_eventuallyI. exists tr'. split=>//. by apply trace_eventually_intro.
+  Qed.
+
+  Lemma trace_always' tr (P: trace S L → Prop):
+    (□ P) tr <-> (∀ tr', trace_suffix_of tr' tr -> P tr').
+  Proof.
+    split.
+    - intros HP tr' Hsuff. rewrite trace_alwaysI in HP.
+      apply trace_always_elim. eauto.
+    - intros H Habs. apply trace_eventually' in Habs as (tr'&Hsuff&?).
+      by specialize (H _ Hsuff).
+  Qed.
+
+  (* MOVE *)
+  Lemma after_levis n m (tr1 tr2 tr3: trace S L):
+    n ≤ m →
+    after n tr1 = Some tr2 →
+    after m tr1 = Some tr3 →
+    after (m - n) tr2 = Some tr3.
+  Proof. Admitted.
+
+  Lemma always_eventually_prefix_insensitive tr1 tr2 (P: trace S L → Prop):
+    trace_suffix_of tr1 tr2 ->
+    (□◊ P) tr1 ->
+    (□◊ P) tr2.
+  Proof.
+    intros [n Hn] H1.
+    apply trace_always'.
+    intros tr' [m Hm].
+    apply trace_eventuallyI.
+
+    destruct (decide (m ≤ n)).
+    - exists tr1. split.
+      + exists (n - m). eapply after_levis =>//.
+      + by apply trace_always_elim in H1.
+    - exists tr'. split=>//.
+      + exists 0. done.
+      + assert (Hsuff: trace_suffix_of tr' tr1).
+        * exists (m - n). assert (n ≤ m) by lia. eapply after_levis =>//.
+        * rewrite trace_alwaysI in H1. specialize (H1 tr' Hsuff).
+          by apply trace_always_elim in H1.
+  Qed.
+
+  Lemma FS_implies_OF (P Q: trace S L → Prop) tr:
+     (trace_implies (□◊ P) (□◊ Q)) tr → (□ (trace_implies (□◊ P) (◊ Q))) tr.
+  Proof.
+    intros Hsf. apply trace_always'. intros tr' Hsuff.
+    apply trace_impliesI. intros Hae.
+    eapply always_eventually_prefix_insensitive in Hae =>//.
+    rewrite trace_impliesI in Hsf. specialize (Hsf Hae).
+    apply trace_always_elim.
+    rewrite trace_alwaysI in Hsf =>//. specialize (Hsf tr'). eauto.
+  Qed.
 End ltl_lemmas.
