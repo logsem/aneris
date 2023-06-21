@@ -1177,6 +1177,54 @@ Proof using PMP.
 Qed.
 
 
+Lemma wp_store_step_singlerole_keep s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
+  f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
+  (ρ ∉ live_roles iM s2 -> (f2 < f1)%nat ) -> (* TODO: check Zombie case in must_decrease *)
+  live_roles _ s2 ⊆ live_roles _ s1 ->
+  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
+    Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
+  {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
+      has_fuel tid ρ f2 }}}. 
+Proof using PMP. 
+  iIntros (Hfl Htrans Hdecr ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
+  iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
+  iSplit; first by rewrite Hexend // in Hheap;  eauto.
+  iIntros "!>" (e2 σ2 efs Hstep).
+  rewrite Hexend in Hheap. inv_head_step.
+  iDestruct (partial_model_agree' with "Hmi Hst") as %Hmeq.
+  rewrite has_fuel_fuels Hexend.
+  iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+  iMod (update_step_still_alive _ _ _ _ _ _ _ s2 _
+            ({[ ρ := f2 ]})
+            _ _ _ _ ∅
+            with "Hfuel1 Hst Hmi Hfr") as
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
+  all: eauto.
+  1-4: set_solver. 
+  - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
+  - destruct (decide (ρ ∈ live_roles iM s2)).
+    + split; first by intros _; rewrite lookup_singleton /=; lia.
+      split; first set_solver.
+      split; first set_solver.
+      split; first (intros ρ' Hin; set_solver).
+      split; set_solver.
+    + (* repeat (split; set_solver). *)
+      repeat (split; try set_solver).
+      * intros. rewrite !lookup_singleton. simpl. eauto.
+      * apply fm_live_spec in Htrans. set_solver. 
+  - iModIntro; iExists δ2, ℓ. iSplit.
+    { iPureIntro. simpl in *. split =>//. }
+    iFrame.
+    iSplit; first done.
+    iApply "HΦ". iFrame.
+    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1))
+      with fr; [iFrame|set_solver].
+    rewrite union_empty_r_L.
+    rewrite has_fuel_fuels //. iFrame. 
+Qed.
+
 Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
