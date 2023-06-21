@@ -852,7 +852,10 @@ Proof using PMP.
   iDestruct "Hsi" as "(%&Hgh&Hmi)". simpl.
   iDestruct (partial_model_agree' with "Hmi Hmod") as %Hmeq.
 
-  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "Hfuels Hmod Hmi Hfr") as "H"; eauto.
+  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "Hfuels Hmod Hmi Hfr") as "H".
+  2: { apply empty_subseteq. }
+  all: eauto.
+  1, 2: set_solver. 
   { rewrite Hexend. eauto. }
   { econstructor =>//.
     - rewrite Hexend //=.
@@ -865,7 +868,8 @@ Proof using PMP.
   - iPureIntro. destruct ℓ =>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - by iSpecialize ("Hkont" with "Hmod Hfr Hfuels").
+  - rewrite union_empty_r_L. 
+    by iSpecialize ("Hkont" with "Hmod Hfr Hfuels").
 Qed. 
 
 Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' (f1 f2: nat) fr Φ e1 e2 ρ φ:
@@ -1171,11 +1175,13 @@ Proof using PMP.
   iDestruct (partial_model_agree' with "Hmi Hst") as %Hmeq.
   rewrite has_fuel_fuels Hexend.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
-  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
+  iMod (update_step_still_alive _ _ _ _ _ _ _ s2 _
             (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
             with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
+  2: { apply empty_subseteq. }
+  1-3: set_solver.
+  all: eauto. 
   - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
   - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
@@ -1191,9 +1197,10 @@ Proof using PMP.
     iApply "HΦ". iFrame.
     replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1))
       with fr; [iFrame|set_solver].
+    rewrite union_empty_r_L. 
     destruct (decide (ρ ∈ live_roles iM s2)).
-    + rewrite has_fuel_fuels //.
-    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //.
+    + rewrite has_fuel_fuels //. iFrame. 
+    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
 Qed.
 
 Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l q v' v1 v2:
@@ -1214,8 +1221,10 @@ Proof using PMP.
   iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
             (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
             with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
+  2: { apply empty_subseteq. }
+  all: eauto.
+  1-3: set_solver. 
   - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
   - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
@@ -1230,9 +1239,10 @@ Proof using PMP.
     iFrame.
     iSplit; first done. iApply "HΦ". iFrame.
     replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
+    rewrite union_empty_r_L. 
     destruct (decide (ρ ∈ live_roles iM s2)).
-    + rewrite has_fuel_fuels //.
-    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //.
+    + rewrite has_fuel_fuels //. iFrame. 
+    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
 Qed.
 
 Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E l v' v1 v2:
@@ -1255,8 +1265,10 @@ Proof using PMP.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   rewrite has_fuel_fuels Hexend.
   iMod (update_step_still_alive _ _ _ _ _ _ _ _ _ {[ ρ := f2 ]} with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
+  2: { apply empty_subseteq. }
+  all: eauto. 
+  1-3: set_solver.
   - apply head_locale_step; econstructor =>//.
   - repeat (split; try done); [|set_solver|set_solver|set_solver| set_solver |].
     + intros ??. rewrite !lookup_singleton /=. lia.
@@ -1267,6 +1279,7 @@ Proof using PMP.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
     iFrame. iSplit; first done. iApply "HΦ". iFrame.
+    rewrite union_empty_r_L. 
     replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
     by rewrite has_fuel_fuels.
 Qed.
@@ -1292,8 +1305,10 @@ Proof using PMP.
   iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
             (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
             with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
+  2: { apply empty_subseteq. }
+  all: eauto. 
+  1-3: set_solver.
   - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
   - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
@@ -1304,10 +1319,10 @@ Proof using PMP.
   - rewrite -> bool_decide_eq_true_2 in *; eauto.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
-    iFrame. iSplit; first done. iApply "HΦ". iFrame.
+    iFrame. iSplit; first done. iApply "HΦ". rewrite union_empty_r_L. iFrame.    
     replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
     destruct (decide (ρ ∈ live_roles iM s2)).
-    + rewrite has_fuel_fuels //.
+    + rewrite has_fuel_fuels //. 
     + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. 
 Qed.
 
