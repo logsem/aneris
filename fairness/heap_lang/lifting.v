@@ -825,17 +825,20 @@ Proof using PMP.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
-Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' fs1 fs2 fr1 Φ e1 e2 ρ φ:
+Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' fs1 fs2 fr1 fr_stash Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
   live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
+  fr_stash ⊆ dom fs1 →
+  live_roles iM s1 ∩ fr_stash = ∅ → 
+  dom fs2 ∩ fr_stash = ∅ ->
   iM.(fmtrans) s1 (Some ρ) s2 ->
   (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
-                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
+                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1) ∪ fr_stash)
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using PMP. 
-  iIntros (Hpe Hφ Hval Hfr Htrans).
+  iIntros (Hpe Hφ Hval Hfr ??? Htrans).
   have Hps: pure_step e1 e2.
   { specialize (Hpe Hφ). by apply nsteps_once_inv in Hpe. }
   iIntros "Hkont".
@@ -852,10 +855,10 @@ Proof using PMP.
   iDestruct "Hsi" as "(%&Hgh&Hmi)". simpl.
   iDestruct (partial_model_agree' with "Hmi Hmod") as %Hmeq.
 
-  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "Hfuels Hmod Hmi Hfr") as "H".
-  2: { apply empty_subseteq. }
-  all: eauto.
-  1, 2: set_solver. 
+  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "Hfuels Hmod Hmi Hfr") as "H"; eauto. 
+  (* 2: { apply empty_subseteq. } *)
+  (* all: eauto. *)
+  (* 1, 2: set_solver.  *)
   { rewrite Hexend. eauto. }
   { econstructor =>//.
     - rewrite Hexend //=.
@@ -868,9 +871,26 @@ Proof using PMP.
   - iPureIntro. destruct ℓ =>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
   - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - rewrite union_empty_r_L. 
-    by iSpecialize ("Hkont" with "Hmod Hfr Hfuels").
+  - by iSpecialize ("Hkont" with "Hmod Hfr Hfuels").
 Qed. 
+
+Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' fs1 fs2 fr1 Φ e1 e2 ρ φ:
+  PureExec φ 1 e1 e2 -> φ ->
+  valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
+  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
+  iM.(fmtrans) s1 (Some ρ) s2 ->
+  (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
+                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
+                  -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
+  ⊢ WP e1 @ tid; E {{ Φ }}.
+Proof using PMP. 
+  iIntros.
+  iApply wp_lift_pure_step_no_fork_take_step_stash.
+  4: { apply empty_subseteq. }
+  all: eauto. 
+  1, 2: set_solver.
+  by rewrite union_empty_r_L.
+Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' (f1 f2: nat) fr Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
