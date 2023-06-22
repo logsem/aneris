@@ -10,8 +10,8 @@ From iris.algebra Require Import gmap.
 
 Section proof.
   
-Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ,
-                !SI_resources Mdl Σ}.
+Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
+           !SI_specs}.
 
   Lemma commitU_spec :
     ∀ c sa E,
@@ -80,11 +80,55 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ,
     by wp_pures.
   Qed.
 
+  Lemma simplified_wait_on_keyT_spec :
+    ∀ (c cond v : val) (k : Key) ms sa E,
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜dom ms ⊆ KVS_keys⌝ -∗
+    ⌜k ∈ dom ms⌝ -∗
+    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
+              ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+    (∀ v', {{{ True }}} cond v' @[ip_of_address sa]
+          {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
+    {{{
+      ConnectionState c (Active ms) ∗
+      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
+    }}}
+      wait_on_keyT c cond k @[ip_of_address sa]
+    {{{ m, RET #(); ⌜dom m = dom ms⌝ ∗
+      ConnectionState c (Active m) ∗
+      ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+      ∃ h, Seen k (v :: h)
+    }}}.
+  Proof.
+  Admitted.
+
+  Lemma wait_on_keyT_spec :
+    ∀ (c cond : val) (k : Key) ms sa E
+      (P : _ → iProp Σ) (Q : val → iProp Σ),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜dom ms ⊆ KVS_keys⌝ -∗
+    ⌜k ∈ dom ms⌝ -∗
+    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
+              ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+    (∀ m v, {{{ P m ∗ ConnectionState c (Active m) ∗ ⌜dom m = dom ms⌝ ∗
+                ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
+             }}}
+              cond v @[ip_of_address sa]
+             {{{ m' (b : bool), RET #b; ConnectionState c (Active m') ∗
+                ([∗ map] k ↦ h ∈ m', k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+                if b then Q v else P m'
+             }}}) -∗
+    {{{
+      P ms ∗ ConnectionState c (Active ms) ∗
+      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
+    }}}
+      wait_on_keyT c cond k @[ip_of_address sa]
+    {{{ m v, RET #(); ⌜dom m = dom ms⌝ ∗ Q v ∗
+      ConnectionState c (Active m) ∗
+      ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+      ∃ h, Seen k (v :: h)
+    }}}.
+  Proof.
+  Admitted.
 
 End proof.
-
-
-
-
-
-
