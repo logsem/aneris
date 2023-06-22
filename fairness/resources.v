@@ -325,6 +325,7 @@ Section PartialOwnership.
         partial_fuel_is (fs1 ∪ fs2) ⊣⊢ partial_fuel_is fs1 ∗ partial_fuel_is fs2;
       partial_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
         partial_free_roles_are (fr1 ∪ fr2) ⊣⊢ partial_free_roles_are fr1 ∗ partial_free_roles_are fr2;
+      
   }.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
@@ -504,7 +505,7 @@ Section PartialOwnership.
         ρ (δ1 : LM) ζ fr1 fr_stash,
     (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ->
     fr_stash ⊆ dom fs1 ->
-    (live_roles _ s1) ∩ fr_stash = ∅ ->
+    (live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅ ->
     dom fs2 ∩ fr_stash = ∅ ->
     trace_last extr = (tp1, σ1) →
     trace_last auxtr = δ1 ->
@@ -520,8 +521,8 @@ Section PartialOwnership.
 
     partial_model_agree': forall n δ1 s2,
         model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = Some s2⌝;
-    (* partial_no_fuels_disabled: *)
-    (*     forall tid, has_fuels tid ∅ -∗ partial_thread_disabled tid; *)
+    partial_free_roles_fuels_disj: forall n δ fr fs tid,
+        model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs⌝;
   }.
 
   End PartialModelPredicates.
@@ -542,6 +543,37 @@ Section model_state_lemmas.
   Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
 
+  (* TODO: upstream *)
+  Lemma gmap_disj_op_union:
+  ∀ {K : Type} {EqDecision0 : EqDecision K} 
+    {H : Countable K} {A : cmra} (m1 m2 : gmap K A),
+    map_disjoint m1 m2 -> m1 ⋅ m2 = m1 ∪ m2. 
+  Proof using. 
+    intros. apply map_eq. intros.
+    rewrite lookup_op lookup_union.
+    destruct (m1 !! i) eqn:L1, (m2 !! i) eqn:L2; try done.
+    eapply map_disjoint_spec in H1; done.
+  Qed.     
+
+  Global Instance ActualOwnershipPartialPre:
+    @PartialModelPredicatesPre _ M _ _ Σ M. 
+  Proof.
+    refine {|
+        partial_model_is := frag_model_is;
+        partial_free_roles_are := frag_free_roles_are;
+        partial_fuel_is := frag_fuel_is;
+        partial_mapping_is := frag_mapping_is;
+        project_inner := Some;
+      |}.
+    - intros. rewrite /frag_fuel_is.
+      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
+      2: { by apply map_disjoint_fmap. }
+      by rewrite auth_frag_op own_op.
+    - intros. rewrite /frag_free_roles_are.
+      rewrite -gset_disj_union; auto.  
+      by rewrite auth_frag_op own_op.
+  Defined. 
+
   Lemma frag_mapping_same ζ m R:
     auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ m !! ζ = Some R ⌝.
   Proof.
@@ -559,79 +591,6 @@ Section model_state_lemmas.
     apply leibniz_equiv in HA. rewrite -> lookup_fmap_Some in HA.
     destruct HA as (?&?&?). congruence.
   Qed.
-
-End model_state_lemmas.
-
-Section adequacy.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
-  Context {Σ : gFunctors}.
-  Context {fG: fairnessGpreS LM Σ}.
-
-  Let as_RA (s: fmstate M): optionR fairnessGpreS_MA :=
-        Some $ mrl_lift s. 
-
-  Lemma model_state_init (s0: M):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (optionR fairnessGpreS_MA)) γ
-            (● (as_RA s0) ⋅ ◯ (as_RA s0)).
-  Proof.
-    iMod (own_alloc (● as_RA s0 ⋅ ◯ as_RA s0)) as (γ) "[Hfl Hfr]".
-    { apply auth_both_valid_2; [| done].
-      apply mrl_valid. }
-    iExists _. by iSplitL "Hfl".
-  Qed.
-
-  Lemma model_mapping_init (s0: M) (ζ0: locale Λ):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
-            (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
-               ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})).  
-  Proof.
-    iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
-                       ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}): authUR (gmapUR _ _))) as (γ) "[Hfl Hfr]".
-    { apply auth_both_valid_2; eauto. by apply singleton_valid. }
-    iExists _. by iSplitL "Hfl".
-  Qed.
-
-  Lemma model_fuel_init (s0: M):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ
-            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))).
-  Proof.
-    iMod (own_alloc
-            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]".
-    { apply auth_both_valid_2;eauto. intros ρ.
-      destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq;
-        rewrite Heq; last done.
-      apply lookup_gset_to_gmap_Some in Heq.
-      destruct Heq as [?<-]. done. }
-    iExists _. by iSplitL "H1".
-  Qed.
-
-  Lemma model_free_roles_init (s0: M) (FR: gset _):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
-  Proof.
-    iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]".
-    { apply auth_both_valid_2 =>//. }
-    iExists _. by iSplitL "H1".
-  Qed.
-End adequacy.
-
-Section model_state_lemmas.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
-  Context `{EqDecision (expr Λ)}.
-  Context {Σ : gFunctors}.
-  Context {fG: fairnessGS LM Σ}.
-
-  (* TODO: decide what to do with notations *)
-  Notation "tid ↦M R" := (frag_mapping_is {[ tid := R ]}) (at level 33).
-  Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
-  Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
   Lemma update_model δ δ1 δ2:
     auth_model_is δ1 -∗ frag_model_is δ2 ==∗ auth_model_is δ ∗ frag_model_is δ.
@@ -736,6 +695,130 @@ Section model_state_lemmas.
     apply delete_singleton_local_update.
     typeclasses eauto.
   Qed.
+
+  Lemma has_fuel_in ζ δ fs n:
+    has_fuels ζ fs -∗ model_state_interp n δ -∗ ⌜ ∀ ρ, ls_mapping δ !! ρ = Some ζ <-> ρ ∈ dom fs ⌝.
+  Proof.
+    unfold model_state_interp, has_fuels, auth_mapping_is, frag_mapping_is.
+    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping &HFR&%Hmapinv&Hamod&Hfr) %ρ".
+    iCombine "Hamapping Hζ" as "H".
+    iDestruct (own_valid with "H") as %Hval. iPureIntro.
+    apply auth_both_valid_discrete in Hval as [Hval ?].
+    rewrite map_fmap_singleton in Hval.
+    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
+    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
+    apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq.
+    rewrite (Hmapinv ρ ζ) HMζ. split.
+    - intros (?&?&?). by simplify_eq.
+    - intros ?. eexists. split; eauto.
+  Qed.
+
+  Lemma has_fuel_fuel ζ δ fs n:
+    has_fuels ζ fs -∗ model_state_interp n δ -∗ 
+    ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
+  Proof.
+    unfold has_fuels, model_state_interp, auth_fuel_is.
+    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping&HFR&%Hmapinv&Hamod)" (ρ Hρ).
+    iDestruct (big_sepS_delete _ _ ρ with "Hfuels") as "[(%f&%Hfs&Hfuel) _]" =>//.
+    iCombine "Hafuel Hfuel" as "H".
+    iDestruct (own_valid with "H") as %Hval. iPureIntro.
+    apply auth_both_valid_discrete in Hval as [Hval ?].
+    rewrite map_fmap_singleton in Hval.
+    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
+    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
+    apply fmap_Some_1 in Hval as (f'&Hfuelρ&?). simplify_eq.
+    rewrite Hfuelρ Hfs //.
+  Qed.
+
+  Lemma frag_free_roles_fuels_disj: forall n δ fr fs tid,
+        model_state_interp n δ -∗ frag_free_roles_are fr -∗ 
+        has_fuels tid fs (PMPP := ActualOwnershipPartialPre) -∗
+        ⌜ fr ## dom fs⌝. 
+  Proof using. 
+    iIntros (?????) "MSI FREE FUELS". 
+    rewrite /model_state_interp.
+    iAssert (⌜ dom fs ⊆ dom (ls_fuel δ) ⌝)%I as "%INCL2".
+    { iDestruct (has_fuel_fuel with "FUELS MSI") as "%IN".
+      iPureIntro. apply elem_of_subseteq.
+      intros ? DOM. specialize (IN _ DOM).
+      apply elem_of_dom. rewrite IN. by apply elem_of_dom.  }
+    iDestruct "MSI" as (??) "(?&?&FREE'&?&?&?&%DISJ)".
+    iDestruct (free_roles_inclusion with "FREE' FREE") as "%INCL1".
+    iPureIntro. set_solver. 
+  Qed.    
+
+End model_state_lemmas.
+
+Section adequacy.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGpreS LM Σ}.
+
+  Let as_RA (s: fmstate M): optionR fairnessGpreS_MA :=
+        Some $ mrl_lift s. 
+
+  Lemma model_state_init (s0: M):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (optionR fairnessGpreS_MA)) γ
+            (● (as_RA s0) ⋅ ◯ (as_RA s0)).
+  Proof.
+    iMod (own_alloc (● as_RA s0 ⋅ ◯ as_RA s0)) as (γ) "[Hfl Hfr]".
+    { apply auth_both_valid_2; [| done].
+      apply mrl_valid. }
+    iExists _. by iSplitL "Hfl".
+  Qed.
+
+  Lemma model_mapping_init (s0: M) (ζ0: locale Λ):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
+            (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
+               ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})).  
+  Proof.
+    iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
+                       ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}): authUR (gmapUR _ _))) as (γ) "[Hfl Hfr]".
+    { apply auth_both_valid_2; eauto. by apply singleton_valid. }
+    iExists _. by iSplitL "Hfl".
+  Qed.
+
+  Lemma model_fuel_init (s0: M):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ
+            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
+               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))).
+  Proof.
+    iMod (own_alloc
+            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
+               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]".
+    { apply auth_both_valid_2;eauto. intros ρ.
+      destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq;
+        rewrite Heq; last done.
+      apply lookup_gset_to_gmap_Some in Heq.
+      destruct Heq as [?<-]. done. }
+    iExists _. by iSplitL "H1".
+  Qed.
+
+  Lemma model_free_roles_init (s0: M) (FR: gset _):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
+  Proof.
+    iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]".
+    { apply auth_both_valid_2 =>//. }
+    iExists _. by iSplitL "H1".
+  Qed.
+End adequacy.
+
+Section actual_ownership.
+  Context `{LM: LiveModel Λ M}.
+  Context `{Countable (locale Λ)}.
+  Context `{EqDecision (expr Λ)}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
+
+  (* TODO: decide what to do with notations *)
+  Notation "tid ↦M R" := (frag_mapping_is {[ tid := R ]}) (at level 33).
+  Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+  Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
   Definition fuel_apply (fs' F:  gmap (fmrole M) nat) (LR: gset (fmrole M)):
     gmap (fmrole M) nat :=
@@ -930,37 +1013,6 @@ Section model_state_lemmas.
     eauto using update_mapping.
   Qed.
 
-  (* TODO: upstream *)
-  Lemma gmap_disj_op_union:
-  ∀ {K : Type} {EqDecision0 : EqDecision K} 
-    {H : Countable K} {A : cmra} (m1 m2 : gmap K A),
-    map_disjoint m1 m2 -> m1 ⋅ m2 = m1 ∪ m2. 
-  Proof using. 
-    intros. apply map_eq. intros.
-    rewrite lookup_op lookup_union.
-    destruct (m1 !! i) eqn:L1, (m2 !! i) eqn:L2; try done.
-    eapply map_disjoint_spec in H1; done.
-  Qed.     
-
-
-  Global Instance ActualOwnershipPartialPre:
-    @PartialModelPredicatesPre _ M _ _ Σ M. 
-  Proof.
-    refine {|
-        partial_model_is := frag_model_is;
-        partial_free_roles_are := frag_free_roles_are;
-        partial_fuel_is := frag_fuel_is;
-        partial_mapping_is := frag_mapping_is;
-        project_inner := Some;
-      |}.
-    - intros. rewrite /frag_fuel_is.
-      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
-      2: { by apply map_disjoint_fmap. }
-      by rewrite auth_frag_op own_op.
-    - intros. rewrite /frag_free_roles_are.
-      rewrite -gset_disj_union; auto.  
-      by rewrite auth_frag_op own_op.
-  Defined. 
 
   Lemma update_has_fuels ζ fs fs' F m :
     let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
@@ -1018,41 +1070,8 @@ Section model_state_lemmas.
     iFrame. rewrite Hdom //.
   Qed.
 
-  Lemma has_fuel_in ζ δ fs n:
-    has_fuels ζ fs -∗ model_state_interp n δ -∗ ⌜ ∀ ρ, ls_mapping δ !! ρ = Some ζ <-> ρ ∈ dom fs ⌝.
-  Proof.
-    unfold model_state_interp, has_fuels, auth_mapping_is, frag_mapping_is.
-    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping &HFR&%Hmapinv&Hamod&Hfr) %ρ".
-    iCombine "Hamapping Hζ" as "H".
-    iDestruct (own_valid with "H") as %Hval. iPureIntro.
-    apply auth_both_valid_discrete in Hval as [Hval ?].
-    rewrite map_fmap_singleton in Hval.
-    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
-    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
-    apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq.
-    rewrite (Hmapinv ρ ζ) HMζ. split.
-    - intros (?&?&?). by simplify_eq.
-    - intros ?. eexists. split; eauto.
-  Qed.
 
-  Lemma has_fuel_fuel ζ δ fs n:
-    has_fuels ζ fs -∗ model_state_interp n δ -∗ 
-    ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
-  Proof.
-    unfold has_fuels, model_state_interp, auth_fuel_is.
-    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping&HFR&%Hmapinv&Hamod)" (ρ Hρ).
-    iDestruct (big_sepS_delete _ _ ρ with "Hfuels") as "[(%f&%Hfs&Hfuel) _]" =>//.
-    iCombine "Hafuel Hfuel" as "H".
-    iDestruct (own_valid with "H") as %Hval. iPureIntro.
-    apply auth_both_valid_discrete in Hval as [Hval ?].
-    rewrite map_fmap_singleton in Hval.
-    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
-    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
-    apply fmap_Some_1 in Hval as (f'&Hfuelρ&?). simplify_eq.
-    rewrite Hfuelρ Hfs //.
-  Qed.
-
-End model_state_lemmas.
+End actual_ownership. 
 
 
 
@@ -1501,7 +1520,7 @@ Section ActualOwnershipImpl.
         tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ (δ1 : LM) ζ fr1 fr_stash:
     (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ->
     fr_stash ⊆ dom fs1 ->
-    (live_roles _ s1) ∩ fr_stash = ∅ ->
+    (live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅ ->
     dom fs2 ∩ fr_stash = ∅ ->
     trace_last extr = (tp1, σ1) →
     trace_last auxtr = δ1 ->
@@ -1819,6 +1838,8 @@ Section ActualOwnershipImpl.
     - intros. iApply actual_update_step_still_alive; done.
     - intros. iIntros "MSI ST".
       by iDestruct (model_agree' with "MSI ST") as "->".
+    - intros. iIntros "???". simpl. 
+      iApply (frag_free_roles_fuels_disj with "[$] [$] [$]").
   Defined. 
 
 End ActualOwnershipImpl.
