@@ -11,10 +11,13 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources.
 
-
-Definition can_commit
- (m ms : gmap Key Hist) (mc : gmap Key (option val * bool)) : Prop :=
-  ∀ (k : Key) (v: val), mc !! k = Some (Some v, true) → m !! k = ms !! k.
+Definition can_commit `{User_params}
+ (m ms : gmap Key Hist) (mc : gmap Key (option val * bool)) : bool :=
+  bool_decide (∀ (k : Key), k ∈ KVS_keys →
+  match (mc !! k : option (option val * bool)) with
+    | Some (vo, true) => bool_decide (m !! k = ms !! k) 
+    | _ => true                       
+  end).
 
 Definition commit_event
   (p : option val * bool) (h : Hist) :=
