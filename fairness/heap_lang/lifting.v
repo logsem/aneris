@@ -859,6 +859,7 @@ Proof using PMP.
   (* 2: { apply empty_subseteq. } *)
   (* all: eauto. *)
   (* 1, 2: set_solver.  *)
+  { set_solver. }
   { rewrite Hexend. eauto. }
   { econstructor =>//.
     - rewrite Hexend //=.
@@ -1177,6 +1178,7 @@ Proof using PMP.
 Qed.
 
 
+(* TODO: clean up all those similar lemmas *)
 Lemma wp_store_step_singlerole_keep s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   (ρ ∉ live_roles iM s2 -> (f2 < f1)%nat ) -> (* TODO: check Zombie case in must_decrease *)
@@ -1231,12 +1233,16 @@ Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
   {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else (tid ↦M ∅)) }}}.
+      (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ∗ partial_free_roles_are {[ ρ ]}) }}}.
 Proof using PMP. 
   iIntros (Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
+  iAssert (⌜ ρ ∉ fr ⌝)%I as %FRρ'.
+  { rewrite has_fuel_fuels. 
+    iDestruct (partial_free_roles_fuels_disj with "[$] [$] [$]") as %?.
+    set_solver. }
   iSplit; first by rewrite Hexend // in Hheap;  eauto.
   iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
@@ -1245,11 +1251,12 @@ Proof using PMP.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   iMod (update_step_still_alive _ _ _ _ _ _ _ s2 _
             (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
+            _ _ _ _ ({[ ρ ]} ∖ live_roles _ s2)
             with "Hfuel1 Hst Hmi Hfr") as
         (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
-  2: { apply empty_subseteq. }
-  1-3: set_solver.
   all: eauto. 
+  1-3: set_solver.
+  { destruct (decide (ρ ∈ live_roles iM s2)); set_solver. }
   - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
   - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
@@ -1263,13 +1270,17 @@ Proof using PMP.
     iFrame.
     iSplit; first done.
     iApply "HΦ". iFrame.
+
+    iDestruct (partial_free_roles_are_sep with "Hmod") as "[? ?]"; [set_solver| ].
     replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1))
       with fr; [iFrame|set_solver].
-    rewrite union_empty_r_L. 
+    
     destruct (decide (ρ ∈ live_roles iM s2)).
-    + rewrite has_fuel_fuels //. iFrame. 
-    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
+    + rewrite has_fuel_fuels //.
+    + rewrite difference_disjoint; [| set_solver]. 
+      iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
 Qed.
+
 
 Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l q v' v1 v2:
   v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
@@ -1405,3 +1416,4 @@ Qed.
 (*   iModIntro. iSplit=>//. iFrame. by iApply "HΦ". *)
 (* Qed. *)
 End lifting.
+ 
