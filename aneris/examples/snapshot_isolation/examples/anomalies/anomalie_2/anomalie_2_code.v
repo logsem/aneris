@@ -6,7 +6,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib Require Import par_code.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
-From aneris.examples.snapshot_isolation.util.util_deprecated Require Import util_code.
+From aneris.examples.snapshot_isolation.util Require Import util_code.
 
 (**  From the paper https://www.cs.umb.edu/~poneil/ROAnom.pdf
     A Read-Only Transaction Anomaly Under Snapshot Isolation
