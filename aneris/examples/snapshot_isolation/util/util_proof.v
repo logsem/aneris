@@ -42,12 +42,39 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ,
     iModIntro.
     iExists m, ms, mc.
     iSplitL "pre"; first done.
-    iIntros "!>%b (CanStart & [( _ & post)|(_ & post)])".
-    {
-      iMod ("HΦ" with "[$CanStart $post]") as "HΦ".
-      iModIntro.
-      by wp_pures.
-    }
+    iIntros "!>%b (CanStart & [( _ & post)|(_ & post)])"; 
+    iMod ("HΦ" with "[$CanStart $post]") as "HΦ";
+    iModIntro;
+    by wp_pures.
+  Qed.
+
+  Lemma commitT_spec :
+    ∀ c sa E,
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    commit_spec -∗
+    <<< ∀∀ (m ms: gmap Key Hist)
+           (mc : gmap Key (option val * bool)),
+        ⌜can_commit m ms mc⌝ ∗
+        ConnectionState c (Active ms) ∗
+        ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
+        ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
+        ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1  ∗ KeyUpdStatus c k p.2) >>>
+      commitT c @[ip_of_address sa] E
+    <<<▷ RET #();
+        ConnectionState c CanStart ∗
+        (** Transaction has been commited. *)
+        ([∗ map] k↦ h;p ∈ m; mc, 
+            k ↦ₖ commit_event p h ∗ Seen k (commit_event p h)) >>>.
+  Proof.
+    iIntros (cst sa E name) "#commit %Φ !>HΦ".
+    rewrite/commitT/assert.
+    wp_pures.
+    wp_apply ("commit" with "[//] [HΦ]").
+    iMod "HΦ" as "(%m & %ms & %mc & (%can_commit & pre) & HΦ)".
+    iModIntro.
+    iExists m, ms, mc.
+    iSplitL "pre"; first done.
+    iIntros "!>%b (CanStart & [(-> & _ & post)|(_ & %abs & _)])"; try done.
     iMod ("HΦ" with "[$CanStart $post]") as "HΦ".
     iModIntro.
     by wp_pures.
