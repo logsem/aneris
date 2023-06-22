@@ -83,7 +83,7 @@ Section Specification.
         ConnectionState c CanStart ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
-          ([∗ map] k↦ h;p ∈ m; mc, 
+          ([∗ map] k↦ h;p ∈ m; mc,
             k ↦ₖ commit_event p h ∗ Seen k (commit_event p h))) ∨
         (** Transaction has been aborted. *)
          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
