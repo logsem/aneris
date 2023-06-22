@@ -17,7 +17,7 @@ Definition can_commit
   ∀ (k : Key) (v: val), mc !! k = Some (Some v, true) → m !! k = ms !! k.
 
 Definition commit_event
-  (k : Key) (p : option val * bool) (h : Hist) :=
+  (p : option val * bool) (h : Hist) :=
     match p with
     | (Some v, true) => v :: h
     | _              => h
@@ -81,7 +81,7 @@ Section Specification.
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
           ([∗ map] k↦ h;p ∈ m; mc, 
-            k ↦ₖ commit_event k p h ∗ Seen k (commit_event k p h))) ∨
+            k ↦ₖ commit_event p h ∗ Seen k (commit_event p h))) ∨
         (** Transaction has been aborted. *)
          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
            [∗ map] k ↦ h ∈ m, k ↦ₖ h ∗ Seen k h)) >>>.
