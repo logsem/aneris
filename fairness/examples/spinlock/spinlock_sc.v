@@ -371,6 +371,14 @@ Section ClientProofs.
     rewrite THV. by apply PeanoNat.Nat.ltb_lt.
   Qed. 
 
+  Lemma finished_role_is_dead th st (DOM: th < length st)
+        (THV: st !! th = Some 0):
+    th ∉ live_roles spinlock_model_impl st.
+  Proof.
+    simpl. unfold spinlock_lr.
+    intros [_ FIN]%elem_of_list_to_set%elem_of_list_In%filter_In.
+    by rewrite THV in FIN.
+  Qed. 
   
   Lemma acquire_spec_term tid l γ P f (FUEL: f > 5) th:
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2 }}}
@@ -478,7 +486,7 @@ Section ClientProofs.
   Lemma release_spec_term tid l γ P f (FUEL: f > 2) (th: fmrole spinlock_model_impl):
     {{{ spinlock_inv l γ P ∗ P ∗ locked γ ∗ thst_frag th 1 ∗ has_fuel tid th f }}}
       release #l @ tid
-    {{{ RET #(); tid ↦M ∅ ∗ thst_frag th 0 }}}.
+    {{{ RET #(); tid ↦M ∅ ∗ thst_frag th 0 ∗ partial_free_roles_are {[ th ]} }}}.
   Proof using PMP. 
     iIntros (Φ) "(#INV & P & LOCKED & THST_FRAG & FUEL) Kont". rewrite /release.
     iDestruct (thst_frag_bound with "THST_FRAG") as "%TH_BOUND".
@@ -510,17 +518,18 @@ Section ClientProofs.
 
     destruct f; [lia| ]. 
     rewrite {2}/model_inv_impl. iDestruct "MODEL" as "(ST & NOFREE & AUTHS & %LENGTH)". 
-    iApply ((wp_store_step_singlerole _ tid th _ 10%nat _ st (<[th:=0]> st)) with "[$]").
+    iApply ((wp_store_step_singlerole _ tid th _ 0%nat _ st (<[th:=0]> st)) with "[$]").
     all: eauto.
     { done. }
     { by econstructor. }
     { apply live_roles_preservation.
       destruct ST_LOCKED as [EQ _]. rewrite EQ /=. lia. }
     do 2 iModIntro. iIntros "(L & ST & NOFREE & FUEL)".
-    rewrite decide_False.
-    2: { simpl. unfold spinlock_lr. intros IN.
-         apply elem_of_list_to_set, elem_of_list_In, filter_In in IN as [_ FLT].
-         rewrite list_lookup_insert in FLT; [done| lia]. }
+
+    (* rewrite decide_False. *)
+    (* 2: { simpl. unfold spinlock_lr. intros IN. *)
+    (*      apply elem_of_list_to_set, elem_of_list_In, filter_In in IN as [_ FLT]. *)
+    (*      rewrite list_lookup_insert in FLT; [done| lia]. } *)
 
     iApply "Kont". iFrame. 
 
@@ -528,8 +537,13 @@ Section ClientProofs.
     { apply elem_of_list_to_set, elem_of_list_In. apply in_seq. simpl.
       split; [lia| eauto]. }
     iDestruct "TH_AUTH" as (v) "[%TH_V THST_AUTH]".
+    pose proof (lookup_lt_Some st th _ TH_V) as LEN.  
     iMod ((thst_update th 0) with "[THST_AUTH THST_FRAG]")
         as "[THST_AUTH THST_FRAG]"; [by iFrame| ].
+    rewrite decide_False.
+    2: { apply finished_role_is_dead. 
+         - by rewrite insert_length.
+         - by rewrite list_lookup_insert. }
     iFrame. 
 
     iMod ("Clos" with "[-]") as "_"; [| done].
@@ -539,14 +553,14 @@ Section ClientProofs.
     { iFrame. }
     iFrame. iSplitL; [by (iLeft; iFrame)|].
     rewrite /model_lock_corr_impl. iLeft. iPureIntro. split; auto. 
-    apply state_becomes_unlocked; auto. lia.
+    apply state_becomes_unlocked; auto.
   Qed. 
     
     
   Lemma client_terminates tid l γ P f th (FUEL: f > 12) :
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2}}}
       client #l @ tid
-    {{{ RET #(); tid ↦M ∅  }}}.
+    {{{ RET #(); tid ↦M ∅ ∗ partial_free_roles_are {[ th ]} }}}.
   Proof using PMP.
     iIntros (Φ) "(#INV & FUEL & FRAG) Kont".
     rewrite /client.
@@ -561,7 +575,7 @@ Section ClientProofs.
     iApply (release_spec_term with "[-Kont]").
     2: { iFrame. iSplitR "P"; done. }
     { lia. }
-    iNext. iIntros "[FIN FRAG]". by iApply "Kont".
+    iNext. iIntros "(? & ? & ?)". iApply ("Kont" with "[$]"). 
   Qed.
           
 End ClientProofs.
