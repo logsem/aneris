@@ -31,5 +31,5 @@ Definition client_3 : val :=
   start "rpc" ;;
   let: "vx" := read "rpc" #"x"  in
   let: "vy" := read "rpc" #"y" in
-  commitT "rpc" ;;
+  commit "rpc" ;;
   assert: ("vx" = "vy").

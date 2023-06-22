@@ -166,7 +166,7 @@ Section SI_Module.
   Class SI_init := {
     SI_init_module E :
       True ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_specs),
-      GlobalInv ∗ ([∗ set] k ∈ KVS_keys, k ↦ₖ [])
+      GlobalInv ∗ ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗ KVS_Init
   }.
 
 End SI_Module.
