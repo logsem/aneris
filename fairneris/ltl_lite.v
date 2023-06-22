@@ -102,6 +102,18 @@ Section ltl_lemmas.
     apply IHn. lia. done.
   Qed.
 
+  Lemma after_levis n m (tr1 tr2 tr3: trace S L):
+    n ≤ m →
+    after n tr1 = Some tr2 →
+    after m tr1 = Some tr3 →
+    after (m - n) tr2 = Some tr3.
+  Proof.
+    intros Hle Haftern Hafterm.
+    pose proof (Nat.le_exists_sub n m Hle) as [p [-> Hle']].
+    rewrite Nat.add_comm Nat.sub_add'.
+    by rewrite after_sum Haftern in Hafterm.
+  Qed.
+
   (** trace_suffix_of lemmas  *)
 
   Lemma trace_suffix_of_refl (tr : trace S L) :
@@ -119,6 +131,14 @@ Section ltl_lemmas.
   Lemma trace_suffix_of_cons_r s l (tr tr' : trace S L) :
     trace_suffix_of tr tr' → trace_suffix_of tr (s -[l]-> tr').
   Proof. intros [n Hafter]. by exists (Datatypes.S n). Qed.
+
+  Lemma trace_suffix_of_trans (tr tr' tr'' : trace S L) :
+    trace_suffix_of tr'' tr' → trace_suffix_of tr' tr → trace_suffix_of tr'' tr.
+  Proof.
+    intros [n Hsuffix1] [m Hsuffix2].
+    exists (n+m). rewrite after_sum. rewrite Hsuffix2.
+    rewrite Hsuffix1. done.
+  Qed.
 
   (** trace_true lemmas *)
   
@@ -257,7 +277,7 @@ Section ltl_lemmas.
     apply trace_eventually_cons. done.
   Qed.
 
-  Lemma trace_eventuallyI (P : trace S L → Prop) tr :
+  Lemma trace_eventuallyI_alt (P : trace S L → Prop) tr :
     (◊ P) tr ↔ (∃ tr', trace_suffix_of tr' tr ∧ (◊ P) tr').
   Proof.
     split.
@@ -280,6 +300,22 @@ Section ltl_lemmas.
         by eapply IHn. }
       apply IHHtr'.
       by eapply trace_suffix_of_cons_l.
+  Qed.
+
+  Lemma trace_eventuallyI (P : trace S L → Prop) tr :
+    (◊ P) tr ↔ (∃ tr', trace_suffix_of tr' tr ∧ P tr').
+  Proof.
+    split.
+    - intros Heventually.
+      induction Heventually using trace_eventually_ind.
+      { exists tr. split; [apply trace_suffix_of_refl|]. done. }
+      destruct IHHeventually as [tr' [Hsuffix HP]].
+      exists tr'.
+      split; [|done].
+      by apply trace_suffix_of_cons_r.
+    - intros [tr' [Hsuffix Htr']].
+      apply trace_eventuallyI_alt. exists tr'. split=>//.
+      by apply trace_eventually_intro.
   Qed.
 
   Lemma trace_eventually_until (P : trace S L → Prop) (tr : trace S L) :
@@ -324,7 +360,7 @@ Section ltl_lemmas.
 
   Lemma trace_eventually_suffix_of (P : trace S L → Prop) tr1 tr2 :
     trace_suffix_of tr1 tr2 → (◊P) tr1 → (◊P) tr2.
-  Proof. intros Hsuffix HP. apply trace_eventuallyI. exists tr1. done. Qed.
+  Proof. intros Hsuffix HP. apply trace_eventuallyI_alt. by exists tr1. Qed.
 
   Lemma trace_eventually_or (P Q : trace S L → Prop) tr :
     (◊ (P \1/ Q)) tr → (◊ P) tr ∨ (◊ Q) tr.
@@ -379,14 +415,14 @@ Section ltl_lemmas.
     specialize (HPQ tr'). rewrite trace_impliesI in HPQ. by apply HPQ.
   Qed.
 
-  Lemma trace_alwaysI (P : trace S L → Prop) tr :
+  Lemma trace_alwaysI_alt (P : trace S L → Prop) tr :
     (□P) tr ↔ (∀ tr', trace_suffix_of tr' tr → (□ P) tr').
   Proof.
     split.
     - intros Htr tr' Hsuffix Htr'.
       apply Htr.
       induction Htr' using trace_eventually_ind.
-      { eapply trace_eventuallyI. exists tr0. split; [done|].
+      { eapply trace_eventuallyI_alt. exists tr0. split; [done|].
         by apply trace_eventually_intro. }
       apply IHHtr'. by eapply trace_suffix_of_cons_l.
     - intros Htr' Htr.
@@ -396,6 +432,20 @@ Section ltl_lemmas.
         by apply trace_eventually_intro. }
       apply IHHtr. intros tr' Htsuffix. apply Htr'.
       by eapply trace_suffix_of_cons_r.
+  Qed.
+
+  Lemma trace_always_suffix_of (P : trace S L → Prop) tr1 tr2 :
+    trace_suffix_of tr2 tr1 → (□P) tr1 → (□P) tr2.
+  Proof. rewrite (trace_alwaysI_alt _ tr1). intros Hsuffix HP. by eapply HP. Qed.
+
+  Lemma trace_alwaysI (P : trace S L → Prop) tr :
+    (□P) tr ↔ (∀ tr', trace_suffix_of tr' tr → P tr').
+  Proof.
+    split.
+    - intros HP tr' Hsuff. rewrite trace_alwaysI_alt in HP.
+      apply trace_always_elim. eauto.
+    - intros H Habs. apply trace_eventuallyI in Habs as (tr'&Hsuff&?).
+      by specialize (H _ Hsuff).
   Qed.
 
   Lemma trace_always_forall {A} (P : A → trace S L → Prop) tr :
@@ -415,10 +465,6 @@ Section ltl_lemmas.
       apply IHHtr'. by apply trace_always_cons in Htr.
   Qed.
 
-  Lemma trace_always_suffix_of (P : trace S L → Prop) tr1 tr2 :
-    trace_suffix_of tr2 tr1 → (□P) tr1 → (□P) tr2.
-  Proof. rewrite (trace_alwaysI _ tr1). intros Hsuffix HP. by eapply HP. Qed.
-
   (* TODO: This breaks naming convention *)
   Lemma trace_always_universal (P : trace S L → Prop) (tr : trace S L) :
     (∀ tr, P tr) → (□P) tr.
@@ -436,6 +482,33 @@ Section ltl_lemmas.
     intros tr' Hsuffix.
     apply trace_always_elim.
     by eapply trace_always_suffix_of.
+  Qed.
+
+  Lemma trace_always_eventually P (tr : trace S L) :
+    (□ P) tr → (◊ P) tr.
+  Proof.
+    intros Halways. eapply trace_eventuallyI_alt. exists tr.
+    split; [apply trace_suffix_of_refl|]. apply trace_eventually_intro.
+    by apply trace_always_elim in Halways.
+  Qed.
+
+  Lemma trace_always_eventually_suffix_of tr1 tr2 (P : trace S L → Prop) :
+    trace_suffix_of tr1 tr2 → (□◊ P) tr1 → (□◊ P) tr2.
+  Proof.
+    intros [n Hn] H1.
+    apply trace_alwaysI.
+    intros tr' [m Hm].
+    apply trace_eventuallyI_alt.
+    destruct (decide (m ≤ n)).
+    - exists tr1. split.
+      + exists (n - m). eapply after_levis =>//.
+      + by apply trace_always_elim in H1.
+    - exists tr'. split=>//.
+      + exists 0. done.
+      + assert (Hsuff: trace_suffix_of tr' tr1).
+        * exists (m - n). assert (n ≤ m) by lia. eapply after_levis =>//.
+        * rewrite trace_alwaysI_alt in H1. specialize (H1 tr' Hsuff).
+          by apply trace_always_elim in H1.
   Qed.
 
   Lemma trace_always_eventually_always_implies (P Q : trace S L → Prop) tr :
@@ -517,14 +590,6 @@ Section ltl_lemmas.
     (□P) tr → trace_weak_until P Q tr.
   Proof. intros HP. by apply trace_or_r. Qed.
 
-  Lemma trace_always_eventually P (tr : trace S L) :
-    (□ P) tr → (◊ P) tr.
-  Proof. 
-    intros Halways. eapply trace_eventuallyI. exists tr.
-    split; [apply trace_suffix_of_refl|]. apply trace_eventually_intro.
-    by apply trace_always_elim in Halways.
-  Qed.    
-
   (* TODO: Remove? *)
   Lemma trace_always_implies_always (P Q : trace S L → Prop) (tr : trace S L) :
     (∀ tr, (□P) tr → Q tr) → ((□P) tr → (□ Q) tr).
@@ -534,3 +599,32 @@ Section ltl_lemmas.
   Qed.
 
 End ltl_lemmas.
+
+Section ltl_theorems.
+  Context {S L : Type}.
+
+  (* Strong fairness implies our (network) fairness *)
+  Lemma SF_implies_OF (P Q: trace S L → Prop) tr :
+    ((□◊ P) → (□◊ Q))%trace tr → (□ ((□◊ P) → (◊ Q))) tr.
+  Proof.
+    intros Hsf. apply trace_alwaysI. intros tr' Hsuff.
+    apply trace_impliesI. intros Hae.
+    eapply trace_always_eventually_suffix_of in Hae =>//.
+    rewrite trace_impliesI in Hsf. specialize (Hsf Hae).
+    apply trace_always_elim.
+    rewrite trace_alwaysI_alt in Hsf =>//. specialize (Hsf tr'). eauto.
+  Qed.
+
+  Lemma OF_implies_SF (P Q: trace S L → Prop) tr :
+    (□ ((□◊ P) → (◊ Q))) tr → ((□◊ P) → (□◊ Q))%trace tr.
+  Proof.
+    intros Hsf. apply trace_impliesI.
+    intros HP. apply trace_always_idemp in HP. revert HP.
+    by apply trace_always_implies.
+  Qed.
+
+  Theorem SF_equiv_OF (P Q: trace S L → Prop) tr :
+    ((□◊ P) → (□◊ Q))%trace tr ≡ (□ ((□◊ P) → (◊ Q))) tr.
+  Proof. split; [apply SF_implies_OF|apply OF_implies_SF]. Qed.
+
+End ltl_theorems.
