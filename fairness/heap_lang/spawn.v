@@ -57,6 +57,27 @@ Proof. solve_proper. Qed.
 (*     iIntros "FUELS". *)
 (*     simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl. *)
 
+     
+Close Scope Z_scope. 
+Notation "'sub' d" := (fun n => n - d) (at level 10). 
+
+Lemma sub_comp (fs: gmap (fmrole iM) nat) (d1 d2: nat):
+  (sub d1 ∘ sub d2) <$> fs = sub (d1 + d2) <$> fs.
+Proof.
+  apply leibniz_equiv. apply map_fmap_proper; [| done].
+  intros ??->. apply leibniz_equiv_iff.
+  rewrite /compose. lia. 
+Qed.
+
+Lemma sub_0_id (fs: gmap (fmrole iM) nat):
+  fs = sub 0 <$> fs.
+Proof.
+  rewrite -{1}(map_fmap_id fs).
+  apply leibniz_equiv. apply map_fmap_proper; [| done].
+  intros ??->. apply leibniz_equiv_iff.
+  simpl. lia.
+Qed.
+
 Ltac solve_fuels_ge_1 FS := 
   intros ?? [? [<- GE]]%lookup_fmap_Some; apply FS in GE; simpl; lia.
 
@@ -70,10 +91,7 @@ Ltac pure_step FS :=
   [| do 3 iModIntro; iSplitL "FUELS"];
   [| solve_fuels_S FS |];
   [by intros ?%fmap_empty_iff| ];
-  iIntros "FUELS"; simpl. 
-     
-Close Scope Z_scope. 
-Notation "'sub' d" := (fun n => n - d) (at level 10). 
+  iIntros "FUELS"; simpl; rewrite sub_comp. 
 
 (* TODO: get rid of has_fuels_S *)
 Lemma spawn_spec tid (Ψ : val → iProp Σ) (f : val) 
@@ -82,11 +100,14 @@ Lemma spawn_spec tid (Ψ : val → iProp Σ) (f : val)
   (NE: fs1 ∪ fs2 ≠ ∅)
   (FS: fuels_ge (fs1 ∪ fs2) 6)
   :
-  {{{ has_fuels tid (fs1 ∪ fs2) ∗ ▷ (has_fuels tid (sub 3 <$> fs2) -∗ WP f #() @ tid {{ Ψ }}) }}} spawn f @ tid {{{ l, RET #l; join_handle l Ψ ∗ has_fuels tid (sub 3 <$> fs1)}}}.
+  {{{ has_fuels tid (fs1 ∪ fs2) ∗ 
+      ▷ (∀ tid', has_fuels tid' (sub 6 <$> fs2) -∗ WP f #() @ tid' {{ v, Ψ v ∗ partial_mapping_is {[tid' := ∅]}}}) }}} 
+    spawn f @ tid
+  {{{ l, RET #l; join_handle l Ψ ∗ has_fuels tid (sub 3 <$> fs1)}}}.
 Proof.
   iIntros (Φ) "[FUELS FORK] HΦ". rewrite /spawn /=.
 
-  rewrite -(map_fmap_id (fs1 ∪ fs2)). 
+  rewrite (sub_0_id (_ ∪ _)). 
    
   pure_step FS. 
   pure_step FS. 
@@ -96,13 +117,10 @@ Proof.
   wp_bind (Alloc _)%E. iApply (wp_alloc_nostep with "[FUELS]").
   2: { solve_fuels_S FS. }
   { by intros ?%fmap_empty_iff. }
-  iNext. iIntros (l) "(L & TKN & FUELS)". 
+  iNext. iIntros (l) "(L & TKN & FUELS)". rewrite sub_comp.  
 
   pure_step FS. 
   pure_step FS.
-
-  
- 
 
   iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
 
@@ -114,20 +132,26 @@ Proof.
   iModIntro.
   wp_bind (Fork _)%E. 
 
+  (* wp_smart_apply (wp_fork with "[Hf]"). *)
+  (* - iNext. wp_bind (f _). iApply (wp_wand with "Hf"); iIntros (v) "Hv". *)
+  (*   wp_inj. iInv N as (v') "[Hl _]". *)
+  (*   wp_store. iSplitL; last done. iIntros "!> !>". iExists (SOMEV v). iFrame. eauto. *)
+  (* - wp_pures. iApply "HΦ". rewrite /join_handle. eauto. *)
 
-
-
-
-
-
-
-
-
-  wp_smart_apply (wp_fork with "[Hf]").
-  - iNext. wp_bind (f _). iApply (wp_wand with "Hf"); iIntros (v) "Hv".
+  iApply (wp_fork_nostep_alt with "[FORK] [] [FUELS]").
+  5: { iApply has_fuels_proper; [reflexivity| ..]. 
+       2: { solve_fuels_S FS. }
+       rewrite !map_fmap_union. reflexivity. }
+  { by apply map_disjoint_fmap. }
+  { rewrite -map_fmap_union. by intros ?%fmap_empty_iff. }
+  - iIntros (tid'). iNext. iIntros "FUELS".
+    wp_bind (f _). iApply (wp_wand with "[FORK FUELS]").
+    { iApply "FORK". by rewrite sub_comp. } 
+    iIntros (v) "Hv".
     wp_inj. iInv N as (v') "[Hl _]".
     wp_store. iSplitL; last done. iIntros "!> !>". iExists (SOMEV v). iFrame. eauto.
-  - wp_pures. iApply "HΦ". rewrite /join_handle. eauto.
+  - 
+
 Qed.
 
 Lemma join_spec (Ψ : val → iProp Σ) l :
