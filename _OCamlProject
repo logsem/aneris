@@ -68,10 +68,14 @@ ML_SOURCES:
   	examples/snapshot_isolation/examples/regular/example1/example1_code.ml
   	examples/snapshot_isolation/examples/regular/example2/example2_code.ml
   	examples/snapshot_isolation/examples/no_conflicts/no_conflicts_code.ml
-	examples/snapshot_isolation/examples/example2/example2_code.ml
-	examples/snapshot_isolation/examples/example3/example3_code.ml
-	examples/snapshot_isolation/examples/example4/example4_code.ml
-	examples/snapshot_isolation/examples/example6/example6_code.ml
+	examples/snapshot_isolation/examples/classical_example/classical_example_code.ml
+	examples/snapshot_isolation/examples/function_call/function_call_code.ml
+	examples/snapshot_isolation/examples/causality_example/causality_example_code.ml
+	examples/snapshot_isolation/examples/only_reads/only_reads_code.ml
+	examples/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
+        examples/snapshot_isolation/examples/sequential_writes/sequential_writes_code.ml
+        examples/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
+        examples/snapshot_isolation/examples/no_serializability/no_serializability_code.ml
 ML_DEPENDENCIES:
 
         aneris_lang

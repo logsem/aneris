@@ -4,6 +4,45 @@
 From aneris.aneris_lang Require Import ast.
 From aneris.examples.reliable_communication Require Import client_server_code.
 
+Definition try_recv_timeout : val :=
+  λ: "c",
+  letrec: "aux" "n" :=
+    let: "reqo" := try_recv "c" in
+    (if: "reqo" = NONE
+     then
+       #() (* unsafe (fun () -> Unix.sleepf 0.1)); aux (n-1) end *);;
+       "aux" ("n" - #1)
+     else  "reqo") in
+    "aux" #100.
+
+Definition service_loop_opt : val :=
+  λ: "c" "request_handler" <>,
+  letrec: "loop" <> :=
+    let: "req" := try_recv_timeout "c" in
+    let: "rep" := "request_handler" "req" in
+    match: "rep" with
+      NONE => #()
+    | SOME "rep" => send "c" "rep"
+    end;;
+    "loop" #() in
+    "loop" #().
+
+Definition accept_new_connections_loop_opt : val :=
+  λ: "skt" "request_handler" <>,
+  letrec: "loop" <> :=
+    let: "new_conn" := accept "skt" in
+    let: "c" := Fst "new_conn" in
+    let: "_a" := Snd "new_conn" in
+    Fork (service_loop_opt "c" "request_handler" #());;
+    "loop" #() in
+    "loop" #().
+
+Definition run_server_opt ser deser : val :=
+  λ: "addr" "request_handler",
+  let: "skt" := make_server_skt ser deser "addr" in
+  server_listen "skt";;
+  Fork (accept_new_connections_loop_opt "skt" "request_handler" #()).
+
 Definition service_loop : val :=
   λ: "c" "request_handler" <>,
   letrec: "loop" <> :=

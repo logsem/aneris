@@ -1,4 +1,4 @@
 (executable
-  (name example4_code)
+  (name causality_example_code)
   (flags :standard -rectypes)
   (libraries client_server_code snapshot_isolation_code util_code aneris))
