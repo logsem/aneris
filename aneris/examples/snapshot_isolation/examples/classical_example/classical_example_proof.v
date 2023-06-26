@@ -1,4 +1,4 @@
-From aneris.aneris_lang Require Import network resources proofmode.
+(* From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -23,7 +23,7 @@ Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.
 Definition client_2_addr := SocketAddressInet "0.0.0.2" 80.
 Definition client_3_addr := SocketAddressInet "0.0.0.3" 80.
 
-Program Instance params : User_params :=
+Instance params : User_params :=
 {| KVS_address := server_addr;
   KVS_keys := {["x"; "y"]};
   KVS_InvName := nroot .@ "siinv";
@@ -55,8 +55,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
     rewrite /server. wp_pures. rewrite Hip Hports.
     by wp_apply (SI_init_kvs_spec with "[$]").
   Qed.
-
-(*
 
   Lemma transaction ip port client_addr (number : nat) :
   ip = ip_of_address client_addr →
@@ -208,13 +206,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
                   wp_pures. by iApply "HΦ".
               -- by iApply "HΦ".
 Qed.
-*)
+
 End proofs.
 
 Section proof_runner.
 
 Context `{!anerisG Mdl Σ, !SI_init}.
-(*
+
   Definition example_runner : expr :=
     let: "serveraddr" := MakeAddress #"0.0.0.0" #80 in
     let: "client1addr" := MakeAddress #"0.0.0.1" #80 in
@@ -275,7 +273,7 @@ Context `{!anerisG Mdl Σ, !SI_init}.
       + iIntros "!> Hports". wp_apply (client_1_spec with "[$]"); try done. 
     - iIntros "!> Hports". wp_apply (server_spec with "[$]"); done.
   Qed.
-*)
+
 End proof_runner.
 
 Definition unit_model := model _ (λ _ _, False) ().
@@ -301,8 +299,6 @@ Global Instance SI_init_instance
 Proof.
 Admitted.
 
-(*
-
 Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
@@ -320,6 +316,4 @@ Proof.
   do 3 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed.
-
-*)
+Qed. *)
