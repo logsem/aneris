@@ -12,7 +12,7 @@ let transaction1 cst =
 
 let transaction2 cst =
   start cst;
-  write "y" 1;
+  write cst "y" 1;
   commitT cst
 
 let transaction1_client caddr kvs_addr =

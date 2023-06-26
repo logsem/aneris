@@ -6,17 +6,26 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
 From aneris.examples.snapshot_isolation.util Require Import util_code.
 
-Definition transaction : val :=
+Definition transaction1 : val :=
+  λ: "cst", start "cst";;
+             write "cst" #"x" #42;;
+             commitU "cst".
+
+Definition transaction2 : val :=
   λ: "cst" "f",
   start "cst";;
-  let: "vx" := read "cst" #"x" in
-  let: "r" := "f" "vx" in
-  write "cst" #"x" "r";;
+  let: "r" := "f" "cst" #"x" in
+  write "cst" #"y" "r";;
   commitU "cst".
 
-Definition client : val :=
+Definition transaction1_client : val :=
+  λ: "caddr" "kvs_addr",
+  let: "cst" := init_client_proxy int_serializer "caddr" "kvs_addr" in
+  transaction1 "cst".
+
+Definition transaction2_client : val :=
   λ: "caddr" "kvs_addr" "f",
   let: "cst" := init_client_proxy int_serializer "caddr" "kvs_addr" in
-  transaction "cst" "f".
+  transaction2 "cst" "f".
 
 Definition server : val := λ: "srv", init_server int_serializer "srv".

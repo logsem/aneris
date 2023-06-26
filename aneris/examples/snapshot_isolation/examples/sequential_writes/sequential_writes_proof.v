@@ -128,7 +128,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       ∗ KVS_address ⤇ KVS_si }}}
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
-  Proof.
+  Proof. (*
     iIntros (Hip Hports Φ) "(#Hinv & Htok & Hmsghis & Hunalloc
     & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
@@ -182,7 +182,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       try solve_ndisj.
       iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | Hrest]]]" "HClose";
       try iDestruct (token_exclusive with "Htok Htok'") as "[]".
-      iModIntro.
+      iModIntro. *)
       (* problem here is that we don't have information about ms, 
       we ned information about the snapshot to say that it has not changed
       since we started. We can infer the state of the db using the seen 
