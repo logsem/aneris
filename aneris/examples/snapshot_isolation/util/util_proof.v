@@ -297,12 +297,13 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     by iPoseProof (big_sepM_lookup with "seen") as "seen_k".
   Qed.
 
-  Lemma simplified_wait_on_keyT_spec :
-    ∀ (c cond v : val) (k : Key) ms sa E,
+  Lemma simplified_wait_on_keyT_spec_ :
+    ∀ (c cond v : val) (k : Key) ms sa E Φ,
+    (∀ m, Persistent (Φ m)) →
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜dom ms ⊆ KVS_keys⌝ -∗
     ⌜k ∈ dom ms⌝ -∗
-    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
+    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ Φ m ∗
               ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}} cond v' @[ip_of_address sa]
           {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
@@ -312,24 +313,24 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       ([∗ map] k ↦ h ∈ ms, Seen k h)
     }}}
       wait_on_keyT c cond #k @[ip_of_address sa]
-    {{{ m, RET #(); ⌜dom m = dom ms⌝ ∗
+    {{{ m, RET #(); ⌜dom m = dom ms⌝ ∗ Φ m ∗
       ConnectionState c (Active m) ∗
       ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
       ∃ h, Seen k (v :: h)
     }}}.
   Proof.
-    iIntros (c cond v k ms sa E name ms_keys k_ms) "#inv #cond_spec %Φ !> 
+    iIntros (c cond v k ms sa E Ψ Ψ_pers name ms_keys k_ms) "#inv #cond_spec %Φ !> 
         (Active & cache & #seen) HΦ".
     wp_apply (wait_on_keyT_spec _ _ _ _ _ _ emp (λ v', ⌜v = v'⌝)%I
           with "[//] [//] [//] inv [] [$Active $cache $seen] [HΦ]").
     {
-      iIntros (m v' Ψ) "!>(_ & Active & %m_ms & cache) HΨ".
+      iIntros (m v' ψ) "!>(_ & Active & %m_ms & cache) Hψ".
       wp_apply ("cond_spec" with "[//]").
-      iIntros ([] v_v'); iApply ("HΨ" with "[$Active $cache]"); iFrame "%".
+      iIntros ([] v_v'); iApply ("Hψ" with "[$Active $cache]"); iFrame "%".
       by rewrite v_v'.
     }
-    iIntros "!>%m %v' (%m_ms & <- & Active & cache & (%h & #seen_k))".
-    iApply ("HΦ" with "[$Active $cache]").
+    iIntros "!>%m %v' (%m_ms & <- & Active & HΨ & cache & (%h & #seen_k))".
+    iApply ("HΦ" with "[$Active $cache $HΨ]").
     iFrame "%".
     by iExists h.
   Qed.

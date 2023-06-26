@@ -13,7 +13,7 @@ Definition transaction1 : val :=
 
 Definition transaction2 : val :=
   λ: "cst", start "cst";;
-             write #"y" #1;;
+             write "cst" #"y" #1;;
              commitT "cst".
 
 Definition transaction1_client : val :=
