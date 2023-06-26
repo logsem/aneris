@@ -11,8 +11,8 @@ let transaction1 cst =
 
 let transaction2 cst =
   start cst;
-  write cst "x" 1;
-  write cst "y" 1;
+  write cst "x" 2;
+  write cst "y" 2;
   commitU cst
 
 let transaction3 cst =

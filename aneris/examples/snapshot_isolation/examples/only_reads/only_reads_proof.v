@@ -23,7 +23,7 @@ Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.
 Definition client_2_addr := SocketAddressInet "0.0.0.2" 80.
 
-Program Instance params : User_params :=
+Instance params : User_params :=
 {| KVS_address := server_addr;
   KVS_keys := {["x"]};
   KVS_InvName := nroot .@ "siinv";

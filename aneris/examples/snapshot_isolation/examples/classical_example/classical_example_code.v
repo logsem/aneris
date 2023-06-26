@@ -16,8 +16,8 @@ Definition transaction1 : val :=
 Definition transaction2 : val :=
   λ: "cst",
   start "cst";;
-  write "cst" #"x" #1;;
-  write "cst" #"y" #1;;
+  write "cst" #"x" #2;;
+  write "cst" #"y" #2;;
   commitU "cst".
 
 Definition transaction3 : val :=
