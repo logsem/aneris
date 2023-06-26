@@ -325,7 +325,7 @@ Section PartialOwnership.
         partial_fuel_is (fs1 ∪ fs2) ⊣⊢ partial_fuel_is fs1 ∗ partial_fuel_is fs2;
       partial_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
         partial_free_roles_are (fr1 ∪ fr2) ⊣⊢ partial_free_roles_are fr1 ∗ partial_free_roles_are fr2;
-      
+      partial_free_roles_empty: ⊢ |==> partial_free_roles_are ∅;      
   }.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
@@ -555,6 +555,10 @@ Section model_state_lemmas.
     eapply map_disjoint_spec in H1; done.
   Qed.     
 
+  Lemma empty_frag_free_roles:
+    ⊢ |==> frag_free_roles_are ∅.
+  Proof. iApply own_unit. Qed. 
+
   Global Instance ActualOwnershipPartialPre:
     @PartialModelPredicatesPre _ M _ _ Σ M. 
   Proof.
@@ -572,6 +576,7 @@ Section model_state_lemmas.
     - intros. rewrite /frag_free_roles_are.
       rewrite -gset_disj_union; auto.  
       by rewrite auth_frag_op own_op.
+    - iApply empty_frag_free_roles. 
   Defined. 
 
   Lemma frag_mapping_same ζ m R:
