@@ -7,9 +7,8 @@ From aneris.examples.snapshot_isolation.instantiation
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From iris.algebra Require Import gmap.
 
-
 Section proof.
-  
+
 Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
            !SI_specs}.
 
@@ -80,11 +79,12 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
 
   Lemma wait_on_keyT_spec :
     ∀ (c cond : val) (k : Key) ms sa E
-      (P : iProp Σ) (Q : val → iProp Σ),
+      (P : iProp Σ) (Q : val → iProp Σ) (Φ : _ → iProp Σ),
+    (∀ m, Persistent (Φ m)) →
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜dom ms ⊆ KVS_keys⌝ -∗
     ⌜k ∈ dom ms⌝ -∗
-    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
+    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ Φ m ∗
               ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     (∀ m v, {{{ P ∗ ConnectionState c (Active m) ∗ ⌜dom m = dom ms⌝ ∗
                 ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
@@ -101,13 +101,13 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     }}}
       wait_on_keyT c cond #k @[ip_of_address sa]
     {{{ m v, RET #(); ⌜dom m = dom ms⌝ ∗ Q v ∗
-      ConnectionState c (Active m) ∗
+      ConnectionState c (Active m) ∗ Φ m ∗
       ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
       ∃ h, Seen k (v :: h)
     }}}.
   Proof.
-    iIntros (c cond k ms sa E P Q name ms_keys k_ms) "#inv #cond_spec %Φ !> 
-        (P & Active & cache & #seen) HΦ".
+    iIntros (c cond k ms sa E P Q Ψ Ψ_pers name ms_keys k_ms) "#inv #cond_spec
+         %Φ !> (P & Active & cache & #seen) HΦ".
     rewrite/wait_on_keyT.
     wp_pures.
     iRevert (ms ms_keys k_ms) "inv seen cond_spec HΦ cache Active P".
@@ -125,7 +125,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       wp_pures.
       wp_apply (commitT_spec with "[//]").
       iPoseProof "inv" as "inv'".
-      iMod "inv'" as "(%m & %m_ms & mem & close)".
+      iMod "inv'" as "(%m & %m_ms & mem & _ & close)".
       iModIntro.
       iExists m, ms, ((λ h, (hist_val h, false)) <$> ms).
       iFrame.
@@ -165,7 +165,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       wp_pures.
       wp_apply (SI_start_spec with "[//]").
       iPoseProof "inv" as "inv'".
-      iMod "inv'" as "(%m' & %m'_ms & mem & close)".
+      iMod "inv'" as "(%m' & %m'_ms & mem & _ & close)".
       iModIntro.
       iExists m'.
       iFrame.
@@ -186,7 +186,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       wp_pures.
       wp_apply (commitT_spec with "[//]").
       iPoseProof "inv" as "inv'".
-      iMod "inv'" as "(%m & %m_ms & mem & close)".
+      iMod "inv'" as "(%m & %m_ms & mem & _ & close)".
       iModIntro.
       iExists m, ms', ((λ h, (hist_val h, false)) <$> ms').
       iFrame.
@@ -227,7 +227,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       wp_apply (SI_start_spec with "[//]").
       iPoseProof "inv" as "inv'".
       iClear (m m_ms) "".
-      iMod "inv'" as "(%m & %m_ms & mem & close)".
+      iMod "inv'" as "(%m & %m_ms & mem & _ & close)".
       iModIntro.
       iExists m.
       iFrame.
@@ -243,7 +243,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_pures.
     wp_apply (commitT_spec with "[//]").
     iPoseProof "inv" as "inv'".
-    iMod "inv'" as "(%m & %m_ms & mem & close)".
+    iMod "inv'" as "(%m & %m_ms & mem & _ & close)".
     iModIntro.
     iExists m, ms', ((λ h, (hist_val h, false)) <$> ms').
     iFrame.
@@ -283,7 +283,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_pures.
     wp_apply (SI_start_spec with "[//]").
     iPoseProof "inv" as "inv'".
-    iMod "inv'" as "(%m' & %m'_ms & mem & close)".
+    iMod "inv'" as "(%m' & %m'_ms & mem & #HΨ & close)".
     iModIntro.
     iExists m'.
     iFrame.
@@ -292,7 +292,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     iModIntro.
     wp_pures.
     iApply ("HΦ" with "[$Active $cache $Q]").
-    iSplit; first done.
+    do 2 (iSplit; first done).
     iExists h.
     by iPoseProof (big_sepM_lookup with "seen") as "seen_k".
   Qed.
