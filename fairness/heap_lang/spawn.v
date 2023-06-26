@@ -87,25 +87,55 @@ Ltac solve_fuels_S FS :=
   solve_fuels_ge_1 FS. 
 
 Ltac pure_step FS :=
+  try rewrite sub_comp;
   iApply wp_lift_pure_step_no_fork; auto;
   [| do 3 iModIntro; iSplitL "FUELS"];
   [| solve_fuels_S FS |];
   [by intros ?%fmap_empty_iff| ];
   iIntros "FUELS"; simpl; rewrite sub_comp. 
 
+Definition final_viewshift (ρ: fmrole iM): iProp Σ.
+Admitted. 
+
+(* TODO: move to resources.v *)
+Lemma fuels_ge_union_l (fs1 fs2: gmap (fmrole iM) nat) b
+  (GE: fuels_ge (fs1 ∪ fs2) b) (DISJ: fs1 ##ₘ fs2):
+  fuels_ge fs1 b.
+Proof. 
+  intros ???. eapply GE. erewrite lookup_union_Some_l; eauto. 
+Qed.  
+
+(* TODO: move to resources.v *)
+Lemma fuels_ge_union_r (fs1 fs2: gmap (fmrole iM) nat) b
+  (GE: fuels_ge (fs1 ∪ fs2) b) (DISJ: fs1 ##ₘ fs2):
+  fuels_ge fs2 b.
+Proof. 
+  intros ???. eapply GE. erewrite lookup_union_Some_r; eauto. 
+Qed.  
+
 (* TODO: get rid of has_fuels_S *)
 Lemma spawn_spec tid (Ψ : val → iProp Σ) (f : val) 
+  (ρ_end2: fmrole iM) (f_end2: nat)
   (fs1 fs2 : gmap (fmrole iM) nat)
   (DISJ: fs1 ##ₘ fs2)
-  (NE: fs1 ∪ fs2 ≠ ∅)
-  (FS: fuels_ge (fs1 ∪ fs2) 6)
+  (* (NE: fs1 ∪ fs2 ≠ ∅) *)
+  (NE1: fs1 ≠ ∅)
+  (FS: fuels_ge (fs1 ∪ fs2) 9)
+  (END2: f_end2 >= 1)
   :
   {{{ has_fuels tid (fs1 ∪ fs2) ∗ 
-      ▷ (∀ tid', has_fuels tid' (sub 6 <$> fs2) -∗ WP f #() @ tid' {{ v, Ψ v ∗ partial_mapping_is {[tid' := ∅]}}}) }}} 
+      ▷ (∀ tid', has_fuels tid' (sub 6 <$> fs2) -∗ WP f #() @ tid' {{ v, Ψ v ∗ has_fuels tid' {[ ρ_end2 := f_end2]} }}) ∗
+      final_viewshift ρ_end2
+  }}} 
     spawn f @ tid
-  {{{ l, RET #l; join_handle l Ψ ∗ has_fuels tid (sub 3 <$> fs1)}}}.
+  {{{ l, RET #l; join_handle l Ψ ∗ has_fuels tid (sub 8 <$> fs1)}}}.
 Proof.
-  iIntros (Φ) "[FUELS FORK] HΦ". rewrite /spawn /=.
+  iIntros (Φ) "(FUELS & FORK & FIN_VS) HΦ". rewrite /spawn /=.
+  assert (fs1 ∪ fs2 ≠ ∅) as NE.
+  { (* TODO: why this approach doesn't work? *)
+    (* intros E. *)
+    (* eapply empty_union_L in E. Unshelve. *)
+    admit. }
 
   rewrite (sub_0_id (_ ∪ _)). 
    
@@ -126,7 +156,7 @@ Proof.
 
   (* TODO: why fupd_wp is needed here now? *)
   iApply fupd_wp.  
-  iMod (inv_alloc N _ (spawn_inv γ l Ψ) with "[L]") as "#?".
+  iMod (inv_alloc N _ (spawn_inv γ l Ψ) with "[L]") as "#SPAWN_INV".
   { iNext. iExists NONEV. iFrame; eauto. }
 
   iModIntro.
@@ -138,7 +168,7 @@ Proof.
   (*   wp_store. iSplitL; last done. iIntros "!> !>". iExists (SOMEV v). iFrame. eauto. *)
   (* - wp_pures. iApply "HΦ". rewrite /join_handle. eauto. *)
 
-  iApply (wp_fork_nostep_alt with "[FORK] [] [FUELS]").
+  iApply (wp_fork_nostep_alt with "[FORK FIN_VS] [HΦ Hγ] [FUELS]").
   5: { iApply has_fuels_proper; [reflexivity| ..]. 
        2: { solve_fuels_S FS. }
        rewrite !map_fmap_union. reflexivity. }
@@ -147,18 +177,73 @@ Proof.
   - iIntros (tid'). iNext. iIntros "FUELS".
     wp_bind (f _). iApply (wp_wand with "[FORK FUELS]").
     { iApply "FORK". by rewrite sub_comp. } 
-    iIntros (v) "Hv".
-    wp_inj. iInv N as (v') "[Hl _]".
-    wp_store. iSplitL; last done. iIntros "!> !>". iExists (SOMEV v). iFrame. eauto.
-  - 
+    iIntros (v) "[Hv FUELS]".
 
-Qed.
+    iAssert (∃ s1 s2, ⌜ fmtrans _ s1 (Some ρ_end2) s2 ⌝∗ 
+                      ⌜ ρ_end2 ∉ live_roles _ s2 ⌝ ∗
+                      ⌜ live_roles iM s2 ⊆ live_roles iM s1 ⌝ ∗
+                      partial_model_is s1)%I with "[FIN_VS]" as (??) "(%STEP&%NL2&%L12&S1)". 
+    { (* TODO: use final_viewshift in client invariant  
+         such that its ownership implies the existence of such transition *)
+      admit. }
+    
+    
+    (* wp_inj. iInv N as (v') "[Hl _]". *)
+    (* wp_store. iSplitL; last done. iIntros "!> !>". iExists (SOMEV v). iFrame. eauto. *)
+    clear FS. assert (fuels_ge {[ρ_end2 := f_end2]} 1) as FS.
+    { red. intros ???%lookup_singleton_Some. lia. }
+    assert ({[ρ_end2 := f_end2]} ≠ (∅: gmap (fmrole iM) nat)) as NE'.
+    { intros ?.
+      (* TODO: ??? *)
+      (* set_solver.  *)
+      admit. }
+    rewrite (sub_0_id {[_ := _]}). 
+    wp_bind (InjR _)%E. pure_step FS.   
+    iApply wp_value.
+    
+    iApply wp_atomic. (* TODO: how does that work? *)
+    iApply fupd_wp.
+    
+    iInv N as (v') "[Hl SPAWN]" "CLOSE".
+    iApply (wp_store_step_singlerole with "[-CLOSE Hv]"); eauto.
+    { apply inj_le, le_0_n. }
+    { rewrite map_fmap_singleton has_fuel_fuels. iFrame. }
 
-Lemma join_spec (Ψ : val → iProp Σ) l :
-  {{{ join_handle l Ψ }}} join #l {{{ v, RET v; Ψ v }}}.
+    do 2 iModIntro. iNext.
+    rewrite decide_False; [| done]. iIntros "(?&ST2&ROLES&?)".
+    iAssert (⌜ True ⌝)%I with "[ST2]" as "_".
+    { (* TODO: here the client invariant should be restored
+         by storing the new state *)
+      admit. }
+    iMod ("CLOSE" with "[-ROLES]") as "_".
+    2: { iFrame. done. }
+    rewrite /spawn_inv. iNext. iExists _. iFrame.
+    iRight. iExists _. iFrame. done.
+  - iNext. iIntros "FUELS". iModIntro.
+    apply fuels_ge_union_l in FS; [| done].
+    pure_step FS.
+    pure_step FS.
+    iApply wp_value'. iApply "HΦ".
+    rewrite /join_handle. iFrame. eauto. 
+Admitted. 
+
+Lemma join_spec tid (Ψ : val → iProp Σ) l (fs: gmap (fmrole iM) nat)
+  (NE: fs ≠ ∅) (FS: fuels_ge fs 1):
+  {{{ join_handle l Ψ ∗ has_fuels tid fs }}} 
+    join #l @tid 
+  {{{ v, RET v; Ψ v ∗ has_fuels tid (sub 1 <$> fs) }}}.
 Proof.
-  iIntros (Φ) "H HΦ". iDestruct "H" as (γ) "[Hγ #?]".
-  iLöb as "IH". wp_rec. wp_bind (! _)%E. iInv N as (v) "[Hl Hinv]".
+  iIntros (Φ) "[H FUELS] HΦ". iDestruct "H" as (γ) "[Hγ #?]".
+  iLöb as "IH".
+
+  (* wp_rec. *)
+  rewrite (sub_0_id fs). rewrite /join. pure_step FS. 
+
+  wp_bind (! _)%E.
+  (* TODO: why fupd_wp is needed here now? *)
+  iApply fupd_wp.  
+  iInv N as (v) "[>Hl Hinv]".  
+
   wp_load. iDestruct "Hinv" as "[%|Hinv]"; subst.
   - iModIntro. iSplitL "Hl"; [iNext; iExists _; iFrame; eauto|].
     wp_smart_apply ("IH" with "Hγ [HΦ]"). auto.
