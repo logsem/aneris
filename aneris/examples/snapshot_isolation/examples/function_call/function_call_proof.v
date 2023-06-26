@@ -1,4 +1,4 @@
-From aneris.aneris_lang Require Import network resources proofmode.
+(* From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.specs
@@ -103,4 +103,4 @@ Section proof_of_code.
 
 
 
-
+ *)
