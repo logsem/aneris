@@ -73,14 +73,14 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
     ∗ unallocated {[client_1_addr]}
     ∗ free_ports ip {[port]}
     ∗ KVS_address ⤇ KVS_si }}}
-    client_1 $client_1_addr $KVS_address @[ip]
+    transaction1_client $client_1_addr $KVS_address @[ip]
   {{{ v, RET v; True }}}.
   Proof.
     iIntros (Hip Hports Φ) "(#Hinv & Htok & Hmsghis & Hunalloc
     & Hports & Hprot) HΦ".
-    rewrite /client_1. wp_pures. rewrite Hip Hports.
+    rewrite /transaction1_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures.
+    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction1. wp_pures.
     wp_apply (SI_start_spec $! rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%hx [Hkx [(_ & Htok' & _) | [(_ & Htok') | %Heq]]]]" "HClose";
     try iDestruct (token_exclusive with "Htok Htok'") as "[]".
@@ -126,14 +126,14 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       ∗ unallocated {[client_2_addr]}
       ∗ free_ports ip {[port]}
       ∗ KVS_address ⤇ KVS_si }}}
-      client_2 $client_2_addr $KVS_address @[ip]
+      transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof.
     iIntros (Hip Hports Φ) "(#Hinv & Htok & Hmsghis & Hunalloc
     & Hports & Hprot) HΦ".
-    rewrite /client_2. wp_pures. rewrite Hip Hports.
+    rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures.
+    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction2. wp_pures.
     wp_apply (SI_start_spec $! rpc client_2_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%hx [Hkx [(_ & _ & Htok') | Hrest]]]" "HClose";
     try iDestruct (token_exclusive with "Htok Htok'") as "[]".
@@ -199,8 +199,8 @@ Context `{!anerisG Mdl Σ, !KVS_time, !SI_init, !KVSG Σ}.
     let: "client1addr" := MakeAddress #"0.0.0.1" #80 in
     let: "client2addr" := MakeAddress #"0.0.0.2" #80 in
     Start "0.0.0.0" (server "serveraddr") ;;
-    Start "0.0.0.1" (client_1 "client1addr" "serveraddr") ;;
-    Start "0.0.0.2" (client_2 "client2addr" "serveraddr").
+    Start "0.0.0.1" (transaction1_client "client1addr" "serveraddr") ;;
+    Start "0.0.0.2" (transaction2_client "client2addr" "serveraddr").
 
   Lemma example_runner_spec :
     {{{ server_addr ⤳ (∅, ∅)

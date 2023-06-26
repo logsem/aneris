@@ -297,7 +297,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     by iPoseProof (big_sepM_lookup with "seen") as "seen_k".
   Qed.
 
-  Lemma simplified_wait_on_keyT_spec_ :
+  Lemma simplified_wait_on_keyT_spec :
     ∀ (c cond v : val) (k : Key) ms sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜dom ms ⊆ KVS_keys⌝ -∗

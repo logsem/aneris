@@ -3,17 +3,17 @@ open Serialization_code
 open Snapshot_isolation_code
 open Util_code
 
+(* Sequential writes will always commit *)
+
 let transaction1 cst =
   start cst;
-  let vx = read cst "x" in
-  write cst "y" 2;
-  commitT cst;
-  assert (vx = None)
+  write cst "x" 1;
+  commitT cst
 
 let transaction2 cst =
   start cst;
-  write cst "x" 1;
-  wait_on_keyT cst (fun v -> v = 2) "y";
+  wait_on_keyT cst (fun v -> v = 1) "x";
+  write cst "x" 2;
   commitT cst
 
 let transaction1_client caddr kvs_addr =
