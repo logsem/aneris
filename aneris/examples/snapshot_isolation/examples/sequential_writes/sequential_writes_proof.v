@@ -128,7 +128,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       ∗ KVS_address ⤇ KVS_si }}}
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
-  Proof. (*
+  Proof. 
     iIntros (Hip Hports Φ) "(#Hinv & Htok & Hmsghis & Hunalloc
     & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
@@ -147,22 +147,26 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
     { iNext. iExists hx. iFrame. }
     iModIntro. wp_pures.
     wp_apply (simplified_wait_on_keyT_spec _ _ (#1) _ 
-    {["x":= hx]} _ (⊤ ∖ ↑client_inv_name) with "[] [] [] [] [] [Hcx Hcstate Hseen] [Htok]").
+      {["x":= hx]} _ (⊤ ∖ ↑client_inv_name) (λ m, ⌜m = {["x":=[(#1)]]}⌝ )%I 
+      with "[] [] [] [] [] [Hcx Hcstate Hseen] [Htok]").
     try solve_ndisj.
       - iPureIntro. set_solver. 
       - iPureIntro. set_solver.
       - iModIntro.
-      iInv (client_inv_name) as ">[%hx' [Hkx Hrest]]" "HClose".
-      iModIntro. iExists {["x":= hx']}.
-      iSplitR. 
-      { iPureIntro. set_solver. }
-      iSplitL "Hkx".
-      { rewrite !big_sepM_insert; set_solver. }
-      iIntros "!>Hkx". 
-      iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
-      iNext. iExists hx'. 
-      rewrite !(big_sepM_insert); try set_solver.
-      iDestruct "Hkx" as "[Hkx _]". iFrame.
+        iInv (client_inv_name) as ">[%hx' [Hkx Hrest]]" "HClose".
+        iModIntro. iExists {["x":= hx']}.
+        iSplit. 
+        { iPureIntro. set_solver. }
+        
+
+        iSplitL.
+        { rewrite !big_sepM_insert; set_solver. }
+        iIntros "!>Hkx". 
+        iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
+        iNext. iExists hx'. 
+        rewrite !(big_sepM_insert); try set_solver.
+        iDestruct "Hkx" as "[Hkx _]". iFrame.
+        admit.
       - iIntros (v Φ') "!>Htrue HΦ".
       wp_lam. wp_op.
       apply bin_op_eval_eq_val.
@@ -186,7 +190,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       (* problem here is that we don't have information about ms, 
       we ned information about the snapshot to say that it has not changed
       since we started. We can infer the state of the db using the seen 
-      information. *)
+      information.
   Admitted.
 End proofs.
 
