@@ -92,18 +92,22 @@ Definition commit_handler : val :=
   let: "kvs_t" := ! "kvs" in
   let: "ts" := Fst "cdata" in
   let: "cache" := Snd "cdata" in
-  let: "b" := map_forall (λ: "k" "_v",
-                          let: "vlsto" := map_lookup "k" "kvs_t" in
-                          let: "vs" := (if: "vlsto" = NONE
-                           then  []
-                           else  unSOME "vlsto") in
-                          check_at_key "k" "ts" "tc" "vs")
-              "cache" in
-  (if: "b"
-   then  "vnum" <- "tc";;
-         "kvs" <- (update_kvs "kvs_t" "cache" "tc");;
-         #true
-   else  #false).
+  (if: list_is_empty "cache"
+   then  #true
+   else
+     let: "b" := map_forall (λ: "k" "_v",
+                             let: "vlsto" := map_lookup "k" "kvs_t" in
+                             let: "vs" := (if: "vlsto" = NONE
+                              then  []
+                              else  unSOME "vlsto") in
+                             check_at_key "k" "ts" "tc" "vs")
+                 "cache" in
+     (if: "b"
+      then
+        "vnum" <- "tc";;
+        "kvs" <- (update_kvs "kvs_t" "cache" "tc");;
+        #true
+      else  #false)).
 
 Definition lk_handle : val :=
   λ: "lk" "handler",

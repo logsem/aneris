@@ -92,17 +92,20 @@ let commit_handler
   let tc = !vnum + 1 in
   let kvs_t = !kvs in
   let (ts, cache) = cdata in
-  let b = map_forall
-      (fun k _v ->
-         let vlsto = (map_lookup k kvs_t) in
-         let vs = if vlsto = None then list_nil else unSOME vlsto in
-         check_at_key k ts tc vs) cache in
-  if b then begin
-    vnum := tc;
-    kvs := update_kvs kvs_t cache tc;
-    true
-  end
-  else false
+  if list_is_empty cache
+  then true
+  else
+    let b = map_forall
+        (fun k _v ->
+           let vlsto = (map_lookup k kvs_t) in
+           let vs = if vlsto = None then list_nil else unSOME vlsto in
+           check_at_key k ts tc vs) cache in
+    if b then begin
+      vnum := tc;
+      kvs := update_kvs kvs_t cache tc;
+      true
+    end
+    else false
 
 
 let lk_handle lk handler =
