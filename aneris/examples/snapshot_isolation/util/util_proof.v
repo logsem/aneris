@@ -79,34 +79,33 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
 
   Lemma wait_on_keyT_spec :
     ∀ (c cond : val) (k : Key) ms sa E
-      (P : iProp Σ) (Q : val → iProp Σ) (Φ : _ → iProp Σ),
-    (∀ m, Persistent (Φ m)) →
+    (P : iProp Σ) (Q : val → iProp Σ) (φ : _ → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜dom ms ⊆ KVS_keys⌝ -∗
     ⌜k ∈ dom ms⌝ -∗
-    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ Φ m ∗
-              ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
-    (∀ m v, {{{ P ∗ ConnectionState c (Active m) ∗ ⌜dom m = dom ms⌝ ∗
-                ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
-             }}}
-              cond v @[ip_of_address sa]
-             {{{ m' (b : bool), RET #b; ConnectionState c (Active m') ∗ ⌜dom m' = dom ms⌝ ∗
-                ([∗ map] k ↦ h ∈ m', k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
-                if b then Q v else P
-             }}}) -∗
+    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ (∀ v h, Q v ∗ Seen k (v :: h) -∗ φ m ∗ Q v) ∗
+            ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+    (∀ m v', {{{ P ∗ ConnectionState c (Active m) ∗ ⌜dom m = dom ms⌝ ∗
+              ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
+            }}}
+            cond v' @[ip_of_address sa]
+            {{{ m' (b : bool), RET #b; ConnectionState c (Active m') ∗ ⌜dom m' = dom ms⌝ ∗
+              ([∗ map] k ↦ h ∈ m', k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+              if b then Q v' else P
+            }}}) -∗
     {{{
-      P ∗ ConnectionState c (Active ms) ∗
-      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
-      ([∗ map] k ↦ h ∈ ms, Seen k h)
+    P ∗ ConnectionState c (Active ms) ∗
+    ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+    ([∗ map] k ↦ h ∈ ms, Seen k h)
     }}}
-      wait_on_keyT c cond #k @[ip_of_address sa]
-    {{{ m v, RET #(); ⌜dom m = dom ms⌝ ∗ Q v ∗
-      ConnectionState c (Active m) ∗ Φ m ∗
-      ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
-      ∃ h, Seen k (v :: h)
+    wait_on_keyT c cond #k @[ip_of_address sa]
+    {{{ m v, RET #(); ⌜dom m = dom ms⌝ ∗
+    ConnectionState c (Active m) ∗ φ m ∗ Q v ∗
+    ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+    ∃ h, Seen k (v :: h)
     }}}.
   Proof.
-    iIntros (c cond k ms sa E P Q Ψ Ψ_pers name ms_keys k_ms) "#inv #cond_spec
+  iIntros (c cond k ms sa E P Q φ name ms_keys k_ms) "#inv #cond_spec
          %Φ !> (P & Active & cache & #seen) HΦ".
     rewrite/wait_on_keyT.
     wp_pures.
@@ -120,7 +119,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_apply (SI_read_spec with "[//] k_h").
     iIntros "k_h".
     iSpecialize ("cache" with "[$k_h $k_upd]").
-    move: h k_h=>[|v' h] k_h.
+    move: h k_h=>[|v' h] k_h. 
     {
       wp_pures.
       wp_apply (commitT_spec with "[//]").
@@ -283,27 +282,30 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_pures.
     wp_apply (SI_start_spec with "[//]").
     iPoseProof "inv" as "inv'".
-    iMod "inv'" as "(%m' & %m'_ms & mem & #HΨ & close)".
+    iMod "inv'" as "(%m' & %m'_ms & mem & infer & close)".
     iModIntro.
     iExists m'.
     iFrame.
     iIntros "!>(Active & mem & cache & _)".
+    iPoseProof ("infer" with "[seen $Q]") as "[Hφ Q]".
+    {
+      iPoseProof (big_sepM_lookup with "seen") as "seen_k"; done.
+    }
     iMod ("close" with "mem") as "_".
     iModIntro.
     wp_pures.
-    iApply ("HΦ" with "[$Active $cache $Q]").
-    do 2 (iSplit; first done).
+    iApply ("HΦ" with "[$Active $cache $Hφ $Q]"). 
+    iSplit; first done.
     iExists h.
     by iPoseProof (big_sepM_lookup with "seen") as "seen_k".
   Qed.
 
   Lemma simplified_wait_on_keyT_spec :
-    ∀ (c cond v : val) (k : Key) ms sa E Φ,
-    (∀ m, Persistent (Φ m)) →
+    ∀ (c cond v : val) (k : Key) ms sa E φ,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜dom ms ⊆ KVS_keys⌝ -∗
     ⌜k ∈ dom ms⌝ -∗
-    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ Φ m ∗
+    □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ (∀ h, Seen k (v :: h) -∗ φ m) ∗
               ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}} cond v' @[ip_of_address sa]
           {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
@@ -313,25 +315,36 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       ([∗ map] k ↦ h ∈ ms, Seen k h)
     }}}
       wait_on_keyT c cond #k @[ip_of_address sa]
-    {{{ m, RET #(); ⌜dom m = dom ms⌝ ∗ Φ m ∗
+    {{{ m, RET #(); ⌜dom m = dom ms⌝ ∗ φ m ∗
       ConnectionState c (Active m) ∗
       ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
       ∃ h, Seen k (v :: h)
     }}}.
   Proof.
-    iIntros (c cond v k ms sa E Ψ Ψ_pers name ms_keys k_ms) "#inv #cond_spec %Φ !> 
-        (Active & cache & #seen) HΦ".
-    wp_apply (wait_on_keyT_spec _ _ _ _ _ _ emp (λ v', ⌜v = v'⌝)%I
-          with "[//] [//] [//] inv [] [$Active $cache $seen] [HΦ]").
+    iIntros (c cond v k ms sa E φ name ms_keys k_ms) "#inv #cond_spec %Φ !> 
+      (Active & cache & #seen) HΦ".
+    wp_apply (wait_on_keyT_spec _ _ _ _ _ _ emp (λ v', ⌜v = v'⌝)%I φ
+          with "[//] [//] [//] [inv] [] [$Active $cache $seen] [HΦ]").
+    {
+      iModIntro.
+      iMod "inv" as "[%m [m_ms [Hkeys [Hinfer Hclose]]]]".
+      iModIntro. 
+      iExists m.
+      iFrame.
+      iIntros (v' h) "[<- Hseen]".
+      iSplitL; try done.
+      by iApply ("Hinfer" with "[Hseen]").
+    }
     {
       iIntros (m v' ψ) "!>(_ & Active & %m_ms & cache) Hψ".
       wp_apply ("cond_spec" with "[//]").
       iIntros ([] v_v'); iApply ("Hψ" with "[$Active $cache]"); iFrame "%".
       by rewrite v_v'.
-    }
-    iIntros "!>%m %v' (%m_ms & <- & Active & HΨ & cache & (%h & #seen_k))".
-    iApply ("HΦ" with "[$Active $cache $HΨ]").
+    } 
+    iIntros "!>%m %v' (%m_ms & Active & Hφ & %Heq & cache & (%h & #seen_k))".
+    iApply ("HΦ" with "[$Active $cache $Hφ]").
     iFrame "%".
+    rewrite Heq.
     by iExists h.
   Qed.
 
