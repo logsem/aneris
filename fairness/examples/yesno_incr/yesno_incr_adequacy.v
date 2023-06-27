@@ -1,3 +1,5 @@
+From iris.base_logic.lib Require Import invariants.
+From iris.algebra Require Import excl_auth.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
@@ -5,16 +7,16 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.fairness.heap_lang Require Export lang lifting tactics.
 From trillium.fairness.heap_lang Require Import notation.
 From trillium.fairness Require Import trace_utils.
-From trillium.fairness.examples.yesno_incr Require Import yesno_incr.
+From trillium.fairness.examples.yesno_incr Require Import yesno_incr3.
 
 From stdpp Require Import finite.
 
+
 (* The model is finitely branching *)
-Definition steppable '(n, w): list ((nat * bool) * option YN) :=
+Definition steppable n : list (nat * option YN) :=
   n' ← [S n; n];
-  w' ← [w; negb w];
   ℓ ← [Some Y; Some No];
-  mret ((n', w'), ℓ).
+  mret (n', ℓ).
 
 #[local] Instance proof_irrel_trans s x:
   ProofIrrel ((let '(s', ℓ) := x in yntrans s ℓ s'): Prop).
@@ -33,7 +35,7 @@ Qed.
 Definition yesno_mtrace : Type := mtrace the_fair_model.
 
 Definition yesno_mdl_progress (tr : yesno_mtrace) :=
-  ∀ n b, ∃ m, pred_at tr m (λ s _, s = (n,b)).
+  ∀ n, ∃ m, pred_at tr m (λ s _, s = n).
 
 Lemma yesno_mdl_alwayslive ρ n (mtr : yesno_mtrace) :
   infinite_trace mtr →
@@ -83,24 +85,39 @@ Proof.
   by inversion Hval'.
 Qed.
 
+Lemma even_odd_False n : Nat.even n → Nat.odd n → False.
+Proof.
+  intros Heven Hodd. rewrite -Nat.negb_odd in Heven.
+  apply Is_true_true_1 in Heven.
+  apply Is_true_true_1 in Hodd.
+  rewrite Hodd in Heven.
+  done.
+Qed.
+
+Lemma even_not_odd n : Nat.even n → ¬ Nat.odd n.
+Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+
+Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n.
+Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+
 Lemma yesno_mdl_noprogress_Y n m (mtr : yesno_mtrace) :
   infinite_trace mtr →
   mtrace_valid mtr →
-  (trfirst mtr) = (n, true) →
+  (trfirst mtr) = n →
+  Nat.even n →
   (∀ m0 : nat,
      m0 < m → pred_at mtr m0
-             (λ (_ : nat * bool) (l : option (option YN)),
-                l ≠ Some (Some Y))) →
-  pred_at mtr m (λ s _, s = (n, true)).
+             (λ _ l, l ≠ Some (Some Y))) →
+  pred_at mtr m (λ s _, s = n).
 Proof.
-  intros Hinf Hvalid Hfirst Hne.
+  intros Hinf Hvalid Hfirst Heven Hne.
   induction m.
   { rewrite /pred_at. destruct mtr; done. }
   simpl in *.
   assert (∀ m0 : nat,
           m0 < m
           → pred_at mtr m0
-              (λ (_ : nat * bool) (l : option (option YN)), l ≠ Some (Some Y)))
+              (λ _ l, l ≠ Some (Some Y)))
     as Hne'.
   { intros. apply Hne. lia. }
   specialize (IHm Hne').
@@ -116,27 +133,30 @@ Proof.
   { assert (m < S m) by lia. specialize (Hne m H). rewrite /pred_at in Hne.
     rewrite Hafter in Hne. intros ->. apply Hne. done. }
   pinversion Hvalid. simplify_eq. inversion H1; simplify_eq.
-  all: rewrite /trfirst in H; destruct t; simplify_eq; try done.
+  - by apply even_not_odd in Heven.
+  - by destruct t.
 Qed.
 
+(* Trivial *)
 Lemma yesno_mdl_noprogress_No n m (mtr : yesno_mtrace) :
   infinite_trace mtr →
   mtrace_valid mtr →
-  (trfirst mtr) = (n, false) →
+  (trfirst mtr) = n →
+  Nat.odd n →
   (∀ m0 : nat,
      m0 < m → pred_at mtr m0
-             (λ (_ : nat * bool) (l : option (option YN)),
+             (λ _ (l : option (option YN)),
                 l ≠ Some (Some No))) →
-  pred_at mtr m (λ s _, s = (n, false)).
+  pred_at mtr m (λ s _, s = n).
 Proof.
-  intros Hinf Hvalid Hfirst Hne.
+  intros Hinf Hvalid Hfirst Hodd Hne.
   induction m.
   { rewrite /pred_at. destruct mtr; done. }
   simpl in *.
   assert (∀ m0 : nat,
           m0 < m
           → pred_at mtr m0
-              (λ (_ : nat * bool) (l : option (option YN)), l ≠ Some (Some No)))
+              (λ _ l, l ≠ Some (Some No)))
     as Hne'.
   { intros. apply Hne. lia. }
   specialize (IHm Hne').
@@ -152,17 +172,19 @@ Proof.
   { assert (m < S m) by lia. specialize (Hne m H). rewrite /pred_at in Hne.
     rewrite Hafter in Hne. intros ->. apply Hne. done. }
   pinversion Hvalid. simplify_eq. inversion H1; simplify_eq.
-  all: rewrite /trfirst in H; destruct t; simplify_eq; try done.
+  - by apply odd_not_even in Hodd.
+  - by destruct t.
 Qed.
 
 Theorem yesno_mdl_progresses_Y n (mtr : yesno_mtrace) :
   infinite_trace mtr →
   mtrace_valid mtr →
   (∀ ρ, fair_model_trace ρ mtr) →
-  (trfirst mtr) = (n, true) →
-  ∃ m, pred_at mtr m (λ s _, s = (n, false)).
+  (trfirst mtr) = n →
+  Nat.even n →
+  ∃ m, pred_at mtr m (λ s _, s = S n).
 Proof.
-  intros Hinf Hvalid Hfair Hfirst.
+  intros Hinf Hvalid Hfair Hfirst Heven.
   specialize (Hfair Y).
   pose proof (yesno_mdl_scheduled Y mtr Hinf Hfair 0) as Hsched.
   simpl in *.
@@ -173,24 +195,26 @@ Proof.
   rewrite Hafter in Hsched.
   destruct t; [done|].
   simplify_eq.
-  assert (s = (n,true)) as ->.
+  assert (s = trfirst mtr) as ->.
   { eapply yesno_mdl_noprogress_Y in Hschedne; [|done..].
     rewrite /pred_at in Hschedne. rewrite Hafter in Hschedne. done. }
   eapply mtrace_valid_after in Hvalid; [|done].
   pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
-  exists (m + 1).
-  rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
-  destruct t; simpl in *; simplify_eq; done.
+  - exists (m + 1).
+    rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
+    destruct t; simpl in *; simplify_eq; done.
+  - by apply even_not_odd in Heven.
 Qed.
 
 Theorem yesno_mdl_progresses_No n (mtr : yesno_mtrace) :
   infinite_trace mtr →
   mtrace_valid mtr →
   (∀ ρ, fair_model_trace ρ mtr) →
-  (trfirst mtr) = (n, false) →
-  ∃ m, pred_at mtr m (λ s _, s = (S n, true)).
+  (trfirst mtr) = n →
+  Nat.odd n →
+  ∃ m, pred_at mtr m (λ s _, s = S n).
 Proof.
-  intros Hinf Hvalid Hfair Hfirst.
+  intros Hinf Hvalid Hfair Hfirst Hodd.
   specialize (Hfair No).
   pose proof (yesno_mdl_scheduled No mtr Hinf Hfair 0) as Hsched.
   simpl in *.
@@ -201,14 +225,15 @@ Proof.
   rewrite Hafter in Hsched.
   destruct t; [done|].
   simplify_eq.
-  assert (s = (n,false)) as ->.
+  assert (s = trfirst mtr) as ->.
   { eapply yesno_mdl_noprogress_No in Hschedne; [|done..].
     rewrite /pred_at in Hschedne. rewrite Hafter in Hschedne. done. }
   eapply mtrace_valid_after in Hvalid; [|done].
   pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
-  exists (m + 1).
-  rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
-  destruct t; simpl in *; simplify_eq; done.
+  - exists (m + 1).
+    rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
+    destruct t; simpl in *; simplify_eq; done.
+  - by apply odd_not_even in Hodd.
 Qed.
 
 Lemma infinite_trace_after'' {S T} n (tr tr' : trace S T) :
@@ -222,58 +247,36 @@ Theorem yesno_mdl_progresses (mtr : yesno_mtrace) :
   infinite_trace mtr →
   mtrace_valid mtr →
   (∀ ρ, fair_model_trace ρ mtr) →
-  (trfirst mtr) = (0, true) →
+  (trfirst mtr) = 0 →
   yesno_mdl_progress mtr.
 Proof.
   intros Hinf Hvalid Hfair Hfirst n.
-  induction n as [|n IHn]; intros b.
-  { destruct b.
-    - exists 0. rewrite /pred_at. rewrite /trfirst in Hfirst. simpl.
-      destruct mtr; done.
-    - by apply yesno_mdl_progresses_Y. }
-  destruct b.
-  - destruct (IHn false) as [m Hpred].
-    rewrite /pred_at in Hpred.
-    destruct (after m mtr) eqn:Hafter; [|done].
-    eapply infinite_trace_after'' in Hinf; [|done].
-    eapply mtrace_valid_after in Hvalid; [|done].
-    assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t) as Hfair'.
+  induction n as [|n IHn].
+  { exists 0. rewrite /pred_at. rewrite /trfirst in Hfirst. simpl.
+    destruct mtr; done. }
+  destruct IHn as [m Hpred].
+  rewrite /pred_at in Hpred.
+  destruct (after m mtr) eqn:Hafter; [|done].
+  eapply infinite_trace_after'' in Hinf; [|done].
+  eapply mtrace_valid_after in Hvalid; [|done].
+  destruct (Nat.even n) eqn:Heqn.
+  - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t) as Hfair'.
     { intros. by eapply fair_model_trace_after. }
-    assert (trfirst t = (n, false)) as Hfirst'.
+    assert (trfirst t = n) as Hfirst'.
     { rewrite /trfirst. destruct t; done. }
-    pose proof (yesno_mdl_progresses_No n t Hinf Hvalid Hfair' Hfirst')
-      as [m' Hpred'].
+    pose proof (yesno_mdl_progresses_Y n t Hinf Hvalid Hfair' Hfirst')
+      as [m' Hpred']; [by eauto|].
     exists (m + m').
     rewrite pred_at_sum. rewrite Hafter. done.
-  - destruct (IHn false) as [m Hpred].
-    rewrite /pred_at in Hpred.
-    destruct (after m mtr) eqn:Hafter; [|done].
-    eapply infinite_trace_after'' in Hinf; [|done].
-    eapply mtrace_valid_after in Hvalid; [|done].
-    assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t) as Hfair'.
+  - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t) as Hfair'.
     { intros. by eapply fair_model_trace_after. }
-    assert (trfirst t = (n, false)) as Hfirst'.
+    assert (trfirst t = n) as Hfirst'.
     { rewrite /trfirst. destruct t; done. }
     pose proof (yesno_mdl_progresses_No n t Hinf Hvalid Hfair' Hfirst')
-      as [m' Hpred'].
-    rewrite /pred_at in Hpred'.
-    destruct (after m' t) eqn:Hafter'; [|done].
-    eapply infinite_trace_after'' in Hinf; [|done].
-    eapply mtrace_valid_after in Hvalid; [|done].
-    assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t0) as Hfair''.
-    { intros. by eapply fair_model_trace_after. }
-    assert (trfirst t0 = (S n, true)) as Hfirst''.
-    { rewrite /trfirst. destruct t0; done. }
-    pose proof (yesno_mdl_progresses_Y (S n) t0 Hinf Hvalid Hfair'' Hfirst'')
-      as [m'' Hpred''].
-    exists (m + m' + m'').
-    rewrite pred_at_sum. rewrite after_sum'. rewrite Hafter. rewrite Hafter'.
-    done.
+      as [m' Hpred']; [by rewrite -Nat.negb_even Heqn|].
+    exists (m + m').
+    rewrite pred_at_sum. rewrite Hafter. done.
 Qed.
-
-(* Definition yesno_mdl_progress' n b (mtr : yesno_mtrace) := *)
-(*   trace_eventually mtr (λ s _, s = (n,b)). *)
-
 
 Lemma trace_eventually_cons {S T} s l (tr : trace S T) P :
   trace_eventually tr P → trace_eventually (s -[l]-> tr) P.
@@ -315,7 +318,7 @@ Qed.
 
 (* TODO: better definition *)
 Definition yesno_aux_progress (auxtr : auxtrace the_model) :=
-  ∀ n b, ∃ m, pred_at auxtr m (λ s l, (λ s' _, s' = (n,b)) (ls_under s) (l ≫= Ul)).
+  ∀ n, ∃ m, pred_at auxtr m (λ s l, (λ s' _, s' = n) (ls_under s) (l ≫= Ul)).
 
 Lemma yesno_mtr_aux_progress_preserved
       (mtr : mtrace the_fair_model)
@@ -324,7 +327,7 @@ Lemma yesno_mtr_aux_progress_preserved
   yesno_mdl_progress mtr → yesno_aux_progress auxtr.
 Proof.
   intros Hstutter Hmtr.
-  intros n b. apply (trace_eventually_stutter_preserves _ mtr auxtr (λ s' _, s' = (n,b))).
+  intros n. apply (trace_eventually_stutter_preserves _ mtr auxtr (λ s' _, s' = n)).
   - done.
   - apply Hmtr.
 Qed.
@@ -332,12 +335,35 @@ Qed.
 (* Defining this requires exposing the location in the state *)
 (* Definition yesno_ex_progress (tr : heap_lang_extrace) := *)
 (*   ∀ n b, ∃ m, pred_at tr m (λ s _, s.2 !! ??? = Some ???). *)
-Definition yesno_ex_progress (tr : heap_lang_extrace) :=
-  False.
+Definition yesno_ex_progress (l:loc) (tr : heap_lang_extrace) :=
+  ∀ (n:nat), ∃ m, pred_at tr m (λ s _, heap s.2 !! l = Some #n).
 
-Lemma yesno_aux_ex_progress_preserved (auxtr : auxtrace the_model) (extr : heap_lang_extrace) :
-  yesno_aux_progress auxtr → yesno_ex_progress extr.
-Proof. Admitted.
+Definition ξ_yesno' (l : loc) (extr : execution_trace heap_lang)
+           (auxtr : finite_trace the_fair_model (option YN)) :=
+  ∃ (N:nat), heap (trace_last extr).2 !! l = Some #N ∧ (trace_last auxtr) = N.
+
+Definition ξ_yesno (l : loc) (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :=
+  ∀ n, ∃ (N:nat),
+    pred_at extr n (λ σ _, heap σ.2 !! l = Some #N) ∧
+    pred_at auxtr n (λ δ _, ls_under δ = N).
+
+Lemma yesno_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
+  ξ_yesno l extr auxtr → yesno_aux_progress auxtr → yesno_ex_progress l extr.
+Proof.
+  intros Hξ Hauxtr.
+  intros n.
+  specialize (Hauxtr n).
+  destruct Hauxtr as [m Hauxtr].
+  exists m.
+  destruct (Hξ m) as [N [Hextr' Hauxtr']].
+  rewrite /pred_at.
+  rewrite /pred_at in Hauxtr.
+  rewrite /pred_at in Hauxtr'.
+  rewrite /pred_at in Hextr'.
+  destruct (after m auxtr); [|done].
+  destruct (after m extr); [|done].
+  destruct t; destruct t0; by simplify_eq.
+Qed.
 
 (* TODO: move *)
 Lemma traces_match_infinite_trace {L1 L2 S1 S2: Type}
@@ -372,34 +398,59 @@ Proof.
       rewrite after_sum' in Hinf. simpl in *. done.
 Qed.
 
-Theorem yesno_ex_progresses (extr : heap_lang_extrace) :
-  extrace_valid extr →
-  (∀ tid, fair_ex tid extr) →
-  (trfirst extr).1 = [start #()] →
-  yesno_ex_progress extr.
+Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel Λ Mdl}
+      `{EqDecision (mstate LM)} `{EqDecision (mlabel LM)}
+      `{Countable (locale Λ)} ξ :
+  rel_finitary (sim_rel LM) → rel_finitary (sim_rel_with_user LM ξ).
 Proof.
-  intros Hvalid Hfair Hfirst.
+  intros Hrel. eapply rel_finitary_impl; [|done]. by intros ex aux [Hsim _].
+Qed.
+
+(* TODO *)
+Instance the_model_mstate_countable : EqDecision (mstate the_model).
+Proof. Admitted.
+
+Instance the_model_mlabel_countable : EqDecision (mlabel the_model).
+Proof. Admitted.
+
+(** Derive that program is related to model by
+    [sim_rel_with_user cn_model (ξ_cn l) using Trillium adequacy *)
+Lemma yesno_incr_sim l :
+  continued_simulation
+    (sim_rel_with_user the_model (ξ_yesno' l))
+    (trace_singleton ([start #l],
+                        {| heap := {[l:=#0]};
+                           used_proph_id := ∅ |}))
+    (trace_singleton (initial_ls (LM := the_model) 0 0)).
+Proof.
+  assert (yesnoPreG yesnoΣ) as HPreG'.
+  { apply _. }
   assert (heapGpreS yesnoΣ the_model) as HPreG.
   { apply _. }
-  pose proof (simulation_adequacy_model_trace yesnoΣ the_model NotStuck
-                                  ∅ (start #()) (0, true) extr Hvalid Hfirst) =>//.
-  assert (rel_finitary (sim_rel the_model)) as Hfin.
-  { eapply valid_state_evolution_finitary_fairness_simple.
+  eapply (strong_simulation_adequacy
+            yesnoΣ _ NotStuck _ _ _ ∅); [|set_solver|].
+  { eapply rel_finitary_sim_rel_with_user_sim_rel.
+    eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1). }
-  assert (live_roles the_fair_model (0, true) ≠ ∅) as Hneq.
-  { set_solver. }
-  assert ((∀ heapGS0 : heapGS yesnoΣ the_model,
-         ⊢ |={⊤}=>
-             frag_model_is (0, true) -∗
-             frag_free_roles_are (∅ ∖ live_roles the_fair_model (0, true)) -∗
-             has_fuels 0
-               (gset_to_gmap (lm_fl the_model (0, true))
-                  (live_roles the_fair_model (0, true))) ={⊤}=∗
-             WP start #() @0 {{ _, 0 ↦M ∅ }})) as Hwp.
-  { iIntros (?) "!> Hmdl Hfree Hfuel !>".
-    replace (∅ ∖ live_roles the_fair_model (0, true)) with
+  iIntros (?) "!> Hσ Hs Hr Hf".
+  iMod (own_alloc (●E 0  ⋅ ◯E 0))%nat as (γ_yes_at) "[Hyes_at_auth Hyes_at]".
+  { apply auth_both_valid_2; eauto. by compute. }
+  iMod (own_alloc (●E 1  ⋅ ◯E 1))%nat as (γ_no_at) "[Hno_at_auth Hno_at]".
+  { apply auth_both_valid_2; eauto. by compute. }
+  pose (the_names := {|
+   yes_name := γ_yes_at;
+   no_name := γ_no_at;
+  |}).
+  iMod (inv_alloc (nroot .@ "yes_no") _ (yesno_inv_inner l) with "[Hσ Hs Hr Hyes_at_auth Hno_at_auth]") as "#Hinv".
+  { iNext. unfold yesno_inv_inner. iExists 0.
+    replace (∅ ∖ live_roles the_fair_model 0) with
       (∅:gset (fmrole the_fair_model)) by set_solver.
     simpl. rewrite /yn_live_roles.
+    iFrame.
+    rewrite big_sepM_singleton. iFrame. }
+  iModIntro.
+  iSplitL.
+  { simpl. rewrite /yn_live_roles.
     replace (gset_to_gmap 61 {[No; Y]}) with
       ({[Y := 61; No := 61]} : gmap _ _); last first.
     { rewrite /gset_to_gmap. simpl.
@@ -409,23 +460,23 @@ Proof.
         by rewrite lookup_insert_ne. }
       rewrite -!insert_union_l.
       rewrite left_id. done. }
-    iApply (start_spec with "[$Hmdl $Hfree $Hfuel]"); [lia|].
+    iApply (start_spec with "[$Hf $Hyes_at $Hno_at $Hinv]"); [lia|].
     by iIntros "!>?". }
-  destruct (H Hfin Hneq Hwp) as [auxtr [mtr [Hmatch Hstutter]]].
-  (* TODO: Prove from ??? - Likely need to lift adequacy to derive from post conditions *)
-  assert (infinite_trace extr) as Hinf by admit.
-  pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfair'.
-  pose proof (upto_stutter_fairness auxtr mtr Hstutter Hfair') as Hfair''.
-  assert (infinite_trace mtr) as Hinf''.
-  { eapply upto_stutter_infinite_trace; [done|].
-    by eapply traces_match_infinite_trace. }
-  assert (mtrace_valid mtr) as Hvalid''.
-  { eapply upto_preserves_validity; [done|].
-    by eapply exaux_preserves_validity. }
-  (* Likely need connection between state and model too for this *)
-  assert (trfirst mtr = (0, true)) as Hfirst''.
-  { admit. }
-  pose proof (yesno_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'') as Hprogress.
-  eapply (yesno_aux_ex_progress_preserved auxtr).
-  by eapply yesno_mtr_aux_progress_preserved.
+  iIntros (extr auxtr c) "??????[?[Hσ Hδ]]".
+  iInv "Hinv" as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
+  iApply fupd_mask_intro; [set_solver|].
+  iIntros "Hclose'".
+  iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
+  iDestruct "Hδ" as (??) "(?&?&?&?&?&Hδ&?)".
+  iDestruct (model_agree with "Hδ Hmod") as %Hn'.
+  iPureIntro. exists M. split; [done|].
+  rewrite -Hn'. by destruct auxtr.
+Qed.
+
+Theorem yesno_ex_progresses (l:loc) (extr : heap_lang_extrace) :
+  extrace_valid extr →
+  (∀ tid, fair_ex tid extr) →
+  (trfirst extr).1 = [start #l] →
+  yesno_ex_progress l extr.
+Proof.
 Admitted.
