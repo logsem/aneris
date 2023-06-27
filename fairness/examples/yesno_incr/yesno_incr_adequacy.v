@@ -352,23 +352,24 @@ Proof.
   by eapply traces_match_after in Hafter as [tr'' [Hafter' _]].
 Qed.
 
-(* TODO: Prove/Move *)
-Lemma upto_stutter_after' {St S' L L': Type} (Us: St -> S') (Ul: L -> option L')
-      {btr str} n {btr'} :
-  upto_stutter Us Ul btr str →
-  after n btr = Some btr' →
-  ∃ str', after n str = Some str'.
-Proof.
-  intros Hstutter Hafter.
-  induction n as [|n IHn].
-Admitted.
-
 Lemma upto_stutter_infinite_trace {St S' L L': Type} (Us: St -> S') (Ul: L -> option L')
  tr1 tr2 :
   upto_stutter Us Ul tr1 tr2 → infinite_trace tr1 → infinite_trace tr2.
 Proof.
-  intros Hmatch Hinf n. specialize (Hinf n) as [tr' Hafter].
-  by eapply upto_stutter_after' in Hafter as [tr'' Hafter'].
+  intros Hstutter Hinf n.
+  revert tr1 tr2 Hstutter Hinf.
+  induction n as [|n IHn]; intros tr1 tr2 Hstutter Hinf.
+  - punfold Hstutter. apply upto_stutter_mono.
+  - punfold Hstutter; [|apply upto_stutter_mono].
+    induction Hstutter.
+    + specialize (Hinf (1 + n)).
+      rewrite after_sum' in Hinf. simpl in *. apply is_Some_None in Hinf. done.
+    + apply IHHstutter.
+      intros m. specialize (Hinf (1 + m)).
+      rewrite after_sum' in Hinf. simpl in *. done.
+    + simpl. eapply (IHn btr str); [by destruct H1|].
+      intros m. specialize (Hinf (1 + m)).
+      rewrite after_sum' in Hinf. simpl in *. done.
 Qed.
 
 Theorem yesno_ex_progresses (extr : heap_lang_extrace) :
@@ -421,6 +422,7 @@ Proof.
   assert (mtrace_valid mtr) as Hvalid''.
   { eapply upto_preserves_validity; [done|].
     by eapply exaux_preserves_validity. }
+  (* Likely need connection between state and model too for this *)
   assert (trfirst mtr = (0, true)) as Hfirst''.
   { admit. }
   pose proof (yesno_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'') as Hprogress.
