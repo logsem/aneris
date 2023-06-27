@@ -52,7 +52,8 @@ Section Specification.
     ⌜k ∈ KVS_keys⌝ -∗
     {{{ k ↦{c} vo }}}
       SI_read c #k @[ip_of_address sa] E
-    {{{ RET $vo; k ↦{c} vo }}}.
+    {{{ (v : SerializableVal), RET $vo; k ↦{c} vo ∗
+                ⌜is_Some vo → vo = Some (SV_val v)⌝ }}}.
 
    Definition start_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address)

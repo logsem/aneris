@@ -195,9 +195,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
     wp_apply (SI_read_spec $! _ _ _ _ with "[] [Hcx]"); try set_solver.
-    iFrame. iIntros "Hcx". wp_pures.
+    iFrame. iIntros (vx) "(Hcx & %hx_vx)". wp_pures.
     wp_apply (SI_read_spec $! _ _ _ _ with "[] [Hcy]"); try set_solver.
-    iFrame. iIntros "Hcy". wp_pures.
+    iFrame. iIntros (vy) "(Hcy & %hy_vy)". wp_pures.
     destruct (hist_val h); wp_pures; do 2 wp_lam; wp_pures.
       - case_bool_decide as Heq; try set_solver. wp_pures. 
       wp_apply (commitU_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
@@ -333,17 +333,12 @@ Definition init_state :=
     state_ms := ∅;
   |}.
 
-Global Instance SI_init_instance
-`{!anerisG Mdl Σ} : SI_init.
-Proof.
-Admitted.
-
 Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); try set_solver.
-  { apply unit_model_rel_finitary. }
+  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
+  [apply unit_model_rel_finitary | |set_solver..].
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).
   2 : { iModIntro. done. }
