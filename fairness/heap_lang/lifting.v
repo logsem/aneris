@@ -690,13 +690,13 @@ Lemma auth_fuel_is_proper `{heapGS Σ Mdl} (x y : gmap (fmrole Mdl) nat):
   auth_fuel_is x -∗ auth_fuel_is y.
 Proof. by intros ->. Qed.
 
+
 Section lifting.
 Context `{LM:LiveModel heap_lang M}.
 Context `{!heapGS Σ LM}.
 
 Context `{iLM:LiveModel heap_lang iM}.
 Context `{PMPP: @PartialModelPredicatesPre _ M _ _ Σ iM}.
-Context `{PMP: @PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP}. 
 
 
 Implicit Types P Q : iProp Σ.
@@ -713,20 +713,22 @@ Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
 Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
 Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
-
+ 
 Lemma wp_lift_pure_step_no_fork tid E E' Φ e1 e2 fs ϕ:
   fs ≠ ∅ ->
   PureExec ϕ 1 e1 e2 ->
   ϕ ->
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗
   (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP. 
+Proof using. 
   intros NnO Hpe Hϕ.
   have Hps: pure_step e1 e2.
   { specialize (Hpe Hϕ). by apply nsteps_once_inv in Hpe. }
-  iIntros "H". iApply wp_lift_step; eauto.
+  iIntros "[PMP H]". iApply wp_lift_step; eauto.
   { destruct Hps as [Hred _]. specialize (Hred inhabitant). eapply reducible_not_val; eauto. }
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "Hsi".
+  
   iMod "H". iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
   iSplit; first by destruct Hps as [Hred _].
   iNext. iIntros (e2' σ2 efs Hpstep).
@@ -737,8 +739,12 @@ Proof using PMP.
 
   (* iMod (update_no_step_enough_fuel _ _ ∅ with "Hfuels Hmi") as "H"; eauto; *)
   (*   [by intros X%dom_empty_inv_L | set_solver | set_solver | econstructor =>//; by apply fill_step |]. *)
-  iMod (update_no_step_enough_fuel _ _ with "Hfuels Hmi") as "H"; eauto;
-    [by intros X%dom_empty_inv_L | econstructor =>//; by apply fill_step |].
+
+  (* TODO: get rid of iDestruct? *)
+  iDestruct (update_no_step_enough_fuel (PMPP := PMPP) with "PMP") as "HH".
+  { by intros X%dom_empty_inv_L. }
+  { econstructor =>//; by apply fill_step. }
+  iMod ("HH" with "Hfuels Hmi") as "H".
 
   iModIntro.
   iDestruct ("H") as (δ2 ℓ [Hlabels Hvse]) "[Hfuels Hmi]".
@@ -809,17 +815,17 @@ Qed.
 Lemma wp_lift_pure_step_no_fork' fs tid E E' Φ e1 e2:
   fs ≠ ∅ ->
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP. 
+Proof using. 
   intros. by iApply wp_lift_pure_step_no_fork.
 Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole tid E E' Φ e1 e2 ρ f φ:
   PureExec φ 1 e1 e2 -> φ ->
-  (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP. 
+Proof using. 
   iIntros (??) "H". rewrite has_fuel_fuels_S.
   iApply (wp_lift_pure_step_no_fork {[ ρ := f ]} {[ρ]}); eauto; last first.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
@@ -833,15 +839,16 @@ Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' fs1 fs2 fr1 fr_st
   live_roles iM s1 ∩ fr_stash = ∅ → 
   dom fs2 ∩ fr_stash = ∅ ->
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1) ∪ fr_stash)
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP. 
+Proof using. 
   iIntros (Hpe Hφ Hval Hfr ??? Htrans).
   have Hps: pure_step e1 e2.
   { specialize (Hpe Hφ). by apply nsteps_once_inv in Hpe. }
-  iIntros "Hkont".
+  iIntros "[PMP Hkont]".
+
   iApply wp_lift_step; eauto.
   { destruct (pure_step_safe _ e2 Hps inhabitant) as (?&?&?&?). by eapply val_stuck. }
 
@@ -853,9 +860,9 @@ Proof using PMP.
   simplify_eq. iMod "Hclose" as "_". iMod "Hkont" as "(Hmod&Hfuels&Hfr&Hkont)".
   rewrite !app_nil_r.
   iDestruct "Hsi" as "(%&Hgh&Hmi)". simpl.
-  iDestruct (partial_model_agree' with "Hmi Hmod") as %Hmeq.
+  iDestruct (partial_model_agree' with "PMP Hmi Hmod") as %Hmeq.
 
-  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "Hfuels Hmod Hmi Hfr") as "H"; eauto. 
+  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "PMP Hfuels Hmod Hmi Hfr") as "H"; eauto. 
   (* 2: { apply empty_subseteq. } *)
   (* all: eauto. *)
   (* 1, 2: set_solver.  *)
@@ -880,11 +887,11 @@ Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' fs1 fs2 fr1 Φ e1 e2 ρ
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
   live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP. 
+Proof using. 
   iIntros.
   iApply wp_lift_pure_step_no_fork_take_step_stash.
   4: { apply empty_subseteq. }
@@ -897,16 +904,16 @@ Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' (f1 f2: nat)
   PureExec φ 1 e1 e2 -> φ ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   (f2 ≤ iLM.(lm_fl) s2)%nat -> iM.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
    (partial_model_is s2 -∗ partial_free_roles_are fr -∗ (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else (tid ↦M ∅) ) -∗
                                WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP.
+Proof using.
   iIntros (Hpe Hφ Hroles Hfl Hmdl).
   rewrite has_fuel_fuels.
-  iIntros "H".
+  iIntros "[PMP H]".
   iApply (wp_lift_pure_step_no_fork_take_step _ _ _ _ _ {[ρ := f1]}
-         (if decide (ρ ∈ live_roles iM s2) then {[ρ := f2]} else ∅) fr  with "[H]"); eauto.
+         (if decide (ρ ∈ live_roles iM s2) then {[ρ := f2]} else ∅) fr  with "[PMP H]"); eauto.
   - repeat split.
     + intros ?. rewrite decide_True //. rewrite lookup_singleton //=.
     + destruct (decide (ρ ∈ live_roles _ s2)); set_solver.
@@ -916,7 +923,7 @@ Proof using PMP.
     + destruct (decide (ρ ∈ live_roles iM s2)); set_solver.
     + destruct (decide (ρ ∈ live_roles iM s2)); set_solver.
   - set_solver.
-  - iMod "H". do 2 iModIntro. iMod "H" as "(Hmod&Hfr&Hfuels&Hkont)". iModIntro.
+  - iFrame. iMod "H". do 2 iModIntro. iMod "H" as "(Hmod&Hfr&Hfuels&Hkont)". iModIntro.
     iFrame "Hmod Hfr Hfuels". iIntros "Hmod Hfr Hfuels". iApply ("Hkont" with "Hmod [Hfr] [Hfuels]").
     + replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [done|set_solver].
     + destruct (decide (ρ ∈ live_roles iM s2)).
@@ -926,9 +933,9 @@ Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole' tid E E' Φ e1 e2 ρ f:
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof using PMP.
+Proof using.
   iIntros (?) "H". rewrite has_fuel_fuels_S.
   iApply (wp_lift_pure_step_no_fork' {[ ρ := f ]} {[ρ]}); last first.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
@@ -944,17 +951,17 @@ Qed.
 Lemma wp_fork_nostep s tid E e Φ R1 R2
   (fs: gmap (fmrole iM) nat) (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
   R1 ∪ R2 = dom fs ->
-  (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
                 WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
   ) -∗
      ▷ (has_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
      has_fuels_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
-Proof using PMP.
+Proof using.
   
-  iIntros (Hunioneq) "He HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
+  iIntros (Hunioneq) "[PMP He] HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iMod (update_fork_split R1 R2 _
-       (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "Htid Hmi") as
+       (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "PMP Htid Hmi") as
        (δ2) "(Hfuels2 & Hfuels1 & Hterm & Hσ & %Hvse)" => //.
   { rewrite -Hloc. rewrite -(language.locale_fill _ _ K). econstructor 1 =>//.
     apply fill_step, head_prim_step. econstructor. }
@@ -1015,17 +1022,18 @@ Lemma wp_fork_nostep_alt s tid E e Φ
   (fs1 fs2: gmap (fmrole iM) nat)
   (DISJ: fs1 ##ₘ fs2)
   (NE: fs1 ∪ fs2 ≠ ∅):
-  (∀ tid', ▷ (has_fuels tid' fs2 -∗
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ∗ (∀ tid', ▷ (has_fuels tid' fs2 -∗
                 WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
   ) -∗
      ▷ (has_fuels tid fs1 ={E}=∗ Φ (LitV LitUnit)) -∗
      has_fuels_S tid (fs1 ∪ fs2) -∗ WP Fork e @ s; tid; E {{ Φ }}.
-Proof using PMP.
-  iIntros "FORK FUEL1 FUEL".
-  iApply (wp_fork_nostep with "[FORK] [FUEL1]").
-  { by eapply map_disjoint_dom_1. }
-  all: try set_solver. 
-  { iIntros (?). iNext. iIntros "FUEL". iApply "FORK".
+Proof using.
+  iIntros "[PMP FORK] FUEL1 FUEL".
+  iApply (wp_fork_nostep with "[PMP FORK] [FUEL1]").
+  { by eapply map_disjoint_dom_1.}
+  1, 2: set_solver.
+  3: done. 
+  { iFrame. iIntros (?). iNext. iIntros "FUEL". iApply "FORK".
     iApply has_fuels_proper; [reflexivity| | iFrame].
     rewrite map_union_comm; auto.
     by apply leibniz_equiv_iff, gmap_filter_disj_id. }
@@ -1075,11 +1083,14 @@ Qed.
 Lemma wp_allocN_seq_nostep s tid E v n fs:
   fs ≠ ∅ ->
   0 < n →
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ⊢
   {{{ has_fuels_S tid fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
   {{{ l, RET LitV (LitLoc l); has_fuels tid fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
-Proof using PMP.
-  iIntros (HnO Hn Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+Proof using.
+  iIntros (HnO Hn) "#PMP".
+  iIntros (Φ). iModIntro. iIntros "HfuelS HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iModIntro; iSplit; first by eauto.
   iIntros (e2 σ2 efs Hstep). iNext.
@@ -1088,7 +1099,7 @@ Proof using PMP.
     as "(Hsi & Hl & Hm)".
   { apply heap_array_map_disjoint.
     rewrite replicate_length Z2Nat.id ?Hexend; auto with lia. }
-  iMod (update_no_step_enough_fuel _ _ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
+  iMod (update_no_step_enough_fuel _ _ with "PMP HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
   { by intros ?%dom_empty_inv_L. }
   (* { set_solver. } *)
   { rewrite Hexend. apply head_locale_step. by econstructor. }
@@ -1105,18 +1116,19 @@ Qed.
 
 Lemma wp_alloc_nostep s tid E v fs :
   fs ≠ ∅ ->
-  {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
-Proof using PMP. 
-  iIntros (? Φ) "HfuelS HΦ". iApply (wp_allocN_seq_nostep with "HfuelS"); auto with lia.
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ⊢ {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
+Proof using. 
+  iIntros (?) "#PMP". iModIntro. iIntros (Φ) "HfuelS HΦ".
+  iApply (wp_allocN_seq_nostep with "PMP HfuelS"); auto with lia.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
 Qed.
 
 Lemma wp_choose_nat_nostep s tid E fs :
   fs ≠ ∅ ->
-  {{{ has_fuels_S tid fs }}}
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ⊢ {{{ has_fuels_S tid fs }}}
     ChooseNat @ s; tid; E
   {{{ (n:nat), RET LitV (LitInt n); has_fuels tid fs }}}.
-Proof using PMP. 
+Proof using. 
   iIntros (? Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iModIntro; iSplit; eauto.
