@@ -301,12 +301,12 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
   Qed.
 
   Lemma simplified_wait_on_keyT_spec :
-    ∀ (c cond v : val) (k : Key) ms sa E φ P_tok,
+    ∀ (c cond v : val) (k : Key) ms sa E φ P_tok Q_tok,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜dom ms ⊆ KVS_keys⌝ -∗
     ⌜k ∈ dom ms⌝ -∗
-    □ (∀ h, Seen k (v :: h) ∗ P_tok ={⊤, E}=∗ ∃ m, ⌜dom m = dom ms⌝ ∗ φ m ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
-              ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+    □ (∀ h, Seen k (v :: h) ∗ P_tok ={⊤, E}=∗ ∃ m, ⌜dom m = dom ms⌝ ∗ φ m ∗ Q_tok ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
+              ▷ (Q_tok ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     □ (|={⊤, E}=> ∃ m, ⌜dom m = dom ms⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
               ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}} cond v' @[ip_of_address sa]
