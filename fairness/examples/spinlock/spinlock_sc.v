@@ -182,7 +182,7 @@ Section ClientProofs.
   (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM, spinlockG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ spinlock_model_impl}.
-  Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}.
+  (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
 
   (* TODO: decide what to do with notations *)
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
@@ -318,7 +318,7 @@ Section ClientProofs.
     partial_free_roles_are ∅ ∗
     thst_auth th v' -∗
     model_inv_impl (<[th:=v']> st).
-  Proof using PMP.
+  Proof using.
     iIntros "(AUTHS' & ST & NOFREE & AUTH)".
     iApply (model_inv_helper with "[AUTHS' ST NOFREE AUTH]").
     { by rewrite insert_length. }
@@ -358,6 +358,7 @@ Section ClientProofs.
   Ltac pure_step_burn_fuel f :=
     destruct f; [lia| ]; 
     iApply wp_lift_pure_step_no_fork_singlerole; auto;
+    iSplitR; [done| ];
     do 3 iModIntro; iFrame; iIntros "FUEL"; simpl.
 
   Lemma nonfinished_role_is_alive th st v (DOM: th < length st)
@@ -380,16 +381,22 @@ Section ClientProofs.
     by rewrite THV in FIN.
   Qed. 
   
+  (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
+  Notation "'PMP'" := (@PartialModelPredicates heap_lang Mdl LM _ _ Σ _ spinlock_model_impl spinlock_model PMPP). 
+
   Lemma acquire_spec_term tid l γ P f (FUEL: f > 5) th:
+    PMP -∗
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2 }}}
       acquire #l @ tid
     {{{ RET #(); P ∗ locked γ ∗ thst_frag th 1 ∗ ∃ f, has_fuel tid th f ∗ ⌜f > 4 ⌝}}}.
-  Proof using PMP.
-    iLöb as "IH" forall (f FUEL). 
-    iIntros (Φ) "(#INV & FUEL & THST_FRAG) Kont".
+  Proof using.
+    iIntros "#PMP". 
+    iLöb as "#IH" forall (f FUEL). 
+    iIntros (Φ). iModIntro. iIntros "(#INV & FUEL & THST_FRAG) Kont".
     rewrite {2}/acquire.
 
-    pure_step_burn_fuel f. 
+    pure_step_burn_fuel f.
+
     
     wp_bind (CmpXchg _ _ _).
     iApply wp_atomic. 
@@ -413,7 +420,7 @@ Section ClientProofs.
       (* |={⊤ ∖ ↑Ns,?E3}=> WP #l <- #false @ tid; ?E3 {{ v, |={?E3,⊤}=> Φ v }} *)
 
       (* iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat st (<[th:=1]> st)) with "[$]"). *)
-      iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat _ st (<[th:=1]> st)) with "[$]"); eauto. 
+      iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat _ st (<[th:=1]> st)) with "[$] [$]"); eauto. 
       { done. }
       { econstructor; eauto. }
       { apply live_roles_preservation. rewrite THST_V. simpl. lia. }
@@ -421,7 +428,7 @@ Section ClientProofs.
       do 2 iModIntro. iIntros "(L & ST & NOFREE & FUEL)".
       iMod ((thst_update th 1) with "[THST_AUTH THST_FRAG]")
         as "[THST_AUTH THST_FRAG]"; [by iFrame| ].
-      iMod ("Clos" with "[-THST_FRAG Kont P LOCKED FUEL]") as "_". 
+      iMod ("Clos" with "[-THST_FRAG Kont P LOCKED FUEL]") as "_".
       { iModIntro. iExists (#true)%V. iExists _.
         iDestruct (model_inv_change_helper with "[AUTHS' ST NOFREE THST_AUTH]") as "MODEL"; eauto. 
         { iFrame. }
@@ -438,7 +445,7 @@ Section ClientProofs.
       do 2 (pure_step_burn_fuel f). 
       iApply wp_value. iApply "Kont". iFrame. iExists _. iFrame. iPureIntro. lia.
     - iDestruct "LOCK" as "[>L [[>-> _] | >->]]"; [done| ].
-      iApply ((wp_cmpxchg_fail_step_singlerole _ tid th _ 10%nat _ st st) with "[$]").
+      iApply ((wp_cmpxchg_fail_step_singlerole _ tid th _ 10%nat _ st st) with "[$] [$]").
       all: eauto. 
       { done. }
       { econstructor; eauto. }
@@ -453,7 +460,7 @@ Section ClientProofs.
         rewrite /model_lock_corr_impl. iRight. eauto. }
       iModIntro.
       do 2 pure_step_burn_fuel f.
-      iApply ("IH" $! 8 with "[] [FUEL THST_FRAG]"). 
+      iApply ("#IH" $! 8 with "[] [FUEL THST_FRAG]"). 
       { iPureIntro. lia. }
       { do 2 iFrame. done. }
       iFrame. 
@@ -484,17 +491,20 @@ Section ClientProofs.
   Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
   Lemma release_spec_term tid l γ P f (FUEL: f > 2) (th: fmrole spinlock_model_impl):
+    PMP -∗
     {{{ spinlock_inv l γ P ∗ P ∗ locked γ ∗ thst_frag th 1 ∗ has_fuel tid th f }}}
       release #l @ tid
     {{{ RET #(); tid ↦M ∅ ∗ thst_frag th 0 ∗ partial_free_roles_are {[ th ]} }}}.
-  Proof using PMP. 
-    iIntros (Φ) "(#INV & P & LOCKED & THST_FRAG & FUEL) Kont". rewrite /release.
+  Proof using. 
+    iIntros "#PMP" (Φ). iModIntro. 
+    iIntros "(#INV & P & LOCKED & THST_FRAG & FUEL) Kont". rewrite /release.
     iDestruct (thst_frag_bound with "THST_FRAG") as "%TH_BOUND".
 
 
     (* TODO: fix pure_step_burn_fuel by adding FUEL param *)
     destruct f; [lia| ]. 
-    iApply wp_lift_pure_step_no_fork_singlerole; auto. 
+    iApply wp_lift_pure_step_no_fork_singlerole; auto.
+    iSplitR; [done| ]. 
     do 3 iModIntro. iSplitL "FUEL"; [by iFrame| ]. iIntros "FUEL"; simpl.
 
     rewrite /spinlock_inv.
@@ -518,13 +528,13 @@ Section ClientProofs.
 
     destruct f; [lia| ]. 
     rewrite {2}/model_inv_impl. iDestruct "MODEL" as "(ST & NOFREE & AUTHS & %LENGTH)". 
-    iApply ((wp_store_step_singlerole _ tid th _ 0%nat _ st (<[th:=0]> st)) with "[$]").
-    all: eauto.
-    { done. }
-    { by econstructor. }
+    (* iApply ((wp_store_step_singlerole _ tid th _ 0%nat _ st (<[th:=0]> st)) with "[$]"). *)
+    iApply (wp_store_step_singlerole with "[$] [$]").
+    { apply inj_le, le_0_n. }
+    { by apply sm_unlock. }  
     { apply live_roles_preservation.
       destruct ST_LOCKED as [EQ _]. rewrite EQ /=. lia. }
-    do 2 iModIntro. iIntros "(L & ST & NOFREE & FUEL)".
+    do 2 iModIntro. iIntros "(L & ST & FUEL)".
 
     (* rewrite decide_False. *)
     (* 2: { simpl. unfold spinlock_lr. intros IN. *)
@@ -558,21 +568,22 @@ Section ClientProofs.
     
     
   Lemma client_terminates tid l γ P f th (FUEL: f > 12) :
+    PMP -∗
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2}}}
       client #l @ tid
     {{{ RET #(); tid ↦M ∅ ∗ partial_free_roles_are {[ th ]} }}}.
-  Proof using PMP.
-    iIntros (Φ) "(#INV & FUEL & FRAG) Kont".
+  Proof using.
+    iIntros "#PMP" (Φ). iModIntro. iIntros "(#INV & FUEL & FRAG) Kont".
     rewrite /client.
     pure_step_burn_fuel f.
     wp_bind (acquire #l)%E.
-    iApply (acquire_spec_term with "[-Kont]"). 
+    iApply (acquire_spec_term with "[$] [-Kont]"). 
     2: { by iFrame. }
     { lia. }
     clear dependent f. 
     iNext. iIntros "(P & LOCKED & FRAG & [%f [FUEL %FUEL]])".
     do 2 pure_step_burn_fuel f. 
-    iApply (release_spec_term with "[-Kont]").
+    iApply (release_spec_term with "[$] [-Kont]").
     2: { iFrame. iSplitR "P"; done. }
     { lia. }
     iNext. iIntros "(? & ? & ?)". iApply ("Kont" with "[$]"). 
@@ -584,7 +595,6 @@ Section MainProof.
   (* Context `{!heapGS Σ spinlock_model, !spinlockPreG Σ}. *)
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM} {SL_PRE: spinlockPreG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ spinlock_model_impl}.
-  Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
@@ -603,7 +613,7 @@ Section MainProof.
         ([∗ set] i ∈ list_to_set (seq 0 n), 
          ∃ γ, ⌜tgns !! i = Some γ⌝ ∗ own γ (●E v) ∗ own γ (◯E v)))%I.
   Proof using. 
-    clear PMP PMPP. 
+    clear PMPP. 
     iInduction n as [| n'] "IH".
     { iModIntro. iExists []. iSplit; done. }
     iMod (own_alloc (●E v  ⋅ ◯E v)) as (γ) "[AUTH FRAG]".
@@ -654,8 +664,11 @@ Section MainProof.
   (* Proof using.  *)
   (*   simpl. done. apply _.  *)
 
+  Notation "'PMP'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP).
+
   Lemma newlock_spec tid P fs
         (FSne: fs ≠ ∅) (FUELS: fuels_ge fs 20):
+    PMP -∗
     {{{ P ∗ has_fuels tid fs ∗
           partial_model_is (repeat 2 (size (dom fs)) ) ∗ 
           partial_free_roles_are ∅}}}
@@ -666,8 +679,9 @@ Section MainProof.
           (* (∃ fs, has_fuels tid (list_to_set ths) fs ∗ ⌜fuels_ge fs 18⌝) }}}. *)
           (has_fuels tid ((fun f => f - 2) <$> fs)) }}}.
   (* Proof. *)
-  Proof using PMP SL_PRE.
-    iIntros (Φ) "(P & FUELS & ST & NOFREE) Kont". rewrite /newlock.
+  Proof using SL_PRE.
+    iIntros "#PMP" (Φ). iModIntro. iIntros "(P & FUELS & ST & NOFREE) Kont". 
+    rewrite /newlock.
     (* remember (list_to_set ths) as ths_set. *)
     (* assert (ths_set ≠ ∅) as THSn0'. *)
     (* { subst. destruct ths; [done| ]. *)
@@ -680,6 +694,7 @@ Section MainProof.
     
     iApply wp_lift_pure_step_no_fork'.
     { apply FS'ne. }
+    iSplitR; [done| ].
     do 3 iModIntro. simpl.
     iFrame. iIntros "FUELS".
     
@@ -689,7 +704,7 @@ Section MainProof.
     { eapply @fuels_ge_minus1. done. }
     (* TODO: fupd in goal is needed to create invariant *)
     wp_bind (Alloc _)%E.
-    iApply (wp_alloc_nostep with "[FUELS]").
+    iApply (wp_alloc_nostep with "[$] [FUELS]").
     2: { iFrame. }
     { intros E. by apply fmap_empty_inv in E. } 
 
@@ -747,6 +762,7 @@ Section MainProof.
   (* TODO: merge with previous *)
   Ltac pure_step_burn_fuel_impl :=
     iApply wp_lift_pure_step_no_fork_singlerole; auto;
+    iSplitR; [done| ];
     do 3 iModIntro; iFrame; iIntros "FUEL"; simpl.
 
   Ltac pure_step_burn_fuel f := destruct f; [lia| ]; pure_step_burn_fuel_impl.
@@ -784,21 +800,25 @@ Section MainProof.
 
   Definition program_init_state: fmstate spinlock_model_impl := [2; 2].
     
+  (* TODO: free roles cannot be retrieved back without par construct *)
   Lemma program_spec tid (P: iProp Σ):
     (* {{{ partial_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
+    PMP -∗
     {{{ partial_model_is program_init_state ∗ partial_free_roles_are ∅ ∗ P ∗ 
       has_fuels tid program_init_fuels }}}
       program #() @ tid
-    {{{ RET #(); tid ↦M ∅ }}}.
+    {{{ RET #(); tid ↦M ∅
+                   (* ∗ partial_free_roles_are (dom program_init_fuels) *)
+    }}}.
   Proof using All.
-    iIntros (Φ) "(ST & NOFREE & P & FUELS) Kont".
+    iIntros "#PMP" (Φ). iModIntro. iIntros "(ST & NOFREE & P & FUELS) Kont".
     rewrite /program /program_init_fuels /sm_fuel. 
 
     (* TODO: refactor this *)
     iDestruct ((has_fuels_ge_S_exact 26) with "FUELS") as "FUELS"; eauto.
     { do 2 (apply fuels_ge_helper; [| lia]). done. }
     iApply wp_lift_pure_step_no_fork; auto.
-    2: do 3 iModIntro; iFrame. 
+    2: iSplitR; [done| ]; do 3 iModIntro; iFrame. 
     1: set_solver. 
     iIntros "FUELS"; simpl.
     repeat rewrite fmap_insert. simpl. rewrite fmap_empty. simpl.
@@ -806,7 +826,7 @@ Section MainProof.
     iDestruct ((has_fuels_ge_S_exact 25) with "FUELS") as "FUELS"; eauto.
     { do 2 (apply fuels_ge_helper; [| lia]). done. }
     iApply wp_lift_pure_step_no_fork; auto.
-    2: do 3 iModIntro; iFrame. 
+    2: iSplitR; [done| ]; do 3 iModIntro; iFrame. 
     1: set_solver. 
     iIntros "FUELS"; simpl.
     repeat rewrite fmap_insert. simpl. rewrite fmap_empty. simpl.
@@ -815,7 +835,7 @@ Section MainProof.
     iAssert (has_fuels tid {[ 0:=25; 1:=25 ]})%I with "FUELS" as "FUELS". 
 
     wp_bind (newlock #())%E.
-    iApply (newlock_spec tid P with "[P FUELS ST NOFREE]"); eauto.
+    iApply (newlock_spec tid P with "[$] [P FUELS ST NOFREE]"); eauto.
     3: { iFrame. 
          replace (size (dom {[0 := 25; 1 := 25]})) with 2; auto. }
     { set_solver. }
@@ -831,7 +851,7 @@ Section MainProof.
     iDestruct (fuels_ne_helper with "FUELS") as "%NE". 
     iApply wp_lift_pure_step_no_fork'; eauto. clear NE. 
     
-    do 3 iModIntro. iSimpl. 
+    iSplitR; [done| ]. do 3 iModIntro. iSimpl. 
     iFrame. iIntros "FUELS".
 
     iDestruct ((has_fuels_ge_S_exact 21) with "FUELS") as "FUELS"; eauto.
@@ -840,7 +860,7 @@ Section MainProof.
 
     iDestruct (fuels_ne_helper with "FUELS") as "%NE". 
     iApply wp_lift_pure_step_no_fork'; eauto. clear NE. 
-    do 3 iModIntro. iSimpl. 
+    iSplitR; [done| ]. do 3 iModIntro. iSimpl. 
     iFrame. iIntros "FUELS".
     
     iDestruct (big_sepS_insert with "FRAGS") as "[FRAG0 FRAGS]"; [set_solver| ]. 
@@ -859,7 +879,7 @@ Section MainProof.
     { set_solver. }
     { done. }
     { set_solver. }
-    { iIntros (tid0).
+    { iSplitR; [done| ]. iIntros (tid0).
       iNext. iIntros "FUEL".
 
       rewrite map_filter_insert.
@@ -869,9 +889,10 @@ Section MainProof.
       2: { apply leibniz_equiv_iff. apply decide_True. done. }
       iDestruct (has_fuel_fuels with "FUEL") as "FUEL". 
 
-      iApply (client_terminates with "[-]"); last by auto.
+      iApply (client_terminates with "[$] [-]"). 
       2: { iFrame. eauto. }
-      lia. }
+      { lia. }
+      iNext. iIntros "[??]". iFrame. }
     
     (* TODO: unify these proofs *)
     
@@ -896,7 +917,7 @@ Section MainProof.
     { set_solver. }
     { done. }
     { set_solver. }
-    { iIntros (tid0).
+    { iSplitR; [done| ]. iIntros (tid0).
       iNext. iIntros "FUEL".
       rewrite map_filter_insert. 
       rewrite map_filter_empty insert_empty.
@@ -904,9 +925,10 @@ Section MainProof.
       2: { apply leibniz_equiv_iff. apply decide_True. done. }
       iDestruct (has_fuel_fuels with "FUEL") as "FUEL". 
 
-      iApply (client_terminates with "[-]"); last by auto. 
+      iApply (client_terminates with "[$] [-]").
       2: { iFrame. eauto. }
-      lia. }
+      { lia. }
+      iNext. iIntros "[??]". iFrame. }
     
     iNext. iIntros "FUELS". iModIntro. iApply "Kont".
     erewrite has_fuels_proper; [| reflexivity|].
