@@ -18,6 +18,8 @@ From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 From iris.algebra Require Import excl.
+From aneris.examples.snapshot_isolation.examples Require Import proof_resources.
+
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.
@@ -37,11 +39,6 @@ Definition client_inv_name := nroot.@"clinv".
 Section proofs.
 
 Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
-
-  Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
-
-  Lemma token_exclusive (γ : gname) : token γ -∗ token γ -∗ False.
-  Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
 
   Definition client_inv (γF1 γF2 : gname): iProp Σ :=
     ∃ hx, "x" ↦ₖ hx ∗
@@ -153,8 +150,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       [solve_ndisj | iPureIntro; set_solver | iPureIntro; set_solver | | | | | ].
       - iModIntro. iIntros (h) "(Hxseen & Htok)". 
         iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
-          + iDestruct (token_exclusive with "Htok Htok'") as "[]".
-          + iModIntro. iExists {["x":= [(#1)]]}.
+        + iDestruct (token_exclusive with "Htok Htok'") as "[]".
+        + iModIntro. iExists {["x":= [(#1)]]}.
           iSplit. 
           { iPureIntro. set_solver. }
           iSplitL "Hkx".
@@ -167,7 +164,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
           rewrite !(big_sepM_insert); try set_solver.
           iDestruct "Hkx" as "[Hkx _]". iFrame.
           iRight. iLeft. by iFrame.
-          + iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
+        + iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
           try solve_ndisj. 
           { iApply SI_GlobalInv. }
           iMod ("Hfalse" with "[$Hxseen $Hkx]") as "%Hfalse".
@@ -177,56 +174,56 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         iInv (client_inv_name) as ">[%hx' [Hkx Hrest]]" "HClose".
         iModIntro.
         iExists {["x":= hx']}.
-          iSplit. 
-          { iPureIntro. set_solver. }
-          iSplitL "Hkx".
-          { rewrite !big_sepM_insert; set_solver. }
-          iIntros "!> Hkx". 
-          iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
-          iNext. iExists _. 
-          rewrite !(big_sepM_insert); try set_solver.
-          iDestruct "Hkx" as "[Hkx _]". iFrame.
+        iSplit. 
+        { iPureIntro. set_solver. }
+        iSplitL "Hkx".
+        { rewrite !big_sepM_insert; set_solver. }
+        iIntros "!> Hkx". 
+        iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
+        iNext. iExists _. 
+        rewrite !(big_sepM_insert); try set_solver.
+        iDestruct "Hkx" as "[Hkx _]". iFrame.
       - iIntros (v Φ') "!>Htrue HΦ".
-      wp_lam. wp_op.
-      apply bin_op_eval_eq_val.
-      case_bool_decide as Heq;
-      iApply "HΦ"; set_solver.
+        wp_lam. wp_op.
+        apply bin_op_eval_eq_val.
+        case_bool_decide as Heq;
+        iApply "HΦ"; set_solver.
       - rewrite !(big_sepM_insert); try set_solver.
-      rewrite !big_sepM_empty. iFrame.
+        rewrite !big_sepM_empty. iFrame.
       - iNext. iIntros (ms) "(%Hdom & (-> & Htok) & Hcp & Hx & Hseen)".
-      wp_pures.
-      wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [Hx]"). 
-      set_solver.
-      {
-        rewrite !big_sepM_insert; try set_solver.
-        rewrite big_sepM_empty. iDestruct "Hx" as "[[? ?] _]". iFrame.
-      }
-      iIntros "Hcx". wp_pures.
-      wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj.
-      iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
+        wp_pures.
+        wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [Hx]"). 
+        set_solver.
+        {
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite big_sepM_empty. iDestruct "Hx" as "[[? ?] _]". iFrame.
+        }
+        iIntros "Hcx". wp_pures.
+        wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
+        try solve_ndisj.
+        iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
         + iDestruct (token_exclusive with "Htok Htok'") as "[]".
         + iModIntro. iExists {["x" := [(#1)]]}, _, {["x" := (Some #2, true)]}.
-        iFrame. iSplitL "Hcx Hkx". 
+          iFrame. iSplitL "Hcx Hkx". 
           * iSplitR "Hcx Hkx"; try iSplitR "Hcx Hkx";
             try iPureIntro; try set_solver.
             rewrite !big_sepM_insert; try set_solver.
             rewrite !big_sepM_empty. iFrame.
           * iNext. iIntros "[_ HBig]". 
             iMod ("HClose" with "[HBig Htok Htok']") as "_".
-                -- iNext. iExists [(#2);(#1)]. 
-                  rewrite !(big_sepM2_insert); try set_solver.
-                  iDestruct "HBig" as "[[Hx _] _]".
-                  iFrame. iLeft. by iFrame.
-                -- iModIntro. by iApply "HΦ".
+            -- iNext. iExists [(#2);(#1)]. 
+               rewrite !(big_sepM2_insert); try set_solver.
+               iDestruct "HBig" as "[[Hx _] _]".
+               iFrame. iLeft. by iFrame.
+            -- iModIntro. by iApply "HΦ".
         + rewrite !big_sepM_insert; last set_solver.
-        iDestruct "Hseen" as "[Hseen _]". 
-        iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
-        try solve_ndisj.
-        { iApply SI_GlobalInv. }
-        iMod ("Hfalse" with "[$Hseen $Hkx]") as "%Hfalse".
-        destruct Hfalse as [? Hfalse].
-        by apply app_cons_not_nil in Hfalse.
+          iDestruct "Hseen" as "[Hseen _]". 
+          iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
+          try solve_ndisj.
+          { iApply SI_GlobalInv. }
+          iMod ("Hfalse" with "[$Hseen $Hkx]") as "%Hfalse".
+          destruct Hfalse as [? Hfalse].
+          by apply app_cons_not_nil in Hfalse.
   Qed.
 
 End proofs.

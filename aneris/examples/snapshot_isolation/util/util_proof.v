@@ -6,6 +6,8 @@ From aneris.examples.snapshot_isolation.instantiation
       Require Import snapshot_isolation_api_implementation.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From iris.algebra Require Import gmap.
+From iris.algebra Require Import excl.
+
 
 Section proof.
 
