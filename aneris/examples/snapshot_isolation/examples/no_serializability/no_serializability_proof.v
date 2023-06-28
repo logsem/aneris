@@ -41,8 +41,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
 
   Definition client_inv_def : iProp Σ :=
   ∃ hx hy hz, "x" ↦ₖ hx ∗ "y" ↦ₖ hy ∗ "z" ↦ₖ hz ∗
-    ((⌜hx = []⌝ ∗ ⌜hx = []⌝ ∗ ⌜hx = []⌝) ∨
-      (⌜#1 ∈ hx⌝ ∗ ∃ vx vy, ⌜hist_val hx = Some vx⌝ ∗ ⌜hist_val hy = Some vy⌝ ∗
+    ((⌜hx = []⌝ ∗ ⌜hy = []⌝ ∗ ⌜hz = []⌝) ∨
+      (⌜#1 ∈ hz⌝ ∗ ∃ vx vy, ⌜hist_val hx = Some vx⌝ ∗ ⌜hist_val hy = Some vy⌝ ∗
       (⌜vx = #1⌝ ∨ ⌜vx = #(-1)⌝) ∗(⌜vy = #1⌝ ∨ ⌜vy = #(-1)⌝))).
 
   Definition client_inv : iProp Σ :=
@@ -152,6 +152,96 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (cst sa) "#inv %Φ!>CanStart HΦ".
+    rewrite/transaction2.
+    wp_pures.
+    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & init)" "close".
+    iModIntro.
+    iExists {[ "x" := hx; "y" := hy; "z" := hz ]}.
+    iFrame.
+    iSplitL "x_hx y_hy z_hz";
+      first by repeat (iApply big_sepM_insert; first done; iFrame).
+    iIntros "!>(Active & mem & cache & _)".
+    iMod ("close" with "[mem init]") as "_".
+    {
+      iNext.
+      iExists hx, hy, hz.
+      iPoseProof (big_sepM_insert with "mem") as "(x_hx & mem)"; first done.
+      iPoseProof (big_sepM_insert with "mem") as "(y_hy & mem)"; first done.
+      iPoseProof (big_sepM_insert with "mem") as "(z_hz & _)"; first done.
+      iFrame.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply (simplified_wait_on_keyT_spec _ _ #1 _ _ _ (⊤ ∖ ↑client_inv_name)
+        (λ m, ∃ hx hy vx vy, ⌜m !! "x" = Some hx⌝ ∗ ⌜m !! "y" = Some hy⌝ ∗
+          ⌜hist_val hx = Some vx⌝ ∗ ⌜hist_val hy = Some vy⌝ ∗
+          (⌜vx = #1⌝ ∨ ⌜vx = #(-1)⌝) ∗ (⌜vy = #1⌝ ∨ ⌜vy = #(-1)⌝))%I
+          emp emp with
+          "[] [] [] [] [] [] [$Active $cache]"); first solve_ndisj.
+    1, 2 : rewrite !dom_insert_L; iPureIntro; set_solver.
+    {
+      iIntros "!>%h (#Seen & _)".
+      iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' &
+          [(_ & _ & ->)|(%hz'_1 & (%vx & %vy & %hx'_vx & %hy'_vy & 
+            (%Hvx & %Hvy)))])" "close".
+      { iMod (Seen_valid with "[] [$Seen $z_hz']") as "%abs";
+          [solve_ndisj|admit|by apply suffix_nil_inv in abs].
+      }
+      iModIntro.
+      iExists {[ "x" := hx'; "y" := hy'; "z" := hz' ]}.
+      iSplit; first by rewrite !dom_insert_L.
+      iSplitL "x_hx' y_hy' z_hz'";
+        first by repeat (iApply big_sepM_insert; first done; iFrame).
+      iSplitR.
+      {
+        iExists hx', hy', vx, vy.
+        iFrame "%".
+        by rewrite (lookup_insert_ne _ _ "y").
+      }
+      iSplitR; first done.
+      iIntros "!>(mem & _)".
+      iMod ("close" with "[mem]") as "_"; last done.
+      iNext.
+      iExists hx', hy', hz'.
+      iPoseProof (big_sepM_insert with "mem") as "(x_hx' & mem)"; first done.
+      iPoseProof (big_sepM_insert with "mem") as "(y_hy' & mem)"; first done.
+      iPoseProof (big_sepM_insert with "mem") as "(z_hz' & _)"; first done.
+      iFrame.
+      iRight.
+      iSplit; first done.
+      by iExists vx, vy.
+    }
+    {
+      iModIntro.
+      iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' &
+          %Hinv)" "close".
+      iModIntro.
+      iExists {[ "x" := hx'; "y" := hy'; "z" := hz' ]}.
+      iSplit; first by rewrite !dom_insert_L.
+      iSplitL "x_hx' y_hy' z_hz'";
+        first by repeat (iApply big_sepM_insert; first done; iFrame).
+      iIntros "!>mem".
+      iMod ("close" with "[mem]") as "_"; last done.
+      iNext.
+      iExists hx', hy', hz'.
+      iPoseProof (big_sepM_insert with "mem") as "(x_hx' & mem)"; first done.
+      iPoseProof (big_sepM_insert with "mem") as "(y_hy' & mem)"; first done.
+      iPoseProof (big_sepM_insert with "mem") as "(z_hz' & _)"; first done.
+      iFrame "∗ %".
+    }
+    {
+      iIntros (v' Ψ) "!>_ HΨ".
+      wp_pures.
+      wp_op; first apply bin_op_eval_eq_val.
+      iApply "HΨ".
+      by rewrite bool_decide_spec.
+    }
+    rewrite !dom_insert_L.
+    iClear (hx hy hz) "".
+    iIntros (m) "(%dom_m & (%hx & %hy & %vx & %vy & %m_x & %m_y & %hx_vx &
+          %hy_vy & %Hvx & %Hvy) & Active & cache & _)".
+    wp_pures.
   Admitted.
 
   Lemma server_spec :
