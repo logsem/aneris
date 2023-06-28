@@ -338,6 +338,25 @@ Section destuttering.
       by destruct Hind.
   Qed.
 
+  Lemma upto_stutter_infinite_trace tr1 tr2 :
+    upto_stutter tr1 tr2 → infinite_trace tr1 → infinite_trace tr2.
+  Proof.
+    intros Hstutter Hinf n.
+    revert tr1 tr2 Hstutter Hinf.
+    induction n as [|n IHn]; intros tr1 tr2 Hstutter Hinf.
+    - punfold Hstutter.
+    - punfold Hstutter.
+      induction Hstutter.
+      + specialize (Hinf (1 + n)).
+        rewrite after_sum' in Hinf. simpl in *. apply is_Some_None in Hinf. done.
+      + apply IHHstutter.
+        intros m. specialize (Hinf (1 + m)).
+        rewrite after_sum' in Hinf. simpl in *. done.
+      + simpl. eapply (IHn btr str); [by destruct H1|].
+        intros m. specialize (Hinf (1 + m)).
+        rewrite after_sum' in Hinf. simpl in *. done.
+  Qed.
+
   Program Fixpoint destutter_once_step N Ψ (btr: trace St L) :
     Ψ (trfirst btr) < N →
     dec_unless Us Ul Ψ btr →

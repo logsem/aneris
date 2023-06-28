@@ -62,6 +62,35 @@ Proof.
     by apply CH.
 Qed.
 
+Lemma traces_match_impl {S1 S2 L1 L2}
+      (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
+      (Rℓ2: L1 -> L2 -> Prop) (Rs2: S1 -> S2 -> Prop)
+      (trans1: S1 -> L1 -> S1 -> Prop)
+      (trans2: S2 -> L2 -> S2 -> Prop)
+      tr1 tr2 :
+  (∀ ℓ1 ℓ2, Rℓ1 ℓ1 ℓ2 → Rℓ2 ℓ1 ℓ2) →
+  (∀ s1 s2, Rs1 s1 s2 → Rs2 s1 s2) →
+  traces_match Rℓ1 Rs1 trans1 trans2 tr1 tr2 →
+  traces_match Rℓ2 Rs2 trans1 trans2 tr1 tr2.
+Proof.
+  intros HRℓ HRs. revert tr1 tr2. cofix IH. intros tr1 tr2 Hmatch.
+  inversion Hmatch; simplify_eq.
+  - constructor 1. by apply HRs.
+  - constructor 2; [by apply HRℓ|by apply HRs|done|done|]. by apply IH.
+Qed.
+
+Lemma traces_match_infinite_trace {L1 L2 S1 S2: Type}
+      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+      (trans1: S1 -> L1 -> S1 -> Prop)
+      (trans2: S2 -> L2 -> S2 -> Prop) tr1 tr2 :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 → infinite_trace tr1 → infinite_trace tr2.
+Proof.
+  intros Hmatch Hinf n.
+  specialize (Hinf n) as [tr' Hafter].
+  apply traces_match_flip in Hmatch.
+  by eapply traces_match_after in Hafter as [tr'' [Hafter' _]].
+Qed.
+
 Lemma traces_match_traces_implies {S1 S2 L1 L2}
       (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
       (trans1: S1 -> L1 -> S1 -> Prop)
