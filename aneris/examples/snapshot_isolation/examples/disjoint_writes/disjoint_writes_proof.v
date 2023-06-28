@@ -18,6 +18,7 @@ From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 From iris.algebra Require Import excl.
+From aneris.examples.snapshot_isolation.examples Require Import proof_resources.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.
@@ -37,11 +38,6 @@ Definition client_inv_name := nroot.@"clinv".
 Section proofs.
 
 Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
-
-  Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
-
-  Lemma token_exclusive (γ : gname) : token γ -∗ token γ -∗ False.
-  Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
 
   Definition client_inv (γF1 γF2 : gname): iProp Σ :=
     ∃ hx hy, "x" ↦ₖ hx ∗ "y" ↦ₖ hy ∗
@@ -90,8 +86,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     iNext. iIntros "(Hcstate & [Hkx [Hky _]] & [Hcx [Hcy _]] & _)".
     iDestruct "hxs" as "[%Hhxeq | [%Hhxeq Htok']]".
       - iMod ("HClose" with "[Hkx Hky hys]") as "_".
-        { iNext. iExists hx, hy. iFrame.
-          set_solver. }
+        { iNext. iExists hx, hy. iFrame. set_solver. }
         iModIntro. wp_pures.
         wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [Hcx]"). 
         set_solver. iFrame. iIntros "Hcx". wp_pures.
@@ -100,10 +95,10 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         iInv (client_inv_name) as ">[%hx' [%hy' (Hkx & Hky & hxs & hys)]]" "HClose".
         iDestruct "hxs" as "[%Hhxeq' | [%Hhxeq' Htok']]".
           + iModIntro.
-          iExists {["x" := hx'; "y" := hy']}, _, 
-          {["x" := (Some #1, true); "y" := (hist_val hy , false)]}.
-          rewrite Hhxeq Hhxeq'.
-          iFrame. iSplitL "Hcx Hcy Hkx Hky". 
+            iExists {["x" := hx'; "y" := hy']}, _, 
+            {["x" := (Some #1, true); "y" := (hist_val hy , false)]}.
+            rewrite Hhxeq Hhxeq'.
+            iFrame. iSplitL "Hcx Hcy Hkx Hky". 
             * iSplitR "Hcx Hcy Hkx Hky"; try iSplitR "Hcx Hcy Hkx Hky";
               try iPureIntro; try set_solver.
               rewrite !big_sepM_insert; try set_solver.
@@ -111,11 +106,11 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
               iPureIntro. set_solver.
             * iNext. iIntros "[_ HBig]". 
               iMod ("HClose" with "[HBig hys Htok]") as "_".
-                  -- iNext. iExists [(#1)], hy'. 
-                    rewrite !(big_sepM2_insert); try set_solver.
-                    iDestruct "HBig" as "[[Hx _] [[Hy _] _]]".
-                    destruct (hist_val hy); iFrame; set_solver.
-                  -- iModIntro. by iApply "HΦ".
+              -- iNext. iExists [(#1)], hy'. 
+                 rewrite !(big_sepM2_insert); try set_solver.
+                 iDestruct "HBig" as "[[Hx _] [[Hy _] _]]".
+                 destruct (hist_val hy); iFrame; set_solver.
+              -- iModIntro. by iApply "HΦ".
           + iDestruct (token_exclusive with "Htok Htok'") as "[]".
       - iDestruct (token_exclusive with "Htok Htok'") as "[]".
   Qed.
@@ -147,8 +142,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     iNext. iIntros "(Hcstate & [Hkx [Hky _]] & [Hcx [Hcy _]] & _)".
     iDestruct "hys" as "[%Hhyeq | [%Hhyeq Htok']]".
       - iMod ("HClose" with "[Hkx Hky hxs]") as "_".
-        { iNext. iExists hx, hy. iFrame.
-          set_solver. }
+        { iNext. iExists hx, hy. iFrame. set_solver. }
         iModIntro. wp_pures.
         wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [Hcy]"). 
         set_solver. iFrame. iIntros "Hcy". wp_pures.
@@ -157,10 +151,10 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         iInv (client_inv_name) as ">[%hx' [%hy' (Hkx & Hky & hxs & hys)]]" "HClose".
         iDestruct "hys" as "[%Hhyeq' | [%Hhyeq' Htok']]".
           + iModIntro.
-          iExists {["x" := hx'; "y" := hy']}, _, 
-          {["x" := (hist_val hx , false); "y" := (Some #1, true)]}.
-          rewrite Hhyeq Hhyeq'.
-          iFrame. iSplitL "Hcx Hcy Hkx Hky". 
+            iExists {["x" := hx'; "y" := hy']}, _, 
+            {["x" := (hist_val hx , false); "y" := (Some #1, true)]}.
+            rewrite Hhyeq Hhyeq'.
+            iFrame. iSplitL "Hcx Hcy Hkx Hky". 
             * iSplitR "Hcx Hcy Hkx Hky"; try iSplitR "Hcx Hcy Hkx Hky";
               try iPureIntro; try set_solver.
               rewrite !big_sepM_insert; try set_solver.
@@ -168,11 +162,11 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
               iPureIntro. set_solver.
             * iNext. iIntros "[_ HBig]". 
               iMod ("HClose" with "[HBig hxs Htok]") as "_".
-                  -- iNext. iExists hx', [(#1)]. 
-                    rewrite !(big_sepM2_insert); try set_solver.
-                    iDestruct "HBig" as "[[Hx _] [[Hy _] _]]".
-                    destruct (hist_val hx); iFrame; set_solver.
-                  -- iModIntro. by iApply "HΦ".
+                -- iNext. iExists hx', [(#1)]. 
+                   rewrite !(big_sepM2_insert); try set_solver.
+                   iDestruct "HBig" as "[[Hx _] [[Hy _] _]]".
+                   destruct (hist_val hx); iFrame; set_solver.
+                -- iModIntro. by iApply "HΦ".
           + iDestruct (token_exclusive with "Htok Htok'") as "[]".
       - iDestruct (token_exclusive with "Htok Htok'") as "[]".
   Qed.

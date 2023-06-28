@@ -89,23 +89,23 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     try solve_ndisj.
     iInv (client_inv_name) as ">[%hx' Hkx]" "HClose".
     iModIntro.
-      iExists {["x" := hx']}, _, {["x" := (Some #1, true)]}.
-      iFrame. iSplitL "Hcx Hkx". 
-        * iSplitR "Hcx Hkx"; try iSplitR "Hcx Hkx";
-          try iPureIntro; try set_solver.
-          rewrite !big_sepM_insert; try set_solver.
-          rewrite !big_sepM_empty. iFrame.
-        * iNext. iIntros "[_ [[_ HBig]| [_ HBig]]]".
-          + iMod ("HClose" with "[HBig]") as "_".
-              -- iNext. iExists _. 
-                rewrite !(big_sepM2_insert); try set_solver.
-                iDestruct "HBig" as "[[Hx _] _]". iFrame.
-              -- iModIntro. by iApply "HΦ".
-          + iMod ("HClose" with "[HBig]") as "_".
-              -- iNext. iExists _. 
-                rewrite !(big_sepM_insert); try set_solver.
-                iDestruct "HBig" as "[[Hx _] _]". iFrame.
-              -- iModIntro. by iApply "HΦ".
+    iExists {["x" := hx']}, _, {["x" := (Some #1, true)]}.
+    iFrame. iSplitL "Hcx Hkx". 
+      * iSplitR "Hcx Hkx"; try iSplitR "Hcx Hkx";
+        try iPureIntro; try set_solver.
+        rewrite !big_sepM_insert; try set_solver.
+        rewrite !big_sepM_empty. iFrame.
+      * iNext. iIntros "[_ [[_ HBig]| [_ HBig]]]".
+        + iMod ("HClose" with "[HBig]") as "_".
+            -- iNext. iExists _. 
+               rewrite !(big_sepM2_insert); try set_solver.
+               iDestruct "HBig" as "[[Hx _] _]". iFrame.
+            -- iModIntro. by iApply "HΦ".
+        + iMod ("HClose" with "[HBig]") as "_".
+            -- iNext. iExists _. 
+               rewrite !(big_sepM_insert); try set_solver.
+               iDestruct "HBig" as "[[Hx _] _]". iFrame.
+            -- iModIntro. by iApply "HΦ".
   Qed.
 
   Lemma client_2_spec ip port:
@@ -141,8 +141,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     try solve_ndisj.
     iInv (client_inv_name) as ">[%hx' Hkx]" "HClose".
     iModIntro.
-      iExists {["x" := hx']}, _, {["x" := (hist_val hx, false)]}.
-      iFrame. iSplitL "Hcx Hkx Hxs". 
+    iExists {["x" := hx']}, _, {["x" := (hist_val hx, false)]}.
+    iFrame. iSplitL "Hcx Hkx Hxs". 
         * iSplitR "Hcx Hkx Hxs"; try iSplitR "Hcx Hkx Hxs";
           try iPureIntro; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
@@ -150,8 +150,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         * iNext. iIntros "[_ HBig]".
           + iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists _. 
-                rewrite !(big_sepM2_insert); try set_solver.
-                iDestruct "HBig" as "[[Hx _] _]". iFrame.
+                 rewrite !(big_sepM2_insert); try set_solver.
+                 iDestruct "HBig" as "[[Hx _] _]". iFrame.
               -- iModIntro. by iApply "HΦ".
   Qed.
   

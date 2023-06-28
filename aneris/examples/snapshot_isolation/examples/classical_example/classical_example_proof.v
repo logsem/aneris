@@ -106,8 +106,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
             * iModIntro. by iApply "HΦ".
           + iMod ("HClose" with "[HBig]") as "_".
             * iNext. iExists h'.
-            rewrite !big_sepM_insert; try set_solver. 
-            iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
+              rewrite !big_sepM_insert; try set_solver. 
+              iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
             * iModIntro. by iApply "HΦ". 
   Qed.
 
@@ -161,8 +161,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
             * iModIntro. by iApply "HΦ".
           + iMod ("HClose" with "[HBig]") as "_".
             * iNext. iExists h'.
-            rewrite !big_sepM_insert; try set_solver. 
-            iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
+              rewrite !big_sepM_insert; try set_solver. 
+              iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
             * iModIntro. by iApply "HΦ". 
   Qed.
 
@@ -200,50 +200,50 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iFrame. iIntros "Hcy". wp_pures.
     destruct (hist_val h); wp_pures; do 2 wp_lam; wp_pures.
       - case_bool_decide as Heq; try set_solver. wp_pures. 
-      wp_apply (commitU_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj.
-      iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
-      iModIntro.
-      iExists {["x" := h'; "y" := h']}, _, 
-      {["x" := (Some v, false); "y" := (Some v, false)]}.
-      iFrame. iSplitL "Hcx Hsx Hcy Hsy Hx Hy".
+        wp_apply (commitU_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
+        try solve_ndisj.
+        iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
+        iModIntro.
+        iExists {["x" := h'; "y" := h']}, _, 
+        {["x" := (Some v, false); "y" := (Some v, false)]}.
+        iFrame. iSplitL "Hcx Hsx Hcy Hsy Hx Hy".
         + iSplitR "Hcx Hsx Hcy Hsy Hx Hy"; try iSplitR "Hcx Hsx Hcy Hsy Hx Hy";
-        try iPureIntro; try set_solver.
-        rewrite !big_sepM_insert; try set_solver.
-        rewrite !big_sepM_empty. iFrame.
+          try iPureIntro; try set_solver.
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite !big_sepM_empty. iFrame.
         + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]". 
             * iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists _.
-              rewrite !(big_sepM2_insert); try set_solver.
+                rewrite !(big_sepM2_insert); try set_solver.
                 iDestruct "HBig" as "[[Hx _] [[Hy _] _]]". iFrame.
               -- iModIntro. by iApply "HΦ".
             * iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists h'.
-              rewrite !big_sepM_insert; try set_solver. 
-              iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
+                rewrite !big_sepM_insert; try set_solver. 
+                iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
               -- iModIntro. by iApply "HΦ".  
       - wp_apply (commitU_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj.
-      iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
-      iModIntro.
-      iExists {["x" := h'; "y" := h']}, _, 
-      {["x" := (None, false); "y" := (None, false)]}.
-      iFrame. iSplitL "Hcx Hsx Hcy Hsy Hx Hy".
+        try solve_ndisj.
+        iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
+        iModIntro.
+        iExists {["x" := h'; "y" := h']}, _, 
+        {["x" := (None, false); "y" := (None, false)]}.
+        iFrame. iSplitL "Hcx Hsx Hcy Hsy Hx Hy".
         + iSplitR "Hcx Hsx Hcy Hsy Hx Hy"; try iSplitR "Hcx Hsx Hcy Hsy Hx Hy";
-        try iPureIntro; try set_solver.
-        rewrite !big_sepM_insert; try set_solver.
-        rewrite !big_sepM_empty. iFrame.
+          try iPureIntro; try set_solver.
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite !big_sepM_empty. iFrame.
         + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]". 
-            * iMod ("HClose" with "[HBig]") as "_".
-              -- iNext. iExists _.
+          * iMod ("HClose" with "[HBig]") as "_".
+            -- iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
-                iDestruct "HBig" as "[[Hx _] [[Hy _] _]]". iFrame.
-              -- iModIntro. by iApply "HΦ".
-            * iMod ("HClose" with "[HBig]") as "_".
-              -- iNext. iExists h'.
+              iDestruct "HBig" as "[[Hx _] [[Hy _] _]]". iFrame.
+            -- iModIntro. by iApply "HΦ".
+          * iMod ("HClose" with "[HBig]") as "_".
+            -- iNext. iExists h'.
               rewrite !big_sepM_insert; try set_solver. 
               iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
-              -- iModIntro. by iApply "HΦ".  
+            -- iModIntro. by iApply "HΦ".  
 Qed.
 
 End proofs.
