@@ -175,7 +175,6 @@ End Utils.
 Section LocksCompositionProofs.
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM} {COMP_PRE: compPreG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ comp_model_impl}.
-  Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ comp_model PMPP}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
@@ -207,26 +206,14 @@ Section LocksCompositionProofs.
 
   Let prog_fuels (key_lift: fmrole spinlock_model_impl -> fmrole comp_model_impl):
     gmap (fmrole comp_model_impl) nat :=
-        list_to_map $ (fun '(k, v) => (key_lift k, v)) <$> map_to_list program_init_fuels.
+    (*     list_to_map $ (fun '(k, v) => (key_lift k, v)) <$> map_to_list program_init_fuels. *)
+    kmap key_lift program_init_fuels. 
 
   Lemma prog_fuels_equiv ρ f lift (INJ: Inj eq eq lift):
     (prog_fuels lift) !! (lift ρ) = Some f <-> program_init_fuels !! ρ = Some f.
   Proof using.
-    assert (Inj eq eq (fun '(k, v) => (lift k, v: nat))) as INJ'.
-    { intros [??][??] [=]. subst. apply INJ in H0. congruence. }
-    rewrite /prog_fuels. etransitivity.
-    { symmetry. apply elem_of_list_to_map.
-      apply NoDup_fmap_fst.
-      - intros. apply elem_of_list_fmap_2 in H as ([??] & [=] & ?), H0 as ([??] & [=] & ?).
-        subst. apply INJ in H0. subst.
-        (* eapply map_to_list_unique; eauto. *)
-        eapply map_to_list_unique in H3; eauto.
-      - apply NoDup_fmap_2; auto. apply NoDup_map_to_list. }
-    etransitivity.
-    2: { apply elem_of_map_to_list. } 
-    (* TODO: why direct application doesn't work? *)
-    pose proof (@elem_of_list_fmap_inj _ _ _ INJ' (map_to_list program_init_fuels) (ρ, f)). apply H.
-  Qed.
+    rewrite /prog_fuels. by rewrite lookup_kmap. 
+  Qed. 
 
   Let lift_sl_st_left (s: fmstate spinlock_model_impl): fmstate comp_model_impl := 
         (Some s, None, None). 
@@ -238,26 +225,28 @@ Section LocksCompositionProofs.
     forall k s1 s2, m1 !! k = Some s1 -> m2 !! k = Some s2 ->
                s1 ## s2. 
 
-  Definition spinlock_left_PMPP 
-    (rs_ctx: gmap (locale heap_lang) (gset (fmrole comp_model_impl))): 
-    @PartialModelPredicatesPre heap_lang Mdl _ _ Σ spinlock_model_impl :=
-    {|
-        partial_model_is := partial_model_is ∘ lift_sl_st_left;
-        partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_left;
-        partial_fuel_is := partial_fuel_is ∘ kmap lift_sl_role_left; 
-        (* partial_mapping_is := partial_mapping_is ∘ (fmap (set_map lift_sl_role_left)); *)        
-        partial_mapping_is rs := 
-          (partial_mapping_is (merge (fun os1 os2 => 
-                                        match os1, os2 with 
-                                        | Some s1, Some s2 => Some (s1 ∪ s2)
-                                        | _, _ => None
-                                                   end)                                                                          rs_ctx (fmap (set_map lift_sl_role_left) rs)) ∗ 
-           ⌜ disjoint_codom_pointwise rs_ctx (fmap (set_map lift_sl_role_left) rs)⌝ ∗
-           ⌜ dom rs = dom rs_ctx⌝)%I;
-        project_inner := (fun om => match om with 
-                                 | Some (Some s1, _, _) => Some s1
-                                 | _ => None end ) ∘ project_inner
-    |}.
+  (* Definition spinlock_left_PMPP  *)
+  (*   (rs_ctx: gmap (locale heap_lang) (gset (fmrole comp_model_impl))):  *)
+  (*   @PartialModelPredicatesPre heap_lang Mdl _ _ Σ spinlock_model_impl. *)
+  (* refine *)
+  (*   {| *)
+  (*       partial_model_is := partial_model_is ∘ lift_sl_st_left; *)
+  (*       partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_left; *)
+  (*       partial_fuel_is := partial_fuel_is ∘ kmap lift_sl_role_left;  *)
+  (*       (* partial_mapping_is := partial_mapping_is ∘ (fmap (set_map lift_sl_role_left)); *)         *)
+  (*       partial_mapping_is rs :=  *)
+  (*         (partial_mapping_is (merge (fun os1 os2 =>  *)
+  (*                                       match os1, os2 with  *)
+  (*                                       | Some s1, Some s2 => Some (s1 ∪ s2) *)
+  (*                                       | _, _ => None *)
+  (*                                                  end)                                                                          rs_ctx (fmap (set_map lift_sl_role_left) rs)) ∗  *)
+  (*          ⌜ disjoint_codom_pointwise rs_ctx (fmap (set_map lift_sl_role_left) rs)⌝ ∗ *)
+  (*          ⌜ dom rs = dom rs_ctx⌝)%I; *)
+  (*       project_inner := (fun om => match om with  *)
+  (*                                | Some (Some s1, _, _) => Some s1 *)
+  (*                                | _ => None end ) ∘ project_inner *)
+  (*   |}. *)
+  (* -  *)
 
   Lemma bi_equiv_both_impl (P Q: iProp Σ) (R: Prop):
     (P → ⌜ R ⌝) -∗ (Q → ⌜ R ⌝) -∗ (⌜ R ⌝ → (P ∗-∗ Q)) -∗ (P ∗-∗ Q). 
@@ -300,113 +289,129 @@ Section LocksCompositionProofs.
   Admitted. 
 
   
-  Lemma has_fuels_sl_left tid
-    (fs: gmap (fmrole spinlock_model_impl) nat) 
-    (rs_ctx: gmap (fmrole comp_model_impl) nat):
-        has_fuels tid fs (PMPP := spinlock_left_PMPP {[ tid := dom rs_ctx ]}) ∗
-        partial_fuel_is rs_ctx (PartialModelPredicatesPre := PMPP) ⊣⊢  
-    has_fuels tid (kmap lift_sl_role_left fs ∪ rs_ctx) (PMPP := PMPP) ∗
-    ⌜ dom rs_ctx ## set_map lift_sl_role_left (dom fs)⌝.
-  Proof.
-    clear -prog_fuels. 
-    iApply bi_equiv_both_impl.
-    2: { iIntros "[_ DISJ]". iApply "DISJ". }
-    { iIntros "[HF PF]". rewrite has_fuels_equiv. simpl.
-      iDestruct "HF" as "((_&%DISJ&_)&_)". iPureIntro.
-      apply (DISJ tid).
-      - apply lookup_singleton.
-      - by rewrite map_fmap_singleton !lookup_singleton. } 
+  (* Lemma has_fuels_sl_left tid *)
+  (*   (fs: gmap (fmrole spinlock_model_impl) nat)  *)
+  (*   (rs_ctx: gmap (fmrole comp_model_impl) nat): *)
+  (*       has_fuels tid fs (PMPP := spinlock_left_PMPP {[ tid := dom rs_ctx ]}) ∗ *)
+  (*       partial_fuel_is rs_ctx (PartialModelPredicatesPre := PMPP) ⊣⊢   *)
+  (*   has_fuels tid (kmap lift_sl_role_left fs ∪ rs_ctx) (PMPP := PMPP) ∗ *)
+  (*   ⌜ dom rs_ctx ## set_map lift_sl_role_left (dom fs)⌝. *)
+  (* Proof. *)
+  (*   clear -prog_fuels.  *)
+  (*   iApply bi_equiv_both_impl. *)
+  (*   2: { iIntros "[_ DISJ]". iApply "DISJ". } *)
+  (*   { iIntros "[HF PF]". rewrite has_fuels_equiv. simpl. *)
+  (*     iDestruct "HF" as "((_&%DISJ&_)&_)". iPureIntro. *)
+  (*     apply (DISJ tid). *)
+  (*     - apply lookup_singleton. *)
+  (*     - by rewrite map_fmap_singleton !lookup_singleton. }  *)
     
-    iIntros "%DISJ". rewrite !has_fuels_equiv.
-    iApply bi.wand_iff_proper; [reflexivity|..]. 
-    { iSplit; [iIntros "[P _]"; by iApply "P" | by (iIntros "?"; iFrame)]. }
-    rewrite -bi.sep_assoc. iApply bi.sep_proper. 
-    - simpl. iApply bi.wand_iff_proper; [| reflexivity| ].
-      { iSplit; [iIntros "(P&_&_)"; by iApply "P"| ]. 
-        iIntros "?". iFrame. iSplit; iPureIntro; [| set_solver].
-        (* TODO: refactor *)
-        red. intros ??? [-> <-]%lookup_singleton_Some L2.
-        rewrite map_fmap_singleton lookup_singleton in L2.
-        by inversion L2. }
-      erewrite map_fmap_singleton, merge_singleton; [|f_equal].
-      iApply partial_mapping_is_Proper. 
-      by rewrite dom_union dom_kmap union_comm.
-    - rewrite big_opM_union.
-      2: { apply map_disjoint_dom_2. by rewrite dom_kmap. }
-      iApply bi.sep_proper.
-      2: { iApply partial_fuels_is_sep. }
-      simpl.
-      etrans.
-      2: { simpl. by rewrite big_opM_kmap. }
-      eapply big_opM_proper. intros. by rewrite kmap_singleton.
-  Qed. 
+  (*   iIntros "%DISJ". rewrite !has_fuels_equiv. *)
+  (*   iApply bi.wand_iff_proper; [reflexivity|..].  *)
+  (*   { iSplit; [iIntros "[P _]"; by iApply "P" | by (iIntros "?"; iFrame)]. } *)
+  (*   rewrite -bi.sep_assoc. iApply bi.sep_proper.  *)
+  (*   - simpl. iApply bi.wand_iff_proper; [| reflexivity| ]. *)
+  (*     { iSplit; [iIntros "(P&_&_)"; by iApply "P"| ].  *)
+  (*       iIntros "?". iFrame. iSplit; iPureIntro; [| set_solver]. *)
+  (*       (* TODO: refactor *) *)
+  (*       red. intros ??? [-> <-]%lookup_singleton_Some L2. *)
+  (*       rewrite map_fmap_singleton lookup_singleton in L2. *)
+  (*       by inversion L2. } *)
+  (*     erewrite map_fmap_singleton, merge_singleton; [|f_equal]. *)
+  (*     iApply partial_mapping_is_Proper.  *)
+  (*     by rewrite dom_union dom_kmap union_comm. *)
+  (*   - rewrite big_opM_union. *)
+  (*     2: { apply map_disjoint_dom_2. by rewrite dom_kmap. } *)
+  (*     iApply bi.sep_proper. *)
+  (*     2: { iApply partial_fuels_is_sep. } *)
+  (*     simpl. *)
+  (*     etrans. *)
+  (*     2: { simpl. by rewrite big_opM_kmap. } *)
+  (*     eapply big_opM_proper. intros. by rewrite kmap_singleton. *)
+  (* Qed.  *)
  
-  Notation "'has_fuels' '<' ctx '>'" := (has_fuels (PMPP := spinlock_left_PMPP ctx)) (at level 10, format "has_fuels  < ctx >"). 
+  Notation "'has_fuels_' '<' ctx '>'" := (has_fuels (PMPP := ctx)) (at level 20, format "has_fuels_  < ctx >"). 
 
-  Lemma spinlock_left_PMP rs_ctx:
-    @PartialModelPredicates _ _ _ _ _ _ _ _ spinlock_model (spinlock_left_PMPP rs_ctx).
-  Proof using.
-    split.
-    - intros ????? DOMNE STEP. iIntros "FUELS MSI".
-      pose proof (update_no_step_enough_fuel (PartialModelPredicates := PMP)) as LEM.
-      iMod (LEM with "[FUELS] [MSI]") as "foo".
-      + intros DOM'E. apply DOMNE. 
-      
-      apply STEP. 
+  (* Lemma spinlock_left_PMP rs_ctx: *)
+  (*   @PartialModelPredicates _ _ _ _ _ _ _ _ spinlock_model (spinlock_left_PMPP rs_ctx). *)
+  (* Proof using. *)
+  (*   split. *)
+  (*   - intros ????? DOMNE STEP. iIntros "FUELS MSI". *)
+  (*     pose proof (update_no_step_enough_fuel (PartialModelPredicates := PMP)) as LEM. *)
+  (*     iMod (LEM with "[FUELS] [MSI]") as "foo". *)
+  (*     + intros DOM'E. apply DOMNE.  *)      
+  (*     apply STEP.  *)    
 
-    
+  Notation "'PMP'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ comp_model PMPP).
 
+  Close Scope Z_scope. 
+  Notation "'sub' d" := (fun n => n - d) (at level 10). 
 
+  Lemma sub_comp `{Countable K} (fs: gmap K nat) (d1 d2: nat):
+    (sub d1 ∘ sub d2) <$> fs = sub (d1 + d2) <$> fs.
+  Proof.
+    apply leibniz_equiv. apply map_fmap_proper; [| done].
+    intros ??->. apply leibniz_equiv_iff.
+    rewrite /compose. lia. 
+  Qed.
+
+  Lemma sub_0_id `{Countable K} (fs: gmap K nat):
+    fs = sub 0 <$> fs.
+  Proof.
+    rewrite -{1}(map_fmap_id fs).
+    apply leibniz_equiv. apply map_fmap_proper; [| done].
+    intros ??->. apply leibniz_equiv_iff.
+    simpl. lia.
+  Qed.
+
+  Ltac solve_fuels_ge_1 FS := 
+    intros ?? [? [<- GE]]%lookup_fmap_Some; apply FS in GE; simpl; lia.
+  
+  Ltac solve_fuels_S FS := 
+    iDestruct (has_fuels_gt_1 with "FUELS") as "F";
+    [| rewrite -map_fmap_compose; by iFrame];
+    solve_fuels_ge_1 FS. 
+  
+  Ltac pure_step FS :=
+    try rewrite sub_comp;
+    iApply wp_lift_pure_step_no_fork; auto;
+    [| iSplitR; [done| ]; do 3 iModIntro; iSplitL "FUELS"];
+    [| solve_fuels_S FS |];
+    [by intros ?%fmap_empty_iff| ];
+    iIntros "FUELS"; simpl; rewrite sub_comp. 
+  
   Lemma comp_spec tid (P: iProp Σ):
+    PMP -∗
     {{{ partial_model_is (None, None, Some 2)  ∗ 
         partial_free_roles_are comp_free_roles_init ∗ 
-        has_fuels tid {[ inr ρc:=5 ]} (PMPP := PMPP) }}}
+        has_fuels tid {[ inr ρc:=5 ]} (PMPP := PMPP)  }}}
       comp #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof using. 
-    iIntros (Φ) "(ST & FREE & FUELS) POST". rewrite /comp.
-
+  Proof using.
+    iIntros "#PMP" (Φ) "!> (ST & FREE & FUELS) POST". rewrite /comp.
+    rewrite (sub_0_id {[ _ := _ ]}). 
     (* iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS". *)
     (* { compute_done. } *)
-    
-    iApply wp_lift_pure_step_no_fork; auto. 
-    2: do 3 iModIntro; iSplitL "FUELS".
-    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
-    { set_solver. }
-    iIntros "FUELS".
-    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+    assert (fuels_ge ({[inr ρc := 5]}: gmap (fmrole comp_model_impl) nat) 5) as FS.
+    { red. intros ??[<- ->]%lookup_singleton_Some. lia. } 
+      
+    pure_step FS. 
 
     wp_bind (ref #1)%E.
-    iApply (wp_alloc_nostep with "[FUELS]").
-    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
+    iApply (wp_alloc_nostep with "[$] [FUELS]").
+    2: { solve_fuels_S FS. }
     { set_solver. }
     iNext. iIntros (l) "(L & MT & FUELS)".
-    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
+    simpl. 
     
-    iApply wp_lift_pure_step_no_fork; auto. 
-    2: do 3 iModIntro; iSplitL "FUELS".
-    2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. }
-    { set_solver. }
-    iIntros "FUELS".
-    simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl.
-
-    (* iApply wp_lift_pure_step_no_fork; auto.  *)
-    (* 2: do 3 iModIntro; iSplitL "FUELS". *)
-    (* 2: { iApply (has_fuels_gt_1 with "FUELS"). compute_done. } *)
-    (* { set_solver. } *)
-    (* iIntros "FUELS". *)
-    (* simpl. repeat rewrite fmap_insert. rewrite fmap_empty. simpl. *)
-
-    (* Set Printing Implicit. *)
-
-    (* wp_bind (_ <- _)%E. *)
-    (* iApply wp_store_step_singlerole. (fs2 := ({[ ρc := 1 ]} ∪  *)
-    (*                                            ([∗ map] k↦x ∈ program_init_fuels, ⌜ True ⌝))).  *)
-    (*   model_state_interp *)
+    pure_step FS. 
+    
     iApply wp_lift_pure_step_no_fork_take_step; [done| ..].
     3: { eapply (cl_sl_init _ program_init_state program_init_state). }
-    3: do 3 iModIntro; iFrame.
-    { Unshelve. 2: exact ({[ inr ρc:=2 ]} ∪ (S <$> prog_fuels (inl ∘ inl)) ∪ (S <$> prog_fuels (inl ∘ inr))).
+    3: iSplitR; [by iApply "PMP"| ]; do 3 iModIntro; iFrame.    
+    { Unshelve.
+      2-4: exact comp_model. (* TODO: get rid of LiveModel here? *)
+      2: exact ({[ inr ρc:=2 ]} ∪ (S <$> prog_fuels (inl ∘ inl)) ∪ (S <$> prog_fuels (inl ∘ inr))).
       red. repeat split; try set_solver. 
       - simpl. intros _.
         erewrite lookup_union_Some_l; try set_solver.
@@ -416,19 +421,23 @@ Section LocksCompositionProofs.
         { done. }
         + apply elem_of_dom in IN as [f' IN].          
           erewrite lookup_union_Some_l; [| erewrite lookup_union_Some_r]; eauto.
-          * apply lookup_fmap_Some in IN as [f [<- IN]]. 
-            assert (exists ρ0, ρ = (inl ∘ inl) ρ0) as [ρ0 ->] by admit.
-            apply prog_fuels_equiv in IN; [| rewrite /compose; congruence].
+          * apply lookup_fmap_Some in IN as [f [<- IN]].
+            rewrite /prog_fuels in IN.
+            apply lookup_kmap_Some in IN as [ρ0 [-> IN]]; [| by apply _].
             apply program_init_fuels_max in IN. simpl. lia. 
-          * rewrite /prog_fuels. admit.
+          * by apply map_disjoint_singleton_l.
         (* TODO: refactor *)
         + apply elem_of_dom in IN as [f' IN]. simpl. 
           erewrite lookup_union_Some_r; eauto.
-          * apply lookup_fmap_Some in IN as [f [<- IN]]. 
-            assert (exists ρ0, ρ = (inl ∘ inr) ρ0) as [ρ0 ->] by admit.
-            apply prog_fuels_equiv in IN; [| rewrite /compose; congruence].
-            apply program_init_fuels_max in IN. simpl. lia.
-          * rewrite /prog_fuels. admit. }
+          * apply lookup_fmap_Some in IN as [f [<- IN]].
+            rewrite /prog_fuels in IN.
+            apply lookup_kmap_Some in IN as [ρ0 [-> IN]]; [| by apply _].
+            apply program_init_fuels_max in IN. simpl. lia. 
+          * apply map_disjoint_union_l. split; [by apply map_disjoint_singleton_l|].
+            rewrite -!kmap_fmap. apply map_disjoint_spec.
+            intros ??? [? [-> ?]]%lookup_kmap_Some [? [? ?]]%lookup_kmap_Some.
+            2, 3: by apply _.
+            discriminate. }            
     { set_solver. }
     iIntros "ST FREE FUELS".
     
