@@ -10,7 +10,7 @@ From iris.algebra Require Import gmap.
 Section proof.
 
 Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
-           !SI_specs}.
+           !SI_client_toolbox}.
 
   Lemma commitU_spec :
     ∀ c sa E,

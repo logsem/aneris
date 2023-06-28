@@ -36,7 +36,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proofs.
 
-Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
+Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
 
   Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
 
@@ -204,7 +204,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod (SI_init_module $! (I: True)) as (SI_res SI_specs) "(#GI' & HKVSres & HVKSinit)".
+    iMod (SI_init_module $! (I: True)) as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
     iMod (own_alloc (Excl ())) as (γF1) "Hftk1"; first done.
     iMod (own_alloc (Excl ())) as (γF2) "Hftk2"; first done.
     iMod (inv_alloc client_inv_name ⊤ (client_inv γF1 γF2) with "[HKVSres]") as "#Hinv".

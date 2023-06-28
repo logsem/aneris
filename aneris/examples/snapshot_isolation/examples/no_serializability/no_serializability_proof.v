@@ -37,7 +37,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proofs.
 
-Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
+Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
 
   Definition client_inv_def : iProp Σ :=
   ∃ hx hy hz, "x" ↦ₖ hx ∗ "y" ↦ₖ hy ∗ "z" ↦ₖ hz ∗
