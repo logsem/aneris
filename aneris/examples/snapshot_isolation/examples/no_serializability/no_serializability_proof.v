@@ -161,7 +161,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iFrame.
     iSplitL "x_hx y_hy z_hz";
       first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "!>(Active & mem & cache & Seen)".
     iMod ("close" with "[mem init]") as "_".
     {
       iNext.
@@ -179,7 +179,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
           ⌜hist_val hx = Some vx⌝ ∗ ⌜hist_val hy = Some vy⌝ ∗
           (⌜vx = #1⌝ ∨ ⌜vx = #(-1)⌝) ∗ (⌜vy = #1⌝ ∨ ⌜vy = #(-1)⌝))%I
           emp emp with
-          "[] [] [] [] [] [] [$Active $cache]"); first solve_ndisj.
+          "[] [] [] [] [] [] [$Active $cache $Seen]"); first solve_ndisj.
     1, 2 : rewrite !dom_insert_L; iPureIntro; set_solver.
     {
       iIntros "!>%h (#Seen & _)".
@@ -187,7 +187,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
           [(_ & _ & ->)|(%hz'_1 & (%vx & %vy & %hx'_vx & %hy'_vy & 
             (%Hvx & %Hvy)))])" "close".
       { iMod (Seen_valid with "[] [$Seen $z_hz']") as "%abs";
-          [solve_ndisj|admit|by apply suffix_nil_inv in abs].
+          [solve_ndisj|iApply SI_GlobalInv|by apply suffix_nil_inv in abs].
       }
       iModIntro.
       iExists {[ "x" := hx'; "y" := hy'; "z" := hz' ]}.

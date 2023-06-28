@@ -102,7 +102,8 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
             }}}) -∗
     {{{
       P ∗ P_tok ∗ ConnectionState c (Active ms) ∗
-      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false)
+      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+      ([∗ map] k ↦ h ∈ ms, Seen k h)
     }}}
      wait_on_keyT c cond #k @[ip_of_address sa]
     {{{ m v h, RET #(); ⌜dom m = dom ms⌝ ∗ φ m v h ∗
@@ -112,12 +113,12 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     }}}.
   Proof.
     iIntros (c cond k ms sa E P P_tok Q Q_tok) "%φ %name %ms_keys %k_ms #finish
-      #inv #cond_spec %Φ !> (P & P_tok & Active & cache) HΦ".
+      #inv #cond_spec %Φ !> (P & P_tok & Active & cache & Seen) HΦ".
     rewrite/wait_on_keyT.
     wp_pures.
-    iRevert (ms ms_keys k_ms) "inv finish cond_spec HΦ cache Active P".
+    iRevert (ms ms_keys k_ms) "inv finish cond_spec HΦ cache Active P Seen".
     iLöb as "IH".
-    iIntros (ms ms_keys k_ms) "#inv #finish #cond_spec HΦ cache Active P".
+    iIntros (ms ms_keys k_ms) "#inv #finish #cond_spec HΦ cache Active P #Seen".
     move: ((proj1 (elem_of_subseteq _ _)) ms_keys _ k_ms)=>k_keys.
     destruct ((proj1 (elem_of_dom ms k)) k_ms) as (h & k_h).
     iPoseProof (big_sepM_lookup_acc _ _ _ _ k_h with "cache") as
@@ -125,12 +126,12 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_apply (SI_read_spec with "[//] k_h").
     iIntros "k_h".
     iSpecialize ("cache" with "[$k_h $k_upd]").
-    iAssert (∀ ms, P_tok -∗ (∀ (m : gmap Key Hist) (v0 : val) (h0 : list val),
+    iAssert (∀ ms', ⌜dom ms = dom ms'⌝ -∗ P_tok -∗ (∀ m v0 h0,
          ⌜dom m = dom ms⌝ ∗ φ m v0 h0 ∗ ConnectionState c (Active m) ∗
          ([∗ map] k0↦h1 ∈ m, k0 ↦{ c} hist_val h1 ∗
           KeyUpdStatus c k0 false) ∗ ([∗ map] k0↦h1 ∈ m, Seen k0 h1) -∗
-         Φ #()) -∗ ConnectionState c (Active ms) -∗ P -∗
-          ([∗ map] k0↦y ∈ ms, k0 ↦{ c} hist_val y ∗ KeyUpdStatus c k0 false) -∗
+         Φ #()) -∗ ConnectionState c (Active ms') -∗ P -∗
+          ([∗ map] k0↦y ∈ ms', k0 ↦{ c} hist_val y ∗ KeyUpdStatus c k0 false) -∗
        WP commitT c ;; 
        snapshot_isolation_code.start c ;; 
        (rec: "aux" <> :=
@@ -142,202 +143,137 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
             else commitT c ;; snapshot_isolation_code.start c ;; "aux" #()
           end)%V #() @[ip_of_address sa] {{ v, Φ v }})%I as "retry".
     {
-      admit.
-    }
-    move: h k_h=>[|v' h] k_h. 
-    { wp_pures. iApply ("retry" with "P_tok HΦ Active P cache"). }
-    wp_pures.
-    wp_apply ("cond_spec" with "[$P $Active $cache]"); first done.
-    iIntros (m' []) "(Active & %m'_ms & cache & result)"; last first.
-    {
-      wp_pures.
-      rewrite -m'_ms.
-      iApply ("retry" with "P_tok HΦ Active result cache").
-    }
-    wp_pures.
-    admit.
-  Admitted.
-  (*
-    simpl in h_v.
-      wp_pures.
+      iClear "Seen".
+      iIntros (ms') "%ms_ms' P_tok HΦ Active P cache".
       wp_apply (commitT_spec with "[//]").
       iPoseProof "inv" as "inv'".
-      iMod "inv'" as "(%m & %m_ms & _ & mem & close)".
+      iMod "inv'" as "(%m & %m_ms & mem & close)".
       iModIntro.
-      iExists m, ms, ((λ h, (hist_val h, false)) <$> ms).
+      iExists _, _, ((λ h, (hist_val h, false)) <$> ms').
       iFrame.
       iSplitL "cache".
       {
         iSplit.
-        { iPureIntro. apply bool_decide_spec=>k' k'_keys. rewrite lookup_fmap.
-          by case: (ms !! k'). }
-        iSplit; first done.
+        {
+          iPureIntro.
+          rewrite bool_decide_spec=>k' k'_key.
+          rewrite lookup_fmap.
+          by case: (ms' !! k').
+        }
+        iSplit; first by rewrite m_ms.
         iSplit; first by rewrite dom_fmap_L.
         by iApply big_sepM_fmap.
       }
-      iIntros "!>(CanStart & data)".
-      iPoseProof (big_sepM2_fmap_r _ _ _ ms with "data") as "data".
-      iPoseProof (big_sepM2_sep with "data") as "(mem & _)".
+      iIntros "!>(CanStart & mem)".
       iMod ("close" with "[mem]") as "_".
       {
-        iPoseProof (big_sepM2_sep_2 (λ k h _, k ↦ₖ h)%I (λ _ _ _, emp)%I m ms
+        iPoseProof (big_sepM2_fmap_r _ _ _ ms' with "mem") as "mem".
+        iPoseProof (big_sepM2_sep with "mem") as "(mem & _)".
+        iPoseProof (big_sepM2_sep_2 (λ k h _, k ↦ₖ h)%I (λ _ _ _, emp)%I m ms'
                 with "[mem] []") as "mem".
         {
           iApply (big_sepM2_impl with "mem").
-          iIntros "!>%k' %h %h' % %Hh' k'_h"=>{Hh'}.
+          iIntros "!>%k' % %h' % %Hh' ?"=>{Hh'}.
           by case: h'.
         }
         {
           iApply big_sepM2_intro; last done.
           move=>k'.
-          split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
-                                                rewrite ?m_ms // -?m_ms//.
+          by split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
+            [rewrite -ms_ms' -m_ms|rewrite m_ms ms_ms'].
         }
         iPoseProof (big_sepM2_sepM with "mem") as "(mem & _)"; last done.
         move=>k'.
-        split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
-                                                rewrite ?m_ms // -?m_ms//.
-      }
-      iModIntro.
-      wp_pures.
-      wp_apply (SI_start_spec with "[//]").
-      iPoseProof "inv" as "inv'".
-      iMod "inv'" as "(%m' & %m'_ms & _ & mem & close)".
-      iModIntro.
-      iExists m'.
-      iFrame.
-      iIntros "!>(Active & mem & cache & #seen')".
-      iMod ("close" with "mem") as "_".
-      iModIntro.
-      wp_pures.
-      rewrite -m'_ms in ms_keys k_ms.
-      rewrite -m'_ms.
-      wp_apply ("IH" with "[//] [//] inv seen' cond_spec HΦ cache Active P").
-    }
-    wp_pures.
-    wp_apply ("cond_spec" with "[$P $Active $cache]"); first done.
-    iIntros (ms' b).
-    case: b; last first.
-    {
-      iIntros "(Active & %ms'_ms & cache & P)".
-      wp_pures.
-      wp_apply (commitT_spec with "[//]").
-      iPoseProof "inv" as "inv'".
-      iMod "inv'" as "(%m & %m_ms & _ & mem & close)".
-      iModIntro.
-      iExists m, ms', ((λ h, (hist_val h, false)) <$> ms').
-      iFrame.
-      iSplitL "cache".
-      {
-        iSplit.
-        { iPureIntro. apply bool_decide_spec=>k' k'_keys. rewrite lookup_fmap.
-          by case: (ms' !! k'). }
-        iSplit; first by rewrite m_ms.
-        iSplit; first by rewrite dom_fmap_L.
-        by iApply big_sepM_fmap.
-      }
-      iIntros "!>(CanStart & data)".
-      iPoseProof (big_sepM2_fmap_r _ _ _ ms' with "data") as "data".
-      iPoseProof (big_sepM2_sep with "data") as "(mem & _)".
-      iMod ("close" with "[mem]") as "_".
-      {
-        iPoseProof (big_sepM2_sep_2 (λ k h _, k ↦ₖ h)%I (λ _ _ _, emp)%I m ms'
-                with "[mem] []") as "mem".
-        {
-          iApply (big_sepM2_impl with "mem").
-          iIntros "!>%k' %h' %h'' % %Hh'' k'_h'"=>{Hh''}.
-          by case: h''.
-        }
-        {
-          iApply big_sepM2_intro; last done.
-          move=>k'.
-          split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
-                                      rewrite ?ms'_ms -?m_ms // ?m_ms -?ms'_ms//.
-        }
-        iPoseProof (big_sepM2_sepM with "mem") as "(mem & _)"; last done.
-        move=>k'.
-        split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
-                                      rewrite ?ms'_ms -?m_ms // ?m_ms -?ms'_ms//.
+        by split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
+            [rewrite -ms_ms' -m_ms|rewrite m_ms ms_ms'].
       }
       iModIntro.
       wp_pures.
       wp_apply (SI_start_spec with "[//]").
       iPoseProof "inv" as "inv'".
       iClear (m m_ms) "".
-      iMod "inv'" as "(%m & %m_ms & _ & mem & close)".
+      iMod "inv'" as "(%m & %m_ms & mem & close)".
       iModIntro.
       iExists m.
       iFrame.
-      iIntros "!>(Active & mem & cache & #seen')".
+      iIntros "!>(Active & mem & cache & #Seen)".
       iMod ("close" with "mem") as "_".
       iModIntro.
       wp_pures.
-      rewrite -m_ms in ms_keys k_ms.
       rewrite -m_ms.
-      wp_apply ("IH" with "[//] [//] inv seen' cond_spec HΦ cache Active P").
+      by iApply ("IH" with
+          "P_tok [] [] inv finish cond_spec HΦ cache Active P Seen");
+        rewrite m_ms.
     }
-    iIntros "(Active & %ms'_ms & cache & Q)".
+    move: h k_h=>[|v' h] k_h. 
+    { wp_pures. iApply ("retry" with "[//] P_tok HΦ Active P cache"). }
+    wp_pures.
+    wp_apply ("cond_spec" with "[$P $Active $cache]"); first done.
+    iIntros (m []) "(Active & %m_ms & cache & result)"; last first.
+    {
+      wp_pures.
+      rewrite -m_ms.
+      by iApply ("retry" with "[] P_tok HΦ Active result cache").
+    }
+    iClear "IH retry cond_spec".
     wp_pures.
     wp_apply (commitT_spec with "[//]").
+    iPoseProof (big_sepM_lookup _ _ _ _ k_h with "Seen") as "#Seen_k".
     iPoseProof "inv" as "inv'".
-    iMod "inv'" as "(%m & %m_ms & _ & mem & close)".
+    iMod "inv'" as "(%m' & %m'_ms & mem & close)".
     iModIntro.
-    iExists m, ms', ((λ h, (hist_val h, false)) <$> ms').
+    iExists _, _, ((λ h, (hist_val h, false)) <$> m).
     iFrame.
     iSplitL "cache".
     {
       iSplit.
-      { iPureIntro. apply bool_decide_spec=>k' k'_keys. rewrite lookup_fmap.
-        by case: (ms' !! k'). }
-      iSplit; first by rewrite ms'_ms.
+      {
+        iPureIntro.
+        rewrite bool_decide_spec=>k' k'_key.
+        rewrite lookup_fmap.
+        by case: (m !! k').
+      }
+      iSplit; first by rewrite m_ms.
       iSplit; first by rewrite dom_fmap_L.
       by iApply big_sepM_fmap.
     }
-    iIntros "!>(CanStart & data)".
-    iPoseProof (big_sepM2_fmap_r _ _ _ ms' with "data") as "data".
-    iPoseProof (big_sepM2_sep with "data") as "(mem & _)".
+    iIntros "!>(CanStart & mem)".
     iMod ("close" with "[mem]") as "_".
     {
-      iPoseProof (big_sepM2_sep_2 (λ k h _, k ↦ₖ h)%I (λ _ _ _, emp)%I m ms'
+      iPoseProof (big_sepM2_fmap_r _ _ _ m with "mem") as "mem".
+      iPoseProof (big_sepM2_sep with "mem") as "(mem & _)".
+      iPoseProof (big_sepM2_sep_2 (λ k h _, k ↦ₖ h)%I (λ _ _ _, emp)%I m' m
               with "[mem] []") as "mem".
       {
         iApply (big_sepM2_impl with "mem").
-        iIntros "!>%k' %h' %h'' % %Hh'' k'_h'"=>{Hh''}.
-        by case: h''.
+        iIntros "!>%k' % %h' % %Hh' ?"=>{Hh'}.
+        by case: h'.
       }
       {
         iApply big_sepM2_intro; last done.
         move=>k'.
-        split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
-                                      rewrite ?ms'_ms -?m_ms // ?m_ms -?ms'_ms//.
+        by split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
+          [rewrite m_ms -m'_ms|rewrite m'_ms -m_ms].
       }
       iPoseProof (big_sepM2_sepM with "mem") as "(mem & _)"; last done.
       move=>k'.
-      split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
-                                      rewrite ?ms'_ms -?m_ms // ?m_ms -?ms'_ms//.
+      by split=>/(proj2 (elem_of_dom _ _)) Hk'; apply elem_of_dom;
+          [rewrite m_ms -m'_ms|rewrite m'_ms -m_ms].
     }
     iModIntro.
     wp_pures.
+    iClear (m m_ms m' m'_ms) "".
     wp_apply (SI_start_spec with "[//]").
-    iPoseProof "inv" as "inv'".
-    iMod "inv'" as "(%m' & %m'_ms & infer & mem & close)".
+    iMod ("finish" with "[$P_tok $result $Seen_k]") as "(%m & %m_ms &
+        mem & φ & Q_tok & close)".
     iModIntro.
-    iExists m'.
+    iExists m.
     iFrame.
-    iIntros "!>(Active & mem & cache & _)".
-    iPoseProof ("infer" with "[seen $Q]") as "[Hφ Q]".
-    {
-      iPoseProof (big_sepM_lookup with "seen") as "seen_k"; done.
-    }
-    iMod ("close" with "mem") as "_".
-    iModIntro.
-    wp_pures.
-    iApply ("HΦ" with "[$Active $cache $Hφ $Q]"). 
-    iSplit; first done.
-    iExists h.
-    by iPoseProof (big_sepM_lookup with "seen") as "seen_k".
+    iIntros "!>(Active & mem & cache & #Seen')".
+    iMod ("close" with "[$mem $Q_tok]") as "_".
+    iApply "HΦ".
+    by iFrame "∗#%".
   Qed.
-  *)
 
   Lemma simplified_wait_on_keyT_spec :
     ∀ (c cond v : val) (k : Key) ms sa E φ P_tok Q_tok,
@@ -352,8 +288,9 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     (∀ v', {{{ True }}} cond v' @[ip_of_address sa]
           {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
     {{{
-      ConnectionState c (Active ms) ∗
-      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗ P_tok
+      ConnectionState c (Active ms) ∗ P_tok ∗
+      ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+      ([∗ map] k ↦ h ∈ ms, Seen k h)
     }}}
       wait_on_keyT c cond #k @[ip_of_address sa]
     {{{ m, RET #(); ⌜dom m = dom ms⌝ ∗ φ m ∗
@@ -363,12 +300,12 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     }}}.
   Proof.
     iIntros (cst cond v k ms sa E φ P_tok Q_tok name ms_keys k_ms)
-      "#finish #inv #cond_spec %Φ !> (Active & cache & P_tok) HΦ".
+      "#finish #inv #cond_spec %Φ !> (Active & P_tok & cache & #Seen) HΦ".
     iApply (wait_on_keyT_spec _ _ _ _ _ _ True P_tok (λ v', ⌜v = v'⌝)%I
           (λ _ _ _, Q_tok) (λ m _ _, φ m) with "[//] [//] [//] [] inv []
-          [$P_tok $Active $cache] [HΦ]").
+          [$P_tok $Active $cache $Seen] [HΦ]").
     {
-      iIntros "!>% %h (P_tok & <- & #Seen)".
+      iIntros "!>% %h (P_tok & <- & #Seen')".
       iApply ("finish" with "[$]").
     }
     {
