@@ -36,7 +36,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proofs.
 
-Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
+Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
 
   Definition token (γ : gname) : iProp Σ := own γ (Excl ()).
 
@@ -120,8 +120,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
   Lemma client_2_spec ip port γF1 γF2:
     ip = ip_of_address client_2_addr →
     port = port_of_address client_2_addr →
-    {{{ GlobalInv 
-      ∗ inv client_inv_name (client_inv γF1 γF2)
+    {{{ inv client_inv_name (client_inv γF1 γF2)
       ∗ token γF2
       ∗ client_2_addr ⤳ (∅, ∅)
       ∗ unallocated {[client_2_addr]}
@@ -130,7 +129,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof. 
-    iIntros (Hip Hports Φ) "(#GlobalInv & #Hinv & Htok & Hmsghis & Hunalloc
+    iIntros (Hip Hports Φ) "(#Hinv & Htok & Hmsghis & Hunalloc
     & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
@@ -151,7 +150,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       {["x":= hx]} _ (⊤ ∖ ↑client_inv_name) 
       (λ m, ⌜m = {["x":=[(#1)]]}⌝ ∗ token γF2)%I (token γF2) (token γF1)
       with "[] [] [] [] [] [] [Hcx Hcstate Hseen Htok] [HΦ]");
-    try solve_ndisj; try iPureIntro; try set_solver.
+      [solve_ndisj | iPureIntro; set_solver | iPureIntro; set_solver | | | | | ].
       - iModIntro. iIntros (h) "(Hxseen & Htok)". 
         iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
           + iDestruct (token_exclusive with "Htok Htok'") as "[]".
@@ -169,7 +168,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
           iDestruct "Hkx" as "[Hkx _]". iFrame.
           iRight. iLeft. by iFrame.
           + iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
-          try solve_ndisj.
+          try solve_ndisj. 
+          { iApply SI_GlobalInv. }
           iMod ("Hfalse" with "[$Hxseen $Hkx]") as "%Hfalse".
           destruct Hfalse as [? Hfalse].
           by apply app_cons_not_nil in Hfalse.
@@ -223,6 +223,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
         iDestruct "Hseen" as "[Hseen _]". 
         iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
         try solve_ndisj.
+        { iApply SI_GlobalInv. }
         iMod ("Hfalse" with "[$Hseen $Hkx]") as "%Hfalse".
         destruct Hfalse as [? Hfalse].
         by apply app_cons_not_nil in Hfalse.
@@ -255,7 +256,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod (SI_init_module $! (I: True)) as (SI_res SI_specs) "(#GI' & HKVSres & HVKSinit)".
+    iMod (SI_init_module $! (I: True)) as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
     iMod (own_alloc (Excl ())) as (γF1) "Hftk1"; first done.
     iMod (own_alloc (Excl ())) as (γF2) "Hftk2"; first done.
     iMod (inv_alloc client_inv_name ⊤ (client_inv γF1 γF2) with "[HKVSres]") as "#Hinv".

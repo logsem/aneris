@@ -36,7 +36,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proofs.
 
-Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
+Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
 
   Definition client_inv : iProp Σ :=
   ∃ h, "x" ↦ₖ h ∗ "y" ↦ₖ h.
@@ -278,7 +278,7 @@ Context `{!anerisG Mdl Σ, !SI_init}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod (SI_init_module $! (I: True)) as (SI_res SI_specs) "(#GI' & HKVSres & HVKSinit)".
+    iMod (SI_init_module $! (I: True)) as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
     iMod (inv_alloc client_inv_name ⊤ (client_inv) with "[HKVSres]") as "#Hinv".
     { iNext. iExists [].
     iDestruct (big_sepS_delete _ _ "x" with "HKVSres") as "(Hx & HKVSres)";

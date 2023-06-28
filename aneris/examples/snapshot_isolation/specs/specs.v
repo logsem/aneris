@@ -154,20 +154,20 @@ Section SI_Module.
   Context `{!anerisG Mdl Σ, !User_params,
     !KVS_snapshot_isolation_api}.
 
-  Class SI_specs `{!SI_resources Mdl Σ} := {
+  Class SI_client_toolbox `{!SI_resources Mdl Σ} := {
     SI_init_kvs_spec : ⊢ init_kvs_spec;
     SI_init_client_proxy_spec : ⊢ init_client_proxy_spec;
     SI_read_spec : ⊢ read_spec ;
     SI_write_spec : ⊢ write_spec;
     SI_start_spec : ⊢ start_spec;
     SI_commit_spec : ⊢ commit_spec;
-    (* SI_run_Spec : ⊢ run_spec; *)
+    SI_GlobalInv : ⊢ GlobalInv;
   }.
 
   Class SI_init := {
     SI_init_module E :
-      True ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_specs),
-      GlobalInv ∗ ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗ KVS_Init
+      True ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_client_toolbox),
+      ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗ KVS_Init
   }.
 
 End SI_Module.
