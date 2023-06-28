@@ -186,7 +186,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
       iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' &
           [(_ & _ & ->)|(%hz'_1 & (%vx & %vy & %hx'_vx & %hy'_vy & 
             (%Hvx & %Hvy)))])" "close".
-      { iMod (Seen_valid with "[] [$Seen $z_hz']") as "%abs";
+      { iMod (Seen_valid with "[] [$Seen $z_hz']") as "(z_hz' & %abs)";
           [solve_ndisj|iApply SI_GlobalInv|by apply suffix_nil_inv in abs].
       }
       iModIntro.
@@ -264,8 +264,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
       iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' &
           [(_ & _ & ->)|%Hinv])" "close".
       {
-        iMod (Seen_valid $! SI_GlobalInv with "[$Seen_z $z_hz']") as "%abs";
-          first solve_ndisj.
+        iMod (Seen_valid $! SI_GlobalInv with "[$Seen_z $z_hz']") as
+            "(z_hz' & %abs)"; first solve_ndisj.
         apply suffix_nil_inv in abs.
         rewrite abs in hz_not_empty.
         by apply elem_of_nil in hz_not_empty.

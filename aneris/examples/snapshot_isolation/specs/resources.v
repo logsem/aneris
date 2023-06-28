@@ -63,6 +63,7 @@ Section Resources.
       ↑KVS_InvName ⊆ E ->
       GlobalInv ⊢
       ConnectionState r (Active ms) -∗ k ↦ₖ h ={E}=∗
+      ConnectionState r (Active ms) ∗ k ↦ₖ h ∗
       ⌜k ∈ dom ms →
       ∀ h', ms !! k = Some h' → h' ≤ₛ h ⌝;
 
@@ -70,19 +71,19 @@ Section Resources.
         ↑KVS_InvName ⊆ E ->
         h ≠ [] ->
         GlobalInv ⊢
-        k ↦ₖ h -∗ k ↦{c} vo ={E}=∗ ⌜is_Some vo⌝;
+        k ↦ₖ h -∗ k ↦{c} vo ={E}=∗ k ↦ₖ h -∗ k ↦{c} vo ∗ ⌜is_Some vo⌝;
 
     ConnectionState_Keys E r ms :
       ↑KVS_InvName ⊆ E ->
         GlobalInv ⊢
         ConnectionState r (Active ms) ={E}=∗
-        ⌜dom ms ⊆ KVS_keys⌝;
+        ConnectionState r (Active ms) ∗ ⌜dom ms ⊆ KVS_keys⌝;
 
     OwnLocalKey_serializable E k cst v :
       ↑KVS_InvName ⊆ E ->
         GlobalInv ⊢
         k ↦{cst} Some v ={E}=∗
-        ⌜KVS_Serializable v⌝;
+        k ↦{cst} Some v ∗ ⌜KVS_Serializable v⌝;
 
     (** Properties of cache Key Status*)
     KeyUpdStatus_exclusive c k b b' :
@@ -96,7 +97,7 @@ Section Resources.
        ↑KVS_InvName ⊆ E ->
         GlobalInv ⊢
         Seen k h ∗ k ↦ₖ h' ={E}=∗
-        ⌜h ≤ₛ h'⌝;
+        k ↦ₖ h' ∗ ⌜h ≤ₛ h'⌝;
   }.
 
 End Resources.

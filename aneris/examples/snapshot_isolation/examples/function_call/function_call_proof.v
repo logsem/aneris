@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.specs
@@ -34,7 +34,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proof_of_code.
 
-  Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs}.
+  Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
 
   Definition f_spec (f : val) : iProp Σ :=
     ∀ (k : Key) cst vo sa,
@@ -112,7 +112,6 @@ Section proof_of_code.
       transaction2 cst f @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    
     iIntros (cst f sa hy) "#f_spec #inv %Φ !>(CanStart & y_hy) HΦ".
     rewrite/transaction2.
     wp_pures.
@@ -237,10 +236,36 @@ Section proof_of_runner.
 
   Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
 
+  Definition f : val :=
+    λ: "cst" "k",
+      match: read "cst" "k" with
+          SOME "v" => "v"
+        | NONE     => #0
+      end.
+
+  Lemma f_spec_holds `{!SI_resources Mdl Σ, !SI_client_toolbox} :
+    ⊢ f_spec f.
+  Proof.
+    iIntros (k cst vo sa k_keys Φ) "!>k_vo HΦ".
+    rewrite/f.
+    wp_pures.
+    wp_apply (SI_read_spec with "[//] k_vo").
+    iIntros "k_vo".
+    case: vo=>[v|].
+    {
+      iMod (OwnLocalKey_serializable $! SI_GlobalInv with "k_vo")
+        as "(k_vo & %v_ser)"; first done.
+      wp_pures.
+      by iApply ("HΦ" $! (SerVal v)).
+    }
+    wp_pures.
+    by iApply ("HΦ" $! (SerVal #0)).
+  Qed.
+
   Definition runner : expr :=
     Start "0.0.0.0" (server #KVS_address) ;;
     Start "0.0.0.1" (transaction1_client #client1_addr #KVS_address) ;;
-    Start "0.0.0.2" (transaction2_client #client2_addr #KVS_address read).
+    Start "0.0.0.2" (transaction2_client #client2_addr #KVS_address f).
 
   Lemma runner_spec :
     {{{
@@ -260,7 +285,7 @@ Section proof_of_runner.
     iIntros (Φ) "(srv_∅ & clt1_∅ & clt2_∅ & srv_unalloc & clt1_unalloc &
             clt2_unalloc & srv_free & clt1_free & clt2_free) HΦ".
     rewrite/runner.
-    iMod (SI_init_module with "[//]") as "(% & % & _ & mem & KVS_Init)".
+    iMod SI_init_module as "(% & % & mem & KVS_Init)".
     iPoseProof (big_sepS_insert with "mem") as "(x_mem & mem)"; first done.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(y_mem & _)";
       first set_solver.
@@ -288,16 +313,12 @@ Section proof_of_runner.
     iSplitR "clt2_∅ clt2_unalloc y_mem"; last first.
     {
       iIntros "!>free".
-      wp_apply (transaction2_client_spec client2_addr with "inv [] [$]");
-        last done.
-      iIntros (k cst vo sa k_keys Ψ) "!>k_vo HΨ".
-      wp_apply (SI_read_spec with "[//] k_vo").
-      iIntros "k_vo".
-      admit.
+      by wp_apply (transaction2_client_spec client2_addr with "inv [] [$]");
+        first iApply f_spec_holds.
     }
     iNext.
     by iApply "HΦ".
-  Admitted.
+  Qed.
 
 End proof_of_runner.
 
@@ -326,24 +347,15 @@ Proof.
   set (Σ := #[anerisΣ unit_model; KVSΣ]).
   apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
     [apply unit_model_rel_finitary|move=>?|set_solver..].
-Admitted.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- *)
+  iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
+  iApply (runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).
+  2 : { iModIntro. done. }
+  do 2 (iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated ?]";
+  [set_solver|]). iFrame.
+  do 2 (rewrite big_sepS_union; [|set_solver];
+  rewrite !big_sepS_singleton;
+  iDestruct "Hhist" as "[Hhist ?]"; iFrame).
+  do 2 (rewrite big_sepS_union; [|set_solver];
+  rewrite !big_sepS_singleton;
+  iDestruct "Hips" as "[Hips ?]"; iFrame).
+Qed.

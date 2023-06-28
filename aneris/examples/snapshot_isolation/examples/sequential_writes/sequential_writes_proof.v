@@ -165,7 +165,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
           iRight. iLeft. by iFrame.
           + iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
           [solve_ndisj|iApply SI_GlobalInv|].
-          iMod ("Hfalse" with "[$Hxseen $Hkx]") as "%Hfalse".
+          iMod ("Hfalse" with "[$Hxseen $Hkx]") as "(Hkx & %Hfalse)".
           destruct Hfalse as [? Hfalse].
           by apply app_cons_not_nil in Hfalse.
       - iModIntro. 
@@ -218,7 +218,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         iDestruct "Hseen" as "[Hseen _]". 
         iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
         [solve_ndisj|iApply SI_GlobalInv|].
-        iMod ("Hfalse" with "[$Hseen $Hkx]") as "%Hfalse".
+        iMod ("Hfalse" with "[$Hseen $Hkx]") as "(Kkx & %Hfalse)".
         destruct Hfalse as [? Hfalse].
         by apply app_cons_not_nil in Hfalse.
   Qed.
