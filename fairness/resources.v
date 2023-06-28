@@ -519,8 +519,7 @@ Section PartialOwnership.
     Let partial_free_roles_fuels_disj_def n δ fr fs tid: iProp Σ :=
         model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝.
 
-    Definition PartialModelPredicates: iProp Σ := 
-      □ (
+    Let PMP_def: iProp Σ := □ (
           (∀ extr auxtr c2 fs ζ NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP) ∗         
           (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL) ∗ 
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
@@ -528,9 +527,18 @@ Section PartialOwnership.
               update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
           (∀ n δ1 δ2, partial_model_agree'_def n δ1 δ2) ∗ 
           (∀ n δ fr fs tid, partial_free_roles_fuels_disj_def n δ fr fs tid)).  
+
+    Definition PartialModelPredicates: iProp Σ := PMP_def. 
+
+    Lemma Build_PartialModelPredicates: PMP_def ⊢ PartialModelPredicates.
+    Proof. done. Qed. 
+
+    Global Instance PMP_pers: Persistent PartialModelPredicates. 
+    Proof. apply _. Qed. 
     
-    (* Doing this _def indirection to provide the "PMP -∗ (property)" lemmas,
-       while gathering them in one iProp to ease the constructions *)
+    (* Doing this _def indirection to provide the "PMP -∗ (property)" lemmas
+       while gathering them in one iProp to ease the constructions,
+       and make PMP opaque, since its unfold takes too much space *)
 
     Lemma update_no_step_enough_fuel extr auxtr c2 fs ζ NE STEP: 
       PartialModelPredicates ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP. 
@@ -548,8 +556,10 @@ Section PartialOwnership.
       PartialModelPredicates ⊢ partial_free_roles_fuels_disj_def n δ fr fs tid.
     Proof. by iIntros "(?&?&?&?&?)". Qed.
 
+    Global Opaque PartialModelPredicates.
+
   End PartialModelPredicates.
-  
+
 End PartialOwnership.
 
 
@@ -834,5 +844,3 @@ Section adequacy.
     iExists _. by iSplitL "H1".
   Qed.
 End adequacy.
-
-
