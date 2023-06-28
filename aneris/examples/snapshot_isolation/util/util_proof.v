@@ -121,7 +121,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     iPoseProof (big_sepM_lookup_acc _ _ _ _ k_h with "cache") as
         "((k_h & k_upd) & cache)".
     wp_apply (SI_read_spec with "[//] k_h").
-    iIntros (v) "(k_h & %h_v)".
+    iIntros "k_h".
     iSpecialize ("cache" with "[$k_h $k_upd]").
     iAssert (∀ ms, P_tok -∗ (∀ (m : gmap Key Hist) (v0 : val) (h0 : list val),
          ⌜dom m = dom ms⌝ ∗ φ m v0 h0 ∗ ConnectionState c (Active m) ∗
@@ -142,7 +142,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     {
       admit.
     }
-    move: h k_h h_v=>[|v' h] k_h h_v. 
+    move: h k_h=>[|v' h] k_h. 
     { wp_pures. iApply ("retry" with "P_tok HΦ Active P cache"). }
     wp_pures.
     wp_apply ("cond_spec" with "[$P $Active $cache]"); first done.

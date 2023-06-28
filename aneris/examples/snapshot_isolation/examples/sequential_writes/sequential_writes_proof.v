@@ -150,7 +150,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       {["x":= hx]} _ (⊤ ∖ ↑client_inv_name) 
       (λ m, ⌜m = {["x":=[(#1)]]}⌝ ∗ token γF2)%I (token γF2) (token γF1)
       with "[] [] [] [] [] [] [Hcx Hcstate Hseen Htok] [HΦ]");
-      [solve_ndisj | iPureIntro; set_solver | iPureIntro; set_solver | | | | | ].
+    try solve_ndisj; try iPureIntro; try set_solver.
       - iModIntro. iIntros (h) "(Hxseen & Htok)". 
         iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
           + iDestruct (token_exclusive with "Htok Htok'") as "[]".
@@ -168,8 +168,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
           iDestruct "Hkx" as "[Hkx _]". iFrame.
           iRight. iLeft. by iFrame.
           + iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
-          try solve_ndisj. 
-          { iApply SI_GlobalInv. }
+          [solve_ndisj|iApply SI_GlobalInv|].
           iMod ("Hfalse" with "[$Hxseen $Hkx]") as "%Hfalse".
           destruct Hfalse as [? Hfalse].
           by apply app_cons_not_nil in Hfalse.
@@ -222,8 +221,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         + rewrite !big_sepM_insert; last set_solver.
         iDestruct "Hseen" as "[Hseen _]". 
         iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
-        try solve_ndisj.
-        { iApply SI_GlobalInv. }
+        [solve_ndisj|iApply SI_GlobalInv|].
         iMod ("Hfalse" with "[$Hseen $Hkx]") as "%Hfalse".
         destruct Hfalse as [? Hfalse].
         by apply app_cons_not_nil in Hfalse.
@@ -256,7 +254,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod (SI_init_module $! (I: True)) as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
+    iMod SI_init_module as (SI_res SI_specs) "(HKVSres & HVKSinit)".
     iMod (own_alloc (Excl ())) as (γF1) "Hftk1"; first done.
     iMod (own_alloc (Excl ())) as (γF2) "Hftk2"; first done.
     iMod (inv_alloc client_inv_name ⊤ (client_inv γF1 γF2) with "[HKVSres]") as "#Hinv".
@@ -311,8 +309,8 @@ Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model; KVSΣ]).
-  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); try set_solver.
-  { apply unit_model_rel_finitary. }
+  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
+    [apply unit_model_rel_finitary| |set_solver..].
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).
   2 : { iModIntro. done. }

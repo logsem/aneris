@@ -78,6 +78,12 @@ Section Resources.
         ConnectionState r (Active ms) ={E}=∗
         ⌜dom ms ⊆ KVS_keys⌝;
 
+    OwnLocalKey_serializable E k cst v :
+      ↑KVS_InvName ⊆ E ->
+        GlobalInv ⊢
+        k ↦{cst} Some v ={E}=∗
+        ⌜KVS_Serializable v⌝;
+
     (** Properties of cache Key Status*)
     KeyUpdStatus_exclusive c k b b' :
       KeyUpdStatus c k b ⊢ KeyUpdStatus c k b' -∗ False;

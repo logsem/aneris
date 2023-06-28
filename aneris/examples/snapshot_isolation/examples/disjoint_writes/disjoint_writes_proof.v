@@ -204,7 +204,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod (SI_init_module $! (I: True)) as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
+    iMod SI_init_module as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
     iMod (own_alloc (Excl ())) as (γF1) "Hftk1"; first done.
     iMod (own_alloc (Excl ())) as (γF2) "Hftk2"; first done.
     iMod (inv_alloc client_inv_name ⊤ (client_inv γF1 γF2) with "[HKVSres]") as "#Hinv".
@@ -261,8 +261,8 @@ Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model; KVSΣ]).
-  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); try set_solver.
-  { apply unit_model_rel_finitary. }
+  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); 
+  [apply unit_model_rel_finitary | |set_solver..].
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).
   2 : { iModIntro. done. }

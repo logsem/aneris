@@ -52,8 +52,7 @@ Section Specification.
     ⌜k ∈ KVS_keys⌝ -∗
     {{{ k ↦{c} vo }}}
       SI_read c #k @[ip_of_address sa] E
-    {{{ (v : SerializableVal), RET $vo; k ↦{c} vo ∗
-                ⌜is_Some vo → vo = Some (SV_val v)⌝ }}}.
+    {{{ RET $vo; k ↦{c} vo }}}.
 
    Definition start_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address)
@@ -166,7 +165,7 @@ Section SI_Module.
 
   Class SI_init := {
     SI_init_module E :
-      True ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_client_toolbox),
+      ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_client_toolbox),
       ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗ KVS_Init
   }.
 

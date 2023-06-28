@@ -136,7 +136,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     { iNext. iExists hx. iFrame. }
     iModIntro. wp_pures.
     wp_apply (SI_read_spec $! _ _ _ _ with "[] [Hcx]"); try set_solver.
-    iFrame. iIntros (vx) "(Hcx & %hx_vx)". wp_pures.
+    iFrame. iIntros "Hcx". wp_pures.
     wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
     iInv (client_inv_name) as ">[%hx' Hkx]" "HClose".
@@ -182,7 +182,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod (SI_init_module $! (I: True)) as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
+    iMod SI_init_module as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
     iMod (inv_alloc client_inv_name ⊤ (client_inv) with "[HKVSres]") as "#Hinv".
     { iNext. iExists [].
     iDestruct (big_sepS_delete _ _ "x" with "HKVSres") as "(Hx & HKVSres)";
