@@ -93,7 +93,6 @@ Proof.
   intros Hrel. eapply rel_finitary_impl; [|done]. by intros ex aux [Hsim _].
 Qed.
 
-
 Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
            (s:stuckness) (ξ : execution_trace heap_lang → finite_trace M
                   (option $ fmrole M) → Prop) (c1:cfg heap_lang)
@@ -256,7 +255,6 @@ Proof.
       { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
 Qed.
 
-
 (* The model is finitely branching *)
 Definition steppable n : list (nat * option YN) :=
   n' ← [S n; n];
@@ -277,12 +275,13 @@ Proof.
     eapply H; try (by left); right); done).
 Qed.
 
+(** Proof that any fair execution of model guarantees progress *)
 Definition yesno_mtrace : Type := mtrace the_fair_model.
 
 Definition yesno_mdl_progress (tr : yesno_mtrace) :=
   ∀ n, ∃ m, pred_at tr m (λ s _, s = n).
 
-Lemma yesno_mdl_alwayslive ρ n (mtr : yesno_mtrace) :
+Lemma yesno_mdl_always_live ρ n (mtr : yesno_mtrace) :
   infinite_trace mtr →
   pred_at mtr n
           (λ (δ : the_fair_model) (_ : option (option (fmrole the_fair_model))),
@@ -295,13 +294,13 @@ Proof.
   destruct mtr'; destruct ρ; set_solver.
 Qed.
 
-Lemma yesno_mdl_scheduled ρ (mtr : yesno_mtrace) :
+Lemma yesno_mdl_always_eventually_scheduled ρ (mtr : yesno_mtrace) :
   infinite_trace mtr →
   fair_model_trace ρ mtr →
   ∀ n, ∃ m, pred_at mtr (n+m) (λ _ ℓ, ℓ = Some (Some ρ)).
 Proof.
   intros Hinf Hfair n.
-  apply (yesno_mdl_alwayslive ρ n mtr) in Hinf.
+  apply (yesno_mdl_always_live ρ n mtr) in Hinf.
   specialize (Hfair n Hinf) as [m [Hfair | Hfair]].
   - rewrite /pred_at in Hfair.
     destruct (after (n + m) mtr); [|done].
@@ -395,7 +394,7 @@ Theorem yesno_mdl_progresses_Y n (mtr : yesno_mtrace) :
 Proof.
   intros Hinf Hvalid Hfair Hfirst Heven.
   specialize (Hfair Y).
-  pose proof (yesno_mdl_scheduled Y mtr Hinf Hfair 0) as Hsched.
+  pose proof (yesno_mdl_always_eventually_scheduled Y mtr Hinf Hfair 0) as Hsched.
   simpl in *.
   apply trace_eventually_until in Hsched as [m [Hsched Hschedne]].
   rewrite /pred_at in Hsched.
@@ -425,7 +424,7 @@ Theorem yesno_mdl_progresses_No n (mtr : yesno_mtrace) :
 Proof.
   intros Hinf Hvalid Hfair Hfirst Hodd.
   specialize (Hfair No).
-  pose proof (yesno_mdl_scheduled No mtr Hinf Hfair 0) as Hsched.
+  pose proof (yesno_mdl_always_eventually_scheduled No mtr Hinf Hfair 0) as Hsched.
   simpl in *.
   apply trace_eventually_until in Hsched as [m [Hsched Hschedne]].
   rewrite /pred_at in Hsched.
@@ -480,6 +479,8 @@ Proof.
     rewrite pred_at_sum. rewrite Hafter. done.
 Qed.
 
+(** Proof that fair progress is preserved through auxiliary trace *)
+
 (* TODO: Better definition *)
 Definition yesno_aux_progress (auxtr : auxtrace the_model) :=
   ∀ n, ∃ m, pred_at auxtr m (λ s l, (λ s' _, s' = n) (ls_under s) (l ≫= Ul)).
@@ -494,6 +495,9 @@ Proof.
   by apply (trace_eventually_stutter_preserves _ mtr auxtr (λ s' _, s' = n)).
 Qed.
 
+(** Proof that progress is preserved between auxilary and execution trace,
+ for a specific ξ *)
+
 Definition yesno_ex_progress (l:loc) (tr : heap_lang_extrace) :=
   ∀ (n:nat), ∃ m, pred_at tr m (λ s _, heap s.2 !! l = Some #n).
 
@@ -504,17 +508,36 @@ Definition ξ_yesno_steps (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
   Forall (λ e, is_Some $ to_val e) c.1 → False.
 
 Definition ξ_yesno (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
-  ξ_yesno_steps l c δ ∧
-  ξ_yesno_model_match l c δ.
+  ξ_yesno_steps l c δ ∧ ξ_yesno_model_match l c δ.
 
 Definition ξ_yesno_trace (l : loc) (extr : execution_trace heap_lang)
            (auxtr : finite_trace the_fair_model (option YN)) :=
   ξ_yesno l (trace_last extr) (trace_last auxtr).
 
+Lemma yesno_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
+  traces_match labels_match (λ c δ, live_tids c δ ∧ ξ_yesno l c δ) locale_step
+  (lm_ls_trans the_model) extr auxtr →
+  yesno_aux_progress auxtr → yesno_ex_progress l extr.
+Proof.
+  intros Hξ Hauxtr.
+  intros n.
+  specialize (Hauxtr n).
+  rewrite /pred_at in Hauxtr.
+  destruct Hauxtr as [m Hauxtr].
+  destruct (after m auxtr) eqn:Heqn; [|done].
+  eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
+  exists m. rewrite /pred_at. rewrite Hafter'.
+  inversion Hextr'; simplify_eq.
+  - destruct H as [? [? [n [? ?]]]]. simplify_eq. done.
+  - destruct H0 as [? [? [n [? ?]]]]. simplify_eq. done.
+Qed.
+
 Instance the_model_mstate_countable : EqDecision (mstate the_model).
 Proof. intros x y. apply make_decision. Qed.
 Instance the_model_mlabel_countable : EqDecision (mlabel the_model).
 Proof. solve_decision. Qed.
+
+(** Proof that program refines model up to ξ_yesno *)
 
 Lemma yesno_incr_sim l :
   continued_simulation
@@ -577,32 +600,14 @@ Proof.
   rewrite /trace_ends_in in Hends.
   rewrite Hends.
   rewrite bi.pure_impl.
-  iIntros "%Hall".
   rewrite !big_sepL_omap.
   rewrite !big_sepL_zip_with.
   simpl.
+  
 Admitted.
 
-Lemma yesno_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
-  traces_match labels_match
-               (λ (x0 : cfg heap_lang) (x1 : lm_ls the_model),
-                  live_tids x0 x1 ∧ ξ_yesno l x0 x1) locale_step
-  (lm_ls_trans the_model) extr auxtr →
-  yesno_aux_progress auxtr → yesno_ex_progress l extr.
-Proof.
-  intros Hξ Hauxtr.
-  intros n.
-  specialize (Hauxtr n).
-  rewrite /pred_at in Hauxtr.
-  destruct Hauxtr as [m Hauxtr].
-  destruct (after m auxtr) eqn:Heqn; [|done].
-  eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
-  exists m. rewrite /pred_at. rewrite Hafter'.
-  inversion Hextr'; simplify_eq.
-  - destruct H as [? [? [n [? ?]]]]. simplify_eq. done.
-  - destruct H0 as [? [? [n [? ?]]]]. simplify_eq. done.
-Qed.
-
+(** Proof that execution trace actually progresses *)
+(* TODO: Needs assumption that trace is maximal *)
 Theorem yesno_ex_progresses (l:loc) (extr : heap_lang_extrace) :
   extrace_valid extr →
   (∀ tid, fair_ex tid extr) →
