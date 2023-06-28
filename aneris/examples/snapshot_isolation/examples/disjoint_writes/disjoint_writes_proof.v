@@ -181,7 +181,7 @@ End proofs.
 
 Section proof_runner.
 
-Context `{!anerisG Mdl Σ, !KVS_time, !SI_init, !KVSG Σ}.
+Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
 
   Definition example_runner : expr :=
     let: "serveraddr" := MakeAddress #"0.0.0.0" #80 in
