@@ -257,11 +257,6 @@ Definition init_state :=
     state_ms := ∅;
   |}.
 
-Global Instance SI_init_instance
-`{!anerisG Mdl Σ} : SI_init.
-Proof.
-Admitted.
-
 Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.

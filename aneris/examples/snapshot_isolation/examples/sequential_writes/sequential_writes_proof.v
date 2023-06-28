@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -45,7 +45,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
 
   Definition client_inv (γF1 γF2 : gname): iProp Σ :=
     ∃ hx, "x" ↦ₖ hx ∗
-    ((⌜hx = [(#1);(#2)]⌝ ∗ token γF1 ∗ token γF2)
+    ((⌜hx = [(#2);(#1)]⌝ ∗ token γF1 ∗ token γF2)
     ∨ (⌜hx = [(#1)]⌝ ∗ token γF1)
     ∨ (⌜hx = []⌝)).
 
@@ -120,7 +120,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
   Lemma client_2_spec ip port γF1 γF2:
     ip = ip_of_address client_2_addr →
     port = port_of_address client_2_addr →
-    {{{ inv client_inv_name (client_inv γF1 γF2)
+    {{{ GlobalInv 
+      ∗ inv client_inv_name (client_inv γF1 γF2)
       ∗ token γF2
       ∗ client_2_addr ⤳ (∅, ∅)
       ∗ unallocated {[client_2_addr]}
@@ -129,7 +130,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof. 
-    iIntros (Hip Hports Φ) "(#Hinv & Htok & Hmsghis & Hunalloc
+    iIntros (Hip Hports Φ) "(#GlobalInv & #Hinv & Htok & Hmsghis & Hunalloc
     & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
@@ -148,28 +149,43 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
     iModIntro. wp_pures.
     wp_apply (simplified_wait_on_keyT_spec _ _ (#1) _ 
       {["x":= hx]} _ (⊤ ∖ ↑client_inv_name) 
-      (λ m, ⌜m = {["x":=[(#1)]]}⌝ ∗ token γF2)%I (token γF2)
-      with "[] [] [] [] [Hcx Hcstate Hseen] [] [] [Htok]").
-    try solve_ndisj.
-      - iPureIntro. set_solver. 
-      - iPureIntro. set_solver.
+      (λ m, ⌜m = {["x":=[(#1)]]}⌝ ∗ token γF2)%I (token γF2) (token γF1)
+      with "[] [] [] [] [] [] [Hcx Hcstate Hseen Htok] [HΦ]");
+    try solve_ndisj; try iPureIntro; try set_solver.
       - iModIntro. iIntros (h) "(Hxseen & Htok)". 
         iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
-        + iDestruct (token_exclusive with "Htok Htok'") as "[]".
-        + iModIntro. iExists {["x":= [(#1)]]}.
-        iSplit. 
-        { iPureIntro. set_solver. }
-        iSplitL "Htok".
-        { by iFrame. }
-        iSplitL.
-        { rewrite !big_sepM_insert; set_solver. }
-        iIntros "!>Hkx". 
-        iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
-        iNext. iExists hx'. 
-        rewrite !(big_sepM_insert); try set_solver.
-        iDestruct "Hkx" as "[Hkx _]". iFrame.
-        + iDestruct (Seen_valid with "[]") as "Hfalse"; try solve_ndisj.
-        admit.
+          + iDestruct (token_exclusive with "Htok Htok'") as "[]".
+          + iModIntro. iExists {["x":= [(#1)]]}.
+          iSplit. 
+          { iPureIntro. set_solver. }
+          iSplitL "Hkx".
+          { rewrite !big_sepM_insert; set_solver. }
+          iSplitL "Htok".
+          { by iFrame. }
+          iFrame. iIntros "!> [Hkx Htok]". 
+          iMod ("HClose" with "[Htok Hkx]") as "_"; try done.
+          iNext. iExists _. 
+          rewrite !(big_sepM_insert); try set_solver.
+          iDestruct "Hkx" as "[Hkx _]". iFrame.
+          iRight. iLeft. by iFrame.
+          + iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
+          try solve_ndisj.
+          iMod ("Hfalse" with "[$Hxseen $Hkx]") as "%Hfalse".
+          destruct Hfalse as [? Hfalse].
+          by apply app_cons_not_nil in Hfalse.
+      - iModIntro. 
+        iInv (client_inv_name) as ">[%hx' [Hkx Hrest]]" "HClose".
+        iModIntro.
+        iExists {["x":= hx']}.
+          iSplit. 
+          { iPureIntro. set_solver. }
+          iSplitL "Hkx".
+          { rewrite !big_sepM_insert; set_solver. }
+          iIntros "!> Hkx". 
+          iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
+          iNext. iExists _. 
+          rewrite !(big_sepM_insert); try set_solver.
+          iDestruct "Hkx" as "[Hkx _]". iFrame.
       - iIntros (v Φ') "!>Htrue HΦ".
       wp_lam. wp_op.
       apply bin_op_eval_eq_val.
@@ -177,29 +193,46 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_specs, !KVSG Σ}.
       iApply "HΦ"; set_solver.
       - rewrite !(big_sepM_insert); try set_solver.
       rewrite !big_sepM_empty. iFrame.
-      - iNext. iIntros (ms) "(%Hdom & Hstate & Hcp & Hseen)".
+      - iNext. iIntros (ms) "(%Hdom & (-> & Htok) & Hcp & Hx & Hseen)".
       wp_pures.
-      assert ("x" ∈ dom ms). { set_solver. }
-      destruct ((proj1 (elem_of_dom ms "x")) H0) as (h & Hkx).
-      iPoseProof (big_sepM_lookup_acc _ _ _ _ Hkx with "Hcp") as
-          "((Hcx & Hupdx) & Hcp)".
-      wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [$Hcx $Hupdx]"). 
-      set_solver. iIntros "Hcx". wp_pures.
+      wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [Hx]"). 
+      set_solver.
+      {
+        rewrite !big_sepM_insert; try set_solver.
+        rewrite big_sepM_empty. iDestruct "Hx" as "[[? ?] _]". iFrame.
+      }
+      iIntros "Hcx". wp_pures.
       wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
       try solve_ndisj.
-      iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | Hrest]]]" "HClose";
-      try iDestruct (token_exclusive with "Htok Htok'") as "[]".
-      iModIntro. *)
-      (* problem here is that we don't have information about ms, 
-      we ned information about the snapshot to say that it has not changed
-      since we started. We can infer the state of the db using the seen 
-      information.
-  Admitted.
+      iInv (client_inv_name) as ">[%hx' [Hkx [(_ & _ & Htok') | [(-> & Htok') | ->]]]]" "HClose".
+        + iDestruct (token_exclusive with "Htok Htok'") as "[]".
+        + iModIntro. iExists {["x" := [(#1)]]}, _, {["x" := (Some #2, true)]}.
+        iFrame. iSplitL "Hcx Hkx". 
+          * iSplitR "Hcx Hkx"; try iSplitR "Hcx Hkx";
+            try iPureIntro; try set_solver.
+            rewrite !big_sepM_insert; try set_solver.
+            rewrite !big_sepM_empty. iFrame.
+          * iNext. iIntros "[_ HBig]". 
+            iMod ("HClose" with "[HBig Htok Htok']") as "_".
+                -- iNext. iExists [(#2);(#1)]. 
+                  rewrite !(big_sepM2_insert); try set_solver.
+                  iDestruct "HBig" as "[[Hx _] _]".
+                  iFrame. iLeft. by iFrame.
+                -- iModIntro. by iApply "HΦ".
+        + rewrite !big_sepM_insert; last set_solver.
+        iDestruct "Hseen" as "[Hseen _]". 
+        iDestruct (Seen_valid (⊤ ∖ ↑client_inv_name) with "[]") as "Hfalse"; 
+        try solve_ndisj.
+        iMod ("Hfalse" with "[$Hseen $Hkx]") as "%Hfalse".
+        destruct Hfalse as [? Hfalse].
+        by apply app_cons_not_nil in Hfalse.
+  Qed.
+
 End proofs.
 
 Section proof_runner.
 
-Context `{!anerisG Mdl Σ, !KVS_time, !SI_init, !KVSG Σ}.
+Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
 
   Definition example_runner : expr :=
     let: "serveraddr" := MakeAddress #"0.0.0.0" #80 in
@@ -273,11 +306,6 @@ Definition init_state :=
     state_ms := ∅;
   |}.
 
-Global Instance SI_init_instance
-`{!anerisG Mdl Σ} : SI_init.
-Proof.
-Admitted.
-
 Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
@@ -295,4 +323,4 @@ Proof.
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed. *)
+Qed.
