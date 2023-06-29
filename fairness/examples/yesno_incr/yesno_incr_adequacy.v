@@ -27,6 +27,26 @@ Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
 Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n.
 Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
 
+Definition indexes {A} (xs : list A) := imap (λ i _, i) xs.
+
+Lemma locales_of_list_from_cons {Λ} es' (e : language.expr Λ) es :
+  locales_of_list_from es' (e :: es) =
+  language.locale_of es' e :: locales_of_list_from (es' ++ [e]) es.
+Proof. done. Qed.
+
+Lemma locales_of_list_from_indexes (es' es : list expr) :
+  locales_of_list_from es' es = imap (λ i _, length es' + i) es.
+Proof.
+  revert es'. induction es; [done|]; intros es'.
+  rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
+  f_equiv; [lia|]. rewrite IHes. apply imap_ext.
+  intros x ? Hin. rewrite app_length=> /=. lia.
+Qed.
+
+Lemma locales_of_list_indexes (es : list expr) :
+  locales_of_list es = indexes es.
+Proof. apply locales_of_list_from_indexes. Qed.
+
 (** The model is finitely branching *)
 
 Definition steppable n : list (nat * option YN) :=
@@ -281,9 +301,6 @@ Definition ξ_yesno_no_val_steps (c : cfg heap_lang) (δ : the_fair_model) :=
   (Forall (λ e, is_Some $ to_val e) c.1 → False) ∧
   Forall (λ e, not_stuck e c.2) c.1.
 
-(* Definition ξ_yesno_steps (l : loc) (c : cfg heap_lang) (δ : the_fair_model) := *)
-(*   Forall (λ e, is_Some $ to_val e) c.1 → False. *)
-
 Definition ξ_yesno (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
   ξ_yesno_no_val_steps c δ ∧ ξ_yesno_model_match l c δ.
 
@@ -315,18 +332,6 @@ Instance the_model_mlabel_countable : EqDecision (mlabel the_model).
 Proof. solve_decision. Qed.
 
 (** Proof that program refines model up to ξ_yesno *)
-
-Definition indexes {A} (xs : list A) :=
-  imap (λ i _, i) xs.
-
-
-Lemma locales_of_list_from_indexes (es' es : list expr) :
-  locales_of_list_from es' es = imap (λ i _, length es' + i) es.
-Proof. Admitted.
-
-Lemma locales_of_list_indexes (es : list expr) :
-  locales_of_list es = indexes es.
-Proof. apply locales_of_list_from_indexes. Qed.
 
 Lemma yesno_incr_sim l :
   continued_simulation
