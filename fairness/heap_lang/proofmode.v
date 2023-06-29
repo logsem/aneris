@@ -79,7 +79,6 @@ Qed.
 (* TODO: move to resources.v *)
 Lemma has_fuels_gt_n 
   `{LM : LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM}
   (* `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)} *)
   `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}  
   (fs: gmap (fmrole iM) _) n tid:
@@ -88,8 +87,8 @@ Lemma has_fuels_gt_n
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 
 Lemma has_fuels_gt_1 
-  `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM}
+  `{LM:LiveModel heap_lang M}
+  `{!heapGS Σ LM}
   `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}  
   (fs: gmap (fmrole iM) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
