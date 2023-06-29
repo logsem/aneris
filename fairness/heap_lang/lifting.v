@@ -1191,6 +1191,43 @@ Qed.
 
 
 (* TODO: clean up all those similar lemmas *)
+Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1 s2 E l v' v
+  (STEP: fmtrans iM s1 (Some ρ) s2)
+  (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM))
+  (LR : live_roles iM s2 ∖ live_roles iM s1 ⊆ fr) (STASH : fr_stash ⊆ dom fs1) 
+  (NSL : live_roles iM s1 ∩ (fr_stash ∖ {[ρ]}) = ∅)
+  (NOS2 : dom fs2 ∩ fr_stash = ∅):
+  (@PartialModelPredicates heap_lang _ LM _ _ _ _ _ iLM PMPP) ⊢
+  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuels tid fs1 ∗
+      ▷ partial_free_roles_are fr}}}
+    Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
+  {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ has_fuels tid fs2 ∗
+                        partial_free_roles_are (fr ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)}}}. 
+Proof using. 
+  iIntros "#PMP !#" (Φ) "(>Hl & >Hst & >Hfuel1 & Hfr) HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
+  iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
+  iSplit; first by rewrite Hexend // in Hheap;  eauto.
+  iIntros "!>" (e2 σ2 efs Hstep).
+  rewrite Hexend in Hheap. inv_head_step.
+  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
+  rewrite Hexend.
+  iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+  iMod (update_step_still_alive _ _ _ _ _ _ _ s2 _
+            (fs2)
+            _ _ _ _ fr_stash
+            with "PMP Hfuel1 Hst Hmi Hfr") as
+        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)".
+  all: eauto.
+  { destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//. }
+  iModIntro; iExists δ2, ℓ. iSplit.
+  { iPureIntro. simpl in *. split =>//. }
+  iFrame.
+  iSplit; first done.
+  iApply "HΦ". iFrame.
+Qed.
+
 Lemma wp_store_step_singlerole_keep s tid ρ (f1 f2: nat) (* fr *) s1 s2 E l v' v :
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   (ρ ∉ live_roles iM s2 -> (f2 < f1)%nat ) -> (* TODO: check Zombie case in must_decrease *)
