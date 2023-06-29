@@ -277,11 +277,15 @@ Definition yesno_ex_progress (l:loc) (tr : heap_lang_extrace) :=
 Definition ξ_yesno_model_match (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
   ∃ (N:nat), heap c.2 !! l = Some #N ∧ δ = N.
 
-Definition ξ_yesno_steps (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
-  Forall (λ e, is_Some $ to_val e) c.1 → False.
+Definition ξ_yesno_no_val_steps (c : cfg heap_lang) (δ : the_fair_model) :=
+  (Forall (λ e, is_Some $ to_val e) c.1 → False) ∧
+  Forall (λ e, not_stuck e c.2) c.1.
+
+(* Definition ξ_yesno_steps (l : loc) (c : cfg heap_lang) (δ : the_fair_model) := *)
+(*   Forall (λ e, is_Some $ to_val e) c.1 → False. *)
 
 Definition ξ_yesno (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
-  ξ_yesno_steps l c δ ∧ ξ_yesno_model_match l c δ.
+  ξ_yesno_no_val_steps c δ ∧ ξ_yesno_model_match l c δ.
 
 Definition ξ_yesno_trace (l : loc) (extr : execution_trace heap_lang)
            (auxtr : finite_trace the_fair_model (option YN)) :=
@@ -311,6 +315,13 @@ Instance the_model_mlabel_countable : EqDecision (mlabel the_model).
 Proof. solve_decision. Qed.
 
 (** Proof that program refines model up to ξ_yesno *)
+
+Definition indexes {A} (xs : list A) :=
+  imap (λ i _, i) xs.
+
+Lemma locales_of_list_indexes (es : list expr) :
+  locales_of_list es = indexes es.
+Proof. Admitted.
 
 Lemma yesno_incr_sim l :
   continued_simulation
@@ -359,12 +370,12 @@ Proof.
       rewrite left_id. done. }
     iApply (start_spec with "[$Hf $Hyes_at $Hno_at $Hinv]"); [lia|].
     by iIntros "!>?". }
-  iIntros (extr auxtr c) "_ _ _ %Hends _ _ [_ [Hσ Hδ]]Hposts".
-  iInv "Hinv" as (M) "(_ & >Hmod & >Hn & _)" "Hclose".
+  iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck [_ [Hσ Hδ]] Hposts".
+  iInv "Hinv" as (M) "(>HFR & >Hmod & >Hn & _)" "Hclose".
   iApply fupd_mask_intro; [set_solver|].
   iIntros "Hclose'".
   iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
-  iDestruct "Hδ" as (??) "(_&_&_&_&_&Hδ&_)".
+  iDestruct (model_state_interp_tids_smaller with "Hδ") as %Hsmaller.   iDestruct "Hδ" as (??) "(Hf&HM&HFR_auth&%Hinverse&%Hlocales&Hδ&%Hdom)".
   iDestruct (model_agree with "Hδ Hmod") as %Hn'.
   iSplitL; last first.
   { iPureIntro.
@@ -372,23 +383,122 @@ Proof.
     rewrite -Hn'. by destruct auxtr. }
   rewrite /trace_ends_in in Hends.
   rewrite Hends.
-  rewrite bi.pure_impl.
-  rewrite !big_sepL_omap.
-  rewrite !big_sepL_zip_with.
-  simpl.  
+    
+  iSplit.
+  - iIntros "%Hall".
+    rewrite !big_sepL_omap.
+    rewrite !big_sepL_zip_with.
+    simpl.
+    iAssert ([∗ list] k↦x ∈ c.1, k ↦M ∅)%I with "[Hposts]" as "Hposts".
+    { 
+      destruct c as [es σ]=> /=.
+      iApply (big_sepL_impl with "Hposts").
+      iIntros "!>" (k x HSome) "Hk".
+      simpl in *.
+      assert (is_Some (to_val x)) as [v Hv].
+      { by eapply (Forall_lookup_1 (λ e : expr, is_Some (to_val e))). }
+      rewrite Hv.
+      destruct k; [done|]. 
+      simpl.
+      destruct es; [done|].
+      simpl in *.
+      rewrite drop_0.
+      rewrite list_lookup_fmap.
+      erewrite prefixes_from_lookup; [|done].
+      simpl.
+      (* TODO: Prove that this holds in HeapLang *)
+      replace (locale_of (take k es) x) with k by admit.
+      done.
+    }
+    iAssert (⌜∀ i, i < length c.1 → M0 !! i = Some ∅⌝)%I as "%HM0".
+    { admit. }    
+    assert (dom M0 = list_to_set $ locales_of_list c.1).
+    { 
+      rewrite Hends in Hlocales.
+      apply set_eq.
+      intros x. rewrite elem_of_dom.
+      rewrite elem_of_list_to_set.
+      split.
+      - intros HSome.
+        destruct (decide (x ∈ locales_of_list c.1))
+          as [|Hnin]; [done|].
+        apply Hlocales in Hnin.
+        destruct HSome as [??]. simplify_eq.
+      - intros Hin.
+        exists ∅.
+        apply HM0.
+        rewrite locales_of_list_indexes in Hin.
+        rewrite /indexes in Hin. 
+        apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
+        by apply lookup_lt_is_Some_1.
+    }
+    assert (ls_mapping (trace_last auxtr) = ∅) as Hmapping.
+    { apply map_eq.
+      intros i.
+      rewrite lookup_empty.
+      destruct (ls_mapping (trace_last auxtr) !! i) as [ζ|]
+        eqn:Heqn; [|done].
+      pose proof Heqn as [e He]%Hsmaller.
+      assert (M0 !! ζ = Some ∅) as Hζ.
+      { apply HM0.
+        apply from_locale_lookup in He.
+        rewrite Hends in He.
+        by apply lookup_lt_is_Some_1. }
+      eapply (no_locale_empty _ _ i) in Hζ; [|done].
+      by simplify_eq. }
+    assert (live_roles _ M = ∅).
+    { cut (live_roles the_fair_model M ⊆ ∅); [by set_solver|].
+      etrans.
+      - eapply (ls_mapping_dom (M:=the_fair_model)).
+      - erewrite Hmapping. done. }
+    rewrite /live_roles in H0. simpl in *.
+    rewrite /yn_live_roles in H0. set_solver.
+  - iPureIntro.
+    apply Forall_forall.
+    intros e He. by apply Hnstuck.
 Admitted.
 
+CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
+| extrace_maximal_singleton c :
+  (∀ oζ c', ¬ locale_step c oζ c') → extrace_maximal ⟨c⟩
+| extrace_maximal_cons c oζ tr :
+  locale_step c oζ (trfirst tr) ->
+  extrace_maximal tr →
+  extrace_maximal (c -[oζ]-> tr).
+
+Lemma extrace_maximal_valid {Λ} (extr : extrace Λ) :
+  extrace_maximal extr → extrace_valid extr.
+Proof.
+  revert extr. cofix IH.
+  intros extr Hmaximal.
+  inversion Hmaximal.
+  - constructor 1.
+  - constructor 2; [done|by apply IH].
+Qed.  
+
+Lemma extrace_maximal_after {Λ} n (extr extr' : extrace Λ) :
+  extrace_maximal extr → after n extr = Some extr' → extrace_maximal extr'.
+Proof. 
+  revert extr extr'.
+  induction n; intros extr extr' Hafter Hvalid.
+  { destruct extr'; simpl in *; by simplify_eq. }
+  simpl in *.
+  destruct extr; [done|].
+  eapply IHn; [|done].
+  by inversion Hafter.
+Qed.
+
 (** Proof that execution trace actually progresses *)
-(* TODO: Needs assumption that trace is maximal *)
 Theorem yesno_ex_progresses (l:loc) (extr : heap_lang_extrace) :
-  extrace_valid extr →
+  extrace_maximal extr →
   (∀ tid, fair_ex tid extr) →
   trfirst extr = ([start #l],
                         {| heap := {[l:=#0]};
                            used_proph_id := ∅ |}) →
   yesno_ex_progress l extr.
 Proof.
-  intros Hvalid Hfair Hfirst.
+  intros Hmaximal Hfair Hfirst.
+  pose proof Hmaximal as Hvalid%extrace_maximal_valid.
   pose proof (yesno_incr_sim l) as Hsim.
 
   assert (∃ iatr,
@@ -430,9 +540,42 @@ Proof.
   { intros ?? Hstep. inversion Hstep. done. }
   destruct Hstutter as [mtr Hupto].
 
-  assert (infinite_trace extr) as Hinf by admit.
+  assert (infinite_trace extr) as Hinf.
+  { 
+    intros n.
+    induction n; [done|].
+    destruct IHn as [extr' Hafter].
+    apply traces_match_flip in Hmatch_strong.
+    eapply traces_match_after in Hmatch_strong; [|done].
+    destruct Hmatch_strong as [auxtr' [Hafter' Hmatch_strong]].
+    replace (S n) with (n + 1) by lia.
+    rewrite after_sum'.
+    rewrite Hafter.
+    apply traces_match_first in Hmatch_strong.
+    destruct Hmatch_strong as [_ [[Hξ1 Hξ2] _]].
+    eapply extrace_maximal_after in Hmaximal; [|done].
+    inversion Hmaximal; simplify_eq; [|done].
 
-  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
+    assert (∃ oζ c', locale_step c oζ c') as Hstep; last first.
+    { exfalso. destruct Hstep as (?&?&Hstep). by eapply H. }
+
+    apply not_Forall_Exists in Hξ1; [|apply _].
+    apply Exists_exists in Hξ1 as [e [Hξ11 Hξ12]].
+    rewrite Forall_forall in Hξ2.
+    specialize (Hξ2 e Hξ11) as [|Hred]; [done|].
+
+    destruct Hred as (e' & σ' & es' & Hred).
+
+    apply elem_of_list_split in Hξ11 as (es1&es2&Hes).
+
+    destruct c; simpl in *.
+
+    eexists (Some _), _.
+    econstructor; eauto. simpl in *.
+    f_equiv. done.
+  }
+
+  pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfairaux.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
@@ -461,4 +604,4 @@ Proof.
 
   eapply (yesno_aux_ex_progress_preserved l _ auxtr); [done|].
   by eapply yesno_mtr_aux_progress_preserved.
-Admitted.
+Qed.
