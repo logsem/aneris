@@ -319,9 +319,14 @@ Proof. solve_decision. Qed.
 Definition indexes {A} (xs : list A) :=
   imap (λ i _, i) xs.
 
+
+Lemma locales_of_list_from_indexes (es' es : list expr) :
+  locales_of_list_from es' es = imap (λ i _, length es' + i) es.
+Proof. Admitted.
+
 Lemma locales_of_list_indexes (es : list expr) :
   locales_of_list es = indexes es.
-Proof. Admitted.
+Proof. apply locales_of_list_from_indexes. Qed.
 
 Lemma yesno_incr_sim l :
   continued_simulation
@@ -383,14 +388,14 @@ Proof.
     rewrite -Hn'. by destruct auxtr. }
   rewrite /trace_ends_in in Hends.
   rewrite Hends.
-    
+
   iSplit.
   - iIntros "%Hall".
     rewrite !big_sepL_omap.
     rewrite !big_sepL_zip_with.
     simpl.
     iAssert ([∗ list] k↦x ∈ c.1, k ↦M ∅)%I with "[Hposts]" as "Hposts".
-    { 
+    {
       destruct c as [es σ]=> /=.
       iApply (big_sepL_impl with "Hposts").
       iIntros "!>" (k x HSome) "Hk".
@@ -398,7 +403,7 @@ Proof.
       assert (is_Some (to_val x)) as [v Hv].
       { by eapply (Forall_lookup_1 (λ e : expr, is_Some (to_val e))). }
       rewrite Hv.
-      destruct k; [done|]. 
+      destruct k; [done|].
       simpl.
       destruct es; [done|].
       simpl in *.
@@ -406,14 +411,23 @@ Proof.
       rewrite list_lookup_fmap.
       erewrite prefixes_from_lookup; [|done].
       simpl.
-      (* TODO: Prove that this holds in HeapLang *)
-      replace (locale_of (take k es) x) with k by admit.
+      rewrite /locale_of.
+      rewrite take_length.
+      assert (k < length es).
+      { apply lookup_lt_is_Some_1. by eauto. }
+      replace (k `min` length es) with k by lia.
       done.
     }
     iAssert (⌜∀ i, i < length c.1 → M0 !! i = Some ∅⌝)%I as "%HM0".
-    { admit. }    
+    {
+      iIntros (i Hlen).
+      assert (is_Some $ c.1 !! i) as [e HSome].
+      { by apply lookup_lt_is_Some_2. }
+      iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
+      by iDestruct (frag_mapping_same with "HM Hpost") as "H".
+    }
     assert (dom M0 = list_to_set $ locales_of_list c.1).
-    { 
+    {
       rewrite Hends in Hlocales.
       apply set_eq.
       intros x. rewrite elem_of_dom.
@@ -428,7 +442,7 @@ Proof.
         exists ∅.
         apply HM0.
         rewrite locales_of_list_indexes in Hin.
-        rewrite /indexes in Hin. 
+        rewrite /indexes in Hin.
         apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
         by apply lookup_lt_is_Some_1.
     }
@@ -456,7 +470,7 @@ Proof.
   - iPureIntro.
     apply Forall_forall.
     intros e He. by apply Hnstuck.
-Admitted.
+Qed.
 
 CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
 | extrace_maximal_singleton c :
@@ -474,11 +488,11 @@ Proof.
   inversion Hmaximal.
   - constructor 1.
   - constructor 2; [done|by apply IH].
-Qed.  
+Qed.
 
 Lemma extrace_maximal_after {Λ} n (extr extr' : extrace Λ) :
   extrace_maximal extr → after n extr = Some extr' → extrace_maximal extr'.
-Proof. 
+Proof.
   revert extr extr'.
   induction n; intros extr extr' Hafter Hvalid.
   { destruct extr'; simpl in *; by simplify_eq. }
@@ -540,8 +554,10 @@ Proof.
   { intros ?? Hstep. inversion Hstep. done. }
   destruct Hstutter as [mtr Hupto].
 
+  clear Hiatr.
+
   assert (infinite_trace extr) as Hinf.
-  { 
+  {
     intros n.
     induction n; [done|].
     destruct IHn as [extr' Hafter].
