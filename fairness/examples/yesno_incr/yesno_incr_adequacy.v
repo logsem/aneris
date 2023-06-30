@@ -8,7 +8,7 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.fairness.heap_lang Require Export lang lifting tactics.
 From trillium.fairness.heap_lang Require Import notation.
 From trillium.fairness Require Import trace_utils.
-From trillium.fairness.examples.yesno_incr Require Import yesno_incr3.
+From trillium.fairness.examples.yesno_incr Require Import yesno_incr.
 From stdpp Require Import finite.
 
 (* TODO: Move prerequisites *)
