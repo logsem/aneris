@@ -400,6 +400,11 @@ Section locales_utils.
     (λ '(t, e), locale_of t e) <$> (prefixes_from tp0 tp).
   Notation locales_of_list tp := (locales_of_list_from [] tp).
 
+  Lemma locales_of_list_from_cons es' (e : expr Λ) es :
+    locales_of_list_from es' (e :: es) =
+    locale_of es' e :: locales_of_list_from (es' ++ [e]) es.
+  Proof. done. Qed.
+
   Lemma locales_of_list_equiv (tp0 tp0' tp1 tp2 : list $ expr Λ) :
     locales_equiv_from tp0 tp0' tp1 tp2 ↔
     locales_of_list_from tp0 tp1 = locales_of_list_from tp0' tp2.

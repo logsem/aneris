@@ -112,6 +112,21 @@ Proof.
     first apply from_locale_from_lookup. simpl; lia.
 Qed.
 
+Definition indexes {A} (xs : list A) := imap (λ i _, i) xs.
+
+Lemma locales_of_list_from_indexes (es' es : list expr) :
+  locales_of_list_from es' es = imap (λ i _, length es' + i)%nat es.
+Proof.
+  revert es'. induction es; [done|]; intros es'.
+  rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
+  f_equiv; [lia|]. rewrite IHes. apply imap_ext.
+  intros x ? Hin. rewrite app_length=> /=. lia.
+Qed.
+
+Lemma locales_of_list_indexes (es : list expr) :
+  locales_of_list es = indexes es.
+Proof. apply locales_of_list_from_indexes. Qed.
+
 Theorem heap_lang_continued_simulation_fair_termination {FM : FairModel}
         `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
   continued_simulation

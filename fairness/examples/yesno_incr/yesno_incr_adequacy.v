@@ -11,7 +11,7 @@ From trillium.fairness Require Import trace_utils.
 From trillium.fairness.examples.yesno_incr Require Import yesno_incr.
 From stdpp Require Import finite.
 
-(* TODO: Move prerequisites *)
+(** Helper lemmas for working with even and odd *)
 
 Lemma even_odd_False n : Nat.even n → Nat.odd n → False.
 Proof.
@@ -26,26 +26,6 @@ Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
 
 Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n.
 Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
-
-Definition indexes {A} (xs : list A) := imap (λ i _, i) xs.
-
-Lemma locales_of_list_from_cons {Λ} es' (e : language.expr Λ) es :
-  locales_of_list_from es' (e :: es) =
-  language.locale_of es' e :: locales_of_list_from (es' ++ [e]) es.
-Proof. done. Qed.
-
-Lemma locales_of_list_from_indexes (es' es : list expr) :
-  locales_of_list_from es' es = imap (λ i _, length es' + i) es.
-Proof.
-  revert es'. induction es; [done|]; intros es'.
-  rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
-  f_equiv; [lia|]. rewrite IHes. apply imap_ext.
-  intros x ? Hin. rewrite app_length=> /=. lia.
-Qed.
-
-Lemma locales_of_list_indexes (es : list expr) :
-  locales_of_list es = indexes es.
-Proof. apply locales_of_list_from_indexes. Qed.
 
 (** The model is finitely branching *)
 
@@ -68,7 +48,8 @@ Proof.
     eapply H; try (by left); right); done).
 Qed.
 
-(** Proof that any fair execution of model guarantees progress *)
+(** Proof that any fair execution of model visits all natural numbers *)
+
 Definition yesno_mtrace : Type := mtrace the_fair_model.
 
 Definition yesno_mdl_progress (tr : yesno_mtrace) :=
