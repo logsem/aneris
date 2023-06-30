@@ -140,8 +140,8 @@ End LocksCompositionCode.
 
 
 Section LocksCompositionProofs.
-  Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM} {COMP_PRE: compPreG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ comp_model_impl}.
+  Context `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} {COMP_PRE: compPreG Σ}.
+  Context `{PMPP: @PartialModelPredicatesPre _ M _ _ Σ comp_model_impl}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
@@ -149,6 +149,9 @@ Section LocksCompositionProofs.
 
   Definition comp_st_auth (γ: gname) (st: fmstate comp_model_impl): iProp Σ := 
       own γ ((● (Excl' (fst $ fst st: sl_ofe), Excl' (snd $ fst st: sl_ofe), Excl' (snd st))): comp_cmra).  
+
+  Definition comp_sl1_st_frag (γ: gname) (st: fmstate spinlock_model_impl): iProp Σ := 
+      own γ ((◯ (Excl' (Some st: sl_ofe), ε, ε)): comp_cmra).  
 
   Definition comp_inv_impl (γ: gname) : iProp Σ :=
     ∃ st, partial_model_is st ∗ comp_st_auth γ st. 
@@ -321,6 +324,209 @@ Section LocksCompositionProofs.
     red. intros ??[?|[_?]]%lookup_union_Some_raw; [by eapply GE1| by eapply GE2].
   Qed.
 
+  (* Notation "'PartialModelPredicates_' '<' ctx '>'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP). *)
+
+  (* @PartialModelPredicates heap_lang M LM Nat.eq_dec nat_countable Σ *)
+  (*   (@heap_fairnessGS Σ M LM heapGS0) spinlock_model_impl spinlock_model  *)
+  (*   ?PMPP *)
+
+  (* TODO: move to upstream *)
+  (* Lemma set_map_disjoint  *)
+  (*   `{Elements A C, Singleton B D, Empty D, Union D} *)
+  (*   `{ElemOf A C} `{ElemOf B D} *)
+  (*   `{Singleton B D} *)
+  (*   (s1 s2: C) (f: A -> B) *)
+  (*   (DISJ: s1 ## s2): *)
+  (*   (set_map f s1: D) ## (set_map f s2: D). *)
+  (* Lemma set_map_disjoint {A B: Type} `{Countable A} `{Countable B} *)
+  (*   (s1 s2: gset A) (f: A -> B) *)
+  (*   (DISJ: s1 ## s2): *)
+  (*   set_map f s1 ## set_map f s2. *)
+  (* Proof using.  *)
+  (*   simpl. rewrite /set_map. apply elem_of_disjoint. *)
+  (*   intros ? IN1%elem_of_list_to_set IN2. *)
+    
+
+  Definition sl1_PMPP (γ: gname):
+    @PartialModelPredicatesPre heap_lang M _ _ Σ spinlock_model_impl.
+  refine
+    {|
+        partial_model_is := comp_sl1_st_frag γ;
+        partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_left;
+        partial_fuel_is := partial_fuel_is ∘ kmap lift_sl_role_left;
+        partial_mapping_is := partial_mapping_is ∘ (fmap (set_map lift_sl_role_left));
+        project_inner := (fun om => match om with
+                                 | Some (Some s1, _, _) => Some s1
+                                 | _ => None end ) ∘ project_inner
+    |}.
+  - intros. simpl. rewrite kmap_union. apply PMPP. 
+    apply map_disjoint_kmap; auto. apply _.
+  - intros. simpl. rewrite set_map_union. apply PMPP. set_solver.
+  - iIntros. simpl. rewrite set_map_empty. iStopProof. apply PMPP. 
+  Defined.
+
+
+  (* TODO: move to upstream *)
+  Lemma big_opM_kmap {M_ : ofe} {o : M_ → M_ → M_}
+    {Monoid0 : Monoid o}
+    {K1 K2 : Type}
+    (PO: Proper (equiv ==> equiv ==> equiv) o) (* TODO: problem with notation *)
+    `{EqDecision K1} `{Countable K1} `{EqDecision K2} `{Countable K2} {A: Type} 
+    (h : K1 → K2) {INJ: Inj eq eq h} (f : K2 → A → M_) (m : gmap K1 A):
+  ([^ o map] k↦y ∈ (kmap h m), f k y) ≡ ([^ o map] k↦y ∈ m, f (h k) y).
+  (* ([^ o map] k↦y ∈ (kmap h m), f k y) = ([^ o map] k↦y ∈ m, f (h k) y).  *)
+  Proof.
+    pattern m. apply map_ind.
+    { simpl. rewrite kmap_empty. simpl. by rewrite !big_opM_empty. }
+    intros. erewrite big_opM_insert; auto.
+    etrans.
+    { eapply big_opM_proper_2.
+      { rewrite insert_union_singleton_l kmap_union kmap_singleton.
+        (* reflexivity.  *)
+        apply leibniz_equiv_iff. reflexivity. }
+      intros. rewrite H5. reflexivity. }
+    rewrite big_opM_union.
+    2: { apply map_disjoint_singleton_l_2. by rewrite lookup_kmap. }
+    rewrite H2. 
+    f_equiv. by rewrite big_opM_singleton. 
+  Qed. 
+
+  (* TODO: move to upstream *)
+  Lemma big_opS_kmap {M_ : ofe} {o : M_ → M_ → M_}
+    {Monoid0 : Monoid o}
+    {K1 K2 : Type}
+    (PO: Proper (equiv ==> equiv ==> equiv) o) (* TODO: problem with notation *)
+    `{Countable K1} `{Countable K2} 
+    (h : K1 → K2) {INJ: Inj eq eq h} (f : K2 → M_) (m : gset K1):
+  ([^ o set] k ∈ (set_map h m), f k) ≡ ([^ o set] k ∈ m, f (h k)).
+  Proof.
+    pattern m. apply set_ind.
+    { solve_proper. }
+    { rewrite set_map_empty. by rewrite !big_opS_empty. } 
+
+    intros. erewrite big_opS_insert; auto.
+    (* TODO: refactor *)
+    etrans.
+    { etrans. 
+      { eapply big_opS_proper'; [reflexivity| ].
+        by rewrite set_map_union_L set_map_singleton_L. }
+      rewrite big_opS_union; [| set_solver].
+      rewrite big_opS_singleton. reflexivity. }
+    by rewrite H2. 
+  Qed.
+
+  Lemma has_fuels_sl1 tid γ (fs: gmap (fmrole spinlock_model_impl) nat):
+        has_fuels tid fs (PMPP := sl1_PMPP γ) ⊣⊢
+    has_fuels tid (kmap lift_sl_role_left fs) (PMPP := PMPP).
+  Proof using. 
+    rewrite /has_fuels. iApply bi.sep_proper.
+    - simpl. rewrite map_fmap_singleton. by rewrite dom_kmap.
+    - simpl. rewrite dom_kmap_L. rewrite big_opS_kmap.
+      apply big_opS_proper. intros. apply bi.exist_proper. 
+      red. intros. rewrite kmap_singleton lookup_kmap. done.
+  Qed.  
+
+  (* (* TODO: generalize*) *)
+  (* Lemma roles_kmap_filter (fs: gmap (fmrole spinlock_model_impl) nat): *)
+  (* kmap lift_sl_role_left (filter (λ '(k, _), k ∈ dom fs) fs) *)
+  (* ≡ filter (λ '(k, _), k ∈ dom (kmap lift_sl_role_left fs)) *)
+  (*     (kmap lift_sl_role_left fs).  *)
+
+  Section KmapMagic.
+
+  (* TODO: without this explicit definition the following lemma  *)
+  (*    fails to instantiate some typeclasses *)
+  Let kmap_: (fmrole spinlock_model_impl -> fmrole comp_model_impl) →
+                     (gmap (fmrole spinlock_model_impl) nat) → (gmap (fmrole comp_model_impl) nat).
+    refine (kmap (K2 := fmrole comp_model_impl) (K1 := fmrole spinlock_model_impl)).
+  Defined.
+
+  (* Context (kmap_: (fmrole spinlock_model_impl -> fmrole comp_model_impl) → *)
+  (*                    (gmap (fmrole spinlock_model_impl) nat) → (gmap (fmrole comp_model_impl) nat)). *)
+  
+  Lemma kmap_filter_dom (fs : gmap (fmrole spinlock_model_impl) nat)
+(f : fmrole spinlock_model_impl → fmrole iM)
+  (H1 : Inj eq eq f)
+  (X : ∀ i : fmrole iM, Decision (∃ j : fmrole spinlock_model_impl, i = f j)):
+  kmap_ f (filter (λ '(k, _), k ∈ dom fs) fs)
+  = filter (λ '(k, _), k ∈ dom (kmap_ f fs)) (kmap_ f fs).
+  Proof using. 
+    rewrite /kmap_.
+    (* TODO: refactor *)
+    apply map_eq. intros.
+    (* destruct i.  *)
+    destruct (@decide (exists j, i = f j)).
+    { done. }
+    2: { etrans; [| etrans]; [| exact (eq_refl None) |].
+         - apply lookup_kmap_None; [apply _| ].
+           intros. destruct n. eauto.
+         - symmetry. apply map_filter_lookup_None. left.
+           apply lookup_kmap_None; [apply _| ].
+           intros. destruct n. eauto. }
+    destruct e as [? ->]. rewrite lookup_kmap.
+    destruct (decide (x ∈ dom fs)).
+    + pose proof e as [? EQ]%elem_of_dom.
+      repeat (erewrite map_filter_lookup_Some_2; eauto).
+      { by rewrite lookup_kmap. }
+      rewrite dom_kmap. set_solver.
+    + pose proof n as ?%not_elem_of_dom_1.
+      repeat (rewrite map_filter_lookup_None_2; eauto).
+      rewrite lookup_kmap. eauto.
+  Qed.
+    
+  End KmapMagic.   
+  
+
+  Lemma sl1_PMP (γ: gname):
+    PMP ∗ □ comp_inv_impl γ ⊢ @PartialModelPredicates _ _ LM _ _ Σ _ _ spinlock_model (sl1_PMPP γ).
+  Proof. 
+    iIntros "[#PMP #COMP]". iApply @Build_PartialModelPredicates.
+
+    iModIntro. repeat iSplitR.
+    - iIntros (???????) "FUELS_SL MSI".
+      iMod (update_no_step_enough_fuel with "PMP [FUELS_SL] [MSI]") as "-#UPD".
+      2: by eauto.
+      3: done. 
+      2: { iDestruct (has_fuels_sl1 with "FUELS_SL") as "foo".
+           rewrite kmap_fmap. iFrame. }
+      { intros ?%dom_empty_iff_L%kmap_empty_iff; [set_solver| apply _]. }
+      iDestruct "UPD" as (??) "([% %]&?&?)".
+      iModIntro. do 2 iExists _. iSplitR; [done| ]. iFrame.
+      iApply has_fuels_sl1. iApply has_fuels_proper; [..| iFrame]; [done| ].
+      rewrite !difference_empty_L.
+
+      apply leibniz_equiv_iff. apply kmap_filter_dom; [apply _| ]. 
+      intros. destruct i; [destruct s| ]; [left| right| right]; eauto.
+      all: by intros [? ?]. 
+    - iIntros (???????????????). iIntros (??) "FUELS_SL MSI".
+      
+      iMod (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD".
+      all: eauto. 
+      4: { iDestruct (has_fuels_sl1 with "FUELS_SL") as "foo".
+           rewrite kmap_fmap. iFrame. }
+      3: { rewrite dom_kmap_L. rewrite -DOM.
+           rewrite set_map_union_L. reflexivity. }
+      { set_solver. }
+      { intros ?%kmap_empty_iff; [done| apply _]. }
+      iDestruct "UPD" as (?) "(F2&F1&?&?&%)".
+      iModIntro. iExists _. iFrame.
+      (* pose proof @dom_union_inv_L.  *)
+      pose proof (dom_union_inv_L fs _ _ DISJ (eq_Symmetric _ _ DOM)) as (fs1 & fs2 & FS12 & DISJ12 & DOM1 & DOM2). 
+      iSplitL "F2".
+      { simpl. iApply has_fuels_sl1. iApply has_fuels_proper; [reflexivity| | iFrame].
+        subst fs. rewrite kmap_union. rewrite !map_filter_union; auto.
+        2: { apply map_disjoint_kmap; [apply _| set_solver]. }
+        rewrite kmap_union. subst R1 R2.
+        (* left parts on both sides are empty *)
+        (* right parts are equal by kmap_filter_dom *)
+        admit. }
+      iSplitL "F1".
+      {
+        (* same as above*)
+        admit. }
+      foobar. 
+      
+
   Lemma comp_spec tid (P: iProp Σ):
     PMP -∗
     {{{ partial_model_is (None, None, Some 2)  ∗ 
@@ -428,14 +634,10 @@ Section LocksCompositionProofs.
       apply lookup_kmap_Some in H0 as [? [-> ?]]; [| by apply _].
       done. }
     { set_solver. }
-    { iSplitR; [done| ]. iIntros (tid') "!# FUELS".   
-    { set_solver. }
-    { iIntros (tid'). iNext. iIntros "FUELS". simpl.
-
-      clear.
-      Set Printing Implicit.
-      unshelve iApply program_spec.
-      clear. 
+    { iSplitR; [done| ]. iIntros (tid') "!# FUELS".
+      iApply program_spec.
+      { Set Printing Implicit. 
+      
       
 
 
