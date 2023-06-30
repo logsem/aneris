@@ -61,120 +61,89 @@ Lemma yesno_mdl_always_live ρ n (mtr : yesno_mtrace) :
           (λ (δ : the_fair_model) (_ : option (option (fmrole the_fair_model))),
              role_enabled_model ρ δ).
 Proof.
-  intros Hinf.
-  specialize (Hinf n) as [mtr' Hafter].
-  rewrite /pred_at. rewrite Hafter.
-  rewrite /role_enabled_model.
+  intros Hinf. specialize (Hinf n) as [mtr' Hafter].
+  rewrite /pred_at Hafter /role_enabled_model.
   destruct mtr'; destruct ρ; set_solver.
 Qed.
 
 Lemma yesno_mdl_always_eventually_scheduled ρ (mtr : yesno_mtrace) :
-  infinite_trace mtr →
-  fair_model_trace ρ mtr →
+  infinite_trace mtr → fair_model_trace ρ mtr →
   ∀ n, ∃ m, pred_at mtr (n+m) (λ _ ℓ, ℓ = Some (Some ρ)).
 Proof.
   intros Hinf Hfair n.
   apply (yesno_mdl_always_live ρ n mtr) in Hinf.
   specialize (Hfair n Hinf) as [m [Hfair | Hfair]].
-  - rewrite /pred_at in Hfair.
-    destruct (after (n + m) mtr); [|done].
+  - rewrite /pred_at in Hfair. destruct (after (n + m) mtr); [|done].
     rewrite /role_enabled_model in Hfair. destruct t; destruct ρ; set_solver.
   - by exists m.
 Qed.
 
-Lemma yesno_mdl_noprogress_Y n m (mtr : yesno_mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr →
-  (trfirst mtr) = n →
-  Nat.even n →
-  (∀ m0 : nat,
-     m0 < m → pred_at mtr m0
-             (λ _ l, l ≠ Some (Some Y))) →
-  pred_at mtr m (λ s _, s = n).
+Lemma yesno_mdl_noprogress_Y i n (mtr : yesno_mtrace) :
+  infinite_trace mtr → mtrace_valid mtr → (trfirst mtr) = i → Nat.even i →
+  (∀ m, m < n → pred_at mtr m (λ _ l, l ≠ Some (Some Y))) →
+  pred_at mtr n (λ s _, s = i).
 Proof.
   intros Hinf Hvalid Hfirst Heven Hne.
-  induction m.
+  induction n as [|n IHn].
   { rewrite /pred_at. destruct mtr; done. }
   simpl in *.
-  assert (∀ m0 : nat,
-          m0 < m
-          → pred_at mtr m0
-              (λ _ l, l ≠ Some (Some Y)))
-    as Hne'.
+  assert (∀ m : nat, m < n → pred_at mtr m (λ _ l, l ≠ Some (Some Y))) as Hne'.
   { intros. apply Hne. lia. }
-  specialize (IHm Hne').
-  rewrite /pred_at in IHm.
-  destruct (after m mtr) eqn:Hafter; rewrite Hafter in IHm; [|done].
-  rewrite /pred_at. replace (S m) with (m + 1) by lia.
-  rewrite after_sum'. rewrite Hafter. simpl.
-  specialize (Hinf (m+1)).
+  specialize (IHn Hne'). rewrite /pred_at in IHn.
+  destruct (after n mtr) as [mtr'|] eqn:Hafter; rewrite Hafter in IHn; [|done].
+  rewrite /pred_at. replace (S n) with (n + 1) by lia.
+  rewrite after_sum'. rewrite Hafter. specialize (Hinf (n+1)).
   rewrite after_sum' in Hinf. rewrite Hafter in Hinf.
-  destruct t; [by apply is_Some_None in Hinf|].
+  destruct mtr'; [by apply is_Some_None in Hinf|].
   eapply mtrace_valid_after in Hvalid; [|done].
   assert (ℓ ≠ Some Y) as Hneq.
-  { assert (m < S m) by lia. specialize (Hne m H). rewrite /pred_at in Hne.
+  { assert (n < S n) by lia. specialize (Hne n H). rewrite /pred_at in Hne.
     rewrite Hafter in Hne. intros ->. apply Hne. done. }
   pinversion Hvalid. simplify_eq. inversion H1; simplify_eq.
   - by apply even_not_odd in Heven.
-  - by destruct t.
+  - by destruct mtr'.
 Qed.
 
-Lemma yesno_mdl_noprogress_No n m (mtr : yesno_mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr →
-  (trfirst mtr) = n →
-  Nat.odd n →
-  (∀ m0 : nat,
-     m0 < m → pred_at mtr m0
-             (λ _ (l : option (option YN)),
-                l ≠ Some (Some No))) →
-  pred_at mtr m (λ s _, s = n).
+Lemma yesno_mdl_noprogress_No i n (mtr : yesno_mtrace) :
+  infinite_trace mtr → mtrace_valid mtr → (trfirst mtr) = i → Nat.odd i →
+  (∀ m, m < n → pred_at mtr m (λ _ l, l ≠ Some (Some No))) →
+  pred_at mtr n (λ s _, s = i).
 Proof.
   intros Hinf Hvalid Hfirst Hodd Hne.
-  induction m.
+  induction n as [|n IHn].
   { rewrite /pred_at. destruct mtr; done. }
   simpl in *.
-  assert (∀ m0 : nat,
-          m0 < m
-          → pred_at mtr m0
-              (λ _ l, l ≠ Some (Some No)))
-    as Hne'.
+  assert (∀ m : nat, m < n → pred_at mtr m (λ _ l, l ≠ Some (Some No))) as Hne'.
   { intros. apply Hne. lia. }
-  specialize (IHm Hne').
-  rewrite /pred_at in IHm.
-  destruct (after m mtr) eqn:Hafter; rewrite Hafter in IHm; [|done].
-  rewrite /pred_at. replace (S m) with (m + 1) by lia.
-  rewrite after_sum'. rewrite Hafter. simpl.
-  specialize (Hinf (m+1)).
+  specialize (IHn Hne'). rewrite /pred_at in IHn.
+  destruct (after n mtr) as [mtr'|] eqn:Hafter; rewrite Hafter in IHn; [|done].
+  rewrite /pred_at. replace (S n) with (n + 1) by lia.
+  rewrite after_sum'. rewrite Hafter. specialize (Hinf (n+1)).
   rewrite after_sum' in Hinf. rewrite Hafter in Hinf.
-  destruct t; [by apply is_Some_None in Hinf|].
+  destruct mtr'; [by apply is_Some_None in Hinf|].
   eapply mtrace_valid_after in Hvalid; [|done].
   assert (ℓ ≠ Some No) as Hneq.
-  { assert (m < S m) by lia. specialize (Hne m H). rewrite /pred_at in Hne.
+  { assert (n < S n) by lia. specialize (Hne n H). rewrite /pred_at in Hne.
     rewrite Hafter in Hne. intros ->. apply Hne. done. }
   pinversion Hvalid. simplify_eq. inversion H1; simplify_eq.
   - by apply odd_not_even in Hodd.
-  - by destruct t.
+  - by destruct mtr'.
 Qed.
 
-Theorem yesno_mdl_progresses_Y n (mtr : yesno_mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr →
-  (∀ ρ, fair_model_trace ρ mtr) →
-  (trfirst mtr) = n →
-  Nat.even n →
-  ∃ m, pred_at mtr m (λ s _, s = S n).
+Theorem yesno_mdl_progresses_Y i (mtr : yesno_mtrace) :
+  infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
+  (trfirst mtr) = i → Nat.even i →
+  ∃ m, pred_at mtr m (λ s _, s = S i).
 Proof.
   intros Hinf Hvalid Hfair Hfirst Heven.
   specialize (Hfair Y).
   pose proof (yesno_mdl_always_eventually_scheduled Y mtr Hinf Hfair 0) as Hsched.
-  simpl in *.
-  apply trace_eventually_until in Hsched as [m [Hsched Hschedne]].
+  simpl in *. apply trace_eventually_until in Hsched as [m [Hsched Hschedne]].
   rewrite /pred_at in Hsched.
-  destruct (after m mtr) eqn:Hafter; last first.
+  destruct (after m mtr) as [mtr'|] eqn:Hafter; last first.
   { rewrite Hafter in Hsched. done. }
   rewrite Hafter in Hsched.
-  destruct t; [done|].
+  destruct mtr'; [done|].
   simplify_eq.
   assert (s = trfirst mtr) as ->.
   { eapply yesno_mdl_noprogress_Y in Hschedne; [|done..].
@@ -183,28 +152,24 @@ Proof.
   pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
   - exists (m + 1).
     rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
-    destruct t; simpl in *; simplify_eq; done.
+    destruct mtr'; simpl in *; simplify_eq; done.
   - by apply even_not_odd in Heven.
 Qed.
 
-Theorem yesno_mdl_progresses_No n (mtr : yesno_mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr →
-  (∀ ρ, fair_model_trace ρ mtr) →
-  (trfirst mtr) = n →
-  Nat.odd n →
-  ∃ m, pred_at mtr m (λ s _, s = S n).
+Theorem yesno_mdl_progresses_No i (mtr : yesno_mtrace) :
+  infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
+  (trfirst mtr) = i → Nat.odd i →
+  ∃ m, pred_at mtr m (λ s _, s = S i).
 Proof.
   intros Hinf Hvalid Hfair Hfirst Hodd.
   specialize (Hfair No).
   pose proof (yesno_mdl_always_eventually_scheduled No mtr Hinf Hfair 0) as Hsched.
-  simpl in *.
-  apply trace_eventually_until in Hsched as [m [Hsched Hschedne]].
+  simpl in *. apply trace_eventually_until in Hsched as [m [Hsched Hschedne]].
   rewrite /pred_at in Hsched.
-  destruct (after m mtr) eqn:Hafter; last first.
+  destruct (after m mtr) as [mtr'|] eqn:Hafter; last first.
   { rewrite Hafter in Hsched. done. }
   rewrite Hafter in Hsched.
-  destruct t; [done|].
+  destruct mtr'; [done|].
   simplify_eq.
   assert (s = trfirst mtr) as ->.
   { eapply yesno_mdl_noprogress_No in Hschedne; [|done..].
@@ -213,48 +178,45 @@ Proof.
   pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
   - exists (m + 1).
     rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
-    destruct t; simpl in *; simplify_eq; done.
+    destruct mtr'; simpl in *; simplify_eq; done.
   - by apply odd_not_even in Hodd.
 Qed.
 
 Theorem yesno_mdl_progresses (mtr : yesno_mtrace) :
-  infinite_trace mtr →
-  mtrace_valid mtr →
-  (∀ ρ, fair_model_trace ρ mtr) →
+  infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
   (trfirst mtr) = 0 →
   yesno_mdl_progress mtr.
 Proof.
-  intros Hinf Hvalid Hfair Hfirst n.
-  induction n as [|n IHn].
+  intros Hinf Hvalid Hfair Hfirst i.
+  induction i as [|i IHi].
   { exists 0. rewrite /pred_at. rewrite /trfirst in Hfirst. simpl.
     destruct mtr; done. }
-  destruct IHn as [m Hpred].
+  destruct IHi as [n Hpred].
   rewrite /pred_at in Hpred.
-  destruct (after m mtr) eqn:Hafter; [|done].
+  destruct (after n mtr) as [mtr'|] eqn:Hafter; [|done].
   eapply infinite_trace_after'' in Hinf; [|done].
   eapply mtrace_valid_after in Hvalid; [|done].
-  destruct (Nat.even n) eqn:Heqn.
-  - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t) as Hfair'.
+  destruct (Nat.even i) eqn:Heqn.
+  - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ mtr') as Hfair'.
     { intros. by eapply fair_model_trace_after. }
-    assert (trfirst t = n) as Hfirst'.
-    { rewrite /trfirst. destruct t; done. }
-    pose proof (yesno_mdl_progresses_Y n t Hinf Hvalid Hfair' Hfirst')
-      as [m' Hpred']; [by eauto|].
-    exists (m + m').
+    assert (trfirst mtr' = i) as Hfirst'.
+    { rewrite /trfirst. destruct mtr'; done. }
+    pose proof (yesno_mdl_progresses_Y i mtr' Hinf Hvalid Hfair' Hfirst')
+      as [m Hpred']; [by eauto|].
+    exists (n + m).
     rewrite pred_at_sum. rewrite Hafter. done.
-  - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ t) as Hfair'.
+  - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ mtr') as Hfair'.
     { intros. by eapply fair_model_trace_after. }
-    assert (trfirst t = n) as Hfirst'.
-    { rewrite /trfirst. destruct t; done. }
-    pose proof (yesno_mdl_progresses_No n t Hinf Hvalid Hfair' Hfirst')
-      as [m' Hpred']; [by rewrite -Nat.negb_even Heqn|].
-    exists (m + m').
+    assert (trfirst mtr' = i) as Hfirst'.
+    { rewrite /trfirst. destruct mtr'; done. }
+    pose proof (yesno_mdl_progresses_No i mtr' Hinf Hvalid Hfair' Hfirst')
+      as [m Hpred']; [by rewrite -Nat.negb_even Heqn|].
+    exists (n + m).
     rewrite pred_at_sum. rewrite Hafter. done.
 Qed.
 
 (** Proof that fair progress is preserved through auxiliary trace *)
 
-(* TODO: Better definition *)
 Definition yesno_aux_progress (auxtr : auxtrace the_model) :=
   ∀ n, ∃ m, pred_at auxtr m (λ s l, (λ s' _, s' = n) (ls_under s) (l ≫= Ul)).
 
@@ -272,8 +234,8 @@ Qed.
 (** Proof that progress is preserved between auxilary and execution trace,
  for a specific ξ *)
 
-Definition yesno_ex_progress (l:loc) (tr : heap_lang_extrace) :=
-  ∀ (n:nat), ∃ m, pred_at tr m (λ s _, heap s.2 !! l = Some #n).
+Definition yesno_ex_progress (l:loc) (extr : heap_lang_extrace) :=
+  ∀ (n:nat), ∃ m, pred_at extr m (λ s _, heap s.2 !! l = Some #n).
 
 Definition ξ_yesno_model_match (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
   ∃ (N:nat), heap c.2 !! l = Some #N ∧ δ = N.
@@ -294,17 +256,14 @@ Lemma yesno_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxt
   (lm_ls_trans the_model) extr auxtr →
   yesno_aux_progress auxtr → yesno_ex_progress l extr.
 Proof.
-  intros Hξ Hauxtr.
-  intros n.
-  specialize (Hauxtr n).
-  rewrite /pred_at in Hauxtr.
-  destruct Hauxtr as [m Hauxtr].
-  destruct (after m auxtr) eqn:Heqn; [|done].
+  intros Hξ Hauxtr n. specialize (Hauxtr n).
+  rewrite /pred_at in Hauxtr. destruct Hauxtr as [m Hauxtr].
+  destruct (after m auxtr) as [auxtr'|] eqn:Heqn; [|done].
   eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
   exists m. rewrite /pred_at. rewrite Hafter'.
-  inversion Hextr'; simplify_eq.
-  - destruct H as [? [? [n [? ?]]]]. simplify_eq. done.
-  - destruct H0 as [? [? [n [? ?]]]]. simplify_eq. done.
+  inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
+  - destruct Hξ as (?&?&n&?&?). by simplify_eq.
+  - destruct Hξ as (?&?&n&?&?). by simplify_eq.
 Qed.
 
 Instance the_model_mstate_countable : EqDecision (mstate the_model).
@@ -344,9 +303,7 @@ Proof.
   { iNext. unfold yesno_inv_inner. iExists 0.
     replace (∅ ∖ live_roles the_fair_model 0) with
       (∅:gset (fmrole the_fair_model)) by set_solver.
-    simpl. rewrite /yn_live_roles.
-    iFrame.
-    rewrite big_sepM_singleton. iFrame. }
+    rewrite /yn_live_roles big_sepM_singleton. by iFrame. }
   iModIntro.
   iSplitL.
   { simpl. rewrite /yn_live_roles.
@@ -357,8 +314,7 @@ Proof.
       rewrite map_union_comm; last first.
       { rewrite map_disjoint_singleton_l.
         by rewrite lookup_insert_ne. }
-      rewrite -!insert_union_l.
-      rewrite left_id. done. }
+      by rewrite -!insert_union_l left_id. }
     iApply (start_spec with "[$Hf $Hyes_at $Hno_at $Hinv]"); [lia|].
     by iIntros "!>?". }
   iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck [_ [Hσ Hδ]] Hposts".
@@ -366,93 +322,67 @@ Proof.
   iApply fupd_mask_intro; [set_solver|].
   iIntros "Hclose'".
   iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
-  iDestruct (model_state_interp_tids_smaller with "Hδ") as %Hsmaller.   iDestruct "Hδ" as (??) "(Hf&HM&HFR_auth&%Hinverse&%Hlocales&Hδ&%Hdom)".
+  iDestruct (model_state_interp_tids_smaller with "Hδ") as %Hsmaller.
+  iDestruct "Hδ" as (Mζ ?) "(Hf&HM&HFR_auth&%Hinverse&%Hlocales&Hδ&%Hdom)".
   iDestruct (model_agree with "Hδ Hmod") as %Hn'.
   iSplitL; last first.
-  { iPureIntro.
-    exists M. split; [done|].
-    rewrite -Hn'. by destruct auxtr. }
+  { iPureIntro. exists M. split; [done|]. rewrite -Hn'. by destruct auxtr. }
   rewrite /trace_ends_in in Hends.
   rewrite Hends.
-
   iSplit.
   - iIntros "%Hall".
-    rewrite !big_sepL_omap.
-    rewrite !big_sepL_zip_with.
-    simpl.
+    rewrite !big_sepL_omap !big_sepL_zip_with=> /=.
     iAssert ([∗ list] k↦x ∈ c.1, k ↦M ∅)%I with "[Hposts]" as "Hposts".
-    {
-      destruct c as [es σ]=> /=.
+    { destruct c as [es σ]=> /=.
       iApply (big_sepL_impl with "Hposts").
       iIntros "!>" (k x HSome) "Hk".
-      simpl in *.
       assert (is_Some (to_val x)) as [v Hv].
       { by eapply (Forall_lookup_1 (λ e : expr, is_Some (to_val e))). }
-      rewrite Hv.
-      destruct k; [done|].
-      simpl.
-      destruct es; [done|].
-      simpl in *.
-      rewrite drop_0.
-      rewrite list_lookup_fmap.
+      rewrite Hv. destruct k; [done|]. destruct es; [done|].
+      simpl in *. rewrite drop_0. rewrite list_lookup_fmap.
       erewrite prefixes_from_lookup; [|done].
-      simpl.
-      rewrite /locale_of.
-      rewrite take_length.
+      simpl. rewrite /locale_of. rewrite take_length.
       assert (k < length es).
       { apply lookup_lt_is_Some_1. by eauto. }
-      replace (k `min` length es) with k by lia.
-      done.
-    }
-    iAssert (⌜∀ i, i < length c.1 → M0 !! i = Some ∅⌝)%I as "%HM0".
-    {
-      iIntros (i Hlen).
+      by replace (k `min` length es) with k by lia. }
+    iAssert (⌜∀ i, i < length c.1 → Mζ !! i = Some ∅⌝)%I as "%HMζ".
+    { iIntros (i Hlen).
       assert (is_Some $ c.1 !! i) as [e HSome].
       { by apply lookup_lt_is_Some_2. }
       iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
-      by iDestruct (frag_mapping_same with "HM Hpost") as "H".
-    }
-    assert (dom M0 = list_to_set $ locales_of_list c.1).
-    {
-      rewrite Hends in Hlocales.
-      apply set_eq.
+      by iDestruct (frag_mapping_same with "HM Hpost") as "?". }
+    assert (dom Mζ = list_to_set $ locales_of_list c.1).
+    { rewrite Hends in Hlocales. apply set_eq.
       intros x. rewrite elem_of_dom.
       rewrite elem_of_list_to_set.
       split.
       - intros HSome.
-        destruct (decide (x ∈ locales_of_list c.1))
-          as [|Hnin]; [done|].
+        destruct (decide (x ∈ locales_of_list c.1)) as [|Hnin]; [done|].
         apply Hlocales in Hnin.
         destruct HSome as [??]. simplify_eq.
-      - intros Hin.
-        exists ∅.
-        apply HM0.
+      - intros Hin. exists ∅. apply HMζ.
         rewrite locales_of_list_indexes in Hin.
         rewrite /indexes in Hin.
         apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
-        by apply lookup_lt_is_Some_1.
-    }
+        by apply lookup_lt_is_Some_1. }
     assert (ls_mapping (trace_last auxtr) = ∅) as Hmapping.
-    { apply map_eq.
-      intros i.
-      rewrite lookup_empty.
-      destruct (ls_mapping (trace_last auxtr) !! i) as [ζ|]
-        eqn:Heqn; [|done].
+    { apply map_eq. intros i. rewrite lookup_empty.
+      destruct (ls_mapping (trace_last auxtr) !! i) as [ζ|] eqn:Heqn; [|done].
       pose proof Heqn as [e He]%Hsmaller.
-      assert (M0 !! ζ = Some ∅) as Hζ.
-      { apply HM0.
+      assert (Mζ !! ζ = Some ∅) as Hζ.
+      { apply HMζ.
         apply from_locale_lookup in He.
         rewrite Hends in He.
         by apply lookup_lt_is_Some_1. }
       eapply (no_locale_empty _ _ i) in Hζ; [|done].
       by simplify_eq. }
-    assert (live_roles _ M = ∅).
+    assert (live_roles _ M = ∅) as Hlive.
     { cut (live_roles the_fair_model M ⊆ ∅); [by set_solver|].
       etrans.
       - eapply (ls_mapping_dom (M:=the_fair_model)).
       - erewrite Hmapping. done. }
-    rewrite /live_roles in H0. simpl in *.
-    rewrite /yn_live_roles in H0. set_solver.
+    rewrite /live_roles in Hlive. simpl in *.
+    rewrite /yn_live_roles in Hlive. set_solver.
   - iPureIntro.
     apply Forall_forall.
     intros e He. by apply Hnstuck.
@@ -469,9 +399,7 @@ CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
 Lemma extrace_maximal_valid {Λ} (extr : extrace Λ) :
   extrace_maximal extr → extrace_valid extr.
 Proof.
-  revert extr. cofix IH.
-  intros extr Hmaximal.
-  inversion Hmaximal.
+  revert extr. cofix IH. intros extr Hmaximal. inversion Hmaximal.
   - constructor 1.
   - constructor 2; [done|by apply IH].
 Qed.
@@ -479,13 +407,9 @@ Qed.
 Lemma extrace_maximal_after {Λ} n (extr extr' : extrace Λ) :
   extrace_maximal extr → after n extr = Some extr' → extrace_maximal extr'.
 Proof.
-  revert extr extr'.
-  induction n; intros extr extr' Hafter Hvalid.
+  revert extr extr'. induction n; intros extr extr' Hafter Hvalid.
   { destruct extr'; simpl in *; by simplify_eq. }
-  simpl in *.
-  destruct extr; [done|].
-  eapply IHn; [|done].
-  by inversion Hafter.
+  simpl in *. destruct extr; [done|]. eapply IHn; [|done]. by inversion Hafter.
 Qed.
 
 (** Proof that execution trace actually progresses *)
@@ -500,7 +424,6 @@ Proof.
   intros Hmaximal Hfair Hfirst.
   pose proof Hmaximal as Hvalid%extrace_maximal_valid.
   pose proof (yesno_incr_sim l) as Hsim.
-
   assert (∃ iatr,
              valid_inf_system_trace
                (continued_simulation (sim_rel_with_user the_model (ξ_yesno_trace l)))
@@ -512,7 +435,6 @@ Proof.
     Unshelve.
     - rewrite Hfirst. done.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
-
   assert (∃ (auxtr : auxtrace the_model),
              traces_match labels_match
                (live_tids /2\ (ξ_yesno l))
@@ -530,7 +452,6 @@ Proof.
       exists n. split; [done|]. by destruct auxtr'.
     - by apply from_trace_spec.
     - by apply to_trace_spec. }
-
   assert (exaux_traces_match extr auxtr) as Hmatch.
   { eapply traces_match_impl; [| |done].
     - done.
@@ -539,13 +460,8 @@ Proof.
   apply can_destutter_auxtr in Hstutter; last first.
   { intros ?? Hstep. inversion Hstep. done. }
   destruct Hstutter as [mtr Hupto].
-
-  clear Hiatr.
-
   assert (infinite_trace extr) as Hinf.
-  {
-    intros n.
-    induction n; [done|].
+  { intros n. induction n as [|n IHn]; [done|].
     destruct IHn as [extr' Hafter].
     apply traces_match_flip in Hmatch_strong.
     eapply traces_match_after in Hmatch_strong; [|done].
@@ -556,42 +472,32 @@ Proof.
     apply traces_match_first in Hmatch_strong.
     destruct Hmatch_strong as [_ [[Hξ1 Hξ2] _]].
     eapply extrace_maximal_after in Hmaximal; [|done].
-    inversion Hmaximal; simplify_eq; [|done].
-
+    inversion Hmaximal as [? Hnstep|]; simplify_eq; [|done].
     assert (∃ oζ c', locale_step c oζ c') as Hstep; last first.
-    { exfalso. destruct Hstep as (?&?&Hstep). by eapply H. }
-
+    { exfalso. destruct Hstep as (?&?&Hstep). by eapply Hnstep. }
     apply not_Forall_Exists in Hξ1; [|apply _].
     apply Exists_exists in Hξ1 as [e [Hξ11 Hξ12]].
     rewrite Forall_forall in Hξ2.
     specialize (Hξ2 e Hξ11) as [|Hred]; [done|].
-
     destruct Hred as (e' & σ' & es' & Hred).
-
     apply elem_of_list_split in Hξ11 as (es1&es2&Hes).
-
     destruct c; simpl in *.
-
     eexists (Some _), _.
     econstructor; eauto. simpl in *.
     f_equiv. done.
   }
-
   pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfairaux.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-
   pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfair'.
   pose proof (upto_stutter_fairness auxtr mtr Hupto Hfair') as Hfair''.
-
   assert (infinite_trace mtr) as Hinf''.
   { eapply upto_stutter_infinite_trace; [done|].
     by eapply traces_match_infinite_trace. }
   assert (mtrace_valid mtr) as Hvalid''.
   { eapply upto_preserves_validity; [done|].
     by eapply exaux_preserves_validity. }
-
   assert (trfirst mtr = 0) as Hfirst''.
   { apply traces_match_first in Hmatch_strong.
     destruct Hmatch_strong as [_ [_ [n [Hσ Hmdl]]]].
@@ -600,10 +506,8 @@ Proof.
     assert (0 = ls_under (trfirst auxtr)) as Hσ' by lia.
     inversion Hupto; simplify_eq;
     by rewrite Hσ'. }
-
   pose proof (yesno_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
     as Hprogress.
-
   eapply (yesno_aux_ex_progress_preserved l _ auxtr); [done|].
   by eapply yesno_mtr_aux_progress_preserved.
 Qed.

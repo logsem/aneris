@@ -15,22 +15,17 @@ Import derived_laws_later.bi.
 
 Set Default Proof Using "Type".
 
-Definition yes_go : val :=
-  rec: "yes_go" "l" "n" :=
+Definition incr_loop : val :=
+  rec: "incr_loop" "l" "n" :=
     (if: CAS "l" "n" ("n"+#1)
-     then "yes_go" "l" ("n" + #2)
-     else "yes_go" "l" "n").
-
-Definition no_go : val :=
-  rec: "no_go" "l" "n" :=
-    (if: CAS "l" "n" ("n"+#1)
-     then "no_go" "l" ("n" + #2)
-     else "no_go" "l" "n").
+     then "incr_loop" "l" ("n" + #2)
+     else "incr_loop" "l" "n").
 
 Definition start : val :=
   λ: "l",
-    (Fork (yes_go "l" #0) ;;
-    Fork (no_go "l" #1)).
+    let: "x" := !"l" in
+    (Fork (incr_loop "l" "x") ;;
+    Fork (incr_loop "l" ("x"+#1))).
 
 (** * Definition of the model! *)
 
@@ -153,7 +148,7 @@ Section proof.
 
   Lemma yes_go_spec tid n (N: nat) f (Hf: f > 40):
     {{{ yesno_inv n ∗ has_fuel tid Y f ∗ yes_at N }}}
-      yes_go #n #N @ tid
+      incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
@@ -217,7 +212,7 @@ Section proof.
 
   Lemma no_go_spec tid n (N: nat) f (Hf: f > 40):
     {{{ yesno_inv n ∗ has_fuel tid No f ∗ no_at N }}}
-      no_go #n #N @ tid
+      incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
@@ -281,56 +276,131 @@ Section proof.
       iPureIntro; lia.
   Qed.
 
+  Definition role_frag (yn : YN) : nat → iProp Σ :=
+    match yn with
+    | Y => yes_at
+    | No => no_at
+    end.
+
+  Lemma incr_loop_spec tid n (N : nat) f (Hf: f > 40) (yn : YN) :
+    {{{ yesno_inv n ∗ has_fuel tid yn f ∗ (role_frag yn) N }}}
+      incr_loop #n #N @ tid
+    {{{ RET #(); tid ↦M ∅ }}}.
+  Proof.
+    iIntros (Φ) "(#Hinv & Hf & Hyn) Hk".
+    destruct yn.
+    - iApply (yes_go_spec with "[$Hf $Hyn]"); [lia|done|done].
+    - iApply (no_go_spec with "[$Hf $Hyn]"); [lia|done|done].
+  Qed.
+
 End proof.
 
 Section proof_start.
   Context `{!heapGS Σ the_model, !yesnoG Σ}.
   Let Ns := nroot .@ "yes_no".
 
-  Lemma start_spec tid n f (Hf: f > 60):
-    {{{ yesno_inv n ∗ has_fuels tid {[ Y := f; No := f ]} ∗ yes_at 0 ∗ no_at 1 }}}
+  Lemma start_spec tid n N1 N2 f (Hf: f > 60) :
+    {{{ yesno_inv n ∗ has_fuels tid {[ Y := f; No := f ]} ∗
+        yes_at N1 ∗ no_at N2 }}}
       start #n @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.
     iIntros (Φ) "(#Hinv & Hf & Hyes_at & Hno_at) HΦ". unfold start.
     wp_pures.
-    wp_bind (Fork _).
-    rewrite has_fuels_gt_1; last solve_fuel_positive.
-    iApply (wp_fork_nostep _ tid _ _ _ {[ No ]} {[ Y ]} {[Y := _; No := _]}
-             with "[Hyes_at] [- Hf] [Hf]");
-      [ set_solver | by apply insert_non_empty |  | | | rewrite !fmap_insert fmap_empty // ];
-      [set_solver | |].
-    { iIntros (tid') "!> Hf".
-      replace 0%Z with (Z.of_nat 0) by lia.
-      iApply (yes_go_spec with "[-]"); last first.
-      + by eauto.
-      + rewrite map_filter_insert_True; last set_solver.
+    wp_bind (Load _).
+    iApply wp_atomic.
+    iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
+    iIntros "!>".
+    wp_load.
+    iIntros "!>".
+    destruct (Nat.even M) eqn:Heven.
+    - iDestruct "Hauths" as "[Hyes Hno]".
+      iDestruct (yes_agree with "Hyes_at Hyes") as %<-.
+      iDestruct (no_agree with "Hno_at Hno") as %<-.
+      iMod ("Hclose" with "[-Hf Hyes_at Hno_at HΦ]") as "_".
+      { iIntros "!>". iExists _. iFrame. rewrite Heven. iFrame. }
+      iIntros "!>". wp_pures. wp_bind (Fork _).
+      rewrite has_fuels_gt_1; last solve_fuel_positive.
+      iApply (wp_fork_nostep _ tid _ _ _ {[ No ]} {[ Y ]} {[Y := _; No := _]}
+               with "[Hyes_at] [- Hf] [Hf]");
+        [ set_solver | by apply insert_non_empty | | | |
+          rewrite !fmap_insert fmap_empty // ]; [set_solver | |].
+      { iIntros (tid') "!> Hf".
+        rewrite map_filter_insert_True; last set_solver.
         rewrite map_filter_insert_not; last set_solver.
         rewrite map_filter_empty insert_empty.
-        rewrite has_fuel_fuels. by iFrame "#∗".
-      + lia. }
-    iIntros "!> Hf".
-    rewrite map_filter_insert_not; last set_solver.
-    rewrite map_filter_insert_True; last set_solver.
-    rewrite map_filter_empty insert_empty.
-    iModIntro.
-    wp_pures.
-    rewrite has_fuels_gt_1; last solve_fuel_positive.
-    iApply (wp_fork_nostep _ tid _ _ _ ∅ {[ No ]} {[No := _]} with "[Hno_at] [HΦ] [Hf]");
-      [ set_solver | by apply insert_non_empty |  | | | rewrite !fmap_insert fmap_empty // ];
-      [set_solver | |].
-    { iIntros (tid') "!> Hf".
-      replace 1%Z with (Z.of_nat 1) by lia.
-      iApply (no_go_spec with "[-]"); last first.
-      + by eauto.
-      + rewrite map_filter_insert_True; last set_solver.
+        rewrite -has_fuel_fuels.
+        iApply (incr_loop_spec with "[Hyes_at $Hf]"); [lia|iFrame "#∗"|].
+        by iIntros "!>?". }
+      iIntros "!> Hf".
+      iIntros "!>".
+      rewrite map_filter_insert_not; last set_solver.
+      rewrite map_filter_insert_True; last set_solver.
+      rewrite map_filter_empty insert_empty.
+      wp_pures.
+      rewrite has_fuels_gt_1; last solve_fuel_positive.
+      iApply (wp_fork_nostep _ tid _ _ _ ∅ {[ No ]} {[No := _]} with "[Hno_at] [HΦ] [Hf]");
+        [ set_solver | by apply insert_non_empty | | | |
+          rewrite !fmap_insert fmap_empty // ]; [set_solver| |].
+      + iIntros (tid') "!> Hf".
+        rewrite map_filter_insert_True; last set_solver.
         rewrite map_filter_empty insert_empty.
-        rewrite has_fuel_fuels. by iFrame "#∗".
-      + lia. }
-    iNext. iIntros "[Hf _]".
-    iApply "HΦ". iModIntro. iApply (equiv_wand with "Hf"). do 2 f_equiv.
-    rewrite dom_empty_iff_L map_filter_empty_iff.
-    intros ???. set_solver.
+        rewrite -has_fuel_fuels.
+        wp_pures.
+        rewrite -has_fuel_fuels.
+        replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
+        iApply (incr_loop_spec with "[Hno_at $Hf]"); [lia|iFrame "#∗"|].
+        by iIntros "!>?".
+    + iIntros "!> Hf".
+        rewrite map_filter_insert_not; last set_solver.
+        rewrite map_filter_empty.
+        iApply "HΦ". iModIntro.
+        iDestruct "Hf" as "[Hf _]".
+        by rewrite dom_empty_L.
+    - iDestruct "Hauths" as "[Hyes Hno]".
+      iDestruct (yes_agree with "Hyes_at Hyes") as %<-.
+      iDestruct (no_agree with "Hno_at Hno") as %<-.
+      iMod ("Hclose" with "[-Hf Hyes_at Hno_at HΦ]") as "_".
+      { iIntros "!>". iExists _. iFrame. rewrite Heven. iFrame. }
+      iIntros "!>". wp_pures. wp_bind (Fork _).
+      rewrite has_fuels_gt_1; last solve_fuel_positive.
+      rewrite insert_commute; [|done].
+      iApply (wp_fork_nostep _ tid _ _ _ {[ Y ]} {[ No ]} {[No := _; Y := _]}
+               with "[Hno_at] [- Hf] [Hf]");
+        [ set_solver | by apply insert_non_empty | | | |
+          rewrite !fmap_insert fmap_empty // ]; [set_solver | |].
+      { iIntros (tid') "!> Hf".
+        rewrite map_filter_insert_True; last set_solver.
+        rewrite map_filter_insert_not; last set_solver.
+        rewrite map_filter_empty insert_empty.
+        rewrite -has_fuel_fuels.
+        iApply (incr_loop_spec with "[Hno_at $Hf]"); [lia|iFrame "#∗"|].
+        by iIntros "!>?". }
+      iIntros "!> Hf".
+      iIntros "!>".
+      rewrite map_filter_insert_not; last set_solver.
+      rewrite map_filter_insert_True; last set_solver.
+      rewrite map_filter_empty insert_empty.
+      wp_pures.
+      rewrite has_fuels_gt_1; last solve_fuel_positive.
+      iApply (wp_fork_nostep _ tid _ _ _ ∅ {[ Y ]} {[Y := _]} with "[Hyes_at] [HΦ] [Hf]");
+        [ set_solver | by apply insert_non_empty | | | |
+          rewrite !fmap_insert fmap_empty // ]; [set_solver| |].
+      + iIntros (tid') "!> Hf".
+        rewrite map_filter_insert_True; last set_solver.
+        rewrite map_filter_empty insert_empty.
+        rewrite -has_fuel_fuels.
+        wp_pures.
+        rewrite -has_fuel_fuels.
+        replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
+        iApply (incr_loop_spec with "[Hyes_at $Hf]"); [lia|iFrame "#∗"|].
+        by iIntros "!>?".
+      + iIntros "!> Hf".
+        rewrite map_filter_insert_not; last set_solver.
+        rewrite map_filter_empty.
+        iApply "HΦ". iModIntro.
+        iDestruct "Hf" as "[Hf _]".
+        by rewrite dom_empty_L.
   Qed.
 
 End proof_start.
