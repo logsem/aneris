@@ -508,7 +508,7 @@ Section LocksCompositionProofs.
            rewrite set_map_union_L. reflexivity. }
       { set_solver. }
       { intros ?%kmap_empty_iff; [done| apply _]. }
-      iDestruct "UPD" as (?) "(F2&F1&?&?&%)".
+      iDestruct "UPD" as (?) "(F2&F1&FIN&?&%)".
       iModIntro. iExists _. iFrame.
       (* pose proof @dom_union_inv_L.  *)
       pose proof (dom_union_inv_L fs _ _ DISJ (eq_Symmetric _ _ DOM)) as (fs1 & fs2 & FS12 & DISJ12 & DOM1 & DOM2). 
@@ -524,7 +524,10 @@ Section LocksCompositionProofs.
       {
         (* same as above*)
         admit. }
-      foobar. 
+      iSplitL; [| done].
+      iIntros "NO". iApply "FIN". 
+      simpl. by rewrite map_fmap_singleton set_map_empty.
+    - 
       
 
   Lemma comp_spec tid (P: iProp Σ):
