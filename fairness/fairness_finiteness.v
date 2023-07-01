@@ -361,3 +361,11 @@ Proof.
   Unshelve.
   - intros ??. apply make_proof_irrel.
 Qed.
+
+Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel Λ Mdl}
+      `{EqDecision (mstate LM)} `{EqDecision (mlabel LM)}
+      `{Countable (locale Λ)} ξ :
+  rel_finitary (sim_rel LM) → rel_finitary (sim_rel_with_user LM ξ).
+Proof.
+  intros Hrel. eapply rel_finitary_impl; [|done]. by intros ex aux [Hsim _].
+Qed.

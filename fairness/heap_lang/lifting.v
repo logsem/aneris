@@ -112,6 +112,21 @@ Proof.
     first apply from_locale_from_lookup. simpl; lia.
 Qed.
 
+Definition indexes {A} (xs : list A) := imap (λ i _, i) xs.
+
+Lemma locales_of_list_from_indexes (es' es : list expr) :
+  locales_of_list_from es' es = imap (λ i _, length es' + i)%nat es.
+Proof.
+  revert es'. induction es; [done|]; intros es'.
+  rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
+  f_equiv; [lia|]. rewrite IHes. apply imap_ext.
+  intros x ? Hin. rewrite app_length=> /=. lia.
+Qed.
+
+Lemma locales_of_list_indexes (es : list expr) :
+  locales_of_list es = indexes es.
+Proof. apply locales_of_list_from_indexes. Qed.
+
 Theorem heap_lang_continued_simulation_fair_termination {FM : FairModel}
         `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
   continued_simulation
@@ -140,6 +155,7 @@ Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
                       ξ ex' (map_underlying_trace atr')⌝ -∗
     ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
     state_interp ex atr -∗
+    posts_of c.1 ((λ _, 0%nat ↦M ∅) :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from c1.1 (drop (length c1.1) c.1)))) -∗
     |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝.
 
 Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
@@ -176,7 +192,6 @@ Proof.
                               fairness_model_free_roles_name := γfr;
                               |}
          |}).
-
   iMod (H distG) as "Hwp". clear H.
   iExists state_interp, (λ _, 0%nat ↦M ∅)%I, fork_post.
   iSplitR.
@@ -201,7 +216,6 @@ Proof.
       iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
       iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
   iDestruct "Hwp" as ">[Hwp H]".
-
   iModIntro. iFrame "Hwp".
   iSplitL "Hgen Hmoda Hmapa Hfuela HFR".
   { unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles M s1) ]}, _.
@@ -214,19 +228,19 @@ Proof.
     - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
     - rewrite dom_gset_to_gmap. set_solver. }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Hequiv) "Hsi Hposts".
-
   assert ( ∀ (ex' : finite_trace (cfg heap_lang) (olocale heap_lang)) (atr' : auxiliary_trace LM) (oζ : olocale heap_lang) (ℓ : mlabel LM),
    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')) as Hcontr'.
   { intros ex' atr' oζ ℓ H1 H2. cut (sim_rel_with_user LM ξ ex' atr'); eauto. rewrite /sim_rel_with_user. intros [??]. done. }
-
   iSpecialize ("H" $! ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr' Hstuck).
   unfold sim_rel_with_user.
-
-  iAssert (|={⊤}=> ⌜ξ ex (map_underlying_trace atr)⌝ ∗ state_interp ex atr)%I with "[Hsi H]" as "H".
-  { iApply fupd_plain_keep_l. iFrame. iIntros "Hsi". iSpecialize ("H" with "Hsi").
+  iAssert (|={⊤}=> ⌜ξ ex (map_underlying_trace atr)⌝ ∗ state_interp ex atr ∗ posts_of c.1
+               ((λ _ : language.val heap_lang, 0%nat ↦M ∅)
+                :: ((λ '(tnew, e), fork_post (language.locale_of tnew e)) <$>
+                    prefixes_from [e1] (drop (length [e1]) c.1))))%I with "[Hsi H Hposts]" as "H".
+  { iApply fupd_plain_keep_l. iFrame. iIntros "[Hsi Hposts]".
+    iSpecialize ("H" with "Hsi Hposts").
     by iApply fupd_plain_mask_empty. }
-  iMod "H" as "[H1 Hsi]".
-
+  iMod "H" as "[H1 [Hsi Hposts]]".
   destruct ex as [c'|ex' tid (e, σ)].
   - (* We need to prove that the initial state satisfies the property *)
     destruct atr as [δ|???]; last by inversion Hvalex. simpl.
@@ -325,7 +339,7 @@ Proof.
   iIntros (Hinv) "".
   iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hσ Hm Hfr Hf". iSplitR "".
   - iApply ("H" with "Hm Hfr Hf").
-  - iIntros "!>%%%???????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
+  - iIntros "!>%%%????????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)

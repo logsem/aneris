@@ -494,6 +494,46 @@ Section fairness_preserved.
     valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
 
   (* TODO: Why do we need explicit [LM] here? *)
+  Lemma valid_inf_system_trace_implies_traces_match_strong
+        (φ : execution_trace Λ -> auxiliary_trace LM -> Prop)
+        (ψ : _ → _ → Prop)
+        ex atr iex iatr progtr (auxtr : auxtrace LM):
+    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+        φ ex atr -> live_tids (LM:=LM) (trace_last ex) (trace_last atr)) ->
+    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+        φ ex atr -> valid_state_evolution_fairness ex atr) ->
+    (∀ extr auxtr, φ extr auxtr → ψ (trace_last extr) (trace_last auxtr)) →
+    exec_trace_match ex iex progtr ->
+    exec_trace_match atr iatr auxtr ->
+    valid_inf_system_trace φ ex atr iex iatr ->
+    traces_match labels_match
+                 (λ σ δ, live_tids σ δ ∧ ψ σ δ)
+                 locale_step
+                 LM.(lm_ls_trans) progtr auxtr.
+  Proof.
+    intros Hφ1 Hφ2 Hφψ.
+    revert ex atr iex iatr auxtr progtr. cofix IH.
+    intros ex atr iex iatr auxtr progtr Hem Ham Hval.
+    inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
+    - inversion Hem; inversion Ham. econstructor; eauto.
+      pose proof (Hφ1 ex atr Hphi).
+      split; [by simplify_eq|]. simplify_eq. by apply Hφψ.
+    - inversion Hem; inversion Ham. subst.
+      pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
+      destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
+      econstructor.
+      + eauto.
+      + eauto.
+      + match goal with
+        | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
+        end; done.
+      + match goal with
+        | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
+        end; done.
+      + eapply IH; eauto.
+  Qed.
+
+  (* TODO: Why do we need explicit [LM] here? *)
   Lemma valid_inf_system_trace_implies_traces_match
         (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
         ex atr iex iatr progtr (auxtr : auxtrace LM):
@@ -527,6 +567,7 @@ Section fairness_preserved.
         end; done.
       + eapply IH; eauto.
   Qed.
+
 End fairness_preserved.
 
 Section fuel_dec_unless.
