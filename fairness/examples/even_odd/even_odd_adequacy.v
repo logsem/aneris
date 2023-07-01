@@ -251,6 +251,7 @@ Definition ξ_evenodd_trace (l : loc) (extr : execution_trace heap_lang)
            (auxtr : finite_trace the_fair_model (option EO)) :=
   ξ_evenodd l (trace_last extr) (trace_last auxtr).
 
+(* TODO: This could be simplified to use [ξ_evenodd_model_match] *)
 Lemma evenodd_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
   traces_match labels_match (λ c δ, live_tids c δ ∧ ξ_evenodd l c δ) locale_step
   (lm_ls_trans the_model) extr auxtr →
@@ -273,7 +274,7 @@ Proof. solve_decision. Qed.
 
 (** Proof that program refines model up to ξ_evenodd *)
 
-Lemma evenodd_incr_sim l :
+Lemma evenodd_sim l :
   continued_simulation
     (sim_rel_with_user the_model (ξ_evenodd_trace l))
     (trace_singleton ([start #l],
@@ -423,7 +424,7 @@ Theorem evenodd_ex_progresses (l:loc) (extr : heap_lang_extrace) :
 Proof.
   intros Hmaximal Hfair Hfirst.
   pose proof Hmaximal as Hvalid%extrace_maximal_valid.
-  pose proof (evenodd_incr_sim l) as Hsim.
+  pose proof (evenodd_sim l) as Hsim.
   assert (∃ iatr,
              valid_inf_system_trace
                (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))
@@ -443,19 +444,17 @@ Proof.
   { exists (to_trace (initial_ls (LM := the_model) 0 0 ) iatr).
     eapply (valid_inf_system_trace_implies_traces_match_strong
               (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))); eauto.
-    - intros ? ? ?%continued_simulation_rel. by destruct H as [[_ H] _].
-    - intros ? ? ?%continued_simulation_rel. by destruct H as [[H _] _].
-    - intros extr' auxtr' ?%continued_simulation_rel.
-      destruct H as [_ [H1 H2]].
+    - intros ? ? Hξ%continued_simulation_rel. by destruct Hξ as [[_ Hξ] _].
+    - intros ? ? Hξ%continued_simulation_rel. by destruct Hξ as [[Hξ _] _].
+    - intros extr' auxtr' Hξ%continued_simulation_rel.
+      destruct Hξ as [_ [Hξ1 Hξ2]].
       split; [done|].
-      destruct H2 as [n [H21 H22]].
+      destruct Hξ2 as [n [Hξ21 Hξ22]].
       exists n. split; [done|]. by destruct auxtr'.
     - by apply from_trace_spec.
     - by apply to_trace_spec. }
   assert (exaux_traces_match extr auxtr) as Hmatch.
-  { eapply traces_match_impl; [| |done].
-    - done.
-    - by intros ?? [? ?]. }
+  { eapply traces_match_impl; [done| |done]. by intros ??[??]. }
   have Hstutter:=Hmatch.
   apply can_destutter_auxtr in Hstutter; last first.
   { intros ?? Hstep. inversion Hstep. done. }
@@ -484,8 +483,7 @@ Proof.
     destruct c; simpl in *.
     eexists (Some _), _.
     econstructor; eauto. simpl in *.
-    f_equiv. done.
-  }
+    by f_equiv. }
   pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfairaux.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
