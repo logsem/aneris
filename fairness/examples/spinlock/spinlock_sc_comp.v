@@ -478,12 +478,12 @@ Section LocksCompositionProofs.
   
 
   Lemma sl1_PMP (γ: gname):
-    PMP ∗ □ comp_inv_impl γ ⊢ @PartialModelPredicates _ _ LM _ _ Σ _ _ spinlock_model (sl1_PMPP γ).
+    PMP ∗ (inv Ns (comp_inv_impl γ)) ⊢ @PartialModelPredicates _ _ LM _ _ Σ _ _ spinlock_model (sl1_PMPP γ).
   Proof. 
     iIntros "[#PMP #COMP]". iApply @Build_PartialModelPredicates.
 
     iModIntro. repeat iSplitR.
-    - iIntros (???????) "FUELS_SL MSI".
+    - iIntros "* FUELS_SL MSI".
       iMod (update_no_step_enough_fuel with "PMP [FUELS_SL] [MSI]") as "-#UPD".
       2: by eauto.
       3: done. 
@@ -498,7 +498,7 @@ Section LocksCompositionProofs.
       apply leibniz_equiv_iff. apply kmap_filter_dom; [apply _| ]. 
       intros. destruct i; [destruct s| ]; [left| right| right]; eauto.
       all: by intros [? ?]. 
-    - iIntros (???????????????). iIntros (??) "FUELS_SL MSI".
+    - iIntros "* FUELS_SL MSI".
       
       iMod (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD".
       all: eauto. 
@@ -527,7 +527,10 @@ Section LocksCompositionProofs.
       iSplitL; [| done].
       iIntros "NO". iApply "FIN". 
       simpl. by rewrite map_fmap_singleton set_map_empty.
-    - 
+    - iIntros "*". iIntros "FUELS ST MSI FR".
+      fupd
+      iInv Ns as (((ost1, ost2), osc)) "(>ST & >AUTH)" "CLOS".
+  Abort. 
       
 
   Lemma comp_spec tid (P: iProp Σ):
