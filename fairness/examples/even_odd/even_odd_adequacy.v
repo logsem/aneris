@@ -53,7 +53,11 @@ Qed.
 Definition evenodd_mtrace : Type := mtrace the_fair_model.
 
 Definition evenodd_mdl_progress (tr : evenodd_mtrace) :=
-  ∀ n, ∃ m, pred_at tr m (λ s _, s = n).
+  ∀ i, ∃ n, pred_at tr n (λ s _, s = i).
+
+Definition evenodd_mdl_mono (tr : evenodd_mtrace) :=
+  ∀ n, ∃ i, pred_at tr n (λ s _, s = i) ∧
+            pred_at tr (S n) (λ s _, ∃ j, s = j ∧ i ≤ j).
 
 Lemma evenodd_mdl_always_live ρ n (mtr : evenodd_mtrace) :
   infinite_trace mtr →
@@ -215,10 +219,43 @@ Proof.
     rewrite pred_at_sum. rewrite Hafter. done.
 Qed.
 
+Theorem evenodd_mdl_is_mono (mtr : evenodd_mtrace) :
+  infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
+  (trfirst mtr) = 0 →
+  evenodd_mdl_mono mtr.
+Proof.
+  intros Hinf Hvalid Hfair Hfirst n.
+  pose proof (Hinf n) as [mtr' Hafter].
+  destruct mtr' as [|s l mtr'].
+  { pose proof (Hinf (S n)) as [mtr'' Hafter'].
+    replace (S n) with (n + 1) in Hafter' by lia.
+    rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. }
+  exists s.
+  rewrite /pred_at. rewrite Hafter.
+  split; [done|].
+  replace (S n) with (n + 1) by lia.
+  rewrite after_sum'. rewrite Hafter. simpl.
+  eapply mtrace_valid_after in Hvalid; [|done].
+  punfold Hvalid. inversion Hvalid as [|??? Htrans]. simplify_eq.
+  inversion Htrans; simplify_eq.
+  - destruct mtr'.
+    + exists (S s); split; [done|lia].
+    + exists (S s); split; [done|lia].
+  - destruct mtr'.
+    + exists s; done.
+    + exists s; done.
+  - destruct mtr'.
+    + exists (S s); split; [done|lia].
+    + exists (S s); split; [done|lia].
+  - destruct mtr'.
+    + exists s; done.
+    + exists s; done.
+Qed.
+
 (** Proof that fair progress is preserved through auxiliary trace *)
 
 Definition evenodd_aux_progress (auxtr : auxtrace the_model) :=
-  ∀ n, ∃ m, pred_at auxtr m (λ s l, (λ s' _, s' = n) (ls_under s) (l ≫= Ul)).
+  ∀ i, ∃ n, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under s) (l ≫= Ul)).
 
 Lemma evenodd_mtr_aux_progress_preserved
       (mtr : mtrace the_fair_model)
@@ -231,11 +268,68 @@ Proof.
               ls_under Ul auxtr mtr (λ s' _, s' = n)).
 Qed.
 
+Definition evenodd_aux_mono (auxtr : auxtrace the_model) :=
+  ∀ n, ∃ i, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under s) (l ≫= Ul)) ∧
+            pred_at auxtr (S n) (λ s l, (λ s' _, ∃ j, s' = j ∧ i ≤ j) (ls_under s) (l ≫= Ul)).
+
+Lemma evenodd_mtr_aux_mono_preserved (mtr : mtrace the_fair_model)
+      (auxtr : auxtrace the_model) :
+  upto_stutter ls_under Ul auxtr mtr →
+  evenodd_mdl_mono mtr → evenodd_aux_mono auxtr.
+Proof.
+  intros Hstutter Hmtr n.
+  revert auxtr mtr Hstutter Hmtr.
+  induction n as [|n IHn]; intros auxtr mtr Hstutter Hmtr.
+  { punfold Hstutter; [|apply upto_stutter_mono].
+    induction Hstutter as
+      [|auxtr mtr s ℓ Hℓ Hauxtr_first Hmtr_first CIHstutter IHstutter|
+      auxtr mtr s ℓ δ ρ Hs Hℓ CIHstutter].
+    - by destruct (Hmtr 0) as [? [? Hmtr']].
+    - simplify_eq.
+      destruct (IHstutter Hmtr) as [i [Hpred ?]].
+      rewrite /pred_at in Hpred. simpl in *.
+      exists i. rewrite /pred_at. simpl.
+      destruct auxtr as [|s' ℓ' auxtr']; [done|].
+      rewrite /trfirst in Hauxtr_first. split; [by simplify_eq|].
+      exists i. simplify_eq. lia.
+    - simplify_eq.
+      destruct (Hmtr 0) as [i [Hpred1 Hpred2]].
+      rewrite /pred_at in Hpred1. simpl in *.
+      exists i.
+      rewrite /pred_at. split; [done|].
+      rewrite /pred_at in Hpred2. simpl in *.
+      destruct CIHstutter as [CIHstutter|?]; [|done].
+      punfold CIHstutter; [|apply upto_stutter_mono].
+      induction CIHstutter as
+        [|mtr auxtr ??? Hauxtr_first Hmtr_first ? IHstutter|];
+        [done| |by simplify_eq].
+      specialize (IHstutter Hmtr Hpred2).
+      destruct mtr.
+      * destruct IHstutter as [j [Hj1 Hj2]]. exists j. by simplify_eq.
+      * destruct IHstutter as [j [Hj1 Hj2]]. exists j. by simplify_eq. }
+  punfold Hstutter; [|apply upto_stutter_mono].
+  induction Hstutter as
+    [|auxtr mtr s ℓ Hℓ Hauxtr_first Hmtr_first CIHstutter IHstutter|
+      auxtr mtr s ℓ δ ρ Hs Hℓ CIHstutter].
+  + by destruct (Hmtr 0) as [? [? Hmtr']].
+  + simplify_eq. setoid_rewrite pred_at_S. eapply IHn; [by apply paco2_fold|done].
+  + simplify_eq. destruct CIHstutter as [CIHstutter|?]; [|done].
+    assert (evenodd_mdl_mono mtr) as Hmtr'.
+    { intros m. specialize (Hmtr (S m)). by setoid_rewrite pred_at_S in Hmtr. }
+    destruct (IHn auxtr mtr CIHstutter Hmtr') as [i [Hpred1 Hpred2]].
+    exists i. by rewrite !pred_at_S.
+Qed.
+
 (** Proof that progress is preserved between auxilary and execution trace,
  for a specific ξ *)
 
 Definition evenodd_ex_progress (l:loc) (extr : heap_lang_extrace) :=
-  ∀ (n:nat), ∃ m, pred_at extr m (λ s _, heap s.2 !! l = Some #n).
+  ∀ (i:nat), ∃ n, pred_at extr n (λ s _, heap s.2 !! l = Some #i).
+
+Definition evenodd_ex_mono (l:loc) (extr : heap_lang_extrace) :=
+  ∀ n, ∃ (i:nat),
+    pred_at extr n (λ s _, heap s.2 !! l = Some #i) ∧
+    pred_at extr (S n) (λ s _, ∃ (j:nat), heap s.2 !! l = Some #j ∧ i ≤ j).
 
 Definition ξ_evenodd_model_match (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
   ∃ (N:nat), heap c.2 !! l = Some #N ∧ δ = N.
@@ -267,6 +361,35 @@ Proof.
   - destruct Hξ as (?&?&n&?&?). by simplify_eq.
 Qed.
 
+Lemma evenodd_aux_ex_mono_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
+  traces_match labels_match (λ c δ, live_tids c δ ∧ ξ_evenodd l c δ) locale_step
+  (lm_ls_trans the_model) extr auxtr →
+  evenodd_aux_mono auxtr → evenodd_ex_mono l extr.
+Proof.
+  intros Hξ Hauxtr n. specialize (Hauxtr n).
+  destruct Hauxtr as [i Hauxtr].
+  exists i.
+  split.
+  - destruct Hauxtr as [Hauxtr _].
+    rewrite /pred_at in Hauxtr.
+    destruct (after n auxtr) as [auxtr'|] eqn:Heqn; [|done].
+    eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
+    rewrite /pred_at. rewrite Hafter'.
+    inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
+    + destruct Hξ as (?&?&i&?&?). by simplify_eq.
+    + destruct Hξ as (?&?&i&?&?). by simplify_eq.
+  - destruct Hauxtr as [_ Hauxtr].
+    rewrite /pred_at in Hauxtr.
+    destruct (after (S n) auxtr) as [auxtr'|] eqn:Heqn; [|done].
+    eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
+    rewrite /pred_at. rewrite Hafter'.
+    inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
+    + destruct Hauxtr as [j [<- Hle]].
+      destruct Hξ as (?&?&j&?&?). exists j. by simplify_eq.
+    + destruct Hauxtr as [j [<- Hle]].
+      destruct Hξ as (?&?&j&?&?). exists j. by simplify_eq.
+Qed.
+
 Instance the_model_mstate_countable : EqDecision (mstate the_model).
 Proof. intros x y. apply make_decision. Qed.
 Instance the_model_mlabel_countable : EqDecision (mlabel the_model).
@@ -277,9 +400,7 @@ Proof. solve_decision. Qed.
 Lemma evenodd_sim l :
   continued_simulation
     (sim_rel_with_user the_model (ξ_evenodd_trace l))
-    (trace_singleton ([start #l],
-                        {| heap := {[l:=#0]};
-                           used_proph_id := ∅ |}))
+    (trace_singleton ([start #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
     (trace_singleton (initial_ls (LM := the_model) 0 0)).
 Proof.
   assert (evenoddPreG evenoddΣ) as HPreG'.
@@ -413,14 +534,12 @@ Proof.
   simpl in *. destruct extr; [done|]. eapply IHn; [|done]. by inversion Hafter.
 Qed.
 
-(** Proof that execution trace actually progresses *)
-Theorem evenodd_ex_progresses (l:loc) (extr : heap_lang_extrace) :
+(** Proof that the execution trace satisfies the liveness properties *)
+Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace) :
   extrace_maximal extr →
   (∀ tid, fair_ex tid extr) →
-  trfirst extr = ([start #l],
-                        {| heap := {[l:=#0]};
-                           used_proph_id := ∅ |}) →
-  evenodd_ex_progress l extr.
+  trfirst extr = ([start #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
+  evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
 Proof.
   intros Hmaximal Hfair Hfirst.
   pose proof Hmaximal as Hvalid%extrace_maximal_valid.
@@ -504,8 +623,13 @@ Proof.
     assert (0 = ls_under (trfirst auxtr)) as Hσ' by lia.
     inversion Hupto; simplify_eq;
     by rewrite Hσ'. }
-  pose proof (evenodd_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
-    as Hprogress.
-  eapply (evenodd_aux_ex_progress_preserved l _ auxtr); [done|].
-  by eapply evenodd_mtr_aux_progress_preserved.
+  split.
+  - pose proof (evenodd_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
+      as Hprogress.
+    eapply (evenodd_aux_ex_progress_preserved l _ auxtr); [done|].
+    by eapply evenodd_mtr_aux_progress_preserved.
+  - pose proof (evenodd_mdl_is_mono mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
+      as Hmono.
+    eapply (evenodd_aux_ex_mono_preserved l _ auxtr); [done|].
+    by eapply evenodd_mtr_aux_mono_preserved.
 Qed.
