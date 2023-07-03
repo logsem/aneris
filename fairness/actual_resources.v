@@ -16,14 +16,13 @@ Section actual_ownership.
   Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
   Global Instance ActualOwnershipPartialPre:
-    @PartialModelPredicatesPre _ M _ _ Σ M. 
+    @PartialModelPredicatesPre _ _ _ Σ M. 
   Proof.
     refine {|
         partial_model_is := frag_model_is;
         partial_free_roles_are := frag_free_roles_are;
         partial_fuel_is := frag_fuel_is;
         partial_mapping_is := frag_mapping_is;
-        project_inner := Some;
       |}.
     - intros. rewrite /frag_fuel_is.
       rewrite map_fmap_union. rewrite -gmap_disj_op_union.

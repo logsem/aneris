@@ -27,7 +27,7 @@ Ltac wp_expr_simpl := wp_expr_eval simpl.
 Lemma tac_wp_pure_helper
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM}
-  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}  
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   (* fs *)
@@ -80,7 +80,7 @@ Qed.
 Lemma has_fuels_gt_n 
   `{LM : LiveModel heap_lang M} `{!heapGS Σ LM}
   (* `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)} *)
-  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}  
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
   (fs: gmap (fmrole iM) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
@@ -89,7 +89,7 @@ Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 Lemma has_fuels_gt_1 
   `{LM:LiveModel heap_lang M}
   `{!heapGS Σ LM}
-  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}  
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
   (fs: gmap (fmrole iM) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
@@ -98,7 +98,7 @@ Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 Lemma tac_wp_pure_helper_2 
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM}
-  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   φ n Φ :
@@ -169,7 +169,7 @@ Qed.
 Lemma tac_wp_pure
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM}
-  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
   Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
   (fs: gmap (fmrole iM) nat)
   :
@@ -366,7 +366,7 @@ Implicit Types tid : locale heap_lang.
 Context `{iLM: LiveModel heap_lang iM}.
 (* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
 Context
-  `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}. 
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}. 
 
 (* Lemma tac_wp_allocN Δ Δ' s E j K v n Φ : *)
 (*   (0 < n)%Z → *)

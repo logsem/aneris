@@ -141,7 +141,7 @@ End LocksCompositionCode.
 
 Section LocksCompositionProofs.
   Context `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} {COMP_PRE: compPreG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ M _ _ Σ comp_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ comp_model_impl}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
@@ -346,16 +346,13 @@ Section LocksCompositionProofs.
   Proof using. set_solver. Qed.  
 
   Definition sl1_PMPP (γ: gname):
-    @PartialModelPredicatesPre heap_lang M _ _ Σ spinlock_model_impl.
+    @PartialModelPredicatesPre heap_lang _ _ Σ spinlock_model_impl.
   refine
     {|
         partial_model_is := comp_sl1_st_frag γ;
         partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_left;
         partial_fuel_is := partial_fuel_is ∘ kmap lift_sl_role_left;
         partial_mapping_is := partial_mapping_is ∘ (fmap (set_map lift_sl_role_left));
-        project_inner := (fun om => match om with
-                                 | Some (Some s1, _, _) => Some s1
-                                 | _ => None end ) ∘ project_inner
     |}.
   - intros. simpl. rewrite kmap_union. apply PMPP. 
     apply map_disjoint_kmap; auto. apply _.
@@ -632,9 +629,8 @@ Section LocksCompositionProofs.
         2: { apply sets.intersection_proper; [reflexivity| ].
              symmetry. apply difference_disjoint.
              destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver. }
-        rewrite -set_map_difference. set_solver. 
-    - iIntros. simpl.
-      admit.
+        rewrite -set_map_difference. set_solver.
+    - admit. 
   Admitted.
 
   Lemma comp_spec tid (P: iProp Σ):

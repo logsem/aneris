@@ -230,7 +230,7 @@ Context `{LM:LiveModel heap_lang M}.
 Context `{!heapGS Σ LM}.
 
 Context `{iLM:LiveModel heap_lang iM}.
-Context `{PMPP: @PartialModelPredicatesPre _ M _ _ Σ iM}.
+Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ iM}.
 
 
 Implicit Types P Q : iProp Σ.
@@ -319,7 +319,6 @@ Qed.
 (*   simplify_eq. iMod "Hclose" as "_". iMod "H" as "(Hmod & Hfuels & Hkont)". *)
 (*   rewrite !app_nil_r. *)
 (*   iDestruct "Hsi" as "(%&Hgh&Hmi)". *)
-(*   iDestruct (partial_model_agree' with "Hmi Hmod") as %Heq. *)
 
 (*   (* TODO: restore 'rem' parameter in the lemma below *) *)
 (*   iMod (update_no_step_enough_fuel _ _ rem with "Hfuels Hmi") as "H"; eauto; *)
@@ -394,7 +393,6 @@ Proof using.
   simplify_eq. iMod "Hclose" as "_". iMod "Hkont" as "(Hmod&Hfuels&Hfr&Hkont)".
   rewrite !app_nil_r.
   iDestruct "Hsi" as "(%&Hgh&Hmi)". simpl.
-  iDestruct (partial_model_agree' with "PMP Hmi Hmod") as %Hmeq.
 
   iDestruct (update_step_still_alive _ _ _ _ σ1 σ1 with "PMP Hfuels Hmod Hmi Hfr") as "H"; eauto.
   { set_solver. }
@@ -748,7 +746,7 @@ Proof using.
   iSplit; first by rewrite Hexend // in Hheap;  eauto.
   iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
+
   rewrite Hexend.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   iDestruct (update_step_still_alive _ _ _ _ _ _ _ s2 _
@@ -787,7 +785,6 @@ Proof using.
   iSplit; first by rewrite Hexend // in Hheap;  eauto.
   iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
   rewrite has_fuel_fuels Hexend.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   iMod partial_free_roles_empty as "Hfr". 
@@ -840,7 +837,6 @@ Proof using.
   iSplit; first by rewrite Hexend // in Hheap;  eauto.
   iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
   rewrite has_fuel_fuels Hexend.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   iMod partial_free_roles_empty as "Hfr". 
@@ -891,7 +887,6 @@ Proof using.
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
   rewrite bool_decide_false //.
   rewrite has_fuel_fuels Hexend.
   iDestruct (update_step_still_alive _ _ _ _ _ _ _ _ _
@@ -937,7 +932,6 @@ Proof using.
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
   rewrite bool_decide_true //.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   rewrite has_fuel_fuels Hexend.
@@ -976,7 +970,6 @@ Proof using.
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (partial_model_agree' with "PMP Hmi Hst") as %Hmeq.
   rewrite bool_decide_true //.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   rewrite has_fuel_fuels Hexend.

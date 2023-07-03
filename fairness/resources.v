@@ -312,7 +312,6 @@ Section PartialOwnership.
       partial_free_roles_are: gset (fmrole iM) → iProp Σ;
       partial_fuel_is: gmap (fmrole iM) nat → iProp Σ;
       partial_mapping_is: gmap (locale Λ) (gset (fmrole iM)) → iProp Σ;
-      project_inner: M -> option iM;
       
       partial_model_is_Timeless :> forall s, Timeless (partial_model_is s);
       partial_fuel_is_Timeless :> forall fs, Timeless (partial_fuel_is fs);
@@ -518,9 +517,6 @@ Section PartialOwnership.
       has_fuels ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
       partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)). 
 
-    Let partial_model_agree'_def n δ1 s2: iProp Σ :=
-        model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = Some s2⌝. 
-    
     Let partial_free_roles_fuels_disj_def n δ fr fs tid: iProp Σ :=
         model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝.
 
@@ -530,7 +526,6 @@ Section PartialOwnership.
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
              LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM,
               update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
-          (∀ n δ1 δ2, partial_model_agree'_def n δ1 δ2) ∗ 
           (∀ n δ fr fs tid, partial_free_roles_fuels_disj_def n δ fr fs tid)).  
 
     Definition PartialModelPredicates Einvs: iProp Σ := PMP_def Einvs. 
@@ -547,19 +542,16 @@ Section PartialOwnership.
 
     Lemma update_no_step_enough_fuel {Einvs} extr auxtr c2 fs ζ NE STEP: 
       PartialModelPredicates Einvs ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP. 
-    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Proof. by iIntros "(?&?&?&?)". Qed.
     Lemma update_fork_split {Einvs} R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL: 
       PartialModelPredicates Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL. 
-    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Proof. by iIntros "(?&?&?&?)". Qed.
     Lemma update_step_still_alive {Einvs} extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM:
       PartialModelPredicates Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM.
-    Proof. by iIntros "(?&?&?&?&?)". Qed.
-    Lemma partial_model_agree' {Einvs} n δ1 δ2:
-      PartialModelPredicates Einvs ⊢ partial_model_agree'_def n δ1 δ2.
-    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Proof. by iIntros "(?&?&?&?)". Qed.
     Lemma partial_free_roles_fuels_disj {Einvs} n δ fr fs tid:
       PartialModelPredicates Einvs ⊢ partial_free_roles_fuels_disj_def n δ fr fs tid.
-    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Proof. by iIntros "(?&?&?&?)". Qed.
 
     Global Opaque PartialModelPredicates.
 

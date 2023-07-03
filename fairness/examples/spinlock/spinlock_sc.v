@@ -181,7 +181,7 @@ End SpinlockDefs.
 Section ClientProofs.
   (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM, spinlockG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ spinlock_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ spinlock_model_impl}.
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
 
   (* TODO: decide what to do with notations *)
@@ -612,7 +612,7 @@ End ClientProofs.
 Section MainProof.
   (* Context `{!heapGS Σ spinlock_model, !spinlockPreG Σ}. *)
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM} {SL_PRE: spinlockPreG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ Mdl _ _ Σ spinlock_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ spinlock_model_impl}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
