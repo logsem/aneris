@@ -338,12 +338,12 @@ Section LocksCompositionProofs.
   (*   (DISJ: s1 ## s2): *)
   (*   (set_map f s1: D) ## (set_map f s2: D). *)
   (* TODO: generalize, upstream *)
+  (* TODO: one-directional version that doesn't require Inj *)
   Lemma set_map_disjoint {A B: Type} `{Countable A} `{Countable B}
     (s1 s2: gset A) (f: A -> B)
-    (INJ: Inj eq eq f)
-    (DISJ: s1 ## s2):
-    (set_map f s1: gset B) ## (set_map f s2: gset B). 
-  Proof using. set_solver. Qed.  
+    (INJ: Inj eq eq f):
+    s1 ## s2 <-> (set_map f s1: gset B) ## (set_map f s2: gset B). 
+  Proof using. set_solver. Qed. 
 
   Definition sl1_PMPP (γ: gname):
     @PartialModelPredicatesPre heap_lang _ _ Σ spinlock_model_impl.
@@ -630,7 +630,11 @@ Section LocksCompositionProofs.
              symmetry. apply difference_disjoint.
              destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver. }
         rewrite -set_map_difference. set_solver.
-    - admit. 
+    - iIntros "* MSI FR FUELS". 
+      iDestruct (has_fuels_sl1 with "FUELS") as "FUELS". simpl.
+      iDestruct (partial_free_roles_fuels_disj with "PMP MSI FR FUELS") as %DISJ.
+      rewrite dom_kmap in DISJ. iPureIntro.
+      eapply set_map_disjoint; eauto. apply _. 
   Admitted.
 
   Lemma comp_spec tid (P: iProp Σ):
