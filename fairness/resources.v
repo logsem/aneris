@@ -301,6 +301,8 @@ Section PartialOwnership.
   Context `{Countable (locale Λ)}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
+  (* Context `{invGS Σ}.  *)
+  Context `{invGS_gen HasNoLc Σ}. 
   Context `{iLM: LiveModel Λ iM}. (* fuel construction over inner model *)
 
 
@@ -487,7 +489,7 @@ Section PartialOwnership.
             (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]}) ∗
             model_state_interp tp2 δ2
         ∧ ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝).
-    
+
 
     Let update_step_still_alive_def
       (extr : execution_trace Λ)
@@ -496,6 +498,7 @@ Section PartialOwnership.
       (s1 s2: iM)
       (fs1 fs2: gmap (fmrole iM) nat)
       ρ (δ1 : LM) ζ fr1 fr_stash
+      (Einvs: coPset)
     `((live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1)
     `(fr_stash ⊆ dom fs1)
     `((live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅)
@@ -504,14 +507,16 @@ Section PartialOwnership.
     `(trace_last auxtr = δ1)
     `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
     `(fmtrans _ s1 (Some ρ) s2)
-     `(valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM)): iProp Σ :=
+     `(valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM))
+      : iProp Σ :=
     ( has_fuels ζ fs1 -∗ partial_model_is s1 -∗ model_state_interp tp1 δ1 -∗
     partial_free_roles_are fr1
-    ==∗ ∃ (δ2: LM) ℓ,
-        ⌜labels_match (Some ζ) ℓ
-        ∧ valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝
-        ∗ has_fuels ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
-        partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)). 
+    ={ Einvs }=∗
+    ∃ (δ2: LM) ℓ,
+      ⌜labels_match (Some ζ) ℓ ∧
+       valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝ ∗
+      has_fuels ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
+      partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)). 
 
     Let partial_model_agree'_def n δ1 s2: iProp Σ :=
         model_state_interp n δ1 -∗ partial_model_is s2 -∗ ⌜project_inner δ1 = Some s2⌝. 
@@ -519,41 +524,41 @@ Section PartialOwnership.
     Let partial_free_roles_fuels_disj_def n δ fr fs tid: iProp Σ :=
         model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝.
 
-    Let PMP_def: iProp Σ := □ (
+    Let PMP_def (Einvs: coPset): iProp Σ := □ (
           (∀ extr auxtr c2 fs ζ NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP) ∗         
           (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL) ∗ 
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
              LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM,
-              update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
+              update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
           (∀ n δ1 δ2, partial_model_agree'_def n δ1 δ2) ∗ 
           (∀ n δ fr fs tid, partial_free_roles_fuels_disj_def n δ fr fs tid)).  
 
-    Definition PartialModelPredicates: iProp Σ := PMP_def. 
+    Definition PartialModelPredicates Einvs: iProp Σ := PMP_def Einvs. 
 
-    Lemma Build_PartialModelPredicates: PMP_def ⊢ PartialModelPredicates.
+    Lemma Build_PartialModelPredicates Einvs: PMP_def Einvs ⊢ PartialModelPredicates Einvs.
     Proof. done. Qed. 
 
-    Global Instance PMP_pers: Persistent PartialModelPredicates. 
+    Global Instance PMP_pers: forall Einvs, Persistent (PartialModelPredicates Einvs). 
     Proof. apply _. Qed. 
     
     (* Doing this _def indirection to provide the "PMP -∗ (property)" lemmas
        while gathering them in one iProp to ease the constructions,
        and make PMP opaque, since its unfold takes too much space *)
 
-    Lemma update_no_step_enough_fuel extr auxtr c2 fs ζ NE STEP: 
-      PartialModelPredicates ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP. 
-    Proof. by iIntros "(?&?&?&?&?)". Qed.       
-    Lemma update_fork_split R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL: 
-      PartialModelPredicates ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL. 
+    Lemma update_no_step_enough_fuel {Einvs} extr auxtr c2 fs ζ NE STEP: 
+      PartialModelPredicates Einvs ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP. 
     Proof. by iIntros "(?&?&?&?&?)". Qed.
-    Lemma update_step_still_alive extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM:
-      PartialModelPredicates ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM. 
+    Lemma update_fork_split {Einvs} R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL: 
+      PartialModelPredicates Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL. 
     Proof. by iIntros "(?&?&?&?&?)". Qed.
-    Lemma partial_model_agree' n δ1 δ2:
-      PartialModelPredicates ⊢ partial_model_agree'_def n δ1 δ2.
+    Lemma update_step_still_alive {Einvs} extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM:
+      PartialModelPredicates Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM.
     Proof. by iIntros "(?&?&?&?&?)". Qed.
-    Lemma partial_free_roles_fuels_disj n δ fr fs tid:
-      PartialModelPredicates ⊢ partial_free_roles_fuels_disj_def n δ fr fs tid.
+    Lemma partial_model_agree' {Einvs} n δ1 δ2:
+      PartialModelPredicates Einvs ⊢ partial_model_agree'_def n δ1 δ2.
+    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Lemma partial_free_roles_fuels_disj {Einvs} n δ fr fs tid:
+      PartialModelPredicates Einvs ⊢ partial_free_roles_fuels_disj_def n δ fr fs tid.
     Proof. by iIntros "(?&?&?&?&?)". Qed.
 
     Global Opaque PartialModelPredicates.
@@ -590,26 +595,6 @@ Section model_state_lemmas.
   Lemma empty_frag_free_roles:
     ⊢ |==> frag_free_roles_are ∅.
   Proof. iApply own_unit. Qed. 
-
-  Global Instance ActualOwnershipPartialPre:
-    @PartialModelPredicatesPre _ M _ _ Σ M. 
-  Proof.
-    refine {|
-        partial_model_is := frag_model_is;
-        partial_free_roles_are := frag_free_roles_are;
-        partial_fuel_is := frag_fuel_is;
-        partial_mapping_is := frag_mapping_is;
-        project_inner := Some;
-      |}.
-    - intros. rewrite /frag_fuel_is.
-      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
-      2: { by apply map_disjoint_fmap. }
-      by rewrite auth_frag_op own_op.
-    - intros. rewrite /frag_free_roles_are.
-      rewrite -gset_disj_union; auto.  
-      by rewrite auth_frag_op own_op.
-    - iApply empty_frag_free_roles. 
-  Defined. 
 
   Lemma frag_mapping_same ζ m R:
     auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ m !! ζ = Some R ⌝.
@@ -732,57 +717,6 @@ Section model_state_lemmas.
     apply delete_singleton_local_update.
     typeclasses eauto.
   Qed.
-
-  Lemma has_fuel_in ζ δ fs n:
-    has_fuels ζ fs -∗ model_state_interp n δ -∗ ⌜ ∀ ρ, ls_mapping δ !! ρ = Some ζ <-> ρ ∈ dom fs ⌝.
-  Proof.
-    unfold model_state_interp, has_fuels, auth_mapping_is, frag_mapping_is.
-    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping &HFR&%Hmapinv&Hamod&Hfr) %ρ".
-    iCombine "Hamapping Hζ" as "H".
-    iDestruct (own_valid with "H") as %Hval. iPureIntro.
-    apply auth_both_valid_discrete in Hval as [Hval ?].
-    rewrite map_fmap_singleton in Hval.
-    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
-    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
-    apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq.
-    rewrite (Hmapinv ρ ζ) HMζ. split.
-    - intros (?&?&?). by simplify_eq.
-    - intros ?. eexists. split; eauto.
-  Qed.
-
-  Lemma has_fuel_fuel ζ δ fs n:
-    has_fuels ζ fs -∗ model_state_interp n δ -∗ 
-    ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
-  Proof.
-    unfold has_fuels, model_state_interp, auth_fuel_is.
-    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping&HFR&%Hmapinv&Hamod)" (ρ Hρ).
-    iDestruct (big_sepS_delete _ _ ρ with "Hfuels") as "[(%f&%Hfs&Hfuel) _]" =>//.
-    iCombine "Hafuel Hfuel" as "H".
-    iDestruct (own_valid with "H") as %Hval. iPureIntro.
-    apply auth_both_valid_discrete in Hval as [Hval ?].
-    rewrite map_fmap_singleton in Hval.
-    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
-    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
-    apply fmap_Some_1 in Hval as (f'&Hfuelρ&?). simplify_eq.
-    rewrite Hfuelρ Hfs //.
-  Qed.
-
-  Lemma frag_free_roles_fuels_disj: forall n δ fr fs tid,
-        model_state_interp n δ -∗ frag_free_roles_are fr -∗ 
-        has_fuels tid fs (PMPP := ActualOwnershipPartialPre) -∗
-        ⌜ fr ## dom fs⌝. 
-  Proof using. 
-    iIntros (?????) "MSI FREE FUELS". 
-    rewrite /model_state_interp.
-    iAssert (⌜ dom fs ⊆ dom (ls_fuel δ) ⌝)%I as "%INCL2".
-    { iDestruct (has_fuel_fuel with "FUELS MSI") as "%IN".
-      iPureIntro. apply elem_of_subseteq.
-      intros ? DOM. specialize (IN _ DOM).
-      apply elem_of_dom. rewrite IN. by apply elem_of_dom.  }
-    iDestruct "MSI" as (??) "(?&?&FREE'&?&?&?&%DISJ)".
-    iDestruct (free_roles_inclusion with "FREE' FREE") as "%INCL1".
-    iPureIntro. set_solver. 
-  Qed.    
 
 End model_state_lemmas.
 
