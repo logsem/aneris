@@ -203,7 +203,7 @@ Section LocksCompositionProofs.
  
   Notation "'has_fuels_' '<' ctx '>'" := (has_fuels (PMPP := ctx)) (at level 20, format "has_fuels_  < ctx >"). 
 
-  Notation "'PMP'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ comp_model PMPP).
+  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (LM := LM) (iLM := comp_model) (PMPP := PMPP))).
 
   Close Scope Z_scope. 
   Notation "'sub' d" := (fun n => n - d) (at level 10). 
@@ -330,7 +330,6 @@ Section LocksCompositionProofs.
   (*   (@heap_fairnessGS Σ M LM heapGS0) spinlock_model_impl spinlock_model  *)
   (*   ?PMPP *)
 
-  (* TODO: move to upstream *)
   (* Lemma set_map_disjoint  *)
   (*   `{Elements A C, Singleton B D, Empty D, Union D} *)
   (*   `{ElemOf A C} `{ElemOf B D} *)
@@ -338,14 +337,13 @@ Section LocksCompositionProofs.
   (*   (s1 s2: C) (f: A -> B) *)
   (*   (DISJ: s1 ## s2): *)
   (*   (set_map f s1: D) ## (set_map f s2: D). *)
-  (* Lemma set_map_disjoint {A B: Type} `{Countable A} `{Countable B} *)
-  (*   (s1 s2: gset A) (f: A -> B) *)
-  (*   (DISJ: s1 ## s2): *)
-  (*   set_map f s1 ## set_map f s2. *)
-  (* Proof using.  *)
-  (*   simpl. rewrite /set_map. apply elem_of_disjoint. *)
-  (*   intros ? IN1%elem_of_list_to_set IN2. *)
-    
+  (* TODO: generalize, upstream *)
+  Lemma set_map_disjoint {A B: Type} `{Countable A} `{Countable B}
+    (s1 s2: gset A) (f: A -> B)
+    (INJ: Inj eq eq f)
+    (DISJ: s1 ## s2):
+    (set_map f s1: gset B) ## (set_map f s2: gset B). 
+  Proof using. set_solver. Qed.  
 
   Definition sl1_PMPP (γ: gname):
     @PartialModelPredicatesPre heap_lang M _ _ Σ spinlock_model_impl.
@@ -475,10 +473,22 @@ Section LocksCompositionProofs.
   Qed.
     
   End KmapMagic.   
-  
 
-  Lemma sl1_PMP (γ: gname):
-    PMP ∗ (inv Ns (comp_inv_impl γ)) ⊢ @PartialModelPredicates _ _ LM _ _ Σ _ _ spinlock_model (sl1_PMPP γ).
+  (* TODO: generalize, upstream *)
+  Lemma set_map_difference {A B:Type} `{Countable A} `{Countable B}
+    (f : A → B) (X Y : gset A)
+    (INJ: Inj eq eq f):
+      (set_map f (X ∖ Y): gset B) ≡ set_map f X ∖ set_map f Y.
+  Proof using.
+    simpl. split; [| set_solver]. 
+    intros [? [[=->] [? ?]%elem_of_difference]]%elem_of_map_1.
+    apply elem_of_difference. split; [set_solver| ].
+    intros [? [EQ ?]]%elem_of_map_1. set_solver.
+  Qed. 
+
+  Lemma sl1_PMP Einvs (γ: gname) (DISJ_INV: Einvs ## ↑Ns):
+    PMP Einvs ∗ (inv Ns (comp_inv_impl γ)) ⊢
+    PartialModelPredicates (Einvs ∪ ↑Ns) (LM := LM) (iLM := spinlock_model) (PMPP := (sl1_PMPP γ)). 
   Proof. 
     iIntros "[#PMP #COMP]". iApply @Build_PartialModelPredicates.
 
@@ -528,10 +538,77 @@ Section LocksCompositionProofs.
       iIntros "NO". iApply "FIN". 
       simpl. by rewrite map_fmap_singleton set_map_empty.
     - iIntros "*". iIntros "FUELS ST MSI FR".
-      fupd
-      iInv Ns as (((ost1, ost2), osc)) "(>ST & >AUTH)" "CLOS".
-  Abort. 
-      
+      iInv Ns as (((ost1, ost2), osc)) "(>ST_COMP & >AUTH)" "CLOS".
+      rewrite difference_union_distr_l_L difference_diag_L.
+      rewrite difference_disjoint_L; [| done]. rewrite union_empty_r_L. 
+      iAssert (⌜ ost1 = Some s1 ⌝)%I as %->.
+      { simpl. rewrite /comp_sl1_st_frag. 
+        iCombine "AUTH ST" as "OWN". iDestruct (own_valid with "OWN") as %[INCL ?]%auth_both_valid_discrete.
+        iPureIntro. 
+        apply pair_included in INCL as [[INCL ?]%pair_included ?]. 
+        by apply Excl_included, leibniz_equiv_iff in INCL. } 
+      iDestruct (update_step_still_alive with "PMP [FUELS] ST_COMP MSI FR") as "UPD".
+      10: { by iApply has_fuels_sl1. }
+      8: { apply ct_sl_step_1. eauto. }
+      { simpl. set_solver. }
+      { rewrite dom_kmap. eapply set_map_mono; [| apply STASH]. done. }
+      { simpl.
+        rewrite /lift_sl_role_left. rewrite /lift_sl_role_left.  (* TODO: why twice? *)
+        apply disjoint_intersection_L. 
+        repeat (apply disjoint_union_l; split).
+        - set_solver.
+        - set_solver.
+        - destruct osc; [destruct n| ]; simpl; set_solver. }
+      2, 3, 4: done.
+      { apply disjoint_intersection_L, (set_map_disjoint _ _ lift_sl_role_left) in NOS2; [| by apply _].
+        rewrite -dom_kmap in NOS2. 
+        apply disjoint_intersection_L. by apply NOS2. }
+      { replace (inl (inl ρ)) with (lift_sl_role_left ρ); [| done]. 
+        (* destruct VFM.  *)
+        repeat (split; simpl).
+        - intros [[IN | ?]%elem_of_union | ?]%elem_of_union.
+          2: { set_solver. }
+          2: { destruct osc; [destruct n| ]; simpl; set_solver. }
+          apply elem_of_map in IN as [? [[=->] IN]].
+          apply VFM in IN.
+          rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
+          destruct (fs2 !! x); [simpl in *; lia | done].
+        - intros. rewrite !lookup_kmap.
+          apply (proj1 (proj2 VFM)).
+          { set_solver. }
+          rewrite !dom_kmap in H0. 
+          apply elem_of_intersection in H0 as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
+          set_solver.
+        - rewrite dom_kmap. apply elem_of_map_2.
+          apply VFM.
+        - intros ? [IN2 NIN1]%elem_of_difference.
+          rewrite dom_kmap in IN2. apply elem_of_map_1 in IN2 as [? [[=->] ?]].
+          rewrite lookup_kmap.
+          do 3 apply proj2 in VFM. apply proj1 in VFM.
+          assert (x ∈ dom fs2 ∖ dom fs1) as X. 
+          { apply elem_of_difference. split; auto.
+            intros ?. apply NIN1. rewrite dom_kmap. set_solver. }
+          specialize (VFM x X).
+          pose proof (sm_fuel_max s2).
+          destruct (fs2 !! x); [simpl in *; lia | done].
+        - intros ?? IN. rewrite !dom_kmap in IN. 
+          apply elem_of_intersection in IN as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
+          rewrite !lookup_kmap. apply VFM; auto. set_solver.
+        - simpl. do 5 apply proj2 in VFM. apply proj1 in VFM.
+          apply union_subseteq. rewrite !dom_kmap. set_solver.
+        - do 6 apply proj2 in VFM. rewrite !dom_kmap.
+          apply elem_of_subseteq. intros ? [? [[=->] ?]]%elem_of_map_1.
+          specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
+          + repeat (apply elem_of_union; left). apply elem_of_difference. split.
+            * set_solver.
+            * intros [[IN | ?]%elem_of_union | ?]%elem_of_union.
+              2: { set_solver. }
+              2: { destruct osc; [destruct n| ]; simpl; set_solver. }
+              apply elem_of_map_1 in IN as [? [[=->] ?]]. set_solver.
+          + foobar. 
+
+            
+          move VFM at bottom. set_solver. 
 
   Lemma comp_spec tid (P: iProp Σ):
     PMP -∗
