@@ -382,10 +382,14 @@ Section ClientProofs.
   Qed. 
   
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
-  Notation "'PMP'" := (@PartialModelPredicates heap_lang Mdl LM _ _ Σ _ spinlock_model_impl spinlock_model PMPP). 
+  (* Notation "'PMP'" := (@PartialModelPredicates heap_lang Mdl LM _ _ Σ _ spinlock_model_impl spinlock_model PMPP).  *)
+  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (LM := LM) (iLM := spinlock_model) (PMPP := PMPP))).
+  
 
-  Lemma acquire_spec_term tid l γ P f (FUEL: f > 5) th:
-    PMP -∗
+  Lemma acquire_spec_term tid Einvs l γ P f (FUEL: f > 5) th
+    (DISJ_INV: Einvs ## ↑Ns) (* TODO: hide this requirement *)
+    :
+    PMP Einvs -∗
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2 }}}
       acquire #l @ tid
     {{{ RET #(); P ∗ locked γ ∗ thst_frag th 1 ∗ ∃ f, has_fuel tid th f ∗ ⌜f > 4 ⌝}}}.
@@ -420,12 +424,19 @@ Section ClientProofs.
       (* |={⊤ ∖ ↑Ns,?E3}=> WP #l <- #false @ tid; ?E3 {{ v, |={?E3,⊤}=> Φ v }} *)
 
       (* iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat st (<[th:=1]> st)) with "[$]"). *)
+
+      iModIntro. (* moved from its previous position *)
+      
       iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat _ st (<[th:=1]> st)) with "[$] [$]"); eauto. 
+      { set_solver. }
       { done. }
       { econstructor; eauto. }
       { apply live_roles_preservation. rewrite THST_V. simpl. lia. }
 
-      do 2 iModIntro. iIntros "(L & ST & NOFREE & FUEL)".
+      (* do 2 iModIntro. - fupd intro moved up *)
+      iModIntro. 
+
+      iIntros "(L & ST & NOFREE & FUEL)".
       iMod ((thst_update th 1) with "[THST_AUTH THST_FRAG]")
         as "[THST_AUTH THST_FRAG]"; [by iFrame| ].
       iMod ("Clos" with "[-THST_FRAG Kont P LOCKED FUEL]") as "_".
@@ -446,6 +457,7 @@ Section ClientProofs.
       iApply wp_value. iApply "Kont". iFrame. iExists _. iFrame. iPureIntro. lia.
     - iDestruct "LOCK" as "[>L [[>-> _] | >->]]"; [done| ].
       iApply ((wp_cmpxchg_fail_step_singlerole _ tid th _ 10%nat _ st st) with "[$] [$]").
+      { set_solver. }
       all: eauto. 
       { done. }
       { econstructor; eauto. }
@@ -490,8 +502,10 @@ Section ClientProofs.
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
   Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
-  Lemma release_spec_term tid l γ P f (FUEL: f > 2) (th: fmrole spinlock_model_impl):
-    PMP -∗
+  Lemma release_spec_term tid Einvs l γ P f (FUEL: f > 2) (th: fmrole spinlock_model_impl)
+    (DISJ_INV: Einvs ## ↑Ns) (* TODO: hide this requirement *)
+    :
+    PMP Einvs -∗
     {{{ spinlock_inv l γ P ∗ P ∗ locked γ ∗ thst_frag th 1 ∗ has_fuel tid th f }}}
       release #l @ tid
     {{{ RET #(); tid ↦M ∅ ∗ thst_frag th 0 ∗ partial_free_roles_are {[ th ]} }}}.
@@ -519,17 +533,18 @@ Section ClientProofs.
       rewrite /op /cmra_op /=  /excl_op_instance.
       iDestruct (own_valid with "L'") as "%".
       done. }
-    
-    
+
     iDestruct "LOCK" as ">->".
     destruct CORR as [[? _] | [_ [i ST_LOCKED]]]; [done| ].
     
     iDestruct (locked_thread_det with "THST_FRAG MODEL") as "%EQ"; eauto. subst i.
 
     destruct f; [lia| ]. 
-    rewrite {2}/model_inv_impl. iDestruct "MODEL" as "(ST & NOFREE & AUTHS & %LENGTH)". 
+    rewrite {2}/model_inv_impl. iDestruct "MODEL" as "(ST & NOFREE & AUTHS & %LENGTH)".
+    Unshelve. 2: exact (⊤ ∖ ↑Ns). 
     (* iApply ((wp_store_step_singlerole _ tid th _ 0%nat _ st (<[th:=0]> st)) with "[$]"). *)
     iApply (wp_store_step_singlerole with "[$] [$]").
+    { set_solver. }
     { apply inj_le, le_0_n. }
     { by apply sm_unlock. }  
     { apply live_roles_preservation.
@@ -567,8 +582,9 @@ Section ClientProofs.
   Qed. 
     
     
-  Lemma client_terminates tid l γ P f th (FUEL: f > 12) :
-    PMP -∗
+  Lemma client_terminates tid Einvs l γ P f th (FUEL: f > 12)
+    (DISJ_INV: Einvs ## ↑Ns):
+    PMP Einvs -∗
     {{{ spinlock_inv l γ P ∗ has_fuel tid th f ∗ thst_frag th 2}}}
       client #l @ tid
     {{{ RET #(); tid ↦M ∅ ∗ partial_free_roles_are {[ th ]} }}}.
@@ -578,13 +594,15 @@ Section ClientProofs.
     pure_step_burn_fuel f.
     wp_bind (acquire #l)%E.
     iApply (acquire_spec_term with "[$] [-Kont]"). 
-    2: { by iFrame. }
+    3: by iFrame.
+    2: done. 
     { lia. }
     clear dependent f. 
     iNext. iIntros "(P & LOCKED & FRAG & [%f [FUEL %FUEL]])".
     do 2 pure_step_burn_fuel f. 
     iApply (release_spec_term with "[$] [-Kont]").
-    2: { iFrame. iSplitR "P"; done. }
+    3: { iFrame. iSplitR "P"; done. }
+    2: done. 
     { lia. }
     iNext. iIntros "(? & ? & ?)". iApply ("Kont" with "[$]"). 
   Qed.
@@ -664,11 +682,12 @@ Section MainProof.
   (* Proof using.  *)
   (*   simpl. done. apply _.  *)
 
-  Notation "'PMP'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP).
+  (* Notation "'PMP'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP). *)
+  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (LM := LM) (iLM := spinlock_model) (PMPP := PMPP))).
 
-  Lemma newlock_spec tid P fs
+  Lemma newlock_spec tid Einvs P fs
         (FSne: fs ≠ ∅) (FUELS: fuels_ge fs 20):
-    PMP -∗
+    PMP Einvs -∗
     {{{ P ∗ has_fuels tid fs ∗
           partial_model_is (repeat 2 (size (dom fs)) ) ∗ 
           partial_free_roles_are ∅}}}
@@ -799,11 +818,12 @@ Section MainProof.
   Qed.    
 
   Definition program_init_state: fmstate spinlock_model_impl := [2; 2].
-    
+
   (* TODO: free roles cannot be retrieved back without par construct *)
-  Lemma program_spec tid (P: iProp Σ):
+  Lemma program_spec tid Einvs (P: iProp Σ)
+    (DISJ_INV: Einvs ## ↑nroot.@"spinlock"):
     (* {{{ partial_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
-    PMP -∗
+    PMP Einvs -∗
     {{{ partial_model_is program_init_state ∗ partial_free_roles_are ∅ ∗ P ∗ 
       has_fuels tid program_init_fuels }}}
       program #() @ tid
@@ -835,7 +855,7 @@ Section MainProof.
     iAssert (has_fuels tid {[ 0:=25; 1:=25 ]})%I with "FUELS" as "FUELS". 
 
     wp_bind (newlock #())%E.
-    iApply (newlock_spec tid P with "[$] [P FUELS ST NOFREE]"); eauto.
+    iApply (newlock_spec tid _ P with "[$] [P FUELS ST NOFREE]"); eauto.
     3: { iFrame. 
          replace (size (dom {[0 := 25; 1 := 25]})) with 2; auto. }
     { set_solver. }
@@ -874,7 +894,7 @@ Section MainProof.
 
     (* Set Printing Implicit.  *)
 
-    iApply (wp_fork_nostep _ tid _ _ _ {[ 1 ]} {[ 0 ]} (<[0:=20]> (<[1:=20]> ∅)) with "[FRAG0] [-FUELS] [FUELS]").
+    iApply (wp_fork_nostep _ tid _ _ _ _ {[ 1 ]} {[ 0 ]} (<[0:=20]> (<[1:=20]> ∅)) with "[FRAG0] [-FUELS] [FUELS]").
     6: { done. }
     { set_solver. }
     { done. }
@@ -889,7 +909,8 @@ Section MainProof.
       2: { apply leibniz_equiv_iff. apply decide_True. done. }
       iDestruct (has_fuel_fuels with "FUEL") as "FUEL". 
 
-      iApply (client_terminates with "[$] [-]"). 
+      iApply (client_terminates with "[$] [-]").
+      2: done. 
       2: { iFrame. eauto. }
       { lia. }
       iNext. iIntros "[??]". iFrame. }
@@ -909,9 +930,9 @@ Section MainProof.
     do 2 pure_step_burn_fuel_impl. 
     
     (* TODO: unify even more*)
-    iApply (wp_fork_nostep _ tid _ _ _ ∅ {[ 1 ]} {[1 := 17]} with "[FRAG1] [-FUEL] [FUEL]").
+    iApply (wp_fork_nostep _ tid _ _ _ _ ∅ {[ 1 ]} {[1 := 17]} with "[FRAG1] [-FUEL] [FUEL]").
     6: { rewrite /has_fuels_S.
-         iDestruct (has_fuel_fuels with "FUEL") as "FUEL". 
+         iDestruct (has_fuel_fuels with "FUEL") as "FUEL".     
          iApply has_fuels_proper; [..| iFrame]; eauto.
          by rewrite map_fmap_singleton. }
     { set_solver. }
@@ -926,6 +947,7 @@ Section MainProof.
       iDestruct (has_fuel_fuels with "FUEL") as "FUEL". 
 
       iApply (client_terminates with "[$] [-]").
+      2: done. 
       2: { iFrame. eauto. }
       { lia. }
       iNext. iIntros "[??]". iFrame. }
