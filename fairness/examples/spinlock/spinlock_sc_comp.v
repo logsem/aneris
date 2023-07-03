@@ -483,6 +483,62 @@ Section LocksCompositionProofs.
     intros [? [EQ ?]]%elem_of_map_1. set_solver.
   Qed. 
 
+  Lemma vfm_sl1 fs1 fs2 s1 s2 ρ ost2 osc
+    (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := spinlock_model)):
+  valid_new_fuelmap (kmap lift_sl_role_left fs1) (kmap lift_sl_role_left fs2)
+    (Some s1, ost2, osc) (Some s2, ost2, osc) (inl (inl ρ)) (LM := comp_model).
+  Proof using.
+    Ltac role_cases :=
+      intros [[IN | ?]%elem_of_union | ?osc]%elem_of_union;
+      [| set_solver| (destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver)];
+      apply elem_of_map in IN as [? [[=->] IN]].
+    
+    replace (inl (inl ρ)) with (lift_sl_role_left ρ); [| done]. 
+    (* destruct VFM.  *)
+    repeat (split; simpl).
+    - role_cases.  
+      apply VFM in IN.
+      rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
+      destruct (fs2 !! x); [simpl in *; lia | done].
+    - intros. rewrite !lookup_kmap.
+      apply (proj1 (proj2 VFM)).
+      { set_solver. }
+      rewrite !dom_kmap in H0. 
+      apply elem_of_intersection in H0 as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
+      set_solver.
+    - rewrite dom_kmap. apply elem_of_map_2.
+      apply VFM.
+    - intros ? [IN2 NIN1]%elem_of_difference.
+      rewrite dom_kmap in IN2. apply elem_of_map_1 in IN2 as [? [[=->] ?]].
+      rewrite lookup_kmap.
+      do 3 apply proj2 in VFM. apply proj1 in VFM.
+      assert (x ∈ dom fs2 ∖ dom fs1) as X. 
+      { apply elem_of_difference. split; auto.
+        intros ?. apply NIN1. rewrite dom_kmap. set_solver. }
+      specialize (VFM x X).
+      pose proof (sm_fuel_max s2).
+      destruct (fs2 !! x); [simpl in *; lia | done].
+    - intros ?? IN. rewrite !dom_kmap in IN. 
+      apply elem_of_intersection in IN as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
+      rewrite !lookup_kmap. apply VFM; auto. set_solver.
+    - simpl. do 5 apply proj2 in VFM. apply proj1 in VFM.
+      apply union_subseteq. rewrite !dom_kmap. set_solver.
+    - do 6 apply proj2 in VFM. rewrite !dom_kmap.
+      apply elem_of_subseteq. intros ? [? [[=->] ?]]%elem_of_map_1.
+      specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
+      + repeat (apply elem_of_union; left). apply elem_of_difference. split.
+        * set_solver.
+        * role_cases. set_solver. 
+      + set_solver.
+      + apply elem_of_union; left. apply elem_of_union; right.
+        apply elem_of_difference. split; [set_solver| ].
+        role_cases. set_solver.
+      + apply elem_of_union; right.
+        apply elem_of_intersection. split; [| set_solver].
+        apply elem_of_difference. split; [set_solver| ].
+        role_cases. set_solver. 
+  Qed. 
+
   Lemma sl1_PMP Einvs (γ: gname) (DISJ_INV: Einvs ## ↑Ns):
     PMP Einvs ∗ (inv Ns (comp_inv_impl γ)) ⊢
     PartialModelPredicates (Einvs ∪ ↑Ns) (LM := LM) (iLM := spinlock_model) (PMPP := (sl1_PMPP γ)). 
@@ -560,56 +616,7 @@ Section LocksCompositionProofs.
       { apply disjoint_intersection_L, (set_map_disjoint _ _ lift_sl_role_left) in NOS2; [| by apply _].
         rewrite -dom_kmap in NOS2. 
         apply disjoint_intersection_L. by apply NOS2. }
-      { 
-        Ltac role_cases :=
-          intros [[IN | ?]%elem_of_union | ?osc]%elem_of_union;
-          [| set_solver| (destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver)];
-          apply elem_of_map in IN as [? [[=->] IN]].
-
-        replace (inl (inl ρ)) with (lift_sl_role_left ρ); [| done]. 
-        (* destruct VFM.  *)
-        repeat (split; simpl).
-        - role_cases.  
-          apply VFM in IN.
-          rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
-          destruct (fs2 !! x); [simpl in *; lia | done].
-        - intros. rewrite !lookup_kmap.
-          apply (proj1 (proj2 VFM)).
-          { set_solver. }
-          rewrite !dom_kmap in H0. 
-          apply elem_of_intersection in H0 as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
-          set_solver.
-        - rewrite dom_kmap. apply elem_of_map_2.
-          apply VFM.
-        - intros ? [IN2 NIN1]%elem_of_difference.
-          rewrite dom_kmap in IN2. apply elem_of_map_1 in IN2 as [? [[=->] ?]].
-          rewrite lookup_kmap.
-          do 3 apply proj2 in VFM. apply proj1 in VFM.
-          assert (x ∈ dom fs2 ∖ dom fs1) as X. 
-          { apply elem_of_difference. split; auto.
-            intros ?. apply NIN1. rewrite dom_kmap. set_solver. }
-          specialize (VFM x X).
-          pose proof (sm_fuel_max s2).
-          destruct (fs2 !! x); [simpl in *; lia | done].
-        - intros ?? IN. rewrite !dom_kmap in IN. 
-          apply elem_of_intersection in IN as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
-          rewrite !lookup_kmap. apply VFM; auto. set_solver.
-        - simpl. do 5 apply proj2 in VFM. apply proj1 in VFM.
-          apply union_subseteq. rewrite !dom_kmap. set_solver.
-        - do 6 apply proj2 in VFM. rewrite !dom_kmap.
-          apply elem_of_subseteq. intros ? [? [[=->] ?]]%elem_of_map_1.
-          specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
-          + repeat (apply elem_of_union; left). apply elem_of_difference. split.
-            * set_solver.
-            * role_cases. set_solver. 
-          + set_solver.
-          + apply elem_of_union; left. apply elem_of_union; right.
-            apply elem_of_difference. split; [set_solver| ].
-            role_cases. set_solver.
-          + apply elem_of_union; right.
-            apply elem_of_intersection. split; [| set_solver].
-            apply elem_of_difference. split; [set_solver| ].
-            role_cases. set_solver. }
+      { by apply vfm_sl1. }
       iMod "UPD" as (??) "(% & FUELS & M2 & MSI & FR)". 
       iMod (update_sl1 _ _ (Some s2) with "[ST AUTH]") as "[ST AUTH]"; [by iFrame| ].
       iMod ("CLOS" with "[M2 AUTH]") as "_".
