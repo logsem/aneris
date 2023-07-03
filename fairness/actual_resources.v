@@ -15,6 +15,77 @@ Section actual_ownership.
   Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
   Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
+  Global Instance ActualOwnershipPartialPre:
+    @PartialModelPredicatesPre _ M _ _ Σ M. 
+  Proof.
+    refine {|
+        partial_model_is := frag_model_is;
+        partial_free_roles_are := frag_free_roles_are;
+        partial_fuel_is := frag_fuel_is;
+        partial_mapping_is := frag_mapping_is;
+        project_inner := Some;
+      |}.
+    - intros. rewrite /frag_fuel_is.
+      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
+      2: { by apply map_disjoint_fmap. }
+      by rewrite auth_frag_op own_op.
+    - intros. rewrite /frag_free_roles_are.
+      rewrite -gset_disj_union; auto.  
+      by rewrite auth_frag_op own_op.
+    - iApply empty_frag_free_roles. 
+  Defined. 
+
+  Lemma has_fuel_in ζ δ fs n:
+    has_fuels ζ fs -∗ model_state_interp n δ -∗ ⌜ ∀ ρ, ls_mapping δ !! ρ = Some ζ <-> ρ ∈ dom fs ⌝.
+  Proof.
+    unfold model_state_interp, has_fuels, auth_mapping_is, frag_mapping_is.
+    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping &HFR&%Hmapinv&Hamod&Hfr) %ρ".
+    iCombine "Hamapping Hζ" as "H".
+    iDestruct (own_valid with "H") as %Hval. iPureIntro.
+    apply auth_both_valid_discrete in Hval as [Hval ?].
+    rewrite map_fmap_singleton in Hval.
+    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
+    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
+    apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq.
+    rewrite (Hmapinv ρ ζ) HMζ. split.
+    - intros (?&?&?). by simplify_eq.
+    - intros ?. eexists. split; eauto.
+  Qed.
+
+  Lemma has_fuel_fuel ζ δ fs n:
+    has_fuels ζ fs -∗ model_state_interp n δ -∗ 
+    ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
+  Proof.
+    unfold has_fuels, model_state_interp, auth_fuel_is.
+    iIntros "[Hζ Hfuels] (%m&%FR&Hafuel&Hamapping&HFR&%Hmapinv&Hamod)" (ρ Hρ).
+    iDestruct (big_sepS_delete _ _ ρ with "Hfuels") as "[(%f&%Hfs&Hfuel) _]" =>//.
+    iCombine "Hafuel Hfuel" as "H".
+    iDestruct (own_valid with "H") as %Hval. iPureIntro.
+    apply auth_both_valid_discrete in Hval as [Hval ?].
+    rewrite map_fmap_singleton in Hval.
+    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
+    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
+    apply fmap_Some_1 in Hval as (f'&Hfuelρ&?). simplify_eq.
+    rewrite Hfuelρ Hfs //.
+  Qed.
+
+  Lemma frag_free_roles_fuels_disj: forall n δ fr fs tid,
+        model_state_interp n δ -∗ frag_free_roles_are fr -∗ 
+        has_fuels tid fs (PMPP := ActualOwnershipPartialPre) -∗
+        ⌜ fr ## dom fs⌝. 
+  Proof using. 
+    iIntros (?????) "MSI FREE FUELS". 
+    rewrite /model_state_interp.
+    iAssert (⌜ dom fs ⊆ dom (ls_fuel δ) ⌝)%I as "%INCL2".
+    { iDestruct (has_fuel_fuel with "FUELS MSI") as "%IN".
+      iPureIntro. apply elem_of_subseteq.
+      intros ? DOM. specialize (IN _ DOM).
+      apply elem_of_dom. rewrite IN. by apply elem_of_dom.  }
+    iDestruct "MSI" as (??) "(?&?&FREE'&?&?&?&%DISJ)".
+    iDestruct (free_roles_inclusion with "FREE' FREE") as "%INCL1".
+    iPureIntro. set_solver. 
+  Qed.
+
   Definition fuel_apply (fs' F:  gmap (fmrole M) nat) (LR: gset (fmrole M)):
     gmap (fmrole M) nat :=
     map_imap
@@ -1021,15 +1092,12 @@ Section ActualOwnershipImpl.
       * assert (ρ' ∈ dom (ls_fuel δ1)) as Hin' by set_solver -Hsamedoms Hnewdom Hfueldom. apply elem_of_dom in Hin' as [? ->]. done. }
   Qed.
 
-  Lemma ActualOwnershipPartial:
-    ⊢ PartialModelPredicates (LM := LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre). 
-  Proof.
-    iIntros. iApply Build_PartialModelPredicates. iModIntro. repeat iSplitL.
-    - iIntros. iApply (actual_update_no_step_enough_fuel with "[$]"); set_solver.
-    - iIntros. iApply (actual_update_fork_split with "[$]"); done.
-    - iIntros. iApply (actual_update_step_still_alive with "[$] [$] [$] [$]"); done.
-    - iIntros. by iDestruct (model_agree' with "[$] [$]") as %->.
-    - iIntros. iApply (frag_free_roles_fuels_disj with "[$] [$] [$]").
-  Defined. 
+  (* Lemma bupd_fupd_empty `{FUpd (iProp Σ)} (P: iProp Σ): *)
+  (*     (|==> P)%I ⊢ |={∅}=> P. *)
+  (* Proof using.  *)
+  (*   iIntros "UP". *)
+  (*   iDestruct (bupd_fupd ∅ with "UP") as "FP". *)
+  (*   iApply "FP".  *)
+  (*   (* Set Printing All. *) *)
 
 End ActualOwnershipImpl.
