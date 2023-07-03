@@ -563,13 +563,16 @@ Section LocksCompositionProofs.
       { apply disjoint_intersection_L, (set_map_disjoint _ _ lift_sl_role_left) in NOS2; [| by apply _].
         rewrite -dom_kmap in NOS2. 
         apply disjoint_intersection_L. by apply NOS2. }
-      { replace (inl (inl ρ)) with (lift_sl_role_left ρ); [| done]. 
+      { 
+        Ltac role_cases :=
+          intros [[IN | ?]%elem_of_union | ?osc]%elem_of_union;
+          [| set_solver| (destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver)];
+          apply elem_of_map in IN as [? [[=->] IN]].
+
+        replace (inl (inl ρ)) with (lift_sl_role_left ρ); [| done]. 
         (* destruct VFM.  *)
         repeat (split; simpl).
-        - intros [[IN | ?]%elem_of_union | ?]%elem_of_union.
-          2: { set_solver. }
-          2: { destruct osc; [destruct n| ]; simpl; set_solver. }
-          apply elem_of_map in IN as [? [[=->] IN]].
+        - role_cases.  
           apply VFM in IN.
           rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
           destruct (fs2 !! x); [simpl in *; lia | done].
@@ -601,14 +604,38 @@ Section LocksCompositionProofs.
           specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
           + repeat (apply elem_of_union; left). apply elem_of_difference. split.
             * set_solver.
-            * intros [[IN | ?]%elem_of_union | ?]%elem_of_union.
-              2: { set_solver. }
-              2: { destruct osc; [destruct n| ]; simpl; set_solver. }
-              apply elem_of_map_1 in IN as [? [[=->] ?]]. set_solver.
-          + foobar. 
-
-            
-          move VFM at bottom. set_solver. 
+            * role_cases. set_solver. 
+          + set_solver.
+          + apply elem_of_union; left. apply elem_of_union; right.
+            apply elem_of_difference. split; [set_solver| ].
+            role_cases. set_solver.
+          + apply elem_of_union; right.
+            apply elem_of_intersection. split; [| set_solver].
+            apply elem_of_difference. split; [set_solver| ].
+            role_cases. set_solver. }
+      iMod "UPD" as (??) "(% & FUELS & M2 & MSI & FR)". 
+      iMod (update_sl1 _ _ (Some s2) with "[ST AUTH]") as "[ST AUTH]"; [by iFrame| ].
+      iMod ("CLOS" with "[M2 AUTH]") as "_".
+      { iNext. rewrite /comp_inv_impl. iExists _. iFrame. }
+      iModIntro. do 2 iExists _. iFrame. iSplitR; [done| ].
+      iSplitL "FUELS".
+      + by iApply has_fuels_sl1.
+      + simpl. iApply partial_free_roles_are_Proper; [| iFrame].
+        rewrite set_map_union.
+        apply sets.union_proper; [| done].
+        rewrite set_map_difference. apply difference_proper; [done| ].
+        rewrite -!union_assoc. rewrite difference_union_distr_l. etrans. 
+        2: { symmetry. eapply sets.union_proper; [reflexivity| ].
+             Unshelve. 2: exact ∅. set_solver. }
+        rewrite union_empty_r. rewrite difference_union_distr_r.
+        etrans.
+        2: { apply sets.intersection_proper; [reflexivity| ].
+             symmetry. apply difference_disjoint.
+             destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver. }
+        rewrite -set_map_difference. set_solver. 
+    - iIntros. simpl.
+      admit.
+  Admitted.
 
   Lemma comp_spec tid (P: iProp Σ):
     PMP -∗
