@@ -28,14 +28,14 @@ Lemma tac_wp_pure_helper
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM}
   `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}  
-  tid E K e1 e2
+  tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   (* fs *)
   φ n Φ :
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  (@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗ ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗ ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels_plus n tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof. 
@@ -50,7 +50,7 @@ Proof.
   iIntros "#PMP H Hf".
   rewrite has_fuels_plus_split_S.
 
-  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
+  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
   { by intros ?%fmap_empty_inv. }
   { econstructor =>//; [ by eapply pure_step_ctx | constructor ]. }
   iSplitR; [done| ]. 
@@ -99,14 +99,14 @@ Lemma tac_wp_pure_helper_2
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM}
   `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
-  tid E K e1 e2
+  tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   φ n Φ :
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  (@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗ ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗ ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof.
@@ -170,7 +170,7 @@ Lemma tac_wp_pure
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
   `{iLM: LiveModel heap_lang iM}
   `{PMPP: @PartialModelPredicatesPre heap_lang M _ _ Σ iM}
-  Δ Δ'other tid E i K e1 e2 φ n Φ
+  Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
   (fs: gmap (fmrole iM) nat)
   :
   (∀ (ρ: fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
@@ -181,9 +181,9 @@ Lemma tac_wp_pure
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs n Δother Δ'other →
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - n)%nat <$> fs)) in
-  envs_entails Δ' ((@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗
+  envs_entails Δ' ((PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP (fill K e2) @ tid; E {{ Φ }}) →
-  envs_entails Δ ((@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗
+  envs_entails Δ ((PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP (fill K e1) @ tid; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ???.
@@ -468,7 +468,7 @@ Context
 (*   apply sep_mono_r, wand_intro_r. rewrite right_id //. *)
 (* Qed. *)
 
-Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E i j l q v Φ :
+Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l q v Φ :
   (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
@@ -477,9 +477,9 @@ Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E i j l q v Φ :
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
   envs_lookup j Δ'other = Some (false,  l ↦{q} v)%I →
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
-  envs_entails Δ' ((@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗
+  envs_entails Δ' ((PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP fill K (Val v) @ tid; E {{ Φ }}) →
-  envs_entails Δ ((@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗
+  envs_entails Δ ((PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
 Proof using.
   intros ?? Hij ?.
@@ -508,7 +508,7 @@ Proof using.
 Qed.
 
 
-Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E i j l v v' Φ :
+Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l v v' Φ :
   (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
@@ -520,11 +520,11 @@ Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E i j l v v' Φ 
   | Some Δ'other2 =>
       let Δ' := envs_snoc Δ'other2 false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
       envs_lookup i Δ'other2 = None (* redondent but easier than  proving it. *) ∧
-      envs_entails Δ' (  (@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗
+      envs_entails Δ' (  (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
  WP fill K (Val $ LitV LitUnit) @ tid; E {{ Φ }})
   | None => False
   end →
-  envs_entails Δ (  (@PartialModelPredicates heap_lang M LM _ _ Σ _ iM iLM PMPP) -∗
+  envs_entails Δ (  (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
 Proof using.
   intros ?? Hij ?.
