@@ -18,7 +18,6 @@ Section ActualOwnershipInterface.
     - iIntros. iApply (actual_update_fork_split with "[$]"); done.
     - iIntros "*". iIntros.
       iApply (actual_update_step_still_alive with "[$] [$] [$] [$]"); eauto.
-    - iIntros. by iDestruct (model_agree' with "[$] [$]") as %->.
     - iIntros. iApply (frag_free_roles_fuels_disj with "[$] [$] [$]").
   Defined.
 
