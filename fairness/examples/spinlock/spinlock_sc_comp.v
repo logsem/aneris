@@ -100,9 +100,11 @@ Section LocksCompositionModel.
     all: apply elem_of_union_r; rewrite orb_true_intro; set_solver. 
   Defined.
 
+  Definition add_fuel_1 := 3. 
+  Definition add_fuel_2 := 3. 
   (* TODO: generalize? *)
   Definition comp_model: LiveModel heap_lang comp_model_impl :=
-    {| lm_fl _ := max 5 (sm_fuel + 3); |}.  
+    {| lm_fl _ := max 5 (sm_fuel + add_fuel_1 + add_fuel_2); |}.  
 
   (* Definition comp_st_init (n: nat): fmstate comp_model_impl :=  *)
   (*   (None: option sl_st, None: option sl_st, n).  *)
@@ -266,17 +268,18 @@ Section LocksCompositionProofs.
     apply option_local_update. by apply exclusive_local_update.
   Qed.
 
+    
   Lemma valid_fm f d:
     valid_new_fuelmap (sub d <$> {[inr ρc := f]})
-    ({[inr ρc := 3]} ∪ ((plus 3) <$> prog_fuels (inl ∘ inl))
-     ∪ ((plus 3) <$> prog_fuels (inl ∘ inr))) (None, None, Some 2)
+    ({[inr ρc := add_fuel_1 + add_fuel_2]} ∪ ((plus add_fuel_1) <$> prog_fuels (inl ∘ inl))
+     ∪ ((plus (add_fuel_1 + add_fuel_2)) <$> prog_fuels (inl ∘ inr))) (None, None, Some 2)
     (Some program_init_state, Some program_init_state, Some 2) 
     (inr ρc) (LM := comp_model).
   Proof.
-    red. repeat split; try set_solver. 
+    red. repeat split; try set_solver.
     - simpl. intros _.
       erewrite lookup_union_Some_l; try set_solver.
-      simpl. lia.
+      unfold add_fuel_1, add_fuel_2. simpl. lia. 
     - intros ρ [IN NIN]%elem_of_difference.
       repeat (rewrite dom_union in IN; apply elem_of_union in IN as [IN|IN]).
       { done. }
@@ -285,7 +288,8 @@ Section LocksCompositionProofs.
         * apply lookup_fmap_Some in IN as [? [<- IN]].
           rewrite /prog_fuels in IN.
           apply lookup_kmap_Some in IN as [ρ0 [-> IN]]; [| by apply _].
-          apply program_init_fuels_max in IN. simpl. lia. 
+          apply program_init_fuels_max in IN. simpl.
+          unfold add_fuel_1, add_fuel_2. lia. 
         * by apply map_disjoint_singleton_l.
       (* TODO: refactor *)
       + apply elem_of_dom in IN as [f' IN]. simpl. 
@@ -293,14 +297,14 @@ Section LocksCompositionProofs.
         * apply lookup_fmap_Some in IN as [? [<- IN]].
           rewrite /prog_fuels in IN.
           apply lookup_kmap_Some in IN as [ρ0 [-> IN]]; [| by apply _].
-          apply program_init_fuels_max in IN. simpl. lia. 
+          apply program_init_fuels_max in IN. simpl.
+          unfold add_fuel_1, add_fuel_2. lia. 
         * apply map_disjoint_union_l. split; [by apply map_disjoint_singleton_l|].
           rewrite -!kmap_fmap. apply map_disjoint_spec.
           intros ??? [? [-> ?]]%lookup_kmap_Some [? [? ?]]%lookup_kmap_Some.
           2, 3: by apply _.
           discriminate.
   Qed.
-    
     
 
   (* TODO: move to resources.v *)
@@ -943,16 +947,17 @@ Section LocksCompositionProofs.
     { iNext. rewrite /comp_inv_impl. iExists _. iFrame. }
     iModIntro. 
 
-    clear FS.
-    assert (forall lift, fuels_ge (Init.Nat.add 3 <$> prog_fuels lift) 3) as FS'.
-    { intros. intros ??[? [<- ?]]%lookup_fmap_Some. lia. } 
-    assert (fuels_ge ({[inr ρc := 3]} ∪ (Init.Nat.add 3 <$> prog_fuels (inl ∘ inl))
-               ∪ (Init.Nat.add 3 <$> prog_fuels (inl ∘ inr))) 3) as FS.
+    clear FS. 
+    assert (fuels_ge ({[inr ρc := add_fuel_1 + add_fuel_2]}
+               ∪ (Init.Nat.add add_fuel_1 <$> prog_fuels (inl ∘ inl))
+               ∪ (Init.Nat.add (add_fuel_1 + add_fuel_2) <$>
+                  prog_fuels (inl ∘ inr))) add_fuel_1) as FS.
     { apply fuels_ge_union; [apply fuels_ge_union| ].
-      { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
-      all: apply FS'. }
+      { red. intros ??[<- ?]%lookup_singleton_Some. lia. }
+      all: intros ?? [? [<- ?]]%lookup_fmap_Some; lia. }
     rewrite (sub_0_id (_ ∪ _ ∪ _)).
 
+    unfold add_fuel_1 in *. 
     pure_step FS.
     pure_step FS. 
 
@@ -967,7 +972,7 @@ Section LocksCompositionProofs.
       done.
 
     wp_bind (Fork _).
-    iApply (wp_fork_nostep_alt with "[ST1] [] [FUELS]").
+    iApply (wp_fork_nostep_alt with "[ST1] [ST2] [FUELS]").
     5: { rewrite -map_union_assoc map_union_comm.
          2: { apply map_disjoint_union_r. split; solve_disjoint. }
          rewrite -map_union_assoc map_union_comm. 
@@ -992,8 +997,47 @@ Section LocksCompositionProofs.
       rewrite -map_fmap_compose. erewrite map_fmap_equiv_ext.
       2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
       rewrite map_fmap_id. done. }
+
+    iNext. iIntros "FUELS". iModIntro.
+
+    clear FS. 
+    rewrite -map_fmap_union.
+    rewrite /add_fuel_2. 
+    assert (fuels_ge ({[inr ρc := 6]} ∪ (Init.Nat.add 6 <$> prog_fuels (inl ∘ inr))) 6) as FS.
+    { apply fuels_ge_union. 
+      { red. intros ??[<- ?]%lookup_singleton_Some. lia. }
+      all: intros ?? [? [<- ?]]%lookup_fmap_Some; lia. }
+
+    pure_step FS.
+    pure_step FS. 
     
-      
+    wp_bind (Fork _).
+    iApply (wp_fork_nostep_alt with "[ST2] [] [FUELS]").
+    5: { iDestruct (has_fuels_gt_1 with "FUELS") as "F". 
+         2: { rewrite -map_fmap_compose. rewrite map_union_comm; [| solve_disjoint].
+              rewrite !map_fmap_union. by iFrame. } 
+         solve_fuels_ge_1 FS. }
+    { solve_disjoint. }
+    { set_solver. }
+    { iSplitR; [done| ]. iIntros (tid') "!# FUELS".
+      iMod (partial_free_roles_empty) as "FR". 
+      iApply (program_spec with "[] [ST2 FUELS FR]"). 
+      2: { iApply sl2_PMP; eauto. }
+      { apply disjoint_union_l. split; [set_solver| ].
+        by apply ndot_ne_disjoint. }
+      2: { iNext. iIntros.
+           simpl. by rewrite map_fmap_singleton set_map_empty. }
+      iFrame. iSplitL "FR". 
+      { simpl. by rewrite set_map_empty. }
+      Unshelve. 2: exact (⌜ True ⌝)%I. iSplitR; [done| ].
+      iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | by iFrame].
+      rewrite -map_fmap_compose. erewrite map_fmap_equiv_ext.
+      2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
+      rewrite map_fmap_id. done. }
+    
+    iNext. 
+    
+    
 
 
 End LocksCompositionProofs.
