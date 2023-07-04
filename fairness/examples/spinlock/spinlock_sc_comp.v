@@ -196,10 +196,10 @@ Section LocksCompositionProofs.
     rewrite /prog_fuels. by rewrite lookup_kmap. 
   Qed. 
 
-  Let lift_sl_st_left (s: fmstate spinlock_model_impl): fmstate comp_model_impl := 
-        (Some s, None, None). 
   Let lift_sl_role_left (ρ: fmrole spinlock_model_impl): fmrole comp_model_impl := 
         (inl ∘ inl) ρ.
+  Let lift_sl_role_right (ρ: fmrole spinlock_model_impl): fmrole comp_model_impl := 
+        (inl ∘ inr) ρ.
  
   Notation "'has_fuels_' '<' ctx '>'" := (has_fuels (PMPP := ctx)) (at level 20, format "has_fuels_  < ctx >"). 
 
@@ -431,43 +431,45 @@ Section LocksCompositionProofs.
 
   (* TODO: without this explicit definition the following lemma  *)
   (*    fails to instantiate some typeclasses *)
-  Let kmap_: (fmrole spinlock_model_impl -> fmrole comp_model_impl) →
-                     (gmap (fmrole spinlock_model_impl) nat) → (gmap (fmrole comp_model_impl) nat).
-    refine (kmap (K2 := fmrole comp_model_impl) (K1 := fmrole spinlock_model_impl)).
-  Defined.
+  (* Let kmap_: (fmrole spinlock_model_impl -> fmrole comp_model_impl) → *)
+  (*                    (gmap (fmrole spinlock_model_impl) nat) → (gmap (fmrole comp_model_impl) nat). *)
+  (*   refine (kmap (K2 := fmrole comp_model_impl) (K1 := fmrole spinlock_model_impl)). *)
+  (* Defined. *)
+
+    Notation "'kmap_'" := kmap. 
 
   (* Context (kmap_: (fmrole spinlock_model_impl -> fmrole comp_model_impl) → *)
   (*                    (gmap (fmrole spinlock_model_impl) nat) → (gmap (fmrole comp_model_impl) nat)). *)
   
-  Lemma kmap_filter_dom (fs : gmap (fmrole spinlock_model_impl) nat)
-(f : fmrole spinlock_model_impl → fmrole iM)
-  (H1 : Inj eq eq f)
-  (X : ∀ i : fmrole iM, Decision (∃ j : fmrole spinlock_model_impl, i = f j)):
-  kmap_ f (filter (λ '(k, _), k ∈ dom fs) fs)
-  = filter (λ '(k, _), k ∈ dom (kmap_ f fs)) (kmap_ f fs).
-  Proof using. 
-    rewrite /kmap_.
-    (* TODO: refactor *)
-    apply map_eq. intros.
-    (* destruct i.  *)
-    destruct (@decide (exists j, i = f j)).
-    { done. }
-    2: { etrans; [| etrans]; [| exact (eq_refl None) |].
-         - apply lookup_kmap_None; [apply _| ].
-           intros. destruct n. eauto.
-         - symmetry. apply map_filter_lookup_None. left.
-           apply lookup_kmap_None; [apply _| ].
-           intros. destruct n. eauto. }
-    destruct e as [? ->]. rewrite lookup_kmap.
-    destruct (decide (x ∈ dom fs)).
-    + pose proof e as [? EQ]%elem_of_dom.
-      repeat (erewrite map_filter_lookup_Some_2; eauto).
-      { by rewrite lookup_kmap. }
-      rewrite dom_kmap. set_solver.
-    + pose proof n as ?%not_elem_of_dom_1.
-      repeat (rewrite map_filter_lookup_None_2; eauto).
-      rewrite lookup_kmap. eauto.
-  Qed.
+(*   Lemma kmap_filter_dom (fs : gmap (fmrole spinlock_model_impl) nat) *)
+(* (f : fmrole spinlock_model_impl → fmrole iM) *)
+(*   (H1 : Inj eq eq f) *)
+(*   (X : ∀ i : fmrole iM, Decision (∃ j : fmrole spinlock_model_impl, i = f j)): *)
+(*   kmap_ f (filter (λ '(k, _), k ∈ dom fs) fs) *)
+(*   = filter (λ '(k, _), k ∈ dom (kmap_ f fs)) (kmap_ f fs). *)
+(*   Proof using.  *)
+(*     rewrite /kmap_. *)
+(*     (* TODO: refactor *) *)
+(*     apply map_eq. intros. *)
+(*     (* destruct i.  *) *)
+(*     destruct (@decide (exists j, i = f j)). *)
+(*     { done. } *)
+(*     2: { etrans; [| etrans]; [| exact (eq_refl None) |]. *)
+(*          - apply lookup_kmap_None; [apply _| ]. *)
+(*            intros. destruct n. eauto. *)
+(*          - symmetry. apply map_filter_lookup_None. left. *)
+(*            apply lookup_kmap_None; [apply _| ]. *)
+(*            intros. destruct n. eauto. } *)
+(*     destruct e as [? ->]. rewrite lookup_kmap. *)
+(*     destruct (decide (x ∈ dom fs)). *)
+(*     + pose proof e as [? EQ]%elem_of_dom. *)
+(*       repeat (erewrite map_filter_lookup_Some_2; eauto). *)
+(*       { by rewrite lookup_kmap. } *)
+(*       rewrite dom_kmap. set_solver. *)
+(*     + pose proof n as ?%not_elem_of_dom_1. *)
+(*       repeat (rewrite map_filter_lookup_None_2; eauto). *)
+(*       rewrite lookup_kmap. eauto. *)
+(*   Qed. *)
     
   End KmapMagic.   
 
@@ -483,20 +485,20 @@ Section LocksCompositionProofs.
     intros [? [EQ ?]]%elem_of_map_1. set_solver.
   Qed. 
 
+  Ltac role_cases_ext :=
+    intros [[IN | IN]%elem_of_union | ?osc]%elem_of_union;
+    [.. | (destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver)];
+    try (apply elem_of_map in IN as [? [[=->] IN]]). 
+
   Lemma vfm_sl1 fs1 fs2 s1 s2 ρ ost2 osc
     (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := spinlock_model)):
   valid_new_fuelmap (kmap lift_sl_role_left fs1) (kmap lift_sl_role_left fs2)
     (Some s1, ost2, osc) (Some s2, ost2, osc) (inl (inl ρ)) (LM := comp_model).
   Proof using.
-    Ltac role_cases :=
-      intros [[IN | ?]%elem_of_union | ?osc]%elem_of_union;
-      [| set_solver| (destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver)];
-      apply elem_of_map in IN as [? [[=->] IN]].
-    
     replace (inl (inl ρ)) with (lift_sl_role_left ρ); [| done]. 
     (* destruct VFM.  *)
     repeat (split; simpl).
-    - role_cases.  
+    - role_cases_ext.  
       apply VFM in IN.
       rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
       destruct (fs2 !! x); [simpl in *; lia | done].
@@ -528,15 +530,68 @@ Section LocksCompositionProofs.
       specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
       + repeat (apply elem_of_union; left). apply elem_of_difference. split.
         * set_solver.
-        * role_cases. set_solver. 
+        * role_cases_ext. set_solver. 
       + set_solver.
       + apply elem_of_union; left. apply elem_of_union; right.
         apply elem_of_difference. split; [set_solver| ].
-        role_cases. set_solver.
+        role_cases_ext. set_solver.
       + apply elem_of_union; right.
         apply elem_of_intersection. split; [| set_solver].
         apply elem_of_difference. split; [set_solver| ].
-        role_cases. set_solver. 
+        role_cases_ext. set_solver. 
+  Qed.
+
+  Lemma vfm_sl2 fs1 fs2 s1 s2 ρ ost1 osc
+    (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := spinlock_model)):
+  valid_new_fuelmap (kmap lift_sl_role_right fs1) (kmap lift_sl_role_right fs2)
+    (ost1, Some s1, osc) (ost1, Some s2, osc) (lift_sl_role_right ρ) (LM := comp_model).
+  Proof using.
+    Ltac simpl_3rd :=
+      rewrite !bool_decide_eq_false_2; try done; rewrite !orb_false_l.
+    
+    repeat (split; simpl).
+    - simpl_3rd. role_cases_ext. 
+      apply VFM in IN.
+      rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
+      destruct (fs2 !! x); [simpl in *; lia | done].
+    - intros. rewrite !lookup_kmap.
+      apply (proj1 (proj2 VFM)).
+      { set_solver. }
+      rewrite !dom_kmap in H0. 
+      apply elem_of_intersection in H0 as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
+      set_solver.
+    - rewrite dom_kmap. apply elem_of_map_2.
+      apply VFM.
+    - intros ? [IN2 NIN1]%elem_of_difference.
+      rewrite dom_kmap in IN2. apply elem_of_map_1 in IN2 as [? [[=->] ?]].
+      rewrite lookup_kmap.
+      do 3 apply proj2 in VFM. apply proj1 in VFM.
+      assert (x ∈ dom fs2 ∖ dom fs1) as X. 
+      { apply elem_of_difference. split; auto.
+        intros ?. apply NIN1. rewrite dom_kmap. set_solver. }
+      specialize (VFM x X).
+      pose proof (sm_fuel_max s2).
+      destruct (fs2 !! x); [simpl in *; lia | done].
+    - intros ?? IN. rewrite !dom_kmap in IN. 
+      apply elem_of_intersection in IN as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
+      rewrite !lookup_kmap. apply VFM; auto. set_solver.
+    - simpl. do 5 apply proj2 in VFM. apply proj1 in VFM.
+      simpl_3rd. apply union_subseteq. rewrite !dom_kmap. set_solver. 
+    - do 6 apply proj2 in VFM. rewrite !dom_kmap.
+      apply elem_of_subseteq. intros ? [? [[=->] ?]]%elem_of_map_1.
+      specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
+      + repeat (apply elem_of_union; left).
+        apply elem_of_difference. split.
+        * set_solver.
+        * simpl_3rd. role_cases_ext. set_solver. 
+      + set_solver.
+      + apply elem_of_union; left. apply elem_of_union; right.
+        apply elem_of_difference. split; [set_solver| ].
+        simpl_3rd. role_cases_ext. set_solver.
+      + simpl_3rd. apply elem_of_union; right.
+        apply elem_of_intersection. split; [| set_solver].
+        apply elem_of_difference. split; [set_solver| ]. 
+        role_cases_ext. set_solver. 
   Qed. 
 
   Lemma sl1_PMP Einvs (γ: gname) (DISJ_INV: Einvs ## ↑Ns):
@@ -557,10 +612,7 @@ Section LocksCompositionProofs.
       iModIntro. do 2 iExists _. iSplitR; [done| ]. iFrame.
       iApply has_fuels_sl1. iApply has_fuels_proper; [..| iFrame]; [done| ].
       rewrite !difference_empty_L.
-
-      apply leibniz_equiv_iff. apply kmap_filter_dom; [apply _| ]. 
-      intros. destruct i; [destruct s| ]; [left| right| right]; eauto.
-      all: by intros [? ?]. 
+      by rewrite !gmap_filter_dom_id. 
     - iIntros "* FUELS_SL MSI".
       
       iMod (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD".
@@ -580,9 +632,19 @@ Section LocksCompositionProofs.
         subst fs. rewrite kmap_union. rewrite !map_filter_union; auto.
         2: { apply map_disjoint_kmap; [apply _| set_solver]. }
         rewrite kmap_union. subst R1 R2.
-        (* left parts on both sides are empty *)
-        (* right parts are equal by kmap_filter_dom *)
-        admit. }
+        rewrite !gmap_filter_dom_id.
+        eapply fin_maps.union_proper.
+        2: { symmetry. apply leibniz_equiv_iff. apply map_filter_id.
+             intros ?? IN. rewrite -dom_kmap. eapply elem_of_dom_2; eauto. }
+        etrans.
+        { apply leibniz_equiv_iff, kmap_empty_iff; [by apply _| ].
+          apply map_filter_empty_iff. red. intros ???%elem_of_dom_2 ?. 
+          set_solver. }
+        symmetry. apply leibniz_equiv_iff.
+        apply map_filter_empty_iff. red. intros ??? IN2.
+        rewrite -dom_kmap in IN2. apply elem_of_dom in IN2 as [? ?].  
+        apply (map_disjoint_kmap lift_sl_role_left) in DISJ12. 
+        eapply map_disjoint_spec in DISJ12; eauto. }
       iSplitL "F1".
       {
         (* same as above*)
