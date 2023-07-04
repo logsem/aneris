@@ -594,6 +594,35 @@ Section LocksCompositionProofs.
         role_cases_ext. set_solver. 
   Qed. 
 
+  Lemma kmap_filter_disj
+    (fs1 fs2: gmap (fmrole spinlock_model_impl) nat)
+    (lift: fmrole spinlock_model_impl -> fmrole comp_model_impl)
+    (INJ: Inj eq eq lift)
+    (DISJ12: fs1 ##ₘ fs2):
+  kmap lift (filter (λ '(k, _), k ∈ dom fs2) (fs1 ∪ fs2))
+  =
+    ((filter (λ '(k, _), k ∈ ((set_map lift (dom fs2)): gset (fmrole comp_model_impl))) (kmap lift (fs1 ∪ fs2))): gmap (fmrole comp_model_impl) nat).
+  Proof using.
+    simpl.
+    rewrite kmap_union. rewrite !map_filter_union; auto.
+    2: { apply map_disjoint_kmap; [apply _| set_solver]. }        
+    rewrite kmap_union.
+    rewrite !gmap_filter_dom_id.
+    apply leibniz_equiv.
+    eapply fin_maps.union_proper.
+    2: { symmetry. apply leibniz_equiv_iff. apply map_filter_id.
+         intros ?? IN. rewrite -dom_kmap. eapply elem_of_dom_2; eauto. }
+    etrans.
+    { apply leibniz_equiv_iff, kmap_empty_iff; [by apply _| ].
+      apply map_filter_empty_iff. red. intros ???%elem_of_dom_2 ?.
+      apply map_disjoint_dom in DISJ12. set_solver. }
+    symmetry. apply leibniz_equiv_iff.
+    apply map_filter_empty_iff. red. intros ??? IN2.
+    rewrite -dom_kmap in IN2. apply elem_of_dom in IN2 as [? ?].  
+    apply (map_disjoint_kmap lift) in DISJ12. 
+    eapply map_disjoint_spec in DISJ12; eauto.
+  Qed.
+
   Lemma sl1_PMP Einvs (γ: gname) (DISJ_INV: Einvs ## ↑Ns):
     PMP Einvs ∗ (inv Ns (comp_inv_impl γ)) ⊢
     PartialModelPredicates (Einvs ∪ ↑Ns) (LM := LM) (iLM := spinlock_model) (PMPP := (sl1_PMPP γ)). 
@@ -629,26 +658,13 @@ Section LocksCompositionProofs.
       pose proof (dom_union_inv_L fs _ _ DISJ (eq_Symmetric _ _ DOM)) as (fs1 & fs2 & FS12 & DISJ12 & DOM1 & DOM2). 
       iSplitL "F2".
       { simpl. iApply has_fuels_sl1. iApply has_fuels_proper; [reflexivity| | iFrame].
-        subst fs. rewrite kmap_union. rewrite !map_filter_union; auto.
-        2: { apply map_disjoint_kmap; [apply _| set_solver]. }
-        rewrite kmap_union. subst R1 R2.
-        rewrite !gmap_filter_dom_id.
-        eapply fin_maps.union_proper.
-        2: { symmetry. apply leibniz_equiv_iff. apply map_filter_id.
-             intros ?? IN. rewrite -dom_kmap. eapply elem_of_dom_2; eauto. }
-        etrans.
-        { apply leibniz_equiv_iff, kmap_empty_iff; [by apply _| ].
-          apply map_filter_empty_iff. red. intros ???%elem_of_dom_2 ?. 
-          set_solver. }
-        symmetry. apply leibniz_equiv_iff.
-        apply map_filter_empty_iff. red. intros ??? IN2.
-        rewrite -dom_kmap in IN2. apply elem_of_dom in IN2 as [? ?].  
-        apply (map_disjoint_kmap lift_sl_role_left) in DISJ12. 
-        eapply map_disjoint_spec in DISJ12; eauto. }
+        subst fs R1 R2. apply leibniz_equiv_iff.
+        eapply kmap_filter_disj; [apply _ | done]. }
       iSplitL "F1".
-      {
-        (* same as above*)
-        admit. }
+      { simpl. iApply has_fuels_sl1. iApply has_fuels_proper; [reflexivity| | iFrame].
+        rewrite map_union_comm in FS12; auto.  
+        subst fs R1 R2. apply leibniz_equiv_iff.
+        eapply kmap_filter_disj; [apply _ | done]. }
       iSplitL; [| done].
       iIntros "NO". iApply "FIN". 
       simpl. by rewrite map_fmap_singleton set_map_empty.
@@ -704,7 +720,7 @@ Section LocksCompositionProofs.
       iDestruct (partial_free_roles_fuels_disj with "PMP MSI FR FUELS") as %DISJ.
       rewrite dom_kmap in DISJ. iPureIntro.
       eapply set_map_disjoint; eauto. apply _. 
-  Admitted.
+  Qed. 
 
   Lemma comp_spec tid Einvs (P: iProp Σ)
     (* TODO: get rid of these restrictions *)
