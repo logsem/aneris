@@ -644,8 +644,10 @@ Section LocksCompositionProofs.
       eapply set_map_disjoint; eauto. apply _. 
   Admitted.
 
-  Lemma comp_spec tid (P: iProp Σ):
-    PMP -∗
+  Lemma comp_spec tid Einvs (P: iProp Σ)
+    (* TODO: get rid of these restrictions *)
+    (DISJ_INV1: Einvs ## ↑Ns) (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"):
+    PMP Einvs -∗
     {{{ partial_model_is (None, None, Some 2)  ∗ 
         partial_free_roles_are comp_free_roles_init ∗ 
         has_fuels tid {[ inr ρc:=5 ]} (PMPP := PMPP)  }}}
@@ -707,11 +709,12 @@ Section LocksCompositionProofs.
 
     iModIntro. 
     iApply (wp_store_step_keep _ _ _ _ _ _ _ _ _  with "[] [L ST FUELS FREE]").
+    8: by iFrame.
+    { set_solver. }
     { eapply (cl_sl_init _ program_init_state program_init_state). }
     { apply valid_fm. }
     2: by apply empty_subseteq.
     2, 3: set_solver.
-    2: done.
     2: { iFrame. }
     { set_solver. }
     
@@ -740,21 +743,43 @@ Section LocksCompositionProofs.
     pure_step FS.
     pure_step FS. 
 
+    Ltac solve_disjoint :=
+      apply map_disjoint_spec; rewrite /prog_fuels; intros ??? IN1 IN2;
+      repeat (apply lookup_fmap_Some in IN1 as [? [<- IN1]]);
+      repeat (apply lookup_fmap_Some in IN2 as [? [<- IN2]]);
+      try (apply lookup_singleton_Some in IN1 as [<- <-]);
+      try (apply lookup_singleton_Some in IN2 as [<- <-]);
+      try (apply lookup_kmap_Some in IN1 as [? [-> ?]]; [| by apply _]);
+      try (apply lookup_kmap_Some in IN2 as [? [? ?]]; [| by apply _]);
+      done.
+
     wp_bind (Fork _).
     iApply (wp_fork_nostep_alt with "[ST1] [] [FUELS]").
-    5: { iDestruct (has_fuels_gt_1 with "FUELS") as "F". 
+    5: { rewrite -map_union_assoc map_union_comm.
+         2: { apply map_disjoint_union_r. split; solve_disjoint. }
+         rewrite -map_union_assoc map_union_comm. 
+         2: { apply map_disjoint_union_r. split; solve_disjoint. }
+         iDestruct (has_fuels_gt_1 with "FUELS") as "F". 
          2: { rewrite -map_fmap_compose. rewrite !map_fmap_union. by iFrame. } 
          solve_fuels_ge_1 FS. }
-    { rewrite -map_fmap_union. apply map_disjoint_spec. rewrite /prog_fuels.
-      intros ??? [? [<- ?]]%lookup_fmap_Some [? [<- ?]]%lookup_fmap_Some.
-      apply lookup_fmap_Some in H0 as [? [<- ?]].
-      apply lookup_kmap_Some in H0 as [? [-> ?]]; [| by apply _].
-      done. }
+    { apply map_disjoint_union_l. split; solve_disjoint. }
     { set_solver. }
     { iSplitR; [done| ]. iIntros (tid') "!# FUELS".
-      iApply program_spec.
-      { Set Printing Implicit. 
-      
+      iMod (partial_free_roles_empty) as "FR". 
+      iApply (program_spec with "[] [ST1 FUELS FR]"). 
+      2: { iApply sl1_PMP; eauto. }
+      { apply disjoint_union_l. split; [set_solver| ].
+        by apply ndot_ne_disjoint. }
+      2: { iNext. iIntros.
+           simpl. by rewrite map_fmap_singleton set_map_empty. }
+      iFrame. iSplitL "FR". 
+      { simpl. by rewrite set_map_empty. }
+      Unshelve. 2: exact (⌜ True ⌝)%I. iSplitR; [done| ].
+      iApply has_fuels_sl1. iApply has_fuels_proper; [reflexivity| | by iFrame].
+      rewrite -map_fmap_compose. erewrite map_fmap_equiv_ext.
+      2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
+      rewrite map_fmap_id. done. }
+    
       
 
 
