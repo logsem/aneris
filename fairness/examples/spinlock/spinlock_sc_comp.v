@@ -102,9 +102,10 @@ Section LocksCompositionModel.
 
   Definition add_fuel_1 := 3. 
   Definition add_fuel_2 := 3. 
+  Definition add_fuel_3 := 1. 
   (* TODO: generalize? *)
   Definition comp_model: LiveModel heap_lang comp_model_impl :=
-    {| lm_fl _ := max 5 (sm_fuel + add_fuel_1 + add_fuel_2); |}.  
+    {| lm_fl _ := sm_fuel + add_fuel_1 + add_fuel_2 + add_fuel_3; |}.  
 
   (* Definition comp_st_init (n: nat): fmstate comp_model_impl :=  *)
   (*   (None: option sl_st, None: option sl_st, n).  *)
@@ -123,8 +124,7 @@ Section LocksCompositionCode.
     let: "x" := ref #1 in
     "x" <- #1 ;;
     (Fork (program #()) ;;
-     Fork (program #()) ;;
-     "x" <- #2).
+     Fork (program #())).
 
   Canonical Structure sl_ofe := optionO (leibnizO (fmstate spinlock_model_impl)).
   Canonical Structure cnt_ofe := optionO natO.  
@@ -269,11 +269,11 @@ Section LocksCompositionProofs.
   Qed.
 
     
-  Lemma valid_fm f d:
+  Lemma valid_fm f d c:
     valid_new_fuelmap (sub d <$> {[inr ρc := f]})
-    ({[inr ρc := add_fuel_1 + add_fuel_2]} ∪ ((plus add_fuel_1) <$> prog_fuels (inl ∘ inl))
-     ∪ ((plus (add_fuel_1 + add_fuel_2)) <$> prog_fuels (inl ∘ inr))) (None, None, Some 2)
-    (Some program_init_state, Some program_init_state, Some 2) 
+    ({[inr ρc := add_fuel_1 + add_fuel_2 + add_fuel_3]} ∪ ((plus add_fuel_1) <$> prog_fuels (inl ∘ inl))
+     ∪ ((plus (add_fuel_1 + add_fuel_2)) <$> prog_fuels (inl ∘ inr))) (None, None, Some (S c))
+    (Some program_init_state, Some program_init_state, Some (S c)) 
     (inr ρc) (LM := comp_model).
   Proof.
     red. repeat split; try set_solver.
@@ -865,7 +865,7 @@ Section LocksCompositionProofs.
     (* TODO: get rid of these restrictions *)
     (DISJ_INV1: Einvs ## ↑Ns) (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"):
     PMP Einvs -∗
-    {{{ partial_model_is (None, None, Some 2)  ∗ 
+    {{{ partial_model_is (None, None, Some 1)  ∗ 
         partial_free_roles_are comp_free_roles_init ∗ 
         has_fuels tid {[ inr ρc:=5 ]} (PMPP := PMPP)  }}}
       comp #() @ tid
@@ -878,7 +878,7 @@ Section LocksCompositionProofs.
     assert (fuels_ge ({[inr ρc := 5]}: gmap (fmrole comp_model_impl) nat) 5) as FS.
     { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
 
-    iMod (own_alloc ((● (Excl' None, Excl' None, Excl' (Some 2)) ⋅ ◯ _))) as (γ) "[AUTH (ST1 & ST2 & STC)]".
+    iMod (own_alloc ((● (Excl' None, Excl' None, Excl' (Some 1)) ⋅ ◯ _))) as (γ) "[AUTH (ST1 & ST2 & STC)]".
     { apply auth_both_valid_discrete. split; [| done].
       rewrite cmra_assoc pair_split_L. apply cmra_mono; [| reflexivity].
       rewrite (pair_split_L _ (Excl' None)). by rewrite pair_op_1. } 
@@ -948,7 +948,7 @@ Section LocksCompositionProofs.
     iModIntro. 
 
     clear FS. 
-    assert (fuels_ge ({[inr ρc := add_fuel_1 + add_fuel_2]}
+    assert (fuels_ge ({[inr ρc := add_fuel_1 + add_fuel_2 + add_fuel_3]}
                ∪ (Init.Nat.add add_fuel_1 <$> prog_fuels (inl ∘ inl))
                ∪ (Init.Nat.add (add_fuel_1 + add_fuel_2) <$>
                   prog_fuels (inl ∘ inr))) add_fuel_1) as FS.
@@ -972,7 +972,7 @@ Section LocksCompositionProofs.
       done.
 
     wp_bind (Fork _).
-    iApply (wp_fork_nostep_alt with "[ST1] [ST2] [FUELS]").
+    iApply (wp_fork_nostep_alt with "[ST1] [ST2 STC POST] [FUELS]").
     5: { rewrite -map_union_assoc map_union_comm.
          2: { apply map_disjoint_union_r. split; solve_disjoint. }
          rewrite -map_union_assoc map_union_comm. 
@@ -1003,7 +1003,7 @@ Section LocksCompositionProofs.
     clear FS. 
     rewrite -map_fmap_union.
     rewrite /add_fuel_2. 
-    assert (fuels_ge ({[inr ρc := 6]} ∪ (Init.Nat.add 6 <$> prog_fuels (inl ∘ inr))) 6) as FS.
+    assert (fuels_ge ({[inr ρc := 6 + add_fuel_3]} ∪ (Init.Nat.add 6 <$> prog_fuels (inl ∘ inr))) 6) as FS.
     { apply fuels_ge_union. 
       { red. intros ??[<- ?]%lookup_singleton_Some. lia. }
       all: intros ?? [? [<- ?]]%lookup_fmap_Some; lia. }
@@ -1012,7 +1012,7 @@ Section LocksCompositionProofs.
     pure_step FS. 
     
     wp_bind (Fork _).
-    iApply (wp_fork_nostep_alt with "[ST2] [] [FUELS]").
+    iApply (wp_fork_nostep_alt with "[ST2] [STC POST] [FUELS]").
     5: { iDestruct (has_fuels_gt_1 with "FUELS") as "F". 
          2: { rewrite -map_fmap_compose. rewrite map_union_comm; [| solve_disjoint].
               rewrite !map_fmap_union. by iFrame. } 
@@ -1035,7 +1035,8 @@ Section LocksCompositionProofs.
       2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
       rewrite map_fmap_id. done. }
     
-    iNext. 
+    iNext. iIntros "FUELS". iModIntro.
+    
     
     
 
