@@ -50,6 +50,16 @@ Proof.
   (* from_option (live_roles _) ∅ s *)
 Admitted. 
 
+Lemma comp_model_term (mtr: mtrace comp_model_impl): mtrace_fairly_terminating mtr.
+Proof.
+  red. intros VALID FAIR. 
+  destruct (infinite_or_finite mtr) as [INF | ?]; [| done]. exfalso.
+  (* inr transitions are well-founded. *)
+  (* two traces induced by inl transitions are finite
+     because the underlying spinlock model is fairly terminating  *)
+Admitted. 
+  
+
 Theorem comp_terminates
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -59,9 +69,9 @@ Proof.
   set (Σ := gFunctors.app (heapΣ comp_model_impl) compΣ). 
   assert (heapGpreS Σ comp_model) as HPreG.
   { apply _. }
-  unshelve eapply (simulation_adequacy_terminate_ftm Σ comp_model NotStuck _ (None, None, Some 0) comp_free_roles_init)
-  =>//.
-  - admit. 
+
+  unshelve eapply (@simulation_adequacy_terminate Σ _ comp_model _ NotStuck _ (None, None, Some 0) comp_free_roles_init) =>//.  
+  - apply comp_model_term.  
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (comp_model_finitary s1).
   - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>".
