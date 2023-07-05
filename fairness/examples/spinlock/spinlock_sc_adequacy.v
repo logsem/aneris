@@ -5,6 +5,7 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 Require Import stdpp.decidable.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import simulation_adequacy. 
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
@@ -419,7 +420,9 @@ Proof.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
   - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.
-    iApply (program_spec _ True _ with "[Hm Hf HFR]"); eauto.
+    iApply (program_spec _ ∅ True _ with "[] [Hm Hf HFR]"); eauto. 
+    { iApply ActualOwnershipPartial.
+      Unshelve. set_solver. } 
     rewrite subseteq_empty_difference_L; [| set_solver]. 
     iFrame. iSplitR; [done| ].
     iApply has_fuels_proper; [..| iFrame]; try done.
