@@ -574,9 +574,9 @@ Proof.
     - by apply to_trace_spec. }
   assert (exaux_traces_match extr auxtr) as Hmatch.
   { eapply traces_match_impl; [done| |done]. by intros ??[??]. }
-  have Hstutter:=Hmatch.
-  apply can_destutter_auxtr in Hstutter; last first.
-  { intros ?? Hstep. inversion Hstep. done. }
+  assert (auxtrace_valid auxtr) as Hstutter.
+  { by eapply exaux_preserves_validity. }
+  apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
   assert (infinite_trace extr) as Hinf.
   { intros n. induction n as [|n IHn]; [done|].

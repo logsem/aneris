@@ -583,26 +583,23 @@ Section fuel_dec_unless.
   Definition Ψ (δ: LiveState Λ Mdl) :=
     size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (Λ := Λ)), f.
 
-  Lemma fuel_dec_unless (extr: extrace Λ) (auxtr: auxtrace LM) :
-    (∀ c c', locale_step (Λ := Λ) c None c' -> False) ->
-    exaux_traces_match (LM:=LM) extr auxtr ->
+  Lemma fuel_dec_unless (auxtr: auxtrace LM) :
+    auxtrace_valid auxtr ->
     dec_unless ls_under Ul Ψ auxtr.
   Proof.
-    intros Hcl Hval n. revert extr auxtr Hval. induction n; intros extr auxtr Hval; last first.
+    intros Hval n. revert auxtr Hval. induction n; intros auxtr Hval; last first.
     { edestruct (after (S n) auxtr) as [auxtrn|] eqn:Heq; rewrite Heq =>//.
       simpl in Heq;
       simplify_eq. destruct auxtrn as [|δ ℓ auxtr']=>//; last first.
-      inversion Hval as [|?????????? Hmatch]; simplify_eq =>//.
-      specialize (IHn _ _ Hmatch). rewrite Heq // in IHn. }
+      inversion Hval as [|???? Hmatch]; simplify_eq =>//.
+      specialize (IHn _ Hmatch). rewrite Heq // in IHn. }
     edestruct (after 0 auxtr) as [auxtrn|] eqn:Heq; rewrite Heq =>//.
     simpl in Heq; simplify_eq. destruct auxtrn as [|δ ℓ auxtr']=>//; last first.
 
-    inversion Hval as [|c tid extr' ?? ? Hlm Hsteps Hstep Htrans Hmatch]; simplify_eq =>//.
+    inversion Hval as [|??? Htrans Hmatch]; simplify_eq =>//.
     destruct ℓ as [| tid' |];
-      [left; eexists; done| right |destruct tid; by [| exfalso; eapply Hcl]].
+      [left; eexists; done| right | inversion Htrans; naive_solver ].
     destruct Htrans as (Hne&Hdec&Hni&Hincl&Heq). rewrite -> Heq in *. split; last done.
-    destruct tid as [tid|]; last done.
-    rewrite <- Hlm in *.
 
     destruct (decide (dom $ ls_fuel δ = dom $ ls_fuel (trfirst auxtr'))) as [Hdomeq|Hdomneq].
     - destruct Hne as [ρ Hρtid].
@@ -644,12 +641,11 @@ Section destuttering_auxtr.
   Definition upto_stutter_auxtr :=
     upto_stutter (ls_under (Λ:=Λ) (M:=M)) (Ul (LM := LM)).
 
-  Lemma can_destutter_auxtr extr auxtr:
-    (∀ c c', locale_step (Λ := Λ) c None c' -> False) ->
-    exaux_traces_match (LM:=LM) extr auxtr ->
+  Lemma can_destutter_auxtr auxtr:
+    auxtrace_valid auxtr →
     ∃ mtr, upto_stutter_auxtr auxtr mtr.
   Proof.
-    intros ??. eapply can_destutter.
+    intros ?. eapply can_destutter.
     eapply fuel_dec_unless =>//.
   Qed.
 

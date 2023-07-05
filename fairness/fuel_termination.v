@@ -46,8 +46,9 @@ Proof.
     - by apply from_trace_spec.
     - by apply to_trace_spec. }
   intros Hfair.
-  assert (Hstutter := Hmatch).
-  apply can_destutter_auxtr in Hstutter; [|done].
+  assert (auxtrace_valid auxtr) as Hstutter.
+  { by eapply exaux_preserves_validity. }
+  apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
   have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
