@@ -21,17 +21,17 @@ Opaque sm_fuel.
 
 Section LocksCompositionCode.
 
-  (* Definition comp: expr := *)
-  (*   let: "l" := newlock #() in *)
-  (*   ((Fork (client "l") ) ;; (Fork (client "l") )). *)
-
   Definition comp: val :=
   λ: <>,
     let: "x" := ref #1 in
     "x" <- #1 ;;
-    (Fork (program #()) ;;
-     Fork (program #())).
-  
+    (
+      Fork (program #()) ;;
+      Fork (program #()
+           (* ;; "x" <- #1 *) (* TODO: a limitation *)
+           )
+    )
+  .
 
 End LocksCompositionCode. 
 
@@ -201,7 +201,7 @@ Section LocksCompositionProofs.
 
   Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (LM := LM) (iLM := comp_model) (PMPP := PMPP))).
 
-  Lemma comp_spec tid Einvs (P: iProp Σ)
+  Lemma comp_spec tid Einvs
     (* TODO: get rid of these restrictions *)
     (DISJ_INV1: Einvs ## ↑Ns) (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"):
     PMP Einvs -∗
@@ -239,15 +239,6 @@ Section LocksCompositionProofs.
     
     pure_step FS. 
     pure_step FS. 
-
-    (* iApply fupd_wp.  *)
-    (* iInv Ns as (((ost1, ost2), osc)) "(>ST & >AUTH)". *)
-    (* iApply fupd_mono.  *)
-    (* iApply fupd_frame_l. iSplit  *)
-    
-    (* iApply (wp_lift_pure_step_no_fork_take_step); [done| ..]. *)
-    (* 3: { eapply (cl_sl_init _ program_init_state program_init_state). } *)
-    (* { apply valid_fm. } *)
 
     wp_bind (_ <- _)%E.
     iApply wp_atomic. 
@@ -390,3 +381,5 @@ Section LocksCompositionProofs.
 
 
 End LocksCompositionProofs.
+
+
