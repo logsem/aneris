@@ -449,8 +449,9 @@ Proof.
   intros Hfb Hlr Hwp.
   destruct (simulation_adequacy_traces
               Σ _ _ FR e1 s1 extr Hvex Hexfirst Hfb Hlr Hwp) as [auxtr Hmatch].
-  destruct (can_destutter_auxtr extr auxtr) as [mtr Hupto] =>//.
-  { intros ?? contra. inversion contra. done. }
+  assert (auxtrace_valid auxtr) as Hstutter.
+  { by eapply exaux_preserves_validity in Hmatch. }
+  destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
   eauto.
 Qed.
 
