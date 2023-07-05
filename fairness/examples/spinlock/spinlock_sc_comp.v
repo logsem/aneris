@@ -210,7 +210,7 @@ Section LocksCompositionProofs.
         has_fuels tid {[ inr ρc:=5 ]} (PMPP := PMPP)  }}}
       comp #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof using.
+  Proof using COMP_PRE.
     iIntros "#PMP" (Φ) "!> (ST & FREE & FUELS) POST". rewrite /comp.
     rewrite (sub_0_id {[ _ := _ ]}). 
     (* iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS". *)
@@ -355,14 +355,15 @@ Section LocksCompositionProofs.
     { rewrite -map_fmap_compose. 
       eapply (map_fmap_proper (sub 5 ∘ plus 6)); [done| ].
       reflexivity. }
-    foobar. insert empty set in has_fuels. 
+    rewrite -(map_empty_union (_ <$> _)). 
+    rewrite map_fmap_compose. 
 
-    
     wp_bind (Fork _).
     iApply (wp_fork_nostep_alt with "[ST2] [STC POST] [FUELS]").
     5: { iDestruct (has_fuels_gt_1 with "FUELS") as "F". 
-         2: { rewrite -map_fmap_compose. rewrite map_union_comm; [| solve_disjoint].
-              rewrite !map_fmap_union. by iFrame. } 
+         2: { (* rewrite map_union_comm; [| solve_disjoint]. *)
+              rewrite !map_fmap_union. by iFrame. }
+         rewrite map_empty_union.
          solve_fuels_ge_1 FS. }
     { solve_disjoint. }
     { set_solver. }
@@ -378,14 +379,14 @@ Section LocksCompositionProofs.
       { simpl. by rewrite set_map_empty. }
       Unshelve. 2: exact (⌜ True ⌝)%I. iSplitR; [done| ].
       iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | by iFrame].
-      rewrite -map_fmap_compose. erewrite map_fmap_equiv_ext.
+      rewrite -!map_fmap_compose. erewrite map_fmap_equiv_ext.
       2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
       rewrite map_fmap_id. done. }
     
     iNext. iIntros "FUELS". iModIntro.
-    
-    
-    
+    iApply "POST". iDestruct "FUELS" as "[??]". 
+    by rewrite fmap_empty dom_empty_L.
+  Qed. 
 
 
 End LocksCompositionProofs.
