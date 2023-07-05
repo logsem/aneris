@@ -314,7 +314,7 @@ Proof.
 Qed. 
   
   
-Lemma model_finitary (s: spinlock_model_impl):
+Lemma spinlock_model_finitary (s: spinlock_model_impl):
   Finite { '(s', ℓ) | spinlock_model_step s ℓ s'}.
 Proof.
   destruct (le_states_list s) as [ls INls].
@@ -405,7 +405,7 @@ Proof.
   eapply (simple_simulation_adequacy_terminate_ftm Σ spinlock_model NotStuck _ [2; 2] ∅)
   =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.
-    intros ?. simpl. apply (model_finitary s1).
+    intros ?. simpl. apply (spinlock_model_finitary s1).
   - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.
     iApply (program_spec _ ∅ True _ with "[] [Hm Hf HFR]"); eauto. 
     { iApply ActualOwnershipPartial.
