@@ -28,12 +28,11 @@ Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
   heap_fairnessGS :> fairnessGS LM Σ;
 }.
 
-Definition heapΣ (M : FairModel) (MA: cmra): gFunctors :=
-  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang M MA].
+Definition heapΣ (M : FairModel): gFunctors :=
+  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang M].
 
-Global Instance subG_heapPreG {Σ} `{LM : LiveModel heap_lang M}
-  (MA: cmra) `(MRL: ModelRALifting M MA):
-  subG (heapΣ M MA) Σ → heapGpreS Σ LM.
+Global Instance subG_heapPreG {Σ} `{LM : LiveModel heap_lang M}:
+  subG (heapΣ M) Σ → heapGpreS Σ LM.
 Proof. solve_inG. Qed.
 
 #[global] Instance heapG_irisG `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} : irisG heap_lang LM Σ := {

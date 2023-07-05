@@ -2,26 +2,13 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fuel.
 
-(* Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl. *)
+Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
-Class ModelRALifting (M: FairModel) (MA: cmra) := {
-    mrl_lift: M -> MA;
-    mrl_valid: forall s, ✓ (mrl_lift s);
-    mrl_excl: forall s, Exclusive (mrl_lift s);
-    (* mrl_lequiv :> LeibnizEquiv M; *)
-    mrl_inj: Inj eq equiv mrl_lift;
-    mrl_m_discrete :> CmraDiscrete MA;
-}.
-
 (* TODO: why require LiveModel here? *)
-Class fairnessGpreS `(LM: LiveModel Λ M)
-  Σ `{Countable (locale Λ)} := {
-  fairnessGpreS_MA: cmra;
-  fairnessGpreS_mrl :> ModelRALifting M fairnessGpreS_MA;
-    
-  fairnessGpreS_model :> inG Σ (authUR (optionR fairnessGpreS_MA));
+Class fairnessGpreS `(LM: LiveModel Λ M) Σ `{Countable (locale Λ)} := {   
+  fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
   fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
@@ -46,30 +33,16 @@ Global Arguments fairness_model_mapping_name {Λ M LM Σ _ _} _ : assert.
 Global Arguments fairness_model_fuel_name {Λ M LM Σ _ _} _ : assert.
 Global Arguments fairness_model_free_roles_name {Λ M LM Σ _ _} _ : assert.
 
-Definition fairnessΣ Λ M (MA: cmra) `{Countable (locale Λ)} : gFunctors := #[
-   GFunctor (authUR (optionR MA));
+Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
+   GFunctor (authUR (optionUR (exclR (ModelO M))));
    GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
    GFunctor (authUR (gmapUR (RoleO M) (exclR natO)));
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel Λ M}
-  `(MRL: ModelRALifting M MA)
-       `{Countable (locale Λ)} :
-  subG (fairnessΣ Λ M MA) Σ -> fairnessGpreS LM Σ.
-Proof.
-  (* TODO: fix this *)
-  (* solve_inG. *)
-  intros. unfold fairnessΣ in H0.
-  repeat match goal with
-    | H : subG (gFunctors.app _ _) _ |- _ => apply subG_inv in H; destruct H
-  end.
-  repeat match goal with
-         | H : subG _ _ |- _ => move:(H); (apply subG_inG in H || clear H)
-         end. 
-  intros; simpl in *.
-  esplit; eauto. 
-Qed.
+Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel Λ M} `{Countable (locale Λ)} :
+  subG (fairnessΣ Λ M) Σ -> fairnessGpreS LM Σ.
+Proof. solve_inG. Qed. 
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
@@ -200,9 +173,6 @@ Section model_state_interp.
 
   Notation Role := (M.(fmrole)).
 
-  Let as_RA (s: fmstate M): optionR fairnessGpreS_MA :=
-        Some $ mrl_lift s. 
-
   Definition auth_fuel_is (F: gmap Role nat): iProp Σ :=
     own (fairness_model_fuel_name fG)
         (● (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))).
@@ -224,10 +194,10 @@ Section model_state_interp.
         )).
 
   Definition auth_model_is (fm: M): iProp Σ :=
-    own (fairness_model_name fG) (● as_RA fm).
+    own (fairness_model_name fG) (● Excl' fm).
 
   Definition frag_model_is (fm: M): iProp Σ :=
-    own (fairness_model_name fG) (◯ as_RA fm).
+    own (fairness_model_name fG) (◯ Excl' fm).
 
   Definition auth_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (● (GSet FR)).
@@ -611,9 +581,7 @@ Section model_state_lemmas.
   Proof.
     iIntros "H1 H2". iCombine "H1 H2" as "H".
     iMod (own_update with "H") as "[??]" ; eauto.
-    - apply auth_update, option_local_update.
-      unshelve eapply (exclusive_local_update _ (mrl_lift δ)).
-      all: by apply fairnessGpreS_mrl. 
+    - by apply auth_update, option_local_update, (exclusive_local_update _ (Excl δ)).
     - iModIntro. iFrame.
   Qed.
 
@@ -683,11 +651,8 @@ Section model_state_lemmas.
     auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1 = s2 ⌝.
   Proof.
     iIntros "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") 
-      as %[LE _]%auth_both_valid_discrete.
-    iDestruct (own_valid_2 with "Ha Hf") as "VALID".
-    apply Some_included_exclusive in LE; try by apply fairnessGpreS_mrl.
-    by apply mrl_inj in LE.
+    by iDestruct (own_valid_2 with "Ha Hf") as
+      %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
   Qed.
 
   Lemma model_agree' δ1 s2 n:
@@ -718,17 +683,13 @@ Section adequacy.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGpreS LM Σ}.
 
-  Let as_RA (s: fmstate M): optionR fairnessGpreS_MA :=
-        Some $ mrl_lift s. 
-
   Lemma model_state_init (s0: M):
     ⊢ |==> ∃ γ,
-        own (A := authUR (optionR fairnessGpreS_MA)) γ
-            (● (as_RA s0) ⋅ ◯ (as_RA s0)).
+        own (A := authUR (optionUR (exclR (ModelO M)))) γ
+            (● (Excl' s0) ⋅ ◯ (Excl' s0)).
   Proof.
-    iMod (own_alloc (● as_RA s0 ⋅ ◯ as_RA s0)) as (γ) "[Hfl Hfr]".
-    { apply auth_both_valid_2; [| done].
-      apply mrl_valid. }
+    iMod (own_alloc (● Excl' s0 ⋅ ◯ Excl' s0)) as (γ) "[Hfl Hfr]".
+    { by apply auth_both_valid_2. }
     iExists _. by iSplitL "Hfl".
   Qed.
 

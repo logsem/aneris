@@ -384,25 +384,25 @@ Qed.
 (* TODO: where to place it and which requirements to put on it? *)
 Section SpinlockRA.
 
-  Canonical Structure spinlock_RA: cmra := exclR (leibnizO spinlock_model_impl).
+  (* Canonical Structure spinlock_RA: cmra := exclR (leibnizO spinlock_model_impl). *)
   
-  (* TODO: generalize *)
-  Global Instance spinlock_RA_lifting: ModelRALifting spinlock_model_impl spinlock_RA.
-  Proof.
-    refine {| mrl_lift := fun s => (Excl s): spinlock_RA |}.
-    { done. }
-    by intros ?? ?%@Excl_inj.
-  Qed.
+  (* (* TODO: generalize *) *)
+  (* Global Instance spinlock_RA_lifting: ModelRALifting spinlock_model_impl spinlock_RA. *)
+  (* Proof. *)
+  (*   refine {| mrl_lift := fun s => (Excl s): spinlock_RA |}. *)
+  (*   { done. } *)
+  (*   by intros ?? ?%@Excl_inj. *)
+  (* Qed. *)
     
-  Definition spinlockΣ (M: FairModel) (MA: cmra) : gFunctors :=
-    #[ heapΣ M MA; GFunctor (exclR unitR);
+  Definition spinlockΣ (M: FairModel) : gFunctors :=
+    #[ heapΣ M; GFunctor (exclR unitR);
        GFunctor (excl_authR natO) ].
   
-  Global Instance subG_spinlockΣ {Σ} (M: FairModel) (MA: cmra):
-    subG (spinlockΣ M MA) Σ → spinlockPreG Σ.
+  Global Instance subG_spinlockΣ {Σ} (M: FairModel):
+    subG (spinlockΣ M) Σ → spinlockPreG Σ.
   Proof. solve_inG. Qed.
 
-End SpinlockRA. 
+End SpinlockRA.
 
 
 
@@ -412,10 +412,9 @@ Theorem spinlock_terminates
         (Hexfirst : (trfirst extr).1 = [program #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (spinlockΣ' := spinlockΣ spinlock_model_impl spinlock_RA). 
-  assert (heapGpreS spinlockΣ' spinlock_model) as HPreG.
+  assert (heapGpreS (spinlockΣ spinlock_model_impl) spinlock_model) as HPreG.
   { apply _. }
-  eapply (simple_simulation_adequacy_terminate_ftm spinlockΣ' spinlock_model NotStuck _ [2; 2] ∅)
+  eapply (simple_simulation_adequacy_terminate_ftm (spinlockΣ spinlock_model_impl) spinlock_model NotStuck _ [2; 2] ∅)
   =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
