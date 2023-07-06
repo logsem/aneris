@@ -1104,6 +1104,38 @@ Qed.
 Lemma wp_nostep s tid E e fs P Φ :
   TCEq (to_val e) None →
   fs ≠ ∅ →
+  sswp s E tid e (λ e', WP e' @ s; tid; E {{ Φ }} ) -∗
+  has_fuels_S tid fs -∗
+  WP e @ s; tid; E {{ v, Φ v ∗ has_fuels tid fs }}.
+Proof.
+  iIntros (Hval ?) "Hwp HfuelS".
+  rewrite wp_unfold /wp_pre /sswp /= Hval.
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
+  rewrite Hends.
+  iMod ("Hwp" with "[//] [//] [//] Hsi") as (Hred) "Hwp".
+  iModIntro. iSplit; [done|].
+  iIntros (e2 σ2 efs Hstep).
+  iMod ("Hwp" with "[//]") as "Hwp".
+  iIntros "!>!>". iMod "Hwp". iIntros "!>".
+  iApply (step_fupdN_wand with "Hwp").
+  iIntros "Hwp". iMod "Hwp".
+  iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  { by intros ?%dom_empty_inv_L. }
+  { set_solver. }
+  { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
+  { by rewrite Hends. }
+  iIntros "!>".
+  iDestruct "Hwp" as "[Hsi [Hwp Hwps]]".
+  iExists _, _. iFrame. iSplit; [done|].
+  iApply (wp_wand with "Hwp").
+  iIntros (v) "HΦ'". iFrame.
+  iApply (has_fuels_proper with "Hfuel") =>//.
+  rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
+Qed.
+
+Lemma wp_nostep_hoare s tid E e fs P Φ :
+  TCEq (to_val e) None →
+  fs ≠ ∅ →
   (□ (P -∗ sswp s E tid e (λ e', WP e' @ s; tid; E {{ Φ }} ))) -∗
   {{{ P ∗ has_fuels_S tid fs }}}
     e @ s; tid; E
@@ -1160,7 +1192,7 @@ Lemma wp_store_nostep_alt s tid E l v' v fs:
   {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
 Proof.
   iIntros (? Φ) "[Hl Hf] HΦ".
-  iApply (wp_nostep _ _ _ _ _ _ (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v)%I with "[] [Hl $Hf]"); [done| |iExact "Hl"|].
+  iApply (wp_nostep_hoare _ _ _ _ _ _ (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v)%I with "[] [Hl $Hf]"); [done| |iExact "Hl"|].
   { iIntros "!> Hl". iApply sswp_wand; [|by iApply wp_store].
     iIntros (e) "[-> Hl]". iApply wp_value. by iFrame. }
   iIntros "!>" (w) "[[-> Hl] Hf]".
