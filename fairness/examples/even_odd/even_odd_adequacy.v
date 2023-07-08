@@ -334,12 +334,12 @@ Definition evenodd_ex_mono (l:loc) (extr : heap_lang_extrace) :=
 Definition ξ_evenodd_model_match (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
   ∃ (N:nat), heap c.2 !! l = Some #N ∧ δ = N.
 
-Definition ξ_evenodd_no_val_steps (c : cfg heap_lang) (δ : the_fair_model) :=
+Definition ξ_evenodd_no_val_steps (c : cfg heap_lang) :=
   (Forall (λ e, is_Some $ to_val e) c.1 → False) ∧
   Forall (λ e, not_stuck e c.2) c.1.
 
 Definition ξ_evenodd (l : loc) (c : cfg heap_lang) (δ : the_fair_model) :=
-  ξ_evenodd_no_val_steps c δ ∧ ξ_evenodd_model_match l c δ.
+  ξ_evenodd_no_val_steps c ∧ ξ_evenodd_model_match l c δ.
 
 Definition ξ_evenodd_trace (l : loc) (extr : execution_trace heap_lang)
            (auxtr : finite_trace the_fair_model (option EO)) :=
@@ -534,6 +534,41 @@ Proof.
   simpl in *. destruct extr; [done|]. eapply IHn; [|done]. by inversion Hafter.
 Qed.
 
+Lemma infinite_trace_no_val_steps extr auxtr :
+  extrace_maximal extr →
+  traces_match
+    (labels_match (LM:=the_model))
+    (λ c _ , ξ_evenodd_no_val_steps c) locale_step
+    (lm_ls_trans the_model) extr auxtr →
+  infinite_trace extr.
+Proof.
+  intros Hmaximal Hmatch.
+  intros n. induction n as [|n IHn]; [done|].
+  destruct IHn as [extr' Hafter].
+  apply traces_match_flip in Hmatch.
+  eapply traces_match_after in Hmatch; [|done].
+  destruct Hmatch as [auxtr' [Hafter' Hmatch]].
+  replace (S n) with (n + 1) by lia.
+  rewrite after_sum'.
+  rewrite Hafter.
+  apply traces_match_first in Hmatch.
+  destruct Hmatch as [Hξ1 Hξ2].
+  eapply extrace_maximal_after in Hmaximal; [|done].
+  inversion Hmaximal as [? Hnstep|]; simplify_eq; [|done].
+  assert (∃ oζ c', locale_step c oζ c') as Hstep; last first.
+  { exfalso. destruct Hstep as (?&?&Hstep). by eapply Hnstep. }
+  apply not_Forall_Exists in Hξ1; [|apply _].
+  apply Exists_exists in Hξ1 as [e [Hξ11 Hξ12]].
+  rewrite Forall_forall in Hξ2.
+  specialize (Hξ2 e Hξ11) as [|Hred]; [done|].
+  destruct Hred as (e' & σ' & es' & Hred).
+  apply elem_of_list_split in Hξ11 as (es1&es2&Hes).
+  destruct c; simpl in *.
+  eexists (Some _), _.
+  econstructor; eauto. simpl in *.
+  by f_equiv.
+Qed.
+
 (** Proof that the execution trace satisfies the liveness properties *)
 Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace) :
   extrace_maximal extr →
@@ -579,30 +614,9 @@ Proof.
   apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
   assert (infinite_trace extr) as Hinf.
-  { intros n. induction n as [|n IHn]; [done|].
-    destruct IHn as [extr' Hafter].
-    apply traces_match_flip in Hmatch_strong.
-    eapply traces_match_after in Hmatch_strong; [|done].
-    destruct Hmatch_strong as [auxtr' [Hafter' Hmatch_strong]].
-    replace (S n) with (n + 1) by lia.
-    rewrite after_sum'.
-    rewrite Hafter.
-    apply traces_match_first in Hmatch_strong.
-    destruct Hmatch_strong as [_ [[Hξ1 Hξ2] _]].
-    eapply extrace_maximal_after in Hmaximal; [|done].
-    inversion Hmaximal as [? Hnstep|]; simplify_eq; [|done].
-    assert (∃ oζ c', locale_step c oζ c') as Hstep; last first.
-    { exfalso. destruct Hstep as (?&?&Hstep). by eapply Hnstep. }
-    apply not_Forall_Exists in Hξ1; [|apply _].
-    apply Exists_exists in Hξ1 as [e [Hξ11 Hξ12]].
-    rewrite Forall_forall in Hξ2.
-    specialize (Hξ2 e Hξ11) as [|Hred]; [done|].
-    destruct Hred as (e' & σ' & es' & Hred).
-    apply elem_of_list_split in Hξ11 as (es1&es2&Hes).
-    destruct c; simpl in *.
-    eexists (Some _), _.
-    econstructor; eauto. simpl in *.
-    by f_equiv. }
+  { eapply infinite_trace_no_val_steps; [done|].
+    eapply traces_match_impl; [done| |apply Hmatch_strong].
+    by intros s1 s2 [_ [? _]]. }
   pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfairaux.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
