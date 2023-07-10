@@ -347,7 +347,7 @@ Definition ξ_evenodd_trace (l : loc) (extr : execution_trace heap_lang)
 
 (* TODO: This could be simplified to use [ξ_evenodd_model_match] *)
 Lemma evenodd_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
-  traces_match labels_match (λ c δ, live_tids c δ ∧ ξ_evenodd l c δ) locale_step
+  traces_match labels_match (λ c (δ:the_model), ξ_evenodd l c δ) locale_step
   (lm_ls_trans the_model) extr auxtr →
   evenodd_aux_progress auxtr → evenodd_ex_progress l extr.
 Proof.
@@ -357,12 +357,12 @@ Proof.
   eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
   exists m. rewrite /pred_at. rewrite Hafter'.
   inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
-  - destruct Hξ as (?&?&n&?&?). by simplify_eq.
-  - destruct Hξ as (?&?&n&?&?). by simplify_eq.
+  - destruct Hξ as (?&n&?&?). by simplify_eq.
+  - destruct Hξ as (?&n&?&?). by simplify_eq.
 Qed.
 
 Lemma evenodd_aux_ex_mono_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
-  traces_match labels_match (λ c δ, live_tids c δ ∧ ξ_evenodd l c δ) locale_step
+  traces_match labels_match (λ c (δ:the_model), ξ_evenodd l c δ) locale_step
   (lm_ls_trans the_model) extr auxtr →
   evenodd_aux_mono auxtr → evenodd_ex_mono l extr.
 Proof.
@@ -376,8 +376,8 @@ Proof.
     eapply traces_match_after in Hξ as [extr' [Hafter' Hextr']]; [|done].
     rewrite /pred_at. rewrite Hafter'.
     inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
-    + destruct Hξ as (?&?&i&?&?). by simplify_eq.
-    + destruct Hξ as (?&?&i&?&?). by simplify_eq.
+    + destruct Hξ as (?&i&?&?). by simplify_eq.
+    + destruct Hξ as (?&i&?&?). by simplify_eq.
   - destruct Hauxtr as [_ Hauxtr].
     rewrite /pred_at in Hauxtr.
     destruct (after (S n) auxtr) as [auxtr'|] eqn:Heqn; [|done].
@@ -385,9 +385,9 @@ Proof.
     rewrite /pred_at. rewrite Hafter'.
     inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
     + destruct Hauxtr as [j [<- Hle]].
-      destruct Hξ as (?&?&j&?&?). exists j. by simplify_eq.
+      destruct Hξ as (?&j&?&?). exists j. by simplify_eq.
     + destruct Hauxtr as [j [<- Hle]].
-      destruct Hξ as (?&?&j&?&?). exists j. by simplify_eq.
+      destruct Hξ as (?&j&?&?). exists j. by simplify_eq.
 Qed.
 
 Instance the_model_mstate_countable : EqDecision (mstate the_model).
@@ -640,10 +640,11 @@ Proof.
   split.
   - pose proof (evenodd_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
       as Hprogress.
-    eapply (evenodd_aux_ex_progress_preserved l _ auxtr); [done|].
+    eapply (evenodd_aux_ex_progress_preserved l _ auxtr).
+    { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. } 
     by eapply evenodd_mtr_aux_progress_preserved.
   - pose proof (evenodd_mdl_is_mono mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
       as Hmono.
-    eapply (evenodd_aux_ex_mono_preserved l _ auxtr); [done|].
-    by eapply evenodd_mtr_aux_mono_preserved.
+    eapply (evenodd_aux_ex_mono_preserved l _ auxtr).
+    { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. }     by eapply evenodd_mtr_aux_mono_preserved.
 Qed.
