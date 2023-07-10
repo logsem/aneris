@@ -713,7 +713,8 @@ Section MainProof.
     
     iApply wp_lift_pure_step_no_fork'.
     { apply FS'ne. }
-    iSplitR; [done| ].
+    2: iSplitR; [done| ].
+    { set_solver. }
     do 3 iModIntro. simpl.
     iFrame. iIntros "FUELS".
     
@@ -724,6 +725,7 @@ Section MainProof.
     (* TODO: fupd in goal is needed to create invariant *)
     wp_bind (Alloc _)%E.
     iApply (wp_alloc_nostep with "[$] [FUELS]").
+    2: { set_solver. }
     2: { iFrame. }
     { intros E. by apply fmap_empty_inv in E. } 
 
@@ -820,6 +822,17 @@ Section MainProof.
   Definition program_init_state: fmstate spinlock_model_impl := [2; 2].
 
   (* TODO: free roles cannot be retrieved back without par construct *)
+  Lemma program_spec_fr tid Einvs (P: iProp Σ)
+    (DISJ_INV: Einvs ## ↑nroot.@"spinlock"):
+    PMP Einvs -∗
+    {{{ partial_model_is program_init_state ∗ partial_free_roles_are ∅ ∗ P ∗ 
+      has_fuels tid program_init_fuels }}}
+      program #() @ tid
+    {{{ RET #(); tid ↦M ∅ ∗ partial_free_roles_are (dom program_init_fuels) }}}.
+  Proof using All.
+  Admitted. 
+    
+
   Lemma program_spec tid Einvs (P: iProp Σ)
     (DISJ_INV: Einvs ## ↑nroot.@"spinlock"):
     (* {{{ partial_model_is [0; 0] ∗ has_fuels tid {[ 0; 1 ]} fs ∗ P }}} *)
@@ -895,11 +908,13 @@ Section MainProof.
     (* Set Printing Implicit.  *)
 
     iApply (wp_fork_nostep _ tid _ _ _ _ {[ 1 ]} {[ 0 ]} (<[0:=20]> (<[1:=20]> ∅)) with "[FRAG0] [-FUELS] [FUELS]").
-    6: { done. }
+    7: { done. }
     { set_solver. }
     { done. }
     { set_solver. }
-    { iSplitR; [done| ]. iIntros (tid0).
+    2: iSplitR; [done| ].
+    { set_solver. }
+    { iIntros (tid0).
       iNext. iIntros "FUEL".
 
       rewrite map_filter_insert.
@@ -931,14 +946,16 @@ Section MainProof.
     
     (* TODO: unify even more*)
     iApply (wp_fork_nostep _ tid _ _ _ _ ∅ {[ 1 ]} {[1 := 17]} with "[FRAG1] [-FUEL] [FUEL]").
-    6: { rewrite /has_fuels_S.
+    7: { rewrite /has_fuels_S.
          iDestruct (has_fuel_fuels with "FUEL") as "FUEL".     
          iApply has_fuels_proper; [..| iFrame]; eauto.
          by rewrite map_fmap_singleton. }
     { set_solver. }
     { done. }
     { set_solver. }
-    { iSplitR; [done| ]. iIntros (tid0).
+    2: iSplitR; [done| ].
+    { set_solver. }
+    { iIntros (tid0).
       iNext. iIntros "FUEL".
       rewrite map_filter_insert. 
       rewrite map_filter_empty insert_empty.
