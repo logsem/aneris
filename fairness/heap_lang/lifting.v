@@ -1104,9 +1104,9 @@ Qed.
 Lemma wp_nostep s tid E e fs P Φ :
   TCEq (to_val e) None →
   fs ≠ ∅ →
-  sswp s E tid e (λ e', WP e' @ s; tid; E {{ Φ }} ) -∗
+  sswp s E tid e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
   has_fuels_S tid fs -∗
-  WP e @ s; tid; E {{ v, Φ v ∗ has_fuels tid fs }}.
+  WP e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros (Hval ?) "Hwp HfuelS".
   rewrite wp_unfold /wp_pre /sswp /= Hval.
@@ -1127,10 +1127,10 @@ Proof.
   iIntros "!>".
   iDestruct "Hwp" as "[Hsi [Hwp Hwps]]".
   iExists _, _. iFrame. iSplit; [done|].
+  rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver].
+  iDestruct ("Hwp" with "Hfuel") as "Hwp".
   iApply (wp_wand with "Hwp").
   iIntros (v) "HΦ'". iFrame.
-  iApply (has_fuels_proper with "Hfuel") =>//.
-  rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
 Lemma wp_nostep_hoare s tid E e fs P Φ :
