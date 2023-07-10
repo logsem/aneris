@@ -299,7 +299,7 @@ Section proof.
         rewrite -has_fuel_fuels.
         iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
         { iFrame "∗#". iSplit; last by iPureIntro; lia.
-          iClear "Hg Hinv". Set Printing Implicit.
+          iClear "Hg Hinv".
 
           assert (∀ l v v', v = v' → l ↦ v ⊣⊢ l ↦ v') as pointsto_proper.
           { intros ??? ->. done. }
