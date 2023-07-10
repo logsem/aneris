@@ -427,11 +427,13 @@ Section PartialOwnership.
     Let update_no_step_enough_fuel_def (extr : finite_trace (cfg Λ) (olocale Λ)) 
       (auxtr : auxiliary_trace LM) 
       (c2 : cfg Λ) (fs : gmap (fmrole iM) nat) (ζ : locale Λ)
+      (Einvs: coPset)
     `(dom fs ≠ ∅)
     `(locale_step (trace_last extr) (Some ζ) c2) : iProp Σ :=
    (
         has_fuels ζ (S <$> fs) -∗
-           model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
+           model_state_interp (trace_last extr).1 (trace_last auxtr) 
+        ={ Einvs }=∗
            ∃ (δ2 : LM) (ℓ : mlabel LM),
              ⌜labels_match (Some ζ) ℓ (LM := LM)
               ∧ valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
@@ -443,6 +445,7 @@ Section PartialOwnership.
         (fs: gmap (fmrole iM) nat)
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM) ζ efork σ1 σ2
+        (Einvs: coPset)
          `(R1 ## R2)
          `(fs ≠ ∅)
          `(R1 ∪ R2 = dom fs)
@@ -452,7 +455,8 @@ Section PartialOwnership.
        (
     (* has_fuels_S ζ fs -∗ *)
     has_fuels ζ (S <$> fs) -∗
-      model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
+      model_state_interp (trace_last extr).1 (trace_last auxtr) 
+    ={ Einvs }=∗
       ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗
             has_fuels ζ (fs ⇂ R1) ∗
             (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]}) ∗
@@ -491,8 +495,8 @@ Section PartialOwnership.
         model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝.
 
     Let PMP_def (Einvs: coPset): iProp Σ := □ (
-          (∀ extr auxtr c2 fs ζ NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP) ∗         
-          (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL) ∗ 
+          (∀ extr auxtr c2 fs ζ Einvs NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ Einvs NE STEP) ∗
+          (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 Einvs DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 Einvs DISJ NE DOM EQatp STEP POOL) ∗ 
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
              LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM,
               update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
@@ -511,10 +515,10 @@ Section PartialOwnership.
        and make PMP opaque, since its unfold takes too much space *)
 
     Lemma update_no_step_enough_fuel {Einvs} extr auxtr c2 fs ζ NE STEP: 
-      PartialModelPredicates Einvs ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP. 
+      PartialModelPredicates Einvs ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ Einvs NE STEP. 
     Proof. by iIntros "(?&?&?&?)". Qed.
     Lemma update_fork_split {Einvs} R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL: 
-      PartialModelPredicates Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL. 
+      PartialModelPredicates Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 Einvs DISJ NE DOM EQatp STEP POOL. 
     Proof. by iIntros "(?&?&?&?)". Qed.
     Lemma update_step_still_alive {Einvs} extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM:
       PartialModelPredicates Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM.

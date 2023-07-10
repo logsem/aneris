@@ -14,9 +14,10 @@ Section ActualOwnershipInterface.
     ⊢ PartialModelPredicates ∅ (LM := LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre). 
   Proof.
     iIntros. iApply Build_PartialModelPredicates. iModIntro. repeat iSplitL.
-    - iIntros. iApply (actual_update_no_step_enough_fuel with "[$]"); set_solver.
-    - iIntros. iApply (actual_update_fork_split with "[$]"); done.
-    - iIntros "*". iIntros.
+    - iIntros. iApply (actual_update_no_step_enough_fuel with "[$] [$]"); eauto.
+      all: set_solver. 
+    - iIntros. iApply (actual_update_fork_split with "[$] [$]"); done.
+    - iIntros. 
       iApply (actual_update_step_still_alive with "[$] [$] [$] [$]"); eauto.
     - iIntros. iApply (frag_free_roles_fuels_disj with "[$] [$] [$]").
   Defined.

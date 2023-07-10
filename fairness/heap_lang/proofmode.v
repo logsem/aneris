@@ -35,25 +35,26 @@ Lemma tac_wp_pure_helper
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
+  Einvs ⊆ E ->
   (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗ ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels_plus n tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof. 
-  intros Hne HPE Hφ. specialize (HPE Hφ).
+  intros Hne HPE Hφ Hinvs. specialize (HPE Hφ).
   revert e1 e2 fs Hne HPE. induction n; intros e1 e2 fs Hne HPE.
   { inversion HPE. rewrite has_fuel_fuels_plus_0. simplify_eq.
     iIntros "#? ?". iFrame. } 
     
-
   inversion HPE; simplify_eq.
 
   iIntros "#PMP H Hf".
   rewrite has_fuels_plus_split_S.
 
-  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
+  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)).
+  5: iSplitR; [done| ].
+  all: eauto. 
   { by intros ?%fmap_empty_inv. }
   { econstructor =>//; [ by eapply pure_step_ctx | constructor ]. }
-  iSplitR; [done| ]. 
   iModIntro; iFrame. do 2 iModIntro.
   iIntros "Hf".
   iApply (IHn _ _ _ with "[PMP] [H] [Hf]") => //. 
@@ -106,11 +107,12 @@ Lemma tac_wp_pure_helper_2
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
+  Einvs ⊆ E ->
   (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗ ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof.
-  iIntros (Hfs Hne Hpe Hphi) "#PMP H Hf".
+  iIntros (Hfs Hne Hpe Hphi Hinvs) "#PMP H Hf".
   rewrite (has_fuels_gt_n fs n) //.
   iApply (tac_wp_pure_helper with "PMP H [Hf]") =>//.
   by intros ?%fmap_empty_inv.
@@ -177,6 +179,7 @@ Lemma tac_wp_pure
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
+  Einvs ⊆ E ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs n Δother Δ'other →
@@ -187,7 +190,7 @@ WP (fill K e2) @ tid; E {{ Φ }}) →
 WP (fill K e1) @ tid; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ???.
-  intros ?? Δother Hlater Δ' Hccl.
+  intros ?? Hinvs Δother Hlater Δ' Hccl.
   iIntros "H #PMP".
   iAssert (⌜envs_wf Δ⌝)%I as %Hwf.
   { unfold of_envs, of_envs', envs_wf. iDestruct "H" as "[%HH _]". by iPureIntro. }
@@ -472,6 +475,7 @@ Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l q v
   (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
+  Einvs ⊆ E ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
@@ -482,7 +486,7 @@ WP fill K (Val v) @ tid; E {{ Φ }}) →
   envs_entails Δ ((PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
 Proof using.
-  intros ?? Hij ?.
+  intros ??? Hij ?.
   rewrite envs_entails_unseal=> Δother ?? Δ' Hccl.
   rewrite -wp_bind.
   iIntros "H #PMP".
@@ -497,7 +501,7 @@ Proof using.
   iDestruct "H2" as "[H2 H3]".
 
   rewrite has_fuels_gt_1 //.
-  iApply (wp_load_nostep with "[$] [H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
+  iApply (wp_load_nostep with "[$] [H1 H2]"); [| done| iFrame |]; [by intros ?%fmap_empty_inv|].
   iIntros "!> [Hl Hf]". iApply (Hccl with "[-]"); [| done]. rewrite /Δ' /=.
   iApply (envs_snoc_sound Δ'other false i with "[H3 Hl] [Hf]") =>//.
   - rewrite maybe_into_latersN_envs_dom // /Δother.
@@ -512,6 +516,7 @@ Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l v 
   (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
+  Einvs ⊆ E ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
@@ -527,7 +532,7 @@ Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l v 
   envs_entails Δ (  (PartialModelPredicates Einvs (LM := LM) (iLM := iLM) (PMPP := PMPP)) -∗
 WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
 Proof using.
-  intros ?? Hij ?.
+  intros ??? Hij ?.
   rewrite envs_entails_unseal=> Δother ??.
   destruct (envs_simple_replace j false (Esnoc Enil j (l ↦ v'))%I Δ'other) as [Δ'other2|] eqn:Heq; last done.
   move=> /= [Hhack Hccl].
@@ -545,7 +550,7 @@ Proof using.
   iDestruct "H2" as "[H2 H3]".
 
   rewrite has_fuels_gt_1 //.
-  iApply (wp_store_nostep with "[$] [H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
+  iApply (wp_store_nostep with "[$] [H1 H2]"); [| done| iFrame |]; [by intros ?%fmap_empty_inv|].
   iIntros "!> [Hl Hf]".
   set Δ' := envs_snoc Δ'other2 false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)).
   fold Δ' in Hccl.
