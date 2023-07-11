@@ -5,7 +5,7 @@ From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
-From iris.algebra Require Import excl_auth.
+From iris.algebra Require Import excl_auth gset gmap. 
 From iris.bi Require Import bi.
 From trillium.fairness.examples.spinlock Require Import spinlock_sc spinlock_sc_comp_model.
 
@@ -21,11 +21,24 @@ Canonical Structure sl_ofe := optionO (leibnizO (fmstate spinlock_model_impl)).
 Canonical Structure cnt_ofe := optionO natO.  
 Definition comp_cmra: ucmra := authUR (prodUR (prodUR (excl' sl_ofe) (excl' sl_ofe)) (excl' cnt_ofe)). 
 
+
+(* Definitions for 2nd call *)
+Notation "'sl_role'" := (fmrole spinlock_model_impl).
+Definition τ_roles_cmra: ucmra := 
+  authUR (excl' (gset_disjUR sl_role)).
+Definition call_fuels_cmra: ucmra := 
+  (authUR (gmapUR (RoleO spinlock_model_impl) (exclR natO))).
+
+
 Class compPreG Σ := {
     sl1PreG :> spinlockPreG Σ;
     sl2PreG :> spinlockPreG Σ;
     slSplitG :> inG Σ comp_cmra;
+
+    τ_rolesG :> inG Σ τ_roles_cmra;
+    call_fuelsG :> inG Σ call_fuels_cmra;
 }.
+
 
 
 Section SlPMP.
@@ -45,9 +58,9 @@ Section SlPMP.
   Definition comp_sl2_st_frag (γ: gname) (st: fmstate spinlock_model_impl): iProp Σ := 
       own γ ((◯ (ε, Excl' (Some st: sl_ofe), ε)): comp_cmra).  
 
-  Let lift_sl_role_left (ρ: fmrole spinlock_model_impl): fmrole comp_model_impl := 
+  Let lift_sl_role_left (ρ: fmrole spinlock_model_impl): comp_role := 
         (inl ∘ inl) ρ.
-  Let lift_sl_role_right (ρ: fmrole spinlock_model_impl): fmrole comp_model_impl := 
+  Let lift_sl_role_right (ρ: fmrole spinlock_model_impl): comp_role := 
         (inl ∘ inr) ρ.
  
   Definition comp_inv_impl (γ: gname) : iProp Σ :=
@@ -80,11 +93,97 @@ Section SlPMP.
     apply option_local_update. by apply exclusive_local_update.
   Qed.
 
-  (* Notation "'PartialModelPredicates_' '<' ctx '>'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP). *)
+  Definition frag_τ_roles_are
+    (γ_τρs: gname) (R: gset sl_role): iProp Σ :=
+    own γ_τρs ((◯ (Excl' (GSet R))): τ_roles_cmra). 
 
-  (* @PartialModelPredicates heap_lang M LM Nat.eq_dec nat_countable Σ *)
-  (*   (@heap_fairnessGS Σ M LM heapGS0) spinlock_model_impl spinlock_model  *)
-  (*   ?PMPP *)
+  Definition auth_τ_roles_are
+    (γ_τρs: gname) (R: gset sl_role): iProp Σ :=
+    own γ_τρs ((● (Excl' (GSet R))): τ_roles_cmra). 
+
+  Definition frag_call_fuel_is
+    (γ_fs: gname) (F: gmap sl_role nat): iProp Σ :=
+    own γ_fs ((◯ (fmap (λ f, Excl f) F)): call_fuels_cmra).
+
+  Definition auth_call_fuel_is
+    (γ_fs: gname) (F: gmap sl_role nat): iProp Σ :=
+    own γ_fs ((● (fmap (λ f, Excl f) F)): call_fuels_cmra).
+
+  Let pmi_client := partial_mapping_is (PartialModelPredicatesPre := PMPP). 
+
+  Let pmi (γ_τρs: gname) (τ: locale heap_lang) 
+    (MP: gmap (locale heap_lang) (gset sl_role)): iProp Σ :=
+        [∗ map] τ' ↦ R ∈ MP,
+        if (decide ((τ': locale heap_lang) = τ)) 
+        then frag_τ_roles_are γ_τρs (R: gset sl_role)
+        else pmi_client ({[ τ' := set_map lift_sl_role_right R ]})
+.
+        
+
+  Definition sl2_call_PMPP 
+    (τ: locale heap_lang) (γ γ_τρs γ_fs: gname):
+    @PartialModelPredicatesPre heap_lang _ _ Σ spinlock_model_impl.
+  refine
+    {|
+        partial_model_is := comp_sl2_st_frag γ;
+        partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_right;
+        partial_fuel_is := frag_call_fuel_is γ_fs;
+        partial_mapping_is := pmi γ_τρs τ;
+    |}.
+  - intros. apply big_sepM_timeless. intros.
+    destruct (decide (k = τ)); apply _. 
+  - intros ???%leibniz_equiv_iff.
+    apply big_opM_proper'; [| done].
+    intros ??. destruct (decide (a = τ)); repeat f_equiv. 
+  - intros. rewrite /frag_call_fuel_is.
+    rewrite map_fmap_union.
+    rewrite -gmap_disj_op_union; [| by apply map_disjoint_fmap].
+    by rewrite auth_frag_op own_op.
+  - intros. simpl. rewrite set_map_union. 
+    apply PMPP. set_solver.
+  - iIntros. simpl. rewrite set_map_empty. iStopProof. apply PMPP.
+  Defined.
+
+  Definition call2_inv_impl 
+    (γ_τρs γ_fs: gname)
+    (τ: locale heap_lang) (ρ__next: comp_role):
+    iProp Σ :=
+    ∃ (R__cur: gset sl_role) (R__next1 R__next2: gset (comp_role))
+      (F: gmap sl_role nat) (f__next: nat),
+      let R__cur' := set_map lift_sl_role_right R__cur in
+      auth_τ_roles_are γ_τρs R__cur ∗ (
+          partial_mapping_is {[ τ := R__cur' ∪ R__next1]} ∗
+          partial_free_roles_are R__next2  ∗
+          ⌜ R__next1 ∪ R__next2 = {[ ρ__next ]} ⌝ ∗
+          ⌜ dom F = R__cur ⌝ ∗
+          auth_call_fuel_is γ_fs F ∗
+          ([∗ map] ρ ↦ f ∈ F, lift_sl_role_right ρ ↦F f ∗ ⌜ρ__next ∈ R__next1 -> f <= f__next ⌝) ∗
+          ρ__next ↦F f__next
+          ∨
+          frag_τ_roles_are γ_τρs R__cur). 
+                         
+  Let Ns_call2 := nroot .@ "call2".
+
+  (* Definition call2_inv (γ_τρs γ_fs: gname) *)
+  (*   (τ: locale heap_lang) (ρ__next: comp_role): iProp Σ := *)
+  (*   inv Ns (call2_inv_impl γ_τρs γ_fs τ ρ__next).  *)
+  
+  Notation "'has_fuels_' '<' ctx '>'" := (has_fuels (PMPP := ctx)) (at level 20, format "has_fuels_  < ctx >"). 
+
+  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (LM := LM) (iLM := comp_model) (PMPP := PMPP))).
+
+  Lemma sl2_call_PMP Einvs (γ γ_τρs γ_fs: gname)
+    (τ: locale heap_lang) (ρ__next: comp_role)
+    (DISJ_INV: Einvs ## ↑Ns):
+    PMP Einvs ∗ inv Ns_call2 (call2_inv_impl γ_τρs γ_fs τ ρ__next) ⊢
+    PartialModelPredicates (Einvs ∪ ↑Ns ∪ ↑Ns_call2)
+    (LM := LM) (iLM := spinlock_model)
+    (PMPP := sl2_call_PMPP τ γ γ_τρs γ_fs). 
+  Proof.
+    iIntros "[#PMP #INV2]".
+  Admitted. 
+  
+
 
   (* Lemma set_map_disjoint  *)
   (*   `{Elements A C, Singleton B D, Empty D, Union D} *)
@@ -116,22 +215,22 @@ Section SlPMP.
   - iIntros. simpl. rewrite set_map_empty. iStopProof. apply PMPP. 
   Defined.
 
-  (* TODO: is there a way to unify these definitions
-     and subsequent proofs for them? *)
-  Definition sl2_PMPP (γ: gname):
-    @PartialModelPredicatesPre heap_lang _ _ Σ spinlock_model_impl.
-  refine
-    {|
-        partial_model_is := comp_sl2_st_frag γ;
-        partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_right;
-        partial_fuel_is := partial_fuel_is ∘ kmap lift_sl_role_right;
-        partial_mapping_is := partial_mapping_is ∘ (fmap (set_map lift_sl_role_right));
-    |}.
-  - intros. simpl. rewrite kmap_union. apply PMPP. 
-    apply map_disjoint_kmap; auto. apply _.
-  - intros. simpl. rewrite set_map_union. apply PMPP. set_solver.
-  - iIntros. simpl. rewrite set_map_empty. iStopProof. apply PMPP. 
-  Defined.
+  (* (* TODO: is there a way to unify these definitions *)
+  (*    and subsequent proofs for them? *) *)
+  (* Definition sl2_PMPP (γ: gname): *)
+  (*   @PartialModelPredicatesPre heap_lang _ _ Σ spinlock_model_impl. *)
+  (* refine *)
+  (*   {| *)
+  (*       partial_model_is := comp_sl2_st_frag γ; *)
+  (*       partial_free_roles_are := partial_free_roles_are ∘ set_map lift_sl_role_right; *)
+  (*       partial_fuel_is := partial_fuel_is ∘ kmap lift_sl_role_right; *)
+  (*       partial_mapping_is := partial_mapping_is ∘ (fmap (set_map lift_sl_role_right)); *)
+  (*   |}. *)
+  (* - intros. simpl. rewrite kmap_union. apply PMPP.  *)
+  (*   apply map_disjoint_kmap; auto. apply _. *)
+  (* - intros. simpl. rewrite set_map_union. apply PMPP. set_solver. *)
+  (* - iIntros. simpl. rewrite set_map_empty. iStopProof. apply PMPP.  *)
+  (* Defined. *)
 
 
   (* TODO: move to upstream *)
@@ -194,16 +293,16 @@ Section SlPMP.
       red. intros. rewrite kmap_singleton lookup_kmap. done.
   Qed.  
 
-  Lemma has_fuels_sl2 tid γ (fs: gmap (fmrole spinlock_model_impl) nat):
-        has_fuels tid fs (PMPP := sl2_PMPP γ) ⊣⊢
-    has_fuels tid (kmap lift_sl_role_right fs) (PMPP := PMPP).
-  Proof using. 
-    rewrite /has_fuels. iApply bi.sep_proper.
-    - simpl. rewrite map_fmap_singleton. by rewrite dom_kmap.
-    - simpl. rewrite dom_kmap_L. rewrite big_opS_kmap.
-      apply big_opS_proper. intros. apply bi.exist_proper. 
-      red. intros. rewrite kmap_singleton lookup_kmap. done.
-  Qed.  
+  (* Lemma has_fuels_sl2 tid γ (fs: gmap (fmrole spinlock_model_impl) nat): *)
+  (*       has_fuels tid fs (PMPP := sl2_PMPP γ) ⊣⊢ *)
+  (*   has_fuels tid (kmap lift_sl_role_right fs) (PMPP := PMPP). *)
+  (* Proof using.  *)
+  (*   rewrite /has_fuels. iApply bi.sep_proper. *)
+  (*   - simpl. rewrite map_fmap_singleton. by rewrite dom_kmap. *)
+  (*   - simpl. rewrite dom_kmap_L. rewrite big_opS_kmap. *)
+  (*     apply big_opS_proper. intros. apply bi.exist_proper.  *)
+  (*     red. intros. rewrite kmap_singleton lookup_kmap. done. *)
+  (* Qed.   *)
 
 
   (* TODO: generalize, upstream *)
@@ -274,58 +373,58 @@ Section SlPMP.
         role_cases_ext. set_solver. 
   Qed.
 
-  Lemma vfm_sl2 fs1 fs2 s1 s2 ρ ost1 osc
-    (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := spinlock_model)):
-  valid_new_fuelmap (kmap lift_sl_role_right fs1) (kmap lift_sl_role_right fs2)
-    (ost1, Some s1, osc) (ost1, Some s2, osc) (lift_sl_role_right ρ) (LM := comp_model).
-  Proof using.
-    Ltac simpl_3rd :=
-      rewrite !bool_decide_eq_false_2; try done; rewrite !orb_false_l.
+  (* Lemma vfm_sl2 fs1 fs2 s1 s2 ρ ost1 osc *)
+  (*   (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := spinlock_model)): *)
+  (* valid_new_fuelmap (kmap lift_sl_role_right fs1) (kmap lift_sl_role_right fs2) *)
+  (*   (ost1, Some s1, osc) (ost1, Some s2, osc) (lift_sl_role_right ρ) (LM := comp_model). *)
+  (* Proof using. *)
+  (*   Ltac simpl_3rd := *)
+  (*     rewrite !bool_decide_eq_false_2; try done; rewrite !orb_false_l. *)
     
-    repeat (split; simpl).
-    - simpl_3rd. role_cases_ext. 
-      apply VFM in IN.
-      rewrite lookup_kmap. pose proof (sm_fuel_max s2). 
-      destruct (fs2 !! x); [simpl in *; lia | done].
-    - intros. rewrite !lookup_kmap.
-      apply (proj1 (proj2 VFM)).
-      { set_solver. }
-      rewrite !dom_kmap in H0. 
-      apply elem_of_intersection in H0 as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
-      set_solver.
-    - rewrite dom_kmap. apply elem_of_map_2.
-      apply VFM.
-    - intros ? [IN2 NIN1]%elem_of_difference.
-      rewrite dom_kmap in IN2. apply elem_of_map_1 in IN2 as [? [[=->] ?]].
-      rewrite lookup_kmap.
-      do 3 apply proj2 in VFM. apply proj1 in VFM.
-      assert (x ∈ dom fs2 ∖ dom fs1) as X. 
-      { apply elem_of_difference. split; auto.
-        intros ?. apply NIN1. rewrite dom_kmap. set_solver. }
-      specialize (VFM x X).
-      pose proof (sm_fuel_max s2).
-      destruct (fs2 !! x); [simpl in *; lia | done].
-    - intros ?? IN. rewrite !dom_kmap in IN. 
-      apply elem_of_intersection in IN as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1].
-      rewrite !lookup_kmap. apply VFM; auto. set_solver.
-    - simpl. do 5 apply proj2 in VFM. apply proj1 in VFM.
-      simpl_3rd. apply union_subseteq. rewrite !dom_kmap. set_solver. 
-    - do 6 apply proj2 in VFM. rewrite !dom_kmap.
-      apply elem_of_subseteq. intros ? [? [[=->] ?]]%elem_of_map_1.
-      specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?].
-      + repeat (apply elem_of_union; left).
-        apply elem_of_difference. split.
-        * set_solver.
-        * simpl_3rd. role_cases_ext. set_solver. 
-      + set_solver.
-      + apply elem_of_union; left. apply elem_of_union; right.
-        apply elem_of_difference. split; [set_solver| ].
-        simpl_3rd. role_cases_ext. set_solver.
-      + simpl_3rd. apply elem_of_union; right.
-        apply elem_of_intersection. split; [| set_solver].
-        apply elem_of_difference. split; [set_solver| ]. 
-        role_cases_ext. set_solver. 
-  Qed. 
+  (*   repeat (split; simpl). *)
+  (*   - simpl_3rd. role_cases_ext.  *)
+  (*     apply VFM in IN. *)
+  (*     rewrite lookup_kmap. pose proof (sm_fuel_max s2).  *)
+  (*     destruct (fs2 !! x); [simpl in *; lia | done]. *)
+  (*   - intros. rewrite !lookup_kmap. *)
+  (*     apply (proj1 (proj2 VFM)). *)
+  (*     { set_solver. } *)
+  (*     rewrite !dom_kmap in H0.  *)
+  (*     apply elem_of_intersection in H0 as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1]. *)
+  (*     set_solver. *)
+  (*   - rewrite dom_kmap. apply elem_of_map_2. *)
+  (*     apply VFM. *)
+  (*   - intros ? [IN2 NIN1]%elem_of_difference. *)
+  (*     rewrite dom_kmap in IN2. apply elem_of_map_1 in IN2 as [? [[=->] ?]]. *)
+  (*     rewrite lookup_kmap. *)
+  (*     do 3 apply proj2 in VFM. apply proj1 in VFM. *)
+  (*     assert (x ∈ dom fs2 ∖ dom fs1) as X.  *)
+  (*     { apply elem_of_difference. split; auto. *)
+  (*       intros ?. apply NIN1. rewrite dom_kmap. set_solver. } *)
+  (*     specialize (VFM x X). *)
+  (*     pose proof (sm_fuel_max s2). *)
+  (*     destruct (fs2 !! x); [simpl in *; lia | done]. *)
+  (*   - intros ?? IN. rewrite !dom_kmap in IN.  *)
+  (*     apply elem_of_intersection in IN as [[? [[=->] ?]]%elem_of_map_1 [? [[=->] ?]]%elem_of_map_1]. *)
+  (*     rewrite !lookup_kmap. apply VFM; auto. set_solver. *)
+  (*   - simpl. do 5 apply proj2 in VFM. apply proj1 in VFM. *)
+  (*     simpl_3rd. apply union_subseteq. rewrite !dom_kmap. set_solver.  *)
+  (*   - do 6 apply proj2 in VFM. rewrite !dom_kmap. *)
+  (*     apply elem_of_subseteq. intros ? [? [[=->] ?]]%elem_of_map_1. *)
+  (*     specialize (VFM x0 H0). apply elem_of_union in VFM as [[[? | ?]%elem_of_union | ?]%elem_of_union | ?]. *)
+  (*     + repeat (apply elem_of_union; left). *)
+  (*       apply elem_of_difference. split. *)
+  (*       * set_solver. *)
+  (*       * simpl_3rd. role_cases_ext. set_solver.  *)
+  (*     + set_solver. *)
+  (*     + apply elem_of_union; left. apply elem_of_union; right. *)
+  (*       apply elem_of_difference. split; [set_solver| ]. *)
+  (*       simpl_3rd. role_cases_ext. set_solver. *)
+  (*     + simpl_3rd. apply elem_of_union; right. *)
+  (*       apply elem_of_intersection. split; [| set_solver]. *)
+  (*       apply elem_of_difference. split; [set_solver| ].  *)
+  (*       role_cases_ext. set_solver.  *)
+  (* Qed.  *)
 
   Lemma kmap_filter_disj
     (fs1 fs2: gmap (fmrole spinlock_model_impl) nat)
@@ -368,20 +467,21 @@ Section SlPMP.
 
     iModIntro. repeat iSplitR.
     - iIntros "* FUELS_SL MSI".
-      iMod (update_no_step_enough_fuel with "PMP [FUELS_SL] [MSI]") as "-#UPD".
+      iDestruct (update_no_step_enough_fuel with "PMP [FUELS_SL] [MSI]") as "-#UPD".
       2: by eauto.
       3: done. 
       2: { iDestruct (has_fuels_sl1 with "FUELS_SL") as "foo".
            rewrite kmap_fmap. iFrame. }
       { intros ?%dom_empty_iff_L%kmap_empty_iff; [set_solver| apply _]. }
-      iDestruct "UPD" as (??) "([% %]&?&?)".
+      iMod (fupd_mask_mono with "UPD") as (??) "([% %]&?&?)".
+      { set_solver. }
       iModIntro. do 2 iExists _. iSplitR; [done| ]. iFrame.
       iApply has_fuels_sl1. iApply has_fuels_proper; [..| iFrame]; [done| ].
       rewrite !difference_empty_L.
       by rewrite !gmap_filter_dom_id. 
     - iIntros "* FUELS_SL MSI".
       
-      iMod (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD".
+      iDestruct (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD".
       all: eauto. 
       4: { iDestruct (has_fuels_sl1 with "FUELS_SL") as "foo".
            rewrite kmap_fmap. iFrame. }
@@ -389,7 +489,8 @@ Section SlPMP.
            rewrite set_map_union_L. reflexivity. }
       { set_solver. }
       { intros ?%kmap_empty_iff; [done| apply _]. }
-      iDestruct "UPD" as (?) "(F2&F1&FIN&?&%)".
+      iMod (fupd_mask_mono with "UPD") as (?) "(F2&F1&FIN&?&%)".
+      { set_solver. }
       iModIntro. iExists _. iFrame.
       (* pose proof @dom_union_inv_L.  *)
       pose proof (dom_union_inv_L fs _ _ DISJ (eq_Symmetric _ _ DOM)) as (fs1 & fs2 & FS12 & DISJ12 & DOM1 & DOM2). 
@@ -459,108 +560,108 @@ Section SlPMP.
       eapply set_map_disjoint; eauto. apply _. 
   Qed. 
 
-  Lemma sl2_PMP Einvs (γ: gname) (DISJ_INV: Einvs ## ↑Ns):
-    PMP Einvs ∗ (inv Ns (comp_inv_impl γ)) ⊢
-    PartialModelPredicates (Einvs ∪ ↑Ns) (LM := LM) (iLM := spinlock_model) (PMPP := (sl2_PMPP γ)). 
-  Proof. 
-    iIntros "[#PMP #COMP]". iApply @Build_PartialModelPredicates.
+  (* Lemma sl2_PMP Einvs (γ: gname) (DISJ_INV: Einvs ## ↑Ns): *)
+  (*   PMP Einvs ∗ (inv Ns (comp_inv_impl γ)) ⊢ *)
+  (*   PartialModelPredicates (Einvs ∪ ↑Ns) (LM := LM) (iLM := spinlock_model) (PMPP := (sl2_PMPP γ)).  *)
+  (* Proof.  *)
+  (*   iIntros "[#PMP #COMP]". iApply @Build_PartialModelPredicates. *)
 
-    iModIntro. repeat iSplitR.
-    - iIntros "* FUELS_SL MSI".
-      iMod (update_no_step_enough_fuel with "PMP [FUELS_SL] [MSI]") as "-#UPD".
-      2: by eauto.
-      3: done. 
-      2: { iDestruct (has_fuels_sl2 with "FUELS_SL") as "foo".
-           rewrite kmap_fmap. iFrame. }
-      { intros ?%dom_empty_iff_L%kmap_empty_iff; [set_solver| apply _]. }
-      iDestruct "UPD" as (??) "([% %]&?&?)".
-      iModIntro. do 2 iExists _. iSplitR; [done| ]. iFrame.
-      iApply has_fuels_sl2. iApply has_fuels_proper; [..| iFrame]; [done| ].
-      rewrite !difference_empty_L.
-      by rewrite !gmap_filter_dom_id. 
-    - iIntros "* FUELS_SL MSI".
+  (*   iModIntro. repeat iSplitR. *)
+  (*   - iIntros "* FUELS_SL MSI". *)
+  (*     iMod (update_no_step_enough_fuel with "PMP [FUELS_SL] [MSI]") as "-#UPD". *)
+  (*     2: by eauto. *)
+  (*     3: done.  *)
+  (*     2: { iDestruct (has_fuels_sl2 with "FUELS_SL") as "foo". *)
+  (*          rewrite kmap_fmap. iFrame. } *)
+  (*     { intros ?%dom_empty_iff_L%kmap_empty_iff; [set_solver| apply _]. } *)
+  (*     iDestruct "UPD" as (??) "([% %]&?&?)". *)
+  (*     iModIntro. do 2 iExists _. iSplitR; [done| ]. iFrame. *)
+  (*     iApply has_fuels_sl2. iApply has_fuels_proper; [..| iFrame]; [done| ]. *)
+  (*     rewrite !difference_empty_L. *)
+  (*     by rewrite !gmap_filter_dom_id.  *)
+  (*   - iIntros "* FUELS_SL MSI". *)
       
-      iMod (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD".
-      all: eauto. 
-      4: { iDestruct (has_fuels_sl2 with "FUELS_SL") as "foo".
-           rewrite kmap_fmap. iFrame. }
-      3: { rewrite dom_kmap_L. rewrite -DOM.
-           rewrite set_map_union_L. reflexivity. }
-      { set_solver. }
-      { intros ?%kmap_empty_iff; [done| apply _]. }
-      iDestruct "UPD" as (?) "(F2&F1&FIN&?&%)".
-      iModIntro. iExists _. iFrame.
-      (* pose proof @dom_union_inv_L.  *)
-      pose proof (dom_union_inv_L fs _ _ DISJ (eq_Symmetric _ _ DOM)) as (fs1 & fs2 & FS12 & DISJ12 & DOM1 & DOM2). 
-      iSplitL "F2".
-      { simpl. iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | iFrame].
-        subst fs R1 R2. apply leibniz_equiv_iff.
-        eapply kmap_filter_disj; [apply _ | done]. }
-      iSplitL "F1".
-      { simpl. iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | iFrame].
-        rewrite map_union_comm in FS12; auto.  
-        subst fs R1 R2. apply leibniz_equiv_iff.
-        eapply kmap_filter_disj; [apply _ | done]. }
-      iSplitL; [| done].
-      iIntros "NO". iApply "FIN". 
-      simpl. by rewrite map_fmap_singleton set_map_empty.
-    - iIntros "*". iIntros "FUELS ST MSI FR".
-      iInv Ns as (((ost1, ost2), osc)) "(>ST_COMP & >AUTH)" "CLOS".
-      rewrite difference_union_distr_l_L difference_diag_L.
-      rewrite difference_disjoint_L; [| done]. rewrite union_empty_r_L. 
-      iAssert (⌜ ost2 = Some s1 ⌝)%I as %->.
-      { simpl. rewrite /comp_sl1_st_frag. 
-        iCombine "AUTH ST" as "OWN". iDestruct (own_valid with "OWN") as %[INCL ?]%auth_both_valid_discrete.
-        iPureIntro. 
-        apply pair_included in INCL as [[? INCL]%pair_included ?]. 
-        by apply Excl_included, leibniz_equiv_iff in INCL. } 
-      iDestruct (update_step_still_alive with "PMP [FUELS] ST_COMP MSI FR") as "UPD".
-      10: { by iApply has_fuels_sl2. }
-      8: { apply ct_sl_step_2. eauto. }
-      { simpl. simpl_3rd. set_solver. }
-      { rewrite dom_kmap. eapply set_map_mono; [| apply STASH]. done. }
-      { simpl.
-        rewrite /lift_sl_role_right. rewrite /lift_sl_role_right.  (* TODO: why twice? *)
-        simpl_3rd. 
-        apply disjoint_intersection_L. 
-        repeat (apply disjoint_union_l; split).
-        - set_solver.
-        - set_solver.
-        - destruct osc; [destruct n| ]; simpl; set_solver. }
-      2, 3, 4: done.
-      { apply disjoint_intersection_L, (set_map_disjoint _ _ lift_sl_role_right) in NOS2; [| by apply _].
-        rewrite -dom_kmap in NOS2. 
-        apply disjoint_intersection_L. by apply NOS2. }
-      { by apply vfm_sl2. }
-      iMod "UPD" as (??) "(% & FUELS & M2 & MSI & FR)". 
-      iMod (update_sl2 _ _ (Some s2) with "[ST AUTH]") as "[ST AUTH]"; [by iFrame| ].
-      iMod ("CLOS" with "[M2 AUTH]") as "_".
-      { iNext. rewrite /comp_inv_impl. iExists _. iFrame. }
-      iModIntro. do 2 iExists _. iFrame. iSplitR; [done| ].
-      iSplitL "FUELS".
-      + by iApply has_fuels_sl2.
-      + simpl. iApply partial_free_roles_are_Proper; [| iFrame].
-        rewrite set_map_union.
-        apply sets.union_proper; [| done].
-        rewrite set_map_difference. apply difference_proper; [done| ].
-        repeat (rewrite difference_union_distr_l). 
-        rewrite (subseteq_empty_difference _ (_ ∪ _ ∪ _)); [| set_solver].
-        rewrite union_empty_l union_comm. simpl_3rd.         
-        rewrite (subseteq_empty_difference _ (_ ∪ _ ∪ _)); [| set_solver].
-        rewrite union_empty_l. rewrite !difference_union_distr_r.
-        rewrite subseteq_intersection_1.
-        2: { eapply subseteq_proper; [reflexivity| ..].
-             { apply difference_disjoint.
-               destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver. }
-             set_solver. }
-        rewrite intersection_comm. rewrite subseteq_intersection_1.
-        { rewrite -set_map_difference. set_solver. }
-        set_solver.
-    - iIntros "* MSI FR FUELS". 
-      iDestruct (has_fuels_sl2 with "FUELS") as "FUELS". simpl.
-      iDestruct (partial_free_roles_fuels_disj with "PMP MSI FR FUELS") as %DISJ.
-      rewrite dom_kmap in DISJ. iPureIntro.
-      eapply set_map_disjoint; eauto. apply _. 
-  Qed. 
+  (*     iMod (update_fork_split with "PMP [FUELS_SL] [MSI]") as "-#UPD". *)
+  (*     all: eauto.  *)
+  (*     4: { iDestruct (has_fuels_sl2 with "FUELS_SL") as "foo". *)
+  (*          rewrite kmap_fmap. iFrame. } *)
+  (*     3: { rewrite dom_kmap_L. rewrite -DOM. *)
+  (*          rewrite set_map_union_L. reflexivity. } *)
+  (*     { set_solver. } *)
+  (*     { intros ?%kmap_empty_iff; [done| apply _]. } *)
+  (*     iDestruct "UPD" as (?) "(F2&F1&FIN&?&%)". *)
+  (*     iModIntro. iExists _. iFrame. *)
+  (*     (* pose proof @dom_union_inv_L.  *) *)
+  (*     pose proof (dom_union_inv_L fs _ _ DISJ (eq_Symmetric _ _ DOM)) as (fs1 & fs2 & FS12 & DISJ12 & DOM1 & DOM2).  *)
+  (*     iSplitL "F2". *)
+  (*     { simpl. iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | iFrame]. *)
+  (*       subst fs R1 R2. apply leibniz_equiv_iff. *)
+  (*       eapply kmap_filter_disj; [apply _ | done]. } *)
+  (*     iSplitL "F1". *)
+  (*     { simpl. iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | iFrame]. *)
+  (*       rewrite map_union_comm in FS12; auto.   *)
+  (*       subst fs R1 R2. apply leibniz_equiv_iff. *)
+  (*       eapply kmap_filter_disj; [apply _ | done]. } *)
+  (*     iSplitL; [| done]. *)
+  (*     iIntros "NO". iApply "FIN".  *)
+  (*     simpl. by rewrite map_fmap_singleton set_map_empty. *)
+  (*   - iIntros "*". iIntros "FUELS ST MSI FR". *)
+  (*     iInv Ns as (((ost1, ost2), osc)) "(>ST_COMP & >AUTH)" "CLOS". *)
+  (*     rewrite difference_union_distr_l_L difference_diag_L. *)
+  (*     rewrite difference_disjoint_L; [| done]. rewrite union_empty_r_L.  *)
+  (*     iAssert (⌜ ost2 = Some s1 ⌝)%I as %->. *)
+  (*     { simpl. rewrite /comp_sl1_st_frag.  *)
+  (*       iCombine "AUTH ST" as "OWN". iDestruct (own_valid with "OWN") as %[INCL ?]%auth_both_valid_discrete. *)
+  (*       iPureIntro.  *)
+  (*       apply pair_included in INCL as [[? INCL]%pair_included ?].  *)
+  (*       by apply Excl_included, leibniz_equiv_iff in INCL. }  *)
+  (*     iDestruct (update_step_still_alive with "PMP [FUELS] ST_COMP MSI FR") as "UPD". *)
+  (*     10: { by iApply has_fuels_sl2. } *)
+  (*     8: { apply ct_sl_step_2. eauto. } *)
+  (*     { simpl. simpl_3rd. set_solver. } *)
+  (*     { rewrite dom_kmap. eapply set_map_mono; [| apply STASH]. done. } *)
+  (*     { simpl. *)
+  (*       rewrite /lift_sl_role_right. rewrite /lift_sl_role_right.  (* TODO: why twice? *) *)
+  (*       simpl_3rd.  *)
+  (*       apply disjoint_intersection_L.  *)
+  (*       repeat (apply disjoint_union_l; split). *)
+  (*       - set_solver. *)
+  (*       - set_solver. *)
+  (*       - destruct osc; [destruct n| ]; simpl; set_solver. } *)
+  (*     2, 3, 4: done. *)
+  (*     { apply disjoint_intersection_L, (set_map_disjoint _ _ lift_sl_role_right) in NOS2; [| by apply _]. *)
+  (*       rewrite -dom_kmap in NOS2.  *)
+  (*       apply disjoint_intersection_L. by apply NOS2. } *)
+  (*     { by apply vfm_sl2. } *)
+  (*     iMod "UPD" as (??) "(% & FUELS & M2 & MSI & FR)".  *)
+  (*     iMod (update_sl2 _ _ (Some s2) with "[ST AUTH]") as "[ST AUTH]"; [by iFrame| ]. *)
+  (*     iMod ("CLOS" with "[M2 AUTH]") as "_". *)
+  (*     { iNext. rewrite /comp_inv_impl. iExists _. iFrame. } *)
+  (*     iModIntro. do 2 iExists _. iFrame. iSplitR; [done| ]. *)
+  (*     iSplitL "FUELS". *)
+  (*     + by iApply has_fuels_sl2. *)
+  (*     + simpl. iApply partial_free_roles_are_Proper; [| iFrame]. *)
+  (*       rewrite set_map_union. *)
+  (*       apply sets.union_proper; [| done]. *)
+  (*       rewrite set_map_difference. apply difference_proper; [done| ]. *)
+  (*       repeat (rewrite difference_union_distr_l).  *)
+  (*       rewrite (subseteq_empty_difference _ (_ ∪ _ ∪ _)); [| set_solver]. *)
+  (*       rewrite union_empty_l union_comm. simpl_3rd.          *)
+  (*       rewrite (subseteq_empty_difference _ (_ ∪ _ ∪ _)); [| set_solver]. *)
+  (*       rewrite union_empty_l. rewrite !difference_union_distr_r. *)
+  (*       rewrite subseteq_intersection_1. *)
+  (*       2: { eapply subseteq_proper; [reflexivity| ..]. *)
+  (*            { apply difference_disjoint. *)
+  (*              destruct osc as [?n| ]; [destruct n| ]; simpl; set_solver. } *)
+  (*            set_solver. } *)
+  (*       rewrite intersection_comm. rewrite subseteq_intersection_1. *)
+  (*       { rewrite -set_map_difference. set_solver. } *)
+  (*       set_solver. *)
+  (*   - iIntros "* MSI FR FUELS".  *)
+  (*     iDestruct (has_fuels_sl2 with "FUELS") as "FUELS". simpl. *)
+  (*     iDestruct (partial_free_roles_fuels_disj with "PMP MSI FR FUELS") as %DISJ. *)
+  (*     rewrite dom_kmap in DISJ. iPureIntro. *)
+  (*     eapply set_map_disjoint; eauto. apply _.  *)
+  (* Qed.  *)
 
 End SlPMP. 

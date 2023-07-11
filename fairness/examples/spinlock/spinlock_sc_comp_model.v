@@ -29,8 +29,9 @@ Section LocksCompositionModel.
   | ct_sl_step_2 s s' ρ os1 oc
       (STEP2: fmtrans spinlock_model_impl s (Some ρ) s'):
     comp_trans (os1, Some s, oc) (Some $ inl $ inr ρ) (os1, Some s', oc)
-  | cl_c_step os1 os2 c:
-    comp_trans (os1, os2, Some (S c)) (Some $ inr ρc) (os1, os2, Some c)
+  | cl_c_step os1 s2 c
+      (DIS2: dom program_init_fuels ∩ live_roles _ s2 = ∅):
+    comp_trans (os1, Some s2, Some (S c)) (Some $ inr ρc) (os1, Some s2, Some c)
   | cl_sl_init oc s1 s2:
     comp_trans (None, None, oc) (Some $ inr ρc) (Some s1, Some s2, oc)
   .
