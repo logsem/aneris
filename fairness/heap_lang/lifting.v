@@ -1064,47 +1064,40 @@ Proof.
 Qed.
 
 (* WIP solution for generic fuel-handling *)
-Definition sswp (s : stuckness) E ζ e1 (Φ : expr → iProp Σ) : iProp Σ :=
+Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
   match to_val e1 with
   | Some v => |={E}=> Φ (of_val v)
-  | None => ∀ (extr : execution_trace heap_lang) K tp1 tp2 σ1,
-      ⌜valid_exec extr⌝ -∗
-      ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗
-      ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ -∗
+  | None => ∀ σ1,
       gen_heap_interp σ1.(heap) ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
        ∀ e2 σ2 efs,
-         ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
-         gen_heap_interp σ2.(heap) ∗ Φ e2 ∗
-         [∗ list] i ↦ ef ∈ efs,
-         WP ef @ s; (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef); ⊤
-                {{ (fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef)) }}
+         ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗ |={∅,E}=>
+         gen_heap_interp σ2.(heap) ∗ Φ e2 ∗ ⌜efs = []⌝
   end%I.
 
 Lemma wp_store s tid E l v' v :
   ▷ l ↦ v' -∗
-  sswp s E tid (Store (Val $ LitV (LitLoc l)) (Val v))
+  sswp s E (Store (Val $ LitV (LitLoc l)) (Val v))
             (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ).
 Proof.
   iIntros ">Hl". simpl.
-  iIntros (extr K tp1 tp2 σ1) "%Hvalid %Hζ %Hexend Hsi".
+  iIntros (σ1) "Hsi".
   iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
   iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
   iSplit.
   { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
   iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".
-  iApply step_fupdN_intro; [done|].
-  iIntros "!>". iMod "Hclose".
+  iMod "Hclose".
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   iFrame.
   apply head_reducible_prim_step in Hstep; [|by eauto].
   inv_head_step. iFrame. done.
 Qed.
 
-Lemma wp_nostep s tid E e fs P Φ :
+Lemma wp_nostep s tid E e fs Φ :
   TCEq (to_val e) None →
   fs ≠ ∅ →
-  sswp s E tid e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
+  sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
   has_fuels_S tid fs -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
@@ -1112,91 +1105,52 @@ Proof.
   rewrite wp_unfold /wp_pre /sswp /= Hval.
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
   rewrite Hends.
-  iMod ("Hwp" with "[//] [//] [//] Hsi") as (Hred) "Hwp".
+  iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
   iModIntro. iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep).
+  iIntros (e2 σ2 efs Hstep). simpl in *.
   iMod ("Hwp" with "[//]") as "Hwp".
   iIntros "!>!>". iMod "Hwp". iIntros "!>".
-  iApply (step_fupdN_wand with "Hwp").
-  iIntros "Hwp". iMod "Hwp".
+  iApply step_fupdN_intro; [done|]. iIntros "!>". iMod "Hwp".
   iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
   { by intros ?%dom_empty_inv_L. }
   { set_solver. }
   { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
   { by rewrite Hends. }
   iIntros "!>".
-  iDestruct "Hwp" as "[Hsi [Hwp Hwps]]".
+  iDestruct "Hwp" as "[Hsi [Hwp ->]]".
   iExists _, _. iFrame. iSplit; [done|].
   rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver].
-  iDestruct ("Hwp" with "Hfuel") as "Hwp".
-  iApply (wp_wand with "Hwp").
-  iIntros (v) "HΦ'". iFrame.
+  iDestruct ("Hwp" with "Hfuel") as "Hwp". iFrame. done.
 Qed.
 
-Lemma wp_nostep_hoare s tid E e fs P Φ :
-  TCEq (to_val e) None →
-  fs ≠ ∅ →
-  (□ (P -∗ sswp s E tid e (λ e', WP e' @ s; tid; E {{ Φ }} ))) -∗
-  {{{ P ∗ has_fuels_S tid fs }}}
-    e @ s; tid; E
-  {{{ v, RET v; Φ v ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (Hval ?) "#Hwp".
-  iIntros "!>" (Ψ) "[HP HfuelS] HΦ".
-  iDestruct ("Hwp" with "HP") as "Hwp'".
-  rewrite wp_unfold /wp_pre /sswp /= Hval.
-  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
-  rewrite Hends.
-  iMod ("Hwp'" with "[//] [//] [//] Hsi") as (Hred) "Hwp''".
-  iModIntro. iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep).
-  iMod ("Hwp''" with "[//]") as "Hwp''".
-  iIntros "!>!>". iMod "Hwp''". iIntros "!>".
-  iApply (step_fupdN_wand with "Hwp''").
-  iIntros "Hwp''". iMod "Hwp''".
-  iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
-  { by intros ?%dom_empty_inv_L. }
-  { set_solver. }
-  { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
-  { by rewrite Hends. }
-  iIntros "!>".
-  iDestruct "Hwp''" as "[Hsi [Hwp'' Hwps]]".
-  iExists _, _. iFrame. iSplit; [done|].
-  iApply (wp_wand with "Hwp''").
-  iIntros (v) "HΦ'". iApply "HΦ". iFrame.
-  iApply (has_fuels_proper with "Hfuel") =>//.
-  rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
-Qed.
-
-Lemma sswp_wand s e tid E (Φ Ψ : expr → iProp Σ) :
-  (∀ e, Φ e -∗ Ψ e) -∗ sswp s E tid e Φ -∗ sswp s E tid e Ψ.
+Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) :
+  (∀ e, Φ e -∗ Ψ e) -∗ sswp s E e Φ -∗ sswp s E e Ψ.
 Proof.
   iIntros "HΦΨ HΦ".
   rewrite /sswp.
   destruct (to_val e); [by iApply "HΦΨ"|].
-  iIntros (????????) "H".
-  iMod ("HΦ" with "[//] [//] [//] H") as "[%Hs HΦ]".
+  iIntros (?) "H".
+  iMod ("HΦ" with "H") as "[%Hs HΦ]".
   iModIntro. iSplit; [done|].
   iIntros (????).
   iDestruct ("HΦ" with "[//]") as "HΦ".
-  iApply (step_fupdN_wand with "HΦ").
-  iIntros "HΦ". iMod "HΦ" as "(?&?&?)". iIntros "!>". iFrame.
+  iMod "HΦ". iIntros "!>!>". iMod "HΦ". iIntros "!>". iMod "HΦ" as "(?&?&?)".
+  iIntros "!>". iFrame.
   by iApply "HΦΨ".
 Qed.
 
 (* Sanity check for sswp *)
 Lemma wp_store_nostep_alt s tid E l v' v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
-    Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
-  {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
+  ▷ l ↦ v' -∗ has_fuels_S tid fs -∗
+  WP Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
+    {{ λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ∗ has_fuels tid fs}}.
 Proof.
-  iIntros (? Φ) "[Hl Hf] HΦ".
-  iApply (wp_nostep_hoare _ _ _ _ _ _ (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v)%I with "[] [Hl $Hf]"); [done| |iExact "Hl"|].
-  { iIntros "!> Hl". iApply sswp_wand; [|by iApply wp_store].
-    iIntros (e) "[-> Hl]". iApply wp_value. by iFrame. }
-  iIntros "!>" (w) "[[-> Hl] Hf]".
-  iApply "HΦ". by iFrame.
+  iIntros (?) ">Hl Hf".
+  iApply (wp_nostep with "[Hl]"); [done| |].
+  { iApply sswp_wand; [|by iApply wp_store].
+    iIntros (e) "[-> Hl] Hf". iApply wp_value. by iFrame. }
+  iFrame.
 Qed.
 
 Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
