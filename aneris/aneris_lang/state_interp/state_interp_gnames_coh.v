@@ -21,9 +21,9 @@ Section state_interpretation.
     γm !! ip = None.
   Proof. rewrite -!not_elem_of_dom => _ [-> _] //. Qed.
 
-  Lemma gnames_coh_alloc_node γm H S ip γn :
+  Lemma gnames_coh_alloc_node γm H S ip γn σh σs :
     gnames_coh γm H S →
-    gnames_coh (<[ip:=γn]> γm) (<[ip:=∅]> H) (<[ip:=∅]> S).
+    gnames_coh (<[ip:=γn]> γm) (<[ip:=σh]> H) (<[ip:=σs]> S).
   Proof. rewrite /gnames_coh. set_solver. Qed.
 
   Lemma gnames_coh_update_heap n γm H S h h' :

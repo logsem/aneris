@@ -152,6 +152,18 @@ Section model_traces.
   Qed.
   Hint Resolve mtrace_valid_mono : paco.
 
+  Lemma mtrace_valid_after (mtr mtr' : mtrace M) k :
+    after k mtr = Some mtr' → mtrace_valid mtr → mtrace_valid mtr'.
+  Proof.
+    revert mtr mtr'.
+    induction k; intros mtr mtr' Hafter Hvalid.
+    { destruct mtr'; simpl in *; by simplify_eq. }
+    punfold Hvalid.
+    inversion Hvalid as [|??? Htrans Hval']; simplify_eq.
+    eapply IHk; [done|].
+    by inversion Hval'.
+  Qed.
+
 End model_traces.
 
 Global Hint Resolve fair_model_trace_cons: core.

@@ -494,6 +494,46 @@ Section fairness_preserved.
     valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
 
   (* TODO: Why do we need explicit [LM] here? *)
+  Lemma valid_inf_system_trace_implies_traces_match_strong
+        (φ : execution_trace Λ -> auxiliary_trace LM -> Prop)
+        (ψ : _ → _ → Prop)
+        ex atr iex iatr progtr (auxtr : auxtrace LM):
+    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+        φ ex atr -> live_tids (LM:=LM) (trace_last ex) (trace_last atr)) ->
+    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
+        φ ex atr -> valid_state_evolution_fairness ex atr) ->
+    (∀ extr auxtr, φ extr auxtr → ψ (trace_last extr) (trace_last auxtr)) →
+    exec_trace_match ex iex progtr ->
+    exec_trace_match atr iatr auxtr ->
+    valid_inf_system_trace φ ex atr iex iatr ->
+    traces_match labels_match
+                 (λ σ δ, live_tids σ δ ∧ ψ σ δ)
+                 locale_step
+                 LM.(lm_ls_trans) progtr auxtr.
+  Proof.
+    intros Hφ1 Hφ2 Hφψ.
+    revert ex atr iex iatr auxtr progtr. cofix IH.
+    intros ex atr iex iatr auxtr progtr Hem Ham Hval.
+    inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
+    - inversion Hem; inversion Ham. econstructor; eauto.
+      pose proof (Hφ1 ex atr Hphi).
+      split; [by simplify_eq|]. simplify_eq. by apply Hφψ.
+    - inversion Hem; inversion Ham. subst.
+      pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
+      destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
+      econstructor.
+      + eauto.
+      + eauto.
+      + match goal with
+        | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
+        end; done.
+      + match goal with
+        | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
+        end; done.
+      + eapply IH; eauto.
+  Qed.
+
+  (* TODO: Why do we need explicit [LM] here? *)
   Lemma valid_inf_system_trace_implies_traces_match
         (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
         ex atr iex iatr progtr (auxtr : auxtrace LM):
@@ -527,6 +567,7 @@ Section fairness_preserved.
         end; done.
       + eapply IH; eauto.
   Qed.
+
 End fairness_preserved.
 
 Section fuel_dec_unless.
@@ -542,26 +583,23 @@ Section fuel_dec_unless.
   Definition Ψ (δ: LiveState Λ Mdl) :=
     size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (Λ := Λ)), f.
 
-  Lemma fuel_dec_unless (extr: extrace Λ) (auxtr: auxtrace LM) :
-    (∀ c c', locale_step (Λ := Λ) c None c' -> False) ->
-    exaux_traces_match (LM:=LM) extr auxtr ->
+  Lemma fuel_dec_unless (auxtr: auxtrace LM) :
+    auxtrace_valid auxtr ->
     dec_unless ls_under Ul Ψ auxtr.
   Proof.
-    intros Hcl Hval n. revert extr auxtr Hval. induction n; intros extr auxtr Hval; last first.
+    intros Hval n. revert auxtr Hval. induction n; intros auxtr Hval; last first.
     { edestruct (after (S n) auxtr) as [auxtrn|] eqn:Heq; rewrite Heq =>//.
       simpl in Heq;
       simplify_eq. destruct auxtrn as [|δ ℓ auxtr']=>//; last first.
-      inversion Hval as [|?????????? Hmatch]; simplify_eq =>//.
-      specialize (IHn _ _ Hmatch). rewrite Heq // in IHn. }
+      inversion Hval as [|???? Hmatch]; simplify_eq =>//.
+      specialize (IHn _ Hmatch). rewrite Heq // in IHn. }
     edestruct (after 0 auxtr) as [auxtrn|] eqn:Heq; rewrite Heq =>//.
     simpl in Heq; simplify_eq. destruct auxtrn as [|δ ℓ auxtr']=>//; last first.
 
-    inversion Hval as [|c tid extr' ?? ? Hlm Hsteps Hstep Htrans Hmatch]; simplify_eq =>//.
+    inversion Hval as [|??? Htrans Hmatch]; simplify_eq =>//.
     destruct ℓ as [| tid' |];
-      [left; eexists; done| right |destruct tid; by [| exfalso; eapply Hcl]].
+      [left; eexists; done| right | inversion Htrans; naive_solver ].
     destruct Htrans as (Hne&Hdec&Hni&Hincl&Heq). rewrite -> Heq in *. split; last done.
-    destruct tid as [tid|]; last done.
-    rewrite <- Hlm in *.
 
     destruct (decide (dom $ ls_fuel δ = dom $ ls_fuel (trfirst auxtr'))) as [Hdomeq|Hdomneq].
     - destruct Hne as [ρ Hρtid].
@@ -603,12 +641,11 @@ Section destuttering_auxtr.
   Definition upto_stutter_auxtr :=
     upto_stutter (ls_under (Λ:=Λ) (M:=M)) (Ul (LM := LM)).
 
-  Lemma can_destutter_auxtr extr auxtr:
-    (∀ c c', locale_step (Λ := Λ) c None c' -> False) ->
-    exaux_traces_match (LM:=LM) extr auxtr ->
+  Lemma can_destutter_auxtr auxtr:
+    auxtrace_valid auxtr →
     ∃ mtr, upto_stutter_auxtr auxtr mtr.
   Proof.
-    intros ??. eapply can_destutter.
+    intros ?. eapply can_destutter.
     eapply fuel_dec_unless =>//.
   Qed.
 

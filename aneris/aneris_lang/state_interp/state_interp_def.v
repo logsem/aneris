@@ -90,8 +90,8 @@ Section definitions.
               state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None) ∧
       (* free ports and bound ports are disjoint *)     
       (∀ ip ps, free_ports !! ip = Some (GSet ps) →
-      ∀ Sn, (state_sockets σ) !! ip = Some Sn →
-      ∀ p, p ∈ ps → port_not_in_use p Sn)⌝) ∗   
+                ∀ Sn, (state_sockets σ) !! ip = Some Sn →
+                      ∀ p, p ∈ ps → port_not_in_use p Sn)⌝) ∗   
       (* we have the auth parts of the resources for free ips and ports *)
       free_ips_auth free_ips ∗
       free_ports_auth free_ports)%I.

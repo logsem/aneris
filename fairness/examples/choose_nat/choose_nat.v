@@ -362,7 +362,7 @@ Proof.
       [lia|lia| |by eauto]=> /=.
     replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
     rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
-  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ".
+  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ _".
   iInv Ns as ">H".
   iDestruct "H" as (cn) "(Hf & Hl & H●)".
   iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
