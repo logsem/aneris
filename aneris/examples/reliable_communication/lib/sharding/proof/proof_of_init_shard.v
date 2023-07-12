@@ -18,18 +18,21 @@ Section proof.
   Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
   Lemma init_shard_spec_holds ShardInit shard_si sa γ :
+    let user_params := user_params_at_shard γ sa in
+    run_server_spec ShardInit shard_si -∗
+    sa ⤇ shard_si -∗
     {{{
-      ShardInit ∗ shard_mem γ (gset_to_gmap None DB_keys) ∗
-      sa ⤇ shard_si ∗
+      ShardInit ∗
+      shard_mem γ (gset_to_gmap None DB_keys) ∗
       sa ⤳ (∅, ∅) ∗
-      free_ports (ip_of_address sa) {[port_of_address sa]} ∗
-      (@run_server_spec _ _ _ _ (user_params_at_shard γ sa) ShardInit shard_si)
+      free_ports (ip_of_address sa) {[port_of_address sa]}
     }}}
       init_shard (s_serializer DB_key_ser) (s_serializer DB_val_ser)
         #sa @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(ShardInit & ●_γ & #shard_si & ∅ & free & #run_shard) HΦ".
+    simpl.
+    iIntros "#run_shard #shard_si !>%Φ (ShardInit & ●_γ & ∅ & free) HΦ".
     rewrite/init_shard.
     wp_pures.
     wp_apply (wp_map_empty with "[//]").

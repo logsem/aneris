@@ -24,17 +24,17 @@ Section utils.
       ↑DB_inv_name ⊆ E → length γs = length DB_addrs →
     ⊢ |={E}=> ∃ (ShardsInit : list (iProp Σ)) (shards_si : list _) (MTRs : list _),
       ([∗ list] i ↦ sa ∈ DB_addrs, ∃ ShardInit shard_si γ,
-          let MTS := (@user_params_at_shard _ _ _ _ _ γ sa.2) in
-          (@run_server_spec _ _ _ _ MTS ShardInit shard_si) ∗
+          let MTS := user_params_at_shard γ sa.2 in
+          run_server_spec ShardInit shard_si ∗
           ⌜ShardsInit !! i = Some ShardInit⌝ ∗ ⌜shards_si !! i = Some shard_si⌝ ∗
         ⌜γs !! i = Some γ⌝) ∗
       ([∗ list] i ↦ sa ∈ DB_addrs, ∃ MTR γ,
-          let MTS := (@user_params_at_shard _ _ _ _ _ γ sa.2) in
-          (@make_request_spec _ _ _ _ MTS MTR)
+          let MTS := user_params_at_shard γ sa.2 in
+          (@make_request_spec _ _ _ _ _ MTR)
         ∗ ⌜γs !! i = Some γ⌝ ∗ ⌜MTRs !! i = Some MTR⌝) ∗
       ([∗ list] i ↦ sa ∈ DB_addrs, ∃ MTR shard_si γ,
-          let MTS := (@user_params_at_shard _ _ _ _ _ γ sa.2) in
-          (@init_client_proxy_spec _ _ _ _ MTS MTR shard_si) ∗
+          let MTS := user_params_at_shard γ sa.2 in
+          (@init_client_proxy_spec _ _ _ _ _ MTR shard_si) ∗
             ⌜γs !! i = Some γ⌝ ∗ ⌜MTRs !! i = Some MTR⌝ ∗
             ⌜shards_si !! i = Some shard_si⌝) ∗
       ([∗ list] i ↦ sa ∈ DB_addrs, ∃ ShardInit,
@@ -48,7 +48,7 @@ Section utils.
     iMod ("Hind" $! γs len_γs) as "(%ShardsInit & %shards_si & %MTRs &
                   #run_shards & #request_shards & #init_shards_clt & ShardsInit)".
     iClear "Hind".
-    set (MTS := @user_params_at_shard _ _ _ _ _ γ addr.2).
+    set (MTS := user_params_at_shard γ addr.2).
     iMod (MTS_init_setup E MTS)
           as "(%shard_si & %ShardInit & %MTR & ShardInit &
                 #run_shard & #init_shard_clt & #request_shard)";
@@ -89,22 +89,10 @@ Section Init.
           (gset_to_gmap None DB_keys))%I) ShardsInit),
           srv_si, shards_si.
     iFrame.
-    iSplitR.
-    {
-      iIntros (shardsv addrs addrs_def Φ) "!>(#hash_spec & SrvInit & #srv_si &
-                        addr_∅ & addr_free & #shards_si & srv_unalloc & srv_∅ &
-                        srv_free) HΦ".
-      wp_apply (init_server_spec_holds with "[//] [//]
-                 [$hash_spec $srv_si $addr_∅ $addr_free $shards_si
-                  $srv_unalloc $srv_∅ $srv_free $run_srv $init_shards_clt
-                  $request_shards $SrvInit]"); last done.
-    }
-    iSplitR.
-    {
-      iIntros (sa Φ) "!>(unalloc & ∅ & #srv_si & free) HΦ".
-      by wp_apply (init_client_spec_holds with "[$unalloc $∅ $srv_si $free
-                          $request_srv $init_srv_clt]").
-    }
+    iSplitR; first iApply (init_server_spec_holds with
+                            "[//] run_srv init_shards_clt request_shards").
+    iSplitR; first iApply (init_client_spec_holds with
+                            "request_srv init_srv_clt").
     iSplitL "●_γs ShardsInit".
     {
       iPoseProof (big_sepL_sep_2 with "●_γs ShardsInit") as "ShardsInit".
@@ -144,11 +132,11 @@ Section Init.
       by rewrite ShardsInit_ShardInit=>[][<-][->->].
     }
     iSplit; first done.
-    iIntros (Φ) "!>((%γ' & %γs_γ' & ShardInit & ●_γ') & #shard_si & ∅ & free) HΦ".
+    iIntros "!>%Φ ((%γ' & %γs_γ' & ShardInit & ●_γ') & #shard_si & ∅ & free) HΦ".
     rewrite γs_γ in γs_γ'.
     move:γs_γ'=>[<-].
-    by wp_apply (init_shard_spec_holds with "[$●_γ' $shard_si $∅ $free
-                            $run_shard $ShardInit]").
+    by wp_apply (init_shard_spec_holds with
+      "run_shard shard_si [$●_γ' $∅ $free $ShardInit]").
   Qed.
 
 End Init.

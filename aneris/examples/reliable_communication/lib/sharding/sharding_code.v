@@ -7,15 +7,13 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.examples.reliable_communication.lib.mt_server Require Import mt_server_code.
 From aneris.aneris_lang.lib Require Import list_code.
 
-(**  Serializers  *)
+(**  Serializers * *)
 
 Definition write_serializer key_ser val_ser :=
   prod_serializer key_ser val_ser.
 
-Definition read_serializer (key_ser : serializer) := key_ser.
-
 Definition req_ser key_ser val_ser :=
-  sum_serializer (write_serializer key_ser val_ser) (read_serializer key_ser).
+  sum_serializer (write_serializer key_ser val_ser) key_ser.
 
 Definition rep_ser val_ser :=
   sum_serializer unit_serializer (option_serializer val_ser).

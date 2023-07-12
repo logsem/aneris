@@ -17,25 +17,16 @@ Section proof.
 
   Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ, !MTS_resources}.
 
-  Lemma init_client_spec_holds srv_si:
-    ∀ sa,
-    {{{
-      unallocated {[sa]} ∗
-      sa ⤳ (∅, ∅) ∗
-      DB_addr ⤇ srv_si ∗
-      free_ports (ip_of_address sa) {[port_of_address sa]} ∗
-      (@make_request_spec _ _ _ _ user_params_at_server _) ∗
-      (@init_client_proxy_spec _ _ _ _ user_params_at_server _ srv_si)
-    }}}
-      init_client (s_serializer DB_key_ser) (s_serializer DB_val_ser)
-          #sa #DB_addr @[ip_of_address sa]
-    {{{ wr rd, RET (wr, rd); read_spec rd sa ∗ write_spec wr sa }}}.
+  Lemma init_client_spec_holds srv_si :
+    make_request_spec -∗
+    init_client_proxy_spec srv_si -∗
+    init_client_spec srv_si.
   Proof.
-    iIntros (sa Φ) "(unalloc & ∅ & #srv_si & free & #request_srv & #init_srv_clt)
-                        HΦ".
+    iIntros "#request_srv #init_clt".
+    iIntros (sa) "!>%Φ (#srv_si & unalloc & ∅ & free) HΦ".
     rewrite/init_client.
     wp_pures.
-    wp_apply ("init_srv_clt" with "[$unalloc $∅ $srv_si $free]").
+    wp_apply ("init_clt" with "[$unalloc $∅ $srv_si $free]").
     iIntros (rpc) "CanRequest".
     wp_pures.
     wp_apply (newlock_spec DB_inv_name with "CanRequest").

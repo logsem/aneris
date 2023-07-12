@@ -71,56 +71,39 @@ Section proof.
 
   Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
-  Lemma init_server_spec_holds SrvInit srv_si (γs : list _)
-        (shards_si : list _) (MTRs : list _) :
-    ∀ addrsv shardsv,
-      ⌜is_list DB_addrs addrsv⌝ -∗
-      ⌜∀ k γ, γs !! (DB_hash k) = Some γ → DBG_hash k = γ⌝ -∗
-    {{{
-      hash_spec shardsv DB_hash ∗ SrvInit ∗
-      DB_addr ⤇ srv_si ∗ DB_addr ⤳ (∅, ∅) ∗
-      free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-      ([∗ list] i↦sa ∈ DB_addrs, ∃ sa_si, ⌜shards_si !! i = Some sa_si⌝ ∗
-            (snd sa) ⤇ sa_si) ∗
-      ([∗ list] sa ∈ DB_addrs, unallocated {[sa.1]}) ∗
-      ([∗ list] sa ∈ DB_addrs, sa.1 ⤳ (∅, ∅)) ∗
-      ([∗ list] sa ∈ DB_addrs, free_ports (ip_of_address sa.1)
-                                {[port_of_address sa.1]}) ∗
-      (@run_server_spec _ _ _ _ user_params_at_server SrvInit srv_si) ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR shard_si γ,
-          (@init_client_proxy_spec _ _ _ _ (user_params_at_shard γ sa.2)
-              MTR shard_si) ∗ ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝ ∗
-          ⌜shards_si !! k = Some shard_si⌝) ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR γ,
-          (@make_request_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR) ∗
-           ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝)
-    }}}
-      init_server (s_serializer DB_key_ser) (s_serializer DB_val_ser)
-        #DB_addr addrsv shardsv @[ip_of_address DB_addr]
-    {{{ RET #(); True }}}.
+  Lemma init_server_spec_holds SrvInit srv_si shards_si
+    (γs : list _) (MTRs : list _) :
+    ⌜∀ k γ, γs !! (DB_hash k) = Some γ → DBG_hash k = γ⌝ -∗
+    run_server_spec SrvInit srv_si -∗
+    ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR shard_si γ,
+    (@init_client_proxy_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR shard_si) ∗
+      ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝ ∗
+        ⌜shards_si !! k = Some shard_si⌝) -∗
+    ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR γ,
+      (@make_request_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR) ∗
+        ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝) -∗
+    init_server_spec SrvInit srv_si shards_si.
   Proof.
-    iIntros (addrsv shardsv addrs_addrsv shards_def Φ)
-          "!>(#hash_spec & SrvInit & #srv_si & addr_∅ & addr_free & #shards_si &
-            srv_unalloc & srv_∅ & srv_free & #run_srv & #init_shards_clt &
-             #request_shards) HΦ".
+    iIntros "%hash_coh #run_srv #init_shards #request_shards".
+    iIntros (hash addrs addrs_coh Φ) "!>(#hash_spec & #srv_si & #shards_si &
+        SrvInit & addr_∅ & free_addr & unalloc & addrs_∅ & free_addrs) HΦ".
     rewrite/init_server.
     wp_pures.
-    iPoseProof (big_sepL_sep_2 with "srv_free shards_si") as "init".
-    iPoseProof (big_sepL_sep_2 with "srv_∅ init") as "init".
-    iPoseProof (big_sepL_sep_2 with "srv_unalloc init") as "init".
+    iPoseProof (big_sepL_sep_2 with "free_addrs shards_si") as "init".
+    iPoseProof (big_sepL_sep_2 with "addrs_∅ init") as "init".
+    iPoseProof (big_sepL_sep_2 with "unalloc init") as "init".
     wp_apply (list_map_spec _ _ _ _
       (λ i sa p, (∃ MTR γ lock, ⌜MTRs !! i = Some MTR⌝ ∗ ⌜γs !! i = Some γ⌝ ∗
           (is_lock DB_inv_name (ip_of_address sa.1) lock (p.2)
               (MTR.(MTSCanRequest) (ip_of_address sa.1) (p.1))) ∗
       (@make_request_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR))%I)
-          $! addrs_addrsv with "[] [$init]").
+          $! addrs_coh with "[] [$init]").
     {
-      iIntros (i sa Ψ)
-          "!>(%addrs_x & unalloc & ∅ & free &
-            (%sa_si & %shards_si_sa_si & #sa_si)) HΨ".
+      iIntros (i sa Ψ) "!>(%addrs_x & unalloc & ∅ & free &
+                        (%sa_si & %shards_si_sa_si & #sa_si)) HΨ".
       move:sa addrs_x=>[srv shard] addrs_srv_shard.
       wp_pures.
-      iPoseProof (big_sepL_lookup _ _ _ _ addrs_srv_shard with "init_shards_clt")
+      iPoseProof (big_sepL_lookup _ _ _ _ addrs_srv_shard with "init_shards")
         as "(%MTR & %sa_si' & %γ & #init_shard & %γs_γ
                 & %MTRs_MTR & %shards_si_sa_si')".
       rewrite shards_si_sa_si in shards_si_sa_si'.
@@ -149,7 +132,7 @@ Section proof.
     iNext.
     rewrite/start_server.
     wp_pures.
-    wp_apply ("run_srv" with "[] [$SrvInit $addr_∅ $addr_free $srv_si]");
+    wp_apply ("run_srv" with "[] [$SrvInit $addr_∅ $free_addr $srv_si]");
           last done.
     iIntros (req reqd Ψ) "!>pre HΨ".
     wp_pures.
@@ -165,7 +148,7 @@ Section proof.
             (%MTR & %γ & %lock & %MTRs_MTR & %γs_γ & #lock & #make_request))".
     iExists rpc, sa.2, DB_inv_name, lock, MTR, lk, data.
     rewrite -(Forall_lookup_1 _ _ _ _ DB_addrs_ips addrs_sa).
-    rewrite (shards_def _ _ γs_γ).
+    rewrite (hash_coh _ _ γs_γ).
     by do 3 (iSplit; first done).
   Qed.
 

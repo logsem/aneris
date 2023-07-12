@@ -75,22 +75,22 @@ Section Spec.
 
   Definition init_server_spec
     SrvInit srv_si (shards_si : list _) : iProp Σ :=
-    ∀ hashv addrs, ⌜is_list DB_addrs addrs⌝ -∗
+    ∀ hash addrs, ⌜is_list DB_addrs addrs⌝ -∗
     {{{
-      hash_spec hashv DB_hash ∗
-      SrvInit ∗
+      hash_spec hash DB_hash ∗
       DB_addr ⤇ srv_si ∗
+      ([∗ list] i↦sa ∈ DB_addrs, ∃ sa_si, ⌜shards_si !! i = Some sa_si⌝ ∗
+          (snd sa) ⤇ sa_si) ∗
+      SrvInit ∗
       DB_addr ⤳ (∅, ∅) ∗
       free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-      ([∗ list] i↦sa ∈ DB_addrs, ∃ sa_si, ⌜shards_si !! i = Some sa_si⌝ ∗
-            (snd sa) ⤇ sa_si) ∗
       ([∗ list] i↦sa ∈ DB_addrs, unallocated {[ (fst sa) ]}) ∗ 
       ([∗ list] i↦sa ∈ DB_addrs, (fst sa) ⤳ (∅, ∅)) ∗
       ([∗ list] i↦sa ∈ DB_addrs,
             free_ports (ip_of_address (fst sa)) {[port_of_address (fst sa)]})
     }}}
       init_server (s_serializer DB_key_ser) (s_serializer DB_val_ser)
-          #DB_addr addrs hashv @[ip_of_address DB_addr]
+          #DB_addr addrs hash @[ip_of_address DB_addr]
     {{{ RET #(); True }}}.
 
   Definition init_shard_spec ShardInit shard_si sa : iProp Σ :=
@@ -107,9 +107,9 @@ Section Spec.
   Definition init_client_spec srv_si : iProp Σ :=
     ∀ sa,
     {{{
+      DB_addr ⤇ srv_si ∗
       unallocated {[sa]} ∗
       sa ⤳ (∅, ∅) ∗
-      DB_addr ⤇ srv_si ∗
       free_ports (ip_of_address sa) {[port_of_address sa]}
     }}}
       init_client (s_serializer DB_key_ser) (s_serializer DB_val_ser)
