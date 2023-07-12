@@ -427,30 +427,87 @@ Section LocksCompositionProofs.
     iNext. iIntros "FUELS". iModIntro.
 
     clear FS. 
-    rewrite /add_fuel_2. rewrite -map_fmap_union. 
-    assert (fuels_ge ((add 6 <$> prog_fuels (inl ∘ inr))
-               ∪ {[inr ρc := S (S (S (S (S (S add_fuel_3)))))]}) 6) as FS.
+    rewrite /add_fuel_2. rewrite -map_fmap_union.
+
+    replace (add 6) with (add 5) by admit. 
+    assert (6 + add_fuel_3 = add 5 sm_fuel).
+    { admit. }
+    simpl in H. rewrite H. clear H. 
+ 
+    assert (fuels_ge ((add 5 <$> prog_fuels (inl ∘ inr)) ∪ {[inr ρc := add 5 sm_fuel]}) 5) as FS.
     (* { all: intros ?? [? [<- ?]]%lookup_fmap_Some; lia. } *)
-    { admit. }           
+    { admit. }
 
     pure_step FS.
     pure_step FS.
     
     iMod (partial_free_roles_empty) as "FR".
-    
-    wp_bind (program _). iApply (program_spec with "[] [ST2 FUELS FR]"). 
-      2: { iApply sl2_PMP; eauto. }
-      { apply disjoint_union_l. split; [set_solver| ].
-        by apply ndot_ne_disjoint. }
-      2: { iNext. iIntros.
-           simpl. by rewrite map_fmap_singleton set_map_empty. }
-      iFrame. iSplitL "FR". 
+
+    iApply fupd_wp. 
+    iMod (alloc_call2_inv with "[FUELS]") as (??) "(#INV2 & FUELS & ROLES)".
+    2: { iApply has_fuels_proper; [..| by iFrame]; [reflexivity| ].
+         rewrite !map_fmap_union. rewrite map_fmap_singleton.
+         apply fin_maps.union_proper; [| reflexivity].
+         rewrite /prog_fuels. rewrite -!kmap_fmap.
+         f_equal. }
+    { lia. }
+    rewrite !dom_fmap_L. 
+    iModIntro. 
+
+    wp_bind (program _). iApply (program_spec_fr with "[] [ST2 FUELS ROLES FR]").
+    2: { iApply sl2_call_PMP.
+         { apply DISJ_INV1. }
+         replace call2_inv_impl' with call2_inv_impl by admit.
+         iSplit; done. }
+    { repeat (apply disjoint_union_l; split); eauto.
+      all: by apply ndot_ne_disjoint. }
+    { iFrame. iSplitL "FR". 
       { simpl. by rewrite set_map_empty. }
       Unshelve. 2: exact (⌜ True ⌝)%I. iSplitR; [done| ].
-      iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | by iFrame].
-      rewrite -!map_fmap_compose. erewrite map_fmap_equiv_ext.
-      2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
-      rewrite map_fmap_id. done. }
+      (* TODO: extract lemma *)
+      rewrite /has_fuels. iSplitL "ROLES"; simpl.
+      - iApply big_sepM_singleton. rewrite decide_True; done. 
+      - rewrite /frag_call_fuel_is.
+        rewrite -!map_fmap_compose.
+        rewrite -(gmap.big_opM_singletons (_ <$> _)).
+        rewrite big_opM_auth_frag. rewrite big_opM_fmap. 
+        iDestruct (big_opM_own with "FUELS") as "FUELS".
+        { set_solver. }
+        iApply big_sepM_dom. iApply big_sepM_proper; [| by iFrame].
+        iIntros. simpl. rewrite Nat.add_sub. iSplit. 
+        + iIntros "[% [% ?]]". assert (x = f) as -> by congruence.
+          rewrite map_fmap_singleton. iFrame.
+        + iIntros. iExists _. iSplit; eauto. by rewrite map_fmap_singleton. }
+
+    iNext. iIntros "[ROLES FR] //=".
+    rewrite big_opM_singleton decide_True; [| done].
+
+    iApply fupd_wp.
+    iInv "INV2" as ">INV2_IMPL" "CLOS". rewrite {2}/call2_inv_impl'.
+    iDestruct "INV2_IMPL" as (??) "(AUTHc & FUELc & FUELS & <- & DIS)".
+    iDestruct "DIS" as "[DIS| ROLES']".
+    2: { 
+         (* TODO: make a lemma *)
+         rewrite /frag_τ_roles_are.
+         iCombine "ROLES ROLES'" as "C".
+         iDestruct (own_valid with "C") as "%V".
+         by apply auth_frag_valid_1 in V. }
+    iDestruct "DIS" as (?? f_next) "(ROLE & FR' & %R_NEXT & %F_NEXT & F_NEXT)".
+    iAssert (⌜ F = ∅ ⌝)%I as %->.
+    { iCombine "AUTHc ROLES" as "R". 
+      iDestruct (own_valid with "R") as "%V".
+      apply auth_both_valid_discrete in V as [LE _].
+      apply @Excl_included, gset.GSet_inj in LE. 
+      iPureIntro. apply dom_empty_inv. set_solver. }
+    rewrite {2}dom_empty set_map_empty union_empty_l.
+      
+    
+    2: { iNext. iIntros.
+         simpl. by rewrite map_fmap_singleton set_map_empty. }
+    iApply has_fuels_sl2. iApply has_fuels_proper; [reflexivity| | by iFrame].
+    rewrite -!map_fmap_compose. erewrite map_fmap_equiv_ext.
+    2: { intros. simpl. rewrite Nat.sub_0_r. reflexivity. }
+    rewrite map_fmap_id. done. }
     
     iNext. iIntros "FUELS". iModIntro.
     iApply "POST". iDestruct "FUELS" as "[??]". 

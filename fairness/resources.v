@@ -495,8 +495,8 @@ Section PartialOwnership.
         model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝.
 
     Let PMP_def (Einvs: coPset): iProp Σ := □ (
-          (∀ extr auxtr c2 fs ζ Einvs NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ Einvs NE STEP) ∗
-          (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 Einvs DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 Einvs DISJ NE DOM EQatp STEP POOL) ∗ 
+          (∀ extr auxtr c2 fs ζ NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ Einvs NE STEP) ∗
+          (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 Einvs DISJ NE DOM EQatp STEP POOL) ∗ 
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
              LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM,
               update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
