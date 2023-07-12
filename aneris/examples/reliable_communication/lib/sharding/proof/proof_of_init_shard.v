@@ -15,7 +15,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 
 Section proof.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !DB_params}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
   Lemma init_shard_spec_holds ShardInit shard_si sa γ :
     {{{
@@ -25,7 +25,8 @@ Section proof.
       free_ports (ip_of_address sa) {[port_of_address sa]} ∗
       (@run_server_spec _ _ _ _ (user_params_at_shard γ sa) ShardInit shard_si)
     }}}
-      init_shard (s_serializer DB_serialization) #sa @[ip_of_address sa]
+      init_shard (s_serializer DB_key_ser) (s_serializer DB_val_ser)
+        #sa @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
     iIntros (Φ) "(ShardInit & ●_γ & #shard_si & ∅ & free & #run_shard) HΦ".
@@ -41,8 +42,6 @@ Section proof.
       iExists db, ∅, (gset_to_gmap None DB_keys).
       iFrame.
       iSplit; first done.
-      iSplit.
-      { iApply big_sepS_intro. by iIntros "!>% % % %". }
       iApply big_sepS_intro.
       iIntros "!>%k %k_key".
       iPureIntro.
@@ -54,6 +53,7 @@ Section proof.
     iSplitL "HΦ"; iNext; first by iApply "HΦ".
     rewrite/start_shard.
     wp_pures.
+    simpl.
     wp_apply ("run_shard" with "[] [$ShardInit $∅ $free $shard_si]"); last done.
     iIntros (reqv reqd Ψ) "!>pre HΨ".
     wp_pures.

@@ -11,12 +11,13 @@ From aneris.examples.reliable_communication.lib.mt_server.proof Require Import
                     mt_server_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 Import sharding_code.
+Import inject.
 
 Section proof.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !DB_params, !MTS_resources}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ, !MTS_resources}.
 
-  Lemma init_client_proxy_spec_holds srv_si:
+  Lemma init_client_spec_holds srv_si:
     ∀ sa,
     {{{
       unallocated {[sa]} ∗
@@ -26,13 +27,13 @@ Section proof.
       (@make_request_spec _ _ _ _ user_params_at_server _) ∗
       (@init_client_proxy_spec _ _ _ _ user_params_at_server _ srv_si)
     }}}
-      init_client_proxy (s_serializer DB_serialization) #sa #DB_addr
-          @[ip_of_address sa]
+      init_client (s_serializer DB_key_ser) (s_serializer DB_val_ser)
+          #sa #DB_addr @[ip_of_address sa]
     {{{ wr rd, RET (wr, rd); read_spec rd sa ∗ write_spec wr sa }}}.
   Proof.
     iIntros (sa Φ) "(unalloc & ∅ & #srv_si & free & #request_srv & #init_srv_clt)
                         HΦ".
-    rewrite/init_client_proxy.
+    rewrite/init_client.
     wp_pures.
     wp_apply ("init_srv_clt" with "[$unalloc $∅ $srv_si $free]").
     iIntros (rpc) "CanRequest".
@@ -43,51 +44,56 @@ Section proof.
     iApply "HΦ".
     iSplit.
     {
-      iIntros (E k P Q) "!>%inv_name %k_keys !>%Ψ (P & #HQ) HΨ".
+      iIntros (E k inv_name k_keys Ψ) "!>HΨ".
       wp_pures.
       wp_apply (acquire_spec with "lock").
       iIntros "% (-> & locked & CanRequest)".
       wp_pures.
-      wp_apply ("request_srv" $! _ _ _ (inr (E, P, Q, k)) with "[$CanRequest P]").
+      wp_apply ("request_srv" $! _ _ _ (inr (E, (λ vo, Ψ $vo)%I, k))
+          with "[$CanRequest HΨ]").
       {
-        iSplitR.
-        { iPureIntro=>/=. exists #k. right. split=>//=. by exists k. }
+        iSplit.
+        { iPureIntro=>/=. exists $k. right. split=>//=.
+            apply DB_keys_serializable. }
         iRight.
-        iExists E, P, Q, k.
+        iExists E, _, k.
         iFrame.
-        do 4 (iSplit; first done).
-        by iModIntro.
+        by do 3 (iSplit; first done).
       }
-      by iIntros (repd repv) "(CanRequest & [(% & % & % & % & % & _ & % & %)|
-                        (% & % & % & % & %eq & [(%v & -> & Q)|
-                      (-> & Q)])])";
-        [done|move:eq=>[_ _ <-_]..] ; wp_pures; 
-      wp_apply (release_spec with "[$lock $locked $CanRequest]");
-      iIntros (? ->); wp_pures; iApply "HΨ"; [iLeft; iExists v|iRight]; iSplit.
+      iIntros (repd repv) "(CanRequest & [(% & % & % & % & _ & _ & %)|
+          (% & % & % & %eq & % & -> & HΨ)])"; first done.
+      move: eq=>[_ <- _].
+      wp_pures.
+      wp_apply (release_spec with "[$lock $locked $CanRequest]").
+      iIntros (? ->).
+      wp_pures.
+      iApply "HΨ".
     }
-    iIntros (E k v P Q inv_name k_keys Ψ) "!>!>(P & #HQ) HΨ".
+    iIntros (E k v inv_name k_keys Ψ) "!>HΨ".
     wp_pures.
     wp_apply (acquire_spec with "lock").
     iIntros "% (-> & locked & CanRequest)".
     wp_pures.
-    wp_apply ("request_srv" $! _ _ _ (inl (E, P, Q, k, v)) with "[$CanRequest P]").
+    wp_apply ("request_srv" $! _ _ _ (inl (E, Ψ #(), k, v))
+            with "[$CanRequest HΨ]").
     {
       iSplitR.
-      { iPureIntro=>/=. exists (#k, v)%V. left. split=>//=. exists #k, v.
-        split=>//=. split; by [exists k|apply SV_ser]. }
+      { iPureIntro=>/=. exists ($k, $v)%V. left. split=>//=. exists $k, $v.
+        split=>//=. split;
+          [apply DB_keys_serializable|apply DB_vals_serializable]. }
       iLeft.
-      iExists E, P, Q, k, v.
+      iExists E, (Ψ #()), k, v.
       iFrame.
-      do 4 (iSplit; first done).
-      by iModIntro.
+      by do 3 (iSplit; first done).
     }
-    iIntros (repd repv) "(CanRequest & [(% & % & % & % & % & Q & -> & %eq)|
-                    (% & % & % & % & % & _)])"; [move:eq=>[_ _ <- _ _]|done].
+    iIntros (repd repv) "(CanRequest & [(% & % & % & % & HΨ & -> & %eq)|
+        (% & % & % & % & _)])"; last done.
+    move: eq => [_ <- _ _].
     wp_pures.
     wp_apply (release_spec with "[$lock $locked $CanRequest]").
     iIntros (? ->).
     wp_pures.
-    by iApply "HΨ".
+    iApply "HΨ".
   Qed.
 
 End proof.

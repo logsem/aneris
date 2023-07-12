@@ -8,45 +8,48 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
      Require Import api_spec.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.lib Require Import list_proof.
+Import inject.
 
 Section proof.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !DB_params}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
   Lemma request_answer_ser k sa res (reqd : ReqData) :
-    (user_params_at_shard (DBG_shards k) sa).(MTS_handler_post) res reqd I -∗
+    (user_params_at_shard (DBG_hash k) sa).(MTS_handler_post) res reqd I -∗
       ⌜Serializable rep_ser res⌝ ∗
       user_params_at_server.(MTS_handler_post) res reqd I.
   Proof.
-    iIntros "[(%E & %P & %Q & %k' & %v' & Q & -> & ->)|
-              (%E & %P & %Q & %k' & -> & [(%v' & -> & Q)|(-> & Q)])]".
+    iIntros "[(%E & %Q & %k' & %v' & Q & -> & ->)|
+              (%E & %Q & %k' & -> & (%v' & -> & Q))]".
     { iSplit. { iPureIntro=>/=. exists #(). by left. }
-      iLeft. iExists E, P, Q, k', v'. iFrame. by iSplit. }
-    { iSplit.
-      { iPureIntro=>/=. exists (InjRV v'). right. split=>//=.
-        left. exists v'. split=>//=. apply SV_ser. }
-      iRight. iExists E, P, Q, k'. iSplit; first done. iLeft.
-        iExists v'. by iFrame. }
-    iSplit. { iPureIntro=>/=. exists (InjLV #()). right. split=>//=. by right. }
-    iRight. iExists E, P, Q, k'. iSplit; first done. iRight. by iFrame.
+      iLeft. iExists E, Q, k', v'. iFrame. by iSplit. }
+    iSplit.
+    { iPureIntro=>/=. exists $v'. right. split=>//=.
+        case: v'=>[v'|]; [left|by right]. exists $v'. split=>//=.
+        apply DB_vals_serializable. }
+    iRight.
+    iExists E, Q, k'.
+    iSplit; first done.
+    iExists v'.
+    by iFrame.
   Qed.
 
-  Definition shards_data_spec (shardsv : val) shards data : iProp Σ :=
+  Definition shards_data_spec (shardsv : val) data : iProp Σ :=
     ∀ k, ⌜k ∈ DB_keys⌝ -∗
     {{{ True }}}
-      shardsv #k @[ip_of_address DB_addr]
-    {{{ RET #(shards k); ⌜shards k < length DB_addrs⌝ ∗
+      shardsv $k @[ip_of_address DB_addr]
+    {{{ RET #(DB_hash k);
       ∃ rpc sa N γ MTR lk (l : list (val*val)), ⌜is_list l data⌝ ∗
       is_lock N (ip_of_address DB_addr) γ lk
           (MTR.(MTSCanRequest) (ip_of_address DB_addr) rpc) ∗
-    (@make_request_spec _ _ _ _ (user_params_at_shard (DBG_shards k) sa) MTR) ∗
-    ⌜l !! (shards k) = Some (rpc, lk)⌝ }}}.
+    (@make_request_spec _ _ _ _ (user_params_at_shard (DBG_hash k) sa) MTR) ∗
+    ⌜l !! (DB_hash k) = Some (rpc, lk)⌝ }}}.
 
   Lemma client_request_handler_at_server_spec :
-    ∀ data shardsv shards reqv reqd,
+    ∀ data shardsv reqv reqd,
     {{{
       user_params_at_server.(MTS_handler_pre) reqv reqd ∗
-      shards_data_spec shardsv shards data
+      shards_data_spec shardsv data
     }}}
       client_request_handler_at_server data shardsv reqv @[ip_of_address DB_addr]
     {{{ res, RET res;
@@ -54,14 +57,14 @@ Section proof.
       user_params_at_server.(MTS_handler_post) res reqd I
     }}}.
   Proof.
-    iIntros (data shardsv shards reqv reqd Φ)
-          "([(%E & %P & %Q & %k & %v & % & % & -> & -> & P & #HQ)|
-        (%E & %P & %Q & %k & % & % & -> & -> & P & #HQ)] & #shards_data_spec) HΦ".
+    iIntros (data shardsv reqv reqd Φ)
+          "([(%E & %Q & %k & %v & % & % & -> & -> & HQ)|
+        (%E & %Q & %k & % & % & -> & -> & HQ)] & #shards_data_spec) HΦ".
     {
       rewrite/client_request_handler_at_server.
       wp_pures.
       wp_apply "shards_data_spec"; [done..|].
-      iIntros "(%shards_k_valid & %rpc & %sa & %N & %γ & %MTR & %lk & %l &
+      iIntros "(%rpc & %sa & %N & %γ & %MTR & %lk & %l &
                   %l_data & #lock & #make_request & %l_k)".
       wp_pures.
       wp_apply wp_list_nth; first done.
@@ -78,17 +81,17 @@ Section proof.
       wp_apply (acquire_spec with "lock").
       iIntros "% (-> & locked & CanRequest)".
       wp_pures.
-      wp_apply ("make_request" with "[$CanRequest P]").
+      wp_apply ("make_request" with "[$CanRequest HQ]").
       {
         iSplit.
         {
           iPureIntro=>/=.
-          exists (#k, v)%V. left. split=>//=. exists #k, v. split=>//=.
-          split; [by exists k|apply v.(SV_ser)].
+          exists ($k, $v)%V. left. split=>//=. exists $k, $v. split=>//=.
+          split; [apply DB_keys_serializable|apply DB_vals_serializable].
         }
         iLeft.
-        iExists E, P, Q, k, v.
-        by do 6 (iSplit; first done).
+        iExists E, Q, k, v.
+        by do 5 (iSplit; first done).
       }
       iIntros "% %repv (CanRequest & post)".
       wp_pures.
@@ -101,7 +104,7 @@ Section proof.
     rewrite/client_request_handler_at_server.
     wp_pures.
     wp_apply "shards_data_spec"; [done..|].
-    iIntros "(%shards_k_valid & %rpc & %sa & %N & %γ & %MTR & %lk & %l &
+    iIntros "(%rpc & %sa & %N & %γ & %MTR & %lk & %l &
                   %l_data & #lock & #make_request & %l_k)".
     wp_pures.
     wp_apply wp_list_nth; first done.
@@ -118,15 +121,15 @@ Section proof.
     wp_apply (acquire_spec with "lock").
     iIntros "% (-> & locked & CanRequest)".
     wp_pures.
-    wp_apply ("make_request" with "[$CanRequest P]").
+    wp_apply ("make_request" with "[$CanRequest HQ]").
     {
       iSplit.
       {
-        iPureIntro. exists #k. right. split=>//=. by exists k.
+        iPureIntro. exists $k. right. split=>//=. apply DB_keys_serializable.
       }
       iRight.
-      iExists E, P, Q, k.
-      by do 6 (iSplit; first done).
+      iExists E, Q, k.
+      by do 5 (iSplit; first done).
     }
     iIntros "% %repv (CanRequest & post)".
     wp_pures.

@@ -20,14 +20,14 @@ let do_reads rd =
   assert (vx = Some 37)
 
 let node0 clt_addr0 db_addr =
-  let db_funs = init_client_proxy int_serializer clt_addr0 db_addr in
+  let db_funs = init_client string_serializer int_serializer clt_addr0 db_addr in
   let wr = fst db_funs in
   do_writes wr
 
 let node1 clt_addr1 db_addr =
-  let db_funs = init_client_proxy int_serializer clt_addr1 db_addr in
+  let db_funs = init_client string_serializer int_serializer clt_addr1 db_addr in
   let rd = snd db_funs in
   do_reads rd
 
 let hash k =
-      if k = "x" then 0 else 1
+  if k = "x" then 0 else 1

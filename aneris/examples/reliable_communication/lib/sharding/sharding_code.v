@@ -9,13 +9,13 @@ From aneris.aneris_lang.lib Require Import list_code.
 
 (**  Serializers  *)
 
-Definition write_serializer val_ser :=
-  prod_serializer string_serializer val_ser.
+Definition write_serializer key_ser val_ser :=
+  prod_serializer key_ser val_ser.
 
-Definition read_serializer := string_serializer.
+Definition read_serializer (key_ser : serializer) := key_ser.
 
-Definition req_ser val_ser :=
-  sum_serializer (write_serializer val_ser) read_serializer.
+Definition req_ser key_ser val_ser :=
+  sum_serializer (write_serializer key_ser val_ser) (read_serializer key_ser).
 
 Definition rep_ser val_ser :=
   sum_serializer unit_serializer (option_serializer val_ser).
@@ -38,9 +38,9 @@ Definition client_request_handler_at_server : val :=
   release "lk";;
   "res".
 
-Definition start_server ser : val :=
+Definition start_server key_ser val_ser : val :=
   λ: "addr" "data" "hash" <>,
-  run_server (rep_ser ser) (req_ser ser) "addr"
+  run_server (rep_ser val_ser) (req_ser key_ser val_ser) "addr"
   (λ: "req", client_request_handler_at_server "data" "hash" "req").
 
 Definition server_request_handler_at_shard : val :=
@@ -57,33 +57,34 @@ Definition server_request_handler_at_shard : val :=
   release "lk";;
   "res".
 
-Definition start_shard ser : val :=
+Definition start_shard key_ser val_ser : val :=
   λ: "addr" "db" "lk" <>,
-  run_server (rep_ser ser) (req_ser ser) "addr"
+  run_server (rep_ser val_ser) (req_ser key_ser val_ser) "addr"
   (λ: "req", server_request_handler_at_shard "db" "lk" "req").
 
-Definition init_server ser : val :=
+Definition init_server key_ser val_ser : val :=
   λ: "srv_addr" "addrs" "hash",
   let: "data" := list_map (λ: "p",
                            let: "srv" := Fst "p" in
                            let: "shard" := Snd "p" in
-                           let: "rpc" := init_client_proxy (req_ser ser)
-                                         (rep_ser ser) "srv" "shard" in
+                           let: "rpc" := init_client_proxy (req_ser key_ser
+                                                            val_ser)
+                                         (rep_ser val_ser) "srv" "shard" in
                            let: "lk" := newlock #() in
                            ("rpc", "lk"))
                  "addrs" in
-  Fork (start_server ser "srv_addr" "data" "hash" #()).
+  Fork (start_server key_ser val_ser "srv_addr" "data" "hash" #()).
 
-Definition init_shard ser : val :=
+Definition init_shard key_ser val_ser : val :=
   λ: "addr",
   let: "db" := ref (map_empty #()) in
   let: "lk" := newlock #() in
-  Fork (start_shard ser "addr" "db" "lk" #()).
+  Fork (start_shard key_ser val_ser "addr" "db" "lk" #()).
 
-Definition init_client_proxy ser : val :=
+Definition init_client key_ser val_ser : val :=
   λ: "clt_addr" "srv_addr",
-  let: "rpc" := init_client_proxy (req_ser ser) (rep_ser ser) "clt_addr"
-                "srv_addr" in
+  let: "rpc" := init_client_proxy (req_ser key_ser val_ser) (rep_ser val_ser)
+                "clt_addr" "srv_addr" in
   let: "lk" := newlock #() in
   let: "request" := λ: "req",
   acquire "lk";;

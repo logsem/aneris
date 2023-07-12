@@ -7,219 +7,247 @@ From aneris.examples.reliable_communication.lib.sharding.proof
 From aneris.examples.reliable_communication.examples.sharding_examples
         Require Import causality_example_code.
 From aneris.examples.reliable_communication.lib Require Import sharding_code.
-From iris.algebra.lib Require Import mono_list.
-From aneris.aneris_lang.lib Require Import list_code.
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From aneris.aneris_lang.program_logic
      Require Import aneris_weakestpre aneris_lifting aneris_adequacy.
 From aneris.examples.reliable_communication.spec
      Require Import prelude ras.
+From iris.algebra Require Import excl.
 Import ser_inj.
+Import inject.
 
 Section spec.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !inG Σ (mono_listR natO)}.
+  Context `{!anerisG Mdl Σ}.
   Context `{addr : socket_address, addrs : list (socket_address*socket_address),
       addrs_ips : (Forall (λ sa, ip_of_address sa.1 = ip_of_address addr) addrs)}.
 
-  Local Instance dbp : DB_params :=
-    {|
-      DB_addr := addr;
-      DB_addrs := addrs;
-      DB_addrs_ips := addrs_ips;
-      DB_keys := {["x"; "y"]};
-      DB_serialization := int_serialization;
-      DB_ser_inj := int_ser_is_ser_injective;
-      DB_ser_inj_alt := int_ser_is_ser_injective_alt;
-      DB_inv_name := nroot .@ "inv"
-    |}.
+  Definition hashf k := if (k =? "x")%string then 0%nat else 1%nat.
+
+  Context `{hashf_valid : ∀ k, (hashf k < length addrs)%nat}.
+
+  Local Instance dbp : DB_params := {
+    (** The type of the keys *)
+    Key := string;
+    DB_keys_val := _;
+    DB_key_eq_dec := _;
+    DB_key_countable := _;
+
+    (** The type of the values *)
+    Val := Z;
+    DB_vals_val := _;
+
+    (** The database's address *)
+    DB_addr := addr;
+
+    (** The shard's addresses *)
+    DB_addrs := addrs;
+    DB_addrs_ips := addrs_ips;
+
+    (** The database's keys *)
+    DB_keys := {[ "x"; "y" ]};
+
+    (** The key redistribution function *)
+    DB_hash := hashf;
+    DB_hash_valid := hashf_valid;
+
+    (** Some serialization lemmas *)
+    DB_key_ser := string_serialization;
+    DB_val_ser := int_serialization;
+    DB_key_ser_inj := string_ser_is_ser_injective;
+    DB_key_ser_inj_alt := string_ser_is_ser_injective_alt;
+    DB_val_ser_inj := int_ser_is_ser_injective;
+    DB_val_ser_inj_alt := int_ser_is_ser_injective_alt;
+    DB_keys_serializable := _;
+    DB_vals_serializable := _;
+
+    (** The namespace for invariants *)
+    DB_inv_name := nroot .@ "DB_inv";
+  }.
+
+  Context `{!DBG Σ}.
 
   Definition N := (nroot .@ "local").
 
-  Definition local_inv_def γ : iProp Σ :=
-    ∃ l, own γ (●ML l) ∗
-        (⌜l = []⌝ ∗ "y" ↦ₖ None ∨
-        own γ (◯ML [37%nat]) ∗ "y" ↦ₖ Some #1 ∗ "x" ↦ₖ Some #37).
+  Definition token γ := own γ (Excl ()).
 
-  Definition local_inv γ :=
-    inv N (local_inv_def γ).
-
-  Lemma do_writes_spec wr sa γ :
-  {{{
-    write_spec wr sa ∗
-    local_inv γ ∗
-    "x" ↦ₖ None
-  }}}
-    do_writes wr @[ip_of_address sa]
-  {{{ RET #(); True }}}.
+  Lemma alloc_token : ⊢ |==> ∃ γ : gname, token γ.
   Proof.
-    iIntros (Φ) "(#write & #inv & x_none) HΦ".
-    iPoseProof (get_atomic_write_spec with "write") as "#atomic_write".
-    iPoseProof (get_simplified_write_spec with "write") as "#simplified_write".
+    iMod (own_alloc (Excl ())) as "(%γ & Hγ)"; first done.
+    iModIntro.
+    by iExists γ.
+  Qed.
+
+  Definition local_inv_def CanWrite Written_x Written_y NotRead Read
+      : iProp Σ :=
+    ("x" ↦ₖ None ∗ "y" ↦ₖ None ∗ token CanWrite ∗ token NotRead) ∨
+    ("x" ↦ₖ Some 37 ∗ "y" ↦ₖ None ∗ token Written_x ∗ token NotRead) ∨
+    ("x" ↦ₖ Some 37 ∗ "y" ↦ₖ Some 1 ∗ token Written_x ∗
+        token Written_y ∗ token NotRead) ∨
+    ("x" ↦ₖ Some 37 ∗ token Written_x ∗ token Written_y ∗ token Read).
+
+  Definition local_inv CanWrite Written_x Written_y NotRead Read :=
+    inv N (local_inv_def CanWrite Written_x Written_y NotRead Read).
+
+  Lemma do_writes_spec wr sa
+      CanWrite Written_x Written_y NotRead Read :
+    local_inv CanWrite Written_x Written_y NotRead Read -∗
+    write_spec wr sa -∗
+    {{{ token Written_x ∗ token Written_y }}}
+      do_writes wr @[ip_of_address sa]
+    {{{ RET #(); True }}}.
+  Proof.
+    iIntros "#inv #write !> %Φ (Written_x & Written_y) HΦ".
     rewrite/do_writes.
     wp_pures.
-    wp_apply ("simplified_write" $! (SerVal #37) with "[] x_none");
-        first set_solver.
-    iIntros "x_37".
+    wp_apply ("write" $! (⊤ ∖ ↑N) with "[] []");
+        [solve_ndisj|set_solver|].
+    iInv "inv" as ">[(x_none & y_none & CanWrite & NotRead) |
+                    [(_ & _ & Written_x' & _) |
+                    [(_ & _ & Written_x' & _ & _) |
+                    (_ & Written_x' & _ & _)]]]" "close".
+    2, 3, 4: by iCombine "Written_x Written_x'" gives "%abs".
+    iModIntro.
+    iExists None.
+    iFrame.
+    iIntros "!>x_37".
+    iMod ("close" with "[x_37 y_none Written_x NotRead]") as "_".
+    { iNext. iRight. iLeft. iFrame. }
+    iModIntro.
     wp_pures.
-    wp_apply ("atomic_write" $! (⊤ ∖ ↑N) _ (SerVal #1));
-      [solve_ndisj|set_solver|].
-    iInv "inv" as ">(%l & ●_γ & [(-> & y_none)|(◯_γ & y_1 & x_37')])" "Hclose";
-      last iPoseProof (shard_mapsto_valid with "x_37 x_37'") as "[]".
+    wp_apply ("write" $! (⊤ ∖ ↑N) with "[] []");
+        [solve_ndisj|set_solver|].
+    iInv "inv" as ">[(_ & _ & CanWrite' & _) |
+                    [(x_37 & y_none & Written_x & NotRead) |
+                    [(_ & _ & _ & Written_y' & _) |
+                    (_ & _ & Written_y' & _)]]]" "close".
+    1: by iCombine "CanWrite CanWrite'" gives "%abs".
+    2, 3: by iCombine "Written_y Written_y'" gives "%abs".
     iModIntro.
     iExists None.
     iFrame.
     iIntros "!>y_1".
-    iMod (own_update with "●_γ") as "●_γ".
-    { apply (mono_list_update [37%nat]). apply prefix_nil. }
-    rewrite mono_list_auth_lb_op.
-    iDestruct "●_γ" as "(●_γ & ◯_γ)".
-    iMod ("Hclose" with "[y_1 x_37 ●_γ ◯_γ]"); last by iModIntro; iApply "HΦ".
-    iNext.
-    iExists [37%nat].
-    iFrame.
-    iRight.
-    iFrame.
+    iMod ("close" with "[x_37 y_1 Written_x Written_y NotRead]") as "_".
+    { iNext. do 2 iRight. iLeft. iFrame. }
+    iApply ("HΦ" with "[//]").
   Qed.
 
-  Lemma wait_on_read_spec rd sa γ :
-  {{{
-    read_spec rd sa ∗
-    local_inv γ
-  }}}
+  Lemma wait_on_read_spec rd sa
+      CanWrite Written_x Written_y NotRead Read :
+    local_inv CanWrite Written_x Written_y NotRead Read -∗
+    read_spec rd sa -∗
+  {{{ token Read }}}
     wait_on_read rd #"y" #1 @[ip_of_address sa]
-  {{{ RET #(); own γ (◯ML [37%nat]) }}}.
+  {{{ RET #(); token NotRead }}}.
   Proof.
-    iIntros (Φ) "(#read & #inv) HΦ".
-    iPoseProof (get_atomic_read_spec with "read") as "#atomic_read".
+    iIntros "#inv #read !> %Φ Read HΦ".
     rewrite/wait_on_read.
-    do 8 (wp_pure _).
+    wp_pures.
     iLöb as "IH".
-    wp_pures.
-    wp_apply ("atomic_read" $! (⊤ ∖ ↑N) "y" with "[] [//]"); first solve_ndisj.
-    iInv "inv" as ">(%l & ●_γ & [(-> & y_none)|(#◯_γ & y_1 & x_37)])" "Hclose";
-    iModIntro; [iExists None | iExists (Some #1)]; iFrame; iNext.
-    {
-      iIntros "% (y_none & [(%a & -> & %abs)|(-> & _)])"; first done.
-      iMod ("Hclose" with "[●_γ y_none]").
-      {
-        iNext.
-        iExists [].
-        iFrame.
-        iLeft.
-        by iFrame.
-      }
-      iModIntro.
-      do 7 (wp_pure _).
-      by iApply "IH".
-    }
-    case l=>[|a l'];
-    iCombine "●_γ ◯_γ" gives "%valid";
-    apply mono_list_both_valid_L in valid;
-    [by apply prefix_nil_not in valid|apply prefix_cons_inv_1 in valid].
-    rewrite -valid.
-    iIntros "% (y_1 & [(% & -> & %eq)|(-> & %abs)])"; last done.
-    move: eq=>[<-].
-    iMod ("Hclose" with "[●_γ y_1 x_37]").
-    {
-      iNext.
-      iExists (37%nat::l').
-      iFrame.
-      iRight.
-      iFrame "∗#".
-    }
-    iModIntro.
-    wp_pures.
-    by iApply "HΦ".
+    wp_apply ("read" $! (⊤ ∖ ↑N) with "[] []");
+        [solve_ndisj|set_solver|].
+    iInv "inv" as ">[(x_none & y_none & CanWrite & NotRead) |
+                    [(x_37 & y_none & Written_x & NotRead) |
+                    [(x_37 & y_1 & Written_x & Written_y & NotRead) |
+                    (_ & _ & _ & Read')]]]" "close".
+    4: by iCombine "Read Read'" gives "%abs".
+    all: iModIntro.
+    all: iExists _.
+    all: iFrame.
+    all: iIntros "!> y_vy".
+    1: iMod ("close" with "[x_none y_vy CanWrite NotRead]") as "_";
+      first (iNext; iLeft; iFrame).
+    2: iMod ("close" with "[x_37 y_vy Written_x NotRead]") as "_";
+      first (iNext; iRight; iLeft; iFrame).
+    3: iMod ("close" with "[x_37 Written_x Written_y Read]") as "_";
+      first (iNext; repeat iRight; iFrame).
+    all: iModIntro.
+    all: wp_pures.
+    1, 2: iApply ("IH" with "Read HΦ").
+    iApply ("HΦ" with "NotRead").
   Qed.
 
-  Lemma do_reads_spec rd sa γ :
-  {{{
-    read_spec rd sa ∗
-    local_inv γ
-  }}}
-    do_reads rd @[ip_of_address sa]
-  {{{ RET #(); True }}}.
+  Lemma do_reads_spec rd sa
+      CanWrite Written_x Written_y NotRead Read :
+    local_inv CanWrite Written_x Written_y NotRead Read -∗
+    read_spec rd sa -∗
+    {{{ token Read }}}
+      do_reads rd @[ip_of_address sa]
+    {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(#read & #inv) HΦ".
-    iPoseProof (get_atomic_read_spec with "read") as "#atomic_read".
+    iIntros "#inv #read !> %Φ Read HΦ".
     rewrite/do_reads.
     wp_pures.
-    wp_apply (wait_on_read_spec with "[$read $inv]").
-    iIntros "#◯_γ".
+    wp_apply (wait_on_read_spec with "inv read Read").
+    iIntros "NotRead".
     wp_pures.
-    wp_apply ("atomic_read" $! (⊤ ∖ ↑N) "x" with "[] [//]"); first solve_ndisj.
-    iInv "inv" as ">(%l & ●_γ & [(-> & y_none)|(_ & y_1 & x_37)])" "Hclose".
-    {
-      iCombine "●_γ ◯_γ" gives "%valid".
-      apply mono_list_both_valid_L in valid.
-      by apply prefix_nil_not in valid.
-    }
+    wp_apply ("read" $! (⊤ ∖ ↑N) with "[] []");
+        [solve_ndisj|set_solver|].
+    iInv "inv" as ">[(_ & _ & _ & NotRead') |
+                    [(_ & _ & _ & NotRead') |
+                    [(_ & _ & _ & _ & NotRead') |
+                    (x_37 & Written_x & Written_y & Read)]]]" "close".
+    1, 2, 3: by iCombine "NotRead NotRead'" gives "%abs".
     iModIntro.
-    iExists (Some #37).
+    iExists (Some 37).
     iFrame.
-    iNext.
-    iIntros "% (x_37 & [(% & -> & %eq)|(-> & %abs)])"; last done.
-    move:eq=>[<-].
-    iMod ("Hclose" with "[●_γ y_1 x_37]").
-    {
-      iNext.
-      iExists l.
-      iFrame.
-      iRight.
-      iFrame "∗#".
-    }
+    iIntros "!>x_37".
+    iMod ("close" with "[x_37 Written_x Written_y Read]") as "_".
+    { iNext. repeat iRight. iFrame. }
     iModIntro.
-    wp_pures.
     rewrite/assert.
     wp_pures.
-    by iApply "HΦ".
+    iApply ("HΦ" with "[//]").
   Qed.
 
-  Lemma node0_spec clt srv_si γ :
-  {{{
-    init_client_proxy_spec srv_si ∗
-    local_inv γ ∗
-    "x" ↦ₖ None ∗
-    unallocated {[clt]} ∗ 
-    clt ⤳ (∅, ∅) ∗
-    addr ⤇ srv_si ∗
-    free_ports (ip_of_address clt) {[port_of_address clt]}
-  }}}
-    node0 #clt #addr @[ip_of_address clt]
-  {{{ RET #(); True }}}.
+  Lemma node0_spec clt srv_si
+      CanWrite Written_x Written_y NotRead Read :
+    local_inv CanWrite Written_x Written_y NotRead Read -∗
+    init_client_spec srv_si -∗
+    addr ⤇ srv_si -∗
+    {{{
+      token Written_x ∗ token Written_y ∗
+      unallocated {[clt]} ∗ 
+      clt ⤳ (∅, ∅) ∗
+      free_ports (ip_of_address clt) {[port_of_address clt]}
+    }}}
+      node0 #clt #addr @[ip_of_address clt]
+    {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(#init & #inv & x_none & unalloc & ∅ & #srv_si & free) HΦ".
+    iIntros "#inv #init #srv_si !> %Φ
+        (Written_x & Written_y & unalloc & ∅ & free) HΦ".
     rewrite/node0.
     wp_pures.
-    wp_apply ("init" with "[$unalloc $∅ $free $srv_si]").
-    iIntros (wr rd) "(#read & #write)".
+    wp_apply ("init" with "[$]").
+    iIntros (wr rd) "(_ & #write)".
     wp_pures.
-    by wp_apply (do_writes_spec with "[$write $inv $x_none]").
+    wp_apply (do_writes_spec with "inv write [$]").
+    iApply "HΦ".
   Qed.
 
-  Lemma node1_spec clt srv_si γ :
-  {{{
-    init_client_proxy_spec srv_si ∗
-    local_inv γ ∗
-    unallocated {[clt]} ∗ 
-    clt ⤳ (∅, ∅) ∗
-    addr ⤇ srv_si ∗
-    free_ports (ip_of_address clt) {[port_of_address clt]}
-  }}}
-    node1 #clt #addr @[ip_of_address clt]
-  {{{ RET #(); True }}}.
+  Lemma node1_spec clt srv_si
+      CanWrite Written_x Written_y NotRead Read :
+    local_inv CanWrite Written_x Written_y NotRead Read -∗
+    init_client_spec srv_si -∗
+    addr ⤇ srv_si -∗
+    {{{
+      token Read ∗
+      unallocated {[clt]} ∗ 
+      clt ⤳ (∅, ∅) ∗
+      free_ports (ip_of_address clt) {[port_of_address clt]}
+    }}}
+      node1 #clt #addr @[ip_of_address clt]
+    {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(#init & #inv & unalloc & ∅ & #srv_si & free) HΦ".
+    iIntros "#inv #init #srv_si !> %Φ (Read & unalloc & ∅ & free) HΦ".
     rewrite/node1.
     wp_pures.
-    wp_apply ("init" with "[$unalloc $∅ $free $srv_si]").
-    iIntros (wr rd) "(#read & #write)".
+    wp_apply ("init" with "[$]").
+    iIntros (wr rd) "(#read & _)".
     wp_pures.
-    by wp_apply (do_reads_spec with "[$read $inv]").
+    wp_apply (do_reads_spec with "inv read [$]").
+    iApply "HΦ".
   Qed.
-
-  Definition hashf (k : Key) := if (k =? "x")%string then 0%nat else 1%nat.
 
   Lemma hash_spec_holds : ⊢ hash_spec hash hashf.
   Proof.
@@ -235,7 +263,7 @@ Section spec.
       by iApply "HΦ".
     }
     apply String.eqb_neq in k_x.
-    rewrite bool_decide_eq_false_2; last by move=>[/k_x].
+    rewrite bool_decide_eq_false_2=>[|[/k_x]]; last done.
     wp_pures.
     by iApply "HΦ".
   Qed.
@@ -258,73 +286,83 @@ Definition addrsv := SOMEV ((#srv0, #shard0), SOMEV ((#srv1, #shard1), NONEV)).
 
 Lemma addrs_ips : (Forall (λ sa, ip_of_address sa.1 = ip_of_address addr) addrs).
 Proof.
-  repeat (constructor; first done).
-  constructor.
+  by repeat (constructor; first done).
 Qed.
 
-Global Instance DBP : DB_params := @dbp addr addrs addrs_ips.
+Lemma hashf_valid k : (hashf k < length addrs)%nat.
+Proof.
+  case k_x : (k =? "x")%string.
+  all: rewrite/hashf k_x/addrs/=.
+  all: lia.
+Qed.
+
+Global Instance DBP : DB_params := @dbp addr addrs addrs_ips hashf_valid.
 
 Definition main : expr :=
-  Start "0.0.0.1" (init_shard DB_serialization.(s_serializer) #shard0);;
-  Start "0.0.0.2" (init_shard DB_serialization.(s_serializer) #shard1);;
-  Start "0.0.0.0" (init_server DB_serialization.(s_serializer) #addr addrsv hash);;
+  Start "0.0.0.1" (init_shard DB_key_ser.(s_serializer) DB_val_ser.(s_serializer)
+                    #shard0);;
+  Start "0.0.0.2" (init_shard DB_key_ser.(s_serializer) DB_val_ser.(s_serializer)
+                    #shard1);;
+  Start "0.0.0.0" (init_server DB_key_ser.(s_serializer) DB_val_ser.(s_serializer)
+                    #addr addrsv hash);;
   Start "0.0.0.3" (node0 #clt0 #addr);;
   Start "0.0.0.4" (node1 #clt1 #addr).
 
 Section main_spec.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !inG Σ (mono_listR natO)}.
+  Context `{!anerisG Mdl Σ, !DBG Σ}.
 
-  Lemma main_spec shards_si srv_si (InitShard0 InitShard1 InitSrv : iProp Σ) γ :
-  {{{
-    ∃ (shard0_si shard1_si : message → iProp Σ),
-    ⌜shards_si !! 0%nat = Some shard0_si⌝ ∗
-    ⌜shards_si !! 1%nat = Some shard1_si⌝ ∗
-    local_inv γ ∗
-    init_shard_spec InitShard0 shard0_si shard0 ∗
-    init_shard_spec InitShard1 shard1_si shard1 ∗
-    init_server_spec InitSrv srv_si shards_si hashf ∗
-    init_client_proxy_spec srv_si ∗
-    addr ⤇ srv_si ∗
-    shard0 ⤇ shard0_si ∗
-    shard1 ⤇ shard1_si ∗
-    unallocated {[srv0]} ∗
-    unallocated {[srv1]} ∗
-    unallocated {[clt0]} ∗
-    unallocated {[clt1]} ∗
-    free_ip "0.0.0.0" ∗
-    free_ip "0.0.0.1" ∗
-    free_ip "0.0.0.2" ∗
-    free_ip "0.0.0.3" ∗
-    free_ip "0.0.0.4" ∗
-    addr ⤳ (∅, ∅) ∗
-    srv0 ⤳ (∅, ∅) ∗
-    srv1 ⤳ (∅, ∅) ∗
-    shard0 ⤳ (∅, ∅) ∗
-    shard1 ⤳ (∅, ∅) ∗
-    clt0 ⤳ (∅, ∅) ∗
-    clt1 ⤳ (∅, ∅) ∗
-    InitSrv ∗
-    InitShard0 ∗
-    InitShard1 ∗
-    "x" ↦ₖ None
-  }}}
-    main @["system"]
-  {{{ RET #(); True }}}.
+  Lemma main_spec shards_si srv_si (InitShard0 InitShard1 InitSrv : iProp Σ)
+      shard0_si shard1_si CanWrite Written_x Written_y NotRead Read :
+    local_inv CanWrite Written_x Written_y NotRead Read -∗
+    ⌜shards_si !! 0%nat = Some shard0_si⌝ -∗
+    ⌜shards_si !! 1%nat = Some shard1_si⌝ -∗
+    init_shard_spec InitShard0 shard0_si shard0 -∗
+    init_shard_spec InitShard1 shard1_si shard1 -∗
+    init_server_spec InitSrv srv_si shards_si -∗
+    init_client_spec srv_si -∗
+    addr ⤇ srv_si -∗
+    shard0 ⤇ shard0_si -∗
+    shard1 ⤇ shard1_si -∗
+    {{{
+      unallocated {[srv0]} ∗
+      unallocated {[srv1]} ∗
+      unallocated {[clt0]} ∗
+      unallocated {[clt1]} ∗
+      free_ip "0.0.0.0" ∗
+      free_ip "0.0.0.1" ∗
+      free_ip "0.0.0.2" ∗
+      free_ip "0.0.0.3" ∗
+      free_ip "0.0.0.4" ∗
+      addr ⤳ (∅, ∅) ∗
+      srv0 ⤳ (∅, ∅) ∗
+      srv1 ⤳ (∅, ∅) ∗
+      shard0 ⤳ (∅, ∅) ∗
+      shard1 ⤳ (∅, ∅) ∗
+      clt0 ⤳ (∅, ∅) ∗
+      clt1 ⤳ (∅, ∅) ∗
+      InitSrv ∗
+      InitShard0 ∗
+      InitShard1 ∗
+      token Written_x ∗ token Written_y ∗ token Read
+    }}}
+      main @["system"]
+    {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(%shard0_si & %shard1_si & %shards_si_0 & %shards_si_1 & #inv &
-              #init_shard0 & #init_shard1 & #init_srv & #init_clt & #srv_si &
-              #shard0_si & #shard1_si & unalloc_srv0 & unalloc_srv1 &
-              unalloc_clt0 & unalloc_clt1 & free0 & free1 & free2 & free3 &
-              free4 & addr_∅ & srv0_∅ & srv1_∅ & shard0_∅ & shard1_∅ & clt0_∅ &
-              clt1_∅ & InitSrv & InitShard0 & InitShard1 & x_none) HΦ".
+    iIntros "#inv %shards_si0 %shards_si_1 #init_shard0 #init_shard1 #init_srv
+              #init_clt #srv_si #shard0_si #shard1_si !> %Φ
+              (unalloc_srv0 & unalloc_srv1 & unalloc_clt0 & unalloc_clt1 &
+                free0 & free1 & free2 & free3 & free4 &
+                addr_∅ & srv0_∅ & srv1_∅ & shard0_∅ & shard1_∅ & clt0_∅ & clt1_∅ &
+                InitSrv & InitShard0 & InitShard1 &
+                Written_x & Written_y & Read) HΦ".
     rewrite/main.
     wp_apply (aneris_wp_start {[80%positive]}).
     iFrame.
     iSplitR "InitShard0 shard0_∅"; last first.
     {
       iIntros "!>free".
-      by wp_apply ("init_shard0" with "[$InitShard0 $shard0_si $shard0_∅ $free]").
+      by wp_apply ("init_shard0" with "[$]").
     }
     iNext.
     wp_pures.
@@ -333,7 +371,7 @@ Section main_spec.
     iSplitR "InitShard1 shard1_∅"; last first.
     {
       iIntros "!>free".
-      by wp_apply ("init_shard1" with "[$InitShard1 $shard1_si $shard1_∅ $free]").
+      by wp_apply ("init_shard1" with "[$]").
     }
     iNext.
     wp_pures.
@@ -384,11 +422,10 @@ Section main_spec.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iFrame.
-    iSplitR "unalloc_clt0 clt0_∅ x_none"; last first.
+    iSplitR "unalloc_clt0 clt0_∅ Written_x Written_y"; last first.
     {
       iIntros "!>free".
-      by wp_apply (node0_spec clt0 with "[$init_clt $inv $x_none $unalloc_clt0
-                    $clt0_∅ $free $srv_si]").
+      by wp_apply (node0_spec clt0 with "inv init_clt srv_si [$]").
     }
     iNext.
     wp_pures.
@@ -396,8 +433,7 @@ Section main_spec.
     iFrame.
     iSplitL "HΦ"; first by iNext; iApply "HΦ".
     iIntros "!>free".
-    by wp_apply (node1_spec clt1 with "[$init_clt $inv $unalloc_clt1 $clt1_∅ $free
-                  $srv_si]").
+    by wp_apply (node1_spec clt1 with "inv init_clt srv_si [$]").
   Qed.
 
 End main_spec.
@@ -420,19 +456,13 @@ Qed.
 
 Theorem main_adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
-  set (Σ := #[anerisΣ dummy_model; SpecChanΣ; DBΣ;
-              GFunctor (mono_listUR natO)]).
+  set (Σ := #[anerisΣ dummy_model; SpecChanΣ; DBΣ]).
   apply (adequacy Σ dummy_model ips A ∅ ∅ ∅);
   [apply dummy_model_finitary | iIntros (Mdl) |set_solver..].
-  assert (DBPreG Σ). apply subG_DB_preGΣ. apply _.
-  assert (subG (GFunctor (mono_listUR natO)) Σ → inG Σ (mono_listR natO))
-      by solve_inG.
-  assert (inG Σ (mono_listR natO)) by apply _.
-  assert (Top (DB_Init hashf)) by apply db_init.
-  iMod (@DB_init_setup _ _ _ _ hashf ⊤) as "(% & %InitSrv & %InitShards & %srv_si &
+  assert (DBPreG Σ). apply subG_DBPreGΣ. apply _.
+  iMod (DB_init_setup ⊤) as "(% & %InitSrv & %InitShards & %srv_si &
               %shards_si & init_keys & InitSrv & #init_srv & #init_clt &
-              InitShards & init_shards)"; [move=>k _|set_solver|].
-  { rewrite/hashf. case (k =? "x")%string=>/=; lia. }
+              InitShards & init_shards)"; first set_solver.
   iPoseProof (big_sepL_cons with "init_shards") as
           "((%InitShard0 & %shard0_si & %InitShard0_def & %shard0_si_def &
               #init_shard0) & init_shards)".
@@ -449,15 +479,14 @@ Proof.
         first set_solver.
   iPoseProof (big_sepS_delete _ _ "y" with "init_keys") as "(y_none & _)";
         first set_solver.
-  iMod (own_alloc (●ML [])) as "(%γ & ●_γ)"; first apply mono_list_auth_valid.
-  iMod (inv_alloc N _ (local_inv_def γ) with "[y_none ●_γ]") as "#inv".
-  {
-    iNext.
-    iExists [].
-    iFrame.
-    iLeft.
-    by iFrame.
-  }
+  iMod alloc_token as "(%CanWrite & CanWrite)".
+  iMod alloc_token as "(%Written_x & Written_x)".
+  iMod alloc_token as "(%Written_y & Written_y)".
+  iMod alloc_token as "(%NotRead & NotRead)".
+  iMod alloc_token as "(%Read & Read)".
+  iMod (inv_alloc N _ (local_inv_def CanWrite Written_x Written_y NotRead Read)
+      with "[x_none y_none CanWrite NotRead]") as "#inv".
+  { iNext. iLeft. iFrame. }
   iModIntro.
   iIntros "unalloc ∅ _ free _ _ _ _ _".
   iPoseProof (unallocated_split with "unalloc") as "(unalloc & unalloc_clt1)";
@@ -502,11 +531,6 @@ Proof.
   iIntros "#shard0_si".
   wp_apply (aneris_wp_socket_interp_alloc_singleton shard1_si with "unalloc_shard1").
   iIntros "#shard1_si".
-  wp_apply (main_spec with "[$inv init_shard0 init_shard1 $init_srv $init_clt
-          $srv_si $unalloc_clt0 $unalloc_clt1 $unalloc_srv0 $unalloc_srv1 $free0
-          $free1 $free2 $free3 $free4 $addr_∅ $srv0_∅ $srv1_∅ $shard0_∅ $shard1_∅
-          $clt0_∅ $clt1_∅ $x_none $InitSrv InitShard0 InitShard1]"); last done.
-  iExists shard0_si, shard1_si.
-  do 4 (iSplit; first done).
-  iFrame "∗#".
+  by wp_apply (main_spec with "inv [//] [//] init_shard0 init_shard1
+                            init_srv init_clt srv_si shard0_si shard1_si [$]").
 Qed.

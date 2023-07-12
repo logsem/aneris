@@ -27,13 +27,15 @@ Definition do_reads : val :=
 
 Definition node0 : val :=
   λ: "clt_addr0" "db_addr",
-  let: "db_funs" := init_client_proxy int_serializer "clt_addr0" "db_addr" in
+  let: "db_funs" := init_client string_serializer int_serializer "clt_addr0"
+                    "db_addr" in
   let: "wr" := Fst "db_funs" in
   do_writes "wr".
 
 Definition node1 : val :=
   λ: "clt_addr1" "db_addr",
-  let: "db_funs" := init_client_proxy int_serializer "clt_addr1" "db_addr" in
+  let: "db_funs" := init_client string_serializer int_serializer "clt_addr1"
+                    "db_addr" in
   let: "rd" := Snd "db_funs" in
   do_reads "rd".
 

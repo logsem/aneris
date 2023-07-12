@@ -8,70 +8,91 @@ From aneris.examples.reliable_communication.lib.mt_server Require Import user_pa
 From aneris.examples.reliable_communication.lib.sharding Require Import sharding_code.
 From aneris.aneris_lang.lib Require Import lock_proof map_proof.
 Import gen_heap_light.
-
-Definition Key := string.
+Import inject.
 
 Section params.
 
+  (** Abstract parameters of the database *)
+
   Class DB_params := {
+    (** The type of the keys *)
+    Key : Type;
+    DB_keys_val :> Inject Key val;
+    DB_key_eq_dec :> EqDecision Key;
+    DB_key_countable :> Countable Key;
+
+    (** The type of the values *)
+    Val : Type;
+    DB_vals_val :> Inject Val val;
+
+    (** The database's address *)
     DB_addr : socket_address;
+
+    (** The shard's addresses *)
     DB_addrs : list (socket_address * socket_address);
     DB_addrs_ips : Forall (λ sa,
                        ip_of_address sa.1 = ip_of_address DB_addr) DB_addrs;
+
+    (** The database's keys *)
     DB_keys : gset Key;
-    DB_serialization : serialization;
-    DB_ser_inj : ser_is_injective DB_serialization;
-    DB_ser_inj_alt : ser_is_injective_alt DB_serialization;
+
+    (** The key redistribution function *)
+    DB_hash : Key → nat;
+    DB_hash_valid (k : Key) : (DB_hash k < length DB_addrs)%nat;
+
+    (** Some serialization lemmas *)
+    DB_key_ser : serialization;
+    DB_val_ser : serialization;
+    DB_key_ser_inj : ser_is_injective DB_key_ser;
+    DB_key_ser_inj_alt : ser_is_injective_alt DB_key_ser;
+    DB_val_ser_inj : ser_is_injective DB_val_ser;
+    DB_val_ser_inj_alt : ser_is_injective_alt DB_val_ser;
+    DB_keys_serializable (k : Key) :> Serializable DB_key_ser $k;
+    DB_vals_serializable (v : Val) :> Serializable DB_val_ser $v;
+
+    (** The namespace for invariants *)
     DB_inv_name : namespace;
   }.
 
+  Context `{!DB_params}.
+
+  (** Information for ghost states *)
   Class DBG Σ :=
     {
-      DBG_mem :> inG Σ (authR (gen_heapUR Key (option val)));
+      DBG_mem :> inG Σ (authR (gen_heapUR Key (option Val)));
       DBG_lockG :> lockG Σ;
-      DBG_shards : Key → gname;
+      DBG_hash : Key → gname;
     }.
 
+  (** Information for ghost states needed for instantiation *)
   Class DBPreG Σ :=
     {
-      DBPreG_mem :> inG Σ (authR (gen_heapUR Key (option val)));
+      DBPreG_mem :> inG Σ (authR (gen_heapUR Key (option Val)));
       DBPreG_lockG :> lockG Σ;
     }.
 
   Definition DBΣ : gFunctors :=
-    #[GFunctor (authR (gen_heapUR Key (option val)));
+    #[GFunctor (authR (gen_heapUR Key (option Val)));
       lockΣ].
 
-  Local Instance subG_DB_preGΣ `{!lockG Σ} : subG DBΣ Σ → DBPreG Σ.
+  Local Instance subG_DBPreGΣ `{!lockG Σ} : subG DBΣ Σ → DBPreG Σ.
   Proof. solve_inG. Qed.
 
 End params.
-
-Notation DB_Serializable v := (Serializable DB_serialization v).
-
-Record SerializableVal `{!DB_params} :=
-  SerVal {SV_val : val;
-          SV_ser : DB_Serializable SV_val }.
-
-Coercion SV_val : SerializableVal >-> val.
-
-Existing Instance SV_ser.
-
-Arguments SerVal {_} _ {_}.
 
 Section mem.
 
   Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
-  Definition mapsto k v := lmapsto (DBG_shards k) k 1 v.
+  Definition mapsto k vo := lmapsto (DBG_hash k) k 1 vo.
 
-  Notation "k ↦ₖ v" := (mapsto k v) (at level 20).
+  Notation "k ↦ₖ vo" := (mapsto k vo) (at level 20).
 
-  Lemma shard_mapsto_valid k v v' : k ↦ₖ v -∗ k ↦ₖ v' -∗ False.
+  Lemma shard_mapsto_valid k vo vo' : k ↦ₖ vo -∗ k ↦ₖ vo' -∗ False.
   Proof.
-    iIntros "k_v k_v'".
-    iPoseProof (lmapsto_agree with "k_v k_v'") as "<-".
-    iCombine "k_v k_v'" as "abs".
+    iIntros "k_vo k_vo'".
+    iPoseProof (lmapsto_agree with "k_vo k_vo'") as "<-".
+    iCombine "k_vo k_vo'" as "abs".
     by iPoseProof (lmapsto_valid with "abs") as "%abs".
   Qed.
 
@@ -85,29 +106,27 @@ Section mem.
     by apply auth_auth_op_valid in abs.
   Qed.
 
-  Lemma shard_valid γ shard k v :
-    ⌜DBG_shards k = γ⌝ -∗
-    shard_mem γ shard -∗ k ↦ₖ v -∗ ⌜shard !! k = Some v⌝.
+  Lemma shard_valid γ shard k vo :
+    ⌜DBG_hash k = γ⌝ -∗
+    shard_mem γ shard -∗ k ↦ₖ vo -∗ ⌜shard !! k = Some vo⌝.
   Proof.
-    iIntros (<-) "γ_shard k_v".
-    iApply (gen_heap_light_valid with "γ_shard k_v").
+    iIntros (<-) "γ_shard k_vo".
+    iApply (gen_heap_light_valid with "γ_shard k_vo").
   Qed.
 
-  Lemma shard_update γ shard k v v' :
-    ⌜DBG_shards k = γ⌝ -∗
+  Lemma shard_update γ shard k vo vo' :
+    ⌜DBG_hash k = γ⌝ -∗
     shard_mem γ shard -∗
-    k ↦ₖ v ==∗
-    shard_mem γ (<[k:=v']> shard) ∗ k ↦ₖ v'.
+    k ↦ₖ vo ==∗
+    shard_mem γ (<[k:=vo']> shard) ∗ k ↦ₖ vo'.
   Proof.
-    iIntros (<-) "γ_shard k_v".
-    by iMod (gen_heap_light_update _ _ _ _ v' with "γ_shard k_v").
+    iIntros (<-) "γ_shard k_vo".
+    by iMod (gen_heap_light_update _ _ _ _ vo' with "γ_shard k_vo").
   Qed.
 
   Definition shard_lock l ip γ : iProp Σ :=
-    ∃ (db : val) (M : gmap Key val) (shard : gmap Key (option val)),
+    ∃ (db : val) (M : gmap Key Val) (shard : gmap Key (option Val)),
       ⌜is_map db M⌝ ∗ shard_mem γ shard ∗ l ↦[ip] db ∗
-      ([∗ set] k ∈ DB_keys, ∀ v, ⌜M !! k = Some v⌝ -∗
-                ⌜Serializable DB_serialization v⌝) ∗
       ([∗ set] k ∈ DB_keys, ⌜shard !! k = Some (M !! k)⌝).
 
 End mem.
@@ -146,10 +165,9 @@ Section Alloc.
 
   Lemma pre_alloc_db :
     ⊢ |==> ∃ γs : list gname, ⌜length γs = length DB_addrs⌝ ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ γ, ⌜γs !! k = Some γ⌝ ∗
-      gen_heap_light_ctx γ (gset_to_gmap None DB_keys)) ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ γ, ⌜γs !! k = Some γ⌝ ∗
-      ([∗ set] k ∈ DB_keys, lmapsto γ k 1 None)).
+      ([∗ list] k ↦ sa ∈ DB_addrs, ∃ γ, ⌜γs !! k = Some γ⌝ ∗
+          gen_heap_light_ctx γ (gset_to_gmap None DB_keys)) ∗
+      ([∗ list] γ ∈ γs, ([∗ set] k ∈ DB_keys, lmapsto γ k 1 None)).
   Proof.
     iInduction DB_addrs as [|addr addrs] "Hind" using list_ind.
     {
@@ -166,53 +184,43 @@ Section Alloc.
     iSplitL "init_● γ_●"; iFrame; iExists γ; by iSplit.
   Qed.
 
-  Lemma alloc_db (hash : Key → nat) :
-    (∀ k, k ∈ DB_keys → hash k < length DB_addrs)%nat →
+  (** Provides the information needed to initialize the database *)
+  Lemma alloc_db :
     ⊢ |==> ∃ (dbg : DBG Σ) (γs : list gname), ⌜length γs = length DB_addrs⌝ ∗
-      ⌜∀ k γ, γs !! (hash k) = Some γ → DBG_shards k = γ⌝ ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ γ, ⌜γs !! k = Some γ⌝ ∗
-      shard_mem γ (gset_to_gmap None DB_keys)) ∗
+      ⌜∀ k γ, γs !! (DB_hash k) = Some γ → DBG_hash k = γ⌝ ∗
+      ([∗ list] i ↦ sa ∈ DB_addrs, ∃ γ, ⌜γs !! i = Some γ⌝ ∗
+          shard_mem γ (gset_to_gmap None DB_keys)) ∗
       ([∗ set] k ∈ DB_keys, k ↦ₖ None).
   Proof.
-    move=>hash_valid.
     iMod pre_alloc_db as "(%γs & %len_γs & ●_γs & ◯_γs)".
     iMod (gen_heap_light_init ∅) as "(%default & Hdefault)".
-    set (DBPreG_shards (k : Key) := match γs !! (hash k) with
+    set (hash (k : Key) := match γs !! (DB_hash k) with
                                   Some γ => γ | None => default end).
     set (dbg := {|
                   DBG_mem := DBPreG_mem;
                   DBG_lockG := DBPreG_lockG;
-                  DBG_shards := DBPreG_shards;
+                  DBG_hash := hash;
                 |}).
     iModIntro.
     iExists dbg, γs.
-    iFrame.
-    iSplit; first done.
-    iSplit; first by (iPureIntro; rewrite/=/DBPreG_shards =>k γ ->).
+    iFrame "∗%".
+    iSplit; first by (iPureIntro; rewrite/=/hash =>k γ ->).
     iInduction DB_keys as [|k keys k_keys] "Hind" using set_ind_L; first done.
-    have hash_k : (hash k < length DB_addrs)%nat
-              by apply hash_valid; set_solver.
-    move: (lookup_lt_is_Some_2 _ _ hash_k)=>[sa addrs_k].
-    iPoseProof (big_sepL_lookup_acc_impl (hash k) _ addrs_k with "◯_γs")
-            as "((%γ & %k_γ & ◯_γ) & lookup)".
+    move: (DB_hash_valid k).
+    rewrite -len_γs=>/(lookup_lt_is_Some_2 _ _)=>[][γ γ_k].
+    iPoseProof (big_sepL_lookup_acc_impl (DB_hash k) _ γ_k with "◯_γs")
+            as "(◯_γ & lookup)".
     iPoseProof (big_sepS_insert _ _ _ k_keys with "◯_γ") as "(◯_γ & ◯_keys)".
     iApply (big_sepS_insert_2 with "[◯_γ]");
-        first by have <- : (DBG_shards k) = γ by rewrite/=/DBPreG_shards k_γ.
-    iPoseProof ("lookup" $! (λ i sa, (∃ γ0 : gname,
-         ⌜γs !! i = Some γ0⌝ ∗ ([∗ set] k1 ∈ keys, lmapsto γ0 k1 1 None))%I)
-          with "[] [◯_keys]") as "◯_keys".
+        first by have <- : (DBG_hash k) = γ by rewrite/=/hash γ_k.
+    iPoseProof ("lookup" $! (λ i γ0, [∗ set] k1 ∈ keys, lmapsto γ0 k1 1 None)%I
+          with "[] ◯_keys") as "◯_keys".
     {
       iModIntro.
-      iIntros (i ? ? i_shards) "(%γ' & %i_γ' & ◯_γ')".
-      iPoseProof (big_sepS_insert _ _ _ k_keys with "◯_γ'") as "(_ & ◯_γ')".
-      iExists γ'.
-      by iFrame.
+      iIntros (i γ' i_γ' i_k) "◯_γ'".
+      by iPoseProof (big_sepS_insert _ _ _ k_keys with "◯_γ'") as "(_ & ◯_γ')".
     }
-    { iExists γ. by iFrame. }
-    iApply ("Hind" with "[] ◯_keys"); last done.
-    iPureIntro=>k' k'_keys.
-    apply hash_valid.
-    set_solver.
+    iApply ("Hind" with "◯_keys Hdefault").
   Qed.
 
 End Alloc.
@@ -221,18 +229,17 @@ Section user_params.
 
   Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
-  Definition write_ser := prod_serialization string_serialization DB_serialization.
+  Definition write_ser := prod_serialization DB_key_ser DB_val_ser.
 
-  Definition read_ser := string_serialization.
+  Definition read_ser := DB_key_ser.
 
   Definition req_ser := sum_serialization write_ser read_ser.
 
   Definition rep_ser := sum_serialization unit_serialization
-                            (option_serialization DB_serialization).
+                            (option_serialization DB_val_ser).
 
-  Definition ReqData : Type := (coPset * (iProp Σ) * (iProp Σ) * Key *
-                                  SerializableVal) +
-              (coPset * (iProp Σ) * (option val → iProp Σ) * Key).
+  Definition ReqData : Type := (coPset * (iProp Σ) * Key * Val) +
+              (coPset * (option Val → iProp Σ) * Key).
 
   Definition RepData : Type := True.
 
@@ -240,19 +247,15 @@ Section user_params.
     ser_is_injective write_ser.
   Proof.
     apply prod_ser_is_ser_injective;
-      [apply string_ser_is_ser_injective|apply DB_ser_inj].
+      [apply DB_key_ser_inj|apply DB_val_ser_inj].
   Qed.
 
   Lemma write_ser_is_ser_injective_alt :
     ser_is_injective_alt write_ser.
   Proof.
     apply prod_ser_is_ser_injective_alt;
-      [apply string_ser_is_ser_injective_alt|apply DB_ser_inj_alt].
+      [apply DB_key_ser_inj_alt|apply DB_val_ser_inj_alt].
   Qed.
-
-  Definition read_ser_is_ser_injective := string_ser_is_ser_injective.
-
-  Definition read_ser_is_ser_injective_alt := string_ser_is_ser_injective_alt.
 
   Lemma unit_ser_is_ser_injective : ser_is_injective unit_serialization.
   Proof.
@@ -265,30 +268,30 @@ Section user_params.
   Qed.
 
   Lemma option_ser_is_ser_injective : ser_is_injective
-    (option_serialization DB_serialization).
+    (option_serialization DB_val_ser).
   Proof.
     move=>s v1 v2[[->->][[->_]|[w][sw][->][_]]|[w][sw][->][ser_w->/=
             [[->]|[w'][sw'][->][ser_w'][sw_sw']]]]//.
-    by move:sw_sw' ser_w ser_w'=>->h/(DB_ser_inj _ _ _ h)->.
+    by move:sw_sw' ser_w ser_w'=>->h/(DB_val_ser_inj _ _ _ h)->.
   Qed.
 
   Lemma option_ser_is_ser_injective_alt : ser_is_injective_alt
-    (option_serialization DB_serialization).
+    (option_serialization DB_val_ser).
   Proof.
     by move=>s1 s2 v[[->->][[_->]|[w][sw][]]|[w][sw][->][ser_w]->/=
-            [[]|[w'][sw'][][<-][]/(DB_ser_inj_alt _ _ _ ser_w)->]].
+            [[]|[w'][sw'][][<-][]/(DB_val_ser_inj_alt _ _ _ ser_w)->]].
   Qed.
 
   Lemma req_ser_is_ser_injective : ser_is_injective req_ser.
   Proof.
     apply sum_ser_is_ser_injective;
-      [apply write_ser_is_ser_injective|apply read_ser_is_ser_injective].
+      [apply write_ser_is_ser_injective|apply DB_key_ser_inj].
   Qed.
 
   Lemma req_ser_is_ser_injective_alt : ser_is_injective_alt req_ser.
   Proof.
     apply sum_ser_is_ser_injective_alt;
-      [apply write_ser_is_ser_injective_alt|apply read_ser_is_ser_injective_alt].
+      [apply write_ser_is_ser_injective_alt|apply DB_key_ser_inj_alt].
   Qed.
 
   Lemma rep_ser_is_ser_injective : ser_is_injective rep_ser.
@@ -304,19 +307,18 @@ Section user_params.
   Qed.
 
   Definition ReqPre (req : val) (data : ReqData) : iProp Σ :=
-    (∃ E P Q (k : Key) (v : SerializableVal), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗
-      ⌜req = InjLV (#k, v)%V⌝ ∗ ⌜data = inl (E, P, Q, k, v)⌝ ∗ P ∗
-      □ (P ={⊤, E}=∗ ∃ old, k ↦ₖ old ∗ ▷(k ↦ₖ Some (SV_val v) ={E, ⊤}=∗ Q))) ∨
-     (∃ E P Q (k : Key), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗ ⌜req = InjRV #k⌝ ∗
-      ⌜data = inr (E, P, Q, k)⌝ ∗ P ∗
-      □ (P ={⊤, E}=∗ ∃ v, k ↦ₖ v ∗ ▷ (k ↦ₖ v ={E,⊤}=∗ Q v))).
+    (∃ E Q (k : Key) (v : Val), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗
+      ⌜req = InjLV ($k, $v)%V⌝ ∗ ⌜data = inl (E, Q, k, v)⌝ ∗
+      (|={⊤, E}=> ∃ old, k ↦ₖ old ∗ ▷(k ↦ₖ Some v ={E, ⊤}=∗ Q))) ∨
+     (∃ E Q (k : Key), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗ ⌜req = InjRV $k⌝ ∗
+      ⌜data = inr (E, Q, k)⌝ ∗
+      (|={⊤, E}=> ∃ v, k ↦ₖ v ∗ ▷ (k ↦ₖ v ={E,⊤}=∗ Q v))).
 
   Definition ReqPost (rep : val) (data : ReqData) (_ : RepData) : iProp Σ :=
-    (∃ E P (Q : iProp Σ) (k : Key) (v : SerializableVal), Q ∗
-      ⌜rep = InjLV #()⌝ ∗ ⌜data = inl (E, P, Q, k, v)⌝) ∨
-    (∃ E P Q (k : Key), ⌜data = inr (E, P, Q, k)⌝ ∗
-      ((∃ v : SerializableVal, ⌜rep = InjRV (SOMEV v)⌝ ∗ Q (Some (SV_val v))) ∨
-      (⌜rep = InjRV NONEV⌝ ∗ Q None))).
+    (∃ E (Q : iProp Σ) (k : Key) (v : Val), Q ∗
+      ⌜rep = InjLV #()⌝ ∗ ⌜data = inl (E, Q, k, v)⌝) ∨
+    (∃ E Q (k : Key), ⌜data = inr (E, Q, k)⌝ ∗ 
+      (∃ vo : option Val, ⌜rep = InjRV $vo⌝ ∗ Q vo)).
 
   Global Instance user_params_at_server : MTS_user_params :=
     {|
@@ -335,12 +337,12 @@ Section user_params.
     |}.
 
   Definition shardReqPre γ (req : val) (data : ReqData) : iProp Σ :=
-    (∃ E P Q (k : Key) (v : SerializableVal), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗
-      ⌜req = InjLV (#k, v)%V⌝ ∗ ⌜data = inl (E, P, Q, k, v)⌝ ∗ P ∗ ⌜DBG_shards k = γ⌝ ∗
-      □ (P ={⊤, E}=∗ ∃ old, k ↦ₖ old ∗ ▷(k ↦ₖ Some (SV_val v) ={E, ⊤}=∗ Q))) ∨
-     (∃ E P Q (k : Key), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗ ⌜req = InjRV #k⌝ ∗
-      ⌜data = inr (E, P, Q, k)⌝ ∗ P ∗ ⌜DBG_shards k = γ⌝ ∗
-      □ (P ={⊤, E}=∗ ∃ v, k ↦ₖ v ∗ ▷ (k ↦ₖ v ={E,⊤}=∗ Q v))).
+    (∃ E Q (k : Key) (v : Val), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗
+      ⌜req = InjLV ($k, $v)%V⌝ ∗ ⌜data = inl (E, Q, k, v)⌝ ∗ ⌜DBG_hash k = γ⌝ ∗
+      (|={⊤, E}=> ∃ old, k ↦ₖ old ∗ ▷(k ↦ₖ Some v ={E, ⊤}=∗ Q))) ∨
+     (∃ E Q (k : Key), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗ ⌜req = InjRV $k⌝ ∗
+      ⌜data = inr (E, Q, k)⌝ ∗ ⌜DBG_hash k = γ⌝ ∗
+      (|={⊤, E}=> ∃ v, k ↦ₖ v ∗ ▷ (k ↦ₖ v ={E,⊤}=∗ Q v))).
 
   Global Instance user_params_at_shard γ sa : MTS_user_params :=
     {|
