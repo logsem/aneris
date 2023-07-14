@@ -1066,7 +1066,7 @@ Qed.
 (* WIP solution for generic fuel-handling *)
 Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
   match to_val e1 with
-  | Some v => |={E}=> Φ (of_val v)
+  | Some v => pre_step_mod E (Φ (of_val v))
   | None => ∀ σ1,
       gen_heap_interp σ1.(heap) ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
@@ -1093,6 +1093,41 @@ Proof.
   apply head_reducible_prim_step in Hstep; [|by eauto].
   inv_head_step. iFrame. done.
 Qed.
+
+Lemma wp_nostep_with_val s tid E e fs P Φ :
+  fs ≠ ∅ →
+  sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
+  has_fuels_S tid fs -∗
+  WP e @ s; tid; E {{ Φ }}.
+Proof.
+  iIntros (?) "Hwp HfuelS".
+  rewrite wp_unfold /wp_pre /sswp /=.
+  destruct (to_val e).
+  { iIntros (??) "(?&?&Hσ)". 
+    (* TODO: Needs to decrement fuel *)
+    admit. }
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
+  rewrite Hends.
+  iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
+  iModIntro. iSplit; [done|].
+  iIntros (e2 σ2 efs Hstep).
+  iMod ("Hwp" with "[//]") as "Hwp".
+  iIntros "!>!>". iMod "Hwp". iIntros "!>".
+  iApply step_fupdN_intro; [done|]. iIntros "!>".
+  iMod "Hwp".
+  iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  { by intros ?%dom_empty_inv_L. }
+  { set_solver. }
+  { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
+  { by rewrite Hends. }
+  iIntros "!>".
+  iDestruct "Hwp" as "[Hsi [Hwp ->]]".
+  iExists _, _. iFrame. iSplit; [done|].
+  rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver].
+  iDestruct ("Hwp" with "Hfuel") as "Hwp". iSplit; [|done].
+  iApply (wp_wand with "Hwp").
+  iIntros (v) "HΦ'". iFrame.
+Admitted.
 
 Lemma wp_nostep s tid E e fs Φ :
   TCEq (to_val e) None →
@@ -1128,7 +1163,8 @@ Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) :
 Proof.
   iIntros "HΦΨ HΦ".
   rewrite /sswp.
-  destruct (to_val e); [by iApply "HΦΨ"|].
+  destruct (to_val e).
+  { iIntros (??) "Hσ". iMod ("HΦ" with "Hσ") as "[$ HΦ]". by iApply "HΦΨ". }
   iIntros (?) "H".
   iMod ("HΦ" with "H") as "[%Hs HΦ]".
   iModIntro. iSplit; [done|].
