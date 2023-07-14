@@ -1,4 +1,4 @@
-open !Ast
+(* open !Ast
 open Serialization_code
 open Network_util_code
 open Par_code
@@ -139,4 +139,4 @@ let node_check_account caddr1 caddr2 kvs_addr =
 let server srv =
   unsafe (fun () -> Printf.printf "Start server.\n%!");
   init_server int_serializer srv;
-  unsafe (fun () -> Printf.printf "Server started.\n%!")
+  unsafe (fun () -> Printf.printf "Server started.\n%!") *)

@@ -63,7 +63,7 @@ ML_SOURCES:
 	examples/reliable_communication/examples/messages_in_order_loop/messages_in_order_loop_code.ml
 	examples/snapshot_isolation/snapshot_isolation_code.ml
   	examples/snapshot_isolation/util/util_code.ml
-  	examples/snapshot_isolation/examples/anomalie/anomalie_code.ml
+  	examples/snapshot_isolation/examples/deprecated/anomalie/anomalie_code.ml
 	examples/snapshot_isolation/examples/classical_example/classical_example_code.ml
 	examples/snapshot_isolation/examples/function_call/function_call_code.ml
 	examples/snapshot_isolation/examples/causality_example/causality_example_code.ml

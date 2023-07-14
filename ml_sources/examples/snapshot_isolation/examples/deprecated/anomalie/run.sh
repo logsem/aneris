@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-EXE="~/research/aneris/ml_sources/_build/default/examples/snapshot_isolation/examples/anomalie/anomalie_runner.exe"
+EXE="~/research/aneris/ml_sources/_build/default/examples/snapshot_isolation/examples/deprecated/anomalie/anomalie_runner.exe"
 
 RUN () {
    osascript -e 'tell app "Terminal" to do script "'"${EXE//\"/\\\"} ${1//\"/\\\"} ${2//\"/\\\"}"'"'
