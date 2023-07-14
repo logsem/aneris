@@ -12,7 +12,7 @@ From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
 From aneris.examples.snapshot_isolation.examples.sequential_writes 
-  Require Import sequential_writes_code_exp.
+  Require Import sequential_writes_code.
 Import ser_inj.
 From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.

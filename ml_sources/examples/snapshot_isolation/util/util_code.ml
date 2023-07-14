@@ -8,7 +8,7 @@ let commitU cst : unit =
 let commitT cst : unit =
   assert (commit cst)
 
-let wait_transaction (cst : int connection_state)
+let wait_transaction (cst : 'a connection_state)
     (cond : 'a -> bool) (k : string) : unit =
   let rec aux () =
     start cst;

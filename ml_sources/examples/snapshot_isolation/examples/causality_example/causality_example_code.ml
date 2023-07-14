@@ -9,14 +9,14 @@ let transaction1 cst =
   commitU cst
 
 let transaction2 cst =
+  wait_transaction cst (fun v -> v = 1) "x";
   start cst;
-  wait_on_keyT cst (fun v -> v = 1) "x";
   write cst "y" 1;
   commitU cst
 
 let transaction3 cst =
+  wait_transaction cst (fun v -> v = 1) "y";
   start cst;
-  wait_on_keyT cst (fun v -> v = 1) "y";
   let vx = read cst "x" in
   assert (vx = Some 1);
   commitU cst

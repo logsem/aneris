@@ -10,7 +10,7 @@ let transaction1 cst =
 
 let transaction2 cst f =
   start cst;
-  let r = f "x" in
+  let r = f cst "x" in
   write cst "y" r;
   commitU cst
 
