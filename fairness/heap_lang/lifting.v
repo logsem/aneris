@@ -1066,7 +1066,7 @@ Qed.
 (* WIP solution for generic fuel-handling *)
 Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
   match to_val e1 with
-  | Some v => pre_step_mod E (Φ (of_val v))
+  | Some v => |={E}=> (Φ (of_val v))
   | None => ∀ σ1,
       gen_heap_interp σ1.(heap) ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
@@ -1092,9 +1092,17 @@ Proof.
   iFrame.
   apply head_reducible_prim_step in Hstep; [|by eauto].
   inv_head_step. iFrame. done.
-Qed.
+Qed.  
 
-Lemma wp_nostep_with_val s tid E e fs P Φ :
+Lemma has_fuels_decr E tid fs :
+  has_fuels_S tid fs -∗ |~{E}~| has_fuels tid fs.
+Proof. Admitted.
+
+Lemma has_fuels_delete E tid fs ρ :
+  has_fuels tid fs -∗ |~{E}~| has_fuels tid (delete ρ fs).
+Proof. Admitted.
+  
+Lemma wp_fuel_step s tid E e fs Φ :
   fs ≠ ∅ →
   sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
   has_fuels_S tid fs -∗
@@ -1103,9 +1111,11 @@ Proof.
   iIntros (?) "Hwp HfuelS".
   rewrite wp_unfold /wp_pre /sswp /=.
   destruct (to_val e).
-  { iIntros (??) "(?&?&Hσ)". 
-    (* TODO: Needs to decrement fuel *)
-    admit. }
+  { (* This should be possible without fupd_pre_step? Probably import stuff. *)
+    iMod (has_fuels_decr with "HfuelS") as "Hfuel".
+    iDestruct ("Hwp" with "Hfuel") as "Hwp".
+    iDestruct (wp_value_inv with "Hwp") as "Hwp".
+    iApply fupd_pre_step. iMod "Hwp". by iIntros "!>!>". }
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
   rewrite Hends.
   iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
@@ -1127,7 +1137,18 @@ Proof.
   iDestruct ("Hwp" with "Hfuel") as "Hwp". iSplit; [|done].
   iApply (wp_wand with "Hwp").
   iIntros (v) "HΦ'". iFrame.
-Admitted.
+Qed.
+
+Lemma wp_fuel_dealloc s tid E e fs ρ Φ :
+  has_fuels tid fs -∗
+  (has_fuels tid (delete ρ fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
+  WP e @ s; tid; E {{ Φ }}.
+Proof.
+  iIntros "Hfuels Hwp".
+  (* TODO: add typeclass to allow iMod'ing pre_step mods under WP's *)
+  iApply pre_step_wp. iMod (has_fuels_delete with "Hfuels") as "Hfuels".
+  iIntros "!>". by iApply "Hwp".
+Qed.
 
 Lemma wp_nostep s tid E e fs Φ :
   TCEq (to_val e) None →
@@ -1164,7 +1185,7 @@ Proof.
   iIntros "HΦΨ HΦ".
   rewrite /sswp.
   destruct (to_val e).
-  { iIntros (??) "Hσ". iMod ("HΦ" with "Hσ") as "[$ HΦ]". by iApply "HΦΨ". }
+  { iMod "HΦ". by iApply "HΦΨ". }
   iIntros (?) "H".
   iMod ("HΦ" with "H") as "[%Hs HΦ]".
   iModIntro. iSplit; [done|].

@@ -470,9 +470,7 @@ Proof.
   iIntros "HΦ". rewrite wp_unfold /wp_pre to_of_val. by iIntros "!>".
 Qed.
 Lemma wp_value_inv' s E ζ Φ v :
-  WP of_val v @ s; ζ; E {{ Φ }} -∗
-  ∀ extr atr, state_interp extr atr ={E}=∗
-              state_interp extr atr ∗ Φ v.
+  WP of_val v @ s; ζ; E {{ Φ }} -∗ |~{E}~| Φ v.
 Proof. by rewrite wp_unfold /wp_pre to_of_val pre_step_unseal. Qed.
 
 Lemma wp_strong_mono s1 s2 E1 E2 ζ e Φ Ψ :
@@ -698,7 +696,7 @@ Proof.
     + simpl in *.
       destruct HSA as [v <-%of_to_val].
       iDestruct (wp_value_inv' with "H") as "H".
-      iMod ("H" with "Hsi") as "[Hsi H]".
+      iMod (pre_step_elim with "Hsi H") as "[Hsi H]".
       iDestruct ("H" with "HR") as ">H".
       iModIntro. iExists _, _.
       iFrame "Hsi Hefs". by iApply wp_value'.
@@ -802,7 +800,7 @@ Proof.
   - simpl in *.
     destruct Hs as [v <-%of_to_val].
     iDestruct (wp_value_inv' with "H") as "H".
-    iDestruct ("H" with "Hsi") as ">[Hsi H]".
+    iMod (pre_step_elim with "Hsi H") as "[Hsi H]".
     iDestruct ("H" with "HR") as ">H".
     iModIntro. iExists _, _.
     iFrame "Hsi Hefs". by iApply wp_value'.
@@ -980,10 +978,7 @@ Lemma wp_value_fupd s E Φ ζ e v `{!IntoVal e v} :
   (|={E}=> Φ v) ⊢ WP e @ s; ζ;  E {{ Φ }}.
 Proof. intros. rewrite -wp_fupd -wp_value //. Qed.
 Lemma wp_value_inv s E Φ ζ e v :
-  IntoVal e v →
-  WP e @ s; ζ; E {{ Φ }} -∗
-               (∀ extr atr, state_interp extr atr ={E}=∗
-                            state_interp extr atr ∗ Φ v).
+  IntoVal e v → WP e @ s; ζ; E {{ Φ }} -∗ |~{E}~| Φ v.
 Proof. intros <-. by apply wp_value_inv'. Qed.
 
 Lemma wp_frame_l s E ζ e Φ R : R ∗ WP e @ s; ζ; E {{ Φ }} ⊢ WP e @ s; ζ; E {{ v, R ∗ Φ v }}.

@@ -717,26 +717,18 @@ Section adequacy_helper_lemmas.
     eapply Forall2_lookup. intros i. destruct (prefixes t0 !! i) as [[??]|]; by constructor.
   Qed.
 
-  Definition pre_step_mod E P : iProp Σ :=
-    ∀ extr atr, state_interp extr atr ={E}=∗
-                state_interp extr atr ∗ P.
-
-  Lemma pre_step_mod_elim extr atr E P :
-    state_interp extr atr -∗ pre_step_mod E P ={E}=∗ state_interp extr atr ∗ P.
-  Proof. iIntros "Hσ HP". by iApply "HP". Qed.
-
   Lemma wp_of_val_post e s Φ ζ:
     WP e @ s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
-    from_option (λ v, pre_step_mod ⊤ $ Φ v) True (to_val e) ∗
-    (from_option (λ v, pre_step_mod ⊤ $ Φ v) True (to_val e) -∗
+    from_option (λ v, |~{⊤}~| Φ v) True (to_val e) ∗
+    (from_option (λ v, |~{⊤}~| Φ v) True (to_val e) -∗
      WP e @ s; ζ; ⊤ {{ v, Φ v }}).
   Proof.
     iIntros "Hwp".
     rewrite wp_unfold /wp_pre.
     destruct (to_val e) eqn:He; simpl.
     - iSplitL.
-      + iIntros "!>" (??) "Hσ". by iApply "Hwp".
-      + iIntros "!> Hwp". done.
+      + by iIntros "!>!>".
+      + by iIntros "!> Hwp".
     - iModIntro.
       iSplit; first by iClear "Hwp".
       iIntros "_"; done.
@@ -786,37 +778,201 @@ Section adequacy_helper_lemmas.
   (*     iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done. *)
   (* Qed. *)
 
-  Lemma wptp_of_val_post_strong t s Φs t0:
-    wptp_from t0 s t Φs ={⊤}=∗
-    posts_of t ((λ Φ, λ v, pre_step_mod ⊤ (Φ v)) <$> Φs) ∗
-    (posts_of t ((λ Φ, λ v, pre_step_mod ⊤ (Φ v)) <$> Φs) -∗ wptp_from t0 s t Φs).
+
+  Lemma wptp_of_val_post t s Φs t0:
+    wptp_from t0 s t Φs -∗ |~{⊤}~|
+    posts_of t Φs ∗
+    (posts_of t Φs -∗ wptp_from t0 s t Φs).
   Proof.
     iIntros "Ht"; simpl.
     iInduction t as [|e t IHt] "IH" forall (Φs t0); simpl.
-    { iDestruct (big_sepL2_nil_inv_l with "Ht") as %->; eauto. }
+    { iDestruct (big_sepL2_nil_inv_l with "Ht") as %->; eauto.
+      iIntros "!>". eauto. }
     iDestruct (big_sepL2_cons_inv_l with "Ht") as (Φ Φs') "[-> [He Ht]] /=".
     iMod (wp_of_val_post with "He") as "[Hpost Hback]".
     iMod ("IH" with "Ht") as "[Ht Htback]".
-    iModIntro.
     destruct (to_val e); simpl.
     - iFrame.
+      iIntros "!>". iFrame.
       iIntros "[Hpost Htpost]".
       iSplitL "Hpost Hback"; [iApply "Hback"|iApply "Htback"]; iFrame.
-    - iFrame.
+      by iIntros "!>".
+    - iIntros "!>".
+      iFrame.
       iIntros "Hefspost".
       iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done.
   Qed.
 
-  Lemma wptp_of_val_post t s Φs t0:
-    wptp_from t0 s t Φs ={⊤}=∗
-    pre_step_mod ⊤ (posts_of t Φs) ∗
-    (pre_step_mod ⊤ (posts_of t Φs) -∗ wptp_from t0 s t Φs).
-  Proof.
-    iIntros "Ht"; simpl. iMod (wptp_of_val_post_strong with "Ht") as "[Ht Ht2]".
-    iModIntro.
-    (* TODO: This is possible with induction. *)
-  Admitted.
 
+  (* Lemma wptp_of_val_post_strong t s Φs t0: *)
+  (*   wptp_from t0 s t Φs -∗ |~{⊤}~| *)
+  (*   posts_of t ((λ Φ, λ v, (Φ v)) <$> Φs) ∗ *)
+  (*   (posts_of t ((λ Φ, λ v, (Φ v)) <$> Φs) -∗ wptp_from t0 s t Φs). *)
+  (* Proof. *)
+  (*   iIntros "Ht"; simpl. *)
+  (*   iInduction t as [|e t IHt] "IH" forall (Φs t0); simpl. *)
+  (*   { iDestruct (big_sepL2_nil_inv_l with "Ht") as %->; eauto. *)
+  (*     iIntros "!>". eauto. } *)
+  (*   iDestruct (big_sepL2_cons_inv_l with "Ht") as (Φ Φs') "[-> [He Ht]] /=". *)
+  (*   iMod (wp_of_val_post with "He") as "[Hpost Hback]". *)
+  (*   iMod ("IH" with "Ht") as "[Ht Htback]". *)
+  (*   destruct (to_val e); simpl. *)
+  (*   - iFrame. *)
+  (*     iIntros "!>". iFrame. *)
+  (*     iIntros "[Hpost Htpost]". *)
+  (*     iSplitL "Hpost Hback"; [iApply "Hback"|iApply "Htback"]; iFrame. *)
+  (*     by iIntros "!>". *)
+  (*   - iIntros "!>". *)
+  (*     iFrame. *)
+  (*     iIntros "Hefspost". *)
+  (*     iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done. *)
+  (* Qed. *)
+
+  (* Lemma wptp_of_val_post_strong t s Φs t0: *)
+  (*   wptp_from t0 s t Φs ={⊤}=∗ *)
+  (*   posts_of t ((λ Φ, λ v, |~{⊤}~| (Φ v)) <$> Φs) ∗ *)
+  (*   (posts_of t ((λ Φ, λ v, |~{⊤}~| (Φ v)) <$> Φs) -∗ wptp_from t0 s t Φs). *)
+  (* Proof. *)
+  (*   iIntros "Ht"; simpl. *)
+  (*   iInduction t as [|e t IHt] "IH" forall (Φs t0); simpl. *)
+  (*   { iDestruct (big_sepL2_nil_inv_l with "Ht") as %->; eauto. } *)
+  (*   iDestruct (big_sepL2_cons_inv_l with "Ht") as (Φ Φs') "[-> [He Ht]] /=". *)
+  (*   iMod (wp_of_val_post with "He") as "[Hpost Hback]". *)
+  (*   iMod ("IH" with "Ht") as "[Ht Htback]". *)
+  (*   iModIntro. *)
+  (*   destruct (to_val e); simpl. *)
+  (*   - iFrame. *)
+  (*     iIntros "[Hpost Htpost]". *)
+  (*     iSplitL "Hpost Hback"; [iApply "Hback"|iApply "Htback"]; iFrame. *)
+  (*   - iFrame. *)
+  (*     iIntros "Hefspost". *)
+  (*     iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done. *)
+  (* Qed. *)
+
+  (* (* Notation posts_of_alt es Φs := *) *)
+  (* (* ([∗ list] e;Φ ∈ es;Φs, match to_val e with *) *)
+  (* (*                        | None => True *) *)
+  (* (*                        | Some v => Φ v *) *)
+  (* (*                        end)%I. *) *)
+
+  (* (* Lemma posts_of_posts_of_alt es (Φs : list (val Λ → iProp Σ)) : *) *)
+  (* (*   ⊢ posts_of es Φs ∗-∗ posts_of_alt es Φs. *) *)
+  (* (* Proof. *) *)
+  (* (*   iSplit. *) *)
+  (* (*   - iInduction es as [|e es] "IHes" forall (Φs). *) *)
+  (* (*     { admit. } *) *)
+  (* (*   rewrite big_sepL2_alt. *) *)
+  (* (*   rewrite big_sepL_omap big_sepL_zip_with. *) *)
+  (* (*   iIntros "H". *) *)
+    
+  (* Lemma big_sepL_pre_step {A} E (xs : list A) (P : nat → A → iProp Σ) : *)
+  (*   ([∗ list] k↦x ∈ xs, |~{E}~| P k x) -∗ |~{E}~| [∗ list] k↦x ∈ xs, P k x. *)
+  (* Proof. *)
+  (*   iIntros "Hxs". *)
+  (*   iInduction xs as [|x xs] "IHxs". *)
+  (*   { iIntros "!>". done. } *)
+  (*   iDestruct "Hxs" as "[Hx Hxs]". *)
+  (*   iMod "Hx". *)
+  (* Admitted. *)
+  (* (*   iMod ("IHxs" with "Hxs") as "Hxs". *) *)
+  (* (*   iIntros "!>". iFrame. *) *)
+  (* (* Qed. *) *)
+
+  (* Lemma wptp_of_val_post t s Φs t0: *)
+  (*   wptp_from t0 s t Φs ={⊤}=∗ *)
+  (*   ((|~{⊤}~| posts_of t Φs) ∗ *)
+  (*            (|~{⊤}~| ((((posts_of t Φs))) -∗ wptp_from t0 s t Φs))). *)
+  (* Proof. *)
+  (*   iIntros "Ht"; simpl. iMod (wptp_of_val_post_strong with "Ht") as "[Ht Ht2]". *)
+  (*   rewrite big_sepL_omap big_sepL_zip_with. *)
+  (*   iDestruct (big_sepL_impl _ *)
+  (*                (λ k x, |~~| match Φs !! k with *)
+  (*        | Some y => *)
+  (*            from_option (λ y0 : val Λ * (val Λ → iPropI Σ), y0.2 y0.1) emp *)
+  (*              ((λ v0 : val Λ, (v0, (x, y).2)) <$> to_val (x, y).1) *)
+  (*        | None => emp *)
+  (*        end)%I *)
+  (*               with "Ht []") as "Ht". *)
+  (*   { iIntros "!>" (k x Hin) "Hx". *)
+  (*     simpl. *)
+  (*     rewrite !list_lookup_fmap. *)
+  (*     destruct (Φs !! k) eqn:Heqn. *)
+  (*     - rewrite Heqn=> /=. *)
+  (*       destruct (to_val x)=> /=. *)
+  (*       + done. *)
+  (*       + by iIntros "!>". *)
+  (*     - rewrite Heqn=> /=. by iIntros "!>". } *)
+  (*   iDestruct (big_sepL_pre_step with "Ht") as "Ht". *)
+  (*   iIntros "!>". *)
+  (*   iSplitL "Ht". *)
+  (*   { rewrite big_sepL_omap big_sepL_zip_with. by iIntros "!>". } *)
+    
+  (*   iIntros "H". *)
+  (*   iApply "Ht2". *)
+    
+  (*   iInduction t as [|e es] "IHes" forall (s Φs t0). *)
+  (*   { iIntros "!>". simpl. iIntros "!>". by iFrame. } *)
+  (*   destruct Φs; [admit|]. *)
+  (*   rewrite big_sepL_omap big_sepL_zip_with. *)
+  (*   rewrite big_sepL_cons. *)
+  (*   iDestruct "Ht" as "[Ht' Ht]". *)
+  (*   iDestruct ("IHes" $! _ Φs with "[Ht]") as "Hes". *)
+  (*   { rewrite big_sepL_omap big_sepL_zip_with. done. } *)
+
+
+  (* Lemma wptp_of_val_post t s Φs t0: *)
+  (*   wptp_from t0 s t Φs ={⊤}=∗ *)
+  (*   |~{⊤}~| ((posts_of t Φs) ∗ *)
+  (*            (((posts_of t Φs)) -∗ wptp_from t0 s t Φs)). *)
+  (* Proof. *)
+  (*   iIntros "Ht"; simpl. iMod (wptp_of_val_post_strong with "Ht") as "[Ht Ht2]". *)
+  (*   iInduction t as [|e es] "IHes" forall (s Φs t0). *)
+  (*   { iIntros "!>". simpl. iIntros "!>". by iFrame. } *)
+  (*   destruct Φs; [admit|]. *)
+  (*   rewrite big_sepL_omap big_sepL_zip_with. *)
+  (*   rewrite big_sepL_cons. *)
+  (*   iDestruct "Ht" as "[Ht' Ht]". *)
+  (*   iDestruct ("IHes" $! _ Φs with "[Ht]") as "Hes". *)
+  (*   { rewrite big_sepL_omap big_sepL_zip_with. done. } *)
+    
+  (*     done. *)
+  (*   iDestruct "Ht2" as "[Ht2' Ht2]". *)
+  (*   simpl. *)
+  (*   simpl. *)
+
+  (* Lemma wptp_of_val_post t s Φs t0: *)
+  (*   wptp_from t0 s t Φs ={⊤}=∗ *)
+  (*   |~{⊤}~| ((posts_of t Φs) ∗ *)
+  (*            (((posts_of t Φs)) -∗ wptp_from t0 s t Φs)). *)
+  (* Proof. *)
+  (*   iIntros "Ht"; simpl. iMod (wptp_of_val_post_strong with "Ht") as "[Ht Ht2]". *)
+  (*   iInduction Φs as [|Φ Φs] "IHΦs" forall (s t t0). *)
+  (*   { iIntros "!>". simpl. rewrite zip_with_nil_r. simpl. *)
+  (*     iIntros "!>". *)
+  (*     iSplitR; [done|]. *)
+  (*     iIntros "H". by iApply "Ht2". }     *)
+    
+    
+  (*   rewrite big_sepL_omap big_sepL_zip_with. *)
+  (*   simpl. *)
+    
+
+  (* Lemma wptp_of_val_post t s Φs t0: *)
+  (*   wptp_from t0 s t Φs ={⊤}=∗ *)
+  (*   (|~{⊤}~| (posts_of t Φs)) ∗ *)
+  (*   ((|~{⊤}~| (posts_of t Φs)) -∗ wptp_from t0 s t Φs). *)
+  (* Proof. *)
+  (*   iIntros "Ht"; simpl. iMod (wptp_of_val_post_strong with "Ht") as "[Ht Ht2]". *)
+  (*   iInduction Φs as [|Φ Φs] "IHΦs" forall (s t t0). *)
+  (*   { iIntros "!>". simpl. rewrite zip_with_nil_r. simpl. *)
+  (*     iSplitR; [by iIntros "!>"|]. *)
+  (*     iIntros "H". by iApply "Ht2". } *)
+    
+  (*   rewrite big_sepL_omap big_sepL_zip_with. simpl. *)
+    
+
+  (*   simpl in *. *)
+  (* Admitted. *)
 
   Notation newelems t t' := (drop (length t) t').
   Notation newposts t t' :=
@@ -965,8 +1121,8 @@ Section adequacy_helper_lemmas.
       erewrite (locale_step_preserve e1 e2) =>//.
       iDestruct (wptp_cons_l with "He2 Ht2efs") as "He2t2efs".
       iDestruct (wptp_app with "Ht1 He2t2efs") as "Hc2"; [by list_simplifier|].
-      iMod (wptp_of_val_post with "Hc2") as "[Hc2posts Hc2back]".
-      iMod (pre_step_mod_elim with "HSI Hc2posts") as "[HSI Hc2posts]".
+      iDestruct (wptp_of_val_post with "Hc2") as "Hc2".
+      iMod (pre_step_elim with "HSI Hc2") as "[HSI [Hc2posts Hc2back]]".
       iModIntro; simpl in *.
       iSplit.
       { iPureIntro; set_solver. }
@@ -976,29 +1132,27 @@ Section adequacy_helper_lemmas.
       list_simplifier.
       erewrite newposts_locales_equiv;
         [iFrame | apply locales_equiv_middle; erewrite <-locale_step_preserve =>//].
-      iIntros "H".
-  Admitted.
-  (*     iDestruct ("Hc2back" with "Hc2posts") as "H". iFrame. *)
-  (*     iIntros "H". iSpecialize ("Hc2back" with "H"). *)
-  (*     rewrite prefixes_from_app //. *)
-  (*   - rewrite /= /config_wp. *)
-  (*     iDestruct ("config_wp" with "[] [] [] HSI") as "Hcfg"; [done|done|done|]. *)
-  (*     iMod "Hcfg". iModIntro. iMod "Hcfg". iModIntro. *)
-  (*     iNext. iMod "Hcfg". iModIntro. *)
-  (*     iApply (step_fupdN_wand with "[Hcfg]"); first by iApply "Hcfg". *)
-  (*     iIntros "Hcfg". *)
-  (*     iMod "Hcfg" as (δ2 ℓ) "HSI". *)
-  (*     assert (valid_exec (ex :tr[None]: ((t, σ1).1, σ2))). *)
-  (*     { econstructor; eauto. } *)
-  (*     iMod (wptp_not_stuck _ _ σ2 _ _ _ [] with "HSI Hc1") as "[HSI [Hc1 %]]"; *)
-  (*       [apply locales_equiv_refl|done|by list_simplifier|]. *)
-  (*     iMod (wptp_of_val_post with "Hc1") as "[Hc1posts Hc1back]". *)
-  (*     iModIntro. *)
-  (*     iSplit; first by auto. *)
-  (*     iExists δ2, ℓ. *)
-  (*     rewrite newposts_same_empty. list_simplifier. *)
-  (*     iFrame. *)
-  (* Qed. *)
+      iIntros "H". iSpecialize ("Hc2back" with "H").
+      rewrite prefixes_from_app //.
+    - rewrite /= /config_wp.
+      iDestruct ("config_wp" with "[] [] [] HSI") as "Hcfg"; [done|done|done|].
+      iMod "Hcfg". iModIntro. iMod "Hcfg". iModIntro.
+      iNext. iMod "Hcfg". iModIntro.
+      iApply (step_fupdN_wand with "[Hcfg]"); first by iApply "Hcfg".
+      iIntros "Hcfg".
+      iMod "Hcfg" as (δ2 ℓ) "HSI".
+      assert (valid_exec (ex :tr[None]: ((t, σ1).1, σ2))).
+      { econstructor; eauto. }
+      iMod (wptp_not_stuck _ _ σ2 _ _ _ [] with "HSI Hc1") as "[HSI [Hc1 %]]";
+        [apply locales_equiv_refl|done|by list_simplifier|].
+      iDestruct (wptp_of_val_post with "Hc1") as "Hc1".
+      iMod (pre_step_elim with "HSI Hc1") as "[HSI [Hc1posts Hc1back]]".
+      iModIntro.
+      iSplit; first by auto.
+      iExists δ2, ℓ.
+      rewrite newposts_same_empty. list_simplifier.
+      iFrame.
+  Qed.
 
 End adequacy_helper_lemmas.
 
@@ -1044,7 +1198,6 @@ Qed.
 Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
   (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
 Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
-
 
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -1143,8 +1296,8 @@ Proof.
   iMod ("Htp") as "(HSI & Htp & %Hnstk)".
   rewrite (last_eq_trace_ends_in _ (tp, σ1')) in Hnstk; last done.
   iPoseProof (wptp_of_val_post with "Htp") as "Htp".
-  iMod ("Htp") as "(Hpost & Hback)".
-  (* iDestruct ("Hback" with "Hpost") as"Hpost". *)
+  iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
+  iDestruct ("Htp") as "(Hpost & Hback)".
   iAssert (|={⊤}=> ▷ ⌜ξ ex atr⌝ ∗ (_ ∗ _ ∗ _ ∗ _))%I with "[Hstep HTI HSI Hpost]"
     as ">[Hξ (HSI & Hpost & HTI & Hstep)]".
   { iCombine "HTI" "Hstep" as "HS".
@@ -1152,7 +1305,6 @@ Proof.
     iCombine "HSI" "HS" as "HS".
     iApply fupd_plain_keep_l; iSplitR; [|iExact "HS"].
     iIntros "(HSI & Hpost & HTI & Hstep)".
-    iMod (pre_step_mod_elim with "HSI Hpost") as "[HSI Hpost]".
     iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
     iApply fupd_plain_mask.
     iMod ("Hξ" with "HTI") as "%"; auto. }
@@ -1161,14 +1313,11 @@ Proof.
                  ⌜trace_contract ex oζ ex'⌝ →
                  ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
                  ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
-  { admit.
-    (* iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]"; *)
-    (*   auto. *)
-    (* iModIntro. *)
-    (* iIntros "HSI HTI". *)
-    (* iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]"; *)
-    (*   auto. *)
-    (* iApply ("Hext" with "[$HSI $HTI]"). *) }
+  { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]";
+      auto.
+    iModIntro.
+    iIntros "HSI HTI".
+    iApply ("Hext" with "[$HSI $HTI]"). }
   iMod ("HTIextend" with "HSI HTI") as "[HSI HTI]".
   iDestruct ("Hback" with "Hpost") as "Htp".
   iModIntro.
@@ -1221,10 +1370,14 @@ Proof.
   iApply bupd_plain.
   iApply "HFtB".
   iMod "Hstp" as "(% & H)".
-  iModIntro.
-  iIntros "HFtB".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
   iSpecialize ("Hback" with "Hpost").
+  replace stateI with state_interp by done.
+  iPoseProof (wptp_of_val_post with "Hback") as "Hback".
+  iMod (pre_step_elim with "HSI Hback") as "[HSI Hback]".
+  (* iDestruct ("H" with "Hpost") as "[? Hξ]". *)
+  iModIntro.
+  iIntros "HFtB".
   (* TODO: Generalise this as its own lemma *)
   assert (Hlocales: ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>
                      (prefixes_from es (drop (length es) tp))) ++
@@ -1243,7 +1396,12 @@ Proof.
     rewrite -fmap_app -prefixes_from_app -locales_of_list_equiv.
     by apply locales_equiv_from_comm, locales_equiv_prefix_from_drop. }
   iAssert (▷ ⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'')⌝)%I as "#Hextend'".
-  { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI") as "H"; [iPureIntro..|].
+  { 
+    (* iPoseProof (wptp_of_val_post with "Hback") as "Hback". *)
+    (* iMod (pre_step_elim with "HSI Hback") as "[HSI Hback]". *)
+    (* iDestruct ("H" with "Hpost") as "[? Hξ]". *)
+
+    iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI") as "H"; [iPureIntro..|].
     - eapply valid_system_trace_extend; eauto.
     - eapply trace_extend_starts_in; eauto.
     - eapply trace_extend_starts_in; eauto.
@@ -1257,19 +1415,18 @@ Proof.
       rewrite !firstn_firstn in Hstep.
       rewrite !min_l in Hstep; [done|simpl; lia].
     - rewrite -app_assoc Hlocales.
-      iPoseProof (wptp_of_val_post with "Hback") as "Hback".
+      (* iPoseProof (wptp_of_val_post with "Hback") as "Hback". *)
       rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
       iApply except_0_later.
       iApply bupd_plain.
       iApply "HFtB".
-      iMod "Hback" as "(Hpost & Hwptp)".
-      admit.
-      (* iDestruct ("H" with "Hpost") as "[? Hξ]". *)
-      (* iMod ("Hξ" with "[HTI]") as "%". *)
-      (* + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend *)
-      (*            [-> ->]%trace_contract_of_extend); done. *)
-      (* + iModIntro. *)
-      (*   iIntros "HFtB"; done.  *)}
+      iDestruct "Hback" as "(Hpost & Hwptp)".
+      iDestruct ("H" with "Hpost") as "[? Hξ]".
+      iMod ("Hξ" with "[HTI]") as "%".
+      + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
+                 [-> ->]%trace_contract_of_extend); done.
+      + iModIntro.
+        iIntros "HFtB"; done. }
   iExists _, _.
   rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
@@ -1294,9 +1451,9 @@ Proof.
   - iIntros (???? [-> ->]%trace_contract_of_extend
                   [-> ->]%trace_contract_of_extend); done.
   - rewrite -app_assoc Hlocales //.
+    iDestruct "Hback" as "(Hpost & Hwptp)". by iApply "Hwptp".
   - iModIntro. iIntros "HFtB". iNext. iApply "IH'"; done.
-(* Qed. *)
-Admitted.
+Qed.
 
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
