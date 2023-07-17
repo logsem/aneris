@@ -11,9 +11,7 @@ open Mt_server_code
 (** 1. The KVS type (updated via commited transactions) *)
 type 'a kvsTy = ((string, (('a * int) alist)) amap)
 
-(** 2. The cache memory (current opened transaction).
-    Simplification: there is only one global cache for all clients.
-    Therefore, no concurrent accesses to disjoint keys) *)
+(** 2. The client side *)
 type 'a cacheTy = ((string, 'a) amap)
 type 'a reqTy = ((string * int), (unit, int * 'a cacheTy) sumTy) sumTy
 type 'a replTy = ('a option, (int, bool) sumTy) sumTy
