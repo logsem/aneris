@@ -221,21 +221,22 @@ Proof.
       { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
 Qed.   
 
-Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
+Theorem strong_simulation_adequacy_general Σ `(LM:LiveModel heap_lang M)
     `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M)
-    (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
-         Prop) :
+    (ξ: execution_trace heap_lang → finite_trace M (option $ fmrole M) →
+         Prop)
+ :
   rel_finitary (sim_rel_with_user LM ξ) →
   (∀ `{Hinv : !heapGS Σ LM},
     ⊢ |={⊤}=>
-       (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
          LM_init_resource s1
        ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
-       rel_always_holds s ξ e1 σ1 (initial_ls (LM := LM) s1 0%nat)) ->
+       rel_always_holds0 (sim_rel_with_user LM ξ) s state_interp
+       (λ _, 0%nat ↦M ∅) e1 σ1 (initial_ls s1 0%nat)) ->
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
-Proof.
+Proof. 
   intros Hfin H.
   apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
   iIntros (?) "".
@@ -259,16 +260,6 @@ Proof.
   iExists state_interp, (λ _, 0%nat ↦M ∅)%I, fork_post.
   iSplitR.
   { unfold config_wp. iIntros "!>!>" (???????) "?". done. }
-  (* iAssert (state_interp with "[Hgen Hmoda Hmodf Hmapa Hfuela HFR] Hfr [Hfuelf Hmapf]"). *)
-  (* { iFrame "Hmodf". unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles Mdl s1) ]}, _. *)
-  (*   iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //. *)
-  (*   iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //. *)
-  (*   iSplit; first done. *)
-  (*   iSplit; iPureIntro; [|split]. *)
-  (*   - intros ρ tid. rewrite lookup_gset_to_gmap_Some. *)
-  (*     setoid_rewrite lookup_singleton_Some. split; naive_solver. *)
-  (*   - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver. *)
-  (*   - rewrite dom_gset_to_gmap. set_solver. } *)
   iSpecialize ("Hwp" with "[Hσ Hmodf Hfr Hfuelf Hmapf]").
   { rewrite /LM_init_resource. 
     rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
@@ -284,19 +275,41 @@ Proof.
       iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
       iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
   iDestruct "Hwp" as ">[Hwp H]".
-  iModIntro. iFrame "Hwp".
-  iSplitL "Hgen Hmoda Hmapa Hfuela HFR".
-  { unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles M s1) ]}, _.
-    iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
-    iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
-    iSplit; first done.
-    iSplit; iPureIntro; [|split].
-    - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
-      setoid_rewrite lookup_singleton_Some. split; naive_solver.
-    - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
-    - rewrite dom_gset_to_gmap. set_solver. }
 
-  by iApply rel_always_holds_lift_LM.  
+  iModIntro. iFrame. 
+  unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles M s1) ]}, _.
+  iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
+  iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
+  iSplit; first done.
+  iSplit; iPureIntro; [|split].
+  - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
+    setoid_rewrite lookup_singleton_Some. split; naive_solver.
+  - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
+  - rewrite dom_gset_to_gmap. set_solver.
+Qed. 
+
+
+Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
+    `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M)
+    (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
+         Prop) :
+  rel_finitary (sim_rel_with_user LM ξ) →
+  (∀ `{Hinv : !heapGS Σ LM},
+    ⊢ |={⊤}=>
+       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
+         LM_init_resource s1
+       ={⊤}=∗
+       WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
+       rel_always_holds s ξ e1 σ1 (initial_ls (LM := LM) s1 0%nat)) ->
+  continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
+Proof.
+  intros Hfin WP_RAH.
+  eapply strong_simulation_adequacy_general.
+  1, 2: by eauto.
+  iIntros. iModIntro. 
+  iIntros "R". iMod (WP_RAH with "R") as ">[WP RAH]".
+  iModIntro. iSplitL "WP"; [by iFrame| ]. 
+  by iApply rel_always_holds_lift_LM. 
 Qed.
 
 Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M):
