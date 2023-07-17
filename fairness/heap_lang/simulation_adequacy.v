@@ -204,71 +204,113 @@ Definition init_thread_post `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
   (tid: locale heap_lang): iProp Σ :=
   tid ↦M ∅.
 
-Theorem strong_simulation_adequacy_general Σ `(LM:LiveModel heap_lang M)
-    `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M)
-    (* (ξ: execution_trace heap_lang → finite_trace M (option $ fmrole M) → *)
-    (R: execution_trace heap_lang → auxiliary_trace LM → Prop)
-  :
-  rel_finitary R →
-  (∀ `{Hinv : !heapGS Σ LM},
-    ⊢ |={⊤}=>
-       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
-         LM_init_resource s1
-       ={⊤}=∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
-       rel_always_holds0 R s state_interp (λ _, 0%nat ↦M ∅) e1 σ1 (initial_ls s1 0%nat)) ->
-  continued_simulation R (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
-Proof. 
-  intros Hfin H.
-  apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
-  iIntros (?) "".
-  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
+(* Theorem strong_simulation_adequacy_general' Σ `(LM:LiveModel heap_lang M) *)
+(*     `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M) *)
+(*     (* (ξ: execution_trace heap_lang → finite_trace M (option $ fmrole M) → *) *)
+(*     (R: execution_trace heap_lang → auxiliary_trace LM → Prop) *)
+(*   : *)
+(*   rel_finitary R → *)
+(*   (* (⊢ |==> heapGS Σ LM) -> *) *)
+(*   (∀ `{Hinv : !heapGS Σ LM}, *)
+(*     ⊢ |={⊤}=> *)
+(*        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗ *)
+(*          LM_init_resource s1 *)
+(*        ={⊤}=∗ *)
+(*        WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗ *)
+(*        rel_always_holds0 R s state_interp (λ _, 0%nat ↦M ∅) e1 σ1 (initial_ls s1 0%nat)) -> *)
+(*   continued_simulation R (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)). *)
+(* Proof. *)
+
+Lemma init_fairnessGS_LM Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM}
+  (s1: M) (e1 : expr):
+  ⊢ (|==> ∃ fGS: fairnessGS LM Σ, (* TODO: what is a canonical way of doing it? *)
+       ∀ `{hGS: !heapGS Σ LM},
+         ⌜ hGS.(heap_fairnessGS) = fGS⌝ →
+      LM_init_resource s1 ∗ model_state_interp [e1] (initial_ls s1 0%nat (LM := LM))).
+Proof.
+  iIntros.
   iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
   iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
   iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
   (* TODO: seems like the concrete set of free roles doesn't matter *)
   (* iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]". *)
   iMod (model_free_roles_init s1 ∅) as (γfr) "[HFR Hfr]".
-  set (distG :=
-         {|
-          heap_fairnessGS := {|
-                              fairness_model_name := γmod;
-                              fairness_model_mapping_name := γmap;
-                              fairness_model_fuel_name := γfuel;
-                              fairness_model_free_roles_name := γfr;
-                              |}
-         |}).
+  iModIntro.
+  iExists ({|
+              fairness_model_name := γmod;
+              fairness_model_mapping_name := γmap;
+              fairness_model_fuel_name := γfuel;
+              fairness_model_free_roles_name := γfr;
+            |}).
+  iIntros.
+
+  iSplitL "Hmodf Hfr Hfuelf Hmapf".
+  2: { unfold model_state_interp. simpl. iFrame. 
+       iExists {[ 0%nat := (live_roles M s1) ]}, _.
+       iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
+       iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
+       iSplit; first done.
+       iSplit; iPureIntro; [|split].
+       - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
+         setoid_rewrite lookup_singleton_Some. split; naive_solver.
+       - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
+       - rewrite dom_gset_to_gmap. set_solver. }
+
+  rewrite /LM_init_resource.
+  rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton.
+    
+  (* iFrame. *)
+  iSplitL "Hmodf".
+  { rewrite /frag_model_is. by rewrite H. }
+  iSplitL "Hfr".
+  { rewrite /frag_free_roles_are. rewrite H.
+    iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
+  
+  iAssert ([∗ set] ρ ∈ live_roles M s1, ρ ↦F (LM.(lm_fl) s1))%I with "[Hfuelf]" as "H".
+  - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
+    destruct (decide (live_roles M s1 = ∅)) as [-> | NE].
+    { by iApply big_sepS_empty. }
+    rewrite -big_opS_own //.
+    rewrite H. iApply (own_proper with "Hfuelf").
+    rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
+  - rewrite /frag_fuel_is. rewrite H. simpl.
+    rewrite dom_gset_to_gmap. iFrame.    
+    iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
+    iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done.
+Qed.
+
+
+Theorem strong_simulation_adequacy_general Σ `(LM:LiveModel heap_lang M)
+    `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M)
+    (R: execution_trace heap_lang → auxiliary_trace LM → Prop)
+  :
+  rel_finitary R →
+  (∀ `{Hinv : !heapGS Σ LM},
+    ⊢ |={⊤}=>
+       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
+       LM_init_resource s1
+       ={⊤}=∗
+       WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
+       rel_always_holds0 R s state_interp (λ _, 0%nat ↦M ∅) e1 σ1 (initial_ls s1 0%nat)) ->
+  continued_simulation R (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
+Proof.
+  intros Hfin H.
+  apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
+  iIntros (?) "".
+
+  iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".  
+  iMod (init_fairnessGS_LM _ _ s1 e1) as (fGS) "GEN".   
+  set (distG := {| heap_fairnessGS := fGS |}).
   iMod (H distG) as "Hwp". clear H.
+  iSpecialize ("GEN" $! distG eq_refl). iDestruct "GEN" as "[LM_INIT MSI]".
+
   iExists state_interp, (λ _, 0%nat ↦M ∅)%I, fork_post.
   iSplitR.
   { unfold config_wp. iIntros "!>!>" (???????) "?". done. }
-  iSpecialize ("Hwp" with "[Hσ Hmodf Hfr Hfuelf Hmapf]").
-  { rewrite /LM_init_resource. 
-    rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton. iFrame.
-    iSplitL "Hfr".
-    { iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
-    iAssert ([∗ set] ρ ∈ live_roles M s1, ρ ↦F (LM.(lm_fl) s1))%I with "[Hfuelf]" as "H".
-    - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
-      destruct (decide (live_roles M s1 = ∅)) as [-> | NE].  
-      { by iApply big_sepS_empty. }
-      rewrite -big_opS_own //. iApply (own_proper with "Hfuelf").
-      rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //. 
-    - rewrite dom_gset_to_gmap. iFrame.
-      iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
-      iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
-  iDestruct "Hwp" as ">[Hwp H]".
-
-  iModIntro. iFrame. 
-  unfold state_interp. simpl. iFrame. iExists {[ 0%nat := (live_roles M s1) ]}, _.
-  iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
-  iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
-  iSplit; first done.
-  iSplit; iPureIntro; [|split].
-  - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
-    setoid_rewrite lookup_singleton_Some. split; naive_solver.
-  - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
-  - rewrite dom_gset_to_gmap. set_solver.
-Qed. 
+  iSpecialize ("Hwp" with "[Hσ LM_INIT]"); [by iFrame| ]. 
+  iDestruct "Hwp" as ">[Hwp H]". 
+  iModIntro. iFrame.
+Qed.
 
 
 Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
