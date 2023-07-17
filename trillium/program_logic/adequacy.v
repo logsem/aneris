@@ -996,6 +996,7 @@ Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
   (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
 Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
 
+
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         es σ δ:
@@ -1241,6 +1242,7 @@ Proof.
   - iModIntro. iIntros "HFtB". iNext. iApply "IH'"; done.
 Qed.
 
+
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ:
@@ -1483,6 +1485,30 @@ Proof.
   iModIntro; iIntros "[$ ?]"; done.
 Qed.
 
+Definition rel_always_holds0 `{irisG Λ M Σ}
+  (ξ: execution_trace Λ → auxiliary_trace M → Prop)
+  (s: stuckness)
+  (stateI: execution_trace Λ → auxiliary_trace M → iProp Σ)
+  (Φ0: val Λ → iProp Σ) 
+  e1 σ1 δ1: iProp Σ
+  :=
+  ∀ (ex : execution_trace Λ) (atr : auxiliary_trace M)
+    (c : cfg Λ),
+    ⌜valid_system_trace ex atr⌝ -∗
+    ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
+    ⌜trace_starts_in atr δ1⌝ -∗
+    ⌜trace_ends_in ex c⌝ -∗
+    ⌜∀ (ex' : finite_trace (cfg Λ) (olocale Λ))
+       (atr' : auxiliary_trace M) (oζ : olocale Λ)
+       (ℓ: mlabel M),
+    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+    ⌜∀ e2 : expr Λ, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+    ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
+    stateI ex atr -∗
+    posts_of c.1 (Φ0 :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
+                            prefixes_from [e1] (drop (length [e1]) c.1)))
+    ={⊤,∅}=∗ ⌜ξ ex atr⌝.
+
 Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
         (s: stuckness)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -1497,17 +1523,7 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         |={⊤, ∅}=> ⌜ξ ex atr⌝)) ->
+       rel_always_holds0 ξ s stateI Φ e1 σ1 δ1) ->
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
   intros Hsc Hwptp.

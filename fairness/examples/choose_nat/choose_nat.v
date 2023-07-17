@@ -368,7 +368,7 @@ Proof.
   { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○ FR]");
       [lia|lia| |by eauto]=> /=.
     rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
-  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ _".
+  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "_ Hσ ?".
   iInv Ns as ">H".
   iDestruct "H" as (cn) "(Hf & Hl & H●)".
   iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".

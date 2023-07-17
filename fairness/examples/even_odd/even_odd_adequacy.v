@@ -443,7 +443,8 @@ Proof.
       by rewrite -!insert_union_l left_id. }
     iApply (start_spec with "[$Hf $Heven_at $Hodd_at $Hinv]"); [lia|].
     by iIntros "!>?". }
-  iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck [_ [Hσ Hδ]] Hposts".
+  (* iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck [_ [Hσ Hδ]] Hposts". *)
+  iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck _ [_ [Hσ Hδ]] Hposts".
   iInv "Hinv" as (M) "(>HFR & >Hmod & >Hn & _)" "Hclose".
   iApply fupd_mask_intro; [set_solver|].
   iIntros "Hclose'".
