@@ -138,7 +138,6 @@ Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop) :
   rel_finitary (sim_rel_with_user LM ξ) →
-  live_roles _ s1 ≠ ∅ ->
   (∀ `{Hinv : !heapGS Σ LM},
     ⊢ |={⊤}=>
        (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
@@ -149,7 +148,7 @@ Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
        rel_always_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
-  intros Hfin Hevol H.
+  intros Hfin (*Hevol*) H.
   apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
   iIntros (?) "".
   iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
@@ -189,8 +188,10 @@ Proof.
     { iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
     iAssert ([∗ set] ρ ∈ live_roles M s1, ρ ↦F (LM.(lm_fl) s1))%I with "[Hfuelf]" as "H".
     - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
+      destruct (decide (live_roles M s1 = ∅)) as [-> | NE].  
+      { by iApply big_sepS_empty. }
       rewrite -big_opS_own //. iApply (own_proper with "Hfuelf").
-      rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
+      rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //. 
     - rewrite dom_gset_to_gmap. iFrame.
       iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
       iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done. }
@@ -285,7 +286,6 @@ Qed.
 Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M):
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  live_roles M s1 ≠ ∅ ->
   (* The initial configuration satisfies certain properties *)
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
@@ -302,7 +302,7 @@ Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (
     (trace_singleton ([e1], σ1))
     (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
-  intros Hfevol Hne H.
+  intros Hne H.
   assert (sim_rel LM = sim_rel_with_user LM (λ _ _, True)) as Heq.
   { Require Import Coq.Logic.FunctionalExtensionality.
     Require Import Coq.Logic.PropExtensionality.
@@ -327,7 +327,6 @@ Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM)  →
-  live_roles M s1 ≠ ∅ ->
   (∀ `{!heapGS Σ LM},
       ⊢ |={⊤}=> LM_init_resource s1
          ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
@@ -344,7 +343,7 @@ Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)
     iex
     iatr.
 Proof.
-  intros Hfin Hlr Hwp.
+  intros Hfin Hwp.
   eexists.
   eapply produced_inf_aux_trace_valid_inf.
   Unshelve.
@@ -363,7 +362,6 @@ Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M) `{!heapGpreS
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  live_roles M s1 ≠ ∅ ->
   (∀ `{!heapGS Σ LM},
       ⊢ |={⊤}=> LM_init_resource s1
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
@@ -371,7 +369,7 @@ Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M) `{!heapGpreS
   (* The coinductive pure coq proposition given by adequacy *)
   ∃ (auxtr : auxtrace LM), exaux_traces_match extr auxtr.
 Proof.
-  intros Hfin Hlr Hwp.
+  intros Hfin Hwp.
   have [iatr Hbig] : exists iatr,
       @valid_inf_system_trace
         heap_lang LM
@@ -406,7 +404,6 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  live_roles M s1 ≠ ∅ ->
   (∀ `{!heapGS Σ LM},
       ⊢ |={⊤}=> LM_init_resource s1 ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
@@ -414,9 +411,9 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
   ∃ (auxtr : auxtrace LM) mtr, exaux_traces_match extr auxtr ∧
                                upto_stutter ls_under Ul auxtr mtr.
 Proof.
-  intros Hfb Hlr Hwp.
+  intros Hfb Hwp.
   destruct (simulation_adequacy_traces
-              Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hlr Hwp) as [auxtr Hmatch].
+              Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as [auxtr Hmatch].
   assert (auxtrace_valid auxtr) as Hstutter.
   { by eapply exaux_preserves_validity in Hmatch. }
   destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
@@ -433,7 +430,6 @@ Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
   (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) ->
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  live_roles _ s1 ≠ ∅ ->
   (∀ `{!heapGS Σ LM},
       ⊢ |={⊤}=> LM_init_resource s1
                  ={⊤}=∗
@@ -442,9 +438,9 @@ Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
   (* The coinductive pure coq proposition given by adequacy *)
   extrace_fairly_terminating extr.
 Proof.  
-  intros Hterm Hfb Hlr Hwp Hvex Hfair.
+  intros Hterm Hfb Hwp Hvex Hfair.
   destruct (simulation_adequacy_model_trace
-              Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hlr Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
   destruct (infinite_or_finite extr) as [Hinf|] =>//.
   have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
   have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
@@ -464,7 +460,6 @@ Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  live_roles M s1 ≠ ∅ ->
   (∀ `{!heapGS Σ LM},
       ⊢ |={⊤}=> LM_init_resource s1 ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->

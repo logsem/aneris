@@ -235,7 +235,6 @@ Proof.
   eapply (simulation_adequacy_terminate_ftm yesnoΣ the_model NotStuck _ (N, true) ∅) =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
-  - destruct N; [lia|destruct N; set_solver].
   - intros ?. iStartProof. iIntros "!> (Hm & HFR & Hf) !>". simpl.
     
     iApply (start_spec _ _ 61 with "[Hm Hf HFR]"); eauto.
