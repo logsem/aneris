@@ -221,6 +221,7 @@ Proof.
     eapply H; try (by left); right); done).
 Qed.
 
+
 Theorem yesno_terminates
         (N : nat)
         (HN: N > 1)
@@ -235,10 +236,12 @@ Proof.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
   - destruct N; [lia|destruct N; set_solver].
-  - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.
+  - intros ?. iStartProof. iIntros "!> (Hm & HFR & Hf) !>". simpl.
+    
     iApply (start_spec _ _ 61 with "[Hm Hf HFR]"); eauto.
+    
     + iSplitL "Hm"; eauto. do 2 (destruct N; first lia).
-      assert (∅ ∖ {[ No; Y ]} = ∅) as -> by set_solver. iFrame. iSplit; last (iPureIntro; lia).
+      iFrame. iSplit; last (iPureIntro; lia).
       assert ({[Y := 61%nat; No := 61%nat]} = gset_to_gmap 61 {[No;Y]}) as <-; last done.
       rewrite -leibniz_equiv_iff. intros ρ.
       destruct (gset_to_gmap 61 {[Y; No]} !! ρ) as [f|] eqn:Heq.

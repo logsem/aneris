@@ -538,12 +538,12 @@ Section proof_start.
   Let Ns := nroot .@ "yes_no".
 
   Lemma start_spec tid (N: nat) f (Hf: f > 60):
-    {{{ frag_model_is (N, true) ∗ frag_free_roles_are ∅ ∗
+    {{{ frag_model_is (N, true) ∗ 
         has_fuels tid {[ Y := f; No := f ]} ∗ ⌜N > 0⌝ }}}
       start #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.
-    iIntros (Φ) "[Hst [HFR [Hf %HN]]] Hkont". unfold start.
+    iIntros (Φ) "[Hst [Hf %HN]] Hkont". unfold start.
 
     wp_pures.
 
@@ -569,6 +569,9 @@ Section proof_start.
     |}).
 
     iApply fupd_wp.
+    iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
+    { rewrite /frag_free_roles_are. iApply own_unit. }
+    iMod "FR" as "FR". 
     iMod (inv_alloc Ns _ (yesno_inv_inner l) with "[-Hkont Hf Hyes_at Hno_at]") as "#Hinv".
     { iNext. unfold yesno_inv_inner. iExists N, true. iFrame. done. }
     iModIntro.

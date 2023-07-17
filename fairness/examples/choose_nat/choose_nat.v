@@ -351,16 +351,22 @@ Proof.
     Unshelve. 2: intros x; apply make_proof_irrel.
     intros [cn o] [cn' [Hextr Hatr]].
     rewrite Hextr Z_CN_CN_Z -Hatr. destruct o; [destruct u|]; set_solver. }
-  iIntros (?) "!> Hσ Hs Hr Hf".
+  iIntros (?) "!> [Hσ (Hs & Hr & Hf)]".
   iMod (own_alloc) as (γ) "He"; [apply (excl_auth_valid (-1)%Z)|].
   iDestruct "He" as "[He● He○]".
   iMod (inv_alloc Ns ⊤ (choose_nat_inv_inner γ l) with "[He● Hσ Hs]") as "#IH".
   { iIntros "!>". iExists _. iFrame. by rewrite big_sepM_singleton. }
+
+  (* TODO: get rid of it by not requiring empty FR in the first place.
+     Also, remove the same trick from other files *)
+  iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
+  { rewrite /frag_free_roles_are. iApply own_unit. }
+  iMod "FR" as "FR". 
+
   iModIntro.
   iSplitL.
-  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
+  { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○ FR]");
       [lia|lia| |by eauto]=> /=.
-    replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
     rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
   iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ _".
   iInv Ns as ">H".

@@ -412,7 +412,7 @@ Proof.
   { eapply rel_finitary_sim_rel_with_user_sim_rel.
     eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1). }
-  iIntros (?) "!> Hσ Hs Hr Hf".
+  iIntros (?) "!> [Hσ (Hs & Hr & Hf)]".
   iMod (own_alloc (●E 0  ⋅ ◯E 0))%nat as (γ_even_at) "[Heven_at_auth Heven_at]".
   { apply auth_both_valid_2; eauto. by compute. }
   iMod (own_alloc (●E 1  ⋅ ◯E 1))%nat as (γ_odd_at) "[Hodd_at_auth Hodd_at]".
@@ -421,7 +421,11 @@ Proof.
    even_name := γ_even_at;
    odd_name := γ_odd_at;
   |}).
-  iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner l) with "[Hσ Hs Hr Heven_at_auth Hodd_at_auth]") as "#Hinv".
+  iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
+  { rewrite /frag_free_roles_are. iApply own_unit. }
+  iMod "FR" as "FR". 
+
+  iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner l) with "[Hσ Hs Hr Heven_at_auth Hodd_at_auth FR]") as "#Hinv".
   { iNext. unfold evenodd_inv_inner. iExists 0.
     replace (∅ ∖ live_roles the_fair_model 0) with
       (∅:gset (fmrole the_fair_model)) by set_solver.
