@@ -200,12 +200,10 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
   Qed.
 
   Lemma simple_wait_transaction_spec :
-    ∀ (c cond v : val) (key : Key) domain sa E,
+    ∀ (c cond v : val) (key : Key) sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    ⌜key ∈ domain⌝ -∗
-    ⌜domain ⊆ KVS_keys⌝ -∗
-    □ (|={⊤, E}=> ∃ m, ⌜dom m = domain⌝ ∗ ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
-            ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+    ⌜key ∈ KVS_keys⌝ -∗
+    □ (|={⊤, E}=> ∃ h, key ↦ₖ h ∗ ▷ (key ↦ₖ h ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
@@ -213,10 +211,10 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
      wait_transaction c cond #key @[ip_of_address sa]
     {{{ h, RET #(); ConnectionState c CanStart ∗ Seen key (v :: h) }}}.
   Proof.
-    iIntros (c cond v key domain sa E name_sub_E key_domain domain_keys)
+    iIntros (c cond v key sa E name_sub_E key_keys)
         "#shift #cond %Φ !> CanStart HΦ".
     iApply (wait_transaction_spec _ _ _ _ _ emp (λ v', ⌜v = v'⌝)%I
-      (λ m, ⌜dom m = domain⌝)%I
+      (λ m, ⌜dom m = {[ key ]}⌝)%I
       with "[//] [] [] [] [$CanStart]"); last first.
     {
       iIntros "!>%v' %h (CanStart & Seen & <-)".
@@ -228,13 +226,18 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
       iIntros ([] eq); first rewrite -(eq I).
       all: by iApply ("HΨ" with "[$Active $cache]").
     }
-    iIntros "!>% ->".
+    iIntros "!>%m_shift ->".
     2: iModIntro.
-    all: iMod "shift" as "(%m_shift & %m_shift_domain & cache & close)".
+    all: iMod "shift" as "(%h & cache & close)".
     all: iModIntro.
-    all: iExists m_shift.
-    all: rewrite m_shift_domain.
-    all: by iFrame "∗%".
+    all: iExists {[ key := h ]}.
+    all: iSplit; first (iPureIntro; set_solver).
+    2: iSplit; first (iPureIntro; set_solver).
+    all: iSplitL "cache"; first iApply (big_sepM_singleton with "cache").
+    2: iSplit; first (iPureIntro; set_solver).
+    all: iIntros "!>kvs".
+    all: iMod ("close" with "[kvs]") as "_"; last done.
+    all: by iApply big_sepM_singleton.
   Qed.
 
 End proof.

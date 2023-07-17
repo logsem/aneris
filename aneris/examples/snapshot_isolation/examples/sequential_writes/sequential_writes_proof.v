@@ -130,22 +130,18 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
     iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction2. wp_pures.
-    wp_apply (simple_wait_transaction_spec _ _ (#1) _ {["x"]} _ (⊤ ∖ ↑client_inv_name)
-      with "[] [] [] [] [] [$Hcstate] [HΦ Htok]"); 
-      [solve_ndisj | iPureIntro; set_solver |  iPureIntro; set_solver | | |].
-    - iModIntro. 
+    wp_apply (simple_wait_transaction_spec _ _ (#1) "x" _ (⊤ ∖ ↑client_inv_name)
+      with "[] [] [] [] [$Hcstate] [HΦ Htok]"); 
+      [solve_ndisj | iPureIntro; set_solver | | |].
+    - iModIntro.
       iInv (client_inv_name) as ">[%hx' [Hkx Hrest]]" "HClose".
       iModIntro.
-      iExists {["x":= hx']}.
-      iSplit. 
-      { iPureIntro. set_solver. }
-      iSplitL "Hkx".
-      { rewrite !big_sepM_insert; set_solver. }
+      iExists hx'.
+      iSplitL "Hkx"; first done.
       iIntros "!> Hkx". 
-      iMod ("HClose" with "[Hkx Hrest]") as "_"; try done.
-      iNext. iExists _. 
-      rewrite !(big_sepM_insert); try set_solver.
-      iDestruct "Hkx" as "[Hkx _]". iFrame.
+      iMod ("HClose" with "[Hkx Hrest]") as "_"; last done.
+      iNext. iExists _.
+      iFrame.
     - iIntros (v Φ') "!>Htrue HΦ".
       wp_lam. wp_op.
       apply bin_op_eval_eq_val.
