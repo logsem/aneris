@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From trillium.fairness.heap_lang Require Export lang lifting tactics.
+From trillium.fairness.heap_lang Require Export lang tactics simulation_adequacy.
 From trillium.fairness.heap_lang Require Import notation.
 From trillium.fairness Require Import trace_utils.
 From trillium.fairness.examples.even_odd Require Import even_odd.
