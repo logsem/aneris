@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.specs
@@ -114,116 +114,84 @@ Section proof_of_code.
     iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
     rewrite/transaction2.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
-    iInv "inv" as ">(%hx & %hy & x_hx & y_hy & Hinv)" "close".
-    iModIntro.
-    iExists {[ "x" := hx; "y" := hy ]}.
-    iFrame.
-    iSplitL "x_hx y_hy";
-        first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & Seen)".
-    iPoseProof (big_sepM_insert with "mem") as "(x_hx & mem)"; first done.
-    iPoseProof (big_sepM_insert with "mem") as "(y_hy & _)"; first done.
-    iMod ("close" with "[x_hx y_hy Hinv]") as "_".
-    { iNext. iExists hx, hy. iFrame. }
-    iModIntro.
-    wp_pures.
-    wp_apply (simplified_wait_on_keyT_spec _ _ #1 _ _ _ (⊤ ∖ ↑client_inv_name)
-          (λ m, ∃ h, ⌜m !! "x" = Some h⌝ ∗ ⌜hist_val h = Some #1⌝)%I emp emp
-          with "[] [] [] [] [] [] [$Active $cache $Seen]"); first solve_ndisj.
-    1, 2 : rewrite !dom_insert_L dom_empty_L; iPureIntro; set_solver.
+    wp_apply (simple_wait_transaction_spec _ _ #1 _ _ (⊤ ∖ ↑client_inv_name)
+        with "[] [] [] [] CanStart");
+    [solve_ndisj|set_solver|..].
     {
-      iIntros "!>%h (#Seen_x & _)".
-      iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(-> & _)|%Hhx'])" "close".
-      {
-        iMod (Seen_valid $! SI_GlobalInv with "[$Seen_x $x_hx']") as "(_ & %abs)";
-          first solve_ndisj.
-        by apply suffix_nil_inv in abs.
-      }
       iModIntro.
-      iExists {[ "x" := hx'; "y" := hy' ]}.
-      rewrite !dom_insert_L dom_empty_L.
-      iSplit; first done.
-      iSplitL "x_hx' y_hy'";
-        first by repeat (iApply big_sepM_insert; first done; iFrame).
-      iSplit; first (iExists hx'; rewrite lookup_insert; by iFrame "%").
-      iSplit; first done.
-      iIntros "!>(mem & _)".
-      iPoseProof (big_sepM_insert with "mem") as "(x_hx' & mem)"; first done.
-      iPoseProof (big_sepM_insert with "mem") as "(y_hy' & _)"; first done.
-      iMod ("close" with "[x_hx' y_hy']") as "_"; last done.
-      iNext.
-      iExists _, _.
+      iInv "inv" as ">(%hx & %hy & x_hx & y_hy & %Hinv)" "close".
+      iModIntro.
+      iExists hx.
       iFrame.
-      by iRight.
-    }
-    {
-      iModIntro.
-      iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & %Hinv)" "close".
-      iModIntro.
-      iExists {[ "x" := hx'; "y" := hy' ]}.
-      rewrite !dom_insert_L dom_empty_L.
-      iSplit; first done.
-      iSplitL "x_hx' y_hy'";
-        first by repeat (iApply big_sepM_insert; first done; iFrame).
-      iIntros "!>mem".
-      iPoseProof (big_sepM_insert with "mem") as "(x_hx' & mem)"; first done.
-      iPoseProof (big_sepM_insert with "mem") as "(y_hy' & _)"; first done.
-      iMod ("close" with "[x_hx' y_hy']") as "_"; last done.
+      iIntros "!>x_hx".
+      iMod ("close" with "[x_hx y_hy]") as "_"; last done.
       iNext.
-      iExists _, _.
-      iFrame "∗%".
+      iExists hx, hy.
+      by iFrame.
     }
     {
-      iIntros (v' Ψ) "!>_ HΨ".
+      iIntros (v Ψ) "!>_ HΨ".
       wp_pures.
       wp_op; first apply bin_op_eval_eq_val.
       iApply "HΨ".
       by rewrite bool_decide_spec.
     }
-    rewrite !dom_insert_L dom_empty_L.
-    iClear (hx hy) "".
-    iIntros (m) "(%dom_m & (%h & %m_x & %Hhx) & Active & cache & Seen)".
+    iIntros (h) "(CanStart & Seen)".
     wp_pures.
-    iPoseProof (big_sepM_delete _ _ _ _ m_x with "cache") as "((x_h & x_upd) & cache)".
-    have y_key : "y" ∈ dom (delete "x" m) by set_solver.
-    destruct ((proj1 (elem_of_dom _ _)) y_key) as [h' m_y].
-    iPoseProof (big_sepM_delete _ _ _ _ m_y with "cache") as "((y_h' & y_upd) & _)".
-    iPoseProof (big_sepM_lookup _ _ _ _ m_x with "Seen") as "#Seen_x".
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_h' $y_upd]");
+    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    iInv "inv" as ">(%hx & %hy & x_hx & y_hy & [(-> & _)|%hx_1])" "close".
+    {
+      iMod (Seen_valid $! SI_GlobalInv with "[$Seen $x_hx]") as "(_ & %abs)";
+        first solve_ndisj.
+      by apply suffix_nil_inv in abs.
+    }
+    iModIntro.
+    iExists {[ "y" := hy ]}.
+    iFrame.
+    iSplitL "y_hy"; first by iApply big_sepM_singleton.
+    iIntros "!>(Active & kvs & cache & _)".
+    iPoseProof (big_sepM_delete _ _ "y" hy with "kvs") as "(y_hy & _)";
+      first done.
+    iMod ("close" with "[x_hx y_hy]") as "_".
+    {
+      iNext.
+      iExists hx, hy.
+      iFrame.
+      by iRight.
+    }
+    iModIntro.
+    iPoseProof (big_sepM_delete _ _ "y" hy with "cache")
+        as "((y_hy & y_upd) & _)"; first done.
+    wp_pures.
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_hy $y_upd]");
           first set_solver.
     iIntros "(y_1 & y_upd)".
     wp_pures.
     wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
     iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(-> & _)|Hinv])" "close".
     {
-      iMod (Seen_valid $! SI_GlobalInv with "[$Seen_x $x_hx']") as "(_ & %abs)";
+      iMod (Seen_valid $! SI_GlobalInv with "[$Seen $x_hx']") as "(_ & %abs)";
         first solve_ndisj.
-      apply suffix_nil_inv in abs.
-      by rewrite abs in Hhx.
+      by apply suffix_nil_inv in abs.
     }
     iModIntro.
-    iExists {[ "x" := hx'; "y" := hy' ]}, _,
-            {[ "x" := (Some #1, false); "y" := (Some #1, true) ]}.
+    iExists {[ "y" := hy' ]}, _,
+            {[ "y" := (Some #1, true) ]}.
     iFrame.
-    rewrite Hhx.
-    iSplitL "x_h x_hx' x_upd y_1 y_hy' y_upd".
+    iSplitL "y_1 y_hy' y_upd".
     {
       do 2 (iSplit; first by rewrite !dom_insert_L !dom_empty_L).
-      by iSplitL "x_hx' y_hy'";
+      by iSplitL "y_hy'";
         repeat (iApply big_sepM_insert; first done; iFrame).
     }
     iIntros "!>(CanStart & [(_ & mem)|(_ & mem)])".
     {
-      iPoseProof (big_sepM2_insert with "mem") as "((x_hx' & _) & mem)";
-        [done..|].
       iPoseProof (big_sepM2_insert with "mem") as "((y_1 & _) & _)";
         [done..|].
       iMod ("close" with "[x_hx' y_1 Hinv]") as "_".
       { iNext. iExists _, (#1 :: hy'). iFrame. }
       by iApply "HΦ".
     }
-    iPoseProof (big_sepM_insert with "mem") as "((x_hx' & _) & mem)"; first done.
     iPoseProof (big_sepM_insert with "mem") as "((y_hy' & _) & mem)"; first done.
     iMod ("close" with "[x_hx' y_hy' Hinv]") as "_".
     { iNext. iExists _, _. iFrame. }
@@ -240,118 +208,87 @@ Section proof_of_code.
     iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
     rewrite/transaction3.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
-    iInv "inv" as ">(%hx & %hy & x_hx & y_hy & Hinv)" "close".
-    iModIntro.
-    iExists {[ "x" := hx; "y" := hy ]}.
-    iFrame.
-    iSplitL "x_hx y_hy";
-        first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & Seen)".
-    iPoseProof (big_sepM_insert with "mem") as "(x_hx & mem)"; first done.
-    iPoseProof (big_sepM_insert with "mem") as "(y_hy & _)"; first done.
-    iMod ("close" with "[x_hx y_hy Hinv]") as "_".
-    { iNext. iExists hx, hy. iFrame. }
-    iModIntro.
-    wp_pures.
-    wp_apply (simplified_wait_on_keyT_spec _ _ #1 _ _ _ (⊤ ∖ ↑client_inv_name)
-          (λ m, ∃ h, ⌜m !! "x" = Some h⌝ ∗ ⌜hist_val h = Some #1⌝)%I emp emp
-          with "[] [] [] [] [] [] [$Active $cache $Seen]"); first solve_ndisj.
-    1, 2 : rewrite !dom_insert_L dom_empty_L; iPureIntro; set_solver.
+    wp_apply (simple_wait_transaction_spec _ _ #1 _ _ (⊤ ∖ ↑client_inv_name)
+        with "[] [] [] [] CanStart");
+    [solve_ndisj|set_solver|..].
     {
-      iIntros "!>%h (#Seen_y & _)".
-      iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(_ & ->)|%Hhx'])" "close".
-      {
-        iMod (Seen_valid $! SI_GlobalInv with "[$Seen_y $y_hy']") as "(_ & %abs)";
-          first solve_ndisj.
-        by apply suffix_nil_inv in abs.
-      }
       iModIntro.
-      iExists {[ "x" := hx'; "y" := hy' ]}.
-      rewrite !dom_insert_L dom_empty_L.
-      iSplit; first done.
-      iSplitL "x_hx' y_hy'";
-        first by repeat (iApply big_sepM_insert; first done; iFrame).
-      iSplit; first (iExists hx'; rewrite lookup_insert; by iFrame "%").
-      iSplit; first done.
-      iIntros "!>(mem & _)".
-      iPoseProof (big_sepM_insert with "mem") as "(x_hx' & mem)"; first done.
-      iPoseProof (big_sepM_insert with "mem") as "(y_hy' & _)"; first done.
-      iMod ("close" with "[x_hx' y_hy']") as "_"; last done.
-      iNext.
-      iExists _, _.
+      iInv "inv" as ">(%hx & %hy & x_hx & y_hy & %Hinv)" "close".
+      iModIntro.
+      iExists hy.
       iFrame.
-      by iRight.
-    }
-    {
-      iModIntro.
-      iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & %Hinv)" "close".
-      iModIntro.
-      iExists {[ "x" := hx'; "y" := hy' ]}.
-      rewrite !dom_insert_L dom_empty_L.
-      iSplit; first done.
-      iSplitL "x_hx' y_hy'";
-        first by repeat (iApply big_sepM_insert; first done; iFrame).
-      iIntros "!>mem".
-      iPoseProof (big_sepM_insert with "mem") as "(x_hx' & mem)"; first done.
-      iPoseProof (big_sepM_insert with "mem") as "(y_hy' & _)"; first done.
-      iMod ("close" with "[x_hx' y_hy']") as "_"; last done.
+      iIntros "!>y_hy".
+      iMod ("close" with "[x_hx y_hy]") as "_"; last done.
       iNext.
-      iExists _, _.
-      iFrame "∗%".
+      iExists hx, hy.
+      by iFrame.
     }
     {
-      iIntros (v' Ψ) "!>_ HΨ".
+      iIntros (v Ψ) "!>_ HΨ".
       wp_pures.
       wp_op; first apply bin_op_eval_eq_val.
       iApply "HΨ".
       by rewrite bool_decide_spec.
     }
-    rewrite !dom_insert_L dom_empty_L.
-    iClear (hx hy) "".
-    iIntros (m) "(%dom_m & (%h & %m_x & %Hhx) & Active & cache & Seen)".
+    iIntros (h) "(CanStart & Seen)".
     wp_pures.
-    iPoseProof (big_sepM_delete _ _ _ _ m_x with "cache") as "((x_h & x_upd) & cache)".
-    have y_key : "y" ∈ dom (delete "x" m) by set_solver.
-    destruct ((proj1 (elem_of_dom _ _)) y_key) as [h' m_y].
-    iPoseProof (big_sepM_delete _ _ _ _ m_y with "cache") as "((y_h' & y_upd) & _)".
-    iPoseProof (big_sepM_lookup _ _ _ _ m_x with "Seen") as "#Seen_x".
-    wp_apply (SI_read_spec with "[] [$x_h]");
-          first set_solver.
-    iIntros "x_h".
-    rewrite Hhx/assert.
-    wp_pures.
-    wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
-    iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(-> & _)|Hinv])" "close".
+    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    iInv "inv" as ">(%hx & %hy & x_hx & y_hy & [(_ & ->)|%hx_1])" "close".
     {
-      iMod (Seen_valid $! SI_GlobalInv with "[$Seen_x $x_hx']") as "(_ & %abs)";
+      iMod (Seen_valid $! SI_GlobalInv with "[$Seen $y_hy]") as "(_ & %abs)";
         first solve_ndisj.
-      apply suffix_nil_inv in abs.
-      by rewrite abs in Hhx.
+      by apply suffix_nil_inv in abs.
     }
     iModIntro.
-    iExists {[ "x" := hx'; "y" := hy' ]}, _,
-            {[ "x" := (Some #1, false); "y" := (hist_val h', false) ]}.
+    iExists {[ "x" := hx ]}.
     iFrame.
-    iSplitL "x_h x_hx' x_upd y_h' y_hy' y_upd".
+    iSplitL "x_hx"; first by iApply big_sepM_singleton.
+    iIntros "!>(Active & kvs & cache & _)".
+    iPoseProof (big_sepM_delete _ _ "x" hx with "kvs") as "(x_hx & _)";
+      first done.
+    iMod ("close" with "[x_hx y_hy]") as "_".
+    {
+      iNext.
+      iExists hx, hy.
+      iFrame.
+      by iRight.
+    }
+    iModIntro.
+    iPoseProof (big_sepM_delete _ _ "x" hx with "cache")
+        as "((x_hx & x_upd) & _)"; first done.
+    wp_pures.
+    wp_apply (SI_read_spec with "[] [$x_hx]");
+          first set_solver.
+    iIntros "x_hx".
+    wp_pures.
+    rewrite/assert hx_1.
+    wp_pures.
+    wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(_ & ->)|Hinv])" "close".
+    {
+      iMod (Seen_valid $! SI_GlobalInv with "[$Seen $y_hy']") as "(_ & %abs)";
+        first solve_ndisj.
+      by apply suffix_nil_inv in abs.
+    }
+    iModIntro.
+    iExists {[ "x" := hx' ]}, _,
+            {[ "x" := (Some #1, false) ]}.
+    iFrame.
+    iSplitL "x_hx x_hx' x_upd".
     {
       do 2 (iSplit; first by rewrite !dom_insert_L !dom_empty_L).
-      by iSplitL "x_hx' y_hy'";
+      by iSplitL "x_hx'";
         repeat (iApply big_sepM_insert; first done; iFrame).
     }
     iIntros "!>(CanStart & [(_ & mem)|(_ & mem)])".
     {
-      iPoseProof (big_sepM2_insert with "mem") as "((x_hx' & _) & mem)";
+      iPoseProof (big_sepM2_insert with "mem") as "((x_hx' & _) & _)";
         [done..|].
-      iPoseProof (big_sepM2_insert with "mem") as "((y_hy' & _) & _)";
-        [done..|].
-      have -> : commit_event (hist_val h', false) hy' = hy' by case: (hist_val h').
       iMod ("close" with "[x_hx' y_hy' Hinv]") as "_".
       { iNext. iExists _, _. iFrame. }
       by iApply "HΦ".
     }
     iPoseProof (big_sepM_insert with "mem") as "((x_hx' & _) & mem)"; first done.
-    iPoseProof (big_sepM_insert with "mem") as "((y_hy' & _) & mem)"; first done.
     iMod ("close" with "[x_hx' y_hy' Hinv]") as "_".
     { iNext. iExists _, _. iFrame. }
     by iApply "HΦ".
@@ -551,4 +488,4 @@ Proof.
   do 3 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed. *)
+Qed.
