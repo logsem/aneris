@@ -38,7 +38,10 @@ Section Whist_valid.
     ∀ e, e ∈ s → e.(we_key) ∈ KVS_keys.
 
   Definition whist_times (h : whist) :=
-    ∀ ei ej (i j : nat), i < j → h !! i = Some ei → h !! j = Some ej → ej.(we_time) < ei.(we_time).
+    ∀ ei ej (i j : nat),
+    i < j → h !! i = Some ei →
+    h !! j = Some ej →
+    ej.(we_time) < ei.(we_time).
 
   Definition whist_vals (h : whist) :=
     ∀ e, e ∈ h → Serializable KVS_serialization e.(we_val).
@@ -80,6 +83,9 @@ Section KVS_valid.
   Definition kvs_whists (M : kvsMdl) :=
     ∀ k h, M !! k = Some h → whist_valid h.
 
+  Definition kvs_keys (M : kvsMdl) :=
+    ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_key) = k.
+
   Definition kvs_whist_commit_times (M : kvsMdl) (T : nat) :=
     ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) <= T.
 
@@ -88,6 +94,7 @@ Section KVS_valid.
     {
       kvs_ValidDom: kvs_dom M;
       kvs_ValidWhists : kvs_whists M;
+      kvs_ValidKeys : kvs_keys M;
       kvs_ValidCommitTimes : kvs_whist_commit_times M T;
     }.
 
@@ -98,9 +105,11 @@ Section KVS_valid.
     -  by rewrite dom_gset_to_gmap.
     - intros ? ? Habs. apply lookup_gset_to_gmap_Some in Habs as [_ <-].
       split; rewrite /whist_times /whist_ext; set_solver.
+    - rewrite /kvs_keys. intros  ? ? Habs e eh.
+      apply lookup_gset_to_gmap_Some in Habs as [_ <-]. set_solver.
     - rewrite /kvs_whist_commit_times. intros ? ? Habs.
       apply lookup_gset_to_gmap_Some in Habs as [_ <-]. set_solver.
-  Qed.
+   Qed.
 
   Definition update_kvs (M0 : kvsMdl) (C : gmap Key SerializableVal) (T : nat) :=
       map_fold
@@ -118,7 +127,7 @@ Section KVS_valid.
   Admitted.
 
   Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (cache : gmap Key SerializableVal) :
-    dom cache = KVS_keys →
+    dom cache ⊆ KVS_keys →
     kvs_valid M T ->
     kvs_valid (update_kvs M cache (T+1)) (T+1).
   Proof.
