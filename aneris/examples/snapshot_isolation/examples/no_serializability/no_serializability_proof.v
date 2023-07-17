@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+(*From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -155,6 +155,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iIntros (cst sa) "#inv %Φ!>CanStart HΦ".
     rewrite/transaction2.
     wp_pures.
+    wp_apply (simple_wait_transaction_spec _ _ _ _ _ _ (⊤ ∖ ↑client_inv_name)
+      with "[] [] [] [] [] CanStart").
+    iIntros 
     wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
     iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & init)" "close".
     iModIntro.
