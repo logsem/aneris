@@ -1,5 +1,9 @@
 name: CI
 
+# Beware: There is a known permission issue due to UID/GID difference between GitHub CI and Docker image.
+# Every required change is marked with "<--"
+# See also: https://github.com/coq-community/docker-coq-action/#permissions
+
 on:
   push:
     branches:
@@ -13,32 +17,31 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        coq_version:
-          - '8.17.0'
       max-parallel: 4
       # don't cancel all in-progress jobs if one matrix job fails:
       fail-fast: false
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: true
+
     - uses: coq-community/docker-coq-action@v1
       with:
-        coq_version: ${{ matrix.coq_version }}
+        coq_version: "8.17.1"
         ocaml_version: "4.14.1-flambda"
         install: ""
         before_script: |
-          sudo chown -R coq:coq . # workaround a permission issue
+          sudo chown -R coq:coq .  # <--
         script: |
           startGroup Build
             make -j2
           endGroup
         uninstall: |
           make clean
+
     - name: Revert permissions
       # to avoid a warning at cleanup time
       if: ${{ always() }}
-      run: sudo chown -R 1001:116 .
+      run: sudo chown -R 1001:116 .  # <--
