@@ -230,7 +230,7 @@ Theorem yesno_terminates
         (Hexfirst : (trfirst extr).1 = [start #N]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  assert (heapGpreS yesnoΣ the_model) as HPreG.
+  assert (heapGpreS yesnoΣ (@LM_EM _ the_model)) as HPreG.
   { apply _. }
   eapply (simulation_adequacy_terminate_ftm yesnoΣ the_model NotStuck _ (N, true) ∅) =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.

@@ -117,13 +117,14 @@ Class yesnoPreG Σ := {
   yesno_f_PreG :> inG Σ (excl_authR boolO);
  }.
 Definition yesnoΣ : gFunctors :=
-  #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
+  #[ heapΣ (@LM_EM _ the_model);
+     GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
 
 Global Instance subG_yesnoΣ {Σ} : subG yesnoΣ Σ → yesnoPreG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!heapGS Σ the_model, !yesnoG Σ}.
+  Context `{@heapGS Σ _ (@LM_EM _ the_model), !yesnoG Σ}.
   Let Ns := nroot .@ "yes_no".
 
   Definition yes_at (n: nat) := own yes_name (◯E n).
@@ -534,7 +535,7 @@ End proof.
 
 
 Section proof_start.
-  Context `{!heapGS Σ the_model, !yesnoPreG Σ}.
+  Context `{@heapGS Σ _ (@LM_EM _ the_model), !yesnoPreG Σ}.
   Let Ns := nroot .@ "yes_no".
 
   Lemma start_spec tid (N: nat) f (Hf: f > 60):

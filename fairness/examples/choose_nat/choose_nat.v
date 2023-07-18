@@ -146,7 +146,7 @@ Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
 Class choose_natG Σ := ChooseNatG { choose_nat_G :> inG Σ (excl_authR ZO) }.
 
 Definition choose_natΣ : gFunctors :=
-  #[ heapΣ cn_fair_model; GFunctor (excl_authR ZO) ].
+  #[ heapΣ (@LM_EM _ cn_model); GFunctor (excl_authR ZO) ].
 
 Global Instance subG_choosenatΣ {Σ} : subG choose_natΣ Σ → choose_natG Σ.
 Proof. solve_inG. Qed.
@@ -154,7 +154,7 @@ Proof. solve_inG. Qed.
 Definition Ns := nroot .@ "choose_nat".
 
 Section proof.
-  Context `{!heapGS Σ cn_model, choose_natG Σ}.
+  Context `{@heapGS Σ _ (@LM_EM _ cn_model), choose_natG Σ}.
 
   (** Determine invariant so we can eventually derive ξ_cn from it *)
   Definition choose_nat_inv_inner (γ : gname) (l:loc) : iProp Σ :=
@@ -337,7 +337,7 @@ Lemma choose_nat_sim l :
                            used_proph_id := ∅ |}))
     (trace_singleton (initial_ls (LM := cn_model) Start 0%nat)).
 Proof.
-  assert (heapGpreS choose_natΣ cn_model) as HPreG.
+  assert (heapGpreS choose_natΣ (@LM_EM _ cn_model)) as HPreG.
   { apply _. }
   eapply (strong_simulation_adequacy
             choose_natΣ _ NotStuck _ _ _ ∅). 

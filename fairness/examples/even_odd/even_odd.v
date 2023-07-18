@@ -88,13 +88,13 @@ Class evenoddPreG Σ := {
   evenodd_PreG :> inG Σ (excl_authR natO);
  }.
 Definition evenoddΣ : gFunctors :=
-  #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
+  #[ heapΣ (@LM_EM _ the_model); GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
 
 Global Instance subG_evenoddΣ {Σ} : subG evenoddΣ Σ → evenoddPreG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!heapGS Σ the_model, !evenoddG Σ}.
+  Context `{@heapGS Σ _ (@LM_EM _ the_model), !evenoddG Σ}.
   Let Ns := nroot .@ "even_odd".
 
   Definition even_at (n: nat) := own even_name (◯E n).
@@ -288,7 +288,7 @@ Section proof.
 End proof.
 
 Section proof_start.
-  Context `{!heapGS Σ the_model, !evenoddG Σ}.
+  Context `{@heapGS Σ _ (@LM_EM _ the_model), !evenoddG Σ}.
   Let Ns := nroot .@ "even_odd".
 
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) :

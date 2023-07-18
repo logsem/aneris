@@ -405,7 +405,7 @@ Lemma evenodd_sim l :
 Proof.
   assert (evenoddPreG evenoddΣ) as HPreG'.
   { apply _. }
-  assert (heapGpreS evenoddΣ the_model) as HPreG.
+  assert (heapGpreS evenoddΣ (@LM_EM _ the_model)) as HPreG.
   { apply _. }
   eapply (strong_simulation_adequacy
             evenoddΣ _ NotStuck _ _ _ ∅). 

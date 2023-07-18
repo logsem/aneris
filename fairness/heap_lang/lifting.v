@@ -6,7 +6,7 @@ From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
 From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness fuel fuel_termination.
 From trillium.program_logic Require Import ectx_lifting.
-From trillium.fairness.heap_lang Require Export lang heap_lang_defs.
+From trillium.fairness.heap_lang Require Export lang heap_lang_defs em_lm.
 From trillium.fairness.heap_lang Require Import tactics notation.
 Set Default Proof Using "Type".
 
@@ -188,14 +188,17 @@ Lemma own_proper `{inG Σ X} γ (x y: X):
   own γ x -∗ own γ y.
 Proof. by intros ->. Qed.
 
-Lemma auth_fuel_is_proper `{heapGS Σ Mdl} (x y : gmap (fmrole Mdl) nat):
+Lemma auth_fuel_is_proper `{LM: LiveModel Λ M}
+  `{fairnessGS _ _ LM Σ}
+  (x y : gmap (fmrole M) nat):
   x = y ->
   auth_fuel_is x -∗ auth_fuel_is y.
 Proof. by intros ->. Qed.
 
 Section lifting.
 Context `{LM:LiveModel heap_lang M}.
-Context `{!heapGS Σ LM}.
+(* Context `{!heapGS Σ LM}. *)
+Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}. 
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types efs : list expr.
