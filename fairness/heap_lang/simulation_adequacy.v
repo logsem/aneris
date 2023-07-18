@@ -7,87 +7,7 @@ From trillium.fairness.heap_lang Require Export lang heap_lang_defs.
 
 Section adequacy.
 
-Lemma posts_of_empty_mapping `{heapGS Σ M} (e1 e: expr) v (tid : nat) (tp : list expr):
-  tp !! tid = Some e ->
-  to_val e = Some v ->
-  posts_of tp ((λ (_ : val), 0%nat ↦M ∅) ::  (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) tp)))) -∗
-  tid ↦M ∅.
-Proof.
-  intros Hsome Hval. simpl.
-
-  rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _: val, tid ↦M ∅)) _) //.
-  apply elem_of_list_omap.
-  exists (e, (λ _: val, tid ↦M ∅)); split; last first.
-  - simpl. apply fmap_Some. exists v. split; done.
-  - destruct tp as [|e1' tp]; first set_solver. simpl.
-    apply elem_of_cons.
-    destruct tid as [|tid]; [left|right]; first by simpl in Hsome; simplify_eq.
-    apply elem_of_lookup_zip_with. eexists tid, e, _. do 2 split =>//.
-    rewrite /locale_of /=.
-    rewrite list_lookup_fmap fmap_Some. simpl in Hsome.
-    exists (e1 :: take tid tp, e). rewrite drop_0. split.
-    + erewrite prefixes_from_lookup =>//.
-    + rewrite /locale_of /= take_length_le //.
-      assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
-Qed.
-
 (* Local Hint Resolve tid_step_tp_length_heap: core. *)
-
-Lemma from_locale_from_lookup tp0 tp tid e :
-  from_locale_from tp0 tp tid = Some e <-> (tp !! (tid - length tp0)%nat = Some e ∧ (length tp0 <= tid)%nat).
-Proof.
-  split.
-  - revert tp0 tid. induction tp as [| e1 tp1 IH]; intros tp0 tid.
-    { unfold from_locale. simpl. done. }
-    unfold from_locale. simpl.
-    destruct (decide (locale_of tp0 e1 = tid)).
-    + intros ?; simplify_eq. rewrite /locale_of /= Nat.sub_diag.
-      split; [done|lia].
-    + intros [H Hlen]%IH. rewrite app_length /= in H.
-      rewrite app_length /= in Hlen.
-      destruct tid as [|tid]; first lia.
-      assert (Heq1 : (length tp0 + 1 = S (length tp0))%nat) by lia.
-      rewrite Heq1 in Hlen.
-      assert (length tp0 ≤ tid)%nat by lia.
-      assert (Heq : (S tid - length tp0)%nat = (S ((tid - (length tp0))))%nat) by lia.
-      rewrite Heq /=. split.
-      * rewrite -H. f_equal. lia.
-      * transitivity tid; try lia. assumption.
-  - revert tp0 tid. induction tp as [|e1 tp1 IH]; intros tp0 tid.
-    { set_solver. }
-    destruct (decide (tid = length tp0)) as [-> | Hneq].
-    + rewrite Nat.sub_diag /=. intros  [? _]. simplify_eq.
-      rewrite decide_True //.
-    + intros [Hlk Hlen]. assert (length tp0 < tid)%nat as Hle by lia.
-      simpl. rewrite decide_False //. apply IH. split.
-      * assert (tid - length tp0 = S ((tid - 1) - length tp0))%nat as Heq by lia.
-        rewrite Heq /= in Hlk. rewrite -Hlk app_length /=. f_equal; lia.
-      * rewrite app_length /=. apply Nat.le_succ_l in Hle. rewrite Nat.add_comm //.
-Qed.
-
-Lemma from_locale_lookup tp tid e :
-  from_locale tp tid = Some e <-> tp !! tid = Some e.
-Proof.
-  assert (from_locale tp tid = Some e <-> (tp !! tid = Some e ∧ 0 ≤ tid)%nat) as H; last first.
-  { split; intros ?; apply H; eauto. split; [done|lia]. }
-  unfold from_locale. replace (tid) with (tid - length (A := expr) [])%nat at 2;
-    first apply from_locale_from_lookup. simpl; lia.
-Qed.
-
-Definition indexes {A} (xs : list A) := imap (λ i _, i) xs.
-
-Lemma locales_of_list_from_indexes (es' es : list expr) :
-  locales_of_list_from es' es = imap (λ i _, length es' + i)%nat es.
-Proof.
-  revert es'. induction es; [done|]; intros es'.
-  rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
-  f_equiv; [lia|]. rewrite IHes. apply imap_ext.
-  intros x ? Hin. rewrite app_length=> /=. lia.
-Qed.
-
-Lemma locales_of_list_indexes (es : list expr) :
-  locales_of_list es = indexes es.
-Proof. apply locales_of_list_from_indexes. Qed.
 
 Theorem heap_lang_continued_simulation_fair_termination {FM : FairModel}
         `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
@@ -103,12 +23,115 @@ Proof.
   - by intros ex atr [[??]?].
 Qed.
 
+Definition LM_init_resource `{LM:LiveModel heap_lang Mdl} `{!fairnessGS LM Σ}
+  (s1: fmstate Mdl)
+  (* FR *)
+  : iProp Σ :=
+  frag_model_is s1 ∗
+  (∃ FR, frag_free_roles_are (FR ∖ live_roles _ s1)) ∗
+  has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1)). 
 
-Let rel_always_holds `{heapGS Σ LM} s ξ e1 σ1 δ1 := 
+Definition init_thread_post `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
+  (tid: locale heap_lang): iProp Σ :=
+  tid ↦M ∅.
+
+
+Global Instance LM_EM `{LM: LiveModel heap_lang M}: @ExecutionModel LM :=
+  {|
+    em_preGS := fun Σ => fairnessGpreS LM Σ;
+    em_GS := fun Σ => fairnessGS LM Σ;
+    em_Σ := fairnessΣ heap_lang M;
+    em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ LM _ _;
+
+    em_valid_state_evolution_fairness := valid_state_evolution_fairness;
+    em_thread_post Σ := fun {_: fairnessGS LM Σ} (tid: locale heap_lang) (_: val) => tid ↦M ∅;
+    (* TODO: cannot express the msi instantiation this way*)
+    em_msi Σ := fun {_: fairnessGS LM Σ} es δ => model_state_interp es δ;                                                                                    
+    em_init_resource Σ := fun {_: fairnessGS LM Σ} δ => LM_init_resource δ;
+|}.
+
+(* TODO: get rid of it*)
+Global Instance LM_EM_fairPre `{LM: LiveModel heap_lang M}
+                `{hGS: @heapGpreS Σ LM (@LM_EM _ LM)}:
+  fairnessGpreS LM Σ.
+Proof. apply hGS. Defined. 
+
+(* TODO: get rid of it*)
+Global Instance LM_EM_fair `{LM: LiveModel heap_lang M}
+                `{hGS: @heapGS Σ LM (@LM_EM _ LM)}:
+  fairnessGS LM Σ.
+Proof. apply hGS. Defined. 
+
+(* TODO: how to make 'heap..' instantiations less wordy? *)
+Lemma init_fairnessGS_LM Σ `(LM:LiveModel heap_lang M)
+  `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)}
+  (s1: M) (e1 : expr):
+  ⊢ (|==> ∃ fGS: fairnessGS LM Σ, (* TODO: what is a canonical way of doing it? *)
+       ∀ `{hGS: @heapGS Σ _ (@LM_EM _ LM)},
+         ⌜ hGS.(heap_fairnessGS) = fGS⌝ →
+      LM_init_resource s1 ∗ model_state_interp [e1] (initial_ls s1 0%nat (LM := LM))).
+Proof.
+  iIntros.
+  iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
+  iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
+  iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
+  (* TODO: seems like the concrete set of free roles doesn't matter *)
+  (* iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]". *)
+  iMod (model_free_roles_init s1 ∅) as (γfr) "[HFR Hfr]".
+  iModIntro.
+  iExists ({|
+              fairness_model_name := γmod;
+              fairness_model_mapping_name := γmap;
+              fairness_model_fuel_name := γfuel;
+              fairness_model_free_roles_name := γfr;
+            |}).
+  iIntros.
+
+  iSplitL "Hmodf Hfr Hfuelf Hmapf".
+  2: { unfold model_state_interp. simpl. iFrame. 
+       iExists {[ 0%nat := (live_roles M s1) ]}, _.
+       iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
+       iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
+       iSplit; first done.
+       iSplit; iPureIntro; [|split].
+       - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
+         setoid_rewrite lookup_singleton_Some. split; naive_solver.
+       - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
+       - rewrite dom_gset_to_gmap. set_solver. }
+
+  rewrite /LM_init_resource.
+  rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton.
+    
+  (* iFrame. *)
+  iSplitL "Hmodf".
+  { by rewrite /frag_model_is. }
+  iSplitL "Hfr".
+  { rewrite /frag_free_roles_are. 
+    iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
+
+  rewrite !dom_gset_to_gmap. iFrame.
+  unfold frag_fuel_is.
+  setoid_rewrite map_fmap_singleton. simpl.
+  destruct (decide (live_roles M s1 = ∅)) as [-> | NE].
+  { by iApply big_sepS_empty. }
+  iDestruct (own_proper with "Hfuelf") as "Hfuelf".
+  { apply auth_frag_proper. apply @gset_to_gmap_singletons. } 
+  rewrite big_opS_auth_frag. rewrite big_opS_own; [| done].
+  iApply (big_sepS_mono with "Hfuelf"). iIntros (ρ Hin) "H".
+  iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done.
+Qed.
+
+(* Lemma foo  `(LM:LiveModel heap_lang M) `{hGS: @heapGS Σ LM (@LM_EM _ LM)}: *)
+(*   irisG heap_lang LM Σ. *)
+(* apply _.  *)
+(* Qed.  *)
+
+Let rel_always_holds `{LM:LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
+  s ξ e1 σ1 δ1 := 
       rel_always_holds0 (fun etr atr => ξ etr (map_underlying_trace atr)) 
         s (state_interp) (fun _ => 0%nat ↦M ∅) e1 σ1 δ1. 
 
-Lemma rel_always_holds_lift_LM `{LM: LiveModel heap_lang M} `{HGS: heapGS Σ _ LM}
+Lemma rel_always_holds_lift_LM `{LM: LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
   s e1 σ1 s1 ξ:
   rel_always_holds s ξ e1 σ1 (initial_ls s1 0%nat) -∗
   rel_always_holds0 (sim_rel_with_user LM ξ) s state_interp
@@ -157,7 +180,7 @@ Proof.
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
       iDestruct "Hsi" as "(_&_&Hsi)".
       iDestruct "Hsi" as "(%m&%FR'&Hfuela&Hmapa&HFR&%Hinvmap&%Hsmall&Hmodel&HfrFR)".
-      iDestruct (frag_mapping_same 0%nat m with "[Hmapa] Hem") as "%H"; first done.
+      iDestruct (frag_mapping_same 0%nat m with "[Hmapa] Hem") as "%H"; [done| ].
       iPureIntro. by eapply no_locale_empty.
     + iSplit; iPureIntro.
       { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
@@ -190,102 +213,14 @@ Proof.
         apply from_locale_lookup =>//. }
       iDestruct (frag_mapping_same tid' m with "Hmapa H") as "%Hlk".
       { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
-Qed.   
-
-Definition LM_init_resource `{LM:LiveModel heap_lang Mdl} `{!heapGS Σ LM}
-  (s1: fmstate Mdl)
-  (* FR *)
-  : iProp Σ :=
-  frag_model_is s1 ∗
-  (∃ FR, frag_free_roles_are (FR ∖ live_roles _ s1)) ∗
-  has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (Mdl.(live_roles) s1)). 
-
-Definition init_thread_post `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} 
-  (tid: locale heap_lang): iProp Σ :=
-  tid ↦M ∅.
-
-(* Theorem strong_simulation_adequacy_general' Σ `(LM:LiveModel heap_lang M) *)
-(*     `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M) *)
-(*     (* (ξ: execution_trace heap_lang → finite_trace M (option $ fmrole M) → *) *)
-(*     (R: execution_trace heap_lang → auxiliary_trace LM → Prop) *)
-(*   : *)
-(*   rel_finitary R → *)
-(*   (* (⊢ |==> heapGS Σ LM) -> *) *)
-(*   (∀ `{Hinv : !heapGS Σ LM}, *)
-(*     ⊢ |={⊤}=> *)
-(*        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗ *)
-(*          LM_init_resource s1 *)
-(*        ={⊤}=∗ *)
-(*        WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗ *)
-(*        rel_always_holds0 R s state_interp (λ _, 0%nat ↦M ∅) e1 σ1 (initial_ls s1 0%nat)) -> *)
-(*   continued_simulation R (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)). *)
-(* Proof. *)
-
-Lemma init_fairnessGS_LM Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM}
-  (s1: M) (e1 : expr):
-  ⊢ (|==> ∃ fGS: fairnessGS LM Σ, (* TODO: what is a canonical way of doing it? *)
-       ∀ `{hGS: !heapGS Σ LM},
-         ⌜ hGS.(heap_fairnessGS) = fGS⌝ →
-      LM_init_resource s1 ∗ model_state_interp [e1] (initial_ls s1 0%nat (LM := LM))).
-Proof.
-  iIntros.
-  iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
-  iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
-  iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
-  (* TODO: seems like the concrete set of free roles doesn't matter *)
-  (* iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]". *)
-  iMod (model_free_roles_init s1 ∅) as (γfr) "[HFR Hfr]".
-  iModIntro.
-  iExists ({|
-              fairness_model_name := γmod;
-              fairness_model_mapping_name := γmap;
-              fairness_model_fuel_name := γfuel;
-              fairness_model_free_roles_name := γfr;
-            |}).
-  iIntros.
-
-  iSplitL "Hmodf Hfr Hfuelf Hmapf".
-  2: { unfold model_state_interp. simpl. iFrame. 
-       iExists {[ 0%nat := (live_roles M s1) ]}, _.
-       iSplitL "Hfuela"; first by rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
-       iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
-       iSplit; first done.
-       iSplit; iPureIntro; [|split].
-       - intros ρ tid. rewrite lookup_gset_to_gmap_Some.
-         setoid_rewrite lookup_singleton_Some. split; naive_solver.
-       - intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs. set_solver.
-       - rewrite dom_gset_to_gmap. set_solver. }
-
-  rewrite /LM_init_resource.
-  rewrite /has_fuels /frag_mapping_is /= map_fmap_singleton.
-    
-  (* iFrame. *)
-  iSplitL "Hmodf".
-  { rewrite /frag_model_is. by rewrite H. }
-  iSplitL "Hfr".
-  { rewrite /frag_free_roles_are. rewrite H.
-    iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
-  
-  iAssert ([∗ set] ρ ∈ live_roles M s1, ρ ↦F (LM.(lm_fl) s1))%I with "[Hfuelf]" as "H".
-  - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
-    destruct (decide (live_roles M s1 = ∅)) as [-> | NE].
-    { by iApply big_sepS_empty. }
-    rewrite -big_opS_own //.
-    rewrite H. iApply (own_proper with "Hfuelf").
-    rewrite -big_opS_auth_frag. f_equiv. rewrite gset_to_gmap_singletons //.
-  - rewrite /frag_fuel_is. rewrite H. simpl.
-    rewrite dom_gset_to_gmap. iFrame.    
-    iApply (big_sepS_mono with "H"). iIntros (ρ Hin) "H".
-    iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done.
-Qed.
-
+Qed. 
 
 Theorem strong_simulation_adequacy_general Σ `(LM:LiveModel heap_lang M)
-    `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M)
+    `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M)
     (R: execution_trace heap_lang → auxiliary_trace LM → Prop)
   :
   rel_finitary R →
-  (∀ `{Hinv : !heapGS Σ LM},
+  (∀ `{Hinv : @heapGS Σ _ (@LM_EM _ LM)} ,
     ⊢ |={⊤}=>
        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
        LM_init_resource s1
@@ -300,7 +235,8 @@ Proof.
 
   iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".  
   iMod (init_fairnessGS_LM _ _ s1 e1) as (fGS) "GEN".   
-  set (distG := {| heap_fairnessGS := fGS |}).
+
+  set (distG := {| heap_fairnessGS := (fGS: (em_GS Σ (ExecutionModel := @LM_EM _ LM))) |}).
   iMod (H distG) as "Hwp". clear H.
   iSpecialize ("GEN" $! distG eq_refl). iDestruct "GEN" as "[LM_INIT MSI]".
 
@@ -314,11 +250,11 @@ Qed.
 
 
 Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
-    `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M)
+    `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop) :
   rel_finitary (sim_rel_with_user LM ξ) →
-  (∀ `{Hinv : !heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)}, 
     ⊢ |={⊤}=>
        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
          LM_init_resource s1
@@ -336,13 +272,13 @@ Proof.
   by iApply rel_always_holds_lift_LM. 
 Qed.
 
-Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M):
+Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M):
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   (* The initial configuration satisfies certain properties *)
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
-  (∀ `{!heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
       ⊢ |={⊤}=>
          LM_init_resource s1
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
@@ -374,14 +310,14 @@ Proof.
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)
-        `{!heapGpreS Σ LM} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)}  (s: stuckness)
         e1 σ1 (s1: M)
         (iex : inf_execution_trace heap_lang)
         (Hvex : valid_inf_exec (trace_singleton ([e1], σ1)) iex)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM)  →
-  (∀ `{!heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
       ⊢ |={⊤}=> LM_init_resource s1
          ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
@@ -408,7 +344,8 @@ Qed.
 
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
-Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M) `{!heapGpreS Σ LM} (s: stuckness)
+Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M)
+  `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -416,7 +353,7 @@ Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M) `{!heapGpreS
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{!heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
       ⊢ |={⊤}=> LM_init_resource s1
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
@@ -450,7 +387,7 @@ Qed.
 
 
 Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
-        `{!heapGpreS Σ LM} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -458,7 +395,7 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{!heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
       ⊢ |={⊤}=> LM_init_resource s1 ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -476,7 +413,7 @@ Qed.
   
 
 Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
-        `{!heapGpreS Σ LM} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: Mdl)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
@@ -484,7 +421,7 @@ Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
   (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) ->
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{!heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
       ⊢ |={⊤}=> LM_init_resource s1
                  ={⊤}=∗
                  WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
@@ -507,14 +444,14 @@ Qed.
 
 Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
         `(LM : LiveModel heap_lang M)
-        `{!heapGpreS Σ LM} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{!heapGS Σ LM},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
       ⊢ |={⊤}=> LM_init_resource s1 ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
