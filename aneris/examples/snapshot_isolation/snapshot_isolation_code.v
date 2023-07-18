@@ -145,8 +145,8 @@ Definition start_server_processing_clients ser : val :=
 Definition init_server ser : val :=
   λ: "addr",
   let: "kvs" := ref (map_empty #()) in
-  let: "lk" := newlock #() in
   let: "vnum" := ref #0 in
+  let: "lk" := newlock #() in
   Fork (start_server_processing_clients ser "addr" "lk" "kvs" "vnum" #()).
 
 Definition init_client_proxy ser : val :=

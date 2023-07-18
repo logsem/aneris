@@ -148,8 +148,8 @@ let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum () =
 
 let init_server (ser[@metavar] : 'a serializer) addr : unit =
   let (kvs : 'a kvsTy Atomic.t) = ref (map_empty ()) in
-  let (lk : Mutex.t) = newlock () in
   let vnum = ref 0 in
+  let (lk : Mutex.t) = newlock () in
   fork (start_server_processing_clients ser addr lk kvs vnum) ()
 
 let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
