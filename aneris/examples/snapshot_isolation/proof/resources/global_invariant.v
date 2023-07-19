@@ -1,7 +1,6 @@
 From iris.algebra Require Import agree auth excl gmap updates local_updates.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
-
 From iris.base_logic Require Import invariants.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
@@ -13,8 +12,10 @@ From aneris.aneris_lang.lib Require Import
      list_proof monitor_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.specs Require Import user_params.
-From aneris.examples.snapshot_isolation.proof Require Import
-     time events model resource_algebras server_resources.
+From aneris.examples.snapshot_isolation.proof
+     Require Import time events model.
+From aneris.examples.snapshot_isolation.proof.resources
+     Require Import resource_algebras server_resources.
 
 
 Section Global_Invariant.
@@ -30,7 +31,6 @@ Section Global_Invariant.
       ownMemGlobal γGauth γGsnap M ∗
       ownTimeGlobal γT T ∗
       ⌜kvs_valid M T⌝.
-
 
   Definition Global_Inv : iProp Σ :=
     inv KVS_InvName global_inv_def.

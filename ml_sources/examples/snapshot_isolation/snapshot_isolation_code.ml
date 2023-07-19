@@ -9,15 +9,18 @@ open Mt_server_code
 (** The internal state of the server *)
 
 (** 1. The KVS type (updated via commited transactions) *)
-type 'a kvsTy = ((string, (('a * int) alist)) amap)
+type 'a kvsTy = ((string, ((string * ('a * int)) alist)) amap)
 
-(** 2. The client side *)
+(** 2. The cache memory (current opened transaction).
+    Simplification: there is only one global cache for all clients.
+    Therefore, no concurrent accesses to disjoint keys) *)
 type 'a cacheTy = ((string, 'a) amap)
 type 'a reqTy = ((string * int), (unit, int * 'a cacheTy) sumTy) sumTy
 type 'a replTy = ('a option, (int, bool) sumTy) sumTy
 type 'a connection_state =
-  ('a reqTy, 'a replTy) rpc *
-  ((int * 'a cacheTy Atomic.t) option Atomic.t)
+  (Mutex.t *
+   (('a reqTy, 'a replTy) rpc *
+    ((int * 'a cacheTy Atomic.t) option Atomic.t)))
 
 (** Serializers *)
 let req_ser (val_ser[@metavar]) =
@@ -47,7 +50,7 @@ let kvs_get_last kt (kvs : 'a kvsTy) : 'a option =
     match l with
     | None -> None
     | Some p ->
-      let ((v, tv), tl) = p in
+      let ((_k, (v, tv)), tl) = p in
       if tv = t then assert false
       else if tv < t then Some v
       else aux tl
@@ -62,19 +65,19 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
       let (kv, cache_l) = chl in
       let (k,v) = kv in
       let vlst = kvs_get k kvs in
-      let newval = (v, tc) in
+      let newval = (k, (v, tc)) in
       let newvals = (list_cons newval vlst) in
       let kvs_t' = map_insert k newvals kvs_t in
       upd kvs_t' cache_l
   in upd kvs cache
 
-let check_at_key k (ts : int) (tc : int) (vlst : (('a * int) alist)) =
+let check_at_key k (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
   assert (ts < tc);
   match vlst with
   | None -> true
   | Some l ->
     let (vlast, _hd) = l in
-    let (_v, t) = vlast in
+    let ((_k, (_v, t))) = vlast in
     if tc <= t || t = ts then assert false
     else
     let b = t < ts in
@@ -152,13 +155,18 @@ let init_server (ser[@metavar] : 'a serializer) addr : unit =
   let (lk : Mutex.t) = newlock () in
   fork (start_server_processing_clients ser addr lk kvs vnum) ()
 
+
 let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
- let rpc = init_client_proxy (req_ser ser) (repl_ser ser) clt_addr srv_addr in
- (rpc, ref None)
+  let rpc = init_client_proxy (req_ser ser) (repl_ser ser) clt_addr srv_addr in
+  let txt = ref None in
+  let lk = newlock () in
+  (lk, (rpc, txt))
 
 let start (cst : 'a connection_state) : unit =
-  let (rpc, tst) = cst in
-  match !tst with
+  let (lk, (rpc, tst)) = cst in
+  acquire lk;
+  begin
+    match !tst with
     | Some _abs -> assert false
     | None ->
       let repl = make_request rpc (InjR (InjL ())) in
@@ -169,47 +177,56 @@ let start (cst : 'a connection_state) : unit =
         | InjL ts ->
           tst := Some (ts, ref (map_empty ()))
         | InjR _abs -> assert false
+  end;
+  release lk
 
 let read (cst : 'a connection_state) k : 'a option =
-  let (rpc, tst) = cst in
-  match !tst with
-  | None -> assert false
-  | Some st ->
-    let (ts, cache) = st in
-    match map_lookup k !cache with
-    | Some v -> Some v
-    | None ->
-      let repl = make_request rpc (InjL (k, ts)) in
-      match repl with
-      | InjL vo -> vo
-      | InjR _abs -> assert false
+  let (lk, (rpc, tst)) = cst in
+  acquire lk;
+  let vo =
+    match !tst with
+    | None -> assert false
+    | Some st ->
+      let (ts, cache) = st in
+      match map_lookup k !cache with
+      | Some v -> Some v
+      | None ->
+        let repl = make_request rpc (InjL (k, ts)) in
+        match repl with
+        | InjL vo -> vo
+        | InjR _abs -> assert false
+  in release lk; vo
 
 let write (cst : 'a connection_state) k v : unit =
-  let (_rpc, tst) = cst in
+  let (lk, (_rpc, tst)) = cst in
+  acquire lk;
   match !tst with
   | None -> assert false
   | Some st ->
     let (_ts, cache) = st in
-    cache := map_insert k v !cache
+    cache := map_insert k v !cache;
+    release lk
 
 let commit (cst : 'a connection_state) : bool =
-  let (rpc, tst) = cst in
-  match !tst with
-  | None -> assert false
-  | Some st ->
-    let (ts, cache) = st in
-    let repl =
-      let cch = !cache in
-      if cch = None then InjR (InjR true)
-      else make_request rpc (InjR (InjR (ts, cch))) in
-    match repl with
-    | InjL _abs -> assert false
-    | InjR r ->
-      match r with
+  let (lk, (rpc, tst)) = cst in
+  acquire lk;
+  let b =
+    match !tst with
+    | None -> assert false
+    | Some st ->
+      let (ts, cache) = st in
+      let repl =
+        let cch = !cache in
+        if cch = None then InjR (InjR true)
+        else make_request rpc (InjR (InjR (ts, cch))) in
+      match repl with
       | InjL _abs -> assert false
-      | InjR b ->
-        tst := None;
-        b
+      | InjR r ->
+        match r with
+        | InjL _abs -> assert false
+        | InjR b ->
+          tst := None; b
+  in release lk; b
 
 let run (cst : 'a connection_state)
     (handler : 'a connection_state -> unit) : bool =

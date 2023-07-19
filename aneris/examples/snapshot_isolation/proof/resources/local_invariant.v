@@ -1,7 +1,6 @@
 From iris.algebra Require Import agree auth excl gmap updates local_updates.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
-
 From iris.base_logic Require Import invariants.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
@@ -14,7 +13,9 @@ From aneris.aneris_lang.lib Require Import
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.specs Require Import user_params.
 From aneris.examples.snapshot_isolation.proof Require Import
-     time events model resource_algebras server_resources.
+     time events model.
+From aneris.examples.snapshot_isolation.proof.resources Require Import
+     resource_algebras server_resources.
 
 Section Local_Invariant.
 

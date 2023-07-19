@@ -1,7 +1,6 @@
 From iris.algebra Require Import agree auth excl gmap updates local_updates.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
-
 From iris.base_logic Require Import invariants.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
@@ -13,7 +12,8 @@ From aneris.aneris_lang.lib Require Import
      list_proof monitor_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.snapshot_isolation.specs Require Import user_params.
-From aneris.examples.snapshot_isolation.proof Require Import time events model resource_algebras.
+From aneris.examples.snapshot_isolation.proof Require Import time events model.
+From aneris.examples.snapshot_isolation.proof.resources Require Import resource_algebras.
 
 
 Section Resources.
@@ -82,6 +82,15 @@ Section Resources.
   Lemma  ownMemSeen_Persistent k h :
     Persistent (ownMemSeen k h).
   Proof. apply _. Qed.
+
+(*  Seen_timeless k h :> Timeless (Seen k h); *)
+
+(* OwnMemKey_exclusive k h h' : *)
+(*         k ↦ₖ h ⊢ k ↦ₖ h' -∗ False; *)
+
+(*     OwnLocalKey_exclusive k c v v' : *)
+(*         k ↦{c} v ⊢ k ↦{c} v' -∗ False; *)
+
 
   Lemma ownMemSeen_prefix k h h':
     ownMemSeen k h ⊢ ownMemSeen k h' -∗
