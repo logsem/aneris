@@ -20,7 +20,13 @@ Class ExecutionModel (M: Model) := {
     em_init_resource {Σ: gFunctors} `{em_GS Σ}: mstate M → iProp Σ;
     (* TODO: currently we assume that postconditions of all threads coincide *)
     (* em_init_thread_post {Σ}: locale heap_lang -> val -> iProp Σ; *)
+    em_init_state: mstate M -> Prop;
+    
+    em_initialization Σ `{ePreGS: em_preGS Σ}: 
+    forall (s1: mstate M) (e1: expr) (INIT: em_init_state s1),
+      ⊢ (|==> ∃ eGS: em_GS Σ, @em_init_resource _ eGS s1 ∗ @em_msi _ eGS [e1] s1)
 }.
+
 
 (* TODO: the missing fact of em_GS etc. being typeclasses
    hardens automatic resolution of their instances *)
