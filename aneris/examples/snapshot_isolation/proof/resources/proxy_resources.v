@@ -23,9 +23,15 @@ Inductive proxy_state : Type :=
 | PSCanStart
 | PSActive of (gmap Key (list write_event)).
 
+Definition hist_to_we (h : list write_event) :=
+  match h with
+  | v :: t => Some v
+  | [] => None
+  end.
+
 Section Proxy.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources}.
-  Context (γGsnap γT γSrvGnames : gname).
+  Context (γGsnap γT : gname).
 
  Definition kvs_valid_snapshot (M : gmap Key (list write_event)) (t : Time) :=
    kvs_valid M t ∧
@@ -35,71 +41,102 @@ Section Proxy.
   Definition isActiveToken (γA : gname) : iProp Σ := own γA (Excl ()).
 
   Definition is_coherent_cache
-    (cache_physM : gmap Key val)
-    (cacheM : gmap Key (option (val * bool)))
+    (cache_updatesM : gmap Key val)
+    (cache_logicalM : gmap Key (option (val * bool)))
     (Msnap :  gmap Key (list write_event)) :=
-               True.
+      (** Cache Logical and Snapshot Coherence *)
+      dom cache_logicalM = dom Msnap ∧
+      (∀ k (v : val) (b : bool),
+        k ∈ dom cache_logicalM →
+        (cache_logicalM !! k) = Some (Some (v, false)) →
+        ∃ h e,
+          Msnap !! k = Some h ∧
+          hist_to_we h = Some e ∧
+          e.(we_val) = v) ∧
+      (** Cache Logical and Cache Updates Coherence *)
+      dom cache_updatesM ⊆ dom cache_logicalM ∧
+      (∀ k (v : val),
+        k ∈ dom cache_updatesM →
+        cache_updatesM !! k = Some v ↔
+        cache_logicalM !! k = Some (Some (v, true))) ∧
+      (∀ k v,
+        k ∈ dom cache_logicalM →
+        (cache_updatesM !! k) = None ↔
+        cache_logicalM !! k = Some (Some (v, false))).
 
-  Definition connection_state_def
+  Definition is_connected_def
     (n : ip_address) (cst : val) (l : loc) (s : proxy_state) (sv : val)
     (γS γA γCache : gname) : iProp Σ :=
       l ↦[n] sv ∗
       MTSCanRequest n cst ∗
-      ((⌜sv = NONEV⌝ ∗
-        ⌜s = PSCanStart⌝ ∗
-        ghost_map_auth γCache 1 ∅ ∗
-        CanStartToken γS) ∨
-       (∃ (ts : nat) (Msnap : gmap Key (list write_event))
-          (cache_physV : val) (cache_physM : gmap Key val)
-          (cacheM : gmap Key (option (val * bool))),
-           ⌜sv = SOMEV (#ts, cache_physV)⌝ ∗
-           ⌜s = PSActive Msnap⌝ ∗
-           ⌜is_map cache_physV cache_physM⌝ ∗
-           ⌜kvs_valid_snapshot Msnap ts⌝ ∗
-           ⌜is_coherent_cache cache_physM cacheM Msnap⌝ ∗
-           ownTimeSnap γT ts ∗
-           ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
-           ghost_map_auth γCache 1 cacheM ∗
-           isActiveToken γA)).
+      (
+        (** If no active transaction is running on the connection: *)
+        (⌜sv = NONEV⌝ ∗
+         ⌜s = PSCanStart⌝ ∗
+         (** then the lock has start token and guards an empty logical cache map. *)
+         ghost_map_auth γCache 1 ∅ ∗
+         CanStartToken γS) ∨
+        (** Or an active transaction is running: *)
+        (∃ (ts : nat) (Msnap : gmap Key (list write_event))
+           (cache_updatesV : val) (cache_updatesM : gmap Key val)
+           (cacheM : gmap Key (option (val * bool))),
+            ⌜sv = SOMEV (#ts, cache_updatesV)⌝ ∗
+            ⌜s = PSActive Msnap⌝ ∗
+            (** then lock has active token and guards a logical cache map
+                whose domain is equal to the one of the snapshot. *)
+            ⌜is_coherent_cache cache_updatesM cacheM Msnap⌝ ∗
+            ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+            ⌜is_map cache_updatesV cache_updatesM⌝ ∗
+            ownTimeSnap γT ts ∗
+            ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
+            ghost_map_auth γCache 1 cacheM ∗
+            isActiveToken γA)).
 
-  Definition connection_state_gen
+  Definition is_connected
    (n : ip_address) (c : val) (s : proxy_state) (γlk γS γA γCache : gname)
     : iProp Σ :=
     ∃ (lk : val) (cst : val) (l : loc) (sv : val),
       ⌜c = (lk, (cst, #l))%V⌝ ∗
       is_lock (KVS_InvName .@ ("lk" +:+ n)) n γlk lk
-              (connection_state_def n cst l s sv γS γA γCache).
+              (is_connected_def n cst l s sv γS γA γCache).
 
   Lemma connection_state_gen_persistent n c s γlk γS γA γCache :
-    Persistent (connection_state_gen n c s γlk γS γA γCache).
+    Persistent (is_connected n c s γlk γS γA γCache).
   Proof. apply _. Qed.
 
-  Definition connection_state
-    (n : ip_address) (c : val) (s : proxy_state) (γCst : gname)
-    : iProp Σ :=
+  (** Tokens forbid the connection state to be duplicable and so
+      prohibit concurrent use of start/commit operations which would
+      make the use of the library inconsistent because one should not
+      run start and commit in parallel, only reads and/or writes. *)
+ Definition connection_state (n : ip_address) (c : val) (s : proxy_state)
+   : iProp Σ :=
     ∃ (γlk γS γA γCache : gnameO),
-      own γCst (to_agree (n, γlk, γCache)) ∗
-      connection_state_gen n c s γlk γS γA γCache ∗
+      is_connected n c s γlk γS γA γCache ∗
         match s with
         | PSCanStart => isActiveToken γA
         | PSActive _ => CanStartToken γS
         end.
 
-  Definition ownCacheUser (k : Key)  (c : val) (vo : option val) (γCst : gname)
+ (** Having a cache pointer guarantees that the connection state is in active
+  mode because the domain of the cache map cannot be empty by agreement on
+  ghost map. *)
+  Definition ownCacheUser (k : Key) (c : val) (vo : option val) (γCache : gname)
     : iProp Σ :=
-    ∃ (n : ip_address) (γlk γS γA γCache : gname) (s : proxy_state)
-       (vbo : option (val * bool)),
-      own γCst (to_agree (n, γlk, γCache)) ∗
-      connection_state_gen n c s γlk γS γA γCache ∗
+    ∃ (vbo : option (val * bool)),
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
         ⌜match vbo with
          | None => vo = None
          | Some (v, b) => vo = Some v
          end⌝.
 
-  Definition key_upd_status (c : val) (k : Key) (b: bool) (γCst : gname) : iProp Σ :=
-    ∃ n vbo γlk γCache,
-      own γCst (to_agree (n, γlk, γCache)) ∗
+  Lemma ownCacheUser_timeless k c vo γCache : Timeless (ownCacheUser k c vo γCache).
+  Proof. apply _. Qed.
+
+ (** To update cache pointers, one need to change the update status of the key.
+  This is enforced by giving half of the pointer permission to the cache pointer
+  the other half to the key_upd_status predicate. *)
+  Definition key_upd_status (c : val) (k : Key) (b: bool) (γCache : gname) : iProp Σ :=
+    ∃ vbo γCache,
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
       ⌜b = true⌝ → ∃ (v : val), ⌜vbo = Some (v, b)⌝.
 
