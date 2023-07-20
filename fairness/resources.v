@@ -6,7 +6,6 @@ Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
-(* TODO: why require LiveModel here? *)
 Class fairnessGpreS `(LM: LiveModel Λ M) Σ `{Countable (locale Λ)} := {   
   fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
   fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
