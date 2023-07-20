@@ -182,6 +182,8 @@ Section ClientProofs.
   (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM, spinlockG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ spinlock_model_impl}.
+  Context {ifG: fairnessGS spinlock_model Σ}.
+
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
 
   (* TODO: decide what to do with notations *)
@@ -386,7 +388,7 @@ Section ClientProofs.
   Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (LM := LM) (iLM := spinlock_model) (PMPP := PMPP))).
   
 
-  Lemma acquire_spec_term tid Einvs l γ P f (FUEL: f > 5) th
+  Lemma acquire_spec_term tid Einvs l γ P f (FUEL: f > 5) (th: nat)
     (DISJ_INV: Einvs ## ↑Ns) (* TODO: hide this requirement *)
     :
     PMP Einvs -∗
@@ -427,7 +429,7 @@ Section ClientProofs.
 
       iModIntro. (* moved from its previous position *)
       
-      iApply ((wp_cmpxchg_suc_step_singlerole _ tid th _ 10%nat _ st (<[th:=1]> st)) with "[$] [$]"); eauto. 
+      iApply ((wp_cmpxchg_suc_step_singlerole _ tid (th: fmrole spinlock_model_impl) _ 10%nat _ st (<[th:=1]> st)) with "[$] [$]"); eauto. 
       { set_solver. }
       { done. }
       { econstructor; eauto. }
@@ -456,7 +458,7 @@ Section ClientProofs.
       do 2 (pure_step_burn_fuel f). 
       iApply wp_value. iApply "Kont". iFrame. iExists _. iFrame. iPureIntro. lia.
     - iDestruct "LOCK" as "[>L [[>-> _] | >->]]"; [done| ].
-      iApply ((wp_cmpxchg_fail_step_singlerole _ tid th _ 10%nat _ st st) with "[$] [$]").
+      iApply ((wp_cmpxchg_fail_step_singlerole _ tid (th: fmrole spinlock_model_impl) _ 10%nat _ st st) with "[$] [$]").
       { set_solver. }
       all: eauto. 
       { done. }
@@ -613,6 +615,7 @@ Section MainProof.
   (* Context `{!heapGS Σ spinlock_model, !spinlockPreG Σ}. *)
   Context `{LM: LiveModel heap_lang Mdl} `{!heapGS Σ LM} {SL_PRE: spinlockPreG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ spinlock_model_impl}.
+  Context {ifG: fairnessGS spinlock_model Σ}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).

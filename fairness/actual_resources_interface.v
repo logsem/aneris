@@ -15,10 +15,12 @@ Section ActualOwnershipInterface.
   Proof.
     iIntros. iApply Build_PartialModelPredicates. iModIntro. repeat iSplitL.
     - iIntros. iApply (actual_update_no_step_enough_fuel with "[$]"); set_solver.
-    - iIntros. iApply (actual_update_fork_split with "[$]"); done.
+    - iIntros. iMod (actual_update_fork_split with "[$] [$]") as (?) "?"; eauto.
     - iIntros "*". iIntros.
       iApply (actual_update_step_still_alive with "[$] [$] [$] [$]"); eauto.
     - iIntros. iApply (frag_free_roles_fuels_disj with "[$] [$] [$]").
+    - iIntros. iExists _. iFrame.
+      iIntros. do 2 iExists _. by iFrame.
   Defined.
 
 End ActualOwnershipInterface.  

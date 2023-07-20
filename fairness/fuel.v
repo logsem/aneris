@@ -478,13 +478,19 @@ Section fairness_preserved.
                 | [H: P |- _] => inversion H; clear H; simplify_eq
                                           end.
 
+  Definition valid_evolution_step oζ (σ2: cfg Λ) δ1 ℓ δ2 :=
+    labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) δ1 ℓ δ2 ∧
+    tids_smaller (σ2.1) δ2.
+    
+
   (* TODO: Why do we need explicit [LM] here? *)
   Definition valid_state_evolution_fairness
              (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
     match extr, auxtr with
     | (extr :tr[oζ]: (es, σ)), auxtr :tr[ℓ]: δ =>
-        labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) (trace_last auxtr) ℓ δ ∧
-        tids_smaller es δ
+        (* labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) (trace_last auxtr) ℓ δ ∧ *)
+        (* tids_smaller es δ *)
+        valid_evolution_step oζ (es, σ) (trace_last auxtr) ℓ δ
     | _, _ => True
     end.
 

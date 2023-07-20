@@ -26,7 +26,7 @@ Ltac wp_expr_simpl := wp_expr_eval simpl.
 
 Lemma tac_wp_pure_helper
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM}
+  `{iLM: LiveModel heap_lang iM}  `{!fairnessGS iLM Σ}  
   `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
@@ -97,7 +97,7 @@ Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM}
+  `{iLM: LiveModel heap_lang iM} `{!fairnessGS iLM Σ}  
   `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
@@ -168,7 +168,7 @@ Qed.
 
 Lemma tac_wp_pure
   `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
-  `{iLM: LiveModel heap_lang iM}
+  `{iLM: LiveModel heap_lang iM} `{!fairnessGS iLM Σ}  
   `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
   Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
   (fs: gmap (fmrole iM) nat)
@@ -364,9 +364,9 @@ Implicit Types v : val.
 Implicit Types tid : locale heap_lang.
 
 Context `{iLM: LiveModel heap_lang iM}.
+Context `{!fairnessGS iLM Σ}. 
 (* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
-Context
-  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}. 
+Context `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}. 
 
 (* Lemma tac_wp_allocN Δ Δ' s E j K v n Φ : *)
 (*   (0 < n)%Z → *)

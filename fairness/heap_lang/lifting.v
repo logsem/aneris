@@ -39,7 +39,7 @@ Proof. solve_inG. Qed.
     state_interp extr auxtr :=
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
        gen_heap_interp (trace_last extr).2.(heap) ∗
-       model_state_interp (trace_last extr).1 (trace_last auxtr))%I ;
+       model_state_interp (trace_last extr) (trace_last auxtr))%I ;
     (* fork_post tid := λ _, tid ↦M ∅; *)
     fork_post tid := fun _ => frag_mapping_is {[ tid := ∅ ]};
 }.
@@ -229,6 +229,7 @@ Context `{LM:LiveModel heap_lang M}.
 Context `{!heapGS Σ LM}.
 
 Context `{iLM:LiveModel heap_lang iM}.
+Context {ifG: fairnessGS iLM Σ}.
 Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ iM}.
 
 
@@ -273,7 +274,7 @@ Proof using.
   (*   [by intros X%dom_empty_inv_L | set_solver | set_solver | econstructor =>//; by apply fill_step |]. *)
 
   (* TODO: get rid of iDestruct? *)
-  iDestruct (update_no_step_enough_fuel (PMPP := PMPP) with "PMP") as "HH".
+  iDestruct (update_no_step_enough_fuel with "PMP") as "HH".
   { by intros X%dom_empty_inv_L. }
   { econstructor =>//; by apply fill_step. }
   iMod ("HH" with "Hfuels Hmi") as "H".
@@ -494,16 +495,16 @@ Proof using.
   iIntros (Hunioneq) "[PMP He] HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iMod (update_fork_split R1 R2 _
-       (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "PMP Htid Hmi") as
-       (δ2) "(Hfuels2 & Hfuels1 & Hterm & Hσ & %Hvse)" => //.
+       (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "PMP Htid Hmi")
+    as (δ2 ?) "(Hfuels2 & Hfuels1 & Hterm & Hσ & %Hvse)" => //.
   { rewrite -Hloc. rewrite -(language.locale_fill _ _ K). econstructor 1 =>//.
     apply fill_step, head_prim_step. econstructor. }
   { list_simplifier. exists (tp1 ++ fill K #() :: tp2). split; first by list_simplifier.
-    rewrite !app_length //=. }
+    rewrite !app_length //=. }  
   iModIntro. iSplit. iPureIntro; first by eauto. iNext.
   iIntros (e2 σ2 efs Hstep).
   have [-> [-> ->]] : σ2 = σ1 ∧ efs = [e] ∧ e2 = Val $ LitV LitUnit by inv_head_step.
-  iMod ("HΦ" with "Hfuels1") as "HΦ". iModIntro. iExists δ2, (Silent_step tid). iFrame.
+  iMod ("HΦ" with "Hfuels1") as "HΦ". iModIntro. iExists δ2, ℓ. iFrame.
   rewrite Hexend /=. iFrame "Hsi".
   iSplit; first by iPureIntro.
   iSplit; [|done].
@@ -514,6 +515,7 @@ Proof using.
   1, 2: by reflexivity.
   { iApply "He". iFrame. }
   iIntros. iModIntro.
+  Set Printing Implicit.
   by iApply "Hterm". 
 Qed.
 
@@ -1007,4 +1009,3 @@ Qed.
 (*   iModIntro. iSplit=>//. iFrame. by iApply "HΦ". *)
 (* Qed. *)
 End lifting.
- 

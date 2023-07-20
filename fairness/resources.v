@@ -204,24 +204,24 @@ Section model_state_interp.
   Definition frag_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
-  Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Λ M): iProp Σ :=
+  Definition model_state_interp (σ: cfg Λ) (δ: LiveState Λ M): iProp Σ :=
     ∃ M FR, auth_fuel_is δ.(ls_fuel) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗
       ⌜maps_inverse_match δ.(ls_mapping) M⌝ ∗
-      ⌜ ∀ ζ, ζ ∉ locales_of_list tp → M !! ζ = None ⌝ ∗
+      ⌜ ∀ ζ, ζ ∉ locales_of_list σ.1 → M !! ζ = None ⌝ ∗
       auth_model_is δ ∗ ⌜ FR ∩ dom δ.(ls_fuel) = ∅ ⌝.
 
-  Lemma model_state_interp_tids_smaller δ tp :
-    model_state_interp tp δ -∗ ⌜ tids_smaller tp δ ⌝.
+  Lemma model_state_interp_tids_smaller δ σ :
+    model_state_interp σ δ -∗ ⌜ tids_smaller σ.1 δ ⌝.
   Proof.
     iIntros "(%m&%FR&_&_&_&%Hminv&%Hbig&_)". iPureIntro.
-    intros ρ ζ Hin.
-    assert (¬ (ζ ∉ locales_of_list tp)).
+    intros ρ ζ Hin. 
+    assert (¬ (ζ ∉ locales_of_list σ.1)).
     - intros contra.
       apply Hminv in Hin as [? [Hsome _]].
       specialize (Hbig _ contra).
       by rewrite Hbig in Hsome.
-    - destruct (decide (ζ ∈ locales_of_list tp)) as [Hin'|] =>//.
-      apply elem_of_list_fmap in Hin' as [[tp' e'] [-> Hin']].
+    - destruct (decide (ζ ∈ locales_of_list σ.1)) as [Hin'|] =>//.
+      apply elem_of_list_fmap in Hin' as [[? e'] [-> Hin']].
       unfold from_locale. exists e'. by apply from_locale_from_Some.
   Qed.
   
@@ -266,12 +266,12 @@ End AuxDefs.
 
 Section PartialOwnership.
 
-  Context `{LM: LiveModel Λ M}.
   Context `{Countable (locale Λ)}.
+  Context `{EqDecision (locale Λ)}.
   Context {Σ : gFunctors}.
-  Context {fG: fairnessGS LM Σ}.
+  (* Context {fG: fairnessGS LM Σ}. *)
   (* Context `{invGS Σ}.  *)
-  Context `{invGS_gen HasNoLc Σ}. 
+  (* Context `{invGS_gen HasNoLc Σ}.  *)
   Context `{iLM: LiveModel Λ iM}. (* fuel construction over inner model *)
 
 
@@ -302,7 +302,7 @@ Section PartialOwnership.
   Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
   Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
-  Section PartialModelPredicates.
+  Section has_fuel.
     Context {PMPP: PartialModelPredicatesPre}. 
 
     Notation Role := (iM.(fmrole)).
@@ -423,79 +423,101 @@ Section PartialOwnership.
       iPureIntro. by apply fuels_ge_minus1. 
     Qed.
 
-    Let update_no_step_enough_fuel_def (extr : finite_trace (cfg Λ) (olocale Λ)) 
-      (auxtr : auxiliary_trace LM) 
-      (c2 : cfg Λ) (fs : gmap (fmrole iM) nat) (ζ : locale Λ)
+  End has_fuel.
+
+  Section PartialModelPredicates.
+    Context `{LM: LiveModel Λ M}.
+    Context {fG: fairnessGS LM Σ}.
+    Context {ifG: fairnessGS iLM Σ}.
+    Context `{invGS_gen HasNoLc Σ}.
+    Context {PMPP: PartialModelPredicatesPre}. 
+
+    Let LM_step_lifting_def: iProp Σ := 
+      ∀ tp1 δ1, model_state_interp tp1 δ1 (LM := LM) →
+      ∃ δ1', model_state_interp tp1 δ1' (LM := iLM) ∗
+             ∀ tp2 δ2' oζ ℓ',
+               ⌜ valid_evolution_step oζ tp2 δ1' ℓ' δ2' (LM := iLM)⌝ →
+               ⌜ labels_match oζ ℓ' (LM := iLM) ⌝ →
+               model_state_interp tp2 δ2' (LM := iLM) →
+               ∃ δ2 ℓ, model_state_interp tp2 δ2 (LM := LM) ∗
+                       ⌜ valid_evolution_step oζ tp2 δ1 ℓ δ2 (LM := LM)⌝ ∗
+                       ⌜ labels_match oζ ℓ (LM := LM) ⌝. 
+
+    Let update_no_step_enough_fuel_step_def 
+      (c1 c2 : cfg Λ) (δ1': iLM) (fs : gmap (fmrole iM) nat) (ζ : locale Λ)
     `(dom fs ≠ ∅)
-    `(locale_step (trace_last extr) (Some ζ) c2) : iProp Σ :=
+    `(locale_step c1 (Some ζ) c2) : iProp Σ :=
    (
         has_fuels ζ (S <$> fs) -∗
-           model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
-           ∃ (δ2 : LM) (ℓ : mlabel LM),
-             ⌜labels_match (Some ζ) ℓ (LM := LM)
-              ∧ valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
-                  (auxtr :tr[ ℓ ]: δ2)⌝ ∗
+           model_state_interp c1 δ1' (LM := iLM) ==∗
+           ∃ (δ2' : iLM) (ℓ' : mlabel iLM),
+             ⌜labels_match (Some ζ) ℓ' (LM := iLM) ∧
+               (* valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2) (auxtr :tr[ ℓ ]: δ2)⌝ *)
+               valid_evolution_step (Some ζ) c2 δ1' ℓ' δ2' (LM := iLM) ⌝
+                  ∗
              has_fuels ζ (filter (λ '(k, _), k ∈ dom fs ∖ ∅) fs) ∗
-             model_state_interp c2.1 δ2)%I. 
+             model_state_interp c2 δ2' (LM := iLM))%I.
 
-    Let update_fork_split_def (R1 R2: gset (fmrole iM)) tp1 tp2
-        (fs: gmap (fmrole iM) nat)
-        (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2
+    Let update_fork_split_step_def (R1 R2: gset (fmrole iM)) tp1 tp2
+        (fs: gmap (fmrole iM) nat) (δ1': iLM)
+        ζ efork σ1 σ2
          `(R1 ## R2)
          `(fs ≠ ∅)
          `(R1 ∪ R2 = dom fs)
-         `(trace_last extr = (tp1, σ1))
+         (* `(trace_last extr = (tp1, σ1)) *)
          `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
          `((∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1)): iProp Σ :=
-       (
     (* has_fuels_S ζ fs -∗ *)
     has_fuels ζ (S <$> fs) -∗
-      model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
-      ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗
+      model_state_interp (tp1, σ1) δ1' (LM := iLM) ==∗
+      ∃ δ2' ℓ', has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗
             has_fuels ζ (fs ⇂ R1) ∗
-            (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]}) ∗
-            model_state_interp tp2 δ2
-        ∧ ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝).
+            (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]} (LM := LM)) ∗
+            model_state_interp (tp2, σ2) δ2' (LM := iLM) ∧
+            (* ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝). *)
+            ⌜ valid_evolution_step (Some ζ) (tp2, σ2) δ1' ℓ' δ2' (LM := iLM) ⌝. 
 
 
-    Let update_step_still_alive_def
-      (extr : execution_trace Λ)
-      (auxtr: auxiliary_trace LM)
+    Let update_step_still_alive_step_def
       tp1 tp2 σ1 σ2
       (s1 s2: iM)
       (fs1 fs2: gmap (fmrole iM) nat)
-      ρ (δ1 : LM) ζ fr1 fr_stash
+      ρ (δ1': iLM) ζ fr1 fr_stash
       (Einvs: coPset)
     `((live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1)
     `(fr_stash ⊆ dom fs1)
     `((live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅)
     `(dom fs2 ∩ fr_stash = ∅)
-    `(trace_last extr = (tp1, σ1))
-    `(trace_last auxtr = δ1)
+    (* `(trace_last extr = (tp1, σ1)) *)
+    (* `(trace_last auxtr = δ1) *)
     `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
     `(fmtrans _ s1 (Some ρ) s2)
      `(valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM))
       : iProp Σ :=
-    ( has_fuels ζ fs1 -∗ partial_model_is s1 -∗ model_state_interp tp1 δ1 -∗
+    ( has_fuels ζ fs1 -∗ partial_model_is s1 -∗ model_state_interp (tp1, σ1) δ1' -∗
     partial_free_roles_are fr1
     ={ Einvs }=∗
-    ∃ (δ2: LM) ℓ,
-      ⌜labels_match (Some ζ) ℓ ∧
-       valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝ ∗
-      has_fuels ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp tp2 δ2 ∗
+    ∃ (δ2': iLM) ℓ',
+      ⌜
+       labels_match (Some ζ) ℓ' (LM := iLM) ∧
+       (* valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2) *)
+        valid_evolution_step (Some ζ) (tp2, σ2) δ1' ℓ' δ2' (LM := iLM)
+         ⌝ ∗
+      has_fuels ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp (tp2, σ2) δ2' ∗
       partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)). 
 
     Let partial_free_roles_fuels_disj_def n δ fr fs tid: iProp Σ :=
         model_state_interp n δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝.
 
     Let PMP_def (Einvs: coPset): iProp Σ := □ (
-          (∀ extr auxtr c2 fs ζ NE STEP, update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP) ∗         
-          (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL, update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL) ∗ 
-          (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
-             LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM,
-              update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM) ∗
-          (∀ n δ fr fs tid, partial_free_roles_fuels_disj_def n δ fr fs tid)).  
+          (∀ extr auxtr c2 fs ζ NE STEP, update_no_step_enough_fuel_step_def extr auxtr c2 fs ζ NE STEP) ∗         
+          (∀ R1 R2 tp1 tp2 fs δ1' ζ efork σ1 σ2 DISJ NE DOM STEP POOL, update_fork_split_step_def R1 R2 tp1 tp2 fs δ1' ζ efork σ1 σ2 DISJ NE DOM STEP POOL) ∗ 
+          (∀ tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1' ζ fr1 fr_stash
+             LR STASH NSL NOS2 STEP STEP' VFM,
+              update_step_still_alive_step_def tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1' ζ fr1 fr_stash Einvs LR STASH NSL NOS2 STEP STEP' VFM) ∗
+          (∀ n δ fr fs tid, partial_free_roles_fuels_disj_def n δ fr fs tid) ∗
+          LM_step_lifting_def
+).  
 
     Definition PartialModelPredicates Einvs: iProp Σ := PMP_def Einvs. 
 
@@ -509,20 +531,111 @@ Section PartialOwnership.
        while gathering them in one iProp to ease the constructions,
        and make PMP opaque, since its unfold takes too much space *)
 
-    Lemma update_no_step_enough_fuel {Einvs} extr auxtr c2 fs ζ NE STEP: 
-      PartialModelPredicates Einvs ⊢ update_no_step_enough_fuel_def extr auxtr c2 fs ζ NE STEP. 
-    Proof. by iIntros "(?&?&?&?)". Qed.
-    Lemma update_fork_split {Einvs} R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL: 
-      PartialModelPredicates Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM EQatp STEP POOL. 
-    Proof. by iIntros "(?&?&?&?)". Qed.
-    Lemma update_step_still_alive {Einvs} extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM:
-      PartialModelPredicates Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH NSL NOS2 LAST1 LAST1' STEP STEP' VFM.
-    Proof. by iIntros "(?&?&?&?)". Qed.
+    Lemma LM_step_lifting {Einvs}: 
+      PartialModelPredicates Einvs ⊢ LM_step_lifting_def. 
+    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Lemma update_no_step_enough_fuel_step {Einvs} extr auxtr c2 fs ζ NE STEP: 
+      PartialModelPredicates Einvs ⊢ update_no_step_enough_fuel_step_def extr auxtr c2 fs ζ NE STEP. 
+    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Lemma update_fork_split_step {Einvs} R1 R2 tp1 tp2 fs δ1' ζ efork σ1 σ2 DISJ NE DOM STEP POOL: 
+      PartialModelPredicates Einvs ⊢ update_fork_split_step_def R1 R2 tp1 tp2 fs δ1' ζ efork σ1 σ2 DISJ NE DOM STEP POOL. 
+    Proof. by iIntros "(?&?&?&?&?)". Qed.
+    Lemma update_step_still_alive_step {Einvs} tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1' ζ fr1 fr_stash LR STASH NSL NOS2 STEP STEP' VFM:
+      PartialModelPredicates Einvs ⊢ update_step_still_alive_step_def tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1' ζ fr1 fr_stash Einvs LR STASH NSL NOS2 STEP STEP' VFM.
+    Proof. by iIntros "(?&?&?&?&?)". Qed.
     Lemma partial_free_roles_fuels_disj {Einvs} n δ fr fs tid:
       PartialModelPredicates Einvs ⊢ partial_free_roles_fuels_disj_def n δ fr fs tid.
-    Proof. by iIntros "(?&?&?&?)". Qed.
+    Proof. by iIntros "(?&?&?&?&?)". Qed.
 
     Global Opaque PartialModelPredicates.
+
+    Lemma update_no_step_enough_fuel {Einvs} (extr : execution_trace Λ) 
+      (auxtr : auxiliary_trace LM) 
+      (c2 : cfg Λ) (fs : gmap (fmrole iM) nat) (ζ : locale Λ)
+      `(dom fs ≠ ∅)
+      `(locale_step (trace_last extr) (Some ζ) c2) :
+      PartialModelPredicates Einvs  ⊢ (
+          has_fuels ζ (S <$> fs) -∗
+           model_state_interp (trace_last extr) (trace_last auxtr) ==∗
+           ∃ (δ2 : LM) (ℓ : mlabel LM),
+             ⌜labels_match (Some ζ) ℓ (LM := LM)
+             ∧ valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
+                 (auxtr :tr[ ℓ ]: δ2)⌝ ∗
+                 has_fuels ζ (filter (λ '(k, _), k ∈ dom fs ∖ ∅) fs) ∗
+                 model_state_interp c2 δ2)%I.
+    Proof using. 
+      iIntros "#PMP FUELS MSI". 
+      iDestruct (LM_step_lifting with "PMP MSI") as (?) "[MSI' LIFT]". 
+      unshelve iMod (update_no_step_enough_fuel_step with "PMP FUELS MSI'") as (?? [??]) "[FUELS MSI']"; eauto.
+      iDestruct ("LIFT" with "[] [] [MSI']") as (??) "(MSI & %EV & %LBL)"; eauto.
+      iModIntro. do 2 iExists _. iFrame. by destruct c2. 
+    Qed. 
+   
+    Lemma update_fork_split {Einvs} (R1 R2: gset (fmrole iM)) tp1 tp2
+       (fs: gmap (fmrole iM) nat)
+        (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2
+          `(R1 ## R2)
+          `(fs ≠ ∅)
+          `(R1 ∪ R2 = dom fs)
+         `(trace_last extr = (tp1, σ1))
+          `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
+          `((∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1)):
+       PartialModelPredicates Einvs ⊢ (
+     has_fuels ζ (S <$> fs) -∗
+      model_state_interp (trace_last extr) (trace_last auxtr) ==∗
+      ∃ δ2 ℓ, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗
+             has_fuels ζ (fs ⇂ R1) ∗
+             (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]} (LM := LM)) ∗
+            model_state_interp (tp2, σ2) δ2 ∧ ⌜valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝).
+    Proof.
+      iIntros "#PMP FUELS MSI". rewrite H4. 
+      iDestruct (LM_step_lifting with "PMP MSI") as (?) "[MSI' LIFT]". 
+      unshelve iMod (update_fork_split_step with "PMP FUELS MSI'") as (??) "(?&?&?&MSI'&%)". 
+      6: by apply H1.
+      all: eauto. 
+      iDestruct ("LIFT" with "[] [] [MSI']") as (??) "(MSI & %EV & %LBL)"; eauto.
+      { iPureIntro. apply H6. }
+      iModIntro.
+      do 2 iExists _. iFrame. done.
+    Qed. 
+ 
+    Lemma update_step_still_alive
+      (extr : execution_trace Λ)
+      (auxtr: auxiliary_trace LM)
+       tp1 tp2 σ1 σ2
+       (s1 s2: iM)
+       (fs1 fs2: gmap (fmrole iM) nat)
+      ρ (δ1 : LM) ζ fr1 fr_stash
+       (Einvs: coPset)
+     `((live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1)
+     `(fr_stash ⊆ dom fs1)
+     `((live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅)
+     `(dom fs2 ∩ fr_stash = ∅)
+    `(trace_last extr = (tp1, σ1))
+    `(trace_last auxtr = δ1)
+     `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
+     `(fmtrans _ s1 (Some ρ) s2)
+      `(valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM)):
+  PartialModelPredicates Einvs ⊢ 
+    ( has_fuels ζ fs1 -∗ partial_model_is s1 -∗ model_state_interp (tp1, σ1) δ1 -∗
+     partial_free_roles_are fr1
+     ={ Einvs }=∗
+    ∃ (δ2: LM) ℓ,
+      ⌜labels_match (Some ζ) ℓ ∧
+       valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝ ∗
+      has_fuels ζ fs2 ∗ partial_model_is s2 ∗ model_state_interp (tp2, σ2) δ2 ∗
+       partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪
+                                   fr_stash)).    
+    Proof using. 
+      iIntros "#PMP FUELS ST MSI FR".
+      iDestruct (LM_step_lifting with "PMP MSI") as (?) "[MSI' LIFT]". 
+      unshelve iMod (update_step_still_alive_step with "PMP [$] [$] [$] [$]") as (??) "([%%]&?&?&MSI'&?)"; eauto.
+      iDestruct ("LIFT" with "[] [] [MSI']") as (??) "(MSI & %EV & %LBL)"; eauto.
+      iModIntro.
+      do 2 iExists _. iFrame. iPureIntro. split; eauto.
+      simpl. by rewrite H6.
+    Qed.
 
   End PartialModelPredicates.
 
