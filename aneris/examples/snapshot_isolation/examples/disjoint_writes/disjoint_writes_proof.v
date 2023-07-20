@@ -11,7 +11,7 @@ From trillium.prelude Require Import finitary.
 From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
-From aneris.examples.snapshot_isolation.examples.disjoint_writes 
+From aneris.examples.snapshot_isolation.examples.disjoint_writes
   Require Import disjoint_writes_code.
 Import ser_inj.
 From aneris.examples.snapshot_isolation.instantiation
@@ -55,6 +55,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     ∀ cst sa h,
     {{{
       ConnectionState cst CanStart ∗
+      IsConnected cst ∗
       "x" ↦ₖ h
     }}}
       transaction1 cst @[ip_of_address sa]
@@ -62,7 +63,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       RET #(); True
     }}}.
   Proof.
-    iIntros (cst sa h Φ) "(CanStart & x_h) HΦ".
+    iIntros (cst sa h Φ) "(CanStart & #HiC & x_h) HΦ".
     rewrite/transaction1.
     wp_pures.
     wp_apply (SI_start_spec $! _ _ ⊤); first done.
@@ -75,7 +76,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       "((x_h & x_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_h $x_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_h $x_upd $HiC]");
       first done.
     iIntros "(x_1 & x_upd)".
     wp_pures.
@@ -108,6 +109,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     ∀ cst sa h,
     {{{
       ConnectionState cst CanStart ∗
+      IsConnected cst ∗
       "y" ↦ₖ h
     }}}
       transaction2 cst @[ip_of_address sa]
@@ -115,7 +117,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       RET #(); True
     }}}.
   Proof.
-    iIntros (cst sa h Φ) "(CanStart & y_h) HΦ".
+    iIntros (cst sa h Φ) "(CanStart & #HiC & y_h) HΦ".
     rewrite/transaction2.
     wp_pures.
     wp_apply (SI_start_spec $! _ _ ⊤); first done.
@@ -128,7 +130,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       "((y_h & y_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_h $y_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_h $y_upd $HiC]");
       first done.
     iIntros "(y_1 & y_upd)".
     wp_pures.
@@ -173,7 +175,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     rewrite/transaction1_client.
     wp_pures.
     wp_apply (SI_init_client_proxy_spec with "[$]").
-    iIntros (cst) "CanStart".
+    iIntros (cst) "(CanStart & #HiC)".
     wp_pures.
     by wp_apply (transaction1_spec with "[$]").
   Qed.
@@ -194,7 +196,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     rewrite/transaction2_client.
     wp_pures.
     wp_apply (SI_init_client_proxy_spec with "[$]").
-    iIntros (cst) "CanStart".
+    iIntros (cst) "(CanStart & #HiC)".
     wp_pures.
     by wp_apply (transaction2_spec with "[$]").
   Qed.
@@ -247,11 +249,11 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
         wp_apply (aneris_wp_start {[80%positive : port]}).
         iFrame.
         iSplitR "clt2_∅ clt2_unalloc mem_y".
-        * by iApply "HΦ". 
+        * by iApply "HΦ".
         * iIntros "!> Hports".
-          by wp_apply (transaction2_client_spec client_2_addr with "[$]"). 
+          by wp_apply (transaction2_client_spec client_2_addr with "[$]").
       + iIntros "!> Hports".
-        by wp_apply (transaction1_client_spec client_1_addr with "[$]"). 
+        by wp_apply (transaction1_client_spec client_1_addr with "[$]").
     - iIntros "!> Hports". by wp_apply (server_spec with "[$]").
   Qed.
 
@@ -279,7 +281,7 @@ Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model; KVSΣ]).
-  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); 
+  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
   [apply unit_model_rel_finitary | |set_solver..].
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).

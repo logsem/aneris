@@ -52,11 +52,11 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
   Lemma transaction1_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !>CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !>(CanStart & #HiC) HΦ".
     rewrite/transaction1.
     wp_pures.
     wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name));
@@ -83,15 +83,15 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
       first done.
     iPoseProof (big_sepM_insert with "cache") as "((z_hz & z_upd) & _)";
       first done.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_hx $x_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_hx $x_upd $HiC]");
       first set_solver.
     iIntros "(x_1 & x_upd)".
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_hy $y_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_hy $y_upd $HiC]");
       first set_solver.
     iIntros "(y_1 & y_upd)".
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$z_hz $z_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$z_hz $z_upd $HiC]");
       first set_solver.
     iIntros "(z_1 & z_upd)".
     wp_pures.
@@ -147,15 +147,15 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
   Lemma transaction2_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction2 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ!>CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !>(CanStart & #HiC) HΦ".
     rewrite/transaction2.
     wp_pures.
-    wp_apply (simple_wait_transaction_spec _ _ _ _ _ (⊤ ∖ ↑client_inv_name)
-      with "[] [] [] [] CanStart"); [solve_ndisj|set_solver|..].
+    wp_apply (simple_wait_transaction_spec _ _ _ _ _  (⊤ ∖ ↑client_inv_name)
+      with "[] [] [] [] [$CanStart $HiC]"); [solve_ndisj|set_solver|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
@@ -207,13 +207,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
         "((x_hx & x_upd) & cache)"; first done.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache") as
         "((y_hy & y_upd) & cache)"; first by rewrite lookup_delete_ne.
-    wp_apply (SI_read_spec with "[] x_hx"); first set_solver.
+    wp_apply (SI_read_spec with "[] [ $HiC $x_hx]"); first set_solver.
     iIntros "x_hx".
     rewrite hx_vx hy_vy.
     destruct Hvx as [-> | ->].
     all: wp_pures.
     wp_apply (SI_write_spec $! _ _ _ _ (SerVal #(-1)) with
-        "[] [$y_hy $y_upd]"); first set_solver.
+        "[] [$y_hy $y_upd  $HiC]"); first set_solver.
     iIntros "(y_hy & y_upd)".
     wp_pures.
     all: wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
@@ -257,15 +257,15 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
   Lemma transaction3_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction3 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ!>CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ!>(CanStart & #HiC) HΦ".
     rewrite/transaction3.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ _ _ _ (⊤ ∖ ↑client_inv_name)
-      with "[] [] [] [] CanStart"); [solve_ndisj|set_solver|..].
+      with "[] [] [] [] [$CanStart $HiC]"); [solve_ndisj|set_solver|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
@@ -317,13 +317,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
         "((x_hx & x_upd) & cache)"; first done.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache") as
         "((y_hy & y_upd) & _)"; first by rewrite lookup_delete_ne.
-    wp_apply (SI_read_spec with "[] y_hy"); first set_solver.
+    wp_apply (SI_read_spec with "[] [$y_hy $HiC]"); first set_solver.
     iIntros "y_hy".
     rewrite hx_vx hy_vy.
     destruct Hvy as [-> | ->].
     all: wp_pures.
     wp_apply (SI_write_spec $! _ _ _ _ (SerVal #(-1)) with
-        "[] [$x_hx $x_upd]"); first set_solver.
+        "[] [$x_hx $x_upd $HiC]"); first set_solver.
     iIntros "(x_hx & x_upd)".
     wp_pures.
     all: wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
@@ -367,15 +367,15 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
   Lemma transaction4_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction4 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !>CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !>(CanStart & #HiC) HΦ".
     rewrite/transaction4.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ _ _ _ (⊤ ∖ ↑client_inv_name)
-      with "[] [] [] [] CanStart"); [solve_ndisj|set_solver|..].
+      with "[] [] [] [] [$CanStart $HiC]"); [solve_ndisj|set_solver|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
@@ -427,11 +427,11 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
         "((x_hx & x_upd) & cache)"; first done.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache") as
         "((y_hy & y_upd) & _)"; first by rewrite lookup_delete_ne.
-    wp_apply (SI_read_spec with "[] x_hx"); first set_solver.
+    wp_apply (SI_read_spec with "[]  [$x_hx $HiC]"); first set_solver.
     iIntros "x_hx".
     rewrite hx_vx hy_vy/unSOME /assert.
     wp_pures.
-    wp_apply (SI_read_spec with "[] y_hy"); first set_solver.
+    wp_apply (SI_read_spec with "[] [$y_hy $HiC]"); first set_solver.
     iIntros "y_hy".
     wp_pures.
     move: Hvx Hvy hx_vx hy_vy=>[]->[]->hx_vx hy_vy.
@@ -687,7 +687,7 @@ Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model; KVSΣ]).
-  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅); 
+  apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
   [apply unit_model_rel_finitary | |set_solver..].
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).

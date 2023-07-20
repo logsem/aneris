@@ -47,11 +47,11 @@ Section proof_of_code.
   Lemma transaction1_spec :
     ∀ (cst : val) sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction1.
     wp_pures.
     wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
@@ -70,7 +70,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_insert with "cache") as "((y_hy & y_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_hx $x_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_hx $x_upd $HiC]");
           first set_solver.
     iIntros "(x_1 & x_upd)".
     wp_pures.
@@ -107,15 +107,15 @@ Section proof_of_code.
   Lemma transaction2_spec :
     ∀ (cst : val) sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction2 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction2.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ #1 _ _ (⊤ ∖ ↑client_inv_name)
-        with "[] [] [] [] CanStart");
+        with "[] [] [] [] [$CanStart $HiC]");
     [solve_ndisj|set_solver|..].
     {
       iModIntro.
@@ -163,7 +163,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache")
         as "((y_hy & y_upd) & _)"; first done.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_hy $y_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_hy $y_upd $HiC]");
           first set_solver.
     iIntros "(y_1 & y_upd)".
     wp_pures.
@@ -201,15 +201,15 @@ Section proof_of_code.
   Lemma transaction3_spec :
     ∀ (cst : val) sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction3 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction3.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ #1 _ _ (⊤ ∖ ↑client_inv_name)
-        with "[] [] [] [] CanStart");
+        with "[] [] [] [] [$CanStart $HiC]");
     [solve_ndisj|set_solver|..].
     {
       iModIntro.
@@ -257,7 +257,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_delete _ _ "x" hx with "cache")
         as "((x_hx & x_upd) & _)"; first done.
     wp_pures.
-    wp_apply (SI_read_spec with "[] [$x_hx]");
+    wp_apply (SI_read_spec with "[] [$x_hx $HiC]");
           first set_solver.
     iIntros "x_hx".
     wp_pures.

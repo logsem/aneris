@@ -8,7 +8,7 @@ From aneris.examples.snapshot_isolation.specs
      Require Export user_params.
 
 Notation "h ≤ₛ h'" := (h `suffix_of` h') (at level 20).
-  
+
 Section Resources.
 
   Definition Hist : Set := list val.
@@ -39,7 +39,9 @@ Section Resources.
 
     (** Connection state *)
     ConnectionState : val → local_state → iProp Σ;
-    
+    IsConnected : val → iProp Σ;
+    IsConnected_persistent c :> Persistent (IsConnected c);
+
     (** KVS resources *)
     KVS_si : message → iProp Σ;
     KVS_Init : iProp Σ;
@@ -58,7 +60,7 @@ Section Resources.
 
     OwnLocalKey_exclusive k c v v' :
         k ↦{c} v ⊢ k ↦{c} v' -∗ False;
-  
+
     ConnectionState_relation E k r ms h :
       ↑KVS_InvName ⊆ E ->
       GlobalInv ⊢
@@ -89,11 +91,11 @@ Section Resources.
     KeyUpdStatus_exclusive c k b b' :
       KeyUpdStatus c k b ⊢ KeyUpdStatus c k b' -∗ False;
 
-    (** Properties about the Seen predicate *) 
+    (** Properties about the Seen predicate *)
     Seen_prefix k h h':
       Seen k h ⊢ Seen k h' -∗ ⌜h ≤ₛ h' ∨ h' ≤ₛ h⌝;
-    
-    Seen_valid E k h h' : 
+
+    Seen_valid E k h h' :
        ↑KVS_InvName ⊆ E ->
         GlobalInv ⊢
         Seen k h ∗ k ↦ₖ h' ={E}=∗

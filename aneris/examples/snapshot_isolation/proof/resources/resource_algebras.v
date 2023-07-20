@@ -1,4 +1,4 @@
-From iris.algebra Require Import auth gmap dfrac frac_auth.
+From iris.algebra Require Import auth gmap dfrac frac_auth excl.
 From iris.algebra.lib Require Import mono_list .
 From iris.base_logic.lib Require Import mono_nat ghost_map.
 From iris.bi.lib Require Import fractional.
@@ -14,6 +14,8 @@ From aneris.examples.snapshot_isolation.proof
 Import gen_heap_light.
 Import lock_proof.
 
+Canonical Structure ip_addressO := leibnizO ip_address.
+
 Class IDBG Σ :=
   {
     (** Key-Value store *)
@@ -22,6 +24,8 @@ Class IDBG Σ :=
     (** Cache at Client Proxies *)
     IDBG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
     IDBG_Cache_lgcl :> ghost_mapG Σ Key (option (val * bool));
+    IDBG_TksExcl :> inG Σ (exclR unitO);
+    IDBG_TksAgr :> inG Σ (agreeR ((ip_addressO * gnameO * gnameO) : Type));
     (** Time *)
     IDBG_TimeStamp :> mono_natG Σ;
     (** Lock *)

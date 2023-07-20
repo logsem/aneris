@@ -39,7 +39,7 @@ Section proof_of_code.
   Definition f_spec (f : val) : iProp Σ :=
     ∀ (k : Key) cst vo sa,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ k ↦{cst} vo }}}
+    {{{ IsConnected cst ∗ k ↦{cst} vo }}}
       f cst #k @[ip_of_address sa]
     {{{ v', RET (SV_val v'); k ↦{cst} vo }}}.
 
@@ -52,11 +52,11 @@ Section proof_of_code.
   Lemma transaction1_spec :
     ∀ (cst : val) sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
+    iIntros (cst sa) "#inv %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction1.
     wp_pures.
     wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
@@ -72,7 +72,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_insert with "cache") as "((x_h & x_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #42) with "[] [$x_h $x_upd]");
+    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #42) with "[] [$x_h $x_upd $HiC]");
           first set_solver.
     iIntros "(x_42 & x_upd)".
     wp_pures.
@@ -108,11 +108,11 @@ Section proof_of_code.
     ∀ (cst f : val) sa h,
     f_spec f -∗
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ "y" ↦ₖ h }}}
+    {{{ ConnectionState cst CanStart ∗ IsConnected cst ∗ "y" ↦ₖ h }}}
       transaction2 cst f @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst f sa hy) "#f_spec #inv %Φ !>(CanStart & y_hy) HΦ".
+    iIntros (cst f sa hy) "#f_spec #inv %Φ !>(CanStart & #HiC & y_hy) HΦ".
     rewrite/transaction2.
     wp_pures.
     wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
@@ -137,10 +137,10 @@ Section proof_of_code.
         first done.
     iModIntro.
     wp_pures.
-    wp_apply ("f_spec" with "[] cache_x"); first set_solver.
+    wp_apply ("f_spec" with "[] [$cache_x $HiC]"); first set_solver.
     iIntros (v') "cache_x".
     wp_pures.
-    wp_apply (SI_write_spec with "[] [$cache_y $y_upd]"); first set_solver.
+    wp_apply (SI_write_spec with "[] [$cache_y $y_upd $HiC]"); first set_solver.
     iIntros "(cache_y & y_upd)".
     wp_pures.
     wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
@@ -209,9 +209,9 @@ Section proof_of_code.
     rewrite/transaction2_client.
     wp_pures.
     wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
-    iIntros (cst) "CanStart".
+    iIntros (cst) "(CanStart & HiC)".
     wp_pures.
-    by wp_apply (transaction2_spec with "f_spec inv [$CanStart $y_h]").
+    by wp_apply (transaction2_spec with "f_spec inv [$CanStart $HiC $y_h]").
   Qed.
 
   Lemma server_spec :
@@ -246,10 +246,10 @@ Section proof_of_runner.
   Lemma f_spec_holds `{!SI_resources Mdl Σ, !SI_client_toolbox} :
     ⊢ f_spec f.
   Proof.
-    iIntros (k cst vo sa k_keys Φ) "!>k_vo HΦ".
+    iIntros (k cst vo sa k_keys Φ) "!>(#HiC & k_vo) HΦ".
     rewrite/f.
     wp_pures.
-    wp_apply (SI_read_spec with "[//] k_vo").
+    wp_apply (SI_read_spec with "[//] [$k_vo $HiC]").
     iIntros "k_vo".
     case: vo=>[v|].
     {

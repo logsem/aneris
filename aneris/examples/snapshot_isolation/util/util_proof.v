@@ -27,7 +27,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
         ConnectionState c CanStart ∗
         (** Transaction has been commited. *)
         ((⌜can_commit m ms mc⌝ ∗
-          ([∗ map] k↦ h;p ∈ m; mc, 
+          ([∗ map] k↦ h;p ∈ m; mc,
             k ↦ₖ commit_event p h ∗ Seen k (commit_event p h))) ∨
         (** Transaction has been aborted. *)
          (⌜¬ can_commit m ms mc⌝ ∗
@@ -41,7 +41,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     iModIntro.
     iExists m, ms, mc.
     iSplitL "pre"; first done.
-    iIntros "!>%b (CanStart & [( _ & post)|(_ & post)])"; 
+    iIntros "!>%b (CanStart & [( _ & post)|(_ & post)])";
     iMod ("HΦ" with "[$CanStart $post]") as "HΦ";
     iModIntro;
     by wp_pures.
@@ -61,7 +61,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     <<<▷ RET #();
         ConnectionState c CanStart ∗
         (** Transaction has been commited. *)
-        ([∗ map] k↦ h;p ∈ m; mc, 
+        ([∗ map] k↦ h;p ∈ m; mc,
             k ↦ₖ commit_event p h ∗ Seen k (commit_event p h)) >>>.
   Proof.
     iIntros (cst sa E name Φ) "!>HΦ".
@@ -135,7 +135,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
   Qed.
 
   Lemma wait_transaction_spec :
-    ∀ (c cond : val) (key : Key) sa E 
+    ∀ (c cond : val) (key : Key) sa E
     (P : iProp Σ) (Q : val → iProp Σ) (Ψ : gmap _ _ → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     □ (|={⊤, E}=> ∃ m, ⌜key ∈ dom m⌝ ∗ ⌜dom m ⊆ KVS_keys⌝ ∗
@@ -151,12 +151,12 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
               ConnectionState c (Active m') ∗ ⌜dom m' = dom m⌝ ∗ Ψ m' ∗
               ([∗ map] k ↦ h ∈ m', k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
               if b then Q v' else P }}}) -∗
-    {{{ P ∗ ConnectionState c CanStart }}}
+    {{{ P ∗ ConnectionState c CanStart ∗ IsConnected c}}}
      wait_transaction c cond #key @[ip_of_address sa]
     {{{ v h, RET #(); ConnectionState c CanStart ∗ Seen key (v :: h) ∗ Q v }}}.
   Proof.
     iIntros (c cond key sa E P Q Ψ name_sub_E) "#start #commit #cond".
-    iIntros (Φ) "!>(HP & CanStart) HΦ".
+    iIntros (Φ) "!>(HP & CanStart & #HiC) HΦ".
     rewrite /wait_transaction.
     wp_pures.
     iLöb as "IH".
@@ -174,7 +174,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     destruct ((proj1 (elem_of_dom m_shift key)) key_in_m_shift) as (h & key_h).
     iPoseProof (big_sepM_lookup_acc _ _ _ _ key_h with "cache") as
         "((key_h & key_upd) & cache)".
-    wp_apply (SI_read_spec with "[] key_h"); first set_solver.
+    wp_apply (SI_read_spec with "[] [$HiC $key_h]"); first set_solver.
     iIntros "key_h".
     iSpecialize ("cache" with "[$key_h $key_upd]").
     destruct h; wp_pures; last first.
@@ -207,21 +207,21 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
-    {{{ ConnectionState c CanStart }}}
+    {{{ ConnectionState c CanStart ∗ IsConnected c }}}
      wait_transaction c cond #key @[ip_of_address sa]
     {{{ h, RET #(); ConnectionState c CanStart ∗ Seen key (v :: h) }}}.
   Proof.
     iIntros (c cond v key sa E name_sub_E key_keys)
-        "#shift #cond %Φ !> CanStart HΦ".
+        "#shift #cond %Φ !> (CanStart & #HiC) HΦ".
     iApply (wait_transaction_spec _ _ _ _ _ emp (λ v', ⌜v = v'⌝)%I
       (λ m, ⌜dom m = {[ key ]}⌝)%I
-      with "[//] [] [] [] [$CanStart]"); last first.
+      with "[//] [] [] [] [$CanStart]"); [| | | iFrame "#"|];
+      last first.
     {
       iIntros "!>%v' %h (CanStart & Seen & <-)".
       iApply ("HΦ" with "[$]").
     }
-    {
-      iIntros (m_shift v' Ψ) "!>(_ & %dom_m_shift & Active & cache) HΨ".
+    { iIntros (m_shift v' Ψ) "!>(_ & %dom_m_shift & Active & cache) HΨ".
       wp_apply ("cond" with "[//]").
       iIntros ([] eq); first rewrite -(eq I).
       all: by iApply ("HΨ" with "[$Active $cache]").

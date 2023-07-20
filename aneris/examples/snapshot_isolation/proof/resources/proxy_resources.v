@@ -23,27 +23,8 @@ Inductive proxy_state : Type :=
 | PSCanStart
 | PSActive of (gmap Key (list write_event)).
 
-
-Canonical Structure ip_addressO := leibnizO ip_address.
-Canonical Structure proxy_stateO := leibnizO proxy_state.
-
-Record client_gnames : Type  :=
-  {
-    CGStart  : gname;
-    CGActive : gname;
-    CGCache  : gname;
-    CGLock   : gname;
-  }.
-
-Canonical Structure client_gnamesO := leibnizO client_gnames.
-
-
 Section Proxy.
-  Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources,
-              !inG Σ (exclR unitO),
-              !inG Σ (agreeR ((ip_addressO * gnameO * gnameO * gnameO * gnameO) : Type)),
-              !inG Σ (authR (gmapUR ip_address (agreeR gnameO)))
-}.
+  Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources}.
   Context (γGsnap γT γSrvGnames : gname).
 
  Definition kvs_valid_snapshot (M : gmap Key (list write_event)) (t : Time) :=
@@ -86,29 +67,29 @@ Section Proxy.
     : iProp Σ :=
     ∃ (lk : val) (cst : val) (l : loc) (sv : val),
       ⌜c = (lk, (cst, #l))%V⌝ ∗
-      is_lock (KVS_InvName .@ "lk") n γlk lk
+      is_lock (KVS_InvName .@ ("lk" +:+ n)) n γlk lk
               (connection_state_def n cst l s sv γS γA γCache).
 
   Lemma connection_state_gen_persistent n c s γlk γS γA γCache :
     Persistent (connection_state_gen n c s γlk γS γA γCache).
   Proof. apply _. Qed.
 
-  Definition connection_state (n : ip_address) c s : iProp Σ :=
-    ∃ (γCst γlk γS γA γCache : gnameO),
-      own γSrvGnames (◯ {[n := to_agree γCst]}) ∗
-      own γCst (to_agree (n, γlk, γS, γA, γCache)) ∗
+  Definition connection_state
+    (n : ip_address) (c : val) (s : proxy_state) (γCst : gname)
+    : iProp Σ :=
+    ∃ (γlk γS γA γCache : gnameO),
+      own γCst (to_agree (n, γlk, γCache)) ∗
       connection_state_gen n c s γlk γS γA γCache ∗
         match s with
         | PSCanStart => isActiveToken γA
         | PSActive _ => CanStartToken γS
         end.
 
-  Definition ownCacheUser
-     (c : val) (k : Key) (vo : option val) : iProp Σ :=
-    ∃ (n : ip_address) (γCst γlk γS γA γCache : gname) (s : proxy_state)
+  Definition ownCacheUser (k : Key)  (c : val) (vo : option val) (γCst : gname)
+    : iProp Σ :=
+    ∃ (n : ip_address) (γlk γS γA γCache : gname) (s : proxy_state)
        (vbo : option (val * bool)),
-      own γSrvGnames (◯ {[n := to_agree γCst]}) ∗
-      own γCst (to_agree (n, γlk, γS, γA, γCache)) ∗
+      own γCst (to_agree (n, γlk, γCache)) ∗
       connection_state_gen n c s γlk γS γA γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
         ⌜match vbo with
@@ -116,19 +97,10 @@ Section Proxy.
          | Some (v, b) => vo = Some v
          end⌝.
 
-  (* Definition key_upd_status (c : val) (k : Key) (b: bool) : iProp Σ := *)
-  (*   ∃ n s vbo, *)
-  (*     own γCst (n,c) ∗ *)
-  (*     connection_state_gen n c s ∗ *)
-  (*     ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗ *)
-  (*     ⌜b = true⌝ → ∃ (v : val), ⌜vbo = Some (v, b)⌝. *)
-
-
-(*  Definition key_upd_status (c : val) (k : Key) (b : Bool) : iProp Σ := *)
-(*    ∃ v. ownCacheUser 1/2 {[ k := v]} ∗ *)
-
-(* OwnLocalKey : Key → val → option val → iProp Σ *)
-(*   where "k ↦{ c } vo" := (OwnLocalKey k c vo); *)
-(*   OwnLocalKey_timeless k v c:> Timeless (k ↦{c} v); *)
+  Definition key_upd_status (c : val) (k : Key) (b: bool) (γCst : gname) : iProp Σ :=
+    ∃ n vbo γlk γCache,
+      own γCst (to_agree (n, γlk, γCache)) ∗
+      ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
+      ⌜b = true⌝ → ∃ (v : val), ⌜vbo = Some (v, b)⌝.
 
 End Proxy.

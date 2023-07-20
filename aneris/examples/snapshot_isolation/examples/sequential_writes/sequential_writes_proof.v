@@ -11,7 +11,7 @@ From trillium.prelude Require Import finitary.
 From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
-From aneris.examples.snapshot_isolation.examples.sequential_writes 
+From aneris.examples.snapshot_isolation.examples.sequential_writes
   Require Import sequential_writes_code.
 Import ser_inj.
 From aneris.examples.snapshot_isolation.instantiation
@@ -76,7 +76,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     & Hports & Hprot) HΦ".
     rewrite /transaction1_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction1. wp_pures.
+    iIntros (rpc) "(Hcstate & #HiC)". wp_pures. rewrite /transaction1. wp_pures.
     wp_apply (SI_start_spec $! rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%hx [Hkx [(_ & Htok' & _) | [(_ & Htok') | %Heq]]]]" "HClose";
     try iDestruct (token_exclusive with "Htok Htok'") as "[]".
@@ -90,7 +90,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     { iNext. iExists hx. iFrame. set_solver. }
     iModIntro. wp_pures.
     wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [Hcx]"). 
-    set_solver. iFrame. iIntros "Hcx". wp_pures.
+    set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
     wp_apply (commitT_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
     iInv (client_inv_name) as ">[%hx' [Hkx [(_ & Htok' & _) | [(_ & Htok') | %Heq']]]]" "HClose";
@@ -129,9 +129,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction2. wp_pures.
+    iIntros (rpc) "(Hcstate & #HiC)". wp_pures. rewrite /transaction2. wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ (#1) "x" _ (⊤ ∖ ↑client_inv_name)
-      with "[] [] [] [] [$Hcstate] [HΦ Htok]"); 
+      with "[] [] [] [] [$Hcstate $HiC] [HΦ Htok]"); 
       [solve_ndisj | iPureIntro; set_solver | | |].
     - iModIntro.
       iInv (client_inv_name) as ">[%hx' [Hkx Hrest]]" "HClose".
@@ -162,7 +162,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
         { iNext. iExists [(#1)]. iFrame. set_solver. }
         iModIntro. wp_pures.
         wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [Hcx]"). 
-        set_solver. iFrame. iIntros "Hcx". wp_pures.
+        set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
         wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
         try solve_ndisj.
         iInv (client_inv_name) as ">[%hx [Hkx [(_ & _ & Htok') | [ (-> & Htok') | -> ]]]]" "HClose".
@@ -224,7 +224,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     iDestruct (big_sepS_delete _ _ "x" with "HKVSres") as "(Hx & HKVSres)";
     first set_solver. iFrame. set_solver.
     }
-    iIntros (Φ) "(Hsrvhist & Hcli1hist & Hcli2hist & Hsrvunalloc & Hcli1unalloc 
+    iIntros (Φ) "(Hsrvhist & Hcli1hist & Hcli2hist & Hsrvunalloc & Hcli1unalloc
     & Hcli2unalloc & ? & ? & ?) HΦ".
     rewrite /example_runner.
     wp_pures.
@@ -241,9 +241,9 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
         wp_apply (aneris_wp_start {[80%positive : port]}).
         iFrame.
         iSplitR "Hcli2hist Hcli2unalloc Hftk2".
-        * by iApply "HΦ". 
-        * iIntros "!> Hports". wp_apply (client_2_spec with "[$]"); try done. 
-      + iIntros "!> Hports". wp_apply (client_1_spec with "[$]"); try done. 
+        * by iApply "HΦ".
+        * iIntros "!> Hports". wp_apply (client_2_spec with "[$]"); try done.
+      + iIntros "!> Hports". wp_apply (client_1_spec with "[$]"); try done.
     - iIntros "!> Hports". wp_apply (server_spec with "[$]"); done.
   Qed.
 

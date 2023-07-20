@@ -15,8 +15,8 @@ Definition can_commit `{User_params}
  (m ms : gmap Key Hist) (mc : gmap Key (option val * bool)) : bool :=
   bool_decide (∀ (k : Key), k ∈ KVS_keys →
   match (mc !! k : option (option val * bool)) with
-    | Some (vo, true) => bool_decide (m !! k = ms !! k) 
-    | _ => true                       
+    | Some (vo, true) => bool_decide (m !! k = ms !! k)
+    | _ => true
   end).
 
 Definition commit_event
@@ -27,7 +27,7 @@ Definition commit_event
     end.
 
 Definition hist_val (h : Hist) :=
-  match h with 
+  match h with
   | v :: t => Some v
   | [] => None
   end.
@@ -42,7 +42,7 @@ Section Specification.
       (vo : option val)
       (k : Key) (v : SerializableVal) (b : bool) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
+    {{{ IsConnected c ∗ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
       SI_write c #k v @[ip_of_address sa] E
     {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
@@ -50,7 +50,7 @@ Section Specification.
     ∀ (c : val) (sa : socket_address)
       (k : Key) (vo : option val) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ k ↦{c} vo }}}
+    {{{ IsConnected c ∗ k ↦{c} vo }}}
       SI_read c #k @[ip_of_address sa] E
     {{{ RET $vo; k ↦{c} vo }}}.
 
@@ -122,7 +122,7 @@ Section Specification.
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
-    {{{ cstate, RET cstate; ConnectionState cstate CanStart }}}.
+    {{{ cstate, RET cstate; ConnectionState cstate CanStart ∗ IsConnected cstate }}}.
 
 Definition init_kvs_spec : iProp Σ :=
   {{{ KVS_address ⤇ KVS_si ∗
