@@ -1263,7 +1263,7 @@ Lemma wp_store_nostep_alt s tid E l v' v fs:
     {{ λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ∗ has_fuels tid fs}}.
 Proof.
   iIntros (?) ">Hl Hf".
-  iApply (wp_nostep with "[Hl]"); [done| |].
+  iApply (wp_fuel_step with "[Hl]"); [done| |].
   { iApply sswp_wand; [|by iApply wp_store].
     iIntros (e) "[-> Hl] Hf". iApply wp_value. by iFrame. }
   iFrame.
