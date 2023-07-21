@@ -119,6 +119,7 @@ Section Specification.
     {{{ unallocated {[sa]} ∗
         KVS_address ⤇ KVS_si ∗
         sa ⤳ (∅, ∅) ∗
+        KVS_ClientCanConnect sa ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
@@ -164,9 +165,11 @@ Section SI_Module.
   }.
 
   Class SI_init := {
-    SI_init_module E :
+    SI_init_module E (clients : gset socket_address) :
       ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_client_toolbox),
-      ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗ KVS_Init
+      ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗
+      KVS_Init ∗
+      ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa)
   }.
 
 End SI_Module.

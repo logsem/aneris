@@ -25,7 +25,9 @@ Class IDBG Σ :=
     IDBG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
     IDBG_Cache_lgcl :> ghost_mapG Σ Key (option (val * bool));
     IDBG_TksExcl :> inG Σ (exclR unitO);
-    IDBG_TksAgr :> inG Σ (agreeR ((ip_addressO * gnameO * gnameO) : Type));
+    IDBG_ConnectedClients :>
+      inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
+    IDBG_TksAgr :> inG Σ (agreeR ((gnameO * gnameO * gnameO * gnameO) : Type));
     (** Time *)
     IDBG_TimeStamp :> mono_natG Σ;
     (** Lock *)

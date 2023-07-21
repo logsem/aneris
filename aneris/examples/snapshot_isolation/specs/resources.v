@@ -45,6 +45,7 @@ Section Resources.
     (** KVS resources *)
     KVS_si : message → iProp Σ;
     KVS_Init : iProp Σ;
+    KVS_ClientCanConnect : socket_address → iProp Σ;
 
     (** Cache Key Status *)
     KeyUpdStatus : val → Key → bool → iProp Σ;

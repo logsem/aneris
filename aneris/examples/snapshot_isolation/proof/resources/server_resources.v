@@ -16,6 +16,42 @@ From aneris.examples.snapshot_isolation.proof Require Import time events model.
 From aneris.examples.snapshot_isolation.proof.resources Require Import resource_algebras.
 
 
+
+(** Meta tokens tracking connection between physical data and ghost names. *)
+Section ConnectedClients.
+  Context `{!anerisG Mdl Σ, !IDBG Σ}.
+
+  Context (γKnownClients : gname).
+
+  Definition connected_clients (M : gmap socket_address gname) : iProp Σ :=
+    own γKnownClients (● (to_agree <$> M : gmap _ _)).
+
+  Definition connected_client_token (sa : socket_address) (γCst : gname) : iProp Σ :=
+    own γKnownClients (◯ {[ sa := to_agree γCst ]}).
+
+  Global Instance session_tokenPersistent sa γ :
+    Persistent (connected_client_token sa γ).
+  Proof. apply _. Qed.
+
+  Lemma session_token_agree sa γ1 γ2 :
+    connected_client_token sa γ1 -∗ connected_client_token sa γ2 -∗ ⌜γ1 = γ2⌝.
+  Proof.
+    iIntros "Hγ1 Hγ2".
+    iDestruct (own_valid_2 with "Hγ1 Hγ2") as %Hval.
+    iPureIntro.
+    rewrite -auth_frag_op singleton_op  in Hval.
+    apply auth_frag_valid_1 in Hval.
+    specialize (Hval sa).
+    rewrite lookup_singleton in Hval.
+    rewrite Some_op in Hval.
+    revert Hval.
+    rewrite Some_valid.
+    intros Hval.
+    by apply (to_agree_op_inv_L (A:=leibnizO _ )) in Hval.
+  Qed.
+
+End ConnectedClients.
+
 Section Resources.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
 

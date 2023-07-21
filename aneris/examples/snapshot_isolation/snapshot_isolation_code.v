@@ -157,13 +157,14 @@ Definition init_client_proxy ser : val :=
                 "srv_addr" in
   let: "txt" := ref NONE in
   let: "lk" := newlock #() in
-  ("lk", ("rpc", "txt")).
+  ("clt_addr", ("lk", ("rpc", "txt"))).
 
 Definition start : val :=
   λ: "cst",
-  let: "lk" := Fst "cst" in
-  let: "rpc" := Fst (Snd "cst") in
-  let: "tst" := Snd (Snd "cst") in
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
   acquire "lk";;
   match: ! "tst" with
     SOME "_abs" => assert: #false
@@ -182,9 +183,10 @@ Definition start : val :=
 
 Definition read : val :=
   λ: "cst" "k",
-  let: "lk" := Fst "cst" in
-  let: "rpc" := Fst (Snd "cst") in
-  let: "tst" := Snd (Snd "cst") in
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
   acquire "lk";;
   let: "vo" := match: ! "tst" with
     NONE => assert: #false
@@ -206,9 +208,10 @@ Definition read : val :=
 
 Definition write : val :=
   λ: "cst" "k" "v",
-  let: "lk" := Fst "cst" in
-  let: "_rpc" := Fst (Snd "cst") in
-  let: "tst" := Snd (Snd "cst") in
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "_rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
   acquire "lk";;
   match: ! "tst" with
     NONE => assert: #false
@@ -221,9 +224,10 @@ Definition write : val :=
 
 Definition commit : val :=
   λ: "cst",
-  let: "lk" := Fst "cst" in
-  let: "rpc" := Fst (Snd "cst") in
-  let: "tst" := Snd (Snd "cst") in
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
   acquire "lk";;
   let: "b" := match: ! "tst" with
     NONE => assert: #false

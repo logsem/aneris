@@ -18,9 +18,9 @@ type 'a cacheTy = ((string, 'a) amap)
 type 'a reqTy = ((string * int), (unit, int * 'a cacheTy) sumTy) sumTy
 type 'a replTy = ('a option, (int, bool) sumTy) sumTy
 type 'a connection_state =
-  (Mutex.t *
+  (saddr * (Mutex.t *
    (('a reqTy, 'a replTy) rpc *
-    ((int * 'a cacheTy Atomic.t) option Atomic.t)))
+    ((int * 'a cacheTy Atomic.t) option Atomic.t))))
 
 (** Serializers *)
 let req_ser (val_ser[@metavar]) =
@@ -160,10 +160,10 @@ let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
   let rpc = init_client_proxy (req_ser ser) (repl_ser ser) clt_addr srv_addr in
   let txt = ref None in
   let lk = newlock () in
-  (lk, (rpc, txt))
+  (clt_addr, (lk, (rpc, txt)))
 
 let start (cst : 'a connection_state) : unit =
-  let (lk, (rpc, tst)) = cst in
+  let (_clt_addr, (lk, (rpc, tst))) = cst in
   acquire lk;
   begin
     match !tst with
@@ -181,7 +181,7 @@ let start (cst : 'a connection_state) : unit =
   release lk
 
 let read (cst : 'a connection_state) k : 'a option =
-  let (lk, (rpc, tst)) = cst in
+  let (_clt_addr, (lk, (rpc, tst))) = cst in
   acquire lk;
   let vo =
     match !tst with
@@ -198,7 +198,7 @@ let read (cst : 'a connection_state) k : 'a option =
   in release lk; vo
 
 let write (cst : 'a connection_state) k v : unit =
-  let (lk, (_rpc, tst)) = cst in
+  let (_clt_addr, (lk, (_rpc, tst))) = cst in
   acquire lk;
   match !tst with
   | None -> assert false
@@ -208,7 +208,7 @@ let write (cst : 'a connection_state) k v : unit =
     release lk
 
 let commit (cst : 'a connection_state) : bool =
-  let (lk, (rpc, tst)) = cst in
+  let (_clt_addr, (lk, (rpc, tst))) = cst in
   acquire lk;
   let b =
     match !tst with
