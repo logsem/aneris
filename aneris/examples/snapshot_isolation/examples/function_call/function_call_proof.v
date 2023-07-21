@@ -177,15 +177,17 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction1_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction1_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
+    wp_apply (SI_init_client_proxy_spec with
+               "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
     by wp_apply (transaction1_spec with "inv CanStart").
@@ -200,15 +202,17 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction2_client #clt #KVS_address f @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt f h) "#inv #f_spec %Φ !> (y_h & ∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt f h) "#inv #f_spec %Φ !> (y_h & ∅ & #KVS_si & unalloc
+ & Hcc & free) HΦ".
     rewrite/transaction2_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
+    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "(CanStart & HiC)".
     wp_pures.
     by wp_apply (transaction2_spec with "f_spec inv [$CanStart $HiC $y_h]").
@@ -285,7 +289,8 @@ Section proof_of_runner.
     iIntros (Φ) "(srv_∅ & clt1_∅ & clt2_∅ & srv_unalloc & clt1_unalloc &
             clt2_unalloc & srv_free & clt1_free & clt2_free) HΦ".
     rewrite/runner.
-    iMod SI_init_module as "(% & % & mem & KVS_Init)".
+    iMod (SI_init_module _ {[client1_addr; client2_addr]})
+           as "(% & % & mem & KVS_Init & Hcc)".
     iPoseProof (big_sepS_insert with "mem") as "(x_mem & mem)"; first done.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(y_mem & _)";
       first set_solver.
@@ -295,13 +300,19 @@ Section proof_of_runner.
     iIntros "#KVS_si".
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "srv_free"; first done.
+    iDestruct (big_sepS_delete _  _ client1_addr with "Hcc")
+      as "(Hcc1 & Hcc)";
+    first set_solver.
+    iDestruct (big_sepS_delete _  _ client2_addr with "Hcc")
+      as "(Hcc2 & Hcc)";
+    first set_solver.
     iSplitR "KVS_Init srv_∅"; last first.
     { iIntros "!>free". by wp_apply (server_spec with "[$]"). }
     iNext.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt1_free"; first done.
-    iSplitR "clt1_∅ clt1_unalloc"; last first.
+    iSplitR "clt1_∅ clt1_unalloc Hcc1"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction1_client_spec client1_addr with "inv [$]").
@@ -310,7 +321,7 @@ Section proof_of_runner.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt2_free"; first done.
-    iSplitR "clt2_∅ clt2_unalloc y_mem"; last first.
+    iSplitR "clt2_∅ clt2_unalloc y_mem Hcc2"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction2_client_spec client2_addr with "inv [] [$]");

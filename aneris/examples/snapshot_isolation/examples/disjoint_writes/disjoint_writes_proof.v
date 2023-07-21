@@ -164,6 +164,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     {{{
       sa ⤳ (∅, ∅) ∗
       unallocated {[sa]} ∗
+      KVS_ClientCanConnect sa ∗
       free_ports (ip_of_address sa) {[port_of_address sa]} ∗
       KVS_address ⤇ KVS_si ∗
       "x" ↦ₖ h
@@ -171,7 +172,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       transaction1_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa h Φ) "(∅ & unalloc & free & #KVS_si & x_h) HΦ".
+    iIntros (sa h Φ) "(∅ & unalloc & Hcc & free & #KVS_si & x_h) HΦ".
     rewrite/transaction1_client.
     wp_pures.
     wp_apply (SI_init_client_proxy_spec with "[$]").
@@ -185,6 +186,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     {{{
       sa ⤳ (∅, ∅) ∗
       unallocated {[sa]} ∗
+      KVS_ClientCanConnect sa ∗
       free_ports (ip_of_address sa) {[port_of_address sa]} ∗
       KVS_address ⤇ KVS_si ∗
       "y" ↦ₖ h
@@ -192,7 +194,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       transaction2_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa h Φ) "(∅ & unalloc & free & #KVS_si & y_h) HΦ".
+    iIntros (sa h Φ) "(∅ & unalloc & free & Hcc & #KVS_si & y_h) HΦ".
     rewrite/transaction2_client.
     wp_pures.
     wp_apply (SI_init_client_proxy_spec with "[$]").
@@ -229,7 +231,8 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ RET #(); True }}}.
   Proof.
-    iMod SI_init_module as (SI_res SI_client_toolbox) "(mem & KVS_Init)".
+    iMod (SI_init_module _ {[client_1_addr; client_2_addr]})
+      as (SI_res SI_client_toolbox) "(mem & KVS_Init & Hcc)".
     iPoseProof (big_sepS_insert with "mem") as "(mem_x & mem)"; first set_solver.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(mem_y & _)"; first done.
     iIntros (Φ) "(srv_∅ & clt1_∅ & clt2_∅ & srv_unalloc & clt1_unalloc &
@@ -241,14 +244,20 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     wp_apply (aneris_wp_start {[80%positive]}).
     iFrame.
     iSplitR "srv_∅ KVS_Init".
+    iDestruct (big_sepS_delete _  _ client_1_addr with "Hcc")
+      as "(Hcc1 & Hcc)";
+      first set_solver.
+    iDestruct (big_sepS_delete _  _ client_2_addr with "Hcc")
+      as "(Hcc2 & Hcc)";
+      first set_solver.
     - iModIntro. wp_pures.
       wp_apply (aneris_wp_start {[80%positive : port]}).
       iFrame.
-      iSplitR "clt1_∅ clt1_unalloc mem_x".
+      iSplitR "clt1_∅ clt1_unalloc mem_x Hcc1".
       + iModIntro. wp_pures.
         wp_apply (aneris_wp_start {[80%positive : port]}).
         iFrame.
-        iSplitR "clt2_∅ clt2_unalloc mem_y".
+        iSplitR "clt2_∅ clt2_unalloc mem_y Hcc2".
         * by iApply "HΦ".
         * iIntros "!> Hports".
           by wp_apply (transaction2_client_spec client_2_addr with "[$]").

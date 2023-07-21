@@ -301,15 +301,16 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction1_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction1_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
+    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
     by wp_apply (transaction1_spec with "inv CanStart").
@@ -322,15 +323,16 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction2_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction2_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
+    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
     by wp_apply (transaction2_spec with "inv CanStart").
@@ -343,15 +345,16 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction3_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction3_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
+    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
     by wp_apply (transaction3_spec with "inv CanStart").
@@ -407,7 +410,7 @@ Section proof_of_runner.
             clt2_unalloc & clt3_unalloc & srv_free & clt1_free & clt2_free & clt3_free)
               HΦ".
     rewrite/runner.
-    iMod SI_init_module as "(% & % & mem & KVS_Init)".
+    iMod (SI_init_module _ {[client1_addr; client2_addr; client3_addr]}) as "(% & % & mem & KVS_Init & Hcc)".
     iPoseProof (big_sepS_insert with "mem") as "(x_mem & mem)"; first done.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(y_mem & _)";
       first set_solver.
@@ -421,9 +424,18 @@ Section proof_of_runner.
     { iIntros "!>free". by wp_apply (server_spec with "[$]"). }
     iNext.
     wp_pures.
+    iDestruct (big_sepS_delete _  _ client1_addr with "Hcc")
+      as "(Hcc1 & Hcc)";
+      first set_solver.
+    iDestruct (big_sepS_delete _  _ client2_addr with "Hcc")
+      as "(Hcc2 & Hcc)";
+      first set_solver.
+    iDestruct (big_sepS_delete _  _ client3_addr with "Hcc")
+      as "(Hcc3 & Hcc)";
+      first set_solver.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt1_free"; first done.
-    iSplitR "clt1_∅ clt1_unalloc"; last first.
+    iSplitR "clt1_∅ clt1_unalloc Hcc1"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction1_client_spec client1_addr with "inv [$]").
@@ -432,7 +444,7 @@ Section proof_of_runner.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt2_free"; first done.
-    iSplitR "clt2_∅ clt2_unalloc"; last first.
+    iSplitR "clt2_∅ clt2_unalloc Hcc2"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction2_client_spec client2_addr with "inv [$]").
@@ -441,7 +453,7 @@ Section proof_of_runner.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt3_free"; first done.
-    iSplitR "clt3_∅ clt3_unalloc"; last first.
+    iSplitR "clt3_∅ clt3_unalloc Hcc3"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction3_client_spec client3_addr with "inv [$]").
