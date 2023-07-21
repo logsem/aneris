@@ -4,15 +4,14 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness fuel fuel_termination.
+From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness fuel fuel_termination. 
 From trillium.program_logic Require Import ectx_lifting.
-From trillium.fairness.heap_lang Require Export lang heap_lang_defs em_lm.
+From trillium.fairness.heap_lang Require Export lang heap_lang_defs. 
 From trillium.fairness.heap_lang Require Import tactics notation.
 Set Default Proof Using "Type".
 
 (* Canonical Structure ModelO (M : FairModel) := leibnizO M. *)
 (* Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)). *)
-
 
 
 (** Override the notations so that scopes and coercions work out *)
@@ -195,10 +194,19 @@ Lemma auth_fuel_is_proper `{LM: LiveModel Λ M}
   auth_fuel_is x -∗ auth_fuel_is y.
 Proof. by intros ->. Qed.
 
+
 Section lifting.
-Context `{LM:LiveModel heap_lang M}.
+(* Context `{LM:LiveModel heap_lang M}. *)
 (* Context `{!heapGS Σ LM}. *)
-Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}. 
+(* Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}.  *)
+Context `{EM: ExecutionModel M}.   
+Context `{hGS: @heapGS Σ _ EM}.
+Context `{iLM:LiveModel heap_lang iM}.
+Context {ifG: fairnessGS iLM Σ}.
+Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ iM}.
+
+Let eGS := heap_fairnessGS. 
+
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types efs : list expr.
@@ -208,19 +216,26 @@ Implicit Types l : loc.
 Implicit Types tid : nat.
 
 
-Lemma wp_lift_pure_step_no_fork tid E E' Φ e1 e2 fs ϕ:
+(* TODO: fix notations *)
+Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
+Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
+Lemma wp_lift_pure_step_no_fork tid E E' Einvs Φ e1 e2 fs ϕ:
   fs ≠ ∅ ->
   PureExec ϕ 1 e1 e2 ->
   ϕ ->
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗
   (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
+Proof using. 
   intros NnO Hpe Hϕ.
   have Hps: pure_step e1 e2.
   { specialize (Hpe Hϕ). by apply nsteps_once_inv in Hpe. }
-  iIntros "H". iApply wp_lift_step; eauto.
+  iIntros "[#PMP H]". iApply wp_lift_step; eauto.
   { destruct Hps as [Hred _]. specialize (Hred inhabitant). eapply reducible_not_val; eauto. }
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "Hsi".
+  
   iMod "H". iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
   iSplit; first by destruct Hps as [Hred _].
   iNext. iIntros (e2' σ2 efs Hpstep).
@@ -228,61 +243,68 @@ Proof.
   simplify_eq. iMod "Hclose" as "_". iMod "H" as "[Hfuels Hkont]".
   rewrite !app_nil_r.
   iDestruct "Hsi" as "(%&Hgh&Hmi)".
-  (* iDestruct "Hmi" as (??) "(?&?&?&?&?&?&%)". *)
 
-  iMod (update_no_step_enough_fuel _ _ ∅ with "Hfuels Hmi") as "H"; eauto;
-    [by intros X%dom_empty_inv_L | set_solver | set_solver | econstructor =>//; by apply fill_step |].
+  (* iMod (update_no_step_enough_fuel _ _ ∅ with "Hfuels Hmi") as "H"; eauto; *)
+  (*   [by intros X%dom_empty_inv_L | set_solver | set_solver | econstructor =>//; by apply fill_step |]. *)
+
+  (* TODO: get rid of iDestruct? *)
+  iDestruct (update_no_step_enough_fuel with "PMP") as "HH".
+  { by intros X%dom_empty_inv_L. }
+  { econstructor =>//; by apply fill_step. }
+  iMod ("HH" with "Hfuels Hmi") as "H".
+
   iModIntro.
-  iDestruct ("H") as (δ2 ℓ [Hlabels Hvse]) "[Hfuels Hmi]".
+  iDestruct ("H") as (δ2 ℓ Hvse) "[Hfuels Hmi]".
   iExists δ2, ℓ.
   rewrite /state_interp /=.
   rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".
-  repeat iSplit; last done.
-  - iPureIntro. destruct ℓ =>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iApply "Hkont". iApply (has_fuels_proper with "Hfuels") =>//.
-    rewrite map_filter_id //. intros ?? ?%elem_of_dom_2; set_solver.
+  iSplitR; [done| ]. iSplitL; [| done]. 
+  iApply "Hkont". iApply (has_fuels_proper with "Hfuels") =>//.
+  rewrite map_filter_id //. intros ?? ?%elem_of_dom_2; set_solver.
 Qed.
 
-Lemma wp_lift_pure_step_no_fork_remove_role rem s tid E E' Φ e1 e2 fs ϕ:
-  fs ≠ ∅ ->
-  rem ⊆ dom fs →
-  rem ∩ live_roles _ s = ∅ →
-  PureExec ϕ 1 e1 e2 ->
-  ϕ ->
-  (|={E}[E']▷=> frag_model_is s ∗ has_fuels_S tid fs ∗
-                 (frag_model_is s -∗ (has_fuels tid (fs ⇂ (dom fs ∖ rem))) -∗ WP e2 @ tid; E {{ Φ }}))
-  ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
-  intros NnO Hincl Hdisj Hpe Hϕ.
-  have Hps: pure_step e1 e2.
-  { specialize (Hpe Hϕ). by apply nsteps_once_inv in Hpe. }
-  iIntros "H". iApply wp_lift_step; eauto.
-  { destruct Hps as [Hred _]. specialize (Hred inhabitant). eapply reducible_not_val; eauto. }
-  iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "Hsi".
-  iMod "H". iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
-  iSplit; first by destruct Hps as [Hred _].
-  iNext. iIntros (e2' σ2 efs Hpstep).
-  destruct Hps as [? Hdet]. specialize (Hdet _ _ _ _ Hpstep) as (?&?&?).
-  simplify_eq. iMod "Hclose" as "_". iMod "H" as "(Hmod & Hfuels & Hkont)".
-  rewrite !app_nil_r.
-  iDestruct "Hsi" as "(%&Hgh&Hmi)".
-  iDestruct (model_agree' with "Hmi Hmod") as %Heq.
+(* (* TODO: restore if needed *)  *)
+(* Lemma wp_lift_pure_step_no_fork_remove_role *)
+(*   rem s tid E E' Φ e1 e2 *)
+(*   (fs: gmap (fmrole iM) nat) *)
+(*   ϕ: *)
+(*   fs ≠ ∅ -> *)
+(*   rem ⊆ dom fs → *)
+(*   rem ∩ live_roles _ s = ∅ → *)
+(*   PureExec ϕ 1 e1 e2 -> *)
+(*   ϕ -> *)
+(*   (|={E}[E']▷=> partial_model_is s ∗ has_fuels_S tid fs ∗ *)
+(*                  (partial_model_is s -∗ (has_fuels tid (fs ⇂ (dom fs ∖ rem))) -∗ WP e2 @ tid; E {{ Φ }})) *)
+(*   ⊢ WP e1 @ tid; E {{ Φ }}. *)
+(* Proof. *)
+(*   intros NnO Hincl Hdisj Hpe Hϕ. *)
+(*   have Hps: pure_step e1 e2. *)
+(*   { specialize (Hpe Hϕ). by apply nsteps_once_inv in Hpe. } *)
+(*   iIntros "H". iApply wp_lift_step; eauto. *)
+(*   { destruct Hps as [Hred _]. specialize (Hred inhabitant). eapply reducible_not_val; eauto. } *)
+(*   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "Hsi". *)
+(*   iMod "H". iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver. *)
+(*   iSplit; first by destruct Hps as [Hred _]. *)
+(*   iNext. iIntros (e2' σ2 efs Hpstep). *)
+(*   destruct Hps as [? Hdet]. specialize (Hdet _ _ _ _ Hpstep) as (?&?&?). *)
+(*   simplify_eq. iMod "Hclose" as "_". iMod "H" as "(Hmod & Hfuels & Hkont)". *)
+(*   rewrite !app_nil_r. *)
+(*   iDestruct "Hsi" as "(%&Hgh&Hmi)". *)
 
-  iMod (update_no_step_enough_fuel _ _ rem with "Hfuels Hmi") as "H"; eauto;
-    [by intros X%dom_empty_inv_L | set_solver | econstructor =>//; by apply fill_step |].
-  iModIntro.
-  iDestruct ("H") as (δ2 ℓ [Hlabels Hvse]) "[Hfuels Hmi]".
-  iExists δ2, ℓ.
-  rewrite /state_interp /=.
-  rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".
-  repeat iSplit; last done.
-  - iPureIntro. destruct ℓ =>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iApply ("Hkont" with "Hmod"). iApply (has_fuels_proper with "Hfuels") =>//.
-Qed.
+(*   (* TODO: restore 'rem' parameter in the lemma below *) *)
+(*   iMod (update_no_step_enough_fuel _ _ rem with "Hfuels Hmi") as "H"; eauto; *)
+(*     [by intros X%dom_empty_inv_L | set_solver | econstructor =>//; by apply fill_step |]. *)
+(*   iModIntro. *)
+(*   iDestruct ("H") as (δ2 ℓ [Hlabels Hvse]) "[Hfuels Hmi]". *)
+(*   iExists δ2, ℓ. *)
+(*   rewrite /state_interp /=. *)
+(*   rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi". *)
+(*   repeat iSplit; last done. *)
+(*   - iPureIntro. destruct ℓ =>//. *)
+(*   - iPureIntro. destruct Hvse as (?&?&? )=>//. *)
+(*   - iPureIntro. destruct Hvse as (?&?&? )=>//. *)
+(*   - iApply ("Hkont" with "Hmod"). iApply (has_fuels_proper with "Hfuels") =>//. *)
+(* Qed. *)
 
 (* Lemma wp_lift_pure_step_no_fork_2 tid E E' Φ e1 e2 (fs: gmap (fmrole Mdl) nat) R ϕ: *)
 (*   R ≠ ∅ -> *)
@@ -293,39 +315,44 @@ Qed.
 (*   ⊢ WP e1 @ tid; E {{ Φ }}. *)
 (* Proof. *)
 
-Lemma wp_lift_pure_step_no_fork' fs tid E E' Φ e1 e2:
+Lemma wp_lift_pure_step_no_fork' fs tid E E' Einvs Φ e1 e2:
   fs ≠ ∅ ->
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
+Proof using. 
   intros. by iApply wp_lift_pure_step_no_fork.
 Qed.
 
-Lemma wp_lift_pure_step_no_fork_singlerole tid E E' Φ e1 e2 ρ f φ:
+Lemma wp_lift_pure_step_no_fork_singlerole tid E E' Einvs Φ e1 e2 ρ f φ:
   PureExec φ 1 e1 e2 -> φ ->
-  (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
+Proof using. 
   iIntros (??) "H". rewrite has_fuel_fuels_S.
   iApply (wp_lift_pure_step_no_fork {[ ρ := f ]} {[ρ]}); eauto; last first.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
-Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' fs1 fs2 fr1 Φ e1 e2 ρ φ:
+Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' Einvs fs1 fs2 fr1 fr_stash Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
-  valid_new_fuelmap (LM := LM) fs1 fs2 s1 s2 ρ ->
-  live_roles M s2 ∖ live_roles M s1 ⊆ fr1 →
-  M.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> frag_model_is s1 ∗ has_fuels tid fs1 ∗ frag_free_roles_are fr1 ∗
-                 (frag_model_is s2 -∗ frag_free_roles_are (fr1 ∖ (live_roles M s2 ∖ live_roles M s1))
+  Einvs ⊆ E ->
+  valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
+  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
+  fr_stash ⊆ dom fs1 →
+  live_roles iM s1 ∩ fr_stash = ∅ → 
+  dom fs2 ∩ fr_stash = ∅ ->
+  iM.(fmtrans) s1 (Some ρ) s2 ->
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
+                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1) ∪ fr_stash)
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
-  iIntros (Hpe Hφ Hval Hfr Htrans).
+Proof using. 
+  iIntros (Hpe Hφ Hinvs Hval Hfr ??? Htrans).
   have Hps: pure_step e1 e2.
   { specialize (Hpe Hφ). by apply nsteps_once_inv in Hpe. }
-  iIntros "Hkont".
+  iIntros "[PMP Hkont]".
+
   iApply wp_lift_step; eauto.
   { destruct (pure_step_safe _ e2 Hps inhabitant) as (?&?&?&?). by eapply val_stuck. }
 
@@ -337,90 +364,186 @@ Proof.
   simplify_eq. iMod "Hclose" as "_". iMod "Hkont" as "(Hmod&Hfuels&Hfr&Hkont)".
   rewrite !app_nil_r.
   iDestruct "Hsi" as "(%&Hgh&Hmi)". simpl.
-  iDestruct (model_agree' with "Hmi Hmod") as %Hmeq.
 
-  iMod (update_step_still_alive _ _ _ _ σ1 σ1 with "Hfuels Hmod Hmi Hfr") as "H"; eauto.
-  { rewrite Hexend. eauto. }
-  { econstructor =>//.
-    - rewrite Hexend //=.
-    - by apply fill_step. }
-  { rewrite Hmeq. apply Hval. }
-  iModIntro. iDestruct "H" as (δ2 ℓ [Hlabels Hvse]) "(Hfuels&Hmod&Hmi&Hfr)".
+  (* iDestruct (update_step_still_alive _ _ _ _ σ1 σ1 with "PMP Hfuels Hmod Hmi Hfr") as "H"; eauto. *)
+  iDestruct (update_step_still_alive _ _ _ _ σ1 σ1 with "PMP Hfuels Hmod [Hmi] Hfr") as "H"; eauto.
+  { set_solver. }
+  2: { rewrite Hexend. iFrame. }
+  { econstructor =>//. by apply fill_step. }
+  (* { rewrite Hmeq. apply Hval. } *)
+  iMod (fupd_mask_mono with "H") as "H"; [apply Hinvs| ]. 
+
+  iModIntro. iDestruct "H" as (δ2 ℓ Hvse) "(Hfuels&Hmod&Hmi&Hfr)".
   iExists δ2, ℓ.
   rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".
-  repeat iSplit; last done.
-  - iPureIntro. destruct ℓ =>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - iPureIntro. destruct Hvse as (?&?&? )=>//.
-  - by iSpecialize ("Hkont" with "Hmod Hfr Hfuels").
+  repeat iSplit; [done| .. | done]. 
+  by iSpecialize ("Hkont" with "Hmod Hfr Hfuels").
+Qed. 
+
+Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' Einvs fs1 fs2 fr1 Φ e1 e2 ρ φ:
+  PureExec φ 1 e1 e2 -> φ ->
+  Einvs ⊆ E ->  
+  valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
+  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
+  iM.(fmtrans) s1 (Some ρ) s2 ->
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗
+  (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
+                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
+                  -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
+  ⊢ WP e1 @ tid; E {{ Φ }}.
+Proof using. 
+  iIntros.
+  iApply wp_lift_pure_step_no_fork_take_step_stash.
+  5: { apply empty_subseteq. }
+  all: eauto. 
+  1, 2: set_solver.
+  by rewrite union_empty_r_L.
 Qed.
 
-Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' (f1 f2: nat) fr Φ e1 e2 ρ φ:
+Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' Einvs
+  (f1 f2: nat) fr Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
+  Einvs ⊆ E ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (f2 ≤ LM.(lm_fl) s2)%nat -> M.(fmtrans) s1 (Some ρ) s2 ->
-  (|={E}[E']▷=> frag_model_is s1 ∗ frag_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
-   (frag_model_is s2 -∗ frag_free_roles_are fr -∗ (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ f2 else tid ↦M ∅) -∗
+  (f2 ≤ iLM.(lm_fl) s2)%nat -> iM.(fmtrans) s1 (Some ρ) s2 ->
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
+   (partial_model_is s2 -∗ partial_free_roles_are fr -∗ (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else (tid ↦M ∅) ) -∗
                                WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
-  iIntros (Hpe Hφ Hroles Hfl Hmdl).
+Proof using.
+  iIntros (Hpe Hφ Hinvs Hroles Hfl Hmdl).
   rewrite has_fuel_fuels.
-  iIntros "H".
-  iApply (wp_lift_pure_step_no_fork_take_step _ _ _ _ _ {[ρ := f1]}
-         (if decide (ρ ∈ live_roles M s2) then {[ρ := f2]} else ∅) fr  with "[H]"); eauto.
+  iIntros "[PMP H]".
+  iApply (wp_lift_pure_step_no_fork_take_step _ _ _ _ _ _ {[ρ := f1]}
+         (if decide (ρ ∈ live_roles iM s2) then {[ρ := f2]} else ∅) fr  with "[PMP H]"); eauto.
   - repeat split.
     + intros ?. rewrite decide_True //. rewrite lookup_singleton //=.
     + destruct (decide (ρ ∈ live_roles _ s2)); set_solver.
     + set_solver.
-    + intros ρ' Hdom. destruct (decide (ρ ∈ live_roles M s2)); set_solver.
-    + intros ρ' Hneq Hin. destruct (decide (ρ ∈ live_roles M s2)); set_solver.
-    + destruct (decide (ρ ∈ live_roles M s2)); set_solver.
-    + destruct (decide (ρ ∈ live_roles M s2)); set_solver.
+    + intros ρ' Hdom. destruct (decide (ρ ∈ live_roles iM s2)); set_solver.
+    + intros ρ' Hneq Hin. destruct (decide (ρ ∈ live_roles iM s2)); set_solver.
+    + destruct (decide (ρ ∈ live_roles iM s2)); set_solver.
+    + destruct (decide (ρ ∈ live_roles iM s2)); set_solver.
   - set_solver.
-  - iMod "H". do 2 iModIntro. iMod "H" as "(Hmod&Hfr&Hfuels&Hkont)". iModIntro.
+  - iFrame. iMod "H". do 2 iModIntro. iMod "H" as "(Hmod&Hfr&Hfuels&Hkont)". iModIntro.
     iFrame "Hmod Hfr Hfuels". iIntros "Hmod Hfr Hfuels". iApply ("Hkont" with "Hmod [Hfr] [Hfuels]").
-    + replace (fr ∖ (live_roles M s2 ∖ live_roles M s1)) with fr; [done|set_solver].
-    + destruct (decide (ρ ∈ live_roles M s2)).
+    + replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [done|set_solver].
+    + destruct (decide (ρ ∈ live_roles iM s2)).
       * rewrite -has_fuel_fuels //.
       * iDestruct "Hfuels" as "[Hf _]". rewrite dom_empty_L //.
 Qed.
 
-Lemma wp_lift_pure_step_no_fork_singlerole' tid E E' Φ e1 e2 ρ f:
+Lemma wp_lift_pure_step_no_fork_singlerole' tid E E' Einvs Φ e1 e2 ρ f:
   PureExec True 1 e1 e2 ->
-  (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
-Proof.
+Proof using.
   iIntros (?) "H". rewrite has_fuel_fuels_S.
   iApply (wp_lift_pure_step_no_fork' {[ ρ := f ]} {[ρ]}); last first.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
+(* Let has_fuels_actual := has_fuels (PMPP := ActualOwnershipPartialPre).  *)
+(* Let has_fuels_partial := has_fuels (PMPP := PMPP). *)
+(* Let has_fuels_S_partial := has_fuels_S (PMPP := PMPP). *)
+
+(* Unset Printing Notations. *)
+(* Set Printing Implicit.  *)
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
-Lemma wp_fork_nostep s tid E e Φ R1 R2 fs (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
+Lemma wp_fork_nostep s tid E Einvs e Φ R1 R2
+  (fs: gmap (fmrole iM) nat) (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
   R1 ∪ R2 = dom fs ->
-  (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅ }})) -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
+                WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
+  ) -∗
      ▷ (has_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
      has_fuels_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
-Proof.
-  iIntros (Hunioneq) "He HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
+Proof using.
+  
+  iIntros (Hunioneq) "[PMP He] HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iMod (update_fork_split R1 R2 _
-       (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "Htid Hmi") as
-       (δ2) "(Hfuels2 & Hfuels1 & Hσ & %Hvse)" => //.
+       (tp1 ++ ectx_language.fill K (Val $ LitV LitUnit) :: tp2 ++ [e]) fs _ _ _ e _ σ1 with "PMP Htid Hmi")
+    as (δ2 ?) "(Hfuels2 & Hfuels1 & Hterm & Hσ & %Hvse)" => //.
   { rewrite -Hloc. rewrite -(language.locale_fill _ _ K). econstructor 1 =>//.
     apply fill_step, head_prim_step. econstructor. }
   { list_simplifier. exists (tp1 ++ fill K #() :: tp2). split; first by list_simplifier.
-    rewrite !app_length //=. }
+    rewrite !app_length //=. }  
   iModIntro. iSplit. iPureIntro; first by eauto. iNext.
   iIntros (e2 σ2 efs Hstep).
   have [-> [-> ->]] : σ2 = σ1 ∧ efs = [e] ∧ e2 = Val $ LitV LitUnit by inv_head_step.
-  iMod ("HΦ" with "Hfuels1") as "HΦ". iModIntro. iExists δ2, (Silent_step tid). iFrame.
+  iMod ("HΦ" with "Hfuels1") as "HΦ". iModIntro. iExists δ2, ℓ. iFrame.
   rewrite Hexend /=. iFrame "Hsi".
   iSplit; first by iPureIntro.
   iSplit; [|done].
-  iApply "He". by list_simplifier.
+  simpl. 
+
+  list_simplifier.
+  iApply (wp_strong_mono with "[Hfuels2 He] [Hterm]").
+  1, 2: by reflexivity.
+  { iApply "He". iFrame. }
+  iIntros. iModIntro.
+  by iApply "Hterm". 
 Qed.
+
+(* TODO: upstream? *)
+Lemma gmap_filter_dom_id {K A: Type} `{Countable K} (m: gmap K A):
+  filter (fun '(k, _) => k ∈ dom m) m = m.
+Proof.
+  rewrite map_filter_id; [done| ].
+  intros. by eapply elem_of_dom_2. 
+Qed. 
+
+(* TODO: upstream? *)
+Lemma gmap_empty_subseteq_equiv {K A: Type} `{Countable K} (m: gmap K A):
+  m ⊆ ∅ <-> m = ∅. 
+Proof.
+  clear.
+  split; [| set_solver].
+  intros E. destruct (map_eq_dec_empty m); try set_solver.
+  apply map_choose in n as (?&?&?).
+  eapply lookup_weaken in E; set_solver. 
+Qed. 
+
+(* TODO: upstream? *)
+Lemma gmap_filter_disj_id {K A: Type} `{Countable K} (m1 m2: gmap K A)
+                          (DISJ: m1 ##ₘ m2):
+  m1 = filter (λ '(k, _), k ∈ dom m1) (m1 ∪ m2).
+Proof.
+  rewrite map_filter_union; auto.
+  rewrite map_union_comm; [| by apply map_disjoint_filter]. 
+  rewrite gmap_filter_dom_id.
+  symmetry. apply map_subseteq_union. etransitivity; [| apply map_empty_subseteq].
+  apply gmap_empty_subseteq_equiv. 
+  eapply map_filter_empty_iff. apply map_Forall_lookup_2.
+  intros. intros [? ?]%elem_of_dom. eapply map_disjoint_spec; eauto.
+Qed. 
+  
+
+Lemma wp_fork_nostep_alt s tid E Einvs e Φ
+  (fs1 fs2: gmap (fmrole iM) nat)
+  (DISJ: fs1 ##ₘ fs2)
+  (NE: fs1 ∪ fs2 ≠ ∅):
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' fs2 -∗
+                WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
+  ) -∗
+     ▷ (has_fuels tid fs1 ={E}=∗ Φ (LitV LitUnit)) -∗
+     has_fuels_S tid (fs1 ∪ fs2) -∗ WP Fork e @ s; tid; E {{ Φ }}.
+Proof using.
+  iIntros "[PMP FORK] FUEL1 FUEL".
+  iApply (wp_fork_nostep with "[PMP FORK] [FUEL1]").
+  { by eapply map_disjoint_dom_1. }
+  1, 2: set_solver.
+  3: done. 
+  { iFrame. iIntros (?). iNext. iIntros "FUEL". iApply "FORK".
+    iApply has_fuels_proper; [reflexivity| | iFrame].
+    rewrite map_union_comm; auto.
+    by apply leibniz_equiv_iff, gmap_filter_disj_id. }
+  iNext. iIntros "FUEL". iApply "FUEL1".
+  iApply has_fuels_proper; [reflexivity| | iFrame].
+  by apply leibniz_equiv_iff, gmap_filter_disj_id.
+Qed.   
+
 
 (** Heap *)
 (** The usable rules for [allocN] stated in terms of the [array] proposition
@@ -459,14 +582,17 @@ Qed.
 
 (* TODO *)
 
-Lemma wp_allocN_seq_nostep s tid E v n fs:
+Lemma wp_allocN_seq_nostep s tid E Einvs v n fs:
   fs ≠ ∅ ->
   0 < n →
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢
   {{{ has_fuels_S tid fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
   {{{ l, RET LitV (LitLoc l); has_fuels tid fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
-Proof.
-  iIntros (HnO Hn Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+Proof using.
+  iIntros (HnO Hn) "#PMP".
+  iIntros (Φ). iModIntro. iIntros "HfuelS HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iModIntro; iSplit; first by eauto.
   iIntros (e2 σ2 efs Hstep). iNext.
@@ -475,9 +601,9 @@ Proof.
     as "(Hsi & Hl & Hm)".
   { apply heap_array_map_disjoint.
     rewrite replicate_length Z2Nat.id ?Hexend; auto with lia. }
-  iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
+  iMod (update_no_step_enough_fuel _ _ with "PMP HfuelS Hmi") as (δ2 ℓ) "(%Hvse & Hfuel & Hmi)" =>//.
   { by intros ?%dom_empty_inv_L. }
-  { set_solver. }
+  (* { set_solver. } *)
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists δ2, ℓ.
   rewrite Hexend //=. iFrame "Hmi Hsi".
@@ -490,30 +616,30 @@ Proof.
   + iApply (heap_array_to_seq_meta with "Hm"). by rewrite replicate_length.
 Qed.
 
-Lemma wp_alloc_nostep s tid E v fs :
+Lemma wp_alloc_nostep s tid E Einvs v fs :
   fs ≠ ∅ ->
-  {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "HfuelS HΦ". iApply (wp_allocN_seq_nostep with "HfuelS"); auto with lia.
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
+Proof using. 
+  iIntros (?) "#PMP". iModIntro. iIntros (Φ) "HfuelS HΦ".
+  iApply (wp_allocN_seq_nostep with "PMP HfuelS"); auto with lia.
   iIntros "!>" (l) "/= (? & ? & _)". rewrite loc_add_0. by iApply "HΦ"; iFrame.
 Qed.
 
-Lemma wp_choose_nat_nostep s tid E fs :
+Lemma wp_choose_nat_nostep s tid E Einvs fs :
   fs ≠ ∅ ->
-  {{{ has_fuels_S tid fs }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ has_fuels_S tid fs }}}
     ChooseNat @ s; tid; E
   {{{ (n:nat), RET LitV (LitInt n); has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+Proof using. 
+  iIntros (?). iIntros "#PMP". iModIntro. iIntros (Φ) "HfuelS HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iModIntro; iSplit; eauto.
   (* TODO: Improve this so we hide the (arbitrary) choice of `n` *)
   Unshelve. 2: apply O.
   iIntros (e2 σ2 efs Hstep). iNext.
   inv_head_step.
-  iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabel %Hvse] & Hfuel & Hmi)" =>//.
+  iMod (update_no_step_enough_fuel _ _ with "PMP HfuelS Hmi") as (δ2 ℓ) "(%Hvse & Hfuel & Hmi)" =>//.
   { by intros ?%dom_empty_inv_L. }
-  { set_solver. }
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists δ2, ℓ.
   rewrite Hexend //=. iFrame "Hmi Hsi".
@@ -523,18 +649,17 @@ Proof.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
-Lemma wp_load_nostep s tid E l q v fs:
+Lemma wp_load_nostep s tid E Einvs l q v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "[>Hl HfuelS] HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
+Proof using. 
+  iIntros (?). iIntros "#PMP". iModIntro. iIntros (Φ) "[>Hl HfuelS] HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  iMod (update_no_step_enough_fuel _ _ with "PMP HfuelS Hmi") as (δ2 ℓ) "(%Hvse & Hfuel & Hmod)" =>//.
   { by intros ?%dom_empty_inv_L. }
-  { set_solver. }
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists _,_.
   rewrite Hexend //=. iFrame "Hsi Hmod".
@@ -543,22 +668,21 @@ Proof.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
-Lemma wp_store_nostep s tid E l v' v fs:
+Lemma wp_store_nostep s tid E Einvs l v' v fs:
   fs ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
     Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "[>Hl HfuelS] HΦ".
+Proof using. 
+  iIntros (?). iIntros "#PMP". iModIntro. iIntros (Φ) "[>Hl HfuelS] HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
-  iMod (update_no_step_enough_fuel _ _ ∅ with "HfuelS Hmi") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  iMod (update_no_step_enough_fuel _ _ with "PMP HfuelS Hmi") as (δ2 ℓ) "(%Hvse & Hfuel & Hmod)" =>//.
   { by intros ?%dom_empty_inv_L. }
-  { set_solver. }
   { rewrite Hexend. apply head_locale_step. by econstructor. }
   iModIntro; iExists _,_.
   rewrite Hexend //=. iFrame "Hsi Hmod".
@@ -567,251 +691,373 @@ Proof.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
-(* WIP solution for generic fuel-handling *)
-Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
-  match to_val e1 with
-  | Some v => |={E}=> Φ (of_val v)
-  | None => ∀ σ1,
-      gen_heap_interp σ1.(heap) ={E,∅}=∗
-       ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
-       ∀ e2 σ2 efs,
-         ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗ |={∅,E}=>
-         gen_heap_interp σ2.(heap) ∗ Φ e2 ∗ ⌜efs = []⌝
-  end%I.
+(* (* WIP solution for generic fuel-handling *) *)
+(* Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ := *)
+(*   match to_val e1 with *)
+(*   | Some v => |={E}=> Φ (of_val v) *)
+(*   | None => ∀ σ1, *)
+(*       gen_heap_interp σ1.(heap) ={E,∅}=∗ *)
+(*        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗ *)
+(*        ∀ e2 σ2 efs, *)
+(*          ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗ |={∅,E}=> *)
+(*          gen_heap_interp σ2.(heap) ∗ Φ e2 ∗ ⌜efs = []⌝ *)
+(*   end%I. *)
 
-Lemma wp_store s tid E l v' v :
-  ▷ l ↦ v' -∗
-  sswp s E (Store (Val $ LitV (LitLoc l)) (Val v))
-            (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ).
-Proof.
-  iIntros ">Hl". simpl.
-  iIntros (σ1) "Hsi".
-  iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
-  iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-  iSplit.
-  { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
-  iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".
-  iMod "Hclose".
-  iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
-  iFrame.
-  apply head_reducible_prim_step in Hstep; [|by eauto].
-  inv_head_step. iFrame. done.
-Qed.
+(* Lemma wp_store s tid E l v' v : *)
+(*   ▷ l ↦ v' -∗ *)
+(*   sswp s E (Store (Val $ LitV (LitLoc l)) (Val v)) *)
+(*             (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ). *)
+(* Proof. *)
+(*   iIntros ">Hl". simpl. *)
+(*   iIntros (σ1) "Hsi". *)
+(*   iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap. *)
+(*   iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose". *)
+(*   iSplit. *)
+(*   { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. } *)
+(*   iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>". *)
+(*   iMod "Hclose". *)
+(*   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]". *)
+(*   iFrame. *)
+(*   apply head_reducible_prim_step in Hstep; [|by eauto]. *)
+(*   inv_head_step. iFrame. done. *)
+(* Qed. *)
 
-Lemma wp_nostep s tid E e fs Φ :
-  TCEq (to_val e) None →
-  fs ≠ ∅ →
-  sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
-  has_fuels_S tid fs -∗
-  WP e @ s; tid; E {{ Φ }}.
-Proof.
-  iIntros (Hval ?) "Hwp HfuelS".
-  rewrite wp_unfold /wp_pre /sswp /= Hval.
-  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
-  rewrite Hends.
-  iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
-  iModIntro. iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep). simpl in *.
-  iMod ("Hwp" with "[//]") as "Hwp".
-  iIntros "!>!>". iMod "Hwp". iIntros "!>".
-  iApply step_fupdN_intro; [done|]. iIntros "!>". iMod "Hwp".
-  iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
-  { by intros ?%dom_empty_inv_L. }
-  { set_solver. }
-  { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
-  { by rewrite Hends. }
-  iIntros "!>".
-  iDestruct "Hwp" as "[Hsi [Hwp ->]]".
-  iExists _, _. iFrame. iSplit; [done|].
-  rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver].
-  iDestruct ("Hwp" with "Hfuel") as "Hwp". iFrame. done.
-Qed.
+(* Lemma wp_nostep s tid E e fs Φ : *)
+(*   TCEq (to_val e) None → *)
+(*   fs ≠ ∅ → *)
+(*   sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗ *)
+(*   has_fuels_S tid fs -∗ *)
+(*   WP e @ s; tid; E {{ Φ }}. *)
+(* Proof. *)
+(*   iIntros (Hval ?) "Hwp HfuelS". *)
+(*   rewrite wp_unfold /wp_pre /sswp /= Hval. *)
+(*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)". *)
+(*   rewrite Hends. *)
+(*   iMod ("Hwp" with "Hsi") as (Hred) "Hwp". *)
+(*   iModIntro. iSplit; [done|]. *)
+(*   iIntros (e2 σ2 efs Hstep). simpl in *. *)
+(*   iMod ("Hwp" with "[//]") as "Hwp". *)
+(*   iIntros "!>!>". iMod "Hwp". iIntros "!>". *)
+(*   iApply step_fupdN_intro; [done|]. iIntros "!>". iMod "Hwp". *)
+(*   iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//. *)
+(*   { by intros ?%dom_empty_inv_L. } *)
+(*   { set_solver. } *)
+(*   { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. } *)
+(*   { by rewrite Hends. } *)
+(*   iIntros "!>". *)
+(*   iDestruct "Hwp" as "[Hsi [Hwp ->]]". *)
+(*   iExists _, _. iFrame. iSplit; [done|]. *)
+(*   rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver]. *)
+(*   iDestruct ("Hwp" with "Hfuel") as "Hwp". iFrame. done. *)
+(* Qed. *)
 
-Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) :
-  (∀ e, Φ e -∗ Ψ e) -∗ sswp s E e Φ -∗ sswp s E e Ψ.
-Proof.
-  iIntros "HΦΨ HΦ".
-  rewrite /sswp.
-  destruct (to_val e); [by iApply "HΦΨ"|].
-  iIntros (?) "H".
-  iMod ("HΦ" with "H") as "[%Hs HΦ]".
-  iModIntro. iSplit; [done|].
-  iIntros (????).
-  iDestruct ("HΦ" with "[//]") as "HΦ".
-  iMod "HΦ". iIntros "!>!>". iMod "HΦ". iIntros "!>". iMod "HΦ" as "(?&?&?)".
-  iIntros "!>". iFrame.
-  by iApply "HΦΨ".
-Qed.
+(* Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) : *)
+(*   (∀ e, Φ e -∗ Ψ e) -∗ sswp s E e Φ -∗ sswp s E e Ψ. *)
+(* Proof. *)
+(*   iIntros "HΦΨ HΦ". *)
+(*   rewrite /sswp. *)
+(*   destruct (to_val e); [by iApply "HΦΨ"|]. *)
+(*   iIntros (?) "H". *)
+(*   iMod ("HΦ" with "H") as "[%Hs HΦ]". *)
+(*   iModIntro. iSplit; [done|]. *)
+(*   iIntros (????). *)
+(*   iDestruct ("HΦ" with "[//]") as "HΦ". *)
+(*   iMod "HΦ". iIntros "!>!>". iMod "HΦ". iIntros "!>". iMod "HΦ" as "(?&?&?)". *)
+(*   iIntros "!>". iFrame. *)
+(*   by iApply "HΦΨ". *)
+(* Qed. *)
 
-(* Sanity check for sswp *)
-Lemma wp_store_nostep_alt s tid E l v' v fs:
-  fs ≠ ∅ ->
-  ▷ l ↦ v' -∗ has_fuels_S tid fs -∗
-  WP Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
-    {{ λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ∗ has_fuels tid fs}}.
-Proof.
-  iIntros (?) ">Hl Hf".
-  iApply (wp_nostep with "[Hl]"); [done| |].
-  { iApply sswp_wand; [|by iApply wp_store].
-    iIntros (e) "[-> Hl] Hf". iApply wp_value. by iFrame. }
-  iFrame.
-Qed.
+(* (* Sanity check for sswp *) *)
+(* Lemma wp_store_nostep_alt s tid E l v' v fs: *)
+(*   fs ≠ ∅ -> *)
+(*   ▷ l ↦ v' -∗ has_fuels_S tid fs -∗ *)
+(*   WP Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E *)
+(*     {{ λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ∗ has_fuels tid fs}}. *)
+(* Proof. *)
+(*   iIntros (?) ">Hl Hf". *)
+(*   iApply (wp_nostep with "[Hl]"); [done| |]. *)
+(*   { iApply sswp_wand; [|by iApply wp_store]. *)
+(*     iIntros (e) "[-> Hl] Hf". iApply wp_value. by iFrame. } *)
+(*   iFrame. *)
+(* Qed. *)
 
-Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v :
-  f2 ≤ LM.(lm_fl) s2 -> fmtrans M s1 (Some ρ) s2 ->
-  live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
+(* Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v : *)
+(*   f2 ≤ LM.(lm_fl) s2 -> fmtrans M s1 (Some ρ) s2 -> *)
+(*   live_roles _ s2 ⊆ live_roles _ s1 -> *)
+(*   {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}} *)
+(* ======= *)
+
+(* TODO: clean up all those similar lemmas *)
+Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1 s2 E Einvs l v' v
+  (INVS: Einvs ⊆ E)
+  (STEP: fmtrans iM s1 (Some ρ) s2)
+  (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM))
+  (LR : live_roles iM s2 ∖ live_roles iM s1 ⊆ fr) (STASH : fr_stash ⊆ dom fs1) 
+  (NSL : live_roles iM s1 ∩ (fr_stash ∖ {[ρ]}) = ∅)
+  (NOS2 : dom fs2 ∩ fr_stash = ∅):
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢
+  {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuels tid fs1 ∗
+      ▷ partial_free_roles_are fr}}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
-  {{{ RET LitV LitUnit; l ↦ v ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
-Proof.
-  iIntros (Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
+  {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ has_fuels tid fs2 ∗
+                        partial_free_roles_are (fr ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)}}}. 
+Proof using. 
+  iIntros "#PMP !#" (Φ) "(>Hl & >Hst & >Hfuel1 & Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto.
   iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (model_agree' with "Hmi Hst") as %Hmeq.
+
+  rewrite Hexend.
+  iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+  iDestruct (update_step_still_alive _ _ _ _ _ _ _ s2 _
+            (fs2)
+            _ _ _ _ fr_stash
+            with "PMP Hfuel1 Hst Hmi Hfr") as
+    "UPD".
+  
+  all: eauto.
+  { destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//. }
+  iMod (fupd_mask_mono with "UPD") as(δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done| ]. 
+  iModIntro; iExists δ2, ℓ. iSplit.
+  { iPureIntro. simpl in *. split =>//. }
+  iFrame.
+  iSplit; first done.
+  iApply "HΦ". iFrame.
+Qed.
+
+Lemma wp_store_step_singlerole_keep s tid ρ (f1 f2: nat) (* fr *) s1 s2 E Einvs l v' v :
+  Einvs ⊆ E ->
+  f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
+  (ρ ∉ live_roles iM s2 -> (f2 < f1)%nat ) -> (* TODO: check Zombie case in must_decrease *)
+  live_roles _ s2 ⊆ live_roles _ s1 ->
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1
+        (* ∗ ▷ partial_free_roles_are fr *)
+  }}}
+    Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
+  {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗
+                          (* partial_free_roles_are fr ∗ *)
+      has_fuel tid ρ f2 }}}. 
+Proof using. 
+  iIntros (Hinvs Hfl Htrans Hdecr ?). iIntros "#PMP". iModIntro. iIntros (Φ) "(>Hl & >Hst & >Hfuel1) HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
+  iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
+  iSplit; first by rewrite Hexend // in Hheap;  eauto.
+  iIntros "!>" (e2 σ2 efs Hstep).
+  rewrite Hexend in Hheap. inv_head_step.
   rewrite has_fuel_fuels Hexend.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
-  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
-            (if decide (ρ ∈ live_roles M s2) then {[ ρ := f2 ]} else ∅)
-            with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
-  - destruct (decide (ρ ∈ live_roles M s2)); apply head_locale_step; econstructor =>//.
-  - destruct (decide (ρ ∈ live_roles M s2)).
+  iMod partial_free_roles_empty as "Hfr". 
+  iDestruct (update_step_still_alive _ _ _ _ _ _ _ s2 _
+            ({[ ρ := f2 ]})
+            _ _ _ _ ∅
+            with "PMP Hfuel1 Hst Hmi Hfr") as "UPD". 
+  all: eauto.
+  1-4: set_solver. 
+  - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
+  - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
       split; first set_solver.
       split; first set_solver.
       split; first (intros ρ' Hin; set_solver).
       split; set_solver.
-    + repeat (split; set_solver).
-  - iModIntro; iExists δ2, ℓ. iSplit.
+    + (* repeat (split; set_solver). *)
+      repeat (split; try set_solver).
+      * intros. rewrite !lookup_singleton. simpl. eauto.
+      * apply fm_live_spec in Htrans. set_solver.
+  - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done |]. 
+    iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
     iFrame.
     iSplit; first done.
     iApply "HΦ". iFrame.
-    replace (fr ∖ (live_roles M s2 ∖ live_roles M s1))
-      with fr; [iFrame|set_solver].
-    destruct (decide (ρ ∈ live_roles M s2)).
-    + rewrite has_fuel_fuels //.
-    + iDestruct "Hfuel" as "[?_]". rewrite dom_empty_L //.
+    (* replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) *)
+    (*   with fr; [iFrame|set_solver]. *)
+    (* rewrite union_empty_r_L. *)
+    rewrite has_fuel_fuels //.
 Qed.
 
-Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l q v' v1 v2:
-  v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ LM.(lm_fl) s2 -> M.(fmtrans) s1 (Some ρ) s2 ->
+Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) s1 s2 E Einvs l v' v :
+  Einvs ⊆ E ->
+  f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦{q} v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
-  {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
-Proof.
-  iIntros (?? Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1}}}
+    Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
+  {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ 
+      (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ∗ partial_free_roles_are {[ ρ ]}) }}}.
+Proof using. 
+  iIntros (Hinvs Hfl Htrans ?). iIntros "#PMP". iModIntro. iIntros (Φ) "(>Hl & >Hst & >Hfuel1) HΦ".
+  iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
-  iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
+  (* iAssert (⌜ ρ ∉ fr ⌝)%I as %FRρ'. *)
+  (* { rewrite has_fuel_fuels.  *)
+  (*   iDestruct (partial_free_roles_fuels_disj with "[$] [$] [$]") as %?. *)
+  (*   set_solver. } *)
+  iSplit; first by rewrite Hexend // in Hheap;  eauto.
+  iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (model_agree' with "Hmi Hst") as %Hmeq.
-  rewrite bool_decide_false //.
   rewrite has_fuel_fuels Hexend.
-  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
-            (if decide (ρ ∈ live_roles M s2) then {[ ρ := f2 ]} else ∅)
-            with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
-  - destruct (decide (ρ ∈ live_roles M s2)); apply head_locale_step; econstructor =>//.
-  - destruct (decide (ρ ∈ live_roles M s2)).
+  iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+  iMod partial_free_roles_empty as "Hfr". 
+  iDestruct (update_step_still_alive _ _ _ _ _ _ _ s2 _
+            (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
+            _ _ _ _ ({[ ρ ]} ∖ live_roles _ s2)
+            with "PMP Hfuel1 Hst Hmi Hfr")
+    as "UPD".
+  all: eauto. 
+  1-3: set_solver.
+  { destruct (decide (ρ ∈ live_roles iM s2)); set_solver. }
+  - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
+  - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
       split; first set_solver.
       split; first set_solver.
       split; first (intros ρ' Hin; set_solver).
       split; set_solver.
     + repeat (split; set_solver).
-  - rewrite -> bool_decide_eq_false_2 in *; eauto.
+  - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done| ]. 
+    iModIntro; iExists δ2, ℓ. iSplit.
+    { iPureIntro. simpl in *. split =>//. }
+    iFrame.
+    iSplit; first done.
+    iApply "HΦ". iFrame.
+
+    (* iDestruct (partial_free_roles_are_sep with "Hmod") as "[? ?]"; [set_solver| ]. *)
+    (* replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) *)
+    (*   with fr; [iFrame|set_solver]. *)
+    
+    destruct (decide (ρ ∈ live_roles iM s2)).
+    + rewrite has_fuel_fuels //.
+    + do 2 (rewrite difference_disjoint; [| set_solver]). rewrite union_empty_l. 
+      iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
+Qed.
+
+
+Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l q v' v1 v2:
+  Einvs ⊆ E ->
+  v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
+  live_roles _ s2 ⊆ live_roles _ s1 ->
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦{q} v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
+  {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
+      (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
+Proof using. 
+  iIntros (Hinvs ?? Hfl Htrans ?) "#PMP". iModIntro. iIntros (Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
+  iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
+  iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
+  iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
+  rewrite Hexend in Hheap. inv_head_step.
+  rewrite bool_decide_false //.
+  rewrite has_fuel_fuels Hexend.
+  iDestruct (update_step_still_alive _ _ _ _ _ _ _ _ _
+            (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
+            with "PMP Hfuel1 Hst Hmi Hfr") as "UPD". 
+  2: { apply empty_subseteq. }
+  all: eauto.
+  1-3: set_solver. 
+  - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
+  - destruct (decide (ρ ∈ live_roles iM s2)).
+    + split; first by intros _; rewrite lookup_singleton /=; lia.
+      split; first set_solver.
+      split; first set_solver.
+      split; first (intros ρ' Hin; set_solver).
+      split; set_solver.
+    + repeat (split; set_solver).
+  - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done| ]. 
+    rewrite -> bool_decide_eq_false_2 in *; eauto.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
     iFrame.
     iSplit; first done. iApply "HΦ". iFrame.
-    replace (fr ∖ (live_roles M s2 ∖ live_roles M s1)) with fr; [iFrame|set_solver].
-    destruct (decide (ρ ∈ live_roles M s2)).
-    + rewrite has_fuel_fuels //.
-    + iDestruct "Hfuel" as "[?_]". rewrite dom_empty_L //.
+    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
+    rewrite union_empty_r_L. 
+    destruct (decide (ρ ∈ live_roles iM s2)).
+    + rewrite has_fuel_fuels //. iFrame. 
+    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
 Qed.
 
-Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E l v' v1 v2:
+Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l v' v1 v2:
+  Einvs ⊆ E ->
   ρ ∉ live_roles _ s2 →
-  v' = v1 → vals_compare_safe v' v1 → f2 < f1 -> M.(fmtrans) s1 (Some ρ) s2 ->
+  v' = v1 → vals_compare_safe v' v1 → f2 < f1 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
-  {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
+  {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
       has_fuel tid ρ f2 }}}.
-Proof.
-  iIntros (??? Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
+Proof using.
+  iIntros (Hinvs ??? Hfl Htrans ?) "#PMP". iModIntro. iIntros (Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (model_agree' with "Hmi Hst") as %Hmeq.
   rewrite bool_decide_true //.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   rewrite has_fuel_fuels Hexend.
-  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _ {[ ρ := f2 ]} with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
+  iDestruct (update_step_still_alive _ _ _ _ _ _ _ _ _ {[ ρ := f2 ]} with "PMP Hfuel1 Hst Hmi Hfr") as "UPD". 
+  2: { apply empty_subseteq. }
+  all: eauto. 
+  1-3: set_solver.
   - apply head_locale_step; econstructor =>//.
   - repeat (split; try done); [|set_solver|set_solver|set_solver| set_solver |].
     + intros ??. rewrite !lookup_singleton /=. lia.
     + rewrite dom_singleton singleton_subseteq_l. simplify_eq.
-      destruct (decide (ρ ∈ live_roles _ (trace_last atr))); set_solver.
-  - rewrite -> bool_decide_eq_true_2 in *; eauto.
+      (* destruct (decide (ρ ∈ live_roles _ (project_inner (trace_last atr)))); set_solver. *)
+      destruct (decide (ρ ∈ live_roles _ s1)); set_solver.
+  - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done| ]. 
+    rewrite -> bool_decide_eq_true_2 in *; eauto.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
     iFrame. iSplit; first done. iApply "HΦ". iFrame.
-    replace (fr ∖ (live_roles M s2 ∖ live_roles M s1)) with fr; [iFrame|set_solver].
+    rewrite union_empty_r_L. 
+    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
     by rewrite has_fuel_fuels.
 Qed.
 
-Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v1 v2:
-  v' = v1 → vals_compare_safe v' v1 → f2 ≤ LM.(lm_fl) s2 -> M.(fmtrans) s1 (Some ρ) s2 ->
+Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l v' v1 v2:
+  Einvs ⊆ E ->
+  v' = v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
-  {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
-Proof.
-  iIntros (?? Hfl Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
+  {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
+      (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
+Proof using. 
+  iIntros (Hinvs ?? Hfl Htrans ?) "#PMP". iModIntro. iIntros (Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
   iDestruct (@gen_heap_valid with "Hsi Hl") as %Hheap.
   iSplit; first by rewrite Hexend // in Hheap;  eauto. iIntros "!>" (e2 σ2 efs Hstep).
   rewrite Hexend in Hheap. inv_head_step.
-  iDestruct (model_agree' with "Hmi Hst") as %Hmeq.
   rewrite bool_decide_true //.
   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
   rewrite has_fuel_fuels Hexend.
-  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
-            (if decide (ρ ∈ live_roles M s2) then {[ ρ := f2 ]} else ∅)
-            with "Hfuel1 Hst Hmi Hfr") as
-        (δ2 ℓ) "([%Hlab %Hvse] & Hfuel & Hst & Hfr & Hmod)"; eauto.
-  - set_solver.
-  - destruct (decide (ρ ∈ live_roles M s2)); apply head_locale_step; econstructor =>//.
-  - destruct (decide (ρ ∈ live_roles M s2)).
+  iDestruct (update_step_still_alive _ _ _ _ _ _ _ _ _
+            (if decide (ρ ∈ live_roles iM s2) then {[ ρ := f2 ]} else ∅)
+            with "PMP Hfuel1 Hst Hmi Hfr") as "UPD". 
+  2: { apply empty_subseteq. }
+  all: eauto. 
+  1-3: set_solver.
+  - destruct (decide (ρ ∈ live_roles iM s2)); apply head_locale_step; econstructor =>//.
+  - destruct (decide (ρ ∈ live_roles iM s2)).
     + split; first by intros _; rewrite lookup_singleton /=; lia.
       split; first set_solver.
       split; first set_solver.
       split; set_solver.
     + repeat (split; set_solver).
-  - rewrite -> bool_decide_eq_true_2 in *; eauto.
+  - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done| ]. 
+    rewrite -> bool_decide_eq_true_2 in *; eauto.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
-    iFrame. iSplit; first done. iApply "HΦ". iFrame.
-    replace (fr ∖ (live_roles M s2 ∖ live_roles M s1)) with fr; [iFrame|set_solver].
-    destruct (decide (ρ ∈ live_roles M s2)).
-    + rewrite has_fuel_fuels //.
-    + iDestruct "Hfuel" as "[?_]". rewrite dom_empty_L //.
+    iFrame. iSplit; first done. iApply "HΦ". rewrite union_empty_r_L. iFrame.    
+    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
+    destruct (decide (ρ ∈ live_roles iM s2)).
+    + rewrite has_fuel_fuels //. 
+    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. 
 Qed.
 
 (* Lemma wp_faa s E l i1 i2 : *)

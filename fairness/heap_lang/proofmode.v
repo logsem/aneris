@@ -3,10 +3,11 @@ From iris.proofmode Require Export tactics.
 From trillium.program_logic Require Import atomic.
 From trillium.fairness.heap_lang Require Export tactics lifting. (* derived_laws. *)
 From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import heap_lang_defs. 
 From iris.prelude Require Import options.
 Import uPred.
 
-Lemma tac_wp_expr_eval `{LM:LiveModel heap_lang M} `{@heapGS Σ LM (@LM_EM _ LM)}
+Lemma tac_wp_expr_eval `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
   Δ tid E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ tid; E {{ Φ }}) → envs_entails Δ (WP e @ tid; E {{ Φ }}).
@@ -20,31 +21,40 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
       [let x := fresh in intros x; t; unfold x; notypeclasses refine eq_refl|]
   | _ => fail "wp_expr_eval: not a 'wp'"
   end.
-Ltac wp_expr_simpl := wp_expr_eval simpl.
+Ltac wp_expr_simpl := wp_expr_eval simpl. 
 
-Lemma tac_wp_pure_helper `{LM:LiveModel heap_lang M} `{@heapGS Σ LM (@LM_EM _ LM)} tid E K e1 e2 fs  φ n Φ :
+Lemma tac_wp_pure_helper `{EM: ExecutionModel M} `{@heapGS Σ _ EM} 
+  `{iLM: LiveModel heap_lang iM}  `{!fairnessGS iLM Σ}  
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
+  tid E Einvs K e1 e2
+  (fs: gmap (fmrole iM) nat)
+  (* fs *)
+  φ n Φ :
+(* >>>>>>> origin/pmp_resource *)
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗ ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels_plus n tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
-Proof.
+Proof. 
   intros Hne HPE Hφ. specialize (HPE Hφ).
   revert e1 e2 fs Hne HPE. induction n; intros e1 e2 fs Hne HPE.
-  { inversion HPE. rewrite has_fuel_fuels_plus_0. by simplify_eq. }
+  { inversion HPE. rewrite has_fuel_fuels_plus_0. simplify_eq.
+    iIntros "#? ?". iFrame. }   
 
   inversion HPE; simplify_eq.
 
-  iIntros "H Hf".
+  iIntros "#PMP H Hf".
   rewrite has_fuels_plus_split_S.
 
-  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
+  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
   { by intros ?%fmap_empty_inv. }
   { econstructor =>//; [ by eapply pure_step_ctx | constructor ]. }
+  iSplitR; [done| ]. 
   iModIntro; iFrame. do 2 iModIntro.
   iIntros "Hf".
-  iApply (IHn _ _ _ with "[H] [Hf]") => //.
+  iApply (IHn _ _ _ with "[PMP] [H] [Hf]") => //. 
 Qed.
 
 Lemma equiv_wand {Σ} (P Q: iProp Σ):
@@ -64,31 +74,38 @@ Proof.
   apply leibniz_equiv_iff. lia.
 Qed.
 
-Lemma has_fuels_gt_n `{LM : LiveModel heap_lang M} `{@heapGS Σ LM (@LM_EM _ LM)}
-  (fs: gmap (fmrole M) _) n tid:
+Lemma has_fuels_gt_n  
+  (* `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)} *)
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
+  (fs: gmap (fmrole iM) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 
-Lemma has_fuels_gt_1 `{LM:LiveModel heap_lang M}
-      `{@heapGS Σ LM (@LM_EM _ LM)} (fs: gmap (fmrole M) _) tid:
+Lemma has_fuels_gt_1
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
+  (fs: gmap (fmrole iM) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
-Lemma tac_wp_pure_helper_2 `{LM:LiveModel heap_lang M}
-      `{@heapGS Σ LM (@LM_EM _ LM)} tid E K e1 e2 fs  φ n Φ :
+Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+  `{iLM: LiveModel heap_lang iM} `{!fairnessGS iLM Σ}  
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
+  tid E Einvs K e1 e2
+  (fs: gmap (fmrole iM) nat)
+  φ n Φ :
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗ ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof.
-  iIntros (Hfs Hne Hpe Hphi) "H Hf".
+  iIntros (Hfs Hne Hpe Hphi) "#PMP H Hf".
   rewrite (has_fuels_gt_n fs n) //.
-  iApply (tac_wp_pure_helper with "H [Hf]") =>//.
+  iApply (tac_wp_pure_helper with "PMP H [Hf]") =>//.
   by intros ?%fmap_empty_inv.
 Qed.
 
@@ -142,9 +159,13 @@ Proof.
       * rewrite env_lookup_env_delete_ne //.
 Qed.
 
-Lemma tac_wp_pure `{LM:LiveModel heap_lang M}
-      `{@heapGS Σ LM (@LM_EM _ LM)} Δ Δ'other tid E i K e1 e2 φ n Φ fs :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
+Lemma tac_wp_pure `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+  `{iLM: LiveModel heap_lang iM} `{!fairnessGS iLM Σ}  
+  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
+  Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
+  (fs: gmap (fmrole iM) nat)
+  :
+  (∀ (ρ: fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
@@ -152,33 +173,36 @@ Lemma tac_wp_pure `{LM:LiveModel heap_lang M}
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs n Δother Δ'other →
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - n)%nat <$> fs)) in
-  envs_entails Δ' (WP (fill K e2) @ tid; E {{ Φ }}) →
-  envs_entails Δ (WP (fill K e1) @ tid; E {{ Φ }}).
+  envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+WP (fill K e2) @ tid; E {{ Φ }}) →
+  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+WP (fill K e1) @ tid; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ???.
   intros ?? Δother Hlater Δ' Hccl.
-  iIntros "H".
+  iIntros "H #PMP".
   iAssert (⌜envs_wf Δ⌝)%I as %Hwf.
-  { unfold of_envs, of_envs', envs_wf. iDestruct "H" as "[% _]". by iPureIntro. }
+  (* { unfold of_envs, of_envs', envs_wf. iDestruct "H" as "[% _]". by iPureIntro. } *)
+  { unfold of_envs, of_envs', envs_wf. iDestruct "H" as "[%HH _]". by iPureIntro. }
 
   rewrite envs_lookup_sound // /= -/Δother. iDestruct "H" as "[H1 H2]".
   rewrite into_laterN_env_sound.
 
-  iApply (tac_wp_pure_helper_2 with "[H2] [H1]") =>//.
-  iNext. simpl. iIntros "H". iApply Hccl.
+  iApply (tac_wp_pure_helper_2 with "[PMP] [H2] [H1]") =>//.
+  iNext. simpl. iIntros "H". iApply (Hccl with "[-PMP]"); [| done]. 
   rewrite /Δ' /= (envs_snoc_sound Δ'other false i); first by iApply "H2".
   eapply maybe_into_latersN_envs_dom =>//. rewrite /Δother.
   eapply envs_lookup_envs_delete =>//.
 Qed.
 
 
-Lemma tac_wp_value_nofupd `{LM:LiveModel heap_lang M}
-      `{@heapGS Σ LM (@LM_EM _ LM)} Δ tid E Φ v :
+Lemma tac_wp_value_nofupd `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+  Δ tid E Φ v :
   envs_entails Δ (Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. by apply wp_value. Qed.
 
-Lemma tac_wp_value `{LM:LiveModel heap_lang M}
-      `{@heapGS Σ LM (@LM_EM _ LM)} Δ tid E (Φ : val → iPropI Σ) v :
+Lemma tac_wp_value `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+  Δ tid E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=> Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. iIntros "?". by iApply wp_value_fupd. Qed.
 
@@ -301,7 +325,7 @@ Tactic Notation "wp_inj" := wp_pure (InjL _) || wp_pure (InjR _).
 Tactic Notation "wp_pair" := wp_pure (Pair _ _).
 Tactic Notation "wp_closure" := wp_pure (Rec _ _ _).
 
-Lemma tac_wp_bind `{LM:LiveModel heap_lang M} `{@heapGS Σ LM (@LM_EM _ LM)}
+Lemma tac_wp_bind `{EM: ExecutionModel M} `{@heapGS Σ _ EM} 
   K Δ s E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
@@ -325,13 +349,18 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
 (** Heap tactics *)
 Section heap.
-Context `{LM:LiveModel heap_lang M}.
-Context `{@heapGS Σ LM (@LM_EM _ LM)}.
+Context `{EM: ExecutionModel M}.
+Context `{@heapGS Σ _ EM}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
 Implicit Types v : val.
 Implicit Types tid : locale heap_lang.
+
+Context `{iLM: LiveModel heap_lang iM}.
+Context `{!fairnessGS iLM Σ}. 
+(* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
+Context `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}. 
 
 (* Lemma tac_wp_allocN Δ Δ' s E j K v n Φ : *)
 (*   (0 < n)%Z → *)
@@ -433,8 +462,8 @@ Implicit Types tid : locale heap_lang.
 (*   apply sep_mono_r, wand_intro_r. rewrite right_id //. *)
 (* Qed. *)
 
-Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
+Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l q v Φ :
+  (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
@@ -442,13 +471,15 @@ Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
   envs_lookup j Δ'other = Some (false,  l ↦{q} v)%I →
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
-  envs_entails Δ' (WP fill K (Val v) @ tid; E {{ Φ }}) →
-  envs_entails Δ (WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
-Proof.
+  envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+WP fill K (Val v) @ tid; E {{ Φ }}) →
+  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
+Proof using.
   intros ?? Hij ?.
   rewrite envs_entails_unseal=> Δother ?? Δ' Hccl.
   rewrite -wp_bind.
-  iIntros "H".
+  iIntros "H #PMP".
   iAssert (⌜envs_wf Δ⌝)%I as %Hwf.
   { unfold of_envs, of_envs', envs_wf. iDestruct "H" as "[% _]". by iPureIntro. }
 
@@ -460,8 +491,8 @@ Proof.
   iDestruct "H2" as "[H2 H3]".
 
   rewrite has_fuels_gt_1 //.
-  iApply (wp_load_nostep with "[H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
-  iIntros "!> [Hl Hf]". iApply Hccl. rewrite /Δ' /=.
+  iApply (wp_load_nostep with "[$] [H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
+  iIntros "!> [Hl Hf]". iApply (Hccl with "[-]"); [| done]. rewrite /Δ' /=.
   iApply (envs_snoc_sound Δ'other false i with "[H3 Hl] [Hf]") =>//.
   - rewrite maybe_into_latersN_envs_dom // /Δother.
     erewrite envs_lookup_envs_delete =>//.
@@ -471,8 +502,8 @@ Proof.
 Qed.
 
 
-Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
+Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l v v' Φ :
+  (∀ (ρ : fmrole iM) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
   fs ≠ ∅ ->
   i ≠ j ->
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
@@ -483,18 +514,20 @@ Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
   | Some Δ'other2 =>
       let Δ' := envs_snoc Δ'other2 false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
       envs_lookup i Δ'other2 = None (* redondent but easier than  proving it. *) ∧
-      envs_entails Δ' (WP fill K (Val $ LitV LitUnit) @ tid; E {{ Φ }})
+      envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+ WP fill K (Val $ LitV LitUnit) @ tid; E {{ Φ }})
   | None => False
   end →
-  envs_entails Δ (WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
-Proof.
+  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
+Proof using.
   intros ?? Hij ?.
   rewrite envs_entails_unseal=> Δother ??.
   destruct (envs_simple_replace j false (Esnoc Enil j (l ↦ v'))%I Δ'other) as [Δ'other2|] eqn:Heq; last done.
   move=> /= [Hhack Hccl].
 
   rewrite -wp_bind.
-  iIntros "H".
+  iIntros "H #PMP".
   iAssert (⌜envs_wf Δ⌝)%I as %Hwf.
   { unfold of_envs, of_envs', envs_wf. iDestruct "H" as "[% _]". by iPureIntro. }
 
@@ -506,12 +539,12 @@ Proof.
   iDestruct "H2" as "[H2 H3]".
 
   rewrite has_fuels_gt_1 //.
-  iApply (wp_store_nostep with "[H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
+  iApply (wp_store_nostep with "[$] [H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
   iIntros "!> [Hl Hf]".
   set Δ' := envs_snoc Δ'other2 false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)).
   fold Δ' in Hccl.
 
-  iApply Hccl. unfold Δ'.
+  iApply (Hccl with "[-PMP]"); [| done]. unfold Δ'.
   iApply (envs_snoc_sound Δ'other2 false i with "[H3 Hl] [Hf]") =>//.
   rewrite envs_simple_replace_sound' //=. simpl.
   iApply "H3". iFrame.

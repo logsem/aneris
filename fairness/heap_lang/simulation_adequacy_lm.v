@@ -22,13 +22,13 @@ Qed.
 Let rel_always_holds `{LM:LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
   s ξ e1 σ1 δ1 := 
       rel_always_holds0 (fun etr atr => ξ etr (map_underlying_trace atr)) 
-        s (state_interp) (fun _ => 0%nat ↦M ∅) e1 σ1 δ1. 
+        s (state_interp) (fun _ => frag_mapping_is {[ 0%nat := ∅ ]}) e1 σ1 δ1. 
 
 Lemma rel_always_holds_lift_LM `{LM: LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
   s e1 σ1 s1 ξ:
   rel_always_holds s ξ e1 σ1 (initial_ls s1 0%nat) -∗
   rel_always_holds0 (sim_rel_with_user LM ξ) s state_interp
-    (λ _, 0%nat ↦M ∅) e1 σ1 (initial_ls s1 0%nat).
+    (λ _, frag_mapping_is {[ 0%nat := ∅ ]}) e1 σ1 (initial_ls s1 0%nat).
 Proof.
   iIntros "H".
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Hequiv) "Hsi Hposts".
@@ -39,7 +39,7 @@ Proof.
   
   unfold sim_rel_with_user.
   iAssert (|={⊤}=> ⌜ξ ex (map_underlying_trace atr)⌝ ∗ state_interp ex atr ∗ posts_of c.1
-               ((λ _ : language.val heap_lang, 0%nat ↦M ∅)
+               ((λ _ : language.val heap_lang, frag_mapping_is {[ 0%nat := ∅ ]})
                 :: ((λ '(tnew, e), fork_post (language.locale_of tnew e)) <$>
                     prefixes_from [e1] (drop (length [e1]) c.1))))%I with "[Hsi H Hposts]" as "H".
   { iApply fupd_plain_keep_l. iFrame. iIntros "[Hsi Hposts]".
@@ -69,7 +69,7 @@ Proof.
         rewrite /from_locale //. }
       iIntros (tid e Hsome Hnoval ρ). destruct tid; last done.
       simpl in Hsome. compute in Hsome. simplify_eq. simpl.
-      iAssert (0%nat ↦M ∅) with "[Hposts]" as "Hem".
+      iAssert (frag_mapping_is {[ 0%nat := ∅ ]}) with "[Hposts]" as "Hem".
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
       iDestruct "Hsi" as "(_&_&Hsi)".
       iDestruct "Hsi" as "(%m&%FR'&Hfuela&Hmapa&HFR&%Hinvmap&%Hsmall&Hmodel&HfrFR)".
@@ -100,7 +100,7 @@ Proof.
     iSplit.
     + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids. eapply Htids. done.
     + iIntros (tid' e' Hsome Hnoval ρ). simpl.
-      iAssert (tid' ↦M ∅) with "[Hposts]" as "H".
+      iAssert (frag_mapping_is {[ tid' := ∅ ]}) with "[Hposts]" as "H".
       { destruct (to_val e') as [?|] eqn:Heq; last done.
         iApply posts_of_empty_mapping => //.
         apply from_locale_lookup =>//. }
@@ -125,7 +125,8 @@ Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
 Proof.
   intros Hfin WP_RAH.
   eapply @strong_simulation_adequacy_general.
-  1-4: done. 
+  1,2,4: done.
+  { split; [| done]. red. eauto. } 
   iIntros. iModIntro. 
   iIntros "R". iMod (WP_RAH with "R") as ">[WP RAH]".
   iModIntro. iSplitL "WP"; [by iFrame| ]. 
