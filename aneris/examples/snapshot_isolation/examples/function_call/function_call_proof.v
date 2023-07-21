@@ -257,7 +257,7 @@ Section proof_of_runner.
     iIntros "k_vo".
     case: vo=>[v|].
     {
-      iMod (OwnLocalKey_serializable $! SI_GlobalInv with "k_vo")
+      iDestruct (OwnLocalKey_serializable with "[k_vo]")
         as "(k_vo & %v_ser)"; first done.
       wp_pures.
       by iApply ("HΦ" $! (SerVal v)).

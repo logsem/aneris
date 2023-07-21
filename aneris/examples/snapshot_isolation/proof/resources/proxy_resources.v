@@ -102,6 +102,9 @@ Section Proxy.
 
   Notation connection_token sa γCst := (connected_client_token γKnownClients sa γCst).
 
+  Definition client_can_connect sa : iProp Σ :=
+   ∃ γCst, connection_token sa γCst.
+
   Definition is_connected (c : val)
     : iProp Σ :=
     ∃ (lk : val) (cst : val) (l : loc) (sv : val)
@@ -142,9 +145,9 @@ Section Proxy.
       connection_token sa γCst ∗
       client_gnames_token γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
-        ⌜match vbo with
-         | None => vo = None
-         | Some (v, b) => vo = Some v
+        ⌜match vo with
+         | None => vbo = None
+         | Some w => KVS_Serializable w ∧ ∃ b, vbo = Some (w, b)
          end⌝.
 
   Lemma ownCacheUser_timeless k c vo : Timeless (ownCacheUser k c vo).
@@ -161,5 +164,12 @@ Section Proxy.
       client_gnames_token γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
       (⌜b = true → ∃ (v : val), vbo = Some (v, b)⌝).
+
+
+  Lemma own_cache_user_serializable k cst v :
+     ownCacheUser k cst (Some v) -∗
+     ownCacheUser k cst (Some v) ∗ ⌜KVS_Serializable v⌝.
+  Proof.
+  Admitted.
 
 End Proxy.

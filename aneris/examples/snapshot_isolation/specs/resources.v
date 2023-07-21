@@ -56,45 +56,43 @@ Section Resources.
     Seen_persistent k h :> Persistent (Seen k h);
 
     (** Properties of points-to connective *)
-    OwnMemKey_exclusive k h h' :
-        k ↦ₖ h ⊢ k ↦ₖ h' -∗ False;
+    (* OwnMemKey_exclusive k h h' : *)
+    (*     k ↦ₖ h ⊢ k ↦ₖ h' -∗ False; *)
 
-    OwnLocalKey_exclusive k c v v' :
-        k ↦{c} v ⊢ k ↦{c} v' -∗ False;
+    (* OwnLocalKey_exclusive k c v v' : *)
+    (*     k ↦{c} v ⊢ k ↦{c} v' -∗ False; *)
 
-    ConnectionState_relation E k r ms h :
-      ↑KVS_InvName ⊆ E ->
-      GlobalInv ⊢
-      ConnectionState r (Active ms) -∗ k ↦ₖ h ={E}=∗
-      ConnectionState r (Active ms) ∗ k ↦ₖ h ∗
-      ⌜k ∈ dom ms →
-      ∀ h', ms !! k = Some h' → h' ≤ₛ h ⌝;
+    (* ConnectionState_relation E k r ms h : *)
+    (*   ↑KVS_InvName ⊆ E -> *)
+    (*   GlobalInv ⊢ *)
+    (*   ConnectionState r (Active ms) -∗ k ↦ₖ h ={E}=∗ *)
+    (*   ConnectionState r (Active ms) ∗ k ↦ₖ h ∗ *)
+    (*   ⌜k ∈ dom ms → *)
+    (*   ∀ h', ms !! k = Some h' → h' ≤ₛ h ⌝; *)
 
-    OwnMemKey_OwnLocalKey_coh k h vo c E :
-        ↑KVS_InvName ⊆ E ->
-        h ≠ [] ->
-        GlobalInv ⊢
-        k ↦ₖ h -∗ k ↦{c} vo ={E}=∗ k ↦ₖ h -∗ k ↦{c} vo ∗ ⌜is_Some vo⌝;
+    (* OwnMemKey_OwnLocalKey_coh k h vo c E : *)
+    (*     ↑KVS_InvName ⊆ E -> *)
+    (*     h ≠ [] -> *)
+    (*     GlobalInv ⊢ *)
+    (*     k ↦ₖ h -∗ k ↦{c} vo ={E}=∗ k ↦ₖ h ∗ k ↦{c} vo ∗ ⌜is_Some vo⌝; *)
 
-    ConnectionState_Keys E r ms :
-      ↑KVS_InvName ⊆ E ->
-        GlobalInv ⊢
-        ConnectionState r (Active ms) ={E}=∗
-        ConnectionState r (Active ms) ∗ ⌜dom ms ⊆ KVS_keys⌝;
+    (* ConnectionState_Keys E r ms : *)
+    (*   ↑KVS_InvName ⊆ E -> *)
+    (*     GlobalInv ⊢ *)
+    (*     ConnectionState r (Active ms) ={E}=∗ *)
+    (*     ConnectionState r (Active ms) ∗ ⌜dom ms ⊆ KVS_keys⌝; *)
 
-    OwnLocalKey_serializable E k cst v :
-      ↑KVS_InvName ⊆ E ->
-        GlobalInv ⊢
-        k ↦{cst} Some v ={E}=∗
+      OwnLocalKey_serializable k cst v :
+        k ↦{cst} Some v -∗
         k ↦{cst} Some v ∗ ⌜KVS_Serializable v⌝;
 
-    (** Properties of cache Key Status*)
-    KeyUpdStatus_exclusive c k b b' :
-      KeyUpdStatus c k b ⊢ KeyUpdStatus c k b' -∗ False;
+    (* (** Properties of cache Key Status*) *)
+    (* KeyUpdStatus_exclusive c k b b' : *)
+    (*   KeyUpdStatus c k b ⊢ KeyUpdStatus c k b' -∗ False; *)
 
-    (** Properties about the Seen predicate *)
-    Seen_prefix k h h':
-      Seen k h ⊢ Seen k h' -∗ ⌜h ≤ₛ h' ∨ h' ≤ₛ h⌝;
+    (* (** Properties about the Seen predicate *) *)
+    (* Seen_prefix k h h': *)
+    (*   Seen k h ⊢ Seen k h' -∗ ⌜h ≤ₛ h' ∨ h' ≤ₛ h⌝; *)
 
     Seen_valid E k h h' :
        ↑KVS_InvName ⊆ E ->
