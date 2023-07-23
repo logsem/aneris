@@ -1,7 +1,7 @@
 From trillium.fairness Require Export fairness resources fair_termination fuel.
 From trillium.fairness.heap_lang Require Export lang heap_lang_defs.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Export actual_resources. 
+From trillium.fairness Require Export actual_resources partial_ownership.
 
 
 Definition LM_init_resource `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}

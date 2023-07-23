@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources. 
+From trillium.fairness Require Import fairness fuel resources partial_ownership.
 
 
 Section actual_ownership.
@@ -23,6 +23,7 @@ Section actual_ownership.
         partial_free_roles_are := frag_free_roles_are;
         partial_fuel_is := frag_fuel_is;
         partial_mapping_is := frag_mapping_is;
+        partial_msi := model_state_interp;
       |}.
     - intros. rewrite /frag_fuel_is.
       rewrite map_fmap_union. rewrite -gmap_disj_op_union.

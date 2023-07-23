@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm.
+From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm pmp_lifting.
 
 Section ActualOwnershipInterface. 
   Context `{LM: LiveModel heap_lang M}.
