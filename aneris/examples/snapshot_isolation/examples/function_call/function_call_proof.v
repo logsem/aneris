@@ -147,7 +147,7 @@ Section proof_of_code.
     iInv "inv" as ">(%hx' & x_hx')" "close".
     iModIntro.
     iExists {[ "x" := hx'; "y" := hy ]}, _,
-        {[ "x" := (hist_val hx, false); "y" := (Some (SV_val v'), true) ]}.
+        {[ "x" := (last hx, false); "y" := (Some (SV_val v'), true) ]}.
     iFrame.
     iSplitL "cache_x x_upd cache_y y_upd x_hx' y_hy".
     {
@@ -257,8 +257,8 @@ Section proof_of_runner.
     iIntros "k_vo".
     case: vo=>[v|].
     {
-      iDestruct (OwnLocalKey_serializable with "[k_vo]")
-        as "(k_vo & %v_ser)"; first done.
+      iDestruct (OwnLocalKey_serializable with "[$k_vo]")
+        as "(k_vo & %v_ser)".
       wp_pures.
       by iApply ("HΦ" $! (SerVal v)).
     }

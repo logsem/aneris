@@ -39,11 +39,13 @@ Definition client_inv_name := nroot.@"clinv".
 Section proofs.
 
 Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
+Import List.ListNotations.
+Local Open Scope list.
 
   Definition client_inv_def : iProp Σ :=
   ∃ hx hy hz, "x" ↦ₖ hx ∗ "y" ↦ₖ hy ∗ "z" ↦ₖ hz ∗
       (⌜hz = []⌝ ∨
-      (∃ vx vy, ⌜hist_val hx = Some vx⌝ ∗ ⌜hist_val hy = Some vy⌝ ∗
+      (∃ vx vy, ⌜last hx = Some vx⌝ ∗ ⌜last hy = Some vy⌝ ∗
       (⌜vx = #1⌝ ∨ ⌜vx = #(-1)⌝) ∗(⌜vy = #1⌝ ∨ ⌜vy = #(-1)⌝))).
 
   Definition client_inv : iProp Σ :=
@@ -128,12 +130,15 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
             lookup_insert_ne// lookup_insert_ne// lookup_insert
             lookup_insert_ne// lookup_insert_ne// lookup_insert=>[][->].
       iNext.
-      iExists (#1 :: hx), (#1 :: hy), (#1 :: hz).
+      iExists (hx ++ cons #1 nil),
+              (hy ++ cons #1 nil),
+              (hz ++ cons #1 nil).
       iFrame.
       iPureIntro.
       right.
       exists #1, #1.
-      do 2 (split; first done).
+      rewrite !last_snoc.
+      do 2 (split; try done).
       by split; left.
     }
     iPoseProof (big_sepM_insert with "mem") as "((x_hx' & _) & mem)"; first done.
@@ -183,7 +188,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $z_hz]") as
           "(z_hz & %abs)"; first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+      apply prefix_nil_inv in abs.
+      by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "x" := hx; "y" := hy ]}.
@@ -221,7 +227,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
       [->|(%vx' & %vy' & %hx'_vx' & %hy'_vy' & %Hvx' & %Hvy')])" "close".
     1, 3: iMod (Seen_valid $! SI_GlobalInv with "[$Seen $z_hz']") as
             "(z_hz' & %abs)"; first solve_ndisj.
-    1, 2: by apply suffix_nil_inv in abs.
+    1, 2:  apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
+    by apply app_nil in abs as [_].
     all: iModIntro.
     all: iExists {[ "x" := hx'; "y" := hy' ]}, _.
     iExists {[ "x" := (Some #1, false); "y" := (Some #(-1), true) ]}.
@@ -244,12 +252,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     all: iMod ("close" with "[x_hx' y_hy' z_hz']") as "_";
           last iApply ("HΦ" with "[//]").
     all: iModIntro.
-    iExists hx', (#(-1) :: hy'), hz'.
+    iExists hx', (hy' ++ cons #(-1) nil), hz'.
     2, 3, 4: iExists hx', hy', hz'.
     all: iFrame.
     all: iRight.
     2, 3, 4: by iExists _, _.
     iExists vx', #(-1).
+    rewrite last_snoc.
     do 3 (iSplit; first done).
     by iRight.
   Qed.
@@ -293,7 +302,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $z_hz]") as
           "(z_hz & %abs)"; first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+       apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "x" := hx; "y" := hy ]}.
@@ -331,7 +341,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
       [->|(%vx' & %vy' & %hx'_vx' & %hy'_vy' & %Hvx' & %Hvy')])" "close".
     1, 3: iMod (Seen_valid $! SI_GlobalInv with "[$Seen $z_hz']") as
             "(z_hz' & %abs)"; first solve_ndisj.
-    1, 2: by apply suffix_nil_inv in abs.
+    1, 2:  apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
+    by apply app_nil in abs as [_].
     all: iModIntro.
     all: iExists {[ "x" := hx'; "y" := hy' ]}, _.
     iExists {[ "x" := (Some #(-1), true); "y" := (Some #1, false) ]}.
@@ -354,12 +366,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     all: iMod ("close" with "[x_hx' y_hy' z_hz']") as "_";
           last iApply ("HΦ" with "[//]").
     all: iModIntro.
-    iExists (#(-1) :: hx'), hy', hz'.
+    iExists (hx' ++ cons #(-1) nil), hy', hz'.
     2, 3, 4: iExists hx', hy', hz'.
     all: iFrame.
     all: iRight.
     2, 3, 4: by iExists _, _.
     iExists #(-1), vy'.
+    rewrite last_snoc.
     do 2 (iSplit; first done).
     by iSplit; first iRight.
   Qed.
@@ -403,7 +416,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $z_hz]") as
           "(z_hz & %abs)"; first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+       apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "x" := hx; "y" := hy ]}.
@@ -603,10 +617,10 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ RET #(); True }}}.
   Proof.
-    iMod (SI_init_module 
-            _ 
+    iMod (SI_init_module
+            _
             {[client_1_addr; client_2_addr;
-              client_3_addr; client_4_addr]}) 
+              client_3_addr; client_4_addr]})
       as (SI_res SI_client_toolbox) "(mem & KVS_Init & Hcc)".
     iPoseProof (big_sepS_delete _ _ "x" with "mem") as "(mem_x & mem)";
       first done.

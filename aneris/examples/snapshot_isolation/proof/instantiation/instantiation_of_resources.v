@@ -36,9 +36,20 @@ Section Session_Resources_intantiation.
     end.
 
   Lemma to_hist_prefix_mono hw hw' :
-    hw `suffix_of` hw' →  to_hist hw `suffix_of` to_hist hw'.
+    hw `prefix_of` hw' →  to_hist hw `prefix_of` to_hist hw'.
   Proof.
-  Admitted.
+    intros Hp.
+    generalize dependent hw'.
+    induction hw as [|x l]; intros hw' Hp.
+    - by apply prefix_nil.
+    - destruct hw' as [|x' l'].
+      -- by apply prefix_nil_not in Hp.
+      -- simplify_eq /=.
+         assert (x = x') as -> by by apply prefix_cons_inv_1 in Hp.
+         apply prefix_cons.
+         apply IHl.
+         by apply prefix_cons_inv_2 in Hp.
+  Qed.
 
   Definition GlobalInv_def : iProp Σ :=
     Global_Inv clients γKnownClients γGauth γGsnap γT.
@@ -82,8 +93,7 @@ Section Session_Resources_intantiation.
     iSplit; first eauto.
     iPureIntro.
     simplify_eq /=.
-    (** FixMe in either in the resources or in resources definition. *)
-    admit.
-    Admitted.
+    by apply to_hist_prefix_mono.
+  Qed.
 
 End Session_Resources_intantiation.

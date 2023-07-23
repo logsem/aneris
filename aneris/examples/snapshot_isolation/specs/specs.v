@@ -22,15 +22,9 @@ Definition can_commit `{User_params}
 Definition commit_event
   (p : option val * bool) (h : Hist) :=
     match p with
-    | (Some v, true) => v :: h
+    | (Some v, true) => h ++ [v]
     | _              => h
     end.
-
-Definition hist_val (h : Hist) :=
-  match h with
-  | v :: t => Some v
-  | [] => None
-  end.
 
 (** Specifications for read and write operations.  *)
 Section Specification.
@@ -65,7 +59,7 @@ Section Specification.
     <<<▷ RET #();
        ConnectionState c (Active m) ∗
        ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
-       ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+       ([∗ map] k ↦ h ∈ m, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗
        ([∗ map] k ↦ h ∈ m, Seen k h)>>>.
 
   Definition commit_spec : iProp Σ :=

@@ -23,11 +23,8 @@ Inductive proxy_state : Type :=
 | PSCanStart
 | PSActive of (gmap Key (list write_event)).
 
-Definition hist_to_we (h : list write_event) :=
-  match h with
-  | v :: t => Some v
-  | [] => None
-  end.
+Definition hist_to_we (h : list write_event) := last h.
+
 
 Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.

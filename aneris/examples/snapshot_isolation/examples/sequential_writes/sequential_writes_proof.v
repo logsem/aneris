@@ -41,7 +41,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
 
   Definition client_inv (γF1 γF2 : gname): iProp Σ :=
     ∃ hx, "x" ↦ₖ hx ∗
-    ((⌜hx = [(#2);(#1)]⌝ ∗ token γF1 ∗ token γF2)
+    ((⌜hx = [(#1);(#2)]⌝ ∗ token γF1 ∗ token γF2)
     ∨ (⌜hx = [(#1)]⌝ ∗ token γF1)
     ∨ (⌜hx = []⌝)).
 
@@ -178,17 +178,19 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
               rewrite !big_sepM_empty. iFrame.
             -- iNext. iIntros "[_ HBig]".
               iMod ("HClose" with "[HBig Htok Htok']") as "_".
-                  ++ iNext. iExists [(#2); (#1)].
+                  ++ iNext. iExists [(#1); (#2)].
                     rewrite !(big_sepM2_insert); try set_solver.
                     iDestruct "HBig" as "[[Hx _] _]".
                     iFrame. iLeft. by iFrame.
                   ++ iModIntro. by iApply "HΦ".
         * iMod (Seen_valid $! SI_GlobalInv with "[$Hseenx $Hkx]") as "(_ & %Hfalse)";
           first solve_ndisj.
-          by apply suffix_nil_inv in Hfalse.
+          apply prefix_nil_inv in Hfalse.
+          by apply app_nil in Hfalse as [_].
       + iMod (Seen_valid $! SI_GlobalInv with "[$Hseenx $Hkx]") as "(_ & %Hfalse)";
         first solve_ndisj.
-        by apply suffix_nil_inv in Hfalse.
+        apply prefix_nil_inv in Hfalse.
+        by apply app_nil in Hfalse as [_].
   Qed.
 
 End proofs.

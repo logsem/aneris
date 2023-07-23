@@ -147,7 +147,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     try solve_ndisj.
     iInv (client_inv_name) as ">[%hx' Hkx]" "HClose".
     iModIntro.
-    iExists {["x" := hx']}, _, {["x" := (hist_val hx, false)]}.
+    iExists {["x" := hx']}, _, {["x" := (last hx, false)]}.
     iFrame. iSplitL "Hcx Hkx Hxs".
         * iSplitR "Hcx Hkx Hxs"; try iSplitR "Hcx Hkx Hxs";
           try iPureIntro; try set_solver.

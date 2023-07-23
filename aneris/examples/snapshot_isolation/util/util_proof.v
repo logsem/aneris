@@ -85,7 +85,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
         ConnectionState c (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗
         ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
-        ([∗ map] k ↦ h ∈ ms, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) >>>
+        ([∗ map] k ↦ h ∈ ms, k ↦{c} (last h) ∗ KeyUpdStatus c k false) >>>
       commitT c @[ip_of_address sa] E
     <<<▷ RET #();
         ConnectionState c CanStart ∗
@@ -97,7 +97,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_apply (commitT_spec with "[//]").
     iMod "HΦ" as "(%m & %ms & (Active & %dom_eq & kvs & cache) & close)".
     iModIntro.
-    iExists _, _, ((λ h, (hist_val h, false)) <$> ms).
+    iExists _, _, ((λ h, (last h, false)) <$> ms).
     iFrame.
     iSplitL "cache".
     {
@@ -106,7 +106,8 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
         iPureIntro.
         rewrite bool_decide_spec=>k k_key.
         rewrite lookup_fmap.
-        by destruct (ms !! k).
+        destruct (ms !! k) eqn:Hk;
+          rewrite Hk; simplify_eq /=; try eauto.
       }
       iSplit; first by rewrite dom_eq.
       iSplit; first by rewrite dom_fmap_L.
@@ -121,7 +122,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     {
       iApply (big_sepM2_impl with "kvs").
       iIntros "!>%k % %h % %Hh ?".
-      by destruct h.
+      by destruct (last h).
     }
     {
       iApply big_sepM2_intro; last done.
@@ -145,15 +146,15 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
               ([∗ map] k ↦ h ∈ m', k ↦ₖ h) ∗
             ▷ (([∗ map] k ↦ h ∈ m', k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     (∀ m v', {{{ P ∗ Ψ m ∗ ConnectionState c (Active m) ∗
-              ([∗ map] k ↦ h ∈ m, k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) }}}
+              ([∗ map] k ↦ h ∈ m, k ↦{c} (last h) ∗ KeyUpdStatus c k false) }}}
               cond v' @[ip_of_address sa]
               {{{ m' (b : bool), RET #b;
               ConnectionState c (Active m') ∗ ⌜dom m' = dom m⌝ ∗ Ψ m' ∗
-              ([∗ map] k ↦ h ∈ m', k ↦{c} (hist_val h) ∗ KeyUpdStatus c k false) ∗
+              ([∗ map] k ↦ h ∈ m', k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗
               if b then Q v' else P }}}) -∗
     {{{ P ∗ ConnectionState c CanStart ∗ IsConnected c}}}
      wait_transaction c cond #key @[ip_of_address sa]
-    {{{ v h, RET #(); ConnectionState c CanStart ∗ Seen key (v :: h) ∗ Q v }}}.
+    {{{ v h, RET #(); ConnectionState c CanStart ∗ Seen key (h ++ [v]) ∗ Q v }}}.
   Proof.
     iIntros (c cond key sa E P Q Ψ name_sub_E) "#start #commit #cond".
     iIntros (Φ) "!>(HP & CanStart & #HiC) HΦ".
@@ -177,7 +178,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     wp_apply (SI_read_spec with "[] [$HiC $key_h]"); first set_solver.
     iIntros "key_h".
     iSpecialize ("cache" with "[$key_h $key_upd]").
-    destruct h; wp_pures; last first.
+    destruct (last h) eqn:Hlast; wp_pures.
     wp_apply ("cond" with "[$HP $HΨ $Active $cache //]").
     rename m_shift into m_old.
     iIntros (m_shift []) "(Active & %Heq & HΨ & cache & HP)"; wp_pures.
@@ -191,6 +192,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     all: iIntros "!>(CanStart & kvs)".
     all: iMod ("close" with "kvs") as "_".
     {
+      apply last_Some in Hlast as [h0]. simplify_eq /=.
       iApply ("HΦ" with "[$HP $CanStart]").
       iApply (big_sepM_lookup _ _ _ _ key_h with "seen").
     }
@@ -209,7 +211,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
     {{{ ConnectionState c CanStart ∗ IsConnected c }}}
      wait_transaction c cond #key @[ip_of_address sa]
-    {{{ h, RET #(); ConnectionState c CanStart ∗ Seen key (v :: h) }}}.
+    {{{ h, RET #(); ConnectionState c CanStart ∗ Seen key (h ++ [v]) }}}.
   Proof.
     iIntros (c cond v key sa E name_sub_E key_keys)
         "#shift #cond %Φ !> (CanStart & #HiC) HΦ".

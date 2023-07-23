@@ -39,7 +39,7 @@ Section proof_of_code.
 
   Definition client_inv_def : iProp Σ :=
     ∃ hx hy, "x" ↦ₖ hx ∗ "y" ↦ₖ hy ∗ (
-      (⌜hx = []⌝ ∗ ⌜hy = []⌝) ∨ ⌜hist_val hx = Some #1⌝).
+      (⌜hx = []⌝ ∗ ⌜hy = []⌝) ∨ ⌜last hx = Some #1⌝).
 
   Definition client_inv : iProp Σ :=
     inv client_inv_name client_inv_def.
@@ -78,7 +78,7 @@ Section proof_of_code.
     iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & Hinv)" "close".
     iModIntro.
     iExists {[ "x" := hx'; "y" := hy' ]}, _,
-            {[ "x" := (Some #1, true); "y" := (hist_val hy, false) ]}.
+            {[ "x" := (Some #1, true); "y" := (last hy, false) ]}.
     iFrame.
     iSplitL "x_1 x_hx' x_upd y_hy y_hy' y_upd".
     {
@@ -92,9 +92,10 @@ Section proof_of_code.
         [done..|].
       iPoseProof (big_sepM2_insert with "mem") as "((y_hy & _) & _)";
         [done..|].
-      have -> : commit_event (hist_val hy, false) hy' = hy' by case: (hist_val hy).
+      have -> : commit_event (last hy, false) hy' = hy' by case: (last hy).
       iMod ("close" with "[x_1 y_hy]") as "_".
-      { iNext. iExists _, _. iFrame. by iRight. }
+      { iNext. iExists _, _. iFrame. rewrite last_snoc. by iRight.
+      }
       by iApply "HΦ".
     }
     iPoseProof (big_sepM_insert with "mem") as "((x_hx' & _) & mem)"; first done.
@@ -143,7 +144,8 @@ Section proof_of_code.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $x_hx]") as "(_ & %abs)";
         first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+    apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "y" := hy ]}.
@@ -172,7 +174,8 @@ Section proof_of_code.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $x_hx']") as "(_ & %abs)";
         first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+     apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "y" := hy' ]}, _,
@@ -189,7 +192,7 @@ Section proof_of_code.
       iPoseProof (big_sepM2_insert with "mem") as "((y_1 & _) & _)";
         [done..|].
       iMod ("close" with "[x_hx' y_1 Hinv]") as "_".
-      { iNext. iExists _, (#1 :: hy'). iFrame. }
+      { iNext. iExists _, _. iFrame. }
       by iApply "HΦ".
     }
     iPoseProof (big_sepM_insert with "mem") as "((y_hy' & _) & mem)"; first done.
@@ -237,7 +240,8 @@ Section proof_of_code.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $y_hy]") as "(_ & %abs)";
         first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+     apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "x" := hx ]}.
@@ -268,7 +272,8 @@ Section proof_of_code.
     {
       iMod (Seen_valid $! SI_GlobalInv with "[$Seen $y_hy']") as "(_ & %abs)";
         first solve_ndisj.
-      by apply suffix_nil_inv in abs.
+     apply prefix_nil_inv in abs.
+    by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "x" := hx' ]}, _,

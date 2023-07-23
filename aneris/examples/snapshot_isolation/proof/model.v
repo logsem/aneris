@@ -39,9 +39,10 @@ Section Whist_valid.
 
   Definition whist_times (h : whist) :=
     ∀ ei ej (i j : nat),
-    i < j → h !! i = Some ei →
+    i < j →
+    h !! i = Some ei →
     h !! j = Some ej →
-    ej.(we_time) < ei.(we_time).
+    ei.(we_time) < ej.(we_time).
 
   Definition whist_vals (h : whist) :=
     ∀ e, e ∈ h → Serializable KVS_serialization e.(we_val).
@@ -114,14 +115,18 @@ Section KVS_valid.
   Definition update_kvs (M0 : kvsMdl) (C : gmap Key SerializableVal) (T : nat) :=
       map_fold
         (λ k v M,
-           (<[ k := {| we_key := k; we_val := v.(SV_val); we_time := T |} :: default [] (M !! k)]> M))
+           (<[ k := (default [] (M !! k)) ++
+                    [{| we_key := k; we_val := v.(SV_val); we_time := T |}]
+             ]> M))
         M0 C.
 
   Lemma kvs_valid_update_cell  (M : kvsMdl) (T : nat) (k : Key) (v : SerializableVal) :
     k ∈ KVS_keys →
     kvs_valid M T ->
     kvs_valid
-      (<[ k := {| we_key := k; we_val := v; we_time := (T + 1)%nat |} :: default [] (M !! k)]> M)
+      (<[ k := (default [] (M !! k)) ++
+               [{| we_key := k; we_val := v; we_time := (T + 1)%nat |}]
+        ]> M)
       (T+1).
   Proof.
   Admitted.
@@ -147,10 +152,10 @@ Section KVSL_valid.
     ∀ k, M !! k = Some [] → m !! k = None.
 
   Definition kvsl_in_model_some_coh (m : gmap Key val) (M : kvsMdl) :=
-    ∀ k (h: whist), M !! k = Some h → h ≠ [] → m !! k = Some $h.
+    ∀ k (h: whist), M !! k = Some h → h ≠ [] → m !! k = Some $(reverse h).
 
   Definition kvsl_in_local_some_coh (m : gmap Key val) (M : kvsMdl) :=
-    ∀ k (h: whist), m !! k = Some $h → M !! k = Some h.
+    ∀ k (h: whist), m !! k = Some $h → M !! k = Some (reverse h).
 
   Record kvsl_valid (m : gmap Key val) (M : kvsMdl) (T : nat) : Prop :=
     {

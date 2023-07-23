@@ -7,7 +7,7 @@ From aneris.examples.reliable_communication.prelude
 From aneris.examples.snapshot_isolation.specs
      Require Export user_params.
 
-Notation "h ≤ₛ h'" := (h `suffix_of` h') (at level 20).
+Notation "h ≤ₚ h'" := (h `prefix_of` h') (at level 20).
 
 Section Resources.
 
@@ -98,7 +98,7 @@ Section Resources.
        ↑KVS_InvName ⊆ E ->
         GlobalInv ⊢
         Seen k h ∗ k ↦ₖ h' ={E}=∗
-        k ↦ₖ h' ∗ ⌜h ≤ₛ h'⌝;
+        k ↦ₖ h' ∗ ⌜h ≤ₚ h'⌝;
   }.
 
 End Resources.
