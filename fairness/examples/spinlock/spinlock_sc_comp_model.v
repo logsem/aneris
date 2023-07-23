@@ -26,10 +26,10 @@ Section LMFair.
     (* intros.  *)
   Admitted.
 
-  Lemma lm_ls_eqdec: EqDecision (lm_ls LM).
+  Global Instance lm_ls_eqdec: EqDecision (lm_ls LM).
   Proof. Admitted. 
 
-  Definition LM_Fair: FairModel.
+  Global Definition LM_Fair: FairModel.
     refine {|
         fmstate := lm_ls LM;
         fmrole := locale Λ;
@@ -41,7 +41,7 @@ Section LMFair.
             end;
         live_roles δ := filter (fun τ => exists δ', locale_trans δ τ δ') (map_img (ls_mapping δ));
       |}.
-    - apply lm_ls_eqdec. 
+    (* - apply lm_ls_eqdec.  *)
     - apply @inhabitant in H0 as l. apply @inhabitant in H1 as st.  
       eapply populate. refine 
         {| ls_under := st; 
@@ -69,25 +69,35 @@ End LMFair.
 
 Section LocksCompositionModel.
 
+  Let sl_fair := LM_Fair (LM := spinlock_model). 
 
-  Let sl_st := fmstate spinlock_model_impl.
-  Let sl_role := fmrole spinlock_model_impl.
+  Let sl_st := fmstate sl_fair.
+  Let sl_role := fmrole sl_fair.
 
   (* TODO: how many 'option's should be there? *)
   Definition comp_state: Type := option sl_st * option sl_st * option nat.
+  (* Definition comp_state: Type := option sl_st.  *)
 
-  Inductive c_role := ρc. 
+  Inductive c_role := ρc.
   Definition comp_role: Type := (sl_role + sl_role) + c_role.
+
+  (* Inductive comp_trans: comp_state -> option comp_role -> comp_state -> Prop := *)
+  (* | ct_sl_step_1 s s' ρ os2 oc *)
+  (*     (STEP1: fmtrans spinlock_model_impl s (Some ρ) s'): *)
+  (*   comp_trans (Some s, os2, oc) (Some $ inl $ inl ρ) (Some s', os2, oc) *)
+  (* | ct_sl_step_2 s s' ρ os1 oc *)
+  (*     (STEP2: fmtrans spinlock_model_impl s (Some ρ) s'): *)
+  (*   comp_trans (os1, Some s, oc) (Some $ inl $ inr ρ) (os1, Some s', oc) *)
+  (* | cl_c_step os1 os2 c: *)
+  (*   comp_trans (os1, os2, Some (S c)) (Some $ inr ρc) (os1, os2, Some c) *)
+  (* | cl_sl_init oc s1 s2: *)
+  (*   comp_trans (None, None, oc) (Some $ inr ρc) (Some s1, Some s2, oc) *)
+  (* . *)
 
   Inductive comp_trans: comp_state -> option comp_role -> comp_state -> Prop :=
   | ct_sl_step_1 s s' ρ os2 oc
-      (STEP1: fmtrans spinlock_model_impl s (Some ρ) s'):
+      (STEP1: fmtrans sl_fair s (Some ρ) s'):
     comp_trans (Some s, os2, oc) (Some $ inl $ inl ρ) (Some s', os2, oc)
-  | ct_sl_step_2 s s' ρ os1 oc
-      (STEP2: fmtrans spinlock_model_impl s (Some ρ) s'):
-    comp_trans (os1, Some s, oc) (Some $ inl $ inr ρ) (os1, Some s', oc)
-  | cl_c_step os1 os2 c:
-    comp_trans (os1, os2, Some (S c)) (Some $ inr ρc) (os1, os2, Some c)
   | cl_sl_init oc s1 s2:
     comp_trans (None, None, oc) (Some $ inr ρc) (Some s1, Some s2, oc)
   .
@@ -111,9 +121,6 @@ Section LocksCompositionModel.
     rewrite /comp_role.
     apply sum_countable. 
   Defined. 
-
-  
-  (* Compute (from_option S 55 None).  *)
 
   Definition comp_lr (st: comp_state): gset (comp_role) :=
     let get_lr (s: option sl_st) := from_option (live_roles _) ∅ s in 
@@ -142,20 +149,19 @@ Section LocksCompositionModel.
         live_roles := comp_lr;
     |}).
     intros ??? TRANS. rewrite /comp_lr. inversion TRANS; subst.
-    1: do 2 apply elem_of_union_l. 2: apply elem_of_union_l, elem_of_union_r. 
-    1, 2: rewrite set_map_compose_gset; do 2 apply elem_of_map_2;
-          eapply fm_live_spec; done. 
-    all: apply elem_of_union_r; rewrite orb_true_intro; set_solver. 
+    (* 1: do 2 apply elem_of_union_l. 2: apply elem_of_union_l, elem_of_union_r.  *)
+    (* 1, 2: rewrite set_map_compose_gset; do 2 apply elem_of_map_2; *)
+    (*       eapply fm_live_spec; done.  *)
+    (* all: apply elem_of_union_r; rewrite orb_true_intro; set_solver.  *)
+    1: do 2 apply elem_of_union_l.
+    1: rewrite set_map_compose_gset; do 2 apply elem_of_map_2;
+       eapply fm_live_spec; done.
+    apply elem_of_union_r; rewrite orb_true_intro; set_solver. 
   Defined.
 
-  Definition add_fuel_1 := 3. 
-  Definition add_fuel_2 := 3. 
-  Definition add_fuel_3 := 1. 
-  (* TODO: generalize? *)
-  Definition comp_model: LiveModel heap_lang comp_model_impl :=
-    {| lm_fl _ := sm_fuel + add_fuel_1 + add_fuel_2 + add_fuel_3; |}.  
+  Definition add_fuel := 3. 
 
-  (* Definition comp_st_init (n: nat): fmstate comp_model_impl :=  *)
-  (*   (None: option sl_st, None: option sl_st, n).  *)
+  Definition comp_model: LiveModel heap_lang comp_model_impl :=
+    {| lm_fl _ := add_fuel; |}.  
 
 End LocksCompositionModel.
