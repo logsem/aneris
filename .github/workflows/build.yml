@@ -15,14 +15,14 @@ jobs:
     strategy:
       matrix:
         coq_version:
-          - '8.17.0'
+          - '8.17.1'
       max-parallel: 4
       # don't cancel all in-progress jobs if one matrix job fails:
       fail-fast: false
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: true
     - uses: coq-community/docker-coq-action@v1
