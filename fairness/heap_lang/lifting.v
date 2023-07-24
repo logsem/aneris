@@ -4,7 +4,7 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness fuel fuel_termination partial_ownership pmp_lifting. 
+From trillium.fairness Require Export fairness resources fuel partial_ownership pmp_lifting. 
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Export lang heap_lang_defs. 
 From trillium.fairness.heap_lang Require Import tactics notation.

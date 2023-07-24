@@ -26,8 +26,6 @@ Section finitary.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
 
-  Context `{HPI0: forall s x, ProofIrrel ((let '(s', ℓ) := x in M.(fmtrans) s ℓ s'): Prop) }.
-
   Variable (ξ: execution_trace Λ -> finite_trace M (option M.(fmrole)) -> Prop).
 
   Variable model_finitary: rel_finitary ξ.
@@ -108,15 +106,16 @@ Section finitary.
     rewrite /= Heq //.
   Qed.
 
-  Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
-    rel_finitary (valid_lift_fairness (λ extr auxtr, ξ extr (map_underlying_trace auxtr) ∧ φ extr auxtr)).
+  Lemma valid_state_evolution_finitary_fairness':
+    rel_finitary (valid_lift_fairness (λ extr auxtr, ξ extr (map_underlying_trace auxtr (LM := LM)))).
   Proof.
     rewrite /valid_lift_fairness.
     intros ex atr [e' σ'] oζ.
     eapply finite_smaller_card_nat.
     simpl.
     eapply (in_list_finite (enumerate_next ex atr (e',σ') oζ)).
-    intros [δ' ℓ] [[Hlbl [Htrans Htids]] [Hξ Hφ]].
+    intros [δ' ℓ] [[Hlbl [Htrans Htids]] Hξ].
+
     unfold enumerate_next. apply elem_of_list_bind.
     exists (δ'.(ls_under), match ℓ with Take_step l _ => Some l | _ => None end).
     split; last first.
@@ -188,7 +187,19 @@ Section finitary.
       + intros. apply make_proof_irrel.
       + done.
       + done.
+  Qed. 
+
+    
+
+  Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
+    rel_finitary (valid_lift_fairness (λ extr auxtr, ξ extr (map_underlying_trace auxtr) ∧ φ extr auxtr)).
+  Proof.
+    eapply rel_finitary_impl; [| apply valid_state_evolution_finitary_fairness'].
+    { by intros ??[? [? ?]]. }
+    Unshelve.
+    all: intros ??; apply make_decision.
   Qed.
+
 End finitary.
 
 Section finitary_simple.
@@ -241,14 +252,14 @@ Section finitary_simple.
     rewrite /= Heq //.
   Qed.
 
-  (* TODO: Derive this from the stronger version *)
-  Lemma valid_state_evolution_finitary_fairness_simple (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
-    rel_finitary (valid_lift_fairness φ).
-  Proof.
+  Lemma valid_state_evolution_finitary_fairness_simple':
+    rel_finitary (valid_state_evolution_fairness (LM := LM)).
+  Proof. 
     intros extr auxtr [e' σ'] oζ.
-    eapply finite_smaller_card_nat.
+    eapply finite_smaller_card_nat. 
     eapply (in_list_finite (enumerate_next_simple (trace_last auxtr) oζ (e',σ'))).
-    intros [δ2 ℓ] [[Hlab [Htrans Hsmall]] ?].
+    intros [δ2 ℓ] [Hlab [Htrans Hsmall]].
+
     unfold enumerate_next. apply elem_of_list_bind.
     exists (δ2.(ls_under), match ℓ with Take_step l _ => Some l | _ => None end).
     split; last first.
@@ -318,6 +329,16 @@ Section finitary_simple.
       + intros. apply make_proof_irrel.
       + done.
       + done.
+  Qed. 
+
+  (* TODO: Derive this from the stronger version *)
+  Lemma valid_state_evolution_finitary_fairness_simple (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
+    rel_finitary (valid_lift_fairness φ).
+  Proof.
+    eapply rel_finitary_impl; [| apply valid_state_evolution_finitary_fairness_simple'].
+    { intros ??[??]. eauto. }
+    Unshelve.
+    all: intros ??; apply make_decision.
   Qed.
 End finitary_simple.
 
@@ -358,8 +379,6 @@ Proof.
     - intros ??. apply make_decision.
     - intros ??. apply make_decision. }
   by eapply valid_state_evolution_finitary_fairness.
-  Unshelve.
-  - intros ??. apply make_proof_irrel.
 Qed.
 
 Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel Λ Mdl}
