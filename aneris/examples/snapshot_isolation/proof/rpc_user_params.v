@@ -26,7 +26,6 @@ Section RPC_user_params.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   (** TODO: Remove it from here once proved and defined.  *)
-  Context (list_serialization : serialization → serialization).
   Context (clients : gset socket_address).
   Context  (γKnownClients γGauth γGsnap γT : gname).
 
@@ -94,13 +93,13 @@ Section RPC_user_params.
   (** TODO: Remove list_serialization from here once proved and defined.  *)
   Global Instance client_handler_at_leader_user_params : MTS_user_params :=
     {|
-      MTS_req_ser  := req_serialization list_serialization;
-      MTS_req_ser_inj := req_ser_is_injective list_serialization;
-      MTS_req_ser_inj_alt := req_ser_is_injective_alt list_serialization;
+      MTS_req_ser  := req_serialization;
+      MTS_req_ser_inj := req_ser_is_injective;
+      MTS_req_ser_inj_alt := req_ser_is_injective_alt;
       MTS_req_data := ReqData;
       MTS_rep_ser  := rep_serialization;
-      MTS_rep_ser_inj := rep_ser_is_injective list_serialization;
-      MTS_rep_ser_inj_alt := rep_ser_is_injective_alt list_serialization;
+      MTS_rep_ser_inj := rep_ser_is_injective;
+      MTS_rep_ser_inj_alt := rep_ser_is_injective_alt;
       MTS_rep_data := RepData;
       MTS_saddr := KVS_address;
       MTS_mN := (KVS_InvName .@ "server");

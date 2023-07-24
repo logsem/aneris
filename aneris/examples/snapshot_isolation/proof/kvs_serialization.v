@@ -1,14 +1,68 @@
 From aneris.aneris_lang Require Import lang.
+From aneris.aneris_lang Require Import proofmode.
+
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.prelude Require Import ser_inj.
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params.
 
+(** TODO: proof list_serialization and move to the serialization_proof file. *)
+Section list_serialization.
+
+  Context (A : serialization).
+
+  Definition list_valid_val (v : val) := True.
+
+  Definition list_ser_str (s1 s2 : string) := True.
+
+  Definition list_is_ser (v : val) (s : string) := True.
+
+  Lemma list_is_ser_valid v s : list_is_ser v s -> list_valid_val v.
+  Proof.
+  Admitted.
+
+  Lemma list_ser_spec `{!anerisG Mdl Σ} ip v:
+    {{{ ⌜list_valid_val v⌝ }}}
+      list_ser A.(s_serializer).(s_ser) v @[ip]
+    {{{ (s : string), RET #s; ⌜list_is_ser v s⌝ }}}.
+  Proof.
+  Admitted.
+
+  Lemma list_deser_spec `{!anerisG Mdl Σ} ip v s:
+    {{{ ⌜list_is_ser v s⌝ }}}
+      list_deser A.(s_serializer).(s_deser) #s @[ip]
+    {{{ RET v; True }}}.
+  Proof.
+  Admitted.
+
+  Definition list_serialization : serialization :=
+    {| s_valid_val := list_valid_val;
+       s_serializer := list_serializer A.(s_serializer);
+       s_is_ser := list_is_ser;
+       s_is_ser_valid := list_is_ser_valid;
+       s_ser_spec := @list_ser_spec;
+       s_deser_spec := @list_deser_spec; |}.
+
+  Global Instance:
+    ∀ v1, Serializable A v1 →
+             Serializable list_serialization v1.
+  Proof. rewrite /Serializable /= /list_valid_val /=; eauto. Qed.
+
+  Global Instance list_serializer_of serA :
+    SerializerOf serA A →
+    SerializerOf (list_serializer serA) (list_serialization).
+  Proof.
+    intros H1.
+    rewrite /SerializerOf.
+    rewrite /SerializerOf in H1.
+    subst. done.
+  Qed.
+
+End list_serialization.
+
 Section Repdb_ser.
 
   Context `{!User_params}.
-  (** TODO: proof list_s (list_serialization) in the serialization_proof file. *)
-  Context (list_serialization : serialization → serialization).
 
   Definition req_serialization :=
     sum_serialization
