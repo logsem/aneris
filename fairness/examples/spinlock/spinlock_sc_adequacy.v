@@ -288,7 +288,8 @@ Next Obligation.
 Qed.
 
 Instance proof_irrel_trans s x:
-  ProofIrrel ((let '(s', ℓ) := x in spinlock_model_step s ℓ s'): Prop).
+  ProofIrrel ((let '(s', ℓ) := x in spinlock_model_step s ℓ s' 
+                                              ∨ s' = s ∧ ℓ = None): Prop).
 Proof. apply make_proof_irrel. Qed.
 
 Lemma le_states_list (s: spinlock_model_impl):
@@ -315,14 +316,17 @@ Qed.
   
   
 Lemma spinlock_model_finitary (s: spinlock_model_impl):
-  Finite { '(s', ℓ) | spinlock_model_step s ℓ s'}.
+  Finite { '(s', ℓ) | spinlock_model_step s ℓ s' ∨ s' = s ∧ ℓ = None}.
 Proof.
   destruct (le_states_list s) as [ls INls].
-  set (l := flat_map (fun (i: nat) => map (fun s_ => (s_, Some i)) ls)
-                     (seq 0 (length s))).
-  eapply in_list_finite with (l := l). intros. destruct x. 
-  apply elem_of_list_In. subst l. apply in_flat_map.
-  pose proof (sm_step_role_bound s s0 o H) as [ρ [-> LT]].
+  set (l := (s, None) :: 
+              flat_map (fun (i: nat) => map (fun s_ => (s_, Some i)) ls) (seq 0 (length s))).
+  eapply in_list_finite with (l := l). intros [s' ℓ'] STEP'.
+  destruct STEP' as [STEP | [-> ->]].
+  2: { subst l. apply elem_of_list_here. }
+  subst l. apply elem_of_list_further. 
+  apply elem_of_list_In, in_flat_map.
+  pose proof (sm_step_role_bound s s' ℓ' STEP) as [ρ [-> LT]].
   exists ρ. split.
   { apply in_seq. lia. }
   apply in_map_iff. eexists. split; eauto.
@@ -408,7 +412,8 @@ Proof.
   eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ ([2; 2] : fmstate spinlock_model_impl) ∅)
   =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.
-    intros ?. simpl. apply (spinlock_model_finitary s1).
+    intros ?. simpl.
+    apply (spinlock_model_finitary s1).    
   - intros ?. iStartProof. iIntros "!> Hm Hf !>". simpl.
     iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
     { rewrite /frag_free_roles_are. iApply own_unit. }
