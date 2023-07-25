@@ -4,21 +4,16 @@ open Serialization_code
 open Mt_server_code
 open List_code
 
-(* Type aliases *)
-type 'a reqTy = (string * 'a, string) sumTy
-type 'a repTy = (unit, 'a option) sumTy
-type 'a dbTy = ((string, 'a) amap)
+(** Serializers **)
 
-(** Serializers *)
-
-let write_serializer (val_ser[@metavar]) =
-  prod_serializer string_serializer val_ser
-let read_serializer = string_serializer
-let req_ser (val_ser[@metavar]) =
-  (sum_serializer (write_serializer val_ser) read_serializer)
+let write_serializer (key_ser[@metavar]) (val_ser[@metavar]) =
+  prod_serializer key_ser val_ser
+let req_ser (key_ser[@metavar]) (val_ser[@metavar]) =
+  (sum_serializer (write_serializer key_ser val_ser) key_ser)
 let rep_ser (val_ser[@metavar]) =
   (sum_serializer (unit_serializer) (option_serializer val_ser))
 
+(** Server's behavior **)
 let client_request_handler_at_server data hash req =
   let k = (* Get the request's key k *)
     match req with
@@ -35,14 +30,15 @@ let client_request_handler_at_server data hash req =
   in
   let (rpc, lk) = p in (* Get the data corresponding to the shard assigned to k *)
   acquire lk;
-  let res = make_request rpc req in
+  let res = make_request rpc req in (* Redirect the request to that shard *)
   release lk;
   res
 
-let start_server (ser[@metavar]) addr data hash () =
-  run_server (rep_ser ser) (req_ser ser) addr
+let start_server (key_ser[@metavar]) (val_ser[@metavar]) addr data hash () =
+  run_server (rep_ser val_ser) (req_ser key_ser val_ser) addr
     (fun req -> client_request_handler_at_server data hash req)
 
+(** Shard's behavior **)
 let server_request_handler_at_shard db lk req =
   acquire lk;
   let res =
@@ -57,26 +53,31 @@ let server_request_handler_at_shard db lk req =
   release lk;
   res
 
-let start_shard (ser[@metavar]) addr db lk () =
-  run_server (rep_ser ser) (req_ser ser) addr
+let start_shard (key_ser[@metavar]) (val_ser[@metavar]) addr db lk () =
+  run_server (rep_ser val_ser) (req_ser key_ser val_ser) addr
     (fun req -> server_request_handler_at_shard db lk req)
 
-let init_server (ser[@metavar]) srv_addr addrs (hash : string -> int) =
+(** Initializes the server **)
+(* addrs contains couples of addresses linking the server to a shard *)
+(* hash has to return an integer smaller than the length of addrs, so that it can be used as an index *)
+let init_server (key_ser[@metavar]) (val_ser[@metavar]) srv_addr (addrs : (saddr * saddr) alist) (hash : string -> int) =
   let data = list_map (
                  fun p ->
                  let (srv, shard) = p in
-                 let rpc = init_client_proxy (req_ser ser) (rep_ser ser) srv shard in
+                 let rpc = init_client_proxy (req_ser key_ser val_ser) (rep_ser val_ser) srv shard in
                  let lk = newlock () in
                  (rpc, lk)) addrs in
-  fork (start_server ser srv_addr data hash) ()
+  fork (start_server key_ser val_ser srv_addr data hash) ()
 
-let init_shard (ser[@metavar]) addr =
+(** Initializes a shard **)
+let init_shard (key_ser[@metavar]) (val_ser[@metavar]) addr =
   let db = ref (map_empty ()) in
   let lk = newlock () in
-  fork (start_shard ser addr db lk) ()
+  fork (start_shard key_ser val_ser addr db lk) ()
 
-let init_client_proxy (ser[@metavar]) clt_addr srv_addr =
-  let rpc = init_client_proxy (req_ser ser) (rep_ser ser) clt_addr srv_addr in
+(** Initializes a client **)
+let init_client (key_ser[@metavar]) (val_ser[@metavar]) clt_addr srv_addr =
+  let rpc = init_client_proxy (req_ser key_ser val_ser) (rep_ser val_ser) clt_addr srv_addr in
   let lk = newlock () in
   let request req =
     acquire lk;

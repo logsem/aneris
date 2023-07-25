@@ -6,10 +6,11 @@ From aneris.aneris_lang Require Import resources proofmode.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.aneris_lang.lib Require Import map_proof lock_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
+Import inject.
 
 Section proof.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !DB_params, !MTS_resources, lock : gname,
+  Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ, !MTS_resources, lock : gname,
                      γ : gname, sa : socket_address, N : namespace}.
 
   Definition MTshard := (user_params_at_shard γ sa).
@@ -27,50 +28,36 @@ Section proof.
     }}}.
   Proof.
     iIntros (l reqv data lk Φ)
-        "([(%E & %P & %Q & %k & %v & % & % & -> & -> & P & %shards_k & HQ)|
-         (%E & %P & %Q & %k & % & %k_keys & -> & -> & P & %shards_k & HQ)] & #lock) HΦ".
+        "([(%E & %Q & %k & %v & % & % & -> & -> & %shards_k & HQ)|
+         (%E & %Q & %k & % & %k_keys & -> & -> & %shards_k & HQ)] & #lock) HΦ".
     {
       rewrite/server_request_handler_at_shard.
       wp_pures.
       wp_apply (acquire_spec with "lock").
       iIntros "% (-> & locked & (%db & %M & %shard &
-                    %db_M & ●_γ & l_db & %values_ser & %M_shard))".
+                    %db_M & ●_γ & l_db & %M_shard))".
       wp_pures.
       wp_load.
       wp_apply (wp_map_insert $! db_M).
       iIntros "%db' %db'_M".
       wp_bind (Store _ _).
       iApply aneris_wp_atomic.
-      iMod ("HQ" with "P") as "(%old & k_old & HQ)".
+      iMod "HQ" as "(%old & k_old & HQ)".
       iModIntro.
       wp_store.
-      iMod (shard_update _ _ _ _ (Some (SV_val v)) with "[//] ●_γ k_old")
+      iMod (shard_update _ _ _ _ (Some v) with "[//] ●_γ k_old")
             as "(●_γ & k_v)".
       iMod ("HQ" with "k_v") as "Q".
       iModIntro.
       wp_pures.
       wp_apply (release_spec with "[$locked $lock l_db ●_γ]").
       {
-        iExists db', (<[k:=(SV_val v)]> M), (<[k:=Some (SV_val v)]> shard).
+        iExists db', (<[k:=v]> M), (<[k:=Some v]> shard).
         iFrame.
         iSplit; first done.
-        iSplit.
-        {
-          iPureIntro=>k' k'_key v'.
-          case eq : (k =? k')%string.
-          { 
-            apply String.eqb_eq in eq.
-            rewrite eq=>k'_M.
-            apply lookup_insert_rev in k'_M.
-            rewrite -k'_M.
-            apply SV_ser.
-          }
-          rewrite eqb_neq in eq.
-          by rewrite (lookup_insert_ne _ _ _ _ eq)=>/(values_ser _ k'_key _).
-        }
         iPureIntro=>k' k'_key.
         move: (M_shard k' k'_key).
-        case: (string_eq_dec k k')=>[->|diff];
+        case: (DB_key_eq_dec k k')=>[->|diff];
         [by rewrite 2!lookup_insert|by rewrite 2!(lookup_insert_ne _ _ _ _ diff)].
       }
       iIntros "% ->".
@@ -83,18 +70,18 @@ Section proof.
         by left.
       }
       iLeft.
-      iExists E, P, Q, k, v.
+      iExists E, Q, k, v.
       by do 2 (iSplit; first done).
     }
     rewrite/server_request_handler_at_shard.
     wp_pures.
     wp_apply (acquire_spec with "lock").
     iIntros "% (-> & locked & (%db & %M & %shard &
-                  %db_M & ●_γ & l_db & %values_ser & %M_shard))".
+                  %db_M & ●_γ & l_db & %M_shard))".
     wp_pures.
     wp_bind (Load _).
     iApply aneris_wp_atomic.
-    iMod ("HQ" with "P") as "(%v & k_v & HQ)".
+    iMod "HQ" as "(%v & k_v & HQ)".
     iModIntro.
     wp_load.
     iPoseProof (shard_valid with "[//] ●_γ k_v") as "%M_k".
@@ -114,22 +101,20 @@ Section proof.
       iIntros "% ->".
       wp_pures.
       iApply "HΦ".
-      have ser_a : Serializable DB_serialization a
-          by apply (values_ser _ k_keys a eq').
       iSplit.
       {
         iPureIntro=>/=.
-        exists (InjRV a).
+        exists (InjRV $a).
         right.
         split=>//=.
         left.
-        by exists a.
+        exists $a.
+        split; [done|apply DB_vals_serializable].
       }
       iRight.
-      iExists E, P, Q, k.
+      iExists E, Q, k.
       iSplit; first done.
-      iLeft.
-      iExists {| SV_val := a; SV_ser := ser_a |}.
+      iExists (Some a).
       by iFrame.
     }
     wp_pures.
@@ -151,9 +136,9 @@ Section proof.
       by right.
     }
     iRight.
-    iExists E, P, Q, k.
+    iExists E, Q, k.
     iSplit; first done.
-    iRight.
+    iExists None.
     by iFrame.
   Qed.
 

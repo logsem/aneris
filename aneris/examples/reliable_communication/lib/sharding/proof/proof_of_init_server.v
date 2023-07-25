@@ -22,11 +22,10 @@ Section utils.
   Lemma list_map_spec (l : list A) (fv lv : val) (P : nat → A → iProp Σ)
                               (Q : nat → A → B → iProp Σ) :
     ⌜is_list l lv⌝ -∗
-    {{{ ([∗ list] i↦x ∈ l, P i x) ∗
-        (∀ i x, {{{ ⌜l !! i = Some x⌝ ∗ P i x }}}
-                  fv $ x @[ip]
-                {{{ ret, RET ($ ret); Q i x ret }}})
-    }}}
+    (∀ i x, {{{ ⌜l !! i = Some x⌝ ∗ P i x }}}
+             fv $ x @[ip]
+            {{{ ret, RET ($ ret); Q i x ret }}}) -∗
+    {{{ ([∗ list] i↦x ∈ l, P i x) }}}
       list_map fv lv @[ip]
     {{{ map_l ret, RET ret;
         ⌜is_list map_l ret⌝ ∗ ⌜length map_l = length l⌝ ∗
@@ -35,18 +34,18 @@ Section utils.
     iRevert (lv P Q).
     iInduction l as [|a l'] "Hind" using list_ind.
     {
-      iIntros (lv P Q -> Φ) "!>_ HΦ".
+      iIntros (lv P Q ->) "_ %Φ !>_ HΦ".
       rewrite/list_map.
       wp_pures.
       iApply ("HΦ" $! []).
       by do 2 (iSplit; first done).
     }
-    iIntros (lv P Q) "(%l'v & -> & %l'v_l') %Φ !>(P_l & #fv_spec) HΦ".
+    iIntros (lv P Q) "(%l'v & -> & %l'v_l') #fv_spec %Φ !>P_l HΦ".
     rewrite/list_map.
     do 7 (wp_pure _).
     iPoseProof (big_sepL_cons with "P_l") as "(P_a & P_l')".
     wp_apply ("Hind" $! l'v (λ i x, P (S i) x) (λ i y, Q (S i) y) l'v_l'
-                    with "[$P_l']").
+                    with "[] P_l'").
     {
       iIntros (i x Ψ) "!>P HΨ".
       by wp_apply ("fv_spec" $! (S i) with "[P]").
@@ -70,60 +69,41 @@ End utils.
 
 Section proof.
 
-  Context `{!anerisG Mdl Σ, !DBG Σ, !DB_params}.
+  Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
-  Lemma init_server_spec_holds hash SrvInit srv_si
-            (γs : list _) (shards_si : list _) (MTRs : list _) :
-    ∀ addrsv shardsv,
-      ⌜is_list DB_addrs addrsv⌝ -∗
-      ⌜∀ k, k ∈ DB_keys → (hash k < length DB_addrs)%nat⌝ -∗
-      ⌜∀ k γ, γs !! (hash k) = Some γ → DBG_shards k = γ⌝ -∗
-    {{{
-      hash_spec shardsv hash ∗ SrvInit ∗
-      DB_addr ⤇ srv_si ∗ DB_addr ⤳ (∅, ∅) ∗
-      free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-      ([∗ list] i↦sa ∈ DB_addrs, ∃ sa_si : message → iProp Σ,
-                                  ⌜shards_si !! i = Some sa_si⌝ ∗
-                                  sa.2 ⤇ sa_si) ∗
-      ([∗ list] sa ∈ DB_addrs, unallocated {[sa.1]}) ∗
-      ([∗ list] sa ∈ DB_addrs, sa.1 ⤳ (∅, ∅)) ∗
-      ([∗ list] sa ∈ DB_addrs, free_ports (ip_of_address sa.1)
-                                {[port_of_address sa.1]}) ∗
-      (@run_server_spec _ _ _ _ user_params_at_server SrvInit srv_si) ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR shard_si γ,
-          (@init_client_proxy_spec _ _ _ _ (user_params_at_shard γ sa.2)
-              MTR shard_si) ∗ ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝ ∗
-          ⌜shards_si !! k = Some shard_si⌝) ∗
-      ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR γ,
-          (@make_request_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR) ∗
-           ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝)
-    }}}
-      init_server (s_serializer DB_serialization) #DB_addr addrsv shardsv
-                                          @[ip_of_address DB_addr]
-    {{{ RET #(); True }}}.
+  Lemma init_server_spec_holds SrvInit srv_si shards_si
+    (γs : list _) (MTRs : list _) :
+    ⌜∀ k γ, γs !! (DB_hash k) = Some γ → DBG_hash k = γ⌝ -∗
+    run_server_spec SrvInit srv_si -∗
+    ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR shard_si γ,
+    (@init_client_proxy_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR shard_si) ∗
+      ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝ ∗
+        ⌜shards_si !! k = Some shard_si⌝) -∗
+    ([∗ list] k↦sa ∈ DB_addrs, ∃ MTR γ,
+      (@make_request_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR) ∗
+        ⌜γs !! k = Some γ⌝ ∗ ⌜MTRs !! k = Some MTR⌝) -∗
+    init_server_spec SrvInit srv_si shards_si.
   Proof.
-    iIntros (addrsv shardsv addrs_addrsv hash_valid shards_def Φ)
-          "!>(#hash_spec & SrvInit & #srv_si & addr_∅ & addr_free & #shards_si &
-            srv_unalloc & srv_∅ & srv_free & #run_srv & #init_shards_clt &
-             #request_shards) HΦ".
+    iIntros "%hash_coh #run_srv #init_shards #request_shards".
+    iIntros (hash addrs addrs_coh Φ) "!>(#hash_spec & #srv_si & #shards_si &
+        SrvInit & addr_∅ & free_addr & unalloc & addrs_∅ & free_addrs) HΦ".
     rewrite/init_server.
     wp_pures.
-    iPoseProof (big_sepL_sep_2 with "srv_free shards_si") as "init".
-    iPoseProof (big_sepL_sep_2 with "srv_∅ init") as "init".
-    iPoseProof (big_sepL_sep_2 with "srv_unalloc init") as "init".
+    iPoseProof (big_sepL_sep_2 with "free_addrs shards_si") as "init".
+    iPoseProof (big_sepL_sep_2 with "addrs_∅ init") as "init".
+    iPoseProof (big_sepL_sep_2 with "unalloc init") as "init".
     wp_apply (list_map_spec _ _ _ _
       (λ i sa p, (∃ MTR γ lock, ⌜MTRs !! i = Some MTR⌝ ∗ ⌜γs !! i = Some γ⌝ ∗
           (is_lock DB_inv_name (ip_of_address sa.1) lock (p.2)
               (MTR.(MTSCanRequest) (ip_of_address sa.1) (p.1))) ∗
       (@make_request_spec _ _ _ _ (user_params_at_shard γ sa.2) MTR))%I)
-          $! addrs_addrsv with "[$init]").
+          $! addrs_coh with "[] [$init]").
     {
-      iIntros (i sa Ψ)
-          "!>(%addrs_x & unalloc & ∅ & free &
-            (%sa_si & %shards_si_sa_si & #sa_si)) HΨ".
+      iIntros (i sa Ψ) "!>(%addrs_x & unalloc & ∅ & free &
+                        (%sa_si & %shards_si_sa_si & #sa_si)) HΨ".
       move:sa addrs_x=>[srv shard] addrs_srv_shard.
       wp_pures.
-      iPoseProof (big_sepL_lookup _ _ _ _ addrs_srv_shard with "init_shards_clt")
+      iPoseProof (big_sepL_lookup _ _ _ _ addrs_srv_shard with "init_shards")
         as "(%MTR & %sa_si' & %γ & #init_shard & %γs_γ
                 & %MTRs_MTR & %shards_si_sa_si')".
       rewrite shards_si_sa_si in shards_si_sa_si'.
@@ -152,24 +132,23 @@ Section proof.
     iNext.
     rewrite/start_server.
     wp_pures.
-    wp_apply ("run_srv" with "[] [$SrvInit $addr_∅ $addr_free $srv_si]");
+    wp_apply ("run_srv" with "[] [$SrvInit $addr_∅ $free_addr $srv_si]");
           last done.
     iIntros (req reqd Ψ) "!>pre HΨ".
     wp_pures.
-    wp_apply (client_request_handler_at_server_spec _ _ hash with "[$pre]");
+    wp_apply (client_request_handler_at_server_spec with "[$pre]");
       last by iIntros (rep); iApply "HΨ".
     iIntros (k k_keys ψ) "!>_ Hψ".
     wp_apply ("hash_spec" $! _ _ k_keys with "[//]").
     iIntros "_".
     iApply "Hψ".
-    iSplit; first by move: (hash_valid _ k_keys).
-    move: (hash_valid _ k_keys).
+    move: (DB_hash_valid k).
     rewrite -data_addrs=>/lookup_lt_is_Some_2[[rpc lk] data_k].
     iPoseProof (big_sepL_lookup _ _ _ _ data_k with "data") as "(%sa & %addrs_sa &
             (%MTR & %γ & %lock & %MTRs_MTR & %γs_γ & #lock & #make_request))".
     iExists rpc, sa.2, DB_inv_name, lock, MTR, lk, data.
     rewrite -(Forall_lookup_1 _ _ _ _ DB_addrs_ips addrs_sa).
-    rewrite (shards_def _ _ γs_γ).
+    rewrite (hash_coh _ _ γs_γ).
     by do 3 (iSplit; first done).
   Qed.
 

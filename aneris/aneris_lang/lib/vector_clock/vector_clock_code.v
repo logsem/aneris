@@ -14,6 +14,8 @@ Definition vect_make : val :=
 
 Definition vect_nth : val := λ: "vec" "i", unSOME (list_nth "vec" "i").
 
+(**  Serializers  *)
+
 Definition vect_update : val :=
   rec: "vect_update" "vec" "i" "v" :=
   match: "vec" with

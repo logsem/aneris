@@ -7,7 +7,7 @@ let try_recv_timeout (c : ('a, 'b) rpc) =
   let rec aux n =
     let reqo = try_recv c in
     if reqo = None
-    then begin Unix.sleepf 0.1; aux (n-1) end
+    then begin (unsafe (fun () -> Unix.sleepf 0.1)); aux (n-1) end
     else reqo
   in aux 100
 

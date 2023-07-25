@@ -10,8 +10,6 @@ From aneris.examples.viewstamped_replication Require Import vr_serialization_cod
 From aneris.examples.viewstamped_replication Require Import vr_network_code.
 From aneris.examples.viewstamped_replication Require Import vr_debug.
 
-(**  Serialization  *)
-
 Definition emit : val :=
   λ: "lk" "outQ" "event",
   acquire "lk";;
@@ -836,8 +834,8 @@ Definition init val_ser : val :=
   let: "viewA" := ref #0 in
   let: "status" := ref #true in
   let: "log" := ref [] in
-  let: "opN" := ref #-1 in
-  let: "cmtN" := ref #-1 in
+  let: "opN" := ref #(-1) in
+  let: "cmtN" := ref #(-1) in
   let: "ctable" := ref (map_empty #()) in
   let: "ptable" := ref (map_empty #()) in
   let: "svc_data" := (ref #0, list_init "len" (λ: "_j", ref #false)) in
