@@ -22,6 +22,24 @@ From aneris.examples.snapshot_isolation.proof.resources
 Import gen_heap_light.
 Import lock_proof.
 
+Definition can_commit_transaction `{User_params}
+ (m ms : gmap Key (list write_event))
+ (mc : gmap Key (option val * bool)) : bool :=
+  bool_decide
+    (∀ (k : Key), k ∈ KVS_keys →
+                  match ((mc !! k) : option ((option val) * bool)) with
+                  | Some (vo, true) => bool_decide (m !! k = ms !! k)
+                  | Some (_, false) => true
+                  | None => true
+                  end).
+
+Definition commit_write_event
+  (p : option val * bool) (h : list write_event) (ct : nat) (k : Key) :=
+    match p with
+    | (Some v, true) => h ++ [{| we_key := k; we_val := v; we_time := ct|}]
+    | _              => h
+    end.
+
 Section RPC_user_params.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
@@ -31,8 +49,11 @@ Section RPC_user_params.
 
   Definition ReqData : Type :=
       (** Read   *) string * nat * (list write_event) +
-      (** Start  *) (unit * iProp Σ * (val → iProp Σ) +
-      (** Commit *) coPset * nat * (gmap Key val) * iProp Σ * (val → iProp Σ)).
+      (** Start  *) (coPset * iProp Σ * (val → iProp Σ) +
+      (** Commit *) (coPset * nat *
+                    (gmap Key val) *
+                    (gmap Key (option val * bool))) *
+                    (gmap Key (list write_event)) * iProp Σ * (val → iProp Σ)).
 
   Definition RepData : Type :=
      (** Read   *) list write_event +
@@ -55,40 +76,94 @@ Section RPC_user_params.
      ∨
       (** Start *)
       (
-       ⌜True⌝ (** TODO *)
+        ∃ E P Q,
+          ⌜reqd = inr (inl (E, P, Q))⌝ ∗
+          ⌜reqv = InjRV (InjLV (#()))%V⌝ ∗
+          ⌜↑KVS_InvName ⊆ E⌝ ∗
+          P ∗
+          (P
+           ={⊤, E}=∗
+           (∃ m, ([∗ map] k ↦ h ∈ m, ownMemUser γGauth γGsnap k h) ∗
+                 ▷ (∀ ts,
+                      ownTimeSnap γT ts ∗
+                      ([∗ map] k ↦ h ∈ m,
+                         ownMemUser γGauth γGsnap k h ∗
+                         ⌜∀ e, e ∈ h → e.(we_time) < ts⌝)
+                      ={E,⊤}=∗ Q #ts))
+          )
       )
      ∨
       (** Commit *)
       (
-        ⌜True⌝ (** TODO *)
+        ∃ E P Q cmapV
+          (cache_updatesM : gmap Key val)
+          (cache_logicalM : gmap Key (option val * bool))
+          (Msnap : gmap Key (list write_event))
+          (ts : nat),
+          ⌜reqd = inr (inr (E, ts, cache_updatesM, cache_logicalM, Msnap, P, Q))⌝ ∗
+          ⌜reqv = InjRV (InjRV (#ts, cmapV))%V⌝ ∗
+          ⌜↑KVS_InvName ⊆ E⌝ ∗
+          ⌜is_map cmapV cache_updatesM⌝ ∗
+          ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ ∗
+          P ∗
+         (P ={⊤, E}=∗
+          ∃ (m : gmap Key (list write_event)),
+          ⌜dom m = dom Msnap⌝ ∗
+          ownTimeSnap γT ts ∗
+          ([∗ map] k ↦ h' ∈ Msnap,
+             ownMemSeen γGsnap k h' ∗
+             ⌜∀ e, e ∈ h' → e.(we_time) < ts⌝) ∗
+          ([∗ map] k ↦ h ∈ m, ownMemUser γGauth γGsnap k h) ∗
+           ▷ (∀ (ct : nat) (b : bool),
+                ((** Transaction has been commited. *)
+                 (⌜b = true⌝ ∗ ⌜can_commit_transaction m Msnap cache_logicalM⌝ ∗
+                 ([∗ map] k↦ h;p ∈ m; cache_logicalM,
+                  ownMemUser γGauth γGsnap k (commit_write_event p h ct k) ∗
+                    ownMemSeen γGsnap k (commit_write_event p h ct k))) ∨
+                 (** Transaction has been aborted. *)
+                 (⌜b = false⌝ ∗ ⌜¬ can_commit_transaction m Msnap cache_logicalM⌝ ∗
+                    [∗ map] k ↦ h ∈ m,
+                    ownMemUser γGauth γGsnap k h ∗
+                    ownMemSeen γGsnap k h)) ={E,⊤}=∗
+                Q #b)
+         )
       )).
-
-
   Definition ReqPost
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=
     Global_Inv clients γKnownClients γGauth γGsnap γT ∗
     (
       (** Read *)
       (
-       (∃ k ts h vo,
+       ∃ k ts h vo,
            ⌜reqd = inl (k, ts, h)⌝ ∗
            ⌜repd = inl h⌝ ∗
            ⌜repv = InjLV vo⌝ ∗
            ownMemSeen γGsnap k h ∗
            ((⌜vo = NONEV⌝ ∗ ⌜h = []⌝ ) ∨
-            (∃ e, ⌜vo = SOMEV (we_val e)⌝ ∗ ⌜hist_to_we h = Some e⌝)))
+            (∃ e, ⌜vo = SOMEV (we_val e)⌝ ∗ ⌜hist_to_we h = Some e⌝))
       )
      ∨
       (** Start *)
       (
-       ⌜True⌝ (** TODO *)
+         ∃ E P Q ts,
+          ⌜reqd = inr (inl (E, P, Q))⌝ ∗
+          ⌜repd = inr (inl ts)⌝ ∗
+          ⌜repv = InjRV (InjLV #ts)⌝ ∗
+          Q #ts
       )
      ∨
       (** Commit *)
       (
-        ⌜True⌝ (** TODO *)
+        ∃ E P Q
+          (cache_updatesM : gmap Key val)
+          (cache_logicalM : gmap Key (option val * bool))
+          (Msnap : gmap Key (list write_event))
+          (ts : nat) (b : bool),
+          ⌜reqd = inr (inr (E, ts, cache_updatesM, cache_logicalM, Msnap, P, Q))⌝ ∗
+          ⌜repd = inr (inr b)⌝ ∗
+          ⌜repv = InjRV (InjRV #b)⌝ ∗
+          Q #b
       )).
-
 
   (** TODO: Remove list_serialization from here once proved and defined.  *)
   Global Instance client_handler_at_leader_user_params : MTS_user_params :=

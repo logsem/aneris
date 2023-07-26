@@ -23,7 +23,7 @@ Class IDBG Σ :=
     IDBG_Global_mono :> inG Σ (authR (gmapUR Key (max_prefix_listR write_eventO)));
     (** Cache at Client Proxies *)
     IDBG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
-    IDBG_Cache_lgcl :> ghost_mapG Σ Key (option (val * bool));
+    IDBG_Cache_lgcl :> ghost_mapG Σ Key (option val * bool);
     IDBG_TksExcl :> inG Σ (exclR unitO);
     IDBG_ConnectedClients :>
       inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));

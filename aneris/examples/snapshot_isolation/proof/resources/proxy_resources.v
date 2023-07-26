@@ -47,27 +47,31 @@ Section Proxy.
 
   Definition is_coherent_cache
     (cache_updatesM : gmap Key val)
-    (cache_logicalM : gmap Key (option (val * bool)))
+    (cache_logicalM : gmap Key (option val * bool))
     (Msnap :  gmap Key (list write_event)) :=
       (** Cache Logical and Snapshot Coherence *)
       dom cache_logicalM = dom Msnap ∧
-      (∀ k (v : val) (b : bool),
+      (∀ k (v : val),
         k ∈ dom cache_logicalM →
-        (cache_logicalM !! k) = Some (Some (v, false)) →
+        (cache_logicalM !! k) = Some (Some v, false) →
         ∃ h e,
           Msnap !! k = Some h ∧
           hist_to_we h = Some e ∧
           e.(we_val) = v) ∧
+      (∀ k (v : val),
+         k ∈ dom cache_logicalM →
+         (cache_logicalM !! k) = Some (None, false) →
+           Msnap !! k = Some []) ∧
       (** Cache Logical and Cache Updates Coherence *)
       dom cache_updatesM ⊆ dom cache_logicalM ∧
       (∀ k (v : val),
         k ∈ dom cache_updatesM →
         cache_updatesM !! k = Some v ↔
-        cache_logicalM !! k = Some (Some (v, true))) ∧
-      (∀ k v,
+        cache_logicalM !! k = Some (Some v, true)) ∧
+      (∀ k (vo : option val),
         k ∈ dom cache_logicalM →
         (cache_updatesM !! k) = None ↔
-        cache_logicalM !! k = Some (Some (v, false))).
+        cache_logicalM !! k = Some (vo, false)).
 
   Definition is_connected_def
     (n : ip_address) (cst : val) (l : loc) (s : proxy_state) (sv : val)
@@ -83,8 +87,9 @@ Section Proxy.
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)
         (∃ (ts : nat) (Msnap : gmap Key (list write_event))
-           (cache_updatesV : val) (cache_updatesM : gmap Key val)
-           (cacheM : gmap Key (option (val * bool))),
+           (cache_updatesV : val)
+           (cache_updatesM : gmap Key val)
+           (cacheM : gmap Key (option val * bool)),
             ⌜sv = SOMEV (#ts, cache_updatesV)⌝ ∗
             ⌜s = PSActive Msnap⌝ ∗
             (** then lock has active token and guards a logical cache map
@@ -137,14 +142,14 @@ Section Proxy.
   ghost map. *)
   Definition ownCacheUser (k : Key) (c : val) (vo : option val) : iProp Σ :=
     ∃ (sa : socket_address) (v: val)
-      (γCst γA γS γlk γCache : gname) (vbo : option (val * bool)),
+      (γCst γA γS γlk γCache : gname) (vo : option val) (b : bool),
       ⌜c = (#sa, v)%V⌝ ∗
       connection_token sa γCst ∗
       client_gnames_token γCst γA γS γlk γCache ∗
-      ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
+      ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
         ⌜match vo with
-         | None => vbo = None
-         | Some w => KVS_Serializable w ∧ ∃ b, vbo = Some (w, b)
+         | None => b = false
+         | Some w => KVS_Serializable w
          end⌝.
 
   Lemma ownCacheUser_timeless k c vo : Timeless (ownCacheUser k c vo).
@@ -153,14 +158,14 @@ Section Proxy.
  (** To update cache pointers, one need to change the update status of the key.
   This is enforced by giving half of the pointer permission to the cache pointer
   the other half to the key_upd_status predicate. *)
-  Definition key_upd_status (c : val) (k : Key) (b: bool) : iProp Σ :=
+  Definition key_upd_status (c : val) (k : Key) (b : bool) : iProp Σ :=
     ∃ (sa : socket_address) (v: val)
       (γCst γA γS γlk γCache : gname)
-      (vbo : option (val * bool)),
+      (vo : option val),
       connection_token sa γCst ∗
       client_gnames_token γCst γA γS γlk γCache ∗
-      ghost_map_elem γCache k (DfracOwn (1/2)%Qp) vbo ∗
-      (⌜b = true → ∃ (v : val), vbo = Some (v, b)⌝).
+      ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
+      (⌜b = true → is_Some vo⌝).
 
 
   Lemma own_cache_user_serializable k cst v :
