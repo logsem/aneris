@@ -13,3 +13,6 @@
 [submodule "actris"]
 	path = external/actris
 	url = https://gitlab.mpi-sws.org/iris/actris.git
+[submodule "external/trillium"]
+	path = external/trillium
+	url = git@github.com:logsem/trillium.git
