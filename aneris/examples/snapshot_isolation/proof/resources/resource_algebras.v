@@ -1,4 +1,4 @@
-From iris.algebra Require Import auth gmap dfrac frac_auth excl.
+From iris.algebra Require Import auth gmap dfrac frac_auth excl csum.
 From iris.algebra.lib Require Import mono_list .
 From iris.base_logic.lib Require Import mono_nat ghost_map.
 From iris.bi.lib Require Import fractional.
@@ -27,7 +27,7 @@ Class IDBG Σ :=
     IDBG_TksExcl :> inG Σ (exclR unitO);
     IDBG_ConnectedClients :>
       inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
-    IDBG_TksAgr :> inG Σ (agreeR ((gnameO * gnameO * gnameO * gnameO) : Type));
+    IDBG_TksAgr :>  inG Σ (csumR (exclR unitR) (agreeR ((gnameO * gnameO * gnameO * gnameO) : Type)));
     (** Time *)
     IDBG_TimeStamp :> mono_natG Σ;
     (** Lock *)

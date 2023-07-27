@@ -166,7 +166,7 @@ Section RPC_user_params.
       )).
 
   (** TODO: Remove list_serialization from here once proved and defined.  *)
-  Global Instance client_handler_at_leader_user_params : MTS_user_params :=
+  Global Instance client_handler_rpc_user_params : MTS_user_params :=
     {|
       MTS_req_ser  := req_serialization;
       MTS_req_ser_inj := req_ser_is_injective;

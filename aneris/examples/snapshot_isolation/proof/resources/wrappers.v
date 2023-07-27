@@ -19,8 +19,7 @@ From aneris.examples.snapshot_isolation.proof.resources
      Require Import resource_algebras server_resources proxy_resources
      global_invariant.
 
-
-Section Session_Resources_intantiation.
+Section Wrapper_defs.
   Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_resources}.
   Context `{!User_params}.
   Context (clients : gset socket_address).
@@ -58,42 +57,12 @@ Section Session_Resources_intantiation.
     ∃ hw, ownMemUser γGauth γGsnap k hw ∗ ⌜h = to_hist hw⌝.
 
   Definition ConnectionState_def c s : iProp Σ :=
-    ∃ sp, connection_state  γGsnap γT γKnownClients c sp ∗ ⌜s = to_local_state sp⌝.
+    ∃ sp, connection_state γGsnap γT γKnownClients c sp ∗ ⌜s = to_local_state sp⌝.
 
   Definition Seen_def k h : iProp Σ :=
     ∃ hw, ownMemSeen γGsnap k hw ∗ ⌜h = to_hist hw⌝.
 
+  Definition client_can_connect_res sa : iProp Σ :=
+    client_can_connect γKnownClients sa.
 
-  Global Program Instance session_resources_instance : SI_resources Mdl Σ :=
-    {|
-      GlobalInv :=  GlobalInv_def;
-      OwnMemKey k h := OwnMemKey_def k h;
-      OwnLocalKey k c vo := ownCacheUser γKnownClients k c vo;
-      ConnectionState c s := ConnectionState_def c s;
-      IsConnected c := is_connected γGsnap γT γKnownClients c;
-      KeyUpdStatus c k b :=  key_upd_status γKnownClients c k b;
-      Seen k h := Seen_def k h;
-      KVS_si := srv_si;
-      KVS_Init := SrvInit;
-      KVS_ClientCanConnect sa := client_can_connect γKnownClients sa;
-      OwnLocalKey_serializable k c v :=
-      own_cache_user_serializable γGsnap γT γKnownClients k c v;
-      (* Seen_valid E k h h' :=  *) |}.
-  Next Obligation.
-    iIntros (E k h h' Hcl) "#Hinv (#Hs & Hk)".
-    iDestruct "Hs" as (hw) "(Hs & %Heq1)".
-    iDestruct "Hk" as (hw') "(Hk & %Heq2)".
-    unfold OwnMemKey_def, GlobalInv_def.
-    iDestruct
-      (ownMemSeen_valid clients γKnownClients γGauth γGsnap γT E k hw hw' with
-        "[$] [$]")
-      as "Hp"; try eauto.
-    iMod ("Hp" with "[$Hk]") as "(Hp & %Hpre)".
-    iModIntro.
-    iSplit; first eauto.
-    iPureIntro.
-    simplify_eq /=.
-    by apply to_hist_prefix_mono.
-  Qed.
-
-End Session_Resources_intantiation.
+End Wrapper_defs.

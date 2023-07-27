@@ -1,4 +1,4 @@
-From iris.algebra Require Import agree auth excl gmap frac_auth updates local_updates.
+From iris.algebra Require Import agree auth excl gmap frac_auth updates local_updates csum.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
 From iris.base_logic Require Import invariants.
@@ -35,8 +35,11 @@ Section Proxy.
   Context (γGsnap γT : gname).
   Context (γKnownClients : gname).
 
-  Definition client_gnames_token γCst γ1 γ2 γ3 γ4 : iProp Σ
-    := own γCst (to_agree (γ1, γ2, γ3, γ4)).
+  Definition client_gnames_token_defined γCst γ1 γ2 γ3 γ4 : iProp Σ
+    := own γCst (Cinr (to_agree (γ1, γ2, γ3, γ4))).
+
+  Definition client_gnames_token_pending γCst : iProp Σ
+    := own γCst (Cinl (Excl ())).
 
   Definition kvs_valid_snapshot (M : gmap Key (list write_event)) (t : Time) :=
    kvs_valid M t ∧
@@ -105,7 +108,10 @@ Section Proxy.
   Notation connection_token sa γCst := (connected_client_token γKnownClients sa γCst).
 
   Definition client_can_connect sa : iProp Σ :=
-   ∃ γCst, connection_token sa γCst.
+   ∃ γCst, connection_token sa γCst ∗ client_gnames_token_pending γCst.
+
+  Definition client_connected sa γCst γCache γlk γA γS : iProp Σ :=
+   connection_token sa γCst ∗ client_gnames_token_defined γCst γCache γlk γA γS.
 
   Definition is_connected (c : val)
     : iProp Σ :=
@@ -113,8 +119,7 @@ Section Proxy.
       (s : proxy_state) (sa : socket_address)
       (γCst γlk γS γA γCache : gname),
       ⌜c = (#sa, (lk, (cst, #l)))%V⌝ ∗
-      connection_token sa γCst ∗
-      client_gnames_token γCst γCache γlk γA γS ∗
+      client_connected sa γCst γA γS γlk γCache ∗
       is_lock (KVS_InvName .@ (socket_address_to_str sa)) (ip_of_address sa) γlk lk
               (is_connected_def (ip_of_address sa) cst l s sv γS γA γCache).
 
@@ -128,8 +133,7 @@ Section Proxy.
  Definition connection_state (c : val) (s : proxy_state) : iProp Σ :=
    ∃ (sa : socket_address) (v : val) (γCst γA γS γlk γCache : gnameO),
      ⌜c = (#sa, v)%V⌝ ∗
-     connection_token sa γCst ∗
-     client_gnames_token γCst γA γS γlk γCache ∗
+     client_connected sa γCst γA γS γlk γCache ∗
      is_connected c ∗
        match s with
        | PSCanStart => isActiveToken γA
@@ -144,8 +148,7 @@ Section Proxy.
     ∃ (sa : socket_address) (v: val)
       (γCst γA γS γlk γCache : gname) (vo : option val) (b : bool),
       ⌜c = (#sa, v)%V⌝ ∗
-      connection_token sa γCst ∗
-      client_gnames_token γCst γA γS γlk γCache ∗
+      client_connected sa γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
         ⌜match vo with
          | None => b = false
@@ -162,8 +165,7 @@ Section Proxy.
     ∃ (sa : socket_address) (v: val)
       (γCst γA γS γlk γCache : gname)
       (vo : option val),
-      connection_token sa γCst ∗
-      client_gnames_token γCst γA γS γlk γCache ∗
+      client_connected sa γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
       (⌜b = true → is_Some vo⌝).
 
