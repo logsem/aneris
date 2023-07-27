@@ -14,8 +14,9 @@ From iris.base_logic.lib Require Import invariants.
 From aneris.examples.snapshot_isolation.examples.only_reads
   Require Import only_reads_code.
 Import ser_inj.
-From aneris.examples.snapshot_isolation.instantiation
-     Require Import snapshot_isolation_api_implementation.
+From aneris.examples.snapshot_isolation.instantiation Require Import
+     snapshot_isolation_api_implementation
+     instantiation_of_init.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 From iris.algebra Require Import excl.
 

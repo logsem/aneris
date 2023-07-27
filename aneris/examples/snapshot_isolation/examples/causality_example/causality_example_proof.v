@@ -12,8 +12,9 @@ From iris.base_logic.lib Require Import invariants.
 From aneris.examples.snapshot_isolation.examples.causality_example
       Require Import causality_example_code.
 Import ser_inj.
-From aneris.examples.snapshot_isolation.instantiation
-     Require Import snapshot_isolation_api_implementation.
+From aneris.examples.snapshot_isolation.instantiation Require Import
+     snapshot_isolation_api_implementation
+     instantiation_of_init.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
 

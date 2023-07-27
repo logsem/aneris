@@ -1,5 +1,5 @@
 From aneris.examples.snapshot_isolation
-     Require Import snapshot_isolation_code 
+     Require Import snapshot_isolation_code
                     snapshot_isolation_code_api.
 From aneris.aneris_lang Require Import resources.
 From aneris.examples.snapshot_isolation.specs Require Import user_params specs.
@@ -15,8 +15,3 @@ Global Instance KVS_snapshot_isolation_api_implementation :
     SI_run := run;
     SI_init_client_proxy := init_client_proxy;
   |}.
-
-Global Instance SI_init_instanciation `{!anerisG Mdl Σ, !User_params} :
-    SI_init.
-Proof.
-Admitted.

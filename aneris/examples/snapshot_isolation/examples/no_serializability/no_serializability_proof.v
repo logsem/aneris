@@ -16,7 +16,9 @@ From aneris.examples.snapshot_isolation.examples.no_serializability
 Import ser_inj.
 Import network_util_proof.
 From aneris.examples.snapshot_isolation.instantiation
-     Require Import snapshot_isolation_api_implementation.
+     Require Import
+     snapshot_isolation_api_implementation
+     instantiation_of_init.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
