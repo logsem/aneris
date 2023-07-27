@@ -162,8 +162,7 @@ Section Proxy.
   This is enforced by giving half of the pointer permission to the cache pointer
   the other half to the key_upd_status predicate. *)
   Definition key_upd_status (c : val) (k : Key) (b : bool) : iProp Σ :=
-    ∃ (sa : socket_address) (v: val)
-      (γCst γA γS γlk γCache : gname)
+    ∃ (sa : socket_address) (γCst γA γS γlk γCache : gname)
       (vo : option val),
       client_connected sa γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
