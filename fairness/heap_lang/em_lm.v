@@ -1,4 +1,4 @@
-From trillium.fairness Require Export fairness resources fair_termination fuel.
+From trillium.fairness Require Export fairness resources fair_termination fuel fuel_ext. 
 From trillium.fairness.heap_lang Require Export lang heap_lang_defs.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Export actual_resources partial_ownership.
@@ -20,7 +20,8 @@ Definition init_thread_post `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
 
 Definition lm_model_init `{LM: LiveModel heap_lang M} (δ: mstate LM) :=
   ls_fuel δ = gset_to_gmap (lm_fl LM δ) (live_roles _ (ls_under δ)) /\
-  ls_mapping δ = gset_to_gmap 0%nat (live_roles _ (ls_under δ)). 
+  (* ls_mapping δ = gset_to_gmap 0%nat (live_roles _ (ls_under δ)).  *)
+  ls_tmap δ (LM := LM) = {[ 0%nat := live_roles _ (ls_under δ) ]}. 
 
 Definition lm_cfg_init (σ: cfg heap_lang) :=
   exists (e: expr), σ.1 = [e].
@@ -41,7 +42,7 @@ Lemma init_fairnessGS_LM Σ `{hPre: @fairnessGpreS heap_lang M LM Σ
       LM_init_resource s1 ∗ model_state_interp σ1 s1).
 Proof.
   iIntros. 
-  destruct INIT as [[??] [FUEL MAP]]. destruct σ1 as [tp ?]. simpl in *. subst.
+  destruct INIT as [[??] [FUEL TMAP]]. destruct σ1 as [tp ?]. simpl in *. subst.
   iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
   iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
   iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
@@ -59,19 +60,19 @@ Proof.
 
   iSplitL "Hmodf Hfr Hfuelf Hmapf".
   2: { unfold model_state_interp. simpl. iFrame. 
-       iExists {[ 0%nat := (live_roles M s1) ]}, _.
+       iExists _.
 
        iSplitL "Hfuela".
        { rewrite /auth_fuel_is /=.
          rewrite FUEL. rewrite fmap_gset_to_gmap //. } 
 
-       iSplitL "Hmapa"; first by rewrite /auth_mapping_is /= map_fmap_singleton //.
+       iSplitL "Hmapa"; first by rewrite TMAP /auth_mapping_is /= map_fmap_singleton //.
        iSplit; first done.
-       iSplit; iPureIntro; [|split].
-       - intros ρ tid. rewrite MAP. 
-         rewrite lookup_gset_to_gmap_Some.
-         setoid_rewrite lookup_singleton_Some. split; naive_solver.
-       - intros tid Hlocs. rewrite lookup_singleton_ne //.
+       iSplit; iPureIntro. 
+       (* - intros ρ tid. rewrite MAP.  *)
+       (*   rewrite lookup_gset_to_gmap_Some. *)
+       (*   setoid_rewrite lookup_singleton_Some. split; naive_solver. *)
+       - intros tid Hlocs. rewrite TMAP lookup_singleton_ne //.
          compute in Hlocs. set_solver.
        - rewrite FUEL. rewrite dom_gset_to_gmap. set_solver. }
 

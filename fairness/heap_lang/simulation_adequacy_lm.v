@@ -24,6 +24,23 @@ Let rel_always_holds `{LM:LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ 
       rel_always_holds0 (fun etr atr => ξ etr (map_underlying_trace atr)) 
         s (state_interp) (fun _ => frag_mapping_is {[ 0%nat := ∅ ]}) e1 σ1 δ1. 
 
+(* TODO: move*)
+Lemma maps_inverse_match_exact `{Countable K, Countable V, EqDecision K}
+                               (v: V) (S: gset K):
+  maps_inverse_match (gset_to_gmap v S) {[v := S]}.
+Proof.
+  red. intros. rewrite lookup_gset_to_gmap_Some. split.
+  - intros [? ->]. eexists. split; eauto. apply lookup_singleton.
+  - intros [? [[? ->]%lookup_singleton_Some ?]]. done.
+Qed.    
+  
+
+(* TODO: should hold by definition after changing LiveState *)
+Lemma initial_ls_tmap `{LM: LiveModel heap_lang M} τ s:
+  ls_tmap (initial_ls s τ) (LM := LM) = {[ τ := live_roles M s ]}.
+Proof. Admitted. 
+
+
 Lemma rel_always_holds_lift_LM `{LM: LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
   s e1 σ1 s1 ξ:
   rel_always_holds s ξ e1 σ1 (initial_ls s1 0%nat) -∗
@@ -72,9 +89,10 @@ Proof.
       iAssert (frag_mapping_is {[ 0%nat := ∅ ]}) with "[Hposts]" as "Hem".
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
       iDestruct "Hsi" as "(_&_&Hsi)".
-      iDestruct "Hsi" as "(%m&%FR'&Hfuela&Hmapa&HFR&%Hinvmap&%Hsmall&Hmodel&HfrFR)".
-      iDestruct (frag_mapping_same 0%nat m with "[Hmapa] Hem") as "%H"; [done| ].
-      iPureIntro. by eapply no_locale_empty.
+      iDestruct "Hsi" as "(%FR'&Hfuela&Hmapa&HFR&%Hsmall&Hmodel&HfrFR)".
+      iDestruct (frag_mapping_same 0%nat with "[Hmapa] Hem") as "%H"; [done| ].
+      iPureIntro. eapply no_locale_empty; [| done].
+      rewrite initial_ls_tmap. apply maps_inverse_match_exact. 
     + iSplit; iPureIntro.
       { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
         simplify_eq. by eexists _. }
@@ -94,7 +112,7 @@ Proof.
     apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
     simpl in *. simplify_eq.
     iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)".
-    iDestruct "Hsi" as "(%m&%&Hfuela&Hmapa&?&%Hinvmap&%Hsmall&Hmodel&?)".
+    iDestruct "Hsi" as "(%&Hfuela&Hmapa&?&%Hsmall&Hmodel&?)".
     iSplit; [|done].
     iSplit; [done|].
     iSplit.
@@ -104,8 +122,9 @@ Proof.
       { destruct (to_val e') as [?|] eqn:Heq; last done.
         iApply posts_of_empty_mapping => //.
         apply from_locale_lookup =>//. }
-      iDestruct (frag_mapping_same tid' m with "Hmapa H") as "%Hlk".
-      { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
+      iDestruct (frag_mapping_same tid' (ls_tmap δ) with "Hmapa H") as "%Hlk".
+      { rewrite /auth_mapping_is. iPureIntro. eapply no_locale_empty; [| done].
+        apply ls_mapping_tmap_corr. }
 Qed.
   
 
@@ -126,7 +145,9 @@ Proof.
   intros Hfin WP_RAH.
   eapply @strong_simulation_adequacy_general.
   1,2,4: done.
-  { split; [| done]. red. eauto. } 
+  { split.
+    - red. eauto.
+    - red. split; auto. apply initial_ls_tmap.  } 
   iIntros. iModIntro. 
   iIntros "R". iMod (WP_RAH with "R") as ">[WP RAH]".
   iModIntro. iSplitL "WP"; [by iFrame| ]. 

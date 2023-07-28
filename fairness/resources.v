@@ -1,7 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From trillium.fairness.heap_lang Require Import heap_lang_defs. 
-From trillium.fairness Require Import fairness fuel.
+From trillium.fairness Require Import fairness fuel fuel_ext. 
 From trillium.fairness Require Import partial_ownership.
 
 Class fairnessGpreS `(LM: LiveModel Λ M) Σ `{Countable (locale Λ)} := {   
@@ -202,16 +202,18 @@ Section model_state_interp.
   Definition frag_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
-  Definition model_state_interp (σ: cfg Λ) (δ: LiveState Λ M): iProp Σ :=
-    ∃ M FR, auth_fuel_is δ.(ls_fuel) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗
-      ⌜maps_inverse_match δ.(ls_mapping) M⌝ ∗
-      ⌜ ∀ ζ, ζ ∉ locales_of_list σ.1 → M !! ζ = None ⌝ ∗
-      auth_model_is δ ∗ ⌜ FR ∩ dom δ.(ls_fuel) = ∅ ⌝.
+  Definition model_state_interp (σ: cfg Λ) (δ: lm_ls LM): iProp Σ :=
+    ∃ FR, auth_fuel_is δ.(ls_fuel) ∗ auth_mapping_is (ls_tmap δ) ∗ 
+          auth_free_roles_are FR ∗
+          (* ⌜maps_inverse_match δ.(ls_mapping) M⌝ ∗ *)
+          ⌜ ∀ ζ, ζ ∉ locales_of_list σ.1 → ls_tmap δ !! ζ = None ⌝ ∗
+          auth_model_is δ ∗ ⌜ FR ∩ dom δ.(ls_fuel) = ∅ ⌝.
 
   Lemma model_state_interp_tids_smaller δ σ :
     model_state_interp σ δ -∗ ⌜ tids_smaller σ.1 δ ⌝.
   Proof.
-    iIntros "(%m&%FR&_&_&_&%Hminv&%Hbig&_)". iPureIntro.
+    iIntros "(%FR&_&_&_&%Hbig&_)". iPureIntro.
+    set (m := ls_tmap δ). pose proof (ls_mapping_tmap_corr δ (LM := LM)) as Hminv. 
     intros ρ ζ Hin. 
     assert (¬ (ζ ∉ locales_of_list σ.1)).
     - intros contra.
@@ -393,7 +395,7 @@ Section model_state_lemmas.
   Lemma model_agree' δ1 s2 n:
     model_state_interp n δ1 -∗ frag_model_is s2 -∗ ⌜ ls_under δ1 = s2 ⌝.
   Proof.
-    iIntros "Hsi Hs2". iDestruct "Hsi" as (??) "(_&_&_&_&_&Hs1&_)".
+    iIntros "Hsi Hs2". iDestruct "Hsi" as (?) "(_&_&_&_&Hs1&_)".
     iApply (model_agree with "Hs1 Hs2").
   Qed.
 
