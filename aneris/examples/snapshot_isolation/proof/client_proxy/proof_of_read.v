@@ -40,7 +40,7 @@ Section Read_Proof.
     ∀ (c : val) (sa : socket_address)
       (k : Key) (vo : option val) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ is_connected γGsnap γT γKnownClients c ∗
+    {{{ is_connected γGsnap γT γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo }}}
       SI_read c #k @[ip_of_address sa] E
     {{{ RET $vo; ownCacheUser γKnownClients k c vo }}}.

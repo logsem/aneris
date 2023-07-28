@@ -41,14 +41,14 @@ Section Commit_Proof.
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
-         ConnectionState_def γKnownClients γGsnap γT c (Active ms) ∗
+         ConnectionState_def γKnownClients γGsnap γT c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
         ([∗ map] k ↦ p ∈ mc,
            ownCacheUser γKnownClients k c p.1 ∗ key_upd_status γKnownClients c k p.2) >>>
       SI_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
-         ConnectionState_def γKnownClients γGsnap γT c CanStart ∗
+         ConnectionState_def γKnownClients γGsnap γT c sa CanStart ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
           ([∗ map] k↦ h;p ∈ m; mc,

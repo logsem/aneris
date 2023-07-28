@@ -44,8 +44,8 @@ Section Client_Proxy_Proof.
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate;
-        ConnectionState_def γKnownClients γGsnap γT cstate CanStart ∗
-        is_connected γGsnap γT γKnownClients cstate }}}.
+        ConnectionState_def γKnownClients γGsnap γT cstate sa CanStart ∗
+        is_connected γGsnap γT γKnownClients cstate sa }}}.
 
   Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources}  :
      ⊢ init_client_proxy_spec_internal.
@@ -76,12 +76,12 @@ Section Client_Proxy_Proof.
          destruct f; simpl; try by inversion 1. }
       wp_pures.
       iApply "HΦ".
-      iAssert (is_connected γGsnap γT γKnownClients (#sa, (lk, (reqh, #l)))) as "#Hic".
+      iAssert (is_connected γGsnap γT γKnownClients (#sa, (lk, (reqh, #l))) sa) as "#Hic".
       iExists _, _, _, _, _, _, _, _.
-      iExists _, _, _.
+      iExists _, _.
       by iFrame "#∗".
       rewrite /ConnectionState_def /connection_state.
-      iFrame "#∗".
+      iSplit; last done.
       iExists PSCanStart; iSplit; last done.
       iExists sa, (lk, (reqh, #l))%V, γCst, γA, γS, γ, γCache.
       by iFrame "#∗".

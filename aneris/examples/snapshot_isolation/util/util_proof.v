@@ -18,13 +18,13 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
-        ConnectionState c (Active ms) ∗
+        ConnectionState c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
         ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1  ∗ KeyUpdStatus c k p.2) >>>
       commitU c @[ip_of_address sa] E
     <<<▷ RET #();
-        ConnectionState c CanStart ∗
+        ConnectionState c sa CanStart ∗
         (** Transaction has been commited. *)
         ((⌜can_commit m ms mc⌝ ∗
           ([∗ map] k↦ h;p ∈ m; mc,
@@ -53,13 +53,13 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
         ⌜can_commit m ms mc⌝ ∗
-        ConnectionState c (Active ms) ∗
+        ConnectionState c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
         ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1  ∗ KeyUpdStatus c k p.2) >>>
       commitT c @[ip_of_address sa] E
     <<<▷ RET #();
-        ConnectionState c CanStart ∗
+        ConnectionState c sa CanStart ∗
         (** Transaction has been commited. *)
         ([∗ map] k↦ h;p ∈ m; mc,
             k ↦ₖ commit_event p h ∗ Seen k (commit_event p h)) >>>.
@@ -82,13 +82,13 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     ∀ c sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m ms : gmap Key Hist),
-        ConnectionState c (Active ms) ∗
+        ConnectionState c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗
         ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
         ([∗ map] k ↦ h ∈ ms, k ↦{c} (last h) ∗ KeyUpdStatus c k false) >>>
       commitT c @[ip_of_address sa] E
     <<<▷ RET #();
-        ConnectionState c CanStart ∗
+        ConnectionState c sa CanStart ∗
         (** Read-only transaction has been commited.
             We don't need seen predicates as nothing changed. *)
         ([∗ map] k↦ h ∈ m, k ↦ₖ h)>>>.
@@ -145,16 +145,16 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     □ (∀ m, Ψ m ={⊤, E}=∗ ∃ m', ⌜dom m = dom m'⌝ ∗
               ([∗ map] k ↦ h ∈ m', k ↦ₖ h) ∗
             ▷ (([∗ map] k ↦ h ∈ m', k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
-    (∀ m v', {{{ P ∗ Ψ m ∗ ConnectionState c (Active m) ∗
+    (∀ m v', {{{ P ∗ Ψ m ∗ ConnectionState c sa (Active m) ∗
               ([∗ map] k ↦ h ∈ m, k ↦{c} (last h) ∗ KeyUpdStatus c k false) }}}
               cond v' @[ip_of_address sa]
               {{{ m' (b : bool), RET #b;
-              ConnectionState c (Active m') ∗ ⌜dom m' = dom m⌝ ∗ Ψ m' ∗
+              ConnectionState c sa (Active m') ∗ ⌜dom m' = dom m⌝ ∗ Ψ m' ∗
               ([∗ map] k ↦ h ∈ m', k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗
               if b then Q v' else P }}}) -∗
-    {{{ P ∗ ConnectionState c CanStart ∗ IsConnected c}}}
+    {{{ P ∗ ConnectionState c sa CanStart ∗ IsConnected c sa}}}
      wait_transaction c cond #key @[ip_of_address sa]
-    {{{ v h, RET #(); ConnectionState c CanStart ∗ Seen key (h ++ [v]) ∗ Q v }}}.
+    {{{ v h, RET #(); ConnectionState c sa CanStart ∗ Seen key (h ++ [v]) ∗ Q v }}}.
   Proof.
     iIntros (c cond key sa E P Q Ψ name_sub_E) "#start #commit #cond".
     iIntros (Φ) "!>(HP & CanStart & #HiC) HΦ".
@@ -209,9 +209,9 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
-    {{{ ConnectionState c CanStart ∗ IsConnected c }}}
+    {{{ ConnectionState c sa CanStart ∗ IsConnected c sa }}}
      wait_transaction c cond #key @[ip_of_address sa]
-    {{{ h, RET #(); ConnectionState c CanStart ∗ Seen key (h ++ [v]) }}}.
+    {{{ h, RET #(); ConnectionState c sa CanStart ∗ Seen key (h ++ [v]) }}}.
   Proof.
     iIntros (c cond v key sa E name_sub_E key_keys)
         "#shift #cond %Φ !> (CanStart & #HiC) HΦ".

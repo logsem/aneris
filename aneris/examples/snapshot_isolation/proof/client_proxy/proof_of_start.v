@@ -40,11 +40,11 @@ Section Start_Proof.
        (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m : gmap Key Hist),
-        ConnectionState_def γKnownClients γGsnap γT c CanStart ∗
+        ConnectionState_def γKnownClients γGsnap γT c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h >>>
       SI_start c @[ip_of_address sa] E
     <<<▷ RET #();
-        ConnectionState_def γKnownClients γGsnap γT c (Active m) ∗
+        ConnectionState_def γKnownClients γGsnap γT c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
        ([∗ map] k ↦ h ∈ m,
           ownCacheUser γKnownClients k c (last h) ∗ key_upd_status γKnownClients c k false) ∗

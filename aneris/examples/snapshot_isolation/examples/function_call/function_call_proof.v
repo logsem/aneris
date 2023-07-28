@@ -40,7 +40,7 @@ Section proof_of_code.
   Definition f_spec (f : val) : iProp Σ :=
     ∀ (k : Key) cst vo sa,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ IsConnected cst ∗ k ↦{cst} vo }}}
+    {{{ IsConnected cst sa ∗ k ↦{cst} vo }}}
       f cst #k @[ip_of_address sa]
     {{{ v', RET (SV_val v'); k ↦{cst} vo }}}.
 
@@ -53,7 +53,7 @@ Section proof_of_code.
   Lemma transaction1_spec :
     ∀ (cst : val) sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
@@ -109,7 +109,7 @@ Section proof_of_code.
     ∀ (cst f : val) sa h,
     f_spec f -∗
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ IsConnected cst ∗ "y" ↦ₖ h }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa ∗ "y" ↦ₖ h }}}
       transaction2 cst f @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.

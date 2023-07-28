@@ -1,5 +1,5 @@
 From iris.algebra Require Import auth gmap dfrac frac_auth excl csum.
-From iris.algebra.lib Require Import mono_list.
+From iris.algebra.lib Require Import mono_list dfrac_agree.
 From iris.base_logic Require Import invariants.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics coq_tactics reduction spec_patterns.
@@ -39,18 +39,92 @@ Section Write_Proof.
  Definition write_spec_internal {MTR : MTS_resources} : iProp Σ :=
     ∀ (c : val) (sa : socket_address)
       (vo : option val)
-      (k : Key) (v : SerializableVal) (b : bool) E,
+      (k : Key) (v : SerializableVal) (b : bool),
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ is_connected γGsnap γT γKnownClients c ∗
+    {{{ is_connected γGsnap γT γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo ∗
         key_upd_status γKnownClients c k b }}}
-      SI_write c #k v @[ip_of_address sa] E
+      SI_write c #k v @[ip_of_address sa]
     {{{ RET #(); ownCacheUser γKnownClients k c (Some v.(SV_val)) ∗
                  key_upd_status γKnownClients c k true }}}.
 
   Lemma write_spec_internal_holds {MTR : MTS_resources}  :
-     Global_Inv clients γKnownClients γGauth γGsnap γT ⊢ write_spec_internal.
+     ⊢ write_spec_internal.
   Proof.
-  Admitted.
+    iIntros (c sa vo k v b Hk Φ) "!# (#Hisc & Hcache & Hkds) Hpost".
+    iDestruct "Hisc" as (lk cst l sv s) "Hisc".
+    iDestruct "Hisc" as (γCst γlk γS γA γCache ->) "#(Hc1 & Hisc)".
+    rewrite /SI_write /= /write.
+    wp_pures.
+    wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
+               with "[$Hisc]").
+    iIntros (uu) "(_ & Hlk & Hres)".
+    iDestruct "Hres"
+      as "(Hl & Hcr & [( -> & -> & Hres_abs & Htk) | Hres])".
+    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
+      symmetry in Heq. simplify_eq.
+      iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
+      iDestruct (client_connected_agree γGsnap γT
+                  with "[$Hc2][$Hc1]") as "%Heq'".
+      simplify_eq /=.
+      by iDestruct (ghost_map.ghost_map_lookup
+                  with "[$Hres_abs][$Helem]")
+                  as "%Habs". }
+    iDestruct "Hres"
+      as (ts Msnap cuL cuV cuM cM -> -> Hcoh Hvalid)
+           "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
+    wp_pures.
+    wp_load.
+    wp_pures.
+    wp_load.
+    wp_apply (wp_map_insert $! Hm).
+    iIntros (cuV' Hm').
+    wp_store.
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq)
+                            "(#Hc3 & HcacheHalf1 & %Hv)".
+    symmetry in Heq. simplify_eq /=.
+    iDestruct (client_connected_agree γGsnap γT
+                with "[$Hc3][$Hc1]") as "%Heq'".
+    simplify_eq.
+    iDestruct "Hkds" as (? ? ? ? ? ? ? ? Heq')
+                            "(#Hc4 & HcacheHalf2 & %Hb)".
+    symmetry in Heq'. simplify_eq /=.
+    iDestruct (client_connected_agree γGsnap γT
+                with "[$Hc4][$Hc1]") as "%Heq''".
+    simplify_eq.
+    iDestruct (ghost_map.ghost_map_elem_combine
+                with "[$HcacheHalf1][$HcacheHalf2]") as "(Hcache & ->)".
+    rewrite dfrac_op_own Qp.half_half.
+    iDestruct (ghost_map.ghost_map_lookup with
+                "[$Hauth][$Hcache]") as "%Hkin".
+    iMod (ghost_map.ghost_map_update ((Some v.(SV_val)), true)
+           with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
+    wp_apply (release_spec with
+               "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [H1 H2 Hpost]").
+    { iFrame "#∗".
+      iRight.
+      iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
+                (<[k:=(Some v.(SV_val), true)]> cM).
+      iFrame "#∗".
+      iSplit; first done.
+      iSplit; first done.
+      iSplit.
+      { iPureIntro;
+          by eapply (is_coherent_cache_upd γKnownClients γGauth γGsnap). }
+      iSplit; done.
+    }
+    iNext.
+    iIntros (v0 ->).
+    iApply "Hpost".
+    iSplitL "H1".
+    { iExists _, _, _, _, _, _, _, true.
+      iSplit; first done.
+      iFrame "#∗".
+      by destruct v. }
+    iExists _, _, _, _, _, _, _, _.
+    iSplit; first done.
+    iFrame "#∗".
+    eauto.
+  Qed.
 
 End Write_Proof.

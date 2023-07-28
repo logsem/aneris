@@ -70,14 +70,21 @@ Section Proxy.
       (∀ k (v : val),
         k ∈ dom cache_updatesM →
         cache_updatesM !! k = Some v ↔
-        cache_logicalM !! k = Some (Some v, true)) ∧
-      (∀ k (vo : option val),
-        k ∈ dom cache_logicalM →
-        (cache_updatesM !! k) = None ↔
-        cache_logicalM !! k = Some (vo, false)).
+                                   cache_logicalM !! k = Some (Some v, true)) ∧
+        (∀ k (vo : option val),
+           k ∈ dom cache_logicalM →
+           (cache_updatesM !! k) = None ↔
+                                        cache_logicalM !! k = Some (vo, false)).
+
+  Lemma is_coherent_cache_upd k v cuM cM Msnap :
+    is_Some (cM !! k) →
+    is_coherent_cache cuM cM Msnap →
+    is_coherent_cache (<[k:=v]> cuM) (<[k:=(Some v, true)]> cM) Msnap.
+  Proof.
+  Admitted.
 
   Definition is_connected_def
-    (n : ip_address) (cst : val) (l : loc) (s : proxy_state) (sv : val)
+             (n : ip_address) (cst : val) (l : loc) (s : proxy_state) (sv : val)
     (γS γA γCache : gname) : iProp Σ :=
       l ↦[n] sv ∗
       MTSCanRequest n cst ∗
@@ -90,10 +97,11 @@ Section Proxy.
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)
         (∃ (ts : nat) (Msnap : gmap Key (list write_event))
+           (cache_updatesL : loc)
            (cache_updatesV : val)
            (cache_updatesM : gmap Key val)
            (cacheM : gmap Key (option val * bool)),
-            ⌜sv = SOMEV (#ts, cache_updatesV)⌝ ∗
+            ⌜sv = SOMEV (#ts, #cache_updatesL)⌝ ∗
             ⌜s = PSActive Msnap⌝ ∗
             (** then lock has active token and guards a logical cache map
                 whose domain is equal to the one of the snapshot. *)
@@ -102,6 +110,7 @@ Section Proxy.
             ⌜is_map cache_updatesV cache_updatesM⌝ ∗
             ownTimeSnap γT ts ∗
             ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
+            cache_updatesL ↦[n] cache_updatesV ∗
             ghost_map_auth γCache 1 cacheM ∗
             isActiveToken γA)).
 
@@ -113,28 +122,28 @@ Section Proxy.
   Definition client_connected sa γCst γCache γlk γA γS : iProp Σ :=
    connection_token sa γCst ∗ client_gnames_token_defined γCst γCache γlk γA γS.
 
-  Definition is_connected (c : val)
+  Definition is_connected (c : val) (sa : socket_address)
     : iProp Σ :=
     ∃ (lk : val) (cst : val) (l : loc) (sv : val)
-      (s : proxy_state) (sa : socket_address)
+      (s : proxy_state)
       (γCst γlk γS γA γCache : gname),
       ⌜c = (#sa, (lk, (cst, #l)))%V⌝ ∗
       client_connected sa γCst γA γS γlk γCache ∗
       is_lock (KVS_InvName .@ (socket_address_to_str sa)) (ip_of_address sa) γlk lk
               (is_connected_def (ip_of_address sa) cst l s sv γS γA γCache).
 
-  Lemma connection_state_gen_persistent c : Persistent (is_connected c).
+  Lemma connection_state_gen_persistent c sa : Persistent (is_connected c sa).
   Proof. apply _. Qed.
 
   (** Tokens forbid the connection state to be duplicable and so
       prohibit concurrent use of start/commit operations which would
       make the use of the library inconsistent because one should not
       run start and commit in parallel, only reads and/or writes. *)
- Definition connection_state (c : val) (s : proxy_state) : iProp Σ :=
+ Definition connection_state (c : val) (sa : socket_address) (s : proxy_state) : iProp Σ :=
    ∃ (sa : socket_address) (v : val) (γCst γA γS γlk γCache : gnameO),
      ⌜c = (#sa, v)%V⌝ ∗
      client_connected sa γCst γA γS γlk γCache ∗
-     is_connected c ∗
+     is_connected c sa ∗
        match s with
        | PSCanStart => isActiveToken γA
        | PSActive _ => CanStartToken γS
@@ -146,7 +155,7 @@ Section Proxy.
   ghost map. *)
   Definition ownCacheUser (k : Key) (c : val) (vo : option val) : iProp Σ :=
     ∃ (sa : socket_address) (v: val)
-      (γCst γA γS γlk γCache : gname) (vo : option val) (b : bool),
+      (γCst γA γS γlk γCache : gname) (b : bool),
       ⌜c = (#sa, v)%V⌝ ∗
       client_connected sa γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
@@ -162,8 +171,9 @@ Section Proxy.
   This is enforced by giving half of the pointer permission to the cache pointer
   the other half to the key_upd_status predicate. *)
   Definition key_upd_status (c : val) (k : Key) (b : bool) : iProp Σ :=
-    ∃ (sa : socket_address) (γCst γA γS γlk γCache : gname)
+    ∃ (sa : socket_address) (vp : val) (γCst γA γS γlk γCache : gname)
       (vo : option val),
+      ⌜c = (#sa, vp)%V⌝ ∗
       client_connected sa γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
       (⌜b = true → is_Some vo⌝).
@@ -172,6 +182,14 @@ Section Proxy.
   Lemma own_cache_user_serializable k cst v :
      ownCacheUser k cst (Some v) -∗
      ownCacheUser k cst (Some v) ∗ ⌜KVS_Serializable v⌝.
+  Proof.
+  Admitted.
+
+  Lemma client_connected_agree sa :
+  ∀ γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
+  client_connected sa γCst γCache γlk γA γS -∗
+  client_connected sa γCst' γCache' γlk' γA' γS'  -∗
+  ⌜(γCst, γA, γS, γlk, γCache) = (γCst', γA', γS', γlk', γCache')⌝.
   Proof.
   Admitted.
 

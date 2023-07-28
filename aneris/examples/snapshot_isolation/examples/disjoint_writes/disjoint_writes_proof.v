@@ -55,8 +55,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
   Lemma transaction1_spec :
     ∀ cst sa h,
     {{{
-      ConnectionState cst CanStart ∗
-      IsConnected cst ∗
+      ConnectionState cst sa CanStart ∗
+      IsConnected cst sa ∗
       "x" ↦ₖ h
     }}}
       transaction1 cst @[ip_of_address sa]
@@ -109,8 +109,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
   Lemma transaction2_spec :
     ∀ cst sa h,
     {{{
-      ConnectionState cst CanStart ∗
-      IsConnected cst ∗
+      ConnectionState cst sa CanStart ∗
+      IsConnected cst sa ∗
       "y" ↦ₖ h
     }}}
       transaction2 cst @[ip_of_address sa]

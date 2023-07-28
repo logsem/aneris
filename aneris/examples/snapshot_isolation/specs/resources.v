@@ -38,9 +38,9 @@ Section Resources.
     OwnLocalKey_timeless k v c:> Timeless (k ↦{c} v);
 
     (** Connection state *)
-    ConnectionState : val → local_state → iProp Σ;
-    IsConnected : val → iProp Σ;
-    IsConnected_persistent c :> Persistent (IsConnected c);
+    ConnectionState : val → socket_address → local_state → iProp Σ;
+    IsConnected : val → socket_address → iProp Σ;
+    IsConnected_persistent c sa :> Persistent (IsConnected c sa);
 
     (** KVS resources *)
     KVS_si : message → iProp Σ;

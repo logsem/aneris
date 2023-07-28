@@ -36,7 +36,7 @@ Section Specification.
       (vo : option val)
       (k : Key) (v : SerializableVal) (b : bool) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ IsConnected c ∗ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
+    {{{ IsConnected c sa ∗ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
       SI_write c #k v @[ip_of_address sa] E
     {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
@@ -44,7 +44,7 @@ Section Specification.
     ∀ (c : val) (sa : socket_address)
       (k : Key) (vo : option val) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ IsConnected c ∗ k ↦{c} vo }}}
+    {{{ IsConnected c sa ∗ k ↦{c} vo }}}
       SI_read c #k @[ip_of_address sa] E
     {{{ RET $vo; k ↦{c} vo }}}.
 
@@ -53,11 +53,11 @@ Section Specification.
        (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m : gmap Key Hist),
-       ConnectionState c CanStart ∗
+       ConnectionState c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, k ↦ₖ h >>>
       SI_start c @[ip_of_address sa] E
     <<<▷ RET #();
-       ConnectionState c (Active m) ∗
+       ConnectionState c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
        ([∗ map] k ↦ h ∈ m, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗
        ([∗ map] k ↦ h ∈ m, Seen k h)>>>.
@@ -68,13 +68,13 @@ Section Specification.
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
-        ConnectionState c (Active ms) ∗
+        ConnectionState c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
         ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1  ∗ KeyUpdStatus c k p.2) >>>
       SI_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
-        ConnectionState c CanStart ∗
+        ConnectionState c sa CanStart ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
           ([∗ map] k↦ h;p ∈ m; mc,
@@ -117,7 +117,7 @@ Section Specification.
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
-    {{{ cstate, RET cstate; ConnectionState cstate CanStart ∗ IsConnected cstate }}}.
+    {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗ IsConnected cstate sa }}}.
 
 Definition init_kvs_spec : iProp Σ :=
   {{{ KVS_address ⤇ KVS_si ∗

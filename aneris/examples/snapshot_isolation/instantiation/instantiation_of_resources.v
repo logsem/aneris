@@ -27,13 +27,14 @@ Section Session_Resources_intantiation.
   Context (γKnownClients γGauth γGsnap γT : gname).
   Context (srv_si : message → iProp Σ) (SrvInit : iProp Σ).
 
+
   Global Program Instance session_resources_instance : SI_resources Mdl Σ :=
     {|
       GlobalInv :=  GlobalInv_def clients γKnownClients γGauth γGsnap γT;
       OwnMemKey k h := OwnMemKey_def γGauth γGsnap k h;
       OwnLocalKey k c vo := ownCacheUser γKnownClients k c vo;
-      ConnectionState c s := ConnectionState_def γKnownClients γGsnap γT c s;
-      IsConnected c := is_connected γGsnap γT γKnownClients c;
+      ConnectionState c s sa := ConnectionState_def γKnownClients γGsnap γT c s sa;
+      IsConnected c sa := is_connected γGsnap γT γKnownClients c sa;
       KeyUpdStatus c k b :=  key_upd_status γKnownClients c k b;
       Seen k h := Seen_def γGsnap k h;
       KVS_si := srv_si;

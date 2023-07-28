@@ -56,7 +56,7 @@ Local Open Scope list.
   Lemma transaction1_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
@@ -154,7 +154,7 @@ Local Open Scope list.
   Lemma transaction2_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction2 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
@@ -268,7 +268,7 @@ Local Open Scope list.
   Lemma transaction3_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction3 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
@@ -382,7 +382,7 @@ Local Open Scope list.
   Lemma transaction4_spec :
     ∀ cst sa,
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ IsConnected cst }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction4 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
