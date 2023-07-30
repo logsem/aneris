@@ -347,6 +347,66 @@ Section ActualOwnershipImpl.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
+  Lemma tids_smaller_restrict_mapping (c1 c2: cfg Λ) δ1 δ2 (ζ: locale Λ)
+    (Hζs : tids_smaller c1.1 δ1)
+    (DOM12: ls_mapping δ2 ⊆ ls_mapping δ1)
+    (STEP: locale_step c1 (Some ζ) c2)
+    :
+    tids_smaller c2.1 δ2 (M := M).
+  Proof.
+    unfold tids_smaller; simpl.
+    intros ρ ζ0 Hin.
+    destruct c1, c2.
+    eapply from_locale_step =>//.
+    rewrite /tids_smaller /= in Hζs. eapply Hζs.
+    eapply lookup_weaken; eauto. 
+  Qed.
+
+
+  (* TODO: the info below should be used, as it'll be related to the lemma above *)
+  (* (TMAP2: tmap2 = <[ζ:=dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)]> (tmap1)) *)
+  Lemma tids_dom_restrict_mapping (c1 c2: cfg Λ)
+    (tmap1 tmap2: gmap (locale Λ) (gset (fmrole M))) (ζ: locale Λ)
+    (* (fs: gmap (fmrole M) nat) *)
+    (* rem *)
+
+    (XX: gset (fmrole M))
+    
+    (Hstep : locale_step c1 (Some ζ) c2)
+  (Hlocssmall : ∀ ζ : locale Λ, ζ ∉ locales_of_list c1.1 → tmap1 !! ζ = None)
+  (TMAP2: tmap2 = <[ζ:=XX]> (tmap1))
+    :
+  ∀ ζ0 : locale Λ,
+    ζ0 ∉ locales_of_list c2.1 →
+    (* <[ζ:=dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)]> (ls_tmap δ1) !! ζ0 = *)
+    (tmap2) !! ζ0 = None.
+  Proof.
+    intros ζ0 Hnotin.
+    rewrite TMAP2. 
+    destruct c1, c2. simpl in *. 
+    apply lookup_insert_None; split.
+    + apply Hlocssmall.
+      have Hle := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
+      clear -Hnotin Hle. set_solver.
+    + intros <-. 
+      have ? := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
+      (* clear Hfueldom Hsamedoms. *)
+      inversion Hstep. simplify_eq.
+      assert (locale_of t1 e1 ∈ locales_of_list (t1 ++ e1 :: t2));
+        last by eauto.
+      apply locales_of_list_from_locale_from.
+      rewrite from_locale_from_Some //. 
+      eapply prefixes_from_spec.
+      eexists _,_. by list_simplifier.
+  Qed.
+  (* TODO: ?? *)
+    (* - rewrite Hnewdom /new_dom. apply elem_of_equiv_empty_L. intros ρ [Hin1 Hin2]%elem_of_intersection. *)
+    (*   assert (ρ ∈ dom (ls_fuel δ1)) *)
+    (*     by set_solver -Hnewdom Hsamedoms Hfueldom. *)
+    (*   set_solver -Hnewdom Hsamedoms Hfueldom. } *)
+ 
+
+
   Lemma actual_update_no_step_enough_fuel
   (δ1: LM) rem c1 c2 fs ζ:
     (dom fs ≠ ∅) ->
@@ -354,9 +414,10 @@ Section ActualOwnershipImpl.
     rem ⊆ dom fs →
     locale_step c1 (Some ζ) c2 ->
     has_fuels_S ζ fs -∗ model_state_interp c1 δ1
-    ==∗ ∃ δ2 (ℓ : mlabel LM),
-        ⌜labels_match (LM:=LM) (Some ζ) ℓ
-        ∧ valid_evolution_step (Some ζ) c2 δ1 ℓ δ2 (LM := LM)⌝ ∗
+    ==∗ ∃ δ2,
+        ⌜
+         labels_match (LM:=LM) (Some ζ) (Silent_step ζ) ∧ 
+          valid_evolution_step (Some ζ) c2 δ1 (Silent_step ζ) δ2 (LM := LM)⌝ ∗
             has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗ model_state_interp c2 δ2.
   Proof.
     iIntros "%HnotO %Holdroles %Hincl %Hstep Hf Hmod".
@@ -447,7 +508,7 @@ Section ActualOwnershipImpl.
     (*   - eauto.   *)
 
 
-    iExists (Silent_step ζ). simpl.
+    simpl.
     iSplit; last first.
     { rewrite (dom_fmap_L _ fs). iFrame "Hfuels". iExists FR.
       (* rewrite /maps_inverse_match //=. *)
@@ -464,20 +525,7 @@ Section ActualOwnershipImpl.
         rewrite -leibniz_equiv_iff. intros ρ. split; [set_solver -Hnewdom Hsamedoms Hfueldom|].
         intros [? [?|?]%not_elem_of_difference]%elem_of_difference =>//. }
       iPureIntro. split.
-      - intros ζ0 Hnotin. apply lookup_insert_None; split.
-        + apply Hlocssmall.
-          destruct c1.
-          have Hle := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
-          clear -Hnotin Hle. set_solver.
-        + intros <-. destruct c1.
-          have ? := locales_of_list_step_incl _ _ _ _ _ Hstep. simpl.
-          clear Hfueldom Hsamedoms. inversion Hstep. simplify_eq.
-          assert (locale_of t1 e1 ∈ locales_of_list (t1 ++ e1 :: t2));
-            last by eauto.
-          apply locales_of_list_from_locale_from.
-          rewrite from_locale_from_Some //. 
-          eapply prefixes_from_spec.
-          eexists _,_. by list_simplifier.
+      - intros. eapply tids_dom_restrict_mapping; eauto. 
       - rewrite Hnewdom /new_dom. apply elem_of_equiv_empty_L. intros ρ [Hin1 Hin2]%elem_of_intersection.
         assert (ρ ∈ dom (ls_fuel δ1))
                by set_solver -Hnewdom Hsamedoms Hfueldom.
@@ -487,7 +535,7 @@ Section ActualOwnershipImpl.
     3: { (* codoms of tmap are disjoint*)
          admit. }
     2: { (* dom fuel = ⋃ codom (tmap τ) *)
-         admit. }         
+         admit. }
     
     iPureIntro.
     do 2 split; first done.
@@ -539,29 +587,110 @@ Section ActualOwnershipImpl.
       intros ρ Hin. apply elem_of_dom.
       rewrite Hfuel ?dom_fmap // -elem_of_dom dom_fmap //.
     - by rewrite build_LS_ext_spec_st.   
-    - unfold tids_smaller; simpl. intros ρ ζ0 Hin.
-      destruct c1.
-      (* ; destruct (trace_last extr). *)
-      eapply from_locale_step =>//.
-      rewrite /tids_smaller /= in Hζs. eapply Hζs.
-      erewrite build_LS_ext_spec_mapping in Hin; [| by eauto]. 
-      rewrite /new_mapping map_filter_lookup_Some in Hin.
-      by destruct Hin.
-  Admitted. 
- 
-  Lemma actual_update_fork_split R1 R2 tp1 tp2 fs (δ1: LM) ζ efork σ1 σ2 (Hdisj: R1 ## R2):
+    - eapply tids_smaller_restrict_mapping; eauto.
+      erewrite build_LS_ext_spec_mapping; [| by eauto].
+      subst new_mapping. apply map_filter_subseteq. 
+  Admitted.
+
+  Lemma tids_smaller_fork_step σ1 σ2 δ1 δ2 ζ τ_new
+    (Hstep: locale_step σ1 (Some ζ) σ2)
+    (SM: tids_smaller σ1.1 δ1)
+    (MAP2: exists (R2: gset (fmrole M)), ls_mapping δ2 = map_imap
+               (λ (ρ : fmrole M) (o : locale Λ),
+                  if decide (ρ ∈ R2) then Some τ_new else Some o)
+               (ls_mapping δ1))
+    (FORK: ∃ tp1' efork, τ_new = locale_of σ1.1 efork /\ σ2.1 = tp1' ++ [efork] ∧ length tp1' = length σ1.1)
+    :
+    tids_smaller σ2.1 δ2 (M := M).
+  Proof.
+    destruct σ1 as [tp1 σ1], σ2 as [tp2 σ2]. simpl in *.
+    intros ρ ζ'.
+    destruct MAP2 as [R2 ->].
+    simpl. rewrite map_lookup_imap.
+    destruct (ls_mapping δ1 !!ρ) eqn:Heq; last done. simpl.
+    destruct (decide (ρ ∈ R2)); first  (intros ?; simplify_eq).
+    - destruct FORK as (tp1' & efork & (-> & -> & Hlen)).
+      inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |]. simplify_eq.
+      assert (efs = [efork]) as ->.
+      { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
+        rewrite app_length //=; rewrite app_length //= in Hlen.
+        clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
+      assert (is_Some (from_locale (t1 ++ e1 :: t2 ++ [efork]) (locale_of (t1 ++ e1 :: t2) efork))).
+      + unfold from_locale. erewrite from_locale_from_Some; eauto.
+        apply prefixes_from_spec. list_simplifier. eexists _, []. split=>//.
+        by list_simplifier.
+      + eapply from_locale_from_equiv =>//; [constructor |]. rewrite H0.
+        replace (t1 ++ e1 :: t2 ++ [efork]) with ((t1 ++ e1 :: t2) ++ [efork]);
+          last by list_simplifier.
+        replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]);
+            last by list_simplifier.
+        assert (locales_equiv (t1 ++ e1 :: t2) (t1 ++ e2 :: t2)).
+          { apply locales_equiv_middle. eapply locale_step_preserve =>//. }
+          apply locales_equiv_from_app =>//.
+          by eapply locales_equiv_from_refl.
+    - intros ?; simplify_eq.
+      assert (is_Some (from_locale tp1 ζ')) by eauto.
+      by eapply from_locale_step =>//.
+  Qed.
+
+  Lemma tids_dom_fork_step (c1 c2: cfg Λ) (ζ: locale Λ)
+    (tmap1 tmap2: gmap (locale Λ) (gset (fmrole M)))
+                           τ_new (R1 R2: gset (fmrole M))
+    (Hstep: locale_step c1 (Some ζ) c2)
+    (Hsmall: ∀ ζ : locale Λ,
+             ζ ∉ locales_of_list c1.1 → tmap1 !! ζ = None)
+    (Hmapping : tmap1 !! ζ = Some (R1 ∪ R2))
+    (FORK: (∃ tp1' efork, τ_new = locale_of c1.1 efork /\ c2.1 = tp1' ++ [efork] ∧ length tp1' = length c1.1))
+    (TMAP2: tmap2 = <[τ_new:=R2]> (<[ζ:=R1]> (tmap1)))
+    :
+  ∀ ζ0 : locale Λ,
+    ζ0 ∉ locales_of_list c2.1 → tmap2 !! ζ0 = None.
+  Proof.
+    assert (Hlocincl: locales_of_list c1.1 ⊆ locales_of_list c2.1).
+    { destruct c1 as [tp1 σ1], c2 as [tp2 σ2]. simpl in *.
+      apply (locales_of_list_step_incl _ _ _ _ _ Hstep). }
+    intros ζ' Hζ'.
+    rewrite TMAP2.
+    destruct c1 as [tp1 σ1], c2 as [tp2 σ2]. simpl in *.
+    rewrite lookup_insert_ne.
+    { rewrite lookup_insert_ne; last first.
+      { intros <-. rewrite Hsmall in Hmapping; [congruence | naive_solver]. }
+      apply Hsmall; set_unfold; naive_solver. }
+    pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep).
+    (* clear Hfueldom Hsamedoms. *)
+    assert (ζ' ∉ locales_of_list tp1) by eauto.
+    intros contra. simplify_eq.
+    destruct FORK as (tp1' & efork & (-> & -> & Hlen)).
+    inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |].
+    simplify_eq.
+    assert (efs = [efork]) as ->.
+    { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
+      rewrite app_length //=; rewrite app_length //= in Hlen.
+      clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
+    rewrite H2 in Hζ'.
+    apply Hζ'. apply elem_of_list_fmap.
+    eexists (t1 ++ e2 :: t2, _); split =>//.
+    - erewrite locale_equiv =>//. apply locales_equiv_middle.
+      eapply locale_step_preserve => //.
+    - replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]); last by list_simplifier.
+      rewrite prefixes_from_app. set_unfold; naive_solver.
+  Qed.
+
+
+  Lemma actual_update_fork_split R1 R2 tp1 tp2 fs (δ1: LM) ζ τ_new σ1 σ2 (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
     (* trace_last extr = (tp1, σ1) -> *)
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) ->
-    (∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1) ->
+    (* (∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1) -> *)
+    τ_new ∉ dom (ls_tmap δ1 (LM := LM)) ->
     has_fuels_S ζ fs -∗ model_state_interp (tp1, σ1) δ1 ==∗
-      ∃ δ2, has_fuels (locale_of tp1 efork) (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
-            (partial_mapping_is {[ locale_of tp1 efork := ∅ ]} -∗ frag_mapping_is {[ locale_of tp1 efork := ∅ ]}) ∗
+      ∃ δ2, has_fuels τ_new (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
+            (partial_mapping_is {[ τ_new := ∅ ]} -∗ frag_mapping_is {[ τ_new := ∅ ]}) ∗
             model_state_interp (tp2, σ2) δ2
         ∧ ⌜valid_evolution_step (Some ζ) (tp2, σ2) δ1 (Silent_step ζ) δ2 (LM := LM)⌝.
   Proof.
-    iIntros (Hnemp Hunioneq Hstep Htlen) "Hf Hmod".
+    iIntros (Hnemp Hunioneq Hstep Hnewζ) "Hf Hmod".
     unfold has_fuels_S.
     simpl in *.
     iDestruct (has_fuel_fuel with "Hf Hmod") as %Hfuels.
@@ -573,21 +702,21 @@ Section ActualOwnershipImpl.
     { rewrite dom_fmap_L //. }
     iDestruct "Hf" as "(Hf & Hfuels)".
     iDestruct (frag_mapping_same with "Ham Hf") as %Hmapping.
-    assert (Hnewζ: (locale_of tp1 efork) ∉ dom (ls_tmap δ1)).
-    { apply not_elem_of_dom. apply Hsmall.
-      unfold tids_smaller in Hsmall.
-      rewrite elem_of_list_fmap. intros ([??]&Hloc&Hin).
-      symmetry in Hloc.
-      rewrite -> prefixes_from_spec in Hin.
-      destruct Hin as (?&t0&?&?).
-      simplify_eq. list_simplifier.
-      eapply locale_injective=>//.
-      apply prefixes_from_spec.
-      exists t0, []. split =>//. by list_simplifier. }
-    iMod (update_mapping_new_locale ζ (locale_of tp1 efork) _ R1 R2 with "Ham Hf") as "(Ham&HR1&HR2)"; eauto.
+    (* assert (Hnewζ: (locale_of tp1 efork) ∉ dom (ls_tmap δ1)). *)
+    (* { apply not_elem_of_dom. apply Hsmall. *)
+    (*   unfold tids_smaller in Hsmall. *)
+    (*   rewrite elem_of_list_fmap. intros ([??]&Hloc&Hin). *)
+    (*   symmetry in Hloc. *)
+    (*   rewrite -> prefixes_from_spec in Hin. *)
+    (*   destruct Hin as (?&t0&?&?). *)
+    (*   simplify_eq. list_simplifier. *)
+    (*   eapply locale_injective=>//. *)
+    (*   apply prefixes_from_spec. *)
+    (*   exists t0, []. split =>//. by list_simplifier. } *)
+    iMod (update_mapping_new_locale ζ τ_new _ R1 R2 with "Ham Hf") as "(Ham&HR1&HR2)"; eauto.
     assert (Hsamedoms: dom (map_imap
                                 (λ ρ o,
-                                 if decide (ρ ∈ R2) then Some $ locale_of tp1 efork else Some o)
+                                 if decide (ρ ∈ R2) then Some $ τ_new else Some o)
                                 (ls_mapping δ1)) =
                          dom (map_imap
                              (λ ρ o,
@@ -635,13 +764,13 @@ Section ActualOwnershipImpl.
       iExists _; iFrame. iPureIntro. rewrite map_filter_lookup_Some //. }
     iSplitR; [iIntros; by iFrame | ].
 
-    (* assert (maps_inverse_match _ (<[locale_of tp1 efork:=R2]> (<[ζ:=R1]> (ls_tmap δ1))) *)
+    (* assert (maps_inverse_match _ (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1))) *)
     
     assert (maps_inverse_match
     (map_imap
        (λ (ρ : fmrole M) (o : locale Λ),
-          if decide (ρ ∈ R2) then Some (locale_of tp1 efork) else Some o)
-       (ls_mapping δ1)) (<[locale_of tp1 efork:=R2]> (<[ζ:=R1]> (ls_tmap δ1)))) as MATCH.
+          if decide (ρ ∈ R2) then Some τ_new else Some o)
+       (ls_mapping δ1)) (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)))) as MATCH.
     { 
       pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as Hminv. 
 
@@ -651,7 +780,7 @@ Section ActualOwnershipImpl.
           destruct (decide (ρ ∈ R2)) as [Hin'|Hin'].
           * split.
             -- intros. simplify_eq. rewrite lookup_insert. eauto.
-            -- intros (ks & Hlk & H'). destruct (decide (ζ' = locale_of tp1 efork)); first congruence.
+            -- intros (ks & Hlk & H'). destruct (decide (ζ' = τ_new)); first congruence.
                rewrite lookup_insert_ne // in Hlk. exfalso.
                assert (ρ ∈ dom fs).
                { set_unfold. naive_solver. }
@@ -664,7 +793,7 @@ Section ActualOwnershipImpl.
             -- intros ?. simplify_eq.
                specialize (Hminv ρ ζ').
                apply Hminv in Hρ as (?&?&?).
-               destruct (decide (ζ' = locale_of tp1 efork)).
+               destruct (decide (ζ' = τ_new)).
                { simplify_eq. apply not_elem_of_dom in Hnewζ.
                  simpl in Hnewζ. rewrite -> Hnewζ in *. congruence. }
                destruct (decide (ζ' = ζ)).
@@ -672,7 +801,7 @@ Section ActualOwnershipImpl.
                  exists R1. rewrite lookup_insert_ne // lookup_insert //. }
                rewrite lookup_insert_ne // lookup_insert_ne //. eauto.
             -- intros (ks&Hin&?).
-               destruct (decide (ζ' = locale_of tp1 efork)).
+               destruct (decide (ζ' = τ_new)).
                { simplify_eq. rewrite lookup_insert in Hin. set_solver. }
                rewrite lookup_insert_ne // in Hin.
                destruct (decide (ζ' = ζ)).
@@ -688,7 +817,7 @@ Section ActualOwnershipImpl.
         + apply not_elem_of_dom in Hin. rewrite Hin /=. split; first done.
           intros (?&Hin'&?). rewrite -ls_same_doms in Hdomincl.
           apply not_elem_of_dom in Hin.
-          destruct (decide (ζ' = locale_of tp1 efork)).
+          destruct (decide (ζ' = τ_new)).
           { simplify_eq. rewrite lookup_insert in Hin'. simplify_eq.
             set_unfold; naive_solver. }
           rewrite lookup_insert_ne // in Hin'.
@@ -728,59 +857,17 @@ Section ActualOwnershipImpl.
           rewrite -> not_elem_of_union in Hin. destruct Hin as [Hin ?].
           rewrite -> not_elem_of_dom in Hin. rewrite Hin //.
       - iPureIntro. split. 
-        { intros ζ' Hζ'. rewrite lookup_insert_ne; last first.
-          { pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep).
-            clear Hfueldom Hsamedoms.
-            assert (ζ' ∉ locales_of_list tp1) by eauto.            
-            intros contra. simplify_eq.
-            destruct Htlen as [tp1' [-> Hlen]].
-            inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |].
-            simplify_eq.
-            assert (efs = [efork]) as ->.
-            { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
-              rewrite app_length //=; rewrite app_length //= in Hlen.
-              clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
-            rewrite H2 in Hζ'.
-            apply Hζ'. apply elem_of_list_fmap.
-            eexists (t1 ++ e2 :: t2, _); split =>//.
-            - erewrite locale_equiv =>//. apply locales_equiv_middle.
-              eapply locale_step_preserve => //.
-            - replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]); last by list_simplifier.
-              rewrite prefixes_from_app. set_unfold; naive_solver. }
-          rewrite lookup_insert_ne; last first.
-          { intros <-. rewrite Hsmall in Hmapping; [congruence | naive_solver]. }
-          apply Hsmall; set_unfold; naive_solver. }
+        { intros. eapply tids_dom_fork_step; eauto.
+          2: admit. 
+          congruence. }
         { rewrite map_imap_dom_eq // => ρ f Hin. by destruct (decide (ρ ∈ R1 ∪ R2)). }
     }
     iSplit; first done.
     iSplit; last first.
-    { iPureIntro. intros ρ ζ'.
-      erewrite build_LS_ext_spec_mapping; [| by eauto]. 
-      simpl. rewrite map_lookup_imap.
-      destruct (ls_mapping δ1 !!ρ) eqn:Heq; last done. simpl.
-      destruct (decide (ρ ∈ R2)); first  (intros ?; simplify_eq).
-      - destruct Htlen as [tp1' [-> Hlen]].
-        inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |]. simplify_eq.
-        assert (efs = [efork]) as ->.
-        { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
-          rewrite app_length //=; rewrite app_length //= in Hlen.
-          clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
-        assert (is_Some (from_locale (t1 ++ e1 :: t2 ++ [efork]) (locale_of (t1 ++ e1 :: t2) efork))).
-        + unfold from_locale. erewrite from_locale_from_Some; eauto.
-          apply prefixes_from_spec. list_simplifier. eexists _, []. split=>//.
-          by list_simplifier.
-        + eapply from_locale_from_equiv =>//; [constructor |]. rewrite H0.
-          replace (t1 ++ e1 :: t2 ++ [efork]) with ((t1 ++ e1 :: t2) ++ [efork]);
-            last by list_simplifier.
-          replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]);
-            last by list_simplifier.
-          assert (locales_equiv (t1 ++ e1 :: t2) (t1 ++ e2 :: t2)).
-          { apply locales_equiv_middle. eapply locale_step_preserve =>//. }
-          apply locales_equiv_from_app =>//.
-          by eapply locales_equiv_from_refl.
-      - intros ?; simplify_eq.
-        assert (is_Some (from_locale tp1 ζ')) by eauto.
-        eapply from_locale_step =>//. }
+    { iPureIntro.
+      eapply tids_smaller_fork_step; eauto.
+      2: admit. 
+      erewrite build_LS_ext_spec_mapping; eauto. }
     iSplit.
     { iPureIntro. destruct (map_choose _ Hnemp) as [ρ[??]]. exists ρ.
       eapply ls_mapping_tmap_corr. 
