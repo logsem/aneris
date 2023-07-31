@@ -29,13 +29,14 @@ Section ActualOwnershipInterface.
   Context {fG: fairnessGS LM Σ}.
   Context`{invGS_gen HasNoLc Σ}. 
 
-  (* TODO: replace Definitions with Lets in pmp_lifting.v *)
+  (* TODO: get rid of mim_* lemmas inside of actual_resources *)
+  (* TODO: get rid of excessive shelved goals
+     (could be solved by new implementation of LiveState) *)
   Lemma ActualOwnershipPartial:
     ⊢ PartialModelPredicates ∅ (EM := @LM_EM _ LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.
     iIntros. iApply Build_PartialModelPredicates. iModIntro. repeat iSplitL.
-    - iIntros. rewrite /update_no_step_enough_fuel_def. 
-      iIntros "FUELS MSI". simpl in *.
+    - iIntros (???????) "FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
       iMod (actual_update_no_step_enough_fuel with "FUELS LM_MSI") as (?) "(%STEPM & FUELS & LM_MSI' & %TMAP')".
@@ -53,9 +54,8 @@ Section ActualOwnershipInterface.
                eapply ls_mapping_tmap_corr. }
           { apply map_filter_subseteq. }
           erewrite <- TMAP'. apply ls_mapping_tmap_corr.
-      + eapply tids_dom_restrict_mapping; eauto.        
-    - iIntros. rewrite /update_fork_split_def. 
-      iIntros "FUELS MSI". simpl in *.
+      + eapply tids_dom_restrict_mapping; eauto.
+    - iIntros "* FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       remember (trace_last auxtr) as δ1.
       pose proof (tids_restrict_smaller _ _ TR) as SM.
@@ -106,28 +106,29 @@ Section ActualOwnershipInterface.
              rewrite -TMAP'. apply ls_mapping_tmap_corr.
           ** destruct POOL as (?&?&?).
              exists x, efork. done.
-    - 
-                  
-
-
-    (* - iIntros "*". iIntros. *)
-    (*   iApply (actual_update_step_still_alive with "[$] [$] [$] [$]"); eauto. *)
-    (* - iIntros. iApply (frag_free_roles_fuels_disj with "[$] [$] [$]"). *)
-    (* - iIntros. iExists _. iFrame. *)
-    (*   iIntros. do 2 iExists _. by iFrame. *)
-  Defined.
-
+    - iIntros "* FUELS ST MSI FR". simpl in *.
+      iDestruct "MSI" as "[LM_MSI %TR]".
+      pose proof (tids_restrict_smaller _ _ TR) as SM.
+      iDestruct (model_agree' with "LM_MSI ST") as "%Heq".
+      iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
+      (* TODO: make it a lemma *)
+      iAssert (⌜ fr1 ∩ dom (ls_fuel δ1) = ∅ ⌝)%I as %FR0.
+      { iDestruct "LM_MSI" as (?) "(?&?&FR'&?&%)".
+        iDestruct (free_roles_inclusion with "FR' FR") as "%".
+        iPureIntro. set_solver. }
+      iMod (actual_update_step_still_alive with "FUELS ST LM_MSI FR") as (?) "(%STEPM & FUELS & ST & LM_MSI & FR & %TMAP2)"; eauto. 
+      iModIntro. do 2 iExists _. iFrame. iPureIntro. split.
+      + repeat split; eauto.
+        2: by rewrite LAST2; eauto.
+        { done. }
+        eapply tids_smaller_model_step; eauto.
+        do 2 eexists.
+        erewrite (maps_inverse_match_uniq1).
+        2: { subst s1. eapply mim_helper_model_step; eauto. }
+        { reflexivity. }
+        rewrite -TMAP2. apply ls_mapping_tmap_corr.
+      + eapply tids_dom_restrict_mapping; eauto.
+        Unshelve. all: eauto. 
+  Qed.
 
 End ActualOwnershipInterface.  
-
-
-
-        (* iPureIntro. split. *)
-        (* { intros. eapply tids_dom_fork_step; eauto. *)
-        (*   2: admit. *)
-        (*   congruence. } *)
-
-    (* { iPureIntro. *)
-    (*   eapply tids_smaller_fork_step; eauto. *)
-    (*   2: admit. *)
-    (*   erewrite build_LS_ext_spec_mapping; eauto. } *)

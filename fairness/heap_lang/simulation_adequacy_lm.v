@@ -88,8 +88,8 @@ Proof.
       simpl in Hsome. compute in Hsome. simplify_eq. simpl.
       iAssert (frag_mapping_is {[ 0%nat := ∅ ]}) with "[Hposts]" as "Hem".
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
-      iDestruct "Hsi" as "(_&_&Hsi)".
-      iDestruct "Hsi" as "(%FR'&Hfuela&Hmapa&HFR&%Hsmall&Hmodel&HfrFR)".
+      iDestruct "Hsi" as "(_&_&Hsi&Haux)".
+      iDestruct "Hsi" as "(%FR'&Hfuela&Hmapa&HFR&Hmodel&HfrFR)".
       iDestruct (frag_mapping_same 0%nat with "[Hmapa] Hem") as "%H"; [done| ].
       iPureIntro. eapply no_locale_empty; [| done].
       rewrite initial_ls_tmap. apply maps_inverse_match_exact. 
@@ -111,8 +111,8 @@ Proof.
     iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
     apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
     simpl in *. simplify_eq.
-    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)".
-    iDestruct "Hsi" as "(%&Hfuela&Hmapa&?&%Hsmall&Hmodel&?)".
+    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi&Haux)".
+    iDestruct "Hsi" as "(%&Hfuela&Hmapa&?&Hmodel&?)".
     iSplit; [|done].
     iSplit; [done|].
     iSplit.

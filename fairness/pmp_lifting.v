@@ -15,7 +15,7 @@ Section PartialModelPredicates.
   (* TODO: generalize after generalizing heap_lang_defs *)
   Let Λ := heap_lang.
 
-  Definition update_no_step_enough_fuel_def (extr : execution_trace Λ) 
+  Let update_no_step_enough_fuel_def (extr : execution_trace Λ) 
       (auxtr : auxiliary_trace M) 
       (c2 : cfg Λ) (fs : gmap (fmrole iM) nat) (ζ : locale Λ)
       `(dom fs ≠ ∅)
@@ -28,7 +28,7 @@ Section PartialModelPredicates.
       has_fuels ζ (filter (λ '(k, _), k ∈ dom fs ∖ ∅) fs) ∗
       em_msi c2 δ2 (em_GS0 := eGS).
   
-  Definition update_fork_split_def (R1 R2: gset (fmrole iM)) tp1 tp2
+  Let update_fork_split_def (R1 R2: gset (fmrole iM)) tp1 tp2
        (fs: gmap (fmrole iM) nat)
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace M) ζ efork σ1 σ2
@@ -47,7 +47,7 @@ Section PartialModelPredicates.
              em_msi (tp2, σ2) δ2 (em_GS0 := eGS) ∧ 
              ⌜em_valid_state_evolution_fairness (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[ℓ]: δ2)⌝.
  
-    Definition update_step_still_alive_def
+    Let update_step_still_alive_def
       (extr : execution_trace Λ)
       (auxtr: auxiliary_trace M)
        tp1 tp2 σ1 σ2

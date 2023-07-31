@@ -326,3 +326,127 @@ Proof.
     rewrite app_comm_cons app_assoc in YY. eapply app_inj_tail in YY.
     set_unfold; naive_solver.
 Qed.
+
+
+Lemma tids_smaller_model_step `{LM: LiveModel heap_lang M} c1 c2 ζ δ1 δ2
+  (Hstep: locale_step c1 (Some ζ) c2)
+  (Hless: tids_smaller c1.1 δ1)
+  (* S is a subset of dom (ls_fuel δ1); *)
+  (*      missing roles are those that are dropped by ζ; *)
+  (*      new roles get assigned here *)
+  (MAP2: exists f (S: gset (fmrole M)),
+      ls_mapping δ2 = map_imap
+                        (λ (ρ' : fmrole M) (_ : nat),
+                          if decide (ρ' ∈ dom (ls_fuel δ1))
+                          then ls_mapping δ1 !! ρ'
+                          else Some ζ)
+                        (gset_to_gmap f S)
+  )
+  :
+  tids_smaller c2.1 δ2 (M := M).
+Proof.
+  (* eapply tids_smaller_restrict_mapping; eauto. *)
+  (* destruct MAP2 as (?&?&->).   *)
+  unfold tids_smaller; simpl.
+  destruct MAP2 as (?&S&->).
+  intros ρ' ? Hmim.
+  rewrite map_lookup_imap in Hmim. rewrite lookup_gset_to_gmap in Hmim.
+  destruct (decide (ρ' ∈ S)); last by rewrite option_guard_False in Hmim.
+  rewrite option_guard_True //= in Hmim.
+  destruct (decide (ρ' ∈ dom (ls_fuel δ1))).
+  + inversion Hstep; simplify_eq.
+    eapply from_locale_step =>//. by eapply Hless.
+  + simplify_eq.
+    inversion Hstep; simplify_eq.
+    eapply from_locale_step =>//. unfold from_locale. rewrite from_locale_from_Some //.
+    apply prefixes_from_spec. exists t1, t2. by list_simplifier.
+Qed.
+
+(* just use tids_dom_restrict_mapping instead *)
+(* Lemma tids_restrict_model_step `{LM: LiveModel heap_lang M} c1 c2 ζ *)
+(*   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M))) *)
+(*   (Hstep: locale_step c1 (Some ζ) c2) *)
+(*   (* Hfuelsval : valid_new_fuelmap fs1 fs2 s1 s2 ρ *) *)
+(*   (* Hxdom : ∀ ρ : fmrole M, ls_mapping δ1 !! ρ = Some ζ ↔ ρ ∈ dom fs1 *) *)
+(*   (* TODO: D2 = dom fs2 *) *)
+(*   (Hsmall: ∀ ζ : locale heap_lang, *)
+(*       ζ ∉ locales_of_list c1.1 → tmap1 !! ζ = None) *)
+(*   (* (Hfs1: ls_mapping δ1 !! ρ = Some ζ) *) *)
+(*   (TMAP2: exists D2, tmap2 = <[ζ:= D2]> (tmap1)): *)
+(*   ∀ ζ0 : locale heap_lang, *)
+(*     ζ0 ∉ locales_of_list c2.1 → tmap2 !! ζ0 = None. *)
+(* Proof. *)
+(*   intros ζ' ?. *)
+(*   destruct c1, c2. simpl in *. *)
+(*   pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep). simpl. *)
+(*   destruct TMAP2 as [? ->]. *)
+(*   rewrite lookup_insert_ne; first by apply Hsmall; set_solver. *)
+(*   intros <-. *)
+(*   (* TODO: use this to prove Hfs1 premise *) *)
+(*   (* destruct Hfuelsval as (_&_&Hfs1&_). *) *)
+(*   (* rewrite <-Hxdom in Hfs1. *) *)
+  
+(*   (* apply (ls_mapping_tmap_corr (LM := LM)) in Hfs1 as (?&HM&?). *) *)
+(*   rewrite Hsmall // in Hfs1; set_solver. *)
+(* Qed. *)
+
+Ltac by_contradiction :=
+  match goal with
+  | |- ?goal => destruct_decide (decide (goal)); first done; exfalso
+  end.
+
+Lemma mim_helper_model_step `{LM: LiveModel heap_lang M}
+  (s2 : M)
+  (fs1 fs2 : gmap (fmrole M) nat)
+  (ρ : fmrole M)
+  (δ1 : LM)
+  (ζ : locale heap_lang)
+  (fr1 : gset (fmrole M))
+  (Hfr_new : live_roles M s2 ∖ live_roles M δ1 ⊆ fr1)
+  (Hfuelsval : valid_new_fuelmap fs1 fs2 δ1 s2 ρ (LM := LM))
+  (Hxdom : ∀ ρ : fmrole M, ls_mapping δ1 !! ρ = Some ζ ↔ ρ ∈ dom fs1)
+  (HFR : fr1 ∩ dom (ls_fuel δ1) = ∅):
+  maps_inverse_match
+    (map_imap
+       (λ (ρ' : fmrole M) (_ : nat),
+          if decide (ρ' ∈ dom (ls_fuel δ1)) then ls_mapping δ1 !! ρ' else Some ζ)
+       (gset_to_gmap 333 ((dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))))
+    (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))).
+Proof. 
+  intros ρ' ζ'. simpl. rewrite map_lookup_imap.
+  rewrite lookup_gset_to_gmap //=.
+  destruct (decide (ρ' ∈ (dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))) as [Hin|Hnotin].
+  - rewrite option_guard_True //=. destruct (decide (ρ' ∈ dom (ls_fuel δ1))).
+    + destruct (decide (ζ' = ζ)) as [->|Hneq].
+      * rewrite lookup_insert. split.
+        { eexists; split =>//. apply elem_of_difference in Hin as [? Hin].
+          apply not_elem_of_difference in Hin as [?|?]; [|done].
+          set_solver. }
+        { intros (?&?&?). simplify_eq. apply Hxdom.
+          destruct Hfuelsval as (?&?&?&?&?). by_contradiction.
+          assert (ρ' ∈ live_roles M s2 ∖ live_roles M δ1).
+          { set_solver. }
+          assert (ρ' ∈ fr1).
+          { set_solver. }
+          assert (ρ' ∉ dom $ ls_fuel δ1) by set_solver.
+          done. }
+      * rewrite lookup_insert_ne //.
+        apply ls_mapping_tmap_corr.
+    + split.
+      * intros Htid. simplify_eq. rewrite lookup_insert. eexists; split=>//.
+        set_solver.
+      * assert (ρ' ∈ dom fs2) by set_solver. intros Hm. by_contradiction.
+        rewrite lookup_insert_ne in Hm; last congruence.
+        apply ls_mapping_tmap_corr in Hm.
+        apply elem_of_dom_2 in Hm. rewrite ls_same_doms // in Hm.
+  - destruct Hfuelsval as (?&?&?&?&Hinf&?). rewrite option_guard_False //=. split; first done.
+    destruct (decide (ζ' = ζ)) as [->|Hneq].
+    { rewrite lookup_insert //. intros (?&?&?). simplify_eq. set_solver. }
+    rewrite lookup_insert_ne //.
+    intros Habs%ls_mapping_tmap_corr.
+    
+    apply not_elem_of_difference in Hnotin as [Hnin|Hin].
+    + apply elem_of_dom_2 in Habs. rewrite ls_same_doms in Habs. set_solver.
+    + apply elem_of_difference in Hin as [Hin Hnin].
+      apply Hxdom in Hin. congruence.   
+Qed.       
