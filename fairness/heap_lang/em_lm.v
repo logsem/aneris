@@ -1,7 +1,7 @@
 From trillium.fairness Require Export fairness resources fair_termination fuel fuel_ext. 
 From trillium.fairness.heap_lang Require Export lang heap_lang_defs.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Export actual_resources partial_ownership.
+From trillium.fairness Require Export partial_ownership.
 
 
 Definition LM_init_resource `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
@@ -227,3 +227,102 @@ Qed.
     (*   assert (ρ ∈ dom (ls_fuel δ1)) *)
     (*     by set_solver -Hnewdom Hsamedoms Hfueldom. *)
     (*   set_solver -Hnewdom Hsamedoms Hfueldom. } *) 
+
+
+Lemma tids_smaller_fork_step `{LM: LiveModel heap_lang M}  σ1 σ2 δ1 δ2 ζ τ_new
+  (Hstep: locale_step σ1 (Some ζ) σ2)
+  (SM: tids_smaller σ1.1 δ1)
+  (MAP2: exists (R2: gset (fmrole M)), ls_mapping δ2 = map_imap
+                                                    (λ (ρ : fmrole M) (o : locale heap_lang),
+                                                      if decide (ρ ∈ R2) then Some τ_new else Some o)
+                                                    (ls_mapping δ1))
+  (FORK: ∃ tp1' efork, τ_new = locale_of σ1.1 efork /\ σ2.1 = tp1' ++ [efork] ∧ length tp1' = length σ1.1)
+  :
+  tids_smaller σ2.1 δ2 (M := M).
+Proof.
+  destruct σ1 as [tp1 σ1], σ2 as [tp2 σ2]. simpl in *.
+  intros ρ ζ'.
+  destruct MAP2 as [R2 ->].
+  simpl. rewrite map_lookup_imap.
+  destruct (ls_mapping δ1 !!ρ) eqn:Heq.
+  2: { intros. by rewrite Heq in H. }
+  
+  destruct (decide (ρ ∈ R2)); first  (intros ?; simplify_eq).
+  - destruct FORK as (tp1' & efork & (-> & -> & Hlen)).
+    inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |]. simplify_eq.
+    assert (efs = [efork]) as ->.
+    { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
+      rewrite app_length //=; rewrite app_length //= in Hlen.
+      clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
+    rewrite Heq in H. simpl in H. inversion H. subst ζ'. 
+    assert (is_Some (from_locale (t1 ++ e1 :: t2 ++ [efork]) (locale_of (t1 ++ e1 :: t2) efork))).
+    + unfold from_locale. erewrite from_locale_from_Some; eauto.
+      apply prefixes_from_spec. list_simplifier. eexists _, []. split=>//.
+      by list_simplifier.
+    + eapply from_locale_from_equiv =>//; [constructor |].
+      (* rewrite H0. *)
+      replace (t1 ++ e1 :: t2 ++ [efork]) with ((t1 ++ e1 :: t2) ++ [efork]);
+        last by list_simplifier.
+      replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]);
+        last by list_simplifier.
+      assert (locales_equiv (t1 ++ e1 :: t2) (t1 ++ e2 :: t2)).
+      { apply locales_equiv_middle. eapply locale_step_preserve =>//. }
+      assert (tp1' = t1 ++ e2 :: t2).
+      { rewrite app_comm_cons in YY. 
+        erewrite app_assoc in YY. eapply app_inj_tail in YY. apply YY. }
+      apply locales_equiv_from_app =>//.
+      * congruence.
+      * eapply locales_equiv_from_refl. by list_simplifier. 
+  - intros ?; simplify_eq.
+    assert (is_Some (from_locale tp1 ζ')). 
+    2: by eapply from_locale_step =>//.
+    rewrite Heq //= in H . eauto. inversion H. subst. eauto. 
+Qed.
+
+Lemma tids_dom_fork_step `{LM: LiveModel heap_lang M}
+  (c1 c2: cfg heap_lang) (ζ: locale heap_lang)
+  (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M)))
+  τ_new (R1 R2: gset (fmrole M))
+  (Hstep: locale_step c1 (Some ζ) c2)
+  (Hsmall: ∀ ζ : locale heap_lang,
+      ζ ∉ locales_of_list c1.1 → tmap1 !! ζ = None)
+  (Hmapping : ζ ∈ dom tmap1)
+  (FORK: (∃ tp1' efork, τ_new = locale_of c1.1 efork /\ c2.1 = tp1' ++ [efork] ∧ length tp1' = length c1.1))
+  (TMAP2: tmap2 = <[τ_new:=R2]> (<[ζ:=R1]> (tmap1)))
+  :
+  ∀ ζ0 : locale heap_lang,
+    ζ0 ∉ locales_of_list c2.1 → tmap2 !! ζ0 = None.
+Proof.
+  assert (Hlocincl: locales_of_list c1.1 ⊆ locales_of_list c2.1).
+  { destruct c1 as [tp1 σ1], c2 as [tp2 σ2]. simpl in *.
+    apply (locales_of_list_step_incl _ _ _ _ _ Hstep). }
+  intros ζ' Hζ'.
+  rewrite TMAP2.
+  destruct c1 as [tp1 σ1], c2 as [tp2 σ2]. simpl in *.
+  rewrite lookup_insert_ne.
+  { rewrite lookup_insert_ne; last first.
+    { intros <-.
+      apply elem_of_dom in Hmapping as [? MM]. 
+      rewrite Hsmall in MM; [congruence | naive_solver]. }
+    apply Hsmall; set_unfold; naive_solver. }
+  pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep).
+  (* clear Hfueldom Hsamedoms. *)
+  assert (ζ' ∉ locales_of_list tp1) by eauto.
+  intros contra. simplify_eq.
+  destruct FORK as (tp1' & efork & (-> & -> & Hlen)).
+  inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |].
+  simplify_eq.
+  assert (efs = [efork]) as ->.
+  { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
+    rewrite app_length //=; rewrite app_length //= in Hlen.
+    clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
+  (* rewrite H0 in Hζ'. *)
+  apply Hζ'. apply elem_of_list_fmap.
+  eexists (t1 ++ e2 :: t2, _); split =>//.
+  - erewrite locale_equiv =>//. apply locales_equiv_middle.
+    eapply locale_step_preserve => //.
+  - replace (t1 ++ e2 :: t2 ++ [efork]) with ((t1 ++ e2 :: t2) ++ [efork]); last by list_simplifier.
+    rewrite prefixes_from_app.
+    rewrite app_comm_cons app_assoc in YY. eapply app_inj_tail in YY.
+    set_unfold; naive_solver.
+Qed.
