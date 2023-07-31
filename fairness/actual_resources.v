@@ -935,6 +935,68 @@ Section ActualOwnershipImpl.
     destruct (decide (x ∈ Y)); set_solver.
   Qed. 
 
+  Lemma tids_smaller_model_step c1 c2 ζ δ1 δ2
+    (Hstep: locale_step c1 (Some ζ) c2)
+    (Hless: tids_smaller c1.1 δ1)
+    (* S is a subset of dom (ls_fuel δ1);
+       missing roles are those that are dropped by ζ;
+       new roles get assigned here *)
+    (MAP2: exists f (S: gset (fmrole M)),
+        ls_mapping δ2 = map_imap
+          (λ (ρ' : fmrole M) (_ : nat),
+             if decide (ρ' ∈ dom (ls_fuel δ1))
+             then ls_mapping δ1 !! ρ'
+             else Some ζ)
+          (gset_to_gmap f S)
+    )
+    :
+    tids_smaller c2.1 δ2 (M := M).
+  Proof. 
+    unfold tids_smaller; simpl.
+    destruct MAP2 as (?&S&->). 
+    intros ρ' ? Hmim.
+    rewrite map_lookup_imap in Hmim. rewrite lookup_gset_to_gmap in Hmim.
+    destruct (decide (ρ' ∈ S)); last by rewrite option_guard_False in Hmim.
+    rewrite option_guard_True //= in Hmim.
+    destruct (decide (ρ' ∈ dom (ls_fuel δ1))).
+    + inversion Hstep; simplify_eq.
+      eapply from_locale_step =>//. by eapply Hless.
+    + simplify_eq.
+      inversion Hstep; simplify_eq.
+      eapply from_locale_step =>//. unfold from_locale. rewrite from_locale_from_Some //.
+      apply prefixes_from_spec. exists t1, t2. by list_simplifier.
+  Qed. 
+
+  Lemma tids_restrict_model_step c1 c2 ζ
+    (tmap1 tmap2: gmap (locale Λ) (gset (fmrole M))) ρ
+    (D2: gset (fmrole M))
+    (Hstep: locale_step c1 (Some ζ) c2)
+    (* Hfuelsval : valid_new_fuelmap fs1 fs2 s1 s2 ρ *)
+  (* Hxdom : ∀ ρ : fmrole M, ls_mapping δ1 !! ρ = Some ζ ↔ ρ ∈ dom fs1 *)
+    (* TODO: D2 = dom fs2 *)
+    (Hsmall: ∀ ζ : locale Λ,
+        ζ ∉ locales_of_list c1.1 → tmap1 !! ζ = None)
+    (* (Hfs1: ls_mapping δ1 !! ρ = Some ζ) *)
+    (Hfs1: exists R, tmap1 !! ζ = Some R /\ ρ ∈ R)
+    (TMAP2: tmap2 = <[ζ:= D2]> (tmap1)):
+  ∀ ζ0 : locale Λ,
+    ζ0 ∉ locales_of_list c2.1 → tmap2 !! ζ0 = None.
+  Proof.
+    intros ζ' ?.
+    destruct c1, c2. simpl in *. 
+    pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep). simpl.
+    rewrite TMAP2. 
+    rewrite lookup_insert_ne; first by apply Hsmall; set_solver.
+    intros <-.
+    (* TODO: use this to prove Hfs1 premise *)
+    (* destruct Hfuelsval as (_&_&Hfs1&_). *)
+    (* rewrite <-Hxdom in Hfs1. *)
+
+    (* apply (ls_mapping_tmap_corr (LM := LM)) in Hfs1 as (?&HM&?). *)
+    rewrite Hsmall // in Hfs1; set_solver.
+  Qed. 
+    
+
   Lemma actual_update_step_still_alive
         tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ (δ1 : LM) ζ fr1 fr_stash:
     (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ->
@@ -1224,20 +1286,8 @@ Section ActualOwnershipImpl.
             apply elem_of_dom in Hinabs. rewrite Hnin in Hinabs. simpl in Hinabs.
             by inversion Hinabs. }
           set_solver -Hsamedoms Hnewdom Hfueldom.
-      - simplify_eq. unfold tids_smaller; simpl.
-        intros ρ' ? Hmim.
-        erewrite build_LS_ext_spec_mapping in Hmim; [| by eauto].
-        rewrite map_lookup_imap in Hmim. rewrite lookup_gset_to_gmap in Hmim.
-        destruct (decide (ρ' ∈ (dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)));
-          last by rewrite option_guard_False in Hmim.
-        rewrite option_guard_True //= in Hmim.
-        destruct (decide (ρ' ∈ dom (ls_fuel δ1))).
-        + inversion Hstep; simplify_eq.
-          eapply from_locale_step =>//. by eapply Hless.
-        + simplify_eq.
-          inversion Hstep; simplify_eq.
-          eapply from_locale_step =>//. unfold from_locale. rewrite from_locale_from_Some //.
-          apply prefixes_from_spec. exists t1, t2. by list_simplifier. }
+      - eapply tids_smaller_model_step; eauto.
+        erewrite build_LS_ext_spec_mapping; eauto. }
 
     iFrame "Hfuel Hmod Hfr2".
 
@@ -1246,12 +1296,9 @@ Section ActualOwnershipImpl.
     iFrame. all: eauto. (* TODO: find source... *)
     iPureIntro; split.
         
-    { intros ζ' ?. pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep). simpl.
-      rewrite lookup_insert_ne; first by apply Hsmall; set_solver -Hsamedoms Hnewdom Hfueldom.
-      intros <-. destruct Hfuelsval as (_&_&Hfs1&_).
-      rewrite <-Hxdom in Hfs1.
-      apply (ls_mapping_tmap_corr (LM := LM)) in Hfs1 as (?&HM&?).
-      rewrite Hsmall // in HM. set_solver -Hsamedoms Hnewdom Hfueldom. }
+    { intros. eapply tids_restrict_model_step; eauto.
+      eapply ls_mapping_tmap_corr; eauto.
+      apply Hxdom. apply Hfuelsval. }
 
     { simpl. rewrite /update_fuel_resource /fuel_apply.
       rewrite map_imap_dom_eq ?dom_gset_to_gmap.
@@ -1284,12 +1331,5 @@ Section ActualOwnershipImpl.
     - admit. 
   Admitted. 
 
-  (* Lemma bupd_fupd_empty `{FUpd (iProp Σ)} (P: iProp Σ): *)
-  (*     (|==> P)%I ⊢ |={∅}=> P. *)
-  (* Proof using.  *)
-  (*   iIntros "UP". *)
-  (*   iDestruct (bupd_fupd ∅ with "UP") as "FP". *)
-  (*   iApply "FP".  *)
-  (*   (* Set Printing All. *) *)
 
 End ActualOwnershipImpl.
