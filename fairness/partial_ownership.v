@@ -33,7 +33,7 @@ Section PartialOwnership.
       partial_free_roles_are_Proper :> Proper (equiv ==> equiv) partial_free_roles_are;
       partial_mapping_is_Proper :> Proper (equiv ==> equiv) partial_mapping_is;
 
-      partial_msi: cfg Λ -> LiveState Λ iM -> iProp Σ;
+      (* partial_msi: LiveState Λ iM -> iProp Σ; *)
 
       (* partial_fuels_is_sep: forall fs, partial_fuel_is fs ⊣⊢ [∗ map] ρ↦f ∈ fs, partial_fuel_is {[ ρ := f ]}; *)
       partial_fuels_is_sep: forall fs1 fs2 (DISJ: fs1 ##ₘ fs2),

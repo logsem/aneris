@@ -3,6 +3,17 @@ From iris.proofmode Require Import tactics.
 
 (* TODO: move these lemmas to appropriate places *)
 
+Lemma gmap_disj_op_union:
+  ∀ {K : Type} {EqDecision0 : EqDecision K} 
+    {H : Countable K} {A : cmra} (m1 m2 : gmap K A),
+    map_disjoint m1 m2 -> m1 ⋅ m2 = m1 ∪ m2. 
+Proof using. 
+  intros. apply map_eq. intros.
+  rewrite lookup_op lookup_union.
+  destruct (m1 !! i) eqn:L1, (m2 !! i) eqn:L2; try done.
+  eapply map_disjoint_spec in H0; done.
+Qed.     
+
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
 Lemma dom_domain_restrict `{Countable X} {A} (f: gmap X A) (R: gset X):
