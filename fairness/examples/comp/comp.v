@@ -305,6 +305,46 @@ Section ClientSpec.
   Admitted. 
     
 
+  Definition lib_PMPP `{clientGS Σ}:
+    @PartialModelPredicatesPre heap_lang _ _ Σ lib_model_impl.
+  refine
+    {|
+        partial_model_is := lib_frag_model_is;
+        partial_free_roles_are := lib_frag_free_roles_are;
+        partial_fuel_is := lib_frag_fuel_is;
+        (* TODO: remove tid=0 restriction ? *)
+        partial_mapping_is (m: gmap (locale heap_lang) (gset (fmrole lib_model_impl))) :=
+        (∃ (L: gset (fmrole lib_model_impl)) (Ract Rfr: gset client_role), ⌜ m = {[ 0 := L ]} ⌝ ∗
+         lib_frag_mapping_impl_is {[ 0 := L ]} ∗
+         (⌜ L ≠ ∅ /\ Ract = {[ inl 0 ]} /\ Rfr = {[ inr ρy ]} \/
+            L = ∅ /\ Ract = {[ inr ρy ]} /\ Rfr = {[ inl 0 ]}⌝ ) ∗
+        partial_mapping_is {[ 0 := Ract ]} (PartialModelPredicatesPre := PMPP) ∗
+        partial_free_roles_are Rfr (PartialModelPredicatesPre := PMPP) )%I;
+    |}.
+  Unshelve.
+  all: try apply _. 
+  - intros ???. set_solver.
+  - intros ???. iSplit. 
+    + iIntros "(%&%&%& [-> (?&%&?&?)])".
+      do 3 iExists _. iFrame. iSplit; iPureIntro.
+      * by apply leibniz_equiv.
+      * done. 
+    + iIntros "(%&%&%& [-> (?&%&?&?)])".
+      do 3 iExists _. iFrame. iSplit; iPureIntro.
+      * by apply leibniz_equiv.
+      * done. 
+  - intros. rewrite /lib_frag_fuel_is.
+      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
+      2: { by apply map_disjoint_fmap. }
+      by rewrite auth_frag_op own_op.
+  - intros. rewrite /lib_frag_free_roles_are.
+      rewrite -gset_disj_union; auto.  
+      by rewrite auth_frag_op own_op.
+  - iApply own_unit.
+  Defined. 
+
+
+
   Lemma client_spec Einvs lb0 f
     (FB: f >= 10):
     (* TODO: get rid of these restrictions *)
