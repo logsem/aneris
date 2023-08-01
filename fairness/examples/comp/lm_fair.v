@@ -1,4 +1,4 @@
-From trillium.fairness Require Import fairness fuel.
+From trillium.fairness Require Import fairness fuel fuel_ext.
 
 
 Close Scope Z_scope.
@@ -31,7 +31,7 @@ Section LMFair.
             | Some τ => locale_trans st1 τ st2
             | _ => False
             end;
-        live_roles δ := filter (fun τ => exists δ', locale_trans δ τ δ') (map_img (ls_mapping δ));
+        live_roles δ := filter (fun τ => exists δ', locale_trans δ τ δ') (dom (ls_tmap δ));
       |}.
     (* - apply lm_ls_eqdec.  *)
     - apply @inhabitant in H0 as l. apply @inhabitant in H1 as st.  
@@ -44,10 +44,12 @@ Section LMFair.
     - intros ??? STEP.
       apply elem_of_filter. split; eauto. 
       inversion STEP as [[STEP']|[? STEP']]. 
-      + inversion STEP'. eapply elem_of_map_img; eauto.
-      + inversion STEP'. eapply elem_of_map_img; eauto.
-        destruct H3. eauto.
-  Defined. 
+      + inversion STEP'. eapply ls_mapping_tmap_corr in H3 as (?&?&?).
+        eapply elem_of_dom_2; eauto. 
+      + inversion STEP' as (? & MAP & ?).
+        eapply ls_mapping_tmap_corr in MAP as (?&?&?).
+        eapply elem_of_dom_2; eauto. 
+  Defined.
 
   Lemma LM_live_roles_strong δ τ:
     τ ∈ live_roles LM_Fair δ <-> (exists δ', locale_trans δ τ δ').
