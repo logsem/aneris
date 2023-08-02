@@ -267,7 +267,7 @@ Section ClientSpec.
                         lib_frag_model_is lb0 ∗
                         lib_frag_free_roles_are ∅ ∗
                         y_frag_model_is n.
-  Proof.
+  Proof using cpG.
     (* simpl in lb0. red in lb0.   *)
     iIntros "ST".
     iMod (own_alloc ((● (Excl' (ls_under lb0)) ⋅ ◯ _))) as (γ_lib) "[AUTH_LIB FRAG_LIB]".
@@ -276,17 +276,12 @@ Section ClientSpec.
     { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
     iMod (own_alloc ((● (Excl <$> ls_tmap lb0 (LM := lib_model)) ⋅ ◯ _ ): (authUR (gmapUR (localeO heap_lang) (exclR (gsetR (RoleO lib_model_impl))))))) as (γ_map) "[AUTH_MAP FRAG_MAP]".
     { apply auth_both_valid_discrete. split; [reflexivity|].
-      (* eapply gmap_validI.  *)
-      admit. } 
+      intros i. rewrite lookup_fmap. by destruct lookup. } 
     iMod (own_alloc (((● (Excl <$> ls_fuel lb0)) ⋅ ◯ _): (authUR (gmapUR (RoleO lib_model_impl) (exclR natO))))) as (γ_fuel) "[AUTH_FUEL FRAG_FUEL]".
     { apply auth_both_valid_discrete. split; [reflexivity| ].
-      (* eapply gmap_validI.  *)
-      admit. 
-    }
-    iMod (own_alloc ((● (∅: gset_disj (fmrole lib_model_impl))  ⋅ ◯ _ ): authUR (gset_disjUR (RoleO lib_model_impl)))) as (γ_fr) "[AUTH_FR FRAG_FR]".
-    { apply auth_both_valid_2 =>//.
-      (* done. *)
-      admit. }
+      intros i. rewrite lookup_fmap. by destruct lookup. } 
+    iMod (own_alloc ((● (GSet ∅)  ⋅ ◯ _): authUR (gset_disjUR (RoleO lib_model_impl)))) as (γ_fr) "[AUTH_FR FRAG_FR]".
+    { apply auth_both_valid_2 =>//. }
 
     set (cG := {| 
                 cl_pre_inG := cpG;
@@ -303,7 +298,7 @@ Section ClientSpec.
       iExists ∅. iFrame. iPureIntro. set_solver. }
 
     iModIntro. iExists _. iFrame. done. 
-  Admitted. 
+  Qed. 
     
 
   Definition lib_PMPP `{clientGS Σ}:
