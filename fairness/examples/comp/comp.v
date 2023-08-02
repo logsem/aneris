@@ -317,8 +317,8 @@ Section ClientSpec.
         partial_mapping_is (m: gmap (locale heap_lang) (gset (fmrole lib_model_impl))) :=
         (∃ (L: gset (fmrole lib_model_impl)) (Ract Rfr: gset client_role), ⌜ m = {[ 0 := L ]} ⌝ ∗
          lib_frag_mapping_impl_is {[ 0 := L ]} ∗
-         (⌜ L ≠ ∅ /\ Ract = {[ inl 0 ]} /\ Rfr = {[ inr ρy ]} \/
-            L = ∅ /\ Ract = {[ inr ρy ]} /\ Rfr = {[ inl 0 ]}⌝ ) ∗
+         (⌜ L ≠ ∅ ⌝ ∗ ⌜ Ract = {[ inl 0 ]} /\ Rfr = {[ inr ρy ]} ⌝ ∨
+          ⌜ L = ∅ ⌝ ∗ ⌜ Ract = {[ inr ρy ]} /\ Rfr = {[ inl 0 ]} ⌝ ∗ partial_fuel_is {[ inr ρy := (* lm_fl client_model  *) 10 ]}) ∗
         partial_mapping_is {[ 0 := Ract ]} (PartialModelPredicatesPre := PMPP) ∗
         partial_free_roles_are Rfr (PartialModelPredicatesPre := PMPP) ∗
         y_frag_model_is 1)%I;
@@ -327,14 +327,7 @@ Section ClientSpec.
   all: try apply _. 
   - intros ???. set_solver.
   - intros ???. iSplit. 
-    + iIntros "(%&%&%& [-> (?&%&?&?)])".
-      do 3 iExists _. iFrame. iSplit; iPureIntro.
-      * by apply leibniz_equiv.
-      * done. 
-    + iIntros "(%&%&%& [-> (?&%&?&?)])".
-      do 3 iExists _. iFrame. iSplit; iPureIntro.
-      * by apply leibniz_equiv.
-      * done. 
+    all: by iIntros "(%&%&%& (-> & ?))"; do 3 iExists _; iFrame; iPureIntro; apply leibniz_equiv.
   - intros. rewrite /lib_frag_fuel_is.
       rewrite map_fmap_union. rewrite -gmap_disj_op_union.
       2: { by apply map_disjoint_fmap. }
@@ -361,7 +354,8 @@ Section ClientSpec.
   Lemma client_spec Einvs (lb0: fmstate lib_fair) f
     (FB: f >= 10)
     (* TODO: get rid of these restrictions *)
-    (* (DISJ_INV1: Einvs ## ↑Ns) (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)
+    (DISJ_INV1: Einvs ## ↑Ns)
+    (* (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)
     (LB0_ACT: 0 ∈ live_roles _ lb0)
     (LB0_INFO: @ls_fuel _ _ lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! 0 = Some {[ tt ]})
     :
@@ -475,23 +469,93 @@ Section ClientSpec.
       iSplitL.
       { (* rewrite mapping in premise as big union by roles, use LIBM *)
         admit. }
-      iPureIntro. left. set_solver. }
+      iLeft. iPureIntro. set_solver. }
 
     iNext. iIntros "[LMAP LFR']". simpl. 
-    iDestruct "LMAP" as (???) "(%LIBM&LM&%MATCH&MAP&FR&YST)".
+    iDestruct "LMAP" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
     assert (L = ∅) as -> by set_solver.
-    destruct MATCH as [? | (_&->&->)]; [set_solver| ]. clear LIBM.
-    iAssert (has_fuels 0 {[ inr ρy := _ ]})%I with "[FUELS MAP]" as "FUELS".
+    iDestruct "MATCH" as "[[%?] | (_&[->->]&FUEL')]"; [set_solver| ]. clear LIBM.
+                                      
+    (* TODO: owning the "inl 0" fuel at this moment is unsound,
+       because it's not assigned.
+       That should appear at some point in lifting proof
+     *)
+    iRename "FUELS" into "FUELS_OLD".
+                                      
+    iAssert (has_fuels 0 {[ inr ρy := 10 ]})%I with "[FUEL' MAP]" as "FUELS".
     { rewrite /has_fuels.
-      rewrite dom_fmap_L !dom_singleton_L !big_sepS_singleton.
-      iFrame "MAP". iDestruct "FUELS" as (?) "[%?]". iExists _. iFrame. 
- 
-                                                              
+      rewrite !dom_singleton_L !big_sepS_singleton.
+      rewrite lookup_singleton. iFrame. iExists _. iFrame. done. }
     
+    simpl. clear FS. 
+    rewrite (sub_0_id {[ inr ρy := _ ]}).
+    assert (fuels_ge ({[ inr ρy := 10 ]}: gmap (fmrole client_model_impl) nat) 10) as FS.
+    { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
+
+    pure_step FS. pure_step FS.
     
+    wp_bind (_ <- _)%E.
+
+    iApply wp_atomic.
+    iInv Ns as ((lb, y)) "inv" "CLOS". rewrite {1}/client_inv_impl. 
+    iDestruct "inv" as "(>ST & >YST_AUTH & > inv')".
+    iAssert (⌜ y = 1 ⌝)%I as %->.
+    { iCombine "YST_AUTH YST" as "Y". iDestruct (own_valid with "Y") as %V.
+      apply auth_both_valid_discrete in V as [EQ%Excl_included _]. done. }
+    iAssert (⌜ ls_tmap lb !! 0 = Some ∅ ⌝)%I as %LIB_END.
+    { rewrite /lib_msi. iDestruct "inv'" as "(_&LM_AUTH&_)".
+      (* TODO: use an analogue of frag_mapping_same *)
+      admit. }
+    assert (live_roles client_model_impl (lb, 1) = {[ inr ρy ]}) as LIVE1'.
+    { simpl. rewrite /client_lr.
+      apply leibniz_equiv. rewrite filter_union.
+      erewrite filter_singleton_not, filter_singleton; [set_solver| ..].
+      - rewrite bool_decide_eq_true_2; [done| ].
+        eexists. by apply ct_y_step_1.
+      - rewrite bool_decide_eq_false_2; [done| ].
+        intros [? STEP].
+        (* TODO: same reasoning as in LIVE1*)
+        admit. }
+    assert (live_roles client_model_impl (lb, 0) = ∅) as LIVE0.
+    { simpl. rewrite /client_lr.
+      apply leibniz_equiv. rewrite filter_union.
+      erewrite !filter_singleton_not; [set_solver| ..].
+      all: rewrite bool_decide_eq_false_2; [done| ].
+      all: intros [? STEP]; inversion STEP. } 
       
+    iModIntro. 
+    iApply (wp_store_step_singlerole_keep with "[$] [L ST FUELS]").
+    { set_solver. }
+    (* { reflexivity. } *)
+    5: { iFrame "L ST". iNext.
+         iApply has_fuel_fuels. rewrite map_fmap_singleton. iFrame. }
+    2: { by apply ct_y_step_1. }
+    3: { rewrite LIVE1' LIVE0. set_solver. }
+    { Unshelve. 2: exact 7. simpl. lia. }
+    { lia. }
+
+    (* rewrite LIVE0. erewrite decide_False; [| set_solver]. *)
+    iNext. iIntros "(L & ST & FUELS)".
+    iAssert (|==> y_frag_model_is 0 ∗ y_auth_model_is 0)%I with "[YST YST_AUTH]" as
+      "Y".
+    { admit. }
+    iMod "Y" as "[YST YST_AUTH]". 
     
-    
+    iMod ("CLOS" with "[YST_AUTH ST inv']") as "_".
+    { iNext. iExists (_, _). rewrite /client_inv_impl. iFrame. }
+    iModIntro.   
+
+    iDestruct (has_fuel_fuels with "FUELS") as "FUELS". 
+    simpl. clear FS. 
+    rewrite (sub_0_id {[ inr ρy := _ ]}).
+    assert (fuels_ge ({[ inr ρy := 7 ]}: gmap (fmrole client_model_impl) nat) 7) as FS.
+    { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
+
+    do 2 pure_step FS.
+
+    (* TODO: restore wp_lift_pure_step_no_fork_remove_role to justify the last step *)
+    admit. 
+Admitted.     
     
  
 End ClientSpec.
