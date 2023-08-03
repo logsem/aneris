@@ -59,4 +59,30 @@ Section LMFair.
     simpl. intros [??]%elem_of_filter. eauto.
   Qed. 
 
+  Lemma LM_map_empty_notlive δ τ
+    (MAP0: ls_tmap δ (LM := LM) !! τ = Some ∅ \/ ls_tmap δ (LM := LM) !! τ = None):
+    τ ∉ live_roles LM_Fair δ. 
+  Proof. 
+    intros [? STEP]%LM_live_roles_strong. inversion STEP.
+    - inversion H2. destruct H3 as [? MAP].
+      eapply ls_mapping_tmap_corr in MAP as (?&?&?).
+      destruct MAP0 as [? | ?]; [| congruence]. set_solver.
+    - inversion H2. destruct H3 as [? [MAP _]].
+      eapply ls_mapping_tmap_corr in MAP as (?&?&?).
+      destruct MAP0 as [? | ?]; [| congruence]. set_solver.
+  Qed. 
+
+  Lemma LM_live_role_map_notempty δ τ
+    (LIVE: τ ∈ live_roles LM_Fair δ):
+    exists R, ls_tmap δ (LM := LM) !! τ = Some R /\ R ≠ ∅.
+  Proof. 
+    apply LM_live_roles_strong in LIVE as [? STEP]. inversion STEP.
+    - inversion H2. destruct H3 as [? MAP].
+      eapply ls_mapping_tmap_corr in MAP as (?&?&?). eexists. split; eauto.
+      set_solver.
+    - inversion H2. destruct H3 as [? [MAP _]].
+      eapply ls_mapping_tmap_corr in MAP as (?&?&?). eexists. split; eauto.
+      set_solver.
+  Qed. 
+      
 End LMFair.

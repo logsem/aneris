@@ -73,7 +73,9 @@ Section ClientDefs.
                 (LIB_STEP: fmtrans lib_fair lb1 (Some 0%nat) lb2):
     client_trans (lb1, 1) (Some $ inl 0%nat) (lb2, 1)
   | ct_y_step_1 (lb: fmstate lib_fair)
-                (LIB_NOSTEP: 0 ∉ live_roles _ lb):
+                (* (LIB_NOSTEP: 0 ∉ live_roles _ lb) *)
+                (LIB_NOROLES: ls_tmap lb (LM := lib_model) !! 0 = Some ∅)
+    :
     client_trans (lb, 1) (Some $ inr ρy) (lb, 0)
   .
 
@@ -127,8 +129,9 @@ Section ClientDefs.
     intros. eapply client_lr_spec; eauto. 
   Defined.
 
+  Definition client_fl := 10. 
   Definition client_model: LiveModel heap_lang client_model_impl :=
-    {| lm_fl _ := 10; |}.  
+    {| lm_fl _ := client_fl; |}.  
 
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
      cl_pre_fuel :> inG Σ (authUR (gmapUR (RoleO lib_model_impl) (exclR natO)));
@@ -305,7 +308,7 @@ Section ClientSpec.
     (∃ (L: gset (fmrole lib_model_impl)) (Ract Rfr: gset client_role), 
         ⌜ m = {[ 0 := L ]} ⌝ ∗
          lib_frag_mapping_impl_is {[ 0 := L ]} ∗
-         (⌜ L ≠ ∅ ⌝ ∗ ⌜ Ract = {[ inl 0 ]} /\ Rfr = {[ inr ρy ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ inl 0 := f ]} ∗ ⌜ f <= 5 (* TODO: quite random, generalize*) ⌝) ∨
+         (⌜ L ≠ ∅ ⌝ ∗ ⌜ Ract = {[ inl 0 ]} /\ Rfr = {[ inr ρy ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ inl 0 := f ]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∨
           ⌜ L = ∅ ⌝ ∗ ⌜ Ract = {[ inr ρy ]} /\ Rfr = {[ inl 0 ]} ⌝ ∗ partial_fuel_is {[ inr ρy := 10 ]}) ∗
         partial_mapping_is {[ 0 := Ract ]} ∗
         partial_free_roles_are Rfr ∗
@@ -353,6 +356,51 @@ Section ClientSpec.
         ⌜ ls_tmap δ2 (LM := lib_model) = <[ζ:=dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)]> (ls_tmap δ1 (LM := lib_model)) ⌝. 
   Proof. Admitted. 
 
+  Lemma live_roles_1 lb:
+    live_roles client_model_impl (lb, 1) = 
+    if (decide (0 ∈ live_roles _ lb)) 
+    then {[ inl 0 ]} 
+    else if decide (ls_tmap lb (LM := lib_model) !! 0 = Some ∅) 
+         then {[ inr ρy ]} 
+         else ∅. 
+  Proof. 
+    simpl. rewrite /client_lr.
+    apply leibniz_equiv. rewrite filter_union.
+
+    destruct (decide (0 ∈ live_roles lib_fair lb)) as [LR | LR].
+    - pose proof (LM_live_role_map_notempty _ _ LR) as (?&MAP&?).
+      erewrite filter_singleton, filter_singleton_not, decide_True.
+      + set_solver.
+      + eauto.
+      + rewrite bool_decide_eq_false_2; [done| ].
+        intros [? STEP]. inversion STEP. subst. set_solver.
+      + rewrite bool_decide_eq_true_2; [done| ].
+        eapply LM_live_roles_strong in LR as [? ?]. eauto. 
+        eexists. eapply ct_lib_step. simpl. eauto.
+    - rewrite filter_singleton_not; [rewrite decide_False| ]. 
+      2: { intros [DOM LIVE]%elem_of_filter.
+           by apply LM_live_roles_strong in DOM. }
+      2: { rewrite bool_decide_eq_false_2; [done| ].
+           intros [? STEP]. inversion STEP. subst. simpl in LIB_STEP.
+           destruct LR. apply LM_live_roles_strong. eauto. }
+      destruct (ls_tmap lb (LM := lib_model) !! 0) eqn:MAP0; rewrite MAP0.
+      + destruct (decide (g = ∅)) as [-> | ?]. 
+        * erewrite decide_True; [| done].
+          rewrite filter_singleton; [set_solver| ].
+          rewrite bool_decide_eq_true_2; [done| ]. eexists. by econstructor.
+        * erewrite decide_False.
+          2: { intros [=]. done. }
+          rewrite filter_singleton_not; [set_solver| ].
+          rewrite bool_decide_eq_false_2; [done| ].
+          intros [? STEP]. inversion STEP. subst.
+          rewrite MAP0 in LIB_NOROLES. congruence.
+      + erewrite decide_False; [| done].
+        rewrite filter_singleton_not; [set_solver| ].
+        rewrite bool_decide_eq_false_2; [done| ].
+        intros [? STEP]. inversion STEP. subst.
+        rewrite MAP0 in LIB_NOROLES. congruence.
+  Qed. 
+
   Lemma live_roles_2 lb0:
     live_roles client_model_impl (lb0, 2) ≡ {[ inr ρy ]}.
   Proof. 
@@ -365,48 +413,53 @@ Section ClientSpec.
       intros [? STEP]. inversion STEP.
   Qed. 
 
-  Lemma live_roles_1' lb0 (LB0_ACT: 0 ∈ live_roles _ lb0):
-    live_roles client_model_impl (lb0, 1) = {[ inl 0 ]}.
-  Proof. 
-    simpl. rewrite /client_lr.
-    pose proof LB0_ACT as LB0_ACT_.
-    apply leibniz_equiv. rewrite filter_union.
-    simpl in LB0_ACT.
-    apply elem_of_filter in LB0_ACT as [[? STEP'] IN].
-    (* red in STEP'.  *)
-    erewrite filter_singleton, filter_singleton_not; [set_solver| ..].
-    - apply not_true_iff_false. 
-      rewrite bool_decide_eq_false_2; [tauto| ].
-      intros [? STEP]. inversion STEP. subst.
-      done. 
-    - rewrite bool_decide_eq_true_2; [done| ].
-      eexists. apply ct_lib_step. simpl. eauto.
-  Qed.  
+  (* Lemma live_roles_1' lb0 R *)
+  (*   (LB0_R: ls_tmap lb0 !! 0 = Some R) *)
+  (*   : *)
+  (*   live_roles client_model_impl (lb0, 1) = if decide (R = ∅) then ∅ else {[ inl 0 ]}. *)
+  (* Proof.  *)
+  (*   simpl. rewrite /client_lr. *)
+  (*   (* pose proof LB0_ACT as LB0_ACT_. *) *)
+  (*   apply leibniz_equiv. rewrite filter_union. *)
+  (*   (* simpl in LB0_ACT. *) *)
+  (*   (* apply elem_of_filter in LB0_ACT as [[? STEP'] IN]. *) *)
+  (*   (* red in STEP'.  *) *)
+  (*   rewrite union_comm.  *)
+  (*   erewrite filter_singleton_not. *)
+  (*   2:  *)
+    
+  (*   - apply not_true_iff_false.  *)
+  (*     rewrite bool_decide_eq_false_2; [tauto| ]. *)
+  (*     intros [? STEP]. inversion STEP. subst. *)
+  (*     apply LM_live_role_map_notempty in LB0_ACT_ as [? [??]]. set_solver. *)
+  (*   - rewrite bool_decide_eq_true_2; [done| ]. *)
+  (*     eexists. apply ct_lib_step. simpl. eauto. *)
+  (* Qed.   *)
 
-  Lemma live_roles_1'' lb
-    (* (NOACT: ls_tmap lb !! 0 = Some ∅) *)
-    (NOACT: 0 ∉ live_roles _ lb)
-    :
-    live_roles client_model_impl (lb, 1) = {[ inr ρy ]}.
-  Proof. 
-    simpl. rewrite /client_lr.
-    apply leibniz_equiv. rewrite filter_union.
-    erewrite filter_singleton_not, filter_singleton; [set_solver| ..].
-    - rewrite bool_decide_eq_true_2; [done| ].
-      eexists. by eapply ct_y_step_1.
-    - rewrite bool_decide_eq_false_2; [done| ].
-      intros [? STEP].
-      apply NOACT. apply LM_live_roles_strong.
-      inversion STEP; subst.
-      eexists. simpl in LIB_STEP. eauto. 
-  Qed. 
+  (* Lemma live_roles_1'' lb *)
+  (*   (* (NOACT: ls_tmap lb !! 0 = Some ∅) *) *)
+  (*   (NOACT: 0 ∉ live_roles _ lb) *)
+  (*   : *)
+  (*   live_roles client_model_impl (lb, 1) = {[ inr ρy ]}. *)
+  (* Proof.  *)
+  (*   simpl. rewrite /client_lr. *)
+  (*   apply leibniz_equiv. rewrite filter_union. *)
+  (*   erewrite filter_singleton_not, filter_singleton; [set_solver| ..]. *)
+  (*   - rewrite bool_decide_eq_true_2; [done| ]. *)
+  (*     eexists. by eapply ct_y_step_1. *)
+  (*   - rewrite bool_decide_eq_false_2; [done| ]. *)
+  (*     intros [? STEP]. *)
+  (*     apply NOACT. apply LM_live_roles_strong. *)
+  (*     inversion STEP; subst. *)
+  (*     eexists. simpl in LIB_STEP. eauto.  *)
+  (* Qed.  *)
 
-  Lemma live_roles_1 lb:
-    live_roles client_model_impl (lb, 1) = 
-    {[ if (decide (0 ∈ live_roles _ lb)) then inl 0 else inr ρy ]}.
-  Proof. 
-    destruct decide; auto using live_roles_1', live_roles_1''.
-  Qed.
+  (* Lemma live_roles_1 lb: *)
+  (*   live_roles client_model_impl (lb, 1) =  *)
+  (*   {[ if (decide (0 ∈ live_roles _ lb)) then inl 0 else inr ρy ]}. *)
+  (* Proof.  *)
+  (*   destruct decide; auto using live_roles_1', live_roles_1''. *)
+  (* Qed. *)
 
   Tactic Notation "specialize_full" ident(H) :=
     let foo := fresh in
@@ -454,8 +507,8 @@ Section ClientSpec.
     { eauto. }
     { set_solver. }
     
-    pose proof (live_roles_1' lb) as LIVE. specialize_full LIVE.
-    { eapply LM_live_roles_strong. eexists. by econstructor. }
+    pose proof (live_roles_1 lb) as LIVE. rewrite decide_True in LIVE. 
+    2: { eapply LM_live_roles_strong. eexists. by econstructor. }
     (* TODO: consider the case with rem ≠ ∅ *)
     pose proof (live_roles_1 lb') as LIVE'.
 
@@ -464,42 +517,56 @@ Section ClientSpec.
     rewrite difference_empty_L. rewrite difference_empty_L in TMAP_LIB.
     iDestruct "FUELS_LIB" as "[MAP_LIB FUEL_LIB]".
     rewrite dom_domain_restrict; [| set_solver].
-    simpl. iDestruct "MAP_LIB" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
+    simpl.  iDestruct "MAP_LIB" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
     iDestruct "MATCH" as "[(_&[-> ->]&[%f [FUEL0 %BOUND0]]) | [% _]]".
     2: { exfalso. set_solver. }    
     iAssert (has_fuels 0 {[ inl 0 := f ]}) with "[MAP FUEL0]" as "FUELS".
     { rewrite /has_fuels. rewrite dom_singleton_L big_sepS_singleton.
       rewrite lookup_singleton. iFrame. iExists _. iFrame. done. }
-                                                                             
+
+    Ltac dEq := destruct (decide (_ = _)). 
+    Ltac dEl := destruct (decide (_ ∈ _)). 
+    pose proof (LM_map_empty_notlive lb' 0 (LM := lib_model)). 
     iPoseProof (update_step_still_alive with "[$] [$] [$] [$] [$]") as "EM_STEP". 
     7: { by rewrite LASTE in x0. }
     7: { apply ct_lib_step. simpl. econstructor; eauto. }
     { rewrite LIVE LIVE'. destruct decide; set_solver. }
     { rewrite dom_singleton. 
-      assert ((if (decide (0 ∈ live_roles lib_fair lb'))
-              then (∅: gset (fmrole client_model_impl)) else {[ inl 0 ]}) ⊆ {[inl 0]}) as IN. 
-      { destruct decide; set_solver. }
+      assert ((if (decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅))
+              then {[ inl 0 ]}
+              else (∅: gset (fmrole client_model_impl))) ⊆ {[inl 0]}) as IN.
+      { destruct (decide (_ = _)); set_solver. }
       apply IN. }
     { rewrite LIVE. set_solver. }
     all: eauto.
-    { Unshelve. 2: exact (if decide (0 ∈ live_roles lib_fair lb') then {[ inl 0 := f ]} else {[ inr ρy := 10 ]}).
-      destruct decide; set_solver. }
+    { Unshelve. 
+      2: exact (if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) 
+                then {[ inr ρy := client_fl ]} 
+                else {[ inl 0 := if decide (0 ∈ live_roles lib_fair lb')
+                                 then client_fl
+                                 else f - 1 ]}).
+      destruct (decide (_=_)); set_solver. }
     { repeat split; rewrite ?LIVE ?LIVE'.
-      - destruct decide; [| set_solver].
-        intros _. rewrite lookup_singleton. simpl. lia.
-      - destruct decide; set_solver.
+      - destruct (decide (_ ∈ _)).
+        2: { destruct decide; set_solver. }
+        intros _. rewrite decide_False. 
+        { rewrite lookup_singleton. simpl. lia. }
+        tauto. 
+      - destruct (decide (_ ∈ _)); [set_solver| ].
+        destruct (decide (_=_)); [set_solver| ].
+        rewrite !lookup_singleton. simpl. lia. 
       - set_solver.
-      - destruct decide; [set_solver| ].
+      - dEq; [| set_solver]. 
         intros. assert (ρ' = inr ρy) as -> by set_solver.
         rewrite lookup_singleton. simpl. lia.
-      - destruct decide; set_solver.
-      - destruct decide; set_solver.
-      - destruct decide; set_solver. }
+      - dEq; set_solver.
+      - dEq; dEl; set_solver.
+      - dEq; dEl; set_solver. }
     iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EVOL & FUELS & ST & MSI & FR)"; [set_solver| ].
     rewrite LIVE LIVE'. 
-    iDestruct (partial_free_roles_are_Proper with "FR") as "FR".
-    { Unshelve. 2: exact {[if decide (0 ∈ live_roles lib_fair lb') then inr ρy else inl 0 ]}.
-      destruct decide; set_solver. }
+    (* iDestruct (partial_free_roles_are_Proper with "FR") as "FR". *)
+    (* { Unshelve. 2: exact {[if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) then inr ρy else inl 0 ]}.
+      destruct decide; set_solver. } *)
     do 2 iExists _. iFrame "MSI EVOL".
 
     iMod ("CLOS" with "[ST MSI_LIB YST_AUTH]") as "_".
@@ -507,8 +574,30 @@ Section ClientSpec.
 
     iModIntro.
     iDestruct "FUELS" as "[MAP FUEL]". 
-    rewrite /has_fuels. 
-    
+    rewrite /has_fuels. iSplitR "FUEL_LIB".
+    2: { rewrite dom_domain_restrict; [| set_solver]. done. }
+    simpl. rewrite dom_domain_restrict; [| set_solver].
+    rewrite /lib_pmi. do 3 iExists _. iFrame.
+    iSplitR; [done| ].
+    assert (L = dom fs) as ->; [set_solver| ].
+    (* TODO: case when domain becomes empty *)
+    iLeft. iSplitR; [done| ].
+    rewrite dom_domain_restrict in TMAP_LIB; [| set_solver].
+    rewrite TMAP_LIB. rewrite lookup_insert.
+    repeat erewrite @decide_False with (P := (Some (dom fs) = Some ∅)).
+    2-4: by intros [=].
+    iSplitR.
+    - iPureIntro. split; [set_solver| ].
+      destruct (decide (_ ∈ filter _ _)); set_solver.
+    -
+      (* iExists f. iSplit; [| done]. *)
+      rewrite dom_singleton_L big_sepS_singleton.
+      rewrite lookup_singleton. 
+      iDestruct "FUEL" as (?) "[%EQ ?]". inversion EQ. subst.  
+      iExists _. iFrame. iPureIntro.
+      rewrite decide_True; [lia| ].
+      apply elem_of_filter. split; [| set_solver]. 
+      eapply LM_live_roles_strong. 
     
     
     
