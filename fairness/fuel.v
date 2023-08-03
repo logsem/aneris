@@ -49,8 +49,8 @@ Section fairness.
   | Change_tid otid (Hneqtid: a.(ls_mapping) !! ρ' ≠ b.(ls_mapping) !! ρ')
                (Hissome: is_Some (b.(ls_mapping) !! ρ')):
     must_decrease ρ' oρ a b otid
-  | Zombie otid (Hismainrole: oρ = Some ρ') (Hnotalive: ρ' ∉ live_roles _ b) (Hnotdead: ρ' ∈ dom b.(ls_fuel)):
-    must_decrease ρ' oρ a b otid
+  (* | Zombie otid (Hismainrole: oρ = Some ρ') (Hnotalive: ρ' ∉ live_roles _ b) (Hnotdead: ρ' ∈ dom b.(ls_fuel)): *)
+  (*   must_decrease ρ' oρ a b otid *)
   .
 
   Definition fuel_decr (tid: olocale Λ) (oρ: option M.(fmrole))
@@ -60,9 +60,13 @@ Section fairness.
           oless (b.(ls_fuel) !! ρ') (a.(ls_fuel) !! ρ').
 
   Definition fuel_must_not_incr oρ (a b: LiveState) :=
-    ∀ ρ', ρ' ∈ dom a.(ls_fuel) -> Some ρ' ≠ oρ ->
-          (oleq (b.(ls_fuel) !! ρ') (a.(ls_fuel) !! ρ')
-                ∨ (ρ' ∉ dom b.(ls_fuel) ∧ ρ' ∉ M.(live_roles) a.(ls_under))).
+    (* ∀ ρ', ρ' ∈ dom a.(ls_fuel) -> Some ρ' ≠ oρ -> *)
+    (*       (oleq (b.(ls_fuel) !! ρ') (a.(ls_fuel) !! ρ') *)
+    (*             ∨ (ρ' ∉ dom b.(ls_fuel) ∧ ρ' ∉ M.(live_roles) a.(ls_under))). *)
+    ∀ ρ', ρ' ∈ dom a.(ls_fuel) -> 
+          (oleq (b.(ls_fuel) !! ρ') (a.(ls_fuel) !! ρ') ∨
+           oρ = Some ρ' /\ (ρ' ∉ dom b.(ls_fuel) \/ ρ' ∈ M.(live_roles) b.(ls_under)) \/
+           (ρ' ∉ dom b.(ls_fuel) ∧ ρ' ∉ M.(live_roles) a.(ls_under))).
 
   Definition ls_trans fuel_limit (a: LiveState) ℓ (b: LiveState): Prop :=
     match ℓ with
@@ -366,7 +370,8 @@ Section fairness_preserved.
           - inversion Htm as [|s1 ℓ1 r1 s2 ℓ2 r2 Hl Hs Hts Hls Hmatchrest]; simplify_eq.
             simpl in *. destruct ℓ; try done. destruct Hls as [_ [_ [Hnoninc _]]].
             have HnotNone: Some ρ ≠ None by congruence.
-            specialize (Hnoninc ρ ltac:(SS) HnotNone).
+            (* specialize (Hnoninc ρ ltac:(SS) HnotNone). *)
+            specialize (Hnoninc ρ ltac:(SS)).
             unfold oleq in Hnoninc. rewrite Hfuel in Hnoninc.
             destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [|set_solver].
             eexists; split =>//. destruct Hnoninc as [Hnoninc|Hnoninc]=>//.
@@ -376,7 +381,8 @@ Section fairness_preserved.
             + destruct Hls as (?&?&?&Hnoninc&?).
               unfold fuel_must_not_incr in Hnoninc.
               have Hneq: Some ρ ≠ Some ρ0 by congruence.
-              specialize (Hnoninc ρ ltac:(SS) Hneq).
+              (* specialize (Hnoninc ρ ltac:(SS) Hneq). *)
+              specialize (Hnoninc ρ ltac:(SS)).
               unfold oleq in Hnoninc. rewrite Hfuel in Hnoninc.
               destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [|set_solver].
               eexists; split =>//. destruct Hnoninc as [Hnoninc|Hnoninc]=>//.
@@ -384,7 +390,8 @@ Section fairness_preserved.
             + destruct Hls as (?&?&Hnoninc&?).
               unfold fuel_must_not_incr in Hnoninc.
               have Hneq: Some ρ ≠ None by congruence.
-              specialize (Hnoninc ρ ltac:(SS) Hneq).
+              (* specialize (Hnoninc ρ ltac:(SS) Hneq). *)
+              specialize (Hnoninc ρ ltac:(SS)).
               unfold oleq in Hnoninc. rewrite Hfuel in Hnoninc.
               destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [|set_solver].
               eexists; split =>//. destruct Hnoninc as [Hnoninc|Hnoninc]=>//.
@@ -629,12 +636,14 @@ Section fuel_dec_unless.
       rewrite !lookup_delete_ne //.
       destruct (decide (ρ' ∈ dom δ.(ls_fuel))) as [Hin|Hnotin]; last set_solver.
       rewrite /fuel_must_not_incr in Hni.
-      destruct (Hni ρ' ltac:(done) ltac:(done)); [done|set_solver].
+      (* destruct (Hni ρ' ltac:(done) ltac:(done)); [done|set_solver]. *)
+      destruct (Hni ρ' ltac:(done)); [done|set_solver].
     - assert (size $ ls_fuel (trfirst auxtr') < size $ ls_fuel δ).
       { rewrite -!size_dom. apply subset_size. set_solver. }
       apply Nat.add_lt_le_mono =>//.
       apply big_addM_leq_forall => ρ' Hρ'.
-      destruct (Hni ρ' ltac:(set_solver) ltac:(done)); [done|set_solver].
+      (* destruct (Hni ρ' ltac:(set_solver) ltac:(done)); [done|set_solver]. *)
+      destruct (Hni ρ' ltac:(set_solver)); [done|set_solver].
   Qed.
 End fuel_dec_unless.
 

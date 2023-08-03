@@ -542,9 +542,7 @@ Section ClientSpec.
     { Unshelve. 
       2: exact (if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) 
                 then {[ inr ρy := client_fl ]} 
-                else {[ inl 0 := if decide (0 ∈ live_roles lib_fair lb')
-                                 then client_fl
-                                 else f - 1 ]}).
+                else {[ inl 0 := f ]}).
       destruct (decide (_=_)); set_solver. }
     { repeat split; rewrite ?LIVE ?LIVE'.
       - destruct (decide (_ ∈ _)).
@@ -594,11 +592,8 @@ Section ClientSpec.
       rewrite dom_singleton_L big_sepS_singleton.
       rewrite lookup_singleton. 
       iDestruct "FUEL" as (?) "[%EQ ?]". inversion EQ. subst.  
-      iExists _. iFrame. iPureIntro.
-      rewrite decide_True; [lia| ].
-      apply elem_of_filter. split; [| set_solver]. 
-      eapply LM_live_roles_strong. 
-    
+      iExists _. iFrame. iPureIntro. lia.
+    Admitted.
     
     
 

@@ -189,8 +189,9 @@ Proof.
         rewrite /= /new_mapping map_filter_lookup in Hneqtid.
         pose proof Hin as Hin2. rewrite -ls_same_doms in Hin2. apply elem_of_dom in Hin2 as [f Hf].
         rewrite Hf /= option_guard_True // in Hneqtid.
-    - intros ρ' Hin _. simpl. destruct (decide (ρ' ∈ rem)) as [Hin'|Hnin'].
-      + right; split; last set_solver -Hnewdom Hsamedoms Hfueldom.
+    - intros ρ' Hin. simpl. destruct (decide (ρ' ∈ rem)) as [Hin'|Hnin'].
+      + right. right. 
+        split; last set_solver -Hnewdom Hsamedoms Hfueldom.
         rewrite build_LS_ext_spec_fuel. 
         rewrite /fuel_apply map_imap_dom_eq ?dom_gset_to_gmap; first set_solver.
         intros ρ0 _ Hin0. 
@@ -449,7 +450,7 @@ Proof.
         assert (Hindom: ρ ∈ dom fs); first by set_unfold; naive_solver.
         apply elem_of_dom in Hindom as [f Hindom]. rewrite Hindom /= decide_True /=; [lia|set_unfold; naive_solver]. }
     iSplit.
-    { iPureIntro. intros ρ' Hρ' _. simpl. left.
+    { iPureIntro. intros ρ' Hρ'. simpl. left.
       rewrite build_LS_ext_spec_fuel.
       rewrite map_lookup_imap. rewrite elem_of_dom in Hρ'.
       destruct Hρ' as [f Hf]. rewrite Hf /=. destruct (decide ((ρ' ∈ R1 ∪ R2))); simpl; lia. }
@@ -691,22 +692,23 @@ Proof.
               apply elem_of_difference in Hin as [??].
               rewrite map_lookup_imap lookup_gset_to_gmap /= option_guard_False /= in Hissome;
                 [inversion Hissome; congruence|set_solver -Hsamedoms Hnewdom Hdom].
-          + simpl in *. rewrite Hfuel; last set_solver -Hsamedoms Hnewdom Hdom.
-            unfold update_fuel_resource, fuel_apply.
-            rewrite build_LS_ext_spec_fuel in Hnotdead, Hdom.
-            rewrite Hnewdom in Hnotdead.
-            rewrite build_LS_ext_spec_fuel.
-            rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=.
-            assert (ρ' ∈ dom fs2) by (set_solver -Hsamedoms Hnewdom Hdom).
-            rewrite decide_True; [| done].
-            apply Hzombie =>//; [| set_solver].
-            rewrite build_LS_ext_spec_st in Hnotalive.
-            set_solver -Hsamedoms Hnewdom Hdom.
+          (* + simpl in *. rewrite Hfuel; last set_solver -Hsamedoms Hnewdom Hdom. *)
+          (*   unfold update_fuel_resource, fuel_apply. *)
+          (*   rewrite build_LS_ext_spec_fuel in Hnotdead, Hdom. *)
+          (*   rewrite Hnewdom in Hnotdead. *)
+          (*   rewrite build_LS_ext_spec_fuel. *)
+          (*   rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=. *)
+          (*   assert (ρ' ∈ dom fs2) by (set_solver -Hsamedoms Hnewdom Hdom). *)
+          (*   rewrite decide_True; [| done]. *)
+          (*   apply Hzombie =>//; [| set_solver]. *)
+          (*   rewrite build_LS_ext_spec_st in Hnotalive. *)
+          (*   set_solver -Hsamedoms Hnewdom Hdom. *)
     }
         split.
-        + intros ? Hin ?.
-          rewrite build_LS_ext_spec_fuel.
+        + intros ? Hin.
+          rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st. 
           simplify_eq; simpl.
+
           unfold update_fuel_resource, fuel_apply.
           rewrite map_lookup_imap lookup_gset_to_gmap.
           destruct (decide (ρ' ∈ (dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))) as [Hlive|Hlive].
@@ -714,9 +716,16 @@ Proof.
             apply elem_of_difference in Hlive as [Hin1 Hnin].
             apply not_elem_of_difference in Hnin.
             destruct (decide (ρ' ∈ dom fs2)) as [Hin2|Hin2].
-            ** destruct (decide (ρ' ∈ live_roles _ δ1)); left.
+            **
+              destruct (decide (ρ' = ρ)).
+              { subst ρ'. destruct Hnin; [set_solver| ].
+                destruct (decide (ρ ∈ live_roles M s2)).
+                - tauto.
+                - left. rewrite Hfuel; set_solver. }
+              destruct (decide (ρ' ∈ live_roles _ δ1)); left.
                *** destruct (decide (ρ' ∈ dom fs1)).
-                   { rewrite Hfuel //. apply oleq_oless, Hdec; [congruence|set_solver -Hsamedoms Hnewdom]. }
+                   { rewrite Hfuel //.
+                     apply oleq_oless, Hdec; [congruence|set_solver -Hsamedoms Hnewdom]. }
                    { exfalso. set_solver -Hsamedoms Hnewdom. }
                *** assert (ρ' ∉ live_roles _ s2).
                    { by_contradiction. assert (ρ' ∈ fr1); [eapply elem_of_subseteq; eauto; set_solver -Hsamedoms Hnewdom|].
@@ -724,12 +733,19 @@ Proof.
                    assert (ρ' ∈ dom fs1) by set_solver -Hsamedoms Hnewdom.
                    rewrite Hfuel //. apply oleq_oless, Hdec; [congruence|set_solver -Hsamedoms Hnewdom].
             ** left. rewrite elem_of_dom in Hin. destruct Hin as [? ->]. simpl;lia.
-          * right; split.
+          * destruct (decide (ρ' = ρ)).
+            { subst. right. left. split; auto. left.               
+              eapply not_elem_of_weaken; [|by apply map_imap_dom_inclusion; rewrite dom_gset_to_gmap].
+              rewrite dom_gset_to_gmap //. }
+
+            right; right; split.
             ** eapply not_elem_of_weaken; [|by apply map_imap_dom_inclusion; rewrite dom_gset_to_gmap].
                rewrite dom_gset_to_gmap //.
             ** apply not_elem_of_difference in Hlive as [?|Hlive]; [set_solver -Hsamedoms Hnewdom|].
                apply elem_of_difference in Hlive as [? Habs].
-               exfalso. apply Habs. set_solver -Hsamedoms Hnewdom Hfueldom.
+               exfalso. apply Habs.
+               (* assert (ρ' ≠ ρ) by admit.  *)
+               set_solver -Hsamedoms Hnewdom Hfueldom.
         +
           rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
           split.

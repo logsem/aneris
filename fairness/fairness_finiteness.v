@@ -192,19 +192,26 @@ Section finitary.
             apply elem_of_dom_2 in Hmap. rewrite ls_same_doms in Hmap.
             pose proof Hsome as Hsome'. apply elem_of_dom_2 in Hsome'.
             specialize (Hleq ρ' ltac:(done) ltac:(done)).
-            assert(must_decrease ρ' (Some ρ') δ1 δ' (Some tid')) as Hmd; first by constructor 3.
-            specialize (Hleq Hmd). rewrite Hsome /= in Hleq.
-            apply elem_of_dom in Hmap as [? Heq]. rewrite Heq in Hleq.
+            (* assert (must_decrease ρ' (Some ρ') δ1 δ' (Some tid')) as Hmd; first by constructor 3. *)            
+            (* specialize (Hleq Hmd). rewrite Hsome /= in Hleq. *)
+            (* apply elem_of_dom in Hmap as [? Heq]. rewrite Heq in Hleq. *)
+            (* pose proof (max_gmap_spec _ _ _ Heq). simpl in *. *)
+            (* apply Nat.lt_le_incl. eapply Nat.lt_le_trans; [apply Hleq| ]. *)
+            (* etrans; [apply H3| ]. *)
+            (* apply Nat.le_max_l.             *)
+            assert (oleq (ls_fuel δ' !! ρ') (ls_fuel (trace_last atr) !! ρ')).
+            { specialize (H0 ρ' Hmap). destruct H0 as [?|[?|?]]; set_solver. }
+            simpl in H3. rewrite Hsome in H3.
+            subst δ1.
+            apply elem_of_dom in Hmap as [? Heq]. rewrite Heq in H3. 
             pose proof (max_gmap_spec _ _ _ Heq). simpl in *.
-            apply Nat.lt_le_incl. eapply Nat.lt_le_trans; [apply Hleq| ].
-            etrans; [apply H3| ].
-            apply Nat.le_max_l.            
+            lia. 
         + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&?&Hleq'&?&Hnew&?).
           destruct (decide (ρ ∈ dom $ ls_fuel δ1)) as [Hin|Hnotin].
           * assert (Hok: oleq (ls_fuel δ' !! ρ) (ls_fuel δ1 !! ρ)).
             { unfold fuel_must_not_incr in *.
               assert (ρ ∈ dom $ ls_fuel δ1) by SS.
-              specialize (Hleq' ρ ltac:(done) ltac:(congruence)) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
+              specialize (Hleq' ρ ltac:(done) ) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
             rewrite Hsome in Hok. destruct (ls_fuel δ1 !! ρ) as [f'|] eqn:Heqn; last done.
             pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
             etrans; [| apply Nat.le_max_l]. etrans; eauto.
@@ -214,12 +221,13 @@ Section finitary.
       - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
         assert (ρ ∈ dom $ ls_fuel δ1) as Hin.
         { apply elem_of_dom_2 in Hsome. set_solver. }
-        specialize (Hleq Hin ltac:(done)) as [Hleq|Hleq].
+        specialize (Hleq Hin) as [Hleq|[Hleq|Hleq]].
         + rewrite Hsome in Hleq. destruct (ls_fuel δ1 !! ρ) as [f'|] eqn:Heqn.
           * pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
             etrans; [| apply Nat.le_max_l].
             rewrite Heqn in Hleq. lia.  
           * simpl in *. rewrite Heqn in Hleq. done.
+        + destruct Hleq as [[=] _]. 
         + apply elem_of_dom_2 in Hsome. set_solver.
       - inversion Htrans as [? [? [Hleq [Hnew Hfalse]]]]. done. }
     { intros ρ' tid' Hsome. unfold tids_smaller in *.
@@ -230,7 +238,7 @@ Section finitary.
     + intros. apply make_proof_irrel.
     + done.
     + done. 
-  Qed.
+  Qed. 
 
   Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
     rel_finitary (valid_lift_fairness (λ extr auxtr, ξ extr (map_underlying_trace auxtr) ∧ φ extr auxtr)).
@@ -342,6 +350,9 @@ Proof.
     - intros ??. apply make_decision.
     - intros ??. apply make_decision. }
   by eapply valid_state_evolution_finitary_fairness.
+  (* TODO: get rid of it *)
+  Unshelve. 
+  all: intros ??; apply make_decision.
 Qed.
 
 Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel Λ Mdl}

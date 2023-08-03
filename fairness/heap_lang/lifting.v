@@ -866,7 +866,7 @@ Proof using.
       split; set_solver.
     + (* repeat (split; set_solver). *)
       repeat (split; try set_solver).
-      * intros. rewrite !lookup_singleton. simpl. eauto.
+      * intros. rewrite !lookup_singleton. simpl. apply Nat.lt_le_incl. tauto. 
       * apply fm_live_spec in Htrans. set_solver.
   - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done |]. 
     iModIntro; iExists δ2, ℓ. iSplit.
@@ -1003,7 +1003,7 @@ Proof using.
   all: eauto. 
   1-3: set_solver.
   - apply head_locale_step; econstructor =>//.
-  - repeat (split; try done); [|set_solver|set_solver|set_solver| set_solver |].
+  - repeat (split; try done); try set_solver. 
     + intros ??. rewrite !lookup_singleton /=. lia.
     + rewrite dom_singleton singleton_subseteq_l. simplify_eq.
       (* destruct (decide (ρ ∈ live_roles _ (project_inner (trace_last atr)))); set_solver. *)
