@@ -6,7 +6,7 @@ Section adequacy.
 (* Local Hint Resolve tid_step_tp_length_heap: core. *)
 
 Theorem heap_lang_continued_simulation_fair_termination {FM : FairModel}
-        `{FairTerminatingModel FM} {LM:LiveModel heap_lang FM} ξ a1 r1 extr :
+        `{FairTerminatingModel FM} {LM:LiveModel (locale heap_lang) FM} ξ a1 r1 extr :
   continued_simulation
     (sim_rel_with_user LM ξ)
     ({tr[trfirst extr]}) ({tr[initial_ls (LM := LM) a1 r1]}) →
@@ -19,7 +19,7 @@ Proof.
   - by intros ex atr [[??]?].
 Qed.
 
-Let rel_always_holds `{LM:LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
+Let rel_always_holds `{LM:LiveModel (locale heap_lang) M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
   s ξ e1 σ1 δ1 := 
       rel_always_holds0 (fun etr atr => ξ etr (map_underlying_trace atr)) 
         s (state_interp) (fun _ => frag_mapping_is {[ 0%nat := ∅ ]}) e1 σ1 δ1. 
@@ -36,12 +36,12 @@ Qed.
   
 
 (* TODO: should hold by definition after changing LiveState *)
-Lemma initial_ls_tmap `{LM: LiveModel heap_lang M} τ s:
+Lemma initial_ls_tmap `{LM: LiveModel (locale heap_lang) M} τ s:
   ls_tmap (initial_ls s τ) (LM := LM) = {[ τ := live_roles M s ]}.
 Proof. Admitted. 
 
 
-Lemma rel_always_holds_lift_LM `{LM: LiveModel heap_lang M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
+Lemma rel_always_holds_lift_LM `{LM: LiveModel (locale heap_lang) M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
   s e1 σ1 s1 ξ:
   rel_always_holds s ξ e1 σ1 (initial_ls s1 0%nat) -∗
   rel_always_holds0 (sim_rel_with_user LM ξ) s state_interp
@@ -128,7 +128,7 @@ Proof.
 Qed.
   
 
-Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
+Theorem strong_simulation_adequacy Σ `(LM:LiveModel (locale heap_lang) M)
     `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop) :
@@ -154,7 +154,7 @@ Proof.
   by iApply rel_always_holds_lift_LM. 
 Qed.
 
-Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M):
+Theorem simulation_adequacy Σ `(LM:LiveModel (locale heap_lang) M) `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M):
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   (* The initial configuration satisfies certain properties *)
@@ -191,7 +191,7 @@ Proof.
     iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
 
-Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)
+Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel (locale heap_lang) M)
         `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)}  (s: stuckness)
         e1 σ1 (s1: M)
         (iex : inf_execution_trace heap_lang)
@@ -226,7 +226,7 @@ Qed.
 
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
-Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M)
+Theorem simulation_adequacy_traces Σ `(LM : LiveModel (locale heap_lang) M)
   `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
@@ -240,7 +240,7 @@ Theorem simulation_adequacy_traces Σ `(LM : LiveModel heap_lang M)
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : auxtrace LM), exaux_traces_match extr auxtr.
+  ∃ (auxtr : auxtrace (LM := LM)), exaux_traces_match extr auxtr.
 Proof.
   intros Hfin Hwp.
   have [iatr Hbig] : exists iatr,
@@ -268,7 +268,7 @@ Proof.
 Qed.
 
 
-Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
+Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel (locale heap_lang) M)
         `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
@@ -282,7 +282,7 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
                ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : auxtrace LM) mtr, exaux_traces_match extr auxtr ∧
+  ∃ (auxtr : auxtrace (LM:=LM)) mtr, exaux_traces_match extr auxtr ∧
                                upto_stutter ls_under Ul auxtr mtr.
 Proof.
   intros Hfb Hwp.
@@ -295,7 +295,7 @@ Proof.
 Qed.
   
 
-Theorem simulation_adequacy_terminate Σ `{LM:LiveModel heap_lang Mdl}
+Theorem simulation_adequacy_terminate Σ `{LM:LiveModel (locale heap_lang) Mdl}
         `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: Mdl)
         (extr : heap_lang_extrace)
@@ -326,7 +326,7 @@ Proof.
 Qed.
 
 Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
-        `(LM : LiveModel heap_lang M)
+        `(LM : LiveModel (locale heap_lang) M)
         `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)

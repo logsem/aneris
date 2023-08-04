@@ -4,9 +4,9 @@ From trillium.fairness Require Import fairness fuel fuel_ext resources partial_o
 
 
 Section actual_ownership.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
-  Context `{EqDecision (expr Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
+  (* Context `{EqDecision (expr Λ)}. *)
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -18,14 +18,14 @@ Section actual_ownership.
 End actual_ownership. 
 
 Section ActualOwnershipImpl.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
-  Context `{EqDecision (expr Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
+  (* Context `{EqDecision (expr Λ)}. *)
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
   Lemma mim_fuel_helper (fs: gmap (fmrole M) nat) rem ζ
-    (tmap1: gmap (locale Λ) (gset (fmrole M)))
+    (tmap1: gmap G (gset (fmrole M)))
     map1
     (Hincl : rem ⊆ dom fs)
     (Hxdom : ∀ ρ : fmrole M, map1 !! ρ = Some ζ ↔ ρ ∈ dom (S <$> fs))
@@ -225,7 +225,7 @@ Proof.
 
   Lemma mim_helper_fork_step tmap1 map1 (R1 R2 : gset (fmrole M))
     (fs: gmap (fmrole M) nat)
-    (ζ τ_new : locale Λ)
+    (ζ τ_new : G)
     (Hdisj : R1 ## R2)
     (Hunioneq : R1 ∪ R2 = dom fs)
     (Hnewζ : τ_new ∉ dom tmap1)
@@ -378,7 +378,7 @@ Proof.
     
     assert (maps_inverse_match
     (map_imap
-       (λ (ρ : fmrole M) (o : locale Λ),
+       (λ (ρ : fmrole M) (o : G),
           if decide (ρ ∈ R2) then Some τ_new else Some o)
        (ls_mapping δ1)) (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)))) as MATCH.
     { eapply mim_helper_fork_step; eauto.
@@ -471,17 +471,17 @@ Proof.
     `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
   Proof. intros. set_solver. Qed.
 
-  Lemma union_intersection_difference_equiv_L:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C}
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C},
-    Set_ A C → LeibnizEquiv C →
-    ∀ X Y: C, (forall y, Decision (y ∈ Y)) ->
-    X ≡ X ∩ Y ∪ X ∖ Y.
-  Proof.
-    intros. apply set_equiv_subseteq. split; [| set_solver].
-    apply elem_of_subseteq. intros x ?.
-    destruct (decide (x ∈ Y)); set_solver.
-  Qed.
+  (* Lemma union_intersection_difference_equiv_L: *)
+  (* ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} *)
+  (*   {H2 : Union C} {H3 : Intersection C} {H4 : Difference C}, *)
+  (*   Set_ A C → LeibnizEquiv C → *)
+  (*   ∀ X Y: C, (forall y, Decision (y ∈ Y)) -> *)
+  (*   X ≡ X ∩ Y ∪ X ∖ Y. *)
+  (* Proof. *)
+  (*   intros. apply set_equiv_subseteq. split; [| set_solver]. *)
+  (*   apply elem_of_subseteq. intros x ?. *)
+  (*   destruct (decide (x ∈ Y)); set_solver. *)
+  (* Qed. *)
 
     
   Lemma actual_update_step_still_alive

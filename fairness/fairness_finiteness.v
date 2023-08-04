@@ -22,7 +22,7 @@ End gmap.
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel (locale Λ) M}.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
 
@@ -60,20 +60,20 @@ Section finitary.
   | trace_extend tr' ℓ x => trace_extend (trace_map sf lf tr') (lf ℓ) (sf x)
   end.
 
-  Fixpoint get_underlying_fairness_trace (M : FairModel) (LM: LiveModel Λ M) (ex : auxiliary_trace LM) :=
+  Fixpoint get_underlying_fairness_trace (M : FairModel) (LM: LiveModel (locale Λ) M) (ex : auxiliary_trace LM) :=
   match ex with
   | trace_singleton δ => trace_singleton (ls_under δ)
   | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LM ex') ρ (ls_under δ)
   | trace_extend ex' _ _ => get_underlying_fairness_trace M LM ex'
   end.
 
-  Definition get_role {M : FairModel} {LM: LiveModel Λ M} (lab: mlabel LM) :=
+  Definition get_role {M : FairModel} {LM: LiveModel (locale Λ) M} (lab: mlabel LM) :=
   match lab with
   | Take_step ρ _ => Some ρ
   | _ => None
   end.
 
-  Definition map_underlying_trace {M : FairModel} {LM: LiveModel Λ M} (aux : auxiliary_trace LM) :=
+  Definition map_underlying_trace {M : FairModel} {LM: LiveModel (locale Λ) M} (aux : auxiliary_trace LM) :=
     (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
 
   Program Definition enumerate_next
@@ -236,7 +236,7 @@ Section finitary.
     Unshelve.
     + intros ??. apply make_decision.
     + intros. apply make_proof_irrel.
-    + done.
+    + (* done. *) exact (locale Λ).
     + done. 
   Qed. 
 
@@ -254,7 +254,7 @@ End finitary.
 Section finitary_simple.
   Context `{M: FairModel}.
   Context `{Λ: language}.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel (locale Λ) M}.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
 
@@ -314,21 +314,21 @@ Section finitary_simple.
 End finitary_simple.
 
 (* TODO: Why do we need [LM] explicit here? *)
-Definition live_rel `(LM: LiveModel Λ M) `{Countable (locale Λ)}
+Definition live_rel `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
            (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   live_tids (LM:=LM) (trace_last ex) (trace_last aux).
 
-Definition sim_rel `(LM: LiveModel Λ M) `{Countable (locale Λ)}
+Definition sim_rel `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
            (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   valid_state_evolution_fairness ex aux ∧ live_rel LM ex aux.
 
-Definition sim_rel_with_user `(LM: LiveModel Λ M) `{Countable (locale Λ)}
+Definition sim_rel_with_user `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
            (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
   (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   sim_rel LM ex aux ∧ ξ ex (map_underlying_trace aux).
 
 (* TODO: Maybe redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
-Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel Λ Mdl}
+Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel (locale Λ) Mdl}
       `{Countable (locale Λ)}
       (ξ : execution_trace Λ → finite_trace Mdl (option $ fmrole Mdl) →
            Prop) extr atr :
@@ -338,7 +338,7 @@ Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel Λ Mdl}
   sim_rel_with_user LM ξ extr atr.
 Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
 
-Lemma rel_finitary_sim_rel_with_user_ξ `{LM:LiveModel Λ Mdl}
+Lemma rel_finitary_sim_rel_with_user_ξ `{LM:LiveModel (locale Λ) Mdl}
       `{Countable (locale Λ)} ξ :
   rel_finitary ξ → rel_finitary (sim_rel_with_user LM ξ).
 Proof.
@@ -355,7 +355,7 @@ Proof.
   all: intros ??; apply make_decision.
 Qed.
 
-Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel Λ Mdl}
+Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel (locale Λ) Mdl}
       `{EqDecision (mstate LM)} `{EqDecision (mlabel LM)}
       `{Countable (locale Λ)} ξ :
   rel_finitary (sim_rel LM) → rel_finitary (sim_rel_with_user LM ξ).

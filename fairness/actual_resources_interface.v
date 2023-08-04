@@ -24,7 +24,7 @@ Section Utils.
 End Utils.
 
 Section ActualOwnershipInterface. 
-  Context `{LM: LiveModel heap_lang M}.
+  Context `{LM: LiveModel (locale heap_lang) M}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
   Context`{invGS_gen HasNoLc Σ}. 
@@ -48,7 +48,7 @@ Section ActualOwnershipInterface.
         repeat split; eauto.
         * done.
         * eapply tids_smaller_restrict_mapping; eauto.
-          erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
+          simpl. erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
           3: { eapply (mim_fuel_helper _ ∅); eauto.
                { set_solver. }
                eapply ls_mapping_tmap_corr. }
@@ -94,7 +94,7 @@ Section ActualOwnershipInterface.
         * done.
         * eapply tids_smaller_fork_step; eauto.
           ** by rewrite -LAST.
-          ** erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
+          ** simpl. erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
              3: { eapply mim_helper_fork_step.
                   6: eapply (ls_mapping_tmap_corr δ1).
                   all: eauto.

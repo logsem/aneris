@@ -1,5 +1,4 @@
 From stdpp Require Import option.
-From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export fuel utils. 
 
 (* TODO: move *)
@@ -29,10 +28,10 @@ End Utils.
          Previous attempt to do so failed due to weird implicit arguments errors
  *)
 Section LsTmap.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
 
-  Definition ls_tmap (δ: lm_ls LM): gmap (locale Λ) (gset (fmrole M)).
+  Definition ls_tmap (δ: lm_ls LM): gmap G (gset (fmrole M)).
   Admitted.
 
   Lemma ls_tmap_fuel_same_doms (δ: lm_ls LM):
@@ -40,11 +39,11 @@ Section LsTmap.
   Proof. Admitted.
 
   Lemma ls_tmap_disj (δ: lm_ls LM):
-    forall (τ1 τ2: locale Λ) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
+    forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
       ls_tmap δ !! τ1 = Some S1 -> ls_tmap δ !! τ2 = Some S2 -> S1 ## S2.
   Proof. Admitted. 
 
-  (* Definition ls_mapping (δ: LiveState): gmap M.(fmrole) (locale Λ) := *)
+  (* Definition ls_mapping (δ: LiveState): gmap M.(fmrole) G := *)
   (*   let tmap_l := map_to_list (ls_tmap δ) in *)
   (*   let tmap_flat := flat_map (fun '(τ, R) => map (pair τ) (elements R)) tmap_l in *)
   (*   let tmap_rev := (fun '(τ, ρ) => (ρ, τ)) <$> tmap_flat in *)
@@ -151,11 +150,11 @@ Section LsTmap.
   Definition build_LS_ext 
     (st: fmstate M) (fuel: gmap (fmrole M) nat)
     (LIVE_FUEL: live_roles _ st ⊆ dom fuel)
-    (tmap: gmap (locale Λ) (gset (fmrole M)))
+    (tmap: gmap G (gset (fmrole M)))
     (TMAP_FUEL_SAME_DOMS: forall ρ, ρ ∈ dom (fuel) <-> exists τ R, tmap !! τ = Some R /\ ρ ∈ R)
-    (LS_TMAP_DISJ: forall (τ1 τ2: locale Λ) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
+    (LS_TMAP_DISJ: forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
       tmap !! τ1 = Some S1 -> tmap !! τ2 = Some S2 -> S1 ## S2): 
-    LiveState Λ M.
+    LiveState G M.
   Admitted. 
 
   Lemma build_LS_ext_spec_st st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ:

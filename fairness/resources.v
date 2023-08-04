@@ -1,17 +1,16 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness.heap_lang Require Import heap_lang_defs. 
 From trillium.fairness Require Import utils fairness fuel fuel_ext. 
 From trillium.fairness Require Import partial_ownership.
 
-Class fairnessGpreS `(LM: LiveModel Λ M) Σ `{Countable (locale Λ)} := {   
+Class fairnessGpreS `(LM: LiveModel G M) Σ `{Countable G} := {   
   fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
-  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
+  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (GroupRoleO G) (exclR (gsetR (RoleO M)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
-Class fairnessGS `(LM : LiveModel Λ M) Σ `{Countable (locale Λ)} := FairnessGS {
+Class fairnessGS `(LM : LiveModel G M) Σ `{Countable G} := FairnessGS {
   fairness_inG :> fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
@@ -26,27 +25,27 @@ Class fairnessGS `(LM : LiveModel Λ M) Σ `{Countable (locale Λ)} := FairnessG
 Global Arguments fairnessGS {_ _} LM Σ {_ _}.
 Global Arguments FairnessGS {_ _} LM Σ {_ _ _} _ _ _.
 Global Arguments fairness_model_name {_ _ LM Σ _ _} _.
-Global Arguments fairness_model_mapping_name {Λ M LM Σ _ _} _ : assert.
-Global Arguments fairness_model_fuel_name {Λ M LM Σ _ _} _ : assert.
-Global Arguments fairness_model_free_roles_name {Λ M LM Σ _ _} _ : assert.
+Global Arguments fairness_model_mapping_name {G M LM Σ _ _} _ : assert.
+Global Arguments fairness_model_fuel_name {G M LM Σ _ _} _ : assert.
+Global Arguments fairness_model_free_roles_name {G M LM Σ _ _} _ : assert.
 
-Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
+Definition fairnessΣ G M `{Countable G} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
-   GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
+   GFunctor (authUR (gmapUR (GroupRoleO G) (exclR (gsetR (RoleO M)))));
    GFunctor (authUR (gmapUR (RoleO M) (exclR natO)));
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel Λ M} `{Countable (locale Λ)} :
-  subG (fairnessΣ Λ M) Σ -> fairnessGpreS LM Σ.
+Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel G M} `{Countable G} :
+  subG (fairnessΣ G M) Σ -> fairnessGpreS LM Σ.
 Proof. solve_inG. Qed. 
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
 
 Section model_state_interp.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -60,13 +59,13 @@ Section model_state_interp.
     own (fairness_model_fuel_name fG)
         (◯ (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))).
 
-  Definition auth_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ :=
+  Definition auth_mapping_is (m: gmap G (gset Role)): iProp Σ :=
     own (fairness_model_mapping_name fG)
         (● ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) :
               ucmra_car (gmapUR _ (exclR (gsetR (RoleO M))))
         )).
 
-  Definition frag_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ :=
+  Definition frag_mapping_is (m: gmap G (gset Role)): iProp Σ :=
     own (fairness_model_mapping_name fG)
         (◯ ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) :
               ucmra_car (gmapUR _ (exclR (gsetR (RoleO M))))
@@ -118,7 +117,7 @@ Section model_state_interp.
   Proof. iApply own_unit. Qed. 
 
   Global Instance ActualOwnershipPartialPre:
-    @PartialModelPredicatesPre _ _ _ Σ M. 
+    @PartialModelPredicatesPre G _ _ Σ M. 
   Proof.
     refine {|
         partial_model_is := frag_model_is;
@@ -126,6 +125,7 @@ Section model_state_interp.
         partial_fuel_is := frag_fuel_is;
         partial_mapping_is := frag_mapping_is;
       |}.
+    - solve_proper. 
     - intros. rewrite /frag_fuel_is.
       rewrite map_fmap_union. rewrite -gmap_disj_op_union.
       2: { by apply map_disjoint_fmap. }
@@ -151,8 +151,8 @@ Proof. by intros ->. Qed.
 
 
 Section model_state_lemmas.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -170,7 +170,7 @@ Section model_state_lemmas.
     rewrite map_fmap_singleton in HA.
     specialize (HA 0%nat).
     apply cmra_discrete_included_iff in HA.
-    apply -> (@singleton_included_l (locale Λ)) in HA. destruct HA as (R' & HA & Hsub).
+    apply -> (@singleton_included_l G) in HA. destruct HA as (R' & HA & Hsub).
     assert (✓ Some R'). by rewrite -HA.
     destruct R' as [R'|]; last done.
     apply Excl_included in Hsub. apply leibniz_equiv in Hsub.
@@ -339,8 +339,8 @@ Section model_state_lemmas.
        end) (gset_to_gmap (0%nat) LR).
 
   Definition update_fuel_resource 
-    (δ1: LiveState Λ M) (fs1 fs2: gmap (fmrole M) nat) (s2: M): gmap (fmrole M) nat :=
-    fuel_apply fs2 (δ1.(ls_fuel (Λ := Λ))) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
+    (δ1: LiveState G M) (fs1 fs2: gmap (fmrole M) nat) (s2: M): gmap (fmrole M) nat :=
+    fuel_apply fs2 (δ1.(ls_fuel (G := G))) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
 
   Lemma elem_of_frame_excl_map
         (fs F: gmap (fmrole M) nat)
@@ -356,7 +356,7 @@ Section model_state_lemmas.
     specialize (Heq ρ). rewrite lookup_op Hlk !lookup_fmap in Heq.
     destruct (decide (ρ ∈ dom F)) as [HF|HF]; last first.
     { exfalso. apply not_elem_of_dom in HF. rewrite HF //= in Heq.
-      destruct (fs !! ρ) eqn:Hfs; inversion Heq as [A S D G Habs|A Habs];
+      destruct (fs !! ρ) eqn:Hfs; inversion Heq as [A S D J Habs|A Habs];
         setoid_rewrite -> Hfs in Habs; by compute in Habs. }
     destruct (decide (ρ ∈ dom fs)) as [Hfs|Hfs].
     { exfalso. apply elem_of_dom in Hfs as [f' Hlk'].
@@ -580,8 +580,8 @@ Section model_state_lemmas.
 End model_state_lemmas.
 
 Section adequacy.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGpreS LM Σ}.
 
@@ -595,7 +595,7 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  Lemma model_mapping_init (s0: M) (ζ0: locale Λ):
+  Lemma model_mapping_init (s0: M) (ζ0: G):
     ⊢ |==> ∃ γ,
         own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
             (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅

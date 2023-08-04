@@ -182,17 +182,17 @@ Proof. solve_pure_exec. Qed.
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
-Lemma own_proper `{inG Σ X} γ (x y: X):
-  x ≡ y ->
-  own γ x -∗ own γ y.
-Proof. by intros ->. Qed.
+(* Lemma own_proper `{inG Σ X} γ (x y: X): *)
+(*   x ≡ y -> *)
+(*   own γ x -∗ own γ y. *)
+(* Proof. by intros ->. Qed. *)
 
-Lemma auth_fuel_is_proper `{LM: LiveModel Λ M}
-  `{fairnessGS _ _ LM Σ}
-  (x y : gmap (fmrole M) nat):
-  x = y ->
-  auth_fuel_is x -∗ auth_fuel_is y.
-Proof. by intros ->. Qed.
+(* Lemma auth_fuel_is_proper `{LM: LiveModel (Λ M} *)
+(*   `{fairnessGS _ _ LM Σ} *)
+(*   (x y : gmap (fmrole M) nat): *)
+(*   x = y -> *)
+(*   auth_fuel_is x -∗ auth_fuel_is y. *)
+(* Proof. by intros ->. Qed. *)
 
 
 Section lifting.
@@ -201,9 +201,10 @@ Section lifting.
 (* Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}.  *)
 Context `{EM: ExecutionModel M}.   
 Context `{hGS: @heapGS Σ _ EM}.
-Context `{iLM:LiveModel heap_lang iM}.
+Context `{iLM:LiveModel G iM}.
+(* Context `{Countable G}.  *)
 Context {ifG: fairnessGS iLM Σ}.
-Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ iM}.
+Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}.
 
 Let eGS := heap_fairnessGS. 
 

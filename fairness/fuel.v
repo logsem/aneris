@@ -4,9 +4,9 @@ From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export inftraces fairness.
 
 Section fairness.
-  Context {Λ : language}.
+  Context {G: Type}.
   Context {M: FairModel}.
-  Context `{Countable (locale Λ)}.
+  Context `{Countable G}.
 
   Record LiveState := MkLiveState {
     ls_under:> M.(fmstate);
@@ -14,7 +14,7 @@ Section fairness.
     ls_fuel: gmap M.(fmrole) nat;
     ls_fuel_dom: M.(live_roles) ls_under ⊆ dom ls_fuel;
 
-    ls_mapping: gmap M.(fmrole) (locale Λ); (* maps roles to thread id *)
+    ls_mapping: gmap M.(fmrole) G;
 
     ls_same_doms: dom ls_mapping = dom ls_fuel;
   }.
@@ -30,8 +30,8 @@ Section fairness.
   Proof. rewrite ls_same_doms. apply ls_fuel_dom. Qed.
 
   Inductive FairLabel {Roles} :=
-  | Take_step: Roles -> locale Λ -> FairLabel
-  | Silent_step: locale Λ -> FairLabel
+  | Take_step: Roles -> G -> FairLabel
+  | Silent_step: G -> FairLabel
   | Config_step: FairLabel
   .
   Arguments FairLabel : clear implicits.
@@ -43,7 +43,7 @@ Section fairness.
     end.
 
   Inductive must_decrease (ρ': M.(fmrole)) (oρ: option M.(fmrole)) (a b: LiveState):
-    olocale Λ -> Prop :=
+    option G -> Prop :=
   | Same_tid tid (Hneqρ: Some ρ' ≠ oρ) (Hsametid: Some tid = a.(ls_mapping) !! ρ'):
       must_decrease ρ' oρ a b (Some tid)
   | Change_tid otid (Hneqtid: a.(ls_mapping) !! ρ' ≠ b.(ls_mapping) !! ρ')
@@ -53,7 +53,7 @@ Section fairness.
   (*   must_decrease ρ' oρ a b otid *)
   .
 
-  Definition fuel_decr (tid: olocale Λ) (oρ: option M.(fmrole))
+  Definition fuel_decr (tid: option G) (oρ: option M.(fmrole))
              (a b: LiveState) :=
     ∀ ρ', ρ' ∈ dom a.(ls_fuel) -> ρ' ∈ dom b.(ls_fuel) →
           must_decrease ρ' oρ a b tid ->
@@ -105,10 +105,7 @@ Section fairness.
     mtrans := lm_ls_trans LM;
   |}.
 
-  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState) :=
-    ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
-
-  Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: locale Λ)
+  Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: G)
     : LM.(lm_ls) :=
     {| ls_under := s0;
        ls_fuel := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0);
@@ -117,7 +114,30 @@ Section fairness.
   Next Obligation. intros ???. apply reflexive_eq. rewrite dom_gset_to_gmap //. Qed.
   Next Obligation. intros ???. apply reflexive_eq. rewrite !dom_gset_to_gmap //. Qed.
 
-  Definition labels_match `{LM:LiveModel} (oζ : olocale Λ) (ℓ : LM.(lm_lbl)) : Prop :=
+End fairness.
+
+Arguments LiveState : clear implicits.
+Arguments LiveModel : clear implicits.
+Arguments fair_model_model _ {_} _.
+
+Definition live_model_to_model : forall G M, LiveModel G M -> Model :=
+  λ G M lm, fair_model_model G lm.
+Coercion live_model_to_model : LiveModel >-> Model.
+Arguments live_model_to_model {_ _}.
+
+
+Section aux_trace.  
+  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{Countable (locale Λ)}.
+
+  Notation "'Tid'" := (locale Λ). 
+
+  Definition auxtrace := trace LM.(lm_ls) LM.(lm_lbl).
+
+  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M) :=
+    ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
+
+  Definition labels_match (oζ : option Tid) (ℓ : LM.(lm_lbl)) : Prop :=
     match oζ, ℓ with
     | None, Config_step => True
     | Some ζ, Silent_step ζ' => ζ = ζ'
@@ -125,25 +145,9 @@ Section fairness.
     | _, _ => False
     end.
 
-End fairness.
+  Definition role_enabled ρ (δ: LiveState Tid M) := ρ ∈ M.(live_roles) δ.
 
-Arguments LiveState : clear implicits.
-Arguments LiveModel : clear implicits.
-Arguments fair_model_model _ {_} _.
-
-Definition live_model_to_model : forall Λ M, LiveModel Λ M -> Model :=
-  λ Λ M lm, fair_model_model Λ lm.
-Coercion live_model_to_model : LiveModel >-> Model.
-Arguments live_model_to_model {_ _}.
-
-Definition auxtrace `(LM: LiveModel Λ M) := trace LM.(lm_ls) LM.(lm_lbl).
-
-Section aux_trace.
-  Context `{LM: LiveModel Λ M}.
-
-  Definition role_enabled ρ (δ: LiveState Λ M) := ρ ∈ M.(live_roles) δ.
-
-  Definition fair_aux ρ (auxtr: auxtrace LM): Prop  :=
+  Definition fair_aux ρ (auxtr: auxtrace): Prop  :=
     forall n, pred_at auxtr n (λ δ _, role_enabled ρ δ) ->
          ∃ m, pred_at auxtr (n+m) (λ δ _, ¬role_enabled ρ δ)
               ∨ pred_at auxtr (n+m) (λ _ ℓ, ∃ tid, ℓ = Some (Take_step ρ tid)).
@@ -160,14 +164,14 @@ Section aux_trace.
     exists (p). by rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n), Hafter in Hp.
   Qed.
 
-  CoInductive auxtrace_valid: auxtrace LM -> Prop :=
+  CoInductive auxtrace_valid: auxtrace -> Prop :=
   | auxtrace_valid_singleton δ: auxtrace_valid ⟨δ⟩
   | auxtrace_valid_cons δ ℓ tr:
       LM.(lm_ls_trans) δ ℓ (trfirst tr) ->
       auxtrace_valid tr →
       auxtrace_valid (δ -[ℓ]-> tr).
 
-  Lemma auxtrace_valid_forall (tr: auxtrace LM) :
+  Lemma auxtrace_valid_forall (tr: auxtrace) :
     auxtrace_valid tr ->
     ∀ n, match after n tr with
          | Some ⟨ _ ⟩ | None => True
@@ -177,7 +181,7 @@ Section aux_trace.
     intros Hval n. revert tr Hval. induction n as [|n]; intros tr Hval;
       destruct (after _ tr) as [trn|] eqn: Heq =>//; simpl in Heq;
       simplify_eq; destruct trn =>//; inversion Hval; simplify_eq; try done.
-    specialize (IHn _ H0) (* TODO *). rewrite Heq in IHn. done.
+    specialize (IHn _ H1) (* TODO *). rewrite Heq in IHn. done.
   Qed.
 
 End aux_trace.
@@ -187,24 +191,25 @@ Ltac SS :=
   (* epose proof ls_mapping_dom; *)
   set_solver.
 
-Definition live_tids `{LM:LiveModel Λ M} `{EqDecision (locale Λ)}
+Definition live_tids `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)}
            (c : cfg Λ) (δ : LM.(lm_ls)) : Prop :=
-  (∀ ρ ζ, δ.(ls_mapping (Λ := Λ)) !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
+  (∀ ρ ζ, δ.(ls_mapping (G := locale Λ)) !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
   ∀ ζ e, from_locale c.1 ζ = Some e -> (to_val e ≠ None) ->
          ∀ ρ, δ.(ls_mapping) !! ρ ≠ Some ζ.
 
-Definition exaux_traces_match `{LM:LiveModel Λ M} `{EqDecision (locale Λ)} :
-  extrace Λ → auxtrace LM → Prop :=
+Definition exaux_traces_match `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)} :
+  extrace Λ → auxtrace (LM := LM) → Prop :=
   traces_match labels_match
                live_tids
                locale_step
                LM.(lm_ls_trans).
 
 Section fairness_preserved.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel (locale Λ) M}.
   Context `{Countable (locale Λ)}.
+  Notation "'Tid'" := (locale Λ). 
 
-  Lemma exaux_preserves_validity extr (auxtr : auxtrace LM):
+  Lemma exaux_preserves_validity extr (auxtr : auxtrace (LM := LM)):
     exaux_traces_match extr auxtr ->
     auxtrace_valid auxtr.
   Proof.
@@ -213,7 +218,7 @@ Section fairness_preserved.
     constructor =>//. by eapply CH.
   Qed.
 
-  Lemma exaux_preserves_termination extr (auxtr : auxtrace LM) :
+  Lemma exaux_preserves_termination extr (auxtr : auxtrace (LM := LM)) :
     exaux_traces_match extr auxtr ->
     terminating_trace auxtr ->
     terminating_trace extr.
@@ -231,7 +236,7 @@ Section fairness_preserved.
     eapply IHn =>//.
   Qed.
 
-  Lemma traces_match_labels tid ℓ c δ rex (raux : auxtrace LM) :
+  Lemma traces_match_labels tid ℓ c δ rex (raux : auxtrace (LM := LM)) :
     exaux_traces_match (c -[Some tid]-> rex) (δ -[ℓ]-> raux) ->
     ((∃ ρ, ℓ = Take_step ρ tid) ∨ (ℓ = Silent_step tid)).
   Proof.
@@ -239,19 +244,19 @@ Section fairness_preserved.
     destruct ℓ; eauto; inversion Hlab; simplify_eq; eauto.
   Qed.
 
-  Lemma mapping_live_role (δ: LiveState Λ M) ρ:
+  Lemma mapping_live_role (δ: LiveState Tid M) ρ:
     ρ ∈ M.(live_roles) δ ->
-    is_Some (ls_mapping (Λ := Λ) δ !! ρ).
+    is_Some (ls_mapping (G := Tid) δ !! ρ).
   Proof. rewrite -elem_of_dom ls_same_doms. SS. Qed.
-  Lemma fuel_live_role (δ: LiveState Λ M) ρ:
+  Lemma fuel_live_role (δ: LiveState Tid M) ρ:
     ρ ∈ M.(live_roles) δ ->
-    is_Some (ls_fuel (Λ := Λ) δ !! ρ).
+    is_Some (ls_fuel (G := Tid) δ !! ρ).
   Proof. rewrite -elem_of_dom. SS. Qed.
 
   Local Hint Resolve mapping_live_role: core.
   Local Hint Resolve fuel_live_role: core.
 
-  Lemma match_locale_enabled (extr : extrace Λ) (auxtr : auxtrace LM) ζ ρ:
+  Lemma match_locale_enabled (extr : extrace Λ) (auxtr : auxtrace (LM := LM)) ζ ρ:
     exaux_traces_match extr auxtr ->
     ls_mapping (trfirst auxtr) !! ρ = Some ζ ->
     locale_enabled ζ (trfirst extr).
@@ -267,7 +272,8 @@ Section fairness_preserved.
   Local Hint Resolve match_locale_enabled: core.
   Local Hint Resolve pred_first_trace: core.
 
-  Definition fairness_induction_stmt ρ fm f m ζ extr (auxtr : auxtrace LM) δ c :=
+  Definition fairness_induction_stmt ρ fm f m ζ extr (auxtr : auxtrace (LM := LM))
+    δ c :=
       (infinite_trace extr ->
        (forall ζ, fair_ex ζ extr) ->
        fm = (f, m) ->
@@ -279,11 +285,11 @@ Section fairness_preserved.
       ∃ M, pred_at auxtr M (λ δ _, ¬role_enabled ρ δ)
            ∨ pred_at auxtr M (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0))).
 
-  Local Lemma case1 ρ f m (extr' : extrace Λ) (auxtr' : auxtrace LM) δ ℓ :
+  Local Lemma case1 ρ f m (extr' : extrace Λ) (auxtr' : auxtrace (LM := LM)) δ ℓ :
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
-         → ∀ (f m: nat) (ζ: locale Λ) (extr : extrace Λ) (auxtr : auxtrace LM)
-             (δ : LiveState Λ M) (c : cfg Λ), fairness_induction_stmt ρ m0 f m ζ extr auxtr δ c) ->
+         → ∀ (f m: nat) (ζ: locale Λ) (extr : extrace Λ) (auxtr : auxtrace (LM := LM))
+             (δ : LiveState Tid M) (c : cfg Λ), fairness_induction_stmt ρ m0 f m ζ extr auxtr δ c) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
     exaux_traces_match extr' auxtr' ->
     infinite_trace extr' ->
@@ -309,8 +315,8 @@ Section fairness_preserved.
         { rewrite /pred_at /= pred_first_trace. eauto. }
 
         have [p Hp] := (Hfair ζ' 0 Hloc'en).
-        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ (δ0 : LiveState Λ M) _, ¬ role_enabled ρ δ0)
-                                  ∨ pred_at auxtr' M0 (λ (_ : LiveState Λ M) ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
+        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ (δ0 : LiveState Tid M) _, ¬ role_enabled ρ δ0)
+                                  ∨ pred_at auxtr' M0 (λ (_ : LiveState Tid M) ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
         { eapply (IH _ _ _ p _ extr'); eauto.
           Unshelve. unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)). lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
@@ -321,7 +327,7 @@ Section fairness_preserved.
     Qed.
 
   Lemma fairness_preserved_ind ρ:
-    ∀ fm f m ζ (extr: extrace Λ) (auxtr: auxtrace LM) δ c,
+    ∀ fm f m ζ (extr: extrace Λ) (auxtr: auxtrace (LM := LM)) δ c,
       fairness_induction_stmt ρ fm f m ζ extr auxtr δ c.
   Proof.
     induction fm as [fm IH] using lex_ind.
@@ -450,7 +456,7 @@ Section fairness_preserved.
         exists (1+P). rewrite !pred_at_sum. simpl. done.
   Qed.
 
-  Theorem fairness_preserved (extr: extrace Λ) (auxtr: auxtrace LM):
+  Theorem fairness_preserved (extr: extrace Λ) (auxtr: auxtrace (LM := LM)):
     infinite_trace extr ->
     exaux_traces_match extr auxtr ->
     (forall ζ, fair_ex ζ extr) -> (forall ρ, fair_aux ρ auxtr).
@@ -510,7 +516,7 @@ Section fairness_preserved.
   Lemma valid_inf_system_trace_implies_traces_match_strong
         (φ : execution_trace Λ -> auxiliary_trace LM -> Prop)
         (ψ : _ → _ → Prop)
-        ex atr iex iatr progtr (auxtr : auxtrace LM):
+        ex atr iex iatr progtr (auxtr : auxtrace (LM := LM)):
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
         φ ex atr -> live_tids (LM:=LM) (trace_last ex) (trace_last atr)) ->
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
@@ -549,7 +555,7 @@ Section fairness_preserved.
   (* TODO: Why do we need explicit [LM] here? *)
   Lemma valid_inf_system_trace_implies_traces_match
         (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
-        ex atr iex iatr progtr (auxtr : auxtrace LM):
+        ex atr iex iatr progtr (auxtr : auxtrace (LM := LM)):
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
         φ ex atr -> live_tids (LM:=LM) (trace_last ex) (trace_last atr)) ->
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
@@ -584,7 +590,7 @@ Section fairness_preserved.
 End fairness_preserved.
 
 Section fuel_dec_unless.
-  Context `{LM: LiveModel Λ Mdl}.
+  Context `{LM: LiveModel (locale Λ) Mdl}.
   Context `{Countable (locale Λ)}.
 
   Definition Ul (ℓ: LM.(mlabel)) :=
@@ -593,10 +599,10 @@ Section fuel_dec_unless.
     | _ => None
     end.
 
-  Definition Ψ (δ: LiveState Λ Mdl) :=
-    size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (Λ := Λ)), f.
+  Definition Ψ (δ: LiveState (locale Λ) Mdl) :=
+    size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := locale Λ)), f.
 
-  Lemma fuel_dec_unless (auxtr: auxtrace LM) :
+  Lemma fuel_dec_unless (auxtr: auxtrace (LM := LM)) :
     auxtrace_valid auxtr ->
     dec_unless ls_under Ul Ψ auxtr.
   Proof.
@@ -648,13 +654,13 @@ Section fuel_dec_unless.
 End fuel_dec_unless.
 
 Section destuttering_auxtr.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel (locale Λ) M}.
 
   Context `{Countable (locale Λ)}.
 
   (* Why is [LM] needed here? *)
   Definition upto_stutter_auxtr :=
-    upto_stutter (ls_under (Λ:=Λ) (M:=M)) (Ul (LM := LM)).
+    upto_stutter (ls_under (G:=locale Λ) (M:=M)) (Ul (LM := LM)).
 
   Lemma can_destutter_auxtr auxtr:
     auxtrace_valid auxtr →
@@ -667,18 +673,18 @@ Section destuttering_auxtr.
 End destuttering_auxtr.
 
 Section upto_preserves.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel (locale Λ) M}.
   Context `{Countable (locale Λ)}.
 
   Lemma upto_stutter_mono' :
-    monotone2 (upto_stutter_ind (ls_under (Λ:=Λ) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (ls_under (G:=locale Λ) (M:=M)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
   Qed.
   Hint Resolve upto_stutter_mono' : paco.
 
-  Lemma upto_preserves_validity (auxtr : auxtrace LM) mtr:
+  Lemma upto_preserves_validity (auxtr : auxtrace (LM := LM)) mtr:
     upto_stutter_auxtr auxtr mtr ->
     auxtrace_valid auxtr ->
     mtrace_valid mtr.
@@ -702,13 +708,13 @@ Section upto_preserves.
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel (locale Λ) M}.
   Context `{Countable (locale Λ)}.
 
-  Notation upto_stutter_aux := (upto_stutter (ls_under (Λ := Λ)) (Ul (Λ := Λ) (LM := LM))).
+  Notation upto_stutter_aux := (upto_stutter (ls_under (G := locale Λ)) (Ul (Λ := Λ) (LM := LM))).
 
   Lemma upto_stutter_mono'' : (* TODO fix this proliferation *)
-    monotone2 (upto_stutter_ind (ls_under (Λ:=Λ) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (ls_under (G:=locale Λ) (M:=M)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
@@ -754,7 +760,7 @@ Section upto_stutter_preserves_fairness_and_termination.
             { destruct IH as [|]; done. }
     Qed.
 
-  Lemma upto_stutter_fairness (auxtr:auxtrace LM) (mtr: mtrace M):
+  Lemma upto_stutter_fairness (auxtr:auxtrace (LM := LM)) (mtr: mtrace M):
     upto_stutter_aux auxtr mtr ->
     (∀ ρ, fair_aux ρ auxtr) ->
     (∀ ρ, fair_model_trace ρ mtr).

@@ -3,13 +3,13 @@ From Paco Require Import pacotac.
 From trillium.fairness Require Export fairness fair_termination fuel.
 
 Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
-           {LM : LiveModel Λ Mdl} (auxtr : auxtrace LM) :=
+           {LM : LiveModel (locale Λ) Mdl} (auxtr : auxtrace (LM := LM)) :=
   auxtrace_valid (LM:=LM) auxtr →
   (∀ ρ, fair_aux ρ auxtr) →
   terminating_trace auxtr.
 
 Theorem continued_simulation_fair_termination
-        `{FairTerminatingModel FM} `(LM:LiveModel Λ FM) `{Countable (locale Λ)}
+        `{FairTerminatingModel FM} `(LM:LiveModel (locale Λ) FM) `{Countable (locale Λ)}
         (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :
   (* TODO: This is required for destruttering - Not sure why *)
   (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
@@ -36,7 +36,7 @@ Proof.
     Unshelve.
     - done.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ (auxtr : auxtrace LM), exaux_traces_match extr auxtr)
+  assert (∃ (auxtr : auxtrace (LM := LM)), exaux_traces_match extr auxtr)
     as [auxtr Hmatch].
   { exists (to_trace (initial_ls a1 r1) iatr).
     eapply (valid_inf_system_trace_implies_traces_match

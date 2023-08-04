@@ -5,25 +5,24 @@ From trillium.fairness Require Import fuel.
 
 Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
-Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
 Section PartialOwnership.
-
-  Context `{Countable (locale Λ)}.
-  Context `{EqDecision (locale Λ)}.
+  Context `{G: Type}.
+  Context `{Countable G}.
   Context {Σ : gFunctors}.
   (* Context {fG: fairnessGS LM Σ}. *)
   (* Context `{invGS Σ}.  *)
   (* Context `{invGS_gen HasNoLc Σ}.  *)
-  Context `{iLM: LiveModel Λ iM}. (* fuel construction over inner model *)
+  Context `{iLM: LiveModel G iM}. (* fuel construction over inner model *)
 
+  Canonical Structure GroupRoleO (G: Type) := leibnizO G.
 
   (* TODO: rename *)
   Class PartialModelPredicatesPre := {
       partial_model_is: fmstate iM -> iProp Σ;
       partial_free_roles_are: gset (fmrole iM) → iProp Σ;
       partial_fuel_is: gmap (fmrole iM) nat → iProp Σ;
-      partial_mapping_is: gmap (locale Λ) (gset (fmrole iM)) → iProp Σ;
+      partial_mapping_is: gmap G (gset (fmrole iM)) → iProp Σ;
       
       partial_model_is_Timeless :> forall s, Timeless (partial_model_is s);
       partial_fuel_is_Timeless :> forall fs, Timeless (partial_fuel_is fs);
@@ -32,6 +31,7 @@ Section PartialOwnership.
 
       partial_free_roles_are_Proper :> Proper (equiv ==> equiv) partial_free_roles_are;
       partial_mapping_is_Proper :> Proper (equiv ==> equiv) partial_mapping_is;
+      partial_fuel_is_Proper :> Proper (equiv ==> equiv) partial_fuel_is;
 
       (* partial_msi: LiveState Λ iM -> iProp Σ; *)
 
@@ -48,25 +48,26 @@ Section PartialOwnership.
   Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
 
   Section has_fuel.
-    Context {PMPP: PartialModelPredicatesPre}. 
+    Context {PMPP: PartialModelPredicatesPre}.
+    (* Context `{Equiv G}. *)
 
     Notation Role := (iM.(fmrole)).
 
-    Definition has_fuel (ζ: locale Λ) (ρ: Role) (f: nat): iProp Σ :=
+    Definition has_fuel (ζ: G) (ρ: Role) (f: nat): iProp Σ :=
       ζ ↦m ρ ∗ ρ ↦F f.
 
-    Definition has_fuels (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
+    Definition has_fuels (ζ: G) (fs: gmap Role nat): iProp Σ :=
       ζ ↦M dom fs ∗ [∗ set] ρ ∈ dom fs, ∃ f, ⌜fs !! ρ = Some f⌝ ∧ ρ ↦F f.
 
-    #[global] Instance has_fuels_proper :
+    #[global] Instance has_fuels_proper:
       Proper ((≡) ==> (≡) ==> (≡)) (has_fuels).
-    Proof. solve_proper. Qed.
+    Proof. solve_proper. Qed. 
 
-    #[global] Instance has_fuels_timeless (ζ: locale Λ) (fs: gmap Role nat):
+    #[global] Instance has_fuels_timeless (ζ: G) (fs: gmap Role nat):
       Timeless (has_fuels ζ fs).
     Proof. rewrite /has_fuels. apply _. Qed.
 
-    Lemma has_fuel_fuels (ζ: locale Λ) (ρ: Role) (f: nat):
+    Lemma has_fuel_fuels (ζ: G) (ρ: Role) (f: nat):
       has_fuel ζ ρ f ⊣⊢ has_fuels ζ {[ ρ := f ]}.
     Proof.
       rewrite /has_fuel /has_fuels. iSplit.
@@ -77,26 +78,26 @@ Section PartialOwnership.
         iDestruct "H" as "[% ?]". by simplify_eq.
     Qed.
 
-    Definition has_fuels_S (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
+    Definition has_fuels_S (ζ: G) (fs: gmap Role nat): iProp Σ :=
       has_fuels ζ (fmap S fs).
 
-    Definition has_fuels_plus (n: nat) (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
+    Definition has_fuels_plus (n: nat) (ζ: G) (fs: gmap Role nat): iProp Σ :=
       has_fuels ζ (fmap (fun m => n+m) fs).
 
-    Lemma has_fuel_fuels_S (ζ: locale Λ) (ρ: Role) (f: nat):
+    Lemma has_fuel_fuels_S (ζ: G) (ρ: Role) (f: nat):
       has_fuel ζ ρ (S f) ⊣⊢ has_fuels_S ζ {[ ρ := f ]}.
     Proof.
       rewrite has_fuel_fuels /has_fuels_S map_fmap_singleton //.
     Qed.
 
-    Lemma has_fuel_fuels_plus_1 (ζ: locale Λ) fs:
+    Lemma has_fuel_fuels_plus_1 (ζ: G) fs:
       has_fuels_plus 1 ζ fs ⊣⊢ has_fuels_S ζ fs.
     Proof.
       rewrite /has_fuels_plus /has_fuels_S. do 2 f_equiv.
-      intros m m' ->. apply leibniz_equiv_iff. lia.
+      (* intros m m' ->. apply leibniz_equiv_iff. lia. *)
     Qed.
 
-    Lemma has_fuel_fuels_plus_0 (ζ: locale Λ) fs:
+    Lemma has_fuel_fuels_plus_0 (ζ: G) fs:
       has_fuels_plus 0 ζ fs ⊣⊢ has_fuels ζ fs.
     Proof.
       rewrite /has_fuels_plus /=.  f_equiv. intros ?.
@@ -104,7 +105,7 @@ Section PartialOwnership.
       destruct (fs !! i) eqn:Heq; rewrite Heq //.
     Qed.
 
-    Lemma has_fuels_plus_split_S n (ζ: locale Λ) fs:
+    Lemma has_fuels_plus_split_S n (ζ: G) fs:
     has_fuels_plus (S n) ζ fs ⊣⊢ has_fuels_S ζ ((λ m, n + m) <$> fs).
     Proof.
       rewrite /has_fuels_plus /has_fuels_S. f_equiv.

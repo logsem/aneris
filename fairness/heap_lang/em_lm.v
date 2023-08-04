@@ -4,7 +4,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Export partial_ownership.
 
 
-Definition LM_init_resource `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
+Definition LM_init_resource `{LM:LiveModel (locale heap_lang) M} `{!fairnessGS LM Σ}
    (s1: LM)
   (* FR *)
   : iProp Σ :=
@@ -13,12 +13,12 @@ Definition LM_init_resource `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
   has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
   (PMPP := ActualOwnershipPartialPre). 
 
-Definition init_thread_post `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
+Definition init_thread_post `{LM:LiveModel (locale heap_lang) M} `{!fairnessGS LM Σ}
   (tid: locale heap_lang): iProp Σ :=
   (* tid ↦M ∅. *)
   frag_mapping_is {[ tid := ∅ ]}.
 
-Definition lm_model_init `{LM: LiveModel heap_lang M} (δ: mstate LM) :=
+Definition lm_model_init `{LM: LiveModel (locale heap_lang) M} (δ: mstate LM) :=
   ls_fuel δ = gset_to_gmap (lm_fl LM δ) (live_roles _ (ls_under δ)) /\
   (* ls_mapping δ = gset_to_gmap 0%nat (live_roles _ (ls_under δ)).  *)
   ls_tmap δ (LM := LM) = {[ 0%nat := live_roles _ (ls_under δ) ]}. 
@@ -26,7 +26,7 @@ Definition lm_model_init `{LM: LiveModel heap_lang M} (δ: mstate LM) :=
 Definition lm_cfg_init (σ: cfg heap_lang) :=
   exists (e: expr), σ.1 = [e].
 
-Definition lm_is_init_st `{LM: LiveModel heap_lang M} σ s := 
+Definition lm_is_init_st `{LM: LiveModel (locale heap_lang) M} σ s := 
   lm_cfg_init σ /\ lm_model_init s (LM := LM). 
 
 Definition tids_restrict `{M: FairModel} `{Countable (locale Λ)}
@@ -49,7 +49,7 @@ Proof.
   set_solver.
 Qed.
 
-Lemma tids_restrict_smaller `{LM:LiveModel heap_lang M} (σ: cfg heap_lang) (δ: lm_ls LM):
+Lemma tids_restrict_smaller `{LM:LiveModel (locale heap_lang) M} (σ: cfg heap_lang) (δ: lm_ls LM):
   tids_restrict σ (ls_tmap δ) -> tids_smaller σ.1 δ.
 Proof.
   rewrite /tids_smaller /tids_restrict. 
@@ -60,13 +60,13 @@ Proof.
   congruence. 
 Qed. 
 
-Definition em_lm_msi `{LM:LiveModel heap_lang M} `{!fairnessGS LM Σ}
+Definition em_lm_msi `{LM:LiveModel (locale heap_lang) M} `{!fairnessGS LM Σ}
   (c: cfg heap_lang) (δ: mstate LM): iProp Σ :=
   model_state_interp δ ∗ ⌜ tids_restrict c (ls_tmap δ (LM := LM)) ⌝. 
 
 (* TODO: how to make 'heap..' instantiations less wordy? *)
 (* TODO: how to avoid different instances of EqDec and Cnt? *)
-Lemma init_fairnessGS_LM Σ `{hPre: @fairnessGpreS heap_lang M LM Σ
+Lemma init_fairnessGS_LM Σ `{hPre: @fairnessGpreS (locale heap_lang) M LM Σ
                                      Nat.eq_dec nat_countable
   }
   (* `(LM:LiveModel heap_lang M)   *)
@@ -140,12 +140,12 @@ Proof.
 Qed.
 
 
-Global Instance LM_EM `{LM: LiveModel heap_lang M}: @ExecutionModel LM.
+Global Instance LM_EM `{LM: LiveModel (locale heap_lang) M}: @ExecutionModel LM.
 refine
   {|
     em_preGS := fun Σ => fairnessGpreS LM Σ;
     em_GS := fun Σ => fairnessGS LM Σ;
-    em_Σ := fairnessΣ heap_lang M;
+    em_Σ := fairnessΣ (locale heap_lang) M;
     em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ LM _ _;
 
     (* em_valid_evolution_step := valid_evolution_step (LM := LM); *)
@@ -167,13 +167,13 @@ iModIntro. iExists _. iFrame.
 Defined. 
 
 (* TODO: get rid of it*)
-Global Instance LM_EM_fairPre `{LM: LiveModel heap_lang M}
+Global Instance LM_EM_fairPre `{LM: LiveModel (locale heap_lang) M}
                 `{hGS: @heapGpreS Σ LM (@LM_EM _ LM)}:
   fairnessGpreS LM Σ.
 Proof. apply hGS. Defined. 
 
 (* TODO: get rid of it*)
-Global Instance LM_EM_fair `{LM: LiveModel heap_lang M}
+Global Instance LM_EM_fair `{LM: LiveModel (locale heap_lang) M}
                 `{hGS: @heapGS Σ LM (@LM_EM _ LM)}:
   fairnessGS LM Σ.
 Proof. apply hGS. Defined.
@@ -195,7 +195,7 @@ Proof.
   eapply lookup_weaken; eauto. 
 Qed.
 
-Lemma tids_dom_restrict_mapping `{LM: LiveModel heap_lang M} 
+Lemma tids_dom_restrict_mapping `{LM: LiveModel (locale heap_lang) M} 
   (c1 c2: cfg heap_lang)
   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M))) (ζ: locale heap_lang)
   (Hstep : locale_step c1 (Some ζ) c2)
@@ -229,7 +229,7 @@ Qed.
     (*   set_solver -Hnewdom Hsamedoms Hfueldom. } *) 
 
 
-Lemma tids_smaller_fork_step `{LM: LiveModel heap_lang M}  σ1 σ2 δ1 δ2 ζ τ_new
+Lemma tids_smaller_fork_step `{LM: LiveModel (locale heap_lang) M}  σ1 σ2 δ1 δ2 ζ τ_new
   (Hstep: locale_step σ1 (Some ζ) σ2)
   (SM: tids_smaller σ1.1 δ1)
   (MAP2: exists (R2: gset (fmrole M)), ls_mapping δ2 = map_imap
@@ -242,10 +242,10 @@ Lemma tids_smaller_fork_step `{LM: LiveModel heap_lang M}  σ1 σ2 δ1 δ2 ζ τ
 Proof.
   destruct σ1 as [tp1 σ1], σ2 as [tp2 σ2]. simpl in *.
   intros ρ ζ'.
-  destruct MAP2 as [R2 ->].
+  simpl in *. destruct MAP2 as [R2 ->].
   simpl. rewrite map_lookup_imap.
   destruct (ls_mapping δ1 !!ρ) eqn:Heq.
-  2: { intros. by rewrite Heq in H. }
+  2: { intros. simpl in *. discriminate. }
   
   destruct (decide (ρ ∈ R2)); first  (intros ?; simplify_eq).
   - destruct FORK as (tp1' & efork & (-> & -> & Hlen)).
@@ -254,7 +254,8 @@ Proof.
     { symmetry. assert (length tp1' = length (t1 ++ e2 :: t2)).
       rewrite app_length //=; rewrite app_length //= in Hlen.
       clear Hlen. eapply app_inj_1 =>//. by list_simplifier. }
-    rewrite Heq in H. simpl in H. inversion H. subst ζ'. 
+    inversion H.
+    subst ζ'. 
     assert (is_Some (from_locale (t1 ++ e1 :: t2 ++ [efork]) (locale_of (t1 ++ e1 :: t2) efork))).
     + unfold from_locale. erewrite from_locale_from_Some; eauto.
       apply prefixes_from_spec. list_simplifier. eexists _, []. split=>//.
@@ -276,10 +277,10 @@ Proof.
   - intros ?; simplify_eq.
     assert (is_Some (from_locale tp1 ζ')). 
     2: by eapply from_locale_step =>//.
-    rewrite Heq //= in H . eauto. inversion H. subst. eauto. 
+    inversion H. subst. eauto. 
 Qed.
 
-Lemma tids_dom_fork_step `{LM: LiveModel heap_lang M}
+Lemma tids_dom_fork_step `{LM: LiveModel (locale heap_lang) M}
   (c1 c2: cfg heap_lang) (ζ: locale heap_lang)
   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M)))
   τ_new (R1 R2: gset (fmrole M))
@@ -328,7 +329,7 @@ Proof.
 Qed.
 
 
-Lemma tids_smaller_model_step `{LM: LiveModel heap_lang M} c1 c2 ζ δ1 δ2
+Lemma tids_smaller_model_step `{LM: LiveModel (locale heap_lang) M} c1 c2 ζ δ1 δ2
   (Hstep: locale_step c1 (Some ζ) c2)
   (Hless: tids_smaller c1.1 δ1)
   (* S is a subset of dom (ls_fuel δ1); *)
@@ -344,58 +345,32 @@ Lemma tids_smaller_model_step `{LM: LiveModel heap_lang M} c1 c2 ζ δ1 δ2
   )
   :
   tids_smaller c2.1 δ2 (M := M).
-Proof.
+Proof.  
   (* eapply tids_smaller_restrict_mapping; eauto. *)
   (* destruct MAP2 as (?&?&->).   *)
   unfold tids_smaller; simpl.
-  destruct MAP2 as (?&S&->).
+  simpl in MAP2. destruct MAP2 as (?&S&->).
   intros ρ' ? Hmim.
   rewrite map_lookup_imap in Hmim. rewrite lookup_gset_to_gmap in Hmim.
   destruct (decide (ρ' ∈ S)); last by rewrite option_guard_False in Hmim.
   rewrite option_guard_True //= in Hmim.
-  destruct (decide (ρ' ∈ dom (ls_fuel δ1))).
+  destruct (decide (ρ' ∈ dom (ls_fuel δ1))). 
   + inversion Hstep; simplify_eq.
-    eapply from_locale_step =>//. by eapply Hless.
+    eapply from_locale_step =>//. eapply Hless. rewrite -Hmim decide_True; auto. 
   + simplify_eq.
     inversion Hstep; simplify_eq.
-    eapply from_locale_step =>//. unfold from_locale. rewrite from_locale_from_Some //.
+    eapply from_locale_step =>//. unfold from_locale.
+    simpl. rewrite decide_False in Hmim; [| done]. inversion Hmim. subst ζ0.  
+    rewrite from_locale_from_Some; [done| ]. 
     apply prefixes_from_spec. exists t1, t2. by list_simplifier.
 Qed.
-
-(* just use tids_dom_restrict_mapping instead *)
-(* Lemma tids_restrict_model_step `{LM: LiveModel heap_lang M} c1 c2 ζ *)
-(*   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M))) *)
-(*   (Hstep: locale_step c1 (Some ζ) c2) *)
-(*   (* Hfuelsval : valid_new_fuelmap fs1 fs2 s1 s2 ρ *) *)
-(*   (* Hxdom : ∀ ρ : fmrole M, ls_mapping δ1 !! ρ = Some ζ ↔ ρ ∈ dom fs1 *) *)
-(*   (* TODO: D2 = dom fs2 *) *)
-(*   (Hsmall: ∀ ζ : locale heap_lang, *)
-(*       ζ ∉ locales_of_list c1.1 → tmap1 !! ζ = None) *)
-(*   (* (Hfs1: ls_mapping δ1 !! ρ = Some ζ) *) *)
-(*   (TMAP2: exists D2, tmap2 = <[ζ:= D2]> (tmap1)): *)
-(*   ∀ ζ0 : locale heap_lang, *)
-(*     ζ0 ∉ locales_of_list c2.1 → tmap2 !! ζ0 = None. *)
-(* Proof. *)
-(*   intros ζ' ?. *)
-(*   destruct c1, c2. simpl in *. *)
-(*   pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep). simpl. *)
-(*   destruct TMAP2 as [? ->]. *)
-(*   rewrite lookup_insert_ne; first by apply Hsmall; set_solver. *)
-(*   intros <-. *)
-(*   (* TODO: use this to prove Hfs1 premise *) *)
-(*   (* destruct Hfuelsval as (_&_&Hfs1&_). *) *)
-(*   (* rewrite <-Hxdom in Hfs1. *) *)
-  
-(*   (* apply (ls_mapping_tmap_corr (LM := LM)) in Hfs1 as (?&HM&?). *) *)
-(*   rewrite Hsmall // in Hfs1; set_solver. *)
-(* Qed. *)
 
 Ltac by_contradiction :=
   match goal with
   | |- ?goal => destruct_decide (decide (goal)); first done; exfalso
   end.
 
-Lemma mim_helper_model_step `{LM: LiveModel heap_lang M}
+Lemma mim_helper_model_step `{LM: LiveModel (locale heap_lang) M}
   (s2 : M)
   (fs1 fs2 : gmap (fmrole M) nat)
   (ρ : fmrole M)
@@ -421,8 +396,10 @@ Proof.
       * rewrite lookup_insert. split.
         { eexists; split =>//. apply elem_of_difference in Hin as [? Hin].
           apply not_elem_of_difference in Hin as [?|?]; [|done].
-          set_solver. }
-        { intros (?&?&?). simplify_eq. apply Hxdom.
+          rewrite decide_True in H; [set_solver| ]. done. }
+        { intros (?&?&?). simplify_eq.
+          rewrite decide_True; [| set_solver]. 
+          apply Hxdom.
           destruct Hfuelsval as (?&?&?&?&?). by_contradiction.
           assert (ρ' ∈ live_roles M s2 ∖ live_roles M δ1).
           { set_solver. }
@@ -430,12 +407,15 @@ Proof.
           { set_solver. }
           assert (ρ' ∉ dom $ ls_fuel δ1) by set_solver.
           done. }
-      * rewrite lookup_insert_ne //.
+      * rewrite lookup_insert_ne //. rewrite decide_True; [| done]. 
         apply ls_mapping_tmap_corr.
     + split.
-      * intros Htid. simplify_eq. rewrite lookup_insert. eexists; split=>//.
+      * rewrite decide_False; [| done]. 
+        intros Htid. simplify_eq.
+        rewrite lookup_insert. eexists; split=>//.
         set_solver.
-      * assert (ρ' ∈ dom fs2) by set_solver. intros Hm. by_contradiction.
+      * rewrite decide_False; [| done]. 
+        assert (ρ' ∈ dom fs2) by set_solver. intros Hm. by_contradiction.
         rewrite lookup_insert_ne in Hm; last congruence.
         apply ls_mapping_tmap_corr in Hm.
         apply elem_of_dom_2 in Hm. rewrite ls_same_doms // in Hm.
@@ -448,5 +428,5 @@ Proof.
     apply not_elem_of_difference in Hnotin as [Hnin|Hin].
     + apply elem_of_dom_2 in Habs. rewrite ls_same_doms in Habs. set_solver.
     + apply elem_of_difference in Hin as [Hin Hnin].
-      apply Hxdom in Hin. congruence.   
+      apply Hxdom in Hin. rewrite Hin in Habs. congruence.  
 Qed.       
