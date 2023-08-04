@@ -35,6 +35,8 @@ Section LibraryDefs.
   
 End LibraryDefs.
 
+Global Opaque lib_model_impl. 
+
 Section LibrarySpec.
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM}.
   Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ lib_model_impl}.
@@ -465,6 +467,85 @@ Section ClientSpec.
     let foo := fresh in
     evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
 
+  Lemma update_client_state `{clientGS Σ} Einvs
+    (extr: execution_trace heap_lang) (mtr: auxiliary_trace M)
+    c2 (lb lb': fmstate lib_fair) f
+    (LIB_STEP: locale_trans lb 0 lb' (LM := lib_model))
+    (PROG_STEP: locale_step (trace_last extr) (Some 0) c2)
+    (F_BOUND: f ≤ client_fl)
+    :
+    PMP Einvs ⊢
+    em_msi (trace_last extr) (trace_last mtr) (em_GS0 := heap_fairnessGS) -∗ 
+    partial_model_is (lb, 1) -∗
+    partial_free_roles_are {[inr ρy]} -∗
+    has_fuels 0 {[inl 0 := f]}
+    ={Einvs}=∗
+    ∃ (δ2 : M) (ℓ: mlabel M),
+      ⌜em_valid_evolution_step (Some 0) c2 (trace_last mtr) ℓ δ2⌝ ∗
+      em_msi c2 δ2 (em_GS0 := heap_fairnessGS) ∗
+      has_fuels 0 (if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅)
+                   then {[inr ρy := client_fl]}
+                   else {[inl 0 := f]}) ∗
+      partial_model_is (lb', 1) ∗
+      partial_free_roles_are
+      (if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) then {[inl 0]} else {[inr ρy]}).
+  Proof.
+    
+    iIntros "#PMP MSI ST FR FUELS".
+    Local Ltac dEq := destruct (decide (_ = _)). 
+    Local Ltac dEl := destruct (decide (_ ∈ _)). 
+    pose proof (LM_map_empty_notlive lb' 0 (LM := lib_model)).
+
+    pose proof (live_roles_1 lb) as LIVE. rewrite decide_True in LIVE. 
+    2: { eapply LM_live_roles_strong. eexists. eauto. }
+    (* TODO: consider the case with rem ≠ ∅ *)
+    pose proof (live_roles_1 lb') as LIVE'.
+
+    remember (trace_last extr) as c1. destruct c1 as (σ1, tp1).
+    destruct c2 as (σ2, tp2).
+
+    iPoseProof (update_step_still_alive with "[$] [$] [$] [$] [$]") as "EM_STEP".
+    7: { apply PROG_STEP. }
+    7: { apply ct_lib_step. simpl. eauto. }
+    { rewrite LIVE LIVE'. dEl; set_solver. }
+    { rewrite dom_singleton. 
+      assert ((if (decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅))
+              then {[ inl 0 ]}
+              else (∅: gset (fmrole client_model_impl))) ⊆ {[inl 0]}) as IN.
+      { dEq; set_solver. }
+      apply IN. }
+    { rewrite LIVE. set_solver. }
+    all: eauto.
+    { Unshelve. 
+      2: exact (if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) 
+                then {[ inr ρy := client_fl ]} 
+                else {[ inl 0 := f ]}).
+      destruct (decide (_=_)); set_solver. }
+    { repeat split; rewrite ?LIVE ?LIVE'.
+      - dEl.
+        2: { destruct decide; set_solver. }
+        intros _. rewrite decide_False. 
+        { rewrite lookup_singleton. simpl. lia. }
+        tauto. 
+      - destruct (decide (_ ∈ _)); [set_solver| ].
+        destruct (decide (_=_)); [set_solver| ].
+        rewrite !lookup_singleton. simpl. lia. 
+      - set_solver.
+      - dEq; [| set_solver]. 
+        intros. assert (ρ' = inr ρy) as -> by set_solver.
+        rewrite lookup_singleton. simpl. lia.
+      - dEq; set_solver.
+      - dEq; dEl; set_solver.
+      - dEq; dEl; set_solver. }
+    rewrite LIVE LIVE'.
+    iMod "EM_STEP" as (??) "(?&?&?&?&FREE)".
+    iModIntro. do 2 iExists _. iFrame.
+    
+    iApply partial_free_roles_are_Proper; [| iFrame].
+    dEl; dEq; tauto || set_solver.  
+  Qed.
+ 
+
   Lemma fuel_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
   PMP Einvs ∗ client_inv ⊢
   ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M) 
@@ -507,11 +588,6 @@ Section ClientSpec.
     { eauto. }
     { set_solver. }
     
-    pose proof (live_roles_1 lb) as LIVE. rewrite decide_True in LIVE. 
-    2: { eapply LM_live_roles_strong. eexists. by econstructor. }
-    (* TODO: consider the case with rem ≠ ∅ *)
-    pose proof (live_roles_1 lb') as LIVE'.
-
     destruct (trace_last extr) as (σ1, tp1) eqn:LASTE. destruct c2 as (σ2, tp2).
     rewrite LASTE. 
     rewrite difference_empty_L. rewrite difference_empty_L in TMAP_LIB.
@@ -524,48 +600,12 @@ Section ClientSpec.
     { rewrite /has_fuels. rewrite dom_singleton_L big_sepS_singleton.
       rewrite lookup_singleton. iFrame. iExists _. iFrame. done. }
 
-    Ltac dEq := destruct (decide (_ = _)). 
-    Ltac dEl := destruct (decide (_ ∈ _)). 
-    pose proof (LM_map_empty_notlive lb' 0 (LM := lib_model)). 
-    iPoseProof (update_step_still_alive with "[$] [$] [$] [$] [$]") as "EM_STEP". 
-    7: { by rewrite LASTE in x0. }
-    7: { apply ct_lib_step. simpl. econstructor; eauto. }
-    { rewrite LIVE LIVE'. destruct decide; set_solver. }
-    { rewrite dom_singleton. 
-      assert ((if (decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅))
-              then {[ inl 0 ]}
-              else (∅: gset (fmrole client_model_impl))) ⊆ {[inl 0]}) as IN.
-      { destruct (decide (_ = _)); set_solver. }
-      apply IN. }
-    { rewrite LIVE. set_solver. }
-    all: eauto.
-    { Unshelve. 
-      2: exact (if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) 
-                then {[ inr ρy := client_fl ]} 
-                else {[ inl 0 := f ]}).
-      destruct (decide (_=_)); set_solver. }
-    { repeat split; rewrite ?LIVE ?LIVE'.
-      - destruct (decide (_ ∈ _)).
-        2: { destruct decide; set_solver. }
-        intros _. rewrite decide_False. 
-        { rewrite lookup_singleton. simpl. lia. }
-        tauto. 
-      - destruct (decide (_ ∈ _)); [set_solver| ].
-        destruct (decide (_=_)); [set_solver| ].
-        rewrite !lookup_singleton. simpl. lia. 
-      - set_solver.
-      - dEq; [| set_solver]. 
-        intros. assert (ρ' = inr ρy) as -> by set_solver.
-        rewrite lookup_singleton. simpl. lia.
-      - dEq; set_solver.
-      - dEq; dEl; set_solver.
-      - dEq; dEl; set_solver. }
-    iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EVOL & FUELS & ST & MSI & FR)"; [set_solver| ].
-    rewrite LIVE LIVE'. 
-    (* iDestruct (partial_free_roles_are_Proper with "FR") as "FR". *)
-    (* { Unshelve. 2: exact {[if decide (ls_tmap lb' (LM := lib_model) !! 0 = Some ∅) then inr ρy else inl 0 ]}.
-      destruct decide; set_solver. } *)
-    do 2 iExists _. iFrame "MSI EVOL".
+    rewrite -LASTE. 
+    iPoseProof (update_client_state with "[$] [$] [$] [$] [$]") as "EM_STEP"; eauto.
+    { econstructor. eauto. }
+    { lia. }
+    iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EV & MSI & FUELS & ST & FR)"; [set_solver| ].
+    do 2 iExists _. iFrame "EV MSI".
 
     iMod ("CLOS" with "[ST MSI_LIB YST_AUTH]") as "_".
     { iNext. iExists (_, _). rewrite /client_inv_impl. iFrame. }
@@ -583,19 +623,51 @@ Section ClientSpec.
     rewrite dom_domain_restrict in TMAP_LIB; [| set_solver].
     rewrite TMAP_LIB. rewrite lookup_insert.
     repeat erewrite @decide_False with (P := (Some (dom fs) = Some ∅)).
-    2-4: by intros [=].
+    2-3: by intros [=].
     iSplitR.
-    - iPureIntro. split; [set_solver| ].
-      destruct (decide (_ ∈ filter _ _)); set_solver.
-    -
-      (* iExists f. iSplit; [| done]. *)
-      rewrite dom_singleton_L big_sepS_singleton.
+    - iPureIntro. set_solver.
+    - rewrite dom_singleton_L big_sepS_singleton.
       rewrite lookup_singleton. 
       iDestruct "FUEL" as (?) "[%EQ ?]". inversion EQ. subst.  
       iExists _. iFrame. iPureIntro. lia.
     Admitted.
+  
+  
+  Lemma model_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
+  PMP Einvs ∗ client_inv ⊢
+  ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M)
+    (tp1 tp2 : list (language.expr heap_lang)) (σ1 σ2 : language.state heap_lang)
+    (s1 s2 : lib_model_impl) (fs1 fs2 : gmap (fmrole lib_model_impl) nat)
+    (ρ : fmrole lib_model_impl) (δ1 : M) (ζ : locale heap_lang)
+    (fr1 fr_stash : gset (fmrole lib_model_impl))
+    (_ : live_roles lib_model_impl s2 ∖ live_roles lib_model_impl s1 ⊆ fr1)
+    (_ : fr_stash ⊆ dom fs1) (_ : live_roles lib_model_impl s1
+                                  ∩ (fr_stash ∖ {[ρ]}) = ∅)
+    (_ : dom fs2 ∩ fr_stash = ∅) (_ : trace_last extr = (tp1, σ1))
+    (_ : trace_last auxtr = δ1) (_ : locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
+    (_ : fmtrans lib_model_impl s1 (Some ρ) s2)
+    (_ : valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := lib_model))
+  ,
+    has_fuels ζ fs1 (PMPP := lib_PMPP) -∗
+    partial_model_is s1 (PartialModelPredicatesPre := lib_PMPP) -∗
+    em_msi (tp1, σ1) δ1 (em_GS0 := heap_fairnessGS) -∗
+    partial_free_roles_are fr1 (PartialModelPredicatesPre := lib_PMPP)
+    ={Einvs ∪ ↑Ns}=∗
+    ∃ (δ2 : M) (ℓ : mlabel M),
+      ⌜em_valid_state_evolution_fairness (extr :tr[ Some ζ ]: (tp2, σ2))
+         (auxtr :tr[ ℓ ]: δ2)⌝ ∗
+      has_fuels ζ fs2 (PMPP := lib_PMPP) ∗
+      partial_model_is s2 (PartialModelPredicatesPre := lib_PMPP) ∗
+      em_msi (tp2, σ2) δ2 (em_GS0 := heap_fairnessGS) ∗
+      partial_free_roles_are
+        (fr1 ∖ (live_roles lib_model_impl s2 ∖ live_roles lib_model_impl s1)
+         ∪ fr_stash) (PartialModelPredicatesPre := lib_PMPP).
+  Proof.
+    iIntros "[#PMP #COMP]". iIntros "* FUELS_LIB ST_LIB MSI FR_LIB". simpl in *.
     
+    iInv Ns as ((lb, y)) ">(ST & YST_AUTH & inv')" "CLOS".
     
+
 
   Lemma lib_PMP `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
     PMP Einvs ∗ client_inv ⊢
@@ -609,6 +681,9 @@ Section ClientSpec.
       iDestruct (fuel_step_lifting with "[$] [] [] FUELS_LIB MSI") as "LIFT"; eauto.
       (* change the PMP interface so it allows fupd in fuel step *)
       admit.
+    - (* TODO: separate fork step *)
+      admit.
+    - 
       
   Admitted. 
 
