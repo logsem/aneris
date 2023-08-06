@@ -4,11 +4,12 @@ From trillium.fairness Require Import fairness fuel fuel_ext.
 Close Scope Z_scope.
 
 Section LMFair.
-  Context `{LM: LiveModel Λ M}.
-  Context `{Countable (locale Λ), Inhabited (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G, Inhabited G}.
   Context `{Inhabited (fmstate M)}.
 
-  Definition locale_trans (st1: lm_ls LM) (τ: locale Λ) st2 :=
+  (* TODO: rename *)
+  Definition locale_trans (st1: lm_ls LM) (τ: G) st2 :=
     ls_trans (lm_fl LM) st1 (Silent_step τ) st2 \/
     exists ρ, ls_trans (lm_fl LM) st1 (Take_step ρ τ) st2. 
 
@@ -24,7 +25,7 @@ Section LMFair.
   Global Definition LM_Fair: FairModel.
     refine {|
         fmstate := lm_ls LM;
-        fmrole := locale Λ;
+        fmrole := G;
         fmtrans :=
           fun st1 oρ st2 => 
             match oρ with

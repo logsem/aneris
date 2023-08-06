@@ -24,8 +24,9 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
 Ltac wp_expr_simpl := wp_expr_eval simpl. 
 
 Lemma tac_wp_pure_helper `{EM: ExecutionModel M} `{@heapGS Σ _ EM} 
-  `{iLM: LiveModel heap_lang iM}  `{!fairnessGS iLM Σ}  
-  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
+  `{iLM: LiveModel G iM} `{Countable G}
+  `{!fairnessGS iLM Σ}  
+  `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}  
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   (* fs *)
@@ -67,7 +68,7 @@ Lemma maps_gt_n {Mdl} (fs: gmap (fmrole Mdl) _) n:
   fs = (λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs).
 Proof.
   intros Hgt.
-  rewrite -leibniz_equiv_iff => ρ.
+  apply map_eq. intros ρ.
   rewrite -map_fmap_compose !lookup_fmap.
   destruct (fs !! ρ) as [f|] eqn:? =>//=. f_equiv.
   assert (f >= n)%nat by eauto.
@@ -76,22 +77,23 @@ Qed.
 
 Lemma has_fuels_gt_n  
   (* `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)} *)
-  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
+  `{Countable G} `{PMPP: @PartialModelPredicatesPre G _ _ Σ iM}
   (fs: gmap (fmrole iM) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
-  has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
+  has_fuels tid fs (PMPP := PMPP) ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)) (PMPP := PMPP).
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 
 Lemma has_fuels_gt_1
-  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}  
+  `{Countable G} `{PMPP: @PartialModelPredicatesPre G _ _ Σ iM}
   (fs: gmap (fmrole iM) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
-  `{iLM: LiveModel heap_lang iM} `{!fairnessGS iLM Σ}  
-  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
+  `{iLM: LiveModel G iM} `{Countable G}
+  `{!fairnessGS iLM Σ}  
+  `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   φ n Φ :
@@ -160,8 +162,9 @@ Proof.
 Qed.
 
 Lemma tac_wp_pure `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
-  `{iLM: LiveModel heap_lang iM} `{!fairnessGS iLM Σ}  
-  `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}
+  `{iLM: LiveModel G iM} `{Countable G}
+  `{!fairnessGS iLM Σ}  
+  `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
   Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
   (fs: gmap (fmrole iM) nat)
   :
@@ -357,10 +360,10 @@ Implicit Types Δ : envs (uPredI (iResUR Σ)).
 Implicit Types v : val.
 Implicit Types tid : locale heap_lang.
 
-Context `{iLM: LiveModel heap_lang iM}.
+Context `{iLM: LiveModel G iM} `{Countable G}.
 Context `{!fairnessGS iLM Σ}. 
 (* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
-Context `{PMPP: @PartialModelPredicatesPre heap_lang _ _ Σ iM}. 
+Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}. 
 
 (* Lemma tac_wp_allocN Δ Δ' s E j K v n Φ : *)
 (*   (0 < n)%Z → *)

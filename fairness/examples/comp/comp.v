@@ -25,21 +25,29 @@ Section LibraryDefs.
              |}).
     intros. set_solver. 
   Defined. 
-    
 
-  Definition lib_model: LiveModel heap_lang lib_model_impl := 
+  (* simply to differentiate between group- and individual role *)
+  Definition lib_grole := unit.
+  Definition ρlg: lib_grole := tt. 
+
+  Definition ρl: fmrole lib_model_impl := tt.
+
+  Definition lib_model: LiveModel lib_role lib_model_impl := 
     {| lm_fl _ := 5; |}.  
   
   Definition lib_fun: val.
   Admitted.
+
+  
   
 End LibraryDefs.
 
 Global Opaque lib_model_impl. 
+Global Opaque lib_grole ρlg. 
 
 Section LibrarySpec.
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM}.
-  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ lib_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ lib_model_impl}.
   (* Context {ifG: fairnessGS lib_model Σ}. *)
   
   Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := lib_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
@@ -47,7 +55,7 @@ Section LibrarySpec.
   Lemma lib_spec tid Einvs:
     PMP Einvs -∗
     {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
-        has_fuels tid {[ tt:=2 ]} (PMPP := PMPP)  }}}
+        has_fuels tid {[ ρlg:=2 ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
     {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
                  partial_free_roles_are {[ tt ]} }}}.
