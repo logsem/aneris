@@ -131,7 +131,7 @@ Next Obligation.
   - inversion Htrans; simplify_eq. constructor. lia.
 Qed.
 
-Definition cn_model : LiveModel heap_lang cn_fair_model :=
+Definition cn_model : LiveModel (locale heap_lang) cn_fair_model :=
   {| lm_fl _ := 40%nat |}.
 
 (** Determine additional restriction on relation to obtain finite branching *)
@@ -158,7 +158,7 @@ Definition Ns := nroot .@ "choose_nat".
 Section proof.
   (* Context `{!heapGS Σ cn_model, choose_natG Σ}. *)
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM, choose_natG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ cn_fair_model}.
+  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ cn_fair_model}.
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ cn_model PMPP}. *)
   Context `{!fairnessGS cn_model Σ}.
 
@@ -227,7 +227,8 @@ Section proof.
   Lemma sub_comp `{Countable K} (fs: gmap K nat) (d1 d2: nat):
     (sub d1 ∘ sub d2) <$> fs = sub (d1 + d2) <$> fs.
   Proof.
-    apply leibniz_equiv. apply map_fmap_proper; [| done].
+    apply leibniz_equiv.
+    apply map_fmap_proper; [| done].
     intros ??->. apply leibniz_equiv_iff.
     rewrite /compose. lia. 
   Qed.
@@ -562,7 +563,10 @@ Proof.
   iDestruct "H" as (cn) "(Hf & Hl & H●)".
   iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
   iDestruct (gen_heap_valid with "Hσ Hl") as %Hlookup%lookup_total_correct.
+
+  simpl. iDestruct "Hs" as "[Hs TM]". 
   iDestruct (model_agree' with "Hs Hf") as %Hlast.
+
   iModIntro. iSplitL; [by iExists _; iFrame|].
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
   iPureIntro. exists cn.

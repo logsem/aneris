@@ -8,6 +8,9 @@ Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 
 Section PartialOwnership.
   Context `{G: Type}.
+  (* Notation GO := (leibnizO G). *)
+  Notation GO := G.
+
   Context `{Countable G}.
   Context {Σ : gFunctors}.
   (* Context {fG: fairnessGS LM Σ}. *)
@@ -15,14 +18,14 @@ Section PartialOwnership.
   (* Context `{invGS_gen HasNoLc Σ}.  *)
   Context `{iLM: LiveModel G iM}. (* fuel construction over inner model *)
 
-  Canonical Structure GroupRoleO (G: Type) := leibnizO G.
+  (* Canonical Structure GroupRoleO (G: Type) := leibnizO G. *)
 
   (* TODO: rename *)
   Class PartialModelPredicatesPre := {
       partial_model_is: fmstate iM -> iProp Σ;
       partial_free_roles_are: gset (fmrole iM) → iProp Σ;
       partial_fuel_is: gmap (fmrole iM) nat → iProp Σ;
-      partial_mapping_is: gmap G (gset (fmrole iM)) → iProp Σ;
+      partial_mapping_is: gmap GO (gset (fmrole iM)) → iProp Σ;
       
       partial_model_is_Timeless :> forall s, Timeless (partial_model_is s);
       partial_fuel_is_Timeless :> forall fs, Timeless (partial_fuel_is fs);
@@ -50,24 +53,28 @@ Section PartialOwnership.
   Section has_fuel.
     Context {PMPP: PartialModelPredicatesPre}.
     (* Context `{Equiv G}. *)
+    (* Context `{LeibnizEquiv G}. *)
 
     Notation Role := (iM.(fmrole)).
 
-    Definition has_fuel (ζ: G) (ρ: Role) (f: nat): iProp Σ :=
+    Definition has_fuel (ζ: GO) (ρ: Role) (f: nat): iProp Σ :=
       ζ ↦m ρ ∗ ρ ↦F f.
 
-    Definition has_fuels (ζ: G) (fs: gmap Role nat): iProp Σ :=
+    Definition has_fuels (ζ: GO) (fs: gmap Role nat): iProp Σ :=
       ζ ↦M dom fs ∗ [∗ set] ρ ∈ dom fs, ∃ f, ⌜fs !! ρ = Some f⌝ ∧ ρ ↦F f.
 
+    (* Context {G: Ofe} *)
+    (* Context `{LeibnizEquiv G}. *)
+
     #[global] Instance has_fuels_proper:
-      Proper ((≡) ==> (≡) ==> (≡)) (has_fuels).
-    Proof. solve_proper. Qed. 
+      Proper ((=) ==> (≡) ==> (≡)) (has_fuels).
+    Proof. solve_proper. Qed.
 
     #[global] Instance has_fuels_timeless (ζ: G) (fs: gmap Role nat):
       Timeless (has_fuels ζ fs).
     Proof. rewrite /has_fuels. apply _. Qed.
 
-    Lemma has_fuel_fuels (ζ: G) (ρ: Role) (f: nat):
+    Lemma has_fuel_fuels (ζ: GO) (ρ: Role) (f: nat):
       has_fuel ζ ρ f ⊣⊢ has_fuels ζ {[ ρ := f ]}.
     Proof.
       rewrite /has_fuel /has_fuels. iSplit.
@@ -90,11 +97,37 @@ Section PartialOwnership.
       rewrite has_fuel_fuels /has_fuels_S map_fmap_singleton //.
     Qed.
 
+    (* Context `{Dist G}.  *)
+    (* Context `{GM: OfeMixin G}.  *)
+    (* Context `{Equivalence G}.  *)
+
     Lemma has_fuel_fuels_plus_1 (ζ: G) fs:
       has_fuels_plus 1 ζ fs ⊣⊢ has_fuels_S ζ fs.
     Proof.
-      rewrite /has_fuels_plus /has_fuels_S. do 2 f_equiv.
-      (* intros m m' ->. apply leibniz_equiv_iff. lia. *)
+      rewrite /has_fuels_plus /has_fuels_S.
+
+      do 2 f_equiv.
+      intros m m' ->. apply leibniz_equiv_iff. lia.
+
+      (* f_equiv. *)
+      (* -  *)
+      (*   eapply leibniz_equiv_iff. done. *)
+      (*   Unshelve. *)
+      (*   red. intros. *)
+      (*   assert (Equivalence (@equiv G H0)). *)
+      (*   { apply _.  *)
+      (*     typeclasses eauto.  *)
+      (*   apply _.  *)
+      (*   reflexivity. *)
+        
+      (*   2: apply _.  *)
+      (*   done. inversion H0.  *)
+
+
+      (* (* intros m m' ->. apply leibniz_equiv_iff. lia. *) *)
+
+
+      (* rewrite /has_fuels_plus /has_fuels_S. *)
     Qed.
 
     Lemma has_fuel_fuels_plus_0 (ζ: G) fs:

@@ -361,7 +361,7 @@ Qed.
 
 Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
         (* `(EM : ExecutionModel M) *)
-        `{LM: LiveModel heap_lang M}
+        `{LM: LiveModel (locale heap_lang) M}
         `{!heapGpreS Σ (@LM_EM _ LM)} (s: stuckness)
         e1 (s1: M)
         (* FR *)

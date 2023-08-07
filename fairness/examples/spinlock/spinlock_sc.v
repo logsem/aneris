@@ -150,7 +150,7 @@ Section SpinlockDefs.
 
   Definition sm_fuel := 27.
 
-  Definition spinlock_model: LiveModel heap_lang spinlock_model_impl :=
+  Definition spinlock_model: LiveModel (locale heap_lang) spinlock_model_impl :=
     {|
       lm_fl (x: fmstate spinlock_model_impl) := sm_fuel; 
     |}.
@@ -181,7 +181,7 @@ End SpinlockDefs.
 Section ClientProofs.
   (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM, spinlockG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ spinlock_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ spinlock_model_impl}.
   Context {ifG: fairnessGS spinlock_model Σ}.
 
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
@@ -614,7 +614,7 @@ End ClientProofs.
 Section MainProof.
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM}.
   Context `{SL_PRE: spinlockPreG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ spinlock_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ spinlock_model_impl}.
   Context {ifG: fairnessGS spinlock_model Σ}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).

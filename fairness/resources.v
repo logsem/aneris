@@ -5,7 +5,7 @@ From trillium.fairness Require Import partial_ownership.
 
 Class fairnessGpreS `(LM: LiveModel G M) Σ `{Countable G} := {   
   fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
-  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (GroupRoleO G) (exclR (gsetR (RoleO M)))));
+  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR G (exclR (gsetR (RoleO M)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
@@ -31,7 +31,7 @@ Global Arguments fairness_model_free_roles_name {G M LM Σ _ _} _ : assert.
 
 Definition fairnessΣ G M `{Countable G} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
-   GFunctor (authUR (gmapUR (GroupRoleO G) (exclR (gsetR (RoleO M)))));
+   GFunctor (authUR (gmapUR G (exclR (gsetR (RoleO M)))));
    GFunctor (authUR (gmapUR (RoleO M) (exclR natO)));
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
