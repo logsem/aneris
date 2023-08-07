@@ -295,21 +295,56 @@ Section model_state_lemmas.
     - intros ?. eexists. split; eauto.
   Qed.
 
+  Lemma frag_fuel_included fs FS:
+    auth_fuel_is FS -∗ frag_fuel_is fs -∗ ⌜ fs ⊆ FS ⌝.
+  Proof.
+    iIntros "Hafuel Hfuel".
+    iCombine "Hafuel Hfuel" as "H".
+    iDestruct (own_valid with "H") as %Hval. iPureIntro.    
+    apply auth_both_valid_discrete in Hval as [Hval ?].
+    rewrite map_subseteq_spec. iIntros (ρ f Hρ).
+    unshelve eapply lookup_included in Hval; [exact ρ| ]. 
+    rewrite !lookup_fmap Hρ //= in Hval.
+    destruct (FS !! ρ) eqn:LL; rewrite LL in Hval; simpl in Hval. 
+    - apply Excl_included in Hval. congruence.
+    - red in Hval.
+      (* TODO: a canonical way? *)
+      destruct Hval as [? ?].
+      rewrite Some_op_opM in H1. inversion H1. 
+  Qed.
+
+  Lemma frag_fuel_is_big_sepM fs (FSn0: fs ≠ ∅):
+       ([∗ map] ρ↦f ∈ fs, frag_fuel_is {[ρ := f]}) ⊣⊢ frag_fuel_is fs.
+  Proof. 
+    rewrite /frag_fuel_is.
+    rewrite -big_opM_own; [| done].
+    rewrite -big_opM_auth_frag.
+    iApply own.own_proper. f_equiv.
+    (* TODO: upstream *)
+    clear FSn0. pattern fs. apply map_ind.
+    { rewrite big_opM_empty fmap_empty. done. }
+    intros.
+    rewrite insert_union_singleton_l. rewrite big_opM_union.
+    2: { by apply map_disjoint_singleton_l_2. }
+    rewrite H1. rewrite big_opM_singleton.
+    rewrite map_fmap_union. rewrite !map_fmap_singleton /=.
+    apply leibniz_equiv_iff. apply gmap_disj_op_union.
+    apply map_disjoint_singleton_l_2. rewrite lookup_fmap H0. done.
+  Qed.
+
+
   Lemma has_fuel_fuel ζ δ fs:
     has_fuels ζ fs -∗ model_state_interp δ -∗ 
     ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
   Proof.
     unfold has_fuels, model_state_interp, auth_fuel_is.
     iIntros "[Hζ Hfuels] (%FR&Hafuel&Hamapping&HFR&Hamod)" (ρ Hρ).
+    iClear "Hζ Hamapping HFR Hamod".
     iDestruct (big_sepS_delete _ _ ρ with "Hfuels") as "[(%f&%Hfs&Hfuel) _]" =>//.
-    iCombine "Hafuel Hfuel" as "H".
-    iDestruct (own_valid with "H") as %Hval. iPureIntro.
-    apply auth_both_valid_discrete in Hval as [Hval ?].
-    rewrite map_fmap_singleton in Hval.
-    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
-    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
-    apply fmap_Some_1 in Hval as (f'&Hfuelρ&?). simplify_eq.
-    rewrite Hfuelρ Hfs //.
+    iPoseProof (frag_fuel_included with "Hafuel Hfuel") as "%INCL".    
+    iPureIntro. rewrite Hfs. 
+    eapply lookup_weaken; [| apply INCL].
+    by rewrite lookup_singleton. 
   Qed.
 
   Lemma frag_free_roles_fuels_disj: forall δ fr fs tid,
