@@ -25,7 +25,6 @@ Ltac wp_expr_simpl := wp_expr_eval simpl.
 
 Lemma tac_wp_pure_helper `{EM: ExecutionModel M} `{@heapGS Σ _ EM} 
   `{iLM: LiveModel G iM} `{Countable G}
-  `{!fairnessGS iLM Σ}  
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}  
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
@@ -92,7 +91,7 @@ Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
   `{iLM: LiveModel G iM} `{Countable G}
-  `{!fairnessGS iLM Σ}  
+  (* `{!fairnessGS iLM Σ}   *)
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
@@ -163,7 +162,7 @@ Qed.
 
 Lemma tac_wp_pure `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
   `{iLM: LiveModel G iM} `{Countable G}
-  `{!fairnessGS iLM Σ}  
+  (* `{!fairnessGS iLM Σ}   *)
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
   Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
   (fs: gmap (fmrole iM) nat)
@@ -196,6 +195,7 @@ Proof.
   rewrite /Δ' /= (envs_snoc_sound Δ'other false i); first by iApply "H2".
   eapply maybe_into_latersN_envs_dom =>//. rewrite /Δother.
   eapply envs_lookup_envs_delete =>//.
+  Unshelve. all: apply H0.
 Qed.
 
 

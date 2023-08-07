@@ -78,62 +78,57 @@ Lemma init_fairnessGS_LM Σ `{hPre: @fairnessGpreS (locale heap_lang) M LM Σ
 Proof.
   iIntros. 
   destruct INIT as [[??] [FUEL TMAP]]. destruct σ1 as [tp ?]. simpl in *. subst.
-  iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
-  iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
-  iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
-  (* TODO: seems like the concrete set of free roles doesn't matter *)
-  (* iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]". *)
-  iMod (model_free_roles_init s1 ∅) as (γfr) "[HFR Hfr]".
-  iModIntro.
-  iExists ({| 
-              fairness_inG := hPre;
-              fairness_model_name := γmod;
-              fairness_model_mapping_name := γmap;
-              fairness_model_fuel_name := γfuel;
-              fairness_model_free_roles_name := γfr;
-            |}).
+
+  iMod (lm_msi_init s1 ∅) as (fG) "(MSI & Hmodf & Hmapf & Hfuelf & Hfr)".
+  { set_solver. } (* TODO: generalize to arbitrary set *)
   
-  iApply bi.sep_comm. rewrite /em_lm_msi. rewrite -bi.sep_assoc.  
-  iSplitR "Hmodf Hfr Hfuelf Hmapf".
-  1: { unfold model_state_interp. simpl. iFrame. 
-       iExists _.
+  (* iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]". *)
+  (* iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]". *)
+  (* iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]". *)
+  (* (* iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]". *) *)
+  (* iMod (model_free_roles_init s1 ∅) as (γfr) "[HFR Hfr]". *)
+  iModIntro.
+  iExists fG. 
+  rewrite /em_lm_msi. iFrame "MSI". 
+  
+  (* iApply bi.sep_comm.  rewrite -bi.sep_assoc.   *)
+  (* iSplitR "Hmodf Hfr Hfuelf Hmapf". *)
+  (* 1: { unfold model_state_interp. simpl. iFrame.  *)
+  (*      iExists _. *)
 
-       iSplitL "Hfuela".
-       { rewrite /auth_fuel_is /=.
-         rewrite FUEL. rewrite fmap_gset_to_gmap //. } 
+  (*      iSplitL "Hfuela". *)
+  (*      { rewrite /auth_fuel_is /=. *)
+  (*        rewrite FUEL. rewrite fmap_gset_to_gmap //. }  *)
 
-       iSplitL "Hmapa"; first by rewrite TMAP /auth_mapping_is /= map_fmap_singleton //.
-       iSplit; first done.
-       (* - intros ρ tid. rewrite MAP.  *)
-       (*   rewrite lookup_gset_to_gmap_Some. *)
-       (*   setoid_rewrite lookup_singleton_Some. split; naive_solver. *)
+  (*      iSplitL "Hmapa"; first by rewrite TMAP /auth_mapping_is /= map_fmap_singleton //. *)
+  (*      iSplit; first done. *)
+  (*      (* - intros ρ tid. rewrite MAP.  *) *)
+  (*      (*   rewrite lookup_gset_to_gmap_Some. *) *)
+  (*      (*   setoid_rewrite lookup_singleton_Some. split; naive_solver. *) *)
 
-       (* - rewrite FUEL. rewrite dom_gset_to_gmap. set_solver. *)
-       iPureIntro. set_solver. 
-  }
+  (*      (* - rewrite FUEL. rewrite dom_gset_to_gmap. set_solver. *) *)
+  (*      iPureIntro. set_solver.  *)
+  (* } *)
 
-  iSplitR.
-  { iPureIntro. rewrite /tids_restrict.
-    intros tid Hlocs. rewrite TMAP lookup_singleton_ne //.
-    compute in Hlocs. set_solver. }    
+  iSplitL.
+  2: { iPureIntro. rewrite /tids_restrict.
+       intros tid Hlocs. rewrite TMAP lookup_singleton_ne //.
+       compute in Hlocs. set_solver. }
 
   rewrite /LM_init_resource /has_fuels /=.
-    
-  (* iFrame. *)
-  iSplitL "Hmodf".
-  { by rewrite /frag_model_is. }
+  rewrite dom_gset_to_gmap. rewrite FUEL TMAP. iFrame.
   iSplitL "Hfr".
   { rewrite /frag_free_roles_are. 
     iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
 
-  rewrite !dom_gset_to_gmap. rewrite /frag_mapping_is. simpl.
-  rewrite map_fmap_singleton. iFrame. 
   unfold frag_fuel_is.
-  setoid_rewrite map_fmap_singleton. simpl.
+  setoid_rewrite map_fmap_singleton.
+  simpl.
   destruct (decide (live_roles M s1 = ∅)) as [-> | NE].
   { by iApply big_sepS_empty. }
   iDestruct (own_proper with "Hfuelf") as "Hfuelf".
-  { apply auth_frag_proper. apply @gset_to_gmap_singletons. } 
+  { apply auth_frag_proper. rewrite fmap_gset_to_gmap. 
+    apply @gset_to_gmap_singletons. } 
   rewrite big_opS_auth_frag. rewrite big_opS_own; [| done].
   iApply (big_sepS_mono with "Hfuelf"). iIntros (ρ Hin) "H".
   iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done.

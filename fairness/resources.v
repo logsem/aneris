@@ -595,16 +595,36 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
+  Lemma model_mapping_init' (tmap: gmap G (gset (fmrole M))):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
+            (● (Excl <$> tmap) ⋅ ◯ (Excl <$> tmap) ).
+  Proof.
+    iMod (own_alloc (● (Excl <$> tmap) ⋅ ◯ _: authUR (gmapUR _ _))) as (γ) "[Hfl Hfr]".
+    { apply auth_both_valid_discrete. split; [reflexivity|].
+      intros i. rewrite lookup_fmap. by destruct lookup. }
+    iExists _. by iSplitL "Hfl".
+  Qed.  
+
   Lemma model_mapping_init (s0: M) (ζ0: G):
     ⊢ |==> ∃ γ,
         own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
             (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
                ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})).  
   Proof.
-    iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
-                       ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}): authUR (gmapUR _ _))) as (γ) "[Hfl Hfr]".
-    { apply auth_both_valid_2; eauto. by apply singleton_valid. }
-    iExists _. by iSplitL "Hfl".
+    rewrite -map_fmap_singleton. iApply model_mapping_init'.
+  Qed.
+
+  Lemma model_fuel_init' (F: gmap (fmrole M) nat):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ
+            (● (Excl <$> F) ⋅ (◯ (Excl <$> F))).
+  Proof.
+    iMod (own_alloc
+            ((● (Excl <$> F) ⋅ (◯ (Excl <$> F))): authUR (gmapUR (RoleO M) (exclR natO)))) as (γ) "[H1 H2]".
+    { apply auth_both_valid_discrete. split; [reflexivity| ].
+      intros i. rewrite lookup_fmap. by destruct lookup. } 
+    iExists _. by iSplitL "H1".
   Qed.
 
   Lemma model_fuel_init (s0: M):
@@ -613,18 +633,10 @@ Section adequacy.
             (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
                (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))).
   Proof.
-    iMod (own_alloc
-            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]".
-    { apply auth_both_valid_2;eauto. intros ρ.
-      destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq;
-        rewrite Heq; last done.
-      apply lookup_gset_to_gmap_Some in Heq.
-      destruct Heq as [?<-]. done. }
-    iExists _. by iSplitL "H1".
+    rewrite -fmap_gset_to_gmap. iApply model_fuel_init'. 
   Qed.
 
-  Lemma model_free_roles_init (s0: M) (FR: gset _):
+  Lemma model_free_roles_init (FR: gset _):
     ⊢ |==> ∃ γ,
         own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
   Proof.
@@ -632,4 +644,30 @@ Section adequacy.
     { apply auth_both_valid_2 =>//. }
     iExists _. by iSplitL "H1".
   Qed.
+
+  Lemma lm_msi_init (δ: LiveState G M) (fr: gset (fmrole M))
+    (FR_DISJ: dom (ls_fuel δ) ## fr):
+    ⊢ |==> ∃ (fG: fairnessGS LM Σ), 
+        model_state_interp δ ∗
+        frag_model_is (ls_under δ)∗
+        frag_mapping_is (ls_tmap δ (LM := LM)) ∗
+        frag_fuel_is (ls_fuel δ) ∗
+        frag_free_roles_are fr.
+  Proof. 
+    iMod (model_state_init (ls_under δ)) as (γ_st) "[AUTH_ST FRAG_ST]".
+    iMod (model_mapping_init' (ls_tmap δ (LM := LM))) as (γ_map) "[AUTH_MAP FRAG_MAP]".
+    iMod (model_fuel_init' (ls_fuel δ)) as (γ_fuel) "[AUTH_FUEL FRAG_FUEL]".
+    iMod (model_free_roles_init fr) as (γ_fr) "[AUTH_FR FRAG_FR]".
+    iModIntro.
+    iExists {| 
+        fairness_inG := fG;
+        fairness_model_name := γ_st;
+        fairness_model_mapping_name := γ_map;
+        fairness_model_fuel_name := γ_fuel;
+        fairness_model_free_roles_name := γ_fr;
+      |}. 
+    rewrite /model_state_interp. 
+    iFrame. iExists _. iFrame. iPureIntro. set_solver.
+  Qed. 
+
 End adequacy.

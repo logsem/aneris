@@ -4,7 +4,7 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fuel partial_ownership pmp_lifting. 
+From trillium.fairness Require Export fairness fuel partial_ownership pmp_lifting. 
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Export lang heap_lang_defs. 
 From trillium.fairness.heap_lang Require Import tactics notation.
@@ -203,7 +203,7 @@ Context `{EM: ExecutionModel M}.
 Context `{hGS: @heapGS Σ _ EM}.
 Context `{iLM:LiveModel G iM}.
 Context `{Countable G}.
-Context {ifG: fairnessGS iLM Σ}.
+(* Context {ifG: fairnessGS iLM Σ}. *)
 Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}.
 
 Let eGS := heap_fairnessGS. 
