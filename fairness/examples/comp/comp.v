@@ -32,7 +32,7 @@ Section LibraryDefs.
 
   Definition ρl: fmrole lib_model_impl := tt.
 
-  Definition lib_model: LiveModel lib_role lib_model_impl := 
+  Definition lib_model: LiveModel lib_grole lib_model_impl := 
     {| lm_fl _ := 5; |}.  
   
   Definition lib_fun: val.
@@ -55,7 +55,7 @@ Section LibrarySpec.
   Lemma lib_spec tid Einvs:
     PMP Einvs -∗
     {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
-        has_fuels tid {[ ρlg:=2 ]} (PMPP := PMPP)  }}}
+        has_fuels tid {[ ρl:=2 ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
     {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
                  partial_free_roles_are {[ tt ]} }}}.
@@ -80,11 +80,11 @@ Section ClientDefs.
     client_trans (lb, 2) (Some $ inr ρy) (lb, 1)
   (* TODO: allow arbitrary library's LM roles *)
   | ct_lib_step lb1 lb2
-                (LIB_STEP: fmtrans lib_fair lb1 (Some 0%nat) lb2):
-    client_trans (lb1, 1) (Some $ inl 0%nat) (lb2, 1)
+                (LIB_STEP: fmtrans lib_fair lb1 (Some ρlg) lb2):
+    client_trans (lb1, 1) (Some $ inl ρlg) (lb2, 1)
   | ct_y_step_1 (lb: fmstate lib_fair)
                 (* (LIB_NOSTEP: 0 ∉ live_roles _ lb) *)
-                (LIB_NOROLES: ls_tmap lb (LM := lib_model) !! 0 = Some ∅)
+                (LIB_NOROLES: ls_tmap lb (LM := lib_model) !! ρlg = Some ∅)
     :
     client_trans (lb, 1) (Some $ inr ρy) (lb, 0)
   .
@@ -115,7 +115,7 @@ Section ClientDefs.
   Proof. Admitted. 
   
   Definition client_lr (st: client_state): gset (client_role) :=
-    filter (fun r => (@bool_decide _ (lib_step_dec st r) = true))  {[ inl 0; inr ρy ]}. 
+    filter (fun r => (@bool_decide _ (lib_step_dec st r) = true))  {[ inl ρlg; inr ρy ]}. 
 
   Lemma client_lr_spec: ∀ (s : client_state) (ρ : client_role),
       (exists s', client_trans s (Some ρ) s') <-> ρ ∈ client_lr s.
@@ -140,7 +140,7 @@ Section ClientDefs.
   Defined.
 
   Definition client_fl := 10. 
-  Definition client_model: LiveModel heap_lang client_model_impl :=
+  Definition client_model: LiveModel (locale heap_lang) client_model_impl :=
     {| lm_fl _ := client_fl; |}.  
 
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
@@ -148,7 +148,7 @@ Section ClientDefs.
      cl_pre_lib_st :> inG Σ (authUR (optionR (exclR (ModelO lib_model_impl))));
      cl_pre_y_st :> inG Σ (authUR (optionR (exclR natO)));
      (* TODO: generalize key type *)
-     cl_pre_mapping :> inG Σ (authUR (gmapUR (localeO heap_lang) (exclR (gsetR (RoleO lib_model_impl)))));
+     cl_pre_mapping :> inG Σ (authUR (gmapUR lib_grole (exclR (gsetR (RoleO lib_model_impl)))));
      cl_pre_fr :> inG Σ (authUR (gset_disjUR (RoleO lib_model_impl)));
   }.
 
@@ -165,7 +165,7 @@ End ClientDefs.
 
 Section ClientRA.
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM} {cG: clientGS Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ client_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
   
   Notation "'lib_inn_role'" := (fmrole lib_model_impl).
   Notation "'lib_inn_state'" := (fmstate lib_model_impl).
@@ -180,11 +180,11 @@ Section ClientRA.
         (◯ ((fmap Excl F): ucmra_car (gmapUR (RoleO lib_model_impl) (exclR natO)))).
 
   (* TODO: generalize the type of keys *)
-  Definition lib_auth_mapping_impl_is (m: gmap (locale heap_lang) (gset lib_inn_role)): iProp Σ :=
+  Definition lib_auth_mapping_impl_is (m: gmap lib_grole (gset lib_inn_role)): iProp Σ :=
     own cl_map_name
         (● (fmap Excl m : ucmra_car (gmapUR _ (exclR (gsetR lib_inn_role))))).
 
-  Definition lib_frag_mapping_impl_is (m: gmap (locale heap_lang) (gset lib_inn_role)): iProp Σ :=
+  Definition lib_frag_mapping_impl_is (m: gmap lib_grole (gset lib_inn_role)): iProp Σ :=
     own cl_map_name
         (◯ (fmap Excl m : ucmra_car (gmapUR _ (exclR (gsetR lib_inn_role))))).
 
@@ -230,7 +230,7 @@ End ClientRA.
 
 Section ClientSpec. 
   Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre _ _ _ Σ client_model_impl}.
+  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
 
   Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
 
@@ -287,7 +287,7 @@ Section ClientSpec.
     { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
     iMod (own_alloc ((● (Excl' n) ⋅ ◯ _))) as (γ_st) "[AUTH_Y FRAG_Y]".
     { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
-    iMod (own_alloc ((● (Excl <$> ls_tmap lb0 (LM := lib_model)) ⋅ ◯ _ ): (authUR (gmapUR (localeO heap_lang) (exclR (gsetR (RoleO lib_model_impl))))))) as (γ_map) "[AUTH_MAP FRAG_MAP]".
+    iMod (own_alloc ((● (Excl <$> ls_tmap lb0 (LM := lib_model)) ⋅ ◯ _ ): (authUR (gmapUR lib_grole (exclR (gsetR (RoleO lib_model_impl))))))) as (γ_map) "[AUTH_MAP FRAG_MAP]".
     { apply auth_both_valid_discrete. split; [reflexivity|].
       intros i. rewrite lookup_fmap. by destruct lookup. } 
     iMod (own_alloc (((● (Excl <$> ls_fuel lb0)) ⋅ ◯ _): (authUR (gmapUR (RoleO lib_model_impl) (exclR natO))))) as (γ_fuel) "[AUTH_FUEL FRAG_FUEL]".
@@ -317,15 +317,15 @@ Section ClientSpec.
   Let lib_pmi `{clientGS Σ} (m: gmap (locale heap_lang) (gset (fmrole lib_model_impl))): iProp Σ:=
     (∃ (L: gset (fmrole lib_model_impl)) (Ract Rfr: gset client_role), 
         ⌜ m = {[ 0 := L ]} ⌝ ∗
-         lib_frag_mapping_impl_is {[ 0 := L ]} ∗
-         (⌜ L ≠ ∅ ⌝ ∗ ⌜ Ract = {[ inl 0 ]} /\ Rfr = {[ inr ρy ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ inl 0 := f ]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∨
-          ⌜ L = ∅ ⌝ ∗ ⌜ Ract = {[ inr ρy ]} /\ Rfr = {[ inl 0 ]} ⌝ ∗ partial_fuel_is {[ inr ρy := 10 ]}) ∗
+         lib_frag_mapping_impl_is {[ ρlg := L ]} ∗
+         (⌜ L ≠ ∅ ⌝ ∗ ⌜ Ract = {[ inl ρlg ]} /\ Rfr = {[ inr ρy ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ inl ρlg := f ]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∨
+          ⌜ L = ∅ ⌝ ∗ ⌜ Ract = {[ inr ρy ]} /\ Rfr = {[ inl ρlg ]} ⌝ ∗ partial_fuel_is {[ inr ρy := 10 ]}) ∗
         partial_mapping_is {[ 0 := Ract ]} ∗
         partial_free_roles_are Rfr ∗
         y_frag_model_is 1). 
   
   Definition lib_PMPP `{clientGS Σ}:
-    @PartialModelPredicatesPre heap_lang _ _ Σ lib_model_impl.
+    @PartialModelPredicatesPre (locale heap_lang) _ _ Σ lib_model_impl.
    refine
     {|
         partial_model_is := lib_frag_model_is;
@@ -334,10 +334,7 @@ Section ClientSpec.
         partial_mapping_is := lib_pmi;
     |}.
   Unshelve.
-  all: try apply _. 
-  - intros ???. set_solver.
-  - intros ???. iSplit. 
-    all: by iIntros "(%&%&%& (-> & ?))"; do 3 iExists _; iFrame; iPureIntro; apply leibniz_equiv.
+  all: try (apply _ || solve_proper). 
   - intros. rewrite /lib_frag_fuel_is.
       rewrite map_fmap_union. rewrite -gmap_disj_op_union.
       2: { by apply map_disjoint_fmap. }
