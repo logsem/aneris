@@ -442,6 +442,15 @@ Section ClientSpec.
       %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
   Qed.
 
+  (* TODO: unify with update_model ? *)
+  Lemma y_update_model `{clientGS Σ} y1 y2 y:
+    y_auth_model_is y1 -∗ y_frag_model_is y2 ==∗ y_auth_model_is y ∗ y_frag_model_is y.
+  Proof.
+    iIntros "H1 H2". iCombine "H1 H2" as "H".
+    iMod (own_update with "H") as "[??]" ; eauto.
+    - by apply auth_update, option_local_update, (exclusive_local_update _ (Excl y)).
+    - iModIntro. iFrame.
+  Qed.
      
 (*   Lemma big_opM_fmap': *)
 (*   ∀ {M M' : ofe} {o : M → M → M} {o' : M' → M' → M'} *)
@@ -656,18 +665,71 @@ Section ClientSpec.
       iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.       
   Admitted.
 
+  (* TODO: upstream *)
+  Lemma big_opM_insert_delete':
+  ∀ {M : ofe} {o : M → M → M} {Monoid0 : Monoid o} {K : Type} 
+    {EqDecision1 : EqDecision K} {H0 : Countable K} {B : Type} 
+    (f : K → B → M) (m : gmap K B) (i : K) (x : B),
+    m !! i = Some x ->
+    ([^ o map] k↦y ∈ m, f k y)
+    ≡ o (f i x) ([^ o map] k↦y ∈ delete i m, f k y).
+  Proof.
+    intros. rewrite -big_opM_insert_delete.
+    symmetry. eapply big_opM_insert_override; eauto.
+  Qed.
 
-  Lemma client_spec Einvs (lb0: fmstate lib_fair) f
+  (* TODO: upstream *)
+  Lemma big_opM_fmap_singletons:
+  ∀ {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} 
+    {A B: cmra} (m : gmap K A) (f: A -> B)
+    (LE: LeibnizEquiv B),
+    ([^ op map] k↦x ∈ m, f <$> {[k := x]}) = (f <$> m: gmap K B).
+  Proof.
+    intros. pattern m. apply map_ind.
+    { rewrite big_opM_empty fmap_empty. done. }
+    intros. 
+    rewrite insert_union_singleton_l.
+    apply leibniz_equiv.
+    rewrite big_opM_union.
+    2: { by apply map_disjoint_singleton_l_2. }
+    rewrite H2. rewrite big_opM_singleton.
+    rewrite map_fmap_union. rewrite !map_fmap_singleton /=.
+    apply leibniz_equiv_iff. apply gmap_disj_op_union.
+    apply map_disjoint_singleton_l_2. rewrite lookup_fmap H1. done.
+  Qed.
+
+  Lemma frag_fuel_is_big_sepM `{clientGS Σ} fs (FSn0: fs ≠ ∅):
+       ([∗ map] ρ↦f ∈ fs, frag_fuel_is {[ρ := f]}) ⊣⊢ frag_fuel_is fs.
+  Proof.
+    rewrite /frag_fuel_is.
+    rewrite -big_opM_own; [| done].
+    rewrite -big_opM_auth_frag.
+    iApply own.own_proper. f_equiv.
+    by rewrite big_opM_fmap_singletons.
+  Qed.
+
+  Lemma frag_mapping_is_big_sepM `{clientGS Σ} m (Mn0: m ≠ ∅):
+       ([∗ map] τ↦R ∈ m, frag_mapping_is {[τ := R]}) ⊣⊢ frag_mapping_is m.
+  Proof.
+    rewrite /frag_mapping_is.
+    rewrite -big_opM_own; [| done].
+    rewrite -big_opM_auth_frag.
+    iApply own.own_proper. f_equiv.
+    by rewrite big_opM_fmap_singletons. 
+  Qed.
+
+
+  Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     (FB: f >= 10)
     (* TODO: get rid of these restrictions *)
     (DISJ_INV1: Einvs ## ↑Ns)
     (* (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)
-    (LB0_ACT: 0 ∈ live_roles _ lb0)
-    (LB0_INFO: @ls_fuel _ _ lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! 0 = Some {[ tt ]})
+    (LB0_ACT: ρlg ∈ live_roles _ lb0)
+    (LB0_INFO: @ls_fuel _ _ lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! ρlg = Some {[ tt ]})
     :
     PMP Einvs -∗
     {{{ partial_model_is (lb0, 2)  ∗ 
-        partial_free_roles_are {[ inl 0 ]} ∗ 
+        partial_free_roles_are {[ inl ρlg ]} ∗ 
         has_fuels 0 {[ inr ρy := f ]} (PMPP := PMPP)  }}}
       client #() @ 0
     {{{ RET #(); partial_mapping_is {[ 0 := ∅ ]} }}}.
@@ -701,10 +763,10 @@ Section ClientSpec.
     3: { rewrite dom_singleton. reflexivity. }
     2: { rewrite LIVE2 LIVE1. set_solver. } 
     2: { set_solver. }
-    { Unshelve. 2: exact {[ inl 0 := lm_fl client_model (lb0, 1) ]}.
+    { Unshelve. 2: exact {[ inl ρlg := lm_fl client_model (lb0, 1) ]}.
       repeat split; rewrite ?LIVE2 ?LIVE1.
       1-3, 5-7: set_solver. 
-      intros. assert (ρ' = inl 0) as -> by set_solver.
+      intros. assert (ρ' = inl ρlg) as -> by set_solver.
       rewrite lookup_singleton. simpl. lia. }
     { set_solver. }
     iNext. iIntros "(L & ST & FUELS & FR)".
@@ -715,7 +777,7 @@ Section ClientSpec.
 
     simpl. clear FS. 
     rewrite (sub_0_id {[ _ := _ ]}).    
-    assert (fuels_ge ({[inl 0 := 10]}: gmap (fmrole client_model_impl) nat) 10) as FS.
+    assert (fuels_ge ({[inl ρlg := 10]}: gmap (fmrole client_model_impl) nat) 10) as FS.
     { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
     
     do 2 pure_step FS. 
@@ -727,33 +789,35 @@ Section ClientSpec.
     iModIntro. 
 
     wp_bind (lib_fun #())%E.
-    iDestruct "FUELS" as "[MAP FUELS]". 
+    (* iDestruct "FUELS" as "[MAP FUELS]".  *)
+    iDestruct (has_fuels_equiv with "FUELS") as "[MAP FUELS]".
     iApply (lib_spec with "[] [LST YST LF LM FR MAP FUELS]").
     { iApply lib_PMP; [done| ]. iSplit; done. }
     { simpl. destruct LB0_INFO as (LIBF & -> & LIBM). iFrame "LST".
-      rewrite /has_fuels. rewrite dom_singleton_L big_sepS_singleton.
-      simpl. iSplitR "LF".
-      2: { iExists 2. iSplitR; [done| ].
-           (* rewrite fuels in premise as big union by roles, use LIBF *)
-           admit. }
+      rewrite has_fuels_equiv. simpl. 
+      rewrite dom_singleton_L !big_sepM_singleton. 
+      iSplitR "LF".
+      2: { rewrite -frag_fuel_is_big_sepM.
+           2: { intros E. by rewrite E in LIBF. }
+           erewrite big_opM_insert_delete'; eauto.
+           iDestruct "LF" as "[??]". iFrame. }
       do 3 iExists _. iFrame. iSplitR.
       { eauto. }
       iSplitL "LM".
-      { (* rewrite mapping in premise as big union by roles, use LIBM *)
-        admit. }
+      { rewrite -frag_mapping_is_big_sepM. 
+        2: { intros E. by rewrite E in LIBM. }
+        erewrite big_opM_insert_delete'; eauto.
+        iDestruct "LM" as "[??]". iFrame. }
       iLeft.
-      rewrite dom_fmap_L dom_singleton_L big_sepS_singleton.
-      rewrite map_fmap_singleton lookup_singleton.
-      do 2 (iSplitR; [done| ]). 
-      iDestruct "FUELS" as (?) "[%FF FUEL]". inversion FF.
+      rewrite bi.sep_assoc. iSplitR.
+      { iPureIntro. set_solver. }
+      rewrite !map_fmap_singleton big_sepM_singleton.
       iExists _. iFrame. iPureIntro. rewrite /client_fl. lia. }
 
     iNext. iIntros "[LMAP LFR']". simpl. 
     iDestruct "LMAP" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
     assert (L = ∅) as -> by set_solver.
     iDestruct "MATCH" as "[[%?] | (_&[->->]&FUEL')]"; [set_solver| ]. clear LIBM.
-                                      
-    (* iRename "FUELS" into "FUELS_OLD". *)
                                       
     iAssert (has_fuels 0 {[ inr ρy := 10 ]})%I with "[FUEL' MAP]" as "FUELS".
     { rewrite /has_fuels.
@@ -775,10 +839,10 @@ Section ClientSpec.
     iAssert (⌜ y = 1 ⌝)%I as %->.
     { iCombine "YST_AUTH YST" as "Y". iDestruct (own_valid with "Y") as %V.
       apply auth_both_valid_discrete in V as [EQ%Excl_included _]. done. }
-    iAssert (⌜ ls_tmap lb !! 0 = Some ∅ ⌝)%I as %LIB_END.
-    { rewrite /lib_msi. iDestruct "inv'" as "(_&LM_AUTH&_)".
-      (* TODO: use an analogue of frag_mapping_same *)
-      admit. }
+    iAssert (⌜ ls_tmap lb !! ρlg = Some ∅ ⌝)%I as %LIB_END.
+    { iApply (frag_mapping_same with "[inv'] LM"). 
+      rewrite /model_state_interp. iFrame.
+      iDestruct "inv'" as (?) "(?&?&_)". iFrame.  }
 
     pose proof (live_roles_1 lb) as LIVE1'. 
     (* rewrite !(decide_False, decide_True) in LIVE1'. -- TODO: how to do it in ssr?*)
@@ -804,11 +868,8 @@ Section ClientSpec.
     { lia. }
 
     (* rewrite LIVE0. erewrite decide_False; [| set_solver]. *)
-    iNext. iIntros "(L & ST & FUELS)".
-    iAssert (|==> y_frag_model_is 0 ∗ y_auth_model_is 0)%I with "[YST YST_AUTH]" as
-      "Y".
-    { admit. }
-    iMod "Y" as "[YST YST_AUTH]". 
+    iNext. iIntros "(L & ST & FUELS)".    
+    iMod (y_update_model _ _ 0 with "YST_AUTH YST") as "[YST_AUTH YST]".
     
     iMod ("CLOS" with "[YST_AUTH ST inv']") as "_".
     { iNext. iExists (_, _). rewrite /client_inv_impl. iFrame. }
@@ -825,6 +886,6 @@ Section ClientSpec.
     (* TODO: restore wp_lift_pure_step_no_fork_remove_role to justify the last step *)
     admit. 
 Admitted.     
-    
+  
  
 End ClientSpec.
