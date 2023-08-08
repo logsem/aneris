@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination.
+From trillium.fairness Require Import fairness resources.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 
 Require Import stdpp.decidable.
