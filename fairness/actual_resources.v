@@ -32,9 +32,9 @@ Section ActualOwnershipImpl.
     (Hminv1 : maps_inverse_match map1 tmap1):
   maps_inverse_match
     (filter (λ '(k, _), k ∈ (dom map1 ∪ dom fs) ∖ rem) map1)
-    (<[ζ:=dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)]> tmap1).
+    (<[ζ:=dom fs ∖ rem]> tmap1).
   Proof.
-    intros ρ ζ'. rewrite dom_domain_restrict; last set_solver. split.
+    intros ρ ζ'. split.
     + intros [Hlk Hin]%map_filter_lookup_Some. destruct (decide (ζ' = ζ)) as [->|Hneq].
       * rewrite lookup_insert. eexists; split=>//.
         set_solver.
@@ -51,6 +51,45 @@ Section ActualOwnershipImpl.
            intros contra%Hxdom. congruence.
   Qed. 
 
+  (* TODO: move to upstream *)
+  Lemma disjoint_subseteq:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C}
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C},
+    `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
+  Proof. intros. set_solver. Qed.
+
+  Lemma fuel_step_ls_tmap_dom δ ρ rem (fs: gmap (fmrole M) nat) ζ
+    (LOOKUP: ls_tmap δ !! ζ = Some (dom fs))
+    (REM_INCL: rem ⊆ dom fs)
+    :
+    ρ ∈ dom (ls_mapping δ) ∖ rem ↔
+    ∃ τ R, <[ζ:=dom fs ∖ rem]> (ls_tmap δ (LM := LM)) !! τ = Some R ∧ ρ ∈ R.
+  Proof.
+    setoid_rewrite lookup_insert_Some.
+    rewrite elem_of_difference.
+    pose proof (ls_mapping_tmap_corr δ (LM := LM)) as Hminv1. 
+    assert (dom fs ⊆ dom (ls_mapping δ)) as INCL. 
+    { apply elem_of_subseteq. intros ρ' [f IN]%elem_of_dom.              
+      red in Hminv1. eapply elem_of_dom.
+      red. exists ζ. apply Hminv1. eexists. split; eauto.
+      eapply elem_of_dom. set_solver. }
+    split.
+    - intros [[τ L]%elem_of_dom Nr].
+      specialize (proj1 (Hminv1 _ _) L) as (R & TM & IN). 
+      exists τ. destruct (decide (τ = ζ)) as [-> | ?].
+      + exists (dom fs ∖ rem). split; [| set_solver]. tauto. 
+      + exists R. split; auto.
+    - intros (τ & R & [[[-> <-] | [? ?]] IN]).
+      + set_solver.
+      + red in Hminv1.
+        split.
+        * apply elem_of_dom. exists τ. apply Hminv1. eauto.
+        * eapply not_elem_of_weaken; eauto.
+          pose proof (ls_tmap_disj _ _ _ _ _ H0 LOOKUP H1).
+          set_solver.
+  Qed.
+
+
   Lemma actual_update_no_step_enough_fuel
   (δ1: LM) rem
   (* c1 c2 *)
@@ -64,7 +103,7 @@ Section ActualOwnershipImpl.
         ⌜ lm_ls_trans LM δ1 (Silent_step ζ) δ2 ⌝ ∗
         has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗
         model_state_interp δ2 ∗
-        ⌜ ls_tmap δ2 (LM := LM) = <[ζ:=dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)]> (ls_tmap δ1 (LM := LM)) ⌝. 
+        ⌜ ls_tmap δ2 (LM := LM) = <[ζ:=dom fs ∖ rem]> (ls_tmap δ1 (LM := LM)) ⌝. 
 Proof.
     iIntros "%HnotO %Holdroles %Hincl Hf Hmod".
     (* destruct c2 as [tp2 σ2]. *)
@@ -73,6 +112,10 @@ Proof.
     iDestruct (has_fuel_fuel with "Hf Hmod") as "%Hfuel"; eauto.
     (* iDestruct (model_state_interp_tids_smaller with "Hmod") as %Hζs. *)
     iDestruct "Hmod" as "(%FR & Hfuel & Hamapping & HFR & Hmodel & %HFR)".
+    iAssert (⌜ ls_tmap δ1 (LM := LM) !! ζ = Some (dom fs) ⌝)%I as %TMAP1.
+    { iDestruct "Hf" as "[MAP _]". simpl.
+      rewrite dom_fmap. 
+      iApply (frag_mapping_same with "Hamapping MAP"). }
     unfold has_fuels_S.
     simpl in *.
 
@@ -115,26 +158,62 @@ Proof.
     iMod (update_has_fuels_no_step ζ (S <$> fs) (fs ⇂ (dom fs ∖ rem)) with "[Hf] [Hfuel] [Hamapping]") as "(Hafuels&Hfuels&Hamapping)" =>//.
     { rewrite -dom_empty_iff_L. set_solver -Hnewdom Hsamedoms Hfueldom. }
     { rewrite dom_domain_restrict; set_solver -Hnewdom Hsamedoms Hfueldom. }
+    rewrite dom_domain_restrict; [| set_solver]. 
     iModIntro. 
-    (* iExists {| *)
-    (*   ls_under := δ1.(ls_under); *)
-    (*   ls_fuel := _; *)
-    (*   ls_fuel_dom := Hfueldom; *)
-    (*   ls_same_doms := Hsamedoms; *)
-    (* |}. *)
-    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ _ _ (LM := LM)).
 
-    (* remember (build_LS_ext _ _ _ _ _ _) as δ2. *)
     pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as Hminv1. 
-    assert (maps_inverse_match new_mapping (<[ζ:=dom (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)]>
+    assert (dom fs ⊆ dom (ls_mapping δ1)) as INCL. 
+    { apply elem_of_subseteq. intros ρ' [f IN]%elem_of_dom.              
+      red in Hminv1. eapply elem_of_dom.
+      red. exists ζ. apply Hminv1. eexists. split; eauto.
+      eapply elem_of_dom. set_solver. }
+    assert (new_dom = dom (ls_mapping δ1) ∖ rem) as NEW_DOM. 
+    { rewrite /new_dom.
+      apply set_eq. intros.
+      pose proof (ls_same_doms δ1). 
+      destruct (decide (x ∈ rem)); [set_solver| ].      
+      destruct (decide (x ∈ dom (ls_mapping δ1))); set_solver. }
+    assert (maps_inverse_match new_mapping (<[ζ:=dom fs ∖ rem]>
       (ls_tmap δ1 (LM := LM))
            )) as MATCH.
     { clear -Hxdom Hminv1 Hincl.
       subst new_mapping new_dom. 
-      rewrite -ls_same_doms. 
+      rewrite -ls_same_doms.
       apply mim_fuel_helper; auto. }
 
-    simpl. 
+    (* TODO: doing this explicitly to avoid saving explicit proof terms
+       (parameters of build_LS_ext)
+       which otherwise critically slow down subsequent proofs *)
+    assert ( ∀ (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
+               τ1 ≠ τ2
+               → <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ1 = Some S1
+               → <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ2 = Some S2 → S1 ## S2) as DISJ2. 
+    { clear -TMAP1. intros.    
+      assert (forall τ R, <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ = Some R ->
+                     exists R0, ls_tmap δ1 !! τ = Some R0 /\ R ⊆ R0) as EXT. 
+      { intros ?? L%lookup_insert_Some.
+        destruct L as [[-> <-]| [? ?]].
+        all: eexists; split; eauto; set_solver. }
+      pose proof (EXT _ _ H1) as (S1'&?&?). pose proof (EXT _ _ H2) as (S2'&?&?).
+      eapply disjoint_subseteq; eauto.
+      { apply _. }
+      eapply ls_tmap_disj; eauto. }
+    assert ( ∀ ρ : fmrole M, ρ ∈ dom
+        (fuel_apply (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)
+           (ls_fuel δ1) ((dom (ls_fuel δ1) ∪ dom fs) ∖ rem))
+    ↔ (∃ (τ : G) (R : gset (fmrole M)),
+         <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ = Some R ∧ ρ ∈ R)) as TMAP_DOM2. 
+    { intros.
+      rewrite -Hsamedoms.
+      rewrite /new_mapping. 
+      erewrite dom_domain_restrict; [| set_solver]. 
+      rewrite NEW_DOM.
+      apply fuel_step_ls_tmap_dom; auto. }
+
+    iExists (build_LS_ext (ls_under δ1) _ Hfueldom (<[ζ:=dom fs ∖ rem]> (ls_tmap δ1 (LM := LM))) TMAP_DOM2 DISJ2 (LM := LM)).
+
+    (* remember (build_LS_ext _ _ _ _ _ _) as δ2.  *)
+    simpl.
     iSplit; last first.
     { rewrite (dom_fmap_L _ fs). iFrame "Hfuels". 
       (* rewrite /maps_inverse_match //=. *)
@@ -149,7 +228,7 @@ Proof.
       iExists _. iFrame. 
       iSplit.
       { iApply (auth_fuel_is_proper with "Hafuels"). f_equiv.
-        rewrite dom_domain_restrict; last set_solver -Hnewdom Hsamedoms Hfueldom.
+        (* rewrite dom_domain_restrict; last set_solver -Hnewdom Hsamedoms Hfueldom. *)
         replace (dom fs ∖ (dom fs ∖ rem)) with rem; [set_solver +|].
         rewrite -leibniz_equiv_iff. intros ρ. split; [set_solver -Hnewdom Hsamedoms Hfueldom|].
         intros [? [?|?]%not_elem_of_difference]%elem_of_difference =>//. }
@@ -160,13 +239,7 @@ Proof.
         assert (ρ ∈ dom (ls_fuel δ1))
                by set_solver -Hnewdom Hsamedoms Hfueldom.
         set_solver -Hnewdom Hsamedoms Hfueldom. }
-
-    Unshelve.
-    3: { (* codoms of tmap are disjoint*)
-         admit. }
-    2: { (* dom fuel = ⋃ codom (tmap τ) *)
-         admit. }
-    
+        
     iPureIntro.
     (* split; [split; [|split; [|split; [|split]]]|] =>//. *)
     repeat split; try done. 
@@ -217,10 +290,7 @@ Proof.
       intros ρ Hin. apply elem_of_dom.
       rewrite Hfuel ?dom_fmap // -elem_of_dom dom_fmap //.
     - by rewrite build_LS_ext_spec_st.   
-    (* - eapply tids_smaller_restrict_mapping; eauto. *)
-    (*   erewrite build_LS_ext_spec_mapping; [| by eauto]. *)
-    (*   subst new_mapping. apply map_filter_subseteq.  *)
-  Admitted.
+  Qed. 
 
 
   Lemma mim_helper_fork_step tmap1 map1 (R1 R2 : gset (fmrole M))
@@ -463,13 +533,6 @@ Proof.
     match goal with
     | |- ?goal => destruct_decide (decide (goal)); first done; exfalso
     end.
-
-  (* TODO: move to upstream *)
-  Lemma disjoint_subseteq:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C}
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C},
-    `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
-  Proof. intros. set_solver. Qed.
 
   (* Lemma union_intersection_difference_equiv_L: *)
   (* ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} *)
