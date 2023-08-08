@@ -453,15 +453,15 @@ Section ClientSpec.
 
 
   Lemma lib_open_inv `{clientGS Σ} ζ fs (FSnz : fs ≠ ∅):
-    client_inv -∗ has_fuels ζ (S <$> fs) (PMPP := lib_PMPP) -∗
+    client_inv -∗ has_fuels ζ fs (PMPP := lib_PMPP) -∗
     |={↑Ns, ∅}=>
     ⌜ ζ = 0 ⌝ ∗
     (∃ lb, partial_model_is (lb, 1) (PartialModelPredicatesPre := PMPP) ∗ model_state_interp lb) ∗ 
-    frag_mapping_is {[ρlg := dom (S <$> fs)]}  ∗ y_auth_model_is 1 ∗
+    frag_mapping_is {[ρlg := dom fs]}  ∗ y_auth_model_is 1 ∗
     (∃ f, partial_fuel_is {[inl ρlg := f]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∗
     partial_mapping_is {[0 := {[inl ρlg]}]} ∗
     partial_free_roles_are {[inr ρy]} ∗ y_frag_model_is 1 ∗
-    frag_fuel_is (S <$> fs) ∗
+    frag_fuel_is fs ∗
     (▷ (∃ st, client_inv_impl st) ={ ∅, ↑Ns}=∗ emp).
   Proof.
     iIntros "#INV FUELS_LIB".
@@ -469,9 +469,9 @@ Section ClientSpec.
     rewrite difference_diag_L. iModIntro.  
     iDestruct (has_fuels_equiv with "FUELS_LIB") as "[MAP_LIB FUEL_LIB]". 
     simpl. iDestruct "MAP_LIB" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)". 
-    assert (ζ = 0 /\ L = dom (S <$> fs)) as [-> ->]; [| clear LIBM].
+    assert (ζ = 0 /\ L = dom fs) as [-> ->]; [| clear LIBM].
     { by apply map_singleton_inj in LIBM as [-> <-]. }
-    assert (S <$> fs ≠ ∅) by (by intros ?%fmap_empty_inv).
+    (* assert (S <$> fs ≠ ∅) by (by intros ?%fmap_empty_inv). *)
     iDestruct "MATCH" as "[(_&[-> ->]&(%f & Ff & %BOUND)) | [% _]]".
     2: { exfalso. apply FSnz. apply dom_empty_iff. set_solver. }
     iPoseProof (y_model_agree with "YST_AUTH YST") as "->".
@@ -592,50 +592,50 @@ Section ClientSpec.
   Proof.
     iIntros "[#PMP #COMP]". iIntros "* FUELS_LIB ST_LIB MSI FR_LIB". simpl in *.
     
-    assert (ρ ∈ dom fs1) as DOM1ρ by apply x7.     
+    assert (ρ ∈ dom fs1) as DOM1ρ by apply x7.
+    assert (dom fs1 ≠ ∅ /\ fs1 ≠ ∅) as [FS1nz FS1nz'].
+    { split; intros ?; set_solver. }
     
-    iInv Ns as ((lb, y)) ">(ST & YST_AUTH & inv')" "CLOS".
-    iAssert (⌜ ζ = 0 /\ y = 1 /\ 
-               ls_tmap lb !! 0 = Some (dom fs1) /\
-               fs1 ⊆ ls_fuel lb ⌝)%I as %(->&->&TMAP&FUEL).
-    { iDestruct "FUELS_LIB" as "[MAP_LIB FUEL_LIB]".
-      simpl. iDestruct "MAP_LIB" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)". 
-      assert (ζ = 0 /\ L = dom fs1) as [-> ->] by set_solver. clear LIBM.
-      iDestruct "MATCH" as "[(_&[-> ->]&X) | [% _]]".
-      2: { set_solver. }
-      iAssert (⌜ y = 1 ⌝)%I as %->.
-      { (* exploit auth and frag parts of y state*)
-      admit. }
-      (* iAssert (⌜  ⌝)%I as %MAPlb. *)
-      (* { admit. }  *)
-      (* iAssert (⌜ ⌝)%I as %FUELlb. *)
-      (* { admit. } *)
-      admit. }
+    iPoseProof (lib_open_inv with "[$] FUELS_LIB") as "INV'"; [done| ]. 
+    rewrite union_comm_L. 
+    iMod (fupd_mask_frame_r _ _ Einvs with "INV'") as 
+      "(-> & (%lb & ST & inv') & LM & YST_AUTH & (%f & Ff & %BOUND) & MAP & FR & YST & FUEL_LIB & CLOS)"; [set_solver| ].
     
-    iPoseProof (lib_update_step_still_alive with "[$] [$] [$] [$]") as "LIFT"; eauto.
-    iMod "LIFT" as (lb') "(%LIB_STEP & FUELS_LIB & ST_LIB & MSI_LIB & FR_LIB & %TMAP_LIB)".
-    simpl. iFrame "ST_LIB". 
+    iMod (actual_update_step_still_alive with "[LM FUEL_LIB] [$] [$] [$]") as "LIFT"; eauto.
+    { rewrite has_fuels_equiv. iFrame. iApply frag_fuel_is_big_sepM; done. }
+    iDestruct "LIFT" as (lb') "(%LIB_STEP & FUELS_LIB & ST_LIB & MSI_LIB & FR_LIB & %TMAP_LIB)".
+    simpl. iFrame "ST_LIB FR_LIB".
     
-    iDestruct "FUELS_LIB" as "[MAP_LIB FUEL_LIB]".
-    simpl.  iDestruct "MAP_LIB" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
-    (* iDestruct "MATCH" as "[(_&[-> ->]&[%f [FUEL0 %BOUND0]]) | [% _]]". *)
-    (* 2: { set_solver. } *)
-    assert (L = dom fs2) as -> by set_solver. clear LIBM.
-    simpl. 
-    iAssert (has_fuels 0 {[ inl 0 := f ]}) with "[MAP FUEL0]" as "FUELS".
+    iAssert (has_fuels 0 {[ inl ρlg := f ]}) with "[MAP Ff]" as "FUELS".
     { rewrite /has_fuels. rewrite dom_singleton_L big_sepS_singleton.
       rewrite lookup_singleton. iFrame. iExists _. iFrame. done. }
 
-    rewrite -x3 -x4. 
-    iPoseProof (update_client_state with "[$] [] [] [$] [$]") as "EM_STEP"; eauto.
-    { econstructor. eauto. }
+    rewrite -x3 -x4. rewrite -x3 in x5. 
+    iPoseProof (update_client_state with "[$] [MSI] [ST] [$] [$]") as "EM_STEP"; eauto.
+    { red. right. eauto. }
     { lia. }
     iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EV & MSI & FUELS & ST & FR)"; [set_solver| ].
     do 2 iExists _. iFrame "EV MSI".
 
+    iDestruct ("CLOS" with "[ST MSI_LIB YST_AUTH]") as "CLOS".
+    { iNext. iExists (_, _). rewrite /client_inv_impl. iFrame. }
+    iMod (fupd_mask_frame_r _ _ Einvs with "CLOS") as "_"; [set_solver| ].
+    iModIntro.
 
-    
-    
+    rewrite !has_fuels_equiv. simpl.
+    iDestruct "FUELS" as "[MAP FUELS]".
+    iDestruct "FUELS_LIB" as "[MAP' FUELS_LIB]". iFrame "FUELS_LIB".
+    rewrite /lib_pmi. do 3 iExists _. iFrame.
+    iSplitR; [done |].
+    rewrite TMAP_LIB. rewrite lookup_insert.
+    dEq.
+    - iRight. rewrite big_sepM_singleton. iFrame.
+      iPureIntro. set_solver. 
+    - iLeft. rewrite big_sepM_singleton.
+      iApply bi.sep_assoc. iSplitR "FUELS".
+      2: { iExists _. iFrame. iPureIntro. lia. }
+      iPureIntro. split; [| set_solver]. intros ?. rewrite H1 in n. done.
+  Qed.
 
 
   Lemma lib_PMP `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
@@ -652,10 +652,9 @@ Section ClientSpec.
       admit.
     - (* TODO: separate fork step *)
       admit.
-    - 
-      
-  Admitted. 
-
+    - iIntros "* FUELS_LIB ST MSI FR". 
+      iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.       
+  Admitted.
 
 
   Lemma client_spec Einvs (lb0: fmstate lib_fair) f
