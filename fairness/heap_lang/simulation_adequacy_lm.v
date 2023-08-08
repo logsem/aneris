@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness resources.
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness resources fair_termination_natural.
 From trillium.fairness.heap_lang Require Export lang simulation_adequacy em_lm.
 
 Section adequacy.
@@ -344,5 +344,26 @@ Proof.
   eapply simulation_adequacy_terminate =>//.
   apply fair_terminating_traces_terminate.
 Qed.
+
+Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
+        `{LM: LiveModel (locale heap_lang) M}
+        `{!heapGpreS Σ (@LM_EM _ LM)} (s: stuckness)
+        e1 (s1: M)
+        (extr : heap_lang_extrace)
+        (Hexfirst : (trfirst extr).1 = [e1])
+  :
+  (* The model has finite branching *)
+  rel_finitary (sim_rel LM) →
+  (∀ `{!heapGS Σ (@LM_EM _ LM)},
+      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat) 
+                 ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, frag_mapping_is {[ 0%nat := ∅ ]} }}
+  ) ->
+  (* The coinductive pure coq proposition given by adequacy *)
+  extrace_fairly_terminating extr.
+Proof.
+  intros. eapply simulation_adequacy_terminate =>//.
+  eapply simple_fair_terminating_traces_terminate.
+Qed.
+
 
 End adequacy.

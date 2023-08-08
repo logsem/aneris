@@ -333,60 +333,6 @@ Proof.
   apply INls. by eapply sm_step_le.
 Qed.
 
-(* (* TODO: adapted from lifting.v, unify? *) *)
-(* Theorem simple_simulation_adequacy_terminate_ftm Σ *)
-(*   `{FairTerminatingModelSimple Mdl} *)
-(*   `(LM : LiveModel heap_lang Mdl) *)
-(*   `{!heapGpreS Σ LM} (s: stuckness) *)
-(*         e1 (s1: Mdl) *)
-(*         (extr : heap_lang_extrace) *)
-(*         (Hvex : extrace_valid extr) *)
-(*         (Hexfirst : (trfirst extr).1 = [e1]) *)
-(*   : *)
-(*   (* The model has finite branching *) *)
-(*   valid_state_evolution_finitary (aux_fair_state Mdl) (λ ex aux, live_tids (trace_last ex) (trace_last aux))→ *)
-(*   live_roles Mdl s1 ≠ ∅ -> *)
-(*   (∀ `{!heapGS Σ Mdl}, *)
-(*       ⊢ |={⊤}=> *)
-(*         frag_model_is s1 -∗ *)
-(*          has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1)) *)
-(*         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }} *)
-(*   ) -> *)
-(*   (* The coinductive pure coq proposition given by adequacy *) *)
-(*   (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
-(* Proof. *)
-(*   eapply simulation_adequacy_terminate =>//. *)
-(*   apply simple_fair_terminating_traces_terminate. *)
-(* Qed. *)
-
-Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
-        (* `(EM : ExecutionModel M) *)
-        `{LM: LiveModel (locale heap_lang) M}
-        `{!heapGpreS Σ (@LM_EM _ LM)} (s: stuckness)
-        e1 (s1: M)
-        (* FR *)
-        (extr : heap_lang_extrace)
-        (Hexfirst : (trfirst extr).1 = [e1])
-  :
-  (* The model has finite branching *)
-  rel_finitary (sim_rel LM) →
-  live_roles M s1 ≠ ∅ ->
-  (∀ `{!heapGS Σ (@LM_EM _ LM)},
-      ⊢ |={⊤}=>
-        frag_model_is s1 -∗
-        (* frag_free_roles_are (FR ∖ live_roles _ s1) -∗ *)
-        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
-        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, frag_mapping_is {[ 0%nat := ∅ ]} }}
-  ) ->
-  (* The coinductive pure coq proposition given by adequacy *)
-  extrace_fairly_terminating extr.
-Proof.
-  intros. eapply simulation_adequacy_terminate =>//. 
-  { eapply simple_fair_terminating_traces_terminate. }
-  iIntros. iModIntro. iIntros "(ST & FR & FUELS)". 
-  specialize (H2 hGS). iMod H2 as "H". iApply ("H" with "ST FUELS").
-Qed.
-
 
 Section SpinlockRA.
     
@@ -414,7 +360,8 @@ Proof.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl.
     apply (spinlock_model_finitary s1).    
-  - intros ?. iStartProof. iIntros "!> Hm Hf !>". simpl.
+  - intros ?. iStartProof.
+    rewrite /LM_init_resource. iIntros "!> (Hm & Hfr & Hf) !>". simpl.
     iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
     { rewrite /frag_free_roles_are. iApply own_unit. }
     iMod "FR" as "FR". 
