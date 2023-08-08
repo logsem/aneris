@@ -558,7 +558,6 @@ Section ClientSpec.
     iSplitR; [done| ].
     (* TODO: case when domain becomes empty *)
     iLeft. iSplitR; [done| ].
-    rewrite dom_domain_restrict in TMAP_LIB; [| set_solver].
     rewrite TMAP_LIB. rewrite lookup_insert.
     repeat erewrite @decide_False with (P := (Some (dom fs) = Some ∅)).
     2-3: by intros [=].
