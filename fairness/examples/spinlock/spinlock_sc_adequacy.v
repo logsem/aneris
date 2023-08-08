@@ -17,7 +17,7 @@ Import derived_laws_later.bi.
 
 From trillium.fairness.examples.spinlock Require Import spinlock_sc. 
 (* From trillium.fairness Require Import fairness fair_termination. *)
-From trillium.fairness.examples.spinlock Require Import fair_termination_natural.
+From trillium.fairness Require Import fair_termination_natural.
 
 
 Definition sm_order (s1 s2: spinlock_model_impl): Prop :=
