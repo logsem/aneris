@@ -315,21 +315,22 @@ Section model_state_lemmas.
 
   Lemma frag_fuel_is_big_sepM fs (FSn0: fs ≠ ∅):
        ([∗ map] ρ↦f ∈ fs, frag_fuel_is {[ρ := f]}) ⊣⊢ frag_fuel_is fs.
-  Proof. 
+  Proof.
     rewrite /frag_fuel_is.
     rewrite -big_opM_own; [| done].
     rewrite -big_opM_auth_frag.
     iApply own.own_proper. f_equiv.
-    (* TODO: upstream *)
-    clear FSn0. pattern fs. apply map_ind.
-    { rewrite big_opM_empty fmap_empty. done. }
-    intros.
-    rewrite insert_union_singleton_l. rewrite big_opM_union.
-    2: { by apply map_disjoint_singleton_l_2. }
-    rewrite H1. rewrite big_opM_singleton.
-    rewrite map_fmap_union. rewrite !map_fmap_singleton /=.
-    apply leibniz_equiv_iff. apply gmap_disj_op_union.
-    apply map_disjoint_singleton_l_2. rewrite lookup_fmap H0. done.
+    by rewrite big_opM_fmap_singletons.
+  Qed.
+
+  Lemma frag_mapping_is_big_sepM m (Mn0: m ≠ ∅):
+       ([∗ map] τ↦R ∈ m, frag_mapping_is {[τ := R]}) ⊣⊢ frag_mapping_is m.
+  Proof.
+    rewrite /frag_mapping_is.
+    rewrite -big_opM_own; [| done].
+    rewrite -big_opM_auth_frag.
+    iApply own.own_proper. f_equiv.
+    by rewrite big_opM_fmap_singletons. 
   Qed.
 
 

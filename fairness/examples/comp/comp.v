@@ -4,6 +4,7 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.fairness Require Import fuel_ext resources actual_resources.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness Require Import utils.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth auth gmap gset excl.
@@ -664,60 +665,6 @@ Section ClientSpec.
     - iIntros "* FUELS_LIB ST MSI FR". 
       iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.       
   Admitted.
-
-  (* TODO: upstream *)
-  Lemma big_opM_insert_delete':
-  ∀ {M : ofe} {o : M → M → M} {Monoid0 : Monoid o} {K : Type} 
-    {EqDecision1 : EqDecision K} {H0 : Countable K} {B : Type} 
-    (f : K → B → M) (m : gmap K B) (i : K) (x : B),
-    m !! i = Some x ->
-    ([^ o map] k↦y ∈ m, f k y)
-    ≡ o (f i x) ([^ o map] k↦y ∈ delete i m, f k y).
-  Proof.
-    intros. rewrite -big_opM_insert_delete.
-    symmetry. eapply big_opM_insert_override; eauto.
-  Qed.
-
-  (* TODO: upstream *)
-  Lemma big_opM_fmap_singletons:
-  ∀ {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} 
-    {A B: cmra} (m : gmap K A) (f: A -> B)
-    (LE: LeibnizEquiv B),
-    ([^ op map] k↦x ∈ m, f <$> {[k := x]}) = (f <$> m: gmap K B).
-  Proof.
-    intros. pattern m. apply map_ind.
-    { rewrite big_opM_empty fmap_empty. done. }
-    intros. 
-    rewrite insert_union_singleton_l.
-    apply leibniz_equiv.
-    rewrite big_opM_union.
-    2: { by apply map_disjoint_singleton_l_2. }
-    rewrite H2. rewrite big_opM_singleton.
-    rewrite map_fmap_union. rewrite !map_fmap_singleton /=.
-    apply leibniz_equiv_iff. apply gmap_disj_op_union.
-    apply map_disjoint_singleton_l_2. rewrite lookup_fmap H1. done.
-  Qed.
-
-  Lemma frag_fuel_is_big_sepM `{clientGS Σ} fs (FSn0: fs ≠ ∅):
-       ([∗ map] ρ↦f ∈ fs, frag_fuel_is {[ρ := f]}) ⊣⊢ frag_fuel_is fs.
-  Proof.
-    rewrite /frag_fuel_is.
-    rewrite -big_opM_own; [| done].
-    rewrite -big_opM_auth_frag.
-    iApply own.own_proper. f_equiv.
-    by rewrite big_opM_fmap_singletons.
-  Qed.
-
-  Lemma frag_mapping_is_big_sepM `{clientGS Σ} m (Mn0: m ≠ ∅):
-       ([∗ map] τ↦R ∈ m, frag_mapping_is {[τ := R]}) ⊣⊢ frag_mapping_is m.
-  Proof.
-    rewrite /frag_mapping_is.
-    rewrite -big_opM_own; [| done].
-    rewrite -big_opM_auth_frag.
-    iApply own.own_proper. f_equiv.
-    by rewrite big_opM_fmap_singletons. 
-  Qed.
-
 
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     (FB: f >= 10)

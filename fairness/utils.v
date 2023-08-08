@@ -65,6 +65,39 @@ Section bigop_utils.
     rewrite -(big_opM_singletons (gset_to_gmap a g)).
     rewrite /gset_to_gmap big_opM_fmap //.
   Qed.
+
+  (* TODO: upstream *)
+  Lemma big_opM_fmap_singletons
+    {B: cmra} (m : gmap K A) (f: A -> B)
+    (LE: LeibnizEquiv B):
+    ([^ op map] k↦x ∈ m, f <$> {[k := x]}) = (f <$> m: gmap K B).
+  Proof.
+    intros. pattern m. apply map_ind.
+    { rewrite big_opM_empty fmap_empty. done. }
+    intros. 
+    rewrite insert_union_singleton_l.
+    apply leibniz_equiv.
+    rewrite big_opM_union.
+    2: { by apply map_disjoint_singleton_l_2. }
+    rewrite H1. rewrite big_opM_singleton.
+    rewrite map_fmap_union. rewrite !map_fmap_singleton /=.
+    apply leibniz_equiv_iff. apply gmap_disj_op_union.
+    apply map_disjoint_singleton_l_2. rewrite lookup_fmap H0. done.
+  Qed.
+
+  (* TODO: upstream *)
+  Lemma big_opM_insert_delete':
+  ∀ {M : ofe} {o : M → M → M} {Monoid0 : Monoid o}
+    {B : Type} 
+    (f : K → B → M) (m : gmap K B) (i : K) (x : B),
+    m !! i = Some x ->
+    ([^ o map] k↦y ∈ m, f k y)
+    ≡ o (f i x) ([^ o map] k↦y ∈ delete i m, f k y).
+  Proof.
+    intros. rewrite -big_opM_insert_delete.
+    symmetry. eapply big_opM_insert_override; eauto.
+  Qed.
+  
 End bigop_utils.
 
 Section map_utils.
