@@ -372,8 +372,8 @@ Theorem client_terminates
         (Hexfirst : (trfirst extr).1 = [client #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM _ client_model)) clientPreΣ). 
-  assert (heapGpreS Σ (@LM_EM _ client_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ client_model)) clientPreΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ client_model)) as HPreG.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 

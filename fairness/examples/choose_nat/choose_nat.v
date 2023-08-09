@@ -519,8 +519,8 @@ Lemma choose_nat_sim l :
 Proof.
   (* assert (heapGpreS choose_natΣ cn_model) as HPreG. *)
   (* { apply _. } *)
-  set (Σ := gFunctors.app (heapΣ (@LM_EM _ cn_model)) choose_natΣ).
-  assert (heapGpreS Σ (@LM_EM _ cn_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ cn_model)) choose_natΣ).
+  assert (heapGpreS Σ (@LM_EM_HL _ cn_model)) as HPreG.
   { apply _. }
   
   eapply (strong_simulation_adequacy

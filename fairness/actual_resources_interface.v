@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm pmp_lifting.
+From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm em_lm_heap_lang pmp_lifting.
 
 
 (* TODO: move *)
@@ -33,9 +33,10 @@ Section ActualOwnershipInterface.
   (* TODO: get rid of excessive shelved goals
      (could be solved by new implementation of LiveState) *)
   Lemma ActualOwnershipPartial:
-    ⊢ PartialModelPredicates ∅ (EM := @LM_EM _ LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
+    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.
-    iIntros. iApply Build_PartialModelPredicates. iModIntro. repeat iSplitL.
+    iIntros. iApply (Build_PartialModelPredicates (EM := @LM_EM_HL _ LM)). 
+    iModIntro. repeat iSplitL.
     - iIntros (???????) "FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.

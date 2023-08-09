@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness resources fair_termination_natural.
-From trillium.fairness.heap_lang Require Export lang simulation_adequacy em_lm.
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness resources fair_termination_natural utils fuel_ext.
+From trillium.fairness.heap_lang Require Export lang simulation_adequacy em_lm_heap_lang em_lm. 
 
 Section adequacy.
 (* Local Hint Resolve tid_step_tp_length_heap: core. *)
@@ -19,7 +19,7 @@ Proof.
   - by intros ex atr [[??]?].
 Qed.
 
-Let rel_always_holds `{LM:LiveModel (locale heap_lang) M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
+Let rel_always_holds `{LM:LiveModel (locale heap_lang) M} `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)}
   s ξ e1 σ1 δ1 := 
       rel_always_holds0 (fun etr atr => ξ etr (map_underlying_trace atr)) 
         s (state_interp) (fun _ => frag_mapping_is {[ 0%nat := ∅ ]}) e1 σ1 δ1. 
@@ -41,7 +41,8 @@ Lemma initial_ls_tmap `{LM: LiveModel (locale heap_lang) M} τ s:
 Proof. Admitted. 
 
 
-Lemma rel_always_holds_lift_LM `{LM: LiveModel (locale heap_lang) M} `{hGS: @heapGS Σ LM (@LM_EM _ LM)}
+Lemma rel_always_holds_lift_LM `{LM: LiveModel (locale heap_lang) M}
+  `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)}
   s e1 σ1 s1 ξ:
   rel_always_holds s ξ e1 σ1 (initial_ls s1 0%nat) -∗
   rel_always_holds0 (sim_rel_with_user LM ξ) s state_interp
@@ -120,7 +121,7 @@ Proof.
     + iIntros (tid' e' Hsome Hnoval ρ). simpl.
       iAssert (frag_mapping_is {[ tid' := ∅ ]}) with "[Hposts]" as "H".
       { destruct (to_val e') as [?|] eqn:Heq; last done.
-        iApply posts_of_empty_mapping => //.
+        iApply (@posts_of_empty_mapping _ LM_EM_HL) => //. 
         apply from_locale_lookup =>//. }
       iDestruct (frag_mapping_same tid' (ls_tmap δ) with "Hmapa H") as "%Hlk".
       { rewrite /auth_mapping_is. iPureIntro. eapply no_locale_empty; [| done].
@@ -129,14 +130,14 @@ Qed.
   
 
 Theorem strong_simulation_adequacy Σ `(LM:LiveModel (locale heap_lang) M)
-    `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M)
+    `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop) :
   rel_finitary (sim_rel_with_user LM ξ) →
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)}, 
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)}, 
     ⊢ |={⊤}=>
        ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
-         LM_init_resource (initial_ls (LM := LM) s1 0%nat)
+         LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat)
        ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
        rel_always_holds s ξ e1 σ1 (initial_ls (LM := LM) s1 0%nat)) ->
@@ -154,15 +155,15 @@ Proof.
   by iApply rel_always_holds_lift_LM. 
 Qed.
 
-Theorem simulation_adequacy Σ `(LM:LiveModel (locale heap_lang) M) `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness) (e1 : expr) σ1 (s1: M):
+Theorem simulation_adequacy Σ `(LM:LiveModel (locale heap_lang) M) `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M):
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   (* The initial configuration satisfies certain properties *)
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)},
       ⊢ |={⊤}=>
-         LM_init_resource (initial_ls (LM := LM) s1 0%nat)
+         LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat)
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -192,15 +193,15 @@ Proof.
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel (locale heap_lang) M)
-        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)}  (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)}  (s: stuckness)
         e1 σ1 (s1: M)
         (iex : inf_execution_trace heap_lang)
         (Hvex : valid_inf_exec (trace_singleton ([e1], σ1)) iex)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM)  →
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
-      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat)
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat)
          ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -227,7 +228,7 @@ Qed.
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
 Theorem simulation_adequacy_traces Σ `(LM : LiveModel (locale heap_lang) M)
-  `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
+  `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -235,8 +236,8 @@ Theorem simulation_adequacy_traces Σ `(LM : LiveModel (locale heap_lang) M)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
-      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat)
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat)
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -269,7 +270,7 @@ Qed.
 
 
 Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel (locale heap_lang) M)
-        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -277,8 +278,8 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel (locale heap_lang) M
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
-      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat) 
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat) 
                ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -296,7 +297,7 @@ Qed.
   
 
 Theorem simulation_adequacy_terminate Σ `{LM:LiveModel (locale heap_lang) Mdl}
-        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness)
         e1 (s1: Mdl)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
@@ -304,8 +305,8 @@ Theorem simulation_adequacy_terminate Σ `{LM:LiveModel (locale heap_lang) Mdl}
   (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) ->
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
-      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat)
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat)
                  ={⊤}=∗
                  WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
@@ -328,15 +329,15 @@ Qed.
 
 Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
         `(LM : LiveModel (locale heap_lang) M)
-        `{hPre: @heapGpreS Σ LM (@LM_EM _ LM)} (s: stuckness)
+        `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ LM (@LM_EM _ LM)},
-      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat) 
+  (∀ `{hGS: @heapGS Σ LM (@LM_EM_HL _ LM)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat) 
                ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
@@ -348,15 +349,15 @@ Qed.
 
 Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
         `{LM: LiveModel (locale heap_lang) M}
-        `{!heapGpreS Σ (@LM_EM _ LM)} (s: stuckness)
+        `{!heapGpreS Σ (@LM_EM_HL _ LM)} (s: stuckness)
         e1 (s1: M)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{!heapGS Σ (@LM_EM _ LM)},
-      ⊢ |={⊤}=> LM_init_resource (initial_ls (LM := LM) s1 0%nat) 
+  (∀ `{!heapGS Σ (@LM_EM_HL _ LM)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat) 
                  ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, frag_mapping_is {[ 0%nat := ∅ ]} }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)

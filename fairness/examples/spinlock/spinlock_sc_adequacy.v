@@ -352,8 +352,8 @@ Theorem spinlock_terminates
         (Hexfirst : (trfirst extr).1 = [program #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM _ spinlock_model)) spinlockΣ). 
-  assert (heapGpreS Σ (@LM_EM _ spinlock_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ spinlock_model)) spinlockΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ spinlock_model)) as HPreG.
   { apply _. }
   eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ ([2; 2] : fmstate spinlock_model_impl) ∅)
   =>//.
