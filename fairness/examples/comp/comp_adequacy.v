@@ -311,79 +311,17 @@ From trillium.fairness Require Import fair_termination_natural.
 (*   inversion STEP; eexists; split; eauto; apply lookup_lt_is_Some; subst; eauto. *)
 (*   destruct LOCKi. eauto. *)
 (* Qed.  *)
-  
-  
-(* Lemma spinlock_model_finitary (s: spinlock_model_impl): *)
-(*   Finite { '(s', ℓ) | spinlock_model_step s ℓ s' ∨ s' = s ∧ ℓ = None}. *)
-(* Proof. *)
-(*   destruct (le_states_list s) as [ls INls]. *)
-(*   set (l := (s, None) ::  *)
-(*               flat_map (fun (i: nat) => map (fun s_ => (s_, Some i)) ls) (seq 0 (length s))). *)
-(*   eapply in_list_finite with (l := l). intros [s' ℓ'] STEP'. *)
-(*   destruct STEP' as [STEP | [-> ->]]. *)
-(*   2: { subst l. apply elem_of_list_here. } *)
-(*   subst l. apply elem_of_list_further.  *)
-(*   apply elem_of_list_In, in_flat_map. *)
-(*   pose proof (sm_step_role_bound s s' ℓ' STEP) as [ρ [-> LT]]. *)
-(*   exists ρ. split. *)
-(*   { apply in_seq. lia. } *)
-(*   apply in_map_iff. eexists. split; eauto. *)
-(*   apply INls. by eapply sm_step_le. *)
-(* Qed. *)
 
-(* (* (* TODO: adapted from lifting.v, unify? *) *) *)
-(* (* Theorem simple_simulation_adequacy_terminate_ftm Σ *) *)
-(* (*   `{FairTerminatingModelSimple Mdl} *) *)
-(* (*   `(LM : LiveModel heap_lang Mdl) *) *)
-(* (*   `{!heapGpreS Σ LM} (s: stuckness) *) *)
-(* (*         e1 (s1: Mdl) *) *)
-(* (*         (extr : heap_lang_extrace) *) *)
-(* (*         (Hvex : extrace_valid extr) *) *)
-(* (*         (Hexfirst : (trfirst extr).1 = [e1]) *) *)
-(* (*   : *) *)
-(* (*   (* The model has finite branching *) *) *)
-(* (*   valid_state_evolution_finitary (aux_fair_state Mdl) (λ ex aux, live_tids (trace_last ex) (trace_last aux))→ *) *)
-(* (*   live_roles Mdl s1 ≠ ∅ -> *) *)
-(* (*   (∀ `{!heapGS Σ Mdl}, *) *)
-(* (*       ⊢ |={⊤}=> *) *)
-(* (*         frag_model_is s1 -∗ *) *)
-(* (*          has_fuels (Σ := Σ) 0%nat (Mdl.(live_roles) s1) (gset_to_gmap (fuel_limit s1) (Mdl.(live_roles) s1)) *) *)
-(* (*         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }} *) *)
-(* (*   ) -> *) *)
-(* (*   (* The coinductive pure coq proposition given by adequacy *) *) *)
-(* (*   (∀ tid, fair_ex tid extr) -> terminating_trace extr. *) *)
-(* (* Proof. *) *)
-(* (*   eapply simulation_adequacy_terminate =>//. *) *)
-(* (*   apply simple_fair_terminating_traces_terminate. *) *)
-(* (* Qed. *) *)
-
-(* Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M} *)
-(*         (* `(EM : ExecutionModel M) *) *)
-(*         `{LM: LiveModel (locale heap_lang) M} *)
-(*         `{!heapGpreS Σ (@LM_EM _ LM)} (s: stuckness) *)
-(*         e1 (s1: M) *)
-(*         (* FR *) *)
-(*         (extr : heap_lang_extrace) *)
-(*         (Hexfirst : (trfirst extr).1 = [e1]) *)
-(*   : *)
-(*   (* The model has finite branching *) *)
-(*   rel_finitary (sim_rel LM) → *)
-(*   live_roles M s1 ≠ ∅ -> *)
-(*   (∀ `{!heapGS Σ (@LM_EM _ LM)}, *)
-(*       ⊢ |={⊤}=> *)
-(*         frag_model_is s1 -∗ *)
-(*         (* frag_free_roles_are (FR ∖ live_roles _ s1) -∗ *) *)
-(*         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1)) *)
-(*         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, frag_mapping_is {[ 0%nat := ∅ ]} }} *)
-(*   ) -> *)
-(*   (* The coinductive pure coq proposition given by adequacy *) *)
-(*   extrace_fairly_terminating extr. *)
-(* Proof. *)
-(*   intros. eapply simulation_adequacy_terminate =>//.  *)
-(*   { eapply simple_fair_terminating_traces_terminate. } *)
-(*   iIntros. iModIntro. iIntros "(ST & FR & FUELS)".  *)
-(*   specialize (H2 hGS). iMod H2 as "H". iApply ("H" with "ST FUELS"). *)
-(* Qed. *)
+Instance client_trans'_PI s x: 
+  ProofIrrel ((let '(s', ℓ) := x in 
+               fmtrans client_model_impl s ℓ s' \/ (s' = s /\ ℓ = None)): Prop).
+Proof. apply make_proof_irrel. Qed.    
+  
+Lemma spinlock_model_finitary (s1 : client_model_impl):
+    Finite
+      {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 
+      fmtrans client_model_impl s1 ℓ s2 ∨ s2 = s1 ∧ ℓ = None}. 
+Proof. Admitted. 
 
 
 Section ClientRA.
@@ -422,6 +360,10 @@ Definition δ_lib0: LiveState lib_grole lib_model_impl.
 Defined. 
 
 
+Lemma client_model_fair_term:
+  ∀ mtr: mtrace client_model_impl, mtrace_fairly_terminating mtr.
+Proof. Admitted. 
+
 Theorem client_terminates
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -433,21 +375,36 @@ Proof.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 
-  eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//. 
-  (* - eapply valid_state_evolution_finitary_fairness_simple. *)
-  (*   intros ?. simpl. *)
-  (*   apply (spinlock_model_finitary s1).     *)
-  (* - intros ?. iStartProof. iIntros "!> Hm Hf !>". simpl. *)
-  (*   iAssert (|==> frag_free_roles_are ∅)%I as "-#FR". *)
-  (*   { rewrite /frag_free_roles_are. iApply own_unit. } *)
-  (*   iMod "FR" as "FR".  *)
-  (*   iApply (program_spec _ ∅ True _ with "[] [Hm Hf FR]"); eauto.  *)
-  (*   { iApply ActualOwnershipPartial. *)
-  (*     Unshelve. set_solver. } *)
-  (*   (* rewrite subseteq_empty_difference_L; [| set_solver].  *) *)
-  (*   iFrame. iSplitR; [done| ]. *)
-  (*   iApply has_fuels_proper; [..| iFrame]; try done. *)
-  (*   rewrite /spinlock_lr. simpl. *)
-  (*   rewrite !gset_to_gmap_union_singleton gset_to_gmap_empty. *)
-  (*   done.  *)
+  unshelve eapply (simulation_adequacy_terminate Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//.
+  - apply client_model_fair_term. 
+  - eapply valid_state_evolution_finitary_fairness_simple.
+    apply spinlock_model_finitary.
+  - intros ?. iStartProof.
+    rewrite /LM_init_resource. iIntros "!> (Hm & Hfr & Hf) !>". simpl.
+    iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
+    { rewrite /frag_free_roles_are. iApply own_unit. }
+    iMod "FR" as "FR". 
+    iApply (client_spec ∅ δ_lib0 with "[] [Hm Hf FR]"); eauto.
+    { set_solver. }
+    { simpl.
+      (* TODO: make sure that lib can make step in δ_lib0 *)
+      admit.  }
+    { rewrite /δ_lib0. simpl.
+      rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel build_LS_ext_spec_tmap.
+      split; try set_solver.
+      (* TODO:
+         - these roles are actually the same
+         - adjust the initial fuel amount *)
+      admit. }
+    { iApply ActualOwnershipPartial. }
+    iFrame.
+    iSplitL "FR".
+    + (* TODO: fix the initialization theorem so it accepts arbitrary FR set *)
+      admit.
+    + subst st0.
+      iApply has_fuels_proper; [reflexivity| | by iFrame].
+      pose proof (live_roles_2 δ_lib0). simpl in H.
+      replace (client_lr (δ_lib0, 2)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
+      2: { symmetry. apply leibniz_equiv. apply live_roles_2. }
+      rewrite -gset_to_gmap_singletons big_opS_singleton. done.   
 Admitted. 
