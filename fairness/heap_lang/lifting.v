@@ -199,7 +199,7 @@ Section lifting.
 (* Context `{LM:LiveModel heap_lang M}. *)
 (* Context `{!heapGS Σ LM}. *)
 (* Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}.  *)
-Context `{EM: ExecutionModel M}.   
+Context `{EM: ExecutionModel heap_lang M}.   
 Context `{hGS: @heapGS Σ _ EM}.
 Context `{iLM:LiveModel G iM}.
 Context `{Countable G}.

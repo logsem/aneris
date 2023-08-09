@@ -1,19 +1,17 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness.heap_lang Require Import heap_lang_defs. 
+From trillium.fairness Require Import execution_model.
 From trillium.fairness Require Import fairness fuel fuel_ext. 
 From trillium.fairness Require Import partial_ownership.
 
 
 Section PartialModelPredicates.
   Context `{iLM: LiveModel G iM}.
-  Context `{EM: ExecutionModel M}.
+  Context `{EM: ExecutionModel Λ M}.
   Context `{eGS: em_GS Σ}. 
   Context `{invGS_gen HasNoLc Σ}.
-  Context {PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}.
-
-  (* TODO: generalize after generalizing heap_lang_defs *)
-  Let Λ := heap_lang.
+  Context `{Countable (locale Λ)}. 
+  Context {PMPP: @PartialModelPredicatesPre (locale Λ) _ _ Σ iM}.
 
   Let update_no_step_enough_fuel_def (extr : execution_trace Λ) 
       (auxtr : auxiliary_trace M) 

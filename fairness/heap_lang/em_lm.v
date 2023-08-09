@@ -135,7 +135,7 @@ Proof.
 Qed.
 
 
-Global Instance LM_EM `{LM: LiveModel (locale heap_lang) M}: @ExecutionModel LM.
+Global Instance LM_EM `{LM: LiveModel (locale heap_lang) M}: @ExecutionModel heap_lang LM.
 refine
   {|
     em_preGS := fun Σ => fairnessGpreS LM Σ;

@@ -10,7 +10,7 @@ Section adequacy.
 
 (* Let eGS := @heap_fairnessGS EM.  *)
 
-Theorem strong_simulation_adequacy_general `(EM: ExecutionModel M)
+Theorem strong_simulation_adequacy_general
     `{hPre: @heapGpreS Σ M EM} (s: stuckness) (e1 : expr) σ1 (s1: M)
     (R: execution_trace heap_lang → auxiliary_trace M → Prop)
   :

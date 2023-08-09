@@ -362,7 +362,9 @@ Defined.
 
 Lemma client_model_fair_term:
   ∀ mtr: mtrace client_model_impl, mtrace_fairly_terminating mtr.
-Proof. Admitted. 
+Proof.
+  intros. red. intros VALID FAIR. 
+Admitted. 
 
 Theorem client_terminates
         (extr : heap_lang_extrace)

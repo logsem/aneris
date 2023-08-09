@@ -157,7 +157,7 @@ Definition Ns := nroot .@ "choose_nat".
 
 Section proof.
   (* Context `{!heapGS Σ cn_model, choose_natG Σ}. *)
-  Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM, choose_natG Σ}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM, choose_natG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ cn_fair_model}.
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ cn_model PMPP}. *)
   Context `{!fairnessGS cn_model Σ}.

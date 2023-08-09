@@ -180,7 +180,7 @@ End SpinlockDefs.
 
 Section ClientProofs.
   (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
-  Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM, spinlockG Σ}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM, spinlockG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ spinlock_model_impl}.
   Context {ifG: fairnessGS spinlock_model Σ}.
 
@@ -612,7 +612,7 @@ Section ClientProofs.
 End ClientProofs.
 
 Section MainProof.
-  Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}.
   Context `{SL_PRE: spinlockPreG Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ spinlock_model_impl}.
   Context {ifG: fairnessGS spinlock_model Σ}.

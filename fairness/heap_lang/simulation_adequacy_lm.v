@@ -311,14 +311,15 @@ Theorem simulation_adequacy_terminate Σ `{LM:LiveModel (locale heap_lang) Mdl}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
   extrace_fairly_terminating extr.
-Proof.  
+Proof.
   intros Hterm Hfb Hwp Hvex Hfair.
+  destruct (infinite_or_finite extr) as [Hinf|] =>//.
+
   destruct (simulation_adequacy_model_trace
               Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
-  destruct (infinite_or_finite extr) as [Hinf|] =>//.
   have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
-  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
   have Htermtr := Hterm mtr Hmtrvalid Hfairm.
   eapply exaux_preserves_termination =>//.

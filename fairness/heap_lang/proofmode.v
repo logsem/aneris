@@ -7,7 +7,7 @@ From trillium.fairness.heap_lang Require Import heap_lang_defs.
 From iris.prelude Require Import options.
 Import uPred.
 
-Lemma tac_wp_expr_eval `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+Lemma tac_wp_expr_eval `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   Δ tid E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ tid; E {{ Φ }}) → envs_entails Δ (WP e @ tid; E {{ Φ }}).
@@ -23,7 +23,7 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
   end.
 Ltac wp_expr_simpl := wp_expr_eval simpl. 
 
-Lemma tac_wp_pure_helper `{EM: ExecutionModel M} `{@heapGS Σ _ EM} 
+Lemma tac_wp_pure_helper `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} 
   `{iLM: LiveModel G iM} `{Countable G}
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}  
   tid E Einvs K e1 e2
@@ -89,7 +89,7 @@ Lemma has_fuels_gt_1
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
-Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   `{iLM: LiveModel G iM} `{Countable G}
   (* `{!fairnessGS iLM Σ}   *)
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
@@ -160,7 +160,7 @@ Proof.
       * rewrite env_lookup_env_delete_ne //.
 Qed.
 
-Lemma tac_wp_pure `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+Lemma tac_wp_pure `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   `{iLM: LiveModel G iM} `{Countable G}
   (* `{!fairnessGS iLM Σ}   *)
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
@@ -199,12 +199,12 @@ Proof.
 Qed.
 
 
-Lemma tac_wp_value_nofupd `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+Lemma tac_wp_value_nofupd `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   Δ tid E Φ v :
   envs_entails Δ (Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. by apply wp_value. Qed.
 
-Lemma tac_wp_value `{EM: ExecutionModel M} `{@heapGS Σ _ EM}
+Lemma tac_wp_value `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   Δ tid E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=> Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. iIntros "?". by iApply wp_value_fupd. Qed.
@@ -328,7 +328,7 @@ Tactic Notation "wp_inj" := wp_pure (InjL _) || wp_pure (InjR _).
 Tactic Notation "wp_pair" := wp_pure (Pair _ _).
 Tactic Notation "wp_closure" := wp_pure (Rec _ _ _).
 
-Lemma tac_wp_bind `{EM: ExecutionModel M} `{@heapGS Σ _ EM} 
+Lemma tac_wp_bind `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} 
   K Δ s E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
@@ -352,7 +352,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
 (** Heap tactics *)
 Section heap.
-Context `{EM: ExecutionModel M}.
+Context `{EM: ExecutionModel heap_lang M}.
 Context `{@heapGS Σ _ EM}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.

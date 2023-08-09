@@ -47,7 +47,7 @@ Global Opaque lib_model_impl.
 Global Opaque lib_grole ρlg. 
 
 Section LibrarySpec.
-  Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ lib_model_impl}.
   (* Context {ifG: fairnessGS lib_model Σ}. *)
   
@@ -158,7 +158,7 @@ Section ClientDefs.
 End ClientDefs. 
 
 Section ClientRA.
-  Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM} {cG: clientGS Σ}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cG: clientGS Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
   
   Notation "'lib_inn_role'" := (fmrole lib_model_impl).
@@ -187,7 +187,7 @@ End ClientRA.
 
 
 Section ClientSpec. 
-  Context `{EM: ExecutionModel M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
 
   Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
