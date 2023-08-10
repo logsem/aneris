@@ -89,6 +89,21 @@ Section ActualOwnershipImpl.
           set_solver.
   Qed.
 
+  (* TODO: move to tmap definition *)
+  Let tmap_disj (tmap: gmap G (gset (fmrole M))) := 
+    forall (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
+      τ1 ≠ τ2 → tmap !! τ1 = Some S1 → tmap !! τ2 = Some S2 → S1 ## S2. 
+    
+  Lemma tmap_update_subset_disjoint (tmap tmap': gmap G (gset (fmrole M)))
+        (DISJ: tmap_disj tmap)
+        (SUB: forall τ S', tmap' !! τ = Some S' -> exists S, tmap !! τ = Some S /\ S' ⊆ S):
+    tmap_disj tmap'.
+  Proof. 
+    red. intros ????? L1 L2.
+    pose proof (SUB _ _ L1) as (S1'&?&?). pose proof (SUB _ _ L2) as (S2'&?&?).
+    eapply disjoint_subseteq; eauto.
+    apply _.
+  Qed. 
 
   Lemma actual_update_no_step_enough_fuel
   (δ1: LM) rem
@@ -188,16 +203,15 @@ Proof.
                τ1 ≠ τ2
                → <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ1 = Some S1
                → <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ2 = Some S2 → S1 ## S2) as DISJ2. 
-    { clear -TMAP1. intros.    
-      assert (forall τ R, <[ζ:=dom fs ∖ rem]> (ls_tmap δ1) !! τ = Some R ->
-                     exists R0, ls_tmap δ1 !! τ = Some R0 /\ R ⊆ R0) as EXT. 
-      { intros ?? L%lookup_insert_Some.
-        destruct L as [[-> <-]| [? ?]].
-        all: eexists; split; eauto; set_solver. }
-      pose proof (EXT _ _ H1) as (S1'&?&?). pose proof (EXT _ _ H2) as (S2'&?&?).
-      eapply disjoint_subseteq; eauto.
-      { apply _. }
-      eapply ls_tmap_disj; eauto. }
+    { clear -TMAP1 tmap_disj. intros.
+      eapply tmap_update_subset_disjoint.
+      { red. apply (ls_tmap_disj δ1). }
+      2: eauto. 
+      2: apply H1. 2: apply H2.
+      intros ?? L%lookup_insert_Some.
+      destruct L as [[-> <-]| [? ?]].
+      all: eexists; split; eauto; set_solver. }
+
     assert ( ∀ ρ : fmrole M, ρ ∈ dom
         (fuel_apply (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs)
            (ls_fuel δ1) ((dom (ls_fuel δ1) ∪ dom fs) ∖ rem))
@@ -362,8 +376,7 @@ Proof.
       assert (map1 !! ρ = Some ζ').
       { eapply Hminv. eauto. }
       apply not_elem_of_dom in Hin. congruence.
-  Qed.    
-    
+  Qed.
 
   Lemma actual_update_fork_split R1 R2 (* tp1 tp2 *) fs (δ1: LM) ζ τ_new
     (* σ1 σ2 *)
@@ -413,14 +426,62 @@ Proof.
     { rewrite map_imap_dom_eq; first by apply ls_fuel_dom.
       - by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)). }
 
-    (* iExists {| *)
-    (*   ls_under := δ1.(ls_under); *)
-    (*   ls_fuel := _; *)
-    (*   ls_fuel_dom := Hfueldom; *)
-    (*   ls_mapping := _; *)
-    (*   ls_same_doms := Hsamedoms; *)
-    (* |}. *)
-    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ _ _ (LM := LM)).
+    assert (∀ ρ: fmrole M, ρ ∈ dom (map_imap
+           (λ (ρ0 : fmrole M) (o : nat),
+              if decide (ρ0 ∈ R1 ∪ R2) then Some (o - 1) else Some o)
+           (ls_fuel δ1))
+    ↔ (∃ (τ : G) (R : gset (fmrole M)),
+         <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)) !! τ = Some R ∧ ρ ∈ R)) as TMAP2_DOM.
+    { intros.
+      rewrite map_imap_dom_eq. 
+      2: { intros. by destruct decide. }
+      rewrite -ls_same_doms. 
+      do 2 setoid_rewrite lookup_insert_Some.
+      split.
+      + intros [g Mρ]%elem_of_dom.
+        apply (ls_mapping_tmap_corr (LM := LM)) in Mρ as (R & TMg & INρ). 
+        destruct (decide (ρ ∈ R2)).
+        { exists τ_new, R2. tauto. }
+        destruct (decide (g = τ_new)) as [-> | ?].
+        * destruct Hnewζ. eapply elem_of_dom; eauto.
+        * destruct (decide (ζ = g)).
+          ** subst ζ. assert (R = dom fs) as -> by congruence.
+             exists g, R1. set_solver.
+          ** exists g, R. set_solver.
+      + intros (τ & R & COND & Rρ).
+        eapply elem_of_dom. 
+        destruct COND as [[-> <-] | [NEQ COND]].
+        * exists ζ. eapply ls_mapping_tmap_corr.
+          eexists. split; eauto. set_solver.
+        * exists τ. destruct COND as [[<- <-] | [NEQ' TMτ]].
+          ** eapply ls_mapping_tmap_corr.
+             eexists. split; eauto. set_solver.
+          ** eapply ls_mapping_tmap_corr; eauto. }
+    assert ( ∀ (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
+    τ1 ≠ τ2
+    → <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)) !! τ1 = Some S1
+      → <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)) !! τ2 = Some S2 → S1 ## S2) as TMAP2_DISJ.
+    { intros. clear -H1 H2 H0 Hmapping Hdisj Hunioneq. 
+      Local Ltac solve_disj δ1 τ1 τ2 := 
+          eapply disjoint_subseteq;
+          [..| eapply (ls_tmap_disj δ1 τ1 τ2 (LM := LM)); eauto];
+          [apply _| ..];
+          set_solver.
+
+      Local Ltac simpl_hyp Hi := 
+        rewrite lookup_insert in Hi || (rewrite lookup_insert_ne in Hi; [| done]).
+
+      Local Ltac simpl_all_hyps H1 H2 :=
+        repeat (simpl_hyp H1 || simpl_hyp H2).
+
+      destruct (decide (τ1 = τ_new)), (decide (τ2 = τ_new)), 
+        (decide (τ1 = ζ)), (decide (τ2 = ζ)).
+      all: subst; try congruence.
+      all: simpl_all_hyps H1 H2.
+      1-8: (solve_disj δ1 ζ τ2 || solve_disj δ1 τ1 ζ || set_solver). 
+      eapply (ls_tmap_disj δ1 τ1 τ2); eauto. }
+
+    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ TMAP2_DOM TMAP2_DISJ (LM := LM)).
 
     iModIntro.
     assert (Hdomincl: dom fs ⊆ dom (ls_fuel δ1)).
@@ -527,7 +588,7 @@ Proof.
     rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
     iSplit; [simpl| done]. rewrite map_imap_dom_eq //.
     by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)).
-  Admitted.
+  Qed. 
 
   Ltac by_contradiction :=
     match goal with
