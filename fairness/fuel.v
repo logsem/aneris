@@ -494,98 +494,12 @@ Section fairness_preserved.
   Definition valid_evolution_step oζ (σ2: cfg Λ) δ1 ℓ δ2 :=
     labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) δ1 ℓ δ2 ∧
     tids_smaller (σ2.1) δ2.
-    
 
-  (* TODO: Why do we need explicit [LM] here? *)
-  Definition valid_state_evolution_fairness
-             (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
-    match extr, auxtr with
-    | (extr :tr[oζ]: (es, σ)), auxtr :tr[ℓ]: δ =>
-        (* labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) (trace_last auxtr) ℓ δ ∧ *)
-        (* tids_smaller es δ *)
-        valid_evolution_step oζ (es, σ) (trace_last auxtr) ℓ δ
-    | _, _ => True
-    end.
-
-  Definition valid_lift_fairness
-             (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
-             (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
-    valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
-
-  (* TODO: Why do we need explicit [LM] here? *)
-  Lemma valid_inf_system_trace_implies_traces_match_strong
-        (φ : execution_trace Λ -> auxiliary_trace LM -> Prop)
-        (ψ : _ → _ → Prop)
-        ex atr iex iatr progtr (auxtr : auxtrace (LM := LM)):
-    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
-        φ ex atr -> live_tids (LM:=LM) (trace_last ex) (trace_last atr)) ->
-    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
-        φ ex atr -> valid_state_evolution_fairness ex atr) ->
-    (∀ extr auxtr, φ extr auxtr → ψ (trace_last extr) (trace_last auxtr)) →
-    exec_trace_match ex iex progtr ->
-    exec_trace_match atr iatr auxtr ->
-    valid_inf_system_trace φ ex atr iex iatr ->
-    traces_match labels_match
-                 (λ σ δ, live_tids σ δ ∧ ψ σ δ)
-                 locale_step
-                 LM.(lm_ls_trans) progtr auxtr.
-  Proof.
-    intros Hφ1 Hφ2 Hφψ.
-    revert ex atr iex iatr auxtr progtr. cofix IH.
-    intros ex atr iex iatr auxtr progtr Hem Ham Hval.
-    inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
-    - inversion Hem; inversion Ham. econstructor; eauto.
-      pose proof (Hφ1 ex atr Hphi).
-      split; [by simplify_eq|]. simplify_eq. by apply Hφψ.
-    - inversion Hem; inversion Ham. subst.
-      pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
-      destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
-      econstructor.
-      + eauto.
-      + eauto.
-      + match goal with
-        | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
-        end; done.
-      + match goal with
-        | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
-        end; done.
-      + eapply IH; eauto.
-  Qed.
-
-  (* TODO: Why do we need explicit [LM] here? *)
-  Lemma valid_inf_system_trace_implies_traces_match
-        (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
-        ex atr iex iatr progtr (auxtr : auxtrace (LM := LM)):
-    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
-        φ ex atr -> live_tids (LM:=LM) (trace_last ex) (trace_last atr)) ->
-    (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
-        φ ex atr -> valid_state_evolution_fairness ex atr) ->
-    exec_trace_match ex iex progtr ->
-    exec_trace_match atr iatr auxtr ->
-    valid_inf_system_trace φ ex atr iex iatr ->
-    exaux_traces_match progtr auxtr.
-  Proof.
-    intros Hφ1 Hφ2.
-    revert ex atr iex iatr auxtr progtr. cofix IH.
-    intros ex atr iex iatr auxtr progtr Hem Ham Hval.
-    inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
-    - inversion Hem; inversion Ham. econstructor; eauto.
-      pose proof (Hφ1 ex atr Hphi).
-      by simplify_eq.
-    - inversion Hem; inversion Ham. subst.
-      pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
-      destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
-      econstructor.
-      + eauto.
-      + eauto.
-      + match goal with
-        | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
-        end; done.
-      + match goal with
-        | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
-        end; done.
-      + eapply IH; eauto.
-  Qed.
+  (* TODO: get rid of previous version *)
+  Definition lm_valid_evolution_step:
+    cfg Λ → olocale Λ → cfg Λ → 
+    mstate LM → lm_lbl LM → mstate LM -> Prop := 
+    (fun (_: cfg Λ) => valid_evolution_step).
 
 End fairness_preserved.
 

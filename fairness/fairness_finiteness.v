@@ -1,6 +1,6 @@
 From stdpp Require Import finite.
 From trillium.prelude Require Import finitary quantifiers classical_instances.
-From trillium.fairness Require Import fairness fuel.
+From trillium.fairness Require Import fairness fuel traces_match.
 
 Section gmap.
   Context `{!EqDecision K, !Countable K}.
@@ -155,7 +155,7 @@ Section finitary.
   Qed.
 
   Lemma valid_state_evolution_finitary_fairness':
-    rel_finitary (valid_lift_fairness (λ extr auxtr, ξ extr (map_underlying_trace auxtr (LM := LM)))).
+    rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (map_underlying_trace auxtr (LM := LM)))).
   Proof.
     rewrite /valid_lift_fairness.
     intros ex atr [e' σ'] oζ.
@@ -241,7 +241,7 @@ Section finitary.
   Qed. 
 
   Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
-    rel_finitary (valid_lift_fairness (λ extr auxtr, ξ extr (map_underlying_trace auxtr) ∧ φ extr auxtr)).
+    rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (map_underlying_trace auxtr) ∧ φ extr auxtr)).
   Proof.
     eapply rel_finitary_impl; [| apply valid_state_evolution_finitary_fairness'].
     { by intros ??[? [? ?]]. }
@@ -286,7 +286,7 @@ Section finitary_simple.
   Proof. by destruct tr. Qed. 
 
   Lemma valid_state_evolution_finitary_fairness_simple (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
-    rel_finitary (valid_lift_fairness φ).
+    rel_finitary (valid_lift_fairness lm_valid_evolution_step φ).
   Proof.
     eapply rel_finitary_impl. 
     2: eapply valid_state_evolution_finitary_fairness with (ξ := mtrace_evolution).
@@ -320,7 +320,7 @@ Definition live_rel `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
 
 Definition sim_rel `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
            (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
-  valid_state_evolution_fairness ex aux ∧ live_rel LM ex aux.
+  valid_state_evolution_fairness lm_valid_evolution_step ex aux ∧ live_rel LM ex aux.
 
 Definition sim_rel_with_user `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
            (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
@@ -332,7 +332,7 @@ Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel (locale Λ) Mdl}
       `{Countable (locale Λ)}
       (ξ : execution_trace Λ → finite_trace Mdl (option $ fmrole Mdl) →
            Prop) extr atr :
-  valid_lift_fairness
+  valid_lift_fairness lm_valid_evolution_step
     (λ extr auxtr, ξ extr (map_underlying_trace (LM:=LM) auxtr) ∧
                    live_rel LM extr auxtr) extr atr ↔
   sim_rel_with_user LM ξ extr atr.

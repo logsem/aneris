@@ -227,6 +227,7 @@ Qed.
 
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
+(* TODO: derive from general case? *)
 Theorem simulation_adequacy_traces Σ `(LM : LiveModel (locale heap_lang) M)
   `{hPre: @heapGpreS Σ LM (@LM_EM_HL _ LM)} (s: stuckness)
         e1 (s1: M)
@@ -260,7 +261,14 @@ Proof.
     simpl. destruct (trfirst extr) eqn:Heq.
     simpl in Hexfirst. rewrite -Hexfirst Heq //. }
   exists (to_trace (initial_ls (LM := LM) s1 0%nat) iatr).
-  eapply (valid_inf_system_trace_implies_traces_match (continued_simulation (sim_rel LM))); eauto.
+  unshelve eapply (valid_inf_system_trace_implies_traces_match 
+            lm_valid_evolution_step
+            live_tids
+            labels_match
+            ltac:(idtac)
+            ltac:(idtac)
+            (continued_simulation (sim_rel LM))); eauto.
+  1, 2: by intros ?????? V; apply V. 
   - by intros ? ? [? ?]%continued_simulation_rel.
   - by intros ? ? [? ?]%continued_simulation_rel.
   - apply from_trace_spec. simpl. destruct (trfirst extr) eqn:Heq. simplify_eq. f_equal.
