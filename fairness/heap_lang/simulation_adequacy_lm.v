@@ -242,7 +242,7 @@ Theorem simulation_adequacy_traces Σ `(LM : LiveModel (locale heap_lang) M)
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : auxtrace (LM := LM)), exaux_traces_match extr auxtr.
+  ∃ (auxtr : auxtrace (LM := LM)), lm_exaux_traces_match extr auxtr.
 Proof.
   intros Hfin Hwp.
   have [iatr Hbig] : exists iatr,
@@ -291,7 +291,7 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel (locale heap_lang) M
                ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : auxtrace (LM:=LM)) mtr, exaux_traces_match extr auxtr ∧
+  ∃ (auxtr : auxtrace (LM:=LM)) mtr, lm_exaux_traces_match extr auxtr ∧
                                upto_stutter ls_under Ul auxtr mtr.
 Proof.
   intros Hfb Hwp.

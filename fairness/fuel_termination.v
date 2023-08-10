@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import pacotac.
-From trillium.fairness Require Export fairness fair_termination fuel traces_match.
+From trillium.fairness Require Export fairness fair_termination fuel traces_match lm_fairness_preservation.
 
 Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
            {LM : LiveModel (locale Λ) Mdl} (auxtr : auxtrace (M := LM)) :=
@@ -40,12 +40,7 @@ Proof.
     Unshelve.
     - done.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ (auxtr : auxtrace (M := LM)), 
-             exaux_traces_match 
-               (* (live_tids (LM := LM)) *)
-               (fun c (δ: mstate LM) => live_tids c δ (LM := LM))
-
-               (labels_match (LM := LM)) extr auxtr)
+  assert (∃ (auxtr : auxtrace (M := LM)), lm_exaux_traces_match extr auxtr)
     as [auxtr Hmatch].
   { exists (to_trace (initial_ls a1 r1) iatr).
     unshelve eapply (valid_inf_system_trace_implies_traces_match
