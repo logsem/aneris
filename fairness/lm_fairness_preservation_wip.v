@@ -9,10 +9,16 @@ Section fairness_preserved.
   Context `{Countable (locale Λ)}.
   Notation "'Tid'" := (locale Λ).
 
-  Context (state_rel: cfg Λ → lm_ls LM → Prop). 
+  Context (state_rel: cfg Λ → lm_ls LM → Prop).
+  Hypothesis (match_locale_enabled_states: 
+               forall ζ ρ δ c,
+                 ls_mapping δ !! ρ = Some ζ ->
+                 state_rel c δ ->
+                 locale_enabled ζ c). 
 
   Definition lm_exaux_traces_match: extrace Λ → auxtrace (M := LM) → Prop :=
-    traces_match labels_match
+    traces_match 
+      labels_match
       (* live_tids *) state_rel
       locale_step LM.(lm_ls_trans).
 
@@ -69,15 +75,10 @@ Section fairness_preserved.
     locale_enabled ζ (trfirst extr).
   Proof.
     intros Hm Hloc.
-    rewrite /locale_enabled.
-  (*   have [HiS Hneqloc] := traces_match_first _ _ _ _ _ _ Hm. *)
-  (*   have [e Hein] := (HiS _ _ Hloc). exists e. split; first done. *)
-  (*   destruct (to_val e) eqn:Heqe =>//. *)
-  (*   exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc. *)
-  (*   have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ). *)
-  (* Qed. *)
-  Admitted. 
-
+    eapply match_locale_enabled_states; eauto.
+    eapply traces_match_first; eauto.  
+  Qed. 
+  
   Local Hint Resolve match_locale_enabled: core.
   Local Hint Resolve pred_first_trace: core.
 
@@ -322,16 +323,7 @@ Section fairness_preserved.
     have [tr1' [Heq' Htr]] : exists tr1', after n extr = Some tr1' ∧ lm_exaux_traces_match tr1' tr
      by eapply traces_match_after.
     have Hte: locale_enabled ζ (trfirst tr1').
-    {
-      (* TODO: what are the exact premises? *)
-      rewrite /locale_enabled.
-      (* have [HiS Hneqζ] := traces_match_first _ _ _ _ _ _ Htr. *)
-      (* have [e Hein] := (HiS _ _ Hζ). exists e. split; first done. *)
-      (* destruct (to_val e) eqn:Heqe =>//. *)
-      (* exfalso. specialize (Hneqζ ζ e Hein). rewrite Heqe in Hneqζ. *)
-      (* have HnotNull: Some v ≠ None by []. specialize (Hneqζ HnotNull ρ). done. *)
-      admit. 
-    }
+    { eapply match_locale_enabled; eauto. }
     
     setoid_rewrite pred_at_sum in Hex'. rewrite Heq' in Hex'.
     have Hpa: pred_at extr n (λ c _, locale_enabled ζ c).
@@ -348,3 +340,19 @@ Section fairness_preserved.
   (*                                         end. *)
 
 End fairness_preserved.
+
+(* TODO: move? *)
+Lemma match_locale_enabled_states_livetids `{Countable (locale Λ)} `{LM: LiveModel (locale Λ) M}
+  ζ ρ δ c
+  (Hloc: ls_mapping δ !! ρ = Some ζ)    
+  (Hsr: live_tids c δ (LM := LM)):
+  locale_enabled ζ c. 
+Proof. 
+  rewrite /locale_enabled.
+  destruct Hsr as [HiS Hneqloc]. 
+  have [e Hein] := (HiS _ _ Hloc). exists e. split; first done.
+  destruct (to_val e) eqn:Heqe =>//.
+  exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc.
+  have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ).
+Qed. 
+
