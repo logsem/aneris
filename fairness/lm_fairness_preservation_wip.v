@@ -4,17 +4,17 @@ From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export inftraces fairness fuel traces_match. 
 
 
-Definition lm_exaux_traces_match `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)} :
-  extrace Λ → auxtrace (M := LM) → Prop :=
-  traces_match labels_match
-               live_tids
-               locale_step
-               LM.(lm_ls_trans).
-
 Section fairness_preserved.
   Context `{LM: LiveModel (locale Λ) M}.
   Context `{Countable (locale Λ)}.
   Notation "'Tid'" := (locale Λ).
+
+  Context (state_rel: cfg Λ → lm_ls LM → Prop). 
+
+  Definition lm_exaux_traces_match: extrace Λ → auxtrace (M := LM) → Prop :=
+    traces_match labels_match
+      (* live_tids *) state_rel
+      locale_step LM.(lm_ls_trans).
 
   Lemma exaux_preserves_validity extr (auxtr : auxtrace (M := LM)):
     lm_exaux_traces_match extr auxtr ->
@@ -69,12 +69,14 @@ Section fairness_preserved.
     locale_enabled ζ (trfirst extr).
   Proof.
     intros Hm Hloc.
-    rewrite /locale_enabled. have [HiS Hneqloc] := traces_match_first _ _ _ _ _ _ Hm.
-    have [e Hein] := (HiS _ _ Hloc). exists e. split; first done.
-    destruct (to_val e) eqn:Heqe =>//.
-    exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc.
-    have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ).
-  Qed.
+    rewrite /locale_enabled.
+  (*   have [HiS Hneqloc] := traces_match_first _ _ _ _ _ _ Hm. *)
+  (*   have [e Hein] := (HiS _ _ Hloc). exists e. split; first done. *)
+  (*   destruct (to_val e) eqn:Heqe =>//. *)
+  (*   exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc. *)
+  (*   have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ). *)
+  (* Qed. *)
+  Admitted. 
 
   Local Hint Resolve match_locale_enabled: core.
   Local Hint Resolve pred_first_trace: core.
@@ -140,7 +142,7 @@ Section fairness_preserved.
     Lemma others_step_fuel_decr ρ f ζ
       δ ℓ auxtr' 
       c ζ' extr'
-      (Htm: lm_exaux_traces_match (c -[ ζ' ]-> extr') (δ -[ ℓ ]-> auxtr') (LM := LM))
+      (Htm: lm_exaux_traces_match (c -[ ζ' ]-> extr') (δ -[ ℓ ]-> auxtr'))
       (Hfuel : ls_fuel δ !! ρ = Some f)
       (Hmapping : ls_mapping δ !! ρ = Some ζ)
       (Hρlive: ρ ∈ live_roles M δ)
@@ -179,7 +181,7 @@ Section fairness_preserved.
       c ζ extr'
       δ ℓ auxtr'
       ζ' ζ''
-      (Htm: lm_exaux_traces_match (c -[ ζ' ]-> extr') (δ -[ ℓ ]-> auxtr') (LM := LM))
+      (Htm: lm_exaux_traces_match (c -[ ζ' ]-> extr') (δ -[ ℓ ]-> auxtr'))
       (Hfuel: ls_fuel δ !! ρ = Some f)
       (Hmapping: ls_mapping δ !! ρ = Some ζ)
       (Hρlive: ρ ∈ live_roles M δ)
@@ -320,12 +322,16 @@ Section fairness_preserved.
     have [tr1' [Heq' Htr]] : exists tr1', after n extr = Some tr1' ∧ lm_exaux_traces_match tr1' tr
      by eapply traces_match_after.
     have Hte: locale_enabled ζ (trfirst tr1').
-    { rewrite /locale_enabled.
-      have [HiS Hneqζ] := traces_match_first _ _ _ _ _ _ Htr.
-      have [e Hein] := (HiS _ _ Hζ). exists e. split; first done.
-      destruct (to_val e) eqn:Heqe =>//.
-      exfalso. specialize (Hneqζ ζ e Hein). rewrite Heqe in Hneqζ.
-      have HnotNull: Some v ≠ None by []. specialize (Hneqζ HnotNull ρ). done. }
+    {
+      (* TODO: what are the exact premises? *)
+      rewrite /locale_enabled.
+      (* have [HiS Hneqζ] := traces_match_first _ _ _ _ _ _ Htr. *)
+      (* have [e Hein] := (HiS _ _ Hζ). exists e. split; first done. *)
+      (* destruct (to_val e) eqn:Heqe =>//. *)
+      (* exfalso. specialize (Hneqζ ζ e Hein). rewrite Heqe in Hneqζ. *)
+      (* have HnotNull: Some v ≠ None by []. specialize (Hneqζ HnotNull ρ). done. *)
+      admit. 
+    }
     
     setoid_rewrite pred_at_sum in Hex'. rewrite Heq' in Hex'.
     have Hpa: pred_at extr n (λ c _, locale_enabled ζ c).
