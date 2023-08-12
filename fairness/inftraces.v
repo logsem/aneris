@@ -183,6 +183,24 @@ Section simulation.
     Rs (trfirst tr1) (trfirst tr2).
   Proof. intros Hm. inversion Hm; done. Qed.
 
+  Lemma traces_match_preserves_termination tr1 tr2 :
+    traces_match tr1 tr2 ->
+    terminating_trace tr2 ->
+    terminating_trace tr1.
+  Proof.
+    intros Hmatch [n HNone].
+    revert tr1 tr2 Hmatch HNone. induction n as [|n IHn]; first done.
+    intros tr1 tr2 Hmatch HNone.
+    replace (S n) with (1 + n) in HNone =>//.
+    rewrite (after_sum' _ 1) in HNone.
+    destruct tr2 as [s| s ℓ tr2'];
+      first by inversion Hmatch; simplify_eq; exists 1.
+    simpl in HNone.
+    inversion Hmatch; simplify_eq.
+    apply terminating_trace_cons.
+    eapply IHn =>//.
+  Qed.
+
 End simulation.
 
 Section execs_and_traces.

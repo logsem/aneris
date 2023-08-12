@@ -7,7 +7,7 @@ Section TracesMatch.
   Context `{Λ: language}.
   Context `{M: Model}. 
 
-  Definition auxtrace := trace (mstate M) (mlabel M).
+  Let model_trace := trace (mstate M) (mlabel M).
 
   Context (evolution_pred: cfg Λ -> olocale Λ → cfg Λ → 
                            M → mlabel M → M -> Prop). 
@@ -22,7 +22,7 @@ Section TracesMatch.
                  mtrans δ1 ℓ δ2).
 
   Definition exaux_traces_match:
-    extrace Λ → auxtrace → Prop :=
+    extrace Λ → model_trace → Prop :=
     traces_match lbl_rel
       state_rel
       locale_step
@@ -30,7 +30,7 @@ Section TracesMatch.
 
   Lemma valid_inf_system_trace_implies_traces_match_strong'
         (φ : execution_trace Λ -> auxiliary_trace M -> Prop)
-        ex atr iex iatr progtr (auxtr : auxtrace):
+        ex atr iex iatr progtr (auxtr : model_trace):
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace M),
         φ ex atr -> state_rel (trace_last ex) (trace_last atr)) ->
     (forall (ex: execution_trace Λ) (oζ: olocale Λ) (c: cfg Λ) 
@@ -87,7 +87,7 @@ Section TracesMatch.
   Lemma valid_inf_system_trace_implies_traces_match
         (φ : execution_trace Λ -> auxiliary_trace M -> Prop)
         (* (ψ : _ → _ → Prop) *)
-        ex atr iex iatr progtr (auxtr : auxtrace):
+        ex atr iex iatr progtr (auxtr : model_trace):
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace M),
         φ ex atr -> state_rel (trace_last ex) (trace_last atr)) ->
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace M),

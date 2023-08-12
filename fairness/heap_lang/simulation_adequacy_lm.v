@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness resources fair_termination_natural utils fuel_ext.
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils fuel_ext.
 From trillium.fairness.heap_lang Require Export lang simulation_adequacy em_lm_heap_lang em_lm. 
 
 Section adequacy.
@@ -298,7 +298,7 @@ Proof.
   destruct (simulation_adequacy_traces
               Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as [auxtr Hmatch].
   assert (auxtrace_valid auxtr) as Hstutter.
-  { by eapply exaux_preserves_validity in Hmatch. }
+  { by eapply traces_match_LM_preserves_validity in Hmatch. }
   destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
   eauto.
 Qed.
@@ -328,12 +328,46 @@ Proof.
               Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
   have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
-  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
+  have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
   have Htermtr := Hterm mtr Hmtrvalid Hfairm.
-  eapply exaux_preserves_termination =>//.
+  eapply traces_match_preserves_termination =>//.
   eapply upto_stutter_finiteness =>//.
 Qed.
+
+(* TODO: derive the heap_lang lemma above from this one
+   Need to define FairModel for heap_lang *)
+Theorem simulation_adequacy_terminate_general
+  `{Mout: FairModel}
+  `{LM:LiveModel G Mdl}
+  (otr: mtrace Mout) (auxtr : auxtrace (LM := LM))
+  state_rel lbl_rel outer_step :
+  (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) ->
+  traces_match lbl_rel state_rel outer_step LM.(lm_ls_trans) otr auxtr ->
+  (* literally a copy of fairness_preserved statement. should be simplified *)
+  (infinite_trace otr → 
+   traces_match lbl_rel state_rel outer_step LM.(lm_ls_trans) otr auxtr ->
+   (∀ ρ, fair_model_trace ρ otr) → ∀ ρ, fair_aux ρ auxtr) ->
+  (* The coinductive pure coq proposition given by adequacy *)
+  mtrace_fairly_terminating otr.
+Proof.
+  (* as is (minus wp) *)
+  intros Hterm Hmatch Hfairpres Hvex Hfair.
+  destruct (infinite_or_finite otr) as [Hinf|] =>//.
+
+  assert (auxtrace_valid auxtr) as Hvalaux.
+  { by eapply traces_match_LM_preserves_validity. }
+
+  specialize (Hfairpres Hinf Hmatch Hfair). rename Hfairpres into Hfairaux. 
+
+  destruct (can_destutter_auxtr auxtr (LM := LM)) as [mtr Hupto] =>//.
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+  have Htermtr := Hterm mtr Hmtrvalid Hfairm.
+  eapply traces_match_preserves_termination =>//.
+  eapply upto_stutter_finiteness =>//.
+Qed.
+
 
 Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
         `(LM : LiveModel (locale heap_lang) M)

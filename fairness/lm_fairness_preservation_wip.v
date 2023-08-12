@@ -3,7 +3,7 @@ From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export inftraces fairness fuel traces_match. 
 
-
+(* TODO: some refactorings were made in original file *)
 Section fairness_preserved.
   Context `{LM: LiveModel (locale Λ) M}.
   Context `{Countable (locale Λ)}.
@@ -16,13 +16,13 @@ Section fairness_preserved.
                  state_rel c δ ->
                  locale_enabled ζ c). 
 
-  Definition lm_exaux_traces_match: extrace Λ → auxtrace (M := LM) → Prop :=
+  Definition lm_exaux_traces_match: extrace Λ → auxtrace (LM := LM) → Prop :=
     traces_match 
       labels_match
       (* live_tids *) state_rel
       locale_step LM.(lm_ls_trans).
 
-  Lemma exaux_preserves_validity extr (auxtr : auxtrace (M := LM)):
+  Lemma exaux_preserves_validity extr (auxtr : auxtrace (LM := LM)):
     lm_exaux_traces_match extr auxtr ->
     auxtrace_valid auxtr (LM := LM).
   Proof.
@@ -31,7 +31,7 @@ Section fairness_preserved.
     constructor =>//. by eapply CH.
   Qed.
 
-  Lemma exaux_preserves_termination extr (auxtr : auxtrace (M := LM)) :
+  Lemma exaux_preserves_termination extr (auxtr : auxtrace (LM := LM)) :
     lm_exaux_traces_match extr auxtr ->
     terminating_trace auxtr ->
     terminating_trace extr.
@@ -49,7 +49,7 @@ Section fairness_preserved.
     eapply IHn =>//.
   Qed.
 
-  Lemma traces_match_labels tid ℓ c δ rex (raux : auxtrace (M := LM)) :
+  Lemma traces_match_labels tid ℓ c δ rex (raux : auxtrace (LM := LM)) :
     lm_exaux_traces_match (c -[Some tid]-> rex) (δ -[ℓ]-> raux) ->
     ((∃ ρ, ℓ = Take_step ρ tid) ∨ (ℓ = Silent_step tid)).
   Proof.
@@ -69,7 +69,7 @@ Section fairness_preserved.
   Local Hint Resolve mapping_live_role: core.
   Local Hint Resolve fuel_live_role: core.
 
-  Lemma match_locale_enabled (extr : extrace Λ) (auxtr : auxtrace (M := LM)) ζ ρ:
+  Lemma match_locale_enabled (extr : extrace Λ) (auxtr : auxtrace (LM := LM)) ζ ρ:
     lm_exaux_traces_match extr auxtr ->
     ls_mapping (trfirst auxtr) !! ρ = Some ζ ->
     locale_enabled ζ (trfirst extr).
@@ -82,7 +82,7 @@ Section fairness_preserved.
   Local Hint Resolve match_locale_enabled: core.
   Local Hint Resolve pred_first_trace: core.
 
-  Definition fairness_induction_stmt ρ fm f m ζ extr (auxtr : auxtrace (M := LM))
+  Definition fairness_induction_stmt ρ fm f m ζ extr (auxtr : auxtrace (LM := LM))
     δ
     (* c *)
     :=
@@ -98,10 +98,10 @@ Section fairness_preserved.
       ∃ M, pred_at auxtr M (λ δ _, ¬role_enabled ρ δ)
            ∨ pred_at auxtr M (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0))).
 
-  Local Lemma case1 ρ f m (extr' : extrace Λ) (auxtr' : auxtrace (M := LM)) δ ℓ :
+  Local Lemma case1 ρ f m (extr' : extrace Λ) (auxtr' : auxtrace (LM := LM)) δ ℓ :
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
-         → ∀ (f m: nat) (ζ: locale Λ) (extr : extrace Λ) (auxtr : auxtrace (M := LM))
+         → ∀ (f m: nat) (ζ: locale Λ) (extr : extrace Λ) (auxtr : auxtrace (LM := LM))
              (δ : LiveState Tid M) (* (c : cfg Λ) *), fairness_induction_stmt ρ m0 f m ζ extr auxtr δ (* c *)) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
     lm_exaux_traces_match extr' auxtr' ->
@@ -132,7 +132,7 @@ Section fairness_preserved.
                                   ∨ pred_at auxtr' M0 (λ (_ : LiveState Tid M) ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
         { eapply (IH _ _ _ p _ extr'); eauto.
           Unshelve. unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)).
-          rewrite Heq in Hdec. lia. }
+          lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
       - exists 1. left. rewrite /pred_at /=. rewrite /role_enabled.
         destruct auxtr' =>/=.
@@ -220,7 +220,7 @@ Section fairness_preserved.
 
 
   Lemma fairness_preserved_ind ρ:
-    ∀ fm f m ζ (extr: extrace Λ) (auxtr: auxtrace (M := LM)) δ (* c *),
+    ∀ fm f m ζ (extr: extrace Λ) (auxtr: auxtrace (LM := LM)) δ (* c *),
       fairness_induction_stmt ρ fm f m ζ extr auxtr δ (* c *).
   Proof.
     induction fm as [fm IH] using lex_ind.
@@ -301,7 +301,7 @@ Section fairness_preserved.
         exists (1+P). rewrite !pred_at_sum. simpl. done.
   Qed.
 
-  Theorem fairness_preserved (extr: extrace Λ) (auxtr: auxtrace (M := LM)):
+  Theorem fairness_preserved (extr: extrace Λ) (auxtr: auxtrace (LM := LM)):
     infinite_trace extr ->
     lm_exaux_traces_match extr auxtr ->
     (forall ζ, fair_ex ζ extr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
@@ -312,9 +312,8 @@ Section fairness_preserved.
     
     unfold pred_at in Hn.
     destruct (after n auxtr) as [tr|] eqn:Heq.
-    2: { by rewrite Heq in Hn. } 
+    2: { done. } 
     setoid_rewrite pred_at_sum. rewrite Heq.
-    rewrite Heq in Hn. 
     have Hen: role_enabled ρ (trfirst tr) by destruct tr.
 
     have [ζ Hζ] : is_Some((trfirst tr).(ls_mapping) !! ρ) by eauto.

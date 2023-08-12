@@ -3,7 +3,7 @@ From Paco Require Import pacotac.
 From trillium.fairness Require Export fairness fair_termination fuel traces_match lm_fairness_preservation.
 
 Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
-           {LM : LiveModel (locale Λ) Mdl} (auxtr : auxtrace (M := LM)) :=
+           {LM : LiveModel (locale Λ) Mdl} (auxtr : auxtrace (LM := LM)) :=
   auxtrace_valid (LM:=LM) auxtr →
   (∀ ρ, fair_aux ρ auxtr (LM := LM)) →
   terminating_trace auxtr.
@@ -40,7 +40,7 @@ Proof.
     Unshelve.
     - done.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ (auxtr : auxtrace (M := LM)), lm_exaux_traces_match extr auxtr)
+  assert (∃ (auxtr : auxtrace (LM := LM)), lm_exaux_traces_match extr auxtr)
     as [auxtr Hmatch].
   { exists (to_trace (initial_ls a1 r1) iatr).
     unshelve eapply (valid_inf_system_trace_implies_traces_match
@@ -57,14 +57,14 @@ Proof.
     - by apply to_trace_spec. }
   intros Hfair.
   assert (auxtrace_valid auxtr (LM := LM)) as Hstutter.
-  { by eapply exaux_preserves_validity. }
+  { by eapply traces_match_LM_preserves_validity. }
   apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
   have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
-  have Hvalaux := exaux_preserves_validity extr auxtr Hmatch.
+  have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-  eapply exaux_preserves_termination; [apply Hmatch|].
+  eapply traces_match_preserves_termination; [apply Hmatch|].
   eapply upto_stutter_finiteness =>//.
   apply fair_terminating_traces_terminate=>//.
 Qed.

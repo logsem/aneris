@@ -127,27 +127,14 @@ Arguments live_model_to_model {_ _}.
 
 
 Section aux_trace.  
-  Context `{LM: LiveModel (locale Λ) M}.
-  Context `{Countable (locale Λ)}.
-
-  Notation "'Tid'" := (locale Λ). 
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
 
   Definition auxtrace := trace LM.(lm_ls) LM.(lm_lbl).
 
-  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M) :=
-    ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
+  Definition role_enabled ρ (δ: LiveState G M) := ρ ∈ M.(live_roles) δ.
 
-  Definition labels_match (oζ : option Tid) (ℓ : LM.(lm_lbl)) : Prop :=
-    match oζ, ℓ with
-    | None, Config_step => True
-    | Some ζ, Silent_step ζ' => ζ = ζ'
-    | Some ζ, Take_step ρ ζ' => ζ = ζ'
-    | _, _ => False
-    end.
-
-  Definition role_enabled ρ (δ: LiveState Tid M) := ρ ∈ M.(live_roles) δ.
-
-  Definition fair_aux ρ (auxtr: auxtrace): Prop  :=
+  Definition fair_aux ρ (auxtr: auxtrace ): Prop  :=
     forall n, pred_at auxtr n (λ δ _, role_enabled ρ δ) ->
          ∃ m, pred_at auxtr (n+m) (λ δ _, ¬role_enabled ρ δ)
               ∨ pred_at auxtr (n+m) (λ _ ℓ, ∃ tid, ℓ = Some (Take_step ρ tid)).
@@ -185,6 +172,25 @@ Section aux_trace.
   Qed.
 
 End aux_trace.
+
+Section aux_trace_lang.
+  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{Countable (locale Λ)}.
+
+  Notation "'Tid'" := (locale Λ). 
+
+  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M) :=
+    ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
+
+  Definition labels_match (oζ : option Tid) (ℓ : LM.(lm_lbl)) : Prop :=
+    match oζ, ℓ with
+    | None, Config_step => True
+    | Some ζ, Silent_step ζ' => ζ = ζ'
+    | Some ζ, Take_step ρ ζ' => ζ = ζ'
+    | _, _ => False
+    end.
+
+End aux_trace_lang.
 
 Ltac SS :=
   epose proof ls_fuel_dom;
@@ -506,8 +512,8 @@ Definition lm_valid_evolution_step `{LM:LiveModel (locale Λ) M} `{EqDecision (l
 (* End fairness_preserved. *)
 
 Section fuel_dec_unless.
-  Context `{LM: LiveModel (locale Λ) Mdl}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G Mdl}.
+  Context `{Countable G}.
 
   Definition Ul (ℓ: LM.(mlabel)) :=
     match ℓ with
@@ -515,8 +521,8 @@ Section fuel_dec_unless.
     | _ => None
     end.
 
-  Definition Ψ (δ: LiveState (locale Λ) Mdl) :=
-    size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := locale Λ)), f.
+  Definition Ψ (δ: LiveState G Mdl) :=
+    size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := G)), f.
 
   Lemma fuel_dec_unless (auxtr: auxtrace (LM := LM)) :
     auxtrace_valid auxtr ->
@@ -570,13 +576,13 @@ Section fuel_dec_unless.
 End fuel_dec_unless.
 
 Section destuttering_auxtr.
-  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{LM: LiveModel G M}.
 
-  Context `{Countable (locale Λ)}.
+  Context `{Countable G}.
 
   (* Why is [LM] needed here? *)
   Definition upto_stutter_auxtr :=
-    upto_stutter (ls_under (G:=locale Λ) (M:=M)) (Ul (LM := LM)).
+    upto_stutter (ls_under (G:=G) (M:=M)) (Ul (LM := LM)).
 
   Lemma can_destutter_auxtr auxtr:
     auxtrace_valid auxtr →
@@ -589,11 +595,11 @@ Section destuttering_auxtr.
 End destuttering_auxtr.
 
 Section upto_preserves.
-  Context `{LM: LiveModel (locale Λ) M}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
 
   Lemma upto_stutter_mono' :
-    monotone2 (upto_stutter_ind (ls_under (G:=locale Λ) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (ls_under (G:=G) (M:=M)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
@@ -624,13 +630,13 @@ Section upto_preserves.
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
-  Context `{LM: LiveModel (locale Λ) M}.
-  Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
 
-  Notation upto_stutter_aux := (upto_stutter (ls_under (G := locale Λ)) (Ul (Λ := Λ) (LM := LM))).
+  Notation upto_stutter_aux := (upto_stutter (ls_under (G := G)) (Ul (LM := LM))).
 
   Lemma upto_stutter_mono'' : (* TODO fix this proliferation *)
-    monotone2 (upto_stutter_ind (ls_under (G:=locale Λ) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (ls_under (G:=G) (M:=M)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
@@ -640,7 +646,7 @@ Section upto_stutter_preserves_fairness_and_termination.
   Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M):
     upto_stutter_aux auxtr mtr ->
     (* role_enabled_model ρ (trfirst mtr) -> *)
-    (∃ n, pred_at auxtr n (λ δ _, ¬role_enabled (Λ := Λ) ρ δ)
+    (∃ n, pred_at auxtr n (λ δ _, ¬role_enabled (G := G) ρ δ)
           ∨ pred_at auxtr n (λ _ ℓ, ∃ ζ, ℓ = Some (Take_step ρ ζ))) ->
     ∃ m, pred_at mtr m (λ δ _, ¬role_enabled_model ρ δ)
          ∨ pred_at mtr m (λ _ ℓ, ℓ = Some $ Some ρ).
