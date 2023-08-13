@@ -48,8 +48,9 @@ Section Read_Proof.
 
 
   Lemma read_spec_internal_holds {MTR : MTS_resources}  :
-    ⊢ read_spec_internal.
+    Global_Inv clients γKnownClients γGauth γGsnap γT ⊢ read_spec_internal.
   Proof.
+    iIntros "#Hinv".
     iIntros (c sa k vo Hk) "#Hspec !#".
     iIntros (Φ) "(#Hisc & Hcache) Hpost".
     iDestruct "Hisc" as (lk cst l sv s) "Hisc".
@@ -78,28 +79,118 @@ Section Read_Proof.
     wp_pures.
     wp_load.
     wp_apply (wp_map_lookup $! Hm).
-    admit.
-    (* iIntros (v1 Hv1). *)
-(*     destruct (cuM !! k) eqn:Hkv1 *)
-(*     destruct vo eqn:Hvo. *)
+    iIntros (vo1 Hvo1).
+    assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
+    destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6) .
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq)
+                            "(#Hc3 & Hcache & %Hvb)".
+    simplify_eq /=.
+    iDestruct (client_connected_agree γGsnap γT
+                with "[$Hc3][$Hc1]") as "%Heq'".
+    simplify_eq.
+    iDestruct (ghost_map.ghost_map_lookup with
+                "[$Hauth][$Hcache]") as "%Hkin".
+    destruct (cuM !! k) eqn:Hkv1.
+    (* Read from cache. *)
+    1:{ rewrite Hvo1.
+        wp_pures.
+        specialize (Hc5 k v).
+        apply Hc5 in Hkv1.
+        simplify_eq /=.
+        wp_apply (release_spec with
+                   "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [Hcache Hpost]").
+        { iFrame "#∗".
+          iRight.
+          iExists ts, Msnap, cuL, cuV, cuM, cM.
+          by iFrame "#∗". }
+        iNext.
+        iIntros (v0 ->).
+        wp_pures.
+        iApply "Hpost".
+        iExists _, _, _, _, _, _, _, _.
+        by iFrame "#∗". }
+    (* Read from the database. *)
+    rewrite Hvo1.
+    wp_pures.
+    assert (is_Some (Msnap !! k)) as Hsnapk.
+    { apply elem_of_dom.
+      assert (is_Some (cM !! k)) as Hin. set_solver.
+      apply elem_of_dom in Hin. set_solver. }
+    destruct Hsnapk as (h & Hinh).
+    iAssert (ownMemSeen γGsnap k h)%I as "df".
+    { iDestruct (big_sepM_lookup with "[$Hsn]") as "Hsnap"; done. }
+    wp_apply ("Hspec" with "[$Hcr]").
+    instantiate (1 := (inl (k, ts, h))).
+    assert (k ∈ dom cM) as Hdomk.
+    { apply elem_of_dom. set_solver. }
+    specialize (Hc6 k vo) as (Hd & _).
+    specialize (Hd Hkv1).
+    destruct Hvalid as (_ & Hvalid).
+    specialize (Hvalid k h Hinh).
+    (* Handler precondition. *)
+    { iSplit.
+      - iPureIntro.
+        simplify_eq /=.
+        eapply sum_is_ser_valid.
+        rewrite /sum_is_ser.
+        eexists (#k, #ts)%V, _. left.
+        split; first eauto.
+        simpl. split; last done.
+        eexists _, _, _, _.
+        split_and!; try done.
+        simplify_eq /=.
+        eexists _; try done.
+      -  rewrite /MTS_handler_pre /= /ReqPre.
+         iSplit; first done.
+         iLeft.
+         iExists k, ts, h.
+         by iFrame "#∗". }
+    (* Getting the reply. *)
+    iIntros (repd repv) "[Hreq Hhpost]".
+    wp_pures.
+    rewrite /MTS_handler_post /= /ReqPost.
+    iDestruct "Hhpost" as "(_ & [Hhpost|Habs])".
+    -- iDestruct "Hhpost" as
+         (? ? ? vo2 Heq1 Heq2 Heq3) "Hhpost".
+       symmetry in Heq1, Heq2, Heq3.
+       simplify_eq /=.
+       wp_pures.
+       iDestruct "Hhpost" as "(_ & Hcnd)".
+       wp_apply (release_spec with
+                  "[$Hisc $Hlk Hl Hreq HcM Hauth Htk] [Hcache Hpost Hcnd]").
+       { iFrame "#∗".
+          iRight.
+          iExists ts, Msnap, cuL, cuV, cuM, cM.
+          by iFrame "#∗". }
+       iNext.
+       iIntros (? ->).
+       wp_pures.
+       specialize (Hc6 k vo) as (Hd & _).
+       apply Hd in Hkv1.
+       iDestruct "Hcnd" as "[(-> & ->) | %Hhe ]".
+       (* Case 2 : There is nothing to read. *)
+       --- assert (vo = None) as ->.
+           by destruct vo; first by specialize (Hc3 k v Hkv1); set_solver.
+           iApply "Hpost".
+           iExists _, _, _, _, _, _, _, _.
+           iSplit; first done.
+           iFrame "#∗".
+           eauto.
+       (* Case 2 : There is a value to read. *)
+       --- destruct Hhe as (rv & -> & Hrv).
+           destruct vo as [v|]; last by set_solver.
+           { specialize (Hc3 k v Hkv1) as (h' & e & Hmk & Hhe & Hev).
+             simplify_eq /=.
+             iApply "Hpost".
+             iExists _, _, _, _, _, _, _, _.
+             iSplit; first done.
+             iFrame "#∗".
+             eauto. }
+    (* Absurd *)
+    -- by iDestruct "Habs"
+         as "[(% & % & % & % & % & Habs) |
+              (% & % & % & % & % & % & % & % & % & Habs)]".
+  Qed.
 
-(*     - simplify_eq /=. *)
-(*       wp_pures. *)
-(*       wp_apply (release_spec with *)
-(*                "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [Hcache Hpost]"). *)
-(*     { iFrame "#∗". *)
-(*       iRight. *)
-(*       iExists ts, Msnap, cuL, _, cuM, cM. *)
-(*       iFrame "#∗". *)
-(*       iPureIntro. *)
-(*       split_and!; eauto. } *)
-(*     iNext. *)
-(*     iIntros (v1 ->). *)
-(*     wp_pures.  *)
-(*     destruct v eqn:Hv. *)
-(*       -- simplify_eq /=. *)
-(*          iApply ("Hpost" with "[Hcache]").       *)
-(* } *)
-  Admitted.
 
 End Read_Proof.

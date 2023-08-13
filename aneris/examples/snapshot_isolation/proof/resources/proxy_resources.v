@@ -52,29 +52,24 @@ Section Proxy.
     (cache_updatesM : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap :  gmap Key (list write_event)) :=
-      (** Cache Logical and Snapshot Coherence *)
       dom cache_logicalM = dom Msnap ∧
-      (∀ k (v : val),
-        k ∈ dom cache_logicalM →
+      dom cache_updatesM ⊆ dom cache_logicalM ∧
+      (** Cache Logical and Snapshot Coherence *)
+      (∀ k v,
         (cache_logicalM !! k) = Some (Some v, false) →
         ∃ h e,
           Msnap !! k = Some h ∧
           hist_to_we h = Some e ∧
           e.(we_val) = v) ∧
       (∀ k (v : val),
-         k ∈ dom cache_logicalM →
-         (cache_logicalM !! k) = Some (None, false) →
-           Msnap !! k = Some []) ∧
+         (cache_logicalM !! k) = Some (None, false) → Msnap !! k = Some []) ∧
       (** Cache Logical and Cache Updates Coherence *)
-      dom cache_updatesM ⊆ dom cache_logicalM ∧
-      (∀ k (v : val),
-        k ∈ dom cache_updatesM →
+      (∀ k v,
         cache_updatesM !! k = Some v ↔
-                                   cache_logicalM !! k = Some (Some v, true)) ∧
-        (∀ k (vo : option val),
-           k ∈ dom cache_logicalM →
+        cache_logicalM !! k = Some (Some v, true)) ∧
+        (∀ k vo,
            (cache_updatesM !! k) = None ↔
-                                        cache_logicalM !! k = Some (vo, false)).
+            cache_logicalM !! k = Some (vo, false)).
 
   Lemma is_coherent_cache_upd k v cuM cM Msnap :
     is_Some (cM !! k) →
@@ -159,10 +154,10 @@ Section Proxy.
       ⌜c = (#sa, v)%V⌝ ∗
       client_connected sa γCst γA γS γlk γCache ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
-        ⌜match vo with
-         | None => b = false
-         | Some w => KVS_Serializable w
-         end⌝.
+      ⌜match vo with
+       | None => b = false
+       | Some w => KVS_Serializable w
+       end⌝.
 
   Lemma ownCacheUser_timeless k c vo : Timeless (ownCacheUser k c vo).
   Proof. apply _. Qed.
