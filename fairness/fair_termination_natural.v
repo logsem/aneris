@@ -113,7 +113,7 @@ Proof.
     2: { apply PreOrder_Reflexive. }
     { eapply ftms_trans'; eauto. }
     { subst. red. red in VALID'. tauto. }
-    eauto. }  
+    intros; eapply fair_by_cons; eauto; apply Hfair. }  
   
   intros. destruct mtr'.
   { red. by exists 2. }
@@ -121,6 +121,8 @@ Proof.
   clear Hval. simpl in *. 
 
   apply terminating_trace_cons.
+  assert (∀ ρ, fair_model_trace ρ (s1 -[ ℓ0 ]-> mtr')) as Hfair'.
+  { intros; eapply fair_by_cons; eauto; apply Hfair. }
 
   pose proof (ftms_notinc _ _ _ STEP) as LE'%ftms_le_lt_eq. destruct LE' as [LT | ->].
   2: { eapply IHm'; eauto. red. red in VALID'. tauto. }
@@ -130,12 +132,6 @@ Proof.
   { simpl. done. }
   red. red in VALID'. tauto.
 Qed.
-
-(* Theorem simple_fair_terminating_traces_terminate `{FairTerminatingModelSimple Mdl}: *)
-(*       fairly_terminating Mdl. *)
-(* Proof. *)
-(*   intros ???. eapply simple_fair_terminating_traces_terminate_rec=>//. *)
-(* Qed. *)
 
 Section SFTTF.
   From trillium.fairness Require Import fair_termination.

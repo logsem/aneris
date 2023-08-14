@@ -42,12 +42,6 @@ Section fairness_preserved.
   
   Context (locale_prop: Lo -> So -> Prop).
 
-  Definition fair_by (ζ: Lo) (otr: out_trace): Prop :=
-    forall n, pred_at otr n (λ c _, locale_prop ζ c) ->
-         ∃ m, pred_at otr (n+m) (λ c _, ¬ locale_prop ζ c)
-              ∨ pred_at otr (n+m) (λ _ otid, otid = Some (Some ζ)).
-
-
   (* Context (state_rel: cfg Λ → lm_ls LM → Prop). *)
   Context (state_rel: So → lm_ls LM → Prop).
 
@@ -122,7 +116,7 @@ Section fairness_preserved.
   Definition fairness_induction_stmt ρ fm f m τ extr (auxtr : auxtrace (LM := LM)) δ
     :=
       (infinite_trace extr ->
-       (forall ζ, fair_by ζ extr) ->
+       (forall ζ, fair_by locale_prop ζ extr) ->
        fm = (f, m) ->
        lm_exaux_traces_match_gen extr auxtr ->
        δ = trfirst auxtr ->
@@ -141,7 +135,7 @@ Section fairness_preserved.
     lm_exaux_traces_match_gen extr' auxtr' ->
     infinite_trace extr' ->
     ls_fuel δ !! ρ = Some f ->
-    (∀ ζ, fair_by ζ extr') ->
+    (∀ ζ, fair_by locale_prop ζ extr') ->
     ∃ M0 : nat,
       pred_at (δ -[ ℓ ]-> auxtr') M0
               (λ δ0 _, ¬ role_enabled ρ δ0)
@@ -257,12 +251,6 @@ Section fairness_preserved.
           destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [by eexists|done]. 
     Qed.
 
-    Lemma fair_by_cons :
-∀ (tid : Lo) (c : So) (tid' : option Lo) (r : out_trace),
-  fair_by tid (c -[ tid' ]-> r) → fair_by tid r.
-    Proof. Admitted. 
-
-
 
   Lemma fairness_preserved_ind ρ:
     ∀ fm f m τ (extr: out_trace) (auxtr: auxtrace (LM := LM)) δ,
@@ -272,7 +260,7 @@ Section fairness_preserved.
     intros f m τ extr auxtr δ Hexinfin Hfair -> Htm -> Hfuel Hmapping Hexen.
     destruct extr as [|c ζ' extr'] eqn:Heq.
     { have [??] := Hexinfin 1. done. }
-    have Hfair': (forall τ, fair_by τ extr').
+    have Hfair': (forall τ, fair_by locale_prop τ extr').
     { intros. by eapply fair_by_cons. }
     destruct auxtr as [|δ ℓ auxtr']; first by inversion Htm.
     destruct (decide (ρ ∈ live_roles M δ)) as [Hρlive|]; last first.
@@ -352,15 +340,10 @@ Section fairness_preserved.
   Qed.
 
 
-  Lemma fair_by_after :
-    ∀ (ζ : Lo) (tr tr' : out_trace) 
-      (k : nat), after k tr = Some tr' → fair_by ζ tr → fair_by ζ tr'.
-  Proof. Admitted.
-
   Theorem fairness_preserved (extr: out_trace) (auxtr: auxtrace (LM := LM)):
     infinite_trace extr ->
     lm_exaux_traces_match_gen extr auxtr ->
-    (forall ζ, fair_by ζ extr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
+    (forall ζ, fair_by locale_prop ζ extr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
   Proof.
     intros Hinfin Hmatch Hex ρ n Hn.
 

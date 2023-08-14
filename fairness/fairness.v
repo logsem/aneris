@@ -32,6 +32,40 @@ Record FairModel : Type := {
 
 (* Definition of fairness for both kinds of traces *)
 
+Section GeneralizedFairness.
+  Context {S L: Type}.
+  Context (locale_prop: L -> S -> Prop). 
+
+  Definition fair_by (ζ: L) (otr: trace S (option L)): Prop :=
+    forall n, pred_at otr n (λ c _, locale_prop ζ c) ->
+         ∃ m, pred_at otr (n+m) (λ c _, ¬ locale_prop ζ c)
+              ∨ pred_at otr (n+m) (λ _ otid, otid = Some (Some ζ)).
+
+  Lemma fair_by_after ζ tr tr' k:
+    after k tr = Some tr' ->
+    fair_by ζ tr -> fair_by ζ tr'.
+  Proof.
+    intros Haf Hf n Hp.
+    have Hh:= Hf (k+n).
+    have Hp': pred_at tr (k + n) (λ (c : S) (_ : option $ option L), locale_prop ζ c).
+    { rewrite (pred_at_sum _ k) Haf /= //. }
+    have [m Hm] := Hh Hp'. exists m.
+    by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
+  Qed.
+
+  Lemma fair_by_cons (tid: L) (c: S) (tid' : option L) (r : trace S (option L)):
+      fair_by tid (c -[ tid' ]-> r) → fair_by tid r.
+  Proof. intros H. by eapply (fair_by_after tid (c -[tid']-> r) r 1). Qed.
+
+  (* Lemma fair_model_trace_cons_forall δ ℓ' r: *)
+  Lemma fair_by_cons_forall δ ℓ' r:
+    (∀ ℓ, fair_by ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_by ℓ r).
+  Proof. eauto using fair_by_cons. Qed.
+
+  (* TODO: try to unify validity lemmas by generalizing over step relation *)
+  
+End GeneralizedFairness.
+
 Definition extrace Λ := trace (cfg Λ) (olocale Λ).
 
 Section exec_trace.
@@ -42,25 +76,7 @@ Section exec_trace.
     ∃ e, from_locale c.1 ζ = Some e ∧ to_val e = None.
 
   Definition fair_ex ζ (extr: extrace Λ): Prop :=
-    forall n, pred_at extr n (λ c _, locale_enabled ζ c) ->
-         ∃ m, pred_at extr (n+m) (λ c _, ¬locale_enabled ζ c)
-              ∨ pred_at extr (n+m) (λ _ otid, otid = Some (Some ζ)).
-
-  Lemma fair_ex_after ζ tr tr' k:
-    after k tr = Some tr' ->
-    fair_ex ζ tr -> fair_ex ζ tr'.
-  Proof.
-    intros Haf Hf n Hp.
-    have Hh:= Hf (k+n).
-    have Hp': pred_at tr (k + n) (λ (c : cfg Λ) (_ : option (olocale Λ)), locale_enabled ζ c).
-    { rewrite (pred_at_sum _ k) Haf /= //. }
-    have [m Hm] := Hh Hp'. exists m.
-    by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
-  Qed.
-
-  Lemma fair_ex_cons tid c tid' r:
-    fair_ex tid (c -[tid']-> r) -> fair_ex tid r.
-  Proof. intros H. by eapply (fair_ex_after tid (c -[tid']-> r) r 1). Qed.
+    fair_by locale_enabled ζ extr. 
 
   CoInductive extrace_valid: extrace Λ -> Prop :=
   | extrace_valid_singleton c: extrace_valid ⟨c⟩
@@ -111,29 +127,7 @@ Section model_traces.
   Definition role_enabled_model ρ (s: M) := ρ ∈ M.(live_roles) s.
 
   Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
-    forall n, pred_at mtr n (λ δ _, role_enabled_model ρ δ) ->
-         ∃ m, pred_at mtr (n+m) (λ δ _, ¬role_enabled_model ρ δ)
-              ∨ pred_at mtr (n+m) (λ _ ℓ, ℓ = Some (Some ρ)).
-
-  Lemma fair_model_trace_after ℓ tr tr' k:
-    after k tr = Some tr' ->
-    fair_model_trace ℓ tr -> fair_model_trace ℓ tr'.
-  Proof.
-    intros Haf Hf n Hp.
-    have Hh:= Hf (k+n).
-    have Hp': pred_at tr (k + n) (λ δ _, role_enabled_model ℓ δ).
-    { rewrite (pred_at_sum _ k) Haf /= //. }
-    have [m Hm] := Hh Hp'. exists m.
-    by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
-  Qed.
-
-  Lemma fair_model_trace_cons ℓ δ ℓ' r:
-    fair_model_trace ℓ (δ -[ℓ']-> r) -> fair_model_trace ℓ r.
-  Proof. intros Hfm. by eapply (fair_model_trace_after ℓ _ r 1) =>//. Qed.
-
-  Lemma fair_model_trace_cons_forall δ ℓ' r:
-    (∀ ℓ, fair_model_trace ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_model_trace ℓ r).
-  Proof. eauto using fair_model_trace_cons. Qed.
+    fair_by role_enabled_model ρ mtr. 
 
   Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace M -> Prop) :
     mtrace M -> Prop :=
@@ -166,5 +160,5 @@ Section model_traces.
 
 End model_traces.
 
-Global Hint Resolve fair_model_trace_cons: core.
+Global Hint Resolve fair_by_cons: core.
 Global Hint Resolve mtrace_valid_mono : paco.
