@@ -339,30 +339,28 @@ Proof.
   eapply upto_stutter_finiteness =>//.
 Qed.
 
-(* TODO: derive the heap_lang lemma above from this one
-   Need to define FairModel for heap_lang *)
+(* TODO: unify with the language-oriented version above *)
 Theorem simulation_adequacy_terminate_general
   `{Mout: FairModel}
-  `{LM:LiveModel G Mdl}
+  `{LM:LiveModel G Mdl} `{EqDecision G}
   (otr: mtrace Mout) (auxtr : auxtrace (LM := LM))
-  state_rel lbl_rel outer_step :
+  state_rel lift_grole:
   (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) ->
-  traces_match lbl_rel state_rel outer_step LM.(lm_ls_trans) otr auxtr ->
-  (* literally a copy of fairness_preserved statement. should be simplified *)
-  (infinite_trace otr → 
-   traces_match lbl_rel state_rel outer_step LM.(lm_ls_trans) otr auxtr ->
-   (∀ ρ, fair_model_trace ρ otr) → ∀ ρ, fair_aux ρ auxtr) ->
+  Inj eq eq lift_grole ->
+  (lm_live_lift lift_grole (role_enabled_model (M := Mout)) state_rel) ->
+  lm_model_traces_match lift_grole state_rel otr auxtr ->
   (* The coinductive pure coq proposition given by adequacy *)
   mtrace_fairly_terminating otr.
 Proof.
-  (* as is (minus wp) *)
-  intros Hterm Hmatch Hfairpres Hvex Hfair.
+  intros Hterm Hmatch Hvex Hfair.
+  red. intros VALID FAIR. 
   destruct (infinite_or_finite otr) as [Hinf|] =>//.
 
   assert (auxtrace_valid auxtr) as Hvalaux.
   { by eapply traces_match_LM_preserves_validity. }
 
-  specialize (Hfairpres Hinf Hmatch Hfair). rename Hfairpres into Hfairaux. 
+  assert (forall ρ, fair_aux ρ auxtr (LM := LM)) as Hfairaux.
+  { eapply model_fairness_preserved; eauto. }
 
   destruct (can_destutter_auxtr auxtr (LM := LM)) as [mtr Hupto] =>//.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.

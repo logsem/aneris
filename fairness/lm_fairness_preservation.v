@@ -37,11 +37,9 @@ Section fairness_preserved.
   Context (out_step: So -> option Lo -> So -> Prop). 
 
   (* Representation of group labels on outer level *)
-  (* TODO: require injectivity? *)
   Context (lift_grole: G -> Lo).
   Hypothesis (INJlg: Inj eq eq lift_grole). 
   
-  (* Context (locale_prop: locale Λ -> cfg Λ -> Prop).  *)
   Context (locale_prop: Lo -> So -> Prop).
 
   Definition fair_by (ζ: Lo) (otr: out_trace): Prop :=
@@ -53,14 +51,15 @@ Section fairness_preserved.
   (* Context (state_rel: cfg Λ → lm_ls LM → Prop). *)
   Context (state_rel: So → lm_ls LM → Prop).
 
-  Hypothesis (match_locale_prop_states: 
-               forall ζ ρ δ c,
-                 ls_mapping δ !! ρ = Some ζ ->
-                 ρ ∈ live_roles _ δ -> 
-                 state_rel c δ ->
-                 (* locale_enabled ζ c *)
-                 locale_prop (lift_grole ζ) c
-             ).
+  Definition lm_live_lift := forall ζ ρ δ c,
+      ls_mapping δ !! ρ = Some ζ ->
+      ρ ∈ live_roles _ δ -> 
+      state_rel c δ ->
+      (* locale_enabled ζ c *)
+      locale_prop (lift_grole ζ) c. 
+
+
+  Hypothesis (match_locale_prop_states: lm_live_lift).
 
   Definition out_LM_labels_match (oζ : option Lo) (ℓ: lm_lbl LM) :=
   match oζ with
@@ -110,7 +109,6 @@ Section fairness_preserved.
     lm_exaux_traces_match_gen extr auxtr ->    
     ls_mapping (trfirst auxtr) !! ρ = Some ζ ->
     ρ ∈ live_roles _ (trfirst auxtr) ->
-    (* locale_prop ζ (trfirst extr). *)
     locale_prop (lift_grole ζ) (trfirst extr).
   Proof.
     intros Hm Hloc Hlive.
@@ -121,15 +119,12 @@ Section fairness_preserved.
   (* Local Hint Resolve match_locale_prop: core. *)
   Local Hint Resolve pred_first_trace: core.
 
-  Definition fairness_induction_stmt ρ fm f m (* ζ *) τ extr (auxtr : auxtrace (LM := LM))
-    δ
-    (* c *)
+  Definition fairness_induction_stmt ρ fm f m τ extr (auxtr : auxtrace (LM := LM)) δ
     :=
       (infinite_trace extr ->
        (forall ζ, fair_by ζ extr) ->
        fm = (f, m) ->
        lm_exaux_traces_match_gen extr auxtr ->
-       (* c = trfirst extr -> *)
        δ = trfirst auxtr ->
        δ.(ls_fuel) !! ρ = Some f ->
        δ.(ls_mapping) !! ρ = Some τ ->
@@ -140,8 +135,8 @@ Section fairness_preserved.
   Local Lemma case1 ρ f m (extr': out_trace) (auxtr' : auxtrace (LM := LM)) δ ℓ :
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
-         → ∀ (f m: nat) (* (ζ: locale Λ) *) τ (extr : out_trace) (auxtr : auxtrace (LM := LM))
-             (δ : LiveState G M), fairness_induction_stmt ρ m0 f m (* ζ *) τ extr auxtr δ ) ->
+         → ∀ (f m: nat) τ (extr : out_trace) (auxtr : auxtrace (LM := LM))
+             (δ : LiveState G M), fairness_induction_stmt ρ m0 f m τ extr auxtr δ ) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
     lm_exaux_traces_match_gen extr' auxtr' ->
     infinite_trace extr' ->
@@ -284,7 +279,6 @@ Section fairness_preserved.
     { exists 0. left. unfold pred_at. simpl. intros contra. eauto. }
     destruct (decide (Some (lift_grole τ) = ζ')) as [Hζ|Hζ].
     - rewrite <- Hζ in *.
-      (* destruct (traces_match_labels _ _ _ _ _ _ Htm) as [[ρ' ->]| ->]; last first. *)
       destruct (traces_match_labels _ _ _ _ _ _ Htm) as [τ' [LIFT_EQ Htm']].
       apply INJlg in LIFT_EQ as <-. 
       destruct Htm' as [[ρ' ->]| ->]; last first.
@@ -404,7 +398,7 @@ End fairness_preserved.
 (* TODO: move? *)
 Section lang_fairness_preserved.
   Context `{LM: LiveModel (locale Λ) M}.
-  Context `{Countable (locale Λ)}.
+  Context `{EqDecision (locale Λ)}.
 
   Definition lm_exaux_traces_match :=
     lm_exaux_traces_match_gen
@@ -412,19 +406,19 @@ Section lang_fairness_preserved.
       (id: locale Λ -> locale Λ)
       (live_tids (LM := LM)). 
 
-  Lemma match_locale_enabled_states_livetids
-    ζ ρ δ c
-    (Hloc: ls_mapping δ !! ρ = Some ζ)    
-    (Hsr: live_tids c δ (LM := LM)):
-    locale_enabled ζ c. 
-  Proof. 
+  Lemma match_locale_enabled_states_livetids: lm_live_lift id locale_enabled live_tids (LM := LM).
+  Proof.
+    red. intros ζ ρ δ c Hloc Hlive Hsr. 
+    (* In case of language we don't require the role to be alive,
+       since the notion of thread's "enabledness" is weaker than one of role *)
+    clear Hlive.
     rewrite /locale_enabled.
-    destruct Hsr as [HiS Hneqloc]. 
+    destruct Hsr as [HiS Hneqloc].
     have [e Hein] := (HiS _ _ Hloc). exists e. split; first done.
     destruct (to_val e) eqn:Heqe =>//.
     exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc.
     have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ).
-  Qed. 
+  Qed.
 
   Theorem ex_fairness_preserved (extr: extrace Λ) (auxtr: auxtrace (LM := LM)):
     infinite_trace extr ->
@@ -433,13 +427,41 @@ Section lang_fairness_preserved.
   Proof.
     intros. eapply fairness_preserved; eauto.
     { apply _. }
-    intros.
-    (* In case of language we don't require the role to be alive,
-       since the notion of thread's "enabledness" is weaker than one of role *)
-    clear H4.
     eapply match_locale_enabled_states_livetids; eauto.
     Unshelve. apply _.
   Qed.
 
-
 End lang_fairness_preserved. 
+
+
+Section model_fairness_preserved.
+  Context `{LM: LiveModel G M}.
+  Context `{EqDecision G}.
+
+  Context `{Mout: FairModel}. 
+
+  Context (lift_grole: G -> fmrole Mout).
+  Hypothesis (INJlg: Inj eq eq lift_grole). 
+
+  Context (state_rel: fmstate Mout → lm_ls LM → Prop).
+
+  Hypothesis (match_labels_prop_states: 
+               lm_live_lift lift_grole role_enabled_model state_rel).
+
+
+  Definition lm_model_traces_match :=
+    lm_exaux_traces_match_gen
+      (fmtrans Mout)
+      lift_grole
+      state_rel. 
+  
+  Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: auxtrace (LM := LM)):
+    infinite_trace mtr ->
+    lm_model_traces_match mtr auxtr ->
+    (∀ ρ, fair_model_trace ρ mtr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
+  Proof.
+    intros. eapply fairness_preserved; eauto.
+    Unshelve. apply _.
+  Qed.
+
+End model_fairness_preserved. 
