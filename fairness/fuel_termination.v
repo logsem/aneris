@@ -60,7 +60,9 @@ Proof.
   { by eapply traces_match_LM_preserves_validity. }
   apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
-  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
+  have Hfairaux := fairness_preserved live_tids 
+                     match_locale_enabled_states_livetids
+                     extr auxtr Hinf Hmatch Hfair.
   have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.

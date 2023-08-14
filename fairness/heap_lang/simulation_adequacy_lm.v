@@ -326,7 +326,9 @@ Proof.
 
   destruct (simulation_adequacy_model_trace
               Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
-  have Hfairaux := fairness_preserved extr auxtr Hinf Hmatch Hfair.
+  have Hfairaux := fairness_preserved live_tids 
+                     match_locale_enabled_states_livetids
+                     extr auxtr Hinf Hmatch Hfair.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
