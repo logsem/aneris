@@ -264,11 +264,14 @@ Proof.
   unshelve eapply (valid_inf_system_trace_implies_traces_match 
             lm_valid_evolution_step
             live_tids
-            labels_match
+            _
             ltac:(idtac)
             ltac:(idtac)
             (continued_simulation (sim_rel LM))); eauto.
-  1, 2: by intros ?????? V; apply V. 
+  - intros ?????? [MATCH _]. 
+    destruct oζ; [| done].
+    by exists l.
+  - intros ?????? V; by apply V. 
   - by intros ? ? [? ?]%continued_simulation_rel.
   - by intros ? ? [? ?]%continued_simulation_rel.
   - apply from_trace_spec. simpl. destruct (trfirst extr) eqn:Heq. simplify_eq. f_equal.
@@ -326,8 +329,7 @@ Proof.
 
   destruct (simulation_adequacy_model_trace
               Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
-  have Hfairaux := fairness_preserved live_tids 
-                     match_locale_enabled_states_livetids
+  have Hfairaux := ex_fairness_preserved 
                      extr auxtr Hinf Hmatch Hfair.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
