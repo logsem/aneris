@@ -15,6 +15,7 @@ From trillium.fairness Require Import fairness_finiteness actual_resources_inter
 Import derived_laws_later.bi.
 
 From trillium.fairness.examples.comp Require Import comp.
+From trillium.fairness.examples.comp Require Import trace_helpers. 
 From trillium.fairness Require Import fair_termination_natural.
 
 
@@ -363,7 +364,11 @@ Defined.
 Lemma client_model_fair_term:
   ∀ mtr: mtrace client_model_impl, mtrace_fairly_terminating mtr.
 Proof.
-  intros. red. intros VALID FAIR. 
+  intros. red. intros VALID FAIR.
+  destruct (infinite_or_finite mtr) as [INF|]; [| done].
+  trace_prefix
+  (* assert (exists  *)
+  
 Admitted. 
 
 Theorem client_terminates
@@ -377,7 +382,7 @@ Proof.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 
-  unshelve eapply (simulation_adequacy_terminate Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//.
+  unshelve eapply (simulation_adqeuacy_terminate Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//.
   - apply client_model_fair_term. 
   - eapply valid_state_evolution_finitary_fairness_simple.
     apply spinlock_model_finitary.
