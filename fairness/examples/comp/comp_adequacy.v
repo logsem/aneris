@@ -15,7 +15,7 @@ From trillium.fairness Require Import fairness_finiteness actual_resources_inter
 Import derived_laws_later.bi.
 
 From trillium.fairness.examples.comp Require Import comp.
-From trillium.fairness.examples.comp Require Import trace_helpers. 
+From trillium.fairness.examples.comp Require Import trace_helpers my_omega trace_len lemmas. 
 From trillium.fairness Require Import fair_termination_natural.
 
 
@@ -360,12 +360,90 @@ Definition δ_lib0: LiveState lib_grole lib_model_impl.
     destruct H, H0. congruence.
 Defined. 
 
+(* TODO: move*)
+Section Subtrace.
+  Context {St L: Type}.
+
+  Definition subtrace (tr_sub tr: trace St L) (start: nat) (fin: nat_omega): Prop.
+  Admitted. 
+
+  Definition trace_append (tr1 tr2: trace St L): trace St L.
+  Admitted.
+
+  (* Definition trace_concat (ltr tr2: list (trace St L)): trace St L :=  *)
+  (* Admitted. *)
+
+  Lemma trace_append_terminating (tr1 tr2: trace St L)
+    (FIN1: terminating_trace tr1) (FIN2: terminating_trace tr2):
+    terminating_trace (trace_append tr1 tr2). 
+  Proof. Admitted.
+
+  (* TODO: move *)
+  Require Import Coq.Logic.Classical.
+  Lemma trace_prop_split (tr: trace St L) (P: (St * option (L * St)) -> Prop)
+    (DECP: forall res, Decision (P res)): 
+    (* (forall i res, tr !! i = Some res -> P res) \/ *)
+    (* exists (l: nat), forall i (LT: NOmega.lt (NOnum i) l), *)
+    (*   pred_at tr i /\ (exists m, l = NOnum m -> pred_ *)
+    (*   pred_at *)
+    exists (l: nat_omega), 
+    (forall i res (LT: NOmega.lt (NOnum i) l) (RES: tr !! i = Some res), P res) /\
+    (forall j res (NEXT: l = NOnum j) (RES: tr !! j = Some res), ¬ P res).
+  Proof using.
+    pose proof (trace_has_len tr) as [len LEN]. 
+    destruct (classic (exists j res, tr !! j = Some res /\ ¬ P res)) as [STOP | EV]. 
+    - destruct STOP as [j' STOP'].
+      pattern j' in STOP'. apply min_prop_dec in STOP' as [j [NPROP MIN]]. 
+      2: { intros. admit. }
+      exists (NOnum j). simpl in *. split.
+      + intros. destruct (decide (P res)); [done| ]. 
+        enough (j <= i); [lia| ].
+        apply MIN. eexists. split; eauto.
+      + intros. inversion NEXT. subst.
+        destruct NPROP as [? [RES' NP]].
+        congruence. 
+    - exists len. split.
+      + intros.
+        apply not_exists_forall_not with (x := i) in EV. 
+        apply not_exists_forall_not with (x := res) in EV.
+        apply not_and_or in EV. destruct EV; [done| ].
+        eapply NNP_P; eauto.
+      + intros.
+        apply not_exists_forall_not with (x := j) in EV.        
+        pose proof (proj1 (trace_lookup_dom _ _ LEN j)).
+        specialize (H ltac:(eauto)).
+        lia_NO' len. inversion NEXT. lia.
+  Admitted. 
+
+End Subtrace.
+
+Definition is_client_step (step: client_state * option (option client_role * client_state)) :=
+  exists st1 st2, step = (st1, Some (Some $ inr ρy, st2)). 
+
+Instance ics_dec: forall step, Decision (is_client_step step).
+Proof. 
+  rewrite /is_client_step. intros [? p2].
+  destruct p2 as [p2| ]. 
+  2: { right. by intros (?&?&?). }
+  destruct p2 as [or s2].
+  destruct or as [r |]. 
+  2: { right. by intros (?&?&?). }
+  destruct (decide (r = inr ρy)).
+  - left. subst. do 2 eexists. eauto.
+  - right. intros (?&?&?). congruence.
+Qed. 
+  
 
 Lemma client_model_fair_term:
-  ∀ mtr: mtrace client_model_impl, mtrace_fairly_terminating mtr.
+  ∀ tr: mtrace client_model_impl, mtrace_fairly_terminating tr.
 Proof.
   intros. red. intros VALID FAIR.
-  destruct (infinite_or_finite mtr) as [INF|]; [| done].
+  (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
+  pose proof (trace_prop_split tr is_client_step ics_dec) as [l1 [L1 NL1]]. 
+  assert (exists d1, l1 = NOnum d1) as [d1 ->].
+  { lia_NO' l1; [| by eauto]. exfalso.
+    
+  
   trace_prefix
   (* assert (exists  *)
   

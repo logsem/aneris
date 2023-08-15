@@ -11,6 +11,10 @@ Require Import Coq.Logic.Classical.
 (* From trillium.fairness.examples.ticketlock Require Import lemmas. *)
 From trillium.fairness.examples.comp Require Import my_omega lemmas. 
 
+(* TODO: move*) 
+Ltac lia_NO len := destruct len; [done| simpl in *; lia]. 
+Ltac lia_NO' len := destruct len; simpl in *; try (done || lia). 
+
 Section TraceLen.
 
   Context {St L: Type}. 
@@ -64,10 +68,6 @@ Section TraceLen.
 
   Instance nat_omega_eq_dec: EqDecision nat_omega.
   Proof using. solve_decision. Qed.
-
-  (* TODO: move*) 
-  Ltac lia_NO len := destruct len; [done| simpl in *; lia]. 
-  Ltac lia_NO' len := destruct len; simpl in *; try (done || lia). 
 
   Lemma trace_lookup_trichotomy (tr: trace St L) (len: nat_omega)
     (LEN: trace_len_is tr len):
