@@ -138,20 +138,28 @@ Definition le' n m :=
 
 End Subtrace.
 
-Definition is_client_step (step: client_state * option (option client_role * client_state)) :=
-  exists st1 st2, step = (st1, Some (Some $ inr ρy, st2)). 
+(* Definition is_client_step (step: client_state * option (option client_role * client_state)) := *)
+(*   exists st1 st2, step = (st1, Some (Some $ inr ρy, st2)).  *)
 
-Instance ics_dec: forall step, Decision (is_client_step step).
+(* Definition is_lib_step (step: client_state * option (option client_role * client_state)) := *)
+(*   exists st1 ρlg st2, step = (st1, Some (Some $ inl ρlg, st2)).  *)
+
+Definition step_label_matches (step: client_state * option (option client_role * client_state)) (P: client_role -> Prop) :=
+  exists st1 ρ st2, step = (st1, Some (Some $ ρ, st2)) /\ P ρ.
+  
+  
+Instance slm_dec P (DECP: forall ρ, Decision (P ρ)):
+  forall step, Decision (step_label_matches step P).
 Proof. 
-  rewrite /is_client_step. intros [? p2].
+  rewrite /step_label_matches. intros [? p2].
   destruct p2 as [p2| ]. 
-  2: { right. by intros (?&?&?). }
+  2: { right. intros (?&?&?&?). intuition. congruence. }
   destruct p2 as [or s2].
   destruct or as [r |]. 
-  2: { right. by intros (?&?&?). }
-  destruct (decide (r = inr ρy)).
+  2: { right. intros (?&?&?&?). intuition. congruence. }
+  destruct (decide (P r)).
   - left. subst. do 2 eexists. eauto.
-  - right. intros (?&?&?). congruence.
+  - right. intros (?&?&?&?). intuition. congruence. 
 Qed. 
 
 
@@ -216,7 +224,10 @@ Proof. done. Qed.
 Lemma label_lookup_cons s l (tr: mtrace client_model_impl) i:
   (s -[ l ]-> tr) L!! S i = tr L!! i.
 Proof. done. Qed. 
-    
+
+Definition is_client_step := fun step => step_label_matches step (eq (inr ρy)).     
+Definition is_lib_step := fun step => step_label_matches step 
+                                     (fun ρ => exists ρlg, inl ρlg = ρ).     
 
 Lemma client_steps_finite (tr: mtrace client_model_impl) (l len: nat_omega)
   (VALID: mtrace_valid tr)
@@ -241,7 +252,7 @@ Proof.
   forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.  
   pose proof (mtrace_valid_steps' VALID _ _ _ _ L0).
   assert (c1 = c0) as ->.
-  { specialize (CL _ _ I L0). red in CL. destruct CL as (?&?&?).
+  { specialize (CL _ _ I L0). do 2 red in CL. destruct CL as (?&?&?&[? <-]).
     inversion H0. subst. clear H0. 
     inversion H; lia. }
   
@@ -256,6 +267,41 @@ Proof.
   rewrite trace_lookup_cons; eauto. 
 Qed. 
 
+Arguments le' _ _ : simpl nomatch.
+
+(* TODO: move*)
+Lemma trace_len_neg (tr: mtrace client_model_impl) (len: nat_omega)
+  (LEN: trace_len_is tr len):
+  forall (i: nat), after i tr = None <-> NOmega.le len (NOnum i).
+Proof. 
+  intros. specialize (LEN i).
+  destruct (after i tr).
+  - apply proj1 in LEN. specialize_full LEN; eauto. 
+    split; try done. lia_NO len.
+  - split; try done. intros _.
+    lia_NO' len.
+    + by destruct (proj2 LEN I).
+    + destruct (decide (n <= i)); [done| ].
+      by destruct (proj2 LEN ltac:(lia)).
+Qed.      
+
+
+Lemma trace_len_after (tr tr': mtrace client_model_impl) i
+  (len: nat_omega)
+  (LEN: trace_len_is tr len)
+  (AFTER: after i tr = Some tr'):
+  trace_len_is tr' (NOmega.sub len (NOnum i)).
+Proof.
+  gd tr. gd tr'. gd len. induction i.
+  { intros. simpl in AFTER. 
+    rewrite NOmega.sub_0_r. inversion AFTER. by subst. }
+  intros. destruct tr; [done| ].
+  simpl in AFTER.
+  pose proof (trace_len_tail _ _ _ _ LEN).
+  specialize (IHi _ _ _ H AFTER).
+  lia_NO' len. simpl in *.
+  by replace (n - S i) with (Nat.pred n - i) by lia.
+Qed. 
 
 Lemma client_model_fair_term:
   ∀ tr: mtrace client_model_impl, mtrace_fairly_terminating tr.
@@ -263,8 +309,30 @@ Proof.
   intros. red. intros VALID FAIR.
   (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
   pose proof (trace_has_len tr) as [len LEN]. 
-  pose proof (trace_prop_split tr _ _ ics_dec LEN) as [l1 (L1 & NL1 & DOM1)].
-  forward eapply client_steps_finite as [m1 ?]; eauto. subst l1. simpl in *.   
+
+  forward eapply (trace_prop_split tr is_client_step) as [l1 (L1 & NL1 & DOM1)]; eauto.
+  { solve_decision. } 
+  forward eapply client_steps_finite as [m1 ?]; eauto. subst l1. simpl in *.
+  (* TODO: also derive the fact that client's counter has decreased *)
+
+  destruct (after m1 tr) as [tr'| ] eqn:TR'.
+  2: { eapply trace_len_neg in TR'; eauto.
+       lia_NO' len. assert (n = m1) as -> by lia.
+       admit. }
+  forward eapply (trace_prop_split tr' is_lib_step) as [l2 (L2 & NL2 & DOM2)]; eauto.
+  { solve_decision. }
+  { eapply trace_len_after; eauto. }
+  
+  
+
+    specialize (LEN m1). rewrite TR' in LEN.
+       lia_NO' len; intuition; try discriminate. 
+       rewrite <- is_Some_None in LEN. 
+  clear L1 DOM1.
+
+  
+   (trace_prop_split tr _ _  LEN) as [l1 (L1 & NL1 & DOM1)].
+
   
 Admitted. 
 
