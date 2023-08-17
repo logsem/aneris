@@ -14,304 +14,12 @@ From trillium.fairness Require Import fairness_finiteness actual_resources_inter
 
 Import derived_laws_later.bi.
 
+From trillium.fairness Require Import fuel_ext. 
 From trillium.fairness.examples.comp Require Import comp.
-From trillium.fairness.examples.comp Require Import trace_helpers my_omega trace_len lemmas. 
 From trillium.fairness Require Import fair_termination_natural.
+From trillium.fairness.examples.comp Require Import my_omega  lemmas trace_len trace_helpers. 
 
-
-(* Definition sm_order (s1 s2: spinlock_model_impl): Prop := *)
-(*   Forall2 le s1 s2. *)
-                                                     
-(* Instance sm_order_po: PartialOrder sm_order.  *)
-(* Proof. *)
-(*   constructor. *)
-(*   - apply PreOrder_instance_1. econstructor; red; lia. *)
-(*   - apply AntiSymm_instance_1. red. lia.  *)
-(* Qed. *)
-
-
-(* Definition rem_actions (st: spinlock_model_impl): nat := list_sum st.  *)
-
-(* Lemma not_Forall2 {A B: Type} (f: A -> B -> Prop) (la: list A) (lb: list B) *)
-(*       (LEN: length la = length lb) *)
-(*       (NF2: ¬ Forall2 f la lb) *)
-(*       (DEC: RelDecision f): *)
-(*   exists i a b, la !! i = Some a /\ lb !! i = Some b /\ not (f a b). *)
-(* Proof. *)
-(*   generalize dependent lb. induction la. *)
-(*   { intros. simpl in LEN. symmetry in LEN. apply nil_length_inv in LEN. subst. *)
-(*     by destruct NF2. } *)
-(*   intros. destruct lb. *)
-(*   { by simpl in LEN. } *)
-(*   simpl in LEN. apply eq_add_S in LEN. *)
-(*   destruct (DEC a b). *)
-(*   2: { exists 0%nat, a, b. auto. } *)
-(*   edestruct @Forall2_dec with (x := la) (y := lb); eauto. *)
-(*   { destruct NF2. eauto. } *)
-(*   specialize (IHla _ LEN n). destruct IHla as (i & a' & b' & ? & ? & ?). *)
-(*   exists (S i), a', b'. simpl. eauto. *)
-(* Qed.  *)
-  
-(* Lemma sm_order_sum_le (st1 st2: spinlock_model_impl) (LE: sm_order st1 st2): *)
-(*   list_sum st1 <= list_sum st2. *)
-(* Proof. *)
-(*   generalize dependent st2. induction st1. *)
-(*   { intros. red in LE. apply Forall2_nil_inv_l in LE. subst. lia. } *)
-(*   intros. destruct st2. *)
-(*   { red in LE. by apply Forall2_nil_inv_r in LE. } *)
-(*   inversion LE. subst. *)
-(*   simpl. specialize (IHst1 _ H4). lia. *)
-(* Qed. *)
-
-(* Lemma sm_order_insert st (i v v': nat) *)
-(*   (ITH: st !! i = Some v) (LE: v' <= v): *)
-(*   sm_order (<[i:=v']> st) st. *)
-(* Proof. *)
-(*   red. apply Forall2_same_length_lookup_2; [by apply insert_length| ]. *)
-(*   intros j x y JTH' ITH_. destruct (dec_eq_nat j i). *)
-(*   + subst j. rewrite ITH_ in ITH. inversion ITH. subst v.  *)
-(*     rewrite list_lookup_insert in JTH'. *)
-(*     2: { by eapply lookup_lt_Some. } *)
-(*     inversion JTH'. lia. *)
-(*   + rewrite list_lookup_insert_ne in JTH'; auto. *)
-(*     rewrite ITH_ in JTH'. inversion JTH'. lia. *)
-(* Qed.  *)
-
-(* Lemma strict_sm_order_insert st (i v v': nat)  (ITH: st !! i = Some v) (LT: v' < v): *)
-(*   strict sm_order (<[i:=v']> st) st. *)
-(* Proof. *)
-(*   red. split; [eapply sm_order_insert; eauto; lia| ]. *)
-(*   intros ORD. red in ORD. *)
-(*   eapply Forall2_lookup_lr with (y := v') in ORD; eauto; [lia| ]. *)
-(*   apply list_lookup_insert. by eapply lookup_lt_Some.  *)
-(* Qed.  *)
-
-(* Lemma unlocked_dec (st: spinlock_model_impl): *)
-(*   Decision (state_unlocked st). *)
-(* Proof. *)
-(*   red. induction st. *)
-(*   { by left. } *)
-(*   destruct IHst. *)
-(*   2: { right. unfold state_unlocked in *. intros UNL. destruct n. *)
-(*        intros. by apply UNL with (j := S j). } *)
-(*   destruct (Nat.eq_dec a 1%nat) as [-> | A]. *)
-(*   { right. intros UNL. red in UNL. specialize (UNL 0%nat 1%nat eq_refl). lia. } *)
-(*   left. red. intros. destruct j. *)
-(*   { simpl in JV. inversion JV. lia. } *)
-(*   simpl in JV. by eapply s. *)
-(* Qed. *)
-
-(* Lemma locked_dec (st: spinlock_model_impl):  *)
-(*   {i | state_locked_by st i} + *)
-(*   {not (exists i, state_locked_by st i)}.  *)
-(* Proof. *)
-(*   destruct (list_find (eq 1%nat) st) eqn:IN1. *)
-(*   2: { right. intros [i [ITH NOJ]].  *)
-(*        apply list_find_None in IN1. *)
-(*        eapply Forall_lookup_1 in ITH; eauto. done. } *)
-(*   destruct p as [i v]. *)
-(*   (* pose proof IN1 as IN_. *) *)
-(*   apply list_find_Some in IN1. destruct IN1 as (ITH & <- & PREV).   *)
-(*   destruct (list_find (eq 1%nat) (drop (S i) st)) eqn:IN2.  *)
-(*   2: { apply list_find_None in IN2.  *)
-(*        left. exists i. red. split; auto. *)
-(*        intros. destruct (Nat.lt_trichotomy i j) as [LT | [? | LT]]; [| done| ]. *)
-(*        2: { specialize (PREV _ _ JV). lia. } *)
-(*        eapply Forall_lookup_1 with (i := (j - (S i))%nat) in IN2. *)
-(*        2: { rewrite lookup_drop. rewrite le_plus_minus_r; eauto. } *)
-(*        lia. } *)
-(*   destruct p as [j v]. *)
-(*   apply list_find_Some in IN2. destruct IN2 as (JTH & <- & PREV'). *)
-(*   right. intros [k [KTH NOOTHER]]. *)
-(*   destruct (Nat.lt_trichotomy k i) as [LT | [? | LT]]. *)
-(*   { eapply PREV in LT; eauto. } *)
-(*   { subst k. edestruct (NOOTHER (S i + j)%nat); try lia.  *)
-(*     { by rewrite lookup_drop in JTH. } *)
-(*     all: lia. }   *)
-(*   destruct (Nat.lt_trichotomy k (S i + j)) as [LT' | [-> | LT']]. *)
-(*   { apply Nat.le_exists_sub in LT as [d [-> _]].  *)
-(*     edestruct (PREV' d); eauto; [| lia]. *)
-(*     rewrite lookup_drop. by rewrite Nat.add_comm. } *)
-(*   { edestruct (NOOTHER i); eauto; lia. } *)
-(*   edestruct (NOOTHER (S i + j)%nat); eauto.  *)
-(*   { by rewrite lookup_drop in JTH. } *)
-(*   all: lia.  *)
-(* Qed.  *)
-
-(* Open Scope nat_scope.  *)
-  
-(* Lemma unlocked_next st (UNL: state_unlocked st): *)
-(*   {i | exists v, st !! i = Some v /\ v >= 2%nat /\ *)
-(*             forall j v' (PREV: j < i) (JTH: st !! j = Some v'), v' < 2} + *)
-(*   {Forall (eq 0%nat) st}. *)
-(* Proof. *)
-(*   edestruct (list_find (fun x => 2 <= x) st) eqn:IN. *)
-(*   { left. destruct p as [i v]. exists i. *)
-(*     apply list_find_Some in IN as (? & ? & ?). eexists. repeat split; eauto. *)
-(*     intros. specialize (H1 _ _ JTH). lia. } *)
-(*   right.  *)
-(*   apply Forall_lookup_2. intros.  *)
-(*   red in UNL. specialize (UNL _ _ H). destruct UNL; auto. *)
-(*   apply list_find_None in IN. eapply Forall_lookup_1 in H; [| apply IN]. *)
-(*   by simpl in H.  *)
-(* Qed.  *)
-
-(* Lemma get_model_status (st: spinlock_model_impl): *)
-(*   state_unlocked st *  *)
-(*   ({i | exists v, st !! i = Some v /\ v >= 2 /\ *)
-(*               forall j v' (PREV: j < i) (JTH: st !! j = Some v'), v' < 2} +  *)
-(*     {Forall (eq 0) st}) +  *)
-(*   {i: nat | state_locked_by st i} + *)
-(*   {~ state_unlocked st /\ ~ (exists i, state_locked_by st i)}. *)
-(*   (* } + *) *)
-(*   (* {True}. *) *)
-(* Proof.   *)
-(*   destruct (unlocked_dec st).  *)
-(*   - repeat left. split; auto. *)
-(*     destruct (unlocked_next st s) as [[]| ?]; [left | right]; eauto. *)
-(*   - destruct (locked_dec st) as [[]| ?]; eauto. *)
-(* Qed. *)
-
-
-(* Lemma unlocked_locked_incompat (s: spinlock_model_impl) *)
-(*       (UNLOCKED : state_unlocked s) (LOCKED: ∃ j, state_locked_by s j): *)
-(*   False. *)
-(* Proof. *)
-(*   destruct LOCKED as [i [LOCKi]]. specialize (UNLOCKED _ _ LOCKi). lia. *)
-(* Qed. *)
-
-(* Lemma live_roles_alt (s: spinlock_model_impl) i v *)
-(*         (ITH: s !! i = Some v) *)
-(*         (V: v ≥ 1): *)
-(*   i ∈ live_roles spinlock_model_impl s. *)
-(* Proof. *)
-(*   simpl. unfold spinlock_lr. apply elem_of_list_to_set, elem_of_list_In.   *)
-(*   apply filter_In. split.  *)
-(*   * apply in_seq. apply lookup_lt_Some in ITH. lia. *)
-(*   * rewrite ITH. simpl. apply Nat.ltb_lt. lia. *)
-(* Qed.  *)
-
-(* Lemma state_locked_by_det (st: spinlock_model_impl) (i j: nat) *)
-(*       (LOCKi: state_locked_by st i) (LOCKj: state_locked_by st j): *)
-(*   i = j. *)
-(* Proof. *)
-(*   destruct LOCKi as [I1 NOJ]. destruct LOCKj as [J1 NOI]. *)
-(*   destruct (dec_eq_nat i j) as [? | NEQ]; auto. *)
-(*   specialize (NOJ _ _ J1). lia. *)
-(* Qed. *)
-
-(* Lemma state_locked_by_simpl (st: spinlock_model_impl) (i j: nat) *)
-(*       (DOMi: i < length st) *)
-(*       (LOCK: state_locked_by (<[i:=1]> st) j): *)
-(*   i = j. *)
-(* Proof. *)
-(*   destruct LOCK as [I1 NOJ]. *)
-(*   destruct (dec_eq_nat i j) as [? | NEQ]; auto. *)
-(*   edestruct (NOJ i); eauto. *)
-(*   { by eapply list_lookup_insert. } *)
-(*   all: lia. *)
-(* Qed.  *)
-
-(* Lemma sm_step_le (s s': spinlock_state) (oρ: option nat) *)
-(*       (STEP: spinlock_model_step s oρ s'): *)
-(*   sm_order s' s. *)
-(* Proof.  *)
-(*   inversion STEP; subst. *)
-(*   - eapply sm_order_insert; eauto. lia. *)
-(*   - destruct LOCKi. eapply sm_order_insert; eauto. *)
-(*   - red. apply Reflexive_instance_0. red. lia. *)
-(* Qed.  *)
-
-  
-(* Program Instance spinlock_model_terminates:   *)
-(*   FairTerminatingModelSimple spinlock_model_impl := *)
-(*   {| *)
-(*   ftms_leq := sm_order; *)
-(*   |}. *)
-(* Next Obligation. *)
-(*   eapply wf_projected with (f := rem_actions). *)
-(*   2: { apply lt_wf. } *)
-(*   unfold sm_order, rem_actions. intros x y [LE NGE]. *)
-(*   edestruct @not_Forall2 as (i & a & b & [? [?]]); [| eauto |..]. *)
-(*   { symmetry. by eapply Forall2_length. } *)
-(*   { apply Nat.le_dec. } *)
-(*   rewrite <- (take_drop_middle x i b), <- (take_drop_middle y i a); auto. *)
-(*   repeat (rewrite list_sum_app; simpl). *)
-(*   apply PeanoNat.Nat.add_le_lt_mono. *)
-(*   { apply sm_order_sum_le. by apply Forall2_take. } *)
-(*   apply PeanoNat.Nat.add_lt_le_mono; [lia| ]. *)
-(*   apply sm_order_sum_le. by apply Forall2_drop.  *)
-(* Qed. *)
-(* Next Obligation. *)
-(*   intros. red. *)
-(*   destruct (get_model_status s) as [[[UNL [[i READY] | ALL0]] | [i LOCK]] | [NO1 NO2]]. *)
-(*   - left. destruct READY, H. red. exists (Some i). *)
-(*     eexists. econstructor; eauto. lia. *)
-(*   - right. intros ACT. red in ACT. destruct ACT, H. inversion H; subst. *)
-(*     1,3: eapply Forall_lookup_1 in READYi; eauto; lia. *)
-(*     destruct LOCKi. eapply Forall_lookup_1 in H0; eauto. lia. *)
-(*   - left. destruct LOCK. exists (Some i). *)
-(*     eexists. eapply sm_unlock. red. eauto. *)
-(*   - right. intros ACT. red in ACT. destruct ACT, H. *)
-(*     inversion H; subst; try tauto.  *)
-(*     edestruct NO2; eauto.  *)
-(* Qed. *)
-(* Next Obligation. *)
-(*   (* TODO: refactor *) *)
-(*   intros. red in ACTIVE. destruct ACTIVE, H. *)
-(*   destruct x as [ρ | ]. *)
-(*   2: { inversion H. } *)
-(*   inversion H; subst.  *)
-(*   1, 2: (exists ρ; split; [by eapply fm_live_spec; eauto| subst; intros]). *)
-(*   - inversion STEPρ; subst. *)
-(*     2, 3: edestruct unlocked_locked_incompat; eauto. *)
-(*     eapply strict_sm_order_insert; eauto. *)
-(*   - inversion STEPρ; subst. *)
-(*     { edestruct unlocked_locked_incompat; eauto. } *)
-(*     { red in LOCKi. destruct LOCKi. eapply strict_sm_order_insert; eauto. } *)
-(*     destruct LOCKED.  *)
-(*     pose proof (state_locked_by_det _ _ _ LOCKi H0) as <-; eauto. *)
-(*     destruct H0. rewrite H0 in READYi. inversion READYi. lia. *)
-(*   - destruct LOCKED as [j LOCKED]. exists j. split. *)
-(*     { eapply fm_live_spec. eapply sm_unlock; eauto. } *)
-(*     intros.  *)
-(*     inversion STEPρ; subst. *)
-(*     { edestruct unlocked_locked_incompat; eauto. } *)
-(*     { red in LOCKi. destruct LOCKi. eapply strict_sm_order_insert; eauto. } *)
-(*     destruct LOCKED0.  *)
-(*     pose proof (state_locked_by_det _ _ _ H0 LOCKED) as <-; eauto. *)
-(*     destruct H0. rewrite H0 in READYi0. inversion READYi0. lia. *)
-(* Qed. *)
-(* Next Obligation. *)
-(*   intros. by eapply sm_step_le.  *)
-(* Qed. *)
-
-(* Instance proof_irrel_trans s x: *)
-(*   ProofIrrel ((let '(s', ℓ) := x in spinlock_model_step s ℓ s'  *)
-(*                                               ∨ s' = s ∧ ℓ = None): Prop). *)
-(* Proof. apply make_proof_irrel. Qed. *)
-
-(* Lemma le_states_list (s: spinlock_model_impl): *)
-(*   {l: list spinlock_state | forall s' (LE: sm_order s' s), In s' l }.  *)
-(* Proof. *)
-(*   induction s as [| a s [l IHl]]. *)
-(*   (* induction s.  *) *)
-(*   { exists [[]]. intros. inversion LE. subst. simpl. tauto. } *)
-(*   exists (flat_map (fun (i: nat) => map (fun s_ => i :: s_) l) (seq 0 (S a))). *)
-(*   intros. inversion LE. subst.  *)
-(*   apply in_flat_map. *)
-(*   exists x. split. *)
-(*   { apply in_seq. lia. } *)
-(*   apply in_map_iff. eexists. split; eauto. *)
-(* Qed. *)
-
-(* Lemma sm_step_role_bound (s s': spinlock_state) (oρ: option nat) *)
-(*       (STEP: spinlock_model_step s oρ s'): *)
-(*   exists ρ, oρ = Some ρ /\ ρ < length s. *)
-(* Proof. *)
-(*   inversion STEP; eexists; split; eauto; apply lookup_lt_is_Some; subst; eauto. *)
-(*   destruct LOCKi. eauto. *)
-(* Qed.  *)
+Close Scope Z_scope. 
 
 Instance client_trans'_PI s x: 
   ProofIrrel ((let '(s', ℓ) := x in 
@@ -337,8 +45,6 @@ Section ClientRA.
 
 End ClientRA.
 
-
-From trillium.fairness Require Import fuel_ext. 
 
 Lemma δ_lib0_init_roles:
   live_roles lib_model_impl 1 ⊆ dom ({[ρlg := 5]}: gmap lib_grole nat).
@@ -378,31 +84,45 @@ Section Subtrace.
     terminating_trace (trace_append tr1 tr2). 
   Proof. Admitted.
 
+(* TODO: move to my_omega *)
+Definition le' n m :=
+  match n, m with
+  | _, NOinfinity => True
+  | NOnum n, NOnum m => n <= m
+  | _, _ => False
+  end.
+
   (* TODO: move *)
   Require Import Coq.Logic.Classical.
-  Lemma trace_prop_split (tr: trace St L) (P: (St * option (L * St)) -> Prop)
-    (DECP: forall res, Decision (P res)): 
+  Lemma trace_prop_split (tr: trace St L) (P: (St * option (L * St)) -> Prop) len 
+    (DECP: forall res, Decision (P res))
+    (LEN: trace_len_is tr len)
+    : 
     (* (forall i res, tr !! i = Some res -> P res) \/ *)
     (* exists (l: nat), forall i (LT: NOmega.lt (NOnum i) l), *)
     (*   pred_at tr i /\ (exists m, l = NOnum m -> pred_ *)
     (*   pred_at *)
     exists (l: nat_omega), 
     (forall i res (LT: NOmega.lt (NOnum i) l) (RES: tr !! i = Some res), P res) /\
-    (forall j res (NEXT: l = NOnum j) (RES: tr !! j = Some res), ¬ P res).
+    (forall j res (NEXT: l = NOnum j) (RES: tr !! j = Some res), ¬ P res) /\
+    le' l len. 
   Proof using.
-    pose proof (trace_has_len tr) as [len LEN]. 
     destruct (classic (exists j res, tr !! j = Some res /\ ¬ P res)) as [STOP | EV]. 
     - destruct STOP as [j' STOP'].
       pattern j' in STOP'. apply min_prop_dec in STOP' as [j [NPROP MIN]]. 
       2: { intros. admit. }
-      exists (NOnum j). simpl in *. split.
+      exists (NOnum j). simpl in *. repeat split.      
       + intros. destruct (decide (P res)); [done| ]. 
         enough (j <= i); [lia| ].
         apply MIN. eexists. split; eauto.
       + intros. inversion NEXT. subst.
         destruct NPROP as [? [RES' NP]].
-        congruence. 
-    - exists len. split.
+        congruence.
+      + lia_NO' len.
+        destruct NPROP as [? [RES' NP]].
+        pose proof (proj1 (trace_lookup_dom _ _ LEN j) (ex_intro _ x RES')).
+        simpl in H. lia. 
+    - exists len. repeat split.
       + intros.
         apply not_exists_forall_not with (x := i) in EV. 
         apply not_exists_forall_not with (x := res) in EV.
@@ -413,6 +133,7 @@ Section Subtrace.
         pose proof (proj1 (trace_lookup_dom _ _ LEN j)).
         specialize (H ltac:(eauto)).
         lia_NO' len. inversion NEXT. lia.
+      + lia_NO len. 
   Admitted. 
 
 End Subtrace.
@@ -432,20 +153,118 @@ Proof.
   - left. subst. do 2 eexists. eauto.
   - right. intros (?&?&?). congruence.
 Qed. 
+
+
+Local Ltac gd t := generalize dependent t.
+
+(* TODO: move *)
+Lemma trace_len_cons s l (tr: mtrace client_model_impl) (len: nat_omega)
+  (LEN: trace_len_is tr len):
+  trace_len_is (s -[l]-> tr) (NOmega.succ len).
+Proof. 
+  unfold trace_len_is in *. intros.
+  destruct i.
+  { simpl. lia_NO' len. simpl. intuition. lia. }
+  simpl. rewrite LEN. lia_NO len.
+Qed.
+
+(* TODO: move *)
+Lemma trace_len_uniq (tr: mtrace client_model_impl) (len1 len2: nat_omega)
+  (LEN1: trace_len_is tr len1) (LEN2: trace_len_is tr len2):
+  len1 = len2. 
+Proof. 
+  unfold trace_len_is in *.
+  destruct (NOmega_trichotomy len1 len2) as [?|[?|?]]; auto.
+  - destruct len1; [done| ].
+    pose proof (proj2 (LEN2 n)) as L2. specialize (L2 ltac:(lia_NO len2)).
+    specialize (proj1 (LEN1 _) L2). simpl. lia.
+  - destruct len2; [done| ].
+    pose proof (proj2 (LEN1 n)) as L1. specialize (L1 ltac:(lia_NO len1)).
+    specialize (proj1 (LEN2 _) L1). simpl. lia.
+Qed. 
+
+Lemma trace_len_tail s l (tr: mtrace client_model_impl) (len: nat_omega)
+  (LEN: trace_len_is (s -[l]-> tr) len):
+  trace_len_is tr (NOmega.pred len).
+Proof.
+  pose proof (trace_has_len tr) as [len' LEN'].
+  pose proof (trace_len_cons s l _ _ LEN').
+  forward eapply (trace_len_uniq _ _ _ LEN H) as ->; eauto.
+  lia_NO' len'. 
+Qed.
+
+(* TODO: move *)
+Global Instance nomega_eqdec: EqDecision nat_omega.
+Proof. solve_decision. Qed. 
+
+(* TODO: move*)
+Lemma trace_state_lookup_simpl (tr: mtrace client_model_impl) i s' step s
+  (TLi: tr !! i = Some (s', step))
+  (SLi: tr S!! i = Some s):
+  s' = s.
+Proof.
+  rewrite /state_lookup in SLi. rewrite /lookup /trace_lookup in TLi.
+  destruct (after i tr); [destruct t| ]; congruence.
+Qed. 
+
+(* TODO: move*)  
+Lemma state_lookup_cons s l (tr: mtrace client_model_impl) i:
+  (s -[ l ]-> tr) S!! S i = tr S!! i.
+Proof. done. Qed. 
+    
+(* TODO: move*)  
+Lemma label_lookup_cons s l (tr: mtrace client_model_impl) i:
+  (s -[ l ]-> tr) L!! S i = tr L!! i.
+Proof. done. Qed. 
+    
+
+Lemma client_steps_finite (tr: mtrace client_model_impl) (l len: nat_omega)
+  (VALID: mtrace_valid tr)
+  (LEN: trace_len_is tr len)
+  (LE: le' l len)
+  (CL: ∀ i res, NOmega.lt (NOnum i) l → tr !! i = Some res → is_client_step res):
+  exists m, l = NOnum m.
+Proof.
+  lia_NO' l; lia_NO' len; try by eauto. exfalso.
+  assert (exists s0, tr S!! 0 = Some s0) as [[δ0 c0] S0].
+  { pose proof (inf_trace_lookup _ LEN 0) as ([δ0 c0] & ℓ0 & s1 & L0).
+    apply state_label_lookup in L0 as (?&?&?). eauto. } 
+  gd tr. gd δ0. clear LE. induction c0.
+  { intros.
+    pose proof (inf_trace_lookup _ LEN 0) as (? & ℓ & ? & L0).
+    forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.  
+    pose proof (mtrace_valid_steps' VALID _ _ _ _ L0) as S. by inversion S. }
+  intros. destruct tr.
+  { specialize (LEN 1). simpl in *.
+    by pose proof (proj2 LEN I) as []. }
+  pose proof (inf_trace_lookup _ LEN 0) as (? & ? & [δ1 c1] & L0).
+  forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.  
+  pose proof (mtrace_valid_steps' VALID _ _ _ _ L0).
+  assert (c1 = c0) as ->.
+  { specialize (CL _ _ I L0). red in CL. destruct CL as (?&?&?).
+    inversion H0. subst. clear H0. 
+    inversion H; lia. }
   
+  assert (tr S!! 0 = Some (δ1, c0)) as L1.
+  { apply state_label_lookup in L0 as (_&?&_).
+    rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. }
+
+  eapply (IHc0 δ1 tr); eauto.  
+  { eapply mtrace_valid_cons; eauto. }
+  { by apply trace_len_tail in LEN. }
+  intros. apply (CL (S i)); [done| ].
+  rewrite trace_lookup_cons; eauto. 
+Qed. 
+
 
 Lemma client_model_fair_term:
   ∀ tr: mtrace client_model_impl, mtrace_fairly_terminating tr.
 Proof.
   intros. red. intros VALID FAIR.
   (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
-  pose proof (trace_prop_split tr is_client_step ics_dec) as [l1 [L1 NL1]]. 
-  assert (exists d1, l1 = NOnum d1) as [d1 ->].
-  { lia_NO' l1; [| by eauto]. exfalso.
-    
-  
-  trace_prefix
-  (* assert (exists  *)
+  pose proof (trace_has_len tr) as [len LEN]. 
+  pose proof (trace_prop_split tr _ _ ics_dec LEN) as [l1 (L1 & NL1 & DOM1)].
+  forward eapply client_steps_finite as [m1 ?]; eauto. subst l1. simpl in *.   
   
 Admitted. 
 

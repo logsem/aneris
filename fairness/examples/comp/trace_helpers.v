@@ -4,6 +4,19 @@ From trillium.fairness.examples.comp Require Import lemmas trace_len.
 
 Close Scope Z_scope.
  
+(* TODO: move *)
+Tactic Notation "forward" tactic1(tac) :=
+  let foo := fresh in
+  evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|].
+
+Tactic Notation "forward" tactic1(tac) "as" simple_intropattern(H) :=
+  let foo := fresh in
+  evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|intros H].
+
+Tactic Notation "specialize_full" ident(H) :=
+  let foo := fresh in
+  evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
+
 Section TraceHelpers.
   Context {St L: Type}.
 
@@ -81,19 +94,6 @@ Section FMTraceHelpers.
                      (tr L!! (n + x) = Some (Some ρ))
            ) m. 
 
-  (* TODO: move *)
-  Tactic Notation "forward" tactic1(tac) :=
-    let foo := fresh in
-    evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|].
-  
-  Tactic Notation "forward" tactic1(tac) "as" simple_intropattern(H) :=
-    let foo := fresh in
-    evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|intros H].
-  
-  Tactic Notation "specialize_full" ident(H) :=
-    let foo := fresh in
-    evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
-
   Lemma strong_fair_model_trace_alt_defs_equiv (tr: mtrace M) (ρ: fmrole M):
     strong_fair_model_trace tr ρ <-> strong_fair_model_trace_alt tr ρ.
   Proof using. 
@@ -139,6 +139,12 @@ Section FMTraceHelpers.
       punfold VALID. inversion_clear VALID; pclearbot; auto.
       eapply IHi; eauto. 
     Qed.
+
+    (* TODO: move*)
+    Lemma mtrace_valid_cons s l (tr': mtrace M)
+      (VALID': mtrace_valid (s -[l]-> tr')):
+      mtrace_valid tr'.
+    Proof. by eapply mtrace_valid_after with (k := 1); eauto. Qed.       
     
     Lemma mtrace_valid_steps'' i st ℓ st'
       (ST1: tr S!! i = Some st)

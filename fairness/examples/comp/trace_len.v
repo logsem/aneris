@@ -46,17 +46,39 @@ Section TraceLen.
       specialize (MIN i). destruct (after i tr); try done.
       specialize (MIN eq_refl). lia. 
   Qed. 
-      
-  (* Lookup nat (mstate M) utrace. *)
-  Global Instance trace_lookup: 
-    Lookup nat (St * option (L * St)) (trace St L).
-  intros i tr.
-  destruct (after i tr) eqn:AFTER.
-  2: { exact None. }
-  destruct t.
-  - exact (Some (s, None)).
-  - exact (Some (s, Some (ℓ, trfirst t))).
-  Defined. 
+
+  (* Postpone instantiation of Lookup to make the notations work properly after *)
+  Let trace_lookup_impl (tr: trace St L) i :=
+        match (after i tr) with
+        | None => None
+        | Some (tr_singl s) => Some (s, None)
+        | Some (tr_cons s l tr') => Some (s, Some (l, trfirst tr'))
+        end.
+
+
+  Definition state_lookup (tr: trace St L) (i: nat): option St := 
+    match trace_lookup_impl tr i with
+    | Some (st, _) => Some st
+    | None => None
+    end. 
+    
+  Definition label_lookup (tr: trace St L) (i: nat): option L := 
+    match trace_lookup_impl tr i with
+    | Some (_, Some (ℓ, _)) => Some ℓ
+    | _ => None
+    end.
+
+  Global Instance state_lookup_Lookup: Lookup nat St (trace St L) :=
+    fun i tr => state_lookup tr i. 
+
+  Global Instance label_lookup_Lookup: Lookup nat L (trace St L) :=
+    fun i tr => label_lookup tr i. 
+
+  Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
+  Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
+  
+  Global Instance trace_lookup: Lookup nat (St * option (L * St)) (trace St L) :=
+    fun i tr => trace_lookup_impl tr i.
 
   Lemma NOmega_trichotomy (x y: nat_omega):
     NOmega.lt x y \/ x = y \/ NOmega.lt y x. 
@@ -68,6 +90,9 @@ Section TraceLen.
 
   Instance nat_omega_eq_dec: EqDecision nat_omega.
   Proof using. solve_decision. Qed.
+
+  Local Ltac unfold_lookups :=
+    rewrite /lookup /state_lookup /label_lookup /trace_lookup /trace_lookup_impl.
 
   Lemma trace_lookup_trichotomy (tr: trace St L) (len: nat_omega)
     (LEN: trace_len_is tr len):
@@ -83,22 +108,22 @@ Section TraceLen.
          destruct len; simpl in *; try done.
          specialize (Ai ltac:(lia)). specialize (Ai' ltac:(lia)). 
          split; [| lia].
-         apply eq_None_not_Some in Ai. rewrite Ai in Ai'. 
-         rewrite /lookup /trace_lookup. by rewrite Ai. }
+         apply eq_None_not_Some in Ai. rewrite Ai in Ai'.
+         unfold_lookups. by rewrite Ai. }
     apply proj2 in Ai.
     specialize (Ai ltac:(lia_NO len)) as [ti Ai]. 
     rewrite Ai in Ai'. 
     destruct (decide (NOnum (i + 1) = len)) eqn:EQ'.
     { right. left. subst. simpl in *. clear EQ'.
       apply not_iff_compat, proj2 in Ai'. specialize (Ai' ltac:(lia)). 
-      apply eq_None_not_Some in Ai'. 
-      rewrite /lookup /trace_lookup. rewrite Ai. destruct ti; eauto. congruence. }
+      apply eq_None_not_Some in Ai'.
+      unfold_lookups. rewrite Ai. destruct ti; eauto. congruence. }
     assert (NOmega.lt_nat_l (i + 1) len) as LT'.
     { destruct len; try done; simpl in *.
       destruct (decide (i + 1 < n0)); auto. destruct n. f_equal. lia. }
     left.
-    apply proj2 in Ai'. specialize (Ai' LT'). destruct Ai' as [ti' Ai']. 
-    rewrite /lookup /trace_lookup. rewrite Ai. 
+    apply proj2 in Ai'. specialize (Ai' LT'). destruct Ai' as [ti' Ai'].
+    unfold_lookups. rewrite Ai. 
     destruct ti; simpl in *; eauto. congruence. 
   Qed. 
 
@@ -151,38 +176,12 @@ Section TraceLen.
         * intros [=]. lia. 
   Qed.
 
-  Definition state_lookup (tr: trace St L) (i: nat): option St := 
-    match tr !! i with
-    | Some (st, _) => Some st
-    | None => None
-    end. 
-    
-  Definition label_lookup (tr: trace St L) (i: nat): option L := 
-    match tr !! i with
-    | Some (_, Some (ℓ, _)) => Some ℓ
-    | _ => None
-    end.
-
-  Global Instance state_lookup_Lookup: 
-    Lookup nat St (trace St L).
-  intros i tr. exact (state_lookup tr i). 
-  Defined. 
-
-  Global Instance label_lookup_Lookup: 
-    Lookup nat L (trace St L).
-  intros i tr. exact (label_lookup tr i). 
-  Defined.
-
-  Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
-  Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
-
   Lemma state_label_lookup (tr: trace St L):
     forall i st st' ℓ, 
       tr !! i = Some (st, Some (ℓ, st')) <->
       (tr S!! i = Some st /\ tr S!! (i + 1) = Some st' /\ tr L!! i = Some ℓ).
   Proof using. 
-    intros. rewrite /state_lookup /label_lookup.
-    rewrite /lookup /trace_lookup. rewrite after_sum'.
+    intros. unfold_lookups. rewrite after_sum'.
     destruct (after i tr); simpl. 
     2: { split; [intros [=] | intros [[=] _]]. }
     destruct t; auto.
@@ -197,9 +196,9 @@ Section TraceLen.
     forall i, is_Some (tr S!! i) <-> NOmega.lt_nat_l i len.
   Proof using. 
     intros. etransitivity; [| apply trace_lookup_dom]; eauto.
-    rewrite /state_lookup. destruct (tr !! i) as [[x y] | ?]; try done.
-    (* TODO: why it's not solved automatically? *)
-    split; intros X; by destruct X. 
+    unfold_lookups. destruct (after i tr); try done.
+    2: { split; by intros []. }
+    by destruct t. 
   Qed. 
   
   Lemma label_lookup_dom (tr: trace St L) (len: nat_omega)
@@ -207,7 +206,8 @@ Section TraceLen.
     forall i, is_Some (tr L!! i) <-> NOmega.lt_nat_l (i + 1) len.
   Proof using. 
     intros. rewrite /label_lookup.
-    destruct (trace_lookup_trichotomy _ _ LEN i) as [LT | [EQ | GT]]. 
+    pose proof (trace_lookup_trichotomy _ _ LEN i) as X. rewrite /lookup /trace_lookup in X.
+    destruct X as [LT | [EQ | GT]].  
     - destruct LT as (?&?&?&LT&?). rewrite LT. done.
     - destruct EQ as (?&->&->). simpl. split; [by intros []| lia]. 
     - destruct GT as [-> ?].
@@ -236,13 +236,23 @@ Section TraceLen.
       pred_at tr i P <-> exists st, tr S!! i = Some st /\ P st (tr L!! i). 
   Proof using.
     destruct (trace_has_len tr) as [len LEN].
-    rewrite /state_lookup /label_lookup /lookup /trace_lookup.
+    rewrite /state_lookup /label_lookup /trace_lookup_impl.
     rewrite /pred_at. destruct (after i tr) eqn:Ai.
     2: { split; intros; try done. by destruct H as [? [[=] ?]]. }
     destruct t; split; intros; eauto; destruct H as [? [[=] ?]]; congruence.
   Qed. 
 
+  Lemma inf_trace_lookup (tr: trace St L)
+    (INF: trace_len_is tr NOinfinity):
+    forall i, exists c1 ℓ c2, tr !! i = Some (c1, Some (ℓ, c2)).
+  Proof. 
+    intros. eapply trace_lookup_dom_strong; done.
+  Qed. 
 
+  Lemma trace_lookup_cons s l (tr: trace St L) i:
+    (s -[ l ]-> tr) !! S i = tr !! i.
+  Proof. done. Qed. 
+    
 End TraceLen.
 
 Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
