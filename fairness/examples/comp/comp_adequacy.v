@@ -266,6 +266,70 @@ Section Subtrace.
     - lia_NO' fin; lia_NO len.
   Qed.    
 
+  Lemma subtrace_eq_after (tr atr: trace St L) len start fin
+    (LEN: trace_len_is tr len)
+    (* (start: nat) *)
+    (* (AFTER : after start tr = Some atr) *)
+    (* (d : nat_omega) *)
+    (* (n : d ≠ NOnum 0): *)
+    (* forall k, NOmega.lt_nat_l k d -> trace_prefix_inf atr d !! k = atr !! k.  *)
+    (LE: le' len fin):
+    subtrace tr start fin = after start tr.
+  Proof.
+    
+
+
+  Lemma trace_prefix_inf_lookup_after (tr atr : trace St L)
+    (start : nat)
+    (AFTER : after start tr = Some atr)
+    (d : nat_omega)
+    (n : d ≠ NOnum 0):
+    forall k, NOmega.lt_nat_l k d -> trace_prefix_inf atr d !! k = atr !! k. 
+  Proof.
+    pose proof (trace_has_len atr) as [len LEN].
+    destruct (decide 
+    destruct d. 
+    { admit. }
+    (* gd tr. *)
+    gd atr. gd start. gd k. induction n0.
+    { intros. done. }
+
+    
+    intros. destruct k.
+    { simpl.
+      rewrite (trace_unfold_fold (trace_prefix_inf atr (NOnum (S n0)))).
+      destruct atr; simpl.  
+
+    
+      rewrite (trace_unfold_fold (trace_prefix_inf atr (NOnum (S n0)))).
+    destruct atr. 
+ 
+    
+
+
+  Lemma subtrace_lookup_after (tr: trace St L) str atr
+    (start: nat) (fin: nat_omega)
+    (SUB: subtrace tr start fin = Some str)
+    (AFTER: after start tr = Some atr):
+    forall k, str !! k = atr !! k. 
+  Proof. 
+    intros. rewrite /subtrace in SUB. rewrite AFTER in SUB.
+    destruct decide; [done| ].
+    inversion SUB. subst. clear SUB. 
+
+    remember (NOmega.sub fin (NOnum start)) as d. clear Heqd fin. 
+    
+    clegd atr. gd res. 
+    
+    
+
+  Lemma subtrace_lookup (tr: trace St L) str
+    (start: nat) (fin: nat_omega)
+    (SUB: subtrace tr start fin = Some str):
+    forall k res, str !! k = Some res <-> tr !! (start + k) = Some res.
+  Proof. 
+    intros. 
+
   Definition trace_append (tr1 tr2: trace St L): trace St L.
   Admitted.
 
@@ -320,6 +384,39 @@ Section Subtrace.
         lia_NO' len. inversion NEXT. lia.
       + lia_NO len. 
   Admitted. 
+
+  (* TODO: move*)
+  Global Instance no_lt_nat_l_dec: forall x y, Decision (NOmega.lt_nat_l x y).
+  Proof. 
+    intros. destruct y.
+    + by left.
+    + simpl. solve_decision.
+  Qed. 
+
+  Lemma trace_prop_split' (tr: trace St L) (P: (St * option (L * St)) -> Prop)
+                          (from: nat) len 
+    (DECP: forall res, Decision (P res))
+    (LEN: trace_len_is tr len)
+    : 
+    exists (l: nat_omega), 
+    (forall i res (GE: from <= i) (LT: NOmega.lt (NOnum i) l) (RES: tr !! i = Some res), P res) /\
+    (forall j res (NEXT: l = NOnum j) (RES: tr !! j = Some res), ¬ P res) /\
+    le' l len.
+  Proof.
+    destruct (decide (NOmega.lt_nat_l from len)) as [LT | GE]. 
+    2: { lia_NO' len. exists (NOnum n). repeat split.
+         - lia.
+         - intros. inversion NEXT. subst.
+           forward eapply trace_lookup_dom with (i := j) as [C _]; eauto.
+           specialize (C (@ex_intro _ _ _ RES)). simpl in *. lia.
+         - simpl. lia. }
+    forward eapply subtrace_len as (str & SUB & LEN'); eauto.
+    { lia_NO len. }
+
+    forward eapply (trace_prop_split str) as (lim' & PROP & NPROP & LIM'); eauto.
+    exists (NOmega.add lim' (NOnum from)). repeat split.
+    - intros. apply Nat.le_sum in GE as [d ->]. 
+    
 
 End Subtrace.
 
@@ -499,7 +596,8 @@ Proof.
   { solve_decision. }
   { eapply trace_len_after; eauto. }
   
-  
+  (* set (str_lib := subtrace *)
+  pose proof (subtrace_len _ _ m1
 
     specialize (LEN m1). rewrite TR' in LEN.
        lia_NO' len; intuition; try discriminate. 
