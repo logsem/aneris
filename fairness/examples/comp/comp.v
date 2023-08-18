@@ -137,7 +137,13 @@ Section ClientDefs.
         fmtrans := client_trans;
         live_roles := client_lr;
     |}).
-    intros. eapply client_lr_spec; eauto. 
+    (* TODO: why it's not solved automatically? *)
+    - rewrite /client_state.
+      red. intros [??] [??].
+      destruct (fmstate_eqdec lib_fair l l0), (decide (n = n0)); subst. 
+      { left. done. }
+      all: right; congruence. 
+    - intros. eapply client_lr_spec; eauto. 
   Defined.
 
   Definition client_fl := 10. 

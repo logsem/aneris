@@ -14,19 +14,34 @@ From trillium.fairness Require Import fairness_finiteness actual_resources_inter
 
 Import derived_laws_later.bi.
 
+From trillium.fairness Require Import lm_fairness_preservation.
 From trillium.fairness Require Import fuel_ext. 
 From trillium.fairness.examples.comp Require Import comp.
 From trillium.fairness Require Import fair_termination_natural.
-From trillium.fairness.examples.comp Require Import my_omega  lemmas trace_len trace_helpers. 
+From trillium.fairness.examples.comp Require Import lm_fair my_omega  lemmas trace_len trace_helpers. 
 
 Close Scope Z_scope. 
+
+Local Ltac gd t := generalize dependent t.
 
 Instance client_trans'_PI s x: 
   ProofIrrel ((let '(s', ℓ) := x in 
                fmtrans client_model_impl s ℓ s' \/ (s' = s /\ ℓ = None)): Prop).
 Proof. apply make_proof_irrel. Qed.    
+
+Local Instance step'_eqdec: forall s1, EqDecision
+                  {'(s2, ℓ) : client_model_impl *
+                              option (fmrole client_model_impl) | 
+                  fmtrans client_model_impl s1 ℓ s2 ∨ 
+                  s2 = s1 ∧ ℓ = None}.
+  (* TODO: why it stopped being inferred automatically? *)
+  pose proof (fmstate_eqdec client_model_impl).
+  solve_decision. 
+Qed.
   
-Lemma spinlock_model_finitary (s1 : client_model_impl):
+  
+
+Lemma spinlock_model_finitary (s1 : fmstate client_model_impl):
     Finite
       {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 
       fmtrans client_model_impl s1 ℓ s2 ∨ s2 = s1 ∧ ℓ = None}. 
@@ -70,8 +85,186 @@ Defined.
 Section Subtrace.
   Context {St L: Type}.
 
-  Definition subtrace (tr_sub tr: trace St L) (start: nat) (fin: nat_omega): Prop.
-  Admitted. 
+  (* TODO: move *)
+  Lemma trace_len_cons s l (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    trace_len_is (s -[l]-> tr) (NOmega.succ len).
+  Proof. 
+    unfold trace_len_is in *. intros.
+    destruct i.
+    { simpl. lia_NO' len. simpl. intuition. lia. }
+    simpl. rewrite LEN. lia_NO len.
+  Qed.
+  
+  (* TODO: move *)
+  Lemma trace_len_uniq (tr: trace St L) (len1 len2: nat_omega)
+    (LEN1: trace_len_is tr len1) (LEN2: trace_len_is tr len2):
+    len1 = len2. 
+  Proof. 
+    unfold trace_len_is in *.
+    destruct (NOmega_trichotomy len1 len2) as [?|[?|?]]; auto.
+    - destruct len1; [done| ].
+      pose proof (proj2 (LEN2 n)) as L2. specialize (L2 ltac:(lia_NO len2)).
+      specialize (proj1 (LEN1 _) L2). simpl. lia.
+    - destruct len2; [done| ].
+      pose proof (proj2 (LEN1 n)) as L1. specialize (L1 ltac:(lia_NO len1)).
+      specialize (proj1 (LEN2 _) L1). simpl. lia.
+  Qed. 
+  
+  Lemma trace_len_tail s l (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is (s -[l]-> tr) len):
+    trace_len_is tr (NOmega.pred len).
+  Proof.
+    pose proof (trace_has_len tr) as [len' LEN'].
+    pose proof (trace_len_cons s l _ _ LEN').
+    forward eapply (trace_len_uniq _ _ _ LEN H) as ->; eauto.
+    lia_NO' len'. 
+  Qed.
+  
+  (* TODO: move*)
+  Lemma trace_state_lookup_simpl (tr: trace St L) i s' step s
+    (TLi: tr !! i = Some (s', step))
+    (SLi: tr S!! i = Some s):
+    s' = s.
+  Proof.
+    rewrite /state_lookup in SLi. rewrite /lookup /trace_lookup in TLi.
+    destruct (after i tr); [destruct t| ]; congruence.
+  Qed. 
+
+
+(* TODO: move to my_omega *)
+  Definition le' n m :=
+    match n, m with
+    | _, NOinfinity => True
+    | NOnum n, NOnum m => n <= m
+    | _, _ => False
+  end.
+
+  CoFixpoint trace_prefix_inf (tr: trace St L) (max_len: nat_omega): trace St L :=
+    match tr, max_len with
+    | tr, NOnum 0 => ⟨ trfirst tr ⟩ (* shouldn't be reached if max_len > 0*)
+    | tr, NOnum 1 => ⟨ trfirst tr ⟩ (* actual base case *)
+    | ⟨ s ⟩, _ => ⟨ s ⟩
+    | s -[ l ]-> tr', ml => s -[l]-> (trace_prefix_inf tr' (NOmega.pred ml))
+    end. 
+
+
+  (* TODO: move *)
+  Global Instance nomega_eqdec: EqDecision nat_omega.
+  Proof. solve_decision. Qed. 
+
+  Definition subtrace (tr: trace St L) (start: nat) (fin: nat_omega): option (trace St L) :=
+    match (after start tr) with
+    | None => None
+    | Some tr => let max_len := NOmega.sub fin (NOnum start) in
+                if (decide (max_len = NOnum 0))
+                then None
+                else Some (trace_prefix_inf tr max_len)
+    end.
+
+  Lemma trace_prefix_len1 (tr: trace St L):
+    trace_prefix_inf tr (NOnum 1) = ⟨ trfirst tr ⟩.
+  Proof. 
+    rewrite (trace_unfold_fold (trace_prefix_inf tr (NOnum 1))).
+    destruct tr; done. 
+  Qed. 
+
+  (* TODO: move*)
+  (* useful for rewriting in equivalences *)
+  Lemma is_Some_Some_True {A: Type} (a: A):
+    is_Some (Some a) <-> True.
+  Proof. done. Qed. 
+
+  (* TODO: move*)
+  (* useful for rewriting in equivalences *)
+  Lemma is_Some_None_False {A: Type}:
+    is_Some (None: option A) <-> False.
+  Proof.
+    split; [| done]. by intros []. 
+  Qed. 
+
+  (* TODO: move*)
+  Lemma trace_len_singleton (s: St):
+    trace_len_is ⟨ s ⟩ (NOnum 1) (L := L).
+  Proof. 
+    red. intros. destruct i; simpl.
+    - rewrite is_Some_Some_True. lia.
+    - rewrite is_Some_None_False. lia.
+  Qed. 
+
+  (* TODO: move*)
+  Lemma trace_len_after (tr tr': trace St L) i
+    (len: nat_omega)
+    (LEN: trace_len_is tr len)
+    (AFTER: after i tr = Some tr'):
+    trace_len_is tr' (NOmega.sub len (NOnum i)).
+  Proof.
+    gd tr. gd tr'. gd len. induction i.
+    { intros. simpl in AFTER. 
+      rewrite NOmega.sub_0_r. inversion AFTER. by subst. }
+    intros. destruct tr; [done| ].
+    simpl in AFTER.
+    pose proof (trace_len_tail _ _ _ _ LEN).
+    specialize (IHi _ _ _ H AFTER).
+    lia_NO' len. simpl in *.
+    by replace (n - S i) with (Nat.pred n - i) by lia.
+  Qed. 
+
+  Lemma trace_prefix_inf_len (tr: trace St L) (len max_len: nat_omega)
+    (GT0: max_len ≠ NOnum 0)
+    (LEN: trace_len_is tr len)
+    (LE: le' max_len len)
+    :
+    trace_len_is (trace_prefix_inf tr max_len) max_len.
+  Proof. 
+    destruct max_len.
+    { lia_NO' len.
+      red. simpl. clear -LEN.
+      intros i. gd tr. induction i.
+      { simpl. done. }
+      intros.
+      rewrite (trace_unfold_fold (trace_prefix_inf tr NOinfinity)).
+      destruct tr.
+      { done. }
+      specialize (IHi tr). specialize_full IHi.
+      { apply trace_len_tail in LEN. eauto. }
+      done. }      
+    gd tr. gd len. induction n.
+    { intros. done. }
+    intros. 
+    destruct n. 
+    { rewrite trace_prefix_len1. apply trace_len_singleton. }
+    rewrite (trace_unfold_fold (trace_prefix_inf tr (NOnum (S (S n))))). 
+    destruct tr. 
+    { pose proof (trace_len_singleton s) as LEN'.
+      pose proof (trace_len_uniq _ _ _ LEN LEN').
+      subst. simpl in *. lia. }
+    specialize (IHn ltac:(done) (NOmega.pred len)).
+    specialize (IHn ltac:(lia_NO len)). specialize_full IHn.
+    { eapply trace_len_tail; eauto. }
+    apply (trace_len_cons s ℓ) in IHn. done.
+  Qed. 
+
+
+  Lemma subtrace_len (tr: trace St L) (len: nat_omega)
+    (start: nat) (fin: nat_omega)
+    (LEN: trace_len_is tr len)
+    (LE: NOmega.lt_nat_l start fin)
+    (BOUND: le' fin len):
+    exists str, subtrace tr start fin = Some str /\
+           trace_len_is str (NOmega.sub fin (NOnum start)).
+  Proof. 
+    rewrite /subtrace.
+    forward eapply (proj2 (LEN start)) as [atr SUF]. 
+    { lia_NO' len; lia_NO' fin. }
+    rewrite SUF.
+    destruct decide. 
+    { lia_NO' fin. inversion e. lia. }
+    eexists. split; eauto.
+    eapply trace_prefix_inf_len; eauto.
+    - eapply trace_len_after; eauto.
+    - lia_NO' fin; lia_NO len.
+  Qed.    
 
   Definition trace_append (tr1 tr2: trace St L): trace St L.
   Admitted.
@@ -83,14 +276,6 @@ Section Subtrace.
     (FIN1: terminating_trace tr1) (FIN2: terminating_trace tr2):
     terminating_trace (trace_append tr1 tr2). 
   Proof. Admitted.
-
-(* TODO: move to my_omega *)
-Definition le' n m :=
-  match n, m with
-  | _, NOinfinity => True
-  | NOnum n, NOnum m => n <= m
-  | _, _ => False
-  end.
 
   (* TODO: move *)
   Require Import Coq.Logic.Classical.
@@ -163,58 +348,6 @@ Proof.
 Qed. 
 
 
-Local Ltac gd t := generalize dependent t.
-
-(* TODO: move *)
-Lemma trace_len_cons s l (tr: mtrace client_model_impl) (len: nat_omega)
-  (LEN: trace_len_is tr len):
-  trace_len_is (s -[l]-> tr) (NOmega.succ len).
-Proof. 
-  unfold trace_len_is in *. intros.
-  destruct i.
-  { simpl. lia_NO' len. simpl. intuition. lia. }
-  simpl. rewrite LEN. lia_NO len.
-Qed.
-
-(* TODO: move *)
-Lemma trace_len_uniq (tr: mtrace client_model_impl) (len1 len2: nat_omega)
-  (LEN1: trace_len_is tr len1) (LEN2: trace_len_is tr len2):
-  len1 = len2. 
-Proof. 
-  unfold trace_len_is in *.
-  destruct (NOmega_trichotomy len1 len2) as [?|[?|?]]; auto.
-  - destruct len1; [done| ].
-    pose proof (proj2 (LEN2 n)) as L2. specialize (L2 ltac:(lia_NO len2)).
-    specialize (proj1 (LEN1 _) L2). simpl. lia.
-  - destruct len2; [done| ].
-    pose proof (proj2 (LEN1 n)) as L1. specialize (L1 ltac:(lia_NO len1)).
-    specialize (proj1 (LEN2 _) L1). simpl. lia.
-Qed. 
-
-Lemma trace_len_tail s l (tr: mtrace client_model_impl) (len: nat_omega)
-  (LEN: trace_len_is (s -[l]-> tr) len):
-  trace_len_is tr (NOmega.pred len).
-Proof.
-  pose proof (trace_has_len tr) as [len' LEN'].
-  pose proof (trace_len_cons s l _ _ LEN').
-  forward eapply (trace_len_uniq _ _ _ LEN H) as ->; eauto.
-  lia_NO' len'. 
-Qed.
-
-(* TODO: move *)
-Global Instance nomega_eqdec: EqDecision nat_omega.
-Proof. solve_decision. Qed. 
-
-(* TODO: move*)
-Lemma trace_state_lookup_simpl (tr: mtrace client_model_impl) i s' step s
-  (TLi: tr !! i = Some (s', step))
-  (SLi: tr S!! i = Some s):
-  s' = s.
-Proof.
-  rewrite /state_lookup in SLi. rewrite /lookup /trace_lookup in TLi.
-  destruct (after i tr); [destruct t| ]; congruence.
-Qed. 
-
 (* TODO: move*)  
 Lemma state_lookup_cons s l (tr: mtrace client_model_impl) i:
   (s -[ l ]-> tr) S!! S i = tr S!! i.
@@ -286,22 +419,65 @@ Proof.
 Qed.      
 
 
-Lemma trace_len_after (tr tr': mtrace client_model_impl) i
-  (len: nat_omega)
-  (LEN: trace_len_is tr len)
-  (AFTER: after i tr = Some tr'):
-  trace_len_is tr' (NOmega.sub len (NOnum i)).
+(* Definition is_lib_step_alt (step: client_state * option (option client_role * client_state)): Prop. *)
+(*   := snd step *)
+
+(* TODO: unify with other decision lemmas about client model *)
+Instance client_trans_dec: forall c1 oρ c2, 
+    Decision (client_trans c1 oρ c2).
+Proof. Admitted. 
+  
+
+
+CoFixpoint project_lib_trace (tr: mtrace client_model_impl):
+  auxtrace (LM := lib_model). 
+destruct tr.
+{ exact ⟨ fst s ⟩. }
+(* cases not corresponding to library role
+   should be ruled out during actual construction *)
+destruct ℓ.
+2: { exact ⟨ fst s ⟩. }
+destruct f.
+2: { exact ⟨ fst s ⟩. }
+set (fls := allowed_step_FLs (fst s) f (fst $ trfirst tr) (LM := lib_model)).
+destruct (decide (fls = ∅)).
+{ exact ⟨ fst s ⟩. }
+assert (elements fls ≠ []).
+{ intros ?%elements_empty_inv. set_solver. }
+destruct (elements fls) eqn:ELS; [done| ]. 
+exact ((fst s) -[f0]-> (project_lib_trace tr)).
+Defined. 
+
+Definition is_end_state (step: client_state * option (option client_role * client_state)) :=
+  exists st, step = (st, None). 
+
+Lemma lib_trace_construction (tr: mtrace client_model_impl)
+  (VALID: mtrace_valid tr)
+  (LIB_STEPS: ∀ i res, tr !! i = Some res → is_lib_step res \/ is_end_state res):
+    lm_model_traces_match
+      (inl: lib_grole -> fmrole client_model_impl)
+      (fun c δ_lib => fst c = δ_lib)
+      tr
+      (project_lib_trace tr).
 Proof.
-  gd tr. gd tr'. gd len. induction i.
-  { intros. simpl in AFTER. 
-    rewrite NOmega.sub_0_r. inversion AFTER. by subst. }
-  intros. destruct tr; [done| ].
-  simpl in AFTER.
-  pose proof (trace_len_tail _ _ _ _ LEN).
-  specialize (IHi _ _ _ H AFTER).
-  lia_NO' len. simpl in *.
-  by replace (n - S i) with (Nat.pred n - i) by lia.
-Qed. 
+  gd tr. cofix IH.
+  intros. 
+  rewrite (trace_unfold_fold (project_lib_trace tr)).
+  rewrite /project_lib_trace.
+  destruct tr.
+  { econstructor. done. }
+  do 2 red.
+  pose proof (LIB_STEPS 0 (s, Some (ℓ, (trfirst tr))) eq_refl) as STEP0.
+  destruct STEP0 as [STEP0 | STEP0].
+  2: { destruct STEP0. done. }
+  destruct STEP0 as (?&?&?&[=]&[ρlg <-]). subst. simpl in *. 
+  destruct decide.
+  { forward eapply (mtrace_valid_steps' VALID 0) as TRANS0; [eauto| ]. 
+    inversion TRANS0; subst. 
+    eapply locale_trans_alt in LIB_STEP.
+    by rewrite -H2 in e. }
+Admitted. 
+
 
 Lemma client_model_fair_term:
   ∀ tr: mtrace client_model_impl, mtrace_fairly_terminating tr.
