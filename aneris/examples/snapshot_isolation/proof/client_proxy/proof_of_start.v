@@ -116,8 +116,7 @@ Section Start_Proof.
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????) "(#Hcc2 & #Hct & Hst')".
         destruct sp; simplify_eq /=.
-        iDestruct (client_connected_agree γGsnap γT
-                  with "[$Hcc1][$Hcc2]") as "%Heq2".
+        iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
         iFrame. iApply "Hclose".
         iFrame "#∗".
