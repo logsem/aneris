@@ -67,9 +67,9 @@ Section Client_Proxy_Proof.
     iDestruct "Hcc" as (γCst) "(#Hcc & Hp)".
     wp_apply (newlock_spec
                 (KVS_InvName.@socket_address_to_str sa) _
-                (is_connected_def γGsnap γT (ip_of_address sa) reqh l PSCanStart (InjLV #()) γS γA γCache)
+                (is_connected_def γGsnap γT (ip_of_address sa) reqh l γS γA γCache)
                with "[Hreq Hl HCache Hs]").
-    - iFrame. iLeft. by iFrame.
+    - iExists _, _. iFrame. iLeft. by iFrame.
     - iIntros (lk γ) "#Hlk".
       iMod (own_update _ _ (Cinr (to_agree (γA, γS, γ, γCache))) with "Hp") as "#Hdefined".
       {  intros n [f |]; simpl; eauto.
@@ -78,7 +78,6 @@ Section Client_Proxy_Proof.
       iApply "HΦ".
       iAssert (is_connected γGsnap γT γKnownClients (#sa, (lk, (reqh, #l))) sa) as "#Hic".
       iExists _, _, _, _, _, _, _, _.
-      iExists _, _.
       by iFrame "#∗".
       rewrite /ConnectionState_def /connection_state.
       iSplit; last done.

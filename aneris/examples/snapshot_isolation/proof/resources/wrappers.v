@@ -24,7 +24,6 @@ Section Wrapper_defs.
   Context `{!User_params}.
   Context (clients : gset socket_address).
   Context (γKnownClients γGauth γGsnap γT : gname).
-  Context (srv_si : message → iProp Σ) (SrvInit : iProp Σ).
 
   Definition to_hist (h : list write_event) : list val := (λ e, e.(we_val)) <$> h.
 
@@ -64,5 +63,12 @@ Section Wrapper_defs.
 
   Definition client_can_connect_res sa : iProp Σ :=
     client_can_connect γKnownClients sa.
+
+  Lemma mem_key_map_we_exists m :
+    ([∗ map] k↦hv ∈ m, OwnMemKey_def k hv) -∗
+    ∃ M, ([∗ map] k↦h ∈ M, ownMemUser γGauth γGsnap k h) ∗
+         ⌜m = (λ h, to_hist h)<$>M⌝.
+  Proof. Admitted.
+
 
 End Wrapper_defs.

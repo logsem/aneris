@@ -60,11 +60,11 @@ Section Start_Proof.
     iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
     rewrite /SI_start /= /start.
     wp_pures.
-    iDestruct "Hlk" as (lk cst l sv s γCst γlk γS γA γCache) "(-> & Hcc1 & Hlk)".
+    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache) "(-> & Hcc1 & Hlk)".
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
-    iDestruct "HisC" as "(Hl & Hcr & Hdisj)".
+    iDestruct "HisC" as (s sv) "(Hl & Hcr & Hdisj)".
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
@@ -83,8 +83,8 @@ Section Start_Proof.
        by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
     iDestruct "Hst" as (-> ->) "(Hgh & Hst)".
     wp_pures.
-    wp_apply ("Hspec" with "[$Hcr Hsh]").
-    instantiate (1 := inr (inl (E, ⌜True⌝%I, (λ _, True)%I))).
+    wp_apply ("Hspec" with "[$Hcr Hsh Hst]").
+    instantiate (1 := inr (inl (E, ⌜True⌝%I, (λ _, isActiveToken γA ∗ Φ #())%I))).
     { iSplit.
       - iPureIntro.
         simplify_eq /=.
@@ -106,8 +106,22 @@ Section Start_Proof.
         iSplit; first done.
         iSplit; first done.
         iIntros "_".
-        iMod "Hsh" as (m) "[dfd Hclose]".
+        iMod "Hsh" as (m) "[(Hst' & Hpts) Hclose]".
         iModIntro.
+        iDestruct (mem_key_map_we_exists clients γKnownClients γGauth γGsnap γT
+                    with "[$Hpts]") as (M) "(Hpts & %Heq)".
+        iExists M.
+        iFrame.
+        iNext.
+        iIntros.
+        iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
+        iDestruct "Hst'" as (???????) "(#Hcc2 & #Hct & Hst')".
+        destruct sp; simplify_eq /=.
+        iDestruct (client_connected_agree γGsnap γT
+                  with "[$Hcc1][$Hcc2]") as "%Heq2".
+        simplify_eq /=.
+        iFrame. iApply "Hclose".
+        iFrame "#∗".
         admit. }
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
@@ -117,7 +131,21 @@ Section Start_Proof.
     iDestruct "Hpost" as (? ? ? ? Heq1 Heq2 Heq3) "Hpost".
     simplify_eq /=.
     wp_pures.
-    admit.
+    wp_apply (@wp_map_empty  _ _ _ _ _ _ _ _ _ with "[//]").
+    iIntros (mv Hmv).
+    wp_alloc cm as "Hc".
+    wp_pures.
+    wp_store.
+    iDestruct "Hpost" as "(Htk & Hpost)".
+    wp_apply (release_spec with "[$Hlkd $Hlk Htk Hl Hcr Hc]").
+    { iExists (PSActive _), _.
+      iFrame.
+      iRight.
+      iExists _, _, _, _, _, _.
+      iFrame "#∗".
+      iSplit; first done.
+      admit. }
+    by iIntros (? ->).
   Admitted.
 
 End Start_Proof.

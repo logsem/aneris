@@ -161,8 +161,9 @@ Section Proxy.
   Qed.
 
   Definition is_connected_def
-             (n : ip_address) (cst : val) (l : loc) (s : proxy_state) (sv : val)
+             (n : ip_address) (cst : val) (l : loc)
     (γS γA γCache : gname) : iProp Σ :=
+    ∃ (s : proxy_state) (sv : val),
       l ↦[n] sv ∗
       MTSCanRequest n cst ∗
       (
@@ -201,13 +202,12 @@ Section Proxy.
 
   Definition is_connected (c : val) (sa : socket_address)
     : iProp Σ :=
-    ∃ (lk : val) (cst : val) (l : loc) (sv : val)
-      (s : proxy_state)
+    ∃ (lk : val) (cst : val) (l : loc)
       (γCst γlk γS γA γCache : gname),
       ⌜c = (#sa, (lk, (cst, #l)))%V⌝ ∗
       client_connected sa γCst γA γS γlk γCache ∗
       is_lock (KVS_InvName .@ (socket_address_to_str sa)) (ip_of_address sa) γlk lk
-              (is_connected_def (ip_of_address sa) cst l s sv γS γA γCache).
+              (is_connected_def (ip_of_address sa) cst l γS γA γCache).
 
   Lemma connection_state_gen_persistent c sa : Persistent (is_connected c sa).
   Proof. apply _. Qed.
