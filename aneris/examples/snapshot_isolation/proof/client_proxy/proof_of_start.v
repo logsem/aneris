@@ -77,13 +77,23 @@ Section Start_Proof.
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & #Habs2 & Hsp)".
       destruct sp; simplify_eq /=.
-       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
-       simplify_eq /=.
-       by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
+      iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
+      simplify_eq /=.
+      by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
     iDestruct "Hst" as (-> ->) "(Hgh & Hst)".
     wp_pures.
-    wp_apply ("Hspec" with "[$Hcr Hsh Hst]").
-    instantiate (1 := inr (inl (E, ⌜True⌝%I, (λ _, isActiveToken γA ∗ Φ #())%I))).
+    set (rd := (inr (inl (E, ⌜True⌝%I,
+                           (λ tsv,
+                        ∃ ts Msnap cacheM,
+                        isActiveToken γA ∗
+                        ghost_map.ghost_map_auth γCache 1 cacheM ∗
+                        ownTimeSnap γT ts ∗
+                        ⌜tsv = #ts⌝ ∗
+                        ⌜is_coherent_cache ∅ cacheM Msnap⌝ ∗
+                        ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+                        ([∗ map] k↦h ∈ Msnap, ownMemSeen γGsnap k h) ∗
+                        Φ #())%I))) : @ReqData Σ).
+    wp_apply ("Hspec" $! _ _ _ rd with "[$Hcr Hsh Hst Hgh]").
     { iSplit.
       - iPureIntro.
         simplify_eq /=.
@@ -112,15 +122,24 @@ Section Start_Proof.
         iExists M.
         iFrame.
         iNext.
-        iIntros.
+        iIntros (ts) "(Hts & Hpts)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????) "(#Hcc2 & #Hct & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
-        iFrame. iApply "Hclose".
-        iFrame "#∗".
+        iExists ts, M.
+        iFrame.
+        iExists _.
+        iFrame.
         admit. }
+      (*  iApply "Hclose".
+        iSplitL "Hst".
+        { iExists (PSActive M).
+          iSplit; last done.
+          iExists _, _, _, _, _, _.
+          eauto with iFrame. }
+        admit. } *)
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
       first by iDestruct "Habs" as (? ? ? ? ?) "Habs".
@@ -129,20 +148,22 @@ Section Start_Proof.
     iDestruct "Hpost" as (? ? ? ? Heq1 Heq2 Heq3) "Hpost".
     simplify_eq /=.
     wp_pures.
-    wp_apply (@wp_map_empty  _ _ _ _ _ _ _ _ _ with "[//]").
+    wp_apply (@wp_map_empty Mdl Σ _ Key _ _ _ val _ with "[//]").
     iIntros (mv Hmv).
     wp_alloc cm as "Hc".
     wp_pures.
     wp_store.
-    iDestruct "Hpost" as "(Htk & Hpost)".
-    wp_apply (release_spec with "[$Hlkd $Hlk Htk Hl Hcr Hc]").
-    { iExists (PSActive _), _.
-      iFrame.
+    iDestruct "Hpost"
+      as (t Msnap ?) "(Htk & Hgh & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
+    wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc]").
+    {
+      iExists (PSActive Msnap), (InjRV (#t, #cm))%V.
+      iFrame "Hl Hcr".
       iRight.
-      iExists _, _, _, _, _, _.
+      iExists _, _, _, _, ∅, _.
       iFrame "#∗".
-      iSplit; first done.
-      admit. }
+      iPureIntro.
+      split_and!; try done. }
     by iIntros (? ->).
   Admitted.
 
