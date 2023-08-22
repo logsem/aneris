@@ -52,7 +52,7 @@ Section Write_Proof.
      ⊢ write_spec_internal.
   Proof.
     iIntros (c sa vo k v b Hk Φ) "!# (#Hisc & Hcache & Hkds) Hpost".
-    iDestruct "Hisc" as (lk cst l sv s) "Hisc".
+    iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache ->) "#(Hc1 & Hisc)".
     rewrite /SI_write /= /write.
     wp_pures.
@@ -60,7 +60,7 @@ Section Write_Proof.
                with "[$Hisc]").
     iIntros (uu) "(_ & Hlk & Hres)".
     iDestruct "Hres"
-      as "(Hl & Hcr & [( -> & -> & Hres_abs & Htk) | Hres])".
+      as (? ?) "(Hl & Hcr & [( -> & -> & Hres_abs & Htk) | Hres])".
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
@@ -98,7 +98,8 @@ Section Write_Proof.
            with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
     wp_apply (release_spec with
                "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [H1 H2 Hpost]").
-    { iFrame "#∗".
+    { iExists _, _.
+      iFrame "#∗".
       iRight.
       iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
