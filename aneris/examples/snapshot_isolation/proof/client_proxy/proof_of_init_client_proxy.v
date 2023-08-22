@@ -83,7 +83,7 @@ Section Client_Proxy_Proof.
       rewrite /ConnectionState_def /connection_state.
       iSplit; last done.
       iExists PSCanStart; iSplit; last done.
-      iExists sa, (lk, (reqh, #l))%V, γCst, γA, γS, γ, γCache.
+      iExists (lk, (reqh, #l))%V, γCst, γA, γS, γ, γCache.
       by iFrame "#∗".
   Qed.
 
