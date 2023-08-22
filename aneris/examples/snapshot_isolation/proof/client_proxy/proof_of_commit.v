@@ -39,6 +39,8 @@ Section Commit_Proof.
    ∀ (c : val) (sa : socket_address)
      (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
+    is_connected γGsnap γT γKnownClients c sa -∗
+    @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
          ConnectionState_def γKnownClients γGsnap γT c sa (Active ms) ∗

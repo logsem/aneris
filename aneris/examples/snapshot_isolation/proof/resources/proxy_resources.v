@@ -135,7 +135,7 @@ Section Proxy.
       make the use of the library inconsistent because one should not
       run start and commit in parallel, only reads and/or writes. *)
  Definition connection_state (c : val) (sa : socket_address) (s : proxy_state) : iProp Σ :=
-   ∃ (sa : socket_address) (v : val) (γCst γA γS γlk γCache : gnameO),
+   ∃ (v : val) (γCst γA γS γlk γCache : gnameO),
      ⌜c = (#sa, v)%V⌝ ∗
      client_connected sa γCst γA γS γlk γCache ∗
      is_connected c sa ∗
