@@ -61,7 +61,7 @@ Section Proxy.
           Msnap !! k = Some h ∧
           hist_to_we h = Some e ∧
           e.(we_val) = v) ∧
-      (∀ k (v : val),
+      (∀ k,
          (cache_logicalM !! k) = Some (None, false) → Msnap !! k = Some []) ∧
       (** Cache Logical and Cache Updates Coherence *)
       (∀ k v,
@@ -76,7 +76,89 @@ Section Proxy.
     is_coherent_cache cuM cM Msnap →
     is_coherent_cache (<[k:=v]> cuM) (<[k:=(Some v, true)]> cM) Msnap.
   Proof.
-  Admitted.
+    intros H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 H_coh_6]]]]].
+    unfold is_coherent_cache.
+    split.
+    - rewrite -H_coh_1.
+      by apply dom_insert_lookup_L.
+    - split.
+      + set_solver.
+      + split.
+        * intros k' v' H_lookup.
+          destruct (decide (k = k')) as [<- | H_neq].
+          {
+            by rewrite lookup_insert in H_lookup.
+          }
+          {
+            apply H_coh_3.
+            apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq. 
+            by rewrite H_neq in H_lookup. 
+          } 
+        * split.
+          -- intros k' H_lookup.
+            destruct (decide (k = k')) as [<- | H_neq].
+            {
+              by rewrite lookup_insert in H_lookup.
+            }
+            {
+              apply H_coh_4. 
+              apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
+              by rewrite H_neq in H_lookup.  
+            } 
+          -- split.
+            ++ intros k' v'.
+              split; intro H_lookup.
+                ** destruct (decide (k = k')) as [<- | H_neq].
+                {
+                  rewrite lookup_insert in H_lookup.
+                  rewrite lookup_insert. 
+                  by rewrite H_lookup.
+                } 
+                {
+                  apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
+                  rewrite H_neq' in H_lookup.
+                  apply H_coh_5 in H_lookup. 
+                  rewrite -H_lookup.
+                  by apply lookup_insert_ne.
+                }
+                ** destruct (decide (k = k')) as [<- | H_neq].
+                {
+                  rewrite lookup_insert in H_lookup.
+                  rewrite lookup_insert.  
+                  set_solver.
+                }
+                {
+                  apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
+                  rewrite H_neq' in H_lookup.
+                  apply H_coh_5 in H_lookup. 
+                  rewrite -H_lookup.
+                  by apply lookup_insert_ne.
+                }
+            ++ intros k' v'.
+              split; intro H_lookup.
+                ** destruct (decide (k = k')) as [<- | H_neq].
+                {
+                  by rewrite lookup_insert in H_lookup.
+                } 
+                {
+                  apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
+                  rewrite H_neq' in H_lookup.
+                  eapply (H_coh_6 k' v') in H_lookup. 
+                  rewrite -H_lookup.
+                  by apply lookup_insert_ne.
+                } 
+                ** destruct (decide (k = k')) as [<- | H_neq].
+                {
+                  by rewrite lookup_insert in H_lookup.
+                }
+                {
+                  apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
+                  rewrite H_neq' in H_lookup.
+                  eapply (H_coh_6 k' v') in H_lookup. 
+                  rewrite -H_lookup.
+                  by apply lookup_insert_ne.
+                }
+  Qed.
 
   Definition is_connected_def
              (n : ip_address) (cst : val) (l : loc) (s : proxy_state) (sv : val)
@@ -178,7 +260,13 @@ Section Proxy.
      ownCacheUser k cst (Some v) -∗
      ownCacheUser k cst (Some v) ∗ ⌜KVS_Serializable v⌝.
   Proof.
-  Admitted.
+    iIntros "[%sa [%v' [%γCst [%γA [%γS [%γlk [%γCache [%b (H_eq & H_cli & H_key & %H_ser)]]]]]]]]".
+    iSplit.
+    2 : { by iPureIntro. }
+    iExists _, _, _, _, _, _, _, _.
+    iFrame.
+    by iPureIntro.
+  Qed.
 
   Lemma client_connected_agree sa :
   ∀ γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
@@ -186,6 +274,25 @@ Section Proxy.
   client_connected sa γCst' γCache' γlk' γA' γS'  -∗
   ⌜(γCst, γA, γS, γlk, γCache) = (γCst', γA', γS', γlk', γCache')⌝.
   Proof.
-  Admitted.
+    iIntros (γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache') "(H_sa & H_cst) (H_sa' & H_cst')".
+    unfold client_gnames_token_defined.
+    unfold connection_token.
+    iAssert (⌜γCst = γCst'⌝%I) as %H_eq_cst.
+    {
+      iDestruct (own_valid_2 with "H_sa H_sa'") as "%H_sa_combined".
+      iPureIntro.
+      apply auth_frag_op_valid_1 in H_sa_combined.
+      rewrite singleton_op in H_sa_combined.
+      rewrite singleton_valid in H_sa_combined.
+      by apply to_agree_op_valid_L in H_sa_combined.
+    }
+    rewrite -H_eq_cst.
+    iDestruct (own_valid_2 with "H_cst H_cst'") as "H_cst_combined".
+    rewrite -Cinr_op csum_validI.
+    iDestruct "H_cst_combined" as "%H_cst_combined".
+    iPureIntro.
+    apply to_agree_op_valid_L in H_cst_combined.
+    set_solver. 
+  Qed.
 
 End Proxy.
