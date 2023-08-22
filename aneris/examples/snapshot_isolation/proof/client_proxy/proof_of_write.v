@@ -64,8 +64,7 @@ Section Write_Proof.
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
-      iDestruct (client_connected_agree γGsnap γT
-                  with "[$Hc2][$Hc1]") as "%Heq'".
+      iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
       simplify_eq /=.
       by iDestruct (ghost_map.ghost_map_lookup
                   with "[$Hres_abs][$Helem]")
@@ -83,14 +82,12 @@ Section Write_Proof.
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq)
                             "(#Hc3 & HcacheHalf1 & %Hv)".
     symmetry in Heq. simplify_eq /=.
-    iDestruct (client_connected_agree γGsnap γT
-                with "[$Hc3][$Hc1]") as "%Heq'".
+    iDestruct (client_connected_agree with "[$Hc3][$Hc1]") as "%Heq'".
     simplify_eq.
     iDestruct "Hkds" as (? ? ? ? ? ? ? ? Heq')
                             "(#Hc4 & HcacheHalf2 & %Hb)".
     symmetry in Heq'. simplify_eq /=.
-    iDestruct (client_connected_agree γGsnap γT
-                with "[$Hc4][$Hc1]") as "%Heq''".
+    iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq''".
     simplify_eq.
     iDestruct (ghost_map.ghost_map_elem_combine
                 with "[$HcacheHalf1][$HcacheHalf2]") as "(Hcache & ->)".
@@ -110,7 +107,7 @@ Section Write_Proof.
       iSplit; first done.
       iSplit.
       { iPureIntro;
-          by eapply (is_coherent_cache_upd γKnownClients γGauth γGsnap). }
+          by eapply is_coherent_cache_upd. }
       iSplit; done.
     }
     iNext.

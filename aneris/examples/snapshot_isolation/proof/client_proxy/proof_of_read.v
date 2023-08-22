@@ -66,8 +66,7 @@ Section Read_Proof.
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
-      iDestruct (client_connected_agree γGsnap γT
-                  with "[$Hc2][$Hc1]") as "%Heq'".
+      iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
       simplify_eq /=.
       by iDestruct (ghost_map.ghost_map_lookup
                   with "[$Hres_abs][$Helem]")
@@ -85,8 +84,7 @@ Section Read_Proof.
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq)
                             "(#Hc3 & Hcache & %Hvb)".
     simplify_eq /=.
-    iDestruct (client_connected_agree γGsnap γT
-                with "[$Hc3][$Hc1]") as "%Heq'".
+    iDestruct (client_connected_agree with "[$Hc3][$Hc1]") as "%Heq'".
     simplify_eq.
     iDestruct (ghost_map.ghost_map_lookup with
                 "[$Hauth][$Hcache]") as "%Hkin".

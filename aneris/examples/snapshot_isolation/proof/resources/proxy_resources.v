@@ -268,13 +268,13 @@ Section Proxy.
     by iPureIntro.
   Qed.
 
-  Lemma client_connected_agree sa :
-  ∀ γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
+  Lemma client_connected_agree :
+  ∀ sa γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
   client_connected sa γCst γCache γlk γA γS -∗
   client_connected sa γCst' γCache' γlk' γA' γS'  -∗
   ⌜(γCst, γA, γS, γlk, γCache) = (γCst', γA', γS', γlk', γCache')⌝.
   Proof.
-    iIntros (γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache') "(H_sa & H_cst) (H_sa' & H_cst')".
+    iIntros (sa γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache') "(H_sa & H_cst) (H_sa' & H_cst')".
     unfold client_gnames_token_defined.
     unfold connection_token.
     iAssert (⌜γCst = γCst'⌝%I) as %H_eq_cst.

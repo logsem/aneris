@@ -41,7 +41,7 @@ Section Session_Resources_intantiation.
       KVS_Init := SrvInit;
       KVS_ClientCanConnect sa := client_can_connect_res γKnownClients sa;
       OwnLocalKey_serializable k c v :=
-      own_cache_user_serializable γGsnap γT γKnownClients k c v;
+      own_cache_user_serializable γKnownClients k c v;
       (* Seen_valid E k h h' :=  *) |}.
   Next Obligation.
     iIntros (E k h h' Hcl) "#Hinv (#Hs & Hk)".

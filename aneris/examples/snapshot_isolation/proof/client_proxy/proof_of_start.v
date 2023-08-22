@@ -77,8 +77,7 @@ Section Start_Proof.
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & #Habs2 & Hsp)".
       destruct sp; simplify_eq /=.
-       iDestruct (client_connected_agree γGsnap γT
-                  with "[$Hcc1][$Habs1]") as "%Heq'".
+       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
        simplify_eq /=.
        by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
     iDestruct "Hst" as (-> ->) "(Hgh & Hst)".
