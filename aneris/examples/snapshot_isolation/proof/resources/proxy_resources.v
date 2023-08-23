@@ -69,7 +69,7 @@ Section Proxy.
       (∀ k v,
         cache_updatesM !! k = Some v ↔
         cache_logicalM !! k = Some (Some v, true)) ∧
-        (∀ k vo,
+        (∀ k vo, 
            (cache_updatesM !! k) = None ↔
             cache_logicalM !! k = Some (vo, false)).
 
@@ -78,7 +78,7 @@ Section Proxy.
     is_coherent_cache cuM cM Msnap →
     is_coherent_cache (<[k:=v]> cuM) (<[k:=(Some v, true)]> cM) Msnap.
   Proof.
-    intros H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 H_coh_6]]]]].
+    intros H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 H_coh_5]]]].
     unfold is_coherent_cache.
     split.
     - rewrite -H_coh_1.
@@ -136,41 +136,84 @@ Section Proxy.
                   rewrite -H_lookup.
                   by apply lookup_insert_ne.
                 }
-            ++ intros k' v'.
-              split; intro H_lookup.
-                ** destruct (decide (k = k')) as [<- | H_neq].
-                {
-                  by rewrite lookup_insert in H_lookup.
-                }
-                {
-                  apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
-                  rewrite H_neq' in H_lookup.
-                  eapply (H_coh_6 k' v') in H_lookup.
-                  rewrite -H_lookup.
-                  by apply lookup_insert_ne.
-                }
-                ** destruct (decide (k = k')) as [<- | H_neq].
-                {
-                  by rewrite lookup_insert in H_lookup.
-                }
-                {
-                  apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
-                  rewrite H_neq' in H_lookup.
-                  eapply (H_coh_6 k' v') in H_lookup.
-                  rewrite -H_lookup.
-                  by apply lookup_insert_ne.
-                }
-  Qed.
+            ++ admit.
+  Admitted.
 
   Definition cacheM_from_Msnap (M : gmap Key (list write_event))
     : gmap Key (option val * bool) :=
     (λ h : list events.write_event,
-       (from_option (λ we : events.write_event, Some (we_val we))
-                    None (last h), false)) <$> M.
+       (from_option (λ we : events.write_event, Some (we_val we)) None (last h), false)) <$> M.
 
+  Lemma last_of_none_empty_list_is_some {A : Type} (l : list A) : 
+    l ≠ [] → ∃ v, Some v = last (l).
+  Proof.
+    induction l.
+    1 : done.
+    destruct l; set_solver.
+  Qed. 
+  
   Lemma is_coherent_cache_start M :
     is_coherent_cache ∅ (cacheM_from_Msnap M) M.
-  Proof. Admitted.
+  Proof.
+    split.
+      - unfold cacheM_from_Msnap.
+        by rewrite dom_fmap_L.
+      - split.
+        + by rewrite dom_empty_L. 
+        + split.
+          * intros k v Hyp.
+            unfold cacheM_from_Msnap in Hyp.
+            rewrite lookup_fmap in Hyp.
+            destruct (M !! k) eqn:H_lookup.
+            {
+              rewrite H_lookup in Hyp.
+              simpl in Hyp.
+              exists l.
+              destruct l. 
+              1 : done.
+              assert (w :: l ≠ []) as H_neq. 
+              { set_solver. }
+              apply last_of_none_empty_list_is_some in H_neq as H_eq.
+              destruct H_eq as [v' H_eq].
+              exists v'.
+              rewrite -H_eq in Hyp.
+              simpl in Hyp.
+              set_solver. 
+            }
+            {
+              rewrite H_lookup in Hyp.
+              by simpl in Hyp.
+            }
+          * split.
+            -- intros k Hyp.
+              unfold cacheM_from_Msnap in Hyp.
+              rewrite lookup_fmap in Hyp.
+              destruct (M !! k) eqn:H_lookup.
+              {
+                rewrite H_lookup in Hyp.
+                simpl in Hyp.
+                destruct l. 
+                1 : done.
+                assert (w :: l ≠ []) as H_neq. 
+                { set_solver. }
+                apply last_of_none_empty_list_is_some in H_neq as H_eq.
+                destruct H_eq as [v H_eq].
+                rewrite -H_eq in Hyp.
+                by simpl in Hyp.
+              }
+              {
+                rewrite H_lookup in Hyp.
+                by simpl in Hyp.
+              }
+            -- split.
+              ++ split. 
+                1: set_solver.
+                intros Hyp.
+                unfold cacheM_from_Msnap in Hyp.
+                rewrite lookup_fmap in Hyp.
+                destruct (M !! k) eqn:H_lookup; by rewrite H_lookup in Hyp.
+              ++ admit.
+  Admitted.
 
   Definition is_connected_def
              (n : ip_address) (cst : val) (l : loc)

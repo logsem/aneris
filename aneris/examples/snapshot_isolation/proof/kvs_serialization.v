@@ -185,25 +185,10 @@ Section Repdb_ser.
                   string_serialization
                   KVS_serialization)))).
 
-
   Definition rep_serialization :=
     sum_serialization
       (option_serialization KVS_serialization)
       (sum_serialization int_serialization bool_serialization).
-
-  Lemma req_ser_is_injective : ser_is_injective req_serialization.
-  Proof.
-  Admitted.
-  (*   apply sum_ser_is_ser_injective. *)
-  (*   - apply prod_ser_is_ser_injective. *)
-  (*     -- apply string_ser_is_ser_injective. *)
-  (*     -- apply DB_ser_inj. *)
-  (*   - apply string_ser_is_ser_injective. *)
-  (* Qed. *)
-
-  Lemma req_ser_is_injective_alt : ser_is_injective_alt req_serialization.
-  Proof.
-  Admitted.
 
   (* TODO : move to lib. *)
   Lemma unit_ser_is_ser_injective :
@@ -218,7 +203,8 @@ Section Repdb_ser.
     ser_is_injective_alt unit_serialization.
   Proof.
     intros s1 s2 mval Heq1 Heq2.
-    inversion Heq1. inversion Heq2. by simplify_eq.
+    inversion Heq1. inversion Heq2.
+    by simplify_eq.
   Qed.
 
   (* TODO : move to lib. *)
@@ -245,17 +231,92 @@ Section Repdb_ser.
     - f_equal. by eapply Hser1.
   Qed.
 
-  Lemma rep_ser_is_injective : ser_is_injective rep_serialization.
+  (* TODO : move to lib. *)
+  Lemma bool_ser_is_ser_injective :
+    ser_is_injective bool_serialization.
+  Proof.
+    intros s mval1 mval2 Hs1 Hs2.
+    destruct Hs1 as [b1].
+    destruct Hs2 as [b2].
+    destruct b1.
+    all : destruct b2; set_solver.
+  Qed.
+
+  (* TODO : move to lib. *)
+  Lemma bool_ser_is_ser_injective_alt :
+    ser_is_injective_alt bool_serialization.
+  Proof.
+    intros s mval1 mval2 Hs1 Hs2.
+    destruct Hs1 as [b1].
+    destruct Hs2 as [b2].
+    destruct b1.
+    all : destruct b2; set_solver.
+  Qed.
+
+  (* TODO : move to lib. *)
+  Lemma list_ser_is_ser_injective ser:
+    ser_is_injective ser →
+    ser_is_injective (list_serialization ser).
   Proof.
   Admitted.
-  (*   apply sum_ser_is_ser_injective. *)
-  (*   - apply unit_ser_is_ser_injective. *)
-  (*   - apply option_ser_is_ser_injective. *)
-  (*     apply DB_ser_inj. *)
-  (* Qed. *)
+
+  (* TODO : move to lib. *)
+  Lemma list_ser_is_ser_injective_alt ser:
+    ser_is_injective_alt ser →
+    ser_is_injective_alt (list_serialization ser).
+  Proof.
+  Admitted.
+
+  Lemma req_ser_is_injective : ser_is_injective req_serialization.
+  Proof.
+    apply sum_ser_is_ser_injective. 
+    - apply prod_ser_is_ser_injective.
+      + apply string_ser_is_ser_injective.
+      + apply int_ser_is_ser_injective.
+    - apply sum_ser_is_ser_injective.
+      + apply unit_ser_is_ser_injective.
+      + apply prod_ser_is_ser_injective.
+        * apply int_ser_is_ser_injective.
+        * apply list_ser_is_ser_injective.
+          apply prod_ser_is_ser_injective.
+            -- apply string_ser_is_ser_injective.
+            -- apply KVS_ser_inj. 
+  Qed. 
+
+  Lemma req_ser_is_injective_alt : ser_is_injective_alt req_serialization.
+  Proof.
+    apply sum_ser_is_ser_injective_alt. 
+    - apply prod_ser_is_ser_injective_alt.
+      + apply string_ser_is_ser_injective_alt.
+      + apply int_ser_is_ser_injective_alt.
+    - apply sum_ser_is_ser_injective_alt.
+      + apply unit_ser_is_ser_injective_alt.
+      + apply prod_ser_is_ser_injective_alt.
+        * apply int_ser_is_ser_injective_alt.
+        * apply list_ser_is_ser_injective_alt.
+          apply prod_ser_is_ser_injective_alt.
+            -- apply string_ser_is_ser_injective_alt.
+            -- apply KVS_ser_inj_alt. 
+  Qed. 
+
+  Lemma rep_ser_is_injective : ser_is_injective rep_serialization.
+  Proof.
+    apply sum_ser_is_ser_injective.
+    - apply option_ser_is_ser_injective.
+      apply KVS_ser_inj.
+    - apply sum_ser_is_ser_injective.
+      + apply int_ser_is_ser_injective.
+      + apply bool_ser_is_ser_injective.
+  Qed.
 
  Lemma rep_ser_is_injective_alt : ser_is_injective_alt rep_serialization.
   Proof.
-  Admitted.
+    apply sum_ser_is_ser_injective_alt.
+    - apply option_ser_is_ser_injective_alt.
+      apply KVS_ser_inj_alt.
+    - apply sum_ser_is_ser_injective_alt.
+      + apply int_ser_is_ser_injective_alt.
+      + apply bool_ser_is_ser_injective_alt.
+  Qed.
 
 End Repdb_ser.
