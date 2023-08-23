@@ -123,6 +123,22 @@ Section Read_Proof.
     assert (k ∈ dom cM) as Hdomk.
     { apply elem_of_dom. set_solver. }
     specialize (Hc6 k vo) as (Hd & _).
+    {  set_solver. }
+    { rewrite Hinh. simplify_eq /=.
+      destruct vo eqn:Hvo.
+      - simplify_eq /=.
+        destruct b.
+        -- destruct (Hc5 k v) as (Hc51 & Hc52).
+           specialize (Hc52 Hkin). set_solver.
+        -- specialize (Hc3 k v Hkin).
+           destruct Hc3 as (h0 & e0 & Hmk & Hh & Hev).
+           rewrite /hist_to_we in Hh.
+           simplify_eq /=.
+           rewrite Hh.
+           done.
+      -  simplify_eq /=.
+         specialize (Hc4 k Hkin).
+         by simplify_eq /=. }
     specialize (Hd Hkv1).
     destruct Hvalid as (_ & Hvalid).
     specialize (Hvalid k h Hinh).
@@ -166,6 +182,22 @@ Section Read_Proof.
        iIntros (? ->).
        wp_pures.
        specialize (Hc6 k vo) as (Hd & _).
+       { apply elem_of_dom. set_solver. }
+       { rewrite Hinh. simplify_eq /=.
+         destruct vo eqn:Hvo.
+         - simplify_eq /=.
+           destruct b.
+           -- destruct (Hc5 k v) as (Hc51 & Hc52).
+              specialize (Hc52 Hkin). set_solver.
+           -- specialize (Hc3 k v Hkin).
+              destruct Hc3 as (h0 & e0 & Hmk & Hh & Hev).
+              rewrite /hist_to_we in Hh.
+              simplify_eq /=.
+              rewrite Hh.
+              done.
+         -  simplify_eq /=.
+            specialize (Hc4 k Hkin).
+            by simplify_eq /=. }
        apply Hd in Hkv1.
        iDestruct "Hcnd" as "[(-> & ->) | %Hhe ]".
        (* Case 2 : There is nothing to read. *)
