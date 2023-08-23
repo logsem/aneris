@@ -48,16 +48,16 @@ Section RPC_user_params.
   Context  (γKnownClients γGauth γGsnap γT : gname).
 
   Definition ReqData : Type :=
-      (** Read   *) string * nat * (list write_event) +
-      (** Start  *) (coPset * iProp Σ * (val → iProp Σ) +
-      (** Commit *) (coPset * nat *
+    (** Read   *) string * nat * (list write_event) +
+    (** Start  *) (coPset * iProp Σ * (val → iProp Σ) +
+    (** Commit *) (coPset * nat *
                     (gmap Key val) *
                     (gmap Key (option val * bool))) *
                     (gmap Key (list write_event)) * iProp Σ * (val → iProp Σ)).
 
   Definition RepData : Type :=
      (** Read   *) list write_event +
-     (** Start  *) (nat +
+     (** Start  *) (nat * (gmap Key (list write_event)) +
      (** Commit *) bool).
 
   Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
@@ -83,12 +83,14 @@ Section RPC_user_params.
           P ∗
           (P
            ={⊤, E}=∗
-           (∃ m, ([∗ map] k ↦ h ∈ m, ownMemUser γGauth γGsnap k h) ∗
+           (∃ (M : gmap Key (list write_event)),
+               ([∗ map] k ↦ h ∈ M, ownMemUser γGauth γGsnap k h) ∗
                  ▷ (∀ ts,
+                      ⌜kvs_valid_snapshot M ts⌝ ∗
                       ownTimeSnap γT ts ∗
-                      ([∗ map] k ↦ h ∈ m,
-                         ownMemUser γGauth γGsnap k h ∗
-                         ⌜∀ e, e ∈ h → e.(we_time) < ts⌝)
+                      ([∗ map] k ↦ h ∈ M,
+                          ownMemUser γGauth γGsnap k h ∗
+                           ⌜∀ e, e ∈ h → e.(we_time) < ts⌝)
                       ={E,⊤}=∗ Q #ts))
           )
       )
@@ -145,9 +147,9 @@ Section RPC_user_params.
      ∨
       (** Start *)
       (
-         ∃ E P Q ts,
+         ∃ E P Q ts M,
           ⌜reqd = inr (inl (E, P, Q))⌝ ∗
-          ⌜repd = inr (inl ts)⌝ ∗
+          ⌜repd = inr (inl (ts, M))⌝ ∗
           ⌜repv = InjRV (InjLV #ts)⌝ ∗
           Q #ts
       )

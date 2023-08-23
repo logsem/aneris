@@ -188,7 +188,7 @@ Section Read_Proof.
              eauto. }
     (* Absurd *)
     -- by iDestruct "Habs"
-         as "[(% & % & % & % & % & Habs) |
+         as "[(% & % & % & % & % & % & Habs) |
               (% & % & % & % & % & % & % & % & % & Habs)]".
   Qed.
 

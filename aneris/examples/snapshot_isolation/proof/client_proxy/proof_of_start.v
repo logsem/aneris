@@ -41,7 +41,7 @@ Section Start_Proof.
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     is_connected γGsnap γT γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
-    <<< ∀∀ (m : gmap Key Hist),
+    <<< ∀∀ (m : gmap Key (list val)),
         ConnectionState_def γKnownClients c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h >>>
       SI_start c @[ip_of_address sa] E
@@ -122,7 +122,7 @@ Section Start_Proof.
         iExists M.
         iFrame.
         iNext.
-        iIntros (ts) "(Hts & Hpts)".
+        iIntros (ts) "(%Hvsn & Hts & Hpts)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
@@ -140,8 +140,7 @@ Section Start_Proof.
         iApply fupd_frame_l; iSplit; first done.
         iApply fupd_frame_l; iSplit.
         { iPureIntro; by apply is_coherent_cache_start. }
-        iApply fupd_frame_l; iSplit.
-        { admit. }
+        iApply fupd_frame_l; iSplit; first done.
         iApply fupd_frame_l; iSplit.
         { admit. }
         iApply "Hclose".
@@ -152,14 +151,16 @@ Section Start_Proof.
           eauto with iFrame. }
         iSplitL "Hpts".
         { admit. }
-        admit.
-    }
+        iSplitL.
+        { iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
+                   with "[$Hcc1][$Hcpts]"). }
+        admit. }
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
       first by iDestruct "Habs" as (? ? ? ? ?) "Habs".
     iDestruct "Hpost" as "[Hpost | Habs]";
       last by iDestruct "Habs" as (? ? ? ? ? ? ? ? ?) "Habs".
-    iDestruct "Hpost" as (? ? ? ? Heq1 Heq2 Heq3) "Hpost".
+    iDestruct "Hpost" as (? ? ? ? ? Heq1 Heq2 Heq3) "Hpost".
     simplify_eq /=.
     wp_pures.
     wp_apply (@wp_map_empty Mdl Σ _ Key _ _ _ val _ with "[//]").

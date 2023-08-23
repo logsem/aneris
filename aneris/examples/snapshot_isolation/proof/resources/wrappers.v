@@ -25,8 +25,6 @@ Section Wrapper_defs.
   Context (clients : gset socket_address).
   Context (γKnownClients γGauth γGsnap γT : gname).
 
-  Definition to_hist (h : list write_event) : list val := (λ e, e.(we_val)) <$> h.
-
   Definition to_local_state (s : proxy_state) : local_state :=
     match s with
       PSCanStart => CanStart

@@ -25,6 +25,8 @@ Inductive proxy_state : Type :=
 
 Definition hist_to_we (h : list write_event) := last h.
 
+Definition to_hist (h : list write_event) : list val := (λ e, e.(we_val)) <$> h.
+
 
 Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
@@ -276,6 +278,14 @@ Section Proxy.
     iFrame.
     by iPureIntro.
   Qed.
+
+  Lemma own_cache_user_from_ghost_map_elem_big (M :gmap Key (list write_event)) :
+    ∀ sa v γCst γA γS γlk γCache,
+    client_connected sa γCst γA γS γlk γCache -∗
+    ([∗ map] k↦hv ∈ cacheM_from_Msnap M, ghost_map.ghost_map_elem γCache k (DfracOwn 1) hv) -∗
+    [∗ map] k↦hw ∈ ((λ hw : list write_event, to_hist hw) <$> M),
+          ownCacheUser k (#sa, v)%V (last hw) ∗ key_upd_status (#sa, v)%V k false.
+  Proof. Admitted.
 
   Lemma client_connected_agree :
   ∀ sa γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
