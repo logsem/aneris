@@ -44,7 +44,7 @@ Section Client_Proxy_Proof.
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate;
-        ConnectionState_def γKnownClients γGsnap γT cstate sa CanStart ∗
+        ConnectionState_def γKnownClients cstate sa CanStart ∗
         is_connected γGsnap γT γKnownClients cstate sa }}}.
 
   Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources}  :

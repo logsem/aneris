@@ -91,9 +91,9 @@ Section Proxy.
           }
           {
             apply H_coh_3.
-            apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq. 
-            by rewrite H_neq in H_lookup. 
-          } 
+            apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
+            by rewrite H_neq in H_lookup.
+          }
         * split.
           -- intros k' H_lookup.
             destruct (decide (k = k')) as [<- | H_neq].
@@ -101,36 +101,36 @@ Section Proxy.
               by rewrite lookup_insert in H_lookup.
             }
             {
-              apply H_coh_4. 
+              apply H_coh_4.
               apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
-              by rewrite H_neq in H_lookup.  
-            } 
+              by rewrite H_neq in H_lookup.
+            }
           -- split.
             ++ intros k' v'.
               split; intro H_lookup.
                 ** destruct (decide (k = k')) as [<- | H_neq].
                 {
                   rewrite lookup_insert in H_lookup.
-                  rewrite lookup_insert. 
+                  rewrite lookup_insert.
                   by rewrite H_lookup.
-                } 
+                }
                 {
                   apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
                   rewrite H_neq' in H_lookup.
-                  apply H_coh_5 in H_lookup. 
+                  apply H_coh_5 in H_lookup.
                   rewrite -H_lookup.
                   by apply lookup_insert_ne.
                 }
                 ** destruct (decide (k = k')) as [<- | H_neq].
                 {
                   rewrite lookup_insert in H_lookup.
-                  rewrite lookup_insert.  
+                  rewrite lookup_insert.
                   set_solver.
                 }
                 {
                   apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
                   rewrite H_neq' in H_lookup.
-                  apply H_coh_5 in H_lookup. 
+                  apply H_coh_5 in H_lookup.
                   rewrite -H_lookup.
                   by apply lookup_insert_ne.
                 }
@@ -139,14 +139,14 @@ Section Proxy.
                 ** destruct (decide (k = k')) as [<- | H_neq].
                 {
                   by rewrite lookup_insert in H_lookup.
-                } 
+                }
                 {
                   apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
                   rewrite H_neq' in H_lookup.
-                  eapply (H_coh_6 k' v') in H_lookup. 
+                  eapply (H_coh_6 k' v') in H_lookup.
                   rewrite -H_lookup.
                   by apply lookup_insert_ne.
-                } 
+                }
                 ** destruct (decide (k = k')) as [<- | H_neq].
                 {
                   by rewrite lookup_insert in H_lookup.
@@ -154,11 +154,21 @@ Section Proxy.
                 {
                   apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
                   rewrite H_neq' in H_lookup.
-                  eapply (H_coh_6 k' v') in H_lookup. 
+                  eapply (H_coh_6 k' v') in H_lookup.
                   rewrite -H_lookup.
                   by apply lookup_insert_ne.
                 }
   Qed.
+
+  Definition cacheM_from_Msnap (M : gmap Key (list write_event))
+    : gmap Key (option val * bool) :=
+    (λ h : list events.write_event,
+       (from_option (λ we : events.write_event, Some (we_val we))
+                    None (last h), false)) <$> M.
+
+  Lemma is_coherent_cache_start M :
+    is_coherent_cache ∅ (cacheM_from_Msnap M) M.
+  Proof. Admitted.
 
   Definition is_connected_def
              (n : ip_address) (cst : val) (l : loc)
@@ -220,7 +230,6 @@ Section Proxy.
    ∃ (v : val) (γCst γA γS γlk γCache : gnameO),
      ⌜c = (#sa, v)%V⌝ ∗
      client_connected sa γCst γA γS γlk γCache ∗
-     is_connected c sa ∗
        match s with
        | PSCanStart => isActiveToken γA
        | PSActive _ => CanStartToken γS
@@ -292,7 +301,7 @@ Section Proxy.
     iDestruct "H_cst_combined" as "%H_cst_combined".
     iPureIntro.
     apply to_agree_op_valid_L in H_cst_combined.
-    set_solver. 
+    set_solver.
   Qed.
 
 End Proxy.

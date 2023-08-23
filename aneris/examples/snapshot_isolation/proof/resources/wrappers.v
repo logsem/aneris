@@ -56,7 +56,7 @@ Section Wrapper_defs.
     ∃ hw, ownMemUser γGauth γGsnap k hw ∗ ⌜h = to_hist hw⌝.
 
   Definition ConnectionState_def c sa s : iProp Σ :=
-    ∃ sp, connection_state γGsnap γT γKnownClients c sa sp ∗ ⌜s = to_local_state sp⌝.
+    ∃ sp, connection_state γKnownClients c sa sp ∗ ⌜s = to_local_state sp⌝.
 
   Definition Seen_def k h : iProp Σ :=
     ∃ hw, ownMemSeen γGsnap k hw ∗ ⌜h = to_hist hw⌝.

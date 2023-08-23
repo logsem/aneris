@@ -33,7 +33,7 @@ Section Session_Resources_intantiation.
       GlobalInv :=  GlobalInv_def clients γKnownClients γGauth γGsnap γT;
       OwnMemKey k h := OwnMemKey_def γGauth γGsnap k h;
       OwnLocalKey k c vo := ownCacheUser γKnownClients k c vo;
-      ConnectionState c s sa := ConnectionState_def γKnownClients γGsnap γT c s sa;
+      ConnectionState c s sa := ConnectionState_def γKnownClients c s sa;
       IsConnected c sa := is_connected γGsnap γT γKnownClients c sa;
       KeyUpdStatus c k b :=  key_upd_status γKnownClients c k b;
       Seen k h := Seen_def γGsnap k h;

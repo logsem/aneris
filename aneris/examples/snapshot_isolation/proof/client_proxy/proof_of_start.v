@@ -42,11 +42,11 @@ Section Start_Proof.
     is_connected γGsnap γT γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m : gmap Key Hist),
-        ConnectionState_def γKnownClients γGsnap γT c sa CanStart ∗
+        ConnectionState_def γKnownClients c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h >>>
       SI_start c @[ip_of_address sa] E
     <<<▷ RET #();
-        ConnectionState_def γKnownClients γGsnap γT c sa (Active m) ∗
+        ConnectionState_def γKnownClients c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
        ([∗ map] k ↦ h ∈ m,
           ownCacheUser γKnownClients k c (last h) ∗
@@ -75,7 +75,7 @@ Section Start_Proof.
       iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
       iDestruct "Habs" as (-> ? ? ?) "(? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
-      iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & #Habs2 & Hsp)".
+      iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
       simplify_eq /=.
@@ -124,22 +124,36 @@ Section Start_Proof.
         iNext.
         iIntros (ts) "(Hts & Hpts)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
-        iDestruct "Hst'" as (???????) "(#Hcc2 & #Hct & Hst')".
+        iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
-        iExists ts, M.
+        iExists ts, M, (cacheM_from_Msnap M).
         iFrame.
-        iExists _.
-        iFrame.
-        admit. }
-      (*  iApply "Hclose".
+        iMod (ghost_map.ghost_map_insert_big (cacheM_from_Msnap M) with "[$Hgh]")
+          as "(Hgh & Hcpts)".
+        { apply map_disjoint_empty_r. }
+        replace ((cacheM_from_Msnap M) ∪ ∅)
+          with (cacheM_from_Msnap M)
+               by by rewrite right_id_L.
+        iApply fupd_frame_l; iFrame.
+        iApply fupd_frame_l; iSplit; first done.
+        iApply fupd_frame_l; iSplit.
+        { iPureIntro; by apply is_coherent_cache_start. }
+        iApply fupd_frame_l; iSplit.
+        { admit. }
+        iApply fupd_frame_l; iSplit.
+        { admit. }
+        iApply "Hclose".
         iSplitL "Hst".
         { iExists (PSActive M).
           iSplit; last done.
           iExists _, _, _, _, _, _.
           eauto with iFrame. }
-        admit. } *)
+        iSplitL "Hpts".
+        { admit. }
+        admit.
+    }
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
       first by iDestruct "Habs" as (? ? ? ? ?) "Habs".
