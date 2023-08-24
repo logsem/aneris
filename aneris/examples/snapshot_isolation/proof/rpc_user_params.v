@@ -16,7 +16,7 @@ From aneris.examples.snapshot_isolation.specs Require Import user_params.
 From aneris.examples.snapshot_isolation.proof Require Import
      time events model kvs_serialization.
 From aneris.examples.snapshot_isolation.proof.resources
-     Require Import resource_algebras server_resources proxy_resources
+     Require Import resource_algebras server_resources proxy_resources wrappers
      global_invariant.
 
 Import gen_heap_light.
@@ -83,9 +83,10 @@ Section RPC_user_params.
           P ∗
           (P
            ={⊤, E}=∗
-           (∃ (M : gmap Key (list write_event)),
-               ([∗ map] k ↦ h ∈ M, ownMemUser γGauth γGsnap k h) ∗
-                 ▷ (∀ ts,
+           (∃ (m : gmap Key (list val)),
+               ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
+                 ▷ (∀ ts M,
+                      ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
                       ⌜kvs_valid_snapshot M ts⌝ ∗
                       ownTimeSnap γT ts ∗
                       ([∗ map] k ↦ h ∈ M,

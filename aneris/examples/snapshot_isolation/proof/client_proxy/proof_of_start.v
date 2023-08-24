@@ -117,12 +117,10 @@ Section Start_Proof.
         iIntros "_".
         iMod "Hsh" as (m) "[(Hst' & Hpts) Hclose]".
         iModIntro.
-        iDestruct (mem_key_map_we_exists clients γKnownClients γGauth γGsnap γT
-                    with "[$Hpts]") as (M) "(Hpts & %Heq)".
-        iExists M.
+        iExists m.
         iFrame.
         iNext.
-        iIntros (ts) "(%Hvsn & Hts & Hpts)".
+        iIntros (ts M HmM) "(%Hvsn & Hts & Hpts)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
