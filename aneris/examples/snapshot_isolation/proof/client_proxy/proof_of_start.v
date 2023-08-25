@@ -117,12 +117,10 @@ Section Start_Proof.
         iIntros "_".
         iMod "Hsh" as (m) "[(Hst' & Hpts) Hclose]".
         iModIntro.
-        iDestruct (mem_key_map_we_exists clients γKnownClients γGauth γGsnap γT
-                    with "[$Hpts]") as (M) "(Hpts & %Heq)".
-        iExists M.
+        iExists m.
         iFrame.
         iNext.
-        iIntros (ts) "(%Hvsn & Hts & Hpts)".
+        iIntros (ts M HmM) "(%Hvsn & Hts & Hpts)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
@@ -130,6 +128,16 @@ Section Start_Proof.
         simplify_eq /=.
         iExists ts, M, (cacheM_from_Msnap M).
         iFrame.
+        iAssert (([∗ map] k↦h ∈ M, ownMemSeen γGsnap k h)%I) as "#Hseen1".
+        { iApply (big_sepM_mono with "[$Hpts]").
+          iIntros (???) "(H1 & H2)".
+          by iDestruct "H1" as "(H11 & H12)". }
+        iAssert (([∗ map] k↦h ∈ ((λ h : list write_event, to_hist h) <$> M),
+              Seen_def γGsnap k h)%I) as "#Hseen2".
+        { rewrite /Seen_def.
+          iApply big_sepM_fmap.
+          iApply (big_sepM_mono with "[$Hseen1]").
+          iIntros (???) "Hs". by eauto. }
         iMod (ghost_map.ghost_map_insert_big (cacheM_from_Msnap M) with "[$Hgh]")
           as "(Hgh & Hcpts)".
         { apply map_disjoint_empty_r. }
@@ -142,7 +150,7 @@ Section Start_Proof.
         { iPureIntro; by apply is_coherent_cache_start. }
         iApply fupd_frame_l; iSplit; first done.
         iApply fupd_frame_l; iSplit.
-        { admit. }
+        iFrame "#".
         iApply "Hclose".
         iSplitL "Hst".
         { iExists (PSActive M).
@@ -150,11 +158,14 @@ Section Start_Proof.
           iExists _, _, _, _, _, _.
           eauto with iFrame. }
         iSplitL "Hpts".
-        { admit. }
+        { iApply big_sepM_fmap.
+          iApply (big_sepM_mono with "[$Hpts]").
+          iIntros (???) "(Hs & %Ht)".
+          iExists _. by eauto. }
         iSplitL.
         { iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
                    with "[$Hcc1][$Hcpts]"). }
-        admit. }
+        iFrame "#". }
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
       first by iDestruct "Habs" as (? ? ? ? ?) "Habs".
@@ -180,6 +191,6 @@ Section Start_Proof.
       iPureIntro.
       split_and!; try done. }
     by iIntros (? ->).
-  Admitted.
+  Qed.
 
 End Start_Proof.
