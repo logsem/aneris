@@ -359,14 +359,6 @@ Qed.
     by iPureIntro.
   Qed.
 
-  Lemma own_cache_user_from_ghost_map_elem_big (M :gmap Key (list write_event)) :
-    ∀ sa v γCst γA γS γlk γCache,
-    client_connected sa γCst γA γS γlk γCache -∗
-    ([∗ map] k↦hv ∈ cacheM_from_Msnap M, ghost_map.ghost_map_elem γCache k (DfracOwn 1) hv) -∗
-    [∗ map] k↦hw ∈ ((λ hw : list write_event, to_hist hw) <$> M),
-          ownCacheUser k (#sa, v)%V (last hw) ∗ key_upd_status (#sa, v)%V k false.
-  Proof. Admitted.
-
   Lemma client_connected_agree :
   ∀ sa γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
   client_connected sa γCst γCache γlk γA γS -∗
@@ -393,5 +385,86 @@ Qed.
     apply to_agree_op_valid_L in H_cst_combined.
     set_solver.
   Qed.
+
+  Lemma own_cache_user_from_ghost_map_elem_big (M :gmap Key (list write_event)) :
+    ∀ sa v γCst γA γS γlk γCache,
+    client_connected sa γCst γA γS γlk γCache -∗
+    ([∗ map] k↦hv ∈ cacheM_from_Msnap M, ghost_map.ghost_map_elem γCache k (DfracOwn 1) hv) -∗
+    [∗ map] k↦hw ∈ ((λ hw : list write_event, to_hist hw) <$> M),
+          ownCacheUser k (#sa, v)%V (last hw) ∗ key_upd_status (#sa, v)%V k false.
+  Proof.
+    iIntros (sa v γCst γA γS γlk γCache) "#H_cli H_map".
+    iApply big_sepM_fmap.
+    unfold ownCacheUser, key_upd_status.
+    iApply (big_sepM_mono (λ k y,
+      (∃ (γCst0 γA0 γS0 γlk0 : gname), 
+      client_connected sa γCst0 γA0 γS0 γlk0 γCache) ∗
+      (∃ (sa0 : socket_address) (v0 : val) (b : bool), 
+          ⌜(#sa, v)%V = (#sa0, v0)%V⌝ ∗
+          ghost_map.ghost_map_elem γCache k (DfracOwn (1 / 2)) (last (to_hist y), b) ∗
+          ⌜match last (to_hist y) with
+            | Some w => KVS_Serializable w
+            | None => b = false
+            end⌝) ∗
+      (∃ (sa0 : socket_address) (vp : val)
+      (vo : option val), 
+          ⌜(#sa, v)%V = (#sa0, vp)%V⌝ ∗
+          ghost_map.ghost_map_elem γCache k (DfracOwn (1 / 2)) (vo, false) ∗ 
+          ⌜false = true → is_Some vo⌝))%I).
+    - iIntros (k x H_eq) "(H_cli & H_cache & H_key)".
+      iDestruct "H_cli" as "[%γCst0 [%γA0 [%γS0 [%γlk0 #H_cli]]]]".
+      iSplitL "H_cache".
+      + iDestruct "H_cache" as "[%sa' [%v' [%b (%H_eq_pair & H_key_half & H_ser)]]]".
+        iExists _, _, _, _, _, _, _ , _.
+        iFrame "#∗".
+        by iPureIntro.
+      + iDestruct "H_key" as "[%sa' [%v' [%vo (%H_eq_pair & H_key_half & H_imp)]]]". 
+        iExists _, _, _, _, _, _, _, _.
+        iFrame "#∗".
+        by iPureIntro.
+      - iApply big_sepM_sep.
+        iSplitR.
+        + iApply big_sepM_dup; first set_solver.
+          iExists _, _, _, _.
+          iFrame "#". 
+        + unfold cacheM_from_Msnap.
+          iDestruct ((big_sepM_fmap (λ h : list events.write_event,
+                                      (from_option 
+                                        (λ we : events.write_event, 
+                                          Some (we_val we)) None (last h), false))) 
+                      with "H_map") as "H_map".
+          iApply big_sepM_mono; last done.
+          iIntros (k l H_eq) "H_key".
+          assert (1%Qp = (1 / 2 + 1 / 2)%Qp) as H_eq_frac.
+          { by rewrite Qp.div_2. }
+          rewrite -> H_eq_frac at 1.
+          iDestruct (ghost_map.ghost_map_elem_fractional with "H_key") as "[H_key H_key']".
+          iSplitL "H_key".
+          * iExists _, _, _.
+            iSplit; first done.
+            iSplitL.
+            {
+              assert (last (to_hist l) = from_option 
+                                        (λ we : events.write_event,
+                                        Some (we_val we)) None (last l))
+              as ->; last done.
+              clear H_eq.
+              destruct l as [| h l]; first done.
+              unfold to_hist. 
+              rewrite fmap_last.
+              assert (h :: l ≠ []) as H_neq.
+              { set_solver. }
+              apply last_of_none_empty_list_is_some in H_neq as H_eq.
+              destruct H_eq as [u H_eq].
+              rewrite -H_eq.
+              by simpl.
+            }
+            (* can't prove this with the current definiton *)
+            admit.
+          * iExists _, _, _.
+            iSplit; first done.
+            iSplit; iFrame.
+            iPureIntro; done. 
+   Admitted.
 
 End Proxy.
