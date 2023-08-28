@@ -9,6 +9,12 @@ Set Implicit Arguments.
 
 Inductive nat_omega := NOinfinity | NOnum (n: nat).
 
+Ltac lia_NO len := destruct len; [done| simpl in *; lia]. 
+Ltac lia_NO' len := destruct len; simpl in *; try (done || lia). 
+
+Global Instance nomega_eqdec: EqDecision nat_omega.
+Proof. solve_decision. Qed. 
+
 Module NOmega.
 
   Definition t := nat_omega.
@@ -57,12 +63,12 @@ Module NOmega.
     | _, _ => false
     end.
 
-  Definition leb n m :=
-    match n, m with
-    | NOnum n, NOnum m => Nat.leb n m
-    | NOnum n, NOinfinity => true
-    | NOinfinity, _ => false
-    end.
+  (* Definition leb n m := *)
+  (*   match n, m with *)
+  (*   | NOnum n, NOnum m => Nat.leb n m *)
+  (*   | NOnum n, NOinfinity => true *)
+  (*   | NOinfinity, _ => false *)
+  (*   end. *)
 
   Definition ltb n m :=
     match n, m with
@@ -84,12 +90,25 @@ Module NOmega.
     | NOinfinity, _ => m
     end.
 
+  (* Definition le n m := *)
+  (*   match n, m with *)
+  (*   | NOinfinity, _ => False *)
+  (*   | NOnum n, NOnum m => n <= m *)
+  (*   | NOnum n, NOinfinity => True *)
+  (*   end. *)
+
   Definition le n m :=
     match n, m with
-    | NOinfinity, _ => False
+    | _, NOinfinity => True
     | NOnum n, NOnum m => n <= m
-    | NOnum n, NOinfinity => True
-    end.
+    | _, _ => False
+  end.
+
+  (* TODO: move *)
+  Global Instance nomega_le_eqdec: forall x y, Decision (le x y).
+  Proof.
+    intros. lia_NO' x; lia_NO' y; solve_decision. 
+  Qed. 
 
   Definition lt n m :=
     match n, m with
@@ -103,6 +122,13 @@ Module NOmega.
     | NOnum m => n < m
     | NOinfinity => True
     end.
+
+  Global Instance no_lt_nat_l_dec: forall x y, Decision (lt_nat_l x y).
+  Proof. 
+    intros. destruct y.
+    + by left.
+    + simpl. solve_decision.
+  Qed. 
   
   Definition sub_nat_l n m :=
     match m with
@@ -126,10 +152,10 @@ Module NOmega.
   Lemma sub_0_r n : sub n zero = n.
   Proof. destruct n; simpl; auto using Nat.sub_0_r. Qed.
 
-  Definition lt_succ_r n m : lt n (succ m) <-> le n m.
-  Proof.
-    destruct n, m; simpl; auto; try done; apply Nat.lt_succ_r.
-  Qed.
+  (* Definition lt_succ_r n m : lt n (succ m) <-> le n m. *)
+  (* Proof. *)
+  (*   destruct n, m; simpl; auto; try done; apply Nat.lt_succ_r. *)
+  (* Qed. *)
 
   Lemma eqb_eq n m : eqb n m <-> n = m.
   Proof.
@@ -138,12 +164,12 @@ Module NOmega.
     split; congruence. 
   Qed.
 
-  Lemma leb_le n m : leb n m <-> le n m.
-  Proof.
-    destruct n, m; simpl; try done.
-    rewrite Is_true_true Nat.leb_le. 
-    split; congruence.     
-  Qed.
+  (* Lemma leb_le n m : leb n m <-> le n m. *)
+  (* Proof. *)
+  (*   destruct n, m; simpl; try done. *)
+  (*   rewrite Is_true_true Nat.leb_le.  *)
+  (*   split; congruence.      *)
+  (* Qed. *)
 
   Lemma ltb_lt n m : ltb n m <-> lt n m.
   Proof.
@@ -291,5 +317,13 @@ Module NOmega.
     destruct k; try done.
     simpl. lia. 
   Qed.
+
+  Lemma lt_trichotomy (x y: nat_omega):
+    lt x y \/ x = y \/ lt y x. 
+  Proof using. 
+    destruct x, y; simpl; try lia; eauto.
+    pose proof (PeanoNat.Nat.lt_trichotomy n n0).
+    destruct H as [? | [? | ?]]; auto. 
+  Qed. 
 
 End NOmega.

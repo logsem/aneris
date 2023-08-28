@@ -1,22 +1,9 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness.examples.comp Require Import lemmas trace_len. 
-(* set_map_properties. *)
+From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup.
+From trillium.fairness Require Import inftraces fairness.
 
 Close Scope Z_scope.
  
-(* TODO: move *)
-Tactic Notation "forward" tactic1(tac) :=
-  let foo := fresh in
-  evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|].
-
-Tactic Notation "forward" tactic1(tac) "as" simple_intropattern(H) :=
-  let foo := fresh in
-  evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|intros H].
-
-Tactic Notation "specialize_full" ident(H) :=
-  let foo := fresh in
-  evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
-
 Section TraceHelpers.
   Context {St L: Type}.
 
@@ -27,6 +14,13 @@ Section TraceHelpers.
     intros tr i. unfold pred_at.
     destruct (after i tr); [destruct t| ]; auto.
     solve_decision.
+  Qed.
+
+  Lemma pred_at_or
+    P1 P2 (tr: trace St L) i: 
+    pred_at tr i P1 \/ pred_at tr i P2 <-> pred_at tr i (fun x y => P1 x y \/ P2 x y).
+  Proof using.
+    unfold pred_at. destruct (after i tr); [destruct t| ]; tauto.
   Qed.
 
 End TraceHelpers. 
@@ -44,14 +38,7 @@ Section FMTraceHelpers.
     Decision Q. 
   Proof using. 
     destruct DEC_P; [left | right]; tauto. 
-  Qed.
-
-  Lemma pred_at_or P1 P2 (tr: mtrace M) i: 
-    pred_at tr i P1 \/ pred_at tr i P2 <-> pred_at tr i (fun x y => P1 x y \/ P2 x y).
-  Proof using.
-    unfold pred_at. destruct (after i tr); [destruct t| ]; tauto.
-  Qed.
-  
+  Qed.  
 
   Definition strong_fair_model_trace (tr: mtrace M) (ρ: fmrole M) :=
     forall n (EN: pred_at tr n (λ δ _, role_enabled_model ρ δ)),

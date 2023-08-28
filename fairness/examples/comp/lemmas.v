@@ -4,6 +4,21 @@ From iris.proofmode Require Import tactics.
 Require Import stdpp.decidable.
 Import derived_laws_later.bi.
 
+
+(* copied from coq-hahn *)
+Tactic Notation "forward" tactic1(tac) :=
+  let foo := fresh in
+  evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|].
+
+Tactic Notation "forward" tactic1(tac) "as" simple_intropattern(H) :=
+  let foo := fresh in
+  evar (foo : Prop); cut (foo); subst foo; cycle 1; [tac|intros H].
+
+Tactic Notation "specialize_full" ident(H) :=
+  let foo := fresh in
+  evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
+
+
 (* to avoid referring to classical logic*)
 Lemma min_prop_dec (P: nat -> Prop) (DEC: forall n, Decision (P n)):
   ClassicalFacts.Minimization_Property P.
@@ -33,3 +48,17 @@ Proof using.
   split; intros [P MIN].
   all: split; [| intros; apply MIN]; apply H; auto.
 Qed. 
+
+(* useful for rewriting in equivalences *)
+Lemma is_Some_Some_True {A: Type} (a: A):
+  is_Some (Some a) <-> True.
+Proof. done. Qed. 
+
+(* TODO: move*)
+(* useful for rewriting in equivalences *)
+Lemma is_Some_None_False {A: Type}:
+  is_Some (None: option A) <-> False.
+Proof.
+  split; [| done]. by intros []. 
+Qed. 
+

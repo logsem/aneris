@@ -414,6 +414,28 @@ Section lang_fairness_preserved.
     Unshelve. apply _.
   Qed.
 
+  Lemma live_tids_alt c δ:
+    live_tids c δ (LM := LM) (Λ := Λ) <->
+    (forall ζ, (exists ρ, ls_mapping δ !! ρ = Some ζ) ->
+          locale_enabled ζ c).
+  Proof.
+    rewrite /live_tids /locale_enabled. split.
+    - intros. destruct H0 as [ρ MAP].
+      destruct H as [EXPR NVAL].
+      specialize (EXPR _ _ MAP) as [e ?].
+      eexists. split; eauto.
+      specialize (NVAL _ _ H). 
+      destruct (to_val e); [| done].
+      specialize (NVAL ltac:(eauto)).
+      edestruct NVAL; eauto.
+    - intros. split.
+      + intros. specialize (H ζ (@ex_intro _ _ _ H0)) as [e [MAP ?]].
+        eauto.
+      + intros. intros MAP.
+        specialize (H ζ (@ex_intro _ _ _ MAP)) as [? [? NVAL]].
+        congruence.
+  Qed. 
+
 End lang_fairness_preserved. 
 
 
