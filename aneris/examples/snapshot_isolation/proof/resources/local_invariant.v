@@ -22,8 +22,8 @@ Section Local_Invariant.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (γGauth γT : gname).
 
-  Definition lkResDef : iProp Σ :=
-    ∃ (kvsL vnumL: loc) (kvsV : val) (T: Time)
+  Definition lkResDef (kvsL vnumL: loc) : iProp Σ :=
+    ∃ (kvsV : val) (T: Time)
       (m : gmap Key val) (M : gmap Key (list write_event)) ,
       ⌜is_map kvsV m⌝ ∗
         ⌜kvsl_valid m M T⌝ ∗
@@ -32,7 +32,8 @@ Section Local_Invariant.
         kvsL ↦[ip_of_address KVS_address] kvsV ∗
         vnumL ↦[ip_of_address KVS_address] #T.
 
-  Definition server_lock_inv (γ : gname) (v : val) : iProp Σ :=
-    is_lock (KVS_InvName .@ "lk") (ip_of_address KVS_address) γ v (lkResDef).
+  Definition server_lock_inv (γ : gname) (v : val) (kvsL vnumL: loc)
+    : iProp Σ :=
+    is_lock (KVS_InvName .@ "lk") (ip_of_address KVS_address) γ v (lkResDef kvsL vnumL).
 
 End Local_Invariant.
