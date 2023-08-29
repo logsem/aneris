@@ -63,7 +63,7 @@ Section Commit_Proof.
   Lemma commit_spec_internal_holds {MTR : MTS_resources}  :
     Global_Inv clients γKnownClients γGauth γGsnap γT  ⊢ commit_spec_internal.
   Proof.
-    iIntros "#Hinv". 
+    iIntros "#Hinv".
     iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
     rewrite /SI_commit /= /commit.
     wp_pures.
@@ -76,9 +76,9 @@ Section Commit_Proof.
     iDestruct "HisC" as (s sv) "(Hl & Hcr & Hdisj)".
     wp_pures.
     wp_load.
-    iDestruct "Hdisj" as "[Hst|Habs]".
-    { 
-      iDestruct "Hst" as (-> ->) "(Hgh & Hst)".
+    iDestruct "Hdisj" as "[Habs|Hst]".
+    {
+      iDestruct "Habs" as (-> ->) "(Hgh & Hst)".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
@@ -90,8 +90,8 @@ Section Commit_Proof.
       simplify_eq /=.
       by iDestruct (own_valid_2 with "Hst Hsp") as %?.
     }
-    iDestruct "Habs" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM) 
-      "(-> & -> & (Hcoh & Hvalid & Hismap & Htime & Hseen & Hupd & Hauth & Htok))".
+    iDestruct "Hst" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
+      "(-> & -> & (%Hcoh & %Hvalid & %Hismap & Htime & Hseen & Hupd & Hauth & Htok))".
     wp_pures.
     wp_load.
     wp_pures.
@@ -104,8 +104,13 @@ Section Commit_Proof.
       wp_store.
       iSpecialize ("Hclose" $! true).
       unfold is_coherent_cache.
+      rewrite /is_map in Hismap.
+      destruct Hismap as (lm & Hlm1 & Hlm2 & Hlm3).
+      simplify_eq /=.
+      destruct lm as [|? lm_abs]; last done.
+      simplify_eq /=.
       iMod ("Hclose" with "[Htok Hkey Hcache]") as "HΦ".
-      + iSplitR.
+      + iSplitL "Htok".
         {
           unfold ConnectionState_def, connection_state.
           iExists PSCanStart.
@@ -115,8 +120,9 @@ Section Commit_Proof.
           iFrame "∗#".
         }
         iLeft.
-        iSplitR; first by iPureIntro.
-        admit. (* Case from mattermost *)
+        iSplit; first done.
+        iSplit. admit. (* should be provable. *)
+        admit.
       + iModIntro.
         wp_pures.
         wp_apply (release_spec with "[$Hlk $Hlkd Hcon Hl Hcr Hauth]").
@@ -136,13 +142,13 @@ Section Commit_Proof.
     - (* TODO: the non-empty cache case *) admit.
 
 
-(* 
+(*
     {
       wp_store.
       wp_pures.
       wp_apply (release_spec with "[$Hlk $Hlkd]").
     }
-    
+
     wp_pures.
     case_bool_decide.
     destruct ().
