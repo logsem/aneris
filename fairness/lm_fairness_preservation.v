@@ -379,33 +379,38 @@ Section fairness_preserved.
     destruct t; eauto.
   Qed. 
 
-  Theorem fairness_preserved (extr: out_trace) (auxtr: auxtrace (LM := LM)):
-    infinite_trace extr ->
-    lm_exaux_traces_match_gen extr auxtr ->
-    (forall ζ, fair_by locale_prop ζ extr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
-  Proof.
-    intros Hinfin Hmatch Hex ρ n Hn.
-
-    enough (∃ m : nat,
+  Definition role_steps_or_unassigned auxtr ρ n := 
+    (* ρ ∈ dom (ls_mapping (trfirst auxtr)) ->  *)
+    pred_at auxtr n
+         (λ δ _, ρ ∈ dom (ls_mapping δ)) ->
+∃ m : nat,
     pred_at auxtr (n + m)
-      (λ (δ : lm_ls LM) (_ : option (lm_lbl LM)), forall τ, ¬ ls_mapping δ !! ρ = Some τ)
+      (λ (δ : lm_ls LM) (_ : option (lm_lbl LM)),
+         ∀ τ : G, ls_mapping δ !! ρ ≠ Some τ)
     ∨ pred_at auxtr (n + m)
         (λ (_ : lm_ls LM) (ℓ : option (lm_lbl LM)),
-           ∃ tid : G, ℓ = Some (Take_step ρ tid))) as [m STOP]. 
-    { exists m. destruct STOP as [STOP| ]; auto. left.
-      eapply pred_at_impl; eauto.
-      simpl. intros. intros EN.  
-      red in EN. apply mapping_live_role in EN as [? MAP].
-      edestruct H; eauto. }    
-    
-    unfold pred_at in Hn.
-    destruct (after n auxtr) as [tr|] eqn:Heq.
+           ∃ tid : G, ℓ = Some (Take_step ρ tid)). 
+
+  Lemma exec_fairness_implies_step_or_unassign (extr: out_trace) (auxtr: auxtrace (LM := LM)):
+    infinite_trace extr ->
+    lm_exaux_traces_match_gen extr auxtr ->
+    (forall ζ, fair_by locale_prop ζ extr) ->
+    forall ρ n, role_steps_or_unassigned auxtr ρ n.
+  Proof.
+    intros Hinfin Hmatch Hex ρ n.
+    red.
+    intros DOMn.
+    unfold pred_at in DOMn.
+    destruct (after n auxtr) as [tr|] eqn:Heq; rewrite Heq in DOMn.
     2: { done. } 
     setoid_rewrite pred_at_sum. rewrite Heq.
-    have Hen: role_enabled ρ (trfirst tr) by destruct tr.
 
-    have [τ Hτ] : is_Some((trfirst tr).(ls_mapping) !! ρ) by eauto.
-    have [f Hfuel] : is_Some((trfirst tr).(ls_fuel) !! ρ) by eauto.
+    have [τ Hτ] : is_Some((trfirst tr).(ls_mapping) !! ρ).
+    { destruct tr; apply elem_of_dom; eauto. }
+    clear DOMn.
+    have [f Hfuel] : is_Some((trfirst tr).(ls_fuel) !! ρ).
+    { apply elem_of_dom. rewrite -ls_same_doms. eapply elem_of_dom; eauto. }
+    
     have Hex' := Hex (lift_grole τ) n.
     have [tr1' [Heq' Htr]] : exists tr1', after n extr = Some tr1' ∧ lm_exaux_traces_match_gen tr1' tr
      by eapply traces_match_after.
@@ -421,6 +426,29 @@ Section fairness_preserved.
     eapply (fairness_preserved_ind ρ _ f m τ _ tr); eauto.
     intros ?. by eapply fair_by_after.
   Qed.
+
+  Lemma steps_or_unassigned_implies_aux_fairness (auxtr: auxtrace (LM := LM)):
+    (forall ρ n, role_steps_or_unassigned auxtr ρ n) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
+  Proof.
+    intros FAIR ρ n Hn.
+    eapply pred_at_impl in Hn.
+    2: { intros ? ? EN%mapping_live_role%elem_of_dom. apply EN. }
+    specialize (FAIR _ _ Hn). destruct FAIR as (m & STEP).
+    exists m. destruct STEP; eauto. left.
+    eapply pred_at_impl; eauto. intros. simpl in *.
+    intros [??]%mapping_live_role. congruence.
+  Qed.   
+ 
+    
+  Theorem fairness_preserved (extr: out_trace) (auxtr: auxtrace (LM := LM)):
+    infinite_trace extr ->
+    lm_exaux_traces_match_gen extr auxtr ->
+    (forall ζ, fair_by locale_prop ζ extr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
+  Proof.
+    intros.
+    apply steps_or_unassigned_implies_aux_fairness.
+    eapply exec_fairness_implies_step_or_unassign; eauto.
+  Qed. 
 
 End fairness_preserved.
 
