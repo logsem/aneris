@@ -9,7 +9,7 @@ From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
-From trillium.fairness.examples Require Import lm_fair. 
+From trillium.fairness Require Import lm_fair. 
 
 (* Close Scope Z_scope. *)
 Section LibraryDefs.
@@ -546,7 +546,7 @@ Section ClientSpec.
 
     rewrite -LASTE. 
     iPoseProof (update_client_state with "[$] [$] [$] [$] [$]") as "EM_STEP"; eauto.
-    { econstructor. eauto. }
+    { eexists. split; [apply LIB_STEP| ]. done. }
     { lia. }
     iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EV & MSI & FUELS & ST & FR)"; [set_solver| ].
     do 2 iExists _. iFrame "EV MSI".
@@ -627,7 +627,7 @@ Section ClientSpec.
 
     rewrite -x3 -x4. rewrite -x3 in x5. 
     iPoseProof (update_client_state with "[$] [MSI] [ST] [$] [$]") as "EM_STEP"; eauto.
-    { red. right. eauto. }
+    { eexists. split; [apply LIB_STEP| ]. done. }
     { lia. }
     iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EV & MSI & FUELS & ST & FR)"; [set_solver| ].
     do 2 iExists _. iFrame "EV MSI".

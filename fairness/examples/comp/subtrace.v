@@ -1,5 +1,5 @@
-From trillium.fairness Require Import inftraces fairness.
-From trillium.fairness.examples.comp Require Import lm_fair my_omega lemmas trace_len trace_helpers trace_lookup.
+From trillium.fairness Require Import inftraces fairness lm_fair.
+From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len trace_helpers trace_lookup.
 
 Local Ltac gd t := generalize dependent t.
 

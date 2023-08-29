@@ -82,10 +82,15 @@ Section LMFair.
     - set_solver. 
   Qed. 
 
+  Definition lm_lbl_matches_group (ℓ: lm_lbl LM) (τ: G) := 
+    match ℓ with
+    | Take_step _ τ' | Silent_step τ' => τ = τ'
+    | Config_step => False
+    end. 
+
   (* TODO: rename *)
   Definition locale_trans (st1: lm_ls LM) (τ: G) st2 :=
-    ls_trans (lm_fl LM) st1 (Silent_step τ) st2 \/
-    exists ρ, ls_trans (lm_fl LM) st1 (Take_step ρ τ) st2. 
+    exists ℓ, ls_trans (lm_fl LM) st1 ℓ st2 /\ lm_lbl_matches_group ℓ τ. 
 
   Lemma locale_trans_alt δ1 τ δ2:
     locale_trans δ1 τ δ2 <-> allowed_step_FLs δ1 τ δ2 ≠ ∅.
@@ -99,11 +104,14 @@ Section LMFair.
     rewrite -ls_same_doms. setoid_rewrite elem_of_dom.  
     setoid_rewrite bool_decide_eq_true. 
     split.
-    - intros [T | [? T]].
-      all: eexists; split; set_solver. 
+    - intros (ℓ & T & MATCH).
+      eexists. split; eauto.
+      destruct ℓ; simpl in MATCH; subst; try tauto.
+      right. eexists. split; eauto. inversion T. set_solver. 
     - intros (?&STEP&POT).
-      destruct POT as [-> | (?&->&MAP)]; eauto. 
-  Qed. 
+      destruct POT as [-> | (?&->&MAP)].
+      all: eexists; split; [eapply STEP| done]. 
+  Qed.
 
   Instance locale_trans_ex_dec τ st1:
     Decision (exists st2, locale_trans st1 τ st2).
@@ -132,47 +140,47 @@ Section LMFair.
       + by rewrite dom_gset_to_gmap.
       + set_solver.
     - intros ??? STEP.
-      apply elem_of_filter. split; eauto. 
-      inversion STEP as [[STEP']|[? STEP']]. 
-      + inversion STEP'. eapply ls_mapping_tmap_corr in H3 as (?&?&?).
-        eapply elem_of_dom_2; eauto. 
-      + inversion STEP' as (? & MAP & ?).
-        eapply ls_mapping_tmap_corr in MAP as (?&?&?).
-        eapply elem_of_dom_2; eauto. 
+      apply elem_of_filter. split; eauto.
+      destruct STEP as (ℓ & STEP & MATCH). destruct ℓ; simpl in *; try done; subst.
+      + destruct STEP as (_&MAP&_).
+        eapply ls_mapping_tmap_corr in MAP as (?&?&?). eapply elem_of_dom; eauto.
+      + destruct STEP as ([? MAP]&_). 
+        eapply ls_mapping_tmap_corr in MAP as (?&?&?). eapply elem_of_dom; eauto.
   Defined.
 
   Lemma LM_live_roles_strong δ τ:
     τ ∈ live_roles LM_Fair δ <-> (exists δ', locale_trans δ τ δ').
-  Proof. 
+  Proof.
     split.
     2: { intros [??]. eapply LM_Fair. simpl. eauto. }
     simpl. intros [??]%elem_of_filter. eauto.
+  Qed.
+
+  (* Useful in cases where the whole LM_Fair machinery cannot be used *)
+  Definition group_enabled τ δ := exists δ', locale_trans δ τ δ'.
+
+  Lemma LM_live_role_map_notempty δ τ
+    (LIVE: τ ∈ live_roles LM_Fair δ):
+    exists R, ls_tmap δ (LM := LM) !! τ = Some R /\ R ≠ ∅.
+  Proof. 
+    apply LM_live_roles_strong in LIVE as [? STEP].
+    destruct STEP as (ℓ & T & MATCH).
+    destruct ℓ; simpl in *; try done; subst. 
+    - destruct T as (_&MAP&_).
+      eapply ls_mapping_tmap_corr in MAP as (?&?&?).
+      eexists. split; eauto. set_solver. 
+    - destruct T as ([? MAP]&_). 
+      eapply ls_mapping_tmap_corr in MAP as (?&?&?). 
+      eexists. split; eauto. set_solver. 
   Qed. 
 
   Lemma LM_map_empty_notlive δ τ
     (MAP0: ls_tmap δ (LM := LM) !! τ = Some ∅ \/ ls_tmap δ (LM := LM) !! τ = None):
     τ ∉ live_roles LM_Fair δ. 
   Proof. 
-    intros [? STEP]%LM_live_roles_strong. inversion STEP.
-    - inversion H2. destruct H3 as [? MAP].
-      eapply ls_mapping_tmap_corr in MAP as (?&?&?).
-      destruct MAP0 as [? | ?]; [| congruence]. set_solver.
-    - inversion H2. destruct H3 as [? [MAP _]].
-      eapply ls_mapping_tmap_corr in MAP as (?&?&?).
-      destruct MAP0 as [? | ?]; [| congruence]. set_solver.
-  Qed. 
-
-  Lemma LM_live_role_map_notempty δ τ
-    (LIVE: τ ∈ live_roles LM_Fair δ):
-    exists R, ls_tmap δ (LM := LM) !! τ = Some R /\ R ≠ ∅.
-  Proof. 
-    apply LM_live_roles_strong in LIVE as [? STEP]. inversion STEP.
-    - inversion H2. destruct H3 as [? MAP].
-      eapply ls_mapping_tmap_corr in MAP as (?&?&?). eexists. split; eauto.
-      set_solver.
-    - inversion H2. destruct H3 as [? [MAP _]].
-      eapply ls_mapping_tmap_corr in MAP as (?&?&?). eexists. split; eauto.
-      set_solver.
+    destruct (decide (τ ∈ live_roles LM_Fair δ)) as [LR| ]; [| done].
+    apply LM_live_role_map_notempty in LR as (? & TMAP & NE).
+    destruct MAP0; set_solver. 
   Qed. 
       
 End LMFair.

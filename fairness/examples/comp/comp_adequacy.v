@@ -14,11 +14,10 @@ From trillium.fairness Require Import fairness_finiteness actual_resources_inter
 
 Import derived_laws_later.bi.
 
-From trillium.fairness Require Import lm_fairness_preservation.
-From trillium.fairness Require Import fuel_ext. 
+From trillium.fairness Require Import lm_fairness_preservation fuel_ext lm_fair.
 From trillium.fairness.examples.comp Require Import comp.
 From trillium.fairness Require Import fair_termination_natural.
-From trillium.fairness.examples.comp Require Import lm_fair my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
+From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
 
 Close Scope Z_scope. 
 
