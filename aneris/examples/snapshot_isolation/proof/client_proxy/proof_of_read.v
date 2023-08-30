@@ -62,7 +62,7 @@ Section Read_Proof.
     iIntros (uu) "(_ & Hlk & Hres)".
     wp_pures.
     iDestruct "Hres"
-      as (? ?) "(Hl & Hcr & [( -> & -> & Hres_abs & Htk) | Hres])".
+      as (?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
@@ -72,7 +72,7 @@ Section Read_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_load.
     wp_pures.
@@ -97,7 +97,7 @@ Section Read_Proof.
         simplify_eq /=.
         wp_apply (release_spec with
                    "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [Hcache Hpost]").
-        { iExists _, _.
+        { iExists _.
           iFrame "#∗".
           iRight.
           iExists ts, Msnap, cuL, cuV, cuM, cM.
@@ -173,7 +173,7 @@ Section Read_Proof.
        iDestruct "Hhpost" as "(_ & Hcnd)".
        wp_apply (release_spec with
                   "[$Hisc $Hlk Hl Hreq HcM Hauth Htk] [Hcache Hpost Hcnd]").
-       { iExists _, _.
+       { iExists _.
          iFrame "#∗".
          iRight.
          iExists ts, Msnap, cuL, cuV, cuM, cM.

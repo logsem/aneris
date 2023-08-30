@@ -60,7 +60,7 @@ Section Write_Proof.
                with "[$Hisc]").
     iIntros (uu) "(_ & Hlk & Hres)".
     iDestruct "Hres"
-      as (? ?) "(Hl & Hcr & [( -> & -> & Hres_abs & Htk) | Hres])".
+      as (?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
@@ -70,7 +70,7 @@ Section Write_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_pures.
     wp_load.
@@ -98,13 +98,12 @@ Section Write_Proof.
            with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
     wp_apply (release_spec with
                "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [H1 H2 Hpost]").
-    { iExists _, _.
+    { iExists _.
       iFrame "#∗".
       iRight.
       iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
       iFrame "#∗".
-      iSplit; first done.
       iSplit; first done.
       iSplit.
       { iPureIntro;

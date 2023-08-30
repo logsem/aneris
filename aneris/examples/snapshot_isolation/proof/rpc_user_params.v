@@ -12,7 +12,7 @@ From aneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 From aneris.examples.reliable_communication.prelude Require Import ser_inj.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
-From aneris.examples.snapshot_isolation.specs Require Import user_params.
+From aneris.examples.snapshot_isolation.specs Require Import aux_defs user_params resources.
 From aneris.examples.snapshot_isolation.proof Require Import
      time events model kvs_serialization.
 From aneris.examples.snapshot_isolation.proof.resources
@@ -89,9 +89,8 @@ Section RPC_user_params.
                       ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
                       ⌜kvs_valid_snapshot M ts⌝ ∗
                       ownTimeSnap γT ts ∗
-                      ([∗ map] k ↦ h ∈ M,
-                          ownMemUser γGauth γGsnap k h ∗
-                           ⌜∀ e, e ∈ h → e.(we_time) < ts⌝)
+                      ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
+                      ([∗ map] k ↦ h ∈ M, ownMemSeen γGsnap k h)
                       ={E,⊤}=∗ Q #ts))
           )
       )
@@ -108,29 +107,29 @@ Section RPC_user_params.
           ⌜↑KVS_InvName ⊆ E⌝ ∗
           ⌜is_map cmapV cache_updatesM⌝ ∗
           ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ ∗
+          ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+          ownTimeSnap γT ts ∗
+          ([∗ map] k ↦ h' ∈ Msnap, ownMemSeen γGsnap k h') ∗
           P ∗
          (P ={⊤, E}=∗
-          ∃ (m : gmap Key (list write_event)),
-          ⌜dom m = dom Msnap⌝ ∗
-          ownTimeSnap γT ts ∗
-          ([∗ map] k ↦ h' ∈ Msnap,
-             ownMemSeen γGsnap k h' ∗
-             ⌜∀ e, e ∈ h' → e.(we_time) < ts⌝) ∗
-          ([∗ map] k ↦ h ∈ m, ownMemUser γGauth γGsnap k h) ∗
-           ▷ (∀ (ct : nat) (b : bool),
+          ∃ (m_current : gmap Key (list val)),
+          ⌜dom m_current = dom Msnap⌝ ∗
+          ([∗ map] k ↦ hv ∈ m_current, OwnMemKey_def γGauth γGsnap k hv) ∗
+           ▷ (∀ (b : bool),
                 ((** Transaction has been commited. *)
-                 (⌜b = true⌝ ∗ ⌜can_commit_transaction m Msnap cache_logicalM⌝ ∗
-                 ([∗ map] k↦ h;p ∈ m; cache_logicalM,
-                  ownMemUser γGauth γGsnap k (commit_write_event p h ct k) ∗
-                    ownMemSeen γGsnap k (commit_write_event p h ct k))) ∨
+                 (⌜b = true⌝ ∗ ⌜can_commit m_current ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ ∗
+                 ([∗ map] k↦ h;p ∈ m_current; cache_logicalM,
+                  OwnMemKey_def γGauth γGsnap k (commit_event p h) ∗
+                    Seen_def γGsnap k (commit_event p h))) ∨
                  (** Transaction has been aborted. *)
-                 (⌜b = false⌝ ∗ ⌜¬ can_commit_transaction m Msnap cache_logicalM⌝ ∗
-                    [∗ map] k ↦ h ∈ m,
-                    ownMemUser γGauth γGsnap k h ∗
-                    ownMemSeen γGsnap k h)) ={E,⊤}=∗
+                 (⌜b = false⌝ ∗ ⌜¬ can_commit m_current ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ ∗
+                    [∗ map] k ↦ h ∈ m_current,
+                    OwnMemKey_def γGauth γGsnap k h ∗
+                    Seen_def γGsnap k h)) ={E,⊤}=∗
                 Q #b)
          )
       )).
+
   Definition ReqPost
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=
     Global_Inv clients γKnownClients γGauth γGsnap γT ∗

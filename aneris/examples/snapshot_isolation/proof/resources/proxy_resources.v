@@ -1,4 +1,5 @@
-From iris.algebra Require Import agree auth excl gmap frac_auth updates local_updates csum.
+From iris.algebra Require Import
+     agree auth excl gmap frac_auth excl_auth updates local_updates csum.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
 From iris.base_logic Require Import invariants.
@@ -16,7 +17,6 @@ From aneris.examples.snapshot_isolation.proof
      Require Import time events model.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import resource_algebras server_resources.
-
 Import gen_heap_light.
 
 Inductive proxy_state : Type :=
@@ -32,7 +32,7 @@ Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
 Section Proxy.
-  Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources}.
+  Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources }.
   (** Those are ghost names allocated before resources are instantiated. *)
   Context (γGsnap γT : gname).
   Context (γKnownClients : gname).
@@ -255,24 +255,22 @@ Qed.
   Definition is_connected_def
              (n : ip_address) (cst : val) (l : loc)
     (γS γA γCache : gname) : iProp Σ :=
-    ∃ (s : proxy_state) (sv : val),
+    ∃ (sv : val),
       l ↦[n] sv ∗
       MTSCanRequest n cst ∗
       (
         (** If no active transaction is running on the connection: *)
         (⌜sv = NONEV⌝ ∗
-         ⌜s = PSCanStart⌝ ∗
-         (** then the lock has start token and guards an empty logical cache map. *)
+            (** then the lock has start token and guards an empty logical cache map. *)
          ghost_map_auth γCache 1 ∅ ∗
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)
-        (∃ (ts : nat) (Msnap : gmap Key (list write_event))
+          (∃ (ts : nat) (Msnap : gmap Key (list write_event))
            (cache_updatesL : loc)
            (cache_updatesV : val)
            (cache_updatesM : gmap Key val)
            (cacheM : gmap Key (option val * bool)),
             ⌜sv = SOMEV (#ts, #cache_updatesL)⌝ ∗
-            ⌜s = PSActive Msnap⌝ ∗
             (** then lock has active token and guards a logical cache map
                 whose domain is equal to the one of the snapshot. *)
             ⌜is_coherent_cache cache_updatesM cacheM Msnap⌝ ∗
@@ -314,7 +312,7 @@ Qed.
      client_connected sa γCst γA γS γlk γCache ∗
        match s with
        | PSCanStart => isActiveToken γA
-       | PSActive _ => CanStartToken γS
+       | PSActive Ms => CanStartToken γS ∗ ([∗ map] k ↦ h ∈ Ms, ownMemSeen γGsnap k h)
        end.
 
 
@@ -397,9 +395,9 @@ Qed.
     iApply big_sepM_fmap.
     unfold ownCacheUser, key_upd_status.
     iApply (big_sepM_mono (λ k y,
-      (∃ (γCst0 γA0 γS0 γlk0 : gname), 
+      (∃ (γCst0 γA0 γS0 γlk0 : gname),
       client_connected sa γCst0 γA0 γS0 γlk0 γCache) ∗
-      (∃ (sa0 : socket_address) (v0 : val) (b : bool), 
+      (∃ (sa0 : socket_address) (v0 : val) (b : bool),
           ⌜(#sa, v)%V = (#sa0, v0)%V⌝ ∗
           ghost_map.ghost_map_elem γCache k (DfracOwn (1 / 2)) (last (to_hist y), b) ∗
           ⌜match last (to_hist y) with
@@ -407,9 +405,9 @@ Qed.
             | None => b = false
             end⌝) ∗
       (∃ (sa0 : socket_address) (vp : val)
-      (vo : option val), 
+      (vo : option val),
           ⌜(#sa, v)%V = (#sa0, vp)%V⌝ ∗
-          ghost_map.ghost_map_elem γCache k (DfracOwn (1 / 2)) (vo, false) ∗ 
+          ghost_map.ghost_map_elem γCache k (DfracOwn (1 / 2)) (vo, false) ∗
           ⌜false = true → is_Some vo⌝))%I).
     - iIntros (k x H_eq) "(H_cli & H_cache & H_key)".
       iDestruct "H_cli" as "[%γCst0 [%γA0 [%γS0 [%γlk0 #H_cli]]]]".
@@ -418,7 +416,7 @@ Qed.
         iExists _, _, _, _, _, _, _ , _.
         iFrame "#∗".
         by iPureIntro.
-      + iDestruct "H_key" as "[%sa' [%v' [%vo (%H_eq_pair & H_key_half & H_imp)]]]". 
+      + iDestruct "H_key" as "[%sa' [%v' [%vo (%H_eq_pair & H_key_half & H_imp)]]]".
         iExists _, _, _, _, _, _, _, _.
         iFrame "#∗".
         by iPureIntro.
@@ -426,12 +424,12 @@ Qed.
         iSplitR.
         + iApply big_sepM_dup; first set_solver.
           iExists _, _, _, _.
-          iFrame "#". 
+          iFrame "#".
         + unfold cacheM_from_Msnap.
           iDestruct ((big_sepM_fmap (λ h : list events.write_event,
-                                      (from_option 
-                                        (λ we : events.write_event, 
-                                          Some (we_val we)) None (last h), false))) 
+                                      (from_option
+                                        (λ we : events.write_event,
+                                          Some (we_val we)) None (last h), false)))
                       with "H_map") as "H_map".
           iApply big_sepM_mono; last done.
           iIntros (k l H_eq) "H_key".
@@ -444,13 +442,13 @@ Qed.
             iSplit; first done.
             iSplitL.
             {
-              assert (last (to_hist l) = from_option 
+              assert (last (to_hist l) = from_option
                                         (λ we : events.write_event,
                                         Some (we_val we)) None (last l))
               as ->; last done.
               clear H_eq.
               destruct l as [| h l]; first done.
-              unfold to_hist. 
+              unfold to_hist.
               rewrite fmap_last.
               assert (h :: l ≠ []) as H_neq.
               { set_solver. }
@@ -464,7 +462,7 @@ Qed.
           * iExists _, _, _.
             iSplit; first done.
             iSplit; iFrame.
-            iPureIntro; done. 
+            iPureIntro; done.
    Admitted.
 
 End Proxy.

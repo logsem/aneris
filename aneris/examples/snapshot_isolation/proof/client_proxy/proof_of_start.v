@@ -42,11 +42,11 @@ Section Start_Proof.
     is_connected γGsnap γT γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m : gmap Key (list val)),
-        ConnectionState_def γKnownClients c sa CanStart ∗
+        ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h >>>
       SI_start c @[ip_of_address sa] E
     <<<▷ RET #();
-        ConnectionState_def γKnownClients c sa (Active m) ∗
+        ConnectionState_def γKnownClients γGsnap c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
        ([∗ map] k ↦ h ∈ m,
           ownCacheUser γKnownClients k c (last h) ∗
@@ -64,7 +64,7 @@ Section Start_Proof.
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
-    iDestruct "HisC" as (s sv) "(Hl & Hcr & Hdisj)".
+    iDestruct "HisC" as (s) "(Hl & Hcr & Hdisj)".
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
@@ -73,14 +73,14 @@ Section Start_Proof.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
-      iDestruct "Habs" as (-> ? ? ?) "(? & ? & ? & ? & Habs)".
+      iDestruct "Habs" as (? ? ?) "(? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
       simplify_eq /=.
       by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
-    iDestruct "Hst" as (-> ->) "(Hgh & Hst)".
+    iDestruct "Hst" as (->) "(Hgh & Hst)".
     wp_pures.
     set (rd := (inr (inl (E, ⌜True⌝%I,
                            (λ tsv,
@@ -120,7 +120,7 @@ Section Start_Proof.
         iExists m.
         iFrame.
         iNext.
-        iIntros (ts M HmM) "(%Hvsn & Hts & Hpts)".
+        iIntros (ts M HmM) "(%Hvsn & Hts & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
@@ -128,15 +128,11 @@ Section Start_Proof.
         simplify_eq /=.
         iExists ts, M, (cacheM_from_Msnap M).
         iFrame.
-        iAssert (([∗ map] k↦h ∈ M, ownMemSeen γGsnap k h)%I) as "#Hseen1".
-        { iApply (big_sepM_mono with "[$Hpts]").
-          iIntros (???) "(H1 & H2)".
-          by iDestruct "H1" as "(H11 & H12)". }
         iAssert (([∗ map] k↦h ∈ ((λ h : list write_event, to_hist h) <$> M),
               Seen_def γGsnap k h)%I) as "#Hseen2".
         { rewrite /Seen_def.
           iApply big_sepM_fmap.
-          iApply (big_sepM_mono with "[$Hseen1]").
+          iApply (big_sepM_mono with "[$Hseen]").
           iIntros (???) "Hs". by eauto. }
         iMod (ghost_map.ghost_map_insert_big (cacheM_from_Msnap M) with "[$Hgh]")
           as "(Hgh & Hcpts)".
@@ -150,22 +146,16 @@ Section Start_Proof.
         { iPureIntro; by apply is_coherent_cache_start. }
         iApply fupd_frame_l; iSplit; first done.
         iApply fupd_frame_l; iSplit.
-        iFrame "#".
+        iFrame "#∗".
         iApply "Hclose".
         iSplitL "Hst".
         { iExists (PSActive M).
           iSplit; last done.
           iExists _, _, _, _, _, _.
           eauto with iFrame. }
-        iSplitL "Hpts".
-        { iApply big_sepM_fmap.
-          iApply (big_sepM_mono with "[$Hpts]").
-          iIntros (???) "(Hs & %Ht)".
-          iExists _. by eauto. }
-        iSplitL.
-        { iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
+        iFrame "#∗".
+        iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
                    with "[$Hcc1][$Hcpts]"). }
-        iFrame "#". }
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
       first by iDestruct "Habs" as (? ? ? ? ?) "Habs".
@@ -183,7 +173,7 @@ Section Start_Proof.
       as (t Msnap ?) "(Htk & Hgh & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
     wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc]").
     {
-      iExists (PSActive Msnap), (InjRV (#t, #cm))%V.
+      iExists (InjRV (#t, #cm))%V.
       iFrame "Hl Hcr".
       iRight.
       iExists _, _, _, _, ∅, _.

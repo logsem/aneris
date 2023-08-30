@@ -44,7 +44,7 @@ Section Client_Proxy_Proof.
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate;
-        ConnectionState_def γKnownClients cstate sa CanStart ∗
+        ConnectionState_def γKnownClients γGsnap cstate sa CanStart ∗
         is_connected γGsnap γT γKnownClients cstate sa }}}.
 
   Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources}  :
@@ -69,7 +69,7 @@ Section Client_Proxy_Proof.
                 (KVS_InvName.@socket_address_to_str sa) _
                 (is_connected_def γGsnap γT (ip_of_address sa) reqh l γS γA γCache)
                with "[Hreq Hl HCache Hs]").
-    - iExists _, _. iFrame. iLeft. by iFrame.
+    - iExists _. iFrame. iLeft. by iFrame.
     - iIntros (lk γ) "#Hlk".
       iMod (own_update _ _ (Cinr (to_agree (γA, γS, γ, γCache))) with "Hp") as "#Hdefined".
       {  intros n [f |]; simpl; eauto.

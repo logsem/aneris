@@ -28,7 +28,7 @@ Section Wrapper_defs.
   Definition to_local_state (s : proxy_state) : local_state :=
     match s with
       PSCanStart => CanStart
-    | PSActive m => Active ((λ h, to_hist h) <$> m)
+    | PSActive M => Active ((λ h, to_hist h) <$> M)
     end.
 
   Lemma to_hist_prefix_mono hw hw' :
@@ -54,7 +54,7 @@ Section Wrapper_defs.
     ∃ hw, ownMemUser γGauth γGsnap k hw ∗ ⌜h = to_hist hw⌝.
 
   Definition ConnectionState_def c sa s : iProp Σ :=
-    ∃ sp, connection_state γKnownClients c sa sp ∗ ⌜s = to_local_state sp⌝.
+    ∃ sp, connection_state γGsnap γKnownClients c sa sp ∗ ⌜s = to_local_state sp⌝.
 
   Definition Seen_def k h : iProp Σ :=
     ∃ hw, ownMemSeen γGsnap k hw ∗ ⌜h = to_hist hw⌝.
@@ -62,11 +62,11 @@ Section Wrapper_defs.
   Definition client_can_connect_res sa : iProp Σ :=
     client_can_connect γKnownClients sa.
 
-  Lemma mem_key_map_we_exists m :
-    ([∗ map] k↦hv ∈ m, OwnMemKey_def k hv) -∗
-    ∃ M, ([∗ map] k↦h ∈ M, ownMemUser γGauth γGsnap k h) ∗
-         ⌜m = (λ h, to_hist h)<$>M⌝.
-  Proof. Admitted.
+  (* Lemma mem_key_map_we_exists m : *)
+  (*   ([∗ map] k↦hv ∈ m, OwnMemKey_def k hv) -∗ *)
+  (*   ∃ M, ([∗ map] k↦h ∈ M, ownMemUser γGauth γGsnap k h) ∗ *)
+  (*        ⌜m = (λ h, to_hist h)<$>M⌝. *)
+  (* Proof. Admitted. *)
 
 
 End Wrapper_defs.

@@ -5,20 +5,14 @@ From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
 From aneris.examples.snapshot_isolation.specs
-     Require Export user_params.
+     Require Export user_params aux_defs.
 
 Notation "h ≤ₚ h'" := (h `prefix_of` h') (at level 20).
 
 Section Resources.
 
-  Definition Hist : Set := list val.
-
   Reserved Notation "k ↦ₖ h" (at level 20).
   Reserved Notation "k ↦{ c } vo" (at level 20).
-
-  Inductive local_state : Type :=
-   | CanStart
-   | Active (ms : gmap Key Hist).
 
   Class SI_resources Mdl Σ
     `{!anerisG Mdl Σ, !User_params}:= {

@@ -43,14 +43,14 @@ Section Commit_Proof.
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
-         ConnectionState_def γKnownClients c sa (Active ms) ∗
+         ConnectionState_def γKnownClients γGsnap c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
         ([∗ map] k ↦ p ∈ mc,
            ownCacheUser γKnownClients k c p.1 ∗ key_upd_status γKnownClients c k p.2) >>>
       SI_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
-         ConnectionState_def γKnownClients c sa CanStart ∗
+         ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
           ([∗ map] k↦ h;p ∈ m; mc,
@@ -73,12 +73,12 @@ Section Commit_Proof.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
     unfold is_connected_def.
-    iDestruct "HisC" as (s sv) "(Hl & Hcr & Hdisj)".
+    iDestruct "HisC" as (sv) "(Hl & Hcr & Hdisj)".
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Habs|Hst]".
     {
-      iDestruct "Habs" as (-> ->) "(Hgh & Hst)".
+      iDestruct "Habs" as (->) "(Hgh & Hst)".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
@@ -86,17 +86,19 @@ Section Commit_Proof.
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
+      iDestruct "Hsp" as "(Hsp & _)".
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
       simplify_eq /=.
       by iDestruct (own_valid_2 with "Hst Hsp") as %?.
     }
     iDestruct "Hst" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
-      "(-> & -> & (%Hcoh & %Hvalid & %Hismap & Htime & Hseen & Hupd & Hauth & Htok))".
+      "( -> & (%Hcoh & %Hvalid & %Hismap & Htime & Hseen & Hupd & Hauth & Htok))".
     wp_pures.
     wp_load.
     wp_pures.
     wp_op; first apply bin_op_eval_eq_val.
     case_bool_decide as Heq; wp_pures.
+    (* Case 1: cache is empty (read-only transaction). *)
     - wp_bind (_ <- _)%E.
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m ms mc) "((Hcon & %Hdomm & %Hdomms & Hkey & Hcache) & Hclose)".
@@ -109,7 +111,14 @@ Section Commit_Proof.
       simplify_eq /=.
       destruct lm as [|? lm_abs]; last done.
       simplify_eq /=.
-      iMod ("Hclose" with "[Htok Hkey Hcache]") as "HΦ".
+      (* Should be provable. Maybe state as Forall *)
+      iAssert (⌜∀ k vo b, mc !! k = Some (vo, b) -> b = false⌝%I) as "%HmcEq1".
+      admit.
+      iAssert (⌜∀ k vo b h, mc !! k = Some (vo, b) →
+                           m !! k = Some h →
+                          commit_event (vo, b) h = h⌝%I) as "%HmcEq2".
+      admit.
+      iMod ("Hclose" with "[Htok Hkey]") as "HΦ".
       + iSplitL "Htok".
         {
           unfold ConnectionState_def, connection_state.
@@ -121,21 +130,31 @@ Section Commit_Proof.
         }
         iLeft.
         iSplit; first done.
-        iSplit. admit. (* should be provable. *)
+        iSplit.
+        rewrite /can_commit.
+        case_bool_decide as Hb; first done.
+        iPureIntro. apply Hb. intros k Hk.
+        destruct (mc !! k) as [(vo,[|])|] eqn:Hmc; last done; last done.
+        { by specialize (HmcEq1 k vo true Hmc). }
         admit.
       + iModIntro.
         wp_pures.
-        wp_apply (release_spec with "[$Hlk $Hlkd Hcon Hl Hcr Hauth]").
+        wp_apply (release_spec with "[$Hlk $Hlkd Hcon Hl Hcr Hauth Hcache]").
         {
-          iExists _, _.
+          iExists _.
           iFrame.
           iLeft.
-          iSplit; first by iPureIntro.
-          iSplit; first by iPureIntro.
           iDestruct "Hcon" as (sp) "(Hst' & %Heq')".
           iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
+          iSplit; first by iPureIntro.
           destruct sp; simplify_eq /=.
-          admit. (* TODO *)
+          iDestruct "Hst'" as "(Htk & #Hseen)".
+          iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq'".
+          simplify_eq /=.
+          iFrame.
+          iDestruct (ghost_map.ghost_map_delete_big mc with "[$Hauth][Hcache]") as "df".
+          admit.
+          admit.
         }
         iIntros (? ->).
         by wp_pures.
