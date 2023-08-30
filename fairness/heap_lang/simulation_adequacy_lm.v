@@ -339,6 +339,31 @@ Proof.
   eapply upto_stutter_finiteness =>//.
 Qed.
 
+Theorem simulation_adequacy_terminate_general'
+  `{Mout: FairModel}
+  `{LM:LiveModel G Mdl}
+  (otr: mtrace Mout) (auxtr : auxtrace (LM := LM))
+  state_rel lift_grole:
+  (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) ->
+  (forall ρ, fair_aux ρ auxtr (LM := LM)) ->
+  lm_model_traces_match lift_grole state_rel otr auxtr ->
+  mtrace_fairly_terminating otr.
+Proof.
+  intros Hterm Hfairaux Hmatch.
+  red. intros VALID FAIR. 
+  destruct (infinite_or_finite otr) as [Hinf|] =>//.
+
+  assert (auxtrace_valid auxtr) as Hvalaux.
+  { by eapply traces_match_LM_preserves_validity. }
+
+  destruct (can_destutter_auxtr auxtr (LM := LM)) as [mtr Hupto] =>//.
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+  have Htermtr := Hterm mtr Hmtrvalid Hfairm.
+  eapply traces_match_preserves_termination =>//.
+  eapply upto_stutter_finiteness =>//.
+Qed.
+
 (* TODO: unify with the language-oriented version above *)
 Theorem simulation_adequacy_terminate_general
   `{Mout: FairModel}
@@ -352,22 +377,10 @@ Theorem simulation_adequacy_terminate_general
   (* The coinductive pure coq proposition given by adequacy *)
   mtrace_fairly_terminating otr.
 Proof.
-  intros Hterm Hmatch Hvex Hfair.
-  red. intros VALID FAIR. 
+  intros. red. intros.
   destruct (infinite_or_finite otr) as [Hinf|] =>//.
-
-  assert (auxtrace_valid auxtr) as Hvalaux.
-  { by eapply traces_match_LM_preserves_validity. }
-
-  assert (forall ρ, fair_aux ρ auxtr (LM := LM)) as Hfairaux.
-  { eapply model_fairness_preserved; eauto. }
-
-  destruct (can_destutter_auxtr auxtr (LM := LM)) as [mtr Hupto] =>//.
-  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
-  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-  have Htermtr := Hterm mtr Hmtrvalid Hfairm.
-  eapply traces_match_preserves_termination =>//.
-  eapply upto_stutter_finiteness =>//.
+  eapply simulation_adequacy_terminate_general'; eauto.  
+  eapply model_fairness_preserved; eauto. 
 Qed.
 
 

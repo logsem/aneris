@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export inftraces fairness fuel traces_match. 
+From trillium.fairness Require Export inftraces fairness fuel traces_match trace_utils.
 
 
 (* TODO: move? *)
@@ -113,6 +113,16 @@ Section fairness_preserved.
   (* Local Hint Resolve match_locale_prop: core. *)
   Local Hint Resolve pred_first_trace: core.
 
+  
+  Definition steps_or_unassigned 
+    (ρ: fmrole M) (δ: LiveState G M) (ℓ: option (lm_lbl LM)) :=
+    (∀ τ, ls_mapping δ !! ρ ≠ Some τ) \/ (∃ τ, ℓ = Some $ Take_step ρ τ).     
+    
+  Definition fair_aux_SoU auxtr ρ n := 
+    pred_at auxtr n (λ δ _, ρ ∈ dom (ls_mapping δ)) ->
+    ∃ m, pred_at auxtr (n + m)
+      (λ (δ : lm_ls LM) (ℓ : option (lm_lbl LM)), steps_or_unassigned ρ δ ℓ). 
+
   Definition fairness_induction_stmt ρ fm f m τ extr (auxtr : auxtrace (LM := LM)) δ
     :=
       (infinite_trace extr ->
@@ -122,17 +132,17 @@ Section fairness_preserved.
        δ = trfirst auxtr ->
        δ.(ls_fuel) !! ρ = Some f ->
        δ.(ls_mapping) !! ρ = Some τ ->
-       (pred_at extr m (λ c _, ¬locale_prop (lift_grole τ) c) ∨ pred_at extr m (λ _ oζ, oζ = Some (Some (lift_grole τ)))) ->
-      ∃ M, pred_at auxtr M (λ δ _, ∀ τ0 : G, ls_mapping δ !! ρ ≠ Some τ0)
-           ∨ pred_at auxtr M (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0))).
-
+       (pred_at extr m (λ c _, ¬locale_prop (lift_grole τ) c) ∨ 
+        pred_at extr m (λ _ oζ, oζ = Some (Some (lift_grole τ)))) ->
+      ∃ M, pred_at auxtr M (fun δ ℓ => steps_or_unassigned ρ δ ℓ)). 
+  
   (* TODO: move *)
   Lemma pred_at_trfirst {St L : Type}
     (tr: trace St L) (P : St → Prop):
     pred_at tr 0 (fun st _ => P st) ↔ P (trfirst tr).
   Proof. 
     rewrite /pred_at. destruct tr; eauto.
-  Qed. 
+  Qed.
 
   Local Lemma case1 ρ f m (extr': out_trace) (auxtr' : auxtrace (LM := LM)) δ ℓ :
     (∀ m0 : nat * nat,
@@ -144,11 +154,7 @@ Section fairness_preserved.
     infinite_trace extr' ->
     ls_fuel δ !! ρ = Some f ->
     (∀ ζ, fair_by locale_prop ζ extr') ->
-    ∃ M0 : nat,
-      pred_at (δ -[ ℓ ]-> auxtr') M0
-              (λ δ0 _, ∀ τ0 : G, ls_mapping δ0 !! ρ ≠ Some τ0)
-      ∨ pred_at (δ -[ ℓ ]-> auxtr') M0
-                (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
+    ∃ M0 : nat, pred_at (δ -[ ℓ ]-> auxtr') M0 (fun δ ℓ => steps_or_unassigned ρ δ ℓ).
     Proof.
       intros IH Hdec Hmatch Hinf Hsome Hfair.
       unfold oless in Hdec.
@@ -159,7 +165,9 @@ Section fairness_preserved.
         
         (* destruct (decide (ρ ∈ live_roles M (trfirst auxtr'))) as [Hρlive'|]; last first. *)
         destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
-        { exists 1. left. unfold pred_at. simpl. destruct auxtr'; eauto. }
+        { exists 1. apply pred_at_S.
+          rewrite /steps_or_unassigned. apply pred_at_or. left.
+          eapply pred_at_trfirst. eauto. }
         (* have [τ' Hτ'] : is_Some (ls_mapping (trfirst auxtr') !! ρ) by eauto. *)
         destruct MAP as [τ' Hτ']. 
 
@@ -169,13 +177,13 @@ Section fairness_preserved.
           eapply match_locale_prop; eauto. }
 
         have [p Hp] := (Hfair (lift_grole τ') 0 Hloc'en).
-        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ (δ0 : LiveState G M) _, ∀ τ0 : G, ls_mapping δ0 !! ρ ≠ Some τ0)
-                                  ∨ pred_at auxtr' M0 (λ (_ : LiveState G M) ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
+        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (steps_or_unassigned ρ).
         { eapply (IH _ _ _ p _ extr'); eauto.
           Unshelve. unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)).
           lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
-      - exists 1. left. apply pred_at_S.
+      - exists 1. apply pred_at_S.
+        rewrite /steps_or_unassigned. apply pred_at_or. left.
         apply pred_at_trfirst.
         rewrite -ls_same_doms in Hdec.
         intros ??. apply Hdec, elem_of_dom. eauto. 
@@ -320,7 +328,8 @@ Section fairness_preserved.
     - (* Another thread is taking a step. *)
       (* destruct (decide (ρ ∈ live_roles M (trfirst auxtr'))) as [Hρlive'|]; last first. *)
       destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
-      { exists 1. left. unfold pred_at. simpl. destruct auxtr'; eauto. }
+      { exists 1. apply pred_at_or. left.
+        eapply pred_at_trfirst; eauto. }
       destruct m as [| m'].
       { rewrite -> !pred_at_0 in Hexen. destruct Hexen as [Hexen|Hexen].
         - exfalso. apply Hexen. eapply (match_locale_prop _ _ _ _ Htm); eauto. 
@@ -342,8 +351,7 @@ Section fairness_preserved.
           eapply match_locale_prop; eauto. 
           by inversion Htm. }
 
-        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ δ0 _, ∀ τ0 : G, ls_mapping δ0 !! ρ ≠ Some τ0)
-                        ∨ pred_at auxtr' M0 (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
+        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (steps_or_unassigned ρ).
         { eapply (IH _ _ _ m' _ extr'); eauto. by eapply infinite_cons. by inversion Htm.
           Unshelve. unfold strict, lt_lex. lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
@@ -361,8 +369,7 @@ Section fairness_preserved.
           eapply match_locale_prop; eauto. 
           by inversion Htm. }
         have [p Hp] := (Hfair' (lift_grole τ'') 0 Hζ'en).
-        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ δ0 _, ∀ τ0 : G, ls_mapping δ0 !! ρ ≠ Some τ0)
-                        ∨ pred_at auxtr' M0 (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
+        have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (steps_or_unassigned ρ).
         { eapply (IH _ _ _ p _ extr'); eauto. by eapply infinite_cons. by inversion Htm.
           Unshelve. unfold strict, lt_lex. lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
@@ -379,23 +386,11 @@ Section fairness_preserved.
     destruct t; eauto.
   Qed. 
 
-  Definition role_steps_or_unassigned auxtr ρ n := 
-    (* ρ ∈ dom (ls_mapping (trfirst auxtr)) ->  *)
-    pred_at auxtr n
-         (λ δ _, ρ ∈ dom (ls_mapping δ)) ->
-∃ m : nat,
-    pred_at auxtr (n + m)
-      (λ (δ : lm_ls LM) (_ : option (lm_lbl LM)),
-         ∀ τ : G, ls_mapping δ !! ρ ≠ Some τ)
-    ∨ pred_at auxtr (n + m)
-        (λ (_ : lm_ls LM) (ℓ : option (lm_lbl LM)),
-           ∃ tid : G, ℓ = Some (Take_step ρ tid)). 
-
   Lemma exec_fairness_implies_step_or_unassign (extr: out_trace) (auxtr: auxtrace (LM := LM)):
     infinite_trace extr ->
     lm_exaux_traces_match_gen extr auxtr ->
     (forall ζ, fair_by locale_prop ζ extr) ->
-    forall ρ n, role_steps_or_unassigned auxtr ρ n.
+    forall ρ n, fair_aux_SoU auxtr ρ n.
   Proof.
     intros Hinfin Hmatch Hex ρ n.
     red.
@@ -428,13 +423,14 @@ Section fairness_preserved.
   Qed.
 
   Lemma steps_or_unassigned_implies_aux_fairness (auxtr: auxtrace (LM := LM)):
-    (forall ρ n, role_steps_or_unassigned auxtr ρ n) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
+    (forall ρ n, fair_aux_SoU auxtr ρ n) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
   Proof.
     intros FAIR ρ n Hn.
     eapply pred_at_impl in Hn.
     2: { intros ? ? EN%mapping_live_role%elem_of_dom. apply EN. }
     specialize (FAIR _ _ Hn). destruct FAIR as (m & STEP).
-    exists m. destruct STEP; eauto. left.
+    exists m.
+    apply pred_at_or in STEP. destruct STEP; eauto. left.
     eapply pred_at_impl; eauto. intros. simpl in *.
     intros [??]%mapping_live_role. congruence.
   Qed.   
