@@ -59,7 +59,6 @@ Section Commit_Proof.
          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
            [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h ∗ Seen_def γGsnap k h)) >>>.
 
-
   Lemma commit_spec_internal_holds {MTR : MTS_resources}  :
     Global_Inv clients γKnownClients γGauth γGsnap γT  ⊢ commit_spec_internal.
   Proof.
@@ -111,13 +110,24 @@ Section Commit_Proof.
       simplify_eq /=.
       destruct lm as [|? lm_abs]; last done.
       simplify_eq /=.
+      unfold ownCacheUser.
       (* Should be provable. Maybe state as Forall *)
       iAssert (⌜∀ k vo b, mc !! k = Some (vo, b) -> b = false⌝%I) as "%HmcEq1".
-      admit.
+      {
+        iPureIntro.
+        intros k vo b H_pure_eq_mc.
+        admit.
+      }
       iAssert (⌜∀ k vo b h, mc !! k = Some (vo, b) →
                            m !! k = Some h →
                           commit_event (vo, b) h = h⌝%I) as "%HmcEq2".
-      admit.
+      {
+        iPureIntro.
+        intros k vo b h H_pure_eq_mc H_pure_eq_m.
+        apply (HmcEq1 _ _ _) in H_pure_eq_mc as ->.
+        simpl.
+        by destruct vo.
+      }
       iMod ("Hclose" with "[Htok Hkeys]") as "HΦ".
       + iSplitL "Htok".
         {
@@ -137,7 +147,38 @@ Section Commit_Proof.
         intros k Hk.
         destruct (mc !! k) as [(vo,[|])|] eqn:Hmc; last done; last done.
         { by specialize (HmcEq1 k vo true Hmc). }
-        admit.
+        iDestruct (big_sepM2_sepM_2 _ ((λ k h, True)%I) _ mc with "[$Hkeys] []") as "Hkeys".
+        * intros k.
+          split; intros H_some.
+          -- apply elem_of_dom in H_some. 
+             rewrite Hdomm in H_some.
+             rewrite Hdomms in H_some.
+             by apply elem_of_dom in H_some.
+          -- apply elem_of_dom in H_some. 
+            rewrite -Hdomms in H_some.
+            rewrite -Hdomm in H_some.
+            by apply elem_of_dom in H_some.
+        * by iApply (big_sepM_dup).
+        * iApply big_sepM2_mono; last done.
+          iIntros (k h p H_some_eq_m H_some_eq_mc) "(H_key & _)".
+          destruct p.
+          apply (HmcEq2 _ _ _ _ H_some_eq_mc) in H_some_eq_m as ->.
+          unfold OwnMemKey_def.
+          iDestruct "H_key" as (hw) "(H_key & %H_key_eq)".
+          unfold ownMemUser.
+          iDestruct "H_key" as "(H_key & #H_key_seen)".
+          iSplit.
+          { 
+             iExists hw.
+             iFrame "#∗".
+             by iPureIntro.
+          }
+          {
+            unfold Seen_def.
+            iExists hw.
+            iFrame "#".
+            by iPureIntro.
+          }
       + iModIntro.
         wp_pures.
         wp_apply (release_spec with "[$Hlk $Hlkd Hcon Hl Hcr Hauth Hcache HauthMsnap]").
@@ -154,125 +195,116 @@ Section Commit_Proof.
           simplify_eq /=.
           iFrame.
           iDestruct (ghost_map.ghost_map_delete_big mc with "[$Hauth][Hcache]") as "df".
-          - admit.
-          - admit.
-        }
-        iIntros (? ->).
-        by wp_pures.
+          - iDestruct (big_sepM_mono _ 
+            (λ k v0, ghost_map.ghost_map_elem _ k (DfracOwn 1) v0)%I 
+            with "[$Hcache]") as "H_goal".
+            * iIntros (k p H_some_mc) "(H_cache & H_upd)".
+              iDestruct "H_cache" as (sa_c v_c γCst_c γA_c γS_c γlk_c γCache_c γMsnap_c b)
+                "(%H_pair_eq_c & H_conn_c & H_elem_c & _)".
+              iDestruct "H_upd" as (sa_u v_u γCst_u γA_u γS_u γlk_u γCache_u γMsnap_u vo)
+                "(%H_pair_eq_u & H_conn_u & H_elem_u & _)".
+              simplify_eq.
+              iDestruct (client_connected_agree with "[$H_conn_c][$H_conn_u]") as "%Heq'".
+              simplify_eq.
+              iDestruct (ghost_map.ghost_map_elem_combine
+                  with "[$H_elem_c][$H_elem_u]") as "(H_elem & %H_eq)".
+              inversion H_eq.
+              rewrite dfrac_op_own Qp.half_half.
+              destruct p.
+              simpl.
+              admit.
+            * admit.
+      
+(*   alternative approach to the above
+          - 
+            iDestruct (big_sepM_mono _ (λ k y,
+              (∃ (γCst0 γA0 γS0 γlk0 γCache γMsnap: gname),
+                client_connected γKnownClients sa γCst0 γA0 γS0 γlk0 γCache γMsnap) ∗
+                ownCacheUser γKnownClients k (#sa, v) y.1 ∗
+                key_upd_status γKnownClients (#sa, v) k y.2)%I 
+              with "[$Hcache]") as "Hcache".
+            + iIntros (k x H_mc_some) "(H_cache & H_upd)". 
+              iDestruct "H_cache" as (sa_c vo_c γCst_c γA_c γS_c γlk_c γCache_c γMsnap_c b_c) 
+                "(%H_eq_c & #H_conn_c & H_map_c & H_match_c)".
+              iDestruct "H_upd" as (sa_u v_u γCst_u γA_u γS_u γlk_u γCache_u γMsnap_u vo_u) 
+                "(%H_eq_u & #H_conn_u & H_map_u & H_imp_u)".
+              simplify_eq.
+              iDestruct (client_connected_agree with "[$H_conn_c][$H_conn_u]") as "%Heq'".
+              simplify_eq.
+              iSplit.
+              {
+               iExists _, _, _, _, _, _.
+               iFrame "#". 
+              }
+              iSplitL "H_map_c H_match_c".
+              {
+                iExists _, _, _, _, _, _, _, _.
+                iExists _.
+                iSplit; first by iPureIntro.
+                iFrame "#∗".
+              }
+              iExists _, _, _, _, _, _, _, _.
+              iExists _.
+              iSplit; first by iPureIntro.
+              iFrame "#∗".
+            + iDestruct (big_sepM_sep
+                (λ k y, (∃ γCst1 γA1 γS1 γlk1 γCache γMsnap : gname,
+                        client_connected γKnownClients sa γCst1 γA1 γS1 γlk1 γCache γMsnap))%I
+                (λ k y, ownCacheUser γKnownClients k (#sa, v) y.1 ∗
+                        key_upd_status γKnownClients (#sa, v) k y.2)%I 
+                mc with "Hcache") as "(Hconn & Hcache)".
+              destruct (decide (mc = ∅)) as [-> | H_mc_neq_emp].
+              * by iApply big_sepM_empty.
+              * apply map_choose in H_mc_neq_emp as H_mc_some.
+                destruct H_mc_some as [i [x H_mc_some]].
+                iDestruct (big_sepM_lookup_dom _ _ i with "[$Hconn]") as "Hconn"; first by rewrite H_mc_some.
+                iDestruct "Hconn" as (γCst1' γA1' γS1' γlk1' γCache' γMsnap') "#Hconn".
+                iDestruct (client_connected_agree with "[$Hconn][$Hcc2]") as "%Heq'".
+                simplify_eq.
+                (* .... *)
+                iApply (big_sepM_mono); last done.
+                iIntros (k p H_some_mc) "(H_cache & H_upd)".
+                iDestruct "H_cache" as (sa_c v_c γCst_c γA_c γS_c γlk_c γCache_c γMsnap_c b)
+                  "(%H_pair_eq_c & H_conn_c & H_elem_c & _)".
+                iDestruct "H_upd" as (sa_u v_u γCst_u γA_u γS_u γlk_u γCache_u γMsnap_u vo)
+                  "(%H_pair_eq_u & H_conn_u & H_elem_u & _)".
+                simplify_eq.
+                iDestruct (client_connected_agree with "[$H_conn_c][$H_conn_u]") as "%Heq'".
+                simplify_eq.
+                iDestruct (ghost_map.ghost_map_elem_combine
+                    with "[$H_elem_c][$H_elem_u]") as "(H_elem & %H_eq)".
+                inversion H_eq.
+                rewrite dfrac_op_own Qp.half_half.
+                destruct p. 
+                simpl.
+                iFrame.
+              admit. *)
+            - unfold ownMsnapFull, ownMsnapFrag.
+              iDestruct "HauthMsnap" as "(HauthMsnap & HauthMsnap'')".
+              iAssert ((⌜Msnap = g⌝)%I) as "<-".
+              {
+                admit.
+              }
+              assert (dom cacheM = dom mc) as H_dom_cacheM_mc.
+              {
+                destruct Hcoh as (H_dom_msnap_chacheM & _).
+                set_solver.
+              }
+              assert (cacheM ∖ mc = ∅) as ->.
+              {
+                admit.
+              }
+              iSplitL "df".
+              {
+                admit.
+              }
+              {
+                admit.
+              }
+          }
+          iIntros (? ->).
+          by wp_pures.
     - (* TODO: the non-empty cache case *) admit.
-
-
-(*
-    {
-      wp_store.
-      wp_pures.
-      wp_apply (release_spec with "[$Hlk $Hlkd]").
-    }
-
-    wp_pures.
-    case_bool_decide.
-    destruct ().
-    set (rd := (inr (inr (E, ts, cache_updatesM, cacheM, Msnap, ⌜True⌝%I,
-                           (λ b, ghost_map.ghost_map_auth γCache 1 ∅ ∗
-                               CanStartToken γS ∗ Φ #())%I))) : @ReqData Σ).
-    wp_apply ("Hspec" $! _ _ _ rd with "[]").
-    { iSplit.
-      - iPureIntro.
-        simplify_eq /=.
-        eapply sum_is_ser_valid.
-        rewrite /sum_is_ser.
-        eexists (InjLV #())%V, _. right.
-        split; first eauto.
-        simpl. split; last done.
-        eexists #(), _.
-        left.
-        split_and!; try done.
-      - rewrite /MTS_handler_pre /= /ReqPre.
-        iSplit; first done.
-        iRight.
-        iLeft.
-        iExists E, _, _.
-        iSplit; first done.
-        iSplit; first done.
-        iSplit; first done.
-        iSplit; first done.
-        iIntros "_".
-        iMod "Hsh" as (m) "[(Hst' & Hpts) Hclose]".
-        iModIntro.
-        iExists m.
-        iFrame.
-        iNext.
-        iIntros (ts M HmM) "(%Hvsn & Hts & Hpts)".
-        iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
-        iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
-        destruct sp; simplify_eq /=.
-        iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
-        simplify_eq /=.
-        iExists ts, M, (cacheM_from_Msnap M).
-        iFrame.
-        iAssert (([∗ map] k↦h ∈ M, ownMemSeen γGsnap k h)%I) as "#Hseen1".
-        { iApply (big_sepM_mono with "[$Hpts]").
-          iIntros (???) "(H1 & H2)".
-          by iDestruct "H1" as "(H11 & H12)". }
-        iAssert (([∗ map] k↦h ∈ ((λ h : list write_event, to_hist h) <$> M),
-              Seen_def γGsnap k h)%I) as "#Hseen2".
-        { rewrite /Seen_def.
-          iApply big_sepM_fmap.
-          iApply (big_sepM_mono with "[$Hseen1]").
-          iIntros (???) "Hs". by eauto. }
-        iMod (ghost_map.ghost_map_insert_big (cacheM_from_Msnap M) with "[$Hgh]")
-          as "(Hgh & Hcpts)".
-        { apply map_disjoint_empty_r. }
-        replace ((cacheM_from_Msnap M) ∪ ∅)
-          with (cacheM_from_Msnap M)
-               by by rewrite right_id_L.
-        iApply fupd_frame_l; iFrame.
-        iApply fupd_frame_l; iSplit; first done.
-        iApply fupd_frame_l; iSplit.
-        { iPureIntro; by apply is_coherent_cache_start. }
-        iApply fupd_frame_l; iSplit; first done.
-        iApply fupd_frame_l; iSplit.
-        iFrame "#".
-        iApply "Hclose".
-        iSplitL "Hst".
-        { iExists (PSActive M).
-          iSplit; last done.
-          iExists _, _, _, _, _, _.
-          eauto with iFrame. }
-        iSplitL "Hpts".
-        { iApply big_sepM_fmap.
-          iApply (big_sepM_mono with "[$Hpts]").
-          iIntros (???) "(Hs & %Ht)".
-          iExists _. by eauto. }
-        iSplitL.
-        { iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
-                   with "[$Hcc1][$Hcpts]"). }
-        iFrame "#". }
-    iIntros (repd repv) "(Hcr & Hpost)".
-    iDestruct "Hpost" as "(_ & [Habs|Hpost])";
-      first by iDestruct "Habs" as (? ? ? ? ?) "Habs".
-    iDestruct "Hpost" as "[Hpost | Habs]";
-      last by iDestruct "Habs" as (? ? ? ? ? ? ? ? ?) "Habs".
-    iDestruct "Hpost" as (? ? ? ? ? Heq1 Heq2 Heq3) "Hpost".
-    simplify_eq /=.
-    wp_pures.
-    wp_apply (@wp_map_empty Mdl Σ _ Key _ _ _ val _ with "[//]").
-    iIntros (mv Hmv).
-    wp_alloc cm as "Hc".
-    wp_pures.
-    wp_store.
-    iDestruct "Hpost"
-      as (t Msnap ?) "(Htk & Hgh & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
-    wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc]").
-    {
-      iExists (PSActive Msnap), (InjRV (#t, #cm))%V.
-      iFrame "Hl Hcr".
-      iRight.
-      iExists _, _, _, _, ∅, _.
-      iFrame "#∗".
-      iPureIntro.
-      split_and!; try done. }
-    by iIntros (? ->). *)
   Admitted.
 
 End Commit_Proof.
