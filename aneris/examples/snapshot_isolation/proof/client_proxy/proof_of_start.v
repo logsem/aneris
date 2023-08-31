@@ -64,11 +64,11 @@ Section Start_Proof.
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
-    iDestruct "HisC" as (sv s) "(Hl & Hcr & Hdisj)".
+    iDestruct "HisC" as (sv) "(Hl & Hcr & Hdisj)".
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
-    { iDestruct "Habs" as (? ? ? ? ? ? -> ->) "Habs".
+    { iDestruct "Habs" as (? ? ? ? ? ? ->) "Habs".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
@@ -81,23 +81,21 @@ Section Start_Proof.
       simplify_eq /=.
       iDestruct "Habs" as "(_ & Habs)".
       by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
-    iDestruct "Hst" as (->) "(Hgh & Hst)".
+    iDestruct "Hst" as (->) "(Hgh & Hsnap & Hst)".
     wp_pures.
-    admit.
-  Admitted.
-(*
     set (rd := (inr (inl (E, ⌜True⌝%I,
                            (λ tsv,
                         ∃ ts Msnap cacheM,
                         isActiveToken γA ∗
                         ghost_map.ghost_map_auth γCache 1 cacheM ∗
+                        ownMsnapAuth γMsnap Msnap ∗
                         ownTimeSnap γT ts ∗
                         ⌜tsv = #ts⌝ ∗
                         ⌜is_coherent_cache ∅ cacheM Msnap⌝ ∗
                         ⌜kvs_valid_snapshot Msnap ts⌝ ∗
                         ([∗ map] k↦h ∈ Msnap, ownMemSeen γGsnap k h) ∗
                         Φ #())%I))) : @ReqData Σ).
-    wp_apply ("Hspec" $! _ _ _ rd with "[$Hcr Hsh Hst Hgh]").
+    wp_apply ("Hspec" $! _ _ _ rd with "[$Hcr Hsh Hst Hgh Hsnap]").
     { iSplit.
       - iPureIntro.
         simplify_eq /=.
@@ -126,7 +124,7 @@ Section Start_Proof.
         iNext.
         iIntros (ts M HmM) "(%Hvsn & Hts & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
-        iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
+        iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
@@ -145,18 +143,27 @@ Section Start_Proof.
           with (cacheM_from_Msnap M)
                by by rewrite right_id_L.
         iApply fupd_frame_l; iFrame.
-        iApply fupd_frame_l; iSplit; first done.
+        rewrite /ownMsnapFull.
+        iMod ((@ghost_map.ghost_map_insert_big _ _ (list write_event) _ _ _ γMsnap0 ∅ M) with "[$Hsnap]")
+          as "((HghM1 & HghM2) & HcptsM)"; first by apply map_disjoint_empty_r.
+        replace (M ∪ ∅)
+          with M
+               by by rewrite right_id_L.
+        iFrame.
+        iApply fupd_frame_l. 
+        iSplit; first done. 
         iApply fupd_frame_l; iSplit.
         { iPureIntro; by apply is_coherent_cache_start. }
         iApply fupd_frame_l; iSplit; first done.
         iApply fupd_frame_l; iSplit.
         iFrame "#∗".
         iApply "Hclose".
-        iSplitL "Hst".
+        iSplitL "Hst HghM1".
         { iExists (PSActive M).
           iSplit; last done.
-          iExists _, _, _, _, _, _.
-          eauto with iFrame. }
+          iExists _, _, _, _, _, _, _.
+          iSplit; first done.
+          iFrame "#∗". }
         iFrame "#∗".
         iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
                    with "[$Hcc1][$Hcpts]"). }
@@ -174,8 +181,8 @@ Section Start_Proof.
     wp_pures.
     wp_store.
     iDestruct "Hpost"
-      as (t Msnap ?) "(Htk & Hgh & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
-    wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc]").
+      as (t Msnap ?) "(Htk & Hgh & Hmfr & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
+    wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc Hmfr]").
     {
       iExists (InjRV (#t, #cm))%V.
       iFrame "Hl Hcr".
@@ -185,6 +192,6 @@ Section Start_Proof.
       iPureIntro.
       split_and!; try done. }
     by iIntros (? ->).
-  Qed. *)
+  Qed.
 
 End Start_Proof.

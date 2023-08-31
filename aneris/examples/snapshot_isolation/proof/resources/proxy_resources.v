@@ -271,7 +271,7 @@ Qed.
         (** If no active transaction is running on the connection: *)
         (⌜sv = NONEV⌝ ∗
             (** then the lock has start token and guards an empty logical cache map. *)
-         ghost_map_auth γCache 1 ∅ ∗
+         ghost_map_auth γCache 1 (∅ : gmap Key (option val * bool)) ∗
          ownMsnapFull γMsnap ∗
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)

@@ -24,6 +24,7 @@ Class IDBG Σ :=
     (** Cache at Client Proxies *)
     IDBG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
     IDBG_Cache_lgcl :> ghost_mapG Σ Key (option val * bool);
+    IDBG_Cache_Msnap :> ghost_mapG Σ Key (list write_event);
     IDBG_TksExcl :> inG Σ (exclR unitO);
     IDBG_ConnectedClients :>
       inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
