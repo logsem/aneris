@@ -76,7 +76,7 @@ Section InnerLMTraceFairness.
   Proof. by destruct tr. Qed.
 
   Definition inner_obls_exposed (lmtr_o: auxtrace (LM := LMo)) :=
-    forall k δo_k gi, lmtr_o !! k = Some δo_k ->
+    forall k δo_k gi, lmtr_o S!! k = Some δo_k ->
                  (exists (δi: LiveState Gi Mi) (ρi: fmrole Mi),
                     state_rel (ls_under δo_k) δi /\
                     ls_mapping δi !! ρi = Some gi) ->
@@ -85,19 +85,226 @@ Section InnerLMTraceFairness.
 
   (* TODO: move, generalize? *)
   From Paco Require Import paco1 paco2 pacotac.
-  Lemma upto_stutter_auxtr_trfirst lmtr_o mtr_o
-    (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo)): 
-    ls_under (trfirst lmtr_o) = trfirst mtr_o.
+  Lemma upto_stutter_trfirst {St S' L L' : Type} 
+    (Us : St → S') (Ul: L → option L') 
+    btr str
+    (CORR: upto_stutter Us Ul btr str):
+    trfirst str = Us (trfirst btr). 
   Proof.
-    punfold CORRo.
-    2: { apply upto_stutter_mono. }    
-    by inversion CORRo. 
+    punfold CORR.
+    2: { apply upto_stutter_mono. }
+    by inversion CORR.
   Qed. 
 
+  (* TODO: move *)
+  Lemma upto_stutter_after' {St S' L L' : Type} (Us : St → S') (Ul: L → option L') 
+    {btr : trace St L} {str : trace S' L'} (n : nat) {btr' : trace St L}:
+    upto_stutter Us Ul btr str
+    → after n btr = Some btr'
+      → ∃ (n' : nat) (str' : trace S' L'),
+          after n' str = Some str' ∧ upto_stutter Us Ul btr' str'.
+  Proof. 
+    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
+    { intros P [x ?]. by exists (S x). }
+
+    intros. 
+    gd btr. gd str. gd btr'. induction n as [|n IH]; intros btr' str btr Hupto Hafter.
+    { injection Hafter => <-. clear Hafter. exists 0, str. done. }
+    punfold Hupto; [| apply upto_stutter_mono]. 
+    inversion Hupto; subst. 
+    - done.
+    - simpl in Hafter. rename btr0 into btr. 
+      specialize (IH btr' str btr). specialize_full IH; eauto.
+      by pfold.
+    - simpl in Hafter. rename btr0 into btr. rename str0 into str.
+      specialize (IH btr' str btr).
+      specialize_full IH; eauto. 
+      (* TODO: proper way of doing it? *)
+      inversion H1; eauto. done.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma upto_stutter_state_lookup' {St S' L L' : Type} (Us : St → S') (Ul: L → option L') 
+    {btr : trace St L} {str : trace S' L'} (n : nat) bst:
+    upto_stutter Us Ul btr str
+    → btr S!! n = Some bst ->
+      ∃ (n' : nat),
+        str S!! n' = Some (Us bst).
+  Proof.
+    intros UPTO NTH.
+    pose proof (trace_has_len btr) as [? LEN]. 
+    pose proof (proj1 (state_lookup_dom _ _ LEN n) (mk_is_Some _ _ NTH)) as BOUND.
+    pose proof (proj2 (LEN _) BOUND) as [btr_n AFTER].
+    forward eapply (upto_stutter_after' _ _ n UPTO); eauto.
+    intros (n' & str' & AFTER' & UPTOn).
+    exists n'.
+    rewrite -(Nat.add_0_r n'). erewrite <- state_lookup_after; eauto.
+    rewrite state_lookup_0. f_equal.     
+    erewrite upto_stutter_trfirst; [..| apply UPTOn]; eauto.
+    f_equal. apply Some_inj.
+    rewrite -state_lookup_0.
+    erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma trace_state_lookup_simpl' {St L: Type}
+    (tr: trace St L) i st:
+    (exists step, tr !! i = Some step /\ fst step = st) <-> tr S!! i = Some st. 
+  Proof.
+    rewrite /state_lookup /lookup /trace_lookup.
+    destruct after.
+    2: { split; [intros (?&?&?) | intros ?]; done. }
+    destruct t.
+    all: split; [intros  ([??]&?&?) | intros [=]]; simpl in *; subst.
+    all: congruence || eauto. 
+  Qed. 
+
+  Lemma state_lookup_after_0 {St L : Type} (tr atr : trace St L) n
+    (AFTER: after n tr = Some atr):
+    tr S!! n = Some (trfirst atr).
+  Proof. 
+    rewrite -(Nat.add_0_r n).
+    erewrite <- state_lookup_after; eauto.
+    apply state_lookup_0.
+  Qed.
+
+  (* TODO: move *)
+  Lemma trace_lookup_after' {St L : Type} (tr: trace St L) n st:
+    (exists atr, after n tr = Some atr /\ trfirst atr = st) <-> tr S!! n = Some st. 
+  Proof. 
+    destruct (after n tr) as [atr| ] eqn:AFTER.
+    2: { split; [by intros (?&?&?)| ].
+         pose proof (trace_has_len tr) as [len ?]. 
+         eintros ?%mk_is_Some%state_lookup_dom; eauto.
+         eapply trace_len_neg in AFTER; eauto. lia_NO len. }
+    erewrite state_lookup_after_0; eauto.
+    split. 
+    - intros (?&[=->]&?). congruence.
+    - intros [=]. eauto.
+  Qed. 
+
+  Lemma trace_lookup_after_strong {St L : Type} (tr: trace St L) s1 ℓ s2 n:
+    (exists atr', after n tr = Some (s1 -[ℓ]-> atr') /\ trfirst atr' = s2) <-> tr !! n = Some (s1, Some (ℓ, s2)). 
+  Proof. 
+    destruct (after n tr) as [atr| ] eqn:AFTER.
+    2: { split; [by intros (?&?&?)| ].
+         pose proof (trace_has_len tr) as [len LEN].
+         intros NTH.
+         forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN n)); eauto.
+         eapply trace_len_neg in AFTER; eauto. lia_NO len. }
+
+    rewrite /lookup /trace_lookup AFTER. 
+    split.
+    - intros (?&[=->]&?). congruence.
+    - intros EQ. destruct atr; [congruence| ].
+      inversion EQ. subst. eauto. 
+  Qed.
+
+  (* TODO: move *)
+  Lemma trace_lookup_dom_neg {St L : Type} (tr : trace St L) (len : nat_omega)
+    (LEN: trace_len_is tr len):
+    ∀ i, tr !! i = None ↔ NOmega.le len (NOnum i).
+  Proof. 
+    intros. erewrite <- trace_len_neg; eauto.
+    rewrite /lookup /trace_lookup. destruct after; [destruct t| ]; done.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma traces_match_after' {L1 L2 S1 S2 : Type} (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
+    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) 
+    (tr1' : trace S1 L1):
+    traces_match Rℓ Rs trans1 trans2 tr1 tr2
+    → after n tr1 = Some tr1'
+      → ∃ tr2' : trace S2 L2,
+          after n tr2 = Some tr2' ∧ traces_match Rℓ Rs trans1 trans2 tr1' tr2'.
+  Proof.
+    intros ?%traces_match_flip ?.
+    forward eapply traces_match_after as (?&?&?); eauto.
+    eexists. split; eauto.
+    by apply traces_match_flip.
+  Qed. 
+
+
+  Lemma traces_match_trace_lookup_general {L1 L2 S1 S2: Type}
+    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
+    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat)
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2):
+    match tr1 !! n, tr2 !! n with
+    | Some step1, Some step2 => 
+        Rs (fst step1) (fst step2) /\
+          match snd step1, snd step2 with 
+          | Some (ℓ1, s1'), Some (ℓ2, s2') => Rℓ ℓ1 ℓ2 /\ Rs s1' s2'
+          | None, None => True
+          | _, _ => False
+          end
+    | None, None => True
+    | _ , _ => False
+    end. 
+  Proof. 
+    pose proof (trace_has_len tr1) as [len LEN1]. pose proof (trace_has_len tr2) as [? LEN2].
+    forward eapply (traces_match_same_length _ _ _ _ tr1 tr2) as X; eauto. subst x.
+    destruct (tr1 !! n) as [[s1 step1]| ] eqn:STEP1, (tr2 !! n) as [[s2 step2]| ] eqn:STEP2. 
+    4: done. 
+    3: { eapply mk_is_Some, trace_lookup_dom in STEP2; eauto. 
+         eapply trace_lookup_dom_neg in STEP1; eauto.
+         lia_NO len. }
+    2: { eapply mk_is_Some, trace_lookup_dom in STEP1; eauto. 
+         eapply trace_lookup_dom_neg in STEP2; eauto.
+         lia_NO len. }
+
+    (* pose proof (trace_state_lookup_simpl' _ _ _ (@ex_intro _ _ _ STEP1)) as ST1.
+     *)
+    forward eapply (proj1 (trace_state_lookup_simpl' tr1 n s1)) as ST1; eauto.  
+    forward eapply (proj1 (trace_state_lookup_simpl' tr2 n s2)) as ST2; eauto.  
+    simpl in *.
+    pose proof (proj2 (trace_lookup_after' _ _ _) ST1) as (atr1 & AFTER1 & A1).
+    forward eapply traces_match_after' with (tr1 := tr1) (tr2 := tr2); eauto.
+    intros (atr2 & AFTER2 & A2). 
+    split.
+    { apply traces_match_first in A2.
+      erewrite state_lookup_after_0 in ST1; eauto. 
+      erewrite state_lookup_after_0 in ST2; eauto.
+      congruence. }
+    destruct step1 as [[ℓ1 s1']| ], step2 as [[ℓ2 s2']| ].
+    4: done.
+    3: { forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN2 n)); eauto.
+         forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN1 n)); eauto.
+         lia_NO' len. intros [=]. lia. }
+    2: { forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN1 n)); eauto.
+         forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN2 n)); eauto.
+         lia_NO' len. intros [=]. lia. }
+    
+    apply trace_lookup_after_strong in STEP1 as (?&AFTER1'&?), STEP2 as (?&AFTER2'&?).
+    erewrite AFTER1' in AFTER1. rewrite AFTER2' in AFTER2.
+    inversion AFTER1. inversion AFTER2. subst atr1 atr2.
+    inversion A2. subst. split; eauto.
+    eapply traces_match_first; eauto.
+  Qed.     
+
+  Lemma traces_match_state_lookup_1 {L1 L2 S1 S2: Type}
+    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
+    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) st1
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (ST1: tr1 S!! n = Some st1):
+    exists st2, tr2 S!! n = Some st2 /\ Rs st1 st2.
+  Proof. 
+    apply trace_state_lookup_simpl' in ST1 as ([s1 ostep1] & NTH1 & <-).
+    pose proof (traces_match_trace_lookup_general _ _ _ _ _ _ n MATCH) as STEPS.
+    rewrite NTH1 in STEPS.
+    destruct (tr2 !! n) as [[s2 ostep2]|] eqn:NTH2; [| done]. simpl in *.
+    destruct STEPS. eexists. split; eauto.
+    eapply trace_state_lookup_simpl'; eauto.
+  Qed. 
+
+
   (* TODO: rename? *)
-  Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ go δi f
+  Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
     (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
+    (FAIR_SOU: forall n gi, fair_aux_SoU lmtr_o (lift_Gi gi) n (LM := LMo))
     (INNER_OBLS: inner_obls_exposed lmtr_o)
   (* (INF : trace_len_is tr_o NOinfinity *)
   (* (INF' : trace_len_is lmtr_i NOinfinity *)
@@ -106,7 +313,7 @@ Section InnerLMTraceFairness.
   (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi),
           lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go')
   (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
-           lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some go)
+           lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi)
   (ST0: lmtr_i S!! 0 = Some δi)
   (FUEL0: ls_fuel δi !! ρ = Some f):
     ∃ m, pred_at lmtr_i m (steps_or_unassigned ρ).
@@ -115,22 +322,34 @@ Section InnerLMTraceFairness.
     gd lmtr_i. gd δi. gd mtr_o. gd lmtr_o. induction f.
     { intros.
       pose proof (traces_match_first _ _ _ _ _ _ MATCH) as REL0.
-      pose proof (upto_stutter_auxtr_trfirst _ _ CORRo) as CORR0. 
-      assert (is_Some (ls_mapping δi !! ρ)) as [gi MAPi].
-      { apply elem_of_dom. rewrite ls_same_doms. eapply elem_of_dom; eauto. } 
+      pose proof (upto_stutter_trfirst _ _ _ _ CORRo) as CORR0. 
+      pose proof (ASGρ _ _ ST0) as MAPi. 
 
-      specialize (INNER_OBLS 0 (trfirst lmtr_o) gi). specialize_full INNER_OBLS.
+      pose proof (INNER_OBLS 0 (trfirst lmtr_o) gi) as OBLS0. specialize_full OBLS0.
       { apply state_lookup_0. }
       { do 2 eexists. split; eauto.
-        rewrite CORR0. rewrite state_lookup_0 in ST0. congruence. }
+        rewrite -CORR0. rewrite state_lookup_0 in ST0. congruence. }
+      
+      specialize (FAIR_SOU 0 gi). red in FAIR_SOU. specialize_full FAIR_SOU.
+      { by apply pred_at_trfirst. }
+      destruct FAIR_SOU as [n_lo STEPlo].
 
-      foobar. 
+      simpl in STEPlo. apply pred_at_trace_lookup' in STEPlo as (δo_n & stepo & STLo & SOUn).
+      
+      rewrite /steps_or_unassigned in SOUn. destruct SOUn as [UNASG | STEP].
+      { forward eapply upto_stutter_state_lookup'; eauto.
+        { eapply trace_state_lookup_simpl'; eauto. }
+        intros [n_mo STmo]. simpl in STmo.
+        forward eapply traces_match_state_lookup_1; [apply MATCH| apply STmo| ].
+        intros (δi_n & STlmi & RELn).
+        red in INNER_OBLS. specialize_full INNER_OBLS.
+        { eapply trace_state_lookup_simpl'. eauto. }
+        { eauto. }
+        simpl in INNER_OBLS. apply elem_of_dom in INNER_OBLS as [??].
+        congruence. }
+
+      
         
-      clear -CORRo.
-      red in CORRo. 
-      
-      
-
 
 
   (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
