@@ -60,28 +60,32 @@ Section Start_Proof.
     iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
     rewrite /SI_start /= /start.
     wp_pures.
-    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache) "(-> & Hcc1 & Hlk)".
+    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
-    iDestruct "HisC" as (s) "(Hl & Hcr & Hdisj)".
+    iDestruct "HisC" as (sv s) "(Hl & Hcr & Hdisj)".
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
-    { iDestruct "Habs" as (? ? ? ? ? ? ->) "Habs".
+    { iDestruct "Habs" as (? ? ? ? ? ? -> ->) "Habs".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
       iDestruct "Habs" as (? ? ?) "(? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
-      iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
+      iDestruct "Hcst" as (? ? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
       simplify_eq /=.
+      iDestruct "Habs" as "(_ & Habs)".
       by iDestruct (own_valid_2 with "Habs Hsp") as %?. }
     iDestruct "Hst" as (->) "(Hgh & Hst)".
     wp_pures.
+    admit.
+  Admitted.
+(*
     set (rd := (inr (inl (E, ⌜True⌝%I,
                            (λ tsv,
                         ∃ ts Msnap cacheM,
@@ -181,6 +185,6 @@ Section Start_Proof.
       iPureIntro.
       split_and!; try done. }
     by iIntros (? ->).
-  Qed.
+  Qed. *)
 
 End Start_Proof.

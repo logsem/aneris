@@ -53,15 +53,15 @@ Section Write_Proof.
   Proof.
     iIntros (c sa vo k v b Hk Φ) "!# (#Hisc & Hcache & Hkds) Hpost".
     iDestruct "Hisc" as (lk cst l) "Hisc".
-    iDestruct "Hisc" as (γCst γlk γS γA γCache ->) "#(Hc1 & Hisc)".
+    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)".
     rewrite /SI_write /= /write.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
                with "[$Hisc]").
     iIntros (uu) "(_ & Hlk & Hres)".
     iDestruct "Hres"
-      as (?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
-    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
+      as (? ?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
+    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
       iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
@@ -70,7 +70,7 @@ Section Write_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> -> Hcoh Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_pures.
     wp_load.
@@ -79,12 +79,12 @@ Section Write_Proof.
     wp_apply (wp_map_insert $! Hm).
     iIntros (cuV' Hm').
     wp_store.
-    iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq)
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
                             "(#Hc3 & HcacheHalf1 & %Hv)".
     symmetry in Heq. simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc3][$Hc1]") as "%Heq'".
     simplify_eq.
-    iDestruct "Hkds" as (? ? ? ? ? ? ? ? Heq')
+    iDestruct "Hkds" as (? ? ? ? ? ? ? ? ? Heq')
                             "(#Hc4 & HcacheHalf2 & %Hb)".
     symmetry in Heq'. simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq''".
@@ -98,12 +98,13 @@ Section Write_Proof.
            with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
     wp_apply (release_spec with
                "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [H1 H2 Hpost]").
-    { iExists _.
+    { iExists _, _.
       iFrame "#∗".
       iRight.
       iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
       iFrame "#∗".
+      iSplit; first done.
       iSplit; first done.
       iSplit.
       { iPureIntro;
@@ -114,11 +115,13 @@ Section Write_Proof.
     iIntros (v0 ->).
     iApply "Hpost".
     iSplitL "H1".
-    { iExists _, _, _, _, _, _, _, true.
+    { iExists _, _, _, _, _, _, _, _.
+      iExists true.
       iSplit; first done.
       iFrame "#∗".
       by destruct v. }
     iExists _, _, _, _, _, _, _, _.
+    iExists _. 
     iSplit; first done.
     iFrame "#∗".
     eauto.

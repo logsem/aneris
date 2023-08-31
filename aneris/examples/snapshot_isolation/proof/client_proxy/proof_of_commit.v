@@ -68,7 +68,7 @@ Section Commit_Proof.
     rewrite /SI_commit /= /commit.
     wp_pures.
     unfold is_connected.
-    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache) "(-> & Hcc1 & Hlk)".
+    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
@@ -78,21 +78,21 @@ Section Commit_Proof.
     wp_load.
     iDestruct "Hdisj" as "[Habs|Hst]".
     {
-      iDestruct "Habs" as (->) "(Hgh & Hst)".
+      iDestruct "Habs" as (->) "(Hgh & Hst & Htk')".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m ms mc) "[(Hcst & _) Hclose]".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
-      iDestruct "Hcst" as (? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
+      iDestruct "Hcst" as (? ? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
       iDestruct "Hsp" as "(Hsp & _)".
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
       simplify_eq /=.
-      by iDestruct (own_valid_2 with "Hst Hsp") as %?.
+      by iDestruct (own_valid_2 with "Htk' Hsp") as %?.
     }
     iDestruct "Hst" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
-      "( -> & (%Hcoh & %Hvalid & %Hismap & Htime & Hseen & Hupd & Hauth & Htok))".
+      "( -> & (%Hcoh & %Hvalid & %Hismap & Htime & Hseen & Hupd & Hauth & HauthMsnap & Htok))".
     wp_pures.
     wp_load.
     wp_pures.
@@ -101,7 +101,7 @@ Section Commit_Proof.
     (* Case 1: cache is empty (read-only transaction). *)
     - wp_bind (_ <- _)%E.
       wp_apply (aneris_wp_atomic _ _ (E)).
-      iMod "Hsh" as (m ms mc) "((Hcon & %Hdomm & %Hdomms & Hkey & Hcache) & Hclose)".
+      iMod "Hsh" as (m ms mc) "((Hcon & %Hdomm & %Hdomms & Hkeys & Hcache) & Hclose)".
       iModIntro.
       wp_store.
       iSpecialize ("Hclose" $! true).
@@ -118,13 +118,13 @@ Section Commit_Proof.
                            m !! k = Some h →
                           commit_event (vo, b) h = h⌝%I) as "%HmcEq2".
       admit.
-      iMod ("Hclose" with "[Htok Hkey]") as "HΦ".
+      iMod ("Hclose" with "[Htok Hkeys]") as "HΦ".
       + iSplitL "Htok".
         {
           unfold ConnectionState_def, connection_state.
           iExists PSCanStart.
           iSplitL; last by iPureIntro.
-          iExists _, _, _, _, _, _.
+          iExists _, _, _, _, _, _, _.
           iSplitR; first by iPureIntro.
           iFrame "∗#".
         }
@@ -133,28 +133,29 @@ Section Commit_Proof.
         iSplit.
         rewrite /can_commit.
         case_bool_decide as Hb; first done.
-        iPureIntro. apply Hb. intros k Hk.
+        iPureIntro. apply Hb.
+        intros k Hk.
         destruct (mc !! k) as [(vo,[|])|] eqn:Hmc; last done; last done.
         { by specialize (HmcEq1 k vo true Hmc). }
         admit.
       + iModIntro.
         wp_pures.
-        wp_apply (release_spec with "[$Hlk $Hlkd Hcon Hl Hcr Hauth Hcache]").
+        wp_apply (release_spec with "[$Hlk $Hlkd Hcon Hl Hcr Hauth Hcache HauthMsnap]").
         {
           iExists _.
           iFrame.
           iLeft.
           iDestruct "Hcon" as (sp) "(Hst' & %Heq')".
-          iDestruct "Hst'" as (???????) "(#Hcc2 & Hst')".
+          iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
           iSplit; first by iPureIntro.
           destruct sp; simplify_eq /=.
-          iDestruct "Hst'" as "(Htk & #Hseen)".
+          iDestruct "Hst'" as "(Htk & #Hseen & HauthMsnap')".
           iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq'".
           simplify_eq /=.
           iFrame.
           iDestruct (ghost_map.ghost_map_delete_big mc with "[$Hauth][Hcache]") as "df".
-          admit.
-          admit.
+          - admit.
+          - admit.
         }
         iIntros (? ->).
         by wp_pures.

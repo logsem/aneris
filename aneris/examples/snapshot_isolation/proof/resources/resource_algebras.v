@@ -27,7 +27,7 @@ Class IDBG Σ :=
     IDBG_TksExcl :> inG Σ (exclR unitO);
     IDBG_ConnectedClients :>
       inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
-    IDBG_TksAgr :>  inG Σ (csumR (exclR unitR) (agreeR ((gnameO * gnameO * gnameO * gnameO) : Type)));
+    IDBG_TksAgr :>  inG Σ (csumR (exclR unitR) (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
     (** Time *)
     IDBG_TimeStamp :> mono_natG Σ;
     (** Lock *)

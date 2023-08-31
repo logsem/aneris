@@ -54,7 +54,7 @@ Section Read_Proof.
     iIntros (c sa k vo Hk) "#Hspec !#".
     iIntros (Φ) "(#Hisc & Hcache) Hpost".
     iDestruct "Hisc" as (lk cst l) "Hisc".
-    iDestruct "Hisc" as (γCst γlk γS γA γCache ->) "#(Hc1 & Hisc)".
+    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)".
     rewrite /SI_read /= /read.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
@@ -62,8 +62,8 @@ Section Read_Proof.
     iIntros (uu) "(_ & Hlk & Hres)".
     wp_pures.
     iDestruct "Hres"
-      as (?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
-    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq) "Hcache".
+      as (? ?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
+    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
       iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
@@ -72,7 +72,7 @@ Section Read_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> -> Hcoh Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_load.
     wp_pures.
@@ -81,7 +81,7 @@ Section Read_Proof.
     iIntros (vo1 Hvo1).
     assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
     destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6) .
-    iDestruct "Hcache" as (? ? ? ? ? ? ? ? Heq)
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
                             "(#Hc3 & Hcache & %Hvb)".
     simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc3][$Hc1]") as "%Heq'".
@@ -97,7 +97,7 @@ Section Read_Proof.
         simplify_eq /=.
         wp_apply (release_spec with
                    "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [Hcache Hpost]").
-        { iExists _.
+        { iExists _, _.
           iFrame "#∗".
           iRight.
           iExists ts, Msnap, cuL, cuV, cuM, cM.
@@ -107,6 +107,7 @@ Section Read_Proof.
         wp_pures.
         iApply "Hpost".
         iExists _, _, _, _, _, _, _, _.
+        iExists _.
         by iFrame "#∗". }
     (* Read from the database. *)
     rewrite Hvo1.
@@ -173,7 +174,7 @@ Section Read_Proof.
        iDestruct "Hhpost" as "(_ & Hcnd)".
        wp_apply (release_spec with
                   "[$Hisc $Hlk Hl Hreq HcM Hauth Htk] [Hcache Hpost Hcnd]").
-       { iExists _.
+       { iExists _, _.
          iFrame "#∗".
          iRight.
          iExists ts, Msnap, cuL, cuV, cuM, cM.
@@ -205,6 +206,7 @@ Section Read_Proof.
            by destruct vo; first by specialize (Hc3 k v Hkv1); set_solver.
            iApply "Hpost".
            iExists _, _, _, _, _, _, _, _.
+           iExists _.
            iSplit; first done.
            iFrame "#∗".
            eauto.
@@ -215,6 +217,7 @@ Section Read_Proof.
              simplify_eq /=.
              iApply "Hpost".
              iExists _, _, _, _, _, _, _, _.
+             iExists _. 
              iSplit; first done.
              iFrame "#∗".
              eauto. }

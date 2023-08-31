@@ -37,8 +37,17 @@ Section Proxy.
   Context (γGsnap γT : gname).
   Context (γKnownClients : gname).
 
-  Definition client_gnames_token_defined γCst γ1 γ2 γ3 γ4 : iProp Σ
-    := own γCst (Cinr (to_agree (γ1, γ2, γ3, γ4))).
+  Definition ownMsnapAuth γ (M : gmap Key (list write_event)) : iProp Σ :=
+    ghost_map_auth γ (1/2)%Qp M ∗ [∗ map] k ↦ h ∈ M, ghost_map_elem γ k (DfracOwn 1%Qp) h.
+
+  Definition ownMsnapFrag γ (M : gmap Key (list write_event)) : iProp Σ :=
+    ghost_map_auth γ (1/2)%Qp M.
+
+  Definition ownMsnapFull γ : iProp Σ :=
+    ghost_map_auth γ 1%Qp ∅.
+
+  Definition client_gnames_token_defined γCst γ1 γ2 γ3 γ4 γ5 : iProp Σ
+    := own γCst (Cinr (to_agree (γ1, γ2, γ3, γ4, γ5))).
 
   Definition client_gnames_token_pending γCst : iProp Σ
     := own γCst (Cinl (Excl ())).
@@ -254,7 +263,7 @@ Qed.
 
   Definition is_connected_def
              (n : ip_address) (cst : val) (l : loc)
-    (γS γA γCache : gname) : iProp Σ :=
+    (γS γA γCache γMsnap : gname) : iProp Σ :=
     ∃ (sv : val),
       l ↦[n] sv ∗
       MTSCanRequest n cst ∗
@@ -263,6 +272,7 @@ Qed.
         (⌜sv = NONEV⌝ ∗
             (** then the lock has start token and guards an empty logical cache map. *)
          ghost_map_auth γCache 1 ∅ ∗
+         ownMsnapFull γMsnap ∗
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)
           (∃ (ts : nat) (Msnap : gmap Key (list write_event))
@@ -280,6 +290,7 @@ Qed.
             ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
             cache_updatesL ↦[n] cache_updatesV ∗
             ghost_map_auth γCache 1 cacheM ∗
+            ownMsnapAuth γMsnap Msnap ∗
             isActiveToken γA)).
 
   Notation connection_token sa γCst := (connected_client_token γKnownClients sa γCst).
@@ -287,17 +298,17 @@ Qed.
   Definition client_can_connect sa : iProp Σ :=
    ∃ γCst, connection_token sa γCst ∗ client_gnames_token_pending γCst.
 
-  Definition client_connected sa γCst γCache γlk γA γS : iProp Σ :=
-   connection_token sa γCst ∗ client_gnames_token_defined γCst γCache γlk γA γS.
+  Definition client_connected sa γCst γCache γlk γA γS γMsnap : iProp Σ :=
+   connection_token sa γCst ∗ client_gnames_token_defined γCst γCache γlk γA γS γMsnap.
 
   Definition is_connected (c : val) (sa : socket_address)
     : iProp Σ :=
     ∃ (lk : val) (cst : val) (l : loc)
-      (γCst γlk γS γA γCache : gname),
+      (γCst γlk γS γA γCache γMsnap : gname),
       ⌜c = (#sa, (lk, (cst, #l)))%V⌝ ∗
-      client_connected sa γCst γA γS γlk γCache ∗
+      client_connected sa γCst γA γS γlk γCache γMsnap ∗
       is_lock (KVS_InvName .@ (socket_address_to_str sa)) (ip_of_address sa) γlk lk
-              (is_connected_def (ip_of_address sa) cst l γS γA γCache).
+              (is_connected_def (ip_of_address sa) cst l γS γA γCache γMsnap).
 
   Lemma connection_state_gen_persistent c sa : Persistent (is_connected c sa).
   Proof. apply _. Qed.
@@ -307,12 +318,15 @@ Qed.
       make the use of the library inconsistent because one should not
       run start and commit in parallel, only reads and/or writes. *)
  Definition connection_state (c : val) (sa : socket_address) (s : proxy_state) : iProp Σ :=
-   ∃ (v : val) (γCst γA γS γlk γCache : gnameO),
+   ∃ (v : val) (γCst γA γS γlk γCache γMsnap : gnameO),
      ⌜c = (#sa, v)%V⌝ ∗
-     client_connected sa γCst γA γS γlk γCache ∗
+     client_connected sa γCst γA γS γlk γCache γMsnap ∗
        match s with
        | PSCanStart => isActiveToken γA
-       | PSActive Ms => CanStartToken γS ∗ ([∗ map] k ↦ h ∈ Ms, ownMemSeen γGsnap k h)
+       | PSActive Msnap =>
+           CanStartToken γS ∗
+           ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
+           ownMsnapFrag γMsnap Msnap
        end.
 
 
@@ -321,9 +335,9 @@ Qed.
   ghost map. *)
   Definition ownCacheUser (k : Key) (c : val) (vo : option val) : iProp Σ :=
     ∃ (sa : socket_address) (v: val)
-      (γCst γA γS γlk γCache : gname) (b : bool),
+      (γCst γA γS γlk γCache γMsnap : gname) (b : bool),
       ⌜c = (#sa, v)%V⌝ ∗
-      client_connected sa γCst γA γS γlk γCache ∗
+      client_connected sa γCst γA γS γlk γCache γMsnap ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
       ⌜match vo with
        | None => b = false
@@ -337,10 +351,10 @@ Qed.
   This is enforced by giving half of the pointer permission to the cache pointer
   the other half to the key_upd_status predicate. *)
   Definition key_upd_status (c : val) (k : Key) (b : bool) : iProp Σ :=
-    ∃ (sa : socket_address) (vp : val) (γCst γA γS γlk γCache : gname)
+    ∃ (sa : socket_address) (vp : val) (γCst γA γS γlk γCache γMsnap : gname)
       (vo : option val),
       ⌜c = (#sa, vp)%V⌝ ∗
-      client_connected sa γCst γA γS γlk γCache ∗
+      client_connected sa γCst γA γS γlk γCache γMsnap ∗
       ghost_map_elem γCache k (DfracOwn (1/2)%Qp) (vo, b) ∗
       (⌜b = true → is_Some vo⌝).
 
@@ -349,21 +363,23 @@ Qed.
      ownCacheUser k cst (Some v) -∗
      ownCacheUser k cst (Some v) ∗ ⌜KVS_Serializable v⌝.
   Proof.
-    iIntros "[%sa [%v' [%γCst [%γA [%γS [%γlk [%γCache [%b (H_eq & H_cli & H_key & %H_ser)]]]]]]]]".
+    iIntros "[%sa [%v' [%γCst [%γA [%γS [%γlk [%γCache [%γMsnap [%b
+    (H_eq & H_cli & H_key & %H_ser)]]]]]]]]]".
     iSplit.
     2 : { by iPureIntro. }
     iExists _, _, _, _, _, _, _, _.
     iFrame.
-    by iPureIntro.
+    iExists _. iFrame. by iPureIntro.
   Qed.
 
   Lemma client_connected_agree :
-  ∀ sa γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache',
-  client_connected sa γCst γCache γlk γA γS -∗
-  client_connected sa γCst' γCache' γlk' γA' γS'  -∗
-  ⌜(γCst, γA, γS, γlk, γCache) = (γCst', γA', γS', γlk', γCache')⌝.
+  ∀ sa γCst γA γS γlk γCache γMsnap γCst' γA' γS' γlk' γCache' γMsnap',
+  client_connected sa γCst γCache γlk γA γS γMsnap -∗
+  client_connected sa γCst' γCache' γlk' γA' γS' γMsnap' -∗
+  ⌜(γCst, γA, γS, γlk, γCache, γMsnap) = (γCst', γA', γS', γlk', γCache', γMsnap')⌝.
   Proof.
-    iIntros (sa γCst γA γS γlk γCache γCst' γA' γS' γlk' γCache') "(H_sa & H_cst) (H_sa' & H_cst')".
+    iIntros (sa γCst γA γS γlk γCache γMsnap γCst' γA' γS' γlk' γCache' γMsnap')
+            "(H_sa & H_cst) (H_sa' & H_cst')".
     unfold client_gnames_token_defined.
     unfold connection_token.
     iAssert (⌜γCst = γCst'⌝%I) as %H_eq_cst.
@@ -385,18 +401,18 @@ Qed.
   Qed.
 
   Lemma own_cache_user_from_ghost_map_elem_big (M :gmap Key (list write_event)) :
-    ∀ sa v γCst γA γS γlk γCache,
-    client_connected sa γCst γA γS γlk γCache -∗
+    ∀ sa v γCst γA γS γlk γCache γMsnap,
+    client_connected sa γCst γA γS γlk γCache γMsnap -∗
     ([∗ map] k↦hv ∈ cacheM_from_Msnap M, ghost_map.ghost_map_elem γCache k (DfracOwn 1) hv) -∗
     [∗ map] k↦hw ∈ ((λ hw : list write_event, to_hist hw) <$> M),
           ownCacheUser k (#sa, v)%V (last hw) ∗ key_upd_status (#sa, v)%V k false.
   Proof.
-    iIntros (sa v γCst γA γS γlk γCache) "#H_cli H_map".
+    iIntros (sa v γCst γA γS γlk γCache γMsnap) "#H_cli H_map".
     iApply big_sepM_fmap.
     unfold ownCacheUser, key_upd_status.
     iApply (big_sepM_mono (λ k y,
       (∃ (γCst0 γA0 γS0 γlk0 : gname),
-      client_connected sa γCst0 γA0 γS0 γlk0 γCache) ∗
+      client_connected sa γCst0 γA0 γS0 γlk0 γCache γMsnap) ∗
       (∃ (sa0 : socket_address) (v0 : val) (b : bool),
           ⌜(#sa, v)%V = (#sa0, v0)%V⌝ ∗
           ghost_map.ghost_map_elem γCache k (DfracOwn (1 / 2)) (last (to_hist y), b) ∗
@@ -414,11 +430,12 @@ Qed.
       iSplitL "H_cache".
       + iDestruct "H_cache" as "[%sa' [%v' [%b (%H_eq_pair & H_key_half & H_ser)]]]".
         iExists _, _, _, _, _, _, _ , _.
+        iExists _.
         iFrame "#∗".
         by iPureIntro.
       + iDestruct "H_key" as "[%sa' [%v' [%vo (%H_eq_pair & H_key_half & H_imp)]]]".
         iExists _, _, _, _, _, _, _, _.
-        iFrame "#∗".
+        iExists _. iFrame "#∗".
         by iPureIntro.
       - iApply big_sepM_sep.
         iSplitR.
