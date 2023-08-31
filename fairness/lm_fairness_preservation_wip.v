@@ -7,6 +7,70 @@ Require Import Coq.Logic.Classical.
 (* TODO: move these files to trillium.fairness *)
 From trillium.fairness.examples.comp Require Export trace_lookup trace_len my_omega lemmas. 
 
+From Paco Require Import paco1 paco2 pacotac.
+
+
+Section Foobar. 
+  Context `{LM: LiveModel G M}.
+  Context `{Countable G}.
+
+  (* TODO: move *)
+  Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M)
+    (Po: LiveState G M -> option (mlabel LM) -> Prop)
+    (Pi: M -> option (option (fmrole M)) -> Prop)
+    (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
+                                              | Some ℓ => Ul ℓ (LM := LM)
+                                              | None => None
+                                              end))
+    (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
+    :
+    upto_stutter_auxtr auxtr mtr (LM := LM) ->
+    (∃ n, pred_at auxtr n Po) ->
+    ∃ m, pred_at mtr m Pi.
+  Proof.
+      Local Set Printing Coercions.
+      intros Hupto (* Hre *) [n Hstep].
+      revert auxtr mtr Hupto (* Hre *) Hstep.
+      induction n as [|n]; intros auxtr mtr Hupto (* Hre *) Hstep.
+      - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto; simplify_eq.
+        + rename Hstep into Hpa. 
+          exists 0. rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
+          by apply LIFT in Hpa. 
+        + rewrite -> !pred_at_0 in Hstep. exists 0.          
+          rewrite /pred_at /=. destruct mtr; simpl in *; try congruence.
+          * apply LIFT in Hstep. congruence.
+          * apply LIFT in Hstep. destruct ℓ; simpl in *; try done.
+            all: subst; eapply PI0; eauto.
+        + rewrite -> !pred_at_0 in Hstep. exists 0.
+          apply pred_at_0. rewrite <- H1.
+          by eapply LIFT in Hstep. 
+      - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
+        + done. 
+        + rewrite -> !pred_at_S in Hstep.
+          eapply IHn; eauto.
+          by pfold.
+        + rewrite -> !pred_at_S in Hstep.
+          specialize (IHn btr str). specialize_full IHn.
+          { inversion IH; eauto. done. } 
+          all: eauto.
+          destruct IHn as [m IHn]. 
+          exists (S m). by apply pred_at_S.          
+    Qed.      
+    
+
+  (* TODO: move, replace original proof (but keep old signature) *)
+  Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M):
+    upto_stutter_auxtr auxtr mtr (LM := LM) ->
+    (∃ n, pred_at auxtr n (λ δ ℓ, ¬role_enabled (G := G) ρ δ \/ ∃ ζ, ℓ = Some (Take_step ρ ζ))) ->
+    ∃ m, pred_at mtr m (λ δ ℓ, ¬role_enabled_model ρ δ \/ ℓ = Some $ Some ρ).
+  Proof.
+    intros ?. eapply upto_stutter_step_correspondence; eauto.
+    - intros ?? Po. destruct Po as [?| [? ->]]; eauto. 
+    - intros. destruct H1; [| done]. eauto.
+  Qed.
+
+End Foobar. 
+
 
 Section InnerLMTraceFairness.
   Context `{LMi: LiveModel Gi Mi}.
@@ -84,7 +148,6 @@ Section InnerLMTraceFairness.
   
 
   (* TODO: move, generalize? *)
-  From Paco Require Import paco1 paco2 pacotac.
   Lemma upto_stutter_trfirst {St S' L L' : Type} 
     (Us : St → S') (Ul: L → option L') 
     btr str
@@ -157,6 +220,18 @@ Section InnerLMTraceFairness.
     destruct t.
     all: split; [intros  ([??]&?&?) | intros [=]]; simpl in *; subst.
     all: congruence || eauto. 
+  Qed. 
+
+  (* TODO: move *)
+  Lemma trace_label_lookup_simpl' {St L: Type}
+    (tr: trace St L) i ℓ:
+    (exists s1 s2, tr !! i = Some (s1, Some (ℓ, s2))) <-> tr L!! i = Some ℓ. 
+  Proof.
+    split.
+    - intros (?&?&?%state_label_lookup). tauto.
+    - rewrite /label_lookup /lookup /trace_lookup.
+      destruct after; [| done].
+      destruct t; [done| ]. intros [=->]. eauto.
   Qed. 
 
   Lemma state_lookup_after_0 {St L : Type} (tr atr : trace St L) n
@@ -299,6 +374,23 @@ Section InnerLMTraceFairness.
     eapply trace_state_lookup_simpl'; eauto.
   Qed. 
 
+  Lemma traces_match_label_lookup_1 {L1 L2 S1 S2: Type}
+    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
+    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) ℓ1
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (LBL1: tr1 L!! n = Some ℓ1):
+    exists ℓ2, tr2 L!! n = Some ℓ2 /\ Rℓ ℓ1 ℓ2. 
+  Proof. 
+    apply trace_label_lookup_simpl' in LBL1 as (s & s' & NTH1).
+    pose proof (traces_match_trace_lookup_general _ _ _ _ _ _ n MATCH) as STEPS.
+    rewrite NTH1 in STEPS.
+    destruct (tr2 !! n) as [[s2 ostep2]|] eqn:NTH2; [| done]. simpl in *.
+    destruct ostep2 as [[??]|]; [| tauto]. destruct STEPS as (?&?&?). 
+    eexists. split; eauto.
+    eapply trace_label_lookup_simpl'; eauto.
+  Qed. 
+
 
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
@@ -336,7 +428,7 @@ Section InnerLMTraceFairness.
 
       simpl in STEPlo. apply pred_at_trace_lookup' in STEPlo as (δo_n & stepo & STLo & SOUn).
       
-      rewrite /steps_or_unassigned in SOUn. destruct SOUn as [UNASG | STEP].
+      rewrite /steps_or_unassigned in SOUn. destruct SOUn as [UNASG | [go STEP]].
       { forward eapply upto_stutter_state_lookup'; eauto.
         { eapply trace_state_lookup_simpl'; eauto. }
         intros [n_mo STmo]. simpl in STmo.
@@ -348,8 +440,22 @@ Section InnerLMTraceFairness.
         simpl in INNER_OBLS. apply elem_of_dom in INNER_OBLS as [??].
         congruence. }
 
-      
-        
+      destruct stepo as [[? δo_n']|]; [| done]. simpl in STEP.
+      inversion STEP. subst. clear STEP.
+
+      forward eapply upto_stutter_step_correspondence with 
+        (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go))
+        (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi).
+      { by intros ?? [-> ->]. }
+      { by intros ?[??]. }
+      { apply CORRo. }
+      { eexists. eapply pred_at_trace_lookup'. eauto. }
+
+      intros [n_mo STEPmo]. apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo).
+      forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto. 
+      intros (ℓ_lm & Llmi & LBL_MATCH).
+      simpl in LBL_MATCH. destruct LBL_MATCH as (? & LIFT_EQ & MATCHgi).
+      apply INJlg in LIFT_EQ. subst x. 
 
 
   (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
