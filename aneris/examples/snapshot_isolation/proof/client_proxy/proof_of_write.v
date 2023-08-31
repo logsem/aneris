@@ -60,17 +60,17 @@ Section Write_Proof.
                with "[$Hisc]").
     iIntros (uu) "(_ & Hlk & Hres)".
     iDestruct "Hres"
-      as (? ?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
+      as (?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
       iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
       simplify_eq /=.
-      by iDestruct (ghost_map.ghost_map_lookup
+      by iDestruct (@ghost_map.ghost_map_lookup
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_pures.
     wp_load.
@@ -89,22 +89,21 @@ Section Write_Proof.
     symmetry in Heq'. simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq''".
     simplify_eq.
-    iDestruct (ghost_map.ghost_map_elem_combine
+    iDestruct (@ghost_map.ghost_map_elem_combine
                 with "[$HcacheHalf1][$HcacheHalf2]") as "(Hcache & ->)".
     rewrite dfrac_op_own Qp.half_half.
-    iDestruct (ghost_map.ghost_map_lookup with
+    iDestruct (@ghost_map.ghost_map_lookup with
                 "[$Hauth][$Hcache]") as "%Hkin".
     iMod (ghost_map.ghost_map_update ((Some v.(SV_val)), true)
            with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
     wp_apply (release_spec with
                "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [H1 H2 Hpost]").
-    { iExists _, _.
+    { iExists _.
       iFrame "#∗".
       iRight.
       iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
       iFrame "#∗".
-      iSplit; first done.
       iSplit; first done.
       iSplit.
       { iPureIntro;
@@ -121,7 +120,7 @@ Section Write_Proof.
       iFrame "#∗".
       by destruct v. }
     iExists _, _, _, _, _, _, _, _.
-    iExists _. 
+    iExists _.
     iSplit; first done.
     iFrame "#∗".
     eauto.
