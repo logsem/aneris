@@ -83,14 +83,15 @@ Section Proxy.
            vo = from_option
                   (λ h, (from_option (λ we : events.write_event, Some (we_val we)) None (last h))) None (Msnap !! k) →
            (cache_updatesM !! k) = None ↔
-            cache_logicalM !! k = Some (vo, false)).
+            cache_logicalM !! k = Some (vo, false)) ∧
+       (∀ k vo, (cache_logicalM !! k = Some (vo, true)) → is_Some vo).
 
   Lemma is_coherent_cache_upd k v cuM cM Msnap :
     is_Some (cM !! k) →
     is_coherent_cache cuM cM Msnap →
     is_coherent_cache (<[k:=v]> cuM) (<[k:=(Some v, true)]> cM) Msnap.
   Proof.
-    intros H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 H_coh_5]]]].
+    intros H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 H_coh_7]]]]]].
     unfold is_coherent_cache.
     split.
     - rewrite -H_coh_1.
@@ -148,33 +149,40 @@ Section Proxy.
                   rewrite -H_lookup.
                   by apply lookup_insert_ne.
                 }
-            ++ intros k' vo Hdom Hvo.
-               split.
-               { intros Hupd.
-                 destruct (decide (k = k')) as [<- | H_neq].
-                 {
-                   by rewrite lookup_insert in Hupd. }
-                 {
-                   apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
-                   rewrite H_neq' in Hupd.
-                   rewrite lookup_insert_ne; last done.
-                   destruct H_coh_5 as (_ & H_coh_5).
-                   specialize (H_coh_5 k' vo Hdom Hvo) as (H_coh_5 & ?).
-                   by apply H_coh_5. }
-               }
-               intros Hupd.
-               destruct (decide (k = k')) as [<- | H_neq].
-               {
-                 by rewrite lookup_insert in Hupd. }
-               {
-                 apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
-                 rewrite H_neq'.
-                 destruct H_coh_5 as (_ & H_coh_5).
-                 specialize (H_coh_5 k' vo Hdom Hvo) as (Hcoh & H_coh_5).
-                 apply H_coh_5.
-                 by rewrite lookup_insert_ne in Hupd.
-                 }
+            ++ split.
+               ** intros k' vo Hdom Hvo.
+                  split.
+                  { intros Hupd.
+                    destruct (decide (k = k')) as [<- | H_neq].
+                    {
+                      by rewrite lookup_insert in Hupd. }
+                    {
+                      apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
+                      rewrite H_neq' in Hupd.
+                      rewrite lookup_insert_ne; last done.
+                      specialize (H_coh_6 k' vo Hdom Hvo) as (H_coh_6 & ?).
+                      by apply H_coh_6. }
+                  }
+                  intros Hupd.
+                  destruct (decide (k = k')) as [<- | H_neq].
+                  {
+                    by rewrite lookup_insert in Hupd. }
+                  {
+                    apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
+                    rewrite H_neq'.
+                    specialize (H_coh_6 k' vo Hdom Hvo) as (Hcoh & H_coh_6).
+                    apply H_coh_6.
+                    by rewrite lookup_insert_ne in Hupd.
+                  }
+               ** intros k' vo' Hvo.
+                  destruct (decide (k = k')) as [<- | H_neq].
+                  {
+                    rewrite lookup_insert in Hvo. by simplify_eq /=. }
+                  {
+                    rewrite lookup_insert_ne in Hvo; last done.
+                    by apply (H_coh_7 k'). }
   Qed.
+
 
   Definition cacheM_from_Msnap (M : gmap Key (list write_event))
     : gmap Key (option val * bool) :=
@@ -249,17 +257,24 @@ Section Proxy.
                 unfold cacheM_from_Msnap in Hyp.
                 rewrite lookup_fmap in Hyp.
                 destruct (M !! k) eqn:H_lookup; by rewrite H_lookup in Hyp.
-              ++ intros k vo Hdom Hvo.
-                 split; last done.
-                 1: intros Hyp.
-                 simplify_eq /=.
-                 rewrite /cacheM_from_Msnap.
-                 rewrite! lookup_fmap.
-                 destruct (M !! k) eqn:H_lookup.
-                 { rewrite H_lookup. simplify_eq /=.
-                   by do 2 f_equal. }
-                 { rewrite elem_of_dom in Hdom. rewrite H_lookup in Hdom. rewrite /is_Some in Hdom. set_solver. }
-Qed.
+              ++ split.
+                 ** intros k vo Hdom Hvo.
+                    split; last done.
+                    1: intros Hyp.
+                    simplify_eq /=.
+                    rewrite /cacheM_from_Msnap.
+                    rewrite! lookup_fmap.
+                    destruct (M !! k) eqn:H_lookup.
+                    { rewrite H_lookup. simplify_eq /=.
+                      by do 2 f_equal. }
+                    { rewrite elem_of_dom in Hdom.
+                      rewrite H_lookup in Hdom. rewrite /is_Some in Hdom. set_solver. }
+                 ** intros k vo Hvo.
+                    rewrite /cacheM_from_Msnap in Hvo.
+                    destruct vo; first done.
+                    rewrite! lookup_fmap in Hvo.
+                    by destruct (M !! k) eqn:H_lookup; rewrite H_lookup in Hvo.
+  Qed.
 
   Definition is_connected_def
              (n : ip_address) (cst : val) (l : loc)

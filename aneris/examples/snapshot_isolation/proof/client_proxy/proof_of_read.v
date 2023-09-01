@@ -80,7 +80,7 @@ Section Read_Proof.
     wp_apply (wp_map_lookup $! Hm).
     iIntros (vo1 Hvo1).
     assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
-    destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6) .
+    destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) .
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
                             "(#Hc3 & Hcache & %Hvb)".
     simplify_eq /=.
