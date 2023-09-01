@@ -5,7 +5,7 @@ From trillium.fairness Require Export lm_fairness_preservation.
 Require Import Coq.Logic.Classical.
 
 (* TODO: move these files to trillium.fairness *)
-From trillium.fairness.examples.comp Require Export trace_lookup trace_len my_omega lemmas. 
+From trillium.fairness.examples.comp Require Export trace_lookup trace_len my_omega lemmas trace_helpers.
 
 From Paco Require Import paco1 paco2 pacotac.
 
@@ -389,9 +389,100 @@ Section InnerLMTraceFairness.
     destruct ostep2 as [[??]|]; [| tauto]. destruct STEPS as (?&?&?). 
     eexists. split; eauto.
     eapply trace_label_lookup_simpl'; eauto.
+  Qed.
+
+  (* TODO: move, ? unify definitions of _valid *)
+  Lemma auxtrace_valid_steps' `{LM: LiveModel G M} (tr: auxtrace (LM := LM))
+    i st ℓ st'
+    (VALID: auxtrace_valid tr)
+    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
+    lm_ls_trans LM st ℓ st'.
+  Proof using.
+    gd st. gd ℓ. gd st'. gd tr.
+    induction i.
+    { simpl. intros.
+      inversion VALID.
+      - subst. done.
+      - subst. inversion ITH. by subst. }
+    intros. simpl in ITH.
+    destruct tr.
+    { inversion ITH. }
+    rewrite trace_lookup_cons in ITH.
+    inversion VALID.  
+    eapply IHi; eauto.
+  Qed.
+
+  Lemma fuel_must_not_incr_fuels {G M} oρ'
+    (δ1 δ2: LiveState G M)
+    ρ f1 f2
+    (KEEP: fuel_must_not_incr oρ' δ1 δ2)
+    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
+    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
+    (OTHER: oρ' ≠ Some ρ):
+    f2 <= f1.
+  Proof.
+    red in KEEP. specialize (KEEP ρ). specialize_full KEEP.
+    { by apply elem_of_dom. }
+    destruct KEEP as [LE|[?|KEEP]].
+    + rewrite FUEL1 FUEL2 in LE. simpl in LE. lia. 
+    + tauto. 
+    + apply proj1 in KEEP. destruct KEEP. eapply elem_of_dom; eauto.
+  Qed.
+
+  Lemma step_nonincr_fuels `{LM: LiveModel G M} ℓ
+    (δ1 δ2: LiveState G M)
+    ρ f1 f2
+    (STEP: lm_ls_trans LM δ1 ℓ δ2)
+    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
+    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
+    (OTHER: forall g, ℓ ≠ Take_step ρ g):
+    f2 <= f1.
+  Proof.
+    destruct ℓ. 
+    all: eapply fuel_must_not_incr_fuels; eauto; [apply STEP|..]; congruence.
   Qed. 
+  
 
+  Lemma role_fuel_decreases `{LM: LiveModel G M} (tr: auxtrace (LM := LM)) δ0 ρ f0
+    (ST0: tr S!! 0 = Some δ0)
+    (FUEL0: ls_fuel δ0 !! ρ = Some f0)
+    (NOρ: ∀ i ℓ, tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
+    (ASGρ: ∀ i δ, tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
+    (VALID: auxtrace_valid tr):
+    forall i δ f, 
+      tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
+  Proof.
+    induction i; intros δ f ST FUEL. 
+    { assert (δ0 = δ) as -> by congruence. 
+      assert (f0 = f) as -> by congruence. 
+      done. }
+    
+    pose proof (trace_has_len tr) as [len LEN]. 
+    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN i)).
+    { eapply mk_is_Some, state_lookup_dom in ST; eauto. 
+      lia_NO len. }
+    intros (δ' & ℓ & δ_ & STEP).
+    
+    forward eapply auxtrace_valid_steps' as TRANS; eauto.
+    apply state_label_lookup in STEP as (ST' & ST_ & LBL).
+    assert (δ_ = δ) as ->; [| clear ST_].
+    { rewrite Nat.add_1_r in ST_. congruence. }
+    
+    specialize (ASGρ _ _ ST'). rewrite ls_same_doms in ASGρ.
+    pose proof ASGρ as ASGρ_.
+    apply elem_of_dom in ASGρ as [f' FUEL'].
+    specialize (IHi _ _ ST' FUEL').
+    etrans; [| apply IHi]. 
+    eapply step_nonincr_fuels in TRANS; eauto.
+  Qed.
 
+  (* TODO: move *)
+  Lemma ls_same_doms' {G M} (δ: LiveState G M):
+    forall ρ, is_Some (ls_mapping δ !! ρ) <-> is_Some (ls_fuel δ !! ρ).
+  Proof. 
+    intros. rewrite -!elem_of_dom. by rewrite ls_same_doms.
+  Qed.
+    
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
@@ -400,12 +491,12 @@ Section InnerLMTraceFairness.
     (INNER_OBLS: inner_obls_exposed lmtr_o)
   (* (INF : trace_len_is tr_o NOinfinity *)
   (* (INF' : trace_len_is lmtr_i NOinfinity *)
-  (EN: ∀ (m : nat) (δi_m : lm_ls LMi),
-      lmtr_i S!! m = Some δi_m → role_enabled ρ δi_m)
-  (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi),
+
+    (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi),
           lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go')
   (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
            lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi)
+  (VALIDi: auxtrace_valid lmtr_i)
   (ST0: lmtr_i S!! 0 = Some δi)
   (FUEL0: ls_fuel δi !! ρ = Some f):
     ∃ m, pred_at lmtr_i m (steps_or_unassigned ρ).
@@ -455,7 +546,45 @@ Section InnerLMTraceFairness.
       forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto. 
       intros (ℓ_lm & Llmi & LBL_MATCH).
       simpl in LBL_MATCH. destruct LBL_MATCH as (? & LIFT_EQ & MATCHgi).
-      apply INJlg in LIFT_EQ. subst x. 
+      apply INJlg in LIFT_EQ. subst x.
+      
+      apply trace_label_lookup_simpl' in Llmi as (δi_n_mo & δi_n_mo' & STEPmo).
+      assert (forall δ n, lmtr_i S!! n = Some δ -> ls_fuel δ !! ρ = Some 0) as NOFUEL.  
+      { intros δ n ST. 
+        pose proof (ASGρ _ _ ST) as ASG.
+        apply mk_is_Some, ls_same_doms' in ASG as [f FUEL].
+        forward eapply role_fuel_decreases with (i := n); eauto.
+        2: { intros. by assert (f = 0) as -> by lia. }
+        intros ?? ST'. apply ASGρ in ST'. by apply elem_of_dom. } 
+        
+      assert (ls_fuel δi_n_mo !! ρ = Some 0 /\ ls_fuel δi_n_mo' !! ρ = Some 0) as [NOFUEL1 NOFUEL2].
+      { apply state_label_lookup in STEPmo.
+        split; eapply NOFUEL; apply STEPmo. }
+      
+      forward eapply auxtrace_valid_steps' as TRANS; [| apply STEPmo|]; eauto.
+      apply state_label_lookup in STEPmo as (ST&?&LBL). 
+      destruct ℓ_lm as [ρ' g| | ]; subst. 
+      3: done. 
+      - destruct (decide (ρ' = ρ)). 
+        + subst. edestruct NOρ; eauto. 
+        + simpl in TRANS. destruct TRANS as (_&_&DECR&_).
+          red in DECR. specialize (DECR ρ). specialize_full DECR. 
+          1, 2: eapply elem_of_dom; eauto.
+          { left; [congruence| ].
+            symmetry. eapply ASGρ; eauto. }
+          rewrite NOFUEL1 NOFUEL2 /= in DECR. lia.
+      - simpl in TRANS. destruct TRANS as (_&DECR&_).
+        (* TODO: remove copypaste from above *)
+        red in DECR. specialize (DECR ρ). specialize_full DECR. 
+        1, 2: eapply elem_of_dom; eauto.
+        { left; [congruence| ].
+          symmetry. eapply ASGρ; eauto. }
+        rewrite NOFUEL1 NOFUEL2 /= in DECR. lia. }
+
+    foobar. 
+
+    
+        
 
 
   (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
