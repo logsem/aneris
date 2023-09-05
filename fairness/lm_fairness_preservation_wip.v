@@ -10,9 +10,75 @@ From trillium.fairness.examples.comp Require Export trace_lookup trace_len my_om
 From Paco Require Import paco1 paco2 pacotac.
 
 
+(* TODO: rename *)
 Section Foobar. 
   Context `{LM: LiveModel G M}.
   Context `{Countable G}.
+
+  Local Set Printing Coercions.
+  Local Ltac gd t := generalize dependent t.
+
+  (* TODO: move *)
+  Lemma after_0_id {St L : Type} (tr : trace St L):
+    after 0 tr = Some tr.
+  Proof. done. Qed. 
+
+  (* (* TODO: move *) *)
+  (* Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M) *)
+  (*   (Po: LiveState G M -> option (mlabel LM * LiveState G M) -> Prop) *)
+  (*   (Pi: M -> option ((option (fmrole M)) * M) -> Prop) *)
+  (*   (LIFT: forall δ1 ostep, Po δ1 ostep -> Pi (ls_under δ1) *)
+  (*                                       (match ostep with  *)
+  (*                                        | Some (ℓ, δ2) => *)
+  (*                                            (Ul ℓ (LM := LM), ls_under δ2) *)
+  (*                                        | None => None *)
+  (*                                        end)): *)
+  (*   True.  *)
+  (*   (PI0: forall st1 st2, Pi st1 None st2 -> forall ℓ, Pi st1 (Some ℓ) st2) *)
+  (*   : *)
+  (*   upto_stutter_auxtr auxtr mtr (LM := LM) -> *)
+  (*   (* (∃ n, pred_at auxtr n Po) -> *) *)
+  (*   (* ∃ m, pred_at mtr m Pi. *) *)
+  (*   (* forall n atr_aux, *) *)
+  (*   (*   after n auxtr = Some atr_aux -> *) *)
+  (*   (*   pred_at atr_aux 0 Po -> *) *)
+  (*   (* exists m atr_m, *) *)
+  (*   (*   after m mtr = Some atr_m /\ pred_at atr_m 0 Pi /\  *) *)
+  (*   (*   upto_stutter_auxtr atr_aux atr_m. *) *)
+  (*   forall n step1, auxtr !! n = Some step1 /\ *)
+  (* Proof. *)
+  (*     (* intros Hupto (* Hre *) [n Hstep]. *) *)
+  (*     (* revert auxtr mtr Hupto (* Hre *) Hstep. *) *)
+  (*   intros Hupto n. gd auxtr. gd mtr.  *)
+
+  (*     induction n as [|n]; intros auxtr mtr Hupto atr_aux AFTER A0. *)
+  (*     - rewrite after_0_id in AFTER. assert (atr_aux = mtr) as -> by congruence. *)
+  (*       do 2 eexists. split; [| split]; [..| by eauto]. *)
+  (*       { by erewrite after_0_id. } *)
+  (*       punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto; simplify_eq. *)
+  (*       + rename A0 into Hpa. *)
+  (*         rewrite /pred_at /=. rewrite /pred_at //= in Hpa. *)
+  (*         by apply LIFT in Hpa.  *)
+  (*       + rewrite -> !pred_at_0 in A0. *)
+  (*         rewrite /pred_at /=. destruct auxtr; simpl in *; try congruence. *)
+  (*         * apply LIFT in A0. congruence. *)
+  (*         * apply LIFT in A0. destruct ℓ; simpl in *; try done. *)
+  (*           all: subst; eapply PI0; eauto. *)
+  (*       + rewrite -> !pred_at_0 in A0. *)
+  (*         apply pred_at_0. rewrite <- H1. *)
+  (*         by eapply LIFT in A0.  *)
+  (*     - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto as [| |?????? ?? IH ]; simplify_eq. *)
+  (*       + simpl in AFTER.  *)
+  (*         eapply IHn; eauto. *)
+  (*         by pfold. *)
+  (*       + simpl in AFTER.  *)
+  (*         specialize (IHn str btr). specialize_full IHn. *)
+  (*         { inversion IH; eauto. done. }  *)
+  (*         all: eauto. *)
+  (*         destruct IHn as (m & atr_m & AFTER' & UPTO').  *)
+  (*         exists (S m). eauto.  *)
+  (* Qed. *)
+
 
   (* TODO: move *)
   Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M)
@@ -25,38 +91,118 @@ Section Foobar.
     (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
     :
     upto_stutter_auxtr auxtr mtr (LM := LM) ->
-    (∃ n, pred_at auxtr n Po) ->
-    ∃ m, pred_at mtr m Pi.
+    (* (∃ n, pred_at auxtr n Po) -> *)
+    (* ∃ m, pred_at mtr m Pi. *)
+    forall n atr_aux,
+      after n auxtr = Some atr_aux ->
+      pred_at atr_aux 0 Po ->
+    exists m atr_m,
+      after m mtr = Some atr_m /\ pred_at atr_m 0 Pi /\ 
+      upto_stutter_auxtr atr_aux atr_m.
   Proof.
-      Local Set Printing Coercions.
-      intros Hupto (* Hre *) [n Hstep].
-      revert auxtr mtr Hupto (* Hre *) Hstep.
-      induction n as [|n]; intros auxtr mtr Hupto (* Hre *) Hstep.
-      - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto; simplify_eq.
-        + rename Hstep into Hpa. 
-          exists 0. rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
+      (* intros Hupto (* Hre *) [n Hstep]. *)
+      (* revert auxtr mtr Hupto (* Hre *) Hstep. *)
+    intros Hupto n. gd auxtr. gd mtr. 
+
+      induction n as [|n]; intros auxtr mtr Hupto atr_aux AFTER A0.
+      - rewrite after_0_id in AFTER. assert (atr_aux = mtr) as -> by congruence.
+        do 2 eexists. split; [| split]; [..| by eauto].
+        { by erewrite after_0_id. }
+        punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto; simplify_eq.
+        + rename A0 into Hpa.
+          rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
           by apply LIFT in Hpa. 
-        + rewrite -> !pred_at_0 in Hstep. exists 0.          
-          rewrite /pred_at /=. destruct mtr; simpl in *; try congruence.
-          * apply LIFT in Hstep. congruence.
-          * apply LIFT in Hstep. destruct ℓ; simpl in *; try done.
+        + rewrite -> !pred_at_0 in A0.
+          rewrite /pred_at /=. destruct auxtr; simpl in *; try congruence.
+          * apply LIFT in A0. congruence.
+          * apply LIFT in A0. destruct ℓ; simpl in *; try done.
             all: subst; eapply PI0; eauto.
-        + rewrite -> !pred_at_0 in Hstep. exists 0.
+        + rewrite -> !pred_at_0 in A0.
           apply pred_at_0. rewrite <- H1.
-          by eapply LIFT in Hstep. 
+          by eapply LIFT in A0. 
       - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
-        + done. 
-        + rewrite -> !pred_at_S in Hstep.
+        + simpl in AFTER. 
           eapply IHn; eauto.
           by pfold.
-        + rewrite -> !pred_at_S in Hstep.
-          specialize (IHn btr str). specialize_full IHn.
+        + simpl in AFTER. 
+          specialize (IHn str btr). specialize_full IHn.
           { inversion IH; eauto. done. } 
           all: eauto.
-          destruct IHn as [m IHn]. 
-          exists (S m). by apply pred_at_S.          
-    Qed.      
+          destruct IHn as (m & atr_m & AFTER' & UPTO'). 
+          exists (S m). eauto. 
+  Qed.
+
+  (* (* TODO: move *) *)
+  (* Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M) *)
+  (*   (Po: LiveState G M -> option (mlabel LM) -> Prop) *)
+  (*   (Pi: M -> option (option (fmrole M)) -> Prop) *)
+  (*   (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with  *)
+  (*                                             | Some ℓ => Ul ℓ (LM := LM) *)
+  (*                                             | None => None *)
+  (*                                             end)) *)
+  (*   (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ)) *)
+  (*   : *)
+  (*   upto_stutter_auxtr auxtr mtr (LM := LM) -> *)
+  (*   (∃ n, pred_at auxtr n Po) -> *)
+  (*   ∃ m, pred_at mtr m Pi. *)
+  (* Proof. *)
+  (*     intros Hupto (* Hre *) [n Hstep]. *)
+  (*     revert auxtr mtr Hupto (* Hre *) Hstep. *)
+  (*     induction n as [|n]; intros auxtr mtr Hupto (* Hre *) Hstep. *)
+  (*     - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto; simplify_eq. *)
+  (*       + rename Hstep into Hpa.  *)
+  (*         exists 0. rewrite /pred_at /=. rewrite /pred_at //= in Hpa. *)
+  (*         by apply LIFT in Hpa.  *)
+  (*       + rewrite -> !pred_at_0 in Hstep. exists 0.           *)
+  (*         rewrite /pred_at /=. destruct mtr; simpl in *; try congruence. *)
+  (*         * apply LIFT in Hstep. congruence. *)
+  (*         * apply LIFT in Hstep. destruct ℓ; simpl in *; try done. *)
+  (*           all: subst; eapply PI0; eauto. *)
+  (*       + rewrite -> !pred_at_0 in Hstep. exists 0. *)
+  (*         apply pred_at_0. rewrite <- H1. *)
+  (*         by eapply LIFT in Hstep.  *)
+  (*     - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto as [| |?????? ?? IH ]; simplify_eq. *)
+  (*       + done.  *)
+  (*       + rewrite -> !pred_at_S in Hstep. *)
+  (*         eapply IHn; eauto. *)
+  (*         by pfold. *)
+  (*       + rewrite -> !pred_at_S in Hstep. *)
+  (*         specialize (IHn btr str). specialize_full IHn. *)
+  (*         { inversion IH; eauto. done. }  *)
+  (*         all: eauto. *)
+  (*         destruct IHn as [m IHn].  *)
+  (*         exists (S m). by apply pred_at_S.           *)
+  (*   Qed.       *)
+
+  Definition upto_stutter_auxtr_at `{LM: LiveModel G M}
+    auxtr (mtr: mtrace M) n m :=
+    exists atr_aux atr_m, 
+      after n auxtr = Some atr_aux /\
+      after m mtr = Some atr_m /\ 
+      upto_stutter_auxtr atr_aux atr_m (LM := LM).
     
+  (* TODO: move *)
+  Lemma upto_stutter_step_correspondence_alt auxtr (mtr: mtrace M)
+    (Po: LiveState G M -> option (mlabel LM) -> Prop)
+    (Pi: M -> option (option (fmrole M)) -> Prop)
+    (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
+                                              | Some ℓ => Ul ℓ (LM := LM)
+                                              | None => None
+                                              end))
+    (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
+    :
+    upto_stutter_auxtr auxtr mtr (LM := LM) ->
+    forall n, pred_at auxtr n Po ->
+    exists m, pred_at mtr m Pi /\ upto_stutter_auxtr_at auxtr mtr n m. 
+  Proof.
+    intros UPTO n NTH.
+    forward eapply pred_at_after_is_Some as [atr AFTER]; eauto.
+    rewrite (plus_n_O n) pred_at_sum AFTER in NTH. 
+    forward eapply upto_stutter_step_correspondence as (m&?&AFTERm&Pm&?); eauto.
+    exists m. split.
+    - rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm.
+    - red. eauto.
+  Qed.    
 
   (* TODO: move, replace original proof (but keep old signature) *)
   Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M):
@@ -64,9 +210,15 @@ Section Foobar.
     (∃ n, pred_at auxtr n (λ δ ℓ, ¬role_enabled (G := G) ρ δ \/ ∃ ζ, ℓ = Some (Take_step ρ ζ))) ->
     ∃ m, pred_at mtr m (λ δ ℓ, ¬role_enabled_model ρ δ \/ ℓ = Some $ Some ρ).
   Proof.
-    intros ?. eapply upto_stutter_step_correspondence; eauto.
+    intros UPTO [n NTH].
+    forward eapply pred_at_after_is_Some as [atr AFTER]; eauto.
+    rewrite (plus_n_O n) in NTH. 
+    rewrite pred_at_sum AFTER in NTH. 
+    forward eapply upto_stutter_step_correspondence; eauto.
+    3: { intros (m & atr_m & AFTERm & Pm & UPTO').
+         exists m. rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm. }
     - intros ?? Po. destruct Po as [?| [? ->]]; eauto. 
-    - intros. destruct H1; [| done]. eauto.
+    - intros. destruct H0; [| done]. eauto.
   Qed.
 
 End Foobar. 
@@ -510,6 +662,123 @@ Section InnerLMTraceFairness.
   Qed. 
           
 
+  (* (* TODO: rename? *) *)
+  (* Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi k0 f *)
+  (*   (MATCH: lm_model_traces_match mtr_o lmtr_i) *)
+  (*   (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo)) *)
+  (*   (FAIR_SOU: forall n gi, fair_aux_SoU lmtr_o (lift_Gi gi) n (LM := LMo)) *)
+  (*   (INNER_OBLS: inner_obls_exposed lmtr_o) *)
+  (* (* (INF : trace_len_is tr_o NOinfinity *) *)
+  (* (* (INF' : trace_len_is lmtr_i NOinfinity *) *)
+
+  (*   (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi), *)
+  (*         lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go') *)
+  (* (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi), *)
+  (*          lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi) *)
+  (* (VALIDi: auxtrace_valid lmtr_i) *)
+  (* (ST0: lmtr_i S!! k0 = Some δi) *)
+  (* (FUEL0: ls_fuel δi !! ρ = Some f): *)
+  (*   ∃ k, k0 <= k /\ pred_at lmtr_i k (steps_or_unassigned ρ). *)
+  (* Proof. *)
+  (*   Local Set Printing Coercions. *)
+  (*   gd lmtr_i. gd δi. gd mtr_o. gd lmtr_o. gd k0. induction f. *)
+  (*   { intros. *)
+  (*     pose proof (traces_match_first _ _ _ _ _ _ MATCH) as REL0. *)
+  (*     pose proof (upto_stutter_trfirst _ _ _ _ CORRo) as CORR0.  *)
+  (*     pose proof (ASGρ _ _ ST0) as MAPi.  *)
+
+  (*     (* pose proof (INNER_OBLS k0 (trfirst lmtr_o) gi) as OBLS0. specialize_full OBLS0. *) *)
+  (*     pose proof (INNER_OBLS k0) as OBLS0. specialize_full OBLS0. *)
+  (*     { apply ST0.  *)
+  (*     { do 2 eexists. split; eauto. *)
+  (*       rewrite -CORR0. rewrite state_lookup_0 in ST0. congruence. } *)
+      
+  (*     specialize (FAIR_SOU 0 gi). red in FAIR_SOU. specialize_full FAIR_SOU. *)
+  (*     { by apply pred_at_trfirst. } *)
+  (*     destruct FAIR_SOU as [n_lo STEPlo]. *)
+
+  (*     simpl in STEPlo. apply pred_at_trace_lookup' in STEPlo as (δo_n & stepo & STLo & SOUn). *)
+      
+  (*     rewrite /steps_or_unassigned in SOUn. destruct SOUn as [UNASG | [go STEP]]. *)
+  (*     { forward eapply upto_stutter_state_lookup'; eauto. *)
+  (*       { eapply trace_state_lookup_simpl'; eauto. } *)
+  (*       intros [n_mo STmo]. simpl in STmo. *)
+  (*       forward eapply traces_match_state_lookup_1; [apply MATCH| apply STmo| ]. *)
+  (*       intros (δi_n & STlmi & RELn). *)
+  (*       red in INNER_OBLS. specialize_full INNER_OBLS. *)
+  (*       { eapply trace_state_lookup_simpl'. eauto. } *)
+  (*       { eauto. } *)
+  (*       simpl in INNER_OBLS. apply elem_of_dom in INNER_OBLS as [??]. *)
+  (*       congruence. } *)
+
+  (*     destruct stepo as [[? δo_n']|]; [| done]. simpl in STEP. *)
+  (*     inversion STEP. subst. clear STEP. *)
+
+  (*     forward eapply upto_stutter_step_correspondence with  *)
+  (*       (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go)) *)
+  (*       (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi). *)
+  (*     { by intros ?? [-> ->]. } *)
+  (*     { by intros ?[??]. } *)
+  (*     { apply CORRo. } *)
+  (*     { eexists. eapply pred_at_trace_lookup'. eauto. } *)
+
+  (*     intros [n_mo STEPmo]. apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo). *)
+  (*     forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto.  *)
+  (*     intros (ℓ_lm & Llmi & LBL_MATCH). *)
+  (*     simpl in LBL_MATCH. destruct LBL_MATCH as (? & LIFT_EQ & MATCHgi). *)
+  (*     apply INJlg in LIFT_EQ. subst x. *)
+      
+  (*     apply trace_label_lookup_simpl' in Llmi as (δi_n_mo & δi_n_mo' & STEPmo). *)
+  (*     assert (forall δ n, lmtr_i S!! n = Some δ -> ls_fuel δ !! ρ = Some 0) as NOFUEL.   *)
+  (*     { intros δ n ST.  *)
+  (*       pose proof (ASGρ _ _ ST) as ASG. *)
+  (*       apply mk_is_Some, ls_same_doms' in ASG as [f FUEL]. *)
+  (*       forward eapply role_fuel_decreases with (i := n); eauto. *)
+  (*       2: { intros. by assert (f = 0) as -> by lia. } *)
+  (*       intros ?? ST'. apply ASGρ in ST'. by apply elem_of_dom. }  *)
+        
+  (*     assert (ls_fuel δi_n_mo !! ρ = Some 0 /\ ls_fuel δi_n_mo' !! ρ = Some 0) as [NOFUEL1 NOFUEL2]. *)
+  (*     { apply state_label_lookup in STEPmo. *)
+  (*       split; eapply NOFUEL; apply STEPmo. } *)
+      
+  (*     forward eapply auxtrace_valid_steps' as TRANS; [| apply STEPmo|]; eauto. *)
+  (*     apply state_label_lookup in STEPmo as (ST&?&LBL).  *)
+  (*     destruct ℓ_lm as [ρ' g| | ]; subst.  *)
+  (*     3: done.  *)
+  (*     - destruct (decide (ρ' = ρ)).  *)
+  (*       + subst. edestruct NOρ; eauto.  *)
+  (*       + simpl in TRANS. destruct TRANS as (_&_&DECR&_). *)
+  (*         red in DECR. specialize (DECR ρ). specialize_full DECR.  *)
+  (*         1, 2: eapply elem_of_dom; eauto. *)
+  (*         { left; [congruence| ]. *)
+  (*           symmetry. eapply ASGρ; eauto. } *)
+  (*         rewrite NOFUEL1 NOFUEL2 /= in DECR. lia. *)
+  (*     - simpl in TRANS. destruct TRANS as (_&DECR&_). *)
+  (*       (* TODO: remove copypaste from above *) *)
+  (*       red in DECR. specialize (DECR ρ). specialize_full DECR.  *)
+  (*       1, 2: eapply elem_of_dom; eauto. *)
+  (*       { left; [congruence| ]. *)
+  (*         symmetry. eapply ASGρ; eauto. } *)
+  (*       rewrite NOFUEL1 NOFUEL2 /= in DECR. lia. } *)
+
+
+  (* TODO: move *)
+  Lemma label_lookup_after {St L: Type} (tr atr: trace St L) (a: nat)
+    (AFTER: after a tr = Some atr):
+    forall k, atr L!! k = tr L!! (a + k).
+  Proof. 
+    intros. rewrite /label_lookup. 
+    rewrite after_sum'. by rewrite AFTER.
+  Qed.    
+
+  (* TODO: move *)
+  Lemma state_lookup_after {St L: Type} (tr atr: trace St L) (a: nat)
+    (AFTER: after a tr = Some atr):
+    forall k, atr S!! k = tr S!! (a + k).
+  Proof. 
+    intros. rewrite /state_lookup. 
+    rewrite after_sum'. by rewrite AFTER.
+  Qed.
 
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
@@ -561,16 +830,18 @@ Section InnerLMTraceFairness.
 
       destruct stepo as [[? δo_n']|]; [| done]. simpl in STEP.
       inversion STEP. subst. clear STEP.
-
-      forward eapply upto_stutter_step_correspondence with 
+      
+      (* pose proof STLo as (atr_lmo & AFTERlmo & HEADlmo)%trace_lookup_after_strong. *)
+      forward eapply upto_stutter_step_correspondence_alt with 
         (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go))
         (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi).
       { by intros ?? [-> ->]. }
       { by intros ?[??]. }
       { apply CORRo. }
-      { eexists. eapply pred_at_trace_lookup'. eauto. }
+      { apply pred_at_trace_lookup'. eauto. } 
+      intros (n_mo & STEPmo & UPTO').
+      apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo).
 
-      intros [n_mo STEPmo]. apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo).
       forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto. 
       intros (ℓ_lm & Llmi & LBL_MATCH).
       simpl in LBL_MATCH. destruct LBL_MATCH as (? & LIFT_EQ & MATCHgi).
@@ -642,15 +913,15 @@ Section InnerLMTraceFairness.
       destruct stepo as [[? δo_n']|]; [| done]. simpl in STEP.
       inversion STEP. subst. clear STEP.
 
-      forward eapply upto_stutter_step_correspondence with 
+      forward eapply upto_stutter_step_correspondence_alt with 
         (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go))
         (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi).
       { by intros ?? [-> ->]. }
       { by intros ?[??]. }
       { apply CORRo. }
-      { eexists. eapply pred_at_trace_lookup'. eauto. }
+      { apply pred_at_trace_lookup'. eauto. } 
+      intros (n_mo & STEPmo & UPTO').
 
-      intros [n_mo STEPmo].
       (* apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo). *)
       apply pred_at_trace_lookup' in STEPmo as (? & step_ & STEPmo & -> & LBL).
       destruct step_ as [[ℓ_mo st_mo']|]; simpl in LBL; [| done].
@@ -694,21 +965,50 @@ Section InnerLMTraceFairness.
 
           (* TODO: distinction with base case goes here *)
 
-          apply trace_lookup_after_strong in STLo as (atr_lmo & AFTERlmo & HEADlmo).
-          specialize (IHf atr_lmo).
-          apply trace_lookup_after_strong in STEPmo as (atr_mo & AFTERmo & HEADmo).
-          specialize IHf with (mtr_o := atr_mo).
-          specialize IHf with (δi := δi_n_mo').
+          (* apply trace_lookup_after_strong in STLo as (atr_lmo & AFTERlmo & HEADlmo). *)
+          (* specialize (IHf atr_lmo). *)
+          (* apply trace_lookup_after_strong in STEPmo as (atr_mo & AFTERmo & HEADmo). *)
+          (* specialize IHf with (mtr_o := atr_mo). *)
+          red in UPTO'. destruct UPTO' as (atr_lmo & atr_mo & AFTERlmo & AFTERmo & UPTO').
+          apply trace_lookup_after_strong in STEPmo as (atr_mo' & AFTERmo' & HEADmo').
+          rewrite AFTERmo in AFTERmo'. inversion AFTERmo'. subst atr_mo. 
+          apply trace_lookup_after_strong in STLo as (atr_lo' & AFTERlo' & HEADlo').
+          rewrite AFTERlmo in AFTERlo'. inversion AFTERlo'. subst atr_lmo.
+          clear AFTERmo' AFTERlo'. 
+          
+          specialize IHf with (lmtr_o := atr_lo') (mtr_o := atr_mo') (δi := δi_n_mo').
           apply trace_lookup_after_strong in STEPlmi as (atr_lmi & AFTERlmi & HEADlmi).
           specialize IHf with (lmtr_i := atr_lmi).
           (* don't we lose any information here? *)
-          apply after_S_tr_cons in AFTERmo, AFTERlmo. 
+          apply after_S_tr_cons in AFTERmo, AFTERlmo, AFTERlmi. 
           (* TODO: wrong so far - IH requires fuel to decrease strictly by 1 *)
           specialize_full IHf.
           * intros. eapply fair_aux_SoU_after; eauto.
           * red. intros.
             erewrite state_lookup_after in H; eauto.
-          * foobar. infer that these are related when n_mo is obtained.
+          * punfold UPTO'; [| apply upto_stutter_mono].
+            inversion UPTO'; subst; try done.
+            inversion H7; eauto. done.
+          * admit.
+          * clear -MATCH AFTERmo AFTERlmi.
+            eapply traces_match_after' in AFTERmo as (?&A'&?); [| apply MATCH].
+            rewrite AFTERlmi in A'. by inversion A'.
+          * intros. eapply NOρ.
+            rewrite -H. symmetry. eapply label_lookup_after; eauto.
+          * intros. eapply ASGρ. 
+            rewrite -H. symmetry. eapply state_lookup_after; eauto.
+          * (* TODO: admitted somewhere else? *)
+            admit.
+          * rewrite -ST'.
+            rewrite (plus_n_O (_ + _)).
+            rewrite -Nat.add_1_r in AFTERlmi. 
+            eapply state_lookup_after; eauto.
+          * destruct IHf as [m PM].
+            eexists (S n_mo + m). apply pred_at_sum.
+            by rewrite AFTERlmi.
+      - foobar. 
+            
+            
             
 
           
