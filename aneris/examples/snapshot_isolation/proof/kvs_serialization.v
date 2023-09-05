@@ -269,7 +269,7 @@ Section Repdb_ser.
 
   Lemma req_ser_is_injective : ser_is_injective req_serialization.
   Proof.
-    apply sum_ser_is_ser_injective. 
+    apply sum_ser_is_ser_injective.
     - apply prod_ser_is_ser_injective.
       + apply string_ser_is_ser_injective.
       + apply int_ser_is_ser_injective.
@@ -280,12 +280,12 @@ Section Repdb_ser.
         * apply list_ser_is_ser_injective.
           apply prod_ser_is_ser_injective.
             -- apply string_ser_is_ser_injective.
-            -- apply KVS_ser_inj. 
-  Qed. 
+            -- apply KVS_ser_inj.
+  Qed.
 
   Lemma req_ser_is_injective_alt : ser_is_injective_alt req_serialization.
   Proof.
-    apply sum_ser_is_ser_injective_alt. 
+    apply sum_ser_is_ser_injective_alt.
     - apply prod_ser_is_ser_injective_alt.
       + apply string_ser_is_ser_injective_alt.
       + apply int_ser_is_ser_injective_alt.
@@ -296,8 +296,8 @@ Section Repdb_ser.
         * apply list_ser_is_ser_injective_alt.
           apply prod_ser_is_ser_injective_alt.
             -- apply string_ser_is_ser_injective_alt.
-            -- apply KVS_ser_inj_alt. 
-  Qed. 
+            -- apply KVS_ser_inj_alt.
+  Qed.
 
   Lemma rep_ser_is_injective : ser_is_injective rep_serialization.
   Proof.
@@ -320,3 +320,20 @@ Section Repdb_ser.
   Qed.
 
 End Repdb_ser.
+
+Lemma ser_start_reply_valid `{!User_params} T:
+  sum_valid_val (option_serialization KVS_serialization)
+                (sum_serialization int_serialization bool_serialization)
+                (InjRV (InjLV #(T + 1))).
+Proof.
+  simplify_eq /=.
+  eapply sum_is_ser_valid.
+  rewrite /sum_is_ser.
+  eexists ( (InjLV #(T + 1)))%V, _. right.
+  split; first eauto.
+  simpl. split; last done.
+  eexists _, _.
+  left.
+  split_and!; try done.
+  simpl. by eexists.
+Qed.

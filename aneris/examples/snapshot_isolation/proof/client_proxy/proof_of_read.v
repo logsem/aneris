@@ -160,7 +160,9 @@ Section Read_Proof.
          iSplit; first done.
          iLeft.
          iExists k, ts, h.
-         by iFrame "#∗". }
+         iFrame "#∗".
+         iPureIntro; split_and!; try done.
+         intros e He. specialize (Hvalid e He). lia. }
     (* Getting the reply. *)
     iIntros (repd repv) "[Hreq Hhpost]".
     wp_pures.
