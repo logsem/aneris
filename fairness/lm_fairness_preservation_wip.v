@@ -799,6 +799,198 @@ Section InnerLMTraceFairness.
     ∃ m, pred_at lmtr_i m (steps_or_unassigned ρ).
   Proof.
     Local Set Printing Coercions.
+    gd lmtr_i. gd δi. gd mtr_o. gd lmtr_o.
+    pattern f. apply lt_wf_ind. clear f. intros f IH.  
+
+    { intros.
+      pose proof (traces_match_first _ _ _ _ _ _ MATCH) as REL0.
+      pose proof (upto_stutter_trfirst _ _ _ _ CORRo) as CORR0. 
+      pose proof (ASGρ _ _ ST0) as MAPi. 
+
+      pose proof (INNER_OBLS 0 (trfirst lmtr_o) gi) as OBLS0. specialize_full OBLS0.
+      { apply state_lookup_0. }
+      { do 2 eexists. split; eauto.
+        rewrite -CORR0. rewrite state_lookup_0 in ST0. congruence. }
+
+      pose proof (FAIR_SOU 0 gi) as FAIR. 
+      red in FAIR. specialize_full FAIR.
+      { by apply pred_at_trfirst. }
+      destruct FAIR as [n_lo STEPlo].
+
+      simpl in STEPlo. apply pred_at_trace_lookup' in STEPlo as (δo_n & stepo & STLo & SOUn).
+      
+      rewrite /steps_or_unassigned in SOUn. destruct SOUn as [UNASG | [go STEP]].
+      { forward eapply upto_stutter_state_lookup'; eauto.
+        { eapply trace_state_lookup_simpl'; eauto. }
+        intros [n_mo STmo]. simpl in STmo.
+        forward eapply traces_match_state_lookup_1; [apply MATCH| apply STmo| ].
+        intros (δi_n & STlmi & RELn).
+        red in INNER_OBLS. specialize_full INNER_OBLS.
+        { eapply trace_state_lookup_simpl'. eauto. }
+        { eauto. }
+        simpl in INNER_OBLS. apply elem_of_dom in INNER_OBLS as [??].
+        congruence. }
+
+      destruct stepo as [[? δo_n']|]; [| done]. simpl in STEP.
+      inversion STEP. subst. clear STEP.
+
+      forward eapply upto_stutter_step_correspondence_alt with 
+        (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go))
+        (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi).
+      { by intros ?? [-> ->]. }
+      { by intros ?[??]. }
+      { apply CORRo. }
+      { apply pred_at_trace_lookup'. eauto. } 
+      intros (n_mo & STEPmo & UPTO').
+
+      (* apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo). *)
+      apply pred_at_trace_lookup' in STEPmo as (? & step_ & STEPmo & -> & LBL).
+      destruct step_ as [[ℓ_mo st_mo']|]; simpl in LBL; [| done].
+      inversion LBL. subst ℓ_mo. clear LBL.
+      pose proof STEPmo as (STmo & Lmo & STmo')%state_label_lookup.
+
+      forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto. 
+      intros (ℓ_lm & Llmi & LBL_MATCH).
+      simpl in LBL_MATCH. destruct LBL_MATCH as (? & LIFT_EQ & MATCHgi).
+      apply INJlg in LIFT_EQ. subst x.
+      
+      apply trace_label_lookup_simpl' in Llmi as (δi_n_mo & δi_n_mo' & STEPlmi).
+      assert (forall δ n, lmtr_i S!! n = Some δ -> exists f', ls_fuel δ !! ρ = Some f' /\ f' <= f) as NOFUEL.  
+      { intros δ n ST. 
+        pose proof (ASGρ _ _ ST) as ASG.
+        apply mk_is_Some, ls_same_doms' in ASG as [f' FUEL].
+        forward eapply role_fuel_decreases with (i := n); eauto.
+        intros ?? ST'. apply ASGρ in ST'. by apply elem_of_dom. }
+        
+      (* assert (exists f_ f_', ls_fuel δi_n_mo !! ρ = Some f_ /\ ls_fuel δi_n_mo' !! ρ = Some f_' /\ f_ <= S f /\ f_' <= S f) as (f_ & f_' & NOFUEL1 & NOFUEL2 & LE_ & LE_').  *)
+      (* { apply state_label_lookup in STEPmo. *)
+      (*   split; eapply NOFUEL; apply STEPmo. } *)
+      (* forward eapply auxtrace_valid_steps' as TRANS; [| apply STEPmo|]; eauto. *)
+      (* apply state_label_lookup in STEPmo as (ST&?&LBL).  *)
+
+      forward eapply auxtrace_valid_steps' as TRANS; [| apply STEPlmi|]; eauto.
+      pose proof STEPlmi as (ST&ST'&LBL)%state_label_lookup. 
+      pose proof (NOFUEL _ _ ST) as (f_ & NOFUEL1 & LE_). 
+      pose proof (NOFUEL _ _ ST') as (f_' & NOFUEL2 & LE_'). 
+            
+      destruct ℓ_lm as [ρ' g| | ]; subst. 
+      3: done. 
+      - destruct (decide (ρ' = ρ)). 
+        { subst. edestruct NOρ; eauto. }
+        simpl in TRANS. destruct TRANS as (_&_&DECR&_).
+        red in DECR. specialize (DECR ρ). specialize_full DECR. 
+        1, 2: eapply elem_of_dom; eauto.
+        { left; [congruence| ].
+          symmetry. eapply ASGρ; eauto. }
+        rewrite NOFUEL1 NOFUEL2 /= in DECR.
+        
+        red in UPTO'. destruct UPTO' as (atr_lmo & atr_mo & AFTERlmo & AFTERmo & UPTO').
+        apply trace_lookup_after_strong in STEPmo as (atr_mo' & AFTERmo' & HEADmo').
+        rewrite AFTERmo in AFTERmo'. inversion AFTERmo'. subst atr_mo. 
+        apply trace_lookup_after_strong in STLo as (atr_lo' & AFTERlo' & HEADlo').
+        rewrite AFTERlmo in AFTERlo'. inversion AFTERlo'. subst atr_lmo.
+        clear AFTERmo' AFTERlo'. 
+        
+        specialize IH with (m := f_') (lmtr_o := atr_lo') (mtr_o := atr_mo') (δi := δi_n_mo').
+        apply trace_lookup_after_strong in STEPlmi as (atr_lmi & AFTERlmi & HEADlmi).
+        specialize IH with (lmtr_i := atr_lmi).
+        (* don't we lose any information here? *)
+        apply after_S_tr_cons in AFTERmo, AFTERlmo, AFTERlmi. 
+        (* TODO: wrong so far - IH requires fuel to decrease strictly by 1 *)
+        specialize_full IH.
+        * lia. 
+        * intros. eapply fair_aux_SoU_after; eauto.
+        * red. intros.
+          erewrite state_lookup_after in H; eauto.
+        * punfold UPTO'; [| apply upto_stutter_mono].
+          inversion UPTO'; subst; try done.
+          inversion H7; eauto. done.
+        * done. 
+        * clear -MATCH AFTERmo AFTERlmi.
+          eapply traces_match_after' in AFTERmo as (?&A'&?); [| apply MATCH].
+          rewrite AFTERlmi in A'. by inversion A'.
+        * intros. eapply NOρ.
+          rewrite -H. symmetry. eapply label_lookup_after; eauto.
+        * intros. eapply ASGρ. 
+          rewrite -H. symmetry. eapply state_lookup_after; eauto.
+        * (* TODO: admitted somewhere else? *)
+          admit.
+        * rewrite -ST'.
+          rewrite (plus_n_O (_ + _)).
+          rewrite -Nat.add_1_r in AFTERlmi. 
+          eapply state_lookup_after; eauto.
+        * destruct IH as [m PM].
+          eexists (S n_mo + m). apply pred_at_sum.
+          by rewrite AFTERlmi.
+      - simpl in TRANS. destruct TRANS as (_&DECR&_).
+        red in DECR. specialize (DECR ρ). specialize_full DECR. 
+        1, 2: eapply elem_of_dom; eauto.
+        { left; [congruence| ].
+          symmetry. eapply ASGρ; eauto. }
+        rewrite NOFUEL1 NOFUEL2 /= in DECR.
+
+        red in UPTO'. destruct UPTO' as (atr_lmo & atr_mo & AFTERlmo & AFTERmo & UPTO').
+        apply trace_lookup_after_strong in STEPmo as (atr_mo' & AFTERmo' & HEADmo').
+        rewrite AFTERmo in AFTERmo'. inversion AFTERmo'. subst atr_mo. 
+        apply trace_lookup_after_strong in STLo as (atr_lo' & AFTERlo' & HEADlo').
+        rewrite AFTERlmo in AFTERlo'. inversion AFTERlo'. subst atr_lmo.
+        clear AFTERmo' AFTERlo'. 
+        
+        specialize IH with (m := f_') (lmtr_o := atr_lo') (mtr_o := atr_mo') (δi := δi_n_mo').
+        apply trace_lookup_after_strong in STEPlmi as (atr_lmi & AFTERlmi & HEADlmi).
+        specialize IH with (lmtr_i := atr_lmi).
+        (* don't we lose any information here? *)
+        apply after_S_tr_cons in AFTERmo, AFTERlmo, AFTERlmi. 
+        (* TODO: wrong so far - IH requires fuel to decrease strictly by 1 *)
+        specialize_full IH.
+        * lia. 
+        * intros. eapply fair_aux_SoU_after; eauto.
+        * red. intros.
+          erewrite state_lookup_after in H; eauto.
+        * punfold UPTO'; [| apply upto_stutter_mono].
+          inversion UPTO'; subst; try done.
+          inversion H7; eauto. done.
+        * done. 
+        * clear -MATCH AFTERmo AFTERlmi.
+          eapply traces_match_after' in AFTERmo as (?&A'&?); [| apply MATCH].
+          rewrite AFTERlmi in A'. by inversion A'.
+        * intros. eapply NOρ.
+          rewrite -H. symmetry. eapply label_lookup_after; eauto.
+        * intros. eapply ASGρ. 
+          rewrite -H. symmetry. eapply state_lookup_after; eauto.
+        * (* TODO: admitted somewhere else? *)
+          admit.
+        * rewrite -ST'.
+          rewrite (plus_n_O (_ + _)).
+          rewrite -Nat.add_1_r in AFTERlmi. 
+          eapply state_lookup_after; eauto.
+        * destruct IH as [m PM].
+          eexists (S n_mo + m). apply pred_at_sum.
+          by rewrite AFTERlmi.
+
+  Admitted. 
+
+
+
+  (* TODO: rename? *)
+  Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
+    (MATCH: lm_model_traces_match mtr_o lmtr_i)
+    (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
+    (FAIR_SOU: forall n gi, fair_aux_SoU lmtr_o (lift_Gi gi) n (LM := LMo))
+    (INNER_OBLS: inner_obls_exposed lmtr_o)
+  (* (INF : trace_len_is tr_o NOinfinity *)
+  (* (INF' : trace_len_is lmtr_i NOinfinity *)
+
+    (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi),
+          lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go')
+  (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
+           lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi)
+  (VALIDi: auxtrace_valid lmtr_i)
+  (ST0: lmtr_i S!! 0 = Some δi)
+  (FUEL0: ls_fuel δi !! ρ = Some f):
+    ∃ m, pred_at lmtr_i m (steps_or_unassigned ρ).
+  Proof.
+    Local Set Printing Coercions.
     gd lmtr_i. gd δi. gd mtr_o. gd lmtr_o. induction f.
     { intros.
       pose proof (traces_match_first _ _ _ _ _ _ MATCH) as REL0.
@@ -955,71 +1147,53 @@ Section InnerLMTraceFairness.
       destruct ℓ_lm as [ρ' g| | ]; subst. 
       3: done. 
       - destruct (decide (ρ' = ρ)). 
-        + subst. edestruct NOρ; eauto. 
-        + simpl in TRANS. destruct TRANS as (_&_&DECR&_).
-          red in DECR. specialize (DECR ρ). specialize_full DECR. 
-          1, 2: eapply elem_of_dom; eauto.
-          { left; [congruence| ].
-            symmetry. eapply ASGρ; eauto. }
-          rewrite NOFUEL1 NOFUEL2 /= in DECR.
-
-          (* TODO: distinction with base case goes here *)
-
-          (* apply trace_lookup_after_strong in STLo as (atr_lmo & AFTERlmo & HEADlmo). *)
-          (* specialize (IHf atr_lmo). *)
-          (* apply trace_lookup_after_strong in STEPmo as (atr_mo & AFTERmo & HEADmo). *)
-          (* specialize IHf with (mtr_o := atr_mo). *)
-          red in UPTO'. destruct UPTO' as (atr_lmo & atr_mo & AFTERlmo & AFTERmo & UPTO').
-          apply trace_lookup_after_strong in STEPmo as (atr_mo' & AFTERmo' & HEADmo').
-          rewrite AFTERmo in AFTERmo'. inversion AFTERmo'. subst atr_mo. 
-          apply trace_lookup_after_strong in STLo as (atr_lo' & AFTERlo' & HEADlo').
-          rewrite AFTERlmo in AFTERlo'. inversion AFTERlo'. subst atr_lmo.
-          clear AFTERmo' AFTERlo'. 
-          
-          specialize IHf with (lmtr_o := atr_lo') (mtr_o := atr_mo') (δi := δi_n_mo').
-          apply trace_lookup_after_strong in STEPlmi as (atr_lmi & AFTERlmi & HEADlmi).
-          specialize IHf with (lmtr_i := atr_lmi).
-          (* don't we lose any information here? *)
-          apply after_S_tr_cons in AFTERmo, AFTERlmo, AFTERlmi. 
-          (* TODO: wrong so far - IH requires fuel to decrease strictly by 1 *)
-          specialize_full IHf.
-          * intros. eapply fair_aux_SoU_after; eauto.
-          * red. intros.
-            erewrite state_lookup_after in H; eauto.
-          * punfold UPTO'; [| apply upto_stutter_mono].
-            inversion UPTO'; subst; try done.
-            inversion H7; eauto. done.
-          * admit.
-          * clear -MATCH AFTERmo AFTERlmi.
-            eapply traces_match_after' in AFTERmo as (?&A'&?); [| apply MATCH].
-            rewrite AFTERlmi in A'. by inversion A'.
-          * intros. eapply NOρ.
-            rewrite -H. symmetry. eapply label_lookup_after; eauto.
-          * intros. eapply ASGρ. 
-            rewrite -H. symmetry. eapply state_lookup_after; eauto.
-          * (* TODO: admitted somewhere else? *)
-            admit.
-          * rewrite -ST'.
-            rewrite (plus_n_O (_ + _)).
-            rewrite -Nat.add_1_r in AFTERlmi. 
-            eapply state_lookup_after; eauto.
-          * destruct IHf as [m PM].
-            eexists (S n_mo + m). apply pred_at_sum.
-            by rewrite AFTERlmi.
-      - foobar. 
-            
-            
-            
-
-          
-          lia.
-      - simpl in TRANS. destruct TRANS as (_&DECR&_).
-        (* TODO: remove copypaste from above *)
+        { subst. edestruct NOρ; eauto. }
+        simpl in TRANS. destruct TRANS as (_&_&DECR&_).
         red in DECR. specialize (DECR ρ). specialize_full DECR. 
         1, 2: eapply elem_of_dom; eauto.
         { left; [congruence| ].
           symmetry. eapply ASGρ; eauto. }
-        rewrite NOFUEL1 NOFUEL2 /= in DECR. lia. }
+        rewrite NOFUEL1 NOFUEL2 /= in DECR.
+        
+        red in UPTO'. destruct UPTO' as (atr_lmo & atr_mo & AFTERlmo & AFTERmo & UPTO').
+        apply trace_lookup_after_strong in STEPmo as (atr_mo' & AFTERmo' & HEADmo').
+        rewrite AFTERmo in AFTERmo'. inversion AFTERmo'. subst atr_mo. 
+        apply trace_lookup_after_strong in STLo as (atr_lo' & AFTERlo' & HEADlo').
+        rewrite AFTERlmo in AFTERlo'. inversion AFTERlo'. subst atr_lmo.
+        clear AFTERmo' AFTERlo'. 
+        
+        specialize IHf with (lmtr_o := atr_lo') (mtr_o := atr_mo') (δi := δi_n_mo').
+        apply trace_lookup_after_strong in STEPlmi as (atr_lmi & AFTERlmi & HEADlmi).
+        specialize IHf with (lmtr_i := atr_lmi).
+        (* don't we lose any information here? *)
+        apply after_S_tr_cons in AFTERmo, AFTERlmo, AFTERlmi. 
+        (* TODO: wrong so far - IH requires fuel to decrease strictly by 1 *)
+        specialize_full IHf.
+        * intros. eapply fair_aux_SoU_after; eauto.
+        * red. intros.
+          erewrite state_lookup_after in H; eauto.
+        * punfold UPTO'; [| apply upto_stutter_mono].
+          inversion UPTO'; subst; try done.
+          inversion H7; eauto. done.
+        * admit.
+        * clear -MATCH AFTERmo AFTERlmi.
+          eapply traces_match_after' in AFTERmo as (?&A'&?); [| apply MATCH].
+          rewrite AFTERlmi in A'. by inversion A'.
+        * intros. eapply NOρ.
+          rewrite -H. symmetry. eapply label_lookup_after; eauto.
+        * intros. eapply ASGρ. 
+          rewrite -H. symmetry. eapply state_lookup_after; eauto.
+        * (* TODO: admitted somewhere else? *)
+          admit.
+        * rewrite -ST'.
+          rewrite (plus_n_O (_ + _)).
+          rewrite -Nat.add_1_r in AFTERlmi. 
+          eapply state_lookup_after; eauto.
+        * destruct IHf as [m PM].
+          eexists (S n_mo + m). apply pred_at_sum.
+          by rewrite AFTERlmi.
+      - foobar. 
+            
 
     
         
