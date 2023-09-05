@@ -27,7 +27,6 @@ Definition hist_to_we (h : list write_event) := last h.
 
 Definition to_hist (h : list write_event) : list val := (λ e, e.(we_val)) <$> h.
 
-
 Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
@@ -51,10 +50,6 @@ Section Proxy.
 
   Definition client_gnames_token_pending γCst : iProp Σ
     := own γCst (Cinl (Excl ())).
-
-  Definition kvs_valid_snapshot (M : gmap Key (list write_event)) (t : Time) :=
-   kvs_valid M t ∧
-   ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
 
   Definition CanStartToken (γS : gname) : iProp Σ := own γS (Excl ()).
   Definition isActiveToken (γA : gname) : iProp Σ := own γA (Excl ()).

@@ -138,6 +138,10 @@ Section KVS_valid.
   Proof.
   Admitted.
 
+
+Lemma kvs_valid_next M T : (kvs_valid M (T + 1)).
+Proof. Admitted.
+
 End KVS_valid.
 
 
@@ -195,6 +199,22 @@ Section KVSL_valid.
 (*   Admitted. *)
 (* End KVSL_valid. *)
 
+Lemma kvsl_valid_next M (m : gmap Key val) T : kvsl_valid m M (T + 1).
+Proof. Admitted.
+
 End KVSL_valid.
 
-(** We might need as well some model of client side state. *)
+Section Snapshot.
+  Context `{!User_params}.
+
+  Definition kvs_valid_snapshot (M : gmap Key (list write_event)) (t : Time) :=
+   kvs_valid M t ∧
+   ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
+
+  Lemma kvs_valid_snapshot_filter_next M (mu : gmap Key (list val)) T :
+    (kvs_valid_snapshot
+       (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M)
+       (T + 1)%nat).
+  Proof. Admitted.
+
+End Snapshot.
