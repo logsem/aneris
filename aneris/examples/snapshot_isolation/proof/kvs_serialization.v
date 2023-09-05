@@ -254,18 +254,114 @@ Section Repdb_ser.
   Qed.
 
   (* TODO : move to lib. *)
+  Lemma prod_ser_str_injective s1 s1' s2 s2' : 
+    prod_ser_str s1 s2 = prod_ser_str s1' s2' →
+    (s1 = s1' ∧ s2 = s2').
+  Proof.
+    intros Hyp.
+    eapply not_elem_of_string_app_cons_inv_l in Hyp;
+    [|intros Hyp'; by apply StringOfZ_not_sep in Hyp'.. ].
+    destruct Hyp as (Heq & _ & Hyp).
+    assert (String.length s1 = String.length s1') as Hlen by naive_solver.
+    by apply append_eq_length_inv.
+  Qed.
+
+  (* TODO : move to lib. *)
+  Lemma is_list_eq_list v l1 l2 : 
+    is_list l1 v → is_list l2 v → l1 = l2.
+  Proof.
+    intros H_l1 H_l2.
+    generalize dependent l2.
+    generalize dependent v.
+    induction l1.
+    - intros v H_l1 l2 H_l2.
+      inversion H_l1 as [H_eq].
+      simplify_eq.
+      destruct l2; set_solver.
+    - intros v H_l1 l2 H_l2.
+      inversion H_l1 as [v' (H_eq & H_l1')].
+      destruct l2; set_solver.
+  Qed.
+
+  (* TODO : move to lib. *)
   Lemma list_ser_is_ser_injective ser:
     ser_is_injective ser →
     ser_is_injective (list_serialization ser).
   Proof.
-  Admitted.
+    intros Hyp s v1 v2 H_ser_1 H_ser_2.
+    simpl in H_ser_1, H_ser_2.
+    destruct H_ser_1 as [l1 [H_list_1 H_aux_1]].
+    generalize dependent v1.
+    generalize dependent v2.
+    generalize dependent s.
+    induction l1.
+    all : intros s H_aux_1 v2 H_ser_2 v1 H_list_1.
+    all : destruct H_ser_2 as [l2 [H_list_2 H_aux_2]].
+    - destruct l2; first set_solver.
+      destruct H_aux_2 as [s1 [s2 [_ [H_eq _]]]].
+      destruct s; last done.
+      unfold prod_ser_str in H_eq.
+      by destruct (StringOfZ (String.length s1)).
+    - destruct l2.
+      all : destruct H_aux_1 as [s1 [s2 [H_ser1 [H_eq H_aux1]]]].
+      + simpl in H_aux_2.
+        rewrite H_aux_2 in H_eq.
+        unfold prod_ser_str in H_eq.
+        by destruct (StringOfZ (String.length s1)).
+      + destruct H_aux_2 as [s1' [s2' [H_ser2' [H_eq2' H_aux2']]]].
+        destruct H_list_2 as [v2' [H_eq_2 H_list_2]].
+        rewrite H_eq_2.
+        unfold list_is_ser in IHl1.
+        assert (list_is_ser ser v2' s2) as H_ser_list.
+        {
+          exists l2. 
+          split; first done.
+          rewrite H_eq in H_eq2'.
+          apply prod_ser_str_injective in H_eq2'.
+          set_solver.
+        }
+        destruct H_list_1 as [v1' [H_eq_1 H_list_1]].
+        rewrite H_eq_1.
+        specialize (IHl1 s2 H_aux1 v2' H_ser_list v1' H_list_1).
+        rewrite IHl1.
+        rewrite H_eq2' in H_eq.
+        destruct H_ser_list as [l2' [H_list2' H_aux2'']].
+        rewrite -IHl1 in H_list2'.
+        assert (l1 = l2') as H_eq_list; first by eapply is_list_eq_list.
+        rewrite -H_eq_list in H_aux2''.
+        apply prod_ser_str_injective in H_eq as (H_eq1_s1 & H_eq1_s2).
+        rewrite H_eq1_s1 in H_ser2'.
+        assert (a = v) as H_eq_val; first by apply (Hyp s1).
+        by rewrite H_eq_val.
+  Qed.
 
   (* TODO : move to lib. *)
   Lemma list_ser_is_ser_injective_alt ser:
     ser_is_injective_alt ser →
     ser_is_injective_alt (list_serialization ser).
   Proof.
-  Admitted.
+    intros Hyp s1 s2 v H_ser_1 H_ser_2.
+    simpl in H_ser_1, H_ser_2.
+    destruct H_ser_1 as [l1 [H_list_1 H_aux_1]].
+    generalize dependent s1.
+    generalize dependent s2.
+    generalize dependent v.
+    induction l1.
+    all : intros v H_list s2 H_ser_2 s1 H_aux_1.
+    all : destruct H_ser_2 as [l2 [H_list_2 H_aux_2]].
+    1 : destruct l2; set_solver.
+    destruct l2; first set_solver.
+    simpl in H_aux_1, H_aux_2.
+    destruct H_aux_1 as [s3 [s4 [H_ser1 [H_eq1 H_aux1]]]].
+    destruct H_aux_2 as [s3' [s4' [H_ser2 [H_eq2 H_aux2]]]].
+    destruct H_list as [v2' [H_eq_2 H_list']].
+    simplify_eq.
+    assert (s3 = s3') as H_eq; first set_solver.
+    f_equal; first done.
+    eapply IHl1; try done.
+    exists l2.
+    set_solver.
+  Qed.
 
   Lemma req_ser_is_injective : ser_is_injective req_serialization.
   Proof.
