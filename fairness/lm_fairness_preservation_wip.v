@@ -295,7 +295,7 @@ Section InnerLMTraceFairness.
   Qed.
 
   (* TODO: move *)
-  Lemma trace_lookup_after' {St L : Type} (tr: trace St L) n st:
+  Lemma state_lookup_after' {St L : Type} (tr: trace St L) n st:
     (exists atr, after n tr = Some atr /\ trfirst atr = st) <-> tr S!! n = Some st. 
   Proof. 
     destruct (after n tr) as [atr| ] eqn:AFTER.
@@ -385,7 +385,7 @@ Section InnerLMTraceFairness.
     forward eapply (proj1 (trace_state_lookup_simpl' tr1 n s1)) as ST1; eauto.  
     forward eapply (proj1 (trace_state_lookup_simpl' tr2 n s2)) as ST2; eauto.  
     simpl in *.
-    pose proof (proj2 (trace_lookup_after' _ _ _) ST1) as (atr1 & AFTER1 & A1).
+    pose proof (proj2 (state_lookup_after' _ _ _) ST1) as (atr1 & AFTER1 & A1).
     forward eapply traces_match_after' with (tr1 := tr1) (tr2 := tr2); eauto.
     intros (atr2 & AFTER2 & A2). 
     split.
@@ -424,6 +424,22 @@ Section InnerLMTraceFairness.
     destruct STEPS. eexists. split; eauto.
     eapply trace_state_lookup_simpl'; eauto.
   Qed. 
+
+  Lemma traces_match_state_lookup_2 {L1 L2 S1 S2: Type}
+    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
+    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) st2
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (ST2: tr2 S!! n = Some st2):
+    exists st1, tr1 S!! n = Some st1 /\ Rs st1 st2.
+  Proof. 
+    apply trace_state_lookup_simpl' in ST2 as ([s2 ostep2] & NTH2 & <-).
+    pose proof (traces_match_trace_lookup_general _ _ _ _ _ _ n MATCH) as STEPS.
+    rewrite NTH2 in STEPS.
+    destruct (tr1 !! n) as [[s1 ostep1]|] eqn:NTH1; [| done]. simpl in *.
+    destruct STEPS. eexists. split; eauto.
+    eapply trace_state_lookup_simpl'; eauto.
+  Qed.
 
   Lemma traces_match_label_lookup_1 {L1 L2 S1 S2: Type}
     (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
@@ -720,15 +736,88 @@ Section InnerLMTraceFairness.
       eapply IH_APP; eauto. lia.
   Admitted.         
 
+  (* Lemma upto_stutter_state_lookup *)
+
+  (* TODO: rename? *)
+  Lemma eventual_step_or_unassign_nth lmtr_o mtr_o lmtr_i ρ gi δi f n
+    (MATCH: lm_model_traces_match mtr_o lmtr_i)
+    (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
+    (FAIR_SOU: forall n gi, fair_aux_SoU lmtr_o (lift_Gi gi) n (LM := LMo))
+    (INNER_OBLS: inner_obls_exposed lmtr_o)
+    (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi),
+          n <= m -> lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go')
+  (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
+           n <= k -> lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi)
+  (VALIDi: auxtrace_valid lmtr_i)
+  (ST0: lmtr_i S!! n = Some δi)
+  (FUEL0: ls_fuel δi !! ρ = Some f):
+    ∃ m, n <= m /\ pred_at lmtr_i m (steps_or_unassigned ρ).
+  Proof.
+    (* pose proof (traces_match_first _ _ _ _ _ _ MATCH) as REL0. *)
+    (* pose proof (upto_stutter_trfirst _ _ _ _ CORRo) as CORR0.  *)
+    pose proof ST0 as X. eapply traces_match_state_lookup_2 in X as (st_mo_n & STm0 & REL0); [| apply MATCH].
+    pose proof STm0 as (atr_mo_n & AFTERmo_n & HEADmo_n)%state_lookup_after'.
+    pose proof AFTERmo_n as X. eapply upto_stutter_after in X as (k & atr_lmo_k & AFTERlmo_k & UPTOkn); eauto.
+    pose proof AFTERmo_n as X. eapply traces_match_after' in X as (atr_lmi_n & AFTERlmi_n & MATCH'); eauto.
+
+    (* TODO: unify with IH usage in eventual_step_or_unassign *)
+    forward eapply eventual_step_or_unassign with (lmtr_o := atr_lmo_k) (mtr_o := atr_mo_n) (lmtr_i := atr_lmi_n); eauto.
+    * intros. eapply fair_aux_SoU_after; eauto.
+    * red. intros. erewrite state_lookup_after in H; eauto. 
+    (* * punfold UPTOkn; [| apply upto_stutter_mono]. *)
+    (*   inversion UPTOkn; subst; try done. *)
+    (*   inversion H7; eauto. done. *)
+    (* * done.  *)
+    (* * eapply traces_match_after' in AFTERmo as (?&A'&?); [| apply MATCH]. *)
+    (*   rewrite AFTERlmi in A'. by inversion A'. *)
+    * intros. eapply NOρ. 
+      2: { rewrite -H. symmetry. eapply label_lookup_after; eauto. }
+      lia.
+    * intros. eapply ASGρ. 
+      2: { rewrite -H. symmetry. eapply state_lookup_after; eauto. }
+      lia. 
+    * (* TODO: admitted somewhere else? *)
+      admit.
+    * rewrite -ST0.
+      erewrite state_lookup_after; eauto.
+    * intros [m PM].
+      eexists (n + m). split; [lia| ].
+      apply pred_at_sum. by rewrite AFTERlmi_n.
+  Admitted.
+
+  (* TODO: move *)
+  Lemma infinite_neg_finite {St L : Type} (tr : trace St L):
+    terminating_trace tr <-> ¬ infinite_trace tr.
+  Proof.
+    rewrite /terminating_trace /infinite_trace. split.
+    - intros [n A]. intros A'. specialize (A' n). rewrite A in A'. by destruct A'.
+    - intros [n A%eq_None_not_Some]%not_forall_exists_not. eexists; eauto.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma infinite_trace_equiv {St L : Type} (tr : trace St L) (len : nat_omega)
+                             (LEN: trace_len_is tr len):
+    infinite_trace tr ↔ len = NOinfinity. 
+  Proof.
+    rewrite /infinite_trace. split.
+    - intros A. destruct len; [done| ].
+      eapply trace_len_neg with (i := n), proj2 in LEN. 
+      specialize (A n) as [? T]. rewrite LEN in T; [done| ]. simpl. lia. 
+    - intros -> ?. by apply LEN.
+  Qed.     
 
   (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
   (* TODO: renaming of arguments? *)
-  Lemma inner_LM_trace_fair_aux (tr_o: mtrace Mo) (lmtr_i: auxtrace (LM := LMi)):
+  Lemma inner_LM_trace_fair_aux (lmtr_i: auxtrace (LM := LMi)) (tr_o: mtrace Mo) 
+    (lmtr_o: auxtrace (LM := LMo)):
+    upto_stutter_auxtr lmtr_o tr_o -> 
+    (∀ n gi, fair_aux_SoU lmtr_o (lift_Gi gi) n) ->
+    inner_obls_exposed lmtr_o -> (* TODO: should become unnecessary with LM state invariants *)
     infinite_trace tr_o ->
     lm_model_traces_match tr_o lmtr_i ->
     (∀ ρ, fair_model_trace ρ tr_o) -> (forall ρ, fair_aux ρ lmtr_i (LM := LMi)).
   Proof. 
-    intros INF MATCH FAIRo ρ.
+    intros UPTO FAIR_SOU INNER_OBLS INF MATCH FAIRo ρ.
     destruct (classic (fair_aux ρ lmtr_i)) as [| UNFAIR]; [done| exfalso].
 
     rewrite /fair_aux in UNFAIR. 
@@ -738,18 +827,17 @@ Section InnerLMTraceFairness.
     clear UNFAIR. rename X into UNFAIR.
 
     assert (trace_len_is tr_o NOinfinity) as INF'.
-    { admit. }
+    { pose proof (trace_has_len tr_o) as [? LEN].
+      eapply infinite_trace_equiv in INF; eauto. by subst. }
     assert (trace_len_is lmtr_i NOinfinity) as INF''.
     { pose proof (trace_has_len lmtr_i) as [li ?].
       forward eapply traces_match_same_length as INF''; [| |by apply MATCH|]; eauto.
       by subst. }
 
-    (* TODO: setoid_rewrite stopped working; any conflict with paco? *)
     (* setoid_rewrite pred_at_neg in UNFAIR; [| by apply INF'']. *)
     (* setoid_rewrite pred_at_trace_lookup' in UNFAIR. simpl in UNFAIR. *)
     erewrite forall_proper in UNFAIR.
-    2: { intros. rewrite pred_at_or. apply pred_at_neg.
-         by apply INF''. }
+    2: { intros. rewrite pred_at_or. apply pred_at_neg. by apply INF''. }
     simpl in UNFAIR. 
     setoid_rewrite pred_at_trace_lookup' in UNFAIR. 
 
@@ -782,12 +870,18 @@ Section InnerLMTraceFairness.
     { apply elem_of_dom. rewrite -ls_same_doms.
       apply ls_mapping_dom.
       eapply EN; eauto. }
-    
-    
-      
-    
-    
 
+    forward eapply eventual_step_or_unassign_nth with (n := j); eauto.
+    { intros. eapply (NOρ m); eauto. lia. }
+    { eapply traces_match_LM_preserves_validity; eauto. }
+    rewrite /steps_or_unassigned. setoid_rewrite <- pred_at_or. 
+    intros (m & LEjm & [UNMAP | STEP]).
+    - apply pred_at_trace_lookup in UNMAP as (?&MTH&UNMAP).
+      edestruct UNMAP; eauto.
+    - apply pred_at_trace_lookup in STEP as (?&MTH&[? STEP]).
+      edestruct (NOρ m); eauto. lia.
+  Qed. 
+    
     
 
 End InnerLMTraceFairness. 
