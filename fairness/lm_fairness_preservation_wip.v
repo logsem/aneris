@@ -594,6 +594,28 @@ Section InnerLMTraceFairness.
     rewrite after_sum'. by rewrite AFTER.
   Qed.
 
+  (* (* TODO: move *) *)
+  (* Lemma owner_burns_fuel `{LM: LiveModel G M} δ1 ℓ δ2 ρ f1 f2 *)
+  (*   (FUEL1: ls_fuel δ1 !! ρ = Some f1) *)
+  (*   (FUEL2: ls_fuel δ2 !! ρ = Some f2) *)
+  (*   (STEP: lm_ls_trans LM δ1 ℓ δ2) *)
+  (*   (* (OWN: ls_mapping δ1 !! ρ =  *) *)
+  (*   (NEQ: forall g, ℓ ≠ Take_step ρ g): *)
+  (*   f2 <= f1. *)
+  (* Proof. *)
+  (*   destruct ℓ; simpl in STEP.  *)
+  (*   3: { by repeat apply proj2 in STEP. } *)
+  (*   - destruct STEP as (?&?&?&?&?&?). *)
+  (*     red in H2. *)
+  (*     specialize (H2 ρ ltac:(apply elem_of_dom; eauto)). rewrite FUEL1 FUEL2 in H2. *)
+  (*     destruct H2 as [X|[X|X]].  *)
+  (*     + done. *)
+  (*     + destruct X as [[=] _]. subst. edestruct NEQ; eauto. *)
+  (*     + apply proj1 in X. destruct X. apply elem_of_dom; eauto. *)
+  (*   - destruct STEP as (?&?&?&?&?). *)
+  (*     red in H2.  *)
+                         
+
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
@@ -604,11 +626,10 @@ Section InnerLMTraceFairness.
           lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go')
   (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
            lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi)
-  (VALIDi: auxtrace_valid lmtr_i)
   (ST0: lmtr_i S!! 0 = Some δi)
   (FUEL0: ls_fuel δi !! ρ = Some f):
     ∃ m, pred_at lmtr_i m (steps_or_unassigned ρ).
-  Proof.
+  Proof.    
     Local Set Printing Coercions.
     gd lmtr_i. gd δi. gd mtr_o. gd lmtr_o.
     pattern f. apply lt_wf_ind. clear f. intros f IH. intros. 
@@ -669,9 +690,12 @@ Section InnerLMTraceFairness.
       pose proof (ASGρ _ _ ST) as ASG.
       apply mk_is_Some, ls_same_doms' in ASG as [f' FUEL].
       forward eapply role_fuel_decreases with (i := n); eauto.
+      2: { eapply traces_match_LM_preserves_validity; eauto. }  
       intros ?? ST'. apply ASGρ in ST'. by apply elem_of_dom. }
     
     forward eapply auxtrace_valid_steps' as TRANS; [| apply STEPlmi|]; eauto.
+    { eapply traces_match_LM_preserves_validity; eauto. }
+    
     pose proof STEPlmi as (ST&ST'&LBL)%state_label_lookup. 
     pose proof (NOFUEL _ _ ST) as (f_ & NOFUEL1 & LE_). 
     pose proof (NOFUEL _ _ ST') as (f_' & NOFUEL2 & LE_'). 
@@ -706,8 +730,6 @@ Section InnerLMTraceFairness.
         rewrite -H. symmetry. eapply label_lookup_after; eauto.
       * intros. eapply ASGρ. 
         rewrite -H. symmetry. eapply state_lookup_after; eauto.
-      * (* TODO: admitted somewhere else? *)
-        admit.
       * rewrite -ST'.
         rewrite (plus_n_O (_ + _)).
         rewrite -Nat.add_1_r in AFTERlmi. 
@@ -720,21 +742,22 @@ Section InnerLMTraceFairness.
     3: done. 
     - destruct (decide (ρ' = ρ)). 
       { subst. edestruct NOρ; eauto. }
+      eapply IH_APP. 
+      
       simpl in TRANS. destruct TRANS as (_&_&DECR&_).
       red in DECR. specialize (DECR ρ). specialize_full DECR. 
       1, 2: eapply elem_of_dom; eauto.
       { left; [congruence| ]. symmetry. eapply ASGρ; eauto. }
-      rewrite NOFUEL1 NOFUEL2 /= in DECR.
-      eapply IH_APP; eauto. lia. 
-    -
-      (* TODO: unify with above? *)
+      rewrite NOFUEL1 NOFUEL2 /= in DECR. lia. 
+    - eapply IH_APP; eauto.
+
       simpl in TRANS. destruct TRANS as (_&DECR&_).
       red in DECR. specialize (DECR ρ). specialize_full DECR. 
       1, 2: eapply elem_of_dom; eauto.
       { left; [congruence| ]. symmetry. eapply ASGρ; eauto. }
       rewrite NOFUEL1 NOFUEL2 /= in DECR.
-      eapply IH_APP; eauto. lia.
-  Admitted.         
+       lia.
+  Qed. 
 
   (* Lemma upto_stutter_state_lookup *)
 
@@ -748,7 +771,6 @@ Section InnerLMTraceFairness.
           n <= m -> lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go')
   (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
            n <= k -> lmtr_i S!! k = Some δi_k → ls_mapping δi_k !! ρ = Some gi)
-  (VALIDi: auxtrace_valid lmtr_i)
   (ST0: lmtr_i S!! n = Some δi)
   (FUEL0: ls_fuel δi !! ρ = Some f):
     ∃ m, n <= m /\ pred_at lmtr_i m (steps_or_unassigned ρ).
@@ -776,14 +798,12 @@ Section InnerLMTraceFairness.
     * intros. eapply ASGρ. 
       2: { rewrite -H. symmetry. eapply state_lookup_after; eauto. }
       lia. 
-    * (* TODO: admitted somewhere else? *)
-      admit.
     * rewrite -ST0.
       erewrite state_lookup_after; eauto.
     * intros [m PM].
       eexists (n + m). split; [lia| ].
       apply pred_at_sum. by rewrite AFTERlmi_n.
-  Admitted.
+  Qed. 
 
   (* TODO: move *)
   Lemma infinite_neg_finite {St L : Type} (tr : trace St L):
@@ -805,6 +825,143 @@ Section InnerLMTraceFairness.
       specialize (A n) as [? T]. rewrite LEN in T; [done| ]. simpl. lia. 
     - intros -> ?. by apply LEN.
   Qed.     
+
+  Local Ltac by_contradiction_classic C :=
+    match goal with
+    | |- ?goal => destruct (classic goal) as [?|C]; first done; exfalso
+    end.
+
+
+  Lemma DNE_iff (P: Prop):
+    P <-> ¬ ¬ P.
+  Proof. 
+    tauto. (* due to classic usage *)
+  Qed. 
+
+  (* TODO: move *)
+  Lemma state_lookup_dom_neg {St L: Type}  (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, tr S!! i = None <-> NOmega.le len (NOnum i).
+  Proof using.
+    intros i.
+    pose proof (state_lookup_dom _ _ LEN i) as EQUIV.
+    apply not_iff_compat in EQUIV. rewrite -not_eq_None_Some in EQUIV.
+    rewrite -DNE_iff in EQUIV. rewrite EQUIV.
+    lia_NO len.
+  Qed.
+
+  (* Lemma finite_forall_dec_restrict: *)
+  (* ∀ {A : Type} {EqDecision0 : EqDecision A} (P : A → Prop) (dom: list A), *)
+  (*   (* finite.Finite {a: A | P a} *) *)
+  (*   (forall a, P a -> a ∈ dom) (* not using Finite to avoid ProofIrrel *) *)
+  (*   → (∀ x : A, Decision (P x)) → Decision (∀ x : A, P x). *)
+  (* Proof. *)
+  (*   intros ?? P dom DOM DEC. *)
+  (*   set (dom' := filter P dom). *)
+  (*   solve_decision.  *)
+  (*   intros ??.  intros ?. intros [dom DOM].  *)
+
+  (* TODO: is it possible to express the general principle of induction by burning fuel? *)
+  Lemma owner_fixed_eventually `{LM: LiveModel G M} `{Inhabited G}
+    (tr: auxtrace (LM := LM)) ρ n
+    (NOρ: ∀ m ℓ, n ≤ m → tr L!! m = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
+    (ASGρ : ∀ m δ, n <= m -> tr S!! m = Some δ → ρ ∈ dom (ls_mapping δ))
+    (VALID: auxtrace_valid tr) :
+  ∃ j g, n ≤ j ∧ ∀ k δ, j ≤ k → tr S!! k = Some δ → ls_mapping δ !! ρ = Some g.
+  Proof.
+    pose proof (trace_has_len tr) as [len LEN].
+    assert (forall m, NOmega.le len (NOnum m) -> ∃ j g, n ≤ j ∧ 
+                ∀ k δ, j ≤ k → tr S!! k = Some δ → ls_mapping δ !! ρ = Some g)
+             as OVER. 
+    { intros.
+      assert (g: G) by eapply inhabitant.
+      exists (max m n), g. split; [lia| ].
+      intros ?? LEnk KTH.
+      eapply mk_is_Some, state_lookup_dom in KTH; eauto.
+      lia_NO len. }
+    
+    destruct (tr S!! n) as [δ|] eqn:NTH.
+    2: { apply (OVER n). eapply state_lookup_dom_neg; eauto. }
+    
+    pose proof (ASGρ _ _ ltac:(eauto) NTH) as FUEL.
+    rewrite ls_same_doms in FUEL. apply elem_of_dom in FUEL as [f FUEL].
+
+    assert (exists j, n = j /\ n <= j) as (j & EQ & LE) by (exists n; lia).
+    rewrite EQ in NTH. clear EQ. 
+    gd δ. gd j. pattern f. apply lt_wf_ind. clear f. intros f IH. intros.
+    
+    by_contradiction_classic CHANGE.
+    pose proof CHANGE as CHANGE_.
+    pose proof FUEL as [g MAP']%mk_is_Some%ls_same_doms'. 
+    apply not_ex_all_not with (n := j) in CHANGE.
+    apply not_ex_all_not with (n := g) in CHANGE.
+    apply not_and_or in CHANGE as [? | CHANGE]; [lia| ].
+
+    apply not_all_ex_not in CHANGE as [m_ CHANGE].
+    pattern m_ in CHANGE. apply min_prop_dec in CHANGE.
+    2: { clear.
+         intros k.
+         apply not_dec.
+         destruct (tr S!! k) as [δ| ] eqn:KTH.
+         2: { apply (Decision_iff_impl True); [split; done| apply _]. }
+         admit. }
+    clear m_. destruct CHANGE as (m & CHANGE & MIN). 
+                
+    apply not_all_ex_not in CHANGE as [δm' CHANGE].
+    apply imply_to_and in CHANGE as [LEjm CHANGE]. 
+    apply imply_to_and in CHANGE as [MTH' CHANGE].
+    
+    apply le_lt_eq_dec in LEjm as [LTjm| ->].
+    2: { congruence. }
+    destruct m; [lia| ].     
+    
+    (* assert (is_Some (tr S!! m)) as [δm MTH]. *)
+    (* { eapply state_lookup_dom; eauto. *)
+    (*   eapply mk_is_Some, state_lookup_dom in MTH'; eauto. *)
+    (*   lia_NO len. } *)
+    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN m)).
+    { eapply state_lookup_dom; eauto. by rewrite Nat.add_1_r. }
+    intros (δm & ℓ & δm'_ & STEP).
+
+    forward eapply auxtrace_valid_steps' as TRANS; [| apply STEP|]; eauto.
+    apply state_label_lookup in STEP as (MTH & MTH'_ & LBL).
+    rewrite Nat.add_1_r MTH' in MTH'_. inversion MTH'_. subst δm'_. clear MTH'_.
+
+    pose proof ASGρ as ASGm. 
+    specialize_full ASGm.
+    2: { apply MTH. }
+    { lia. }
+    apply elem_of_dom in ASGm as [g_ MAP]. 
+
+    assert (EqDecision G) by admit.
+    destruct (decide (g_ = g)) as [->| ]. 
+    2: { subst. specialize (MIN m). specialize_full MIN; [| lia].
+         intros MAPP. specialize (MAPP _ ltac:(lia) MTH). congruence. }
+
+    pose proof ASGρ as ASGm'. 
+    specialize_full ASGm'.
+    2: { apply MTH'. }
+    { lia. }
+    apply elem_of_dom, ls_same_doms' in ASGm' as [f' FUEL']. 
+
+    apply CHANGE_. eapply IH.
+    3: { apply FUEL'. }
+    3: { eauto. }
+    2: { lia. }
+
+    pose proof MAP as [f_ FUEL_]%mk_is_Some%ls_same_doms'.
+
+    foobar. reuse assertion about non-increasing fuel. 
+
+    destruct ℓ; simpl in TRANS. 
+    3: { by repeat apply proj2 in TRANS. }
+    - do 2 apply proj2 in TRANS. apply proj1 in TRANS.
+      red in TRANS. specialize (TRANS ρ). rewrite FUEL' FUEL in TRANS. 
+      eapply TRANS. 
+    
+    
+
+
 
   (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
   (* TODO: renaming of arguments? *)
