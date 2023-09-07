@@ -24,14 +24,10 @@ From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources
      global_invariant local_invariant wrappers.
-From aneris.examples.snapshot_isolation.proof.server
-     Require Import
-     proof_of_start_handler
-     proof_of_read_handler.
 From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.
 
-Section Proof_of_handler.
+Section Proof_of_read_handler.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
@@ -41,40 +37,40 @@ Section Proof_of_handler.
                      clients γKnownClients γGauth γGsnap γT).
   Import snapshot_isolation_code_api.
 
-  Lemma client_request_handler_spec (lk : val) (kvs vnum : loc) :
-    ∀ reqv reqd,
-    {{{ server_lock_inv γGauth γT γlk lk kvs vnum ∗
-        MTC.(MTS_handler_pre) reqv reqd }}}
-        client_request_handler lk #kvs #vnum reqv  @[ip_of_address MTC.(MTS_saddr)]
-    {{{ repv repd, RET repv;
-        ⌜Serializable (rep_serialization) repv⌝ ∗
-         MTC.(MTS_handler_post) repv reqd repd }}}.
+  Lemma read_handler_spec
+        (k : string)
+        (lk : val)
+        (kvs vnum : loc)
+        (reqd : ReqData)
+        (ts : nat)
+        (h : list write_event)
+        (Φ : val → iPropI Σ) :
+    k ∈ KVS_keys →
+    reqd = inl (k, ts, h) →
+    (∀ e : events.write_event, e ∈ h → we_time e < ts) →
+    server_lock_inv γGauth γT γlk lk kvs vnum -∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT -∗
+    ownTimeSnap γT ts -∗
+    ownMemSeen γGsnap k h -∗
+    (∀ (repv : val) (repd : RepData),
+       ⌜sum_valid_val (option_serialization KVS_serialization)
+        (sum_serialization int_serialization bool_serialization) repv⌝ ∗
+         ReqPost clients γKnownClients γGauth γGsnap γT repv reqd repd -∗
+           Φ repv) -∗
+    WP let: "res" := InjL
+                     (acquire lk ;;
+                      let: "res" := (λ: <>, kvs_get_last (#k, #ts)%V ! #kvs)%V
+                                      #() in release lk ;; "res") in "res" @[
+  ip_of_address KVS_address] {{ v, Φ v }}.
   Proof.
-    iIntros (reqv reqd Φ) "(#Hlk & Hpre) HΦ".
-    rewrite /client_request_handler.
+    iIntros (Hin Hreqd Hts) "#Hlk #HGlobInv #HsnapT #HsnapH HΦ".
+    wp_apply (acquire_spec with "[Hlk]"); first by iFrame "#".
+    iIntros (?) "(-> & Hlock & Hlkres)".
     wp_pures.
-    rewrite /MTS_handler_pre //= /ReqPre.
-    rewrite /lk_handle.
-    iDestruct "Hpre" as "(#HGlobInv & [HpreRead|[HpreStart|HpreCommit]])".
-    (** Proof of read request. TODO: make a separate case as the proof will be quite long. *)
-    1:{
-      iDestruct "HpreRead"
-      as (k ts h Hin Hreqd ->) "(%Hts & #HsnapT & #HsnapH)".
-      wp_pures.
-      wp_lam.
-      wp_pures.
-      by iApply (read_handler_spec _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
-                with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]"). }
-    (** Proof of commit request. TODO: make a separate case as the proof will be quite long *)
-    2:{ admit. }
-    iDestruct "HpreStart"
-      as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
-    wp_pures.
-    wp_lam.
-    rewrite /start_handler.
-    wp_pures.
-    by iApply (start_handler_spec _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ Hreqd HinE
-                with "[$Hlk][$HGlobInv][$HP][$Hsh]").
+    iDestruct "Hlkres"
+      as (kvsV T m M Hmap Hvalid)
+           "(HmemLoc & HtimeLoc & HkvsL & HvnumL)".
+    wp_load.
   Admitted.
 
-End Proof_of_handler.
+End Proof_of_read_handler.
