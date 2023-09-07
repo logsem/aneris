@@ -54,7 +54,9 @@ Section Proof_of_start_handler.
             ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
             ▷ (∀ (ts : Time) (M : gmap Key (list write_event)),
                  ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                 ⌜kvs_valid_snapshot M ts⌝ ∗ ownTimeSnap γT ts ∗
+                 ⌜kvs_valid_snapshot M ts⌝ ∗ 
+                 ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
+                 ownTimeSnap γT ts ∗
                  ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
                  ([∗ map] k↦h ∈ M, ownMemSeen γGsnap k h) ={E,⊤}=∗
                  Q #ts)) -∗
@@ -80,7 +82,7 @@ Section Proof_of_start_handler.
     wp_pures.
     iDestruct "Hlkres"
       as (kvsV T m M Hmap Hvalid)
-           "(HmemLoc & HtimeLoc & HkvsL & HvnumL)".
+           "(%Hser & HmemLoc & HtimeLoc & HkvsL & HvnumL)".
     wp_load.
     wp_pures.
     (* This is where the viewshift is happening. *)
@@ -132,7 +134,14 @@ Section Proof_of_start_handler.
     iDestruct ("Hpost" $! (T+1)%nat ((filter (λ k, k.1 ∈ dom mu) M))
                 with "[][Hkeys]") as "HQ"; first done.
     iFrame "#∗".
-    iPureIntro. apply kvs_valid_snapshot_filter_next.
+    iPureIntro.
+    split; first by apply kvs_valid_snapshot_filter_next.
+    {
+      apply map_Forall_lookup_2.
+      intros k x H_filter_some.
+      apply map_filter_lookup_Some_1_1 in H_filter_some.
+      by apply Hser in H_filter_some.
+    }
     iMod "HQ".
     iModIntro.
     wp_pures.
@@ -143,7 +152,8 @@ Section Proof_of_start_handler.
       replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
       iFrame "#∗".
       iSplit; first done.
-      iPureIntro; apply kvsl_valid_next. }
+      iSplit; last done.
+      iPureIntro; first apply kvsl_valid_next. }
     iIntros (? ->).
     wp_pures.
     iApply ("HΦ" $! _ _).

@@ -72,7 +72,7 @@ Section Read_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_load.
     wp_pures.
@@ -228,6 +228,5 @@ Section Read_Proof.
          as "[(% & % & % & % & % & % & Habs) |
               (% & % & % & % & % & % & % & % & % & Habs)]".
   Qed.
-
 
 End Read_Proof.

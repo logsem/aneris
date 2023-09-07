@@ -88,6 +88,7 @@ Section RPC_user_params.
                  ▷ (∀ ts M,
                       ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
                       ⌜kvs_valid_snapshot M ts⌝ ∗
+                      ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗ 
                       ownTimeSnap γT ts ∗
                       ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
                       ([∗ map] k ↦ h ∈ M, ownMemSeen γGsnap k h)
@@ -107,6 +108,7 @@ Section RPC_user_params.
           ⌜↑KVS_InvName ⊆ E⌝ ∗
           ⌜is_map cmapV cache_updatesM⌝ ∗
           ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ ∗
+          ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
           ⌜kvs_valid_snapshot Msnap ts⌝ ∗
           ownTimeSnap γT ts ∗
           ([∗ map] k ↦ h' ∈ Msnap, ownMemSeen γGsnap k h') ∗

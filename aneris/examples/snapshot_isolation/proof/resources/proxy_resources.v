@@ -14,7 +14,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.examples.snapshot_isolation.specs Require Import user_params.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model.
+     Require Import time events model kvs_serialization.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import resource_algebras server_resources.
 Import gen_heap_light.
@@ -192,6 +192,19 @@ Section Proxy.
     destruct l; set_solver.
   Qed.
 
+  Lemma last_in {A : Type} (l : list A) (a : A) :
+    last l  = Some a → In a l.
+  Proof.
+    intros Hyp.
+    induction l as [ | h l IH]; first inversion Hyp.
+    destruct l.
+    - inversion Hyp. 
+      set_solver.
+    - inversion Hyp as [Hyp']. 
+      apply IH in Hyp'. 
+      set_solver.
+  Qed.
+
   Lemma is_coherent_cache_start M :
     is_coherent_cache ∅ (cacheM_from_Msnap M) M.
   Proof.
@@ -294,6 +307,8 @@ Section Proxy.
             (** then lock has active token and guards a logical cache map
                 whose domain is equal to the one of the snapshot. *)
             ⌜is_coherent_cache cache_updatesM cacheM Msnap⌝ ∗
+            ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
+            (* ⌜cache_is_ser cache_updatesV⌝ ∗ *)
             ⌜kvs_valid_snapshot Msnap ts⌝ ∗
             ⌜is_map cache_updatesV cache_updatesM⌝ ∗
             ownTimeSnap γT ts ∗
@@ -412,12 +427,13 @@ Section Proxy.
 
   Lemma own_cache_user_from_ghost_map_elem_big (M :gmap Key (list write_event)) :
     ∀ sa v γCst γA γS γlk γCache γMsnap,
+    ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ -∗
     client_connected sa γCst γA γS γlk γCache γMsnap -∗
     ([∗ map] k↦hv ∈ cacheM_from_Msnap M, ghost_map.ghost_map_elem γCache k (DfracOwn 1) hv) -∗
     [∗ map] k↦hw ∈ ((λ hw : list write_event, to_hist hw) <$> M),
           ownCacheUser k (#sa, v)%V (last hw) ∗ key_upd_status (#sa, v)%V k false.
   Proof.
-    iIntros (sa v γCst γA γS γlk γCache γMsnap) "#H_cli H_map".
+    iIntros (sa v γCst γA γS γlk γCache γMsnap) "%H_ser #H_cli H_map".
     iApply big_sepM_fmap.
     unfold ownCacheUser, key_upd_status.
     iApply (big_sepM_mono (λ k y,
@@ -467,12 +483,11 @@ Section Proxy.
           iSplitL "H_key".
           * iExists _, _, _.
             iSplit; first done.
-            iSplitL.
-            {
-              assert (last (to_hist l) = from_option
+            assert (last (to_hist l) = from_option
                                         (λ we : events.write_event,
                                         Some (we_val we)) None (last l))
-              as ->; last done.
+            as ->.
+            {
               clear H_eq.
               destruct l as [| h l]; first done.
               unfold to_hist.
@@ -484,12 +499,17 @@ Section Proxy.
               rewrite -H_eq.
               by simpl.
             }
-            (* can't prove this with the current definiton *)
-            admit.
+            iSplitL; first done.
+            iPureIntro.
+            apply H_ser in H_eq.
+            destruct (last l) eqn:H_eq_last; last done; simpl.
+            apply last_in in H_eq_last.
+            rewrite List.Forall_forall in H_eq.
+            by apply H_eq in H_eq_last.
           * iExists _, _, _.
             iSplit; first done.
             iSplit; iFrame.
             iPureIntro; done.
-   Admitted.
+   Qed.
 
 End Proxy.

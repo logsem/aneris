@@ -73,7 +73,7 @@ Section Start_Proof.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
-      iDestruct "Habs" as (? ? ?) "(? & ? & ? & ? & Habs)".
+      iDestruct "Habs" as (? ? ? ?) "(? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
@@ -122,7 +122,7 @@ Section Start_Proof.
         iExists m.
         iFrame.
         iNext.
-        iIntros (ts M HmM) "(%Hvsn & Hts & Hpts & #Hseen)".
+        iIntros (ts M HmM) "(%Hvsn & Hser & Hts & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
@@ -165,8 +165,8 @@ Section Start_Proof.
           iSplit; first done.
           iFrame "#∗". }
         iFrame "#∗".
-        iApply (own_cache_user_from_ghost_map_elem_big γKnownClients γT
-                   with "[$Hcc1][$Hcpts]"). }
+        iApply (own_cache_user_from_ghost_map_elem_big
+                   with "[$Hser][$Hcc1][$Hcpts]"). }
     iIntros (repd repv) "(Hcr & Hpost)".
     iDestruct "Hpost" as "(_ & [Habs|Hpost])";
       first by iDestruct "Habs" as (? ? ? ? ?) "Habs".

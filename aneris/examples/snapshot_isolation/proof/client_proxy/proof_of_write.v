@@ -70,7 +70,7 @@ Section Write_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hvalid)
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_pures.
     wp_load.
@@ -108,7 +108,10 @@ Section Write_Proof.
       iSplit.
       { iPureIntro;
           by eapply is_coherent_cache_upd. }
-      iSplit; done.
+      iSplit; last done.
+      iPureIntro.
+      apply map_Forall_insert_2; last done.
+      apply SV_ser.
     }
     iNext.
     iIntros (v0 ->).

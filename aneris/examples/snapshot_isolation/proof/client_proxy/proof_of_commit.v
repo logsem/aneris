@@ -133,7 +133,7 @@ Section Commit_Proof.
       by iDestruct (own_valid_2 with "Htk' Hsp") as %?.
     }
     iDestruct "Hst" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
-      "( -> & (%Hcoh & %Hvalid & %Hismap & #Htime & #Hseen & Hupd & Hauth & HauthMsnap & Htok))".
+      "( -> & (%Hcoh & %Hser & %Hvalid & %Hismap & #Htime & #Hseen & Hupd & Hauth & HauthMsnap & Htok))".
     wp_pures.
     wp_load.
     wp_pures.
@@ -283,31 +283,35 @@ Section Commit_Proof.
                               Φ vb)%I))) : @ReqData Σ).
        wp_apply ("Hspec" $! _ _ _ rd with "[$Hcr Hsh Hauth HauthMsnap Htok]").
        { iSplit.
-         - iPureIntro.
-           simplify_eq /=.
-           destruct Hismap as (lm & Hlm1 & Hlm2 & Hlm3).
-           apply is_list_inject in Hlm2.
-           simpl in Hlm2.
-           eapply sum_is_ser_valid.
-           rewrite /sum_is_ser.
-           eexists (InjRV (#ts, cache_updatesV))%V, _.
-           right.
-           split; first eauto.
-           simpl.
-           split; last done.
-           eexists (#ts, cache_updatesV)%V, _.
-           right.
-           split_and!; try done.
-           simpl.
-           eexists #ts, cache_updatesV, _, _.
-           split; first done.
-           admit.
+         -  iPureIntro.
+            simplify_eq /=.
+            destruct Hismap as (lm & Hlm1 & Hlm2 & Hlm3).
+            apply is_list_inject in Hlm2.
+            simpl in Hlm2.
+            eapply sum_is_ser_valid.
+            rewrite /sum_is_ser.
+            eexists (InjRV (#ts, cache_updatesV))%V, _.
+            right.
+            split; first eauto.
+            simpl.
+            split; last done.
+            eexists (#ts, cache_updatesV)%V, _.
+            right.
+            split_and!; try done.
+            simpl.
+            eexists #ts, cache_updatesV, _, _.
+            split; first done.
+            simpl.
+            split; first by eexists _.
+            split; last done.
+            eexists _.
+            admit.
          -  rewrite /MTS_handler_pre /= /ReqPre.
             iSplit; first done.
             iRight.
             iRight.
             iExists E, _, _, _, _, _, _, _.
-            do 6 (iSplit; first done).
+            do 7 (iSplit; first done).
             iFrame "#∗".
             iSplit; first done.
             iIntros "_".
