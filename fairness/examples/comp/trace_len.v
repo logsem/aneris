@@ -1,5 +1,5 @@
 From trillium.fairness.examples.comp Require Import my_omega lemmas. 
-From trillium.fairness Require Import inftraces.
+From trillium.fairness Require Import inftraces trace_utils.
 
 Section TraceLen.
   Context {St L: Type}. 
@@ -136,4 +136,49 @@ Section TraceLen.
       eapply trace_len_neg; eauto. simpl. lia.
   Qed. 
 
+  Lemma infinite_trace_equiv (tr : trace St L) (len : nat_omega)
+    (LEN: trace_len_is tr len):
+    infinite_trace tr ↔ len = NOinfinity. 
+  Proof.
+    rewrite /infinite_trace. split.
+    - intros A. destruct len; [done| ].
+      eapply trace_len_neg with (i := n), proj2 in LEN. 
+      specialize (A n) as [? T]. rewrite LEN in T; [done| ]. simpl. lia. 
+    - intros -> ?. by apply LEN.
+  Qed.     
+
 End TraceLen.
+
+
+Section TracesMatch.
+  (* Context {L1 L2 S1 S2 : Type}. *)
+
+  Lemma traces_match_same_length_impl {L1 L2 S1 S2 : Type}
+    R1 R2 step1 step2 tr1 tr2 len1 len2
+    (LEN1: trace_len_is tr1 len1)
+    (LEN2: trace_len_is tr2 len2)
+    (MATCH: @traces_match L1 L2 S1 S2 R1 R2 step1 step2 tr1 tr2)
+    (LT: NOmega.lt len1 len2):
+    False. 
+  Proof.
+    destruct len1; [done| ].
+    pose proof (proj2 (LEN2 n)) as LL2. specialize (LL2 ltac:(lia_NO len2)) as [atr2 AFTER2].
+    pose proof (traces_match_after _ _ _ _ _ _ _ _ MATCH AFTER2) as (atr1 & AFTER1 & _).
+    specialize (proj1 (LEN1 _) (mk_is_Some _ _ AFTER1)). simpl. lia.
+  Qed.
+    
+  Lemma traces_match_same_length {L1 L2 S1 S2 : Type}
+    R1 R2 step1 step2 tr1 tr2 len1 len2
+    (LEN1: trace_len_is tr1 len1)
+    (LEN2: trace_len_is tr2 len2)
+    (MATCH: @traces_match L1 L2 S1 S2 R1 R2 step1 step2 tr1 tr2):
+    len1 = len2.
+  Proof. 
+    unfold trace_len_is in *.
+    destruct (NOmega.lt_trichotomy len1 len2) as [?|[?|?]]; auto; exfalso. 
+    - eapply traces_match_same_length_impl with (tr1 := tr1) (tr2 := tr2); eauto. 
+    - apply traces_match_flip in MATCH. 
+      eapply @traces_match_same_length_impl with (tr1 := tr2) (tr2 := tr1); eauto.
+  Qed. 
+
+End TracesMatch.

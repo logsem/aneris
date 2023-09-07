@@ -127,6 +127,43 @@ Section map_utils.
     congruence.
   Qed.
 
+  Lemma maps_inverse_match_exact (v: V) (S: gset K):
+    maps_inverse_match (gset_to_gmap v S) {[v := S]}.
+  Proof.
+    red. intros. rewrite lookup_gset_to_gmap_Some. split.
+    - intros [? ->]. eexists. split; eauto. apply lookup_singleton.
+    - intros [? [[? ->]%lookup_singleton_Some ?]]. done.
+  Qed.    
+  
+  Lemma maps_inverse_match_uniq1 (m1 m2: gmap K V) (m': gmap V (gset K))
+    (M1: maps_inverse_match m1 m') (M2: maps_inverse_match m2 m'):
+    m1 = m2.
+  Proof.
+    red in M1, M2. apply map_eq. intros.
+    destruct (m1 !! i) eqn:L1.
+    - pose proof (proj1 (M1 _ _) L1) as EQ.
+      pose proof (proj2 (M2 _ _) EQ).
+      congruence.
+    - destruct (m2 !! i) eqn:L2; [| done].
+      pose proof (proj1 (M2 _ _) L2) as EQ.
+      pose proof (proj2 (M1 _ _) EQ).
+      congruence.
+  Qed.
+
+  Lemma maps_inverse_match_subseteq (m1 m2: gmap K V) (m1' m2': gmap V (gset K))
+    (M1: maps_inverse_match m1 m1') (M2: maps_inverse_match m2 m2')
+    (SUB: dom m1' ⊆ dom m2')
+    (INCL: forall v S1 S2, m1' !! v = Some S1 -> m2' !! v = Some S2 -> S1 ⊆ S2):
+    m1 ⊆ m2.
+  Proof.
+    red in M1, M2. apply map_subseteq_spec. intros.
+    specialize (proj1 (M1 _ _) H1) as [? [L1 ?]]. 
+    apply M2.
+    specialize (SUB x (elem_of_dom_2 _ _ _ L1)).
+    apply elem_of_dom in SUB as [? ?].
+    eexists. split; eauto. set_solver.
+  Qed. 
+
 End map_utils.
 
 Section fin_map_dom.

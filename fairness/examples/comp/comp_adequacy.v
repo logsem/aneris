@@ -144,7 +144,7 @@ Proof.
     rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. }
 
   eapply (IHc0 δ1 tr); eauto.  
-  { eapply mtrace_valid_cons; eauto. }
+  { eapply mtrace_valid_tail; eauto. }
   { by apply trace_len_tail in LEN. }
   intros. apply (CL (S i)); [done| ].
   rewrite trace_lookup_cons; eauto. 
@@ -212,16 +212,6 @@ Proof.
     by rewrite -H2 in e. }
 Admitted. 
 
-
-(* TODO: move *)
-Definition FM_strong_lr (FM: FairModel) :=
-  forall st ρ, ρ ∈ live_roles FM st <-> exists st', fmtrans FM st (Some ρ) st'.
-
-(* TODO: move *)
-Lemma lib_model_impl_lr_strong: FM_strong_lr lib_model_impl.
-Proof. 
-  red. intros.
-Admitted. 
 
 Lemma client_model_fair_term:
   ∀ tr: mtrace client_model_impl, mtrace_fairly_terminating tr.

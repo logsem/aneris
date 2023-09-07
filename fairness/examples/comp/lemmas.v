@@ -54,7 +54,6 @@ Lemma is_Some_Some_True {A: Type} (a: A):
   is_Some (Some a) <-> True.
 Proof. done. Qed. 
 
-(* TODO: move*)
 (* useful for rewriting in equivalences *)
 Lemma is_Some_None_False {A: Type}:
   is_Some (None: option A) <-> False.

@@ -158,7 +158,17 @@ Section model_traces.
     by inversion Hval'.
   Qed.
 
+  Lemma mtrace_valid_tail s l (tr: mtrace M)
+    (VALID': mtrace_valid (s -[l]-> tr)):
+    mtrace_valid tr.
+  Proof. by eapply mtrace_valid_after with (k := 1); eauto. Qed.
+
 End model_traces.
+
+
+Definition FM_strong_lr (FM: FairModel) :=
+  forall st ρ, ρ ∈ live_roles FM st <-> exists st', fmtrans FM st (Some ρ) st'.
+
 
 Global Hint Resolve fair_by_cons: core.
 Global Hint Resolve mtrace_valid_mono : paco.

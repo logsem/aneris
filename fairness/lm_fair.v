@@ -7,10 +7,6 @@ Section LMFair.
   Context `{Countable G, Inhabited G}.
   Context `{EqDecision M, Inhabited (fmstate M)}.
 
-  (* TODO: move *)
-  Global Instance FL_eqdec: EqDecision (@FairLabel G (fmrole M)).
-  Proof. solve_decision. Qed.
-
   Global Instance FL_cnt: Countable (@FairLabel G (fmrole M)).
   Proof. 
     set (FL_alt := (G * (fmrole M) + G + unit)%type).

@@ -1,9 +1,9 @@
 From trillium.fairness Require Import inftraces fairness lm_fair.
 From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len trace_helpers trace_lookup.
+Require Import Coq.Logic.Classical.
 
 Local Ltac gd t := generalize dependent t.
 
-(* TODO: move*)
 Section Subtrace.
   Context {St L: Type}.
   
@@ -265,9 +265,6 @@ Section Subtrace.
     lia_NO fin. 
   Qed.
 
-  (* TODO: move *)
-  Require Import Coq.Logic.Classical.
-
   Lemma trace_prop_split (tr: trace St L) (P: (St * option (L * St)) -> Prop) len 
     (DECP: forall res, Decision (P res))
     (LEN: trace_len_is tr len)
@@ -423,9 +420,7 @@ Section ModelSubtrace.
     destruct tr.
     { constructor. }
   Admitted.
-  
-  
-  (* TODO: move *)
+    
   Lemma subtrace_valid `{M: FairModel} (tr: mtrace M) len
     str start max_len
     (LEN: trace_len_is tr len)

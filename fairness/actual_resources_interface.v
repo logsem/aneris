@@ -3,26 +3,6 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm em_lm_heap_lang pmp_lifting.
 
 
-(* TODO: move *)
-Section Utils.
-  Context `{Countable K, Countable V, EqDecision K}.
-  
-  Lemma maps_inverse_match_subseteq (m1 m2: gmap K V) (m1' m2': gmap V (gset K))
-    (M1: maps_inverse_match m1 m1') (M2: maps_inverse_match m2 m2')
-    (SUB: dom m1' ⊆ dom m2')
-    (INCL: forall v S1 S2, m1' !! v = Some S1 -> m2' !! v = Some S2 -> S1 ⊆ S2):
-    m1 ⊆ m2.
-  Proof.
-    red in M1, M2. apply map_subseteq_spec. intros.
-    specialize (proj1 (M1 _ _) H1) as [? [L1 ?]]. 
-    apply M2.
-    specialize (SUB x (elem_of_dom_2 _ _ _ L1)).
-    apply elem_of_dom in SUB as [? ?].
-    eexists. split; eauto. set_solver.
-  Qed. 
-
-End Utils.
-
 Section ActualOwnershipInterface. 
   Context `{LM: LiveModel (locale heap_lang) M}.
   Context {Σ : gFunctors}.

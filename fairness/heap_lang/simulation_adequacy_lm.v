@@ -24,16 +24,6 @@ Let rel_always_holds `{LM:LiveModel (locale heap_lang) M} `{hGS: @heapGS Σ LM (
       rel_always_holds0 (fun etr atr => ξ etr (map_underlying_trace atr)) 
         s (state_interp) (fun _ => frag_mapping_is {[ 0%nat := ∅ ]}) e1 σ1 δ1. 
 
-(* TODO: move*)
-Lemma maps_inverse_match_exact `{Countable K, Countable V, EqDecision K}
-                               (v: V) (S: gset K):
-  maps_inverse_match (gset_to_gmap v S) {[v := S]}.
-Proof.
-  red. intros. rewrite lookup_gset_to_gmap_Some. split.
-  - intros [? ->]. eexists. split; eauto. apply lookup_singleton.
-  - intros [? [[? ->]%lookup_singleton_Some ?]]. done.
-Qed.    
-  
 
 (* TODO: should hold by definition after changing LiveState *)
 Lemma initial_ls_tmap `{LM: LiveModel (locale heap_lang) M} τ s:

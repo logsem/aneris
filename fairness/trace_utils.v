@@ -41,6 +41,16 @@ Proof.
     + by destruct tr; [by destruct Htr as [Htr|Htr]|apply IHn].
 Qed.
 
+Lemma pred_at_impl {St L : Type}
+  (tr : trace St L) i (P Q : St → option L → Prop)
+  (IMPL: forall s ol, P s ol -> Q s ol):
+  pred_at tr i P -> pred_at tr i Q.
+Proof.
+  rewrite /pred_at. destruct after eqn:AFTER; [| done].
+  destruct t; eauto.
+Qed.
+
+
 Lemma traces_match_flip {S1 S2 L1 L2}
       (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
       (trans1: S1 -> L1 -> S1 -> Prop)
@@ -61,6 +71,22 @@ Proof.
     constructor; [done..|].
     by apply CH.
 Qed.
+
+Lemma traces_match_after' {S1 S2 L1 L2}
+  (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop)
+  (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop)
+  (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) 
+  (tr1' : trace S1 L1):
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2
+  → after n tr1 = Some tr1'
+  → ∃ tr2' : trace S2 L2,
+      after n tr2 = Some tr2' ∧ traces_match Rℓ Rs trans1 trans2 tr1' tr2'.
+Proof.
+  intros ?%traces_match_flip ?.
+  eapply traces_match_after in H0 as (?&?&?); eauto.
+  eexists. split; eauto.
+  by apply traces_match_flip.
+Qed. 
 
 Lemma traces_match_impl {S1 S2 L1 L2}
       (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
@@ -213,14 +239,6 @@ Proof.
   case_bool_decide.
   - simpl. f_equiv. by apply IHn.
   - by apply IHn.
-Qed.
-
-Lemma pred_at_impl {S L} (tr:trace S L) n (P Q : S → option L → Prop) :
-  (∀ s l, P s l → Q s l) → pred_at tr n P → pred_at tr n Q.
-Proof.
-  rewrite /pred_at. intros HPQ HP.
-  destruct (after n tr); [|done].
-  by destruct t; apply HPQ.
 Qed.
 
 Lemma pred_at_neg {S L} (tr:trace S L) n (P : S → option L → Prop) :

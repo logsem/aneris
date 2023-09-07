@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export inftraces fairness.
+From trillium.fairness Require Export inftraces fairness trace_utils.
 
 Section fairness.
   Context {G: Type}.
@@ -35,6 +35,9 @@ Section fairness.
   | Config_step: FairLabel
   .
   Arguments FairLabel : clear implicits.
+
+  Global Instance FL_eqdec: EqDecision (@FairLabel (fmrole M)).
+  Proof. solve_decision. Qed.
 
   Definition less (x y: option nat) :=
     match x, y with
@@ -114,6 +117,12 @@ Section fairness.
   Next Obligation. intros ???. apply reflexive_eq. rewrite dom_gset_to_gmap //. Qed.
   Next Obligation. intros ???. apply reflexive_eq. rewrite !dom_gset_to_gmap //. Qed.
 
+  Lemma ls_same_doms' (δ: LiveState):
+    forall ρ, is_Some (@ls_mapping δ !! ρ) <-> is_Some (@ls_fuel δ !! ρ).
+  Proof. 
+    intros. rewrite -!elem_of_dom. by rewrite ls_same_doms.
+  Qed.
+
 End fairness.
 
 Arguments LiveState : clear implicits.
@@ -171,6 +180,17 @@ Section aux_trace.
     specialize (IHn _ H1) (* TODO *). rewrite Heq in IHn. done.
   Qed.
 
+  Lemma auxtrace_valid_after (tr: auxtrace):
+    auxtrace_valid tr ->
+    forall n atr, after n tr = Some atr -> auxtrace_valid atr.
+  Proof. 
+    intros VALID n. generalize dependent tr. induction n.
+    { intros. rewrite after_0_id in H0. congruence. }  
+    intros. inversion VALID; subst. 
+    { done. }
+    simpl in H0. eauto.
+  Qed. 
+    
 End aux_trace.
 
 Section aux_trace_lang.
@@ -202,6 +222,29 @@ Definition live_tids `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)}
   (∀ ρ ζ, δ.(ls_mapping (G := locale Λ)) !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
   ∀ ζ e, from_locale c.1 ζ = Some e -> (to_val e ≠ None) ->
          ∀ ρ, δ.(ls_mapping) !! ρ ≠ Some ζ.
+
+(* TODO: replace original definition with this *)
+Lemma live_tids_alt `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)} c δ:
+  live_tids c δ (LM := LM) (Λ := Λ) <->
+    (forall ζ, (exists ρ, ls_mapping δ !! ρ = Some ζ) ->
+          locale_enabled ζ c).
+Proof.
+  rewrite /live_tids /locale_enabled. split.
+  - intros. destruct H0 as [ρ MAP].
+    destruct H as [EXPR NVAL].
+    specialize (EXPR _ _ MAP) as [e ?].
+    eexists. split; eauto.
+    specialize (NVAL _ _ H). 
+    destruct (to_val e); [| done].
+    specialize (NVAL ltac:(eauto)).
+    edestruct NVAL; eauto.
+  - intros. split.
+    + intros. specialize (H ζ (@ex_intro _ _ _ H0)) as [e [MAP ?]].
+      eauto.
+    + intros. intros MAP.
+      specialize (H ζ (@ex_intro _ _ _ MAP)) as [? [? NVAL]].
+      congruence.
+Qed.
 
 (* Definition exaux_traces_match `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)} : *)
 (*   extrace Λ → auxtrace (LM := LM) → Prop := *)
@@ -514,6 +557,36 @@ Definition lm_valid_evolution_step `{LM:LiveModel (locale Λ) M} `{EqDecision (l
 Section fuel_dec_unless.
   Context `{LM: LiveModel G Mdl}.
   Context `{Countable G}.
+  
+  Lemma fuel_must_not_incr_fuels oρ'
+    (δ1 δ2: LiveState G Mdl)
+    ρ f1 f2
+    (KEEP: fuel_must_not_incr oρ' δ1 δ2)
+    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
+    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
+    (OTHER: oρ' ≠ Some ρ):
+    f2 <= f1.
+  Proof.
+    red in KEEP. specialize (KEEP ρ ltac:(by apply elem_of_dom)).
+    destruct KEEP as [LE|[?|KEEP]].
+    + rewrite FUEL1 FUEL2 in LE. simpl in LE. lia. 
+    + tauto. 
+    + apply proj1 in KEEP. destruct KEEP. eapply elem_of_dom; eauto.
+  Qed.
+
+  Lemma step_nonincr_fuels ℓ
+    (δ1 δ2: LiveState G Mdl)
+    ρ f1 f2
+    (STEP: lm_ls_trans LM δ1 ℓ δ2)
+    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
+    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
+    (OTHER: forall g, ℓ ≠ Take_step ρ g):
+    f2 <= f1.
+  Proof.
+    destruct ℓ. 
+    all: eapply fuel_must_not_incr_fuels; eauto; [apply STEP|..]; congruence.
+  Qed. 
+
 
   Definition Ul (ℓ: LM.(mlabel)) :=
     match ℓ with
@@ -573,6 +646,7 @@ Section fuel_dec_unless.
       (* destruct (Hni ρ' ltac:(set_solver) ltac:(done)); [done|set_solver]. *)
       destruct (Hni ρ' ltac:(set_solver)); [done|set_solver].
   Qed.
+
 End fuel_dec_unless.
 
 Section destuttering_auxtr.
@@ -643,45 +717,110 @@ Section upto_stutter_preserves_fairness_and_termination.
   Qed.
   Hint Resolve upto_stutter_mono' : paco.
 
+  Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M)
+    (Po: LiveState G M -> option (mlabel LM) -> Prop)
+    (Pi: M -> option (option (fmrole M)) -> Prop)
+    (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
+                                              | Some ℓ => Ul ℓ (LM := LM)
+                                              | None => None
+                                              end))
+    (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
+    :
+    upto_stutter_auxtr auxtr mtr (LM := LM) ->
+    forall n atr_aux,
+      after n auxtr = Some atr_aux ->
+      pred_at atr_aux 0 Po ->
+    exists m atr_m,
+      after m mtr = Some atr_m /\ pred_at atr_m 0 Pi /\ 
+      upto_stutter_auxtr atr_aux atr_m.
+  Proof.
+    intros Hupto n. generalize dependent auxtr. generalize dependent mtr. 
+    induction n as [|n]; intros auxtr mtr Hupto atr_aux AFTER A0.
+    - rewrite after_0_id in AFTER. assert (atr_aux = mtr) as -> by congruence.
+      do 2 eexists. split; [| split]; [..| by eauto].
+      { by erewrite after_0_id. }
+      punfold Hupto. inversion Hupto; simplify_eq.
+      + rename A0 into Hpa.
+        rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
+        by apply LIFT in Hpa. 
+      + rewrite -> !pred_at_0 in A0.
+        rewrite /pred_at /=. destruct auxtr; simpl in *; try congruence.
+        * apply LIFT in A0. congruence.
+        * apply LIFT in A0. destruct ℓ; simpl in *; try done.
+          all: subst; eapply PI0; eauto.
+      + rewrite -> !pred_at_0 in A0.
+        apply pred_at_0. rewrite <- H1.
+        by eapply LIFT in A0. 
+    - punfold Hupto. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
+      + simpl in AFTER. 
+        eapply IHn; eauto.
+        by pfold.
+      + simpl in AFTER.
+        assert (upto_stutter_auxtr btr str) as UPTO'.
+        { inversion IH; eauto. done. } 
+        specialize (IHn str btr UPTO' _ AFTER A0) as (m & ?&?&?).
+        exists (S m). eauto. 
+  Qed.
+
+  (* Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M): *)
+  (*   upto_stutter_aux auxtr mtr -> *)
+  (*   (* role_enabled_model ρ (trfirst mtr) -> *) *)
+  (*   (∃ n, pred_at auxtr n (λ δ _, ¬role_enabled (G := G) ρ δ) *)
+  (*         ∨ pred_at auxtr n (λ _ ℓ, ∃ ζ, ℓ = Some (Take_step ρ ζ))) -> *)
+  (*   ∃ m, pred_at mtr m (λ δ _, ¬role_enabled_model ρ δ) *)
+  (*        ∨ pred_at mtr m (λ _ ℓ, ℓ = Some $ Some ρ). *)
+  (*   Proof. *)
+  (*     intros Hupto (* Hre *) [n Hstep]. *)
+  (*     revert auxtr mtr Hupto (* Hre *) Hstep. *)
+  (*     induction n as [|n]; intros auxtr mtr Hupto (* Hre *) Hstep. *)
+  (*     - punfold Hupto. inversion Hupto; simplify_eq. *)
+  (*       + destruct Hstep as [Hpa|[??]]; try done. *)
+  (*         exists 0. left. rewrite /pred_at /=. rewrite /pred_at //= in Hpa. *)
+  (*       + rewrite -> !pred_at_0 in Hstep. exists 0. *)
+  (*         destruct Hstep as [Hstep| [tid Hstep]]; [left|right]. *)
+  (*         * rewrite /pred_at /=. destruct mtr; simpl in *; try congruence. *)
+  (*         * exfalso. injection Hstep => Heq. rewrite -> Heq in *. *)
+  (*           unfold Ul in *. congruence. *)
+  (*       + rewrite -> !pred_at_0 in Hstep. exists 0. *)
+  (*         destruct Hstep as [Hstep| [tid Hstep]]; [left|right]. *)
+  (*         * rewrite /pred_at //=. *)
+  (*         * rewrite /pred_at //=. injection Hstep. intros Heq. simplify_eq. *)
+  (*           unfold Ul in *. congruence. *)
+  (*     - punfold Hupto. inversion Hupto as [| |?????? ?? IH ]; simplify_eq. *)
+  (*       + destruct Hstep as [?|?]; done. *)
+  (*       + rewrite -> !pred_at_S in Hstep. *)
+  (*         eapply IHn; eauto. *)
+  (*         by pfold. *)
+  (*       + destruct (decide (ℓ' = Some ρ)). *)
+  (*         * simplify_eq. *)
+  (*           exists 0. right. rewrite pred_at_0 //. *)
+  (*         * have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n). *)
+  (*           { intros P [x ?]. by exists (S x). } *)
+  (*           apply Hw. setoid_rewrite pred_at_S. *)
+  (*           eapply IHn; eauto. *)
+  (*           { destruct IH as [|]; done. } *)
+  (*   Qed. *)
+
+
   Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M):
     upto_stutter_aux auxtr mtr ->
-    (* role_enabled_model ρ (trfirst mtr) -> *)
     (∃ n, pred_at auxtr n (λ δ _, ¬role_enabled (G := G) ρ δ)
           ∨ pred_at auxtr n (λ _ ℓ, ∃ ζ, ℓ = Some (Take_step ρ ζ))) ->
     ∃ m, pred_at mtr m (λ δ _, ¬role_enabled_model ρ δ)
          ∨ pred_at mtr m (λ _ ℓ, ℓ = Some $ Some ρ).
-    Proof.
-      intros Hupto (* Hre *) [n Hstep].
-      revert auxtr mtr Hupto (* Hre *) Hstep.
-      induction n as [|n]; intros auxtr mtr Hupto (* Hre *) Hstep.
-      - punfold Hupto. inversion Hupto; simplify_eq.
-        + destruct Hstep as [Hpa|[??]]; try done.
-          exists 0. left. rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
-        + rewrite -> !pred_at_0 in Hstep. exists 0.
-          destruct Hstep as [Hstep| [tid Hstep]]; [left|right].
-          * rewrite /pred_at /=. destruct mtr; simpl in *; try congruence.
-          * exfalso. injection Hstep => Heq. rewrite -> Heq in *.
-            unfold Ul in *. congruence.
-        + rewrite -> !pred_at_0 in Hstep. exists 0.
-          destruct Hstep as [Hstep| [tid Hstep]]; [left|right].
-          * rewrite /pred_at //=.
-          * rewrite /pred_at //=. injection Hstep. intros Heq. simplify_eq.
-            unfold Ul in *. congruence.
-      - punfold Hupto. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
-        + destruct Hstep as [?|?]; done.
-        + rewrite -> !pred_at_S in Hstep.
-          eapply IHn; eauto.
-          by pfold.
-        + destruct (decide (ℓ' = Some ρ)).
-          * simplify_eq.
-            exists 0. right. rewrite pred_at_0 //.
-          * have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
-            { intros P [x ?]. by exists (S x). }
-            apply Hw. setoid_rewrite pred_at_S.
-            eapply IHn; eauto.
-            { destruct IH as [|]; done. }
-    Qed.
-
+  Proof.
+    repeat setoid_rewrite <- pred_at_or. 
+    intros UPTO [n NTH].
+    pose proof NTH as [atr AFTER]%pred_at_after_is_Some. 
+    rewrite (plus_n_O n) in NTH. 
+    rewrite pred_at_sum AFTER in NTH. 
+    eapply upto_stutter_step_correspondence in NTH; eauto. 
+    - destruct NTH as (m & atr_m & AFTERm & Pm & UPTO').
+      exists m. rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm. 
+    - intros ?? Po. destruct Po as [?| [? ->]]; eauto.
+    - intros. destruct H0; [| done]. eauto.
+  Qed.  
+    
   Lemma upto_stutter_fairness (auxtr:auxtrace (LM := LM)) (mtr: mtrace M):
     upto_stutter_aux auxtr mtr ->
     (∀ ρ, fair_aux ρ auxtr) ->

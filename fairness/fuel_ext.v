@@ -1,27 +1,6 @@
 From stdpp Require Import option.
 From trillium.fairness Require Export fuel utils. 
 
-(* TODO: move *)
-Section Utils.
-  Context `{Countable K, Countable V, EqDecision K}.
-  
-  Lemma maps_inverse_match_uniq1 (m1 m2: gmap K V) (m': gmap V (gset K))
-    (M1: maps_inverse_match m1 m') (M2: maps_inverse_match m2 m'):
-    m1 = m2.
-  Proof.
-    red in M1, M2. apply map_eq. intros.
-    destruct (m1 !! i) eqn:L1.
-    - pose proof (proj1 (M1 _ _) L1) as EQ.
-      pose proof (proj2 (M2 _ _) EQ).
-      congruence.
-    - destruct (m2 !! i) eqn:L2; [| done].
-      pose proof (proj1 (M2 _ _) L2) as EQ.
-      pose proof (proj2 (M1 _ _) EQ).
-      congruence.
-  Qed.
-
-End Utils.
-
 
 (* TODO: implement LiveModel with ls_tmap as primitive 
          and define ls_mapping on top of it.

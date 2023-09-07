@@ -104,7 +104,6 @@ Module NOmega.
     | _, _ => False
   end.
 
-  (* TODO: move *)
   Global Instance nomega_le_eqdec: forall x y, Decision (le x y).
   Proof.
     intros. lia_NO' x; lia_NO' y; solve_decision. 
@@ -325,5 +324,9 @@ Module NOmega.
     pose proof (PeanoNat.Nat.lt_trichotomy n n0).
     destruct H as [? | [? | ?]]; auto. 
   Qed. 
+
+  Lemma le_iff_not_lt_nat (n: nat) (x: nat_omega):
+    NOmega.le x (NOnum n) <-> ¬ lt_nat_l n x. 
+  Proof. lia_NO x. Qed. 
 
 End NOmega.

@@ -16,62 +16,6 @@ Section Foobar.
   Context `{Countable G}.
 
   Local Set Printing Coercions.
-  Local Ltac gd t := generalize dependent t.
-
-  (* TODO: move *)
-  Lemma after_0_id {St L : Type} (tr : trace St L):
-    after 0 tr = Some tr.
-  Proof. done. Qed. 
-
-  (* TODO: move *)
-  Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M)
-    (Po: LiveState G M -> option (mlabel LM) -> Prop)
-    (Pi: M -> option (option (fmrole M)) -> Prop)
-    (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
-                                              | Some ℓ => Ul ℓ (LM := LM)
-                                              | None => None
-                                              end))
-    (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
-    :
-    upto_stutter_auxtr auxtr mtr (LM := LM) ->
-    (* (∃ n, pred_at auxtr n Po) -> *)
-    (* ∃ m, pred_at mtr m Pi. *)
-    forall n atr_aux,
-      after n auxtr = Some atr_aux ->
-      pred_at atr_aux 0 Po ->
-    exists m atr_m,
-      after m mtr = Some atr_m /\ pred_at atr_m 0 Pi /\ 
-      upto_stutter_auxtr atr_aux atr_m.
-  Proof.
-    intros Hupto n. gd auxtr. gd mtr. 
-
-      induction n as [|n]; intros auxtr mtr Hupto atr_aux AFTER A0.
-      - rewrite after_0_id in AFTER. assert (atr_aux = mtr) as -> by congruence.
-        do 2 eexists. split; [| split]; [..| by eauto].
-        { by erewrite after_0_id. }
-        punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto; simplify_eq.
-        + rename A0 into Hpa.
-          rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
-          by apply LIFT in Hpa. 
-        + rewrite -> !pred_at_0 in A0.
-          rewrite /pred_at /=. destruct auxtr; simpl in *; try congruence.
-          * apply LIFT in A0. congruence.
-          * apply LIFT in A0. destruct ℓ; simpl in *; try done.
-            all: subst; eapply PI0; eauto.
-        + rewrite -> !pred_at_0 in A0.
-          apply pred_at_0. rewrite <- H1.
-          by eapply LIFT in A0. 
-      - punfold Hupto; [| by apply upto_stutter_mono']. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
-        + simpl in AFTER. 
-          eapply IHn; eauto.
-          by pfold.
-        + simpl in AFTER. 
-          specialize (IHn str btr). specialize_full IHn.
-          { inversion IH; eauto. done. } 
-          all: eauto.
-          destruct IHn as (m & atr_m & AFTER' & UPTO'). 
-          exists (S m). eauto. 
-  Qed.
 
   Definition upto_stutter_auxtr_at `{LM: LiveModel G M}
     auxtr (mtr: mtrace M) n m :=
@@ -80,7 +24,6 @@ Section Foobar.
       after m mtr = Some atr_m /\ 
       upto_stutter_auxtr atr_aux atr_m (LM := LM).
     
-  (* TODO: move *)
   Lemma upto_stutter_step_correspondence_alt auxtr (mtr: mtrace M)
     (Po: LiveState G M -> option (mlabel LM) -> Prop)
     (Pi: M -> option (option (fmrole M)) -> Prop)
@@ -103,29 +46,11 @@ Section Foobar.
     - red. eauto.
   Qed.    
 
-  (* TODO: move, replace original proof (but keep old signature) *)
-  Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M):
-    upto_stutter_auxtr auxtr mtr (LM := LM) ->
-    (∃ n, pred_at auxtr n (λ δ ℓ, ¬role_enabled (G := G) ρ δ \/ ∃ ζ, ℓ = Some (Take_step ρ ζ))) ->
-    ∃ m, pred_at mtr m (λ δ ℓ, ¬role_enabled_model ρ δ \/ ℓ = Some $ Some ρ).
-  Proof.
-    intros UPTO [n NTH].
-    forward eapply pred_at_after_is_Some as [atr AFTER]; eauto.
-    rewrite (plus_n_O n) in NTH. 
-    rewrite pred_at_sum AFTER in NTH. 
-    forward eapply upto_stutter_step_correspondence; eauto.
-    3: { intros (m & atr_m & AFTERm & Pm & UPTO').
-         exists m. rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm. }
-    - intros ?? Po. destruct Po as [?| [? ->]]; eauto. 
-    - intros. destruct H0; [| done]. eauto.
-  Qed.
-
 End Foobar. 
 
 
 Section InnerLMTraceFairness.
   Context `{LMi: LiveModel Gi Mi}.
-  (* Context `{EqDecision Gi}. *)
   Context `{INH_Gi: Inhabited Gi, EQ_Gi: EqDecision Gi}. 
 
   Context `{LMo: LiveModel Go Mo}.
@@ -141,55 +66,8 @@ Section InnerLMTraceFairness.
       lift_Gi
       state_rel.
 
-  (* TODO: move *)
-  Lemma traces_match_same_length_impl {L1 L2 S1 S2 : Type}
-    R1 R2 step1 step2 tr1 tr2 len1 len2
-    (LEN1: trace_len_is tr1 len1)
-    (LEN2: trace_len_is tr2 len2)
-    (MATCH: @traces_match L1 L2 S1 S2 R1 R2 step1 step2 tr1 tr2)
-    (LT: NOmega.lt len1 len2):
-    False. 
-  Proof.
-    destruct len1; [done| ].
-    pose proof (proj2 (LEN2 n)) as LL2. specialize (LL2 ltac:(lia_NO len2)) as [atr2 AFTER2].
-    pose proof (traces_match_after _ _ _ _ _ _ _ _ MATCH AFTER2) as (atr1 & AFTER1 & _).
-    specialize (proj1 (LEN1 _) (mk_is_Some _ _ AFTER1)). simpl. lia.
-  Qed.
-    
-
-  (* TODO: move *)
-  Lemma traces_match_same_length {L1 L2 S1 S2 : Type}
-    R1 R2 step1 step2 tr1 tr2 len1 len2
-    (LEN1: trace_len_is tr1 len1)
-    (LEN2: trace_len_is tr2 len2)
-    (MATCH: @traces_match L1 L2 S1 S2 R1 R2 step1 step2 tr1 tr2):
-    len1 = len2.
-  Proof. 
-    unfold trace_len_is in *.
-    destruct (NOmega.lt_trichotomy len1 len2) as [?|[?|?]]; auto; exfalso. 
-    - eapply traces_match_same_length_impl with (tr1 := tr1) (tr2 := tr2); eauto. 
-    - apply traces_match_flip in MATCH. 
-      eapply traces_match_same_length_impl with (tr1 := tr2) (tr2 := tr1); eauto.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma trace_label_lookup_simpl {St L: Type} (tr: trace St L) i step ℓ
-    (TLi: tr !! i = Some step)
-    (SLi: tr L!! i = Some ℓ):
-    exists s1 s2, step = (s1, Some (ℓ, s2)). 
-  Proof.
-    rewrite /label_lookup in SLi. rewrite /lookup /trace_lookup in TLi.
-    (* destruct (trace_lookup_impl tr i) as [[??]|]; congruence.  *)
-    destruct (after i tr); try done.
-    destruct t; try done. inversion SLi. inversion TLi. subst. eauto.  
-  Qed. 
 
   Local Ltac gd t := generalize dependent t.
-
-  (* TODO: move *)
-  Lemma state_lookup_0 {St L: Type} (tr: trace St L):
-    tr S!! 0 = Some (trfirst tr). 
-  Proof. by destruct tr. Qed.
 
   Definition inner_obls_exposed (lmtr_o: auxtrace (LM := LMo)) :=
     forall k δo_k gi, lmtr_o S!! k = Some δo_k ->
@@ -197,453 +75,7 @@ Section InnerLMTraceFairness.
                     state_rel (ls_under δo_k) δi /\
                     ls_mapping δi !! ρi = Some gi) ->
                  lift_Gi gi ∈ dom (ls_mapping δo_k). 
-  
-
-  (* TODO: move, generalize? *)
-  Lemma upto_stutter_trfirst {St S' L L' : Type} 
-    (Us : St → S') (Ul: L → option L') 
-    btr str
-    (CORR: upto_stutter Us Ul btr str):
-    trfirst str = Us (trfirst btr). 
-  Proof.
-    punfold CORR.
-    2: { apply upto_stutter_mono. }
-    by inversion CORR.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma upto_stutter_after' {St S' L L' : Type} (Us : St → S') (Ul: L → option L') 
-    {btr : trace St L} {str : trace S' L'} (n : nat) {btr' : trace St L}:
-    upto_stutter Us Ul btr str
-    → after n btr = Some btr'
-      → ∃ (n' : nat) (str' : trace S' L'),
-          after n' str = Some str' ∧ upto_stutter Us Ul btr' str'.
-  Proof. 
-    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
-    { intros P [x ?]. by exists (S x). }
-
-    intros. 
-    gd btr. gd str. gd btr'. induction n as [|n IH]; intros btr' str btr Hupto Hafter.
-    { injection Hafter => <-. clear Hafter. exists 0, str. done. }
-    punfold Hupto; [| apply upto_stutter_mono]. 
-    inversion Hupto; subst. 
-    - done.
-    - simpl in Hafter. rename btr0 into btr. 
-      specialize (IH btr' str btr). specialize_full IH; eauto.
-      by pfold.
-    - simpl in Hafter. rename btr0 into btr. rename str0 into str.
-      specialize (IH btr' str btr).
-      specialize_full IH; eauto. 
-      (* TODO: proper way of doing it? *)
-      inversion H1; eauto. done.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma upto_stutter_state_lookup' {St S' L L' : Type} (Us : St → S') (Ul: L → option L') 
-    {btr : trace St L} {str : trace S' L'} (n : nat) bst:
-    upto_stutter Us Ul btr str
-    → btr S!! n = Some bst ->
-      ∃ (n' : nat),
-        str S!! n' = Some (Us bst).
-  Proof.
-    intros UPTO NTH.
-    pose proof (trace_has_len btr) as [? LEN]. 
-    pose proof (proj1 (state_lookup_dom _ _ LEN n) (mk_is_Some _ _ NTH)) as BOUND.
-    pose proof (proj2 (LEN _) BOUND) as [btr_n AFTER].
-    forward eapply (upto_stutter_after' _ _ n UPTO); eauto.
-    intros (n' & str' & AFTER' & UPTOn).
-    exists n'.
-    rewrite -(Nat.add_0_r n'). erewrite <- state_lookup_after; eauto.
-    rewrite state_lookup_0. f_equal.     
-    erewrite upto_stutter_trfirst; [..| apply UPTOn]; eauto.
-    f_equal. apply Some_inj.
-    rewrite -state_lookup_0.
-    erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma trace_state_lookup_simpl' {St L: Type}
-    (tr: trace St L) i st:
-    (exists step, tr !! i = Some step /\ fst step = st) <-> tr S!! i = Some st. 
-  Proof.
-    rewrite /state_lookup /lookup /trace_lookup.
-    destruct after.
-    2: { split; [intros (?&?&?) | intros ?]; done. }
-    destruct t.
-    all: split; [intros  ([??]&?&?) | intros [=]]; simpl in *; subst.
-    all: congruence || eauto. 
-  Qed. 
-
-  (* TODO: move *)
-  Lemma trace_label_lookup_simpl' {St L: Type}
-    (tr: trace St L) i ℓ:
-    (exists s1 s2, tr !! i = Some (s1, Some (ℓ, s2))) <-> tr L!! i = Some ℓ. 
-  Proof.
-    split.
-    - intros (?&?&?%state_label_lookup). tauto.
-    - rewrite /label_lookup /lookup /trace_lookup.
-      destruct after; [| done].
-      destruct t; [done| ]. intros [=->]. eauto.
-  Qed. 
-
-  Lemma state_lookup_after_0 {St L : Type} (tr atr : trace St L) n
-    (AFTER: after n tr = Some atr):
-    tr S!! n = Some (trfirst atr).
-  Proof. 
-    rewrite -(Nat.add_0_r n).
-    erewrite <- state_lookup_after; eauto.
-    apply state_lookup_0.
-  Qed.
-
-  (* TODO: move *)
-  Lemma state_lookup_after' {St L : Type} (tr: trace St L) n st:
-    (exists atr, after n tr = Some atr /\ trfirst atr = st) <-> tr S!! n = Some st. 
-  Proof. 
-    destruct (after n tr) as [atr| ] eqn:AFTER.
-    2: { split; [by intros (?&?&?)| ].
-         pose proof (trace_has_len tr) as [len ?]. 
-         eintros ?%mk_is_Some%state_lookup_dom; eauto.
-         eapply trace_len_neg in AFTER; eauto. lia_NO len. }
-    erewrite state_lookup_after_0; eauto.
-    split. 
-    - intros (?&[=->]&?). congruence.
-    - intros [=]. eauto.
-  Qed. 
-
-  Lemma trace_lookup_after_strong {St L : Type} (tr: trace St L) s1 ℓ s2 n:
-    (exists atr', after n tr = Some (s1 -[ℓ]-> atr') /\ trfirst atr' = s2) <-> tr !! n = Some (s1, Some (ℓ, s2)). 
-  Proof. 
-    destruct (after n tr) as [atr| ] eqn:AFTER.
-    2: { split; [by intros (?&?&?)| ].
-         pose proof (trace_has_len tr) as [len LEN].
-         intros NTH.
-         forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN n)); eauto.
-         eapply trace_len_neg in AFTER; eauto. lia_NO len. }
-
-    rewrite /lookup /trace_lookup AFTER. 
-    split.
-    - intros (?&[=->]&?). congruence.
-    - intros EQ. destruct atr; [congruence| ].
-      inversion EQ. subst. eauto. 
-  Qed.
-
-  (* TODO: move *)
-  Lemma trace_lookup_dom_neg {St L : Type} (tr : trace St L) (len : nat_omega)
-    (LEN: trace_len_is tr len):
-    ∀ i, tr !! i = None ↔ NOmega.le len (NOnum i).
-  Proof. 
-    intros. erewrite <- trace_len_neg; eauto.
-    rewrite /lookup /trace_lookup. destruct after; [destruct t| ]; done.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma traces_match_after' {L1 L2 S1 S2 : Type} (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
-    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
-    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) 
-    (tr1' : trace S1 L1):
-    traces_match Rℓ Rs trans1 trans2 tr1 tr2
-    → after n tr1 = Some tr1'
-      → ∃ tr2' : trace S2 L2,
-          after n tr2 = Some tr2' ∧ traces_match Rℓ Rs trans1 trans2 tr1' tr2'.
-  Proof.
-    intros ?%traces_match_flip ?.
-    forward eapply traces_match_after as (?&?&?); eauto.
-    eexists. split; eauto.
-    by apply traces_match_flip.
-  Qed. 
-
-
-  Lemma traces_match_trace_lookup_general {L1 L2 S1 S2: Type}
-    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
-    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
-    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat)
-    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2):
-    match tr1 !! n, tr2 !! n with
-    | Some step1, Some step2 => 
-        Rs (fst step1) (fst step2) /\
-          match snd step1, snd step2 with 
-          | Some (ℓ1, s1'), Some (ℓ2, s2') => Rℓ ℓ1 ℓ2 /\ Rs s1' s2'
-          | None, None => True
-          | _, _ => False
-          end
-    | None, None => True
-    | _ , _ => False
-    end. 
-  Proof. 
-    pose proof (trace_has_len tr1) as [len LEN1]. pose proof (trace_has_len tr2) as [? LEN2].
-    forward eapply (traces_match_same_length _ _ _ _ tr1 tr2) as X; eauto. subst x.
-    destruct (tr1 !! n) as [[s1 step1]| ] eqn:STEP1, (tr2 !! n) as [[s2 step2]| ] eqn:STEP2. 
-    4: done. 
-    3: { eapply mk_is_Some, trace_lookup_dom in STEP2; eauto. 
-         eapply trace_lookup_dom_neg in STEP1; eauto.
-         lia_NO len. }
-    2: { eapply mk_is_Some, trace_lookup_dom in STEP1; eauto. 
-         eapply trace_lookup_dom_neg in STEP2; eauto.
-         lia_NO len. }
-
-    (* pose proof (trace_state_lookup_simpl' _ _ _ (@ex_intro _ _ _ STEP1)) as ST1.
-     *)
-    forward eapply (proj1 (trace_state_lookup_simpl' tr1 n s1)) as ST1; eauto.  
-    forward eapply (proj1 (trace_state_lookup_simpl' tr2 n s2)) as ST2; eauto.  
-    simpl in *.
-    pose proof (proj2 (state_lookup_after' _ _ _) ST1) as (atr1 & AFTER1 & A1).
-    forward eapply traces_match_after' with (tr1 := tr1) (tr2 := tr2); eauto.
-    intros (atr2 & AFTER2 & A2). 
-    split.
-    { apply traces_match_first in A2.
-      erewrite state_lookup_after_0 in ST1; eauto. 
-      erewrite state_lookup_after_0 in ST2; eauto.
-      congruence. }
-    destruct step1 as [[ℓ1 s1']| ], step2 as [[ℓ2 s2']| ].
-    4: done.
-    3: { forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN2 n)); eauto.
-         forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN1 n)); eauto.
-         lia_NO' len. intros [=]. lia. }
-    2: { forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN1 n)); eauto.
-         forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN2 n)); eauto.
-         lia_NO' len. intros [=]. lia. }
-    
-    apply trace_lookup_after_strong in STEP1 as (?&AFTER1'&?), STEP2 as (?&AFTER2'&?).
-    erewrite AFTER1' in AFTER1. rewrite AFTER2' in AFTER2.
-    inversion AFTER1. inversion AFTER2. subst atr1 atr2.
-    inversion A2. subst. split; eauto.
-    eapply traces_match_first; eauto.
-  Qed.     
-
-  Lemma traces_match_state_lookup_1 {L1 L2 S1 S2: Type}
-    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
-    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
-    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) st1
-    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
-    (ST1: tr1 S!! n = Some st1):
-    exists st2, tr2 S!! n = Some st2 /\ Rs st1 st2.
-  Proof. 
-    apply trace_state_lookup_simpl' in ST1 as ([s1 ostep1] & NTH1 & <-).
-    pose proof (traces_match_trace_lookup_general _ _ _ _ _ _ n MATCH) as STEPS.
-    rewrite NTH1 in STEPS.
-    destruct (tr2 !! n) as [[s2 ostep2]|] eqn:NTH2; [| done]. simpl in *.
-    destruct STEPS. eexists. split; eauto.
-    eapply trace_state_lookup_simpl'; eauto.
-  Qed. 
-
-  Lemma traces_match_state_lookup_2 {L1 L2 S1 S2: Type}
-    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
-    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
-    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) st2
-    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
-    (ST2: tr2 S!! n = Some st2):
-    exists st1, tr1 S!! n = Some st1 /\ Rs st1 st2.
-  Proof. 
-    apply trace_state_lookup_simpl' in ST2 as ([s2 ostep2] & NTH2 & <-).
-    pose proof (traces_match_trace_lookup_general _ _ _ _ _ _ n MATCH) as STEPS.
-    rewrite NTH2 in STEPS.
-    destruct (tr1 !! n) as [[s1 ostep1]|] eqn:NTH1; [| done]. simpl in *.
-    destruct STEPS. eexists. split; eauto.
-    eapply trace_state_lookup_simpl'; eauto.
-  Qed.
-
-  Lemma traces_match_label_lookup_1 {L1 L2 S1 S2: Type}
-    (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop) 
-    (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop) 
-    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) ℓ1
-    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
-    (LBL1: tr1 L!! n = Some ℓ1):
-    exists ℓ2, tr2 L!! n = Some ℓ2 /\ Rℓ ℓ1 ℓ2. 
-  Proof. 
-    apply trace_label_lookup_simpl' in LBL1 as (s & s' & NTH1).
-    pose proof (traces_match_trace_lookup_general _ _ _ _ _ _ n MATCH) as STEPS.
-    rewrite NTH1 in STEPS.
-    destruct (tr2 !! n) as [[s2 ostep2]|] eqn:NTH2; [| done]. simpl in *.
-    destruct ostep2 as [[??]|]; [| tauto]. destruct STEPS as (?&?&?). 
-    eexists. split; eauto.
-    eapply trace_label_lookup_simpl'; eauto.
-  Qed.
-
-  (* TODO: move, ? unify definitions of _valid *)
-  Lemma auxtrace_valid_steps' `{LM: LiveModel G M} (tr: auxtrace (LM := LM))
-    i st ℓ st'
-    (VALID: auxtrace_valid tr)
-    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
-    lm_ls_trans LM st ℓ st'.
-  Proof using.
-    gd st. gd ℓ. gd st'. gd tr.
-    induction i.
-    { simpl. intros.
-      inversion VALID.
-      - subst. done.
-      - subst. inversion ITH. by subst. }
-    intros. simpl in ITH.
-    destruct tr.
-    { inversion ITH. }
-    rewrite trace_lookup_cons in ITH.
-    inversion VALID.  
-    eapply IHi; eauto.
-  Qed.
-
-  Lemma fuel_must_not_incr_fuels {G M} oρ'
-    (δ1 δ2: LiveState G M)
-    ρ f1 f2
-    (KEEP: fuel_must_not_incr oρ' δ1 δ2)
-    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
-    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
-    (OTHER: oρ' ≠ Some ρ):
-    f2 <= f1.
-  Proof.
-    red in KEEP. specialize (KEEP ρ). specialize_full KEEP.
-    { by apply elem_of_dom. }
-    destruct KEEP as [LE|[?|KEEP]].
-    + rewrite FUEL1 FUEL2 in LE. simpl in LE. lia. 
-    + tauto. 
-    + apply proj1 in KEEP. destruct KEEP. eapply elem_of_dom; eauto.
-  Qed.
-
-  Lemma step_nonincr_fuels `{LM: LiveModel G M} ℓ
-    (δ1 δ2: LiveState G M)
-    ρ f1 f2
-    (STEP: lm_ls_trans LM δ1 ℓ δ2)
-    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
-    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
-    (OTHER: forall g, ℓ ≠ Take_step ρ g):
-    f2 <= f1.
-  Proof.
-    destruct ℓ. 
-    all: eapply fuel_must_not_incr_fuels; eauto; [apply STEP|..]; congruence.
-  Qed. 
-  
-
-  Lemma role_fuel_decreases `{LM: LiveModel G M} (tr: auxtrace (LM := LM)) δ0 ρ f0
-    (ST0: tr S!! 0 = Some δ0)
-    (FUEL0: ls_fuel δ0 !! ρ = Some f0)
-    (NOρ: ∀ i ℓ, tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
-    (ASGρ: ∀ i δ, tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: auxtrace_valid tr):
-    forall i δ f, 
-      tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
-  Proof.
-    induction i; intros δ f ST FUEL. 
-    { assert (δ0 = δ) as -> by congruence. 
-      assert (f0 = f) as -> by congruence. 
-      done. }
-    
-    pose proof (trace_has_len tr) as [len LEN]. 
-    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN i)).
-    { eapply mk_is_Some, state_lookup_dom in ST; eauto. 
-      lia_NO len. }
-    intros (δ' & ℓ & δ_ & STEP).
-    
-    forward eapply auxtrace_valid_steps' as TRANS; eauto.
-    apply state_label_lookup in STEP as (ST' & ST_ & LBL).
-    assert (δ_ = δ) as ->; [| clear ST_].
-    { rewrite Nat.add_1_r in ST_. congruence. }
-    
-    specialize (ASGρ _ _ ST'). rewrite ls_same_doms in ASGρ.
-    pose proof ASGρ as ASGρ_.
-    apply elem_of_dom in ASGρ as [f' FUEL'].
-    specialize (IHi _ _ ST' FUEL').
-    etrans; [| apply IHi]. 
-    eapply step_nonincr_fuels in TRANS; eauto.
-  Qed.
-
-
-  (* TODO: move; is there an existing lemma? *)
-  Lemma after_S_tr_cons {St L: Type} (tr: trace St L) n s ℓ atr
-    (AFTER: after n tr = Some (s -[ℓ]-> atr)):
-    after (S n) tr = Some atr.
-  Proof.
-    by rewrite -Nat.add_1_r after_sum' AFTER.
-  Qed.           
-
-  (* TODO: move *)
-  Lemma label_lookup_after {St L: Type} (tr atr: trace St L) (a: nat)
-    (AFTER: after a tr = Some atr):
-    forall k, atr L!! k = tr L!! (a + k).
-  Proof. 
-    intros. rewrite /label_lookup. 
-    rewrite after_sum'. by rewrite AFTER.
-  Qed.    
-
-  (* TODO: move *)
-  Lemma state_lookup_after {St L: Type} (tr atr: trace St L) (a: nat)
-    (AFTER: after a tr = Some atr):
-    forall k, atr S!! k = tr S!! (a + k).
-  Proof. 
-    intros. rewrite /state_lookup. 
-    rewrite after_sum'. by rewrite AFTER.
-  Qed.
-
-  Lemma role_fuel_decreases_nth `{LM: LiveModel G M} (tr: auxtrace (LM := LM)) δ0 ρ f0 n
-    (ST0: tr S!! n = Some δ0)
-    (FUEL0: ls_fuel δ0 !! ρ = Some f0)
-    (NOρ: ∀ i ℓ, n <= i -> tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
-    (ASGρ: ∀ i δ, n <= i -> tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: auxtrace_valid tr):
-    forall i δ f, 
-      n <= i -> tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
-  Proof.
-    intros i δ f LE ITH FUEL.
-    apply Nat.le_sum in LE as [d ->]. 
-    pose proof ST0 as (atr & AFTER & HEAD)%state_lookup_after'.
-    forward eapply (role_fuel_decreases atr).
-    - erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
-    - eauto.
-    - intros. eapply (NOρ (n + i)); eauto.
-      + lia.
-      + rewrite -H. symmetry. eapply label_lookup_after; eauto.
-    - intros. eapply (ASGρ (n + i)); eauto.
-      + lia.
-      + rewrite -H. symmetry. eapply state_lookup_after; eauto.
-    - admit. (* TODO: is it admitted somewhere? *)
-    - erewrite state_lookup_after; eauto.
-    - eauto.
-    - lia.
-  Admitted.     
-
-  (* TODO: move *)
-  Lemma ls_same_doms' {G M} (δ: LiveState G M):
-    forall ρ, is_Some (ls_mapping δ !! ρ) <-> is_Some (ls_fuel δ !! ρ).
-  Proof. 
-    intros. rewrite -!elem_of_dom. by rewrite ls_same_doms.
-  Qed.
-
-  (* TODO: move? try to unify with fair_aux_after *)
-  (* TODO: add ∀ in fair_aux_SoU definition  *)
-  Lemma fair_aux_SoU_after `{LM: LiveModel G M} ρ (auxtr: auxtrace (LM := LM))
-    n auxtr':
-    (forall k, fair_aux_SoU auxtr ρ k) ->
-    after n auxtr = Some auxtr' ->
-    (forall k, fair_aux_SoU auxtr' ρ k).
-  Proof.
-    rewrite /fair_aux_SoU => Hfair Hafter m Hpa.
-    specialize (Hfair (n+m)).
-    rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair.
-    destruct (Hfair Hpa) as (p&Hp).
-    exists (p).
-    (* by rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n), Hafter in Hp. *)
-    rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n) in Hp.
-    by rewrite Hafter in Hp. 
-  Qed.
-
-  (* (* TODO: move *) *)
-  (* Lemma owner_burns_fuel `{LM: LiveModel G M} δ1 ℓ δ2 ρ f1 f2 *)
-  (*   (FUEL1: ls_fuel δ1 !! ρ = Some f1) *)
-  (*   (FUEL2: ls_fuel δ2 !! ρ = Some f2) *)
-  (*   (STEP: lm_ls_trans LM δ1 ℓ δ2) *)
-  (*   (* (OWN: ls_mapping δ1 !! ρ =  *) *)
-  (*   (NEQ: forall g, ℓ ≠ Take_step ρ g): *)
-  (*   f2 <= f1. *)
-  (* Proof. *)
-  (*   destruct ℓ; simpl in STEP.  *)
-  (*   3: { by repeat apply proj2 in STEP. } *)
-  (*   - destruct STEP as (?&?&?&?&?&?). *)
-  (*     red in H2. *)
-  (*     specialize (H2 ρ ltac:(apply elem_of_dom; eauto)). rewrite FUEL1 FUEL2 in H2. *)
-  (*     destruct H2 as [X|[X|X]].  *)
-  (*     + done. *)
-  (*     + destruct X as [[=] _]. subst. edestruct NEQ; eauto. *)
-  (*     + apply proj1 in X. destruct X. apply elem_of_dom; eauto. *)
-  (*   - destruct STEP as (?&?&?&?&?). *)
-  (*     red in H2.  *)
-                         
+   
 
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
@@ -673,7 +105,7 @@ Section InnerLMTraceFairness.
     
     pose proof (FAIR_SOU 0 gi) as FAIR. 
     red in FAIR. specialize_full FAIR.
-    { by apply pred_at_trfirst. }
+    { by apply pred_at_state_trfirst. }
     destruct FAIR as [n_lo STEPlo].
     
     simpl in STEPlo. apply pred_at_trace_lookup' in STEPlo as (δo_n & stepo & STLo & SOUn).
@@ -788,8 +220,6 @@ Section InnerLMTraceFairness.
        lia.
   Qed. 
 
-  (* Lemma upto_stutter_state_lookup *)
-
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign_nth lmtr_o mtr_o lmtr_i ρ gi δi f n
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
@@ -804,8 +234,6 @@ Section InnerLMTraceFairness.
   (FUEL0: ls_fuel δi !! ρ = Some f):
     ∃ m, n <= m /\ pred_at lmtr_i m (steps_or_unassigned ρ).
   Proof.
-    (* pose proof (traces_match_first _ _ _ _ _ _ MATCH) as REL0. *)
-    (* pose proof (upto_stutter_trfirst _ _ _ _ CORRo) as CORR0.  *)
     pose proof ST0 as X. eapply traces_match_state_lookup_2 in X as (st_mo_n & STm0 & REL0); [| apply MATCH].
     pose proof STm0 as (atr_mo_n & AFTERmo_n & HEADmo_n)%state_lookup_after'.
     pose proof AFTERmo_n as X. eapply upto_stutter_after in X as (k & atr_lmo_k & AFTERlmo_k & UPTOkn); eauto.
@@ -834,61 +262,16 @@ Section InnerLMTraceFairness.
       apply pred_at_sum. by rewrite AFTERlmi_n.
   Qed. 
 
-  (* TODO: move *)
-  Lemma infinite_neg_finite {St L : Type} (tr : trace St L):
-    terminating_trace tr <-> ¬ infinite_trace tr.
-  Proof.
-    rewrite /terminating_trace /infinite_trace. split.
-    - intros [n A]. intros A'. specialize (A' n). rewrite A in A'. by destruct A'.
-    - intros [n A%eq_None_not_Some]%not_forall_exists_not. eexists; eauto.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma infinite_trace_equiv {St L : Type} (tr : trace St L) (len : nat_omega)
-                             (LEN: trace_len_is tr len):
-    infinite_trace tr ↔ len = NOinfinity. 
-  Proof.
-    rewrite /infinite_trace. split.
-    - intros A. destruct len; [done| ].
-      eapply trace_len_neg with (i := n), proj2 in LEN. 
-      specialize (A n) as [? T]. rewrite LEN in T; [done| ]. simpl. lia. 
-    - intros -> ?. by apply LEN.
-  Qed.     
-
   Local Ltac by_contradiction_classic C :=
     match goal with
     | |- ?goal => destruct (classic goal) as [?|C]; first done; exfalso
     end.
-
 
   Lemma DNE_iff (P: Prop):
     P <-> ¬ ¬ P.
   Proof. 
     tauto. (* due to classic usage *)
   Qed. 
-
-  (* TODO: move *)
-  Lemma state_lookup_dom_neg {St L: Type}  (tr: trace St L) (len: nat_omega)
-    (LEN: trace_len_is tr len):
-    forall i, tr S!! i = None <-> NOmega.le len (NOnum i).
-  Proof using.
-    intros i.
-    pose proof (state_lookup_dom _ _ LEN i) as EQUIV.
-    apply not_iff_compat in EQUIV. rewrite -not_eq_None_Some in EQUIV.
-    rewrite -DNE_iff in EQUIV. rewrite EQUIV.
-    lia_NO len.
-  Qed.
-
-  (* (* TODO: move *) *)
-  (* Lemma forall_impl_dec_restrict {A: Type} (P Q: A -> Prop) (domP: list A) *)
-  (*   (DECP: forall a, Decision (P a)) *)
-  (*   (DOMP: forall a, P a <-> a ∈ domP) *)
-  (*   (DECQ: forall a, P a -> Decision (Q a)): *)
-  (*   Decision (forall a, P a -> Q a). *)
-  (* Proof. *)
-  (*   destruct (decide (Forall P domP)). *)
-  (*   2: { right. intros ALL.  *)
-
 
   (* TODO: is it possible to express the general principle of induction by burning fuel? *)
   Lemma owner_fixed_eventually `{LM: LiveModel G M} `{Inhabited G} `{EqDecision G}
@@ -1077,5 +460,4 @@ Section InnerLMTraceFairness.
       edestruct (NOρ m); eauto. lia.
   Qed. 
     
-
 End InnerLMTraceFairness. 

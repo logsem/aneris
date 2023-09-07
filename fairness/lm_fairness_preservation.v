@@ -123,6 +123,24 @@ Section fairness_preserved.
     ∃ m, pred_at auxtr (n + m)
       (λ (δ : lm_ls LM) (ℓ : option (lm_lbl LM)), steps_or_unassigned ρ δ ℓ). 
 
+  (* TODO: ? try to unify with fair_aux_after *)
+  (* TODO: add ∀ in fair_aux_SoU definition  *)
+  Lemma fair_aux_SoU_after ρ (auxtr: auxtrace (LM := LM))
+    n auxtr':
+    (forall k, fair_aux_SoU auxtr ρ k) ->
+    after n auxtr = Some auxtr' ->
+    (forall k, fair_aux_SoU auxtr' ρ k).
+  Proof.
+    rewrite /fair_aux_SoU => Hfair Hafter m Hpa.
+    specialize (Hfair (n+m)).
+    rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair.
+    destruct (Hfair Hpa) as (p&Hp).
+    exists (p).
+    (* by rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n), Hafter in Hp. *)
+    rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n) in Hp.
+    by rewrite Hafter in Hp. 
+  Qed.
+
   Definition fairness_induction_stmt ρ fm f m τ extr (auxtr : auxtrace (LM := LM)) δ
     :=
       (infinite_trace extr ->
@@ -136,14 +154,6 @@ Section fairness_preserved.
         pred_at extr m (λ _ oζ, oζ = Some (Some (lift_grole τ)))) ->
       ∃ M, pred_at auxtr M (fun δ ℓ => steps_or_unassigned ρ δ ℓ)). 
   
-  (* TODO: move *)
-  Lemma pred_at_trfirst {St L : Type}
-    (tr: trace St L) (P : St → Prop):
-    pred_at tr 0 (fun st _ => P st) ↔ P (trfirst tr).
-  Proof. 
-    rewrite /pred_at. destruct tr; eauto.
-  Qed.
-
   Local Lemma case1 ρ f m (extr': out_trace) (auxtr' : auxtrace (LM := LM)) δ ℓ :
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
@@ -167,7 +177,7 @@ Section fairness_preserved.
         destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
         { exists 1. apply pred_at_S.
           rewrite /steps_or_unassigned. apply pred_at_or. left.
-          eapply pred_at_trfirst. eauto. }
+          eapply pred_at_state_trfirst. eauto. }
         (* have [τ' Hτ'] : is_Some (ls_mapping (trfirst auxtr') !! ρ) by eauto. *)
         destruct MAP as [τ' Hτ']. 
 
@@ -184,7 +194,7 @@ Section fairness_preserved.
         exists (1+P). rewrite !pred_at_sum. simpl. done.
       - exists 1. apply pred_at_S.
         rewrite /steps_or_unassigned. apply pred_at_or. left.
-        apply pred_at_trfirst.
+        apply pred_at_state_trfirst.
         rewrite -ls_same_doms in Hdec.
         intros ??. apply Hdec, elem_of_dom. eauto. 
     Qed.
@@ -329,7 +339,7 @@ Section fairness_preserved.
       (* destruct (decide (ρ ∈ live_roles M (trfirst auxtr'))) as [Hρlive'|]; last first. *)
       destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
       { exists 1. apply pred_at_or. left.
-        eapply pred_at_trfirst; eauto. }
+        eapply pred_at_state_trfirst; eauto. }
       destruct m as [| m'].
       { rewrite -> !pred_at_0 in Hexen. destruct Hexen as [Hexen|Hexen].
         - exfalso. apply Hexen. eapply (match_locale_prop _ _ _ _ Htm); eauto. 
@@ -376,16 +386,6 @@ Section fairness_preserved.
   Qed.
 
   
-  (* TODO: move *)
-  Lemma pred_at_impl {St L : Type}
-    (tr : trace St L) i (P Q : St → option L → Prop)
-    (IMPL: forall s ol, P s ol -> Q s ol):
-    pred_at tr i P -> pred_at tr i Q.
-  Proof.
-    rewrite /pred_at. destruct after eqn:AFTER; [| done].
-    destruct t; eauto.
-  Qed. 
-
   Lemma exec_fairness_implies_step_or_unassign (extr: out_trace) (auxtr: auxtrace (LM := LM)):
     infinite_trace extr ->
     lm_exaux_traces_match_gen extr auxtr ->
@@ -449,7 +449,6 @@ Section fairness_preserved.
 End fairness_preserved.
 
 
-(* TODO: move? *)
 Section lang_fairness_preserved.
   Context `{LM: LiveModel (locale Λ) M}.
   Context `{EqDecision (locale Λ)}.
@@ -480,29 +479,6 @@ Section lang_fairness_preserved.
     { apply _. }
     eapply match_locale_enabled_states_livetids; eauto.
     Unshelve. apply _.
-  Qed.
-
-  (* TODO: move, even better - replace original definition *)
-  Lemma live_tids_alt c δ:
-    live_tids c δ (LM := LM) (Λ := Λ) <->
-    (forall ζ, (exists ρ, ls_mapping δ !! ρ = Some ζ) ->
-          locale_enabled ζ c).
-  Proof.
-    rewrite /live_tids /locale_enabled. split.
-    - intros. destruct H0 as [ρ MAP].
-      destruct H as [EXPR NVAL].
-      specialize (EXPR _ _ MAP) as [e ?].
-      eexists. split; eauto.
-      specialize (NVAL _ _ H). 
-      destruct (to_val e); [| done].
-      specialize (NVAL ltac:(eauto)).
-      edestruct NVAL; eauto.
-    - intros. split.
-      + intros. specialize (H ζ (@ex_intro _ _ _ H0)) as [e [MAP ?]].
-        eauto.
-      + intros. intros MAP.
-        specialize (H ζ (@ex_intro _ _ _ MAP)) as [? [? NVAL]].
-        congruence.
   Qed.
 
 End lang_fairness_preserved. 

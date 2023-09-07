@@ -39,7 +39,10 @@ Section LibraryDefs.
   Definition lib_fun: val.
   Admitted.
 
-  
+  Lemma lib_model_impl_lr_strong: FM_strong_lr lib_model_impl.
+  Proof. 
+    red. intros.
+  Admitted.   
   
 End LibraryDefs.
 

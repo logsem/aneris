@@ -89,7 +89,6 @@ Section ActualOwnershipImpl.
           set_solver.
   Qed.
 
-  (* TODO: move to tmap definition *)
   Let tmap_disj (tmap: gmap G (gset (fmrole M))) := 
     forall (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
       τ1 ≠ τ2 → tmap !! τ1 = Some S1 → tmap !! τ2 = Some S2 → S1 ## S2. 

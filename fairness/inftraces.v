@@ -54,6 +54,10 @@ Section traces.
         end
       end.
 
+    Lemma after_0_id (tr : trace St L):
+      after 0 tr = Some tr.
+    Proof. done. Qed.
+
     Definition pred_at (tr: trace St L) (n: nat) (P: St -> option L -> Prop): Prop :=
       match after n tr with
       | None => False
@@ -82,6 +86,13 @@ Section traces.
         | Some tr' => after m tr'
         end.
     Proof. intros. rewrite Nat.add_comm. apply after_sum. Qed.
+
+    Lemma after_S_tr_cons (tr: trace St L) n s ℓ atr
+      (AFTER: after n tr = Some (s -[ℓ]-> atr)):
+      after (S n) tr = Some atr.
+    Proof. 
+      by rewrite -Nat.add_1_r after_sum' AFTER.
+    Qed.
 
     Lemma pred_at_sum P n m tr:
       pred_at tr (n + m) P <->
@@ -113,6 +124,12 @@ Section traces.
       pred_at (s -[ℓ]-> r) (S n) P <-> pred_at r n P.
     Proof. by unfold pred_at. Qed.
 
+    Lemma pred_at_state_trfirst (tr: trace St L) (P : St → Prop):
+      pred_at tr 0 (fun st _ => P st) ↔ P (trfirst tr).
+    Proof. 
+      rewrite /pred_at. destruct tr; eauto.
+    Qed.
+
     Definition infinite_trace tr :=
       forall n, is_Some (after n tr).
 
@@ -140,6 +157,15 @@ Section traces.
       intros Hinf n. specialize (Hinf (1+n)).
       rewrite (after_sum' _ 1) // in Hinf.
     Qed.
+
+    Lemma infinite_neg_finite (tr : trace St L):
+      terminating_trace tr <-> ¬ infinite_trace tr.
+    Proof.
+      rewrite /terminating_trace /infinite_trace. split.
+      - intros [n A]. intros A'. specialize (A' n). rewrite A in A'. by destruct A'.
+      - intros [n A%eq_None_not_Some]%not_forall_exists_not. eexists; eauto.
+    Qed. 
+
   End after.
 
 End traces.
@@ -200,6 +226,8 @@ Section simulation.
     apply terminating_trace_cons.
     eapply IHn =>//.
   Qed.
+
+  
 
 End simulation.
 
@@ -318,6 +346,13 @@ Section destuttering.
   Qed.
   Hint Resolve upto_stutter_mono : paco.
 
+  Lemma upto_stutter_trfirst btr str
+    (CORR: upto_stutter btr str):
+    trfirst str = Us (trfirst btr). 
+  Proof.
+    punfold CORR. by inversion CORR.
+  Qed. 
+
   Lemma upto_stutter_after {btr str} n {str'}:
     upto_stutter btr str ->
     after n str = Some str' ->
@@ -336,6 +371,37 @@ Section destuttering.
       apply Hw. simpl. eapply IH =>//.
       by destruct Hind.
   Qed.
+
+  Local Ltac gd t := generalize dependent t.
+
+  Lemma upto_stutter_after'
+    {btr : trace St L} {str : trace S' L'} (n : nat) {btr' : trace St L}:
+    upto_stutter btr str
+    → after n btr = Some btr'
+      → ∃ (n' : nat) (str' : trace S' L'),
+          after n' str = Some str' ∧ upto_stutter btr' str'.
+  Proof. 
+    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
+    { intros P [x ?]. by exists (S x). }
+
+    intros. 
+    gd btr. gd str. gd btr'. induction n as [|n IH]; intros btr' str btr Hupto Hafter.
+    { injection Hafter => <-. clear Hafter. exists 0, str. done. }
+    punfold Hupto.
+    inversion Hupto; subst. 
+    - done.
+    - simpl in Hafter. rename btr0 into btr. 
+      specialize (IH btr' str btr).
+      eapply IH; eauto. 
+      by pfold.
+    - simpl in Hafter. rename btr0 into btr. rename str0 into str.
+      specialize (IH btr' str btr).
+      assert (upto_stutter btr str) as UPTO'.
+      { (* TODO: proper way of doing it? *)
+        inversion H1; eauto. done. }
+      specialize (IH UPTO' Hafter) as (?&?&?&?). 
+      eauto. 
+  Qed. 
 
   Lemma upto_stutter_after_None {btr str} n:
     upto_stutter btr str ->

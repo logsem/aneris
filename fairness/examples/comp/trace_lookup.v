@@ -1,5 +1,5 @@
 From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len.
-From trillium.fairness Require Import inftraces.
+From trillium.fairness Require Import inftraces trace_utils.
 
 Section TraceLookup.
   Context {St L: Type}. 
@@ -88,6 +88,14 @@ Section TraceLookup.
       + lia_NO len. 
   Qed. 
 
+  Lemma trace_lookup_dom_neg (tr : trace St L) (len : nat_omega)
+    (LEN: trace_len_is tr len):
+    ∀ i, tr !! i = None ↔ NOmega.le len (NOnum i).
+  Proof. 
+    intros. erewrite <- trace_len_neg; eauto.
+    unfold_lookups. destruct after; [destruct t| ]; done.
+  Qed. 
+
   Lemma trace_lookup_dom_strong (tr: trace St L) (len: nat_omega)
     (LEN: trace_len_is tr len):
     forall i, (exists st ℓ st', tr !! i = Some (st, Some (ℓ, st'))) <-> NOmega.lt_nat_l (i + 1) len.
@@ -146,6 +154,16 @@ Section TraceLookup.
     2: { split; by intros []. }
     by destruct t. 
   Qed. 
+
+  Lemma state_lookup_dom_neg (tr: trace St L) (len: nat_omega)
+    (LEN: trace_len_is tr len):
+    forall i, tr S!! i = None <-> NOmega.le len (NOnum i).
+  Proof using.
+    intros i.
+    pose proof (state_lookup_dom _ _ LEN i) as EQUIV.
+    apply not_iff_compat in EQUIV. 
+    by rewrite -eq_None_not_Some -NOmega.le_iff_not_lt_nat in EQUIV.
+  Qed.
   
   Lemma label_lookup_dom (tr: trace St L) (len: nat_omega)
     (LEN: trace_len_is tr len):
@@ -249,11 +267,58 @@ Section TraceLookup.
     (s -[ l ]-> tr) S!! S i = tr S!! i.
   Proof. done. Qed.
     
+  Lemma trace_label_lookup_simpl (tr: trace St L) i step ℓ
+    (TLi: tr !! i = Some step)
+    (SLi: tr L!! i = Some ℓ):
+    exists s1 s2, step = (s1, Some (ℓ, s2)). 
+  Proof.
+    rewrite /label_lookup /trace_lookup_impl in SLi. rewrite /lookup /trace_lookup /trace_lookup_impl in TLi.
+    destruct (after i tr); try done.
+    destruct t; try done. inversion SLi. inversion TLi. subst. eauto.  
+  Qed. 
+
+  Lemma state_lookup_0 (tr: trace St L):
+    tr S!! 0 = Some (trfirst tr). 
+  Proof. by destruct tr. Qed.
+
+  Lemma trace_state_lookup_simpl' (tr: trace St L) i st:
+    (exists step, tr !! i = Some step /\ fst step = st) <-> tr S!! i = Some st. 
+  Proof.
+    unfold_lookups. 
+    destruct after.
+    2: { split; [intros (?&?&?) | intros ?]; done. }
+    destruct t.
+    all: split; [intros  ([??]&?&?) | intros [=]]; simpl in *; subst.
+    all: congruence || eauto. 
+  Qed. 
+
+  Lemma trace_label_lookup_simpl' (tr: trace St L) i ℓ:
+    (exists s1 s2, tr !! i = Some (s1, Some (ℓ, s2))) <-> tr L!! i = Some ℓ. 
+  Proof.
+    split.
+    { intros (?&?&?%state_label_lookup). tauto. }
+    unfold_lookups. 
+    destruct after; [| done].
+    destruct t; [done| ]. intros [=->]. eauto.
+  Qed. 
+
+End TraceLookup.
+
+Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
+Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
+
+
+Section After.
+  Context {St L: Type}. 
+
+  Local Ltac unfold_lookups :=
+    rewrite /lookup /state_lookup /label_lookup /trace_lookup.
+
   Lemma trace_lookup_after (tr atr: trace St L) (a: nat)
     (AFTER: after a tr = Some atr):
     forall k, atr !! k = tr !! (a + k).
   Proof. 
-    intros. rewrite /lookup /trace_lookup /trace_lookup_impl. 
+    intros. unfold_lookups. 
     rewrite after_sum'. by rewrite AFTER.
   Qed. 
     
@@ -261,11 +326,192 @@ Section TraceLookup.
     (AFTER: after a tr = Some atr):
     forall k, atr S!! k = tr S!! (a + k).
   Proof. 
-    intros. rewrite /state_lookup /trace_lookup_impl. 
+    intros. unfold_lookups. 
     rewrite after_sum'. by rewrite AFTER.
   Qed. 
-    
-End TraceLookup.
 
-Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
-Notation "tr L!! i" := (label_lookup tr i) (at level 20). 
+  Lemma label_lookup_after (tr atr: trace St L) (a: nat)
+    (AFTER: after a tr = Some atr):
+    forall k, atr L!! k = tr L!! (a + k).
+  Proof. 
+    intros. unfold_lookups. 
+    rewrite after_sum'. by rewrite AFTER.
+  Qed.
+
+  Lemma state_lookup_after_0 (tr atr : trace St L) n
+    (AFTER: after n tr = Some atr):
+    tr S!! n = Some (trfirst atr).
+  Proof. 
+    rewrite -(Nat.add_0_r n).
+    erewrite <- state_lookup_after; eauto.
+    apply state_lookup_0.
+  Qed.
+
+  Lemma state_lookup_after' (tr: trace St L) n st:
+    (exists atr, after n tr = Some atr /\ trfirst atr = st) <-> tr S!! n = Some st. 
+  Proof. 
+    destruct (after n tr) as [atr| ] eqn:AFTER.
+    2: { split; [by intros (?&?&?)| ].
+         pose proof (trace_has_len tr) as [len ?]. 
+         eintros ?%mk_is_Some%state_lookup_dom; eauto.
+         eapply trace_len_neg in AFTER; eauto. lia_NO len. }
+    erewrite state_lookup_after_0; eauto.
+    split. 
+    - intros (?&[=->]&?). congruence.
+    - intros [=]. eauto.
+  Qed. 
+
+  Lemma trace_lookup_after_strong (tr: trace St L) s1 ℓ s2 n:
+    (exists atr', after n tr = Some (s1 -[ℓ]-> atr') /\ trfirst atr' = s2) <-> tr !! n = Some (s1, Some (ℓ, s2)). 
+  Proof. 
+    destruct (after n tr) as [atr| ] eqn:AFTER.
+    2: { split; [by intros (?&?&?)| ].
+         pose proof (trace_has_len tr) as [len LEN].
+         intros NTH.
+         forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN n)); eauto.
+         eapply trace_len_neg in AFTER; eauto. lia_NO len. }
+
+    rewrite /lookup /trace_lookup AFTER. 
+    split.
+    - intros (?&[=->]&?). congruence.
+    - intros EQ. destruct atr; [congruence| ].
+      inversion EQ. subst. eauto. 
+  Qed.
+
+End After.
+
+
+Section TracesMatch.
+  Context {L1 L2 S1 S2: Type}.
+  Context {Rℓ : L1 → L2 → Prop}.
+  Context {Rs : S1 → S2 → Prop}.
+  Context {trans1 : S1 → L1 → S1 → Prop}.
+  Context {trans2 : S2 → L2 → S2 → Prop}.  
+  
+
+  Lemma traces_match_trace_lookup_general 
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat)
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2):
+    match tr1 !! n, tr2 !! n with
+    | Some step1, Some step2 => 
+        Rs (fst step1) (fst step2) /\
+          match snd step1, snd step2 with 
+          | Some (ℓ1, s1'), Some (ℓ2, s2') => Rℓ ℓ1 ℓ2 /\ Rs s1' s2'
+          | None, None => True
+          | _, _ => False
+          end
+    | None, None => True
+    | _ , _ => False
+    end. 
+  Proof. 
+    pose proof (trace_has_len tr1) as [len LEN1]. pose proof (trace_has_len tr2) as [? LEN2].
+    forward eapply (traces_match_same_length _ _ _ _ tr1 tr2) as X; eauto. subst x.
+    destruct (tr1 !! n) as [[s1 step1]| ] eqn:STEP1, (tr2 !! n) as [[s2 step2]| ] eqn:STEP2. 
+    4: done. 
+    3: { eapply mk_is_Some, trace_lookup_dom in STEP2; eauto. 
+         eapply trace_lookup_dom_neg in STEP1; eauto.
+         lia_NO len. }
+    2: { eapply mk_is_Some, trace_lookup_dom in STEP1; eauto. 
+         eapply trace_lookup_dom_neg in STEP2; eauto.
+         lia_NO len. }
+
+    forward eapply (proj1 (trace_state_lookup_simpl' tr1 n s1)) as ST1; eauto.  
+    forward eapply (proj1 (trace_state_lookup_simpl' tr2 n s2)) as ST2; eauto.  
+    simpl in *.
+    pose proof (proj2 (state_lookup_after' _ _ _) ST1) as (atr1 & AFTER1 & A1).
+    forward eapply traces_match_after' with (tr1 := tr1) (tr2 := tr2); eauto.
+    intros (atr2 & AFTER2 & A2). 
+    split.
+    { apply traces_match_first in A2.
+      erewrite state_lookup_after_0 in ST1; eauto. 
+      erewrite state_lookup_after_0 in ST2; eauto.
+      congruence. }
+    destruct step1 as [[ℓ1 s1']| ], step2 as [[ℓ2 s2']| ].
+    4: done.
+    3: { forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN2 n)); eauto.
+         forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN1 n)); eauto.
+         lia_NO' len. intros [=]. lia. }
+    2: { forward eapply (proj1 (trace_lookup_dom_strong _ _ LEN1 n)); eauto.
+         forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN2 n)); eauto.
+         lia_NO' len. intros [=]. lia. }
+    
+    apply trace_lookup_after_strong in STEP1 as (?&AFTER1'&?), STEP2 as (?&AFTER2'&?).
+    erewrite AFTER1' in AFTER1. rewrite AFTER2' in AFTER2.
+    inversion AFTER1. inversion AFTER2. subst atr1 atr2.
+    inversion A2. subst. split; eauto.
+    eapply traces_match_first; eauto.
+  Qed.
+
+  Lemma traces_match_state_lookup_1
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) st1
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (ST1: tr1 S!! n = Some st1):
+    exists st2, tr2 S!! n = Some st2 /\ Rs st1 st2.
+  Proof. 
+    apply trace_state_lookup_simpl' in ST1 as ([s1 ostep1] & NTH1 & <-).
+    pose proof (traces_match_trace_lookup_general _ _ n MATCH) as STEPS.
+    rewrite NTH1 in STEPS.
+    destruct (tr2 !! n) as [[s2 ostep2]|] eqn:NTH2; [| done]. simpl in *.
+    destruct STEPS. eexists. split; eauto.
+    eapply trace_state_lookup_simpl'; eauto.
+  Qed. 
+
+  Lemma traces_match_state_lookup_2
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) st2
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (ST2: tr2 S!! n = Some st2):
+    exists st1, tr1 S!! n = Some st1 /\ Rs st1 st2.
+  Proof. 
+    apply trace_state_lookup_simpl' in ST2 as ([s2 ostep2] & NTH2 & <-).
+    pose proof (traces_match_trace_lookup_general _ _ n MATCH) as STEPS.
+    rewrite NTH2 in STEPS.
+    destruct (tr1 !! n) as [[s1 ostep1]|] eqn:NTH1; [| done]. simpl in *.
+    destruct STEPS. eexists. split; eauto.
+    eapply trace_state_lookup_simpl'; eauto.
+  Qed.
+
+  Lemma traces_match_label_lookup_1
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) ℓ1
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (LBL1: tr1 L!! n = Some ℓ1):
+    exists ℓ2, tr2 L!! n = Some ℓ2 /\ Rℓ ℓ1 ℓ2. 
+  Proof. 
+    apply trace_label_lookup_simpl' in LBL1 as (s & s' & NTH1).
+    pose proof (traces_match_trace_lookup_general _ _ n MATCH) as STEPS.
+    rewrite NTH1 in STEPS.
+    destruct (tr2 !! n) as [[s2 ostep2]|] eqn:NTH2; [| done]. simpl in *.
+    destruct ostep2 as [[??]|]; [| tauto]. destruct STEPS as (?&?&?). 
+    eexists. split; eauto.
+    eapply trace_label_lookup_simpl'; eauto.
+  Qed.
+
+End TracesMatch. 
+
+
+Section UptoStutter.
+  Context {St S' L L' : Type}.
+  Context {Us : St → S'}.
+  Context {Ul: L → option L'}.  
+
+  Lemma upto_stutter_state_lookup' {btr : trace St L} {str : trace S' L'} (n : nat) bst:
+    upto_stutter Us Ul btr str
+    → btr S!! n = Some bst ->
+      ∃ (n' : nat),
+        str S!! n' = Some (Us bst).
+  Proof.
+    intros UPTO NTH.
+    pose proof (trace_has_len btr) as [? LEN]. 
+    pose proof (proj1 (state_lookup_dom _ _ LEN n) (mk_is_Some _ _ NTH)) as BOUND.
+    pose proof (proj2 (LEN _) BOUND) as [btr_n AFTER].
+    forward eapply (upto_stutter_after' _ _ n UPTO); eauto.
+    intros (n' & str' & AFTER' & UPTOn).
+    exists n'.
+    rewrite -(Nat.add_0_r n'). erewrite <- state_lookup_after; eauto.
+    rewrite state_lookup_0. f_equal.     
+    erewrite upto_stutter_trfirst; [..| apply UPTOn]; eauto.
+    f_equal. apply Some_inj.
+    rewrite -state_lookup_0.
+    erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
+  Qed. 
+
+End UptoStutter.

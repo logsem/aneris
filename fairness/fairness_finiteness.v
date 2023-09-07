@@ -307,7 +307,6 @@ Section finitary_simple.
     destruct l0; simpl in H1; intuition.
     Unshelve.
     + intros ??. apply make_decision.
-    + intros ??. apply make_decision.
     + intros. apply make_proof_irrel.
   Qed.
 
@@ -347,8 +346,7 @@ Proof.
   { intros ex aux. by eapply valid_lift_fairness_sim_rel_with_user.
     (* TODO: Figure out if these typeclass subgoals should be resolved locally *)
     Unshelve.
-    - intros ??. apply make_decision.
-    - intros ??. apply make_decision. }
+    intros ??. apply make_decision. }
   by eapply valid_state_evolution_finitary_fairness.
   (* TODO: get rid of it *)
   Unshelve. 
