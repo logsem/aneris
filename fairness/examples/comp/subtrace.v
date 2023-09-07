@@ -443,3 +443,68 @@ Section ModelSubtrace.
   Qed. 
 
 End ModelSubtrace.
+
+
+Section UptoStutter.
+  Context {St S' L L' : Type}.
+  Context {Us : St → S'}.
+  Context {Ul: L → option L'}.  
+
+  Set Printing Coercions.
+
+  Lemma trace_prefix_inf_upto_stutter ltr tr i atr i' latr ml
+    (AFTER: after i tr = Some atr)
+    (LAFTER: after i' ltr = Some latr)
+    (UPTO: upto_stutter Us Ul latr atr):
+  ∃ (ml' : nat_omega),
+    (* Some (trace_prefix_inf latr (NOmega.sub ml' (NOnum i'))) = Some ltr' *)
+    upto_stutter Us Ul 
+      (trace_prefix_inf latr ml')
+      (trace_prefix_inf atr ml) /\
+    ml' ≠ NOnum 0. 
+  Proof.
+    (* destruct ml. *)
+    (* { exists NOinfinity. simpl. *)
+    (*   gd atr. gd latr. gd i'. induction i. *)
+    (*   { intros. rewrite after_0_id in AFTER. *)
+    (*     inversion AFTER. subst tr. *)
+    (*     revert UPTO. *)
+    (*     From Paco Require Import paco1 paco2 pacotac. *)
+    (*     pcofix UPTOOO.  *)
+    (*     intros; pfold. *)
+    (*     (* rewrite (trace_unfold_fold latr) (trace_unfold_fold atr). *) *)
+    (*     rewrite !trace_prefix_inf_step_equiv. rewrite /trace_prefix_inf_step_alt. *)
+    (*     punfold UPTO; [| admit]. *)
+    (*     inversion UPTO; subst.  *)
+    (*     - simpl. do 2 (rewrite decide_False; [| tauto]). econstructor. *)
+    (*     - simpl. do 2 (rewrite decide_False; [| tauto]). econstructor; eauto. *)
+    (*       3: { specialize_full UPTOOO. *)
+    (*            { pfold. eauto. } *)
+  Admitted. 
+
+  Lemma subtrace_upto_stutter ltr tr i ml tr'
+    (UPTO: upto_stutter Us Ul ltr tr)
+    (SUB: subtrace tr i ml = Some tr'):
+    exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Ul ltr' tr'.
+  Proof.
+    pose proof (trace_has_len tr) as [len LEN].
+    forward eapply subtrace_inv as [LT1 LT2]; eauto.
+    rewrite /subtrace in SUB. 
+    destruct after eqn:AFTER; [| congruence].
+    rewrite decide_False in SUB.
+    2: { lia_NO' ml. intros [=]. lia. }
+    inversion SUB. subst tr'. clear SUB. rename t into atr. 
+    forward eapply upto_stutter_after as (i' & latr & LAFTER & UPTOi); eauto.
+    exists i'. rewrite /subtrace LAFTER.
+
+    forward eapply trace_prefix_inf_upto_stutter with (ml := (NOmega.sub ml (NOnum i))); eauto.
+    intros (ml' & UPTO' & NZml'). exists (NOmega.add (NOnum i') ml').
+    eexists. split; eauto. 
+    rewrite decide_False; eauto.
+    - lia_NO' ml'. do 3 f_equal. lia.
+    - lia_NO' ml'. do 3 f_equal. intros [=].
+      apply NZml'. f_equal. lia.
+  Qed.     
+
+
+End UptoStutter.
