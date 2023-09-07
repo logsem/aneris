@@ -26,7 +26,8 @@ From aneris.examples.snapshot_isolation.proof.resources
      global_invariant local_invariant wrappers.
 From aneris.examples.snapshot_isolation.proof.server
      Require Import
-     proof_of_start_handler.
+     proof_of_start_handler
+     proof_of_read_handler.
 From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.
 
@@ -56,7 +57,14 @@ Section Proof_of_handler.
     rewrite /lk_handle.
     iDestruct "Hpre" as "(#HGlobInv & [HpreRead|[HpreStart|HpreCommit]])".
     (** Proof of read request. TODO: make a separate case as the proof will be quite long. *)
-    1:{ admit. }
+    1:{
+      iDestruct "HpreRead"
+      as (k ts h Hin Hreqd ->) "(%Hts & #HsnapT & #HsnapH)".
+      wp_pures.
+      wp_lam.
+      wp_pures.
+      by iApply (read_handler_spec _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
+                with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]"). }
     (** Proof of commit request. TODO: make a separate case as the proof will be quite long *)
     2:{ admit. }
     iDestruct "HpreStart"
