@@ -37,6 +37,40 @@ Section Proof_of_read_handler.
                      clients γKnownClients γGauth γGsnap γT).
   Import snapshot_isolation_code_api.
 
+
+
+  Lemma kvs_get_spec (k : Key) (kvsV : val) (h : list write_event)
+       (m : gmap Key val) :
+   is_map kvsV m →
+   {{{ ownMemSeen γGsnap k h }}}
+       kvs_get #k kvsV  @[ip_of_address MTC.(MTS_saddr)]
+    {{{ (h : list write_event), RET $h;
+        (⌜$h = InjLV #()⌝ ∗ ⌜h = []⌝) ∨ 
+        (∃ hv : list val, ⌜hv = to_hist h⌝)
+    }}}.
+  Proof.
+  Admitted.
+
+  Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (kvsV : val) (h : list write_event)
+       (m : gmap Key val) (M : gmap Key (list write_event)) :
+   (∀ e : events.write_event, e ∈ h → we_time e < ts) →
+   (∀ e : events.write_event, e ∈ h → we_time e < ts) →
+   is_map kvsV m →
+   kvsl_valid m M T →
+   ts < T →
+    {{{
+          ownTimeSnap γT ts ∗
+          ownMemSeen γGsnap k h
+    }}}
+        kvs_get_last (#k, #ts)%V kvsV  @[ip_of_address MTC.(MTS_saddr)]
+    {{{ (vo : option val), RET $vo;
+        (⌜$vo = InjLV #()⌝ ∗ ⌜h = []⌝ ∨
+        (∃ e : events.write_event, ⌜$vo = InjRV (we_val e)⌝ ∗
+             ⌜hist_to_we h = Some e⌝))
+    }}}.
+  Proof.
+  Admitted.
+
   Lemma read_handler_spec
         (k : string)
         (lk : val)
@@ -71,6 +105,10 @@ Section Proof_of_read_handler.
       as (kvsV T m M Hmap Hvalid)
            "(HmemLoc & HtimeLoc & HkvsL & HvnumL)".
     wp_load.
+    wp_lam.
+    wp_pures.
+    (* wp_apply (kvs_get_last_spec); try done. eauto. *)
   Admitted.
+
 
 End Proof_of_read_handler.
