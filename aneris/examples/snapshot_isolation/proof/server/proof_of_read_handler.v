@@ -110,22 +110,47 @@ Section Proof_of_read_handler.
     {{{ (vo : option val), RET $vo;
         (⌜$vo = InjLV #()⌝ ∗ ⌜h = []⌝ ∨
         (∃ e : events.write_event, ⌜$vo = InjRV (we_val e)⌝ ∗
-             ⌜hist_to_we h = Some e⌝))
+             ⌜hist_to_we (reverse h) = Some e⌝))
     }}}.
   Proof.
-    iIntros (Het Hm Hcoh HtT Hin Hpre Φ) "(Ht & Hsh & HsH) HΦ".
+    iIntros (Het Hm Hcoh HtT Hin Hpre Φ) "(#Ht & #Hsh & #HsH) HΦ".
     wp_lam.
     wp_pures.
     destruct Hcoh.
     wp_smart_apply (kvs_get_spec k kvsV Hk m M Hm Hin ); eauto.
     iIntros (vget Hget).
-    destruct Hget as (-> & [(<- & ->) | (hv &  Hhv & Heq1 & Heq2)]).
+    destruct Hget as (Hget & [(<- & ->) | (hv &  Hhv & Heq1 & Heq2)]).
     - apply prefix_nil_inv in Hpre.
+      rewrite Hget.
       rewrite reverse_nil.
       wp_pures.
       iApply ("HΦ" $! None); eauto.
     - rewrite Heq1.
-      admit.
+      iLöb as "IH".
+      wp_pures.
+      case_bool_decide.
+      (** should be proven by contradiction. *)
+      { admit. }
+      wp_pures.
+      case_bool_decide.
+      { wp_pures.
+        iApply ("HΦ" $! (Some (we_val hv))).
+        iRight.
+        iPureIntro.
+        exists hv.
+        split; first done.
+        assert (Some hv = last (reverse (hv :: Hhv))) as HvkL.
+        { assert (Some hv = head (hv :: Hhv)) as ->. done.
+          by rewrite last_reverse. }
+        rewrite /hist_to_we.
+        rewrite HvkL.
+        assert ((reverse h) `suffix_of` (reverse (hv :: Hhv))) as Hsuf.
+        { rewrite Heq2 in Hpre.
+          admit. }
+        admit.
+      }
+      wp_pure _.
+      (* iApply ("IH" with "[$HΦ]"). *)
    Admitted.
 
   Lemma read_handler_spec
