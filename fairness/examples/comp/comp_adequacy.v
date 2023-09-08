@@ -19,6 +19,8 @@ From trillium.fairness.examples.comp Require Import comp.
 From trillium.fairness Require Import fair_termination_natural.
 From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
 
+From trillium.fairness Require Import lm_fairness_preservation_wip.
+
 Close Scope Z_scope. 
 
 Local Ltac gd t := generalize dependent t.
@@ -38,8 +40,6 @@ Local Instance step'_eqdec: forall s1, EqDecision
   solve_decision. 
 Qed.
   
-  
-
 Lemma client_model_finitary (s1 : fmstate client_model_impl):
     Finite
       {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 
@@ -213,8 +213,192 @@ Proof.
 Admitted. 
 
 
-Lemma client_model_fair_term:
-  ∀ tr: mtrace client_model_impl, mtrace_fairly_terminating tr.
+Definition outer_LM_trace_exposing
+  (lmtr: auxtrace (LM := client_model)) (mtr: mtrace client_model_impl) :=
+  upto_stutter_auxtr lmtr mtr /\
+  (∀ n gi, fair_aux_SoU lmtr (inl gi) n) /\
+  (* TODO: remove LMo parameter from inner_obls_exposed *)
+  inner_obls_exposed inl (λ c δ_lib, c.1 = δ_lib) lmtr (LMo := client_model).
+
+Definition traces_equiv {St L: Type} :=
+  @traces_match L L St St eq eq (fun _ _ _ => True) (fun _ _ _ => True).
+
+(* Lemma after_equiv {St L: Type} (tr1 tr *)
+(* Lemma subtrace _inf_after_equiva *)
+Lemma trace_prefix_inf_equiv_id {St L: Type} (tr: trace St L) ml len
+  (LEN: trace_len_is tr len)
+  (LE: NOmega.le len ml):
+  traces_equiv tr (trace_prefix_inf tr ml).
+Proof.
+  gd tr. gd ml. gd len. 
+  cofix CIH.
+  intros. 
+  rewrite trace_prefix_inf_step_equiv.
+  rewrite (trace_unfold_fold tr).
+  destruct tr.
+  { rewrite /trace_prefix_inf_step_alt. simpl.
+    destruct decide; by econstructor. }
+  rewrite /trace_prefix_inf_step_alt. simpl.
+  eapply trace_len_tail in LEN.
+  rewrite decide_False.
+  2: { lia_NO' ml; lia_NO' len.
+       destruct (decide (2 <= n0)).
+       { lia. }
+       replace (Nat.pred n0) with 0 in LEN; [| lia].
+       by eapply trace_len_0_inv in LEN. }
+  econstructor; try done.
+  specialize_full CIH; [| by apply LEN| by apply CIH]. 
+  lia_NO' ml; lia_NO' len. 
+Qed.
+
+
+Lemma subtrace_equiv_after {St L: Type} (tr str: trace St L) i ml len
+  (LEN: trace_len_is tr len)
+  (LE: NOmega.le len ml)
+  (SUB: subtrace tr i ml = Some str)
+  (* (DOM: NOmega.lt_nat_l start fin *)
+  :
+  exists atr, after i tr = Some atr /\
+  traces_equiv atr str.
+Proof.
+  rewrite /subtrace in SUB.
+  destruct after eqn:AFTER; [| done]. destruct decide; [done| ].
+  eexists. split; eauto.  
+  inversion SUB. subst str.
+  eapply trace_prefix_inf_equiv_id. 
+  - eapply trace_len_after; eauto.
+  - lia_NO' ml; lia_NO' len.
+Qed.
+
+
+Lemma traces_equiv_refl {St L: Type} (tr: trace St L):
+  traces_equiv tr tr.
+Proof.
+  revert tr. 
+  cofix CIH.
+  intros. rewrite (trace_unfold_fold tr).  
+  destruct tr.
+  - constructor. done. Guarded.  
+  - constructor; try done.
+    by apply CIH. 
+Qed. 
+
+
+Lemma traces_equiv_symm {St L: Type} (tr1 tr2: trace St L):
+  traces_equiv tr1 tr2 -> traces_equiv tr2 tr1.
+Proof.
+  revert tr1 tr2. 
+  cofix CIH.
+  intros. rewrite (trace_unfold_fold tr1) (trace_unfold_fold tr2).
+  destruct tr1, tr2.
+  - constructor. inversion H. done. Guarded.
+  - by inversion H. 
+  - by inversion H. 
+  - inversion H. subst.
+    constructor; try done.
+    by apply CIH. 
+Qed. 
+
+
+
+From Paco Require Import paco1 paco2 pacotac.
+Lemma upto_stutter_Proper_impl {St S' L L': Type} {Us: St -> S'} {Ul: L -> option L'}:
+  Proper (@traces_equiv St L ==> @traces_equiv S' L' ==> impl)
+    (upto_stutter Us Ul).
+Proof. 
+  red. intros t1 t1' EQ1 t2 t2' EQ2 UPTO.
+  gd t1. gd t2. gd t1'. gd t2'.
+  (* pcofix CIH.  *)
+  pcofix CIH. 
+  pfold.
+
+  intros. 
+  erewrite (trace_unfold_fold t1'), (trace_unfold_fold t2') in *. 
+  erewrite (trace_unfold_fold t1), (trace_unfold_fold t2) in *. 
+  (* pfold. punfold UPTO; [| admit]. *) 
+  punfold UPTO; [| apply upto_stutter_mono].
+  inversion UPTO; subst.
+  - destruct t1, t2; try done.
+    inversion EQ1; inversion EQ2; subst; try done.    
+    inversion H0. inversion H. subst.
+    destruct t1', t2'; try done.
+    inversion H2. inversion H5. subst.
+    econstructor.
+  - destruct t1, t2, t1', t2'; try by done.
+    all: inversion EQ1; inversion EQ2; subst; try by done.
+    + inversion H. simpl in H2. subst.
+      Guarded. 
+      specialize (CIH ⟨ Us s2 ⟩ t1' ⟨ Us s2 ⟩).
+      specialize CIH with (t1 := t1).
+      Guarded.
+      specialize_full CIH.
+      4: { rewrite /upaco2.
+           (* eapply upto_stutter_stutter. *)
+           (* 4: { eapply upto_stutter_stutter.  *)
+           (* 2: { econstructor.  *)
+           (* (* 2: { ??? *) *)
+           (* all: admit. } *)
+Admitted. 
+
+Instance upto_stutter_Proper {St S' L L': Type} {Us: St -> S'} {Ul: L -> option L'}:
+  Proper (@traces_equiv St L ==> @traces_equiv S' L' ==> iff)
+    (upto_stutter Us Ul).
+Proof. 
+  red. intros ??????. split.
+  - intros. eapply upto_stutter_Proper_impl; eauto.
+  - intros. apply traces_equiv_symm in H, H0. 
+    eapply upto_stutter_Proper_impl; eauto.
+Qed. 
+                                   
+
+Lemma outer_exposing_subtrace ltr tr i str 
+  (OUTER_CORR: outer_LM_trace_exposing ltr tr)
+  (SUB: subtrace tr i NOinfinity = Some str):
+  exists sltr, 
+    outer_LM_trace_exposing sltr str.
+Proof. 
+  red in OUTER_CORR. destruct OUTER_CORR as (UPTO & FAIR_AUX & INNER_OBLS).
+  pose proof (trace_has_len tr) as [len LEN].
+  pose proof SUB as X. eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto.
+  2: { lia_NO len. }
+  forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTR & UPTO').
+  exists latr. split; [| split].
+  - eauto. 
+
+
+
+
+  forward eapply subtrace_upto_stutter; eauto.
+  intros (i' & ml' & slmtr' & SUBl & UPTO' & LEN').
+  exists slmtr'. split; [| split]; eauto. 
+  - intros. red. intros P'n.
+    (* TODO: extract lemma about pred_at in subtrace *)
+    apply pred_at_trace_lookup in P'n as (s & ST & ASG).
+    assert (NOmega.lt_nat_l n (NOmega.sub ml' (NOnum i'))) as DOM.
+    { eapply state_lookup_dom; eauto. }
+    erewrite subtrace_state_lookup in ST; eauto.
+    red in FAIR_AUX. setoid_rewrite pred_at_trace_lookup in FAIR_AUX.
+    specialize_full FAIR_AUX.
+    { eexists. split; eauto. }
+    destruct FAIR_AUX as (m & st' & ST' & STEP).
+    rewrite -Nat.add_assoc in ST'. 
+    erewrite <- subtrace_state_lookup in ST'; eauto.
+    2: { eapply state_lookup_dom; eauto. 
+    
+    
+    setoid_rewrite pred_at_trace_lookup. 
+    
+    erewrite H in ST. 
+    
+    erewrite (proj2 ) in ST. 
+    eapply FAIR_AUX; eauto. 
+    
+  
+  
+
+Lemma client_model_fair_term tr lmtr
+  (OUTER_CORR: outer_LM_trace_exposing lmtr tr):
+  mtrace_fairly_terminating tr.
 Proof.
   intros. red. intros VALID FAIR.
   (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
@@ -244,25 +428,34 @@ Proof.
       rewrite -RES. symmetry. 
       eapply subtrace_lookup; eauto. }
 
-    eapply simulation_adequacy_terminate_general in MATCH; eauto; cycle 1. 
+    eapply simulation_adequacy_terminate_general' in MATCH; eauto; cycle 1. 
     { admit. }
-    { apply _. }
-    { red. intros. destruct c as [? n]. simpl in *. subst.
-      red. 
-      assert (n = 1) as ->.
-      { admit. }
-      Set Printing Coercions.
-      rewrite live_roles_1.
+    (* { red. intros. destruct c as [? n]. simpl in *. subst. *)
+    (*   red.  *)
+    (*   assert (n = 1) as ->. *)
+    (*   { admit. } *)
+    (*   Set Printing Coercions. *)
+    (*   rewrite live_roles_1. *)
+    (*   (* should be provable with parametrized LiveState *)
+    (*      and connection between tr and corresponding LM trace *) *)
+    (*   admit. } *)
+    {       
+      subst. simpl in *.
 
-      (* should be provable with parametrized LiveState
-         and connection between tr and corresponding LM trace *)
-      admit. }      
+      
+      
+      eapply inner_LM_trace_fair_aux.
+      6: by apply MATCH.
+      { apply _. }
+      4: { subst. eapply infinite_trace_equiv; eauto. }
+      4: { eapply fair_by_subtrace; eauto. }
+    
 
     red in MATCH. specialize_full MATCH; eauto.
     { subst. eapply (subtrace_valid tr); eauto. }
     { subst. eapply fair_by_subtrace; eauto. }
     apply (terminating_trace_equiv _ _ LEN2) in MATCH as [??].
-    subst. done. }    
+    subst. done. }
   
 Admitted. 
 

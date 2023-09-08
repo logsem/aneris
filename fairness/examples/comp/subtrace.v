@@ -249,10 +249,8 @@ Section Subtrace.
   Lemma subtrace_lookup (tr: trace St L) str
     (start: nat) (fin: nat_omega)
     (SUB: subtrace tr start fin = Some str):
-    forall k, NOmega.lt_nat_l k (NOmega.sub fin (NOnum start)) ->
-         str S!! k = tr S!! (start + k) /\
-         (NOmega.lt_nat_l (k + 1) (NOmega.sub fin (NOnum start)) -> 
-          str !! k = tr !! (start + k)). 
+    forall k, NOmega.lt_nat_l (k + 1) (NOmega.sub fin (NOnum start)) -> 
+         str !! k = tr !! (start + k). 
   Proof. 
     intros.
     rewrite /subtrace in SUB.
@@ -260,9 +258,22 @@ Section Subtrace.
     destruct decide; [done| ].
     inversion SUB. subst. clear SUB. 
     erewrite <- trace_lookup_after; [| apply AFTER].
+    eapply trace_prefix_inf_lookup; lia_NO fin. 
+  Qed.
+
+  Lemma subtrace_state_lookup (tr: trace St L) str
+    (start: nat) (fin: nat_omega)
+    (SUB: subtrace tr start fin = Some str):
+    forall k, NOmega.lt_nat_l k (NOmega.sub fin (NOnum start)) ->
+         str S!! k = tr S!! (start + k). 
+  Proof. 
+    intros.
+    rewrite /subtrace in SUB.
+    destruct (after start tr) eqn:AFTER; [| done].
+    destruct decide; [done| ].
+    inversion SUB. subst. clear SUB. 
     erewrite <- state_lookup_after; [| apply AFTER].
-    eapply trace_prefix_inf_lookup.
-    lia_NO fin. 
+    eapply trace_prefix_inf_lookup. lia_NO fin. 
   Qed.
 
   Lemma trace_prop_split (tr: trace St L) (P: (St * option (L * St)) -> Prop) len 
@@ -406,7 +417,9 @@ Section ModelSubtrace.
     erewrite inf_subtrace_after_lookup; eauto.
   Qed.
   
-  
+
+  (* TODO: are these lemmas even needed? *)
+
   From Paco Require Import paco1 paco2 pacotac.
   (* TODO: merge with mtrace_valid_steps'*)
   Lemma trace_valid_equiv `{M: FairModel} (tr: mtrace M)
@@ -439,7 +452,6 @@ Section ModelSubtrace.
     assert (NOmega.lt_nat_l (i + 1) (NOmega.sub max_len (NOnum start))) as LT'.
     { eapply trace_lookup_dom_strong; eauto. }
     eapply subtrace_lookup; eauto.
-    lia_NO max_len. 
   Qed. 
 
 End ModelSubtrace.
@@ -450,18 +462,13 @@ Section UptoStutter.
   Context {Us : St → S'}.
   Context {Ul: L → option L'}.  
 
-  Set Printing Coercions.
-
-  Lemma trace_prefix_inf_upto_stutter ltr tr i atr i' latr ml
-    (AFTER: after i tr = Some atr)
-    (LAFTER: after i' ltr = Some latr)
-    (UPTO: upto_stutter Us Ul latr atr):
+  Lemma trace_prefix_inf_upto_stutter tr ltr ml
+    (UPTO: upto_stutter Us Ul ltr tr):
   ∃ (ml' : nat_omega),
-    (* Some (trace_prefix_inf latr (NOmega.sub ml' (NOnum i'))) = Some ltr' *)
     upto_stutter Us Ul 
-      (trace_prefix_inf latr ml')
-      (trace_prefix_inf atr ml) /\
-    ml' ≠ NOnum 0. 
+      (trace_prefix_inf ltr ml')
+      (trace_prefix_inf tr ml) /\
+    trace_len_is (trace_prefix_inf ltr ml') ml'. 
   Proof.
     (* destruct ml. *)
     (* { exists NOinfinity. simpl. *)
@@ -485,11 +492,12 @@ Section UptoStutter.
   Lemma subtrace_upto_stutter ltr tr i ml tr'
     (UPTO: upto_stutter Us Ul ltr tr)
     (SUB: subtrace tr i ml = Some tr'):
-    exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Ul ltr' tr'.
+    exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Ul ltr' tr' /\
+                   trace_len_is ltr' (NOmega.sub ml' (NOnum i')). 
   Proof.
     pose proof (trace_has_len tr) as [len LEN].
     forward eapply subtrace_inv as [LT1 LT2]; eauto.
-    rewrite /subtrace in SUB. 
+    rewrite /subtrace in SUB.
     destruct after eqn:AFTER; [| congruence].
     rewrite decide_False in SUB.
     2: { lia_NO' ml. intros [=]. lia. }
@@ -498,13 +506,14 @@ Section UptoStutter.
     exists i'. rewrite /subtrace LAFTER.
 
     forward eapply trace_prefix_inf_upto_stutter with (ml := (NOmega.sub ml (NOnum i))); eauto.
-    intros (ml' & UPTO' & NZml'). exists (NOmega.add (NOnum i') ml').
-    eexists. split; eauto. 
+    intros (ml' & UPTO' & LEN'). exists (NOmega.add (NOnum i') ml').
+    eexists. split; [| split]; eauto.
+    2: { lia_NO' ml'. by rewrite Nat.sub_add'. }  
     rewrite decide_False; eauto.
     - lia_NO' ml'. do 3 f_equal. lia.
     - lia_NO' ml'. do 3 f_equal. intros [=].
-      apply NZml'. f_equal. lia.
-  Qed.     
-
+      assert (n = 0) as -> by lia.
+      eapply trace_len_0_inv; eauto. 
+  Qed.
 
 End UptoStutter.
