@@ -36,31 +36,75 @@ Section Proof_of_read_handler.
   Notation MTC := (client_handler_rpc_user_params
                      clients γKnownClients γGauth γGsnap γT).
   Import snapshot_isolation_code_api.
-
-
+  Import assert_proof.
 
   Lemma kvs_get_spec (k : Key) (kvsV : val) (h : list write_event)
-       (m : gmap Key val) :
+       (m : gmap Key val) (M : gmap Key (list write_event)) :
    is_map kvsV m →
-   {{{ ownMemSeen γGsnap k h }}}
+   M !! k = Some h →
+   kvsl_in_model_empty_coh m M →
+   kvsl_in_model_some_coh m M →
+   kvsl_in_local_some_coh m M →
+   {{{ ⌜True⌝ }}}
        kvs_get #k kvsV  @[ip_of_address MTC.(MTS_saddr)]
-    {{{ (h : list write_event), RET $h;
-        (⌜$h = InjLV #()⌝ ∗ ⌜h = []⌝) ∨ 
-        (∃ hv : list val, ⌜hv = to_hist h⌝)
+    {{{ v, RET v; ⌜v = $(reverse h)⌝ ∧
+                 ((⌜v = InjLV #()⌝ ∗ ⌜h = []⌝) ∨
+                  (∃ e h', ⌜v = InjRV ($e, $h')⌝ ∗ ⌜h = (reverse (e :: h'))⌝))
     }}}.
   Proof.
-  Admitted.
+    iIntros (Hmap HMk Hc1 Hc2 Hc3 Φ) "_ HΦ".
+    wp_lam.
+    wp_pures.
+    wp_apply (wp_map_lookup $! Hmap).
+    iIntros (v) "%Hkv".
+    destruct h as [|e h'] eqn:Hh; simplify_eq /=.
+    - specialize (Hc1 k HMk).
+      destruct (m !! k) as [hv | ] eqn:Hmk; first done.
+      simplify_eq /=.
+      do 3 wp_pure _.
+      wp_pures.
+      by iApply ("HΦ"); eauto.
+    - destruct (m !! k) as [hv | ] eqn:Hmk.
+      2: { specialize (Hc2 k (e :: h') HMk).
+           naive_solver. }
+      assert (m !! k = Some $ (reverse (e :: h'))) as Hmk'.
+      { by apply (Hc2 k (e :: h') HMk). }
+      simplify_eq /=.
+      specialize (Hc3 k (reverse (e :: h')) Hmk).
+      do 3 wp_pure _.
+      wp_smart_apply wp_assert.
+      wp_pures.
+      destruct ((reverse (e :: h'))) as [| x l] eqn:Hrev.
+      -- rewrite reverse_nil in Hc3.
+         by rewrite HMk in Hc3.
+      -- wp_pures.
+         iSplit; first done.
+         iNext.
+         wp_pures.
+         iApply "HΦ".
+         iSplit; first done.
+         iRight.
+         iExists _, _.
+         iPureIntro.
+         split; first done.
+         apply Inj_instance_2.
+         rewrite Hrev.
+         by rewrite reverse_involutive.
+  Qed.
 
-  Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (kvsV : val) (h : list write_event)
+  Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (kvsV : val)
+        (h Hk : list write_event)
        (m : gmap Key val) (M : gmap Key (list write_event)) :
-   (∀ e : events.write_event, e ∈ h → we_time e < ts) →
    (∀ e : events.write_event, e ∈ h → we_time e < ts) →
    is_map kvsV m →
    kvsl_valid m M T →
    ts < T →
+   M !! k = Some Hk →
+   h `prefix_of` Hk →
     {{{
           ownTimeSnap γT ts ∗
-          ownMemSeen γGsnap k h
+          ownMemSeen γGsnap k h ∗
+          ownMemSeen γGsnap k Hk
     }}}
         kvs_get_last (#k, #ts)%V kvsV  @[ip_of_address MTC.(MTS_saddr)]
     {{{ (vo : option val), RET $vo;
@@ -69,7 +113,20 @@ Section Proof_of_read_handler.
              ⌜hist_to_we h = Some e⌝))
     }}}.
   Proof.
-  Admitted.
+    iIntros (Het Hm Hcoh HtT Hin Hpre Φ) "(Ht & Hsh & HsH) HΦ".
+    wp_lam.
+    wp_pures.
+    destruct Hcoh.
+    wp_smart_apply (kvs_get_spec k kvsV Hk m M Hm Hin ); eauto.
+    iIntros (vget Hget).
+    destruct Hget as (-> & [(<- & ->) | (hv &  Hhv & Heq1 & Heq2)]).
+    - apply prefix_nil_inv in Hpre.
+      rewrite reverse_nil.
+      wp_pures.
+      iApply ("HΦ" $! None); eauto.
+    - rewrite Heq1.
+      admit.
+   Admitted.
 
   Lemma read_handler_spec
         (k : string)
@@ -102,11 +159,10 @@ Section Proof_of_read_handler.
     iIntros (?) "(-> & Hlock & Hlkres)".
     wp_pures.
     iDestruct "Hlkres"
-      as (kvsV T m M Hmap Hvalid)
+      as (kvsV T m M Hmap Hvalid Hforall)
            "(HmemLoc & HtimeLoc & HkvsL & HvnumL)".
     wp_load.
-    wp_lam.
-    wp_pures.
+    admit.
     (* wp_apply (kvs_get_last_spec); try done. eauto. *)
   Admitted.
 
