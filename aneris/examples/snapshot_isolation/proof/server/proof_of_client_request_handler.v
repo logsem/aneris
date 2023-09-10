@@ -35,15 +35,15 @@ Section Proof_of_handler.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γlk : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss γlk : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
-                     clients γKnownClients γGauth γGsnap γT).
+                     clients γKnownClients γGauth γGsnap γT γTss).
   Import snapshot_isolation_code_api.
 
   Lemma client_request_handler_spec (lk : val) (kvs vnum : loc) :
     ∀ reqv reqd,
-    {{{ server_lock_inv γGauth γT γlk lk kvs vnum ∗
+    {{{ server_lock_inv γGauth γT γTss γlk lk kvs vnum ∗
         MTC.(MTS_handler_pre) reqv reqd }}}
         client_request_handler lk #kvs #vnum reqv  @[ip_of_address MTC.(MTS_saddr)]
     {{{ repv repd, RET repv;
@@ -63,7 +63,7 @@ Section Proof_of_handler.
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (read_handler_spec _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
+      by iApply (read_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
                 with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]"). }
     (** Proof of commit request. TODO: make a separate case as the proof will be quite long *)
     2:{ admit. }
@@ -73,7 +73,7 @@ Section Proof_of_handler.
     wp_lam.
     rewrite /start_handler.
     wp_pures.
-    by iApply (start_handler_spec _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ Hreqd HinE
+    by iApply (start_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ Hreqd HinE
                 with "[$Hlk][$HGlobInv][$HP][$Hsh]").
   Admitted.
 

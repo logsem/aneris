@@ -30,9 +30,9 @@ Section Write_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss : gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
   Import snapshot_isolation_code_api.
 
 
@@ -41,7 +41,7 @@ Section Write_Proof.
       (vo : option val)
       (k : Key) (v : SerializableVal) (b : bool),
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ is_connected γGsnap γT γKnownClients c sa ∗
+    {{{ is_connected γGsnap γT γTss γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo ∗
         key_upd_status γKnownClients c k b }}}
       SI_write c #k v @[ip_of_address sa]
@@ -70,7 +70,8 @@ Section Write_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser Hvalid)
+      as (ts Tss Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
+    iDestruct "Hres" as (Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_pures.
     wp_load.
@@ -101,7 +102,7 @@ Section Write_Proof.
     { iExists _.
       iFrame "#∗".
       iRight.
-      iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
+      iExists ts, Tss, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
       iFrame "#∗".
       iSplit; first done.

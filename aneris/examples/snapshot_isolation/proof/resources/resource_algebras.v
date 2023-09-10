@@ -31,6 +31,7 @@ Class IDBG Σ :=
     IDBG_TksAgr :>  inG Σ (csumR (exclR unitR) (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
     (** Time *)
     IDBG_TimeStamp :> mono_natG Σ;
+    IDBG_TimeSnaps :> inG Σ (authUR (gsetUR nat));
     (** Lock *)
     IDBG_lockG :> lockG Σ;
   }.

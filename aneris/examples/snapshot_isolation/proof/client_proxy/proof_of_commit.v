@@ -30,9 +30,9 @@ Section Commit_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss : gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
   Import snapshot_isolation_code_api.
 
 
@@ -81,7 +81,7 @@ Section Commit_Proof.
    ∀ (c : val) (sa : socket_address)
      (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    is_connected γGsnap γT γKnownClients c sa -∗
+    is_connected γGsnap γT γTss γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
@@ -102,7 +102,7 @@ Section Commit_Proof.
            [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h ∗ Seen_def γGsnap k h)) >>>.
 
   Lemma commit_spec_internal_holds {MTR : MTS_resources}  :
-    Global_Inv clients γKnownClients γGauth γGsnap γT  ⊢ commit_spec_internal.
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTss ⊢ commit_spec_internal.
   Proof.
     iIntros "#Hinv".
     iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
@@ -132,7 +132,7 @@ Section Commit_Proof.
       simplify_eq /=.
       by iDestruct (own_valid_2 with "Htk' Hsp") as %?.
     }
-    iDestruct "Hst" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
+    iDestruct "Hst" as (ts Tss Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
       "( -> & (%Hcoh & %Hser & %Hvalid & %Hismap & #Htime & #Hseen & Hupd & Hauth & HauthMsnap & Htok))".
     wp_pures.
     wp_load.
@@ -329,7 +329,7 @@ Section Commit_Proof.
               split; first done.
               apply IHlm.
               set_solver.
-            + clear rd Hcoh Heq. 
+            + clear rd Hcoh Heq.
               generalize dependent cache_updatesV.
               generalize dependent cache_updatesM.
               induction lm; first intros; first set_solver.
@@ -387,6 +387,7 @@ Section Commit_Proof.
             iRight.
             iRight.
             iExists E, _, _, _, _, _, _, _.
+            iExists _.
             do 7 (iSplit; first done).
             iFrame "#∗".
             iSplit; first done.

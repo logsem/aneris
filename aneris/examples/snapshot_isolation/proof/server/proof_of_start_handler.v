@@ -30,7 +30,7 @@ Section Proof_of_start_handler.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γlk : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss γlk : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
                      clients γKnownClients γGauth γGsnap γT).
@@ -46,24 +46,24 @@ Section Proof_of_start_handler.
         (Q : val → iProp Σ) :
     reqd = inr (inl (E, P, Q)) →
     ↑KVS_InvName ⊆ E →
-    server_lock_inv γGauth γT γlk lk kvs vnum -∗
-    Global_Inv clients γKnownClients γGauth γGsnap γT -∗
+    server_lock_inv γGauth γT γTss γlk lk kvs vnum -∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTss -∗
     P -∗
     (P ={⊤,E}=∗
           ∃ m : gmap Key (list val),
             ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-            ▷ (∀ (ts : Time) (M : gmap Key (list write_event)),
+            ▷ (∀ (ts : Time) (Tss : gset nat) (M : gmap Key (list write_event)),
                  ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                 ⌜kvs_valid_snapshot M ts⌝ ∗ 
+                 ⌜kvs_valid_snapshot M ts Tss⌝ ∗
                  ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
-                 ownTimeSnap γT ts ∗
+                 ownTimeSnap γT γTss ts ∗
                  ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
                  ([∗ map] k↦h ∈ M, ownMemSeen γGsnap k h) ={E,⊤}=∗
                  Q #ts)) -∗
     (∀ (repv : val) (repd : RepData),
            ⌜sum_valid_val (option_serialization KVS_serialization)
               (sum_serialization int_serialization bool_serialization) repv⌝ ∗
-           ReqPost clients γKnownClients γGauth γGsnap γT repv reqd repd -∗
+           ReqPost clients γKnownClients γGauth γGsnap γT γTss repv reqd repd -∗
            Φ repv) -∗
     WP let: "res" := InjR
                      (InjL
@@ -81,8 +81,8 @@ Section Proof_of_start_handler.
     iIntros (?) "(-> & Hlock & Hlkres)".
     wp_pures.
     iDestruct "Hlkres"
-      as (kvsV T m M Hmap Hvalid)
-           "(%Hser & HmemLoc & HtimeLoc & HkvsL & HvnumL)".
+      as (kvsV T Tss m M Hmap Hvalid)
+           "(%Hser & HmemLoc & HtimeLoc & #HtimeSnaps & HkvsL & HvnumL)".
     wp_load.
     wp_pures.
     (* This is where the viewshift is happening. *)
@@ -90,7 +90,7 @@ Section Proof_of_start_handler.
     wp_apply (aneris_wp_atomic _ _ E).
     iMod ("Hsh" with "[$HP]") as (mu) "(Hkeys & Hpost)".
     iInv KVS_InvName
-      as (Mg Tg gMg) ">(HmemGlob & HtimeGlob & Hccls & %Hdom & %HkvsValid)".
+      as (Mg Tg Tssg gMg) ">(HmemGlob & HtimeGlob & HtimeStartsGlob & Hccls & %Hdom & %HkvsValid)".
     (* Logical updates. *)
     rewrite /ownTimeGlobal /ownTimeLocal.
     iDestruct (mono_nat.mono_nat_auth_own_agree with "[$HtimeGlob][$HtimeLoc]")
@@ -120,27 +120,36 @@ Section Proof_of_start_handler.
                 ownMemSeen γGsnap k h)%I as "#Hsnapshot".
     { (** TODO: should be enough to prove using HmemGlob *)
       admit. }
-    iSplitL "HtimeGlob HmemGlob Hccls".
+    (** TODO: first perform update on HtimeStartsGLob and construct witnesses *)
+    iSplitL "HtimeGlob HmemGlob Hccls HtimeStartsGlob".
     { iModIntro. iNext.
-      iExists M, (T+1), gMg.
+      iExists M, (T+1), (Tssg ∪ {[(T+1)%nat]}), gMg.
       iFrame "#∗".
+      iSplit; first admit.  (** valid by update *)
       iSplit; first done.
       iPureIntro.
-      apply kvs_valid_next.
+      by apply kvs_valid_next.
     }
     iModIntro.
     iModIntro.
     wp_store.
-    iDestruct ("Hpost" $! (T+1)%nat ((filter (λ k, k.1 ∈ dom mu) M))
+    iDestruct ("Hpost" $! (T+1)%nat (Tssg ∪ {[(T+1)%nat]}) ((filter (λ k, k.1 ∈ dom mu) M))
                 with "[][Hkeys]") as "HQ"; first done.
     iFrame "#∗".
-    iPureIntro.
-    split; first by apply kvs_valid_snapshot_filter_next.
-    {
-      apply map_Forall_lookup_2.
-      intros k x H_filter_some.
-      apply map_filter_lookup_Some_1_1 in H_filter_some.
-      by apply Hser in H_filter_some.
+    { iSplit.
+      - iPureIntro.
+        split; first by set_solver.
+        split.
+        -- apply kvs_valid_next.
+           by apply kvs_valid_filter.
+        --  admit. (** follows from Hvalid *)
+      - iSplit.
+        -- iPureIntro.
+           apply map_Forall_lookup_2.
+           intros k x H_filter_some.
+           apply map_filter_lookup_Some_1_1 in H_filter_some.
+           by apply Hser in H_filter_some.
+        -- admit. (** can be framed after update of the resource. *)
     }
     iMod "HQ".
     iModIntro.
@@ -148,12 +157,14 @@ Section Proof_of_start_handler.
     wp_smart_apply (release_spec with "[-HQ HΦ]").
     iFrame "#∗".
     { rewrite /lkResDef.
-      iExists  kvsV, ((T+1)%nat), m, M.
+      iExists  kvsV, ((T+1)%nat), (Tss ∪ {[(T+1)%nat]}), m, M.
       replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
       iFrame "#∗".
       iSplit; first done.
-      iSplit; last done.
-      iPureIntro; first apply kvsl_valid_next. }
+      iSplit.
+      - iPureIntro; first by apply kvsl_valid_next.
+      - iSplit; first done.
+        admit. (**  can be framed after update of the resource. *) }
     iIntros (? ->).
     wp_pures.
     iApply ("HΦ" $! _ _).

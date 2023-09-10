@@ -36,7 +36,7 @@ Section Wrapper_defs.
   Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_resources}.
   Context `{!User_params}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss : gname).
 
   Definition to_local_state (s : proxy_state) : local_state :=
     match s with
@@ -61,7 +61,7 @@ Section Wrapper_defs.
   Qed.
 
   Definition GlobalInv_def : iProp Σ :=
-    Global_Inv clients γKnownClients γGauth γGsnap γT.
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTss.
 
   Definition OwnMemKey_def k h : iProp Σ :=
     ∃ hw, ownMemUser γGauth γGsnap k hw ∗ ⌜h = to_hist hw⌝.

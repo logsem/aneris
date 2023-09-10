@@ -30,9 +30,9 @@ Section Read_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss : gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
   Import snapshot_isolation_code_api.
 
 
@@ -41,14 +41,14 @@ Section Read_Proof.
       (k : Key) (vo : option val),
     ⌜k ∈ KVS_keys⌝ -∗
     @make_request_spec _ _ _ _ MTC _ -∗
-    {{{ is_connected γGsnap γT γKnownClients c sa ∗
+    {{{ is_connected γGsnap γT γTss γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo }}}
       SI_read c #k @[ip_of_address sa]
     {{{ RET $vo; ownCacheUser γKnownClients k c vo }}}.
 
 
   Lemma read_spec_internal_holds {MTR : MTS_resources}  :
-    Global_Inv clients γKnownClients γGauth γGsnap γT ⊢ read_spec_internal.
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTss ⊢ read_spec_internal.
   Proof.
     iIntros "#Hinv".
     iIntros (c sa k vo Hk) "#Hspec !#".
@@ -72,7 +72,8 @@ Section Read_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser Hvalid)
+      as (ts Tss Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
+    iDestruct "Hres" as (Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_load.
     wp_pures.
@@ -100,7 +101,7 @@ Section Read_Proof.
         { iExists _.
           iFrame "#∗".
           iRight.
-          iExists ts, Msnap, cuL, cuV, cuM, cM.
+          iExists ts, _, Msnap, cuL, cuV, cuM, cM.
           by iFrame "#∗". }
         iNext.
         iIntros (v0 ->).
@@ -141,7 +142,7 @@ Section Read_Proof.
          specialize (Hc4 k Hkin).
          by simplify_eq /=. }
     specialize (Hd Hkv1).
-    destruct Hvalid as (_ & Hvalid).
+    destruct Hvalid as (_ & _ & Hvalid).
     specialize (Hvalid k h Hinh).
     (* Handler precondition. *)
     { iSplit.
@@ -179,7 +180,7 @@ Section Read_Proof.
        { iExists _.
          iFrame "#∗".
          iRight.
-         iExists ts, Msnap, cuL, cuV, cuM, cM.
+         iExists ts, _, Msnap, cuL, cuV, cuM, cM.
          by iFrame "#∗". }
        iNext.
        iIntros (? ->).

@@ -30,16 +30,16 @@ Section Start_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss: gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
   Import snapshot_isolation_code_api.
 
-  Definition start_spec_internal  {MTR : MTS_resources} : iProp Σ :=
+  Definition start_spec_internal {MTR : MTS_resources} : iProp Σ :=
     ∀ (c : val) (sa : socket_address)
        (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    is_connected γGsnap γT γKnownClients c sa -∗
+    is_connected γGsnap γT γTss γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m : gmap Key (list val)),
         ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
@@ -54,7 +54,7 @@ Section Start_Proof.
        ([∗ map] k ↦ h ∈ m, Seen_def γGsnap k h)>>>.
 
   Lemma start_spec_internal_holds {MTR : MTS_resources}  :
-     Global_Inv clients γKnownClients γGauth γGsnap γT ⊢ start_spec_internal.
+     Global_Inv clients γKnownClients γGauth γGsnap γT γTss ⊢ start_spec_internal.
   Proof.
     iIntros "#Hinv".
     iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
@@ -68,7 +68,7 @@ Section Start_Proof.
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
-    { iDestruct "Habs" as (? ? ? ? ? ? ->) "Habs".
+    { iDestruct "Habs" as (? ? ? ? ? ? ? ->) "Habs".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
@@ -85,14 +85,14 @@ Section Start_Proof.
     wp_pures.
     set (rd := (inr (inl (E, ⌜True⌝%I,
                            (λ tsv,
-                        ∃ ts Msnap cacheM,
+                        ∃ ts Tss Msnap cacheM,
                         isActiveToken γA ∗
                         ghost_map.ghost_map_auth γCache 1 cacheM ∗
                         ownMsnapAuth γMsnap Msnap ∗
-                        ownTimeSnap γT ts ∗
+                        ownTimeSnap γT γTss ts ∗
                         ⌜tsv = #ts⌝ ∗
                         ⌜is_coherent_cache ∅ cacheM Msnap⌝ ∗
-                        ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+                        ⌜kvs_valid_snapshot Msnap ts Tss⌝ ∗
                         ([∗ map] k↦h ∈ Msnap, ownMemSeen γGsnap k h) ∗
                         Φ #())%I))) : @ReqData Σ).
     wp_apply ("Hspec" $! _ _ _ rd with "[$Hcr Hsh Hst Hgh Hsnap]").
@@ -122,13 +122,13 @@ Section Start_Proof.
         iExists m.
         iFrame.
         iNext.
-        iIntros (ts M HmM) "(%Hvsn & Hser & Hts & Hpts & #Hseen)".
+        iIntros (ts Tss M HmM) "(%Hvsn & Hser & Hts & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
-        iExists ts, M, (cacheM_from_Msnap M).
+        iExists ts, Tss, M, (cacheM_from_Msnap M).
         iFrame.
         iAssert (([∗ map] k↦h ∈ ((λ h : list write_event, to_hist h) <$> M),
               Seen_def γGsnap k h)%I) as "#Hseen2".
@@ -150,7 +150,7 @@ Section Start_Proof.
           with M
                by by rewrite right_id_L.
         iFrame.
-        iApply fupd_frame_l. 
+        iApply fupd_frame_l.
         iSplit; first done. 
         iApply fupd_frame_l; iSplit.
         { iPureIntro; by apply is_coherent_cache_start. }
@@ -181,13 +181,13 @@ Section Start_Proof.
     wp_pures.
     wp_store.
     iDestruct "Hpost"
-      as (t Msnap ?) "(Htk & Hgh & Hmfr & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
+      as (t Tss Msnap ?) "(Htk & Hgh & Hmfr & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
     wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc Hmfr]").
     {
       iExists (InjRV (#t, #cm))%V.
       iFrame "Hl Hcr".
       iRight.
-      iExists _, _, _, _, ∅, _.
+      iExists _, _, _, _, _, ∅, _.
       iFrame "#∗".
       iPureIntro.
       split_and!; try done. }

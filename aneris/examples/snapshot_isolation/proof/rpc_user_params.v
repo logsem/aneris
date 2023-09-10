@@ -45,7 +45,7 @@ Section RPC_user_params.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   (** TODO: Remove it from here once proved and defined.  *)
   Context (clients : gset socket_address).
-  Context  (γKnownClients γGauth γGsnap γT : gname).
+  Context  (γKnownClients γGauth γGsnap γT γTss : gname).
 
   Definition ReqData : Type :=
     (** Read   *) string * nat * (list write_event) +
@@ -61,7 +61,7 @@ Section RPC_user_params.
      (** Commit *) bool).
 
   Definition ReqPre (reqv : val) (reqd : ReqData) : iProp Σ :=
-    Global_Inv clients γKnownClients γGauth γGsnap γT ∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTss ∗
     (
       (** Read *)
       (
@@ -70,7 +70,7 @@ Section RPC_user_params.
           ⌜reqd = inl (k, ts, h)⌝ ∗
           ⌜reqv = InjLV (#(LitString k), #ts)⌝ ∗
           ⌜∀ e, e ∈ h → e.(we_time) < ts⌝ ∗
-          ownTimeSnap γT ts ∗
+          ownTimeSnap γT γTss ts ∗
           ownMemSeen γGsnap k h
       )
      ∨
@@ -85,11 +85,11 @@ Section RPC_user_params.
            ={⊤, E}=∗
            (∃ (m : gmap Key (list val)),
                ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-                 ▷ (∀ ts M,
+                 ▷ (∀ ts Tss M,
                       ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                      ⌜kvs_valid_snapshot M ts⌝ ∗
-                      ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗ 
-                      ownTimeSnap γT ts ∗
+                      ⌜kvs_valid_snapshot M ts Tss⌝ ∗
+                      ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
+                      ownTimeSnap γT γTss ts ∗
                       ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
                       ([∗ map] k ↦ h ∈ M, ownMemSeen γGsnap k h)
                       ={E,⊤}=∗ Q #ts))
@@ -102,15 +102,16 @@ Section RPC_user_params.
           (cache_updatesM : gmap Key val)
           (cache_logicalM : gmap Key (option val * bool))
           (Msnap : gmap Key (list write_event))
-          (ts : nat),
+          (ts : nat)
+          (Tss : gset nat),
           ⌜reqd = inr (inr (E, ts, cache_updatesM, cache_logicalM, Msnap, P, Q))⌝ ∗
           ⌜reqv = InjRV (InjRV (#ts, cmapV))%V⌝ ∗
           ⌜↑KVS_InvName ⊆ E⌝ ∗
           ⌜is_map cmapV cache_updatesM⌝ ∗
           ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ ∗
           ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
-          ⌜kvs_valid_snapshot Msnap ts⌝ ∗
-          ownTimeSnap γT ts ∗
+          ⌜kvs_valid_snapshot Msnap ts Tss⌝ ∗
+          ownTimeSnap γT γTss ts ∗
           ([∗ map] k ↦ h' ∈ Msnap, ownMemSeen γGsnap k h') ∗
           P ∗
          (P ={⊤, E}=∗
@@ -134,7 +135,7 @@ Section RPC_user_params.
 
   Definition ReqPost
     (repv : val) (reqd : ReqData) (repd : RepData) : iProp Σ :=
-    Global_Inv clients γKnownClients γGauth γGsnap γT ∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTss ∗
     (
       (** Read *)
       (

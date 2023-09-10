@@ -24,17 +24,17 @@ Section Session_Resources_intantiation.
   Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_resources}.
   Context `{!User_params}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT : gname).
+  Context (γKnownClients γGauth γGsnap γT γTss : gname).
   Context (srv_si : message → iProp Σ) (SrvInit : iProp Σ).
 
 
   Global Program Instance session_resources_instance : SI_resources Mdl Σ :=
     {|
-      GlobalInv :=  GlobalInv_def clients γKnownClients γGauth γGsnap γT;
+      GlobalInv :=  GlobalInv_def clients γKnownClients γGauth γGsnap γT γTss;
       OwnMemKey k h := OwnMemKey_def γGauth γGsnap k h;
       OwnLocalKey k c vo := ownCacheUser γKnownClients k c vo;
       ConnectionState c s sa := ConnectionState_def γGsnap γKnownClients c s sa;
-      IsConnected c sa := is_connected γGsnap γT γKnownClients c sa;
+      IsConnected c sa := is_connected γGsnap γT γTss γKnownClients c sa;
       KeyUpdStatus c k b :=  key_upd_status γKnownClients c k b;
       Seen k h := Seen_def γGsnap k h;
       KVS_si := srv_si;
@@ -49,7 +49,7 @@ Section Session_Resources_intantiation.
     iDestruct "Hk" as (hw') "(Hk & %Heq2)".
     unfold OwnMemKey_def, GlobalInv_def.
     iDestruct
-      (ownMemSeen_valid clients γKnownClients γGauth γGsnap γT E k hw hw' with
+      (ownMemSeen_valid clients γKnownClients γGauth γGsnap γT γTss E k hw hw' with
         "[$] [$]")
       as "Hp"; try eauto.
     iMod ("Hp" with "[$Hk]") as "(Hp & %Hpre)".

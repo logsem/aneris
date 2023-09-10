@@ -24,19 +24,21 @@ Section Global_Invariant.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources}.
   Context (clients : gset socket_address).
   Context (γKnownClients : gname).
-  Context (γGauth γGsnap γT : gname).
+  Context (γGauth γGsnap γT γTss : gname).
 
   (* ------------------------------------------------------------------------ *)
   (** Definition of the global invariant. *)
   Definition global_inv_def : iProp Σ :=
     ∃ (M : gmap Key (list write_event))
       (T : Time)
+      (Tss : gset nat)
       (gM : gmap socket_address gname),
       ownMemGlobal γGauth γGsnap M ∗
       ownTimeGlobal γT T ∗
+      ownTimeStartsAuth γTss Tss ∗
       connected_clients γKnownClients gM ∗
       ⌜dom gM = clients⌝ ∗
-      ⌜kvs_valid M T⌝.
+      ⌜kvs_valid M T Tss⌝.
 
   Definition Global_Inv : iProp Σ :=
     inv KVS_InvName global_inv_def.
@@ -53,13 +55,16 @@ Section Global_Invariant.
     iIntros (?) "#Hginv #Hm Hu".
     iDestruct "Hu" as "(Hu & #Hum)".
     rewrite /Global_Inv /ownMemSeen.
-    iInv KVS_InvName as (M T gM) ">((HmemA & HmemM) & ? & ? & ? & %Hvalid)" "Hcl".
-    iDestruct (ownMemSeen_lookup with "HmemM Hm") as (h1) "(%Hh1 & %Hh2)".
+    iInv KVS_InvName
+      as (M T Tss gM)
+           ">((HmemA & HmemM) & ? & ? & ? & ? & %Hvalid)" "Hcl".
+    iDestruct (ownMemSeen_lookup with "HmemM Hm")
+      as (h1) "(%Hh1 & %Hh2)".
     iDestruct (ghost_map_lookup with "HmemA Hu") as "%Hh3".
     simplify_eq /=.
     iFrame "#". iFrame.
     iMod ("Hcl" with "[-]") as "_".
-    { iNext. do 3 iExists _. by iFrame. }
+    { iNext. do 4 iExists _. by iFrame. }
     by iModIntro.
   Qed.
 

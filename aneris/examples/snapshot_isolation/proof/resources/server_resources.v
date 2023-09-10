@@ -55,7 +55,7 @@ End ConnectedClients.
 Section Resources.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
 
-  Context (γGauth γGsnap γT : gname).
+  Context (γGauth γGsnap γT γTss : gname).
 
   (** ---------------- Global memory ---------------- *)
 
@@ -80,6 +80,12 @@ Section Resources.
   Definition ownMemGlobal (M : gmap Key (list write_event)) : iProp Σ :=
     ownMemAuthGlobal M ∗ ownMemMono M.
 
+  (** ---------------- Time Snaps ---------------- *)
+  Definition ownTimeStartsAuth (tss : gset nat) : iProp Σ :=
+    own γTss (● tss).
+
+  Definition ownTimeStartsSnap (t : nat) : iProp Σ :=
+    own γTss (◯ {[ t ]}).
 
   (** ---------------- Time ---------------- *)
   Definition ownTimeGlobal T : iProp Σ :=
@@ -88,8 +94,15 @@ Section Resources.
   Definition ownTimeLocal T : iProp Σ :=
     mono_nat_auth_own γT (1/2) T.
 
-  Definition ownTimeSnap T : iProp Σ :=
+  Definition ownTimeCptSnap T : iProp Σ :=
     mono_nat_lb_own γT T.
+
+  Definition ownTimeSnap ts : iProp Σ :=
+     ownTimeCptSnap ts ∗ ownTimeStartsSnap ts.
+
+  Instance ownTimeSnap_Persistent :
+      ∀ i, Persistent (ownTimeSnap i).
+    Proof. apply _. Qed.
 
   (** ---------------- Propreties of global memory. ---------------- *)
 

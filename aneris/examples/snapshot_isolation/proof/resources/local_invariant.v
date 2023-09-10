@@ -20,21 +20,21 @@ From aneris.examples.snapshot_isolation.proof.resources Require Import
 Section Local_Invariant.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
-  Context (γGauth γT : gname).
-  Search "forall".
-  Definition lkResDef (kvsL vnumL: loc) : iProp Σ :=
-    ∃ (kvsV : val) (T: Time)
-      (m : gmap Key val) (M : gmap Key (list write_event)) ,
+  Context (γGauth γT γTss : gname).
+
+  Definition lkResDef (kvsL vnumL : loc) : iProp Σ :=
+    ∃ (kvsV : val) (T : Time) (Tss : gset nat)
+      (m : gmap Key val) (M : gmap Key (list write_event)),
         ⌜is_map kvsV m⌝ ∗
-        ⌜kvsl_valid m M T⌝ ∗
-        ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗ 
+        ⌜kvsl_valid m M T Tss⌝ ∗
+        ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
         ownMemAuthLocal γGauth M ∗
         ownTimeLocal γT T ∗
+        ([∗ set] t ∈ Tss, ownTimeSnap γT γTss t) ∗
         kvsL ↦[ip_of_address KVS_address] kvsV ∗
         vnumL ↦[ip_of_address KVS_address] #T.
 
-  Definition server_lock_inv (γ : gname) (v : val) (kvsL vnumL: loc)
-    : iProp Σ :=
+  Definition server_lock_inv (γ : gname) (v : val) (kvsL vnumL : loc) : iProp Σ :=
     is_lock (KVS_InvName .@ "lk") (ip_of_address KVS_address) γ v (lkResDef kvsL vnumL).
 
 End Local_Invariant.

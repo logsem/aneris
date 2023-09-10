@@ -33,7 +33,7 @@ Definition socket_address_to_str (sa : socket_address) : string :=
 Section Proxy.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources }.
   (** Those are ghost names allocated before resources are instantiated. *)
-  Context (γGsnap γT : gname).
+  Context (γGsnap γT γTss : gname).
   Context (γKnownClients : gname).
 
   Definition ownMsnapAuth γ (M : gmap Key (list write_event)) : iProp Σ :=
@@ -198,10 +198,10 @@ Section Proxy.
     intros Hyp.
     induction l as [ | h l IH]; first inversion Hyp.
     destruct l.
-    - inversion Hyp. 
+    - inversion Hyp.
       set_solver.
-    - inversion Hyp as [Hyp']. 
-      apply IH in Hyp'. 
+    - inversion Hyp as [Hyp'].
+      apply IH in Hyp'.
       set_solver.
   Qed.
 
@@ -298,7 +298,7 @@ Section Proxy.
          ownMsnapFull γMsnap ∗
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)
-          (∃ (ts : nat) (Msnap : gmap Key (list write_event))
+          (∃ (ts : nat) (Tss : gset nat) (Msnap : gmap Key (list write_event))
            (cache_updatesL : loc)
            (cache_updatesV : val)
            (cache_updatesM : gmap Key val)
@@ -309,9 +309,9 @@ Section Proxy.
             ⌜is_coherent_cache cache_updatesM cacheM Msnap⌝ ∗
             ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
             (* ⌜cache_is_ser cache_updatesV⌝ ∗ *)
-            ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+            ⌜kvs_valid_snapshot Msnap ts Tss⌝ ∗
             ⌜is_map cache_updatesV cache_updatesM⌝ ∗
-            ownTimeSnap γT ts ∗
+            ownTimeSnap γT γTss ts ∗
             ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
             cache_updatesL ↦[n] cache_updatesV ∗
             ghost_map_auth γCache 1 cacheM ∗
