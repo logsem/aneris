@@ -288,24 +288,100 @@ Section Commit_Proof.
             destruct Hismap as (lm & Hlm1 & Hlm2 & Hlm3).
             apply is_list_inject in Hlm2.
             simpl in Hlm2.
-            eapply sum_is_ser_valid.
-            rewrite /sum_is_ser.
-            eexists (InjRV (#ts, cache_updatesV))%V, _.
+            unfold sum_valid_val.
+            eexists.
             right.
-            split; first eauto.
-            simpl.
-            split; last done.
-            eexists (#ts, cache_updatesV)%V, _.
-            right.
-            split_and!; try done.
-            simpl.
-            eexists #ts, cache_updatesV, _, _.
             split; first done.
             simpl.
-            split; first by eexists _.
-            split; last done.
-            eexists _.
-            admit.
+            unfold sum_valid_val.
+            eexists.
+            right.
+            split; first done.
+            simpl.
+            unfold prod_valid_val.
+            eexists _, _.
+            split; first done.
+            split.
+            {
+              simpl.
+              unfold int_valid_val.
+              by eexists.
+            }
+            simpl.
+            unfold list_valid_val.
+            exists ((λ p, $p) <$> lm).
+            split.
+            + clear Hlm1 Hlm3 Heq.
+              generalize dependent cache_updatesV.
+              induction lm; first done.
+              intros cache_updatesV H_list.
+              destruct cache_updatesV;
+              [ inversion H_list as [t (Habs & _)]; first inversion Habs |
+                inversion H_list as [t (Habs & _)]; first inversion Habs |
+                inversion H_list as [t (Habs & _)]; first inversion Habs |
+                inversion H_list as [t (Habs & _)]; first inversion Habs |
+              ].
+              inversion H_list as [t (H_eq & _)].
+              rewrite H_eq.
+              rewrite H_eq in H_list.
+              rewrite fmap_cons.
+              exists t.
+              split; first done.
+              apply IHlm.
+              set_solver.
+            + clear rd Hcoh Heq. 
+              generalize dependent cache_updatesV.
+              generalize dependent cache_updatesM.
+              induction lm; first intros; first set_solver.
+              intros cache_updatesM Hser Hlm1 cache_updatesV Hlm2 e H_e_in.
+              rewrite fmap_cons in H_e_in.
+              destruct a.
+              rewrite list_to_map_cons in Hlm1.
+              rewrite Hlm1 in Hser.
+              assert (KVS_Serializable v) as H_ser_v.
+              {
+                apply (Hser k v).
+                apply lookup_insert.
+              }
+              apply elem_of_cons in H_e_in as [H_e_eq | H_e_in].
+              {
+                rewrite H_e_eq.
+                eexists _, _.
+                split_and!; try done.
+                by eexists.
+              }
+              inversion Hlm2 as [t (H_eq_updates & H_t_list)].
+              destruct cache_updatesM.
+              eapply (IHlm _ (list_to_map lm)); try done.
+              Unshelve.
+              2 : by apply NoDup_cons_1_2 in Hlm3.
+              unfold map_Forall.
+              unfold map_Forall in Hser.
+              intros i x H_i_x_some.
+              destruct (decide (k = i)) as [H_eq_k_i | ].
+              {
+                exfalso.
+                rewrite -H_eq_k_i in H_i_x_some.
+                simpl in Hlm3.
+                apply NoDup_cons_1_1 in Hlm3.
+                apply elem_of_list_to_map_2 in H_i_x_some.
+                apply Hlm3.
+                clear Hlm3 IHlm H_eq_updates Hser Hlm1 Hlm2 H_e_in H_t_list.
+                induction lm; first inversion H_i_x_some.
+                destruct a as [k' v']. 
+                simpl.
+                destruct (decide (k = k')); first set_solver.
+                apply elem_of_cons.
+                right. 
+                apply IHlm.
+                apply elem_of_cons in H_i_x_some.
+                destruct H_i_x_some; set_solver.
+              }
+              {
+                eapply (Hser i x).
+                rewrite -H_i_x_some.
+                by apply lookup_insert_ne.
+              }
          -  rewrite /MTS_handler_pre /= /ReqPre.
             iSplit; first done.
             iRight.
@@ -379,6 +455,6 @@ Section Commit_Proof.
          by iFrame. }
        iIntros (v ->).
        by wp_pures.
-  Admitted.
+  Qed.
 
 End Commit_Proof.
