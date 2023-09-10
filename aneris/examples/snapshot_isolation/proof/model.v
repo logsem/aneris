@@ -14,7 +14,7 @@ Global Instance int_time : KVS_time :=
 Instance: Inhabited (@write_event int_time) := populate (Build_write_event "" #() inhabitant).
 
 Global Program Instance Inject_write_event : Inject write_event val :=
-  {| inject a := $(a.(we_key), a.(we_val), a.(we_time))
+  {| inject a := $(a.(we_key), (a.(we_val), a.(we_time)))
   |}.
 Next Obligation.
   intros w1 w2 Heq.
