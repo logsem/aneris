@@ -220,6 +220,16 @@ Section InnerLMTraceFairness.
        lia.
   Qed. 
 
+  Lemma inner_obls_exposed_after tr atr a
+    (INNER_OBLS: inner_obls_exposed tr)
+    (AFTER: after a tr = Some atr):
+    inner_obls_exposed atr.
+  Proof using.
+    red. intros ??? L.
+    erewrite state_lookup_after in L; eauto.
+  Qed. 
+ 
+
   (* TODO: rename? *)
   Lemma eventual_step_or_unassign_nth lmtr_o mtr_o lmtr_i ρ gi δi f n
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
@@ -242,7 +252,7 @@ Section InnerLMTraceFairness.
     (* TODO: unify with IH usage in eventual_step_or_unassign *)
     forward eapply eventual_step_or_unassign with (lmtr_o := atr_lmo_k) (mtr_o := atr_mo_n) (lmtr_i := atr_lmi_n); eauto.
     * intros. eapply fair_aux_SoU_after; eauto.
-    * red. intros. erewrite state_lookup_after in H; eauto. 
+    * eapply inner_obls_exposed_after; eauto.
     (* * punfold UPTOkn; [| apply upto_stutter_mono]. *)
     (*   inversion UPTOkn; subst; try done. *)
     (*   inversion H7; eauto. done. *)
@@ -260,7 +270,7 @@ Section InnerLMTraceFairness.
     * intros [m PM].
       eexists (n + m). split; [lia| ].
       apply pred_at_sum. by rewrite AFTERlmi_n.
-  Qed. 
+  Qed.
 
   Local Ltac by_contradiction_classic C :=
     match goal with

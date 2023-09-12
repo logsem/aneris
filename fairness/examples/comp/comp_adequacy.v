@@ -112,43 +112,154 @@ Definition is_client_step := fun step => step_label_matches step (eq (inr ρy)).
 Definition is_lib_step := fun step => step_label_matches step 
                                      (fun ρ => exists ρlg, inl ρlg = ρ).     
 
-Lemma client_steps_finite (tr: mtrace client_model_impl) (l len: nat_omega)
+Lemma client_steps_finite (tr: mtrace client_model_impl)
   (VALID: mtrace_valid tr)
-  (LEN: trace_len_is tr len)
-  (LE: NOmega.le l len)
-  (CL: ∀ i res, NOmega.lt (NOnum i) l → tr !! i = Some res → is_client_step res):
-  exists m, l = NOnum m.
+  (CL: ∀ i s step, tr !! i = Some (s, step) → is_client_step (s, step) \/ step = None):
+  exists l, trace_len_is tr (NOnum l) /\ 
+         (forall s, tr S!! (l - 1) = Some s -> snd s = snd (trfirst tr) - (l - 1)). 
 Proof.
-  lia_NO' l; lia_NO' len; try by eauto. exfalso.
-  assert (exists s0, tr S!! 0 = Some s0) as [[δ0 c0] S0].
-  { pose proof (inf_trace_lookup _ LEN 0) as ([δ0 c0] & ℓ0 & s1 & L0).
-    apply state_label_lookup in L0 as (?&?&?). eauto. } 
-  gd tr. gd δ0. clear LE. induction c0.
-  { intros.
-    pose proof (inf_trace_lookup _ LEN 0) as (? & ℓ & ? & L0).
-    forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.  
-    pose proof (mtrace_valid_steps' VALID _ _ _ _ L0) as S. by inversion S. }
-  intros. destruct tr.
-  { specialize (LEN 1). simpl in *.
-    by pose proof (proj2 LEN I) as []. }
-  pose proof (inf_trace_lookup _ LEN 0) as (? & ? & [δ1 c1] & L0).
-  forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.  
-  pose proof (mtrace_valid_steps' VALID _ _ _ _ L0).
-  assert (c1 = c0) as ->.
-  { specialize (CL _ _ I L0). do 2 red in CL. destruct CL as (?&?&?&[? <-]).
-    inversion H0. subst. clear H0. 
-    inversion H; lia. }
-  
-  assert (tr S!! 0 = Some (δ1, c0)) as L1.
-  { apply state_label_lookup in L0 as (_&?&_).
-    rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. }
+  pose proof (state_lookup_0 tr) as S0.
+  destruct (trfirst tr) as [δ0 c0] eqn:ST0. 
+  gd tr. gd δ0. induction c0.
+  { intros. exists 1.
+    pose proof (trace_has_len tr) as [len LEN].
+    destruct (tr !! 0) as [[δ0_ c0_]| ] eqn:STEP0.
+    2: { eapply trace_lookup_dom_neg in STEP0; eauto.
+         lia_NO' len. assert (n = 0) as -> by lia. 
+         by apply trace_len_0_inv in LEN. }
+    forward eapply trace_state_lookup_simpl; eauto. intros ->.
+    specialize (CL _ _ _ STEP0). destruct CL.
+    2: { subst. 
+         pattern (δ0, 0) in STEP0. eapply ex_intro, trace_lookup_dom_eq in STEP0; eauto. subst.
+         simpl in *. split; auto.
+         intros. destruct s. simpl in *. congruence. }
+    do 2 red in H. destruct H as (?&?&?&[[=] <-]). subst.
+    pose proof (mtrace_valid_steps' VALID _ _ _ _ STEP0) as STEP.
+    inversion STEP. }
 
-  eapply (IHc0 δ1 tr); eauto.  
-  { eapply mtrace_valid_tail; eauto. }
-  { by apply trace_len_tail in LEN. }
-  intros. apply (CL (S i)); [done| ].
-  rewrite trace_lookup_cons; eauto. 
+  intros.
+  pose proof (trace_has_len tr) as [len LEN].
+  destruct (tr !! 0) as [[δ0_ c0_]| ] eqn:STEP0.
+  2: { eapply trace_lookup_dom_neg in STEP0; eauto.
+       lia_NO' len. assert (n = 0) as -> by lia. 
+       by apply trace_len_0_inv in LEN. }
+  forward eapply trace_state_lookup_simpl; eauto. intros ->.
+
+  pose proof CL as CL'. specialize (CL' _ _ _ STEP0).
+  destruct CL'.
+  2: { subst. 
+       pattern (δ0, S c0) in STEP0. eapply ex_intro, trace_lookup_dom_eq in STEP0; eauto. subst.
+       simpl in *. eexists. split; eauto.
+       intros. destruct s. simpl in *. congruence. }
+  do 2 red in H. destruct H as (?&?&?&[[=] <-]). subst.
+  pose proof (mtrace_valid_steps' VALID _ _ _ _ STEP0) as STEP.
+  destruct x1 as [δ1 c0_].
+  assert (c0_ = c0) as ->. 
+  { inversion STEP; lia. }
+  pose proof STEP0 as (atr & AFTER & HEAD)%trace_lookup_after_strong.
+  apply after_S_tr_cons in AFTER. 
+  specialize (IHc0 δ1 atr). specialize_full IHc0; eauto. 
+  { eapply mtrace_valid_after; eauto. }
+  { intros. apply (CL (S i)). rewrite -H.
+    symmetry. rewrite -Nat.add_1_r Nat.add_comm.
+    eapply trace_lookup_after; eauto. }
+  { by rewrite -HEAD -state_lookup_0. }
+  destruct IHc0 as (l' & LEN' & C).
+  destruct l'.
+  { simpl in LEN'. by apply trace_len_0_inv in LEN'. }
+  exists (S l' + 1). split.
+  { forward eapply (trace_len_after tr) as LEN'_; eauto.
+    forward eapply (trace_len_uniq _ _ _ LEN' LEN'_) as L_; eauto.
+    lia_NO' len. inversion L_. subst.
+    enough (S (l' + 1) = n); [subst; done| ]. lia. } 
+  intros. destruct s as [δ c].
+  erewrite state_lookup_after in C; eauto.
+  simpl. simpl in C. rewrite Nat.sub_0_r.
+  rewrite Nat.add_sub in H. rewrite Nat.sub_0_r in C. 
+  specialize (C _ H). simpl in *. lia. 
 Qed. 
+
+(* Lemma client_steps_finite (tr: mtrace client_model_impl) *)
+(*   (VALID: mtrace_valid tr) *)
+(*   (CL: ∀ i s step, tr !! i = Some (s, step) → is_client_step (s, step) \/ step = None): *)
+(*   (* exists l, trace_len_is tr (NOnum l) /\ (l = 0 /\ snd (trfirst tr) =  *) *)
+(*   terminating_trace tr.  *)
+(* Proof. *)
+(*   pose proof (trace_has_len tr) as [len LEN].  *)
+(*   lia_NO' len. *)
+(*   2: { eapply terminating_trace_equiv; eauto. } *)
+(*   exfalso. *)
+(*   assert (exists s0, tr S!! 0 = Some s0) as [[δ0 c0] S0]. *)
+(*   { pose proof (inf_trace_lookup _ LEN 0) as ([δ0 c0] & ℓ0 & s1 & L0). *)
+(*     apply state_label_lookup in L0 as (?&?&?). eauto. }  *)
+(*   gd tr. gd δ0. induction c0. *)
+(*   { intros. *)
+(*     pose proof (inf_trace_lookup _ LEN 0) as (? & ℓ & ? & L0). *)
+(*     forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
+(*     pose proof (mtrace_valid_steps' VALID _ _ _ _ L0) as S. by inversion S. } *)
+(*   intros. destruct tr. *)
+(*   { specialize (LEN 1). simpl in *. *)
+(*     by pose proof (proj2 LEN I) as []. } *)
+(*   pose proof (inf_trace_lookup _ LEN 0) as (? & ? & [δ1 c1] & L0). *)
+(*   forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
+(*   pose proof (mtrace_valid_steps' VALID _ _ _ _ L0). *)
+  
+(*   assert (c1 = c0) as ->. *)
+(*   { specialize (CL _ _ _ L0). destruct CL as [CL|?]; [| done]. *)
+(*     do 2 red in CL. destruct CL as (?&?&?&[? <-]). *)
+(*     inversion H0. subst. clear H0.  *)
+(*     inversion H; lia. } *)
+  
+(*   assert (tr S!! 0 = Some (δ1, c0)) as L1. *)
+(*   { apply state_label_lookup in L0 as (_&?&_). *)
+(*     rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. } *)
+
+(*   apply trace_len_tail in LEN. *)
+(*   eapply (IHc0 δ1 tr); eauto.   *)
+(*   { eapply mtrace_valid_tail; eauto. } *)
+(*   intros. left. *)
+(*   pose proof (CL (S i) _ _ H0) as [? | ->]; [done| ]. *)
+(*   pattern s0 in H0. eapply ex_intro, trace_lookup_dom_eq in H0; eauto. *)
+(*   done.  *)
+(* Qed.  *)
+
+(* Lemma client_steps_finite (tr: mtrace client_model_impl) (l len: nat_omega) *)
+(*   (VALID: mtrace_valid tr) *)
+(*   (LEN: trace_len_is tr len) *)
+(*   (LE: NOmega.le l len) *)
+(*   (CL: ∀ i res, NOmega.lt (NOnum i) l → tr !! i = Some res → is_client_step res): *)
+(*   exists m, l = NOnum m. *)
+(* Proof. *)
+(*   lia_NO' l; lia_NO' len; try by eauto. exfalso. *)
+(*   assert (exists s0, tr S!! 0 = Some s0) as [[δ0 c0] S0]. *)
+(*   { pose proof (inf_trace_lookup _ LEN 0) as ([δ0 c0] & ℓ0 & s1 & L0). *)
+(*     apply state_label_lookup in L0 as (?&?&?). eauto. }  *)
+(*   gd tr. gd δ0. clear LE. induction c0. *)
+(*   { intros. *)
+(*     pose proof (inf_trace_lookup _ LEN 0) as (? & ℓ & ? & L0). *)
+(*     forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
+(*     pose proof (mtrace_valid_steps' VALID _ _ _ _ L0) as S. by inversion S. } *)
+(*   intros. destruct tr. *)
+(*   { specialize (LEN 1). simpl in *. *)
+(*     by pose proof (proj2 LEN I) as []. } *)
+(*   pose proof (inf_trace_lookup _ LEN 0) as (? & ? & [δ1 c1] & L0). *)
+(*   forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
+(*   pose proof (mtrace_valid_steps' VALID _ _ _ _ L0). *)
+(*   assert (c1 = c0) as ->. *)
+(*   { specialize (CL _ _ I L0). do 2 red in CL. destruct CL as (?&?&?&[? <-]). *)
+(*     inversion H0. subst. clear H0.  *)
+(*     inversion H; lia. } *)
+  
+(*   assert (tr S!! 0 = Some (δ1, c0)) as L1. *)
+(*   { apply state_label_lookup in L0 as (_&?&_). *)
+(*     rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. } *)
+
+(*   eapply (IHc0 δ1 tr); eauto.   *)
+(*   { eapply mtrace_valid_tail; eauto. } *)
+(*   { by apply trace_len_tail in LEN. } *)
+(*   intros. apply (CL (S i)); [done| ]. *)
+(*   rewrite trace_lookup_cons; eauto.  *)
+(* Qed.  *)
 
 Arguments NOmega.le _ _ : simpl nomatch.
 
@@ -271,12 +382,11 @@ Proof.
 Qed.
 
 
-Lemma traces_equiv_refl {St L: Type} (tr: trace St L):
-  traces_equiv tr tr.
+Instance traces_equiv_refl {St L: Type}:
+  Reflexive (@traces_equiv St L). 
 Proof.
-  revert tr. 
-  cofix CIH.
-  intros. rewrite (trace_unfold_fold tr).  
+  red. cofix CIH.
+  intros tr. rewrite (trace_unfold_fold tr).  
   destruct tr.
   - constructor. done. Guarded.  
   - constructor; try done.
@@ -284,21 +394,21 @@ Proof.
 Qed. 
 
 
-Lemma traces_equiv_symm {St L: Type} (tr1 tr2: trace St L):
-  traces_equiv tr1 tr2 -> traces_equiv tr2 tr1.
+Global Instance traces_equiv_symm {St L: Type}:
+  Symmetric (@traces_equiv St L). 
 Proof.
-  revert tr1 tr2. 
+  red. 
   cofix CIH.
-  intros. rewrite (trace_unfold_fold tr1) (trace_unfold_fold tr2).
+  intros tr1 tr2 EQ. 
+  rewrite (trace_unfold_fold tr1) (trace_unfold_fold tr2).
   destruct tr1, tr2.
-  - constructor. inversion H. done. Guarded.
-  - by inversion H. 
-  - by inversion H. 
-  - inversion H. subst.
+  - constructor. inversion EQ. done. 
+  - by inversion EQ. 
+  - by inversion EQ. 
+  - inversion EQ. subst.
     constructor; try done.
     by apply CIH. 
 Qed. 
-
 
 
 From Paco Require Import paco1 paco2 pacotac.
@@ -361,40 +471,38 @@ Proof.
   pose proof (trace_has_len tr) as [len LEN].
   pose proof SUB as X. eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto.
   2: { lia_NO len. }
-  forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTR & UPTO').
+  forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTER' & UPTO').
   exists latr. split; [| split].
-  - eauto. 
+  - eauto. eapply upto_stutter_Proper; [.. |eapply UPTO']; eauto.
+    + reflexivity. 
+    + by symmetry.
+  - intros.
+    forward eapply fair_aux_SoU_after; [| apply AFTER' |]; eauto.
+    intros. apply FAIR_AUX.
+  - eapply inner_obls_exposed_after; eauto.
+Qed.   
+
+(* TODO: move *)
+Lemma trace_len_gt_0 {St L: Type} (tr: trace St L):
+  forall len, trace_len_is tr len -> NOmega.lt_nat_l 0 len.
+Proof. 
+  intros. lia_NO' len. destruct n; [| lia].
+  by apply trace_len_0_inv in H. 
+Qed. 
 
 
-
-
-  forward eapply subtrace_upto_stutter; eauto.
-  intros (i' & ml' & slmtr' & SUBl & UPTO' & LEN').
-  exists slmtr'. split; [| split]; eauto. 
-  - intros. red. intros P'n.
-    (* TODO: extract lemma about pred_at in subtrace *)
-    apply pred_at_trace_lookup in P'n as (s & ST & ASG).
-    assert (NOmega.lt_nat_l n (NOmega.sub ml' (NOnum i'))) as DOM.
-    { eapply state_lookup_dom; eauto. }
-    erewrite subtrace_state_lookup in ST; eauto.
-    red in FAIR_AUX. setoid_rewrite pred_at_trace_lookup in FAIR_AUX.
-    specialize_full FAIR_AUX.
-    { eexists. split; eauto. }
-    destruct FAIR_AUX as (m & st' & ST' & STEP).
-    rewrite -Nat.add_assoc in ST'. 
-    erewrite <- subtrace_state_lookup in ST'; eauto.
-    2: { eapply state_lookup_dom; eauto. 
-    
-    
-    setoid_rewrite pred_at_trace_lookup. 
-    
-    erewrite H in ST. 
-    
-    erewrite (proj2 ) in ST. 
-    eapply FAIR_AUX; eauto. 
-    
+(* TODO: move *)
+Lemma trace_lookup_0_Some {St L: Type} (tr: trace St L):
+  is_Some (tr !! 0). 
+Proof.
+  pose proof (trace_has_len tr) as [len LEN]. 
+  eapply trace_lookup_dom; eauto.
+  eapply trace_len_gt_0; eauto. 
+Qed.  
   
-  
+Local Notation " 'step_of' M " := 
+  (fmstate M * option (option (fmrole M) * fmstate M))%type 
+    (at level 10).
 
 Lemma client_model_fair_term tr lmtr
   (OUTER_CORR: outer_LM_trace_exposing lmtr tr):
@@ -404,14 +512,44 @@ Proof.
   (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
   pose proof (trace_has_len tr) as [len LEN]. 
 
+  assert (len = NOnum 1 \/ NOmega.lt_nat_l 1 len /\ snd (trfirst tr) <= 2) as [-> | [LENnz BOUNDc]].
+  { pose proof (trace_lookup_0_Some tr) as [[δ0 step0] STEP0].
+    destruct step0.
+    2: { left. rewrite -(plus_O_n 1).
+         eapply trace_lookup_dom_eq; eauto. }
+    destruct p. 
+    right. split.
+    { rewrite -(plus_O_n 1). eapply trace_lookup_dom_strong; eauto. }
+    forward eapply (mtrace_valid_steps' VALID 0) as TRANS; [eauto| ].
+    apply state_label_lookup in STEP0 as (ST0 & ?&?). 
+    rewrite state_lookup_0 in ST0. inversion ST0. rewrite H2. 
+    inversion TRANS; subst; simpl; lia. }
+  { eapply terminating_trace_equiv; eauto. }
+
   forward eapply (trace_prop_split tr is_client_step) as [l1 (L1 & NL1 & DOM1)]; eauto.
-  { solve_decision. } 
-  forward eapply client_steps_finite as [m1 ?]; eauto. subst l1. simpl in *.
-  (* TODO: also derive the fact that client's counter has decreased *)
+  { solve_decision. }
+
+  assert (exists n1, l1 = NOnum n1 /\ (forall s, tr S!! (n1 - 1) = Some s -> snd s < 2)) as (m1 & LEN1 & BOUNDc'). 
+  { 
+    (* destruct l1; eauto.  *)
+    forward eapply (subtrace_len tr _ 0 l1) as SUB1; eauto.
+    { done. }
+    destruct SUB1 as (str & SUB & LEN1). 
+    forward eapply (client_steps_finite str) as (m1 & LEN1' & XX); eauto.
+    { eapply (subtrace_valid tr); eauto. }  
+    { intros. left. eapply L1; [done| ].
+      rewrite -H.
+      rewrite -{2}(plus_O_n i). symmetry.
+      eapply subtrace_lookup; eauto. done. }
+    forward eapply (trace_len_uniq _ _ _ LEN1 LEN1'). done. }
+
+  subst l1. simpl in *. 
 
   forward eapply (trace_prop_split' tr is_lib_step _ m1)
     as (l2 & L2 & NL2 & LE2 & LE2'); eauto.
   { solve_decision. }
+
+  
 
   assert (exists m2, l2 = NOnum m2) as [m2 ->].
   { destruct l2 eqn:L2_EQ; [| by eauto].
@@ -430,32 +568,27 @@ Proof.
 
     eapply simulation_adequacy_terminate_general' in MATCH; eauto; cycle 1. 
     { admit. }
-    (* { red. intros. destruct c as [? n]. simpl in *. subst. *)
-    (*   red.  *)
-    (*   assert (n = 1) as ->. *)
-    (*   { admit. } *)
-    (*   Set Printing Coercions. *)
-    (*   rewrite live_roles_1. *)
-    (*   (* should be provable with parametrized LiveState *)
-    (*      and connection between tr and corresponding LM trace *) *)
-    (*   admit. } *)
     {       
       subst. simpl in *.
-
+      forward eapply outer_exposing_subtrace; eauto.
+      intros [? EXP'].
       
-      
-      eapply inner_LM_trace_fair_aux.
-      6: by apply MATCH.
-      { apply _. }
-      4: { subst. eapply infinite_trace_equiv; eauto. }
-      4: { eapply fair_by_subtrace; eauto. }
-    
+      eapply inner_LM_trace_fair_aux. 
+      2-4: by apply EXP'. 
+      - apply _. 
+      - subst. eapply infinite_trace_equiv; eauto. 
+      - by apply MATCH. 
+      - eapply fair_by_subtrace; eauto. }   
 
     red in MATCH. specialize_full MATCH; eauto.
     { subst. eapply (subtrace_valid tr); eauto. }
     { subst. eapply fair_by_subtrace; eauto. }
     apply (terminating_trace_equiv _ _ LEN2) in MATCH as [??].
     subst. done. }
+
+  simpl in *. 
+
+  
   
 Admitted. 
 
