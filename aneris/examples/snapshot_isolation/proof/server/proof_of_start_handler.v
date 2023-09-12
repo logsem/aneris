@@ -108,13 +108,8 @@ Section Proof_of_start_handler.
       rewrite /ownMemAuthLocal /ownMemAuthGlobal.
       iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
                with "[$HmemLoc][$Hg1]"). }
-    iDestruct (big_sepM_split_frac M mu (1/2)%Qp with "HmemLoc") as "HmemLoc".
-    iDestruct (big_sepM_sep with "[$Hkeys $HmemLoc]") as "HmemKeys".
-    iDestruct (mem_auth_lookup_big _ _ (1/2)%Qp mu M) as "Hkeys_map".
-    iDestruct (big_sepM_wand with "[$HmemKeys][$Hkeys_map]") as "Hcln".
-    iDestruct (big_sepM_sep with "Hcln") as "(Hkeys & Hcln)".
-    iDestruct (big_sepM_sep with "Hcln") as "(HauthFrags & %Hmap_eq)".
-    iDestruct (big_sepM_split_frac with "[$HauthFrags]") as "HmemLoc"; try eauto.
+    iDestruct (mem_auth_lookup_big _ _ (1/2)%Qp mu M with "[$HmemLoc] [$Hkeys]") 
+      as "(Hmemloc & Hkeys & %Hmap_eq)".
     apply map_eq_filter_dom in Hmap_eq.
     iAssert ( [∗ map] k↦h ∈ filter (λ k : Key * list write_event, k.1 ∈ dom mu) M,
                 ownMemSeen γGsnap k h)%I as "#Hsnapshot".

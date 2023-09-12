@@ -81,10 +81,12 @@ Section Wrapper_defs.
   (*        ⌜m = (λ h, to_hist h)<$>M⌝. *)
   (* Proof. Admitted. *)
 
-  Lemma mem_auth_lookup_big_alternative
+  Lemma mem_auth_lookup_big
     (q : Qp) (mu : gmap Key (list val)) (M : gmap Key (list write_event)) :
     ghost_map.ghost_map_auth γGauth q%Qp M -∗
     ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) -∗
+    ghost_map.ghost_map_auth γGauth q%Qp M ∗
+    ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) ∗
     ([∗ map] k↦h ∈ mu,
       ⌜mu !! k =
             ((λ h : list write_event, to_hist h)
@@ -92,21 +94,28 @@ Section Wrapper_defs.
               !! k⌝).
   Proof.
     iIntros "H_auth H_keys".
-    iInduction mu as [|i x m H_eq] "IH" using map_ind forall (q); first done.
-    iDestruct "H_auth" as "(H_auth_half & H_auth_half')".
+    iInduction mu as [|i x m H_eq] "IH" using map_ind forall (q); first by iFrame.
+    iDestruct (big_sepM_insert with "H_keys") as "(H_key & H_keys)"; first apply H_eq.
+    iDestruct "H_key" as (hw) "((H_key & H_seen) & %H_eq_x_hw)".
+    iDestruct (ghost_map_lookup with "H_auth H_key") as "%H_lookup".
+    iDestruct ("IH" $! q%Qp with "H_auth H_keys") as "(H_auth & H_keys & IH_instance)".
+    iFrame.
+    iSplitL "H_keys H_key H_seen".
+    {
+      iApply big_sepM_insert; first apply H_eq.
+      iFrame.
+      iExists hw.
+      by iFrame.
+    }
     iApply big_sepM_insert; first apply H_eq.
-    iDestruct (big_sepM_insert with "H_keys") as "(H_key & H_keys)"; first apply H_eq. 
-    iSplitL "H_auth_half H_key".
-    - iDestruct "H_key" as (hw) "((H_key & _) & %H_eq_x_hw)". 
-      iDestruct (ghost_map_lookup with "H_auth_half H_key") as "%H_lookup".
-      iPureIntro.
+    iSplitL "".
+    - iPureIntro.
       rewrite lookup_insert.
       rewrite lookup_fmap.
       eapply (map_filter_lookup_Some_2 
         (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_lookup
         as ->; set_solver.
-    - iDestruct ("IH" $! (q / 2)%Qp with "H_auth_half' H_keys") as "IH_instance".
-      iApply (big_sepM_wand with "[$IH_instance]").
+    - iApply (big_sepM_wand with "[$IH_instance]").
       iApply big_sepM_intro.
       iPureIntro.
       simpl.
@@ -115,15 +124,15 @@ Section Wrapper_defs.
       rewrite lookup_insert_ne; last done.
       rewrite lookup_fmap.
       destruct (decide (k ∈ dom m)) as [H_in | H_nin].
-      + destruct (M !! k) as [ lw | ] eqn:H_lookup.
+      + destruct (M !! k) as [ lw | ] eqn:H_k_lookup.
         * eapply (map_filter_lookup_Some_2 
-          (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_lookup
-          as H_lookup'; last set_solver.
+          (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_k_lookup
+          as H_k_lookup'; last set_solver.
           eapply (map_filter_lookup_Some_2 
-          (λ k : Key * list write_event, k.1 ∈ dom m)) in H_lookup
-          as H_lookup''; last set_solver.
+          (λ k : Key * list write_event, k.1 ∈ dom m)) in H_k_lookup
+          as H_k_lookup''; last set_solver.
           rewrite IH lookup_fmap. 
-          by rewrite H_lookup' H_lookup''.
+          by rewrite H_k_lookup' H_k_lookup''.
         * rewrite map_filter_lookup_None_2; last set_solver.
           rewrite lookup_fmap in IH.
           by rewrite map_filter_lookup_None_2 in IH; last set_solver.
@@ -131,42 +140,6 @@ Section Wrapper_defs.
         rewrite lookup_fmap in IH.
         by rewrite map_filter_lookup_None_2 in IH; last set_solver.
     Qed.
-
-  Lemma mem_auth_lookup_big
-        (q : Qp) (mu : gmap Key (list val)) (M : gmap Key (list write_event)):
-    ⊢ [∗ map] k↦h ∈ mu,
-          OwnMemKey_def  k h ∗
-            ghost_map.ghost_map_auth
-              γGauth (Qp.div q (pos_to_Qp ((Pos.of_nat (size mu))))) M -∗
-          OwnMemKey_def k h ∗
-            ghost_map.ghost_map_auth
-              γGauth (Qp.div q (pos_to_Qp ((Pos.of_nat (size mu))))) M ∗
-            ⌜mu !! k =
-            ((λ h : list write_event, to_hist h)
-               <$> (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M))
-              !! k⌝.
-  Proof.
-    iApply big_sepM_intro.
-    iIntros "!#".
-    iIntros (k hv Hin).
-    iIntros "(Hk & Hauthk)".
-    rewrite /OwnMemKey_def /ownMemUser.
-    iDestruct "Hk" as (hw) "((Hk & #Hsk) & ->)".
-    iDestruct (ghost_map.ghost_map_lookup with "[$Hauthk][$Hk]") as "%HMin".
-    iFrame "#∗".
-    iSplitL.
-    iExists _.
-    by iFrame "#∗".
-    iPureIntro.
-    rewrite Hin.
-    symmetry.
-    rewrite lookup_fmap.
-    apply fmap_Some_2.
-    apply map_filter_lookup_Some_2; first done.
-    simpl.
-    apply elem_of_dom.
-    eauto with set_solver.
-  Qed.
 
   Lemma map_eq_filter_dom
         (mu : gmap Key (list val)) (M : gmap Key (list write_event)) :
