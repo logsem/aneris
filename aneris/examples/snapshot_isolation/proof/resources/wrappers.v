@@ -81,6 +81,57 @@ Section Wrapper_defs.
   (*        ⌜m = (λ h, to_hist h)<$>M⌝. *)
   (* Proof. Admitted. *)
 
+  Lemma mem_auth_lookup_big_alternative
+    (q : Qp) (mu : gmap Key (list val)) (M : gmap Key (list write_event)) :
+    ghost_map.ghost_map_auth γGauth q%Qp M -∗
+    ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) -∗
+    ([∗ map] k↦h ∈ mu,
+      ⌜mu !! k =
+            ((λ h : list write_event, to_hist h)
+                <$> (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M))
+              !! k⌝).
+  Proof.
+    iIntros "H_auth H_keys".
+    iInduction mu as [|i x m H_eq] "IH" using map_ind forall (q); first done.
+    iDestruct "H_auth" as "(H_auth_half & H_auth_half')".
+    iApply big_sepM_insert; first apply H_eq.
+    iDestruct (big_sepM_insert with "H_keys") as "(H_key & H_keys)"; first apply H_eq. 
+    iSplitL "H_auth_half H_key".
+    - iDestruct "H_key" as (hw) "((H_key & _) & %H_eq_x_hw)". 
+      iDestruct (ghost_map_lookup with "H_auth_half H_key") as "%H_lookup".
+      iPureIntro.
+      rewrite lookup_insert.
+      rewrite lookup_fmap.
+      eapply (map_filter_lookup_Some_2 
+        (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_lookup
+        as ->; set_solver.
+    - iDestruct ("IH" $! (q / 2)%Qp with "H_auth_half' H_keys") as "IH_instance".
+      iApply (big_sepM_wand with "[$IH_instance]").
+      iApply big_sepM_intro.
+      iPureIntro.
+      simpl.
+      intros k lv H_eq_some IH.
+      destruct (decide (k = i)) as [ -> | ]; first set_solver.
+      rewrite lookup_insert_ne; last done.
+      rewrite lookup_fmap.
+      destruct (decide (k ∈ dom m)) as [H_in | H_nin].
+      + destruct (M !! k) as [ lw | ] eqn:H_lookup.
+        * eapply (map_filter_lookup_Some_2 
+          (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_lookup
+          as H_lookup'; last set_solver.
+          eapply (map_filter_lookup_Some_2 
+          (λ k : Key * list write_event, k.1 ∈ dom m)) in H_lookup
+          as H_lookup''; last set_solver.
+          rewrite IH lookup_fmap. 
+          by rewrite H_lookup' H_lookup''.
+        * rewrite map_filter_lookup_None_2; last set_solver.
+          rewrite lookup_fmap in IH.
+          by rewrite map_filter_lookup_None_2 in IH; last set_solver.
+      + rewrite map_filter_lookup_None_2; last set_solver.
+        rewrite lookup_fmap in IH.
+        by rewrite map_filter_lookup_None_2 in IH; last set_solver.
+    Qed.
+
   Lemma mem_auth_lookup_big
         (q : Qp) (mu : gmap Key (list val)) (M : gmap Key (list write_event)):
     ⊢ [∗ map] k↦h ∈ mu,
