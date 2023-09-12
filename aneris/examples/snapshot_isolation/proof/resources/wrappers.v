@@ -19,19 +19,6 @@ From aneris.examples.snapshot_isolation.proof.resources
      Require Import resource_algebras server_resources proxy_resources
      global_invariant.
 
-(** TODO: try to prove this lemma unfolding it down to big_opM and using induction.
-            Should probably be done in a similar way to how e.g. big_sepM_filter is proven. *)
-  Lemma big_sepM_split_frac:
-      ∀ {Σ :  gFunctors} {K1 : Type} {K2 : Type}
-        {EqDecision1 : EqDecision K1} {EqDecision2 : EqDecision K2}
-        {H1 : Countable K1} {H2 : Countable K2} {A1 : Type} {A2: Type}
-        (m1 : gmap K1 A1)  (m2 : gmap K2 A2) (q : Qp) (γ : gname)
-        {H0 : ghost_map.ghost_mapG Σ K1 A1},
-          ghost_map.ghost_map_auth γ q m1 ⊣⊢
-          [∗ map] k ↦ _ ∈ m2,
-            ghost_map.ghost_map_auth γ (q / pos_to_Qp (Pos.of_nat (size m2))) m1.
-  Proof. Admitted.
-
 Section Wrapper_defs.
   Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_resources}.
   Context `{!User_params}.

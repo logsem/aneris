@@ -114,13 +114,22 @@ Section Proof_of_start_handler.
     iAssert ( [∗ map] k↦h ∈ filter (λ k : Key * list write_event, k.1 ∈ dom mu) M,
                 ownMemSeen γGsnap k h)%I as "#Hsnapshot".
     { (** TODO: should be enough to prove using HmemGlob *)
-      admit. }
-    (** TODO: first perform update on HtimeStartsGLob and construct witnesses *)
-    iSplitL "HtimeGlob HmemGlob Hccls HtimeStartsGlob".
+      unfold ownMemSeen.
+      unfold ownMemGlobal.
+      unfold ownMemMono.
+      admit. 
+    }
+    iMod (own_update _ _ (● (Tssg ∪ {[T + 1]}) ⋅ ◯ (Tssg ∪ {[T + 1]})) 
+      with "HtimeStartsGlob") as "(HtimeStartsGlob' & #HtimeStartsSnap')".
+    {
+      apply auth_update_alloc.
+      apply gset_local_update.
+      set_solver.
+    }
+    iSplitL "HtimeGlob HmemGlob Hccls HtimeStartsGlob'".
     { iModIntro. iNext.
       iExists M, (T+1), (Tssg ∪ {[(T+1)%nat]}), gMg.
       iFrame "#∗".
-      iSplit; first admit.  (** valid by update *)
       iSplit; first done.
       iPureIntro.
       by apply kvs_valid_next.
@@ -137,14 +146,19 @@ Section Proof_of_start_handler.
         split.
         -- apply kvs_valid_next.
            by apply kvs_valid_filter.
-        --  admit. (** follows from Hvalid *)
+        -- intros k h H_lookup e H_e_in_h.
+          apply map_filter_lookup_Some_1_1 in H_lookup.
+          assert ((we_time e ≤ T)%Z); first by eapply kvs_ValidCommitTimes.
+          lia.
       - iSplit.
         -- iPureIntro.
            apply map_Forall_lookup_2.
            intros k x H_filter_some.
            apply map_filter_lookup_Some_1_1 in H_filter_some.
            by apply Hser in H_filter_some.
-        -- admit. (** can be framed after update of the resource. *)
+        -- iApply (own_mono with "HtimeStartsSnap'").
+           apply auth_frag_mono.
+           set_solver.
     }
     iMod "HQ".
     iModIntro.
@@ -159,7 +173,13 @@ Section Proof_of_start_handler.
       iSplit.
       - iPureIntro; first by apply kvsl_valid_next.
       - iSplit; first done.
-        admit. (**  can be framed after update of the resource. *) }
+        iApply big_sepS_insert_2'; last iFrame "#".
+        unfold ownTimeSnap.
+        iFrame "#".
+        iApply (own_mono with "HtimeStartsSnap'").
+        apply auth_frag_mono.
+        set_solver.
+    }
     iIntros (? ->).
     wp_pures.
     iApply ("HΦ" $! _ _).
