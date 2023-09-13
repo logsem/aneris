@@ -504,6 +504,100 @@ Local Notation " 'step_of' M " :=
   (fmstate M * option (option (fmrole M) * fmstate M))%type 
     (at level 10).
 
+Lemma client_trace_lookup (tr: mtrace client_model_impl) i
+  (VALID: mtrace_valid tr)
+  :
+  terminating_trace tr \/
+  exists step, tr !! i = Some step /\
+            (is_client_step step \/
+             is_lib_step step /\ snd $ fst step = 1).
+Proof.
+  pose proof (trace_has_len tr) as [len LEN].
+  destruct (tr !! i) as [[st step]|] eqn:ST.
+  2: { left. eapply terminating_trace_equiv; eauto.
+       eapply trace_lookup_dom_neg in ST; eauto.
+       lia_NO' len. eauto. }
+  destruct step as [[ℓ st']|].
+  2: { pattern st in ST. eapply ex_intro, trace_lookup_dom_eq in ST; eauto.
+       left. eapply terminating_trace_equiv; eauto. }
+  right. eexists. split; eauto. simpl.
+  forward eapply (mtrace_valid_steps' VALID i) as TRANS; [eauto| ].
+  simpl in TRANS.
+  inversion TRANS; subst.
+  1, 3: left; do 2 red; eauto.
+  right. split; eauto. do 2 red.
+  do 3 eexists. eauto.
+Qed. 
+
+(* TODO: try to unify with 'kept_*' lemmas
+   in ticketlock proof *)
+(* TODO: move*)
+Lemma preserved_prop_kept (M: FairModel) (tr: mtrace M)
+  (Pst: fmstate M -> Prop)
+  (Pstep: step_of M -> Prop)
+  (m1 m2 : nat) s
+  (VALID : mtrace_valid tr)
+  (L2: ∀ i step, m1 ≤ i → i < m2 → tr !! i = Some step → Pstep step)
+  (* (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> Pst s1 -> Pst s2) *)
+  (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> fmtrans M s1 ℓ s2 -> Pst s1 -> Pst s2)
+  (Sm1 : tr S!! m1 = Some s)
+  (P1: Pst s):
+  (* (C1 : s.2 = 1): *)
+  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → Pst s. 
+Proof. 
+  intros j s' [GE LE] ST.
+  apply Nat.le_sum in GE as [d ->].
+  gd s'. induction d.
+  { intros. rewrite Nat.add_0_r in LE ST.
+    assert (s' = s) as ->; congruence. }
+  intros s' ST'.
+  pose proof (trace_has_len tr) as [len LEN]. 
+  forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN (m1 + d))).
+  { eapply mk_is_Some, state_lookup_dom in ST'; eauto.
+    lia_NO len. }
+  clear dependent s. 
+  intros (s & ? & s'_ & STEP'_). 
+  forward eapply (mtrace_valid_steps' VALID) as TRANS; [eauto| ].
+  pose proof STEP'_ as X%L2; try lia. 
+  (* destruct X as (?&?&?&[=]&[? <-]). subst.   *)
+  apply state_label_lookup in STEP'_ as (ST & ST'_ & LBL).
+  replace (m1 + S d) with (m1 + d + 1) in ST' by lia.
+  rewrite ST' in ST'_. inversion ST'_. subst s'_.
+  specialize_full IHd; eauto. lia. 
+Qed. 
+
+(* TODO: inline? *)
+Lemma c1_preserved (tr: mtrace client_model_impl)
+  (m1 m2 : nat) s  
+  (VALID : mtrace_valid tr)
+  (L2: ∀ i res, m1 ≤ i → i < m2 → tr !! i = Some res → is_lib_step res)
+  (Sm1 : tr S!! m1 = Some s)
+  (C1 : s.2 = 1)
+  :
+  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → s.2 = 1.
+Proof. 
+  eapply preserved_prop_kept; eauto.
+  intros ??? LIB STEP EQ1.
+  do 2 red in LIB. destruct LIB as (?&?&?&[=]&[? <-]). subst.
+  simpl in STEP. inversion STEP. by subst.
+Qed.
+
+(* TODO: inline? *)  
+Lemma done_lib_preserved (tr: mtrace client_model_impl)
+  (m1 m2 : nat) s  
+  (VALID : mtrace_valid tr)
+  (L2: ∀ i res, m1 ≤ i → i < m2 → tr !! i = Some res → is_client_step res)
+  (Sm1 : tr S!! m1 = Some s)
+  (NOLIB1 : ls_tmap s.1 (LM := lib_model) !! ρlg = Some ∅):
+  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → ls_tmap s.1 (LM := lib_model) !! ρlg = Some ∅.
+Proof. 
+  eapply preserved_prop_kept; eauto.
+  intros ??? CL STEP EQ1.
+  do 2 red in CL. destruct CL as (?&?&?&[=]&[=]). subst. 
+  simpl in STEP. inversion STEP; subst; done. 
+Qed. 
+
+  
 Lemma client_model_fair_term tr lmtr
   (OUTER_CORR: outer_LM_trace_exposing lmtr tr):
   mtrace_fairly_terminating tr.
@@ -529,10 +623,11 @@ Proof.
   forward eapply (trace_prop_split tr is_client_step) as [l1 (L1 & NL1 & DOM1)]; eauto.
   { solve_decision. }
 
-  assert (exists n1, l1 = NOnum n1 /\ (forall s, tr S!! (n1 - 1) = Some s -> snd s < 2)) as (m1 & LEN1 & BOUNDc'). 
+  (* assert (exists n1, l1 = NOnum n1 /\ (forall s, tr S!! (n1 - 1) = Some s -> snd s < 2)) as (m1 & LEN1 & BOUNDc').  *)
+  assert (exists n1, l1 = NOnum n1) as (m1 & LEN1).
   { 
-    (* destruct l1; eauto.  *)
-    forward eapply (subtrace_len tr _ 0 l1) as SUB1; eauto.
+    destruct l1; eauto.
+    forward eapply (subtrace_len tr _ 0 NOinfinity) as SUB1; eauto.
     { done. }
     destruct SUB1 as (str & SUB & LEN1). 
     forward eapply (client_steps_finite str) as (m1 & LEN1' & XX); eauto.
@@ -548,8 +643,6 @@ Proof.
   forward eapply (trace_prop_split' tr is_lib_step _ m1)
     as (l2 & L2 & NL2 & LE2 & LE2'); eauto.
   { solve_decision. }
-
-  
 
   assert (exists m2, l2 = NOnum m2) as [m2 ->].
   { destruct l2 eqn:L2_EQ; [| by eauto].
@@ -586,10 +679,74 @@ Proof.
     apply (terminating_trace_equiv _ _ LEN2) in MATCH as [??].
     subst. done. }
 
-  simpl in *. 
+  simpl in *.
+  assert (terminating_trace tr \/ exists step, snd (fst step) = 1 /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 (LM := lib_model) !! ρlg = Some ∅) as NEXT. 
+  { edestruct (client_trace_lookup tr m2) as [?|STEP]; eauto.
+    destruct STEP as [[s step] [STEP [CL | [LIB BOUND]]]].
+    2: { eapply NL2 in LIB; done. }  
+    edestruct (client_trace_lookup tr m1) as [?|STEP']; eauto.
+    destruct STEP' as [step' [STEP' [CL' | [LIB BOUND]]]].
+    { eapply NL1 in CL'; done. }
+    right. do 2 red in CL. destruct CL as (?&?&?&[=]&[=]).
+    subst.
+    eexists. apply and_comm, and_assoc. 
+    split; [apply STEP|]. simpl.
+    apply and_assoc. split; [by do 2 red; eauto| ].
+    assert (x.2 = 1).
+    { apply state_label_lookup in STEP.
+    do 2 red in LIB. destruct LIB as (?&?&?&[=]&[? <-]).
+    subst. apply state_label_lookup in STEP'. simpl in *. 
+    eapply c1_preserved.
+    3: { apply (proj1 STEP'). }
+    all: eauto.
+    apply STEP. }
+    forward eapply (mtrace_valid_steps' VALID m2) as TRANS; eauto.
+    simpl in TRANS. inversion TRANS; subst. 
+    { done. }
+    eauto. }
+  
+  destruct NEXT as [? | (step & BOUND & STm2 & CL2 & NOlib)]; [done| ].
+  forward eapply (trace_prop_split' tr is_client_step _ m2) as [l3 (L3 & NL3 & DOM3)]; eauto.
+  { solve_decision. }
+  forward eapply (subtrace_len tr _ m2 l3) as SUB3; eauto.
+  { lia_NO' l3. apply proj1, le_lt_eq_dec in DOM3 as [?| ->]; [done| ].
+    eapply NL3 in STm2; done. }
+  { apply DOM3. }
+  destruct SUB3 as (str3 & SUB3 & LEN3).
+  (* TODO: refactor usages of this lemma  *)
+  forward eapply (client_steps_finite str3) as (m3 & LEN3' & BOUND3); eauto.
+  { eapply (subtrace_valid tr); [..| apply SUB3]; eauto.
+    apply DOM3. }  
+  { intros. destruct step0 as [[ℓ s']| ]; eauto. left.
+    (* pose proof H as X%trace_lookup_dom_strong.  *)
+    assert (NOmega.lt_nat_l (i + 1) (NOmega.sub l3 (NOnum m2))). 
+    { eapply trace_lookup_dom_strong; eauto. }
+    erewrite @subtrace_lookup in H; eauto.
+    eapply L3; [..| apply H]; [lia| ].
+    lia_NO l3. }
+    
+  pose proof (trace_len_uniq _ _ _ LEN3 LEN3').
+  lia_NO' l3. inversion H. subst m3.
+  forward eapply (client_trace_lookup tr n); eauto.
+  intros [? | [stepn [STEPn [CL3 | LIB3]]]]; [done| ..].
+  { eapply NL3 in CL3; done. }
+  destruct LIB3 as [LIB3 BOUND3'].
+  do 2 red in LIB3. destruct LIB3 as (?&?&?&[=]&[? <-]).
+  subst. simpl in *.
+  destruct DOM3 as [LE3 DOM3].
 
-  
-  
+  enough (ls_tmap x.1 (LM := lib_model) !! x2 = Some ∅).
+  2: { apply state_label_lookup in STEPn. 
+       eapply done_lib_preserved. 
+       6: apply STEPn.
+       all: eauto.
+       destruct CL2 as (?&?&?&[=]&[=]). subst. simpl.
+       eapply state_label_lookup; eauto. }
+       
+  forward eapply (mtrace_valid_steps' VALID n) as TRANS; eauto.
+  simpl in TRANS. inversion TRANS. subst.
+  apply fm_live_spec in LIB_STEP.
+  eapply LM_map_empty_notlive in LIB_STEP; eauto. done. 
 Admitted. 
 
 Theorem client_terminates
