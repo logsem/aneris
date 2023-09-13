@@ -749,6 +749,65 @@ Proof.
   eapply LM_map_empty_notlive in LIB_STEP; eauto. done. 
 Admitted. 
 
+(* TODO: should directly follow from LM state invariants *)
+Lemma client_LM_inner_exposed (auxtr: auxtrace (LM := client_model)):
+  inner_obls_exposed (inl: lib_grole -> fmrole client_model_impl)
+    (λ c δ_lib, c.1 = δ_lib) auxtr.
+Proof. Admitted. 
+
+(* TODO: try to unify it with general lemma.
+   The problem is that proving client model trace termination
+   now depends on client LM trace with certain properties,
+   whereas in original lemma all model traces are required to be terminating. *)
+Theorem simulation_adequacy_terminate_client Σ 
+        `{hPre: @heapGpreS Σ client_model (@LM_EM_HL _ client_model)} (s: stuckness)
+        e1 (s1: fmstate client_model_impl)
+        (extr : heap_lang_extrace)
+        (Hexfirst : (trfirst extr).1 = [e1])
+  :
+  (* (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) -> *)
+  rel_finitary (sim_rel client_model) →
+  (∀ `{hGS: @heapGS Σ client_model (@LM_EM_HL _ client_model)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat)
+                 ={⊤}=∗
+                 WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
+  ) ->
+  extrace_fairly_terminating extr.
+Proof.
+  intros Hfb Hwp Hvex Hfair.
+  destruct (infinite_or_finite extr) as [Hinf|] =>//.
+
+  destruct (simulation_adequacy_model_trace
+              Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+
+  (* have Hfairaux := ex_fairness_preserved  *)
+  (*                    extr auxtr Hinf Hmatch Hfair. *)
+  assert (forall ρ n, fair_aux_SoU auxtr ρ n (LM := client_model)) as FAIR_SOU.
+  { eapply exec_fairness_implies_step_or_unassign; eauto.  
+    - by apply _.
+    - apply match_locale_enabled_states_livetids.
+    Unshelve. apply _. }
+  assert (forall ρ, fair_aux ρ auxtr) as Hfairaux. 
+  { eapply steps_or_unassigned_implies_aux_fairness; eauto.  
+    - by apply id_inj. 
+    - apply match_locale_enabled_states_livetids. }
+
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
+  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+
+  (* have Htermtr := Hterm mtr Hmtrvalid Hfairm. *)
+  assert (mtrace_fairly_terminating mtr) as FAIR_TERM. 
+  { eapply client_model_fair_term.
+    red. split; [| split]; eauto.
+    apply client_LM_inner_exposed. }
+  assert (terminating_trace mtr) as Hterm.
+  { eapply FAIR_TERM; eauto. }
+    
+  eapply traces_match_preserves_termination =>//.
+  eapply upto_stutter_finiteness =>//.
+Qed.
+
 Theorem client_terminates
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -760,8 +819,8 @@ Proof.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 
-  unshelve eapply (simulation_adequacy_terminate Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//.
-  - apply client_model_fair_term. 
+  unshelve eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//.
+  (* - apply client_model_fair_term.  *)
   - eapply valid_state_evolution_finitary_fairness_simple.
     (* TODO: problems with inferring EqDecision *)
     (* apply client_model_finitary. *)    
@@ -793,5 +852,6 @@ Proof.
       pose proof (live_roles_2 δ_lib0). simpl in H.
       replace (client_lr (δ_lib0, 2)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
       2: { symmetry. apply leibniz_equiv. apply live_roles_2. }
-      rewrite -gset_to_gmap_singletons big_opS_singleton. done.   
+      rewrite -gset_to_gmap_singletons big_opS_singleton. done.
+    Unshelve. admit.     
 Admitted. 
