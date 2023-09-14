@@ -867,7 +867,6 @@ Proof.
             ** apply not_elem_of_difference in Hlive as [?|Hlive]; [set_solver -Hsamedoms Hnewdom|].
                apply elem_of_difference in Hlive as [? Habs].
                exfalso. apply Habs.
-               (* assert (ρ' ≠ ρ) by admit.  *)
                set_solver -Hsamedoms Hnewdom Hfueldom.
         +
           rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
@@ -947,9 +946,57 @@ Proof.
       * assert (ρ' ∈ dom (ls_fuel δ1)) as Hin' by set_solver -Hsamedoms Hnewdom Hfueldom. apply elem_of_dom in Hin' as [? ->]. done. }
 
     Unshelve. all: eauto.
-    - admit.
-    - admit.
-  Admitted.
+    - intros. 
+      rewrite Hnewdom. setoid_rewrite lookup_insert_Some.
+      rewrite -ls_same_doms. split.
+      + intros [IN NIN]%elem_of_difference.
+        apply not_elem_of_difference in NIN.        
+        apply elem_of_union in IN as [IN | IN].
+        2: set_solver. 
+        apply elem_of_dom in IN as [τ' MAP].
+        destruct (decide (τ' = ζ)) as [-> | NEQ].
+        * destruct NIN.
+           ** destruct H0. by apply Hxdom.
+           ** set_solver.
+        * apply (ls_mapping_tmap_corr (LM := LM)) in MAP as (?&?&?).
+          set_solver.
+      + intros (τ & R & PROP & IN).
+        destruct PROP as [[<- <-] | [NEQ MAP]].
+        * set_solver.
+        * apply elem_of_difference. split.
+          ** apply elem_of_union. left.
+             eapply elem_of_dom. exists τ. eapply ls_mapping_tmap_corr; eauto.
+          ** apply not_elem_of_difference. left.
+             intros IN'%Hxdom.
+             apply (ls_mapping_tmap_corr (LM := LM)) in IN' as (?&?&?).
+             eapply ls_tmap_disj; eauto.
+    - intros.
+      assert (forall τ' S', τ' ≠ ζ -> ls_tmap δ1 (LM := LM) !! τ' = Some S' -> dom fs2 ## S') as FS2_DISJ. 
+      { destruct Hfuelsval as (?&?&?&?&?&?&FS2).
+        clear -Hfr_new HfrFR FS2 Hxdom HFR.  
+        intros τ' S' NEQ' IN'. 
+        
+        intros ρ' IN1 IN2.
+        move FS2 at bottom. specialize (FS2 _ IN1).
+        assert (ρ' ∈ dom fs1 -> False) as NINf1. 
+        { intros INf1. apply Hxdom in INf1.
+          eapply (ls_mapping_tmap_corr (LM := LM)) in INf1 as (?&?&?).
+          eapply ls_tmap_disj; eauto. }
+        repeat rewrite elem_of_union in FS2. destruct FS2 as [[[?|?]|?]|?].
+        2-4: apply NINf1; set_solver. 
+        apply Hfr_new, HfrFR in H0.
+        assert (ρ' ∈ dom (ls_fuel δ1)); [| set_solver].
+        rewrite -ls_same_doms. eapply elem_of_dom. 
+        eexists. eapply ls_mapping_tmap_corr. eauto. }
+ 
+      destruct (decide (τ1 = ζ)), (decide (τ2 = ζ)). 
+      all: subst; try congruence.
+      all: simpl_all_hyps H0 H1.
+      + inversion H0. subst. eapply FS2_DISJ; eauto.
+      + inversion H1. subst. symmetry. eapply FS2_DISJ; eauto.
+      + assert (τ1 ≠ τ2) by congruence. 
+        eapply ls_tmap_disj; eauto. 
+  Qed. 
 
 
 End ActualOwnershipImpl.

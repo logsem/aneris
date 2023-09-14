@@ -352,7 +352,6 @@ Section fairness_preserved.
       destruct (decide (τ = τ'')) as [<-|Hchange].
       +
         (* have [f' [Hfuel' Hff']] : exists f', ls_fuel (trfirst auxtr') !! ρ = Some f' ∧ f' ≤ f. *)
-        (* { eapply others_step_fuel_decr; eauto. admit. } *)
         assert (f' <= f) as Hff' by (eapply others_step_fuel_decr; eauto).
 
         unfold fair_by in *.
