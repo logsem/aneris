@@ -134,7 +134,7 @@ Section Wrapper_defs.
     ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) -∗
     ghost_map.ghost_map_auth γGauth q%Qp M ∗
     ([∗ map] k↦h ∈ mu, ∃ hwe, ownMemUser γGauth γGsnap k hwe ∗
-        ⌜h = to_hist hwe⌝ ∗ ⌜M !! k = Some hwe ⌝).
+        ⌜h = to_hist hwe⌝ ∗ ⌜M !! k = Some hwe⌝).
   Proof.
     iIntros "H_auth H_keys".
     iInduction mu as [|i x m H_eq] "IH" using map_ind forall (q); first by iFrame.
