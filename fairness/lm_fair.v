@@ -6,6 +6,7 @@ Section LMFair.
   Context `{LM: LiveModel G M}.
   Context `{Countable G, Inhabited G}.
   Context `{EqDecision M, Inhabited (fmstate M)}.
+  Context `{forall s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}.
 
   Global Instance FL_cnt: Countable (@FairLabel G (fmrole M)).
   Proof. 
@@ -25,33 +26,105 @@ Section LMFair.
   Qed. 
   
   Global Instance LS_eqdec: EqDecision (LiveState G M).
-  Proof. Admitted. 
+  Proof.
+    red. intros [] [].
+    destruct (decide (ls_under = ls_under0)), (decide (ls_fuel = ls_fuel0)), (decide (ls_mapping = ls_mapping0)).
+    2-8: right; intros [=]; congruence.
+    subst.
+    left. f_equal.
+    all: apply ProofIrrelevance. 
+  Qed. 
 
-  (* Lemma ls_trans_lim δ1 l δ2 *)
-  (*   (STEP: lm_ls_trans LM δ1 l δ2): *)
-  (*   l ∈ potential_step_FLs δ1 l.  *)
+  (* TODO: move, use in other places *)
+  Lemma dec_forall_fin_impl {A: Type} (P Q: A -> Prop) (domP: list A)
+    (DOMP: forall a, P a -> a ∈ domP)
+    (DECP: forall a, Decision (P a))
+    (DECQ: forall a, P a -> Decision (Q a)):
+    Decision (forall a, P a -> Q a).
+  Proof. 
+    set (domPP := filter P domP). 
+    destruct (@decide (Forall Q domPP)).
+    { assert (forall a, a ∈ domPP -> P a).
+      { subst domPP. intros ??%elem_of_list_filter. tauto. }
+      remember domPP as dom. clear Heqdom. induction dom.
+      { left. by apply Forall_nil. }
+      assert (P a) as Pa.
+      { apply H3; eauto. set_solver. }
+      specialize (DECQ _ Pa). 
+      destruct DECQ.
+      2: { right. by intros ALL%Forall_inv. }
+      destruct IHdom.
+      { intros. apply H3. set_solver. }
+      - left. by constructor.
+      - right. by intros ALL%Forall_inv_tail. } 
+    - left. intros.
+      eapply Forall_forall; eauto.
+      subst domPP. apply elem_of_list_filter. split; auto. 
+    - right. intros IMPL.
+      apply n. apply List.Forall_forall.
+      intros. apply IMPL.
+      subst domPP. apply elem_of_list_In, elem_of_list_filter in H3. 
+      tauto.
+  Qed.
+    
+  Lemma dec_forall_fin_impl' {A: Type} `{Countable A} 
+    (P Q: A -> Prop) (domP: gset A)
+    (DOMP: forall a, P a -> a ∈ domP)
+    (DECP: forall a, Decision (P a))
+    (DECQ: forall a, P a -> Decision (Q a)):
+    Decision (forall a, P a -> Q a).
+  Proof.
+    apply dec_forall_fin_impl with (domP := elements domP); auto.
+    set_solver. 
+  Qed. 
+
+  (* TODO: move *)
+  Global Instance must_decrease_dec {M_: FairModel} {G_: Type}
+    `{EqDecision G_}:
+    forall a oρ st1 st2 og,
+      Decision (must_decrease a oρ st1 st2 og (M := M_) (G := G_)).
+  Proof. 
+    intros.
+    destruct (decide (ls_mapping st1 !! a ≠ ls_mapping st2 !! a /\ is_Some (ls_mapping st2 !! a))).
+    { left. apply Change_tid; apply a0. }
+    destruct og.
+    2: { right. intros DECR. inversion DECR; tauto. }
+    destruct (decide (Some a ≠ oρ /\ Some g = ls_mapping st1 !! a)).
+    - left. econstructor; apply a0.
+    - right. intros DECR. inversion DECR; tauto.
+  Qed. 
+
+  (* TODO: move *)
+  Global Instance oless_dec: forall x y, Decision (oless x y). 
+  Proof. 
+    destruct x, y; simpl; solve_decision. 
+  Qed. 
+
+  (* TODO: move *)
+  Global Instance oleq_dec: forall x y, Decision (oleq x y). 
+  Proof. 
+    destruct x, y; simpl; solve_decision. 
+  Qed. 
+
+    
   Instance lm_ls_trans_dec st1 l st2:
     Decision (lm_ls_trans LM st1 l st2).
   Proof.
     destruct l; simpl. 
     3: { right. intros []. tauto. }
-    - repeat apply and_dec.
-      + admit. 
-      + solve_decision. 
-      + rewrite /fuel_decr. admit. 
-      + rewrite /fuel_must_not_incr.
-        admit.
-      + apply impl_dec; [solve_decision| ].
-        admit.
-      + admit.
-      + solve_decision.
-    - repeat apply and_dec.
-      + admit.
-      + admit. (* TODO: reuse *)
-      + admit. (* TODO: reuse *)
-      + solve_decision.
-      + solve_decision.
-  Admitted.
+    - solve_decision. 
+    - repeat apply and_dec; try solve_decision.
+      destruct (ls_tmap st1 (LM := LM) !! g) eqn:TMAP.
+      2: { right. intros [? MAP].
+           apply (ls_mapping_tmap_corr (LM := LM)) in MAP as (?&?&?).
+           set_solver. }
+      destruct (decide (g0 = ∅)) as [-> |NEMPTY].
+      { right. intros [? MAP].
+        apply (ls_mapping_tmap_corr (LM := LM)) in MAP as (?&?&?).
+        set_solver. }
+      left. apply set_choose_L in NEMPTY as [ρ ?].
+      exists ρ. apply (ls_mapping_tmap_corr (LM := LM)). eauto. 
+  Qed. 
 
 
   Definition potential_step_FLs (st1: lm_ls LM) (τ: G): 
@@ -158,7 +231,7 @@ Section LMFair.
   Lemma LM_live_role_map_notempty δ τ
     (LIVE: τ ∈ live_roles LM_Fair δ):
     exists R, ls_tmap δ (LM := LM) !! τ = Some R /\ R ≠ ∅.
-  Proof. 
+  Proof.N 
     apply LM_live_roles_strong in LIVE as [? STEP].
     destruct STEP as (ℓ & T & MATCH).
     destruct ℓ; simpl in *; try done; subst. 
