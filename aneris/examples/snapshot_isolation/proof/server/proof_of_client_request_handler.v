@@ -71,9 +71,9 @@ Section Proof_of_handler.
       as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
     wp_pures.
     wp_lam.
-    rewrite /start_handler.
+    (* rewrite /start_handler. *)
     wp_pures.
-    by iApply (start_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ Hreqd HinE
+    by iApply (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE
                 with "[$Hlk][$HGlobInv][$HP][$Hsh]").
   Admitted.
 

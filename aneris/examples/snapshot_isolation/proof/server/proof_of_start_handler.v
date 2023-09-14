@@ -108,16 +108,26 @@ Section Proof_of_start_handler.
       rewrite /ownMemAuthLocal /ownMemAuthGlobal.
       iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
                with "[$HmemLoc][$Hg1]"). }
-    iDestruct (mem_auth_lookup_big _ _ (1/2)%Qp mu M with "[$HmemLoc] [$Hkeys]") 
-      as "(Hmemloc & Hkeys & %Hmap_eq)".
+    iDestruct (mem_auth_lookup_big with "[$HmemLoc] [$Hkeys]") 
+      as "(HmemLoc & Hkeys & %Hmap_eq)".
     apply map_eq_filter_dom in Hmap_eq.
     iAssert ( [∗ map] k↦h ∈ filter (λ k : Key * list write_event, k.1 ∈ dom mu) M,
                 ownMemSeen γGsnap k h)%I as "#Hsnapshot".
-    { (** TODO: should be enough to prove using HmemGlob *)
-      unfold ownMemSeen.
-      unfold ownMemGlobal.
-      unfold ownMemMono.
-      admit. 
+    {
+      iDestruct (mem_auth_lookup_big_some with "[$HmemLoc] [$Hkeys]") 
+      as "(HmemLoc & Hkeys)". 
+      Unshelve. 
+      all : try done.
+      iApply big_sepM_filter.
+      rewrite Hmap_eq.
+      iDestruct (big_sepM_fmap (λ h : list write_event, to_hist h) with "Hkeys" ) as "Hkeys".
+      iDestruct (big_sepM_filter with "Hkeys" ) as "Hkeys".
+      iApply (big_sepM_mono with "Hkeys").
+      iIntros (k hwe H_lookup) "H_key_def H_dom".
+      rewrite -Hmap_eq.
+      iSpecialize ("H_key_def" with "H_dom").
+      iDestruct "H_key_def" as "[%hwe' ((_ & Hseen) & _ & %H_lookup')]".
+      by simplify_eq.
     }
     iMod (own_update _ _ (● (Tssg ∪ {[T + 1]}) ⋅ ◯ (Tssg ∪ {[T + 1]})) 
       with "HtimeStartsGlob") as "(HtimeStartsGlob' & #HtimeStartsSnap')".
@@ -195,6 +205,6 @@ Section Proof_of_start_handler.
        split_and!; eauto.
        replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
        done.
-  Admitted.
+  Qed.
 
 End Proof_of_start_handler.

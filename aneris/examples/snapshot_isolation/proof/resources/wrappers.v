@@ -128,6 +128,27 @@ Section Wrapper_defs.
         by rewrite map_filter_lookup_None_2 in IH; last set_solver.
     Qed.
 
+  Lemma mem_auth_lookup_big_some
+    (q : Qp) (mu : gmap Key (list val)) (M : gmap Key (list write_event)) :
+    ghost_map.ghost_map_auth γGauth q%Qp M -∗
+    ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) -∗
+    ghost_map.ghost_map_auth γGauth q%Qp M ∗
+    ([∗ map] k↦h ∈ mu, ∃ hwe, ownMemUser γGauth γGsnap k hwe ∗
+        ⌜h = to_hist hwe⌝ ∗ ⌜M !! k = Some hwe ⌝).
+  Proof.
+    iIntros "H_auth H_keys".
+    iInduction mu as [|i x m H_eq] "IH" using map_ind forall (q); first by iFrame.
+    iDestruct (big_sepM_insert with "H_keys") as "(H_key & H_keys)"; first apply H_eq.
+    iDestruct "H_key" as (hw) "((H_key & H_seen) & %H_eq_x_hw)".
+    iDestruct (ghost_map_lookup with "H_auth H_key") as "%H_lookup".
+    iDestruct ("IH" $! q%Qp with "H_auth H_keys") as "(H_auth & H_keys)".
+    iFrame.
+    iApply big_sepM_insert; first apply H_eq.
+    iFrame.
+    iExists hw.
+    by iFrame.
+  Qed.
+
   Lemma map_eq_filter_dom
         (mu : gmap Key (list val)) (M : gmap Key (list write_event)) :
     map_Forall
