@@ -27,7 +27,8 @@ From aneris.examples.snapshot_isolation.proof.resources
 From aneris.examples.snapshot_isolation.proof.server
      Require Import
      proof_of_start_handler
-     proof_of_read_handler.
+     proof_of_read_handler
+     proof_of_commit_handler.
 From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.
 
@@ -56,24 +57,31 @@ Section Proof_of_handler.
     rewrite /MTS_handler_pre //= /ReqPre.
     rewrite /lk_handle.
     iDestruct "Hpre" as "(#HGlobInv & [HpreRead|[HpreStart|HpreCommit]])".
-    (** Proof of read request. TODO: make a separate case as the proof will be quite long. *)
     1:{
-      iDestruct "HpreRead"
-      as (k ts h Hin Hreqd ->) "(%Hts & #HsnapT & #HsnapH)".
+      iDestruct "HpreRead" as (k ts h Hin Hreqd ->) "(%Hts & #HsnapT & #HsnapH)".
       wp_pures.
       wp_lam.
       wp_pures.
       by iApply (read_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
-                with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]"). }
-    (** Proof of commit request. TODO: make a separate case as the proof will be quite long *)
-    2:{ admit. }
-    iDestruct "HpreStart"
-      as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
+        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]"). 
+      }
+    2:{
+      iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap ts Tss Hreqd)
+        "HpreCommit".
+      iDestruct "HpreCommit" as (-> Hin Hmap Hcoh Hall Hvalid) 
+        "(Hsnap & Hseen & Hp & Hshift)".
+      wp_pures.
+      wp_lam.
+      wp_pures.
+      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _ _ 
+        Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]").
+      }
+    iDestruct "HpreStart" as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
     wp_pures.
     wp_lam.
     wp_pures.
     by iApply (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE
-                with "[$Hlk][$HGlobInv][$HP][$Hsh]").
-  Admitted.
+      with "[$Hlk][$HGlobInv][$HP][$Hsh]").
+  Qed.
 
 End Proof_of_handler.
