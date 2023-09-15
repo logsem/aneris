@@ -621,7 +621,11 @@ Proof.
   { eapply terminating_trace_equiv; eauto. }
 
   forward eapply (trace_prop_split tr is_client_step) as [l1 (L1 & NL1 & DOM1)]; eauto.
-  { solve_decision. }
+  { eapply slm_dec. intros.
+    (* TODO: why it's not inferred automatically? *)
+    assert (EqDecision client_role).    
+    { apply (@sum_eq_dec (fmrole lib_fair) lib_role_EqDec y_role y_EqDec). } 
+    solve_decision. }
 
   (* assert (exists n1, l1 = NOnum n1 /\ (forall s, tr S!! (n1 - 1) = Some s -> snd s < 2)) as (m1 & LEN1 & BOUNDc').  *)
   assert (exists n1, l1 = NOnum n1) as (m1 & LEN1).
@@ -642,7 +646,11 @@ Proof.
 
   forward eapply (trace_prop_split' tr is_lib_step _ m1)
     as (l2 & L2 & NL2 & LE2 & LE2'); eauto.
-  { solve_decision. }
+  { eapply slm_dec. intros.
+    (* TODO: why it's not inferred automatically? *)
+    assert (EqDecision client_role).    
+    { apply (@sum_eq_dec (fmrole lib_fair) lib_role_EqDec y_role y_EqDec). } 
+    solve_decision. }
 
   assert (exists m2, l2 = NOnum m2) as [m2 ->].
   { destruct l2 eqn:L2_EQ; [| by eauto].
@@ -660,7 +668,7 @@ Proof.
       eapply subtrace_lookup; eauto. }
 
     eapply simulation_adequacy_terminate_general' in MATCH; eauto; cycle 1. 
-    { admit. }
+    { apply lib_fair_term. }
     {       
       subst. simpl in *.
       forward eapply outer_exposing_subtrace; eauto.
@@ -707,7 +715,12 @@ Proof.
   
   destruct NEXT as [? | (step & BOUND & STm2 & CL2 & NOlib)]; [done| ].
   forward eapply (trace_prop_split' tr is_client_step _ m2) as [l3 (L3 & NL3 & DOM3)]; eauto.
-  { solve_decision. }
+  { eapply slm_dec. intros.
+    (* TODO: why it's not inferred automatically? *)
+    assert (EqDecision client_role).    
+    { apply (@sum_eq_dec (fmrole lib_fair) lib_role_EqDec y_role y_EqDec). } 
+    solve_decision. }
+
   forward eapply (subtrace_len tr _ m2 l3) as SUB3; eauto.
   { lia_NO' l3. apply proj1, le_lt_eq_dec in DOM3 as [?| ->]; [done| ].
     eapply NL3 in STm2; done. }
@@ -853,5 +866,4 @@ Proof.
       replace (client_lr (δ_lib0, 2)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
       2: { symmetry. apply leibniz_equiv. apply live_roles_2. }
       rewrite -gset_to_gmap_singletons big_opS_singleton. done.
-    Unshelve. admit.     
 Admitted. 

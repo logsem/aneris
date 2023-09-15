@@ -107,7 +107,7 @@ Section LMFair.
   Qed. 
 
     
-  Instance lm_ls_trans_dec st1 l st2:
+  Global Instance lm_ls_trans_dec st1 l st2:
     Decision (lm_ls_trans LM st1 l st2).
   Proof.
     destruct l; simpl. 
@@ -182,7 +182,7 @@ Section LMFair.
       all: eexists; split; [eapply STEP| done]. 
   Qed.
 
-  Instance locale_trans_ex_dec τ st1:
+  Global Instance locale_trans_ex_dec τ st1:
     Decision (exists st2, locale_trans st1 τ st2).
   Proof.
     (* intros.  *)
@@ -231,7 +231,7 @@ Section LMFair.
   Lemma LM_live_role_map_notempty δ τ
     (LIVE: τ ∈ live_roles LM_Fair δ):
     exists R, ls_tmap δ (LM := LM) !! τ = Some R /\ R ≠ ∅.
-  Proof.N 
+  Proof. 
     apply LM_live_roles_strong in LIVE as [? STEP].
     destruct STEP as (ℓ & T & MATCH).
     destruct ℓ; simpl in *; try done; subst. 

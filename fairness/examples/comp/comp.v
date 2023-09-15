@@ -41,8 +41,28 @@ Section LibraryDefs.
 
   Lemma lib_model_impl_lr_strong: FM_strong_lr lib_model_impl.
   Proof. 
-    red. intros.
-  Admitted.   
+    red. intros. simpl.
+    destruct st; [| destruct st]; set_solver. 
+  Qed. 
+
+  (* TODO: this is needed to prove lib termination; should extract this part *)
+  From trillium.fairness Require Import fair_termination trace_helpers trace_lookup. 
+
+  (* straightforward proof which can be done more idiomatically 
+     by providing FairTerminatingModel of library *)
+  Lemma lib_fair_term:
+    ∀ mtr: mtrace lib_model_impl, mtrace_fairly_terminating mtr. 
+  Proof.
+    red. intros mtr VALID FAIR. 
+    destruct mtr; [by exists 1| ].
+    destruct mtr; [by exists 2| ].
+    pose proof (mtrace_valid_steps' VALID 0) as STEP0.
+    pose proof (mtrace_valid_steps' VALID 1) as STEP1.
+    rewrite trace_lookup_0_cons in STEP0. simpl in STEP0. 
+    specialize (STEP0 _ _ _ eq_refl) as [-> ->].
+    rewrite trace_lookup_cons trace_lookup_0_cons in STEP1.
+    specialize (STEP1 _ _ _ eq_refl). by inversion STEP1.
+  Qed. 
   
 End LibraryDefs.
 
@@ -99,11 +119,16 @@ Section ClientDefs.
   Proof using. rewrite /lib_role. simpl. apply _. Defined. 
   
 
-  Global Instance client_role_EqDec: EqDecision client_role.
-  Proof. Admitted. 
-  Global Instance client_role_Cnt: Countable client_role.
-  Proof using. Admitted. 
+  Instance y_EqDec: EqDecision y_role.
+  Proof. by (solve_decision). Qed.
 
+  Global Instance client_role_Cnt: Countable client_role.
+  Proof using.
+    rewrite /client_role.
+    unshelve eapply sum_countable.
+    eauto. eapply (inj_countable' (fun _ => ()) (fun _ => ρy)).
+    by destruct x. 
+  Qed. 
 
   Definition client: val :=
   λ: <>,
@@ -114,9 +139,49 @@ Section ClientDefs.
     Skip
   .
 
+  (* Instance lib_step_dec (st: client_state) (ρ: client_role) st': *)
+  (*   Decision (client_trans st (Some ρ) st'). *)
+  (* Proof. *)
+  (*   Local Ltac nostep := right; intros T; inversion T. *)
+  (*   destruct st as [δ_lib n], st' as [δ'_lib n']. *)
+  (*   destruct (decide (n = S n' /\ ρ = inr ρy /\ δ_lib = δ'_lib)), *)
+  (*            (decide (n = 1 /\ n' = 1 /\ ρ = inl ρlg)). *)
+  (*   { lia. } *)
+  (*   3: { nostep; subst; tauto. } *)
+  (*   - destruct a as (->&->&<-). *)
+  (*     destruct n'; [| destruct n'].  *)
+  (*     + destruct (ls_tmap δ_lib (LM := lib_model) !! ρlg) eqn:LIB_OBLS. *)
+  (*       2: { nostep. by rewrite LIB_OBLS in LIB_NOROLES. } *)
+  (*       destruct (decide (g = ∅)). *)
+  (*       * subst. left. by constructor.  *)
+  (*       * nostep. rewrite LIB_OBLS in LIB_NOROLES. set_solver. *)
+  (*     + left. econstructor. *)
+  (*     + nostep. *)
+  (*   - destruct a as (->&->&->). *)
+  (*     destruct (decide (locale_trans δ_lib ρlg δ'_lib (LM := lib_model))).  *)
+  
   Instance lib_step_dec (st: client_state) (ρ: client_role):
     Decision (exists st', client_trans st (Some ρ) st').
-  Proof. Admitted. 
+  Proof.
+    Local Ltac nostep := right; intros [? T]; inversion T.
+    destruct st as [δ_lib n]. destruct n; [| destruct n]; [..| destruct n]. 
+    - by nostep. 
+    - destruct ρ.
+      + destruct l.
+        destruct (decide (exists δ'_lib, locale_trans δ_lib () δ'_lib (LM := lib_model))).
+        * left. destruct e. eexists. econstructor. simpl. eauto.
+        * nostep. simpl in LIB_STEP. eauto. 
+      + destruct y. 
+        destruct (ls_tmap δ_lib (LM := lib_model) !! ρlg) eqn:LIB_OBLS.
+        2: { nostep. by rewrite LIB_OBLS in LIB_NOROLES. }
+        destruct (decide (g = ∅)).
+        * subst. left. eexists. by constructor. 
+        * nostep. rewrite LIB_OBLS in LIB_NOROLES. set_solver.
+    - destruct ρ.
+      + nostep.
+      + destruct y. left. eexists. constructor.
+    - nostep. 
+   Qed. 
   
   Definition client_lr (st: client_state): gset (client_role) :=
     filter (fun r => (@bool_decide _ (lib_step_dec st r) = true))  {[ inl ρlg; inr ρy ]}. 
@@ -140,12 +205,6 @@ Section ClientDefs.
         fmtrans := client_trans;
         live_roles := client_lr;
     |}).
-    (* TODO: why it's not solved automatically? *)
-    - rewrite /client_state.
-      red. intros [??] [??].
-      destruct (fmstate_eqdec lib_fair l l0), (decide (n = n0)); subst. 
-      { left. done. }
-      all: right; congruence. 
     - intros. eapply client_lr_spec; eauto. 
   Defined.
 
