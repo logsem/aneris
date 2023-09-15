@@ -152,6 +152,12 @@ Section Resources.
     by rewrite to_max_prefix_list_op_valid_L in Hvalid.
   Qed.
 
+  Lemma get_OwnMemSeen M k h :
+      M !! k = Some h →
+      ownMemMono M ⊢ |==> ownMemMono M ∗ ownMemSeen k h.
+    Proof.
+   Admitted.
+
   (** TODO: other needed lemmas. *)
 
 End Resources.
