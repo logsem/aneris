@@ -93,13 +93,12 @@ Section Proof_of_read_handler.
          by iApply ("HΦ" $! (Some (x :: l))).
   Qed.
 
-  Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (Tss : gset nat) (kvsV : val)
+ Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (Tss : gset nat) (kvsV : val)
         (h Hk : list write_event)
        (m : gmap Key val) (M : gmap Key (list write_event)) :
    (∀ e : events.write_event, e ∈ h → we_time e < ts) →
    is_map kvsV m →
    kvsl_valid m M T Tss →
-   ts < T →
    M !! k = Some Hk →
    h `prefix_of` Hk →
     {{{
@@ -114,24 +113,32 @@ Section Proof_of_read_handler.
              ⌜hist_to_we h = Some e⌝))
     }}}.
   Proof.
-    iIntros (Het Hm Hcoh HtT Hin Hpre Φ) "(#Ht & #Hsh & #HsH) HΦ".
+    iIntros (Het Hm Hcoh Hin Hpre Φ) "(#Ht & #Hsh & #HsH) HΦ".
     wp_lam.
     do 15 wp_pures.
     destruct Hcoh.
     wp_smart_apply (kvs_get_spec k kvsV Hk m M Hm Hin); eauto.
     iIntros (vlo v) "%Hvlo".
-    iLöb as "IH" forall (v Hk vlo Hin Hpre Hvlo) "HsH".
-    destruct vlo as [l | ] eqn: Hvloeq; last first.
-    - destruct Hvlo as (-> & ->).
-      apply prefix_nil_inv in Hpre.
-      subst.
+    assert (v = $ (reverse Hk)) as Hvlo'.
+    admit.
+    clear Hvlo.
+    clear m Hm kvsl_ValidDom kvsl_ValidInModelEmpty kvsl_ValidInModelSome kvsl_ValidLocalSome.
+    iLöb as "IH" forall (v M Hk Hin Hpre Hvlo' kvsl_ValidModel) "HsH".
+    destruct (reverse Hk) as [| e Hr] eqn:Hkeq.
+    - subst; simpl.
       wp_pures.
       iApply ("HΦ" $! None); eauto.
-    - destruct Hvlo as (Hvl & Hmk & Hlneq & HlHk).
-      rewrite Hvl HlHk.
-      assert (∃ e Hr, reverse Hk = e :: (reverse Hr)) as (e & Hr & HkLast).
-      { admit. }
-      rewrite HkLast.
+      iLeft; iPureIntro; split; first done.
+      rewrite -reverse_nil in Hkeq.
+      list_simplifier.
+      by apply prefix_nil_inv in Hpre.
+    - assert (∃ Hr', Hr = reverse Hr') as (Hr' & Hrr).
+      { subst. destruct (reverse Hk); first done. exists (reverse (Hr)).
+        by rewrite reverse_involutive. }
+      rewrite Hrr in Hkeq.
+      rewrite Hrr in Hvlo'.
+      clear Hrr Hr.
+      rewrite Hvlo'.
       wp_pures.
       case_bool_decide.
       (** should be proven by contradiction: *)
@@ -147,121 +154,39 @@ Section Proof_of_read_handler.
         iExists e.
         iSplit; first done.
         iPureIntro.
-        admit. }
+        assert (e ∈ h ∨ e ∉ h) as [Heh|Heh].
+        {  destruct (bool_decide (e ∈ h)) eqn:Heh.
+           - apply bool_decide_eq_true in Heh; set_solver.
+           - apply bool_decide_eq_false in Heh; set_solver.
+        }
+        - rewrite /hist_to_we.
+          rewrite -head_reverse.
+          assert (Some e = head (reverse Hk)) as Hek.
+          { rewrite Hkeq. by list_simplifier. }
+          rewrite Hek.
+          assert (h = Hk) as ->.
+          { destruct kvsl_ValidModel.
+            assert ( ts ∈ Tss ) as HinTss.
+            { admit. }
+            destruct (kvs_ValidSnapshotTimesCuts k Hk ts Hin HinTss)
+              as (hl & hr & (Hc1 & Hc2 & Hc3)).
+            destruct Hpre as (hr' & Hc1').
+            admit.
+          }
+          done.
+        - destruct kvsl_ValidModel.
+          assert ( ts ∈ Tss ) as HinTss.
+          { admit. }
+          destruct (kvs_ValidSnapshotTimesCuts k Hk ts Hin HinTss)
+            as (hl & hr & (Hc1 & Hc2 & Hc3)).
+          admit. }
       wp_pure _.
-      iApply ("IH" $! ($(reverse Hr)) Hr with "[][][][$HΦ]").
-      + admit.
-      + admit.
+      iApply ("IH" $! ($(reverse Hr')) (<[ k := Hr']> M) Hr' with "[][][//][][$HΦ]").
+      + iPureIntro. admit.
+      + iPureIntro. list_simplifier. (* h prefix of Hk = Hr' ++ [e] and e ∉ h *) admit.
       + admit.
       + admit.
   Admitted.
-    (*   iPureIntro. *)
- (*      split. *)
- (*      -- simpl.  *)
- (*      split_and!; eauto. done. *)
- (*    (** --------------------------- old stuff --------------------------- *) *)
- (*    destruct Hget as (Hget & Hdis). *)
- (*    rewrite Hget. *)
-
- (*    iLöb as "IH". *)
- (*    destruct Hdis as [(Hvgeteq & Hkeq) | (hv &  Hhv & Heq1 & Heq2)]. *)
-
- (*    - rewrite -Hget Heq1.   *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      (** should be proven by contradiction:  *) *)
-(*  (*           we_time hv.t = ts  *) *)
-(*  (*           either hv ∈ h, then hv.t < ts *) *)
-(*  (*           or hv ∉ h but hv ∈ Hk, then ts < hv.t *) *)
- (*      { admit. } *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      { wp_pures.  *)
- (*        iApply ("HΦ" $! (Some (we_val hv))). *)
- (*        iRight. *)
- (*        iExists hv. *)
- (*        iSplit; first done. *)
- (*        iPureIntro. *)
- (*        admit. } *)
- (*      wp_pure _.  *)
-
- (*    (* --------------------------------------------------------------------- *) *)
- (*    iLöb as "IH"forall (Hk Hget Hin Hpre Hdis) "HsH". *)
- (*    destruct Hdis as [(Hvgeteq & Hkeq) | (hv &  Hhv & Heq1 & Heq2)]. *)
- (*    - subst.  *)
- (*      apply prefix_nil_inv in Hpre. *)
- (*      rewrite reverse_nil. *)
- (*      wp_pures. *)
- (*      iApply ("HΦ" $! None); eauto. *)
- (*    - rewrite -Hget Heq1.   *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      (** should be proven by contradiction:  *) *)
-(*  (*           we_time hv.t = ts  *) *)
-(*  (*           either hv ∈ h, then hv.t < ts *) *)
-(*  (*           or hv ∉ h but hv ∈ Hk, then ts < hv.t *) *)
- (*      { admit. } *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      { wp_pures.  *)
- (*        iApply ("HΦ" $! (Some (we_val hv))). *)
- (*        iRight. *)
- (*        iExists hv. *)
- (*        iSplit; first done. *)
- (*        iPureIntro. *)
- (*        admit. } *)
- (*      wp_pure _.  *)
-
- (*      assert ($ Hhv = reverse  *)
- (*      iDestruct ("IH" $! . *)
- (* destruct (reverse Hk) as [| e Hkl] eqn: Hkeq; first done. *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      (** should be proven by contradiction. *) *)
- (*      { admit. } *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      { wp_pures. *)
- (*        iApply ("HΦ" $! (Some (we_val e))). *)
- (*         iRight. *)
- (*         iExists e. *)
- (*         iSplit; first done. *)
- (*         iPureIntro. *)
- (*      -- apply prefix_nil_inv in Hpre. *)
- (*         rewrite reverse_nil. *)
- (*         wp_pures. *)
- (*         iApply ("HΦ" $! None); eauto. *)
- (*      --        list_simplifier. *)
- (*         simpl in Heq1. *)
- (*         inversion Heq1. *)
- (*         rewrite Heq2. *)
- (*         rewrite reverse_involutive. *)
- (*         wp_pures. *)
- (*      case_bool_decide. *)
- (*      (** should be proven by contradiction. *) *)
- (*      { admit. } *)
- (*      wp_pures. *)
- (*      case_bool_decide. *)
- (*      { wp_pures. *)
- (*        iApply ("HΦ" $! (Some (we_val hv))). *)
- (*        iRight. *)
- (*        iPureIntro. *)
- (*        exists hv. *)
- (*        split; first done. *)
- (*        rewrite /hist_to_we. *)
- (*        assert (Some hv = head (hv :: Hhv)) as Hsomehv by done. *)
- (*        rewrite -last_reverse in Hsomehv. *)
- (*        rewrite Hsomehv. *)
- (*        rewrite reverse_cons. *)
- (*        rewrite last_snoc. *)
- (*        assert ((reverse h) `suffix_of` ((hv :: Hhv))) as Hsuf. *)
- (*        { rewrite Heq2 in Hpre. *)
- (*          admit. } *)
- (*        admit. *)
- (*      } *)
- (*      wp_pure _. *)
- (*      (* iApply ("IH" with "[$HΦ]"). *) *)
- (*   Admitted. *)
 
   Lemma read_handler_spec
         (k : string)
@@ -297,8 +222,89 @@ Section Proof_of_read_handler.
       as (kvsV T Tss m M Hmap Hvalid Hforall)
            "(HmemLoc & HtimeLoc & #Hstarts & HkvsL & HvnumL)".
     wp_load.
-    admit.
-    (* wp_apply (kvs_get_last_spec); try done. eauto. *)
+    wp_apply fupd_aneris_wp.
+    iInv KVS_InvName
+      as (Mg Tg Tssg gMg)
+           ">((HmemG & HmemGmono) &
+             HtimeGlob & HtimeStartsGlob & Hccls & %Hdom & %HkvsValid)".
+    iDestruct (ownMemSeen_lookup with "[$HmemGmono][$HsnapH]") as "%HinM".
+     iAssert (⌜M = Mg⌝%I) as "<-".
+    { rewrite /ownMemAuthLocal /ownMemAuthGlobal.
+      iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
+               with "[$HmemLoc][$HmemG]"). }
+    destruct HinM as (Hk & Hpre & Hkin).
+    iAssert (ownMemSeen γGsnap k Hk)%I as "#HseenHk".
+    { admit. }
+    iSplitL "HtimeGlob HmemG HmemGmono Hccls HtimeStartsGlob".
+    { iModIntro. iNext.
+      iExists _, _, _, _.
+      by iFrame "#∗".
+    }
+    iModIntro.
+    iModIntro.
+    wp_apply (kvs_get_last_spec k ts T Tss kvsV h Hk ); try eauto.
+    iIntros (vo) "[(-> & ->)|Hres]".
+    - wp_pures.
+      wp_smart_apply (release_spec with "[-HΦ]").
+      iFrame "#∗".
+      { rewrite /lkResDef.
+        iExists  kvsV, _, _, m, M.
+        by iFrame "#∗". }
+      iIntros (? ->).
+      wp_pures.
+      iApply ("HΦ" $! _ _).
+      iSplit.
+      -- iPureIntro.
+         simplify_eq /=.
+         eapply sum_is_ser_valid.
+         rewrite /sum_is_ser.
+         eexists (InjLV #()), _.
+         left.
+         split; first eauto.
+         simpl. split; last done.
+         by left.
+      -- rewrite /ReqPost.
+         iFrame "#".
+         iLeft.
+         iExists k, ts, [], NONEV.
+         iFrame "#∗".
+         iPureIntro.
+         split_and!; eauto.
+    - iDestruct "Hres" as (e) "(-> & %Hhist)".
+      wp_pures.
+      wp_smart_apply (release_spec with "[-HΦ]").
+      iFrame "#∗".
+      { rewrite /lkResDef.
+        iExists  kvsV, _, _, m, M.
+        by iFrame "#∗". }
+      iIntros (? ->).
+      wp_pures.
+      iApply ("HΦ" $! _ _).
+      iSplit.
+      -- iPureIntro.
+         simplify_eq /=.
+         exists (SOMEV (we_val e)).
+         left.
+         split; first done.
+         left.
+         exists (we_val e).
+         split; first done.
+         specialize (map_Forall_lookup_1 _ M k Hk Hforall Hkin).
+         simpl. intros Hser1.
+         destruct (Forall_forall (λ we, KVS_Serializable (we.(we_val))) Hk)
+           as [Hs1 _].
+         specialize (Hs1 Hser1).
+         apply Hs1.
+         rewrite /hist_to_we in Hhist.
+         apply last_Some_elem_of in Hhist.
+         by eapply elem_of_prefix.
+      -- rewrite /ReqPost.
+         iFrame "#".
+         iLeft.
+         iExists k, ts, h, _.
+         iFrame "#∗".
+         iPureIntro.
+         split_and!; eauto.
   Admitted.
 
 
