@@ -68,12 +68,26 @@ Section Wrapper_defs.
   (*        ⌜m = (λ h, to_hist h)<$>M⌝. *)
   (* Proof. Admitted. *)
 
+  Lemma mem_implies_seen (m : gmap Key (list val)) :
+    ([∗ map] k↦h ∈ m, OwnMemKey_def k h) -∗
+    ([∗ map] k↦h ∈ m, OwnMemKey_def k h ∗ Seen_def k h).
+  Proof.
+    iIntros "Hkeys".
+    iApply (big_sepM_wand with "[$Hkeys] []").
+    iApply big_sepM_intro.
+    iModIntro.
+    iIntros (k v Hlookup) "[%hwe ((Helem & #Hseen') & %HhistEq)]".
+    iSplitL "Helem".
+    all : iExists hwe.
+    all : by iFrame "#∗".
+  Qed.
+
   Lemma mem_auth_lookup_big
     (q : Qp) (mu : gmap Key (list val)) (M : gmap Key (list write_event)) :
     ghost_map.ghost_map_auth γGauth q%Qp M -∗
-    ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) -∗
+    ([∗ map] k↦h ∈ mu, OwnMemKey_def k h) -∗
     ghost_map.ghost_map_auth γGauth q%Qp M ∗
-    ([∗ map] k↦h ∈ mu, OwnMemKey_def  k h) ∗
+    ([∗ map] k↦h ∈ mu, OwnMemKey_def k h) ∗
     ([∗ map] k↦h ∈ mu,
       ⌜mu !! k =
             ((λ h : list write_event, to_hist h)
