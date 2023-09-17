@@ -132,7 +132,7 @@ Section Commit_Proof.
       simplify_eq /=.
       by iDestruct (own_valid_2 with "Htk' Hsp") as %?.
     }
-    iDestruct "Hst" as (ts Tss Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
+    iDestruct "Hst" as (ts Msnap cache_updatesL cache_updatesV cache_updatesM cacheM)
       "( -> & (%Hcoh & %Hser & %Hvalid & %Hismap & #Htime & #Hseen & Hupd & Hauth & HauthMsnap & Htok))".
     wp_pures.
     wp_load.
@@ -368,11 +368,11 @@ Section Commit_Proof.
                 apply Hlm3.
                 clear Hlm3 IHlm H_eq_updates Hser Hlm1 Hlm2 H_e_in H_t_list.
                 induction lm; first inversion H_i_x_some.
-                destruct a as [k' v']. 
+                destruct a as [k' v'].
                 simpl.
                 destruct (decide (k = k')); first set_solver.
                 apply elem_of_cons.
-                right. 
+                right.
                 apply IHlm.
                 apply elem_of_cons in H_i_x_some.
                 destruct H_i_x_some; set_solver.
@@ -387,7 +387,6 @@ Section Commit_Proof.
             iRight.
             iRight.
             iExists E, _, _, _, _, _, _, _.
-            iExists _.
             do 7 (iSplit; first done).
             iFrame "#∗".
             iSplit; first done.

@@ -70,7 +70,7 @@ Section Write_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Tss Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
     iDestruct "Hres" as (Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_pures.
@@ -102,7 +102,7 @@ Section Write_Proof.
     { iExists _.
       iFrame "#∗".
       iRight.
-      iExists ts, Tss, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
+      iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
       iFrame "#∗".
       iSplit; first done.

@@ -63,17 +63,17 @@ Section Proof_of_handler.
       wp_lam.
       wp_pures.
       by iApply (read_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
-        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]"). 
+        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]").
       }
     2:{
-      iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap ts Tss Hreqd)
+      iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap ts Hreqd)
         "HpreCommit".
-      iDestruct "HpreCommit" as (-> Hin Hmap Hcoh Hall Hvalid) 
+      iDestruct "HpreCommit" as (-> Hin Hmap Hcoh Hall Hvalid)
         "(Hsnap & Hseen & Hp & Hshift)".
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _ _ 
+      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _
         Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]").
       }
     iDestruct "HpreStart" as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".

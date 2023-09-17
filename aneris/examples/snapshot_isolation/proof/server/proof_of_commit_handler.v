@@ -44,17 +44,16 @@ Section Proof_of_commit_handler.
     (E : coPset)
     (P : iProp Σ)
     (Q : val → iProp Σ)
-    (ts : nat) 
+    (ts : nat)
     (cache_updatesM : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap : gmap Key (list write_event))
-    (cmapV : val)
-    (Tss : gset nat) :
+    (cmapV : val) :
     reqd = inr (inr (E, ts, cache_updatesM, cache_logicalM, Msnap, P, Q)) →
     ↑KVS_InvName ⊆ E →
     is_map cmapV cache_updatesM →
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
-    kvs_valid_snapshot Msnap ts Tss →
+    kvs_valid_snapshot Msnap ts →
     map_Forall (λ (_ : Key) (v : val), KVS_Serializable v) cache_updatesM →
     server_lock_inv γGauth γT γTss γlk lk kvs vnum -∗
     Global_Inv clients γKnownClients γGauth γGsnap γT γTss -∗
@@ -69,7 +68,7 @@ Section Proof_of_commit_handler.
               ⌜can_commit m_current
                   ((λ h : list write_event, to_hist h) <$> Msnap)
                   cache_logicalM⌝ ∗
-              ([∗ map] k↦h;p ∈ m_current;cache_logicalM, 
+              ([∗ map] k↦h;p ∈ m_current;cache_logicalM,
                 OwnMemKey_def γGauth γGsnap k (commit_event p h) ∗
                 Seen_def γGsnap k (commit_event p h)) ∨ ⌜
               b = false⌝ ∗
@@ -84,35 +83,35 @@ Section Proof_of_commit_handler.
          ReqPost clients γKnownClients γGauth γGsnap γT γTss repv reqd repd -∗
          Φ repv) -∗
     WP let: "res" := InjR
-                      (InjR 
-                        (acquire lk ;; 
+                      (InjR
+                        (acquire lk ;;
                         let: "res" := (λ: <>,
-                                        let: "tc" := 
+                                        let: "tc" :=
                                         ! #vnum + #1 in
-                                        let: "kvs_t" := 
+                                        let: "kvs_t" :=
                                         ! #kvs in
-                                        let: "ts" := 
+                                        let: "ts" :=
                                         Fst (#ts, cmapV)%V in
-                                        let: "cache" := 
+                                        let: "cache" :=
                                         Snd (#ts, cmapV)%V in
                                         if: list_is_empty "cache" then #true
-                                        else let: "b" := 
+                                        else let: "b" :=
                                              map_forall
                                                (λ: "k" "_v",
-                                                  let: "vlsto" := 
+                                                  let: "vlsto" :=
                                                   map_lookup "k" "kvs_t" in
-                                                  let: "vs" := 
-                                                  if: 
+                                                  let: "vs" :=
+                                                  if:
                                                   "vlsto" = InjL #()
-                                                  then 
+                                                  then
                                                   InjL #()
-                                                  else 
+                                                  else
                                                   network_util_code.unSOME
                                                     "vlsto" in
                                                   check_at_key "k" "ts" "tc" "vs")
                                                "cache" in
                                              if: "b"
-                                             then #vnum <- "tc" ;; 
+                                             then #vnum <- "tc" ;;
                                                   #kvs <-
                                                   snapshot_isolation_code.update_kvs
                                                     "kvs_t" "cache" "tc" ;; #true
@@ -120,13 +119,13 @@ Section Proof_of_commit_handler.
                        release lk ;; "res")) in "res" @[
       ip_of_address KVS_address] {{ v, Φ v }}.
   Proof.
-    iIntros (Hreqd Hsub Hmap Hcoh Hvalid Hall) "#Hlk #HGlobInv #Htime #Hseen HP Hshift HΦ". 
+    iIntros (Hreqd Hsub Hmap Hcoh Hvalid Hall) "#Hlk #HGlobInv #Htime #Hseen HP Hshift HΦ".
     wp_apply (acquire_spec with "[Hlk]"); first by iFrame "#".
     iIntros (?) "(-> & Hlock & Hlkres)".
     wp_pures.
     unfold lkResDef.
     iDestruct "Hlkres"
-      as (kvsV T Tss' m M Hmap' Hvalid')
+      as (kvsV T tss' m M Hmap' Hvalid')
            "(%Hser & HmemLoc & HtimeLoc & #HtimeSnaps & HkvsL & HvnumL)".
     wp_load.
     wp_pures.
@@ -136,7 +135,7 @@ Section Proof_of_commit_handler.
     [
      destruct l; inversion HcmapEq |
      destruct l; inversion HcmapEq |
-     destruct l; inversion HcmapEq | | 
+     destruct l; inversion HcmapEq | |
     ].
     - wp_bind (Load _).
       wp_apply (aneris_wp_atomic _ _ E).
@@ -160,7 +159,7 @@ Section Proof_of_commit_handler.
           apply Hcoh2 in Hlookup as Hsome.
           destruct p1; last by inversion Hsome.
           by rewrite -Hcoh1 in Hlookup.
-        * iApply (big_sepM2_mono 
+        * iApply (big_sepM2_mono
             (λ k v1 v2, OwnMemKey_def γGauth γGsnap k v1 ∗ Seen_def γGsnap k v1)%I).
           -- iIntros (k v1 v2 Hlookupv1 Hlookupv2) "Hkeys".
              assert (commit_event v2 v1 = v1) as ->; last iFrame.
@@ -170,17 +169,17 @@ Section Proof_of_commit_handler.
              destruct b; last done.
              apply Hcoh2 in Hlookupv2 as Hsome.
              by rewrite -Hcoh1 in Hlookupv2.
-          -- iApply (big_sepM2_mono 
+          -- iApply (big_sepM2_mono
                (λ k v1 v2, (OwnMemKey_def γGauth γGsnap k v1 ∗ Seen_def γGsnap k v1) ∗ emp)%I).
                {
-                iIntros (? ? ? ? ?) "((? & ?) & ?)". 
+                iIntros (? ? ? ? ?) "((? & ?) & ?)".
                 iFrame.
                }
              iApply (big_sepM2_sepM_2
                (λ k v, OwnMemKey_def γGauth γGsnap k v ∗ Seen_def γGsnap k v)%I
                (λ k v, emp)%I m_current cache_logicalM with "[Hkeys] [//]").
              2 : iApply (mem_implies_seen with "[$Hkeys]").
-             rewrite -Hdom in HdomEq. 
+             rewrite -Hdom in HdomEq.
              intro k.
              destruct (decide (k ∈ dom m_current)) as [Hin | Hnin].
              {
@@ -196,10 +195,10 @@ Section Proof_of_commit_handler.
       + iMod "HQ".
         iModIntro.
         wp_pures.
-        wp_apply (release_spec with 
+        wp_apply (release_spec with
           "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
         {
-          iExists kvsV, T, Tss', m, M.
+          iExists kvsV, T, tss', m, M.
           iFrame "#∗".
           by iPureIntro.
         }

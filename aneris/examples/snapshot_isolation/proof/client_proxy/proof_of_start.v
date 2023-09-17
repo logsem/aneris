@@ -68,7 +68,7 @@ Section Start_Proof.
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
-    { iDestruct "Habs" as (? ? ? ? ? ? ? ->) "Habs".
+    { iDestruct "Habs" as (? ? ? ? ? ? ->) "Habs".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
@@ -85,14 +85,14 @@ Section Start_Proof.
     wp_pures.
     set (rd := (inr (inl (E, ⌜True⌝%I,
                            (λ tsv,
-                        ∃ ts Tss Msnap cacheM,
+                        ∃ ts Msnap cacheM,
                         isActiveToken γA ∗
                         ghost_map.ghost_map_auth γCache 1 cacheM ∗
                         ownMsnapAuth γMsnap Msnap ∗
                         ownTimeSnap γT γTss ts ∗
                         ⌜tsv = #ts⌝ ∗
                         ⌜is_coherent_cache ∅ cacheM Msnap⌝ ∗
-                        ⌜kvs_valid_snapshot Msnap ts Tss⌝ ∗
+                        ⌜kvs_valid_snapshot Msnap ts⌝ ∗
                         ([∗ map] k↦h ∈ Msnap, ownMemSeen γGsnap k h) ∗
                         Φ #())%I))) : @ReqData Σ).
     wp_apply ("Hspec" $! _ _ _ rd with "[$Hcr Hsh Hst Hgh Hsnap]").
@@ -122,13 +122,13 @@ Section Start_Proof.
         iExists m.
         iFrame.
         iNext.
-        iIntros (ts Tss M HmM) "(%Hvsn & Hser & Hts & Hpts & #Hseen)".
+        iIntros (ts M HmM) "(%Hvsn & Hser & Hts & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
-        iExists ts, Tss, M, (cacheM_from_Msnap M).
+        iExists ts, M, (cacheM_from_Msnap M).
         iFrame.
         iAssert (([∗ map] k↦h ∈ ((λ h : list write_event, to_hist h) <$> M),
               Seen_def γGsnap k h)%I) as "#Hseen2".
@@ -151,7 +151,7 @@ Section Start_Proof.
                by by rewrite right_id_L.
         iFrame.
         iApply fupd_frame_l.
-        iSplit; first done. 
+        iSplit; first done.
         iApply fupd_frame_l; iSplit.
         { iPureIntro; by apply is_coherent_cache_start. }
         iApply fupd_frame_l; iSplit; first done.
@@ -181,13 +181,13 @@ Section Start_Proof.
     wp_pures.
     wp_store.
     iDestruct "Hpost"
-      as (t Tss Msnap ?) "(Htk & Hgh & Hmfr & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
+      as (t Msnap ?) "(Htk & Hgh & Hmfr & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
     wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc Hmfr]").
     {
       iExists (InjRV (#t, #cm))%V.
       iFrame "Hl Hcr".
       iRight.
-      iExists _, _, _, _, _, ∅, _.
+      iExists _, _, _, _, _, _.
       iFrame "#∗".
       iPureIntro.
       split_and!; try done. }

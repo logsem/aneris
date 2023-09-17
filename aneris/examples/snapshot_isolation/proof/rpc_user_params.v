@@ -85,9 +85,9 @@ Section RPC_user_params.
            ={⊤, E}=∗
            (∃ (m : gmap Key (list val)),
                ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-                 ▷ (∀ ts Tss M,
+                 ▷ (∀ ts M,
                       ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                      ⌜kvs_valid_snapshot M ts Tss⌝ ∗
+                      ⌜kvs_valid_snapshot M ts⌝ ∗
                       ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
                       ownTimeSnap γT γTss ts ∗
                       ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
@@ -102,15 +102,14 @@ Section RPC_user_params.
           (cache_updatesM : gmap Key val)
           (cache_logicalM : gmap Key (option val * bool))
           (Msnap : gmap Key (list write_event))
-          (ts : nat)
-          (Tss : gset nat),
+          (ts : nat),
           ⌜reqd = inr (inr (E, ts, cache_updatesM, cache_logicalM, Msnap, P, Q))⌝ ∗
           ⌜reqv = InjRV (InjRV (#ts, cmapV))%V⌝ ∗
           ⌜↑KVS_InvName ⊆ E⌝ ∗
           ⌜is_map cmapV cache_updatesM⌝ ∗
           ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ ∗
           ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
-          ⌜kvs_valid_snapshot Msnap ts Tss⌝ ∗
+          ⌜kvs_valid_snapshot Msnap ts⌝ ∗
           ownTimeSnap γT γTss ts ∗
           ([∗ map] k ↦ h' ∈ Msnap, ownMemSeen γGsnap k h') ∗
           P ∗

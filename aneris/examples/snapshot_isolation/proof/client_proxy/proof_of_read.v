@@ -72,7 +72,7 @@ Section Read_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Tss Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
+      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
     iDestruct "Hres" as (Hvalid)
            "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
     wp_load.
@@ -101,7 +101,7 @@ Section Read_Proof.
         { iExists _.
           iFrame "#∗".
           iRight.
-          iExists ts, _, Msnap, cuL, cuV, cuM, cM.
+          iExists ts, Msnap, cuL, cuV, cuM, cM.
           by iFrame "#∗". }
         iNext.
         iIntros (v0 ->).
@@ -142,7 +142,7 @@ Section Read_Proof.
          specialize (Hc4 k Hkin).
          by simplify_eq /=. }
     specialize (Hd Hkv1).
-    destruct Hvalid as (_ & _ & Hvalid).
+    destruct Hvalid as (_ & Hvalid).
     specialize (Hvalid k h Hinh).
     (* Handler precondition. *)
     { iSplit.
@@ -180,7 +180,7 @@ Section Read_Proof.
        { iExists _.
          iFrame "#∗".
          iRight.
-         iExists ts, _, Msnap, cuL, cuV, cuM, cM.
+         iExists ts, Msnap, cuL, cuV, cuM, cM.
          by iFrame "#∗". }
        iNext.
        iIntros (? ->).

@@ -173,8 +173,13 @@ Lemma kvs_valid_next M T Tss :
   kvs_valid M (T + 1) (Tss ∪ {[(T+1)%nat]}).
 Proof. Admitted.
 
-End KVS_valid.
+Lemma kvs_valid_subset_Tss M T Tss sub:
+  sub ⊆ Tss →
+  kvs_valid M T Tss →
+  kvs_valid M T sub.
+Proof. Admitted.
 
+End KVS_valid.
 
 (** Local Validity tying physical and logical state. *)
 
@@ -206,31 +211,31 @@ Section KVSL_valid.
   Proof.
   Admitted.
 
-(* TODO: adapt for local state *)
+  (* TODO: adapt for local state *)
   (* Definition update_kvs (M0 : kvsMdl) (C : gmap Key SerializableVal) (T : nat) := *)
-(*       map_fold *)
-(*         (λ k v M, *)
-(*            (<[ k := {| we_key := k; we_val := v.(SV_val); we_time := T |} :: default [] (M !! k)]> M)) *)
-(*         M0 C. *)
+  (*       map_fold *)
+  (*         (λ k v M, *)
+  (*            (<[ k := {| we_key := k; we_val := v.(SV_val); we_time := T |} :: default [] (M !! k)]> M)) *)
+  (*         M0 C. *)
 
-(*   Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (cache : gmap Key SerializableVal) : *)
-(*     dom cache = KVS_keys → *)
-(*     kvs_valid M T -> *)
-(*     kvs_valid (update_kvs M cache (T+1)) (T+1). *)
-(*   Proof. *)
-(*   Admitted. *)
-(* End KVSL_valid. *)
+  (*   Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (cache : gmap Key SerializableVal) : *)
+  (*     dom cache = KVS_keys → *)
+  (*     kvs_valid M T -> *)
+  (*     kvs_valid (update_kvs M cache (T+1)) (T+1). *)
+  (*   Proof. *)
+  (*   Admitted. *)
+  (* End KVSL_valid. *)
 
-Lemma kvsl_valid_next M (m : gmap Key val) T Tss :
+  Lemma kvsl_valid_next M (m : gmap Key val) T Tss :
   kvsl_valid m M T Tss →
   kvsl_valid m M (T + 1) (Tss ∪ {[(T+1)%nat]}).
-Proof. Admitted.
+  Proof. Admitted.
 
   Lemma kvs_valid_filter M (mu : gmap Key (list val)) T Tss :
     kvs_valid M T Tss →
     kvs_valid
-       (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M)
-       T Tss.
+      (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M)
+      T Tss.
   Proof.
   Admitted.
 
@@ -240,11 +245,8 @@ Section Snapshot.
   Context `{!User_params}.
 
   Definition kvs_valid_snapshot
-             (M : gmap Key (list write_event)) (t : Time) (Tss : gset nat)  :=
-   t ∈ Tss ∧
-   kvs_valid M t Tss ∧
-   ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
-
-
+             (M : gmap Key (list write_event)) (t : Time) :=
+    kvs_valid M t {[t]} ∧
+      ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
 
 End Snapshot.

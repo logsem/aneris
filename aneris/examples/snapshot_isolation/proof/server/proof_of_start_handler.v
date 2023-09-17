@@ -52,9 +52,9 @@ Section Proof_of_start_handler.
     (P ={⊤,E}=∗
           ∃ m : gmap Key (list val),
             ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-            ▷ (∀ (ts : Time) (Tss : gset nat) (M : gmap Key (list write_event)),
+            ▷ (∀ (ts : Time) (M : gmap Key (list write_event)),
                  ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                 ⌜kvs_valid_snapshot M ts Tss⌝ ∗
+                 ⌜kvs_valid_snapshot M ts⌝ ∗
                  ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
                  ownTimeSnap γT γTss ts ∗
                  ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
@@ -108,15 +108,15 @@ Section Proof_of_start_handler.
       rewrite /ownMemAuthLocal /ownMemAuthGlobal.
       iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
                with "[$HmemLoc][$Hg1]"). }
-    iDestruct (mem_auth_lookup_big with "[$HmemLoc] [$Hkeys]") 
+    iDestruct (mem_auth_lookup_big with "[$HmemLoc] [$Hkeys]")
       as "(HmemLoc & Hkeys & %Hmap_eq)".
     apply map_eq_filter_dom in Hmap_eq.
     iAssert ( [∗ map] k↦h ∈ filter (λ k : Key * list write_event, k.1 ∈ dom mu) M,
                 ownMemSeen γGsnap k h)%I as "#Hsnapshot".
     {
-      iDestruct (mem_auth_lookup_big_some with "[$HmemLoc] [$Hkeys]") 
-      as "(HmemLoc & Hkeys)". 
-      Unshelve. 
+      iDestruct (mem_auth_lookup_big_some with "[$HmemLoc] [$Hkeys]")
+      as "(HmemLoc & Hkeys)".
+      Unshelve.
       all : try done.
       iApply big_sepM_filter.
       rewrite Hmap_eq.
@@ -129,7 +129,7 @@ Section Proof_of_start_handler.
       iDestruct "H_key_def" as "[%hwe' ((_ & Hseen) & _ & %H_lookup')]".
       by simplify_eq.
     }
-    iMod (own_update _ _ (● (Tssg ∪ {[T + 1]}) ⋅ ◯ (Tssg ∪ {[T + 1]})) 
+    iMod (own_update _ _ (● (Tssg ∪ {[T + 1]}) ⋅ ◯ (Tssg ∪ {[T + 1]}))
       with "HtimeStartsGlob") as "(HtimeStartsGlob' & #HtimeStartsSnap')".
     {
       apply auth_update_alloc.
@@ -147,15 +147,17 @@ Section Proof_of_start_handler.
     iModIntro.
     iModIntro.
     wp_store.
-    iDestruct ("Hpost" $! (T+1)%nat (Tssg ∪ {[(T+1)%nat]}) ((filter (λ k, k.1 ∈ dom mu) M))
+    iDestruct ("Hpost" $! (T+1)%nat ((filter (λ k, k.1 ∈ dom mu) M))
                 with "[][Hkeys]") as "HQ"; first done.
     iFrame "#∗".
     { iSplit.
       - iPureIntro.
-        split; first by set_solver.
         split.
-        -- apply kvs_valid_next.
-           by apply kvs_valid_filter.
+        -- apply kvs_valid_filter.
+           apply kvsl_valid_next in Hvalid.
+           destruct Hvalid.
+           eapply kvs_valid_subset_Tss in kvsl_ValidModel;
+           by set_solver.
         -- intros k h H_lookup e H_e_in_h.
           apply map_filter_lookup_Some_1_1 in H_lookup.
           assert ((we_time e ≤ T)%Z); first by eapply kvs_ValidCommitTimes.
