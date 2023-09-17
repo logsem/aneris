@@ -7,6 +7,8 @@ Section fairness.
   Context {G: Type}.
   Context {M: FairModel}.
   Context `{Countable G}.
+  Context {LSI: fmstate M -> gmap M.(fmrole) G -> gmap M.(fmrole) nat -> Prop}.
+  Context `{forall s m f, Decision (LSI s m f)}.
 
   Record LiveState := MkLiveState {
     ls_under:> M.(fmstate);
@@ -17,6 +19,8 @@ Section fairness.
     ls_mapping: gmap M.(fmrole) G;
 
     ls_same_doms: dom ls_mapping = dom ls_fuel;
+
+    ls_inv: LSI ls_under ls_mapping ls_fuel;
   }.
 
   Arguments ls_under {_}.
@@ -108,40 +112,50 @@ Section fairness.
     mtrans := lm_ls_trans LM;
   |}.
 
-  Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: G)
-    : LM.(lm_ls) :=
-    {| ls_under := s0;
-       ls_fuel := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0);
-       ls_mapping := gset_to_gmap ζ0 (M.(live_roles) s0);
-    |}.
-  Next Obligation. intros ???. apply reflexive_eq. rewrite dom_gset_to_gmap //. Qed.
-  Next Obligation. intros ???. apply reflexive_eq. rewrite !dom_gset_to_gmap //. Qed.
-
   Lemma ls_same_doms' (δ: LiveState):
     forall ρ, is_Some (@ls_mapping δ !! ρ) <-> is_Some (@ls_fuel δ !! ρ).
   Proof. 
     intros. rewrite -!elem_of_dom. by rewrite ls_same_doms.
   Qed.
 
+  Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: G)
+    (f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0))
+    (m0 := gset_to_gmap ζ0 (M.(live_roles) s0))
+    (LSI0: LSI s0 m0 f0) 
+    : LM.(lm_ls) :=
+    {| ls_under := s0;
+       ls_fuel := f0;
+       ls_mapping := m0;
+    |}.
+  Next Obligation. 
+    simpl. intros. apply reflexive_eq. rewrite dom_gset_to_gmap //.
+  Qed.
+  Next Obligation. 
+    simpl. intros. apply reflexive_eq. rewrite !dom_gset_to_gmap //. 
+  Qed.
+  Next Obligation.
+    done.
+  Qed. 
+
 End fairness.
 
 Arguments LiveState : clear implicits.
 Arguments LiveModel : clear implicits.
-Arguments fair_model_model _ {_} _.
+Arguments fair_model_model _ {_} _ _.
 
-Definition live_model_to_model : forall G M, LiveModel G M -> Model :=
-  λ G M lm, fair_model_model G lm.
+Definition live_model_to_model : forall G M LSI, LiveModel G M LSI -> Model :=
+  λ G M LSI lm, fair_model_model G LSI lm.
 Coercion live_model_to_model : LiveModel >-> Model.
 Arguments live_model_to_model {_ _}.
 
 
 Section aux_trace.  
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
 
   Definition auxtrace := trace LM.(lm_ls) LM.(lm_lbl).
 
-  Definition role_enabled ρ (δ: LiveState G M) := ρ ∈ M.(live_roles) δ.
+  Definition role_enabled ρ (δ: LiveState G M LSI) := ρ ∈ M.(live_roles) δ.
 
   Definition fair_aux ρ (auxtr: auxtrace ): Prop  :=
     forall n, pred_at auxtr n (λ δ _, role_enabled ρ δ) ->
@@ -194,12 +208,12 @@ Section aux_trace.
 End aux_trace.
 
 Section aux_trace_lang.
-  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{Countable (locale Λ)}.
 
   Notation "'Tid'" := (locale Λ). 
 
-  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M) :=
+  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
     ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
 
   Definition labels_match (oζ : option Tid) (ℓ : LM.(lm_lbl)) : Prop :=
@@ -217,14 +231,14 @@ Ltac SS :=
   (* epose proof ls_mapping_dom; *)
   set_solver.
 
-Definition live_tids `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)}
+Definition live_tids `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)}
            (c : cfg Λ) (δ : LM.(lm_ls)) : Prop :=
   (∀ ρ ζ, δ.(ls_mapping (G := locale Λ)) !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
   ∀ ζ e, from_locale c.1 ζ = Some e -> (to_val e ≠ None) ->
          ∀ ρ, δ.(ls_mapping) !! ρ ≠ Some ζ.
 
 (* TODO: replace original definition with this *)
-Lemma live_tids_alt `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)} c δ:
+Lemma live_tids_alt `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)} c δ:
   live_tids c δ (LM := LM) (Λ := Λ) <->
     (forall ζ, (exists ρ, ls_mapping δ !! ρ = Some ζ) ->
           locale_enabled ζ c).
@@ -254,13 +268,13 @@ Qed.
 (*                LM.(lm_ls_trans). *)
 
 
-Definition valid_evolution_step `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)}
+Definition valid_evolution_step `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)}
   oζ (σ2: cfg Λ) δ1 ℓ δ2 :=
     labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) δ1 ℓ δ2 ∧
     tids_smaller (σ2.1) δ2.
 
 (* TODO: get rid of previous version *)
-Definition lm_valid_evolution_step `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)}:
+Definition lm_valid_evolution_step `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)}:
     cfg Λ → olocale Λ → cfg Λ → 
     mstate LM → lm_lbl LM → mstate LM -> Prop := 
     (fun (_: cfg Λ) => valid_evolution_step).
@@ -555,11 +569,11 @@ Definition lm_valid_evolution_step `{LM:LiveModel (locale Λ) M} `{EqDecision (l
 (* End fairness_preserved. *)
 
 Section fuel_dec_unless.
-  Context `{LM: LiveModel G Mdl}.
+  Context `{LM: LiveModel G Mdl LSI}.
   Context `{Countable G}.
   
   Lemma fuel_must_not_incr_fuels oρ'
-    (δ1 δ2: LiveState G Mdl)
+    (δ1 δ2: LiveState G Mdl LSI)
     ρ f1 f2
     (KEEP: fuel_must_not_incr oρ' δ1 δ2)
     (FUEL1: ls_fuel δ1 !! ρ = Some f1)
@@ -575,7 +589,7 @@ Section fuel_dec_unless.
   Qed.
 
   Lemma step_nonincr_fuels ℓ
-    (δ1 δ2: LiveState G Mdl)
+    (δ1 δ2: LiveState G Mdl LSI)
     ρ f1 f2
     (STEP: lm_ls_trans LM δ1 ℓ δ2)
     (FUEL1: ls_fuel δ1 !! ρ = Some f1)
@@ -594,7 +608,7 @@ Section fuel_dec_unless.
     | _ => None
     end.
 
-  Definition Ψ (δ: LiveState G Mdl) :=
+  Definition Ψ (δ: LiveState G Mdl LSI) :=
     size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := G)), f.
 
   Lemma fuel_dec_unless (auxtr: auxtrace (LM := LM)) :
@@ -650,13 +664,13 @@ Section fuel_dec_unless.
 End fuel_dec_unless.
 
 Section destuttering_auxtr.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
 
   Context `{Countable G}.
 
   (* Why is [LM] needed here? *)
   Definition upto_stutter_auxtr :=
-    upto_stutter (ls_under (G:=G) (M:=M)) (Ul (LM := LM)).
+    upto_stutter (ls_under (G:=G) (M:=M) (LSI := LSI)) (Ul (LM := LM)).
 
   Lemma can_destutter_auxtr auxtr:
     auxtrace_valid auxtr →
@@ -669,11 +683,11 @@ Section destuttering_auxtr.
 End destuttering_auxtr.
 
 Section upto_preserves.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
 
   Lemma upto_stutter_mono' :
-    monotone2 (upto_stutter_ind (ls_under (G:=G) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (ls_under (LSI := LSI)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
@@ -704,13 +718,13 @@ Section upto_preserves.
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
 
-  Notation upto_stutter_aux := (upto_stutter (ls_under (G := G)) (Ul (LM := LM))).
+  Notation upto_stutter_aux := (upto_stutter (ls_under (LSI := LSI)) (Ul (LM := LM))).
 
   Lemma upto_stutter_mono'' : (* TODO fix this proliferation *)
-    monotone2 (upto_stutter_ind (ls_under (G:=G) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (ls_under (LSI := LSI)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
@@ -718,7 +732,7 @@ Section upto_stutter_preserves_fairness_and_termination.
   Hint Resolve upto_stutter_mono' : paco.
 
   Lemma upto_stutter_step_correspondence auxtr (mtr: mtrace M)
-    (Po: LiveState G M -> option (mlabel LM) -> Prop)
+    (Po: LiveState _ _ LSI -> option (mlabel LM) -> Prop)
     (Pi: M -> option (option (fmrole M)) -> Prop)
     (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
                                               | Some ℓ => Ul ℓ (LM := LM)
@@ -804,7 +818,7 @@ Section upto_stutter_preserves_fairness_and_termination.
 
   Lemma upto_stutter_fairness_0 ρ auxtr (mtr: mtrace M):
     upto_stutter_aux auxtr mtr ->
-    (∃ n, pred_at auxtr n (λ δ _, ¬role_enabled (G := G) ρ δ)
+    (∃ n, pred_at auxtr n (λ δ _, ¬role_enabled (LSI := LSI) ρ δ)
           ∨ pred_at auxtr n (λ _ ℓ, ∃ ζ, ℓ = Some (Take_step ρ ζ))) ->
     ∃ m, pred_at mtr m (λ δ _, ¬role_enabled_model ρ δ)
          ∨ pred_at mtr m (λ _ ℓ, ℓ = Some $ Some ρ).

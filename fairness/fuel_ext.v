@@ -7,7 +7,7 @@ From trillium.fairness Require Export fuel utils.
          Previous attempt to do so failed due to weird implicit arguments errors
  *)
 Section LsTmap.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
 
   Definition ls_tmap (δ: lm_ls LM): gmap G (gset (fmrole M)).
@@ -22,11 +22,11 @@ Section LsTmap.
       ls_tmap δ !! τ1 = Some S1 -> ls_tmap δ !! τ2 = Some S2 -> S1 ## S2.
   Proof. Admitted. 
 
-  (* Definition ls_mapping (δ: LiveState): gmap M.(fmrole) G := *)
-  (*   let tmap_l := map_to_list (ls_tmap δ) in *)
-  (*   let tmap_flat := flat_map (fun '(τ, R) => map (pair τ) (elements R)) tmap_l in *)
-  (*   let tmap_rev := (fun '(τ, ρ) => (ρ, τ)) <$> tmap_flat in *)
-  (*   list_to_map tmap_rev. *)
+  Definition ls_mapping_impl (tmap: gmap G (gset (fmrole M))): gmap M.(fmrole) G :=
+    let tmap_l := map_to_list tmap in
+    let tmap_flat := flat_map (fun '(τ, R) => map (pair τ) (elements R)) tmap_l in
+    let tmap_rev := (fun '(τ, ρ) => (ρ, τ)) <$> tmap_flat in
+    list_to_map tmap_rev.
     
   Lemma fmap_flat_map {A B C: Type} (f : A → list B) (g: B -> C) (l : list A):
       g <$> (flat_map f l) = flat_map ((fmap g) ∘ f) l.
@@ -57,6 +57,11 @@ Section LsTmap.
     - eauto.
     - by apply elem_of_list_In.
   Qed.
+
+  (* Lemma ls_mapping_tmap_corr_impl tmap: *)
+  (*   maps_inverse_match (ls_mapping_impl tmap) tmap. *)
+  (* Proof. *)
+  (* Admitted.  *)
 
   Lemma ls_mapping_tmap_corr δ:
     maps_inverse_match (ls_mapping δ) (ls_tmap δ).
@@ -132,25 +137,26 @@ Section LsTmap.
     (tmap: gmap G (gset (fmrole M)))
     (TMAP_FUEL_SAME_DOMS: forall ρ, ρ ∈ dom (fuel) <-> exists τ R, tmap !! τ = Some R /\ ρ ∈ R)
     (LS_TMAP_DISJ: forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
-      tmap !! τ1 = Some S1 -> tmap !! τ2 = Some S2 -> S1 ## S2): 
-    LiveState G M.
+      tmap !! τ1 = Some S1 -> tmap !! τ2 = Some S2 -> S1 ## S2)
+    (LS_INV: LSI st (ls_mapping_impl tmap) fuel): 
+    LiveState G M LSI.
   Admitted. 
 
-  Lemma build_LS_ext_spec_st st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ:
-    ls_under (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ) = st.
+  Lemma build_LS_ext_spec_st st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV:
+    ls_under (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = st.
   Proof. Admitted. 
 
-  Lemma build_LS_ext_spec_fuel st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ:
-    ls_fuel (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ) = fuel.
+  Lemma build_LS_ext_spec_fuel st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV:
+    ls_fuel (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = fuel.
   Proof. Admitted. 
 
-  Lemma build_LS_ext_spec_tmap st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ:
-    ls_tmap (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ) = tmap.
+  Lemma build_LS_ext_spec_tmap st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV:
+    ls_tmap (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = tmap.
   Proof. Admitted. 
 
-  Lemma build_LS_ext_spec_mapping st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ
+  Lemma build_LS_ext_spec_mapping st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV
         rmap (MATCH: maps_inverse_match rmap tmap):
-    ls_mapping (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ) = rmap. 
+    ls_mapping (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = rmap. 
   Proof. 
     eapply maps_inverse_match_uniq1.
     - apply ls_mapping_tmap_corr. 

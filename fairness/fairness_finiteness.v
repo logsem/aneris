@@ -22,7 +22,7 @@ End gmap.
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
-  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
 
@@ -60,20 +60,20 @@ Section finitary.
   | trace_extend tr' ℓ x => trace_extend (trace_map sf lf tr') (lf ℓ) (sf x)
   end.
 
-  Fixpoint get_underlying_fairness_trace (M : FairModel) (LM: LiveModel (locale Λ) M) (ex : auxiliary_trace LM) :=
+  Fixpoint get_underlying_fairness_trace (M : FairModel) LSI (LM: LiveModel (locale Λ) M LSI) (ex : auxiliary_trace LM) :=
   match ex with
   | trace_singleton δ => trace_singleton (ls_under δ)
-  | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LM ex') ρ (ls_under δ)
-  | trace_extend ex' _ _ => get_underlying_fairness_trace M LM ex'
+  | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LSI LM ex') ρ (ls_under δ)
+  | trace_extend ex' _ _ => get_underlying_fairness_trace M LSI LM ex'
   end.
 
-  Definition get_role {M : FairModel} {LM: LiveModel (locale Λ) M} (lab: mlabel LM) :=
+  Definition get_role {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (lab: mlabel LM) :=
   match lab with
   | Take_step ρ _ => Some ρ
   | _ => None
   end.
 
-  Definition map_underlying_trace {M : FairModel} {LM: LiveModel (locale Λ) M} (aux : auxiliary_trace LM) :=
+  Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) :=
     (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
 
   Program Definition enumerate_next
@@ -101,6 +101,8 @@ Section finitary.
     intros ??????????. destruct fs as [? Heq]. destruct ms as [? Heq'].
     rewrite /= Heq //.
   Qed.
+  Next Obligation.
+    intros. 
 
   Definition lift_convert_lbl (oζ: olocale Λ) (ℓ: option (fmrole M)): lm_lbl LM :=
     match ℓ with
