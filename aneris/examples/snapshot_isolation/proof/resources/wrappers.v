@@ -113,7 +113,7 @@ Section Wrapper_defs.
     - iPureIntro.
       rewrite lookup_insert.
       rewrite lookup_fmap.
-      eapply (map_filter_lookup_Some_2 
+      eapply (map_filter_lookup_Some_2
         (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_lookup
         as ->; set_solver.
     - iApply (big_sepM_wand with "[$IH_instance]").
@@ -126,13 +126,13 @@ Section Wrapper_defs.
       rewrite lookup_fmap.
       destruct (decide (k ∈ dom m)) as [H_in | H_nin].
       + destruct (M !! k) as [ lw | ] eqn:H_k_lookup.
-        * eapply (map_filter_lookup_Some_2 
+        * eapply (map_filter_lookup_Some_2
           (λ k : Key * list write_event, k.1 ∈ dom (<[i:=x]> m))) in H_k_lookup
           as H_k_lookup'; last set_solver.
-          eapply (map_filter_lookup_Some_2 
+          eapply (map_filter_lookup_Some_2
           (λ k : Key * list write_event, k.1 ∈ dom m)) in H_k_lookup
           as H_k_lookup''; last set_solver.
-          rewrite IH lookup_fmap. 
+          rewrite IH lookup_fmap.
           by rewrite H_k_lookup' H_k_lookup''.
         * rewrite map_filter_lookup_None_2; last set_solver.
           rewrite lookup_fmap in IH.
@@ -193,5 +193,63 @@ Section Wrapper_defs.
       rewrite Hmi in Hmfi.
       by destruct Hmfi.
   Qed.
+
+
+  (** A candidate for a high-level logical update to be used in the proof of commit.
+
+      Remark 1: Check that this is indeed a good candidate toghether with checking that the model lemma
+      is stated in a reasonable way, i.e.
+
+      (** Used for commit *)
+      Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
+        dom cache ⊆ KVS_keys →
+        kvs_valid M T Tss ->
+        kvs_valid (update_kvs M cache (T+1)) (T+1) Tss.
+      Proof.
+      Admitted.
+
+      Remark 2: A possible way to proceed would be to prove several intermediate update lemmas modifying
+      different components, e.g. time, monotone memory, etc.
+      For instance :
+
+         Lemma own_mem_mono_update M (cache : gmap Key SerializableVal) (T : nat) :
+            ownMemMono M ⊢ |==> ownMemMono (update_kvs M cache (T+1)).
+         Proof.
+         Admitted.
+
+      Remark 3: It can also be useful to see if we can improve the definitions (in the easiest possible way)
+      to make `cache_updatesM` already of the type  `gmap Key SerializableVal` so that there is no need
+      to have both `cache` and  `cache_updatesM` or something similar. **)
+  Lemma commit_logical_update (ts T : nat) (Tss : gset nat)
+    (cache_logicalM : gmap Key (option val * bool))
+    (cache_updatesM : gmap Key val)
+    (cache : gmap Key SerializableVal)
+    (M Msnap : gmap Key (list write_event))
+    (m_current : gmap Key (list val)) :
+      ⌜dom m_current = dom Msnap⌝ -∗
+      ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ -∗
+      ⌜kvs_valid_snapshot Msnap ts⌝ -∗
+      ⌜kvs_valid M T Tss⌝ -∗
+      ⌜map_Forall (λ (_ : Key) (v : val), KVS_Serializable v) cache_updatesM⌝ -∗
+      ⌜∀ k v, cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)⌝ -∗
+      ⌜can_commit m_current
+           ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ ∗
+       ownMemMono γGsnap M -∗
+       ownTimeGlobal γT T -∗
+       ownTimeLocal γT T -∗
+       ownMemAuthGlobal γGauth M -∗
+       ownMemAuthLocal γGauth M -∗
+      ([∗ map] k↦hv ∈ m_current, OwnMemKey_def k hv) -∗
+        |==>
+          ownTimeGlobal γT (T+1) ∗
+          ownTimeLocal γT (T+1) ∗
+          ownMemAuthGlobal γGauth (update_kvs M cache (T+1)) ∗
+          ownMemAuthLocal γGauth (update_kvs M cache (T+1)) ∗
+          ownMemMono γGsnap (update_kvs M cache (T+1)) ∗
+          ([∗ map] k↦h;p ∈ m_current;cache_logicalM,
+                OwnMemKey_def k (commit_event p h) ∗
+                Seen_def k (commit_event p h)).
+    Proof.
+    Admitted.
 
 End Wrapper_defs.
