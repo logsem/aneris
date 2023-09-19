@@ -152,11 +152,34 @@ Section Resources.
     by rewrite to_max_prefix_list_op_valid_L in Hvalid.
   Qed.
 
+  Lemma get_OwnMemSeen_prefix M k h hl:
+      M !! k = Some h →
+      hl `prefix_of` h →
+      ownMemMono M ⊢ |==> ownMemMono M ∗ ownMemSeen k hl.
+  Proof.
+    iIntros (HMk h_hl) "?".
+    iApply own_op.
+    iApply own_update; last done.
+    apply auth_update_dfrac_alloc.
+    {
+      apply gmap_core_id=>i x/lookup_singleton_Some[_<-].
+      apply max_prefix_list.mono_list_lb_core_id.
+    }
+    apply (@singleton_included_l _ _ _ (max_prefix_listR write_eventO)).
+    exists (to_max_prefix_list h).
+    split; first by rewrite lookup_fmap HMk.
+    apply Some_included_2.
+    apply (@to_max_prefix_list_included_L write_eventO); last done.
+    apply _.
+  Qed.
+
   Lemma get_OwnMemSeen M k h :
       M !! k = Some h →
       ownMemMono M ⊢ |==> ownMemMono M ∗ ownMemSeen k h.
-    Proof.
-   Admitted.
+  Proof.
+    intro HMk.
+    by iApply get_OwnMemSeen_prefix.
+  Qed.
 
   (** TODO: other needed lemmas. *)
 
