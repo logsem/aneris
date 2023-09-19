@@ -33,7 +33,7 @@ Section LibraryDefs.
 
   Definition ρl: fmrole lib_model_impl := tt.
 
-  Definition lib_model: LiveModel lib_grole lib_model_impl := 
+  Definition lib_model: LiveModel lib_grole lib_model_impl LSI_True := 
     {| lm_fl _ := 5; |}.  
   
   Definition lib_fun: val.
@@ -88,6 +88,14 @@ Section LibrarySpec.
 End LibrarySpec.
 
 Section ClientDefs.
+
+  (* TODO: generalize to any LSI_True model *)
+  Instance lib_model_inh: Inhabited (lm_ls lib_model).
+  Proof. 
+    pose proof (fmrole_inhabited lib_model_impl) as [ρ].
+    pose proof (fmstate_inhabited lib_model_impl) as [s].
+    eapply populate, (initial_ls s ρ). done.
+  Qed. 
 
   Definition lib_fair := LM_Fair (LM := lib_model). 
 
@@ -209,7 +217,7 @@ Section ClientDefs.
   Defined.
 
   Definition client_fl := 10. 
-  Definition client_model: LiveModel (locale heap_lang) client_model_impl :=
+  Definition client_model: LiveModel (locale heap_lang) client_model_impl LSI_True :=
     {| lm_fl _ := client_fl; |}.  
 
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
@@ -451,7 +459,7 @@ Section ClientSpec.
     iIntros "#PMP MSI ST FR FUELS".
     Local Ltac dEq := destruct (decide (_ = _)). 
     Local Ltac dEl := destruct (decide (_ ∈ _)). 
-    pose proof (LM_map_empty_notlive lb' ρlg (LM := lib_model)).
+    pose proof (LM_map_empty_notlive lb' ρlg (LM := lib_model) (INH_LM := lib_model_inh)).
 
     pose proof (live_roles_1 lb) as LIVE. rewrite decide_True in LIVE. 
     2: { eapply LM_live_roles_strong. eexists. eauto. }
@@ -739,7 +747,7 @@ Section ClientSpec.
     (DISJ_INV1: Einvs ## ↑Ns)
     (* (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)
     (LB0_ACT: ρlg ∈ live_roles _ lb0)
-    (LB0_INFO: @ls_fuel _ _ lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! ρlg = Some {[ tt ]})
+    (LB0_INFO: ls_fuel lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! ρlg = Some {[ tt ]})
     :
     PMP Einvs -∗
     {{{ partial_model_is (lb0, 2)  ∗ 
