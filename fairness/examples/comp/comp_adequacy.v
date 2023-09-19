@@ -66,8 +66,8 @@ Proof.
   (* TODO: definition hidden under Opaque *)
 Admitted. 
 
-Definition δ_lib0: LiveState lib_grole lib_model_impl.
-  refine (build_LS_ext 1 {[ ρlg := 5 ]} _ {[ ρlg := {[ ρl ]} ]} _ _ (LM := lib_model)).
+Definition δ_lib0: LiveState lib_grole lib_model_impl LSI_True.
+  refine (build_LS_ext 1 {[ ρlg := 5 ]} _ {[ ρlg := {[ ρl ]} ]} _ _ _ (LM := lib_model)).
   - apply δ_lib0_init_roles.  
   - intros.
     rewrite dom_singleton. setoid_rewrite lookup_singleton_Some.
@@ -78,6 +78,7 @@ Definition δ_lib0: LiveState lib_grole lib_model_impl.
     erewrite lookup_singleton_Some in H.
     rewrite lookup_singleton_Some in H0.
     destruct H, H0. congruence.
+  - done. 
 Defined. 
 
   
@@ -635,7 +636,9 @@ Proof.
     { done. }
     destruct SUB1 as (str & SUB & LEN1). 
     forward eapply (client_steps_finite str) as (m1 & LEN1' & XX); eauto.
-    { eapply (subtrace_valid tr); eauto. }  
+    { eapply (subtrace_valid tr); eauto.
+      (* TODO: get rid of excessive arguments *)
+      Unshelve. all: exact True. }  
     { intros. left. eapply L1; [done| ].
       rewrite -H.
       rewrite -{2}(plus_O_n i). symmetry.
@@ -659,13 +662,19 @@ Proof.
     destruct SUB2 as (str & SUB2 & LEN2).
 
     forward eapply (lib_trace_construction str) as MATCH. 
-    { subst. eapply (subtrace_valid tr); eauto. }
+    { subst. eapply (subtrace_valid tr); eauto.
+      (* TODO: get rid of excessive arguments *)
+      Unshelve. all: exact True.  }
     { subst. intros i res RES.
       pose proof RES as H. 
       eapply mk_is_Some, trace_lookup_dom in H; eauto.
       left. apply (L2 (m1 + i)); [lia| ..]; eauto.
       rewrite -RES. symmetry. 
       eapply subtrace_lookup; eauto. }
+
+    (* forward eapply (simulation_adequacy_terminate_general' (LM := lib_model)). *)
+    (* 3: { Unshelve. *)
+    (*   apply MATCH.  *)
 
     eapply simulation_adequacy_terminate_general' in MATCH; eauto; cycle 1. 
     { apply lib_fair_term. }
@@ -773,15 +782,15 @@ Proof. Admitted.
    now depends on client LM trace with certain properties,
    whereas in original lemma all model traces are required to be terminating. *)
 Theorem simulation_adequacy_terminate_client Σ 
-        `{hPre: @heapGpreS Σ client_model (@LM_EM_HL _ client_model)} (s: stuckness)
+        `{hPre: @heapGpreS Σ client_model (@LM_EM_HL _ _ client_model)} (s: stuckness)
         e1 (s1: fmstate client_model_impl)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) -> *)
   rel_finitary (sim_rel client_model) →
-  (∀ `{hGS: @heapGS Σ client_model (@LM_EM_HL _ client_model)},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat)
+  (∀ `{hGS: @heapGS Σ client_model (@LM_EM_HL _ _ client_model)},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat I)
                  ={⊤}=∗
                  WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
@@ -791,7 +800,7 @@ Proof.
   destruct (infinite_or_finite extr) as [Hinf|] =>//.
 
   destruct (simulation_adequacy_model_trace
-              Σ _ _ e1 s1 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ e1 s1 I extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
 
   (* have Hfairaux := ex_fairness_preserved  *)
   (*                    extr auxtr Hinf Hmatch Hfair. *)
@@ -827,8 +836,8 @@ Theorem client_terminates
         (Hexfirst : (trfirst extr).1 = [client #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ client_model)) clientPreΣ). 
-  assert (heapGpreS Σ (@LM_EM_HL _ client_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model)) clientPreΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ _ client_model)) as HPreG.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 

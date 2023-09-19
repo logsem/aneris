@@ -415,6 +415,14 @@ Proof.
   eapply simple_fair_terminating_traces_terminate.
 Qed.
 
+End adequacy.
+
+
+Section adequacy_general.
+
+Context `{LM: LiveModel G M LSI}. 
+
+
 Theorem simulation_adequacy_terminate_general'
   `{Mout: FairModel}
   (otr: mtrace Mout) (auxtr : auxtrace (LM := LM))
@@ -458,4 +466,4 @@ Proof.
   eapply model_fairness_preserved; eauto. 
 Qed.
 
-End adequacy.
+End adequacy_general.
