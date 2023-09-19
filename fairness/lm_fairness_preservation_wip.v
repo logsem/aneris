@@ -12,12 +12,12 @@ From Paco Require Import paco1 paco2 pacotac.
 
 (* TODO: rename *)
 Section Foobar. 
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
 
   Local Set Printing Coercions.
 
-  Definition upto_stutter_auxtr_at `{LM: LiveModel G M}
+  Definition upto_stutter_auxtr_at `{LM: LiveModel G M LSI}
     auxtr (mtr: mtrace M) n m :=
     exists atr_aux atr_m, 
       after n auxtr = Some atr_aux /\
@@ -25,7 +25,7 @@ Section Foobar.
       upto_stutter_auxtr atr_aux atr_m (LM := LM).
     
   Lemma upto_stutter_step_correspondence_alt auxtr (mtr: mtrace M)
-    (Po: LiveState G M -> option (mlabel LM) -> Prop)
+    (Po: LiveState G M LSI -> option (mlabel LM) -> Prop)
     (Pi: M -> option (option (fmrole M)) -> Prop)
     (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
                                               | Some ℓ => Ul ℓ (LM := LM)
@@ -50,10 +50,10 @@ End Foobar.
 
 
 Section InnerLMTraceFairness.
-  Context `{LMi: LiveModel Gi Mi}.
+  Context `{LMi: LiveModel Gi Mi LSIi}.
   Context `{INH_Gi: Inhabited Gi, EQ_Gi: EqDecision Gi}. 
 
-  Context `{LMo: LiveModel Go Mo}.
+  Context `{LMo: LiveModel Go Mo LSIo}.
 
   Context (lift_Gi: Gi -> fmrole Mo).
   Hypothesis (INJlg: Inj eq eq lift_Gi). 
@@ -71,7 +71,7 @@ Section InnerLMTraceFairness.
 
   Definition inner_obls_exposed (lmtr_o: auxtrace (LM := LMo)) :=
     forall k δo_k gi, lmtr_o S!! k = Some δo_k ->
-                 (exists (δi: LiveState Gi Mi) (ρi: fmrole Mi),
+                 (exists (δi: LiveState Gi Mi LSIi) (ρi: fmrole Mi),
                     state_rel (ls_under δo_k) δi /\
                     ls_mapping δi !! ρi = Some gi) ->
                  lift_Gi gi ∈ dom (ls_mapping δo_k). 
@@ -284,7 +284,7 @@ Section InnerLMTraceFairness.
   Qed. 
 
   (* TODO: is it possible to express the general principle of induction by burning fuel? *)
-  Lemma owner_fixed_eventually `{LM: LiveModel G M} `{Inhabited G} `{EqDecision G}
+  Lemma owner_fixed_eventually `{LM: LiveModel G M LSI} `{Inhabited G} `{EqDecision G}
     (tr: auxtrace (LM := LM)) ρ n
     (NOρ: ∀ m ℓ, n ≤ m → tr L!! m = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
     (ASGρ : ∀ m δ, n <= m -> tr S!! m = Some δ → ρ ∈ dom (ls_mapping δ))

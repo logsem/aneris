@@ -5,7 +5,7 @@ From trillium.fairness Require Export partial_ownership.
 From trillium.fairness Require Import execution_model.
 
 Section LMExecModel.
-  Context `{LM:LiveModel (locale Λ) M}.
+  Context `{LM:LiveModel (locale Λ) M LSI}.
   Context `{CNT_Λ: Countable (locale Λ)}. 
 
   (* TODO: remove *)
@@ -76,7 +76,7 @@ Definition em_lm_msi `{!fairnessGS LM Σ}
 (* TODO: how to avoid different instances of EqDec and Cnt? *)
 Lemma init_fairnessGS_LM Σ
   (* `{hPre: @fairnessGpreS (locale Λ) M LM Σ Nat.eq_dec nat_countable} *)
-  `{hPre: @fairnessGpreS (locale Λ) M LM Σ _ CNT_Λ}
+  `{hPre: @fairnessGpreS (locale Λ) M LSI LM Σ _ CNT_Λ}
 
   (* `(LM:LiveModel Λ M)   *)
   (s1: LM) (σ1 : cfg Λ) (INIT: lm_is_init_st σ1 s1):
@@ -152,7 +152,7 @@ refine
     em_preGS := fun Σ => fairnessGpreS LM Σ;
     em_GS := fun Σ => fairnessGS LM Σ;
     em_Σ := fairnessΣ (locale Λ) M;
-    em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ LM _ _;
+    em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ _ LM _ _;
 
     (* em_valid_evolution_step := valid_evolution_step (LM := LM); *)
     em_thread_post Σ := fun {_: fairnessGS LM Σ} (tid: locale Λ) => 
@@ -173,4 +173,3 @@ iModIntro. iExists _. iFrame.
 Defined. 
 
 End LMExecModel.
-

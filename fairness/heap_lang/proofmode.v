@@ -24,7 +24,7 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
 Ltac wp_expr_simpl := wp_expr_eval simpl. 
 
 Lemma tac_wp_pure_helper `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} 
-  `{iLM: LiveModel G iM} `{Countable G}
+  `{iLM: LiveModel G iM LSI_True} `{Countable G}
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}  
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
@@ -90,7 +90,7 @@ Lemma has_fuels_gt_1
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
-  `{iLM: LiveModel G iM} `{Countable G}
+  `{iLM: LiveModel G iM LSI_True} `{Countable G}
   (* `{!fairnessGS iLM Σ}   *)
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
   tid E Einvs K e1 e2
@@ -161,7 +161,7 @@ Proof.
 Qed.
 
 Lemma tac_wp_pure `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
-  `{iLM: LiveModel G iM} `{Countable G}
+  `{iLM: LiveModel G iM LSI_True} `{Countable G}
   (* `{!fairnessGS iLM Σ}   *)
   `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
   Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
@@ -360,7 +360,7 @@ Implicit Types Δ : envs (uPredI (iResUR Σ)).
 Implicit Types v : val.
 Implicit Types tid : locale heap_lang.
 
-Context `{iLM: LiveModel G iM} `{Countable G}.
+Context `{iLM: LiveModel G iM LSI_True} `{Countable G}.
 Context `{!fairnessGS iLM Σ}. 
 (* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
 Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}. 

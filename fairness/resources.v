@@ -3,14 +3,14 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import utils fairness fuel fuel_ext. 
 From trillium.fairness Require Import partial_ownership.
 
-Class fairnessGpreS `(LM: LiveModel G M) Σ `{Countable G} := {   
+Class fairnessGpreS `(LM: LiveModel G M LSI) Σ `{Countable G} := {   
   fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
   fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR G (exclR (gsetR (RoleO M)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
-Class fairnessGS `(LM : LiveModel G M) Σ `{Countable G} := FairnessGS {
+Class fairnessGS `(LM : LiveModel G M LSI) Σ `{Countable G} := FairnessGS {
   fairness_inG :> fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
@@ -22,12 +22,12 @@ Class fairnessGS `(LM : LiveModel G M) Σ `{Countable G} := FairnessGS {
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments fairnessGS {_ _} LM Σ {_ _}.
-Global Arguments FairnessGS {_ _} LM Σ {_ _ _} _ _ _.
-Global Arguments fairness_model_name {_ _ LM Σ _ _} _.
-Global Arguments fairness_model_mapping_name {G M LM Σ _ _} _ : assert.
-Global Arguments fairness_model_fuel_name {G M LM Σ _ _} _ : assert.
-Global Arguments fairness_model_free_roles_name {G M LM Σ _ _} _ : assert.
+Global Arguments fairnessGS {_ _ _} LM Σ {_ _}.
+Global Arguments FairnessGS {_ _ _} LM Σ {_ _ _} _ _ _.
+Global Arguments fairness_model_name {_ _ _ LM Σ _ _} _.
+Global Arguments fairness_model_mapping_name {G M LSI LM Σ _ _} _ : assert.
+Global Arguments fairness_model_fuel_name {G M LSI LM Σ _ _} _ : assert.
+Global Arguments fairness_model_free_roles_name {G M LSI LM Σ _ _} _ : assert.
 
 Definition fairnessΣ G M `{Countable G} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
@@ -36,7 +36,7 @@ Definition fairnessΣ G M `{Countable G} : gFunctors := #[
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel G M} `{Countable G} :
+Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel G M LSI} `{Countable G} :
   subG (fairnessΣ G M) Σ -> fairnessGpreS LM Σ.
 Proof. solve_inG. Qed. 
 
@@ -44,7 +44,7 @@ Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
 
 Section model_state_interp.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
@@ -151,7 +151,7 @@ Proof. by intros ->. Qed.
 
 
 Section model_state_lemmas.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
@@ -375,7 +375,7 @@ Section model_state_lemmas.
        end) (gset_to_gmap (0%nat) LR).
 
   Definition update_fuel_resource 
-    (δ1: LiveState G M) (fs1 fs2: gmap (fmrole M) nat) (s2: M): gmap (fmrole M) nat :=
+    (δ1: LiveState G M LSI) (fs1 fs2: gmap (fmrole M) nat) (s2: M): gmap (fmrole M) nat :=
     fuel_apply fs2 (δ1.(ls_fuel (G := G))) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
 
   Lemma elem_of_frame_excl_map
@@ -616,7 +616,7 @@ Section model_state_lemmas.
 End model_state_lemmas.
 
 Section adequacy.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGpreS LM Σ}.
@@ -681,7 +681,7 @@ Section adequacy.
     iExists _. by iSplitL "H1".
   Qed.
 
-  Lemma lm_msi_init (δ: LiveState G M) (fr: gset (fmrole M))
+  Lemma lm_msi_init (δ: LiveState G M LSI) (fr: gset (fmrole M))
     (FR_DISJ: dom (ls_fuel δ) ## fr):
     ⊢ |==> ∃ (fG: fairnessGS LM Σ), 
         model_state_interp δ ∗

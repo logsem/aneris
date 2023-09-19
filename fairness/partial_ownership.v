@@ -16,7 +16,7 @@ Section PartialOwnership.
   (* Context {fG: fairnessGS LM Σ}. *)
   (* Context `{invGS Σ}.  *)
   (* Context `{invGS_gen HasNoLc Σ}.  *)
-  Context `{iLM: LiveModel G iM}. (* fuel construction over inner model *)
+  Context `{iLM: LiveModel G iM iLSI}. (* fuel construction over inner model *)
 
   (* Canonical Structure GroupRoleO (G: Type) := leibnizO G. *)
 
@@ -207,7 +207,7 @@ Section PartialOwnership.
 End PartialOwnership.
 
 Section AuxDefs.
-  Context `{LM: LiveModel Λ M}.
+  Context `{LM: LiveModel Λ M LSI}.
 
   Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole M) nat) (s1 s2: M) (ρ: fmrole M) :=
     (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(lm_fl) s2))) ∧
@@ -223,3 +223,7 @@ Section AuxDefs.
       (* new deads *) ((live_roles _ s1 ∖ live_roles _ s2) ∩ dom fs1).
 
 End AuxDefs.
+
+Definition LSI_True {G: Type} {M: FairModel}:
+  M → gmap (fmrole M) G → gmap (fmrole M) nat → Prop :=
+  fun _ _ _=> True. 

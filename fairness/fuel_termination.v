@@ -2,19 +2,23 @@ From stdpp Require Import option.
 From Paco Require Import pacotac.
 From trillium.fairness Require Export fairness fair_termination fuel traces_match lm_fairness_preservation.
 
-Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
-           {LM : LiveModel (locale Λ) Mdl} (auxtr : auxtrace (LM := LM)) :=
+Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel} {LSI}
+           {LM : LiveModel (locale Λ) Mdl LSI} (auxtr : auxtrace (LM := LM)) :=
   auxtrace_valid (LM:=LM) auxtr →
   (∀ ρ, fair_aux ρ auxtr (LM := LM)) →
   terminating_trace auxtr.
 
 Definition lm_valid_state_evolution_fairness 
-  `{LM:LiveModel (locale Λ) M} `{EqDecision (locale Λ)} := 
+  `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)} := 
   valid_state_evolution_fairness (M := LM) lm_valid_evolution_step.
 
 Theorem continued_simulation_fair_termination
-        `{FairTerminatingModel FM} `(LM:LiveModel (locale Λ) FM) `{Countable (locale Λ)}
-        (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :
+        `{FairTerminatingModel FM} `(LM:LiveModel (locale Λ) FM LSI) `{Countable (locale Λ)}
+        (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr
+        (LSI0: let f0 := gset_to_gmap (LM.(lm_fl) a1) (FM.(live_roles) a1) in
+               let m0 := gset_to_gmap r1 (FM.(live_roles) a1) in
+               LSI a1 m0 f0)
+  :
   (* TODO: This is required for destruttering - Not sure why *)
   (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
   (* The relation must capture that live tids correspond *)
@@ -24,7 +28,7 @@ Theorem continued_simulation_fair_termination
   (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),
      ξ ex atr -> lm_valid_state_evolution_fairness ex atr) →
   continued_simulation
-    ξ ({tr[trfirst extr]}) ({tr[initial_ls a1 r1]}) →
+    ξ ({tr[trfirst extr]}) ({tr[initial_ls a1 r1 LSI0]}) →
   extrace_fairly_terminating extr.
 Proof.
   intros Hstep Hlive Hvalid Hsim Hvex.
@@ -33,7 +37,7 @@ Proof.
              valid_inf_system_trace
                (continued_simulation ξ)
                (trace_singleton (trfirst extr))
-               (trace_singleton (initial_ls a1 r1))
+               (trace_singleton (initial_ls a1 r1 LSI0))
                (from_trace extr)
                iatr) as [iatr Hiatr].
   { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
@@ -42,7 +46,7 @@ Proof.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
   assert (∃ (auxtr : auxtrace (LM := LM)), lm_exaux_traces_match extr auxtr)
     as [auxtr Hmatch].
-  { exists (to_trace (initial_ls a1 r1) iatr).
+  { exists (to_trace (initial_ls a1 r1 LSI0) iatr).
     unshelve eapply (valid_inf_system_trace_implies_traces_match
               (lm_valid_evolution_step (LM := LM))
               live_tids

@@ -4,7 +4,7 @@ From trillium.fairness Require Import fairness fuel resources actual_resources h
 
 
 Section ActualOwnershipInterface. 
-  Context `{LM: LiveModel (locale heap_lang) M}.
+  Context `{LM: LiveModel (locale heap_lang) M LSI_True}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
   Context`{invGS_gen HasNoLc Σ}. 
@@ -13,9 +13,9 @@ Section ActualOwnershipInterface.
   (* TODO: get rid of excessive shelved goals
      (could be solved by new implementation of LiveState) *)
   Lemma ActualOwnershipPartial:
-    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
+    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ _ LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.
-    iIntros. iApply (Build_PartialModelPredicates (EM := @LM_EM_HL _ LM)). 
+    iIntros. iApply (Build_PartialModelPredicates (EM := @LM_EM_HL _ _ LM)). 
     iModIntro. repeat iSplitL.
     - iIntros (???????) "FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".

@@ -5,7 +5,7 @@ From trillium.fairness Require Export inftraces fairness fuel traces_match trace
 
 
 (* TODO: move? *)
-Lemma traces_match_LM_preserves_validity `{LM: LiveModel G M}
+Lemma traces_match_LM_preserves_validity `{LM: LiveModel G M LSI}
   `{C: Type} {L: Type}
    (otr: trace C L) (auxtr : auxtrace (LM := LM))
    state_rel lbl_rel outer_step :
@@ -19,7 +19,7 @@ Qed.
 
 
 Section fairness_preserved.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{EqDecision G}.
 
   (* State and labels of 'outer' model.
@@ -87,11 +87,11 @@ Section fairness_preserved.
     destruct ℓ; eauto; inversion Hlab; simplify_eq; eauto.
   Qed.
 
-  Lemma mapping_live_role (δ: LiveState G M) ρ:
+  Lemma mapping_live_role (δ: LiveState G M LSI) ρ:
     ρ ∈ M.(live_roles) δ ->
     is_Some (ls_mapping δ !! ρ).
   Proof. rewrite -elem_of_dom ls_same_doms. SS. Qed.
-  Lemma fuel_live_role (δ: LiveState G M) ρ:
+  Lemma fuel_live_role (δ: LiveState G M LSI) ρ:
     ρ ∈ M.(live_roles) δ ->
     is_Some (ls_fuel δ !! ρ).
   Proof. rewrite -elem_of_dom. SS. Qed.
@@ -115,7 +115,7 @@ Section fairness_preserved.
 
   
   Definition steps_or_unassigned 
-    (ρ: fmrole M) (δ: LiveState G M) (ℓ: option (lm_lbl LM)) :=
+    (ρ: fmrole M) (δ: LiveState G M LSI) (ℓ: option (lm_lbl LM)) :=
     (∀ τ, ls_mapping δ !! ρ ≠ Some τ) \/ (∃ τ, ℓ = Some $ Take_step ρ τ).     
     
   Definition fair_aux_SoU auxtr ρ n := 
@@ -158,7 +158,7 @@ Section fairness_preserved.
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
          → ∀ (f m: nat) τ (extr : out_trace) (auxtr : auxtrace (LM := LM))
-             (δ : LiveState G M), fairness_induction_stmt ρ m0 f m τ extr auxtr δ ) ->
+             (δ : LiveState G M LSI), fairness_induction_stmt ρ m0 f m τ extr auxtr δ ) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
     lm_exaux_traces_match_gen extr' auxtr' ->
     infinite_trace extr' ->
@@ -449,7 +449,7 @@ End fairness_preserved.
 
 
 Section lang_fairness_preserved.
-  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision (locale Λ)}.
 
   Definition lm_exaux_traces_match :=
@@ -484,7 +484,7 @@ End lang_fairness_preserved.
 
 
 Section model_fairness_preserved.
-  Context `{LM: LiveModel G M}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{EqDecision G}.
 
   Context `{Mout: FairModel}. 

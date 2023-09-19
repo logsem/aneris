@@ -2,11 +2,31 @@ From trillium.fairness Require Import fairness fuel fuel_ext.
 
 Close Scope Z_scope.
 
+(* TODO: move *)
+Global Instance must_decrease_dec {M_: FairModel} {G_: Type} {LSI}
+  `{EqDecision G_}:
+  forall a oρ st1 st2 og,
+    Decision (must_decrease a oρ st1 st2 og (M := M_) (G := G_) (LSI := LSI)).
+Proof. 
+  intros.
+  destruct (decide (ls_mapping st1 !! a ≠ ls_mapping st2 !! a /\ is_Some (ls_mapping st2 !! a))).
+  { left. apply Change_tid; apply a0. }
+  destruct og.
+  2: { right. intros DECR. inversion DECR; tauto. }
+  destruct (decide (Some a ≠ oρ /\ Some g = ls_mapping st1 !! a)).
+  - left. econstructor; apply a0.
+  - right. intros DECR. inversion DECR; tauto.
+Qed. 
+
+
 Section LMFair.
-  Context `{LM: LiveModel G M}.
-  Context `{Countable G, Inhabited G}.
-  Context `{EqDecision M, Inhabited (fmstate M)}.
+  Context `{LM: LiveModel G M LSI}.
+  Context `{Countable G}.
+  Context `{EqDecision M}.  
   Context `{forall s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}.
+  (* Context {INH_LSI: exists s m f, LSI s m f}.  *)
+  Context {INH_LM: Inhabited (lm_ls LM)}.
+  Context {INH_G: Inhabited G}.
 
   Global Instance FL_cnt: Countable (@FairLabel G (fmrole M)).
   Proof. 
@@ -25,7 +45,7 @@ Section LMFair.
     intros. by destruct x. 
   Qed. 
   
-  Global Instance LS_eqdec: EqDecision (LiveState G M).
+  Global Instance LS_eqdec: EqDecision (LiveState G M LSI).
   Proof.
     red. intros [] [].
     destruct (decide (ls_under = ls_under0)), (decide (ls_fuel = ls_fuel0)), (decide (ls_mapping = ls_mapping0)).
@@ -49,12 +69,12 @@ Section LMFair.
       remember domPP as dom. clear Heqdom. induction dom.
       { left. by apply Forall_nil. }
       assert (P a) as Pa.
-      { apply H3; eauto. set_solver. }
+      { apply H1; eauto. set_solver. }
       specialize (DECQ _ Pa). 
       destruct DECQ.
       2: { right. by intros ALL%Forall_inv. }
       destruct IHdom.
-      { intros. apply H3. set_solver. }
+      { intros. apply H1. set_solver. }
       - left. by constructor.
       - right. by intros ALL%Forall_inv_tail. } 
     - left. intros.
@@ -63,7 +83,7 @@ Section LMFair.
     - right. intros IMPL.
       apply n. apply List.Forall_forall.
       intros. apply IMPL.
-      subst domPP. apply elem_of_list_In, elem_of_list_filter in H3. 
+      subst domPP. apply elem_of_list_In, elem_of_list_filter in H1.
       tauto.
   Qed.
     
@@ -76,22 +96,6 @@ Section LMFair.
   Proof.
     apply dec_forall_fin_impl with (domP := elements domP); auto.
     set_solver. 
-  Qed. 
-
-  (* TODO: move *)
-  Global Instance must_decrease_dec {M_: FairModel} {G_: Type}
-    `{EqDecision G_}:
-    forall a oρ st1 st2 og,
-      Decision (must_decrease a oρ st1 st2 og (M := M_) (G := G_)).
-  Proof. 
-    intros.
-    destruct (decide (ls_mapping st1 !! a ≠ ls_mapping st2 !! a /\ is_Some (ls_mapping st2 !! a))).
-    { left. apply Change_tid; apply a0. }
-    destruct og.
-    2: { right. intros DECR. inversion DECR; tauto. }
-    destruct (decide (Some a ≠ oρ /\ Some g = ls_mapping st1 !! a)).
-    - left. econstructor; apply a0.
-    - right. intros DECR. inversion DECR; tauto.
   Qed. 
 
   (* TODO: move *)
@@ -201,13 +205,6 @@ Section LMFair.
         live_roles δ := filter (fun τ => exists δ', locale_trans δ τ δ') (dom (ls_tmap δ));
       |}.
     (* - apply lm_ls_eqdec.  *)
-    - apply @inhabitant in H0 as l. apply @inhabitant in H1 as st.  
-      eapply populate. refine 
-        {| ls_under := st; 
-           ls_fuel := gset_to_gmap 0 (live_roles _ st);
-           ls_mapping := gset_to_gmap l (live_roles _ st); |}.
-      + by rewrite dom_gset_to_gmap.
-      + set_solver.
     - intros ??? STEP.
       apply elem_of_filter. split; eauto.
       destruct STEP as (ℓ & STEP & MATCH). destruct ℓ; simpl in *; try done; subst.

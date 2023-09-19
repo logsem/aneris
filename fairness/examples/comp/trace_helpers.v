@@ -205,7 +205,7 @@ End FMTraceHelpers.
 
 
 Section LMTraceHelpers.
-  Context `{LM: LiveModel G M}. 
+  Context `{LM: LiveModel G M  LSI}. 
 
   Local Ltac gd t := generalize dependent t.
 

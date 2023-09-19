@@ -25,6 +25,7 @@ Section finitary.
   Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
+  Context `{DEC: forall a b c, Decision (LSI a b c)}.
 
   Variable (ξ: execution_trace Λ -> finite_trace M (option M.(fmrole)) -> Prop).
 
@@ -76,6 +77,9 @@ Section finitary.
   Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) :=
     (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
 
+  
+
+
   Program Definition enumerate_next
     (δ1: LM)
     (* (c': cfg Λ) *)
@@ -89,11 +93,17 @@ Section finitary.
     ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) next_threads ;
     let ℓ' := convert_lbl ℓ
     in
-    mret ({| ls_under := s2;
+    (if
+        (* (decide ((s2, ms, fs) = (s2, ms, fs))) *)
+        (* (decide (LSI s2 ms fs)) *)        
+        (decide (LSI s2 (`ms) (`fs))) (* TODO: what's the difference with above? *)
+    then
+    [({| ls_under := s2;
              ls_fuel := `fs;
-             (* ls_fuel_dom := proj2_sig fs; *) (* TODO: why this does not work?*)
              ls_mapping := `ms ;
-          |}, ℓ').
+          |}, ℓ')]
+      else
+    []).
   Next Obligation.
     intros ??????????. destruct fs as [? Heq]. rewrite /= Heq //. set_solver.
   Qed.
@@ -101,8 +111,8 @@ Section finitary.
     intros ??????????. destruct fs as [? Heq]. destruct ms as [? Heq'].
     rewrite /= Heq //.
   Qed.
-  Next Obligation.
-    intros. 
+  Next Obligation. done. Qed. 
+
 
   Definition lift_convert_lbl (oζ: olocale Λ) (ℓ: option (fmrole M)): lm_lbl LM :=
     match ℓ with
@@ -150,7 +160,8 @@ Section finitary.
     assert (Hmappingdom: dom δ'.(ls_mapping) = live_roles M δ' ∪ dom (ls_fuel δ')).
     { rewrite -Hfueldom ls_same_doms //. }
     exists (δ'.(ls_mapping) ↾ Hmappingdom); split; last first.
-    { eapply enum_gmap_range_bounded'_spec; split=>//. }    
+    { eapply enum_gmap_range_bounded'_spec; split=>//. }
+    destruct decide; [| by destruct δ']. 
     rewrite elem_of_list_singleton; f_equal.
     - destruct δ'; simpl. f_equal; apply ProofIrrelevance.
     - done.
@@ -291,9 +302,10 @@ End finitary.
 Section finitary_simple.
   Context `{M: FairModel}.
   Context `{Λ: language}.
-  Context `{LM: LiveModel (locale Λ) M}.
+  Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision M}.
   Context `{EqDecision (locale Λ)}.
+  Context `{DEC: forall a b c, Decision (LSI a b c)}.
 
   (* Context `{HPI0: forall s x, ProofIrrel ((let '(s', ℓ) := x in M.(fmtrans) s ℓ s'): Prop) }. *)
   Context `{HPI0: forall s x, ProofIrrel ((let '(s', ℓ) := x in
@@ -349,34 +361,33 @@ Section finitary_simple.
 
 End finitary_simple.
 
-(* TODO: Why do we need [LM] explicit here? *)
-Definition live_rel `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
-           (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
+
+Section RelFinitary.
+  Context `{Countable (locale Λ)}. 
+  Context `(LM: LiveModel (locale Λ) M LSI). 
+
+  (* TODO: Why do we need [LM] explicit here? *)
+  Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   live_tids (LM:=LM) (trace_last ex) (trace_last aux).
 
-Definition sim_rel `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
-           (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
-  valid_state_evolution_fairness lm_valid_evolution_step ex aux ∧ live_rel LM ex aux.
+  Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
+    valid_state_evolution_fairness lm_valid_evolution_step ex aux ∧ live_rel ex aux.
 
-Definition sim_rel_with_user `(LM: LiveModel (locale Λ) M) `{Countable (locale Λ)}
-           (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
+Definition sim_rel_with_user (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
   (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
-  sim_rel LM ex aux ∧ ξ ex (map_underlying_trace aux).
+  sim_rel ex aux ∧ ξ ex (map_underlying_trace aux).
 
 (* TODO: Maybe redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
-Lemma valid_lift_fairness_sim_rel_with_user `{LM:LiveModel (locale Λ) Mdl}
-      `{Countable (locale Λ)}
-      (ξ : execution_trace Λ → finite_trace Mdl (option $ fmrole Mdl) →
-           Prop) extr atr :
+Lemma valid_lift_fairness_sim_rel_with_user 
+      (ξ : execution_trace Λ → finite_trace M (option $ fmrole M) → Prop) extr atr :
   valid_lift_fairness lm_valid_evolution_step
     (λ extr auxtr, ξ extr (map_underlying_trace (LM:=LM) auxtr) ∧
-                   live_rel LM extr auxtr) extr atr ↔
-  sim_rel_with_user LM ξ extr atr.
+                   live_rel extr auxtr) extr atr ↔
+  sim_rel_with_user ξ extr atr.
 Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
 
-Lemma rel_finitary_sim_rel_with_user_ξ `{LM:LiveModel (locale Λ) Mdl}
-      `{Countable (locale Λ)} ξ :
-  rel_finitary ξ → rel_finitary (sim_rel_with_user LM ξ).
+Lemma rel_finitary_sim_rel_with_user_ξ {DEC: forall a b c, Decision (LSI a b c)} ξ :
+  rel_finitary ξ → rel_finitary (sim_rel_with_user ξ).
 Proof.
   intros Hrel.
   eapply rel_finitary_impl.
@@ -390,10 +401,12 @@ Proof.
   all: intros ??; apply make_decision.
 Qed.
 
-Lemma rel_finitary_sim_rel_with_user_sim_rel `{LM:LiveModel (locale Λ) Mdl}
-      `{EqDecision (mstate LM)} `{EqDecision (mlabel LM)}
-      `{Countable (locale Λ)} ξ :
-  rel_finitary (sim_rel LM) → rel_finitary (sim_rel_with_user LM ξ).
+Lemma rel_finitary_sim_rel_with_user_sim_rel 
+  `{forall a b c, Decision (LSI a b c)} `{EqDecision (mstate LM)}
+ξ :
+  rel_finitary (sim_rel ) → rel_finitary (sim_rel_with_user ξ).
 Proof.
   intros Hrel. eapply rel_finitary_impl; [|done]. by intros ex aux [Hsim _].
 Qed.
+
+End RelFinitary.

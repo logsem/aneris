@@ -201,7 +201,7 @@ Section lifting.
 (* Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}.  *)
 Context `{EM: ExecutionModel heap_lang M}.   
 Context `{hGS: @heapGS Σ _ EM}.
-Context `{iLM:LiveModel G iM}.
+Context `{iLM:LiveModel G iM LSI_True}.
 Context `{Countable G}.
 (* Context {ifG: fairnessGS iLM Σ}. *)
 Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}.

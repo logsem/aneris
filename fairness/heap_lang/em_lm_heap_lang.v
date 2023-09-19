@@ -2,7 +2,7 @@ From trillium.fairness.heap_lang Require Import heap_lang_defs em_lm.
 
 
 Section LM_EM_HL.
-  Context `{LM: LiveModel (locale heap_lang) M}. 
+  Context `{LM: LiveModel (locale heap_lang) M LSI}. 
 
   Definition LM_EM_HL: ExecutionModel heap_lang LM :=
     LM_EM (LM := LM) 0%nat ltac:(done).
@@ -18,13 +18,13 @@ Section LM_EM_HL.
 
 End LM_EM_HL.
 
-Lemma tids_smaller_restrict_mapping `{M: FairModel}
+Lemma tids_smaller_restrict_mapping `{M: FairModel} {LSI}
   (c1 c2: cfg heap_lang) δ1 δ2 (ζ: locale heap_lang)
   (Hζs : tids_smaller c1.1 δ1)
-  (DOM12: ls_mapping δ2 ⊆ ls_mapping δ1)
+  (DOM12: ls_mapping δ2 ⊆ ls_mapping δ1 (LSI := LSI))
   (STEP: locale_step c1 (Some ζ) c2)
   :
-  tids_smaller c2.1 δ2 (M := M).
+  tids_smaller c2.1 δ2 (M := M) (LSI := LSI).
 Proof.
   unfold tids_smaller; simpl.
   intros ρ ζ0 Hin.
@@ -34,7 +34,7 @@ Proof.
   eapply lookup_weaken; eauto. 
 Qed.
 
-Lemma tids_dom_restrict_mapping `{LM: LiveModel (locale heap_lang) M} 
+Lemma tids_dom_restrict_mapping `{LM: LiveModel (locale heap_lang) M LSI} 
   (c1 c2: cfg heap_lang)
   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M))) (ζ: locale heap_lang)
   (Hstep : locale_step c1 (Some ζ) c2)
@@ -68,16 +68,16 @@ Qed.
     (*   set_solver -Hnewdom Hsamedoms Hfueldom. } *) 
 
 
-Lemma tids_smaller_fork_step `{LM: LiveModel (locale heap_lang) M}  σ1 σ2 δ1 δ2 ζ τ_new
+Lemma tids_smaller_fork_step `{LM: LiveModel (locale heap_lang) M LSI} σ1 σ2 δ1 δ2 ζ τ_new
   (Hstep: locale_step σ1 (Some ζ) σ2)
   (SM: tids_smaller σ1.1 δ1)
   (MAP2: exists (R2: gset (fmrole M)), ls_mapping δ2 = map_imap
                                                     (λ (ρ : fmrole M) (o : locale heap_lang),
                                                       if decide (ρ ∈ R2) then Some τ_new else Some o)
-                                                    (ls_mapping δ1))
+                                                    (ls_mapping δ1 (LSI := LSI)))
   (FORK: ∃ tp1' efork, τ_new = locale_of σ1.1 efork /\ σ2.1 = tp1' ++ [efork] ∧ length tp1' = length σ1.1)
   :
-  tids_smaller σ2.1 δ2 (M := M).
+  tids_smaller σ2.1 δ2 (LSI := LSI).
 Proof.
   destruct σ1 as [tp1 σ1], σ2 as [tp2 σ2]. simpl in *.
   intros ρ ζ'.
@@ -119,7 +119,7 @@ Proof.
     inversion H. subst. eauto. 
 Qed.
 
-Lemma tids_dom_fork_step `{LM: LiveModel (locale heap_lang) M}
+Lemma tids_dom_fork_step `{LM: LiveModel (locale heap_lang) M LSI}
   (c1 c2: cfg heap_lang) (ζ: locale heap_lang)
   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M)))
   τ_new (R1 R2: gset (fmrole M))
@@ -168,7 +168,7 @@ Proof.
 Qed.
 
 
-Lemma tids_smaller_model_step `{LM: LiveModel (locale heap_lang) M} c1 c2 ζ δ1 δ2
+Lemma tids_smaller_model_step `{LM: LiveModel (locale heap_lang) M LSI} c1 c2 ζ δ1 δ2
   (Hstep: locale_step c1 (Some ζ) c2)
   (Hless: tids_smaller c1.1 δ1)
   (* S is a subset of dom (ls_fuel δ1); *)
@@ -178,12 +178,12 @@ Lemma tids_smaller_model_step `{LM: LiveModel (locale heap_lang) M} c1 c2 ζ δ1
       ls_mapping δ2 = map_imap
                         (λ (ρ' : fmrole M) (_ : nat),
                           if decide (ρ' ∈ dom (ls_fuel δ1))
-                          then ls_mapping δ1 !! ρ'
+                          then ls_mapping δ1 (LSI := LSI) !! ρ'
                           else Some ζ)
                         (gset_to_gmap f S)
   )
   :
-  tids_smaller c2.1 δ2 (M := M).
+  tids_smaller c2.1 δ2 (LSI := LSI).
 Proof.  
   (* eapply tids_smaller_restrict_mapping; eauto. *)
   (* destruct MAP2 as (?&?&->).   *)
@@ -209,7 +209,7 @@ Ltac by_contradiction :=
   | |- ?goal => destruct_decide (decide (goal)); first done; exfalso
   end.
 
-Lemma mim_helper_model_step `{LM: LiveModel (locale heap_lang) M}
+Lemma mim_helper_model_step `{LM: LiveModel (locale heap_lang) M LSI}
   (s2 : fmstate M)
   (fs1 fs2 : gmap (fmrole M) nat)
   (ρ : fmrole M)
