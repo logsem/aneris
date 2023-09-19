@@ -150,7 +150,7 @@ Section SpinlockDefs.
 
   Definition sm_fuel := 27.
 
-  Definition spinlock_model: LiveModel (locale heap_lang) spinlock_model_impl :=
+  Definition spinlock_model: LiveModel (locale heap_lang) spinlock_model_impl LSI_True:=
     {|
       lm_fl (x: fmstate spinlock_model_impl) := sm_fuel; 
     |}.

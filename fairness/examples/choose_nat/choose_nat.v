@@ -131,7 +131,7 @@ Next Obligation.
   - inversion Htrans; simplify_eq. constructor. lia.
 Qed.
 
-Definition cn_model : LiveModel (locale heap_lang) cn_fair_model :=
+Definition cn_model : LiveModel (locale heap_lang) cn_fair_model LSI_True :=
   {| lm_fl _ := 40%nat |}.
 
 (** Determine additional restriction on relation to obtain finite branching *)
@@ -515,18 +515,19 @@ Lemma choose_nat_sim l :
     (trace_singleton ([choose_nat_prog l #()],
                         {| heap := {[l:=#-1]};
                            used_proph_id := ∅ |}))
-    (trace_singleton (initial_ls (LM := cn_model) Start 0%nat)).
+    (trace_singleton (initial_ls (LM := cn_model) Start 0%nat ltac:(done))).
 Proof.
   (* assert (heapGpreS choose_natΣ cn_model) as HPreG. *)
   (* { apply _. } *)
-  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ cn_model)) choose_natΣ).
-  assert (heapGpreS Σ (@LM_EM_HL _ cn_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ cn_model)) choose_natΣ).
+  assert (heapGpreS Σ (@LM_EM_HL _ _ cn_model)) as HPreG.
   { apply _. }
   
   eapply (strong_simulation_adequacy
-            Σ _ NotStuck _ _ _ ∅). 
+            Σ NotStuck _ _ _ ∅). 
   { clear.
     apply rel_finitary_sim_rel_with_user_ξ.
+    { solve_decision. }
     intros extr atr c' oζ.
     eapply finite_smaller_card_nat=> /=.
     eapply (in_list_finite [(Z_CN (heap c'.2 !!! l), None);
