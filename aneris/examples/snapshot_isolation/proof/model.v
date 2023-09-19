@@ -102,6 +102,7 @@ Section KVS_valid.
 
   (** There are several lemmas that we will probably need about valid cuts. *)
 
+  (** State a weakier version knowing only for the left part. *)
   Lemma hist_cut_by_snap_unicity (h hl1 hr1 hl2 hr2 : list write_event) (t : nat) :
     whist_ext h →
     whist_times h →
@@ -148,31 +149,34 @@ Section KVS_valid.
         M0 C.
 
   (** Probably not needed as lemma! *)
-  Lemma kvs_valid_update_cell
-        (M : kvsMdl) (T : nat) (Tss : gset nat) (k : Key) (v : SerializableVal) :
-    k ∈ KVS_keys →
-    kvs_valid M T Tss ->
-    kvs_valid
-      (<[ k := (default [] (M !! k)) ++
-               [{| we_key := k; we_val := v; we_time := (T + 1)%nat |}]
-        ]> M)
-      (T+1) (Tss ∪ {[(T+1)%nat]}).
-  Proof.
-  Admitted.
-
-  Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
-    dom cache ⊆ KVS_keys →
-    kvs_valid M T Tss ->
-    kvs_valid (update_kvs M cache (T+1)) (T+1) (Tss ∪ {[(T+1)%nat]}).
-  Proof.
-  Admitted.
+  (* Lemma kvs_valid_update_cell *)
+  (*       (M : kvsMdl) (T : nat) (Tss : gset nat) (k : Key) (v : SerializableVal) : *)
+  (*   k ∈ KVS_keys → *)
+  (*   kvs_valid M T Tss -> *)
+  (*   kvs_valid *)
+  (*     (<[ k := (default [] (M !! k)) ++ *)
+  (*              [{| we_key := k; we_val := v; we_time := (T + 1)%nat |}] *)
+  (*       ]> M) *)
+  (*     (T+1) Tss. *)
+  (* Proof. *)
+  (* Admitted. *)
 
 
+(** Used for start *)
 Lemma kvs_valid_next M T Tss :
   kvs_valid M T Tss →
   kvs_valid M (T + 1) (Tss ∪ {[(T+1)%nat]}).
 Proof. Admitted.
 
+(** Used for commit *)
+Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
+    dom cache ⊆ KVS_keys →
+    kvs_valid M T Tss ->
+    kvs_valid (update_kvs M cache (T+1)) (T+1) Tss.
+  Proof.
+  Admitted.
+
+(** Weakening lemma *)
 Lemma kvs_valid_subset_Tss M T Tss sub:
   sub ⊆ Tss →
   kvs_valid M T Tss →
@@ -211,6 +215,7 @@ Section KVSL_valid.
   Proof.
   Admitted.
 
+  (** TODO: state for commit *)
   (* TODO: adapt for local state *)
   (* Definition update_kvs (M0 : kvsMdl) (C : gmap Key SerializableVal) (T : nat) := *)
   (*       map_fold *)
@@ -226,11 +231,13 @@ Section KVSL_valid.
   (*   Admitted. *)
   (* End KVSL_valid. *)
 
+  (** Used for start *)
   Lemma kvsl_valid_next M (m : gmap Key val) T Tss :
   kvsl_valid m M T Tss →
   kvsl_valid m M (T + 1) (Tss ∪ {[(T+1)%nat]}).
   Proof. Admitted.
 
+  (** Weakening lemma *)
   Lemma kvs_valid_filter M (mu : gmap Key (list val)) T Tss :
     kvs_valid M T Tss →
     kvs_valid
