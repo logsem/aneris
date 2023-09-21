@@ -365,19 +365,6 @@ Section model_state_lemmas.
     iPureIntro. set_solver. 
   Qed.
 
-  Definition fuel_apply (fs' F:  gmap (fmrole M) nat) (LR: gset (fmrole M)):
-    gmap (fmrole M) nat :=
-    map_imap
-      (λ (ρ: fmrole M ) (fold : nat),
-       match decide (ρ ∈ dom fs') with
-       | left x => fs' !! ρ
-       | right _ => F !! ρ
-       end) (gset_to_gmap (0%nat) LR).
-
-  Definition update_fuel_resource 
-    (δ1: LiveState G M LSI) (fs1 fs2: gmap (fmrole M) nat) (s2: M): gmap (fmrole M) nat :=
-    fuel_apply fs2 (δ1.(ls_fuel (G := G))) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
-
   Lemma elem_of_frame_excl_map
         (fs F: gmap (fmrole M) nat)
         (mf: gmap (fmrole M) (excl nat))

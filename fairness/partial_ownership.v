@@ -207,7 +207,7 @@ Section PartialOwnership.
 End PartialOwnership.
 
 Section AuxDefs.
-  Context `{LM: LiveModel Λ M LSI}.
+  Context `{LM: LiveModel G M LSI}.
 
   Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole M) nat) (s1 s2: M) (ρ: fmrole M) :=
     (ρ ∈ live_roles _ s2 -> oleq (fs2 !! ρ) (Some (LM.(lm_fl) s2))) ∧
@@ -222,11 +222,44 @@ Section AuxDefs.
       (* already dead *) (dom fs1 ∖ live_roles _ s1) ∪
       (* new deads *) ((live_roles _ s1 ∖ live_roles _ s2) ∩ dom fs1).
 
+  Definition fuel_apply (fs' F: gmap (fmrole M) nat) (LR: gset (fmrole M)):
+    gmap (fmrole M) nat :=
+    map_imap
+      (λ (ρ: fmrole M ) (fold : nat),
+       match decide (ρ ∈ dom fs') with
+       | left x => fs' !! ρ
+       | right _ => F !! ρ
+       end) (gset_to_gmap (0%nat) LR).
+
+  Definition update_fuel_resource 
+    (* (δ1: LiveState G M LSI) *) (F: gmap (fmrole M) nat)
+    (fs1 fs2: gmap (fmrole M) nat): gmap (fmrole M) nat :=
+    fuel_apply fs2 F ((dom F ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
+
+  (* TODO: refactor this? *)
+  Definition update_mapping (R: gmap (fmrole M) G) ζ (fs1 fs2: gmap (fmrole M) nat) := 
+    map_imap (λ ρ' _, if decide (ρ' ∈ dom R) then R !! ρ' else Some ζ)
+      (gset_to_gmap 333 ((dom R ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))).
+
+  Definition fuel_reorder_preserves_LSI :=
+    forall S (R R': gmap (fmrole M) G) F F',
+      dom R = dom R' ->
+      LSI S R F -> LSI S R' F'. 
+
+  Definition fuel_drop_preserves_LSI S (rem: gset (fmrole M)) :=
+    forall (R: gmap (fmrole M) G) F F',
+      let R' := filter (fun '(k, _) => k ∉ rem) R in
+      LSI S R F -> LSI S R' F'. 
+
+  (* TODO: is it too strong? *)
+  Definition model_step_preserves_LSI s2 fs1 fs2:= 
+    forall M g F, LSI s2 (update_mapping M g fs1 fs2) (update_fuel_resource F fs1 fs2). 
+
 End AuxDefs.
 
 Definition LSI_True {G: Type} {M: FairModel}:
   M → gmap (fmrole M) G → gmap (fmrole M) nat → Prop :=
-  fun _ _ _=> True. 
+  fun _ _ _ => True.
 
 
 (* TODO: move to upstream *)
@@ -235,4 +268,3 @@ Lemma disjoint_subseteq:
     {H2 : Union C} {H3 : Intersection C} {H4 : Difference C},
     `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
 Proof. intros. set_solver. Qed.
-

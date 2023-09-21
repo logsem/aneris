@@ -17,9 +17,12 @@ Section LsTmap.
       forall ρ, ρ ∈ dom (ls_fuel δ) <-> exists τ R, ls_tmap δ !! τ = Some R /\ ρ ∈ R.
   Proof. Admitted.
 
-  Lemma ls_tmap_disj (δ: lm_ls LM):
+  Let tmap_disj (tmap: gmap G (gset (fmrole M))) :=
     forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
-      ls_tmap δ !! τ1 = Some S1 -> ls_tmap δ !! τ2 = Some S2 -> S1 ## S2.
+      tmap !! τ1 = Some S1 -> tmap !! τ2 = Some S2 -> S1 ## S2.
+
+  Lemma ls_tmap_disj (δ: lm_ls LM):
+    tmap_disj (ls_tmap δ). 
   Proof. Admitted. 
 
   Definition ls_mapping_impl (tmap: gmap G (gset (fmrole M))): gmap M.(fmrole) G :=
@@ -58,67 +61,66 @@ Section LsTmap.
     - by apply elem_of_list_In.
   Qed.
 
-  (* Lemma ls_mapping_tmap_corr_impl tmap: *)
-  (*   maps_inverse_match (ls_mapping_impl tmap) tmap. *)
-  (* Proof. *)
-  (* Admitted.  *)
+  Lemma ls_mapping_tmap_corr_impl tmap (DISJ: tmap_disj tmap):
+    maps_inverse_match (ls_mapping_impl tmap) tmap.
+  Proof.
+    red. intros. rewrite /ls_mapping_impl.
+    etransitivity.
+    { symmetry. apply elem_of_list_to_map.
+      rewrite -list_fmap_compose.
+      rewrite fmap_flat_map.
+      rewrite flat_map_concat_map. apply concat_NoDup.
+      { intros. apply list_lookup_fmap_Some in H0 as [[??] [? ->]].
+        simpl. rewrite -list_fmap_compose.
+        apply NoDup_fmap_2; [apply _| ].
+        apply NoDup_elements. }
+      intros.
+      apply list_lookup_fmap_Some in H1 as [[??] [? ->]].
+      apply list_lookup_fmap_Some in H2 as [[??] [? ->]].
+      simpl. apply elem_of_disjoint.
+      intros ? [[??] [-> ?]]%elem_of_list_fmap_2 [[??] [? ?]]%elem_of_list_fmap_2.
+      simpl in H4. subst.
+      apply elem_of_list_fmap_2 in H3 as [? [[=] ?]].
+      apply elem_of_list_fmap_2 in H5 as [? [[=] ?]].
+      subst.
+      assert (tmap !! g = Some g0).
+      { eapply elem_of_map_to_list. eapply elem_of_list_lookup_2; eauto. }
+      assert (tmap !! g1 = Some g2).
+      { eapply elem_of_map_to_list. eapply elem_of_list_lookup_2; eauto. }
+      assert (g ≠ g1).
+      { intros <-.
+        pose proof (NoDup_fst_map_to_list tmap).
+        eapply NoDup_alt in H5.
+        { apply H0, H5. }
+        all: apply list_lookup_fmap_Some; eauto. }
+      pose proof (@DISJ _ _ _ _ H5 H3 H4).
+      set_solver. }
+    etransitivity.
+    { apply elem_of_list_fmap. }
+    transitivity ((v, k)
+       ∈ flat_map (λ '(τ, R), map (pair τ) (elements R)) (map_to_list tmap)).
+    { split.
+      - intros (?&?&?). destruct x. congruence.
+      - intros. exists (v, k). eauto. }
+    rewrite elem_of_list_In.
+    rewrite in_flat_map.
+
+    split.
+    - intros [[??][IN1 IN2]].
+      apply elem_of_list_In, elem_of_map_to_list in IN1.
+      apply in_map_iff in IN2 as [? [[=] yy]]. subst.
+      eexists. split; eauto.
+      apply elem_of_list_In in yy. set_solver.
+    - intros [? [??]]. exists (v, x). split.
+      + by apply elem_of_list_In, elem_of_map_to_list.
+      + apply in_map_iff. eexists. split; eauto.
+        apply elem_of_list_In. set_solver.
+  Qed.
 
   Lemma ls_mapping_tmap_corr δ:
     maps_inverse_match (ls_mapping δ) (ls_tmap δ).
   Proof.
-    (* red. intros. rewrite /ls_mapping. *)
-    (* etransitivity. *)
-    (* { symmetry. apply elem_of_list_to_map. *)
-    (*   rewrite -list_fmap_compose. *)
-    (*   rewrite fmap_flat_map. *)
-    (*   rewrite flat_map_concat_map. apply concat_NoDup. *)
-    (*   { intros. apply list_lookup_fmap_Some in H0 as [[??] [? ->]]. *)
-    (*     simpl. rewrite -list_fmap_compose. *)
-    (*     apply NoDup_fmap_2; [apply _| ]. *)
-    (*     apply NoDup_elements. } *)
-    (*   intros. *)
-    (*   apply list_lookup_fmap_Some in H1 as [[??] [? ->]]. *)
-    (*   apply list_lookup_fmap_Some in H2 as [[??] [? ->]]. *)
-    (*   simpl. apply elem_of_disjoint. *)
-    (*   intros ? [[??] [-> ?]]%elem_of_list_fmap_2 [[??] [? ?]]%elem_of_list_fmap_2. *)
-    (*   simpl in H4. subst. *)
-    (*   apply elem_of_list_fmap_2 in H3 as [? [[=] ?]]. *)
-    (*   apply elem_of_list_fmap_2 in H5 as [? [[=] ?]]. *)
-    (*   subst. *)
-    (*   assert (ls_tmap δ !! l = Some g). *)
-    (*   { eapply elem_of_map_to_list. eapply elem_of_list_lookup_2; eauto. } *)
-    (*   assert (ls_tmap δ !! l0 = Some g0). *)
-    (*   { eapply elem_of_map_to_list. eapply elem_of_list_lookup_2; eauto. } *)
-    (*   assert (l ≠ l0). *)
-    (*   { intros <-. *)
-    (*     pose proof (NoDup_fst_map_to_list (ls_tmap δ)). *)
-    (*     eapply NoDup_alt in H5. *)
-    (*     { apply H0, H5. } *)
-    (*     all: apply list_lookup_fmap_Some; eauto. } *)
-    (*   pose proof (@ls_tmap_disj δ _ _ _ _ H5 H3 H4). *)
-    (*   set_solver. } *)
-    (* etransitivity. *)
-    (* { apply elem_of_list_fmap. } *)
-    (* transitivity ((v, k) *)
-    (*    ∈ flat_map (λ '(τ, R), map (pair τ) (elements R)) (map_to_list (ls_tmap δ))). *)
-    (* { split. *)
-    (*   - intros (?&?&?). destruct x. congruence. *)
-    (*   - intros. exists (v, k). eauto. } *)
-    (* rewrite elem_of_list_In. *)
-    (* rewrite in_flat_map. *)
-
-    (* split. *)
-    (* - intros [[??][IN1 IN2]]. *)
-    (*   apply elem_of_list_In, elem_of_map_to_list in IN1. *)
-    (*   apply in_map_iff in IN2 as [? [[=] yy]]. subst. *)
-    (*   eexists. split; eauto. *)
-    (*   apply elem_of_list_In in yy. set_solver. *)
-    (* - intros [? [??]]. exists (v, x). split. *)
-    (*   + by apply elem_of_list_In, elem_of_map_to_list. *)
-    (*   + apply in_map_iff. eexists. split; eauto. *)
-    (*     apply elem_of_list_In. set_solver. *)
-  (* Qed. *)
-  Admitted.
+  Admitted. 
       
   
   (* Lemma ls_same_doms δ: dom (ls_mapping δ) = dom (ls_fuel δ). *)
