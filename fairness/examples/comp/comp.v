@@ -2,7 +2,6 @@ From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.fairness Require Import fuel_ext resources actual_resources.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
 From trillium.fairness Require Import utils.
 From iris.base_logic.lib Require Import invariants.
@@ -10,82 +9,10 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
 From trillium.fairness Require Import lm_fair. 
+From trillium.fairness.examples.comp Require Import lib.
+From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi.
 
-(* Close Scope Z_scope. *)
-Section LibraryDefs.
-
-  (* Definition ρl := tt.  *)
-
-  Definition lib_model_impl: FairModel.
-    refine ({|
-        fmstate := nat;
-        fmrole := unit;
-        fmtrans s1 oρ s2 := s1 = 1 /\ s2 = 0;
-        live_roles s := if (decide (s = 1)) then {[ tt ]} else ∅;
-        (* fuel_limit _ := 25%nat; (* exact value; should relax its usage *) *)
-             |}).
-    intros. set_solver. 
-  Defined. 
-
-  (* simply to differentiate between group- and individual role *)
-  Definition lib_grole := unit.
-  Definition ρlg: lib_grole := tt. 
-
-  Definition ρl: fmrole lib_model_impl := tt.
-
-  Definition lib_model: LiveModel lib_grole lib_model_impl LSI_True := 
-    {| lm_fl _ := 5; |}.  
-  
-  Definition lib_fun: val.
-  Admitted.
-
-  Lemma lib_model_impl_lr_strong: FM_strong_lr lib_model_impl.
-  Proof. 
-    red. intros. simpl.
-    destruct st; [| destruct st]; set_solver. 
-  Qed. 
-
-  (* TODO: this is needed to prove lib termination; should extract this part *)
-  From trillium.fairness Require Import fair_termination trace_helpers trace_lookup. 
-
-  (* straightforward proof which can be done more idiomatically 
-     by providing FairTerminatingModel of library *)
-  Lemma lib_fair_term:
-    ∀ mtr: mtrace lib_model_impl, mtrace_fairly_terminating mtr. 
-  Proof.
-    red. intros mtr VALID FAIR. 
-    destruct mtr; [by exists 1| ].
-    destruct mtr; [by exists 2| ].
-    pose proof (mtrace_valid_steps' VALID 0) as STEP0.
-    pose proof (mtrace_valid_steps' VALID 1) as STEP1.
-    rewrite trace_lookup_0_cons in STEP0. simpl in STEP0. 
-    specialize (STEP0 _ _ _ eq_refl) as [-> ->].
-    rewrite trace_lookup_cons trace_lookup_0_cons in STEP1.
-    specialize (STEP1 _ _ _ eq_refl). by inversion STEP1.
-  Qed. 
-  
-End LibraryDefs.
-
-Global Opaque lib_model_impl. 
-Global Opaque lib_grole ρlg. 
-
-Section LibrarySpec.
-  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}.
-  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ lib_model_impl}.
-  (* Context {ifG: fairnessGS lib_model Σ}. *)
-  
-  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := lib_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
-
-  Lemma lib_spec tid Einvs:
-    PMP Einvs -∗
-    {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
-        has_fuels tid {[ ρl:=2 ]} (PMPP := PMPP)  }}}
-      lib_fun #() @ tid
-    {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
-                 partial_free_roles_are {[ tt ]} }}}.
-  Proof using. Admitted.
-
-End LibrarySpec.
+Close Scope Z_scope.
 
 Section ClientDefs.
 
@@ -122,9 +49,9 @@ Section ClientDefs.
   .
 
   Global Instance lib_role_EqDec: EqDecision lib_role.
-  Proof. solve_decision. Defined. 
+  Proof. solve_decision. Defined.
   Global Instance lib_role_Cnt: Countable lib_role.
-  Proof using. rewrite /lib_role. simpl. apply _. Defined. 
+  Proof using. rewrite /lib_role. simpl. apply _. Defined.
   
 
   Instance y_EqDec: EqDecision y_role.
@@ -135,8 +62,8 @@ Section ClientDefs.
     rewrite /client_role.
     unshelve eapply sum_countable.
     eauto. eapply (inj_countable' (fun _ => ()) (fun _ => ρy)).
-    by destruct x. 
-  Qed. 
+    by destruct x.
+  Qed.
 
   Definition client: val :=
   λ: <>,
@@ -189,8 +116,8 @@ Section ClientDefs.
       + nostep.
       + destruct y. left. eexists. constructor.
     - nostep. 
-   Qed. 
-  
+  Qed.
+
   Definition client_lr (st: client_state): gset (client_role) :=
     filter (fun r => (@bool_decide _ (lib_step_dec st r) = true))  {[ inl ρlg; inr ρy ]}. 
 
@@ -216,8 +143,19 @@ Section ClientDefs.
     - intros. eapply client_lr_spec; eauto. 
   Defined.
 
+  
+    (* forall k δo_k gi, lmtr_o S!! k = Some δo_k -> *)
+    (*              (exists (δi: LiveState Gi Mi LSIi) (ρi: fmrole Mi), *)
+    (*                 state_rel (ls_under δo_k) δi /\ *)
+    (*                 ls_mapping δi !! ρi = Some gi) -> *)
+    (*              lift_Gi gi ∈ dom (ls_mapping δo_k).  *)
+  Definition client_LSI (s: client_state)
+    (m: gmap (fmrole client_model_impl) (locale heap_lang))
+    (_: gmap (fmrole client_model_impl) nat) :=
+    forall gi, (exists ρi, ls_mapping s.1 !! ρi = Some gi) -> inl gi ∈ dom m.
+    
   Definition client_fl := 10. 
-  Definition client_model: LiveModel (locale heap_lang) client_model_impl LSI_True :=
+  Definition client_model: LiveModel (locale heap_lang) client_model_impl client_LSI :=
     {| lm_fl _ := client_fl; |}.  
 
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
@@ -266,45 +204,8 @@ Section ClientSpec.
   Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
 
-  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
-
-  Notation "'sub' d" := (fun n => n - d) (at level 10). 
-
-  Lemma sub_comp `{Countable K} (fs: gmap K nat) (d1 d2: nat):
-    (sub d1 ∘ sub d2) <$> fs = sub (d1 + d2) <$> fs.
-  Proof.
-    apply leibniz_equiv. apply map_fmap_proper; [| done].
-    intros ??->. apply leibniz_equiv_iff.
-    rewrite /compose. lia. 
-  Qed.
-
-  Lemma sub_0_id `{Countable K} (fs: gmap K nat):
-    fs = sub 0 <$> fs.
-  Proof.
-    rewrite -{1}(map_fmap_id fs).
-    apply leibniz_equiv. apply map_fmap_proper; [| done].
-    intros ??->. apply leibniz_equiv_iff.
-    simpl. lia.
-  Qed.
-
-  Ltac solve_fuels_ge_1 FS := 
-    intros ?? [? [<- GE]]%lookup_fmap_Some; apply FS in GE; simpl; lia.
-  
-  Ltac solve_fuels_S FS := 
-    iDestruct (has_fuels_gt_1 with "FUELS") as "F";
-    [| rewrite -map_fmap_compose; by iFrame];
-    solve_fuels_ge_1 FS. 
-
-  Ltac solve_map_not_empty := intros ?MM%fmap_empty_iff; try apply map_non_empty_singleton in MM; set_solver. 
-
-  Ltac pure_step FS :=
-    try rewrite sub_comp;
-    iApply wp_lift_pure_step_no_fork; auto;
-    [| iSplitR; [done| ]; do 3 iModIntro; iSplitL "FUELS"];
-    [| solve_fuels_S FS |];
-    (* [by intros ?%fmap_empty_iff| ]; *)
-    [solve_map_not_empty| ];
-    iIntros "FUELS"; simpl; rewrite sub_comp. 
+  (* Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))). *)
+  Notation "'LSG' Einvs" := (LM_steps_gen Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS)) (at level 10).
 
   Lemma init_client_inv lb0 n:
     partial_model_is (lb0, n)  ={∅}=∗ 
@@ -439,7 +340,7 @@ Section ClientSpec.
     (PROG_STEP: locale_step (trace_last extr) (Some 0) c2)
     (F_BOUND: f ≤ client_fl)
     :
-    PMP Einvs ⊢
+    LSG Einvs ⊢
     em_msi (trace_last extr) (trace_last mtr) (em_GS0 := heap_fairnessGS) -∗ 
     partial_model_is (lb, 1) -∗
     partial_free_roles_are {[inr ρy]} -∗
@@ -469,46 +370,47 @@ Section ClientSpec.
     remember (trace_last extr) as c1. destruct c1 as (σ1, tp1).
     destruct c2 as (σ2, tp2).
 
-    iPoseProof (update_step_still_alive with "[$] [$] [$] [$] [$]") as "EM_STEP".
-    7: { apply PROG_STEP. }
-    7: { apply ct_lib_step. simpl. eauto. }
-    { rewrite LIVE LIVE'. dEl; set_solver. }
-    { rewrite dom_singleton. 
-      assert ((if (decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅))
-              then {[ inl ρlg ]}
-              else (∅: gset (fmrole client_model_impl))) ⊆ {[inl ρlg]}) as IN.
-      { dEq; set_solver. }
-      apply IN. }
-    { rewrite LIVE. set_solver. }
-    all: eauto.
-    { Unshelve. 
-      2: exact (if decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅) 
-                then {[ inr ρy := client_fl ]} 
-                else {[ inl ρlg := f ]}).
-      destruct (decide (_=_)); set_solver. }
-    { repeat split; rewrite ?LIVE ?LIVE'.
-      - dEl.
-        2: { destruct decide; set_solver. }
-        intros _. rewrite decide_False. 
-        { rewrite lookup_singleton. simpl. lia. }
-        tauto. 
-      - destruct (decide (_ ∈ _)); [set_solver| ].
-        destruct (decide (_=_)); [set_solver| ].
-        rewrite !lookup_singleton. simpl. lia. 
-      - set_solver.
-      - dEq; [| set_solver]. 
-        intros. assert (ρ' = inr ρy) as -> by set_solver.
-        rewrite lookup_singleton. simpl. lia.
-      - dEq; set_solver.
-      - dEq; dEl; set_solver.
-      - dEq; dEl; set_solver. }
-    rewrite LIVE LIVE'.
-    iMod "EM_STEP" as (??) "(?&?&?&?&FREE)".
-    iModIntro. do 2 iExists _. iFrame.
+  (*   iPoseProof (update_step_still_alive with "[$] [$] [$] [$] [$]") as "EM_STEP". *)
+  (*   7: { apply PROG_STEP. } *)
+  (*   7: { apply ct_lib_step. simpl. eauto. } *)
+  (*   { rewrite LIVE LIVE'. dEl; set_solver. } *)
+  (*   { rewrite dom_singleton.  *)
+  (*     assert ((if (decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅)) *)
+  (*             then {[ inl ρlg ]} *)
+  (*             else (∅: gset (fmrole client_model_impl))) ⊆ {[inl ρlg]}) as IN. *)
+  (*     { dEq; set_solver. } *)
+  (*     apply IN. } *)
+  (*   { rewrite LIVE. set_solver. } *)
+  (*   all: eauto. *)
+  (*   { Unshelve.  *)
+  (*     2: exact (if decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅)  *)
+  (*               then {[ inr ρy := client_fl ]}  *)
+  (*               else {[ inl ρlg := f ]}). *)
+  (*     destruct (decide (_=_)); set_solver. } *)
+  (*   { repeat split; rewrite ?LIVE ?LIVE'. *)
+  (*     - dEl. *)
+  (*       2: { destruct decide; set_solver. } *)
+  (*       intros _. rewrite decide_False.  *)
+  (*       { rewrite lookup_singleton. simpl. lia. } *)
+  (*       tauto.  *)
+  (*     - destruct (decide (_ ∈ _)); [set_solver| ]. *)
+  (*       destruct (decide (_=_)); [set_solver| ]. *)
+  (*       rewrite !lookup_singleton. simpl. lia.  *)
+  (*     - set_solver. *)
+  (*     - dEq; [| set_solver].  *)
+  (*       intros. assert (ρ' = inr ρy) as -> by set_solver. *)
+  (*       rewrite lookup_singleton. simpl. lia. *)
+  (*     - dEq; set_solver. *)
+  (*     - dEq; dEl; set_solver. *)
+  (*     - dEq; dEl; set_solver. } *)
+  (*   rewrite LIVE LIVE'. *)
+  (*   iMod "EM_STEP" as (??) "(?&?&?&?&FREE)". *)
+  (*   iModIntro. do 2 iExists _. iFrame. *)
     
-    iApply partial_free_roles_are_Proper; [| iFrame].
-    dEl; dEq; tauto || set_solver.  
-  Qed.
+  (*   iApply partial_free_roles_are_Proper; [| iFrame]. *)
+  (*   dEl; dEq; tauto || set_solver.   *)
+  (* Qed. *)
+  Admitted. 
 
   (* TODO: unify with model_agree ? *)
   Lemma y_model_agree `{clientGS Σ} y1 y2:
@@ -571,11 +473,11 @@ Section ClientSpec.
     - iExists _. iFrame.
     - iDestruct (frag_fuel_is_big_sepM with "FUEL_LIB") as "?"; [done| ].
       iFrame. iExists _. iFrame. done. 
-  Qed. 
+  Qed.
 
 
   Lemma fuel_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
-  PMP Einvs ∗ client_inv ⊢
+  LSG Einvs ∗ client_inv ⊢
   ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M) 
     (c2 : cfg heap_lang) (fs : gmap (fmrole lib_model_impl) nat) 
     (ζ : locale heap_lang) (_ : dom fs ≠ ∅) (_ : locale_step 
@@ -646,7 +548,7 @@ Section ClientSpec.
   Qed.
   
   Lemma model_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
-  PMP Einvs ∗ client_inv ⊢
+  LSG Einvs ∗ client_inv ⊢
   ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M)
     (tp1 tp2 : list (language.expr heap_lang)) (σ1 σ2 : language.state heap_lang)
     (s1 s2 : lib_model_impl) (fs1 fs2 : gmap (fmrole lib_model_impl) nat)
@@ -724,7 +626,7 @@ Section ClientSpec.
 
 
   Lemma lib_PMP `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
-    PMP Einvs ∗ client_inv ⊢
+    LSG Einvs ∗ client_inv ⊢
     (* PartialModelPredicates (Einvs ∪ ↑Ns) (LM := LM) (iLM := spinlock_model) (PMPP := (sl1_PMPP γ)).  *)
     PartialModelPredicates (Einvs ∪ ↑Ns) (EM := EM) (iLM := lib_model) (PMPP := lib_PMPP) (eGS := heap_fairnessGS).
   Proof. 
@@ -741,6 +643,58 @@ Section ClientSpec.
       iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.       
   Admitted.
 
+  (* TODO: problems with Countable instance *)
+  (* Set Printing All. *)
+  (* Lemma fuel_reorder_preserves_client_LSI: *)
+  (*   fuel_reorder_preserves_LSI (LSI := client_LSI).  *)
+  Lemma fuel_reorder_preserves_client_LSI:
+    @fuel_reorder_preserves_LSI (locale heap_lang) client_model_impl client_LSI.
+  Proof. 
+    red. rewrite /client_LSI. intros. set_solver.
+  Qed. 
+
+
+  Notation "'sub' d" := (fun n => n - d) (at level 10). 
+
+  Lemma sub_comp `{Countable K} (fs: gmap K nat) (d1 d2: nat):
+    (sub d1 ∘ sub d2) <$> fs = sub (d1 + d2) <$> fs.
+  Proof.
+    apply leibniz_equiv. apply map_fmap_proper; [| done].
+    intros ??->. apply leibniz_equiv_iff.
+    rewrite /compose. lia. 
+  Qed.
+
+  Lemma sub_0_id `{Countable K} (fs: gmap K nat):
+    fs = sub 0 <$> fs.
+  Proof.
+    rewrite -{1}(map_fmap_id fs).
+    apply leibniz_equiv. apply map_fmap_proper; [| done].
+    intros ??->. apply leibniz_equiv_iff.
+    simpl. lia.
+  Qed.
+
+  Ltac solve_fuels_ge_1 FS := 
+    intros ?? [? [<- GE]]%lookup_fmap_Some; apply FS in GE; simpl; lia.
+  
+  Ltac solve_fuels_S FS := 
+    iDestruct (has_fuels_gt_1 with "FUELS") as "F";
+    [| rewrite -map_fmap_compose; by iFrame];
+    solve_fuels_ge_1 FS. 
+
+  Ltac solve_map_not_empty := intros ?MM%fmap_empty_iff; try apply map_non_empty_singleton in MM; set_solver. 
+
+  Ltac pure_step_impl FS :=
+    try rewrite sub_comp;
+    iApply wp_lift_pure_step_no_fork; auto;
+    [| iSplitR; [done| ]; do 3 iModIntro; iSplitL "FUELS"];
+    [| solve_fuels_S FS |];
+    (* [by intros ?%fmap_empty_iff| ]; *)
+    [solve_map_not_empty| ];
+    iIntros "FUELS"; simpl; rewrite sub_comp. 
+
+  Ltac pure_step FS :=
+    unshelve (pure_step_impl FS); [by apply fuel_reorder_preserves_client_LSI| ].
+
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     (FB: f >= 10)
     (* TODO: get rid of these restrictions *)
@@ -749,7 +703,7 @@ Section ClientSpec.
     (LB0_ACT: ρlg ∈ live_roles _ lb0)
     (LB0_INFO: ls_fuel lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! ρlg = Some {[ tt ]})
     :
-    PMP Einvs -∗
+    LSG Einvs -∗
     {{{ partial_model_is (lb0, 2)  ∗ 
         partial_free_roles_are {[ inl ρlg ]} ∗ 
         has_fuels 0 {[ inr ρy := f ]} (PMPP := PMPP)  }}}
@@ -761,16 +715,18 @@ Section ClientSpec.
     rewrite (sub_0_id {[ _ := _ ]}). 
     assert (fuels_ge ({[inr ρy := f]}: gmap (fmrole client_model_impl) nat) 10) as FS.
     { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
-    
+
     pure_step FS.
 
     wp_bind (ref _)%E.
     iApply (wp_alloc_nostep with "[$] [FUELS]").
     2: { solve_fuels_S FS. }
     { solve_map_not_empty. }
-    iNext. iIntros (l) "(L & MT & FUELS) /=". 
+    iNext. iIntros (l) "(L & MT & FUELS) /=".
+    Unshelve. 2: by apply fuel_reorder_preserves_client_LSI.
 
     pure_step FS. pure_step FS.
+    (* Set Printing Implicit. Unshelve. *)
 
     pose proof (live_roles_2 lb0) as LIVE2.
     pose proof (live_roles_1 lb0) as LIVE1. 
@@ -779,7 +735,7 @@ Section ClientSpec.
     wp_bind (_ <- _)%E.
     iApply (wp_store_step_keep with "[$] [L ST FUELS FREE]").
     { set_solver. }
-    7: { iFrame "L ST FREE". iNext.
+    8: { iFrame "L ST FREE". iNext.
          rewrite map_fmap_singleton. iFrame. }
     { econstructor. }
     3: { rewrite dom_singleton. reflexivity. }
@@ -791,6 +747,18 @@ Section ClientSpec.
       intros. assert (ρ' = inl ρlg) as -> by set_solver.
       rewrite lookup_singleton. simpl. lia. }
     { set_solver. }
+    { red. intros. simpl. red.
+      intros.
+      assert (client_LSI (lb0, 2) M0 F) as LSI1 by admit.
+      red in LSI1.
+      rewrite /update_mapping. rewrite map_imap_dom_eq.
+      2: { intros. destruct decide; [| done].
+           by apply elem_of_dom. }
+      rewrite dom_gset_to_gmap.
+      set_solver. }
+
+    foobar. 
+      
     iNext. iIntros "(L & ST & FUELS & FR)".
     rewrite LIVE2 LIVE1.
     iDestruct (partial_free_roles_are_Proper with "FR") as "FR".
