@@ -6,199 +6,15 @@ From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
 From trillium.fairness Require Export fairness fuel partial_ownership pmp_lifting. 
 From trillium.program_logic Require Import ectx_lifting.
-From trillium.fairness.heap_lang Require Export lang heap_lang_defs. 
+From trillium.fairness.heap_lang Require Export heap_lang_defs. 
 From trillium.fairness.heap_lang Require Import tactics notation.
+
 Set Default Proof Using "Type".
-
-(* Canonical Structure ModelO (M : FairModel) := leibnizO M. *)
-(* Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)). *)
-
-
-(** Override the notations so that scopes and coercions work out *)
-Notation "l ↦{ q } v" := (mapsto (L:=loc) (V:=val) l (DfracOwn q) v%V)
-  (at level 20, q at level 50, format "l  ↦{ q }  v") : bi_scope.
-Notation "l ↦ v" :=
-  (mapsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
-Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
-  (at level 20, q at level 50, format "l  ↦{ q }  -") : bi_scope.
-Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : bi_scope.
-
-(** The tactic [inv_head_step] performs inversion on hypotheses of the shape
-[head_step]. The tactic will discharge head-reductions starting from values, and
-simplifies hypothesis related to conversions from and to values, and finite map
-operations. This tactic is slightly ad-hoc and tuned for proving our lifting
-lemmas. *)
-Ltac inv_head_step :=
-  repeat match goal with
-  | _ => progress simplify_map_eq/= (* simplify memory stuff *)
-  | H : to_val _ = Some _ |- _ => apply of_to_val in H
-  | H : head_step ?e _ _ _ _ |- _ =>
-     try (is_var e; fail 1); (* inversion yields many goals if [e] is a variable
-     and can thus better be avoided. *)
-     inversion H; subst; clear H
-  end.
-
-Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
-(* Local Hint Extern 0 (head_reducible_no_obs _ _) => eexists _, _, _; simpl : core. *)
-
-(* [simpl apply] is too stupid, so we need extern hints here. *)
-Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.
-Local Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core.
-Local Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core.
-Local Hint Resolve to_of_val : core.
-
-#[global] Instance into_val_val v : IntoVal (Val v) v.
-Proof. done. Qed.
-#[global] Instance as_val_val v : AsVal (Val v).
-Proof. by eexists. Qed.
-
-Local Ltac solve_atomic :=
-  apply strongly_atomic_atomic, ectx_language_atomic;
-    [inversion 1; naive_solver
-    |apply ectxi_language_sub_redexes_are_values; intros [] **; naive_solver].
-
-#[global] Instance rec_atomic s f x e : Atomic s (Rec f x e).
-Proof. solve_atomic. Qed.
-#[global] Instance pair_atomic s v1 v2 : Atomic s (Pair (Val v1) (Val v2)).
-Proof. solve_atomic. Qed.
-#[global] Instance injl_atomic s v : Atomic s (InjL (Val v)).
-Proof. solve_atomic. Qed.
-#[global] Instance injr_atomic s v : Atomic s (InjR (Val v)).
-Proof. solve_atomic. Qed.
-(** The instance below is a more general version of [Skip] *)
-#[global] Instance beta_atomic s f x v1 v2 : Atomic s (App (RecV f x (Val v1)) (Val v2)).
-Proof. destruct f, x; solve_atomic. Qed.
-#[global] Instance unop_atomic s op v : Atomic s (UnOp op (Val v)).
-Proof. solve_atomic. Qed.
-#[global] Instance binop_atomic s op v1 v2 : Atomic s (BinOp op (Val v1) (Val v2)).
-Proof. solve_atomic. Qed.
-#[global] Instance if_true_atomic s v1 e2 : Atomic s (If (Val $ LitV $ LitBool true) (Val v1) e2).
-Proof. solve_atomic. Qed.
-#[global] Instance if_false_atomic s e1 v2 : Atomic s (If (Val $ LitV $ LitBool false) e1 (Val v2)).
-Proof. solve_atomic. Qed.
-#[global] Instance fst_atomic s v : Atomic s (Fst (Val v)).
-Proof. solve_atomic. Qed.
-#[global] Instance snd_atomic s v : Atomic s (Snd (Val v)).
-Proof. solve_atomic. Qed.
-
-#[global] Instance fork_atomic s e : Atomic s (Fork e).
-Proof. solve_atomic. Qed.
-
-#[global] Instance alloc_atomic s v w : Atomic s (AllocN (Val v) (Val w)).
-Proof. solve_atomic. Qed.
-#[global] Instance load_atomic s v : Atomic s (Load (Val v)).
-Proof. solve_atomic. Qed.
-#[global] Instance store_atomic s v1 v2 : Atomic s (Store (Val v1) (Val v2)).
-Proof. solve_atomic. Qed.
-#[global] Instance cmpxchg_atomic s v0 v1 v2 : Atomic s (CmpXchg (Val v0) (Val v1) (Val v2)).
-Proof. solve_atomic. Qed.
-#[global] Instance faa_atomic s v1 v2 : Atomic s (FAA (Val v1) (Val v2)).
-Proof. solve_atomic. Qed.
-
-Local Ltac solve_exec_safe := intros; subst; do 3 eexists; econstructor; eauto.
-Local Ltac solve_exec_puredet := simpl; intros; by inv_head_step.
-Local Ltac solve_pure_exec :=
-  subst; intros ?; apply nsteps_once, pure_head_step_pure_step;
-    constructor; [solve_exec_safe | solve_exec_puredet].
-
-(** The behavior of the various [wp_] tactics with regard to lambda differs in
-the following way:
-
-- [wp_pures] does *not* reduce lambdas/recs that are hidden behind a definition.
-- [wp_rec] and [wp_lam] reduce lambdas/recs that are hidden behind a definition.
-
-To realize this behavior, we define the class [AsRecV v f x erec], which takes a
-value [v] as its input, and turns it into a [RecV f x erec] via the instance
-[AsRecV_recv : AsRecV (RecV f x e) f x e]. We register this instance via
-[Hint Extern] so that it is only used if [v] is syntactically a lambda/rec, and
-not if [v] contains a lambda/rec that is hidden behind a definition.
-
-To make sure that [wp_rec] and [wp_lam] do reduce lambdas/recs that are hidden
-behind a definition, we activate [AsRecV_recv] by hand in these tactics. *)
-Class AsRecV (v : val) (f x : binder) (erec : expr) :=
-  as_recv : v = RecV f x erec.
-#[global] Hint Mode AsRecV ! - - - : typeclass_instances.
-Definition AsRecV_recv f x e : AsRecV (RecV f x e) f x e := eq_refl.
-#[global] Hint Extern 0 (AsRecV (RecV _ _ _) _ _ _) =>
-  apply AsRecV_recv : typeclass_instances.
-
-#[global] Instance pure_recc f x (erec : expr) :
-  PureExec True 1 (Rec f x erec) (Val $ RecV f x erec).
-Proof. solve_pure_exec. Qed.
-#[global] Instance pure_pairc (v1 v2 : val) :
-  PureExec True 1 (Pair (Val v1) (Val v2)) (Val $ PairV v1 v2).
-Proof. solve_pure_exec. Qed.
-#[global] Instance pure_injlc (v : val) :
-  PureExec True 1 (InjL $ Val v) (Val $ InjLV v).
-Proof. solve_pure_exec. Qed.
-#[global] Instance pure_injrc (v : val) :
-  PureExec True 1 (InjR $ Val v) (Val $ InjRV v).
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_beta f x (erec : expr) (v1 v2 : val) `{!AsRecV v1 f x erec} :
-  PureExec True 1 (App (Val v1) (Val v2)) (subst' x v2 (subst' f v1 erec)).
-Proof. unfold AsRecV in *. solve_pure_exec. Qed.
-
-#[global] Instance pure_unop op v v' :
-  PureExec (un_op_eval op v = Some v') 1 (UnOp op (Val v)) (Val v').
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_binop op v1 v2 v' :
-  PureExec (bin_op_eval op v1 v2 = Some v') 1 (BinOp op (Val v1) (Val v2)) (Val v') | 10.
-Proof. solve_pure_exec. Qed.
-(* Higher-priority instance for [EqOp]. *)
-#[global] Instance pure_eqop v1 v2 :
-  PureExec (vals_compare_safe v1 v2) 1
-    (BinOp EqOp (Val v1) (Val v2))
-    (Val $ LitV $ LitBool $ bool_decide (v1 = v2)) | 1.
-Proof.
-  intros Hcompare.
-  cut (bin_op_eval EqOp v1 v2 = Some $ LitV $ LitBool $ bool_decide (v1 = v2)).
-  { intros. revert Hcompare. solve_pure_exec. }
-  rewrite /bin_op_eval /= decide_True //.
-Qed.
-
-#[global] Instance pure_if_true e1 e2 : PureExec True 1 (If (Val $ LitV $ LitBool true) e1 e2) e1.
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_if_false e1 e2 : PureExec True 1 (If (Val $ LitV  $ LitBool false) e1 e2) e2.
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_fst v1 v2 :
-  PureExec True 1 (Fst (Val $ PairV v1 v2)) (Val v1).
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_snd v1 v2 :
-  PureExec True 1 (Snd (Val $ PairV v1 v2)) (Val v2).
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_case_inl v e1 e2 :
-  PureExec True 1 (Case (Val $ InjLV v) e1 e2) (App e1 (Val v)).
-Proof. solve_pure_exec. Qed.
-
-#[global] Instance pure_case_inr v e1 e2 :
-  PureExec True 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
-Proof. solve_pure_exec. Qed.
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
-(* Lemma own_proper `{inG Σ X} γ (x y: X): *)
-(*   x ≡ y -> *)
-(*   own γ x -∗ own γ y. *)
-(* Proof. by intros ->. Qed. *)
-
-(* Lemma auth_fuel_is_proper `{LM: LiveModel (Λ M} *)
-(*   `{fairnessGS _ _ LM Σ} *)
-(*   (x y : gmap (fmrole M) nat): *)
-(*   x = y -> *)
-(*   auth_fuel_is x -∗ auth_fuel_is y. *)
-(* Proof. by intros ->. Qed. *)
-
 
 Section lifting.
-(* Context `{LM:LiveModel heap_lang M}. *)
-(* Context `{!heapGS Σ LM}. *)
-(* Context `{hGS: @heapGS Σ LM (@LM_EM _ LM)}.  *)
 Context `{EM: ExecutionModel heap_lang M}.   
 Context `{hGS: @heapGS Σ _ EM}.
 Context `{iLM:LiveModel G iM LSI_True}.
@@ -221,6 +37,15 @@ Implicit Types tid : nat.
 Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
 Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
 Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
+Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
+(* Local Hint Extern 0 (head_reducible_no_obs _ _) => eexists _, _, _; simpl : core. *)
+
+(* [simpl apply] is too stupid, so we need extern hints here. *)
+Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.
+Local Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core.
+Local Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core.
+Local Hint Resolve to_of_val : core.
 
 Lemma wp_lift_pure_step_no_fork tid E E' Einvs Φ e1 e2 fs ϕ:
   fs ≠ ∅ ->
@@ -460,7 +285,6 @@ Lemma wp_fork_nostep s tid E Einvs e Φ R1 R2
      ▷ (has_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
      has_fuels_S tid fs -∗ WP Fork e @ s; tid; E {{ Φ }}.
 Proof using.
-  
   iIntros (Hunioneq) "[PMP He] HΦ Htid". iApply wp_lift_atomic_head_step; [done|].
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
   iMod (update_fork_split R1 R2 _
@@ -470,7 +294,10 @@ Proof using.
     apply fill_step, head_prim_step. econstructor. }
   { list_simplifier. exists (tp1 ++ fill K #() :: tp2). split; first by list_simplifier.
     rewrite !app_length //=. }  
-  iModIntro. iSplit. iPureIntro; first by eauto. iNext.
+  iModIntro. iSplit.
+  iPureIntro; first by eauto.
+
+  iNext.
   iIntros (e2 σ2 efs Hstep).
   have [-> [-> ->]] : σ2 = σ1 ∧ efs = [e] ∧ e2 = Val $ LitV LitUnit by inv_head_step.
   iMod ("HΦ" with "Hfuels1") as "HΦ". iModIntro. iExists δ2, ℓ. iFrame.
@@ -595,7 +422,7 @@ Proof using.
   iIntros (Φ). iModIntro. iIntros "HfuelS HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "(% & Hsi & Hmi)".
-  iModIntro; iSplit; first by eauto.
+  iModIntro; iSplit; [by eauto| ]. 
   iIntros (e2 σ2 efs Hstep). iNext.
   inv_head_step.
   iMod (gen_heap_alloc_big _ (heap_array l (replicate (Z.to_nat n) v)) with "Hsi")
@@ -692,101 +519,6 @@ Proof using.
   rewrite map_filter_id //. intros ???%elem_of_dom_2; set_solver.
 Qed.
 
-(* (* WIP solution for generic fuel-handling *) *)
-(* Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ := *)
-(*   match to_val e1 with *)
-(*   | Some v => |={E}=> Φ (of_val v) *)
-(*   | None => ∀ σ1, *)
-(*       gen_heap_interp σ1.(heap) ={E,∅}=∗ *)
-(*        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗ *)
-(*        ∀ e2 σ2 efs, *)
-(*          ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗ |={∅,E}=> *)
-(*          gen_heap_interp σ2.(heap) ∗ Φ e2 ∗ ⌜efs = []⌝ *)
-(*   end%I. *)
-
-(* Lemma wp_store s tid E l v' v : *)
-(*   ▷ l ↦ v' -∗ *)
-(*   sswp s E (Store (Val $ LitV (LitLoc l)) (Val v)) *)
-(*             (λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ). *)
-(* Proof. *)
-(*   iIntros ">Hl". simpl. *)
-(*   iIntros (σ1) "Hsi". *)
-(*   iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap. *)
-(*   iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose". *)
-(*   iSplit. *)
-(*   { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. } *)
-(*   iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>". *)
-(*   iMod "Hclose". *)
-(*   iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]". *)
-(*   iFrame. *)
-(*   apply head_reducible_prim_step in Hstep; [|by eauto]. *)
-(*   inv_head_step. iFrame. done. *)
-(* Qed. *)
-
-(* Lemma wp_nostep s tid E e fs Φ : *)
-(*   TCEq (to_val e) None → *)
-(*   fs ≠ ∅ → *)
-(*   sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗ *)
-(*   has_fuels_S tid fs -∗ *)
-(*   WP e @ s; tid; E {{ Φ }}. *)
-(* Proof. *)
-(*   iIntros (Hval ?) "Hwp HfuelS". *)
-(*   rewrite wp_unfold /wp_pre /sswp /= Hval. *)
-(*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)". *)
-(*   rewrite Hends. *)
-(*   iMod ("Hwp" with "Hsi") as (Hred) "Hwp". *)
-(*   iModIntro. iSplit; [done|]. *)
-(*   iIntros (e2 σ2 efs Hstep). simpl in *. *)
-(*   iMod ("Hwp" with "[//]") as "Hwp". *)
-(*   iIntros "!>!>". iMod "Hwp". iIntros "!>". *)
-(*   iApply step_fupdN_intro; [done|]. iIntros "!>". iMod "Hwp". *)
-(*   iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//. *)
-(*   { by intros ?%dom_empty_inv_L. } *)
-(*   { set_solver. } *)
-(*   { rewrite Hends  -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. } *)
-(*   { by rewrite Hends. } *)
-(*   iIntros "!>". *)
-(*   iDestruct "Hwp" as "[Hsi [Hwp ->]]". *)
-(*   iExists _, _. iFrame. iSplit; [done|]. *)
-(*   rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver]. *)
-(*   iDestruct ("Hwp" with "Hfuel") as "Hwp". iFrame. done. *)
-(* Qed. *)
-
-(* Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) : *)
-(*   (∀ e, Φ e -∗ Ψ e) -∗ sswp s E e Φ -∗ sswp s E e Ψ. *)
-(* Proof. *)
-(*   iIntros "HΦΨ HΦ". *)
-(*   rewrite /sswp. *)
-(*   destruct (to_val e); [by iApply "HΦΨ"|]. *)
-(*   iIntros (?) "H". *)
-(*   iMod ("HΦ" with "H") as "[%Hs HΦ]". *)
-(*   iModIntro. iSplit; [done|]. *)
-(*   iIntros (????). *)
-(*   iDestruct ("HΦ" with "[//]") as "HΦ". *)
-(*   iMod "HΦ". iIntros "!>!>". iMod "HΦ". iIntros "!>". iMod "HΦ" as "(?&?&?)". *)
-(*   iIntros "!>". iFrame. *)
-(*   by iApply "HΦΨ". *)
-(* Qed. *)
-
-(* (* Sanity check for sswp *) *)
-(* Lemma wp_store_nostep_alt s tid E l v' v fs: *)
-(*   fs ≠ ∅ -> *)
-(*   ▷ l ↦ v' -∗ has_fuels_S tid fs -∗ *)
-(*   WP Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E *)
-(*     {{ λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ∗ has_fuels tid fs}}. *)
-(* Proof. *)
-(*   iIntros (?) ">Hl Hf". *)
-(*   iApply (wp_nostep with "[Hl]"); [done| |]. *)
-(*   { iApply sswp_wand; [|by iApply wp_store]. *)
-(*     iIntros (e) "[-> Hl] Hf". iApply wp_value. by iFrame. } *)
-(*   iFrame. *)
-(* Qed. *)
-
-(* Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E l v' v : *)
-(*   f2 ≤ LM.(lm_fl) s2 -> fmtrans M s1 (Some ρ) s2 -> *)
-(*   live_roles _ s2 ⊆ live_roles _ s1 -> *)
-(*   {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}} *)
-(* ======= *)
 
 (* TODO: clean up all those similar lemmas *)
 Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1 s2 E Einvs l v' v
@@ -866,7 +598,8 @@ Proof using.
       split; first (intros ρ' Hin; set_solver).
       split; set_solver.
     + (* repeat (split; set_solver). *)
-      repeat (split; try set_solver).
+      repeat split. 
+      1, 3-6: set_solver. 
       * intros. rewrite !lookup_singleton. simpl. apply Nat.lt_le_incl. tauto. 
       * apply fm_live_spec in Htrans. set_solver.
   - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done |]. 
@@ -875,9 +608,6 @@ Proof using.
     iFrame.
     iSplit; first done.
     iApply "HΦ". iFrame.
-    (* replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) *)
-    (*   with fr; [iFrame|set_solver]. *)
-    (* rewrite union_empty_r_L. *)
     rewrite has_fuel_fuels //.
 Qed.
 
@@ -925,12 +655,7 @@ Proof using.
     { iPureIntro. simpl in *. split =>//. }
     iFrame.
     iSplit; first done.
-    iApply "HΦ". iFrame.
-
-    (* iDestruct (partial_free_roles_are_sep with "Hmod") as "[? ?]"; [set_solver| ]. *)
-    (* replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) *)
-    (*   with fr; [iFrame|set_solver]. *)
-    
+    iApply "HΦ". iFrame.    
     destruct (decide (ρ ∈ live_roles iM s2)).
     + rewrite has_fuel_fuels //.
     + do 2 (rewrite difference_disjoint; [| set_solver]). rewrite union_empty_l. 
@@ -1004,10 +729,10 @@ Proof using.
   all: eauto. 
   1-3: set_solver.
   - apply head_locale_step; econstructor =>//.
-  - repeat (split; try done); try set_solver. 
+  - repeat (split; try done).
+    2-5: set_solver. 
     + intros ??. rewrite !lookup_singleton /=. lia.
     + rewrite dom_singleton singleton_subseteq_l. simplify_eq.
-      (* destruct (decide (ρ ∈ live_roles _ (project_inner (trace_last atr)))); set_solver. *)
       destruct (decide (ρ ∈ live_roles _ s1)); set_solver.
   - iMod (fupd_mask_mono with "UPD") as (δ2 ℓ) "(%Hvse & Hfuel & Hst & Hfr & Hmod)"; [done| ]. 
     rewrite -> bool_decide_eq_true_2 in *; eauto.
