@@ -1,4 +1,5 @@
 From iris.base_logic Require Export gen_heap.
+From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 (* From trillium.fairness Require Export resources fuel. *)
 From trillium.fairness.heap_lang Require Export lang.
@@ -132,6 +133,39 @@ Section GeneralProperties.
   Lemma locales_of_list_indexes (es : list expr) :
     locales_of_list es = indexes es.
   Proof. apply locales_of_list_from_indexes. Qed.
+
+  (* TODO: upstream? *)
+  Lemma gmap_filter_dom_id {K A: Type} `{Countable K} (m: gmap K A):
+    filter (fun '(k, _) => k ∈ dom m) m = m.
+  Proof.
+    rewrite map_filter_id; [done| ].
+    intros. by eapply elem_of_dom_2. 
+  Qed. 
+  
+  (* TODO: upstream? *)
+  Lemma gmap_empty_subseteq_equiv {K A: Type} `{Countable K} (m: gmap K A):
+  m ⊆ ∅ <-> m = ∅. 
+  Proof.
+    clear.
+    split; [| set_solver].
+    intros E. destruct (map_eq_dec_empty m); try set_solver.
+    apply map_choose in n as (?&?&?).
+    eapply lookup_weaken in E; set_solver. 
+  Qed. 
+  
+  (* TODO: upstream? *)
+  Lemma gmap_filter_disj_id {K A: Type} `{Countable K} (m1 m2: gmap K A)
+    (DISJ: m1 ##ₘ m2):
+    m1 = filter (λ '(k, _), k ∈ dom m1) (m1 ∪ m2).
+  Proof.
+    rewrite map_filter_union; auto.
+    rewrite map_union_comm; [| by apply map_disjoint_filter]. 
+    rewrite gmap_filter_dom_id.
+    symmetry. apply map_subseteq_union. etransitivity; [| apply map_empty_subseteq].
+    apply gmap_empty_subseteq_equiv. 
+    eapply map_filter_empty_iff. apply map_Forall_lookup_2.
+    intros. intros [? ?]%elem_of_dom. eapply map_disjoint_spec; eauto.
+  Qed. 
 
 End GeneralProperties.
 
@@ -300,3 +334,45 @@ Proof. solve_pure_exec. Qed.
 #[global] Instance pure_case_inr v e1 e2 :
   PureExec True 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
 Proof. solve_pure_exec. Qed.
+
+
+Section Heap.
+  Context `{EM: ExecutionModel heap_lang M}. 
+  Context `{HGS: @heapGS Σ _ EM}.
+
+  (** Heap *)
+  (** The usable rules for [allocN] stated in terms of the [array] proposition
+are   derived in te file [array]. *)
+  Lemma heap_array_to_seq_meta l vs (n : nat) :
+    length vs = n →
+    ([∗ map] l' ↦ _ ∈ heap_array l vs, meta_token l' ⊤) -∗
+      [∗ list] i ∈ seq 0 n, meta_token (l +ₗ (i : nat)) ⊤.
+  Proof.
+    iIntros (<-) "Hvs". iInduction vs as [|v vs] "IH" forall (l)=> //=.
+    rewrite big_opM_union; last first.
+    { apply map_disjoint_spec=> l' v1 v2 /lookup_singleton_Some [-> _].
+    intros (j&?&Hjl&_)%heap_array_lookup.
+    rewrite loc_add_assoc -{1}[l']loc_add_0 in Hjl. simplify_eq; lia. }
+    rewrite loc_add_0 -fmap_S_seq big_sepL_fmap.
+    setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l.
+    setoid_rewrite <-loc_add_assoc.
+    rewrite big_opM_singleton; iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
+  Qed.
+
+  Lemma heap_array_to_seq_mapsto l v (n : nat) :
+    ([∗ map] l' ↦ v ∈ heap_array l (replicate n v), l' ↦ v) -∗
+  [∗ list] i ∈ seq 0 n, (l +ₗ (i : nat)) ↦ v.
+  Proof.
+    iIntros "Hvs". iInduction n as [|n] "IH" forall (l); simpl.
+    { done. }
+    rewrite big_opM_union; last first.
+    { apply map_disjoint_spec=> l' v1 v2 /lookup_singleton_Some [-> _].
+      intros (j&?&Hjl&_)%heap_array_lookup.
+      rewrite loc_add_assoc -{1}[l']loc_add_0 in Hjl. simplify_eq; lia. }
+    rewrite loc_add_0 -fmap_S_seq big_sepL_fmap.
+    setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l.
+    setoid_rewrite <-loc_add_assoc.
+    rewrite big_opM_singleton; iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
+  Qed.
+
+End Heap.
