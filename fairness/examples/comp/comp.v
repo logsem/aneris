@@ -749,16 +749,19 @@ Section ClientSpec.
     { set_solver. }
     { red. intros. simpl. red.
       intros.
-      assert (client_LSI (lb0, 2) M0 F) as LSI1 by admit.
-      red in LSI1.
+      (* assert (client_LSI (lb0, 2) M0 F) as LSI1 by admit. *)
+      (* red in LSI1. *)
       rewrite /update_mapping. rewrite map_imap_dom_eq.
       2: { intros. destruct decide; [| done].
            by apply elem_of_dom. }
       rewrite dom_gset_to_gmap.
+      rewrite !dom_singleton.
+      assert (gi = ρlg) as ->.
+      { by destruct gi, ρlg. }
       set_solver. }
 
-    foobar. 
-      
+    foobar. strengthen model_step_preserves_LSI: add LSI in original state and only consider corresponding role step and group owning that role.
+
     iNext. iIntros "(L & ST & FUELS & FR)".
     rewrite LIVE2 LIVE1.
     iDestruct (partial_free_roles_are_Proper with "FR") as "FR".
@@ -844,18 +847,23 @@ Section ClientSpec.
       apply leibniz_equiv. rewrite filter_union.
       erewrite !filter_singleton_not; [set_solver| ..].
       all: rewrite bool_decide_eq_false_2; [done| ].
-      all: intros [? STEP]; inversion STEP. } 
+      all: intros [? STEP]; inversion STEP. }
     
     iModIntro. 
     iApply (wp_store_step_singlerole_keep with "[$] [L ST FUELS]").
     { set_solver. }
     (* { reflexivity. } *)
-    5: { iFrame "L ST". iNext.
+    6: { iFrame "L ST". iNext.
          iApply has_fuel_fuels. rewrite map_fmap_singleton. iFrame. }
     2: { by apply ct_y_step_1. }
     3: { rewrite LIVE1' LIVE0. set_solver. }
     { Unshelve. 2: exact 7. simpl. rewrite /client_fl. lia. }
     { lia. }
+    { red. intros. simpl. red.
+      intros ? [? MAP].
+      apply (ls_mapping_tmap_corr (LM := lib_model)) in MAP as (? & TMAP' & ?).
+      assert (ρlg = gi) as <- by (by destruct ρlg, gi).
+      set_solver. }      
 
     (* rewrite LIVE0. erewrite decide_False; [| set_solver]. *)
     iNext. iIntros "(L & ST & FUELS)".    
