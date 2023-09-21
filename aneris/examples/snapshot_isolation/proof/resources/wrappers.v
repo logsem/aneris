@@ -233,7 +233,7 @@ Section Wrapper_defs.
       ⌜map_Forall (λ (_ : Key) (v : val), KVS_Serializable v) cache_updatesM⌝ -∗
       ⌜∀ k v, cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)⌝ -∗
       ⌜can_commit m_current
-           ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ ∗
+           ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ -∗
        ownMemMono γGsnap M -∗
        ownTimeGlobal γT T -∗
        ownTimeLocal γT T -∗

@@ -433,3 +433,17 @@ Proof.
   split_and!; try done.
   simpl. by eexists.
 Qed.
+
+Lemma ser_commit_reply_valid `{!User_params} (b : bool):
+  sum_valid_val (option_serialization KVS_serialization)
+    (sum_serialization int_serialization bool_serialization)
+    (InjRV (InjRV #b)).
+Proof.
+  eexists _.
+  right.
+  split; first done.
+  eexists _.
+  right.
+  split; first done.
+  by eexists _.
+Qed.
