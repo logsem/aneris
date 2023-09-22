@@ -772,11 +772,13 @@ Proof.
   Unshelve. 1-4: exact True. 
 Qed. 
 
-(* TODO: should directly follow from LM state invariants *)
 Lemma client_LM_inner_exposed (auxtr: auxtrace (LM := client_model)):
   inner_obls_exposed (inl: lib_grole -> fmrole client_model_impl)
     (λ c δ_lib, c.1 = δ_lib) auxtr.
-Proof. Admitted. 
+Proof. 
+  red. intros n δ gl NTH MAP.
+  apply (ls_inv δ). eauto. set_solver. 
+Qed. 
 
 (* TODO: try to unify it with general lemma.
    The problem is that proving client model trace termination
