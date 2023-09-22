@@ -61,13 +61,13 @@ End ClientRA.
 
 
 Lemma δ_lib0_init_roles:
-  live_roles lib_model_impl 1 ⊆ dom ({[ρlg := 5]}: gmap lib_grole nat).
+  live_roles lib_model_impl 1 ⊆ dom ({[ρlg := 2]}: gmap lib_grole nat).
 Proof. 
   (* TODO: definition hidden under Opaque *)
 Admitted. 
 
 Definition δ_lib0: LiveState lib_grole lib_model_impl LSI_True.
-  refine (build_LS_ext 1 {[ ρlg := 5 ]} _ {[ ρlg := {[ ρl ]} ]} _ _ _ (LM := lib_model)).
+  refine (build_LS_ext 1 {[ ρlg := 2 ]} _ {[ ρlg := {[ ρl ]} ]} _ _ _ (LM := lib_model)).
   - apply δ_lib0_init_roles.  
   - intros.
     rewrite dom_singleton. setoid_rewrite lookup_singleton_Some.
@@ -835,6 +835,16 @@ Proof.
   eapply upto_stutter_finiteness =>//.
 Qed.
 
+Lemma init_lib_state: lib_ls_premise δ_lib0.
+Proof. 
+  repeat split.
+  - rewrite build_LS_ext_spec_fuel.
+    destruct ρlg, ρl. (* there are two aliases for unit type *)
+    set_solver.
+  - by rewrite build_LS_ext_spec_st.
+  - rewrite build_LS_ext_spec_tmap. set_solver.
+Qed.
+
 Theorem client_terminates
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -865,16 +875,7 @@ Proof.
     iMod "FR" as "FR". 
     iApply (client_spec ∅ δ_lib0 with "[] [Hm Hf FR]"); eauto.
     { set_solver. }
-    { simpl.
-      (* TODO: make sure that lib can make step in δ_lib0 *)
-      admit.  }
-    { rewrite /δ_lib0. simpl.
-      rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel build_LS_ext_spec_tmap.
-      split; try set_solver.
-      (* TODO:
-         - these roles are actually the same
-         - adjust the initial fuel amount *)
-      admit. }
+    { apply init_lib_state. }
     { iApply lm_lsi_toplevel. }
     iFrame.
     iSplitL "FR".

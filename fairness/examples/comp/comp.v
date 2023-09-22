@@ -715,13 +715,67 @@ Section ClientSpec.
     rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
   Qed. 
 
+  Definition lib_ls_premise (lb: lm_ls lib_model) :=
+    ls_fuel lb !! ρl = Some 2 ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}. 
+
+  (* TODO: move to library, weaken Σ requirement *)
+  Lemma lib_premise_dis (lb: lm_ls lib_model)
+    (LB_INFO: lib_ls_premise lb):
+    ρlg ∈ live_roles lib_fair lb.
+  Proof. 
+    apply LM_live_roles_strong.
+    destruct LB_INFO as (F & S & TM).
+    eset (δ := ({| ls_under := (0: fmstate lib_model_impl); ls_fuel := ls_fuel lb; ls_mapping := ls_mapping lb; ls_inv := _ |})).     
+    exists δ. red. exists (Take_step ρl ρlg). split; [| done].    
+    repeat split; eauto.
+    - eapply ls_mapping_tmap_corr. eexists. split; eauto. set_solver.
+    - red. intros. inversion H2; subst; try set_solver.
+      destruct ρ', ρl; done.
+    - red. intros. left.
+      replace ρ' with ρl by (by destruct ρ', ρl). 
+      rewrite F. simpl. lia.
+    - intros. rewrite F. simpl. lia.
+    - intros. subst δ. simpl in H0. set_solver.
+    - subst δ. simpl. set_solver.
+    Unshelve.
+    + simpl. transitivity (∅: gset (fmrole lib_model_impl)); [| set_solver].
+      apply elem_of_subseteq. intros ? LIVE.
+      apply lib_model_impl_lr_strong in LIVE as [? [?]]. lia.
+    + apply ls_same_doms.
+    + done.
+  (* TODO: fix this weird error *)
+  (* Qed. *)
+  Admitted.
+      
+    
+
+  (* TODO: move to library, weaken Σ requirement *)
+  Lemma lib_premise `{clientGS Σ} (lb: lm_ls lib_model)
+    (LB_INFO: lib_ls_premise lb):
+    ⊢ (frag_model_is (ls_under lb) -∗ frag_fuel_is (ls_fuel lb) -∗ frag_mapping_is (ls_tmap lb) -∗
+    frag_model_is (1: fmstate lib_model_impl) ∗ frag_mapping_is {[ρlg := {[ρl]}]} ∗ frag_fuel_is {[ρl := 2]})%I.
+  Proof. 
+    iIntros "LST LF LM".
+    destruct LB_INFO as (LIBF & -> & LIBM).
+    iFrame "LST". iSplitL "LM".
+    { rewrite -frag_mapping_is_big_sepM. 
+      2: { intros E. by rewrite E in LIBM. }
+      erewrite big_opM_insert_delete'; eauto.
+      iDestruct "LM" as "[??]". iFrame. }
+    rewrite -frag_fuel_is_big_sepM.
+    2: { intros E. by rewrite E in LIBF. }
+    erewrite big_opM_insert_delete'; eauto.
+    iDestruct "LF" as "[??]". iFrame. 
+  Qed. 
+    
+
+
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     (FB: f >= 10)
     (* TODO: get rid of these restrictions *)
     (DISJ_INV1: Einvs ## ↑Ns)
-    (* (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)
-    (LB0_ACT: ρlg ∈ live_roles _ lb0)
-    (LB0_INFO: ls_fuel lb0 !! tt = Some 2 /\ ls_under lb0 = 1 /\ ls_tmap lb0 (LM := lib_model) !! ρlg = Some {[ tt ]})
+    (* (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)    
+    (LB0_INFO: lib_ls_premise lb0)
     :
     LSG Einvs -∗
     {{{ partial_model_is (lb0, 2)  ∗ 
@@ -749,8 +803,11 @@ Section ClientSpec.
     (* Set Printing Implicit. Unshelve. *)
 
     pose proof (live_roles_2 lb0) as LIVE2.
-    pose proof (live_roles_1 lb0) as LIVE1. 
-    rewrite decide_True in LIVE1; [| set_solver].
+    pose proof (live_roles_1 lb0) as LIVE1.
+    (* TODO: after introduction of external transitions,
+       here the false branch should be used *)
+    pose proof (lib_premise_dis _ LB0_INFO) as LIB_LIVE. 
+    rewrite decide_True in LIVE1; [ | done]. 
 
     wp_bind (_ <- _)%E.
     iApply (wp_store_step_keep with "[$] [L ST FUELS FREE]").
@@ -804,27 +861,19 @@ Section ClientSpec.
     iDestruct (has_fuels_equiv with "FUELS") as "[MAP FUELS]".
     iApply (lib_spec with "[] [LST YST LF LM FR MAP FUELS]").
     { iApply lib_PMP; [done| ]. iSplit; done. }
-    { simpl. destruct LB0_INFO as (LIBF & -> & LIBM). iFrame "LST".
+    { simpl.
+      iDestruct (lib_premise with "LST LF LM") as "(LST & LF & LM)"; eauto.       
       rewrite has_fuels_equiv. simpl. 
-      rewrite dom_singleton_L !big_sepM_singleton. 
-      iSplitR "LF".
-      2: { rewrite -frag_fuel_is_big_sepM.
-           2: { intros E. by rewrite E in LIBF. }
-           erewrite big_opM_insert_delete'; eauto.
-           iDestruct "LF" as "[??]". iFrame. }
+      rewrite dom_singleton_L !big_sepM_singleton.
+      iFrame.
       do 3 iExists _. iFrame. iSplitR.
       { eauto. }
-      iSplitL "LM".
-      { rewrite -frag_mapping_is_big_sepM. 
-        2: { intros E. by rewrite E in LIBM. }
-        erewrite big_opM_insert_delete'; eauto.
-        iDestruct "LM" as "[??]". iFrame. }
       iLeft.
       rewrite bi.sep_assoc. iSplitR.
       { iPureIntro. set_solver. }
       rewrite !map_fmap_singleton big_sepM_singleton.
       iExists _. iFrame. iPureIntro. rewrite /client_fl. lia. }
-
+ 
     iNext. iIntros "[LMAP LFR']". simpl. 
     iDestruct "LMAP" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
     assert (L = ∅) as -> by set_solver.
