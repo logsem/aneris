@@ -251,9 +251,9 @@ Section AuxDefs.
       let R' := filter (fun '(k, _) => k ∉ rem) R in
       LSI S R F -> LSI S R' F'. 
 
-  (* TODO: is it too strong? *)
-  Definition model_step_preserves_LSI s2 fs1 fs2:= 
-    forall M g F, LSI s2 (update_mapping M g fs1 fs2) (update_fuel_resource F fs1 fs2). 
+  Definition model_step_preserves_LSI s1 ρ s2 fs1 fs2 :=
+    forall R g F, LSI s1 R F -> fmtrans M s1 (Some ρ) s2 -> R !! ρ = Some g ->
+             LSI s2 (update_mapping R g fs1 fs2) (update_fuel_resource F fs1 fs2). 
 
 End AuxDefs.
 

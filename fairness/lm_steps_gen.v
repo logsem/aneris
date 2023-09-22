@@ -84,7 +84,7 @@ Section LMSteps.
      `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))
      `(fmtrans _ s1 (Some ρ) s2)
      `(valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM))
-     `(model_step_preserves_LSI s2 fs1 fs2 (LSI := LSI))
+     `(model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI))
     : iProp Σ :=
       has_fuels ζ fs1 -∗
       partial_model_is s1 -∗

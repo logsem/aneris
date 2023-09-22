@@ -183,7 +183,7 @@ Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' Einvs fs1 fs2 fr1
   live_roles iM s1 ∩ fr_stash = ∅ → 
   dom fs2 ∩ fr_stash = ∅ ->
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  model_step_preserves_LSI s2 fs1 fs2 (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI) ->
   LSG Einvs ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1) ∪ fr_stash)
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
@@ -228,7 +228,7 @@ Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' Einvs fs1 fs2 fr1 Φ e1
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
   live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  model_step_preserves_LSI s2 fs1 fs2 (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI) ->
   LSG Einvs ∗
   (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
@@ -252,7 +252,7 @@ Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' Einvs
   Einvs ⊆ E ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   (f2 ≤ iLM.(lm_fl) s2)%nat -> iM.(fmtrans) s1 (Some ρ) s2 ->
-  model_step_preserves_LSI s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
   LSG Einvs ∗ (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
    (partial_model_is s2 -∗ partial_free_roles_are fr -∗ (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else (tid ↦M ∅) ) -∗
                                WP e2 @ tid; E {{ Φ }}))
@@ -478,7 +478,7 @@ Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1
   (LR : live_roles iM s2 ∖ live_roles iM s1 ⊆ fr) (STASH : fr_stash ⊆ dom fs1) 
   (NSL : live_roles iM s1 ∩ (fr_stash ∖ {[ρ]}) = ∅)
   (NOS2 : dom fs2 ∩ fr_stash = ∅)
-  (PRES: model_step_preserves_LSI s2 fs1 fs2 (LSI := LSI)):
+  (PRES: model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI)):
   LSG Einvs ⊢
   {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuels tid fs1 ∗
       ▷ partial_free_roles_are fr}}}
@@ -517,7 +517,7 @@ Lemma wp_store_step_singlerole_keep s tid ρ (f1 f2: nat) (* fr *) s1 s2 E Einvs
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   (ρ ∉ live_roles iM s2 -> (f2 < f1)%nat ) -> (* TODO: check Zombie case in must_decrease *)
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  model_step_preserves_LSI s2 {[ ρ := f1 ]} {[ ρ := f2 ]} (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 {[ ρ := f1 ]} {[ ρ := f2 ]} (LSI := LSI) ->
   LSG Einvs ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1
         (* ∗ ▷ partial_free_roles_are fr *)
   }}}
@@ -570,7 +570,7 @@ Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) s1 s2 E Einvs l v' v
   Einvs ⊆ E ->
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  model_step_preserves_LSI s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
   LSG Einvs ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1}}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ 
@@ -625,7 +625,7 @@ Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l q
   Einvs ⊆ E ->
   v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  model_step_preserves_LSI s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
   LSG Einvs ⊢ {{{ ▷ l ↦{q} v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
       (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
@@ -669,7 +669,7 @@ Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E
   ρ ∉ live_roles _ s2 →
   v' = v1 → vals_compare_safe v' v1 → f2 < f1 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  model_step_preserves_LSI s2 {[ ρ := f1 ]} {[ ρ := f2 ]} (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 {[ ρ := f1 ]} {[ ρ := f2 ]} (LSI := LSI) ->
   LSG Einvs ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
@@ -710,7 +710,7 @@ Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l v'
   Einvs ⊆ E ->
   v' = v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  model_step_preserves_LSI s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
+  model_step_preserves_LSI s1 ρ s2 {[ ρ := f1 ]} fs2 (LSI := LSI) ->
   LSG Einvs ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
