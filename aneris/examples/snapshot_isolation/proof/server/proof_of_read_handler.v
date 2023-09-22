@@ -38,7 +38,7 @@ Section Proof_of_read_handler.
   Import snapshot_isolation_code_api.
   Import assert_proof.
 
-  Lemma kvs_get_spec (k : Key) (kvsV : val)
+  Lemma kvs_get_spec_aux (k : Key) (kvsV : val)
         (Hh : list write_event)
        (m : gmap Key val) (M : gmap Key (list write_event)) :
    is_map kvsV m →
@@ -93,18 +93,37 @@ Section Proof_of_read_handler.
          by iApply ("HΦ" $! (Some (x :: l))).
   Qed.
 
- Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (Tss : gset nat) (kvsV : val)
-        (h Hk : list write_event)
+  Lemma kvs_get_spec (k : Key) (kvsV : val) (h : list write_event)
+       (m : gmap Key val) (M : gmap Key (list write_event)) :
+   is_map kvsV m →
+   M !! k = Some h →
+   kvsl_in_model_empty_coh m M →
+   kvsl_in_model_some_coh m M →
+   kvsl_in_local_some_coh m M →
+   {{{ ⌜True⌝ }}}
+       kvs_get #k kvsV  @[ip_of_address MTC.(MTS_saddr)]
+    {{{ (v : val), RET v; ⌜v = $ (reverse h)⌝ }}}.
+  Proof.
+    iIntros (???????) "Hp".
+    iApply kvs_get_spec_aux; eauto.
+    iNext.
+    iIntros (vlo v Hvlo). 
+    iApply "Hp".
+    iPureIntro.
+    destruct vlo; naive_solver.
+  Qed.
+
+  Lemma kvs_get_last_spec (k : Key) (ts : nat) (T : nat) (Tss Tssg : gset nat) (kvsV : val)
+    (h Hk : list write_event)
        (m : gmap Key val) (M : gmap Key (list write_event)) :
    (∀ e : events.write_event, e ∈ h → we_time e < ts) →
    is_map kvsV m →
+   ts ∈ Tssg →
    kvsl_valid m M T Tss →
+   kvs_valid M T Tssg →
    M !! k = Some Hk →
    h `prefix_of` Hk →
-    {{{
-          ownTimeSnap γT γTss ts ∗
-          ownMemSeen γGsnap k h ∗
-          ownMemSeen γGsnap k Hk
+    {{{ ⌜True⌝
     }}}
         kvs_get_last (#k, #ts)%V kvsV  @[ip_of_address MTC.(MTS_saddr)]
     {{{ (vo : option val), RET $vo;
@@ -113,17 +132,15 @@ Section Proof_of_read_handler.
              ⌜hist_to_we h = Some e⌝))
     }}}.
   Proof.
-    iIntros (Het Hm Hcoh Hin Hpre Φ) "(#Ht & #Hsh & #HsH) HΦ".
-    wp_lam.
-    do 15 wp_pures.
+    iIntros (Het Hm Hts Hcoh HcohM Hin Hpre Φ) "_ HΦ".
+    wp_lam. do 15 wp_pures.
     destruct Hcoh.
     wp_smart_apply (kvs_get_spec k kvsV Hk m M Hm Hin); eauto.
-    iIntros (vlo v) "%Hvlo".
-    assert (v = $ (reverse Hk)) as Hvlo'.
-    admit.
-    clear Hvlo.
-    clear m Hm kvsl_ValidDom kvsl_ValidInModelEmpty kvsl_ValidInModelSome kvsl_ValidLocalSome.
-    iLöb as "IH" forall (v M Hk Hin Hpre Hvlo' kvsl_ValidModel) "HsH".
+    iIntros (v) "%Hvlo".
+    clear m Hm kvsl_ValidDom kvsl_ValidInModelEmpty
+      kvsl_ValidInModelSome kvsl_ValidLocalSome
+      kvsl_ValidModel Tss.
+    iLöb as "IH" forall (v M Hk Hin Hpre Hvlo HcohM).
     destruct (reverse Hk) as [| e Hr] eqn:Hkeq.
     - subst; simpl.
       wp_pures.
@@ -136,9 +153,9 @@ Section Proof_of_read_handler.
       { subst. destruct (reverse Hk); first done. exists (reverse (Hr)).
         by rewrite reverse_involutive. }
       rewrite Hrr in Hkeq.
-      rewrite Hrr in Hvlo'.
+      rewrite Hrr in Hvlo.
       clear Hrr Hr.
-      rewrite Hvlo'.
+      rewrite Hvlo.
       wp_pures.
       case_bool_decide.
       (** should be proven by contradiction: *)
@@ -165,27 +182,27 @@ Section Proof_of_read_handler.
           { rewrite Hkeq. by list_simplifier. }
           rewrite Hek.
           assert (h = Hk) as ->.
-          { destruct kvsl_ValidModel.
-            assert ( ts ∈ Tss ) as HinTss.
-            { admit. }
-            destruct (kvs_ValidSnapshotTimesCuts k Hk ts Hin HinTss)
+          { destruct HcohM.
+            destruct (kvs_ValidSnapshotTimesCuts k Hk ts Hin Hts)
               as (hl & hr & (Hc1 & Hc2 & Hc3)).
             destruct Hpre as (hr' & Hc1').
+            apply Inj_instance_2.
+            (** State, prove, and use a lemma about unicity of half-cut. *)
             admit.
           }
           done.
-        - destruct kvsl_ValidModel.
-          assert ( ts ∈ Tss ) as HinTss.
-          { admit. }
-          destruct (kvs_ValidSnapshotTimesCuts k Hk ts Hin HinTss)
+        - destruct HcohM.
+          destruct (kvs_ValidSnapshotTimesCuts k Hk ts Hin Hts)
             as (hl & hr & (Hc1 & Hc2 & Hc3)).
+          (** Prove by absurdity, using again the fact that hl = h. *)
           admit. }
       wp_pure _.
-      iApply ("IH" $! ($(reverse Hr')) (<[ k := Hr']> M) Hr' with "[][][//][][$HΦ]").
-      + iPureIntro. admit.
-      + iPureIntro. list_simplifier. (* h prefix of Hk = Hr' ++ [e] and e ∉ h *) admit.
-      + admit.
-      + admit.
+      iApply ("IH" $! ($(reverse Hr')) (<[ k := Hr']> M) Hr'
+               with "[][][//][][$HΦ]").
+      + iPureIntro. by rewrite lookup_insert. 
+      + iPureIntro. list_simplifier.
+        (* h prefix of Hk = Hr' ++ [e] and e ∉ h *) admit.
+      + (* State weakining lemma. *) admit.
   Admitted.
 
   Lemma read_handler_spec
@@ -233,8 +250,16 @@ Section Proof_of_read_handler.
       iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
                with "[$HmemLoc][$HmemG]"). }
     destruct HinM as (Hk & Hpre & Hkin).
-    iAssert (ownMemSeen γGsnap k Hk)%I as "#HseenHk".
-    { admit. }
+     iAssert (⌜ts ∈ Tssg⌝%I) as "%Hintss1".
+     { rewrite /ownTimeSnap /ownTimeStartsSnap /ownTimeStartsAuth.
+       iDestruct "HsnapT" as "(_ & HsnapT)".
+       iDestruct (own_valid_2 with "HtimeStartsGlob HsnapT")
+         as %[Hv'1 Hv'2]%auth_both_valid_discrete.
+       apply gset_included in Hv'1; set_solver. }
+     iAssert (⌜Tg = T⌝%I) as "->".
+     { by iDestruct (mono_nat.mono_nat_auth_own_agree
+                   with "[$HtimeGlob][$HtimeLoc]")
+         as "(_ & <-)". }
     iSplitL "HtimeGlob HmemG HmemGmono Hccls HtimeStartsGlob".
     { iModIntro. iNext.
       iExists _, _, _, _.
@@ -242,7 +267,7 @@ Section Proof_of_read_handler.
     }
     iModIntro.
     iModIntro.
-    wp_apply (kvs_get_last_spec k ts T Tss kvsV h Hk ); try eauto.
+    wp_apply (kvs_get_last_spec k ts T Tss Tssg kvsV h Hk); try eauto.
     iIntros (vo) "[(-> & ->)|Hres]".
     - wp_pures.
       wp_smart_apply (release_spec with "[-HΦ]").
@@ -253,7 +278,7 @@ Section Proof_of_read_handler.
       iIntros (? ->).
       wp_pures.
       iApply ("HΦ" $! _ _).
-      iSplit.
+      iSplit. 
       -- iPureIntro.
          simplify_eq /=.
          eapply sum_is_ser_valid.
@@ -305,7 +330,6 @@ Section Proof_of_read_handler.
          iFrame "#∗".
          iPureIntro.
          split_and!; eauto.
-  Admitted.
-
+  Qed.
 
 End Proof_of_read_handler.
