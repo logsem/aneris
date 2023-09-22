@@ -10,12 +10,12 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 From stdpp Require Import finite.
-From trillium.fairness Require Import fairness_finiteness actual_resources_interface. 
+From trillium.fairness Require Import fairness_finiteness lm_lsi_top. 
 
 Import derived_laws_later.bi.
 
 From trillium.fairness Require Import lm_fairness_preservation fuel_ext lm_fair.
-From trillium.fairness.examples.comp Require Import comp.
+From trillium.fairness.examples.comp Require Import comp lib.
 From trillium.fairness Require Import fair_termination_natural.
 From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
 
@@ -79,9 +79,7 @@ Definition δ_lib0: LiveState lib_grole lib_model_impl LSI_True.
     rewrite lookup_singleton_Some in H0.
     destruct H, H0. congruence.
   - done. 
-Defined. 
-
-  
+Defined.   
 
 
 (* Definition is_client_step (step: client_state * option (option client_role * client_state)) := *)
@@ -768,8 +766,11 @@ Proof.
   forward eapply (mtrace_valid_steps' VALID n) as TRANS; eauto.
   simpl in TRANS. inversion TRANS. subst.
   apply fm_live_spec in LIB_STEP.
-  eapply LM_map_empty_notlive in LIB_STEP; eauto. done. 
-Admitted. 
+  eapply LM_map_empty_notlive in LIB_STEP; eauto. done.
+
+  (* TODO: should be removed after fixing mtrace_valid_steps' type *)
+  Unshelve. 1-4: exact True. 
+Qed. 
 
 (* TODO: should directly follow from LM state invariants *)
 Lemma client_LM_inner_exposed (auxtr: auxtrace (LM := client_model)):
@@ -781,16 +782,18 @@ Proof. Admitted.
    The problem is that proving client model trace termination
    now depends on client LM trace with certain properties,
    whereas in original lemma all model traces are required to be terminating. *)
+(* TODO: generalize the initial state in general lemma as well? *)
 Theorem simulation_adequacy_terminate_client Σ 
         `{hPre: @heapGpreS Σ client_model (@LM_EM_HL _ _ client_model)} (s: stuckness)
         e1 (s1: fmstate client_model_impl)
+        (LSI0: initial_ls_LSI s1 0 (M := client_model_impl) (LM := client_model) (LSI := client_LSI))
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) -> *)
   rel_finitary (sim_rel client_model) →
   (∀ `{hGS: @heapGS Σ client_model (@LM_EM_HL _ _ client_model)},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat I)
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat LSI0)
                  ={⊤}=∗
                  WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
   ) ->
@@ -800,7 +803,7 @@ Proof.
   destruct (infinite_or_finite extr) as [Hinf|] =>//.
 
   destruct (simulation_adequacy_model_trace
-              Σ _ e1 s1 I extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
 
   (* have Hfairaux := ex_fairness_preserved  *)
   (*                    extr auxtr Hinf Hmatch Hfair. *)
@@ -841,11 +844,17 @@ Proof.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 
-  unshelve eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl) ∅) =>//.
-  (* - apply client_model_fair_term.  *)
+  unshelve eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl)) =>//.
+  - subst st0. red. rewrite /initial_ls_pre. red.
+    intros gi [ρ MAP]. simpl in MAP.
+    (* TODO: we should start with empty mapping in δ_lib0,
+       so we'd have a contradiction here.
+       Afterwards we'd execute an external transition to set the mapping before calling the library.
+       See explanation in notes *)
+    admit. 
   - eapply valid_state_evolution_finitary_fairness_simple.
     (* TODO: problems with inferring EqDecision *)
-    (* apply client_model_finitary. *)    
+    (* apply client_model_finitary. *)
     admit. 
   - intros ?. iStartProof.
     rewrite /LM_init_resource. iIntros "!> (Hm & Hfr & Hf) !>". simpl.
@@ -864,7 +873,7 @@ Proof.
          - these roles are actually the same
          - adjust the initial fuel amount *)
       admit. }
-    { iApply ActualOwnershipPartial. }
+    { iApply lm_lsi_toplevel. }
     iFrame.
     iSplitL "FR".
     + (* TODO: fix the initialization theorem so it accepts arbitrary FR set *)

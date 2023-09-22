@@ -4,7 +4,7 @@ From trillium.fairness Require Import fairness resources heap_lang_defs em_lm em
 From trillium.fairness.lm_rules Require Import fuel_step.
 
 Section LMLSITopLevel. 
-  Context `{LM: LiveModel (locale heap_lang) M LSI_True}.
+  Context `{LM: LiveModel (locale heap_lang) M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
   Context`{invGS_gen HasNoLc Σ}. 
