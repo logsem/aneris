@@ -329,6 +329,16 @@ Section ClientSpec.
       intros [? STEP]. inversion STEP.
   Qed. 
 
+  Lemma live_roles_0 lb:
+    live_roles client_model_impl (lb, 0) = ∅.
+  Proof. 
+    simpl. rewrite /client_lr.
+    apply leibniz_equiv. rewrite filter_union.
+    erewrite !filter_singleton_not; [set_solver| ..].
+    all: rewrite bool_decide_eq_false_2; [done| ].
+    all: intros [? STEP]; inversion STEP.
+  Qed. 
+
   Tactic Notation "specialize_full" ident(H) :=
     let foo := fresh in
     evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
@@ -676,9 +686,9 @@ Section ClientSpec.
   Ltac solve_fuels_ge_1 FS := 
     intros ?? [? [<- GE]]%lookup_fmap_Some; apply FS in GE; simpl; lia.
   
-  Ltac solve_fuels_S FS := 
+  Ltac solve_fuels_S FS :=    
     iDestruct (has_fuels_gt_1 with "FUELS") as "F";
-    [| rewrite -map_fmap_compose; by iFrame];
+    [| rewrite -map_fmap_compose; (try rewrite sub_comp); by iFrame];
     solve_fuels_ge_1 FS. 
 
   Ltac solve_map_not_empty := intros ?MM%fmap_empty_iff; try apply map_non_empty_singleton in MM; set_solver. 
@@ -690,10 +700,20 @@ Section ClientSpec.
     [| solve_fuels_S FS |];
     (* [by intros ?%fmap_empty_iff| ]; *)
     [solve_map_not_empty| ];
-    iIntros "FUELS"; simpl; rewrite sub_comp. 
+    iIntros "FUELS"; simpl; try rewrite sub_comp. 
 
   Ltac pure_step FS :=
     unshelve (pure_step_impl FS); [by apply fuel_reorder_preserves_client_LSI| ].
+
+  (* TODO: move, upstream *)
+  Lemma dom_filter_comm {K A: Type} `{Countable K}
+                        (P: K -> Prop) `{∀ x : K, Decision (P x)}:
+    forall (m: gmap K A), dom (filter (fun '(k, _) => P k) m) = filter P (dom m).
+  Proof. 
+    intros. apply leibniz_equiv. apply dom_filter. intros.
+    rewrite elem_of_filter elem_of_dom.
+    rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
+  Qed. 
 
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     (FB: f >= 10)
@@ -709,7 +729,7 @@ Section ClientSpec.
         has_fuels 0 {[ inr ρy := f ]} (PMPP := PMPP)  }}}
       client #() @ 0
     {{{ RET #(); partial_mapping_is {[ 0 := ∅ ]} }}}.
-  Proof using.
+  Proof using cpG. 
     iIntros "#PMP" (Φ) "!> (ST & FREE & FUELS) POST". rewrite /client.
 
     rewrite (sub_0_id {[ _ := _ ]}). 
@@ -759,8 +779,6 @@ Section ClientSpec.
       assert (gi = ρlg) as ->.
       { by destruct gi, ρlg. }
       set_solver. }
-
-    foobar. strengthen model_step_preserves_LSI: add LSI in original state and only consider corresponding role step and group owning that role.
 
     iNext. iIntros "(L & ST & FUELS & FR)".
     rewrite LIVE2 LIVE1.
@@ -842,12 +860,7 @@ Section ClientSpec.
     erewrite decide_False, decide_True in LIVE1'; eauto.
     2: { apply LM_map_empty_notlive. eauto. }    
     
-    assert (live_roles client_model_impl (lb, 0) = ∅) as LIVE0.
-    { simpl. rewrite /client_lr.
-      apply leibniz_equiv. rewrite filter_union.
-      erewrite !filter_singleton_not; [set_solver| ..].
-      all: rewrite bool_decide_eq_false_2; [done| ].
-      all: intros [? STEP]; inversion STEP. }
+    pose proof (live_roles_0 lb) as LIVE0. 
     
     iModIntro. 
     iApply (wp_store_step_singlerole_keep with "[$] [L ST FUELS]").
@@ -881,9 +894,39 @@ Section ClientSpec.
 
     do 2 pure_step FS.
 
-    (* TODO: restore wp_lift_pure_step_no_fork_remove_role to justify the last step *)
-    admit. 
-Admitted.     
+    iApply wp_atomic. 
+    iInv Ns as ((lb', y)) "inv" "CLOS". rewrite {1}/client_inv_impl. 
+    iDestruct "inv" as "(>ST & >YST_AUTH & > inv')".
+    iAssert (⌜ y = 0 ⌝)%I as %->.
+    { iCombine "YST_AUTH YST" as "Y". iDestruct (own_valid with "Y") as %V.
+      apply auth_both_valid_discrete in V as [EQ%Excl_included _]. done. }
+
+    (* Unshelve. 2: exact (⊤ ∖ ↑Ns).  *)
+    iModIntro.
+    
+    iApply (wp_lift_pure_step_no_fork_remove_role {[ inr ρy ]} ((lb', 0): fmstate client_model_impl) _ _ _ _ _ _ _ (sub 3 <$> {[inr ρy := 7]}) (iLM := client_model)); eauto.
+    { solve_map_not_empty. }
+    { set_solver. }
+    { rewrite live_roles_0. set_solver. }
+    { red. intros. red. intros.
+      red in H0. specialize (H0 _ H1). 
+      rewrite dom_filter_comm. apply elem_of_filter. split; set_solver. }
+    iFrame "PMP". do 3 iModIntro. iFrame.
+    iSplitL "FUELS".
+    { solve_fuels_S FS. } 
+    iIntros "ST FUELS". 
+
+    simpl. iApply wp_value'.
+    iMod ("CLOS" with "[ST YST_AUTH inv']") as "_".
+    { rewrite /client_inv_impl. iNext. iExists (_, _). iFrame. }
+    iModIntro. iApply "POST".
+    iDestruct (has_fuels_equiv with "FUELS") as "[MAP FUEL]".
+    iApply partial_mapping_is_Proper; [| by iFrame].
+    f_equiv. rewrite map_fmap_singleton dom_singleton_L.
+    rewrite difference_diag_L. 
+    rewrite dom_filter_comm.
+    by rewrite dom_singleton_L filter_singleton_not.  
+  Qed. 
   
  
 End ClientSpec.
