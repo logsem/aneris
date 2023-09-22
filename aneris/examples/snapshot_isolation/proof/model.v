@@ -162,26 +162,26 @@ Section KVS_valid.
   (* Admitted. *)
 
 
-(** Used for start *)
-Lemma kvs_valid_next M T Tss :
-  kvs_valid M T Tss →
-  kvs_valid M (T + 1) (Tss ∪ {[(T+1)%nat]}).
-Proof. Admitted.
+  (** Used for start *)
+  Lemma kvs_valid_next M T Tss :
+    kvs_valid M T Tss →
+    kvs_valid M (T + 1) (Tss ∪ {[(T+1)%nat]}).
+  Proof. Admitted.
 
-(** Used for commit *)
-Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
+  (** Used for commit *)
+  Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
     dom cache ⊆ KVS_keys →
-    kvs_valid M T Tss ->
+    kvs_valid M T Tss →
     kvs_valid (update_kvs M cache (T+1)) (T+1) Tss.
   Proof.
   Admitted.
 
-(** Weakening lemma *)
-Lemma kvs_valid_subset_Tss M T Tss sub:
-  sub ⊆ Tss →
-  kvs_valid M T Tss →
-  kvs_valid M T sub.
-Proof. Admitted.
+  (** Weakening lemma *)
+  Lemma kvs_valid_subset_Tss M T Tss sub:
+    sub ⊆ Tss →
+    kvs_valid M T Tss →
+    kvs_valid M T sub.
+  Proof. Admitted.
 
 End KVS_valid.
 
@@ -215,26 +215,24 @@ Section KVSL_valid.
   Proof.
   Admitted.
 
-  (** TODO: state for commit *)
-  (* TODO: adapt for local state *)
-  (* Definition update_kvs (M0 : kvsMdl) (C : gmap Key SerializableVal) (T : nat) := *)
-  (*       map_fold *)
-  (*         (λ k v M, *)
-  (*            (<[ k := {| we_key := k; we_val := v.(SV_val); we_time := T |} :: default [] (M !! k)]> M)) *)
-  (*         M0 C. *)
+  Definition update_kvsl (m0 : gmap Key val) (C : gmap Key SerializableVal) (T : nat) :=
+    map_fold (λ k v m, 
+               (<[ k := SOMEV ($(k, (v.(SV_val), T)), v)]> m))
+              m0 C.
 
-  (*   Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (cache : gmap Key SerializableVal) : *)
-  (*     dom cache = KVS_keys → *)
-  (*     kvs_valid M T -> *)
-  (*     kvs_valid (update_kvs M cache (T+1)) (T+1). *)
-  (*   Proof. *)
-  (*   Admitted. *)
-  (* End KVSL_valid. *)
+  (* Used for commit *)
+  Lemma kvsl_valid_update (m : gmap Key val) (M : kvsMdl) (T : nat) (Tss : gset nat)
+    (cache : gmap Key SerializableVal) :
+    dom cache ⊆ KVS_keys →
+    kvsl_valid m M T Tss →
+    kvsl_valid (update_kvsl m cache (T+1)) (update_kvs M cache (T+1)) (T+1) Tss.
+  Proof.
+  Admitted.
 
   (** Used for start *)
   Lemma kvsl_valid_next M (m : gmap Key val) T Tss :
-  kvsl_valid m M T Tss →
-  kvsl_valid m M (T + 1) (Tss ∪ {[(T+1)%nat]}).
+    kvsl_valid m M T Tss →
+    kvsl_valid m M (T + 1) (Tss ∪ {[(T+1)%nat]}).
   Proof. Admitted.
 
   (** Weakening lemma *)

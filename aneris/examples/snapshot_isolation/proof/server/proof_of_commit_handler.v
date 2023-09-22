@@ -55,7 +55,7 @@ Section Proof_of_commit_handler.
                         if b then bool_decide (M !! k = Msnap !! k) else true
                       | None => true
                       end⌝) 
-      ∨ (⌜br = false⌝ ∗ ⌜is_Some (cache_updatesM !! k)⌝ ∗ ⌜M !! k ≠ Msnap !! k⌝)
+      ∨ (⌜br = false⌝ ∗ ⌜is_Some (cache_logicalM !! k)⌝ ∗ ⌜M !! k ≠ Msnap !! k⌝)
     }}}.
   Proof.
   Admitted.
@@ -86,23 +86,24 @@ Section Proof_of_commit_handler.
   Proof.
   Admitted.
 
-  Lemma update_kvs_spec (kvs cache : val) (tc : nat) (tss : gset nat)
+  Lemma update_kvs_spec (kvs cacheV : val) (tc : nat) (tss : gset nat)
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
-    (Msnap M : gmap Key (list write_event)) :
+    (Msnap M : gmap Key (list write_event)) 
+    (cache : gmap Key SerializableVal) :
+    (∀ k v, cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)) →
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
-    is_map (InjRV cache) cache_updatesM →
+    is_map (InjRV cacheV) cache_updatesM →
     is_map kvs m →
     kvsl_valid m M tc tss →
     {{{ ⌜True⌝ }}}
-      snapshot_isolation_code.update_kvs kvs (InjRV cache) #(tc + 1) 
+      snapshot_isolation_code.update_kvs kvs (InjRV cacheV) #(tc + 1) 
         @[ip_of_address MTC.(MTS_saddr)]
-    {{{ (m_updated : gmap Key (list val)) (kvs_updated : val), RET kvs_updated; 
-        ⌜is_map kvs_updated m_updated⌝ ∗ ⌜dom m_updated = dom Msnap⌝ ∗
-        ([∗ map] k↦hw;p ∈ M;cache_logicalM, ⌜∀ h, m_updated !! k = Some h → h = commit_event p (to_hist hw)⌝) }}}.
+    {{{ (kvs_updated : val), RET kvs_updated; 
+        ⌜is_map kvs_updated (update_kvsl m cache (tc + 1))⌝}}}.
   Proof.
   Admitted.
-
+ 
   Lemma commit_handler_spec
     (lk : val)
     (kvs vnum : loc)
@@ -302,12 +303,18 @@ Section Proof_of_commit_handler.
       + (* Commit is successful case *)
        wp_pures.
         wp_store.
+        assert (∃ (cache : gmap Key SerializableVal), ∀ (k : Key) (v : SerializableVal),
+          cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)) as [cache H_cache].
+        {
+
+        admit.
+        }
         unfold snapshot_isolation_code.update_kvs.
-        wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M); try eauto.
+        wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M cache); try eauto.
         {
           by eexists _.
         }
-        iIntros (m_updated kvs_updated) "(%H_map_up & %H_dom_eq_up & H_big_eq)".
+        iIntros (kvs_updated) "%H_map_up".
         wp_bind (Store _ _).
         wp_apply (aneris_wp_atomic _ _ E).
         (* Viewshift and opening of invariant *)
@@ -331,11 +338,6 @@ Section Proof_of_commit_handler.
           rewrite H_curr_eq Hmap_eq.
           by rewrite H_dom_eq_cl H_dom_eq.
         }
-        assert (∃ (cache : gmap Key SerializableVal), ∀ (k : Key) (v : SerializableVal),
-          cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)) as [cache H_cache].
-        {
-          admit.
-        }
         (* Update of logical ressources *)
         iDestruct (commit_logical_update clients γKnownClients γGauth γGsnap γT γTss
           ts T Tssg cache_logicalM cache_updatesM cache M Msnap m_current) as "H_upd".
@@ -350,6 +352,8 @@ Section Proof_of_commit_handler.
           iExists (update_kvs M cache (T + 1)), (T + 1), Tssg, gMg.
           iFrame.
           iSplit; first done.
+          iPureIntro.
+          apply kvs_valid_update; try done.
           admit.
         }
         iModIntro.
@@ -368,9 +372,23 @@ Section Proof_of_commit_handler.
         wp_apply (release_spec with
           "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
         {
-          iExists kvs_updated, (T + 1), tss', _, (update_kvs M cache (T + 1)).
+          iExists kvs_updated, (T + 1), tss', 
+            (update_kvsl m cache (T + 1)), (update_kvs M cache (T + 1)).
           iFrame "#∗".
-          admit.
+          iSplit; first done.
+          iSplit.
+          {
+            iPureIntro.
+            apply kvsl_valid_update; try done.
+            admit.
+          }
+          iSplit.
+          {
+            iPureIntro.
+            admit.
+          }
+          replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
+          iFrame.
         }
         iIntros (? ->).
         wp_pures.
