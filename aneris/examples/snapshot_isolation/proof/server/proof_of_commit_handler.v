@@ -91,7 +91,7 @@ Section Proof_of_commit_handler.
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap M : gmap Key (list write_event)) 
     (cache : gmap Key SerializableVal) :
-    (∀ k v, cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)) →
+    (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v) →
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
     is_map (InjRV cacheV) cache_updatesM →
     is_map kvs m →
@@ -103,6 +103,44 @@ Section Proof_of_commit_handler.
         ⌜is_map kvs_updated (update_kvsl m cache (tc + 1))⌝}}}.
   Proof.
   Admitted.
+
+  Lemma cache_updatesM_to_cache (cache_updatesM: gmap Key val) :
+    map_Forall (λ k v, KVS_Serializable v) cache_updatesM →
+    (∃ cache : gmap Key SerializableVal,
+      (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v)).
+  Proof.
+    intros Hyp.
+    induction cache_updatesM as [|i x m H_eq IH] using map_ind.
+    - exists ∅.
+      intros k v.
+      split.
+      + intros [v' (Habs & _)].
+        by rewrite lookup_empty in Habs. 
+      + intro Habs.
+        by rewrite lookup_empty in Habs. 
+    - eapply map_Forall_insert_1_2 in H_eq as Hyp_less; last apply Hyp.
+      apply IH in Hyp_less as [cache H_cache].
+      apply map_Forall_insert_1_1 in Hyp as H_ser_x.
+      exists (<[i:={| SV_val := x; SV_ser := H_ser_x|}]> cache).
+      intros k v.
+      split.
+      + intro H_lookup.
+        destruct (decide (k = i)) as [<-| H_neq_k].
+        * rewrite lookup_insert.
+          rewrite lookup_insert in H_lookup.
+          set_solver.
+        * rewrite lookup_insert_ne; last done.
+          rewrite lookup_insert_ne in H_lookup; last done.
+          by apply H_cache.
+      + intro H_lookup.
+        destruct (decide (k = i)) as [<-| H_neq_k].
+        * rewrite lookup_insert.
+          rewrite lookup_insert in H_lookup.
+          set_solver.
+        * rewrite lookup_insert_ne; last done.
+          rewrite lookup_insert_ne in H_lookup; last done.
+          by apply H_cache.
+  Qed.
  
   Lemma commit_handler_spec
     (lk : val)
@@ -303,12 +341,7 @@ Section Proof_of_commit_handler.
       + (* Commit is successful case *)
        wp_pures.
         wp_store.
-        assert (∃ (cache : gmap Key SerializableVal), ∀ (k : Key) (v : SerializableVal),
-          cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)) as [cache H_cache].
-        {
-
-        admit.
-        }
+        pose proof (cache_updatesM_to_cache _ Hall) as [cache H_cache].
         unfold snapshot_isolation_code.update_kvs.
         wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M cache); try eauto.
         {
@@ -385,7 +418,7 @@ Section Proof_of_commit_handler.
           iSplit.
           {
             iPureIntro.
-            admit.
+            by apply upd_serializable.
           }
           replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
           iFrame.

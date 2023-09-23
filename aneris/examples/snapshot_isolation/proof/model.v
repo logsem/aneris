@@ -148,6 +148,16 @@ Section KVS_valid.
              ]> M))
         M0 C.
 
+  Lemma upd_serializable (cache : gmap Key SerializableVal) (M : gmap Key (list write_event)) (T : nat) :
+    map_Forall
+          (λ (_ : Key) (l : list events.write_event), Forall (λ we : events.write_event, KVS_Serializable (we_val we)) l) M
+    →
+    map_Forall
+      (λ (_ : Key) (l : list events.write_event),
+        Forall (λ we : events.write_event, KVS_Serializable (we_val we)) l) (update_kvs M cache T).
+  Proof.
+  Admitted. 
+
   (** Probably not needed as lemma! *)
   (* Lemma kvs_valid_update_cell *)
   (*       (M : kvsMdl) (T : nat) (Tss : gset nat) (k : Key) (v : SerializableVal) : *)

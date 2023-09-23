@@ -231,7 +231,7 @@ Section Wrapper_defs.
       ⌜kvs_valid_snapshot Msnap ts⌝ -∗
       ⌜kvs_valid M T Tss⌝ -∗
       ⌜map_Forall (λ (_ : Key) (v : val), KVS_Serializable v) cache_updatesM⌝ -∗
-      ⌜∀ k v, cache !! k = Some v ↔ cache_updatesM !! k = Some v.(SV_val)⌝ -∗
+      ⌜(∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v)⌝ -∗
       ⌜can_commit m_current
            ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ -∗
        ownMemMono γGsnap M -∗
