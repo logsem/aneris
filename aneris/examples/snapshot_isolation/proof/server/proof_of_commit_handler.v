@@ -141,7 +141,38 @@ Section Proof_of_commit_handler.
           rewrite lookup_insert_ne in H_lookup; last done.
           by apply H_cache.
   Qed.
- 
+
+  Lemma cache_dom_eq (cache_updatesM : gmap Key val) (cache : gmap Key SerializableVal) :
+    (∀ (k : Key) (v : val),
+      (∃ sv : SerializableVal, cache !! k = Some sv ∧ sv.(SV_val) = v)
+      ↔ cache_updatesM !! k = Some v) →
+    dom cache = dom cache_updatesM.
+  Proof.
+    intros H_some. 
+    assert (∀ k, k ∈ dom cache ↔ k ∈ dom cache_updatesM) as H_in_in.
+    {
+      intro k.
+      split; intro H_is_some.
+      - apply elem_of_dom in H_is_some. 
+        destruct (cache !! k) as [v | ] eqn:H_lookup.
+        + specialize (H_some k v).
+          destruct H_some as [H_some _].
+          apply elem_of_dom.
+          rewrite H_some; first done.
+          set_solver.
+        + by inversion H_is_some.
+      - apply elem_of_dom in H_is_some.
+        destruct (cache_updatesM !! k) as [v | ] eqn:H_lookup. 
+        + specialize (H_some k v).
+          destruct H_some as [_ H_some].
+          apply H_some in H_lookup as [sv [H_lookup _]].
+          apply elem_of_dom.
+          by rewrite H_lookup.
+        + by inversion H_is_some.
+    }
+    set_solver.
+  Qed.
+
   Lemma commit_handler_spec
     (lk : val)
     (kvs vnum : loc)
@@ -255,7 +286,7 @@ Section Proof_of_commit_handler.
         destruct l; inversion HcmapEq as [HvEq].
         simpl in HcupdEq.
         simplify_eq.
-        destruct Hcoh as (Hdom & _ & _ & _ & Hcoh1 & _ & Hcoh2).
+        destruct Hcoh as (Hdom & _ & _ & _ & _ & Hcoh1 & _ & Hcoh2).
         iSplit.
         * iPureIntro.
           apply bool_decide_pack.
@@ -342,6 +373,9 @@ Section Proof_of_commit_handler.
        wp_pures.
         wp_store.
         pose proof (cache_updatesM_to_cache _ Hall) as [cache H_cache].
+        pose proof (cache_dom_eq _ _ H_cache) as H_cache_eq.
+        pose proof Hcoh as ( _ & _ & H_sub & _).
+        rewrite -H_cache_eq in H_sub.
         unfold snapshot_isolation_code.update_kvs.
         wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M cache); try eauto.
         {
@@ -387,7 +421,6 @@ Section Proof_of_commit_handler.
           iSplit; first done.
           iPureIntro.
           apply kvs_valid_update; try done.
-          admit.
         }
         iModIntro.
         iModIntro.
@@ -413,7 +446,6 @@ Section Proof_of_commit_handler.
           {
             iPureIntro.
             apply kvsl_valid_update; try done.
-            admit.
           }
           iSplit.
           {

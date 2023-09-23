@@ -60,6 +60,7 @@ Section Proxy.
     (Msnap :  gmap Key (list write_event)) :=
       dom cache_logicalM = dom Msnap ∧
       dom cache_updatesM ⊆ dom cache_logicalM ∧
+      dom cache_updatesM ⊆ KVS_keys ∧
       (** Cache Logical and Snapshot Coherence *)
       (∀ k v,
         (cache_logicalM !! k) = Some (Some v, false) →
@@ -82,11 +83,12 @@ Section Proxy.
        (∀ k vo, (cache_logicalM !! k = Some (vo, true)) → is_Some vo).
 
   Lemma is_coherent_cache_upd k v cuM cM Msnap :
+    k ∈ KVS_keys →
     is_Some (cM !! k) →
     is_coherent_cache cuM cM Msnap →
     is_coherent_cache (<[k:=v]> cuM) (<[k:=(Some v, true)]> cM) Msnap.
   Proof.
-    intros H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 H_coh_7]]]]]].
+    intros H_in H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 [H_coh_7 H_coh_8]]]]]]].
     unfold is_coherent_cache.
     split.
     - rewrite -H_coh_1.
@@ -94,88 +96,90 @@ Section Proxy.
     - split.
       + set_solver.
       + split.
-        * intros k' v' H_lookup.
-          destruct (decide (k = k')) as [<- | H_neq].
-          {
-            by rewrite lookup_insert in H_lookup.
-          }
-          {
-            apply H_coh_3.
-            apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
-            by rewrite H_neq in H_lookup.
-          }
+        * set_solver.
         * split.
-          -- intros k' H_lookup.
-            destruct (decide (k = k')) as [<- | H_neq].
-            {
-              by rewrite lookup_insert in H_lookup.
-            }
-            {
-              apply H_coh_4.
-              apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
-              by rewrite H_neq in H_lookup.
-            }
+          -- intros k' v' H_lookup.
+              destruct (decide (k = k')) as [<- | H_neq].
+              {
+                by rewrite lookup_insert in H_lookup.
+              }
+              {
+                apply H_coh_4.
+                apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
+                by rewrite H_neq in H_lookup.
+              }
           -- split.
-            ++ intros k' v'.
-              split; intro H_lookup.
-                ** destruct (decide (k = k')) as [<- | H_neq].
+              ++ intros k' H_lookup.
+                destruct (decide (k = k')) as [<- | H_neq].
                 {
-                  rewrite lookup_insert in H_lookup.
-                  rewrite lookup_insert.
-                  by rewrite H_lookup.
+                  by rewrite lookup_insert in H_lookup.
                 }
                 {
-                  apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
-                  rewrite H_neq' in H_lookup.
-                  apply H_coh_5 in H_lookup.
-                  rewrite -H_lookup.
-                  by apply lookup_insert_ne.
+                  apply H_coh_5.
+                  apply (lookup_insert_ne cM _ _ (Some v, true)) in H_neq.
+                  by rewrite H_neq in H_lookup.
                 }
-                ** destruct (decide (k = k')) as [<- | H_neq].
-                {
-                  rewrite lookup_insert in H_lookup.
-                  rewrite lookup_insert.
-                  set_solver.
-                }
-                {
-                  apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
-                  rewrite H_neq' in H_lookup.
-                  apply H_coh_5 in H_lookup.
-                  rewrite -H_lookup.
-                  by apply lookup_insert_ne.
-                }
-            ++ split.
-               ** intros k' vo Hdom Hvo.
-                  split.
-                  { intros Hupd.
-                    destruct (decide (k = k')) as [<- | H_neq].
+              ++ split.
+                ** intros k' v'.
+                   split; intro H_lookup.
+                    --- destruct (decide (k = k')) as [<- | H_neq].
                     {
-                      by rewrite lookup_insert in Hupd. }
+                      rewrite lookup_insert in H_lookup.
+                      rewrite lookup_insert.
+                      by rewrite H_lookup.
+                    }
                     {
                       apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
-                      rewrite H_neq' in Hupd.
-                      rewrite lookup_insert_ne; last done.
-                      specialize (H_coh_6 k' vo Hdom Hvo) as (H_coh_6 & ?).
-                      by apply H_coh_6. }
-                  }
-                  intros Hupd.
-                  destruct (decide (k = k')) as [<- | H_neq].
-                  {
-                    by rewrite lookup_insert in Hupd. }
-                  {
-                    apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
-                    rewrite H_neq'.
-                    specialize (H_coh_6 k' vo Hdom Hvo) as (Hcoh & H_coh_6).
-                    apply H_coh_6.
-                    by rewrite lookup_insert_ne in Hupd.
-                  }
-               ** intros k' vo' Hvo.
-                  destruct (decide (k = k')) as [<- | H_neq].
-                  {
-                    rewrite lookup_insert in Hvo. by simplify_eq /=. }
-                  {
-                    rewrite lookup_insert_ne in Hvo; last done.
-                    by apply (H_coh_7 k'). }
+                      rewrite H_neq' in H_lookup.
+                      apply H_coh_6 in H_lookup.
+                      rewrite -H_lookup.
+                      by apply lookup_insert_ne.
+                    }
+                    --- destruct (decide (k = k')) as [<- | H_neq].
+                    {
+                      rewrite lookup_insert in H_lookup.
+                      rewrite lookup_insert.
+                      set_solver.
+                    }
+                    {
+                      apply (lookup_insert_ne cM _ _ ((Some v, true))) in H_neq as H_neq'.
+                      rewrite H_neq' in H_lookup.
+                      apply H_coh_6 in H_lookup.
+                      rewrite -H_lookup.
+                      by apply lookup_insert_ne.
+                    }
+                ** split.
+                  --- intros k' vo Hdom Hvo.
+                      split.
+                      { intros Hupd.
+                        destruct (decide (k = k')) as [<- | H_neq].
+                        {
+                          by rewrite lookup_insert in Hupd. }
+                        {
+                          apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
+                          rewrite H_neq' in Hupd.
+                          rewrite lookup_insert_ne; last done.
+                          specialize (H_coh_7 k' vo Hdom Hvo) as (H_coh_7 & ?).
+                          by apply H_coh_7. }
+                      }
+                      intros Hupd.
+                      destruct (decide (k = k')) as [<- | H_neq].
+                      {
+                        by rewrite lookup_insert in Hupd. }
+                      {
+                        apply (lookup_insert_ne cuM _ _ v) in H_neq as H_neq'.
+                        rewrite H_neq'.
+                        specialize (H_coh_7 k' vo Hdom Hvo) as (Hcoh & H_coh_7).
+                        apply H_coh_7.
+                        by rewrite lookup_insert_ne in Hupd.
+                      }
+                  --- intros k' vo' Hvo.
+                      destruct (decide (k = k')) as [<- | H_neq].
+                      {
+                        rewrite lookup_insert in Hvo. by simplify_eq /=. }
+                      {
+                        rewrite lookup_insert_ne in Hvo; last done.
+                        by apply (H_coh_8 k'). }
   Qed.
 
 
@@ -214,74 +218,76 @@ Section Proxy.
       - split.
         + by rewrite dom_empty_L.
         + split.
-          * intros k v Hyp.
-            unfold cacheM_from_Msnap in Hyp.
-            rewrite lookup_fmap in Hyp.
-            destruct (M !! k) eqn:H_lookup.
-            {
-              rewrite H_lookup in Hyp.
-              simpl in Hyp.
-              exists l.
-              destruct l.
-              1 : done.
-              assert (w :: l ≠ []) as H_neq.
-              { set_solver. }
-              apply last_of_none_empty_list_is_some in H_neq as H_eq.
-              destruct H_eq as [v' H_eq].
-              exists v'.
-              rewrite -H_eq in Hyp.
-              simpl in Hyp.
-              set_solver.
-            }
-            {
-              rewrite H_lookup in Hyp.
-              by simpl in Hyp.
-            }
+          * by rewrite dom_empty_L.
           * split.
-            -- intros k Hyp.
-              unfold cacheM_from_Msnap in Hyp.
-              rewrite lookup_fmap in Hyp.
-              destruct (M !! k) eqn:H_lookup.
-              {
-                rewrite H_lookup in Hyp.
-                simpl in Hyp.
-                destruct l.
-                1 : done.
-                assert (w :: l ≠ []) as H_neq.
-                { set_solver. }
-                apply last_of_none_empty_list_is_some in H_neq as H_eq.
-                destruct H_eq as [v H_eq].
-                rewrite -H_eq in Hyp.
-                by simpl in Hyp.
-              }
-              {
-                rewrite H_lookup in Hyp.
-                by simpl in Hyp.
-              }
+            -- intros k v Hyp.
+               unfold cacheM_from_Msnap in Hyp.
+               rewrite lookup_fmap in Hyp.
+               destruct (M !! k) eqn:H_lookup.
+               {
+                 rewrite H_lookup in Hyp.
+                 simpl in Hyp.
+                 exists l.
+                 destruct l.
+                 1 : done.
+                 assert (w :: l ≠ []) as H_neq.
+                 { set_solver. }
+                 apply last_of_none_empty_list_is_some in H_neq as H_eq.
+                 destruct H_eq as [v' H_eq].
+                 exists v'.
+                 rewrite -H_eq in Hyp.
+                 simpl in Hyp.
+                 set_solver.
+               }
+               {
+                 rewrite H_lookup in Hyp.
+                 by simpl in Hyp.
+               }
             -- split.
-              ++ split.
-                1: set_solver.
-                intros Hyp.
+              ++ intros k Hyp.
                 unfold cacheM_from_Msnap in Hyp.
                 rewrite lookup_fmap in Hyp.
-                destruct (M !! k) eqn:H_lookup; by rewrite H_lookup in Hyp.
+                destruct (M !! k) eqn:H_lookup.
+                {
+                  rewrite H_lookup in Hyp.
+                  simpl in Hyp.
+                  destruct l.
+                  1 : done.
+                  assert (w :: l ≠ []) as H_neq.
+                  { set_solver. }
+                  apply last_of_none_empty_list_is_some in H_neq as H_eq.
+                  destruct H_eq as [v H_eq].
+                  rewrite -H_eq in Hyp.
+                  by simpl in Hyp.
+                }
+                {
+                  rewrite H_lookup in Hyp.
+                  by simpl in Hyp.
+                }
               ++ split.
-                 ** intros k vo Hdom Hvo.
-                    split; last done.
-                    1: intros Hyp.
-                    simplify_eq /=.
-                    rewrite /cacheM_from_Msnap.
-                    rewrite! lookup_fmap.
-                    destruct (M !! k) eqn:H_lookup.
-                    { rewrite H_lookup. simplify_eq /=.
-                      by do 2 f_equal. }
-                    { rewrite elem_of_dom in Hdom.
-                      rewrite H_lookup in Hdom. rewrite /is_Some in Hdom. set_solver. }
-                 ** intros k vo Hvo.
-                    rewrite /cacheM_from_Msnap in Hvo.
-                    destruct vo; first done.
-                    rewrite! lookup_fmap in Hvo.
-                    by destruct (M !! k) eqn:H_lookup; rewrite H_lookup in Hvo.
+                ** split.
+                  1: set_solver.
+                  intros Hyp.
+                  unfold cacheM_from_Msnap in Hyp.
+                  rewrite lookup_fmap in Hyp.
+                  destruct (M !! k) eqn:H_lookup; by rewrite H_lookup in Hyp.
+                ** split.
+                  --- intros k vo Hdom Hvo.
+                      split; last done.
+                      1: intros Hyp.
+                      simplify_eq /=.
+                      rewrite /cacheM_from_Msnap.
+                      rewrite! lookup_fmap.
+                      destruct (M !! k) eqn:H_lookup.
+                      { rewrite H_lookup. simplify_eq /=.
+                        by do 2 f_equal. }
+                      { rewrite elem_of_dom in Hdom.
+                        rewrite H_lookup in Hdom. rewrite /is_Some in Hdom. set_solver. }
+                  --- intros k vo Hvo.
+                      rewrite /cacheM_from_Msnap in Hvo.
+                      destruct vo; first done.
+                      rewrite! lookup_fmap in Hvo.
+                      by destruct (M !! k) eqn:H_lookup; rewrite H_lookup in Hvo.
   Qed.
 
   Definition is_connected_def

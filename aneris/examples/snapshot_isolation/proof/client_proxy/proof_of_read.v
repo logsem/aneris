@@ -81,11 +81,11 @@ Section Read_Proof.
     wp_apply (wp_map_lookup $! Hm).
     iIntros (vo1 Hvo1).
     assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
-    destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) .
+    destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8) .
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
-                            "(#Hc3 & Hcache & %Hvb)".
+                            "(#Hc4 & Hcache & %Hvb)".
     simplify_eq /=.
-    iDestruct (client_connected_agree with "[$Hc3][$Hc1]") as "%Heq'".
+    iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq'".
     simplify_eq.
     iDestruct (@ghost_map.ghost_map_lookup with
                 "[$Hauth][$Hcache]") as "%Hkin".
@@ -93,8 +93,8 @@ Section Read_Proof.
     (* Read from cache. *)
     1:{ rewrite Hvo1.
         wp_pures.
-        specialize (Hc5 k v).
-        apply Hc5 in Hkv1.
+        specialize (Hc6 k v).
+        apply Hc6 in Hkv1.
         simplify_eq /=.
         wp_apply (release_spec with
                    "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [Hcache Hpost]").
@@ -124,22 +124,22 @@ Section Read_Proof.
     instantiate (1 := (inl (k, ts, h))).
     assert (k ∈ dom cM) as Hdomk.
     { apply elem_of_dom. set_solver. }
-    specialize (Hc6 k vo) as (Hd & _).
+    specialize (Hc7 k vo) as (Hd & _).
     {  set_solver. }
     { rewrite Hinh. simplify_eq /=.
       destruct vo eqn:Hvo.
       - simplify_eq /=.
         destruct b.
-        -- destruct (Hc5 k v) as (Hc51 & Hc52).
-           specialize (Hc52 Hkin). set_solver.
-        -- specialize (Hc3 k v Hkin).
-           destruct Hc3 as (h0 & e0 & Hmk & Hh & Hev).
+        -- destruct (Hc6 k v) as (Hc61 & Hc62).
+           specialize (Hc62 Hkin). set_solver.
+        -- specialize (Hc4 k v Hkin).
+           destruct Hc4 as (h0 & e0 & Hmk & Hh & Hev).
            rewrite /hist_to_we in Hh.
            simplify_eq /=.
            rewrite Hh.
            done.
       -  simplify_eq /=.
-         specialize (Hc4 k Hkin).
+         specialize (Hc5 k Hkin).
          by simplify_eq /=. }
     specialize (Hd Hkv1).
     destruct Hvalid as (_ & Hvalid).
@@ -185,28 +185,28 @@ Section Read_Proof.
        iNext.
        iIntros (? ->).
        wp_pures.
-       specialize (Hc6 k vo) as (Hd & _).
+       specialize (Hc7 k vo) as (Hd & _).
        { apply elem_of_dom. set_solver. }
        { rewrite Hinh. simplify_eq /=.
          destruct vo eqn:Hvo.
          - simplify_eq /=.
            destruct b.
-           -- destruct (Hc5 k v) as (Hc51 & Hc52).
-              specialize (Hc52 Hkin). set_solver.
-           -- specialize (Hc3 k v Hkin).
-              destruct Hc3 as (h0 & e0 & Hmk & Hh & Hev).
+           -- destruct (Hc6 k v) as (Hc61 & Hc62).
+              specialize (Hc62 Hkin). set_solver.
+           -- specialize (Hc4 k v Hkin).
+              destruct Hc4 as (h0 & e0 & Hmk & Hh & Hev).
               rewrite /hist_to_we in Hh.
               simplify_eq /=.
               rewrite Hh.
               done.
          -  simplify_eq /=.
-            specialize (Hc4 k Hkin).
+            specialize (Hc5 k Hkin).
             by simplify_eq /=. }
        apply Hd in Hkv1.
        iDestruct "Hcnd" as "[(-> & ->) | %Hhe ]".
        (* Case 2 : There is nothing to read. *)
        --- assert (vo = None) as ->.
-           by destruct vo; first by specialize (Hc3 k v Hkv1); set_solver.
+           by destruct vo; first by specialize (Hc4 k v Hkv1); set_solver.
            iApply "Hpost".
            iExists _, _, _, _, _, _, _, _.
            iExists _.
@@ -216,7 +216,7 @@ Section Read_Proof.
        (* Case 2 : There is a value to read. *)
        --- destruct Hhe as (rv & -> & Hrv).
            destruct vo as [v|]; last by set_solver.
-           { specialize (Hc3 k v Hkv1) as (h' & e & Hmk & Hhe & Hev).
+           { specialize (Hc4 k v Hkv1) as (h' & e & Hmk & Hhe & Hev).
              simplify_eq /=.
              iApply "Hpost".
              iExists _, _, _, _, _, _, _, _.

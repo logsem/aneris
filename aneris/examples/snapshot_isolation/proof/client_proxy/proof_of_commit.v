@@ -165,11 +165,11 @@ Section Commit_Proof.
       {
         iPureIntro.
         intros k v b H_pure_eq_mc.
-        destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6).
+        destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8).
         destruct b; last done.
         specialize (HmcEq0 k (Some v) true H_pure_eq_mc).
         rewrite -HmcEq0 in H_pure_eq_mc.
-        specialize (Hc5 k v) as (_ & Habs).
+        specialize (Hc6 k v) as (_ & Habs).
         by apply Habs in H_pure_eq_mc.
       }
       iAssert (⌜∀ k vo b h, mc !! k = Some (vo, b) →
@@ -201,10 +201,10 @@ Section Commit_Proof.
         destruct (mc !! k) as [(vo,[|])|] eqn:Hmc; last done; last done.
         { destruct vo.
           - by specialize (HmcEq1 k v true Hmc).
-          -   destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7).
+          -   destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8).
               assert (cacheM !! k = Some (None, true)) as Hcm.
               { by eapply map_subseteq_spec. }
-              by destruct (Hc7 k None Hcm). }
+              by destruct (Hc8 k None Hcm). }
         iDestruct (big_sepM2_sepM_2 _ ((λ k h, True)%I) _ mc with "[$Hkeys] []") as "Hkeys".
         * intros k.
           split; intros H_some.
@@ -395,7 +395,7 @@ Section Commit_Proof.
             iDestruct "Hpre" as "(Hst & %Hdom1 & %Hdom2 & Hkeys & Hcache)".
             iModIntro.
             iExists m.
-            destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7).
+            destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8).
             iDestruct "Hst" as (sp) "(Hst' & %Heq')".
             iDestruct "Hst'" as (??????? Heq2) "(#Hcc2 & Hst')".
             destruct sp as [|Msnap']; simplify_eq /=.
