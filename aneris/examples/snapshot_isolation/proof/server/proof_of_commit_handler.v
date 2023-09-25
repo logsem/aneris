@@ -277,9 +277,11 @@ Section Proof_of_commit_handler.
     - (* Cache is empty case *)
       wp_bind (Load _).
       wp_apply (aneris_wp_atomic _ _ E).
+      (* Viewshift *)
       iMod ("Hshift" with "[$HP]") as (m_current HdomEq) "(Hkeys & Hpost)".
       iModIntro.
       wp_load.
+      (* Closing of viewshift *)
       iDestruct ("Hpost" with "[Hkeys]") as "HQ".
       + iLeft.
         iSplitR; first done.
@@ -330,7 +332,8 @@ Section Proof_of_commit_handler.
              apply not_elem_of_dom_1 in Hnin as Hnone'.
              rewrite Hnone Hnone'.
              split; intro Habs; by inversion Habs.
-      + iMod "HQ".
+      + (* Proceding with proof after viewshift *)
+        iMod "HQ".
         iModIntro.
         wp_pures.
         wp_apply (release_spec with
@@ -361,144 +364,186 @@ Section Proof_of_commit_handler.
           iSplit; first done.
           iSplit; first done.
           iSplit; done.
-    - (* Cache is not empty case *)
-      wp_load.
-      wp_pures.
-      wp_apply (map_forall_spec ts T tss' kvsV v cache_updatesM m cache_logicalM Msnap M); try eauto.
-      {
-        by eexists _.
-      }
-      iIntros (m_current b) "(%H_dom_eq & %H_curr_eq & [(-> & %H_com_status) | (-> & %H_com_status)])".
-      + (* Commit is successful case *)
-       wp_pures.
-        wp_store.
-        pose proof (cache_updatesM_to_cache _ Hall) as [cache H_cache].
-        pose proof (cache_dom_eq _ _ H_cache) as H_cache_eq.
-        pose proof Hcoh as ( _ & _ & H_sub & _).
-        rewrite -H_cache_eq in H_sub.
-        unfold snapshot_isolation_code.update_kvs.
-        wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M cache); try eauto.
+    - (* Cache is not empty case. *) 
+      (* Note: We have to figure out now whether the commit will be successful,
+         and not wait till we apply map_forall_spec, as we will have no atomic 
+         operations left to apply the viewshift if the commit is unsuccessful. *)
+      destruct (decide (can_commit
+                          ((λ hw, to_hist hw) <$> filter (λ k, k.1 ∈ dom Msnap) M) 
+                          ((λ hw, to_hist hw) <$> Msnap) 
+                          cache_logicalM)) as [H_commit | H_commit].
+      + (* Commit is successfull case *)
+        wp_load.
+        wp_pures.
+        wp_apply (map_forall_spec ts T tss' kvsV v cache_updatesM m cache_logicalM Msnap M); try eauto.
         {
           by eexists _.
         }
-        iIntros (kvs_updated) "%H_map_up".
-        wp_bind (Store _ _).
-        wp_apply (aneris_wp_atomic _ _ E).
-        (* Viewshift and opening of invariant *)
-        iMod ("Hshift" with "[$HP]") as (m_current_client) "(%H_dom_eq_cl & Hkeys & Hpost)".
-        iInv KVS_InvName as (Mg Tg Tssg gMg) 
-          ">(HmemGlob & HtimeGlob & HtimeStartsGlob & Hccls & %Hdom & %HkvsValid)".
-        (* Getting ready for update of logical ressources *)
-        iDestruct "HmemGlob" as "(HmemGlobAuth & HmemMono)".
-        iAssert (⌜M = Mg⌝%I) as "<-".
-        { 
-          iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
-            with "[$HmemLoc][$HmemGlobAuth]").
-        }
-        iDestruct (mono_nat.mono_nat_auth_own_agree with "[$HtimeGlob][$HtimeLoc]")
-          as "(%Hleq & ->)".
-        iDestruct (mem_auth_lookup_big with "[$HmemLoc] [$Hkeys]")
-          as "(HmemLoc & Hkeys & %Hmap_eq)".
-        apply map_eq_filter_dom in Hmap_eq.
-        assert (m_current = m_current_client) as <-.
-        {
-          rewrite H_curr_eq Hmap_eq.
-          by rewrite H_dom_eq_cl H_dom_eq.
-        }
-        (* Update of logical ressources *)
-        iDestruct (commit_logical_update clients γKnownClients γGauth γGsnap γT γTss
-          ts T Tssg cache_logicalM cache_updatesM cache M Msnap m_current) as "H_upd".
-        iDestruct ("H_upd" with "[] [] [] [] [] [] [] [$HmemMono] [$HtimeGlob]
-          [$HtimeLoc] [$HmemGlobAuth] [$HmemLoc] [$Hkeys]") as 
-          ">(HtimeGlob & HtimeLoc & HmemGlob & HmemLoc & HmemMono & Hkeys)"; try done.
-        (* Closing of invaraint *)
-        iSplitL "HtimeGlob HmemGlob Hccls HmemMono HtimeStartsGlob".
-        {
+        iIntros (m_current b) "(%H_dom_eq & %H_curr_eq & [(-> & %H_com_status) | (-> & %H_com_status)])".
+        * (* Valid case when we know commit is successful *)
+          wp_pures.
+          wp_store.
+          pose proof (cache_updatesM_to_cache _ Hall) as [cache H_cache].
+          pose proof (cache_dom_eq _ _ H_cache) as H_cache_eq.
+          pose proof Hcoh as ( _ & _ & H_sub & _).
+          rewrite -H_cache_eq in H_sub.
+          unfold snapshot_isolation_code.update_kvs.
+          wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M cache); try eauto.
+          {
+            by eexists _.
+          }
+          iIntros (kvs_updated) "%H_map_up".
+          wp_bind (Store _ _).
+          wp_apply (aneris_wp_atomic _ _ E).
+          (* Viewshift and opening of invariant *)
+          iMod ("Hshift" with "[$HP]") as (m_current_client) "(%H_dom_eq_cl & Hkeys & Hpost)".
+          iInv KVS_InvName as (Mg Tg Tssg gMg) 
+            ">(HmemGlob & HtimeGlob & HtimeStartsGlob & Hccls & %Hdom & %HkvsValid)".
+          (* Getting ready for update of logical ressources *)
+          iDestruct "HmemGlob" as "(HmemGlobAuth & HmemMono)".
+          iAssert (⌜M = Mg⌝%I) as "<-".
+          { 
+            iApply (ghost_map.ghost_map_auth_agree γGauth (1/2)%Qp (1/2)%Qp M
+              with "[$HmemLoc][$HmemGlobAuth]").
+          }
+          iDestruct (mono_nat.mono_nat_auth_own_agree with "[$HtimeGlob][$HtimeLoc]")
+            as "(%Hleq & ->)".
+          iDestruct (mem_auth_lookup_big with "[$HmemLoc] [$Hkeys]")
+            as "(HmemLoc & Hkeys & %Hmap_eq)".
+          apply map_eq_filter_dom in Hmap_eq.
+          assert (m_current = m_current_client) as <-.
+          {
+            rewrite H_curr_eq Hmap_eq.
+            by rewrite H_dom_eq_cl H_dom_eq.
+          }
+          (* Update of logical ressources *)
+          iDestruct (commit_logical_update clients γKnownClients γGauth γGsnap γT γTss
+            ts T Tssg cache_logicalM cache_updatesM cache M Msnap m_current) as "H_upd".
+          iDestruct ("H_upd" with "[] [] [] [] [] [] [] [$HmemMono] [$HtimeGlob]
+            [$HtimeLoc] [$HmemGlobAuth] [$HmemLoc] [$Hkeys]") as 
+            ">(HtimeGlob & HtimeLoc & HmemGlob & HmemLoc & HmemMono & Hkeys)"; try done.
+          (* Closing of invaraint *)
+          iSplitL "HtimeGlob HmemGlob Hccls HmemMono HtimeStartsGlob".
+          {
+            iModIntro.
+            iNext.
+            iExists (update_kvs M cache (T + 1)), (T + 1), Tssg, gMg.
+            iFrame.
+            iSplit; first done.
+            iPureIntro.
+            apply kvs_valid_update; try done.
+          }
           iModIntro.
-          iNext.
-          iExists (update_kvs M cache (T + 1)), (T + 1), Tssg, gMg.
-          iFrame.
-          iSplit; first done.
-          iPureIntro.
-          apply kvs_valid_update; try done.
-        }
-        iModIntro.
-        iModIntro.
-        wp_store.
-        (* Closing of viewshift *)
-        iDestruct ("Hpost" $! true with "[Hkeys]") as "HQ".
-        {
-          iLeft.
-          by iFrame.
-        }
-        (* Proceding with proof after viewshift *)
-        iMod "HQ".
-        iModIntro.
-        wp_pures.
-        wp_apply (release_spec with
-          "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
-        {
-          iExists kvs_updated, (T + 1), tss', 
-            (update_kvsl m cache (T + 1)), (update_kvs M cache (T + 1)).
-          iFrame "#∗".
-          iSplit; first done.
+          iModIntro.
+          wp_store.
+          (* Closing of viewshift *)
+          iDestruct ("Hpost" $! true with "[Hkeys]") as "HQ".
+          {
+            iLeft.
+            by iFrame.
+          }
+          (* Proceding with proof after viewshift *)
+          iMod "HQ".
+          iModIntro.
+          wp_pures.
+          wp_apply (release_spec with
+            "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
+          {
+            iExists kvs_updated, (T + 1), tss', 
+              (update_kvsl m cache (T + 1)), (update_kvs M cache (T + 1)).
+            iFrame "#∗".
+            iSplit; first done.
+            iSplit.
+            {
+              iPureIntro.
+              apply kvsl_valid_update; try done.
+            }
+            iSplit.
+            {
+              iPureIntro.
+              by apply upd_serializable.
+            }
+            replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
+            iFrame.
+          }
+          iIntros (? ->).
+          wp_pures.
+          iApply ("HΦ" $! _ _).
           iSplit.
           {
-            iPureIntro.
-            apply kvsl_valid_update; try done.
+            iPureIntro. 
+            by apply ser_commit_reply_valid.
           }
-          iSplit.
-          {
-            iPureIntro.
-            by apply upd_serializable.
-          }
-          replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
-          iFrame.
-        }
-        iIntros (? ->).
-        wp_pures.
-        iApply ("HΦ" $! _ _).
-        iSplit.
-        * iPureIntro. 
-          by apply ser_commit_reply_valid.
-        * rewrite /ReqPost.
+          rewrite /ReqPost.
           iFrame "#".
           do 2 iRight.
           iExists _, _, _, _, _, _, _, _.
           iSplit; first done.
           iSplit; first done.
           iSplit; done.
-        Unshelve.
-        all : try done.
-      + (* Commit is not successful case *)
-        wp_pures.
-        unfold release.
-        wp_pures.
-        wp_bind (Store _ _).
+          Unshelve.
+          all : try done.
+        * (* Absurd case when we know commit is successful *)
+          rewrite H_curr_eq in H_com_status.
+          by rewrite H_dom_eq in H_com_status.
+      + (* Commit is not successfull case *)
+        wp_bind (Load _).
         wp_apply (aneris_wp_atomic _ _ E).
-        admit.
-        (* wp_apply (release_spec with
-          "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
-        {
-          unfold lkResDef.
-          iExists kvsV, T, tss', m, M.
-          iFrame "#∗".
-          iPureIntro.
-          split_and!; done.
-        }
-        iIntros (? ->).
-        wp_pures.
-        iApply ("HΦ" $! _ _).
-        iSplit.
-        * iPureIntro. 
-          by apply ser_commit_reply_valid.
-        * rewrite /ReqPost.
-          iFrame "#".
-          do 2 iRight.
-          iExists _, _, _, _, _, _, _, _.
-          iSplit; first done.
-          iSplit; first done. 
-          iSplit; done. *)
-  Admitted.
+        (* Viewshift *)
+        iMod ("Hshift" with "[$HP]") as (m_current HdomEq) "(Hkeys & Hpost)".
+        iModIntro.
+        iDestruct (mem_auth_lookup_big with "[$HmemLoc] [$Hkeys]")
+          as "(HmemLoc & Hkeys & %Hmap_eq)".
+        apply map_eq_filter_dom in Hmap_eq.
+        wp_load.
+        (* Closing of viewshift *)
+        iDestruct ("Hpost" with "[Hkeys]") as "HQ".
+        * iRight.
+          iSplitR; first done.
+          iSplitR.
+          {
+            iPureIntro.
+            rewrite Hmap_eq.
+            by rewrite HdomEq.
+          }
+          by iApply mem_implies_seen.
+        * (* Proceding with proof after viewshift *)
+          iMod "HQ".
+          iModIntro.
+          wp_pures.
+          wp_apply (map_forall_spec ts T tss' kvsV v cache_updatesM m cache_logicalM Msnap M); try eauto.
+          {
+            by eexists _.
+          }
+          iIntros (m_current' b) "(%H_dom_eq & %H_curr_eq & [(-> & %H_com_status) | (-> & %H_com_status)])".
+          -- (* Absurd case when we know commit is not successful *)
+             rewrite H_curr_eq in H_com_status.
+             by rewrite H_dom_eq in H_com_status.
+          -- (* Valid case when we know commit is not successful *)
+             wp_pures.
+             wp_apply (release_spec with
+               "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
+             {
+               iExists kvsV, T, tss', m, M.
+               iFrame "#∗".
+               iPureIntro.
+               split_and!; done.
+             }
+             iIntros (? ->).
+             wp_pures.
+             iApply ("HΦ" $! _ _).
+             iSplit.
+             {
+               iPureIntro. 
+               by apply ser_commit_reply_valid.
+             }
+             rewrite /ReqPost.
+             iFrame "#".
+             do 2 iRight.
+             iExists _, _, _, _, _, _, _, _.
+             iSplit; first done.
+             iSplit; first done.
+             iSplit; done.
+  Qed.
 
 End Proof_of_commit_handler.
