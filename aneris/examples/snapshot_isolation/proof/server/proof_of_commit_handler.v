@@ -486,7 +486,7 @@ Section Proof_of_commit_handler.
         * (* Absurd case when we know commit is successful *)
           rewrite H_curr_eq in H_com_status.
           by rewrite H_dom_eq in H_com_status.
-      + (* Commit is not successfull case *)
+      + (* Commit is not successful case *)
         wp_bind (Load _).
         wp_apply (aneris_wp_atomic _ _ E).
         (* Viewshift *)
