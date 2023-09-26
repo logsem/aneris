@@ -176,10 +176,105 @@ Section Proxy.
                   --- intros k' vo' Hvo.
                       destruct (decide (k = k')) as [<- | H_neq].
                       {
-                        rewrite lookup_insert in Hvo. by simplify_eq /=. }
+                        rewrite lookup_insert in Hvo. by simplify_eq /=. 
+                      }
                       {
                         rewrite lookup_insert_ne in Hvo; last done.
-                        by apply (H_coh_8 k'). }
+                        by apply (H_coh_8 k').
+                      }
+  Qed.
+
+  Lemma is_coherent_cache_delete k cuM cM Msnap :
+    k ∈ KVS_keys →
+    is_coherent_cache cuM cM Msnap →
+    is_coherent_cache (delete k cuM) (delete k cM) (delete k Msnap).
+  Proof.
+    intros H_in [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 [H_coh_7 H_coh_8]]]]]]].
+    unfold is_coherent_cache.
+    split; first set_solver.
+    split; first set_solver.
+    split; first set_solver.
+    split.
+    - intros k' v' H_lookup.
+        destruct (decide (k = k')) as [<- | H_neq].
+        {
+          by rewrite lookup_delete in H_lookup. 
+        }
+        {
+          rewrite lookup_delete_ne in H_lookup; last done.
+          rewrite lookup_delete_ne; last done.
+          by apply H_coh_4.
+        }
+    - split.
+        + intros k' H_lookup.
+          destruct (decide (k = k')) as [<- | H_neq].
+          {
+            by rewrite lookup_delete in H_lookup.
+          }
+          {
+            rewrite lookup_delete_ne in H_lookup; last done.
+            rewrite lookup_delete_ne; last done.
+            by apply H_coh_5.
+          }
+        + split.
+          * intros k' v'.
+            split; intro H_lookup.
+              -- destruct (decide (k = k')) as [<- | H_neq].
+              {
+                by rewrite lookup_delete in H_lookup.
+              }
+              {
+                rewrite lookup_delete_ne in H_lookup; last done.
+                rewrite lookup_delete_ne; last done.
+                by apply H_coh_6.
+              }
+              -- destruct (decide (k = k')) as [<- | H_neq].
+              {
+                by rewrite lookup_delete in H_lookup.
+              }
+              {
+                rewrite lookup_delete_ne in H_lookup; last done.
+                rewrite lookup_delete_ne; last done.
+                by apply H_coh_6.
+              }
+          * split.
+            -- intros k' vo Hdom Hvo.
+               split.
+               { 
+                 intros Hupd.
+                 destruct (decide (k = k')) as [<- | H_neq].
+                 {
+                   set_solver.
+                 }
+                 {
+                  rewrite lookup_delete_ne in Hvo; last done.
+                  rewrite lookup_delete_ne in Hupd; last done.
+                  rewrite lookup_delete_ne; last done.
+                  apply H_coh_7; try done.
+                  set_solver.
+                 }
+                }
+                intros Hupd.
+                destruct (decide (k = k')) as [<- | H_neq].
+                {
+                  set_solver.
+                }
+                {
+                  rewrite lookup_delete_ne in Hvo; last done.
+                  rewrite lookup_delete_ne in Hupd; last done.
+                  rewrite lookup_delete_ne; last done.
+                  eapply H_coh_7; try done.
+                  set_solver.
+                }
+            -- intros k' vo' Hvo.
+                destruct (decide (k = k')) as [<- | H_neq].
+                {
+                  by rewrite lookup_delete in Hvo.
+                }
+                {
+                  rewrite lookup_delete_ne in Hvo; last done.
+                  by apply (H_coh_8 k'). 
+                }
   Qed.
 
 
