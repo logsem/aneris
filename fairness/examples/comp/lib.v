@@ -73,7 +73,7 @@ Section LibrarySpec.
         has_fuels tid {[ ρl:=2 ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
     {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
-                 partial_free_roles_are {[ tt ]} }}}.
+                 partial_free_roles_are {[ ρl ]} }}}.
   Proof using. Admitted.
 
 End LibrarySpec.

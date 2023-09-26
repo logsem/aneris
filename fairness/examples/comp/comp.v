@@ -207,36 +207,6 @@ Section ClientSpec.
   (* Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))). *)
   Notation "'LSG' Einvs" := (LM_steps_gen Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS)) (at level 10).
 
-  Lemma init_client_inv lb0 n:
-    partial_model_is (lb0, n)  ={∅}=∗ 
-    ∃ (cG: clientGS Σ), client_inv ∗
-                        frag_fuel_is (ls_fuel lb0) (fG := cl_lib_Σ) ∗
-                        frag_mapping_is (ls_tmap lb0 (LM := lib_model)) (fG := cl_lib_Σ)∗
-                        frag_model_is lb0 (fG := cl_lib_Σ)∗
-                        frag_free_roles_are ∅ (fG := cl_lib_Σ)∗
-                        y_frag_model_is n.
-  Proof using cpG.
-    iIntros "ST".
-        
-    iMod (lm_msi_init lb0 ∅) as (fG) "(MSI_LIB & FRAG_LIB & FRAG_MAP & FRAG_FUEL & FRAG_FR)".
-    { set_solver. }
-
-    iMod (own_alloc ((● (Excl' n) ⋅ ◯ _))) as (γ_st) "[AUTH_Y FRAG_Y]".
-    { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
-
-    set (cG := {| 
-                cl_pre_inG := cpG;
-                cl_y_st_name := γ_st;
-                cl_lib_Σ := fG;
-              |}). 
- 
-    iMod (inv_alloc Ns _  (∃ st, client_inv_impl st) with "[-FRAG_LIB FRAG_Y FRAG_MAP FRAG_FR FRAG_FUEL]") as "#INV".
-    { iNext. rewrite /client_inv_impl. 
-      iExists (_, _). iFrame. }
-
-    iModIntro. iExists _. iFrame. done. 
-  Qed.
-
   (* TODO: remove tid=0 restriction ? *)
   Let lib_pmi `{clientGS Σ} (m: gmap (locale heap_lang) (gset (fmrole lib_model_impl))): iProp Σ:=
     (∃ (L: gset (fmrole lib_model_impl)) (Ract Rfr: gset client_role), 
@@ -270,6 +240,97 @@ Section ClientSpec.
     by rewrite auth_frag_op own_op.
   - iApply own_unit.
   Defined.
+
+  Definition lib_spec_pre `{clientGS Σ} tid: iProp Σ := 
+    partial_model_is 1 (PartialModelPredicatesPre := lib_PMPP) ∗ 
+    has_fuels tid {[ ρl:=2 ]} (PMPP := lib_PMPP).
+
+  Definition lib_spec_post `{clientGS Σ} tid: iProp Σ :=
+    partial_mapping_is {[ tid := ∅ ]} (PartialModelPredicatesPre := lib_PMPP) ∗ 
+    partial_free_roles_are {[ ρl ]} (PartialModelPredicatesPre := lib_PMPP). 
+
+  Definition lib_ls_premise (lb: lm_ls lib_model) :=
+    ls_fuel lb !! ρl = Some 2 ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}. 
+
+  (* TODO: move to library, weaken Σ requirement *)
+  Lemma lib_premise_dis (lb: lm_ls lib_model)
+    (LB_INFO: lib_ls_premise lb):
+    ρlg ∈ live_roles lib_fair lb.
+  Proof. 
+    apply LM_live_roles_strong.
+    destruct LB_INFO as (F & S & TM).
+    eset (δ := ({| ls_under := (0: fmstate lib_model_impl); ls_fuel := ls_fuel lb; ls_mapping := ls_mapping lb; ls_inv := _ |})).     
+    exists δ. red. exists (Take_step ρl ρlg). split; [| done].    
+    repeat split; eauto.
+    - eapply ls_mapping_tmap_corr. eexists. split; eauto. set_solver.
+    - red. intros. inversion H2; subst; try set_solver.
+      destruct ρ', ρl; done.
+    - red. intros. left.
+      replace ρ' with ρl by (by destruct ρ', ρl). 
+      rewrite F. simpl. lia.
+    - intros. rewrite F. simpl. lia.
+    - intros. subst δ. simpl in H0. set_solver.
+    - subst δ. simpl. set_solver.
+    Unshelve.
+    + simpl. transitivity (∅: gset (fmrole lib_model_impl)); [| set_solver].
+      apply elem_of_subseteq. intros ? LIVE.
+      apply lib_model_impl_lr_strong in LIVE as [? [?]]. lia.
+    + apply ls_same_doms.
+    + done.
+  (* TODO: fix this weird error *)
+  (* Qed. *)
+  Admitted.
+      
+    
+
+  (* TODO: move to library, weaken Σ requirement *)
+  Lemma lib_premise `{clientGS Σ} (lb: lm_ls lib_model)
+    (LB_INFO: lib_ls_premise lb):
+    ⊢ (frag_model_is (ls_under lb) -∗ frag_fuel_is (ls_fuel lb) -∗ frag_mapping_is (ls_tmap lb) -∗
+    frag_model_is (1: fmstate lib_model_impl) ∗ frag_mapping_is {[ρlg := {[ρl]}]} ∗ frag_fuel_is {[ρl := 2]})%I.
+  Proof. 
+    iIntros "LST LF LM".
+    destruct LB_INFO as (LIBF & -> & LIBM).
+    iFrame "LST". iSplitL "LM".
+    { rewrite -frag_mapping_is_big_sepM. 
+      2: { intros E. by rewrite E in LIBM. }
+      erewrite big_opM_insert_delete'; eauto.
+      iDestruct "LM" as "[??]". iFrame. }
+    rewrite -frag_fuel_is_big_sepM.
+    2: { intros E. by rewrite E in LIBF. }
+    erewrite big_opM_insert_delete'; eauto.
+    iDestruct "LF" as "[??]". iFrame. 
+  Qed.
+
+  Lemma init_client_inv lb0 n:
+    partial_model_is (lb0, n)  ={∅}=∗ 
+    ∃ (cG: clientGS Σ), client_inv ∗
+                        frag_fuel_is (ls_fuel lb0) (fG := cl_lib_Σ) ∗
+                        frag_mapping_is (ls_tmap lb0 (LM := lib_model)) (fG := cl_lib_Σ)∗
+                        frag_model_is lb0 (fG := cl_lib_Σ)∗
+                        frag_free_roles_are ∅ (fG := cl_lib_Σ)∗
+                        y_frag_model_is n.
+  Proof using cpG.
+    iIntros "ST".
+        
+    iMod (lm_msi_init lb0 ∅) as (fG) "(MSI_LIB & FRAG_LIB & FRAG_MAP & FRAG_FUEL & FRAG_FR)".
+    { set_solver. }
+
+    iMod (own_alloc ((● (Excl' n) ⋅ ◯ _))) as (γ_st) "[AUTH_Y FRAG_Y]".
+    { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
+
+    set (cG := {| 
+                cl_pre_inG := cpG;
+                cl_y_st_name := γ_st;
+                cl_lib_Σ := fG;
+              |}). 
+ 
+    iMod (inv_alloc Ns _  (∃ st, client_inv_impl st) with "[-FRAG_LIB FRAG_Y FRAG_MAP FRAG_FR FRAG_FUEL]") as "#INV".
+    { iNext. rewrite /client_inv_impl. 
+      iExists (_, _). iFrame. }
+
+    iModIntro. iExists _. iFrame. done. 
+  Qed.
 
   Lemma live_roles_1 lb:
     live_roles client_model_impl (lb, 1) = 
@@ -343,6 +404,12 @@ Section ClientSpec.
     let foo := fresh in
     evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
 
+
+  (* TODO: make it a library LSI *)
+  Lemma lib_tmap_dom_restricted (δ: fmstate lib_fair):
+    dom (ls_tmap δ (LM := lib_model)) ⊆ {[ ρlg ]}.
+  Proof. Admitted.
+
   Lemma update_client_state `{clientGS Σ} Einvs
     (extr: execution_trace heap_lang) (mtr: auxiliary_trace M)
     c2 (lb lb': fmstate lib_fair) f
@@ -380,47 +447,66 @@ Section ClientSpec.
     remember (trace_last extr) as c1. destruct c1 as (σ1, tp1).
     destruct c2 as (σ2, tp2).
 
-  (*   iPoseProof (update_step_still_alive with "[$] [$] [$] [$] [$]") as "EM_STEP". *)
-  (*   7: { apply PROG_STEP. } *)
-  (*   7: { apply ct_lib_step. simpl. eauto. } *)
-  (*   { rewrite LIVE LIVE'. dEl; set_solver. } *)
-  (*   { rewrite dom_singleton.  *)
-  (*     assert ((if (decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅)) *)
-  (*             then {[ inl ρlg ]} *)
-  (*             else (∅: gset (fmrole client_model_impl))) ⊆ {[inl ρlg]}) as IN. *)
-  (*     { dEq; set_solver. } *)
-  (*     apply IN. } *)
-  (*   { rewrite LIVE. set_solver. } *)
-  (*   all: eauto. *)
-  (*   { Unshelve.  *)
-  (*     2: exact (if decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅)  *)
-  (*               then {[ inr ρy := client_fl ]}  *)
-  (*               else {[ inl ρlg := f ]}). *)
-  (*     destruct (decide (_=_)); set_solver. } *)
-  (*   { repeat split; rewrite ?LIVE ?LIVE'. *)
-  (*     - dEl. *)
-  (*       2: { destruct decide; set_solver. } *)
-  (*       intros _. rewrite decide_False.  *)
-  (*       { rewrite lookup_singleton. simpl. lia. } *)
-  (*       tauto.  *)
-  (*     - destruct (decide (_ ∈ _)); [set_solver| ]. *)
-  (*       destruct (decide (_=_)); [set_solver| ]. *)
-  (*       rewrite !lookup_singleton. simpl. lia.  *)
-  (*     - set_solver. *)
-  (*     - dEq; [| set_solver].  *)
-  (*       intros. assert (ρ' = inr ρy) as -> by set_solver. *)
-  (*       rewrite lookup_singleton. simpl. lia. *)
-  (*     - dEq; set_solver. *)
-  (*     - dEq; dEl; set_solver. *)
-  (*     - dEq; dEl; set_solver. } *)
-  (*   rewrite LIVE LIVE'. *)
-  (*   iMod "EM_STEP" as (??) "(?&?&?&?&FREE)". *)
-  (*   iModIntro. do 2 iExists _. iFrame. *)
+    iPoseProof (update_step_still_alive_gen with "[$] [$] [$] [$] [$]") as "EM_STEP".
+    7: { apply PROG_STEP. }
+    7: { apply ct_lib_step. simpl. eauto. }
+    { rewrite LIVE LIVE'. dEl; set_solver. }
+    { rewrite dom_singleton.
+      assert ((if (decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅))
+              then {[ inl ρlg ]}
+              else (∅: gset (fmrole client_model_impl))) ⊆ {[inl ρlg]}) as IN.
+      { dEq; set_solver. }
+      apply IN. }
+    { rewrite LIVE. set_solver. }
+    all: eauto.
+    { Unshelve.
+      2: exact (if decide (ls_tmap lb' (LM := lib_model) !! ρlg = Some ∅)
+                then {[ inr ρy := client_fl ]}
+                else {[ inl ρlg := f ]}).
+      destruct (decide (_=_)); set_solver. }
+    { repeat split; rewrite ?LIVE ?LIVE'.
+      - dEl.
+        2: { destruct decide; set_solver. }
+        intros _. rewrite decide_False.
+        { rewrite lookup_singleton. simpl. lia. }
+        tauto.
+      - destruct (decide (_ ∈ _)); [set_solver| ].
+        destruct (decide (_=_)); [set_solver| ].
+        rewrite !lookup_singleton. simpl. lia.
+      - set_solver.
+      - dEq; [| set_solver].
+        intros. assert (ρ' = inr ρy) as -> by set_solver.
+        rewrite lookup_singleton. simpl. lia.
+      - dEq; set_solver.
+      - dEq; dEl; set_solver.
+      - dEq; dEl; set_solver. }
+    { red. intros. red.
+      (* TODO: move this simplification, as it occurs quite often *)
+      rewrite /update_mapping. rewrite map_imap_dom_eq.
+      2: { rewrite dom_gset_to_gmap. intro.
+           destruct (decide (k ∈ dom R)); [| done].
+           intros. by eapply elem_of_dom. }
+      rewrite dom_gset_to_gmap. intros g' IN'.
+      red in H2.
+      (* at this point we must ensure that no new group roles 
+         were created by a lib step *)
+
+      destruct IN' as [? IN']. simpl in IN'.
+      apply (ls_mapping_tmap_corr (LM := lib_model)) in IN' as (?&?&?).
+      pose proof (lib_tmap_dom_restricted lb') as DOML.
+      specialize (DOML g'). specialize_full DOML.
+      { apply elem_of_dom. set_solver. }
+      apply elem_of_singleton_1 in DOML. subst g'.
+      rewrite decide_False; [set_solver| ].
+      intros EMP. set_solver. }
+      
+    rewrite LIVE LIVE'.
+    iMod "EM_STEP" as (??) "(?&?&?&?&FREE)".
+    iModIntro. do 2 iExists _. iFrame.
     
-  (*   iApply partial_free_roles_are_Proper; [| iFrame]. *)
-  (*   dEl; dEq; tauto || set_solver.   *)
-  (* Qed. *)
-  Admitted. 
+    iApply partial_free_roles_are_Proper; [| iFrame].
+    dEl; dEq; tauto || set_solver.
+  Qed. 
 
   (* TODO: unify with model_agree ? *)
   Lemma y_model_agree `{clientGS Σ} y1 y2:
@@ -647,10 +733,10 @@ Section ClientSpec.
       iDestruct (fuel_step_lifting with "[$] [] [] FUELS_LIB MSI") as "LIFT"; eauto.
       (* change the PMP interface so it allows fupd in fuel step *)
       admit.
-    - (* TODO: separate fork step *)
+    - (* TODO: shouldn't be required from a library that doesn't fork *)
       admit.
     - iIntros "* FUELS_LIB ST MSI FR". 
-      iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.       
+      iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.
   Admitted.
 
   (* TODO: problems with Countable instance *)
@@ -715,61 +801,6 @@ Section ClientSpec.
     rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
   Qed. 
 
-  Definition lib_ls_premise (lb: lm_ls lib_model) :=
-    ls_fuel lb !! ρl = Some 2 ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}. 
-
-  (* TODO: move to library, weaken Σ requirement *)
-  Lemma lib_premise_dis (lb: lm_ls lib_model)
-    (LB_INFO: lib_ls_premise lb):
-    ρlg ∈ live_roles lib_fair lb.
-  Proof. 
-    apply LM_live_roles_strong.
-    destruct LB_INFO as (F & S & TM).
-    eset (δ := ({| ls_under := (0: fmstate lib_model_impl); ls_fuel := ls_fuel lb; ls_mapping := ls_mapping lb; ls_inv := _ |})).     
-    exists δ. red. exists (Take_step ρl ρlg). split; [| done].    
-    repeat split; eauto.
-    - eapply ls_mapping_tmap_corr. eexists. split; eauto. set_solver.
-    - red. intros. inversion H2; subst; try set_solver.
-      destruct ρ', ρl; done.
-    - red. intros. left.
-      replace ρ' with ρl by (by destruct ρ', ρl). 
-      rewrite F. simpl. lia.
-    - intros. rewrite F. simpl. lia.
-    - intros. subst δ. simpl in H0. set_solver.
-    - subst δ. simpl. set_solver.
-    Unshelve.
-    + simpl. transitivity (∅: gset (fmrole lib_model_impl)); [| set_solver].
-      apply elem_of_subseteq. intros ? LIVE.
-      apply lib_model_impl_lr_strong in LIVE as [? [?]]. lia.
-    + apply ls_same_doms.
-    + done.
-  (* TODO: fix this weird error *)
-  (* Qed. *)
-  Admitted.
-      
-    
-
-  (* TODO: move to library, weaken Σ requirement *)
-  Lemma lib_premise `{clientGS Σ} (lb: lm_ls lib_model)
-    (LB_INFO: lib_ls_premise lb):
-    ⊢ (frag_model_is (ls_under lb) -∗ frag_fuel_is (ls_fuel lb) -∗ frag_mapping_is (ls_tmap lb) -∗
-    frag_model_is (1: fmstate lib_model_impl) ∗ frag_mapping_is {[ρlg := {[ρl]}]} ∗ frag_fuel_is {[ρl := 2]})%I.
-  Proof. 
-    iIntros "LST LF LM".
-    destruct LB_INFO as (LIBF & -> & LIBM).
-    iFrame "LST". iSplitL "LM".
-    { rewrite -frag_mapping_is_big_sepM. 
-      2: { intros E. by rewrite E in LIBM. }
-      erewrite big_opM_insert_delete'; eauto.
-      iDestruct "LM" as "[??]". iFrame. }
-    rewrite -frag_fuel_is_big_sepM.
-    2: { intros E. by rewrite E in LIBF. }
-    erewrite big_opM_insert_delete'; eauto.
-    iDestruct "LF" as "[??]". iFrame. 
-  Qed. 
-    
-
-
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     (FB: f >= 10)
     (* TODO: get rid of these restrictions *)
@@ -826,8 +857,6 @@ Section ClientSpec.
     { set_solver. }
     { red. intros. simpl. red.
       intros.
-      (* assert (client_LSI (lb0, 2) M0 F) as LSI1 by admit. *)
-      (* red in LSI1. *)
       rewrite /update_mapping. rewrite map_imap_dom_eq.
       2: { intros. destruct decide; [| done].
            by apply elem_of_dom. }
