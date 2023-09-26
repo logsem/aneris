@@ -30,13 +30,30 @@ Definition hist_to_we (h : list write_event) := last h.
 
 Definition to_hist (h : list write_event) : list val := (λ e, e.(we_val)) <$> h.
 
+Lemma to_hist_prefix_mono hw hw' :
+  hw `prefix_of` hw' →  to_hist hw `prefix_of` to_hist hw'.
+Proof.
+  intros Hp.
+  generalize dependent hw'.
+  induction hw as [|x l]; intros hw' Hp.
+  - by apply prefix_nil.
+  - destruct hw' as [|x' l'].
+    -- by apply prefix_nil_not in Hp.
+    -- simplify_eq /=.
+       assert (x = x') as -> by by apply prefix_cons_inv_1 in Hp.
+       apply prefix_cons.
+       apply IHl.
+       by apply prefix_cons_inv_2 in Hp.
+Qed.
+
+  
 Definition socket_address_to_str (sa : socket_address) : string :=
     match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
 Section Proxy.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources }.
   (** Those are ghost names allocated before resources are instantiated. *)
-  Context (γGsnap γT γTss : gname).
+  Context (γGsnap γT γTrs : gname).
   Context (γKnownClients : gname).
 
   Definition ownMsnapAuth γ (M : gmap Key (list write_event)) : iProp Σ :=
@@ -401,7 +418,7 @@ Section Proxy.
             ⌜is_map cache_updatesV cache_updatesM⌝ ∗
             ownTimeSnap γT ts ∗
             ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
-            (* ownSnapFragMemGname *)
+            ownSnapFrag γTrs ts Msnap ∗
             cache_updatesL ↦[n] cache_updatesV ∗
             ghost_map_auth γCache 1 cacheM ∗
             ownMsnapAuth γMsnap Msnap ∗

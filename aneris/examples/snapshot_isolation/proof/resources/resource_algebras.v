@@ -17,8 +17,9 @@ Class IDBG Σ :=
     (** Key-Value store *)
     IDBG_Global_mem :> ghost_mapG Σ Key (list write_event);
     IDBG_Global_mono :> inG Σ (authR (gmapUR Key (max_prefix_listR write_eventO)));
-    IDBG_Global_snapshot_gnames :> inG Σ (authR (gmapUR nat (agreeR (leibnizO gname))));
-    
+    IDBG_Global_snapshots :>
+      inG Σ (authR (gmapUR nat (agreeR ((gmapUR Key ((max_prefix_listR write_eventO)))))));
+
     (** Cache at Client Proxies *)
     IDBG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
     IDBG_Cache_lgcl :> ghost_mapG Σ Key (option val * bool);

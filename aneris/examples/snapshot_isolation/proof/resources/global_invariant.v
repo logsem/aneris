@@ -30,13 +30,12 @@ Section Global_Invariant.
   (** Definition of the global invariant. *)
   Definition global_inv_def : iProp Σ :=
     ∃ (M : global_mem) (S : snapshots) (T : Time)
-      (gM : gmap socket_address gname) (Sγ : gmap nat gname),
+      (gM : gmap socket_address gname),
       ownMemGlobal γGauth γGsnap M ∗
-      ownSnapshotsAuth γTrs Sγ S ∗
+      ownSnapAuth γTrs S ∗
       ownTimeGlobal γT T ∗
       connected_clients γKnownClients gM ∗
       ⌜dom gM = clients⌝ ∗
-      ⌜dom Sγ = dom S⌝ ∗
       ⌜kvs_valid M S T⌝.
 
   Definition Global_Inv : iProp Σ :=
@@ -56,15 +55,15 @@ Section Global_Invariant.
     iDestruct "Hu" as "(Hu & #Hum)".
     rewrite /Global_Inv /ownMemSeen.
     iInv KVS_InvName
-      as (M S T gM gS)
-           ">((HmemA & HmemM) & ? & ? & ? & ? & ? & %Hvalid)" "Hcl".
+      as (M S T gM)
+           ">((HmemA & HmemM) & ? & ? & ? & ? & %Hvalid)" "Hcl".
     iDestruct (ownMemSeen_lookup with "HmemM Hm")
       as (h1) "(%Hh1 & %Hh2)".
     iDestruct (ghost_map_lookup with "HmemA Hu") as "%Hh3".
     simplify_eq /=.
     iFrame "#". iFrame.
     iMod ("Hcl" with "[-]") as "_".
-    { iNext. do 5 iExists _. by iFrame. }
+    { iNext. do 4 iExists _. by iFrame. }
     iModIntro.
     rewrite Hh2 in Hh3.
     set_solver. 

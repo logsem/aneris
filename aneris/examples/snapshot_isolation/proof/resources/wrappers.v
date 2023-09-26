@@ -23,7 +23,7 @@ Section Wrapper_defs.
   Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_resources}.
   Context `{!User_params}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss : gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs : gname).
 
   Definition to_local_state (s : proxy_state) : local_state :=
     match s with
@@ -31,24 +31,8 @@ Section Wrapper_defs.
     | PSActive M => Active ((λ h, to_hist h) <$> M)
     end.
 
-  Lemma to_hist_prefix_mono hw hw' :
-    hw `prefix_of` hw' →  to_hist hw `prefix_of` to_hist hw'.
-  Proof.
-    intros Hp.
-    generalize dependent hw'.
-    induction hw as [|x l]; intros hw' Hp.
-    - by apply prefix_nil.
-    - destruct hw' as [|x' l'].
-      -- by apply prefix_nil_not in Hp.
-      -- simplify_eq /=.
-         assert (x = x') as -> by by apply prefix_cons_inv_1 in Hp.
-         apply prefix_cons.
-         apply IHl.
-         by apply prefix_cons_inv_2 in Hp.
-  Qed.
-
   Definition GlobalInv_def : iProp Σ :=
-    Global_Inv clients γKnownClients γGauth γGsnap γT γTss.
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs.
 
   Definition OwnMemKey_def k h : iProp Σ :=
     ∃ hw, ownMemUser γGauth γGsnap k hw ∗ ⌜h = to_hist hw⌝.
@@ -61,12 +45,6 @@ Section Wrapper_defs.
 
   Definition client_can_connect_res sa : iProp Σ :=
     client_can_connect γKnownClients sa.
-
-  (* Lemma mem_key_map_we_exists m : *)
-  (*   ([∗ map] k↦hv ∈ m, OwnMemKey_def k hv) -∗ *)
-  (*   ∃ M, ([∗ map] k↦h ∈ M, ownMemUser γGauth γGsnap k h) ∗ *)
-  (*        ⌜m = (λ h, to_hist h)<$>M⌝. *)
-  (* Proof. Admitted. *)
 
   Lemma mem_implies_seen (m : gmap Key (list val)) :
     ([∗ map] k↦h ∈ m, OwnMemKey_def k h) -∗
@@ -220,7 +198,9 @@ Section Wrapper_defs.
       Remark 3: It can also be useful to see if we can improve the definitions (in the easiest possible way)
       to make `cache_updatesM` already of the type  `gmap Key SerializableVal` so that there is no need
       to have both `cache` and  `cache_updatesM` or something similar. **)
-  Lemma commit_logical_update (ts T : nat) (Tss : gset nat)
+
+  (* TODO : Fixme w.r.t. (S : snapshots) *)
+  Lemma commit_logical_update (ts T : nat) (S : snapshots)
     (cache_logicalM : gmap Key (option val * bool))
     (cache_updatesM : gmap Key val)
     (cache : gmap Key SerializableVal)
@@ -229,7 +209,7 @@ Section Wrapper_defs.
       ⌜dom m_current = dom Msnap⌝ -∗
       ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ -∗
       ⌜kvs_valid_snapshot Msnap ts⌝ -∗
-      ⌜kvs_valid M T Tss⌝ -∗
+      ⌜kvs_valid M S T⌝ -∗
       ⌜map_Forall (λ (_ : Key) (v : val), KVS_Serializable v) cache_updatesM⌝ -∗
       ⌜(∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v)⌝ -∗
       ⌜can_commit m_current

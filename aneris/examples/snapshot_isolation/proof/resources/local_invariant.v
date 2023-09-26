@@ -22,14 +22,14 @@ Section Local_Invariant.
 
   Definition lkResDef (kvsL vnumL : loc) : iProp Σ :=
     ∃ (kvsV : val) (T : Time)
-      (m : gmap Key val) (Mc : global_mem) (S : snapshots)
-      (Sγ : gmap nat gname),
+      (m : gmap Key val) (M : global_mem) (S : snapshots),
         ⌜is_map kvsV m⌝ ∗
-        ⌜kvsl_valid m Mc S T⌝ ∗
-        ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) Mc⌝ ∗
-        ownMemAuthLocal γGauth Mc ∗
+        ⌜kvsl_valid m M S T⌝ ∗
+        ⌜map_Forall (λ k l,
+          Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
+        ownMemAuthLocal γGauth M ∗
         ownTimeLocal γT T ∗
-        ([∗ map] t ↦γ;M ∈ Sγ;S, ownTrnFrag γTrs t γ ∗ ownSnapFragMemGname γ M) ∗
+        ([∗ map] t ↦ Mt ∈ S, ownSnapFrag γTrs t Mt) ∗
         kvsL ↦[ip_of_address KVS_address] kvsV ∗
         vnumL ↦[ip_of_address KVS_address] #T.
 
