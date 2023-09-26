@@ -185,11 +185,10 @@ Section Proxy.
   Qed.
 
   Lemma is_coherent_cache_delete k cuM cM Msnap :
-    k ∈ KVS_keys →
     is_coherent_cache cuM cM Msnap →
     is_coherent_cache (delete k cuM) (delete k cM) (delete k Msnap).
   Proof.
-    intros H_in [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 [H_coh_7 H_coh_8]]]]]]].
+    intros [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 [H_coh_7 H_coh_8]]]]]]].
     unfold is_coherent_cache.
     split; first set_solver.
     split; first set_solver.

@@ -141,11 +141,7 @@ Section Proof_of_commit_handler.
           simpl in H_eq_updates.
           iApply "IH".
           -- iPureIntro.
-             eapply is_coherent_cache_delete; last apply H_coh.
-             destruct H_coh as ( _ & _ & H_coh & _).
-             rewrite H_eq_updates in H_coh.
-             assert (e_key ∈ KVS_keys); last done.
-             set_solver.
+             eapply (is_coherent_cache_delete e_key); last apply H_coh.
           -- iPureIntro.
              eexists l'.
              generalize dependent cache_updatesM.
