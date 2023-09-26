@@ -11,12 +11,15 @@ From aneris.aneris_lang Require Import lang resources resources inject.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import list_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
-From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
-From aneris.examples.snapshot_isolation.specs Require Import user_params.
-From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization.
-From aneris.examples.snapshot_isolation.proof.resources
-     Require Import resource_algebras server_resources.
+From aneris.examples.reliable_communication.lib.mt_server Require Import
+  user_params.
+From aneris.examples.snapshot_isolation.proof Require Import
+  model kvs_serialization utils.
+From aneris.examples.snapshot_isolation.proof.resources Require Import
+  resource_algebras
+  server_resources.
+
+
 Import gen_heap_light.
 
 Inductive proxy_state : Type :=
@@ -69,7 +72,8 @@ Section Proxy.
           hist_to_we h = Some e ∧
           e.(we_val) = v) ∧
       (∀ k,
-         (cache_logicalM !! k) = Some (None, false) → Msnap !! k = Some []) ∧
+          (cache_logicalM !! k) = Some (None, false) →
+          Msnap !! k = Some []) ∧
       (** Cache Logical and Cache Updates Coherence *)
       (∀ k v,
         cache_updatesM !! k = Some v ↔
@@ -77,7 +81,10 @@ Section Proxy.
         (∀ k vo,
            k ∈ dom Msnap →
            vo = from_option
-                  (λ h, (from_option (λ we : events.write_event, Some (we_val we)) None (last h))) None (Msnap !! k) →
+                  (λ h, (from_option
+                           (λ we : events.write_event,
+                               Some (we_val we)) None (last h)))
+                  None (Msnap !! k) →
            (cache_updatesM !! k) = None ↔
             cache_logicalM !! k = Some (vo, false)) ∧
        (∀ k vo, (cache_logicalM !! k = Some (vo, true)) → is_Some vo).
@@ -88,7 +95,9 @@ Section Proxy.
     is_coherent_cache cuM cM Msnap →
     is_coherent_cache (<[k:=v]> cuM) (<[k:=(Some v, true)]> cM) Msnap.
   Proof.
-    intros H_in H_some [H_coh_1 [H_coh_2 [H_coh_3 [H_coh_4 [H_coh_5 [H_coh_6 [H_coh_7 H_coh_8]]]]]]].
+    intros H_in H_some
+      (H_coh_1 & H_coh_2 & H_coh_3 & H_coh_4 &
+       H_coh_5 & H_coh_6 & H_coh_7 & H_coh_8).
     unfold is_coherent_cache.
     split.
     - rewrite -H_coh_1.
@@ -280,28 +289,8 @@ Section Proxy.
   Definition cacheM_from_Msnap (M : gmap Key (list write_event))
     : gmap Key (option val * bool) :=
     (λ h : list events.write_event,
-       (from_option (λ we : events.write_event, Some (we_val we)) None (last h), false)) <$> M.
-
-  Lemma last_of_none_empty_list_is_some {A : Type} (l : list A) :
-    l ≠ [] → ∃ v, Some v = last (l).
-  Proof.
-    induction l.
-    1 : done.
-    destruct l; set_solver.
-  Qed.
-
-  Lemma last_in {A : Type} (l : list A) (a : A) :
-    last l  = Some a → In a l.
-  Proof.
-    intros Hyp.
-    induction l as [ | h l IH]; first inversion Hyp.
-    destruct l.
-    - inversion Hyp.
-      set_solver.
-    - inversion Hyp as [Hyp'].
-      apply IH in Hyp'.
-      set_solver.
-  Qed.
+        (from_option (λ we : events.write_event,
+               Some (we_val we)) None (last h), false)) <$> M.
 
   Lemma is_coherent_cache_start M :
     is_coherent_cache ∅ (cacheM_from_Msnap M) M.
@@ -408,16 +397,16 @@ Section Proxy.
                 whose domain is equal to the one of the snapshot. *)
             ⌜is_coherent_cache cache_updatesM cacheM Msnap⌝ ∗
             ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
-            (* ⌜cache_is_ser cache_updatesV⌝ ∗ *)
             ⌜kvs_valid_snapshot Msnap ts⌝ ∗
             ⌜is_map cache_updatesV cache_updatesM⌝ ∗
-            ownTimeSnap γT γTss ts ∗
+            ownTimeSnap γT ts ∗
             ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
+            (* ownSnapFragMemGname *)
             cache_updatesL ↦[n] cache_updatesV ∗
             ghost_map_auth γCache 1 cacheM ∗
             ownMsnapAuth γMsnap Msnap ∗
             isActiveToken γA)).
-
+  
   Notation connection_token sa γCst := (connected_client_token γKnownClients sa γCst).
 
   Definition client_can_connect sa : iProp Σ :=

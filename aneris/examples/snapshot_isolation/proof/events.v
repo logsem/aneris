@@ -1,4 +1,4 @@
-From aneris.aneris_lang Require Import lang.
+From aneris.aneris_lang Require Import lang inject.
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params.
 From aneris.examples.snapshot_isolation.proof
@@ -49,4 +49,6 @@ Section Events_lemmas.
     by intros []; rewrite /= decode_encode /=.
   Qed.
 
- End Events_lemmas.
+End Events_lemmas.
+
+
