@@ -65,15 +65,15 @@ Section RPC_user_params.
     (
       (** Read *)
       (
-        ∃ k ts h M,
+        ∃ k ts h Msnap_full,
           ⌜k ∈ KVS_keys⌝ ∗
           ⌜reqd = inl (k, ts, h)⌝ ∗
           ⌜reqv = InjLV (#(LitString k), #ts)⌝ ∗
           ⌜∀ e, e ∈ h → e.(we_time) < ts⌝ ∗
-          ⌜M !! k = Some h⌝ ∗
+          ⌜Msnap_full !! k = Some h⌝ ∗
           ownTimeSnap γT ts ∗
           ownMemSeen γGsnap k h ∗
-          ownSnapFrag γTrs ts M 
+          ownSnapFrag γTrs ts Msnap_full 
 
       )
      ∨
@@ -88,14 +88,15 @@ Section RPC_user_params.
            ={⊤, E}=∗
            (∃ (m : gmap Key (list val)),
                ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-                 ▷ (∀ ts (M : global_mem),
-                      ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                      ⌜kvs_valid_snapshot M ts⌝ ∗
-                      ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
+                 ▷ (∀ ts (Msnap Msnap_full: gmap Key (list write_event)),
+                      ⌜Msnap ⊆ Msnap_full⌝ ∗
+                      ⌜m = (λ h : list write_event, to_hist h) <$> Msnap⌝ ∗
+                      ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+                      ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) Msnap⌝ ∗
                       ownTimeSnap γT ts ∗
-                      ownSnapFrag γTrs ts M ∗
+                      ownSnapFrag γTrs ts Msnap_full ∗
                       ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-                      ([∗ map] k ↦ h ∈ M, ownMemSeen γGsnap k h)
+                      ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h)
                       ={E,⊤}=∗ Q #ts))
           )
       )

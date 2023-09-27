@@ -29,7 +29,6 @@ Section Local_Invariant.
           Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
         ownMemAuthLocal γGauth M ∗
         ownTimeLocal γT T ∗
-        (* ([∗ map] t ↦ Mt ∈ S, ownSnapFrag γTrs t Mt) ∗ *)
         kvsL ↦[ip_of_address KVS_address] kvsV ∗
         vnumL ↦[ip_of_address KVS_address] #T.
 

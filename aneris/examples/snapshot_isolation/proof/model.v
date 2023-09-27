@@ -285,9 +285,9 @@ Section Snapshot.
 
   Definition kvs_valid_snapshot
     (Msnap : global_mem) (t : Time) :=
-    dom Msnap = KVS_keys ∧
-    kvs_whists Msnap ∧
-    kvs_keys Msnap ∧
+    (* dom Msnap ⊆ KVS_keys ∧ *)
+    (* kvs_whists Msnap ∧ *)
+    (* kvs_keys Msnap ∧ *)
     ∀ k h, Msnap !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
 
 End Snapshot.

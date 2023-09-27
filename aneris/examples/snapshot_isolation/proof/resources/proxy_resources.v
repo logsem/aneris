@@ -379,7 +379,7 @@ Section Proxy.
          ownMsnapFull γMsnap ∗
          CanStartToken γS) ∨
         (** Or an active transaction is running: *)
-          (∃ (ts : nat) (Msnap : gmap Key (list write_event))
+          (∃ (ts : nat) (Msnap Msnap_full : gmap Key (list write_event))
            (cache_updatesL : loc)
            (cache_updatesV : val)
            (cache_updatesM : gmap Key val)
@@ -391,9 +391,10 @@ Section Proxy.
             ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
             ⌜kvs_valid_snapshot Msnap ts⌝ ∗
             ⌜is_map cache_updatesV cache_updatesM⌝ ∗
+            ⌜Msnap ⊆ Msnap_full⌝ ∗
             ownTimeSnap γT ts ∗
             ([∗ map] k ↦ h ∈ Msnap, ownMemSeen γGsnap k h) ∗
-            ownSnapFrag γTrs ts Msnap ∗
+            ownSnapFrag γTrs ts Msnap_full ∗
             cache_updatesL ↦[n] cache_updatesV ∗
             ghost_map_auth γCache 1 cacheM ∗
             ownMsnapAuth γMsnap Msnap ∗

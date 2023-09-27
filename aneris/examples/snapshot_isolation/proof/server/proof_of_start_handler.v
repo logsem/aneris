@@ -19,7 +19,7 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources specs.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization rpc_user_params.
+     Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources
@@ -30,7 +30,7 @@ Section Proof_of_start_handler.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss γlk : gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs γlk : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
                      clients γKnownClients γGauth γGsnap γT).
@@ -46,24 +46,26 @@ Section Proof_of_start_handler.
         (Q : val → iProp Σ) :
     reqd = inr (inl (E, P, Q)) →
     ↑KVS_InvName ⊆ E →
-    server_lock_inv γGauth γT γTss γlk lk kvs vnum -∗
-    Global_Inv clients γKnownClients γGauth γGsnap γT γTss -∗
+    server_lock_inv γGauth γT γlk lk kvs vnum -∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
     P -∗
     (P ={⊤,E}=∗
           ∃ m : gmap Key (list val),
             ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-            ▷ (∀ (ts : Time) (M : gmap Key (list write_event)),
-                 ⌜m = (λ h : list write_event, to_hist h) <$> M⌝ -∗
-                 ⌜kvs_valid_snapshot M ts⌝ ∗
-                 ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
-                 ownTimeSnap γT γTss ts ∗
+              ▷ (∀ (ts : Time) (Msnap Msnap_full : gmap Key (list write_event)),
+                 ⌜Msnap ⊆ Msnap_full⌝ ∗
+                 ⌜m = (λ h : list write_event, to_hist h) <$> Msnap⌝ ∗
+                 ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+                 ⌜map_Forall (λ k l, Forall (λ we, KVS_Serializable (we_val we)) l) Msnap⌝ ∗
+                 ownTimeSnap γT ts ∗
+                 ownSnapFrag γTrs ts Msnap_full ∗
                  ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-                 ([∗ map] k↦h ∈ M, ownMemSeen γGsnap k h) ={E,⊤}=∗
+                 ([∗ map] k↦h ∈ Msnap, ownMemSeen γGsnap k h) ={E,⊤}=∗
                  Q #ts)) -∗
     (∀ (repv : val) (repd : RepData),
            ⌜sum_valid_val (option_serialization KVS_serialization)
               (sum_serialization int_serialization bool_serialization) repv⌝ ∗
-           ReqPost clients γKnownClients γGauth γGsnap γT γTss repv reqd repd -∗
+           ReqPost clients γKnownClients γGauth γGsnap γT γTrs repv reqd repd -∗
            Φ repv) -∗
     WP let: "res" := InjR
                      (InjL
@@ -76,25 +78,22 @@ Section Proof_of_start_handler.
   ip_of_address KVS_address] {{ v, Φ v }}.
   Proof.
     iIntros (Hreqd HinE) "#Hlk #HGlobInv HP Hsh HΦ".
-    wp_pures.
-    wp_apply (acquire_spec with "[Hlk]"); first by iFrame "#".
-    iIntros (?) "(-> & Hlock & Hlkres)".
-    wp_pures.
+    wp_pures. wp_apply (acquire_spec with "[Hlk]"); first by iFrame "#".
+    iIntros (?) "(-> & Hlock & Hlkres)". wp_pures.
     iDestruct "Hlkres"
-      as (kvsV T Tss m M Hmap Hvalid)
-           "(%Hser & HmemLoc & HtimeLoc & #HtimeSnaps & HkvsL & HvnumL)".
-    wp_load.
-    wp_pures.
+      as (M S T m kvsV Hmap Hvalid)
+           "(%Hser & HmemLoc & HtimeLoc & HkvsL & HvnumL)".
+    wp_load. wp_pures.
     (* This is where the viewshift is happening. *)
     wp_bind (Store _ _).
     wp_apply (aneris_wp_atomic _ _ E).
     iMod ("Hsh" with "[$HP]") as (mu) "(Hkeys & Hpost)".
     iInv KVS_InvName
-      as (Mg Tg Tssg gMg) ">(HmemGlob & HtimeGlob & HtimeStartsGlob & Hccls & %Hdom & %HkvsValid)".
+      as (Mg Sg Tg gMg) ">(HmemGlob & HsnapG & HtimeGlob & Hccls & %Hdom & %HkvsValid)".
     (* Logical updates. *)
     rewrite /ownTimeGlobal /ownTimeLocal.
     iDestruct (mono_nat.mono_nat_auth_own_agree with "[$HtimeGlob][$HtimeLoc]")
-      as "(%Hleq & ->)".
+      as "(%_ & ->)".
     iAssert (mono_nat.mono_nat_auth_own γT (1 / 2) T -∗
              mono_nat.mono_nat_auth_own γT (1 / 2) T -∗
              mono_nat.mono_nat_auth_own γT 1 T)%I as "Htime".
@@ -113,8 +112,7 @@ Section Proof_of_start_handler.
     apply map_eq_filter_dom in Hmap_eq.
     iAssert ( [∗ map] k↦h ∈ filter (λ k : Key * list write_event, k.1 ∈ dom mu) M,
                 ownMemSeen γGsnap k h)%I as "#Hsnapshot".
-    {
-      iDestruct (mem_auth_lookup_big_some with "[$HmemLoc] [$Hkeys]")
+    { iDestruct (mem_auth_lookup_big_some with "[$HmemLoc] [$Hkeys]")
       as "(HmemLoc & Hkeys)".
       Unshelve.
       all : try done.
@@ -127,80 +125,61 @@ Section Proof_of_start_handler.
       rewrite -Hmap_eq.
       iSpecialize ("H_key_def" with "H_dom").
       iDestruct "H_key_def" as "[%hwe' ((_ & Hseen) & _ & %H_lookup')]".
-      by simplify_eq.
-    }
-    iMod (own_update _ _ (● (Tssg ∪ {[T + 1]}) ⋅ ◯ (Tssg ∪ {[T + 1]}))
-      with "HtimeStartsGlob") as "(HtimeStartsGlob' & #HtimeStartsSnap')".
-    {
+      by simplify_map_eq /=. }
+    iMod (own_update
+            _ _ (● (((λ M, to_agree (global_memUR M)) <$> (<[(T + 1)%nat :=M]> Sg)) : gmap _ _) ⋅
+                 ◯ ({[(T + 1)%nat := to_agree (global_memUR M) ]}))
+      with "HsnapG") as "(HsnapG & #HsnapFrag)".
+    { 
       apply auth_update_alloc.
-      apply gset_local_update.
-      set_solver.
-    }
-    iSplitL "HtimeGlob HmemGlob Hccls HtimeStartsGlob'".
-    { iModIntro. iNext.
-      iExists M, (T+1), (Tssg ∪ {[(T+1)%nat]}), gMg.
-      iFrame "#∗".
-      iSplit; first done.
-      iPureIntro.
-      by apply kvs_valid_next.
-    }
-    iModIntro.
-    iModIntro.
-    wp_store.
-    iDestruct ("Hpost" $! (T+1)%nat ((filter (λ k, k.1 ∈ dom mu) M))
-                with "[][Hkeys]") as "HQ"; first done.
-    iFrame "#∗".
-    { iSplit.
-      - iPureIntro.
-        split.
-        -- apply kvs_valid_filter.
-           apply kvsl_valid_next in Hvalid.
-           destruct Hvalid.
-           eapply kvs_valid_subset_Tss in kvsl_ValidModel;
-           by set_solver.
-        -- intros k h H_lookup e H_e_in_h.
-          apply map_filter_lookup_Some_1_1 in H_lookup.
-          assert ((we_time e ≤ T)%Z); first by eapply kvs_ValidCommitTimes.
-          lia.
-      - iSplit.
-        -- iPureIntro.
-           apply map_Forall_lookup_2.
-           intros k x H_filter_some.
-           apply map_filter_lookup_Some_1_1 in H_filter_some.
-           by apply Hser in H_filter_some.
-        -- iApply (own_mono with "HtimeStartsSnap'").
-           apply auth_frag_mono.
-           set_solver.
-    }
+      simplify_eq /=.
+      rewrite fmap_insert.
+      eapply alloc_local_update; last done.
+      rewrite lookup_fmap.
+      destruct (Sg !! (T + 1)%nat) as [Mx|] eqn:Hsg; last by rewrite Hsg.
+      assert (is_Some (Sg !! (T+1))) as Habs by naive_solver.
+      apply elem_of_dom in Habs.
+      destruct HkvsValid.
+      specialize (kvs_ValidSnapshotTimesTime (T+1) Habs). 
+      by lia. }
+    iSplitL "HtimeGlob HmemGlob Hccls HsnapG".
+     { iModIntro. iNext. iExists M, (<[T + 1:=M]> Sg), (T+1), _.
+      iFrame "#∗". iSplit; first done. iPureIntro.
+      by apply kvs_valid_step_start_transaction. }
+     do 2 iModIntro. wp_store.
+     iDestruct ("Hpost" $! (T+1)%nat ((filter (λ k, k.1 ∈ dom mu) M)) M
+                 with "[Hkeys]") as "HQ".
+     { iFrame "#∗".
+       iSplit; first by iPureIntro; apply map_filter_subseteq. 
+       iSplit; first done.
+       iPureIntro.
+       split.
+       - intros k h H_lookup e H_e_in_h.
+         apply map_filter_lookup_Some_1_1 in H_lookup.
+         assert ((we_time e ≤ T)%Z); first by eapply kvs_ValidCommitTimes. lia.
+       - apply map_Forall_lookup_2.
+         intros k x H_filter_some.
+         apply map_filter_lookup_Some_1_1 in H_filter_some.
+         by apply Hser in H_filter_some. }
     iMod "HQ".
     iModIntro.
     wp_pures.
     wp_smart_apply (release_spec with "[-HQ HΦ]").
     iFrame "#∗".
     { rewrite /lkResDef.
-      iExists  kvsV, ((T+1)%nat), (Tss ∪ {[(T+1)%nat]}), m, M.
+      iExists  M, _, ((T+1)%nat), m, kvsV.
       replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
       iFrame "#∗".
       iSplit; first done.
-      iSplit.
-      - iPureIntro; first by apply kvsl_valid_next.
-      - iSplit; first done.
-        iApply big_sepS_insert_2'; last iFrame "#".
-        unfold ownTimeSnap.
-        iFrame "#".
-        iApply (own_mono with "HtimeStartsSnap'").
-        apply auth_frag_mono.
-        set_solver.
-    }
+      iSplit; last done.
+      iPureIntro; first by apply kvsl_valid_next. }
     iIntros (? ->).
     wp_pures.
     iApply ("HΦ" $! _ _).
     iSplit.
     -- iPureIntro. by apply ser_start_reply_valid.
     -- rewrite /ReqPost.
-       iFrame "#".
-       iRight.
-       iLeft.
+       iFrame "#". iRight. iLeft.
        iExists E, P, Q, (T+1), (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M).
        iFrame "#∗".
        iPureIntro.
