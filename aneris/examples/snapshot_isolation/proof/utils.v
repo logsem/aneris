@@ -8,7 +8,30 @@ From iris.proofmode Require Import tactics.
 From aneris.prelude Require Import list.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import lang resources resources inject.
+From aneris.examples.snapshot_isolation.proof Require Import model.
 
+Definition hist_to_we (h : list write_event) := last h.
+
+Definition to_hist (h : list write_event) : list val :=
+  (λ e, e.(we_val)) <$> h.
+
+Lemma to_hist_prefix_mono hw hw' :
+  hw `prefix_of` hw' →  to_hist hw `prefix_of` to_hist hw'.
+Proof.
+  intros Hp.
+  generalize dependent hw'.
+  induction hw as [|x l]; intros hw' Hp.
+  - by apply prefix_nil.
+  - destruct hw' as [|x' l'].
+    -- by apply prefix_nil_not in Hp.
+    -- simplify_eq /=.
+       assert (x = x') as -> by by apply prefix_cons_inv_1 in Hp.
+       apply prefix_cons.
+       apply IHl.
+       by apply prefix_cons_inv_2 in Hp.
+Qed.  
+Definition socket_address_to_str (sa : socket_address) : string :=
+    match sa with SocketAddressInet ip p => ip +:+ (string_of_pos p) end.
 
 
 Lemma last_of_none_empty_list_is_some {A : Type} (l : list A) :

@@ -68,7 +68,7 @@ Section Snapshot_Resources.
     (to_max_prefix_list <$> M :
       gmapUR Key (max_prefix_listR write_eventO)).
 
-  Definition ownSnapFrag (t : nat)  (M : gmap Key (list write_eventO)) : iProp Σ :=
+  Definition ownSnapFrag (t : nat) (M : gmap Key (list write_eventO)) : iProp Σ :=
     own γTrns (◯ {[ t := to_agree (global_memUR M) ]}).
 
   Lemma ownSnapFragPersistent t M:
@@ -78,7 +78,7 @@ Section Snapshot_Resources.
   Definition ownSnapAuth (S : gmap nat global_mem) : iProp Σ :=
     own γTrns (● (((λ M, to_agree (global_memUR M)) <$> S) : gmap _ _)).
 
-   Lemma ownSnapAgree t M S :
+  Lemma ownSnapAgree t M S :
     ownSnapFrag t M -∗
     ownSnapAuth S -∗
       ⌜S !! t = Some M⌝. 

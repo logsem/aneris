@@ -18,18 +18,18 @@ From aneris.examples.snapshot_isolation.proof.resources Require Import
 Section Local_Invariant.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
-  Context (γGauth γT γTrs : gname).
+  Context (γGauth γT : gname).
 
   Definition lkResDef (kvsL vnumL : loc) : iProp Σ :=
-    ∃ (kvsV : val) (T : Time)
-      (m : gmap Key val) (M : global_mem) (S : snapshots),
+    ∃ (M : global_mem) (S : snapshots) (T : Time)
+      (m : gmap Key val) (kvsV : val),
         ⌜is_map kvsV m⌝ ∗
         ⌜kvsl_valid m M S T⌝ ∗
         ⌜map_Forall (λ k l,
           Forall (λ we, KVS_Serializable (we_val we)) l) M⌝ ∗
         ownMemAuthLocal γGauth M ∗
         ownTimeLocal γT T ∗
-        ([∗ map] t ↦ Mt ∈ S, ownSnapFrag γTrs t Mt) ∗
+        (* ([∗ map] t ↦ Mt ∈ S, ownSnapFrag γTrs t Mt) ∗ *)
         kvsL ↦[ip_of_address KVS_address] kvsV ∗
         vnumL ↦[ip_of_address KVS_address] #T.
 

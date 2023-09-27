@@ -14,7 +14,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.examples.snapshot_isolation.specs Require Import user_params resources.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model.
+     Require Import utils model.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import resource_algebras server_resources proxy_resources
      global_invariant.
