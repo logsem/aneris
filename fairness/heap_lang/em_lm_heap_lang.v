@@ -216,7 +216,7 @@ Lemma mim_helper_model_step `{LM: LiveModel (locale heap_lang) M LSI}
   (δ1 : LM)
   (ζ : locale heap_lang)
   (fr1 : gset (fmrole M))
-  (Hfr_new : live_roles M s2 ∖ live_roles M δ1 ⊆ fr1)
+  (Hfr_new : live_roles M s2 ∖ live_roles M δ1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2)
   (Hfuelsval : valid_new_fuelmap fs1 fs2 δ1 s2 ρ (LM := LM))
   (Hxdom : ∀ ρ : fmrole M, ls_mapping δ1 !! ρ = Some ζ ↔ ρ ∈ dom fs1)
   (HFR : fr1 ∩ dom (ls_fuel δ1) = (∅: gset (fmrole M))):

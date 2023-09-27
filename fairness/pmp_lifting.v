@@ -53,7 +53,7 @@ Section PartialModelPredicates.
        (fs1 fs2: gmap (fmrole iM) nat)
       ρ (δ1 : M) ζ fr1 fr_stash
        (Einvs: coPset)
-     `((live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1)
+     `((live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ∪ dom fs1 ∩ dom fs2)
      `(fr_stash ⊆ dom fs1)
      `((live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅)
      `(dom fs2 ∩ fr_stash = ∅)
@@ -72,7 +72,7 @@ Section PartialModelPredicates.
       has_fuels ζ fs2 ∗
       partial_model_is s2 ∗
       em_msi (tp2, σ2) δ2 (em_GS0 := eGS)∗
-      partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash).
+      partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash).
 
     (* TODO: where to place it? *)
     (* Let partial_free_roles_fuels_disj_def δ fr fs tid: iProp Σ := *)

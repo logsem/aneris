@@ -34,16 +34,12 @@ Section ModelStep.
     (δ1 : LM)
     (ζ : G)
     (fr1 : gset (fmrole M))
-    (Hfr_new : live_roles M s2 ∖ live_roles M (ls_under δ1) ⊆ fr1)
+    (Hfr_new : live_roles M s2 ∖ live_roles M (ls_under δ1) ⊆ fr1 ∪ dom fs1 ∩ dom fs2)
     (Hfuelsval : valid_new_fuelmap fs1 fs2 (ls_under δ1) s2 ρ (LM := LM))
     (Hxdom : ∀ ρ : fmrole M, ls_mapping δ1 !! ρ = Some ζ ↔ ρ ∈ dom fs1)
     (HFR : fr1 ∩ dom (ls_fuel δ1) = ∅)
 :
   maps_inverse_match
-    (* (map_imap *)
-    (*    (λ (ρ' : fmrole M) (_ : nat), *)
-    (*       if decide (ρ' ∈ dom (ls_fuel δ1)) then ls_mapping δ1 !! ρ' else Some ζ) *)
-    (*    (gset_to_gmap 333 ((dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)))) *)
     (update_mapping (ls_mapping δ1) ζ fs1 fs2)
     (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))). 
   Proof.
@@ -99,7 +95,7 @@ Section ModelStep.
   (δ1 : LM)
   (ζ : G)
   (fr1 : gset (fmrole M))
-  (Hfr_new : live_roles M s2 ∖ live_roles M s1 ⊆ fr1)
+  (Hfr_new : live_roles M s2 ∖ live_roles M s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2)
   (Htrans : fmtrans M s1 (Some ρ) s2)
   (Hlim : ρ ∈ live_roles M s2 → oleq (fs2 !! ρ) (Some (lm_fl LM s2)))
   (Hzombie : ρ ∉ live_roles M s2
@@ -223,11 +219,14 @@ Section ModelStep.
               { exfalso.
                 clear -Hsup Hin2 e n0. 
                 set_solver. }
-          *** assert (ρ' ∉ live_roles _ s2).
-              { by_contradiction. assert (ρ' ∈ fr1); [eapply elem_of_subseteq; eauto |].
-                { by apply elem_of_difference. }
-                assert (ρ' ∈ (fr1 ∪ FR')); [eapply elem_of_subseteq; eauto; set_solver -Hsamedoms Hnewdom| ].
-                clear -H1 Hin HFR. set_solver. }
+          *** destruct (decide (ρ' ∈ live_roles _ s2)).
+              { assert (ρ' ∈ fr1 ∪ dom fs1 ∩ dom fs2); [eapply elem_of_subseteq; eauto |].
+                { set_solver. }
+                apply elem_of_union in H0 as [H0 | H0]. 
+                - assert (ρ' ∈ (fr1 ∪ FR')); [eapply elem_of_subseteq; eauto; set_solver -Hsamedoms Hnewdom| ].
+                  clear -H1 Hin HFR. set_solver.
+                - apply oleq_oless. rewrite Hfuel.
+                  eapply Hdec; eauto. clear -H0. set_solver. }
               assert (ρ' ∈ dom fs1).
               { clear Hin1 Hnin Hsamedoms Hnewdom.
                 clear tmap_disj tmap_sd. clear Hinf Hfueldom.
@@ -301,7 +300,7 @@ Section ModelStep.
   (δ1 : LM)
   (ζ : G)
   (fr1 fr_stash : gset (fmrole M))
-  (Hfr_new : live_roles M s2 ∖ live_roles M s1 ⊆ fr1)
+  (Hfr_new : live_roles M s2 ∖ live_roles M s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2 )
   (Hstash_own : fr_stash ⊆ dom fs1)
   (Hstash_dis : live_roles M s1 ∩ (fr_stash ∖ {[ρ]}) = ∅)
   (Hstash_rem : dom fs2 ∩ fr_stash = ∅)
@@ -317,7 +316,7 @@ Section ModelStep.
   (FR_EQ : FR = fr1 ∪ FR')
   (DISJ' : fr1 ## FR')
   :
-  (fr1 ∖ (live_roles M s2 ∖ live_roles M s1) ∪ fr_stash ∪ FR')
+  (fr1 ∖ (live_roles M s2 ∖ (live_roles M s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash ∪ FR')
    ∩ dom (update_fuel_resource (ls_fuel δ1) fs1 fs2) = ∅.
   Proof. 
     simpl. rewrite /update_fuel_resource /fuel_apply.
@@ -330,7 +329,7 @@ Section ModelStep.
     apply elem_of_equiv_empty_L. intros ρ' [Hin1 Hin2]%elem_of_intersection.
       
     (* TODO: problems with elem_of_proper *)
-    assert (fr1 ∖ (live_roles M s2 ∖ live_roles M s1) ∪ fr_stash ∪ FR' ≡ FR ∖ (live_roles M s2 ∖ live_roles M s1) ∪ fr_stash ∪ FR' ∩ (live_roles M s2 ∖ live_roles M s1)) as ALT.
+    assert (fr1 ∖ (live_roles M s2 ∖ (live_roles M s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash ∪ FR' ≡ FR ∖ (live_roles M s2 ∖ (live_roles M s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash ∪ FR' ∩ (live_roles M s2 ∖ (live_roles M s1 ∪ dom fs1 ∩ dom fs2))) as ALT.
     { set_solver -Hin1 Hin2. }
     rewrite ALT in Hin1. clear ALT. 
     
@@ -343,7 +342,10 @@ Section ModelStep.
     assert (ρ' ∉ dom $ ls_fuel δ1) by set_solver.
     assert (ρ' ∈ dom fs2) by set_solver.
     destruct Hin12 as [Hin12|Hin12].
-    2: { eapply H0. eapply ls_fuel_dom. set_solver. }
+    2: { eapply H0. apply elem_of_union in Hin12 as [? | ?].
+         - eapply ls_fuel_dom. set_solver.
+         - destruct H0. rewrite -ls_same_doms.
+           apply elem_of_dom. eexists. apply Hxdom. clear -H2. set_solver. } 
     destruct Hfuelsval as (?&?&?&?&?&?).
     assert (ρ' ∉ dom fs1).
     2: { eapply H0. eapply ls_fuel_dom. set_solver -Hin11 Hin21 Hin22. }
@@ -359,7 +361,7 @@ Section ModelStep.
 
   Lemma actual_update_step_still_alive
         s1 s2 fs1 fs2 ρ (δ1 : LM) ζ fr1 fr_stash:
-    (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ->
+    (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ∪ dom fs1 ∩ dom fs2 ->
     fr_stash ⊆ dom fs1 ->
     (live_roles _ s1) ∩ (fr_stash ∖ {[ ρ ]}) = ∅ ->
     dom fs2 ∩ fr_stash = ∅ ->
@@ -370,7 +372,7 @@ Section ModelStep.
     ==∗ ∃ (δ2: LM),
         ⌜lm_ls_trans LM δ1 (Take_step ρ ζ) δ2 ⌝
         ∗ has_fuels ζ fs2 ∗ frag_model_is s2 ∗ model_state_interp δ2 ∗
-        frag_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash) ∗
+        frag_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash) ∗
         ⌜ ls_tmap δ2 (LM := LM) = (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))) ⌝. 
   Proof.
     iIntros (Hfr_new Hstash_own Hstash_dis Hstash_rem Htrans Hfuelsval) "Hfuel Hmod Hsi Hfr1".
@@ -465,7 +467,7 @@ Section ModelStep.
     (* iMod (update_free_roles (live_roles M s2 ∖ live_roles M s1) *)
     (*        with "HFR Hfr1") as "[HFR Hfr2]"; [set_solver|]. *)
     pose proof (proj1 (subseteq_disjoint_union_L _ _) HfrFR) as [FR' [FR_EQ DISJ']].
-    iMod (update_free_roles_strong fr1 (fr1 ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash) FR' with "[HFR] [Hfr1]") as "[HFR Hfr2]"; auto.
+    iMod (update_free_roles_strong fr1 (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash) FR' with "[HFR] [Hfr1]") as "[HFR Hfr2]"; auto.
     { apply disjoint_union_l. split; [set_solver| ].
       eapply disjoint_subseteq.
       { apply _. } (* TODO: why is it needed explicitly? *)
@@ -482,10 +484,12 @@ Section ModelStep.
     { by rewrite FR_EQ. }
     
     assert (maps_inverse_match new_mapping (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM)))) as MATCH.
-    { eapply @mim_model_step_helper; eauto.
-      { rewrite Heq. apply Hfuelsval. }
-      rewrite Heq; eauto.
-      clear -Hfr_new HFR HfrFR. set_solver. }
+    { pose proof Hfuelsval as (?&?&?&?&?&?). 
+      eapply @mim_model_step_helper; eauto.
+      { rewrite Heq. etransitivity.
+        { apply Hfr_new. }
+        set_solver. }
+      rewrite Heq; eauto. }
 
     iModIntro.
     iSplit.
@@ -540,7 +544,9 @@ Section ModelStep.
           eapply ls_tmap_disj; eauto. }
         repeat rewrite elem_of_union in FS2. destruct FS2 as [[[?|?]|?]|?].
         2-4: apply NINf1; set_solver. 
-        apply Hfr_new, HfrFR in H0.
+        apply Hfr_new, elem_of_union in H0 as [H0 | H0].
+        2: { set_solver. }
+        apply HfrFR in H0. 
         assert (ρ' ∈ dom (ls_fuel δ1)); [| set_solver].
         rewrite -ls_same_doms. eapply elem_of_dom. 
         eexists. eapply ls_mapping_tmap_corr. eauto. }

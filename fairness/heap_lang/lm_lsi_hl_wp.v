@@ -178,14 +178,14 @@ Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' Einvs fs1 fs2 fr1
   PureExec φ 1 e1 e2 -> φ ->
   Einvs ⊆ E ->
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
-  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
+  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2 →
   fr_stash ⊆ dom fs1 →
   live_roles iM s1 ∩ fr_stash = ∅ → 
   dom fs2 ∩ fr_stash = ∅ ->
   iM.(fmtrans) s1 (Some ρ) s2 ->
   model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI) ->
   LSG Einvs ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
-                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1) ∪ fr_stash)
+                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ (live_roles iM s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash)
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using.
@@ -226,12 +226,12 @@ Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' Einvs fs1 fs2 fr1 Φ e1
   PureExec φ 1 e1 e2 -> φ ->
   Einvs ⊆ E ->  
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
-  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 →
+  live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2 →
   iM.(fmtrans) s1 (Some ρ) s2 ->
   model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI) ->
   LSG Einvs ∗
   (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
-                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ live_roles iM s1))
+                 (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ (live_roles iM s1 ∪ dom fs1 ∩ dom fs2)))
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using.
@@ -274,7 +274,8 @@ Proof using.
   - set_solver.
   - iFrame. iMod "H". do 2 iModIntro. iMod "H" as "(Hmod&Hfr&Hfuels&Hkont)". iModIntro.
     iFrame "Hmod Hfr Hfuels". iIntros "Hmod Hfr Hfuels". iApply ("Hkont" with "Hmod [Hfr] [Hfuels]").
-    + replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [done|set_solver].
+    + iApply partial_free_roles_are_Proper; [| by iFrame].
+      set_solver. 
     + destruct (decide (ρ ∈ live_roles iM s2)).
       * rewrite -has_fuel_fuels //.
       * iDestruct "Hfuels" as "[Hf _]". rewrite dom_empty_L //.
@@ -475,7 +476,8 @@ Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1
   (INVS: Einvs ⊆ E)
   (STEP: fmtrans iM s1 (Some ρ) s2)
   (VFM: valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM))
-  (LR : live_roles iM s2 ∖ live_roles iM s1 ⊆ fr) (STASH : fr_stash ⊆ dom fs1) 
+  (LR : live_roles iM s2 ∖ live_roles iM s1 ⊆ fr ∪ dom fs1 ∩ dom fs2) 
+  (STASH : fr_stash ⊆ dom fs1) 
   (NSL : live_roles iM s1 ∩ (fr_stash ∖ {[ρ]}) = ∅)
   (NOS2 : dom fs2 ∩ fr_stash = ∅)
   (PRES: model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI)):
@@ -484,7 +486,7 @@ Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1
       ▷ partial_free_roles_are fr}}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ has_fuels tid fs2 ∗
-                        partial_free_roles_are (fr ∖ (live_roles _ s2 ∖ live_roles _ s1) ∪ fr_stash)}}}. 
+                        partial_free_roles_are (fr ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash)}}}. 
 Proof using. 
   iIntros "#PMP !#" (Φ) "(>Hl & >Hst & >Hfuel1 & Hfr) HΦ".
   iApply wp_lift_atomic_head_step_no_fork; auto.
@@ -657,11 +659,13 @@ Proof using.
     { iPureIntro. simpl in *. split =>//. }
     iFrame.
     iSplit; first done. iApply "HΦ". iFrame.
-    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
-    rewrite union_empty_r_L. 
+    (* replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver]. *)
+    (* rewrite union_empty_r_L.  *)
+    iSplitL "Hmod".
+    { iApply partial_free_roles_are_Proper; [| by iFrame]. set_solver. }
     destruct (decide (ρ ∈ live_roles iM s2)).
-    + rewrite has_fuel_fuels //. iFrame. 
-    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. iFrame. 
+    + rewrite has_fuel_fuels //.
+    + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. 
 Qed.
 
 Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l v' v1 v2:
@@ -700,8 +704,8 @@ Proof using.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
     iFrame. iSplit; first done. iApply "HΦ". iFrame.
-    rewrite union_empty_r_L. 
-    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
+    iSplitL "Hmod".
+    { iApply partial_free_roles_are_Proper; [| by iFrame]. set_solver. }
     by rewrite has_fuel_fuels.
 Qed.
 
@@ -744,7 +748,10 @@ Proof using.
     iModIntro; iExists δ2, ℓ. iSplit.
     { iPureIntro. simpl in *. split =>//. }
     iFrame. iSplit; first done. iApply "HΦ". rewrite union_empty_r_L. iFrame.    
-    replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver].
+    (* replace (fr ∖ (live_roles iM s2 ∖ live_roles iM s1)) with fr; [iFrame|set_solver]. *)
+    iSplitL "Hmod".
+    { iApply partial_free_roles_are_Proper; [| by iFrame]. set_solver. }
+
     destruct (decide (ρ ∈ live_roles iM s2)).
     + rewrite has_fuel_fuels //. 
     + iDestruct "Hfuel" as "[Hf _]". rewrite dom_empty_L //. 
