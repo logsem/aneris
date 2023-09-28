@@ -199,7 +199,6 @@ Section Wrapper_defs.
       to make `cache_updatesM` already of the type  `gmap Key SerializableVal` so that there is no need
       to have both `cache` and  `cache_updatesM` or something similar. **)
 
-  (* TODO : Fixme w.r.t. (S : snapshots) *)
   Lemma commit_logical_update (ts T : nat) (S : snapshots)
     (cache_logicalM : gmap Key (option val * bool))
     (cache_updatesM : gmap Key val)

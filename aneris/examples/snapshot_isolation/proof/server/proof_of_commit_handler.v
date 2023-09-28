@@ -19,7 +19,7 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources specs.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization rpc_user_params.
+     Require Import time events model kvs_serialization rpc_user_params utils.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources
@@ -30,20 +30,21 @@ Section Proof_of_commit_handler.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss γlk : gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs γlk : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
-                     clients γKnownClients γGauth γGsnap γT γTss).
+                     clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
-  Lemma check_at_key_spec (k : Key) (ts tc : nat) (tss : gset nat) (vl kvs cache : val)
+  Lemma check_at_key_spec (k : Key) (ts tc : nat) (vl kvs cache : val)
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
-    (Msnap M : gmap Key (list write_event)) :
+    (Msnap M : gmap Key (list write_event))
+    (S : snapshots) :
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
     is_map (InjRV cache) cache_updatesM →
     is_map kvs m →
-    kvsl_valid m M tc tss →
+    kvsl_valid m M S tc →
     (match m !! k with
       | Some p => vl = $p
       | None => vl = InjLV #()
@@ -109,14 +110,15 @@ Section Proof_of_commit_handler.
       by left.
   Qed.
 
-  Lemma map_forall_spec (ts tc : nat) (tss : gset nat) (kvs cache : val) 
+  Lemma map_forall_spec (ts tc : nat) (kvs cache : val) 
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
-    (Msnap M : gmap Key (list write_event)) :
+    (Msnap M : gmap Key (list write_event)) 
+    (S : snapshots):
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
     is_map cache cache_updatesM →
     is_map kvs m →
-    kvsl_valid m M tc tss →
+    kvsl_valid m M S tc →
     {{{ ⌜True⌝ }}}
       map_forall (λ: "k" "_v",
                     let: "vlsto" := map_lookup "k" kvs in
@@ -175,7 +177,7 @@ Section Proof_of_commit_handler.
         rewrite H_match; wp_pures.
       + unfold network_util_code.unSOME.
         wp_pures.
-        wp_apply (check_at_key_spec e_key ts tc tss v' kvs cache 
+        wp_apply (check_at_key_spec e_key ts tc v' kvs cache 
           cache_updatesM m cache_logicalM Msnap M); try done.
         {
           by eexists _.
@@ -241,7 +243,7 @@ Section Proof_of_commit_handler.
           assert (e_key ∈ KVS_keys) as H_e_in; first set_solver.
           assert (e_key ∈ dom Msnap) as H_e_in'; first set_solver.
           eapply can_not_commit; try done.
-      + wp_apply (check_at_key_spec e_key ts tc tss (InjLV #()) kvs cache 
+      + wp_apply (check_at_key_spec e_key ts tc (InjLV #()) kvs cache 
           cache_updatesM m cache_logicalM Msnap M); try done.
         {
           by eexists _.
@@ -291,16 +293,17 @@ Section Proof_of_commit_handler.
           eapply can_not_commit; try done.
   Admitted.
 
-  Lemma update_kvs_spec (kvs cacheV : val) (tc : nat) (tss : gset nat)
+  Lemma update_kvs_spec (kvs cacheV : val) (tc : nat)
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap M : gmap Key (list write_event)) 
-    (cache : gmap Key SerializableVal) :
+    (cache : gmap Key SerializableVal)
+    (S : snapshots) :
     (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v) →
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
     is_map (InjRV cacheV) cache_updatesM →
     is_map kvs m →
-    kvsl_valid m M tc tss →
+    kvsl_valid m M S tc →
     {{{ ⌜True⌝ }}}
       snapshot_isolation_code.update_kvs kvs (InjRV cacheV) #(tc + 1) 
         @[ip_of_address MTC.(MTS_saddr)]
@@ -397,9 +400,9 @@ Section Proof_of_commit_handler.
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
     kvs_valid_snapshot Msnap ts →
     map_Forall (λ (_ : Key) (v : val), KVS_Serializable v) cache_updatesM →
-    server_lock_inv γGauth γT γTss γlk lk kvs vnum -∗
-    Global_Inv clients γKnownClients γGauth γGsnap γT γTss -∗
-    ownTimeSnap γT γTss ts -∗
+    server_lock_inv γGauth γT γlk lk kvs vnum -∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
+    ownTimeSnap γT ts -∗
     ([∗ map] k↦h' ∈ Msnap, ownMemSeen γGsnap k h') -∗
     P -∗
     (P ={⊤,E}=∗
@@ -422,7 +425,7 @@ Section Proof_of_commit_handler.
     (∀ (repv : val) (repd : RepData),
          ⌜sum_valid_val (option_serialization KVS_serialization)
             (sum_serialization int_serialization bool_serialization) repv⌝ ∗
-         ReqPost clients γKnownClients γGauth γGsnap γT γTss repv reqd repd -∗
+         ReqPost clients γKnownClients γGauth γGsnap γT γTrs repv reqd repd -∗
          Φ repv) -∗
     WP let: "res" := InjR
                       (InjR
@@ -467,8 +470,8 @@ Section Proof_of_commit_handler.
     wp_pures.
     unfold lkResDef.
     iDestruct "Hlkres"
-      as (kvsV T tss' m M Hmap' Hvalid')
-           "(%Hser & HmemLoc & HtimeLoc & #HtimeSnaps & HkvsL & HvnumL)".
+      as (M S T m kvsV Hmap' Hvalid')
+      "(%Hser & HmemLoc & HtimeLoc & HkvsL & HvnumL)".
     wp_load.
     wp_pures.
     unfold list_is_empty.
@@ -544,7 +547,8 @@ Section Proof_of_commit_handler.
         wp_apply (release_spec with
           "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
         {
-          iExists kvsV, T, tss', m, M.
+          unfold lkResDef.
+          iExists M, S, T, m, kvsV.
           iFrame "#∗".
           by iPureIntro.
         }
@@ -580,7 +584,7 @@ Section Proof_of_commit_handler.
       + (* Commit is successfull case *)
         wp_load.
         wp_pures.
-        wp_apply (map_forall_spec ts T tss' kvsV (InjRV v) cache_updatesM m cache_logicalM Msnap M); try eauto.
+        wp_apply (map_forall_spec ts T kvsV (InjRV v) cache_updatesM m cache_logicalM Msnap M S); try eauto.
         {
           by eexists _.
         }
@@ -593,7 +597,7 @@ Section Proof_of_commit_handler.
         pose proof Hcoh as ( _ & _ & H_sub & _).
         rewrite -H_cache_eq in H_sub.
         unfold snapshot_isolation_code.update_kvs.
-        wp_apply (update_kvs_spec kvsV v T tss' cache_updatesM m cache_logicalM Msnap M cache); try eauto.
+        wp_apply (update_kvs_spec kvsV v T cache_updatesM m cache_logicalM Msnap M cache S); try eauto.
         {
           by eexists _.
         }
@@ -602,8 +606,8 @@ Section Proof_of_commit_handler.
         wp_apply (aneris_wp_atomic _ _ E).
         (* Viewshift and opening of invariant *)
         iMod ("Hshift" with "[$HP]") as (m_current_client) "(%H_dom_eq_cl & Hkeys & Hpost)".
-        iInv KVS_InvName as (Mg Tg Tssg gMg) 
-          ">(HmemGlob & HtimeGlob & HtimeStartsGlob & Hccls & %Hdom & %HkvsValid)".
+        iInv KVS_InvName as (Mg Sg Tg gMg) 
+          ">(HmemGlob & HsnapAuth & HtimeGlob & Hccls & %Hdom & %HkvsValid)".
         (* Getting ready for update of logical ressources *)
         iDestruct "HmemGlob" as "(HmemGlobAuth & HmemMono)".
         iAssert (⌜M = Mg⌝%I) as "<-".
@@ -617,8 +621,8 @@ Section Proof_of_commit_handler.
           as "(HmemLoc & Hkeys & %Hmap_eq)".
         apply map_eq_filter_dom in Hmap_eq.
         (* Update of logical ressources *)
-        iDestruct (commit_logical_update clients γKnownClients γGauth γGsnap γT γTss
-          ts T Tssg cache_logicalM cache_updatesM cache M Msnap m_current_client) as "H_upd".
+        iDestruct (commit_logical_update clients γKnownClients γGauth γGsnap γT γTrs
+          ts T Sg cache_logicalM cache_updatesM cache M Msnap m_current_client) as "H_upd".
         iDestruct ("H_upd" with "[] [] [] [] [] [] [] [$HmemMono] [$HtimeGlob]
           [$HtimeLoc] [$HmemGlobAuth] [$HmemLoc] [$Hkeys]") as 
           ">(HtimeGlob & HtimeLoc & HmemGlob & HmemLoc & HmemMono & Hkeys)"; try done.
@@ -627,11 +631,11 @@ Section Proof_of_commit_handler.
           by rewrite Hmap_eq  H_dom_eq_cl.
         }
         (* Closing of invaraint *)
-        iSplitL "HtimeGlob HmemGlob Hccls HmemMono HtimeStartsGlob".
+        iSplitL "HtimeGlob HmemGlob Hccls HmemMono HsnapAuth".
         {
           iModIntro.
           iNext.
-          iExists (update_kvs M cache (T + 1)), (T + 1), Tssg, gMg.
+          iExists (update_kvs M cache (T + 1)), Sg, (T + 1), gMg.
           iFrame.
           iSplit; first done.
           iPureIntro.
@@ -656,8 +660,8 @@ Section Proof_of_commit_handler.
         wp_apply (release_spec with
           "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
         {
-          iExists kvs_updated, (T + 1), tss', 
-            (update_kvsl m cache (T + 1)), (update_kvs M cache (T + 1)).
+          iExists (update_kvs M cache (T + 1)), S, (T + 1), 
+            (update_kvsl m cache (T + 1)), kvs_updated.
           iFrame "#∗".
           iSplit; first done.
           iSplit.
@@ -715,7 +719,7 @@ Section Proof_of_commit_handler.
           iMod "HQ".
           iModIntro.
           wp_pures.
-          wp_apply (map_forall_spec ts T tss' kvsV (InjRV v) cache_updatesM m cache_logicalM Msnap M); try eauto.
+          wp_apply (map_forall_spec ts T kvsV (InjRV v) cache_updatesM m cache_logicalM Msnap M S); try eauto.
           {
             by eexists _.
           }
@@ -725,7 +729,7 @@ Section Proof_of_commit_handler.
           wp_apply (release_spec with
             "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
           {
-            iExists kvsV, T, tss', m, M.
+            iExists M, S, T, m, kvsV.
             iFrame "#∗".
             iPureIntro.
             split_and!; done.
