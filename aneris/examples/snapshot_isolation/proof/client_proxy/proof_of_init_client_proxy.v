@@ -18,7 +18,7 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources specs.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization rpc_user_params.
+     Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources global_invariant wrappers.
@@ -28,9 +28,9 @@ Section Client_Proxy_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss : gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs : gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
   Definition init_client_proxy_spec_internal {MTR : MTS_resources} : iProp Σ :=
@@ -45,7 +45,7 @@ Section Client_Proxy_Proof.
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate;
         ConnectionState_def γKnownClients γGsnap cstate sa CanStart ∗
-        is_connected γGsnap γT γTss γKnownClients cstate sa }}}.
+        is_connected γGsnap γT γTrs γKnownClients cstate sa }}}.
 
   Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources}  :
      ⊢ init_client_proxy_spec_internal.
@@ -68,7 +68,7 @@ Section Client_Proxy_Proof.
     iDestruct "Hcc" as (γCst) "(#Hcc & Hp)".
     wp_apply (newlock_spec
                 (KVS_InvName.@socket_address_to_str sa) _
-                (is_connected_def γGsnap γT γTss (ip_of_address sa) reqh l γS γA γCache γMsnap)
+                (is_connected_def γGsnap γT γTrs (ip_of_address sa) reqh l γS γA γCache γMsnap)
                with "[Hreq Hl HCache HMsnap Hs]").
     - iExists _. iFrame. iLeft. by iFrame.
     - iIntros (lk γ) "#Hlk".
@@ -77,7 +77,7 @@ Section Client_Proxy_Proof.
          destruct f; simpl; try by inversion 1. }
       wp_pures.
       iApply "HΦ".
-      iAssert (is_connected γGsnap γT γTss γKnownClients (#sa, (lk, (reqh, #l))) sa) as "#Hic".
+      iAssert (is_connected γGsnap γT γTrs γKnownClients (#sa, (lk, (reqh, #l))) sa) as "#Hic".
       iExists _, _, _, _, _, _, _, _.
       iExists _.
       by iFrame "#∗".

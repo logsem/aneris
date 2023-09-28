@@ -19,7 +19,7 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources specs.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization rpc_user_params.
+     Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources global_invariant wrappers.
@@ -30,16 +30,16 @@ Section Start_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss: gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs: gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
   Definition start_spec_internal {MTR : MTS_resources} : iProp Σ :=
     ∀ (c : val) (sa : socket_address)
        (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    is_connected γGsnap γT γTss γKnownClients c sa -∗
+    is_connected γGsnap γT γTrs γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m : gmap Key (list val)),
         ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
@@ -54,7 +54,7 @@ Section Start_Proof.
        ([∗ map] k ↦ h ∈ m, Seen_def γGsnap k h)>>>.
 
   Lemma start_spec_internal_holds {MTR : MTS_resources}  :
-     Global_Inv clients γKnownClients γGauth γGsnap γT γTss ⊢ start_spec_internal.
+     Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ⊢ start_spec_internal.
   Proof.
     iIntros "#Hinv".
     iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
@@ -68,12 +68,12 @@ Section Start_Proof.
     wp_pures.
     wp_load.
     iDestruct "Hdisj" as "[Hst|Habs]"; last first.
-    { iDestruct "Habs" as (? ? ? ? ? ? ->) "Habs".
+    { iDestruct "Habs" as (? ? ? ? ? ? ? ->) "Habs".
       wp_pure _.
       wp_bind (Lam _ _).
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
-      iDestruct "Habs" as (? ? ? ?) "(? & ? & ? & ? & Habs)".
+      iDestruct "Habs" as (? ? ? ? ?) "(? & ? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
@@ -85,11 +85,13 @@ Section Start_Proof.
     wp_pures.
     set (rd := (inr (inl (E, ⌜True⌝%I,
                            (λ tsv,
-                        ∃ ts Msnap cacheM,
+                        ∃ ts Msnap Msnap_full cacheM,
                         isActiveToken γA ∗
                         ghost_map.ghost_map_auth γCache 1 cacheM ∗
                         ownMsnapAuth γMsnap Msnap ∗
-                        ownTimeSnap γT γTss ts ∗
+                        ownSnapFrag γTrs ts Msnap_full ∗
+                        ownTimeSnap γT ts ∗
+                        ⌜Msnap ⊆ Msnap_full⌝ ∗
                         ⌜tsv = #ts⌝ ∗
                         ⌜is_coherent_cache ∅ cacheM Msnap⌝ ∗
                         ⌜kvs_valid_snapshot Msnap ts⌝ ∗
@@ -122,13 +124,14 @@ Section Start_Proof.
         iExists m.
         iFrame.
         iNext.
-        iIntros (ts M HmM) "(%Hvsn & Hser & Hts & Hpts & #Hseen)".
+        iIntros (ts M Mf) "Hpost".
+        iDestruct "Hpost" as "(%Hsub & -> & %Hvsn & Hser & Hts & Hfrag & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
         iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
-        iExists ts, M, (cacheM_from_Msnap M).
+        iExists ts, M, Mf, (cacheM_from_Msnap M).
         iFrame.
         iAssert (([∗ map] k↦h ∈ ((λ h : list write_event, to_hist h) <$> M),
               Seen_def γGsnap k h)%I) as "#Hseen2".
@@ -152,6 +155,7 @@ Section Start_Proof.
         iFrame.
         iApply fupd_frame_l.
         iSplit; first done.
+        iApply fupd_frame_l; iSplit; first done.
         iApply fupd_frame_l; iSplit.
         { iPureIntro; by apply is_coherent_cache_start. }
         iApply fupd_frame_l; iSplit; first done.
@@ -181,13 +185,14 @@ Section Start_Proof.
     wp_pures.
     wp_store.
     iDestruct "Hpost"
-      as (t Msnap ?) "(Htk & Hgh & Hmfr & Htm & -> & %Hcoh & %Hval & Hseen & Hpost)".
-    wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Htm Hc Hmfr]").
+      as (t Msnap Msnap_full ?)
+           "(Htk & Hgh & Hmfr & Hf & Htm & %Hsub & -> & %Hcoh & %Hval & Hseen & Hpost)".  
+    wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Hf Htm Hc Hmfr]").
     {
       iExists (InjRV (#t, #cm))%V.
       iFrame "Hl Hcr".
       iRight.
-      iExists _, _, _, _, _, _.
+      iExists _, _, _, _, _, _, _.
       iFrame "#∗".
       iPureIntro.
       split_and!; try done. }

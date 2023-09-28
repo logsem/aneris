@@ -13,10 +13,10 @@ From aneris.aneris_lang.lib Require Import
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.examples.snapshot_isolation.specs Require Import user_params.
-From aneris.examples.snapshot_isolation.proof
-     Require Import time events model.
-From aneris.examples.snapshot_isolation.proof.resources
-     Require Import resource_algebras server_resources proxy_resources.
+From aneris.examples.snapshot_isolation.proof Require Import model.
+From aneris.examples.snapshot_isolation.proof.resources Require Import
+  resource_algebras
+  server_resources.
 
 
 Section Global_Invariant.
@@ -24,21 +24,19 @@ Section Global_Invariant.
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ, !MTS_resources}.
   Context (clients : gset socket_address).
   Context (γKnownClients : gname).
-  Context (γGauth γGsnap γT γTss : gname).
+  Context (γGauth γGsnap γT γTrs : gname).
 
   (* ------------------------------------------------------------------------ *)
   (** Definition of the global invariant. *)
   Definition global_inv_def : iProp Σ :=
-    ∃ (M : gmap Key (list write_event))
-      (T : Time)
-      (Tss : gset nat)
+    ∃ (M : global_mem) (S : snapshots) (T : Time)
       (gM : gmap socket_address gname),
       ownMemGlobal γGauth γGsnap M ∗
+      ownSnapAuth γTrs S ∗
       ownTimeGlobal γT T ∗
-      ownTimeStartsAuth γTss Tss ∗
       connected_clients γKnownClients gM ∗
       ⌜dom gM = clients⌝ ∗
-      ⌜kvs_valid M T Tss⌝.
+      ⌜kvs_valid M S T⌝.
 
   Definition Global_Inv : iProp Σ :=
     inv KVS_InvName global_inv_def.
@@ -49,14 +47,15 @@ Section Global_Invariant.
   Lemma ownMemSeen_valid E k h h' :
     nclose KVS_InvName ⊆ E →
     Global_Inv ⊢
-    ownMemSeen γGsnap k h -∗ ownMemUser γGauth γGsnap k h' ={E}=∗
+    ownMemSeen γGsnap k h -∗
+    ownMemUser γGauth γGsnap k h' ={E}=∗
     ownMemUser γGauth γGsnap k h' ∗ ⌜h `prefix_of` h'⌝.
   Proof.
     iIntros (?) "#Hginv #Hm Hu".
     iDestruct "Hu" as "(Hu & #Hum)".
     rewrite /Global_Inv /ownMemSeen.
     iInv KVS_InvName
-      as (M T Tss gM)
+      as (M S T gM)
            ">((HmemA & HmemM) & ? & ? & ? & ? & %Hvalid)" "Hcl".
     iDestruct (ownMemSeen_lookup with "HmemM Hm")
       as (h1) "(%Hh1 & %Hh2)".
@@ -65,49 +64,9 @@ Section Global_Invariant.
     iFrame "#". iFrame.
     iMod ("Hcl" with "[-]") as "_".
     { iNext. do 4 iExists _. by iFrame. }
-    by iModIntro.
+    iModIntro.
+    rewrite Hh2 in Hh3.
+    set_solver. 
   Qed.
-
-
-  (* (** NB: not sure we will use this lemma. *) *)
-  (* (** FIXME: Maybe don't need the GlobalInv, *)
-  (*     in which case update the specs.resources *) *)
-  (* Lemma Connection_State_relation E k r ms h : *)
-  (*     ↑KVS_InvName ⊆ E -> *)
-  (*     Global_Inv ⊢ *)
-  (*     connection_state γGsnap γT γKnownClients r (PSActive ms) -∗ *)
-  (*     ownMemUser γGauth γGsnap k h ={E}=∗ *)
-  (*     connection_state γGsnap γT γKnownClients r (PSActive ms) ∗ *)
-  (*     ownMemUser γGauth γGsnap k h ∗ *)
-  (*     ⌜k ∈ dom ms → *)
-  (*     ∀ h', ms !! k = Some h' → h' `prefix_of` h ⌝. *)
-  (* Proof. *)
-  (* Admitted.  *)
-
-  (* (** NB: not sure we will use this lemma. *) *)
-  (* (** FIXME: Maybe don't need the GlobalInv, *)
-  (*     in which case update the specs.resources *) *)
-  (* Lemma OwnMemUser_OwnLocalKey_coh k h vo c E : *)
-  (*       ↑KVS_InvName ⊆ E -> *)
-  (*       h ≠ [] -> *)
-  (*       Global_Inv ⊢ *)
-  (*       ownMemUser γGauth γGsnap k h -∗ *)
-  (*       ownCacheUser γKnownClients k c vo ={E}=∗ *)
-  (*       ownMemUser γGauth γGsnap k h ∗ *)
-  (*       ownCacheUser γKnownClients k c vo ∗ ⌜is_Some vo⌝. *)
-  (* Proof. *)
-  (* Admitted. *)
-
-  (* (** NB: not sure we will use this lemma. *) *)
-  (* (** FIXME: Maybe don't need the GlobalInv, *)
-  (*     in which case update the specs.resources *) *)
-  (*   Lemma connection_state_Keys E r ms : *)
-  (*     ↑KVS_InvName ⊆ E -> *)
-  (*       Global_Inv ⊢ *)
-  (*       connection_state γGsnap γT γKnownClients r (PSActive ms) ={E}=∗ *)
-  (*       connection_state γGsnap γT γKnownClients r (PSActive ms) ∗ *)
-  (*       ⌜dom ms ⊆ KVS_keys⌝. *)
-  (*   Proof. *)
-  (*   Admitted. *)
 
 End Global_Invariant.

@@ -19,7 +19,7 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources specs.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization rpc_user_params.
+     Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources global_invariant wrappers.
@@ -30,9 +30,9 @@ Section Write_Proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss : gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs : gname).
   Context (srv_si : message → iProp Σ).
-  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTss).
+  Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
 
@@ -41,7 +41,7 @@ Section Write_Proof.
       (vo : option val)
       (k : Key) (v : SerializableVal) (b : bool),
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ is_connected γGsnap γT γTss γKnownClients c sa ∗
+    {{{ is_connected γGsnap γT γTrs γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo ∗
         key_upd_status γKnownClients c k b }}}
       SI_write c #k v @[ip_of_address sa]
@@ -60,7 +60,7 @@ Section Write_Proof.
                with "[$Hisc]").
     iIntros (uu) "(_ & Hlk & Hres)".
     iDestruct "Hres"
-      as (?) "(Hl & Hcr & [( -> & Hres_abs & Htk) | Hres])".
+      as (?) "(Hl & Hcr & [( -> & Hres_abs & _ & Htk) | Hres])".
     { iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
@@ -70,9 +70,9 @@ Section Write_Proof.
                   with "[$Hres_abs][$Helem]")
                   as "%Habs". }
     iDestruct "Hres"
-      as (ts Msnap cuL cuV cuM cM -> Hcoh Hser) "Hres".
+      as (ts Msnap Msnap_full cuL cuV cuM cM -> Hcoh Hser) "Hres".
     iDestruct "Hres" as (Hvalid)
-           "(%Hm & #Hts & #Hsn & HcM & Hauth & Htk)".
+           "(%Hm & %Hsub & #Hts & #Hsn & #Hf & HcM & Hauth & Htk)".
     wp_pures.
     wp_load.
     wp_pures.
@@ -102,7 +102,7 @@ Section Write_Proof.
     { iExists _.
       iFrame "#∗".
       iRight.
-      iExists ts, Msnap, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
+      iExists ts, Msnap, _, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
                 (<[k:=(Some v.(SV_val), true)]> cM).
       iFrame "#∗".
       iSplit; first done.

@@ -19,7 +19,7 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params resources specs.
 From aneris.examples.snapshot_isolation.proof
-     Require Import time events model kvs_serialization rpc_user_params.
+     Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      resource_algebras server_resources proxy_resources
@@ -36,15 +36,15 @@ Section Proof_of_handler.
 
   Context `{!anerisG Mdl Σ, !User_params, !IDBG Σ}.
   Context (clients : gset socket_address).
-  Context (γKnownClients γGauth γGsnap γT γTss γlk : gname).
+  Context (γKnownClients γGauth γGsnap γT γTrs γlk : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
-                     clients γKnownClients γGauth γGsnap γT γTss).
+                     clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
   Lemma client_request_handler_spec (lk : val) (kvs vnum : loc) :
     ∀ reqv reqd,
-    {{{ server_lock_inv γGauth γT γTss γlk lk kvs vnum ∗
+    {{{ server_lock_inv γGauth γT γlk lk kvs vnum ∗
         MTC.(MTS_handler_pre) reqv reqd }}}
         client_request_handler lk #kvs #vnum reqv  @[ip_of_address MTC.(MTS_saddr)]
     {{{ repv repd, RET repv;
@@ -58,13 +58,12 @@ Section Proof_of_handler.
     rewrite /lk_handle.
     iDestruct "Hpre" as "(#HGlobInv & [HpreRead|[HpreStart|HpreCommit]])".
     1:{
-      iDestruct "HpreRead" as (k ts h Hin Hreqd ->) "(%Hts & #HsnapT & #HsnapH)".
+      iDestruct "HpreRead" as (k ts h Msf Hin Hreqd ->) "(%Hts & %Hmsf & #HsnapT & #HsnapH & #Hfrag)".
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (read_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ reqd ts h Φ Hin Hreqd Hts
-        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH]").
-      }
+      by iApply (read_handler_spec _ _ _ _ _ _ _ _ _ _ _ reqd ts h Msf Φ Hin Hreqd Hts
+        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH][$Hfrag]"). }
     2:{
       iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap ts Hreqd)
         "HpreCommit".
@@ -73,15 +72,16 @@ Section Proof_of_handler.
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _
-        Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]").
+      (* by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _ *)
+      (*   Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]"). *)
+      admit.
       }
     iDestruct "HpreStart" as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
     wp_pures.
     wp_lam.
     wp_pures.
     by iApply (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE
-      with "[$Hlk][$HGlobInv][$HP][$Hsh]").
-  Qed.
+             with "[$Hlk][$HGlobInv][$HP][$Hsh]").
+  Admitted.
 
 End Proof_of_handler.

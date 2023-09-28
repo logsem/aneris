@@ -1,9 +1,10 @@
 From aneris.aneris_lang Require Import lang resources inject.
-From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
-From aneris.examples.snapshot_isolation.specs
-     Require Import user_params.
-From aneris.examples.snapshot_isolation.proof
-     Require Import time events.
+From aneris.aneris_lang.lib.serialization Require Import
+  serialization_proof.
+From aneris.examples.snapshot_isolation.specs Require Export
+  user_params.
+From aneris.examples.snapshot_isolation.proof Require Export
+  time events.
 
 
 Global Instance int_time : KVS_time :=
@@ -28,8 +29,6 @@ Qed.
 Definition write_event := @write_event int_time.
 Definition write_eventO := leibnizO write_event.
 Definition whist := list write_eventO.
-Definition kvsMdl :=  gmap Key whist.
-
 
 Section Whist_valid.
   Context `{!anerisG Mdl Σ, !User_params}.
@@ -57,7 +56,7 @@ Section Whist_valid.
     whist_ValidExt: whist_ext h;
 }.
 
-
+  (** TODO: Proof this lemma if needed or remove. *)
   Lemma whist_events_no_dup h : whist_valid h → NoDup h.
   Proof.
   Admitted.
@@ -69,65 +68,96 @@ Section Whist_valid.
 
 End Whist_valid.
 
-(** For now, we don't use a commit-times M map : nat → gmap key write_event that would track in the logic
-    for each commit time T the events that extended the KVS with the cache M(T), but maybe it could be
-    necessary or useful.
-    Similarly, we don't model separately commit times and start times, and currently use only one global time
-    for both, which gives a very simple kvs model coherence. In particular, if the global time is strictly
-    positive, it does not imply that any commit happened previously. *)
+Definition global_mem :=  gmap Key whist.
+Definition snapshots := gmap nat global_mem.
 
-(** Update: we do need to track start times separately. *)
+Definition map_included (m1 m2 : global_mem) : Prop :=
+  dom m1 = dom m2 ∧
+  ∀ k h1, m1 !! k = Some h1 →
+    ∃ h2, m2 !! k = Some h2 ∧ h1 `prefix_of` h2.
+
 
 Section KVS_valid.
   Context `{!User_params}.
 
-  Definition kvs_dom (M : kvsMdl) := KVS_keys = dom M.
+  Definition kvs_dom (M : global_mem) := KVS_keys = dom M.
 
-  Definition kvs_whists (M : kvsMdl) :=
+  Definition kvs_whists (M : global_mem) :=
     ∀ k h, M !! k = Some h → whist_valid h.
 
-  Definition kvs_keys (M : kvsMdl) :=
+  Definition kvs_keys (M : global_mem) :=
     ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_key) = k.
 
-  Definition kvs_whist_commit_times (M : kvsMdl) (T : nat) :=
+  Definition kvs_whist_commit_times (M : global_mem) (T : nat) :=
     ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) <= T.
+  
+  (** Importantly, note that there is currently no relation between snapshots
+      for two given transactions. We only relate snapshots to the state of 
+      the global memory. *)
+  Definition kvs_snapshots_included (M : global_mem) (S : snapshots) : Prop :=
+    ∀ t Mt,
+      S !! t = Some Mt →
+      map_included Mt M.
+   
+  Definition kvs_snapshots_cuts (M : global_mem) (S : snapshots) : Prop :=
+    ∀ t k h_snap h_curr Mt,
+      S !! t = Some Mt →
+      Mt !! k = Some h_snap →
+      M !! k = Some h_curr →
+      ∃ h_after, h_curr = h_snap ++ h_after ∧
+              (∀ e, e ∈ h_snap → e.(we_time) < t) ∧
+              (∀ e, e ∈ h_after → t < e.(we_time)).
 
-  Definition time_tss_valid (T : nat) (Tss : gset nat) : Prop :=
-    ∀ (t : nat), t ∈ Tss → t ≤ T.
-
-  Definition hist_cut_by_snap (h hl hr : list write_event) (t : nat) : Prop :=
-      h = hl ++ hr ∧
-      (∀ e, e ∈ hl → e.(we_time) < t) ∧
-      (∀ e, e ∈ hr → t < e.(we_time)).
-
-  (** There are several lemmas that we will probably need about valid cuts. *)
-
-  (** State a weakier version knowing only for the left part. *)
-  Lemma hist_cut_by_snap_unicity (h hl1 hr1 hl2 hr2 : list write_event) (t : nat) :
-    whist_ext h →
-    whist_times h →
-    hist_cut_by_snap h hl1 hr1 t →
-    hist_cut_by_snap h hl2 hr2 t →
-    hl1 = hl2 ∧ hr1 = hr2.
-  Proof.
-  Admitted.
-
-  Definition kvs_tss_valid (M : kvsMdl) (Tss : gset nat) : Prop :=
-    ∀ k h t, M !! k = Some h → t ∈ Tss → ∃ hl hr, hist_cut_by_snap h hl hr t.
-
-  Record kvs_valid (M : kvsMdl) (T : nat) (Tss : gset nat) : Prop :=
+  Definition kvs_time_snapshot_map_valid (S : snapshots) (T : nat) : Prop :=
+    ∀ (t : nat), t ∈ dom S → (t <= T)%nat.
+ 
+  Record kvs_valid (M : global_mem) (S : snapshots) (T : nat) : Prop :=
     {
       kvs_ValidDom: kvs_dom M;
       kvs_ValidWhists : kvs_whists M;
       kvs_ValidKeys : kvs_keys M;
       kvs_ValidCommitTimes : kvs_whist_commit_times M T;
-      kvs_ValidSnapshotTimesTime : time_tss_valid T Tss;
-      kvs_ValidSnapshotTimesCuts : kvs_tss_valid M Tss
+      kvs_ValidSnapshotTimesTime : kvs_time_snapshot_map_valid S T;
+      kvs_ValidSnapshotTimesInclusion : kvs_snapshots_included M S;
+      kvs_ValidSnapshotTimesCuts : kvs_snapshots_cuts M S
     }.
 
-  Lemma valid_state_empty :
-    kvs_valid (gset_to_gmap [] KVS_keys) 0 ∅.
+  Definition update_kvs
+    (M0 : global_mem) (C : gmap Key SerializableVal) (T : nat) :=
+      map_fold
+        (λ k v M,
+           (<[ k := (default [] (M !! k)) ++
+                      [{|
+                          we_key := k;
+                          we_val := v.(SV_val);
+                          we_time := T
+                        |}]
+             ]> M))
+        M0 C.
+
+  Lemma upd_serializable
+    (cache : gmap Key SerializableVal)
+    (M : gmap Key (list write_event)) (T : nat) :
+    map_Forall
+      (λ (_ : Key) (l : list events.write_event),
+        Forall (λ we : events.write_event,
+              KVS_Serializable (we_val we)) l) M
+    →
+    map_Forall
+      (λ (_ : Key) (l : list events.write_event),
+        Forall (λ we : events.write_event,
+              KVS_Serializable (we_val we)) l) (update_kvs M cache T).
   Proof.
+  Admitted. 
+
+
+  
+  (** The initial state of the system is valid. *)
+  Lemma valid_init_state :
+    kvs_valid (gset_to_gmap [] KVS_keys) ∅ 0.
+  Proof.
+  Admitted.
+  (*
     split; rewrite /kvs_ValidDom /kvs_dom /kvs_whists /kvs_ValidWhists /kvs_ValidCommitTimes.
     -  by rewrite dom_gset_to_gmap.
     - intros ? ? Habs. apply lookup_gset_to_gmap_Some in Habs as [_ <-].
@@ -138,60 +168,41 @@ Section KVS_valid.
       apply lookup_gset_to_gmap_Some in Habs as [_ <-]. set_solver.
     - by rewrite /time_tss_valid.
     - by rewrite /kvs_tss_valid.
-   Qed.
-
-  Definition update_kvs (M0 : kvsMdl) (C : gmap Key SerializableVal) (T : nat) :=
-      map_fold
-        (λ k v M,
-           (<[ k := (default [] (M !! k)) ++
-                    [{| we_key := k; we_val := v.(SV_val); we_time := T |}]
-             ]> M))
-        M0 C.
-
-  Lemma upd_serializable (cache : gmap Key SerializableVal) (M : gmap Key (list write_event)) (T : nat) :
-    map_Forall
-          (λ (_ : Key) (l : list events.write_event), Forall (λ we : events.write_event, KVS_Serializable (we_val we)) l) M
-    →
-    map_Forall
-      (λ (_ : Key) (l : list events.write_event),
-        Forall (λ we : events.write_event, KVS_Serializable (we_val we)) l) (update_kvs M cache T).
-  Proof.
-  Admitted. 
-
-  (** Probably not needed as lemma! *)
-  (* Lemma kvs_valid_update_cell *)
-  (*       (M : kvsMdl) (T : nat) (Tss : gset nat) (k : Key) (v : SerializableVal) : *)
-  (*   k ∈ KVS_keys → *)
-  (*   kvs_valid M T Tss -> *)
-  (*   kvs_valid *)
-  (*     (<[ k := (default [] (M !! k)) ++ *)
-  (*              [{| we_key := k; we_val := v; we_time := (T + 1)%nat |}] *)
-  (*       ]> M) *)
-  (*     (T+1) Tss. *)
-  (* Proof. *)
-  (* Admitted. *)
-
-
-  (** Used for start *)
-  Lemma kvs_valid_next M T Tss :
-    kvs_valid M T Tss →
-    kvs_valid M (T + 1) (Tss ∪ {[(T+1)%nat]}).
-  Proof. Admitted.
-
-  (** Used for commit *)
-  Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
-    dom cache ⊆ KVS_keys →
-    kvs_valid M T Tss →
-    kvs_valid (update_kvs M cache (T+1)) (T+1) Tss.
+   Qed. *)
+  
+  (** A system step starting new transaction is valid.  *)
+  Lemma kvs_valid_step_start_transaction M S T :
+    kvs_valid M S T →
+    kvs_valid M (<[(T+1)%nat := M]>S) (T + 1).
   Proof.
   Admitted.
 
-  (** Weakening lemma *)
-  Lemma kvs_valid_subset_Tss M T Tss sub:
-    sub ⊆ Tss →
-    kvs_valid M T Tss →
-    kvs_valid M T sub.
-  Proof. Admitted.
+  (** A system step updating the memory with the effect of commit 
+      of a transaction is valid *)
+  Lemma kvs_valid_update M S T (cache : gmap Key SerializableVal) :
+    dom cache ⊆ KVS_keys →
+    kvs_valid M S T →
+    kvs_valid (update_kvs M cache (T+1)) S (T+1).
+  Proof.
+  Admitted.
+
+  (**  Weakening lemma. *)
+  Lemma kvs_valid_single_snapshot M Mts T t Mt:
+    kvs_valid M Mts T →
+    Mts !! t = Some Mt →
+    kvs_valid M {[ t := Mt ]} T.
+  Proof.
+  Admitted.
+  
+  (** Strong Weakening lemma. *)
+  Lemma kvs_valid_global_mem_prefix M Mts T t Mt Msub:
+    kvs_valid M Mts T →
+    Mts !! t = Some Mt →
+    map_included Mt Msub →
+    map_included Msub M →
+    kvs_valid Msub {[ t := Mt ]} T.
+  Proof.
+  Admitted.
 
 End KVS_valid.
 
@@ -202,66 +213,82 @@ Section KVSL_valid.
 
   Definition kvsl_dom (m : gmap Key val) := dom m ⊆ KVS_keys.
 
-  Definition kvsl_in_model_empty_coh (m : gmap Key val) (M : kvsMdl) :=
+  Definition kvsl_in_model_empty_coh (m : gmap Key val) (M : global_mem) :=
     ∀ k, M !! k = Some [] → m !! k = None.
 
-  Definition kvsl_in_model_some_coh (m : gmap Key val) (M : kvsMdl) :=
+  Definition kvsl_in_model_some_coh (m : gmap Key val) (M : global_mem) :=
     ∀ k (h: whist), M !! k = Some h → h ≠ [] → m !! k = Some $(reverse h).
 
-  Definition kvsl_in_local_some_coh (m : gmap Key val) (M : kvsMdl) :=
+  Definition kvsl_in_local_some_coh (m : gmap Key val) (M : global_mem) :=
     ∀ k (h: whist), m !! k = Some $h → M !! k = Some (reverse h).
 
-  Record kvsl_valid (m : gmap Key val) (M : kvsMdl) (T : nat) (Tss : gset nat) : Prop :=
+  Record kvsl_valid
+    (m : gmap Key val) (M : global_mem) (S : snapshots) (T : nat) : Prop :=
     {
       kvsl_ValidDom: kvsl_dom m;
       kvsl_ValidInModelEmpty : kvsl_in_model_empty_coh m M;
       kvsl_ValidInModelSome : kvsl_in_model_some_coh m M;
       kvsl_ValidLocalSome : kvsl_in_local_some_coh m M;
-      kvsl_ValidModel : kvs_valid M T Tss
+      kvsl_ValidModel : kvs_valid M S T
     }.
-
+  
   Lemma kvsl_valid_empty :
-    kvsl_valid ∅ (gset_to_gmap [] KVS_keys) 0 ∅.
+    kvsl_valid ∅ (gset_to_gmap [] KVS_keys) ∅ 0.
   Proof.
   Admitted.
 
-  Definition update_kvsl (m0 : gmap Key val) (C : gmap Key SerializableVal) (T : nat) :=
+  Definition update_kvsl
+    (m0 : gmap Key val)
+    (C : gmap Key SerializableVal)
+    (T : nat) :=
     map_fold (λ k v m, 
                (<[ k := SOMEV ($(k, (v.(SV_val), T)), v)]> m))
-              m0 C.
+      m0 C.
 
-  (* Used for commit *)
-  Lemma kvsl_valid_update (m : gmap Key val) (M : kvsMdl) (T : nat) (Tss : gset nat)
+  (** Used for commit *)
+  Lemma kvsl_valid_update
+    (m : gmap Key val)
+    (M : global_mem)
+    (Mts : snapshots)
+    (T : nat) 
     (cache : gmap Key SerializableVal) :
     dom cache ⊆ KVS_keys →
-    kvsl_valid m M T Tss →
-    kvsl_valid (update_kvsl m cache (T+1)) (update_kvs M cache (T+1)) (T+1) Tss.
+    kvsl_valid m M Mts T →
+    kvsl_valid
+      (update_kvsl m cache (T+1))
+      (update_kvs M cache (T+1)) Mts (T+1).
   Proof.
   Admitted.
 
   (** Used for start *)
-  Lemma kvsl_valid_next M (m : gmap Key val) T Tss :
-    kvsl_valid m M T Tss →
-    kvsl_valid m M (T + 1) (Tss ∪ {[(T+1)%nat]}).
+  Lemma kvsl_valid_next M S (m : gmap Key val) T :
+    kvsl_valid m M S T →
+    kvsl_valid m M (<[(T+1)%nat := M]>S) (T + 1).
   Proof. Admitted.
 
+  
   (** Weakening lemma *)
-  Lemma kvs_valid_filter M (mu : gmap Key (list val)) T Tss :
-    kvs_valid M T Tss →
+  Lemma kvs_valid_filter M S t Mt (mu : gmap Key (list val)) T :
+    kvs_valid M S T →
+    S !! t = Some Mt →
     kvs_valid
       (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M)
-      T Tss.
+      {[t := (filter (λ k : Key * list write_event, k.1 ∈ dom mu) Mt) ]}
+      T.
   Proof.
   Admitted.
-
+  
 End KVSL_valid.
 
 Section Snapshot.
   Context `{!User_params}.
 
   Definition kvs_valid_snapshot
-             (M : gmap Key (list write_event)) (t : Time) :=
-    kvs_valid M t {[t]} ∧
-      ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
+    (Msnap : global_mem) (t : Time) :=
+    (* dom Msnap ⊆ KVS_keys ∧ *)
+    (* kvs_whists Msnap ∧ *)
+    (* kvs_keys Msnap ∧ *)
+    ∀ k h, Msnap !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
 
 End Snapshot.
+
