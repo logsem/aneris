@@ -57,10 +57,57 @@ Section Proof_of_commit_handler.
                         if b then bool_decide (M !! k = Msnap !! k) else true
                       | None => true
                       end⌝) 
-      ∨ (⌜br = false⌝ ∗ ⌜∃ vo, cache_logicalM !! k = Some (vo, true)⌝ ∗ ⌜M !! k ≠ Msnap !! k⌝)
+      ∨ (⌜br = false⌝ ∗ ⌜∃ vo, cache_logicalM !! k = Some (vo, true)⌝ ∗       
+      ⌜∀ (v1 v2 : list write_event), M !! k = Some v1 → Msnap !! k = Some v2 →
+      to_hist v1 ≠ to_hist v2⌝)
     }}}.
   Proof.
   Admitted.
+
+  Lemma can_not_commit M Msnap cache_logicalM k :
+    (∃ vo : option val,
+          cache_logicalM !! k =
+          Some (vo, true)) → 
+    (∀ v1 v2 : list write_event,
+            M !! k = Some v1
+            → Msnap !! k = Some v2
+              → to_hist v1 ≠ to_hist v2) →
+    k ∈ KVS_keys →
+    k ∈ dom Msnap →
+    ¬ can_commit
+      ((λ hw : list write_event, to_hist hw) <$>
+      filter
+        (λ k : Key * list write_event,
+            k.1 ∈ dom Msnap) M)
+      ((λ hw : list write_event, to_hist hw) <$>
+      Msnap) cache_logicalM.
+  Proof.
+    intros H_some H_neq H_in H_in' H_abs.
+    unfold can_commit in H_abs.
+    apply bool_decide_unpack in H_abs.
+    specialize (H_abs k).
+    destruct (cache_logicalM !! k) as [ p | ] eqn:H_lookup; 
+      try by inversion H_some.
+    specialize (H_abs H_in).
+    inversion H_some as [vo H_eq].
+    inversion H_eq as [H_p_eq].
+    rewrite H_p_eq in H_abs.
+    apply bool_decide_unpack in H_abs.
+    do 2 rewrite lookup_fmap in H_abs.
+    pose proof H_in' as H_k_some.
+    rewrite elem_of_dom in H_k_some.
+    apply lookup_lookup_total in H_k_some.
+    rewrite H_k_some in H_abs.
+    simpl in H_abs.
+    destruct (M !! k) as [wl | ] eqn:H_lookup'.
+    - rewrite (map_filter_lookup_Some_2 _ _ _ wl) in H_abs; try done.
+      simpl in H_abs.
+      specialize (H_neq wl (Msnap !!! k)).
+      apply H_neq; try done.
+      by inversion H_abs.
+    - rewrite map_filter_lookup_None_2 in H_abs; try done.
+      by left.
+  Qed.
 
   Lemma map_forall_spec (ts tc : nat) (tss : gset nat) (kvs cache : val) 
     (cache_updatesM m : gmap Key val)
@@ -144,44 +191,56 @@ Section Proof_of_commit_handler.
              eapply (is_coherent_cache_delete e_key); last apply H_coh.
           -- iPureIntro.
              eexists l'.
-             generalize dependent cache_updatesM.
-             induction l'.
-             ++ intros; simpl.
-                split_and!; try done.
-                ** rewrite H_eq_updates.
-                   rewrite delete_insert_dom; done.
-                ** apply NoDup_nil_2.
-             ++ intros.
-                split_and!; try done.
-                ** rewrite H_eq_updates.
+             split_and!; try done.
+             ++ rewrite H_eq_updates.
                    rewrite delete_insert_dom; first done.
-                   admit.
-                ** admit.
+                   apply NoDup_cons_1_1 in H_dup.
+                   simpl in H_dup.
+                   rewrite dom_list_to_map_L.
+                   set_solver.
+             ++ by apply NoDup_cons_1_2 in H_dup.
           -- iModIntro.
-             admit.
+             iIntros (b) "HΦ'".
+             iApply "HΦ".
+             destruct b.
+             ++ iLeft.
+                iSplit; first done.
+                iDestruct "HΦ'" as "[(_ & %H_com_status) | (%Habs & _)]"; last done.
+                iPureIntro.
+                
+                apply bool_decide_pack.
+                intros k H_k_in.
+                apply bool_decide_unpack in H_com_status.
+                destruct (decide (k = e_key)) as [<-| H_neq_k].
+                *** destruct (cache_logicalM !! k) as [p |]; last done.
+                    destruct p as [vo b].
+                    destruct b; last done.
+                    apply bool_decide_pack.
+                    admit. (* Can be proven *)
+                *** specialize (H_com_status k H_k_in).
+                    rewrite lookup_delete_ne in H_com_status; last done.
+                    admit. (* Can be proven *)
+
+             ++ iRight.
+                iSplit; first done.
+                iDestruct "HΦ'" as "[(%Habs & _) | (_ & %H_com_status)]"; first done.
+                iPureIntro.
+
+                intros H_com_status'.
+                apply H_com_status.
+                admit. (* Can be proven *)
+
+
         * wp_if_false.
           iApply "HΦ".
           iRight.
           iSplit; first done.
           iPureIntro.
-          intro abs.
-          unfold can_commit in abs.
-          apply bool_decide_unpack in abs.
-          specialize (abs e_key).
-          destruct (cache_logicalM !! e_key) as [ p | ] eqn:H_lookup'; 
-            try by inversion H_some.
-          unfold is_coherent_cache in H_coh.
           destruct H_coh as (H_coh1 & H_coh2 & H_coh3 & _).
           rewrite H_eq_updates in H_coh3.
           assert (e_key ∈ KVS_keys) as H_e_in; first set_solver.
-          specialize (abs H_e_in).
-          inversion H_some as [vo H_eq].
-          inversion H_eq as [H_p_eq].
-          rewrite H_p_eq in abs.
-          apply bool_decide_unpack in abs.
           assert (e_key ∈ dom Msnap) as H_e_in'; first set_solver.
-          rewrite lookup_fmap in abs.
-          admit.
+          eapply can_not_commit; try done.
       + wp_apply (check_at_key_spec e_key ts tc tss (InjLV #()) kvs cache 
           cache_updatesM m cache_logicalM Msnap M); try done.
         {
@@ -192,28 +251,44 @@ Section Proof_of_commit_handler.
         }
         iIntros (br [(-> & H_commit) | (-> & (H_some & H_neq))]).
         * wp_if_true.
-          (* iApply "IH".  *)
-          admit.
+          simpl in H_eq_updates.
+          iApply "IH".
+          -- iPureIntro.
+             eapply (is_coherent_cache_delete e_key); last apply H_coh.
+          -- iPureIntro.
+             eexists l'.
+             split_and!; try done.
+             ++ rewrite H_eq_updates.
+                   rewrite delete_insert_dom; first done.
+                   apply NoDup_cons_1_1 in H_dup.
+                   simpl in H_dup.
+                   rewrite dom_list_to_map_L.
+                   set_solver.
+             ++ by apply NoDup_cons_1_2 in H_dup.
+          -- iModIntro.
+             iIntros (b) "HΦ'".
+             iApply "HΦ".
+             destruct b.
+             ++ iLeft.
+                iSplit; first done.
+                iDestruct "HΦ'" as "[(_ & %H_com_status) | (%Habs & _)]"; last done.
+                iPureIntro. 
+                admit. (* Can be proven *)
+             ++ iRight.
+                iSplit; first done.
+                iDestruct "HΦ'" as "[(%Habs & _) | (_ & %H_com_status)]"; first done.
+                iPureIntro.
+                admit. (* Can be proven *)
         * wp_if_false.
           iApply "HΦ".
           iRight.
           iSplit; first done.
           iPureIntro.
-          intro abs.
-          unfold can_commit in abs.
-          apply bool_decide_unpack in abs.
-          specialize (abs e_key).
-          destruct (cache_logicalM !! e_key) as [ p | ] eqn:H_lookup'; 
-            try by inversion H_some.
-          destruct H_coh as ( _ & _ & H_coh & _).
-          rewrite H_eq_updates in H_coh.
+          destruct H_coh as (H_coh1 & H_coh2 & H_coh3 & _).
+          rewrite H_eq_updates in H_coh3.
           assert (e_key ∈ KVS_keys) as H_e_in; first set_solver.
-          specialize (abs H_e_in).
-          inversion H_some as [vo H_eq].
-          inversion H_eq as [H_p_eq].
-          rewrite H_p_eq in abs.
-          apply bool_decide_unpack in abs.
-          admit.
+          assert (e_key ∈ dom Msnap) as H_e_in'; first set_solver.
+          eapply can_not_commit; try done.
   Admitted.
 
   Lemma update_kvs_spec (kvs cacheV : val) (tc : nat) (tss : gset nat)
