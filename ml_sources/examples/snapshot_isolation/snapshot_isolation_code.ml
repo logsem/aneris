@@ -79,12 +79,7 @@ let check_at_key k (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) 
     let (vlast, _hd) = l in
     let ((_k, (_v, t))) = vlast in
     if tc <= t || t = ts then assert false
-    else
-    let b = t < ts in
-      let () =
-        if b then ()
-        else unsafe (fun () -> Printf.printf "%s last_t=%d snap_t=%d\n%!" k t ts)
-      in b
+    else t < ts
 
 let commit_handler
     (kvs : 'a kvsTy Atomic.t)
