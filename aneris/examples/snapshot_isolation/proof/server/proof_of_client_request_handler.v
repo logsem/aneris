@@ -72,16 +72,14 @@ Section Proof_of_handler.
       wp_pures.
       wp_lam.
       wp_pures.
-      (* by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _ *)
-      (*   Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]"). *)
-      admit.
-      }
+      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _
+        Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]"). }
     iDestruct "HpreStart" as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
     wp_pures.
     wp_lam.
     wp_pures.
     by iApply (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE
              with "[$Hlk][$HGlobInv][$HP][$Hsh]").
-  Admitted.
+  Qed.
 
 End Proof_of_handler.
