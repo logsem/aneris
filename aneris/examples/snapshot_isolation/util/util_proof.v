@@ -10,12 +10,13 @@ From iris.algebra Require Import excl.
 
 Section proof.
 
-Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
+  Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
            !SI_client_toolbox}.
 
   Lemma commitU_spec :
     ∀ c sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
+    IsConnected c sa -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
         ConnectionState c sa (Active ms) ∗
@@ -33,10 +34,10 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
          (⌜¬ can_commit m ms mc⌝ ∗
            [∗ map] k ↦ h ∈ m, k ↦ₖ h ∗ Seen k h)) >>>.
   Proof.
-    iIntros (cst sa E name Φ) "!>HΦ".
+    iIntros (cst sa E name) "#HisC %Φ !>HΦ" . 
     rewrite/commitU.
     wp_pures.
-    wp_apply (SI_commit_spec with "[//] [HΦ]").
+    wp_apply (SI_commit_spec with "[//] [$] [HΦ]").
     iMod "HΦ" as "(%m & %ms & %mc & pre & HΦ)".
     iModIntro.
     iExists m, ms, mc.
@@ -50,6 +51,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
   Lemma commitT_spec :
     ∀ c sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
+    IsConnected c sa -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
         ⌜can_commit m ms mc⌝ ∗
@@ -64,10 +66,10 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
         ([∗ map] k↦ h;p ∈ m; mc,
             k ↦ₖ commit_event p h ∗ Seen k (commit_event p h)) >>>.
   Proof.
-    iIntros (cst sa E name Φ) "!>HΦ".
+    iIntros (cst sa E name) "#HisC %Φ !>HΦ". 
     rewrite/commitT/assert.
     wp_pures.
-    wp_apply (SI_commit_spec with "[//] [HΦ]").
+    wp_apply (SI_commit_spec with "[//] [$] [HΦ]").
     iMod "HΦ" as "(%m & %ms & %mc & (%can_commit & pre) & HΦ)".
     iModIntro.
     iExists m, ms, mc.
@@ -81,6 +83,7 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
   Lemma simplified_commitT_spec :
     ∀ c sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
+    IsConnected c sa -∗
     <<< ∀∀ (m ms : gmap Key Hist),
         ConnectionState c sa (Active ms) ∗
         ⌜dom m = dom ms⌝ ∗
@@ -93,9 +96,10 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
             We don't need seen predicates as nothing changed. *)
         ([∗ map] k↦ h ∈ m, k ↦ₖ h)>>>.
   Proof.
-    iIntros (c sa E name_sub_E Φ) "!>HΦ".
-    wp_apply (commitT_spec with "[//]").
-    iMod "HΦ" as "(%m & %ms & (Active & %dom_eq & kvs & cache) & close)".
+    iIntros (cst sa E name) "#HisC %Φ !>HΦ" . 
+    wp_apply (commitT_spec with "[//][$]").
+    iMod "HΦ" as
+      "(%m & %ms & (Active & %dom_eq & kvs & cache) & close)".
     iModIntro.
     iExists _, _, ((λ h, (last h, false)) <$> ms).
     iFrame.
@@ -139,7 +143,8 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     ∀ (c cond : val) (key : Key) sa E
     (P : iProp Σ) (Q : val → iProp Σ) (Ψ : gmap _ _ → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    □ (|={⊤, E}=> ∃ m, ⌜key ∈ dom m⌝ ∗ ⌜dom m ⊆ KVS_keys⌝ ∗
+    IsConnected c sa -∗
+      □ (|={⊤, E}=> ∃ m, ⌜key ∈ dom m⌝ ∗ ⌜dom m ⊆ KVS_keys⌝ ∗
               ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ Ψ m ∗
             ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     □ (∀ m, Ψ m ={⊤, E}=∗ ∃ m', ⌜dom m = dom m'⌝ ∗
@@ -152,16 +157,17 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
               ConnectionState c sa (Active m') ∗ ⌜dom m' = dom m⌝ ∗ Ψ m' ∗
               ([∗ map] k ↦ h ∈ m', k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗
               if b then Q v' else P }}}) -∗
-    {{{ P ∗ ConnectionState c sa CanStart ∗ IsConnected c sa}}}
+    {{{ P ∗ ConnectionState c sa CanStart }}}
      wait_transaction c cond #key @[ip_of_address sa]
     {{{ v h, RET #(); ConnectionState c sa CanStart ∗ Seen key (h ++ [v]) ∗ Q v }}}.
   Proof.
-    iIntros (c cond key sa E P Q Ψ name_sub_E) "#start #commit #cond".
-    iIntros (Φ) "!>(HP & CanStart & #HiC) HΦ".
+    iIntros (c cond key sa E P Q Ψ name_sub_E)
+      "#HisC #start #commit #cond".
+    iIntros (Φ) "!>(HP & CanStart) HΦ".
     rewrite /wait_transaction.
     wp_pures.
     iLöb as "IH".
-    wp_apply (SI_start_spec with "[//]").
+    wp_apply (SI_start_spec with "[//][$]").
     iPoseProof "start" as "start'".
     iMod "start'" as "(%m_shift & %key_in_m_shift & %m_sub_keys &
                           kvs & HΨ & close)".
@@ -175,14 +181,14 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     destruct ((proj1 (elem_of_dom m_shift key)) key_in_m_shift) as (h & key_h).
     iPoseProof (big_sepM_lookup_acc _ _ _ _ key_h with "cache") as
         "((key_h & key_upd) & cache)".
-    wp_apply (SI_read_spec with "[] [$HiC $key_h]"); first set_solver.
+    wp_apply (SI_read_spec with "[][$][$key_h] "); first set_solver.
     iIntros "key_h".
     iSpecialize ("cache" with "[$key_h $key_upd]").
     destruct (last h) eqn:Hlast; wp_pures.
     wp_apply ("cond" with "[$HP $HΨ $Active $cache //]").
     rename m_shift into m_old.
     iIntros (m_shift []) "(Active & %Heq & HΨ & cache & HP)"; wp_pures.
-    all: wp_apply (simplified_commitT_spec with "[//]").
+    all: wp_apply (simplified_commitT_spec with "[//][$]").
     all: iMod ("commit" with "HΨ") as
         "(%m_shift' & %Heq' & kvs & close)".
     all: iModIntro.
@@ -205,19 +211,20 @@ Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ,
     ∀ (c cond v : val) (key : Key) sa E,
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜key ∈ KVS_keys⌝ -∗
+    IsConnected c sa -∗  
     □ (|={⊤, E}=> ∃ h, key ↦ₖ h ∗ ▷ (key ↦ₖ h ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
-    {{{ ConnectionState c sa CanStart ∗ IsConnected c sa }}}
+    {{{ ConnectionState c sa CanStart }}}
      wait_transaction c cond #key @[ip_of_address sa]
     {{{ h, RET #(); ConnectionState c sa CanStart ∗ Seen key (h ++ [v]) }}}.
   Proof.
     iIntros (c cond v key sa E name_sub_E key_keys)
-        "#shift #cond %Φ !> (CanStart & #HiC) HΦ".
+        "#HiC #shift #cond %Φ !> CanStart HΦ".
     iApply (wait_transaction_spec _ _ _ _ _ emp (λ v', ⌜v = v'⌝)%I
       (λ m, ⌜dom m = {[ key ]}⌝)%I
-      with "[//] [] [] [] [$CanStart]"); [| | | iFrame "#"|];
+      with "[//] [$] [] [] [] [$CanStart]"); [| | iFrame "#"|];
       last first.
     {
       iIntros "!>%v' %h (CanStart & Seen & <-)".
