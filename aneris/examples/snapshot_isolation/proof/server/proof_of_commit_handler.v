@@ -17,7 +17,7 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params resources specs.
+     Require Import user_params aux_defs.
 From aneris.examples.snapshot_isolation.proof
      Require Import time events model kvs_serialization rpc_user_params utils.
 From aneris.examples.snapshot_isolation.proof.resources
@@ -699,7 +699,7 @@ Section Proof_of_commit_handler.
         {
           iModIntro.
           iNext.
-          iExists (update_kvs M cache (T + 1)), Sg, (T + 1), gMg.
+          iExists (update_kvs M cache (T + 1)%nat), Sg, (T + 1)%nat, gMg.
           iFrame.
           iSplit; first done.
           iPureIntro.
@@ -724,8 +724,8 @@ Section Proof_of_commit_handler.
         wp_apply (release_spec with
           "[$Hlock $Hlk HkvsL HvnumL HmemLoc HtimeLoc]").
         {
-          iExists (update_kvs M cache (T + 1)), S, (T + 1), 
-            (update_kvsl m cache (T + 1)), kvs_updated.
+          iExists (update_kvs M cache (T + 1)%nat), S, (T + 1)%nat, 
+            (update_kvsl m cache (T + 1)%nat), kvs_updated.
           iFrame "#∗".
           iSplit; first done.
           iSplit.

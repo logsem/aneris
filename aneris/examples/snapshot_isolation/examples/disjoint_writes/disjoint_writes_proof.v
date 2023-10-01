@@ -232,7 +232,8 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     {{{ RET #(); True }}}.
   Proof.
     iMod (SI_init_module _ {[client_1_addr; client_2_addr]})
-      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)".
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
+      first done.
     destruct specs as (Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     iPoseProof (big_sepS_insert with "mem") as "(mem_x & mem)"; first set_solver.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(mem_y & _)"; first done.
@@ -297,6 +298,7 @@ Proof.
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).
   2 : { iModIntro. done. }
+  Unshelve.
   do 2 (iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated ?]";
   [set_solver|]). iFrame.
   do 2 (rewrite big_sepS_union; [|set_solver];
@@ -304,5 +306,5 @@ Proof.
   iDestruct "Hhist" as "[Hhist ?]"; iFrame).
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
-  iDestruct "Hips" as "[Hips ?]"; iFrame).
+        iDestruct "Hips" as "[Hips ?]"; iFrame).
 Qed.

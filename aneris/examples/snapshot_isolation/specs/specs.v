@@ -1,6 +1,9 @@
-From iris.algebra Require Import auth gmap excl excl_auth.
+From iris.algebra Require Import auth gmap excl excl_auth csum.
+From iris.base_logic.lib Require Import mono_nat ghost_map.
+From iris.algebra.lib Require Import mono_list.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -124,14 +127,51 @@ Definition init_kvs_spec : Prop :=
 
 End Specification.
 
-Class KVSG  Σ :=
+Canonical Structure valO := leibnizO val.
+
+Class KVSG Σ :=
   {
-    KVS_lockG :> lockG Σ;
-    (* TODO ... : ... ; *)
-  }.
+    (** Key-Value store *)
+    SIG_Global_mem :> ghost_mapG Σ Key (list val);
+    SIG_Global_mono :> inG Σ (authR (gmapUR Key (max_prefix_listR
+                                                   valO)));
+    SIG_Global_snapshots :>
+          inG Σ (authR (gmapUR nat (agreeR ((gmapUR Key ((max_prefix_listR valO)))))));
+    (** Cache at Client Proxies *)
+    SIG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
+    SIG_Cache_lgcl :> ghost_mapG Σ Key (option val * bool);
+    SIG_Cache_Msnap :> ghost_mapG Σ Key (list val);
+    SIG_TksExcl :> inG Σ (exclR unitO);
+    SIG_ConnectedClients :>
+      inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
+    SIG_TksAgr :>  inG Σ (csumR
+                             (exclR unitR)
+                             (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
+
+    (** Time *)
+    SIG_TimeStamp :> mono_natG Σ;
+    SIG_TimeSnaps :> inG Σ (authUR (gsetUR nat));
+    }.
+
+
 
 Definition KVSΣ : gFunctors :=
-  #[ (* TODO ... ; *) lockΣ].
+  #[
+      ghost_mapΣ Key (list val);
+      ghost_mapΣ Key (option val * bool);
+      GFunctor (authR (gmapUR Key (max_prefix_listR
+                                     valO)));
+      GFunctor ((authR (gen_heapUR Key val)));
+      GFunctor (authR (gmapUR nat (agreeR (gmapUR Key (max_prefix_listR valO)))));
+      GFunctor
+        (authR (gmapUR socket_address (agreeR (leibnizO gname))));
+      GFunctor ((csumR
+                   (exclR unitR)
+                   (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type))));
+     GFunctor (exclR unitO);
+     GFunctor (authUR (gsetUR nat));
+     mono_natΣ;
+     lockΣ].
 
 Instance subG_KVSΣ {Σ} : subG KVSΣ Σ → KVSG Σ.
 Proof. econstructor; solve_inG. Qed.
@@ -148,10 +188,11 @@ Section SI_Module.
     SI_start_spec : start_spec;
     SI_commit_spec : commit_spec;
   }.
-
+ 
    Class SI_init := {
     SI_init_module E (clients : gset socket_address) :
-      ⊢ |={E}=>
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=>
       ∃ (res : SI_resources Mdl Σ),
         ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗
         KVS_Init ∗
@@ -166,3 +207,4 @@ Section SI_Module.
      }.
    
 End SI_Module.
+ 

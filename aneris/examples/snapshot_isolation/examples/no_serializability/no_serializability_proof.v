@@ -639,7 +639,8 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
             _
             {[client_1_addr; client_2_addr;
               client_3_addr; client_4_addr]})
-      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)".
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
+      first done.
     destruct specs as (Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     iPoseProof (big_sepS_delete _ _ "x" with "mem") as "(mem_x & mem)";
       first done.
