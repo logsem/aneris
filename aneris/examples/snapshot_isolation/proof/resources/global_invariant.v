@@ -12,10 +12,10 @@ From aneris.aneris_lang.lib Require Import
      list_proof monitor_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
-From aneris.examples.snapshot_isolation.specs Require Import user_params.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events resource_algebras.
 From aneris.examples.snapshot_isolation.proof Require Import model.
 From aneris.examples.snapshot_isolation.proof.resources Require Import
-  resource_algebras
   server_resources.
 
 

@@ -3,32 +3,8 @@ From aneris.aneris_lang.lib.serialization Require Import
   serialization_proof.
 From aneris.examples.snapshot_isolation.specs Require Export
   user_params.
-From aneris.examples.snapshot_isolation.proof Require Export
+From aneris.examples.snapshot_isolation.specs Require Export
   time events.
-
-
-Global Instance int_time : KVS_time :=
-  {| Time := nat;
-    TM_lt := Nat.lt;
-    TM_lt_tricho := PeanoNat.Nat.lt_trichotomy |}.
-
-Instance: Inhabited (@write_event int_time) := populate (Build_write_event "" #() inhabitant).
-
-Global Program Instance Inject_write_event : Inject write_event val :=
-  {| inject a := $(a.(we_key), (a.(we_val), a.(we_time)))
-  |}.
-Next Obligation.
-  intros w1 w2 Heq.
-  inversion Heq as [[Hk Hv Ht]].
-  assert (we_time w1 = we_time w2) as Ht'.
-  { by apply (inj (R := eq)) in Ht; [ | apply _]. }
-  destruct w1, w2; simpl in *.
-  by apply Nat2Z.inj in Ht; subst.
-Qed.
-
-Definition write_event := @write_event int_time.
-Definition write_eventO := leibnizO write_event.
-Definition whist := list write_eventO.
 
 Section Whist_valid.
   Context `{!anerisG Mdl Σ, !User_params}.
@@ -298,11 +274,9 @@ Section KVSL_valid.
   
 End KVSL_valid.
 
-Section Snapshot.
-  Context `{!User_params}.
 
   Definition kvs_valid_snapshot
-    (Msnap : global_mem) (t : Time) :=
+    (Msnap : global_mem) (t : nat) :=
     (* dom Msnap ⊆ KVS_keys ∧ *)
     (* kvs_whists Msnap ∧ *)
     (* kvs_keys Msnap ∧ *)
@@ -313,5 +287,4 @@ Section Snapshot.
     kvs_valid_snapshot (delete k M) ts.
   Proof. Admitted.
   
-End Snapshot.
 

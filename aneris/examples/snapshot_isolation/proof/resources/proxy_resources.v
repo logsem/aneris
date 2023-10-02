@@ -16,9 +16,9 @@ From aneris.examples.reliable_communication.lib.mt_server Require Import
 From aneris.examples.snapshot_isolation.proof Require Import
   model kvs_serialization utils.
 From aneris.examples.snapshot_isolation.proof.resources Require Import
-  resource_algebras
   server_resources.
-
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events resource_algebras.
 
 Import gen_heap_light.
 
@@ -300,23 +300,24 @@ Section Proxy.
                rewrite lookup_fmap in Hyp.
                destruct (M !! k) eqn:H_lookup.
                {
-                 rewrite H_lookup in Hyp.
-                 simpl in Hyp.
+                 inversion Hyp as [Hyp'].
                  exists l.
                  destruct l.
                  1 : done.
                  assert (w :: l ≠ []) as H_neq.
                  { set_solver. }
                  apply last_of_none_empty_list_is_some in H_neq as H_eq.
-                 destruct H_eq as [v' H_eq].
-                 exists v'.
-                 rewrite -H_eq in Hyp.
-                 simpl in Hyp.
+                 destruct H_eq as [v' H_eq]. 
+                 exists v'. split; first done.
+                 simpl in *.
+                 rewrite H_eq.
+                 split; first done.
+                 rewrite -H_eq in Hyp'.
+                 simpl in Hyp'.
                  set_solver.
                }
                {
-                 rewrite H_lookup in Hyp.
-                 by simpl in Hyp.
+                by inversion Hyp.
                }
             -- split.
               ++ intros k Hyp.
@@ -324,8 +325,8 @@ Section Proxy.
                 rewrite lookup_fmap in Hyp.
                 destruct (M !! k) eqn:H_lookup.
                 {
-                  rewrite H_lookup in Hyp.
                   simpl in Hyp.
+                  inversion Hyp as [Hyp'].
                   destruct l.
                   1 : done.
                   assert (w :: l ≠ []) as H_neq.
@@ -336,8 +337,7 @@ Section Proxy.
                   by simpl in Hyp.
                 }
                 {
-                  rewrite H_lookup in Hyp.
-                  by simpl in Hyp.
+                  by inversion Hyp.
                 }
               ++ split.
                 ** split.
@@ -345,7 +345,8 @@ Section Proxy.
                   intros Hyp.
                   unfold cacheM_from_Msnap in Hyp.
                   rewrite lookup_fmap in Hyp.
-                  destruct (M !! k) eqn:H_lookup; by rewrite H_lookup in Hyp.
+                  destruct (M !! k) eqn:H_lookup;
+                  inversion Hyp.
                 ** split.
                   --- intros k vo Hdom Hvo.
                       split; last done.
@@ -354,15 +355,14 @@ Section Proxy.
                       rewrite /cacheM_from_Msnap.
                       rewrite! lookup_fmap.
                       destruct (M !! k) eqn:H_lookup.
-                      { rewrite H_lookup. simplify_eq /=.
-                        by do 2 f_equal. }
+                      { simpl. by do 2 f_equal. }
                       { rewrite elem_of_dom in Hdom.
                         rewrite H_lookup in Hdom. rewrite /is_Some in Hdom. set_solver. }
                   --- intros k vo Hvo.
                       rewrite /cacheM_from_Msnap in Hvo.
                       destruct vo; first done.
                       rewrite! lookup_fmap in Hvo.
-                      by destruct (M !! k) eqn:H_lookup; rewrite H_lookup in Hvo.
+                      by destruct (M !! k) eqn:H_lookup. 
   Qed.
 
   Definition is_connected_def

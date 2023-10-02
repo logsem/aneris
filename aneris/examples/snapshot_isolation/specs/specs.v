@@ -12,7 +12,8 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
 From aneris.examples.snapshot_isolation.specs
-     Require Import resources.
+  Require Import
+  user_params time events aux_defs resource_algebras resources.
 
 Set Default Proof Using "Type".
 
@@ -129,40 +130,16 @@ End Specification.
 
 Canonical Structure valO := leibnizO val.
 
-Class KVSG Σ :=
-  {
-    (** Key-Value store *)
-    SIG_Global_mem :> ghost_mapG Σ Key (list val);
-    SIG_Global_mono :> inG Σ (authR (gmapUR Key (max_prefix_listR
-                                                   valO)));
-    SIG_Global_snapshots :>
-          inG Σ (authR (gmapUR nat (agreeR ((gmapUR Key ((max_prefix_listR valO)))))));
-    (** Cache at Client Proxies *)
-    SIG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
-    SIG_Cache_lgcl :> ghost_mapG Σ Key (option val * bool);
-    SIG_Cache_Msnap :> ghost_mapG Σ Key (list val);
-    SIG_TksExcl :> inG Σ (exclR unitO);
-    SIG_ConnectedClients :>
-      inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
-    SIG_TksAgr :>  inG Σ (csumR
-                             (exclR unitR)
-                             (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
-
-    (** Time *)
-    SIG_TimeStamp :> mono_natG Σ;
-    SIG_TimeSnaps :> inG Σ (authUR (gsetUR nat));
-    }.
-
-
-
+Notation KVSG Σ := (IDBG Σ).
+ 
 Definition KVSΣ : gFunctors :=
   #[
-      ghost_mapΣ Key (list val);
+      ghost_mapΣ Key (list write_eventO);
       ghost_mapΣ Key (option val * bool);
       GFunctor (authR (gmapUR Key (max_prefix_listR
-                                     valO)));
+                                     write_eventO)));
       GFunctor ((authR (gen_heapUR Key val)));
-      GFunctor (authR (gmapUR nat (agreeR (gmapUR Key (max_prefix_listR valO)))));
+      GFunctor (authR (gmapUR nat (agreeR (gmapUR Key (max_prefix_listR write_eventO)))));
       GFunctor
         (authR (gmapUR socket_address (agreeR (leibnizO gname))));
       GFunctor ((csumR
@@ -178,7 +155,7 @@ Proof. econstructor; solve_inG. Qed.
 
 Section SI_Module.
   Context `{!anerisG Mdl Σ, !User_params,
-    !KVS_snapshot_isolation_api}.
+            !KVSG Σ, !KVS_snapshot_isolation_api}.
 
   Class SI_client_toolbox `{!SI_resources Mdl Σ} := {
     SI_init_kvs_spec : init_kvs_spec ;

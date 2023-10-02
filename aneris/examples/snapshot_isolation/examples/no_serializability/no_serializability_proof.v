@@ -4,8 +4,8 @@ From aneris.aneris_lang.lib Require Import
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-From aneris.examples.snapshot_isolation.specs
-     Require Import user_params resources specs.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events aux_defs resource_algebras resources specs.
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From trillium.prelude Require Import finitary.
 From aneris.aneris_lang.program_logic Require Import
