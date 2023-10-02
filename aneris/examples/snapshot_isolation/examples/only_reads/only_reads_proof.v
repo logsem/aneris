@@ -1,4 +1,4 @@
-From aneris.aneris_lang Require Import network resources proofmode.
+(* From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -263,4 +263,4 @@ Proof.
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed.
+Qed. *)

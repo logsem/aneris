@@ -65,7 +65,8 @@ Section Proof_of_commit_handler.
       assert (ts <= tc); last lia.
       assert (is_Some (S !! ts)) as H_some; first set_solver.
       rewrite -elem_of_dom in H_some.
-      apply (kvs_ValidSnapshotTimesTime M S tc); done.
+      apply (kvs_ValidSnapshotTimesTime M S tc) in H_some; try done.
+      lia.
     }
     wp_pures.
     destruct (m !! k) as [ p | ] eqn:H_lookup_m.
