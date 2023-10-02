@@ -269,5 +269,4 @@ End KVSL_valid.
     kvs_valid_snapshot (delete k M) ts.
   Proof. Admitted.
   
-End Snapshot.
 
