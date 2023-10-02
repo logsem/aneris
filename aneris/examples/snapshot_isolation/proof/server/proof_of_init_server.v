@@ -17,7 +17,7 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params resources specs.
+     Require Import user_params aux_defs.
 From aneris.examples.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
@@ -75,7 +75,7 @@ Section Proof_of_init_server.
                 (KVS_InvName .@ "lk") (ip_of_address KVS_address)
                 (lkResDef γGauth γT kvsL vnumL)                   
                with "[Hvnum HpKvs HauthL HtimeL]") .
-    - iExists (gset_to_gmap [] KVS_keys), ∅, 0, ∅, kvsV.
+    - iExists (gset_to_gmap [] KVS_keys), ∅, 0%nat, ∅, kvsV.
       iSplit; first done.
       iSplit; first by (iPureIntro; apply kvsl_valid_empty).
       iSplit; last by iFrame.

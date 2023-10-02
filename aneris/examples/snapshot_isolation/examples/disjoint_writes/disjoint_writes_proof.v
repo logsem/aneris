@@ -67,7 +67,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     iIntros (cst sa h Φ) "(CanStart & #HiC & x_h) HΦ".
     rewrite/transaction1.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ ⊤); first done.
+    inversion H.
+    wp_apply (SI_start_spec _ _ ⊤); first done; eauto.
     iModIntro.
     iExists {[ "x" := h ]}.
     iFrame.
@@ -77,11 +78,10 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       "((x_h & x_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$x_h $x_upd $HiC]");
-      first done.
+    wp_apply (SI_write_spec _ _ _ _ (SerVal #1) with "[][$] [$x_h $x_upd $HiC]"); first done.
     iIntros "(x_1 & x_upd)".
     wp_pures.
-    wp_apply (commitT_spec _ _ ⊤ with "[//]").
+    wp_apply (commitT_spec _ _ ⊤ with "[//]"); eauto.
     iModIntro.
     iExists _, _, {[ "x" := (Some #1, true) ]}.
     iFrame.
@@ -121,7 +121,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     iIntros (cst sa h Φ) "(CanStart & #HiC & y_h) HΦ".
     rewrite/transaction2.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ ⊤); first done.
+    wp_apply (SI_start_spec _ _ ⊤); first done; eauto.
     iModIntro.
     iExists {[ "y" := h ]}.
     iFrame.
@@ -131,11 +131,10 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       "((y_h & y_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [$y_h $y_upd $HiC]");
-      first done.
+    wp_apply (SI_write_spec _ _ _ _ (SerVal #1) with "[][$][$y_h $y_upd $HiC]"); eauto.
     iIntros "(y_1 & y_upd)".
     wp_pures.
-    wp_apply (commitT_spec _ _ ⊤ with "[//]").
+    wp_apply (commitT_spec _ _ ⊤ with "[//][$]").
     iModIntro.
     iExists _, _, {[ "y" := (Some #1, true) ]}.
     iFrame.
@@ -233,7 +232,9 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     {{{ RET #(); True }}}.
   Proof.
     iMod (SI_init_module _ {[client_1_addr; client_2_addr]})
-      as (SI_res SI_client_toolbox) "(mem & KVS_Init & Hcc)".
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
+      first done.
+    destruct specs as (Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     iPoseProof (big_sepS_insert with "mem") as "(mem_x & mem)"; first set_solver.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(mem_y & _)"; first done.
     iIntros (Φ) "(srv_∅ & clt1_∅ & clt2_∅ & srv_unalloc & clt1_unalloc &
@@ -265,6 +266,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       + iIntros "!> Hports".
         by wp_apply (transaction1_client_spec client_1_addr with "[$]").
     - iIntros "!> Hports". by wp_apply (server_spec with "[$]").
+      Unshelve. all: by eauto.
   Qed.
 
 End proof_runner.
@@ -296,6 +298,7 @@ Proof.
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
   iApply (example_runner_spec with "[Hunallocated Hhist Hfrag Hips Hlbl]" ).
   2 : { iModIntro. done. }
+  Unshelve.
   do 2 (iDestruct (unallocated_split with "Hunallocated") as "[Hunallocated ?]";
   [set_solver|]). iFrame.
   do 2 (rewrite big_sepS_union; [|set_solver];
@@ -303,5 +306,5 @@ Proof.
   iDestruct "Hhist" as "[Hhist ?]"; iFrame).
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
-  iDestruct "Hips" as "[Hips ?]"; iFrame).
+        iDestruct "Hips" as "[Hips ?]"; iFrame).
 Qed.

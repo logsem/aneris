@@ -17,7 +17,7 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params resources specs.
+     Require Import user_params.
 From aneris.examples.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
@@ -137,13 +137,13 @@ Section Proof_of_start_handler.
       eapply alloc_local_update; last done.
       rewrite lookup_fmap.
       destruct (Sg !! (T + 1)%nat) as [Mx|] eqn:Hsg; last by rewrite Hsg.
-      assert (is_Some (Sg !! (T+1))) as Habs by naive_solver.
+      assert (is_Some (Sg !! (T+1)%nat)) as Habs by naive_solver.
       apply elem_of_dom in Habs.
       destruct HkvsValid.
-      specialize (kvs_ValidSnapshotTimesTime (T+1) Habs). 
+      specialize (kvs_ValidSnapshotTimesTime (T+1)%nat Habs). 
       by lia. }
     iSplitL "HtimeGlob HmemGlob Hccls HsnapG".
-     { iModIntro. iNext. iExists M, (<[T + 1:=M]> Sg), (T+1), _.
+     { iModIntro. iNext. iExists M, (<[(T + 1)%nat:=M]> Sg), (T+1)%nat, _.
       iFrame "#∗". iSplit; first done. iPureIntro.
       by apply kvs_valid_step_start_transaction. }
      do 2 iModIntro. wp_store.
@@ -180,7 +180,7 @@ Section Proof_of_start_handler.
     -- iPureIntro. by apply ser_start_reply_valid.
     -- rewrite /ReqPost.
        iFrame "#". iRight. iLeft.
-       iExists E, P, Q, (T+1), (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M).
+       iExists E, P, Q, (T+1)%nat, (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M).
        iFrame "#∗".
        iPureIntro.
        split_and!; eauto.

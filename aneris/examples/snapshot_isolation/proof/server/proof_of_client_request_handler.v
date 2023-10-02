@@ -17,7 +17,7 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.snapshot_isolation.specs
-     Require Import user_params resources specs.
+     Require Import user_params aux_defs.
 From aneris.examples.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
@@ -62,8 +62,12 @@ Section Proof_of_handler.
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (read_handler_spec _ _ _ _ _ _ _ _ _ _ _ reqd ts h Msf Φ Hin Hreqd Hts
-        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH][$Hfrag]"). }
+      iApply (read_handler_spec _ _ _ _ _ _ _ _ _ _ _ 
+                reqd ts h Msf Φ Hin Hreqd 
+       with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH][$Hfrag]"); try done.
+      intros e He. 
+      specialize (Hts e He).
+      replace ts with (Z.abs_nat ts) in Hts; lia. }
     2:{
       iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap ts Hreqd)
         "HpreCommit".
@@ -80,6 +84,6 @@ Section Proof_of_handler.
     wp_pures.
     by iApply (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE
              with "[$Hlk][$HGlobInv][$HP][$Hsh]").
-  Qed.
+   Qed.
 
 End Proof_of_handler.

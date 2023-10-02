@@ -1,6 +1,9 @@
-From iris.algebra Require Import auth gmap excl excl_auth.
+From iris.algebra Require Import auth gmap excl excl_auth csum.
+From iris.base_logic.lib Require Import mono_nat ghost_map.
+From iris.algebra.lib Require Import mono_list.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -11,33 +14,37 @@ From aneris.examples.snapshot_isolation
 From aneris.examples.snapshot_isolation.specs
      Require Import resources.
 
+Set Default Proof Using "Type".
 
 (** Specifications for read and write operations.  *)
 Section Specification.
   Context `{!anerisG Mdl Σ, !User_params,
             !KVS_snapshot_isolation_api, !SI_resources Mdl Σ}.
 
-  Definition write_spec : iProp Σ :=
+  Definition write_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
       (vo : option val)
       (k : Key) (v : SerializableVal) (b : bool) E,
-    ⌜k ∈ KVS_keys⌝ -∗
-    {{{ IsConnected c sa ∗ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
+      ⌜k ∈ KVS_keys⌝ -∗
+      IsConnected c sa -∗
+    {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
       SI_write c #k v @[ip_of_address sa] E
     {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
-  Definition read_spec : iProp Σ :=
+  Definition read_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
       (k : Key) (vo : option val) E,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ IsConnected c sa ∗ k ↦{c} vo }}}
+    IsConnected c sa -∗
+    {{{ k ↦{c} vo }}}
       SI_read c #k @[ip_of_address sa] E
     {{{ RET $vo; k ↦{c} vo }}}.
 
-   Definition start_spec : iProp Σ :=
+   Definition start_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
        (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+      ⌜↑KVS_InvName ⊆ E⌝ -∗
+      IsConnected c sa -∗
     <<< ∀∀ (m : gmap Key Hist),
        ConnectionState c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, k ↦ₖ h >>>
@@ -48,10 +55,11 @@ Section Specification.
        ([∗ map] k ↦ h ∈ m, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗
        ([∗ map] k ↦ h ∈ m, Seen k h)>>>.
 
-  Definition commit_spec : iProp Σ :=
+  Definition commit_spec : Prop :=
    ∀ (c : val) (sa : socket_address)
      (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+     ⌜↑KVS_InvName ⊆ E⌝ -∗
+     IsConnected c sa -∗
     <<< ∀∀ (m ms: gmap Key Hist)
            (mc : gmap Key (option val * bool)),
         ConnectionState c sa (Active ms) ∗
@@ -94,7 +102,7 @@ Section Specification.
                (⌜b = false⌝ ∗ ⌜¬ can_commit m1 m0 mc⌝ ∗
                 [∗ map] k ↦ eo ∈ m1, k ↦ₖ eo)) >>>. *)
 
-  Definition init_client_proxy_spec : iProp Σ :=
+  Definition init_client_proxy_spec : Prop :=
     ∀ (sa : socket_address),
     {{{ unallocated {[sa]} ∗
         KVS_address ⤇ KVS_si ∗
@@ -103,9 +111,10 @@ Section Specification.
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
       SI_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
-    {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗ IsConnected cstate sa }}}.
+    {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗
+                            IsConnected cstate sa }}}.
 
-Definition init_kvs_spec : iProp Σ :=
+Definition init_kvs_spec : Prop :=
   {{{ KVS_address ⤇ KVS_si ∗
         KVS_address ⤳ (∅,∅) ∗
         free_ports (ip_of_address KVS_address)
@@ -118,14 +127,51 @@ Definition init_kvs_spec : iProp Σ :=
 
 End Specification.
 
-Class KVSG  Σ :=
+Canonical Structure valO := leibnizO val.
+
+Class KVSG Σ :=
   {
-    KVS_lockG :> lockG Σ;
-    (* TODO ... : ... ; *)
-  }.
+    (** Key-Value store *)
+    SIG_Global_mem :> ghost_mapG Σ Key (list val);
+    SIG_Global_mono :> inG Σ (authR (gmapUR Key (max_prefix_listR
+                                                   valO)));
+    SIG_Global_snapshots :>
+          inG Σ (authR (gmapUR nat (agreeR ((gmapUR Key ((max_prefix_listR valO)))))));
+    (** Cache at Client Proxies *)
+    SIG_Cache_phys :> inG Σ (authR (gen_heapUR Key val));
+    SIG_Cache_lgcl :> ghost_mapG Σ Key (option val * bool);
+    SIG_Cache_Msnap :> ghost_mapG Σ Key (list val);
+    SIG_TksExcl :> inG Σ (exclR unitO);
+    SIG_ConnectedClients :>
+      inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
+    SIG_TksAgr :>  inG Σ (csumR
+                             (exclR unitR)
+                             (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
+
+    (** Time *)
+    SIG_TimeStamp :> mono_natG Σ;
+    SIG_TimeSnaps :> inG Σ (authUR (gsetUR nat));
+    }.
+
+
 
 Definition KVSΣ : gFunctors :=
-  #[ (* TODO ... ; *) lockΣ].
+  #[
+      ghost_mapΣ Key (list val);
+      ghost_mapΣ Key (option val * bool);
+      GFunctor (authR (gmapUR Key (max_prefix_listR
+                                     valO)));
+      GFunctor ((authR (gen_heapUR Key val)));
+      GFunctor (authR (gmapUR nat (agreeR (gmapUR Key (max_prefix_listR valO)))));
+      GFunctor
+        (authR (gmapUR socket_address (agreeR (leibnizO gname))));
+      GFunctor ((csumR
+                   (exclR unitR)
+                   (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type))));
+     GFunctor (exclR unitO);
+     GFunctor (authUR (gsetUR nat));
+     mono_natΣ;
+     lockΣ].
 
 Instance subG_KVSΣ {Σ} : subG KVSΣ Σ → KVSG Σ.
 Proof. econstructor; solve_inG. Qed.
@@ -135,21 +181,30 @@ Section SI_Module.
     !KVS_snapshot_isolation_api}.
 
   Class SI_client_toolbox `{!SI_resources Mdl Σ} := {
-    SI_init_kvs_spec : ⊢ init_kvs_spec;
-    SI_init_client_proxy_spec : ⊢ init_client_proxy_spec;
-    SI_read_spec : ⊢ read_spec ;
-    SI_write_spec : ⊢ write_spec;
-    SI_start_spec : ⊢ start_spec;
-    SI_commit_spec : ⊢ commit_spec;
-    SI_GlobalInv : ⊢ GlobalInv;
+    SI_init_kvs_spec : init_kvs_spec ;
+    SI_init_client_proxy_spec : init_client_proxy_spec;
+    SI_read_spec : read_spec ;
+    SI_write_spec : write_spec;
+    SI_start_spec : start_spec;
+    SI_commit_spec : commit_spec;
   }.
-
-  Class SI_init := {
+ 
+   Class SI_init := {
     SI_init_module E (clients : gset socket_address) :
-      ⊢ |={E}=> ∃ (res : SI_resources Mdl Σ) (specs : SI_client_toolbox),
-      ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗
-      KVS_Init ∗
-      ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa)
-  }.
-
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=>
+      ∃ (res : SI_resources Mdl Σ),
+        ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗
+        KVS_Init ∗
+        GlobalInv ∗
+        ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
+        ⌜init_kvs_spec⌝ ∗
+        ⌜init_client_proxy_spec⌝ ∗
+        ⌜read_spec⌝ ∗
+        ⌜write_spec⌝ ∗
+        ⌜start_spec⌝ ∗
+        ⌜commit_spec⌝
+     }.
+   
 End SI_Module.
+ 
