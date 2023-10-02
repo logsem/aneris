@@ -55,4 +55,20 @@ Lemma last_of_none_empty_list_is_some {A : Type} (l : list A) :
       set_solver.
   Qed.
 
-  
+  Lemma list_later_in {A : Type} (l l1 l2: list A) (a a' : A) :
+   l ++ [a] = l1 ++ a' :: l2 → a ∈ a' :: l2.
+  Proof.
+   intro Hyp.
+   generalize dependent l.
+   induction l1; intros l Hyp.
+   - simpl in Hyp.
+     rewrite -Hyp.
+     set_solver.
+   - simpl in Hyp.
+     destruct l as [| h t].
+     + inversion Hyp as [[Heq Habs]].
+       by apply app_cons_not_nil in Habs.
+     + simpl in Hyp.
+       inversion Hyp as [[Heq Heq']].
+       by eapply IHl1.
+  Qed.

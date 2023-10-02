@@ -79,13 +79,7 @@ Definition check_at_key : val :=
       let: "t" := Snd (Snd "vlast") in
       (if: ("tc" ≤ "t") || ("t" = "ts")
        then  assert: #false
-       else
-         let: "b" := "t" < "ts" in
-         let: "<>" := (if: "b"
-          then  #()
-          else
-            #() (* unsafe (fun () -> Printf.printf "%s last_t=%d snap_t=%d\n%!" k t ts) *)) in
-         "b")
+       else  "t" < "ts")
   end.
 
 Definition commit_handler : val :=

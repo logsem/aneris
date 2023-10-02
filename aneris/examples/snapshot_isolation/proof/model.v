@@ -290,5 +290,10 @@ Section Snapshot.
     (* kvs_keys Msnap ∧ *)
     ∀ k h, Msnap !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
 
+  Lemma kvs_valid_snapshot_delete M ts k :
+    kvs_valid_snapshot M ts ->
+    kvs_valid_snapshot (delete k M) ts.
+  Proof. Admitted.
+  
 End Snapshot.
 
