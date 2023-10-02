@@ -16,13 +16,13 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
      Require Import api_spec.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code.
-From aneris.examples.snapshot_isolation.specs
-     Require Import user_params aux_defs.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events aux_defs resource_algebras.
 From aneris.examples.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
-     resource_algebras server_resources proxy_resources global_invariant wrappers.
+     server_resources proxy_resources global_invariant wrappers.
 From aneris.examples.snapshot_isolation.instantiation
      Require Import snapshot_isolation_api_implementation.
 

@@ -10,10 +10,14 @@ From aneris.aneris_lang Require Import lang resources resources inject.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import
      list_proof monitor_proof lock_proof map_proof.
-From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
-From aneris.examples.snapshot_isolation.proof Require Import model.
+From aneris.aneris_lang.lib.serialization Require Import
+  serialization_proof.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events resource_algebras.
+From aneris.examples.snapshot_isolation.proof Require Import
+  model.
 From aneris.examples.snapshot_isolation.proof.resources Require Import
-     resource_algebras server_resources.
+     server_resources.
 
 Section Local_Invariant.
 

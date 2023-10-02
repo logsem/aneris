@@ -5,7 +5,7 @@ From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
 From aneris.examples.snapshot_isolation.specs
-     Require Export user_params aux_defs.
+     Require Import user_params aux_defs.
 
 Notation "h ≤ₚ h'" := (h `prefix_of` h') (at level 20).
 

@@ -5,7 +5,8 @@ From iris.bi.lib Require Import fractional.
 From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang Require Import lang resources.
 From aneris.aneris_lang.lib Require Import lock_proof.
-From aneris.examples.snapshot_isolation.proof Require Import model.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events.
 
 Import gen_heap_light.
 Import lock_proof.

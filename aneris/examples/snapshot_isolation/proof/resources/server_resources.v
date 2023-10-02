@@ -11,9 +11,12 @@ From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import
      list_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
-From aneris.examples.snapshot_isolation.proof Require Import model.
-From aneris.examples.snapshot_isolation.proof.resources Require Import
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params
+  time
+  events
   resource_algebras.
+From aneris.examples.snapshot_isolation.proof Require Import model.
 
 
 (*----------------------------------------------------------------------------*)
