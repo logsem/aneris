@@ -40,8 +40,11 @@ Section Proof_of_commit_handler.
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap M : gmap Key (list write_event))
-    (S Sg : snapshots) :
-    kvsl_valid m M Sg tc →
+    (S : snapshots) :
+    (* kvsl_valid m M Sg tc → *)
+    kvsl_in_model_empty_coh m M →
+    kvsl_in_model_some_coh m M →
+    kvsl_dom m →
     kvs_valid M S tc →
     S !! ts = Some Msnap →
     (match m !! k with
@@ -56,7 +59,7 @@ Section Proof_of_commit_handler.
         ⌜∀ (v1 v2 : list write_event), M !! k = Some v1 → Msnap !! k = Some v2 → to_hist v1 ≠ to_hist v2⌝)
     }}}.
   Proof.
-    iIntros (H_kvsl H_kvs H_lookup_snap H_match Φ) "_ HΦ".
+    iIntros (H_kvsl_empty H_kvsl_some H_kvsl_dom H_kvs H_lookup_snap H_match Φ) "_ HΦ".
     unfold check_at_key.
     unfold assert.
     wp_pures.
@@ -73,9 +76,9 @@ Section Proof_of_commit_handler.
     - destruct (M !! k) as [ wl | ] eqn:H_lookup_M.
       + assert (m !! k = Some $(reverse wl)).
         {
-          apply (kvsl_ValidInModelSome m M Sg tc); try done.
+          apply H_kvsl_some; try done.
           destruct wl as [ | w wl]; last done.
-          apply (kvsl_ValidInModelEmpty m M Sg tc) in H_lookup_M; last done.
+          apply H_kvsl_empty in H_lookup_M.
           set_solver.
         }
         simpl in H_match.
@@ -88,7 +91,7 @@ Section Proof_of_commit_handler.
           rewrite H_reverse_wl in H_rev_rev_wl.
           rewrite reverse_nil in H_rev_rev_wl.
           simplify_eq.
-          apply (kvsl_ValidInModelEmpty m M Sg tc) in H_lookup_M; last done.
+          apply H_kvsl_empty in H_lookup_M.
           set_solver.
         }
         simpl.
@@ -170,7 +173,7 @@ Section Proof_of_commit_handler.
         apply elem_of_dom in H_is_some_m.
         rewrite -(kvs_ValidDom M S tc) in H_lookup_M; last done.
         assert (dom m ⊆ KVS_keys) as H_subset_eq; last set_solver.
-        apply (kvsl_ValidDom m M Sg tc); done.
+        apply H_kvsl_dom.
     - simplify_eq.
       wp_pures.
       iApply "HΦ".
@@ -201,7 +204,7 @@ Section Proof_of_commit_handler.
           destruct wl' as [ | w' wl']; first done.
           by inversion H_leq.
         * assert (m !! k = Some $(reverse (w :: wl))); last set_solver.
-          apply (kvsl_ValidInModelSome m M Sg tc); done.
+          apply H_kvsl_some; done.
       + apply (kvs_ValidSnapshotTimesInclusion M S tc) in H_lookup_snap; last done.
         destruct H_lookup_snap as (H_eq_dom & H_included).
         assert (k ∉ dom Msnap) as H_k_nin_Msnap.
@@ -263,7 +266,7 @@ Section Proof_of_commit_handler.
     M !! key = Msnap !! key →
     can_commit
       ((λ hw : list write_event, to_hist hw) <$>
-      filter (λ k : Key * list write_event, k.1 ∈ dom (delete key Msnap)) M)
+      filter (λ k : Key * list write_event, k.1 ∈ dom (delete key Msnap)) (delete key M))
       ((λ hw : list write_event, to_hist hw) <$> delete key Msnap)
       (delete key cache_logicalM) →
     can_commit
@@ -300,13 +303,20 @@ Section Proof_of_commit_handler.
       + destruct (decide (k ∈ dom Msnap)) as [H_k_in_snap | H_k_nin_snap]; try done.
         * rewrite (map_filter_lookup_Some_2 _ _ _ wl); try done.
           rewrite (map_filter_lookup_Some_2 _ _ _ wl) in H_com_status; try done.
-          set_solver.
+          -- rewrite -H_lookup'.
+             rewrite lookup_delete_ne; done.
+          -- rewrite elem_of_dom.
+             simpl.
+             rewrite lookup_delete_ne; last done.
+             by rewrite -elem_of_dom.
         * rewrite map_filter_lookup_None_2.
           2 : right; set_solver. 
           rewrite map_filter_lookup_None_2 in H_com_status; first done.
           right; set_solver.
       + rewrite map_filter_lookup_None_2; last by left.
-        by rewrite map_filter_lookup_None_2 in H_com_status; last by left.
+        rewrite map_filter_lookup_None_2 in H_com_status; first done.
+        left.
+        rewrite lookup_delete_ne; done.
   Qed.
 
   Lemma can_not_do_commit_delete (key : Key) (M Msnap : gmap Key (list write_event)) 
@@ -315,7 +325,7 @@ Section Proof_of_commit_handler.
     M !! key = Msnap !! key →
     ¬ can_commit
       ((λ hw : list write_event, to_hist hw) <$>
-      filter (λ k : Key * list write_event, k.1 ∈ dom (delete key Msnap)) M)
+      filter (λ k : Key * list write_event, k.1 ∈ dom (delete key Msnap)) (delete key M))
       ((λ hw : list write_event, to_hist hw) <$> delete key Msnap)
       (delete key cache_logicalM) →
     ¬ can_commit
@@ -323,8 +333,7 @@ Section Proof_of_commit_handler.
       filter (λ k : Key * list write_event, k.1 ∈ dom Msnap) M)
       ((λ hw : list write_event, to_hist hw) <$> Msnap) cache_logicalM.
   Proof.
-    intros H_in_snap H_commit H_com_status.
-    intros H_com_status'.
+    intros H_in_snap H_commit H_com_status H_com_status'.
     apply H_com_status.
     unfold can_commit.
     apply bool_decide_pack.
@@ -346,17 +355,24 @@ Section Proof_of_commit_handler.
       + destruct (decide (k ∈ dom Msnap)) as [H_k_in_snap | H_k_nin_snap]; try done.
         * rewrite (map_filter_lookup_Some_2 _ _ _ wl); try done.
           rewrite (map_filter_lookup_Some_2 _ _ _ wl) in H_com_status'; try done.
-          set_solver.
+          -- rewrite -H_lookup'.
+             rewrite lookup_delete_ne; done.
+          -- rewrite elem_of_dom.
+             simpl.
+             rewrite lookup_delete_ne; last done.
+             by rewrite -elem_of_dom.
         * rewrite map_filter_lookup_None_2.
           2 : right; set_solver. 
           rewrite map_filter_lookup_None_2 in H_com_status'; first done.
           right; set_solver. 
-      + rewrite map_filter_lookup_None_2; last by left.
-        by rewrite map_filter_lookup_None_2 in H_com_status'; last by left.
+      + rewrite map_filter_lookup_None_2.
+        * by rewrite map_filter_lookup_None_2 in H_com_status'; last by left.
+        * left.
+          rewrite lookup_delete_ne; done.
   Qed.
 
   Lemma map_forall_spec (ts tc : nat) (kvs cache : val) 
-    (cache_updatesM m : gmap Key val)
+    (cache_updatesM m m' : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap M : gmap Key (list write_event)) 
     (S Sg : snapshots) :
@@ -383,7 +399,10 @@ Section Proof_of_commit_handler.
                          ((λ hw, to_hist hw) <$> Msnap) cache_logicalM⌝) }}}.
   Proof.
     iIntros (H_coh H_map_cache H_map_kvs H_kvsl H_kvs H_lookup_snap Φ) "_ HΦ".
-    iLöb as "IH" forall (cache cache_updatesM cache_logicalM Msnap S M m kvs H_map_kvs H_kvsl H_kvs H_coh H_map_cache H_lookup_snap).
+    destruct H_kvsl.
+    clear kvsl_ValidLocalSome kvsl_ValidModel.
+    iLöb as "IH" forall (cache cache_updatesM cache_logicalM Msnap S M H_kvs H_coh 
+      H_map_cache H_lookup_snap kvsl_ValidInModelEmpty kvsl_ValidInModelSome).
     unfold map_forall.
     wp_pures.
     destruct H_map_cache as [l (H_eq_updates & H_eq_cache & H_dup)].
@@ -441,10 +460,11 @@ Section Proof_of_commit_handler.
         iIntros (br [(-> & H_commit) | (-> & H_neq)]).
         * wp_if_true.
           simpl in H_eq_updates.
-          iApply "IH".
-          -- admit.
-          -- admit.
-          -- admit.
+          iApply ("IH" $! _ (delete e_key cache_updatesM)
+            (delete e_key cache_logicalM) (delete e_key Msnap)
+            ({[ ts := (delete e_key Msnap)]}) (delete e_key M)).
+          -- iPureIntro.
+             eapply kvs_valid_single_snapshot_delete; try done.
           -- iPureIntro.
              eapply (is_coherent_cache_delete e_key); last apply H_coh.
           -- iPureIntro.
@@ -457,7 +477,12 @@ Section Proof_of_commit_handler.
                    rewrite dom_list_to_map_L.
                    set_solver.
              ++ by apply NoDup_cons_1_2 in H_dup.
-          -- admit.
+          -- iPureIntro.
+             by rewrite lookup_insert.
+          -- iPureIntro.
+             eapply kvsl_model_empty_delete; try done.
+          -- iPureIntro.
+             eapply kvsl_model_some_delete; try done.
           -- iModIntro.
              iIntros (b) "HΦ'".
              iApply "HΦ".
@@ -484,10 +509,11 @@ Section Proof_of_commit_handler.
         iIntros (br [(-> & H_commit) | (-> & H_neq)]).
         * wp_if_true.
           simpl in H_eq_updates.
-          iApply "IH".
-          -- admit.
-          -- admit.
-          -- admit.
+          iApply ("IH" $! _ (delete e_key cache_updatesM)
+            (delete e_key cache_logicalM) (delete e_key Msnap)
+            ({[ ts := (delete e_key Msnap)]}) (delete e_key M)).
+          -- iPureIntro.
+             eapply kvs_valid_single_snapshot_delete; try done.
           -- iPureIntro.
              eapply (is_coherent_cache_delete e_key); last apply H_coh.
           -- iPureIntro.
@@ -500,7 +526,12 @@ Section Proof_of_commit_handler.
                    rewrite dom_list_to_map_L.
                    set_solver.
              ++ by apply NoDup_cons_1_2 in H_dup.
-          -- admit.
+          -- iPureIntro.
+             by rewrite lookup_insert.
+          -- iPureIntro.
+             eapply kvsl_model_empty_delete; try done.
+          -- iPureIntro.
+             eapply kvsl_model_some_delete; try done.
           -- iModIntro.
              iIntros (b) "HΦ'".
              iApply "HΦ".
@@ -521,7 +552,7 @@ Section Proof_of_commit_handler.
           iSplit; first done.
           iPureIntro.
           eapply can_not_do_commit; try done.
-  Admitted.
+  Qed.
 
   Lemma update_kvs_spec (kvs cacheV : val) (tc : nat)
     (cache_updatesM m : gmap Key val)

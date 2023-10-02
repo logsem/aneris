@@ -193,6 +193,13 @@ Section KVS_valid.
     kvs_valid M {[ t := Mt ]} T.
   Proof.
   Admitted.
+
+  Lemma kvs_valid_single_snapshot_delete M Mts T t Mt k :
+    kvs_valid M Mts T →
+    Mts !! t = Some Mt →
+    kvs_valid (delete k M) {[t := delete k Mt]} T.
+  Proof.
+  Admitted.
   
   (** Strong Weakening lemma. *)
   Lemma kvs_valid_global_mem_prefix M Mts T t Mt Msub:
@@ -266,7 +273,18 @@ Section KVSL_valid.
     kvsl_valid m M (<[(T+1)%nat := M]>S) (T + 1).
   Proof. Admitted.
 
-  
+  Lemma kvsl_model_empty_delete m M k :
+    kvsl_in_model_empty_coh m M →
+    kvsl_in_model_empty_coh m (delete k M).
+  Proof.
+  Admitted.
+
+  Lemma kvsl_model_some_delete m M k :
+    kvsl_in_model_some_coh m M →
+    kvsl_in_model_some_coh m (delete k M).
+  Proof.
+  Admitted.
+
   (** Weakening lemma *)
   Lemma kvs_valid_filter M S t Mt (mu : gmap Key (list val)) T :
     kvs_valid M S T →
