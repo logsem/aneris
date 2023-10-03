@@ -69,15 +69,15 @@ Section Proof_of_handler.
       specialize (Hts e He).
       replace ts with (Z.abs_nat ts) in Hts; lia. }
     2:{
-      iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap ts Hreqd)
+      iDestruct "HpreCommit" as (E P Q cmapV cache_updatesM cache_logicaM Msnap Msnap_full ts Hreqd)
         "HpreCommit".
-      iDestruct "HpreCommit" as (-> Hin Hmap Hcoh Hall Hvalid)
-        "(Hsnap & Hseen & Hp & Hshift)".
+      iDestruct "HpreCommit" as (-> Hin Hmap Hcoh Hall Hvalid Hsubeq)
+        "(Hsnap & HsnapFrag & Hseen & Hp & Hshift)".
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _
-        Hreqd Hin Hmap Hcoh Hvalid Hall with "[][][$Hsnap][$Hseen][$Hp][$Hshift]"). }
+      by iApply (commit_handler_spec _ _ _ _ _ _ _ srv_si _ _ _ _ Φ _ _ _ _ _ _ _ _ _
+        Hreqd Hin Hmap Hcoh Hvalid Hall Hsubeq with "[][][$Hsnap][$HsnapFrag][$Hseen][$Hp][$Hshift]"). }
     iDestruct "HpreStart" as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
     wp_pures.
     wp_lam.

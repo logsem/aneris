@@ -276,7 +276,7 @@ Section Commit_Proof.
           by iFrame. }
         iIntros (? ->).
         by wp_pures.
-    -  set (rd := (inr (inr (E, ts, cache_updatesM, cacheM, Msnap,  ⌜True⌝%I,
+    - set (rd := (inr (inr (E, ts, cache_updatesM, cacheM, Msnap,  ⌜True⌝%I,
                            (λ vb,
                               ghost_map.ghost_map_auth γCache 1 (∅ : gmap Key (option val * bool)) ∗
                               ownMsnapFull γMsnap  ∗
@@ -388,7 +388,8 @@ Section Commit_Proof.
             iRight.
             iRight.
             iExists E, _, _, _, _, _, _, _.
-            do 7 (iSplit; first done).
+            iExists _.
+            do 8 (iSplit; first done).
             iFrame "#∗".
             iSplit; first done.
             iIntros "_".

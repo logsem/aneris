@@ -107,7 +107,7 @@ Section RPC_user_params.
         ∃ E P Q cmapV
           (cache_updatesM : gmap Key val)
           (cache_logicalM : gmap Key (option val * bool))
-          (Msnap : gmap Key (list write_event))
+          (Msnap Msnap_full : gmap Key (list write_event))
           (ts : nat),
           ⌜reqd = inr (inr (E, ts, cache_updatesM, cache_logicalM, Msnap, P, Q))⌝ ∗
           ⌜reqv = InjRV (InjRV (#ts, cmapV))%V⌝ ∗
@@ -116,7 +116,9 @@ Section RPC_user_params.
           ⌜is_coherent_cache cache_updatesM cache_logicalM Msnap⌝ ∗
           ⌜map_Forall (λ k v, KVS_Serializable v) cache_updatesM⌝ ∗
           ⌜kvs_valid_snapshot Msnap ts⌝ ∗
+          ⌜Msnap ⊆ Msnap_full⌝ ∗
           ownTimeSnap γT ts ∗
+          ownSnapFrag γTrs ts Msnap_full ∗ 
           ([∗ map] k ↦ h' ∈ Msnap, ownMemSeen γGsnap k h') ∗
           P ∗
          (P ={⊤, E}=∗
