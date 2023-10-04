@@ -77,10 +77,11 @@ Section Commit_Proof.
     destruct p. by iFrame.
   Qed.
 
-  Definition commit_spec_internal {MTR : MTS_resources} : iProp Σ :=
+  Definition commit_spec_internal {MTR : MTS_resources} : Prop :=
    ∀ (c : val) (sa : socket_address)
      (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+     ⌜↑KVS_InvName ⊆ E⌝ -∗
+       Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
     is_connected γGsnap γT γTrs γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
@@ -101,11 +102,11 @@ Section Commit_Proof.
          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗
            [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h ∗ Seen_def γGsnap k h)) >>>.
 
-  Lemma commit_spec_internal_holds {MTR : MTS_resources}  :
-    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ⊢ commit_spec_internal.
+  Lemma commit_spec_internal_holds `{!MTS_resources} :
+    commit_spec_internal.
   Proof.
-    iIntros "#Hinv".
-    iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
+     iIntros (c sa E HE).
+    iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
     rewrite /SI_commit /= /commit.
     wp_pures.
     unfold is_connected.

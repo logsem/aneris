@@ -27,20 +27,20 @@ Section Specification.
   Definition write_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
       (vo : option val)
-      (k : Key) (v : SerializableVal) (b : bool) E,
+      (k : Key) (v : SerializableVal) (b : bool) ,
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
     {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
-      SI_write c #k v @[ip_of_address sa] E
+      SI_write c #k v @[ip_of_address sa] 
     {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
   Definition read_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
-      (k : Key) (vo : option val) E,
+      (k : Key) (vo : option val),
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
     {{{ k ↦{c} vo }}}
-      SI_read c #k @[ip_of_address sa] E
+      SI_read c #k @[ip_of_address sa] 
     {{{ RET $vo; k ↦{c} vo }}}.
 
    Definition start_spec : Prop :=
