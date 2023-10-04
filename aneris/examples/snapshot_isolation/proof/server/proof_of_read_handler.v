@@ -20,6 +20,8 @@ From aneris.examples.snapshot_isolation.specs Require Import
   user_params time events aux_defs resource_algebras.
 From aneris.examples.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
+From aneris.examples.snapshot_isolation.proof.server
+     Require Import proof_of_utility_code.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      server_resources proxy_resources
@@ -37,38 +39,6 @@ Section Proof_of_read_handler.
                      clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
   Import assert_proof.
-
-  Lemma kvs_get_spec (k : Key) (kvsV : val) (h : whist)
-       (m : gmap Key val) (M : global_mem) :
-   is_map kvsV m →
-   M !! k = Some h →
-   kvsl_in_model_empty_coh m M →
-   kvsl_in_model_some_coh m M →
-   kvsl_in_local_some_coh m M →
-   {{{ ⌜True⌝ }}}
-       kvs_get #k kvsV  @[ip_of_address MTC.(MTS_saddr)]
-   {{{ (v : val), RET v; ⌜v = $ (reverse h)⌝ }}}.
-  Proof.
-    iIntros (Hmap HMk Hc1 Hc2 Hc3 Φ) "_ HΦ".
-    wp_lam. wp_pures. wp_apply (wp_map_lookup $! Hmap).
-    iIntros (v) "%Hkv".
-    destruct h as [|e h'] eqn:Heq; simplify_eq /=.
-    - specialize (Hc1 k HMk).
-      destruct (m !! k) as [hv | ] eqn:Hmk; first done.
-      simplify_eq /=. do 3 wp_pure _. wp_pures.
-      by iApply "HΦ".
-    - destruct (m !! k) as [hv | ] eqn:Hmk.
-      2: { specialize (Hc2 k (e :: h') HMk). naive_solver. }
-      assert (m !! k = Some $ (reverse (e :: h'))) as Hmk'.
-      { by apply (Hc2 k (e :: h') HMk). }
-      simplify_eq /=. specialize (Hc3 k (reverse (e :: h')) Hmk).
-      do 3 wp_pure _. wp_smart_apply wp_assert. wp_pures.
-      destruct ((reverse (e :: h'))) as [| x l] eqn:Hrev.
-      -- rewrite reverse_nil in Hc3.
-         by rewrite HMk in Hc3.
-      -- wp_pures. iSplit; first done. iNext. wp_pures.
-         by iApply "HΦ".
-  Qed.
 
   Lemma kvs_get_last_spec 
     (M Mt : global_mem) (S Sg: snapshots) (T : nat)
@@ -91,7 +61,7 @@ Section Proof_of_read_handler.
     iIntros (Hlt Hmv Hkvsl Hkvs Hmk Hst Hmtk Φ) "_ HΦ".
     wp_lam. do 15 wp_pures. destruct Hkvsl.
     (** We start by getting the versions at the key k. *)
-    wp_smart_apply (kvs_get_spec k kvsV hc m M Hmv); eauto.
+    wp_smart_apply (kvs_get_spec_some _ _ _ _ _ _ k kvsV hc m M Hmv); eauto.
     iIntros (v) "%Hvres".
     eapply kvs_valid_single_snapshot in Hkvs;  try eauto.
     clear m Hmv kvsl_ValidDom kvsl_ValidInModelEmpty

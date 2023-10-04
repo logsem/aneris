@@ -21,6 +21,8 @@ From aneris.examples.snapshot_isolation.specs Require Import
 From aneris.examples.snapshot_isolation.proof
   Require Import model kvs_serialization
   rpc_user_params utils.
+From aneris.examples.snapshot_isolation.proof.server
+     Require Import proof_of_utility_code.
 From aneris.examples.snapshot_isolation.proof.resources
      Require Import
      server_resources proxy_resources
@@ -562,7 +564,7 @@ Section Proof_of_commit_handler.
           eapply can_not_do_commit; try done.
   Qed.
 
-  Lemma update_kvs_spec (kvs cacheV : val) (tc : nat)
+  Lemma update_kvs_spec (kvs cacheV : val) (T T': nat)
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
     (Msnap M : gmap Key (list write_event)) 
@@ -570,15 +572,75 @@ Section Proof_of_commit_handler.
     (S : snapshots) :
     (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v) →
     is_coherent_cache cache_updatesM cache_logicalM Msnap →
-    is_map (InjRV cacheV) cache_updatesM →
+    is_map cacheV cache_updatesM →
     is_map kvs m →
-    kvsl_valid m M S tc →
+    kvsl_valid m M S T →
     {{{ ⌜True⌝ }}}
-      snapshot_isolation_code.update_kvs kvs (InjRV cacheV) #(tc + 1) 
+      snapshot_isolation_code.update_kvs kvs cacheV #T'
         @[ip_of_address MTC.(MTS_saddr)]
     {{{ (kvs_updated : val), RET kvs_updated; 
-        ⌜is_map kvs_updated (update_kvsl m cache (tc + 1))⌝}}}.
+        ⌜is_map kvs_updated (update_kvsl m cache T')⌝}}}.
   Proof.
+   iIntros (H_all H_coh H_map_cache H_map_kvs H_valid Φ) "_ HΦ".
+   unfold snapshot_isolation_code.update_kvs.
+   wp_lam.
+   do 2 wp_let.
+   wp_pure _.
+   wp_let.
+   iLöb as "IH" forall (cacheV cache_updatesM cache_logicalM kvs 
+    H_map_cache H_map_kvs H_coh H_all).
+   wp_pures.
+   destruct H_map_cache as [l (H_map_cache1 & H_map_cache2 & H_map_cache3)].
+   destruct l as [|[k v] l]; simpl in H_map_cache2, H_map_cache1; 
+    simplify_eq; wp_pures.
+   - iApply "HΦ".
+     iPureIntro.
+     assert (cache = ∅) as ->.
+     {
+      apply map_empty.
+      intro k.
+      destruct (cache !! k) as [ sv | ] eqn:H_lookup_cache; last done.
+      specialize (H_all k sv.(SV_val)).
+      assert ((∅ : gmap Key val) !! k = Some sv.(SV_val)) as H_abs.
+      - apply H_all.
+        by exists sv.
+      - by rewrite lookup_empty in H_abs.
+     }
+     unfold update_kvsl.
+     by rewrite map_fold_empty.
+   - destruct (M !! k) as [ wl | ] eqn:H_lookup_M.
+     + wp_apply (kvs_get_spec_some _ _ _ _ _ _ k kvs wl m M); try done.
+       apply (kvsl_ValidInModelEmpty m M S T); first done.
+       apply (kvsl_ValidInModelSome m M S T); first done.
+       apply (kvsl_ValidLocalSome m M S T); first done.
+       iIntros (v' ->).
+       wp_pures.
+       wp_apply (wp_list_cons {|we_key:=k; we_val:=v; we_time:=_|} (reverse wl) 
+        (inject_list (reverse wl))).
+       {
+        iPureIntro. 
+        by apply is_list_inject.
+       }
+       iIntros (v_list H_list).
+       wp_pures.
+       wp_apply (wp_map_insert _ _ _ _ m); first done.
+       iIntros (v_map H_map).
+       wp_let.
+       (* iApply ("IH" $! (inject_list l) _ _ v_map). *)
+       admit.
+     + wp_apply (kvs_get_spec_none _ _ _ _ _ _ k kvs m M); try done.
+       apply (kvsl_ValidDom m M S T); first done.
+       assert (kvs_valid M S T) as H_valid'; apply (kvsl_ValidModel m M S T); done.
+       iIntros (v' ->).
+       wp_pures.
+       wp_apply (wp_list_cons {|we_key:=k; we_val:=v; we_time:=_|} [] (InjLV #())); first done.
+       iIntros (v_list H_list).
+       wp_pures.
+       wp_apply (wp_map_insert _ _ _ _ m); first done.
+       iIntros (v_map H_map).
+       wp_let.
+       (* iApply "IH". *)
+       admit.
   Admitted.
 
   Lemma cache_updatesM_to_cache (cache_updatesM: gmap Key val) :
@@ -891,8 +953,8 @@ Section Proof_of_commit_handler.
         pose proof (cache_dom_eq _ _ H_cache) as H_cache_eq.
         pose proof Hcoh as ( _ & _ & H_sub & _).
         rewrite -H_cache_eq in H_sub.
-        unfold snapshot_isolation_code.update_kvs.
-        wp_apply (update_kvs_spec kvsV v T cache_updatesM m cache_logicalM Msnap M cache S); try eauto.
+        replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
+        wp_apply (update_kvs_spec kvsV (InjRV v) T (T + 1)%nat cache_updatesM m cache_logicalM Msnap M cache S); try eauto.
         {
           by eexists _.
         }
@@ -964,13 +1026,8 @@ Section Proof_of_commit_handler.
             iPureIntro.
             apply kvsl_valid_update; try done.
           }
-          iSplit.
-          {
-            iPureIntro.
-            by apply upd_serializable.
-          }
-          replace (Z.of_nat T + 1)%Z with (Z.of_nat (T + 1)) by lia.
-          iFrame.
+          iPureIntro.
+          by apply upd_serializable.
         }
         iIntros (? ->).
         wp_pures.
