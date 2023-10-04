@@ -7,7 +7,9 @@ From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
-     Require Import serialization_proof.
+  Require Import serialization_proof.
+From aneris.examples.reliable_communication.spec
+     Require Import ras.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
@@ -148,6 +150,7 @@ Definition KVSΣ : gFunctors :=
      GFunctor (exclR unitO);
      GFunctor (authUR (gsetUR nat));
      mono_natΣ;
+     ras.SpecChanΣ;
      lockΣ].
 
 Instance subG_KVSΣ {Σ} : subG KVSΣ Σ → KVSG Σ.
