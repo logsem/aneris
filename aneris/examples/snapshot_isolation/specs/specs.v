@@ -7,7 +7,9 @@ From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
-     Require Import serialization_proof.
+  Require Import serialization_proof.
+From aneris.examples.reliable_communication.spec
+     Require Import ras.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.snapshot_isolation
      Require Import snapshot_isolation_code_api.
@@ -25,20 +27,20 @@ Section Specification.
   Definition write_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
       (vo : option val)
-      (k : Key) (v : SerializableVal) (b : bool) E,
+      (k : Key) (v : SerializableVal) (b : bool) ,
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
     {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
-      SI_write c #k v @[ip_of_address sa] E
+      SI_write c #k v @[ip_of_address sa] 
     {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
   Definition read_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
-      (k : Key) (vo : option val) E,
+      (k : Key) (vo : option val),
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
     {{{ k ↦{c} vo }}}
-      SI_read c #k @[ip_of_address sa] E
+      SI_read c #k @[ip_of_address sa] 
     {{{ RET $vo; k ↦{c} vo }}}.
 
    Definition start_spec : Prop :=
@@ -148,6 +150,7 @@ Definition KVSΣ : gFunctors :=
      GFunctor (exclR unitO);
      GFunctor (authUR (gsetUR nat));
      mono_natΣ;
+     ras.SpecChanΣ;
      lockΣ].
 
 Instance subG_KVSΣ {Σ} : subG KVSΣ Σ → KVSG Σ.

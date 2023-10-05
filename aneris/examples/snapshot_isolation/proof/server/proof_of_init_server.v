@@ -45,9 +45,9 @@ Section Proof_of_init_server.
   Import snapshot_isolation_code_api.
 
 
-  Definition init_server_spec_internal : iProp Σ :=
+  Definition init_server_spec_internal : Prop :=
     {{{ KVS_address ⤇ srv_si ∗
-        (@run_server_spec _ _ _ _ MTC SrvInit srv_si) ∗
+        Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ∗               (@run_server_spec _ _ _ _ MTC SrvInit srv_si) ∗
         SrvInit ∗
         ownMemAuthLocal γGauth (gset_to_gmap [] KVS_keys) ∗
         ownTimeLocal γT 0 ∗
@@ -58,11 +58,11 @@ Section Proof_of_init_server.
       #KVS_address @[ip_of_address KVS_address]
     {{{ RET #(); True }}}.
 
-  Lemma init_leader_spec_internal_holds :
-    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ⊢
-      init_server_spec_internal.
+  Lemma init_server_spec_internal_holds : init_server_spec_internal.
   Proof.
-    iIntros "#Hinv %Φ !# (#Hsi & Hspec & HinitRes & HauthL & HtimeL & Hmh & Hfp) HΦ". 
+    iStartProof.
+    iIntros (Φ) "(#Hsi & #Hinv & Hspec & HinitRes & 
+                   HauthL & HtimeL & Hmh & Hfp) HΦ". 
     rewrite /init_server.
     wp_pures.
     wp_apply (wp_map_empty with "[//]").
@@ -92,7 +92,8 @@ Section Proof_of_init_server.
       rewrite /handler_spec.
       iIntros (v1 v2 Ψ) "!> HP HΨ".
       wp_pures.
-      by iApply (client_request_handler_spec clients with "[$HLInv $HP]").
+      by iApply (client_request_handler_spec clients
+             with "[$HLInv $HP]").
   Qed.   
 
 End Proof_of_init_server.

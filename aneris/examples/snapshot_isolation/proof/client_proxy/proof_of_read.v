@@ -37,25 +37,25 @@ Section Read_Proof.
   Import snapshot_isolation_code_api.
 
 
- Definition read_spec_internal {MTR : MTS_resources} : iProp Σ :=
+ Definition read_spec_internal `{!MTS_resources} : Prop :=
     ∀ (c : val) (sa : socket_address)
       (k : Key) (vo : option val),
     ⌜k ∈ KVS_keys⌝ -∗
-    @make_request_spec _ _ _ _ MTC _ -∗
-    {{{ is_connected γGsnap γT γTrs γKnownClients c sa ∗
+      @make_request_spec _ _ _ _ MTC _ -∗
+      {{{ Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ∗
+          is_connected γGsnap γT γTrs γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo }}}
       SI_read c #k @[ip_of_address sa]
     {{{ RET $vo; ownCacheUser γKnownClients k c vo }}}.
 
 
-  Lemma read_spec_internal_holds {MTR : MTS_resources}  :
-    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ⊢ read_spec_internal.
+ Lemma read_spec_internal_holds `{!MTS_resources} :
+   read_spec_internal.
   Proof.
-    iIntros "#Hinv".
-    iIntros (c sa k vo Hk) "#Hspec !#".
-    iIntros (Φ) "(#Hisc & Hcache) Hpost".
+    iIntros (c sa k vo Hk) "#HSpec !#".
+    iIntros (Φ) "(#Hinv & #Hisc & Hcache) Hpost".
     iDestruct "Hisc" as (lk cst l) "Hisc".
-    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)".
+    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)". rewrite /make_request_spec.
     rewrite /SI_read /= /read.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
@@ -121,7 +121,7 @@ Section Read_Proof.
     destruct Hsnapk as (h & Hinh).
     iAssert (ownMemSeen γGsnap k h)%I as "df".
     { iDestruct (big_sepM_lookup with "[$Hsn]") as "Hsnap"; done. }
-    wp_apply ("Hspec" with "[$Hcr]").
+    wp_apply ("HSpec" with "[$Hcr]").
     instantiate (1 := (inl (k, ts, h))).
     assert (k ∈ dom cM) as Hdomk.
     { apply elem_of_dom. set_solver. }

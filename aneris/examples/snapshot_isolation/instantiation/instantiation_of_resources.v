@@ -12,6 +12,7 @@ From aneris.aneris_lang.lib Require Import
      list_proof monitor_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
+From aneris.examples.reliable_communication.lib.mt_server.spec Require Import api_spec.
 From aneris.examples.snapshot_isolation.specs Require Import
   user_params time events aux_defs resource_algebras resources.
 From aneris.examples.snapshot_isolation.proof
@@ -22,7 +23,7 @@ From aneris.examples.snapshot_isolation.proof.resources
 
 
 Section SI_Resources_intantiation.
-  Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_resources}.
+  Context `{!anerisG Mdl Σ, !IDBG Σ, !MTS_user_params, !MTS_resources}.
   Context `{!User_params}.
   Context (clients : gset socket_address).
   Context (γKnownClients γGauth γGsnap γT γTrs : gname).
@@ -34,13 +35,27 @@ Section SI_Resources_intantiation.
       GlobalInv :=  GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs;
       OwnMemKey k h := OwnMemKey_def γGauth γGsnap k h;
       OwnLocalKey k c vo := ownCacheUser γKnownClients k c vo;
-      ConnectionState c s sa := ConnectionState_def γGsnap γKnownClients c s sa;
-      IsConnected c sa := is_connected γGsnap γT γTrs γKnownClients c sa;
+      ConnectionState c s sa :=
+        ConnectionState_def γKnownClients γGsnap c s sa;
+      IsConnected c sa :=
+        (GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs ∗
+        make_request_spec ∗
+        is_connected γGsnap γT γTrs γKnownClients c sa)%I;
       KeyUpdStatus c k b :=  key_upd_status γKnownClients c k b;
       Seen k h := Seen_def γGsnap k h;
       KVS_si := srv_si;
-      KVS_Init := SrvInit;
-      KVS_ClientCanConnect sa := client_can_connect_res γKnownClients sa;
+      KVS_Init :=
+        (SrvInit ∗ 
+         api_spec.run_server_spec SrvInit srv_si ∗
+         GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs ∗
+         ghost_map_auth γGauth (1 / 2) (gset_to_gmap [] KVS_keys) ∗
+         mono_nat_auth_own γT (1 / 2) 0);
+      KVS_ClientCanConnect sa :=
+        (api_spec.init_client_proxy_spec srv_si ∗
+         client_can_connect_res γKnownClients sa ∗
+         GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs ∗
+         make_request_spec
+        )%I;
       OwnLocalKey_serializable k c v :=
       own_cache_user_serializable γKnownClients k c v;
       (* Seen_valid E k h h' :=  *) |}.

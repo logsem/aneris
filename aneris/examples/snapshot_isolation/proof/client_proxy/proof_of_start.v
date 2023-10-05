@@ -35,10 +35,11 @@ Section Start_Proof.
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
-  Definition start_spec_internal {MTR : MTS_resources} : iProp Σ :=
+  Definition start_spec_internal {MTR : MTS_resources} : Prop :=
     ∀ (c : val) (sa : socket_address)
        (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+      ⌜↑KVS_InvName ⊆ E⌝ -∗
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
     is_connected γGsnap γT γTrs γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m : gmap Key (list val)),
@@ -53,11 +54,10 @@ Section Start_Proof.
           key_upd_status γKnownClients c k false) ∗
        ([∗ map] k ↦ h ∈ m, Seen_def γGsnap k h)>>>.
 
-  Lemma start_spec_internal_holds {MTR : MTS_resources}  :
-     Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ⊢ start_spec_internal.
+  Lemma start_spec_internal_holds `{!MTS_resources} : start_spec_internal.
   Proof.
-    iIntros "#Hinv".
-    iIntros (c sa E HE) "#Hlk #Hspec %Φ !# Hsh".
+    iIntros (c sa E HE).
+    iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
     rewrite /SI_start /= /start.
     wp_pures.
     iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".

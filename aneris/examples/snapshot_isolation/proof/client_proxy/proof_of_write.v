@@ -36,7 +36,7 @@ Section Write_Proof.
   Import snapshot_isolation_code_api.
 
 
- Definition write_spec_internal {MTR : MTS_resources} : iProp Σ :=
+ Definition write_spec_internal `{!MTS_resources} : Prop :=
     ∀ (c : val) (sa : socket_address)
       (vo : option val)
       (k : Key) (v : SerializableVal) (b : bool),
@@ -48,8 +48,7 @@ Section Write_Proof.
     {{{ RET #(); ownCacheUser γKnownClients k c (Some v.(SV_val)) ∗
                  key_upd_status γKnownClients c k true }}}.
 
-  Lemma write_spec_internal_holds {MTR : MTS_resources}  :
-     ⊢ write_spec_internal.
+  Lemma write_spec_internal_holds `{!MTS_resources} : write_spec_internal.
   Proof.
     iIntros (c sa vo k v b Hk Φ) "!# (#Hisc & Hcache & Hkds) Hpost".
     iDestruct "Hisc" as (lk cst l) "Hisc".

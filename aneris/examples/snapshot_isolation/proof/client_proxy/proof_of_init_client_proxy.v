@@ -33,11 +33,13 @@ Section Client_Proxy_Proof.
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
   Import snapshot_isolation_code_api.
 
-  Definition init_client_proxy_spec_internal {MTR : MTS_resources} : iProp Σ :=
+  Definition init_client_proxy_spec_internal `{!MTS_resources} : Prop :=
     ∀ (sa : socket_address),
     {{{ unallocated {[sa]} ∗
         KVS_address ⤇ srv_si ∗
         sa ⤳ (∅, ∅) ∗
+        GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs ∗
+        @make_request_spec _ _ _ _ MTC _ ∗
         (@api_spec.init_client_proxy_spec _ _ _ _ MTC _ srv_si) ∗
         client_can_connect_res γKnownClients sa ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
@@ -48,10 +50,10 @@ Section Client_Proxy_Proof.
         is_connected γGsnap γT γTrs γKnownClients cstate sa }}}.
 
   Lemma init_client_leader_proxy_internal_holds {MTR : MTS_resources}  :
-     ⊢ init_client_proxy_spec_internal.
+     init_client_proxy_spec_internal.
   Proof.
-    iIntros (sa Φ) "!#".
-    iIntros "(Hf & #Hsi & Hmh & #Hspec & Hcc & Hfp) HΦ".
+    iIntros (sa Φ). 
+    iIntros "(Hf & #Hsi & Hmh & _ & _ & #Hspec & Hcc & Hfp) HΦ".
     rewrite /SI_init_client_proxy /=.
     rewrite /init_client_proxy.
     wp_pures.
