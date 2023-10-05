@@ -80,28 +80,45 @@ Section Init_setup_proof.
     iIntros (Hne).
     iMod (ghost_map_alloc ((gset_to_gmap [] KVS_keys)))
       as (γGauth) "((HmemG & HmemL) & Hkeys)".
-    iMod (own_alloc (● (global_memUR (gset_to_gmap [] KVS_keys))))
-      as (γSnap) "HSnap".
-    { apply auth_auth_valid.
-      intro k.
-      rewrite /global_memUR.
-      rewrite lookup_fmap lookup_gset_to_gmap.
-      rewrite option_guard_bool_decide.
-      destruct (decide (k ∈ KVS_keys)).
-      - by rewrite bool_decide_eq_true_2.
-      - by rewrite bool_decide_eq_false_2. }
     iMod (own_alloc (● (∅ : snapsTy))) as (γTrs) "HauthTrs";
       first by apply auth_auth_valid.
     iMod (own_alloc (● ∅ : authR gnamesTy)) as (γClts) "HauthClts";
       first by apply auth_auth_valid.
+    iMod (own_alloc
+            (● (∅ : gmapUR Key (max_prefix_listR write_eventO))))
+      as (γGsnap) "HGsnap". 
+     { apply auth_auth_valid. done. }
     iAssert (|==>
-               own γSnap (● global_memUR (gset_to_gmap ([] : list write_event) KVS_keys)) ∗
-               ([∗ map] k↦v ∈ gset_to_gmap ([] : list write_event) KVS_keys,
-              own γSnap (◯ {[k := to_max_prefix_list []]})))%I
-              with "[HSnap]" as ">(HSnap & #Hseens)".
-    {  iInduction KVS_keys as [|x xs] "IH" using set_ind_L.
-       - iModIntro. iFrame. rewrite big_sepM_gset_to_gmap. set_solver.
-       - admit. }
+               own γGsnap
+               (● global_memUR
+                  (gset_to_gmap ([] : list write_event) KVS_keys)) ∗
+               ([∗ map] k↦v ∈ gset_to_gmap ([] : list write_event)
+                  KVS_keys,
+              own γGsnap (◯ {[k := to_max_prefix_list []]})))%I
+              with "[HGsnap]" as ">(HGsnap & #Hseens)".
+     { rewrite big_sepM_gset_to_gmap.
+       iInduction KVS_keys as [|k ks] "IH" using set_ind_L.
+       - iModIntro.
+         rewrite /gset_to_gmap fmap_empty /global_memUR //=.
+         rewrite fmap_empty; by iFrame.
+       - iMod ("IH" with "HGsnap") as "(HGsnap & Hks)".
+         rewrite big_sepS_insert; last done.
+         iFrame.
+         rewrite gset_to_gmap_union_singleton.
+         rewrite /global_memUR fmap_insert.
+         iMod (own_update _ _
+                 (● ((to_max_prefix_list <$>
+                        (<[k := []]> (gset_to_gmap [] ks))) :
+                   gmapUR Key (max_prefix_listR write_eventO)  ) ⋅
+                 ◯  {[k := to_max_prefix_list []]})
+               with "HGsnap") as "(HGsnap & Hks)".
+        { apply auth_update_alloc.
+          rewrite -insert_empty.
+          rewrite fmap_insert.
+          eapply (alloc_local_update); last done.
+          apply not_elem_of_dom.
+          by rewrite dom_fmap dom_gset_to_gmap. }
+        rewrite fmap_insert. by iFrame. } 
     iAssert (|==> ∃ M,
                  own γClts (● ((to_agree <$> M) :gnamesTy)) ∗
                  ⌜dom M = clients⌝ ∗
@@ -132,21 +149,21 @@ Section Init_setup_proof.
     iMod "HauthClts" as (M) "(HauthClts & %Hdom & Hclts)".
     iMod (mono_nat_own_alloc 0) as (γT) "((HTimeG & HTimeL) & _)" .
     iMod (inv_alloc KVS_InvName E
-            (global_inv_def clients γClts γGauth γSnap γT γTrs)
-           with "[HmemG HSnap HauthTrs HauthClts HTimeG]")
+            (global_inv_def clients γClts γGauth γGsnap γT γTrs)
+           with "[HmemG HGsnap HauthTrs HauthClts HTimeG]")
       as "#Hginv".
     { iNext. iExists _, ∅, _, _.
       iFrame. unfold ownSnapAuth, connected_clients.
       rewrite fmap_empty. iFrame. iSplit; first done.
       iPureIntro. apply model.valid_init_state. }
     set (MTSC := client_handler_rpc_user_params clients
-                   γClts γGauth γSnap γT γTrs).
+                   γClts γGauth γGsnap γT γTrs).
     iMod (MTS_init_setup E MTSC)
       as (srv_si SrvInit MTRC) "(Hsinit & #HsrvS & #HcltS & #HreqS)". 
     { simplify_eq /=; solve_ndisj. }
     iModIntro.
     iExists (SI_resources_instance clients
-               γClts γGauth γSnap γT γTrs srv_si SrvInit).
+               γClts γGauth γGsnap γT γTrs srv_si SrvInit).
     iFrame "#∗".
     iSplitL "Hkeys".
     { rewrite !big_sepM_gset_to_gmap.
@@ -182,7 +199,7 @@ Section Init_setup_proof.
       iIntros (?????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "Hk HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
-      wp_apply (read_spec_internal_holds clients γClts γGauth γSnap γT γTrs
+      wp_apply (read_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                  with "[//][$][$Hk][$HΦ]").
       iFrame "#∗". }
     iSplit.
@@ -190,20 +207,20 @@ Section Init_setup_proof.
       iIntros (???????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "Hk HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
-      by wp_apply (write_spec_internal_holds γClts γSnap γT γTrs
+      by wp_apply (write_spec_internal_holds γClts γGsnap γT γTrs
                  with "[//][$Hk][$HΦ]"). }
     iSplit.
     { iPureIntro.
       iIntros (????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "HΦ".
-      wp_apply (start_spec_internal_holds clients γClts γGauth γSnap γT γTrs
+      wp_apply (start_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                  with "[//][$][$][$][$HΦ]"). }
     iPureIntro.
       iIntros (????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "HΦ".
-      wp_apply (commit_spec_internal_holds clients γClts γGauth γSnap γT γTrs
+      wp_apply (commit_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                  with "[//][$][$][$][$HΦ]").
-  Admitted. 
+  Qed.
   
 End Init_setup_proof.
 
