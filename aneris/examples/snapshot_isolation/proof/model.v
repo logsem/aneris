@@ -223,9 +223,10 @@ Section KVSL_valid.
   Definition update_kvsl
     (m0 : gmap Key val)
     (C : gmap Key SerializableVal)
-    (T : nat) :=
+    (T : nat) : gmap Key val :=
     map_fold (λ k v m, 
-               (<[ k := SOMEV ($(k, (v.(SV_val), T)), v)]> m))
+        (<[ k := SOMEV ($(k, (v.(SV_val), T)),
+                     (default NONEV (m0 !! k)))]> m))
       m0 C.
 
   (** Used for commit *)

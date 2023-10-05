@@ -564,6 +564,43 @@ Section Proof_of_commit_handler.
           eapply can_not_do_commit; try done.
   Qed.
 
+  (* Lemma update_kvs_spec_internal (kvs_orig kvs_rec cacheV : val) (T T': nat)
+  (cache_updatesM m_orig m_rec : gmap Key val)
+  (cache_logicalM : gmap Key (option val * bool))
+  (Msnap M : gmap Key (list write_event)) 
+  (cache : gmap Key SerializableVal)
+  (S : snapshots) :
+  (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v) →
+  is_coherent_cache cache_updatesM cache_logicalM Msnap →
+  is_map cacheV cache_updatesM →
+  is_map kvs_orig m_orig →
+  is_map kvs_rec m_rec →
+  kvsl_valid m_orig M S T →
+  {{{ ⌜True⌝ }}}
+    (rec: "upd" "kvs_t" "cache_t" :=
+    match: "cache_t" with
+      InjL <> => "kvs_t"
+    | InjR "chl" =>
+      let: "kv" := Fst "chl" in
+      let: "cache_l" := Snd "chl" in
+      let: "k" := Fst "kv" in
+      let: "v" := Snd "kv" in
+      let: "vlst" := kvs_get "k" kvs_orig in
+      let: "newval" := ("k", ("v", #T')) in
+      let: "newvals" := "newval" :: "vlst" in
+      let: "kvs_t'" := map_code.map_insert "k" "newvals"
+                        "kvs_t" in
+      "upd" "kvs_t'" "cache_l"
+  end)%V kvs_rec cacheV 
+    @[ip_of_address MTS_saddr]
+  {{{ (m_updated : gmap Key val) (kvs_updated : val), RET kvs_updated;
+    ⌜is_map kvs_updated m_updated⌝ ∗
+    ⌜∀ k, k ∈ dom cache_updatesM → m_updated !! k = (update_kvsl m_orig cache T') !! k⌝ ∗
+    ⌜∀ k, k ∉ dom cache_updatesM → m_updated !! k = m_rec !! k⌝
+  }}}.
+  Proof.
+  Admitted. *)
+
   Lemma update_kvs_spec (kvs cacheV : val) (T T': nat)
     (cache_updatesM m : gmap Key val)
     (cache_logicalM : gmap Key (option val * bool))
