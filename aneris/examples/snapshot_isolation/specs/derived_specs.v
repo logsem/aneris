@@ -45,6 +45,7 @@ Section Specs.
       ∃ (mh : gmap Key (list val)),
         ⌜m = (last)<$> mh⌝ ∗ ([∗ map] k↦h ∈ mh, k ↦ₖ h).
   Proof.
+    
   Admitted.
                                                               
  Lemma start_spec_derived : 
@@ -116,6 +117,8 @@ Section Specs.
       (P :  gmap Key (option val) → iProp Σ)
       (Q :  gmap Key (option val) → gmap Key (option val * bool) → iProp Σ),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
+      ⌜start_spec⌝ -∗ 
+      ⌜commit_spec⌝ -∗ 
         (∀ (m_snap : gmap Key (option val)) (m_cache : gmap Key (option val * bool)),
             {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗
                 P m_snap }}}
