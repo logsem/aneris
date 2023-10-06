@@ -178,9 +178,20 @@ Section Specs.
     iApply ("Hsh" with "[Hst Hpost]").
     iSplitL "Hst".
     iLeft. iFrame; eauto.
-    iDestruct "Hpost" as "[Hp|Hp]".
-    - admit.
-    - admit.
+    iDestruct "Hpost" as "[Hp|Hp]"; iDestruct "Hp" as "(-> & (_ & Hkeys))".
+    - iLeft; iSplit; first done.
+      rewrite Heqmh.
+      rewrite big_sepM2_fmap_l.
+      iApply (big_sepM2_mono with "Hkeys").
+      iIntros (k hk p Hk1 Hc1) "(Hk & _)".
+      iExists hk.
+      (* maybe here is some problem with wrapping definitions of the derived specs. *)
+      admit.
+    - iRight; iSplit; first done.
+      rewrite Heqmh. rewrite big_sepM_fmap.
+      iApply (big_sepM_mono with "Hkeys").
+      iIntros (k hk Hk) "(Hk & _)".
+      iExists hk. by iFrame.
   Admitted.
 
   
