@@ -26,11 +26,13 @@ Section Specs.
   Definition OwnMemKeyVal (k : Key) (vo : option val) : iProp Σ :=
     ∃ (hv : list val), OwnMemKey k hv ∗ ⌜last hv = vo⌝.
 
-  Inductive TxtSt : Type := TxtCanStart : TxtSt | TxtActive : TxtSt.
+  Inductive TxtSt : Type :=
+  | TxtCanStart : TxtSt
+  | TxtActive (m : gmap Key (option val)) : TxtSt.
 
   Definition ConnectionStateTxt c sa (st : TxtSt) : iProp Σ :=
     (⌜st = TxtCanStart⌝ ∗  ConnectionState c sa CanStart) ∨
-    (⌜st = TxtActive⌝ ∗ ∃ ms,  ConnectionState c sa (Active ms)).
+    (∃ m, ⌜st = TxtActive m⌝ ∗ ∃ ms, ConnectionState c sa (Active ms) ∗ ⌜last <$> ms = m⌝).
 
   Definition commitTxt (p : option val * bool) (w : option val) :=
     match p with
@@ -45,8 +47,52 @@ Section Specs.
       ∃ (mh : gmap Key (list val)),
         ⌜m = (last)<$> mh⌝ ∗ ([∗ map] k↦h ∈ mh, k ↦ₖ h).
   Proof.
-    
-  Admitted.
+    iInduction m as [| k vo m Hk] "IH" using map_ind.
+    - iSplit; last by iIntros; done.
+      iIntros. iExists ∅. rewrite fmap_empty. by iSplit; first set_solver.
+    - iDestruct "IH" as "(IH1 & IH2)".
+      iSplit.
+      -- iClear "IH2".
+         rewrite !big_sepM_insert; last done.
+         iIntros "(H1 & H2)".
+         iDestruct ("IH1" with "[$H2]") as "H2".
+         iDestruct "H2" as (mh) "(%Heq & H2)".
+         iDestruct "H1" as (h) "(Hk & %Heqh)".
+         iExists (<[k:=h]>mh).
+         iSplit.
+         --- by iPureIntro; simplify_map_eq /=; rewrite fmap_insert.
+         --- rewrite big_sepM_insert; first iFrame.
+             rewrite Heq in Hk.
+             rewrite lookup_fmap in Hk.
+             by destruct (mh !! k) eqn:Hhk; first done.
+      -- iClear "IH1".
+         rewrite !big_sepM_insert; last done.
+         iIntros "H".
+         iDestruct "H" as (mh Heq) "Hks".
+         assert (∃ h, mh !! k = Some h) as (h & Heqh).
+         { destruct (mh !! k) eqn:Heqkh; first eauto.
+           apply not_elem_of_dom in Heqkh.
+           rewrite -(dom_fmap last) in Heqkh.
+           rewrite -Heq in Heqkh.
+           set_solver. }
+         iDestruct (big_sepM_delete with "Hks") as "(Hk & Hks)"; first done.
+         iSplitL "Hk".
+         { iExists h. iFrame. iPureIntro. simpl.
+           assert (((last <$> mh) !! k) = Some vo) as Ha.
+           { rewrite -Heq. by rewrite lookup_insert. }
+           rewrite lookup_fmap in Ha.
+           rewrite Heqh in Ha.
+           apply fmap_Some_1 in Ha.
+           set_solver. }
+         iApply "IH2".
+         iExists (delete k mh).
+         iFrame.
+         iPureIntro.
+         assert (delete k (<[k:=vo]> m) = delete k (last <$> mh)) as Heqdel.
+         { f_equal. eauto. }
+         rewrite delete_insert in Heqdel; last done.
+         by rewrite fmap_delete.
+  Qed.
                                                               
  Lemma start_spec_derived : 
     ∀ (c : val) (sa : socket_address)
@@ -59,7 +105,7 @@ Section Specs.
        [∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo >>>
       SI_start c @[ip_of_address sa] E
     <<<▷ RET #();
-       ConnectionStateTxt c sa TxtActive ∗
+       ConnectionStateTxt c sa (TxtActive m) ∗
        ([∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo) ∗
        ([∗ map] k ↦ vo ∈ m, k ↦{c} vo ∗ KeyUpdStatus c k false) >>>.
   Proof.
@@ -74,16 +120,20 @@ Section Specs.
     iDestruct "Hkeys" as (mh Heq) "Hkeys".
     iExists mh.
     rewrite /ConnectionStateTxt.
-    iDestruct "Hst" as "[(_ & Hres)|(%df & _)]"; last done.
+    iDestruct "Hst" as "[(_ & Hres)|Habs]"; last first.
+    { iDestruct "Habs" as (_df) "(% & _)". done. }
     iFrame.
     iNext.
     iIntros "(Hst & Hks & (Hres & _))".
     iApply ("Hsh" with "[Hst Hks Hres]").
     iSplitL "Hst"; first eauto.
     rewrite Heq.
-    iSplitL "Hks".
+    iRight.
+    iExists (last <$> mh).
+    iSplit; first done.
     by iExists mh; iSplit; first done.
-    by rewrite big_sepM_fmap.
+    iSplitL "Hks". iExists _. by iFrame.
+    rewrite Heq. by rewrite big_sepM_fmap.
   Qed.
   
   Lemma commit_spec_derived :
@@ -92,10 +142,10 @@ Section Specs.
      ⌜↑KVS_InvName ⊆ E⌝ -∗
        IsConnected c sa -∗
        ⌜commit_spec⌝ -∗ 
-    <<< ∀∀ (m : gmap Key (option val))
+    <<< ∀∀ (m ms : gmap Key (option val))
            (mc : gmap Key (option val * bool)),
-        ConnectionStateTxt c sa TxtActive ∗
-        ⌜dom m = dom mc⌝ ∗
+        ConnectionStateTxt c sa (TxtActive ms) ∗
+        ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo) ∗
         ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) >>>
       SI_commit c @[ip_of_address sa] E
@@ -108,6 +158,29 @@ Section Specs.
          (⌜b = false⌝ ∗
            [∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo)) >>>.
   Proof.
+    iIntros (c sa E HE) "#Hic %spec".
+    iIntros (Φ) "!# Hsh".
+    wp_apply (spec _ _ E with "[//][//][Hsh]").
+    iMod "Hsh".
+    iModIntro.
+    iDestruct "Hsh" as (m ms_ mc) "((Hst & %HdomEq1 & %HdomEq2 & Hkeys1 & Hkeys2) & Hsh)".
+    rewrite /OwnMemKeyVal /Hist.
+    iDestruct (convert_mhist m with "Hkeys1") as (mh Heqmh) "Hkeys1".
+    rewrite /ConnectionStateTxt.
+    iDestruct "Hst" as "[(%Habs & _)|Hst]"; first done.
+    iDestruct "Hst" as  (_ms) "(%HeqT & (%ms & Hres & %Heq))".
+    iExists mh, ms, mc.
+    iFrame.
+    iSplit.
+    { iPureIntro. inversion HeqT; subst. set_solver. }
+    iNext.
+    iIntros (b) "(Hst & Hpost)".  
+    iApply ("Hsh" with "[Hst Hpost]").
+    iSplitL "Hst".
+    iLeft. iFrame; eauto.
+    iDestruct "Hpost" as "[Hp|Hp]".
+    - admit.
+    - admit.
   Admitted.
 
   
