@@ -202,6 +202,15 @@ Section Wrapper_defs.
                 OwnMemKey_def k (commit_event p h) ∗
                 Seen_def k (commit_event p h)).
     Proof.
+      iIntros (dom0 [dom1 [dom2 [dom3 [cache_logical_some [cache_logical_none
+        [updates_logical_some [updates_logical_none cache_logical]]]]]]]
+        snap_valid M_valid updates_ser eval_updates
+        commit_current) "ownM ownTimeGlobal ownTimeLocal ownAuthGlobal ownAuthLocal
+        ownMemKey".
+      apply bool_decide_spec in commit_current.
+      iCombine "ownTimeGlobal ownTimeLocal" as "ownTime".
+      iMod (mono_nat_own_update (T+1) with "ownTime")
+        as "[ownTimeGlobal ownTimeLocal]"; first lia.
     Admitted.
 
 End Wrapper_defs.
