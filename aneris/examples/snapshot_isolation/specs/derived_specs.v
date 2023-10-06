@@ -42,7 +42,8 @@ Section Specs.
 
   Lemma convert_mhist (m : gmap Key (option val)) :
     ([∗ map] k↦vo ∈ m, ∃ hv : list val, k ↦ₖ hv ∗ ⌜last hv = vo⌝) ⊣⊢
-      ∃ (mh : gmap Key (list val)), ([∗ map] k↦h ∈ mh, k ↦ₖ h).
+      ∃ (mh : gmap Key (list val)),
+        ⌜m = (last)<$> mh⌝ ∗ ([∗ map] k↦h ∈ mh, k ↦ₖ h).
   Proof.
   Admitted.
                                                               
@@ -69,7 +70,7 @@ Section Specs.
     iDestruct "Hsh" as (m) "((Hst & Hkeys) & Hsh)".
     rewrite /OwnMemKeyVal /Hist.
     rewrite convert_mhist.
-    iDestruct "Hkeys" as (mh) "Hkeys".
+    iDestruct "Hkeys" as (mh Heq) "Hkeys".
     iExists mh.
     rewrite /ConnectionStateTxt.
     iDestruct "Hst" as "[(_ & Hres)|(%df & _)]"; last done.
@@ -78,11 +79,11 @@ Section Specs.
     iIntros "(Hst & Hks & (Hres & _))".
     iApply ("Hsh" with "[Hst Hks Hres]").
     iSplitL "Hst"; first eauto.
+    rewrite Heq.
     iSplitL "Hks".
-    iExists mh.
-    iFrame.
-    admit.
-  Admitted.
+    by iExists mh; iSplit; first done.
+    by rewrite big_sepM_fmap.
+  Qed.
   
   Lemma commit_spec_derived :
    ∀ (c : val) (sa : socket_address)
@@ -107,5 +108,6 @@ Section Specs.
            [∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo)) >>>.
   Proof.
   Admitted.
+
  
  End Specs.
