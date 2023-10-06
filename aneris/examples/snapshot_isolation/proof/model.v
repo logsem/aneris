@@ -32,11 +32,6 @@ Section Whist_valid.
     whist_ValidExt: whist_ext h;
 }.
 
-  (** TODO: Proof this lemma if needed or remove. *)
-  Lemma whist_events_no_dup h : whist_valid h → NoDup h.
-  Proof.
-  Admitted.
-
   Global Arguments whist_ValidKeys {_ _} _.
   Global Arguments whist_ValidExt {_ _} _.
   Global Arguments whist_ValidTimes {_ _} _.
@@ -65,7 +60,7 @@ Section KVS_valid.
     ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_key) = k.
 
   Definition kvs_whist_commit_times (M : global_mem) (T : nat) :=
-    ∀ k h, M !! k = Some h → ∀ e, e ∈ h → e.(we_time) <= T.
+    ∀ k h, M !! k = Some h → ∀ e, e ∈ h → (e.(we_time) <= T)%nat.
   
   (** Importantly, note that there is currently no relation between snapshots
       for two given transactions. We only relate snapshots to the state of 
@@ -151,7 +146,49 @@ Section KVS_valid.
     kvs_valid M S T →
     kvs_valid M (<[(T+1)%nat := M]>S) (T + 1).
   Proof.
-  Admitted.
+    destruct 1.
+    split; 
+    unfold
+      kvs_whists,
+      kvs_keys,
+      kvs_whist_commit_times,
+      kvs_time_snapshot_map_valid,
+      kvs_snapshots_included,
+      kvs_snapshots_cuts in *;
+      try eauto with set_solver.
+    - intros k h Hk e He.
+      specialize (kvs_ValidCommitTimes0 k h Hk e He). lia.
+    - intros n Hn.
+      specialize (kvs_ValidSnapshotTimesTime0 n).
+      rewrite dom_insert in Hn.
+      apply elem_of_union in Hn as [Hn|Hn].
+      -- by rewrite elem_of_singleton in Hn; eauto with lia.
+      -- specialize (kvs_ValidSnapshotTimesTime0 Hn).
+         eauto with lia.
+    - intros t Mt Hmt.
+      destruct (bool_decide (t = (T + 1)%nat)) eqn:Hteq. 
+      -- rewrite bool_decide_eq_true in Hteq. subst.
+         rewrite lookup_insert in Hmt.
+         inversion Hmt.
+         rewrite /map_included; eauto.
+      -- rewrite bool_decide_eq_false in Hteq.
+         rewrite lookup_insert_ne in Hmt; last done.
+         naive_solver. 
+    - intros t k h_snap h_curr Mt Hmt Hmtk Hmk.
+      destruct (bool_decide (t = (T + 1)%nat)) eqn:Hteq. 
+      -- rewrite bool_decide_eq_true in Hteq. subst.
+         rewrite lookup_insert in Hmt.
+         inversion Hmt; subst.
+         rewrite Hmk in Hmtk.
+         inversion Hmtk; subst.
+         exists []. split; first by apply app_nil_end.
+         split; last by set_solver.
+         intros e He.
+         specialize (kvs_ValidCommitTimes0 k h_snap Hmk e He). lia.
+      -- rewrite bool_decide_eq_false in Hteq.
+         rewrite lookup_insert_ne in Hmt; last done.
+         naive_solver. 
+  Qed.  
 
   (** A system step updating the memory with the effect of commit 
       of a transaction is valid *)
