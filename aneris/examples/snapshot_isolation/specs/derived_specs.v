@@ -109,5 +109,33 @@ Section Specs.
   Proof.
   Admitted.
 
- 
+  
+  Lemma run_spec_derived :
+    ∀ (c : val) (tbody : val)
+      (sa : socket_address) (E : coPset)
+      (P :  gmap Key (option val) → iProp Σ)
+      (Q :  gmap Key (option val) → gmap Key (option val * bool) → iProp Σ),
+      ⌜↑KVS_InvName ⊆ E⌝ -∗
+        (∀ (m_snap : gmap Key (option val)) (m_cache : gmap Key (option val * bool)),
+            {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗
+                P m_snap }}}
+           tbody c #() @[ip_of_address sa] E
+           {{{ RET #(); ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
+                Q m_snap m_cache }}})
+    →
+    <<< ∀∀ m_curr, ConnectionStateTxt c sa TxtCanStart ∗
+               P m_curr ∗
+               [∗ map] k ↦ vo ∈ m_curr, OwnMemKeyVal k vo >>>
+           SI_run c tbody @[ip_of_address sa] E
+    <<<▷∃∃ mc b, RET #b;
+        ConnectionStateTxt c sa TxtCanStart ∗
+        (** Transaction has been commited. *)
+        ((⌜b = true⌝ ∗ Q m_curr mc ∗
+          ([∗ map] k↦ vo;p ∈ m_curr; mc, OwnMemKeyVal k (commitTxt p vo))) ∨
+        (** Transaction has been aborted. *)
+         (⌜b = false⌝ ∗
+           [∗ map] k ↦ vo ∈ m_curr, OwnMemKeyVal k vo)) >>>.
+  Proof.
+  Admitted.
+  
  End Specs.
