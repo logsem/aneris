@@ -127,8 +127,6 @@ Section KVS_valid.
   Lemma valid_init_state :
     kvs_valid (gset_to_gmap [] KVS_keys) ∅ 0.
   Proof.
-  Admitted.
-  (*
     split; rewrite /kvs_ValidDom /kvs_dom /kvs_whists /kvs_ValidWhists /kvs_ValidCommitTimes.
     -  by rewrite dom_gset_to_gmap.
     - intros ? ? Habs. apply lookup_gset_to_gmap_Some in Habs as [_ <-].
@@ -137,9 +135,10 @@ Section KVS_valid.
       apply lookup_gset_to_gmap_Some in Habs as [_ <-]. set_solver.
     - rewrite /kvs_whist_commit_times. intros ? ? Habs.
       apply lookup_gset_to_gmap_Some in Habs as [_ <-]. set_solver.
-    - by rewrite /time_tss_valid.
-    - by rewrite /kvs_tss_valid.
-   Qed. *)
+    - by rewrite /kvs_time_snapshot_map_valid.
+    - by rewrite /kvs_snapshots_included.
+    - by rewrite /kvs_snapshots_cuts.
+   Qed. 
   
   (** A system step starting new transaction is valid.  *)
   Lemma kvs_valid_step_start_transaction M S T :
