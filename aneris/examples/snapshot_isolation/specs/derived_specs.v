@@ -226,8 +226,8 @@ Section Specs.
       -∗
         □ (∀ m_curr, ConnectionStateTxt c sa (TxtActive m_curr) ∗
              ([∗ map] k↦vo ∈ m_curr, OwnMemKeyVal k vo)  ={E, ⊤}=∗
-          |={⊤,E}=> (ConnectionStateTxt c sa (TxtActive m_curr) ∗
-             ([∗ map] k ↦ vo ∈ m_curr, OwnMemKeyVal k vo))) -∗
+          |={⊤,E}=> ∃ m_new, (ConnectionStateTxt c sa (TxtActive m_curr) ∗
+             ([∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo))) -∗
     <<< ∀∀ m_curr, ConnectionStateTxt c sa TxtCanStart ∗
                P m_curr ∗
                [∗ map] k ↦ vo ∈ m_curr, OwnMemKeyVal k vo >>>
@@ -261,6 +261,8 @@ Section Specs.
     iIntros (m_cache) "(%Hdom & Hcache)".
     wp_pures.
     wp_apply commit_spec_derived; try eauto.
+    iMod "Hcl" as (m_new) "(Hst & Hks)".
+    iModIntro.    
    Admitted.
   
  End Specs.
