@@ -156,7 +156,9 @@ Section Proof_of_start_handler.
        split.
        - intros k h H_lookup e H_e_in_h.
          apply map_filter_lookup_Some_1_1 in H_lookup.
-         assert ((we_time e ≤ T)%Z); first by eapply kvs_ValidCommitTimes. lia.
+         assert ((we_time e ≤ T)%nat).
+         eapply kvs_ValidCommitTimes; eauto with lia.
+         lia. 
        - apply map_Forall_lookup_2.
          intros k x H_filter_some.
          apply map_filter_lookup_Some_1_1 in H_filter_some.
