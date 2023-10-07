@@ -215,31 +215,27 @@ Section Specs.
       ⌜commit_spec⌝ -∗
        IsConnected c sa -∗
        (∀ (m_snap : gmap Key (option val)),
-           {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗
-                 KeyUpdStatus c k false) ∗
-               P m_snap }}}
-           tbody c  @[ip_of_address sa] 
+           {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
+              tbody c  @[ip_of_address sa] 
            {{{ (m_cache : gmap Key (option val * bool)), RET #();
                ⌜dom m_snap = dom m_cache⌝ ∗
                ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
-                Q m_snap m_cache }}})
-      -∗
-        □ (∀ m_curr, ConnectionStateTxt c sa (TxtActive m_curr) ∗
-             ([∗ map] k↦vo ∈ m_curr, OwnMemKeyVal k vo)  ={E, ⊤}=∗
-          |={⊤,E}=> ∃ m_new, (ConnectionStateTxt c sa (TxtActive m_curr) ∗
-             ([∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo))) -∗
-    <<< ∀∀ m_curr, ConnectionStateTxt c sa TxtCanStart ∗
-               P m_curr ∗
-               [∗ map] k ↦ vo ∈ m_curr, OwnMemKeyVal k vo >>>
+                Q m_snap m_cache }}}) -∗
+        □ (∀ m_snap,  
+             ([∗ map] k↦vo ∈ m_snap, OwnMemKeyVal k vo) ={E, ⊤}=∗ 
+              |={⊤,E}=> ∃ m_new, ⌜dom m_new = dom m_snap⌝ ∗
+             (([∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo))) -∗
+       <<< ∀∀ m_snap, ConnectionStateTxt c sa TxtCanStart ∗
+               P m_snap ∗ [∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo >>>
            SI_run c tbody @[ip_of_address sa] E
-    <<<▷∃∃ mc b, RET #b;
+       <<<▷∃∃ m_new mc b, RET #b;
         ConnectionStateTxt c sa TxtCanStart ∗
         (** Transaction has been commited. *)
-        ((⌜b = true⌝ ∗ Q m_curr mc ∗
-          ([∗ map] k↦ vo;p ∈ m_curr; mc, OwnMemKeyVal k (commitTxt p vo))) ∨
+        ((⌜b = true⌝ ∗ Q m_snap mc ∗
+          ([∗ map] k↦ vo;p ∈ m_new; mc, OwnMemKeyVal k (commitTxt p vo))) ∨
         (** Transaction has been aborted. *)
          (⌜b = false⌝ ∗
-           [∗ map] k ↦ vo ∈ m_curr, OwnMemKeyVal k vo)) >>>.
+           [∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo)) >>>.
   Proof.
     iIntros (c tbody sa E P Q HE HspecS HspecC).
     iIntros "#HiC #Hbody #pre_body".
@@ -248,21 +244,31 @@ Section Specs.
     wp_pures.
     wp_apply start_spec_derived; try eauto.
     iMod "Hsh".
-    iDestruct "Hsh" as (m_curr) "((Hst & HP & Hks) & Hsh)".
+    iDestruct "Hsh" as (m_snap) "((Hst & HP & Hks) & Hsh)".
     iModIntro.
-    iExists m_curr.
+    iExists m_snap.
     iFrame.
-    iNext.
+    iNext. 
     iIntros "(Hst & Hks & Hcs)".
-    iMod ("pre_body" $! m_curr with "[$Hst $Hks]") as "Hcl".
+    iMod ("pre_body" $! m_snap with "[$Hks]") as "Hcl".
     iModIntro.
     wp_pures.
-    wp_apply ("Hbody" $! m_curr  with "[$Hcs $HP]"). 
-    iIntros (m_cache) "(%Hdom & Hcache)".
+    wp_apply ("Hbody" $! m_snap  with "[$Hcs $HP]"). 
+    iIntros (m_cache) "(%Hdom & Hcache & HQ)".
     wp_pures.
     wp_apply commit_spec_derived; try eauto.
-    iMod "Hcl" as (m_new) "(Hst & Hks)".
-    iModIntro.    
-   Admitted.
+    iMod "Hcl" as (m_new) "(%Hdom' & Hks)".
+    iModIntro.
+    iExists m_new, m_snap, m_cache.
+    iFrame.
+    iSplit; first by iPureIntro; set_solver.
+    iNext.
+    iIntros (b) "(Hst & Hpost)".
+    iMod ("Hsh" $! m_new m_cache b with "[HQ $Hst Hpost]").
+    iDestruct "Hpost" as "[(-> & Hpost) | (-> & Hpost)]".
+    - iLeft. by iFrame.
+    - iRight. by iFrame.
+    - done.
+  Qed.   
   
  End Specs.
