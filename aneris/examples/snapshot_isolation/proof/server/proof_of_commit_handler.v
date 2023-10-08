@@ -564,42 +564,165 @@ Section Proof_of_commit_handler.
           eapply can_not_do_commit; try done.
   Qed.
 
-  (* Lemma update_kvs_spec_internal (kvs_orig kvs_rec cacheV : val) (T T': nat)
-  (cache_updatesM m_orig m_rec : gmap Key val)
-  (cache_logicalM : gmap Key (option val * bool))
-  (Msnap M : gmap Key (list write_event)) 
-  (cache : gmap Key SerializableVal)
-  (S : snapshots) :
-  (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v) →
-  is_coherent_cache cache_updatesM cache_logicalM Msnap →
-  is_map cacheV cache_updatesM →
-  is_map kvs_orig m_orig →
-  is_map kvs_rec m_rec →
-  kvsl_valid m_orig M S T →
-  {{{ ⌜True⌝ }}}
-    (rec: "upd" "kvs_t" "cache_t" :=
-    match: "cache_t" with
-      InjL <> => "kvs_t"
-    | InjR "chl" =>
-      let: "kv" := Fst "chl" in
-      let: "cache_l" := Snd "chl" in
-      let: "k" := Fst "kv" in
-      let: "v" := Snd "kv" in
-      let: "vlst" := kvs_get "k" kvs_orig in
-      let: "newval" := ("k", ("v", #T')) in
-      let: "newvals" := "newval" :: "vlst" in
-      let: "kvs_t'" := map_code.map_insert "k" "newvals"
-                        "kvs_t" in
-      "upd" "kvs_t'" "cache_l"
-  end)%V kvs_rec cacheV 
-    @[ip_of_address MTS_saddr]
-  {{{ (m_updated : gmap Key val) (kvs_updated : val), RET kvs_updated;
-    ⌜is_map kvs_updated m_updated⌝ ∗
-    ⌜∀ k, k ∈ dom cache_updatesM → m_updated !! k = (update_kvsl m_orig cache T') !! k⌝ ∗
-    ⌜∀ k, k ∉ dom cache_updatesM → m_updated !! k = m_rec !! k⌝
-  }}}.
+  Lemma update_kvs_spec_internal (kvs_orig kvs_rec cacheV : val) (T T': nat)
+    (cache_updatesM m_orig m_rec : gmap Key val)
+    (cache_logicalM : gmap Key (option val * bool))
+    (Msnap M : gmap Key (list write_event)) 
+    (cache : gmap Key SerializableVal)
+    (S : snapshots) :
+    (∀ k v, (∃ sv, cache !! k = Some sv ∧ sv.(SV_val) = v) ↔ cache_updatesM !! k = Some v) →
+    is_coherent_cache cache_updatesM cache_logicalM Msnap →
+    is_map cacheV cache_updatesM →
+    is_map kvs_orig m_orig →
+    is_map kvs_rec m_rec →
+    kvsl_valid m_orig M S T →
+    {{{ ⌜True⌝ }}}
+      (rec: "upd" "kvs_t" "cache_t" :=
+      match: "cache_t" with
+        InjL <> => "kvs_t"
+      | InjR "chl" =>
+        let: "kv" := Fst "chl" in
+        let: "cache_l" := Snd "chl" in
+        let: "k" := Fst "kv" in
+        let: "v" := Snd "kv" in
+        let: "vlst" := kvs_get "k" kvs_orig in
+        let: "newval" := ("k", ("v", #T')) in
+        let: "newvals" := "newval" :: "vlst" in
+        let: "kvs_t'" := map_code.map_insert "k" "newvals"
+                          "kvs_t" in
+        "upd" "kvs_t'" "cache_l"
+      end)%V kvs_rec cacheV
+      @[ip_of_address MTC.(MTS_saddr)]
+    {{{ (m_updated : gmap Key val) (kvs_updated : val), RET kvs_updated;
+        ⌜is_map kvs_updated m_updated⌝ ∗
+        ⌜∀ k v, cache !! k = Some v → m_updated !! k = Some (InjRV ($ (k, (v.(SV_val), T')), default (InjLV #()) (m_orig !! k)))⌝ ∗
+        ⌜∀ k, k ∉ dom cache → m_updated !! k = m_rec !! k⌝ }}}.
   Proof.
-  Admitted. *)
+    iIntros (H_all H_coh H_map_cache H_map_kvs_orig H_map_kvs_rec H_valid Φ) "_ HΦ".
+    iLöb as "IH" forall (Φ cache cacheV cache_updatesM cache_logicalM Msnap kvs_rec m_rec 
+      H_map_kvs_rec H_coh H_all H_map_cache).
+    wp_pures.
+    destruct H_map_cache as [l (H_map_cache1 & H_map_cache2 & H_map_cache3)].
+    destruct l as [|[k v] l]; simpl in H_map_cache2, H_map_cache1; 
+      simplify_eq; wp_pures.
+    - iApply "HΦ".
+      iSplit; first done.
+      iSplit; last done.
+      iPureIntro.
+      intros k v H_lookup.
+      assert ((∅ : gmap Key val) !! k = Some v.(SV_val)) as H_abs; last done.
+      apply H_all.
+      by exists v. 
+    - destruct (M !! k) as [ wl | ] eqn:H_lookup_M.
+      + wp_apply (kvs_get_spec_some _ _ _ _ _ _ k kvs_orig wl m_orig M); try done.
+        apply (kvsl_ValidInModelEmpty m_orig M S T); first done.
+        apply (kvsl_ValidInModelSome m_orig M S T); first done.
+        apply (kvsl_ValidLocalSome m_orig M S T); first done.
+        iIntros (v' ->).
+        wp_pures.
+        wp_apply (wp_list_cons {|we_key:=k; we_val:=v; we_time:=_|} (reverse wl) 
+          (inject_list (reverse wl))).
+        {
+          iPureIntro. 
+          by apply is_list_inject.
+        }
+        iIntros (v_list H_list).
+        wp_pures.
+        wp_apply (wp_map_insert _ _ _ _ m_rec); first done.
+        iIntros (v_map H_map).
+        wp_let.
+        assert (k ∉ dom ((list_to_map l) : gmap Key val)) as H_k_nin.
+        {
+          rewrite dom_list_to_map.
+          apply NoDup_cons_1_1 in H_map_cache3.
+          set_solver.
+        }
+        iApply ("IH" $! _ (delete k cache) (inject_list l) (delete k (<[k:=v]> (list_to_map l))) 
+          (delete k cache_logicalM) (delete k Msnap) v_map (<[k:=v_list]> m_rec))
+          ; try done.
+        * iPureIntro.
+          eapply (is_coherent_cache_delete k); last apply H_coh.
+        * iPureIntro.
+          intros k' x.
+          specialize (H_all k' x).
+          split.
+          -- intros [sv (H_lookup_cache & H_eq)].
+             destruct (decide (k = k')) as [<-| H_neq_k].
+             ++ by rewrite lookup_delete in H_lookup_cache.
+             ++ rewrite lookup_delete_ne; last done.
+                apply H_all.
+                exists sv.
+                rewrite lookup_delete_ne in H_lookup_cache; done.
+          -- intros H_lookup_cache.
+             destruct (decide (k = k')) as [<-| H_neq_k].
+             ++ by rewrite lookup_delete in H_lookup_cache.
+             ++ rewrite lookup_delete_ne; last done.
+                apply H_all.
+                rewrite lookup_delete_ne in H_lookup_cache; done.
+        * rewrite delete_insert_dom; last done.
+          iPureIntro.
+          exists l.
+          split_and!; try done.
+          by apply NoDup_cons_1_2 in H_map_cache3.
+        * iModIntro.
+          iIntros (m_updated kvs_updated) "(%H_map' & %H_in & %H_nin)".
+          iApply "HΦ".
+          iSplit; first done.
+          iSplit; iPureIntro.
+          -- intros k' x H_lookup_cache.
+             destruct (decide (k = k')) as [<-| H_neq_k].
+             ++ specialize (H_nin k).
+                assert (m_updated !! k = <[k:=v_list]> m_rec !! k) as ->;
+                  first apply H_nin; first set_solver.
+                rewrite lookup_insert.
+                apply f_equal.
+                destruct H_list as [l_rev_wl (-> & H_list)].
+                simpl.
+                assert (v = x) as ->.
+                {
+                  specialize (H_all k x).
+                  rewrite lookup_insert in H_all.
+                  assert (Some v = Some x.(SV_val)) as H_eq.
+                  - apply H_all.
+                    by exists x.
+                  - by inversion H_eq.
+                }
+                destruct wl as [|h t].
+                ** apply (kvsl_ValidInModelEmpty m_orig M S T) in H_lookup_M; last done.
+                   rewrite H_lookup_M.
+                   simpl.
+                   simpl in H_list.
+                   by rewrite H_list.
+                ** apply (kvsl_ValidInModelSome m_orig M S T) in H_lookup_M; last done.
+                   rewrite H_lookup_M; last done.
+                   simpl.
+                   apply is_list_inject in H_list.
+                   by rewrite H_list.
+             ++ apply H_in.
+                by rewrite lookup_delete_ne.
+          -- intros k' H_k'_dom.
+             destruct (decide (k = k')) as [<-| H_neq_k].
+             ++ assert (k ∈ dom cache); last done.
+                specialize (H_all k v).
+                rewrite lookup_insert in H_all.
+                assert ((∃ sv : SerializableVal, cache !! k = Some sv ∧ sv.(SV_val) = v)) 
+                  as [sv (H_lookup_cache & _)]; first by apply H_all.
+                assert (is_Some (cache !! k)) as H_some; first done.
+                by rewrite -elem_of_dom in H_some. 
+             ++ specialize (H_nin k').
+                rewrite lookup_insert_ne in H_nin; last done.
+                apply H_nin.
+                set_solver.
+      + destruct H_coh as (_ & _ & H_coh & _).
+        assert (k ∈ KVS_keys) as H_k_in; first set_solver.
+        assert (KVS_keys = dom M) as H_eq_dom.
+        {
+          apply (kvs_ValidDom M S T).
+          by apply (kvsl_ValidModel m_orig M S T).
+        }
+        rewrite -not_elem_of_dom in H_lookup_M.
+        set_solver.
+  Qed.
 
   Lemma update_kvs_spec (kvs cacheV : val) (T T': nat)
     (cache_updatesM m : gmap Key val)
@@ -618,67 +741,83 @@ Section Proof_of_commit_handler.
     {{{ (kvs_updated : val), RET kvs_updated; 
         ⌜is_map kvs_updated (update_kvsl m cache T')⌝}}}.
   Proof.
-   iIntros (H_all H_coh H_map_cache H_map_kvs H_valid Φ) "_ HΦ".
-   unfold snapshot_isolation_code.update_kvs.
-   wp_lam.
-   do 2 wp_let.
-   wp_pure _.
-   wp_let.
-   iLöb as "IH" forall (cacheV cache_updatesM cache_logicalM kvs 
-    H_map_cache H_map_kvs H_coh H_all).
-   wp_pures.
-   destruct H_map_cache as [l (H_map_cache1 & H_map_cache2 & H_map_cache3)].
-   destruct l as [|[k v] l]; simpl in H_map_cache2, H_map_cache1; 
-    simplify_eq; wp_pures.
-   - iApply "HΦ".
-     iPureIntro.
-     assert (cache = ∅) as ->.
-     {
-      apply map_empty.
+    iIntros (H_all H_coh H_map_cache H_map_kvs H_valid Φ) "_ HΦ".
+    unfold snapshot_isolation_code.update_kvs.
+    wp_lam.
+    do 2 wp_let.
+    wp_pure _.
+    wp_let.
+    wp_apply (update_kvs_spec_internal); try done.
+    iIntros (m_updated kvs_updated) "(%H_map_kvs_updated & %H_eq_in & %H_eq_nin)".
+    iApply "HΦ".
+    iPureIntro.
+    assert (m_updated = (update_kvsl m cache T')) as <-; last done.
+    unfold update_kvsl.
+    clear H_map_kvs H_map_kvs_updated H_all H_coh H_map_cache.
+    generalize dependent m_updated.
+    induction cache as [|k x cache H_eq IH] using map_ind; 
+    intros m_updated H_eq_in H_eq_nin.
+    - rewrite map_fold_empty.
+      apply map_eq.
       intro k.
-      destruct (cache !! k) as [ sv | ] eqn:H_lookup_cache; last done.
-      specialize (H_all k sv.(SV_val)).
-      assert ((∅ : gmap Key val) !! k = Some sv.(SV_val)) as H_abs.
-      - apply H_all.
-        by exists sv.
-      - by rewrite lookup_empty in H_abs.
-     }
-     unfold update_kvsl.
-     by rewrite map_fold_empty.
-   - destruct (M !! k) as [ wl | ] eqn:H_lookup_M.
-     + wp_apply (kvs_get_spec_some _ _ _ _ _ _ k kvs wl m M); try done.
-       apply (kvsl_ValidInModelEmpty m M S T); first done.
-       apply (kvsl_ValidInModelSome m M S T); first done.
-       apply (kvsl_ValidLocalSome m M S T); first done.
-       iIntros (v' ->).
-       wp_pures.
-       wp_apply (wp_list_cons {|we_key:=k; we_val:=v; we_time:=_|} (reverse wl) 
-        (inject_list (reverse wl))).
-       {
-        iPureIntro. 
-        by apply is_list_inject.
-       }
-       iIntros (v_list H_list).
-       wp_pures.
-       wp_apply (wp_map_insert _ _ _ _ m); first done.
-       iIntros (v_map H_map).
-       wp_let.
-       (* iApply ("IH" $! (inject_list l) _ _ v_map). *)
-       admit.
-     + wp_apply (kvs_get_spec_none _ _ _ _ _ _ k kvs m M); try done.
-       apply (kvsl_ValidDom m M S T); first done.
-       assert (kvs_valid M S T) as H_valid'; apply (kvsl_ValidModel m M S T); done.
-       iIntros (v' ->).
-       wp_pures.
-       wp_apply (wp_list_cons {|we_key:=k; we_val:=v; we_time:=_|} [] (InjLV #())); first done.
-       iIntros (v_list H_list).
-       wp_pures.
-       wp_apply (wp_map_insert _ _ _ _ m); first done.
-       iIntros (v_map H_map).
-       wp_let.
-       (* iApply "IH". *)
-       admit.
-  Admitted.
+      by apply H_eq_nin.
+    - rewrite map_fold_insert_L; try done.
+      + assert (m_updated !! k =
+      Some (InjRV ($ (k, (x.(SV_val), T')), default (InjLV #()) (m !! k)))) as H_lookup.
+      {
+        apply H_eq_in.
+        by rewrite lookup_insert.
+      }
+      apply map_eq.
+      intro i.
+      destruct (decide (k = i)) as [<-| H_neq_k].
+      * by rewrite lookup_insert.
+      * rewrite lookup_insert_ne; last done.
+        rewrite -(insert_delete m_updated k 
+          (InjRV ($ (k, (x.(SV_val), T')), default (InjLV #()) (m !! k)))); last done.
+        destruct (m !! k) as [ m_val| ] eqn:H_lookup_m.
+        -- rewrite -(insert_insert (delete k m_updated) k _ m_val).
+            specialize (IH (<[k:=m_val]> (delete k m_updated))).
+            rewrite lookup_insert_ne; last done.
+            rewrite -IH; first done.
+            ++ intros k' v' H_lookup_k'.
+              destruct (decide (k = k')) as [<-| H_neq_k'].
+              ** by rewrite H_eq in H_lookup_k'.
+              ** specialize (H_eq_in k' v').
+                rewrite lookup_insert_ne; last done.
+                rewrite lookup_delete_ne; last done.
+                apply H_eq_in.
+                rewrite lookup_insert_ne; done.
+            ++ intros k' H_k'_nin.
+              destruct (decide (k = k')) as [<-| H_neq_k'].
+              ** rewrite H_lookup_m.
+                  by rewrite lookup_insert.
+              ** specialize (H_eq_nin k').
+                  rewrite lookup_insert_ne; last done.
+                  rewrite lookup_delete_ne; last done.
+                  apply H_eq_nin.
+                  set_solver.
+        -- specialize (IH (delete k m_updated)).
+            rewrite lookup_insert_ne; last done.
+            rewrite -IH; first done.
+            ++ intros k' v' H_lookup_k'.
+              destruct (decide (k = k')) as [<-| H_neq_k'].
+              ** by rewrite H_eq in H_lookup_k'.
+              ** specialize (H_eq_in k' v').
+                rewrite lookup_delete_ne; last done.
+                apply H_eq_in.
+                rewrite lookup_insert_ne; done.
+            ++ intros k' H_k'_nin.
+              destruct (decide (k = k')) as [<-| H_neq_k'].
+              ** rewrite H_lookup_m.
+                  by rewrite lookup_delete.
+              ** specialize (H_eq_nin k').
+                  rewrite lookup_delete_ne; last done.
+                  apply H_eq_nin.
+                  set_solver.
+      + intros k1 k2 v1 v2 map H_neq H_k1_lookup H_k2_lookup.
+        by rewrite insert_commute.
+  Qed.
 
   Lemma cache_updatesM_to_cache (cache_updatesM: gmap Key val) :
     map_Forall (λ k v, KVS_Serializable v) cache_updatesM →
