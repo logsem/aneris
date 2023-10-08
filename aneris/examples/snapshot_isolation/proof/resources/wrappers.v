@@ -172,33 +172,6 @@ Section Wrapper_defs.
       by destruct Hmfi.
   Qed.
 
-
-  (** A candidate for a high-level logical update to be used in the proof of commit.
-
-      Remark 1: Check that this is indeed a good candidate toghether with checking that the model lemma
-      is stated in a reasonable way, i.e.
-
-      (** Used for commit *)
-      Lemma kvs_valid_update  (M : kvsMdl) (T : nat) (Tss : gset nat) (cache : gmap Key SerializableVal) :
-        dom cache ⊆ KVS_keys →
-        kvs_valid M T Tss ->
-        kvs_valid (update_kvs M cache (T+1)) (T+1) Tss.
-      Proof.
-      Admitted.
-
-      Remark 2: A possible way to proceed would be to prove several intermediate update lemmas modifying
-      different components, e.g. time, monotone memory, etc.
-      For instance :
-
-         Lemma own_mem_mono_update M (cache : gmap Key SerializableVal) (T : nat) :
-            ownMemMono M ⊢ |==> ownMemMono (update_kvs M cache (T+1)).
-         Proof.
-         Admitted.
-
-      Remark 3: It can also be useful to see if we can improve the definitions (in the easiest possible way)
-      to make `cache_updatesM` already of the type  `gmap Key SerializableVal` so that there is no need
-      to have both `cache` and  `cache_updatesM` or something similar. **)
-
   Lemma commit_logical_update (ts T : nat) (S : snapshots)
     (cache_logicalM : gmap Key (option val * bool))
     (cache_updatesM : gmap Key val)
@@ -229,6 +202,15 @@ Section Wrapper_defs.
                 OwnMemKey_def k (commit_event p h) ∗
                 Seen_def k (commit_event p h)).
     Proof.
+      iIntros (dom0 [dom1 [dom2 [dom3 [cache_logical_some [cache_logical_none
+        [updates_logical_some [updates_logical_none cache_logical]]]]]]]
+        snap_valid M_valid updates_ser eval_updates
+        commit_current) "ownM ownTimeGlobal ownTimeLocal ownAuthGlobal ownAuthLocal
+        ownMemKey".
+      apply bool_decide_spec in commit_current.
+      iCombine "ownTimeGlobal ownTimeLocal" as "ownTime".
+      iMod (mono_nat_own_update (T+1) with "ownTime")
+        as "[ownTimeGlobal ownTimeLocal]"; first lia.
     Admitted.
 
 End Wrapper_defs.
