@@ -7,7 +7,7 @@ From aneris.examples.snapshot_isolation.specs Require Export
   time events.
 
 Section Whist_valid.
-  Context `{!anerisG Mdl Σ, !User_params}.
+  Context `{!User_params}.
 
   Definition whist_keys (s : whist) :=
     ∀ e, e ∈ s → e.(we_key) ∈ KVS_keys.
@@ -36,6 +36,13 @@ Section Whist_valid.
   Global Arguments whist_ValidExt {_ _} _.
   Global Arguments whist_ValidTimes {_ _} _.
   Global Arguments whist_ValidVals {_ _} _.
+
+  Lemma whist_valid_included (h h' : whist) :
+    h `prefix_of` h' →
+    whist_valid h' →
+    whist_valid h.
+  Proof.
+  Admitted.
 
 End Whist_valid.
 
@@ -198,14 +205,6 @@ Section KVS_valid.
   Proof.
   Admitted.
 
-  (**  Weakening lemma. *)
-  Lemma kvs_valid_single_snapshot M Mts T t Mt:
-    kvs_valid M Mts T →
-    Mts !! t = Some Mt →
-    kvs_valid M {[ t := Mt ]} T.
-  Proof.
-  Admitted.
-
   Lemma kvs_valid_single_snapshot_delete M Mts T t Mt k :
     kvs_valid M Mts T →
     Mts !! t = Some Mt →
@@ -221,7 +220,33 @@ Section KVS_valid.
     map_included Msub M →
     kvs_valid Msub {[ t := Mt ]} T.
   Proof.
+    move=>[dom_M hists_valid keys_M commit_times snapshot_valid snapshots_included
+            snapshots_cut Mts_t [dom_Mt Mt_Msub] [dom_Msub Msub_M]].
+    split.
+    - set_solver.
+    - move=>k h Msub_k.
+      move: (Msub_M _ _ Msub_k)=>[h' [/hists_valid h'_valid h_h']].
+      apply (whist_valid_included _ _ h_h' h'_valid).
+    - move=>k h Msub_k we we_h.
+      move: (Msub_M _ _ Msub_k)=>[h' [M_k h_h']].
+      apply (keys_M _ h'); first done.
+      by apply (elem_of_prefix h).
+    -
   Admitted.
+
+  (**  Weakening lemma. *)
+  Lemma kvs_valid_single_snapshot M Mts T t Mt:
+    kvs_valid M Mts T →
+    Mts !! t = Some Mt →
+    kvs_valid M {[ t := Mt ]} T.
+  Proof.
+    intros M_valid Mts_t.
+    apply (kvs_valid_global_mem_prefix _ _ _ _ _ _ M_valid Mts_t); last split.
+    - apply (kvs_ValidSnapshotTimesInclusion _ _ _ M_valid t Mt Mts_t).
+    - done.
+    - move=>k h1 ->.
+      by exists h1.
+  Qed.
 
 End KVS_valid.
 
@@ -254,7 +279,11 @@ Section KVSL_valid.
   Lemma kvsl_valid_empty :
     kvsl_valid ∅ (gset_to_gmap [] KVS_keys) ∅ 0.
   Proof.
-  Admitted.
+    split; [set_solver|done| |done|apply valid_init_state].
+    move=>k h emp_k abs.
+    apply lookup_gset_to_gmap_Some in emp_k.
+    by move: emp_k abs=>[_ <-].
+  Qed.
 
   Definition update_kvsl
     (m0 : gmap Key val)
