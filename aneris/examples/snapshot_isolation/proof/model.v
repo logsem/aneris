@@ -42,7 +42,21 @@ Section Whist_valid.
     whist_valid h' →
     whist_valid h.
   Proof.
-  Admitted.
+    move=>h_h' [keys times vals ext].
+    split.
+    - move=>we we_h.
+      apply keys.
+      by apply (elem_of_prefix h).
+    - move=>wei wej i j i_j h_i h_j.
+      apply (times _ _ i j);
+        [done|by apply (prefix_lookup_Some h)..].
+    - move=>we we_h.
+      apply vals.
+      by apply (elem_of_prefix h).
+    - move=>we we' we_h we'_h e_e'.
+      apply ext;
+        [by apply (elem_of_prefix h)..|done].
+  Qed.
 
 End Whist_valid.
 
@@ -205,6 +219,7 @@ Section KVS_valid.
   Proof.
   Admitted.
 
+  (* TODO rephrase without delete *)
   Lemma kvs_valid_single_snapshot_delete M Mts T t Mt k :
     kvs_valid M Mts T →
     Mts !! t = Some Mt →
@@ -221,7 +236,7 @@ Section KVS_valid.
     kvs_valid Msub {[ t := Mt ]} T.
   Proof.
     move=>[dom_M hists_valid keys_M commit_times snapshot_valid snapshots_included
-            snapshots_cut Mts_t [dom_Mt Mt_Msub] [dom_Msub Msub_M]].
+            snapshots_cut Mts_t Mt_Msub [dom_Msub Msub_M]].
     split.
     - set_solver.
     - move=>k h Msub_k.
@@ -231,8 +246,32 @@ Section KVS_valid.
       move: (Msub_M _ _ Msub_k)=>[h' [M_k h_h']].
       apply (keys_M _ h'); first done.
       by apply (elem_of_prefix h).
-    -
-  Admitted.
+    - move=>k h Msub_k we we_h.
+      move: (Msub_M _ _ Msub_k)=>[h' [M_k h_h']].
+      apply (commit_times k h'); first done.
+      by apply (elem_of_prefix h).
+    - move=>T0 T0_t.
+      apply elem_of_dom in T0_t.
+      move: T0_t=>[x/lookup_singleton_Some][<- _] {T0 x}.
+      apply snapshot_valid, elem_of_dom.
+      by exists Mt.
+    - by move=>t' Mt'/lookup_singleton_Some[_ <-].
+    - move=>t' k h_snap h_curr Mt' /lookup_singleton_Some [<- <-] Mt_k.
+      move:Mt_Msub=>[_]/(_ k h_snap Mt_k)[h_snap'][Msub_k][h' h_snap_def].
+      rewrite h_snap_def in Msub_k.
+      rewrite Msub_k=>[][<-] {t' h_curr Mt' h_snap_def h_snap'}.
+      move:Msub_k=>/Msub_M[h][M_k][h'' h_def].
+      move: (snapshots_cut _ _ _ _ _ Mts_t Mt_k M_k)=>
+            [h_after [h_curr'_eq][snap_t after_t]].
+      exists h'.
+      do 2 (split; first done).
+      rewrite -app_assoc  h_curr'_eq in h_def.
+      apply app_inv_head in h_def.
+      rewrite h_def in after_t.
+      move=>we we_h'.
+      apply after_t, elem_of_app.
+      tauto.
+  Qed.
 
   (**  Weakening lemma. *)
   Lemma kvs_valid_single_snapshot M Mts T t Mt:
@@ -313,20 +352,27 @@ Section KVSL_valid.
   Lemma kvsl_valid_next M S (m : gmap Key val) T :
     kvsl_valid m M S T →
     kvsl_valid m M (<[(T+1)%nat := M]>S) (T + 1).
-  Proof. Admitted.
+  Proof.
+    move=>[dom_m empty_coh model_coh local_coh valid].
+    split; [done..|exact: kvs_valid_step_start_transaction].
+  Qed.
 
+  (* TODO rephrase without delete *)
   Lemma kvsl_model_empty_delete m M k :
     kvsl_in_model_empty_coh m M →
     kvsl_in_model_empty_coh m (delete k M).
   Proof.
   Admitted.
 
+  (* TODO rephrase without delete *)
   Lemma kvsl_model_some_delete m M k :
     kvsl_in_model_some_coh m M →
     kvsl_in_model_some_coh m (delete k M).
   Proof.
   Admitted.
 
+  (* TODO rephrase without filter. When mu = ∅ and M ≠ ∅,
+      the domain condition cannot be proven *)
   (** Weakening lemma *)
   Lemma kvs_valid_filter M S t Mt (mu : gmap Key (list val)) T :
     kvs_valid M S T →
@@ -348,6 +394,7 @@ End KVSL_valid.
     (* kvs_keys Msnap ∧ *)
     ∀ k h, Msnap !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
 
+  (* TODO rephrase without delete *)
   Lemma kvs_valid_snapshot_delete M ts k :
     kvs_valid_snapshot M ts ->
     kvs_valid_snapshot (delete k M) ts.
