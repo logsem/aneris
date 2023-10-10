@@ -46,8 +46,10 @@ Section Proof_of_commit_handler.
     (S : snapshots) :
     kvsl_in_model_empty_coh m M →
     kvsl_in_model_some_coh m M →
-    kvsl_dom m →
-    kvs_valid M S tc →
+    kvs_whist_commit_times M tc →
+    kvs_time_snapshot_map_valid S tc ->
+    kvs_snapshots_included M S →
+    kvs_snapshots_cuts M S →
     S !! ts = Some Msnap_full →
     Msnap ⊆ Msnap_full →
     k ∈ dom Msnap →
@@ -63,7 +65,8 @@ Section Proof_of_commit_handler.
         ⌜∀ (v1 v2 : list write_event), M !! k = Some v1 → Msnap !! k = Some v2 → to_hist v1 ≠ to_hist v2⌝)
     }}}.
   Proof.
-    iIntros (H_kvsl_empty H_kvsl_some H_kvsl_dom H_kvs H_lookup_snap H_sub_eq H_k_in_Msnap H_match Φ) "_ HΦ".
+    iIntros (H_kvsl_empty H_kvsl_some H_kvs_com_times H_kvs_map_valid H_kvs_included
+             H_kvs_cuts H_lookup_snap H_sub_eq H_k_in_Msnap H_match Φ) "_ HΦ".
     unfold check_at_key.
     unfold assert.
     wp_pures.
@@ -72,7 +75,7 @@ Section Proof_of_commit_handler.
       assert (ts <= tc); last lia.
       assert (is_Some (S !! ts)) as H_some; first set_solver.
       rewrite -elem_of_dom in H_some.
-      apply (kvs_ValidSnapshotTimesTime M S tc) in H_some; try done.
+      apply H_kvs_map_valid in H_some.
       lia.
     }
     wp_pures.
@@ -109,7 +112,7 @@ Section Proof_of_commit_handler.
         case_bool_decide as H_leq.
         {
           exfalso.
-          apply (kvs_ValidCommitTimes M S tc) in H_lookup_M; last done.
+          apply H_kvs_com_times in H_lookup_M.
           apply (H_lookup_M rw) in H_rw_in_wl.
           lia.
         }
@@ -118,7 +121,7 @@ Section Proof_of_commit_handler.
         {
           exfalso.
           destruct (Msnap !! k) as [ wl' | ] eqn:H_lookup_Msnap.
-          - eapply (kvs_ValidSnapshotTimesCuts M S tc) in H_lookup_snap; last done.
+          - eapply H_kvs_cuts in H_lookup_snap.
             assert (Msnap_full !! k = Some wl') as H_lookup_Msnap_full; 
               first apply (lookup_weaken Msnap); try done.
             destruct (H_lookup_snap H_lookup_Msnap_full H_lookup_M) as [h_after (H_wl_eq & H_times_le & H_times_gt)].
@@ -144,7 +147,7 @@ Section Proof_of_commit_handler.
             by rewrite (reverse_involutive wl).
           }
           destruct (Msnap !! k) as [ wl' | ] eqn:H_lookup_Msnap.
-          -- eapply (kvs_ValidSnapshotTimesCuts M S tc) in H_lookup_snap; last done.
+          -- eapply H_kvs_cuts in H_lookup_snap.
              assert (Msnap_full !! k = Some wl') as H_lookup_Msnap_full; 
               first apply (lookup_weaken Msnap); try done.
              destruct (H_lookup_snap H_lookup_Msnap_full H_lookup_M) 
@@ -161,7 +164,7 @@ Section Proof_of_commit_handler.
           iSplit; first done.
           iPureIntro.
           intros v1 v2 H_some_eq H_lookup_Msnap. 
-          eapply (kvs_ValidSnapshotTimesCuts M S tc) in H_lookup_snap; last done.
+          eapply H_kvs_cuts in H_lookup_snap.
           assert (Msnap_full !! k = Some v2) as H_lookup_Msnap_full; 
               first apply (lookup_weaken Msnap); try done.
           destruct (H_lookup_snap H_lookup_Msnap_full H_lookup_M)
@@ -175,11 +178,14 @@ Section Proof_of_commit_handler.
           by apply app_inv_head in H_abs.
       + exfalso.
         apply not_elem_of_dom in H_lookup_M.
-        assert (is_Some (m !! k)) as H_is_some_m; first done.
-        apply elem_of_dom in H_is_some_m.
-        rewrite -(kvs_ValidDom M S tc) in H_lookup_M; last done.
-        assert (dom m ⊆ KVS_keys) as H_subset_eq; last set_solver.
-        apply H_kvsl_dom.
+        assert (dom M = dom Msnap_full) as H_eq_dom.
+        {
+          apply H_kvs_included in H_lookup_snap.
+          by destruct H_lookup_snap as (H_eq_dom & _).
+        }
+        rewrite H_eq_dom in H_lookup_M.
+        apply subseteq_dom in H_sub_eq.
+        set_solver.
     - simplify_eq.
       wp_pures.
       iApply "HΦ".
@@ -189,7 +195,7 @@ Section Proof_of_commit_handler.
       destruct (M !! k) as [ wl | ] eqn:H_lookup_M.
       + destruct wl as [ | w wl].
         * assert (Msnap !! k = Some []); last done.
-          apply (kvs_ValidSnapshotTimesInclusion M S tc) in H_lookup_snap; last done.
+          apply H_kvs_included in H_lookup_snap.
           destruct H_lookup_snap as (H_eq_dom & H_included).
           apply elem_of_dom in H_k_in_Msnap.
           destruct (Msnap !! k) as [ wl' | ] eqn:H_lookup_Msnap; 
@@ -207,7 +213,7 @@ Section Proof_of_commit_handler.
           by inversion H_leq.
         * assert (m !! k = Some $(reverse (w :: wl))); last set_solver.
           apply H_kvsl_some; done.
-      + apply (kvs_ValidSnapshotTimesInclusion M S tc) in H_lookup_snap; last done.
+      + apply H_kvs_included in H_lookup_snap.
         destruct H_lookup_snap as (H_eq_dom & H_included).
         assert (k ∉ dom Msnap_full) as H_k_nin_Msnap_full.
         {
@@ -404,9 +410,22 @@ Section Proof_of_commit_handler.
   Proof.
     iIntros (H_coh H_map_cache H_map_kvs H_kvsl H_kvs H_lookup_snap H_sub_eq Φ) "_ HΦ".
     destruct H_kvsl.
-    clear kvsl_ValidLocalSome kvsl_ValidModel.
-    iLöb as "IH" forall (cache cache_updatesM cache_logicalM Msnap Msnap_full Sg M H_kvs H_coh 
-      H_map_cache H_lookup_snap kvsl_ValidInModelEmpty kvsl_ValidInModelSome H_sub_eq).
+    destruct H_kvs.
+    assert (kvs_whist_commit_times M tc ∧
+            kvs_time_snapshot_map_valid Sg tc ∧
+            kvs_snapshots_included M Sg ∧
+            kvs_snapshots_cuts M Sg ) 
+            as H_kvs; first done.
+    clear kvs_ValidDom kvs_ValidWhists kvs_ValidKeys kvs_ValidCommitTimes
+          kvs_ValidSnapshotTimesTime kvs_ValidSnapshotTimesInclusion
+          kvs_ValidSnapshotTimesCuts.
+    assert (kvsl_in_model_empty_coh m M ∧
+            kvsl_in_model_some_coh m M)
+            as H_kvsl; first done.
+    clear kvsl_ValidDom kvsl_ValidInModelEmpty kvsl_ValidInModelSome 
+          kvsl_ValidLocalSome kvsl_ValidModel.
+    iLöb as "IH" forall (cache cache_updatesM cache_logicalM Msnap Msnap_full Sg M H_coh
+      H_map_cache H_lookup_snap H_sub_eq H_kvs H_kvsl).
     unfold map_forall.
     wp_pures.
     destruct H_map_cache as [l (H_eq_updates & H_eq_cache & H_dup)].
@@ -454,6 +473,9 @@ Section Proof_of_commit_handler.
       wp_apply (wp_map_lookup _ e_key kvs m); first done.
       iIntros (v H_match).
       wp_pures.
+      destruct H_kvs as (kvs_ValidCommitTimes & kvs_ValidSnapshotTimesTime &
+                         kvs_ValidSnapshotTimesInclusion & kvs_ValidSnapshotTimesCuts).
+      destruct H_kvsl as (kvsl_ValidInModelEmpty & kvsl_ValidInModelSome).
       destruct (m !! e_key) as [ v' | ] eqn:H_lookup; 
         rewrite H_match; wp_pures.
       + unfold network_util_code.unSOME.
@@ -469,8 +491,6 @@ Section Proof_of_commit_handler.
             (delete e_key Msnap_full) ({[ ts := (delete e_key Msnap_full)]}) 
             (delete e_key M)).
           -- iPureIntro.
-             eapply kvs_valid_single_snapshot_delete; try done.
-          -- iPureIntro.
              eapply (is_coherent_cache_delete e_key); last apply H_coh.
           -- iPureIntro.
              eexists l'.
@@ -485,11 +505,17 @@ Section Proof_of_commit_handler.
           -- iPureIntro.
              by rewrite lookup_insert.
           -- iPureIntro.
-             by eapply kvsl_model_empty_delete.
-          -- iPureIntro.
-             by eapply kvsl_model_some_delete.
-          -- iPureIntro.
              by apply delete_mono.
+          -- iPureIntro.
+             split_and!.
+             ++ by eapply kvs_whist_commit_times_delete.
+             ++ by eapply kvs_time_snapshot_map_valid_delete.
+             ++ by eapply kvs_snapshots_included_delete.
+             ++ by eapply kvs_snapshots_cuts_delete.
+          -- iPureIntro.
+             split.
+             ++ by eapply kvsl_model_empty_delete.
+             ++ by eapply kvsl_model_some_delete.
           -- iModIntro.
              iIntros (b) "HΦ'".
              iApply "HΦ".
@@ -520,42 +546,46 @@ Section Proof_of_commit_handler.
             (delete e_key cache_logicalM) (delete e_key Msnap)
             (delete e_key Msnap_full) ({[ ts := (delete e_key Msnap_full)]}) 
             (delete e_key M)).
-          -- iPureIntro.
-             eapply kvs_valid_single_snapshot_delete; try done.
-          -- iPureIntro.
-             eapply (is_coherent_cache_delete e_key); last apply H_coh.
-          -- iPureIntro.
-             eexists l'.
-             split_and!; try done.
-             ++ rewrite H_eq_updates.
-                   rewrite delete_insert_dom; first done.
-                   apply NoDup_cons_1_1 in H_dup.
-                   simpl in H_dup.
-                   rewrite dom_list_to_map_L.
-                   set_solver.
-             ++ by apply NoDup_cons_1_2 in H_dup.
-          -- iPureIntro.
-             by rewrite lookup_insert.
-          -- iPureIntro.
-             by eapply kvsl_model_empty_delete.
-          -- iPureIntro.
-             by eapply kvsl_model_some_delete.
-          -- iPureIntro.
-             by apply delete_mono.
-          -- iModIntro.
-             iIntros (b) "HΦ'".
-             iApply "HΦ".
-             destruct b.
-             ++ iLeft.
-                iSplit; first done.
-                iDestruct "HΦ'" as "[(_ & %H_com_status) | (%Habs & _)]"; last done.
-                iPureIntro. 
-                apply (can_do_commit e_key); done.
-             ++ iRight.
-                iSplit; first done.
-                iDestruct "HΦ'" as "[(%Habs & _) | (_ & %H_com_status)]"; first done.
-                iPureIntro.
-                apply (can_not_do_commit_delete e_key); done.
+            -- iPureIntro.
+            eapply (is_coherent_cache_delete e_key); last apply H_coh.
+         -- iPureIntro.
+            eexists l'.
+            split_and!; try done.
+            ++ rewrite H_eq_updates.
+                  rewrite delete_insert_dom; first done.
+                  apply NoDup_cons_1_1 in H_dup.
+                  simpl in H_dup.
+                  rewrite dom_list_to_map_L.
+                  set_solver.
+            ++ by apply NoDup_cons_1_2 in H_dup.
+         -- iPureIntro.
+            by rewrite lookup_insert.
+         -- iPureIntro.
+            by apply delete_mono.
+         -- iPureIntro.
+            split_and!.
+            ++ by eapply kvs_whist_commit_times_delete.
+            ++ by eapply kvs_time_snapshot_map_valid_delete.
+            ++ by eapply kvs_snapshots_included_delete.
+            ++ by eapply kvs_snapshots_cuts_delete.
+         -- iPureIntro.
+            split.
+            ++ by eapply kvsl_model_empty_delete.
+            ++ by eapply kvsl_model_some_delete.
+         -- iModIntro.
+            iIntros (b) "HΦ'".
+            iApply "HΦ".
+            destruct b.
+            ++ iLeft.
+               iSplit; first done.
+               iDestruct "HΦ'" as "[(_ & %H_com_status) | (%Habs & _)]"; last done.
+               iPureIntro.
+               apply (can_do_commit e_key); done.
+            ++ iRight.
+               iSplit; first done.
+               iDestruct "HΦ'" as "[(%Habs & _) | (_ & %H_com_status)]"; first done.
+               iPureIntro.
+               apply (can_not_do_commit_delete e_key); done.
         * wp_if_false.
           iApply "HΦ".
           iRight.
