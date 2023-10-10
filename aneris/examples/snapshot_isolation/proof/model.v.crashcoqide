@@ -210,33 +210,6 @@ Section KVS_valid.
          naive_solver. 
   Qed.  
 
-  Lemma kvs_whist_commit_times_delete k M T :
-    kvs_whist_commit_times M T →
-    kvs_whist_commit_times (delete k M) T.
-  Proof.
-  Admitted.
-
-  Lemma kvs_time_snapshot_map_valid_delete t St k S T :
-    kvs_time_snapshot_map_valid S T →
-    S !! t = Some St →
-    kvs_time_snapshot_map_valid {[t := delete k St]} T.
-  Proof.
-  Admitted.
-
-  Lemma kvs_snapshots_included_delete t St k M S :
-    kvs_snapshots_included M S →
-    S !! t = Some St →
-    kvs_snapshots_included (delete k M) {[t := delete k St]}.
-  Proof.
-  Admitted.
-
-  Lemma kvs_snapshots_cuts_delete t St k M S :
-    kvs_snapshots_cuts M S →
-    S !! t = Some St →
-    kvs_snapshots_cuts (delete k M) {[t := delete k St]}.
-  Proof.
-  Admitted.
-
   (** A system step updating the memory with the effect of commit 
       of a transaction is valid *)
   Lemma kvs_valid_update M S T (cache : gmap Key SerializableVal) :
@@ -246,6 +219,14 @@ Section KVS_valid.
   Proof.
   Admitted.
 
+  (* TODO rephrase without delete *)
+  Lemma kvs_valid_single_snapshot_delete M Mts T t Mt k :
+    kvs_valid M Mts T →
+    Mts !! t = Some Mt →
+    kvs_valid (delete k M) {[t := delete k Mt]} T.
+  Proof.
+  Admitted.
+  
   (** Strong Weakening lemma. *)
   Lemma kvs_valid_global_mem_prefix M Mts T t Mt Msub:
     kvs_valid M Mts T →
@@ -352,20 +333,6 @@ Section KVSL_valid.
                      (default NONEV (m0 !! k)))]> m))
       m0 C.
 
-  Lemma kvsl_model_empty_delete m M k :
-    kvsl_in_model_empty_coh m M →
-    kvsl_in_model_empty_coh m (delete k M).
-  Proof.
-    by move=>coh i /lookup_delete_Some[_]/coh.
-  Qed.
-
-  Lemma kvsl_model_some_delete m M k :
-    kvsl_in_model_some_coh m M →
-    kvsl_in_model_some_coh m (delete k M).
-  Proof.
-    by move=>coh i h /lookup_delete_Some[_]/coh.
-  Qed.
-
   (** Used for commit *)
   Lemma kvsl_valid_update
     (m : gmap Key val)
@@ -390,7 +357,35 @@ Section KVSL_valid.
     split; [done..|exact: kvs_valid_step_start_transaction].
   Qed.
 
+  (* TODO rephrase without delete *)
+  Lemma kvsl_model_empty_delete m M k :
+    kvsl_in_model_empty_coh m M →
+    kvsl_in_model_empty_coh m (delete k M).
+  Proof.
+  Admitted.
+
+  (* TODO rephrase without delete *)
+  Lemma kvsl_model_some_delete m M k :
+    kvsl_in_model_some_coh m M →
+    kvsl_in_model_some_coh m (delete k M).
+  Proof.
+  Admitted.
+
+  (* TODO rephrase without filter. When mu = ∅ and M ≠ ∅,
+      the domain condition cannot be proven *)
+  (** Weakening lemma *)
+  Lemma kvs_valid_filter M S t Mt (mu : gmap Key (list val)) T :
+    kvs_valid M S T →
+    S !! t = Some Mt →
+    kvs_valid
+      (filter (λ k : Key * list write_event, k.1 ∈ dom mu) M)
+      {[t := (filter (λ k : Key * list write_event, k.1 ∈ dom mu) Mt) ]}
+      T.
+  Proof.
+  Admitted.
+  
 End KVSL_valid.
+
 
   Definition kvs_valid_snapshot
     (Msnap : global_mem) (t : nat) :=
@@ -398,3 +393,11 @@ End KVSL_valid.
     (* kvs_whists Msnap ∧ *)
     (* kvs_keys Msnap ∧ *)
     ∀ k h, Msnap !! k = Some h → ∀ e, e ∈ h → e.(we_time) < t.
+
+  (* TODO rephrase without delete *)
+  Lemma kvs_valid_snapshot_delete M ts k :
+    kvs_valid_snapshot M ts ->
+    kvs_valid_snapshot (delete k M) ts.
+  Proof. Admitted.
+  
+
