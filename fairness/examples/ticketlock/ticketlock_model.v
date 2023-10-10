@@ -7,7 +7,8 @@ From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 Import derived_laws_later.bi.
 From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup trace_helpers.
-From trillium.fairness.examples.ticketlock Require Import set_map_properties ext_models fair_lock.
+From trillium.fairness.ext_models Require Import set_map_properties ext_models.
+From trillium.fairness.examples.ticketlock Require Import fair_lock.
 
 
 (* TODO: inherited from hahn? *)
@@ -231,15 +232,15 @@ Section Model.
         + eapply elem_of_dom_2; eauto.  
     Qed. 
 
-    Instance ExtTL: ExtModel := 
-      Build_ExtModel tl_fair_model _ _ _ _ _ tl_active_exts_spec.       
+    Instance ExtTL: ExtModel tl_fair_model := 
+      Build_ExtModel tl_fair_model _ _ _ _ _ tl_active_exts_spec.
     
-  End TlExtTrans.  
+  End TlExtTrans.
 
 
   Section ProgressProperties.
 
-    Let ExtTL_FM := ext_model_FM ExtTL. 
+    Let ExtTL_FM := @ext_model_FM _ ExtTL. 
 
     Definition tl_state_wf '(mkTlSt o t rm) :=
       o <= t /\
@@ -730,8 +731,7 @@ Section Model.
       Qed.
 
       
-      Let tl_eventual_release := 
-            eventual_release ExtTL has_lock_st active_st.
+      Let tl_eventual_release := @eventual_release _ ExtTL has_lock_st active_st.
 
       Lemma has_lock_unique st ρ1 ρ2
         (WF: tl_state_wf st)
@@ -1025,7 +1025,7 @@ Section Model.
     End ProgressPropertiesImpl. 
 
     Instance TLFairLock: 
-      FairLock ExtTL can_lock_st has_lock_st active_st tl_state_wf.
+      @FairLock _ ExtTL can_lock_st has_lock_st active_st tl_state_wf.
     Proof.
       constructor. red. intros.
       eapply tl_progress; eauto.

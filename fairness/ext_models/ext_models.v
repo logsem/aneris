@@ -2,8 +2,7 @@ From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness.examples.ticketlock Require Import set_map_properties. 
 From trillium.fairness Require Import trace_helpers.
 
-Class ExtModel := {
-  innerM: FairModel;
+Class ExtModel (innerM: FairModel) := {  
   EI: Type; (* indexes over external transitions *)
   DecEI: EqDecision EI;
   CntEI: Countable EI;
@@ -12,11 +11,11 @@ Class ExtModel := {
      of possible external transitions, even if EI is infinite *)
   active_exts: fmstate (innerM) -> gset EI;
   active_exts_spec: forall st ι, ι ∈ active_exts st <-> ∃ st', ETs ι st st';
-}. 
+}.
 
 (* TODO: can it be generalized to Model? *)
 Section ExtModelFair.
-  Context (EM: ExtModel). 
+  Context `{EM: ExtModel innerM}. 
 
   Inductive env_role := env (i: EI).
   Definition ext_role: Type := (fmrole innerM + env_role). 

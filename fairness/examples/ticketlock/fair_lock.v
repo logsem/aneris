@@ -3,16 +3,15 @@ From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
 From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup.
-From trillium.fairness.examples.ticketlock Require Import set_map_properties ext_models.
+From trillium.fairness.ext_models Require Import set_map_properties ext_models.
 
 
 Section FairLock.
-  Context (EM: ExtModel). 
+  Context `{EM: ExtModel m}. 
 
-  Let m := @innerM EM. 
   Let St := fmstate m.
   Let R := fmrole m.
-  Let EFM := ext_model_FM EM. 
+  Let EFM := @ext_model_FM _ EM. 
 
   Context (can_lock_st can_unlock_st has_lock_st active_st: R -> St -> Prop).
   Context {active_st_Dec: forall ρ st, Decision (active_st ρ st)}. 
@@ -80,7 +79,7 @@ Section FairLock.
     forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
       (VALID: mtrace_valid tr)
       (FROM_INIT: forall st0, tr S!! 0 = Some st0 -> is_init_st st0)
-      (FAIR: inner_fair_ext_model_trace EM tr)
+      (FAIR: inner_fair_ext_model_trace tr)
       (ITH: tr S!! i = Some st)
       (CAN_LOCK: can_lock_st ρ st)
       (ACT: active_st ρ st)
