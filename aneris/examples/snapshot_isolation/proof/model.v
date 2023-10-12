@@ -356,13 +356,15 @@ Section KVSL_valid.
     kvsl_in_model_empty_coh m M →
     kvsl_in_model_empty_coh m (delete k M).
   Proof.
-  Admitted.
+    by move=>coh i /lookup_delete_Some[_]/coh.
+  Qed.
 
   Lemma kvsl_model_some_delete m M k :
     kvsl_in_model_some_coh m M →
     kvsl_in_model_some_coh m (delete k M).
   Proof.
-  Admitted.
+    by move=>coh i h /lookup_delete_Some[_]/coh.
+  Qed.
 
   (** Used for commit *)
   Lemma kvsl_valid_update
