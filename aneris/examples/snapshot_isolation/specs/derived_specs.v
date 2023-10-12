@@ -44,6 +44,10 @@ Section Specs.
     | (Some v, true) => Some v
     | _              => w
     end.
+  
+  Definition SeenVal (k : Key) (vo : option val) : iProp Σ :=
+    ∃ (h : list val) (v : val),
+      ⌜last h = vo⌝ ∗ ⌜vo = Some v⌝ ∗ Seen k h.
 
   Lemma convert_mhist (m : gmap Key (option val)) :
     ([∗ map] k↦vo ∈ m, ∃ hv : list val, k ↦ₖ hv ∗ ⌜last hv = vo⌝) ⊣⊢
@@ -96,7 +100,7 @@ Section Specs.
          rewrite delete_insert in Heqdel; last done.
          by rewrite fmap_delete.
   Qed.
-                                                              
+
  Lemma start_spec_derived : 
     ∀ (c : val) (sa : socket_address)
        (E : coPset),
@@ -199,76 +203,198 @@ Section Specs.
       iExists hk. by iFrame.
   Qed.
 
-  Definition run' : val :=
-  λ: "cst" "handler", start "cst";;
-                      "handler" "cst";;
-                       commit "cst".
-  
-  Lemma run_spec_derived :
+  (* This us not intuitive to read because the viewshift seems backwards, 
+      because the viewshifts from the atomicity notation is used together 
+      with the other viewshifts. But the atomicity notation makes it cleaner
+      to talk about the return value. Also the persistent modality around 
+      does not seem to be needed. *)
+  Lemma run_spec_derived_candidate_1 :
     ∀ (c : val) (tbody : val)
-      (sa : socket_address) (E : coPset)
-      (P :  gmap Key (option val) → iProp Σ)
-      (Q :  gmap Key (option val) →
-            gmap Key (option val * bool) → iProp Σ),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
-      ⌜start_spec⌝ -∗ 
-      ⌜commit_spec⌝ -∗
-       IsConnected c sa -∗
-       (∀ (m_snap : gmap Key (option val)),
-           {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
-              tbody c  @[ip_of_address sa] 
-           {{{ (m_cache : gmap Key (option val * bool)), RET #();
-               ⌜dom m_snap = dom m_cache⌝ ∗
-               ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
-                Q m_snap m_cache }}}) -∗
-        □ (∀ m_snap,  
-             ([∗ map] k↦vo ∈ m_snap, OwnMemKeyVal k vo) ={E, ⊤}=∗ 
-              |={⊤,E}=> ∃ m_new, ⌜dom m_new = dom m_snap⌝ ∗
-             (([∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo))) -∗
-       <<< ∀∀ m_snap, ConnectionStateTxt c sa TxtCanStart ∗
-               P m_snap ∗ [∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo >>>
-           SI_run c tbody @[ip_of_address sa] E
-       <<<▷∃∃ m_new mc b, RET #b;
-        ConnectionStateTxt c sa TxtCanStart ∗
-        (** Transaction has been commited. *)
-        ((⌜b = true⌝ ∗ Q m_snap mc ∗
-          ([∗ map] k↦ vo;p ∈ m_new; mc, OwnMemKeyVal k (commitTxt p vo))) ∨
-        (** Transaction has been aborted. *)
-         (⌜b = false⌝ ∗
-           [∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo)) >>>.
+    (sa : socket_address) (E : coPset)
+    (P :  gmap Key (option val) → iProp Σ)
+    (Q :  gmap Key (option val) →
+          gmap Key (option val * bool) → iProp Σ),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜start_spec⌝ -∗ 
+    ⌜commit_spec⌝ -∗
+    IsConnected c sa -∗
+    (∀ (m_snap : gmap Key (option val)),
+        {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
+            tbody c  @[ip_of_address sa] 
+        {{{ (m_cache : gmap Key (option val * bool)), RET #();
+            ⌜dom m_snap = dom m_cache⌝ ∗
+            ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
+              Q m_snap m_cache }}}) -∗
+      □ (∀ m_snap,
+          ([∗ map] k↦vo ∈ m_snap, OwnMemKeyVal k vo) ={E, ⊤}=∗ 
+            |={⊤,E}=> ∃ m_new, ⌜dom m_new = dom m_snap⌝ ∗
+          (([∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo))) -∗
+    <<< ∀∀ m_snap, ConnectionStateTxt c sa TxtCanStart ∗
+            P m_snap ∗ [∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo >>>
+        SI_run c tbody @[ip_of_address sa] E
+    <<<▷∃∃ m_new mc b, RET #b;
+      ConnectionStateTxt c sa TxtCanStart ∗
+      (** Transaction has been commited. *)
+      ((⌜b = true⌝ ∗ Q m_snap mc ∗
+        ([∗ map] k↦ vo;p ∈ m_new; mc, OwnMemKeyVal k (commitTxt p vo))) ∨
+      (** Transaction has been aborted. *)
+      (⌜b = false⌝ ∗
+        [∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo)) >>>.
+Proof.
+  iIntros (c tbody sa E P Q HE HspecS HspecC).
+  iIntros "#HiC #Hbody #pre_body".
+  iIntros (Φ) "!# Hsh".
+  rewrite /SI_run /= /run.
+  wp_pures.
+  wp_apply start_spec_derived; try eauto.
+  iMod "Hsh".
+  iDestruct "Hsh" as (m_snap) "((Hst & HP & Hks) & Hsh)".
+  iModIntro.
+  iExists m_snap.
+  iFrame.
+  iNext. 
+  iIntros "(Hst & Hks & Hcs)".
+  iMod ("pre_body" $! m_snap with "[$Hks]") as "Hcl".
+  iModIntro.
+  wp_pures.
+  wp_apply ("Hbody" $! m_snap  with "[$Hcs $HP]"). 
+  iIntros (m_cache) "(%Hdom & Hcache & HQ)".
+  wp_pures.
+  wp_apply commit_spec_derived; try eauto.
+  iMod "Hcl" as (m_new) "(%Hdom' & Hks)".
+  iModIntro.
+  iExists m_new, m_snap, m_cache.
+  iFrame.
+  iSplit; first by iPureIntro; set_solver.
+  iNext.
+  iIntros (b) "(Hst & Hpost)".
+  iMod ("Hsh" $! m_new m_cache b with "[HQ $Hst Hpost]").
+  iDestruct "Hpost" as "[(-> & Hpost) | (-> & Hpost)]".
+  - iLeft. by iFrame.
+  - iRight. by iFrame.
+  - done.
+Qed.
+
+(* Lemma run_spec_derived_generic :
+  ∀ (c : val) (tbody : val)
+  (sa : socket_address) (E : coPset)
+  (R1 : (gmap Key (option val)) -> (gmap Key (option val * bool)) → iProp Σ) (R2 : iProp Σ)
+  (P :  gmap Key (option val) → iProp Σ)
+  (Q :  gmap Key (option val) →
+        gmap Key (option val * bool) → iProp Σ),
+  ⌜↑KVS_InvName ⊆ E⌝ -∗
+  ⌜start_spec⌝ -∗ 
+  ⌜commit_spec⌝ -∗
+  IsConnected c sa -∗
+  (|={⊤, E}=> ∃ m_start, P m_start ∗ ([∗ map] k ↦ vo ∈ m_start, OwnMemKeyVal k vo) 
+        ∗ ▷ (([∗ map] k ↦ vo ∈ m_start, OwnMemKeyVal k vo) ={E, ⊤}=∗ emp)) -∗
+  (∀ m_snap,
+    {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
+        tbody c  @[ip_of_address sa] 
+    {{{ (m_cache : gmap Key (option val * bool)), RET #();
+        ⌜dom m_snap = dom m_cache⌝ ∗
+        ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
+          Q m_snap m_cache }}}) -∗
+    (|={⊤, E}=> ∃ m_commit, ([∗ map] k ↦ vo ∈ m_commit, OwnMemKeyVal k vo) 
+        ∗ ▷ (∀ m_cache m_snap, ⌜dom m_cache = dom m_snap = dom m_commit⌝ ∗
+             (Q m_snap m_cache ∗
+                ([∗ map] k↦ vo;p ∈ m_commit; m_cache, OwnMemKeyVal k (commitTxt p vo)) ={E, ⊤}=∗ R1 m_snap m_cache) ∧
+              (([∗ map] k ↦ vo ∈ m_commit, OwnMemKeyVal k vo) ={E, ⊤}=∗ R2))) -∗
+  {{{ ConnectionStateTxt c sa TxtCanStart }}}
+        SI_run c tbody @[ip_of_address sa] E
+  {{{ ∃ m_snap m_cacheb_ret, RET #b_ret;
+      ConnectionStateTxt c sa TxtCanStart ∗ 
+      if b_ret then R1 m_snap m_cache else R2 }}}.
+Proof.
+Admitted. *)
+
+(* Lemma run_spec_derived_candidate_3 :
+∀ (c : val) (tbody : val)
+(m_cache : gmap Key (option val * bool))
+(sa : socket_address) (E : coPset)
+(P :  gmap Key (option val) → iProp Σ)
+(Q :  gmap Key (option val * bool) → iProp Σ),
+⌜↑KVS_InvName ⊆ E⌝ -∗
+⌜start_spec⌝ -∗ 
+⌜commit_spec⌝ -∗
+IsConnected c sa -∗
+□ (|={⊤, E}=> ∃ m_snap m_new, ⌜dom m_new = dom m_snap = dom m_cache⌝ ∗ P m_snap ∗ ([∗ map] k ↦ vo ∈ m_new, OwnMemKeyVal k vo)
+  ∗ ▷ (((Q m_cache ∗ ([∗ map] k↦ vo;p ∈ m_new; m_cache, OwnMemKeyVal k (commitTxt p vo)))
+        ∨ (([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo))) ={E, ⊤}=∗ emp)) -∗
+(∀ m_snap,
+  {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
+      tbody c  @[ip_of_address sa]
+  {{{ RET #(); ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗ Q m_cache }}}) -∗
+{{{ ConnectionStateTxt c sa TxtCanStart }}}
+      SI_run c tbody @[ip_of_address sa] ⊤
+{{{ b, RET #b; ConnectionStateTxt c sa TxtCanStart }}}.
+Proof. *)
+
+
+  (* This one is trying to be as simple as possible by doing two things:
+  i) the two viewshifts are collected under the persistent modality 
+  ii) no seen information in the postcondition *)
+  Lemma run_spec_derived_candidate_3 :
+    ∀ (c : val) (tbody : val)
+    (m_cache : gmap Key (option val * bool))
+    (sa : socket_address) (E : coPset)
+    (P :  gmap Key (option val) → iProp Σ)
+    (Q :  gmap Key (option val * bool) → iProp Σ),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜start_spec⌝ -∗ 
+    ⌜commit_spec⌝ -∗
+    IsConnected c sa -∗
+    □ (|={⊤, E}=> ∃ m_snap, ⌜dom m_snap = dom m_cache⌝ ∗ P m_snap ∗ ([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo)
+      ∗ ▷ (((Q m_cache ∗ ([∗ map] k↦ vo;p ∈ m_snap; m_cache, OwnMemKeyVal k (commitTxt p vo)))
+            ∨ (([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo))) ={E, ⊤}=∗ emp)) -∗
+    (∀ m_snap,
+      {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
+          tbody c  @[ip_of_address sa]
+      {{{ RET #(); ([∗ map] k ↦ p ∈ m_cache, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗ Q m_cache }}}) -∗
+    {{{ ConnectionStateTxt c sa TxtCanStart }}}
+          SI_run c tbody @[ip_of_address sa] ⊤
+    {{{ b, RET #b; ConnectionStateTxt c sa TxtCanStart }}}.
   Proof.
-    iIntros (c tbody sa E P Q HE HspecS HspecC).
-    iIntros "#HiC #Hbody #pre_body".
-    iIntros (Φ) "!# Hsh".
+    iIntros (c tbody m_cache sa E P Q H_sub H_start_spec H_commit_spec)
+      "#H_conn #H_shift #H_body".
+    iIntros (Φ) "!# H_state HΦ".
     rewrite /SI_run /= /run.
     wp_pures.
     wp_apply start_spec_derived; try eauto.
-    iMod "Hsh".
-    iDestruct "Hsh" as (m_snap) "((Hst & HP & Hks) & Hsh)".
+    iPoseProof "H_shift" as "H_shift'".
+    iMod "H_shift'" as (m_snap_start) "(%H_dom & H_P & H_keys & H_shift')".
     iModIntro.
-    iExists m_snap.
+    iExists m_snap_start.
     iFrame.
-    iNext. 
-    iIntros "(Hst & Hks & Hcs)".
-    iMod ("pre_body" $! m_snap with "[$Hks]") as "Hcl".
+    iModIntro.
+    iIntros "(H_state & H_keys & H_cache)".
+    iMod ("H_shift'" with "[$H_keys]") as "_".
     iModIntro.
     wp_pures.
-    wp_apply ("Hbody" $! m_snap  with "[$Hcs $HP]"). 
-    iIntros (m_cache) "(%Hdom & Hcache & HQ)".
+    wp_apply ("H_body" $! m_snap_start  with "[$H_cache $H_P]"). 
+    iIntros "(H_cache & H_Q)".
     wp_pures.
     wp_apply commit_spec_derived; try eauto.
-    iMod "Hcl" as (m_new) "(%Hdom' & Hks)".
+    iMod "H_shift" as (m_snap_commit) "(%H_dom' & H_P & H_keys & H_shift)".
     iModIntro.
-    iExists m_new, m_snap, m_cache.
+    iExists m_snap_commit, m_snap_start, m_cache.
     iFrame.
-    iSplit; first by iPureIntro; set_solver.
-    iNext.
-    iIntros (b) "(Hst & Hpost)".
-    iMod ("Hsh" $! m_new m_cache b with "[HQ $Hst Hpost]").
-    iDestruct "Hpost" as "[(-> & Hpost) | (-> & Hpost)]".
-    - iLeft. by iFrame.
-    - iRight. by iFrame.
-    - done.
-  Qed.   
-  
- End Specs.
+    iSplit.
+    {
+      iPureIntro.
+      by rewrite H_dom H_dom'.
+    }
+    iModIntro.
+    iIntros (b) "(H_state & [(-> & H_keys) | (-> & H_keys)])".
+    - iMod ("H_shift" with "[H_keys H_Q]") as "_".
+      + iLeft.
+        iFrame.
+      + iModIntro.
+        by iApply "HΦ".
+    - iMod ("H_shift" with "[H_keys]") as "_".
+      + by iRight.
+      + iModIntro.
+        by iApply "HΦ".
+  Qed.
+
+End Specs.
