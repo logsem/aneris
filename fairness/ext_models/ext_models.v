@@ -71,4 +71,8 @@ Section ExtModelFair.
   Definition inner_fair_ext_model_trace :=
     set_fair_model_trace (λ ρ0: fmrole ext_model_FM, ∃ r, ρ0 = inl r).
 
+  Definition emtrace := trace (fmstate innerM) (option ext_role). 
+
+  Definition emtrace_valid := trace_valid ext_trans. 
+
 End ExtModelFair. 

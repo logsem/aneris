@@ -119,35 +119,32 @@ Section exec_trace.
 
 End exec_trace.
 
-Definition mtrace (M:FairModel) := trace M (option M.(fmrole)).
+Section TraceValid.
+  Context {St L: Type}.
+  Context (trans: St -> L -> St -> Prop). 
 
-Section model_traces.
-  Context `{M: FairModel}.
+  Let traceM := trace St L. 
 
-  Definition role_enabled_model ρ (s: M) := ρ ∈ M.(live_roles) s.
+  Inductive trace_valid_ind (trace_valid_coind: traceM -> Prop) :
+    traceM -> Prop :=
+  | trace_valid_singleton δ: trace_valid_ind _ ⟨δ⟩
+  | trace_valid_cons δ ℓ tr:
+      trans δ ℓ (trfirst tr) ->
+      trace_valid_coind tr →
+      trace_valid_ind _ (δ -[ℓ]-> tr).
 
-  Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
-    fair_by role_enabled_model ρ mtr. 
+  Definition trace_valid := paco1 trace_valid_ind bot1.
 
-  Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace M -> Prop) :
-    mtrace M -> Prop :=
-  | mtrace_valid_singleton δ: mtrace_valid_ind _ ⟨δ⟩
-  | mtrace_valid_cons δ ℓ tr:
-      fmtrans _ δ ℓ (trfirst tr) ->
-      mtrace_valid_coind tr →
-      mtrace_valid_ind _ (δ -[ℓ]-> tr).
-  Definition mtrace_valid := paco1 mtrace_valid_ind bot1.
-
-  Lemma mtrace_valid_mono :
-    monotone1 mtrace_valid_ind.
+  Lemma trace_valid_mono :
+    monotone1 trace_valid_ind.
   Proof.
     unfold monotone1. intros x0 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
   Qed.
-  Hint Resolve mtrace_valid_mono : paco.
+  Hint Resolve trace_valid_mono : paco.
 
-  Lemma mtrace_valid_after (mtr mtr' : mtrace M) k :
-    after k mtr = Some mtr' → mtrace_valid mtr → mtrace_valid mtr'.
+  Lemma trace_valid_after (mtr mtr' : traceM) k :
+    after k mtr = Some mtr' → trace_valid mtr → trace_valid mtr'.
   Proof.
     revert mtr mtr'.
     induction k; intros mtr mtr' Hafter Hvalid.
@@ -158,10 +155,25 @@ Section model_traces.
     by inversion Hval'.
   Qed.
 
-  Lemma mtrace_valid_tail s l (tr: mtrace M)
-    (VALID': mtrace_valid (s -[l]-> tr)):
-    mtrace_valid tr.
-  Proof. by eapply mtrace_valid_after with (k := 1); eauto. Qed.
+  Lemma trace_valid_tail s l (tr: traceM)
+    (VALID': trace_valid (s -[l]-> tr)):
+    trace_valid tr.
+  Proof. by eapply trace_valid_after with (k := 1); eauto. Qed.
+
+End TraceValid.
+
+
+Definition mtrace (M:FairModel) := trace M (option M.(fmrole)).
+
+Section model_traces.
+  Context `{M: FairModel}.
+
+  Definition role_enabled_model ρ (s: M) := ρ ∈ M.(live_roles) s.
+
+  Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
+    fair_by role_enabled_model ρ mtr. 
+
+  Definition mtrace_valid := trace_valid (fmtrans M). 
 
 End model_traces.
 
@@ -171,4 +183,4 @@ Definition FM_strong_lr (FM: FairModel) :=
 
 
 Global Hint Resolve fair_by_cons: core.
-Global Hint Resolve mtrace_valid_mono : paco.
+Global Hint Resolve trace_valid_mono : paco.
