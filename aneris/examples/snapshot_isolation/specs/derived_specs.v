@@ -246,9 +246,47 @@ Section DerivedSpecs.
              with "[//][//][//][$HiC][][][HstS]").
     -  iModIntro.
        iMod "Hsh1".
-       iModIntro. 
-       admit.
-    -  admit.
+       iModIntro.
+       setoid_rewrite convert_mhist.
+       iDestruct "Hsh1" as (ms) "(HP & Hkvs & Hvsh)".
+       iDestruct "Hkvs" as (mh) "(-> & Hvks)". 
+       iExists mh. iFrame.
+       iNext.
+       iIntros "Hkvs".
+       iMod ("Hvsh" with "[Hkvs]") as "Hsh".
+       -- iExists _. by iFrame.
+       -- iModIntro.
+          iIntros (mc).
+          iMod ("Hsh" $! mc) as (mc') "(Hkvs & %Heq1 & %Heq2 & Hpost)".
+          iModIntro.
+          iDestruct "Hkvs" as (m_at_commit ->) "Hkvs".
+          iExists m_at_commit.
+          iFrame.
+          iSplit; [iPureIntro; set_solver|].
+          iSplit; [iPureIntro; set_solver|].
+          iIntros "Hp".
+          iMod ("Hpost" with "[Hp]").
+          iNext.
+          iDestruct "Hp" as "[Hp|Hp]".
+          { iLeft.
+          rewrite big_sepM2_fmap_l.
+          iApply (big_sepM2_mono with "Hp").
+          iIntros (k hk p Hk1 Hc1) "Hk".
+          rewrite /OwnMemKeyVal.
+          destruct p as (vo, b)  eqn:Hp;
+            destruct vo as [v|] eqn:Hvo;
+            destruct b eqn:Hb;
+            iExists _; eauto with iFrame.
+          simpl. iFrame. by rewrite last_snoc. }
+          { iRight.  iExists _. by iFrame. }
+          done.
+    - iIntros (m_snap) "!#".
+      iIntros (Ψ) "(Hks & HP) HΨ".
+      wp_apply ("HspecBdy" with "[HP Hks][HΨ]").
+      -- iFrame. by rewrite big_sepM_fmap.
+      -- iNext. iIntros (mc) "(%Heq & Hkvs & HQ)".
+         iApply "HΨ". iFrame.
+         iPureIntro; set_solver.
     - rewrite /ConnectionStateTxt.
       iDestruct "HstS" as "[(_ & Hres)|Habs]"; last first.
       { iDestruct "Habs" as (_df) "(% & _)". done. }
@@ -264,7 +302,7 @@ Section DerivedSpecs.
           iDestruct "Hkeys" as "(_ & HQ)".
           iFrame.
        -- by iRight.
-  Admitted.
+  Qed. 
 
 End DerivedSpecs.
 
