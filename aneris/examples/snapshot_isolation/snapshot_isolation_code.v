@@ -245,7 +245,4 @@ Definition commit : val :=
   release "lk";;
   "b".
 
-Definition run : val :=
-  λ: "cst" "handler", start "cst";;
-                       "handler" "cst";;
-                       commit "cst".
+

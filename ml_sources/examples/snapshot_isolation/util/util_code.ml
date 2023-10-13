@@ -21,6 +21,12 @@ let wait_transaction (cst : 'a connection_state)
       else (commitT cst; aux ())
   in aux ()
 
+let run (cst : 'a connection_state)
+    (handler : 'a connection_state -> unit) : bool =
+  start cst;
+  handler cst;
+  commit cst
+  
 let run_client caddr kvs_addr tbody =
   unsafe (fun () -> Printf.printf "Start client.\n%!");
   let cst = init_client_proxy int_serializer caddr kvs_addr in

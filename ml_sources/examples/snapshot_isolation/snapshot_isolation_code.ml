@@ -223,8 +223,3 @@ let commit (cst : 'a connection_state) : bool =
           tst := None; b
   in release lk; b
 
-let run (cst : 'a connection_state)
-    (handler : 'a connection_state -> unit) : bool =
-  start cst;
-  handler cst;
-  commit cst
