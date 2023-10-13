@@ -214,28 +214,41 @@ Section KVS_valid.
     kvs_whist_commit_times M T →
     kvs_whist_commit_times (delete k M) T.
   Proof.
-  Admitted.
+    by move=>commit_times k' h/lookup_delete_Some[_]/commit_times.
+  Qed.
 
   Lemma kvs_time_snapshot_map_valid_delete t St k S T :
     kvs_time_snapshot_map_valid S T →
     S !! t = Some St →
     kvs_time_snapshot_map_valid {[t := delete k St]} T.
   Proof.
-  Admitted.
+    move=>map_valid S_t t'.
+    rewrite dom_singleton_L elem_of_singleton=>->.
+    apply map_valid, elem_of_dom.
+    by exists St.
+  Qed.
 
   Lemma kvs_snapshots_included_delete t St k M S :
     kvs_snapshots_included M S →
     S !! t = Some St →
     kvs_snapshots_included (delete k M) {[t := delete k St]}.
   Proof.
-  Admitted.
+    move=>included /included[dom_eq hist_included] t' Mt/lookup_singleton_Some[_ <-].
+    split; first set_solver.
+    move=>k' h1/lookup_delete_Some[k_k']/hist_included[h2][M_k' h1_h2].
+    exists h2.
+    split; last done.
+    by apply lookup_delete_Some.
+  Qed.
 
   Lemma kvs_snapshots_cuts_delete t St k M S :
     kvs_snapshots_cuts M S →
     S !! t = Some St →
     kvs_snapshots_cuts (delete k M) {[t := delete k St]}.
   Proof.
-  Admitted.
+    by move=>/[apply] cuts t' k' h_snap h_curr Mt/lookup_singleton_Some[<-]<-
+      /lookup_delete_Some[_]/cuts cuts'/lookup_delete_Some[_]/cuts'.
+  Qed.
 
   (** A system step updating the memory with the effect of commit 
       of a transaction is valid *)
