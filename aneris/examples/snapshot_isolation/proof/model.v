@@ -114,18 +114,62 @@ Section KVS_valid.
       kvs_ValidSnapshotTimesCuts : kvs_snapshots_cuts M S
     }.
 
-  Definition update_kvs
-    (M0 : global_mem) (C : gmap Key SerializableVal) (T : nat) :=
-      map_fold
-        (λ k v M,
-           (<[ k := (default [] (M !! k)) ++
+  Definition update_kvs0
+    (M : global_mem) (C : gmap Key SerializableVal) (T : nat) : global_mem :=
+      (map_imap
+        (λ k (p : whist * SerializableVal), let (h, v) := p in
+                Some (h ++
                       [{|
-                          we_key := k;
-                          we_val := v.(SV_val);
-                          we_time := T
-                        |}]
-             ]> M))
-        M0 C.
+                        we_key := k;
+                        we_val := v.(SV_val);
+                        we_time := T
+                      |}])) (map_zip M C)).
+
+  Definition update_kvs M C T : global_mem :=
+      (update_kvs0 M C T) ∪ (gset_to_gmap [] (KVS_keys ∖ dom C)).
+
+  Lemma upd_disj M C T :
+    update_kvs0 M C T ##ₘ gset_to_gmap [] (KVS_keys ∖ dom C).
+  Proof.
+    apply map_disjoint_dom.
+    rewrite (dom_imap_L _ _ (dom (map_zip M C))).
+    { rewrite dom_map_zip_with dom_gset_to_gmap. set_solver. }
+    move=>k.
+    split.
+    - rewrite dom_map_zip_with=>/elem_of_intersection[]/elem_of_dom[h M_k]
+        /elem_of_dom[v C_k].
+      exists (h, v).
+      split; last done.
+      by apply map_lookup_zip_Some.
+    - move=>[[h v]][]/map_lookup_zip_Some/=[M_k C_k] _.
+      apply elem_of_dom.
+      exists (h, v).
+      by apply map_lookup_zip_Some.
+  Qed.
+
+  Lemma upd_dom M C T :
+    kvs_dom M →
+    dom C ⊆ KVS_keys →
+    dom (update_kvs M C T) = KVS_keys.
+  Proof.
+    move=>dom_M dom_C.
+    rewrite /update_kvs dom_union_L dom_gset_to_gmap/update_kvs0
+      (dom_imap_L _ _ (dom (map_zip M C))).
+    - rewrite dom_map_zip_with_L -dom_M.
+      replace (KVS_keys ∩ _) with (dom C ∩ KVS_keys) by set_solver.
+      by rewrite subseteq_intersection_1_L// -union_difference_L.
+    - move=>k.
+    split.
+    + rewrite dom_map_zip_with=>/elem_of_intersection[]/elem_of_dom[h M_k]
+        /elem_of_dom[v C_k].
+      exists (h, v).
+      split; last done.
+      by apply map_lookup_zip_Some.
+    + move=>[[h v]][]/map_lookup_zip_Some/=[M_k C_k] _.
+      apply elem_of_dom.
+      exists (h, v).
+      by apply map_lookup_zip_Some.
+  Qed.
 
   Lemma upd_serializable
     (cache : gmap Key SerializableVal)
@@ -140,7 +184,14 @@ Section KVS_valid.
         Forall (λ we : events.write_event,
               KVS_Serializable (we_val we)) l) (update_kvs M cache T).
   Proof.
-  Admitted. 
+    move=>M_ser k h.
+    rewrite /update_kvs=>/lookup_union_Some[]; first apply upd_disj.
+    - rewrite map_lookup_imap=>/bind_Some[[h' v]][]/map_lookup_zip_Some/=[M_k C_k][<-].
+      apply Forall_app.
+      split; first apply (M_ser _ _ M_k).
+      apply Forall_singleton, _.
+    - by move=>/lookup_gset_to_gmap_Some[_ <-].
+  Qed.
 
 
   
@@ -257,6 +308,11 @@ Section KVS_valid.
     kvs_valid M S T →
     kvs_valid (update_kvs M cache (T+1)) S (T+1).
   Proof.
+    move=> dom_incl [dom_eq whists_valid keys_valid commit_times time_valid
+        snapshots_incl cuts].
+    split.
+    - by rewrite /kvs_dom upd_dom.
+    - 
   Admitted.
 
   (** Strong Weakening lemma. *)
