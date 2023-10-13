@@ -25,6 +25,11 @@ Definition wait_transaction : val :=
     end in
     "aux" #().
 
+Definition run : val :=
+  λ: "cst" "handler", start "cst";;
+                       "handler" "cst";;
+                       commit "cst".
+
 Definition run_client : val :=
   λ: "caddr" "kvs_addr" "tbody",
   #() (* unsafe (fun () -> Printf.printf "Start client.\n%!"); *);;

@@ -1,10 +1,11 @@
-From aneris.examples.snapshot_isolation.util Require Import util_code.
 From aneris.aneris_lang Require Import tactics adequacy proofmode.
 From aneris.examples.snapshot_isolation.specs
   Require Import user_params time events aux_defs resource_algebras
   resources specs.
 From aneris.examples.snapshot_isolation.instantiation
-      Require Import snapshot_isolation_api_implementation.
+  Require Import snapshot_isolation_api_implementation.
+From aneris.examples.snapshot_isolation.util Require Import util_code.
+
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From iris.algebra Require Import gmap.
 From iris.algebra Require Import excl.
@@ -249,5 +250,70 @@ Section proof.
     all: iMod ("close" with "[kvs]") as "_"; last done.
     all: by iApply big_sepM_singleton.
   Qed.
-
+  
 End proof.
+
+Section run_spec_proof.
+
+  Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ}.
+    
+  Lemma run_spec :
+    ∀ (c : val) (tbody : val) (sa : socket_address) (E : coPset)
+      (P :  gmap Key Hist → iProp Σ)
+      (Q : (gmap Key Hist) -> (gmap Key (option val * bool)) → iProp Σ),
+      ⌜↑KVS_InvName ⊆ E⌝ -∗
+      ⌜start_spec⌝ -∗
+      ⌜commit_spec⌝ -∗
+      IsConnected c sa -∗
+      □ (|={⊤, E}=>
+         ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗ 
+            ▷ (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗
+               (∀ mc,
+                   |={⊤, E}=>                          
+                   ∃ m_at_commit, (([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
+                     ⌜dom m_at_commit = dom m_at_start⌝ ∗ ⌜dom m_at_start = dom mc⌝ ∗
+                     (▷(([∗ map] k↦ h;p ∈ m_at_commit; mc,  k ↦ₖ (commit_event p h)) ∨
+                        ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h))
+                      ={E, ⊤}=∗ emp))))) -∗
+   (∀ (m_snap : gmap Key Hist),
+     {{{ ([∗ map] k ↦ h ∈ m_snap, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
+       tbody c  @[ip_of_address sa] 
+     {{{ (mc : gmap Key (option val * bool)), RET #();
+        ⌜dom m_snap = dom mc⌝ ∗
+        ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
+        Q m_snap mc }}}) -∗
+     {{{ ConnectionState c sa CanStart }}}
+       run c tbody @[ip_of_address sa] 
+     {{{ m ms mc (b : bool), RET #b;
+         ConnectionState c sa CanStart ∗
+        (** Transaction has been commited. *)
+        ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
+         ([∗ map] k↦ h;p ∈  m; mc, Seen k (commit_event p h)) ∗ Q ms mc) ∨
+        (** Transaction has been aborted. *)
+          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗ [∗ map] k ↦ h ∈ m, Seen k h)) }}}.
+  Proof.
+    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC #Hsh1 #HspecBdy !# %Φ HstS HΦ".
+    rewrite /run.
+    wp_pures. wp_apply HspecS; try eauto.
+    iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
+    iModIntro. iExists m_at_start. iFrame.
+    iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
+    iMod ("Hsh1" with "[$Hmks]") as "Hsh2".
+    iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
+    iIntros (mc) "(%Hdeq1 & Hcks & HQ)".
+    wp_pures.  wp_apply HspecC; try eauto.
+    iMod ("Hsh2" $! mc) as (m_at_commit) "(Hks & %Hdom1 & %Hdom2 & Hp)".
+    iModIntro. iExists _, _, _. iFrame.
+    iSplit; [iPureIntro; set_solver|].
+    - iNext. iIntros (b) "(HstS & Hdisj)".
+      iApply ("HΦ" $! m_at_commit m_at_start mc).
+      iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
+      -- iDestruct "Hc" as "(%Hbt & %Hcm & Hkts)".
+         rewrite big_sepM2_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
+         iMod ("Hp" with "[$Hkts]") as "_". iModIntro; iLeft; iFrame "#"; eauto.
+      -- iDestruct "Ha" as "(%Hbf & %Hcmn & Hkts)".
+         rewrite big_sepM_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
+         iMod ("Hp" with "[$Hkts]") as "_". iModIntro; iRight; iFrame; eauto.
+  Qed.
+
+End run_spec_proof.
