@@ -265,14 +265,15 @@ Section run_spec_proof.
       ⌜start_spec⌝ -∗
       ⌜commit_spec⌝ -∗
       IsConnected c sa -∗
+      ⌜∀ m_snap mc, Persistent (Q m_snap mc)⌝ -∗
       □ (|={⊤, E}=>
          ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗ 
             ▷ (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗
                (∀ mc,
-                   |={⊤, E}=>                          
+                   |={⊤, E}=>
                    ∃ m_at_commit, (([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
-                     ⌜dom m_at_commit = dom m_at_start⌝ ∗ ⌜dom m_at_start = dom mc⌝ ∗
-                     (▷(([∗ map] k↦ h;p ∈ m_at_commit; mc,  k ↦ₖ (commit_event p h)) ∨
+                     ⌜dom m_at_commit = dom m_at_start⌝ ∗
+                     (▷((Q m_at_start mc ∗ ([∗ map] k↦ h;p ∈ m_at_commit; mc, k ↦ₖ (commit_event p h))) ∨
                         ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h))
                       ={E, ⊤}=∗ emp))))) -∗
    (∀ (m_snap : gmap Key Hist),
@@ -292,7 +293,7 @@ Section run_spec_proof.
         (** Transaction has been aborted. *)
           (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗ [∗ map] k ↦ h ∈ m, Seen k h)) }}}.
   Proof.
-    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC #Hsh1 #HspecBdy !# %Φ HstS HΦ".
+    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC %HpersQ #Hsh1 #HspecBdy !# %Φ HstS HΦ".
     rewrite /run.
     wp_pures. wp_apply HspecS; try eauto.
     iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
@@ -300,9 +301,10 @@ Section run_spec_proof.
     iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
     iMod ("Hsh1" with "[$Hmks]") as "Hsh2".
     iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
-    iIntros (mc) "(%Hdeq1 & Hcks & HQ)".
+    iIntros (mc). specialize (HpersQ m_at_start mc).
+    iIntros "(%Hdeq1 & Hcks & #HQ)".
     wp_pures.  wp_apply HspecC; try eauto.
-    iMod ("Hsh2" $! mc) as (m_at_commit) "(Hks & %Hdom1 & %Hdom2 & Hp)".
+    iMod ("Hsh2" $! mc) as (m_at_commit) "(Hks & %Hdom1 & Hp)".
     iModIntro. iExists _, _, _. iFrame.
     iSplit; [iPureIntro; set_solver|].
     - iNext. iIntros (b) "(HstS & Hdisj)".
@@ -310,7 +312,8 @@ Section run_spec_proof.
       iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
       -- iDestruct "Hc" as "(%Hbt & %Hcm & Hkts)".
          rewrite big_sepM2_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
-         iMod ("Hp" with "[$Hkts]") as "_". iModIntro; iLeft; iFrame "#"; eauto.
+         iMod ("Hp" with "[$HQ $Hkts]") as "_".
+         iModIntro; iLeft; iFrame "#"; eauto.
       -- iDestruct "Ha" as "(%Hbf & %Hcmn & Hkts)".
          rewrite big_sepM_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
          iMod ("Hp" with "[$Hkts]") as "_". iModIntro; iRight; iFrame; eauto.
