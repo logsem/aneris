@@ -268,12 +268,12 @@ Section run_spec_proof.
     {{{
         ConnectionState c sa CanStart ∗
         (* Viewshift for looking at the state of the database at start time *)
-        (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗ 
+        (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗
             ▷ (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗ emp)) ∗
         (* Specification for the body of the transaction *)
         (∀ (m_snap : gmap Key Hist),
           {{{ 
-              ([∗ map] k ↦ h ∈ m_snap, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗ P m_snap 
+              ([∗ map] k ↦ h ∈ m_snap, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗ P m_snap
           }}}
             tbody c  @[ip_of_address sa] 
           {{{ (mc : gmap Key (option val * bool)), RET #();

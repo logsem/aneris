@@ -349,7 +349,9 @@ Section KVS_valid.
           last by rewrite (lookup_ge_None_2 _ j); [|rewrite app_length -eqi/=; lia].
         move=>/lookup_snoc_Some[[_ h'_j]|[_ <-/=]];
           first by apply (times _ _ i j).
-        (* TODO feels like a problem *)
+        apply elem_of_list_lookup_2 in h'_i.
+        specialize (commit_times k h' M_k ei h'_i).
+        lia.
   Admitted.
 
   (** Strong Weakening lemma. *)
