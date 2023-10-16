@@ -80,45 +80,42 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     wp_apply (run_spec rpc _ client_1_addr (⊤ ∖ ↑client_inv_name)
       (λ msnap, ⌜∃ h, msnap = {["x" := h; "y" := h]}⌝)%I 
       (λ msnap mc, ⌜mc = {["x" := (Some #1, true); "y" := (Some #1, true)]}⌝)%I
-      with "[][][][][][][][$Hcstate][HΦ]"); try solve_ndisj.
-    - iPureIntro. apply SI_start_spec. 
-    - iPureIntro. apply SI_commit_spec. 
-    - iPureIntro. apply _.
-    - iModIntro.
-      iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
-      iModIntro. iExists {["x" := h; "y" := h]}.
-      iSplit. { iPureIntro. by exists h. }
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
-      iNext. iIntros "(Hx & Hy & _)".
-      iMod ("HClose" with "[Hx Hy]") as "_".
-      { iNext. iExists h. iFrame. }
-      iModIntro. iIntros (mc).
-      iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
-      iModIntro. iExists {["x" := h'; "y" := h']}.
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
-      iSplit. { iPureIntro. set_solver. }
-      iIntros ">[(-> & Hkeys) | (Hx & Hy & _)]".
-      + iMod ("HClose" with "[Hkeys]") as "_"; last done.
-        iNext. iExists (h' ++ [(#1)]).
-        rewrite !big_sepM2_insert; try set_solver.
-        iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
-      + iMod ("HClose" with "[Hx Hy]") as "_"; last done.
-        iNext. iExists h'. iFrame.
-    - iIntros (msnap Φ') "!# (H_cache & [%h ->]) HΦ'".
-      rewrite /transaction1. wp_pures.
-      rewrite !big_sepM_insert; try set_solver.
-      iDestruct "H_cache" as "(H_cx & H_cy & _)".
-      wp_apply (SI_write_spec  _ _ _ _ (SerVal #1) with "[][$][H_cx]").
-      set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
-      wp_apply (SI_write_spec  _ _ _ _ (SerVal #1) with "[][$][H_cy]").
-      set_solver. iFrame "#∗". iIntros "Hcy".
-      iApply ("HΦ'" $! {["x" := (Some #1, true); "y" := (Some #1, true)]}).
-      iSplit. { iPureIntro. set_solver. }
-      iSplit; last done.
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
+      with "[][][][][$Hcstate][HΦ]"); try solve_ndisj.
+    - iPureIntro. apply SI_start_spec.
+    - iPureIntro. apply SI_commit_spec.
+    - iSplit.
+      + iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
+        iModIntro. iExists {["x" := h; "y" := h]}.
+        iSplit. { iPureIntro. by exists h. }
+        rewrite !big_sepM_insert; try set_solver.
+        rewrite big_sepM_empty. iFrame.
+        iNext. iIntros "(Hx & Hy & _)".
+        iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+        iNext. iExists h. iFrame.
+      + iIntros (msnap Φ') "!# (H_cache & [%h ->]) HΦ'".
+        rewrite /transaction1. wp_pures.
+        rewrite !big_sepM_insert; try set_solver.
+        iDestruct "H_cache" as "(H_cx & H_cy & _)".
+        wp_apply (SI_write_spec _ _ _ _ (SerVal #1) with "[][$][H_cx]").
+        set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
+        wp_apply (SI_write_spec _ _ _ _ (SerVal #1) with "[][$][H_cy]").
+        set_solver. iFrame "#∗". iIntros "Hcy".
+        iApply ("HΦ'" $! {["x" := (Some #1, true); "y" := (Some #1, true)]}).
+        iSplit. { iPureIntro. set_solver. }
+        iSplit; first done. iSplitL.
+        { rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
+        iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
+        iModIntro. iExists {["x" := h'; "y" := h']}.
+        rewrite !big_sepM_insert; try set_solver.
+        rewrite big_sepM_empty. iFrame.
+        iSplit. { iPureIntro. set_solver. }
+        iIntros ">[ Hkeys | (Hx & Hy & _)]".
+        * iMod ("HClose" with "[Hkeys]") as "_"; last done.
+          iNext. iExists (h' ++ [(#1)]).
+          rewrite !big_sepM2_insert; try set_solver.
+          iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
+        * iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+          iNext. iExists h'. iFrame.
     - iNext. iIntros. by iApply "HΦ".
   Qed.
 
@@ -143,45 +140,42 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     wp_apply (run_spec rpc _ client_2_addr (⊤ ∖ ↑client_inv_name)
       (λ msnap, ⌜∃ h, msnap = {["x" := h; "y" := h]}⌝)%I 
       (λ msnap mc, ⌜mc = {["x" := (Some #2, true); "y" := (Some #2, true)]}⌝)%I
-      with "[][][][][][][][$Hcstate][HΦ]"); try solve_ndisj.
-    - iPureIntro. apply SI_start_spec. 
-    - iPureIntro. apply SI_commit_spec. 
-    - iPureIntro. apply _.
-    - iModIntro.
-      iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
-      iModIntro. iExists {["x" := h; "y" := h]}.
-      iSplit. { iPureIntro. by exists h. }
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
-      iNext. iIntros "(Hx & Hy & _)".
-      iMod ("HClose" with "[Hx Hy]") as "_".
-      { iNext. iExists h. iFrame. }
-      iModIntro. iIntros (mc).
-      iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
-      iModIntro. iExists {["x" := h'; "y" := h']}.
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
-      iSplit. { iPureIntro. set_solver. }
-      iIntros ">[(-> & Hkeys) | (Hx & Hy & _)]".
-      + iMod ("HClose" with "[Hkeys]") as "_"; last done.
-        iNext. iExists (h' ++ [(#2)]).
-        rewrite !big_sepM2_insert; try set_solver.
-        iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
-      + iMod ("HClose" with "[Hx Hy]") as "_"; last done.
-        iNext. iExists h'. iFrame.
-    - iIntros (msnap Φ') "!# (H_cache & [%h ->]) HΦ'".
-      rewrite /transaction2. wp_pures.
-      rewrite !big_sepM_insert; try set_solver.
-      iDestruct "H_cache" as "(H_cx & H_cy & _)".
-      wp_apply (SI_write_spec  _ _ _ _ (SerVal #2) with "[][$][H_cx]").
-      set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
-      wp_apply (SI_write_spec  _ _ _ _ (SerVal #2) with "[][$][H_cy]").
-      set_solver. iFrame "#∗". iIntros "Hcy".
-      iApply ("HΦ'" $! {["x" := (Some #2, true); "y" := (Some #2, true)]}).
-      iSplit. { iPureIntro. set_solver. }
-      iSplit; last done.
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
+      with "[][][][][$Hcstate][HΦ]"); try solve_ndisj.
+    - iPureIntro. apply SI_start_spec.
+    - iPureIntro. apply SI_commit_spec.
+    - iSplit.
+      + iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
+        iModIntro. iExists {["x" := h; "y" := h]}.
+        iSplit. { iPureIntro. by exists h. }
+        rewrite !big_sepM_insert; try set_solver.
+        rewrite big_sepM_empty. iFrame.
+        iNext. iIntros "(Hx & Hy & _)".
+        iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+        iNext. iExists h. iFrame.
+      + iIntros (msnap Φ') "!# (H_cache & [%h ->]) HΦ'".
+        rewrite /transaction2. wp_pures.
+        rewrite !big_sepM_insert; try set_solver.
+        iDestruct "H_cache" as "(H_cx & H_cy & _)".
+        wp_apply (SI_write_spec  _ _ _ _ (SerVal #2) with "[][$][H_cx]").
+        set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
+        wp_apply (SI_write_spec  _ _ _ _ (SerVal #2) with "[][$][H_cy]").
+        set_solver. iFrame "#∗". iIntros "Hcy".
+        iApply ("HΦ'" $! {["x" := (Some #2, true); "y" := (Some #2, true)]}).
+        iSplit. { iPureIntro. set_solver. }
+        iSplit; first done. iSplitL.
+        { rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
+        iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
+        iModIntro. iExists {["x" := h'; "y" := h']}.
+        rewrite !big_sepM_insert; try set_solver.
+        rewrite big_sepM_empty. iFrame.
+        iSplit. { iPureIntro. set_solver. }
+        iIntros ">[ Hkeys | (Hx & Hy & _)]".
+        * iMod ("HClose" with "[Hkeys]") as "_"; last done.
+          iNext. iExists (h' ++ [(#2)]).
+          rewrite !big_sepM2_insert; try set_solver.
+          iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
+        * iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+          iNext. iExists h'. iFrame.
     - iNext. iIntros. by iApply "HΦ".
   Qed.
 
@@ -204,55 +198,62 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iIntros (rpc) "(Hcstate & #HiC)".
     wp_pures.
     wp_apply (run_spec rpc _ client_3_addr (⊤ ∖ ↑client_inv_name)
-      (λ msnap, ⌜∃ h, msnap = {["x" := h; "y" := h]}⌝)%I
-      (λ msnap mc, ⌜∃ vo1 vo2, mc = {["x" := (vo1, false); "y" := (vo2, false)]}⌝)%I
-      with "[][][][][][][][$Hcstate][HΦ]"); try solve_ndisj.
-    - iPureIntro. apply SI_start_spec. 
-    - iPureIntro. apply SI_commit_spec. 
-    - iPureIntro. apply _.
-    - iModIntro.
-      iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
-      iModIntro. iExists {["x" := h; "y" := h]}.
-      iSplit. { iPureIntro. by exists h. }
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
-      iNext. iIntros "(Hx & Hy & _)".
-      iMod ("HClose" with "[Hx Hy]") as "_".
-      { iNext. iExists h. iFrame. }
-      iModIntro. iIntros (mc).
-      iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
-      iModIntro. iExists {["x" := h'; "y" := h']}.
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty. iFrame.
-      iSplit. { iPureIntro. set_solver. }
-      iIntros ">[([%vo1 [%vo2 ->]] & Hkeys) | (Hx & Hy & _)]".
-      + iMod ("HClose" with "[Hkeys]") as "_"; last done.
-        iNext. iExists h'.
-        rewrite !big_sepM2_insert; try set_solver.
-        iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
-        destruct vo1, vo2; iFrame.
-      + iMod ("HClose" with "[Hx Hy]") as "_"; last done.
-        iNext. iExists h'. iFrame.
-    - iIntros (msnap Φ') "!# (H_cache & [%h ->]) HΦ'".
-      rewrite /transaction3. wp_pures.
-      rewrite !big_sepM_insert; try set_solver.
-      iDestruct "H_cache" as "((H_cx & H_cx_s) & (H_cy & H_cy_s) & _)".
-      wp_apply (SI_read_spec _ _ _ _ with "[][$][H_cx]"); try set_solver.
-      iFrame "#∗". iIntros "H_cx". wp_pures.
-      wp_apply (SI_read_spec _ _ _ _ with "[][$][H_cy]"); try set_solver.
-      iFrame "#∗". iIntros "H_cy". wp_pures.
-      destruct (last h); wp_pures; do 2 wp_lam; wp_pures.
-      + case_bool_decide as Heq; try set_solver. wp_pures.
-        iApply ("HΦ'" $! {["x" := (Some v, false); "y" := (Some v, false)]}).
-        iSplit. { iPureIntro. set_solver. }
-        iSplit; last set_solver.
+    (λ msnap, ⌜∃ h, msnap = {["x" := h; "y" := h]}⌝)%I
+    (λ msnap mc, ⌜∃ vo1 vo2, mc = {["x" := (vo1, false); "y" := (vo2, false)]}⌝)%I
+      with "[][][][][$Hcstate][HΦ]"); try solve_ndisj.
+    - iPureIntro. apply SI_start_spec.
+    - iPureIntro. apply SI_commit_spec.
+    - iSplit.
+      + iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
+        iModIntro. iExists {["x" := h; "y" := h]}.
+        iSplit. { iPureIntro. by exists h. }
         rewrite !big_sepM_insert; try set_solver.
         rewrite big_sepM_empty. iFrame.
-      + iApply ("HΦ'" $! {["x" := (None, false); "y" := (None, false)]}).
-        iSplit. { iPureIntro. set_solver. }
-        iSplit; last set_solver.
+        iNext. iIntros "(Hx & Hy & _)".
+        iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+        iNext. iExists h. iFrame.
+      + iIntros (msnap Φ') "!# (H_cache & [%h ->]) HΦ'".
+        rewrite /transaction3. wp_pures.
         rewrite !big_sepM_insert; try set_solver.
-        rewrite big_sepM_empty. iFrame.
+        iDestruct "H_cache" as "((H_cx & H_cx_s) & (H_cy & H_cy_s) & _)".
+        wp_apply (SI_read_spec _ _ _ _ with "[][$][H_cx]"); try set_solver.
+        iFrame "#∗". iIntros "H_cx". wp_pures.
+        wp_apply (SI_read_spec _ _ _ _ with "[][$][H_cy]"); try set_solver.
+        iFrame "#∗". iIntros "H_cy". wp_pures.
+        destruct (last h); wp_pures; do 2 wp_lam; wp_pures.
+        * case_bool_decide as Heq; try set_solver. wp_pures.
+          iApply ("HΦ'" $! {["x" := (Some v, false); "y" := (Some v, false)]}).
+          iSplit. { iPureIntro. set_solver. }
+          iSplit; first set_solver.
+          iSplitL. {rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
+          iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
+          iModIntro. iExists {["x" := h'; "y" := h']}.
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite big_sepM_empty. iFrame.
+          iSplit. { iPureIntro. set_solver. }
+          iIntros ">[ Hkeys | (Hx & Hy & _)]".
+          -- iMod ("HClose" with "[Hkeys]") as "_"; last done.
+             iNext. iExists h'.
+             rewrite !big_sepM2_insert; try set_solver.
+             iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
+          -- iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+             iNext. iExists h'. iFrame.
+        * iApply ("HΦ'" $! {["x" := (None, false); "y" := (None, false)]}).
+          iSplit. { iPureIntro. set_solver. }
+          iSplit; first set_solver.
+          iSplitL. {rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
+          iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
+          iModIntro. iExists {["x" := h'; "y" := h']}.
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite big_sepM_empty. iFrame.
+          iSplit. { iPureIntro. set_solver. }
+          iIntros ">[ Hkeys | (Hx & Hy & _)]".
+          -- iMod ("HClose" with "[Hkeys]") as "_"; last done.
+             iNext. iExists h'.
+             rewrite !big_sepM2_insert; try set_solver.
+             iDestruct "Hkeys" as "(Hx & Hy & _)". iFrame.
+          -- iMod ("HClose" with "[Hx Hy]") as "_"; last done.
+             iNext. iExists h'. iFrame.
     - iNext. iIntros. by iApply "HΦ".
 Qed.
 

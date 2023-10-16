@@ -232,94 +232,59 @@ Section DerivedSpecs.
       ⌜start_spec⌝ -∗
       ⌜commit_spec⌝ -∗
       IsConnected c sa -∗
-      ⌜∀ m_snap mc, Persistent (Q m_snap mc)⌝ -∗
-      □ (|={⊤, E}=>
-         ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ∗ 
-            ▷ (([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ={E, ⊤}=∗
-               (∀ mc,
-                  |={⊤, E}=>                          
-                  ∃ m_at_commit, (([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo) ∗
-                    ⌜dom m_at_commit = dom m_at_start⌝ ∗
-                    (▷((Q m_at_start mc ∗ ([∗ map] k↦ vo;p ∈ m_at_commit; mc, OwnMemKeyVal k (commitTxt p vo))) ∨
-                       ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo))
-                      ={E, ⊤}=∗ emp))))) -∗
-   (∀ (m_snap : gmap Key (option val)),
-     {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
-       tbody c  @[ip_of_address sa] 
-     {{{ (mc : gmap Key (option val * bool)), RET #();
-        ⌜dom m_snap = dom mc⌝ ∗
-        ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
-        Q m_snap mc }}}) -∗
-     {{{ ConnectionStateTxt c sa TxtCanStart }}}
+      {{{ 
+        ConnectionStateTxt c sa TxtCanStart ∗
+        (* Viewshift for looking at the state of the database at start time *)
+        (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ∗ 
+           ▷ (([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ={E, ⊤}=∗ emp )) ∗
+        (* Specification for the body of the transaction *)
+        (∀ (m_snap : gmap Key (option val)),
+          {{{ 
+            ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap 
+          }}}
+            tbody c  @[ip_of_address sa] 
+          {{{ (mc : gmap Key (option val * bool)), RET #();
+            ⌜dom m_snap = dom mc⌝ ∗ Q m_snap mc ∗
+            ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
+            (* Viewshift for looking at the state of the database at commit time after
+              the transaction body has been executed *)
+            (|={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo) ∗
+                ⌜dom m_at_commit = dom m_snap⌝ ∗
+                (▷(([∗ map] k↦ vo;p ∈ m_at_commit; mc, OwnMemKeyVal k (commitTxt p vo)) ∨
+                  ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo)) ={E, ⊤}=∗ emp))
+          }}})
+      }}}
        run c tbody @[ip_of_address sa] 
      {{{ ms mc (b : bool), RET #b;
          ConnectionStateTxt c sa TxtCanStart ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ Q ms mc) ∨
         (** Transaction has been aborted. *)
-        (⌜b = false⌝)) }}}.
+        (⌜b = false⌝)) 
+      }}}.
   Proof.
-    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC %HpersQ #Hsh1 #HspecBdy !# %Φ HstS HΦ".
-    iApply (run_spec c bdy sa E
-              (λ (ms : gmap Key Hist), P (last <$> ms))%I
-              (λ (ms : gmap Key Hist) mc, Q (last <$> ms) mc)%I
-             with "[//][//][//][$HiC][//][][][HstS]").
-    -  iModIntro.
-       iMod "Hsh1".
-       iModIntro.
-       setoid_rewrite convert_mhist.
-       iDestruct "Hsh1" as (ms) "(HP & Hkvs & Hvsh)".
-       iDestruct "Hkvs" as (mh) "(-> & Hvks)". 
-       iExists mh. iFrame.
-       iNext.
-       iIntros "Hkvs".
-       iMod ("Hvsh" with "[Hkvs]") as "Hsh".
-       -- iExists _. by iFrame.
-       -- iModIntro.
-          iIntros (mc).
-          iMod ("Hsh" $! mc) as (mc') "(Hkvs & %Heq1 & Hpost)".
-          iModIntro.
-          iDestruct "Hkvs" as (m_at_commit ->) "Hkvs".
-          iExists m_at_commit.
-          iFrame.
-          iSplit; [iPureIntro; set_solver|].
-          iIntros "Hp".
-          iMod ("Hpost" with "[Hp]"); last done.
-          iNext.
-          iDestruct "Hp" as "[(HQ & Hp)|Hp]".
-          { iLeft. iFrame.
-          rewrite big_sepM2_fmap_l.
-          iApply (big_sepM2_mono with "Hp").
-          iIntros (k hk p Hk1 Hc1) "Hk".
-          rewrite /OwnMemKeyVal.
-          destruct p as (vo, b)  eqn:Hp;
-            destruct vo as [v|] eqn:Hvo;
-            destruct b eqn:Hb;
-            iExists _; eauto with iFrame.
-          simpl. iFrame. by rewrite last_snoc. }
-          { iRight.  iExists _. by iFrame. }
-    - iIntros (m_snap) "!#".
-      iIntros (Ψ) "(Hks & HP) HΨ".
-      wp_apply ("HspecBdy" with "[HP Hks][HΨ]").
-      -- iFrame. by rewrite big_sepM_fmap.
-      -- iNext. iIntros (mc) "(%Heq & Hkvs & HQ)".
-         iApply "HΨ". iFrame.
-         iPureIntro; set_solver.
-    - rewrite /ConnectionStateTxt.
-      iDestruct "HstS" as "[(_ & Hres)|Habs]"; last first.
-      { iDestruct "Habs" as (_df) "(% & _)". done. }
-      iFrame.
-    -  iNext.
-       iIntros (m ms mc b) "(Hst & Hpost)".
-       iApply ("HΦ" $! (last <$> ms) mc).
-       iSplitL "Hst".
-       rewrite  /ConnectionStateTxt.
-       iLeft. by iFrame.
-       iDestruct "Hpost" as "[Hp|Hp]"; iDestruct "Hp" as "(-> & (_ & Hkeys))".
-       -- iLeft; iSplit; first done.
-          iDestruct "Hkeys" as "(_ & HQ)".
-          iFrame.
-       -- by iRight.
+    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
+    rewrite /run.
+    wp_pures. wp_apply start_spec_derived; try eauto.
+    iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
+    iModIntro. iExists m_at_start. iFrame.
+    iNext. iIntros "(HstA & Hmks & Hcks)".
+    iMod ("Hsh1" with "[$Hmks]") as "_".
+    iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
+    iIntros (mc) "(%Hdeq1 & HQ & Hcks & Hsh2)".
+    wp_pures. wp_apply commit_spec_derived; try eauto.
+    iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & Hsh2)".
+    iModIntro. iExists _, _, _. iFrame.
+    iSplit; [iPureIntro; set_solver|].
+    iNext. iIntros (b) "(HstS & Hdisj)".
+    iApply ("HΦ" $! m_at_start mc).
+    iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
+    - iDestruct "Hc" as "(%Hbt & Hkts)".
+      iMod ("Hsh2" with "[$Hkts]") as "_".
+      iModIntro; iLeft; iFrame "#"; eauto.
+    - iDestruct "Ha" as "(%Hbf & Hkts)".
+      iMod ("Hsh2" with "[$Hkts]") as "_". 
+      iModIntro; iRight; iFrame; eauto.
   Qed.
 
   Lemma run_spec_derived_simple :

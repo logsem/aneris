@@ -256,67 +256,70 @@ End proof.
 Section run_spec_proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !KVSG Σ, !SI_resources Mdl Σ}.
-    
+
   Lemma run_spec :
-    ∀ (c : val) (tbody : val) (sa : socket_address) (E : coPset)
-      (P :  gmap Key Hist → iProp Σ)
-      (Q : (gmap Key Hist) -> (gmap Key (option val * bool)) → iProp Σ),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
-      ⌜start_spec⌝ -∗
-      ⌜commit_spec⌝ -∗
-      IsConnected c sa -∗
-      ⌜∀ m_snap mc, Persistent (Q m_snap mc)⌝ -∗
-      □ (|={⊤, E}=>
-         ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗ 
-            ▷ (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗
-               (∀ mc,
-                   |={⊤, E}=>
-                   ∃ m_at_commit, (([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
-                     ⌜dom m_at_commit = dom m_at_start⌝ ∗
-                     (▷((Q m_at_start mc ∗ ([∗ map] k↦ h;p ∈ m_at_commit; mc, k ↦ₖ (commit_event p h))) ∨
-                        ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h))
-                      ={E, ⊤}=∗ emp))))) -∗
-   (∀ (m_snap : gmap Key Hist),
-     {{{ ([∗ map] k ↦ h ∈ m_snap, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
-       tbody c  @[ip_of_address sa] 
-     {{{ (mc : gmap Key (option val * bool)), RET #();
-        ⌜dom m_snap = dom mc⌝ ∗
-        ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
-        Q m_snap mc }}}) -∗
-     {{{ ConnectionState c sa CanStart }}}
-       run c tbody @[ip_of_address sa] 
-     {{{ m ms mc (b : bool), RET #b;
-         ConnectionState c sa CanStart ∗
+  ∀ (c : val) (tbody : val) (sa : socket_address) (E : coPset)
+    (P :  gmap Key Hist → iProp Σ)
+    (Q : (gmap Key Hist) -> (gmap Key (option val * bool)) → iProp Σ),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜start_spec⌝ -∗
+    ⌜commit_spec⌝ -∗
+    IsConnected c sa -∗
+    {{{
+        ConnectionState c sa CanStart ∗
+        (* Viewshift for looking at the state of the database at start time *)
+        (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗ 
+            ▷ (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗ emp)) ∗
+        (* Specification for the body of the transaction *)
+        (∀ (m_snap : gmap Key Hist),
+          {{{ 
+              ([∗ map] k ↦ h ∈ m_snap, k ↦{c} (last h) ∗ KeyUpdStatus c k false) ∗ P m_snap 
+          }}}
+            tbody c  @[ip_of_address sa] 
+          {{{ (mc : gmap Key (option val * bool)), RET #();
+              ⌜dom m_snap = dom mc⌝ ∗ Q m_snap mc ∗
+              ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
+              (* Viewshift for looking at the state of the database at commit time after
+                the transaction body has been executed *)
+              (|={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
+                  ⌜dom m_at_commit = dom m_snap⌝ ∗
+                  (▷(([∗ map] k↦h;p ∈ m_at_commit; mc, k ↦ₖ (commit_event p h)) ∨
+                    ([∗ map] k↦h ∈ m_at_commit, k ↦ₖ h)) ={E, ⊤}=∗ emp))
+          }}})
+    }}}
+      run c tbody @[ip_of_address sa] 
+    {{{ m ms mc (b : bool), RET #b;
+        ConnectionState c sa CanStart ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
-         ([∗ map] k↦ h;p ∈  m; mc, Seen k (commit_event p h)) ∗ Q ms mc) ∨
+        ([∗ map] k↦ h;p ∈  m; mc, Seen k (commit_event p h)) ∗ Q ms mc) ∨
         (** Transaction has been aborted. *)
-          (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗ [∗ map] k ↦ h ∈ m, Seen k h)) }}}.
-  Proof.
-    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC %HpersQ #Hsh1 #HspecBdy !# %Φ HstS HΦ".
-    rewrite /run.
-    wp_pures. wp_apply HspecS; try eauto.
-    iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
-    iModIntro. iExists m_at_start. iFrame.
-    iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
-    iMod ("Hsh1" with "[$Hmks]") as "Hsh2".
-    iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
-    iIntros (mc). specialize (HpersQ m_at_start mc).
-    iIntros "(%Hdeq1 & Hcks & #HQ)".
-    wp_pures.  wp_apply HspecC; try eauto.
-    iMod ("Hsh2" $! mc) as (m_at_commit) "(Hks & %Hdom1 & Hp)".
-    iModIntro. iExists _, _, _. iFrame.
-    iSplit; [iPureIntro; set_solver|].
-    - iNext. iIntros (b) "(HstS & Hdisj)".
-      iApply ("HΦ" $! m_at_commit m_at_start mc).
-      iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
-      -- iDestruct "Hc" as "(%Hbt & %Hcm & Hkts)".
-         rewrite big_sepM2_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
-         iMod ("Hp" with "[$HQ $Hkts]") as "_".
-         iModIntro; iLeft; iFrame "#"; eauto.
-      -- iDestruct "Ha" as "(%Hbf & %Hcmn & Hkts)".
-         rewrite big_sepM_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
-         iMod ("Hp" with "[$Hkts]") as "_". iModIntro; iRight; iFrame; eauto.
-  Qed.
+        (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗ [∗ map] k ↦ h ∈ m, Seen k h)) 
+    }}}.
+Proof.
+  iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
+  rewrite /run.
+  wp_pures. wp_apply HspecS; try eauto.
+  iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
+  iModIntro. iExists m_at_start. iFrame.
+  iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
+  iMod ("Hsh1" with "[$Hmks]") as "_".
+  iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
+  iIntros (mc) "(%Hdeq1 & HQ & Hcks & Hsh2)".
+  wp_pures.  wp_apply HspecC; try eauto.
+  iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & Hsh2)".
+  iModIntro. iExists _, _, _. iFrame.
+  iSplit; [iPureIntro; set_solver|].
+  iNext. iIntros (b) "(HstS & Hdisj)".
+  iApply ("HΦ" $! m_at_commit m_at_start mc).
+  iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
+  - iDestruct "Hc" as "(%Hbt & %Hcm & Hkts)".
+    rewrite big_sepM2_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
+    iMod ("Hsh2" with "[$Hkts]") as "_".
+    iModIntro; iLeft; iFrame "#"; eauto.
+  - iDestruct "Ha" as "(%Hbf & %Hcmn & Hkts)".
+    rewrite big_sepM_sep. iDestruct "Hkts" as "(Hkts & #Hseens2)".
+    iMod ("Hsh2" with "[$Hkts]") as "_". iModIntro; iRight; iFrame; eauto.
+Qed.
 
 End run_spec_proof.
