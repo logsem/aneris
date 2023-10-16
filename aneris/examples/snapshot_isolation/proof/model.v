@@ -58,6 +58,16 @@ Section Whist_valid.
         [by apply (elem_of_prefix h)..|done].
   Qed.
 
+  Lemma whist_valid_empty : whist_valid [].
+  Proof.
+    split.
+    - by move=>?/elem_of_nil.
+    - move=>? ? ? ? ?.
+      by rewrite lookup_nil.
+    - by move=>?/elem_of_nil.
+    - by move=>? ? /elem_of_nil.
+  Qed.
+
 End Whist_valid.
 
 Definition global_mem :=  gmap Key whist.
@@ -67,7 +77,6 @@ Definition map_included (m1 m2 : global_mem) : Prop :=
   dom m1 = dom m2 ∧
   ∀ k h1, m1 !! k = Some h1 →
     ∃ h2, m2 !! k = Some h2 ∧ h1 `prefix_of` h2.
-
 
 Section KVS_valid.
   Context `{!User_params}.
@@ -145,6 +154,24 @@ Section KVS_valid.
       apply elem_of_dom.
       exists (h, v).
       by apply map_lookup_zip_Some.
+  Qed.
+
+  Lemma lookup_update_kvs_Some M C T k h :
+    update_kvs M C T !! k = Some h →
+    h = [] ∨ (∃ h0 v, M !! k = Some h0 ∧ C !! k = Some v ∧
+      h = h0 ++ [{|
+                  we_key := k;
+                  we_val := v.(SV_val);
+                  we_time := T
+                |}]).
+  Proof.
+    move=>/(lookup_union_Some _ _ _ _ (upd_disj M C T))[].
+    - rewrite map_lookup_imap=>/bind_Some[[h' v]][]/map_lookup_zip_with_Some[h''][v']
+        [[<-<-]][M_k cache_k][<-].
+      right.
+      by exists h', v.
+    - rewrite lookup_gset_to_gmap_Some=>[][_ <-].
+      by left.
   Qed.
 
   Lemma upd_dom M C T :
@@ -312,7 +339,17 @@ Section KVS_valid.
         snapshots_incl cuts].
     split.
     - by rewrite /kvs_dom upd_dom.
-    - 
+    - move=>k h/lookup_update_kvs_Some[->|[h'][v][M_k][cache_k ->]];
+        first apply whist_valid_empty.
+      destruct (whists_valid _ _ M_k) as (keys, times, vals, ext).
+      split.
+      + by move=>we/elem_of_app[/(keys_valid _ _ M_k) ->|/elem_of_list_singleton->/=];
+        rewrite dom_eq; apply elem_of_dom; rewrite M_k.
+      + move=>ei ej i j ij/lookup_snoc_Some[[_ h'_i]|[eqi]];
+          last by rewrite (lookup_ge_None_2 _ j); [|rewrite app_length -eqi/=; lia].
+        move=>/lookup_snoc_Some[[_ h'_j]|[_ <-/=]];
+          first by apply (times _ _ i j).
+        (* TODO feels like a problem *)
   Admitted.
 
   (** Strong Weakening lemma. *)
