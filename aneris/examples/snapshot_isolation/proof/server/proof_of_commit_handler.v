@@ -782,71 +782,28 @@ Section Proof_of_commit_handler.
     iApply "HΦ".
     iPureIntro.
     assert (m_updated = (update_kvsl m cache T')) as <-; last done.
-    unfold update_kvsl.
     clear H_map_kvs H_map_kvs_updated H_all H_coh H_map_cache.
-    generalize dependent m_updated.
-    induction cache as [|k x cache H_eq IH] using map_ind; 
-    intros m_updated H_eq_in H_eq_nin.
-    - rewrite map_fold_empty.
-      apply map_eq.
-      intro k.
-      by apply H_eq_nin.
-    - rewrite map_fold_insert_L; try done.
-      + assert (m_updated !! k =
-      Some (InjRV ($ (k, (x.(SV_val), T')), default (InjLV #()) (m !! k)))) as H_lookup.
-      {
-        apply H_eq_in.
-        by rewrite lookup_insert.
-      }
-      apply map_eq.
-      intro i.
-      destruct (decide (k = i)) as [<-| H_neq_k].
-      * by rewrite lookup_insert.
-      * rewrite lookup_insert_ne; last done.
-        rewrite -(insert_delete m_updated k 
-          (InjRV ($ (k, (x.(SV_val), T')), default (InjLV #()) (m !! k)))); last done.
-        destruct (m !! k) as [ m_val| ] eqn:H_lookup_m.
-        -- rewrite -(insert_insert (delete k m_updated) k _ m_val).
-            specialize (IH (<[k:=m_val]> (delete k m_updated))).
-            rewrite lookup_insert_ne; last done.
-            rewrite -IH; first done.
-            ++ intros k' v' H_lookup_k'.
-              destruct (decide (k = k')) as [<-| H_neq_k'].
-              ** by rewrite H_eq in H_lookup_k'.
-              ** specialize (H_eq_in k' v').
-                rewrite lookup_insert_ne; last done.
-                rewrite lookup_delete_ne; last done.
-                apply H_eq_in.
-                rewrite lookup_insert_ne; done.
-            ++ intros k' H_k'_nin.
-              destruct (decide (k = k')) as [<-| H_neq_k'].
-              ** rewrite H_lookup_m.
-                  by rewrite lookup_insert.
-              ** specialize (H_eq_nin k').
-                  rewrite lookup_insert_ne; last done.
-                  rewrite lookup_delete_ne; last done.
-                  apply H_eq_nin.
-                  set_solver.
-        -- specialize (IH (delete k m_updated)).
-            rewrite lookup_insert_ne; last done.
-            rewrite -IH; first done.
-            ++ intros k' v' H_lookup_k'.
-              destruct (decide (k = k')) as [<-| H_neq_k'].
-              ** by rewrite H_eq in H_lookup_k'.
-              ** specialize (H_eq_in k' v').
-                rewrite lookup_delete_ne; last done.
-                apply H_eq_in.
-                rewrite lookup_insert_ne; done.
-            ++ intros k' H_k'_nin.
-              destruct (decide (k = k')) as [<-| H_neq_k'].
-              ** rewrite H_lookup_m.
-                  by rewrite lookup_delete.
-              ** specialize (H_eq_nin k').
-                  rewrite lookup_delete_ne; last done.
-                  apply H_eq_nin.
-                  set_solver.
-      + intros k1 k2 v1 v2 map H_neq H_k1_lookup H_k2_lookup.
-        by rewrite insert_commute.
+    apply map_eq.
+    move=>k.
+    case cache_k : (@lookup _ SerializableVal _ _ k cache)=>[v|].
+    - rewrite (H_eq_in _ _ cache_k).
+      apply eq_sym, lookup_update_kvsl_Some.
+      right.
+      case (m !! k)=>[h|].
+      + right.
+        by exists h, v.
+      + left.
+        by exists v.
+    - apply not_elem_of_dom in cache_k.
+      rewrite (H_eq_nin _ cache_k).
+      case m_k : (m !! k)=>[h|].
+      + apply eq_sym, lookup_update_kvsl_Some.
+        left.
+        by split; first apply not_elem_of_dom.
+      + apply eq_sym, lookup_update_kvsl_None.
+        by split; first apply not_elem_of_dom.
+    Unshelve.
+    apply _.
   Qed.
 
   Lemma cache_updatesM_to_cache (cache_updatesM: gmap Key val) :

@@ -451,14 +451,95 @@ Section KVSL_valid.
     by move: emp_k abs=>[_ <-].
   Qed.
 
+  Lemma kvsl_in_local_some' m M S T k h :
+    kvsl_valid m M S T →
+    m !! k = Some h →
+    ∃ h', h = $ h' ∧ M !! k = Some (reverse h').
+  Proof.
+    move=>[dom_m model_empty model_some local [dom_M _ _ _ _ _ _]].
+    case M_k : (M !! k)=>[h'|].
+    - move: h' M_k=>[|we h'].
+      + by move=>/model_empty->.
+      + move=>M_k m_k.
+        rewrite (model_some _ _ M_k) in m_k; last done.
+        move: m_k =>[]<-.
+        exists (reverse (we :: h')).
+        by rewrite reverse_involutive.
+    - move=>m_k.
+      apply not_elem_of_dom in M_k.
+      exfalso; apply M_k.
+      rewrite -dom_M.
+      apply elem_of_dom_2 in m_k.
+      set_solver.
+  Qed.
+
+  Lemma kvsl_in_local_empty m M S T k :
+    kvsl_valid m M S T →
+    m !! k = None →
+    k ∈ KVS_keys →
+    M !! k = Some [].
+  Proof.
+    move=>[_ model_empty model_some local [dom_M _ _ _ _ _ _]].
+    case M_k : (M !! k)=>[[//|we h]|].
+    - apply model_some in M_k.
+      by rewrite M_k.
+    - apply not_elem_of_dom in M_k.
+      by rewrite -dom_M in M_k.
+  Qed.
+
  Definition update_kvsl
-    (m0 : gmap Key val)
+    (m : gmap Key val)
     (C : gmap Key SerializableVal)
     (T : nat) : gmap Key val :=
-    map_fold (λ k v m, 
-        (<[ k := SOMEV ($(k, (v.(SV_val), T)),
-                     (default NONEV (m0 !! k)))]> m))
-      m0 C.
+    fn_to_gmap (dom m ∪ dom C) (λ k,
+      let h := default NONEV (m !! k) in
+      match C !! k with
+        | None => h
+        | Some v => SOMEV ($(k, (v.(SV_val), T)), h)
+      end).
+
+  Lemma update_kvsl_dom m C T :
+    dom (update_kvsl m C T) = dom m ∪ dom C.
+  Proof.
+    by rewrite fn_to_gmap_dom.
+  Qed.
+
+  Lemma lookup_update_kvsl_Some m C T k h :
+    update_kvsl m C T !! k = Some h ↔
+    (C !! k = None ∧ m !! k = Some h) ∨
+    (∃ v, C !! k = Some v ∧ m !! k = None ∧ h = SOMEV ($(k, (v.(SV_val), T)), NONEV)) ∨
+    (∃ h' v, C !! k = Some v ∧ m !! k = Some h' ∧
+      h = SOMEV ($(k, (v.(SV_val), T)), h')).
+  Proof.
+    split.
+    - move=>/lookup_fn_to_gmap[]/[swap]/elem_of_union[]/elem_of_dom.
+      + move=>[h']->.
+        case C_k : (C !! k)=>[v|]/=<-.
+        * right. right. by exists h', v.
+        * by left.
+      + move=>[v]->.
+        case m_k : (m !! k)=>[h'|]/=<-.
+        * right. right. by exists h', v.
+        * right. left. by exists v.
+    - move=>[[C_k m_k]|[[v][C_k][m_k]->|[h'][v][C_k][m_k]->]].
+      all: apply lookup_fn_to_gmap.
+      all: rewrite C_k m_k.
+      all: split; first done.
+      1, 3: apply elem_of_dom_2 in m_k.
+      3: apply elem_of_dom_2 in C_k.
+      all: set_solver.
+  Qed.
+
+  Lemma lookup_update_kvsl_None m C T k :
+    update_kvsl m C T !! k = None ↔ C !! k = None ∧ m !! k = None.
+  Proof.
+    split.
+    - by move=>/lookup_fn_to_gmap_not_in/not_elem_of_union[/not_elem_of_dom m_k]
+        /not_elem_of_dom C_k.
+    - move=>[/not_elem_of_dom C_k]/not_elem_of_dom m_k.
+      apply lookup_fn_to_gmap_not_in.
+      set_solver.
+  Qed.
 
   Lemma kvsl_model_empty_delete m M k :
     kvsl_in_model_empty_coh m M →
@@ -487,7 +568,58 @@ Section KVSL_valid.
       (update_kvsl m cache (T+1))
       (update_kvs M cache (T+1)) Mts (T+1).
   Proof.
-  Admitted.
+    move=>dom_cache [dom_m model_empty model_some local_some valid].
+    split.
+    - rewrite /kvsl_dom update_kvsl_dom. set_solver.
+    - move=>k/lookup_update_kvs_Some[[cache_k M_k]|[h][v][M_k][cache_k]abs];
+        last by (apply eq_sym, app_nil in abs; destruct abs).
+      apply lookup_update_kvsl_None.
+      split; first done.
+      by apply model_empty.
+    - move=>k h/lookup_update_kvs_Some[[cache_k M_k] neq|[h'][v][M_k][cache_k]->_].
+      + apply lookup_update_kvsl_Some.
+        left.
+        split; first done.
+        by apply model_some.
+      + apply lookup_update_kvsl_Some.
+        right.
+        move:h' M_k=>[|we h'] M_k.
+        * left.
+          exists v.
+          split; first done.
+          split; last done.
+          by apply model_empty.
+        * right.
+          exists $(reverse (we::h')), v.
+          split; first done.
+          split; first by apply model_some.
+          by rewrite reverse_snoc.
+    - move=>k h/lookup_update_kvsl_Some[[cache_k m_k]|[[v]|[h'][v]][cache_k][m_k]eq_h];
+        apply lookup_update_kvs_Some.
+      + left.
+        split; first done.
+        by apply local_some.
+      + right.
+        exists [], v.
+        split; first by apply (kvsl_in_local_empty m M Mts T k);
+            last (apply elem_of_dom_2 in cache_k; set_solver).
+        split; first done.
+        rewrite -(reverse_involutive (_ ++ _)).
+        f_equal.
+        apply (inj inject).
+        by rewrite eq_h.
+      + right.
+        apply (kvsl_in_local_some' m M Mts T) in m_k; last done.
+        destruct m_k as [h'' [eq M_k]].
+        exists (reverse h''), v.
+        split; first done.
+        split; first done.
+        rewrite -(reverse_involutive (_ ++ _)) reverse_snoc reverse_involutive.
+        f_equal.
+        apply (inj inject).
+        by rewrite eq_h eq.
+    - by apply kvs_valid_update.
+  Qed.
 
   (** Used for start *)
   Lemma kvsl_valid_next M S (m : gmap Key val) T :
