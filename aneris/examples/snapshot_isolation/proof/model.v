@@ -5,6 +5,7 @@ From aneris.examples.snapshot_isolation.specs Require Export
   user_params.
 From aneris.examples.snapshot_isolation.specs Require Export
   time events.
+Import gset_map.
 
 Section Whist_valid.
   Context `{!User_params}.
@@ -123,79 +124,44 @@ Section KVS_valid.
       kvs_ValidSnapshotTimesCuts : kvs_snapshots_cuts M S
     }.
 
-  Definition update_kvs0
+  Definition update_kvs
     (M : global_mem) (C : gmap Key SerializableVal) (T : nat) : global_mem :=
-      (map_imap
-        (λ k (p : whist * SerializableVal), let (h, v) := p in
-                Some (h ++
+      fn_to_gmap (dom M) (λ k,
+        let h := default [] (M !! k) in
+        match C !! k with
+          | Some v => (h ++
                       [{|
                         we_key := k;
                         we_val := v.(SV_val);
                         we_time := T
-                      |}])) (map_zip M C)).
-
-  Definition update_kvs M C T : global_mem :=
-      (update_kvs0 M C T) ∪ (gset_to_gmap [] (KVS_keys ∖ dom C)).
-
-  Lemma upd_disj M C T :
-    update_kvs0 M C T ##ₘ gset_to_gmap [] (KVS_keys ∖ dom C).
-  Proof.
-    apply map_disjoint_dom.
-    rewrite (dom_imap_L _ _ (dom (map_zip M C))).
-    { rewrite dom_map_zip_with dom_gset_to_gmap. set_solver. }
-    move=>k.
-    split.
-    - rewrite dom_map_zip_with=>/elem_of_intersection[]/elem_of_dom[h M_k]
-        /elem_of_dom[v C_k].
-      exists (h, v).
-      split; last done.
-      by apply map_lookup_zip_Some.
-    - move=>[[h v]][]/map_lookup_zip_Some/=[M_k C_k] _.
-      apply elem_of_dom.
-      exists (h, v).
-      by apply map_lookup_zip_Some.
-  Qed.
+                      |}])
+          | None => h
+        end).
 
   Lemma lookup_update_kvs_Some M C T k h :
-    update_kvs M C T !! k = Some h →
-    h = [] ∨ (∃ h0 v, M !! k = Some h0 ∧ C !! k = Some v ∧
-      h = h0 ++ [{|
+    update_kvs M C T !! k = Some h ↔
+    (C !! k = None ∧ M !! k = Some h) ∨ (
+      ∃ h' v, M !! k = Some h' ∧ C !! k = Some v ∧
+      h = h' ++ [{|
                   we_key := k;
                   we_val := v.(SV_val);
                   we_time := T
                 |}]).
   Proof.
-    move=>/(lookup_union_Some _ _ _ _ (upd_disj M C T))[].
-    - rewrite map_lookup_imap=>/bind_Some[[h' v]][]/map_lookup_zip_with_Some[h''][v']
-        [[<-<-]][M_k cache_k][<-].
-      right.
-      by exists h', v.
-    - rewrite lookup_gset_to_gmap_Some=>[][_ <-].
-      by left.
+    split.
+    + move=>/lookup_fn_to_gmap[]/[swap]/elem_of_dom[h'->]/=.
+      case C_k : (C !! k)=>[v|]<-.
+      - right.
+        by exists h', v.
+      - by left.
+    + by move=>[[C_k M_k]|[h'][v][M_k][C_k]->]; apply lookup_fn_to_gmap; rewrite C_k M_k/=;
+        (split; last apply elem_of_dom).
   Qed.
 
   Lemma upd_dom M C T :
-    kvs_dom M →
-    dom C ⊆ KVS_keys →
-    dom (update_kvs M C T) = KVS_keys.
+    dom (update_kvs M C T) = dom M.
   Proof.
-    move=>dom_M dom_C.
-    rewrite /update_kvs dom_union_L dom_gset_to_gmap/update_kvs0
-      (dom_imap_L _ _ (dom (map_zip M C))).
-    - rewrite dom_map_zip_with_L -dom_M.
-      replace (KVS_keys ∩ _) with (dom C ∩ KVS_keys) by set_solver.
-      by rewrite subseteq_intersection_1_L// -union_difference_L.
-    - move=>k.
-    split.
-    + rewrite dom_map_zip_with=>/elem_of_intersection[]/elem_of_dom[h M_k]
-        /elem_of_dom[v C_k].
-      exists (h, v).
-      split; last done.
-      by apply map_lookup_zip_Some.
-    + move=>[[h v]][]/map_lookup_zip_Some/=[M_k C_k] _.
-      apply elem_of_dom.
-      exists (h, v).
-      by apply map_lookup_zip_Some.
+    by rewrite fn_to_gmap_dom.
   Qed.
 
   Lemma upd_serializable
@@ -211,17 +177,13 @@ Section KVS_valid.
         Forall (λ we : events.write_event,
               KVS_Serializable (we_val we)) l) (update_kvs M cache T).
   Proof.
-    move=>M_ser k h.
-    rewrite /update_kvs=>/lookup_union_Some[]; first apply upd_disj.
-    - rewrite map_lookup_imap=>/bind_Some[[h' v]][]/map_lookup_zip_Some/=[M_k C_k][<-].
-      apply Forall_app.
-      split; first apply (M_ser _ _ M_k).
-      apply Forall_singleton, _.
-    - by move=>/lookup_gset_to_gmap_Some[_ <-].
+    move=>M_ser k h/lookup_update_kvs_Some[[cache_k M_k]|[h'][v][M_k][cache_k]->];
+    specialize (M_ser _ _ M_k); first done.
+    apply Forall_app.
+    split; first done.
+    apply Forall_singleton, _.
   Qed.
 
-
-  
   (** The initial state of the system is valid. *)
   Lemma valid_init_state :
     kvs_valid (gset_to_gmap [] KVS_keys) ∅ 0.
@@ -338,9 +300,9 @@ Section KVS_valid.
     move=> dom_incl [dom_eq whists_valid keys_valid commit_times time_valid
         snapshots_incl cuts].
     split.
-    - by rewrite /kvs_dom upd_dom.
-    - move=>k h/lookup_update_kvs_Some[->|[h'][v][M_k][cache_k ->]];
-        first apply whist_valid_empty.
+    - by rewrite /kvs_dom upd_dom -dom_eq.
+    - move=>k h/lookup_update_kvs_Some[[cache_k /whists_valid]|[h'][v][M_k][cache_k]->];
+        first done.
       destruct (whists_valid _ _ M_k) as (keys, times, vals, ext).
       split.
       + by move=>we/elem_of_app[/(keys_valid _ _ M_k) ->|/elem_of_list_singleton->/=];
@@ -349,10 +311,48 @@ Section KVS_valid.
           last by rewrite (lookup_ge_None_2 _ j); [|rewrite app_length -eqi/=; lia].
         move=>/lookup_snoc_Some[[_ h'_j]|[_ <-/=]];
           first by apply (times _ _ i j).
-        apply elem_of_list_lookup_2 in h'_i.
-        specialize (commit_times k h' M_k ei h'_i).
+        move: (commit_times k h' M_k ei (elem_of_list_lookup_2 _ _ _ h'_i)).
         lia.
-  Admitted.
+      + by move=>we/elem_of_app[/vals|/elem_of_list_singleton->]; last apply _.
+      + move=>we we'/elem_of_app[we_h'|/elem_of_list_singleton->]/elem_of_app
+          [we'_h'|/elem_of_list_singleton->]; [by apply ext|simpl..|done].
+        move: (commit_times _ _ M_k _ we_h'). lia.
+        move: (commit_times _ _ M_k _ we'_h'). lia.
+    - move=>k h/lookup_update_kvs_Some[[cache_k M_k]|[h'][v][M_k][cache_k]->] we;
+        first by apply keys_valid.
+      by move=>/elem_of_app[/(keys_valid _ _ M_k)|/elem_of_list_singleton->].
+    - move=>k h/lookup_update_kvs_Some[[cache_k M_k]|
+          [h'][v][M_k][cache_k]->] we; first (move=>/(commit_times _ _ M_k); lia).
+      move=>/elem_of_app[/(commit_times _ _ M_k)|/elem_of_list_singleton->/=]; lia.
+    - move=>t/time_valid. lia.
+    - move=>t Mt S_t.
+      move: (snapshots_incl _ _ S_t)=>[Mt_M incl].
+      split; first by rewrite upd_dom ?Mt_M -dom_eq.
+      move=>k h1 Mt_k.
+      move: (incl k h1 Mt_k)=>{incl} [h2][M_k h1_h2].
+      set o := cache !! k.
+      case cache_k : o=>[v|]; rewrite/o in cache_k=>{o}.
+      + exists (h2 ++ [{|we_key := k; we_val := v;
+              we_time := ((T+1)%nat : int_time.(Time))|}]).
+        split; last by apply prefix_app_r.
+        apply lookup_update_kvs_Some.
+        right.
+        by exists h2, v.
+      + exists h2.
+        split; last done.
+        apply lookup_update_kvs_Some.
+        by left.
+    - move=>t k h_snap h_curr Mt S_t Mt_k/lookup_update_kvs_Some[[cache_k M_k]|
+          [h'][v][M_k][cache_k]->];
+      move:(cuts _ _ _ _ _ S_t Mt_k M_k)=>[h_after][->][before_t after_t].
+      + by exists h_after.
+      + exists (h_after ++ [{|we_key := k; we_val := v;
+              we_time := ((T+1)%nat : int_time.(Time))|}]).
+        split; first by rewrite app_assoc.
+        split; first done.
+        move=>we /elem_of_app[/after_t|/elem_of_list_singleton->/=]; first done.
+        generalize (elem_of_dom_2 _ _ _ S_t)=>/time_valid. lia.
+  Qed.
 
   (** Strong Weakening lemma. *)
   Lemma kvs_valid_global_mem_prefix M Mts T t Mt Msub:
@@ -451,7 +451,7 @@ Section KVSL_valid.
     by move: emp_k abs=>[_ <-].
   Qed.
 
-  Definition update_kvsl
+ Definition update_kvsl
     (m0 : gmap Key val)
     (C : gmap Key SerializableVal)
     (T : nat) : gmap Key val :=
