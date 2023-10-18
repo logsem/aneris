@@ -157,22 +157,26 @@ Section aux_trace.
 
   Definition role_enabled ρ (δ: LiveState G M LSI) := ρ ∈ M.(live_roles) δ.
 
-  Definition fair_aux ρ (auxtr: auxtrace ): Prop  :=
-    forall n, pred_at auxtr n (λ δ _, role_enabled ρ δ) ->
-         ∃ m, pred_at auxtr (n+m) (λ δ _, ¬role_enabled ρ δ)
-              ∨ pred_at auxtr (n+m) (λ _ ℓ, ∃ tid, ℓ = Some (Take_step ρ tid)).
+  Definition lbl_with_role (ρ: fmrole M) (ℓ: lm_lbl LM) := 
+    ∃ tid, ℓ = Take_step ρ tid. 
 
-  Lemma fair_aux_after ρ auxtr n auxtr':
-    fair_aux ρ auxtr ->
-    after n auxtr = Some auxtr' ->
-    fair_aux ρ auxtr'.
-  Proof.
-    rewrite /fair_aux => Hfair Hafter m Hpa.
-    specialize (Hfair (n+m)).
-    rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair.
-    destruct (Hfair Hpa) as (p&Hp).
-    exists (p). by rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n), Hafter in Hp.
-  Qed.
+  (* Definition fair_aux ρ (auxtr: auxtrace ): Prop  := *)
+  (*   forall n, pred_at auxtr n (λ δ _, role_enabled ρ δ) -> *)
+  (*        ∃ m, pred_at auxtr (n+m) (λ δ _, ¬role_enabled ρ δ) *)
+  (*             ∨ pred_at auxtr (n+m) (λ _ ℓ, ∃ tid, ℓ = Some (Take_step ρ tid)). *)
+  Definition fair_aux := fair_by role_enabled lbl_with_role. 
+  
+  (* Lemma fair_aux_after ρ auxtr n auxtr': *)
+  (*   fair_aux ρ auxtr -> *)
+  (*   after n auxtr = Some auxtr' -> *)
+  (*   fair_aux ρ auxtr'. *)
+  (* Proof. *)
+  (*   rewrite /fair_aux => Hfair Hafter m Hpa. *)
+  (*   specialize (Hfair (n+m)). *)
+  (*   rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair. *)
+  (*   destruct (Hfair Hpa) as (p&Hp). *)
+  (*   exists (p). by rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n), Hafter in Hp. *)
+  (* Qed. *)
 
   CoInductive auxtrace_valid: auxtrace -> Prop :=
   | auxtrace_valid_singleton δ: auxtrace_valid ⟨δ⟩
@@ -851,11 +855,26 @@ Section upto_stutter_preserves_fairness_and_termination.
       - punfold Hupto'. by inversion Hupto'.
       - unfold role_enabled, role_enabled_model in *.
         rewrite HUs //. }
-    have Hfa' := (fair_aux_after ρ auxtr n' auxtr' Hfa Heq' 0).
+    (* have Hfa' := (fair_by_after ρ auxtr n' auxtr' Hfa Heq' 0). *)
+    have Hfa' := (fair_by_after _ _ ρ auxtr auxtr' n' Heq' Hfa 0).
+    
     have Hpredat: pred_at auxtr' 0 (λ δ _, role_enabled ρ δ).
     { rewrite /pred_at /=. destruct auxtr'; done. }
-    destruct (upto_stutter_fairness_0 ρ auxtr' mtr' Hupto' (Hfa' Hpredat)) as (m&Hres).
-    exists m. rewrite !(pred_at_sum _ n) Heq //.
+
+    specialize (Hfa' Hpredat). clear Hpredat.
+    destruct Hfa' as (m&Hres). simpl in Hres.
+    (* rewrite /fairness_sat.  *)
+    repeat setoid_rewrite pred_at_sum. rewrite !Heq. rewrite /role_match. 
+    setoid_rewrite pred_at_iff.
+    2: { intros. apply Morphisms_Prop.or_iff_morphism; [reflexivity| ].
+         Unshelve. 2: exact (ol = Some (Some ρ)).
+         split; [intros (?&->&->)| intros ->]; eauto. }
+    setoid_rewrite pred_at_or. 
+    eapply upto_stutter_fairness_0; eauto.
+    eexists. rewrite -pred_at_or.
+    eapply pred_at_iff; eauto. intros.
+    apply Morphisms_Prop.or_iff_morphism; [done| ].
+    rewrite /lbl_with_role. split; [intros (?&->)| intros (?&->&(?&->))]; eauto. 
   Qed.
 
   Lemma upto_stutter_finiteness auxtr (mtr: mtrace M):

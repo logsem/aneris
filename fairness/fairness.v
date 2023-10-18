@@ -33,29 +33,32 @@ Record FairModel : Type := {
 (* Definition of fairness for both kinds of traces *)
 
 Section GeneralizedFairness.
-  Context {S L: Type}.
-  Context (locale_prop: L -> S -> Prop). 
+  Context {S L T: Type}.
+  Context (locale_prop: T -> S -> Prop).
+  Context (does_step: T -> L -> Prop).
 
-  Definition fair_by (ζ: L) (otr: trace S (option L)): Prop :=
-    forall n, pred_at otr n (λ c _, locale_prop ζ c) ->
-         ∃ m, pred_at otr (n+m) (λ c _, ¬ locale_prop ζ c)
-              ∨ pred_at otr (n+m) (λ _ otid, otid = Some (Some ζ)).
+  Definition fairness_sat (t: T) (s: S) (ol: option L) :=
+    ¬ locale_prop t s \/ exists ℓ, ol = Some ℓ /\ does_step t ℓ. 
 
-  Lemma fair_by_after ζ tr tr' k:
+  Definition fair_by (t: T) (otr: trace S L): Prop :=
+    forall n, pred_at otr n (λ c _, locale_prop t c) ->
+         exists m, pred_at otr (n + m) (fairness_sat t). 
+
+  Lemma fair_by_after t tr tr' k:
     after k tr = Some tr' ->
-    fair_by ζ tr -> fair_by ζ tr'.
+    fair_by t tr -> fair_by t tr'.
   Proof.
     intros Haf Hf n Hp.
     have Hh:= Hf (k+n).
-    have Hp': pred_at tr (k + n) (λ (c : S) (_ : option $ option L), locale_prop ζ c).
+    have Hp': pred_at tr (k + n) (λ (c : S) (_ : option L), locale_prop t c).
     { rewrite (pred_at_sum _ k) Haf /= //. }
     have [m Hm] := Hh Hp'. exists m.
-    by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
+    red. by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
   Qed.
 
-  Lemma fair_by_cons (tid: L) (c: S) (tid' : option L) (r : trace S (option L)):
-      fair_by tid (c -[ tid' ]-> r) → fair_by tid r.
-  Proof. intros H. by eapply (fair_by_after tid (c -[tid']-> r) r 1). Qed.
+  Lemma fair_by_cons (t: T) (c: S) (tid' : L) (r : trace S L):
+      fair_by t (c -[ tid' ]-> r) → fair_by t r.
+  Proof. intros H. by eapply (fair_by_after t (c -[tid']-> r) r 1). Qed.
 
   (* Lemma fair_model_trace_cons_forall δ ℓ' r: *)
   Lemma fair_by_cons_forall δ ℓ' r:
@@ -75,8 +78,11 @@ Section exec_trace.
   Definition locale_enabled (ζ : locale Λ) (c: cfg Λ) :=
     ∃ e, from_locale c.1 ζ = Some e ∧ to_val e = None.
 
+  Definition tid_match (ζ : locale Λ) (oζ': olocale Λ) :=
+    oζ' = Some ζ. 
+
   Definition fair_ex ζ (extr: extrace Λ): Prop :=
-    fair_by locale_enabled ζ extr. 
+    fair_by locale_enabled tid_match ζ extr. 
 
   CoInductive extrace_valid: extrace Λ -> Prop :=
   | extrace_valid_singleton c: extrace_valid ⟨c⟩
@@ -170,8 +176,11 @@ Section model_traces.
 
   Definition role_enabled_model ρ (s: M) := ρ ∈ M.(live_roles) s.
 
+  Definition role_match (ρ : fmrole M) (oρ': option $ fmrole M) :=
+    oρ' = Some ρ. 
+
   Definition fair_model_trace ρ (mtr: mtrace M): Prop  :=
-    fair_by role_enabled_model ρ mtr. 
+    fair_by role_enabled_model role_match ρ mtr. 
 
   Definition mtrace_valid := trace_valid (fmtrans M). 
 

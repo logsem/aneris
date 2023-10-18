@@ -394,25 +394,25 @@ End Subtrace.
 Section ModelSubtrace.
   Context {St L: Type}. 
 
-  Lemma fair_by_subtrace
-    (tr str: trace St (option L)) k P
+  Lemma fair_by_subtrace {T: Type}
+    (tr str: trace St (option L)) k (locale_prop: T -> St -> Prop) done_step
     (SUB: subtrace tr k NOinfinity = Some str)
-    (FAIR: ∀ ρ, fair_by P ρ tr):
-    ∀ ρ, fair_by P ρ str.
+    (FAIR: ∀ ρ, fair_by locale_prop done_step ρ tr):
+    ∀ ρ, fair_by locale_prop done_step ρ str.
   Proof. 
     intros.
     pose proof (trace_has_len tr) as [len LEN]. 
     forward eapply subtrace_inv as [_ BOUND]; eauto.
     apply LEN in BOUND as [atr AFTER]. 
-    eapply (fair_by_after P ρ tr atr) in FAIR; eauto.
+    (* eapply (fair_by_after P ρ tr atr) in FAIR; eauto. *)
+    eapply fair_by_after in FAIR; [| apply AFTER]. 
     red. intros.
     apply pred_at_trace_lookup' in H as (s & step & NTH & Ps).
     red in FAIR. specialize (FAIR n). specialize_full FAIR.
     { apply pred_at_trace_lookup'.
       erewrite <- inf_subtrace_after_lookup; eauto. }
     destruct FAIR as [m FAIR]. exists m.
-    apply pred_at_or. apply pred_at_trace_lookup'. 
-    apply pred_at_or in FAIR.
+    apply pred_at_trace_lookup'. 
     apply pred_at_trace_lookup' in FAIR as (s'&step'&MNth&PROP).
     erewrite inf_subtrace_after_lookup; eauto.
   Qed.

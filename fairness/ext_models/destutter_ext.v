@@ -352,16 +352,6 @@ Section upto_stutter_preserves_fairness_and_termination.
     - intros. destruct H; [| done]. eauto.
   Qed.
 
-  (* TODO: move *)
-  Lemma pred_at_iff {St L : Type} (P Q: St -> option L -> Prop)
-    (IFF: forall s ol, P s ol <-> Q s ol):
-      forall tr i, pred_at tr i P <-> pred_at tr i Q.
-  Proof.
-    intros. rewrite /pred_at.
-    destruct after; intuition; destruct t.
-    all: by apply IFF.
-  Qed.
-    
   Lemma upto_stutter_fairness (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM)):
     upto_stutter_eauxtr proj_ext eauxtr emtr ->
     (∀ ρ, fair_eaux ρ eauxtr) ->
@@ -399,10 +389,13 @@ Section upto_stutter_preserves_fairness_and_termination.
     { rewrite /pred_at /=. destruct auxtr'; done. }
     destruct (upto_stutter_fairness_0 ρ auxtr' emtr' Hupto' (Hfa' Hpredat)) as (m&Hres).
     exists m. rewrite !(pred_at_sum _ n) Heq //.
-    rewrite -pred_at_or. rewrite -pred_at_or in Hres.
+    rewrite /fairness_sat. 
+    rewrite -pred_at_or in Hres.
     eapply pred_at_iff; [| apply Hres].
-    intros. simpl. apply or_iff_compat_r. apply not_iff_compat.
-    rewrite {1}/role_enabled_model. simpl. set_solver. 
+    intros. simpl. apply Morphisms_Prop.or_iff_morphism.
+    - apply not_iff_compat. rewrite {1}/role_enabled_model. simpl. set_solver.
+    - split; [intros (?&->&[=->])| intros ->]; subst; eauto.
+      exists (Some (inl ρ)). split; done. 
   Qed.
 
   Lemma upto_stutter_finiteness eauxtr (emtr: emtrace (EM := EM)):

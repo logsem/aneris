@@ -107,7 +107,10 @@ Proof.
   { intros. unfold pred_at in POINT. simpl in POINT. destruct POINT as [Nρ | EQ]. 
     { by destruct Nρ. }
     punfold Hval. inversion Hval; subst. rename H2 into STEP, H4 into VALID'. 
-    inversion EQ. subst ℓ. clear EQ.
+    inversion EQ.
+    destruct H0 as [[=->] [=->]]. 
+    (* subst ℓ. *)
+    (* clear EQ. *)
     apply terminating_trace_cons.
     eapply IH.
     2: { apply PreOrder_Reflexive. }

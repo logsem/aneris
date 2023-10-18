@@ -50,6 +50,15 @@ Proof.
   destruct t; eauto.
 Qed.
 
+Lemma pred_at_iff {St L : Type} (P Q: St -> option L -> Prop)
+  (IFF: forall s ol, P s ol <-> Q s ol):
+  forall tr i, pred_at tr i P <-> pred_at tr i Q.
+Proof.
+  intros. rewrite /pred_at.
+  destruct after; intuition; destruct t.
+  all: by apply IFF.
+Qed.
+
 
 Lemma traces_match_flip {S1 S2 L1 L2}
       (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)

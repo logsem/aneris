@@ -25,46 +25,50 @@ Section fairness_preserved.
 
   (* TODO: fix names below *)
   
-  Definition group_step_or_dis
-    (τ: G) (δ: LiveState G M LSI) (oℓ: option (lm_lbl LM)) :=
-    (forall ρ, ¬ ls_mapping δ !! ρ = Some τ) \/ (∃ ℓ, oℓ = Some ℓ /\ lm_lbl_matches_group ℓ τ).
+  (* Definition group_step_or_dis *)
+  (*   (τ: G) (δ: LiveState G M LSI) (oℓ: option (lm_lbl LM)) := *)
+  (*   (forall ρ, ¬ ls_mapping δ !! ρ = Some τ) \/ (∃ ℓ, oℓ = Some ℓ /\ lm_lbl_matches_group ℓ τ). *)
+  Definition group_step_or_dis (τ: G) (δ: LiveState G M LSI) (oℓ: option (lm_lbl LM)) :=
+    fairness_sat (λ τ δ, exists ρ, ls_mapping δ !! ρ = Some τ) (flip lm_lbl_matches_group) τ δ oℓ.
 
-  Definition fair_by_group auxtr τ n :=
-    pred_at auxtr n (λ δ _, exists ρ, ls_mapping δ !! ρ = Some τ) ->
-    ∃ m, pred_at auxtr (n + m)
-      (λ (δ : lm_ls LM) (ℓ : option (lm_lbl LM)), group_step_or_dis τ δ ℓ).
-
-  Definition steps_or_unassigned 
-    (ρ: fmrole M) (δ: LiveState G M LSI) (ℓ: option (lm_lbl LM)) :=
-    (∀ τ, ls_mapping δ !! ρ ≠ Some τ) \/ (∃ τ, ℓ = Some $ Take_step ρ τ).
+  Definition fair_by_group: G -> auxtrace (LM := LM) -> Prop := 
+    fair_by (λ τ δ, exists ρ, ls_mapping δ !! ρ = Some τ)
+      (flip lm_lbl_matches_group). 
+  
+  (* Definition steps_or_unassigned *)
+  (*   (ρ: fmrole M) (δ: LiveState G M LSI) (ℓ: option (lm_lbl LM)) := *)
+  (*   (∀ τ, ls_mapping δ !! ρ ≠ Some τ) \/ (∃ τ, ℓ = Some $ Take_step ρ τ). *)
+  Definition steps_or_unassigned
+    (ρ: fmrole M) (δ: LiveState G M LSI) (oℓ: option (lm_lbl LM)) :=
+    fairness_sat (λ ρ δ, ρ ∈ dom (ls_mapping δ))
+      (fun ρ ℓ => exists τ, ℓ = Take_step ρ τ) ρ δ oℓ.
     
-  Definition fair_aux_SoU auxtr ρ n := 
-    pred_at auxtr n (λ δ _, ρ ∈ dom (ls_mapping δ)) ->
-    ∃ m, pred_at auxtr (n + m)
-      (λ (δ : lm_ls LM) (ℓ : option (lm_lbl LM)), steps_or_unassigned ρ δ ℓ). 
+  Definition fair_aux_SoU: fmrole M -> auxtrace (LM := LM) -> Prop := 
+    fair_by (λ ρ δ, ρ ∈ dom (ls_mapping δ))
+      (fun ρ ℓ => exists τ, ℓ = Take_step ρ τ). 
 
-  (* TODO: ? try to unify with fair_aux_after *)
-  (* TODO: add ∀ in fair_aux_SoU definition  *)
-  Lemma fair_aux_SoU_after ρ (auxtr: auxtrace (LM := LM))
-    n auxtr':
-    (forall k, fair_aux_SoU auxtr ρ k) ->
-    after n auxtr = Some auxtr' ->
-    (forall k, fair_aux_SoU auxtr' ρ k).
-  Proof.
-    rewrite /fair_aux_SoU => Hfair Hafter m Hpa.
-    specialize (Hfair (n+m)).
-    rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair.
-    destruct (Hfair Hpa) as (p&Hp).
-    exists (p).
-    rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n) in Hp.
-    by rewrite Hafter in Hp. 
-  Qed.
+  (* (* TODO: ? try to unify with fair_aux_after *) *)
+  (* (* TODO: add ∀ in fair_aux_SoU definition  *) *)
+  (* Lemma fair_aux_SoU_after ρ (auxtr: auxtrace (LM := LM)) *)
+  (*   n auxtr': *)
+  (*   (forall k, fair_aux_SoU auxtr ρ k) -> *)
+  (*   after n auxtr = Some auxtr' -> *)
+  (*   (forall k, fair_aux_SoU auxtr' ρ k). *)
+  (* Proof. *)
+  (*   rewrite /fair_aux_SoU => Hfair Hafter m Hpa. *)
+  (*   specialize (Hfair (n+m)). *)
+  (*   rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair. *)
+  (*   destruct (Hfair Hpa) as (p&Hp). *)
+  (*   exists (p). *)
+  (*   rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n) in Hp. *)
+  (*   by rewrite Hafter in Hp.  *)
+  (* Qed. *)
 
   Definition fairness_induction_stmt ρ fm f m τ (* extr *) (auxtr : auxtrace (LM := LM)) δ
     :=
       (
         infinite_trace auxtr ->
-          (forall τ n, fair_by_group auxtr τ n) ->
+          (forall τ, fair_by_group τ auxtr) ->
        fm = (f, m) ->
        δ = trfirst auxtr ->
        δ.(ls_fuel) !! ρ = Some f ->
@@ -83,7 +87,7 @@ Section fairness_preserved.
     auxtrace_valid auxtr' ->
     infinite_trace auxtr' ->
     ls_fuel δ !! ρ = Some f ->
-    (forall τ n, fair_by_group auxtr' τ n) ->
+    (forall τ, fair_by_group τ auxtr' ) ->
     ∃ M0 : nat, pred_at (δ -[ ℓ ]-> auxtr') M0 (fun δ ℓ => steps_or_unassigned ρ δ ℓ).
   Proof.
       intros IH Hdec (* Hmatch *) Hvalid Hinf Hsome Hfair.
@@ -95,21 +99,21 @@ Section fairness_preserved.
         destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
         { exists 1. apply pred_at_S.
           rewrite /steps_or_unassigned. apply pred_at_or. left.
-          eapply pred_at_state_trfirst. eauto. }
+          eapply pred_at_state_trfirst. intros ?%elem_of_dom. eauto. }
         destruct MAP as [τ' Hτ']. 
         pose proof (Hfair τ' 0) as [p Hp]. 
         { rewrite pred_at_state_trfirst. eauto. } 
 
         have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (steps_or_unassigned ρ).
-        { eapply (IH _ _ _ p _); eauto.
+        { red in Hp. simpl in Hp. 
+          eapply (IH _ _ _ p _); eauto.
           Unshelve. unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)).
           lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
       - exists 1. apply pred_at_S.
         rewrite /steps_or_unassigned. apply pred_at_or. left.
         apply pred_at_state_trfirst.
-        rewrite -ls_same_doms in Hdec.
-        intros ??. apply Hdec, elem_of_dom. eauto. 
+        by rewrite -ls_same_doms in Hdec.
   Qed.
   
   Local Ltac SS' := eapply elem_of_dom; eauto. 
@@ -196,29 +200,6 @@ Section fairness_preserved.
     intros. destruct ℓ; simpl; solve_decision.
   Qed.
   
-  (* TODO: get rid of it *)      
-  Lemma fair_by_group_after tr atr n
-    (AFTER: after n tr = Some atr)
-    (FG: ∀ τ n, fair_by_group tr τ n):
-    ∀ τ n, fair_by_group atr τ n.
-  Proof. 
-    intros. red. intros.
-    specialize (FG τ (n + n0)) as [k FAIR].
-    { eapply pred_at_sum; eauto. by rewrite AFTER. }
-    exists k.
-    rewrite -Nat.add_assoc Nat.add_comm in FAIR.
-    by rewrite pred_at_sum' AFTER in FAIR.
-  Qed. 
-  
-  (* TODO: get rid of it *)      
-  Lemma fair_by_group_cons δ ℓ tr
-    (FG: ∀ τ n, fair_by_group (δ -[ℓ]-> tr) τ n):
-    ∀ τ n, fair_by_group tr τ n.
-  Proof. 
-    intros.
-    eapply fair_by_group_after with (n := 1); eauto. done. 
-  Qed. 
-
   Lemma fairness_preserved_ind ρ:
     ∀ fm f m τ (auxtr: auxtrace (LM := LM)) δ,
       auxtrace_valid auxtr -> 
@@ -228,8 +209,8 @@ Section fairness_preserved.
     intros f m τ auxtr δ VALID Hexinfin Hfair -> Htm Hfuel Hmapping Hexen.
     destruct auxtr as [|δ_ ℓ auxtr'] eqn:Heq.
     { have [??] := Hexinfin 1. done. }
-    have Hfair': (forall τ n, fair_by_group auxtr' τ n). 
-    { eapply fair_by_group_cons; eauto. }
+    have Hfair': (forall τ, fair_by_group τ auxtr'). 
+    { intros. eapply fair_by_cons; eauto. apply Hfair. }
     simpl in *. subst δ_. 
     destruct (decide (lm_lbl_matches_group ℓ τ)) as [Hζ|Hζ].
     - destruct ℓ; simpl in Hζ; try done; subst g; last first.       
@@ -265,7 +246,8 @@ Section fairness_preserved.
     - (* Another thread is taking a step. *)
       destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
       { exists 1. apply pred_at_or. left.
-        eapply pred_at_state_trfirst; eauto. }
+        eapply pred_at_state_trfirst; eauto.
+        by intros ?%elem_of_dom. }
       destruct m as [| m'].
       { rewrite -> !pred_at_0 in Hexen.
         red in Hexen. destruct Hexen as [Hexen|Hexen].
@@ -302,12 +284,11 @@ Section fairness_preserved.
     (auxtr: auxtrace (LM := LM)):
     infinite_trace auxtr ->
     auxtrace_valid auxtr ->
-    (forall τ n, fair_by_group auxtr τ n) ->
-    forall ρ n, fair_aux_SoU auxtr ρ n.
+    (forall τ, fair_by_group τ auxtr) ->
+    forall ρ, fair_aux_SoU ρ auxtr.
   Proof.
-    intros Hinfin Hmatch Hex ρ n.
-    red.
-    intros DOMn.
+    intros Hinfin Hmatch Hex ρ.
+    red. intros n DOMn.
     unfold pred_at in DOMn.
     destruct (after n auxtr) as [tr|] eqn:Heq; rewrite Heq in DOMn.
     2: { done. } 
@@ -320,7 +301,6 @@ Section fairness_preserved.
     { apply elem_of_dom. rewrite -ls_same_doms. eapply elem_of_dom; eauto. }
     have Hex' := Hex τ n.
 
-    red in Hex'. 
     setoid_rewrite pred_at_sum in Hex'.
     destruct Hex' as [m Hm].
     { red. rewrite Heq. destruct tr; eauto. }
@@ -330,26 +310,25 @@ Section fairness_preserved.
     { have Hinf := infinite_trace_after n auxtr Hinfin. by rewrite Heq in Hinf. }
     eapply (fairness_preserved_ind ρ _ f m τ _); eauto.
     - eapply auxtrace_valid_after; eauto. 
-    - eapply fair_by_group_after; eauto. 
+    - intros. eapply fair_by_after; eauto. apply Hex. 
   Qed.
 
   Lemma steps_or_unassigned_implies_aux_fairness (auxtr: auxtrace (LM := LM)):
-    (forall ρ n, fair_aux_SoU auxtr ρ n) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
+    (forall ρ, fair_aux_SoU ρ auxtr) -> (forall ρ, fair_aux ρ auxtr (LM := LM)).
   Proof.
     intros FAIR ρ n Hn.
     eapply pred_at_impl in Hn.
     2: { intros ? ? EN%mapping_live_role%elem_of_dom. apply EN. }
     specialize (FAIR _ _ Hn). destruct FAIR as (m & STEP).
-    exists m.
-    apply pred_at_or in STEP. destruct STEP; eauto. left.
-    eapply pred_at_impl; eauto. intros. simpl in *.
-    intros [??]%mapping_live_role. congruence.
+    exists m. eapply pred_at_impl; [| apply STEP].
+    rewrite /fairness_sat. intros. destruct H; eauto.
+    left. intros [??]%mapping_live_role. destruct H. by apply elem_of_dom.  
   Qed.
 
   Lemma group_fairness_implies_role_fairness (auxtr: auxtrace (LM := LM)):
     infinite_trace auxtr ->
     auxtrace_valid auxtr ->
-    (forall τ n, fair_by_group auxtr τ n) ->
+    (forall τ, fair_by_group τ auxtr) ->
     (forall ρ, fair_aux ρ auxtr (LM := LM)).
   Proof. 
     intros. auto using steps_or_unassigned_implies_aux_fairness, 
@@ -418,29 +397,35 @@ Section fairness_preserved.
         destruct after; intuition; destruct t.
         all: by apply IMPL.
       Qed.
+
+      Let lbl_match (ℓ: Lo) oℓ' := oℓ' = Some ℓ. 
     
       Theorem fairness_preserved (extr: out_trace) (auxtr: auxtrace (LM := LM)):
         infinite_trace extr ->
         lm_exaux_traces_match_gen extr auxtr ->
-        (forall ζ, fair_by locale_prop ζ extr) -> (forall τ n, fair_by_group auxtr τ n).
+        (forall ζ, fair_by locale_prop lbl_match ζ extr) -> (forall τ, fair_by_group τ auxtr).
       Proof.
         intros INF MATCH FAIR_OUT.
-        intros. red. intros ASG.
-        pose proof ASG as (δ & NTH & [ρ MAP])%pred_at_trace_lookup.        
+        intros. do 2 red. intros n ASG.
+        pose proof ASG as (δ & NTH & [ρ MAP])%pred_at_trace_lookup.
+        
         edestruct @traces_match_state_lookup_2 as (c & ENTH & RELn); eauto.
         
         red in FAIR_OUT. edestruct FAIR_OUT as [m STEP].
         { eapply pred_at_trace_lookup; eauto. }
         apply pred_at_or in STEP.
 
+        apply pred_at_or in STEP. 
         apply pred_at_trace_lookup in STEP as (c' & ENTH' & STEP).
         edestruct @traces_match_state_lookup_1 as (δ' & NTH' & RELn'); eauto. 
         exists m. apply pred_at_trace_lookup. eexists. split; eauto.
         red. destruct STEP as [EMP | STEP]. 
-        - eauto.
+        - left. intros [??]. apply EMP. eapply match_locale_prop_states; eauto.  
         - right.
+          destruct STEP as (?&?&LBLM). 
           edestruct @traces_match_label_lookup_1 as (ℓ & NTH'l & LBL); eauto.
-          eexists. split; eauto. simpl in LBL.
+          eexists. split; eauto. red in LBL.
+          red in LBLM. subst. 
           destruct LBL as [? [->%INJlg ?]]. done. 
       Qed.      
       

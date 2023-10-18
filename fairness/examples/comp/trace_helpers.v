@@ -50,10 +50,14 @@ Section FMTraceHelpers.
   Lemma fair_model_trace_defs_equiv (tr: mtrace M) (ρ: fmrole M):
     fair_model_trace ρ tr <-> strong_fair_model_trace tr ρ.
   Proof using. 
+
     split.
     2: { intros FAIR. do 2 red. intros.
          red in FAIR. specialize (FAIR n H) as [m [FAIR MIN]].
-         exists m. by apply pred_at_or. }
+         exists m. eapply pred_at_iff; [| apply FAIR]. 
+         intros. rewrite /role_match.
+         apply Morphisms_Prop.or_iff_morphism; [done| ].
+         split; [intros (?&->&->)|intros ->]; eauto. }
 
     intros FAIR. red. intros.
     red in FAIR.
@@ -62,13 +66,21 @@ Section FMTraceHelpers.
     pattern x in H. eapply min_prop_dec in H as [d MIN].
     { clear x. exists d. 
       eapply Minimal_proper; eauto. 
-      red. intros. symmetry. apply pred_at_or. }
+      red. intros. symmetry. 
+      apply pred_at_iff.
+      intros. rewrite /role_match.
+      apply Morphisms_Prop.or_iff_morphism; [done| ].
+      split; [intros (?&->&->)|intros ->]; eauto. }
 
-    intros. eapply Decision_iff_impl. 
-    { symmetry. apply pred_at_or. }
+    intros.
     eapply pred_at_dec. intros.
     apply or_dec.
-    2: { solve_decision. }
+    2: { destruct ro; [destruct o| ]. 
+         - destruct (decide (f = ρ)).
+           + subst. left. eexists. split; eauto. done.
+           + right. by intros (?&[=<-]&[=]).
+         - right. by intros (?&[=<-]&[=]).
+         - right. by intros (?&[=<-]&[=]). }
     apply not_dec.
     rewrite /role_enabled_model. solve_decision.
   Qed. 

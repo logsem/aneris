@@ -74,8 +74,13 @@ Proof.
   revert mtr Hval Hleq Hfair Hlive IH Hev Htrdec. induction n as [| n IHn];
     intros mtr Hval Hleq Hfair Hlive IH Hev Htrdec.
   - simpl in *. rewrite /pred_at /= in Hev.
-    destruct Hev as [Hev|Hev]; first by destruct mtr; done.
-    destruct mtr; first done. injection Hev => ->.
+    destruct mtr.
+    { by exists 1. }
+    red in Hev. destruct Hev as [Hev|Hev]; first by destruct mtr; done.
+    destruct Hev as (? & [=<-] & Hev).
+    red in Hev. rewrite Hev. 
+    (* destruct mtr; first done. *)
+    (* injection Hev => ->. *)
     apply terminating_trace_cons.
     Local Ltac solve_fair Hfair := intros; eapply fair_by_cons; eauto; apply Hfair.
     eapply IH =>//; eauto.
@@ -86,6 +91,7 @@ Proof.
     + solve_fair Hfair. 
   - simpl in *. destruct mtr; first (exists 1; done).
     rewrite -> !pred_at_S in Hev.
+    red in Hev. 
     punfold Hval; inversion Hval as [|??? Htrans Hval']; simplify_eq.
     destruct Hval' as [Hval'|]; last done.
     destruct (decide (ℓ = Some (ftm_decreasing_role s))) as [-> | Hnoteq].
