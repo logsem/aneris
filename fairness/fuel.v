@@ -106,7 +106,7 @@ Section fairness.
       lm_ls_trans := ls_trans lm_fl;
     }.
   
-  Definition fair_model_model `(LM : LiveModel) : Model := {|
+  Definition live_model_model `(LM : LiveModel) : Model := {|
     mstate := lm_ls LM;
     mlabel := lm_lbl LM;
     mtrans := lm_ls_trans LM;
@@ -141,10 +141,10 @@ End fairness.
 
 Arguments LiveState : clear implicits.
 Arguments LiveModel : clear implicits.
-Arguments fair_model_model _ {_} _ _.
+Arguments live_model_model _ {_} _ _.
 
 Definition live_model_to_model : forall G M LSI, LiveModel G M LSI -> Model :=
-  λ G M LSI lm, fair_model_model G LSI lm.
+  λ G M LSI lm, live_model_model G LSI lm.
 Coercion live_model_to_model : LiveModel >-> Model.
 Arguments live_model_to_model {_ _}.
 
