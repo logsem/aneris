@@ -491,10 +491,10 @@ End TracesMatch.
 Section UptoStutter.
   Context {St S' L L' : Type}.
   Context {Us : St → S'}.
-  Context {Ul: L → option L'}.  
+  Context {Usls: St -> L -> St -> option L'}.
 
   Lemma upto_stutter_state_lookup' {btr : trace St L} {str : trace S' L'} (n : nat) bst:
-    upto_stutter Us Ul btr str
+    upto_stutter Us Usls btr str
     → btr S!! n = Some bst ->
       ∃ (n' : nat),
         str S!! n' = Some (Us bst).

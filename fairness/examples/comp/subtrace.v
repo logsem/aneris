@@ -460,12 +460,12 @@ End ModelSubtrace.
 Section UptoStutter.
   Context {St S' L L' : Type}.
   Context {Us : St → S'}.
-  Context {Ul: L → option L'}.  
+  Context {Usls: St -> L -> St → option L'}.  
 
   Lemma trace_prefix_inf_upto_stutter tr ltr ml
-    (UPTO: upto_stutter Us Ul ltr tr):
+    (UPTO: upto_stutter Us Usls ltr tr):
   ∃ (ml' : nat_omega),
-    upto_stutter Us Ul 
+    upto_stutter Us Usls 
       (trace_prefix_inf ltr ml')
       (trace_prefix_inf tr ml) /\
     trace_len_is (trace_prefix_inf ltr ml') ml'. 
@@ -490,9 +490,9 @@ Section UptoStutter.
   Admitted. 
 
   Lemma subtrace_upto_stutter ltr tr i ml tr'
-    (UPTO: upto_stutter Us Ul ltr tr)
+    (UPTO: upto_stutter Us Usls ltr tr)
     (SUB: subtrace tr i ml = Some tr'):
-    exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Ul ltr' tr' /\
+    exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Usls ltr' tr' /\
                    trace_len_is ltr' (NOmega.sub ml' (NOnum i')). 
   Proof.
     pose proof (trace_has_len tr) as [len LEN].

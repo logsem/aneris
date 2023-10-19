@@ -329,7 +329,7 @@ Theorem simulation_adequacy_model_trace Σ
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
   ∃ (auxtr : auxtrace (LM:=LM)) mtr, lm_exaux_traces_match extr auxtr ∧
-                               upto_stutter ls_under Ul auxtr mtr.
+                               upto_stutter ls_under Usls auxtr mtr.
 Proof.
   intros Hfb Hwp.
   destruct (simulation_adequacy_traces

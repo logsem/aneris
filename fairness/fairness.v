@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.fairness Require Export inftraces.
+From trillium.fairness Require Export inftraces trace_lookup.
 
 Record FairModel : Type := {
   fmstate:> Type;
@@ -18,6 +18,13 @@ Record FairModel : Type := {
   fm_live_spec: forall s ρ s', fmtrans s (Some ρ) s' -> ρ ∈ live_roles s;
 }.
 
+Definition fair_model_model `(FM : FairModel) : Model := {|
+    mstate := fmstate FM;
+    mlabel := option (fmrole FM);
+    mtrans := fmtrans FM;
+|}.
+
+
 #[global] Existing Instance fmrole_eqdec.
 #[global] Existing Instance fmrole_countable.
 #[global] Existing Instance fmrole_inhabited.
@@ -30,9 +37,50 @@ Record FairModel : Type := {
    place of which is fairness.
  *)
 
-(* Definition of fairness for both kinds of traces *)
-
+(* Definition of fairness for all kinds of traces *)
 Section GeneralizedFairness.
+  Context {S L T: Type}.
+  Context (locale_prop: T -> S -> Prop).
+  Context (does_step: T -> S -> option (L * S) -> Prop).
+
+  Definition fairness_sat_gen (t: T) (s: S) (step: option (L * S)) :=
+    ¬ locale_prop t s \/ does_step t s step. 
+
+  Definition fair_by_gen (t: T) (otr: trace S L): Prop :=
+    forall n, pred_at otr n (λ c _, locale_prop t c) ->
+         exists m s step, otr !! (n + m) = Some (s, step) /\ fairness_sat_gen t s step. 
+
+  Lemma fair_by_gen_after t tr tr' k:
+    after k tr = Some tr' ->
+    fair_by_gen t tr -> fair_by_gen t tr'.
+  Proof.
+    intros Haf Hf n Hp.
+    have Hh:= Hf (k+n).
+    have Hp': pred_at tr (k + n) (λ (c : S) (_ : option L), locale_prop t c).
+    { rewrite (pred_at_sum _ k) Haf /= //. }
+    have [m Hm] := Hh Hp'.
+    destruct Hm as (s & step & STEP & SAT). 
+    do 3 eexists. split; eauto.
+    erewrite trace_lookup_after; eauto.
+    rewrite Nat.add_assoc. eauto. 
+  Qed.
+
+  Lemma fair_by_gen_cons (t: T) (c: S) (tid' : L) (r : trace S L):
+      fair_by_gen t (c -[ tid' ]-> r) → fair_by_gen t r.
+  Proof. intros H. by eapply (fair_by_gen_after t (c -[tid']-> r) r 1). Qed.
+
+  (* Lemma fair_model_trace_cons_forall δ ℓ' r: *)
+  Lemma fair_by_gen_cons_forall δ ℓ' r:
+    (∀ ℓ, fair_by_gen ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_by_gen ℓ r).
+  Proof. eauto using fair_by_gen_cons. Qed.
+
+End GeneralizedFairness.
+
+
+Section LocaleFairness.
+  (* This is in fact a case of fair_by_gen with a simpler does_step relation,
+     but formalizing it would require some routine work to adjust all the proofs.
+     TODO: actually do it *)
   Context {S L T: Type}.
   Context (locale_prop: T -> S -> Prop).
   Context (does_step: T -> L -> Prop).
@@ -67,7 +115,7 @@ Section GeneralizedFairness.
 
   (* TODO: try to unify validity lemmas by generalizing over step relation *)
   
-End GeneralizedFairness.
+End LocaleFairness.
 
 Definition extrace Λ := trace (cfg Λ) (olocale Λ).
 

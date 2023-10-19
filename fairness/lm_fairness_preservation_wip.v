@@ -9,6 +9,20 @@ From trillium.fairness.examples.comp Require Export trace_lookup trace_len my_om
 
 From Paco Require Import paco1 paco2 pacotac.
 
+(* TODO: move, rename *)
+Lemma trace_lookup_after_weak {St L: Type} (tr: trace St L) s n:
+  (exists atr, after n tr = Some atr /\ trfirst atr = s) <-> exists ostep, tr !! n = Some (s, ostep). 
+Proof. 
+  rewrite /lookup /trace_lookup.
+  destruct after.
+  2: { by split; [intros (?&?&?)| intros (?&?)]. }
+  transitivity (trfirst t = s).
+  { split; eauto. by intros (?&[=->]&?). }
+  destruct t; simpl; eauto.
+  all: split; [intros ->| intros (?&[=])]; eauto.
+Qed.
+
+
 
 (* TODO: rename *)
 Section Foobar. 
@@ -25,25 +39,36 @@ Section Foobar.
       upto_stutter_auxtr atr_aux atr_m (LM := LM).
     
   Lemma upto_stutter_step_correspondence_alt auxtr (mtr: mtrace M)
-    (Po: LiveState G M LSI -> option (mlabel LM) -> Prop)
-    (Pi: M -> option (option (fmrole M)) -> Prop)
-    (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
-                                              | Some ℓ => Ul ℓ (LM := LM)
+    (Po: lm_ls LM -> option (mlabel LM * lm_ls LM) -> Prop)
+    (Pi: M -> option (option (fmrole M) * M) -> Prop)
+    (LIFT: forall δ ostep, Po δ ostep -> Pi (ls_under δ) (match ostep with 
+                                              | Some (ℓ, δ') => match (Usls δ ℓ δ') with | Some r => Some (r, ls_under δ') | None => None end
                                               | None => None
                                               end))
     (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
     :
     upto_stutter_auxtr auxtr mtr (LM := LM) ->
-    forall n, pred_at auxtr n Po ->
-    exists m, pred_at mtr m Pi /\ upto_stutter_auxtr_at auxtr mtr n m. 
+    forall n so stepo,
+      (* pred_at auxtr n Po -> *)
+      auxtr !! n = Some (so, stepo) ->
+      Po so stepo ->
+    exists m si stepi,
+      (* pred_at mtr m Pi /\ upto_stutter_auxtr_at auxtr mtr n m.  *)
+      mtr !! m = Some (si, stepi) /\ Pi si stepi /\
+      upto_stutter_auxtr_at auxtr mtr n m.       
   Proof.
-    intros UPTO n NTH.
-    forward eapply pred_at_after_is_Some as [atr AFTER]; eauto.
-    rewrite (plus_n_O n) pred_at_sum AFTER in NTH. 
-    forward eapply upto_stutter_step_correspondence as (m&?&AFTERm&Pm&?); eauto.
-    exists m. split.
-    - rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm.
-    - red. eauto.
+    intros UPTO n so stepo NTH Pon.
+    (* forward eapply pred_at_after_is_Some as [atr AFTER]; eauto. *)
+    forward eapply (proj2 (trace_lookup_after_weak auxtr so n)); [by eauto| ].
+    intros (atr&AFTER&A0). 
+    (* rewrite (plus_n_O n) pred_at_sum AFTER in NTH.  *)
+    forward eapply upto_stutter_step_correspondence as (m&amtr&s&stepi&AFTERm&Pm&?); eauto.
+    { erewrite trace_lookup_after; eauto. by rewrite Nat.add_0_r. }
+    do 3 eexists. repeat split.
+    - erewrite trace_lookup_after in Pm; [| apply AFTERm].
+      rewrite Nat.add_0_r in Pm. apply Pm. 
+    - apply H0.
+    - red. do 2 eexists. repeat split; [..| apply H0]; eauto. 
   Qed.    
 
 End Foobar. 
@@ -128,19 +153,32 @@ Section InnerLMTraceFairness.
     inversion STEP. subst. clear STEP. rename x into go. 
     
     forward eapply upto_stutter_step_correspondence_alt with 
-      (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go))
-      (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi).
-    { by intros ?? [-> ->]. }
-    { by intros ?[??]. }
+      (* (Po := fun δ oℓ => δ = δo_n /\ oℓ = Some (Take_step (lift_Gi gi) go)) *)
+      (* (Pi := fun st ooρ => st = ls_under δo_n /\ ooρ = Some $ Some $ lift_Gi gi) *)
+      (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Take_step (lift_Gi gi) go, δ'))
+      (Pi := fun st ostep => st = ls_under δo_n /\ exists st', ostep = Some (Some $ lift_Gi gi, st'))
+    .
+    (* { by intros ?? [-> ->]. } *)
+    (* { by intros ?[??]. } *)
+    (* { apply CORRo. } *)
+    (* { apply pred_at_trace_lookup'. eauto. }  *)
+    { simpl. intros. destruct H as [-> [? ->]]. split; auto.
+      simpl. eauto. }
+    { intros. by destruct H as [_ [??]]. }
     { apply CORRo. }
-    { apply pred_at_trace_lookup'. eauto. } 
-    intros (n_mo & STEPmo & UPTO').
+    { apply STLo. }    
+    { eauto. } 
+
+    intros (n_mo & ? & step_ & STEPmo & UPTO').
+    destruct UPTO' as [[? [? ->]]UPTO']. subst x.
+    rename x0 into st_mo'.
+    pose proof STEPmo as (STmo & Lmo & STmo')%state_label_lookup.
     
     (* apply pred_at_trace_lookup in STEPmo as (st_mo & STmo & -> & Lmo). *)
-    apply pred_at_trace_lookup' in STEPmo as (? & step_ & STEPmo & -> & LBL).
-    destruct step_ as [[ℓ_mo st_mo']|]; simpl in LBL; [| done].
-    inversion LBL. subst ℓ_mo. clear LBL.
-    pose proof STEPmo as (STmo & Lmo & STmo')%state_label_lookup.
+    (* apply pred_at_trace_lookup' in STEPmo as (? & step_ & STEPmo & -> & LBL). *)
+    (* destruct step_ as [[ℓ_mo st_mo']|]; simpl in LBL; [| done]. *)
+    (* inversion LBL. subst ℓ_mo. clear LBL. *)
+    (* pose proof STEPmo as (STmo & Lmo & STmo')%state_label_lookup. *)
     
     forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto. 
     intros (ℓ_lm & Llmi & LBL_MATCH).

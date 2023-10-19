@@ -297,13 +297,14 @@ Proof. destruct a; destruct b=>//. unfold oless, oleq. lia. Qed.
 Section dec_unless.
   Context {St S' L L': Type}.
   Context (Us: St -> S').
-  Context (Ul: L -> option L').
+  (* Context (Ul: L -> option L'). *)
+  Context (Usls: St -> L -> St -> option L').
 
   Definition dec_unless Ψ (tr: trace St L) :=
     ∀ n, match after n tr with
          | Some ⟨ _ ⟩ | None => True
          | Some (s -[ℓ]-> tr') =>
-           (∃ ℓ', Ul ℓ = Some ℓ') ∨
+           (∃ ℓ', Usls s ℓ (trfirst tr') = Some ℓ') ∨
            (Ψ (trfirst tr') < Ψ s ∧ Us s = Us (trfirst tr'))
          end.
 
@@ -317,22 +318,26 @@ End dec_unless.
 Section destuttering.
   Context {St S' L L': Type}.
   Context (Us: St -> S').
-  Context (Ul: L -> option L').
+  (* Context (Ul: L -> option L'). *)
+  Context (Usls: St -> L -> St -> option L').
 
   Inductive upto_stutter_ind (upto_stutter_coind: trace St L -> trace S' L' -> Prop):
     trace St L -> trace S' L' -> Prop :=
   | upto_stutter_singleton s:
       upto_stutter_ind upto_stutter_coind ⟨s⟩ ⟨Us s⟩
   | upto_stutter_stutter btr str s ℓ:
-      Ul ℓ = None ->
-      (* (Us s = Us (trfirst btr) -> (or something like this...?) *)
+      (* Ul ℓ = None -> *)
+      (* (forall ℓ', ¬ inner_step ℓ' s ℓ (trfirst btr)) -> *)
+      (Usls s ℓ (trfirst btr) = None) ->
       Us s = Us (trfirst btr) ->
       Us s = trfirst str ->
       upto_stutter_ind upto_stutter_coind btr str ->
       upto_stutter_ind upto_stutter_coind (s -[ℓ]-> btr) str
   | upto_stutter_step btr str s ℓ s' ℓ':
       Us s = s' ->
-      Ul ℓ = Some ℓ' ->
+      (* Ul ℓ = Some ℓ' -> *)
+      (* inner_step ℓ' s ℓ (trfirst btr) -> *)
+      Usls s ℓ (trfirst btr) = Some ℓ' ->
       upto_stutter_coind btr str ->
       upto_stutter_ind upto_stutter_coind (s -[ℓ]-> btr) (s' -[ℓ']-> str).
 
@@ -380,7 +385,7 @@ Section destuttering.
     → after n btr = Some btr'
       → ∃ (n' : nat) (str' : trace S' L'),
           after n' str = Some str' ∧ upto_stutter btr' str'.
-  Proof. 
+  Proof.
     have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
     { intros P [x ?]. by exists (S x). }
 
@@ -441,26 +446,33 @@ Section destuttering.
         rewrite after_sum' in Hinf. simpl in *. done.
   Qed.
 
-  Program Fixpoint destutter_once_step N Ψ (btr: trace St L) :
+  Program Fixpoint destutter_once_step N Ψ (btr: trace St L)
+                   (* {DEC: forall ℓ' s1 ℓ s2, Decision (inner_step ℓ' s1 ℓ s2)} *)
+    :
     Ψ (trfirst btr) < N →
-    dec_unless Us Ul Ψ btr →
-    S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) :=
+    dec_unless Us Usls Ψ btr →
+    S' + (S' * L' * { btr' : trace St L | dec_unless Us Usls Ψ btr'}) :=
     match N as n return
           Ψ (trfirst btr) < n →
-          dec_unless Us Ul Ψ btr →
-          S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'})
+          dec_unless Us Usls Ψ btr →
+          S' + (S' * L' * { btr' : trace St L | dec_unless Us Usls Ψ btr'})
     with
     | O => λ Hlt _, False_rect _ (Nat.nlt_0_r _ Hlt)
     | S N' =>
       λ Hlt Hdec,
-      match btr as z return btr = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) with
+      match btr as z return btr = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Usls Ψ btr'}) with
       | tr_singl s => λ _, inl (Us s)
       | tr_cons s l btr' =>
         λ Hbtreq,
-        match Ul l as z return Ul l = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) with
+        (* match inner_step l as z return Ul l = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) with *)
+        (* | Some l' => λ _, inr (Us s, l', exist _ btr' _) *)
+        (* | None => λ HUll, destutter_once_step N' Ψ btr' _ _ *)
+        (* end *)
+        match Usls s l (trfirst btr') as z return Usls s l (trfirst btr') = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Usls Ψ btr'}) with
         | Some l' => λ _, inr (Us s, l', exist _ btr' _)
         | None => λ HUll, destutter_once_step N' Ψ btr' _ _
-        end eq_refl
+        end
+          eq_refl
       end eq_refl
     end.
   Next Obligation.
@@ -481,7 +493,7 @@ Section destuttering.
 
   CoFixpoint destutter_gen Ψ N (btr: trace St L) :
     Ψ (trfirst btr) < N ->
-    dec_unless Us Ul Ψ btr → trace S' L' :=
+    dec_unless Us Usls Ψ btr → trace S' L' :=
     λ Hlt Hdec,
     match destutter_once_step N Ψ btr Hlt Hdec with
     | inl s' => tr_singl s'
@@ -490,7 +502,7 @@ Section destuttering.
     end.
 
   Definition destutter Ψ (btr: trace St L) :
-    dec_unless Us Ul Ψ btr → trace S' L' :=
+    dec_unless Us Usls Ψ btr → trace S' L' :=
     λ Hdec,
     destutter_gen Ψ (S (Ψ (trfirst btr))) btr (Nat.lt_succ_diag_r _) Hdec.
 
@@ -507,13 +519,13 @@ Section destuttering.
     generalize (destutter_once_step_obligation_2 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
     generalize (destutter_once_step_obligation_3 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
     intros HunlessNone HltNone HdecSome.
-    destruct (Ul ℓ) as [ℓ'|] eqn:Heq; cbn; first done.
+    destruct (Usls s ℓ (trfirst btr')) as [ℓ'|] eqn:Heq; cbn; first done.
     unfold dec_unless in Hdec.
     destruct (Hdec 0) as [[??]|[? Hsame]]; first congruence.
     rewrite Hsame. apply IHN.
   Qed.
 
-  Lemma destutter_spec_ind N Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr)
+  Lemma destutter_spec_ind N Ψ (btr: trace St L) (Hdec: dec_unless Us Usls Ψ btr)
     (Hlt: Ψ (trfirst btr) < N):
     upto_stutter btr (destutter_gen Ψ N btr Hlt Hdec).
   Proof.
@@ -531,7 +543,7 @@ Section destuttering.
     generalize (destutter_once_step_obligation_2 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
     generalize (destutter_once_step_obligation_3 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
     intros HunlessNone HltNone HdecSome.
-    destruct (Ul ℓ) as [ℓ'|] eqn:Heq; cbn.
+    destruct (Usls s ℓ (trfirst btr')) as [ℓ'|] eqn:Heq; cbn.
     - econstructor 3 =>//. right. apply (CH (S (Ψ $ trfirst btr'))).
     - econstructor 2=>//.
       + destruct (Hdec 0) as [[??]|[??]];congruence.
@@ -550,11 +562,11 @@ Section destuttering.
         rewrite {1}(trace_unfold_fold (destutter_gen _ _ _ _ _)) /= -trace_unfold_fold //.
   Qed.
 
-  Lemma destutter_spec Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr):
+  Lemma destutter_spec Ψ (btr: trace St L) (Hdec: dec_unless Us Usls Ψ btr):
     upto_stutter btr (destutter Ψ btr Hdec).
   Proof. eapply destutter_spec_ind. Qed.
 
-  Lemma can_destutter Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr):
+  Lemma can_destutter Ψ (btr: trace St L) (Hdec: dec_unless Us Usls Ψ btr):
     ∃ str, upto_stutter btr str.
   Proof. exists (destutter Ψ btr Hdec). apply destutter_spec. Qed.
 

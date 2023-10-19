@@ -118,7 +118,14 @@ Section destuttering_auxtr.
   Qed. 
 
 
-  Definition EUl (ℓ: ELM.(mlabel)): option (option (@ext_role _ EM)) :=
+  (* Definition EUl (ℓ: ELM.(mlabel)): option (option (@ext_role _ EM)) := *)
+  (*   match ℓ with *)
+  (*   | inl (Take_step ρ _) => Some (Some (inl ρ)) *)
+  (*   | inr e => Some $ Some $ inr $ env $ proj_ext $ e *)
+  (*   | _ => None *)
+  (*   end. *)
+  Definition EUsls (_: lm_ls LM) (ℓ: ELM.(mlabel)) (_: lm_ls LM):
+    option (option (@ext_role _ EM)) :=
     match ℓ with
     | inl (Take_step ρ _) => Some (Some (inl ρ))
     | inr e => Some $ Some $ inr $ env $ proj_ext $ e
@@ -128,9 +135,9 @@ Section destuttering_auxtr.
   Definition Ψ (δ: LiveState G M LSI) :=
     size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := G)), f.
 
-  Lemma fuel_dec_unless_lm_step δ ℓ δ'
+  Lemma fuel_dec_unless_lm_step δ (ℓ: lm_lbl LM) δ'
     (Htrans : lm_ls_trans LM δ ℓ δ'):
-    (∃ ℓ' : fmrole M, EUl (inl ℓ) = Some $ Some $ inl ℓ') ∨
+    (∃ ℓ' : fmrole M, EUsls δ (inl ℓ) δ' = Some $ Some $ inl ℓ') ∨
     Ψ δ' < Ψ δ ∧ ls_under δ = ls_under δ'.
   Proof. 
     destruct ℓ as [| tid' |];
@@ -170,7 +177,7 @@ Section destuttering_auxtr.
 
   Lemma fuel_dec_unless_step δ ℓ δ'
     (Htrans : elm_trans δ ℓ δ'):
-    (∃ ℓ' : option (@ext_role _ EM), EUl ℓ = Some ℓ') ∨
+    (∃ ℓ' : option (@ext_role _ EM), EUsls δ ℓ δ' = Some ℓ') ∨
     Ψ δ' < Ψ δ ∧ ls_under δ = ls_under δ'.
   Proof. 
     inversion Htrans.
@@ -186,7 +193,7 @@ Section destuttering_auxtr.
           (eauxtr: eauxtrace (LM := LM))
     :
     eauxtrace_valid eauxtr ->
-    dec_unless ls_under EUl Ψ eauxtr.
+    dec_unless ls_under EUsls Ψ eauxtr.
   Proof.
     intros Hval n. revert eauxtr Hval. induction n; intros eauxtr Hval; last first.
     { edestruct (after (S n) eauxtr) as [eauxtrn|] eqn:Heq; rewrite Heq =>//.
@@ -199,7 +206,7 @@ Section destuttering_auxtr.
   Qed.
 
   Definition upto_stutter_eauxtr :=
-    upto_stutter (ls_under (G:=G) (M:=M) (LSI := LSI)) EUl.
+    upto_stutter (ls_under (G:=G) (M:=M) (LSI := LSI)) EUsls.
 
   Lemma can_destutter_eauxtr eauxtr:
     eauxtrace_valid eauxtr →
@@ -212,8 +219,8 @@ Section destuttering_auxtr.
 End destuttering_auxtr.
 
 (* TODO: move *)
-Lemma upto_stutter_mono' {S S' L L': Type} (Us: S -> S') (Ul: L -> option L'):
-  monotone2 (upto_stutter_ind Us Ul).
+Lemma upto_stutter_mono' {S S' L L': Type} (Us: S -> S') (Usls: S -> L -> S -> option L'):
+  monotone2 (upto_stutter_ind Us Usls).
 Proof.
   unfold monotone2. intros x0 x1 r r' IN LE.
   induction IN; try (econstructor; eauto; done).
@@ -285,52 +292,152 @@ Section upto_stutter_preserves_fairness_and_termination.
 
   (* Notation upto_stutter_aux := (upto_stutter (ls_under (LSI := LSI)) (Ul (LM := LM))). *)
 
+  (* Lemma upto_stutter_step_correspondence (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM)) *)
+  (*   (Po: LiveState _ _ LSI -> option (mlabel ELM) -> Prop) *)
+  (*   (Pi: M -> option (option (ext_role (EM := EM))) -> Prop) *)
+  (*   (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with  *)
+  (*                                             | Some ℓ => EUl proj_ext ℓ (LM := LM) *)
+  (*                                             | None => None *)
+  (*                                             end)) *)
+  (*   (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ)) *)
+  (*   : *)
+  (*   upto_stutter_eauxtr proj_ext eauxtr emtr (LM := LM) -> *)
+  (*   forall n atr_aux, *)
+  (*     after n eauxtr = Some atr_aux -> *)
+  (*     pred_at atr_aux 0 Po -> *)
+  (*   exists m atr_m, *)
+  (*     after m emtr = Some atr_m /\ pred_at atr_m 0 Pi /\  *)
+  (*     upto_stutter_eauxtr proj_ext atr_aux atr_m. *)
+  (* Proof. *)
+  (*   intros Hupto n. generalize dependent eauxtr. generalize dependent emtr.  *)
+  (*   induction n as [|n]; intros eauxtr emtr Hupto atr_aux AFTER A0. *)
+  (*   - rewrite after_0_id in AFTER. assert (atr_aux = emtr) as -> by congruence. *)
+  (*     do 2 eexists. split; [| split]; [..| by eauto]. *)
+  (*     { by erewrite after_0_id. } *)
+  (*     punfold Hupto. inversion Hupto; simplify_eq. *)
+  (*     4: { apply upto_stutter_mono'. } *)
+  (*     + rename A0 into Hpa. *)
+  (*       rewrite /pred_at /=. rewrite /pred_at //= in Hpa. *)
+  (*       by apply LIFT in Hpa.  *)
+  (*     + rewrite -> !pred_at_0 in A0. *)
+  (*       rewrite /pred_at /=. destruct eauxtr; simpl in *; try congruence. *)
+  (*       * apply LIFT in A0. congruence. *)
+  (*       * apply LIFT in A0. destruct ℓ; simpl in *; try done. *)
+  (*         destruct l; [done| ..].            *)
+  (*         all: subst; eapply PI0; eauto. *)
+  (*     + rewrite -> !pred_at_0 in A0. *)
+  (*       apply pred_at_0. rewrite <- H0. *)
+  (*       by eapply LIFT in A0.  *)
+  (*   - punfold Hupto. inversion Hupto as [| |?????? ?? IH ]; simplify_eq. *)
+  (*     3: { apply upto_stutter_mono'. } *)
+  (*     + simpl in AFTER.  *)
+  (*       eapply IHn; eauto. *)
+  (*       by pfold. *)
+  (*     + simpl in AFTER. *)
+  (*       assert (upto_stutter_eauxtr proj_ext btr str) as UPTO'. *)
+  (*       { inversion IH; eauto. done. }  *)
+  (*       specialize (IHn str btr UPTO' _ AFTER A0) as (m & ?&?&?). *)
+  (*       exists (S m). eauto.  *)
+  (* Qed. *)
+
+  (* Lemma upto_stutter_step_correspondence (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM)) *)
+  (*   (Po: LiveState _ _ LSI -> option (mlabel ELM) -> Prop) *)
+  (*   (Pi: M -> option (option (ext_role (EM := EM))) -> Prop) *)
+  (*   (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with  *)
+  (*                                             | Some ℓ => EUl proj_ext ℓ (LM := LM) *)
+  (*                                             | None => None *)
+  (*                                             end)) *)
+  (*   (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ)) *)
+  (*   : *)
+  (*   upto_stutter_eauxtr proj_ext eauxtr emtr (LM := LM) -> *)
+  (*   forall n atr_aux, *)
+  (*     after n eauxtr = Some atr_aux -> *)
+  (*     pred_at atr_aux 0 Po -> *)
+  (*   exists m atr_m, *)
+  (*     after m emtr = Some atr_m /\ pred_at atr_m 0 Pi /\  *)
+  (*     upto_stutter_eauxtr proj_ext atr_aux atr_m. *)
+  (* Proof. *)
   Lemma upto_stutter_step_correspondence (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM))
-    (Po: LiveState _ _ LSI -> option (mlabel ELM) -> Prop)
-    (Pi: M -> option (option (ext_role (EM := EM))) -> Prop)
-    (LIFT: forall δ oℓ, Po δ oℓ -> Pi (ls_under δ) (match oℓ with 
-                                              | Some ℓ => EUl proj_ext ℓ (LM := LM)
+    (Po: lm_ls LM -> option (mlabel ELM * lm_ls LM) -> Prop)
+    (Pi: M -> option (option (ext_role (EM := EM)) * M) -> Prop)
+    (LIFT: forall δ ostep, Po δ ostep -> Pi (ls_under δ) (match ostep with 
+                                              | Some (ℓ, δ') => match (EUsls proj_ext δ ℓ δ') with | Some r => Some (r, ls_under δ') | None => None end
                                               | None => None
                                               end))
     (PI0: forall st, Pi st None -> forall ℓ, Pi st (Some ℓ))
     :
     upto_stutter_eauxtr proj_ext eauxtr emtr (LM := LM) ->
-    forall n atr_aux,
+    forall n atr_aux so stepo,
       after n eauxtr = Some atr_aux ->
-      pred_at atr_aux 0 Po ->
-    exists m atr_m,
-      after m emtr = Some atr_m /\ pred_at atr_m 0 Pi /\ 
+      (* pred_at atr_aux 0 Po -> *)
+      atr_aux !! 0 = Some (so, stepo) ->
+      Po so stepo ->
+    exists m atr_m si stepi,
+      after m emtr = Some atr_m /\ 
+      (* pred_at atr_m 0 Pi /\  *)
+      atr_m !! 0 = Some (si, stepi) /\
+      Pi si stepi /\
       upto_stutter_eauxtr proj_ext atr_aux atr_m.
   Proof.
     intros Hupto n. generalize dependent eauxtr. generalize dependent emtr. 
-    induction n as [|n]; intros eauxtr emtr Hupto atr_aux AFTER A0.
-    - rewrite after_0_id in AFTER. assert (atr_aux = emtr) as -> by congruence.
-      do 2 eexists. split; [| split]; [..| by eauto].
-      { by erewrite after_0_id. }
+    induction n as [|n]; intros auxtr mtr Hupto atr_aux os ostep AFTER O0 A0.
+    - rewrite after_0_id in AFTER. assert (atr_aux = mtr) as -> by congruence.
+      (* do 4 eexists. *)
+      exists 0, auxtr.
+      pose proof (trace_lookup_0 auxtr) as [stepi STEPI].
+      exists (trfirst auxtr), stepi.
+      do 3 (split; eauto). 
       punfold Hupto. inversion Hupto; simplify_eq.
       4: { apply upto_stutter_mono'. }
       + rename A0 into Hpa.
         rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
-        by apply LIFT in Hpa. 
-      + rewrite -> !pred_at_0 in A0.
-        rewrite /pred_at /=. destruct eauxtr; simpl in *; try congruence.
-        * apply LIFT in A0. congruence.
-        * apply LIFT in A0. destruct ℓ; simpl in *; try done.
-          destruct l; [done| ..].           
-          all: subst; eapply PI0; eauto.
-      + rewrite -> !pred_at_0 in A0.
-        apply pred_at_0. rewrite <- H0.
-        by eapply LIFT in A0. 
+        destruct ostep; [done| ].
+        specialize (LIFT _ _ Hpa). simpl in LIFT.
+        simpl in O0.
+        rewrite trace_lookup_0_singleton in O0. inversion O0. 
+        rewrite trace_lookup_0_singleton in STEPI. inversion STEPI. 
+        congruence. 
+      +
+        (* rewrite -> !pred_at_0 in A0. *)
+        rewrite /pred_at /=.
+        destruct auxtr; try congruence.
+        * apply LIFT in A0. 
+          simpl.
+          rewrite trace_lookup_0_singleton in STEPI. inversion STEPI.
+          subst.           
+          rewrite trace_lookup_0_cons in O0. inversion O0. subst.
+          rewrite H0 H in A0. congruence. 
+        * apply LIFT in A0.
+          simpl in H2. subst.
+          rewrite trace_lookup_0_cons in O0.
+          inversion O0. subst. simpl. 
+          rewrite H0 H in A0.
+          simpl in H1. subst. rewrite H0.  
+          destruct stepi; eauto. 
+      + 
+        (* rewrite -> !pred_at_0 in A0. *)
+        simpl. 
+        (* apply pred_at_0. rewrite <- H1. *)
+        eapply LIFT in A0.
+        rewrite trace_lookup_0_cons in O0. inversion O0. subst.
+        rewrite H0 in A0.
+        simpl in STEPI.
+        pose proof (trace_lookup_0_cons (ls_under os) ℓ' str).
+        simpl in H. rewrite STEPI in H. inversion H. subst.
+        red in H1. try pclearbot.
+        apply upto_stutter_trfirst in H1. by rewrite H1.
     - punfold Hupto. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
-      3: { apply upto_stutter_mono'. }
+      3: { apply upto_stutter_mono'. } 
       + simpl in AFTER. 
         eapply IHn; eauto.
         by pfold.
       + simpl in AFTER.
         assert (upto_stutter_eauxtr proj_ext btr str) as UPTO'.
         { inversion IH; eauto. done. } 
-        specialize (IHn str btr UPTO' _ AFTER A0) as (m & ?&?&?).
-        exists (S m). eauto. 
+        specialize (IHn str btr UPTO').
+        specialize (IHn _ os ostep AFTER O0 A0). 
+        destruct IHn as (m&?&?&?&?&?&?&?). 
+        exists (S m). do 3 eexists. eauto. 
   Qed.
 
   Lemma upto_stutter_fairness_0 ρ eauxtr (mtr: emtrace (EM := EM)):
@@ -340,16 +447,35 @@ Section upto_stutter_preserves_fairness_and_termination.
     ∃ m, pred_at mtr m (λ δ _, ¬role_enabled_model ρ δ)
          ∨ pred_at mtr m (λ _ ℓ, ℓ = Some $ Some $ inl ρ).
   Proof.
+    (* repeat setoid_rewrite <- pred_at_or.  *)
+    (* intros UPTO [n NTH]. *)
+    (* pose proof NTH as [atr AFTER]%pred_at_after_is_Some.  *)
+    (* rewrite (plus_n_O n) in NTH.  *)
+    (* rewrite pred_at_sum AFTER in NTH.  *)
+    (* eapply upto_stutter_step_correspondence in NTH; eauto.  *)
+    (* - destruct NTH as (m & atr_m & AFTERm & Pm & UPTO'). *)
+    (*   exists m. rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm.  *)
+    (* - intros ?? Po. destruct Po as [?| [? ->]]; eauto. *)
+    (* - intros. destruct H; [| done]. eauto. *)
     repeat setoid_rewrite <- pred_at_or. 
     intros UPTO [n NTH].
     pose proof NTH as [atr AFTER]%pred_at_after_is_Some. 
     rewrite (plus_n_O n) in NTH. 
-    rewrite pred_at_sum AFTER in NTH. 
-    eapply upto_stutter_step_correspondence in NTH; eauto. 
-    - destruct NTH as (m & atr_m & AFTERm & Pm & UPTO').
-      exists m. rewrite (plus_n_O m) pred_at_sum AFTERm. apply Pm. 
-    - intros ?? Po. destruct Po as [?| [? ->]]; eauto.
-    - intros. destruct H; [| done]. eauto.
+    rewrite pred_at_sum AFTER in NTH.
+    apply pred_at_trace_lookup' in NTH as (so & stepo & A0 & PROP).
+    pattern so, stepo in PROP. 
+    
+    eapply upto_stutter_step_correspondence in PROP; eauto. 
+    - destruct PROP as (m & atr_m & si & stepi & AFTERm & B0 & Pi & UPTO').
+      exists m. rewrite (plus_n_O m) pred_at_sum AFTERm.
+      eapply pred_at_trace_lookup'.
+      do 2 eexists. split; [eauto| ].
+      pattern si. pattern stepi. apply Pi. 
+    - intros ?? Po. simpl. destruct Po as [?| ?]; eauto.
+      right. destruct H as [? H].
+      destruct ostep; try done. simpl in *.
+      destruct p. simpl in H. inversion H. by subst.
+    - intros. destruct H; eauto. done. 
   Qed.
 
   Lemma upto_stutter_fairness (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM)):

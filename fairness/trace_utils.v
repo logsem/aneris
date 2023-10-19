@@ -341,34 +341,37 @@ Lemma trace_eventually_cons {S T} s l (tr : trace S T) P :
   trace_eventually tr P → trace_eventually (s -[l]-> tr) P.
 Proof. intros [n HP]. by exists (Datatypes.S n). Qed.
 
-Lemma trace_eventually_stutter_preserves 
-      {St S' L L': Type} (Us: St -> S') (Ul: L -> option L')
-      tr1 tr2 P :
-  upto_stutter Us Ul tr1 tr2 →
-  trace_eventually tr2 P →
-  trace_eventually tr1 (λ s l, P (Us s) (l ≫= Ul)).
-Proof.
-  intros Hstutter [n Heventually].
-  revert tr1 tr2 Hstutter Heventually.
-  induction n as [|n IHn]; intros tr1 tr2 Hstutter Heventually.
-  - punfold Hstutter; [|apply upto_stutter_mono].
-    induction Hstutter.
-    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done.
-    + destruct (IHHstutter Heventually) as [n Heventually'].
-      exists (1 + n). rewrite /pred_at. rewrite after_sum'. simpl.
-      done.
-    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl.
-      simplify_eq. rewrite H0. done.
-  - punfold Hstutter; [|apply upto_stutter_mono].
-    induction Hstutter.
-    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done.
-    + destruct (IHHstutter Heventually) as [n' Heventually'].
-      exists (1 + n'). rewrite /pred_at. rewrite after_sum'. simpl.
-      done.
-    + apply trace_eventually_cons.
-      assert (pred_at str n P) as Heventually'.
-      { rewrite /pred_at in Heventually.
-        simpl in *. done. }
-      eapply IHn; [|done].
-      rewrite /upaco2 in H1. destruct H1; [done|done].
-Qed.
+(* TODO: ask about how to restore it*)
+
+
+(* Lemma trace_eventually_stutter_preserves  *)
+(*       {St S' L L': Type} (Us: St -> S') Usls *)
+(*       tr1 tr2 P : *)
+(*   upto_stutter Us Usls tr1 tr2 → *)
+(*   trace_eventually tr2 P → *)
+(*   trace_eventually tr1 (λ s l, P (Us s) (l ≫= Usls)). *)
+(* Proof. *)
+(*   intros Hstutter [n Heventually]. *)
+(*   revert tr1 tr2 Hstutter Heventually. *)
+(*   induction n as [|n IHn]; intros tr1 tr2 Hstutter Heventually. *)
+(*   - punfold Hstutter; [|apply upto_stutter_mono]. *)
+(*     induction Hstutter. *)
+(*     + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done. *)
+(*     + destruct (IHHstutter Heventually) as [n Heventually']. *)
+(*       exists (1 + n). rewrite /pred_at. rewrite after_sum'. simpl. *)
+(*       done. *)
+(*     + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl. *)
+(*       simplify_eq. rewrite H0. done. *)
+(*   - punfold Hstutter; [|apply upto_stutter_mono]. *)
+(*     induction Hstutter. *)
+(*     + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done. *)
+(*     + destruct (IHHstutter Heventually) as [n' Heventually']. *)
+(*       exists (1 + n'). rewrite /pred_at. rewrite after_sum'. simpl. *)
+(*       done. *)
+(*     + apply trace_eventually_cons. *)
+(*       assert (pred_at str n P) as Heventually'. *)
+(*       { rewrite /pred_at in Heventually. *)
+(*         simpl in *. done. } *)
+(*       eapply IHn; [|done]. *)
+(*       rewrite /upaco2 in H1. destruct H1; [done|done]. *)
+(* Qed. *)
