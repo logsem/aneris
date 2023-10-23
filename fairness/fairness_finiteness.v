@@ -75,12 +75,15 @@ Section finitary.
   | trace_singleton δ => trace_singleton (ls_under δ)
   (* | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LSI LM ex') ρ (ls_under δ) *)
   (* | trace_extend ex' _ _ => get_underlying_fairness_trace M LSI LM ex' *)
-  | trace_extend ex' None δ => get_underlying_fairness_trace ex'
+  | trace_extend ex' None δ =>
+      let u' := get_underlying_fairness_trace ex' in
+      trace_extend u' None δ
   | trace_extend ex' (Some g) δ =>
       let u' := get_underlying_fairness_trace ex' in
       match (next_TS_role (trace_last ex') g δ) with
       | Some ρ => trace_extend u' (Some ρ) δ
-      | None => u'
+      (* | None => u' *)
+      | None => trace_extend u' None δ
       end
   end.
 
@@ -377,7 +380,8 @@ Section finitary_simple.
   Lemma valid_state_evolution_finitary_fairness_simple
           {LF: LMFairPre LM}
     (φ: execution_trace Λ -> auxiliary_trace (fair_model_model LM_Fair) -> Prop)
-    (VALIDφ: forall extr auxtr, φ extr auxtr -> trace_steps (fmtrans LM_Fair) auxtr):
+    (* (VALIDφ: forall extr auxtr, φ extr auxtr -> trace_steps (fmtrans LM_Fair) auxtr): *)
+    :
     rel_finitary (valid_lift_fairness lm_valid_evolution_step φ (M := (fair_model_model LM_Fair))).
   Proof.
     eapply rel_finitary_impl. 
@@ -397,33 +401,30 @@ Section finitary_simple.
     (* rewrite trace_map_last.  *)
     red in H. destruct H as (?&?&?). red in H1.
     destruct l0; simpl in H1; intuition.
-    (* TODO: move *)
-    assert (forall tr, trace_steps (fmtrans LM_Fair) tr -> trace_last (get_underlying_fairness_trace tr) = ls_under (trace_last tr)) as UNDER_LAST. 
-    { clear. induction tr; try done.
-      intros VALID. 
-      simpl. inversion VALID. subst. destruct l.
+    (* TODO: move *) 
+    assert (forall tr, trace_last (get_underlying_fairness_trace tr) = ls_under (trace_last tr)) as UNDER_LAST.
+    { clear. destruct tr; try done. simpl.
+      (* inversion VALID. *)
+      subst. destruct l.
       2: { done. }
-      destruct next_TS_role eqn:N; [done| ].
-      eapply next_TS_spec_inv_S in N.
-      2: { by rewrite H2. }
-      simpl in N. repeat apply proj2 in N. rewrite -N.
-      by apply IHtr. }
-    
+      destruct next_TS_role; done. }
+      
+    (*   destruct next_TS_role eqn:N; [done| ]. *)
+    (*   eapply next_TS_spec_inv_S in N. *)
+    (*   2: { by rewrite H2. } *)
+    (*   simpl in N. repeat apply proj2 in N. rewrite -N. *)
+    (*   simpl. done. } *)
+     
     destruct (next_TS_role (trace_last f0) l0 a0) eqn:N.
     - apply next_TS_spec_pos in N. left.
-      rewrite UNDER_LAST.
-      { apply N. }
-      apply VALIDφ in H0.
-      by inversion H0.
-    - subst.
-      destruct f0; [done| ]. simpl. 
-      
-      destruct get_underlying_fairness_trace eqn:UNDER; [done| ].
-      subst. 
-      right. 
+      rewrite UNDER_LAST. apply N. 
+    - subst. simpl.
+      right. split; auto.
+      apply next_TS_spec_inv_S in N; auto.
+      simpl in N. repeat apply proj2 in N. rewrite -N.
+      symmetry. apply UNDER_LAST.
     
     Unshelve.
-    + intros ??. apply make_decision.
     + intros. apply make_proof_irrel.
   Qed.
 
@@ -431,28 +432,32 @@ End finitary_simple.
 
 
 Section RelFinitary.
-  Context `{Countable (locale Λ)}. 
+  (* Context `{Countable (locale Λ)}.  *)
   Context `(LM: LiveModel (locale Λ) M LSI). 
+  Context {LF: LMFairPre LM}. 
 
   (* TODO: Why do we need [LM] explicit here? *)
-  Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
+  Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) :=
   live_tids (LM:=LM) (trace_last ex) (trace_last aux).
 
-  Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
-    valid_state_evolution_fairness lm_valid_evolution_step ex aux ∧ live_rel ex aux.
+  Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) :=
+    valid_state_evolution_fairness lm_valid_evolution_step ex aux (M := (fair_model_model LM_Fair)) ∧ live_rel ex aux.
 
 Definition sim_rel_with_user (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop)
-  (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
-  sim_rel ex aux ∧ ξ ex (map_underlying_trace aux).
+  (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) :=
+  sim_rel ex aux ∧ ξ ex (get_underlying_fairness_trace aux).
 
 (* TODO: Maybe redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
 Lemma valid_lift_fairness_sim_rel_with_user 
       (ξ : execution_trace Λ → finite_trace M (option $ fmrole M) → Prop) extr atr :
   valid_lift_fairness lm_valid_evolution_step
-    (λ extr auxtr, ξ extr (map_underlying_trace (LM:=LM) auxtr) ∧
-                   live_rel extr auxtr) extr atr ↔
+    (λ extr auxtr, ξ extr (get_underlying_fairness_trace (LM:=LM) auxtr) ∧
+                   live_rel extr auxtr) (M := fair_model_model LM_Fair) extr atr ↔
   sim_rel_with_user ξ extr atr.
-Proof. split; [by intros [Hvalid [Hlive Hξ]]|by intros [[Hvalid Hlive] Hξ]]. Qed.
+Proof. 
+  split; [by intros [Hvalid [Hlive Hξ]]|
+          by intros [[Hvalid Hlive] Hξ]].
+Qed.
 
 Lemma rel_finitary_sim_rel_with_user_ξ {DEC: forall a b c, Decision (LSI a b c)} ξ :
   rel_finitary ξ → rel_finitary (sim_rel_with_user ξ).
@@ -460,13 +465,8 @@ Proof.
   intros Hrel.
   eapply rel_finitary_impl.
   { intros ex aux. by eapply valid_lift_fairness_sim_rel_with_user.
-    (* TODO: Figure out if these typeclass subgoals should be resolved locally *)
-    Unshelve.
-    intros ??. apply make_decision. }
+    (* TODO: Figure out if these typeclass subgoals should be resolved locally *) }
   by eapply valid_state_evolution_finitary_fairness.
-  (* TODO: get rid of it *)
-  Unshelve. 
-  all: intros ??; apply make_decision.
 Qed.
 
 Lemma rel_finitary_sim_rel_with_user_sim_rel 

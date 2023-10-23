@@ -1,49 +1,21 @@
-From trillium.fairness Require Import fairness fuel fuel_ext.
+From trillium.fairness Require Import fairness fuel fuel_ext utils.
 
 Close Scope Z_scope.
 
-(* TODO: move *)
-Global Instance must_decrease_dec {M_: FairModel} {G_: Type} {LSI}
-  `{EqDecision G_}:
-  forall a oρ st1 st2 og,
-    Decision (must_decrease a oρ st1 st2 og (M := M_) (G := G_) (LSI := LSI)).
-Proof. 
-  intros.
-  destruct (decide (ls_mapping st1 !! a ≠ ls_mapping st2 !! a /\ is_Some (ls_mapping st2 !! a))).
-  { left. apply Change_tid; apply a0. }
-  destruct og.
-  2: { right. intros DECR. inversion DECR; tauto. }
-  destruct (decide (Some a ≠ oρ /\ Some g = ls_mapping st1 !! a)).
-  - left. econstructor; apply a0.
-  - right. intros DECR. inversion DECR; tauto.
-Qed. 
+
+Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := {
+  edG :> EqDecision G;
+  cntG :> Countable G;
+  edM :> EqDecision (fmstate M);
+  dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
+  inhLM :> Inhabited (lm_ls LM);
+  inhG :> Inhabited G;
+}. 
 
 
 Section LMFair.
   Context `{LM: LiveModel G M LSI}.
-  Context `{Countable G}.
-  Context `{EqDecision M}.  
-  Context `{forall s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}.
-  (* Context {INH_LSI: exists s m f, LSI s m f}.  *)
-  Context {INH_LM: Inhabited (lm_ls LM)}.
-  Context {INH_G: Inhabited G}.
-
-  Global Instance FL_cnt: Countable (@FairLabel G (fmrole M)).
-  Proof. 
-    set (FL_alt := (G * (fmrole M) + G + unit)%type).
-    set (to_alt := fun fl => match fl with
-                          | Take_step ρ τ => inl $ inl (τ, ρ)
-                          | Silent_step τ => inl $ inr τ
-                          | Config_step => (inr tt): FL_alt
-                          end).
-    set (from_alt := fun (fl': FL_alt) => match fl' with
-                             | inl (inl (τ, ρ)) => Take_step ρ τ
-                             | inl (inr τ) => Silent_step τ
-                             | inr _ => Config_step
-                             end).
-    eapply (inj_countable' to_alt from_alt).
-    intros. by destruct x. 
-  Qed. 
+  Context {LF: LMFairPre LM}.
   
   Global Instance LS_eqdec: EqDecision (LiveState G M LSI).
   Proof.
@@ -69,12 +41,12 @@ Section LMFair.
       remember domPP as dom. clear Heqdom. induction dom.
       { left. by apply Forall_nil. }
       assert (P a) as Pa.
-      { apply H1; eauto. set_solver. }
+      { apply H; eauto. set_solver. }
       specialize (DECQ _ Pa). 
       destruct DECQ.
       2: { right. by intros ALL%Forall_inv. }
       destruct IHdom.
-      { intros. apply H1. set_solver. }
+      { intros. apply H. set_solver. }
       - left. by constructor.
       - right. by intros ALL%Forall_inv_tail. } 
     - left. intros.
@@ -83,7 +55,7 @@ Section LMFair.
     - right. intros IMPL.
       apply n. apply List.Forall_forall.
       intros. apply IMPL.
-      subst domPP. apply elem_of_list_In, elem_of_list_filter in H1.
+      subst domPP. apply elem_of_list_In, elem_of_list_filter in H.
       tauto.
   Qed.
     
@@ -98,19 +70,6 @@ Section LMFair.
     set_solver. 
   Qed. 
 
-  (* TODO: move *)
-  Global Instance oless_dec: forall x y, Decision (oless x y). 
-  Proof. 
-    destruct x, y; simpl; solve_decision. 
-  Qed. 
-
-  (* TODO: move *)
-  Global Instance oleq_dec: forall x y, Decision (oleq x y). 
-  Proof. 
-    destruct x, y; simpl; solve_decision. 
-  Qed. 
-
-    
   Global Instance lm_ls_trans_dec st1 l st2:
     Decision (lm_ls_trans LM st1 l st2).
   Proof.
@@ -129,8 +88,7 @@ Section LMFair.
       left. apply set_choose_L in NEMPTY as [ρ ?].
       exists ρ. apply (ls_mapping_tmap_corr (LM := LM)). eauto. 
   Qed. 
-
-
+    
   Definition potential_step_FLs (st1: lm_ls LM) (τ: G): 
     gset (@FairLabel G (fmrole M)) :=
     {[ Silent_step τ ]} ∪ (set_map (fun ρ => Take_step ρ τ) (dom (ls_fuel st1))).
@@ -139,31 +97,29 @@ Section LMFair.
     filter (fun l => bool_decide (lm_ls_trans LM δ1 l δ2) = true)
       (potential_step_FLs δ1 τ).
 
-
-  (* TODO: upstream *)
-  (* Lemma not_elem_of_equiv_not_empty_L: *)
-  (* ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} *)
-  (*   {H2 : Union C}, *)
-  (*   SemiSet A C → LeibnizEquiv C → *)
-  (*   ∀ X : C, X ≠ ∅ ↔ (exists x : A, x ∈ X). *)
-  Lemma gset_not_elem_of_equiv_not_empty_L:
-  ∀ {A : Type} `{Countable A},
-    ∀ (X : gset A), X ≠ ∅ ↔ (exists x : A, x ∈ X).
+  Lemma aFLs_unique_TS_helper δ1 τ δ2 ρ:
+    Take_step ρ τ ∈ allowed_step_FLs δ1 τ δ2 ->
+    lm_ls_trans LM δ1 (Take_step ρ τ) δ2 /\ ls_mapping δ1 !! ρ = Some τ.
   Proof.
-    intros. split.
-    - by apply set_choose_L.
-    - set_solver. 
-  Qed. 
+    rewrite /allowed_step_FLs /potential_step_FLs. 
+    rewrite !elem_of_filter. rewrite !elem_of_union.
+    rewrite elem_of_singleton elem_of_map.
+    intros [STEP%bool_decide_eq_true [[=] | IN]].
+    destruct IN as (?&[=]&?). subst.
+    split; auto.
+    apply STEP.
+  Qed.
 
-  Definition lm_lbl_matches_group (ℓ: lm_lbl LM) (τ: G) := 
-    match ℓ with
-    | Take_step _ τ' | Silent_step τ' => τ = τ'
-    | Config_step => False
-    end. 
+  (* not true in general - it's possible to burn fuels even for the stepping role *)
+  (* Lemma allowed_FLs_unique_TS δ1 τ δ2: *)
+  (*   forall ρ1 ρ2, *)
+  (*     Take_step ρ1 τ ∈ allowed_step_FLs δ1 τ δ2 -> *)
+  (*     Take_step ρ2 τ ∈ allowed_step_FLs δ1 τ δ2 -> *)
+  (*     ρ1 = ρ2. *)
 
   (* TODO: rename *)
   Definition locale_trans (st1: lm_ls LM) (τ: G) st2 :=
-    exists ℓ, ls_trans (lm_fl LM) st1 ℓ st2 /\ lm_lbl_matches_group ℓ τ. 
+    exists ℓ, ls_trans (lm_fl LM) st1 ℓ st2 /\ fair_lbl_matches_group ℓ τ. 
 
   Lemma locale_trans_alt δ1 τ δ2:
     locale_trans δ1 τ δ2 <-> allowed_step_FLs δ1 τ δ2 ≠ ∅.
@@ -186,9 +142,11 @@ Section LMFair.
       all: eexists; split; [eapply STEP| done]. 
   Qed.
 
-  Global Instance locale_trans_ex_dec τ st1:
-    Decision (exists st2, locale_trans st1 τ st2).
+  Global Instance locale_trans_ex_dec τ δ1:
+    Decision (exists δ2, locale_trans δ1 τ δ2).
   Proof.
+    set (fls := potential_step_FLs δ1 τ). 
+    (* destruct (decide ( *)
     (* intros.  *)
   Admitted.
 
@@ -250,3 +208,4 @@ Section LMFair.
   Qed. 
       
 End LMFair.
+

@@ -236,10 +236,11 @@ Section AuxDefs.
     (fs1 fs2: gmap (fmrole M) nat): gmap (fmrole M) nat :=
     fuel_apply fs2 F ((dom F ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
 
-  (* TODO: refactor this? *)
-  Definition update_mapping (R: gmap (fmrole M) G) ζ (fs1 fs2: gmap (fmrole M) nat) := 
+
+  (* (* TODO: refactor this? *) *)
+  Definition update_mapping (R: gmap (fmrole M) G) (ζ: G) (fs1 fs2: gmap (fmrole M) nat): gmap (fmrole M) G := 
     map_imap (λ ρ' _, if decide (ρ' ∈ dom R) then R !! ρ' else Some ζ)
-      (gset_to_gmap 333 ((dom R ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))).
+      (gset_to_gmap 333 ((dom R ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))). 
 
   Definition fuel_reorder_preserves_LSI :=
     forall S (R R': gmap (fmrole M) G) F F',

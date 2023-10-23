@@ -293,6 +293,16 @@ Definition oless (a b : option nat) : Prop :=
 Lemma oleq_oless a b : oless a b -> oleq a b.
 Proof. destruct a; destruct b=>//. unfold oless, oleq. lia. Qed.
 
+Global Instance oless_dec: forall x y, Decision (oless x y). 
+Proof. 
+  destruct x, y; simpl; solve_decision. 
+Qed. 
+
+Global Instance oleq_dec: forall x y, Decision (oleq x y). 
+Proof. 
+  destruct x, y; simpl; solve_decision. 
+Qed. 
+
 
 Section dec_unless.
   Context {St S' L L': Type}.

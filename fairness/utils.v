@@ -204,3 +204,18 @@ Section map_imap.
   Qed.
 End map_imap.
 
+(* TODO: upstream *)
+(* Lemma not_elem_of_equiv_not_empty_L: *)
+(* ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} *)
+(*   {H2 : Union C}, *)
+(*   SemiSet A C → LeibnizEquiv C → *)
+(*   ∀ X : C, X ≠ ∅ ↔ (exists x : A, x ∈ X). *)
+Lemma gset_not_elem_of_equiv_not_empty_L:
+  ∀ {A : Type} `{Countable A},
+  ∀ (X : gset A), X ≠ ∅ ↔ (exists x : A, x ∈ X).
+Proof.
+  intros. split.
+  - by apply set_choose_L.
+  - set_solver. 
+Qed. 
+

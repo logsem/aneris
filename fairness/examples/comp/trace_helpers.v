@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup.
-From trillium.fairness Require Import inftraces fairness fuel. 
+From trillium.fairness Require Import inftraces fairness trace_utils.
 
 Close Scope Z_scope.
  
@@ -213,93 +213,15 @@ Section FMTraceHelpers.
 
   End ValidTracesProperties.
 
+  From Paco Require Import pacotac.
+  Lemma mtrace_valid_cons (tr: mtrace M) (s: fmstate M) (oρ: option (fmrole M))
+    (VALID: mtrace_valid (s -[oρ]-> tr)):
+    mtrace_valid tr /\ fmtrans M s oρ (trfirst tr). 
+  Proof using.
+    punfold VALID. inversion VALID. subst.
+    pclearbot. done. 
+  Qed.
+
 End FMTraceHelpers.
 
 
-Section LMTraceHelpers.
-  Context `{LM: LiveModel G M  LSI}. 
-
-  Local Ltac gd t := generalize dependent t.
-
-  (* TODO: ? unify definitions of _valid *)
-  Lemma auxtrace_valid_steps'  (tr: auxtrace (LM := LM))
-    i st ℓ st'
-    (VALID: auxtrace_valid tr)
-    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
-    lm_ls_trans LM st ℓ st'.
-  Proof using.
-    gd st. gd ℓ. gd st'. gd tr.
-    induction i.
-    { simpl. intros.
-      inversion VALID.
-      - subst. done.
-      - subst. inversion ITH. by subst. }
-    intros. simpl in ITH.
-    destruct tr.
-    { inversion ITH. }
-    rewrite trace_lookup_cons in ITH.
-    inversion VALID.  
-    eapply IHi; eauto.
-  Qed.
-
-  Lemma role_fuel_decreases (tr: auxtrace (LM := LM)) δ0 ρ f0
-    (ST0: tr S!! 0 = Some δ0)
-    (FUEL0: ls_fuel δ0 !! ρ = Some f0)
-    (NOρ: ∀ i ℓ, tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
-    (ASGρ: ∀ i δ, tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: auxtrace_valid tr):
-    forall i δ f, 
-      tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
-  Proof.
-    induction i; intros δ f ST FUEL. 
-    { assert (δ0 = δ) as -> by congruence. 
-      assert (f0 = f) as -> by congruence. 
-      done. }
-    
-    pose proof (trace_has_len tr) as [len LEN]. 
-    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN i)).
-    { eapply mk_is_Some, state_lookup_dom in ST; eauto. 
-      my_omega.lia_NO len. }
-    intros (δ' & ℓ & δ_ & STEP).
-    
-    forward eapply auxtrace_valid_steps' as TRANS; eauto.
-    apply state_label_lookup in STEP as (ST' & ST_ & LBL).
-    assert (δ_ = δ) as ->; [| clear ST_].
-    { rewrite Nat.add_1_r in ST_. congruence. }
-    
-    specialize (ASGρ _ _ ST'). rewrite ls_same_doms in ASGρ.
-    pose proof ASGρ as ASGρ_.
-    apply elem_of_dom in ASGρ as [f' FUEL'].
-    specialize (IHi _ _ ST' FUEL').
-    etrans; [| apply IHi]. 
-    eapply step_nonincr_fuels in TRANS; eauto.
-  Qed.
-
-  Lemma role_fuel_decreases_nth (tr: auxtrace (LM := LM)) δ0 ρ f0 n
-    (ST0: tr S!! n = Some δ0)
-    (FUEL0: ls_fuel δ0 !! ρ = Some f0)
-    (NOρ: ∀ i ℓ, n <= i -> tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g)
-    (ASGρ: ∀ i δ, n <= i -> tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: auxtrace_valid tr):
-    forall i δ f, 
-      n <= i -> tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
-  Proof.
-    intros i δ f LE ITH FUEL.
-    apply Nat.le_sum in LE as [d ->]. 
-    pose proof ST0 as (atr & AFTER & HEAD)%state_lookup_after'.
-    forward eapply (role_fuel_decreases atr).
-    - erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
-    - eauto.
-    - intros. eapply (NOρ (n + i)); eauto.
-      + lia.
-      + rewrite -H. symmetry. eapply label_lookup_after; eauto.
-    - intros. eapply (ASGρ (n + i)); eauto.
-      + lia.
-      + rewrite -H. symmetry. eapply state_lookup_after; eauto.
-    - eapply auxtrace_valid_after; eauto. 
-    - erewrite state_lookup_after; eauto.
-    - eauto.
-    - lia.
-  Qed. 
-
-End LMTraceHelpers.
