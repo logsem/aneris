@@ -1,6 +1,6 @@
 From stdpp Require Import finite.
 From trillium.prelude Require Import finitary quantifiers classical_instances.
-From trillium.fairness Require Import fairness fuel traces_match.
+From trillium.fairness Require Import fairness fuel traces_match lm_fair_traces lm_fair. 
 
 Section gmap.
   Context `{!EqDecision K, !Countable K}.
@@ -24,7 +24,7 @@ Section finitary.
   Context `{Λ: language}.
   Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision M}.
-  Context `{EqDecision (locale Λ)}.
+  (* Context `{EqDecision (locale Λ)}. *)
   Context `{DEC: forall a b c, Decision (LSI a b c)}.
 
   Variable (ξ: execution_trace Λ -> finite_trace M (option M.(fmrole)) -> Prop).
@@ -54,18 +54,34 @@ Section finitary.
     exists (exist _ (δ', ℓ) H). split =>//. apply elem_of_enum.
   Qed.
 
-  (* TODO: move *)
-  Fixpoint trace_map {A A' L L'} (sf: A → A') (lf: L -> L') (tr: finite_trace A L): finite_trace A' L' :=
-  match tr with
-  | trace_singleton x => trace_singleton $ sf x
-  | trace_extend tr' ℓ x => trace_extend (trace_map sf lf tr') (lf ℓ) (sf x)
-  end.
+  (* Lemma enum_inner_spec extr atr c' oζ : *)
+  (*   ξ (extr :tr[oζ]: c') (atr) → (δ', ℓ) ∈ enum_inner extr atr c' oζ. *)
+  (* Proof. *)
+  (*   intros H. unfold enum_inner. rewrite elem_of_list_fmap. *)
+  (*   exists (exist _ (δ', ℓ) H). split =>//. apply elem_of_enum. *)
+  (* Qed. *)
 
-  Fixpoint get_underlying_fairness_trace (M : FairModel) LSI (LM: LiveModel (locale Λ) M LSI) (ex : auxiliary_trace LM) :=
+  (* (* TODO: move *) *)
+  (* Fixpoint trace_map {A A' L L'} (sf: A → A') *)
+  (*   (lsf: A -> L -> A -> L') (tr: finite_trace A L): finite_trace A' L' := *)
+  (* match tr with *)
+  (* | trace_singleton x => trace_singleton $ sf x *)
+  (* | trace_extend tr' ℓ x => trace_extend (trace_map sf lsf tr') (lsf x ℓ (trace_first tr')) (sf x) *)
+  (* end. *)
+
+  Fixpoint get_underlying_fairness_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} {LF: LMFairPre LM}
+    (ex : auxiliary_trace (fair_model_model LM_Fair)) :=
   match ex with
   | trace_singleton δ => trace_singleton (ls_under δ)
-  | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LSI LM ex') ρ (ls_under δ)
-  | trace_extend ex' _ _ => get_underlying_fairness_trace M LSI LM ex'
+  (* | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LSI LM ex') ρ (ls_under δ) *)
+  (* | trace_extend ex' _ _ => get_underlying_fairness_trace M LSI LM ex' *)
+  | trace_extend ex' None δ => get_underlying_fairness_trace ex'
+  | trace_extend ex' (Some g) δ =>
+      let u' := get_underlying_fairness_trace ex' in
+      match (next_TS_role (trace_last ex') g δ) with
+      | Some ρ => trace_extend u' (Some ρ) δ
+      | None => u'
+      end
   end.
 
   Definition get_role {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (lab: mlabel LM) :=
@@ -74,11 +90,8 @@ Section finitary.
   | _ => None
   end.
 
-  Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) :=
-    (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux).
-
-  
-
+  (* Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) := *)
+  (*   (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux). *)
 
   Program Definition enumerate_next
     (δ1: LM)
@@ -259,37 +272,62 @@ Section finitary.
     subst ℓ. by destruct oζ, oρ. 
   Qed. 
 
-  Lemma valid_state_evolution_finitary_fairness':
-    rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (map_underlying_trace auxtr (LM := LM)))).
+  Lemma valid_state_evolution_finitary_fairness' {LF: LMFairPre LM}:
+    rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (get_underlying_fairness_trace auxtr)) (M := fair_model_model LM_Fair)).
   Proof.
     rewrite /valid_lift_fairness.
     intros ex atr [e' σ'] oζ.
     eapply finite_smaller_card_nat.
     simpl.
-    set (inner_exts := ((trace_last atr).(ls_under), None) :: enum_inner ex (map_underlying_trace atr) (e', σ') oζ).
+    set (inner_exts := ((trace_last atr).(ls_under), None) :: enum_inner ex (get_underlying_fairness_trace atr) (e', σ') oζ).
     set (next_threads := (locales_of_list e')).
-    set (convert_lbl := lift_convert_lbl oζ). 
-    eapply (in_list_finite (enumerate_next (trace_last atr) 
-                              inner_exts next_threads convert_lbl)).
-    intros [δ' ℓ]. intros [[Hlbl [Htrans Htids]] Hξ].
+    set (convert_lbl := lift_convert_lbl oζ).
 
-    eapply next_step_domain; eauto.
-    { destruct ℓ as [ρ tid' | |].
-      - inversion Htrans as [Htrans'].
+    (* eapply surjective_finite. Unshelve. *)
+    set (get_ol := fun (st_ℓ: lm_ls LM * lm_lbl LM) => 
+                        match st_ℓ with
+                        | (st, Silent_step τ) | (st, Take_step _ τ) => (st, Some τ)
+                        | (st, _) => (st, None)
+                        end). 
+    
+    eapply (in_list_finite (get_ol <$> (enumerate_next (trace_last atr) 
+                              inner_exts next_threads convert_lbl))).
+    intros [δ' ℓ]. intros [[Hlbl [Htrans Htids]] Hξ].
+    apply elem_of_list_fmap.
+    subst. simpl in Htrans. destruct ℓ as [τ| ]; [| done].
+    red in Htrans. destruct Htrans as (ℓ & Htrans & MATCH).
+
+    (* TODO: get rid of duplication *)
+    destruct (next_TS_role (trace_last atr) τ δ') eqn:N; rewrite N in Hξ.
+    - clear Htrans.
+      apply next_TS_spec_pos in N as Htrans.
+      exists (δ', Take_step f τ). split; [done| ].
+      eapply next_step_domain; eauto.
+      { done. }
+      { inversion Htrans as [Htrans'].
         apply elem_of_cons; right.
-        by apply enum_inner_spec.
-      - apply elem_of_cons; left. f_equal. inversion Htrans as (?&?&?&?&?); done.
-      - apply elem_of_cons; right. inversion Htrans as (?&?).
-        simpl. by apply enum_inner_spec. }
-    { intros ρ' tid' Hsome. unfold tids_smaller in *.
-      apply locales_of_list_from_locale_from. eauto. }
+        by apply enum_inner_spec. }
+      { intros ρ' tid' Hsome. unfold tids_smaller in *.
+        apply locales_of_list_from_locale_from. eauto. }
+    - eapply next_TS_spec_inv_S in N.  
+      2: { eexists. split; eauto. }
+      clear Htrans. rename N into Htrans. 
+      exists (δ', Silent_step τ). split. 
+      { simpl. destruct ℓ; simpl in *; congruence || done. }
+      eapply next_step_domain; eauto.
+      { done. }
+      { apply elem_of_cons; left. f_equal. inversion Htrans as (?&?&?&?&?); done. }
+      { intros ρ' tid' Hsome. unfold tids_smaller in *.
+        apply locales_of_list_from_locale_from. eauto. }
+      
     Unshelve.
-    + intros ??. apply make_decision.
     + intros. apply make_proof_irrel.
   Qed.
 
-  Lemma valid_state_evolution_finitary_fairness (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
-    rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (map_underlying_trace auxtr) ∧ φ extr auxtr)).
+  Lemma valid_state_evolution_finitary_fairness
+          {LF: LMFairPre LM}
+    (φ: execution_trace Λ -> auxiliary_trace (fair_model_model LM_Fair) -> Prop) :
+    rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (get_underlying_fairness_trace auxtr) ∧ φ extr auxtr) (M := fair_model_model LM_Fair)).
   Proof.
     eapply rel_finitary_impl; [| apply valid_state_evolution_finitary_fairness'].
     { by intros ??[? [? ?]]. }
@@ -328,14 +366,19 @@ Section finitary_simple.
     | _, _ => True
     end.
 
-  (* TODO: move*)
-  Lemma trace_map_last {A A' L L' : Type} (sf : A → A') (lf : L → L') 
-    (tr : finite_trace A L):
-    trace_last (trace_map sf lf tr) = sf (trace_last tr).
-  Proof. by destruct tr. Qed. 
+  (* (* TODO: move*) *)
+  (* Lemma underlying_trace_last {A A' L L' : Type} (sf : A → A') (lf : L → L') *)
+  (*   (tr : finite_trace A L): *)
+  (*   trace_last (trace_map sf lf tr) = sf (trace_last tr). *)
+  (* Proof. *)
+  (*   get_underlying_fairness_trace *)
+  (*   by destruct tr. Qed. *)
 
-  Lemma valid_state_evolution_finitary_fairness_simple (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
-    rel_finitary (valid_lift_fairness lm_valid_evolution_step φ).
+  Lemma valid_state_evolution_finitary_fairness_simple
+          {LF: LMFairPre LM}
+    (φ: execution_trace Λ -> auxiliary_trace (fair_model_model LM_Fair) -> Prop)
+    (VALIDφ: forall extr auxtr, φ extr auxtr -> trace_steps (fmtrans LM_Fair) auxtr):
+    rel_finitary (valid_lift_fairness lm_valid_evolution_step φ (M := (fair_model_model LM_Fair))).
   Proof.
     eapply rel_finitary_impl. 
     2: eapply valid_state_evolution_finitary_fairness with (ξ := mtrace_evolution).
@@ -351,9 +394,34 @@ Section finitary_simple.
     red. destruct ex as [?| ] eqn:EX; [done| ].
     destruct aux as [?| ] eqn:AUX; [done| ]. 
     destruct a. simpl in *. 
-    rewrite trace_map_last. 
+    (* rewrite trace_map_last.  *)
     red in H. destruct H as (?&?&?). red in H1.
     destruct l0; simpl in H1; intuition.
+    (* TODO: move *)
+    assert (forall tr, trace_steps (fmtrans LM_Fair) tr -> trace_last (get_underlying_fairness_trace tr) = ls_under (trace_last tr)) as UNDER_LAST. 
+    { clear. induction tr; try done.
+      intros VALID. 
+      simpl. inversion VALID. subst. destruct l.
+      2: { done. }
+      destruct next_TS_role eqn:N; [done| ].
+      eapply next_TS_spec_inv_S in N.
+      2: { by rewrite H2. }
+      simpl in N. repeat apply proj2 in N. rewrite -N.
+      by apply IHtr. }
+    
+    destruct (next_TS_role (trace_last f0) l0 a0) eqn:N.
+    - apply next_TS_spec_pos in N. left.
+      rewrite UNDER_LAST.
+      { apply N. }
+      apply VALIDφ in H0.
+      by inversion H0.
+    - subst.
+      destruct f0; [done| ]. simpl. 
+      
+      destruct get_underlying_fairness_trace eqn:UNDER; [done| ].
+      subst. 
+      right. 
+    
     Unshelve.
     + intros ??. apply make_decision.
     + intros. apply make_proof_irrel.
