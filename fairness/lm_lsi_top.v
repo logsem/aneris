@@ -1,18 +1,23 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness resources heap_lang_defs em_lm em_lm_heap_lang lm_steps_gen.
+From trillium.fairness Require Import fairness resources heap_lang_defs em_lm em_lm_heap_lang lm_steps_gen lm_fair. 
 From trillium.fairness.lm_rules Require Import fuel_step.
 
 Section LMLSITopLevel. 
   Context `{LM: LiveModel (locale heap_lang) M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
+  Context {LF': LMFairPre' LM}. 
   Context`{invGS_gen HasNoLc Σ}. 
 
+  Local Instance LF: LMFairPre LM.
+  esplit; apply _.
+  Defined. 
+
   Lemma lm_lsi_toplevel:
-    ⊢ LM_steps_gen ∅ (EM := @LM_EM_HL _ _ LM) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
+    ⊢ LM_steps_gen ∅ (EM := @LM_EM_HL _ _ _ LF') (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.
-    iIntros. iApply (Build_LM_steps_gen (EM := @LM_EM_HL _ _ LM)). 
+    iIntros. iApply (Build_LM_steps_gen (EM := @LM_EM_HL _ _ _ LF')). 
     iModIntro. repeat iSplitL.
     - iIntros "* FUELS ST MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
@@ -25,7 +30,7 @@ Section LMLSITopLevel.
       + remember (trace_last auxtr) as δ1. 
         pose proof (tids_restrict_smaller _ _ TR) as SM.
         repeat split; eauto.
-        * done.
+        * eexists. split; [apply STEPM| ]; done. 
         * eapply tids_smaller_restrict_mapping; eauto.
           simpl. erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
           3: { eapply (mim_fuel_helper _ rem); eauto.

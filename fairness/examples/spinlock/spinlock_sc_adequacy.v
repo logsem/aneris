@@ -11,7 +11,7 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 From stdpp Require Import finite.
-From trillium.fairness Require Import fairness_finiteness actual_resources_interface. 
+From trillium.fairness Require Import fairness_finiteness actual_resources_interface lm_fair.
 
 Import derived_laws_later.bi.
 
@@ -345,6 +345,23 @@ Section SpinlockRA.
 
 End SpinlockRA.
 
+(* TODO: generalize to any LSI_True model *)
+Instance sl_model_inh: Inhabited (lm_ls spinlock_model).
+Proof. 
+  pose proof (fmrole_inhabited spinlock_model_impl) as [ρ].
+  pose proof (fmstate_inhabited spinlock_model_impl) as [s].
+  eapply populate, (initial_ls s ρ). done.
+Qed.     
+
+Instance sl_dec_trans s1 ρ s2:
+  Decision (fmtrans spinlock_model_impl s1 (Some ρ) s2).
+Proof. 
+Admitted. 
+
+Local Instance LF_SL': LMFairPre' spinlock_model.
+Proof. 
+  esplit; try by apply _.
+Defined. 
 
 Theorem spinlock_terminates
         (extr : heap_lang_extrace)
@@ -352,11 +369,10 @@ Theorem spinlock_terminates
         (Hexfirst : (trfirst extr).1 = [program #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ spinlock_model)) spinlockΣ). 
-  assert (heapGpreS Σ (@LM_EM_HL _ _ spinlock_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ spinlock_model LF_SL')) spinlockΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ _ _ LF_SL')) as HPreG.
   { apply _. }
-  unshelve eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ ([2; 2] : fmstate spinlock_model_impl) _ ∅)
-  =>//.
+  unshelve eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ ([2; 2] : fmstate spinlock_model_impl) _ ∅) =>//.
   - done. 
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl.

@@ -2,12 +2,13 @@ From trillium.fairness Require Export fairness resources fair_termination fuel f
 (* From trillium.fairness.heap_lang Require Export lang heap_lang_defs. *)
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Export partial_ownership.
-From trillium.fairness Require Import execution_model.
+From trillium.fairness Require Import execution_model lm_fair_traces lm_fair. 
 
 Section LMExecModel.
   Context `{LM:LiveModel (locale Λ) M LSI}.
-  Context `{CNT_Λ: Countable (locale Λ)}. 
-
+  (* Context `{CNT_Λ: Countable (locale Λ)}. *)
+  Context {LF: LMFairPre LM}. 
+  
   (* TODO: remove *)
   Context (τ0: locale Λ). 
   Hypothesis (INITτ0: forall e, locales_of_list [e] = [τ0]). 
@@ -75,15 +76,10 @@ Definition em_lm_msi `{!fairnessGS LM Σ}
 (* TODO: how to make 'heap..' instantiations less wordy? *)
 (* TODO: how to avoid different instances of EqDec and Cnt? *)
 Lemma init_fairnessGS_LM Σ
-  (* `{hPre: @fairnessGpreS (locale Λ) M LM Σ Nat.eq_dec nat_countable} *)
-  `{hPre: @fairnessGpreS (locale Λ) M LSI LM Σ _ CNT_Λ}
-
-  (* `(LM:LiveModel Λ M)   *)
+  {hPre: @fairnessGpreS (locale Λ) M LSI LM Σ _ _}
   (s1: LM) (σ1 : cfg Λ) (INIT: lm_is_init_st σ1 s1):
   ⊢ (|==> ∃ fGS: fairnessGS LM Σ, (* TODO: what is a canonical way of doing it? *)
-       (* ∀ `{hGS: @heapGS Σ _ (@LM_EM _ LM)}, *)
-       (*   ⌜ hGS.(heap_fairnessGS) = fGS⌝ → *)
-      LM_init_resource s1 ∗ em_lm_msi σ1 s1).
+         LM_init_resource s1 ∗ em_lm_msi σ1 s1).
 Proof.
   iIntros. 
   destruct INIT as [[??] [FUEL TMAP]]. destruct σ1 as [tp ?]. simpl in *. subst.
@@ -91,34 +87,10 @@ Proof.
   iMod (lm_msi_init s1 ∅) as (fG) "(MSI & Hmodf & Hmapf & Hfuelf & Hfr)".
   { set_solver. } (* TODO: generalize to arbitrary set *)
   
-  (* iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]". *)
-  (* iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]". *)
-  (* iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]". *)
-  (* (* iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]". *) *)
-  (* iMod (model_free_roles_init s1 ∅) as (γfr) "[HFR Hfr]". *)
   iModIntro.
   iExists fG. 
   rewrite /em_lm_msi. iFrame "MSI". 
   
-  (* iApply bi.sep_comm.  rewrite -bi.sep_assoc.   *)
-  (* iSplitR "Hmodf Hfr Hfuelf Hmapf". *)
-  (* 1: { unfold model_state_interp. simpl. iFrame.  *)
-  (*      iExists _. *)
-
-  (*      iSplitL "Hfuela". *)
-  (*      { rewrite /auth_fuel_is /=. *)
-  (*        rewrite FUEL. rewrite fmap_gset_to_gmap //. }  *)
-
-  (*      iSplitL "Hmapa"; first by rewrite TMAP /auth_mapping_is /= map_fmap_singleton //. *)
-  (*      iSplit; first done. *)
-  (*      (* - intros ρ tid. rewrite MAP.  *) *)
-  (*      (*   rewrite lookup_gset_to_gmap_Some. *) *)
-  (*      (*   setoid_rewrite lookup_singleton_Some. split; naive_solver. *) *)
-
-  (*      (* - rewrite FUEL. rewrite dom_gset_to_gmap. set_solver. *) *)
-  (*      iPureIntro. set_solver.  *)
-  (* } *)
-
   iSplitL.
   2: { iPureIntro. rewrite /tids_restrict.
        intros tid Hlocs. rewrite TMAP lookup_singleton_ne //.
@@ -145,8 +117,7 @@ Proof.
   iExists _. iFrame. iPureIntro. apply lookup_gset_to_gmap_Some. done.
 Qed.
 
-
-Global Instance LM_EM: @ExecutionModel Λ LM.
+Global Instance LM_EM: @ExecutionModel Λ (fair_model_model (LM_Fair)).
 refine
   {|
     em_preGS := fun Σ => fairnessGpreS LM Σ;
@@ -155,14 +126,14 @@ refine
     em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ _ LM _ _;
 
     (* em_valid_evolution_step := valid_evolution_step (LM := LM); *)
-    em_thread_post Σ := fun {_: fairnessGS LM Σ} (tid: locale Λ) => 
+    em_thread_post Σ := fun {_: fairnessGS LM Σ} (tid: locale Λ) =>
                           (* tid ↦M ∅; *)
                           frag_mapping_is {[ tid := ∅ ]};
     (* TODO: cannot express the msi instantiation this way*)
     (* em_msi Σ := fun {_: fairnessGS LM Σ} es δ => model_state_interp es δ (LM := LM); *)
-    em_is_init_st := lm_is_init_st;
+    em_is_init_st := (@lm_is_init_st: cfg Λ -> mstate (fair_model_model (LM_Fair)) -> Prop);
 
-    em_init_resource Σ := fun {_: fairnessGS LM Σ} δ => LM_init_resource δ;
+    em_init_resource Σ := fun {_: fairnessGS LM Σ} (δ: mstate (fair_model_model (LM_Fair))) => LM_init_resource δ;
 |}.
 (* TODO: cannot directly specify these components *)
 Unshelve. 

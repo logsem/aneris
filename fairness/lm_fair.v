@@ -3,6 +3,17 @@ From trillium.fairness Require Import fairness fuel fuel_ext utils.
 Close Scope Z_scope.
 
 
+(* excluding parts that are provided by other classes in context *)
+(* TODO: find a better solution *)
+Class LMFairPre' {G M LSI} (LM: LiveModel G M LSI) := {
+  (* edG :> EqDecision G; *)
+  (* cntG :> Countable G; *)
+  edM' :> EqDecision (fmstate M);
+  dTr' :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
+  inhLM' :> Inhabited (lm_ls LM);
+  inhG' :> Inhabited G;
+}.
+
 Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := {
   edG :> EqDecision G;
   cntG :> Countable G;
@@ -10,7 +21,7 @@ Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := {
   dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
   inhLM :> Inhabited (lm_ls LM);
   inhG :> Inhabited G;
-}. 
+}.
 
 
 Section LMFair.
