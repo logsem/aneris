@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup.
+From trillium.fairness Require Import lemmas trace_len trace_lookup.
 From trillium.fairness Require Import inftraces fairness trace_utils.
 
 Close Scope Z_scope.
@@ -213,14 +213,14 @@ Section FMTraceHelpers.
 
   End ValidTracesProperties.
 
-  From Paco Require Import pacotac.
-  Lemma mtrace_valid_cons (tr: mtrace M) (s: fmstate M) (oρ: option (fmrole M))
-    (VALID: mtrace_valid (s -[oρ]-> tr)):
-    mtrace_valid tr /\ fmtrans M s oρ (trfirst tr). 
-  Proof using.
-    punfold VALID. inversion VALID. subst.
-    pclearbot. done. 
-  Qed.
+  (* use trace_valid_cons_inv instead *)
+  (* Lemma mtrace_valid_cons (tr: mtrace M) (s: fmstate M) (oρ: option (fmrole M)) *)
+  (*   (VALID: mtrace_valid (s -[oρ]-> tr)): *)
+  (*   mtrace_valid tr /\ fmtrans M s oρ (trfirst tr).  *)
+  (* Proof using. *)
+  (*   punfold VALID. inversion VALID. subst. *)
+  (*   pclearbot. done.  *)
+  (* Qed. *)
 
 End FMTraceHelpers.
 

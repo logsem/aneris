@@ -1,4 +1,4 @@
-From trillium.fairness.examples.comp Require Import my_omega lemmas. 
+From trillium.fairness Require Import my_omega lemmas. 
 From trillium.fairness Require Import inftraces trace_utils.
 
 Section TraceLen.

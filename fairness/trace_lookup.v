@@ -1,4 +1,4 @@
-From trillium.fairness.examples.comp Require Import my_omega lemmas trace_len.
+From trillium.fairness Require Import my_omega lemmas trace_len.
 From trillium.fairness Require Import inftraces trace_utils.
 
 Section TraceLookup.
@@ -301,6 +301,16 @@ Section TraceLookup.
     destruct after; [| done].
     destruct t; [done| ]. intros [=->]. eauto.
   Qed. 
+
+  Lemma trace_lookup_0_singleton (s: St):    
+     (⟨ s ⟩: trace St L) !! 0 = Some (s, None).
+  Proof. done. Qed. 
+
+  Lemma trace_lookup_0 (tr: trace St L):    
+    exists ostep, tr !! 0 = Some (trfirst tr, ostep).
+  Proof.
+    destruct tr; eauto. 
+  Qed.
 
 End TraceLookup.
 
