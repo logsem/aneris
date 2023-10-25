@@ -6,7 +6,7 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 Import derived_laws_later.bi.
-From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup trace_helpers.
+From trillium.fairness Require Import lemmas trace_len trace_lookup trace_helpers.
 From trillium.fairness.ext_models Require Import set_map_properties ext_models.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 

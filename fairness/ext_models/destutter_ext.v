@@ -1,150 +1,75 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export inftraces fairness trace_utils.
-From trillium.fairness Require Export fuel lm_fair. 
-From trillium.fairness.ext_models Require Export ext_models.
-(* ext_lm_fair.  *)
+From trillium.fairness Require Import inftraces fairness trace_utils.
+From trillium.fairness Require Import fuel lm_fair lm_fair_traces.
+From trillium.fairness.ext_models Require Import ext_models.
 
-
-(* TODO: move to lm_fair, reorganize?, reduce the scope? *)
-Class LMFairPre `{LM: LiveModel G M LSI} := {
-  edG :> EqDecision G;
-  cntG :> Countable G;
-  edM :> EqDecision (fmstate M);
-  dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
-  inhLM :> Inhabited (lm_ls LM);
-  inhG :> Inhabited G;
-}. 
-
-
-Section ExtLM.
-  (** The differences with Ext(LM_Fair) are:
-      - this is not a FairModel, so there is no notion of "roles" and enabledness
-      - following from previous, (inl) transitions are made with FairLabel
-      This additional construction is needed because the destuttering proof
-      would be hard to conduct using LM_Fair-like traces *)
-
-  Context `{LM: LiveModel G M LSI}.
-  Context {LMFP: LMFairPre (LM := LM)}.
-  Let LMF := LM_Fair (LM := LM).
-  
-  Context {ELMF: ExtModel LMF}.
-
-  Definition elm_lbl := (lm_lbl LM + (@EI _ ELMF))%type. 
-
-  (* TODO: change name? *)
-  Inductive elm_trans: lm_ls LM -> elm_lbl -> lm_ls LM -> Prop :=
-  | elm_lm_step s1 ℓ s2 (STEP: lm_ls_trans LM s1 ℓ s2):
-    elm_trans s1 (inl ℓ) s2
-  | elm_ext_step s1 s2 ι (REL: ETs ι s1 s2):
-    elm_trans s1 (inr ι) s2.   
-
-  Definition ELM : Model := {|
-    mstate := lm_ls LM;
-    mlabel := elm_lbl;
-    mtrans := elm_trans
-  |}.  
-
-  Definition eauxtrace := trace (mstate ELM) (mlabel ELM). 
-
-  CoInductive eauxtrace_valid: eauxtrace -> Prop :=
-  | eauxtrace_valid_singleton δ: eauxtrace_valid ⟨δ⟩
-  | eauxtrace_valid_cons δ ℓ tr:
-      elm_trans δ ℓ (trfirst tr) ->
-      eauxtrace_valid tr →
-      eauxtrace_valid (δ -[ℓ]-> tr).
-
-  (* TODO: unify fairness definitions by parametrizing fair_by
-     with predicate on "expected step"; use it in fair_aux and fair_eaux  *)
-  Definition fair_eaux ρ (eauxtr: eauxtrace): Prop :=
-    forall n, pred_at eauxtr n (λ δ _, role_enabled ρ δ) ->
-         ∃ m, pred_at eauxtr (n+m) (λ δ _, ¬role_enabled ρ δ) ∨
-              pred_at eauxtr (n+m) (λ _ ℓ, ∃ tid, ℓ = Some $ inl (Take_step ρ tid)).
-
-  (* TODO: remove after refactoring of fair_eaux*)
-  Lemma fair_eaux_after ρ eauxtr n eauxtr':
-    fair_eaux ρ eauxtr ->
-    after n eauxtr = Some eauxtr' ->
-    fair_eaux ρ eauxtr'.
-  Proof.
-    rewrite /fair_aux => Hfair Hafter m Hpa.
-    specialize (Hfair (n+m)).
-    rewrite -> (pred_at_sum _ n) in Hfair. rewrite Hafter in Hfair.
-    destruct (Hfair Hpa) as (p&Hp).
-    exists (p). by rewrite <-Nat.add_assoc, ->!(pred_at_sum _ n), Hafter in Hp.
-  Qed.
-
-End ExtLM.
-
+(* TODO: is it possible to unify usual and ext-aware versions of these proofs? *)
 
 Section destuttering_auxtr.
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
   (* Let EMF := ext_model_FM (EM := EM).  *)
-  Context {LMFP: LMFairPre (LM := LM)}.
-  Let LMF := LM_Fair (LM := LM).
-  Context {ELMF: ExtModel LMF}.
+  Context {LF: LMFairPre LM}.
 
-  Context (proj_ext: (@EI _ ELMF) -> (@EI _ EM)). 
-  
-  Lemma fuel_must_not_incr_fuels oρ'
-    (δ1 δ2: LiveState G M LSI)
-    ρ f1 f2
-    (KEEP: fuel_must_not_incr oρ' δ1 δ2)
-    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
-    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
-    (OTHER: oρ' ≠ Some ρ):
-    f2 <= f1.
-  Proof.
-    red in KEEP. specialize (KEEP ρ ltac:(by apply elem_of_dom)).
-    destruct KEEP as [LE|[?|KEEP]].
-    + rewrite FUEL1 FUEL2 in LE. simpl in LE. lia. 
-    + tauto. 
-    + apply proj1 in KEEP. destruct KEEP. eapply elem_of_dom; eauto.
-  Qed.
+  (* Let LMF := LM_Fair (LM := LM). *)
+  Context {ELM: ExtModel LM_Fair}.
 
-  Lemma step_nonincr_fuels ℓ
-    (δ1 δ2: LiveState G M LSI)
-    ρ f1 f2
-    (STEP: lm_ls_trans LM δ1 ℓ δ2)
-    (FUEL1: ls_fuel δ1 !! ρ = Some f1)
-    (FUEL2: ls_fuel δ2 !! ρ = Some f2)
-    (OTHER: forall g, ℓ ≠ Take_step ρ g):
-    f2 <= f1.
-  Proof.
-    destruct ℓ. 
-    all: eapply fuel_must_not_incr_fuels; eauto; [apply STEP|..]; congruence.
-  Qed. 
+  Context (proj_ext: (@EI _ ELM) -> (@EI _ EM)).   
 
-
-  (* Definition EUl (ℓ: ELM.(mlabel)): option (option (@ext_role _ EM)) := *)
+  (* Definition EUsls (_: lm_ls LM) (ℓ: ELM.(mlabel)) (_: lm_ls LM): *)
+  (*   option (option (@ext_role _ EM)) := *)
   (*   match ℓ with *)
   (*   | inl (Take_step ρ _) => Some (Some (inl ρ)) *)
   (*   | inr e => Some $ Some $ inr $ env $ proj_ext $ e *)
   (*   | _ => None *)
   (*   end. *)
-  Definition EUsls (_: lm_ls LM) (ℓ: ELM.(mlabel)) (_: lm_ls LM):
-    option (option (@ext_role _ EM)) :=
-    match ℓ with
-    | inl (Take_step ρ _) => Some (Some (inl ρ))
-    | inr e => Some $ Some $ inr $ env $ proj_ext $ e
-    | _ => None
-    end.
+  Definition EUsls (δ1: lm_ls LM) (oτ: option (@ext_role _ ELM)) (δ2: lm_ls LM):
+    option $ option $ @ext_role _ EM :=
+    match oτ with 
+    | Some (inl τ) => match (next_TS_role δ1 τ δ2) with 
+                     | Some ρ => Some $ Some (inl ρ)
+                     | None => None
+                     end
+    | Some (inr (env ι)) => Some $ Some $ inr $ env $ proj_ext ι
+    | None => None
+    end. 
 
   Definition Ψ (δ: LiveState G M LSI) :=
     size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := G)), f.
 
-  Lemma fuel_dec_unless_lm_step δ (ℓ: lm_lbl LM) δ'
-    (Htrans : lm_ls_trans LM δ ℓ δ'):
-    (∃ ℓ' : fmrole M, EUsls δ (inl ℓ) δ' = Some $ Some $ inl ℓ') ∨
-    Ψ δ' < Ψ δ ∧ ls_under δ = ls_under δ'.
-  Proof. 
-    destruct ℓ as [| tid' |];
-      [left; eexists; done| right | inversion Htrans; naive_solver ].
+  (* TODO: move *)
+  Ltac unfold_LMF_trans T :=
+    match type of T with
+    | locale_trans ?δ1 ?l ?δ2 =>
+        destruct (next_TS_role δ1 l δ2) eqn:N;
+        [pose proof N as ?STEP%next_TS_spec_pos|
+         pose proof N as ?STEP%next_TS_spec_inv_S; [| by eauto]] 
+    end.
 
-    destruct Htrans as (Hne&Hdec&Hni&Hincl&Heq).
-    rewrite -> Heq in *. split; last done.
+  (* TODO: move *)
+  Ltac unfold_LMF_trans' T :=
+    match type of T with
+    | fmtrans LM_Fair ?δ1 ?l ?δ2 =>
+        simpl in T; destruct l as [l| ]; [| done];
+        unfold_LMF_trans' T
+    end.
+
+
+  Lemma fuel_dec_unless_lm_step δ τ δ'
+    (* (Htrans : lm_ls_trans LM δ ℓ δ') *)
+    (Htrans: locale_trans δ τ δ'):
+    (∃ ρ' : fmrole M, EUsls δ (Some $ inl τ) δ' = Some $ Some $ inl ρ') ∨
+    Ψ δ' < Ψ δ ∧ ls_under δ = ls_under δ'.
+  Proof.
+    unfold_LMF_trans Htrans. 
+    (* destruct ℓ as [| tid' |]; *)
+    (*   [left; eexists; done| right | inversion Htrans; naive_solver ]. *)
+    { left. simpl. rewrite N. eauto. } 
+
+    destruct STEP as (Hne&Hdec&Hni&Hincl&Heq).
+    right. rewrite -> Heq in *. split; last done.
     
     destruct (decide (dom $ ls_fuel δ = dom $ ls_fuel δ')) as [Hdomeq|Hdomneq].
     - destruct Hne as [ρ Hρtid].
@@ -175,9 +100,9 @@ Section destuttering_auxtr.
       destruct (Hni ρ' ltac:(set_solver)); [done|set_solver].
   Qed.
 
-  Lemma fuel_dec_unless_step δ ℓ δ'
-    (Htrans : elm_trans δ ℓ δ'):
-    (∃ ℓ' : option (@ext_role _ EM), EUsls δ ℓ δ' = Some ℓ') ∨
+  Lemma fuel_dec_unless_step δ r δ'
+    (Htrans : ext_trans δ r δ'):
+    (∃ ρ' : option (@ext_role _ EM), EUsls δ r δ' = Some ρ') ∨
     Ψ δ' < Ψ δ ∧ ls_under δ = ls_under δ'.
   Proof. 
     inversion Htrans.
@@ -188,28 +113,32 @@ Section destuttering_auxtr.
     left. eauto.
   Qed.
 
+  Definition elmftrace := mtrace (@ext_model_FM _ ELM). 
+
   Lemma fuel_dec_unless
     (* (auxtr: auxtrace (LM := LM)) *)
-          (eauxtr: eauxtrace (LM := LM))
+          (eauxtr: elmftrace)
     :
-    eauxtrace_valid eauxtr ->
+    mtrace_valid eauxtr ->
     dec_unless ls_under EUsls Ψ eauxtr.
   Proof.
     intros Hval n. revert eauxtr Hval. induction n; intros eauxtr Hval; last first.
     { edestruct (after (S n) eauxtr) as [eauxtrn|] eqn:Heq; rewrite Heq =>//.
-      simpl in Heq. simplify_eq. destruct eauxtrn as [|δ ℓ eauxtr']=>//; last first.
-      inversion Hval as [|???? Hmatch]; simplify_eq =>//.
-      specialize (IHn _ Hmatch). rewrite Heq // in IHn. }
+      simpl in Heq. simplify_eq. destruct eauxtrn as [|δ ℓ eauxtr']=>//; last first.            
+      destruct eauxtr; [done| ].
+      apply trace_valid_cons_inv in Hval as [VAL _].
+      specialize (IHn _ VAL). rewrite Heq // in IHn. 
+    }
     rewrite after_0_id. destruct eauxtr; [done| ].
-    inversion Hval as [|??? Htrans Hmatch]; simplify_eq =>//.
+    apply trace_valid_cons_inv in Hval as [VAL ?]; simplify_eq =>//.
     eapply fuel_dec_unless_step; eauto. 
   Qed.
 
   Definition upto_stutter_eauxtr :=
     upto_stutter (ls_under (G:=G) (M:=M) (LSI := LSI)) EUsls.
 
-  Lemma can_destutter_eauxtr eauxtr:
-    eauxtrace_valid eauxtr →
+  Lemma can_destutter_eauxtr (eauxtr: elmftrace):
+    mtrace_valid eauxtr →
     ∃ mtr, upto_stutter_eauxtr eauxtr mtr.
   Proof.
     intros ?. eapply can_destutter.
@@ -218,53 +147,42 @@ Section destuttering_auxtr.
 
 End destuttering_auxtr.
 
-(* TODO: move *)
-Lemma upto_stutter_mono' {S S' L L': Type} (Us: S -> S') (Usls: S -> L -> S -> option L'):
-  monotone2 (upto_stutter_ind Us Usls).
-Proof.
-  unfold monotone2. intros x0 x1 r r' IN LE.
-  induction IN; try (econstructor; eauto; done).
-Qed.
-
 Section upto_preserves.
-  (* Context `{LM: LiveModel G M LSI}. *)
-  (* Context `{Countable G}. *)
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
-  Context {LMFP: LMFairPre (LM := LM)}.
-  Let LMF := LM_Fair (LM := LM).
-  Context {ELMF: ExtModel LMF}.
+  Context {LF: LMFairPre LM}.
+  (* Let LMF := LM_Fair (LM := LM). *)
+  Context {ELMF: ExtModel LM_Fair}.
   Context (proj_ext: (@EI _ ELMF) -> (@EI _ EM)). 
 
   Hypothesis PROJ_KEEP_EXT:
     forall δ1 ι δ2, (@ETs _ ELMF) ι δ1 δ2 -> 
                 (@ETs _ EM) (proj_ext ι) (ls_under δ1) (ls_under δ2). 
 
-  Local Hint Resolve upto_stutter_mono' : paco.
-
   (* TODO: here and for similar lemmas:
      try to unify usual and external versions *)
-  Lemma upto_preserves_validity (eauxtr : eauxtrace (LM := LM)) mtr:
+  Lemma upto_preserves_validity (eauxtr : elmftrace (LM := LM)) mtr:
     upto_stutter_eauxtr proj_ext eauxtr mtr ->
-    eauxtrace_valid eauxtr ->
+    mtrace_valid eauxtr ->
     emtrace_valid mtr.
   Proof.
     revert eauxtr mtr. pcofix CH. intros eauxtr mtr Hupto Hval.
-    punfold Hupto.
+    punfold Hupto. 
+    2: { apply upto_stutter_mono. } 
     induction Hupto as [| |btr str δ ????? IH].
     - pfold. constructor.
-    - apply IHHupto. inversion Hval. assumption.
+    - apply IHHupto. eapply trace_valid_cons_inv; eauto. 
     - pfold; constructor=>//.
-      + subst. inversion Hval as [| A B C Htrans E F ] =>//. subst.
-
+      + subst.
+        (* inversion Hval as [| A B C Htrans E F ] =>//. *)
+        apply trace_valid_cons_inv in Hval as [VAL Htrans].  
         inversion Htrans.
-        * subst.  
-          unfold lm_ls_trans, ls_trans in *.
-          destruct ℓ0; try done. simpl in *. simplify_eq.
-          destruct STEP as [??].
-          have <- //: ls_under $ trfirst btr = trfirst str.
-          { destruct IH as [IH|]; last done. punfold IH. inversion IH =>//. }
-          by constructor. 
+        * subst. simpl in H0.
+          destruct next_TS_role eqn:N; [| done]. inversion H0. subst.
+          apply next_TS_spec_pos in N. 
+          econstructor.
+          pclearbot. apply upto_stutter_trfirst in IH.
+          rewrite IH. apply N.
         * subst.
           simpl in H0. inversion H0. subst. 
           constructor.
@@ -273,9 +191,9 @@ Section upto_preserves.
                inversion IH; [| pclearbot; done].
                symmetry. eapply upto_stutter_trfirst; eauto. }           
           eapply PROJ_KEEP_EXT; eauto. 
-      + right. eapply CH.
+      + right. eapply CH.        
         { destruct IH =>//. }
-        subst. by inversion Hval.
+        eapply trace_valid_cons_inv; eauto.        
   Qed.
 
 End upto_preserves.
@@ -285,10 +203,10 @@ Section upto_stutter_preserves_fairness_and_termination.
   (* Context `{Countable G}. *)
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
-  Context {LMFP: LMFairPre (LM := LM)}.
-  Let LMF := LM_Fair (LM := LM).
-  Context {ELMF: ExtModel LMF}.
-  Context (proj_ext: (@EI _ ELMF) -> (@EI _ EM)). 
+  Context {LMFP: LMFairPre LM}.
+  (* Let LMF := LM_Fair (LM := LM). *)
+  Context {ELM: ExtModel LM_Fair}.
+  Context (proj_ext: (@EI _ ELM) -> (@EI _ EM)). 
 
   (* Notation upto_stutter_aux := (upto_stutter (ls_under (LSI := LSI)) (Ul (LM := LM))). *)
 
@@ -357,8 +275,8 @@ Section upto_stutter_preserves_fairness_and_termination.
   (*     after m emtr = Some atr_m /\ pred_at atr_m 0 Pi /\  *)
   (*     upto_stutter_eauxtr proj_ext atr_aux atr_m. *)
   (* Proof. *)
-  Lemma upto_stutter_step_correspondence (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM))
-    (Po: lm_ls LM -> option (mlabel ELM * lm_ls LM) -> Prop)
+  Lemma upto_stutter_step_correspondence (eauxtr: elmftrace (LM := LM)) (emtr: emtrace (EM := EM))
+    (Po: lm_ls LM -> option (option (@ext_role _ ELM) * lm_ls LM) -> Prop)
     (Pi: M -> option (option (ext_role (EM := EM)) * M) -> Prop)
     (LIFT: forall δ ostep, Po δ ostep -> Pi (ls_under δ) (match ostep with 
                                               | Some (ℓ, δ') => match (EUsls proj_ext δ ℓ δ') with | Some r => Some (r, ls_under δ') | None => None end
@@ -388,12 +306,11 @@ Section upto_stutter_preserves_fairness_and_termination.
       exists (trfirst auxtr), stepi.
       do 3 (split; eauto). 
       punfold Hupto. inversion Hupto; simplify_eq.
-      4: { apply upto_stutter_mono'. }
+      4: { apply upto_stutter_mono. }
       + rename A0 into Hpa.
         rewrite /pred_at /=. rewrite /pred_at //= in Hpa.
         destruct ostep; [done| ].
         specialize (LIFT _ _ Hpa). simpl in LIFT.
-        simpl in O0.
         rewrite trace_lookup_0_singleton in O0. inversion O0. 
         rewrite trace_lookup_0_singleton in STEPI. inversion STEPI. 
         congruence. 
@@ -427,7 +344,7 @@ Section upto_stutter_preserves_fairness_and_termination.
         red in H1. try pclearbot.
         apply upto_stutter_trfirst in H1. by rewrite H1.
     - punfold Hupto. inversion Hupto as [| |?????? ?? IH ]; simplify_eq.
-      3: { apply upto_stutter_mono'. } 
+      3: { apply upto_stutter_mono. } 
       + simpl in AFTER. 
         eapply IHn; eauto.
         by pfold.
@@ -442,8 +359,14 @@ Section upto_stutter_preserves_fairness_and_termination.
 
   Lemma upto_stutter_fairness_0 ρ eauxtr (mtr: emtrace (EM := EM)):
     upto_stutter_eauxtr proj_ext eauxtr mtr ->
-    (∃ n, pred_at eauxtr n (λ δ _, ¬role_enabled (LSI := LSI) ρ δ)
-          ∨ pred_at eauxtr n (λ _ ℓ, ∃ ζ, ℓ = Some $ inl (Take_step ρ ζ))) ->
+    (∃ n s ostep, eauxtr !! n = Some (s, ostep ) /\ 
+                  (¬role_enabled (LSI := LSI) ρ s ∨
+                     (* pred_at eauxtr n (λ _ ℓ, ∃ ζ, ℓ = Some $ inl (Take_step ρ ζ)) *)
+            (* step_by_next_TS ρ s ostep *)
+                     ∃ (τ : G) (δ2 : lm_ls LM),
+    ostep = Some (Some (inl τ), δ2) ∧ next_TS_role s τ δ2 = Some ρ
+                  )
+    ) ->
     ∃ m, pred_at mtr m (λ δ _, ¬role_enabled_model ρ δ)
          ∨ pred_at mtr m (λ _ ℓ, ℓ = Some $ Some $ inl ρ).
   Proof.
@@ -458,11 +381,14 @@ Section upto_stutter_preserves_fairness_and_termination.
     (* - intros ?? Po. destruct Po as [?| [? ->]]; eauto. *)
     (* - intros. destruct H; [| done]. eauto. *)
     repeat setoid_rewrite <- pred_at_or. 
-    intros UPTO [n NTH].
-    pose proof NTH as [atr AFTER]%pred_at_after_is_Some. 
+    intros UPTO (n & so & stepo & NTH & PROP).
+    (* pose proof NTH as [atr AFTER]%pred_at_after_is_Some.  *)
+    pose proof (proj2 (trace_lookup_after_weak eauxtr so n)) as (atr & AFTER & A0); [by eauto| ].
     rewrite (plus_n_O n) in NTH. 
-    rewrite pred_at_sum AFTER in NTH.
-    apply pred_at_trace_lookup' in NTH as (so & stepo & A0 & PROP).
+
+    (* rewrite pred_at_sum AFTER in NTH. *)
+    erewrite <- @trace_lookup_after in NTH; eauto.  
+    (* apply pred_at_trace_lookup' in NTH as (so & stepo & A0 & PROP). *)
     pattern so, stepo in PROP. 
     
     eapply upto_stutter_step_correspondence in PROP; eauto. 
@@ -473,14 +399,22 @@ Section upto_stutter_preserves_fairness_and_termination.
       pattern si. pattern stepi. apply Pi. 
     - intros ?? Po. simpl. destruct Po as [?| ?]; eauto.
       right. destruct H as [? H].
-      destruct ostep; try done. simpl in *.
-      destruct p. simpl in H. inversion H. by subst.
+      destruct ostep.
+      2: { by destruct H as (?&?&?). }
+      simpl in *. destruct H as (?&[=]&[=]). subst.
+      simpl. rewrite H2. done. 
     - intros. destruct H; eauto. done. 
   Qed.
 
-  Lemma upto_stutter_fairness (eauxtr: eauxtrace (LM := LM)) (emtr: emtrace (EM := EM)):
+  Definition fair_by_next_TS_ext: fmrole M -> elmftrace (LM := LM) -> Prop :=
+    fair_by_gen role_enabled 
+      (fun ρ s ostep => ∃ (τ : G) (δ2 : lm_ls LM),
+           ostep = Some (Some (inl τ), δ2) ∧ next_TS_role s τ δ2 = Some ρ).
+
+  Lemma upto_stutter_fairness (eauxtr: elmftrace (LM := LM)) (emtr: emtrace (EM := EM)):
     upto_stutter_eauxtr proj_ext eauxtr emtr ->
-    (∀ ρ, fair_eaux ρ eauxtr) ->
+    (* (∀ ρ, fair_eaux ρ eauxtr) -> *)
+    (forall ρ, fair_by_next_TS_ext ρ eauxtr) ->
     (* (∀ ρ, fair_model_trace ρ emtr). *)
     inner_fair_ext_model_trace emtr. 
   Proof.
@@ -506,14 +440,27 @@ Section upto_stutter_preserves_fairness_and_termination.
     specialize (Hfa ρ).
     have Henaux : role_enabled ρ (trfirst auxtr').
     { have HUs: ls_under (trfirst auxtr') = trfirst emtr'.
-      - punfold Hupto'; [| by apply upto_stutter_mono']. 
+      - punfold Hupto'; [| by apply upto_stutter_mono]. 
         by inversion Hupto'.
       - unfold role_enabled, role_enabled_model in *.
         rewrite HUs //. }
-    have Hfa' := (fair_eaux_after ρ eauxtr n' auxtr' Hfa Heq' 0).
+    (* have Hfa' := (fair_by_gen_after ρ eauxtr n' auxtr' Hfa Heq' 0). *)
+    assert (fair_by_next_TS_ext ρ auxtr') as Hfa'.
+    { eapply fair_by_gen_after; eauto. }
     have Hpredat: pred_at auxtr' 0 (λ δ _, role_enabled ρ δ).
     { rewrite /pred_at /=. destruct auxtr'; done. }
-    destruct (upto_stutter_fairness_0 ρ auxtr' emtr' Hupto' (Hfa' Hpredat)) as (m&Hres).
+    (* destruct (upto_stutter_fairness_0 ρ auxtr' emtr' Hupto' (Hfa' Hpredat)) as (m&Hres). *)
+    destruct (upto_stutter_fairness_0 ρ auxtr' emtr' Hupto') as(m&Hres).
+    { apply pred_at_trace_lookup in Hpredat as EN.
+      do 2 red in Hfa. specialize (Hfa n').
+      destruct Hfa.
+      { apply pred_at_trace_lookup.
+        exists (trfirst auxtr'). split; auto.
+        erewrite (plus_n_O n'), <- state_lookup_after; eauto.
+        by rewrite state_lookup_0. }
+      destruct H as (?&?&NNTH&FS).
+      erewrite <- trace_lookup_after in NNTH; eauto. }
+    
     exists m. rewrite !(pred_at_sum _ n) Heq //.
     rewrite /fairness_sat. 
     rewrite -pred_at_or in Hres.

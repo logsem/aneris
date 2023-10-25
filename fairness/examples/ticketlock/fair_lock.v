@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness.examples.comp Require Import lemmas trace_len trace_lookup.
+From trillium.fairness Require Import lemmas trace_len trace_lookup.
 From trillium.fairness.ext_models Require Import set_map_properties ext_models.
 
 

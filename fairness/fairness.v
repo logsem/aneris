@@ -214,6 +214,14 @@ Section TraceValid.
     trace_valid tr.
   Proof. by eapply trace_valid_after with (k := 1); eauto. Qed.
 
+  Lemma trace_valid_cons_inv (tr: trace St L) s l
+    (VALID: trace_valid (s -[l]-> tr)):
+    trace_valid tr /\ trans s l (trfirst tr). 
+  Proof using.
+    punfold VALID. inversion VALID. subst.
+    pclearbot. done. 
+  Qed.
+
 End TraceValid.
 
 

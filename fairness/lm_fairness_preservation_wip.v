@@ -3,9 +3,7 @@ From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export inftraces fairness fuel traces_match trace_utils.
 From trillium.fairness Require Export lm_fairness_preservation. 
 Require Import Coq.Logic.Classical.
-
-(* TODO: move these files to trillium.fairness *)
-From trillium.fairness.examples.comp Require Export trace_lookup trace_len my_omega lemmas trace_helpers.
+From trillium.fairness Require Import trace_lookup trace_len my_omega lemmas trace_helpers.
 
 From Paco Require Import paco1 paco2 pacotac.
 

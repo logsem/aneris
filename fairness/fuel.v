@@ -254,6 +254,35 @@ Section fairness.
       by rewrite FUEL in Hdec.
   Qed.
 
+  Lemma fuel_must_not_incr_fuels oρ'
+    (δ1 δ2: LiveState)
+    ρ f1 f2
+    (KEEP: fuel_must_not_incr oρ' δ1 δ2)
+    (FUEL1: @ls_fuel δ1 !! ρ = Some f1)
+    (FUEL2: @ls_fuel δ2 !! ρ = Some f2)
+    (OTHER: oρ' ≠ Some ρ):
+    f2 <= f1.
+  Proof using.
+    red in KEEP. specialize (KEEP ρ ltac:(by apply elem_of_dom)).
+    destruct KEEP as [LE|[?|KEEP]].
+    + rewrite FUEL1 FUEL2 in LE. simpl in LE. lia. 
+    + tauto. 
+    + apply proj1 in KEEP. destruct KEEP. eapply elem_of_dom; eauto.
+  Qed.
+
+  Lemma step_nonincr_fuels {LM: LiveModel} 
+    ℓ (δ1 δ2: LiveState)
+    ρ f1 f2
+    (STEP: lm_ls_trans LM δ1 ℓ δ2)
+    (FUEL1: @ls_fuel δ1 !! ρ = Some f1)
+    (FUEL2: @ls_fuel δ2 !! ρ = Some f2)
+    (OTHER: forall g, ℓ ≠ Take_step ρ g):
+    f2 <= f1.
+  Proof.
+    destruct ℓ. 
+    all: eapply fuel_must_not_incr_fuels; eauto; [apply STEP|..]; congruence.
+  Qed. 
+
 End fairness.
 
 Arguments LiveState : clear implicits.

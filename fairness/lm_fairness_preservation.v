@@ -118,7 +118,7 @@ Section fairness_preserved.
     destruct (decide (ℓ = Some τ)) as [Hζ|Hζ]. 
     - subst.
       (* pose proof (mtrace_valid_steps' VALID 0) as Hls.  *)
-      pose proof (mtrace_valid_cons _ _ _ VALID) as [_ Hls]. simpl in Hls.
+      pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [_ Hls]. simpl in Hls.
       destruct (next_TS_role δ τ (trfirst auxtr')) eqn:N. 
       + (* Three cases: *)
 (*            (1) ρ' = ρ and we are done *)
@@ -136,7 +136,7 @@ Section fairness_preserved.
         { constructor; eauto; congruence. }
         (* Copy and paste begins here *)
         eapply case1 =>//; last by eauto using infinite_cons.
-        2: { eapply mtrace_valid_cons; eauto. }
+        2: { eapply trace_valid_cons_inv; eauto. }
         intros Hinfuels. apply Hdec =>//. 
         clear -Hfuel. apply elem_of_dom; eauto.
       + eapply next_TS_spec_inv_S in N; eauto. clear Hls. rename N into Hls.  
@@ -146,7 +146,7 @@ Section fairness_preserved.
         { constructor; eauto. }
         eapply case1 =>//.
         * move=> Hinfuel; apply Hlsdec => //; first set_solver.
-        * eapply mtrace_valid_cons; eauto. 
+        * eapply trace_valid_cons_inv; eauto. 
         * eapply infinite_cons =>//.
     - (* Another thread is taking a step. *)
       destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
@@ -158,7 +158,7 @@ Section fairness_preserved.
         red in Hexen. destruct Hexen as [Hexen|Hexen].
         - exfalso. set_solver. 
         - destruct Hexen as (?&?&?). set_solver. }
-      pose proof (mtrace_valid_cons _ _ _ VALID) as [_ Hls]. simpl in Hls.
+      pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [_ Hls]. simpl in Hls.
       destruct ℓ; [| done]. 
       destruct MAP as [τ'' Hτ'']. 
       destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'| ] eqn:Hfuel'.
@@ -172,7 +172,7 @@ Section fairness_preserved.
         unfold fair_by in *.
         assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
         { eapply (IH _ _ _ m' _); eauto.
-          - eapply mtrace_valid_cons; eauto.
+          - eapply trace_valid_cons_inv; eauto.
           - by eapply infinite_cons.
           Unshelve. unfold strict, lt_lex. lia. }
         exists (1+P). eauto.
@@ -182,7 +182,7 @@ Section fairness_preserved.
         { rewrite pred_at_state_trfirst. eauto. }        
         assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
         { eapply (IH _ _ _ p _); eauto.
-          - eapply mtrace_valid_cons; eauto.
+          - eapply trace_valid_cons_inv; eauto.
           - by eapply infinite_cons.
           Unshelve. unfold strict, lt_lex. lia. }
         exists (1+P). eauto.
