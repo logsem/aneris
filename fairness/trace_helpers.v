@@ -23,6 +23,23 @@ Section TraceHelpers.
     unfold pred_at. destruct (after i tr); [destruct t| ]; tauto.
   Qed.
 
+  Lemma pred_at_ex {T: Type} (P : T -> St → option L → Prop) tr n:
+    pred_at tr n (fun s ol => exists t, P t s ol) <-> exists t, pred_at tr n (P t).
+  Proof.
+    rewrite /pred_at. destruct after.
+    2: { intuition. by destruct H. }
+    destruct t; eauto.
+  Qed.
+
+  Lemma pred_at_impl (P Q: St -> option L -> Prop)
+    (IMPL: forall s ol, P s ol -> Q s ol):
+    forall tr i, pred_at tr i P -> pred_at tr i Q.
+  Proof.
+    rewrite /pred_at. intros. 
+    destruct after; intuition; destruct t.
+    all: by apply IMPL.
+  Qed.
+
 End TraceHelpers. 
 
 Section FMTraceHelpers.
@@ -32,13 +49,6 @@ Section FMTraceHelpers.
   
   Definition set_fair_model_trace (T: L -> Prop) tr :=
     forall ρ (Tρ: T ρ), fair_model_trace ρ tr. 
-
-  (* TODO: already exists somewhere? *)
-  Lemma Decision_iff_impl (P Q: Prop) (PQ: P <-> Q) (DEC_P: Decision P):
-    Decision Q. 
-  Proof using. 
-    destruct DEC_P; [left | right]; tauto. 
-  Qed.  
 
   Definition strong_fair_model_trace (tr: mtrace M) (ρ: fmrole M) :=
     forall n (EN: pred_at tr n (λ δ _, role_enabled_model ρ δ)),

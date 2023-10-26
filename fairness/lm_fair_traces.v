@@ -3,7 +3,6 @@ From Paco Require Import paco1 paco2 pacotac.
 
 Section aux_trace.  
   Context `{LM: LiveModel G M LSI}.
-  Context `{Countable G}.
   Context {LF: LMFairPre LM}. 
 
   (* Definition auxtrace := trace LM.(lm_ls) LM.(lm_lbl). *)

@@ -131,7 +131,7 @@ Section LMFair.
   (* TODO: rename *)
   Definition locale_trans (st1: lm_ls LM) (τ: G) st2 :=
     exists ℓ, ls_trans (lm_fl LM) st1 ℓ st2 /\ fair_lbl_matches_group ℓ τ. 
-
+    
   Lemma locale_trans_alt δ1 τ δ2:
     locale_trans δ1 τ δ2 <-> allowed_step_FLs δ1 τ δ2 ≠ ∅.
   Proof. 
@@ -151,6 +151,13 @@ Section LMFair.
     - intros (?&STEP&POT).
       destruct POT as [-> | (?&->&MAP)].
       all: eexists; split; [eapply STEP| done]. 
+  Qed.
+
+  Global Instance locale_trans_dec st1 τ st2:
+    Decision (locale_trans st1 τ st2).
+  Proof.
+    eapply Decision_iff_impl; [symmetry; by apply locale_trans_alt| ].
+    solve_decision.
   Qed.
 
   Global Instance locale_trans_ex_dec τ δ1:

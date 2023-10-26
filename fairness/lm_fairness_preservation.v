@@ -1,13 +1,40 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup. 
+From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup fuel_ext trace_lookup.
 
 
 Section fairness_preserved.
   Context `{LM: LiveModel G M LSI}.
-  (* Context `{EqDecision G}. *)
   Context {LF: LMFairPre LM}. 
+
+  (* Context `{EqDecision G}. *)
+  (* Context {LF: LMFairPre LM}.  *)
+
+  (* Context (GLM: Model). *)
+  (* Let St := mstate GLM. *)
+  (* Let L := mlabel GLM. *)
+  Let LS := lm_ls LM. 
+  (* Variable (A: Type). *)
+  (* Variable (transA: LS -> A -> LS -> Prop).  *)
+
+  Class AlmostLM {A: Type} (transA: LS -> A -> LS -> Prop) := {
+      am_lift_G: G -> A; 
+      am_lift_LM_step: forall δ1 δ2 g, transA δ1 (am_lift_G g) δ2 -> 
+                                   locale_trans δ1 g δ2 (LM := LM);
+      am_transA_keep_asg: forall δ1 a δ2 ρ τ f, 
+                 transA δ1 a δ2 -> 
+                 (forall g, am_lift_G g ≠ a) ->
+                 ls_mapping δ1 !! ρ = Some τ ->
+                 ls_fuel δ1 !! ρ = Some f ->
+                 ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f;
+      am_lift_G_dec :> forall a, Decision (exists g, am_lift_G g = a);
+      am_lift_inj :> Inj eq eq am_lift_G;
+  }.
+
+  Context `(AM: AlmostLM). 
+  
+  Definition atrace := trace LS A.
 
   Lemma mapping_live_role (δ: LiveState G M LSI) ρ:
     ρ ∈ M.(live_roles) δ ->
@@ -27,28 +54,28 @@ Section fairness_preserved.
   Local Hint Resolve pred_first_trace: core.
 
   (* TODO: fix names below *)
-  
-  (* Definition group_step_or_dis *)
-  (*   (τ: G) (δ: LiveState G M LSI) (oℓ: option (lm_lbl LM)) := *)
-  (*   (forall ρ, ¬ ls_mapping δ !! ρ = Some τ) \/ (∃ ℓ, oℓ = Some ℓ /\ lm_lbl_matches_group ℓ τ). *)
-  Definition group_step_or_dis (τ: G) (δ: LiveState G M LSI) (og: option $ option G) :=
-    fairness_sat (λ τ δ, exists ρ, ls_mapping δ !! ρ = Some τ) (fun t og' => og' = Some t) τ δ og.
+  Definition group_step_or_dis (τ: G) (δ: LiveState G M LSI) (ol: option A) :=
+    fairness_sat (λ τ δ, exists ρ, ls_mapping δ !! ρ = Some τ) 
+      (fun t l' => am_lift_G t = l') τ δ ol.
 
-  Definition fair_by_group: G -> lmftrace (LM := LM) -> Prop := 
+  Definition fair_by_group: G -> atrace -> Prop := 
     fair_by (λ τ δ, exists ρ, ls_mapping δ !! ρ = Some τ)
-      (fun t og' => og' = Some t). 
-  
-  (* Definition steps_or_unassigned *)
-  (*   (ρ: fmrole M) (δ: LiveState G M LSI) (ℓ: option (lm_lbl LM)) := *)
-  (*   (∀ τ, ls_mapping δ !! ρ ≠ Some τ) \/ (∃ τ, ℓ = Some $ Take_step ρ τ). *)
-  Definition steps_or_unassigned :=
-    fairness_sat_gen (λ ρ δ, ρ ∈ dom (ls_mapping δ)) step_by_next_TS.
-    
-  Definition fair_aux_SoU: fmrole M -> lmftrace (LM := LM) -> Prop := 
-    fair_by_gen (λ ρ δ, ρ ∈ dom (ls_mapping δ))
-      step_by_next_TS. 
+      (fun t l' => am_lift_G t = l').
 
-  Definition fairness_induction_stmt ρ fm f m τ (* extr *) (auxtr : lmftrace (LM := LM)) δ
+  Definition astep_by_next_TS ρ δ1 ostep :=
+    ∃ (l : A) (δ2 : LS) (τ: G),
+      ostep = Some (l, δ2) ∧ am_lift_G τ = l /\
+      next_TS_role δ1 τ δ2 = Some ρ. 
+  
+  Definition steps_or_unassigned :=
+    fairness_sat_gen (λ ρ δ, ρ ∈ dom (ls_mapping δ))
+                     astep_by_next_TS. 
+
+  Definition fair_aux_SoU: fmrole M -> atrace -> Prop := 
+    fair_by_gen (λ ρ δ, ρ ∈ dom (ls_mapping δ))
+      astep_by_next_TS. 
+
+  Definition fairness_induction_stmt ρ fm f m τ (* extr *) (auxtr : atrace) δ
     :=
     infinite_trace auxtr ->
     (forall τ, fair_by_group τ auxtr) ->
@@ -61,50 +88,79 @@ Section fairness_preserved.
     (* ∃ M, pred_at auxtr M (fun δ ℓ => steps_or_unassigned ρ δ ℓ)).  *)
     exists i δi ostep, auxtr !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep.
   
-  Local Lemma case1 ρ f m (auxtr' : lmftrace (LM := LM)) δ ℓ :
+  Local Lemma case1 ρ f m (auxtr' : atrace) δ ℓ :
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
-         → ∀ (f m: nat) τ (auxtr : lmftrace (LM := LM))
+         → ∀ (f m: nat) τ (auxtr : atrace)
              (δ : LiveState G M LSI),
-          mtrace_valid auxtr -> fairness_induction_stmt ρ m0 f m τ (* extr *) auxtr δ ) ->
+          trace_valid transA auxtr -> fairness_induction_stmt ρ m0 f m τ (* extr *) auxtr δ ) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
-    mtrace_valid auxtr' ->
+    trace_valid transA auxtr' ->
     infinite_trace auxtr' ->
     ls_fuel δ !! ρ = Some f ->
     (forall τ, fair_by_group τ auxtr' ) ->
     ∃ i δi ostep, (δ -[ ℓ ]-> auxtr') !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep.
   Proof.
-      intros IH Hdec (* Hmatch *) Hvalid Hinf Hsome Hfair.
-      unfold oless in Hdec.
-      simpl in *.
-      rewrite -> Hsome in *.
-      destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq.
-      -
-        destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
-        { exists 1. rewrite trace_lookup_cons.
-          pose proof (trace_lookup_0 auxtr') as (?&?).
-          do 2 eexists. split; eauto. 
-          rewrite /steps_or_unassigned. left.
-          intros ?%elem_of_dom. apply n. done. }
-        destruct MAP as [τ' Hτ']. 
-        pose proof (Hfair τ' 0) as [p Hp]. 
-        { rewrite pred_at_state_trfirst. eauto. } 
-
-        assert (∃ i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (i&?&?&?&?). 
-        { eapply (IH _ _ _ p _); eauto.
-          Unshelve. 
-          unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)).
-          rewrite Heq in Hdec. lia. } 
-        exists (1+i). eauto. 
-      - pose proof (trace_lookup_0 auxtr') as (?&?).
-        exists 1. do 2 eexists. rewrite trace_lookup_cons. split; eauto. 
+    intros IH Hdec (* Hmatch *) Hvalid Hinf Hsome Hfair.
+    unfold oless in Hdec.
+    simpl in *.
+    rewrite -> Hsome in *.
+    destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq.
+    -
+      destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
+      { exists 1. rewrite trace_lookup_cons.
+        pose proof (trace_lookup_0 auxtr') as (?&?).
+        do 2 eexists. split; eauto. 
         rewrite /steps_or_unassigned. left.
-        apply not_elem_of_dom in Heq. by rewrite -ls_same_doms in Heq. 
+        intros ?%elem_of_dom. apply n. done. }
+      destruct MAP as [τ' Hτ']. 
+      pose proof (Hfair τ' 0) as [p Hp]. 
+      { rewrite pred_at_state_trfirst. eauto. } 
+      
+      assert (∃ i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (i&?&?&?&?). 
+      { eapply (IH _ _ _ p _); eauto.
+        Unshelve. 
+        unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)).
+        (* rewrite Heq in Hdec. *)
+        lia. } 
+      exists (1+i). eauto. 
+    - pose proof (trace_lookup_0 auxtr') as (?&?).
+      exists 1. do 2 eexists. rewrite trace_lookup_cons. split; eauto. 
+      rewrite /steps_or_unassigned. left.
+      apply not_elem_of_dom in Heq. by rewrite -ls_same_doms in Heq. 
   Qed.
-  
+
+  (* TODO: move *)
+  Instance ex_fin_dec {T: Type} (P: T -> Prop) (l: list T)
+    (DEC: forall a, Decision (P a))
+    (IN: forall a, P a -> In a l):
+    Decision (exists a, P a).
+  Proof.
+    destruct (Exists_dec P l) as [EX|NEX].
+    - left. apply List.Exists_exists in EX as (?&?&?). eauto.
+    - right. intros [a Pa]. apply NEX.
+      apply List.Exists_exists. eexists. split; eauto.
+  Qed. 
+    
+
+  (* TODO: move? *)
+  Instance locale_trans_exG_dec st1 st2:
+    Decision (exists τ, locale_trans st1 τ st2 (LM := LM)).
+  Proof.
+    apply ex_fin_dec with (l := elements (dom (ls_tmap st1))).
+    { solve_decision. }
+    intros g STEP. apply elem_of_list_In, elem_of_elements, elem_of_dom. 
+    destruct STEP as (ℓ&STEP&MATCH).
+    destruct ℓ; simpl in MATCH; try done; subst g0.
+    - apply proj2, proj1 in STEP.
+      apply (ls_mapping_tmap_corr (LM := LM)) in STEP as (?&?&?). eauto.
+    - apply proj1 in STEP. destruct STEP as (?&STEP).
+      apply (ls_mapping_tmap_corr (LM := LM)) in STEP as (?&?&?). eauto.
+  Qed.
+
   Lemma fairness_preserved_ind ρ:
-    ∀ fm f m τ (auxtr: lmftrace (LM := LM)) δ,
-      mtrace_valid auxtr -> 
+    ∀ fm f m τ (auxtr: atrace) δ,
+      trace_valid transA auxtr -> 
       fairness_induction_stmt ρ fm f m τ auxtr δ.
   Proof.    
     induction fm as [fm IH] using lex_ind.
@@ -115,10 +171,56 @@ Section fairness_preserved.
     { intros. eapply fair_by_cons; eauto. apply Hfair. }
     simpl in *. subst δ_. 
     (* destruct (decide (lm_lbl_matches_group ℓ τ)) as [Hζ|Hζ]. *)
-    destruct (decide (ℓ = Some τ)) as [Hζ|Hζ]. 
+    pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [_ Hls].
+    
+    assert (am_lift_G τ ≠ ℓ ->
+            (forall f', ls_fuel (trfirst auxtr') !! ρ = Some f' -> f' <= f) ->
+            (forall f' τ', ls_fuel (trfirst auxtr') !! ρ = Some f' -> ls_mapping (trfirst auxtr') !! ρ = Some τ' -> τ' ≠ τ -> f' < f) ->
+            ∃ (i : nat) (δi : LiveState G M LSI) (ostep : option (A * LiveState G M LSI)),
+    (δ -[ ℓ ]-> auxtr') !! i = Some (δi, ostep) ∧ steps_or_unassigned ρ δi ostep)
+      as OTHER_HELPER.
+    { intros NEQ FUEL_LE FUEL_LT.
+      destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
+      { exists 1. pose proof (trace_lookup_0 auxtr') as (?&?).
+        do 2 eexists. rewrite trace_lookup_cons. split; eauto.
+        left. by intros ?%elem_of_dom. }
+      destruct m as [| m'].
+      { rewrite -> !pred_at_0 in Hexen.
+        red in Hexen. destruct Hexen as [Hexen|Hexen].
+        - exfalso. set_solver.
+        - destruct Hexen as (?&?&?). set_solver. }
+      destruct MAP as [τ'' Hτ''].
+      destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'| ] eqn:Hfuel'.
+      2: { apply elem_of_dom_2 in Hτ''. apply not_elem_of_dom_2 in Hfuel'.
+           rewrite ls_same_doms in Hτ''. done. }
+      destruct (decide (τ = τ'')) as [<-|Hchange].
+      - specialize (FUEL_LE _ eq_refl). 
+        assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
+        { eapply (IH _ _ _ m' _); eauto.
+          - eapply trace_valid_cons_inv; eauto.
+          - by eapply infinite_cons.
+            Unshelve. unfold strict, lt_lex. lia. }
+        exists (1+P). eauto.
+      - apply not_eq_sym in Hchange. specialize (FUEL_LT _ _ eq_refl Hτ'' Hchange). 
+        unfold fair_by in *.
+        pose proof (Hfair' τ'' 0) as [p Hp].
+        { rewrite pred_at_state_trfirst. eauto. }        
+        assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
+        { eapply (IH _ _ _ p _); eauto.
+          - eapply trace_valid_cons_inv; eauto.
+          - by eapply infinite_cons.
+          Unshelve. unfold strict, lt_lex. lia. }
+        exists (1+P). eauto. } 
+
+    
+    (* destruct (proj_G ℓ) as [g| ] eqn:PROJ. *)
+    destruct (decide (exists g, am_lift_G g = ℓ)) as [[g LIFTg]| ]. 
+    { 
+
+    (* destruct (decide (ℓ = Some τ)) as [Hζ|Hζ].  *)
+    destruct (decide (g = τ)) as [Hζ|Hζ]. 
     - subst.
       (* pose proof (mtrace_valid_steps' VALID 0) as Hls.  *)
-      pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [_ Hls]. simpl in Hls.
       destruct (next_TS_role δ τ (trfirst auxtr')) eqn:N. 
       + (* Three cases: *)
 (*            (1) ρ' = ρ and we are done *)
@@ -128,8 +230,8 @@ Section fairness_preserved.
         clear Hls. 
         pose proof N as Hls%next_TS_spec_pos. 
         destruct (decide (ρ = f0)) as [->|Hρneq].
-        { exists 0. do 2 eexists. rewrite trace_lookup_0_cons. split; eauto. 
-          right. red. eauto. }
+        { exists 0. do 2 eexists. rewrite trace_lookup_0_cons. split; eauto.          
+          right. red. do 3 eexists. repeat split; eauto. }
         destruct Hls as (?&Hsame&Hdec&Hnotinc&_).
         rewrite -Hsame /= in Hmapping.
         have Hmustdec: must_decrease ρ (Some f0) δ (trfirst auxtr') (Some τ).
@@ -148,50 +250,25 @@ Section fairness_preserved.
         * move=> Hinfuel; apply Hlsdec => //; first set_solver.
         * eapply trace_valid_cons_inv; eauto. 
         * eapply infinite_cons =>//.
-    - (* Another thread is taking a step. *)
-      destruct (decide (exists τ, ls_mapping (trfirst auxtr') !! ρ = Some τ)) as [MAP| ]; last first.
-      { exists 1. pose proof (trace_lookup_0 auxtr') as (?&?). 
-        do 2 eexists. rewrite trace_lookup_cons. split; eauto.         
-        left. by intros ?%elem_of_dom. }
-      destruct m as [| m'].
-      { rewrite -> !pred_at_0 in Hexen.
-        red in Hexen. destruct Hexen as [Hexen|Hexen].
-        - exfalso. set_solver. 
-        - destruct Hexen as (?&?&?). set_solver. }
-      pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [_ Hls]. simpl in Hls.
-      destruct ℓ; [| done]. 
-      destruct MAP as [τ'' Hτ'']. 
-      destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'| ] eqn:Hfuel'.
-      2: { apply elem_of_dom_2 in Hτ''. apply not_elem_of_dom_2 in Hfuel'.
-           rewrite ls_same_doms in Hτ''. done. }
-      red in Hls. destruct Hls as (ℓ & STEP & MATCH). 
-      destruct (decide (τ = τ'')) as [<-|Hchange].
-      + assert (f' <= f) as Hff'.
-        { eapply others_step_fuel_decr; eauto.
-          destruct ℓ; simpl in *; congruence. }
-        unfold fair_by in *.
-        assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
-        { eapply (IH _ _ _ m' _); eauto.
-          - eapply trace_valid_cons_inv; eauto.
-          - by eapply infinite_cons.
-          Unshelve. unfold strict, lt_lex. lia. }
-        exists (1+P). eauto.
-      + assert (f' < f) as Hff' by (eapply owner_change_fuel_decr; eauto). 
-        unfold fair_by in *.
-        pose proof (Hfair' τ'' 0) as [p Hp].
-        { rewrite pred_at_state_trfirst. eauto. }        
-        assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
-        { eapply (IH _ _ _ p _); eauto.
-          - eapply trace_valid_cons_inv; eauto.
-          - by eapply infinite_cons.
-          Unshelve. unfold strict, lt_lex. lia. }
-        exists (1+P). eauto.
+        * eapply am_lift_LM_step; eauto.   
+    - subst. eapply am_lift_LM_step in Hls as (?&?&?); eauto.
+      eapply OTHER_HELPER.
+      + intros ?. apply Hζ. eapply am_lift_inj; eauto.
+      + intros. eapply others_step_fuel_decr; eauto.
+        destruct x; simpl in *; congruence. 
+      + intros. eapply owner_change_fuel_decr; eauto. }
+
+    eapply OTHER_HELPER; eauto.
+    - intros. eapply am_transA_keep_asg in Hmapping as (?&?); eauto.
+      rewrite H in H1. inversion H1. lia.
+    - intros. eapply am_transA_keep_asg in Hfuel as (?&?); eauto.
+      congruence.     
   Qed.
   
   Lemma group_fairness_implies_step_or_unassign
-    (auxtr: lmftrace (LM := LM)):
+    (auxtr: atrace):
     infinite_trace auxtr ->
-    mtrace_valid auxtr ->
+    trace_valid transA auxtr ->
     (forall τ, fair_by_group τ auxtr) ->
     forall ρ, fair_aux_SoU ρ auxtr.
   Proof.
@@ -222,17 +299,12 @@ Section fairness_preserved.
     - intros. eapply fair_by_after; eauto. apply Hex. 
   Qed.
 
-  (* TODO: move*)
-  Lemma pred_at_ex {S L T: Type} (P : T -> S → option L → Prop) tr n:
-    pred_at tr n (fun s ol => exists t, P t s ol) <-> exists t, pred_at tr n (P t).
-  Proof.
-    rewrite /pred_at. destruct after.
-    2: { intuition. by destruct H. }
-    destruct t; eauto.
-  Qed.     
-
-  Lemma steps_or_unassigned_implies_aux_fairness (auxtr: lmftrace (LM := LM)):
-    (forall ρ, fair_aux_SoU ρ auxtr) -> (forall ρ, fair_by_next_TS ρ auxtr).
+  Definition afair_by_next_TS: fmrole M -> atrace -> Prop :=
+    (* fair_by_gen role_enabled step_by_next_TS.  *)
+    fair_by_gen role_enabled astep_by_next_TS. 
+ 
+  Lemma steps_or_unassigned_implies_aux_fairness (auxtr: atrace):
+    (forall ρ, fair_aux_SoU ρ auxtr) -> (forall ρ, afair_by_next_TS ρ auxtr).
   Proof.
     intros FAIR ρ n Hn.
     eapply pred_at_impl in Hn.
@@ -247,11 +319,11 @@ Section fairness_preserved.
     - by right.
   Qed.
 
-  Lemma group_fairness_implies_role_fairness (auxtr: lmftrace (LM := LM)):
+  Lemma group_fairness_implies_role_fairness (auxtr: atrace):
     infinite_trace auxtr ->
-    mtrace_valid auxtr ->
+    trace_valid transA auxtr ->
     (forall τ, fair_by_group τ auxtr) ->
-    (forall ρ, fair_by_next_TS ρ auxtr).
+    (forall ρ, afair_by_next_TS ρ auxtr).
   Proof. 
     intros. auto using steps_or_unassigned_implies_aux_fairness, 
       group_fairness_implies_step_or_unassign.
@@ -267,22 +339,21 @@ Section fairness_preserved.
        TODO: any restrictions? *)
     Context (out_step: So -> option Lo -> So -> Prop). 
     
-    (* Representation of group labels on outer level *)
-    Context (lift_grole: G -> Lo).
-    Hypothesis (INJlg: Inj eq eq lift_grole). 
+    (* Representation of "almost LM" model labels on outer level *)
+    Context (lift_A: A -> Lo).
+    Hypothesis (INJlg: Inj eq eq lift_A). 
     
     Context (locale_prop: Lo -> So -> Prop).
     
     (* Context (state_rel: cfg Λ → lm_ls LM → Prop). *)
     Context (state_rel: So → lm_ls LM → Prop).
     
-    Definition lm_live_lift := forall ζ ρ δ c,
-        ls_mapping δ !! ρ = Some ζ ->
+    Definition lm_live_lift := forall g (ρ: fmrole M) δ c,
+        ls_mapping δ !! ρ = Some g ->
         (* ρ ∈ live_roles _ δ ->  *)
         state_rel c δ ->
         (* locale_enabled ζ c *)
-        locale_prop (lift_grole ζ) c. 
-    
+        locale_prop (lift_A (am_lift_G g)) c.     
     
     Hypothesis (match_locale_prop_states: lm_live_lift).
     
@@ -300,36 +371,28 @@ Section fairness_preserved.
     (*            end *)
     (*   end.  *)
     
-    Definition out_LMF_labels_match (oζ : option Lo) (oℓ: option G) :=
-      match oζ, oℓ with
-      | Some ζ, Some ℓ => lift_grole ℓ = ζ
-      | None, None => True
-      | _, _ => False
+    Definition out_A_labels_match (oζ : option Lo) (a: A) :=
+      (* match oζ, oℓ with *)
+      (* | Some ζ, Some ℓ => lift_grole ℓ = ζ *)
+      (* | None, None => True *)
+      (* | _, _ => False *)
+      (* end.  *)
+      match oζ with
+      | Some ζ => lift_A a = ζ
+      | None => False
       end. 
     
     (* TODO: rename *)
-    Definition lm_exaux_traces_match_gen: out_trace → lmftrace (LM := LM) → Prop :=
+    Definition lm_exaux_traces_match_gen: out_trace → atrace → Prop :=
       traces_match 
-        (* labels_match *) out_LMF_labels_match
+        (* labels_match *) out_A_labels_match
         (* live_tids *) state_rel
         (* locale_step  *) out_step
-        (fmtrans LM_Fair). 
-    
-    From trillium.fairness Require Import trace_lookup.
-    
-    (* TODO: move *)
-    Lemma pred_at_impl {St L : Type} (P Q: St -> option L -> Prop)
-      (IMPL: forall s ol, P s ol -> Q s ol):
-      forall tr i, pred_at tr i P -> pred_at tr i Q.
-    Proof.
-      rewrite /pred_at. intros. 
-      destruct after; intuition; destruct t.
-      all: by apply IMPL.
-    Qed.
-    
+        (* (fmtrans LM_Fair).  *) transA. 
+        
     Let lbl_match (ℓ: Lo) oℓ' := oℓ' = Some ℓ. 
     
-    Theorem fairness_preserved (extr: out_trace) (auxtr: lmftrace (LM := LM)):
+    Theorem fairness_preserved (extr: out_trace) (auxtr: atrace):
       infinite_trace extr ->
       lm_exaux_traces_match_gen extr auxtr ->
       (forall ζ, fair_by locale_prop lbl_match ζ extr) -> (forall τ, fair_by_group τ auxtr).
@@ -355,24 +418,21 @@ Section fairness_preserved.
         edestruct @traces_match_label_lookup_1 as (ℓ & NTH'l & LBL); eauto.
         eexists. split; eauto. red in LBL.
         red in LBLM. subst.
-        destruct ℓ; try done.
-        apply INJlg in LBL. congruence.
-    Qed.      
+        eapply INJlg; eauto. 
+    Qed.
     
   End Preservation.
 
 End fairness_preserved.
 
 
-(* TODO: move? *)
-Lemma traces_match_LM_preserves_validity `{LM: LiveModel G M LSI} {LF: LMFairPre LM}
-  `{C: Type} {L: Type}
-  (otr: trace C L) (auxtr : lmftrace (LM := LM))
-  state_rel lbl_rel outer_step :
-  traces_match lbl_rel state_rel outer_step ((fmtrans LM_Fair)) otr auxtr ->
-  mtrace_valid auxtr.
+(* TODO: move *)
+Lemma traces_match_valid1 {L1 L2 S1 S2 : Type} Rl Rs trans1 trans2
+  (tr1: trace S1 L1) (tr2: trace S2 L2):
+  traces_match Rl Rs trans1 trans2 tr1 tr2 ->
+  trace_valid trans1 tr1. 
 Proof.
-  revert otr auxtr. pcofix CH. intros otr auxtr Hmatch.
+  revert tr1 tr2. pcofix CH. intros tr1 tr2 Hmatch.
   pfold. 
   inversion Hmatch; [by econstructor| ].
   constructor =>//.
@@ -380,18 +440,52 @@ Proof.
   eauto.   
 Qed.
 
+(* TODO: move *)
+Lemma traces_match_valid2 {L1 L2 S1 S2 : Type} Rl Rs trans1 trans2
+  (tr1: trace S1 L1) (tr2: trace S2 L2):
+  traces_match Rl Rs trans1 trans2 tr1 tr2 ->
+  trace_valid trans2 tr2. 
+Proof.
+  intros ?%traces_match_flip. eapply traces_match_valid1; eauto. 
+Qed.
+
+Instance LM_ALM `(LM: LiveModel G M LSI): AlmostLM locale_trans (LM := LM).
+Proof. 
+  refine {| am_lift_G := id |}; eauto. 
+  - intros. by destruct (H0 a).
+  - intros. left. eauto.
+Defined.
+
+(* Lemma traces_match_LM_preserves_validity `{LM: LiveModel G M LSI} {LF: LMFairPre LM} *)
+(*   `{C: Type} {L: Type} *)
+(*   (otr: trace C L) (auxtr : lmftrace (LM := LM)) *)
+(*   state_rel lbl_rel outer_step : *)
+(*   traces_match lbl_rel state_rel outer_step ((fmtrans LM_Fair)) otr auxtr -> *)
+(*   mtrace_valid auxtr. *)
+(* Proof. *)
+(*   revert otr auxtr. pcofix CH. intros otr auxtr Hmatch. *)
+(*   pfold.  *)
+(*   inversion Hmatch; [by econstructor| ]. *)
+(*   constructor =>//. *)
+(*   specialize (CH _ _ H3). *)
+(*   eauto.    *)
+(* Qed. *)
+
 Section lang_fairness_preserved.
   Context `{LM: LiveModel (locale Λ) M LSI}.
   (* Context `{EqDecision (locale Λ)}. *)
-  Context {LF: LMFairPre LM}. 
+  Context {LF: LMFairPre LM}.
+
+  Let ALM := LM_ALM LM.
 
   Definition lm_exaux_traces_match :=
     lm_exaux_traces_match_gen
+      (transA := locale_trans)
       (locale_step (Λ := Λ))
       (id: locale Λ -> locale Λ)
       (live_tids (LM := LM)). 
 
-  Lemma match_locale_enabled_states_livetids: lm_live_lift id locale_enabled live_tids (LM := LM).
+  Lemma match_locale_enabled_states_livetids: lm_live_lift ALM id locale_enabled live_tids (LM := LM).
   Proof.
     red. intros ζ ρ δ c Hloc Hsr. 
     rewrite /locale_enabled.
@@ -402,14 +496,14 @@ Section lang_fairness_preserved.
     have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ).
   Qed.
 
-  Theorem ex_fairness_preserved (extr: extrace Λ) (auxtr: lmftrace (LM := LM)):
+  Theorem ex_fairness_preserved (extr: extrace Λ) (auxtr: atrace (LM := LM)):
     infinite_trace extr ->
     lm_exaux_traces_match extr auxtr ->
-    (forall ζ, fair_ex ζ extr) -> (∀ ρ : fmrole M, fair_by_next_TS ρ auxtr).
+    (forall ζ, fair_ex ζ extr) -> (∀ ρ : fmrole M, afair_by_next_TS ALM ρ auxtr).
   Proof.
     intros. eapply group_fairness_implies_role_fairness; eauto. 
     { eapply traces_match_infinite_trace; eauto. }
-    { eapply traces_match_LM_preserves_validity; eauto. }
+    { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
     { apply _. }
     eapply match_locale_enabled_states_livetids; eauto.
@@ -420,34 +514,35 @@ End lang_fairness_preserved.
 
 Section model_fairness_preserved.
   Context `{LM: LiveModel G M LSI}.
+  Context {A} {transA} {ALM: AlmostLM transA (LM := LM) (A := A)}. 
   (* Context `{EqDecision G}. *)
   Context {LF: LMFairPre LM}. 
 
   Context `{Mout: FairModel}. 
 
-  Context (lift_grole: G -> fmrole Mout).
-  Hypothesis (INJlg: Inj eq eq lift_grole). 
+  Context (lift_A: A -> fmrole Mout).
+  Hypothesis (INJlg: Inj eq eq lift_A). 
 
   Context (state_rel: fmstate Mout → lm_ls LM → Prop).
 
   Hypothesis (match_labels_prop_states: 
-               lm_live_lift lift_grole role_enabled_model state_rel).
-
+               lm_live_lift ALM lift_A role_enabled_model state_rel).
 
   Definition lm_model_traces_match :=
     lm_exaux_traces_match_gen
+      (transA := transA)
       (fmtrans Mout)
-      lift_grole
+      lift_A
       state_rel. 
   
-  Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: lmftrace (LM := LM)):
+  Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: atrace (LM := LM)):
     infinite_trace mtr ->
     lm_model_traces_match mtr auxtr ->
-    (∀ ρ, fair_model_trace ρ mtr) -> (∀ ρ : fmrole M, fair_by_next_TS ρ auxtr).
+    (∀ ρ, fair_model_trace ρ mtr) -> (∀ ρ : fmrole M, afair_by_next_TS ALM ρ auxtr).
   Proof.
     intros. eapply group_fairness_implies_role_fairness; eauto. 
     { eapply traces_match_infinite_trace; eauto. }
-    { eapply traces_match_LM_preserves_validity; eauto. }
+    { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
   Qed.
 

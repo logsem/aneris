@@ -219,3 +219,10 @@ Proof.
   - set_solver. 
 Qed. 
 
+(* TODO: already exists somewhere? *)
+Lemma Decision_iff_impl (P Q: Prop) (PQ: P <-> Q) (DEC_P: Decision P):
+  Decision Q. 
+Proof using. 
+  destruct DEC_P; [left | right]; tauto. 
+Qed.  
+
