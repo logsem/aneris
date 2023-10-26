@@ -164,6 +164,17 @@ Section KVS_valid.
     by rewrite fn_to_gmap_dom.
   Qed.
 
+  Lemma update_kvs_empty M T :
+    update_kvs M ∅ T = M.
+  Proof.
+    apply map_eq.
+    move=>k.
+    case M_k : (M !! k)=>[h|].
+    - apply lookup_update_kvs_Some.
+      by left.
+    - by apply lookup_fn_to_gmap_not_in, not_elem_of_dom.
+  Qed.
+
   Lemma upd_serializable
     (cache : gmap Key SerializableVal)
     (M : gmap Key (list write_event)) (T : nat) :
@@ -539,6 +550,83 @@ Section KVSL_valid.
     - move=>[/not_elem_of_dom C_k]/not_elem_of_dom m_k.
       apply lookup_fn_to_gmap_not_in.
       set_solver.
+  Qed.
+
+  Lemma update_kvsl_empty m T :
+    update_kvsl m ∅ T = m.
+  Proof.
+    apply map_eq=>k.
+    case m_k : (m !! k)=>[h|].
+    - apply lookup_update_kvsl_Some.
+      by left.
+    - by apply lookup_update_kvsl_None.
+  Qed.
+
+  Lemma upadte_kvsl_insert_Some m C T k v h :
+    m !! k = Some h →
+    update_kvsl m (<[k := v]> C) T =
+      <[k := SOMEV ($(k, (v.(SV_val), T)), h)]> (update_kvsl m C T).
+  Proof.
+    move=>m_k.
+    apply map_eq=>k'.
+    case (string_eq_dec k k')=>[<-|neq].
+    {
+      rewrite lookup_insert.
+      apply lookup_update_kvsl_Some.
+      right. right.
+      erewrite lookup_insert.
+      eauto.
+    }
+    rewrite lookup_insert_ne; last done.
+    set C_k'_ := C !! k'.
+    case C_k' : C_k'_=>[v'|]; rewrite /C_k'_ in C_k'=>{C_k'_};
+    set m_k'_ := m !! k';
+    case m_k' : m_k'_=>[h'|]; rewrite /m_k'_ in m_k'=>{m_k'_}.
+    - erewrite (proj2 (lookup_update_kvsl_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvsl_Some. right. right. eauto. }
+      right. right. by erewrite lookup_insert_ne; first eauto.
+    - erewrite (proj2 (lookup_update_kvsl_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvsl_Some. right. left. eauto. }
+      right. left. by erewrite lookup_insert_ne; first eauto.
+    - erewrite (proj2 (lookup_update_kvsl_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvsl_Some. left. eauto. }
+      left. by erewrite lookup_insert_ne; first eauto.
+    - rewrite (proj2 (lookup_update_kvsl_None _ _ _ _));
+        last by rewrite lookup_insert_ne.
+      by apply eq_sym, lookup_update_kvsl_None.
+  Qed.
+
+  Lemma update_kvsl_insert_None m C T k v :
+    m !! k = None →
+    update_kvsl m (<[k := v]> C) T = 
+      <[k := SOMEV ($(k, (v.(SV_val), T)), NONEV)]> (update_kvsl m C T).
+  Proof.
+    move=>m_k.
+    apply map_eq=>k'.
+    case (string_eq_dec k k')=>[<-|neq].
+    {
+      rewrite lookup_insert.
+      apply lookup_update_kvsl_Some.
+      right. left. erewrite lookup_insert.
+      eauto.
+    }
+    rewrite lookup_insert_ne; last done.
+    set C_k'_ := C !! k'.
+    case C_k' : C_k'_=>[v'|]; rewrite /C_k'_ in C_k'=>{C_k'_};
+    set m_k'_ := m !! k';
+    case m_k' : m_k'_=>[h'|]; rewrite /m_k'_ in m_k'=>{m_k'_}.
+    - erewrite (proj2 (lookup_update_kvsl_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvsl_Some. right. right. eauto. }
+      right. right. by erewrite lookup_insert_ne; first eauto.
+    - erewrite (proj2 (lookup_update_kvsl_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvsl_Some. right. left. eauto. }
+      right. left. by erewrite lookup_insert_ne; first eauto.
+    - erewrite (proj2 (lookup_update_kvsl_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvsl_Some. left. eauto. }
+      left. by erewrite lookup_insert_ne; first eauto.
+    - rewrite (proj2 (lookup_update_kvsl_None _ _ _ _));
+        last by rewrite lookup_insert_ne.
+      by apply eq_sym, lookup_update_kvsl_None.
   Qed.
 
   Lemma kvsl_model_empty_delete m M k :

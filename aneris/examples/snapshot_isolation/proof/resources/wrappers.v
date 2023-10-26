@@ -210,7 +210,28 @@ Section Wrapper_defs.
       apply bool_decide_spec in commit_current.
       iCombine "ownTimeGlobal ownTimeLocal" as "ownTime".
       iMod (mono_nat_own_update (T+1) with "ownTime")
-        as "[ownTimeGlobal ownTimeLocal]"; first lia.
+        as "[[ownTimeGlobal ownTimeLocal] _]"; first lia.
+      iInduction cache as [|k sv cache cache_k] "IH" using map_ind.
+      - iModIntro.
+        rewrite update_kvs_empty.
+        iFrame.
+        iPoseProof (mem_implies_seen with "ownMemKey") as "ownMemKey".
+        iAssert ([∗ map] k↦h;_ ∈ m_current;cache_logicalM,
+          (OwnMemKey_def k h ∗ Seen_def k h) ∗ True)%I
+          with "[ownMemKey]" as "ownMemKey".
+        {
+          iApply (big_sepM2_sepM_2 with "ownMemKey"); last done.
+          move=>k.
+          by split=>/(proj2 (elem_of_dom _ _ ))Hk;
+              apply elem_of_dom; move: Hk; rewrite dom0 dom1.
+        }
+        iApply (big_sepM2_impl with "ownMemKey").
+        iIntros "!>%k %h1 %h2 %m_current_k %cache_logicalM_k ((OwnMemKey & Seen) & _)".
+        move:h2 cache_logicalM_k=>[][v[]|b]cache_logicalM_k; [|iFrame..].
+        apply updates_logical_some, eval_updates in cache_logicalM_k.
+        by destruct cache_logicalM_k as [sv (abs & _)].
+      - iMod ("IH" with "[] [$] [$] [$] [$] [$] [$]").
+      (* Check ghost_map_update *)
     Admitted.
 
 End Wrapper_defs.
