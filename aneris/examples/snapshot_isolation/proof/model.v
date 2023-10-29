@@ -175,6 +175,60 @@ Section KVS_valid.
     - by apply lookup_fn_to_gmap_not_in, not_elem_of_dom.
   Qed.
 
+  Lemma update_kvs_insert_Some m C T k v h :
+    m !! k = Some h →
+    update_kvs m (<[k := v]> C) T =
+      <[k := h ++ [{|
+                  we_key := k;
+                  we_val := v.(SV_val);
+                  we_time := T
+                |}]]> (update_kvs m C T).
+  Proof.
+    move=>m_k.
+    apply map_eq=>k'.
+    case (string_eq_dec k k')=>[<-|neq].
+    {
+      rewrite lookup_insert.
+      apply lookup_update_kvs_Some.
+      right.
+      erewrite lookup_insert.
+      eauto.
+    }
+    rewrite lookup_insert_ne; last done.
+    set m_k'_ := m !! k'.
+    case m_k' : m_k'_=>[h'|]; rewrite /m_k'_ in m_k'=>{m_k'_};
+      last by rewrite !not_elem_of_dom_1//upd_dom; apply not_elem_of_dom.
+    set C_k'_ := C !! k'.
+    case C_k' : C_k'_=>[v'|]; rewrite /C_k'_ in C_k'=>{C_k'_}.
+    - erewrite (proj2 (lookup_update_kvs_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvs_Some. right. eauto. }
+      right. by erewrite lookup_insert_ne; first eauto.
+    - erewrite (proj2 (lookup_update_kvs_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvs_Some. left. eauto. }
+      left. by erewrite lookup_insert_ne; first eauto.
+  Qed.
+
+  Lemma upadte_kvs_insert_None m C T k v :
+    m !! k = None →
+    update_kvs m (<[k := v]> C) T = (update_kvs m C T).
+  Proof.
+    move=>m_k.
+    apply map_eq=>k'.
+    case (string_eq_dec k k')=>[<-|neq];
+      first by rewrite !not_elem_of_dom_1//upd_dom; apply not_elem_of_dom.
+    set m_k'_ := m !! k'.
+    case m_k' : m_k'_=>[h'|]; rewrite /m_k'_ in m_k'=>{m_k'_};
+      last by rewrite !not_elem_of_dom_1//upd_dom; apply not_elem_of_dom.
+    set C_k'_ := C !! k'.
+    case C_k' : C_k'_=>[v'|]; rewrite /C_k'_ in C_k'=>{C_k'_}.
+    - erewrite (proj2 (lookup_update_kvs_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvs_Some. right. eauto. }
+      right. by erewrite lookup_insert_ne; first eauto.
+    - erewrite (proj2 (lookup_update_kvs_Some _ _ _ _ _)).
+      { apply eq_sym, lookup_update_kvs_Some. left. eauto. }
+      left. by erewrite lookup_insert_ne; first eauto.
+  Qed.
+
   Lemma upd_serializable
     (cache : gmap Key SerializableVal)
     (M : gmap Key (list write_event)) (T : nat) :

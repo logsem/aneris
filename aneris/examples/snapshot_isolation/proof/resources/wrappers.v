@@ -202,16 +202,20 @@ Section Wrapper_defs.
                 OwnMemKey_def k (commit_event p h) ∗
                 Seen_def k (commit_event p h)).
     Proof.
-      iIntros (dom0 [dom1 [dom2 [dom3 [cache_logical_some [cache_logical_none
-        [updates_logical_some [updates_logical_none cache_logical]]]]]]]
-        snap_valid M_valid updates_ser eval_updates
-        commit_current) "ownM ownTimeGlobal ownTimeLocal ownAuthGlobal ownAuthLocal
-        ownMemKey".
+      iIntros (dom0 cache_coh snap_valid M_valid updates_ser eval_updates commit_current) "ownM ownTimeGlobal
+        ownTimeLocal ownAuthGlobal ownAuthLocal ownMemKey".
       apply bool_decide_spec in commit_current.
       iCombine "ownTimeGlobal ownTimeLocal" as "ownTime".
       iMod (mono_nat_own_update (T+1) with "ownTime")
-        as "[[ownTimeGlobal ownTimeLocal] _]"; first lia.
+              as "[[ownTimeGlobal ownTimeLocal] _]"; first lia.
+      iFrame.
+      iRevert (cache_updatesM cache_logicalM Msnap m_current cache_coh commit_current
+          updates_ser eval_updates dom0 snap_valid) "ownMemKey".
       iInduction cache as [|k sv cache cache_k] "IH" using map_ind.
+      all: iIntros (cache_updatesM cache_logicalM Msnap m_current cache_coh commit_current
+          updates_ser eval_updates dom0 snap_valid) "ownMemKey".
+      all: destruct (cache_coh) as [dom1 [dom2 [dom3 [logical_false [logical_false_empty
+             [updates_some [updates_none logical_true]]]]]]].
       - iModIntro.
         rewrite update_kvs_empty.
         iFrame.
@@ -223,14 +227,100 @@ Section Wrapper_defs.
           iApply (big_sepM2_sepM_2 with "ownMemKey"); last done.
           move=>k.
           by split=>/(proj2 (elem_of_dom _ _ ))Hk;
-              apply elem_of_dom; move: Hk; rewrite dom0 dom1.
+            apply elem_of_dom; move: Hk; rewrite dom0 dom1.
         }
         iApply (big_sepM2_impl with "ownMemKey").
         iIntros "!>%k %h1 %h2 %m_current_k %cache_logicalM_k ((OwnMemKey & Seen) & _)".
         move:h2 cache_logicalM_k=>[][v[]|b]cache_logicalM_k; [|iFrame..].
-        apply updates_logical_some, eval_updates in cache_logicalM_k.
+        apply updates_some, eval_updates in cache_logicalM_k.
         by destruct cache_logicalM_k as [sv (abs & _)].
-      - iMod ("IH" with "[] [$] [$] [$] [$] [$] [$]").
+      - iSpecialize ("IH" with "[$] [$] [$]").
+        iSpecialize ("IH" $! (delete k cache_updatesM) (delete k cache_logicalM)
+                              (delete k Msnap) (delete k m_current)).
+        have [hm m_current_k] : is_Some (m_current !! k).
+        {
+          apply elem_of_dom.
+          rewrite dom0 -dom1.
+          apply (elem_of_subseteq (dom cache_updatesM)); first done.
+          apply elem_of_dom.
+          exists (sv.(SV_val)).
+          apply eval_updates.
+          exists sv.
+          by rewrite lookup_insert.
+        }
+        iPoseProof (big_sepM_delete _ _ _ _ m_current_k with "ownMemKey")
+          as "((%hw & (k_hw & #ownMemSeen) & ->) & ownMemKey)".
+        iMod ("IH" with "[] [] [] [] [] [] ownMemKey")
+          as "(global & local & mono & ownMemKey)"; [iPureIntro..|].
+        + by apply is_coherent_cache_delete.
+        + move=>k' k'_key.
+          case delete_k' : (delete k cache_logicalM !! k')=>[[a [|//]]|//].
+          move: delete_k'=>/lookup_delete_Some[k_k' logical_k'].
+          apply bool_decide_spec.
+          rewrite lookup_delete_ne; last done.
+          move: (commit_current k' k'_key).
+          rewrite logical_k'=>/bool_decide_spec->.
+          by rewrite !lookup_fmap lookup_delete_ne.
+        + by apply map_Forall_delete.
+        + move=>k' v.
+          split.
+          * move=>[sv'][cache_k' <-].
+            apply lookup_delete_Some.
+            have k_k' : k ≠ k'.
+            { move=>k_k'. by rewrite -k_k' cache_k in cache_k'. }
+            split; first done.
+            apply eval_updates.
+            exists sv'.
+            by rewrite lookup_insert_ne.
+          * move=>/lookup_delete_Some[k_k']/eval_updates[sv'][].
+            rewrite (lookup_insert_ne _ _ _ _ k_k')=>-><-.
+            by exists sv'.
+        + by rewrite !dom_delete_L dom0.
+        + by move=>k' h/lookup_delete_Some[k_k']/snap_valid.
+        + set M_k_ := (M !! k).
+          case M_k : M_k_=>[h|]; rewrite /M_k_ in M_k=>{M_k_}; last first.
+          {
+            rewrite upadte_kvs_insert_None//.
+            iFrame.
+            have [vo logical_k] : ∃ vo, cache_logicalM !! k = Some (vo, false).
+            {
+              exists (from_option
+                     (λ h : list write_event,
+                        from_option
+                          (λ we : write_event, Some (we_val we))
+                          None (last h)) None 
+                     (Msnap !! k)).
+              apply updates_none.
+              * rewrite -dom0. apply elem_of_dom. eauto.
+              * done.
+              * apply not_elem_of_dom, (not_elem_of_weaken _ _ KVS_keys); last done.
+                rewrite (kvs_ValidDom _ _ _ M_valid). by apply not_elem_of_dom.
+            }
+            iModIntro.
+            iApply (big_sepM2_delete with "[k_hw ownMemSeen $ownMemKey]");
+              [done..|].
+            iSplitL; last first.
+            {
+              iExists hw.
+              iSplit; first done.
+              iPureIntro.
+              by case vo.
+            }
+            iExists hw.
+            iSplit; first iFrame "∗#".
+            iPureIntro.
+            by case vo.
+          }
+          rewrite (update_kvs_insert_Some _ _ _ _ _ _ M_k).
+          set we := {| we_key := k; we_val := sv;
+            we_time := T + 1 : int_time.(Time) |}.
+          iCombine "global local" as "auth".
+          iMod (ghost_map_update (h ++ [we]) with "auth k_hw")
+            as "((global & local) & k_h)".
+          iMod (own_update _ _ (● global_memUR
+            (<[k := h ++ [we]]>(update_kvs M cache (T + 1)))) with "mono") as "mono".
+          { admit. }
+          
       (* Check ghost_map_update *)
     Admitted.
 
