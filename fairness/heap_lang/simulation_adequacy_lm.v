@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils fuel_ext.
-From trillium.fairness.heap_lang Require Export lang simulation_adequacy em_lm_heap_lang em_lm. 
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils fuel_ext lm_fair lm_fair_traces lm_fairness_preservation traces_match.
+From trillium.fairness.heap_lang Require Import lang simulation_adequacy em_lm_heap_lang em_lm.
 
 
 (* TODO: move, change initial_ls definition *)
@@ -340,7 +340,7 @@ Proof.
   destruct (simulation_adequacy_traces
               Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as [auxtr Hmatch].
   assert (mtrace_valid auxtr) as Hstutter.
-  { by eapply traces_match_LM_preserves_validity in Hmatch. }
+  { by eapply traces_match_valid2 in Hmatch. }
   destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
   eauto.
 Qed.
@@ -371,8 +371,10 @@ Proof.
               Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
   have Hfairaux := ex_fairness_preserved 
                      extr auxtr Hinf Hmatch Hfair.
-  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
-  have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
+  pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) Hfairaux) as Hfairaux'. 
+  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux'.
+  (* have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch. *)
+  pose proof Hmatch as Hvalaux%traces_match_valid2. 
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
   have Htermtr := Hterm mtr Hmtrvalid Hfairm.
   eapply traces_match_preserves_termination =>//.
@@ -435,16 +437,14 @@ Theorem simulation_adequacy_terminate_general'
   (∀ mtr: @mtrace M, mtrace_fairly_terminating mtr) ->
   (* (forall ρ, fair_aux ρ auxtr (LM := LM)) -> *)
   (∀ ρ : fmrole M, fair_by_next_TS ρ auxtr) ->
-  lm_model_traces_match lift_grole state_rel otr auxtr ->
+  lm_model_traces_match lift_grole state_rel otr auxtr (transA := olocale_trans) (LM := LM) ->
   mtrace_fairly_terminating otr.
 Proof.
   intros Hterm Hfairaux Hmatch.
   red. intros VALID FAIR. 
   destruct (infinite_or_finite otr) as [Hinf|] =>//.
 
-  assert (mtrace_valid auxtr) as Hvalaux.
-  { by eapply traces_match_LM_preserves_validity. }
-
+  pose proof Hmatch as Hvalaux%traces_match_valid2. 
   destruct (can_destutter_auxtr auxtr (LM := LM)) as [mtr Hupto] =>//.
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
@@ -461,14 +461,16 @@ Theorem simulation_adequacy_terminate_general
   state_rel lift_grole:
   (∀ mtr: @mtrace M, mtrace_fairly_terminating mtr) ->
   Inj eq eq lift_grole ->
-  (lm_live_lift lift_grole (role_enabled_model (M := Mout)) state_rel) ->
-  lm_model_traces_match lift_grole state_rel otr auxtr ->
+  (lm_live_lift (LM_ALM LM) lift_grole (role_enabled_model (M := Mout)) state_rel) ->
+  (* lm_model_traces_match lift_grole state_rel otr auxtr -> *)
+  lm_model_traces_match lift_grole state_rel otr auxtr (transA := olocale_trans) (LM := LM) ->
   (* The coinductive pure coq proposition given by adequacy *)
   mtrace_fairly_terminating otr.
 Proof.
   intros. red. intros.
   destruct (infinite_or_finite otr) as [Hinf|] =>//.
-  eapply simulation_adequacy_terminate_general'; eauto.  
+  eapply simulation_adequacy_terminate_general'; eauto.
+  intros. apply LM_ALM_afair_by_next.
   eapply model_fairness_preserved; eauto. 
 Qed.
 

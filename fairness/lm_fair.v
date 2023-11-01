@@ -168,16 +168,18 @@ Section LMFair.
     (* intros.  *)
   Admitted.
 
+  Definition olocale_trans st1 oρ st2 :=
+    match oρ with
+    | Some τ => locale_trans st1 τ st2
+    | _ => False
+    end.
+
+  (* TODO: rename "locale" into "group" everywhere *)
   Global Definition LM_Fair: FairModel.
     refine {|
         fmstate := lm_ls LM;
         fmrole := G;
-        fmtrans :=
-          fun st1 oρ st2 => 
-            match oρ with
-            | Some τ => locale_trans st1 τ st2
-            | _ => False
-            end;
+        fmtrans := olocale_trans;
         live_roles δ := filter (fun τ => exists δ', locale_trans δ τ δ') (dom (ls_tmap δ));
       |}.
     (* - apply lm_ls_eqdec.  *)

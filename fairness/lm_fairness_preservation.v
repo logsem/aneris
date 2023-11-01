@@ -333,11 +333,12 @@ Section fairness_preserved.
     Context {So Lo: Type}.
     Context `{EqDecision Lo}. 
     
-    Let out_trace := trace So (option Lo).
+    Let out_trace := trace So (Lo).
     
     (* counterpart of locale step.
        TODO: any restrictions? *)
-    Context (out_step: So -> option Lo -> So -> Prop). 
+    (* Context (out_step: So -> option Lo -> So -> Prop).  *)
+    Context (out_step: So -> Lo -> So -> Prop).
     
     (* Representation of "almost LM" model labels on outer level *)
     Context (lift_A: A -> Lo).
@@ -371,16 +372,13 @@ Section fairness_preserved.
     (*            end *)
     (*   end.  *)
     
-    Definition out_A_labels_match (oζ : option Lo) (a: A) :=
-      (* match oζ, oℓ with *)
-      (* | Some ζ, Some ℓ => lift_grole ℓ = ζ *)
-      (* | None, None => True *)
-      (* | _, _ => False *)
+    (* Definition out_A_labels_match (oζ : option Lo) (a: A) := *)
+    Definition out_A_labels_match (ζ : Lo) (a: A) :=
+      (* match oζ with *)
+      (* | Some ζ => lift_A a = ζ *)
+      (* | None => False *)
       (* end.  *)
-      match oζ with
-      | Some ζ => lift_A a = ζ
-      | None => False
-      end. 
+      lift_A a = ζ. 
     
     (* TODO: rename *)
     Definition lm_exaux_traces_match_gen: out_trace → atrace → Prop :=
@@ -390,7 +388,7 @@ Section fairness_preserved.
         (* locale_step  *) out_step
         (* (fmtrans LM_Fair).  *) transA. 
         
-    Let lbl_match (ℓ: Lo) oℓ' := oℓ' = Some ℓ. 
+    Let lbl_match (ℓ: Lo) oℓ' := oℓ' = ℓ. 
     
     Theorem fairness_preserved (extr: out_trace) (auxtr: atrace):
       infinite_trace extr ->
@@ -449,12 +447,49 @@ Proof.
   intros ?%traces_match_flip. eapply traces_match_valid1; eauto. 
 Qed.
 
-Instance LM_ALM `(LM: LiveModel G M LSI): AlmostLM locale_trans (LM := LM).
+Instance LM_ALM `(LM: LiveModel G M LSI): AlmostLM olocale_trans (LM := LM).
 Proof. 
-  refine {| am_lift_G := id |}; eauto. 
-  - intros. by destruct (H0 a).
-  - intros. left. eauto.
+  refine {| am_lift_G := Some |}; eauto. 
+  - intros ?????? STEP NEQ **.
+    destruct a; [| done]. 
+    by destruct (NEQ g).
+  - intros [a| ].
+    + left. eauto.
+    + right. by intros [? [=]].  
 Defined.
+
+(* TODO: move *)
+Global Instance fair_by_gen_Proper {S L T: Type}:
+  Proper
+    ((eq ==> eq ==> iff) ==> (eq ==> eq ==> eq ==> iff) ==> eq ==> eq ==> iff) 
+    (@fair_by_gen S L T).
+Proof.
+  intros ?? LOC_IFF ?? STEP_IFF.
+  red. intros ?? ->. red. intros ?? ->.
+  rewrite /fair_by_gen.
+  apply forall_proper. intros.
+  erewrite pred_at_iff.
+  2: { intros. eapply LOC_IFF; reflexivity. }
+  apply Morphisms_Prop.iff_iff_iff_impl_morphism; [reflexivity| ].
+  repeat (apply exist_proper; intros).
+  apply Morphisms_Prop.and_iff_morphism; [done| ].
+  rewrite /fairness_sat_gen. 
+  apply Morphisms_Prop.or_iff_morphism.
+  - apply not_iff_compat, LOC_IFF; reflexivity.
+  - apply STEP_IFF; reflexivity. 
+Qed. 
+
+Lemma LM_ALM_afair_by_next `(LM: LiveModel G M LSI) {LF: LMFairPre LM} auxtr:
+  (∀ ρ, afair_by_next_TS (LM_ALM LM) ρ auxtr) <-> ∀ ρ, fair_by_next_TS ρ auxtr.
+Proof.
+  apply forall_proper. intros.
+  apply fair_by_gen_Proper; try reflexivity.
+  red. intros ??->. intros ??->. intros ??->.
+  rewrite /step_by_next_TS /astep_by_next_TS. simpl.
+  split.
+  - intros (?&?&?&->&<-&<-). eauto.
+  - intros (?&?&->&?). do 3 eexists. eauto. 
+Qed. 
 
 (* Lemma traces_match_LM_preserves_validity `{LM: LiveModel G M LSI} {LF: LMFairPre LM} *)
 (*   `{C: Type} {L: Type} *)
@@ -480,12 +515,15 @@ Section lang_fairness_preserved.
 
   Definition lm_exaux_traces_match :=
     lm_exaux_traces_match_gen
-      (transA := locale_trans)
+      (transA := olocale_trans)
       (locale_step (Λ := Λ))
-      (id: locale Λ -> locale Λ)
-      (live_tids (LM := LM)). 
+      id
+      (live_tids (LM := LM)).  
 
-  Lemma match_locale_enabled_states_livetids: lm_live_lift ALM id locale_enabled live_tids (LM := LM).
+  Lemma match_locale_enabled_states_livetids: 
+    lm_live_lift ALM id
+      (* locale_enabled *) (from_option locale_enabled (fun _ => False))
+      live_tids (LM := LM).
   Proof.
     red. intros ζ ρ δ c Hloc Hsr. 
     rewrite /locale_enabled.
@@ -506,7 +544,10 @@ Section lang_fairness_preserved.
     { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
     { apply _. }
-    eapply match_locale_enabled_states_livetids; eauto.
+    { eapply match_locale_enabled_states_livetids; eauto. }
+    simpl. intros. destruct ζ as [ζ| ].
+    { apply H1. }
+    red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
   Qed.
 
 End lang_fairness_preserved. 
@@ -532,7 +573,7 @@ Section model_fairness_preserved.
     lm_exaux_traces_match_gen
       (transA := transA)
       (fmtrans Mout)
-      lift_A
+      (Some ∘ lift_A)
       state_rel. 
   
   Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: atrace (LM := LM)):
@@ -543,7 +584,14 @@ Section model_fairness_preserved.
     intros. eapply group_fairness_implies_role_fairness; eauto. 
     { eapply traces_match_infinite_trace; eauto. }
     { eapply traces_match_valid2; eauto. }
-    eapply fairness_preserved; eauto.
+    eapply fairness_preserved.
+    4: by apply H0. 
+    all: eauto.
+    { apply _. }
+    { Unshelve. 2: exact (from_option role_enabled_model (fun _ => False)). done. }
+    intros [?| ].
+    { red. simpl. apply H1. }
+    red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
   Qed.
 
 End model_fairness_preserved. 

@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import pacotac.
-From trillium.fairness Require Export fairness fair_termination fuel traces_match lm_fairness_preservation.
+From trillium.fairness Require Import fairness fair_termination fuel traces_match lm_fairness_preservation lm_fair lm_fair_traces.
 
 Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel} {LSI}
            {LM : LiveModel (locale Λ) Mdl LSI}
@@ -70,13 +70,17 @@ Proof.
     - by apply to_trace_spec. }
   intros Hfair.
   assert (mtrace_valid auxtr) as Hstutter.
-  { by eapply traces_match_LM_preserves_validity. }
+  { by eapply traces_match_valid2. }
   apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
   have Hfairaux := ex_fairness_preserved
                      extr auxtr Hinf Hmatch Hfair.
-  have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
-  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  (* have Hvalaux := traces_match_valid2 extr auxtr _ _ _ Hmatch. *)
+  pose proof Hmatch as Hvalaux%traces_match_valid2.
+  (* pose proof Hfairaux as X%LM_ALM_afair_by_next.  *)
+  assert (∀ ρ, fair_by_next_TS ρ auxtr) as Hfairaux'.
+  { eapply LM_ALM_afair_by_next; eauto. }
+  pose proof (upto_stutter_fairness auxtr mtr Hupto Hfairaux') as Hfairm.   
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
   eapply traces_match_preserves_termination; [apply Hmatch|].
   eapply upto_stutter_finiteness =>//.

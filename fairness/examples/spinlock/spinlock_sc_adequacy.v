@@ -1,11 +1,11 @@
 From iris.proofmode Require Import tactics.
-From trillium.program_logic Require Export weakestpre.
-From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
+From trillium.program_logic Require Import weakestpre.
+From trillium.prelude Require Import finitary quantifiers sigma classical_instances.
 
 Require Import stdpp.decidable.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang Require Import simulation_adequacy_lm.
+From trillium.fairness.heap_lang Require Import simulation_adequacy_lm em_lm_heap_lang em_lm.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
