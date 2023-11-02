@@ -281,6 +281,10 @@ Section TraceLookup.
     tr S!! 0 = Some (trfirst tr). 
   Proof. by destruct tr. Qed.
 
+  Lemma label_lookup_0 st ℓ (tr: trace St L):
+    (st -[ℓ]-> tr) L!! 0 = Some ℓ. 
+  Proof. done. Qed.
+
   Lemma trace_state_lookup_simpl' (tr: trace St L) i st:
     (exists step, tr !! i = Some step /\ fst step = st) <-> tr S!! i = Some st. 
   Proof.
@@ -502,6 +506,27 @@ Section UptoStutter.
   Context {St S' L L' : Type}.
   Context {Us : St → S'}.
   Context {Usls: St -> L -> St -> option L'}.
+
+  From Paco Require Import paco1 paco2 pacotac.
+
+  Lemma upto_stutter_trace_label_lookup {btr : trace St L} {str : trace S' L'} 
+    (n : nat) st ℓ st' l:
+    upto_stutter Us Usls btr str →
+    btr !! n = Some (st, Some (ℓ, st')) ->
+    Usls st ℓ st' = Some l ->
+      ∃ (n' : nat), str L!! n' = Some l.
+  Proof.
+    intros UPTO NTH MATCH.
+    pose proof (trace_has_len btr) as [? LEN].
+    apply trace_lookup_after_strong in NTH as (atr' & AFTER & A0). 
+    forward eapply (upto_stutter_after' _ _ n UPTO); eauto.
+    intros (n' & str' & AFTER' & UPTOn).
+    exists n'.
+    rewrite -(Nat.add_0_r n'). erewrite <- label_lookup_after; eauto.
+    punfold UPTOn; [| by apply upto_stutter_mono].
+    inversion UPTOn; subst; try congruence.
+    rewrite label_lookup_0. congruence.  
+  Qed.
 
   Lemma upto_stutter_state_lookup' {btr : trace St L} {str : trace S' L'} (n : nat) bst:
     upto_stutter Us Usls btr str
