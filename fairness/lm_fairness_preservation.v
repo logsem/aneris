@@ -561,19 +561,22 @@ Section model_fairness_preserved.
 
   Context `{Mout: FairModel}. 
 
-  Context (lift_A: A -> fmrole Mout).
+  Context (lift_A: A -> option $ fmrole Mout).
   Hypothesis (INJlg: Inj eq eq lift_A). 
 
   Context (state_rel: fmstate Mout → lm_ls LM → Prop).
 
   Hypothesis (match_labels_prop_states: 
-               lm_live_lift ALM lift_A role_enabled_model state_rel).
+               lm_live_lift ALM lift_A
+                 (* role_enabled_model *)
+                 (from_option role_enabled_model (fun _ => False))
+                 state_rel).
 
   Definition lm_model_traces_match :=
     lm_exaux_traces_match_gen
       (transA := transA)
       (fmtrans Mout)
-      (Some ∘ lift_A)
+      (lift_A)
       state_rel. 
   
   Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: atrace (LM := LM)):
@@ -587,8 +590,6 @@ Section model_fairness_preserved.
     eapply fairness_preserved.
     4: by apply H0. 
     all: eauto.
-    { apply _. }
-    { Unshelve. 2: exact (from_option role_enabled_model (fun _ => False)). done. }
     intros [?| ].
     { red. simpl. apply H1. }
     red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.

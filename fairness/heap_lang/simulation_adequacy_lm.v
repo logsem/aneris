@@ -461,9 +461,9 @@ Theorem simulation_adequacy_terminate_general
   state_rel lift_grole:
   (∀ mtr: @mtrace M, mtrace_fairly_terminating mtr) ->
   Inj eq eq lift_grole ->
-  (lm_live_lift (LM_ALM LM) lift_grole (role_enabled_model (M := Mout)) state_rel) ->
+  (lm_live_lift (LM_ALM LM) (option_fmap _ _ lift_grole) (from_option (role_enabled_model (M := Mout)) (fun _ => False)) state_rel) ->
   (* lm_model_traces_match lift_grole state_rel otr auxtr -> *)
-  lm_model_traces_match lift_grole state_rel otr auxtr (transA := olocale_trans) (LM := LM) ->
+  lm_model_traces_match (option_fmap _ _ lift_grole) state_rel otr auxtr (transA := olocale_trans) (LM := LM) ->
   (* The coinductive pure coq proposition given by adequacy *)
   mtrace_fairly_terminating otr.
 Proof.
@@ -471,7 +471,8 @@ Proof.
   destruct (infinite_or_finite otr) as [Hinf|] =>//.
   eapply simulation_adequacy_terminate_general'; eauto.
   intros. apply LM_ALM_afair_by_next.
-  eapply model_fairness_preserved; eauto. 
+  eapply model_fairness_preserved; eauto.
+  apply _. 
 Qed.
 
 End adequacy_general.
