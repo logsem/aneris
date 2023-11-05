@@ -312,16 +312,30 @@ Section Wrapper_defs.
             by case vo.
           }
           rewrite (update_kvs_insert_Some _ _ _ _ _ _ M_k).
+          iCombine "k_hw global" gives "%upd_some".
+          move:upd_some=>/lookup_update_kvs_Some[[_]|[?][?][?][abs]];
+            last by rewrite cache_k in abs.
+          rewrite M_k=>[][]eq. subst.
           set we := {| we_key := k; we_val := sv;
             we_time := T + 1 : int_time.(Time) |}.
           iCombine "global local" as "auth".
-          iMod (ghost_map_update (h ++ [we]) with "auth k_hw")
+          iMod (ghost_map_update (hw ++ [we]) with "auth k_hw")
             as "((global & local) & k_h)".
           iMod (own_update _ _ (● global_memUR
-            (<[k := h ++ [we]]>(update_kvs M cache (T + 1)))) with "mono") as "mono".
+            (<[k := hw ++ [we]]>(update_kvs M cache (T + 1)))) with "mono") as "mono".
           { admit. }
-          
-      (* Check ghost_map_update *)
+          iMod (get_OwnMemSeen _ _ k (hw ++ [we]) with "mono") as "(mono & #seen)";
+            first apply lookup_insert.
+          iModIntro.
+          iFrame.
+          iApply big_sepM2_delete; first done.
+          { apply updates_some, eval_updates.
+            exists sv. by split; first apply lookup_insert. }
+          iFrame.
+          simpl.
+          change [sv.(SV_val)] with (to_hist [we]).
+          rewrite -fmap_snoc.
+          by iSplit; iExists (hw ++ [we]); repeat iSplit.
     Admitted.
 
 End Wrapper_defs.
