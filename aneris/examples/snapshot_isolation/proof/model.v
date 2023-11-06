@@ -208,7 +208,7 @@ Section KVS_valid.
       left. by erewrite lookup_insert_ne; first eauto.
   Qed.
 
-  Lemma upadte_kvs_insert_None m C T k v :
+  Lemma update_kvs_insert_None m C T k v :
     m !! k = None →
     update_kvs m (<[k := v]> C) T = (update_kvs m C T).
   Proof.

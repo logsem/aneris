@@ -1141,8 +1141,8 @@ Section Proof_of_commit_handler.
           as "(HmemLoc & Hkeys & %Hmap_eq)".
         apply map_eq_filter_dom in Hmap_eq.
         (* Update of logical ressources *)
-        iDestruct (commit_logical_update clients γKnownClients γGauth γGsnap γT γTrs
-          ts T Sg cache_logicalM cache_updatesM cache M Msnap m_current_client) as "H_upd".
+        iDestruct (commit_logical_update γGauth γGsnap γT ts T Sg cache_logicalM cache_updatesM 
+          cache M Msnap m_current_client) as "H_upd".
         iDestruct ("H_upd" with "[] [] [] [] [] [] [] [$HmemMono] [$HtimeGlob]
           [$HtimeLoc] [$HmemGlobAuth] [$HmemLoc] [$Hkeys]") as 
           ">(HtimeGlob & HtimeLoc & HmemGlob & HmemLoc & HmemMono & Hkeys)"; try done.

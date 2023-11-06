@@ -280,7 +280,7 @@ Section Wrapper_defs.
         + set M_k_ := (M !! k).
           case M_k : M_k_=>[h|]; rewrite /M_k_ in M_k=>{M_k_}; last first.
           {
-            rewrite upadte_kvs_insert_None//.
+            rewrite update_kvs_insert_None//.
             iFrame.
             have [vo logical_k] : ∃ vo, cache_logicalM !! k = Some (vo, false).
             {
@@ -323,7 +323,30 @@ Section Wrapper_defs.
             as "((global & local) & k_h)".
           iMod (own_update _ _ (● global_memUR
             (<[k := hw ++ [we]]>(update_kvs M cache (T + 1)))) with "mono") as "mono".
-          { admit. }
+          { 
+            unfold global_memUR.
+            apply (auth_update_auth _ _ (to_max_prefix_list <$> {[k := hw ++ [we]]})).
+            do 2 rewrite fmap_insert.
+            rewrite fmap_empty insert_empty.
+            apply (insert_alloc_local_update _ _ _ (to_max_prefix_list hw)); try done.
+            - rewrite lookup_fmap.
+              unfold update_kvs.
+              rewrite gset_map.lookup_fn_to_gmap_2'.
+              by rewrite cache_k M_k.
+              by rewrite elem_of_dom.
+            - assert (to_max_prefix_list (hw ++ [we]) ⋅ to_max_prefix_list hw ≡ to_max_prefix_list (hw ++ [we])) 
+                as H_eq1.
+              + apply to_max_prefix_list_op_r.
+                by apply prefix_app_r.
+              + rewrite <- H_eq1 at 1.
+                assert (to_max_prefix_list (hw ++ [we]) ⋅ ε ≡ to_max_prefix_list (hw ++ [we])) 
+                  as H_eq2; first by rewrite right_id.
+                rewrite <- H_eq2 at 2.
+                apply op_local_update.
+                intros.
+                rewrite H_eq1.
+                apply to_max_prefix_list_validN.
+          }
           iMod (get_OwnMemSeen _ _ k (hw ++ [we]) with "mono") as "(mono & #seen)";
             first apply lookup_insert.
           iModIntro.
@@ -336,6 +359,6 @@ Section Wrapper_defs.
           change [sv.(SV_val)] with (to_hist [we]).
           rewrite -fmap_snoc.
           by iSplit; iExists (hw ++ [we]); repeat iSplit.
-    Admitted.
+    Qed.
 
 End Wrapper_defs.
