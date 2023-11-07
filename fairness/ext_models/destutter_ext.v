@@ -113,8 +113,6 @@ Section destuttering_auxtr.
     left. eauto.
   Qed.
 
-  Definition elmftrace := mtrace (@ext_model_FM _ ELM). 
-
   Lemma fuel_dec_unless
     (* (auxtr: auxtrace (LM := LM)) *)
           (eauxtr: elmftrace)

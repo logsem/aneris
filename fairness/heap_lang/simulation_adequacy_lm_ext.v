@@ -68,21 +68,6 @@ Section adequacy_general.
   Context {lift_erole: @ext_role _ ELM -> fmrole Mout}.
   Let lift_erole' := option_fmap _ _ lift_erole. 
 
-  (* TODO: move? *)
-  Instance LM_ALM: AlmostLM (@ext_trans _ ELM) (LM := LM).
-  Proof.
-    refine {| am_lift_G := Some ∘ inl |}; eauto.
-    - intros ??? STEP. inversion STEP. eauto. 
-    - intros ?????? STEP NEQ **. inversion STEP; subst. 
-      + by destruct (NEQ ρ0).
-      + eapply EXT_KEEP_ASG; eauto. 
-    - intros [[?|?]| ].
-      2, 3: right; by intros [? [=]].
-      left; eauto.
-  Defined.
-
-  Let elmftrace := @emtrace _ ELM. 
-  
   (* TODO: try to unify with lm_model_traces_match *)
   Definition ext_lm_model_traces_match: mtrace Mout -> elmftrace -> Prop :=
     traces_match 
@@ -148,7 +133,7 @@ Section adequacy_general.
     punfold H0; [| apply upto_stutter_mono]. inversion H0; subst.
     { by rewrite H1 in H5. }
     rewrite H1 in H9. inversion H9. subst. clear H9. 
-    destruct x1; simpl in H1; [| done]. destruct e.
+    destruct x1; simpl in H1; [| done]. destruct f.
     { destruct lm_fair_traces.next_TS_role; congruence. }
     destruct e. inversion H1. subst. clear H1.
     destruct (EXT_FIN (n + k + x) (Some (inr (env i)))).

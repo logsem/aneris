@@ -1,6 +1,6 @@
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness.examples.ticketlock Require Import set_map_properties. 
-From trillium.fairness Require Import trace_helpers.
+From trillium.fairness Require Import trace_helpers lm_fairness_preservation lm_fair fuel.
 
 Class ExtModel (innerM: FairModel) := {  
   EI: Type; (* indexes over external transitions *)
@@ -76,3 +76,37 @@ Section ExtModelFair.
   Definition emtrace_valid := trace_valid ext_trans. 
 
 End ExtModelFair. 
+
+(* TODO: move? *)
+Section ELM_ALM.
+  Context `{LM: LiveModel G M LSI}.
+  Context {EM: ExtModel M}.
+  Context {LF: LMFairPre LM}.
+  Context {ELM: ExtModel LM_Fair}. 
+
+  Definition elmftrace := mtrace (@ext_model_FM _ ELM). 
+
+  Hypothesis (EXT_KEEP_ASG: forall δ1 ι δ2 ρ τ f,
+                 @ext_trans _ ELM δ1 (Some $ inr ι) δ2 -> 
+                 ls_mapping δ1 !! ρ = Some τ ->
+                 ls_fuel δ1 !! ρ = Some f ->
+                 ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f). 
+
+  Instance ELM_ALM: AlmostLM (@ext_trans _ ELM) (LM := LM).
+  Proof.
+    refine {| am_lift_G := Some ∘ inl |}; eauto.
+    - intros ??? STEP. inversion STEP. eauto. 
+    - intros ?????? STEP NEQ **. inversion STEP; subst. 
+      + by destruct (NEQ ρ0).
+      + eapply EXT_KEEP_ASG; eauto. 
+    - intros [[?|?]| ].
+      2, 3: right; by intros [? [=]].
+      left; eauto.
+  Defined.
+
+  Local Lemma same_type (l: elmftrace) (a: @atrace _ _ _ LM (option ext_role)): False.
+  Proof.
+    assert (l = a). 
+  Abort. 
+
+End ELM_ALM.
