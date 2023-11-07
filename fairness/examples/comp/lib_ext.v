@@ -98,7 +98,7 @@ Section ExtModelLM.
     (A <-> False) <-> ¬ A.
   Proof. tauto. Qed.
 
-  Let lib_lm_projEI (_: lib_lm_EI) := (tt: lib_EI).
+  Definition lib_lm_projEI (_: lib_lm_EI) := (tt: lib_EI).
 
   Lemma lib_lm_active_exts_spec:
     ∀ δ ι, ι ∈ lib_lm_active_exts δ ↔ (∃ δ' : lib_fair, lib_lm_ETs ι δ δ'). 

@@ -4,21 +4,6 @@ From trillium.fairness.heap_lang Require Import simulation_adequacy_lm.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext.
 From trillium.fairness Require Import trace_lookup.
 
-(* Definition ext_trans_bounded `{EM: ExtModel M} (emtr: emtrace) := *)
-(*   exists n, forall i ℓ, n <= i -> emtr L!! i = Some ℓ -> forall ι, ℓ ≠ Some (inr ι).  *)
-Definition trans_bounded {St L: Type} (tr: trace St L) (P: L -> Prop) :=
-  exists n, forall i ℓ, n <= i -> tr L!! i = Some ℓ -> ¬ P ℓ.
-
-Lemma fin_trans_bounded {St L: Type} (tr: trace St L) (P: L -> Prop)
-  (FIN: terminating_trace tr):
-  trans_bounded tr P.
-Proof.
-  pose proof (trace_has_len tr) as [? LEN].
-  eapply terminating_trace_equiv in FIN as [n ?]; eauto. subst. 
-  red. exists n. intros.
-  eapply mk_is_Some, label_lookup_dom in H0; eauto.
-  simpl in *. lia.
-Qed. 
 
 (* TODO: move, unify? *)
 Lemma upto_stutter_terminating_trace:
@@ -42,8 +27,6 @@ Proof.
   exists (S m). rewrite -Nat.add_1_r after_sum' AFTER2. done.
 Qed. 
 
-Definition ext_trans_bounded `{EM: ExtModel M} (emtr: emtrace) :=
-  trans_bounded emtr (fun oℓ => exists ι, oℓ = Some (inr ι)). 
 
 Section adequacy_general.
 
@@ -114,6 +97,7 @@ Section adequacy_general.
     (VALID: emtrace_valid eauxtr):
     ext_trans_bounded emtr.
   Proof.
+    (* clear PROJ_EXT.  *)
     (* red. red. *)
     do 2 red in EXT_FIN. destruct EXT_FIN as [n EXT_FIN].
     destruct (infinite_or_finite eauxtr) as [INF| FIN]. 
