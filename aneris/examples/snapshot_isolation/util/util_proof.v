@@ -260,7 +260,7 @@ Section run_spec_proof.
   Lemma run_spec :
   ∀ (c : val) (tbody : val) (sa : socket_address) (E : coPset)
     (P :  gmap Key Hist → iProp Σ)
-    (Q : (gmap Key Hist) -> (gmap Key (option val * bool)) → iProp Σ),
+    (Q : (gmap Key Hist) -> (gmap Key Hist) -> (gmap Key (option val * bool)) → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜start_spec⌝ -∗
     ⌜commit_spec⌝ -∗
@@ -277,22 +277,22 @@ Section run_spec_proof.
           }}}
             tbody c  @[ip_of_address sa] 
           {{{ (mc : gmap Key (option val * bool)), RET #();
-              ⌜dom m_snap = dom mc⌝ ∗ Q m_snap mc ∗
+              ⌜dom m_snap = dom mc⌝ ∗
               ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
               (* Viewshift for looking at the state of the database at commit time after
                 the transaction body has been executed *)
               (|={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
-                  ⌜dom m_at_commit = dom m_snap⌝ ∗
+                  ⌜dom m_at_commit = dom m_snap⌝ ∗ Q m_at_commit m_snap mc ∗
                   (▷(([∗ map] k↦h;p ∈ m_at_commit; mc, k ↦ₖ (commit_event p h)) ∨
                     ([∗ map] k↦h ∈ m_at_commit, k ↦ₖ h)) ={E, ⊤}=∗ emp))
           }}})
     }}}
       run c tbody @[ip_of_address sa] 
     {{{ m ms mc (b : bool), RET #b;
-        ConnectionState c sa CanStart ∗
+        ConnectionState c sa CanStart ∗ Q m ms mc ∗
         (** Transaction has been commited. *)
         ((⌜b = true⌝ ∗ ⌜can_commit m ms mc⌝ ∗
-        ([∗ map] k↦ h;p ∈  m; mc, Seen k (commit_event p h)) ∗ Q ms mc) ∨
+          ([∗ map] k↦ h;p ∈  m; mc, Seen k (commit_event p h))) ∨
         (** Transaction has been aborted. *)
         (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗ [∗ map] k ↦ h ∈ m, Seen k h)) 
     }}}.
@@ -305,9 +305,9 @@ Proof.
   iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
   iMod ("Hsh1" with "[$Hmks]") as "_".
   iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
-  iIntros (mc) "(%Hdeq1 & HQ & Hcks & Hsh2)".
-  wp_pures.  wp_apply HspecC; try eauto.
-  iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & Hsh2)".
+  iIntros (mc) "(%Hdeq1 & Hcks & Hsh2)".
+  wp_pures. wp_apply HspecC; try eauto.
+  iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & HQ & Hsh2)".
   iModIntro. iExists _, _, _. iFrame.
   iSplit; [iPureIntro; set_solver|].
   iNext. iIntros (b) "(HstS & Hdisj)".

@@ -80,7 +80,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     wp_pures.
     wp_apply (run_spec_derived_generic rpc _ client_1_addr (⊤ ∖ ↑client_inv_name)
       (λ msnap, ⌜∃ vo, msnap = {["x" := vo; "y" := vo]}⌝)%I 
-      (λ msnap mc, ⌜mc = {["x" := (Some #1, true); "y" := (Some #1, true)]}⌝)%I
+      (λ _ msnap mc, ⌜mc = {["x" := (Some #1, true); "y" := (Some #1, true)]}⌝)%I
       with "[][][][][$Hcstate][HΦ]"); try solve_ndisj.
     - iPureIntro. apply SI_start_spec. 
     - iPureIntro. apply SI_commit_spec.
@@ -103,12 +103,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
         set_solver. iFrame "#∗". iIntros "Hcy".
         iApply ("HΦ'" $! {["x" := (Some #1, true); "y" := (Some #1, true)]}).
         iSplit. { iPureIntro. set_solver. }
-        iSplit; first done. iSplitL.
+        iSplitL.
         { rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
         iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
         iModIntro. iExists {["x" := h'; "y" := h']}.
         rewrite !big_sepM_insert; try set_solver.
         rewrite big_sepM_empty. iFrame.
+        iSplit. { iPureIntro. set_solver. }
         iSplit. { iPureIntro. set_solver. }
         iIntros ">[ Hkeys | (Hx & Hy & _)]".
         * iMod ("HClose" with "[Hkeys]") as "_"; last done.
@@ -141,7 +142,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     wp_pures.
     wp_apply (run_spec_derived_generic rpc _ client_2_addr (⊤ ∖ ↑client_inv_name)
       (λ msnap, ⌜∃ vo, msnap = {["x" := vo; "y" := vo]}⌝)%I 
-      (λ msnap mc, ⌜mc = {["x" := (Some #2, true); "y" := (Some #2, true)]}⌝)%I
+      (λ _ msnap mc, ⌜mc = {["x" := (Some #2, true); "y" := (Some #2, true)]}⌝)%I
       with "[][][][][$Hcstate][HΦ]"); try solve_ndisj.
     - iPureIntro. apply SI_start_spec. 
     - iPureIntro. apply SI_commit_spec.
@@ -164,12 +165,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
         set_solver. iFrame "#∗". iIntros "Hcy".
         iApply ("HΦ'" $! {["x" := (Some #2, true); "y" := (Some #2, true)]}).
         iSplit. { iPureIntro. set_solver. }
-        iSplit; first done. iSplitL.
+        iSplitL.
         { rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
         iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
         iModIntro. iExists {["x" := h'; "y" := h']}.
         rewrite !big_sepM_insert; try set_solver.
         rewrite big_sepM_empty. iFrame.
+        iSplit. { iPureIntro. set_solver. }
         iSplit. { iPureIntro. set_solver. }
         iIntros ">[ Hkeys | (Hx & Hy & _)]".
         * iMod ("HClose" with "[Hkeys]") as "_"; last done.
@@ -202,7 +204,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     wp_pures.
     wp_apply (run_spec_derived_generic rpc _ client_3_addr (⊤ ∖ ↑client_inv_name)
       (λ msnap, ⌜∃ vo, msnap = {["x" := vo; "y" := vo]}⌝)%I 
-      (λ msnap mc, ⌜∃ vo1 vo2, mc = {["x" := (vo1, false); "y" := (vo2, false)]}⌝)%I
+      (λ _ msnap mc, ⌜∃ vo1 vo2, mc = {["x" := (vo1, false); "y" := (vo2, false)]}⌝)%I
       with "[][][][][$Hcstate][HΦ]"); try solve_ndisj.
     - iPureIntro. apply SI_start_spec. 
     - iPureIntro. apply SI_commit_spec.
@@ -227,12 +229,12 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
         * case_bool_decide as Heq; try set_solver. wp_pures.
           iApply ("HΦ'" $! {["x" := (Some v, false); "y" := (Some v, false)]}).
           iSplit. { iPureIntro. set_solver. }
-          iSplit; first set_solver.
           iSplitL. {rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
           iInv (client_inv_name) as ">[%vo'[Hx Hy]]" "HClose".
           iModIntro. iExists {["x" := vo'; "y" := vo']}.
           rewrite !big_sepM_insert; try set_solver.
           rewrite big_sepM_empty. iFrame.
+          iSplit. { iPureIntro. set_solver. }
           iSplit. { iPureIntro. set_solver. }
           iIntros ">[ Hkeys | (Hx & Hy & _)]".
           -- iMod ("HClose" with "[Hkeys]") as "_"; last done.
@@ -243,12 +245,12 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
              iNext. iExists vo'. iFrame.
         * iApply ("HΦ'" $! {["x" := (None, false); "y" := (None, false)]}).
           iSplit. { iPureIntro. set_solver. }
-          iSplit; first set_solver.
           iSplitL. {rewrite !big_sepM_insert; try set_solver. rewrite big_sepM_empty. iFrame. }
           iInv (client_inv_name) as ">[%vo'[Hx Hy]]" "HClose".
           iModIntro. iExists {["x" := vo'; "y" := vo']}.
           rewrite !big_sepM_insert; try set_solver.
           rewrite big_sepM_empty. iFrame.
+          iSplit. { iPureIntro. set_solver. }
           iSplit. { iPureIntro. set_solver. }
           iIntros ">[ Hkeys | (Hx & Hy & _)]".
           -- iMod ("HClose" with "[Hkeys]") as "_"; last done.

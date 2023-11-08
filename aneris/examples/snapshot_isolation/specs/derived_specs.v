@@ -227,12 +227,12 @@ Section DerivedSpecs.
    Lemma run_spec_derived_generic :
     ∀ (c : val) (tbody : val) (sa : socket_address) (E : coPset)
       (P :  gmap Key (option val) → iProp Σ)
-      (Q : (gmap Key (option val)) -> (gmap Key (option val * bool)) → iProp Σ),
+      (Q : (gmap Key (option val)) -> (gmap Key (option val)) -> (gmap Key (option val * bool)) → iProp Σ),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜start_spec⌝ -∗
       ⌜commit_spec⌝ -∗
       IsConnected c sa -∗
-      {{{ 
+      {{{
         ConnectionStateTxt c sa TxtCanStart ∗
         (* Viewshift for looking at the state of the database at start time *)
         (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ∗ 
@@ -244,24 +244,20 @@ Section DerivedSpecs.
           }}}
             tbody c  @[ip_of_address sa] 
           {{{ (mc : gmap Key (option val * bool)), RET #();
-            ⌜dom m_snap = dom mc⌝ ∗ Q m_snap mc ∗
+            ⌜dom m_snap = dom mc⌝ ∗
             ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
             (* Viewshift for looking at the state of the database at commit time after
               the transaction body has been executed *)
             (|={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo) ∗
-                ⌜dom m_at_commit = dom m_snap⌝ ∗
+                ⌜dom m_at_commit = dom m_snap⌝ ∗ Q m_at_commit m_snap mc ∗
                 (▷(([∗ map] k↦ vo;p ∈ m_at_commit; mc, OwnMemKeyVal k (commitTxt p vo)) ∨
                   ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo)) ={E, ⊤}=∗ emp))
           }}})
       }}}
        run c tbody @[ip_of_address sa] 
-     {{{ ms mc (b : bool), RET #b;
-         ConnectionStateTxt c sa TxtCanStart ∗
-        (** Transaction has been commited. *)
-        ((⌜b = true⌝ ∗ Q ms mc) ∨
-        (** Transaction has been aborted. *)
-        (⌜b = false⌝)) 
-      }}}.
+     {{{ m ms mc (b : bool), RET #b;
+         ConnectionStateTxt c sa TxtCanStart ∗ Q m ms mc
+     }}}.
   Proof.
     iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
     rewrite /run.
@@ -271,20 +267,18 @@ Section DerivedSpecs.
     iNext. iIntros "(HstA & Hmks & Hcks)".
     iMod ("Hsh1" with "[$Hmks]") as "_".
     iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
-    iIntros (mc) "(%Hdeq1 & HQ & Hcks & Hsh2)".
+    iIntros (mc) "(%Hdeq1 & Hcks & Hsh2)".
     wp_pures. wp_apply commit_spec_derived; try eauto.
-    iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & Hsh2)".
+    iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & HQ & Hsh2)".
     iModIntro. iExists _, _, _. iFrame.
     iSplit; [iPureIntro; set_solver|].
     iNext. iIntros (b) "(HstS & Hdisj)".
-    iApply ("HΦ" $! m_at_start mc).
+    iApply ("HΦ" $! m_at_commit m_at_start mc).
     iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
     - iDestruct "Hc" as "(%Hbt & Hkts)".
-      iMod ("Hsh2" with "[$Hkts]") as "_".
-      iModIntro; iLeft; iFrame "#"; eauto.
+      by iMod ("Hsh2" with "[$Hkts]") as "_".
     - iDestruct "Ha" as "(%Hbf & Hkts)".
-      iMod ("Hsh2" with "[$Hkts]") as "_". 
-      iModIntro; iRight; iFrame; eauto.
+      by iMod ("Hsh2" with "[$Hkts]") as "_". 
   Qed.
 
   Lemma run_spec_derived_simple :
