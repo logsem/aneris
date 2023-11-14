@@ -72,6 +72,8 @@ ML_SOURCES:
         examples/snapshot_isolation/examples/sequential_writes/sequential_writes_code.ml
         examples/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
         examples/snapshot_isolation/examples/no_serializability/no_serializability_code.ml
+	examples/snapshot_isolation/examples/disjoint_reads/disjoint_reads_code.ml
+	examples/snapshot_isolation/examples/read_your_writes/read_your_writes_code.ml
 ML_DEPENDENCIES:
 
         aneris_lang

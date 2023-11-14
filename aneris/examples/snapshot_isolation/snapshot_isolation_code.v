@@ -244,5 +244,3 @@ Definition commit : val :=
   end in
   release "lk";;
   "b".
-
-
