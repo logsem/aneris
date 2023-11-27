@@ -133,7 +133,7 @@ Section adequacy_general.
   Theorem simulation_adequacy_terminate_general'_ext
     (otr: mtrace Mout) (eauxtr : elmftrace)
     :    
-    (∀ emtr: @emtrace _ EM, ext_trans_bounded emtr -> inner_fair_ext_model_trace emtr -> terminating_trace emtr) ->
+    (∀ emtr: @emtrace _ EM, ext_trans_bounded emtr -> emtrace_valid emtr -> inner_fair_ext_model_trace emtr -> terminating_trace emtr) ->
     ext_trans_bounded eauxtr ->
     (∀ ρ : fmrole M, fair_by_next_TS_ext ρ eauxtr) ->
     ext_lm_model_traces_match otr eauxtr ->
@@ -145,9 +145,12 @@ Section adequacy_general.
     pose proof Hmatch as Hvalaux%traces_match_valid2.
     destruct (can_destutter_eauxtr proj_ext eauxtr (LM := LM)) as [mtr Hupto] =>//.
     have Hfairm := upto_stutter_fairness _ _ _ Hupto Hfairaux.
+
     have Hmtrvalid := upto_preserves_validity _ _ _ _ Hupto Hvalaux.
+    specialize (Hmtrvalid PROJ_KEEP_EXT). 
+
     eapply upto_stutter_ext_bounded in EXT_FIN; eauto.     
-    have Htermtr := Hterm _ EXT_FIN Hfairm. 
+    have Htermtr := Hterm _ EXT_FIN Hmtrvalid Hfairm. 
     eapply traces_match_preserves_termination =>//.
     eapply upto_stutter_finiteness =>//.
   Qed.

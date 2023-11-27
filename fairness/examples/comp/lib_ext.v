@@ -122,5 +122,15 @@ Section ExtModelLM.
   Definition ExtLibLM: ExtModel (LM_Fair (LM := lib_model)) :=
     Build_ExtModel (LM_Fair (LM := lib_model)) _ _ _ _ _ lib_lm_active_exts_spec. 
 
+  Lemma lib_proj_keep_ext:
+    ∀ (δ1 : LM_Fair) ι (δ2 : LM_Fair), 
+      @ETs _ ExtLibLM ι δ1 δ2 → @ETs _ ExtLib (lib_lm_projEI ι) (ls_under δ1) (ls_under δ2). 
+  Proof.
+    intros. simpl in *. destruct ι; simpl in *.
+    simpl. rewrite /lib_lm_projEI. simpl. do 2 red.
+    red in H. revert H. rewrite /reset_lm_st /reset_st. rewrite /lm_is_stopped.
+    destruct decide; [| done].
+    intros [=]. subst. rewrite decide_True; tauto. 
+  Qed.
 
 End ExtModelLM. 

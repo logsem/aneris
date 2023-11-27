@@ -48,8 +48,8 @@ Section LibraryDefs.
     red. intros mtr VALID FAIR. 
     destruct mtr; [by exists 1| ].
     destruct mtr; [by exists 2| ].
-    pose proof (mtrace_valid_steps' VALID 0) as STEP0.
-    pose proof (mtrace_valid_steps' VALID 1) as STEP1.
+    pose proof (trace_valid_steps' _ _ VALID 0) as STEP0.
+    pose proof (trace_valid_steps' _ _ VALID 1) as STEP1.
     rewrite trace_lookup_0_cons in STEP0. simpl in STEP0. 
     specialize (STEP0 _ _ _ eq_refl) as [-> ->].
     rewrite trace_lookup_cons trace_lookup_0_cons in STEP1.

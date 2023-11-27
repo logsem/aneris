@@ -567,7 +567,7 @@ Section Model.
         forward eapply trace_lookup_dom_strong with (i := i) as [_ ITH]; eauto.
         specialize_full ITH; [eapply state_lookup_dom; eauto| ].
         destruct ITH as (?&?&?&ITH). 
-        forward eapply mtrace_valid_steps' as STEP; eauto.
+        forward eapply trace_valid_steps' as STEP; eauto.
         apply state_label_lookup in ITH.
         destruct ITH as (?&ITH0&?). 
         rewrite ITH' in ITH0. inversion ITH0. subst.
@@ -597,7 +597,7 @@ Section Model.
         forward eapply trace_lookup_dom_strong with (i := (i + d)) as [_ J'TH]; eauto.
         specialize_full J'TH; [eapply state_lookup_dom; eauto| ].
         destruct J'TH as (?&?&?&J'TH). 
-        forward eapply mtrace_valid_steps' as STEP; eauto. 
+        forward eapply trace_valid_steps' as STEP; eauto. 
         apply step_counters_mono in STEP; auto.  
         apply state_label_lookup in J'TH as (J'TH_ & JTH_ & LBL).
         assert (x1 = st') as -> by congruence.
@@ -785,7 +785,7 @@ Section Model.
           forward eapply (proj1 (label_lookup_states tr (i + v))) as HH; eauto.
           destruct HH as [[st1 ST1] [st2 ST2]].
           eexists. split; [| split]; [eauto| lia|].
-          forward eapply mtrace_valid_steps' as STEP; eauto.
+          forward eapply trace_valid_steps' as STEP; eauto.
           { eapply state_label_lookup; eauto. }
           inversion STEP; subst.
           apply active_st_enabled.
@@ -810,7 +810,7 @@ Section Model.
 
         forward eapply (proj1 (label_lookup_states tr j)) as [_ [st''' J'TH]]; eauto.
         exists (j + 1), st'''. split; [lia| ]. split; [auto| ].
-        forward eapply (mtrace_valid_steps' VALID j) as STEP; eauto.
+        forward eapply (trace_valid_steps' _ _ VALID j) as STEP; eauto.
         { eapply state_label_lookup; eauto. }
         inversion STEP; subst. inversion STEP0; subst; simpl in *.
         { congruence. }
@@ -860,8 +860,8 @@ Section Model.
                 - rewrite set_map_compose_gset in H4.
                   apply elem_of_map_1 in H4 as (? & ? & ?). congruence. }
               eapply fm_live_spec; eauto.
-              pose proof (mtrace_valid_steps'' VALID k1). 
-              eapply (mtrace_valid_steps'' VALID k1); eauto. }
+              pose proof (trace_valid_steps'' _ _ VALID k1). 
+              eapply (trace_valid_steps'' _ _ VALID k1); eauto. }
             
             move MINj at bottom. specialize (MINj k1 (conj MINk H1)).
             lia. }
@@ -1002,7 +1002,7 @@ Section Model.
         forward eapply (proj1 (label_lookup_states tr (i + d))); [eauto| ].
         intros [_ [s'_ S'_]].
         assert (s'_ = st'') as -> by congruence. clear S'_. 
-        forward eapply (mtrace_valid_steps' VALID (i + d)) as TRANS; auto. 
+        forward eapply (trace_valid_steps' _ _ VALID (i + d)) as TRANS; auto. 
         { by eapply state_label_lookup. }
           
         simpl in TRANS. inversion TRANS as [? ? ? TRANS'| ]; subst.
@@ -1034,4 +1034,3 @@ Section Model.
   End ProgressProperties. 
 
 End Model.
-                       

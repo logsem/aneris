@@ -42,6 +42,46 @@ Section TraceHelpers.
 
 End TraceHelpers. 
 
+(* TODO: move *)
+Section ValidTracesProperties.
+  Context {St L: Type}.
+  Context (trans: St -> L -> St -> Prop). 
+
+  Context (tr: trace St L).
+  Hypothesis VALID: trace_valid trans tr. 
+
+  From Paco Require Import pacotac.
+  Local Ltac gd t := generalize dependent t.
+  
+  Lemma trace_valid_steps' i st ℓ st'
+    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
+    trans st ℓ st'. 
+  Proof using VALID.
+    gd st. gd ℓ. gd st'. gd tr. clear dependent tr. 
+    induction i. 
+    { simpl. intros. punfold VALID. inversion VALID.
+      - subst. done.
+      - subst. inversion ITH. by subst. }
+    intros. simpl in ITH.
+    destruct tr.
+    { inversion ITH. }
+    punfold VALID. inversion_clear VALID; pclearbot; auto.
+    eapply IHi; eauto. 
+  Qed.
+  
+  Lemma trace_valid_steps'' i st ℓ st'
+    (ST1: tr S!! i = Some st)
+    (ST2: tr S!! (i + 1) = Some st')
+    (LBL: tr L!! i = Some ℓ):
+    trans st ℓ st'. 
+  Proof using VALID.
+    eapply trace_valid_steps'.
+    apply state_label_lookup. eauto.
+  Qed.      
+  
+End ValidTracesProperties. 
+
+
 Section FMTraceHelpers.
   Context {M: FairModel}.
   Let St := fmstate M.
@@ -126,39 +166,13 @@ Section FMTraceHelpers.
         * left. apply pred_at_trace_lookup in DIS. eauto. 
         * right. apply pred_at_trace_lookup in STEP as [?[??]]. eauto. 
   Qed.        
+
   
   Section ValidTracesProperties.
     Context {tr: mtrace M} (VALID: mtrace_valid tr). 
 
-    From Paco Require Import pacotac.
     Local Ltac gd t := generalize dependent t.
 
-    Lemma mtrace_valid_steps' i st ℓ st'
-      (ITH: tr !! i = Some (st, Some (ℓ, st'))):
-      fmtrans _ st ℓ st'. 
-    Proof using VALID.
-      gd st. gd ℓ. gd st'. gd tr. clear dependent tr. 
-      induction i. 
-      { simpl. intros. punfold VALID. inversion VALID.
-        - subst. done.
-        - subst. inversion ITH. by subst. }
-      intros. simpl in ITH.
-      destruct tr.
-      { inversion ITH. }
-      punfold VALID. inversion_clear VALID; pclearbot; auto.
-      eapply IHi; eauto. 
-    Qed.
-
-    Lemma mtrace_valid_steps'' i st ℓ st'
-      (ST1: tr S!! i = Some st)
-      (ST2: tr S!! (i + 1) = Some st')
-      (LBL: tr L!! i = Some ℓ):
-      fmtrans _ st ℓ st'. 
-    Proof using VALID.
-      eapply mtrace_valid_steps'.
-      apply state_label_lookup. eauto.
-    Qed. 
-    
     Definition label_kept_state (P: St -> Prop) (ℓ: L) :=
       forall st oℓ' st' (Ps: P st) (OTHER: oℓ' ≠ Some ℓ) (STEP: fmtrans _ st oℓ' st'), 
         P st'.
@@ -180,7 +194,7 @@ Section FMTraceHelpers.
       red in P_KEPT. eapply P_KEPT.
       - apply IHd; [lia| eauto].
       - eapply NOρ; eauto. lia.
-      - eapply mtrace_valid_steps'; eauto. 
+      - eapply trace_valid_steps'; eauto. 
         apply state_label_lookup. eauto. 
     Qed.
     
@@ -233,5 +247,3 @@ Section FMTraceHelpers.
   (* Qed. *)
 
 End FMTraceHelpers.
-
-

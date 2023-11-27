@@ -499,6 +499,21 @@ Section TracesMatch.
     eapply trace_label_lookup_simpl'; eauto.
   Qed.
 
+  Lemma traces_match_label_lookup_2
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) ℓ2
+    (MATCH: traces_match Rℓ Rs trans1 trans2 tr1 tr2)
+    (LBL2: tr2 L!! n = Some ℓ2):
+    exists ℓ1, tr1 L!! n = Some ℓ1 /\ Rℓ ℓ1 ℓ2. 
+  Proof. 
+    apply trace_label_lookup_simpl' in LBL2 as (s & s' & NTH2).
+    pose proof (traces_match_trace_lookup_general _ _ n MATCH) as STEPS.
+    rewrite NTH2 in STEPS.
+    destruct (tr1 !! n) as [[s1 ostep1]|] eqn:NTH1; [| done]. simpl in *.
+    destruct ostep1 as [[??]|]; [| tauto]. destruct STEPS as (?&?&?). 
+    eexists. split; eauto.
+    eapply trace_label_lookup_simpl'; eauto.
+  Qed.
+
 End TracesMatch. 
 
 

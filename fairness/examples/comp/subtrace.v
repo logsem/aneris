@@ -444,7 +444,7 @@ Section ModelSubtrace.
   Proof.
     forward eapply subtrace_inv as [LT1 LT2]; eauto.
     apply trace_valid_equiv. intros.
-    eapply mtrace_valid_steps' in VALID; eauto.
+    eapply trace_valid_steps' in VALID; eauto.
     rewrite -H. symmetry.
     forward eapply (subtrace_len tr _ _ max_len); eauto.
     intros (str' & SUB' & LEN').

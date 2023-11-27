@@ -168,8 +168,7 @@ Section ExtTerm.
     destruct (after n emtr) as [atr| ] eqn:AFTER.
     2: { by exists n. }
     eapply terminating_trace_after; eauto.
-    eapply trace_valid_after in VALID; eauto.
-    (* set (proj_ext := fun oℓ =>  *)
+    eapply trace_valid_after in VALID; eauto.    
     unshelve eapply project_until_match in VALID.
     5: exact (fmtrans M). 
     { exact (fun oer => match oer with | Some (inl g) => Some $ Some g | _ => None end). }
@@ -177,13 +176,13 @@ Section ExtTerm.
     2: { simpl. intros. destruct ℓ; simpl in *; try done.
          destruct e; try done. 
          inversion H0. subst. inversion H. congruence. }
-    2: { intros. erewrite label_lookup_after in H; eauto.
+    2: { intros.
+         assert (ℓ ≠ None) as Ln0. 
+         { intros ->. pose proof H as [[??][??]]%mk_is_Some%label_lookup_states.
+           eapply (trace_valid_steps'' _ _ VALID) in H; eauto.
+           by inversion H. }
+         erewrite label_lookup_after in H; eauto.
          apply BOUND in H; [| lia].
-         assert (ℓ ≠ None).
-         { (* exploit emtr validity.
-              Generalize trace_helpers.mtrace_valid_steps'' for that
-            *)
-           admit. }
          destruct ℓ; [| congruence].
          destruct e; eauto.
          edestruct H; eauto. }
@@ -209,13 +208,13 @@ Section ExtTerm.
     red in STEP. destruct STEP as [DIS | STEP].
     { left. intros ?. apply DIS.
       red. simpl. rewrite /ext_live_roles. set_solver. }
-    right.
-    foobar. 
-    
-    
-    
-         
-    
+    right. destruct STEP as (ℓ & NTH' & MATCH).
+    rewrite -Nat.add_assoc in NTH'. erewrite <- label_lookup_after in NTH'; eauto.
+    pose proof NTH' as NTH''. eapply traces_match_label_lookup_1 in NTH''; eauto.
+    destruct NTH'' as (ℓ' & NTH'' & MATCH'). eexists. split; eauto.
+    destruct ℓ; try done. destruct f; try done. inversion MATCH'. subst.
+    red in MATCH. congruence. 
+  Qed.    
 
 End ExtTerm.
 
