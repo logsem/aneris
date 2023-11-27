@@ -227,5 +227,26 @@ Section LMFair.
     destruct MAP0; set_solver. 
   Qed. 
       
-End LMFair.
+  (* TODO: move *)
+  Lemma iff_and_pre {A B C: Prop}
+    (BC: A -> (B <-> C)):
+    A /\ B <-> A /\ C.
+  Proof using. tauto. Qed.
+                    
+  Lemma aFLs_equiv ℓ δ1 τ δ2 :
+    ℓ ∈ allowed_step_FLs δ1 τ δ2 <-> lm_ls_trans LM δ1 ℓ δ2 /\ fair_lbl_matches_group ℓ τ.
+  Proof using.
+    rewrite /allowed_step_FLs elem_of_filter.
+    rewrite bool_decide_eq_true.
+    apply iff_and_pre. intros STEP. 
+    rewrite /potential_step_FLs /fair_lbl_matches_group.
+    rewrite elem_of_union elem_of_singleton elem_of_map.
+    split.
+    { by intros [-> | (?&->&?)]. } 
+    destruct ℓ; [..| done]; intros ->; eauto. 
+    right. eexists. split; eauto.
+    simpl in STEP. rewrite -ls_same_doms. apply elem_of_dom.
+    eexists. apply STEP. 
+  Qed. 
 
+End LMFair.

@@ -14,18 +14,28 @@ From Paco Require Import paco1 paco2 pacotac.
 (*       simpl in T; destruct l; [| done]; *)
 (*       destruct T as (?ℓ&?STEP&?MATCH)  *)
 (*   end. *)
-Ltac unfold_LMF_trans T :=
+
+Ltac unfold_LMF_trans' T :=
   match type of T with
-  | fmtrans LM_Fair ?δ1 ?l ?δ2 =>
-      simpl in T; destruct l as [l| ]; [| done];
+  | locale_trans ?δ1 ?l ?δ2 =>      
       destruct (next_TS_role δ1 l δ2) eqn:N;
       [pose proof N as ?STEP%next_TS_spec_pos|
        pose proof N as ?STEP%next_TS_spec_inv_S; [| by eauto]] 
   end.
+
+Ltac unfold_LMF_trans T :=
+  match type of T with
+  | fmtrans LM_Fair ?δ1 ?l ?δ2 =>
+      simpl in T; destruct l as [l| ]; [| done]; 
+      simpl in T; unfold_LMF_trans' T
+  end.
  
 Section LMTraceHelpers.
   Context `{LM: LiveModel G M  LSI}.
-  Context {LF: LMFairPre LM}. 
+  Context {LF: LMFairPre LM}.
+
+  Context {A: Type} {transA: lm_ls LM -> A -> lm_ls LM -> Prop}
+    {AM: AlmostLM transA}.
 
   Local Ltac gd t := generalize dependent t.
 
@@ -51,38 +61,40 @@ Section LMTraceHelpers.
   (* Qed. *)
 
   (* TODO: move *)
-  Lemma iff_and_pre {A B C: Prop}
-    (BC: A -> (B <-> C)):
-    A /\ B <-> A /\ C.
-  Proof using. tauto. Qed.
-                    
+  Lemma am_transA_keep_fuel: forall δ1 a δ2 ρ f, 
+      transA δ1 a δ2 -> 
+      (forall g, am_lift_G g ≠ a) ->
+      ls_fuel δ1 !! ρ = Some f ->
+      ls_fuel δ2 !! ρ = Some f.
+  Proof. 
+    intros ????? TRANS NOa FUEL.
+    pose proof FUEL as [??]%mk_is_Some%ls_same_doms'.
+    eapply am_transA_keep_asg; eauto. 
+  Qed.
 
   (* TODO: move *)
-  Lemma aFLs_equiv ℓ δ1 τ δ2 :
-    ℓ ∈ allowed_step_FLs δ1 τ δ2 <-> lm_ls_trans LM δ1 ℓ δ2 /\ fair_lbl_matches_group ℓ τ.
-  Proof.
-    rewrite /allowed_step_FLs elem_of_filter.
-    rewrite bool_decide_eq_true.
-    apply iff_and_pre. intros STEP. 
-    rewrite /potential_step_FLs /fair_lbl_matches_group.
-    rewrite elem_of_union elem_of_singleton elem_of_map.
-    split.
-    { by intros [-> | (?&->&?)]. } 
-    destruct ℓ; [..| done]; intros ->; eauto. 
-    right. eexists. split; eauto.
-    simpl in STEP. rewrite -ls_same_doms. apply elem_of_dom.
-    eexists. apply STEP. 
-  Qed. 
+  Lemma am_transA_keep_mapping: forall δ1 a δ2 ρ g, 
+      transA δ1 a δ2 -> 
+      (forall g, am_lift_G g ≠ a) ->
+      ls_mapping δ1 !! ρ = Some g ->
+      ls_mapping δ2 !! ρ = Some g.
+  Proof. 
+    intros ????? TRANS NOa MAP.
+    pose proof MAP as [??]%mk_is_Some%ls_same_doms'.
+    eapply am_transA_keep_asg; eauto. 
+  Qed.
 
-  Lemma role_fuel_decreases (tr: lmftrace (LM := LM)) δ0 ρ f0
+  Lemma role_fuel_decreases (tr: atrace) δ0 ρ f0
     (ST0: tr S!! 0 = Some δ0)
     (FUEL0: ls_fuel δ0 !! ρ = Some f0)
     (* (NOρ: ∀ i ℓ, tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g) *)
-    (NOρ: forall i δ τ δ', tr !! i = Some (δ, Some (Some τ, δ')) ->
+    (NOρ: forall i δ τ δ',
+        (* tr !! i = Some (δ, Some (Some τ, δ')) -> *)
+        tr !! i = Some (δ, Some (am_lift_G τ, δ')) ->
                       (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
                       next_TS_role δ τ δ' ≠ Some ρ)
     (ASGρ: ∀ i δ, tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: mtrace_valid tr):
+    (VALID: trace_valid transA tr):
     forall i δ f, 
       tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
   Proof.
@@ -97,7 +109,7 @@ Section LMTraceHelpers.
       my_omega.lia_NO len. }
     intros (δ' & ℓ & δ_ & STEP).
     
-    forward eapply mtrace_valid_steps' as TRANS; eauto.
+    forward eapply trace_valid_steps' as TRANS; eauto.
     apply state_label_lookup in STEP as (ST' & ST_ & LBL).
     assert (δ_ = δ) as ->; [| clear ST_].
     { rewrite Nat.add_1_r in ST_. congruence. }
@@ -108,24 +120,29 @@ Section LMTraceHelpers.
     specialize (IHi _ _ ST' FUEL').
     etrans; [| apply IHi].
 
-    unfold_LMF_trans TRANS. 
+    destruct (decide (exists g, am_lift_G g = ℓ)).
+    2: { eapply am_transA_keep_fuel in FUEL'; eauto.
+         rewrite FUEL in FUEL'. inversion FUEL'. lia. }
+    destruct e. subst ℓ. apply am_lift_LM_step in TRANS. 
+
+    unfold_LMF_trans' TRANS.
     - destruct (decide (f1 = ρ)).
       2: { eapply step_nonincr_fuels in STEP; eauto. congruence. }
       subst. edestruct NOρ; eauto.  
       eapply state_label_lookup. rewrite Nat.add_1_r. eauto.
     - by eapply step_nonincr_fuels in STEP; eauto.
-  Qed. 
+  Qed.
 
-  Lemma role_fuel_decreases_nth (tr: lmftrace (LM := LM)) δ0 ρ f0 n
+  Lemma role_fuel_decreases_nth (tr: atrace) δ0 ρ f0 n
     (ST0: tr S!! n = Some δ0)
     (FUEL0: ls_fuel δ0 !! ρ = Some f0)
     (* (NOρ: ∀ i ℓ, n <= i -> tr L!! i = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g) *)
-    (NOρ: forall i δ τ δ', n <= i -> tr !! i = Some (δ, Some (Some τ, δ')) ->
+    (NOρ: forall i δ τ δ', n <= i -> tr !! i = Some (δ, Some (am_lift_G τ, δ')) ->
                       (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
                       next_TS_role δ τ δ' ≠ Some ρ
 )
     (ASGρ: ∀ i δ, n <= i -> tr S!! i = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: mtrace_valid tr):
+    (VALID: trace_valid transA tr):
     forall i δ f, 
       n <= i -> tr S!! i = Some δ -> ls_fuel δ !! ρ = Some f -> f <= f0. 
   Proof.
@@ -156,6 +173,9 @@ Section Foobar.
   Context `{LM: LiveModel G M LSI}.
   (* Context `{Countable G}. *)
   Context {LF: LMFairPre LM}. 
+
+  (* Context {A: Type} {transA: lm_ls LM -> A -> lm_ls LM -> Prop} *)
+  (*   {AM: AlmostLM transA}. *)
 
   Local Set Printing Coercions.
 
@@ -208,17 +228,21 @@ Section InnerLMTraceFairness.
   Context `{LMo: LiveModel Go Mo LSIo}.
   Context {LFi: LMFairPre LMi} {LFo: LMFairPre LMo}.
 
-  Context (lift_Gi: Gi -> fmrole Mo).
-  Hypothesis (INJlg: Inj eq eq lift_Gi). 
+  Context {Ai: Type} {transAi: lm_ls LMi -> Ai -> lm_ls LMi -> Prop}
+    {AMi: AlmostLM transAi}.
+
+  (* Context (lift_Gi: Gi -> fmrole Mo). *)
+  Context (lift_Ai: Ai -> fmrole Mo).
+  Hypothesis (INJlg: Inj eq eq lift_Ai). 
 
   Context (state_rel: fmstate Mo → lm_ls LMi → Prop).
 
   Let lm_model_traces_match :=
     lm_exaux_traces_match_gen
-      (transA := olocale_trans)
+      (transA := transAi)
       (fmtrans Mo)
       (* (lift_Gi)  *)
-      (option_map lift_Gi)
+      (Some ∘ lift_Ai)
       state_rel.
   
   Local Ltac gd t := generalize dependent t.
@@ -228,7 +252,7 @@ Section InnerLMTraceFairness.
                  (exists (δi: LiveState Gi Mi LSIi) (ρi: fmrole Mi),
                     state_rel (ls_under δo_k) δi /\
                     ls_mapping δi !! ρi = Some gi) ->
-                 lift_Gi gi ∈ dom (ls_mapping δo_k). 
+                 lift_Ai (am_lift_G gi) ∈ dom (ls_mapping δo_k). 
 
   (* (* TODO: move *) *)
   (* Lemma upto_stutter_trcons {St S' L L': Type} {Us: St -> S'} {Usls: St -> L -> St -> option L'} *)
@@ -239,17 +263,16 @@ Section InnerLMTraceFairness.
   (*   punfold UPTO. inversion UPTO; subst. *)
   (*   3: { apply upto_stutter_mono. } *)
   (*   -  *)
-
   
   (* TODO: rename? *)
-  Lemma eventual_step_or_unassign lmtr_o mtr_o lmtr_i ρ gi δi f
+  Lemma eventual_step_or_unassign lmtr_o mtr_o (lmtr_i: atrace) ρ gi δi f
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
     (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
-    (FAIR_SOU: forall gi, fair_aux_SoU (LM_ALM LMo) (lift_Gi gi) lmtr_o (LM := LMo))
+    (FAIR_SOU: forall gi, fair_aux_SoU (LM_ALM LMo) (lift_Ai $ am_lift_G gi) lmtr_o (LM := LMo))
     (INNER_OBLS: inner_obls_exposed lmtr_o)
     (* (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi), *)
     (*       lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go') *)
-    (NOρ: forall i δ τ δ', lmtr_i !! i = Some (δ, Some (Some τ, δ')) ->
+    (NOρ: forall i δ τ δ', lmtr_i !! i = Some (δ, Some (am_lift_G τ, δ')) ->
                       (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
                       next_TS_role δ τ δ' ≠ Some ρ
 )
@@ -258,7 +281,7 @@ Section InnerLMTraceFairness.
     (ST0: lmtr_i S!! 0 = Some δi)
     (FUEL0: ls_fuel δi !! ρ = Some f):
     (* ∃ m ostepm, pred_at lmtr_i m (steps_or_unassigned ρ). *)
-    exists m δm ostepm, lmtr_i !! m = Some (δm, ostepm) /\ steps_or_unassigned (LM_ALM LMi) ρ δm ostepm.
+    exists m δm ostepm, lmtr_i !! m = Some (δm, ostepm) /\ steps_or_unassigned _ ρ δm ostepm.
   Proof.    
     Local Set Printing Coercions.
     gd lmtr_i. gd δi. gd mtr_o. gd lmtr_o.
@@ -301,8 +324,8 @@ Section InnerLMTraceFairness.
     
     forward eapply upto_stutter_step_correspondence_alt with 
       (* (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Take_step (lift_Gi gi) go, δ')) *)
-      (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Some go, δ') /\ next_TS_role δ go δ' = Some (lift_Gi gi))
-      (Pi := fun st ostep => st = ls_under δo_n /\ exists st', ostep = Some (Some $ lift_Gi gi, st'))
+      (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Some go, δ') /\ next_TS_role δ go δ' = Some (lift_Ai $ am_lift_G gi))
+      (Pi := fun st ostep => st = ls_under δo_n /\ exists st', ostep = Some (Some $ lift_Ai $ am_lift_G gi, st'))
     .
     (* { by intros ?? [-> ->]. } *)
     (* { by intros ?[??]. } *)
@@ -313,7 +336,7 @@ Section InnerLMTraceFairness.
     { intros. by destruct H as [_ [??]]. }
     { apply CORRo. }
     { apply STLo. }    
-    { eauto. } 
+    { eauto. }
 
     intros (n_mo & ? & step_ & STEPmo & UPTO').
     destruct UPTO' as [[? [? ->]]UPTO']. subst x.
@@ -328,10 +351,15 @@ Section InnerLMTraceFairness.
     
     forward eapply traces_match_label_lookup_1; [apply MATCH| ..]; eauto. 
     intros (ℓ_lm & Llmi & LBL_MATCH).
-    simpl in LBL_MATCH. destruct ℓ_lm as [ℓ_lm| ]; [| done].
-    (* destruct LBL_MATCH as (? & LIFT_EQ). *)
-    red in LBL_MATCH. simpl in LBL_MATCH. inversion LBL_MATCH.   
-    apply INJlg in H0. subst ℓ_lm.
+    simpl in LBL_MATCH.
+
+
+    (* destruct ℓ_lm as [ℓ_lm| ]; [| done]. *)
+    (* (* destruct LBL_MATCH as (? & LIFT_EQ). *) *)
+    (* red in LBL_MATCH. simpl in LBL_MATCH. inversion LBL_MATCH.    *)
+    (* apply INJlg in H0. subst ℓ_lm. *)
+    unfold compose in LBL_MATCH. red in LBL_MATCH.
+    inversion LBL_MATCH. apply INJlg in H0. subst ℓ_lm. 
     
     apply trace_label_lookup_simpl' in Llmi as (δi_n_mo & δi_n_mo' & STEPlmi).
     assert (forall δ n, lmtr_i S!! n = Some δ -> exists f', ls_fuel δ !! ρ = Some f' /\ f' <= f) as NOFUEL.  
@@ -342,14 +370,14 @@ Section InnerLMTraceFairness.
       2: { eapply traces_match_valid2; eauto. }  
       intros ?? ST'. apply ASGρ in ST'. by apply elem_of_dom. }
     
-    forward eapply (@mtrace_valid_steps' (LM_Fair (LM := LMi))) as TRANS; [| apply STEPlmi|]; eauto.
+    forward eapply (@trace_valid_steps' (LM_Fair (LM := LMi))) as TRANS; [| apply STEPlmi|]; eauto.
     { eapply traces_match_valid2; eauto. }
     
     pose proof STEPlmi as (ST&ST'&LBL)%state_label_lookup. 
     pose proof (NOFUEL _ _ ST) as (f_ & NOFUEL1 & LE_). 
     pose proof (NOFUEL _ _ ST') as (f_' & NOFUEL2 & LE_'). 
 
-    assert (f_' < f -> exists m δm ostepm, lmtr_i !! m = Some (δm, ostepm) /\ steps_or_unassigned (LM_ALM LMi) ρ δm ostepm) as IH_APP.    
+    assert (f_' < f -> exists m δm ostepm, lmtr_i !! m = Some (δm, ostepm) /\ steps_or_unassigned _ ρ δm ostepm) as IH_APP.    
     {
       (* clear -UPTO' STEPmo IH STLo ST' STEPlmi FAIR_SOU INNER_OBLS NOFUEL2 MATCH NOρ ASGρ. *)
       intros LT. 
@@ -388,7 +416,11 @@ Section InnerLMTraceFairness.
         exists (S n_mo + m). do 2 eexists. split; eauto.
         rewrite -H. symmetry. eapply trace_lookup_after; eauto. }
 
-    remember (Some gi) as sg. unfold_LMF_trans TRANS; inversion Heqsg; subst sg.
+    (* remember (Some gi) as sg. *)
+    apply am_lift_LM_step in TRANS. 
+    simpl in TRANS. unfold_LMF_trans' TRANS. 
+ 
+    (* unfold_LMF_trans TRANS; inversion Heqsg; subst sg. *)
     - destruct (decide (f0 = ρ)). 
       { subst. edestruct NOρ; eauto. }
       eapply IH_APP.       
@@ -417,14 +449,14 @@ Section InnerLMTraceFairness.
  
 
   (* TODO: rename? *)
-  Lemma eventual_step_or_unassign_nth lmtr_o mtr_o lmtr_i ρ gi δi f n
+  Lemma eventual_step_or_unassign_nth lmtr_o mtr_o (lmtr_i: atrace) ρ gi δi f n
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
     (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
-    (FAIR_SOU: forall gi, fair_aux_SoU (LM_ALM LMo) (lift_Gi gi) lmtr_o (LM := LMo))
+    (FAIR_SOU: forall gi, fair_aux_SoU (LM_ALM LMo) (lift_Ai $ am_lift_G gi) lmtr_o (LM := LMo))
     (INNER_OBLS: inner_obls_exposed lmtr_o)
     (* (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi), *)
     (*       n <= m -> lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go') *)
-    (NOρ: forall i δ τ δ', n <= i -> lmtr_i !! i = Some (δ, Some (Some τ, δ')) ->
+    (NOρ: forall i δ τ δ', n <= i -> lmtr_i !! i = Some (δ, Some (am_lift_G τ, δ')) ->
                       (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
                       next_TS_role δ τ δ' ≠ Some ρ)
     (ASGρ : ∀ (k : nat) (δi_k : lm_ls LMi),
@@ -432,7 +464,7 @@ Section InnerLMTraceFairness.
   (ST0: lmtr_i S!! n = Some δi)
   (FUEL0: ls_fuel δi !! ρ = Some f):
     (* ∃ m, n <= m /\ pred_at lmtr_i m (steps_or_unassigned ρ). *)
-    exists m δm ostepm, n <= m /\ lmtr_i !! m = Some (δm, ostepm) /\ steps_or_unassigned (LM_ALM LMi) ρ δm ostepm.
+    exists m δm ostepm, n <= m /\ lmtr_i !! m = Some (δm, ostepm) /\ steps_or_unassigned _ ρ δm ostepm.
   Proof.
     pose proof ST0 as X. eapply traces_match_state_lookup_2 in X as (st_mo_n & STm0 & REL0); [| apply MATCH].
     pose proof STm0 as (atr_mo_n & AFTERmo_n & HEADmo_n)%state_lookup_after'.
@@ -474,14 +506,16 @@ Section InnerLMTraceFairness.
   (* Qed.  *)
 
   (* TODO: is it possible to express the general principle of induction by burning fuel? *)
-  Lemma owner_fixed_eventually `{LM: LiveModel G M LSI} {LF: LMFairPre LM}
-    (tr: lmftrace (LM := LM)) ρ n
+  Lemma owner_fixed_eventually `{LM: LiveModel G M LSI}
+                               {A: Type} {transA} {AM: AlmostLM transA (LM := LM)} 
+    {LF: LMFairPre LM}
+    (tr: @atrace _ _ _ LM A) ρ n
     (* (NOρ: ∀ m ℓ, n ≤ m → tr L!! m = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g) *)
-    (NOρ: forall i δ τ δ', n ≤ i -> tr !! i = Some (δ, Some (Some τ, δ')) ->
+    (NOρ: forall i δ τ δ', n ≤ i -> tr !! i = Some (δ, Some (am_lift_G τ, δ')) ->
                       (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
                       next_TS_role δ τ δ' ≠ Some ρ)
     (ASGρ : ∀ m δ, n <= m -> tr S!! m = Some δ → ρ ∈ dom (ls_mapping δ))
-    (VALID: mtrace_valid tr) :
+    (VALID: trace_valid transA tr) :
   ∃ j g, n ≤ j ∧ ∀ k δ, j ≤ k → tr S!! k = Some δ → ls_mapping δ !! ρ = Some g.
   Proof.
     pose proof (trace_has_len tr) as [len LEN].
@@ -540,7 +574,7 @@ Section InnerLMTraceFairness.
     { eapply state_lookup_dom; eauto. by rewrite Nat.add_1_r. }
     intros (δm & ℓ & δm'_ & STEP).
 
-    forward eapply mtrace_valid_steps' as TRANS; [| apply STEP|]; eauto.
+    forward eapply trace_valid_steps' as TRANS; [| apply STEP|]; eauto.
     apply state_label_lookup in STEP as (MTH & MTH'_ & LBL).
     rewrite Nat.add_1_r MTH' in MTH'_. inversion MTH'_. subst δm'_. clear MTH'_.
 
@@ -560,6 +594,11 @@ Section InnerLMTraceFairness.
     { lia. }
     apply elem_of_dom, ls_same_doms' in ASGm' as [f' FUEL']. 
 
+
+    destruct (decide (exists g, am_lift_G g = ℓ)).
+    2: { apply CHANGE. eapply am_transA_keep_mapping; eauto. }
+    destruct e. subst ℓ. apply am_lift_LM_step in TRANS. 
+
     apply CHANGE_. eapply IH.
     3: { apply FUEL'. }
     3: { eauto. }
@@ -573,7 +612,7 @@ Section InnerLMTraceFairness.
     { lia. }
     intros LE'.
 
-    unfold_LMF_trans TRANS. 
+    unfold_LMF_trans' TRANS. 
     - do 2 apply proj2 in STEP. apply proj1 in STEP.
       red in STEP. specialize (STEP ρ). rewrite FUEL' FUEL_ in STEP.
       specialize_full STEP; [..| simpl in *; lia].
@@ -590,17 +629,17 @@ Section InnerLMTraceFairness.
 
   (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
   (* TODO: renaming of arguments? *)
-  Lemma inner_LM_trace_fair_aux (lmtr_i: lmftrace (LM := LMi)) (tr_o: mtrace Mo) 
+  Lemma inner_LM_trace_fair_aux (lmtr_i: atrace) (tr_o: mtrace Mo) 
     (lmtr_o: lmftrace (LM := LMo)):
     upto_stutter_auxtr lmtr_o tr_o -> 
-    (∀ gi, fair_aux_SoU (LM_ALM LMo) (lift_Gi gi) lmtr_o) ->
+    (∀ gi, fair_aux_SoU (LM_ALM LMo) (lift_Ai $ am_lift_G gi) lmtr_o) ->
     inner_obls_exposed lmtr_o -> (* TODO: should become unnecessary with LM state invariants *)
     infinite_trace tr_o ->
     lm_model_traces_match tr_o lmtr_i ->
-    (∀ ρ, fair_model_trace ρ tr_o) -> (∀ ρ : fmrole Mi, fair_by_next_TS ρ lmtr_i). 
+    (∀ ρ, fair_model_trace ρ tr_o) -> (∀ ρ : fmrole Mi, afair_by_next_TS _ ρ lmtr_i). 
   Proof. 
     intros UPTO FAIR_SOU INNER_OBLS INF MATCH FAIRo ρ.
-    destruct (classic (fair_by_next_TS ρ lmtr_i)) as [| UNFAIR]; [done| exfalso].
+    destruct (classic (afair_by_next_TS _ ρ lmtr_i)) as [| UNFAIR]; [done| exfalso].
 
     rewrite /fair_by_next_TS in UNFAIR. 
     apply not_all_ex_not in UNFAIR as [n UNFAIR].
@@ -632,17 +671,19 @@ Section InnerLMTraceFairness.
       rewrite /fairness_sat_gen in UNFAIR.
       tauto. }
     (* assert (forall m ℓ, n <= m -> lmtr_i L!! m = Some ℓ -> forall go', ℓ ≠ Take_step ρ go') as NOρ. *)
-    assert (forall m δ τ δ', n <= m -> lmtr_i !! m = Some (δ, Some (Some τ, δ')) ->
+    assert (forall m δ τ δ', n <= m -> lmtr_i !! m = Some (δ, Some (am_lift_G τ, δ')) ->
                          (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
                         next_TS_role δ τ δ' ≠ Some ρ) as NOρ. 
     { intros. apply Nat.le_sum in H as [d ->].
       (* specialize (UNFAIR d) as (? & ? & MTH & UNFAIR). *)
       eapply not_exists_forall_not with (x := δ) in UNFAIR.
-      eapply not_exists_forall_not with (x := Some (Some τ, δ')) in UNFAIR.
+      eapply not_exists_forall_not with (x := Some (am_lift_G τ, δ')) in UNFAIR.
       apply not_and_or in UNFAIR as [?| UNFAIR]; [done| ].
       rewrite /fairness_sat_gen in UNFAIR. 
       apply Decidable.not_or, proj2 in UNFAIR.
-      intros IN. apply UNFAIR. red. eauto. }
+      intros IN. apply UNFAIR. red.
+
+      do 3 eexists. eauto. }
       
     clear ENn. 
 
