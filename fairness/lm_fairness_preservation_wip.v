@@ -232,7 +232,7 @@ Section InnerLMTraceFairness.
     {AMi: AlmostLM transAi}.
 
   (* Context (lift_Gi: Gi -> fmrole Mo). *)
-  Context (lift_Ai: Ai -> fmrole Mo).
+  Context (lift_Ai: Ai -> option $ fmrole Mo).
   Hypothesis (INJlg: Inj eq eq lift_Ai). 
 
   Context (state_rel: fmstate Mo → lm_ls LMi → Prop).
@@ -242,7 +242,7 @@ Section InnerLMTraceFairness.
       (transA := transAi)
       (fmtrans Mo)
       (* (lift_Gi)  *)
-      (Some ∘ lift_Ai)
+      (lift_Ai)
       state_rel.
   
   Local Ltac gd t := generalize dependent t.
@@ -252,7 +252,7 @@ Section InnerLMTraceFairness.
                  (exists (δi: LiveState Gi Mi LSIi) (ρi: fmrole Mi),
                     state_rel (ls_under δo_k) δi /\
                     ls_mapping δi !! ρi = Some gi) ->
-                 lift_Ai (am_lift_G gi) ∈ dom (ls_mapping δo_k). 
+                 exists r, lift_Ai (am_lift_G gi) = Some r /\ r ∈ dom (ls_mapping δo_k). 
 
   (* (* TODO: move *) *)
   (* Lemma upto_stutter_trcons {St S' L L': Type} {Us: St -> S'} {Usls: St -> L -> St -> option L'} *)
@@ -268,7 +268,7 @@ Section InnerLMTraceFairness.
   Lemma eventual_step_or_unassign lmtr_o mtr_o (lmtr_i: atrace) ρ gi δi f
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
     (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
-    (FAIR_SOU: forall gi, fair_aux_SoU (LM_ALM LMo) (lift_Ai $ am_lift_G gi) lmtr_o (LM := LMo))
+    (FAIR_SOU: forall gi r, lift_Ai $ am_lift_G gi = Some r -> fair_aux_SoU (LM_ALM LMo) r lmtr_o (LM := LMo))
     (INNER_OBLS: inner_obls_exposed lmtr_o)
     (* (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi), *)
     (*       lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go') *)
@@ -295,8 +295,9 @@ Section InnerLMTraceFairness.
     { do 2 eexists. split; eauto.
       rewrite -CORR0. rewrite state_lookup_0 in ST0.
       by inversion ST0. }
+    destruct OBLS0 as (r & EQr & OBLS0). 
     
-    pose proof (FAIR_SOU gi 0) as FAIR. specialize_full FAIR.
+    pose proof (FAIR_SOU gi _ EQr 0) as FAIR. specialize_full FAIR.
     { by apply pred_at_state_trfirst. }
     destruct FAIR as [n_lo STEPlo].
     
@@ -311,7 +312,7 @@ Section InnerLMTraceFairness.
       red in INNER_OBLS. specialize_full INNER_OBLS.
       { eapply trace_state_lookup_simpl'. eauto. }
       { eauto. }
-      simpl in INNER_OBLS. congruence. }
+      simpl in INNER_OBLS. destruct INNER_OBLS as (?&?&?). congruence. }
     
     (* destruct stepo as [[? δo_n']|]; [| done]. *)
     destruct stepo as [[? δo_n']|].
@@ -324,19 +325,19 @@ Section InnerLMTraceFairness.
     
     forward eapply upto_stutter_step_correspondence_alt with 
       (* (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Take_step (lift_Gi gi) go, δ')) *)
-      (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Some go, δ') /\ next_TS_role δ go δ' = Some (lift_Ai $ am_lift_G gi))
-      (Pi := fun st ostep => st = ls_under δo_n /\ exists st', ostep = Some (Some $ lift_Ai $ am_lift_G gi, st'))
+      (Po := fun δ ostep => δ = δo_n /\ exists δ', ostep = Some (Some go, δ') /\ next_TS_role δ go δ' = lift_Ai $ am_lift_G gi)
+      (Pi := fun st ostep => st = ls_under δo_n /\ exists st', ostep = Some (lift_Ai $ am_lift_G gi, st'))
     .
     (* { by intros ?? [-> ->]. } *)
     (* { by intros ?[??]. } *)
     (* { apply CORRo. } *)
     (* { apply pred_at_trace_lookup'. eauto. }  *)
     { simpl. intros. destruct H as [-> (?&->&N)]. split; auto.
-      simpl. rewrite N. eauto. }
+      simpl. rewrite N EQr. eauto. }
     { intros. by destruct H as [_ [??]]. }
     { apply CORRo. }
     { apply STLo. }    
-    { eauto. }
+    { split; eauto. eexists. split; eauto. congruence. }
 
     intros (n_mo & ? & step_ & STEPmo & UPTO').
     destruct UPTO' as [[? [? ->]]UPTO']. subst x.
@@ -394,7 +395,9 @@ Section InnerLMTraceFairness.
       apply after_S_tr_cons in AFTERmo, AFTERlmo, AFTERlmi. 
       specialize_full IH.
       * lia. 
-      * intros. eapply fair_by_gen_after; eauto. apply FAIR_SOU. 
+      * intros. eapply fair_by_gen_after; eauto.
+        specialize (FAIR_SOU _ _ H). 
+        apply FAIR_SOU. 
       * red. intros.
         erewrite state_lookup_after in H; eauto. 
       * punfold UPTO'; [| apply upto_stutter_mono].
@@ -452,7 +455,7 @@ Section InnerLMTraceFairness.
   Lemma eventual_step_or_unassign_nth lmtr_o mtr_o (lmtr_i: atrace) ρ gi δi f n
     (MATCH: lm_model_traces_match mtr_o lmtr_i)
     (CORRo: upto_stutter_auxtr lmtr_o mtr_o (LM := LMo))
-    (FAIR_SOU: forall gi, fair_aux_SoU (LM_ALM LMo) (lift_Ai $ am_lift_G gi) lmtr_o (LM := LMo))
+    (FAIR_SOU: forall gi r, lift_Ai $ am_lift_G gi = Some r -> fair_aux_SoU (LM_ALM LMo) r lmtr_o (LM := LMo))
     (INNER_OBLS: inner_obls_exposed lmtr_o)
     (* (NOρ : ∀ (m : nat) (ℓ : lm_lbl LMi), *)
     (*       n <= m -> lmtr_i L!! m = Some ℓ → ∀ go' : Gi, ℓ ≠ Take_step ρ go') *)
@@ -473,7 +476,8 @@ Section InnerLMTraceFairness.
 
     (* TODO: unify with IH usage in eventual_step_or_unassign *)
     forward eapply eventual_step_or_unassign with (lmtr_o := atr_lmo_k) (mtr_o := atr_mo_n) (lmtr_i := atr_lmi_n); eauto.
-    * intros. eapply fair_by_gen_after; eauto. apply FAIR_SOU. 
+    * intros. eapply fair_by_gen_after; eauto.
+      specialize (FAIR_SOU _ _ H). apply FAIR_SOU. 
     * eapply inner_obls_exposed_after; eauto.
     (* * punfold UPTOkn; [| apply upto_stutter_mono]. *)
     (*   inversion UPTOkn; subst; try done. *)
@@ -632,7 +636,7 @@ Section InnerLMTraceFairness.
   Lemma inner_LM_trace_fair_aux (lmtr_i: atrace) (tr_o: mtrace Mo) 
     (lmtr_o: lmftrace (LM := LMo)):
     upto_stutter_auxtr lmtr_o tr_o -> 
-    (∀ gi, fair_aux_SoU (LM_ALM LMo) (lift_Ai $ am_lift_G gi) lmtr_o) ->
+    (∀ gi r, (lift_Ai $ am_lift_G gi) = Some r -> fair_aux_SoU (LM_ALM LMo) r lmtr_o) ->
     inner_obls_exposed lmtr_o -> (* TODO: should become unnecessary with LM state invariants *)
     infinite_trace tr_o ->
     lm_model_traces_match tr_o lmtr_i ->

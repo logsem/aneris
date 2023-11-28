@@ -41,12 +41,12 @@ Section ClientDefs.
     client_trans (lb, 1) (Some $ inr ρy) (lb, 0)
   .
 
-  (* Global Instance lib_role_EqDec: EqDecision lib_erole. *)
-  (* Proof. solve_decision. Defined. *)
-  (* Global Instance lib_role_Cnt: Countable lib_erole. *)
-  (* Proof using. *)
-  (*   rewrite /lib_erole. simpl. apply _.  *)
-  (* Defined. *)
+  Global Instance lib_role_EqDec: EqDecision lib_erole.
+  Proof. solve_decision. Defined.
+  Global Instance lib_role_Cnt: Countable lib_erole.
+  Proof using.
+    rewrite /lib_erole. simpl. apply _.
+  Defined.
   
   Instance y_EqDec: EqDecision y_role.
   Proof. by (solve_decision). Qed.

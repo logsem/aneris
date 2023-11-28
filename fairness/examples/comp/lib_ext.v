@@ -133,4 +133,21 @@ Section ExtModelLM.
     intros [=]. subst. rewrite decide_True; tauto. 
   Qed.
 
+  Lemma lib_keeps_asg: ∀ (δ1 : LM_Fair) (ι : env_role) (δ2 : LM_Fair) ρ τ (f : nat),
+     @ext_trans _ ExtLibLM δ1 (Some (inr ι)) δ2
+     → ls_mapping δ1 !! ρ = Some τ
+       → ls_fuel δ1 !! ρ = Some f
+         → ls_mapping δ2 !! ρ = Some τ ∧ ls_fuel δ2 !! ρ = Some f.
+  Proof.
+    intros. inversion H. subst.
+    simpl in REL. destruct ι0. simpl in REL. red in REL.
+    rewrite /reset_lm_st in REL. destruct decide; [| done]. inversion REL. subst.
+    rewrite /reset_lm_st_impl. simpl.
+    red in l. destruct l as (?&NIN&DOMg). split.
+    - rewrite lookup_insert_ne; auto. intros <-.
+      apply NIN. apply elem_of_dom. set_solver.
+    - rewrite lookup_insert_ne; auto. intros <-.
+      apply NIN. apply elem_of_dom. set_solver.
+  Qed.    
+
 End ExtModelLM. 

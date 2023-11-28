@@ -4,7 +4,7 @@ From trillium.prelude Require Import finitary quantifiers sigma classical_instan
 Require Import stdpp.decidable.
 From trillium.fairness.heap_lang Require Import lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang Require Import simulation_adequacy_lm simulation_adequacy_lm_ext.
+From trillium.fairness.heap_lang Require Import simulation_adequacy_lm simulation_adequacy_lm_ext em_lm.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
@@ -134,7 +134,7 @@ Proof.
          simpl in *. split; auto.
          intros. destruct s. simpl in *. congruence. }
     do 2 red in H. destruct H as (?&?&?&[[=] <-]). subst.
-    pose proof (mtrace_valid_steps' VALID _ _ _ _ STEP0) as STEP.
+    pose proof (trace_valid_steps' _ _ VALID _ _ _ _ STEP0) as STEP.
     inversion STEP. }
 
   intros.
@@ -152,7 +152,7 @@ Proof.
        simpl in *. eexists. split; eauto.
        intros. destruct s. simpl in *. congruence. }
   do 2 red in H. destruct H as (?&?&?&[[=] <-]). subst.
-  pose proof (mtrace_valid_steps' VALID _ _ _ _ STEP0) as STEP.
+  pose proof (trace_valid_steps' _ _ VALID _ _ _ _ STEP0) as STEP.
   destruct x1 as [δ1 c0_].
   assert (c0_ = c0) as ->. 
   { inversion STEP; lia. }
@@ -321,8 +321,8 @@ Proof.
   pose proof (LIB_STEPS 0 (s, Some (ℓ, (trfirst tr))) eq_refl) as STEP0.
   destruct STEP0 as [STEP0 | STEP0].
   2: { destruct STEP0. done. }
-  (* pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [VALID' STEP].   *)
   destruct STEP0 as (?&?&?&[=]&[ρlg <-]). subst. simpl in *.
+  pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [VALID' STEP].  
   econstructor.
   1-3: done.
   { rewrite project_lib_trfirst. inversion STEP; subst; simpl in *.
@@ -359,14 +359,16 @@ Qed.
 
 Local Instance client_LF: LMFairPre client_model.
   esplit; apply _.
-Qed. 
+Defined.
+
+Let lib_ALM := ELM_ALM lib_keeps_asg. 
 
 Definition outer_LM_trace_exposing
   (lmtr: lmftrace (LM := client_model)) (mtr: mtrace client_model_impl) :=
   upto_stutter_auxtr lmtr mtr /\
   (∀ gi, fair_aux_SoU _ ((inl $ inl gi): fmrole client_model_impl) lmtr) /\
   (* TODO: remove LMo parameter from inner_obls_exposed *)
-  inner_obls_exposed (inl ∘ inl) (λ c δ_lib, c.1 = δ_lib) lmtr (LMo := client_model).
+  inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) lmtr (LMo := client_model) (AMi := lib_ALM).
 
 Definition traces_equiv {St L: Type} :=
   @traces_match L L St St eq eq (fun _ _ _ => True) (fun _ _ _ => True).
@@ -558,7 +560,7 @@ Proof.
   2: { pattern st in ST. eapply ex_intro, trace_lookup_dom_eq in ST; eauto.
        left. eapply terminating_trace_equiv; eauto. }
   right. eexists. split; eauto. simpl.
-  forward eapply (mtrace_valid_steps' VALID i) as TRANS; [eauto| ].
+  forward eapply (trace_valid_steps' _ _ VALID i) as TRANS; [eauto| ].
   simpl in TRANS.
   inversion TRANS; subst; simpl.
   1, 4: by (left; do 2 red; eauto). 
@@ -593,7 +595,7 @@ Proof.
     lia_NO len. }
   clear dependent s. 
   intros (s & ? & s'_ & STEP'_). 
-  forward eapply (mtrace_valid_steps' VALID) as TRANS; [eauto| ].
+  forward eapply (trace_valid_steps' _ _ VALID) as TRANS; [eauto| ].
   pose proof STEP'_ as X%L2; try lia. 
   (* destruct X as (?&?&?&[=]&[? <-]). subst.   *)
   apply state_label_lookup in STEP'_ as (ST & ST'_ & LBL).
@@ -652,7 +654,7 @@ Proof.
     destruct p. 
     right. split.
     { rewrite -(plus_O_n 1). eapply trace_lookup_dom_strong; eauto. }
-    forward eapply (mtrace_valid_steps' VALID 0) as TRANS; [eauto| ].
+    forward eapply (trace_valid_steps' _ _ VALID 0) as TRANS; [eauto| ].
     apply state_label_lookup in STEP0 as (ST0 & ?&?). 
     rewrite state_lookup_0 in ST0. inversion ST0. rewrite H2. 
     inversion TRANS; subst; simpl; lia. }
@@ -712,19 +714,35 @@ Proof.
     (* 4: { apply MATCH.  *)
     eapply @simulation_adequacy_terminate_general'_ext in MATCH; eauto; cycle 1. 
     (* eapply simulation_adequacy_terminate_general'_ext in MATCH; eauto; cycle 1.  *)
-    { exact (lib_lm_projEI: @EI _ ExtLibLM -> @EI _ ExtLib). }  
-    {  apply lib_fair_term. }
+    { apply lib_proj_keep_ext. }
+    { intros.
+      eapply fin_ext_fair_termination; eauto.
+      apply lib_fair_term. }
+    { subst l2. simpl in *.
+      assert (trans_bounded str (fun oℓ => exists l, oℓ = Some (inl $ inr l))).
+      { admit. }
+      destruct H as [b BOUND]. exists b. intros. intros [? ->].
+      pose proof H0 as ITH'. 
+      eapply traces_match_label_lookup_2 in ITH' as (ℓ & ITH' & MATCH'); [| apply MATCH].
+      red in MATCH'. simpl in MATCH'. subst.  
+      apply BOUND in ITH'; auto. destruct ITH'. eauto. }  
     {       
       subst. simpl in *.
       forward eapply outer_exposing_subtrace; eauto.
       intros [? EXP'].
-      
-      eapply inner_LM_trace_fair_aux. 
-      2-4: by apply EXP'. 
-      - apply _. 
+
+      unshelve eapply ELM_ALM_afair_by_next.
+      { red. apply lib_keeps_asg. }  
+
+      eapply inner_LM_trace_fair_aux.
+      - apply _.
+      - by apply EXP'. 
+      - simpl. intros ?? [=<-].
+        by apply EXP'.
+      - by apply EXP'.
       - subst. eapply infinite_trace_equiv; eauto. 
       - by apply MATCH. 
-      - eapply fair_by_subtrace; eauto. }   
+      - eapply fair_by_subtrace; eauto. }
 
     red in MATCH. specialize_full MATCH; eauto.
     { subst. eapply (subtrace_valid tr); eauto. }
@@ -733,7 +751,7 @@ Proof.
     subst. done. }
 
   simpl in *.
-  assert (terminating_trace tr \/ exists step, snd (fst step) = 1 /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 (LM := lib_model) !! ρlg = Some ∅) as NEXT. 
+  assert (terminating_trace tr \/ exists step, (snd (fst step) = 2 \/ snd (fst step) = 1) /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 (LM := lib_model) !! ρlg = Some ∅) as NEXT. 
   { edestruct (client_trace_lookup tr m2) as [?|STEP]; eauto.
     destruct STEP as [[s step] [STEP [CL | [LIB BOUND]]]].
     2: { eapply NL2 in LIB; done. }  
@@ -745,17 +763,36 @@ Proof.
     eexists. apply and_comm, and_assoc. 
     split; [apply STEP|]. simpl.
     apply and_assoc. split; [by do 2 red; eauto| ].
-    assert (x.2 = 1).
+    assert (x.2 = 2 \/ x.2 = 1).
     { apply state_label_lookup in STEP.
-    do 2 red in LIB. destruct LIB as (?&?&?&[=]&[? <-]).
-    subst. apply state_label_lookup in STEP'. simpl in *. 
-    eapply c1_preserved.
-    3: { apply (proj1 STEP'). }
-    all: eauto.
-    apply STEP. }
-    forward eapply (mtrace_valid_steps' VALID m2) as TRANS; eauto.
+      do 2 red in LIB. destruct LIB as (?&?&?&[=]&[? <-]).
+      subst. apply state_label_lookup in STEP'. simpl in *.
+
+      destruct BOUND.
+      2: { right. eapply c1_preserved.
+           3: { apply (proj1 STEP'). }
+           all: eauto.
+           apply STEP. }
+
+      assert (m2 = m1 \/ m1 + 1 <= m2) as [-> | LE] by lia.
+      { destruct STEP. destruct STEP'. rewrite H0 in H2.
+        inversion H2. subst x0. tauto. }
+    
+      forward eapply (trace_valid_steps'' _ _ VALID m1) as TRANS; eauto; try by apply STEP'.
+      simpl in TRANS. inversion TRANS; subst; simpl in *. 
+      2: { lia. }
+
+      right.
+      destruct STEP' as (?&X&?).
+      eapply c1_preserved.
+      3: { apply X. }
+      all: eauto.
+      2: by apply STEP.
+      intros. apply (L2 i); eauto; try lia. }
+    
+    forward eapply (trace_valid_steps' _ _ VALID m2) as TRANS; eauto.
     simpl in TRANS. inversion TRANS; subst. 
-    { done. }
+    { simpl in H. lia. }
     eauto. }
   
   destruct NEXT as [? | (step & BOUND & STm2 & CL2 & NOlib)]; [done| ].
@@ -763,8 +800,11 @@ Proof.
   { eapply slm_dec. intros.
     (* TODO: why it's not inferred automatically? *)
     assert (EqDecision client_role).    
-    { apply (@sum_eq_dec (fmrole lib_fair) lib_role_EqDec y_role y_EqDec). } 
-    solve_decision. }
+    { unshelve eapply sum_eq_dec. solve_decision. } 
+    (* apply (@sum_eq_dec (fmrole lib_fair) lib_role_EqDec y_role y_EqDec).   *)
+    solve_decision.
+    Unshelve. all: exact True.  
+  }
 
   forward eapply (subtrace_len tr _ m2 l3) as SUB3; eauto.
   { lia_NO' l3. apply proj1, le_lt_eq_dec in DOM3 as [?| ->]; [done| ].
@@ -774,7 +814,9 @@ Proof.
   (* TODO: refactor usages of this lemma  *)
   forward eapply (client_steps_finite str3) as (m3 & LEN3' & BOUND3); eauto.
   { eapply (subtrace_valid tr); [..| apply SUB3]; eauto.
-    apply DOM3. }  
+    apply DOM3.
+    Unshelve. all: exact True. 
+  }  
   { intros. destruct step0 as [[ℓ s']| ]; eauto. left.
     (* pose proof H as X%trace_lookup_dom_strong.  *)
     assert (NOmega.lt_nat_l (i + 1) (NOmega.sub l3 (NOnum m2))). 
@@ -793,6 +835,11 @@ Proof.
   subst. simpl in *.
   destruct DOM3 as [LE3 DOM3].
 
+  destruct x2.
+  2: { (* corner case of only ext step without following lib steps *)
+    admit. }
+  rename f into x2. 
+
   enough (ls_tmap x.1 (LM := lib_model) !! x2 = Some ∅).
   2: { apply state_label_lookup in STEPn. 
        eapply done_lib_preserved. 
@@ -801,41 +848,64 @@ Proof.
        destruct CL2 as (?&?&?&[=]&[=]). subst. simpl.
        eapply state_label_lookup; eauto. }
        
-  forward eapply (mtrace_valid_steps' VALID n) as TRANS; eauto.
+  forward eapply (trace_valid_steps' _ _ VALID n) as TRANS; eauto.
   simpl in TRANS. inversion TRANS. subst.
   apply fm_live_spec in LIB_STEP.
-  eapply LM_map_empty_notlive in LIB_STEP; eauto. done.
+  eapply LM_map_empty_notlive in LIB_STEP; eauto. done.  
+  
+Admitted. 
 
-  (* TODO: should be removed after fixing mtrace_valid_steps' type *)
-  Unshelve. 1-4: exact True. 
-Qed. 
-
-Lemma client_LM_inner_exposed (auxtr: auxtrace (LM := client_model)):
-  inner_obls_exposed (inl: lib_grole -> fmrole client_model_impl)
-    (λ c δ_lib, c.1 = δ_lib) auxtr.
+Lemma client_LM_inner_exposed (auxtr: lmftrace (LM := client_model)):
+  inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) auxtr (LMo := client_model) (AMi := lib_ALM).
 Proof. 
   red. intros n δ gl NTH MAP.
-  apply (ls_inv δ). eauto. set_solver. 
-Qed. 
+  simpl. eexists. split; eauto. 
+  apply (ls_inv δ). set_solver. 
+Qed.
 
+
+From trillium.fairness.heap_lang Require Import em_lm_heap_lang. 
+
+(* Local Instance client_LF': LMFairPre' client_model. *)
+(*   esplit; apply _. *)
+(* Qed. *)
+
+(* Definition foo Σ: fairnessGS client_model Σ. *)
+(*   assert (@heapGS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model client_LF')). *)
+(*   { admit. } *)
+(*   inversion H. apply heap_fairnessGS.  *)
+
+  
+(*   set (bar := @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model client_LF')). *)
+(*   unfold LM_EM_HL in bar. *)
+(*   simpl in bar. *)
+(*   (* apply heapGpreS_em in bar.  *) *)
+  
+(*   inversion bar.  *)
+
+
+Local Instance LF': LMFairPre' client_model.
+esplit; apply _.
+Defined.
+
+  
 (* TODO: try to unify it with general lemma.
    The problem is that proving client model trace termination
    now depends on client LM trace with certain properties,
    whereas in original lemma all model traces are required to be terminating. *)
 (* TODO: generalize the initial state in general lemma as well? *)
-Theorem simulation_adequacy_terminate_client Σ 
-        `{hPre: @heapGpreS Σ client_model (@LM_EM_HL _ _ client_model)} (s: stuckness)
+Theorem simulation_adequacy_terminate_client (Σ: gFunctors)
+        {hPre: @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')} (s: stuckness)
         e1 (s1: fmstate client_model_impl)
         (LSI0: initial_ls_LSI s1 0 (M := client_model_impl) (LM := client_model) (LSI := client_LSI))
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
-  (* (∀ mtr: @mtrace Mdl, mtrace_fairly_terminating mtr) -> *)
-  rel_finitary (sim_rel client_model) →
-  (∀ `{hGS: @heapGS Σ client_model (@LM_EM_HL _ _ client_model)},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat LSI0)
+  rel_finitary (sim_rel client_model (LF := client_LF)) →
+  (∀ {hGS: @heapGS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')},
+      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat LSI0) 
                  ={⊤}=∗
-                 WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
+                 WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat (LF := client_LF)}}
   ) ->
   extrace_fairly_terminating extr.
 Proof.
@@ -845,32 +915,41 @@ Proof.
   destruct (simulation_adequacy_model_trace
               Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
 
-  (* have Hfairaux := ex_fairness_preserved  *)
-  (*                    extr auxtr Hinf Hmatch Hfair. *)
-  assert (forall ρ n, fair_aux_SoU auxtr ρ n (LM := client_model)) as FAIR_SOU.
-  { eapply exec_fairness_implies_step_or_unassign; eauto.  
-    - by apply _.
-    - apply match_locale_enabled_states_livetids.
-    Unshelve. apply _. }
-  assert (forall ρ, fair_aux ρ auxtr) as Hfairaux. 
-  { eapply steps_or_unassigned_implies_aux_fairness; eauto.  
-    - by apply id_inj. 
-    - apply match_locale_enabled_states_livetids. }
+  (* (* have Hfairaux := ex_fairness_preserved  *) *)
+  (* (*                    extr auxtr Hinf Hmatch Hfair. *) *)
+  (* assert (forall ρ, fair_aux_SoU (LM_ALM client_model) ρ auxtr (LM := client_model)) as FAIR_SOU. *)
+  (* { (* eapply group_fairness_implies_step_or_unassign.  *) *)
+  (*   eapply exec_fairness_implies_step_or_unassign; eauto. *)
+  (*   - by apply _. *)
+  (*   - apply match_locale_enabled_states_livetids. *)
+  (*   Unshelve. apply _. } *)
 
-  have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
-  have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch.
-  have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+  (* assert (forall ρ, fair_aux ρ auxtr) as Hfairaux.  *)
+  (* { eapply steps_or_unassigned_implies_aux_fairness; eauto.   *)
+  (*   - by apply id_inj.  *)
+  (*   - apply match_locale_enabled_states_livetids. } *)
+
+  pose proof (ex_fairness_preserved _ _ Hinf Hmatch Hfair) as Hfairaux'.
+  (* eapply @LM_ALM_afair_by_next in Hfairaux.  *)
+  pose proof (proj1 (LM_ALM_afair_by_next _ auxtr) Hfairaux') as Hfairaux.  
+  
+  have Hfairm := lm_fair_traces.upto_stutter_fairness auxtr mtr Hupto Hfairaux.
+  (* have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch. *)
+  pose proof (traces_match_valid2 _ _ _ _ _ _ Hmatch) as Hvalaux. 
+  have Hmtrvalid := lm_fair_traces.upto_preserves_validity auxtr mtr Hupto Hvalaux.
 
   (* have Htermtr := Hterm mtr Hmtrvalid Hfairm. *)
   assert (mtrace_fairly_terminating mtr) as FAIR_TERM. 
   { eapply client_model_fair_term.
     red. split; [| split]; eauto.
-    apply client_LM_inner_exposed. }
+    2: by apply client_LM_inner_exposed.
+    admit. 
+  }
   assert (terminating_trace mtr) as Hterm.
   { eapply FAIR_TERM; eauto. }
     
   eapply traces_match_preserves_termination =>//.
-  eapply upto_stutter_finiteness =>//.
+  eapply lm_fair_traces.upto_stutter_finiteness =>//.
 Qed.
 
 Lemma init_lib_state: lib_ls_premise δ_lib0.

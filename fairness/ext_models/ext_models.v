@@ -227,19 +227,19 @@ Section ELM_ALM.
 
   Definition elmftrace := mtrace (@ext_model_FM _ ELM). 
 
-  Hypothesis (EXT_KEEP_ASG: forall δ1 ι δ2 ρ τ f,
-                 @ext_trans _ ELM δ1 (Some $ inr ι) δ2 -> 
-                 ls_mapping δ1 !! ρ = Some τ ->
-                 ls_fuel δ1 !! ρ = Some f ->
-                 ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f). 
+  Definition ext_keeps_asg := forall δ1 ι δ2 ρ τ f,
+      @ext_trans _ ELM δ1 (Some $ inr ι) δ2 -> 
+      ls_mapping δ1 !! ρ = Some τ ->
+      ls_fuel δ1 !! ρ = Some f ->
+      ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f. 
 
-  Instance ELM_ALM: AlmostLM (@ext_trans _ ELM) (LM := LM).
+  Instance ELM_ALM (KEEPS: ext_keeps_asg): AlmostLM (@ext_trans _ ELM) (LM := LM).
   Proof.
     refine {| am_lift_G := Some ∘ inl |}; eauto.
     - intros ??? STEP. inversion STEP. eauto. 
     - intros ?????? STEP NEQ **. inversion STEP; subst. 
       + by destruct (NEQ ρ0).
-      + eapply EXT_KEEP_ASG; eauto. 
+      + eapply KEEPS; eauto. 
     - intros [[?|?]| ].
       2, 3: right; by intros [? [=]].
       left; eauto.

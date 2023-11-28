@@ -480,3 +480,19 @@ Section upto_stutter_preserves_fairness_and_termination.
   Qed.
 
 End upto_stutter_preserves_fairness_and_termination.
+
+(* TODO: move, unify with non-ext version? *)
+From trillium.fairness Require Import lm_fairness_preservation.
+Lemma ELM_ALM_afair_by_next `(LM: LiveModel G M LSI) {LF: LMFairPre LM}
+  {ELM: ExtModel (@LM_Fair _ _ _ _ LF)} auxtr
+  (KEEPS: ext_keeps_asg):
+  (∀ ρ, afair_by_next_TS (ELM_ALM KEEPS) ρ auxtr) <-> ∀ ρ, fair_by_next_TS_ext ρ auxtr.
+Proof.
+  apply forall_proper. intros.
+  apply fair_by_gen_Proper; try reflexivity.
+  red. intros ??->. intros ??->. intros ??->.
+  rewrite /step_by_next_TS /astep_by_next_TS. simpl.
+  split.
+  - intros (?&?&?&->&<-&<-). eauto.
+  - intros (?&?&->&?). do 3 eexists. eauto. 
+Qed. 
