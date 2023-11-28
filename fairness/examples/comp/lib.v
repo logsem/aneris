@@ -93,3 +93,35 @@ Section LibrarySpec.
   Proof using. Admitted.
 
 End LibrarySpec.
+
+
+Definition lib_ls_premise (lb: lm_ls lib_model) :=
+  ls_fuel lb !! ρl = Some 2 ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}.
+
+Lemma lib_premise_dis (lb: lm_ls lib_model)
+  (LB_INFO: lib_ls_premise lb):
+  ρlg ∈ live_roles lib_fair lb.
+Proof.
+  apply LM_live_roles_strong.
+  destruct LB_INFO as (F & S & TM).
+  eset (δ := ({| ls_under := (0: fmstate lib_model_impl); ls_fuel := ls_fuel lb; ls_mapping := ls_mapping lb; ls_inv := _ |})).
+  exists δ. red. exists (Take_step ρl ρlg). split; [| done].
+  repeat split; eauto.
+  - eapply ls_mapping_tmap_corr. eexists. split; eauto. set_solver.
+  - red. intros. inversion H1; subst; try set_solver.
+    destruct ρ', ρl; done.
+  - red. intros. left.
+    replace ρ' with ρl by (by destruct ρ', ρl).
+    rewrite F. simpl. lia.
+  - intros. rewrite F. simpl. lia.
+  - intros. subst δ. simpl in H. set_solver.
+  - subst δ. simpl. set_solver.
+    Unshelve.
+    + simpl. transitivity (∅: gset (fmrole lib_model_impl)); [| set_solver].
+      apply elem_of_subseteq. intros ? LIVE.
+      apply lib_model_impl_lr_strong in LIVE as [? [?]]. lia.
+    + apply ls_same_doms.
+    + done.
+      (* TODO: fix this weird error *)
+  (* Qed. *)
+Admitted.

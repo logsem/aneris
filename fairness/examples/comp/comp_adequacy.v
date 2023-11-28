@@ -915,36 +915,30 @@ Proof.
   destruct (simulation_adequacy_model_trace
               Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
 
-  (* (* have Hfairaux := ex_fairness_preserved  *) *)
-  (* (*                    extr auxtr Hinf Hmatch Hfair. *) *)
-  (* assert (forall ρ, fair_aux_SoU (LM_ALM client_model) ρ auxtr (LM := client_model)) as FAIR_SOU. *)
-  (* { (* eapply group_fairness_implies_step_or_unassign.  *) *)
-  (*   eapply exec_fairness_implies_step_or_unassign; eauto. *)
-  (*   - by apply _. *)
-  (*   - apply match_locale_enabled_states_livetids. *)
-  (*   Unshelve. apply _. } *)
-
-  (* assert (forall ρ, fair_aux ρ auxtr) as Hfairaux.  *)
-  (* { eapply steps_or_unassigned_implies_aux_fairness; eauto.   *)
-  (*   - by apply id_inj.  *)
-  (*   - apply match_locale_enabled_states_livetids. } *)
+  (* TODO: clarify which types of fairness we need in this proof *)
+  assert (forall ρ, fair_aux_SoU (LM_ALM client_model) ρ auxtr (LM := client_model)) as FAIR_SOU.
+  { apply group_fairness_implies_step_or_unassign; eauto.
+    { eapply traces_match_infinite_trace; eauto. }
+    { eapply traces_match_valid2; eauto. }
+    eapply fairness_preserved; eauto.
+    { apply _. }
+    { apply match_locale_enabled_states_livetids. }
+    intros.
+    destruct ζ.
+    { apply Hfair. }
+    simpl. red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup. }
 
   pose proof (ex_fairness_preserved _ _ Hinf Hmatch Hfair) as Hfairaux'.
-  (* eapply @LM_ALM_afair_by_next in Hfairaux.  *)
   pose proof (proj1 (LM_ALM_afair_by_next _ auxtr) Hfairaux') as Hfairaux.  
   
   have Hfairm := lm_fair_traces.upto_stutter_fairness auxtr mtr Hupto Hfairaux.
-  (* have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch. *)
   pose proof (traces_match_valid2 _ _ _ _ _ _ Hmatch) as Hvalaux. 
   have Hmtrvalid := lm_fair_traces.upto_preserves_validity auxtr mtr Hupto Hvalaux.
 
-  (* have Htermtr := Hterm mtr Hmtrvalid Hfairm. *)
   assert (mtrace_fairly_terminating mtr) as FAIR_TERM. 
   { eapply client_model_fair_term.
     red. split; [| split]; eauto.
-    2: by apply client_LM_inner_exposed.
-    admit. 
-  }
+    by apply client_LM_inner_exposed. }
   assert (terminating_trace mtr) as Hterm.
   { eapply FAIR_TERM; eauto. }
     
@@ -968,8 +962,8 @@ Theorem client_terminates
         (Hexfirst : (trfirst extr).1 = [client #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model)) clientPreΣ). 
-  assert (heapGpreS Σ (@LM_EM_HL _ _ client_model)) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model LF')) clientPreΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ _ client_model LF')) as HPreG.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 2)). 
