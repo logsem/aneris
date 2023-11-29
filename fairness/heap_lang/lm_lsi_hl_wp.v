@@ -174,13 +174,14 @@ Proof using REORDER_PRES.
   rewrite has_fuel_fuels //. apply map_non_empty_singleton.
 Qed.
 
+
 Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' Einvs fs1 fs2 fr1 fr_stash Φ e1 e2 ρ φ:
   PureExec φ 1 e1 e2 -> φ ->
   Einvs ⊆ E ->
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
   live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2 →
   fr_stash ⊆ dom fs1 →
-  live_roles iM s1 ∩ fr_stash = ∅ → 
+  live_roles iM s1 ∩ (fr_stash ∖ {[ρ]}) = ∅ → 
   dom fs2 ∩ fr_stash = ∅ ->
   iM.(fmtrans) s1 (Some ρ) s2 ->
   model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI) ->
@@ -209,7 +210,6 @@ Proof using.
 
   (* iDestruct (update_step_still_alive _ _ _ _ σ1 σ1 with "PMP Hfuels Hmod Hmi Hfr") as "H"; eauto. *)
   iDestruct (update_step_still_alive_gen _ _ _ _ σ1 σ1 with "PMP Hfuels Hmod [Hmi] Hfr") as "H"; eauto.
-  { set_solver. }
   2: { rewrite Hexend. iFrame. }
   { econstructor =>//. by apply fill_step. }
   (* { rewrite Hmeq. apply Hval. } *)
