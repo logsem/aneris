@@ -62,19 +62,16 @@ End ClientRA.
 
 
 Lemma δ_lib0_init_roles:
-  live_roles lib_model_impl 1 ⊆ dom ({[ρlg := 2]}: gmap lib_grole nat).
-Proof. 
+  live_roles lib_model_impl 0 = ∅.
+Proof.
+  set_solver. 
   (* TODO: definition hidden under Opaque *)
-Admitted. 
+Qed. 
 
 Definition δ_lib0: LiveState lib_grole lib_model_impl LSI_True.
-  refine (build_LS_ext 1 {[ ρlg := 2 ]} _ {[ ρlg := {[ ρl ]} ]} _ _ _ (LM := lib_model)).
-  - apply δ_lib0_init_roles.  
-  - intros.
-    rewrite dom_singleton. setoid_rewrite lookup_singleton_Some.
-    split; intros.
-    + exists ρ, {[ ρl ]}. set_solver.
-    + destruct H as (?&?&?&?). by destruct ρ.
+  refine (build_LS_ext 0 ∅ _ {[ ρlg := ∅ ]} _ _ _ (LM := lib_model)).
+  - rewrite δ_lib0_init_roles. set_solver.   
+  - intros. setoid_rewrite lookup_singleton_Some. set_solver. 
   - intros. 
     erewrite lookup_singleton_Some in H.
     rewrite lookup_singleton_Some in H0.
@@ -946,14 +943,19 @@ Proof.
   eapply lm_fair_traces.upto_stutter_finiteness =>//.
 Qed.
 
-Lemma init_lib_state: lib_ls_premise δ_lib0.
-Proof. 
-  repeat split.
-  - rewrite build_LS_ext_spec_fuel.
-    destruct ρlg, ρl. (* there are two aliases for unit type *)
-    set_solver.
+Lemma δ_lib0_map: ls_mapping δ_lib0 = ∅. 
+Proof.
+  eapply build_LS_ext_spec_mapping. 
+  red. intros. split; try set_solver. intros (? & L & IN).
+  rewrite lookup_singleton_Some in L. set_solver.  
+Qed.   
+
+Lemma init_lib_state: lm_is_stopped ρlg δ_lib0.
+Proof.
+  repeat split; simpl; try done. 
   - by rewrite build_LS_ext_spec_st.
-  - rewrite build_LS_ext_spec_tmap. set_solver.
+  - by rewrite δ_lib0_map. 
+  - rewrite build_LS_ext_spec_tmap. set_solver. 
 Qed.
 
 Theorem client_terminates
@@ -966,15 +968,11 @@ Proof.
   assert (heapGpreS Σ (@LM_EM_HL _ _ client_model LF')) as HPreG.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
-  set (st0 := (δ_lib0, 2)). 
+  set (st0 := (δ_lib0, 3)). 
   unshelve eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl)) =>//.
   - subst st0. red. rewrite /initial_ls_pre. red.
     intros gi [ρ MAP]. simpl in MAP.
-    (* TODO: we should start with empty mapping in δ_lib0,
-       so we'd have a contradiction here.
-       Afterwards we'd execute an external transition to set the mapping before calling the library.
-       See explanation in notes *)
-    admit. 
+    by rewrite δ_lib0_map in MAP. 
   - eapply valid_state_evolution_finitary_fairness_simple.
     (* TODO: problems with inferring EqDecision *)
     (* apply client_model_finitary. *)
@@ -994,8 +992,8 @@ Proof.
       admit.
     + subst st0.
       iApply has_fuels_proper; [reflexivity| | by iFrame].
-      pose proof (live_roles_2 δ_lib0). simpl in H.
-      replace (client_lr (δ_lib0, 2)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
-      2: { symmetry. apply leibniz_equiv. apply live_roles_2. }
+      pose proof (live_roles_3 δ_lib0). simpl in H.
+      replace (client_lr (δ_lib0, 3)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
+      2: { symmetry. apply leibniz_equiv. apply live_roles_3. }
       rewrite -gset_to_gmap_singletons big_opS_singleton. done.
 Admitted. 
