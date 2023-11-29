@@ -19,6 +19,200 @@ Section gmap.
   Qed.
 End gmap.
 
+(* TODO: move? *)
+Section LMFinBranching.
+  Context `{LM: LiveModel G M LSI}.
+  Context {DEC: forall a b c, Decision (LSI a b c)}.
+
+  Definition get_role {M : FairModel} {LSI} {LM: LiveModel G M LSI} (lab: mlabel LM) :=
+  match lab with
+  | Take_step ρ _ => Some ρ
+  | _ => None
+  end.
+
+  (* Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) := *)
+  (*   (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux). *)
+
+  Program Definition enumerate_next
+    (δ1: LM)
+    (* (c': cfg Λ) *)
+    (inner_exts: list (M * option (fmrole M)))
+    (next_threads: list G)
+    (convert_lbl: option (fmrole M) -> lm_lbl LM)
+    : list (LM * @mlabel LM) := 
+    '(s2, ℓ) ← inner_exts;
+    d ← enumerate_dom_gsets' (dom δ1.(ls_fuel) ∪ live_roles _ s2);
+    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(lm_fl) s2);
+    ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) next_threads ;
+    let ℓ' := convert_lbl ℓ
+    in
+    (if
+        (* (decide ((s2, ms, fs) = (s2, ms, fs))) *)
+        (* (decide (LSI s2 ms fs)) *)        
+        (decide (LSI s2 (`ms) (`fs))) (* TODO: what's the difference with above? *)
+    then
+    [({| ls_under := s2;
+             ls_fuel := `fs;
+             ls_mapping := `ms ;
+          |}, ℓ')]
+      else
+    []).
+  Next Obligation.
+    intros ??????????. destruct fs as [? Heq]. rewrite /= Heq //. set_solver.
+  Qed.
+  Next Obligation.
+    intros ??????????. destruct fs as [? Heq]. destruct ms as [? Heq'].
+    rewrite /= Heq //.
+  Qed.
+  Next Obligation. done. Qed. 
+
+  Definition lift_convert_lbl (oζ: option G) (ℓ: option (fmrole M)): lm_lbl LM :=
+    match ℓ with
+    | None => match oζ with
+               Some ζ => Silent_step ζ
+             | None => Config_step
+             end
+    | Some ℓ => match oζ with
+               | None => Config_step
+               | Some ζ => Take_step ℓ ζ
+               end
+    end. 
+
+  Lemma enum_next_in
+    δ1
+    ℓ δ'
+    inner_exts
+    next_threads
+    convert_lbl
+    (IN_IE: (ls_under δ', get_role ℓ) ∈ inner_exts)
+    (IN_DOMS: dom (ls_fuel δ') ⊆ dom (ls_fuel δ1) ∪ live_roles M δ')
+    (FUEL_LIM: forall ρ f (F: ls_fuel δ' !! ρ = Some f),
+        f ≤ max_gmap (ls_fuel δ1) `max` lm_fl LM δ')
+    (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'),
+        tid' ∈ next_threads)    
+    (CONVERT: ℓ = convert_lbl (get_role ℓ))
+    :
+    (δ', ℓ) ∈ enumerate_next δ1 inner_exts next_threads convert_lbl
+  .
+  Proof. 
+    unfold enumerate_next. apply elem_of_list_bind.
+    exists (δ'.(ls_under), get_role ℓ).
+    split; last first.
+    { apply IN_IE. }
+    
+    apply elem_of_list_bind. eexists (dom $ δ'.(ls_fuel)). split; last first.
+    { apply enumerate_dom_gsets'_spec.
+      apply IN_DOMS. }
+    apply elem_of_list_bind.
+    assert (Hfueldom: dom δ'.(ls_fuel) = live_roles M δ' ∪ dom (ls_fuel δ')).
+    { rewrite subseteq_union_1_L //. apply ls_fuel_dom. }
+    eexists (δ'.(ls_fuel) ↾ Hfueldom); split; last first.
+    { eapply enum_gmap_bounded'_spec; split =>//. }
+    apply elem_of_list_bind.
+    assert (Hmappingdom: dom δ'.(ls_mapping) = live_roles M δ' ∪ dom (ls_fuel δ')).
+    { rewrite -Hfueldom ls_same_doms //. }
+    exists (δ'.(ls_mapping) ↾ Hmappingdom); split; last first.
+    { eapply enum_gmap_range_bounded'_spec; split=>//. }
+    destruct decide; [| by destruct δ']. 
+    rewrite elem_of_list_singleton; f_equal.
+    - destruct δ'; simpl. f_equal; apply ProofIrrelevance.
+    - done.
+  Qed.
+
+  Lemma next_step_domain
+    δ           
+    (oζ : option G)
+    inner_exts
+    next_threads
+    (δ' : LM)
+    (ℓ : mlabel LM)
+    (Hlbl : labels_match oζ ℓ (LM := LM))
+    (Htrans : lm_ls_trans LM δ ℓ δ')
+    (INNER_DOM: (ls_under δ', get_role ℓ) ∈ inner_exts)
+    (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads)
+    :
+    (δ', ℓ) ∈ enumerate_next δ inner_exts next_threads (lift_convert_lbl oζ).
+  Proof.
+    eapply enum_next_in. 
+    { done. }
+    { destruct ℓ as [ρ tid' | |].
+      - inversion Htrans as (?&?&?&?&?&?&?). intros ρ' Hin. destruct (decide (ρ' ∈ live_roles _ δ')); first set_solver.
+        destruct (decide (ρ' ∈ dom $ ls_fuel δ)); set_solver. 
+      - inversion Htrans as (?&?&?&?&?). set_solver.
+      - inversion Htrans as (?&?&?&?&?). done. }
+    { set (δ1 := δ). 
+      intros ρ f Hsome. destruct ℓ as [ρ' tid' | |].
+      - destruct (decide (ρ = ρ')) as [-> | Hneq].
+        + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&Hleq&?&Hlim&?&?).
+          destruct (decide (ρ' ∈ live_roles _ δ')).
+          * rewrite Hsome /= in Hlim.
+            assert (Hlive: ρ' ∈ live_roles _ δ') by set_solver.
+            specialize (Hlim Hlive). lia.
+          * unfold fuel_decr in Hleq.
+            apply elem_of_dom_2 in Hmap. rewrite ls_same_doms in Hmap.
+            pose proof Hsome as Hsome'. apply elem_of_dom_2 in Hsome'.
+            specialize (Hleq ρ' ltac:(done) ltac:(done)).
+            assert (oleq (ls_fuel δ' !! ρ') (ls_fuel δ !! ρ')).
+            { specialize (H0 ρ' Hmap). destruct H0 as [?|[?|?]]; set_solver. }
+            simpl in H3. rewrite Hsome in H3.
+            subst δ1.
+            apply elem_of_dom in Hmap as [? Heq]. rewrite Heq in H3. 
+            pose proof (max_gmap_spec _ _ _ Heq). simpl in *.
+            lia. 
+        + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&?&Hleq'&?&Hnew&?).
+          destruct (decide (ρ ∈ dom $ ls_fuel δ1)) as [Hin|Hnotin].
+          * assert (Hok: oleq (ls_fuel δ' !! ρ) (ls_fuel δ1 !! ρ)).
+            { unfold fuel_must_not_incr in *.
+              (* assert (ρ ∈ dom $ ls_fuel δ1) by SS. *)              
+              specialize (Hleq' ρ ltac:(done) ) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
+            rewrite Hsome in Hok. destruct (ls_fuel δ1 !! ρ) as [f'|] eqn:Heqn; last done.
+            pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
+            etrans; [| apply Nat.le_max_l]. etrans; eauto.
+          * assert (Hok: oleq (ls_fuel δ' !! ρ) (Some (LM.(lm_fl) δ'))).
+            { apply Hnew. apply elem_of_dom_2 in Hsome. set_solver. }
+            rewrite Hsome in Hok. simpl in Hok. lia.
+      - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
+        assert (ρ ∈ dom $ ls_fuel δ1) as Hin.
+        { apply elem_of_dom_2 in Hsome. set_solver. }
+        specialize (Hleq Hin) as [Hleq|[Hleq|Hleq]].
+        + rewrite Hsome in Hleq. destruct (ls_fuel δ1 !! ρ) as [f'|] eqn:Heqn.
+          * pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
+            etrans; [| apply Nat.le_max_l].
+            rewrite Heqn in Hleq. lia.  
+          * simpl in *. rewrite Heqn in Hleq. done.
+        + destruct Hleq as [[=] _]. 
+        + apply elem_of_dom_2 in Hsome. set_solver.
+      - inversion Htrans as [? [? [Hleq [Hnew Hfalse]]]]. done. }
+    { done. }
+    { destruct ℓ; simpl; destruct oζ =>//; by inversion Hlbl. }
+   Qed.
+
+  Lemma role_LM_step_dom
+    δ           
+    (inner_exts : list (M * option (fmrole M)))
+    (next_threads : list G)
+    (ℓ : mlabel LM)
+    : 
+    exists (lδ': list (lm_ls LM)), forall (δ': lm_ls LM),
+      lm_ls_trans LM δ ℓ δ' ->
+      (ls_under δ', get_role ℓ) ∈ inner_exts ->
+      (forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads) ->
+      In δ' lδ'.
+  Proof.
+    assert (exists oζ oρ, lift_convert_lbl oζ oρ = ℓ) as (oζ & oρ & CONV). 
+    { rewrite /lift_convert_lbl. destruct ℓ.
+      - by exists (Some g), (Some f).
+      - by exists (Some g), None.
+      - by exists None, None. }
+    set (l2 := enumerate_next δ inner_exts next_threads (lift_convert_lbl oζ)).
+    exists (map fst l2).
+    intros. apply in_map_iff. exists (δ', ℓ). split; auto.
+    apply elem_of_list_In. subst l2. apply next_step_domain; auto.
+    subst ℓ. by destruct oζ, oρ. 
+  Qed. 
+
+End LMFinBranching.
+
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
@@ -87,194 +281,6 @@ Section finitary.
       end
   end.
 
-  Definition get_role {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (lab: mlabel LM) :=
-  match lab with
-  | Take_step ρ _ => Some ρ
-  | _ => None
-  end.
-
-  (* Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) := *)
-  (*   (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux). *)
-
-  Program Definition enumerate_next
-    (δ1: LM)
-    (* (c': cfg Λ) *)
-    (inner_exts: list (M * option (fmrole M)))
-    (next_threads: list (locale Λ))
-    (convert_lbl: option (fmrole M) -> lm_lbl LM)
-    : list (LM * @mlabel LM) := 
-    '(s2, ℓ) ← inner_exts;
-    d ← enumerate_dom_gsets' (dom δ1.(ls_fuel) ∪ live_roles _ s2);
-    fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(lm_fl) s2);
-    ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) next_threads ;
-    let ℓ' := convert_lbl ℓ
-    in
-    (if
-        (* (decide ((s2, ms, fs) = (s2, ms, fs))) *)
-        (* (decide (LSI s2 ms fs)) *)        
-        (decide (LSI s2 (`ms) (`fs))) (* TODO: what's the difference with above? *)
-    then
-    [({| ls_under := s2;
-             ls_fuel := `fs;
-             ls_mapping := `ms ;
-          |}, ℓ')]
-      else
-    []).
-  Next Obligation.
-    intros ??????????. destruct fs as [? Heq]. rewrite /= Heq //. set_solver.
-  Qed.
-  Next Obligation.
-    intros ??????????. destruct fs as [? Heq]. destruct ms as [? Heq'].
-    rewrite /= Heq //.
-  Qed.
-  Next Obligation. done. Qed. 
-
-
-  Definition lift_convert_lbl (oζ: olocale Λ) (ℓ: option (fmrole M)): lm_lbl LM :=
-    match ℓ with
-    | None => match oζ with
-               Some ζ => Silent_step ζ
-             | None => Config_step
-             end
-    | Some ℓ => match oζ with
-               | None => Config_step
-               | Some ζ => Take_step ℓ ζ
-               end
-    end. 
-
-  Lemma enum_next_in
-    δ1
-    ℓ δ'
-    inner_exts
-    next_threads
-    convert_lbl
-    (IN_IE: (ls_under δ', get_role ℓ) ∈ inner_exts)
-    (IN_DOMS: dom (ls_fuel δ') ⊆ dom (ls_fuel δ1) ∪ live_roles M δ')
-    (FUEL_LIM: forall ρ f (F: ls_fuel δ' !! ρ = Some f),
-        f ≤ max_gmap (ls_fuel δ1) `max` lm_fl LM δ')
-    (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'),
-        tid' ∈ next_threads)    
-    (CONVERT: ℓ = convert_lbl (get_role ℓ))
-    :
-    (δ', ℓ) ∈ enumerate_next δ1 inner_exts next_threads convert_lbl
-  .
-  Proof. 
-    unfold enumerate_next. apply elem_of_list_bind.
-    exists (δ'.(ls_under), get_role ℓ).
-    split; last first.
-    { apply IN_IE. }
-    
-    apply elem_of_list_bind. eexists (dom $ δ'.(ls_fuel)). split; last first.
-    { apply enumerate_dom_gsets'_spec.
-      apply IN_DOMS. }
-    apply elem_of_list_bind.
-    assert (Hfueldom: dom δ'.(ls_fuel) = live_roles M δ' ∪ dom (ls_fuel δ')).
-    { rewrite subseteq_union_1_L //. apply ls_fuel_dom. }
-    eexists (δ'.(ls_fuel) ↾ Hfueldom); split; last first.
-    { eapply enum_gmap_bounded'_spec; split =>//. }
-    apply elem_of_list_bind.
-    assert (Hmappingdom: dom δ'.(ls_mapping) = live_roles M δ' ∪ dom (ls_fuel δ')).
-    { rewrite -Hfueldom ls_same_doms //. }
-    exists (δ'.(ls_mapping) ↾ Hmappingdom); split; last first.
-    { eapply enum_gmap_range_bounded'_spec; split=>//. }
-    destruct decide; [| by destruct δ']. 
-    rewrite elem_of_list_singleton; f_equal.
-    - destruct δ'; simpl. f_equal; apply ProofIrrelevance.
-    - done.
-  Qed.
-
-  Lemma next_step_domain
-    δ           
-    (oζ : olocale Λ)
-    inner_exts
-    next_threads
-    (δ' : LM)
-    (ℓ : mlabel LM)
-    (Hlbl : labels_match oζ ℓ (LM := LM))
-    (Htrans : lm_ls_trans LM δ ℓ δ')
-    (INNER_DOM: (ls_under δ', get_role ℓ) ∈ inner_exts)
-    (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads)
-    :
-    (δ', ℓ) ∈ enumerate_next δ inner_exts next_threads (lift_convert_lbl oζ).
-  Proof.
-    eapply enum_next_in. 
-    { done. }
-    { destruct ℓ as [ρ tid' | |].
-      - inversion Htrans as (?&?&?&?&?&?&?). intros ρ' Hin. destruct (decide (ρ' ∈ live_roles _ δ')); first set_solver.
-        destruct (decide (ρ' ∈ dom $ ls_fuel δ)); set_solver. 
-      - inversion Htrans as (?&?&?&?&?). set_solver.
-      - inversion Htrans as (?&?&?&?&?). done. }
-    { set (δ1 := δ). 
-      intros ρ f Hsome. destruct ℓ as [ρ' tid' | |].
-      - destruct (decide (ρ = ρ')) as [-> | Hneq].
-        + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&Hleq&?&Hlim&?&?).
-          destruct (decide (ρ' ∈ live_roles _ δ')).
-          * rewrite Hsome /= in Hlim.
-            assert (Hlive: ρ' ∈ live_roles _ δ') by set_solver.
-            specialize (Hlim Hlive). lia.
-          * unfold fuel_decr in Hleq.
-            apply elem_of_dom_2 in Hmap. rewrite ls_same_doms in Hmap.
-            pose proof Hsome as Hsome'. apply elem_of_dom_2 in Hsome'.
-            specialize (Hleq ρ' ltac:(done) ltac:(done)).
-            assert (oleq (ls_fuel δ' !! ρ') (ls_fuel δ !! ρ')).
-            { specialize (H0 ρ' Hmap). destruct H0 as [?|[?|?]]; set_solver. }
-            simpl in H3. rewrite Hsome in H3.
-            subst δ1.
-            apply elem_of_dom in Hmap as [? Heq]. rewrite Heq in H3. 
-            pose proof (max_gmap_spec _ _ _ Heq). simpl in *.
-            lia. 
-        + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&?&Hleq'&?&Hnew&?).
-          destruct (decide (ρ ∈ dom $ ls_fuel δ1)) as [Hin|Hnotin].
-          * assert (Hok: oleq (ls_fuel δ' !! ρ) (ls_fuel δ1 !! ρ)).
-            { unfold fuel_must_not_incr in *.
-              (* assert (ρ ∈ dom $ ls_fuel δ1) by SS. *)              
-              specialize (Hleq' ρ ltac:(done) ) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
-            rewrite Hsome in Hok. destruct (ls_fuel δ1 !! ρ) as [f'|] eqn:Heqn; last done.
-            pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
-            etrans; [| apply Nat.le_max_l]. etrans; eauto.
-          * assert (Hok: oleq (ls_fuel δ' !! ρ) (Some (LM.(lm_fl) δ'))).
-            { apply Hnew. apply elem_of_dom_2 in Hsome. set_solver. }
-            rewrite Hsome in Hok. simpl in Hok. lia.
-      - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
-        assert (ρ ∈ dom $ ls_fuel δ1) as Hin.
-        { apply elem_of_dom_2 in Hsome. set_solver. }
-        specialize (Hleq Hin) as [Hleq|[Hleq|Hleq]].
-        + rewrite Hsome in Hleq. destruct (ls_fuel δ1 !! ρ) as [f'|] eqn:Heqn.
-          * pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
-            etrans; [| apply Nat.le_max_l].
-            rewrite Heqn in Hleq. lia.  
-          * simpl in *. rewrite Heqn in Hleq. done.
-        + destruct Hleq as [[=] _]. 
-        + apply elem_of_dom_2 in Hsome. set_solver.
-      - inversion Htrans as [? [? [Hleq [Hnew Hfalse]]]]. done. }
-    { done. }
-    { destruct ℓ; simpl; destruct oζ =>//; by inversion Hlbl. }
-   Qed.      
-
-  Lemma role_LM_step_dom
-    δ           
-    (inner_exts : list (M * option (fmrole M)))
-    (next_threads : list (locale Λ))
-    (ℓ : mlabel LM)
-    : 
-    exists (lδ': list (lm_ls LM)), forall (δ': lm_ls LM),
-      lm_ls_trans LM δ ℓ δ' ->
-      (ls_under δ', get_role ℓ) ∈ inner_exts ->
-      (forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads) ->
-      In δ' lδ'.
-  Proof.
-    assert (exists oζ oρ, lift_convert_lbl oζ oρ = ℓ) as (oζ & oρ & CONV). 
-    { rewrite /lift_convert_lbl. destruct ℓ.
-      - by exists (Some l), (Some f).
-      - by exists (Some l), None.
-      - by exists None, None. }
-    set (l2 := enumerate_next δ inner_exts next_threads (lift_convert_lbl oζ)).
-    exists (map fst l2).
-    intros. apply in_map_iff. exists (δ', ℓ). split; auto.
-    apply elem_of_list_In. subst l2. apply next_step_domain; auto.
-    subst ℓ. by destruct oζ, oρ. 
-  Qed. 
-
   Lemma valid_state_evolution_finitary_fairness' {LF: LMFairPre LM}:
     rel_finitary (valid_lift_fairness lm_valid_evolution_step (λ extr auxtr, ξ extr (get_underlying_fairness_trace auxtr)) (M := fair_model_model LM_Fair)).
   Proof.
@@ -284,7 +290,7 @@ Section finitary.
     simpl.
     set (inner_exts := ((trace_last atr).(ls_under), None) :: enum_inner ex (get_underlying_fairness_trace atr) (e', σ') oζ).
     set (next_threads := (locales_of_list e')).
-    set (convert_lbl := lift_convert_lbl oζ).
+    set (convert_lbl := lift_convert_lbl oζ (LM := LM)).
 
     (* eapply surjective_finite. Unshelve. *)
     set (get_ol := fun (st_ℓ: lm_ls LM * lm_lbl LM) => 

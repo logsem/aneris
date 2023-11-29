@@ -107,6 +107,14 @@ Section aux_trace.
     
 End aux_trace.
 
+
+Definition labels_match `{LM: LiveModel G M LSI} (oζ : option G) (ℓ : LM.(lm_lbl)) : Prop :=
+  match oζ, ℓ with
+  | None, Config_step => True
+  | Some ζ, lbl => fair_lbl_matches_group lbl ζ
+  | _, _ => False
+  end.
+
 Section aux_trace_lang.
   Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{Countable (locale Λ)}.
@@ -115,13 +123,6 @@ Section aux_trace_lang.
 
   Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
     ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
-
-  Definition labels_match (oζ : option Tid) (ℓ : LM.(lm_lbl)) : Prop :=
-    match oζ, ℓ with
-    | None, Config_step => True
-    | Some ζ, lbl => fair_lbl_matches_group lbl ζ
-    | _, _ => False
-    end.
 
 End aux_trace_lang.
 
