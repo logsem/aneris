@@ -29,9 +29,18 @@ Section aux_trace.
   Lemma next_TS_spec_pos δ1 τ δ2 ρ:
     next_TS_role δ1 τ δ2 = Some ρ ->
     lm_ls_trans LM δ1 (Take_step ρ τ) δ2.
-  Proof. 
-    (* rewrite /next_TS_role.  *)
-  Admitted.
+  Proof.
+    rewrite /next_TS_role. intros N.
+    destruct elements eqn:ELTS; [done| ]. 
+    destruct f; try done. inversion N. subst f.
+    pose proof (in_eq (Take_step ρ g) l) as IN. rewrite -ELTS in IN.
+    apply elem_of_list_In, elem_of_elements in IN.
+    apply elem_of_filter in IN as [_ IN].
+    rewrite /allowed_step_FLs in IN. apply elem_of_filter in IN as [STEP IN].
+    rewrite /potential_step_FLs in IN. apply elem_of_union in IN as [? | IN]; [set_solver| ].
+    apply elem_of_map in IN. destruct IN as (? & [=] & FUEL). subst.
+    eapply bool_decide_eq_true_1; eauto. 
+  Qed. 
 
   Lemma next_TS_spec_inv_TS δ1 τ δ2 ρ:
     lm_ls_trans LM δ1 (Take_step ρ τ) δ2 ->
