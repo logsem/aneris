@@ -1,7 +1,7 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
-From trillium.fairness Require Import lm_fair fuel_ext.
+From trillium.fairness Require Import lm_fair fuel_ext fairness_finiteness. 
 From trillium.fairness.heap_lang Require Import notation.
 
 Close Scope Z_scope.
@@ -64,6 +64,19 @@ Section LibraryDefs.
     pose proof (fmstate_inhabited lib_model_impl) as [s].
     eapply populate, (initial_ls s ρ). done.
   Qed.
+
+  Instance lib_lm_dec_ex_step:
+  ∀ (τ : lib_grole) (δ1 : lm_ls lib_model),
+    Decision (∃ δ2, locale_trans δ1 τ δ2).
+  Proof. 
+    intros.
+    apply locale_trans_ex_dec_fin with (steps := [0]).
+    - intros. inversion H. set_solver.
+    - intros. eexists. eapply rearrange_roles_spec.
+      Unshelve.
+      + exact lib_model.
+      + done. 
+  Defined. 
 
   Global Instance lib_LF: LMFairPre lib_model.
     esplit; by apply _.

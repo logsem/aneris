@@ -39,7 +39,7 @@ Section aux_trace.
     rewrite /allowed_step_FLs in IN. apply elem_of_filter in IN as [STEP IN].
     rewrite /potential_step_FLs in IN. apply elem_of_union in IN as [? | IN]; [set_solver| ].
     apply elem_of_map in IN. destruct IN as (? & [=] & FUEL). subst.
-    eapply bool_decide_eq_true_1; eauto. 
+    eapply bool_decide_eq_true_1. apply STEP. 
   Qed. 
 
   Lemma next_TS_spec_inv_TS δ1 τ δ2 ρ:
@@ -49,7 +49,7 @@ Section aux_trace.
     intros TRANS.
     rewrite /next_TS_role.
     (* /allowed_step_FLs. *)
-    destruct (decide (filter is_TS (allowed_step_FLs δ1 τ δ2) = ∅)).
+    destruct (decide (filter is_TS (allowed_step_FLs δ1 τ δ2 (LM := LM)) = ∅)).
     { exfalso. eapply filter_empty_not_elem_of_L; [| apply e|..].
       3: { rewrite /allowed_step_FLs. apply elem_of_filter. split.
            { apply bool_decide_eq_true. eauto. }

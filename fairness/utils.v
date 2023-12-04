@@ -164,6 +164,16 @@ Section map_utils.
     eexists. split; eauto. set_solver.
   Qed. 
 
+  Lemma mim_in_1 (m: gmap K V) (m': gmap V (gset K)) k v
+    (MIM: maps_inverse_match m m')
+    (DOM: m !! k = Some v):
+      v ∈ dom m'.
+  Proof.
+    red in MIM.
+    pose proof (proj1 (MIM _ _) DOM) as (?&?&?).
+    apply elem_of_dom. set_solver.
+  Qed. 
+
 End map_utils.
 
 Section fin_map_dom.

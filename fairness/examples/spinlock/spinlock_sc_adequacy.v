@@ -356,11 +356,31 @@ Qed.
 Instance sl_dec_trans s1 ρ s2:
   Decision (fmtrans spinlock_model_impl s1 (Some ρ) s2).
 Proof. 
-Admitted. 
+Admitted.
+
+Instance sl_lm_dec_ex_step:
+  ∀ τ δ1,
+    Decision (∃ δ2, locale_trans δ1 τ δ2 (LM := spinlock_model)).
+Proof. 
+  intros. Set Printing Coercions.
+  pose proof (spinlock_model_finitary (ls_under δ1)) as FIN.
+  (* sig *)
+  (* apply finite_sig_pred_finite in FIN. red in FIN. destruct FIN as [dom FIN].  *)  
+  apply locale_trans_ex_dec_fin with (steps := map (fst ∘ proj1_sig) (@enum _ _ FIN)).
+  - intros. apply in_map_iff.
+    unshelve eexists.
+    { eapply (exist _ (s2, oρ)). by left. }
+    split; [done| ]. 
+    apply elem_of_list_In. apply elem_of_enum.  
+  - intros. eexists. eapply rearrange_roles_spec.
+    Unshelve.
+    + exact spinlock_model.
+    + done. 
+Defined. 
 
 Local Instance LF_SL': LMFairPre' spinlock_model.
 Proof. 
-  esplit; try by apply _.
+  esplit; by apply _.
 Defined. 
 
 Theorem spinlock_terminates
