@@ -34,8 +34,8 @@ Section ClientDefs.
   | ct_y_step_3 lb:
     client_trans (lb, 3) (Some ρ_cl) (lb, 2)
   (* TODO: allow arbitrary library's LM roles *)
-  | ct_lib_ext lb1 lb2 (LIB_EXT: reset_lm_st_rel ρlg lb1 lb2):
-    client_trans (lb1, 2) (Some ρ_ext) (lb2, 1)
+  | ct_lib_ext lb (STOP: lm_is_stopped ρlg lb):
+    client_trans (lb, 2) (Some ρ_ext) (reset_lm_st ρlg lb, 1)
   | ct_lib_step lb1 lb2 (LIB_STEP: fmtrans lib_fair lb1 (Some ρlg) lb2):
     client_trans (lb1, 1) (Some ρ_lib) (lb2, 1)
   | ct_y_step_1 (lb: fmstate lib_fair)
@@ -119,8 +119,10 @@ Section ClientDefs.
         apply active_exts_spec in e as [??]. simpl in *. 
         eexists. destruct ρlg. 
         eapply ct_lib_ext; eauto.
+        apply H. 
       + nostep. subst. apply n. apply active_exts_spec.
-        inversion T. subst. simpl. eauto.
+        inversion T. subst. simpl.
+        eexists. red. eauto. 
     - destruct ρ.
       + nostep.
       + destruct y. left. eexists. constructor.
@@ -468,11 +470,8 @@ Section ClientSpec.
     2: { intros. rewrite bool_decide_eq_true.
          split.
          - intros [? STEP]. inversion STEP. subst. split; eauto.
-           red in LIB_EXT. rewrite /reset_lm_st in LIB_EXT.
-           destruct decide; done.
-         - intros [-> STOP]. exists ((reset_lm_st_impl ρlg lb STOP), 1). econstructor.
-           red. rewrite /reset_lm_st. destruct decide; [| done].
-           done. }
+         - intros [-> STOP]. exists ((reset_lm_st ρlg lb), 1).
+           by econstructor. }
 
     rewrite -set_filter_and set_filter_comm.
     erewrite set_filter_equiv.
@@ -888,8 +887,8 @@ Section ClientSpec.
   Qed.
 
   (* TODO: move *)
-  Lemma lib_reset_premise g lb STOP:
-    lib_ls_premise (reset_lm_st_impl g lb STOP).
+  Lemma lib_reset_premise g lb (STOP: lm_is_stopped ρlg lb):
+    lib_ls_premise (reset_lm_st g lb).
   Proof. 
     red. repeat split; simpl.
     - (* TODO: fix required fuel amount in lib_ls_premise *)
@@ -981,10 +980,10 @@ Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
 
     do 1 pure_step FS.
 
-    set (lb' := reset_lm_st_impl ρlg lb0 LB0_INFO). 
+    set (lb' := reset_lm_st ρlg lb0).
     pose proof (live_roles_1 lb') as LIVE1.
     rewrite decide_True in LIVE1.
-    2: { apply lib_premise_dis. apply lib_reset_premise. }
+    2: { apply lib_premise_dis. by apply lib_reset_premise. }
            
     iApply (wp_lift_pure_step_no_fork_take_step_stash).
     { done. }
@@ -992,14 +991,9 @@ Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     9: iSplitL "PMP"; [by iApply "PMP"| ]; iFrame "ST FUELS FR".
     { set_solver. }
     3: { rewrite dom_fmap dom_singleton. reflexivity. }
-    5: { econstructor. red. rewrite /reset_lm_st.
-         destruct decide; [| done].
-         Unshelve.
-         2: exact ⊤.
-         2: exact {[ρ_lib := client_fl]}.
-         2: exact lb'.
-         done. }
-    2: { rewrite LIVE2 LIVE1. set_solver. }
+    5: { by econstructor. }
+    2: { Unshelve. 3: exact {[ρ_lib := client_fl]}. 2: exact ⊤.       
+         rewrite LIVE2 LIVE1. set_solver. }
     2: { set_solver. }
     2: { set_solver. }
     2: { red. intros.
@@ -1037,7 +1031,7 @@ Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     {
       (* simpl. *)
       iDestruct (lib_premise with "LST LF LM") as "(LST & LF & LM)"; eauto.
-      { apply lib_reset_premise. }
+      { by apply lib_reset_premise. }
       rewrite has_fuels_equiv. simpl.
       iDestruct (partial_free_roles_are_sep with "FR") as "[FR FR']"; [set_solver| ].
       rewrite dom_singleton_L !big_sepM_singleton.
@@ -1152,6 +1146,5 @@ Lemma client_spec (Einvs: coPset) (lb0: fmstate lib_fair) f
     rewrite dom_filter_comm.
     by rewrite dom_singleton_L filter_singleton_not.
   Qed.
-  
  
 End ClientSpec.

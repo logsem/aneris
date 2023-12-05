@@ -45,9 +45,8 @@ Section ExtModelLM.
     ρlg ∈ dom (ls_tmap δ (LM := lib_model)).
 
   (* TODO: implement it via ls_tmap*)
-  Definition reset_lm_st_impl 
-    (ρlg: fmrole lib_fair) (δ: fmstate lib_fair)
-    (STOP: lm_is_stopped ρlg δ): fmstate lib_fair.
+  Definition reset_lm_st 
+    (ρlg: fmrole lib_fair) (δ: fmstate lib_fair): fmstate lib_fair.
     refine 
       {| ls_under := reset_st_impl (ls_under δ); 
         ls_mapping := <[ρl := ρlg]> (ls_mapping δ);
@@ -57,16 +56,16 @@ Section ExtModelLM.
       set_solver.
     - rewrite !dom_insert_L. by rewrite ls_same_doms.
     - done.
-  Defined.       
+  Defined.
 
-  Definition reset_lm_st (ρlg: fmrole lib_fair) (δ: fmstate lib_fair): option (fmstate lib_fair) :=
-    match decide (lm_is_stopped ρlg δ) with
-    | left STOP => Some (reset_lm_st_impl ρlg δ STOP)
-    | _ => None
-    end.
+  (* Definition reset_lm_st (ρlg: fmrole lib_fair) (δ: fmstate lib_fair): option (fmstate lib_fair) := *)
+  (*   match decide (lm_is_stopped ρlg δ) with *)
+  (*   | left STOP => Some (reset_lm_st_impl ρlg δ STOP) *)
+  (*   | _ => None *)
+  (*   end. *)
 
   Definition reset_lm_st_rel ρlg: relation (fmstate lib_fair) :=
-    fun x y => reset_lm_st ρlg x = Some y.
+    fun x y => lm_is_stopped ρlg x /\ reset_lm_st ρlg x = y.
 
   Inductive lib_lm_EI := eiG (ρlg: lib_grole).
 
@@ -105,18 +104,13 @@ Section ExtModelLM.
   Proof using.
     intros. 
     destruct ι. simpl.
-    rewrite /lib_lm_active_exts /reset_lm_st_rel /reset_lm_st.
+    rewrite /lib_lm_active_exts /reset_lm_st_rel.
     erewrite <- set_map_properties.elem_of_map_inj_gset.
     2: { red. by intros ??[=]. }
     rewrite elem_of_filter. simpl.
     rewrite iff_and_impl_helper.
     2: { rewrite /lm_is_stopped. tauto. }
-    destruct decide.
-    - transitivity True; [tauto| ].
-      symmetry. apply iff_True_helper. eauto.
-    - transitivity False; [tauto| ].
-      symmetry. apply iff_False_helper.
-      by intros [??].
+    split; eauto. by intros (?&?&?). 
   Qed.
 
   Definition ExtLibLM: ExtModel (LM_Fair (LM := lib_model)) :=
@@ -128,9 +122,9 @@ Section ExtModelLM.
   Proof.
     intros. simpl in *. destruct ι; simpl in *.
     simpl. rewrite /lib_lm_projEI. simpl. do 2 red.
-    red in H. revert H. rewrite /reset_lm_st /reset_st. rewrite /lm_is_stopped.
-    destruct decide; [| done].
-    intros [=]. subst. rewrite decide_True; tauto. 
+    red in H. revert H. rewrite /reset_lm_st /reset_st.
+    simpl. rewrite /lm_is_stopped.
+    by intros [(->&?&?) <-].
   Qed.
 
   Lemma lib_keeps_asg: ∀ (δ1 : LM_Fair) (ι : env_role) (δ2 : LM_Fair) ρ τ (f : nat),
@@ -140,14 +134,14 @@ Section ExtModelLM.
          → ls_mapping δ2 !! ρ = Some τ ∧ ls_fuel δ2 !! ρ = Some f.
   Proof.
     intros. inversion H. subst.
-    simpl in REL. destruct ι0. simpl in REL. red in REL.
-    rewrite /reset_lm_st in REL. destruct decide; [| done]. inversion REL. subst.
-    rewrite /reset_lm_st_impl. simpl.
-    red in l. destruct l as (?&NIN&DOMg). split.
+    simpl in REL. destruct ι0. simpl in REL.
+    red in REL. destruct REL as [STOP <-].
+    simpl. 
+    red in STOP. destruct STOP as (?&NIN&DOMg). split.
     - rewrite lookup_insert_ne; auto. intros <-.
       apply NIN. apply elem_of_dom. set_solver.
     - rewrite lookup_insert_ne; auto. intros <-.
       apply NIN. apply elem_of_dom. set_solver.
-  Qed.    
+  Qed.
 
 End ExtModelLM. 
