@@ -327,7 +327,197 @@ Section FuelDropStep.
 End FuelDropStep. 
 
 
-(* TODO: remove lots of duplication between two rules *)
+Section FuelKeepStep.
+  Context `{LM: LiveModel G M LSI}.
+  Context `{Countable G}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
+
+    (* model_state_interp δ1 *)
+    (* ==∗ ∃ δ2, *)
+    (*     ⌜ lm_ls_trans LM δ1 (Silent_step ζ) δ2 ⌝ ∗ *)
+    (*     has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗ *)
+    (*     partial_model_is s ∗  *)
+    (*     model_state_interp δ2 ∗ *)
+    (*     ⌜ ls_tmap δ2 (LM := LM) = <[ζ:=dom fs ∖ rem]> (ls_tmap δ1 (LM := LM)) ⌝.  *)
+
+  Lemma actual_update_no_step_enough_fuel_keep
+  (δ1: LM)
+  (* c1 c2 *)
+  fs ζ:
+    dom fs ≠ ∅ ->
+    fuel_reorder_preserves_LSI (LSI := LSI) ->
+    (* locale_step c1 (Some ζ) c2 -> *)
+    has_fuels_S ζ fs -∗
+    model_state_interp δ1
+    ==∗ ∃ δ2,
+        ⌜ lm_ls_trans LM δ1 (Silent_step ζ) δ2 ⌝ ∗
+        has_fuels ζ fs ∗
+        model_state_interp δ2 ∗
+        ⌜ ls_tmap δ2 (LM := LM) = ls_tmap δ1 (LM := LM) ⌝. 
+  Proof.
+    iIntros "%HnotO %PRES Hf Hmod".
+    (* destruct c2 as [tp2 σ2]. *)
+    destruct (set_choose_L _ HnotO) as [??].
+    iDestruct (has_fuel_in with "Hf Hmod") as %Hxdom; eauto.
+    iDestruct (has_fuel_fuel with "Hf Hmod") as "%Hfuel"; eauto.
+    (* iDestruct (model_state_interp_tids_smaller with "Hmod") as %Hζs. *)
+    pose proof (ls_inv δ1) as LSI1. 
+    iDestruct "Hmod" as "(%FR & Hfuel & Hamapping & HFR & Hmodel & %HFR)".
+    iAssert (⌜ ls_tmap δ1 (LM := LM) !! ζ = Some (dom fs) ⌝)%I as %TMAP1.
+    { iDestruct "Hf" as "[MAP _]". simpl.
+      rewrite dom_fmap. 
+      iApply (frag_mapping_same with "Hamapping MAP"). }
+    unfold has_fuels_S.
+    simpl in *.
+
+    (* set new_dom := ((dom (ls_fuel δ1) ∪ dom fs)). *)
+    (* set new_mapping := ls_mapping δ1 ⇂ new_dom. *)
+    (* set new_dom := dom (ls_fuel δ1). *)
+    set new_mapping := ls_mapping δ1. 
+    set new_fuels := fuel_apply fs (ls_fuel δ1) (dom (ls_fuel δ1) ∪ dom fs). 
+
+    (* assert (dom (fuel_apply (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs) (ls_fuel δ1) *)
+    (*                ((dom (ls_fuel δ1) ∪ dom fs) ∖ rem)) = new_dom) as Hnewdom. *)
+    (* { rewrite /fuel_apply map_imap_dom_eq ?dom_gset_to_gmap //. *)
+    (*   intros ρ0 _ Hindom. *)
+    (*   case_decide as Hninf; [by apply elem_of_dom|]. *)
+    (*   apply elem_of_difference in Hindom as [Hin1 ?]. *)
+    (*   apply elem_of_union in Hin1 as [?|Hin2]; first by apply elem_of_dom. *)
+    (*   exfalso. apply Hninf. apply elem_of_dom in Hin2 as [f ?]. *)
+    (*   eapply elem_of_dom_2. rewrite map_filter_lookup_Some. split =>//. *)
+    (*   apply elem_of_difference; split =>//. by eapply elem_of_dom_2. } *)
+
+    (* assert (new_dom = dom (ls_mapping δ1)) as NEW_DOM.  *)
+    (* { by rewrite ls_same_doms. }  *)
+
+    pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as Hminv1. 
+    assert (dom fs ⊆ dom (ls_mapping δ1)) as INCL. 
+    { apply elem_of_subseteq. intros ρ' [f IN]%elem_of_dom.              
+      red in Hminv1. eapply elem_of_dom.
+      red. exists ζ. apply Hminv1. eexists. split; eauto.
+      eapply elem_of_dom. set_solver. }
+
+    assert (Hsamedoms: dom new_mapping = dom new_fuels).
+    { rewrite /new_mapping /new_fuels.
+      rewrite map_imap_dom_eq; last first.
+      { intros ρ _ Hin. rewrite dom_gset_to_gmap in Hin.
+        case_decide; [by apply elem_of_dom|].
+        apply elem_of_dom. set_solver. }
+      rewrite dom_gset_to_gmap.
+      rewrite -ls_same_doms. 
+      by rewrite union_comm_L subseteq_union_1_L. }
+
+    assert (Hfueldom: live_roles _ δ1 ⊆ dom new_fuels).
+    { rewrite -Hsamedoms.
+      etrans; [by apply ls_mapping_dom| ].
+      set_solver. }
+
+    iMod (update_has_fuels_no_step ζ (S <$> fs) (fs) with "[Hf] [Hfuel] [Hamapping]") as "(Hafuels&Hfuels&Hamapping)" =>//.
+    { rewrite -dom_empty_iff_L. set_solver. }
+    { set_solver. }
+    (* rewrite dom_domain_restrict; [| set_solver].  *)
+    rewrite (dom_fmap_L _ fs) difference_diag_L difference_empty_L. fold new_fuels.
+    rewrite insert_id; [| done]. 
+    iModIntro. 
+
+    assert (maps_inverse_match new_mapping (ls_tmap δ1 (LM := LM))) as MATCH.
+    { apply ls_mapping_tmap_corr. }
+
+    (* TODO: doing this explicitly to avoid saving explicit proof terms
+       (parameters of build_LS_ext)
+       which otherwise critically slow down subsequent proofs *)
+    assert ( ∀ (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
+               τ1 ≠ τ2
+               → (ls_tmap δ1) !! τ1 = Some S1
+               → (ls_tmap δ1) !! τ2 = Some S2 → S1 ## S2) as DISJ2. 
+    { apply ls_tmap_disj. }
+
+    assert ( ∀ ρ : fmrole M, ρ ∈ dom new_fuels
+    ↔ (∃ (τ : G) (R : gset (fmrole M)),
+         (ls_tmap δ1) !! τ = Some R ∧ ρ ∈ R)) as TMAP_DOM2. 
+    { intros.
+      rewrite -ls_tmap_fuel_same_doms.
+      by rewrite -Hsamedoms ls_same_doms. }
+
+    (* iAssert (⌜ ls_under δ1 = s ⌝)%I as "%ST_EQ". *)
+    (* { iApply (model_agree with "Hmodel ST"). } *)
+    assert (LSI δ1 (ls_mapping_impl (ls_tmap δ1)) new_fuels) as LSI2.
+    { eapply PRES; [| by apply (ls_inv δ1)].
+      erewrite (maps_inverse_match_uniq1 (ls_mapping_impl _)); eauto.
+      apply ls_mapping_tmap_corr_impl. apply DISJ2. }
+
+    (* fold new_fuels in Hfueldom.  *)
+    iExists (build_LS_ext (ls_under δ1) _ Hfueldom (ls_tmap δ1 (LM := LM)) TMAP_DOM2 DISJ2 LSI2 (LM := LM)).
+
+    (* remember (build_LS_ext _ _ _ _ _ _) as δ2.  *)
+    simpl.
+    iSplit; last first.
+    { iFrame "Hfuels". 
+      (* rewrite /maps_inverse_match //=. *)
+      rewrite /model_state_interp. 
+      rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel build_LS_ext_spec_tmap.
+      iFrame.
+      iSplitL; [| done]. 
+      assert (dom fs ⊆ dom (ls_fuel $ δ1)).
+      { intros ρ Hin. setoid_rewrite dom_fmap in Hxdom.
+        specialize (Hxdom ρ). rewrite -ls_same_doms. apply elem_of_dom. exists ζ.
+        by apply Hxdom. }      
+      iExists _. iFrame. 
+      iPureIntro.
+      (* split. *)
+      (* - intros. eapply tids_dom_restrict_mapping; eauto.  *)
+      - apply elem_of_equiv_empty_L. intros ρ [Hin1 Hin2]%elem_of_intersection.
+        rewrite -Hsamedoms in Hin2. rewrite /new_mapping in Hin2.
+        rewrite ls_same_doms in Hin2. set_solver. }
+        
+    iPureIntro.
+    (* split; [split; [|split; [|split; [|split]]]|] =>//. *)
+    repeat split; try done. 
+    - eexists. apply Hxdom. by rewrite dom_fmap.
+    - unfold fuel_decr. simpl.
+      rewrite (build_LS_ext_spec_fuel). 
+      intros ρ' Hin Hin' Hmustdec.
+      (* rewrite Hnewdom in Hin'. *)
+
+      inversion Hmustdec; simplify_eq.
+      + have Hinfs: ρ' ∈ dom (S <$> fs) by set_solver.
+        rewrite map_lookup_imap Hfuel // lookup_fmap. rewrite dom_fmap in Hinfs.
+        rewrite lookup_gset_to_gmap option_guard_True //=.
+
+        pose proof Hinfs as Hinfs'. apply elem_of_dom in Hinfs' as [f Heqf].
+        assert (fs !! ρ' = Some f) as Heqfilter.
+        { rewrite Heqf /= //.  }
+        rewrite decide_True // ?Heqfilter ?lookup_fmap ?Heqf /=.
+        { lia. }
+        set_solver. 
+      + erewrite build_LS_ext_spec_mapping in Hneqtid; [| by eauto].
+        rewrite /= /new_mapping in Hneqtid.
+        pose proof Hin as Hin2. rewrite -ls_same_doms in Hin2. apply elem_of_dom in Hin2 as [f Hf].
+        rewrite Hf /= // in Hneqtid.
+    - intros ρ' Hin. simpl.
+      rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
+
+      left. 
+      rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True //=;
+        last set_solver -Hsamedoms Hfueldom.
+      apply elem_of_dom in Hin as [f Hf].
+      case_decide as Hin; [|by rewrite !Hf //=].
+      apply elem_of_dom in Hin as [f' Hf'].
+      rewrite Hf' Hf. simpl.
+      pose proof (Hfuel ρ') as F.
+      assert (ρ' ∈ dom (S <$> fs)) as DOM.
+      { rewrite dom_fmap. eapply elem_of_dom; eauto. }
+      specialize (F DOM).
+      rewrite lookup_fmap Hf' in F. rewrite Hf in F. inversion F. lia.  
+    - rewrite build_LS_ext_spec_fuel.
+      by rewrite -Hsamedoms ls_same_doms. 
+    - by rewrite build_LS_ext_spec_st.
+  Qed. 
+  
+End FuelKeepStep.
+
+(* TODO: remove lots of duplication between three rules *)
 Section FuelStep.
   Context `{LM: LiveModel G M LSI_True}.
   Context `{Countable G}.
