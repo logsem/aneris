@@ -346,7 +346,7 @@ Section FuelKeepStep.
   (* c1 c2 *)
   fs ζ:
     dom fs ≠ ∅ ->
-    fuel_reorder_preserves_LSI (LSI := LSI) ->
+    LSI_fuel_independent (LSI := LSI) ->
     (* locale_step c1 (Some ζ) c2 -> *)
     has_fuels_S ζ fs -∗
     model_state_interp δ1
@@ -443,8 +443,7 @@ Section FuelKeepStep.
     (* iAssert (⌜ ls_under δ1 = s ⌝)%I as "%ST_EQ". *)
     (* { iApply (model_agree with "Hmodel ST"). } *)
     assert (LSI δ1 (ls_mapping_impl (ls_tmap δ1)) new_fuels) as LSI2.
-    { eapply PRES; [| by apply (ls_inv δ1)].
-      erewrite (maps_inverse_match_uniq1 (ls_mapping_impl _)); eauto.
+    { erewrite (maps_inverse_match_uniq1 (ls_mapping_impl _)); eauto.
       apply ls_mapping_tmap_corr_impl. apply DISJ2. }
 
     (* fold new_fuels in Hfueldom.  *)

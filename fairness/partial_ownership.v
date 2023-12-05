@@ -242,6 +242,10 @@ Section AuxDefs.
     map_imap (λ ρ' _, if decide (ρ' ∈ dom R) then R !! ρ' else Some ζ)
       (gset_to_gmap 333 ((dom R ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))). 
 
+  Definition LSI_fuel_independent :=
+    forall S R F F',
+      LSI S R F -> LSI S R F'.
+
   Definition fuel_reorder_preserves_LSI :=
     forall S (R R': gmap (fmrole M) G) F F',
       dom R = dom R' ->

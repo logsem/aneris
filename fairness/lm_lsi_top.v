@@ -19,7 +19,7 @@ Section LMLSITopLevel.
   Proof.
     iIntros. iApply (Build_LM_steps_gen (EM := @LM_EM_HL _ _ _ LF')). 
     iModIntro. repeat iSplitL.
-    - iIntros "* FUELS ST MSI". simpl in *.
+    - iModIntro. iIntros "* FUELS ST MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
       iPoseProof (model_agree' with "LM_MSI ST") as "%ST_EQ". 

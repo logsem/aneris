@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
+From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi.
 From trillium.fairness Require Import lm_fair fuel_ext fairness_finiteness. 
 From trillium.fairness.heap_lang Require Import notation.
 
@@ -25,8 +25,17 @@ Section LibraryDefs.
 
   Definition ρl: fmrole lib_model_impl := tt.
 
-  Definition lib_model: LiveModel lib_grole lib_model_impl LSI_True := 
-    {| lm_fl _ := 5; |}.  
+  Definition LSI_groups_fixed (gs: gset lib_grole):
+    fmstate lib_model_impl → gmap (fmrole lib_model_impl) lib_grole → gmap (fmrole lib_model_impl) nat → Prop := 
+    fun _ m _ => forall ρ g, m !! ρ = Some g -> g ∈ gs. 
+
+  Definition lib_model gs: LiveModel lib_grole lib_model_impl (LSI_groups_fixed gs) := 
+    {| lm_fl _ := 5; |}.
+
+  (* Definition lib_lm_LSI_alt gs (δ: lm_ls (lib_model gs)): *)
+  (*   dom (ls_tmap δ) ⊆ gs. *)
+  (* Proof.  *)
+  (*   apply elem_of_subseteq. intros g.  *)
   
   Definition lib_fun: val.
   Admitted.
@@ -58,15 +67,31 @@ Section LibraryDefs.
 
 
   (* TODO: generalize to any LSI_True model *)
-  Instance lib_model_inh: Inhabited (lm_ls lib_model).
+  Instance lib_model_inh gs (NE: gs ≠ ∅): Inhabited (lm_ls (lib_model gs)).
   Proof. 
-    pose proof (fmrole_inhabited lib_model_impl) as [ρ].
+    (* pose proof (fmrole_inhabited lib_model_impl) as [ρ]. *)
+    (* pose proof (fmstate_inhabited lib_model_impl) as [s]. *)
+    apply finitary.set_choose_L' in NE as [g GS]. 
     pose proof (fmstate_inhabited lib_model_impl) as [s].
-    eapply populate, (initial_ls s ρ). done.
+    eapply populate, (initial_ls s g).
+    red. intros ??. rewrite lookup_gset_to_gmap_Some.
+    by intros [? ->]. 
   Qed.
 
-  Instance lib_lm_dec_ex_step:
-  ∀ (τ : lib_grole) (δ1 : lm_ls lib_model),
+  (* TODO: move *)
+  Lemma locale_trans_ex_role `{LM: LiveModel M G LSI} δ1 τ δ2
+    (STEP: locale_trans δ1 τ δ2 (LM := LM)):
+    exists ρ, ls_mapping δ1 !! ρ = Some τ.
+  Proof.
+    red in STEP. destruct STEP as (ℓ & STEP & MATCH).
+    destruct ℓ; simpl in *; try done; subst.
+    - apply proj2, proj1 in STEP. eauto.
+    - apply STEP.
+  Qed. 
+    
+
+  Instance lib_lm_dec_ex_step gs:
+  ∀ (τ : lib_grole) (δ1 : lm_ls (lib_model gs)),
     Decision (∃ δ2, locale_trans δ1 τ δ2).
   Proof. 
     intros.
@@ -74,15 +99,24 @@ Section LibraryDefs.
     - intros. inversion H. set_solver.
     - intros. eexists. eapply rearrange_roles_spec.
       Unshelve.
-      + exact lib_model.
-      + done. 
-  Defined. 
+      + exact (lib_model gs).
+      + red. intros ??.
+        rewrite /rearrange_roles_map. rewrite lookup_fmap_Some.
+        intros (? & <- & MAP).
+        destruct decide. 
+        * eapply (ls_inv δ2). eauto.
+        * apply locale_trans_ex_role in H as [??]. 
+          by eapply (ls_inv δ0).
+  Defined.
 
-  Global Instance lib_LF: LMFairPre lib_model.
-    esplit; by apply _.
+  Global Instance lib_LF gs (NE: gs ≠ ∅): LMFairPre (lib_model gs).
+    esplit; try by apply _.
+    by apply lib_model_inh. 
   Defined.
   
-  Definition lib_fair := LM_Fair (LM := lib_model). 
+  (* Definition lib_fair gs (NE: gs ≠ ∅) := LM_Fair (LM := (lib_model gs)).  *)
+  Definition lib_fair gs (NE: gs ≠ ∅) :=
+    @LM_Fair _ _ _ _ (lib_LF gs NE).
 
 End LibraryDefs.
 
@@ -94,10 +128,10 @@ Section LibrarySpec.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ lib_model_impl}.
   (* Context {ifG: fairnessGS lib_model Σ}. *)
   
-  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := lib_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
+  Notation "'PMP' gs" := (fun Einvs => (LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS))) (at level 10). 
 
-  Lemma lib_spec tid Einvs:
-    PMP Einvs -∗
+  Lemma lib_spec tid gs Einvs:
+    PMP gs Einvs -∗
     {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
         has_fuels tid {[ ρl:=2 ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
@@ -108,12 +142,13 @@ Section LibrarySpec.
 End LibrarySpec.
 
 
-Definition lib_ls_premise (lb: lm_ls lib_model) :=
+Definition lib_ls_premise gs (lb: lm_ls (lib_model gs)) :=
   ls_fuel lb !! ρl = Some 2 ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}.
 
-Lemma lib_premise_dis (lb: lm_ls lib_model)
-  (LB_INFO: lib_ls_premise lb):
-  ρlg ∈ live_roles lib_fair lb.
+Lemma lib_premise_dis gs (lb: lm_ls (lib_model gs))
+  (NE: gs ≠ ∅)
+  (LB_INFO: lib_ls_premise gs lb):
+  ρlg ∈ live_roles (lib_fair _ NE) lb.
 Proof.
   apply LM_live_roles_strong.
   destruct LB_INFO as (F & S & TM).
@@ -134,7 +169,7 @@ Proof.
       apply elem_of_subseteq. intros ? LIVE.
       apply lib_model_impl_lr_strong in LIVE as [? [?]]. lia.
     + apply ls_same_doms.
-    + done.
+    + red. intros. eapply (ls_inv lb); eauto.  
       (* TODO: fix this weird error *)
   (* Qed. *)
 Admitted.

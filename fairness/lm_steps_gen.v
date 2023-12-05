@@ -37,7 +37,7 @@ Section LMSteps.
       (c2 : cfg Λ) (fs : gmap (fmrole iM) nat) (ζ : locale Λ)
       `(dom fs ≠ ∅)
       `(locale_step (trace_last extr) (Some ζ) c2)
-      `(fuel_reorder_preserves_LSI (LSI := LSI))
+      `(LSI_fuel_independent (LSI := LSI))
     : iProp Σ :=
     has_fuels ζ (S <$> fs) -∗
     em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS) ==∗
@@ -102,44 +102,60 @@ Section LMSteps.
     (* Let partial_free_roles_fuels_disj_def δ fr fs tid: iProp Σ := *)
     (*     partial_msi δ -∗ partial_free_roles_are fr -∗ has_fuels tid fs -∗ ⌜ fr ## dom fs ⌝. *)
 
-    Let LM_steps_gen_def (Einvs: coPset): iProp Σ := □ (
+    Let LM_steps_gen_nofork_def (Einvs: coPset): iProp Σ := □ (
           (∀ extr auxtr c2 s fs rem ζ NE NL RD STEP PRES, update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ NE NL RD STEP PRES) ∗
           (∀ extr auxtr c2 fs ζ NE STEP PRES, update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ NE STEP PRES) ∗
-          (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL, 
-update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL) ∗
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
              LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES,
               update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES)
 ).  
 
+    Let LM_steps_gen_def (Einvs: coPset): iProp Σ := □ (
+        LM_steps_gen_nofork_def Einvs ∗
+        (∀ R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL, 
+update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL)
+    ). 
+
+    Definition LM_steps_gen_nofork Einvs: iProp Σ := LM_steps_gen_nofork_def Einvs.
     Definition LM_steps_gen Einvs: iProp Σ := LM_steps_gen_def Einvs.
+
+    Lemma Build_LM_steps_gen_nofork Einvs:
+      LM_steps_gen_nofork_def Einvs ⊢ LM_steps_gen_nofork Einvs.
+    Proof. done. Qed. 
 
     Lemma Build_LM_steps_gen Einvs:
       LM_steps_gen_def Einvs ⊢ LM_steps_gen Einvs.
-    Proof. done. Qed. 
+    Proof. done. Qed.
+
+    Lemma LM_steps_gen_nofork_sub Einvs:
+      LM_steps_gen Einvs ⊢ LM_steps_gen_nofork Einvs.
+    Proof. iIntros "[NF ?]". iApply "NF". Qed. 
+
+    Global Instance LM_steps_gen_nofork_pers: forall Einvs, Persistent (LM_steps_gen_nofork Einvs).
+    Proof. apply _. Qed.
 
     Global Instance LM_steps_gen_pers: forall Einvs, Persistent (LM_steps_gen Einvs).
     Proof. apply _. Qed.
 
     Lemma update_no_step_enough_fuel_drop_gen {Einvs} extr auxtr c2 s fs rem ζ NE NL RD STEP PRES: 
-      LM_steps_gen Einvs ⊢ update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ NE NL RD STEP PRES. 
-    Proof. by iIntros "(?&?&?&?)". Qed.
+      LM_steps_gen_nofork Einvs ⊢ update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ NE NL RD STEP PRES. 
+    Proof. by iIntros "(?&?&?)". Qed.
 
     Lemma update_no_step_enough_fuel_keep_gen {Einvs} extr auxtr c2 fs ζ NE STEP PRES: 
-      LM_steps_gen Einvs ⊢ update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ NE STEP PRES. 
-    Proof. by iIntros "(?&?&?&?)". Qed.
+      LM_steps_gen_nofork Einvs ⊢ update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ NE STEP PRES. 
+    Proof. by iIntros "(?&?&?)". Qed.
 
     Lemma update_fork_split_gen {Einvs} R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL: 
       LM_steps_gen Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL. 
-    Proof. by iIntros "(?&?&?&?)". Qed.
+    Proof. by iIntros "(?&?)". Qed.
 
     Lemma update_step_still_alive_gen {Einvs} extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash
              LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES:
-      LM_steps_gen Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs
+      LM_steps_gen_nofork Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ fr1 fr_stash Einvs
              LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES.
-    Proof. by iIntros "(?&?&?&?)". Qed. 
+    Proof. by iIntros "(?&?&?)". Qed. 
 
-
+    Global Opaque LM_steps_gen_nofork.
     Global Opaque LM_steps_gen.
 
 End LMSteps.

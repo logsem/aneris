@@ -38,24 +38,28 @@ Section ExtModelInner.
 End ExtModelInner.
 
 Section ExtModelLM.
+  Context {gs: gset lib_grole} {NE: gs ≠ ∅}.
+  Let lf := lib_fair _ NE. 
 
-  Definition lm_is_stopped (ρlg: fmrole lib_fair) (δ: fmstate lib_fair) := 
+  Definition lm_is_stopped (ρlg: fmrole lf) (δ: fmstate lf) := 
     ls_under δ = 0 /\ (* TODO: get rid of this duplication *)
     ρl ∉ dom (ls_mapping δ) /\
-    ρlg ∈ dom (ls_tmap δ (LM := lib_model)).
+    ρlg ∈ dom (ls_tmap δ (LM := lib_model gs)).
 
   (* TODO: implement it via ls_tmap*)
-  Definition reset_lm_st 
-    (ρlg: fmrole lib_fair) (δ: fmstate lib_fair): fmstate lib_fair.
+  Definition reset_lm_st (ρlg: fmrole lf) (δ: fmstate lf)
+    (IN: ρlg ∈ gs)
+    : fmstate lf.
     refine 
       {| ls_under := reset_st_impl (ls_under δ); 
         ls_mapping := <[ρl := ρlg]> (ls_mapping δ);
-        ls_fuel := <[ρl := lm_fl lib_model δ]> (ls_fuel δ) |}.
+        ls_fuel := <[ρl := lm_fl (lib_model gs) δ]> (ls_fuel δ) |}.
     - (* TODO: merge model files, get rid of this *)
       Transparent lib_model_impl. 
       set_solver.
     - rewrite !dom_insert_L. by rewrite ls_same_doms.
-    - done.
+    - red. intros.
+      done.
   Defined.
 
   (* Definition reset_lm_st (ρlg: fmrole lib_fair) (δ: fmstate lib_fair): option (fmstate lib_fair) := *)
@@ -64,8 +68,8 @@ Section ExtModelLM.
   (*   | _ => None *)
   (*   end. *)
 
-  Definition reset_lm_st_rel ρlg: relation (fmstate lib_fair) :=
-    fun x y => lm_is_stopped ρlg x /\ reset_lm_st ρlg x = y.
+  Definition reset_lm_st_rel ρlg: relation (fmstate lf) :=
+    fun x y => lm_is_stopped ρlg x /\ exists IN, reset_lm_st ρlg x IN = y.
 
   Inductive lib_lm_EI := eiG (ρlg: lib_grole).
 
@@ -81,8 +85,9 @@ Section ExtModelLM.
   Qed.  
 
   (* TODO: avoid duplication *)
-  Definition lib_lm_active_exts (δ: fmstate lib_fair): gset lib_lm_EI := 
-    set_map eiG $ filter (flip lm_is_stopped δ) (dom (ls_tmap δ (LM := lib_model))). 
+  Definition lib_lm_active_exts (δ: fmstate lf): gset lib_lm_EI := 
+    (* set_map eiG $ filter (flip lm_is_stopped δ) (dom (ls_tmap δ (LM := (lib_model gs)))).  *)
+    set_map eiG $ filter (flip lm_is_stopped δ) gs. 
   
   Definition lib_lm_ETs '(eiG ρlg) := reset_lm_st_rel ρlg. 
 
@@ -96,25 +101,29 @@ Section ExtModelLM.
   Lemma iff_False_helper {A: Prop}:
     (A <-> False) <-> ¬ A.
   Proof. tauto. Qed.
+  Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
+    (exists t, A /\ B t) <-> A /\ exists t, B t.
+  Proof. split; intros (?&?&?); eauto. Qed. 
 
   Definition lib_lm_projEI (_: lib_lm_EI) := (tt: lib_EI).
 
   Lemma lib_lm_active_exts_spec:
-    ∀ δ ι, ι ∈ lib_lm_active_exts δ ↔ (∃ δ' : lib_fair, lib_lm_ETs ι δ δ'). 
+    ∀ δ ι, ι ∈ lib_lm_active_exts δ ↔ (∃ δ' : lf, lib_lm_ETs ι δ δ'). 
   Proof using.
     intros. 
     destruct ι. simpl.
     rewrite /lib_lm_active_exts /reset_lm_st_rel.
     erewrite <- set_map_properties.elem_of_map_inj_gset.
-    2: { red. by intros ??[=]. }
+    2: { red. by intros ??[=]. }    
     rewrite elem_of_filter. simpl.
-    rewrite iff_and_impl_helper.
-    2: { rewrite /lm_is_stopped. tauto. }
-    split; eauto. by intros (?&?&?). 
+    rewrite ex_and_comm. apply Morphisms_Prop.and_iff_morphism; [done| ].
+    split; try eauto.
+    by intros (?&?&<-).
+    Unshelve. done. 
   Qed.
 
-  Definition ExtLibLM: ExtModel (LM_Fair (LM := lib_model)) :=
-    Build_ExtModel (LM_Fair (LM := lib_model)) _ _ _ _ _ lib_lm_active_exts_spec. 
+  Definition ExtLibLM: ExtModel (LM_Fair (LM := lib_model gs)) :=
+    Build_ExtModel (LM_Fair (LM := lib_model gs)) _ _ _ _ _ lib_lm_active_exts_spec. 
 
   Lemma lib_proj_keep_ext:
     ∀ (δ1 : LM_Fair) ι (δ2 : LM_Fair), 
@@ -122,9 +131,10 @@ Section ExtModelLM.
   Proof.
     intros. simpl in *. destruct ι; simpl in *.
     simpl. rewrite /lib_lm_projEI. simpl. do 2 red.
-    red in H. revert H. rewrite /reset_lm_st /reset_st.
-    simpl. rewrite /lm_is_stopped.
-    by intros [(->&?&?) <-].
+    red in H. revert H. 
+    intros [? (?&<-)]. simpl.
+    rewrite /reset_st. rewrite decide_True; [| by apply H].
+    done. 
   Qed.
 
   Lemma lib_keeps_asg: ∀ (δ1 : LM_Fair) (ι : env_role) (δ2 : LM_Fair) ρ τ (f : nat),
@@ -135,7 +145,7 @@ Section ExtModelLM.
   Proof.
     intros. inversion H. subst.
     simpl in REL. destruct ι0. simpl in REL.
-    red in REL. destruct REL as [STOP <-].
+    red in REL. destruct REL as [STOP [IN <-]].
     simpl. 
     red in STOP. destruct STOP as (?&NIN&DOMg). split.
     - rewrite lookup_insert_ne; auto. intros <-.
