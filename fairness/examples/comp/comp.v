@@ -666,14 +666,12 @@ Section ClientSpec.
     { iApply frag_fuel_is_big_sepM; [done | by iFrame]. }
     iSplitR; [done| ].
     iFrame. iSplitL "ST inv'".
-    - iExists _. iFrame.
+    - iExists lb. iFrame. 
     - iDestruct (frag_fuel_is_big_sepM with "FUEL_LIB") as "?"; [done| ].
       iFrame. iExists _. iFrame. done.
   Qed.
 
   (* TODO: move*)
-  From trillium.fairness Require Import lm_steps_gen. 
-
   Lemma fuel_keep_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
   LSG Einvs ∗ client_inv ⊢
   ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M)
@@ -753,6 +751,125 @@ Section ClientSpec.
       iDestruct "FUEL" as (?) "[%EQ ?]". inversion EQ. subst.
       iExists _. iFrame. iPureIntro. lia.
   Qed.
+
+  Lemma lib_fuel_drop_step_preserves_LSI s rem:
+    fuel_drop_preserves_LSI s rem (LSI := LSI_groups_fixed lib_gs).
+  Proof. 
+    (* done. *)
+    red. intros. red. intros ?? IN.
+    apply map_filter_lookup_Some in IN as [??].
+    eapply H0; eauto. 
+  Qed. 
+    
+
+  (* TODO: move*)
+  Lemma fuel_drop_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
+  LSG Einvs ∗ client_inv ⊢
+  ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M)
+    (c2 : cfg heap_lang) s (fs : gmap (fmrole lib_model_impl) nat)
+    rem
+    (ζ : locale heap_lang) (_ : dom fs ≠ ∅)
+
+    (_: (live_roles _ s) ∩ rem = ∅)
+    (_: rem ⊆ dom fs)
+    (_ : locale_step (trace_last extr) (Some ζ) c2),
+    has_fuels ζ (S <$> fs) (PMPP := lib_PMPP) -∗
+    partial_model_is s -∗
+    em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := heap_fairnessGS)
+    ={Einvs ∪ ↑Ns}=∗
+    ∃ (δ2 : M) (ℓ : mlabel M),
+      ⌜em_valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
+         (auxtr :tr[ ℓ ]: δ2)⌝ ∗
+      has_fuels ζ (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs) (PMPP := lib_PMPP) ∗
+      partial_model_is s ∗
+      em_msi c2 δ2 (em_GS0 := heap_fairnessGS).
+  Proof.
+    iIntros "[#PMP #COMP]". iIntros "* FUELS_LIB ST_LIB MSI". simpl in *.
+    
+    assert (S <$> fs ≠ ∅) as NE.
+    { intros ?%dom_empty_iff. set_solver. }
+
+    iPoseProof (lib_open_inv with "[$] FUELS_LIB") as "INV'"; [set_solver| ].
+    rewrite union_comm_L.
+    iMod (fupd_mask_frame_r _ _ Einvs with "INV'") as
+      "(-> & (%lb & ST & inv') & LM & YST_AUTH & (%f & Ff & %BOUND) & MAP & FR & YST & FUEL_LIB & CLOS)"; [set_solver| ].
+
+    iAssert (⌜ s = ls_under lb ⌝)%I as %->.
+    { rewrite /model_state_interp.
+      iDestruct "inv'" as (?)"(?&?&?&ST_LIB'&?)".
+      (* TODO: make a lemma? *)
+      by iDestruct (own_valid_2 with "ST_LIB' ST_LIB") as
+      %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete. }
+      
+      
+    iMod (actual_update_no_step_enough_fuel_drop with "[LM FUEL_LIB] ST_LIB inv'") as (lb') "(%LIB_STEP & FUELS_LIB & ST_LIB & MSI_LIB & %TMAP_LIB)".
+    (* 3: { apply empty_subseteq. } *)
+    { eauto. }
+    4: { rewrite /has_fuels_S. rewrite has_fuels_equiv. iFrame.
+         iApply frag_fuel_is_big_sepM; done. }
+    2: { eauto. }
+    { done. }
+    { apply lib_fuel_drop_step_preserves_LSI. }
+    
+    destruct (trace_last extr) as (σ1, tp1) eqn:LASTE. destruct c2 as (σ2, tp2).
+    rewrite LASTE.
+    (* rewrite difference_empty_L. *)
+    (* rewrite difference_empty_L in TMAP_LIB. *)
+    iAssert (has_fuels 0 {[ ρ_lib := f ]}) with "[MAP Ff]" as "FUELS".
+    { rewrite /has_fuels. rewrite dom_singleton_L big_sepS_singleton.
+      rewrite lookup_singleton. iFrame. iExists _. iFrame. done. }
+
+    rewrite -LASTE.
+    iPoseProof (update_client_state with "[$] [$] [$] [$] [$]") as "EM_STEP"; eauto.
+    { eexists. split; [apply LIB_STEP| ]. done. }
+    { lia. }
+    iMod (fupd_mask_mono with "EM_STEP") as (δ2 ℓ) "(EV & MSI & FUELS & ST & FR)"; [set_solver| ].
+    do 2 iExists _. iFrame "EV MSI".
+
+    iDestruct ("CLOS" with "[ST MSI_LIB YST_AUTH]") as "CLOS".
+    { iNext. iExists (_, _). rewrite /client_inv_impl. iFrame. }
+    iMod (fupd_mask_frame_r _ _ Einvs with "CLOS") as "_"; [set_solver| ].
+
+    iModIntro.
+    iDestruct "FUELS" as "[MAP FUEL]". iDestruct "FUELS_LIB" as "[MAP_LIB FUELS_LIB]".
+
+    iFrame "ST_LIB". 
+    iSplitR "FUELS_LIB".
+    2: { rewrite dom_domain_restrict; [| set_solver]. done. }
+    simpl. rewrite dom_domain_restrict; [| set_solver].
+    rewrite /lib_pmi. do 3 iExists _. iFrame.
+    iSplitR; [done| ].
+
+    rewrite TMAP_LIB. rewrite lookup_insert.
+    destruct (decide (dom fs = rem)).
+    2: { 
+
+    iLeft.
+    iSplitR.
+    { iPureIntro. intros ?. apply n. set_solver. } 
+    (* rewrite lookup_insert. *)
+    repeat erewrite @decide_False with (P := (Some (dom fs ∖ rem) = Some ∅)).
+    (* 2-3: by intros [=]. *)
+    2, 3: intros [=]; set_solver. 
+    iSplitR.
+    { iPureIntro. set_solver. }
+    rewrite dom_singleton_L big_sepS_singleton.
+    rewrite lookup_singleton.
+    iDestruct "FUEL" as (?) "[%EQ ?]". inversion EQ. subst.
+    iExists _. iFrame. iPureIntro. lia. }
+    
+    subst rem. iRight. iSplitR.
+    { iPureIntro. set_solver. }
+    rewrite difference_diag_L. repeat erewrite decide_True.
+    2, 3: done.
+    iSplitR.
+    { iPureIntro. set_solver. }
+    rewrite dom_singleton_L big_sepS_singleton.
+    rewrite lookup_singleton.
+    iDestruct "FUEL" as (?) "[%EQ ?]". inversion EQ.
+    iFrame.         
+  Qed.
+
 
   Lemma lib_model_step_preserves_LSI:
   ∀ (s1 : lib_model_impl) (ρ : fmrole lib_model_impl) 
@@ -861,10 +978,13 @@ Section ClientSpec.
     iIntros "[#PMP #COMP]". iApply @Build_LM_steps_gen_nofork.
 
     iModIntro. repeat iSplitR.
-    - admit. 
+    - iIntros "* FUELS_LIB ST MSI".
+      iDestruct (fuel_drop_step_lifting with "[$] [] [] [] [] FUELS_LIB ST MSI") as "LIFT"; eauto.
+      (* change the PMP interface so it allows fupd in fuel step *)
+      admit.      
     - iIntros "* FUELS_LIB MSI".
       iDestruct (fuel_keep_step_lifting with "[$] [] [] FUELS_LIB MSI") as "LIFT"; eauto.
-      (* change the PMP interface so it allows fupd in fuel step *)
+      (* same as above *)
       admit.
     - iIntros "* FUELS_LIB ST MSI FR".
       iApply (model_step_lifting with "[$] [] [] [] [] [] [] [] [] [] [$] [$] [$] [$]"); eauto.
