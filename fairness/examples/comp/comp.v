@@ -1061,17 +1061,6 @@ Section ClientSpec.
     rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
   Qed.
 
-  (* TODO: move, generalize over group role?  *)
-  Lemma lib_reset_premise lb (STOP: lm_is_stopped ρlg lb):
-    lib_ls_premise lib_gs (reset_lm_st ρlg lb ρlg_in_lib_gs (NE := lib_gs_ne)).
-  Proof. 
-    red. repeat split; simpl.
-    - (* TODO: fix required fuel amount in lib_ls_premise *)
-      admit.
-    - (* TODO: reformulate reset_lm_st_impl via ls_tmap *)
-      admit.
-  Admitted. 
-
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lf) f
     (FB: f >= client_fl)
     (* TODO: get rid of these restrictions *)

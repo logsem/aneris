@@ -143,7 +143,7 @@ End LibrarySpec.
 
 
 Definition lib_ls_premise gs (lb: lm_ls (lib_model gs)) :=
-  ls_fuel lb !! ρl = Some 2 ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}.
+  ls_fuel lb !! ρl = Some (lm_fl (lib_model gs) (ls_under lb)) ∧ ls_under lb = 1 ∧ ls_tmap lb !! ρlg = Some {[ρl]}.
 
 Lemma lib_premise_dis gs (lb: lm_ls (lib_model gs))
   (NE: gs ≠ ∅)
