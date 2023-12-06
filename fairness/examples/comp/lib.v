@@ -130,10 +130,10 @@ Section LibrarySpec.
   
   Notation "'PMP' gs" := (fun Einvs => (LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS))) (at level 10). 
 
-  Lemma lib_spec tid gs Einvs:
+  Lemma lib_spec tid gs Einvs f (F2: f >= 2):
     PMP gs Einvs -∗
     {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
-        has_fuels tid {[ ρl:=2 ]} (PMPP := PMPP)  }}}
+        has_fuels tid {[ ρl:=f ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
     {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
                  partial_free_roles_are {[ ρl ]} }}}.

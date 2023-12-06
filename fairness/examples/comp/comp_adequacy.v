@@ -17,6 +17,7 @@ Import derived_laws_later.bi.
 From trillium.fairness Require Import lm_fairness_preservation fuel_ext lm_fair lm_fair_traces fair_termination.
 From trillium.fairness.ext_models Require Import destutter_ext ext_models.
 From trillium.fairness.examples.comp Require Import comp lib lib_ext. 
+From trillium.fairness.examples.comp Require Import traces_equiv.
 From trillium.fairness Require Import fair_termination_natural.
 From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
 
@@ -31,6 +32,12 @@ Instance client_trans'_PI s x:
                fmtrans client_model_impl s ℓ s' \/ (s' = s /\ ℓ = None)): Prop).
 Proof. apply make_proof_irrel. Qed.    
 
+(* (* The unpacked form used in *_pair lemmas is needed to apply in_list_finite. *)
+(*    TODO: is it possible to get rid of duplication? *) *)
+(* Instance client_trans'_PI_pair s x:  *)
+(*   ProofIrrel ((fmtrans client_model_impl s (snd x) (fst x) \/ (fst x = s /\ snd x = None)): Prop). *)
+(* Proof. apply make_proof_irrel. Qed.     *)
+
 Local Instance step'_eqdec: forall s1, EqDecision
                   {'(s2, ℓ) : client_model_impl *
                               option (fmrole client_model_impl) | 
@@ -39,13 +46,42 @@ Local Instance step'_eqdec: forall s1, EqDecision
   (* TODO: why it stopped being inferred automatically? *)
   pose proof (fmstate_eqdec client_model_impl).
   solve_decision. 
-Qed.
+Defined. 
   
+(* Local Instance step'_eqdec_pair: forall s1, EqDecision *)
+(*                   {s2_ℓ : client_model_impl * *)
+(*                               option (fmrole client_model_impl) |  *)
+(*                   fmtrans client_model_impl s1 (snd s2_ℓ) (fst s2_ℓ) ∨  *)
+(*                   (fst s2_ℓ) = s1 ∧ (snd s2_ℓ) = None}. *)
+(*   pose proof (fmstate_eqdec client_model_impl).
+  solve_decision.  *)
+(* Defined.  *)
+  
+(* Lemma client_model_finitary'_pair (s1 : fmstate client_model_impl): *)
+(*     Finite *)
+(*       {s2_ℓ : client_model_impl * option (fmrole client_model_impl) | *)
+(*       fmtrans client_model_impl s1 (snd s2_ℓ) (fst s2_ℓ) ∨ (fst s2_ℓ) = s1 ∧ (snd s2_ℓ) = None}. *)
+(* Proof. *)
+(*   (* set (l := [(s1, None: option (fmrole client_model_impl))]). *) *)
+(*   (* eapply bijective_finite.  *) *)
+(*   pose proof (@in_list_finite (client_model_impl * option (fmrole client_model_impl)) ltac:(solve_decision) (fun s2_ℓ => fmtrans client_model_impl s1 (snd s2_ℓ) (fst s2_ℓ) ∨ (fst s2_ℓ) = s1 ∧ (snd s2_ℓ) = None) ltac:(apply _) []). *)
+(*   simpl in X. simpl.  *)
+(*   apply X.  *)
+
+  
+
 Lemma client_model_finitary (s1 : fmstate client_model_impl):
     Finite
       {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 
       fmtrans client_model_impl s1 ℓ s2 ∨ s2 = s1 ∧ ℓ = None}. 
-Proof. Admitted. 
+Proof.
+  (* set (l := [(s1, None: option (fmrole client_model_impl))]). *)
+  (* eapply bijective_finite.  *)
+  destruct s1 as (δ_lib, c).
+  set (steps := [((δ_lib, c), None); ((δ_lib, c - 1), Some ρ_cl);
+                 ((reset_lm_st ρlg δ_lib, c - 1), Some ρ_ext)]). 
+  eapply in_list_finite with (l := steps). 
+Admitted. 
 
 
 Section ClientRA.
@@ -176,93 +212,8 @@ Proof.
   specialize (C _ H). simpl in *. lia. 
 Qed. 
 
-(* Lemma client_steps_finite (tr: mtrace client_model_impl) *)
-(*   (VALID: mtrace_valid tr) *)
-(*   (CL: ∀ i s step, tr !! i = Some (s, step) → is_client_step (s, step) \/ step = None): *)
-(*   (* exists l, trace_len_is tr (NOnum l) /\ (l = 0 /\ snd (trfirst tr) =  *) *)
-(*   terminating_trace tr.  *)
-(* Proof. *)
-(*   pose proof (trace_has_len tr) as [len LEN].  *)
-(*   lia_NO' len. *)
-(*   2: { eapply terminating_trace_equiv; eauto. } *)
-(*   exfalso. *)
-(*   assert (exists s0, tr S!! 0 = Some s0) as [[δ0 c0] S0]. *)
-(*   { pose proof (inf_trace_lookup _ LEN 0) as ([δ0 c0] & ℓ0 & s1 & L0). *)
-(*     apply state_label_lookup in L0 as (?&?&?). eauto. }  *)
-(*   gd tr. gd δ0. induction c0. *)
-(*   { intros. *)
-(*     pose proof (inf_trace_lookup _ LEN 0) as (? & ℓ & ? & L0). *)
-(*     forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
-(*     pose proof (mtrace_valid_steps' VALID _ _ _ _ L0) as S. by inversion S. } *)
-(*   intros. destruct tr. *)
-(*   { specialize (LEN 1). simpl in *. *)
-(*     by pose proof (proj2 LEN I) as []. } *)
-(*   pose proof (inf_trace_lookup _ LEN 0) as (? & ? & [δ1 c1] & L0). *)
-(*   forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
-(*   pose proof (mtrace_valid_steps' VALID _ _ _ _ L0). *)
-  
-(*   assert (c1 = c0) as ->. *)
-(*   { specialize (CL _ _ _ L0). destruct CL as [CL|?]; [| done]. *)
-(*     do 2 red in CL. destruct CL as (?&?&?&[? <-]). *)
-(*     inversion H0. subst. clear H0.  *)
-(*     inversion H; lia. } *)
-  
-(*   assert (tr S!! 0 = Some (δ1, c0)) as L1. *)
-(*   { apply state_label_lookup in L0 as (_&?&_). *)
-(*     rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. } *)
-
-(*   apply trace_len_tail in LEN. *)
-(*   eapply (IHc0 δ1 tr); eauto.   *)
-(*   { eapply mtrace_valid_tail; eauto. } *)
-(*   intros. left. *)
-(*   pose proof (CL (S i) _ _ H0) as [? | ->]; [done| ]. *)
-(*   pattern s0 in H0. eapply ex_intro, trace_lookup_dom_eq in H0; eauto. *)
-(*   done.  *)
-(* Qed.  *)
-
-(* Lemma client_steps_finite (tr: mtrace client_model_impl) (l len: nat_omega) *)
-(*   (VALID: mtrace_valid tr) *)
-(*   (LEN: trace_len_is tr len) *)
-(*   (LE: NOmega.le l len) *)
-(*   (CL: ∀ i res, NOmega.lt (NOnum i) l → tr !! i = Some res → is_client_step res): *)
-(*   exists m, l = NOnum m. *)
-(* Proof. *)
-(*   lia_NO' l; lia_NO' len; try by eauto. exfalso. *)
-(*   assert (exists s0, tr S!! 0 = Some s0) as [[δ0 c0] S0]. *)
-(*   { pose proof (inf_trace_lookup _ LEN 0) as ([δ0 c0] & ℓ0 & s1 & L0). *)
-(*     apply state_label_lookup in L0 as (?&?&?). eauto. }  *)
-(*   gd tr. gd δ0. clear LE. induction c0. *)
-(*   { intros. *)
-(*     pose proof (inf_trace_lookup _ LEN 0) as (? & ℓ & ? & L0). *)
-(*     forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
-(*     pose proof (mtrace_valid_steps' VALID _ _ _ _ L0) as S. by inversion S. } *)
-(*   intros. destruct tr. *)
-(*   { specialize (LEN 1). simpl in *. *)
-(*     by pose proof (proj2 LEN I) as []. } *)
-(*   pose proof (inf_trace_lookup _ LEN 0) as (? & ? & [δ1 c1] & L0). *)
-(*   forward eapply trace_state_lookup_simpl as EQ; eauto. subst x.   *)
-(*   pose proof (mtrace_valid_steps' VALID _ _ _ _ L0). *)
-(*   assert (c1 = c0) as ->. *)
-(*   { specialize (CL _ _ I L0). do 2 red in CL. destruct CL as (?&?&?&[? <-]). *)
-(*     inversion H0. subst. clear H0.  *)
-(*     inversion H; lia. } *)
-  
-(*   assert (tr S!! 0 = Some (δ1, c0)) as L1. *)
-(*   { apply state_label_lookup in L0 as (_&?&_). *)
-(*     rewrite Nat.add_1_r in H0. by rewrite state_lookup_cons in H0. } *)
-
-(*   eapply (IHc0 δ1 tr); eauto.   *)
-(*   { eapply mtrace_valid_tail; eauto. } *)
-(*   { by apply trace_len_tail in LEN. } *)
-(*   intros. apply (CL (S i)); [done| ]. *)
-(*   rewrite trace_lookup_cons; eauto.  *)
-(* Qed.  *)
-
 Arguments NOmega.le _ _ : simpl nomatch.
 
-
-(* Definition is_lib_step_alt (step: client_state * option (option client_role * client_state)): Prop. *)
-(*   := snd step *)
 
 (* TODO: unify with other decision lemmas about client model *)
 Instance client_trans_dec: forall c1 oρ c2, 
@@ -273,7 +224,6 @@ Proof. Admitted.
 
 CoFixpoint project_lib_trace (tr: mtrace client_model_impl): 
   elmftrace (ELM := ExtLibLM)
-  (* @atrace _ _ _ lib_model (option $ ext_role (EM := ExtLibLM)) *)
   :=
   match tr with 
   | ⟨ s ⟩ => ⟨ fst s ⟩
@@ -287,13 +237,6 @@ Proof.
   destruct tr; eauto.
   destruct ℓ; [destruct f|]; eauto. 
 Qed. 
-
-(* CoFixpoint project_lib_trace (tr: mtrace client_model_impl): elmftrace (ELM := ExtLibLM) := *)
-(*   match tr with  *)
-(*   | ⟨ s ⟩ => ⟨ fst s ⟩ *)
-(*   | s -[Some (inl ρlg)]-> tr' => (fst s) -[ Some $ inl ρlg ]-> (project_lib_trace tr') *)
-(*   | s -[ _ ]-> tr' => ⟨fst s ⟩ *)
-(*   end.  *)
 
 
 Definition is_end_state (step: client_state * option (option client_role * client_state)) :=
@@ -352,7 +295,12 @@ Proof.
     destruct IN as [? IN]. apply (ls_mapping_tmap_corr (LM := lib_model)) in IN.
     destruct IN as (?&?&?). simpl in *.
     eapply elem_of_dom; eauto. 
-Qed. 
+Qed.
+
+Instance sl_lm_dec_ex_step:
+  ∀ τ δ1, Decision (∃ δ2, locale_trans δ1 τ δ2 (LM := spinlock_model)).
+Proof. 
+ 
 
 Local Instance client_LF: LMFairPre client_model.
   esplit; apply _.
@@ -367,134 +315,6 @@ Definition outer_LM_trace_exposing
   (* TODO: remove LMo parameter from inner_obls_exposed *)
   inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) lmtr (LMo := client_model) (AMi := lib_ALM).
 
-Definition traces_equiv {St L: Type} :=
-  @traces_match L L St St eq eq (fun _ _ _ => True) (fun _ _ _ => True).
-
-(* Lemma after_equiv {St L: Type} (tr1 tr *)
-(* Lemma subtrace _inf_after_equiva *)
-Lemma trace_prefix_inf_equiv_id {St L: Type} (tr: trace St L) ml len
-  (LEN: trace_len_is tr len)
-  (LE: NOmega.le len ml):
-  traces_equiv tr (trace_prefix_inf tr ml).
-Proof.
-  gd tr. gd ml. gd len. 
-  cofix CIH.
-  intros. 
-  rewrite trace_prefix_inf_step_equiv.
-  rewrite (trace_unfold_fold tr).
-  destruct tr.
-  { rewrite /trace_prefix_inf_step_alt. simpl.
-    destruct decide; by econstructor. }
-  rewrite /trace_prefix_inf_step_alt. simpl.
-  eapply trace_len_tail in LEN.
-  rewrite decide_False.
-  2: { lia_NO' ml; lia_NO' len.
-       destruct (decide (2 <= n0)).
-       { lia. }
-       replace (Nat.pred n0) with 0 in LEN; [| lia].
-       by eapply trace_len_0_inv in LEN. }
-  econstructor; try done.
-  specialize_full CIH; [| by apply LEN| by apply CIH]. 
-  lia_NO' ml; lia_NO' len. 
-Qed.
-
-
-Lemma subtrace_equiv_after {St L: Type} (tr str: trace St L) i ml len
-  (LEN: trace_len_is tr len)
-  (LE: NOmega.le len ml)
-  (SUB: subtrace tr i ml = Some str)
-  (* (DOM: NOmega.lt_nat_l start fin *)
-  :
-  exists atr, after i tr = Some atr /\
-  traces_equiv atr str.
-Proof.
-  rewrite /subtrace in SUB.
-  destruct after eqn:AFTER; [| done]. destruct decide; [done| ].
-  eexists. split; eauto.  
-  inversion SUB. subst str.
-  eapply trace_prefix_inf_equiv_id. 
-  - eapply trace_len_after; eauto.
-  - lia_NO' ml; lia_NO' len.
-Qed.
-
-
-Instance traces_equiv_refl {St L: Type}:
-  Reflexive (@traces_equiv St L). 
-Proof.
-  red. cofix CIH.
-  intros tr. rewrite (trace_unfold_fold tr).  
-  destruct tr.
-  - constructor. done. Guarded.  
-  - constructor; try done.
-    by apply CIH. 
-Qed. 
-
-
-Global Instance traces_equiv_symm {St L: Type}:
-  Symmetric (@traces_equiv St L). 
-Proof.
-  red. 
-  cofix CIH.
-  intros tr1 tr2 EQ. 
-  rewrite (trace_unfold_fold tr1) (trace_unfold_fold tr2).
-  destruct tr1, tr2.
-  - constructor. inversion EQ. done. 
-  - by inversion EQ. 
-  - by inversion EQ. 
-  - inversion EQ. subst.
-    constructor; try done.
-    by apply CIH. 
-Qed. 
-
-
-From Paco Require Import paco1 paco2 pacotac.
-Lemma upto_stutter_Proper_impl {St S' L L': Type} {Us: St -> S'} {Usls: St -> L -> St -> option L'}:
-  Proper (@traces_equiv St L ==> @traces_equiv S' L' ==> impl)
-    (upto_stutter Us Usls).
-Proof. 
-  red. intros t1 t1' EQ1 t2 t2' EQ2 UPTO.
-  gd t1. gd t2. gd t1'. gd t2'.
-  (* pcofix CIH.  *)
-  pcofix CIH. 
-  pfold.
-
-  intros. 
-  erewrite (trace_unfold_fold t1'), (trace_unfold_fold t2') in *. 
-  erewrite (trace_unfold_fold t1), (trace_unfold_fold t2) in *. 
-  (* pfold. punfold UPTO; [| admit]. *) 
-  punfold UPTO; [| apply upto_stutter_mono].
-  inversion UPTO; subst.
-  - destruct t1, t2; try done.
-    inversion EQ1; inversion EQ2; subst; try done.    
-    inversion H0. inversion H. subst.
-    destruct t1', t2'; try done.
-    inversion H2. inversion H5. subst.
-    econstructor.
-  - destruct t1, t2, t1', t2'; try by done.
-    all: inversion EQ1; inversion EQ2; subst; try by done.
-    + inversion H. simpl in H2. subst.
-      Guarded. 
-      specialize (CIH ⟨ Us s2 ⟩ t1' ⟨ Us s2 ⟩).
-      specialize CIH with (t1 := t1).
-      Guarded.
-      specialize_full CIH.
-      4: { rewrite /upaco2.
-           (* eapply upto_stutter_stutter. *)
-           (* 4: { eapply upto_stutter_stutter.  *)
-           (* 2: { econstructor.  *)
-           (* (* 2: { ??? *) *)
-           (* all: admit. } *)
-Admitted. 
-
-Instance upto_stutter_Proper {St S' L L': Type} {Us: St -> S'} {Usls: St -> L -> St -> option L'}:
-  Proper (@traces_equiv St L ==> @traces_equiv S' L' ==> iff)
-    (upto_stutter Us Usls).
-Proof. 
-  red. intros ??????. split.
-  - intros. eapply upto_stutter_Proper_impl; eauto.
-  - intros. apply traces_equiv_symm in H, H0. 
-    eapply upto_stutter_Proper_impl; eauto.
-Qed.
 
 
 Lemma outer_exposing_subtrace ltr tr i str 
@@ -862,23 +682,6 @@ Qed.
 
 
 From trillium.fairness.heap_lang Require Import em_lm_heap_lang. 
-
-(* Local Instance client_LF': LMFairPre' client_model. *)
-(*   esplit; apply _. *)
-(* Qed. *)
-
-(* Definition foo Σ: fairnessGS client_model Σ. *)
-(*   assert (@heapGS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model client_LF')). *)
-(*   { admit. } *)
-(*   inversion H. apply heap_fairnessGS.  *)
-
-  
-(*   set (bar := @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model client_LF')). *)
-(*   unfold LM_EM_HL in bar. *)
-(*   simpl in bar. *)
-(*   (* apply heapGpreS_em in bar.  *) *)
-  
-(*   inversion bar.  *)
 
 
 Local Instance LF': LMFairPre' client_model.
