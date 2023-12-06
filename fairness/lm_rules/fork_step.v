@@ -4,7 +4,7 @@ From trillium.fairness Require Import fairness fuel fuel_ext resources partial_o
 
 
 Section ForkStep.
-  Context `{LM: LiveModel G M LSI_True}.
+  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
@@ -81,14 +81,11 @@ Section ForkStep.
       apply not_elem_of_dom in Hin. congruence.
   Qed.
 
-  Lemma actual_update_fork_split R1 R2 (* tp1 tp2 *) fs (δ1: LM) ζ τ_new
-    (* σ1 σ2 *)
+  Lemma actual_update_fork_split_gen R1 R2 fs (δ1: LM) ζ τ_new
     (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
-    (* trace_last extr = (tp1, σ1) -> *)
-    (* locale_step (tp1, σ1) (Some ζ) (tp2, σ2) -> *)
-    (* (∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1) -> *)
+    fuel_reorder_preserves_LSI (LSI := LSI) ->
     τ_new ∉ dom (ls_tmap δ1 (LM := LM)) ->
     has_fuels_S ζ fs -∗ model_state_interp δ1 ==∗
       ∃ δ2, has_fuels τ_new (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
@@ -97,7 +94,7 @@ Section ForkStep.
             ⌜lm_ls_trans LM δ1 (Silent_step ζ) δ2⌝ ∗
             ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1 (LM := LM)))) ⌝. 
   Proof.
-    iIntros (Hnemp Hunioneq Hnewζ) "Hf Hmod".
+    iIntros (Hnemp Hunioneq PRES Hnewζ) "Hf Hmod".
     unfold has_fuels_S.
     simpl in *.
     iDestruct (has_fuel_fuel with "Hf Hmod") as %Hfuels.
@@ -110,36 +107,30 @@ Section ForkStep.
     iDestruct "Hf" as "(Hf & Hfuels)".
     iDestruct (frag_mapping_same with "Ham Hf") as %Hmapping.
     iMod (update_mapping_new_locale ζ τ_new _ R1 R2 with "Ham Hf") as "(Ham&HR1&HR2)"; eauto.
-    assert (Hsamedoms: dom (map_imap
-                                (λ ρ o,
+
+    set new_mapping := (map_imap (λ ρ o,
                                  if decide (ρ ∈ R2) then Some $ τ_new else Some o)
-                                (ls_mapping δ1)) =
-                         dom (map_imap
-                             (λ ρ o,
+                                (ls_mapping δ1)).
+    set new_fuels := (map_imap (λ ρ o,
                               if decide (ρ ∈ R1 ∪ R2) then Some (o - 1)%nat else Some o)
-                             (ls_fuel δ1))
-           ).
+                             (ls_fuel δ1)). 
+    set new_tmap := <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)). 
+
+    assert (Hsamedoms: dom new_mapping = dom new_fuels).
     { rewrite !map_imap_dom_eq; first by rewrite ls_same_doms.
       - by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)).
       - by intros ρ??; destruct (decide (ρ ∈ R2)). }
-    assert (Hfueldom: live_roles _ δ1 ⊆ dom (map_imap
-                             (λ ρ o,
-                              if decide (ρ ∈ R1 ∪ R2) then Some (o - 1)%nat else Some o)
-                             (ls_fuel δ1))).
+    assert (Hfueldom: live_roles _ δ1 ⊆ dom new_fuels).
     { rewrite map_imap_dom_eq; first by apply ls_fuel_dom.
       - by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)). }
 
-    assert (∀ ρ: fmrole M, ρ ∈ dom (map_imap
-           (λ (ρ0 : fmrole M) (o : nat),
-              if decide (ρ0 ∈ R1 ∪ R2) then Some (o - 1) else Some o)
-           (ls_fuel δ1))
-    ↔ (∃ (τ : G) (R : gset (fmrole M)),
-         <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)) !! τ = Some R ∧ ρ ∈ R)) as TMAP2_DOM.
+    assert (∀ ρ: fmrole M, ρ ∈ dom new_fuels
+    ↔ (∃ (τ : G) (R : gset (fmrole M)), new_tmap !! τ = Some R ∧ ρ ∈ R)) as TMAP2_DOM.
     { intros.
       rewrite map_imap_dom_eq. 
       2: { intros. by destruct decide. }
       rewrite -ls_same_doms. 
-      do 2 setoid_rewrite lookup_insert_Some.
+      rewrite /new_tmap. do 2 setoid_rewrite lookup_insert_Some.
       split.
       + intros [g Mρ]%elem_of_dom.
         apply (ls_mapping_tmap_corr (LM := LM)) in Mρ as (R & TMg & INρ). 
@@ -160,10 +151,9 @@ Section ForkStep.
           ** eapply ls_mapping_tmap_corr.
              eexists. split; eauto. set_solver.
           ** eapply ls_mapping_tmap_corr; eauto. }
-    assert ( ∀ (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
-    τ1 ≠ τ2
-    → <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)) !! τ1 = Some S1
-      → <[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)) !! τ2 = Some S2 → S1 ## S2) as TMAP2_DISJ.
+    assert (∀ (τ1 τ2 : G) (S1 S2 : gset (fmrole M)), τ1 ≠ τ2
+    → new_tmap !! τ1 = Some S1
+      → new_tmap !! τ2 = Some S2 → S1 ## S2) as TMAP2_DISJ.
     { intros. clear -H1 H2 H0 Hmapping Hdisj Hunioneq. 
       Local Ltac solve_disj δ1 τ1 τ2 := 
           eapply disjoint_subseteq;
@@ -184,13 +174,29 @@ Section ForkStep.
       1-8: (solve_disj δ1 ζ τ2 || solve_disj δ1 τ1 ζ || set_solver). 
       eapply (ls_tmap_disj δ1 τ1 τ2); eauto. }
 
-    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ TMAP2_DOM TMAP2_DISJ ltac:(done) (LM := LM)).
-
-    iModIntro.
     assert (Hdomincl: dom fs ⊆ dom (ls_fuel δ1)).
     { intros ρ' Hin'. rewrite elem_of_dom Hfuels; last first.
       { rewrite dom_fmap_L //. }
       rewrite lookup_fmap fmap_is_Some. by apply elem_of_dom. }
+
+    assert (maps_inverse_match new_mapping new_tmap) as MATCH.
+    { eapply mim_helper_fork_step; eauto.
+      - by rewrite ls_same_doms.
+      - by apply ls_mapping_tmap_corr. }
+
+    assert (LSI (ls_under δ1) new_mapping new_fuels) as LSI'.
+    { eapply PRES; [| by apply (ls_inv δ1)].
+      rewrite /new_mapping. erewrite dom_imap_L; [reflexivity| ].
+      intros. rewrite elem_of_dom /is_Some. split.
+      - intros [? ?]. eexists. split; eauto. destruct decide; eauto.
+      - intros (?&?&?). eauto. }
+    erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'.
+    3: { apply MATCH. }
+    2: { apply ls_mapping_tmap_corr_impl. apply TMAP2_DISJ. }    
+
+    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ TMAP2_DOM TMAP2_DISJ LSI' (LM := LM)).
+
+    iModIntro.
     rewrite -Hunioneq big_sepS_union //. iDestruct "Hfuels" as "[Hf1 Hf2]".
     iSplitL "Hf2 HR2".
     { unfold has_fuels.
@@ -210,15 +216,6 @@ Section ForkStep.
 
     (* assert (maps_inverse_match _ (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1))) *)
     
-    assert (maps_inverse_match
-    (map_imap
-       (λ (ρ : fmrole M) (o : G),
-          if decide (ρ ∈ R2) then Some τ_new else Some o)
-       (ls_mapping δ1)) (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1)))) as MATCH.
-    { eapply mim_helper_fork_step; eauto.
-      - by rewrite ls_same_doms.
-      - by apply ls_mapping_tmap_corr. }
-
     iSplitL "Ham Haf Hamod HFR".
     { iExists FR; simpl.
       rewrite build_LS_ext_spec_st build_LS_ext_spec_tmap build_LS_ext_spec_fuel.
@@ -294,3 +291,27 @@ Section ForkStep.
   Qed. 
 
 End ForkStep.
+
+
+Section ForkStepTrue.
+  Context `{LM: LiveModel G M LSI_True}.
+  Context `{Countable G}.
+  Context {Σ : gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
+
+  Lemma actual_update_fork_split R1 R2 fs (δ1: LM) ζ τ_new
+    (Hdisj: R1 ## R2):
+    fs ≠ ∅ ->
+    R1 ∪ R2 = dom fs ->
+    τ_new ∉ dom (ls_tmap δ1 (LM := LM)) ->
+    has_fuels_S ζ fs -∗ model_state_interp δ1 ==∗
+      ∃ δ2, has_fuels τ_new (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
+            (partial_mapping_is {[ τ_new := ∅ ]} -∗ frag_mapping_is {[ τ_new := ∅ ]}) ∗
+            model_state_interp δ2 ∗ 
+            ⌜lm_ls_trans LM δ1 (Silent_step ζ) δ2⌝ ∗
+            ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1 (LM := LM)))) ⌝. 
+  Proof.
+    intros. by apply actual_update_fork_split_gen. 
+  Qed. 
+
+End ForkStepTrue.
