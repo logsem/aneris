@@ -288,7 +288,11 @@ Section Subtrace.
     destruct (classic (exists j res, tr !! j = Some res /\ ¬ P res)) as [STOP | EV]. 
     - destruct STOP as [j' STOP'].
       pattern j' in STOP'. apply min_prop_dec in STOP' as [j [NPROP MIN]]. 
-      2: { intros. admit. }
+      2: { intros. destruct (tr !! n).
+           - destruct (decide (P p)).
+             + right. by intros (?&[=->]&?).
+             + left. eauto.
+           - right. by intros (?&[=->]&?). }
       exists (NOnum j). simpl in *. repeat split.      
       + intros. destruct (decide (P res)); [done| ]. 
         enough (j <= i); [lia| ].
@@ -312,7 +316,7 @@ Section Subtrace.
         specialize (H ltac:(eauto)).
         lia_NO' len. inversion NEXT. lia.
       + lia_NO len. 
-  Admitted. 
+  Qed. 
 
   Lemma trace_prop_split' (tr: trace St L) (P: (St * option (L * St)) -> Prop) 
     len
@@ -467,14 +471,14 @@ Section UptoStutter.
   Context {Us : St → S'}.
   Context {Usls: St -> L -> St → option L'}.  
 
-  Lemma trace_prefix_inf_upto_stutter tr ltr ml
-    (UPTO: upto_stutter Us Usls ltr tr):
-  ∃ (ml' : nat_omega),
-    upto_stutter Us Usls 
-      (trace_prefix_inf ltr ml')
-      (trace_prefix_inf tr ml) /\
-    trace_len_is (trace_prefix_inf ltr ml') ml'. 
-  Proof.
+  (* Lemma trace_prefix_inf_upto_stutter tr ltr ml *)
+  (*   (UPTO: upto_stutter Us Usls ltr tr): *)
+  (* ∃ (ml' : nat_omega), *)
+  (*   upto_stutter Us Usls  *)
+  (*     (trace_prefix_inf ltr ml') *)
+  (*     (trace_prefix_inf tr ml) /\ *)
+  (*   trace_len_is (trace_prefix_inf ltr ml') ml'.  *)
+  (* Proof. *)
     (* destruct ml. *)
     (* { exists NOinfinity. simpl. *)
     (*   gd atr. gd latr. gd i'. induction i. *)
@@ -486,39 +490,38 @@ Section UptoStutter.
     (*     intros; pfold. *)
     (*     (* rewrite (trace_unfold_fold latr) (trace_unfold_fold atr). *) *)
     (*     rewrite !trace_prefix_inf_step_equiv. rewrite /trace_prefix_inf_step_alt. *)
-    (*     punfold UPTO; [| admit]. *)
+    (*     punfold UPTO; [| ???????? ]. *)
     (*     inversion UPTO; subst.  *)
     (*     - simpl. do 2 (rewrite decide_False; [| tauto]). econstructor. *)
     (*     - simpl. do 2 (rewrite decide_False; [| tauto]). econstructor; eauto. *)
     (*       3: { specialize_full UPTOOO. *)
     (*            { pfold. eauto. } *)
-  Admitted. 
 
-  Lemma subtrace_upto_stutter ltr tr i ml tr'
-    (UPTO: upto_stutter Us Usls ltr tr)
-    (SUB: subtrace tr i ml = Some tr'):
-    exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Usls ltr' tr' /\
-                   trace_len_is ltr' (NOmega.sub ml' (NOnum i')). 
-  Proof.
-    pose proof (trace_has_len tr) as [len LEN].
-    forward eapply subtrace_inv as [LT1 LT2]; eauto.
-    rewrite /subtrace in SUB.
-    destruct after eqn:AFTER; [| congruence].
-    rewrite decide_False in SUB.
-    2: { lia_NO' ml. intros [=]. lia. }
-    inversion SUB. subst tr'. clear SUB. rename t into atr. 
-    forward eapply upto_stutter_after as (i' & latr & LAFTER & UPTOi); eauto.
-    exists i'. rewrite /subtrace LAFTER.
+  (* Lemma subtrace_upto_stutter ltr tr i ml tr' *)
+  (*   (UPTO: upto_stutter Us Usls ltr tr) *)
+  (*   (SUB: subtrace tr i ml = Some tr'): *)
+  (*   exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Usls ltr' tr' /\ *)
+  (*                  trace_len_is ltr' (NOmega.sub ml' (NOnum i')).  *)
+  (* Proof. *)
+  (*   pose proof (trace_has_len tr) as [len LEN]. *)
+  (*   forward eapply subtrace_inv as [LT1 LT2]; eauto. *)
+  (*   rewrite /subtrace in SUB. *)
+  (*   destruct after eqn:AFTER; [| congruence]. *)
+  (*   rewrite decide_False in SUB. *)
+  (*   2: { lia_NO' ml. intros [=]. lia. } *)
+  (*   inversion SUB. subst tr'. clear SUB. rename t into atr.  *)
+  (*   forward eapply upto_stutter_after as (i' & latr & LAFTER & UPTOi); eauto. *)
+  (*   exists i'. rewrite /subtrace LAFTER. *)
 
-    forward eapply trace_prefix_inf_upto_stutter with (ml := (NOmega.sub ml (NOnum i))); eauto.
-    intros (ml' & UPTO' & LEN'). exists (NOmega.add (NOnum i') ml').
-    eexists. split; [| split]; eauto.
-    2: { lia_NO' ml'. by rewrite Nat.sub_add'. }  
-    rewrite decide_False; eauto.
-    - lia_NO' ml'. do 3 f_equal. lia.
-    - lia_NO' ml'. do 3 f_equal. intros [=].
-      assert (n = 0) as -> by lia.
-      eapply trace_len_0_inv; eauto. 
-  Qed.
+  (*   forward eapply trace_prefix_inf_upto_stutter with (ml := (NOmega.sub ml (NOnum i))); eauto. *)
+  (*   intros (ml' & UPTO' & LEN'). exists (NOmega.add (NOnum i') ml'). *)
+  (*   eexists. split; [| split]; eauto. *)
+  (*   2: { lia_NO' ml'. by rewrite Nat.sub_add'. }   *)
+  (*   rewrite decide_False; eauto. *)
+  (*   - lia_NO' ml'. do 3 f_equal. lia. *)
+  (*   - lia_NO' ml'. do 3 f_equal. intros [=]. *)
+  (*     assert (n = 0) as -> by lia. *)
+  (*     eapply trace_len_0_inv; eauto.  *)
+  (* Qed. *)
 
 End UptoStutter.
