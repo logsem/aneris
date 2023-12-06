@@ -16,7 +16,7 @@ Import derived_laws_later.bi.
 
 From trillium.fairness Require Import lm_fairness_preservation fuel_ext lm_fair lm_fair_traces fair_termination.
 From trillium.fairness.ext_models Require Import destutter_ext ext_models.
-From trillium.fairness.examples.comp Require Import comp lib lib_ext. 
+From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.examples.comp Require Import traces_equiv.
 From trillium.fairness Require Import fair_termination_natural.
 From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
@@ -68,21 +68,54 @@ Defined.
 (*   simpl in X. simpl.  *)
 (*   apply X.  *)
 
-  
+(* TODO: move *)
+Lemma lib_model_impl_fin (s1: fmstate lib_model_impl):
+  {l: list (fmstate lib_model_impl) | forall s2 oρ, fmtrans lib_model_impl s1 oρ s2 -> s2 ∈ l}. 
+Proof.
+  eapply (exist _ [0]). 
+  intros ?? TRANS. inversion TRANS. subst. set_solver. 
+Qed.
+
+(* TODO: move *)
+Lemma locale_trans_fmtrans_or_eq `{LM : LiveModel G M LSI} δ1 τ δ2
+  (LIB_STEP: locale_trans δ1 τ δ2 (LM := LM)):
+  (exists ρ, fmtrans M (ls_under δ1) (Some ρ) (ls_under δ2)) \/ (ls_under δ1 = ls_under δ2).
+Proof.
+  destruct LIB_STEP as (ℓ & LIB_STEP & MATCH).
+  destruct ℓ; simpl in *; try done; subst.
+  - left. eexists. apply LIB_STEP.
+  - tauto.
+Qed.   
 
 Lemma client_model_finitary (s1 : fmstate client_model_impl):
     Finite
       {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 
       fmtrans client_model_impl s1 ℓ s2 ∨ s2 = s1 ∧ ℓ = None}. 
 Proof.
-  (* set (l := [(s1, None: option (fmrole client_model_impl))]). *)
-  (* eapply bijective_finite.  *)
   destruct s1 as (δ_lib, c).
+  pose proof (lib_model_impl_fin (ls_under δ_lib)) as [ie_lib IE_LIB]. 
+  pose proof (role_LM_step_dom_all δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := lib_model lib_gs)) as STEPS_LIB.
+  
+  remember (map fst (enumerate_next δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := lib_model lib_gs))) as steps_lib.
   set (steps := [((δ_lib, c), None); ((δ_lib, c - 1), Some ρ_cl);
-                 ((reset_lm_st ρlg δ_lib, c - 1), Some ρ_ext)]). 
-  eapply in_list_finite with (l := steps). 
-Admitted. 
-
+                 ((reset_lm_st ρlg δ_lib ρlg_in_lib_gs, c - 1), Some ρ_ext)] ++
+                 ((fun δ' => ((δ', c), Some ρ_lib)) <$> steps_lib)). 
+  eapply in_list_finite with (l := steps).
+  intros [[δ' c'] oρ] TRANS. destruct TRANS as [TRANS | [EQ ->]].
+  2: { inversion EQ. subst. subst steps. set_solver. }
+  simpl in TRANS. inversion TRANS; subst.
+  1,2,4: set_solver. 
+  subst steps. apply elem_of_app. right. apply elem_of_list_fmap.
+  eexists. split; eauto.
+  simpl in LIB_STEP. destruct LIB_STEP as (ℓ & LIB_STEP & MATCH). 
+  apply elem_of_list_In. eapply STEPS_LIB; eauto.
+  { apply elem_of_cons. 
+    edestruct @locale_trans_fmtrans_or_eq as [[? FM] | EQ]. 
+    { eexists. eauto. }
+    - right. eauto.
+    - by left. }
+  intros. apply elem_of_elements. eapply (ls_inv δ'); eauto.  
+Qed. 
 
 Section ClientRA.
 
@@ -104,8 +137,8 @@ Proof.
   (* TODO: definition hidden under Opaque *)
 Qed. 
 
-Definition δ_lib0: LiveState lib_grole lib_model_impl LSI_True.
-  refine (build_LS_ext 0 ∅ _ {[ ρlg := ∅ ]} _ _ _ (LM := lib_model)).
+Definition δ_lib0: LiveState lib_grole lib_model_impl (LSI_groups_fixed lib_gs).
+  refine (build_LS_ext 0 ∅ _ {[ ρlg := ∅ ]} _ _ _ (LM := lib_model lib_gs)).
   - rewrite δ_lib0_init_roles. set_solver.   
   - intros. setoid_rewrite lookup_singleton_Some. set_solver. 
   - intros. 
@@ -266,19 +299,18 @@ Proof.
   econstructor.
   1-3: done.
   { rewrite project_lib_trfirst. inversion STEP; subst; simpl in *.
-    all: rewrite -H2; econstructor; eauto. }
+    2: { rewrite -H2; econstructor; eauto. }
+    rewrite -H2. simpl. econstructor. simpl.
+    red. split; eauto. }
   eapply IH; eauto. intros. 
   apply (LIB_STEPS (S i)); eauto. 
 Qed.
 
-Local Lemma client_lr_0_tmp δ:
-  client_lr (δ, 0) = ∅.
-Proof. Admitted. 
-
 (* TODO: abstract the nested LM state *)
 Local Instance inh_client: Inhabited (lm_ls client_model).
 Proof.
-  assert (Inhabited (lm_ls lib_model)) as [δ] by apply _.
+  (* assert (Inhabited (lm_ls (lib_model lib_gs))) as [δ] by apply _. *)
+  pose proof (lib_model_inh _ lib_gs_ne) as [δ].  
   assert (Inhabited (locale heap_lang)) as [τ] by apply _.
   apply populate.
   refine {| ls_under := (δ, 0): fmstate client_model_impl;
@@ -286,27 +318,49 @@ Proof.
        ls_mapping := kmap (inl ∘ inl) (gset_to_gmap τ (dom (ls_tmap δ)));
     |}.
   Unshelve.
-  - simpl. rewrite client_lr_0_tmp. set_solver. 
+  - by rewrite live_roles_0.
   - apply leibniz_equiv. rewrite !dom_kmap.
     f_equiv. by rewrite !dom_gset_to_gmap. 
   - red. intros gi IN.
     rewrite dom_kmap. apply elem_of_map. eexists. split; eauto.
     rewrite dom_gset_to_gmap.
-    destruct IN as [? IN]. apply (ls_mapping_tmap_corr (LM := lib_model)) in IN.
+    destruct IN as [? IN]. apply (ls_mapping_tmap_corr (LM := lib_model lib_gs)) in IN.
     destruct IN as (?&?&?). simpl in *.
     eapply elem_of_dom; eauto. 
 Qed.
 
-Instance sl_lm_dec_ex_step:
-  ∀ τ δ1, Decision (∃ δ2, locale_trans δ1 τ δ2 (LM := spinlock_model)).
-Proof. 
+Local Instance client_eq: EqDecision (fmstate client_model_impl).
+Proof.
+  pose proof (@LS_eqdec _ _ _ _ (lib_LF _ lib_gs_ne)).
+  solve_decision. 
+Defined.   
+
+(* TODO: almost a copypaste from spinlock, unify? *)
+Instance client_lm_dec_ex_step:
+  ∀ τ δ1, Decision (∃ δ2, locale_trans δ1 τ δ2 (LM := client_model)).
+Proof.
+  intros.
+  pose proof (client_model_finitary (ls_under δ1)) as FIN.
+  apply locale_trans_ex_dec_fin with (steps := map (fst ∘ proj1_sig) (@enum _ _ FIN)).
+  - intros. apply in_map_iff.
+    unshelve eexists.
+    { eapply (exist _ (s2, oρ)). by left. }
+    split; [done| ]. 
+    apply elem_of_list_In. apply elem_of_enum.
+  - intros. eexists. eapply rearrange_roles_spec.
+    Unshelve.
+    + exact client_model. 
+    + red. intros ? [??]. 
+      rewrite /rearrange_roles_map. rewrite dom_fmap.
+      eapply (ls_inv δ2); eauto.
+Defined. 
  
 
 Local Instance client_LF: LMFairPre client_model.
   esplit; apply _.
 Defined.
 
-Let lib_ALM := ELM_ALM lib_keeps_asg. 
+Let lib_ALM := ELM_ALM (lib_keeps_asg (NE := lib_gs_ne)). 
 
 Definition outer_LM_trace_exposing
   (lmtr: lmftrace (LM := client_model)) (mtr: mtrace client_model_impl) :=
@@ -445,8 +499,8 @@ Lemma done_lib_preserved (tr: mtrace client_model_impl)
   (VALID : mtrace_valid tr)
   (L2: ∀ i res, m1 ≤ i → i < m2 → tr !! i = Some res → is_client_step res)
   (Sm1 : tr S!! m1 = Some s)
-  (NOLIB1 : ls_tmap s.1 (LM := lib_model) !! ρlg = Some ∅):
-  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → ls_tmap s.1 (LM := lib_model) !! ρlg = Some ∅.
+  (NOLIB1 : ls_tmap s.1 (LM := lib_model lib_gs) !! ρlg = Some ∅):
+  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → ls_tmap s.1 (LM := lib_model lib_gs) !! ρlg = Some ∅.
 Proof. 
   eapply preserved_prop_kept; eauto.
   intros ??? CL STEP EQ1.
@@ -568,7 +622,7 @@ Proof.
     subst. done. }
 
   simpl in *.
-  assert (terminating_trace tr \/ exists step, (snd (fst step) = 2 \/ snd (fst step) = 1) /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 (LM := lib_model) !! ρlg = Some ∅) as NEXT. 
+  assert (terminating_trace tr \/ exists step, (snd (fst step) = 2 \/ snd (fst step) = 1) /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 (LM := lib_model lib_gs) !! ρlg = Some ∅) as NEXT. 
   { edestruct (client_trace_lookup tr m2) as [?|STEP]; eauto.
     destruct STEP as [[s step] [STEP [CL | [LIB BOUND]]]].
     2: { eapply NL2 in LIB; done. }  
@@ -657,7 +711,7 @@ Proof.
     admit. }
   rename f into x2. 
 
-  enough (ls_tmap x.1 (LM := lib_model) !! x2 = Some ∅).
+  enough (ls_tmap x.1 (LM := lib_model lib_gs) !! x2 = Some ∅).
   2: { apply state_label_lookup in STEPn. 
        eapply done_lib_preserved. 
        6: apply STEPn.
@@ -753,13 +807,16 @@ Proof.
   rewrite lookup_singleton_Some in L. set_solver.  
 Qed.   
 
-Lemma init_lib_state: lm_is_stopped ρlg δ_lib0.
+Lemma init_lib_state: lm_is_stopped ρlg δ_lib0 (NE := lib_gs_ne).
 Proof.
   repeat split; simpl; try done. 
   - by rewrite build_LS_ext_spec_st.
   - by rewrite δ_lib0_map. 
   - rewrite build_LS_ext_spec_tmap. set_solver. 
 Qed.
+
+(* TODO: move *)
+From trillium.fairness.examples.comp Require Import comp.
 
 Theorem client_terminates
         (extr : heap_lang_extrace)
@@ -777,9 +834,7 @@ Proof.
     intros gi [ρ MAP]. simpl in MAP.
     by rewrite δ_lib0_map in MAP. 
   - eapply valid_state_evolution_finitary_fairness_simple.
-    (* TODO: problems with inferring EqDecision *)
-    (* apply client_model_finitary. *)
-    admit. 
+    apply client_model_finitary.
   - intros ?. iStartProof.
     rewrite /LM_init_resource. iIntros "!> (Hm & Hfr & Hf) !>". simpl.
     iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".

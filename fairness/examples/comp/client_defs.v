@@ -157,7 +157,168 @@ Section ClientDefs.
     - intros. eapply client_lr_spec; eauto. 
   Defined.
 
-  
+  (* TODO: move *)
+  Lemma set_filter_equiv:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A}
+    {LL: LeibnizEquiv C}
+    {FS: FinSet A C}
+    (P1 P2 : A → Prop)
+    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
+    (P_EQ: forall x, P1 x <-> P2 x)
+    (c1 c2: C)
+    (EQUIV: c1 ≡ c2)
+    ,
+    filter P1 c1 = filter P2 c2.
+  Proof. set_solver. Qed.
+
+  (* TODO: move *)
+  Lemma set_filter_and:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A}
+    {LL: LeibnizEquiv C}
+    {FS: FinSet A C}
+    (P1 P2 : A → Prop)
+    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
+    (c: C)
+    ,
+    filter P1 (filter P2 c) = filter (fun x => P1 x /\ P2 x) c.
+  Proof. set_solver. Qed. 
+
+  (* TODO: move *)
+  Lemma set_filter_comm:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A}
+    {LL: LeibnizEquiv C}
+    {FS: FinSet A C}
+    (P1 P2 : A → Prop)
+    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
+    (c: C)
+    ,
+    filter P1 (filter P2 c) = filter P2 (filter P1 c). 
+  Proof. set_solver. Qed. 
+
+  (* TODO: move *)
+  Lemma filter_singleton_if:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A},
+    FinSet A C
+    → ∀ (P : A → Prop) {H7 : ∀ x : A, Decision (P x)} (x : A),
+        filter P ({[x]} : C) ≡ if decide (P x) then {[x]} else ∅.
+  Proof. intros. destruct decide; set_solver. Qed. 
+
+  Lemma live_roles_1 lb:
+    live_roles client_model_impl (lb, 1) =
+    if (decide (ρlg ∈ live_roles _ lb))
+    then {[ ρ_lib ]}
+    else if decide (ls_tmap lb (LM := lib_model lib_gs) !! ρlg = Some ∅)
+         then {[ ρ_cl ]}
+         else ∅.
+  Proof.
+    simpl. rewrite /client_lr.
+    apply leibniz_equiv. rewrite !filter_union.
+
+    erewrite filter_singleton_not with (x := ρ_ext). 
+    2: { rewrite bool_decide_eq_false_2; [done| ].
+         intros [? STEP]. inversion STEP. }
+    rewrite union_empty_r. 
+
+    destruct (decide (ρlg ∈ live_roles lf lb)) as [LR | LR].
+    - pose proof (LM_live_role_map_notempty _ _ LR) as (?&MAP&?).
+      erewrite filter_singleton, filter_singleton_not, decide_True.
+      + set_solver.
+      + eauto.
+      + rewrite bool_decide_eq_false_2; [done| ].
+        intros [? STEP]. inversion STEP. subst. set_solver.
+      + rewrite bool_decide_eq_true_2; [done| ].
+        eapply LM_live_roles_strong in LR as [? ?]. eauto.
+        eexists. eapply ct_lib_step. simpl. eauto.
+    - rewrite filter_singleton_not; [rewrite decide_False| ].
+      2: { intros [DOM LIVE]%elem_of_filter.
+           eapply LM_live_roles_strong in DOM. done. }
+      2: { rewrite bool_decide_eq_false_2; [done| ].
+           intros [? STEP]. inversion STEP. subst. simpl in LIB_STEP.
+           destruct LR. apply LM_live_roles_strong. eauto. }
+      destruct (ls_tmap lb (LM := lib_model lib_gs) !! ρlg) eqn:MAP0.
+      (* ; rewrite MAP0. *)
+      + destruct (decide (g = ∅)) as [-> | ?].
+        * erewrite decide_True; [| done].
+          rewrite filter_singleton; [set_solver| ].
+          rewrite bool_decide_eq_true_2; [done| ]. eexists. by econstructor.
+        * erewrite decide_False.
+          2: { intros [=]. done. }
+          rewrite filter_singleton_not; [set_solver| ].
+          rewrite bool_decide_eq_false_2; [done| ].
+          intros [? STEP]. inversion STEP. subst.
+          rewrite MAP0 in LIB_NOROLES. congruence.
+      + erewrite decide_False; [| done].
+        rewrite filter_singleton_not; [set_solver| ].
+        rewrite bool_decide_eq_false_2; [done| ].
+        intros [? STEP]. inversion STEP. subst.
+        rewrite MAP0 in LIB_NOROLES. congruence.
+  Qed.
+
+  Lemma live_roles_3 lb0:
+    live_roles client_model_impl (lb0, 3) ≡ {[ ρ_cl ]}.
+  Proof.
+    simpl. rewrite /client_lr.
+    rewrite !filter_union.
+    erewrite filter_singleton_not, filter_singleton_not, filter_singleton; [set_solver| ..].
+    - rewrite bool_decide_eq_true_2; [done| ]. eexists. econstructor.
+    - apply not_true_iff_false.
+      rewrite bool_decide_eq_false_2; [tauto| ].
+      intros [? STEP]. inversion STEP.
+    - apply not_true_iff_false.
+      rewrite bool_decide_eq_false_2; [tauto| ].
+      intros [? STEP]. inversion STEP.
+  Qed.
+
+  Lemma live_roles_0 lb:
+    live_roles client_model_impl (lb, 0) = ∅.
+  Proof.
+    simpl. rewrite /client_lr.
+    apply leibniz_equiv. rewrite !filter_union.
+    erewrite !filter_singleton_not; [set_solver| ..].
+    all: rewrite bool_decide_eq_false_2; [done| ].
+    all: intros [? STEP]; inversion STEP.
+  Qed.
+
+  Lemma live_roles_2 lb:
+    live_roles client_model_impl (lb, 2) =
+    if (decide (lm_is_stopped ρlg lb (NE := lib_gs_ne)))
+    then {[ ρ_ext ]}
+    else ∅.
+  Proof.
+    simpl. rewrite /client_lr.
+    apply leibniz_equiv. rewrite !filter_union.
+    rewrite union_comm.
+    rewrite filter_singleton_not; [rewrite filter_singleton_not| ].
+    2, 3: rewrite bool_decide_eq_false_2; [done| ]; 
+    intros [? STEP]; by inversion STEP.
+    rewrite !union_empty_l.
+
+    unshelve erewrite set_filter_equiv with (P2 := fun r => r = ρ_ext /\ lm_is_stopped ρlg lb).
+    5: reflexivity.
+    { apply lib_gs_ne. }
+    2: { intros. rewrite bool_decide_eq_true.
+         split.
+         - intros [? STEP]. inversion STEP. subst. split; eauto.
+         - intros [-> STOP]. exists ((reset_lm_st ρlg lb ρlg_in_lib_gs), 1).
+           by econstructor. }
+
+    rewrite -set_filter_and set_filter_comm.
+    erewrite set_filter_equiv.
+    3: { rewrite filter_singleton; reflexivity. }
+    2: { intros. apply iff_refl. }
+    rewrite filter_singleton_if. 
+    repeat destruct decide; reflexivity || tauto.
+    Unshelve. intros. solve_decision. 
+  Qed. 
+      
     (* forall k δo_k gi, lmtr_o S!! k = Some δo_k -> *)
     (*              (exists (δi: LiveState Gi Mi LSIi) (ρi: fmrole Mi), *)
     (*                 state_rel (ls_under δo_k) δi /\ *)
