@@ -5,6 +5,9 @@ Local Ltac gd t := generalize dependent t.
 Definition traces_equiv {St L: Type} :=
   @traces_match L L St St eq eq (fun _ _ _ => True) (fun _ _ _ => True).
 
+Axiom traces_equiv_eq:
+  forall {St L: Type} (t1 t2: trace St L), traces_equiv t1 t2 -> t1 = t2. 
+
 (* Lemma after_equiv {St L: Type} (tr1 tr *)
 (* Lemma subtrace _inf_after_equiva *)
 Lemma trace_prefix_inf_equiv_id {St L: Type} (tr: trace St L) ml len
@@ -87,39 +90,8 @@ Lemma upto_stutter_Proper_impl {St S' L L': Type} {Us: St -> S'} {Usls: St -> L 
   Proper (@traces_equiv St L ==> @traces_equiv S' L' ==> impl)
     (upto_stutter Us Usls).
 Proof. 
-  red. intros t1 t1' EQ1 t2 t2' EQ2 UPTO.
-  gd t1. gd t2. gd t1'. gd t2'.
-  (* pcofix CIH.  *)
-  pcofix CIH. 
-  pfold.
-
-  intros. 
-  erewrite (trace_unfold_fold t1'), (trace_unfold_fold t2') in *. 
-  erewrite (trace_unfold_fold t1), (trace_unfold_fold t2) in *. 
-  (* pfold. punfold UPTO; [| admit]. *) 
-  punfold UPTO; [| apply upto_stutter_mono].
-  inversion UPTO; subst.
-  - destruct t1, t2; try done.
-    inversion EQ1; inversion EQ2; subst; try done.    
-    inversion H0. inversion H. subst.
-    destruct t1', t2'; try done.
-    inversion H2. inversion H5. subst.
-    econstructor.
-  - destruct t1, t2, t1', t2'; try by done.
-    all: inversion EQ1; inversion EQ2; subst; try by done.
-    + inversion H. simpl in H2. subst.
-      Guarded. 
-      specialize (CIH ⟨ Us s2 ⟩ t1' ⟨ Us s2 ⟩).
-      specialize CIH with (t1 := t1).
-      Guarded.
-      specialize_full CIH.
-      4: { rewrite /upaco2.
-           (* eapply upto_stutter_stutter. *)
-           (* 4: { eapply upto_stutter_stutter.  *)
-           (* 2: { econstructor.  *)
-           (* (* 2: { ??? *) *)
-           (* all: admit. } *)
-Admitted. 
+  intros ?? ->%traces_equiv_eq ?? ->%traces_equiv_eq. done.
+Qed. 
 
 Instance upto_stutter_Proper {St S' L L': Type} {Us: St -> S'} {Usls: St -> L -> St -> option L'}:
   Proper (@traces_equiv St L ==> @traces_equiv S' L' ==> iff)

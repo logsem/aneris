@@ -426,13 +426,18 @@ Section ModelSubtrace.
     (VALID': forall i s1 ℓ s2, tr !! i = Some (s1, Some (ℓ, s2)) ->
                           fmtrans _ s1 ℓ s2):
     mtrace_valid tr. 
-  Proof. 
+  Proof.
+    generalize dependent tr. 
     pcofix V.
     intros; pfold.
     rewrite (trace_unfold_fold tr); simpl.
     destruct tr.
     { constructor. }
-  Admitted.
+    constructor. 
+    { apply (VALID' 0). done. }
+    red. right. apply V.
+    intros i *. apply (VALID' (S i)). 
+  Qed.
     
   Lemma subtrace_valid `{M: FairModel} (tr: mtrace M) len
     str start max_len
