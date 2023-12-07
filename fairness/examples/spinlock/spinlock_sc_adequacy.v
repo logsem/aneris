@@ -353,10 +353,85 @@ Proof.
   eapply populate, (initial_ls s ρ). done.
 Qed.     
 
+(* TODO: move this lemma from lm_fairness_preservation to utils *)
+Instance ex_fin_dec {T: Type} (P: T -> Prop) (l: list T)
+  (DEC: forall a, Decision (P a))
+  (IN: forall a, P a -> In a l):
+  Decision (exists a, P a).
+Proof. Admitted. 
+
+Lemma state_unlocked_alt s:
+  state_unlocked s <-> Forall (fun v => v = 0 ∨ v ≥ 2) s.
+Proof. 
+  by rewrite Forall_lookup.
+Qed. 
+
+Lemma state_locked_by_alt s j:
+  state_locked_by s j <-> s !! j = Some 1 /\ Forall (fun v => v = 0 ∨ v ≥ 2) (take j s ++ drop (S j) s).
+Proof. 
+  rewrite /state_locked_by.
+  apply Morphisms_Prop.and_iff_morphism; [done| ].
+  rewrite Forall_app. rewrite !Forall_lookup.
+  setoid_rewrite lookup_take_Some. setoid_rewrite lookup_drop.
+  split.
+  - intros LOCK. split.
+    + intros ?? [??]. eapply LOCK; eauto. lia.
+    + intros ?? ?. eapply LOCK; eauto. lia.
+  - intros [LOCK1 LOCK2]. intros.
+    apply not_eq in JNI as [LT | LT].
+    + eapply LOCK1; eauto. 
+    + apply Nat.le_succ_l in LT. apply Nat.le_sum in LT as [? ->]. 
+      eapply LOCK2; eauto.
+Qed.
+  
+Instance state_locked_by_dec s ρ: Decision (state_locked_by s ρ). 
+Proof.
+  eapply Decision_iff_impl.
+  { symmetry. apply state_locked_by_alt. }
+  apply and_dec; try solve_decision.
+  apply Forall_dec. intros.
+  apply or_dec; try solve_decision.
+  eapply Decision_iff_impl; [apply PeanoNat.Nat.leb_le| ]. solve_decision.
+Qed. 
+  
+Instance le_dec x y: Decision (x <= y).
+Proof. eapply Decision_iff_impl; [apply PeanoNat.Nat.leb_le| ]. solve_decision. Qed.
+
 Instance sl_dec_trans s1 ρ s2:
   Decision (fmtrans spinlock_model_impl s1 (Some ρ) s2).
-Proof. 
-Admitted.
+Proof.
+  set thread_steps_2 := exists v, s1 !! ρ = Some v /\ v >= 2 /\ state_unlocked s1 /\ s2 = (<[ρ:=1]> s1). 
+  set thread_steps_1 := state_locked_by s1 ρ /\ s2 = <[ρ:=0]> s1.
+  set thread_steps' := exists v, s1 !! ρ = Some v /\ v >= 2 /\ s2 = s1 /\ exists j, state_locked_by s1 j. 
+  apply Decision_iff_impl with (P := thread_steps_2 \/ thread_steps_1 \/ thread_steps').
+  { simpl. split.
+    - intros [STEP|[STEP|STEP]]; red in STEP. 
+      + destruct STEP as (?&?&?&?&->). econstructor; eauto.
+      + destruct STEP as (?&->). econstructor; eauto.
+      + destruct STEP as (?&?&?&->&?). econstructor; eauto.
+    - intros STEP. inversion STEP; subst.
+      + left. red. eauto.
+      + right. left. red. eauto.
+      + right. right. red. eauto. }
+  repeat apply or_dec.
+  - rewrite /thread_steps_2.
+    apply ex_fin_dec with (l := match s1 !! ρ with Some v => [v] | _ => [] end).
+    2: { intros ? (->&?&?). set_solver. }
+    intros. repeat apply and_dec; try solve_decision.
+    eapply Decision_iff_impl.
+    { symmetry. apply state_unlocked_alt. }
+    apply Forall_dec. intros. apply or_dec; solve_decision.
+  - rewrite /thread_steps_1.
+    apply and_dec; solve_decision.
+  - rewrite /thread_steps'.
+    apply ex_fin_dec with (l := match s1 !! ρ with Some v => [v] | _ => [] end).
+    2: { intros ? (->&?&?). set_solver. }
+    intros. repeat apply and_dec; try solve_decision. 
+    apply ex_fin_dec with (l := seq 0 (length s1)). 
+    2: { rewrite /state_locked_by. intros ? [IN _].
+         apply in_seq. apply lookup_lt_Some in IN. lia. } 
+    solve_decision. 
+Qed.
 
 Instance sl_lm_dec_ex_step:
   ∀ τ δ1,
