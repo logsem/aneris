@@ -173,57 +173,6 @@ Section exec_trace.
 
 End exec_trace.
 
-Section TraceValid.
-  Context {St L: Type}.
-  Context (trans: St -> L -> St -> Prop). 
-
-  Let traceM := trace St L. 
-
-  Inductive trace_valid_ind (trace_valid_coind: traceM -> Prop) :
-    traceM -> Prop :=
-  | trace_valid_singleton δ: trace_valid_ind _ ⟨δ⟩
-  | trace_valid_cons δ ℓ tr:
-      trans δ ℓ (trfirst tr) ->
-      trace_valid_coind tr →
-      trace_valid_ind _ (δ -[ℓ]-> tr).
-
-  Definition trace_valid := paco1 trace_valid_ind bot1.
-
-  Lemma trace_valid_mono :
-    monotone1 trace_valid_ind.
-  Proof.
-    unfold monotone1. intros x0 r r' IN LE.
-    induction IN; try (econstructor; eauto; done).
-  Qed.
-  Hint Resolve trace_valid_mono : paco.
-
-  Lemma trace_valid_after (mtr mtr' : traceM) k :
-    after k mtr = Some mtr' → trace_valid mtr → trace_valid mtr'.
-  Proof.
-    revert mtr mtr'.
-    induction k; intros mtr mtr' Hafter Hvalid.
-    { destruct mtr'; simpl in *; by simplify_eq. }
-    punfold Hvalid.
-    inversion Hvalid as [|??? Htrans Hval']; simplify_eq.
-    eapply IHk; [done|].
-    by inversion Hval'.
-  Qed.
-
-  Lemma trace_valid_tail s l (tr: traceM)
-    (VALID': trace_valid (s -[l]-> tr)):
-    trace_valid tr.
-  Proof. by eapply trace_valid_after with (k := 1); eauto. Qed.
-
-  Lemma trace_valid_cons_inv (tr: trace St L) s l
-    (VALID: trace_valid (s -[l]-> tr)):
-    trace_valid tr /\ trans s l (trfirst tr). 
-  Proof using.
-    punfold VALID. inversion VALID. subst.
-    pclearbot. done. 
-  Qed.
-
-End TraceValid.
-
 
 Definition mtrace (M:FairModel) := trace M (option M.(fmrole)).
 

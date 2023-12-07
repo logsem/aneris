@@ -236,3 +236,13 @@ Proof using.
   destruct DEC_P; [left | right]; tauto. 
 Qed.  
 
+Instance ex_fin_dec {T: Type} (P: T -> Prop) (l: list T)
+  (DEC: forall a, Decision (P a))
+  (IN: forall a, P a -> In a l):
+  Decision (exists a, P a).
+Proof.
+  destruct (Exists_dec P l) as [EX|NEX].
+  - left. apply List.Exists_exists in EX as (?&?&?). eauto.
+  - right. intros [a Pa]. apply NEX.
+    apply List.Exists_exists. eexists. split; eauto.
+Qed. 

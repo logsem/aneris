@@ -11,7 +11,7 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 From stdpp Require Import finite.
-From trillium.fairness Require Import fairness_finiteness actual_resources_interface lm_fair.
+From trillium.fairness Require Import fairness_finiteness actual_resources_interface lm_fair utils.
 
 Import derived_laws_later.bi.
 
@@ -352,13 +352,6 @@ Proof.
   pose proof (fmstate_inhabited spinlock_model_impl) as [s].
   eapply populate, (initial_ls s ρ). done.
 Qed.     
-
-(* TODO: move this lemma from lm_fairness_preservation to utils *)
-Instance ex_fin_dec {T: Type} (P: T -> Prop) (l: list T)
-  (DEC: forall a, Decision (P a))
-  (IN: forall a, P a -> In a l):
-  Decision (exists a, P a).
-Proof. Admitted. 
 
 Lemma state_unlocked_alt s:
   state_unlocked s <-> Forall (fun v => v = 0 ∨ v ≥ 2) s.

@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup fuel_ext trace_lookup.
+From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup fuel_ext trace_lookup utils.
 
 
 Section fairness_preserved.
@@ -128,20 +128,7 @@ Section fairness_preserved.
       exists 1. do 2 eexists. rewrite trace_lookup_cons. split; eauto. 
       rewrite /steps_or_unassigned. left.
       apply not_elem_of_dom in Heq. by rewrite -ls_same_doms in Heq. 
-  Qed.
-
-  (* TODO: move *)
-  Instance ex_fin_dec {T: Type} (P: T -> Prop) (l: list T)
-    (DEC: forall a, Decision (P a))
-    (IN: forall a, P a -> In a l):
-    Decision (exists a, P a).
-  Proof.
-    destruct (Exists_dec P l) as [EX|NEX].
-    - left. apply List.Exists_exists in EX as (?&?&?). eauto.
-    - right. intros [a Pa]. apply NEX.
-      apply List.Exists_exists. eexists. split; eauto.
-  Qed. 
-    
+  Qed.    
 
   (* TODO: move? *)
   Instance locale_trans_exG_dec st1 st2:
@@ -423,29 +410,6 @@ Section fairness_preserved.
 
 End fairness_preserved.
 
-
-(* TODO: move *)
-Lemma traces_match_valid1 {L1 L2 S1 S2 : Type} Rl Rs trans1 trans2
-  (tr1: trace S1 L1) (tr2: trace S2 L2):
-  traces_match Rl Rs trans1 trans2 tr1 tr2 ->
-  trace_valid trans1 tr1. 
-Proof.
-  revert tr1 tr2. pcofix CH. intros tr1 tr2 Hmatch.
-  pfold. 
-  inversion Hmatch; [by econstructor| ].
-  constructor =>//.
-  specialize (CH _ _ H3).
-  eauto.   
-Qed.
-
-(* TODO: move *)
-Lemma traces_match_valid2 {L1 L2 S1 S2 : Type} Rl Rs trans1 trans2
-  (tr1: trace S1 L1) (tr2: trace S2 L2):
-  traces_match Rl Rs trans1 trans2 tr1 tr2 ->
-  trace_valid trans2 tr2. 
-Proof.
-  intros ?%traces_match_flip. eapply traces_match_valid1; eauto. 
-Qed.
 
 Instance LM_ALM `(LM: LiveModel G M LSI): AlmostLM olocale_trans (LM := LM).
 Proof. 

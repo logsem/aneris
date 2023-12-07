@@ -60,43 +60,6 @@ Proof.
 Qed.
 
 
-Lemma traces_match_flip {S1 S2 L1 L2}
-      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
-      (trans1: S1 -> L1 -> S1 -> Prop)
-      (trans2: S2 -> L2 -> S2 -> Prop)
-      tr1 tr2 :
-  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
-  traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
-Proof.
-  split.
-  - revert tr1 tr2. cofix CH.
-    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
-    { by constructor. }
-    constructor; [done..|].
-    by apply CH.
-  - revert tr1 tr2. cofix CH.
-    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
-    { by constructor. }
-    constructor; [done..|].
-    by apply CH.
-Qed.
-
-Lemma traces_match_after' {S1 S2 L1 L2}
-  (Rℓ : L1 → L2 → Prop) (Rs : S1 → S2 → Prop)
-  (trans1 : S1 → L1 → S1 → Prop) (trans2 : S2 → L2 → S2 → Prop)
-  (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) 
-  (tr1' : trace S1 L1):
-  traces_match Rℓ Rs trans1 trans2 tr1 tr2
-  → after n tr1 = Some tr1'
-  → ∃ tr2' : trace S2 L2,
-      after n tr2 = Some tr2' ∧ traces_match Rℓ Rs trans1 trans2 tr1' tr2'.
-Proof.
-  intros ?%traces_match_flip ?.
-  eapply traces_match_after in H0 as (?&?&?); eauto.
-  eexists. split; eauto.
-  by apply traces_match_flip.
-Qed. 
-
 Lemma traces_match_impl {S1 S2 L1 L2}
       (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
       (Rℓ2: L1 -> L2 -> Prop) (Rs2: S1 -> S2 -> Prop)

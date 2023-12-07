@@ -177,6 +177,57 @@ Notation "⟨ s ⟩" := (tr_singl s) : trace_scope.
 Notation "s -[ ℓ ]->  r" := (tr_cons s ℓ r) (at level 33) : trace_scope.
 Open Scope trace.
 
+Section TraceValid.
+  Context {St L: Type}.
+  Context (trans: St -> L -> St -> Prop). 
+
+  Let traceM := trace St L. 
+
+  Inductive trace_valid_ind (trace_valid_coind: traceM -> Prop) :
+    traceM -> Prop :=
+  | trace_valid_singleton δ: trace_valid_ind _ ⟨δ⟩
+  | trace_valid_cons δ ℓ tr:
+      trans δ ℓ (trfirst tr) ->
+      trace_valid_coind tr →
+      trace_valid_ind _ (δ -[ℓ]-> tr).
+
+  Definition trace_valid := paco1 trace_valid_ind bot1.
+
+  Lemma trace_valid_mono :
+    monotone1 trace_valid_ind.
+  Proof.
+    unfold monotone1. intros x0 r r' IN LE.
+    induction IN; try (econstructor; eauto; done).
+  Qed.
+  Hint Resolve trace_valid_mono : paco.
+
+  Lemma trace_valid_after (mtr mtr' : traceM) k :
+    after k mtr = Some mtr' → trace_valid mtr → trace_valid mtr'.
+  Proof.
+    revert mtr mtr'.
+    induction k; intros mtr mtr' Hafter Hvalid.
+    { destruct mtr'; simpl in *; by simplify_eq. }
+    punfold Hvalid.
+    inversion Hvalid as [|??? Htrans Hval']; simplify_eq.
+    eapply IHk; [done|].
+    by inversion Hval'.
+  Qed.
+
+  Lemma trace_valid_tail s l (tr: traceM)
+    (VALID': trace_valid (s -[l]-> tr)):
+    trace_valid tr.
+  Proof. by eapply trace_valid_after with (k := 1); eauto. Qed.
+
+  Lemma trace_valid_cons_inv (tr: trace St L) s l
+    (VALID: trace_valid (s -[l]-> tr)):
+    trace_valid tr /\ trans s l (trfirst tr). 
+  Proof using.
+    punfold VALID. inversion VALID. subst.
+    pclearbot. done. 
+  Qed.
+
+End TraceValid.
+
 Section simulation.
   Context {L1 L2 S1 S2: Type}.
   Context (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop).
@@ -227,9 +278,72 @@ Section simulation.
     eapply IHn =>//.
   Qed.
 
+  (* TODO: move *)
+  Lemma traces_match_valid1
+    (tr1: trace S1 L1) (tr2: trace S2 L2):
+    traces_match tr1 tr2 ->
+    trace_valid trans1 tr1. 
+  Proof.
+    revert tr1 tr2. pcofix CH. intros tr1 tr2 Hmatch.
+    pfold. 
+    inversion Hmatch; [by econstructor| ].
+    constructor =>//.
+    specialize (CH _ _ H3).
+    eauto.   
+  Qed.
   
+  (* TODO: move *)
+  Lemma traces_match_valid2
+    (tr1: trace S1 L1) (tr2: trace S2 L2):
+    traces_match tr1 tr2 ->
+    trace_valid trans2 tr2. 
+  Proof.
+    revert tr1 tr2. pcofix CH. intros tr1 tr2 Hmatch.
+    pfold. 
+    inversion Hmatch; [by econstructor| ].
+    constructor =>//.
+    specialize (CH _ _ H3).
+    eauto.   
+  Qed.  
+  
+  Lemma traces_match_after'
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) 
+    (tr1' : trace S1 L1):
+    traces_match tr1 tr2
+    → after n tr1 = Some tr1'
+    → ∃ tr2' : trace S2 L2,
+        after n tr2 = Some tr2' ∧ traces_match tr1' tr2'.
+  Proof.
+    revert tr1 tr2.
+    induction n; intros tr1 tr2.
+    { simpl. intros. exists tr2. simplify_eq. done. }
+    move=> /= Hm Ha. destruct tr1 as [|s ℓ tr1''] eqn:Heq; first done.
+    destruct tr2; first by inversion Hm.
+    inversion Hm; simplify_eq. by eapply IHn.
+  Qed.
 
 End simulation.
+
+Lemma traces_match_flip {S1 S2 L1 L2}
+  (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+  (trans1: S1 -> L1 -> S1 -> Prop)
+  (trans2: S2 -> L2 -> S2 -> Prop)
+  tr1 tr2 :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
+    traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
+Proof.
+  split.
+  - revert tr1 tr2. cofix CH.
+    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
+    { by constructor. }
+    constructor; [done..|].
+    by apply CH.
+  - revert tr1 tr2. cofix CH.
+    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
+    { by constructor. }
+    constructor; [done..|].
+    by apply CH.
+Qed.
 
 Section execs_and_traces.
   Context {S L: Type}.
