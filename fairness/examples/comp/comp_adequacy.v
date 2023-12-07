@@ -19,9 +19,9 @@ From trillium.fairness.ext_models Require Import destutter_ext ext_models.
 From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.examples.comp Require Import traces_equiv.
 From trillium.fairness Require Import fair_termination_natural.
-From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
-
 From trillium.fairness Require Import lm_fairness_preservation_wip.
+
+From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
 
 Close Scope Z_scope. 
 
@@ -514,6 +514,32 @@ Proof.
   replace (m1 + S d) with (m1 + d + 1) in ST' by lia.
   rewrite ST' in ST'_. inversion ST'_. subst s'_.
   specialize_full IHd; eauto. lia. 
+Qed.
+
+Lemma client_step_mono s1 oρ s2
+  (STEP: client_trans s1 oρ s2):
+  s2.2 <= s1.2.
+Proof. inversion STEP; simpl; lia. Qed. 
+
+(* TODO: use this lemma more extensively *)
+Lemma client_trace_mono (tr: mtrace client_model_impl) i j si sj
+  (VALID : mtrace_valid tr)
+  (LE: i <= j)
+  (ITH: tr S!! i = Some si) (JTH: tr S!! j = Some sj):
+  sj.2 <= si.2.
+Proof. 
+  apply Nat.le_sum in LE as [d ->].
+  gd sj. induction d.
+  { intros. rewrite Nat.add_0_r in JTH. rewrite ITH in JTH. by inversion JTH. }
+  rewrite Nat.add_succ_r -Nat.add_1_r. intros sj' JTH'. 
+  pose proof (trace_has_len tr) as [len LEN].  
+  destruct (proj2 (trace_lookup_dom_strong _ _ LEN (i + d))) as (sj & ρ & sj'_ & JTH). 
+  { eapply state_lookup_dom; eauto. }
+  apply state_label_lookup in JTH as (JTH & JTH'_ & JTHρ).
+  rewrite JTH' in JTH'_. inversion JTH'_. subst sj'_. clear JTH'_.   
+  specialize (IHd _ JTH). etrans; [| apply IHd].
+  eapply client_step_mono.
+  eapply trace_valid_steps''; eauto.
 Qed. 
 
 (* TODO: inline? *)
@@ -549,6 +575,59 @@ Proof.
   simpl in STEP. inversion STEP; subst; done. 
 Qed. 
 
+Definition is_lib_ext_step := 
+  fun step => step_label_matches step (fun ρ => exists e, inl (inr e) = ρ).
+
+(* TODO: move *)
+Lemma nomega_le_lt_eq x y:
+  NOmega.le x y <-> NOmega.lt x y \/ x = y.
+Proof.
+  lia_NO' x; lia_NO' y; try tauto.
+  - split; try done. intros [[] | [=]].
+  - rewrite Nat.le_lteq. apply Morphisms_Prop.or_iff_morphism; [done| ].
+    split; [intros -> | intros [=->]]; done.
+Qed. 
+
+Instance is_lib_ext_step_dec res: Decision (is_lib_ext_step res).
+Proof.
+  apply slm_dec. intros.
+  destruct ρ as [[ | ]|].
+  2: by left; eauto.
+  all: by right; intros [? [=]].
+Qed. 
+  
+
+Lemma lib_ext_trans_bound (tr: mtrace client_model_impl)
+  (VALID : mtrace_valid tr):
+  trans_bounded tr (λ oℓ, ∃ l : env_role, oℓ = Some (inl (inr l))).
+Proof. 
+  red.
+  pose proof (trace_has_len tr) as [len LEN]. 
+  forward eapply (trace_prop_split tr (not ∘ is_lib_ext_step)) as [l1 (L1 & NL1 & DOM1)]; eauto.
+  { solve_decision. }
+  apply nomega_le_lt_eq in DOM1 as [DOM1 | ->].
+  2: { exists 0. intros i ? _ ITH. intros [? ->].
+       apply trace_label_lookup_simpl' in ITH as (?&?&ITH). 
+       eapply L1; eauto.
+       - eapply trace_lookup_dom; eauto.
+       - do 2 red. do 3 eexists. split; eauto. }
+  destruct l1 as [| n]; [lia_NO len| ].
+  pose proof DOM1 as NTH. eapply trace_lookup_dom in NTH as [step NTH]; eauto.  
+  specialize (NL1 _ _ eq_refl NTH).
+  apply dec_stable in NL1.
+  do 2 red in NL1. destruct NL1 as (?&?&?&->&[? <-]).
+  pose proof NTH as STEP. eapply trace_valid_steps' in STEP; eauto.
+  inversion STEP; subst.
+  exists (S n). intros j ? LT JTH. intros [? ->].
+  apply trace_label_lookup_simpl' in JTH as (?&?&JTH). 
+  pose proof JTH as STEP'. eapply trace_valid_steps' in STEP'; eauto.
+  inversion STEP'. subst.
+  apply state_label_lookup in NTH as (?&NTH'&?). 
+  apply state_label_lookup in JTH as (JTH&?&?). 
+  epose proof (client_trace_mono _ _ _ _ _ VALID _ NTH' JTH) as LE.
+  simpl in LE. lia.
+  Unshelve. lia.
+Qed.
   
 Lemma client_model_fair_term tr lmtr
   (OUTER_CORR: outer_LM_trace_exposing lmtr tr):
@@ -632,7 +711,8 @@ Proof.
       apply lib_fair_term. }
     { subst l2. simpl in *.
       assert (trans_bounded str (fun oℓ => exists l, oℓ = Some (inl $ inr l))).
-      { admit. }
+      { eapply lib_ext_trans_bound; eauto.
+        eapply (subtrace_valid tr); eauto. }
       destruct H as [b BOUND]. exists b. intros. intros [? ->].
       pose proof H0 as ITH'. 
       eapply traces_match_label_lookup_2 in ITH' as (ℓ & ITH' & MATCH'); [| apply MATCH].
