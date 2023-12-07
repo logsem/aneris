@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi.
 From trillium.fairness Require Import lm_fair fuel_ext fairness_finiteness. 
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import notation wp_tacs.
 
 Close Scope Z_scope.
 
@@ -29,16 +29,19 @@ Section LibraryDefs.
     fmstate lib_model_impl → gmap (fmrole lib_model_impl) lib_grole → gmap (fmrole lib_model_impl) nat → Prop := 
     fun _ m _ => forall ρ g, m !! ρ = Some g -> g ∈ gs. 
 
+  Definition lib_fl := 5.
   Definition lib_model gs: LiveModel lib_grole lib_model_impl (LSI_groups_fixed gs) := 
-    {| lm_fl _ := 5; |}.
+    {| lm_fl _ := lib_fl; |}.
 
   (* Definition lib_lm_LSI_alt gs (δ: lm_ls (lib_model gs)): *)
   (*   dom (ls_tmap δ) ⊆ gs. *)
   (* Proof.  *)
   (*   apply elem_of_subseteq. intros g.  *)
   
-  Definition lib_fun: val.
-  Admitted.
+  Definition lib_fun: val :=
+    λ: <>,
+      let: "y" := ref #1 in
+      "y" <- #0. 
 
   Lemma lib_model_impl_lr_strong: FM_strong_lr lib_model_impl.
   Proof. 
@@ -130,14 +133,59 @@ Section LibrarySpec.
   
   Notation "'PMP' gs" := (fun Einvs => (LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS))) (at level 10). 
 
-  Lemma lib_spec tid gs Einvs f (F2: f >= 2):
+  Lemma lib_LSI_fuel_independent gs:
+    @LSI_fuel_independent lib_grole lib_model_impl (LSI_groups_fixed gs).
+  Proof.
+    red. rewrite /LSI_groups_fixed. intros.
+    eapply H0; eauto. 
+  Qed.
+
+  Lemma lib_spec tid gs Einvs f (F2: f >= 4):
     PMP gs Einvs -∗
     {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
         has_fuels tid {[ ρl:=f ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
     {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
                  partial_free_roles_are {[ ρl ]} }}}.
-  Proof using. Admitted.
+  Proof using.
+    iIntros "#PMP" (Φ) "!> (ST & FUELS) POST". rewrite /lib_fun.
+
+    rewrite (sub_0_id {[ _ := _ ]}).
+    assert (fuels_ge ({[ρl := f]}: gmap (fmrole lib_model_impl) nat) 4) as FS.
+    { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
+
+    pure_step FS lib_LSI_fuel_independent.
+
+    wp_bind (ref _)%E.
+    iApply (wp_alloc_nostep with "[$] [FUELS]").
+    { apply lib_LSI_fuel_independent. }
+    2: { solve_fuels_S FS. }
+    { solve_map_not_empty. }
+    iNext. iIntros (l) "(L & _ & FUELS) /=".
+
+    do 2 pure_step FS lib_LSI_fuel_independent.
+
+    iApply (wp_store_step_singlerole with "[$] [L ST FUELS]").
+    6: { iFrame "L ST". iNext.
+         iApply has_fuel_fuels. rewrite map_fmap_singleton. iFrame. }
+    { done. }
+    2: { econstructor; eauto. }
+    { reflexivity. }
+    { done. }
+    { erewrite decide_False; [| done].
+      red. intros. red. intros ρ g'. 
+      rewrite /update_mapping. rewrite map_lookup_imap.
+      rewrite dom_empty_L difference_empty_L union_empty_r_L dom_singleton_L.  
+      rewrite lookup_gset_to_gmap. rewrite option_guard_decide.
+      destruct (decide (ρ ∈ dom R ∖ {[ρl]})).
+      2: { simpl. congruence. }
+      simpl. destruct decide.
+      { intros. eapply H0; eauto. }
+      intros [=]. subst. eapply H0; eauto. }
+    iNext. iIntros "(L & ST & FUELS)".
+    erewrite decide_False; [| done].
+    iApply ("POST" with "FUELS"). 
+  Qed. 
 
 End LibrarySpec.
 

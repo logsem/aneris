@@ -98,50 +98,6 @@ Section ClientSpec.
     set_solver.
   Qed.
 
-  Notation "'sub' d" := (fun n => n - d) (at level 10).
-
-  Lemma sub_comp `{Countable K} (fs: gmap K nat) (d1 d2: nat):
-    (sub d1 ∘ sub d2) <$> fs = sub (d1 + d2) <$> fs.
-  Proof.
-    apply leibniz_equiv. apply map_fmap_proper; [| done].
-    intros ??->. apply leibniz_equiv_iff.
-    rewrite /compose. lia.
-  Qed.
-
-  Lemma sub_0_id `{Countable K} (fs: gmap K nat):
-    fs = sub 0 <$> fs.
-  Proof.
-    rewrite -{1}(map_fmap_id fs).
-    apply leibniz_equiv. apply map_fmap_proper; [| done].
-    intros ??->. apply leibniz_equiv_iff.
-    simpl. lia.
-  Qed.
-
-  Ltac solve_fuels_ge_1 FS :=
-    intros ?? [? [<- GE]]%lookup_fmap_Some; apply FS in GE; simpl; lia.
-  
-  Ltac solve_fuels_S FS :=
-    iDestruct (has_fuels_gt_1 with "FUELS") as "F";
-    [| rewrite -map_fmap_compose; (try rewrite sub_comp); by iFrame];
-    solve_fuels_ge_1 FS.
-
-  Ltac solve_map_not_empty := intros ?MM%fmap_empty_iff; try rewrite -insert_empty in MM; try apply insert_non_empty in MM; set_solver.
-
-  Ltac pure_step_impl FS :=
-    try rewrite sub_comp;
-    iApply wp_lift_pure_step_no_fork; auto;
-    [apply client_LSI_fuel_independent| ..];
-    [| iSplitR; [done| ]; do 3 iModIntro; iSplitL "FUELS"];
-    [| solve_fuels_S FS |];
-    (* [by intros ?%fmap_empty_iff| ]; *)
-    [solve_map_not_empty| ];
-    iIntros "FUELS"; simpl; try rewrite sub_comp.
-
-  Ltac pure_step FS :=
-    (* unshelve (pure_step_impl FS); [by apply fuel_reorder_preserves_client_LSI| ]. *)
-    (* unshelve (pure_step_impl FS); [by apply client_LSI_fuel_independent| ]. *)
-    pure_step_impl FS. 
-
   (* TODO: move, upstream *)
   Lemma dom_filter_comm {K A: Type} `{Countable K}
                         (P: K -> Prop) `{∀ x : K, Decision (P x)}:
