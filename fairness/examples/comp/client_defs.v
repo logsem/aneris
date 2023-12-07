@@ -91,7 +91,7 @@ Section ClientDefs.
   (*   - destruct a as (->&->&->). *)
   (*     destruct (decide (locale_trans δ_lib ρlg δ'_lib (LM := lib_model))).  *)
   
-  Instance client_step_dec (st: client_state) (ρ: client_role):
+  Instance client_step_ex_dec (st: client_state) (ρ: client_role):
     Decision (exists st', client_trans st (Some ρ) st').
   Proof.
     Local Ltac nostep := right; intros [? T]; inversion T.

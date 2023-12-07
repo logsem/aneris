@@ -248,11 +248,52 @@ Qed.
 Arguments NOmega.le _ _ : simpl nomatch.
 
 
-(* TODO: unify with other decision lemmas about client model *)
-Instance client_trans_dec: forall c1 oρ c2, 
-    Decision (client_trans c1 oρ c2).
-Proof. Admitted. 
+(* TODO: unify with client_step_ex_dec ? *)
+Instance client_step_ex_dec: forall st oρ st', 
+    Decision (client_trans st oρ st').
+Proof.
+  intros. destruct oρ as [ρ| ].
+  2: { right. intros T. inversion T. }
+  destruct st' as [δ_lib' c']. 
   
+  pose proof (@lib_LF _ lib_gs_ne). (* why it's not inferred anymore? *)
+  pose proof lib_lm_EI_eqdec. 
+  Local Ltac nostep := right; intros T; inversion T.
+  destruct st as [δ_lib n]. destruct n; [| destruct n]; [..| destruct n]; [..| destruct n]. 
+  - by nostep. 
+  - destruct ρ as [l | y].
+    + destruct l.
+      2: by nostep. 
+      destruct f.
+      destruct (decide (locale_trans δ_lib () δ_lib' (LM := lib_model lib_gs))).
+      ** destruct (decide (c' = 1)).
+         *** left. subst. econstructor. eauto.
+         *** by nostep.  
+      ** nostep. simpl in LIB_STEP. eauto. 
+    + destruct y. 
+      destruct (ls_tmap δ_lib (LM := lib_model lib_gs) !! ρlg) eqn:LIB_OBLS.
+      2: { nostep. subst. congruence. }
+      destruct (decide (g = ∅)).
+      * subst. destruct (decide (c' = 0 /\ δ_lib' = δ_lib)) as [[-> ->] |].
+        ** subst. left. econstructor. eauto.
+        ** nostep. subst. by apply n. 
+      * nostep. subst. set_solver.
+  - destruct ρ as [l | y]; [destruct l| ]. 
+    1, 3: by nostep.
+    destruct e as [i].      
+    destruct (decide (δ_lib' = reset_lm_st ρlg δ_lib ρlg_in_lib_gs /\ lm_is_stopped ρlg δ_lib /\ c' = 1 /\ i = (eiG ρlg))) as [(-> & STOP & -> & ->)|].
+    + left. by econstructor.
+    + nostep. subst. tauto. 
+  - assert (EqDecision client_role).
+    { rewrite /client_role.
+      assert (EqDecision y_role). (* not inferred? *)
+      { solve_decision. }
+        solve_decision. }
+    destruct (decide (ρ = ρ_cl /\ c' = 2 /\ δ_lib' = δ_lib)) as [(->&->&->)|?]. 
+    + left. econstructor; eauto.
+    + nostep. subst. tauto.  
+  - by nostep. 
+Qed.
 
 
 CoFixpoint project_lib_trace (tr: mtrace client_model_impl): 
