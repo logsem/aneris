@@ -829,7 +829,22 @@ Proof.
 
   destruct x2.
   2: { (* corner case of only ext step without following lib steps *)
-    admit. }
+    destruct BOUND3'.
+    2: { eapply trace_valid_steps' in STEPn; eauto.
+         inversion STEPn. subst. simpl in *. lia. }
+    do 2 red in CL2. destruct CL2 as (st_m2&?&st_m2'&[=]&?). subst. 
+    apply Nat.le_lteq in LE3 as [LT | ->].
+    2: { rewrite STm2 in STEPn. inversion STEPn. }
+    simpl in BOUND.
+    assert (st_m2'.2 <= 1) as BOUND'.
+    { eapply trace_valid_steps' in STm2; eauto.
+      inversion STm2; subst; simpl in *; lia. }
+    apply state_label_lookup in STm2 as (?&M2TH'&?). 
+    apply state_label_lookup in STEPn as (NTH&?&?). 
+    epose proof (client_trace_mono _ _ _ _ _ VALID _ M2TH' NTH) as LE.
+    simpl in *. lia.
+    Unshelve. lia. } 
+
   rename f into x2. 
 
   enough (ls_tmap x.1 (LM := lib_model lib_gs) !! x2 = Some ∅).
@@ -845,7 +860,7 @@ Proof.
   apply fm_live_spec in LIB_STEP.
   eapply LM_map_empty_notlive in LIB_STEP; eauto. done.  
   
-Admitted. 
+Qed. 
 
 Lemma client_LM_inner_exposed (auxtr: lmftrace (LM := client_model)):
   inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) auxtr (LMo := client_model) (AMi := lib_ALM).
