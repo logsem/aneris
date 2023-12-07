@@ -130,7 +130,7 @@ Section ClientDefs.
   Qed.
 
   Definition client_lr (st: client_state): gset (client_role) :=
-    filter (fun r => (@bool_decide _ (client_step_dec st r) = true))  
+    filter (fun r => (@bool_decide _ (client_step_ex_dec st r) = true))  
       {[ ρ_lib; ρ_ext; ρ_cl ]}. 
 
   Lemma client_lr_spec: ∀ (s : client_state) (ρ : client_role),

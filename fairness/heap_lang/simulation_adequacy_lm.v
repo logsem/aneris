@@ -162,21 +162,40 @@ Proof.
         apply ls_mapping_tmap_corr. }
 Qed.
   
+Let wp_premise
+  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}
+  conv_init ξ σ1 e1 s1 s
+  (LSI0: initial_ls_LSI s1 0)
+  (δ0 := initial_ls (LM := LM) s1 0%nat LSI0)
+    := (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}, 
+    ⊢ (|={⊤}=>
+       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
+         conv_init hGS
+       ={⊤}=∗
+       WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
+       rel_always_holds s ξ e1 σ1 δ0) ∗
+       (LM_init_resource 0%nat δ0 ∗ em_lm_msi ([e1], σ1) δ0  ==∗ conv_init hGS ∗ em_lm_msi ([e1], σ1) δ0)%I). 
 
 Theorem strong_simulation_adequacy Σ
     `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop)
-  (LSI0: initial_ls_LSI s1 0):
+    conv_init
+  (LSI0: initial_ls_LSI s1 0)
+  (δ0 := initial_ls (LM := LM) s1 0%nat LSI0)
+  :
   rel_finitary (sim_rel_with_user LM ξ) →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}, 
-    ⊢ |={⊤}=>
-       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
-         LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0)
-       ={⊤}=∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
-       rel_always_holds s ξ e1 σ1 (initial_ls (LM := LM) s1 0%nat LSI0)) ->
-  continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat LSI0)).
+  (* (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},  *)
+  (*   ⊢ (|={⊤}=> *)
+  (*      ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗ *)
+  (*        conv_init *)
+  (*      ={⊤}=∗ *)
+  (*      WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗ *)
+  (*      rel_always_holds s ξ e1 σ1 δ0) ∗ *)
+  (*      (LM_init_resource 0%nat δ0 ∗ em_lm_msi ([e1], σ1) δ0  ==∗ conv_init ∗ em_lm_msi ([e1], σ1) δ0)%I) *)
+  wp_premise conv_init ξ σ1 e1 s1 s LSI0
+ ->
+  continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton δ0).
 Proof.
   intros Hfin WP_RAH.
   eapply @strong_simulation_adequacy_general.
@@ -184,32 +203,33 @@ Proof.
   { split.
     - red. eauto.
     - red. split; auto. apply initial_ls_tmap.  } 
-  iIntros. iModIntro. 
-  iIntros "R". iMod (WP_RAH with "R") as ">[WP RAH]".
+  iIntros.
+  iPoseProof (WP_RAH Hinv) as "[WP_RAH CONV]".
+  iSplitR.
+  2: { simpl. iApply "CONV". } 
+  iIntros "R". iMod ("WP_RAH" with "R") as ">[WP RAH]".
   iModIntro. iSplitL "WP"; [by iFrame| ]. 
   by iApply rel_always_holds_lift_LM. 
 Qed.
 
 Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M)
+  conv_init
   (LSI0: initial_ls_LSI s1 0)
+  (δ0 := initial_ls (LM := LM) s1 0%nat LSI0)
 :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   (* The initial configuration satisfies certain properties *)
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=>
-         LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0)
-        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
-  ) ->
-  (* The coinductive pure coq proposition given by adequacy *)
+  wp_premise conv_init (λ _ _, True) σ1 e1 s1 s LSI0 ->
+    (* The coinductive pure coq proposition given by adequacy *)
   @continued_simulation
     heap_lang
     (fair_model_model LM_Fair)
     (sim_rel LM)
     (trace_singleton ([e1], σ1))
-    (trace_singleton (initial_ls (LM := LM) s1 0%nat LSI0)).
+    (trace_singleton δ0).
 Proof.
   intros Hne H.
   assert (sim_rel LM = sim_rel_with_user LM (λ _ _, True)) as Heq.
@@ -220,28 +240,21 @@ Proof.
     unfold sim_rel_with_user. intuition. }
 
   rewrite Heq.
-  apply (strong_simulation_adequacy Σ s) =>//.
-  { rewrite -Heq. done. }
-  iIntros (Hinv) "".
-  iPoseProof (H Hinv) as ">H". iModIntro. iIntros "[Hσ (Hm & Hfr & Hf)]". iSplitR "".
-  - iApply ("H" with "[Hm Hfr Hf]"). rewrite /LM_init_resource. iFrame. 
-  - iIntros "!>%%%?????????".
-    iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
+  eapply (strong_simulation_adequacy Σ s) =>//.
+  rewrite -Heq. done.
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ
         `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}  (s: stuckness)
         e1 σ1 (s1: M)
+        conv_init
         (LSI0: initial_ls_LSI s1 0)
         (iex : inf_execution_trace heap_lang)
         (Hvex : valid_inf_exec (trace_singleton ([e1], σ1)) iex)
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM)  →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0)
-         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
-  ) ->
+  wp_premise conv_init (λ _ _, True) σ1 e1 s1 s LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
   exists iatr,
   @valid_inf_system_trace _ (fair_model_model LM_Fair)
@@ -259,7 +272,7 @@ Proof.
   eapply produced_inf_aux_trace_valid_inf.
   Unshelve.
   - econstructor.
-  - apply (simulation_adequacy Σ s) => //.
+  - eapply (simulation_adequacy Σ s) => //.
   - done.
 Qed.
 
@@ -269,6 +282,7 @@ Definition heap_lang_extrace : Type := extrace heap_lang.
 Theorem simulation_adequacy_traces Σ
   `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
         e1 (s1: M)
+        conv_init
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -276,10 +290,7 @@ Theorem simulation_adequacy_traces Σ
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0)
-        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
-  ) ->
+  wp_premise conv_init (λ _ _, True) (trfirst extr).2 e1 s1 s LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
   ∃ (auxtr : lmftrace (LM := LM)), lm_exaux_traces_match extr auxtr.
 Proof.
@@ -295,7 +306,7 @@ Proof.
         (trace_singleton (initial_ls (LM := LM) s1 0%nat LSI0))
         (from_trace extr)
         iatr.
-  { apply (simulation_adequacy_inftraces _ s); eauto.
+  { eapply (simulation_adequacy_inftraces _ s); eauto.
     eapply from_trace_preserves_validity; eauto; first econstructor.
     simpl. destruct (trfirst extr) eqn:Heq.
     simpl in Hexfirst. rewrite -Hexfirst Heq //. }
@@ -321,6 +332,7 @@ Qed.
 Theorem simulation_adequacy_model_trace Σ
         `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
         e1 (s1: M)
+        conv_init
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
@@ -328,17 +340,14 @@ Theorem simulation_adequacy_model_trace Σ
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0) 
-               ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
-  ) ->
+  wp_premise conv_init (λ _ _, True) (trfirst extr).2 e1 s1 s LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
   ∃ (auxtr : lmftrace (LM:=LM)) mtr, lm_exaux_traces_match extr auxtr ∧
                                upto_stutter ls_under Usls auxtr mtr.
 Proof.
   intros Hfb Hwp.
   destruct (simulation_adequacy_traces
-              Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as [auxtr Hmatch].
+              Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as [auxtr Hmatch].
   assert (mtrace_valid auxtr) as Hstutter.
   { by eapply traces_match_valid2 in Hmatch. }
   destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
@@ -349,6 +358,7 @@ Qed.
 Theorem simulation_adequacy_terminate Σ
         `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
         e1 (s1: M)
+        conv_init
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
@@ -356,11 +366,7 @@ Theorem simulation_adequacy_terminate Σ
   (∀ mtr: @mtrace M, mtrace_fairly_terminating mtr) ->
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0)
-                 ={⊤}=∗
-                 WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
-  ) ->
+  wp_premise conv_init (λ _ _, True) (trfirst extr).2 e1 s1 s LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
   extrace_fairly_terminating extr.
 Proof.
@@ -368,7 +374,7 @@ Proof.
   destruct (infinite_or_finite extr) as [Hinf|] =>//.
 
   destruct (simulation_adequacy_model_trace
-              Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
   have Hfairaux := ex_fairness_preserved 
                      extr auxtr Hinf Hmatch Hfair.
   pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) Hfairaux) as Hfairaux'. 
@@ -385,16 +391,14 @@ Qed.
 Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
         `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
         e1 (s1: M)
+        conv_init
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0) 
-               ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat }}
-  ) ->
+  wp_premise conv_init (λ _ _, True) (trfirst extr).2 e1 s1 s LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
   extrace_fairly_terminating extr.
 Proof.
@@ -405,16 +409,14 @@ Qed.
 Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
         `{!heapGpreS Σ (@LM_EM_HL _ _ _ LF')} (s: stuckness)
         e1 (s1: M)
+        conv_init
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
-  (∀ `{!heapGS Σ (@LM_EM_HL _ _ _ LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := LM) s1 0%nat LSI0) 
-                 ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, frag_mapping_is {[ 0%nat := ∅ ]} }}
-  ) ->
+  wp_premise conv_init (λ _ _, True) (trfirst extr).2 e1 s1 s LSI0 -> 
   (* The coinductive pure coq proposition given by adequacy *)
   extrace_fairly_terminating extr.
 Proof.

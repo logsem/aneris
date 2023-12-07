@@ -460,17 +460,26 @@ Proof.
   set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ spinlock_model LF_SL')) spinlockΣ). 
   assert (heapGpreS Σ (@LM_EM_HL _ _ _ LF_SL')) as HPreG.
   { apply _. }
-  unshelve eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ ([2; 2] : fmstate spinlock_model_impl) _ ∅) =>//.
+  set s0 := [2; 2] : fmstate spinlock_model_impl.
+  set δ0 := initial_ls s0 0 I: lm_ls spinlock_model.
+  (* pose conv_init := ((fun hGS => LM_init_resource 0%nat δ0): heapGS Σ LM_EM_HL -> iProp Σ). *)
+
+  unshelve eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ s0 _ _ ∅) =>//; cycle 1. 
   - done. 
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl.
     apply (spinlock_model_finitary s1).    
   - intros ?. iStartProof.
-    rewrite /LM_init_resource. iIntros "!> (Hm & Hfr & Hf) !>". simpl.
+    rewrite /LM_init_resource.
+    iIntros (hGS). iSplitR.
+    2: { iIntros "X". iModIntro. iApply "X". }
+    iIntros "!> (Hm & ST & Hfr & Hf) !>". simpl.
     iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
     { rewrite /frag_free_roles_are. iApply own_unit. }
+    iSplitL. 
+    { 
     iMod "FR" as "FR". 
-    iApply (program_spec _ ∅ True _ with "[] [Hm Hf FR]"); eauto. 
+    iApply (program_spec _ ∅ True _ with "[] [Hf FR ST]"); eauto. 
     { iApply ActualOwnershipPartial.
       Unshelve. set_solver. }
     (* rewrite subseteq_empty_difference_L; [| set_solver].  *)
@@ -478,5 +487,9 @@ Proof.
     iApply has_fuels_proper; [..| iFrame]; try done.
     rewrite /spinlock_lr. simpl.
     rewrite !gset_to_gmap_union_singleton gset_to_gmap_empty.
-    done. 
+    done.  }
+
+    (* TODO: make a lemma, move it to simulation_adequacy_lm *)
+    iIntros (?). iIntros "**". 
+    iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
