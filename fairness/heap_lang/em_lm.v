@@ -13,15 +13,15 @@ Section LMExecModel.
   Context (τ0: locale Λ). 
   Hypothesis (INITτ0: forall e, locales_of_list [e] = [τ0]). 
 
-Definition LM_init_resource `{!fairnessGS LM Σ}
-   (s1: LM)
-  (* FR *)
-  : iProp Σ :=
-  frag_model_is s1 ∗
-  (∃ FR, frag_free_roles_are (FR ∖ live_roles _ s1)) ∗
-  has_fuels (Σ := Σ) τ0 (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
-  (PMPP := ActualOwnershipPartialPre). 
-
+  Definition LM_init_resource `{!fairnessGS LM Σ}
+    (s1: LM)
+    FR
+    : iProp Σ :=
+    frag_model_is s1 ∗
+      (frag_free_roles_are (FR ∖ live_roles _ s1)) ∗
+      has_fuels (Σ := Σ) τ0 (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
+      (PMPP := ActualOwnershipPartialPre). 
+  
 Definition init_thread_post `{!fairnessGS LM Σ}
   (tid: locale Λ): iProp Σ :=
   (* tid ↦M ∅. *)
@@ -77,14 +77,14 @@ Definition em_lm_msi `{!fairnessGS LM Σ}
 (* TODO: how to avoid different instances of EqDec and Cnt? *)
 Lemma init_fairnessGS_LM Σ
   {hPre: @fairnessGpreS (locale Λ) M LSI LM Σ _ _}
-  (s1: LM) (σ1 : cfg Λ) (INIT: lm_is_init_st σ1 s1):
+  (s1: LM) (σ1 : cfg Λ) FR (INIT: lm_is_init_st σ1 s1):
   ⊢ (|==> ∃ fGS: fairnessGS LM Σ, (* TODO: what is a canonical way of doing it? *)
-         LM_init_resource s1 ∗ em_lm_msi σ1 s1).
+         LM_init_resource s1 (FR ∖ dom (ls_fuel s1)) ∗ em_lm_msi σ1 s1).
 Proof.
-  iIntros. 
+  iIntros.
   destruct INIT as [[??] [FUEL TMAP]]. destruct σ1 as [tp ?]. simpl in *. subst.
 
-  iMod (lm_msi_init s1 ∅) as (fG) "(MSI & Hmodf & Hmapf & Hfuelf & Hfr)".
+  iMod (lm_msi_init s1 (FR ∖ dom (ls_fuel s1))) as (fG) "(MSI & Hmodf & Hmapf & Hfuelf & Hfr)".
   { set_solver. } (* TODO: generalize to arbitrary set *)
   
   iModIntro.
@@ -101,8 +101,8 @@ Proof.
   rewrite /LM_init_resource /has_fuels /=.
   rewrite dom_gset_to_gmap. rewrite FUEL TMAP. iFrame.
   iSplitL "Hfr".
-  { rewrite /frag_free_roles_are. 
-    iExists ∅. rewrite subseteq_empty_difference_L; set_solver. }
+  { iApply frag_free_roles_are_proper; [| by iFrame].
+    rewrite dom_gset_to_gmap. set_solver. }
 
   unfold frag_fuel_is.
   setoid_rewrite map_fmap_singleton.
@@ -131,9 +131,10 @@ refine
                           frag_mapping_is {[ tid := ∅ ]};
     (* TODO: cannot express the msi instantiation this way*)
     (* em_msi Σ := fun {_: fairnessGS LM Σ} es δ => model_state_interp es δ (LM := LM); *)
+    em_init_param := gset (fmrole M);
     em_is_init_st := (@lm_is_init_st: cfg Λ -> mstate (fair_model_model (LM_Fair)) -> Prop);
 
-    em_init_resource Σ := fun {_: fairnessGS LM Σ} (δ: mstate (fair_model_model (LM_Fair))) => LM_init_resource δ;
+    em_init_resource Σ := fun {_: fairnessGS LM Σ} (δ: mstate (fair_model_model (LM_Fair))) FR => LM_init_resource δ (FR ∖ dom (ls_fuel δ));
 |}.
 (* TODO: cannot directly specify these components *)
 Unshelve. 

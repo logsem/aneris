@@ -886,24 +886,20 @@ Defined.
 (* TODO: generalize the initial state in general lemma as well? *)
 Theorem simulation_adequacy_terminate_client (Σ: gFunctors)
         {hPre: @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')} (s: stuckness)
-        e1 (s1: fmstate client_model_impl)
+        e1 (s1: fmstate client_model_impl) FR
         (LSI0: initial_ls_LSI s1 0 (M := client_model_impl) (LM := client_model) (LSI := client_LSI))
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
   rel_finitary (sim_rel client_model (LF := client_LF)) →
-  (∀ {hGS: @heapGS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')},
-      ⊢ |={⊤}=> LM_init_resource 0%nat (initial_ls (LM := client_model) s1 0%nat LSI0) 
-                 ={⊤}=∗
-                 WP e1 @ s; 0%nat; ⊤ {{ v, init_thread_post 0%nat (LF := client_LF)}}
-  ) ->
+  wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 ->
   extrace_fairly_terminating extr.
 Proof.
   intros Hfb Hwp Hvex Hfair.
-  destruct (infinite_or_finite extr) as [Hinf|] =>//.
+  destruct (infinite_or_finite extr) as [Hinf|] =>//.  
 
   destruct (simulation_adequacy_model_trace
-              Σ _ e1 s1 LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ e1 s1 FR LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
 
   (* TODO: clarify which types of fairness we need in this proof *)
   assert (forall ρ, fair_aux_SoU (LM_ALM client_model) ρ auxtr (LM := client_model)) as FAIR_SOU.
@@ -951,8 +947,9 @@ Proof.
   - rewrite build_LS_ext_spec_tmap. set_solver. 
 Qed.
 
-(* TODO: move *)
+(* (* TODO: move *) *)
 From trillium.fairness.examples.comp Require Import comp.
+(* Variable (client: val heap_lang).  *)
 
 Theorem client_terminates
         (extr : heap_lang_extrace)
@@ -964,30 +961,35 @@ Proof.
   assert (heapGpreS Σ (@LM_EM_HL _ _ client_model LF')) as HPreG.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
-  set (st0 := (δ_lib0, 3)). 
-  unshelve eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl)) =>//.
-  - subst st0. red. rewrite /initial_ls_pre. red.
+  set (st0 := (δ_lib0, 3): fmstate client_model_impl).
+  assert (initial_ls_LSI st0 0 (LM := client_model)) as LSI0.
+  { subst st0. red. rewrite /initial_ls_pre. red.
     intros gi [ρ MAP]. simpl in MAP.
-    by rewrite δ_lib0_map in MAP. 
+    by rewrite δ_lib0_map in MAP. } 
+  eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl) _ LSI0); try done.  
   - eapply valid_state_evolution_finitary_fairness_simple.
     apply client_model_finitary.
-  - intros ?. iStartProof.
-    rewrite /LM_init_resource. iIntros "!> (Hm & Hfr & Hf) !>". simpl.
-    iAssert (|==> frag_free_roles_are ∅)%I as "-#FR".
-    { rewrite /frag_free_roles_are. iApply own_unit. }
-    iMod "FR" as "FR". 
+  - intros ?. iStartProof.    
+    rewrite /LM_init_resource. iIntros "!> (Hm & FR & Hf) !>".
+    iSplitL.
+    2: { (* TODO: make a lemma, move it to simulation_adequacy_lm *)
+      iIntros (?). iIntros "**". 
+      iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>". }
+
+    simpl.
     iApply (client_spec ∅ δ_lib0 with "[] [Hm Hf FR]"); eauto.
     { set_solver. }
     { apply init_lib_state. }
     { iApply lm_lsi_toplevel. }
     iFrame.
     iSplitL "FR".
-    + (* TODO: fix the initialization theorem so it accepts arbitrary FR set *)
-      admit.
+    + simpl. rewrite dom_gset_to_gmap. rewrite difference_twice_L.
+      rewrite difference_disjoint; [by iFrame| ].
+      subst st0. erewrite live_roles_3. set_solver. 
     + subst st0.
       iApply has_fuels_proper; [reflexivity| | by iFrame].
       pose proof (live_roles_3 δ_lib0). simpl in H.
       replace (client_lr (δ_lib0, 3)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
       2: { symmetry. apply leibniz_equiv. apply live_roles_3. }
       rewrite -gset_to_gmap_singletons big_opS_singleton. done.
-Admitted. 
+Qed. 

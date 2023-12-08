@@ -22,15 +22,17 @@ Class ExecutionModel (Λ: language) (M: Model) := {
       iProp Σ;
     em_msi {Σ} `{em_GS Σ}: cfg Λ -> mstate M -> iProp Σ;
     
-    em_init_resource {Σ: gFunctors} `{em_GS Σ}: mstate M → iProp Σ;
+    (* TODO: is there a nicer way to allow parametrization of initial resource? *)
+    em_init_param: Type; 
+    em_init_resource {Σ: gFunctors} `{em_GS Σ}: mstate M → em_init_param -> iProp Σ;
     (* TODO: currently we assume that postconditions of all threads coincide *)
     (* em_init_thread_post {Σ}: locale Λ -> val -> iProp Σ; *)
     em_is_init_st: cfg Λ -> mstate M -> Prop;
     
     em_initialization Σ `{ePreGS: em_preGS Σ}: 
-    forall (s1: mstate M) (σ: cfg Λ)
+    forall (s1: mstate M) (σ: cfg Λ) (p: em_init_param)
       (INIT_ST: em_is_init_st σ s1),
-      ⊢ (|==> ∃ eGS: em_GS Σ, @em_init_resource _ eGS s1 ∗ @em_msi _ eGS σ s1)
+      ⊢ (|==> ∃ eGS: em_GS Σ, @em_init_resource _ eGS s1 p ∗ @em_msi _ eGS σ s1)
 }.
 
 Section EMDefinitions.
