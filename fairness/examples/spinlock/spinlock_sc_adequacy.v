@@ -350,7 +350,7 @@ Instance sl_model_inh: Inhabited (lm_ls spinlock_model).
 Proof. 
   pose proof (fmrole_inhabited spinlock_model_impl) as [ρ].
   pose proof (fmstate_inhabited spinlock_model_impl) as [s].
-  eapply populate, (initial_ls s ρ). done.
+  eapply populate, (initial_ls' s ρ). done.
 Qed.     
 
 Lemma state_unlocked_alt s:
@@ -461,7 +461,7 @@ Proof.
   assert (heapGpreS Σ (@LM_EM_HL _ _ _ LF_SL')) as HPreG.
   { apply _. }
   set s0 := [2; 2] : fmstate spinlock_model_impl.
-  set δ0 := initial_ls s0 0 I: lm_ls spinlock_model.
+  set δ0 := initial_ls' s0 0 I: lm_ls spinlock_model.
   (* pose conv_init := ((fun hGS => LM_init_resource 0%nat δ0): heapGS Σ LM_EM_HL -> iProp Σ). *)
 
   unshelve eapply (simple_simulation_adequacy_terminate_ftm Σ NotStuck _ s0 ∅) =>//.
@@ -483,6 +483,7 @@ Proof.
     iApply (program_spec _ ∅ True _ with "[] [Hf FR ST]"); eauto. 
     { iApply ActualOwnershipPartial.
       Unshelve. set_solver. }
+    rewrite build_LS_ext_spec_st. 
     (* rewrite subseteq_empty_difference_L; [| set_solver].  *)
     iFrame. iSplitR; [done| ].
     iApply has_fuels_proper; [..| iFrame]; try done.

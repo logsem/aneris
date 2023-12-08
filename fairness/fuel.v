@@ -161,24 +161,24 @@ Section fairness.
     intros. rewrite -!elem_of_dom. by rewrite ls_same_doms.
   Qed.
 
-  Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: G)
-    (f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0))
-    (m0 := gset_to_gmap ζ0 (M.(live_roles) s0))
-    (LSI0: LSI s0 m0 f0) 
-    : LM.(lm_ls) :=
-    {| ls_under := s0;
-       ls_fuel := f0;
-       ls_mapping := m0;
-    |}.
-  Next Obligation. 
-    simpl. intros. apply reflexive_eq. rewrite dom_gset_to_gmap //.
-  Qed.
-  Next Obligation. 
-    simpl. intros. apply reflexive_eq. rewrite !dom_gset_to_gmap //. 
-  Qed.
-  Next Obligation.
-    done.
-  Qed. 
+  (* Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: G) *)
+  (*   (f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0)) *)
+  (*   (m0 := gset_to_gmap ζ0 (M.(live_roles) s0)) *)
+  (*   (LSI0: LSI s0 m0 f0)  *)
+  (*   : LM.(lm_ls) := *)
+  (*   {| ls_under := s0; *)
+  (*      ls_fuel := f0; *)
+  (*      ls_mapping := m0; *)
+  (*   |}. *)
+  (* Next Obligation.  *)
+  (*   simpl. intros. apply reflexive_eq. rewrite dom_gset_to_gmap //. *)
+  (* Qed. *)
+  (* Next Obligation.  *)
+  (*   simpl. intros. apply reflexive_eq. rewrite !dom_gset_to_gmap //.  *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (*   done. *)
+  (* Qed.  *)
 
   Local Ltac SS' := eapply elem_of_dom; eauto. 
 
