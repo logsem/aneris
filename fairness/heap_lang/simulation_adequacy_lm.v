@@ -44,12 +44,6 @@ Let rel_always_holds `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _
         s (state_interp) (fun _ => frag_mapping_is {[ 0%nat := ∅ ]} (LM := LM)) e1 σ1 δ1. 
 
 
-(* (* TODO: should hold by definition after changing LiveState *) *)
-(* Lemma initial_ls_tmap τ s (LSI0: initial_ls_LSI s τ): *)
-(*   ls_tmap (initial_ls s τ LSI0) (LM := LM) = {[ τ := live_roles M s ]}. *)
-(* Proof. Admitted.  *)
-
-
 Lemma rel_always_holds_lift_LM 
   `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}
   s e1 σ1 s1 ξ
