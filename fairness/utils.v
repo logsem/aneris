@@ -246,3 +246,34 @@ Proof.
   - right. intros [a Pa]. apply NEX.
     apply List.Exists_exists. eexists. split; eauto.
 Qed. 
+
+
+Lemma fmap_flat_map {A B C: Type} (f : A → list B) (g: B -> C) (l : list A):
+  g <$> (flat_map f l) = flat_map ((fmap g) ∘ f) l.
+Proof.
+  induction l; [done| ].
+  simpl. rewrite fmap_app. congruence.
+Qed.
+
+(* TODO: upstream *)
+Lemma concat_NoDup {A: Type} (ll : list (list A)):
+  (forall i l, ll !! i = Some l -> NoDup l) ->
+  (forall i j li lj, i ≠ j -> ll !! i = Some li -> ll !! j = Some lj -> li ## lj) ->
+  NoDup (concat ll).
+Proof.
+  induction ll.
+  { constructor. }
+  intros. simpl. apply NoDup_app. repeat split.
+  { apply (H 0). done. }
+  2: { apply IHll.
+       - intros. apply (H (S i)). done.
+       - intros. apply (H0 (S i) (S j)); auto. }
+  intros. intros [lx [INlx INx]]%elem_of_list_In%in_concat.
+  apply elem_of_list_In, elem_of_list_lookup_1 in INlx as [ix IX].
+  eapply (H0 0 (S ix)).
+  - lia.
+  - simpl. reflexivity.
+  - simpl. apply IX.
+  - eauto.
+  - by apply elem_of_list_In.
+Qed.

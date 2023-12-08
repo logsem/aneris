@@ -4,8 +4,8 @@ From trillium.fairness Require Import fairness fuel fuel_ext resources partial_o
 
 
 Section ForkStep.
-  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -86,13 +86,13 @@ Section ForkStep.
     fs ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
     fuel_reorder_preserves_LSI (LSI := LSI) ->
-    τ_new ∉ dom (ls_tmap δ1 (LM := LM)) ->
+    τ_new ∉ dom (ls_tmap δ1) ->
     has_fuels_S ζ fs -∗ model_state_interp δ1 ==∗
       ∃ δ2, has_fuels τ_new (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
             (partial_mapping_is {[ τ_new := ∅ ]} -∗ frag_mapping_is {[ τ_new := ∅ ]}) ∗
             model_state_interp δ2 ∗ 
             ⌜lm_ls_trans LM δ1 (Silent_step ζ) δ2⌝ ∗
-            ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1 (LM := LM)))) ⌝. 
+            ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1))) ⌝. 
   Proof.
     iIntros (Hnemp Hunioneq PRES Hnewζ) "Hf Hmod".
     unfold has_fuels_S.
@@ -133,7 +133,7 @@ Section ForkStep.
       rewrite /new_tmap. do 2 setoid_rewrite lookup_insert_Some.
       split.
       + intros [g Mρ]%elem_of_dom.
-        apply (ls_mapping_tmap_corr (LM := LM)) in Mρ as (R & TMg & INρ). 
+        apply (ls_mapping_tmap_corr) in Mρ as (R & TMg & INρ). 
         destruct (decide (ρ ∈ R2)).
         { exists τ_new, R2. tauto. }
         destruct (decide (g = τ_new)) as [-> | ?].
@@ -157,7 +157,7 @@ Section ForkStep.
     { intros. clear -H1 H2 H0 Hmapping Hdisj Hunioneq. 
       Local Ltac solve_disj δ1 τ1 τ2 := 
           eapply disjoint_subseteq;
-          [..| eapply (ls_tmap_disj δ1 τ1 τ2 (LM := LM)); eauto];
+          [..| eapply (ls_tmap_disj δ1 τ1 τ2); eauto];
           [apply _| ..];
           set_solver.
 
@@ -190,11 +190,13 @@ Section ForkStep.
       intros. rewrite elem_of_dom /is_Some. split.
       - intros [? ?]. eexists. split; eauto. destruct decide; eauto.
       - intros (?&?&?). eauto. }
+
     erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'.
     3: { apply MATCH. }
-    2: { apply ls_mapping_tmap_corr_impl. apply TMAP2_DISJ. }    
+    2: { apply ls_mapping_tmap_corr_impl.
+         red. apply TMAP2_DISJ. }
 
-    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ TMAP2_DOM TMAP2_DISJ LSI' (LM := LM)).
+    iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ TMAP2_DOM TMAP2_DISJ LSI').
 
     iModIntro.
     rewrite -Hunioneq big_sepS_union //. iDestruct "Hfuels" as "[Hf1 Hf2]".
@@ -218,7 +220,7 @@ Section ForkStep.
     
     iSplitL "Ham Haf Hamod HFR".
     { iExists FR; simpl.
-      rewrite build_LS_ext_spec_st build_LS_ext_spec_tmap build_LS_ext_spec_fuel.
+      (* rewrite build_LS_ext_spec_st build_LS_ext_spec_tmap build_LS_ext_spec_fuel. *)
       iFrame "Ham Hamod HFR".
       iSplit.
       - iApply (auth_fuel_is_proper with "Haf"). unfold fuel_apply.
@@ -254,7 +256,7 @@ Section ForkStep.
       eexists _. split; eauto. apply elem_of_dom. eauto. }
     iSplit.
     { iPureIntro. intros ρ Hlive Hlive' Hmd. simpl. inversion Hmd; simplify_eq.
-      - rewrite build_LS_ext_spec_fuel.
+      - 
         rewrite map_lookup_imap.
         assert (Hin: ρ ∈ dom (ls_fuel δ1)).
         { rewrite -ls_same_doms elem_of_dom. eauto. }
@@ -267,7 +269,7 @@ Section ForkStep.
           intros ->. simpl. lia. }
         symmetry in Hsametid. eapply ls_mapping_tmap_corr in Hsametid as (?&?&?).
         set_unfold; naive_solver.
-      - rewrite build_LS_ext_spec_fuel.
+      - 
         rewrite map_lookup_imap. simpl in *. clear Hmd.
         erewrite build_LS_ext_spec_mapping in Hissome, Hneqtid.
         2, 3: by eauto.
@@ -282,7 +284,7 @@ Section ForkStep.
         apply elem_of_dom in Hindom as [f Hindom]. rewrite Hindom /= decide_True /=; [lia|set_unfold; naive_solver]. }
     iSplit.
     { iPureIntro. intros ρ' Hρ'. simpl. left.
-      rewrite build_LS_ext_spec_fuel.
+      
       rewrite map_lookup_imap. rewrite elem_of_dom in Hρ'.
       destruct Hρ' as [f Hf]. rewrite Hf /=. destruct (decide ((ρ' ∈ R1 ∪ R2))); simpl; lia. }
     rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
@@ -294,8 +296,8 @@ End ForkStep.
 
 
 Section ForkStepTrue.
-  Context `{LM: LiveModel G M LSI_True}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI_True}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -303,13 +305,13 @@ Section ForkStepTrue.
     (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
-    τ_new ∉ dom (ls_tmap δ1 (LM := LM)) ->
+    τ_new ∉ dom (ls_tmap δ1) ->
     has_fuels_S ζ fs -∗ model_state_interp δ1 ==∗
       ∃ δ2, has_fuels τ_new (fs ⇂ R2) ∗ has_fuels ζ (fs ⇂ R1) ∗
             (partial_mapping_is {[ τ_new := ∅ ]} -∗ frag_mapping_is {[ τ_new := ∅ ]}) ∗
             model_state_interp δ2 ∗ 
             ⌜lm_ls_trans LM δ1 (Silent_step ζ) δ2⌝ ∗
-            ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1 (LM := LM)))) ⌝. 
+            ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1))) ⌝. 
   Proof.
     intros. by apply actual_update_fork_split_gen. 
   Qed. 

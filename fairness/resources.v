@@ -3,14 +3,14 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import utils fairness fuel fuel_ext. 
 From trillium.fairness Require Import partial_ownership.
 
-Class fairnessGpreS `(LM: LiveModel G M LSI) Σ `{Countable G} := {   
+Class fairnessGpreS `{Countable G} `(LM: LiveModel G M LSI) Σ := {   
   fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
   fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR G (exclR (gsetR (RoleO M)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
-Class fairnessGS `(LM : LiveModel G M LSI) Σ `{Countable G} := FairnessGS {
+Class fairnessGS `{Countable G} `(LM : LiveModel G M LSI) Σ := FairnessGS {
   fairness_inG :> fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
@@ -22,12 +22,18 @@ Class fairnessGS `(LM : LiveModel G M LSI) Σ `{Countable G} := FairnessGS {
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments fairnessGS {_ _ _} LM Σ {_ _}.
-Global Arguments FairnessGS {_ _ _} LM Σ {_ _ _} _ _ _.
-Global Arguments fairness_model_name {_ _ _ LM Σ _ _} _.
-Global Arguments fairness_model_mapping_name {G M LSI LM Σ _ _} _ : assert.
-Global Arguments fairness_model_fuel_name {G M LSI LM Σ _ _} _ : assert.
-Global Arguments fairness_model_free_roles_name {G M LSI LM Σ _ _} _ : assert.
+(* Global Arguments fairnessGS {_ _ _} LM Σ {_ _}. *)
+(* Global Arguments FairnessGS {_ _ _} LM Σ {_ _ _} _ _ _. *)
+(* Global Arguments fairness_model_name {_ _ _ LM Σ _ _} _. *)
+(* Global Arguments fairness_model_mapping_name {G M LSI LM Σ _ _} _ : assert. *)
+(* Global Arguments fairness_model_fuel_name {G M LSI LM Σ _ _} _ : assert. *)
+(* Global Arguments fairness_model_free_roles_name {G M LSI LM Σ _ _} _ : assert. *)
+Global Arguments fairnessGS {_ _ _ _ _} LM Σ. 
+Global Arguments FairnessGS {_ _ _ _ _} LM Σ _ _ _.
+Global Arguments fairness_model_name {_ _ _ _ _ LM Σ} _.
+Global Arguments fairness_model_mapping_name {G _ _ M LSI LM Σ} _ : assert.
+Global Arguments fairness_model_fuel_name {G _ _ M LSI LM Σ} _ : assert.
+Global Arguments fairness_model_free_roles_name {G _ _ M LSI LM Σ} _ : assert.
 
 Definition fairnessΣ G M `{Countable G} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
@@ -36,7 +42,7 @@ Definition fairnessΣ G M `{Countable G} : gFunctors := #[
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel G M LSI} `{Countable G} :
+Global Instance subG_fairnessGpreS {Σ} `{Countable G} `{LM : LiveModel G M LSI} :
   subG (fairnessΣ G M) Σ -> fairnessGpreS LM Σ.
 Proof. solve_inG. Qed. 
 
@@ -44,8 +50,8 @@ Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
 
 Section model_state_interp.
-  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -151,8 +157,8 @@ Proof. by intros ->. Qed.
 
 
 Section model_state_lemmas.
-  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -289,7 +295,7 @@ Section model_state_lemmas.
     apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
     rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
     apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq.
-    pose proof (ls_mapping_tmap_corr δ (LM := LM)) as Hmapinv. 
+    pose proof (ls_mapping_tmap_corr δ) as Hmapinv. 
     rewrite (Hmapinv ρ ζ) HMζ. split.
     - intros (?&?&?). by simplify_eq.
     - intros ?. eexists. split; eauto.
@@ -603,8 +609,8 @@ Section model_state_lemmas.
 End model_state_lemmas.
 
 Section adequacy.
-  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGpreS LM Σ}.
 
@@ -673,12 +679,12 @@ Section adequacy.
     ⊢ |==> ∃ (fG: fairnessGS LM Σ), 
         model_state_interp δ ∗
         frag_model_is (ls_under δ)∗
-        frag_mapping_is (ls_tmap δ (LM := LM)) ∗
+        frag_mapping_is (ls_tmap δ) ∗
         frag_fuel_is (ls_fuel δ) ∗
         frag_free_roles_are fr.
   Proof. 
     iMod (model_state_init (ls_under δ)) as (γ_st) "[AUTH_ST FRAG_ST]".
-    iMod (model_mapping_init' (ls_tmap δ (LM := LM))) as (γ_map) "[AUTH_MAP FRAG_MAP]".
+    iMod (model_mapping_init' (ls_tmap δ)) as (γ_map) "[AUTH_MAP FRAG_MAP]".
     iMod (model_fuel_init' (ls_fuel δ)) as (γ_fuel) "[AUTH_FUEL FRAG_FUEL]".
     iMod (model_free_roles_init fr) as (γ_fr) "[AUTH_FR FRAG_FR]".
     iModIntro.

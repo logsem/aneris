@@ -5,8 +5,8 @@ From trillium.fairness Require Export partial_ownership.
 From trillium.fairness Require Import execution_model lm_fair_traces lm_fair. 
 
 Section LMExecModel.
+  Context `{CNT_Λ: Countable (locale Λ)}.
   Context `{LM:LiveModel (locale Λ) M LSI}.
-  (* Context `{CNT_Λ: Countable (locale Λ)}. *)
   Context {LF: LMFairPre LM}. 
   
   (* TODO: remove *)
@@ -30,7 +30,7 @@ Definition init_thread_post `{!fairnessGS LM Σ}
 Definition lm_model_init (δ: mstate LM) :=
   ls_fuel δ = gset_to_gmap (lm_fl LM δ) (live_roles _ (ls_under δ)) /\
   (* ls_mapping δ = gset_to_gmap 0%nat (live_roles _ (ls_under δ)).  *)
-  ls_tmap δ (LM := LM) = {[ τ0 := live_roles _ (ls_under δ) ]}. 
+  ls_tmap δ = {[ τ0 := live_roles _ (ls_under δ) ]}. 
 
 Definition lm_cfg_init (σ: cfg Λ) :=
   exists (e: expr Λ), σ.1 = [e].
@@ -38,7 +38,7 @@ Definition lm_cfg_init (σ: cfg Λ) :=
 Definition lm_is_init_st σ s := 
   lm_cfg_init σ /\ lm_model_init s. 
 
-Definition tids_restrict `{M: FairModel} `{Countable (locale Λ)}
+Definition tids_restrict `{M: FairModel}
   (c: cfg Λ) (tmap: gmap (locale Λ) (gset (fmrole M))): Prop :=
   forall ζ, ζ ∉ locales_of_list c.1 → tmap !! ζ = None.
 
@@ -65,18 +65,18 @@ Proof.
   intros. apply locales_of_list_from_locale_from'.
   destruct (decide (ζ ∈ locales_of_list σ.1)); [done| ].
   specialize (H _ n).
-  eapply (ls_mapping_tmap_corr (LM := LM)) in H0 as [R [? ?]].
+  eapply (ls_mapping_tmap_corr) in H0 as [R [? ?]].
   congruence. 
 Qed. 
 
 Definition em_lm_msi `{!fairnessGS LM Σ}
   (c: cfg Λ) (δ: mstate LM): iProp Σ :=
-  model_state_interp δ ∗ ⌜ tids_restrict c (ls_tmap δ (LM := LM)) ⌝. 
+  model_state_interp δ ∗ ⌜ tids_restrict c (ls_tmap δ) ⌝. 
 
 (* TODO: how to make 'heap..' instantiations less wordy? *)
 (* TODO: how to avoid different instances of EqDec and Cnt? *)
 Lemma init_fairnessGS_LM Σ
-  {hPre: @fairnessGpreS (locale Λ) M LSI LM Σ _ _}
+  {hPre: @fairnessGpreS (locale Λ) _ _ M LSI LM Σ}
   (s1: LM) (σ1 : cfg Λ) FR (INIT: lm_is_init_st σ1 s1):
   ⊢ (|==> ∃ fGS: fairnessGS LM Σ, (* TODO: what is a canonical way of doing it? *)
          LM_init_resource s1 (FR ∖ dom (ls_fuel s1)) ∗ em_lm_msi σ1 s1).
@@ -123,7 +123,7 @@ refine
     em_preGS := fun Σ => fairnessGpreS LM Σ;
     em_GS := fun Σ => fairnessGS LM Σ;
     em_Σ := fairnessΣ (locale Λ) M;
-    em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ _ LM _ _;
+    em_Σ_subG := fun Σ => @subG_fairnessGpreS _ _ _ _ _ _ LM;
 
     (* em_valid_evolution_step := valid_evolution_step (LM := LM); *)
     em_thread_post Σ := fun {_: fairnessGS LM Σ} (tid: locale Λ) =>

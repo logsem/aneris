@@ -207,6 +207,7 @@ Section PartialOwnership.
 End PartialOwnership.
 
 Section AuxDefs.
+  Context `{Countable G}. 
   Context `{LM: LiveModel G M LSI}.
 
   Definition valid_new_fuelmap (fs1 fs2: gmap (fmrole M) nat) (s1 s2: M) (ρ: fmrole M) :=

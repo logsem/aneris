@@ -15,10 +15,10 @@ Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
 
 Section lifting.
+Context `{Countable G}.
 Context `{EM: ExecutionModel heap_lang M}.   
 Context `{hGS: @heapGS Σ _ EM}.
 Context `{iLM:LiveModel G iM LSI}.
-Context `{Countable G}.
 (* Context {ifG: fairnessGS iLM Σ}. *)
 Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}.
 

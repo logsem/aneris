@@ -1,7 +1,80 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export inftraces fairness trace_utils trace_lookup.
+From trillium.fairness Require Export inftraces fairness trace_utils trace_lookup utils.
+
+Section LsMapping.
+  Context {G: Type}.
+  Context {M: FairModel}.
+  Context `{Countable G}.
+  
+  Definition ls_mapping_impl (tmap: gmap G (gset (fmrole M))): gmap M.(fmrole) G :=
+    let tmap_l := map_to_list tmap in
+    let tmap_flat := flat_map (fun '(τ, R) => map (pair τ) (elements R)) tmap_l in
+    let tmap_rev := (fun '(τ, ρ) => (ρ, τ)) <$> tmap_flat in
+    list_to_map tmap_rev.
+
+  Definition tmap_disj (tm: gmap G (gset (fmrole M))) :=
+      forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
+        tm !! τ1 = Some S1 -> tm !! τ2 = Some S2 -> S1 ## S2.
+
+  Lemma ls_mapping_tmap_corr_impl tmap (DISJ: tmap_disj tmap):
+    maps_inverse_match (ls_mapping_impl tmap) tmap.
+  Proof.
+    red. intros. rewrite /ls_mapping_impl.
+    etransitivity.
+    { symmetry. apply elem_of_list_to_map.
+      rewrite -list_fmap_compose.
+      rewrite fmap_flat_map.
+      rewrite flat_map_concat_map. apply concat_NoDup.
+      { intros. apply list_lookup_fmap_Some in H0 as [[??] [? ->]].
+        simpl. rewrite -list_fmap_compose.
+        apply NoDup_fmap_2; [apply _| ].
+        apply NoDup_elements. }
+      intros.
+      apply list_lookup_fmap_Some in H1 as [[??] [? ->]].
+      apply list_lookup_fmap_Some in H2 as [[??] [? ->]].
+      simpl. apply elem_of_disjoint.
+      intros ? [[??] [-> ?]]%elem_of_list_fmap_2 [[??] [? ?]]%elem_of_list_fmap_2.
+      simpl in H4. subst.
+      apply elem_of_list_fmap_2 in H3 as [? [[=] ?]].
+      apply elem_of_list_fmap_2 in H5 as [? [[=] ?]].
+      subst.
+      assert (tmap !! g = Some g0).
+      { eapply elem_of_map_to_list. eapply elem_of_list_lookup_2; eauto. }
+      assert (tmap !! g1 = Some g2).
+      { eapply elem_of_map_to_list. eapply elem_of_list_lookup_2; eauto. }
+      assert (g ≠ g1).
+      { intros <-.
+        pose proof (NoDup_fst_map_to_list tmap).
+        eapply NoDup_alt in H5.
+        { apply H0, H5. }
+        all: apply list_lookup_fmap_Some; eauto. }
+      pose proof (@DISJ _ _ _ _ H5 H3 H4).
+      set_solver. }
+    etransitivity.
+    { apply elem_of_list_fmap. }
+    transitivity ((v, k)
+       ∈ flat_map (λ '(τ, R), map (pair τ) (elements R)) (map_to_list tmap)).
+    { split.
+      - intros (?&?&?). destruct x. congruence.
+      - intros. exists (v, k). eauto. }
+    rewrite elem_of_list_In.
+    rewrite in_flat_map.
+
+    split.
+    - intros [[??][IN1 IN2]].
+      apply elem_of_list_In, elem_of_map_to_list in IN1.
+      apply in_map_iff in IN2 as [? [[=] yy]]. subst.
+      eexists. split; eauto.
+      apply elem_of_list_In in yy. set_solver.
+    - intros [? [??]]. exists (v, x). split.
+      + by apply elem_of_list_In, elem_of_map_to_list.
+      + apply in_map_iff. eexists. split; eauto.
+        apply elem_of_list_In. set_solver.
+  Qed.
+
+End LsMapping.
 
 Section fairness.
   Context {G: Type}.
@@ -16,21 +89,45 @@ Section fairness.
     ls_fuel: gmap M.(fmrole) nat;
     ls_fuel_dom: M.(live_roles) ls_under ⊆ dom ls_fuel;
 
-    ls_mapping: gmap M.(fmrole) G;
+    (* ls_mapping: gmap M.(fmrole) G; *)
+    (* ls_same_doms: dom ls_mapping = dom ls_fuel; *)
+    ls_tmap: gmap G (gset (fmrole M));
+    ls_tmap_fuel_same_doms:
+      forall ρ, ρ ∈ dom ls_fuel <-> exists τ R, ls_tmap !! τ = Some R /\ ρ ∈ R;
+    ls_tmap_disj: tmap_disj ls_tmap;
+      (* forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2), *)
+      (*   ls_tmap !! τ1 = Some S1 -> ls_tmap !! τ2 = Some S2 -> S1 ## S2; *)
 
-    ls_same_doms: dom ls_mapping = dom ls_fuel;
-
-    ls_inv: LSI ls_under ls_mapping ls_fuel;
+    ls_inv: LSI ls_under (ls_mapping_impl ls_tmap) ls_fuel;
   }.
 
   Arguments ls_under {_}.
   Arguments ls_fuel {_}.
   Arguments ls_fuel_dom {_}.
-  Arguments ls_mapping {_}.
-  Arguments ls_same_doms {_}.
+  (* Arguments ls_mapping {_}. *)
+  (* Arguments ls_same_doms {_}. *)
+  Arguments ls_tmap {_}.
+  Arguments ls_tmap_fuel_same_doms {_}.
+  Arguments ls_tmap_disj {_}.
+
+  Definition ls_mapping (δ: LiveState): gmap M.(fmrole) G :=
+    ls_mapping_impl δ.(ls_tmap).
+
+  Definition ls_mapping_tmap_corr (δ: LiveState) :=
+    ls_mapping_tmap_corr_impl (@ls_tmap δ) (@ls_tmap_disj δ). 
+    
+  Lemma ls_same_doms δ: dom (ls_mapping δ) = dom (@ls_fuel δ).
+  Proof.
+    pose proof (@ls_tmap_fuel_same_doms δ). apply set_eq.
+    intros. split; intros.
+    - apply H1. apply elem_of_dom in H2 as [? ?].
+      apply ls_mapping_tmap_corr in H2. eauto.
+    - apply H1 in H2 as [? H2]. apply ls_mapping_tmap_corr in H2.
+      eapply elem_of_dom; eauto.
+  Qed.
 
   Lemma ls_mapping_dom (m: LiveState):
-    M.(live_roles) m.(ls_under) ⊆ dom m.(ls_mapping).
+    M.(live_roles) m.(ls_under) ⊆ dom (ls_mapping m).
   Proof. rewrite ls_same_doms. apply ls_fuel_dom. Qed.
 
   Inductive FairLabel {Roles} :=
@@ -68,10 +165,10 @@ Section fairness.
 
   Inductive must_decrease (ρ': M.(fmrole)) (oρ: option M.(fmrole)) (a b: LiveState):
     option G -> Prop :=
-  | Same_tid tid (Hneqρ: Some ρ' ≠ oρ) (Hsametid: Some tid = a.(ls_mapping) !! ρ'):
+  | Same_tid tid (Hneqρ: Some ρ' ≠ oρ) (Hsametid: Some tid = (ls_mapping a) !! ρ'):
       must_decrease ρ' oρ a b (Some tid)
-  | Change_tid otid (Hneqtid: a.(ls_mapping) !! ρ' ≠ b.(ls_mapping) !! ρ')
-               (Hissome: is_Some (b.(ls_mapping) !! ρ')):
+  | Change_tid otid (Hneqtid: (ls_mapping a) !! ρ' ≠ (ls_mapping b) !! ρ')
+               (Hissome: is_Some (ls_mapping b !! ρ')):
     must_decrease ρ' oρ a b otid
   (* | Zombie otid (Hismainrole: oρ = Some ρ') (Hnotalive: ρ' ∉ live_roles _ b) (Hnotdead: ρ' ∈ dom b.(ls_fuel)): *)
   (*   must_decrease ρ' oρ a b otid *)
@@ -110,14 +207,14 @@ Section fairness.
     match ℓ with
     | Take_step ρ tid =>
       M.(fmtrans) a (Some ρ) b
-      ∧ a.(ls_mapping) !! ρ = Some tid
+      ∧ (ls_mapping a) !! ρ = Some tid
       ∧ fuel_decr (Some tid) (Some ρ) a b
       ∧ fuel_must_not_incr (Some ρ) a b
       ∧ (ρ ∈ live_roles _ b -> oleq (b.(ls_fuel) !! ρ) (Some (fuel_limit b)))
       ∧ (∀ ρ, ρ ∈ dom b.(ls_fuel) ∖ dom a.(ls_fuel) -> oleq (b.(ls_fuel) !! ρ) (Some (fuel_limit b)))
       ∧ dom b.(ls_fuel) ∖ dom a.(ls_fuel) ⊆ live_roles _ b ∖ live_roles _ a
     | Silent_step tid =>
-      (∃ ρ, a.(ls_mapping) !! ρ = Some tid)
+      (∃ ρ, (ls_mapping a) !! ρ = Some tid)
       ∧ fuel_decr (Some tid) None a b
       ∧ fuel_must_not_incr None a b
       ∧ dom b.(ls_fuel) ⊆ dom a.(ls_fuel)
@@ -136,6 +233,12 @@ Section fairness.
       lm_lbl := FairLabel M.(fmrole);
       lm_ls_trans := ls_trans lm_fl;
     }.
+
+  Definition live_model_model `(LM : LiveModel) : Model := {|
+    mstate := lm_ls LM;
+    mlabel := lm_lbl LM;
+    mtrans := lm_ls_trans LM;
+  |}. 
   
   Definition fair_lbl_matches_group (ℓ: @FairLabel (fmrole M)) (τ: G) := 
     match ℓ with
@@ -148,12 +251,6 @@ Section fairness.
   Proof.
     intros. destruct ℓ; simpl; solve_decision.
   Qed.  
-
-  Definition live_model_model `(LM : LiveModel) : Model := {|
-    mstate := lm_ls LM;
-    mlabel := lm_lbl LM;
-    mtrans := lm_ls_trans LM;
-  |}.
 
   Lemma ls_same_doms' (δ: LiveState):
     forall ρ, is_Some (@ls_mapping δ !! ρ) <-> is_Some (@ls_fuel δ !! ρ).
@@ -179,6 +276,76 @@ Section fairness.
   (* Next Obligation. *)
   (*   done. *)
   (* Qed.  *)
+
+  (* TODO: get rid of these functions *)
+  Section Legacy.
+
+    Definition build_LS_ext 
+    (st: fmstate M) (fuel: gmap (fmrole M) nat)
+    (LIVE_FUEL: live_roles _ st ⊆ dom fuel)
+    (tmap: gmap G (gset (fmrole M)))
+    (TMAP_FUEL_SAME_DOMS: forall ρ, ρ ∈ dom (fuel) <-> exists τ R, tmap !! τ = Some R /\ ρ ∈ R)
+    (LS_TMAP_DISJ: forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
+      tmap !! τ1 = Some S1 -> tmap !! τ2 = Some S2 -> S1 ## S2)
+    (LS_INV: LSI st (ls_mapping_impl tmap) fuel) :=
+      {| ls_under := st;
+         ls_fuel := fuel;
+         ls_fuel_dom := LIVE_FUEL;
+         ls_tmap := tmap;
+         ls_tmap_fuel_same_doms := TMAP_FUEL_SAME_DOMS;
+         ls_tmap_disj := LS_TMAP_DISJ;
+         ls_inv := LS_INV; |}.
+    
+    Lemma build_LS_ext_spec_st st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV:
+      @ls_under (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = st.
+    Proof. done. Qed. 
+
+    Lemma build_LS_ext_spec_fuel st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV:
+      @ls_fuel (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = fuel.
+    Proof. done. Qed. 
+
+    Lemma build_LS_ext_spec_tmap st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV:
+      @ls_tmap (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = tmap.
+    Proof. done. Qed. 
+
+    Lemma build_LS_ext_spec_mapping st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV
+      rmap (MATCH: maps_inverse_match rmap tmap):
+      ls_mapping (build_LS_ext st fuel LIVE_FUEL tmap TMAP_FUEL_SAME_DOMS LS_TMAP_DISJ LS_INV) = rmap. 
+    Proof. 
+      eapply maps_inverse_match_uniq1.
+      - apply ls_mapping_tmap_corr. 
+      - by rewrite build_LS_ext_spec_tmap.
+    Qed.
+
+  End Legacy.
+
+  Definition initial_ls_LSI {LM: LiveModel} s0 (g: G) :=
+    let f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0) in
+    let m0 := gset_to_gmap g (M.(live_roles) s0) in
+    LSI s0 m0 f0.
+
+  (* TODO: use Program after changing the definition of LiveState *)
+  Definition initial_ls' {LM: LiveModel} (s0: M) (ζ0: G)
+    (f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0))
+    (tm0 := {[ ζ0 := M.(live_roles) s0 ]}: gmap G (gset (fmrole M)))
+    (* (LSI0: LSI s0 (ls_mapping_impl tm0) f0)  *)
+    (LSI0: @initial_ls_LSI LM s0 ζ0)
+    : LM.(lm_ls).
+    assert (tmap_disj tm0) as DISJ0.
+    { subst tm0. intros ????. repeat setoid_rewrite lookup_singleton_Some.
+      by intros ? [-> <-] [-> <-]. }
+    unshelve eapply (@build_LS_ext  s0 f0 _ tm0 _ _); eauto. 
+    - simpl. intros. apply reflexive_eq. rewrite dom_gset_to_gmap //.
+    - intros. subst tm0. setoid_rewrite lookup_singleton_Some.
+      subst f0. rewrite dom_gset_to_gmap.
+      split.
+      + intros; eauto.
+      + intros (?&?&[-> <-]&?); eauto.
+    - red in LSI0. fold f0 in LSI0.
+      erewrite maps_inverse_match_uniq1 with (m1 := ls_mapping_impl tm0); eauto.
+      { apply ls_mapping_tmap_corr_impl; eauto. }
+      subst tm0. apply maps_inverse_match_exact.
+  Defined. 
 
   Local Ltac SS' := eapply elem_of_dom; eauto. 
 
@@ -285,13 +452,18 @@ Section fairness.
 
 End fairness.
 
-Arguments LiveState : clear implicits.
-Arguments LiveModel : clear implicits.
-Arguments live_model_model _ {_} _ _.
+(* Arguments LiveState : clear implicits. *)
+(* Arguments LiveModel : clear implicits. *)
+Arguments LiveState _ _ {_} {_} _.
+Arguments LiveModel _ _ {_ _} _.
+(* Arguments live_model_model _ _ {_ _} _. *)
 
-Definition live_model_to_model : forall G M LSI, LiveModel G M LSI -> Model :=
-  λ G M LSI lm, live_model_model G LSI lm.
+(* Definition live_model_to_model : forall G M LSI, LiveModel G M LSI -> Model := *)
+(*   λ G M LSI lm, live_model_model G LSI lm. *)
+(* Coercion live_model_to_model : LiveModel >-> Model. *)
+(* Arguments live_model_to_model {_ _}. *)
+
+Definition live_model_to_model : forall G M LSI `{_: Countable G}, LiveModel G M LSI -> Model :=
+  λ G M LSI e c lm, live_model_model lm.
 Coercion live_model_to_model : LiveModel >-> Model.
 Arguments live_model_to_model {_ _}.
-
-

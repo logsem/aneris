@@ -6,6 +6,7 @@ From trillium.fairness Require Import partial_ownership.
 
 
 Section LMSteps.
+  Context `{Countable G}. 
   Context `{iLM: LiveModel G iM LSI}.
   Context `{EM: ExecutionModel Λ M}.
   Context `{eGS: em_GS Σ}. 

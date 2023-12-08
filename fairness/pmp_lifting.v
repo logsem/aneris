@@ -6,6 +6,7 @@ From trillium.fairness Require Import partial_ownership.
 
 
 Section PartialModelPredicates.
+  Context `{Countable G}. 
   Context `{iLM: LiveModel G iM LSI_True}.
   Context `{EM: ExecutionModel Λ M}.
   Context `{eGS: em_GS Σ}. 

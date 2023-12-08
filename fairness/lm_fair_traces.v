@@ -1,7 +1,8 @@
 From trillium.fairness Require Import fuel lm_fair trace_helpers inftraces trace_lookup.
 From Paco Require Import paco1 paco2 pacotac.
 
-Section aux_trace.  
+Section aux_trace.
+  Context `{CNTG: Countable G}.  
   Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}. 
 
@@ -117,7 +118,7 @@ Section aux_trace.
 End aux_trace.
 
 
-Definition labels_match `{LM: LiveModel G M LSI} (oζ : option G) (ℓ : LM.(lm_lbl)) : Prop :=
+Definition labels_match `{Countable G} `{LM: LiveModel G M LSI} (oζ : option G) (ℓ : LM.(lm_lbl)) : Prop :=
   match oζ, ℓ with
   | None, Config_step => True
   | Some ζ, lbl => fair_lbl_matches_group lbl ζ
@@ -125,13 +126,13 @@ Definition labels_match `{LM: LiveModel G M LSI} (oζ : option G) (ℓ : LM.(lm_
   end.
 
 Section aux_trace_lang.
-  Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel (locale Λ) M LSI}.
 
   Notation "'Tid'" := (locale Λ). 
 
   Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
-    ∀ ρ ζ, δ.(ls_mapping) !! ρ = Some ζ -> is_Some (from_locale c ζ).
+    ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ).
 
 End aux_trace_lang.
 
@@ -140,14 +141,14 @@ Ltac SS :=
   (* epose proof ls_mapping_dom; *)
   set_solver.
 
-Definition live_tids `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)}
+Definition live_tids  `{Countable (locale Λ)} `{LM:LiveModel (locale Λ) M LSI}
            (c : cfg Λ) (δ : LM.(lm_ls)) : Prop :=
-  (∀ ρ ζ, δ.(ls_mapping (G := locale Λ)) !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
+  (∀ ρ ζ, (ls_mapping δ (G := locale Λ)) !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
   ∀ ζ e, from_locale c.1 ζ = Some e -> (to_val e ≠ None) ->
-         ∀ ρ, δ.(ls_mapping) !! ρ ≠ Some ζ.
+         ∀ ρ, (ls_mapping δ) !! ρ ≠ Some ζ.
 
 (* TODO: replace original definition with this *)
-Lemma live_tids_alt `{LM:LiveModel (locale Λ) M LSI} `{EqDecision (locale Λ)} c δ:
+Lemma live_tids_alt `{CNTG: Countable (locale Λ)} `{LM:LiveModel (locale Λ) M LSI} c δ:
   live_tids c δ (LM := LM) (Λ := Λ) <->
     (forall ζ, (exists ρ, ls_mapping δ !! ρ = Some ζ) ->
           locale_enabled ζ c).
@@ -171,6 +172,7 @@ Qed.
 
 
 Section fuel_dec_unless.
+  Context `{CNTG: Countable G}.
   Context `{LM: LiveModel G Mdl LSI}.
   (* Context `{Countable G}. *)
   Context {LF: LMFairPre LM}. 
@@ -255,9 +257,9 @@ Section fuel_dec_unless.
 End fuel_dec_unless.
 
 Section destuttering_auxtr.
+  Context `{Countable G}.
   Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}. 
-  (* Context `{Countable G}. *)
 
   (* Why is [LM] needed here? *)
   Definition upto_stutter_auxtr :=
@@ -274,6 +276,7 @@ Section destuttering_auxtr.
 End destuttering_auxtr.
 
 Section upto_preserves.
+  Context `{Countable G}.
   Context `{LM: LiveModel G M LSI}.
   (* Context `{Countable G}. *)
   Context {LF: LMFairPre LM}. 
@@ -302,7 +305,7 @@ Section upto_preserves.
         { destruct IH as [IH|]; last done. punfold IH. inversion IH =>//. }
         Set Printing Coercions.
         destruct next_TS_role eqn:N; [| done].
-        inversion H0. subst.
+        inversion H1. subst.
         apply next_TS_spec_pos in N. apply N. 
       + right. eapply CH.
         { destruct IH =>//. }
@@ -312,8 +315,8 @@ Section upto_preserves.
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
+  Context `{CNTG: Countable G}.
   Context `{LM: LiveModel G M LSI}.
-  (* Context `{Countable G}. *)
   Context {LF: LMFairPre LM}. 
 
   (* Notation upto_stutter_aux := (upto_stutter (ls_under (LSI := LSI)) (Usls (LM := LM))). *)
@@ -500,7 +503,7 @@ Section upto_stutter_preserves_fairness_and_termination.
 End upto_stutter_preserves_fairness_and_termination.
 
 
-Definition valid_evolution_step `{LM:LiveModel (locale Λ) M LSI} 
+Definition valid_evolution_step `{Countable (locale Λ)} `{LM:LiveModel (locale Λ) M LSI} 
   (* `{EqDecision (locale Λ)} *)
                                 {LF: LMFairPre LM}
   oζ (σ2: cfg Λ) δ1 (oℓ: option (locale Λ)) δ2 :=
@@ -511,7 +514,7 @@ Definition valid_evolution_step `{LM:LiveModel (locale Λ) M LSI}
     tids_smaller (σ2.1) δ2.
 
 (* TODO: get rid of previous version *)
-Definition lm_valid_evolution_step `{LM:LiveModel (locale Λ) M LSI} 
+Definition lm_valid_evolution_step `{Countable (locale Λ)} `{LM:LiveModel (locale Λ) M LSI} 
   (* `{EqDecision (locale Λ)} *)
   {LF: LMFairPre LM}
   :

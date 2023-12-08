@@ -4,8 +4,8 @@ Close Scope Z_scope.
 
 
 Section LocaleTrans.
-  Context `{LM: LiveModel G M LSI}. 
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}. 
   Context `{∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}.
   Context `{EqDecision (fmstate M)}. 
 
@@ -26,16 +26,16 @@ Section LocaleTrans.
     3: { right. intros []. tauto. }
     - solve_decision. 
     - repeat apply and_dec; try solve_decision.
-      destruct (ls_tmap st1 (LM := LM) !! g) eqn:TMAP.
+      destruct (ls_tmap st1 !! g) eqn:TMAP.
       2: { right. intros [? MAP].
-           apply (ls_mapping_tmap_corr (LM := LM)) in MAP as (?&?&?).
+           apply ls_mapping_tmap_corr in MAP as (?&?&?).
            set_solver. }
       destruct (decide (g0 = ∅)) as [-> |NEMPTY].
       { right. intros [? MAP].
-        apply (ls_mapping_tmap_corr (LM := LM)) in MAP as (?&?&?).
+        apply (ls_mapping_tmap_corr) in MAP as (?&?&?).
         set_solver. }
       left. apply set_choose_L in NEMPTY as [ρ ?].
-      exists ρ. apply (ls_mapping_tmap_corr (LM := LM)). eauto. 
+      exists ρ. apply (ls_mapping_tmap_corr). eauto. 
   Defined. 
     
   Definition allowed_step_FLs δ1 τ δ2: gset (@FairLabel G (fmrole M)) :=
@@ -110,7 +110,7 @@ End LocaleTrans.
 
 (* excluding parts that are provided by other classes in context *)
 (* TODO: find a better solution *)
-Class LMFairPre' {G M LSI} (LM: LiveModel G M LSI) := {
+Class LMFairPre' {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := {
   (* edG :> EqDecision G; *)
   (* cntG :> Countable G; *)
   edM' :> EqDecision (fmstate M);
@@ -120,9 +120,22 @@ Class LMFairPre' {G M LSI} (LM: LiveModel G M LSI) := {
   locale_trans_ex_dec' τ δ1 :> Decision (exists δ2, locale_trans δ1 τ δ2 (LM := LM));
 }.
 
-Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := {
-  edG :> EqDecision G;
-  cntG :> Countable G;
+(* Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := { *)
+(*   edG :> EqDecision G; *)
+(*   cntG :> Countable G; *)
+(*   edM :> EqDecision (fmstate M); *)
+(*   dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2); *)
+(*   inhLM :> Inhabited (lm_ls LM); *)
+(*   inhG :> Inhabited G; *)
+(*   locale_trans_ex_dec τ δ1 :> Decision (exists δ2, locale_trans δ1 τ δ2 (LM := LM)); *)
+(* }. *)
+
+(* TODO: get rid of this duplication *)
+(* Definition LMFairPre {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := *)
+(*   LMFairPre' LM.  *)
+Class LMFairPre {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := {
+  (* edG :> EqDecision G; *)
+  (* cntG :> Countable G; *)
   edM :> EqDecision (fmstate M);
   dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
   inhLM :> Inhabited (lm_ls LM);
@@ -132,13 +145,14 @@ Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := {
 
 
 Section LMFair.
+  Context `{CNTG: Countable G}.
   Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}.
   
   Global Instance LS_eqdec: EqDecision (LiveState G M LSI).
   Proof.
     red. intros [] [].
-    destruct (decide (ls_under = ls_under0)), (decide (ls_fuel = ls_fuel0)), (decide (ls_mapping = ls_mapping0)).
+    destruct (decide (ls_under = ls_under0)), (decide (ls_fuel = ls_fuel0)), (decide (ls_tmap = ls_tmap0)).
     2-8: right; intros [=]; congruence.
     subst.
     left. f_equal.
@@ -243,7 +257,7 @@ Section LMFair.
 
   Lemma LM_live_role_map_notempty δ τ
     (LIVE: τ ∈ live_roles LM_Fair δ):
-    exists R, ls_tmap δ (LM := LM) !! τ = Some R /\ R ≠ ∅.
+    exists R, ls_tmap δ !! τ = Some R /\ R ≠ ∅.
   Proof using.
     apply LM_live_roles_strong in LIVE as [? STEP].
     destruct STEP as (ℓ & T & MATCH).
@@ -257,7 +271,7 @@ Section LMFair.
   Qed. 
 
   Lemma LM_map_empty_notlive δ τ
-    (MAP0: ls_tmap δ (LM := LM) !! τ = Some ∅ \/ ls_tmap δ (LM := LM) !! τ = None):
+    (MAP0: ls_tmap δ !! τ = Some ∅ \/ ls_tmap δ !! τ = None):
     τ ∉ live_roles LM_Fair δ. 
   Proof using. 
     destruct (decide (τ ∈ live_roles LM_Fair δ)) as [LR| ]; [| done].
