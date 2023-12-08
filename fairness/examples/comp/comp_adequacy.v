@@ -963,7 +963,7 @@ Proof.
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 3): fmstate client_model_impl).
   assert (initial_ls_LSI st0 0 (LM := client_model)) as LSI0.
-  { subst st0. red. rewrite /initial_ls_pre. red.
+  { subst st0. red. red.
     intros gi [ρ MAP]. simpl in MAP.
     by rewrite δ_lib0_map in MAP. } 
   eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl) _ LSI0); try done.  
@@ -981,7 +981,8 @@ Proof.
     { set_solver. }
     { apply init_lib_state. }
     { iApply lm_lsi_toplevel. }
-    iFrame.
+    rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel. 
+    iFrame. 
     iSplitL "FR".
     + simpl. rewrite dom_gset_to_gmap. rewrite difference_twice_L.
       rewrite difference_disjoint; [by iFrame| ].
