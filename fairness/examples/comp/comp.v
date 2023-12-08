@@ -11,7 +11,7 @@ From iris.bi Require Import bi.
 From trillium.fairness Require Import lm_fair. 
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.comp Require Import lib lib_ext client_defs comp_lib_pmp.
-From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi.
+From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi wp_tacs.
 
 Close Scope Z_scope. 
 
@@ -132,7 +132,7 @@ Section ClientSpec.
     { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
 
     iPoseProof (LM_steps_gen_nofork_sub with "PMP") as "PMP'".
-    pure_step FS.
+    pure_step FS client_LSI_fuel_independent.
 
     wp_bind (ref _)%E.
     iApply (wp_alloc_nostep with "[$] [FUELS]").
@@ -140,8 +140,8 @@ Section ClientSpec.
     2: { solve_fuels_S FS. }
     { solve_map_not_empty. }
     iNext. iIntros (l) "(L & MT & FUELS) /=".
-
-    pure_step FS. pure_step FS.
+    
+    do 2 pure_step FS client_LSI_fuel_independent.
     (* Set Printing Implicit. Unshelve. *)
 
     pose proof (live_roles_3 lb0) as LIVE3.
@@ -187,7 +187,7 @@ Section ClientSpec.
     { red. unfold client_fl.
       intros ??[? ?]%lookup_singleton_Some. lia. }
 
-    do 1 pure_step FS.
+    pure_step FS client_LSI_fuel_independent. 
 
     set (lb' := reset_lm_st ρlg lb0 ρlg_in_lib_gs).
     pose proof (live_roles_1 lb') as LIVE1.
@@ -252,7 +252,7 @@ Section ClientSpec.
       { iPureIntro. set_solver. }
       (* rewrite !map_fmap_singleton big_sepM_singleton. *)
       iExists _. iFrame. iPureIntro. rewrite /client_fl. lia. }
-    2: lia. 
+    2: { unfold lib_fl. lia. } 
  
     iNext. iIntros "[LMAP LFR']". simpl.
     iDestruct "LMAP" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
@@ -269,7 +269,7 @@ Section ClientSpec.
     assert (fuels_ge ({[ ρ_cl := 15 ]}: gmap (fmrole client_model_impl) nat) 10) as FS.
     { red. intros ??[? ?]%lookup_singleton_Some. lia. }
 
-    pure_step FS. pure_step FS.
+    do 2 pure_step FS client_LSI_fuel_independent.
     
     wp_bind (_ <- _)%E.
 
@@ -321,7 +321,7 @@ Section ClientSpec.
     assert (fuels_ge ({[ ρ_cl := 7 ]}: gmap (fmrole client_model_impl) nat) 7) as FS.
     { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
 
-    do 2 pure_step FS.
+    do 2 pure_step FS client_LSI_fuel_independent.
 
     iApply wp_atomic.
     iInv Ns as ((lb'', y)) "inv" "CLOS". rewrite {1}/client_inv_impl.
