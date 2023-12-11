@@ -1,5 +1,7 @@
 From stdpp Require Import finite.
-From trillium.prelude Require Import finitary quantifiers classical_instances.
+From trillium.prelude Require Import quantifiers classical_instances.
+(* From trillium.prelude Require Import finitary. *)
+From trillium.fairness Require Import finitary_copy.
 From trillium.fairness Require Import fairness fuel traces_match lm_fair_traces lm_fair fuel_ext utils. 
 
 Section gmap.
@@ -21,8 +23,8 @@ End gmap.
 
 (* TODO: move? *)
 Section LMFinBranching.
-  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {DEC: forall a b c, Decision (LSI a b c)}.
 
   Definition get_role {M : FairModel} {LSI} {LM: LiveModel G M LSI} (lab: mlabel LM) :=
@@ -53,9 +55,9 @@ Section LMFinBranching.
       apply elem_of_dom. 
       destruct ℓ; try congruence; simpl in *; subst. 
       - apply proj2, proj1 in TRANS.
-        apply (ls_mapping_tmap_corr (LM := LM)) in TRANS as (?&?&?). eauto.
+        apply (ls_mapping_tmap_corr) in TRANS as (?&?&?). eauto.
       - apply proj1 in TRANS as (?&TRANS).
-        apply (ls_mapping_tmap_corr (LM := LM)) in TRANS as (?&?&?). eauto. }
+        apply (ls_mapping_tmap_corr) in TRANS as (?&?&?). eauto. }
     apply elem_of_list_In, elem_of_elements.
     rewrite /potential_step_FLs.
     destruct ℓ; try congruence; simpl in *; subst. 
@@ -64,6 +66,107 @@ Section LMFinBranching.
     apply elem_of_dom. apply proj2, proj1 in TRANS.
     by apply mk_is_Some, ls_same_doms' in TRANS.
   Qed. 
+
+  (* TODO: upstream *)
+  Section SetMapProperties.
+    
+    Lemma set_map_compose_gset {A1 A2 A3: Type}
+      `{EqDecision A1} `{EqDecision A2} `{EqDecision A3}
+      `{Countable A1} `{Countable A2} `{Countable A3}
+      (f: A2 -> A3) (g: A1 -> A2) (m: gset A1):
+      set_map (f ∘ g) m (D:=gset _) = set_map f (set_map g m (D:= gset _)).
+    Proof using.
+      set_solver. 
+    Qed. 
+    
+    Lemma elem_of_map_inj_gset {A B} 
+      `{EqDecision A} `{Countable A}
+      `{EqDecision B} `{Countable B}
+      (f: A -> B) (m: gset A) (a: A) (INJ: injective f):
+      a ∈ m <-> f a ∈ set_map f m (D := gset _).
+    Proof using.
+      split; [apply elem_of_map_2| ].
+      intros IN. apply elem_of_map_1 in IN as (a' & EQ & IN).
+      apply INJ in EQ. congruence. 
+    Qed.
+    
+  End SetMapProperties.
+
+
+  (* TODO: move *)
+  Section Powerset.
+    Context {K: Type}.
+    Context `{Countable K}. 
+
+    (* it's easier to perform recursion on lists *)
+    (* TODO: another name? *)
+    Fixpoint powerlist (l: list K): gset (gset K) :=
+      match l with
+      | [] => {[ ∅ ]}
+      | k :: l' => let p' := powerlist l' in
+                 p' ∪ (set_map (fun s => {[ k ]} ∪ s) p')
+                 (* {[ {[ k ]} ]} ∪ p' ∪ (set_map (fun s => {[ k ]} ∪ s) p') *)
+      end. 
+  
+    Definition powerset (s: gset K): gset (gset K) :=
+      powerlist (elements s).
+    
+  (* TODO: move, find existing? *)
+  Lemma iff_and_impl_helper {A B: Prop} (AB: A -> B):
+    A /\ B <-> A.
+  Proof. tauto. Qed.     
+  Lemma iff_True_helper {A: Prop}:
+    (A <-> True) <-> A.
+  Proof. tauto. Qed.     
+  Lemma iff_False_helper {A: Prop}:
+    (A <-> False) <-> ¬ A.
+  Proof. tauto. Qed.
+  Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
+    (exists t, A /\ B t) <-> A /\ exists t, B t.
+  Proof. split; intros (?&?&?); eauto. Qed.
+
+    Lemma powerlist_nil l:
+      ∅ ∈ powerlist l.
+    Proof. induction l; set_solver. Qed.
+
+    Instance powerlist_perm_Proper:
+      Proper (Permutation ==> eq) powerlist.
+    Proof.
+      induction 1; csimpl; auto. 
+      - congruence. 
+      -
+        (* by rewrite !(assoc_L (++)) (comm (++) (f _)). *)
+        rewrite -!union_assoc_L. f_equal. 
+        (* do 2 rewrite -(union_assoc_L (_ ∪ powerlist l)). *)
+        (* f_equal; [set_solver| ]. *)
+        rewrite !set_map_union_L.
+        rewrite !union_assoc_L. f_equal.
+        { set_solver. }
+        rewrite -!set_map_compose_gset. apply leibniz_equiv.
+        f_equiv. red. simpl. set_solver.
+      - congruence.
+    Qed.
+
+    Lemma powerset_spec `{Countable K} s:
+      forall e, e ⊆ s <-> e ∈ powerset s. 
+    Proof. 
+      intros. rewrite /powerset.
+      revert e. pattern s. apply set_ind.
+      { intros ?? EQUIV. apply leibniz_equiv_iff in EQUIV. by rewrite EQUIV. }
+      { rewrite elements_empty. simpl.
+        setoid_rewrite elem_of_singleton.
+        intros. set_solver. }
+      clear s. intros k s NIN IND e.
+      rewrite elements_disj_union; [| set_solver].
+      rewrite elements_singleton. simpl.
+      rewrite !elem_of_union elem_of_map.
+      repeat setoid_rewrite <- IND.
+      erewrite ex_det_iff with (a := e ∖ {[ k ]}).
+      2: { set_solver. }
+      destruct (decide (k ∈ e)); set_solver. 
+    Qed.              
+          
+  End Powerset.
 
   Program Definition enumerate_next
     (δ1: LM)
@@ -76,18 +179,20 @@ Section LMFinBranching.
     '(s2) ← inner_exts;
     d ← enumerate_dom_gsets' (dom δ1.(ls_fuel) ∪ live_roles _ s2);
     fs ← enum_gmap_bounded' (live_roles _ s2 ∪ d) (max_gmap δ1.(ls_fuel) `max` LM.(lm_fl) s2);
-    ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) next_threads ;
+    (* ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) next_threads ; *)
+    dom_tmap ← elements $ powerset $ list_to_set next_threads;
+    tm ←
+      enum_gmap_range_bounded' dom_tmap (elements $ powerset (live_roles _ s2 ∪ d));
     (* let ℓ' := convert_lbl ℓ *)
     ℓ' ← potential_FLs_list δ1;
-    
     (if
-        (* (decide ((s2, ms, fs) = (s2, ms, fs))) *)
-        (* (decide (LSI s2 ms fs)) *)        
-        (decide (LSI s2 (`ms) (`fs))) (* TODO: what's the difference with above? *)
+        (decide (LSI s2 (ls_mapping_impl (`tm)) (`fs) /\
+                 dom (ls_mapping_impl (`tm)) = dom (`fs) /\
+                 tmap_disj (`tm)))
     then
     [({| ls_under := s2;
              ls_fuel := `fs;
-             ls_mapping := `ms ;
+             ls_tmap := `tm ;
           |}, ℓ')]
       else
     []).
@@ -95,23 +200,19 @@ Section LMFinBranching.
     intros ??????????. destruct fs as [? Heq]. rewrite /= Heq //. set_solver.
   Qed.
   Next Obligation.
-    intros ?????????. destruct fs as [? Heq]. destruct ms as [? Heq'].
+    intros ?????????(? & DOM_EQ & TM_DISJ).
+    destruct fs as [fs Heq]. destruct tm as [tm [DOM CODOM]].
     rewrite /= Heq //.
-  Qed.
-  Next Obligation. done. Qed. 
-
-  (* Definition lift_convert_lbl (oζ: option G) (ℓ: option (fmrole M)): lm_lbl LM := *)
-  (*   match ℓ with *)
-  (*   | None => match oζ with *)
-  (*              Some ζ => Silent_step ζ *)
-  (*            | None => Config_step *)
-  (*            end *)
-  (*   | Some ℓ => match oζ with *)
-  (*              | None => Config_step *)
-  (*              | Some ζ => Take_step ℓ ζ *)
-  (*              end *)
-  (*   end.  *)
-
+    simpl in *. rewrite -Heq -DOM_EQ.
+    intros.
+    rewrite elem_of_dom.
+    apply exist_proper.
+    by apply ls_mapping_tmap_corr_impl.
+  Qed. 
+  Next Obligation. tauto. Qed. 
+  Next Obligation. tauto. Qed.
+  
+  
   Lemma enum_next_in
     δ1
     ℓ δ'
@@ -124,9 +225,9 @@ Section LMFinBranching.
     (IN_DOMS: dom (ls_fuel δ') ⊆ dom (ls_fuel δ1) ∪ live_roles M δ')
     (FUEL_LIM: forall ρ f (F: ls_fuel δ' !! ρ = Some f),
         f ≤ max_gmap (ls_fuel δ1) `max` lm_fl LM δ')
-    (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'),
-        tid' ∈ next_threads)    
-    (* (CONVERT: ℓ = convert_lbl (get_role ℓ)) *)
+    (* (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), *)
+    (*     tid' ∈ next_threads)     *)
+    (THREADS_IN: dom (ls_tmap δ') ⊆ list_to_set next_threads)    
     :
     (δ', ℓ) ∈ enumerate_next δ1 inner_exts next_threads
       (* convert_lbl *)
@@ -146,17 +247,32 @@ Section LMFinBranching.
     eexists (δ'.(ls_fuel) ↾ Hfueldom); split; last first.
     { eapply enum_gmap_bounded'_spec; split =>//. }
     apply elem_of_list_bind.
-    assert (Hmappingdom: dom δ'.(ls_mapping) = live_roles M δ' ∪ dom (ls_fuel δ')).
-    { rewrite -Hfueldom ls_same_doms //. }
-    exists (δ'.(ls_mapping) ↾ Hmappingdom); split; last first.
-    { eapply enum_gmap_range_bounded'_spec; split=>//. }
 
+    (* assert (Hmappingdom: dom δ'.(ls_mapping) = live_roles M δ' ∪ dom (ls_fuel δ')). *)
+    (* { rewrite -Hfueldom ls_same_doms //. } *)
+    (* exists (δ'.(ls_mapping) ↾ Hmappingdom); split; last first. *)
+    (* { eapply enum_gmap_range_bounded'_spec; split=>//. } *)  
+    (* unshelve eapply ex_intro. *)
+    exists (dom (ls_tmap δ')). split.
+    2: { apply elem_of_elements. by apply powerset_spec. }
+    assert (enum_range_prop (dom (ls_tmap δ'))
+              (elements (powerset (live_roles M δ' ∪ dom (ls_fuel δ')))) 
+              (ls_tmap δ')) as ERPδ'.
+    { split; [done| ].
+      apply map_Forall_lookup. intros ?? ITH.
+      apply elem_of_elements. apply powerset_spec.
+      rewrite -Hfueldom.
+      apply elem_of_subseteq.
+      intros. eapply ls_tmap_fuel_same_doms; eauto. }
 
-    apply elem_of_list_bind.
-    exists ℓ. split.
+    apply elem_of_list_bind. unshelve eexists; [by eauto| ]. 
+    split; [| by apply enum_gmap_range_bounded'_spec].
+    apply elem_of_list_bind. exists ℓ. split.
     2: { eapply potential_FLs_list_approx; eauto. }
     
-    destruct decide; [| by destruct δ']. 
+    destruct decide.
+    2: { destruct n. simpl. repeat split; try by apply δ'.
+         by rewrite ls_same_doms. }
     rewrite elem_of_list_singleton; f_equal.
     destruct δ'; simpl. f_equal; apply ProofIrrelevance.
   Qed.
@@ -171,7 +287,7 @@ Section LMFinBranching.
     (* (Hlbl : labels_match oζ ℓ (LM := LM)) *)
     (Htrans : lm_ls_trans LM δ ℓ δ')
     (INNER_DOM: (ls_under δ') ∈ inner_exts)
-    (THREADS_IN: forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads)
+    (THREADS_IN: dom (ls_tmap δ') ⊆ list_to_set next_threads)    
     :
     (δ', ℓ) ∈ enumerate_next δ inner_exts next_threads.
   Proof.
@@ -227,33 +343,8 @@ Section LMFinBranching.
         + apply elem_of_dom_2 in Hsome. set_solver.
       - inversion Htrans as [? [? [Hleq [Hnew Hfalse]]]]. done. }
     { done. }
-    (* { destruct ℓ; simpl; destruct oζ =>//; by inversion Hlbl. } *)
    Qed.
 
-
-  (* Definition role_LM_step_dom_enum *)
-  (*   δ            *)
-  (*   (inner_exts : list M) *)
-  (*   (next_threads : list G) := *)
-  (*   enumerate_next δ inner_exts next_threads.  *)
-
-  (* Lemma role_LM_step_dom *)
-  (*   δ            *)
-  (*   (inner_exts : list M) *)
-  (*   (next_threads : list G) *)
-  (*   (ℓ : mlabel LM) *)
-  (*   :  *)
-  (*   (* exists (lδ': list (lm_ls LM)), *) *)
-  (*   forall (δ': lm_ls LM), *)
-  (*     lm_ls_trans LM δ ℓ δ' -> *)
-  (*     (ls_under δ') ∈ inner_exts -> *)
-  (*     (forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads) -> *)
-  (*     In δ' (map fst (enumerate_next δ inner_exts next_threads)). *)
-  (* Proof. *)
-  (*   intros. apply in_map_iff. exists (δ', ℓ). split; auto. *)
-  (*   apply elem_of_list_In. apply next_step_domain; auto. *)
-  (*   (* subst ℓ. by destruct oζ, oρ.  *) *)
-  (* Qed.  *)
 
   Lemma role_LM_step_dom_all
     δ           
@@ -264,7 +355,7 @@ Section LMFinBranching.
     forall ℓ (δ': lm_ls LM),
       lm_ls_trans LM δ ℓ δ' ->
       (ls_under δ') ∈ inner_exts ->
-      (forall ρ' tid' (T: ls_mapping δ' !! ρ' = Some tid'), tid' ∈ next_threads) ->
+      dom (ls_tmap δ') ⊆ list_to_set next_threads ->
       In δ' (map fst (enumerate_next δ inner_exts next_threads)).
   Proof.
     intros. apply in_map_iff. exists (δ', ℓ). split; auto.
@@ -272,17 +363,18 @@ Section LMFinBranching.
     (* subst ℓ. by destruct oζ, oρ.  *)
   Qed.
 
+  (* TODO: write more concisely? *)
   Definition roles_rearranged (δ1 δ2: LiveState _ _ LSI) (D: gset G) τ :=
     ls_under δ2 = ls_under δ1 /\ ls_fuel δ2 = ls_fuel δ1 /\
     (* dom (ls_mapping δ2) = dom (ls_mapping δ1) /\ *)
-    (* dom (ls_tmap δ2 (LM := LM)) ⊆ D. *)
+    dom (ls_tmap δ2) ⊆ D /\
     dom (ls_mapping δ2) = dom (ls_mapping δ1) /\    
     (forall ρ, ρ ∈ dom (ls_mapping δ2) ->
           ls_mapping δ2 !! ρ = match (ls_mapping δ1 !! ρ) with
                                | Some τ' => Some (if (decide (τ' ∈ D)) then τ' else τ)
                                | None => Some τ
                                end). 
-    
+  
   Lemma ex_norm_step δ1 ℓ δ2
     (STEP: lm_ls_trans LM δ1 ℓ δ2)
     (* (LSI_STABLE: *)
@@ -296,13 +388,13 @@ Section LMFinBranching.
     (*                  LSI (ls_under δ2) (<[ρ := g']> (ls_mapping δ2)) (ls_fuel δ2)) *)
     (* (LSI_STABLE: forall δ1 D, D ⊆ dom (ls_tmap δ1 (LM := LM)) -> *)
     (*                       exists δ2, roles_rearranged δ1 δ2 D) *)
-    (LSI_STABLE: forall δ1 τ δ2, locale_trans δ1 τ δ2 ->
-                             exists δ2', roles_rearranged δ2 δ2' (dom $ ls_tmap δ1 (LM := LM)) τ)
+    (LSI_STABLE: forall δ1 τ δ2, locale_trans δ1 τ δ2 (LM := LM) ->
+                             exists δ2', roles_rearranged δ2 δ2' (dom $ ls_tmap δ1) τ)
     :
     exists (δ2': LiveState _ _ LSI) (g: G),
       fair_lbl_matches_group ℓ g /\
       lm_ls_trans LM δ1 ℓ δ2' /\
-      roles_rearranged δ2 δ2' (dom $ ls_tmap δ1 (LM := LM)) g.
+      roles_rearranged δ2 δ2' (dom $ ls_tmap δ1) g.
   Proof.
     assert (exists τ, fair_lbl_matches_group ℓ τ) as [τ MATCH]. 
     { destruct ℓ; simpl in STEP; [..| tauto].
@@ -310,7 +402,7 @@ Section LMFinBranching.
     specialize (LSI_STABLE δ1 τ δ2 ltac:(by red; eauto)).
     destruct LSI_STABLE as [δ2' ARR].
     exists δ2', τ. split; [| split]; [done |.. | by apply ARR].
-    destruct ARR as (ST & FUEL & MAP_DOM & MAP_VAL). 
+    destruct ARR as (ST & FUEL & TMAP_DOM & MAP_DOM & MAP_VAL). 
     destruct ℓ; simpl in *; subst; rewrite ST FUEL.
     3: done. 
     - repeat split; try by apply STEP.
@@ -327,7 +419,7 @@ Section LMFinBranching.
           eapply STEP; eauto. right; eauto. }
         eapply STEP; eauto. right; eauto.
         rewrite Hissome. intros MAP1.
-        pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as MINV.
+        pose proof (ls_mapping_tmap_corr δ1) as MINV.
         apply n. eapply mim_in_1; eauto. 
       + apply proj2, proj2, proj2, proj1 in STEP. red.
         rewrite FUEL ST. apply STEP.
@@ -346,11 +438,11 @@ Section LMFinBranching.
           eapply STEP; eauto. right; eauto. }
         eapply STEP; eauto. right; eauto.
         rewrite Hissome. intros MAP1.
-        pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as MINV.
+        pose proof (ls_mapping_tmap_corr δ1) as MINV.
         apply n. eapply mim_in_1; eauto. 
       + apply proj2, proj2, proj1 in STEP. red.
         rewrite FUEL ST. apply STEP.
-  Qed. 
+  Qed.
 
   (* TODO: move *)
   Ltac forward_gen H tac :=
@@ -370,12 +462,12 @@ Section LMFinBranching.
     δ1 τ
     steps
     (FIN_STEPS: forall oρ s2, fmtrans M (ls_under δ1) oρ s2 -> In s2 steps)
-    (LSI_STABLE: forall δ1 τ δ2, locale_trans δ1 τ δ2 ->
-                             exists δ2', roles_rearranged δ2 δ2' (dom $ ls_tmap δ1 (LM := LM)) τ):
+    (LSI_STABLE: forall δ1 τ δ2, locale_trans δ1 τ δ2 (LM := LM) ->
+                             exists δ2', roles_rearranged δ2 δ2' (dom $ ls_tmap δ1) τ):
     Decision (exists δ2, locale_trans δ1 τ δ2 (LM := LM)).
   Proof. 
-    pose proof (role_LM_step_dom_all δ1 (ls_under δ1 :: steps) (elements $ dom $ ls_tmap δ1 (LM := LM))) as STEPS. 
-    set (δ's := map fst (enumerate_next δ1 (ls_under δ1 :: steps) (elements (dom (ls_tmap δ1 (LM := LM)))))).
+    pose proof (role_LM_step_dom_all δ1 (ls_under δ1 :: steps) (elements $ dom $ ls_tmap δ1)) as STEPS. 
+    set (δ's := map fst (enumerate_next δ1 (ls_under δ1 :: steps) (elements (dom (ls_tmap δ1))))).
     set (τ_ℓs := filter (locale_trans δ1 τ (LM := LM)) δ's).
     destruct τ_ℓs eqn:FLT.
     2: { left. exists m. eauto.
@@ -390,24 +482,26 @@ Section LMFinBranching.
     { apply elem_of_cons. destruct ℓ; simpl in *; try done.
       - right. eapply elem_of_list_In, FIN_STEPS; eauto. apply TRANS'.
       - left. repeat apply proj2 in TRANS'. congruence. }
-    { intros. apply elem_of_elements.
-      destruct ARR as (ST & FUEL & MAP_DOM & MAP_VAL). 
-      pose proof T as T'%mk_is_Some%elem_of_dom. specialize (MAP_VAL _ T').
-      rewrite T in MAP_VAL.
-      rewrite MAP_DOM in T'. apply elem_of_dom in T' as [? T'].
-      rewrite T' in MAP_VAL. inversion MAP_VAL. subst tid'.
-      destruct decide; [done| ].
-      pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as MINV.
-      destruct ℓ; simpl in *; try done.
-      - apply proj2, proj1 in TRANS'. subst. 
-        eapply mim_in_1; eauto.
-      - apply proj1 in TRANS' as [? TRANS']. subst. 
-        eapply mim_in_1; eauto. }
+    { intros. rewrite list_to_set_elements. apply ARR. }
+      (* destruct ARR as (ST & FUEL & TMAP_DOM & MAP_DOM & MAP_VAL). *)
+      (* apply elem_of_subseteq. intros ?. rewrite !elem_of_dom. intros T.   *)
+      (* pose proof T as T'. specialize (MAP_VAL _ T'). *)
+      (* rewrite T in MAP_VAL. *)
+      (* rewrite MAP_DOM in T'. apply elem_of_dom in T' as [? T']. *)
+      (* rewrite T' in MAP_VAL. inversion MAP_VAL. subst tid'. *)
+      (* destruct decide; [done| ]. *)
+      (* pose proof (ls_mapping_tmap_corr δ1 (LM := LM)) as MINV. *)
+      (* destruct ℓ; simpl in *; try done. *)
+      (* - apply proj2, proj1 in TRANS'. subst.  *)
+      (*   eapply mim_in_1; eauto. *)
+      (* - apply proj1 in TRANS' as [? TRANS']. subst.  *)
+      (*   eapply mim_in_1; eauto. } *)
     subst τ_ℓs. apply elem_of_list_In, elem_of_list_filter. split.
     { eexists. split; eauto. }
     apply elem_of_list_In. done.
   Qed. 
-    
+
+  foobar. use map_img to reimplement it. 
   (* TODO: move *)
   Definition rearrange_roles_map (m: gmap (fmrole M) G)
     (R: gset G) (r: G):

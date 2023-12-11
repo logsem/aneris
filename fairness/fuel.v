@@ -3,6 +3,57 @@ From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
 From trillium.fairness Require Export inftraces fairness trace_utils trace_lookup utils.
 
+
+Section TmapDisj.
+  Context `{Countable K} `{Countable V}. 
+
+  Definition tmap_disj (tm: gmap K (gset V)) :=
+    forall (k1 k2: K) (S1 S2: gset V) (NEQ: k1 ≠ k2),
+      tm !! k1 = Some S1 -> tm !! k2 = Some S2 -> S1 ## S2.
+
+  Lemma forall_prod_helper {A B: Type} (P: A -> B -> Prop):
+    (forall a b, P a b) <-> (forall ab: A * B, P ab.1 ab.2).
+  Proof.
+    split; [by eauto|]. intros PP ??.
+    apply (PP (a, b)).
+  Qed.    
+  
+  (* TODO: move, find existing? *)
+  Lemma ex_det_iff {A: Type} (P: A -> Prop) a
+    (DET: forall a', P a' -> a' = a):
+    (exists a', P a') <-> P a.
+  Proof. 
+    split; [| by eauto].
+    intros [? ?]. erewrite <- DET; eauto.
+  Qed. 
+                                
+  Global Instance tmap_disj_dec tm: Decision (tmap_disj tm).
+  Proof.
+    set pairs := let d := elements (dom tm) in
+                 k1 ← d; k2 ← d;
+                 if (decide (k1 = k2)) then [] else [(k1, k2)]. 
+    set alt := Forall (fun '(k1, k2) => (default ∅ (tm !! k1)) ## (default ∅ (tm !! k2))) pairs.
+    apply Decision_iff_impl with (P := alt); [| solve_decision].
+    rewrite /alt. rewrite Forall_forall. 
+    rewrite /pairs.
+    repeat setoid_rewrite elem_of_list_bind.
+    repeat setoid_rewrite elem_of_elements.
+    rewrite /tmap_disj.
+    repeat setoid_rewrite elem_of_dom.
+    rewrite forall_prod_helper. apply forall_proper. intros [k1 k2]. simpl.
+    erewrite ex_det_iff with (a := k1).
+    2: { intros ?. erewrite ex_det_iff with (a := k2).
+         2: { intros ?. destruct decide; set_solver. }
+         destruct decide; set_solver. }
+    erewrite ex_det_iff with (a := k2).
+    2: { intros ?. destruct decide; set_solver. }
+    destruct decide; [set_solver| ].
+    destruct (tm !! k1), (tm !! k2); set_solver.
+  Qed. 
+
+End TmapDisj.
+
+
 Section LsMapping.
   Context {G: Type}.
   Context {M: FairModel}.
@@ -13,10 +64,6 @@ Section LsMapping.
     let tmap_flat := flat_map (fun '(τ, R) => map (pair τ) (elements R)) tmap_l in
     let tmap_rev := (fun '(τ, ρ) => (ρ, τ)) <$> tmap_flat in
     list_to_map tmap_rev.
-
-  Definition tmap_disj (tm: gmap G (gset (fmrole M))) :=
-      forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
-        tm !! τ1 = Some S1 -> tm !! τ2 = Some S2 -> S1 ## S2.
 
   Lemma ls_mapping_tmap_corr_impl tmap (DISJ: tmap_disj tmap):
     maps_inverse_match (ls_mapping_impl tmap) tmap.
