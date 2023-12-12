@@ -8,6 +8,7 @@ From trillium.fairness.ext_models Require Import ext_models.
 (* TODO: is it possible to unify usual and ext-aware versions of these proofs? *)
 
 Section destuttering_auxtr.
+  Context `{Countable G}. 
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
   (* Let EMF := ext_model_FM (EM := EM).  *)
@@ -146,6 +147,7 @@ Section destuttering_auxtr.
 End destuttering_auxtr.
 
 Section upto_preserves.
+  Context `{CNT: Countable G}. 
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
   Context {LF: LMFairPre LM}.
@@ -199,6 +201,7 @@ End upto_preserves.
 Section upto_stutter_preserves_fairness_and_termination.
   (* Context `{LM: LiveModel G M LSI}. *)
   (* Context `{Countable G}. *)
+  Context `{CNT: Countable G}. 
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
   Context {LMFP: LMFairPre LM}.
@@ -483,8 +486,8 @@ End upto_stutter_preserves_fairness_and_termination.
 
 (* TODO: move, unify with non-ext version? *)
 From trillium.fairness Require Import lm_fairness_preservation.
-Lemma ELM_ALM_afair_by_next `(LM: LiveModel G M LSI) {LF: LMFairPre LM}
-  {ELM: ExtModel (@LM_Fair _ _ _ _ LF)} auxtr
+Lemma ELM_ALM_afair_by_next `{Countable G}`(LM: LiveModel G M LSI) {LF: LMFairPre LM}
+  {ELM: ExtModel (@LM_Fair _ _ _ _ _ _ LF)} auxtr
   (KEEPS: ext_keeps_asg):
   (∀ ρ, afair_by_next_TS (ELM_ALM KEEPS) ρ auxtr) <-> ∀ ρ, fair_by_next_TS_ext ρ auxtr.
 Proof.

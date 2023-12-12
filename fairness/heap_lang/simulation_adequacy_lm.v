@@ -4,7 +4,7 @@ From trillium.fairness.heap_lang Require Import lang simulation_adequacy em_lm_h
 
 
 (* TODO: move *)
-Lemma initial_ls'_mapping `{LM : LiveModel G M LSI} `{Countable G} s0 g LSI0:
+Lemma initial_ls'_mapping  `{Countable G} `{LM : LiveModel G M LSI} s0 g LSI0:
   ls_mapping (initial_ls' s0 g LSI0 (LM := LM)) = gset_to_gmap g (live_roles M s0).
 Proof.
   rewrite /initial_ls'. erewrite build_LS_ext_spec_mapping; [reflexivity| ].
@@ -124,7 +124,9 @@ Proof.
     iSplit; [|done].
     iSplit; [done|].
     iSplit.
-    + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids. eapply Htids. done.
+    + iPureIntro. intros ρ tid' Hsome. simpl.      
+      unfold tids_smaller' in Htids. eapply Htids.
+      eapply mim_in_1; eauto. apply ls_mapping_tmap_corr. 
     + iIntros (tid' e' Hsome Hnoval ρ). simpl.
       iAssert (frag_mapping_is {[ tid' := ∅ ]}) with "[Hposts]" as "H".
       { destruct (to_val e') as [?|] eqn:Heq; last done.
@@ -265,7 +267,7 @@ Theorem simulation_adequacy_traces Σ
   rel_finitary (sim_rel LM) →
   wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : lmftrace (LM := LM)), lm_exaux_traces_match extr auxtr.
+  ∃ (auxtr : lmftrace (LM := LM)), lm_exaux_traces_match extr auxtr (LM := LM).
 Proof.
   intros Hfin Hwp.
   have [iatr Hbig] : exists iatr,
@@ -314,7 +316,7 @@ Theorem simulation_adequacy_model_trace Σ
   rel_finitary (sim_rel LM) →
   wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : lmftrace (LM:=LM)) mtr, lm_exaux_traces_match extr auxtr ∧
+  ∃ (auxtr : lmftrace (LM:=LM)) mtr, lm_exaux_traces_match extr auxtr (LM := LM) ∧
                                upto_stutter ls_under Usls auxtr mtr.
 Proof.
   intros Hfb Hwp.
@@ -325,7 +327,10 @@ Proof.
   destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
   eauto.
 Qed.
-  
+
+Definition get_LF: LMFairPre' LM -> LMFairPre LM. 
+intros. split; apply X. 
+Defined. 
 
 Theorem simulation_adequacy_terminate Σ
         `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
@@ -348,7 +353,10 @@ Proof.
               Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
   have Hfairaux := ex_fairness_preserved 
                      extr auxtr Hinf Hmatch Hfair.
-  pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) Hfairaux) as Hfairaux'. 
+  (* assert (LMFairPre LM) as LF. *)
+  (* { esplit; apply LF'. } *)
+  set LF := get_LF LF'.
+  pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) (Hfairaux LF)) as Hfairaux'. 
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux'.
   (* have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch. *)
   pose proof Hmatch as Hvalaux%traces_match_valid2. 
@@ -397,7 +405,7 @@ End adequacy.
 
 
 Section adequacy_general.
-
+Context `{CNT: Countable G}.
 Context `{LM: LiveModel G M LSI}. 
 Context {LF: LMFairPre LM}. 
 

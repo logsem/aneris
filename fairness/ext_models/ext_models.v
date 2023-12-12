@@ -220,6 +220,7 @@ End ExtTerm.
 
 (* TODO: move? *)
 Section ELM_ALM.
+  Context `{CNT: Countable G}.
   Context `{LM: LiveModel G M LSI}.
   Context {EM: ExtModel M}.
   Context {LF: LMFairPre LM}.
@@ -245,7 +246,7 @@ Section ELM_ALM.
       left; eauto.
   Defined.
 
-  Local Lemma same_type (l: elmftrace) (a: @atrace _ _ _ LM (option ext_role)): False.
+  Local Lemma same_type (l: elmftrace) (a: @atrace _ _ _ _ _ LM (option ext_role)): False.
   Proof.
     assert (l = a). 
   Abort. 

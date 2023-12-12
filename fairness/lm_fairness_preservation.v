@@ -5,6 +5,7 @@ From trillium.fairness Require Import inftraces fairness fuel traces_match trace
 
 
 Section fairness_preserved.
+  Context `{Countable G}.
   Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}. 
 
@@ -82,7 +83,7 @@ Section fairness_preserved.
     fm = (f, m) ->
     δ = trfirst auxtr ->
     δ.(ls_fuel) !! ρ = Some f ->
-    δ.(ls_mapping) !! ρ = Some τ ->
+    (ls_mapping δ) !! ρ = Some τ ->
     pred_at auxtr m (fun δ oℓ => group_step_or_dis τ δ oℓ)
     ->
     (* ∃ M, pred_at auxtr M (fun δ ℓ => steps_or_unassigned ρ δ ℓ)).  *)
@@ -140,9 +141,9 @@ Section fairness_preserved.
     destruct STEP as (ℓ&STEP&MATCH).
     destruct ℓ; simpl in MATCH; try done; subst g0.
     - apply proj2, proj1 in STEP.
-      apply (ls_mapping_tmap_corr (LM := LM)) in STEP as (?&?&?). eauto.
+      apply (ls_mapping_tmap_corr) in STEP as (?&?&?). eauto.
     - apply proj1 in STEP. destruct STEP as (?&STEP).
-      apply (ls_mapping_tmap_corr (LM := LM)) in STEP as (?&?&?). eauto.
+      apply (ls_mapping_tmap_corr) in STEP as (?&?&?). eauto.
   Qed.
 
   Lemma fairness_preserved_ind ρ:
@@ -247,7 +248,7 @@ Section fairness_preserved.
 
     eapply OTHER_HELPER; eauto.
     - intros. eapply am_transA_keep_asg in Hmapping as (?&?); eauto.
-      rewrite H in H1. inversion H1. lia.
+      rewrite H0 in H2. inversion H2. lia.
     - intros. eapply am_transA_keep_asg in Hfuel as (?&?); eauto.
       congruence.     
   Qed.
@@ -267,7 +268,7 @@ Section fairness_preserved.
     (* setoid_rewrite pred_at_sum. rewrite Heq. *)
     setoid_rewrite <- trace_lookup_after; eauto.  
 
-    have [τ Hτ] : is_Some((trfirst tr).(ls_mapping) !! ρ).
+    have [τ Hτ] : is_Some((ls_mapping (trfirst tr)) !! ρ).
     { destruct tr; apply elem_of_dom; eauto. }
     clear DOMn.
     have [f Hfuel] : is_Some((trfirst tr).(ls_fuel) !! ρ).
@@ -302,7 +303,7 @@ Section fairness_preserved.
     do 2 eexists. split; eauto. 
     destruct STEP. 
     - left. intros ?%mapping_live_role.
-      by apply H, elem_of_dom.
+      by apply H0, elem_of_dom.
     - by right.
   Qed.
 
@@ -411,7 +412,7 @@ Section fairness_preserved.
 End fairness_preserved.
 
 
-Instance LM_ALM `(LM: LiveModel G M LSI): AlmostLM olocale_trans (LM := LM).
+Instance LM_ALM `{Countable G} `(LM: LiveModel G M LSI): AlmostLM olocale_trans (LM := LM).
 Proof. 
   refine {| am_lift_G := Some |}; eauto. 
   - intros ?????? STEP NEQ **.
@@ -443,7 +444,7 @@ Proof.
   - apply STEP_IFF; reflexivity. 
 Qed. 
 
-Lemma LM_ALM_afair_by_next `(LM: LiveModel G M LSI) {LF: LMFairPre LM} auxtr:
+Lemma LM_ALM_afair_by_next `{Countable G} `(LM: LiveModel G M LSI) {LF: LMFairPre LM} auxtr:
   (∀ ρ, afair_by_next_TS (LM_ALM LM) ρ auxtr) <-> ∀ ρ, fair_by_next_TS ρ auxtr.
 Proof.
   apply forall_proper. intros.
@@ -471,8 +472,8 @@ Qed.
 (* Qed. *)
 
 Section lang_fairness_preserved.
+  Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel (locale Λ) M LSI}.
-  (* Context `{EqDecision (locale Λ)}. *)
   Context {LF: LMFairPre LM}.
 
   Let ALM := LM_ALM LM.
@@ -510,7 +511,7 @@ Section lang_fairness_preserved.
     { apply _. }
     { eapply match_locale_enabled_states_livetids; eauto. }
     simpl. intros. destruct ζ as [ζ| ].
-    { apply H1. }
+    { apply H2. }
     red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
   Qed.
 
@@ -518,9 +519,9 @@ End lang_fairness_preserved.
 
 
 Section model_fairness_preserved.
+  Context `{CNT: Countable G}.
   Context `{LM: LiveModel G M LSI}.
   Context {A} {transA} {ALM: AlmostLM transA (LM := LM) (A := A)}. 
-  (* Context `{EqDecision G}. *)
   Context {LF: LMFairPre LM}. 
 
   Context `{Mout: FairModel}. 

@@ -4,8 +4,8 @@ From trillium.fairness Require Import fairness fuel fuel_ext resources partial_o
 
 
 Section ModelStep.
-  Context `{LM: LiveModel G M LSI}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -17,7 +17,7 @@ Section ModelStep.
   (* TODO: remove duplication across lm_rules files *)
   Local Ltac solve_disj δ1 τ1 τ2 := 
     eapply disjoint_subseteq;
-    [..| eapply (ls_tmap_disj δ1 τ1 τ2 (LM := LM)); eauto];
+    [..| eapply (ls_tmap_disj δ1 τ1 τ2); eauto];
     [apply _| ..];
     set_solver.
   
@@ -41,7 +41,7 @@ Section ModelStep.
 :
   maps_inverse_match
     (update_mapping (ls_mapping δ1) ζ fs1 fs2)
-    (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))). 
+    (<[ζ:=dom fs2]> (ls_tmap δ1)). 
   Proof.
     intros ρ' ζ'. simpl. rewrite map_lookup_imap.
     rewrite lookup_gset_to_gmap //=.
@@ -85,7 +85,7 @@ Section ModelStep.
       apply not_elem_of_difference in Hnotin as [Hnin|Hin].
       + apply elem_of_dom_2 in Habs. rewrite ls_same_doms in Habs. set_solver.
       + apply elem_of_difference in Hin as [Hin Hnin].
-        apply Hxdom in Hin. congruence.
+        apply Hxdom in Hin. rewrite Hin in Habs. congruence. 
   Qed.
 
   Lemma model_step_ls_trans
@@ -134,18 +134,18 @@ Section ModelStep.
   (FR' : gset (fmrole M))
   (FR_EQ : FR = fr1 ∪ FR')
   (DISJ' : fr1 ## FR')
-  (MATCH : maps_inverse_match new_mapping (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))))
+  (MATCH : maps_inverse_match new_mapping (<[ζ:=dom fs2]> (ls_tmap δ1)))
   (* (PRES: model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI)) *)
 :
     forall tmap_sd tmap_disj LSI',
   lm_ls_trans LM δ1 (Take_step ρ ζ)
     (build_LS_ext s2 new_fuels Hfueldom
-       (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM)))
-       tmap_sd tmap_disj LSI' (LM := LM)). 
+       (<[ζ:=dom fs2]> (ls_tmap δ1))
+       tmap_sd tmap_disj LSI' ). 
   Proof.
     intros. 
     constructor; simpl. 
-   { rewrite build_LS_ext_spec_st. by rewrite Heq //. }
+   { by rewrite Heq //. }
     split; first by apply Hxdom; set_solver.
     split.
     { intros ? ? Hdom Hmd. 
@@ -250,7 +250,7 @@ Section ModelStep.
            exfalso. apply Habs.
            set_solver -Hsamedoms Hnewdom Hfueldom.
     +
-      rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
+      (* rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st. *)
       split.
       { intros Hlive.
         
@@ -368,7 +368,7 @@ Section ModelStep.
     dom fs2 ∩ fr_stash = ∅ ->
     (* locale_step (tp1, σ1) (Some ζ) (tp2, σ2) -> *)
     fmtrans _ s1 (Some ρ) s2 -> 
-    valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := LM) ->
+    valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := LM)  ->
     (model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI)) ->
     has_fuels ζ fs1 -∗ frag_model_is s1 -∗ model_state_interp δ1 -∗
     frag_free_roles_are fr1
@@ -376,7 +376,7 @@ Section ModelStep.
         ⌜lm_ls_trans LM δ1 (Take_step ρ ζ) δ2 ⌝
         ∗ has_fuels ζ fs2 ∗ frag_model_is s2 ∗ model_state_interp δ2 ∗
         frag_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash) ∗
-        ⌜ ls_tmap δ2 (LM := LM) = (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))) ⌝. 
+        ⌜ ls_tmap δ2 = (<[ζ:=dom fs2]> (ls_tmap δ1)) ⌝. 
   Proof.
     iIntros (Hfr_new Hstash_own Hstash_dis Hstash_rem Htrans Hfuelsval PRES) "Hfuel Hmod Hsi Hfr1".
 
@@ -452,11 +452,11 @@ Section ModelStep.
     
     assert (∀ (τ1 τ2 : G) (S1 S2 : gset (fmrole M)),
     τ1 ≠ τ2
-    → <[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM)) !! τ1 = Some S1
-      → <[ζ:=dom fs2]> (ls_tmap δ1(LM := LM)) !! τ2 = Some S2 → S1 ## S2)
+    → <[ζ:=dom fs2]> (ls_tmap δ1) !! τ1 = Some S1
+      → <[ζ:=dom fs2]> (ls_tmap δ1) !! τ2 = Some S2 → S1 ## S2)
       as TMAP_DISJ'.
     { intros.
-      assert (forall τ' S', τ' ≠ ζ -> ls_tmap δ1 (LM := LM) !! τ' = Some S' -> dom fs2 ## S') as FS2_DISJ. 
+      assert (forall τ' S', τ' ≠ ζ -> ls_tmap δ1 !! τ' = Some S' -> dom fs2 ## S') as FS2_DISJ. 
       { destruct Hfuelsval as (?&?&?&?&?&?&FS2).
         clear -Hfr_new HfrFR FS2 Hxdom HFR.  
         intros τ' S' NEQ' IN'. 
@@ -465,7 +465,7 @@ Section ModelStep.
         move FS2 at bottom. specialize (FS2 _ IN1).
         assert (ρ' ∈ dom fs1 -> False) as NINf1. 
         { intros INf1. apply Hxdom in INf1.
-          eapply (ls_mapping_tmap_corr (LM := LM)) in INf1 as (?&?&?).
+          eapply (ls_mapping_tmap_corr) in INf1 as (?&?&?).
           eapply ls_tmap_disj; eauto. }
         repeat rewrite elem_of_union in FS2. destruct FS2 as [[[?|?]|?]|?].
         2-4: apply NINf1; set_solver. 
@@ -490,7 +490,7 @@ Section ModelStep.
       red in Hfuelsval. apply proj2, proj2, proj1 in Hfuelsval.
       set_solver. }
 
-    assert (maps_inverse_match new_mapping (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM)))) as MATCH.
+    assert (maps_inverse_match new_mapping (<[ζ:=dom fs2]> (ls_tmap δ1))) as MATCH.
     { pose proof Hfuelsval as (?&?&?&?&?&?). 
       eapply @mim_model_step_helper; eauto.
       { rewrite Heq. etransitivity.
@@ -500,9 +500,10 @@ Section ModelStep.
 
     erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'.
     3: { apply MATCH. }
-    2: { apply ls_mapping_tmap_corr_impl. apply TMAP_DISJ'. }         
+    2: { apply ls_mapping_tmap_corr_impl.
+         red. apply TMAP_DISJ'. }         
     
-    iExists (build_LS_ext s2 _ Hfueldom (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))) _ _ LSI' (LM := LM)).
+    iExists (build_LS_ext s2 _ Hfueldom (<[ζ:=dom fs2]> (ls_tmap δ1)) _ _ LSI').
     (* Unshelve. *)
     iMod (update_has_fuels _ fs1 fs2 with "Hfuel Hafuel Hamapping") as "(Hafuel & Hfuel & Hmapping)".
     { set_solver. }
@@ -566,7 +567,7 @@ Section ModelStep.
       * destruct NIN.
         ** destruct H0. by apply Hxdom.
         ** set_solver.
-      * apply (ls_mapping_tmap_corr (LM := LM)) in MAP as (?&?&?).
+      * apply (ls_mapping_tmap_corr) in MAP as (?&?&?).
         set_solver.
     + intros (τ & R & PROP & IN).
       destruct PROP as [[<- <-] | [NEQ MAP]].
@@ -576,7 +577,7 @@ Section ModelStep.
            eapply elem_of_dom. exists τ. eapply ls_mapping_tmap_corr; eauto.
         ** apply not_elem_of_difference. left.
            intros IN'%Hxdom.
-           apply (ls_mapping_tmap_corr (LM := LM)) in IN' as (?&?&?).
+           apply (ls_mapping_tmap_corr) in IN' as (?&?&?).
            eapply ls_tmap_disj; eauto.
   Qed.
 
@@ -584,8 +585,8 @@ End ModelStep.
 
 
 Section ModelStepTrue.
-  Context `{LM: LiveModel G M LSI_True}.
   Context `{Countable G}.
+  Context `{LM: LiveModel G M LSI_True}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
   
@@ -604,7 +605,7 @@ Section ModelStepTrue.
         ⌜lm_ls_trans LM δ1 (Take_step ρ ζ) δ2 ⌝
         ∗ has_fuels ζ fs2 ∗ frag_model_is s2 ∗ model_state_interp δ2 ∗
         frag_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash) ∗
-        ⌜ ls_tmap δ2 (LM := LM) = (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))) ⌝. 
+        ⌜ ls_tmap δ2 = (<[ζ:=dom fs2]> (ls_tmap δ1)) ⌝. 
   Proof.
     intros. iApply actual_update_step_still_alive_gen; auto.
     done.

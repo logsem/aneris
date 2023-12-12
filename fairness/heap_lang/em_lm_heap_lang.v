@@ -240,7 +240,7 @@ Lemma mim_helper_model_step `{LM: LiveModel (locale heap_lang) M LSI}
          (* : gmap (fmrole M) (locale heap_lang) *)
 )
 )
-    (<[ζ:=dom fs2]> (ls_tmap δ1 (LM := LM))).
+    (<[ζ:=dom fs2]> (ls_tmap δ1)).
 Proof. 
   intros ρ' ζ'. simpl. rewrite map_lookup_imap.
   rewrite lookup_gset_to_gmap //=.

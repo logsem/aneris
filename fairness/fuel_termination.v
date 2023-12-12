@@ -3,7 +3,7 @@ From Paco Require Import pacotac.
 From trillium.fairness Require Import fairness fair_termination fuel fuel_ext traces_match lm_fairness_preservation lm_fair lm_fair_traces.
 
 Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel} {LSI}
-           {LM : LiveModel (locale Λ) Mdl LSI}
+           `{Countable (locale Λ)} {LM : LiveModel (locale Λ) Mdl LSI}
            {LF: LMFairPre LM}
            (auxtr : lmftrace (LM := LM)) :=
   mtrace_valid auxtr →
@@ -11,13 +11,13 @@ Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel} {LSI}
   terminating_trace auxtr.
 
 Definition lm_valid_state_evolution_fairness 
-  `{LM:LiveModel (locale Λ) M LSI}
+  `{Countable (locale Λ)} `{LM:LiveModel (locale Λ) M LSI}
   {LF: LMFairPre LM}
   := 
   valid_state_evolution_fairness (M := fair_model_model LM_Fair) lm_valid_evolution_step.
 
 Theorem continued_simulation_fair_termination
-        `{FairTerminatingModel FM} `(LM:LiveModel (locale Λ) FM LSI)
+        `{FairTerminatingModel FM} `{Countable (locale Λ)} `(LM:LiveModel (locale Λ) FM LSI)
         {LF: LMFairPre LM}
         (ξ : execution_trace Λ → auxiliary_trace (fair_model_model LM_Fair) → Prop) a1 r1 extr
         (* (LSI0: let f0 := gset_to_gmap (LM.(lm_fl) a1) (FM.(live_roles) a1) in *)
@@ -50,7 +50,7 @@ Proof.
     Unshelve.
     - done.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ (auxtr : lmftrace), lm_exaux_traces_match extr auxtr)
+  assert (∃ (auxtr : lmftrace), lm_exaux_traces_match extr auxtr (LM := LM))
     as [auxtr Hmatch].
   { exists (to_trace (initial_ls' a1 r1 LSI0) iatr).
     unshelve eapply (valid_inf_system_trace_implies_traces_match

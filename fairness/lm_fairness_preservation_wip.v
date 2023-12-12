@@ -31,7 +31,8 @@ Ltac unfold_LMF_trans T :=
   end.
  
 Section LMTraceHelpers.
-  Context `{LM: LiveModel G M  LSI}.
+  Context `{CNT: Countable G}.
+  Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}.
 
   Context {A: Type} {transA: lm_ls LM -> A -> lm_ls LM -> Prop}
@@ -170,6 +171,7 @@ End LMTraceHelpers.
 
 (* TODO: rename *)
 Section Foobar. 
+  Context `{CNT: Countable G}.
   Context `{LM: LiveModel G M LSI}.
   (* Context `{Countable G}. *)
   Context {LF: LMFairPre LM}. 
@@ -223,8 +225,10 @@ End Foobar.
 
 
 Section InnerLMTraceFairness.
+  Context `{CNTi: Countable Gi}.
   Context `{LMi: LiveModel Gi Mi LSIi}.
   (* Context `{INH_Gi: Inhabited Gi, EQ_Gi: EqDecision Gi}.  *)
+  Context `{CNTo: Countable Go}.
   Context `{LMo: LiveModel Go Mo LSIo}.
   Context {LFi: LMFairPre LMi} {LFo: LMFairPre LMo}.
 
@@ -510,10 +514,10 @@ Section InnerLMTraceFairness.
   (* Qed.  *)
 
   (* TODO: is it possible to express the general principle of induction by burning fuel? *)
-  Lemma owner_fixed_eventually `{LM: LiveModel G M LSI}
+  Lemma owner_fixed_eventually `{CNT: Countable G} `{LM: LiveModel G M LSI}
                                {A: Type} {transA} {AM: AlmostLM transA (LM := LM)} 
     {LF: LMFairPre LM}
-    (tr: @atrace _ _ _ LM A) ρ n
+    (tr: @atrace _ _ _ _ _ LM A) ρ n
     (* (NOρ: ∀ m ℓ, n ≤ m → tr L!! m = Some ℓ → ∀ g, ℓ ≠ Take_step ρ g) *)
     (NOρ: forall i δ τ δ', n ≤ i -> tr !! i = Some (δ, Some (am_lift_G τ, δ')) ->
                       (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
