@@ -367,7 +367,7 @@ Section LMFinBranching.
   Definition roles_rearranged (δ1 δ2: LiveState _ _ LSI) (D: gset G) τ :=
     ls_under δ2 = ls_under δ1 /\ ls_fuel δ2 = ls_fuel δ1 /\
     (* dom (ls_mapping δ2) = dom (ls_mapping δ1) /\ *)
-    dom (ls_tmap δ2) ⊆ D /\
+    dom (ls_tmap δ2) ⊆ D ∪ {[ τ ]} /\
     dom (ls_mapping δ2) = dom (ls_mapping δ1) /\    
     (forall ρ, ρ ∈ dom (ls_mapping δ2) ->
           ls_mapping δ2 !! ρ = match (ls_mapping δ1 !! ρ) with
@@ -482,7 +482,11 @@ Section LMFinBranching.
     { apply elem_of_cons. destruct ℓ; simpl in *; try done.
       - right. eapply elem_of_list_In, FIN_STEPS; eauto. apply TRANS'.
       - left. repeat apply proj2 in TRANS'. congruence. }
-    { intros. rewrite list_to_set_elements. apply ARR. }
+    { intros. rewrite list_to_set_elements.
+      red in ARR. apply proj2, proj2, proj1 in ARR.
+      etrans; [apply ARR| ].
+      rewrite union_comm subseteq_union_1; [done| ]. apply singleton_subseteq_l.
+      eapply locale_trans_dom. eexists. split; eauto. }
       (* destruct ARR as (ST & FUEL & TMAP_DOM & MAP_DOM & MAP_VAL). *)
       (* apply elem_of_subseteq. intros ?. rewrite !elem_of_dom. intros T.   *)
       (* pose proof T as T'. specialize (MAP_VAL _ T'). *)
@@ -499,36 +503,240 @@ Section LMFinBranching.
     subst τ_ℓs. apply elem_of_list_In, elem_of_list_filter. split.
     { eexists. split; eauto. }
     apply elem_of_list_In. done.
+  Qed.
+
+  (* TODO: find existing? *)
+  Definition flatten_gset `{Countable K} (ss: gset (gset K)): gset K :=
+    list_to_set (concat (map elements (elements ss))).
+
+  Lemma flatten_gset_spec `{Countable K} (ss: gset (gset K)):
+    forall k, k ∈ flatten_gset ss <-> exists s, s ∈ ss /\ k ∈ s.
+  Proof.
+    intros. rewrite /flatten_gset.
+    rewrite elem_of_list_to_set.
+    rewrite elem_of_list_In in_concat.
+    setoid_rewrite in_map_iff. 
+    repeat setoid_rewrite <- elem_of_list_In.
+    split.
+    - intros (?&(l&<-&?)&?). exists l. set_solver.
+    - intros (s&?&?). exists (elements s). set_solver. 
+  Qed. 
+    
+  Lemma flatten_gset_disjoint `{Countable K} (ss: gset (gset K)) s':
+    flatten_gset ss ## s' <-> forall s, s ∈ ss -> s ## s'.
+  Proof.
+    repeat setoid_rewrite elem_of_disjoint. setoid_rewrite flatten_gset_spec.
+    set_solver.
+  Qed.
+
+  (* TODO: move *)
+  Definition rearrange_roles_map (tm: gmap G (gset (fmrole M))) (R: gset G) (r: G):
+    gmap G (gset (fmrole M)) :=
+    let cleaned := filter (fun '(k, _) => k ∈ R) tm in
+    let cur_r := default ∅ (tm !! r) in
+    let to_move := flatten_gset (map_img (filter (fun '(k, _) => k ∉ R) tm)) in
+    <[ r := cur_r ∪ to_move ]> cleaned.
+
+  (* TODO: move, gneralize*)
+  Lemma mim_neg m (tm: gmap G (gset (fmrole M)))
+    (MIM: maps_inverse_match m tm):
+    ∀ (k: fmrole M), m !! k = None <-> forall g, k ∉ default ∅ (tm !! g).
+  Proof. 
+    intros. red in MIM. specialize (MIM k). split.
+    - intros MAP. intros g IN.
+      destruct (tm !! g) eqn:TM; set_solver.
+    - intros NIN. destruct (m !! k) eqn:MAP; [| done].
+      pose proof (proj1 (MIM g) eq_refl) as (?&?&?).
+      specialize (NIN g). rewrite H0 in NIN. set_solver.
   Qed. 
 
-  foobar. use map_img to reimplement it. 
-  (* TODO: move *)
-  Definition rearrange_roles_map (m: gmap (fmrole M) G)
-    (R: gset G) (r: G):
-    gmap (fmrole M) G :=
-    (fun g => if (decide (g ∈ R)) then g else r) <$> m.
 
+  Lemma rrm_tmap_fuel_same_doms (δ: LiveState G M LSI) R r:
+    ∀ ρ : fmrole M,
+    ρ ∈ dom (ls_fuel δ)
+    ↔ (∃ (τ : G) (R0 : gset (fmrole M)),
+         rearrange_roles_map (ls_tmap δ) R r !! τ = Some R0 ∧ ρ ∈ R0).
+  Proof.
+    intros ρ. 
+    rewrite /rearrange_roles_map.
+    setoid_rewrite lookup_insert_Some. setoid_rewrite map_filter_lookup_Some.
+    rewrite -ls_same_doms elem_of_dom. 
+    split.
+    { intros [g MAP].
+      pose proof MAP as TM. apply ls_mapping_tmap_corr in TM as (Rg & TM & IN).
+      destruct (decide (r = g)).
+      - subst.
+        do 2 eexists. split.
+        + left. split; reflexivity.
+        + rewrite TM. simpl. set_solver.
+      - destruct (decide (g ∈ R)).
+        + do 2 eexists. split; [| apply IN].
+          right. eauto.
+        + do 2 eexists. split.
+          * left. split; reflexivity.
+          * apply elem_of_union. right. apply flatten_gset_spec.
+            eexists. split; eauto.
+            apply elem_of_map_img.
+            eexists. apply map_filter_lookup_Some. eauto. }
+    intros (τ & R' & PROP & IN).
+    destruct PROP as [[<- <-] | (? & tm & IN')].
+    + apply elem_of_union in IN as [IN | IN].
+      * destruct (ls_tmap δ !! r) eqn:TM; try set_solver. simpl in IN.
+        exists r. eapply ls_mapping_tmap_corr; eauto.
+      * apply flatten_gset_spec in IN. destruct IN as (s & IN' & IN).
+        apply elem_of_map_img in IN'. destruct IN' as (g & IN').
+        apply map_filter_lookup_Some in IN' as (TM & IN').  
+        exists g. eapply ls_mapping_tmap_corr; eauto.
+    + exists τ. eapply ls_mapping_tmap_corr; eauto.
+  Qed. 
+
+  Lemma rrm_tmap_disj tm R r
+    (DISJ: tmap_disj tm):
+    tmap_disj (rearrange_roles_map tm R r).
+  Proof.
+red. rewrite /rearrange_roles_map.
+      setoid_rewrite lookup_insert_Some. setoid_rewrite map_filter_lookup_Some.
+      intros * NEQ TM1 TM2.
+
+      assert (forall k2 S2 (NEQ: r ≠ k2) (tm2 : tm !! k2 = Some S2)
+                (IN2 : k2 ∈ R),
+  default ∅ (tm !! r)
+  ∪ flatten_gset (map_img (filter (λ '(k, _), k ∉ R) tm)) ## S2) as HELPER. 
+      { intros. apply disjoint_union_l. split.
+        * destruct (tm !! r) eqn:TM; [| set_solver].
+          simpl. eapply DISJ; [apply NEQ0| ..]; eauto. 
+        * apply flatten_gset_disjoint. intros s. 
+          rewrite elem_of_map_img.
+          setoid_rewrite map_filter_lookup_Some.
+          intros (g&?&?).
+          destruct (decide (g = k0)); [subst; done| ]. 
+          eapply DISJ; eauto. }
+      
+      destruct TM1 as [[<- <-] | (? & tm1 & IN1)], TM2 as [[<- <-] | (? & tm2 & IN2)]. 
+      { congruence. }
+      + eapply HELPER; eauto.
+      + apply disjoint_sym. eapply HELPER; eauto.
+      + eapply DISJ; [apply NEQ| ..]; eauto.
+  Qed. 
+
+  Lemma rrm_mapping (tm: gmap G (gset (fmrole M))) (R: gset G) (r: G)
+                    (DISJ: tmap_disj tm)
+    :
+    ls_mapping_impl (rearrange_roles_map tm R r) =
+    (fun g => if (decide (g ∈ R)) then g else r) <$> (ls_mapping_impl tm). 
+  Proof. 
+    simpl. apply map_eq. intros ρ. 
+    rewrite /rearrange_roles_map.
+    rewrite lookup_fmap.
+    (* pose proof (ls_mapping_tmap_corr_impl tm DISJ ρ) as MIM. *)
+    destruct (ls_mapping_impl tm !! ρ) eqn:MAP.
+    2: { simpl. apply not_elem_of_dom_1. simpl.
+         intros [g MAP']%elem_of_dom.
+         pose proof MAP as TM. eapply mim_neg with (g := g) in MAP.
+         2: { by apply ls_mapping_tmap_corr_impl. }
+         pose proof MAP' as TM'. apply ls_mapping_tmap_corr_impl in TM'.
+         2: { by apply rrm_tmap_disj. }
+         destruct TM' as (Rg & EQRg & IN).
+         apply lookup_insert_Some in EQRg. 
+         destruct EQRg as [[-> <-] | [NEQ IN']].
+         - apply elem_of_union in IN as [? | IN]; [set_solver| ].
+           apply flatten_gset_spec in IN as (?&IN'&IN).
+           apply elem_of_map_img in IN' as (?&IN').
+           apply map_filter_lookup_Some in IN' as [IN' ?].
+           eapply mim_neg with (g := x0) in TM.
+           2: { by apply ls_mapping_tmap_corr_impl. }
+           by rewrite IN' in TM.
+         - apply map_filter_lookup_Some in IN' as [IN' ?].
+           by rewrite IN' in MAP. }
+    simpl.
+    apply ls_mapping_tmap_corr_impl.
+    { by apply rrm_tmap_disj. }
+    pose proof MAP as TM. apply ls_mapping_tmap_corr_impl in TM; [| done].
+    destruct TM as (R' & TM & IN).
+    setoid_rewrite lookup_insert_Some.
+    destruct (decide (g ∈ R)) as [gR | ngR].
+    { destruct (decide (r = g)) as [-> | NEQ].
+      - eexists. split.
+        { left. split; reflexivity. }
+        rewrite TM. set_solver.
+      - eexists. split; [| eauto].
+        right. split; eauto. apply map_filter_lookup_Some. eauto. }
+    eexists.  split.
+    { left. split; reflexivity. }
+    rewrite elem_of_union. right. apply flatten_gset_spec.
+    eexists. split; eauto. apply elem_of_map_img.
+    eexists. apply map_filter_lookup_Some. eauto.
+  Qed. 
+
+    
   Definition rearrange_roles (δ: lm_ls LM) (R: gset G) (r: G)
-    (LSI': LSI (ls_under δ) (rearrange_roles_map (ls_mapping δ) R r) (ls_fuel δ)): 
+    (LSI': LSI (ls_under δ) (ls_mapping_impl $ rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ)): 
     lm_ls LM.
-    refine {| ls_under := ls_under δ; ls_fuel := ls_fuel δ;
-                                      ls_mapping := rearrange_roles_map (ls_mapping δ) R r |}.
+    refine {| ls_under := ls_under δ;
+              ls_fuel := ls_fuel δ;
+              (* ls_mapping := rearrange_roles_map (ls_mapping δ) R r *)
+              ls_tmap := rearrange_roles_map (ls_tmap δ) R r;
+           |}.
     - apply ls_fuel_dom.
-    - rewrite /rearrange_roles_map. rewrite dom_fmap_L. apply ls_same_doms.
-    - apply LSI'.
-  Defined. 
+    - apply rrm_tmap_fuel_same_doms. 
+    - red. rewrite /rearrange_roles_map.
+      setoid_rewrite lookup_insert_Some. setoid_rewrite map_filter_lookup_Some.
+      intros * NEQ TM1 TM2.
+
+      assert (forall k2 S2 (NEQ: r ≠ k2) (tm2 : ls_tmap δ !! k2 = Some S2)
+                (IN2 : k2 ∈ R),
+  default ∅ (ls_tmap δ !! r)
+  ∪ flatten_gset (map_img (filter (λ '(k, _), k ∉ R) (ls_tmap δ))) ## S2) as HELPER. 
+      { intros. apply disjoint_union_l. split.
+        * destruct (ls_tmap δ !! r) eqn:TM; [| set_solver].
+          simpl. eapply ls_tmap_disj; eauto.
+        * apply flatten_gset_disjoint. intros s. 
+          rewrite elem_of_map_img.
+          setoid_rewrite map_filter_lookup_Some.
+          intros (g&?&?).
+          destruct (decide (g = k0)); [subst; done| ]. 
+          eapply ls_tmap_disj; eauto. }
+      
+      destruct TM1 as [[<- <-] | (? & tm1 & IN1)], TM2 as [[<- <-] | (? & tm2 & IN2)]. 
+      { congruence. }
+      + eapply HELPER; eauto.
+      + apply disjoint_sym. eapply HELPER; eauto.
+      + eapply ls_tmap_disj; [apply NEQ| ..]; eauto.
+    - done. 
+  Defined.
+
+  (* TODO: move, generalize *)
+  Lemma dom_filter_sub {K V: Type} `{Countable K} (m: gmap K V)
+    (ks: gset K):
+    dom (filter (λ '(k, _), k ∈ ks) m) ⊆ ks.
+  Proof.
+    apply elem_of_subseteq.
+    intros ? IN. rewrite elem_of_dom in IN. destruct IN as [? IN].
+    apply map_filter_lookup_Some in IN. apply IN.
+  Qed. 
 
   Lemma rearrange_roles_spec (δ: lm_ls LM) 
     (R: gset G) (r: G)
-    (LSI': LSI (ls_under δ) (rearrange_roles_map (ls_mapping δ) R r) (ls_fuel δ))
+    (LSI': LSI (ls_under δ) (ls_mapping_impl $ rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ))
     :
     roles_rearranged δ (rearrange_roles δ R r LSI') R r.
   Proof.
     red. repeat split; simpl.
-    - rewrite /rearrange_roles_map. by rewrite dom_fmap_L.
-    - intros ? [? DOM]%elem_of_dom.
-      rewrite DOM. rewrite /rearrange_roles_map in DOM.
-      apply lookup_fmap_Some in DOM. by destruct DOM as (? & <- & ->).
+    - rewrite /rearrange_roles_map.
+      rewrite dom_insert. 
+      rewrite union_comm. apply union_mono; [| done].
+      apply dom_filter_sub.
+    - rewrite (ls_same_doms δ).
+      apply set_eq. intros. rewrite elem_of_dom. 
+      rewrite rrm_tmap_fuel_same_doms. 
+      apply exist_proper. simpl.
+      intros. rewrite ls_mapping_tmap_corr.
+      simpl. reflexivity.
+    - intros ?. rewrite /ls_mapping. rewrite !rrm_mapping.
+      2: { apply δ. }
+      simpl. rewrite !elem_of_dom !lookup_fmap. intros [g MAP].
+      rewrite MAP.
+      destruct (ls_mapping_impl (ls_tmap δ) !! ρ); done. 
   Qed. 
 
 End LMFinBranching.
@@ -536,6 +744,7 @@ End LMFinBranching.
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
+  Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision M}.
   (* Context `{EqDecision (locale Λ)}. *)
@@ -555,7 +764,7 @@ Section finitary.
   Proof.
     intros ex atr c' oζ.
     pose proof (model_finitary ex atr c' oζ).
-    by apply smaller_card_nat_finite in H.
+    by apply smaller_card_nat_finite in H0.
   Qed.
 
   Definition enum_inner extr fmodtr c' oζ : list (M * option M.(fmrole)) :=
@@ -564,8 +773,8 @@ Section finitary.
   Lemma enum_inner_spec (δ' : M) ℓ extr atr c' oζ :
     ξ (extr :tr[oζ]: c') (atr :tr[ℓ]: δ') → (δ', ℓ) ∈ enum_inner extr atr c' oζ.
   Proof.
-    intros H. unfold enum_inner. rewrite elem_of_list_fmap.
-    exists (exist _ (δ', ℓ) H). split =>//. apply elem_of_enum.
+    intros REL. unfold enum_inner. rewrite elem_of_list_fmap.
+    exists (exist _ (δ', ℓ) REL). split =>//. apply elem_of_enum.
   Qed.
 
   (* Lemma enum_inner_spec extr atr c' oζ : *)
@@ -638,7 +847,9 @@ Section finitary.
         apply elem_of_list_fmap. 
         exists (ls_under δ', Some f). split; [done| ].  
         by apply enum_inner_spec. }
-      { intros ρ' tid' Hsome. unfold tids_smaller in *.
+      {
+        (* intros ρ' tid' Hsome. *)
+        unfold tids_smaller in *.
         apply locales_of_list_from_locale_from. eauto. }
     - eapply next_TS_spec_inv_S in N.  
       2: { eexists. split; eauto. }

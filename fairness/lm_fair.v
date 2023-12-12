@@ -106,6 +106,25 @@ Section LocaleTrans.
     eexists. apply STEP. 
   Qed. 
 
+  (* TODO: move *)
+  Lemma locale_trans_ex_role δ1 τ δ2
+    (STEP: locale_trans δ1 τ δ2):
+    exists ρ, ls_mapping δ1 !! ρ = Some τ.
+  Proof using.
+    red in STEP. destruct STEP as (ℓ & STEP & MATCH).
+    destruct ℓ; simpl in *; try done; subst.
+    - apply proj2, proj1 in STEP. eauto.
+    - apply STEP.
+  Qed. 
+    
+  Lemma locale_trans_dom δ1 τ δ2
+    (STEP: locale_trans δ1 τ δ2):
+    τ ∈ dom (ls_tmap δ1). 
+  Proof using.
+    apply locale_trans_ex_role in STEP as [??]. 
+    eapply mim_in_1; [apply ls_mapping_tmap_corr| eauto].
+  Qed. 
+
 End LocaleTrans. 
 
 (* excluding parts that are provided by other classes in context *)
