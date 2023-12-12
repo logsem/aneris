@@ -134,6 +134,18 @@ Section aux_trace_lang.
   Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
     ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ).
 
+  Definition tids_smaller' (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
+    (* ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ). *)
+    forall ζ, ζ ∈ dom (ls_tmap δ) -> is_Some (from_locale c ζ).
+
+  Lemma tids_smaller'_stronger (c : list (expr Λ)) (δ: LiveState Tid M LSI):
+    tids_smaller' c δ -> tids_smaller c δ.
+  Proof. 
+    intros TS. red. intros. apply TS.
+    eapply mim_in_1; eauto. 
+    apply ls_mapping_tmap_corr.
+  Qed. 
+
 End aux_trace_lang.
 
 Ltac SS :=
@@ -511,7 +523,7 @@ Definition valid_evolution_step `{Countable (locale Λ)} `{LM:LiveModel (locale 
     eq oζ oℓ /\
     (* LM.(lm_ls_trans) δ1 ℓ δ2 ∧ *)
     (fmtrans LM_Fair δ1 oℓ δ2) /\
-    tids_smaller (σ2.1) δ2.
+    tids_smaller' (σ2.1) δ2.
 
 (* TODO: get rid of previous version *)
 Definition lm_valid_evolution_step `{Countable (locale Λ)} `{LM:LiveModel (locale Λ) M LSI} 

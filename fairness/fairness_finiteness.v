@@ -847,10 +847,12 @@ Section finitary.
         apply elem_of_list_fmap. 
         exists (ls_under δ', Some f). split; [done| ].  
         by apply enum_inner_spec. }
-      {
+      { 
         (* intros ρ' tid' Hsome. *)
-        unfold tids_smaller in *.
-        apply locales_of_list_from_locale_from. eauto. }
+        unfold tids_smaller' in *.
+        apply elem_of_subseteq. intros.
+        apply Htids in H0. apply locales_of_list_from_locale_from in H0.
+        apply elem_of_list_to_set. done. }
     - eapply next_TS_spec_inv_S in N.  
       2: { eexists. split; eauto. }
       clear Htrans. rename N into Htrans. 
@@ -860,8 +862,10 @@ Section finitary.
       (* { done. } *)
       { apply elem_of_cons.
         left. inversion Htrans as (?&?&?&?&?); done. }
-      { intros ρ' tid' Hsome. unfold tids_smaller in *.
-        apply locales_of_list_from_locale_from. eauto. }
+      {
+        apply elem_of_subseteq. intros.
+        apply elem_of_list_to_set. apply locales_of_list_from_locale_from.
+        by apply Htids. }
       
     Unshelve.
     + intros. apply make_proof_irrel.
@@ -883,9 +887,9 @@ End finitary.
 Section finitary_simple.
   Context `{M: FairModel}.
   Context `{Λ: language}.
+  Context `{CNT: Countable (locale Λ)}.
   Context `{LM: LiveModel (locale Λ) M LSI}.
   Context `{EqDecision M}.
-  Context `{EqDecision (locale Λ)}.
   Context `{DEC: forall a b c, Decision (LSI a b c)}.
 
   (* Context `{HPI0: forall s x, ProofIrrel ((let '(s', ℓ) := x in M.(fmtrans) s ℓ s'): Prop) }. *)
@@ -973,6 +977,7 @@ End finitary_simple.
 
 Section RelFinitary.
   (* Context `{Countable (locale Λ)}.  *)
+  Context `{Countable (locale Λ)}. 
   Context `(LM: LiveModel (locale Λ) M LSI). 
   Context {LF: LMFairPre LM}. 
 
