@@ -48,15 +48,17 @@ Section LMLSITopLevel.
       iModIntro. do 2 iExists _. rewrite /em_lm_msi. iFrame.
       iPureIntro. split.
       + remember (trace_last auxtr) as δ1. 
-        pose proof (tids_restrict_smaller _ _ TR) as SM.
+        pose proof (tids_restrict_smaller' _ _ TR) as SM.
         repeat split; eauto.
         * eexists. split; [apply STEPM| ]; done. 
-        * eapply tids_smaller_restrict_mapping; eauto.
-          simpl. erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
-          3: { eapply (mim_fuel_helper _ rem); eauto.
-               eapply ls_mapping_tmap_corr. }
-          { apply map_filter_subseteq. }
-          erewrite <- TMAP'. apply ls_mapping_tmap_corr.
+        * eapply tids_smaller'_restrict_mapping; eauto.
+          rewrite TMAP'.
+          rewrite dom_insert. rewrite subseteq_union_1; [done| ].
+          apply singleton_subseteq_l.
+          eapply locale_trans_dom; eauto.
+          eexists. split; eauto.
+          { apply STEPM. }
+          done. 
       + eapply tids_dom_restrict_mapping; eauto.
     - iModIntro. iIntros "* FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
@@ -67,21 +69,11 @@ Section LMLSITopLevel.
       iModIntro. do 2 iExists _. rewrite /em_lm_msi. iFrame.
       iPureIntro. split.
       + remember (trace_last auxtr) as δ1. 
-        pose proof (tids_restrict_smaller _ _ TR) as SM.
+        pose proof (tids_restrict_smaller' _ _ TR) as SM.
         repeat split; eauto.
         * eexists. split; [apply STEPM| ]; done. 
-        * eapply tids_smaller_restrict_mapping; eauto.
-          simpl. erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
-          3: { eapply (mim_fuel_helper _ (∅: gset (fmrole M))); eauto.
-               { done. }
-               eapply ls_mapping_tmap_corr. }
-          { apply map_filter_subseteq. }
-          rewrite difference_empty_L.
-          rewrite insert_id.
-          2: { rewrite dom_fmap_L in Hxdom.
-               eapply mim_lookup_helper; eauto.
-               apply ls_mapping_tmap_corr. }               
-          erewrite <- TMAP'. apply ls_mapping_tmap_corr. 
+        * eapply tids_smaller'_restrict_mapping; eauto.
+          by rewrite TMAP'.
       + eapply tids_dom_restrict_mapping; eauto.
         rewrite TMAP'.
         rewrite dom_fmap_L in Hxdom.
@@ -91,7 +83,7 @@ Section LMLSITopLevel.
         apply ls_mapping_tmap_corr.         
     - iModIntro. iIntros "* FUELS ST MSI FR". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
-      pose proof (tids_restrict_smaller _ _ TR) as SM.
+      pose proof (tids_restrict_smaller' _ _ TR) as SM.
       iDestruct (model_agree' with "LM_MSI ST") as "%Heq".
       iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
       (* TODO: make it a lemma *)
@@ -104,18 +96,15 @@ Section LMLSITopLevel.
       + repeat split; eauto.
         (* 2: by rewrite LAST2; eauto. *)
         { rewrite LAST2. eexists; split; [apply STEPM| ]. done. }  
-        eapply tids_smaller_model_step; eauto.
-        do 2 eexists.
-        erewrite (maps_inverse_match_uniq1).
-        2: { subst s1. eapply mim_helper_model_step; eauto. }
-        { reflexivity. }
-        rewrite -TMAP2. apply ls_mapping_tmap_corr.
+        eapply tids_smaller'_model_step; eauto.
+        eapply locale_trans_dom; eauto.
+        eexists. split; [apply STEPM| ]. done. 
       + eapply tids_dom_restrict_mapping; eauto.
         Unshelve. all: eauto. 
     - iIntros "* FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       remember (trace_last auxtr) as δ1.
-      pose proof (tids_restrict_smaller _ _ TR) as SM.
+      pose proof (tids_restrict_smaller' _ _ TR) as SM.
       assert (Hnewζ: (locale_of tp1 efork) ∉ dom (ls_tmap δ1)).
       { subst δ1. rewrite LAST in SM. apply not_elem_of_dom. simpl in *.
         apply TR. 
@@ -149,22 +138,14 @@ Section LMLSITopLevel.
           exists x, efork. done.
       + repeat split; eauto.
         { eexists; split; [apply STEPM| ]; done. } 
-        eapply tids_smaller_fork_step; eauto.
+        eapply tids_smaller'_fork_step; eauto.
         * by rewrite -LAST.
-        * simpl. erewrite (maps_inverse_match_uniq1 (ls_mapping δ2)).
-          3: { eapply mim_helper_fork_step.
-               6: eapply (ls_mapping_tmap_corr δ1).
-               all: eauto.
-               rewrite dom_fmap_L in Hxdom.
-               apply elem_of_subseteq. intros.
-               apply Hxdom in H0.
-               apply elem_of_dom. eauto. }
-          { eauto. }
-          rewrite -TMAP'. apply ls_mapping_tmap_corr.
+        * eapply locale_trans_dom; eauto.
+          eexists. split; [apply STEPM| ]. done.  
         * destruct POOL as (?&?&?).
           exists x, efork. done.
           Unshelve.
-          2, 3: exact LM. 
+          2: exact LM. 
   Qed. 
 
 End LMLSITopLevel.

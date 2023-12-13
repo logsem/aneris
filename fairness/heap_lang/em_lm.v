@@ -67,7 +67,19 @@ Proof.
   specialize (H _ n).
   eapply (ls_mapping_tmap_corr) in H0 as [R [? ?]].
   congruence. 
-Qed. 
+Qed.
+
+Lemma tids_restrict_smaller' (σ: cfg Λ) (δ: lm_ls LM):
+  tids_restrict σ (ls_tmap δ) -> tids_smaller' σ.1 δ.
+Proof.
+  rewrite /tids_smaller' /tids_restrict. 
+  intros. apply locales_of_list_from_locale_from'.
+  destruct (decide (ζ ∈ locales_of_list σ.1)); [done| ].
+  specialize (H _ n).
+  apply elem_of_dom in H0 as [? ?]. congruence. 
+Qed.
+
+
 
 Definition em_lm_msi `{!fairnessGS LM Σ}
   (c: cfg Λ) (δ: mstate LM): iProp Σ :=
