@@ -54,7 +54,7 @@ Section ClientSpec.
     partial_model_is (lb0, n)  ={∅}=∗
     ∃ (cG: clientGS Σ), client_inv ∗
                         frag_fuel_is (ls_fuel lb0) (fG := cl_lib_Σ) ∗
-                        frag_mapping_is (ls_tmap lb0 (LM := lib_model lib_gs)) (fG := cl_lib_Σ)∗
+                        frag_mapping_is (ls_tmap lb0) (fG := cl_lib_Σ)∗
                         frag_model_is lb0 (fG := cl_lib_Σ)∗
                         frag_free_roles_are ∅ (fG := cl_lib_Σ)∗
                         y_frag_model_is n.
@@ -303,7 +303,7 @@ Section ClientSpec.
     { lia. }
     { red. intros. simpl. red.
       intros ? [? MAP].
-      apply (ls_mapping_tmap_corr (LM := lib_model lib_gs)) in MAP as (? & TMAP' & ?).
+      apply (ls_mapping_tmap_corr) in MAP as (? & TMAP' & ?).
       assert (ρlg = gi) as <- by (by destruct ρlg, gi).
       set_solver. }
 

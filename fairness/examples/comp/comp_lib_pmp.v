@@ -25,7 +25,7 @@ Section LibPMP.
     evar (foo : Prop); cut (foo); subst foo; cycle 1; [eapply H|try clear H; intro H].
 
   Lemma lib_tmap_dom_restricted (δ: fmstate lf):
-    dom (ls_tmap δ (LM := lib_model lib_gs)) ⊆ {[ ρlg ]}.
+    dom (ls_tmap δ) ⊆ {[ ρlg ]}.
   Proof.    
     done.
   Qed. 
@@ -46,12 +46,12 @@ Section LibPMP.
     ∃ (δ2 : M) (ℓ: mlabel M),
       ⌜em_valid_evolution_step (Some 0) c2 (trace_last mtr) ℓ δ2⌝ ∗
       em_msi c2 δ2 (em_GS0 := heap_fairnessGS) ∗
-      has_fuels 0 (if decide (ls_tmap lb' (LM := lib_model lib_gs) !! ρlg = Some ∅)
+      has_fuels 0 (if decide (ls_tmap lb' !! ρlg = Some ∅)
                    then {[ρ_cl := client_fl]}
                    else {[ρ_lib := f]}) ∗
       partial_model_is (lb', 1) ∗
       partial_free_roles_are
-      (if decide (ls_tmap lb' (LM := lib_model lib_gs) !! ρlg = Some ∅) then {[ρ_lib]} else {[ρ_cl]}).
+      (if decide (ls_tmap lb' !! ρlg = Some ∅) then {[ρ_lib]} else {[ρ_cl]}).
   Proof.
     
     iIntros "#PMP MSI ST FR FUELS".
@@ -75,7 +75,7 @@ Section LibPMP.
       apply union_subseteq_l'.
       dEq; dEl; set_solver. }
     { rewrite dom_singleton.
-      assert ((if (decide (ls_tmap lb' (LM := lib_model lib_gs) !! ρlg = Some ∅))
+      assert ((if (decide (ls_tmap lb' !! ρlg = Some ∅))
               then {[ ρ_lib ]}
               else (∅: gset (fmrole client_model_impl))) ⊆ {[ρ_lib]}) as IN.
       { dEq; set_solver. }
@@ -83,7 +83,7 @@ Section LibPMP.
     { rewrite LIVE. set_solver. }
     all: eauto.
     { Unshelve.
-      2: exact (if decide (ls_tmap lb' (LM := lib_model lib_gs) !! ρlg = Some ∅)
+      2: exact (if decide (ls_tmap lb' !! ρlg = Some ∅)
                 then {[ ρ_cl := client_fl ]}
                 else {[ ρ_lib := f ]}).
       destruct (decide (_=_)); set_solver. }
@@ -115,7 +115,7 @@ Section LibPMP.
 (*          were created by a lib step *)
 
       destruct IN' as [? IN']. simpl in IN'.
-      apply (ls_mapping_tmap_corr (LM := lib_model lib_gs)) in IN' as (?&?&?).
+      apply (ls_mapping_tmap_corr ) in IN' as (?&?&?).
       pose proof (lib_tmap_dom_restricted lb') as DOML.
       specialize (DOML g'). specialize_full DOML.
       { apply elem_of_dom. set_solver. }
@@ -297,7 +297,7 @@ Section LibPMP.
     rewrite TMAP_LIB.
     (* rewrite lookup_insert. *)
 
-    assert (ls_tmap lb (LM := lib_model lib_gs) !! ρlg ≠ Some ∅) as TM_NE.
+    assert (ls_tmap lb !! ρlg ≠ Some ∅) as TM_NE.
     { edestruct (locale_trans_ex_role lb ρlg lb' (LM := lib_model lib_gs)) as [? STEP].
       { eexists. split; [apply LIB_STEP| ]. done. }
     eapply ls_mapping_tmap_corr in STEP as (?&?&?). rewrite H1. set_solver. } 

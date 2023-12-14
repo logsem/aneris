@@ -47,7 +47,7 @@ Section ClientDefs.
     client_trans (lb1, 1) (Some ρ_lib) (lb2, 1)
   | ct_y_step_1 (lb: fmstate lf)
                 (* (LIB_NOSTEP: 0 ∉ live_roles _ lb) *)
-                (LIB_NOROLES: ls_tmap lb (LM := lib_model lib_gs) !! ρlg = Some ∅)
+                (LIB_NOROLES: ls_tmap lb !! ρlg = Some ∅)
     :
     client_trans (lb, 1) (Some ρ_cl) (lb, 0)
   .
@@ -106,7 +106,7 @@ Section ClientDefs.
         ** left. destruct e. eexists. econstructor. simpl. eauto.
         ** nostep. simpl in LIB_STEP. eauto. 
       + destruct y. 
-        destruct (ls_tmap δ_lib (LM := lib_model lib_gs) !! ρlg) eqn:LIB_OBLS.
+        destruct (ls_tmap δ_lib !! ρlg) eqn:LIB_OBLS.
         2: { nostep. by rewrite LIB_OBLS in LIB_NOROLES. }
         destruct (decide (g = ∅)).
         * subst. left. eexists. by constructor. 
@@ -152,7 +152,7 @@ Section ClientDefs.
         fmtrans := client_trans;
         live_roles := client_lr;
     |}).
-    - pose proof (@LS_eqdec _ _ _ _ (@lib_LF _ lib_gs_ne)). (* not inferred? *)
+    - pose proof (@LS_eqdec _ _ _ _ _ _ (@lib_LF _ lib_gs_ne)). (* not inferred? *)
       solve_decision.       
     - intros. eapply client_lr_spec; eauto. 
   Defined.
@@ -215,7 +215,7 @@ Section ClientDefs.
     live_roles client_model_impl (lb, 1) =
     if (decide (ρlg ∈ live_roles _ lb))
     then {[ ρ_lib ]}
-    else if decide (ls_tmap lb (LM := lib_model lib_gs) !! ρlg = Some ∅)
+    else if decide (ls_tmap lb !! ρlg = Some ∅)
          then {[ ρ_cl ]}
          else ∅.
   Proof.
@@ -243,7 +243,7 @@ Section ClientDefs.
       2: { rewrite bool_decide_eq_false_2; [done| ].
            intros [? STEP]. inversion STEP. subst. simpl in LIB_STEP.
            destruct LR. apply LM_live_roles_strong. eauto. }
-      destruct (ls_tmap lb (LM := lib_model lib_gs) !! ρlg) eqn:MAP0.
+      destruct (ls_tmap lb !! ρlg) eqn:MAP0.
       (* ; rewrite MAP0. *)
       + destruct (decide (g = ∅)) as [-> | ?].
         * erewrite decide_True; [| done].

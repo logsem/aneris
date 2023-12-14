@@ -483,7 +483,6 @@ Proof.
     iApply (program_spec _ ∅ True _ with "[] [Hf FR ST]"); eauto. 
     { iApply ActualOwnershipPartial.
       Unshelve. set_solver. }
-    rewrite build_LS_ext_spec_st. 
     (* rewrite subseteq_empty_difference_L; [| set_solver].  *)
     iFrame. iSplitR; [done| ].
     iApply has_fuels_proper; [..| iFrame]; try done.

@@ -81,17 +81,6 @@ Section LibraryDefs.
     by intros [? ->]. 
   Qed.
 
-  (* TODO: move *)
-  Lemma locale_trans_ex_role `{LM: LiveModel M G LSI} δ1 τ δ2
-    (STEP: locale_trans δ1 τ δ2 (LM := LM)):
-    exists ρ, ls_mapping δ1 !! ρ = Some τ.
-  Proof.
-    red in STEP. destruct STEP as (ℓ & STEP & MATCH).
-    destruct ℓ; simpl in *; try done; subst.
-    - apply proj2, proj1 in STEP. eauto.
-    - apply STEP.
-  Qed. 
-    
 
   Instance lib_lm_dec_ex_step gs:
   ∀ (τ : lib_grole) (δ1 : lm_ls (lib_model gs)),
@@ -103,8 +92,9 @@ Section LibraryDefs.
     - intros. eexists. eapply rearrange_roles_spec.
       Unshelve.
       + exact (lib_model gs).
-      + red. intros ??.
-        rewrite /rearrange_roles_map. rewrite lookup_fmap_Some.
+      + red. intros ??.        
+        rewrite rrm_mapping; [| apply δ2].
+        rewrite lookup_fmap_Some.
         intros (? & <- & MAP).
         destruct decide. 
         * eapply (ls_inv δ2). eauto.
@@ -119,7 +109,7 @@ Section LibraryDefs.
   
   (* Definition lib_fair gs (NE: gs ≠ ∅) := LM_Fair (LM := (lib_model gs)).  *)
   Definition lib_fair gs (NE: gs ≠ ∅) :=
-    @LM_Fair _ _ _ _ (lib_LF gs NE).
+    @LM_Fair _ _ _ _ _ _ (lib_LF gs NE).
 
 End LibraryDefs.
 
@@ -202,10 +192,10 @@ Proof.
   destruct LB_INFO as (F & S & TM).
   unshelve eset (δ := ({| ls_under := (0: fmstate lib_model_impl);
                 ls_fuel := ls_fuel lb;
-                ls_mapping := ls_mapping lb; ls_inv := _ |})).
+                ls_tmap := ls_tmap lb; ls_inv := _ |})).
+  all: try by apply lb. 
   { exact (LSI_groups_fixed gs). }
   { set_solver. } 
-  { apply ls_same_doms. }
   { apply (ls_inv lb). }
   exists δ. red. exists (Take_step ρl ρlg). split; [| done].
   repeat split; eauto.  

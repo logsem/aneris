@@ -45,14 +45,14 @@ Section ExtModelLM.
     ls_under δ = 0 /\ (* TODO: get rid of this duplication *)
     ρl ∉ dom (ls_mapping δ) /\
     (* ρlg ∈ dom (ls_tmap δ (LM := lib_model gs)). *)
-    ls_tmap δ (LM := lib_model gs) !! ρlg = Some ∅. 
+    ls_tmap δ !! ρlg = Some ∅. 
 
   Definition reset_lm_st (ρlg: fmrole lf) (δ: fmstate lf)
     (IN: ρlg ∈ gs)
     : fmstate lf.
     Set Printing Coercions.
     set tm' :=
-        let tm_ := (fun ρs => ρs ∖ {[ ρl ]}) <$> (ls_tmap δ (LM := lib_model gs)) in
+        let tm_ := (fun ρs => ρs ∖ {[ ρl ]}) <$> (ls_tmap δ) in
         <[ ρlg := {[ ρl ]} ]> tm_. 
     eapply (build_LS_ext (reset_st_impl (ls_under δ)) (<[ρl := lm_fl (lib_model gs) δ]> (ls_fuel δ)) _ tm').
     - intros. rewrite dom_insert.
@@ -81,7 +81,6 @@ Section ExtModelLM.
         eapply ls_tmap_disj; [| apply TM1| apply TM2]. congruence.
     - red. intros. done.
     Unshelve.
-    + exact (lib_model gs).
     + simpl.
       Transparent lib_model_impl.
       set_solver.
@@ -116,21 +115,12 @@ Section ExtModelLM.
   
   Definition lib_lm_ETs '(eiG ρlg) := reset_lm_st_rel ρlg. 
 
-  (* TODO: move, find existing? *)
-  Lemma iff_and_impl_helper {A B: Prop} (AB: A -> B):
-    A /\ B <-> A.
-  Proof. tauto. Qed.     
-  Lemma iff_True_helper {A: Prop}:
-    (A <-> True) <-> A.
-  Proof. tauto. Qed.     
-  Lemma iff_False_helper {A: Prop}:
-    (A <-> False) <-> ¬ A.
-  Proof. tauto. Qed.
+  Definition lib_lm_projEI (_: lib_lm_EI) := (tt: lib_EI).
+
+  (* TODO: remove duplicate, move to utils *)
   Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
     (exists t, A /\ B t) <-> A /\ exists t, B t.
-  Proof. split; intros (?&?&?); eauto. Qed. 
-
-  Definition lib_lm_projEI (_: lib_lm_EI) := (tt: lib_EI).
+  Proof. split; intros (?&?&?); eauto. Qed.
 
   Lemma lib_lm_active_exts_spec:
     ∀ δ ι, ι ∈ lib_lm_active_exts δ ↔ (∃ δ' : lf, lib_lm_ETs ι δ δ'). 
@@ -159,7 +149,7 @@ Section ExtModelLM.
     red in H. revert H. 
     intros [? (?&<-)]. simpl.
     rewrite /reset_st. rewrite decide_True; [| by apply H].
-    by rewrite build_LS_ext_spec_st.
+    done. 
   Qed.
 
   Lemma reset_lm_st_map (ρlg: fmrole lf) (δ: fmstate lf) (IN: ρlg ∈ gs)
@@ -173,7 +163,7 @@ Section ExtModelLM.
     - intros [[<- <-] | [NEQ MAP]].
       + eexists. split; [left; eauto| ]. done.
       + destruct STOP as (?&?&?). 
-        eapply (ls_mapping_tmap_corr δ (LM := lib_model gs)) in MAP as (?&?&?).
+        eapply (ls_mapping_tmap_corr δ) in MAP as (?&?&?).
         destruct (decide (ρlg = g)).
         { subst g. set_solver. } 
         eexists. split; [| eauto]. right. split; eauto.
@@ -203,7 +193,7 @@ Section ExtModelLM.
     simpl in REL. destruct ι0. simpl in REL.
     red in REL. destruct REL as [STOP [IN <-]].
     simpl. 
-    rewrite reset_lm_st_map; auto. rewrite build_LS_ext_spec_fuel. 
+    rewrite reset_lm_st_map; auto.
     red in STOP. destruct STOP as (?&NIN&DOMg).
     split.
     - rewrite lookup_insert_ne; auto. intros <-.
@@ -217,10 +207,8 @@ Section ExtModelLM.
     lib_ls_premise gs (reset_lm_st ρlg lb IN).
   Proof. 
     red. repeat split; simpl.
-    - rewrite build_LS_ext_spec_fuel. rewrite lookup_insert. done. 
-    - rewrite build_LS_ext_spec_st. done.
-    - rewrite build_LS_ext_spec_tmap. simpl.
-      rewrite lookup_insert. done. 
+    - rewrite lookup_insert. done. 
+    - simpl. rewrite lookup_insert. done. 
   Qed. 
 
 End ExtModelLM. 

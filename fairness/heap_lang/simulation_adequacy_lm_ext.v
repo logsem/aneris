@@ -29,7 +29,7 @@ Qed.
 
 
 Section adequacy_general.
-
+  Context `{CNT: Countable G}. 
   Context `{LM: LiveModel G M LSI}.
 
   Context {EM: ExtModel M}.
