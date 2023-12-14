@@ -77,7 +77,7 @@ Proof.
 Qed.
 
 (* TODO: move *)
-Lemma locale_trans_fmtrans_or_eq `{LM : LiveModel G M LSI} δ1 τ δ2
+Lemma locale_trans_fmtrans_or_eq `{Countable G} `{LM : LiveModel G M LSI} δ1 τ δ2
   (LIB_STEP: locale_trans δ1 τ δ2 (LM := LM)):
   (exists ρ, fmtrans M (ls_under δ1) (Some ρ) (ls_under δ2)) \/ (ls_under δ1 = ls_under δ2).
 Proof.
@@ -114,7 +114,7 @@ Proof.
     { eexists. eauto. }
     - right. eauto.
     - by left. }
-  intros. apply elem_of_elements. eapply (ls_inv δ'); eauto.  
+  rewrite list_to_set_elements_L. by apply δ'. 
 Qed. 
 
 Section ClientRA.
@@ -138,14 +138,14 @@ Proof.
 Qed. 
 
 Definition δ_lib0: LiveState lib_grole lib_model_impl (LSI_groups_fixed lib_gs).
-  refine (build_LS_ext 0 ∅ _ {[ ρlg := ∅ ]} _ _ _ (LM := lib_model lib_gs)).
+  refine (build_LS_ext (0: fmstate lib_model_impl) ∅ _ {[ ρlg := ∅ ]} _ _ _).
   - rewrite δ_lib0_init_roles. set_solver.   
   - intros. setoid_rewrite lookup_singleton_Some. set_solver. 
   - intros. 
     erewrite lookup_singleton_Some in H.
     rewrite lookup_singleton_Some in H0.
     destruct H, H0. congruence.
-  - done. 
+  - red. rewrite dom_singleton. rewrite /lib_gs. done.  
 Defined.   
 
 
@@ -271,7 +271,7 @@ Proof.
          *** by nostep.  
       ** nostep. simpl in LIB_STEP. eauto. 
     + destruct y. 
-      destruct (ls_tmap δ_lib (LM := lib_model lib_gs) !! ρlg) eqn:LIB_OBLS.
+      destruct (ls_tmap δ_lib !! ρlg) eqn:LIB_OBLS.
       2: { nostep. subst. congruence. }
       destruct (decide (g = ∅)).
       * subst. destruct (decide (c' = 0 /\ δ_lib' = δ_lib)) as [[-> ->] |].
@@ -347,6 +347,13 @@ Proof.
   apply (LIB_STEPS (S i)); eauto. 
 Qed.
 
+(* TODO: remove duplicate *)
+Lemma flatten_gset_singleton `{Countable K} (S: gset K):
+  flatten_gset {[ S ]} = S. 
+Proof.
+  rewrite /flatten_gset. rewrite elements_singleton. set_solver. 
+Qed. 
+
 (* TODO: abstract the nested LM state *)
 Local Instance inh_client: Inhabited (lm_ls client_model).
 Proof.
@@ -355,26 +362,57 @@ Proof.
   assert (Inhabited (locale heap_lang)) as [τ] by apply _.
   apply populate.
   refine {| ls_under := (δ, 0): fmstate client_model_impl;
-       ls_fuel := kmap (inl ∘ inl) (gset_to_gmap 0 (dom (ls_tmap δ)));
-       ls_mapping := kmap (inl ∘ inl) (gset_to_gmap τ (dom (ls_tmap δ)));
+       ls_fuel := kmap (inl ∘ inl) (gset_to_gmap 0 (dom (ls_tmap δ))): gmap (fmrole client_model_impl) nat;
+       (* ls_mapping := kmap (inl ∘ inl) (gset_to_gmap τ (dom (ls_tmap δ))) *)
+        ls_tmap := {[ τ := set_map (inl ∘ inl) (dom (ls_tmap δ)) ]}: gmap (locale heap_lang) (gset (fmrole client_model_impl))
+         ;
     |}.
-  Unshelve.
   - by rewrite live_roles_0.
-  - apply leibniz_equiv. rewrite !dom_kmap.
-    f_equiv. by rewrite !dom_gset_to_gmap. 
-  - red. intros gi IN.
-    rewrite dom_kmap. apply elem_of_map. eexists. split; eauto.
-    rewrite dom_gset_to_gmap.
-    destruct IN as [? IN]. apply (ls_mapping_tmap_corr (LM := lib_model lib_gs)) in IN.
-    destruct IN as (?&?&?). simpl in *.
-    eapply elem_of_dom; eauto. 
-Qed.
+  - intros ρ. 
+    rewrite dom_kmap dom_gset_to_gmap. rewrite !elem_of_map.
+    setoid_rewrite lookup_singleton_Some.
+    etrans.
+    2: { symmetry. apply ex_det_iff with (a := τ). by intros ? (?&[??]&?). } 
+    etrans.
+    2: { symmetry. eapply ex_det_iff. intros ? ([??]&?). symmetry. apply H0. }
+    rewrite elem_of_map. tauto.
+  - red. intros * NEQ TM1%lookup_singleton_Some TM2%lookup_singleton_Some.
+    destruct TM1, TM2. congruence.
+  - red. intros.
+    rewrite /mapped_roles. rewrite map_img_singleton_L flatten_gset_singleton.
+    apply elem_of_map. eexists. split; [reflexivity| ].
+    destruct H. eapply mim_in_1; eauto. apply ls_mapping_tmap_corr.
+Qed. 
 
 Local Instance client_eq: EqDecision (fmstate client_model_impl).
 Proof.
-  pose proof (@LS_eqdec _ _ _ _ (lib_LF _ lib_gs_ne)).
+  pose proof (@LS_eqdec _ _ _ _ _ _ (lib_LF _ lib_gs_ne)).
   solve_decision. 
-Defined.   
+Defined.
+
+(*TODO: move*)
+Lemma ex2_comm {A B: Type} (P: A -> B -> Prop):
+  (exists (a: A) (b: B), P a b) <-> (exists (b: B) (a: A), P a b).
+Proof. 
+  split; intros (?&?&?); eauto. 
+Qed. 
+
+(* TODO: move *)
+Lemma mapped_roles_dom_fuels_gen `{Countable G} (M: FairModel) 
+  (tm: groups_map) (fm: fuel_map (M := M))
+  (DOMS:    
+      forall ρ, ρ ∈ dom fm <-> exists τ R, tm !! τ = Some R /\ ρ ∈ R)
+
+  :
+  (* dom (@ls_fuel δ) = mapped_roles (@ls_tmap δ). *)
+  dom fm = mapped_roles tm (G := G). 
+Proof. 
+  apply set_eq. intros ρ.
+  rewrite DOMS.
+  rewrite /mapped_roles. rewrite flatten_gset_spec.
+  rewrite ex2_comm. apply exist_proper. intros R.
+  rewrite elem_of_map_img. set_solver. 
+Qed.
 
 (* TODO: almost a copypaste from spinlock, unify? *)
 Instance client_lm_dec_ex_step:
@@ -391,9 +429,12 @@ Proof.
   - intros. eexists. eapply rearrange_roles_spec.
     Unshelve.
     + exact client_model. 
-    + red. intros ? [??]. 
-      rewrite /rearrange_roles_map. rewrite dom_fmap.
-      eapply (ls_inv δ2); eauto.
+    + red. intros ? [??].
+      erewrite <- mapped_roles_dom_fuels_gen.
+      2: { apply rrm_tmap_fuel_same_doms. }
+      pose proof (ls_inv δ2) as LSI2. red in LSI2. 
+      specialize (LSI2 _ ltac:(eauto)).
+      by rewrite -mapped_roles_dom_fuels in LSI2. 
 Defined. 
  
 
@@ -566,8 +607,8 @@ Lemma done_lib_preserved (tr: mtrace client_model_impl)
   (VALID : mtrace_valid tr)
   (L2: ∀ i res, m1 ≤ i → i < m2 → tr !! i = Some res → is_client_step res)
   (Sm1 : tr S!! m1 = Some s)
-  (NOLIB1 : ls_tmap s.1 (LM := lib_model lib_gs) !! ρlg = Some ∅):
-  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → ls_tmap s.1 (LM := lib_model lib_gs) !! ρlg = Some ∅.
+  (NOLIB1 : ls_tmap s.1 !! ρlg = Some ∅):
+  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → ls_tmap s.1 !! ρlg = Some ∅.
 Proof. 
   eapply preserved_prop_kept; eauto.
   intros ??? CL STEP EQ1.
@@ -743,7 +784,7 @@ Proof.
     subst. done. }
 
   simpl in *.
-  assert (terminating_trace tr \/ exists step, (snd (fst step) = 2 \/ snd (fst step) = 1) /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 (LM := lib_model lib_gs) !! ρlg = Some ∅) as NEXT. 
+  assert (terminating_trace tr \/ exists step, (snd (fst step) = 2 \/ snd (fst step) = 1) /\ tr !! m2 = Some step /\ is_client_step step /\ ls_tmap step.1.1 !! ρlg = Some ∅) as NEXT. 
   { edestruct (client_trace_lookup tr m2) as [?|STEP]; eauto.
     destruct STEP as [[s step] [STEP [CL | [LIB BOUND]]]].
     2: { eapply NL2 in LIB; done. }  
@@ -847,7 +888,7 @@ Proof.
 
   rename f into x2. 
 
-  enough (ls_tmap x.1 (LM := lib_model lib_gs) !! x2 = Some ∅).
+  enough (ls_tmap x.1 !! x2 = Some ∅).
   2: { apply state_label_lookup in STEPn. 
        eapply done_lib_preserved. 
        6: apply STEPn.
@@ -865,9 +906,10 @@ Qed.
 Lemma client_LM_inner_exposed (auxtr: lmftrace (LM := client_model)):
   inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) auxtr (LMo := client_model) (AMi := lib_ALM).
 Proof. 
-  red. intros n δ gl NTH MAP.
-  simpl. eexists. split; eauto. 
-  apply (ls_inv δ). set_solver. 
+  red. simpl. intros n δ gl NTH (?&?&?&MAP).
+  eexists. split; [reflexivity| ].
+  rewrite (ls_same_doms δ) mapped_roles_dom_fuels. 
+  apply (ls_inv δ). rewrite H. eauto. 
 Qed.
 
 
@@ -885,7 +927,7 @@ Defined.
    whereas in original lemma all model traces are required to be terminating. *)
 (* TODO: generalize the initial state in general lemma as well? *)
 Theorem simulation_adequacy_terminate_client (Σ: gFunctors)
-        {hPre: @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')} (s: stuckness)
+        {hPre: @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')} (s: stuckness)
         e1 (s1: fmstate client_model_impl) FR
         (LSI0: initial_ls_LSI s1 0 (M := client_model_impl) (LM := client_model) (LSI := client_LSI))
         (extr : heap_lang_extrace)
@@ -941,10 +983,7 @@ Qed.
 
 Lemma init_lib_state: lm_is_stopped ρlg δ_lib0 (NE := lib_gs_ne).
 Proof.
-  repeat split; simpl; try done. 
-  - by rewrite build_LS_ext_spec_st.
-  - by rewrite δ_lib0_map. 
-  - rewrite build_LS_ext_spec_tmap. set_solver. 
+  repeat split; simpl; done. 
 Qed.
 
 (* (* TODO: move *) *)
@@ -981,7 +1020,6 @@ Proof.
     { set_solver. }
     { apply init_lib_state. }
     { iApply lm_lsi_toplevel. }
-    rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel. 
     iFrame. 
     iSplitL "FR".
     + simpl. rewrite dom_gset_to_gmap. rewrite difference_twice_L.
