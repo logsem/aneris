@@ -384,10 +384,11 @@ Section ModelStep.
     { destruct Hfuelsval as (_&_&?&_). intros ->. set_solver. }
 
     iDestruct (has_fuel_in with "Hfuel Hsi") as "%Hxdom"; eauto.
+    iDestruct (has_fuel_in' with "Hfuel Hsi") as "%TMζ"; eauto.
     iDestruct (has_fuel_fuel with "Hfuel Hsi") as %Hfuel; eauto.
 
     iDestruct "Hsi" as "(%FR&Hafuel&Hamapping&HFR&Hamod&%HFR)".
-    iDestruct (model_agree with "Hamod Hmod") as "%Heq".
+    iDestruct (model_agree with "Hamod Hmod") as "%Heq". 
 
     iDestruct (free_roles_inclusion with "HFR Hfr1") as %HfrFR.
 
@@ -484,24 +485,24 @@ Section ModelStep.
       + assert (τ1 ≠ τ2) by congruence. 
         eapply ls_tmap_disj; eauto. } 
 
-    assert (LSI s2 new_mapping new_fuels) as LSI'.
-    { apply PRES; auto.
-      { replace s1 with (ls_under δ1). apply ls_inv. }
-      red in Hfuelsval. apply proj2, proj2, proj1 in Hfuelsval.
-      set_solver. }
-
+    set new_tmap := <[ζ:=dom fs2]> (ls_tmap δ1). 
+    
     assert (maps_inverse_match new_mapping (<[ζ:=dom fs2]> (ls_tmap δ1))) as MATCH.
     { pose proof Hfuelsval as (?&?&?&?&?&?). 
       eapply @mim_model_step_helper; eauto.
       { rewrite Heq. etransitivity.
         { apply Hfr_new. }
-        set_solver. }
+        apply union_mono; done. }
       rewrite Heq; eauto. }
 
-    erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'.
-    3: { apply MATCH. }
-    2: { apply ls_mapping_tmap_corr_impl.
-         red. apply TMAP_DISJ'. }         
+    assert (LSI s2 new_tmap new_fuels) as LSI'.
+    { eapply PRES; [rewrite -Heq; by apply δ1| ..]; eauto.
+      rewrite TMζ. simpl. apply Hfuelsval. }
+      
+    (* erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'. *)
+    (* 3: { apply MATCH. } *)
+    (* 2: { apply ls_mapping_tmap_corr_impl. *)
+    (*      red. apply TMAP_DISJ'. }          *)
     
     iExists (build_LS_ext s2 _ Hfueldom (<[ζ:=dom fs2]> (ls_tmap δ1)) _ _ LSI').
     (* Unshelve. *)
@@ -556,8 +557,11 @@ Section ModelStep.
     
     Unshelve. all: eauto.
     intros. 
-    rewrite Hnewdom. setoid_rewrite lookup_insert_Some.
-    rewrite -ls_same_doms. split.
+    rewrite Hnewdom. 
+    rewrite -ls_same_doms.
+    clear -Hxdom.
+    setoid_rewrite lookup_insert_Some.
+    split.
     + intros [IN NIN]%elem_of_difference.
       apply not_elem_of_difference in NIN.        
       apply elem_of_union in IN as [IN | IN].

@@ -93,6 +93,26 @@ Section FuelDropStep.
   (* Lemma frag_model_LSI s: *)
   (* frag_model_is s -∗ ⌜ LSI ( ⌝ *)
 
+  Lemma TMAP'_ALT: 
+    forall (δ1: lm_ls LM) ζ Rζ rem, ls_tmap δ1 !! ζ = Some Rζ -> rem ⊆ Rζ -> <[ζ:=Rζ ∖ rem]> (ls_tmap δ1) = (λ rs, rs ∖ rem) <$> (ls_tmap δ1). 
+  Proof. 
+    intros * TMζ Hincl. apply map_eq. intros g.
+    rewrite lookup_fmap.
+    destruct (ls_tmap δ1 !! g) eqn:TMg.
+    2: { simpl. apply not_elem_of_dom_1. rewrite dom_insert.
+         apply not_elem_of_union. split.
+         2: { intros [??]%elem_of_dom. congruence. }
+         apply not_elem_of_singleton. intros ->. congruence. }
+    simpl. rewrite lookup_insert_Some.
+    destruct (decide (ζ = g)).
+    - left. subst. split; eauto. congruence.
+    - right. split; auto. rewrite TMg. f_equal.
+      symmetry. apply difference_disjoint_L.
+      eapply disjoint_subseteq; [| reflexivity | apply Hincl| ].
+      { apply _. }
+      symmetry. eapply (ls_tmap_disj δ1); eauto. 
+  Qed. 
+
   Lemma actual_update_no_step_enough_fuel_drop
   (δ1: LM) rem
   (* c1 c2 *)
@@ -215,32 +235,16 @@ Section FuelDropStep.
       rewrite /new_mapping. 
       erewrite dom_domain_restrict; [| set_solver]. 
       rewrite NEW_DOM.
-      apply fuel_step_ls_tmap_dom; auto. }
+      apply fuel_step_ls_tmap_dom; auto. }  
 
     iAssert (⌜ ls_under δ1 = s ⌝)%I as "%ST_EQ".
     { iApply (model_agree with "Hmodel ST"). }
-    assert (LSI δ1 (ls_mapping_impl (<[ζ:=dom fs ∖ rem]> (ls_tmap δ1))) new_fuels) as LSI2.
-    { erewrite (maps_inverse_match_uniq1 (ls_mapping_impl _)); eauto.
-      2: { apply ls_mapping_tmap_corr_impl.
-           red. apply DISJ2. }
-      subst new_mapping new_dom.
-      replace (dom (ls_fuel δ1) ∪ dom fs) with (dom (ls_fuel δ1)). 
-      2: { rewrite -ls_same_doms. set_solver. }
-      move PRES at bottom. red in PRES.
-      rewrite -ls_same_doms. rewrite map_filter_diff_simpl.
-      rewrite -ST_EQ in PRES. eapply PRES. eauto. }
+    assert (LSI δ1 (<[ζ:=dom fs ∖ rem]> (ls_tmap δ1)) new_fuels) as LSI2.
+    { rewrite TMAP'_ALT; auto. 
+      move PRES at bottom. red in PRES. simpl.
+      rewrite ST_EQ. eapply PRES.
+      rewrite -ST_EQ. apply δ1. }
       
-    (* (* assert (forall s m f, LSI_True s m f) as mk_LT. *) *)
-    (* (* { intros. rewrite /LSI_True.  *) *)
-    (* assert (LSI s new_mapping new_fuels) as LSI2.  *)
-    (* { assert (dom (ls_fuel δ1) ∪ dom fs = dom (ls_fuel δ1)) as FUELS'.  *)
-    (*   { rewrite -ls_same_doms. set_solver. } *)
-    (*   subst new_mapping new_dom. rewrite FUELS'. *)
-    (*   move PRES at bottom. red in PRES. *)
-    (*   rewrite -ls_same_doms. rewrite map_filter_diff_simpl. *)
-    (*   eapply PRES. rewrite -ST_EQ. eauto. } *)
-
-
     fold new_fuels in Hfueldom. 
     iExists (build_LS_ext (ls_under δ1) _ Hfueldom (<[ζ:=dom fs ∖ rem]> (ls_tmap δ1)) TMAP_DOM2 DISJ2 LSI2).
 
@@ -438,8 +442,8 @@ Section FuelKeepStep.
 
     (* iAssert (⌜ ls_under δ1 = s ⌝)%I as "%ST_EQ". *)
     (* { iApply (model_agree with "Hmodel ST"). } *)
-    assert (LSI δ1 (ls_mapping_impl (ls_tmap δ1)) new_fuels) as LSI2.
-    { erewrite (maps_inverse_match_uniq1 (ls_mapping_impl _)); eauto. }
+    assert (LSI δ1 (ls_tmap δ1) new_fuels) as LSI2.
+    { eapply PRES; eauto. }
 
     (* fold new_fuels in Hfueldom.  *)
     iExists (build_LS_ext (ls_under δ1) _ Hfueldom (ls_tmap δ1) TMAP_DOM2 DISJ2 LSI2).

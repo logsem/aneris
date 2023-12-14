@@ -28,12 +28,12 @@ Section LocaleTrans.
     - repeat apply and_dec; try solve_decision.
       destruct (ls_tmap st1 !! g) eqn:TMAP.
       2: { right. intros [? MAP].
-           apply ls_mapping_tmap_corr in MAP as (?&?&?).
-           set_solver. }
+           apply ls_mapping_tmap_corr in MAP as (?&SOME&?).
+           by rewrite TMAP in SOME. }
       destruct (decide (g0 = ∅)) as [-> |NEMPTY].
       { right. intros [? MAP].
-        apply (ls_mapping_tmap_corr) in MAP as (?&?&?).
-        set_solver. }
+        apply (ls_mapping_tmap_corr) in MAP as (?&SOME&?).
+        rewrite TMAP in SOME. set_solver. }
       left. apply set_choose_L in NEMPTY as [ρ ?].
       exists ρ. apply (ls_mapping_tmap_corr). eauto. 
   Defined. 
@@ -129,7 +129,7 @@ End LocaleTrans.
 
 (* excluding parts that are provided by other classes in context *)
 (* TODO: find a better solution *)
-Class LMFairPre' {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := {
+Class LMFairPre' `{Countable G} {M LSI} (LM: LiveModel G M LSI) := {
   (* edG :> EqDecision G; *)
   (* cntG :> Countable G; *)
   edM' :> EqDecision (fmstate M);
@@ -152,7 +152,7 @@ Class LMFairPre' {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := {
 (* TODO: get rid of this duplication *)
 (* Definition LMFairPre {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := *)
 (*   LMFairPre' LM.  *)
-Class LMFairPre {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := {
+Class LMFairPre `{Countable G} {M LSI} (LM: LiveModel G M LSI) := {
   (* edG :> EqDecision G; *)
   (* cntG :> Countable G; *)
   edM :> EqDecision (fmstate M);
@@ -256,11 +256,8 @@ Section LMFair.
     (* - apply lm_ls_eqdec.  *)
     - intros ??? STEP.
       apply elem_of_filter. split; eauto.
-      destruct STEP as (ℓ & STEP & MATCH). destruct ℓ; simpl in *; try done; subst.
-      + destruct STEP as (_&MAP&_).
-        eapply ls_mapping_tmap_corr in MAP as (?&?&?). eapply elem_of_dom; eauto.
-      + destruct STEP as ([? MAP]&_). 
-        eapply ls_mapping_tmap_corr in MAP as (?&?&?). eapply elem_of_dom; eauto.
+      simpl in STEP.
+      eapply locale_trans_dom; eauto. 
   Defined.
 
   Lemma LM_live_roles_strong δ τ:

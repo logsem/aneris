@@ -248,23 +248,29 @@ Section AuxDefs.
       LSI S R F -> LSI S R F'.
 
   Definition fuel_reorder_preserves_LSI :=
-    forall S (R R': gmap (fmrole M) G) F F',
-      dom R = dom R' ->
+    forall S (R R': groups_map) F F',
+      dom F = dom F' ->
+      mapped_roles R = mapped_roles R' ->
+      dom F = mapped_roles R ->
       LSI S R F -> LSI S R' F'. 
 
   Definition fuel_drop_preserves_LSI S (rem: gset (fmrole M)) :=
-    forall (R: gmap (fmrole M) G) F F',
-      let R' := filter (fun '(k, _) => k ∉ rem) R in
+    forall (R: groups_map) F F',
+      (* let R' := filter (fun '(k, _) => k ∉ rem) R in *)
+      let R' := (fun rs => rs ∖ rem) <$> R in
       LSI S R F -> LSI S R' F'. 
 
   Definition model_step_preserves_LSI s1 ρ s2 fs1 fs2 :=
-    forall R g F, LSI s1 R F -> fmtrans M s1 (Some ρ) s2 -> R !! ρ = Some g ->
-             LSI s2 (update_mapping R g fs1 fs2) (update_fuel_resource F fs1 fs2). 
+    forall (R: groups_map) g F,
+      LSI s1 R F -> fmtrans M s1 (Some ρ) s2 ->
+      (* ls_mapping_impl R !! ρ = Some g -> *)
+      ρ ∈ default ∅ (R !! g) ->
+      LSI s2 (<[g:=dom fs2]> R) (update_fuel_resource F fs1 fs2). 
 
 End AuxDefs.
 
-Definition LSI_True {G: Type} {M: FairModel}:
-  M → gmap (fmrole M) G → gmap (fmrole M) nat → Prop :=
+Definition LSI_True `{Countable G} {M: FairModel}:
+  M → @groups_map G M _ _ → @fuel_map M → Prop :=
   fun _ _ _ => True.
 
 

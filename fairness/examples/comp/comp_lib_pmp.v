@@ -87,7 +87,7 @@ Section LibPMP.
                 then {[ ρ_cl := client_fl ]}
                 else {[ ρ_lib := f ]}).
       destruct (decide (_=_)); set_solver. }
-    { repeat split; rewrite ?LIVE ?LIVE'.
+    { repeat split; rewrite ?LIVE ?LIVE';  clear -F_BOUND H1.
       - dEl.
         2: { destruct decide; set_solver. }
         intros _. rewrite decide_False.
@@ -103,25 +103,20 @@ Section LibPMP.
       - dEq; set_solver.
       - dEq; dEl; set_solver.
       - dEq; dEl; set_solver. }
-    { red. intros. red.
-      (* TODO: move this simplification, as it occurs quite often *)
-      rewrite /update_mapping. rewrite map_imap_dom_eq.
-      2: { rewrite dom_gset_to_gmap. intro.
-           destruct (decide (k ∈ dom R)); [| done].
-           intros. by eapply elem_of_dom. }
-      rewrite dom_gset_to_gmap. intros g' IN'.
-      red in H2.
-      (* at this point we must ensure that no new group roles  *)
-(*          were created by a lib step *)
-
-      destruct IN' as [? IN']. simpl in IN'.
+    { red. simpl. intros. red. 
+      simpl. intros g' [? IN']. simpl in IN'. 
+      (* red in H2. specialize (H2 g' ltac:(eauto)).  *)
       apply (ls_mapping_tmap_corr ) in IN' as (?&?&?).
       pose proof (lib_tmap_dom_restricted lb') as DOML.
       specialize (DOML g'). specialize_full DOML.
       { apply elem_of_dom. set_solver. }
       apply elem_of_singleton_1 in DOML. subst g'.
-      rewrite decide_False; [set_solver| ].
-      intros EMP. set_solver. }
+      rewrite H5. rewrite decide_False.
+      2: { intros [=->]. done. }
+      rewrite /mapped_roles. apply flatten_gset_spec.
+      exists ({[ ρ_lib ]}). split; [| apply elem_of_singleton; reflexivity].
+      rewrite elem_of_map_img. exists g.
+      by rewrite lookup_insert dom_singleton_L. }
       
     rewrite LIVE LIVE'.
     iMod "EM_STEP" as (??) "(?&?&?&?&FREE)".
@@ -315,9 +310,7 @@ Section LibPMP.
     fuel_drop_preserves_LSI s rem (LSI := LSI_groups_fixed lib_gs).
   Proof. 
     (* done. *)
-    red. intros. red. intros ?? IN.
-    apply map_filter_lookup_Some in IN as [??].
-    eapply H0; eauto. 
+    red. intros. red. rewrite dom_fmap. apply H0. 
   Qed. 
     
 
@@ -435,17 +428,14 @@ Section LibPMP.
     (s2 : lib_model_impl) (fs1 fs2 : gmap (fmrole lib_model_impl) nat),
     model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI_groups_fixed lib_gs).
   Proof.
-    (* done.  *)
     (* can be proven trivially, but the proof below should work for non-trivial Gs *)
-    intros. red. intros. red. intros ??.
-    rewrite /update_mapping. rewrite map_lookup_imap. simpl.
-    rewrite lookup_gset_to_gmap.
-    rewrite option_guard_decide.
-    destruct (decide (ρ0 ∈ _ ∖ _)); simpl. 
-    2: { congruence. }
-    destruct decide.
-    { eapply H0; eauto. }
-    intros [=->]. eapply H0; eauto.
+    intros. red. intros * LSI1 STEP INρ. red. intros g' DOMg'.
+    apply LSI1.
+    rewrite dom_insert_L in DOMg'.
+    apply elem_of_union in DOMg' as [IN| ?]; [| done].
+    apply elem_of_singleton in IN as ->.
+    eapply @elem_of_dom; [by apply _| ].
+    destruct (R !! g) eqn:RG; done. 
   Qed.
     
   Lemma model_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):

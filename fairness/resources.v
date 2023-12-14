@@ -301,6 +301,20 @@ Section model_state_lemmas.
     - intros ?. eexists. split; eauto.
   Qed.
 
+  Lemma has_fuel_in' ζ δ fs:
+    has_fuels ζ fs -∗ model_state_interp δ -∗ ⌜ ls_tmap δ !! ζ = Some (dom fs) ⌝.
+  Proof.
+    unfold model_state_interp, has_fuels, auth_mapping_is, frag_mapping_is.
+    iIntros "[Hζ Hfuels] (%FR&Hafuel&Hamapping &HFR&Hamod&Hfr)".
+    iCombine "Hamapping Hζ" as "H".
+    iDestruct (own_valid with "H") as %Hval. iPureIntro.
+    apply auth_both_valid_discrete in Hval as [Hval ?].
+    rewrite map_fmap_singleton in Hval.
+    apply singleton_included_exclusive_l in Hval =>//; last by typeclasses eauto.
+    rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
+    apply fmap_Some_1 in Hval as (R'&HMζ&?). simplify_eq. done. 
+  Qed.
+
   Lemma frag_fuel_included fs FS:
     auth_fuel_is FS -∗ frag_fuel_is fs -∗ ⌜ fs ⊆ FS ⌝.
   Proof.

@@ -186,7 +186,7 @@ Section LMFinBranching.
     (* let ℓ' := convert_lbl ℓ *)
     ℓ' ← potential_FLs_list δ1;
     (if
-        (decide (LSI s2 (ls_mapping_impl (`tm)) (`fs) /\
+        (decide (LSI s2 (`tm) (`fs) /\
                  dom (ls_mapping_impl (`tm)) = dom (`fs) /\
                  tmap_disj (`tm)))
     then
@@ -505,30 +505,6 @@ Section LMFinBranching.
     apply elem_of_list_In. done.
   Qed.
 
-  (* TODO: find existing? *)
-  Definition flatten_gset `{Countable K} (ss: gset (gset K)): gset K :=
-    list_to_set (concat (map elements (elements ss))).
-
-  Lemma flatten_gset_spec `{Countable K} (ss: gset (gset K)):
-    forall k, k ∈ flatten_gset ss <-> exists s, s ∈ ss /\ k ∈ s.
-  Proof.
-    intros. rewrite /flatten_gset.
-    rewrite elem_of_list_to_set.
-    rewrite elem_of_list_In in_concat.
-    setoid_rewrite in_map_iff. 
-    repeat setoid_rewrite <- elem_of_list_In.
-    split.
-    - intros (?&(l&<-&?)&?). exists l. set_solver.
-    - intros (s&?&?). exists (elements s). set_solver. 
-  Qed. 
-    
-  Lemma flatten_gset_disjoint `{Countable K} (ss: gset (gset K)) s':
-    flatten_gset ss ## s' <-> forall s, s ∈ ss -> s ## s'.
-  Proof.
-    repeat setoid_rewrite elem_of_disjoint. setoid_rewrite flatten_gset_spec.
-    set_solver.
-  Qed.
-
   (* TODO: move *)
   Definition rearrange_roles_map (tm: gmap G (gset (fmrole M))) (R: gset G) (r: G):
     gmap G (gset (fmrole M)) :=
@@ -670,7 +646,7 @@ red. rewrite /rearrange_roles_map.
 
     
   Definition rearrange_roles (δ: lm_ls LM) (R: gset G) (r: G)
-    (LSI': LSI (ls_under δ) (ls_mapping_impl $ rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ)): 
+    (LSI': LSI (ls_under δ) (rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ)): 
     lm_ls LM.
     refine {| ls_under := ls_under δ;
               ls_fuel := ls_fuel δ;
@@ -717,7 +693,7 @@ red. rewrite /rearrange_roles_map.
 
   Lemma rearrange_roles_spec (δ: lm_ls LM) 
     (R: gset G) (r: G)
-    (LSI': LSI (ls_under δ) (ls_mapping_impl $ rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ))
+    (LSI': LSI (ls_under δ) (rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ))
     :
     roles_rearranged δ (rearrange_roles δ R r LSI') R r.
   Proof.

@@ -277,3 +277,33 @@ Proof.
   - eauto.
   - by apply elem_of_list_In.
 Qed.
+
+
+Section FlattenGset.
+  Context `{Countable K}. 
+  
+  (* TODO: find existing? *)
+  Definition flatten_gset (ss: gset (gset K)): gset K :=
+    list_to_set (concat (map elements (elements ss))).
+
+  Lemma flatten_gset_spec (ss: gset (gset K)):
+    forall k, k ∈ flatten_gset ss <-> exists s, s ∈ ss /\ k ∈ s.
+  Proof.
+    intros. rewrite /flatten_gset.
+    rewrite elem_of_list_to_set.
+    rewrite elem_of_list_In in_concat.
+    setoid_rewrite in_map_iff. 
+    repeat setoid_rewrite <- elem_of_list_In.
+    split.
+    - intros (?&(l&<-&?)&?). exists l. set_solver.
+    - intros (s&?&?). exists (elements s). set_solver. 
+  Qed. 
+    
+  Lemma flatten_gset_disjoint (ss: gset (gset K)) s':
+    flatten_gset ss ## s' <-> forall s, s ∈ ss -> s ## s'.
+  Proof.
+    repeat setoid_rewrite elem_of_disjoint. setoid_rewrite flatten_gset_spec.
+    set_solver.
+  Qed.
+
+End FlattenGset.

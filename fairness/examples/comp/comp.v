@@ -10,7 +10,7 @@ From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
 From trillium.fairness Require Import lm_fair. 
 From trillium.fairness.ext_models Require Import ext_models.
-From trillium.fairness.examples.comp Require Import lib lib_ext client_defs comp_lib_pmp.
+From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi wp_tacs.
 
 Close Scope Z_scope. 
@@ -86,13 +86,15 @@ Section ClientSpec.
   (* Lemma fuel_reorder_preserves_client_LSI: *)
   (*   fuel_reorder_preserves_LSI (LSI := client_LSI).  *)
   Lemma fuel_reorder_preserves_client_LSI:
-    @fuel_reorder_preserves_LSI (locale heap_lang) client_model_impl client_LSI.
+    @fuel_reorder_preserves_LSI (locale heap_lang) _ _ client_model_impl client_LSI.
   Proof.
-    red. rewrite /client_LSI. intros. set_solver.
+    red. rewrite /client_LSI. intros * EQ1 EQ2 EQ3.
+    intros ? LSI1 IN2. rewrite <- EQ2. auto. 
   Qed.
 
   Lemma client_LSI_fuel_independent:
-    @LSI_fuel_independent (locale heap_lang) client_model_impl client_LSI.
+    (* @LSI_fuel_independent (LSI := client_LSI). *)
+    @LSI_fuel_independent (locale heap_lang) _ _ client_model_impl client_LSI.
   Proof.
     red. rewrite /client_LSI. intros.
     set_solver.
@@ -107,6 +109,9 @@ Section ClientSpec.
     rewrite elem_of_filter elem_of_dom.
     rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
   Qed.
+
+  (* TODO: move upper *)
+  From trillium.fairness.examples.comp Require Import comp_lib_pmp.
 
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lf) f
     (FB: f >= client_fl)
@@ -165,15 +170,19 @@ Section ClientSpec.
       rewrite lookup_singleton. simpl. lia. }
     { set_solver. }
     { red. intros. simpl. red.
-      intros.
-      rewrite /update_mapping. rewrite map_imap_dom_eq.
-      2: { intros. destruct decide; [| done].
-           by apply elem_of_dom. }
-      rewrite dom_gset_to_gmap.
-      rewrite !dom_singleton.
-      assert (gi = ρlg) as ->.
-      { by destruct gi, ρlg. }
-      set_solver. }
+      intros lg [? IN]. simpl in IN.
+      assert (lg = ρlg) as ->.
+      { unshelve eapply elem_of_singleton.
+        { exact (gset lib_grole). }
+        all: try by apply _. 
+        apply elem_of_subseteq_singleton.
+        etrans; [| apply (ls_inv lb0)].
+        apply elem_of_subseteq_singleton.
+        apply ls_mapping_tmap_corr in IN as (?&?&?).
+        eapply @elem_of_dom; eauto. apply _. }
+      red in LB0_INFO. do 2 apply proj2 in LB0_INFO.
+      apply ls_mapping_tmap_corr in IN as (?&IN&?).
+      rewrite LB0_INFO in IN. clear -H3 IN. set_solver. }
 
     iNext. iIntros "(L & ST & FUELS & FR)".
     rewrite LIVE3 LIVE2.
@@ -207,18 +216,28 @@ Section ClientSpec.
     2: { set_solver. }
     2: { red. intros.
          red. 
-         rewrite /update_mapping. rewrite map_imap_dom_eq.
-         2: { intros. destruct decide; [| done].
-              by apply elem_of_dom. }
-         rewrite dom_gset_to_gmap.
-         intros. 
-         rewrite !dom_singleton.
-         assert (gi = ρlg) as ->.
-         { by destruct gi, ρlg. }
+         intros lg [? IN]. simpl in IN.
+         assert (lg = ρlg) as ->.
+         { apply ls_mapping_tmap_corr in IN.
+           destruct IN as (?&TM&IN). 
+           rewrite /reset_lm_st in TM. simpl in TM.
+           apply lookup_insert_Some in TM. destruct TM as [TM | TM].
+           { symmetry. apply TM. }
+           destruct TM as [NEQ TM]. 
+           simpl in TM. apply lookup_fmap_Some in TM.
+           destruct TM as (?&<-&TM).
+           red in LB0_INFO. apply proj2, proj1 in LB0_INFO.
+           destruct LB0_INFO. apply elem_of_dom.
+           exists lg. eapply ls_mapping_tmap_corr. eexists. split; eauto.
+           set_solver. } 
+
+         fold ρ_lib. 
+         rewrite /mapped_roles. rewrite map_img_insert_L.
+         rewrite flatten_gset_union flatten_gset_singleton.
          set_solver. }
     { repeat split; rewrite ?LIVE2 ?LIVE1.
-      1-3, 5-7: set_solver.
-      intros. assert (ρ' = ρ_lib) as -> by set_solver.
+      1-3, 5-7: set_solver. 
+      intros. simpl. assert (ρ' = ρ_lib) as -> by set_solver.
       rewrite lookup_singleton. simpl. lia. }
     do 3 iModIntro. iIntros "ST FR FUELS".
     rewrite LIVE2 LIVE1.
@@ -314,7 +333,7 @@ Section ClientSpec.
     iMod ("CLOS" with "[YST_AUTH ST inv']") as "_".
     { iNext. iExists (_, _). rewrite /client_inv_impl. iFrame. }
     iModIntro.
-
+    
     iDestruct (has_fuel_fuels with "FUELS") as "FUELS".
     simpl. clear FS.
     rewrite (sub_0_id {[ ρ_cl := _ ]}).
@@ -329,7 +348,10 @@ Section ClientSpec.
     iAssert (⌜ y = 0 ⌝)%I as %->.
     { iCombine "YST_AUTH YST" as "Y". iDestruct (own_valid with "Y") as %V.
       apply auth_both_valid_discrete in V as [EQ%Excl_included _]. done. }
-
+    iAssert (⌜ ls_tmap lb'' !! ρlg = Some ∅ ⌝)%I as %LIB_END''.
+    { iApply (frag_mapping_same with "[inv'] LM").
+      rewrite /model_state_interp. iFrame.
+      iDestruct "inv'" as (?) "(?&?&_)". iFrame.  }
     (* Unshelve. 2: exact (⊤ ∖ ↑Ns).  *)
     iModIntro.
     
@@ -338,8 +360,19 @@ Section ClientSpec.
     { set_solver. }
     { rewrite live_roles_0. set_solver. }
     { red. intros. red. intros.
-      red in H0. specialize (H0 _ H1).
-      rewrite dom_filter_comm. apply elem_of_filter. split; set_solver. }
+      red in H0. specialize (H0 _ H1). simpl in H1.
+      destruct H1  as [? IN]. 
+      assert (gi = ρlg) as ->.
+      { unshelve eapply elem_of_singleton.
+        { exact (gset lib_grole). }
+        all: try by apply _. 
+        apply elem_of_subseteq_singleton.
+        etrans; [| apply (ls_inv lb'')].
+        apply elem_of_subseteq_singleton.
+        apply ls_mapping_tmap_corr in IN as (?&?&?).
+        eapply @elem_of_dom; eauto. apply _. }
+      apply ls_mapping_tmap_corr in IN as (?&?&?).
+      rewrite LIB_END'' in H1. clear -H2 H1. set_solver. }
     iFrame "PMP'". do 3 iModIntro. iFrame.
     iSplitL "FUELS".
     { solve_fuels_S FS. }

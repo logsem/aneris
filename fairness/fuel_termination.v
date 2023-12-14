@@ -2,8 +2,9 @@ From stdpp Require Import option.
 From Paco Require Import pacotac.
 From trillium.fairness Require Import fairness fair_termination fuel fuel_ext traces_match lm_fairness_preservation lm_fair lm_fair_traces.
 
-Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel} {LSI}
-           `{Countable (locale Λ)} {LM : LiveModel (locale Λ) Mdl LSI}
+Definition auxtrace_fairly_terminating `{Countable (locale Λ)} {Mdl : FairModel} 
+  {LSI}
+             {LM : LiveModel (locale Λ) Mdl LSI}
            {LF: LMFairPre LM}
            (auxtr : lmftrace (LM := LM)) :=
   mtrace_valid auxtr →

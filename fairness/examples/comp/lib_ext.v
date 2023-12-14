@@ -79,7 +79,9 @@ Section ExtModelLM.
       + destruct TM'1 as [NEQ1 (?&<-&TM1)], TM'2 as [NEQ2 (?&<-&TM2)].
         apply disjoint_difference_r2, disjoint_difference_l2.
         eapply ls_tmap_disj; [| apply TM1| apply TM2]. congruence.
-    - red. intros. done.
+    - red. intros. subst tm'. simpl.
+      rewrite dom_insert dom_fmap. apply union_subseteq. split; [set_solver| ].
+      apply δ. 
     Unshelve.
     + simpl.
       Transparent lib_model_impl.

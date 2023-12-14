@@ -318,16 +318,11 @@ Section ClientDefs.
     repeat destruct decide; reflexivity || tauto.
     Unshelve. intros. solve_decision. 
   Qed. 
-      
-    (* forall k δo_k gi, lmtr_o S!! k = Some δo_k -> *)
-    (*              (exists (δi: LiveState Gi Mi LSIi) (ρi: fmrole Mi), *)
-    (*                 state_rel (ls_under δo_k) δi /\ *)
-    (*                 ls_mapping δi !! ρi = Some gi) -> *)
-    (*              lift_Gi gi ∈ dom (ls_mapping δo_k).  *)
+
   Definition client_LSI (s: client_state)
-    (m: gmap (fmrole client_model_impl) (locale heap_lang))
+    (tm: groups_map (M := client_model_impl) (G := locale heap_lang))
     (_: gmap (fmrole client_model_impl) nat) :=
-    forall gi, (exists ρi, ls_mapping s.1 !! ρi = Some gi) -> inl $ inl gi ∈ dom m.
+    forall gi, (exists ρi, ls_mapping s.1 !! ρi = Some gi) -> inl $ inl gi ∈ mapped_roles tm.
     
   Definition client_fl := 15. 
   Definition client_model: LiveModel (locale heap_lang) client_model_impl client_LSI :=

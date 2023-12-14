@@ -26,8 +26,14 @@ Section LibraryDefs.
   Definition ρl: fmrole lib_model_impl := tt.
 
   Definition LSI_groups_fixed (gs: gset lib_grole):
-    fmstate lib_model_impl → gmap (fmrole lib_model_impl) lib_grole → gmap (fmrole lib_model_impl) nat → Prop := 
-    fun _ m _ => forall ρ g, m !! ρ = Some g -> g ∈ gs. 
+    fmstate lib_model_impl → groups_map (M := lib_model_impl) → fuel_map (M := lib_model_impl) → Prop := 
+    fun _ tm _ => dom tm ⊆ gs.
+
+  Global Instance LSI_gf_dec gs:
+    forall s tm fm, Decision (LSI_groups_fixed gs s tm fm).
+  Proof.
+    intros. rewrite /LSI_groups_fixed. solve_decision.
+  Qed. 
 
   Definition lib_fl := 5.
   Definition lib_model gs: LiveModel lib_grole lib_model_impl (LSI_groups_fixed gs) := 
@@ -77,8 +83,7 @@ Section LibraryDefs.
     apply finitary.set_choose_L' in NE as [g GS]. 
     pose proof (fmstate_inhabited lib_model_impl) as [s].
     eapply populate, (initial_ls' s g).
-    red. intros ??. rewrite lookup_gset_to_gmap_Some.
-    by intros [? ->]. 
+    red. simpl. red. rewrite dom_singleton. set_solver. 
   Qed.
 
 
@@ -92,14 +97,11 @@ Section LibraryDefs.
     - intros. eexists. eapply rearrange_roles_spec.
       Unshelve.
       + exact (lib_model gs).
-      + red. intros ??.        
-        rewrite rrm_mapping; [| apply δ2].
-        rewrite lookup_fmap_Some.
-        intros (? & <- & MAP).
-        destruct decide. 
-        * eapply (ls_inv δ2). eauto.
-        * apply locale_trans_ex_role in H as [??]. 
-          by eapply (ls_inv δ0).
+      + red. intros ?. 
+        rewrite /rearrange_roles_map. rewrite dom_insert.
+        intros [->%elem_of_singleton | IN]%elem_of_union; apply (ls_inv δ0).
+        { eapply locale_trans_dom; eauto. }
+        by apply dom_filter_sub in IN. 
   Defined.
 
   Global Instance lib_LF gs (NE: gs ≠ ∅): LMFairPre (lib_model gs).
@@ -124,7 +126,7 @@ Section LibrarySpec.
   Notation "'PMP' gs" := (fun Einvs => (LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS))) (at level 10). 
 
   Lemma lib_LSI_fuel_independent gs:
-    @LSI_fuel_independent lib_grole lib_model_impl (LSI_groups_fixed gs).
+    LSI_fuel_independent (LSI := LSI_groups_fixed gs).
   Proof.
     red. rewrite /LSI_groups_fixed. intros.
     eapply H0; eauto. 
@@ -163,15 +165,17 @@ Section LibrarySpec.
     { reflexivity. }
     { done. }
     { erewrite decide_False; [| done].
-      red. intros. red. intros ρ g'. 
-      rewrite /update_mapping. rewrite map_lookup_imap.
-      rewrite dom_empty_L difference_empty_L union_empty_r_L dom_singleton_L.  
-      rewrite lookup_gset_to_gmap. rewrite option_guard_decide.
-      destruct (decide (ρ ∈ dom R ∖ {[ρl]})).
-      2: { simpl. congruence. }
-      simpl. destruct decide.
-      { intros. eapply H0; eauto. }
-      intros [=]. subst. eapply H0; eauto. }
+      red. intros. red.
+      (* intros ρ g'. *)
+      apply elem_of_subseteq. intros g'.
+      eintros [Rg' TMg']%@elem_of_dom.
+      2: { apply _. }  (* TODO: ? *)
+      destruct (R !! g) eqn:EQRg.
+      2: { done. }
+      simpl in H2. 
+      rewrite lookup_insert_Some in TMg'. destruct TMg' as [[<- <-] | [NEQ TMg']].
+      { apply H0. eapply @elem_of_dom; [by apply _| ]. eauto. } 
+      apply H0. eapply @elem_of_dom; [by apply _| ]. eauto. }
     iNext. iIntros "(L & ST & FUELS)".
     erewrite decide_False; [| done].
     iApply ("POST" with "FUELS"). 

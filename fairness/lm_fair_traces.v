@@ -240,6 +240,7 @@ Section fuel_dec_unless.
       assert (ρ ∈ dom $ ls_fuel δ) as Hin by rewrite -ls_same_doms elem_of_dom //.
       pose proof Hin as Hin'. pose proof Hin as Hin''.
       apply elem_of_dom in Hin as [f Hf].
+
       rewrite Hdomeq in Hin'. apply elem_of_dom in Hin' as [f' Hf'].
       rewrite /Ψ -!size_dom Hdomeq.
       apply Nat.add_lt_mono_l.

@@ -81,6 +81,45 @@ Section ForkStep.
       apply not_elem_of_dom in Hin. congruence.
   Qed.
 
+  (* TODO: move *)
+  Lemma iff_and_pre {A B C: Prop}
+    (BC: A -> (B <-> C)):
+    A /\ B <-> A /\ C.
+  Proof using. tauto. Qed.
+
+  (* TODO: move, upstream*)
+  Lemma map_img_insert_L :
+    ∀ {K : Type} {M : Type → Type} {H : FMap M} {H0 : ∀ A : Type, Lookup K A (M A)} 
+  {H1 : ∀ A : Type, Empty (M A)} {H2 : ∀ A : Type, PartialAlter K A (M A)} 
+  {H3 : OMap M} {H4 : Merge M} {H5 : ∀ A : Type, FinMapToList K A (M A)} 
+  {EqDecision0 : EqDecision K}
+    ,
+  FinMap K M
+  → ∀ {A SA : Type} {H7 : ElemOf A SA} {H8 : Empty SA} 
+      {H9 : Singleton A SA} {H10 : Union SA} {H11 : Intersection SA} 
+      {H12 : Difference SA}
+      {LE: LeibnizEquiv SA}
+,
+      Set_ A SA
+      → ∀ (m : M A) (i : K) (x : A),
+          map_img (<[i:=x]> m) = ({[x]}: SA) ∪ map_img (delete i m).
+  Proof.
+    intros. apply leibniz_equiv. apply map_img_insert. 
+  Qed.  
+
+  (* TODO: move *)
+  Lemma flatten_gset_union `{Countable K} (S1 S2: gset (gset K)):
+    flatten_gset (S1 ∪ S2) = flatten_gset S1 ∪ flatten_gset S2.
+  Proof.
+    rewrite /flatten_gset. set_solver.
+  Qed. 
+
+  Lemma flatten_gset_singleton `{Countable K} (S: gset K):
+    flatten_gset {[ S ]} = S. 
+  Proof.
+    rewrite /flatten_gset. rewrite elements_singleton. set_solver. 
+  Qed. 
+
   Lemma actual_update_fork_split_gen R1 R2 fs (δ1: LM) ζ τ_new
     (Hdisj: R1 ## R2):
     fs ≠ ∅ ->
@@ -184,17 +223,29 @@ Section ForkStep.
       - by rewrite ls_same_doms.
       - by apply ls_mapping_tmap_corr. }
 
-    assert (LSI (ls_under δ1) new_mapping new_fuels) as LSI'.
-    { eapply PRES; [| by apply (ls_inv δ1)].
-      rewrite /new_mapping. erewrite dom_imap_L; [reflexivity| ].
-      intros. rewrite elem_of_dom /is_Some. split.
-      - intros [? ?]. eexists. split; eauto. destruct decide; eauto.
-      - intros (?&?&?). eauto. }
+    assert (LSI (ls_under δ1) new_tmap new_fuels) as LSI'.
+    { eapply PRES; [..| by apply (ls_inv δ1)].
+      - rewrite /new_fuels. rewrite map_imap_dom_eq; [done| ].
+        intros. destruct decide; done.
+      - rewrite /mapped_roles.        
+        rewrite /new_tmap.
+        rewrite map_img_insert_L.
+        rewrite delete_notin.
+        2: { apply not_elem_of_dom_1. rewrite dom_insert_L.
+             apply not_elem_of_union. split; auto.
+             intros ->%elem_of_singleton. apply Hnewζ. by eapply elem_of_dom. }
+        rewrite map_img_insert_L.
+        erewrite <- insert_id with (m := (ls_tmap δ1)) at 1; [| apply Hmapping].
+        rewrite map_img_insert_L.
+        rewrite union_assoc_L.
+        rewrite !flatten_gset_union. f_equal.
+        rewrite !flatten_gset_singleton. rewrite -Hunioneq. clear. set_solver. 
+      - apply mapped_roles_dom_fuels. }
 
-    erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'.
-    3: { apply MATCH. }
-    2: { apply ls_mapping_tmap_corr_impl.
-         red. apply TMAP2_DISJ. }
+    (* erewrite <- maps_inverse_match_uniq1 with (m2 := new_mapping) in LSI'. *)
+    (* 3: { apply MATCH. } *)
+    (* 2: { apply ls_mapping_tmap_corr_impl. *)
+    (*      red. apply TMAP2_DISJ. } *)
 
     iExists (build_LS_ext (ls_under δ1) _ Hfueldom _ TMAP2_DOM TMAP2_DISJ LSI').
 

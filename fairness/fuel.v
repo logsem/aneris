@@ -127,13 +127,14 @@ Section fairness.
   Context {G: Type}.
   Context {M: FairModel}.
   Context `{Countable G}.
-  Context {LSI: fmstate M -> gmap M.(fmrole) G -> gmap M.(fmrole) nat -> Prop}.
-  Context `{forall s m f, Decision (LSI s m f)}.
+
+  Context {LSI: fmstate M -> gmap G (gset (fmrole M)) -> gmap (fmrole M) nat -> Prop}.
+  Context `{forall s tm f, Decision (LSI s tm f)}.
 
   Record LiveState := MkLiveState {
     ls_under:> M.(fmstate);
 
-    ls_fuel: gmap M.(fmrole) nat;
+    ls_fuel: gmap (fmrole M) nat;
     ls_fuel_dom: M.(live_roles) ls_under ⊆ dom ls_fuel;
 
     (* ls_mapping: gmap M.(fmrole) G; *)
@@ -145,8 +146,12 @@ Section fairness.
       (* forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2), *)
       (*   ls_tmap !! τ1 = Some S1 -> ls_tmap !! τ2 = Some S2 -> S1 ## S2; *)
 
-    ls_inv: LSI ls_under (ls_mapping_impl ls_tmap) ls_fuel;
+    ls_inv: LSI ls_under ls_tmap ls_fuel;
   }.
+
+  Definition fuel_map := gmap (fmrole M) nat.
+  Definition groups_map := gmap G (gset (fmrole M)).
+  Definition roles_map := gmap (fmrole M) G. 
 
   Arguments ls_under {_}.
   Arguments ls_fuel {_}.
@@ -176,6 +181,19 @@ Section fairness.
   Lemma ls_mapping_dom (m: LiveState):
     M.(live_roles) m.(ls_under) ⊆ dom (ls_mapping m).
   Proof. rewrite ls_same_doms. apply ls_fuel_dom. Qed.
+
+  Definition mapped_roles (tm: groups_map): gset (fmrole M) :=
+    flatten_gset (map_img tm). 
+
+  Lemma mapped_roles_dom_fuels δ:
+    dom (@ls_fuel δ) = mapped_roles (@ls_tmap δ).
+  Proof. 
+    apply set_eq. intros ρ.
+    rewrite ls_tmap_fuel_same_doms.
+    rewrite /mapped_roles. rewrite flatten_gset_spec.
+    setoid_rewrite elem_of_map_img.
+    split; [intros (?&?&?&?) | intros (?&[??]&?)]; eauto.
+  Qed.   
 
   Inductive FairLabel {Roles} :=
   | Take_step: Roles -> G -> FairLabel
@@ -334,7 +352,7 @@ Section fairness.
     (TMAP_FUEL_SAME_DOMS: forall ρ, ρ ∈ dom (fuel) <-> exists τ R, tmap !! τ = Some R /\ ρ ∈ R)
     (LS_TMAP_DISJ: forall (τ1 τ2: G) (S1 S2: gset (fmrole M)) (NEQ: τ1 ≠ τ2),
       tmap !! τ1 = Some S1 -> tmap !! τ2 = Some S2 -> S1 ## S2)
-    (LS_INV: LSI st (ls_mapping_impl tmap) fuel) :=
+    (LS_INV: LSI st tmap fuel) :=
       {| ls_under := st;
          ls_fuel := fuel;
          ls_fuel_dom := LIVE_FUEL;
@@ -368,14 +386,14 @@ Section fairness.
 
   Definition initial_ls_LSI {LM: LiveModel} s0 (g: G) :=
     let f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0) in
-    let m0 := gset_to_gmap g (M.(live_roles) s0) in
-    LSI s0 m0 f0.
+    (* let m0 := gset_to_gmap g (M.(live_roles) s0) in *)
+    let tm0 := {[ g := M.(live_roles) s0 ]}: groups_map in
+    LSI s0 tm0 f0.
 
   (* TODO: use Program after changing the definition of LiveState *)
   Definition initial_ls' {LM: LiveModel} (s0: M) (ζ0: G)
     (f0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0))
     (tm0 := {[ ζ0 := M.(live_roles) s0 ]}: gmap G (gset (fmrole M)))
-    (* (LSI0: LSI s0 (ls_mapping_impl tm0) f0)  *)
     (LSI0: @initial_ls_LSI LM s0 ζ0)
     : LM.(lm_ls).
     assert (tmap_disj tm0) as DISJ0.
@@ -388,10 +406,6 @@ Section fairness.
       split.
       + intros; eauto.
       + intros (?&?&[-> <-]&?); eauto.
-    - red in LSI0. fold f0 in LSI0.
-      erewrite maps_inverse_match_uniq1 with (m1 := ls_mapping_impl tm0); eauto.
-      { apply ls_mapping_tmap_corr_impl; eauto. }
-      subst tm0. apply maps_inverse_match_exact.
   Defined. 
 
   Local Ltac SS' := eapply elem_of_dom; eauto. 
@@ -510,7 +524,7 @@ Arguments LiveModel _ _ {_ _} _.
 (* Coercion live_model_to_model : LiveModel >-> Model. *)
 (* Arguments live_model_to_model {_ _}. *)
 
-Definition live_model_to_model : forall G M LSI `{_: Countable G}, LiveModel G M LSI -> Model :=
+Definition live_model_to_model : forall G M `{_: Countable G} LSI, LiveModel G M LSI -> Model :=
   λ G M LSI e c lm, live_model_model lm.
 Coercion live_model_to_model : LiveModel >-> Model.
-Arguments live_model_to_model {_ _}.
+Arguments live_model_to_model _ _ {_ _}.
