@@ -1,7 +1,7 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From trillium.fairness Require Import fuel_ext resources actual_resources.
+From trillium.fairness Require Import resources actual_resources.
 From trillium.fairness.heap_lang Require Import notation.
 From trillium.fairness Require Import utils.
 From iris.base_logic.lib Require Import invariants.
@@ -12,6 +12,8 @@ From trillium.fairness Require Import lm_fair.
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi wp_tacs.
+From trillium.fairness.examples.comp Require Import comp_lib_pmp.
+
 
 Close Scope Z_scope. 
 
@@ -99,19 +101,6 @@ Section ClientSpec.
     red. rewrite /client_LSI. intros.
     set_solver.
   Qed.
-
-  (* TODO: move, upstream *)
-  Lemma dom_filter_comm {K A: Type} `{Countable K}
-                        (P: K -> Prop) `{∀ x : K, Decision (P x)}:
-    forall (m: gmap K A), dom (filter (fun '(k, _) => P k) m) = filter P (dom m).
-  Proof.
-    intros. apply leibniz_equiv. apply dom_filter. intros.
-    rewrite elem_of_filter elem_of_dom.
-    rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
-  Qed.
-
-  (* TODO: move upper *)
-  From trillium.fairness.examples.comp Require Import comp_lib_pmp.
 
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lf) f
     (FB: f >= client_fl)

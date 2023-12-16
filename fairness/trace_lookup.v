@@ -316,6 +316,14 @@ Section TraceLookup.
     destruct tr; eauto. 
   Qed.
 
+  Lemma trace_lookup_0_Some (tr: trace St L):
+    is_Some (tr !! 0). 
+  Proof.
+    pose proof (trace_has_len tr) as [len LEN]. 
+    eapply trace_lookup_dom; eauto.
+    eapply trace_len_gt_0; eauto. 
+  Qed.
+
 End TraceLookup.
 
 Notation "tr S!! i" := (state_lookup tr i) (at level 20). 
@@ -335,7 +343,7 @@ Section After.
     intros. unfold_lookups. 
     rewrite after_sum'. by rewrite AFTER.
   Qed. 
-    
+
   Lemma state_lookup_after (tr atr: trace St L) (a: nat)
     (AFTER: after a tr = Some atr):
     forall k, atr S!! k = tr S!! (a + k).
@@ -391,6 +399,18 @@ Section After.
     - intros EQ. destruct atr; [congruence| ].
       inversion EQ. subst. eauto. 
   Qed.
+
+  Lemma trace_lookup_after_weak (tr: trace St L) s n:
+    (exists atr, after n tr = Some atr /\ trfirst atr = s) <-> exists ostep, tr !! n = Some (s, ostep). 
+  Proof. 
+    rewrite /lookup /trace_lookup.
+    destruct after.
+    2: { by split; [intros (?&?&?)| intros (?&?)]. }
+    transitivity (trfirst t = s).
+    { split; eauto. by intros (?&[=->]&?). }
+    destruct t; simpl; eauto.
+    all: split; [intros ->| intros (?&[=])]; eauto.
+  Qed.   
 
 End After.
 
@@ -565,3 +585,44 @@ Section UptoStutter.
   Qed. 
 
 End UptoStutter.
+
+
+Section ValidTracesProperties.
+  Context {St L: Type}.
+  Context (trans: St -> L -> St -> Prop). 
+
+  Context (tr: trace St L).
+  Hypothesis VALID: trace_valid trans tr. 
+
+  From Paco Require Import pacotac.
+  Local Ltac gd t := generalize dependent t.
+  
+  Lemma trace_valid_steps' i st ℓ st'
+    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
+    trans st ℓ st'. 
+  Proof using VALID.
+    gd st. gd ℓ. gd st'. gd tr. clear dependent tr. 
+    induction i. 
+    { simpl. intros. punfold VALID. inversion VALID.
+      3: { by apply trace_valid_mono. } 
+      - subst. done.
+      - subst. inversion ITH. by subst. }
+    intros. simpl in ITH.
+    destruct tr.
+    { inversion ITH. }
+    punfold VALID; [| by apply trace_valid_mono]. 
+    inversion_clear VALID; pclearbot; auto.
+    eapply IHi; eauto. 
+  Qed.
+  
+  Lemma trace_valid_steps'' i st ℓ st'
+    (ST1: tr S!! i = Some st)
+    (ST2: tr S!! (i + 1) = Some st')
+    (LBL: tr L!! i = Some ℓ):
+    trans st ℓ st'. 
+  Proof using VALID.
+    eapply trace_valid_steps'.
+    apply state_label_lookup. eauto.
+  Qed.      
+  
+End ValidTracesProperties. 

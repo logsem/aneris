@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel fuel_ext resources partial_ownership.
+From trillium.fairness Require Import fairness fuel resources partial_ownership.
 
 
 Section ModelStep.
@@ -354,12 +354,6 @@ Section ModelStep.
     rewrite contra in Habs. apply elem_of_dom_2 in Habs. done.
   Qed.
     
-  (* (* TODO: refactor this definition? *) *)
-  (* (* TODO: move *) *)
-  (* Definition update_mapping (δ1: lm_ls LM) ζ (fs1 fs2: gmap (fmrole M) nat) :=  *)
-  (*   map_imap (λ ρ' _, if decide (ρ' ∈ dom $ ls_fuel δ1) then ls_mapping δ1 !! ρ' else Some ζ) *)
-  (*     (gset_to_gmap 333 ((dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))). *)
-
   Lemma actual_update_step_still_alive_gen
         s1 s2 fs1 fs2 ρ (δ1 : LM) ζ fr1 fr_stash:
     (live_roles _ s2 ∖ live_roles _ s1) ⊆ fr1 ∪ dom fs1 ∩ dom fs2 ->

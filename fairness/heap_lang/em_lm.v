@@ -1,4 +1,4 @@
-From trillium.fairness Require Export fairness resources fair_termination fuel fuel_ext. 
+From trillium.fairness Require Export fairness resources fair_termination fuel. 
 (* From trillium.fairness.heap_lang Require Export lang heap_lang_defs. *)
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Export partial_ownership.

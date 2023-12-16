@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel fuel_ext resources partial_ownership.
+From trillium.fairness Require Import fairness fuel resources partial_ownership.
 
 
 Section FuelDropStep.
@@ -82,16 +82,12 @@ Section FuelDropStep.
     apply _.
   Qed.
 
-  (* TODO: move, generalize, upstream? *)
   Lemma map_filter_diff_simpl (m: gmap (fmrole M) G) (R: gset (fmrole M)):
     filter (fun '(k, _) => k ∈ dom m ∖ R) m = filter (fun '(k, _) => k ∉ R) m.
   Proof. 
     apply map_filter_ext. intros.
     rewrite elem_of_difference elem_of_dom. set_solver. 
   Qed.
-
-  (* Lemma frag_model_LSI s: *)
-  (* frag_model_is s -∗ ⌜ LSI ( ⌝ *)
 
   Lemma TMAP'_ALT: 
     forall (δ1: lm_ls LM) ζ Rζ rem, ls_tmap δ1 !! ζ = Some Rζ -> rem ⊆ Rζ -> <[ζ:=Rζ ∖ rem]> (ls_tmap δ1) = (λ rs, rs ∖ rem) <$> (ls_tmap δ1). 

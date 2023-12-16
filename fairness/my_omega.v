@@ -329,4 +329,13 @@ Module NOmega.
     NOmega.le x (NOnum n) <-> ¬ lt_nat_l n x. 
   Proof. lia_NO x. Qed. 
 
+  Lemma nomega_le_lt_eq x y:
+    NOmega.le x y <-> NOmega.lt x y \/ x = y.
+  Proof.
+    lia_NO' x; lia_NO' y; try tauto.
+    - split; try done. intros [[] | [=]].
+    - rewrite Nat.le_lteq. apply Morphisms_Prop.or_iff_morphism; [done| ].
+      split; [intros -> | intros [=->]]; done.
+  Qed. 
+
 End NOmega.

@@ -1,13 +1,13 @@
-From trillium.fairness Require Import fairness fuel fuel_ext utils.
+From trillium.fairness Require Import fairness fuel utils.
 
 Close Scope Z_scope.
 
 
 Section LocaleTrans.
-  Context `{Countable G}.
+  Context `{CNT: Countable G}.
   Context `{LM: LiveModel G M LSI}. 
-  Context `{∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}.
-  Context `{EqDecision (fmstate M)}. 
+  Context `{M_TRANS_DEC: ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}.
+  Context `{M_ST_DEC: EqDecision (fmstate M)}. 
 
   (* TODO: rename *)
   Definition locale_trans  (st1: lm_ls LM) (τ: G) st2 :=
@@ -18,26 +18,6 @@ Section LocaleTrans.
     gset (@FairLabel G (fmrole M)) :=
     {[ Silent_step τ ]} ∪ (set_map (fun ρ => Take_step ρ τ) (dom (ls_fuel st1))).
 
-  (* TODO: move *)
-  Global Instance lm_ls_trans_dec st1 l st2:
-    Decision (lm_ls_trans LM st1 l st2).
-  Proof.
-    destruct l; simpl. 
-    3: { right. intros []. tauto. }
-    - solve_decision. 
-    - repeat apply and_dec; try solve_decision.
-      destruct (ls_tmap st1 !! g) eqn:TMAP.
-      2: { right. intros [? MAP].
-           apply ls_mapping_tmap_corr in MAP as (?&SOME&?).
-           by rewrite TMAP in SOME. }
-      destruct (decide (g0 = ∅)) as [-> |NEMPTY].
-      { right. intros [? MAP].
-        apply (ls_mapping_tmap_corr) in MAP as (?&SOME&?).
-        rewrite TMAP in SOME. set_solver. }
-      left. apply set_choose_L in NEMPTY as [ρ ?].
-      exists ρ. apply (ls_mapping_tmap_corr). eauto. 
-  Defined. 
-    
   Definition allowed_step_FLs δ1 τ δ2: gset (@FairLabel G (fmrole M)) :=
     filter (fun l => bool_decide (lm_ls_trans LM δ1 l δ2) = true)
       (potential_step_FLs δ1 τ (LM := LM)).
@@ -54,7 +34,6 @@ Section LocaleTrans.
     split; auto.
     apply STEP.
   Qed.
-
 
   Lemma locale_trans_alt δ1 τ δ2:
     locale_trans δ1 τ δ2 <-> allowed_step_FLs δ1 τ δ2 ≠ ∅.
@@ -84,12 +63,6 @@ Section LocaleTrans.
     solve_decision.
   Qed.
 
-  (* TODO: move *)
-  Lemma iff_and_pre {A B C: Prop}
-    (BC: A -> (B <-> C)):
-    A /\ B <-> A /\ C.
-  Proof using. tauto. Qed.
-                    
   Lemma aFLs_equiv ℓ δ1 τ δ2 :
     ℓ ∈ allowed_step_FLs δ1 τ δ2 <-> lm_ls_trans LM δ1 ℓ δ2 /\ fair_lbl_matches_group ℓ τ.
   Proof using.
@@ -106,7 +79,6 @@ Section LocaleTrans.
     eexists. apply STEP. 
   Qed. 
 
-  (* TODO: move *)
   Lemma locale_trans_ex_role δ1 τ δ2
     (STEP: locale_trans δ1 τ δ2):
     exists ρ, ls_mapping δ1 !! ρ = Some τ.
@@ -117,6 +89,17 @@ Section LocaleTrans.
     - apply STEP.
   Qed. 
     
+  Lemma locale_trans_fmtrans_or_eq δ1 τ δ2
+    (LIB_STEP: locale_trans δ1 τ δ2):
+    (exists ρ, fmtrans M (ls_under δ1) (Some ρ) (ls_under δ2)) \/
+    (ls_under δ1 = ls_under δ2).
+  Proof.
+    destruct LIB_STEP as (ℓ & LIB_STEP & MATCH).
+    destruct ℓ; simpl in *; try done; subst.
+    - left. eexists. apply LIB_STEP.
+    - tauto.
+  Qed.   
+
   Lemma locale_trans_dom δ1 τ δ2
     (STEP: locale_trans δ1 τ δ2):
     τ ∈ dom (ls_tmap δ1). 
@@ -124,6 +107,20 @@ Section LocaleTrans.
     apply locale_trans_ex_role in STEP as [??]. 
     eapply mim_in_1; [apply ls_mapping_tmap_corr| eauto].
   Qed. 
+
+  Instance locale_trans_exG_dec st1 st2:
+    Decision (exists τ, locale_trans st1 τ st2).
+  Proof using M_TRANS_DEC M_ST_DEC.
+    apply ex_fin_dec with (l := elements (dom (ls_tmap st1))).
+    { solve_decision. }
+    intros g STEP. apply elem_of_list_In, elem_of_elements, elem_of_dom. 
+    destruct STEP as (ℓ&STEP&MATCH).
+    destruct ℓ; simpl in MATCH; try done; subst g0.
+    - apply proj2, proj1 in STEP.
+      apply (ls_mapping_tmap_corr) in STEP as (?&?&?). eauto.
+    - apply proj1 in STEP. destruct STEP as (?&STEP).
+      apply (ls_mapping_tmap_corr) in STEP as (?&?&?). eauto.
+  Qed.
 
 End LocaleTrans. 
 
@@ -178,7 +175,6 @@ Section LMFair.
     all: apply ProofIrrelevance. 
   Qed. 
 
-  (* TODO: move, use in other places *)
   Lemma dec_forall_fin_impl {A: Type} (P Q: A -> Prop) (domP: list A)
     (DOMP: forall a, P a -> a ∈ domP)
     (DECP: forall a, Decision (P a))

@@ -101,6 +101,13 @@ Section TraceLen.
     red in H. lia. 
   Qed. 
 
+  Lemma trace_len_gt_0 (tr: trace St L):
+    forall len, trace_len_is tr len -> NOmega.lt_nat_l 0 len.
+  Proof. 
+    intros. lia_NO' len. destruct n; [| lia].
+    by apply trace_len_0_inv in H. 
+  Qed. 
+
   Lemma trace_len_1_inv (tr: trace St L)
     (LEN1: trace_len_is tr (NOnum 1)):
     exists s, tr = ⟨ s ⟩.

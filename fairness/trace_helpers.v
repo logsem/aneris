@@ -4,83 +4,6 @@ From trillium.fairness Require Import inftraces fairness trace_utils.
 
 Close Scope Z_scope.
  
-Section TraceHelpers.
-  Context {St L: Type}.
-
-  Lemma pred_at_dec (P: St → option L → Prop)
-    (DEC: forall st ro, Decision (P st ro)):
-    forall tr i, Decision (pred_at tr i P).
-  Proof using.
-    intros tr i. unfold pred_at.
-    destruct (after i tr); [destruct t| ]; auto.
-    solve_decision.
-  Qed.
-
-  Lemma pred_at_or
-    P1 P2 (tr: trace St L) i: 
-    pred_at tr i P1 \/ pred_at tr i P2 <-> pred_at tr i (fun x y => P1 x y \/ P2 x y).
-  Proof using.
-    unfold pred_at. destruct (after i tr); [destruct t| ]; tauto.
-  Qed.
-
-  Lemma pred_at_ex {T: Type} (P : T -> St → option L → Prop) tr n:
-    pred_at tr n (fun s ol => exists t, P t s ol) <-> exists t, pred_at tr n (P t).
-  Proof.
-    rewrite /pred_at. destruct after.
-    2: { intuition. by destruct H. }
-    destruct t; eauto.
-  Qed.
-
-  Lemma pred_at_impl (P Q: St -> option L -> Prop)
-    (IMPL: forall s ol, P s ol -> Q s ol):
-    forall tr i, pred_at tr i P -> pred_at tr i Q.
-  Proof.
-    rewrite /pred_at. intros. 
-    destruct after; intuition; destruct t.
-    all: by apply IMPL.
-  Qed.
-
-End TraceHelpers. 
-
-(* TODO: move *)
-Section ValidTracesProperties.
-  Context {St L: Type}.
-  Context (trans: St -> L -> St -> Prop). 
-
-  Context (tr: trace St L).
-  Hypothesis VALID: trace_valid trans tr. 
-
-  From Paco Require Import pacotac.
-  Local Ltac gd t := generalize dependent t.
-  
-  Lemma trace_valid_steps' i st ℓ st'
-    (ITH: tr !! i = Some (st, Some (ℓ, st'))):
-    trans st ℓ st'. 
-  Proof using VALID.
-    gd st. gd ℓ. gd st'. gd tr. clear dependent tr. 
-    induction i. 
-    { simpl. intros. punfold VALID. inversion VALID.
-      - subst. done.
-      - subst. inversion ITH. by subst. }
-    intros. simpl in ITH.
-    destruct tr.
-    { inversion ITH. }
-    punfold VALID. inversion_clear VALID; pclearbot; auto.
-    eapply IHi; eauto. 
-  Qed.
-  
-  Lemma trace_valid_steps'' i st ℓ st'
-    (ST1: tr S!! i = Some st)
-    (ST2: tr S!! (i + 1) = Some st')
-    (LBL: tr L!! i = Some ℓ):
-    trans st ℓ st'. 
-  Proof using VALID.
-    eapply trace_valid_steps'.
-    apply state_label_lookup. eauto.
-  Qed.      
-  
-End ValidTracesProperties. 
-
 
 Section FMTraceHelpers.
   Context {M: FairModel}.
@@ -236,14 +159,5 @@ Section FMTraceHelpers.
     Qed.
 
   End ValidTracesProperties.
-
-  (* use trace_valid_cons_inv instead *)
-  (* Lemma mtrace_valid_cons (tr: mtrace M) (s: fmstate M) (oρ: option (fmrole M)) *)
-  (*   (VALID: mtrace_valid (s -[oρ]-> tr)): *)
-  (*   mtrace_valid tr /\ fmtrans M s oρ (trfirst tr).  *)
-  (* Proof using. *)
-  (*   punfold VALID. inversion VALID. subst. *)
-  (*   pclearbot. done.  *)
-  (* Qed. *)
 
 End FMTraceHelpers.

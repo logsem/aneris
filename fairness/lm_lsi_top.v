@@ -14,26 +14,6 @@ Section LMLSITopLevel.
   esplit; apply _.
   Defined. 
 
-  (* TODO: move *)
-  Lemma mim_lookup_helper `{Countable K, Countable V, EqDecision K}
-    (tm: gmap V (gset K)) (m: gmap K V)
-    R ζ
-    (MIM: maps_inverse_match m tm)
-    (NE: R ≠ ∅)
-    (DOM: ∀ ρ, m !! ρ = Some ζ ↔ ρ ∈ R):
-    tm !! ζ = Some R.
-  Proof. 
-    apply finitary.set_choose_L' in NE as [k INR].
-    pose proof (proj2 (DOM k) INR) as MAP.
-    red in MIM. specialize MIM with (v := ζ). 
-    pose proof (proj1 (MIM _ ) MAP) as (R' & TM' & IN').
-    rewrite TM'. f_equal.
-    apply set_eq. clear dependent k. intros k.
-    rewrite <- DOM. rewrite TM' in MIM. split.
-    - intros IN'. apply MIM. eauto.
-    - intros ?%MIM. set_solver.
-  Qed. 
-
   Lemma lm_lsi_toplevel:
     ⊢ LM_steps_gen ∅ (EM := @LM_EM_HL _ _ _ LF') (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.

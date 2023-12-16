@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fuel_ext resources.
+From trillium.fairness Require Import resources.
 From trillium.fairness.heap_lang Require Import notation.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
@@ -10,6 +10,7 @@ From trillium.fairness Require Import lm_fair.
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.heap_lang Require Export lang.
+From trillium.fairness Require Import actual_resources.
 
 Close Scope Z_scope.
 
@@ -123,8 +124,9 @@ Section LibPMP.
     iModIntro. do 2 iExists _. iFrame.
     
     iApply partial_free_roles_are_Proper; [| iFrame].
+    clear -H1. 
     dEl; dEq; tauto || set_solver.
-  Qed.
+   Qed.
 
   (* TODO: unify with model_agree ? *)
   Lemma y_model_agree `{clientGS Σ} y1 y2:
@@ -145,14 +147,6 @@ Section LibPMP.
     - iModIntro. iFrame.
   Qed.
      
-(*   Lemma big_opM_fmap': *)
-(*   ∀ {M M' : ofe} {o : M → M → M} {o' : M' → M' → M'} *)
-(*     {Monoid0 : Monoid o} {Monoid0' : Monoid o'} {K : Type} *)
-(*     {EqDecision0 : EqDecision K} {H : Countable K} *)
-(*     (f : M → M') (m : gmap K M), *)
-(*     (([^ op map] k↦y ∈ m, f <$> ({[ k := y ]}: gmap K M)): gmap K M') = (f <$> m: gmap K M'). *)
-(* (* f <$> {[k := ]} *) *)
-
 
   (* TODO: remove tid=0 restriction ? *)
   Let lib_pmi `{clientGS Σ} (m: gmap (locale heap_lang) (gset (fmrole lib_model_impl))): iProp Σ:=
@@ -223,8 +217,6 @@ Section LibPMP.
       iFrame. iExists _. iFrame. done.
   Qed.
 
-  (* TODO: move*)
-  From trillium.fairness Require Import actual_resources.
 
   Lemma fuel_keep_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
   LSG Einvs ∗ client_inv ⊢
@@ -307,14 +299,13 @@ Section LibPMP.
   Qed.
 
   Lemma lib_fuel_drop_step_preserves_LSI s rem:
-    fuel_drop_preserves_LSI s rem (LSI := LSI_groups_fixed lib_gs).
+    fuel_drop_preserves_LSI s rem (LSI := LSI_groups_fixed lib_gs (M := lib_model_impl)).
   Proof. 
     (* done. *)
     red. intros. red. rewrite dom_fmap. apply H0. 
   Qed. 
     
 
-  (* TODO: move*)
   Lemma fuel_drop_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
   LSG Einvs ∗ client_inv ⊢
   ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M)

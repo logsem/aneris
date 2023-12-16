@@ -69,12 +69,30 @@ Section GeneralizedFairness.
       fair_by_gen t (c -[ tid' ]-> r) → fair_by_gen t r.
   Proof. intros H. by eapply (fair_by_gen_after t (c -[tid']-> r) r 1). Qed.
 
-  (* Lemma fair_model_trace_cons_forall δ ℓ' r: *)
   Lemma fair_by_gen_cons_forall δ ℓ' r:
     (∀ ℓ, fair_by_gen ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_by_gen ℓ r).
   Proof. eauto using fair_by_gen_cons. Qed.
 
 End GeneralizedFairness.
+
+Global Instance fair_by_gen_Proper {S L T: Type}:
+  Proper ((eq ==> eq ==> iff) ==> (eq ==> eq ==> eq ==> iff) ==> eq ==> eq ==> iff) 
+    (@fair_by_gen S L T).
+Proof.
+  intros ?? LOC_IFF ?? STEP_IFF.
+  red. intros ?? ->. red. intros ?? ->.
+  rewrite /fair_by_gen.
+  apply forall_proper. intros.
+  erewrite pred_at_iff.
+  2: { intros. eapply LOC_IFF; reflexivity. }
+  apply Morphisms_Prop.iff_iff_iff_impl_morphism; [reflexivity| ].
+  repeat (apply exist_proper; intros).
+  apply Morphisms_Prop.and_iff_morphism; [done| ].
+  rewrite /fairness_sat_gen. 
+  apply Morphisms_Prop.or_iff_morphism.
+  - apply not_iff_compat, LOC_IFF; reflexivity.
+  - apply STEP_IFF; reflexivity. 
+Qed. 
 
 
 Section LocaleFairness.

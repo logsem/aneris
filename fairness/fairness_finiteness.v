@@ -1,27 +1,8 @@
 From stdpp Require Import finite.
-From trillium.prelude Require Import quantifiers classical_instances.
+From trillium.prelude Require Import quantifiers classical_instances finitary.
 (* From trillium.prelude Require Import finitary. *)
-From trillium.fairness Require Import finitary_copy.
-From trillium.fairness Require Import fairness fuel traces_match lm_fair_traces lm_fair fuel_ext utils. 
+From trillium.fairness Require Import fairness fuel traces_match lm_fair_traces lm_fair utils. 
 
-Section gmap.
-  Context `{!EqDecision K, !Countable K}.
-
-  Definition max_gmap (m: gmap K nat) : nat :=
-    map_fold (λ k v r, v `max` r) 0 m.
-
-  Lemma max_gmap_spec m:
-    map_Forall (λ _ v, v <= max_gmap m) m.
-  Proof.
-    induction m using map_ind; first done.
-    apply map_Forall_insert =>//. rewrite /max_gmap map_fold_insert //.
-    - split; first lia. intros ?? Hnotin. specialize (IHm _ _ Hnotin). simpl in IHm.
-      unfold max_gmap in IHm. lia.
-    - intros **. lia.
-  Qed.
-End gmap.
-
-(* TODO: move? *)
 Section LMFinBranching.
   Context `{Countable G}.
   Context `{LM: LiveModel G M LSI}.
@@ -32,9 +13,6 @@ Section LMFinBranching.
   | Take_step ρ _ => Some ρ
   | _ => None
   end.
-
-  (* Definition map_underlying_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} (aux : auxiliary_trace LM) := *)
-  (*   (trace_map (λ s, ls_under s) (λ lab, get_role lab) aux). *)
 
   Definition potential_FLs_list (st1: lm_ls LM): list (@FairLabel G (fmrole M)) :=    
     Config_step :: flat_map (fun τ => elements (potential_step_FLs st1 τ)) (elements (dom (ls_tmap st1))). 
@@ -66,107 +44,6 @@ Section LMFinBranching.
     apply elem_of_dom. apply proj2, proj1 in TRANS.
     by apply mk_is_Some, ls_same_doms' in TRANS.
   Qed. 
-
-  (* TODO: upstream *)
-  Section SetMapProperties.
-    
-    Lemma set_map_compose_gset {A1 A2 A3: Type}
-      `{EqDecision A1} `{EqDecision A2} `{EqDecision A3}
-      `{Countable A1} `{Countable A2} `{Countable A3}
-      (f: A2 -> A3) (g: A1 -> A2) (m: gset A1):
-      set_map (f ∘ g) m (D:=gset _) = set_map f (set_map g m (D:= gset _)).
-    Proof using.
-      set_solver. 
-    Qed. 
-    
-    Lemma elem_of_map_inj_gset {A B} 
-      `{EqDecision A} `{Countable A}
-      `{EqDecision B} `{Countable B}
-      (f: A -> B) (m: gset A) (a: A) (INJ: injective f):
-      a ∈ m <-> f a ∈ set_map f m (D := gset _).
-    Proof using.
-      split; [apply elem_of_map_2| ].
-      intros IN. apply elem_of_map_1 in IN as (a' & EQ & IN).
-      apply INJ in EQ. congruence. 
-    Qed.
-    
-  End SetMapProperties.
-
-
-  (* TODO: move *)
-  Section Powerset.
-    Context {K: Type}.
-    Context `{Countable K}. 
-
-    (* it's easier to perform recursion on lists *)
-    (* TODO: another name? *)
-    Fixpoint powerlist (l: list K): gset (gset K) :=
-      match l with
-      | [] => {[ ∅ ]}
-      | k :: l' => let p' := powerlist l' in
-                 p' ∪ (set_map (fun s => {[ k ]} ∪ s) p')
-                 (* {[ {[ k ]} ]} ∪ p' ∪ (set_map (fun s => {[ k ]} ∪ s) p') *)
-      end. 
-  
-    Definition powerset (s: gset K): gset (gset K) :=
-      powerlist (elements s).
-    
-  (* TODO: move, find existing? *)
-  Lemma iff_and_impl_helper {A B: Prop} (AB: A -> B):
-    A /\ B <-> A.
-  Proof. tauto. Qed.     
-  Lemma iff_True_helper {A: Prop}:
-    (A <-> True) <-> A.
-  Proof. tauto. Qed.     
-  Lemma iff_False_helper {A: Prop}:
-    (A <-> False) <-> ¬ A.
-  Proof. tauto. Qed.
-  Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
-    (exists t, A /\ B t) <-> A /\ exists t, B t.
-  Proof. split; intros (?&?&?); eauto. Qed.
-
-    Lemma powerlist_nil l:
-      ∅ ∈ powerlist l.
-    Proof. induction l; set_solver. Qed.
-
-    Instance powerlist_perm_Proper:
-      Proper (Permutation ==> eq) powerlist.
-    Proof.
-      induction 1; csimpl; auto. 
-      - congruence. 
-      -
-        (* by rewrite !(assoc_L (++)) (comm (++) (f _)). *)
-        rewrite -!union_assoc_L. f_equal. 
-        (* do 2 rewrite -(union_assoc_L (_ ∪ powerlist l)). *)
-        (* f_equal; [set_solver| ]. *)
-        rewrite !set_map_union_L.
-        rewrite !union_assoc_L. f_equal.
-        { set_solver. }
-        rewrite -!set_map_compose_gset. apply leibniz_equiv.
-        f_equiv. red. simpl. set_solver.
-      - congruence.
-    Qed.
-
-    Lemma powerset_spec `{Countable K} s:
-      forall e, e ⊆ s <-> e ∈ powerset s. 
-    Proof. 
-      intros. rewrite /powerset.
-      revert e. pattern s. apply set_ind.
-      { intros ?? EQUIV. apply leibniz_equiv_iff in EQUIV. by rewrite EQUIV. }
-      { rewrite elements_empty. simpl.
-        setoid_rewrite elem_of_singleton.
-        intros. set_solver. }
-      clear s. intros k s NIN IND e.
-      rewrite elements_disj_union; [| set_solver].
-      rewrite elements_singleton. simpl.
-      rewrite !elem_of_union elem_of_map.
-      repeat setoid_rewrite <- IND.
-      erewrite ex_det_iff with (a := e ∖ {[ k ]}).
-      2: { set_solver. }
-      destruct (decide (k ∈ e)); set_solver. 
-    Qed.              
-          
-  End Powerset.
 
   Program Definition enumerate_next
     (δ1: LM)
@@ -377,17 +254,6 @@ Section LMFinBranching.
   
   Lemma ex_norm_step δ1 ℓ δ2
     (STEP: lm_ls_trans LM δ1 ℓ δ2)
-    (* (LSI_STABLE: *)
-    (*   forall δ1 τ δ2 ρ g, locale_trans δ1 τ δ2 -> *)
-    (*                  ls_mapping δ2 !! ρ = Some g -> *)
-    (*                  g ∉ dom (ls_tmap δ1 (LM := LM)) -> *)
-    (*                  let g' := match ls_mapping δ1 !! ρ with *)
-    (*                            | Some g_ => g_ *)
-    (*                            | None => τ *)
-    (*                            end in *)
-    (*                  LSI (ls_under δ2) (<[ρ := g']> (ls_mapping δ2)) (ls_fuel δ2)) *)
-    (* (LSI_STABLE: forall δ1 D, D ⊆ dom (ls_tmap δ1 (LM := LM)) -> *)
-    (*                       exists δ2, roles_rearranged δ1 δ2 D) *)
     (LSI_STABLE: forall δ1 τ δ2, locale_trans δ1 τ δ2 (LM := LM) ->
                              exists δ2', roles_rearranged δ2 δ2' (dom $ ls_tmap δ1) τ)
     :
@@ -444,15 +310,6 @@ Section LMFinBranching.
         rewrite FUEL ST. apply STEP.
   Qed.
 
-  (* TODO: move *)
-  Ltac forward_gen H tac :=
-    match type of H with
-    | ?X -> _ => let H' := fresh in assert (H':X) ; [tac|specialize (H H'); clear H']
-    end.
-
-  Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac).
-  Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
-
   (* not using Finite type to avoid dealing with ProofIrrel *)
   
   Lemma locale_trans_ex_dec_fin
@@ -478,7 +335,8 @@ Section LMFinBranching.
     pose proof (ex_norm_step _ _ _ TRANS LSI_STABLE) as (δ2' & g & MATCH' & TRANS' & ARR).
     enough (In δ2' τ_ℓs) as IN. 
     { by rewrite FLT in IN. }
-    specialize (STEPS _ _ TRANS'). forward STEPS; [| forward STEPS]. 
+    (* specialize (STEPS _ _ TRANS'). forward STEPS; [| forward STEPS].  *)
+    forward eapply (STEPS _ _ TRANS') as ?. 
     { apply elem_of_cons. destruct ℓ; simpl in *; try done.
       - right. eapply elem_of_list_In, FIN_STEPS; eauto. apply TRANS'.
       - left. repeat apply proj2 in TRANS'. congruence. }
@@ -505,27 +363,12 @@ Section LMFinBranching.
     apply elem_of_list_In. done.
   Qed.
 
-  (* TODO: move *)
   Definition rearrange_roles_map (tm: gmap G (gset (fmrole M))) (R: gset G) (r: G):
     gmap G (gset (fmrole M)) :=
     let cleaned := filter (fun '(k, _) => k ∈ R) tm in
     let cur_r := default ∅ (tm !! r) in
     let to_move := flatten_gset (map_img (filter (fun '(k, _) => k ∉ R) tm)) in
     <[ r := cur_r ∪ to_move ]> cleaned.
-
-  (* TODO: move, gneralize*)
-  Lemma mim_neg m (tm: gmap G (gset (fmrole M)))
-    (MIM: maps_inverse_match m tm):
-    ∀ (k: fmrole M), m !! k = None <-> forall g, k ∉ default ∅ (tm !! g).
-  Proof. 
-    intros. red in MIM. specialize (MIM k). split.
-    - intros MAP. intros g IN.
-      destruct (tm !! g) eqn:TM; set_solver.
-    - intros NIN. destruct (m !! k) eqn:MAP; [| done].
-      pose proof (proj1 (MIM g) eq_refl) as (?&?&?).
-      specialize (NIN g). rewrite H0 in NIN. set_solver.
-  Qed. 
-
 
   Lemma rrm_tmap_fuel_same_doms (δ: LiveState G M LSI) R r:
     ∀ ρ : fmrole M,
@@ -681,16 +524,6 @@ red. rewrite /rearrange_roles_map.
     - done. 
   Defined.
 
-  (* TODO: move, generalize *)
-  Lemma dom_filter_sub {K V: Type} `{Countable K} (m: gmap K V)
-    (ks: gset K):
-    dom (filter (λ '(k, _), k ∈ ks) m) ⊆ ks.
-  Proof.
-    apply elem_of_subseteq.
-    intros ? IN. rewrite elem_of_dom in IN. destruct IN as [? IN].
-    apply map_filter_lookup_Some in IN. apply IN.
-  Qed. 
-
   Lemma rearrange_roles_spec (δ: lm_ls LM) 
     (R: gset G) (r: G)
     (LSI': LSI (ls_under δ) (rearrange_roles_map (ls_tmap δ) R r) (ls_fuel δ))
@@ -753,27 +586,10 @@ Section finitary.
     exists (exist _ (δ', ℓ) REL). split =>//. apply elem_of_enum.
   Qed.
 
-  (* Lemma enum_inner_spec extr atr c' oζ : *)
-  (*   ξ (extr :tr[oζ]: c') (atr) → (δ', ℓ) ∈ enum_inner extr atr c' oζ. *)
-  (* Proof. *)
-  (*   intros H. unfold enum_inner. rewrite elem_of_list_fmap. *)
-  (*   exists (exist _ (δ', ℓ) H). split =>//. apply elem_of_enum. *)
-  (* Qed. *)
-
-  (* (* TODO: move *) *)
-  (* Fixpoint trace_map {A A' L L'} (sf: A → A') *)
-  (*   (lsf: A -> L -> A -> L') (tr: finite_trace A L): finite_trace A' L' := *)
-  (* match tr with *)
-  (* | trace_singleton x => trace_singleton $ sf x *)
-  (* | trace_extend tr' ℓ x => trace_extend (trace_map sf lsf tr') (lsf x ℓ (trace_first tr')) (sf x) *)
-  (* end. *)
-
   Fixpoint get_underlying_fairness_trace {M : FairModel} {LSI} {LM: LiveModel (locale Λ) M LSI} {LF: LMFairPre LM}
     (ex : auxiliary_trace (fair_model_model LM_Fair)) :=
   match ex with
   | trace_singleton δ => trace_singleton (ls_under δ)
-  (* | trace_extend ex' (Take_step ρ _) δ => trace_extend (get_underlying_fairness_trace M LSI LM ex') ρ (ls_under δ) *)
-  (* | trace_extend ex' _ _ => get_underlying_fairness_trace M LSI LM ex' *)
   | trace_extend ex' None δ =>
       let u' := get_underlying_fairness_trace ex' in
       trace_extend u' None δ
@@ -889,14 +705,6 @@ Section finitary_simple.
     | _, _ => True
     end.
 
-  (* (* TODO: move*) *)
-  (* Lemma underlying_trace_last {A A' L L' : Type} (sf : A → A') (lf : L → L') *)
-  (*   (tr : finite_trace A L): *)
-  (*   trace_last (trace_map sf lf tr) = sf (trace_last tr). *)
-  (* Proof. *)
-  (*   get_underlying_fairness_trace *)
-  (*   by destruct tr. Qed. *)
-
   Lemma valid_state_evolution_finitary_fairness_simple
           {LF: LMFairPre LM}
     (φ: execution_trace Λ -> auxiliary_trace (fair_model_model LM_Fair) -> Prop)
@@ -921,7 +729,7 @@ Section finitary_simple.
     (* rewrite trace_map_last.  *)
     red in H. destruct H as (?&?&?). red in H1.
     destruct l0; simpl in H1; intuition.
-    (* TODO: move *) 
+    (* TODO: extract to a lemma *) 
     assert (forall tr, trace_last (get_underlying_fairness_trace tr) = ls_under (trace_last tr)) as UNDER_LAST.
     { clear. destruct tr; try done. simpl.
       (* inversion VALID. *)
@@ -929,12 +737,6 @@ Section finitary_simple.
       2: { done. }
       destruct next_TS_role; done. }
       
-    (*   destruct next_TS_role eqn:N; [done| ]. *)
-    (*   eapply next_TS_spec_inv_S in N. *)
-    (*   2: { by rewrite H2. } *)
-    (*   simpl in N. repeat apply proj2 in N. rewrite -N. *)
-    (*   simpl. done. } *)
-     
     destruct (next_TS_role (trace_last f0) l0 a0) eqn:N.
     - apply next_TS_spec_pos in N. left.
       rewrite UNDER_LAST. apply N. 

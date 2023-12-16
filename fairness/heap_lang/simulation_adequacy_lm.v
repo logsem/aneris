@@ -1,16 +1,8 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils fuel_ext lm_fair lm_fair_traces lm_fairness_preservation traces_match.
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils lm_fair lm_fair_traces lm_fairness_preservation traces_match.
 From trillium.fairness.heap_lang Require Import lang simulation_adequacy em_lm_heap_lang em_lm.
 
 
-(* TODO: move *)
-Lemma initial_ls'_mapping  `{Countable G} `{LM : LiveModel G M LSI} s0 g LSI0:
-  ls_mapping (initial_ls' s0 g LSI0 (LM := LM)) = gset_to_gmap g (live_roles M s0).
-Proof.
-  rewrite /initial_ls'. erewrite build_LS_ext_spec_mapping; [reflexivity| ].
-  apply maps_inverse_match_exact. 
-Qed. 
-  
 
 Section adequacy.
 (* Local Hint Resolve tid_step_tp_length_heap: core. *)

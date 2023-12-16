@@ -40,23 +40,6 @@ Section destuttering_auxtr.
   Definition Ψ (δ: LiveState G M LSI) :=
     size δ.(ls_fuel) + [^ Nat.add map] ρ ↦ f ∈ δ.(ls_fuel (G := G)), f.
 
-  (* TODO: move *)
-  Ltac unfold_LMF_trans T :=
-    match type of T with
-    | locale_trans ?δ1 ?l ?δ2 =>
-        destruct (next_TS_role δ1 l δ2) eqn:N;
-        [pose proof N as ?STEP%next_TS_spec_pos|
-         pose proof N as ?STEP%next_TS_spec_inv_S; [| by eauto]] 
-    end.
-
-  (* TODO: move *)
-  Ltac unfold_LMF_trans' T :=
-    match type of T with
-    | fmtrans LM_Fair ?δ1 ?l ?δ2 =>
-        simpl in T; destruct l as [l| ]; [| done];
-        unfold_LMF_trans' T
-    end.
-
 
   Lemma fuel_dec_unless_lm_step δ τ δ'
     (* (Htrans : lm_ls_trans LM δ ℓ δ') *)
@@ -394,7 +377,8 @@ Section upto_stutter_preserves_fairness_and_termination.
     
     eapply upto_stutter_step_correspondence in PROP; eauto. 
     - destruct PROP as (m & atr_m & si & stepi & AFTERm & B0 & Pi & UPTO').
-      exists m. rewrite (plus_n_O m) pred_at_sum AFTERm.
+      exists m. rewrite (plus_n_O m). repeat rewrite pred_at_sum AFTERm.
+      apply pred_at_or. 
       eapply pred_at_trace_lookup'.
       do 2 eexists. split; [eauto| ].
       pattern si. pattern stepi. apply Pi. 
@@ -464,7 +448,7 @@ Section upto_stutter_preserves_fairness_and_termination.
     
     exists m. rewrite !(pred_at_sum _ n) Heq //.
     rewrite /fairness_sat. 
-    rewrite -pred_at_or in Hres.
+    rewrite pred_at_or in Hres.
     eapply pred_at_iff; [| apply Hres].
     intros. simpl. apply Morphisms_Prop.or_iff_morphism.
     - apply not_iff_compat. rewrite {1}/role_enabled_model. simpl. set_solver.

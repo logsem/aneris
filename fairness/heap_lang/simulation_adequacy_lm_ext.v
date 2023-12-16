@@ -1,31 +1,9 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils fuel_ext lm_fair lm_fairness_preservation fair_termination trace_len lemmas.
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils lm_fair lm_fairness_preservation fair_termination trace_len lemmas.
 From trillium.fairness.heap_lang Require Import simulation_adequacy_lm.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext.
 From trillium.fairness Require Import trace_lookup.
-
-
-(* TODO: move, unify? *)
-Lemma upto_stutter_terminating_trace:
-  ∀ {St S' L L' : Type} (Us : St → S') (Usls : St → L → St → option L') 
-    (tr1 : trace St L) (tr2 : trace S' L'),
-    upto_stutter Us Usls tr1 tr2 → terminating_trace tr1 → terminating_trace tr2.
-Proof.
-  From Paco Require Import paco1 paco2 pacotac.
-  intros.
-  pose proof (trace_has_len tr1) as [? LEN].
-  eapply terminating_trace_equiv in H0 as [n ?]; eauto. subst.
-  destruct n.
-  { edestruct @trace_len_0_inv; eauto. }
-  pose proof (proj2 (LEN n) ltac:(simpl; lia)) as [atr1 AFTER].
-  destruct atr1.
-  2: { apply after_S_tr_cons in AFTER.
-       apply mk_is_Some, LEN in AFTER. 
-       simpl in AFTER. lia. }
-  eapply upto_stutter_after' in H as (m & atr2 & AFTER2 & UPTO'); eauto.
-  punfold UPTO'; [| apply upto_stutter_mono]. inversion UPTO'. subst.
-  exists (S m). rewrite -Nat.add_1_r after_sum' AFTER2. done.
-Qed. 
+From Paco Require Import paco1 paco2 pacotac.
 
 
 Section adequacy_general.
@@ -89,16 +67,12 @@ Section adequacy_general.
     exists (S i). do 3 eexists. eauto.
   Qed. 
           
-              
-  (* TODO: move? *)
   Lemma upto_stutter_ext_bounded (eauxtr: elmftrace) emtr
     (EXT_FIN: ext_trans_bounded eauxtr)
     (Hupto: upto_stutter_eauxtr proj_ext eauxtr emtr)
     (VALID: emtrace_valid eauxtr):
     ext_trans_bounded emtr.
   Proof.
-    (* clear PROJ_EXT.  *)
-    (* red. red. *)
     do 2 red in EXT_FIN. destruct EXT_FIN as [n EXT_FIN].
     destruct (infinite_or_finite eauxtr) as [INF| FIN]. 
     2: { eapply fin_trans_bounded. eapply upto_stutter_terminating_trace; eauto. }

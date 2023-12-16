@@ -544,12 +544,15 @@ Section finite_range_gmap.
       rewrite insert_union_singleton_l. set_solver.
   Qed.
 
+  Definition enum_range_prop D (lr : list A) :=
+    fun (m: gmap K A) => dom m = D ∧ map_Forall (λ _ v, v ∈ lr) m. 
+    
   Local Instance proof_irrel_range_P D (lr : list A) (m: gmap K A):
-    ProofIrrel (dom m = D ∧ map_Forall (λ _ v, v ∈ lr) m).
+    ProofIrrel (enum_range_prop D lr m).
   Proof. apply make_proof_irrel. Qed.
 
   Lemma bounded_range_maps_finite (D: gset K) (lr: list A):
-    Finite { m : gmap K A | dom m = D ∧ map_Forall (λ _ v, v ∈ lr) m}.
+    Finite { m : gmap K A | enum_range_prop D lr m}.
   Proof.
     apply (in_list_finite (enumerate_range_gmaps (elements D) lr)).
     intros **. by eapply enumerate_range_gmaps_spec.
@@ -559,21 +562,24 @@ Section finite_range_gmap.
     enumerate_range_gmaps (elements D) lr.
 
   Lemma enum_gmap_range_bounded_spec D m (lr : list A):
-    dom m = D ∧ map_Forall (λ (_ : K) (v : A), v ∈ lr) m → m ∈ enum_gmap_range_bounded D lr.
+    enum_range_prop D lr m → m ∈ enum_gmap_range_bounded D lr.
   Proof.
     intros **. unfold enum_gmap_range_bounded. eapply enumerate_range_gmaps_spec; done.
   Qed.
 
   Lemma enum_gmap_range_dom lr D:
-    Forall (λ m, dom m = D) (enum_gmap_range_bounded D lr).
+    Forall (enum_range_prop D lr) (enum_gmap_range_bounded D lr).
   Proof.
     assert (Hok: forall l D,
-      elements D ≡ₚ l -> Forall (λ m, dom m = D) (enumerate_range_gmaps l lr)
+      elements D ≡ₚ l -> Forall (enum_range_prop D lr) (enumerate_range_gmaps l lr)
     ); last first.
     { rewrite Forall_forall. setoid_rewrite Forall_forall in Hok. by apply Hok. }
     induction l.
     { intros ? Hp. eapply list.Permutation_nil_r in Hp. eauto. apply elements_empty_inv in Hp.
-      rewrite leibniz_equiv_iff in Hp. rewrite Hp. simpl. by rewrite Forall_singleton, dom_empty_L. }
+      rewrite leibniz_equiv_iff in Hp. rewrite Hp. simpl.
+      rewrite Forall_singleton. split.
+      - set_solver.
+      - apply map_Forall_empty. }
     clear D. intros D Hel. simpl. rewrite Forall_forall. intros m Hin.
     apply elem_of_list_bind in Hin as (m'&Hin&Hin').
 
@@ -585,20 +591,22 @@ Section finite_range_gmap.
       apply NoDup_elements. }
 
     apply Permutation_cons_inv in Hel; eauto.
-    setoid_rewrite Forall_forall in IHl. specialize (IHl (list_to_set l) Hel _ Hin').
+    setoid_rewrite Forall_forall in IHl. specialize (IHl (list_to_set l) Hel _ Hin') as [DOM CODOM]. 
 
     rewrite H.
-    apply elem_of_list_bind in Hin as (?&Hfin&Hseq).
+    apply elem_of_list_bind in Hin as (?&Hfin&Hseq).    
     apply elem_of_list_singleton in Hfin as ->.
-    rewrite dom_insert_L, IHl. done.
+    split. 
+    - rewrite dom_insert_L, DOM. done.
+    - eapply map_Forall_insert_2; eauto. 
   Qed.
 
   Definition enum_gmap_range_bounded' (D: gset K) (lr : list A):
-    list { m : (gmap K A) | dom m = D }
+    list { m : (gmap K A) | enum_range_prop D lr m }
     := Forall_to_sig _ (enum_gmap_range_dom lr D).
 
   Lemma enum_gmap_range_bounded'_spec lr D m Hdom:
-    dom m = D ∧ map_Forall (λ (_ : K) (v : A), v ∈ lr) m → m ↾ Hdom ∈ enum_gmap_range_bounded' D lr.
+    enum_range_prop D lr m → m ↾ Hdom ∈ enum_gmap_range_bounded' D lr.
   Proof.
     intros * H. apply enum_gmap_range_bounded_spec,
                 (elem_of_Forall_to_sig_2 _ (enum_gmap_range_dom lr D)) in H as [Hdom' ?].

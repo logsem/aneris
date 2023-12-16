@@ -345,13 +345,13 @@ Section SpinlockRA.
 
 End SpinlockRA.
 
-(* TODO: generalize to any LSI_True model *)
-Instance sl_model_inh: Inhabited (lm_ls spinlock_model).
-Proof. 
-  pose proof (fmrole_inhabited spinlock_model_impl) as [ρ].
-  pose proof (fmstate_inhabited spinlock_model_impl) as [s].
-  eapply populate, (initial_ls' s ρ). done.
-Qed.     
+(* (* TODO: generalize to any LSI_True model *) *)
+(* Instance sl_model_inh: Inhabited (lm_ls spinlock_model). *)
+(* Proof.  *)
+(*   pose proof (fmrole_inhabited spinlock_model_impl) as [ρ]. *)
+(*   pose proof (fmstate_inhabited spinlock_model_impl) as [s]. *)
+(*   eapply populate, (initial_ls' s ρ). done. *)
+(* Qed.      *)
 
 Lemma state_unlocked_alt s:
   state_unlocked s <-> Forall (fun v => v = 0 ∨ v ≥ 2) s.

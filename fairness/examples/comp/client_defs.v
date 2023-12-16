@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fuel_ext resources.
+From trillium.fairness Require Import resources.
 From trillium.fairness.heap_lang Require Import notation.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
@@ -156,60 +156,6 @@ Section ClientDefs.
       solve_decision.       
     - intros. eapply client_lr_spec; eauto. 
   Defined.
-
-  (* TODO: move *)
-  Lemma set_filter_equiv:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
-    {H5 : Elements A C} {EqDecision0 : EqDecision A}
-    {LL: LeibnizEquiv C}
-    {FS: FinSet A C}
-    (P1 P2 : A → Prop)
-    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
-    (P_EQ: forall x, P1 x <-> P2 x)
-    (c1 c2: C)
-    (EQUIV: c1 ≡ c2)
-    ,
-    filter P1 c1 = filter P2 c2.
-  Proof. set_solver. Qed.
-
-  (* TODO: move *)
-  Lemma set_filter_and:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
-    {H5 : Elements A C} {EqDecision0 : EqDecision A}
-    {LL: LeibnizEquiv C}
-    {FS: FinSet A C}
-    (P1 P2 : A → Prop)
-    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
-    (c: C)
-    ,
-    filter P1 (filter P2 c) = filter (fun x => P1 x /\ P2 x) c.
-  Proof. set_solver. Qed. 
-
-  (* TODO: move *)
-  Lemma set_filter_comm:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
-    {H5 : Elements A C} {EqDecision0 : EqDecision A}
-    {LL: LeibnizEquiv C}
-    {FS: FinSet A C}
-    (P1 P2 : A → Prop)
-    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
-    (c: C)
-    ,
-    filter P1 (filter P2 c) = filter P2 (filter P1 c). 
-  Proof. set_solver. Qed. 
-
-  (* TODO: move *)
-  Lemma filter_singleton_if:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
-    {H5 : Elements A C} {EqDecision0 : EqDecision A},
-    FinSet A C
-    → ∀ (P : A → Prop) {H7 : ∀ x : A, Decision (P x)} (x : A),
-        filter P ({[x]} : C) ≡ if decide (P x) then {[x]} else ∅.
-  Proof. intros. destruct decide; set_solver. Qed. 
 
   Lemma live_roles_1 lb:
     live_roles client_model_impl (lb, 1) =

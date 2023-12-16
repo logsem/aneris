@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness.ext_models Require Import ext_models. 
-From trillium.fairness Require Import lm_fair fuel_ext.
+From trillium.fairness Require Import lm_fair.
 From trillium.fairness.examples.comp Require Import lib. 
 
 Close Scope Z_scope.
@@ -119,11 +119,6 @@ Section ExtModelLM.
 
   Definition lib_lm_projEI (_: lib_lm_EI) := (tt: lib_EI).
 
-  (* TODO: remove duplicate, move to utils *)
-  Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
-    (exists t, A /\ B t) <-> A /\ exists t, B t.
-  Proof. split; intros (?&?&?); eauto. Qed.
-
   Lemma lib_lm_active_exts_spec:
     ∀ δ ι, ι ∈ lib_lm_active_exts δ ↔ (∃ δ' : lf, lib_lm_ETs ι δ δ'). 
   Proof using.
@@ -204,7 +199,6 @@ Section ExtModelLM.
       apply NIN. apply elem_of_dom. set_solver.
   Qed.
 
-  (* TODO: move, generalize over group role?  *)
   Lemma lib_reset_premise lb (STOP: lm_is_stopped ρlg lb) (IN: ρlg ∈ gs):
     lib_ls_premise gs (reset_lm_st ρlg lb IN).
   Proof. 

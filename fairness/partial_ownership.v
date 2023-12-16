@@ -269,14 +269,3 @@ Section AuxDefs.
 
 End AuxDefs.
 
-Definition LSI_True `{Countable G} {M: FairModel}:
-  M → @groups_map G M _ _ → @fuel_map M → Prop :=
-  fun _ _ _ => True.
-
-
-(* TODO: move to upstream *)
-Lemma disjoint_subseteq:
-  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C}
-    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C},
-    `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
-Proof. intros. set_solver. Qed.

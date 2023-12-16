@@ -1,6 +1,7 @@
 From trillium.program_logic Require Export adequacy.
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
+From trillium.fairness Require Export lemmas.
 
 Require Import
         Coq.Relations.Relation_Definitions
@@ -130,6 +131,48 @@ Section traces.
       rewrite /pred_at. destruct tr; eauto.
     Qed.
 
+    Lemma pred_at_dec (P: St → option L → Prop)
+      (DEC: forall st ro, Decision (P st ro)):
+      forall tr i, Decision (pred_at tr i P).
+    Proof using.
+      intros tr i. unfold pred_at.
+      destruct (after i tr); [destruct t| ]; auto.
+      solve_decision.
+    Qed.
+    
+    Lemma pred_at_or
+      P1 P2 (tr: trace St L) i: 
+      pred_at tr i P1 \/ pred_at tr i P2 <-> pred_at tr i (fun x y => P1 x y \/ P2 x y).
+    Proof using.
+      unfold pred_at. destruct (after i tr); [destruct t| ]; tauto.
+    Qed.
+    
+    Lemma pred_at_ex {T: Type} (P : T -> St → option L → Prop) tr n:
+      pred_at tr n (fun s ol => exists t, P t s ol) <-> exists t, pred_at tr n (P t).
+    Proof.
+      rewrite /pred_at. destruct after.
+      2: { intuition. by destruct H. }
+      destruct t; eauto.
+    Qed.
+    
+    Lemma pred_at_impl (P Q: St -> option L -> Prop)
+      (IMPL: forall s ol, P s ol -> Q s ol):
+      forall tr i, pred_at tr i P -> pred_at tr i Q.
+    Proof.
+      rewrite /pred_at. intros. 
+      destruct after; intuition; destruct t.
+      all: by apply IMPL.
+    Qed.
+
+    Lemma pred_at_iff (P Q: St -> option L -> Prop)
+      (IFF: forall s ol, P s ol <-> Q s ol):
+      forall tr i, pred_at tr i P <-> pred_at tr i Q.
+    Proof.
+      intros. rewrite /pred_at.
+      destruct after; intuition; destruct t.
+      all: by apply IFF.
+    Qed.
+
     Definition infinite_trace tr :=
       forall n, is_Some (after n tr).
 
@@ -164,6 +207,15 @@ Section traces.
       rewrite /terminating_trace /infinite_trace. split.
       - intros [n A]. intros A'. specialize (A' n). rewrite A in A'. by destruct A'.
       - intros [n A%eq_None_not_Some]%not_forall_exists_not. eexists; eauto.
+    Qed. 
+
+    Lemma terminating_trace_after (tr atr: trace St L) i
+      (AFTER: after i tr = Some atr)
+      (FIN_ATR: terminating_trace atr):
+      terminating_trace tr.
+    Proof.
+      destruct FIN_ATR as [n FIN].
+      exists (i + n). by rewrite after_sum' AFTER.
     Qed. 
 
   End after.
@@ -278,7 +330,6 @@ Section simulation.
     eapply IHn =>//.
   Qed.
 
-  (* TODO: move *)
   Lemma traces_match_valid1
     (tr1: trace S1 L1) (tr2: trace S2 L2):
     traces_match tr1 tr2 ->
@@ -292,7 +343,6 @@ Section simulation.
     eauto.   
   Qed.
   
-  (* TODO: move *)
   Lemma traces_match_valid2
     (tr1: trace S1 L1) (tr2: trace S2 L2):
     traces_match tr1 tr2 ->
@@ -570,6 +620,27 @@ Section destuttering.
         rewrite after_sum' in Hinf. simpl in *. done.
   Qed.
 
+  Lemma upto_stutter_terminating_trace:
+    ∀ (tr1 : trace St L) (tr2 : trace S' L'),
+      upto_stutter tr1 tr2 → terminating_trace tr1 → terminating_trace tr2.
+  Proof.
+    intros * UPTO TERM1.
+    red in TERM1. destruct TERM1 as [len'1 AFTER1].
+    pattern len'1 in AFTER1.
+    apply min_prop_dec in AFTER1 as [len1 [LEN1 MIN1]]; [| solve_decision]. clear len'1.
+    destruct len1.
+    { simpl in LEN1. done. }
+    destruct (after len1 tr1) eqn:A1.
+    2: { specialize (MIN1 _ A1). lia. }
+    rewrite -Nat.add_1_r after_sum' A1 in LEN1.
+    destruct t; [| done].
+    eapply upto_stutter_after' in A1; eauto.
+    destruct A1 as (?&?&?&UPTO').
+    punfold UPTO'. inversion UPTO'. subst.
+    exists (S x).
+    rewrite -Nat.add_1_r after_sum' H. done. 
+  Qed.  
+ 
   Program Fixpoint destutter_once_step N Ψ (btr: trace St L)
                    (* {DEC: forall ℓ' s1 ℓ s2, Decision (inner_step ℓ' s1 ℓ s2)} *)
     :

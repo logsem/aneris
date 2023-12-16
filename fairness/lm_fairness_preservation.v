@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup fuel_ext trace_lookup utils.
+From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup trace_lookup utils.
 
 
 Section fairness_preserved.
@@ -36,6 +36,28 @@ Section fairness_preserved.
   Context `(AM: AlmostLM). 
   
   Definition atrace := trace LS A.
+
+  Lemma am_transA_keep_fuel: forall δ1 a δ2 ρ f, 
+      transA δ1 a δ2 -> 
+      (forall g, am_lift_G g ≠ a) ->
+      ls_fuel δ1 !! ρ = Some f ->
+      ls_fuel δ2 !! ρ = Some f.
+  Proof. 
+    intros ????? TRANS NOa FUEL.
+    pose proof FUEL as [??]%mk_is_Some%ls_same_doms'.
+    eapply am_transA_keep_asg; eauto. 
+  Qed.
+
+  Lemma am_transA_keep_mapping: forall δ1 a δ2 ρ g, 
+      transA δ1 a δ2 -> 
+      (forall g, am_lift_G g ≠ a) ->
+      ls_mapping δ1 !! ρ = Some g ->
+      ls_mapping δ2 !! ρ = Some g.
+  Proof. 
+    intros ????? TRANS NOa MAP.
+    pose proof MAP as [??]%mk_is_Some%ls_same_doms'.
+    eapply am_transA_keep_asg; eauto. 
+  Qed.
 
   Lemma mapping_live_role (δ: LiveState G M LSI) ρ:
     ρ ∈ M.(live_roles) δ ->
@@ -130,21 +152,6 @@ Section fairness_preserved.
       rewrite /steps_or_unassigned. left.
       apply not_elem_of_dom in Heq. by rewrite -ls_same_doms in Heq. 
   Qed.    
-
-  (* TODO: move? *)
-  Instance locale_trans_exG_dec st1 st2:
-    Decision (exists τ, locale_trans st1 τ st2 (LM := LM)).
-  Proof.
-    apply ex_fin_dec with (l := elements (dom (ls_tmap st1))).
-    { solve_decision. }
-    intros g STEP. apply elem_of_list_In, elem_of_elements, elem_of_dom. 
-    destruct STEP as (ℓ&STEP&MATCH).
-    destruct ℓ; simpl in MATCH; try done; subst g0.
-    - apply proj2, proj1 in STEP.
-      apply (ls_mapping_tmap_corr) in STEP as (?&?&?). eauto.
-    - apply proj1 in STEP. destruct STEP as (?&STEP).
-      apply (ls_mapping_tmap_corr) in STEP as (?&?&?). eauto.
-  Qed.
 
   Lemma fairness_preserved_ind ρ:
     ∀ fm f m τ (auxtr: atrace) δ,
@@ -422,27 +429,6 @@ Proof.
     + left. eauto.
     + right. by intros [? [=]].  
 Defined.
-
-(* TODO: move *)
-Global Instance fair_by_gen_Proper {S L T: Type}:
-  Proper
-    ((eq ==> eq ==> iff) ==> (eq ==> eq ==> eq ==> iff) ==> eq ==> eq ==> iff) 
-    (@fair_by_gen S L T).
-Proof.
-  intros ?? LOC_IFF ?? STEP_IFF.
-  red. intros ?? ->. red. intros ?? ->.
-  rewrite /fair_by_gen.
-  apply forall_proper. intros.
-  erewrite pred_at_iff.
-  2: { intros. eapply LOC_IFF; reflexivity. }
-  apply Morphisms_Prop.iff_iff_iff_impl_morphism; [reflexivity| ].
-  repeat (apply exist_proper; intros).
-  apply Morphisms_Prop.and_iff_morphism; [done| ].
-  rewrite /fairness_sat_gen. 
-  apply Morphisms_Prop.or_iff_morphism.
-  - apply not_iff_compat, LOC_IFF; reflexivity.
-  - apply STEP_IFF; reflexivity. 
-Qed. 
 
 Lemma LM_ALM_afair_by_next `{Countable G} `(LM: LiveModel G M LSI) {LF: LMFairPre LM} auxtr:
   (∀ ρ, afair_by_next_TS (LM_ALM LM) ρ auxtr) <-> ∀ ρ, fair_by_next_TS ρ auxtr.

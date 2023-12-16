@@ -1,7 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import execution_model.
-From trillium.fairness Require Import fairness fuel fuel_ext. 
+From trillium.fairness Require Import fairness fuel. 
 From trillium.fairness Require Import partial_ownership.
 
 

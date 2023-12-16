@@ -1,18 +1,191 @@
 From iris.algebra Require Import gmap gset.
 From iris.proofmode Require Import tactics.
+From trillium.prelude Require Import quantifiers finitary.
+(* From stdpp Require Import finitary. *)
 
 (* TODO: move these lemmas to appropriate places *)
 
-Lemma gmap_disj_op_union:
-  ∀ {K : Type} {EqDecision0 : EqDecision K} 
-    {H : Countable K} {A : cmra} (m1 m2 : gmap K A),
-    map_disjoint m1 m2 -> m1 ⋅ m2 = m1 ∪ m2. 
-Proof using. 
-  intros. apply map_eq. intros.
-  rewrite lookup_op lookup_union.
-  destruct (m1 !! i) eqn:L1, (m2 !! i) eqn:L2; try done.
-  eapply map_disjoint_spec in H0; done.
-Qed.     
+Section gmap.
+  Context `{!EqDecision K, !Countable K}.
+
+  Definition max_gmap (m: gmap K nat) : nat :=
+    map_fold (λ k v r, v `max` r) 0 m.
+
+  Lemma max_gmap_spec m:
+    map_Forall (λ _ v, v <= max_gmap m) m.
+  Proof.
+    induction m using map_ind; first done.
+    apply map_Forall_insert =>//. rewrite /max_gmap map_fold_insert //.
+    - split; first lia. intros ?? Hnotin. specialize (IHm _ _ Hnotin). simpl in IHm.
+      unfold max_gmap in IHm. lia.
+    - intros **. lia.
+  Qed.
+
+  Lemma gmap_disj_op_union:
+    ∀ {A : cmra} (m1 m2 : gmap K A),
+      map_disjoint m1 m2 -> m1 ⋅ m2 = m1 ∪ m2. 
+  Proof using. 
+    intros. apply map_eq. intros.
+    rewrite lookup_op lookup_union.
+    destruct (m1 !! i) eqn:L1, (m2 !! i) eqn:L2; try done.
+    eapply map_disjoint_spec in H; done.
+  Qed.
+
+End gmap.
+
+(* TODO: upstream*)
+Lemma map_img_insert_L :
+  ∀ {K : Type} {M : Type → Type} {H : FMap M} {H0 : ∀ A : Type, Lookup K A (M A)} 
+    {H1 : ∀ A : Type, Empty (M A)} {H2 : ∀ A : Type, PartialAlter K A (M A)} 
+    {H3 : OMap M} {H4 : Merge M} {H5 : ∀ A : Type, FinMapToList K A (M A)} 
+    {EqDecision0 : EqDecision K}
+  ,
+    FinMap K M
+    → ∀ {A SA : Type} {H7 : ElemOf A SA} {H8 : Empty SA} 
+        {H9 : Singleton A SA} {H10 : Union SA} {H11 : Intersection SA} 
+        {H12 : Difference SA}
+        {LE: LeibnizEquiv SA}
+    ,
+      Set_ A SA
+      → ∀ (m : M A) (i : K) (x : A),
+        map_img (<[i:=x]> m) = ({[x]}: SA) ∪ map_img (delete i m).
+Proof.
+  intros. apply leibniz_equiv. apply map_img_insert. 
+Qed.  
+
+
+Section Disjoint.
+
+  Lemma disjoint_subseteq:
+    ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C}
+      {H2 : Union C} {H3 : Intersection C} {H4 : Difference C},
+      `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
+  Proof. intros. set_solver. Qed.
+
+End Disjoint.
+
+Section SetMapProperties.
+  
+  Lemma set_map_compose_gset {A1 A2 A3: Type}
+    `{EqDecision A1} `{EqDecision A2} `{EqDecision A3}
+    `{Countable A1} `{Countable A2} `{Countable A3}
+    (f: A2 -> A3) (g: A1 -> A2) (m: gset A1):
+    set_map (f ∘ g) m (D:=gset _) = set_map f (set_map g m (D:= gset _)).
+  Proof using.
+    set_solver. 
+  Qed. 
+  
+  Lemma elem_of_map_inj_gset {A B} 
+    `{EqDecision A} `{Countable A}
+    `{EqDecision B} `{Countable B}
+    (f: A -> B) (m: gset A) (a: A) (INJ: injective f):
+    a ∈ m <-> f a ∈ set_map f m (D := gset _).
+  Proof using.
+    split; [apply elem_of_map_2| ].
+    intros IN. apply elem_of_map_1 in IN as (a' & EQ & IN).
+    apply INJ in EQ. congruence. 
+  Qed.
+    
+End SetMapProperties.
+
+
+(* TODO: find existing? *)
+Section LogicHelpers.
+
+  Lemma ex2_comm {A B: Type} (P: A -> B -> Prop):
+    (exists (a: A) (b: B), P a b) <-> (exists (b: B) (a: A), P a b).
+  Proof. 
+    split; intros (?&?&?); eauto. 
+  Qed. 
+
+  Lemma iff_and_impl_helper {A B: Prop} (AB: A -> B):
+    A /\ B <-> A.
+  Proof. tauto. Qed.     
+
+  Lemma iff_True_helper {A: Prop}:
+    (A <-> True) <-> A.
+  Proof. tauto. Qed.     
+
+  Lemma iff_False_helper {A: Prop}:
+    (A <-> False) <-> ¬ A.
+  Proof. tauto. Qed.
+
+  Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
+    (exists t, A /\ B t) <-> A /\ exists t, B t.
+  Proof. split; intros (?&?&?); eauto. Qed.
+
+  Lemma ex_det_iff {A: Type} (P: A -> Prop) a
+    (DET: forall a', P a' -> a' = a):
+    (exists a', P a') <-> P a.
+  Proof. 
+    split; [| by eauto].
+    intros [? ?]. erewrite <- DET; eauto.
+  Qed. 
+
+  Lemma iff_and_pre {A B C: Prop}
+    (BC: A -> (B <-> C)):
+    A /\ B <-> A /\ C.
+  Proof using. tauto. Qed.
+
+End LogicHelpers.
+
+
+Section Powerset.
+  Context {K: Type}.
+  Context `{Countable K}. 
+  
+  (* it's easier to perform recursion on lists *)
+  (* TODO: another name? *)
+  Fixpoint powerlist (l: list K): gset (gset K) :=
+    match l with
+    | [] => {[ ∅ ]}
+    | k :: l' => let p' := powerlist l' in
+                 p' ∪ (set_map (fun s => {[ k ]} ∪ s) p')
+    end. 
+  
+  Definition powerset (s: gset K): gset (gset K) :=
+    powerlist (elements s).
+    
+  Lemma powerlist_nil l:
+    ∅ ∈ powerlist l.
+  Proof. induction l; set_solver. Qed.
+
+  Instance powerlist_perm_Proper:
+    Proper (Permutation ==> eq) powerlist.
+  Proof.
+    induction 1; csimpl; auto; cycle -1.
+    1, 2: congruence. 
+    rewrite -!union_assoc_L. f_equal. 
+    rewrite !set_map_union_L.
+    rewrite !union_assoc_L. f_equal.
+    { set_solver. }
+    rewrite -!set_map_compose_gset. apply leibniz_equiv.
+    f_equiv. red. simpl. set_solver.
+  Qed.
+
+  Lemma powerset_spec s:
+    forall e, e ⊆ s <-> e ∈ powerset s. 
+  Proof. 
+    intros. rewrite /powerset.
+    revert e. pattern s. apply set_ind.
+    { intros ?? EQUIV. apply leibniz_equiv_iff in EQUIV. by rewrite EQUIV. }
+    { rewrite elements_empty. simpl.
+      setoid_rewrite elem_of_singleton.
+      intros. set_solver. }
+    clear s. intros k s NIN IND e.
+    rewrite elements_disj_union; [| set_solver].
+    rewrite elements_singleton. simpl.
+    rewrite !elem_of_union elem_of_map.
+    repeat setoid_rewrite <- IND.
+    erewrite ex_det_iff with (a := e ∖ {[ k ]}).
+    2: { set_solver. }
+    destruct (decide (k ∈ e)); set_solver. 
+  Qed.              
+          
+End Powerset.
+
+
+
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
 
@@ -26,6 +199,27 @@ Proof.
   apply elem_of_dom in Hin' as [??]. set_solver.
 Qed.
 
+(* TODO: generalize *)
+Lemma dom_filter_sub {K V: Type} `{Countable K} (m: gmap K V)
+  (ks: gset K):
+  dom (filter (λ '(k, _), k ∈ ks) m) ⊆ ks.
+Proof.
+  apply elem_of_subseteq.
+  intros ? IN. rewrite elem_of_dom in IN. destruct IN as [? IN].
+  apply map_filter_lookup_Some in IN. apply IN.
+Qed. 
+
+(* TODO: generalize, upstream *)
+Lemma dom_filter_comm {K A: Type} `{Countable K}
+  (P: K -> Prop) `{∀ x : K, Decision (P x)}:
+  forall (m: gmap K A), dom (filter (fun '(k, _) => P k) m) = filter P (dom m).
+Proof.
+  intros. apply leibniz_equiv. apply dom_filter. intros.
+  rewrite elem_of_filter elem_of_dom.
+  rewrite /is_Some. split; [intros [?[??]] | intros [? [??]]]; eauto.
+Qed.
+
+
 Lemma dom_domain_restrict_union_l `{Countable X} {A} (f: gmap X A) R1 R2:
   R1 ∪ R2 ⊆ dom f ->
   dom (f ⇂ R1) = R1.
@@ -38,6 +232,54 @@ Lemma dom_domain_restrict_union_r `{Countable X} {A} (f: gmap X A) R1 R2:
 Proof.
   intros ?. apply dom_domain_restrict. set_solver.
 Qed.
+
+Lemma set_filter_equiv:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A}
+    {LL: LeibnizEquiv C}
+    {FS: FinSet A C}
+    (P1 P2 : A → Prop)
+    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
+    (P_EQ: forall x, P1 x <-> P2 x)
+    (c1 c2: C)
+    (EQUIV: c1 ≡ c2),
+    filter P1 c1 = filter P2 c2.
+Proof. set_solver. Qed.
+
+Lemma set_filter_and:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A}
+    {LL: LeibnizEquiv C}
+    {FS: FinSet A C}
+    (P1 P2 : A → Prop)
+    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
+    (c: C),
+    filter P1 (filter P2 c) = filter (fun x => P1 x /\ P2 x) c.
+Proof. set_solver. Qed. 
+
+Lemma set_filter_comm:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A}
+    {LL: LeibnizEquiv C}
+    {FS: FinSet A C}
+    (P1 P2 : A → Prop)
+    (DEC1: ∀ x : A, Decision (P1 x)) (DEC2: ∀ x : A, Decision (P2 x))
+    (c: C),
+    filter P1 (filter P2 c) = filter P2 (filter P1 c). 
+Proof. set_solver. Qed. 
+
+Lemma filter_singleton_if:
+  ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} 
+    {H2 : Union C} {H3 : Intersection C} {H4 : Difference C} 
+    {H5 : Elements A C} {EqDecision0 : EqDecision A},
+    FinSet A C
+    → ∀ (P : A → Prop) {H7 : ∀ x : A, Decision (P x)} (x : A),
+        filter P ({[x]} : C) ≡ if decide (P x) then {[x]} else ∅.
+Proof. intros. destruct decide; set_solver. Qed. 
+
 
 Section bigop_utils.
   Context `{Monoid M o}.
@@ -174,6 +416,37 @@ Section map_utils.
     apply elem_of_dom. set_solver.
   Qed. 
 
+  Lemma mim_lookup_helper
+    (tm: gmap V (gset K)) (m: gmap K V)
+    R ζ
+    (MIM: maps_inverse_match m tm)
+    (NE: R ≠ ∅)
+    (DOM: ∀ ρ, m !! ρ = Some ζ ↔ ρ ∈ R):
+    tm !! ζ = Some R.
+  Proof. 
+    apply finitary.set_choose_L' in NE as [k INR].
+    pose proof (proj2 (DOM k) INR) as MAP.
+    red in MIM. specialize MIM with (v := ζ). 
+    pose proof (proj1 (MIM _ ) MAP) as (R' & TM' & IN').
+    rewrite TM'. f_equal.
+    apply set_eq. clear dependent k. intros k.
+    rewrite <- DOM. rewrite TM' in MIM. split.
+    - intros IN'. apply MIM. eauto.
+    - intros ?%MIM. set_solver.
+  Qed. 
+
+  Lemma mim_neg m tm
+    (MIM: maps_inverse_match m tm):
+    ∀ (k: K), m !! k = None <-> forall g, k ∉ default ∅ (tm !! g).
+  Proof. 
+    intros. red in MIM. specialize (MIM k). split.
+    - intros MAP. intros g IN.
+      destruct (tm !! g) eqn:TM; set_solver.
+    - intros NIN. destruct (m !! k) eqn:MAP; [| done].
+      pose proof (proj1 (MIM v) eq_refl) as (?&?&?).
+      specialize (NIN v). rewrite H1 in NIN. set_solver.
+  Qed. 
+
 End map_utils.
 
 Section fin_map_dom.
@@ -306,4 +579,26 @@ Section FlattenGset.
     set_solver.
   Qed.
 
+  Lemma flatten_gset_union (S1 S2: gset (gset K)):
+    flatten_gset (S1 ∪ S2) = flatten_gset S1 ∪ flatten_gset S2.
+  Proof.
+    rewrite /flatten_gset. set_solver.
+  Qed. 
+
+  Lemma flatten_gset_singleton (S: gset K):
+    flatten_gset {[ S ]} = S. 
+  Proof.
+    rewrite /flatten_gset. rewrite elements_singleton. set_solver. 
+  Qed. 
+
 End FlattenGset.
+
+
+(* Ltac forward_gen H tac := *)
+(*   match type of H with *)
+(*   | ?X -> _ => let H' := fresh in assert (H':X) ; [tac|specialize (H H'); clear H'] *)
+(*   end. *)
+
+(* Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac). *)
+(* Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac. *)
+

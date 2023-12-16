@@ -6,10 +6,7 @@ Section aux_trace.
   Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}. 
 
-  (* Definition auxtrace := trace LM.(lm_ls) LM.(lm_lbl). *)
   Definition lmftrace := mtrace LM_Fair.
-  (* Definition foo := trace (mstate LM) (option G).  *)
-  (* Goal forall (t1: lmftrace) (t2: foo), t1 = t2.  *)  
 
   Definition role_enabled ρ (δ: LiveState G M LSI) := ρ ∈ M.(live_roles) δ.
 
@@ -83,39 +80,25 @@ Section aux_trace.
                          
   Definition fair_by_next_TS: fmrole M -> lmftrace -> Prop :=
     fair_by_gen role_enabled step_by_next_TS. 
-  
-  (* CoInductive auxtrace_valid: auxtrace -> Prop := *)
-  (* | auxtrace_valid_singleton δ: auxtrace_valid ⟨δ⟩ *)
-  (* | auxtrace_valid_cons δ ℓ tr: *)
-  (*     LM.(lm_ls_trans) δ ℓ (trfirst tr) -> *)
-  (*     auxtrace_valid tr → *)
-  (*     auxtrace_valid (δ -[ℓ]-> tr). *)
-
-  (* Lemma auxtrace_valid_forall (tr: auxtrace) : *)
-  (*   auxtrace_valid tr -> *)
-  (*   ∀ n, match after n tr with *)
-  (*        | Some ⟨ _ ⟩ | None => True *)
-  (*        | Some (δ -[ℓ]-> tr') => LM.(lm_ls_trans) δ ℓ (trfirst tr') *)
-  (*        end. *)
-  (* Proof. *)
-  (*   intros Hval n. revert tr Hval. induction n as [|n]; intros tr Hval; *)
-  (*     destruct (after _ tr) as [trn|] eqn: Heq =>//; simpl in Heq; *)
-  (*     simplify_eq; destruct trn =>//; inversion Hval; simplify_eq; try done. *)
-  (*   specialize (IHn _ H1) (* TODO *). rewrite Heq in IHn. done. *)
-  (* Qed. *)
-
-  (* Lemma auxtrace_valid_after (tr: auxtrace): *)
-  (*   auxtrace_valid tr -> *)
-  (*   forall n atr, after n tr = Some atr -> auxtrace_valid atr. *)
-  (* Proof.  *)
-  (*   intros VALID n. generalize dependent tr. induction n. *)
-  (*   { intros. rewrite after_0_id in H0. congruence. }   *)
-  (*   intros. inversion VALID; subst.  *)
-  (*   { done. } *)
-  (*   simpl in H0. eauto. *)
-  (* Qed.  *)
-    
+      
 End aux_trace.
+
+Ltac unfold_LMF_trans T :=
+  match type of T with
+  | locale_trans ?δ1 ?l ?δ2 =>
+      destruct (next_TS_role δ1 l δ2) eqn:N;
+      [pose proof N as ?STEP%next_TS_spec_pos|
+        pose proof N as ?STEP%next_TS_spec_inv_S; [| by eauto]] 
+  end.
+
+Ltac unfold_LMF_trans' T :=
+  match type of T with
+  | fmtrans LM_Fair ?δ1 ?l ?δ2 =>
+      simpl in T; destruct l as [l| ]; [| done];
+      unfold_LMF_trans' T
+  end.
+
+
 
 
 Definition labels_match `{Countable G} `{LM: LiveModel G M LSI} (oζ : option G) (ℓ : LM.(lm_lbl)) : Prop :=
@@ -332,16 +315,6 @@ Section upto_stutter_preserves_fairness_and_termination.
   Context `{LM: LiveModel G M LSI}.
   Context {LF: LMFairPre LM}. 
 
-  (* Notation upto_stutter_aux := (upto_stutter (ls_under (LSI := LSI)) (Usls (LM := LM))). *)
-
-  (* Lemma upto_stutter_mono'' : (* TODO fix this proliferation *) *)
-  (*   monotone2 (upto_stutter_ind (ls_under (LSI := LSI)) (Usls (LM:=LM))). *)
-  (* Proof. *)
-  (*   unfold monotone2. intros x0 x1 r r' IN LE. *)
-  (*   induction IN; try (econstructor; eauto; done). *)
-  (* Qed. *)
-  (* Hint Resolve upto_stutter_mono' : paco. *)
-
   Lemma upto_stutter_step_correspondence (auxtr: lmftrace (LM := LM)) (mtr: mtrace M)
     (Po: lm_ls LM -> option (option G * lm_ls LM) -> Prop)
     (Pi: M -> option (option (fmrole M) * M) -> Prop)
@@ -421,19 +394,6 @@ Section upto_stutter_preserves_fairness_and_termination.
         specialize (IHn _ os ostep AFTER O0 A0). 
         destruct IHn as (m&?&?&?&?&?&?&?). 
         exists (S m). do 3 eexists. eauto. 
-  Qed.
-
-  (* TODO: move, rename *)
-  Lemma trace_lookup_after_weak {St L: Type} (tr: trace St L) s n:
-    (exists atr, after n tr = Some atr /\ trfirst atr = s) <-> exists ostep, tr !! n = Some (s, ostep). 
-  Proof. 
-    rewrite /lookup /trace_lookup.
-    destruct after.
-    2: { by split; [intros (?&?&?)| intros (?&?)]. }
-    transitivity (trfirst t = s).
-    { split; eauto. by intros (?&[=->]&?). }
-    destruct t; simpl; eauto.
-    all: split; [intros ->| intros (?&[=])]; eauto.
   Qed.
 
   Lemma upto_stutter_fairness_0 ρ (auxtr: lmftrace (LM := LM)) (mtr: mtrace M):
@@ -534,3 +494,4 @@ Definition lm_valid_evolution_step `{Countable (locale Λ)} `{LM:LiveModel (loca
     cfg Λ → olocale Λ → cfg Λ → 
     mstate LM → olocale Λ → mstate LM -> Prop := 
     (fun (_: cfg Λ) => valid_evolution_step).
+

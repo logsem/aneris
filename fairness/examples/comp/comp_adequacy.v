@@ -14,7 +14,7 @@ From trillium.fairness Require Import fairness_finiteness lm_lsi_top resources.
 
 Import derived_laws_later.bi.
 
-From trillium.fairness Require Import lm_fairness_preservation fuel_ext lm_fair lm_fair_traces fair_termination.
+From trillium.fairness Require Import lm_fairness_preservation lm_fair lm_fair_traces fair_termination.
 From trillium.fairness.ext_models Require Import destutter_ext ext_models.
 From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.examples.comp Require Import traces_equiv.
@@ -32,11 +32,6 @@ Instance client_trans'_PI s x:
                fmtrans client_model_impl s ℓ s' \/ (s' = s /\ ℓ = None)): Prop).
 Proof. apply make_proof_irrel. Qed.    
 
-(* (* The unpacked form used in *_pair lemmas is needed to apply in_list_finite. *)
-(*    TODO: is it possible to get rid of duplication? *) *)
-(* Instance client_trans'_PI_pair s x:  *)
-(*   ProofIrrel ((fmtrans client_model_impl s (snd x) (fst x) \/ (fst x = s /\ snd x = None)): Prop). *)
-(* Proof. apply make_proof_irrel. Qed.     *)
 
 Local Instance step'_eqdec: forall s1, EqDecision
                   {'(s2, ℓ) : client_model_impl *
@@ -48,44 +43,13 @@ Local Instance step'_eqdec: forall s1, EqDecision
   solve_decision. 
 Defined. 
   
-(* Local Instance step'_eqdec_pair: forall s1, EqDecision *)
-(*                   {s2_ℓ : client_model_impl * *)
-(*                               option (fmrole client_model_impl) |  *)
-(*                   fmtrans client_model_impl s1 (snd s2_ℓ) (fst s2_ℓ) ∨  *)
-(*                   (fst s2_ℓ) = s1 ∧ (snd s2_ℓ) = None}. *)
-(*   pose proof (fmstate_eqdec client_model_impl).
-  solve_decision.  *)
-(* Defined.  *)
-  
-(* Lemma client_model_finitary'_pair (s1 : fmstate client_model_impl): *)
-(*     Finite *)
-(*       {s2_ℓ : client_model_impl * option (fmrole client_model_impl) | *)
-(*       fmtrans client_model_impl s1 (snd s2_ℓ) (fst s2_ℓ) ∨ (fst s2_ℓ) = s1 ∧ (snd s2_ℓ) = None}. *)
-(* Proof. *)
-(*   (* set (l := [(s1, None: option (fmrole client_model_impl))]). *) *)
-(*   (* eapply bijective_finite.  *) *)
-(*   pose proof (@in_list_finite (client_model_impl * option (fmrole client_model_impl)) ltac:(solve_decision) (fun s2_ℓ => fmtrans client_model_impl s1 (snd s2_ℓ) (fst s2_ℓ) ∨ (fst s2_ℓ) = s1 ∧ (snd s2_ℓ) = None) ltac:(apply _) []). *)
-(*   simpl in X. simpl.  *)
-(*   apply X.  *)
-
-(* TODO: move *)
+(* TODO: move? *)
 Lemma lib_model_impl_fin (s1: fmstate lib_model_impl):
   {l: list (fmstate lib_model_impl) | forall s2 oρ, fmtrans lib_model_impl s1 oρ s2 -> s2 ∈ l}. 
 Proof.
   eapply (exist _ [0]). 
   intros ?? TRANS. inversion TRANS. subst. set_solver. 
 Qed.
-
-(* TODO: move *)
-Lemma locale_trans_fmtrans_or_eq `{Countable G} `{LM : LiveModel G M LSI} δ1 τ δ2
-  (LIB_STEP: locale_trans δ1 τ δ2 (LM := LM)):
-  (exists ρ, fmtrans M (ls_under δ1) (Some ρ) (ls_under δ2)) \/ (ls_under δ1 = ls_under δ2).
-Proof.
-  destruct LIB_STEP as (ℓ & LIB_STEP & MATCH).
-  destruct ℓ; simpl in *; try done; subst.
-  - left. eexists. apply LIB_STEP.
-  - tauto.
-Qed.   
 
 Lemma client_model_finitary (s1 : fmstate client_model_impl):
     Finite
@@ -347,23 +311,14 @@ Proof.
   apply (LIB_STEPS (S i)); eauto. 
 Qed.
 
-(* TODO: remove duplicate *)
-Lemma flatten_gset_singleton `{Countable K} (S: gset K):
-  flatten_gset {[ S ]} = S. 
-Proof.
-  rewrite /flatten_gset. rewrite elements_singleton. set_solver. 
-Qed. 
-
 (* TODO: abstract the nested LM state *)
 Local Instance inh_client: Inhabited (lm_ls client_model).
 Proof.
-  (* assert (Inhabited (lm_ls (lib_model lib_gs))) as [δ] by apply _. *)
   pose proof (lib_model_inh _ lib_gs_ne) as [δ].  
   assert (Inhabited (locale heap_lang)) as [τ] by apply _.
   apply populate.
   refine {| ls_under := (δ, 0): fmstate client_model_impl;
        ls_fuel := kmap (inl ∘ inl) (gset_to_gmap 0 (dom (ls_tmap δ))): gmap (fmrole client_model_impl) nat;
-       (* ls_mapping := kmap (inl ∘ inl) (gset_to_gmap τ (dom (ls_tmap δ))) *)
         ls_tmap := {[ τ := set_map (inl ∘ inl) (dom (ls_tmap δ)) ]}: gmap (locale heap_lang) (gset (fmrole client_model_impl))
          ;
     |}.
@@ -389,30 +344,6 @@ Proof.
   pose proof (@LS_eqdec _ _ _ _ _ _ (lib_LF _ lib_gs_ne)).
   solve_decision. 
 Defined.
-
-(*TODO: move*)
-Lemma ex2_comm {A B: Type} (P: A -> B -> Prop):
-  (exists (a: A) (b: B), P a b) <-> (exists (b: B) (a: A), P a b).
-Proof. 
-  split; intros (?&?&?); eauto. 
-Qed. 
-
-(* TODO: move *)
-Lemma mapped_roles_dom_fuels_gen `{Countable G} (M: FairModel) 
-  (tm: groups_map) (fm: fuel_map (M := M))
-  (DOMS:    
-      forall ρ, ρ ∈ dom fm <-> exists τ R, tm !! τ = Some R /\ ρ ∈ R)
-
-  :
-  (* dom (@ls_fuel δ) = mapped_roles (@ls_tmap δ). *)
-  dom fm = mapped_roles tm (G := G). 
-Proof. 
-  apply set_eq. intros ρ.
-  rewrite DOMS.
-  rewrite /mapped_roles. rewrite flatten_gset_spec.
-  rewrite ex2_comm. apply exist_proper. intros R.
-  rewrite elem_of_map_img. set_solver. 
-Qed.
 
 (* TODO: almost a copypaste from spinlock, unify? *)
 Instance client_lm_dec_ex_step:
@@ -473,24 +404,6 @@ Proof.
     intros. apply FAIR_AUX.
   - eapply inner_obls_exposed_after; eauto.
 Qed.   
-
-(* TODO: move *)
-Lemma trace_len_gt_0 {St L: Type} (tr: trace St L):
-  forall len, trace_len_is tr len -> NOmega.lt_nat_l 0 len.
-Proof. 
-  intros. lia_NO' len. destruct n; [| lia].
-  by apply trace_len_0_inv in H. 
-Qed. 
-
-
-(* TODO: move *)
-Lemma trace_lookup_0_Some {St L: Type} (tr: trace St L):
-  is_Some (tr !! 0). 
-Proof.
-  pose proof (trace_has_len tr) as [len LEN]. 
-  eapply trace_lookup_dom; eauto.
-  eapply trace_len_gt_0; eauto. 
-Qed.  
   
 Local Notation " 'step_of' M " := 
   (fmstate M * option (option (fmrole M) * fmstate M))%type 
@@ -529,11 +442,9 @@ Lemma preserved_prop_kept (M: FairModel) (tr: mtrace M)
   (m1 m2 : nat) s
   (VALID : mtrace_valid tr)
   (L2: ∀ i step, m1 ≤ i → i < m2 → tr !! i = Some step → Pstep step)
-  (* (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> Pst s1 -> Pst s2) *)
   (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> fmtrans M s1 ℓ s2 -> Pst s1 -> Pst s2)
   (Sm1 : tr S!! m1 = Some s)
   (P1: Pst s):
-  (* (C1 : s.2 = 1): *)
   ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → Pst s. 
 Proof. 
   intros j s' [GE LE] ST.
@@ -619,16 +530,6 @@ Qed.
 Definition is_lib_ext_step := 
   fun step => step_label_matches step (fun ρ => exists e, inl (inr e) = ρ).
 
-(* TODO: move *)
-Lemma nomega_le_lt_eq x y:
-  NOmega.le x y <-> NOmega.lt x y \/ x = y.
-Proof.
-  lia_NO' x; lia_NO' y; try tauto.
-  - split; try done. intros [[] | [=]].
-  - rewrite Nat.le_lteq. apply Morphisms_Prop.or_iff_morphism; [done| ].
-    split; [intros -> | intros [=->]]; done.
-Qed. 
-
 Instance is_lib_ext_step_dec res: Decision (is_lib_ext_step res).
 Proof.
   apply slm_dec. intros.
@@ -646,7 +547,7 @@ Proof.
   pose proof (trace_has_len tr) as [len LEN]. 
   forward eapply (trace_prop_split tr (not ∘ is_lib_ext_step)) as [l1 (L1 & NL1 & DOM1)]; eauto.
   { solve_decision. }
-  apply nomega_le_lt_eq in DOM1 as [DOM1 | ->].
+  apply NOmega.nomega_le_lt_eq in DOM1 as [DOM1 | ->].
   2: { exists 0. intros i ? _ ITH. intros [? ->].
        apply trace_label_lookup_simpl' in ITH as (?&?&ITH). 
        eapply L1; eauto.
@@ -988,7 +889,6 @@ Qed.
 
 (* (* TODO: move *) *)
 From trillium.fairness.examples.comp Require Import comp.
-(* Variable (client: val heap_lang).  *)
 
 Theorem client_terminates
         (extr : heap_lang_extrace)

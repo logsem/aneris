@@ -18,15 +18,6 @@ Section TmapDisj.
     apply (PP (a, b)).
   Qed.    
   
-  (* TODO: move, find existing? *)
-  Lemma ex_det_iff {A: Type} (P: A -> Prop) a
-    (DET: forall a', P a' -> a' = a):
-    (exists a', P a') <-> P a.
-  Proof. 
-    split; [| by eauto].
-    intros [? ?]. erewrite <- DET; eauto.
-  Qed. 
-                                
   Global Instance tmap_disj_dec tm: Decision (tmap_disj tm).
   Proof.
     set pairs := let d := elements (dom tm) in
@@ -149,6 +140,7 @@ Section fairness.
     ls_inv: LSI ls_under ls_tmap ls_fuel;
   }.
 
+
   Definition fuel_map := gmap (fmrole M) nat.
   Definition groups_map := gmap G (gset (fmrole M)).
   Definition roles_map := gmap (fmrole M) G. 
@@ -185,14 +177,23 @@ Section fairness.
   Definition mapped_roles (tm: groups_map): gset (fmrole M) :=
     flatten_gset (map_img tm). 
 
-  Lemma mapped_roles_dom_fuels δ:
-    dom (@ls_fuel δ) = mapped_roles (@ls_tmap δ).
+  Lemma mapped_roles_dom_fuels_gen
+    (tm: groups_map) (fm: fuel_map)
+    (DOMS: forall ρ, ρ ∈ dom fm <-> exists τ R, tm !! τ = Some R /\ ρ ∈ R):
+    dom fm = mapped_roles tm. 
   Proof. 
     apply set_eq. intros ρ.
-    rewrite ls_tmap_fuel_same_doms.
+    rewrite DOMS.
     rewrite /mapped_roles. rewrite flatten_gset_spec.
-    setoid_rewrite elem_of_map_img.
-    split; [intros (?&?&?&?) | intros (?&[??]&?)]; eauto.
+    rewrite ex2_comm. apply exist_proper. intros R.
+    rewrite elem_of_map_img. set_solver. 
+  Qed.
+
+  Lemma mapped_roles_dom_fuels δ:
+    dom (@ls_fuel δ) = mapped_roles (@ls_tmap δ).
+  Proof.
+    apply mapped_roles_dom_fuels_gen.
+    apply δ. 
   Qed.   
 
   Inductive FairLabel {Roles} :=
@@ -299,6 +300,28 @@ Section fairness.
       lm_ls_trans := ls_trans lm_fl;
     }.
 
+  Global Instance lm_ls_trans_dec `{LM: LiveModel}
+    {M_TRANS_DEC: ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}
+    {M_ST_DEC: EqDecision (fmstate M)}
+    st1 l st2:
+    Decision (lm_ls_trans LM st1 l st2).
+  Proof.
+    destruct l; simpl. 
+    3: { right. intros []. tauto. }
+    - solve_decision. 
+    - repeat apply and_dec; try solve_decision.
+      destruct (@ls_tmap st1 !! g) eqn:TMAP.
+      2: { right. intros [? MAP].
+           apply ls_mapping_tmap_corr in MAP as (?&SOME&?).
+           by rewrite TMAP in SOME. }
+      destruct (decide (g0 = ∅)) as [-> |NEMPTY].
+      { right. intros [? MAP].
+        apply (ls_mapping_tmap_corr) in MAP as (?&SOME&?).
+        rewrite TMAP in SOME. set_solver. }
+      left. apply set_choose_L in NEMPTY as [ρ ?].
+      exists ρ. apply (ls_mapping_tmap_corr). eauto. 
+  Defined. 
+    
   Definition live_model_model `(LM : LiveModel) : Model := {|
     mstate := lm_ls LM;
     mlabel := lm_lbl LM;
@@ -408,6 +431,14 @@ Section fairness.
       + intros (?&?&[-> <-]&?); eauto.
   Defined. 
 
+  Lemma initial_ls'_mapping `{LM: LiveModel} s0 g LSI0:
+    ls_mapping (initial_ls' s0 g LSI0 (LM := LM)) = gset_to_gmap g (live_roles M s0).
+  Proof.
+    rewrite /initial_ls'. erewrite build_LS_ext_spec_mapping; [reflexivity| ].
+    apply maps_inverse_match_exact. 
+  Qed. 
+
+
   Local Ltac SS' := eapply elem_of_dom; eauto. 
 
   Lemma others_step_fuel_decr `{LM: LiveModel} ρ f f' τ δ ℓ δ'
@@ -512,6 +543,31 @@ Section fairness.
   Qed. 
 
 End fairness.
+
+Definition LSI_True `{Countable G} {M: FairModel}:
+  M → @groups_map G M _ _ → @fuel_map M → Prop :=
+  fun _ _ _ => True.
+
+Global Instance lsi_true_model_inh `{Countable G}
+  `{INH: Inhabited G} `{LM: @LiveModel G M _ _ LSI_True}: 
+  Inhabited (lm_ls LM).
+Proof. 
+  destruct INH as [g]. 
+  pose proof (fmstate_inhabited M) as [s].
+  eapply populate, (initial_ls' s g). done.
+Qed.
+
+
+Definition LSI_groups_fixed `{Countable G} {M : FairModel}  (gs: gset G):
+  fmstate M → groups_map (M := M) → fuel_map (M := M) → Prop := 
+  fun _ tm _ => dom tm ⊆ gs.
+
+Global Instance LSI_gf_dec `{Countable G} M gs:
+  forall s tm fm, Decision (LSI_groups_fixed gs s tm fm (G := G) (M := M)).
+Proof.
+  intros. rewrite /LSI_groups_fixed. solve_decision.
+Qed. 
+
 
 (* Arguments LiveState : clear implicits. *)
 (* Arguments LiveModel : clear implicits. *)

@@ -1,7 +1,7 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi.
-From trillium.fairness Require Import lm_fair fuel_ext fairness_finiteness. 
+From trillium.fairness Require Import lm_fair fairness_finiteness. 
 From trillium.fairness.heap_lang Require Import notation wp_tacs.
 
 Close Scope Z_scope.
@@ -24,16 +24,6 @@ Section LibraryDefs.
   Definition ρlg: lib_grole := tt. 
 
   Definition ρl: fmrole lib_model_impl := tt.
-
-  Definition LSI_groups_fixed (gs: gset lib_grole):
-    fmstate lib_model_impl → groups_map (M := lib_model_impl) → fuel_map (M := lib_model_impl) → Prop := 
-    fun _ tm _ => dom tm ⊆ gs.
-
-  Global Instance LSI_gf_dec gs:
-    forall s tm fm, Decision (LSI_groups_fixed gs s tm fm).
-  Proof.
-    intros. rewrite /LSI_groups_fixed. solve_decision.
-  Qed. 
 
   Definition lib_fl := 5.
   Definition lib_model gs: LiveModel lib_grole lib_model_impl (LSI_groups_fixed gs) := 
@@ -75,7 +65,6 @@ Section LibraryDefs.
   Qed.
 
 
-  (* TODO: generalize to any LSI_True model *)
   Instance lib_model_inh gs (NE: gs ≠ ∅): Inhabited (lm_ls (lib_model gs)).
   Proof. 
     (* pose proof (fmrole_inhabited lib_model_impl) as [ρ]. *)
@@ -125,8 +114,8 @@ Section LibrarySpec.
   
   Notation "'PMP' gs" := (fun Einvs => (LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS))) (at level 10). 
 
-  Lemma lib_LSI_fuel_independent gs:
-    LSI_fuel_independent (LSI := LSI_groups_fixed gs).
+  Lemma lib_LSI_fuel_independent (gs: gset lib_grole):
+    LSI_fuel_independent (LSI := LSI_groups_fixed gs) (M := lib_model_impl).
   Proof.
     red. rewrite /LSI_groups_fixed. intros.
     eapply H0; eauto. 

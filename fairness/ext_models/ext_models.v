@@ -144,16 +144,6 @@ End TraceProjection.
 Section ExtTerm.
   Context `{EM: ExtModel M}. 
 
-  (* TODO: move *)
-  Lemma terminating_trace_after {St L: Type} (tr atr: trace St L) i
-    (AFTER: after i tr = Some atr)
-    (FIN_ATR: terminating_trace atr):
-    terminating_trace tr.
-  Proof.
-    destruct FIN_ATR as [n FIN].
-    exists (i + n). by rewrite after_sum' AFTER.
-  Qed. 
-
   Definition ext_trans_bounded (emtr: emtrace) :=
     trans_bounded emtr (fun oℓ => exists ι, oℓ = Some (inr ι)). 
  
@@ -218,7 +208,6 @@ Section ExtTerm.
 
 End ExtTerm.
 
-(* TODO: move? *)
 Section ELM_ALM.
   Context `{CNT: Countable G}.
   Context `{LM: LiveModel G M LSI}.

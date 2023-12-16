@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel fuel_ext resources partial_ownership.
+From trillium.fairness Require Import fairness fuel resources partial_ownership.
 
 
 Section ForkStep.
@@ -80,45 +80,6 @@ Section ForkStep.
       { eapply Hminv. eauto. }
       apply not_elem_of_dom in Hin. congruence.
   Qed.
-
-  (* TODO: move *)
-  Lemma iff_and_pre {A B C: Prop}
-    (BC: A -> (B <-> C)):
-    A /\ B <-> A /\ C.
-  Proof using. tauto. Qed.
-
-  (* TODO: move, upstream*)
-  Lemma map_img_insert_L :
-    ∀ {K : Type} {M : Type → Type} {H : FMap M} {H0 : ∀ A : Type, Lookup K A (M A)} 
-  {H1 : ∀ A : Type, Empty (M A)} {H2 : ∀ A : Type, PartialAlter K A (M A)} 
-  {H3 : OMap M} {H4 : Merge M} {H5 : ∀ A : Type, FinMapToList K A (M A)} 
-  {EqDecision0 : EqDecision K}
-    ,
-  FinMap K M
-  → ∀ {A SA : Type} {H7 : ElemOf A SA} {H8 : Empty SA} 
-      {H9 : Singleton A SA} {H10 : Union SA} {H11 : Intersection SA} 
-      {H12 : Difference SA}
-      {LE: LeibnizEquiv SA}
-,
-      Set_ A SA
-      → ∀ (m : M A) (i : K) (x : A),
-          map_img (<[i:=x]> m) = ({[x]}: SA) ∪ map_img (delete i m).
-  Proof.
-    intros. apply leibniz_equiv. apply map_img_insert. 
-  Qed.  
-
-  (* TODO: move *)
-  Lemma flatten_gset_union `{Countable K} (S1 S2: gset (gset K)):
-    flatten_gset (S1 ∪ S2) = flatten_gset S1 ∪ flatten_gset S2.
-  Proof.
-    rewrite /flatten_gset. set_solver.
-  Qed. 
-
-  Lemma flatten_gset_singleton `{Countable K} (S: gset K):
-    flatten_gset {[ S ]} = S. 
-  Proof.
-    rewrite /flatten_gset. rewrite elements_singleton. set_solver. 
-  Qed. 
 
   Lemma actual_update_fork_split_gen R1 R2 fs (δ1: LM) ζ τ_new
     (Hdisj: R1 ## R2):
