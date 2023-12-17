@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len trace_lookup fuel.
+From trillium.fairness Require Import lemmas trace_len trace_lookup fuel lm_fair.
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 
@@ -112,6 +112,7 @@ Section GroupRolesInstantiation.
 End GroupRolesInstantiation.
 
 
+(* TODO: replace 'Tl' prefixes with 'Fl' *)
 Section ClientDefs.
   
   Context {Gtl: Type} `{Countable Gtl}.
@@ -129,11 +130,9 @@ Section ClientDefs.
     rewrite gls_ρlg. simpl. set_solver.
   Qed. 
 
-  Context {Mtl: FairModel}. 
-  Context {TlLM: LiveModel Gtl Mtl (LSI_groups_fixed lib_gs)}.
-
   Lemma lib_gs_ne: lib_gs ≠ ∅.
   Proof. rewrite lib_gs_ρlg. set_solver. Qed.
+
   Lemma ρlg_in_lib_gs: forall i (LT: i < 2), ρlg_tl i ∈ lib_gs.
   Proof. 
     rewrite lib_gs_ρlg. simpl. intros i DOM.
@@ -142,20 +141,35 @@ Section ClientDefs.
     lia. 
   Qed. 
 
-  (* Definition lf := lib_fair _ lib_gs_ne. *)
+  Context {Mtl: FairModel}.  
 
-  (* Let lib_st := fmstate lf. *)
-  (* (* Let lib_role := fmrole lib_fair. *) *)
-  (* Let lib_erole := @ext_role _ (@ExtLibLM _ lib_gs_ne).  *)
+  Context {TlLM': forall gs, LiveModel Gtl Mtl (LSI_groups_fixed gs)}.  
+  Context (TlLM_LFP': ∀ gs: gset Gtl, gs ≠ ∅ → LMFairPre (TlLM' gs)).
+  Context `{TlEM': forall gs (NE: gs ≠ ∅), ExtModel (LM_Fair (LF := TlLM_LFP' _ NE))}. 
 
-  (* Definition client_state: Type := lib_st * nat. *)
+  Definition TlLM := TlLM' lib_gs. 
+  Definition TlLM_LFP := TlLM_LFP' _ lib_gs_ne.
+  Definition TlLM_FM := LM_Fair (LF := TlLM_LFP).
+  Definition TlEM := TlEM' _ lib_gs_ne. 
 
-  (* Inductive y_role := ρy. *)
-  (* Definition client_role: Type := lib_erole + y_role. *)
+  Let tl_st := fmstate TlLM_FM. 
+  Let lib_role := fmrole TlLM_FM.
+  Let lib_erole := @ext_role _ TlEM.
+
+  Inductive flag_state := | fs_U | fs_S | fs_O. 
+  Definition client_state: Type := tl_st * flag_state.
+
+  (* Inductive cl_role := | cl_l | cl_r.  *)
+  (* we don't really need roles besides those provided by library:
+     every client thread corresponds to an exact pair of a library' and ext roles.
+     The only problem is that it complicates (?) subtraces projection a bit. *)
+
+  Definition client_role: Type := lib_erole. 
 
   (* Definition ρ_cl: client_role := inr ρy. *)
-  (* Definition ρ_lib: client_role := inl $ inl ρlg. *)
-  (* Definition ρ_ext: client_role := inl $ inr $ env (eiG ρlg) (EM := (@ExtLibLM _ lib_gs_ne)).  *)
+  Definition ρ_lib i: client_role := inl $ ρlg_tl i.
+  (* TODO: move tl_ETs-related stuff to the level of FairLock *)
+  Definition ρ_ext i: client_role := inr $ env (eiG ρlg) (EM := TlEM).
   
   (* Inductive client_trans: client_state -> option client_role -> client_state -> Prop := *)
   (* | ct_y_step_3 lb: *)
