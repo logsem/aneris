@@ -1,6 +1,5 @@
 From trillium.fairness Require Import fairness fair_termination.
-From trillium.fairness.examples.ticketlock Require Import set_map_properties. 
-From trillium.fairness Require Import trace_helpers lm_fairness_preservation lm_fair fuel trace_len.
+From trillium.fairness Require Import trace_helpers lm_fairness_preservation lm_fair fuel trace_len utils.
 
 Class ExtModel (innerM: FairModel) := {  
   EI: Type; (* indexes over external transitions *)

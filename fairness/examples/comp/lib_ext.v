@@ -125,7 +125,7 @@ Section ExtModelLM.
     intros. 
     destruct ι. simpl.
     rewrite /lib_lm_active_exts /reset_lm_st_rel.
-    erewrite <- set_map_properties.elem_of_map_inj_gset.
+    erewrite <- elem_of_map_inj_gset.
     2: { red. by intros ??[=]. }    
     rewrite elem_of_filter. simpl.
     rewrite ex_and_comm. apply Morphisms_Prop.and_iff_morphism; [done| ].
