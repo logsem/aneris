@@ -97,7 +97,6 @@ Lemma δ_lib0_init_roles:
   live_roles lib_model_impl 0 = ∅.
 Proof.
   set_solver. 
-  (* TODO: definition hidden under Opaque *)
 Qed. 
 
 Definition δ_lib0: LiveState lib_grole lib_model_impl (LSI_groups_fixed lib_gs).
@@ -110,25 +109,6 @@ Definition δ_lib0: LiveState lib_grole lib_model_impl (LSI_groups_fixed lib_gs)
     destruct H, H0. congruence.
   - red. rewrite dom_singleton. rewrite /lib_gs. done.  
 Defined.   
-
-
-(* Definition step_label_matches (step: client_state * option (option client_role * client_state)) (P: client_role -> Prop) := *)
-(*   exists st1 ρ st2, step = (st1, Some (Some $ ρ, st2)) /\ P ρ. *)
-  
-  
-(* Instance slm_dec P (DECP: forall ρ, Decision (P ρ)): *)
-(*   forall step, Decision (step_label_matches step P). *)
-(* Proof.  *)
-(*   rewrite /step_label_matches. intros [? p2]. *)
-(*   destruct p2 as [p2| ].  *)
-(*   2: { right. intros (?&?&?&?). intuition. congruence. } *)
-(*   destruct p2 as [or s2]. *)
-(*   destruct or as [r |].  *)
-(*   2: { right. intros (?&?&?&?). intuition. congruence. } *)
-(*   destruct (decide (P r)). *)
-(*   - left. subst. do 2 eexists. eauto. *)
-(*   - right. intros (?&?&?&?). intuition. congruence.  *)
-(* Qed.  *)
 
 
 Definition is_client_step := fun (step: model_trace_step client_model_impl) => 
@@ -259,17 +239,6 @@ Definition project_lib_trace (tr: mtrace client_model_impl): elmftrace (ELM := E
     (fun ℓ => match ℓ with | Some (inl l) => Some $ Some l | _ => None end)
     tr. 
     
-(* Lemma project_lib_trfirst (tr: mtrace client_model_impl): *)
-(*     trfirst (project_lib_trace tr) = fst (trfirst tr). *)
-(* Proof.  *)
-(*   destruct tr; eauto. *)
-(*   destruct ℓ; [destruct f|]; eauto.  *)
-(* Qed.  *)
-
-
-(* Definition is_end_state (step: client_state * option (option client_role * client_state)) := *)
-(*   exists st, step = (st, None).  *)
-
 Ltac unfold_slm H :=
   match type of H with 
   | step_label_matches ?step ?P => destruct H as (?&?&?&->&?Pstep)
@@ -366,7 +335,7 @@ Local Instance client_LF: LMFairPre client_model.
   esplit; apply _.
 Defined.
 
-Let lib_ALM := ELM_ALM (lib_keeps_asg (NE := lib_gs_ne)). 
+Let lib_ALM := ELM_ALM (lib_keeps_asg (NE := lib_gs_ne)).
 
 Definition outer_LM_trace_exposing
   (lmtr: lmftrace (LM := client_model)) (mtr: mtrace client_model_impl) :=
@@ -425,41 +394,6 @@ Proof.
   1, 4: by (left; do 2 red; eauto). 
   all: right; split; eauto; do 2 red; do 3 eexists; eauto. 
 Qed. 
-
-(* TODO: try to unify with 'kept_*' lemmas
-   in ticketlock proof *)
-(* TODO: move*)
-Lemma preserved_prop_kept (M: FairModel) (tr: mtrace M)
-  (Pst: fmstate M -> Prop)
-  (Pstep: step_of M -> Prop)
-  (m1 m2 : nat) s
-  (VALID : mtrace_valid tr)
-  (L2: ∀ i step, m1 ≤ i → i < m2 → tr !! i = Some step → Pstep step)
-  (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> fmtrans M s1 ℓ s2 -> Pst s1 -> Pst s2)
-  (Sm1 : tr S!! m1 = Some s)
-  (P1: Pst s):
-  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → Pst s. 
-Proof. 
-  intros j s' [GE LE] ST.
-  apply Nat.le_sum in GE as [d ->].
-  gd s'. induction d.
-  { intros. rewrite Nat.add_0_r in LE ST.
-    assert (s' = s) as ->; congruence. }
-  intros s' ST'.
-  pose proof (trace_has_len tr) as [len LEN]. 
-  forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN (m1 + d))).
-  { eapply mk_is_Some, state_lookup_dom in ST'; eauto.
-    lia_NO len. }
-  clear dependent s. 
-  intros (s & ? & s'_ & STEP'_). 
-  forward eapply (trace_valid_steps' _ _ VALID) as TRANS; [eauto| ].
-  pose proof STEP'_ as X%L2; try lia. 
-  (* destruct X as (?&?&?&[=]&[? <-]). subst.   *)
-  apply state_label_lookup in STEP'_ as (ST & ST'_ & LBL).
-  replace (m1 + S d) with (m1 + d + 1) in ST' by lia.
-  rewrite ST' in ST'_. inversion ST'_. subst s'_.
-  specialize_full IHd; eauto. lia. 
-Qed.
 
 Lemma client_step_mono s1 oρ s2
   (STEP: client_trans s1 oρ s2):

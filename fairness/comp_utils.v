@@ -1,4 +1,4 @@
-From trillium.fairness Require Import inftraces trace_lookup fairness.
+From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega.
 
 
 Section StepLabelMatches.
@@ -95,4 +95,40 @@ Section ProjectNestedTrace.
   Qed.
 
 End ProjectNestedTrace.
+
+
+(* TODO: try to unify with 'kept_*' lemmas
+   in ticketlock proof *)
+(* TODO: move*)
+Lemma preserved_prop_kept (M: FairModel) (tr: mtrace M)
+  (Pst: fmstate M -> Prop)
+  (Pstep: model_trace_step M -> Prop)
+  (m1 m2 : nat) s
+  (VALID : mtrace_valid tr)
+  (L2: ∀ i step, m1 ≤ i → i < m2 → tr !! i = Some step → Pstep step)
+  (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> fmtrans M s1 ℓ s2 -> Pst s1 -> Pst s2)
+  (Sm1 : tr S!! m1 = Some s)
+  (P1: Pst s):
+  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → Pst s. 
+Proof. 
+  intros j s' [GE LE] ST.
+  apply Nat.le_sum in GE as [d ->].
+  generalize dependent s'. induction d.
+  { intros. rewrite Nat.add_0_r in LE ST.
+    assert (s' = s) as ->; congruence. }
+  intros s' ST'.
+  pose proof (trace_has_len tr) as [len LEN]. 
+  forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN (m1 + d))).
+  { eapply mk_is_Some, state_lookup_dom in ST'; eauto.
+    lia_NO len. }
+  clear dependent s. 
+  intros (s & ? & s'_ & STEP'_). 
+  forward eapply (trace_valid_steps' _ _ VALID) as TRANS; [eauto| ].
+  pose proof STEP'_ as X%L2; try lia. 
+  (* destruct X as (?&?&?&[=]&[? <-]). subst.   *)
+  apply state_label_lookup in STEP'_ as (ST & ST'_ & LBL).
+  replace (m1 + S d) with (m1 + d + 1) in ST' by lia.
+  rewrite ST' in ST'_. inversion ST'_. subst s'_.
+  specialize_full IHd; eauto. lia. 
+Qed.
 
