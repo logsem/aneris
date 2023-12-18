@@ -6,33 +6,10 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
 Import derived_laws_later.bi.
-From trillium.fairness Require Import lemmas trace_len trace_lookup trace_helpers.
+From trillium.fairness Require Import lemmas trace_len trace_lookup trace_helpers utils.
 From trillium.fairness.ext_models Require Import set_map_properties ext_models.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 
-
-(* TODO: get rid of this duplicate *)
-Lemma elem_of_map_inj_gset {A B} 
-  `{EqDecision A} `{Countable A}
-  `{EqDecision B} `{Countable B}
-  (f: A -> B) (m: gset A) (a: A) (INJ: injective f):
-  a ∈ m <-> f a ∈ set_map f m (D := gset _).
-Proof using.
-  split; [apply elem_of_map_2| ].
-  intros IN. apply elem_of_map_1 in IN as (a' & EQ & IN).
-  apply INJ in EQ. congruence. 
-Qed.
-
-
-(* TODO: get rid of this duplicate *)
-Lemma set_map_compose_gset {A1 A2 A3: Type}
-  `{EqDecision A1} `{EqDecision A2} `{EqDecision A3}
-  `{Countable A1} `{Countable A2} `{Countable A3}
-  (f: A2 -> A3) (g: A1 -> A2) (m: gset A1):
-  set_map (f ∘ g) m (D:=gset _) = set_map f (set_map g m (D:= gset _)).
-Proof using.
-  set_solver. 
-Qed. 
     
 
 (* TODO: inherited from hahn? *)
@@ -56,9 +33,18 @@ Section Model.
   Record tl_st := mkTlSt {
                       owner: nat;
                       ticket: nat;
-                      role_map: tl_role_map
+                      role_map: tl_role_map;
                     }. 
 
+  Definition tl_state_wf
+    '(mkTlSt o t rm) :=
+    (* (o t: nat) (rm: tl_role_map) := *)
+    o <= t /\
+    (forall k, o <= k < t <-> exists ρ e, rm !! ρ = Some (tl_U k, e)) /\
+    (forall ρ k, rm !! ρ = Some (tl_U k, false) -> k = o) /\
+    (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1))
+       (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2).
+    
   Notation "<{ o , t , rm }>" := (mkTlSt o t rm).
 
   #[global] Instance tl_role_eqdec: EqDecision tl_role.
@@ -71,7 +57,11 @@ Section Model.
   Proof using. solve_decision. Qed. 
 
   #[global] Instance tl_st_eqdec: EqDecision tl_st. 
-  Proof using. solve_decision. Qed. 
+  Proof using.
+    solve_decision.
+  Qed. 
+
+  (* Definition tl_st_wf := { st | tl_state_wf st}. *)
     
   Lemma role_of_dec (rm: tl_role_map) (s: tl_role_st):
     {r | rm !! r = Some s} + (forall r, rm !! r ≠ Some s). 
@@ -136,7 +126,7 @@ Section Model.
     exists e, (role_map st) !! ρ = Some (tl_L, e). 
 
   Definition has_lock_st (ρ: tl_role) (st: tl_st) :=
-    exists e, (role_map st) !! ρ = Some (tl_U (owner st), e). 
+    (exists e, (role_map st) !! ρ = Some (tl_U (owner st), e)).    
 
   Definition active_st (ρ: tl_role) (st: tl_st) :=
     exists r, (role_map st) !! ρ = Some (r, true).
@@ -173,6 +163,9 @@ Section Model.
     let rm := gset_to_gmap (tl_L, true) (set_seq 0 n) in
     <{ 0, 0, rm }>.
 
+  Definition tl_is_init_st (st: tl_st) := 
+    exists n, st = tl_init_st n. 
+
 
   Section TlExtTrans.
 
@@ -186,23 +179,117 @@ Section Model.
       allows_lock ρ (mkTlSt o t rm) (mkTlSt o t (<[ρ := (tl_L, true)]> rm))
     .
 
-    Inductive tl_EI := eiU | eiL (ρ: tl_role).
+    Definition allow_unlock_impl '(mkTlSt o t rm) :=
+      let unlockers := dom (filter (fun '(_, v) => v = (tl_U o, false)) rm) in
+      let oρ := nth_error (elements unlockers) 0 in
+      let rm' := match oρ with
+                 | Some ρ => (<[ρ := (tl_U o, true)]> rm) 
+                 | None => rm
+                 end in
+      mkTlSt o t rm'. 
 
-    Definition tl_ETs (ι: tl_EI) := 
-      match ι with
-      | eiU => allows_unlock
-      | eiL ρ => allows_lock ρ
-      end. 
+    Definition allow_lock_impl ρ '(mkTlSt o t rm) := 
+      mkTlSt o t (<[ρ := (tl_L, true)]> rm). 
 
-    Global Instance tl_EI_dec: EqDecision tl_EI. 
-    Proof using. solve_decision. Qed. 
+    (* TODO: move*)
+    Lemma lookup_empty_dom:
+  ∀ {K : Type} {M : Type → Type} {D : Type} {H : ∀ A : Type, Dom (M A) D} 
+    {H0 : FMap M} {H1 : ∀ A : Type, Lookup K A (M A)} 
+    {H2 : ∀ A : Type, Empty (M A)} {H3 : ∀ A : Type, PartialAlter K A (M A)} 
+    {H4 : OMap M} {H5 : Merge M} {H6 : ∀ A : Type, FinMapToList K A (M A)} 
+    {EqDecision0 : EqDecision K} {H7 : ElemOf K D} {H8 : Empty D} 
+    {H9 : Singleton K D} {H10 : Union D} {H11 : Intersection D} 
+    {H12 : Difference D} `{FinMapDom K M D},
+  ∀ {A : Type} (m : M A),
+      m = ∅ <-> forall k, m !! k = None.
+    Proof.
+      intros. destruct (decide (m = ∅)).
+      { subst. setoid_rewrite lookup_empty. done. }
+      trans False; [tauto| ]. split; [done| ]. intros ALL. 
+      apply map_choose in n as (?&?&n). by rewrite ALL in n.
+    Qed.
 
-    Global Instance tl_EI_cnt: Countable tl_EI. 
+
+    Lemma allows_unlock_impl_spec st (WF: tl_state_wf st):
+      forall st', allows_unlock st st' <-> 
+              (allow_unlock_impl st = st' /\ (exists ρ, has_lock_st ρ st /\ ¬ active_st ρ st)).
+    Proof.
+      destruct st as [o t rm]. intros [o' t' rm']. 
+      erewrite exist_proper with (Q := fun ρ => rm !! ρ = Some (tl_U o, false)).
+      2: { intros ρ. rewrite /has_lock_st /active_st. simpl.
+           destruct (rm !! ρ).
+           2: { split; [by intros [[? [=]] ?]| by intros [=]]. }
+           simpl. split; [intros [[? [=]] ?]| intros [=]]; subst.
+           - destruct x; auto. edestruct H1; eauto.
+           - split; eauto. by intros [? [=]]. }
+      red in WF. repeat apply proj2 in WF. 
+      simpl. destruct (decide (dom (filter (λ '(_, v), v = (tl_U o, false)) rm) = ∅)).
+      { apply dom_empty_inv_L in e.
+        pose proof (proj1 (lookup_empty_dom _) e) as NO. 
+        (* apply filter_empty_not_elem_of_L in e.  *)
+        rewrite e. rewrite dom_empty_L elements_empty.
+        trans False; split; try done.
+        - intros AU. inversion AU. subst.
+          specialize (NO ρ).
+          apply map_filter_lookup_None_1 in NO. destruct NO.
+          { by rewrite LOCK in H. }
+          eapply H; eauto.
+        - intros [_ [ρ SOME]]. specialize (NO ρ).
+          apply map_filter_lookup_None_1 in NO. destruct NO.
+          { by rewrite H in SOME. }
+          eapply H; eauto. }
+      apply set_choose_L in n as [ρ IN].
+      destruct elements eqn:ELTS.
+      { apply elements_empty_inv, leibniz_equiv_iff in ELTS.
+        set_solver. }
+      assert (t0 = ρ) as ->.
+      { assert (t0 ∈ t0 :: l) as IN' by set_solver.
+        rewrite -ELTS in IN'. apply elem_of_elements in IN'.
+        apply elem_of_dom in IN as [? IN], IN' as [? IN'].
+        apply map_filter_lookup_Some in IN as [??], IN' as [??].
+        subst. eapply WF; eauto. }
+      rewrite iff_and_impl_helper.
+      2: { intros _.
+           apply elem_of_dom in IN as [? IN].
+           apply map_filter_lookup_Some in IN as [? ->]. eauto. }
+      simpl. split.
+      - intros AU. inversion AU. subst. f_equal; try done.
+        apply elem_of_dom in IN as [? IN].
+        apply map_filter_lookup_Some in IN as [? ->]. 
+        eapply (WF ρ ρ0) in LOCK as ->; eauto.
+      - intros EQ. inversion EQ. subst. econstructor.
+        apply elem_of_dom in IN as [? IN].
+        apply map_filter_lookup_Some in IN as [? ->].
+        eauto.
+    Qed.
+
+    Lemma allows_lock_impl_spec ρ st
+                                :
+      forall st', allows_lock ρ st st' <-> 
+              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ ¬ active_st ρ st)).
+    Proof.
+      destruct st as [o t rm]. intros [o' t' rm'].
+      rewrite /allow_lock_impl /can_lock_st /active_st. simpl.  
+      destruct (rm !! ρ) as [[s e] |] eqn:R.
+      2: { simpl. trans False; [| set_solver].
+           apply neg_false. intros AL. inversion AL. subst.
+           congruence. }
+      split.
+      - intros AL. inversion AL. subst.
+        rewrite R in LOCK. inversion LOCK. subst. repeat split; eauto.
+        by intros [??].
+      - intros ([=]&[?[=]]&?). subst. econstructor.
+        rewrite R. repeat f_equal.
+        destruct x; [| done]. edestruct H6; eauto.
+    Qed. 
+      
+    Instance allows_lock_ex_dec:
+      forall st ρ, Decision (∃ st', allows_lock ρ st st'). 
     Proof using.
-      eapply inj_countable' with 
-        (f := fun ι => match ι with | eiU => 0 | eiL ρ => S (ρ: nat) end)
-        (g := fun n => match n with | 0 => eiU | S n' => eiL (n': tl_role) end).
-      intros. destruct x; auto.
+      intros [o t rm] ρ.
+      destruct (decide (rm !! ρ = Some (tl_L, false))).
+      - left. eexists. econstructor; eauto.
+      - right. intros [st' L]. inversion L. congruence. 
     Qed.
 
     Lemma allows_unlock_ex_dec: 
@@ -212,26 +299,17 @@ Section Model.
       destruct (role_of_dec rm (tl_U o, false)) as [[r LOCK] | FREE].
       - left. eexists. econstructor. eauto.
       - right. intros [st' TRANS]. inversion TRANS. subst.
-        edestruct FREE; eauto.
+        set_solver.
     Qed. 
+ 
 
-    Instance allows_lock_ex_dec:
-      forall st ρ, Decision (∃ st', allows_lock ρ st st'). 
-    Proof using.
-      intros [o t rm] ρ.
-      destruct (decide (rm !! ρ = Some (tl_L, false))).
-      - left. eexists. econstructor; eauto.
-      - right. intros [st' L]. inversion L. congruence. 
-    Qed. 
-
-    Definition tl_active_exts st: gset tl_EI := 
-      (if (allows_unlock_ex_dec st) then {[ eiU ]} else ∅) ∪
-      set_map eiL (filter (fun ρ => exists st', allows_lock ρ st st')
-                          (dom (role_map st))).
+    Definition tl_active_exts st: gset fl_EI := 
+      (if (allows_unlock_ex_dec st) then {[ flU ]} else ∅) ∪
+      set_map (flL (M := tl_fair_model)) 
+          (filter (fun ρ => exists st', allows_lock ρ st st') (dom (role_map st))).
     
-
     Lemma tl_active_exts_spec st ι:
-      ι ∈ tl_active_exts st <-> ∃ st', tl_ETs ι st st'.
+      ι ∈ tl_active_exts st <-> ∃ st', @fl_ETs tl_fair_model allows_unlock allows_lock ι st st'.
     Proof using. 
       unfold tl_active_exts.
       etransitivity; [apply elem_of_union| ].
@@ -245,34 +323,25 @@ Section Model.
         split; auto. intros _. eauto.
       - etransitivity; [| etransitivity]; [| eapply False_or |].
         { eapply Morphisms_Prop.or_iff_morphism; destruct (allows_unlock_ex_dec st); set_solver. }
-        etransitivity.
-        { symmetry. apply elem_of_map_inj_gset with (f := eiL).
-          red. intros. congruence. }
-        etransitivity; [apply elem_of_filter| ].
-        simpl.  
-        split; [intros [[? ?] ?] | intros [? [FF]]]; eauto. 
-        simpl. split.
-        + eexists. econstructor; eauto.
-        + eapply elem_of_dom_2; eauto.  
+        rewrite -elem_of_map_inj_gset.
+        2: { red. intros. congruence. }
+        rewrite elem_of_filter.
+        rewrite iff_and_impl_helper; [done| ].
+        intros [? [?]]. simpl. by apply elem_of_dom.
     Qed. 
 
+    (* Instance ExtTL: ExtModel tl_fair_model :=  *)
+    (*   Build_ExtModel tl_fair_model _ _ _ _ _ tl_active_exts_spec. *)
+
     Instance ExtTL: ExtModel tl_fair_model := 
-      Build_ExtModel tl_fair_model _ _ _ _ _ tl_active_exts_spec.
+      @FL_EM tl_fair_model _ _ _ tl_active_exts_spec. 
     
   End TlExtTrans.
-
-
+ 
   Section ProgressProperties.
 
     Let ExtTL_FM := @ext_model_FM _ ExtTL. 
 
-    Definition tl_state_wf '(mkTlSt o t rm) :=
-      o <= t /\
-      (forall k, o <= k < t <-> exists ρ e, rm !! ρ = Some (tl_U k, e)) /\
-      (forall ρ k, rm !! ρ = Some (tl_U k, false) -> k = o) /\
-      (forall ρ1 ρ2 k e1 e2 (R1: rm !! ρ1 = Some (tl_U k, e1))
-         (R2: rm !! ρ2 = Some (tl_U k, e2)), ρ1 = ρ2).
-    
     Lemma tl_init_st_wf n:
       tl_state_wf (tl_init_st n). 
     Proof using. 
@@ -755,7 +824,9 @@ Section Model.
       Qed.
 
       
-      Let tl_eventual_release := @eventual_release _ ExtTL has_lock_st active_st.
+      Let tl_eventual_release := @eventual_release tl_fair_model _ _ _ 
+                                   tl_active_exts_spec
+                                   has_lock_st active_st.
 
       Lemma has_lock_unique st ρ1 ρ2
         (WF: tl_state_wf st)
@@ -1049,11 +1120,17 @@ Section Model.
     End ProgressPropertiesImpl. 
 
     Instance TLFairLock: 
-      @FairLock _ ExtTL can_lock_st has_lock_st active_st tl_state_wf.
+      @FairLock tl_fair_model 
+        allows_unlock allows_lock 
+        _ tl_active_exts_spec
+        can_lock_st has_lock_st active_st tl_state_wf.
     Proof.
-      constructor. red. intros.
-      eapply tl_progress; eauto.
-    Qed.     
+      econstructor.
+      - red. intros.
+        eapply tl_progress; eauto.
+      - apply allows_unlock_impl_spec.
+      - apply allows_lock_impl_spec.
+    Qed.      
 
   End ProgressProperties. 
 

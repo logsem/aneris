@@ -118,10 +118,13 @@ Section ClientDefs.
   Context {Gtl: Type} `{Countable Gtl}.
   Context (get_Gtls: forall n, { gls: gset Gtl | size gls = n}).
   
+  Inductive cl_id := | cl_L | cl_R.
+  Definition cl_id_nat c := match c with | cl_L => 0 | cl_R => 1 end. 
+
   Definition lib_gs: gset Gtl := gls get_Gtls 2.
-  Definition ρlg_tl i := ρlg_i get_Gtls 2 i.
-  Definition ρlg_l := ρlg_tl 0.
-  Definition ρlg_r := ρlg_tl 1. 
+  Definition ρlg_tl c := ρlg_i get_Gtls 2 (cl_id_nat c).
+  Definition ρlg_l := ρlg_tl cl_L.
+  Definition ρlg_r := ρlg_tl cl_R. 
 
   Lemma lib_gs_ρlg:
     lib_gs = {[ ρlg_l; ρlg_r ]}.
@@ -133,58 +136,79 @@ Section ClientDefs.
   Lemma lib_gs_ne: lib_gs ≠ ∅.
   Proof. rewrite lib_gs_ρlg. set_solver. Qed.
 
-  Lemma ρlg_in_lib_gs: forall i (LT: i < 2), ρlg_tl i ∈ lib_gs.
+  Lemma ρlg_in_lib_gs: forall c, ρlg_tl c ∈ lib_gs.
   Proof. 
-    rewrite lib_gs_ρlg. simpl. intros i DOM.
-    destruct i as [| i]; [| destruct i].
-    1, 2: set_solver.
-    lia. 
+    rewrite lib_gs_ρlg. intros c.
+    destruct c; set_solver. 
   Qed. 
 
   Context {Mtl: FairModel}.  
 
   Context {TlLM': forall gs, LiveModel Gtl Mtl (LSI_groups_fixed gs)}.  
   Context (TlLM_LFP': ∀ gs: gset Gtl, gs ≠ ∅ → LMFairPre (TlLM' gs)).
-  Context `{TlEM': forall gs (NE: gs ≠ ∅), ExtModel (LM_Fair (LF := TlLM_LFP' _ NE))}. 
+  Context (TlEM': forall gs (NE: gs ≠ ∅), ExtModel (LM_Fair (LF := TlLM_LFP' _ NE))).
 
   Definition TlLM := TlLM' lib_gs. 
   Definition TlLM_LFP := TlLM_LFP' _ lib_gs_ne.
   Definition TlLM_FM := LM_Fair (LF := TlLM_LFP).
-  Definition TlEM := TlEM' _ lib_gs_ne. 
+  Definition TlEM := TlEM' _ lib_gs_ne.
 
+  (* TODO: reorganize the premises so those below don't depend
+     on the client's choice of lib_gs *)
   Let tl_st := fmstate TlLM_FM. 
-  Let lib_role := fmrole TlLM_FM.
-  Let lib_erole := @ext_role _ TlEM.
+  Let tl_role := fmrole TlLM_FM.
+  Let tl_erole := @ext_role _ TlEM.
+
+  Context
+    {allows_unlock: tl_st → tl_st → Prop}
+    {allows_lock: tl_role → tl_st → tl_st → Prop}
+    {tl_active_exts: tl_st → gset (fl_EI (M := TlLM_FM))}
+    (tl_active_exts_spec: ∀ st ι,
+        ι ∈ tl_active_exts st ↔ (∃ st', @fl_ETs _ allows_unlock allows_lock ι st st')). 
+  Context {can_lock_st has_lock_st active_st: tl_role → tl_st → Prop}. 
+  Context {is_init_st: tl_st → Prop}.
+
+  Context (TlEM_FL: @FairLock TlLM_FM _ _ _ tl_active_exts_spec
+                      can_lock_st has_lock_st active_st is_init_st).
 
   Inductive flag_state := | fs_U | fs_S | fs_O. 
   Definition client_state: Type := tl_st * flag_state.
 
   (* Inductive cl_role := | cl_l | cl_r.  *)
-  (* we don't really need roles besides those provided by library:
-     every client thread corresponds to an exact pair of a library' and ext roles.
-     The only problem is that it complicates (?) subtraces projection a bit. *)
+  Inductive cl_role_kind := | cl_lift | cl_au | cl_al | cl_cl.
+  Definition client_role: Type := cl_role_kind * cl_id. 
 
-  Definition client_role: Type := lib_erole. 
+  (* (* Definition ρ_cl: client_role := inr ρy. *) *)
+  (* Definition ρ_lib i: client_role := inl $ ρlg_tl i. *)
+  (* Definition ρ_ext i: client_role := inr $ env (eiG ρlg) (EM := TlEM). *)
 
-  (* Definition ρ_cl: client_role := inr ρy. *)
-  Definition ρ_lib i: client_role := inl $ ρlg_tl i.
-  (* TODO: move tl_ETs-related stuff to the level of FairLock *)
-  Definition ρ_ext i: client_role := inr $ env (eiG ρlg) (EM := TlEM).
+  Let allow_unlock_impl := allow_unlock_impl _ _ _ _ _ _ (FairLock := TlEM_FL). 
+  Let allow_lock_impl := allow_lock_impl _ _ _ _ _ _ (FairLock := TlEM_FL). 
   
-  (* Inductive client_trans: client_state -> option client_role -> client_state -> Prop := *)
-  (* | ct_y_step_3 lb: *)
-  (*   client_trans (lb, 3) (Some ρ_cl) (lb, 2) *)
-  (* (* TODO: allow arbitrary library's LM roles *) *)
-  (* | ct_lib_ext lb (STOP: lm_is_stopped ρlg lb): *)
-  (*   client_trans (lb, 2) (Some ρ_ext) (reset_lm_st ρlg lb ρlg_in_lib_gs, 1) *)
-  (* | ct_lib_step lb1 lb2 (LIB_STEP: fmtrans lf lb1 (Some ρlg) lb2): *)
-  (*   client_trans (lb1, 1) (Some ρ_lib) (lb2, 1) *)
-  (* | ct_y_step_1 (lb: fmstate lf) *)
-  (*               (* (LIB_NOSTEP: 0 ∉ live_roles _ lb) *) *)
-  (*               (LIB_NOROLES: ls_tmap lb (LM := lib_model lib_gs) !! ρlg = Some ∅) *)
-  (*   : *)
-  (*   client_trans (lb, 1) (Some ρ_cl) (lb, 0) *)
-  (* . *)
-
+  Inductive client_trans: client_state -> option client_role -> client_state -> Prop :=
+  | ct_lib_step tl1 tl2 c flag
+        (LIB_STEP: fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2):
+      client_trans (tl1, flag) (Some (cl_lift, c)) (tl2, flag)
+  | ct_flag_US tl 
+      (LOCK: has_lock_st (ρlg_tl cl_L) tl)
+      (DIS: ¬ active_st (ρlg_tl cl_L) tl):
+    client_trans (tl, fs_U) (Some (cl_cl, cl_L)) (tl, fs_S)
+  | ct_au_L tl (ρlg := ρlg_l)
+      (LOCK: has_lock_st ρlg tl)
+      (DIS: ¬ active_st ρlg tl):
+    client_trans (tl, fs_S) (Some (cl_au, cl_L)) (allow_unlock_impl tl, fs_S)
+  | ct_au_R tl fs
+      (ρlg := ρlg_r)
+      (fs' := match fs with | fs_U => fs_U | _ => fs_O end) (* fs=O is impossible though*)
+      (LOCK: has_lock_st ρlg tl)
+      (DIS: ¬ active_st ρlg tl):
+    client_trans (tl, fs) (Some (cl_au, cl_R)) (allow_unlock_impl tl, fs')
+  | ct_al_R tl fs
+      (ρlg := ρlg_r)
+      (CANL: can_lock_st ρlg tl)
+      (DIS: ¬ active_st ρlg tl)
+      (NO: fs ≠ fs_O):
+    client_trans (tl, fs) (Some (cl_al, cl_R)) (allow_lock_impl ρlg tl, fs)
+  . 
 
 End ClientDefs. 
