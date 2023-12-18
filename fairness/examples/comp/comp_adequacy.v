@@ -20,8 +20,7 @@ From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.examples.comp Require Import traces_equiv.
 From trillium.fairness Require Import fair_termination_natural.
 From trillium.fairness Require Import lm_fairness_preservation_wip.
-
-From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup.
+From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup comp_utils.
 
 Close Scope Z_scope. 
 
@@ -113,34 +112,29 @@ Definition δ_lib0: LiveState lib_grole lib_model_impl (LSI_groups_fixed lib_gs)
 Defined.   
 
 
-(* Definition is_client_step (step: client_state * option (option client_role * client_state)) := *)
-(*   exists st1 st2, step = (st1, Some (Some $ inr ρy, st2)).  *)
-
-(* Definition is_lib_step (step: client_state * option (option client_role * client_state)) := *)
-(*   exists st1 ρlg st2, step = (st1, Some (Some $ inl ρlg, st2)).  *)
-
-Definition step_label_matches (step: client_state * option (option client_role * client_state)) (P: client_role -> Prop) :=
-  exists st1 ρ st2, step = (st1, Some (Some $ ρ, st2)) /\ P ρ.
+(* Definition step_label_matches (step: client_state * option (option client_role * client_state)) (P: client_role -> Prop) := *)
+(*   exists st1 ρ st2, step = (st1, Some (Some $ ρ, st2)) /\ P ρ. *)
   
   
-Instance slm_dec P (DECP: forall ρ, Decision (P ρ)):
-  forall step, Decision (step_label_matches step P).
-Proof. 
-  rewrite /step_label_matches. intros [? p2].
-  destruct p2 as [p2| ]. 
-  2: { right. intros (?&?&?&?). intuition. congruence. }
-  destruct p2 as [or s2].
-  destruct or as [r |]. 
-  2: { right. intros (?&?&?&?). intuition. congruence. }
-  destruct (decide (P r)).
-  - left. subst. do 2 eexists. eauto.
-  - right. intros (?&?&?&?). intuition. congruence. 
-Qed. 
+(* Instance slm_dec P (DECP: forall ρ, Decision (P ρ)): *)
+(*   forall step, Decision (step_label_matches step P). *)
+(* Proof.  *)
+(*   rewrite /step_label_matches. intros [? p2]. *)
+(*   destruct p2 as [p2| ].  *)
+(*   2: { right. intros (?&?&?&?). intuition. congruence. } *)
+(*   destruct p2 as [or s2]. *)
+(*   destruct or as [r |].  *)
+(*   2: { right. intros (?&?&?&?). intuition. congruence. } *)
+(*   destruct (decide (P r)). *)
+(*   - left. subst. do 2 eexists. eauto. *)
+(*   - right. intros (?&?&?&?). intuition. congruence.  *)
+(* Qed.  *)
 
 
-Definition is_client_step := fun step => step_label_matches step (eq (inr ρy)).     
-Definition is_lib_step := fun step => step_label_matches step 
-                                     (fun ρ => exists ρlg, inl ρlg = ρ).     
+Definition is_client_step := fun (step: model_trace_step client_model_impl) => 
+                               step_label_matches step (eq (Some $ inr ρy)).
+Definition is_lib_step := fun (step: model_trace_step client_model_impl) =>
+                            step_label_matches step (fun ρ => exists ρlg, Some $ inl ρlg = ρ).
 
 Lemma client_steps_finite (tr: mtrace client_model_impl)
   (VALID: mtrace_valid tr)
@@ -260,26 +254,27 @@ Proof.
 Qed.
 
 
-CoFixpoint project_lib_trace (tr: mtrace client_model_impl): 
-  elmftrace (ELM := ExtLibLM)
-  :=
-  match tr with 
-  | ⟨ s ⟩ => ⟨ fst s ⟩
-  | s -[Some (inl l)]-> tr' => (fst s) -[ Some l ]-> (project_lib_trace tr')
-  | s -[ _ ]-> tr' => ⟨fst s ⟩
+Definition project_lib_trace (tr: mtrace client_model_impl): elmftrace (ELM := ExtLibLM) :=
+  project_nested_trace fst 
+    (fun ℓ => match ℓ with | Some (inl l) => Some $ Some l | _ => None end)
+    tr. 
+    
+(* Lemma project_lib_trfirst (tr: mtrace client_model_impl): *)
+(*     trfirst (project_lib_trace tr) = fst (trfirst tr). *)
+(* Proof.  *)
+(*   destruct tr; eauto. *)
+(*   destruct ℓ; [destruct f|]; eauto.  *)
+(* Qed.  *)
+
+
+(* Definition is_end_state (step: client_state * option (option client_role * client_state)) := *)
+(*   exists st, step = (st, None).  *)
+
+Ltac unfold_slm H :=
+  match type of H with 
+  | step_label_matches ?step ?P => destruct H as (?&?&?&->&?Pstep)
   end. 
-
-Lemma project_lib_trfirst (tr: mtrace client_model_impl):
-    trfirst (project_lib_trace tr) = fst (trfirst tr).
-Proof. 
-  destruct tr; eauto.
-  destruct ℓ; [destruct f|]; eauto. 
-Qed. 
-
-
-Definition is_end_state (step: client_state * option (option client_role * client_state)) :=
-  exists st, step = (st, None). 
-
+ 
 Lemma lib_trace_construction (tr: mtrace client_model_impl)
   (VALID: mtrace_valid tr)
   (LIB_STEPS: ∀ i res, tr !! i = Some res → is_lib_step res \/ is_end_state res):
@@ -290,26 +285,24 @@ Lemma lib_trace_construction (tr: mtrace client_model_impl)
       tr
       (project_lib_trace tr).
 Proof.
-  gd tr. cofix IH.
-  intros. 
-  rewrite (trace_unfold_fold (project_lib_trace tr)).
-  destruct tr.
-  { econstructor. done. }
   do 2 red.
-  pose proof (LIB_STEPS 0 (s, Some (ℓ, (trfirst tr))) eq_refl) as STEP0.
-  destruct STEP0 as [STEP0 | STEP0].
-  2: { destruct STEP0. done. }
-  destruct STEP0 as (?&?&?&[=]&[ρlg <-]). subst. simpl in *.
-  pose proof (trace_valid_cons_inv _ _ _ _ VALID) as [VALID' STEP].  
-  econstructor.
-  1-3: done.
-  { rewrite project_lib_trfirst. inversion STEP; subst; simpl in *.
-    2: { rewrite -H2; econstructor; eauto. }
-    rewrite -H2. simpl. econstructor. simpl.
+  rewrite /out_A_labels_match. simpl.
+  eapply traces_match_impl; cycle 1. 
+  { intros *. intros X. apply X. }
+  { eapply nested_trace_construction.
+    { done. }
+    { intros * ITH. apply LIB_STEPS in ITH as [LIB | ?]; [| tauto].
+      red in LIB. unfold_slm LIB. destruct Pstep as [? <-].
+      left. do 3 eexists. eauto. }
+    intros. destruct ℓ; [| done]. destruct c; [| done].
+    inversion H0. subst.
+    inversion H; subst; simpl in *.
+    2: { econstructor; eauto. }
+    simpl. econstructor. simpl.
     red. split; eauto. }
-  eapply IH; eauto. intros. 
-  apply (LIB_STEPS (S i)); eauto. 
-Qed.
+  simpl. intros. destruct ℓ1; [| done]. destruct c; [| done].
+  by inversion H.
+Qed. 
 
 (* TODO: abstract the nested LM state *)
 Local Instance inh_client: Inhabited (lm_ls client_model).
@@ -528,11 +521,14 @@ Proof.
 Qed. 
 
 Definition is_lib_ext_step := 
-  fun step => step_label_matches step (fun ρ => exists e, inl (inr e) = ρ).
+  fun step => step_label_matches (step: model_trace_step client_model_impl)
+             (fun ρ => exists e, Some $ inl (inr e) = ρ).
 
 Instance is_lib_ext_step_dec res: Decision (is_lib_ext_step res).
 Proof.
   apply slm_dec. intros.
+  destruct ρ as [ρ| ].
+  2: { right. by intros [??]. }
   destruct ρ as [[ | ]|].
   2: by left; eauto.
   all: by right; intros [? [=]].
@@ -570,6 +566,16 @@ Proof.
   simpl in LE. lia.
   Unshelve. lia.
 Qed.
+
+(* TODO: move*)
+Global Instance inj_EqDec {A B: Type} (f: A -> B)
+  (EDA: EqDecision A)
+  (INJ: @Inj A B eq eq f):
+  forall a1 a2, Decision (f a1 = f a2).
+Proof.
+  intros. destruct (decide (a1 = a2)); [subst; by left| ].
+  right. by intros ->%INJ.
+Qed. 
   
 Lemma client_model_fair_term tr lmtr
   (OUTER_CORR: outer_LM_trace_exposing lmtr tr):
@@ -595,7 +601,9 @@ Proof.
 
   forward eapply (trace_prop_split tr is_client_step) as [l1 (L1 & NL1 & DOM1)]; eauto.
   { eapply slm_dec. intros.
-    (* TODO: why it's not inferred automatically? *)
+    (* TODO: why it's not inferred automatically? *)                          
+    destruct ρ as [ρ| ]; [| by nostep].
+    apply inj_EqDec; [| by apply _]. 
     unshelve eapply sum_eq_dec. solve_decision. }
 
   (* assert (exists n1, l1 = NOnum n1 /\ (forall s, tr S!! (n1 - 1) = Some s -> snd s < 2)) as (m1 & LEN1 & BOUNDc').  *)
@@ -620,6 +628,7 @@ Proof.
   forward eapply (trace_prop_split' tr is_lib_step _ m1)
     as (l2 & L2 & NL2 & LE2 & LE2'); eauto.
   { eapply slm_dec. intros.
+    destruct ρ as [ρ| ]; [| by nostep].
     destruct ρ; [left | right]; eauto. by intros [??]. }
 
   assert (exists m2, l2 = NOnum m2) as [m2 ->].
