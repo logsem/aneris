@@ -312,7 +312,7 @@ Section LMFinBranching.
 
   (* not using Finite type to avoid dealing with ProofIrrel *)
   
-  Lemma locale_trans_ex_dec_fin
+  Global Instance locale_trans_ex_dec_fin
     (* {LF: LMFairPre LM} *)
     `{∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}
     `{EqDecision (fmstate M)}
@@ -361,6 +361,20 @@ Section LMFinBranching.
     subst τ_ℓs. apply elem_of_list_In, elem_of_list_filter. split.
     { eexists. split; eauto. }
     apply elem_of_list_In. done.
+  Qed.
+
+  Global Instance locale_trans_fin_ex_dec_fin
+    `{∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}
+    `{EqDecision (fmstate M)}
+    δ1 τ
+    (nexts: forall s1, {l: list (fmstate M) | forall s2 oρ, fmtrans M s1 oρ s2 -> s2 ∈ l})
+    (LSI_STABLE: forall δ1 τ δ2, locale_trans δ1 τ δ2 (LM := LM) ->
+                             exists δ2', roles_rearranged δ2 δ2' (dom $ ls_tmap δ1) τ):
+    Decision (exists δ2, locale_trans δ1 τ δ2 (LM := LM)).
+  Proof. 
+    apply locale_trans_ex_dec_fin with (steps := proj1_sig $ nexts (ls_under δ1)); eauto.
+    intros. simpl. destruct (nexts δ1) as [? IN]; simpl in *.
+    apply elem_of_list_In. eauto.
   Qed.
 
   Definition rearrange_roles_map (tm: gmap G (gset (fmrole M))) (R: gset G) (r: G):

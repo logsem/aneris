@@ -1,4 +1,4 @@
-From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega.
+From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega fuel lm_fair fairness_finiteness.
 
 
 Section StepLabelMatches.
@@ -132,3 +132,44 @@ Proof.
   specialize_full IHd; eauto. lia. 
 Qed.
 
+
+Section LSI_GF_Properties.
+  Context `{Countable G}.
+  Context {gs: gset G} `(LM: LiveModel G M (LSI_groups_fixed gs)). 
+  
+  Global Instance LSI_gf_ls_inh (NE: gs ≠ ∅):
+    Inhabited (lm_ls LM).
+  Proof.
+    apply finitary.set_choose_L' in NE as [g GS]. 
+    pose proof (fmstate_inhabited M) as [s].
+    eapply populate, (initial_ls' s g).
+    red. simpl. red. rewrite dom_singleton. set_solver. 
+  Qed.
+  
+  Lemma LSI_gf_rrm (δ1 δ2 : lm_ls LM) τ
+    (STEP: locale_trans δ1 τ δ2 (LM := LM)):
+    LSI_groups_fixed gs δ2 (rearrange_roles_map (ls_tmap δ2) (dom (ls_tmap δ1)) τ)
+      (ls_fuel δ2).
+  Proof. 
+    red. intros ?. 
+    rewrite /rearrange_roles_map. rewrite dom_insert.
+    intros [->%elem_of_singleton | IN]%elem_of_union; apply (ls_inv δ1).
+    { eapply locale_trans_dom; eauto. }
+    by apply dom_filter_sub in IN.
+  Qed.
+  
+  Global Instance LSI_gf_fin_dec_ex_step
+    `{EqDecision (fmstate M)}
+    `{∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2)}
+    (FIN: ∀ s1, {l : list (fmstate M) | ∀ s2 oρ, fmtrans M s1 oρ s2 → s2 ∈ l}):
+    ∀ (τ : G) (δ1 : lm_ls LM),
+      Decision (∃ δ2, locale_trans δ1 τ δ2).
+  Proof.
+    intros. eapply locale_trans_fin_ex_dec_fin; eauto. 
+    intros. eexists. eapply rearrange_roles_spec.
+    Unshelve.
+    + exact LM.
+    + by apply LSI_gf_rrm. 
+  Defined.
+
+End LSI_GF_Properties.

@@ -102,6 +102,7 @@ Section FairLock.
            in the definition of EM itself? *)
   Class FairLock := {
       lock_progress: fair_lock_progress;
+
       allow_unlock_impl: fmstate M -> fmstate M;
       allow_lock_impl: fmrole M -> fmstate M -> fmstate M;
       allows_unlock_impl_spec st (WF: state_wf st):
@@ -110,6 +111,10 @@ Section FairLock.
       allows_lock_impl_spec ρ st:
       forall st', allows_lock ρ st st' <-> 
               (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ ¬ active_st ρ st));
+
+      has_lock_st_dec :> forall ρ st, Decision (has_lock_st ρ st);
+      can_lock_st_dec :> forall ρ st, Decision (can_lock_st ρ st);
+      active_st_dec :> forall ρ st, Decision (active_st ρ st);
   }.
 
 End FairLock.

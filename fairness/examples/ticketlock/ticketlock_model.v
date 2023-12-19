@@ -1130,6 +1130,12 @@ Section Model.
         eapply tl_progress; eauto.
       - apply allows_unlock_impl_spec.
       - apply allows_lock_impl_spec.
+      - intros. solve_decision.
+      - intros. solve_decision.
+      - intros. rewrite /active_st.
+        destruct (role_map st !! ρ) as [[? b] |] eqn:R; rewrite R. 
+        + destruct b; [left | right]; eauto. by intros [? [=]].
+        + right. by intros [? [=]].         
     Qed.      
 
   End ProgressProperties. 

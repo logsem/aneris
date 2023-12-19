@@ -42,14 +42,6 @@ Local Instance step'_eqdec: forall s1, EqDecision
   solve_decision. 
 Defined. 
   
-(* TODO: move? *)
-Lemma lib_model_impl_fin (s1: fmstate lib_model_impl):
-  {l: list (fmstate lib_model_impl) | forall s2 oρ, fmtrans lib_model_impl s1 oρ s2 -> s2 ∈ l}. 
-Proof.
-  eapply (exist _ [0]). 
-  intros ?? TRANS. inversion TRANS. subst. set_solver. 
-Qed.
-
 Lemma client_model_finitary (s1 : fmstate client_model_impl):
     Finite
       {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 

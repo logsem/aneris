@@ -1,10 +1,11 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi.
-From trillium.fairness Require Import lm_fair fairness_finiteness. 
+From trillium.fairness Require Import lm_fair fairness_finiteness comp_utils. 
 From trillium.fairness.heap_lang Require Import notation wp_tacs.
 
 Close Scope Z_scope.
+
 
 Section LibraryDefs.
 
@@ -29,11 +30,6 @@ Section LibraryDefs.
   Definition lib_model gs: LiveModel lib_grole lib_model_impl (LSI_groups_fixed gs) := 
     {| lm_fl _ := lib_fl; |}.
 
-  (* Definition lib_lm_LSI_alt gs (δ: lm_ls (lib_model gs)): *)
-  (*   dom (ls_tmap δ) ⊆ gs. *)
-  (* Proof.  *)
-  (*   apply elem_of_subseteq. intros g.  *)
-  
   Definition lib_fun: val :=
     λ: <>,
       let: "y" := ref #1 in
@@ -64,41 +60,22 @@ Section LibraryDefs.
     specialize (STEP1 _ _ _ eq_refl). by inversion STEP1.
   Qed.
 
-
-  Instance lib_model_inh gs (NE: gs ≠ ∅): Inhabited (lm_ls (lib_model gs)).
-  Proof. 
-    (* pose proof (fmrole_inhabited lib_model_impl) as [ρ]. *)
-    (* pose proof (fmstate_inhabited lib_model_impl) as [s]. *)
-    apply finitary.set_choose_L' in NE as [g GS]. 
-    pose proof (fmstate_inhabited lib_model_impl) as [s].
-    eapply populate, (initial_ls' s g).
-    red. simpl. red. rewrite dom_singleton. set_solver. 
+  (* TODO: move? *)
+  Lemma lib_model_impl_fin (s1: fmstate lib_model_impl):
+    {l: list (fmstate lib_model_impl) | forall s2 oρ, fmtrans lib_model_impl s1 oρ s2 -> s2 ∈ l}. 
+  Proof.
+    eapply (exist _ [0]). 
+    intros ?? TRANS. inversion TRANS. subst. set_solver. 
   Qed.
 
 
-  Instance lib_lm_dec_ex_step gs:
-  ∀ (τ : lib_grole) (δ1 : lm_ls (lib_model gs)),
-    Decision (∃ δ2, locale_trans δ1 τ δ2).
-  Proof. 
-    intros.
-    apply locale_trans_ex_dec_fin with (steps := [0]).
-    - intros. inversion H. set_solver.
-    - intros. eexists. eapply rearrange_roles_spec.
-      Unshelve.
-      + exact (lib_model gs).
-      + red. intros ?. 
-        rewrite /rearrange_roles_map. rewrite dom_insert.
-        intros [->%elem_of_singleton | IN]%elem_of_union; apply (ls_inv δ0).
-        { eapply locale_trans_dom; eauto. }
-        by apply dom_filter_sub in IN. 
-  Defined.
-
   Global Instance lib_LF gs (NE: gs ≠ ∅): LMFairPre (lib_model gs).
     esplit; try by apply _.
-    by apply lib_model_inh. 
+    - by apply LSI_gf_ls_inh.
+    - apply LSI_gf_fin_dec_ex_step; try by apply _.
+      apply lib_model_impl_fin. 
   Defined.
   
-  (* Definition lib_fair gs (NE: gs ≠ ∅) := LM_Fair (LM := (lib_model gs)).  *)
   Definition lib_fair gs (NE: gs ≠ ∅) :=
     @LM_Fair _ _ _ _ _ _ (lib_LF gs NE).
 
