@@ -159,17 +159,8 @@ Section ClientDefs.
   Let tl_role := fmrole TlLM_FM.
   Let tl_erole := @ext_role _ TlEM.
 
-  Context
-    {allows_unlock: tl_state → tl_state → Prop}
-    {allows_lock: tl_role → tl_state → tl_state → Prop}
-    {tl_active_exts: tl_state → gset (fl_EI (M := TlLM_FM))}
-    (tl_active_exts_spec: ∀ st ι,
-        ι ∈ tl_active_exts st ↔ (∃ st', @fl_ETs _ allows_unlock allows_lock ι st st')). 
-  Context {can_lock_st has_lock_st active_st: tl_role → tl_state → Prop}. 
-  Context {is_init_st: tl_state → Prop}.
-
-  Context (TlEM_FL: @FairLock TlLM_FM _ _ _ tl_active_exts_spec
-                      can_lock_st has_lock_st active_st is_init_st).
+  Context `(TlEM_FL: @FairLock TlLM_FM tl_FLP tl_FLE).
+  (* Existing Instances tl_FLP tl_FLE.  *)
 
   Inductive flag_state := | fs_U | fs_S | fs_O. 
   Definition client_state: Type := tl_state * flag_state.
@@ -178,12 +169,8 @@ Section ClientDefs.
   Inductive cl_role_kind := | cl_lift | cl_au | cl_al | cl_cl.
   Definition client_role: Type := cl_role_kind * cl_id. 
 
-  (* (* Definition ρ_cl: client_role := inr ρy. *) *)
-  (* Definition ρ_lib i: client_role := inl $ ρlg_tl i. *)
-  (* Definition ρ_ext i: client_role := inr $ env (eiG ρlg) (EM := TlEM). *)
-
-  Let allow_unlock_impl := allow_unlock_impl _ _ _ _ _ _ (FairLock := TlEM_FL). 
-  Let allow_lock_impl := allow_lock_impl _ _ _ _ _ _ (FairLock := TlEM_FL). 
+  (* Let allow_unlock_impl := allow_unlock_impl _ _ _ _ _ _ (FairLock := TlEM_FL).  *)
+  (* Let allow_lock_impl := allow_lock_impl _ _ _ _ _ _ (FairLock := TlEM_FL).  *)
   
   Inductive client_trans: client_state -> option client_role -> client_state -> Prop :=
   | ct_lib_step tl1 tl2 c flag
@@ -234,6 +221,7 @@ Section ClientDefs.
   (* Lemma client_role_Cnt: Countable client_role. *)
     
   (*   unshelve eapply prod_countable; try apply _.   *)
+
   
   Instance client_step_ex_dec (st: client_state) (ρ: client_role):
     Decision (exists st', client_trans st (Some ρ) st').
@@ -248,10 +236,10 @@ Section ClientDefs.
       + right. intros [? STEP]. inversion STEP. subst.
         eapply NOSTEP. eexists. apply LIB_STEP.
     - destruct c.
-      + destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st /\ ¬ active_st (ρlg_tl cl_L) tl_st /\ flag = fs_S)) as [(?&?&->)| ]. 
+      + destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_S)) as [(?&?&->)| ]. 
         * left. eexists (_, _). eapply ct_au_L; eauto.
         * right. intros [? STEP]. inversion STEP. subst. tauto.
-      + destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st /\ ¬ active_st (ρlg_tl cl_R) tl_st /\ flag ≠ fs_O)) as [(?&?&?)| ].
+      + destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ flag ≠ fs_O)) as [(?&?&?)| ].
         * left. eexists (_, if decide (flag = fs_U) then fs_U else fs_O). eapply ct_au_R; eauto.
           destruct flag;
             (rewrite decide_True; tauto) || (rewrite decide_False; try tauto; congruence).
@@ -259,10 +247,10 @@ Section ClientDefs.
           apply n. 
           destruct FS as [[-> ->] | [-> ->]]; try tauto.
           all: split; eauto.
-    - destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st /\ ¬ active_st (ρlg_tl cl_R) tl_st /\ flag ≠ fs_O /\ c = cl_R)) as [(?&?&?&->) | NOSTEP].
+    - destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ flag ≠ fs_O /\ c = cl_R)) as [(?&?&?&->) | NOSTEP].
       + left. eexists (_, _). econstructor; eauto.
       + right. intros [? STEP]. inversion STEP; subst. tauto.
-    - destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st /\ ¬ active_st (ρlg_tl cl_L) tl_st /\ flag = fs_U /\ c = cl_L)) as [(?&?&->&->)| ].
+    - destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_U /\ c = cl_L)) as [(?&?&->&->)| ].
       + left. eexists (_, _). econstructor; eauto.
       + right. intros [? STEP]. inversion STEP; subst. tauto.
   Qed.
@@ -300,12 +288,8 @@ Section ClientDefs.
     - intros. apply client_lr_spec. eauto.
   Defined.  
 
-End ClientDefs. 
 
-
-Section ClientTraceTermination.
-
-  Lemma client_model_fair_term (tr: mtrace client_model
+  Lemma client_model_fair_term (tr: mtrace client_model_impl)
     (* lmtr *)
     (* (OUTER_CORR: outer_LM_trace_exposing lmtr tr) *)
     :
@@ -313,8 +297,9 @@ Section ClientTraceTermination.
   Proof.
     intros. red. intros VALID FAIR.
     (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
-    pose proof (trace_has_len tr) as [len LEN]. 
+    pose proof (trace_has_len tr) as [len LEN].
+    
 
 
 
-End ClientTraceTermination.
+End ClientDefs. 

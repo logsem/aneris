@@ -268,7 +268,7 @@ Qed.
 (* TODO: abstract the nested LM state *)
 Local Instance inh_client: Inhabited (lm_ls client_model).
 Proof.
-  pose proof (lib_model_inh _ lib_gs_ne) as [δ].  
+  pose proof (LSI_gf_ls_inh (lib_model lib_gs) lib_gs_ne) as [δ].  
   assert (Inhabited (locale heap_lang)) as [τ] by apply _.
   apply populate.
   refine {| ls_under := (δ, 0): fmstate client_model_impl;

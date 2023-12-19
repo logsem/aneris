@@ -147,7 +147,7 @@ Section Model.
       destruct r. subst. eauto.      
   Qed. 
 
-  Lemma active_st_dec (ρ: tl_role) (st: tl_st):
+  Instance active_st_dec (ρ: tl_role) (st: tl_st):
     Decision (active_st ρ st).
   Proof using. 
     rewrite /active_st.
@@ -290,7 +290,7 @@ Section Model.
       destruct (decide (rm !! ρ = Some (tl_L, false))).
       - left. eexists. econstructor; eauto.
       - right. intros [st' L]. inversion L. congruence. 
-    Qed.
+    Defined.
 
     Lemma allows_unlock_ex_dec: 
       forall st, Decision (∃ st', allows_unlock st st'). 
@@ -300,8 +300,7 @@ Section Model.
       - left. eexists. econstructor. eauto.
       - right. intros [st' TRANS]. inversion TRANS. subst.
         set_solver.
-    Qed. 
- 
+    Defined. 
 
     Definition tl_active_exts st: gset fl_EI := 
       (if (allows_unlock_ex_dec st) then {[ flU ]} else ∅) ∪
@@ -330,11 +329,14 @@ Section Model.
         intros [? [?]]. simpl. by apply elem_of_dom.
     Qed. 
 
-    (* Instance ExtTL: ExtModel tl_fair_model :=  *)
-    (*   Build_ExtModel tl_fair_model _ _ _ _ _ tl_active_exts_spec. *)
-
+    Global Instance tl_FLE: FairLockExt tl_fair_model.
+    (* refine {| fl_active_exts := tl_active_exts |}.  *)
+    esplit.
+    apply tl_active_exts_spec.
+    Defined. 
+    
     Instance ExtTL: ExtModel tl_fair_model := 
-      @FL_EM tl_fair_model _ _ _ tl_active_exts_spec. 
+      FL_EM tl_FLE. 
     
   End TlExtTrans.
  
@@ -823,10 +825,21 @@ Section Model.
           all: split; auto; rewrite lookup_insert_ne; eauto; intros ->; congruence.
       Qed.
 
+      Definition tl_FLP: FairLockPredicates tl_fair_model.
+      (* the simple way doesn't get through *)
+      (* refine {| fair_lock.can_lock_st := can_lock_st |}.  *)
+        unshelve esplit.
+        - exact can_lock_st.
+        - exact has_lock_st.
+        - exact active_st.
+        - exact tl_state_wf.
+        (* all: solve_decision.  -- ??? *) 
+        - solve_decision.
+        - solve_decision.
+        - solve_decision.
+      Defined. 
       
-      Let tl_eventual_release := @eventual_release tl_fair_model _ _ _ 
-                                   tl_active_exts_spec
-                                   has_lock_st active_st.
+      Let tl_eventual_release := @eventual_release _ tl_FLP ExtTL.  
 
       Lemma has_lock_unique st ρ1 ρ2
         (WF: tl_state_wf st)
@@ -858,7 +871,6 @@ Section Model.
           rewrite R in LOCK. inversion LOCK. lia. }
         
         forward eapply eventual_release_strenghten as HH; eauto.
-        { apply active_st_dec. }
         { intros. split; auto. intros.
           assert (k = i) as -> by lia.
           rewrite ST in KTH. inversion KTH. subst st_k.
@@ -1119,24 +1131,14 @@ Section Model.
 
     End ProgressPropertiesImpl. 
 
-    Instance TLFairLock: 
-      @FairLock tl_fair_model 
-        allows_unlock allows_lock 
-        _ tl_active_exts_spec
-        can_lock_st has_lock_st active_st tl_state_wf.
+    Instance TLFairLock: @FairLock _ tl_FLP tl_FLE. 
     Proof.
       econstructor.
-      - red. intros.
-        eapply tl_progress; eauto.
       - apply allows_unlock_impl_spec.
       - apply allows_lock_impl_spec.
-      - intros. solve_decision.
-      - intros. solve_decision.
-      - intros. rewrite /active_st.
-        destruct (role_map st !! ρ) as [[? b] |] eqn:R; rewrite R. 
-        + destruct b; [left | right]; eauto. by intros [? [=]].
-        + right. by intros [? [=]].         
-    Qed.      
+      - red. intros.
+        eapply tl_progress; eauto.
+    Qed. 
 
   End ProgressProperties. 
 
