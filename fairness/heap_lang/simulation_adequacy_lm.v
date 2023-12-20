@@ -246,6 +246,15 @@ Qed.
 
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
+(* TODO: move *)
+Definition to_trace_trfirst {S L : Type}
+  (s: S) (il: inflist (L * S)):
+  trfirst (to_trace s il) = s.
+Proof. 
+  destruct il as [| [??]]; done.
+Qed. 
+
+
 (* TODO: derive from general case? *)
 Theorem simulation_adequacy_traces Σ
   `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
@@ -259,7 +268,9 @@ Theorem simulation_adequacy_traces Σ
   rel_finitary (sim_rel LM) →
   wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : lmftrace (LM := LM)), lm_exaux_traces_match extr auxtr (LM := LM).
+  ∃ (auxtr : lmftrace (LM := LM)), 
+    lm_exaux_traces_match extr auxtr (LM := LM) /\
+    trfirst auxtr = initial_ls' s1 0 LSI0.
 Proof.
   intros Hfin Hwp.
   have [iatr Hbig] : exists iatr,
@@ -278,6 +289,9 @@ Proof.
     simpl. destruct (trfirst extr) eqn:Heq.
     simpl in Hexfirst. rewrite -Hexfirst Heq //. }
   exists (to_trace (initial_ls' (LM := LM) s1 0%nat LSI0) iatr).
+  split.
+  2: { by rewrite to_trace_trfirst. }
+  
   unshelve eapply (valid_inf_system_trace_implies_traces_match (M := fair_model_model LM_Fair)
             lm_valid_evolution_step
             live_tids
@@ -308,12 +322,14 @@ Theorem simulation_adequacy_model_trace Σ
   rel_finitary (sim_rel LM) →
   wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 ->
   (* The coinductive pure coq proposition given by adequacy *)
-  ∃ (auxtr : lmftrace (LM:=LM)) mtr, lm_exaux_traces_match extr auxtr (LM := LM) ∧
-                               upto_stutter ls_under Usls auxtr mtr.
+  ∃ (auxtr : lmftrace (LM:=LM)) mtr, 
+    lm_exaux_traces_match extr auxtr (LM := LM) ∧
+    upto_stutter ls_under Usls auxtr mtr /\
+    trfirst auxtr = initial_ls' s1 0 LSI0. 
 Proof.
   intros Hfb Hwp.
   destruct (simulation_adequacy_traces
-              Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as [auxtr Hmatch].
+              Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr & Hmatch & A0).
   assert (mtrace_valid auxtr) as Hstutter.
   { by eapply traces_match_valid2 in Hmatch. }
   destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
@@ -331,7 +347,7 @@ Theorem simulation_adequacy_terminate Σ
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
   :
-  (∀ mtr: @mtrace M, mtrace_fairly_terminating mtr) ->
+  (∀ mtr: @mtrace M, trfirst mtr = s1 -> mtrace_fairly_terminating mtr) ->
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 ->
@@ -342,7 +358,7 @@ Proof.
   destruct (infinite_or_finite extr) as [Hinf|] =>//.
 
   destruct (simulation_adequacy_model_trace
-              Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto&A0).
   have Hfairaux := ex_fairness_preserved 
                      extr auxtr Hinf Hmatch Hfair.
   (* assert (LMFairPre LM) as LF. *)
@@ -353,7 +369,8 @@ Proof.
   (* have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch. *)
   pose proof Hmatch as Hvalaux%traces_match_valid2. 
   have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-  have Htermtr := Hterm mtr Hmtrvalid Hfairm.
+  pose proof Hupto as M0%upto_stutter_trfirst. rewrite A0 in M0.  
+  have Htermtr := Hterm mtr M0 Hmtrvalid Hfairm.
   eapply traces_match_preserves_termination =>//.
   eapply upto_stutter_finiteness =>//.
 Qed.
@@ -373,7 +390,8 @@ Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
   extrace_fairly_terminating extr.
 Proof.
   eapply simulation_adequacy_terminate =>//.
-  apply fair_terminating_traces_terminate.
+  intros ? _. 
+  by apply fair_terminating_traces_terminate.
 Qed.
 
 Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
@@ -390,7 +408,8 @@ Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple
   extrace_fairly_terminating extr.
 Proof.
   intros. eapply simulation_adequacy_terminate =>//.
-  eapply simple_fair_terminating_traces_terminate.
+  intros ? _.
+  by eapply simple_fair_terminating_traces_terminate.
 Qed.
 
 End adequacy.

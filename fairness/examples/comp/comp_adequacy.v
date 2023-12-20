@@ -777,7 +777,7 @@ Proof.
   destruct (infinite_or_finite extr) as [Hinf|] =>//.  
 
   destruct (simulation_adequacy_model_trace
-              Σ _ e1 s1 FR LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto).
+              Σ _ e1 s1 FR LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto&A0).
 
   (* TODO: clarify which types of fairness we need in this proof *)
   assert (forall ρ, fair_aux_SoU (LM_ALM client_model) ρ auxtr (LM := client_model)) as FAIR_SOU.
