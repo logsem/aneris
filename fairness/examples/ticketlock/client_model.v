@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len trace_lookup fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation.
+From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation trace_lookup.
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 
@@ -447,23 +447,83 @@ Section ClientDefs.
     by inversion H0.
   Qed.
 
+  Definition is_UU_step (step: model_trace_step client_model_impl) :=
+    exists tl1 oℓ tl2, step = ((tl1, fs_U), Some (oℓ, (tl2, fs_U))). 
+
+  Definition is_init_cl_state (st: client_state) :=
+    (forall c, let ρlg := ρlg_tl c in can_lock_st ρlg st.1 /\ active_st ρlg st.1) /\
+    st.2 = fs_U. 
+
+  
+  Definition client_LM_trace_exposing :=
+    outer_LM_trace_exposing lib_keeps_asg
+      (inl ∘ inl) (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib). 
+
+
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     (* lmtr *)
     (* (OUTER_CORR: outer_LM_trace_exposing lmtr tr) *)
+    (INIT: is_init_cl_state (trfirst tr))
     :
     mtrace_fairly_terminating tr.
   Proof.
     intros. red. intros VALID FAIR.
     pose proof (trace_has_len tr) as [len LEN].
     
-    forward eapply trace_prop_split with (P := fun '(s, _) => s.2 = fs_U) as (i'_s & STEPs & NOs).
+    forward eapply trace_prop_split with (P := is_UU_step) as (i'_s & STEPs & NOs & LEN1).
     2: by apply LEN. 
-    { solve_decision. }
+    { intros [[? f] ostep]. destruct ostep as [[? [? f']] | ]. 
+      2: { right. intros (?&?&?&[=]). }
+      destruct (decide (f = fs_U /\ f' = fs_U)) as [[-> ->]|].
+      - left. red. eauto.
+      - right. intros (?&?&?&[=]). subst. tauto. }
 
     assert (exists i_s, i'_s = NOnum i_s) as [i_s ->]. 
-    { 
+    { destruct (decide (i'_s = NOnum 0)) as [| NZ1]. 
+      { eauto. }
+      forward eapply (subtrace_len tr _ 0 i'_s) as SUB1; eauto.
+      { lia_NO' i'_s. destruct n; try lia. done. } 
+      destruct SUB1 as (str & SUB1 & LEN1').
+      rewrite NOmega.sub_0_r in LEN1'. 
     
-    
+      forward eapply (tl_trace_construction str) as MATCH. 
+      { subst. eapply (subtrace_valid tr); eauto. }
+      { subst. intros i res RES.
+
+        (* TODO: make this 'P \/ is_end_state' a lemma? *)
+        pose proof (trace_lookup_trichotomy _ _ LEN1' i) as [TL | [END | NO]]; cycle 1. 
+        { right.
+          destruct END as (?&END&->).
+          rewrite RES in END. inversion END. subst.
+          eexists. eauto. } 
+        { rewrite RES in NO. by apply proj1 in NO. }
+        left. 
+        destruct TL as (?&?&?&TL&dom). rewrite RES in TL. inversion TL. subst.
+        apply subtrace_lookup with (k := i) in SUB1.
+        2: { lia_NO i'_s. }
+        pose proof RES as RES'.
+        rewrite SUB1 in RES. simpl in RES.
+        pose proof RES as UUres.
+        apply STEPs in UUres.
+        2: { eapply trace_lookup_dom; eauto. }
+        destruct UUres as (?&?&?&[=]). subst.
+        eapply trace_valid_steps' in RES; eauto.
+        inversion RES; subst. 
+        all: by do 3 eexists; eauto. }
+
+      forward eapply (lock_progress (project_tl_trace str) (ρlg_tl cl_L) 0 (trfirst str).1).
+      { by eapply traces_match_valid2. }
+      { intros.
+        apply ALWAYS_tl_state_wf. }
+      { 
+
+      
+
+      admit. }
+
+    admit. 
+  Admitted. 
+
 
 
 
