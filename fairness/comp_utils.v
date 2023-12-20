@@ -1,4 +1,5 @@
-From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega fuel lm_fair fairness_finiteness.
+From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega fuel lm_fair fairness_finiteness lm_fair_traces lm_fairness_preservation lm_fairness_preservation_wip subtrace traces_equiv.
+From trillium.fairness.ext_models Require Import ext_models.
 
 
 Section StepLabelMatches.
@@ -173,3 +174,53 @@ Section LSI_GF_Properties.
   Defined.
 
 End LSI_GF_Properties.
+
+
+Section OuterExposing.
+  Context `{Countable Go} `{LMo: LiveModel Go Mo LSIo}.
+  Context `{Countable Gi} `{LMi: LiveModel Gi Mi LSIi}. 
+  Context {LFi: LMFairPre LMi} {LFo: LMFairPre LMo}. 
+  Context {ELMi: ExtModel (LM_Fair (LF := LFi))}. 
+
+  Context (EXT_KEEPS: ext_keeps_asg (ELM := ELMi)). 
+  Let ALMi := ELM_ALM EXT_KEEPS. 
+
+  Definition outer_LM_trace_exposing
+    (* TODO: these functions are closely related, but due to 'option's here and there
+       it's hard to express one in terms of another.
+       We should just get rid of 'option' in FairModel transition. *)
+    (lift_Gi: Gi -> fmrole Mo)
+    (lift_EAi: option (@ext_role _ ELMi) -> option (fmrole Mo))
+    (state_rel : Mo → lm_ls LMi → Prop)
+    
+    (lmtr: lmftrace (LM := LMo)) (mtr: mtrace Mo)
+    :=
+    upto_stutter_auxtr lmtr mtr /\
+      (∀ gi, fair_aux_SoU _ (lift_Gi gi) lmtr) /\
+      (* TODO: get rid of LMo and use appropriate fairness premise on mtr *)
+      inner_obls_exposed lift_EAi state_rel lmtr (LMo := LMo) (AMi := ALMi).
+  
+  Lemma outer_exposing_subtrace ltr tr i str
+    lift_Gi lift_EAi state_rel
+    (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr)
+    (SUB: subtrace tr i NOinfinity = Some str):
+    exists sltr, 
+      outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr str.
+  Proof. 
+    red in OUTER_CORR. destruct OUTER_CORR as (UPTO & FAIR_AUX & INNER_OBLS).
+    pose proof (trace_has_len tr) as [len LEN].
+    pose proof SUB as X. eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto.
+    2: { lia_NO len. }
+    forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTER' & UPTO').
+    exists latr. split; [| split].
+    - eauto. eapply upto_stutter_Proper; [.. |eapply UPTO']; eauto.
+      + reflexivity. 
+      + by symmetry.
+    - intros.
+      forward eapply fair_by_gen_after; [apply AFTER' |..]; eauto.
+      intros. apply FAIR_AUX.
+    - eapply inner_obls_exposed_after; eauto.
+  Qed.   
+  
+End OuterExposing.
+

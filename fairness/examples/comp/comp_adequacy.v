@@ -327,38 +327,35 @@ Local Instance client_LF: LMFairPre client_model.
   esplit; apply _.
 Defined.
 
-Let lib_ALM := ELM_ALM (lib_keeps_asg (NE := lib_gs_ne)).
+(* Let lib_ALM := ELM_ALM (lib_keeps_asg (NE := lib_gs_ne)). *)
 
-Definition outer_LM_trace_exposing
-  (lmtr: lmftrace (LM := client_model)) (mtr: mtrace client_model_impl) :=
-  upto_stutter_auxtr lmtr mtr /\
-  (∀ gi, fair_aux_SoU _ ((inl $ inl gi): fmrole client_model_impl) lmtr) /\
-  (* TODO: remove LMo parameter from inner_obls_exposed *)
-  inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) lmtr (LMo := client_model) (AMi := lib_ALM).
-
-
-
-Lemma outer_exposing_subtrace ltr tr i str 
-  (OUTER_CORR: outer_LM_trace_exposing ltr tr)
-  (SUB: subtrace tr i NOinfinity = Some str):
-  exists sltr, 
-    outer_LM_trace_exposing sltr str.
-Proof. 
-  red in OUTER_CORR. destruct OUTER_CORR as (UPTO & FAIR_AUX & INNER_OBLS).
-  pose proof (trace_has_len tr) as [len LEN].
-  pose proof SUB as X. eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto.
-  2: { lia_NO len. }
-  forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTER' & UPTO').
-  exists latr. split; [| split].
-  - eauto. eapply upto_stutter_Proper; [.. |eapply UPTO']; eauto.
-    + reflexivity. 
-    + by symmetry.
-  - intros.
-    forward eapply fair_by_gen_after; [apply AFTER' |..]; eauto.
-    intros. apply FAIR_AUX.
-  - eapply inner_obls_exposed_after; eauto.
-Qed.   
+Definition comp_LM_trace_exposing :=
+  outer_LM_trace_exposing lib_keeps_asg
+    (inl ∘ inl) (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib). 
   
+
+(* Lemma outer_exposing_subtrace ltr tr i str  *)
+(*   (OUTER_CORR: outer_LM_trace_exposing ltr tr) *)
+(*   (SUB: subtrace tr i NOinfinity = Some str): *)
+(*   exists sltr,  *)
+(*     outer_LM_trace_exposing sltr str. *)
+(* Proof.  *)
+(*   red in OUTER_CORR. destruct OUTER_CORR as (UPTO & FAIR_AUX & INNER_OBLS). *)
+(*   pose proof (trace_has_len tr) as [len LEN]. *)
+(*   pose proof SUB as X. eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto. *)
+(*   2: { lia_NO len. } *)
+(*   forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTER' & UPTO'). *)
+(*   exists latr. split; [| split]. *)
+(*   - eauto. eapply upto_stutter_Proper; [.. |eapply UPTO']; eauto. *)
+(*     + reflexivity.  *)
+(*     + by symmetry. *)
+(*   - intros. *)
+(*     forward eapply fair_by_gen_after; [apply AFTER' |..]; eauto. *)
+(*     intros. apply FAIR_AUX. *)
+(*   - eapply inner_obls_exposed_after; eauto. *)
+(* Qed.    *)
+
+
 Local Notation " 'step_of' M " := 
   (fmstate M * option (option (fmrole M) * fmstate M))%type 
     (at level 10).
@@ -504,7 +501,7 @@ Proof.
 Qed. 
   
 Lemma client_model_fair_term tr lmtr
-  (OUTER_CORR: outer_LM_trace_exposing lmtr tr):
+  (OUTER_CORR: comp_LM_trace_exposing lmtr tr):
   mtrace_fairly_terminating tr.
 Proof.
   intros. red. intros VALID FAIR.
@@ -595,7 +592,7 @@ Proof.
       eapply traces_match_label_lookup_2 in ITH' as (ℓ & ITH' & MATCH'); [| apply MATCH].
       red in MATCH'. simpl in MATCH'. subst.  
       apply BOUND in ITH'; auto. destruct ITH'. eauto. }  
-    {       
+    { 
       subst. simpl in *.
       forward eapply outer_exposing_subtrace; eauto.
       intros [? EXP'].
@@ -740,7 +737,7 @@ Proof.
 Qed. 
 
 Lemma client_LM_inner_exposed (auxtr: lmftrace (LM := client_model)):
-  inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) auxtr (LMo := client_model) (AMi := lib_ALM).
+  inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) auxtr (LMo := client_model) (AMi := ELM_ALM (lib_keeps_asg (NE := lib_gs_ne))).
 Proof. 
   red. simpl. intros n δ gl NTH (?&?&?&MAP).
   eexists. split; [reflexivity| ].
