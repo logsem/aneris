@@ -18,9 +18,9 @@ From trillium.fairness Require Import lm_fairness_preservation lm_fair lm_fair_t
 From trillium.fairness.ext_models Require Import destutter_ext ext_models.
 From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
 From trillium.fairness.examples.comp Require Import traces_equiv.
-From trillium.fairness Require Import fair_termination_natural.
+From trillium.fairness Require Import fair_termination_natural subtrace.
 From trillium.fairness Require Import lm_fairness_preservation_wip.
-From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers subtrace trace_lookup comp_utils.
+From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers trace_lookup comp_utils.
 
 Close Scope Z_scope. 
 

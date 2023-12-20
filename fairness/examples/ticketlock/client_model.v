@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len trace_lookup fuel lm_fair.
+From trillium.fairness Require Import lemmas trace_len trace_lookup fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation.
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 
@@ -75,18 +75,21 @@ Section GroupRolesInstantiation.
     apply NoDup_elements.
   Qed. 
 
+  Lemma gls'_len n: length (gls' n) = n.
+  Proof. 
+    rewrite /gls'. destruct decide.
+    - rewrite length_remove_NoDup.
+      2: { rewrite /get_Gls'. apply NoDup_elements. }
+      rewrite decide_True; [| done].
+      rewrite get_Gls'_len. lia. 
+    - rewrite skipn_length.
+      rewrite get_Gls'_len. lia. 
+  Qed. 
+
   Lemma gls'_ρlg n:
     gls' n = map (ρlg_i n) (seq 0 n). 
   Proof.
-    assert (length (gls' n) = n) as LEN'. 
-    { rewrite /gls'. destruct decide.
-      - rewrite length_remove_NoDup.
-        2: { rewrite /get_Gls'. apply NoDup_elements. }
-        rewrite decide_True; [| done].
-        rewrite get_Gls'_len. lia. 
-      - rewrite skipn_length.
-        rewrite get_Gls'_len. lia. }
-    
+    pose proof (gls'_len n) as LEN'. 
     apply nth_ext with (d := g0) (d' := g0).
     { by rewrite fmap_length seq_length. }
 
@@ -108,7 +111,46 @@ Section GroupRolesInstantiation.
   Proof. 
     rewrite /gls. f_equal. apply gls'_ρlg.
   Qed. 
-    
+
+  Lemma get_Gls'_NoDup n: NoDup (get_Gls' n).
+  Proof. 
+    rewrite /get_Gls'. apply NoDup_elements.
+  Qed.
+
+  (* TODO: move *)
+  Lemma NoDup_remove {A: Type} (l: list A)
+    (ND: NoDup l):
+    forall a EQ, NoDup (remove EQ a l).
+  Proof. 
+    intros a ?. revert a. induction l.
+    { done. }
+    intros. simpl. destruct EQ.
+    { subst. apply IHl. by inversion ND. }
+    econstructor.
+    2: { apply IHl. by inversion ND. }
+    inversion ND. subst.
+    intros IN%elem_of_list_In%in_remove.
+    apply H2. apply elem_of_list_In, IN. 
+  Qed. 
+
+  Lemma gls'_NoDup n: NoDup (gls' n).
+  Proof. 
+    rewrite /gls'. destruct decide.
+    - apply NoDup_remove. apply get_Gls'_NoDup.
+    - apply NoDup_ListNoDup.
+      eapply NoDup_app_remove_l.
+      erewrite take_drop.
+      apply NoDup_ListNoDup. apply get_Gls'_NoDup.
+  Qed. 
+
+  Lemma ρlg_i_dom_inj n:
+    forall i j, i < n -> j < n -> ρlg_i n i = ρlg_i n j -> i = j. 
+  Proof.
+    rewrite /ρlg_i.
+    rewrite -{1 2}(gls'_len n). apply NoDup_nth.
+    apply NoDup_ListNoDup. apply gls'_NoDup. 
+  Qed.
+
 End GroupRolesInstantiation.
 
 
@@ -124,7 +166,12 @@ Section ClientDefs.
   Definition lib_gs: gset Gtl := gls get_Gtls 2.
   Definition ρlg_tl c := ρlg_i get_Gtls 2 (cl_id_nat c).
   Definition ρlg_l := ρlg_tl cl_L.
-  Definition ρlg_r := ρlg_tl cl_R. 
+  Definition ρlg_r := ρlg_tl cl_R.   
+
+  (* Lemma ρlg_tl_inj: Inj eq eq ρlg_tl. *)
+  (* Proof.  *)
+  (*   intros ??. rewrite /ρlg_tl. EQ.  *)
+
 
   Lemma lib_gs_ρlg:
     lib_gs = {[ ρlg_l; ρlg_r ]}.
@@ -136,22 +183,38 @@ Section ClientDefs.
   Lemma lib_gs_ne: lib_gs ≠ ∅.
   Proof. rewrite lib_gs_ρlg. set_solver. Qed.
 
+  Lemma ρlg_lr_neq: ρlg_l ≠ ρlg_r.
+  Proof.
+    intros EQ%ρlg_i_dom_inj; [done|..]. 
+    all: simpl; lia.
+  Qed. 
+
   Lemma ρlg_in_lib_gs: forall c, ρlg_tl c ∈ lib_gs.
   Proof. 
     rewrite lib_gs_ρlg. intros c.
     destruct c; set_solver. 
+  Qed.
+
+  Lemma ρlg_tl_inj: Inj eq eq ρlg_tl.
+  Proof.
+    intros ?? EQ%ρlg_i_dom_inj.
+    - destruct x, y; done.
+    - destruct x; simpl; lia. 
+    - destruct y; simpl; lia.
   Qed. 
 
   Context {Mtl: FairModel}.  
 
   Context {TlLM': forall gs, LiveModel Gtl Mtl (LSI_groups_fixed gs)}.  
   Context (TlLM_LFP': ∀ gs: gset Gtl, gs ≠ ∅ → LMFairPre (TlLM' gs)).
-  Context (TlEM': forall gs (NE: gs ≠ ∅), ExtModel (LM_Fair (LF := TlLM_LFP' _ NE))).
+  (* Context (TlEM': forall gs (NE: gs ≠ ∅), ExtModel (LM_Fair (LF := TlLM_LFP' _ NE))). *)
 
   Definition TlLM := TlLM' lib_gs. 
   Definition TlLM_LFP := TlLM_LFP' _ lib_gs_ne.
   Definition TlLM_FM := LM_Fair (LF := TlLM_LFP).
-  Definition TlEM := TlEM' _ lib_gs_ne.
+
+  Context `(TlEM_FL: @FairLock TlLM_FM tl_FLP tl_FLE).
+  Definition TlEM := FL_EM tl_FLE. 
 
   (* TODO: reorganize the premises so those below don't depend
      on the client's choice of lib_gs *)
@@ -159,47 +222,55 @@ Section ClientDefs.
   Let tl_role := fmrole TlLM_FM.
   Let tl_erole := @ext_role _ TlEM.
 
-  Context `(TlEM_FL: @FairLock TlLM_FM tl_FLP tl_FLE).
   (* Existing Instances tl_FLP tl_FLE.  *)
 
   Inductive flag_state := | fs_U | fs_S | fs_O. 
   Definition client_state: Type := tl_state * flag_state.
 
-  (* Inductive cl_role := | cl_l | cl_r.  *)
-  Inductive cl_role_kind := | cl_lift | cl_au | cl_al | cl_cl.
-  Definition client_role: Type := cl_role_kind * cl_id. 
+  (* Inductive cl_role_kind := | cl_lift | cl_au | cl_al | cl_cl. *)
+  (* Definition client_role: Type := cl_role_kind * cl_id.  *)
+  Definition client_role: Type := tl_erole + cl_id. 
 
   (* Let allow_unlock_impl := allow_unlock_impl _ _ _ _ _ _ (FairLock := TlEM_FL).  *)
   (* Let allow_lock_impl := allow_lock_impl _ _ _ _ _ _ (FairLock := TlEM_FL).  *)
+
+  Definition ρ_cl c: client_role := inr c. 
+  Definition ρ_lib ρlg: client_role := inl $ inl ρlg.
+  Definition ρ_ext er: client_role := inl $ inr $ env er (EM := TlEM). 
+
   
   Inductive client_trans: client_state -> option client_role -> client_state -> Prop :=
   | ct_lib_step tl1 tl2 c flag
         (LIB_STEP: fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2):
-      client_trans (tl1, flag) (Some (cl_lift, c)) (tl2, flag)
+      (* client_trans (tl1, flag) (Some (cl_lift, c)) (tl2, flag) *)
+      client_trans (tl1, flag) (Some $ ρ_lib (ρlg_tl c)) (tl2, flag)
   | ct_flag_US tl 
       (LOCK: has_lock_st (ρlg_tl cl_L) tl)
       (DIS: ¬ active_st (ρlg_tl cl_L) tl):
-    client_trans (tl, fs_U) (Some (cl_cl, cl_L)) (tl, fs_S)
+    (* client_trans (tl, fs_U) (Some (cl_cl, cl_L)) (tl, fs_S) *)
+    client_trans (tl, fs_U) (Some $ ρ_cl cl_L) (tl, fs_S)
   | ct_au_L tl (ρlg := ρlg_l)
       (LOCK: has_lock_st ρlg tl)
       (DIS: ¬ active_st ρlg tl):
-    client_trans (tl, fs_S) (Some (cl_au, cl_L)) (allow_unlock_impl tl, fs_S)
+    client_trans (tl, fs_S) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs_S)
   | ct_au_R tl fs fs'
       (ρlg := ρlg_r)
       (FS: fs = fs_U /\ fs' = fs_U \/ fs = fs_S /\ fs' = fs_O)
       (LOCK: has_lock_st ρlg tl)
       (DIS: ¬ active_st ρlg tl):
-    client_trans (tl, fs) (Some (cl_au, cl_R)) (allow_unlock_impl tl, fs')
+    (* client_trans (tl, fs) (Some (cl_au, cl_R)) (allow_unlock_impl tl, fs') *)
+    client_trans (tl, fs) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs')
   | ct_al_R tl fs
       (ρlg := ρlg_r)
       (CANL: can_lock_st ρlg tl)
       (DIS: ¬ active_st ρlg tl)
       (NO: fs ≠ fs_O):
-    client_trans (tl, fs) (Some (cl_al, cl_R)) (allow_lock_impl ρlg tl, fs)
+    (* client_trans (tl, fs) (Some (cl_al, cl_R)) (allow_lock_impl ρlg tl, fs) *)
+    client_trans (tl, fs) (Some $ ρ_ext $ flL (ρlg: fmrole TlLM_FM)) (allow_lock_impl ρlg tl, fs)
   .
 
-  Instance cl_role_kind_dec: EqDecision cl_role_kind.
-  Proof. solve_decision. Qed. 
+  (* Instance cl_role_kind_dec: EqDecision cl_role_kind. *)
+  (* Proof. solve_decision. Qed.  *)
   Instance flag_state_dec: EqDecision flag_state.
   Proof. solve_decision. Qed.   
   Instance cl_id_dec: EqDecision cl_id.
@@ -211,8 +282,8 @@ Section ClientDefs.
     [ repeat (apply NoDup_cons; split; [set_solver| ]); apply NoDup_nil_2 |
      by intros x; destruct x; set_solver]. 
        
-  Instance cl_role_kind_cnt: Countable cl_role_kind.
-  Proof. fin_type_countable [cl_lift; cl_au; cl_al; cl_cl]. Qed. 
+  (* Instance cl_role_kind_cnt: Countable cl_role_kind. *)
+  (* Proof. fin_type_countable [cl_lift; cl_au; cl_al; cl_cl]. Qed.  *)
   Instance flag_state_cnt: Countable flag_state.
   Proof. fin_type_countable [fs_U; fs_S; fs_O]. Qed. 
   Instance cl_id_cnt: Countable cl_id.
@@ -222,45 +293,67 @@ Section ClientDefs.
     
   (*   unshelve eapply prod_countable; try apply _.   *)
 
+  Lemma ρlg_dom_dec (ρlg: Gtl):
+    {c | ρlg = ρlg_tl c} + (forall c, ρlg ≠ ρlg_tl c).
+  Proof. 
+    destruct (decide (ρlg = ρlg_tl cl_L)) as [-> | ?].
+    { left. eauto. } 
+    destruct (decide (ρlg = ρlg_tl cl_R)) as [-> | ?].
+    { left. eauto. }
+    right. intros c. by destruct c.
+  Qed. 
+
   
   Instance client_step_ex_dec (st: client_state) (ρ: client_role):
     Decision (exists st', client_trans st (Some ρ) st').
   Proof.
     destruct st as [tl_st flag].
-    destruct ρ as [k c].
-    destruct k.
-    - pose proof TlLM_LFP. (* why it's not inferred? *)
+    destruct ρ as [er | c].
+    2: { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_U /\ c = cl_L)) as [(?&?&->&->)| ].
+         + left. eexists (_, _). econstructor; eauto.
+         + right. intros [? STEP]. inversion STEP; subst. tauto. }
+    destruct er as [ρlg | [ι]]. 
+    { destruct (ρlg_dom_dec ρlg).
+      2: { right. intros [? STEP]. inversion STEP. subst.
+           eapply n; eauto. }
+      destruct s as [c ->]. 
+      pose proof TlLM_LFP. (* why it's not inferred? *)
       destruct (decide (exists tl_st', locale_trans tl_st (ρlg_tl c) tl_st' (LM := TlLM))) as [STEP | NOSTEP]. 
       + left. destruct STEP as [? STEP].
         eexists (_, _). eapply ct_lib_step. apply STEP.
       + right. intros [? STEP]. inversion STEP. subst.
-        eapply NOSTEP. eexists. apply LIB_STEP.
-    - destruct c.
-      + destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_S)) as [(?&?&->)| ]. 
+        apply ρlg_tl_inj in H3. subst. 
+        eapply NOSTEP. eexists. apply LIB_STEP. }
+
+    destruct ι.
+    - destruct (decide (ρ = ρlg_tl cl_L)) as [-> | ?].
+      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_S)) as [(?&?&->)| ]. 
         * left. eexists (_, _). eapply ct_au_L; eauto.
-        * right. intros [? STEP]. inversion STEP. subst. tauto.
-      + destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ flag ≠ fs_O)) as [(?&?&?)| ].
+        * right. intros [? STEP]. inversion STEP; subst; try tauto.
+          by eapply ρlg_lr_neq. }
+      destruct (decide (ρ = ρlg_tl cl_R)) as [-> | ?].
+      { destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ flag ≠ fs_O)) as [(?&?&?)| ].
         * left. eexists (_, if decide (flag = fs_U) then fs_U else fs_O). eapply ct_au_R; eauto.
           destruct flag;
             (rewrite decide_True; tauto) || (rewrite decide_False; try tauto; congruence).
-        * right. intros [? STEP]. inversion STEP; subst.
-          apply n. 
-          destruct FS as [[-> ->] | [-> ->]]; try tauto.
-          all: split; eauto.
-    - destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ flag ≠ fs_O /\ c = cl_R)) as [(?&?&?&->) | NOSTEP].
-      + left. eexists (_, _). econstructor; eauto.
-      + right. intros [? STEP]. inversion STEP; subst. tauto.
-    - destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_U /\ c = cl_L)) as [(?&?&->&->)| ].
+        * right. intros [? STEP]. inversion STEP; subst; try tauto.
+          all: apply n0; set_solver. }
+      right. intros [? STEP]. inversion STEP; subst; try tauto.
+    - destruct (decide (ρ = ρlg_tl cl_R)) as [-> | ?].
+      2: { right. intros [? STEP]. inversion STEP; subst; try tauto. }
+      destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st (M := TlLM_FM) /\ flag ≠ fs_O)) as [(?&?&?) | NOSTEP].
       + left. eexists (_, _). econstructor; eauto.
       + right. intros [? STEP]. inversion STEP; subst. tauto.
   Qed.
 
   Definition client_lr (st: client_state): gset (client_role) :=
     filter (fun r => (@bool_decide _ (client_step_ex_dec st r) = true))
+           (* (set_map ρlg_tl) *)
+           (* {[ ρlg_l; ρlg_r *)
            (list_to_set $
-              k ← [cl_lift; cl_au; cl_al; cl_cl];
+              f ← [ρ_lib ∘ ρlg_tl; ρ_ext ∘ flU ∘ ρlg_tl; ρ_ext ∘ flL ∘ ρlg_tl; ρ_cl];
               c ← [cl_L; cl_R];
-              mret (k, c)). 
+              mret (f c)). 
 
   Lemma client_lr_spec: ∀ (s : client_state) (ρ : client_role),
       (exists s', client_trans s (Some ρ) s') <-> ρ ∈ client_lr s.
@@ -268,9 +361,11 @@ Section ClientDefs.
     intros ??. rewrite /client_lr.
     rewrite elem_of_filter. rewrite @bool_decide_eq_true.
     rewrite iff_and_impl_helper; [done| ]. 
-    intros _. destruct ρ as [[] []]; set_solver.  
+    intros [? STEP]. apply elem_of_list_to_set.
+    simpl. inversion STEP; subst. 
+    { destruct c; set_solver. }
+    all: set_solver.
   Qed. 
-
     
   Definition client_model_impl: FairModel.
   Proof.
@@ -284,10 +379,73 @@ Section ClientDefs.
       solve_decision.
     - pose proof (@inhLM _ _ _ _ _ _ TlLM_LFP) as [δ]. 
       apply (populate (δ, fs_U)).
-    - apply (populate (cl_cl, cl_L)).
     - intros. apply client_lr_spec. eauto.
-  Defined.  
+  Defined.
 
+  (* Definition project_tl_label (oρ: option $ fmrole client_model_impl): *)
+  (*   option (@ext_role _ TlEM) := *)
+  (*   match oρ with | Some (inl l) => Some $ Some l | _ => None end.  *)
+    
+  (*   match oρ with *)
+  (*   | Some (cl_lift, c) => Some $ inl $ ρlg_tl c *)
+  (*   | Some (cl_au, c) => Some $ inr $ @env _ TlEM flU *)
+  (*   | Some (cl_al, c) => Some $ inr $ @env _ TlEM (flL ((ρlg_tl c): fmrole TlLM_FM)) *)
+  (*   | _ => None  *)
+  (*   end.  *)
+
+  Definition project_tl_trace (tr: mtrace client_model_impl): 
+    elmftrace (ELM := TlEM) :=
+    project_nested_trace fst 
+      (* (fun oρ => option_fmap _ _ Some (project_tl_label oρ)) *)
+      (fun ℓ => match ℓ with | Some (inl l) => Some $ Some l | _ => None end)                         
+      tr. 
+    
+  Local Ltac unfold_slm H :=
+    match type of H with 
+    | step_label_matches ?step ?P => destruct H as (?&?&?&->&?Pstep)
+    end.
+
+  Definition is_tl_step (step: model_trace_step client_model_impl) :=
+    step_label_matches step (fun ρ => exists ρlg, Some $ inl ρlg = ρ). 
+
+  (* TODO: show that all TL states used in client trace are WF;
+     add a "step belongs to trace" premise to nested_trace_construction *)
+  Lemma ALWAYS_tl_state_wf (tl: tl_state): state_wf tl.
+  Proof. Admitted. 
+  
+  Lemma tl_trace_construction (tr: mtrace client_model_impl)
+    (VALID: mtrace_valid tr)
+    (TL_STEPS: ∀ i res, tr !! i = Some res → is_tl_step res \/ is_end_state res):
+    lm_model_traces_match
+      (transA := @ext_trans _ TlEM)
+      ((option_fmap _ _ inl): option (@ext_role _ TlEM) -> option $ fmrole client_model_impl)
+      (fun c δ_lib => fst c = δ_lib)
+      tr (project_tl_trace tr).
+  Proof.
+    do 2 red.
+    rewrite /out_A_labels_match. simpl.
+    eapply traces_match_impl; cycle 1.
+    { intros *. intros X. apply X. }
+    { eapply nested_trace_construction.
+      { done. }
+      { intros * ITH. apply TL_STEPS in ITH as [LIB | ?]; [| tauto].
+        red in LIB. unfold_slm LIB. destruct Pstep as [? <-].
+        left. do 3 eexists. eauto. }
+      intros. destruct ℓ; [| done]. destruct c; [| done].
+      inversion H1. subst.
+      inversion H0; subst; simpl in *.
+      - econstructor. auto.
+      - econstructor. simpl.
+        eapply allows_unlock_impl_spec; auto.
+        apply ALWAYS_tl_state_wf.
+      - econstructor. simpl. 
+        eapply allows_unlock_impl_spec; auto.
+        apply ALWAYS_tl_state_wf.
+      - econstructor. simpl. 
+        eapply allows_lock_impl_spec; auto. }
+    simpl. intros. destruct ℓ1; [| done]. destruct c; [| done].
+    by inversion H0.
+  Qed.
 
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     (* lmtr *)
@@ -296,8 +454,15 @@ Section ClientDefs.
     mtrace_fairly_terminating tr.
   Proof.
     intros. red. intros VALID FAIR.
-    (* destruct (infinite_or_finite tr) as [INF|]; [| done]. *)
     pose proof (trace_has_len tr) as [len LEN].
+    
+    forward eapply trace_prop_split with (P := fun '(s, _) => s.2 = fs_U) as (i'_s & STEPs & NOs).
+    2: by apply LEN. 
+    { solve_decision. }
+
+    assert (exists i_s, i'_s = NOnum i_s) as [i_s ->]. 
+    { 
+    
     
 
 

@@ -70,30 +70,26 @@ End FairLock.
 
 Section FairLockEM.
   Context {M: FairModel}.
-  Inductive fl_EI := flU | flL (ρ: fmrole M).
-  Context {au: fmstate M -> fmstate M -> Prop}
-          {al: fmrole M -> fmstate M -> fmstate M -> Prop}. 
+  Inductive fl_EI := flU (ρ: fmrole M) | flL (ρ: fmrole M).
+  Context {au al: fmrole M -> fmstate M -> fmstate M -> Prop}. 
 
   Global Instance fl_EI_dec: EqDecision fl_EI. 
   Proof using. solve_decision. Qed. 
 
   Global Instance fl_EI_cnt: Countable fl_EI. 
   Proof using.
-    assert (Countable (fmrole M)) as CNTρ by apply _.    
+    assert (Countable (fmrole M)) as CNTρ by apply _.
     eapply inj_countable' with 
-      (f := fun ι => match ι with | flU => 0 | flL ρ => S (encode_nat ρ) end)
-      (g := fun n => match n with 
-                  | 0 => flU 
-                  | S n' => match decode_nat n' with
-                           | Some ρ => flL ρ
-                           | None => flU
-                           end end).
-    intros. destruct x; auto. by rewrite decode_encode_nat. 
+      (f := fun ι => match ι with | flU ρ => inl ρ
+                                | flL ρ => inr ρ end)
+      (g := fun sn => match sn with | inl n => flU n
+                            | inr n => flL n end).
+    by destruct x. 
   Qed.
 
   Definition fl_ETs (ι: fl_EI) :=
     match ι with
-    | flU => au
+    | flU ρ => au ρ
     | flL ρ => al ρ
     end.
 
@@ -109,7 +105,7 @@ End FairLockEM.
 
 
 Class FairLockExt (M: FairModel) := {
-  allows_unlock: fmstate M -> fmstate M -> Prop;
+  allows_unlock: fmrole M -> fmstate M -> fmstate M -> Prop;
   allows_lock: fmrole M -> fmstate M -> fmstate M -> Prop;
   fl_active_exts: fmstate M -> gset (@fl_EI M);
   fl_active_exts_spec: forall st ι, ι ∈ fl_active_exts st <-> ∃ st', (@fl_ETs _ allows_unlock allows_lock) ι st st';
@@ -121,11 +117,11 @@ Definition FL_EM `(FLE: FairLockExt M) :=
 
 
 Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) := {
-  allow_unlock_impl: fmstate M -> fmstate M;
+  allow_unlock_impl: fmrole M -> fmstate M -> fmstate M;
   allow_lock_impl: fmrole M -> fmstate M -> fmstate M;
-  allows_unlock_impl_spec st (WF: state_wf st):
-    forall st', allows_unlock st st' <->
-             (allow_unlock_impl st = st' /\ (exists ρ, has_lock_st ρ st /\ ¬ active_st ρ st));
+  allows_unlock_impl_spec ρ st (WF: state_wf st):
+    forall st', allows_unlock ρ st st' <->
+             (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ ¬ active_st ρ st));
   allows_lock_impl_spec ρ st:
     forall st', allows_lock ρ st st' <->
              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ ¬ active_st ρ st));
