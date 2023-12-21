@@ -26,38 +26,20 @@ Close Scope Z_scope.
 
 Local Ltac gd t := generalize dependent t.
 
-Instance client_trans'_PI s x: 
-  ProofIrrel ((let '(s', ℓ) := x in 
-               fmtrans client_model_impl s ℓ s' \/ (s' = s /\ ℓ = None)): Prop).
-Proof. apply make_proof_irrel. Qed.    
-
-
-Local Instance step'_eqdec: forall s1, EqDecision
-                  {'(s2, ℓ) : client_model_impl *
-                              option (fmrole client_model_impl) | 
-                  fmtrans client_model_impl s1 ℓ s2 ∨ 
-                  s2 = s1 ∧ ℓ = None}.
-  (* TODO: why it stopped being inferred automatically? *)
-  pose proof (fmstate_eqdec client_model_impl).
-  solve_decision. 
-Defined. 
-  
-Lemma client_model_finitary (s1 : fmstate client_model_impl):
-    Finite
-      {'(s2, ℓ) : client_model_impl * option (fmrole client_model_impl) | 
-      fmtrans client_model_impl s1 ℓ s2 ∨ s2 = s1 ∧ ℓ = None}. 
+Lemma client_model_step_fin (s1 : fmstate client_model_impl):
+  {nexts: list (fmstate client_model_impl) | forall s2 oρ, fmtrans _ s1 oρ s2 -> s2 ∈ nexts}. 
 Proof.
   destruct s1 as (δ_lib, c).
   pose proof (lib_model_impl_fin (ls_under δ_lib)) as [ie_lib IE_LIB]. 
   pose proof (role_LM_step_dom_all δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := lib_model lib_gs)) as STEPS_LIB.
-  
+
   remember (map fst (enumerate_next δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := lib_model lib_gs))) as steps_lib.
-  set (steps := [((δ_lib, c), None); ((δ_lib, c - 1), Some ρ_cl);
-                 ((reset_lm_st ρlg δ_lib ρlg_in_lib_gs, c - 1), Some ρ_ext)] ++
-                 ((fun δ' => ((δ', c), Some ρ_lib)) <$> steps_lib)). 
-  eapply in_list_finite with (l := steps).
-  intros [[δ' c'] oρ] TRANS. destruct TRANS as [TRANS | [EQ ->]].
-  2: { inversion EQ. subst. subst steps. set_solver. }
+  set (steps := [((δ_lib, c - 1));
+                 ((reset_lm_st ρlg δ_lib ρlg_in_lib_gs, c - 1))] ++
+                 ((fun δ' => ((δ', c))) <$> steps_lib)). 
+
+  exists steps. 
+  intros [δ' c'] oρ TRANS.
   simpl in TRANS. inversion TRANS; subst.
   1,2,4: set_solver. 
   subst steps. apply elem_of_app. right. apply elem_of_list_fmap.
@@ -69,9 +51,14 @@ Proof.
     { eexists. eauto. }
     - right. eauto.
     - by left. }
-  rewrite list_to_set_elements_L. by apply δ'. 
-Qed. 
+  rewrite list_to_set_elements_L. by apply δ'.
+Qed.
 
+Let client_model_finitary s1 :=
+      let NEXT := client_model_step_fin s1 in
+      model_finitary_helper s1 (proj1_sig NEXT) (proj2_sig NEXT). 
+ 
+  
 Section ClientRA.
 
   Definition clientPreΣ : gFunctors :=

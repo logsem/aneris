@@ -1,5 +1,7 @@
 From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega fuel lm_fair fairness_finiteness lm_fair_traces lm_fairness_preservation lm_fairness_preservation_wip subtrace traces_equiv.
 From trillium.fairness.ext_models Require Import ext_models.
+From stdpp Require Import finite.
+From trillium.prelude Require Import classical_instances finitary.
 
 
 Section StepLabelMatches.
@@ -224,3 +226,51 @@ Section OuterExposing.
   
 End OuterExposing.
 
+
+Section FinitaryModels.
+  Context {M: FairModel}. 
+  
+  Definition model_step_helper
+    (st: fmstate M) (step: fmstate M * option (fmrole M)) :=
+    let '(s', ℓ) := step in
+    fmtrans M st ℓ s' \/ (s' = st /\ ℓ = None).
+
+  Instance model_trans'_PI st step: 
+    ProofIrrel (model_step_helper st step). 
+  Proof. apply make_proof_irrel. Qed.
+
+  Instance step'_eqdec: 
+    forall s1, EqDecision {step | model_step_helper s1 step}.
+  (* TODO: why it stopped being inferred automatically? *)
+  Proof. 
+    pose proof (fmstate_eqdec M).
+    solve_decision. 
+  (* Qed. *)
+  Defined. 
+
+  Lemma model_finitary_helper (s1: fmstate M)
+    (nexts: list (fmstate M))
+    (NEXTS: forall s2 oρ, fmtrans M s1 oρ s2 -> s2 ∈ nexts)
+    :
+    Finite {step | model_step_helper s1 step }. 
+  Proof.
+    rewrite /model_step_helper.
+    set (steps :=
+           let lr := None :: (Some <$> (elements $ live_roles _ s1)) in
+           (s1, None) :: (s ← nexts; ρ ← lr; mret (s, ρ))).
+   (* : list (lf * nat * option client_role) *)
+    eapply in_list_finite with (l := steps).
+    intros [s2 oρ] TRANS. destruct TRANS as [TRANS | [EQ ->]].
+    2: { set_solver. }
+    subst steps. simpl. apply elem_of_cons. right.
+    apply elem_of_list_bind. eexists. split; eauto.
+    destruct oρ.
+    2: { set_solver. }
+    apply elem_of_cons. right.
+    apply elem_of_list_bind. eexists. split. 
+    { apply elem_of_list_ret. reflexivity. }
+    apply elem_of_list_fmap_1, elem_of_elements.
+    eapply fm_live_spec; eauto.
+  Qed. 
+
+End FinitaryModels.
