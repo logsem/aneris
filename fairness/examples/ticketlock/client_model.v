@@ -2,8 +2,8 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation trace_lookup fairness_finiteness.
-From trillium.fairness.ext_models Require Import ext_models.
+From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
+From trillium.fairness.ext_models Require Import ext_models destutter_ext.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 From trillium.fairness.heap_lang Require Export lang.
 From stdpp Require Import finite.
@@ -673,13 +673,11 @@ Section ClientDefs.
       ((inl ∘ inl): Gtl -> fmrole client_model_impl) (option_fmap _ _ inl) (λ st tl_st, st.1 = tl_st)
       (LMo := client_model)
   .
-
-  
-
+ 
 
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
-    (* lmtr *)
-    (* (OUTER_CORR: outer_LM_trace_exposing lmtr tr) *)
+    lmtr
+    (OUTER_CORR: client_LM_trace_exposing lmtr tr)
     (INIT: is_init_cl_state (trfirst tr))
     :
     mtrace_fairly_terminating tr.
@@ -728,11 +726,47 @@ Section ClientDefs.
         inversion RES; subst. 
         all: by do 3 eexists; eauto. }
 
+      destruct (decide (i'_s = NOinfinity)) as [INF| ]. 
+      2: { destruct i'_s; set_solver. }
+
       forward eapply (lock_progress (project_tl_trace str) (ρlg_tl cl_L) 0 (trfirst str).1).
       { by eapply traces_match_valid2. }
       { intros.
         apply ALWAYS_tl_state_wf. }
-      { 
+      { subst i'_s. 
+        forward eapply outer_exposing_subtrace; eauto.
+        intros [? EXP'].
+
+        assert (∀ ρ, afair_by_next_TS (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str) (LF := TlLM_LFP)) as TL_FAIR'.
+        { eapply inner_LM_trace_fair_aux.
+          - apply _.
+          - by apply EXP'. 
+          - simpl. intros ?? [=<-].
+            by apply EXP'.
+          - by apply EXP'.
+          - subst. eapply infinite_trace_equiv; eauto. 
+          - by apply MATCH. 
+          - eapply fair_by_subtrace; eauto. }
+        
+        pose proof (proj1 (ELM_ALM_afair_by_next _ _ _) TL_FAIR') as TL_FAIR.  
+        red. red. intros ? [ρ ->].
+        red. specialize (TL_FAIR ρ).
+
+        foobar. derive the required fairness from fair_by_next_TS_ext.
+        red.
+        unfold fair_by_next_TS_ext in FI. 
+        do 2 red. intros. eapply FI. 
+        apply FI. 
+
+      eapply inner_LM_trace_fair_aux.
+      - apply _.
+      - by apply EXP'. 
+      - simpl. intros ?? [=<-].
+        by apply EXP'.
+      - by apply EXP'.
+      - subst. eapply infinite_trace_equiv; eauto. 
+      - by apply MATCH. 
+      - eapply fair_by_subtrace; eauto.
 
       
 
