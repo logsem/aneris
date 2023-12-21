@@ -2,9 +2,12 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation trace_lookup.
+From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation trace_lookup fairness_finiteness.
 From trillium.fairness.ext_models Require Import ext_models.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
+From trillium.fairness.heap_lang Require Export lang.
+From stdpp Require Import finite.
+From trillium.prelude Require Import finitary classical_instances.
 
 Close Scope Z_scope.
 
@@ -203,7 +206,8 @@ Section ClientDefs.
     - destruct y; simpl; lia.
   Qed. 
 
-  Context {Mtl: FairModel}.  
+  Context {Mtl: FairModel}.
+  Context {Tl_nexts: forall tl_st, next_states tl_st (M := Mtl)}.
 
   Context {TlLM': forall gs, LiveModel Gtl Mtl (LSI_groups_fixed gs)}.  
   Context (TlLM_LFP': ∀ gs: gset Gtl, gs ≠ ∅ → LMFairPre (TlLM' gs)).
@@ -214,7 +218,8 @@ Section ClientDefs.
   Definition TlLM_FM := LM_Fair (LF := TlLM_LFP).
 
   Context `(TlEM_FL: @FairLock TlLM_FM tl_FLP tl_FLE).
-  Definition TlEM := FL_EM tl_FLE. 
+  Definition TlEM := FL_EM tl_FLE.
+  Context (TlEM_EXT_KEEPS: ext_keeps_asg (ELM := TlEM)).
 
   (* TODO: reorganize the premises so those below don't depend
      on the client's choice of lib_gs *)
@@ -269,6 +274,18 @@ Section ClientDefs.
     client_trans (tl, fs) (Some $ ρ_ext $ flL (ρlg: fmrole TlLM_FM)) (allow_lock_impl ρlg tl, fs)
   .
 
+  (* (* easier to show decidability for*) *)
+  (* Definition client_trans_alt '(tl1, flag1) oρ '(tl2, flag2) := *)
+  (*   (exists c, oρ = Some $ ρ_lib (ρlg_tl c) /\ *)
+  (*         fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2 /\ flag1 = flag2 /\ oρ) \/ *)
+  (*   (has_lock_st (ρlg_tl cl_L) tl1) /\ ¬ active_st (ρlg_tl cl_L) tl1 /\ *)
+  (*         flag1 =  *)
+    
+
+      
+    (* client_trans (tl_st1, flag1) oρ (tl_st2, flag2).  *)
+    
+
   (* Instance cl_role_kind_dec: EqDecision cl_role_kind. *)
   (* Proof. solve_decision. Qed.  *)
   Instance flag_state_dec: EqDecision flag_state.
@@ -284,10 +301,13 @@ Section ClientDefs.
        
   (* Instance cl_role_kind_cnt: Countable cl_role_kind. *)
   (* Proof. fin_type_countable [cl_lift; cl_au; cl_al; cl_cl]. Qed.  *)
+  Let all_flag_states := [fs_U; fs_S; fs_O]. 
   Instance flag_state_cnt: Countable flag_state.
-  Proof. fin_type_countable [fs_U; fs_S; fs_O]. Qed. 
+  Proof. fin_type_countable all_flag_states. Qed. 
+
+  Let all_cl_id := [cl_L; cl_R]. 
   Instance cl_id_cnt: Countable cl_id.
-  Proof. fin_type_countable [cl_L; cl_R]. Qed. 
+  Proof. fin_type_countable all_cl_id. Qed. 
   
   (* Lemma client_role_Cnt: Countable client_role. *)
     
@@ -303,7 +323,59 @@ Section ClientDefs.
     right. intros c. by destruct c.
   Qed. 
 
-  
+  Local Instance client_eq: EqDecision client_state.
+  Proof.
+    pose proof (@LS_eqdec _ _ _ _ _ _ TlLM_LFP).
+    solve_decision. 
+  Defined.  
+
+  (* TODO: derive this from decidability of a transition
+     and finite branching, make it a general lemma *)
+  Instance client_step_dec st1 ρ st2:
+    Decision (client_trans st1 (Some ρ) st2).
+  Proof.
+    pose proof (@LS_eqdec _ _ _ _ _ _ TlLM_LFP).
+    destruct st1 as [tl_st1 flag1], st2 as [tl_st2 flag2].
+    destruct ρ as [er | c].
+    2: { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ flag1 = fs_U /\ c = cl_L /\ flag2 = fs_S /\ tl_st1 = tl_st2)) as [(?&?&->&->&->&->)| ].
+         + left. econstructor; eauto.
+         + right. intros STEP. inversion STEP; subst. tauto. }
+
+    destruct er as [ρlg | [ι]]. 
+    { destruct (ρlg_dom_dec ρlg).
+      2: { right. intros STEP. inversion STEP. subst.
+           eapply n; eauto. }
+      destruct s as [c ->]. 
+      pose proof TlLM_LFP. (* why it's not inferred? *)
+      destruct (decide (locale_trans tl_st1 (ρlg_tl c) tl_st2 (LM := TlLM) /\ flag1 = flag2)) as [[STEP ->] | NOSTEP]. 
+      + left. 
+        eapply ct_lib_step. apply STEP.
+      + right. intros STEP. inversion STEP. subst.
+        apply ρlg_tl_inj in H3. subst. 
+        by eapply NOSTEP. }
+
+    destruct ι.
+    - destruct (decide (ρ = ρlg_tl cl_L)) as [-> | ?].
+      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_L): fmrole TlLM_FM) tl_st1 /\ flag1 = fs_S /\ flag2 = fs_S)) as [(?&?&->&->&->)| ]. 
+        * left. eapply ct_au_L; eauto.
+        * right. intros STEP. inversion STEP; subst; try tauto.
+          by eapply ρlg_lr_neq. }
+      destruct (decide (ρ = ρlg_tl cl_R)) as [-> | ?].
+      { destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ (flag1 = fs_U /\ flag2 = fs_U \/ flag1 = fs_S /\ flag2 = fs_O))) as [(?&?&->&?)| ].
+        * left. eapply ct_au_R; eauto.
+        * right. intros STEP. inversion STEP; subst; try tauto.
+          apply n0; set_solver. }
+      right. intros STEP. inversion STEP; subst; tauto.
+    - destruct (decide (ρ = ρlg_tl cl_R)) as [-> | ?].
+      2: { right. intros STEP. inversion STEP; subst; tauto. }
+      destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_lock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ flag1 ≠ fs_O /\ flag2 = flag1)) as [(?&?&->&?&->) | NOSTEP].
+      + left. econstructor; eauto.
+      + right. intros STEP. inversion STEP; subst. tauto.
+  Qed.  
+    
+
+  (* TODO: derive this from decidability of a transition
+     and finite branching, make it a general lemma *)
   Instance client_step_ex_dec (st: client_state) (ρ: client_role):
     Decision (exists st', client_trans st (Some ρ) st').
   Proof.
@@ -346,14 +418,14 @@ Section ClientDefs.
       + right. intros [? STEP]. inversion STEP; subst. tauto.
   Qed.
 
+  Let all_roles: gset client_role :=
+      list_to_set $
+      f ← [ρ_lib ∘ ρlg_tl; ρ_ext ∘ flU ∘ ρlg_tl; ρ_ext ∘ flL ∘ ρlg_tl; ρ_cl];
+      c ← [cl_L; cl_R];
+      mret (f c).
+
   Definition client_lr (st: client_state): gset (client_role) :=
-    filter (fun r => (@bool_decide _ (client_step_ex_dec st r) = true))
-           (* (set_map ρlg_tl) *)
-           (* {[ ρlg_l; ρlg_r *)
-           (list_to_set $
-              f ← [ρ_lib ∘ ρlg_tl; ρ_ext ∘ flU ∘ ρlg_tl; ρ_ext ∘ flL ∘ ρlg_tl; ρ_cl];
-              c ← [cl_L; cl_R];
-              mret (f c)). 
+    filter (fun r => (@bool_decide _ (client_step_ex_dec st r) = true)) all_roles. 
 
   Lemma client_lr_spec: ∀ (s : client_state) (ρ : client_role),
       (exists s', client_trans s (Some ρ) s') <-> ρ ∈ client_lr s.
@@ -375,8 +447,6 @@ Section ClientDefs.
         fmtrans := client_trans;
         live_roles := client_lr;
     |}).
-    - pose proof (@LS_eqdec _ _ _ _ _ _ TlLM_LFP). (* not inferred? *)
-      solve_decision.
     - pose proof (@inhLM _ _ _ _ _ _ TlLM_LFP) as [δ]. 
       apply (populate (δ, fs_U)).
     - intros. apply client_lr_spec. eauto.
@@ -452,12 +522,159 @@ Section ClientDefs.
 
   Definition is_init_cl_state (st: client_state) :=
     (forall c, let ρlg := ρlg_tl c in can_lock_st ρlg st.1 /\ active_st ρlg st.1) /\
-    st.2 = fs_U. 
+    st.2 = fs_U.
+
+ 
+  Definition client_LSI (s: client_state)
+    (tm: groups_map (M := client_model_impl) (G := locale heap_lang))
+    (_: gmap (fmrole client_model_impl) nat) :=
+    forall gi, (exists ρi, ls_mapping s.1 !! ρi = Some gi) -> inl $ inl gi ∈ mapped_roles tm.
+    
+  Definition client_fl := 15. 
+  Definition client_model: LiveModel (locale heap_lang) client_model_impl client_LSI :=
+    {| lm_fl _ := client_fl; |}.  
+
+  Local Instance inh_client: Inhabited (lm_ls client_model).
+  Proof.
+    (* pose proof (LSI_gf_ls_inh (lib_model lib_gs) lib_gs_ne) as [δ].   *)
+    pose proof (@inhLM _ _ _ _ _ _ TlLM_LFP) as [tl_st].  
+    assert (Inhabited (locale heap_lang)) as [τ] by apply _.
+    apply populate.
+    refine {| ls_under := (tl_st, fs_U): fmstate client_model_impl;
+              ls_fuel := (gset_to_gmap 0 all_roles);
+              ls_tmap := {[ τ := all_roles ]}; |}.
+    - rewrite dom_gset_to_gmap. simpl. set_solver.   
+    - intros ρ. 
+      rewrite dom_gset_to_gmap. 
+      setoid_rewrite lookup_singleton_Some.
+      etrans.
+      2: { symmetry. apply ex_det_iff with (a := τ). by intros ? (?&[??]&?). } 
+      etrans.
+      2: { symmetry. eapply ex_det_iff. intros ? ([??]&?). symmetry. apply H1. }
+      tauto.
+  - red. intros * NEQ TM1%lookup_singleton_Some TM2%lookup_singleton_Some.
+    destruct TM1, TM2. congruence.
+  - red. intros g [ρ MAP]. simpl in MAP. 
+    rewrite /mapped_roles. rewrite map_img_singleton_L flatten_gset_singleton.
+    apply ls_mapping_tmap_corr in MAP as (?&TM&?).
+    forward eapply (ls_inv tl_st g) as IN.
+    { eapply @elem_of_dom; [apply _| ]. eauto. }
+    rewrite lib_gs_ρlg in IN.
+    rewrite /all_roles. set_solver.
+  Qed.
+
+  Lemma all_flag_states_spec: forall f, f ∈ all_flag_states.
+  Proof. destruct f; set_solver. Qed.  
+
+  Lemma client_model_step_fin (s1 : fmstate client_model_impl):
+    {nexts: list (fmstate client_model_impl) | forall s2 oρ, fmtrans _ s1 oρ s2 -> s2 ∈ nexts}.
+  Proof.
+    destruct s1 as (δ_lib, f).
+    pose proof (Tl_nexts (ls_under δ_lib)) as [ie_lib IE_LIB].
+    pose proof (role_LM_step_dom_all δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := TlLM)) as STEPS_LIB.
+
+    set nexts_lib := (map fst (enumerate_next δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := TlLM))).
+    fold nexts_lib in STEPS_LIB.
+    
+    set (nexts_tl :=
+           δ_lib :: nexts_lib ++
+           map (flip allow_unlock_impl δ_lib) (elements lib_gs) ++
+           map (flip allow_lock_impl δ_lib) (elements lib_gs)). 
+    set nexts := f ← all_flag_states; δ ← nexts_tl; mret (δ, f). 
+    
+    exists nexts. 
+    intros [δ' f'] oρ TRANS. simpl in TRANS.
+    subst nexts. repeat setoid_rewrite elem_of_list_bind.
+    setoid_rewrite elem_of_list_ret.
+    eexists. split; [| by apply all_flag_states_spec].
+    eexists. split; eauto.
+    subst nexts_tl. 
+    inversion TRANS; subst.
+    - apply elem_of_list_further, elem_of_app. left.
+      simpl in LIB_STEP. destruct LIB_STEP as (ℓ & LIB_STEP & MATCH). 
+      apply elem_of_list_In. eapply STEPS_LIB; eauto.
+      2: { rewrite list_to_set_elements_L. by apply δ'. }
+      apply elem_of_cons. 
+      edestruct @locale_trans_fmtrans_or_eq as [[? FM] | EQ]. 
+      { eexists. eauto. }
+      + right. eauto.
+      + by left.
+    - apply elem_of_cons. tauto.
+    - apply elem_of_list_further, elem_of_app. right.
+      apply elem_of_app. left. rewrite lib_gs_ρlg. 
+      apply elem_of_list_fmap. eexists. split; eauto.
+      apply elem_of_elements. set_solver.
+    - apply elem_of_list_further, elem_of_app. right.
+      apply elem_of_app. left. rewrite lib_gs_ρlg.
+      apply elem_of_list_fmap. eexists. split; eauto.
+      apply elem_of_elements. set_solver.
+    - apply elem_of_list_further, elem_of_app. right.
+      apply elem_of_app. right. rewrite lib_gs_ρlg.
+      apply elem_of_list_fmap. eexists. split; eauto.
+      apply elem_of_elements. set_solver.
+  Qed. 
+
+  (* TODO: move, find existing? *)
+  Lemma curry_uncurry_prop {A B C: Prop}:
+    (A -> B -> C) <-> (A /\ B -> C).
+  Proof. tauto. Qed. 
+
+  Instance client_LSI_dec: 
+    forall st tm fm, Decision (client_LSI st tm fm).
+  Proof. 
+    intros [tl_st ?] tm fm. rewrite /client_LSI. simpl. 
+    eapply Decision_iff_impl with
+      (P := Forall 
+              (fun g => Exists 
+                       (fun ρ => ls_mapping tl_st !! ρ = Some g) 
+                       (elements $ dom $ ls_mapping tl_st) -> inl (inl g) ∈ mapped_roles tm)
+              (elements lib_gs)).
+    2: { solve_decision. }
+    
+    rewrite -set_Forall_elements.
+    apply forall_proper. intros g.
+    rewrite curry_uncurry_prop. apply ZifyClasses.impl_morph; [| done].
+    rewrite and_comm. rewrite iff_and_impl_helper.
+    2: { intros (?&?&IN)%List.Exists_exists.
+         apply (ls_inv tl_st). 
+         apply ls_mapping_tmap_corr in IN as (?&IN&?).
+         eapply @elem_of_dom; eauto. apply _. }
+    rewrite List.Exists_exists.
+    apply exist_proper. intros ρ. 
+    rewrite and_comm. apply iff_and_impl_helper.
+    intros. apply elem_of_list_In, elem_of_elements. by apply elem_of_dom.
+  Qed. 
+
+  Instance client_lm_dec_ex_step:
+    ∀ τ δ1, Decision (∃ δ2, locale_trans δ1 τ δ2 (LM := client_model)).
+  Proof. 
+    intros.
+    pose proof (client_model_step_fin (ls_under δ1)) as [nexts NEXTS]. 
+    apply locale_trans_ex_dec_fin with (steps := nexts).
+    { intros. apply elem_of_list_In. eauto. }
+    intros. eexists. eapply rearrange_roles_spec.
+    Unshelve.
+    + exact client_model. 
+    + red. intros ? [??].
+      erewrite <- mapped_roles_dom_fuels_gen.
+      2: { apply rrm_tmap_fuel_same_doms. }
+      pose proof (ls_inv δ2) as LSI2. red in LSI2. 
+      specialize (LSI2 _ ltac:(eauto)).
+      by rewrite -mapped_roles_dom_fuels in LSI2. 
+  Qed. 
+
+    
+  Local Instance client_LF: LMFairPre client_model.
+  esplit; apply _.
+  Defined.
+
+  Definition client_LM_trace_exposing :=
+    outer_LM_trace_exposing TlEM_EXT_KEEPS
+      ((inl ∘ inl): Gtl -> fmrole client_model_impl) (option_fmap _ _ inl) (λ st tl_st, st.1 = tl_st)
+      (LMo := client_model)
+  .
 
   
-  Definition client_LM_trace_exposing :=
-    outer_LM_trace_exposing lib_keeps_asg
-      (inl ∘ inl) (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib). 
 
 
   Lemma client_model_fair_term (tr: mtrace client_model_impl)

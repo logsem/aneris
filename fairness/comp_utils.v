@@ -228,7 +228,7 @@ End OuterExposing.
 
 
 Section FinitaryModels.
-  Context {M: FairModel}. 
+  Context {M: FairModel}.  
   
   Definition model_step_helper
     (st: fmstate M) (step: fmstate M * option (fmrole M)) :=
@@ -246,15 +246,18 @@ Section FinitaryModels.
     pose proof (fmstate_eqdec M).
     solve_decision. 
   (* Qed. *)
-  Defined. 
+  Defined.
+
+  Definition next_states (s1: fmstate M) :=
+    {l: list (fmstate M) | forall s2 oρ, fmtrans M s1 oρ s2 -> s2 ∈ l}. 
 
   Lemma model_finitary_helper (s1: fmstate M)
-    (nexts: list (fmstate M))
-    (NEXTS: forall s2 oρ, fmtrans M s1 oρ s2 -> s2 ∈ nexts)
+    (NEXTS: next_states s1)
     :
     Finite {step | model_step_helper s1 step }. 
   Proof.
     rewrite /model_step_helper.
+    destruct NEXTS as [nexts ?]. 
     set (steps :=
            let lr := None :: (Some <$> (elements $ live_roles _ s1)) in
            (s1, None) :: (s ← nexts; ρ ← lr; mret (s, ρ))).

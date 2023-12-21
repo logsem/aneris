@@ -62,7 +62,7 @@ Section LibraryDefs.
 
   (* TODO: move? *)
   Lemma lib_model_impl_fin (s1: fmstate lib_model_impl):
-    {l: list (fmstate lib_model_impl) | forall s2 oρ, fmtrans lib_model_impl s1 oρ s2 -> s2 ∈ l}. 
+    next_states s1. 
   Proof.
     eapply (exist _ [0]). 
     intros ?? TRANS. inversion TRANS. subst. set_solver. 

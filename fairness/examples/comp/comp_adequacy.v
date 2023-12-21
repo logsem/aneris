@@ -27,7 +27,7 @@ Close Scope Z_scope.
 Local Ltac gd t := generalize dependent t.
 
 Lemma client_model_step_fin (s1 : fmstate client_model_impl):
-  {nexts: list (fmstate client_model_impl) | forall s2 oρ, fmtrans _ s1 oρ s2 -> s2 ∈ nexts}. 
+  next_states s1. 
 Proof.
   destruct s1 as (δ_lib, c).
   pose proof (lib_model_impl_fin (ls_under δ_lib)) as [ie_lib IE_LIB]. 
@@ -54,9 +54,7 @@ Proof.
   rewrite list_to_set_elements_L. by apply δ'.
 Qed.
 
-Let client_model_finitary s1 :=
-      let NEXT := client_model_step_fin s1 in
-      model_finitary_helper s1 (proj1_sig NEXT) (proj2_sig NEXT). 
+Let client_model_finitary s1 := model_finitary_helper s1 (client_model_step_fin s1).
  
   
 Section ClientRA.
