@@ -587,13 +587,13 @@ Proof.
 
       eapply inner_LM_trace_fair_aux.
       - apply _.
+      - done. 
       - by apply EXP'. 
       - simpl. intros ?? [=<-].
         by apply EXP'.
       - by apply EXP'.
       - subst. eapply infinite_trace_equiv; eauto. 
-      - by apply MATCH. 
-      - eapply fair_by_subtrace; eauto. }
+      - by apply MATCH. }
 
     red in MATCH. specialize_full MATCH; eauto.
     { subst. eapply (subtrace_valid tr); eauto. }
@@ -768,7 +768,7 @@ Proof.
     { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
     { apply _. }
-    { apply match_locale_enabled_states_livetids. }
+    { intros. apply match_locale_enabled_states_livetids. }
     intros.
     destruct ζ.
     { apply Hfair. }

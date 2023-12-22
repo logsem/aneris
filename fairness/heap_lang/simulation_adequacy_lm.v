@@ -451,7 +451,7 @@ Theorem simulation_adequacy_terminate_general
   state_rel lift_grole:
   (∀ mtr: @mtrace M, mtrace_fairly_terminating mtr) ->
   Inj eq eq lift_grole ->
-  (lm_live_lift (LM_ALM LM) (option_fmap _ _ lift_grole) (from_option (role_enabled_model (M := Mout)) (fun _ => False)) state_rel) ->
+  (forall i δ, auxtr S!! i = Some δ -> lm_live_lift (LM_ALM LM) (option_fmap _ _ lift_grole) (from_option (role_enabled_model (M := Mout)) (fun _ => False)) state_rel δ) ->
   (* lm_model_traces_match lift_grole state_rel otr auxtr -> *)
   lm_model_traces_match (option_fmap _ _ lift_grole) state_rel otr auxtr (transA := olocale_trans) (LM := LM) ->
   (* The coinductive pure coq proposition given by adequacy *)

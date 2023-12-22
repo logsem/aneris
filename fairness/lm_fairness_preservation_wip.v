@@ -585,8 +585,97 @@ Section InnerLMTraceFairness.
       apply elem_of_dom. eapply (ASGρ (S m)); eauto. lia.
   Qed.
 
-  (* TODO: is it possible to unify this proof with those in lm_fairness_preservation? *)
-  (* TODO: renaming of arguments? *)
+  Hypothesis (LIFT_SOME: forall gi, is_Some (lift_Ai (am_lift_G gi))). 
+
+  Lemma inner_LM_trace_fair_aux_group (lmtr_i: atrace) (tr_o: mtrace Mo)
+    (lmtr_o: lmftrace (LM := LMo)):
+    upto_stutter_auxtr lmtr_o tr_o ->
+    (∀ gi r, (lift_Ai $ am_lift_G gi) = Some r -> fair_aux_SoU (LM_ALM LMo) r lmtr_o) ->
+    inner_obls_exposed lmtr_o -> (* TODO: should become unnecessary with LM state invariants *)
+    infinite_trace tr_o ->
+    lm_model_traces_match tr_o lmtr_i ->
+    (* (∀ ρ : fmrole Mi, afair_by_next_TS _ ρ lmtr_i).  *)
+    (forall τ, fair_by_group AMi τ lmtr_i).
+  Proof.
+    intros UPTO FAIRlmo INNER_EXP INF MATCH.
+    intros gi.
+    set (fairness_cond := fun ρ st => exists gi, lift_Ai (am_lift_G gi) = Some ρ /\
+                                              (∃ δi ρi,
+         state_rel st δi ∧ ls_mapping δi !! ρi = Some gi)). 
+    assert (forall ρ, fair_by fairness_cond role_match ρ tr_o).
+    { clear gi.
+      intros. red. intros n (st & NTH & COND)%pred_at_trace_lookup.
+      red in COND. destruct COND as (gi & LIFTgi & (δi & ρi & STATES & MAPi)).
+      
+      pose proof NTH as (atr_o & AFTER & A0)%state_lookup_after'.
+      setoid_rewrite pred_at_sum. rewrite AFTER.
+      eapply upto_stutter_after in AFTER as (m & almtr_o & AFTER' & UPTO'); eauto.
+      eapply inner_obls_exposed_after in INNER_EXP; eauto.
+      specialize (FAIRlmo _ _ LIFTgi). eapply fair_by_gen_after in FAIRlmo; eauto. 
+      clear dependent tr_o. clear dependent lmtr_o. clear m. 
+
+      pose proof INNER_EXP as IE. 
+      red in IE. specialize (IE 0 (trfirst almtr_o) gi).
+      specialize_full IE.
+      { apply state_lookup_0. }
+      { do 2 eexists. split; eauto.
+        Set Printing Coercions.
+        erewrite <- upto_stutter_trfirst; eauto.
+        congruence. }
+      destruct IE as (ρ' & LIFT' & DOMρ).
+      rewrite LIFTgi in LIFT'. inversion LIFT'. subst ρ'.
+      red in FAIRlmo. specialize (FAIRlmo 0). specialize_full FAIRlmo.
+      { by apply pred_at_state_trfirst. } 
+      destruct FAIRlmo as (m & δo & stepo & MTH & FAIR). simpl in MTH.
+      pattern δo, stepo in FAIR. 
+
+      assert (almtr_o S!! m = Some δo) as MTH'.
+      { eapply trace_state_lookup_simpl'; eauto. }        
+
+      destruct FAIR as [UNMAP | STEP].
+      { 
+        assert (exists k st', ls_under δo = st' /\ atr_o S!! k = Some st') as (k & st' & CORR & KTH). 
+        { pose proof MTH' as FF. 
+          eapply upto_stutter_state_lookup' in FF as [??]; eauto. }
+        exists k. apply pred_at_trace_lookup. eexists. split; eauto.
+        red. left. intros F. apply UNMAP.
+        red in F. destruct F as (gi' & LIFT'' & DOM).
+        rewrite -LIFTgi in LIFT''. apply INJlg in LIFT''.
+        red in INNER_EXP. specialize (INNER_EXP _ _ gi' MTH').
+        rewrite CORR in INNER_EXP. specialize (INNER_EXP DOM).
+        destruct INNER_EXP as (?&?&?). congruence. }
+
+      set (Pi := fun (st: fmstate Mo) (ostep: option (option (fmrole Mo) * fmstate Mo)) => (∃ oℓ st', ostep = Some (oℓ, st') ∧ role_match ρ oℓ)). 
+      forward eapply upto_stutter_step_correspondence_alt with (Pi := Pi).
+      3: { apply UPTO'. }
+      3: { apply MTH. }
+      3: { apply STEP. }
+      2: { intros. red in H. by destruct H as (?&?&?&?). }
+      { intros. red in H. destruct H as (?&?&?&->&<-&?).
+        red.
+        rewrite /Usls. 
+        rewrite /am_lift_G. simpl. rewrite H.
+        do 2 eexists. split; eauto. }
+      intros (k & st' & step & KTH & PROP & UPTO'').
+      red in PROP. destruct PROP as (oℓ & st'' & -> & MATCH). 
+      exists k. apply pred_at_trace_lookup. eexists. split.
+      { eapply trace_state_lookup_simpl'; eauto. }
+      simpl. red. right.
+      apply state_label_lookup in KTH as (?&?&?). 
+      eauto. }
+
+    eapply model_fairness_preserved'.
+    3: by apply MATCH.
+    { apply _. }
+    { by apply INF. }
+    2: { by apply H. }
+
+    red. intros. red. intros. red.
+    destruct lift_Ai eqn:AA.
+    2: { destruct (LIFT_SOME g). congruence. }
+    red. eexists. split; eauto.   
+  Qed.
+
   Lemma inner_LM_trace_fair_aux (lmtr_i: atrace) (tr_o: mtrace Mo) 
     (lmtr_o: lmftrace (LM := LMo)):
     upto_stutter_auxtr lmtr_o tr_o -> 
@@ -594,85 +683,12 @@ Section InnerLMTraceFairness.
     inner_obls_exposed lmtr_o -> (* TODO: should become unnecessary with LM state invariants *)
     infinite_trace tr_o ->
     lm_model_traces_match tr_o lmtr_i ->
-    (∀ ρ, fair_model_trace ρ tr_o) -> (∀ ρ : fmrole Mi, afair_by_next_TS _ ρ lmtr_i). 
+    (∀ ρ : fmrole Mi, afair_by_next_TS _ ρ lmtr_i). 
   Proof. 
-    intros UPTO FAIR_SOU INNER_OBLS INF MATCH FAIRo ρ.
-    destruct (classic (afair_by_next_TS _ ρ lmtr_i)) as [| UNFAIR]; [done| exfalso].
-
-    rewrite /fair_by_next_TS in UNFAIR. 
-    apply not_all_ex_not in UNFAIR as [n UNFAIR].
-    apply imply_to_and in UNFAIR as [ENn UNFAIR].
-    pose proof (not_ex_all_not _ _ UNFAIR) as X. simpl in X.
-    clear UNFAIR. rename X into UNFAIR.
-
-    assert (trace_len_is tr_o NOinfinity) as INF'.
-    { pose proof (trace_has_len tr_o) as [? LEN].
-      eapply infinite_trace_equiv in INF; eauto. by subst. }
-    assert (trace_len_is lmtr_i NOinfinity) as INF''.
-    { pose proof (trace_has_len lmtr_i) as [li ?].
-      forward eapply traces_match_same_length as INF''; [| |by apply MATCH|]; eauto.
-      by subst. }
-
-    (* erewrite forall_proper in UNFAIR. *)
-    (* 2: { intros. apply pred_at_neg. by apply INF''. } *)
-    (* simpl in UNFAIR.  *)
-    (* setoid_rewrite pred_at_trace_lookup' in UNFAIR.  *)
-
-    assert (forall m δi_m, n <= m -> lmtr_i S!! m = Some δi_m -> role_enabled ρ (ls_under δi_m)) as EN.
-    { intros. apply Nat.le_sum in H as [d ->].
-      specialize (UNFAIR d).
-      pose proof H0 as ([? ostep]&L&?)%trace_state_lookup_simpl'.
-      simpl in *. subst. 
-      eapply not_exists_forall_not with (x := δi_m) in UNFAIR.
-      eapply not_exists_forall_not with (x := ostep) in UNFAIR.
-      apply not_and_or in UNFAIR as [?| UNFAIR]; [done| ].
-      rewrite /fairness_sat_gen in UNFAIR.
-      tauto. }
-    (* assert (forall m ℓ, n <= m -> lmtr_i L!! m = Some ℓ -> forall go', ℓ ≠ Take_step ρ go') as NOρ. *)
-    assert (forall m δ τ δ', n <= m -> lmtr_i !! m = Some (δ, Some (am_lift_G τ, δ')) ->
-                         (* Take_step ρ τ ∉ allowed_step_FLs δ τ δ' *)
-                        next_TS_role δ τ δ' ≠ Some ρ) as NOρ. 
-    { intros. apply Nat.le_sum in H as [d ->].
-      (* specialize (UNFAIR d) as (? & ? & MTH & UNFAIR). *)
-      eapply not_exists_forall_not with (x := δ) in UNFAIR.
-      eapply not_exists_forall_not with (x := Some (am_lift_G τ, δ')) in UNFAIR.
-      apply not_and_or in UNFAIR as [?| UNFAIR]; [done| ].
-      rewrite /fairness_sat_gen in UNFAIR. 
-      apply Decidable.not_or, proj2 in UNFAIR.
-      intros IN. apply UNFAIR. red.
-
-      do 3 eexists. eauto. }
-      
-    clear ENn. 
-
-    assert (exists j go, n <= j /\ forall k δi_k, j <= k -> lmtr_i S!! k = Some δi_k ->
-                                       ls_mapping δi_k !! ρ = Some go) 
-      as (j & go & LE & ASGρ). 
-    { eapply owner_fixed_eventually; eauto.
-      2: { eapply traces_match_valid2; eauto. }
-      intros. eapply ls_mapping_dom, EN; eauto. }
-
-    assert (is_Some (lmtr_i S!! j)) as [δi_j JTH].
-    { eapply state_lookup_dom; eauto. done. }
-    assert (is_Some (ls_fuel δi_j !! ρ)) as [f FUEL].
-    { apply elem_of_dom. rewrite -ls_same_doms.
-      apply ls_mapping_dom.
-      eapply EN; eauto. }
-
-    forward eapply eventual_step_or_unassign_nth with (n := j); eauto.
-    { intros. eapply (NOρ i); eauto. lia. }
-    
-    rewrite /steps_or_unassigned. 
-    intros (m & ?&?& LEjm & MTH & [UNMAP | STEP]).
-    -
-      (* apply pred_at_trace_lookup in UNMAP as (?&MTH&UNMAP). *) 
-      edestruct UNMAP; eauto. apply elem_of_dom, mapping_live_role.
-      eapply (EN m); eauto.
-      { lia. }
-      eapply trace_state_lookup_simpl'; eauto. 
-    - red in STEP. 
-      destruct STEP as (?&?&? & (-> & <- & ?)). 
-      edestruct (NOρ m); eauto. lia. 
+    intros. revert ρ. apply group_fairness_implies_role_fairness.
+    { by eapply traces_match_infinite_trace. }
+    { by eapply traces_match_valid2. }
+    eapply inner_LM_trace_fair_aux_group; eauto.
   Qed. 
-    
+
 End InnerLMTraceFairness. 

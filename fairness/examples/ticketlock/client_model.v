@@ -733,49 +733,60 @@ Section ClientDefs.
       { by eapply traces_match_valid2. }
       { intros.
         apply ALWAYS_tl_state_wf. }
-      { subst i'_s. 
+      { subst i'_s.
         forward eapply outer_exposing_subtrace; eauto.
-        intros [? EXP'].
-
-        assert (∀ ρ, afair_by_next_TS (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str) (LF := TlLM_LFP)) as TL_FAIR'.
-        { eapply inner_LM_trace_fair_aux.
+        intros [? EXP'].       
+        assert (∀ ρ, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str)) as TL_FAIR'.
+        { eapply inner_LM_trace_fair_aux_group.
           - apply _.
+          - done.
           - by apply EXP'. 
           - simpl. intros ?? [=<-].
             by apply EXP'.
           - by apply EXP'.
           - subst. eapply infinite_trace_equiv; eauto. 
-          - by apply MATCH. 
-          - eapply fair_by_subtrace; eauto. }
-        
-        pose proof (proj1 (ELM_ALM_afair_by_next _ _ _) TL_FAIR') as TL_FAIR.  
-        red. red. intros ? [ρ ->].
-        red. specialize (TL_FAIR ρ).
+          - by apply MATCH. }
+        red. red. intros ? [g ->]. simpl in g.
+        red. red. intros n ENg. simpl in ENg.
 
-        foobar. derive the required fairness from fair_by_next_TS_ext.
-        red.
-        unfold fair_by_next_TS_ext in FI. 
-        do 2 red. intros. eapply FI. 
-        apply FI. 
+        apply pred_at_trace_lookup in ENg as (?&NTH&ENg).
+        red in ENg. simpl in ENg. rewrite /ext_live_roles in ENg.
+        apply elem_of_union in ENg as [ENg | ?].
+        2: { set_solver. }
+        apply elem_of_map in ENg as (?&[=<-]&ENg).
 
-      eapply inner_LM_trace_fair_aux.
-      - apply _.
-      - by apply EXP'. 
-      - simpl. intros ?? [=<-].
-        by apply EXP'.
-      - by apply EXP'.
-      - subst. eapply infinite_trace_equiv; eauto. 
-      - by apply MATCH. 
-      - eapply fair_by_subtrace; eauto.
+        specialize (TL_FAIR' g). do 2 red in TL_FAIR'.
+        specialize (TL_FAIR' n). specialize_full TL_FAIR'.
+        { apply pred_at_trace_lookup. eexists. split; eauto.
+          apply LM_live_roles_strong in ENg as [? STEP].
+          eapply locale_trans_ex_role; eauto. }
+        destruct TL_FAIR' as [m FAIR']. exists m.
+        eapply pred_at_impl; [| apply FAIR'].
+        intros.
+        red in H0. red. destruct H0.
+        2: { right. simpl. destruct H0 as (er & -> & <-).
+             eexists. split; eauto. done. }
+        left. intros EN. apply H0.
+        red in EN. simpl in EN. rewrite /ext_live_roles in EN.
+        apply elem_of_union in EN as [EN | ?].
+        2: { set_solver. }
+        apply elem_of_map in EN as (?&[=<-]&EN).
+        apply LM_live_roles_strong in EN as [? STEP].
+        eapply locale_trans_ex_role; eauto. }
+      { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
+      { admit. (* assume this for the initial state *) }
+      { admit. (* assume this for the initial state *) }
+      { red. intros. specialize (AFTER ltac:(lia)).
+        destruct AFTER as [NEQ NO_L_LOCKS]. 
 
+        admit. }
       
 
       admit. }
 
+    
+
     admit. 
   Admitted. 
-
-
-
 
 End ClientDefs. 

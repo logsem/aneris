@@ -344,14 +344,14 @@ Section fairness_preserved.
     (* Context (state_rel: cfg Λ → lm_ls LM → Prop). *)
     Context (state_rel: So → lm_ls LM → Prop).
     
-    Definition lm_live_lift := forall g (ρ: fmrole M) δ c,
+    Definition lm_live_lift δ := forall g (ρ: fmrole M) c,
         ls_mapping δ !! ρ = Some g ->
         (* ρ ∈ live_roles _ δ ->  *)
         state_rel c δ ->
         (* locale_enabled ζ c *)
         locale_prop (lift_A (am_lift_G g)) c.     
     
-    Hypothesis (match_locale_prop_states: lm_live_lift).
+    (* Hypothesis (match_locale_prop_states: lm_live_lift). *)
     
     (* Definition out_LM_labels_match (oζ : option Lo) (ℓ: lm_lbl LM) := *)
     (*   match oζ with *)
@@ -388,16 +388,18 @@ Section fairness_preserved.
     Theorem fairness_preserved (extr: out_trace) (auxtr: atrace):
       infinite_trace extr ->
       lm_exaux_traces_match_gen extr auxtr ->
+      (forall δ i, auxtr S!! i = Some δ -> lm_live_lift δ) ->
       (forall ζ, fair_by locale_prop lbl_match ζ extr) -> (forall τ, fair_by_group τ auxtr).
     Proof.
-      intros INF MATCH FAIR_OUT.
+      intros INF MATCH LIFT FAIR_OUT.
       intros. do 2 red. intros n ASG.
       pose proof ASG as (δ & NTH & [ρ MAP])%pred_at_trace_lookup.
       
       edestruct @traces_match_state_lookup_2 as (c & ENTH & RELn); eauto.
       
       red in FAIR_OUT. edestruct FAIR_OUT as [m STEP].
-      { eapply pred_at_trace_lookup; eauto. }
+      { specialize (LIFT _ _ NTH). 
+        eapply pred_at_trace_lookup; eauto. }
       apply pred_at_or in STEP.
       
       apply pred_at_or in STEP. 
@@ -405,7 +407,8 @@ Section fairness_preserved.
       edestruct @traces_match_state_lookup_1 as (δ' & NTH' & RELn'); eauto. 
       exists m. apply pred_at_trace_lookup. eexists. split; eauto.
       red. destruct STEP as [EMP | STEP]. 
-      - left. intros [??]. apply EMP. eapply match_locale_prop_states; eauto.  
+      - left. intros [??]. apply EMP.
+        eapply LIFT; eauto.  
       - right.
         destruct STEP as (?&?&LBLM). 
         edestruct @traces_match_label_lookup_1 as (ℓ & NTH'l & LBL); eauto.
@@ -472,11 +475,11 @@ Section lang_fairness_preserved.
       (live_tids (LM := LM)).  
 
   Lemma match_locale_enabled_states_livetids: 
-    lm_live_lift ALM id
+    forall δ, lm_live_lift ALM id
       (* locale_enabled *) (from_option locale_enabled (fun _ => False))
-      live_tids (LM := LM).
+      live_tids δ (LM := LM).
   Proof.
-    red. intros ζ ρ δ c Hloc Hsr. 
+    red. intros δ ζ ρ c Hloc Hsr. 
     rewrite /locale_enabled.
     destruct Hsr as [HiS Hneqloc].
     have [e Hein] := (HiS _ _ Hloc). exists e. split; first done.
@@ -495,7 +498,7 @@ Section lang_fairness_preserved.
     { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
     { apply _. }
-    { eapply match_locale_enabled_states_livetids; eauto. }
+    { intros. eapply match_locale_enabled_states_livetids; eauto. }
     simpl. intros. destruct ζ as [ζ| ].
     { apply H2. }
     red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
@@ -517,11 +520,19 @@ Section model_fairness_preserved.
 
   Context (state_rel: fmstate Mout → lm_ls LM → Prop).
 
-  Hypothesis (match_labels_prop_states: 
-               lm_live_lift ALM lift_A
-                 (* role_enabled_model *)
-                 (from_option role_enabled_model (fun _ => False))
-                 state_rel).
+  Context (fairness_cond: fmrole Mout → fmstate Mout → Prop). 
+
+  (* Hypothesis (match_labels_prop_states:  *)
+  (*              lm_live_lift ALM lift_A *)
+  (*                (* role_enabled_model *) *)
+  (*                (from_option fairness_cond (fun _ => False)) *)
+  (*                state_rel). *)
+  Definition match_labels_prop_states :=
+    lm_live_lift ALM lift_A
+      (* role_enabled_model *)
+      (from_option fairness_cond (fun _ => False))
+      state_rel.
+    
 
   Definition lm_model_traces_match :=
     lm_exaux_traces_match_gen
@@ -530,20 +541,34 @@ Section model_fairness_preserved.
       (lift_A)
       state_rel. 
   
+  Lemma model_fairness_preserved' (mtr: mtrace Mout) (auxtr: atrace (LM := LM))
+    (INF: infinite_trace mtr)
+    (MATCH: lm_model_traces_match mtr auxtr)
+    (* (FAIR: ∀ ρ : fmrole Mout, fair_model_trace ρ mtr): *)
+    (LIFT: forall i δ, auxtr S!! i = Some δ -> match_labels_prop_states δ)
+    (FAIR: forall ρ, fair_by fairness_cond role_match ρ mtr):
+    ∀ τ : G, fair_by_group ALM τ auxtr.
+  Proof. 
+    eapply fairness_preserved.
+    3: by apply MATCH. 
+    all: eauto.
+    { intros. eapply LIFT; eauto. } 
+    intros [?| ].
+    { apply FAIR. }
+    red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
+  Qed. 
+
+
   Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: atrace (LM := LM)):
     infinite_trace mtr ->
     lm_model_traces_match mtr auxtr ->
-    (∀ ρ, fair_model_trace ρ mtr) -> (∀ ρ : fmrole M, afair_by_next_TS ALM ρ auxtr).
+    (forall i δ, auxtr S!! i = Some δ -> match_labels_prop_states δ) ->
+    (forall ρ, fair_by fairness_cond role_match ρ mtr) -> (∀ ρ : fmrole M, afair_by_next_TS ALM ρ auxtr).
   Proof.
     intros. eapply group_fairness_implies_role_fairness; eauto. 
     { eapply traces_match_infinite_trace; eauto. }
     { eapply traces_match_valid2; eauto. }
-    eapply fairness_preserved.
-    4: by apply H0. 
-    all: eauto.
-    intros [?| ].
-    { red. simpl. apply H1. }
-    red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
-  Qed.
+    by eapply model_fairness_preserved'.
+  Qed. 
 
 End model_fairness_preserved. 
