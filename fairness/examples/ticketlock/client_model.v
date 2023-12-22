@@ -1,13 +1,12 @@
 From iris.proofmode Require Import tactics.
+From trillium.prelude Require Import finitary classical_instances.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
-(* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
+From stdpp Require Import finite.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 From trillium.fairness.heap_lang Require Export lang.
-From stdpp Require Import finite.
-From trillium.prelude Require Import finitary classical_instances.
+From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
 
 Close Scope Z_scope.
 
@@ -675,6 +674,27 @@ Section ClientDefs.
   .
  
 
+  (* TODO: move *)
+  Definition fair_by' {S L T : Type}
+    (locale_prop: T -> S -> Prop) (does_step: T -> L -> Prop)
+    (t: T) (otr: trace S L) :=
+    forall n, from_option (locale_prop t) False (otr S!! n) ->
+    exists m s', otr S!! (n + m) = Some s' /\
+             fairness_sat locale_prop does_step t s' (otr L!! (n + m)).
+
+  (* TODO: move *)
+  Lemma fair_by_equiv {S L T : Type}
+    (locale_prop: T -> S -> Prop) (does_step: T -> L -> Prop):
+    forall (t: T) (otr: trace S L),
+      fair_by locale_prop does_step t otr <-> fair_by' locale_prop does_step t otr.
+  Proof.
+    intros. rewrite /fair_by /fair_by'.
+    apply forall_proper. intros n.
+    repeat setoid_rewrite pred_at_trace_lookup.
+    apply Morphisms_Prop.iff_iff_iff_impl_morphism; [| done].    
+    destruct (otr S!! n); simpl; set_solver.
+  Qed. 
+
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
     (OUTER_CORR: client_LM_trace_exposing lmtr tr)
@@ -776,10 +796,38 @@ Section ClientDefs.
       { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
       { admit. (* assume this for the initial state *) }
       { admit. (* assume this for the initial state *) }
-      { red. intros. specialize (AFTER ltac:(lia)).
-        destruct AFTER as [NEQ NO_L_LOCKS]. 
-
-        admit. }
+      { red. intros ρlg j tl_st **. specialize (AFTER ltac:(lia)).
+        destruct AFTER as [NEQ NO_L_LOCKS].
+        assert (ρlg = ρlg_r) as ->.
+        { admit. (* need to ensure that we only operate with lib_gs roles *) }
+        destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) tl_st)) as [| DIS]. 
+        { eauto. }
+        eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
+        2: by apply MATCH.
+        destruct st as [? f]. simpl in EQ. subst.
+        assert (f = fs_U) as ->.
+        { apply trace_state_lookup_simpl' in JTH as (step&JTH&ST).
+          erewrite subtrace_lookup in JTH; eauto.
+          2: done.
+          simpl in JTH. apply STEPs in JTH; [| done].
+          destruct JTH as (?&?&?&[=]). subst. by inversion ST. }
+          
+        (* forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN1' j)); [done| ]. *)
+        pose proof SUB1 as FAIR1. eapply fair_by_subtrace in FAIR1; eauto.
+        Unshelve. 2: exact (ρ_ext $ flU (ρlg_r: fmrole TlLM_FM)).
+        apply fair_by_equiv in FAIR1. red in FAIR1.
+        specialize (FAIR1 j). rewrite JTH in FAIR1. specialize_full FAIR1.
+        { simpl. red. eapply fm_live_spec.
+          econstructor; eauto. }
+        
+        destruct FAIR1 as (k & [tl_st' f'] & JKTH & FAIR1).
+        eapply traces_match_state_lookup_1 in JKTH as (tl_st'_&JKTH&EQ').
+        2: by eauto.
+        simpl in EQ'.
+        
+        foobar. use kept_state_fair_step?
+        admit. 
+      }
       
 
       admit. }
