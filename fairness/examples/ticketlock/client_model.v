@@ -695,6 +695,73 @@ Section ClientDefs.
     destruct (otr S!! n); simpl; set_solver.
   Qed. 
 
+  Lemma model_step_keeps_others_preds st1 ρ st2 ρ'
+    (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2)
+    (NEQ: ρ' ≠ ρ):
+    forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] ->
+         P st2 <-> P st1.
+  Proof using. Admitted.
+
+  (* TODO: is it possible to get rid of this active_st - live_roles duplication? *)
+  (* TODO: move *)
+  Lemma not_active_st_not_live tl_st ρlg:
+    ¬ active_st ρlg tl_st -> ρlg ∉ live_roles _ tl_st.
+  Proof. Admitted. 
+
+  (* Lemma ext_step_keeps_others_preds st1 ρ st2 ρ' *)
+  (*   (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2) *)
+  (*   (NEQ: ρ' ≠ ρ): *)
+  (*   forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> *)
+  (*        P st1 <-> P st2. *)
+  (* Proof. Admitted.  *)
+
+  (* TODO: move, rename *)
+  Lemma kept2:
+  @label_kept_state client_model_impl
+    (@role_enabled_model client_model_impl (ρ_ext (@flU TlLM_FM ρlg_r)))
+    (ρ_ext (@flU TlLM_FM ρlg_r)). 
+  Proof.
+    red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP.
+    destruct oℓ' as [ρ | ].
+    2: { by inversion STEP. }
+    assert (ρ ≠ ρ_ext (flU (ρlg_r: fmrole TlLM_FM))) as NEQ' by congruence.
+    
+    assert ((f = fs_U ∨ f = fs_S) /\
+              has_lock_st ρlg_r tl_st /\ ¬ active_st ρlg_r tl_st) as PREρlg.
+    { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP'].
+      inversion STEP'; subst; tauto. }
+    
+    pose proof (ct_au_R tl_st' f' (match f' with | fs_U => fs_U | _ => fs_O end)) as STEPr.
+    simpl in STEPr. rewrite !curry_uncurry_prop in STEPr.
+    red. simpl. apply client_lr_spec.
+    eexists. apply STEPr. apply and_assoc. split.
+    { apply proj1 in PREρlg.
+      inversion STEP; destruct PREρlg as [-> | ->]; subst; tauto. }
+    inversion STEP; subst.
+    - split.
+      + eapply model_step_keeps_others_preds with (ρ' := ρlg_r); eauto.
+        { rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
+          2: { simpl; lia. }
+          2: { destruct c; simpl; lia. }
+          assert (c = cl_R) as -> by (by destruct c). 
+          eapply not_active_st_not_live; eauto. apply PREρlg.
+          by eapply fm_live_spec. }
+        { set_solver. }
+        apply PREρlg.
+      + 
+        (* TODO: unify with proof above *)
+        forward eapply model_step_keeps_others_preds with (ρ' := ρlg_r) (P := active_st (ρlg_r: fmrole TlLM_FM)); eauto.
+        { rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
+          2: { simpl; lia. }
+          2: { destruct c; simpl; lia. }
+          assert (c = cl_R) as -> by (by destruct c). 
+          eapply not_active_st_not_live; eauto. apply PREρlg.
+          by eapply fm_live_spec. }
+        { set_solver. }
+        intros EQUIV%not_iff_compat. apply EQUIV.
+        apply PREρlg.
+    - foobar.
+        
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
     (OUTER_CORR: client_LM_trace_exposing lmtr tr)
@@ -815,17 +882,24 @@ Section ClientDefs.
         (* forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN1' j)); [done| ]. *)
         pose proof SUB1 as FAIR1. eapply fair_by_subtrace in FAIR1; eauto.
         Unshelve. 2: exact (ρ_ext $ flU (ρlg_r: fmrole TlLM_FM)).
-        apply fair_by_equiv in FAIR1. red in FAIR1.
-        specialize (FAIR1 j). rewrite JTH in FAIR1. specialize_full FAIR1.
-        { simpl. red. eapply fm_live_spec.
-          econstructor; eauto. }
+        (* apply fair_by_equiv in FAIR1. red in FAIR1. *)
+        (* specialize (FAIR1 j). rewrite JTH in FAIR1. specialize_full FAIR1. *)
+        (* { simpl. red. eapply fm_live_spec. *)
+        (*   econstructor; eauto. } *)
         
-        destruct FAIR1 as (k & [tl_st' f'] & JKTH & FAIR1).
-        eapply traces_match_state_lookup_1 in JKTH as (tl_st'_&JKTH&EQ').
-        2: by eauto.
-        simpl in EQ'.
+        (* destruct FAIR1 as (k & [tl_st' f'] & JKTH & FAIR1). *)
+        (* eapply traces_match_state_lookup_1 in JKTH as (tl_st'_&JKTH&EQ'). *)
+        (* 2: by eauto. *)
+        (* simpl in EQ'. *)
         
-        foobar. use kept_state_fair_step?
+        forward eapply kept_state_fair_step.
+        5: by apply JTH.
+        3: { intros ? P. apply P. }
+        4: { simpl. red. eapply fm_live_spec.
+             eapply ct_au_R; eauto. }
+        { eapply (subtrace_valid tr); eauto. }
+        { Set Printing Implicit.
+        
         admit. 
       }
       
