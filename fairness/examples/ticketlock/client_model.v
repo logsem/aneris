@@ -1175,6 +1175,9 @@ Section ClientDefs.
     destruct (otr S!! n); simpl; set_solver.
   Qed.
 
+  (* TODO: move *)
+  From trillium.fairness.heap_lang Require Import simulation_adequacy_lm_ext.
+
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
     (OUTER_CORR: client_LM_trace_exposing lmtr tr)
@@ -1242,96 +1245,35 @@ Section ClientDefs.
       all: try by repeat eexists.
       red in LEi. lia. }
 
-    eapply traces_match_preserves_termination; eauto.
-    (* eapply @fin_ext_fair_termination.  *)
-    apply (@fin_ext_fair_termination _ TlEM (project_tl_trace str)).
-    all: eauto.
-    { eapply traces_match_valid2; eauto. }
+    eapply simulation_adequacy_terminate_general'_ext.
+    5: by apply MATCH.
+    { Unshelve.
+      all: admit. }
+    { intros.
+      eapply fin_ext_fair_termination; eauto. }
     { admit. }
-    { eapply tl_subtrace_fair; eauto. }
-    { clear dependent lmtr. clear VALID. 
-      intros lmtr. red. intros VALID FAIRm.
- 
-      pose proof (can_destutter_auxtr _ VALID) as [mtr UPTO].
-      eapply upto_stutter_finiteness; eauto.
-      eapply Mtl_TERM; eauto.
-      { eapply upto_preserves_validity; eauto. }
+    { (* TODO: unify this proof, one in tl_subtrace_fair
+         and one in comp_adequacy *)
+      subst. simpl in *.
+      forward eapply outer_exposing_subtrace; eauto.
+      intros [? EXP'].
 
-      assert (∀ ρ: fmrole TlLM_FM, afair_by_next_TS (LM_ALM TlLM) ρ lmtr). 
-      
+      unshelve eapply ELM_ALM_afair_by_next.
+      { red. apply TlEM_EXT_KEEPS. }  
 
-      (* TODO: check whether this transformation already exists somewhere *)
-      eapply upto_stutter_fairness; eauto.
+      eapply inner_LM_trace_fair_aux.
+      - apply _.
+      - done. 
+      - by apply EXP'. 
+      - simpl. intros ?? [=<-].
+        by apply EXP'.
+      - by apply EXP'.
+      - subst. eapply infinite_trace_equiv; eauto. 
+      - by apply MATCH. }
+    { eapply traces_match_valid1; eauto. }
+    subst. eapply fair_by_subtrace; eauto.
 
-      assert (forall τ, fair_by_group (LM_ALM TlLM) τ lmtr) as FAIRm'.
-      { intros. red. 
-      
-      intros ρ. red.
-      apply fair_by_gen_equiv. red.
-      intros n EN. destruct (lmtr S!! n) eqn:NTH.
-      2: { rewrite NTH in EN. done. }
-      rewrite NTH in EN. simpl in EN.
-      red in EN. apply mapping_live_role in EN as [g MAP].
-      specialize (FAIRm g). red in FAIRm. apply fair_by_equiv in FAIRm.
-      red in FAIRm. specialize (FAIRm n). specialize_full FAIRm.
-      { rewrite NTH. simpl. 
-      eapply LM_ALM_afair_by_next.  
-      apply group_fairness_implies_role_fairness.
-      { admit. }
-      { done. }
-      
-
-      red. intros ? [ρlg ->] j tl_st **. specialize (AFTER ltac:(lia)).
-      destruct AFTER as [NEQ NO_L_LOCKS].
-      assert (ρlg = ρlg_r) as ->.
-      { admit. (* need to ensure that we only operate with lib_gs roles *) }
-      destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) tl_st)) as [| DIS]. 
-      { eauto. }
-      eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
-      2: by apply MATCH.
-      destruct st as [? f]. simpl in EQ. subst.
-      assert (f = fs_U) as ->.
-      { apply trace_state_lookup_simpl' in JTH as (step&JTH&ST).
-        erewrite subtrace_lookup in JTH; eauto.
-        2: done.
-        simpl in JTH. apply STEPs in JTH; [| done].
-        destruct JTH as (?&?&?&[=]). subst. by inversion ST. }
-      
-      pose proof SUB1 as FAIR1. eapply fair_by_subtrace in FAIR1; eauto.
-      Unshelve. 2: exact (ρ_ext $ flU (ρlg_r: fmrole TlLM_FM)).
-      forward eapply kept_state_fair_step.
-      5: by apply JTH.
-      3: { intros ? P. apply P. }
-      4: { simpl. red. eapply fm_live_spec.
-           eapply ct_au_R; eauto. }
-      { eapply (subtrace_valid tr); eauto. }
-      { apply kept2. }
-      { eapply fair_by_subtrace; eauto. }
-      
-      clear dependent tl_st. 
-      simpl. intros (k & st & PROPk & KTH & ENk).
-      red in PROPk. destruct PROPk as [[LE STEP] MINk].
-      apply trace_label_lookup_simpl' in STEP as (? & st' & KTH').
-      exists (k + 1), st'.1. repeat split.
-      2: lia.
-      { apply state_label_lookup in KTH' as (?&KTH'&?).
-        eapply traces_match_state_lookup_1 in KTH' as (? & KTH' & EQ).
-        2: { eauto. }
-        rewrite KTH'. congruence. }
-      
-      eapply trace_state_lookup_simpl in KTH; eauto. subst.
-      eapply trace_valid_steps' in KTH'.
-      2: { eapply subtrace_valid in SUB1; eauto. }
-      inversion KTH'; subst.
-      { by apply ρlg_lr_neq in H2. }
-      simpl. eapply allows_unlock_spec; eauto.
-      apply allows_unlock_impl_spec; eauto.
-      apply ALWAYS_tl_state_wf. 
-    
-
-
-    admit. 
-  Admitted. 
+  Qed. 
 
 End ClientDefs. 
 
