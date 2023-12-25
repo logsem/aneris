@@ -6,7 +6,7 @@ From stdpp Require Import finite.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext.
 From trillium.fairness.examples.ticketlock Require Import fair_lock.
 From trillium.fairness.heap_lang Require Export lang.
-From trillium.fairness Require Import lemmas trace_len fuel lm_fair subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
+From trillium.fairness Require Import lemmas trace_len fuel lm_fair lm_fair_traces subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
 
 Close Scope Z_scope.
 
@@ -207,6 +207,7 @@ Section ClientDefs.
 
   Context {Mtl: FairModel}.
   Context {Tl_nexts: forall tl_st, next_states tl_st (M := Mtl)}.
+  Context (Mtl_TERM: ∀ mtr: mtrace Mtl, mtrace_fairly_terminating mtr). 
 
   Context {TlLM': forall gs, LiveModel Gtl Mtl (LSI_groups_fixed gs)}.  
   Context (TlLM_LFP': ∀ gs: gset Gtl, gs ≠ ∅ → LMFairPre (TlLM' gs)).
@@ -863,6 +864,68 @@ Section ClientDefs.
         tauto. 
   Qed.
 
+  (* TODO: simplify MATCH *)
+  Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k
+    (OUTER_CORR : client_LM_trace_exposing lmtr tr)
+    (LEN1': trace_len_is str NOinfinity)
+    (SUB1 : subtrace tr k NOinfinity = Some str)
+    (MATCH : @lm_model_traces_match Gtl EqDecision0 H Mtl
+            (@LSI_groups_fixed Gtl EqDecision0 H Mtl lib_gs) 
+            (TlLM' lib_gs) (option (@ext_role TlLM_FM TlEM))
+            (@ext_trans TlLM_FM TlEM) client_model_impl
+            (option_fmap (@ext_role TlLM_FM TlEM)
+               (sum (@ext_role TlLM_FM TlEM) cl_id)
+               (@inl (@ext_role TlLM_FM TlEM) cl_id))
+            (fun (c : fmstate client_model_impl)
+               (δ_lib : @lm_ls Gtl Mtl EqDecision0 H
+                          (@LSI_groups_fixed Gtl EqDecision0 H Mtl lib_gs)
+                          (TlLM' lib_gs)) =>
+             @eq tl_state (@fst tl_state flag_state c) δ_lib) str
+            (project_tl_trace str)):
+  inner_fair_ext_model_trace (project_tl_trace str).
+  Proof.
+    forward eapply outer_exposing_subtrace; eauto.
+    intros [? EXP'].       
+    assert (∀ ρ, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str)) as TL_FAIR'.
+    { eapply inner_LM_trace_fair_aux_group.
+      - apply _.
+      - done.
+      - by apply EXP'. 
+      - simpl. intros ?? [=<-].
+        by apply EXP'.
+      - by apply EXP'.
+      - subst. eapply infinite_trace_equiv; eauto. 
+      - by apply MATCH. }
+    red. red. intros ? [g ->]. simpl in g.
+    red. red. intros n ENg. simpl in ENg.
+    
+    apply pred_at_trace_lookup in ENg as (?&NTH&ENg).
+    red in ENg. simpl in ENg. rewrite /ext_live_roles in ENg.
+    apply elem_of_union in ENg as [ENg | ?].
+    2: { set_solver. }
+    apply elem_of_map in ENg as (?&[=<-]&ENg).
+    
+    specialize (TL_FAIR' g). do 2 red in TL_FAIR'.
+    specialize (TL_FAIR' n). specialize_full TL_FAIR'.
+    { apply pred_at_trace_lookup. eexists. split; eauto.
+      apply LM_live_roles_strong in ENg as [? STEP].
+      eapply locale_trans_ex_role; eauto. }
+    destruct TL_FAIR' as [m FAIR']. exists m.
+    eapply pred_at_impl; [| apply FAIR'].
+    intros.
+    red in H0. red. destruct H0.
+    2: { right. simpl. destruct H0 as (er & -> & <-).
+         eexists. split; eauto. done. }
+    left. intros EN. apply H0.
+    red in EN. simpl in EN. rewrite /ext_live_roles in EN.
+    apply elem_of_union in EN as [EN | ?].
+    2: { set_solver. }
+    apply elem_of_map in EN as (?&[=<-]&EN).
+    apply LM_live_roles_strong in EN as [? STEP].
+    eapply locale_trans_ex_role; eauto.  
+  Qed. 
+    
+
   Lemma first_tl_subtrace_finite
   (tr : mtrace client_model_impl)
   (lmtr : lm_fair_traces.lmftrace)
@@ -874,7 +937,7 @@ Section ClientDefs.
   (i'_s : nat_omega)
   (STEPs : ∀ i res, NOmega.lt (NOnum i) i'_s → tr !! i = Some res → is_UU_step res)
   (LEN1 : NOmega.le i'_s len):
-    exists i_s, i'_s = NOnum i_s. 
+    exists i_s, i'_s = NOnum i_s.
   Proof.    
     destruct (decide (i'_s = NOnum 0)) as [| NZ1]. 
     { eauto. }
@@ -916,46 +979,7 @@ Section ClientDefs.
     { by eapply traces_match_valid2. }
     { intros.
       apply ALWAYS_tl_state_wf. }
-    { subst i'_s.
-      forward eapply outer_exposing_subtrace; eauto.
-      intros [? EXP'].       
-      assert (∀ ρ, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str)) as TL_FAIR'.
-      { eapply inner_LM_trace_fair_aux_group.
-        - apply _.
-        - done.
-        - by apply EXP'. 
-        - simpl. intros ?? [=<-].
-          by apply EXP'.
-        - by apply EXP'.
-        - subst. eapply infinite_trace_equiv; eauto. 
-        - by apply MATCH. }
-      red. red. intros ? [g ->]. simpl in g.
-      red. red. intros n ENg. simpl in ENg.
-      
-      apply pred_at_trace_lookup in ENg as (?&NTH&ENg).
-      red in ENg. simpl in ENg. rewrite /ext_live_roles in ENg.
-      apply elem_of_union in ENg as [ENg | ?].
-      2: { set_solver. }
-      apply elem_of_map in ENg as (?&[=<-]&ENg).
-      
-      specialize (TL_FAIR' g). do 2 red in TL_FAIR'.
-      specialize (TL_FAIR' n). specialize_full TL_FAIR'.
-      { apply pred_at_trace_lookup. eexists. split; eauto.
-        apply LM_live_roles_strong in ENg as [? STEP].
-        eapply locale_trans_ex_role; eauto. }
-      destruct TL_FAIR' as [m FAIR']. exists m.
-      eapply pred_at_impl; [| apply FAIR'].
-      intros.
-      red in H0. red. destruct H0.
-      2: { right. simpl. destruct H0 as (er & -> & <-).
-           eexists. split; eauto. done. }
-      left. intros EN. apply H0.
-      red in EN. simpl in EN. rewrite /ext_live_roles in EN.
-      apply elem_of_union in EN as [EN | ?].
-      2: { set_solver. }
-      apply elem_of_map in EN as (?&[=<-]&EN).
-      apply LM_live_roles_strong in EN as [? STEP].
-      eapply locale_trans_ex_role; eauto. }
+    { subst i'_s. eapply tl_subtrace_fair; eauto. }
     { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
     { admit. (* assume this for the initial state *) }
     { admit. (* assume this for the initial state *) }
@@ -1038,7 +1062,119 @@ Section ClientDefs.
     destruct JTH' as (?&?&?&[=]). 
   Admitted.
 
-  
+
+  (* TODO: move*)
+  Lemma trace_lookup_prev {St L : Type} (tr: trace St L) i st2 ostep
+    (ITH': tr !! S i = Some (st2, ostep)):
+    exists st1 l, tr !! i = Some (st1, Some (l, st2)).
+  Proof.
+    pose proof (trace_has_len tr) as [len LEN]. 
+    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN i)).
+    { eapply trace_lookup_dom; eauto.
+      by rewrite Nat.add_1_r. }
+    intros (?&?&st'&ITH).
+    enough (st' = st2).
+    { subst. eauto. }    
+    apply state_label_lookup in ITH as (?&ITH'_&?).
+    rewrite Nat.add_1_r in ITH'_.
+    symmetry. 
+    eapply trace_state_lookup_simpl; eauto.
+  Qed.
+
+  Definition fs_le f1 f2: Prop :=
+    let fn := fun fs => match fs with | fs_U => 2 | fs_S => 1 | fs_O => 0 end in
+    fn f1 <= fn f2.
+  Local Hint Unfold fs_le. 
+
+  Instance fs_le_TO: TotalOrder fs_le.
+  Proof. 
+    split. 
+    - split.
+      + split.
+        * intros [| |]; red; lia.
+        * unfold fs_le. intros [| |] [| |] [| |]; lia.
+      + unfold fs_le. intros [| |] [| |]; try lia.
+        all: congruence.
+    - red. unfold fs_le, strict. intros [| |] [| |]; simpl; try lia.
+      all: tauto.
+  Qed. 
+
+  Lemma client_trans_fs_mono st1 ρ st2
+    (STEP: client_trans st1 ρ st2):
+    fs_le st2.2 st1.2.
+  Proof. 
+    inversion STEP; subst; simpl.
+    all: try reflexivity; auto.
+    destruct FS as [[-> ->] | [-> ->]]; auto.
+  Qed.
+
+  Lemma client_trace_fs_mono (tr: mtrace client_model_impl) i j si sj
+    (VALID : mtrace_valid tr)
+    (LE: i <= j)
+    (ITH: tr S!! i = Some si) (JTH: tr S!! j = Some sj):
+    fs_le sj.2 si.2.
+  Proof. 
+    apply Nat.le_sum in LE as [d ->].
+    generalize dependent sj. induction d.
+    { intros. rewrite Nat.add_0_r in JTH. rewrite ITH in JTH. by inversion JTH. }
+    rewrite Nat.add_succ_r -Nat.add_1_r. intros sj' JTH'. 
+    pose proof (trace_has_len tr) as [len LEN].  
+    destruct (proj2 (trace_lookup_dom_strong _ _ LEN (i + d))) as (sj & ρ & sj'_ & JTH). 
+    { eapply state_lookup_dom; eauto. }
+    apply state_label_lookup in JTH as (JTH & JTH'_ & JTHρ).
+    rewrite JTH' in JTH'_. inversion JTH'_. subst sj'_. clear JTH'_.   
+    specialize (IHd _ JTH). etrans; [| apply IHd].
+    eapply client_trans_fs_mono.
+    eapply trace_valid_steps''; eauto.
+  Qed.
+
+  (* TODO: Move *)
+  Instance NOmega_le_TO: TotalOrder NOmega.le. 
+  Proof. 
+    split. 
+    - split.
+      + split.
+        * intros [|]; red; lia.
+        * unfold fs_le. intros [|] [|] [|]; done || simpl; lia. 
+      + unfold fs_le. intros [|] [|]; try (done || simpl; lia). 
+        simpl. intros. f_equal. lia. 
+    - red. unfold fs_le, strict. intros [|] [|]; try (done || simpl; lia). 
+      + simpl. tauto.
+      + simpl. destruct (Nat.lt_trichotomy n n0) as [?|[?|?]]; try lia.
+        subst. tauto.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma trace_state_lookup {St L: Type} (tr: trace St L) i st ostep
+    (ITH: tr !! i = Some (st, ostep)):
+    tr S!! i = Some st.
+  Proof. 
+    eapply trace_state_lookup_simpl'; eauto. 
+  Qed. 
+
+  (* TODO: move *)
+  Definition fair_by_gen' {S L T : Type}
+    (locale_prop: T -> S -> Prop) (does_step: T -> S -> option (L * S) -> Prop)
+    (t: T) (otr: trace S L) :=
+    forall n, from_option (locale_prop t) False (otr S!! n) ->
+    exists m s' step, otr !! (n + m) = Some (s', step) /\
+                  fairness_sat_gen locale_prop does_step t s' step.
+
+  (* TODO: move *)
+  Lemma fair_by_gen_equiv {S L T : Type}
+    (locale_prop: T -> S -> Prop) (does_step: T -> S -> option (L * S) -> Prop):
+    forall (t: T) (otr: trace S L),
+      fair_by_gen locale_prop does_step t otr <-> 
+      fair_by_gen' locale_prop does_step t otr.
+  Proof.
+    intros. rewrite /fair_by_gen /fair_by_gen'.    
+    apply forall_proper. intros n.
+    repeat setoid_rewrite pred_at_trace_lookup.
+    apply Morphisms_Prop.iff_iff_iff_impl_morphism.
+    2: { done. }
+    destruct (otr S!! n); simpl; set_solver.
+  Qed.
+
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
     (OUTER_CORR: client_LM_trace_exposing lmtr tr)
@@ -1057,10 +1193,146 @@ Section ClientDefs.
       - left. red. eauto.
       - right. intros (?&?&?&[=]). subst. tauto. }
 
-    forward eapply first_tl_subtrace_finite; eauto. intros [i_s ->].
+    forward eapply first_tl_subtrace_finite; eauto. intros [m ->].
+    apply NOmega.nomega_le_lt_eq in LEN1 as [LEN1 | <-].
+    2: { eapply terminating_trace_equiv; eauto. }
+    destruct (proj2 (trace_lookup_dom _ _ LEN m)) as [[[tl_st f] step] MTH]; [done| ].
+    destruct step as [[ρ [tl_st' f']]| ]. 
+    2: { forward eapply (proj1 (trace_lookup_dom_eq _ _ LEN m)); eauto.
+         intros ->. eapply terminating_trace_equiv; eauto. }
+    assert (f = fs_U) as ->.
+    { destruct m.
+      { destruct (trace_lookup_0 tr) as [? TR0].
+        rewrite MTH in TR0. inversion TR0. subst.
+        red in INIT. rewrite -H1 in INIT. tauto. }
+      apply trace_lookup_prev in MTH as (?&?&MTH).
+      apply STEPs in MTH; [| simpl; lia]. 
+      by destruct MTH as (?&?&?&[=]). }
+    pose proof MTH as STEP. eapply trace_valid_steps' in STEP; eauto.
+    Local Ltac exploit_UU NOs MTH := apply NOs in MTH; [| done]; destruct MTH; by repeat eexists.
+    simpl in STEP. inversion STEP; subst; cycle -2. 
+    { destruct FS as [[? ->] | [[=] ?]]. exploit_UU NOs MTH. }
+    1, 2: exploit_UU NOs MTH. 
+
+    forward eapply (subtrace_len tr _ (S m) len); eauto.
+    { rewrite -Nat.add_1_r. eapply trace_lookup_dom_strong; eauto. }
+    { reflexivity. }
+    intros (str & SUB & LEN2).
+    destruct len as [ | ?].
+    2: { eapply terminating_trace_equiv; eauto. }
+    enough (terminating_trace str) as TERM.
+    { eapply terminating_trace_equiv in TERM as [? LEN']; eauto.
+      simpl in LEN'. done. }
+
+    simpl in LEN2.
+    forward eapply (tl_trace_construction str) as MATCH. 
+    { subst. eapply (subtrace_valid tr); eauto. done. }
+    { intros i [[tl_st f] [[ρ st']| ]] RES.
+      2: { right. eexists. eauto. }
+      left.
+      assert (fs_le f fs_S) as LEi.
+      { eapply state_label_lookup in MTH as (_&MTH'&_).
+        apply trace_state_lookup in RES. 
+        erewrite subtrace_state_lookup in RES; eauto.
+        unshelve forward eapply (client_trace_fs_mono _ _ _ _ _ _ _ MTH' RES); eauto.
+        lia. }
+      pose proof RES as STEP'. eapply trace_valid_steps' in STEP'.
+      2: { eapply (subtrace_valid tr); eauto. done. }
+      inversion STEP'; subst; try done.
+      all: try by repeat eexists.
+      red in LEi. lia. }
+
+    eapply traces_match_preserves_termination; eauto.
+    (* eapply @fin_ext_fair_termination.  *)
+    apply (@fin_ext_fair_termination _ TlEM (project_tl_trace str)).
+    all: eauto.
+    { eapply traces_match_valid2; eauto. }
+    { admit. }
+    { eapply tl_subtrace_fair; eauto. }
+    { clear dependent lmtr. clear VALID. 
+      intros lmtr. red. intros VALID FAIRm.
+ 
+      pose proof (can_destutter_auxtr _ VALID) as [mtr UPTO].
+      eapply upto_stutter_finiteness; eauto.
+      eapply Mtl_TERM; eauto.
+      { eapply upto_preserves_validity; eauto. }
+
+      assert (∀ ρ: fmrole TlLM_FM, afair_by_next_TS (LM_ALM TlLM) ρ lmtr). 
+      
+
+      (* TODO: check whether this transformation already exists somewhere *)
+      eapply upto_stutter_fairness; eauto.
+
+      assert (forall τ, fair_by_group (LM_ALM TlLM) τ lmtr) as FAIRm'.
+      { intros. red. 
+      
+      intros ρ. red.
+      apply fair_by_gen_equiv. red.
+      intros n EN. destruct (lmtr S!! n) eqn:NTH.
+      2: { rewrite NTH in EN. done. }
+      rewrite NTH in EN. simpl in EN.
+      red in EN. apply mapping_live_role in EN as [g MAP].
+      specialize (FAIRm g). red in FAIRm. apply fair_by_equiv in FAIRm.
+      red in FAIRm. specialize (FAIRm n). specialize_full FAIRm.
+      { rewrite NTH. simpl. 
+      eapply LM_ALM_afair_by_next.  
+      apply group_fairness_implies_role_fairness.
+      { admit. }
+      { done. }
+      
+
+      red. intros ? [ρlg ->] j tl_st **. specialize (AFTER ltac:(lia)).
+      destruct AFTER as [NEQ NO_L_LOCKS].
+      assert (ρlg = ρlg_r) as ->.
+      { admit. (* need to ensure that we only operate with lib_gs roles *) }
+      destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) tl_st)) as [| DIS]. 
+      { eauto. }
+      eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
+      2: by apply MATCH.
+      destruct st as [? f]. simpl in EQ. subst.
+      assert (f = fs_U) as ->.
+      { apply trace_state_lookup_simpl' in JTH as (step&JTH&ST).
+        erewrite subtrace_lookup in JTH; eauto.
+        2: done.
+        simpl in JTH. apply STEPs in JTH; [| done].
+        destruct JTH as (?&?&?&[=]). subst. by inversion ST. }
+      
+      pose proof SUB1 as FAIR1. eapply fair_by_subtrace in FAIR1; eauto.
+      Unshelve. 2: exact (ρ_ext $ flU (ρlg_r: fmrole TlLM_FM)).
+      forward eapply kept_state_fair_step.
+      5: by apply JTH.
+      3: { intros ? P. apply P. }
+      4: { simpl. red. eapply fm_live_spec.
+           eapply ct_au_R; eauto. }
+      { eapply (subtrace_valid tr); eauto. }
+      { apply kept2. }
+      { eapply fair_by_subtrace; eauto. }
+      
+      clear dependent tl_st. 
+      simpl. intros (k & st & PROPk & KTH & ENk).
+      red in PROPk. destruct PROPk as [[LE STEP] MINk].
+      apply trace_label_lookup_simpl' in STEP as (? & st' & KTH').
+      exists (k + 1), st'.1. repeat split.
+      2: lia.
+      { apply state_label_lookup in KTH' as (?&KTH'&?).
+        eapply traces_match_state_lookup_1 in KTH' as (? & KTH' & EQ).
+        2: { eauto. }
+        rewrite KTH'. congruence. }
+      
+      eapply trace_state_lookup_simpl in KTH; eauto. subst.
+      eapply trace_valid_steps' in KTH'.
+      2: { eapply subtrace_valid in SUB1; eauto. }
+      inversion KTH'; subst.
+      { by apply ρlg_lr_neq in H2. }
+      simpl. eapply allows_unlock_spec; eauto.
+      apply allows_unlock_impl_spec; eauto.
+      apply ALWAYS_tl_state_wf. 
     
+
 
     admit. 
   Admitted. 
 
 End ClientDefs. 
+
+                                            
