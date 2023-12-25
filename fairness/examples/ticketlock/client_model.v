@@ -715,6 +715,23 @@ Section ClientDefs.
   (*        P st1 <-> P st2. *)
   (* Proof. Admitted.  *)
 
+  (* TODO: move *)
+  Lemma has_lock_st_excl tl_st ρlg1 ρlg2:
+    has_lock_st ρlg1 tl_st -> has_lock_st ρlg2 tl_st -> ρlg1 = ρlg2.
+  Proof. Admitted. 
+
+  (* TODO: move *)
+  Lemma can_has_lock_incompat tl_st ρlg:
+    has_lock_st ρlg tl_st -> can_lock_st ρlg tl_st -> False. 
+  Proof. Admitted. 
+
+  (* TODO: move, introduce more uniform treatment of ETs pre- and postconditions *)
+  Lemma allows_unlock_spec tl_st1 ρlg tl_st2:
+    allows_unlock ρlg tl_st1 tl_st2 ->
+    has_lock_st ρlg tl_st1 /\ ¬ active_st ρlg tl_st1 /\
+    has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2. 
+  Proof. Admitted. 
+
   (* TODO: move, rename *)
   Lemma kept2:
   @label_kept_state client_model_impl
@@ -760,7 +777,11 @@ Section ClientDefs.
         { set_solver. }
         intros EQUIV%not_iff_compat. apply EQUIV.
         apply PREρlg.
-    - foobar.
+    - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
+    - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
+    - done.
+    - edestruct can_has_lock_incompat; eauto. apply PREρlg.
+  Qed. 
         
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
@@ -898,11 +919,30 @@ Section ClientDefs.
         4: { simpl. red. eapply fm_live_spec.
              eapply ct_au_R; eauto. }
         { eapply (subtrace_valid tr); eauto. }
-        { Set Printing Implicit.
+        { apply kept2. }
+        { eapply fair_by_subtrace; eauto. }
+
+        clear dependent tl_st. 
+        simpl. intros (k & st & PROPk & KTH & ENk).
+        red in PROPk. destruct PROPk as [[LE STEP] MINk].
+        apply trace_label_lookup_simpl' in STEP as (? & st' & KTH').
+        exists (k + 1), st'.1. repeat split.
+        2: lia.
+        { apply state_label_lookup in KTH' as (?&KTH'&?).
+          eapply traces_match_state_lookup_1 in KTH' as (? & KTH' & EQ).
+          2: { eauto. }
+          rewrite KTH'. congruence. }
         
-        admit. 
-      }
-      
+        eapply trace_state_lookup_simpl in KTH; eauto. subst.
+        eapply trace_valid_steps' in KTH'.
+        2: { eapply subtrace_valid in SUB1; eauto. }
+        inversion KTH'; subst.
+        { by apply ρlg_lr_neq in H2. }
+        simpl. eapply allows_unlock_spec; eauto.
+        apply allows_unlock_impl_spec; eauto.
+        apply ALWAYS_tl_state_wf. }
+
+      intros (k & tl_st & ? & KTH & LOCKl & DISl). 
 
       admit. }
 
