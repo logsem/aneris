@@ -73,6 +73,24 @@ Section GeneralizedFairness.
     (∀ ℓ, fair_by_gen ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_by_gen ℓ r).
   Proof. eauto using fair_by_gen_cons. Qed.
 
+  Definition fair_by_gen'
+    (t: T) (otr: trace S L) :=
+    forall n, from_option (locale_prop t) False (otr S!! n) ->
+    exists m s' step, otr !! (n + m) = Some (s', step) /\
+                  fairness_sat_gen t s' step.
+
+  Lemma fair_by_gen_equiv:
+    forall (t: T) (otr: trace S L),
+      fair_by_gen t otr <-> fair_by_gen' t otr.
+  Proof.
+    intros. rewrite /fair_by_gen /fair_by_gen'.    
+    apply forall_proper. intros n.
+    repeat setoid_rewrite pred_at_trace_lookup.
+    apply Morphisms_Prop.iff_iff_iff_impl_morphism.
+    2: { done. }
+    destruct (otr S!! n); simpl; set_solver.
+  Qed.
+
 End GeneralizedFairness.
 
 Global Instance fair_by_gen_Proper {S L T: Type}:
@@ -126,13 +144,25 @@ Section LocaleFairness.
       fair_by t (c -[ tid' ]-> r) → fair_by t r.
   Proof. intros H. by eapply (fair_by_after t (c -[tid']-> r) r 1). Qed.
 
-  (* Lemma fair_model_trace_cons_forall δ ℓ' r: *)
   Lemma fair_by_cons_forall δ ℓ' r:
     (∀ ℓ, fair_by ℓ (δ -[ℓ']-> r)) -> (∀ ℓ, fair_by ℓ r).
   Proof. eauto using fair_by_cons. Qed.
 
-  (* TODO: try to unify validity lemmas by generalizing over step relation *)
-  
+  Definition fair_by' (t: T) (otr: trace S L) :=
+    forall n, from_option (locale_prop t) False (otr S!! n) ->
+    exists m s', otr S!! (n + m) = Some s' /\
+             fairness_sat t s' (otr L!! (n + m)).
+
+  Lemma fair_by_equiv:
+    forall (t: T) (otr: trace S L), fair_by t otr <-> fair_by' t otr.
+  Proof.
+    intros. rewrite /fair_by /fair_by'.
+    apply forall_proper. intros n.
+    repeat setoid_rewrite pred_at_trace_lookup.
+    apply Morphisms_Prop.iff_iff_iff_impl_morphism; [| done].    
+    destruct (otr S!! n); simpl; set_solver.
+  Qed. 
+
 End LocaleFairness.
 
 Definition extrace Λ := trace (cfg Λ) (olocale Λ).

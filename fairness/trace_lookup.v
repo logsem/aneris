@@ -296,6 +296,13 @@ Section TraceLookup.
     all: congruence || eauto. 
   Qed. 
 
+  Lemma trace_state_lookup (tr: trace St L) i st ostep
+    (ITH: tr !! i = Some (st, ostep)):
+    tr S!! i = Some st.
+  Proof. 
+    eapply trace_state_lookup_simpl'; eauto. 
+  Qed. 
+
   Lemma trace_label_lookup_simpl' (tr: trace St L) i ℓ:
     (exists s1 s2, tr !! i = Some (s1, Some (ℓ, s2))) <-> tr L!! i = Some ℓ. 
   Proof.
@@ -411,6 +418,23 @@ Section After.
     destruct t; simpl; eauto.
     all: split; [intros ->| intros (?&[=])]; eauto.
   Qed.   
+
+  Lemma trace_lookup_prev (tr: trace St L) i st2 ostep
+    (ITH': tr !! S i = Some (st2, ostep)):
+    exists st1 l, tr !! i = Some (st1, Some (l, st2)).
+  Proof.
+    pose proof (trace_has_len tr) as [len LEN]. 
+    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN i)).
+    { eapply trace_lookup_dom; eauto.
+      by rewrite Nat.add_1_r. }
+    intros (?&?&st'&ITH).
+    enough (st' = st2).
+    { subst. eauto. }    
+    apply state_label_lookup in ITH as (?&ITH'_&?).
+    rewrite Nat.add_1_r in ITH'_.
+    symmetry. 
+    eapply trace_state_lookup_simpl; eauto.
+  Qed.
 
 End After.
 

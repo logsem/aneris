@@ -109,6 +109,21 @@ Module NOmega.
     intros. lia_NO' x; lia_NO' y; solve_decision. 
   Qed. 
 
+  Global Instance NOmega_le_TO: TotalOrder NOmega.le. 
+  Proof. 
+    split. 
+    - split.
+      + split.
+        * intros [|]; red; lia.
+        * intros [|] [|] [|]; done || simpl; lia. 
+      + intros [|] [|]; try (done || simpl; lia). 
+        simpl. intros. f_equal. lia. 
+    - red. unfold strict. intros [|] [|]; try (done || simpl; lia). 
+      + simpl. tauto.
+      + simpl. destruct (Nat.lt_trichotomy n n0) as [?|[?|?]]; try lia.
+        subst. tauto.
+  Qed. 
+
   Definition lt n m :=
     match n, m with
     | NOinfinity, _ => False

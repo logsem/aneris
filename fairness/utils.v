@@ -127,6 +127,14 @@ Section LogicHelpers.
     A /\ B <-> A /\ C.
   Proof using. tauto. Qed.
 
+  Lemma curry_uncurry_prop {A B C: Prop}:
+    (A -> B -> C) <-> (A /\ B -> C).
+  Proof. tauto. Qed. 
+
+  Lemma forall_eq_gen {A: Type} (P: A -> Prop):
+    forall a, P a <-> (forall a', a' = a -> P a').
+  Proof. set_solver. Qed. 
+
 End LogicHelpers.
 
 

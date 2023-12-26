@@ -4,156 +4,12 @@ From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 From stdpp Require Import finite.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext.
-From trillium.fairness.examples.ticketlock Require Import fair_lock.
+From trillium.fairness.examples.ticketlock Require Import fair_lock group_roles.
 From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness Require Import lemmas trace_len fuel lm_fair lm_fair_traces subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
+From trillium.fairness.heap_lang Require Import simulation_adequacy_lm_ext.
 
 Close Scope Z_scope.
-
-(* TODO: move *)
-(* TODO: rename definitions inside? *)
-Section GroupRolesInstantiation.  
-  Context {Gl: Type} `{Countable Gl}.
-  Context (get_Gls: forall n, { gls: gset Gl | size gls = n}).
-  Let get_Gls' n := elements (proj1_sig (get_Gls n)). 
-
-  Instance Gl_inhabited: Inhabited Gl.
-  Proof. 
-    pose proof (get_Gls 1) as [gls SPEC].
-    destruct (decide (gls = ∅)).
-    { subst. set_solver. }
-    apply finitary.set_choose_L' in n as [g IN].
-    econstructor. apply g. 
-  Qed.
-
-  Let g0 := @inhabitant _ Gl_inhabited.
-
-  Definition gls' n: list Gl := 
-    let gls_Sn := get_Gls' (S n) in
-    if (decide (g0 ∈ gls_Sn)) 
-    then remove EqDecision0 g0 gls_Sn
-    else drop 1 gls_Sn. 
-      
-  Definition ρlg_i (n i: nat) := nth i (gls' n) g0.
-
-  (* TODO: move *)
-  Lemma nth_error_seq n i (DOM: i < n):
-    nth_error (seq 0 n) i = Some i.
-  Proof.
-    erewrite nth_error_nth' with (d := 0).
-    - f_equal. by apply seq_nth.
-    - by rewrite seq_length. 
-  Qed. 
-
-  (* TODO: move *)
-  Lemma length_remove_NoDup `{ED: EqDecision A} (l: list A) (a: A)
-                            (ND: NoDup l)
-    :
-    length (remove ED a l) = length l - (if (decide (a ∈ l)) then 1 else 0).
-  Proof.
-    destruct (decide (a ∈ l)) as [IN| ].
-    2: { rewrite notin_remove; [lia| ].
-         by intros ?%elem_of_list_In. }
-    apply elem_of_list_In, In_nth_error in IN as [i ITH].
-    pose proof ITH as (l1 & l2 & -> & LEN)%nth_error_split.
-    rewrite remove_app. rewrite notin_remove.
-    2: { apply NoDup_app in ND as (?&NIN&?).
-         intros IN1. apply (NIN a); [| set_solver]. by apply elem_of_list_In. }
-    simpl. rewrite decide_True; [| done].
-    rewrite notin_remove.
-    2: { rewrite cons_middle app_assoc in ND. 
-         apply NoDup_app in ND as (?&NIN&?).
-         intros ?%elem_of_list_In. apply (NIN a); set_solver. }
-    rewrite !app_length. simpl. lia.
-  Qed. 
-
-
-  Lemma get_Gls'_len n: length (get_Gls' n) = n. 
-  Proof.
-    rewrite /get_Gls'. 
-    destruct (get_Gls n) as [gls SPEC]; simpl in *.
-    rewrite -(list_to_set_elements_L gls) in SPEC.
-    rewrite size_list_to_set in SPEC; [lia| ].
-    apply NoDup_elements.
-  Qed. 
-
-  Lemma gls'_len n: length (gls' n) = n.
-  Proof. 
-    rewrite /gls'. destruct decide.
-    - rewrite length_remove_NoDup.
-      2: { rewrite /get_Gls'. apply NoDup_elements. }
-      rewrite decide_True; [| done].
-      rewrite get_Gls'_len. lia. 
-    - rewrite skipn_length.
-      rewrite get_Gls'_len. lia. 
-  Qed. 
-
-  Lemma gls'_ρlg n:
-    gls' n = map (ρlg_i n) (seq 0 n). 
-  Proof.
-    pose proof (gls'_len n) as LEN'. 
-    apply nth_ext with (d := g0) (d' := g0).
-    { by rewrite fmap_length seq_length. }
-
-    intros i DOM.    
-    eapply Some_inj.
-    rewrite -nth_error_nth'; [| done].
-    rewrite -nth_error_nth'. 
-    2: { rewrite fmap_length seq_length. congruence. }
-    rewrite nth_error_map.
-    rewrite nth_error_seq; [| congruence].
-    simpl. rewrite /ρlg_i.
-    by apply nth_error_nth'.
-  Qed.
-
-  Definition gls n: gset Gl := list_to_set (gls' n). 
-
-  Lemma gls_ρlg n:
-    gls n = list_to_set (map (ρlg_i n) (seq 0 n)).
-  Proof. 
-    rewrite /gls. f_equal. apply gls'_ρlg.
-  Qed. 
-
-  Lemma get_Gls'_NoDup n: NoDup (get_Gls' n).
-  Proof. 
-    rewrite /get_Gls'. apply NoDup_elements.
-  Qed.
-
-  (* TODO: move *)
-  Lemma NoDup_remove {A: Type} (l: list A)
-    (ND: NoDup l):
-    forall a EQ, NoDup (remove EQ a l).
-  Proof. 
-    intros a ?. revert a. induction l.
-    { done. }
-    intros. simpl. destruct EQ.
-    { subst. apply IHl. by inversion ND. }
-    econstructor.
-    2: { apply IHl. by inversion ND. }
-    inversion ND. subst.
-    intros IN%elem_of_list_In%in_remove.
-    apply H2. apply elem_of_list_In, IN. 
-  Qed. 
-
-  Lemma gls'_NoDup n: NoDup (gls' n).
-  Proof. 
-    rewrite /gls'. destruct decide.
-    - apply NoDup_remove. apply get_Gls'_NoDup.
-    - apply NoDup_ListNoDup.
-      eapply NoDup_app_remove_l.
-      erewrite take_drop.
-      apply NoDup_ListNoDup. apply get_Gls'_NoDup.
-  Qed. 
-
-  Lemma ρlg_i_dom_inj n:
-    forall i j, i < n -> j < n -> ρlg_i n i = ρlg_i n j -> i = j. 
-  Proof.
-    rewrite /ρlg_i.
-    rewrite -{1 2}(gls'_len n). apply NoDup_nth.
-    apply NoDup_ListNoDup. apply gls'_NoDup. 
-  Qed.
-
-End GroupRolesInstantiation.
 
 
 (* TODO: replace 'Tl' prefixes with 'Fl' *)
@@ -169,11 +25,6 @@ Section ClientDefs.
   Definition ρlg_tl c := ρlg_i get_Gtls 2 (cl_id_nat c).
   Definition ρlg_l := ρlg_tl cl_L.
   Definition ρlg_r := ρlg_tl cl_R.   
-
-  (* Lemma ρlg_tl_inj: Inj eq eq ρlg_tl. *)
-  (* Proof.  *)
-  (*   intros ??. rewrite /ρlg_tl. EQ.  *)
-
 
   Lemma lib_gs_ρlg:
     lib_gs = {[ ρlg_l; ρlg_r ]}.
@@ -227,17 +78,10 @@ Section ClientDefs.
   Let tl_role := fmrole TlLM_FM.
   Let tl_erole := @ext_role _ TlEM.
 
-  (* Existing Instances tl_FLP tl_FLE.  *)
-
   Inductive flag_state := | fs_U | fs_S | fs_O. 
   Definition client_state: Type := tl_state * flag_state.
 
-  (* Inductive cl_role_kind := | cl_lift | cl_au | cl_al | cl_cl. *)
-  (* Definition client_role: Type := cl_role_kind * cl_id.  *)
   Definition client_role: Type := tl_erole + cl_id. 
-
-  (* Let allow_unlock_impl := allow_unlock_impl _ _ _ _ _ _ (FairLock := TlEM_FL).  *)
-  (* Let allow_lock_impl := allow_lock_impl _ _ _ _ _ _ (FairLock := TlEM_FL).  *)
 
   Definition ρ_cl c: client_role := inr c. 
   Definition ρ_lib ρlg: client_role := inl $ inl ρlg.
@@ -247,12 +91,10 @@ Section ClientDefs.
   Inductive client_trans: client_state -> option client_role -> client_state -> Prop :=
   | ct_lib_step tl1 tl2 c flag
         (LIB_STEP: fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2):
-      (* client_trans (tl1, flag) (Some (cl_lift, c)) (tl2, flag) *)
       client_trans (tl1, flag) (Some $ ρ_lib (ρlg_tl c)) (tl2, flag)
   | ct_flag_US tl 
       (LOCK: has_lock_st (ρlg_tl cl_L) tl)
       (DIS: ¬ active_st (ρlg_tl cl_L) tl):
-    (* client_trans (tl, fs_U) (Some (cl_cl, cl_L)) (tl, fs_S) *)
     client_trans (tl, fs_U) (Some $ ρ_cl cl_L) (tl, fs_S)
   | ct_au_L tl (ρlg := ρlg_l)
       (LOCK: has_lock_st ρlg tl)
@@ -263,31 +105,15 @@ Section ClientDefs.
       (FS: fs = fs_U /\ fs' = fs_U \/ fs = fs_S /\ fs' = fs_O)
       (LOCK: has_lock_st ρlg tl)
       (DIS: ¬ active_st ρlg tl):
-    (* client_trans (tl, fs) (Some (cl_au, cl_R)) (allow_unlock_impl tl, fs') *)
     client_trans (tl, fs) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs')
   | ct_al_R tl fs
       (ρlg := ρlg_r)
       (CANL: can_lock_st ρlg tl)
       (DIS: ¬ active_st ρlg tl)
       (NO: fs ≠ fs_O):
-    (* client_trans (tl, fs) (Some (cl_al, cl_R)) (allow_lock_impl ρlg tl, fs) *)
     client_trans (tl, fs) (Some $ ρ_ext $ flL (ρlg: fmrole TlLM_FM)) (allow_lock_impl ρlg tl, fs)
   .
 
-  (* (* easier to show decidability for*) *)
-  (* Definition client_trans_alt '(tl1, flag1) oρ '(tl2, flag2) := *)
-  (*   (exists c, oρ = Some $ ρ_lib (ρlg_tl c) /\ *)
-  (*         fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2 /\ flag1 = flag2 /\ oρ) \/ *)
-  (*   (has_lock_st (ρlg_tl cl_L) tl1) /\ ¬ active_st (ρlg_tl cl_L) tl1 /\ *)
-  (*         flag1 =  *)
-    
-
-      
-    (* client_trans (tl_st1, flag1) oρ (tl_st2, flag2).  *)
-    
-
-  (* Instance cl_role_kind_dec: EqDecision cl_role_kind. *)
-  (* Proof. solve_decision. Qed.  *)
   Instance flag_state_dec: EqDecision flag_state.
   Proof. solve_decision. Qed.   
   Instance cl_id_dec: EqDecision cl_id.
@@ -299,8 +125,6 @@ Section ClientDefs.
     [ repeat (apply NoDup_cons; split; [set_solver| ]); apply NoDup_nil_2 |
      by intros x; destruct x; set_solver]. 
        
-  (* Instance cl_role_kind_cnt: Countable cl_role_kind. *)
-  (* Proof. fin_type_countable [cl_lift; cl_au; cl_al; cl_cl]. Qed.  *)
   Let all_flag_states := [fs_U; fs_S; fs_O]. 
   Instance flag_state_cnt: Countable flag_state.
   Proof. fin_type_countable all_flag_states. Qed. 
@@ -309,10 +133,6 @@ Section ClientDefs.
   Instance cl_id_cnt: Countable cl_id.
   Proof. fin_type_countable all_cl_id. Qed. 
   
-  (* Lemma client_role_Cnt: Countable client_role. *)
-    
-  (*   unshelve eapply prod_countable; try apply _.   *)
-
   Lemma ρlg_dom_dec (ρlg: Gtl):
     {c | ρlg = ρlg_tl c} + (forall c, ρlg ≠ ρlg_tl c).
   Proof. 
@@ -329,8 +149,6 @@ Section ClientDefs.
     solve_decision. 
   Defined.  
 
-  (* TODO: derive this from decidability of a transition
-     and finite branching, make it a general lemma *)
   Instance client_step_dec st1 ρ st2:
     Decision (client_trans st1 (Some ρ) st2).
   Proof.
@@ -452,21 +270,9 @@ Section ClientDefs.
     - intros. apply client_lr_spec. eauto.
   Defined.
 
-  (* Definition project_tl_label (oρ: option $ fmrole client_model_impl): *)
-  (*   option (@ext_role _ TlEM) := *)
-  (*   match oρ with | Some (inl l) => Some $ Some l | _ => None end.  *)
-    
-  (*   match oρ with *)
-  (*   | Some (cl_lift, c) => Some $ inl $ ρlg_tl c *)
-  (*   | Some (cl_au, c) => Some $ inr $ @env _ TlEM flU *)
-  (*   | Some (cl_al, c) => Some $ inr $ @env _ TlEM (flL ((ρlg_tl c): fmrole TlLM_FM)) *)
-  (*   | _ => None  *)
-  (*   end.  *)
-
   Definition project_tl_trace (tr: mtrace client_model_impl): 
     elmftrace (ELM := TlEM) :=
     project_nested_trace fst 
-      (* (fun oρ => option_fmap _ _ Some (project_tl_label oρ)) *)
       (fun ℓ => match ℓ with | Some (inl l) => Some $ Some l | _ => None end)                         
       tr. 
     
@@ -614,11 +420,6 @@ Section ClientDefs.
       apply elem_of_elements. set_solver.
   Qed. 
 
-  (* TODO: move, find existing? *)
-  Lemma curry_uncurry_prop {A B C: Prop}:
-    (A -> B -> C) <-> (A /\ B -> C).
-  Proof. tauto. Qed. 
-
   Instance client_LSI_dec: 
     forall st tm fm, Decision (client_LSI st tm fm).
   Proof. 
@@ -675,27 +476,6 @@ Section ClientDefs.
   .
  
 
-  (* TODO: move *)
-  Definition fair_by' {S L T : Type}
-    (locale_prop: T -> S -> Prop) (does_step: T -> L -> Prop)
-    (t: T) (otr: trace S L) :=
-    forall n, from_option (locale_prop t) False (otr S!! n) ->
-    exists m s', otr S!! (n + m) = Some s' /\
-             fairness_sat locale_prop does_step t s' (otr L!! (n + m)).
-
-  (* TODO: move *)
-  Lemma fair_by_equiv {S L T : Type}
-    (locale_prop: T -> S -> Prop) (does_step: T -> L -> Prop):
-    forall (t: T) (otr: trace S L),
-      fair_by locale_prop does_step t otr <-> fair_by' locale_prop does_step t otr.
-  Proof.
-    intros. rewrite /fair_by /fair_by'.
-    apply forall_proper. intros n.
-    repeat setoid_rewrite pred_at_trace_lookup.
-    apply Morphisms_Prop.iff_iff_iff_impl_morphism; [| done].    
-    destruct (otr S!! n); simpl; set_solver.
-  Qed. 
-
   (* TODO: move*)
   Lemma model_step_keeps_others_preds st1 ρ st2 ρ'
     (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2)
@@ -720,13 +500,6 @@ Section ClientDefs.
   Lemma not_active_st_not_live tl_st ρlg:
     ¬ active_st ρlg tl_st -> ρlg ∉ live_roles _ tl_st.
   Proof. Admitted. 
-
-  (* Lemma ext_step_keeps_others_preds st1 ρ st2 ρ' *)
-  (*   (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2) *)
-  (*   (NEQ: ρ' ≠ ρ): *)
-  (*   forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> *)
-  (*        P st1 <-> P st2. *)
-  (* Proof. Admitted.  *)
 
   (* TODO: move *)
   Lemma has_lock_st_excl tl_st ρlg1 ρlg2:
@@ -795,10 +568,6 @@ Section ClientDefs.
     - done.
     - edestruct can_has_lock_incompat; eauto. apply PREρlg.
   Qed.
-
-  Lemma forall_eq_gen {A: Type} (P: A -> Prop):
-    forall a, P a <-> (forall a', a' = a -> P a').
-  Proof. set_solver. Qed. 
         
   (* TODO: move, rename *)
   Lemma kept1:
@@ -809,7 +578,6 @@ Section ClientDefs.
     red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP.
     destruct oℓ' as [ρ | ].
     2: { by inversion STEP. }
-    (* assert (ρ ≠ ρ_ext (flU (ρlg_r: fmrole TlLM_FM))) as NEQ' by congruence. *)
     
     assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ active_st ρlg_l tl_st) as [-> PREρlg].
     { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP'].
@@ -821,9 +589,6 @@ Section ClientDefs.
     red. simpl. apply client_lr_spec.
     eexists. apply STEPr.
     apply and_assoc.
-    (* split. *)
-    (* { apply proj1 in PREρlg. *)
-    (*   inversion STEP; destruct PREρlg as [-> | ->]; subst; tauto. } *)
     inversion STEP; subst.
     - split; [done| ]. split.
       + eapply model_step_keeps_others_preds with (ρ' := ρlg_l); eauto.
@@ -1063,24 +828,6 @@ Section ClientDefs.
   Admitted.
 
 
-  (* TODO: move*)
-  Lemma trace_lookup_prev {St L : Type} (tr: trace St L) i st2 ostep
-    (ITH': tr !! S i = Some (st2, ostep)):
-    exists st1 l, tr !! i = Some (st1, Some (l, st2)).
-  Proof.
-    pose proof (trace_has_len tr) as [len LEN]. 
-    forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN i)).
-    { eapply trace_lookup_dom; eauto.
-      by rewrite Nat.add_1_r. }
-    intros (?&?&st'&ITH).
-    enough (st' = st2).
-    { subst. eauto. }    
-    apply state_label_lookup in ITH as (?&ITH'_&?).
-    rewrite Nat.add_1_r in ITH'_.
-    symmetry. 
-    eapply trace_state_lookup_simpl; eauto.
-  Qed.
-
   Definition fs_le f1 f2: Prop :=
     let fn := fun fs => match fs with | fs_U => 2 | fs_S => 1 | fs_O => 0 end in
     fn f1 <= fn f2.
@@ -1127,56 +874,6 @@ Section ClientDefs.
     eapply client_trans_fs_mono.
     eapply trace_valid_steps''; eauto.
   Qed.
-
-  (* TODO: Move *)
-  Instance NOmega_le_TO: TotalOrder NOmega.le. 
-  Proof. 
-    split. 
-    - split.
-      + split.
-        * intros [|]; red; lia.
-        * unfold fs_le. intros [|] [|] [|]; done || simpl; lia. 
-      + unfold fs_le. intros [|] [|]; try (done || simpl; lia). 
-        simpl. intros. f_equal. lia. 
-    - red. unfold fs_le, strict. intros [|] [|]; try (done || simpl; lia). 
-      + simpl. tauto.
-      + simpl. destruct (Nat.lt_trichotomy n n0) as [?|[?|?]]; try lia.
-        subst. tauto.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma trace_state_lookup {St L: Type} (tr: trace St L) i st ostep
-    (ITH: tr !! i = Some (st, ostep)):
-    tr S!! i = Some st.
-  Proof. 
-    eapply trace_state_lookup_simpl'; eauto. 
-  Qed. 
-
-  (* TODO: move *)
-  Definition fair_by_gen' {S L T : Type}
-    (locale_prop: T -> S -> Prop) (does_step: T -> S -> option (L * S) -> Prop)
-    (t: T) (otr: trace S L) :=
-    forall n, from_option (locale_prop t) False (otr S!! n) ->
-    exists m s' step, otr !! (n + m) = Some (s', step) /\
-                  fairness_sat_gen locale_prop does_step t s' step.
-
-  (* TODO: move *)
-  Lemma fair_by_gen_equiv {S L T : Type}
-    (locale_prop: T -> S -> Prop) (does_step: T -> S -> option (L * S) -> Prop):
-    forall (t: T) (otr: trace S L),
-      fair_by_gen locale_prop does_step t otr <-> 
-      fair_by_gen' locale_prop does_step t otr.
-  Proof.
-    intros. rewrite /fair_by_gen /fair_by_gen'.    
-    apply forall_proper. intros n.
-    repeat setoid_rewrite pred_at_trace_lookup.
-    apply Morphisms_Prop.iff_iff_iff_impl_morphism.
-    2: { done. }
-    destruct (otr S!! n); simpl; set_solver.
-  Qed.
-
-  (* TODO: move *)
-  From trillium.fairness.heap_lang Require Import simulation_adequacy_lm_ext.
 
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
@@ -1276,5 +973,3 @@ Section ClientDefs.
   Qed. 
 
 End ClientDefs. 
-
-                                            
