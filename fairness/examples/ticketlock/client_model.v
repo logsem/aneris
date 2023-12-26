@@ -911,28 +911,78 @@ Section ClientDefs.
     specialize (IHd _ JTH). etrans; [| apply IHd].
     eapply client_trans_fs_mono.
     eapply trace_valid_steps''; eauto.
-  Qed.  
+  Qed.
 
-  (* Lemma client_trace_tl_ext_bounded (tr: mtrace client_model_impl) *)
-  (*   (VALID: mtrace_valid tr) *)
-  (*   (S0: fs_le (trfirst tr).2 fs_S): *)
-  (*   trans_bounded tr (fun oℓ => exists ι, oℓ = Some (ρ_ext ι)). *)
-  (* Proof. *)
-  (*   destruct (classic (exists n ι, tr L!! n = Some (Some (ρ_ext ι)))) as [(n&ι&Ln)|NO].  *)
-  (*   2: { exists 0. intros. intros [? ->]. apply NO. eauto. } *)
-  (*   apply trace_label_lookup_simpl' in Ln as ([? f]&[? f']&NTH). *)
-  (*   assert (fs_le f' fs_S) as ->.  *)
-  (*   { assert (fs_le f fs_S) as LE. *)
-  (*     { forward eapply (client_trace_fs_mono tr 0 n); eauto. *)
-  (*       { lia. } *)
-  (*       { rewrite state_lookup_0. reflexivity. } *)
-  (*       { eapply trace_state_lookup; eauto. } *)
-  (*       simpl. intros. etrans; eauto. } *)
-  (*     eapply trace_valid_steps' in NTH; eauto. *)
-  (*     simpl in NTH. red in LE. inversion NTH; subst; try auto || lia.  *)
-  (*     - destruct FS as [[-> ->]|[-> ->]]; [| done]. lia. *)
-  (*     - destruct f'; try auto || lia.  *)
-  (* Abort.  *)
+  (* TODO: move *)
+  Lemma forall_impl_helper {A: Type} (P Q: A -> Prop):
+    (forall a, P a -> Q a) -> all P -> all Q.
+  Proof. rewrite /all. intros. eauto. Qed. 
+
+  Lemma client_trace_tl_ext_bounded (tr: mtrace client_model_impl)
+    (VALID: mtrace_valid tr)
+    (S0: fs_le (trfirst tr).2 fs_S):
+    trans_bounded tr (fun oℓ => exists ι, oℓ = Some (ρ_ext ι)).
+  Proof.
+    assert (forall tl_st1 f1 ι tl_st2 f2,
+               client_trans (tl_st1, f1) (Some (ρ_ext ι)) (tl_st2, f2) -> f1 ≠ fs_U ->
+               strict fs_le f2 f1) as LT.
+    { intros * STEP NU. inversion STEP; subst.
+      - done.
+      - destruct FS as [[-> ->] | [[-> | ->] ->]]; try done.
+        + red. split; auto. auto. rewrite /fs_le. lia.
+        + split; auto. rewrite /fs_le. lia.
+      - destruct FS as [[-> ->] | [-> ->]]; try done.
+        split; auto. rewrite /fs_le. lia. }
+
+    destruct (classic (trans_bounded tr (fun oℓ => exists ι, oℓ = Some (ρ_ext ι)))) as [| INF]; [done| ].
+    pose proof (trace_has_len tr) as [len LEN].
+    destruct len.
+    2: { apply fin_trans_bounded. eapply terminating_trace_equiv; eauto. }
+
+    rewrite /trans_bounded in INF.
+    pose proof (@not_exists_forall_not _ _ INF) as INF'. simpl in INF'. clear INF.
+    eapply forall_impl_helper in INF'.
+    2: { intros ?. apply not_forall_exists_not. }
+    (* TODO: shorten *)
+    eapply Morphisms_Prop.all_impl_morphism in INF'.
+    2: { red. intros ?. apply Morphisms_Prop.ex_impl_morphism. intros ?.
+         red. apply not_forall_exists_not. }
+    eapply Morphisms_Prop.all_impl_morphism in INF'.
+    2: { red. intros ?. red. do 2 (apply Morphisms_Prop.ex_impl_morphism; intros ?).
+         red. apply imply_to_and. } 
+    eapply Morphisms_Prop.all_impl_morphism in INF'.
+    2: { red. intros ?. red. do 2 (apply Morphisms_Prop.ex_impl_morphism; intros ?).
+         red. eapply Morphisms_Prop.and_impl_morphism; [reflexivity| ].
+         red. apply imply_to_and. }
+    eapply Morphisms_Prop.all_impl_morphism in INF'.
+    2: { red. intros ?. red. do 2 (apply Morphisms_Prop.ex_impl_morphism; intros ?).
+         red. eapply Morphisms_Prop.and_impl_morphism; [reflexivity| ].
+         red. eapply Morphisms_Prop.and_impl_morphism; [reflexivity| ].
+         red. apply NNPP. }
+    red in INF'. 
+    
+
+    pose proof (INF' 0). destruct H0.  
+    apply Morphisms_Prop.all_impl_morphism in INF'.
+    2: { intros. 
+    
+    contra. 
+    
+    destruct (classic (exists n ι, tr L!! n = Some (Some (ρ_ext ι)))) as [(n&ι&Ln)|NO].
+    2: { exists 0. intros. intros [? ->]. apply NO. eauto. }
+    apply trace_label_lookup_simpl' in Ln as ([? f]&[? f']&NTH).
+    assert (fs_le f' fs_S) as ->.
+    { assert (fs_le f fs_S) as LE.
+      { forward eapply (client_trace_fs_mono tr 0 n); eauto.
+        { lia. }
+        { rewrite state_lookup_0. reflexivity. }
+        { eapply trace_state_lookup; eauto. }
+        simpl. intros. etrans; eauto. }
+      eapply trace_valid_steps' in NTH; eauto.
+      simpl in NTH. red in LE. inversion NTH; subst; try auto || lia.
+      - destruct FS as [[-> ->]|[-> ->]]; [| done]. lia.
+      - destruct f'; try auto || lia.
+  Abort.
    
     
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
