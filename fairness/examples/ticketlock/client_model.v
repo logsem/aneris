@@ -8,6 +8,7 @@ From trillium.fairness.examples.ticketlock Require Import fair_lock group_roles.
 From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness Require Import lemmas trace_len fuel lm_fair lm_fair_traces subtrace comp_utils my_omega lm_fairness_preservation lm_fairness_preservation_wip trace_lookup fairness_finiteness.
 From trillium.fairness.heap_lang Require Import simulation_adequacy_lm_ext.
+Require Import Coq.Logic.Classical.
 
 Close Scope Z_scope.
 
@@ -854,7 +855,7 @@ Section ClientDefs.
     all: try reflexivity; auto.
     destruct FS as [[-> ->] | [-> ->]]; auto.
   Qed.
-
+  
   Lemma client_trace_fs_mono (tr: mtrace client_model_impl) i j si sj
     (VALID : mtrace_valid tr)
     (LE: i <= j)
@@ -873,8 +874,20 @@ Section ClientDefs.
     specialize (IHd _ JTH). etrans; [| apply IHd].
     eapply client_trans_fs_mono.
     eapply trace_valid_steps''; eauto.
-  Qed.
+  Qed.  
 
+  Lemma client_trace_tl_ext_bounded (tr: mtrace client_model_impl)
+    (VALID: mtrace_valid tr)
+    (S0: fs_le (trfirst tr).2 fs_S):
+    trans_bounded tr (fun oℓ => exists ι, oℓ = Some (ρ_ext ι)).
+  Proof.
+    destruct (classic (exists n ι, tr L!! n = Some (Some (ρ_ext ι)))) as [(n&ι&Ln)|NO]. 
+    2: { exists 0. intros. intros [? ->]. apply NO. eauto. }
+    apply trace_label_lookup_simpl' in Ln as (?&?&NTH).
+    eapply trace_valid_steps' in NTH; eauto. inversion NTH; subst.
+  Abort. 
+    
+    
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
     (OUTER_CORR: client_LM_trace_exposing lmtr tr)
