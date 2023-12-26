@@ -82,6 +82,7 @@ Section ClientDefs.
   Inductive flag_state := | fs_U | fs_S | fs_O. 
   Definition client_state: Type := tl_state * flag_state.
 
+  (* TODO: cl_id is not used, get rid of it? *)
   Definition client_role: Type := tl_erole + cl_id. 
 
   Definition ρ_cl c: client_role := inr c. 
@@ -93,14 +94,14 @@ Section ClientDefs.
   | ct_lib_step tl1 tl2 c flag
         (LIB_STEP: fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2):
       client_trans (tl1, flag) (Some $ ρ_lib (ρlg_tl c)) (tl2, flag)
-  | ct_flag_US tl 
-      (LOCK: has_lock_st (ρlg_tl cl_L) tl)
-      (DIS: ¬ active_st (ρlg_tl cl_L) tl):
-    client_trans (tl, fs_U) (Some $ ρ_cl cl_L) (tl, fs_S)
+  (* | ct_flag_US tl  *)
+  (*     (LOCK: has_lock_st (ρlg_tl cl_L) tl) *)
+  (*     (DIS: ¬ active_st (ρlg_tl cl_L) tl): *)
+  (*   client_trans (tl, fs_U) (Some $ ρ_cl cl_L) (tl, fs_S) *)
   | ct_au_L tl (ρlg := ρlg_l)
       (LOCK: has_lock_st ρlg tl)
       (DIS: ¬ active_st ρlg tl):
-    client_trans (tl, fs_S) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs_S)
+    client_trans (tl, fs_U) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs_S)
   | ct_au_R tl fs fs'
       (ρlg := ρlg_r)
       (FS: fs = fs_U /\ fs' = fs_U \/ fs = fs_S /\ fs' = fs_O)
@@ -156,9 +157,7 @@ Section ClientDefs.
     pose proof (@LS_eqdec _ _ _ _ _ _ TlLM_LFP).
     destruct st1 as [tl_st1 flag1], st2 as [tl_st2 flag2].
     destruct ρ as [er | c].
-    2: { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ flag1 = fs_U /\ c = cl_L /\ flag2 = fs_S /\ tl_st1 = tl_st2)) as [(?&?&->&->&->&->)| ].
-         + left. econstructor; eauto.
-         + right. intros STEP. inversion STEP; subst. tauto. }
+    2: { right. intros STEP. inversion STEP. }
 
     destruct er as [ρlg | [ι]]. 
     { destruct (ρlg_dom_dec ρlg).
@@ -175,7 +174,7 @@ Section ClientDefs.
 
     destruct ι.
     - destruct (decide (ρ = ρlg_tl cl_L)) as [-> | ?].
-      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_L): fmrole TlLM_FM) tl_st1 /\ flag1 = fs_S /\ flag2 = fs_S)) as [(?&?&->&->&->)| ]. 
+      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_L): fmrole TlLM_FM) tl_st1 /\ flag1 = fs_U /\ flag2 = fs_S)) as [(?&?&->&->&->)| ]. 
         * left. eapply ct_au_L; eauto.
         * right. intros STEP. inversion STEP; subst; try tauto.
           by eapply ρlg_lr_neq. }
@@ -190,7 +189,7 @@ Section ClientDefs.
       destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_lock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ flag1 ≠ fs_O /\ flag2 = flag1)) as [(?&?&->&?&->) | NOSTEP].
       + left. econstructor; eauto.
       + right. intros STEP. inversion STEP; subst. tauto.
-  Qed.  
+  Qed.
     
 
   (* TODO: derive this from decidability of a transition
@@ -200,9 +199,7 @@ Section ClientDefs.
   Proof.
     destruct st as [tl_st flag].
     destruct ρ as [er | c].
-    2: { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_U /\ c = cl_L)) as [(?&?&->&->)| ].
-         + left. eexists (_, _). econstructor; eauto.
-         + right. intros [? STEP]. inversion STEP; subst. tauto. }
+    2: { right. intros [? STEP]. inversion STEP. }
     destruct er as [ρlg | [ι]]. 
     { destruct (ρlg_dom_dec ρlg).
       2: { right. intros [? STEP]. inversion STEP. subst.
@@ -218,7 +215,7 @@ Section ClientDefs.
 
     destruct ι.
     - destruct (decide (ρ = ρlg_tl cl_L)) as [-> | ?].
-      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_S)) as [(?&?&->)| ]. 
+      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st (M := TlLM_FM) /\ flag = fs_U)) as [(?&?&->)| ]. 
         * left. eexists (_, _). eapply ct_au_L; eauto.
         * right. intros [? STEP]. inversion STEP; subst; try tauto.
           by eapply ρlg_lr_neq. }
@@ -406,7 +403,7 @@ Section ClientDefs.
       { eexists. eauto. }
       + right. eauto.
       + by left.
-    - apply elem_of_cons. tauto.
+    (* - apply elem_of_cons. tauto. *)
     - apply elem_of_list_further, elem_of_app. right.
       apply elem_of_app. left. rewrite lib_gs_ρlg. 
       apply elem_of_list_fmap. eexists. split; eauto.
@@ -565,54 +562,115 @@ Section ClientDefs.
         intros EQUIV%not_iff_compat. apply EQUIV.
         apply PREρlg.
     - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
-    - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
     - done.
     - edestruct can_has_lock_incompat; eauto. apply PREρlg.
   Qed.
         
-  (* TODO: move, rename *)
+  (* (* TODO: move, rename *) *)
+  (* Lemma kept1: *)
+  (* @label_kept_state client_model_impl *)
+  (*   (@role_enabled_model client_model_impl (ρ_cl cl_L))  *)
+  (*   (ρ_cl cl_L).  *)
+  (* Proof. *)
+  (*   red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP. *)
+  (*   destruct oℓ' as [ρ | ]. *)
+  (*   2: { by inversion STEP. } *)
+    
+  (*   assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ active_st ρlg_l tl_st) as [-> PREρlg]. *)
+  (*   { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP']. *)
+  (*     inversion STEP'; subst; tauto. } *)
+    
+  (*   pose proof (ct_flag_US tl_st') as STEPr. *)
+  (*   pattern fs_U in STEPr. erewrite (forall_eq_gen _ fs_U) in STEPr.  *)
+  (*   simpl in STEPr. repeat setoid_rewrite curry_uncurry_prop in STEPr. *)
+  (*   red. simpl. apply client_lr_spec. *)
+  (*   eexists. apply STEPr. *)
+  (*   apply and_assoc. *)
+  (*   inversion STEP; subst. *)
+  (*   - split; [done| ]. split. *)
+  (*     + eapply model_step_keeps_others_preds with (ρ' := ρlg_l); eauto. *)
+  (*       { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj. *)
+  (*         2: { simpl; lia. } *)
+  (*         2: { destruct c; simpl; lia. } *)
+  (*         assert (c = cl_L) as -> by (by destruct c). *)
+  (*         eapply not_active_st_not_live; eauto. apply PREρlg. *)
+  (*         by eapply fm_live_spec. } *)
+  (*       { set_solver. } *)
+  (*       apply PREρlg. *)
+  (*     + *)
+  (*       (* TODO: unify with proof above *) *)
+  (*       forward eapply model_step_keeps_others_preds with (ρ' := ρlg_l) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto. *)
+  (*       { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj. *)
+  (*         2: { simpl; lia. } *)
+  (*         2: { destruct c; simpl; lia. } *)
+  (*         assert (c = cl_L) as -> by (by destruct c). *)
+  (*         eapply not_active_st_not_live; eauto. apply PREρlg. *)
+  (*         by eapply fm_live_spec. } *)
+  (*       { set_solver. } *)
+  (*       tauto.  *)
+  (*   - congruence.  *)
+  (*   - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg. *)
+  (*   - split; [done| ]. *)
+  (*     split. *)
+  (*     + eapply ext_step_keeps_others_preds with (mkEI := flL) (ρ' := ρlg_l); eauto. *)
+  (*       { set_solver. } *)
+  (*       1: { eapply allows_lock_impl_spec; eauto. } *)
+  (*       3: by apply PREρlg. *)
+  (*       { by intros ?%ρlg_lr_neq. } *)
+  (*       set_solver. *)
+  (*     + forward eapply ext_step_keeps_others_preds with (ρ' := ρlg_l) (mkEI := flL) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto. *)
+  (*       { set_solver. } *)
+  (*       1: { eapply allows_lock_impl_spec; eauto. } *)
+  (*       { by intros ?%ρlg_lr_neq. } *)
+  (*       { set_solver. } *)
+  (*       tauto.  *)
+  (* Qed. *)
+
   Lemma kept1:
   @label_kept_state client_model_impl
-    (@role_enabled_model client_model_impl (ρ_cl cl_L)) 
-    (ρ_cl cl_L). 
+    (@role_enabled_model client_model_impl (ρ_ext (@flU TlLM_FM ρlg_l)))
+    (ρ_ext (@flU TlLM_FM ρlg_l)).
   Proof.
     red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP.
     destruct oℓ' as [ρ | ].
     2: { by inversion STEP. }
+    assert (ρ ≠ ρ_ext (flU (ρlg_l: fmrole TlLM_FM))) as NEQ' by congruence.
     
     assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ active_st ρlg_l tl_st) as [-> PREρlg].
     { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP'].
-      inversion STEP'; subst; tauto. }
+      inversion STEP'; subst; eauto.
+      edestruct ρlg_lr_neq; eauto. }
     
-    pose proof (ct_flag_US tl_st') as STEPr.
-    pattern fs_U in STEPr. erewrite (forall_eq_gen _ fs_U) in STEPr. 
+    pose proof (ct_au_L tl_st') as STEPr.
+    pattern fs_U in STEPr. erewrite (forall_eq_gen _ fs_U) in STEPr.
     simpl in STEPr. repeat setoid_rewrite curry_uncurry_prop in STEPr.
     red. simpl. apply client_lr_spec.
-    eexists. apply STEPr.
-    apply and_assoc.
+    eexists. apply STEPr. apply and_assoc.
     inversion STEP; subst.
-    - split; [done| ]. split.
+    - split; [done| ]. 
+      split.
       + eapply model_step_keeps_others_preds with (ρ' := ρlg_l); eauto.
         { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
           2: { simpl; lia. }
           2: { destruct c; simpl; lia. }
-          assert (c = cl_L) as -> by (by destruct c).
+          assert (c = cl_L) as -> by (by destruct c). 
           eapply not_active_st_not_live; eauto. apply PREρlg.
           by eapply fm_live_spec. }
         { set_solver. }
         apply PREρlg.
-      +
+      + 
         (* TODO: unify with proof above *)
         forward eapply model_step_keeps_others_preds with (ρ' := ρlg_l) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto.
         { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
           2: { simpl; lia. }
           2: { destruct c; simpl; lia. }
-          assert (c = cl_L) as -> by (by destruct c).
+          assert (c = cl_L) as -> by (by destruct c). 
           eapply not_active_st_not_live; eauto. apply PREρlg.
           by eapply fm_live_spec. }
         { set_solver. }
-        tauto. 
-    - congruence. 
+        intros EQUIV%not_iff_compat. apply EQUIV.
+        apply PREρlg.
+    - done. 
     - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
     - split; [done| ].
       split.
@@ -627,8 +685,9 @@ Section ClientDefs.
         1: { eapply allows_lock_impl_spec; eauto. }
         { by intros ?%ρlg_lr_neq. }
         { set_solver. }
-        tauto. 
+        tauto.
   Qed.
+
 
   (* TODO: simplify MATCH *)
   Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k
@@ -810,7 +869,7 @@ Section ClientDefs.
     5: by apply KTH.
     3: { intros ? P. apply P. }
     4: { simpl. red. eapply fm_live_spec.
-         eapply ct_flag_US; eauto. }
+         eapply ct_au_L; eauto. }
     { eapply (subtrace_valid tr); eauto. }
     { apply kept1. }
     { eapply fair_by_subtrace; eauto. }
@@ -823,7 +882,8 @@ Section ClientDefs.
     2: { done. }
     simpl in JTH'.
     pose proof JTH' as STEP. eapply trace_valid_steps' in STEP; eauto.
-    simpl in STEP. inversion STEP. subst. 
+    simpl in STEP. inversion STEP; subst.
+    2: { edestruct ρlg_lr_neq; eauto. }
     apply STEPs in JTH'; [| done].
     destruct JTH' as (?&?&?&[=]). 
   Admitted.
@@ -886,7 +946,7 @@ Section ClientDefs.
     apply trace_label_lookup_simpl' in Ln as (?&?&NTH).
     eapply trace_valid_steps' in NTH; eauto. inversion NTH; subst.
   Abort. 
-    
+  
     
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
@@ -940,7 +1000,8 @@ Section ClientDefs.
     simpl in LEN2.
     forward eapply (tl_trace_construction str) as MATCH. 
     { subst. eapply (subtrace_valid tr); eauto. done. }
-    { intros i [[tl_st f] [[ρ st']| ]] RES.
+    { rename tl_st into tl_st'. 
+      intros i [[tl_st f] [[ρ st']| ]] RES.
       2: { right. eexists. eauto. }
       left.
       assert (fs_le f fs_S) as LEi.
@@ -952,8 +1013,7 @@ Section ClientDefs.
       pose proof RES as STEP'. eapply trace_valid_steps' in STEP'.
       2: { eapply (subtrace_valid tr); eauto. done. }
       inversion STEP'; subst; try done.
-      all: try by repeat eexists.
-      red in LEi. lia. }
+      all: try by repeat eexists. }
 
     eapply simulation_adequacy_terminate_general'_ext.
     5: by apply MATCH.
