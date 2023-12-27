@@ -905,7 +905,7 @@ Section ClientDefs.
     rewrite Nat.add_succ_r -Nat.add_1_r. intros sj' JTH'. 
     pose proof (trace_has_len tr) as [len LEN].  
     destruct (proj2 (trace_lookup_dom_strong _ _ LEN (i + d))) as (sj & ρ & sj'_ & JTH). 
-    { eapply state_lookup_dom; eauto. }
+    { eapply state_lookup_dom; eauto. }    
     apply state_label_lookup in JTH as (JTH & JTH'_ & JTHρ).
     rewrite JTH' in JTH'_. inversion JTH'_. subst sj'_. clear JTH'_.   
     specialize (IHd _ JTH). etrans; [| apply IHd].
@@ -922,7 +922,7 @@ Section ClientDefs.
     (VALID: mtrace_valid tr)
     (S0: fs_le (trfirst tr).2 fs_S):
     trans_bounded tr (fun oℓ => exists ι, oℓ = Some (ρ_ext ι)).
-  Proof.
+  Proof with (unfold fs_le in *; simpl in *; try auto || lia).
     assert (forall tl_st1 f1 ι tl_st2 f2,
                client_trans (tl_st1, f1) (Some (ρ_ext ι)) (tl_st2, f2) -> f1 ≠ fs_U ->
                strict fs_le f2 f1) as LT.
@@ -938,7 +938,7 @@ Section ClientDefs.
     pose proof (trace_has_len tr) as [len LEN].
     destruct len.
     2: { apply fin_trans_bounded. eapply terminating_trace_equiv; eauto. }
-
+    
     rewrite /trans_bounded in INF.
     pose proof (@not_exists_forall_not _ _ INF) as INF'. simpl in INF'. clear INF.
     eapply forall_impl_helper in INF'.
@@ -959,31 +959,55 @@ Section ClientDefs.
          red. eapply Morphisms_Prop.and_impl_morphism; [reflexivity| ].
          red. eapply Morphisms_Prop.and_impl_morphism; [reflexivity| ].
          red. apply NNPP. }
-    red in INF'. 
-    
 
-    pose proof (INF' 0). destruct H0.  
-    apply Morphisms_Prop.all_impl_morphism in INF'.
-    2: { intros. 
-    
-    contra. 
-    
-    destruct (classic (exists n ι, tr L!! n = Some (Some (ρ_ext ι)))) as [(n&ι&Ln)|NO].
-    2: { exists 0. intros. intros [? ->]. apply NO. eauto. }
-    apply trace_label_lookup_simpl' in Ln as ([? f]&[? f']&NTH).
-    assert (fs_le f' fs_S) as ->.
-    { assert (fs_le f fs_S) as LE.
-      { forward eapply (client_trace_fs_mono tr 0 n); eauto.
-        { lia. }
-        { rewrite state_lookup_0. reflexivity. }
-        { eapply trace_state_lookup; eauto. }
-        simpl. intros. etrans; eauto. }
-      eapply trace_valid_steps' in NTH; eauto.
-      simpl in NTH. red in LE. inversion NTH; subst; try auto || lia.
-      - destruct FS as [[-> ->]|[-> ->]]; [| done]. lia.
-      - destruct f'; try auto || lia.
-  Abort.
+    pose proof (INF' 0) as (i & ? & LE1 & ITH & [? ->]).
+    apply trace_label_lookup_simpl' in ITH as ([? f1]&[? f1']&ITH).
+    assert (fs_le f1' fs_S') as S1.
+    { pose proof ITH as STEP. 
+      apply trace_state_lookup in ITH.
+      forward eapply (client_trace_fs_mono tr 0 i); eauto.
+      { by rewrite state_lookup_0. }
+      intros.
+      eapply trace_valid_steps' in STEP; eauto.
+      eapply LT in STEP.
+      2: { destruct ((trfirst tr).2), f1; auto... }
+      destruct STEP. destruct ((trfirst tr).2), f1, f1'; auto... }
+ 
+    pose proof (INF' (S i)) as (j & ? & LE2 & JTH & [? ->]).
+    apply trace_label_lookup_simpl' in JTH as ([? f2]&[? f2']&JTH).
+    assert (f2' = fs_O) as ->. 
+    { pose proof JTH as STEP. 
+      apply trace_state_lookup in JTH.
+      forward eapply (client_trace_fs_mono tr (S i) j); eauto.
+      { rewrite -Nat.add_1_r. 
+        apply state_label_lookup in ITH as (?&?&?). eauto. }
+      intros. simpl in *. 
+      eapply trace_valid_steps' in STEP; eauto.
+      eapply LT in STEP.
+      2: { destruct f1', f2; auto... }
+      destruct STEP. destruct f1', f2, f2'; auto... }
+
+    exists (S j). intros k ? ? KTH [? ->].
+    apply trace_label_lookup_simpl' in KTH as ([? f3]&[? f3']&KTH).
+    pose proof KTH as STEP. 
+    apply trace_state_lookup in KTH.
+    forward eapply (client_trace_fs_mono tr (S j) k); eauto.
+    { rewrite -Nat.add_1_r. 
+      apply state_label_lookup in JTH as (?&?&?). eauto. }
+    intros. simpl in *. destruct f3...  
+    eapply trace_valid_steps' in STEP; eauto.
+    simpl in STEP. inversion STEP; subst.
+    all: clear -FS; set_solver. 
+  Qed. 
    
+  (* TODO: move *)
+  Lemma trace_state_lookup_S {St L: Type} (tr: trace St L) i st1 ℓ st2 
+    (ITH: tr !! i = Some (st1, Some (ℓ, st2))):
+    tr S!! (S i) = Some st2.
+  Proof.
+    apply state_label_lookup in ITH as (?&?&?).
+    rewrite -Nat.add_1_r. done. 
+  Qed.
     
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
@@ -1065,7 +1089,17 @@ Section ClientDefs.
       all: admit. }
     { intros.
       eapply fin_ext_fair_termination; eauto. }
-    { admit. }
+    { forward eapply (client_trace_tl_ext_bounded str); eauto.
+      { eapply (subtrace_valid tr); eauto. done. }
+      { apply trace_state_lookup_S in MTH.
+        rewrite -(Nat.add_0_r (S m)) in MTH. 
+        erewrite <- subtrace_state_lookup in MTH; eauto.
+        rewrite state_lookup_0 in MTH. inversion MTH. rewrite H1.
+        done. }
+      intros [i NOEXT]. exists i. intros * ? ITH [[e] ->].
+      eapply traces_match_label_lookup_2 in ITH as (?&ITH&MATCH'); [| by eauto].
+      red in MATCH'. simpl in MATCH'. subst.
+      edestruct NOEXT; eauto. }      
     { (* TODO: unify this proof, one in tl_subtrace_fair
          and one in comp_adequacy *)
       subst. simpl in *.
