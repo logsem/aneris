@@ -73,6 +73,12 @@ Section ClientDefs.
   Definition TlEM := FL_EM tl_FLE.
   Context (TlEM_EXT_KEEPS: ext_keeps_asg (ELM := TlEM)).
 
+  Context (Mtl_EM: ExtModel Mtl). 
+  Context {proj_ext : @EI _ TlEM → @EI _ Mtl_EM}. 
+  Hypothesis PROJ_KEEP_EXT:
+    forall δ1 ι δ2, (@ETs _ TlEM) ι δ1 δ2 -> 
+                (@ETs _ Mtl_EM) (proj_ext ι) (ls_under δ1) (ls_under δ2). 
+
   (* TODO: reorganize the premises so those below don't depend
      on the client's choice of lib_gs *)
   Let tl_state := fmstate TlLM_FM. 
@@ -1168,8 +1174,7 @@ Section ClientDefs.
 
     eapply simulation_adequacy_terminate_general'_ext.
     5: by apply MATCH.
-    { Unshelve.
-      all: admit. }
+    { apply PROJ_KEEP_EXT. }
     { intros.
       eapply fin_ext_fair_termination; eauto. }
     { forward eapply (client_trace_tl_ext_bounded str); eauto.
