@@ -842,15 +842,20 @@ Section ClientDefs.
     
     destruct (decide (i'_s = NOinfinity)) as [INF| ]. 
     2: { destruct i'_s; set_solver. }
-    
+
+    forward eapply subtrace_state_lookup with (k := 0) as TR0'; eauto.
+    { subst. done. }
+    simpl in TR0'. rewrite !state_lookup_0 in TR0'.
+    inversion TR0' as [TR0]. clear TR0'.
+
     forward eapply (lock_progress (project_tl_trace str) (ρlg_tl cl_L) 0 (trfirst str).1).
     { by eapply traces_match_valid2. }
     { intros.
       apply ALWAYS_tl_state_wf. }
     { subst i'_s. eapply tl_subtrace_fair; eauto. }
     { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
-    { admit. (* assume this for the initial state *) }
-    { admit. (* assume this for the initial state *) }
+    { rewrite TR0. apply INIT. }
+    { rewrite TR0. apply INIT. }
     { red. intros ρlg j tl_st **. specialize (AFTER ltac:(lia)).
       destruct AFTER as [NEQ NO_L_LOCKS].
       assert (ρlg = ρlg_r) as ->.
@@ -938,7 +943,7 @@ Section ClientDefs.
     2: { edestruct ρlg_lr_neq; eauto. }
     apply STEPs in JTH'; [| done].
     destruct JTH' as (?&?&?&[=]). 
-  Admitted.
+  Qed. 
 
 
   Definition fs_le f1 f2: Prop :=
