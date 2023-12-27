@@ -344,10 +344,78 @@ Section ClientDefs.
   Qed.
 
   Definition is_UU_step (step: model_trace_step client_model_impl) :=
-    exists tl1 oℓ tl2, step = ((tl1, fs_U), Some (oℓ, (tl2, fs_U))). 
+    exists tl1 oℓ tl2, step = ((tl1, fs_U), Some (oℓ, (tl2, fs_U))).
+
+  (* TODO: move; how to generalize it? *)
+  Section UnusedRoles.
+    
+    Definition is_unused (ρlg: fmrole TlLM_FM) tl_st :=
+      ¬ can_lock_st ρlg tl_st /\ ¬ has_lock_st ρlg tl_st.
+
+    Let get_lifted (ρ: client_role) :=
+          match ρ with 
+          | inl (inr (env (flU ρlg)))
+          | inl (inr (env (flL ρlg)))
+          | inl (inl ρlg) => Some ρlg
+          | _ => None
+          end. 
+
+    Lemma model_step_keeps_unused st1 ρ st2
+      (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2):
+      forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2.
+    Proof. Admitted. 
+
+    Lemma ext_step_keeps_unused st1 ρ st2
+      mkEI
+      (MK: mkEI ∈ [flU; flL])
+      (LIB_STEP: @ETs _ (FL_EM tl_FLE) (mkEI ρ) st1 st2):
+      forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2.
+    Proof. Admitted. 
+
+    Lemma client_trans_keeps_unused st1 ρ st2
+      (STEP: client_trans st1 ρ st2):
+      forall ρlg, is_unused ρlg st1.1 <-> is_unused ρlg st2.1.
+    Proof. 
+      intros ρlg.       
+      inversion STEP; subst; simpl in *.
+      - eapply model_step_keeps_unused; eauto.
+        simpl. eauto.
+      - eapply ext_step_keeps_unused with (mkEI := flU); eauto.
+        { set_solver. }
+        apply allows_unlock_impl_spec; eauto. 
+        apply ALWAYS_tl_state_wf.
+      - eapply ext_step_keeps_unused with (mkEI := flU); eauto.
+        { set_solver. }
+        apply allows_unlock_impl_spec; eauto. 
+        apply ALWAYS_tl_state_wf.
+      - eapply ext_step_keeps_unused with (mkEI := flL); eauto.
+        { set_solver. }
+        apply allows_lock_impl_spec; eauto.
+    Qed.
+
+    Lemma client_trace_keeps_unused (tr: mtrace client_model_impl) i si
+      (VALID : mtrace_valid tr)
+      (ITH: tr S!! i = Some si):
+      forall ρlg, is_unused ρlg si.1 <-> is_unused ρlg (trfirst tr).1. 
+    Proof.
+      intros ρlg. generalize dependent si. induction i.
+      { intros. rewrite state_lookup_0 in ITH. inversion ITH. auto. }
+      rewrite -Nat.add_1_r. intros si' ITH'. 
+      pose proof (trace_has_len tr) as [len LEN].  
+      destruct (proj2 (trace_lookup_dom_strong _ _ LEN i)) as (sj & ρ & sj'_ & JTH). 
+      { eapply state_lookup_dom; eauto. }    
+      apply state_label_lookup in JTH as (JTH & JTH'_ & JTHρ).
+      rewrite ITH' in JTH'_. inversion JTH'_. subst sj'_. clear JTH'_.   
+      specialize (IHi _ JTH). etrans; [| apply IHi].
+      symmetry. eapply client_trans_keeps_unused. 
+      eapply trace_valid_steps''; eauto.
+    Qed. 
+
+  End UnusedRoles. 
 
   Definition is_init_cl_state (st: client_state) :=
     (forall c, let ρlg := ρlg_tl c in can_lock_st ρlg st.1 /\ active_st ρlg st.1) /\
+    (forall ρlg, is_unused ρlg st.1 <-> ¬ exists c, ρlg = ρlg_tl c) /\
     st.2 = fs_U.
 
  
@@ -722,7 +790,7 @@ Section ClientDefs.
     apply elem_of_map in EN as (?&[=<-]&EN).
     apply LM_live_roles_strong in EN as [? STEP].
     eapply locale_trans_ex_role; eauto.  
-  Qed. 
+  Qed.
     
 
   Lemma first_tl_subtrace_finite
@@ -730,6 +798,7 @@ Section ClientDefs.
   (lmtr : lm_fair_traces.lmftrace)
   (OUTER_CORR : client_LM_trace_exposing lmtr tr)
   (VALID : mtrace_valid tr)
+  (INIT : is_init_cl_state (trfirst tr))
   (FAIR : ∀ ρ, fair_model_trace ρ tr)
   (len : nat_omega)
   (LEN : trace_len_is tr len)
@@ -785,7 +854,16 @@ Section ClientDefs.
     { red. intros ρlg j tl_st **. specialize (AFTER ltac:(lia)).
       destruct AFTER as [NEQ NO_L_LOCKS].
       assert (ρlg = ρlg_r) as ->.
-      { admit. (* need to ensure that we only operate with lib_gs roles *) }
+      { red in INIT. apply proj2, proj1 in INIT. specialize (INIT ρlg).
+        eapply traces_match_state_lookup_2 in JTH as (st&JTH&MATCH'); [| by eauto].
+        destruct st. simpl in MATCH'. subst.  
+        rewrite -client_trace_keeps_unused in INIT; eauto.
+        2: { erewrite subtrace_state_lookup in JTH; eauto. done. }
+        simpl in INIT. apply not_iff_compat, proj1 in INIT. specialize_full INIT. 
+        { rewrite /is_unused. tauto. }
+        apply NNPP in INIT. destruct INIT as [? ->].
+        destruct x; eauto. congruence. }
+
       destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) tl_st)) as [| DIS]. 
       { eauto. }
       eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
