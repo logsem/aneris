@@ -355,9 +355,6 @@ Section ClientDefs.
   (* TODO: move; how to generalize it? *)
   Section UnusedRoles.
     
-    Definition is_unused (ρlg: fmrole TlLM_FM) tl_st :=
-      ¬ can_lock_st ρlg tl_st /\ ¬ has_lock_st ρlg tl_st.
-
     Let get_lifted (ρ: client_role) :=
           match ρ with 
           | inl (inr (env (flU ρlg)))
@@ -365,18 +362,6 @@ Section ClientDefs.
           | inl (inl ρlg) => Some ρlg
           | _ => None
           end. 
-
-    Lemma model_step_keeps_unused st1 ρ st2
-      (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2):
-      forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2.
-    Proof. Admitted. 
-
-    Lemma ext_step_keeps_unused st1 ρ st2
-      mkEI
-      (MK: mkEI ∈ [flU; flL])
-      (LIB_STEP: @ETs _ (FL_EM tl_FLE) (mkEI ρ) st1 st2):
-      forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2.
-    Proof. Admitted. 
 
     Lemma client_trans_keeps_unused st1 ρ st2
       (STEP: client_trans st1 ρ st2):
@@ -517,49 +502,6 @@ Section ClientDefs.
       (LMo := client_model)
   .
  
-
-  (* TODO: move*)
-  Lemma model_step_keeps_others_preds st1 ρ st2 ρ'
-    (LIB_STEP: fmtrans TlLM_FM st1 (Some ρ) st2)
-    (NEQ: ρ' ≠ ρ):
-    forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] ->
-         P st2 <-> P st1.
-  Proof using. Admitted.
-
-  
-  (* TODO: move*)
-  Lemma ext_step_keeps_others_preds st1 ρ st2 ρ'
-    mkEI
-    (MK: mkEI ∈ [flU; flL])
-    (LIB_STEP: @ETs _ (FL_EM tl_FLE) (mkEI ρ) st1 st2)
-    (NEQ: ρ' ≠ ρ):
-    forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] ->
-         P st2 <-> P st1.
-  Proof using. Admitted.
-
-  (* TODO: is it possible to get rid of this active_st - live_roles duplication? *)
-  (* TODO: move *)
-  Lemma not_active_st_not_live tl_st ρlg:
-    ¬ active_st ρlg tl_st -> ρlg ∉ live_roles _ tl_st.
-  Proof. Admitted. 
-
-  (* TODO: move *)
-  Lemma has_lock_st_excl tl_st ρlg1 ρlg2:
-    has_lock_st ρlg1 tl_st -> has_lock_st ρlg2 tl_st -> ρlg1 = ρlg2.
-  Proof. Admitted. 
-
-  (* TODO: move *)
-  Lemma can_has_lock_incompat tl_st ρlg:
-    has_lock_st ρlg tl_st -> can_lock_st ρlg tl_st -> False. 
-  Proof. Admitted. 
-
-  (* TODO: move, introduce more uniform treatment of ETs pre- and postconditions *)
-  Lemma allows_unlock_spec tl_st1 ρlg tl_st2:
-    allows_unlock ρlg tl_st1 tl_st2 ->
-    has_lock_st ρlg tl_st1 /\ ¬ active_st ρlg tl_st1 /\
-    has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2. 
-  Proof. Admitted. 
-
   (* TODO: move, rename *)
   Lemma kept2:
   @label_kept_state client_model_impl

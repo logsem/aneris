@@ -11,11 +11,15 @@ Class FairLockPredicates (M: FairModel) := {
   has_lock_st: fmrole M -> fmstate M -> Prop;
   active_st: fmrole M -> fmstate M -> Prop;
   state_wf: fmstate M -> Prop;
+  (* is_unused := fun ρlg st => ¬ can_lock_st ρlg st /\ ¬ has_lock_st ρlg st; *)
 
   has_lock_st_dec :> forall ρ st, Decision (has_lock_st ρ st);
   can_lock_st_dec :> forall ρ st, Decision (can_lock_st ρ st);
   active_st_dec :> forall ρ st, Decision (active_st ρ st);
 }.
+
+Definition is_unused `{FairLockPredicates M} ρlg tl_st :=
+  ¬ can_lock_st ρlg tl_st /\ ¬ has_lock_st ρlg tl_st.
 
 
 Section FairLock.
@@ -125,6 +129,39 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
   allows_lock_impl_spec ρ st:
     forall st', allows_lock ρ st st' <->
              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ ¬ active_st ρ st));
+    
+  model_step_keeps_others_preds: forall st1 ρ st2 ρ',
+    fmtrans M st1 (Some ρ) st2 -> ρ' ≠ ρ ->
+    forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1;
+  
+  ext_step_keeps_others_preds: forall st1 ρ st2 ρ' mkEI,
+      mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 -> ρ' ≠ ρ ->
+      forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1;
+
+  model_step_keeps_unused: forall st1 ρ st2,
+      fmtrans M st1 (Some ρ) st2 -> forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2;
+  ext_step_keeps_unused: forall st1 ρ st2 mkEI,
+      mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 ->
+      forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2;
+
+  (* TODO: is it possible to get rid of this active_st - live_roles duplication? *)
+  not_active_st_not_live: forall tl_st ρlg,
+      ¬ active_st ρlg tl_st -> ρlg ∉ live_roles _ tl_st;
+
+  has_lock_st_excl: forall tl_st ρlg1 ρlg2,
+      has_lock_st ρlg1 tl_st -> has_lock_st ρlg2 tl_st -> ρlg1 = ρlg2;
+
+  can_has_lock_incompat: forall tl_st ρlg,
+    has_lock_st ρlg tl_st -> can_lock_st ρlg tl_st -> False;
+
+  (* TODO: introduce more uniform treatment of ETs pre- and postconditions *)
+  allows_unlock_spec: forall tl_st1 ρlg tl_st2,
+    allows_unlock ρlg tl_st1 tl_st2 ->
+    has_lock_st ρlg tl_st1 /\ ¬ active_st ρlg tl_st1 /\
+    has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2;
 
   lock_progress: @fair_lock_progress _ FLP (FL_EM FLE);
 }.
+
+
+
