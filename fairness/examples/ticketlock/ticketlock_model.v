@@ -334,10 +334,13 @@ Section Model.
                                                 exists r, ρ = inl r) tr).
 
       Local Ltac gd t := generalize dependent t.
-      
+
+      Let other_step ρ: option (fmrole ExtTL_FM) -> Prop :=
+            fun oρ' => oρ' ≠ Some ρ. 
+
       Lemma lock_compete_kept (ρ: tl_role):
         @label_kept_state ExtTL_FM 
-          (fun st => role_map st !! ρ = Some (tl_L, true)) (inl ρ).
+          (fun st => role_map st !! ρ = Some (tl_L, true)) (other_step $ inl ρ).
       Proof using. 
         red. intros.
         inversion STEP; subst.
@@ -352,10 +355,10 @@ Section Model.
           { rewrite lookup_insert_ne; auto. }
           intros ->. subst st'0 st'1. simpl in *. 
           rewrite lookup_insert_ne in e; auto.
-          rewrite Ps in e. congruence.
+          rewrite Pst in e. congruence.
         - destruct ι; inversion REL; subst; simpl in *.
           all: rewrite lookup_insert_ne; auto; 
-            intros ->; rewrite Ps in LOCK; congruence.
+          intros ->; rewrite Pst in LOCK; congruence.
       Qed.
       
       Lemma advance_next_owner st:
@@ -663,12 +666,54 @@ Section Model.
         assert (x1 = st') as -> by congruence.
         specialize (IHd _ _ _ ITH J'TH_). lia. 
       Qed.
+
+      Let proj_role (eρ: fmrole ExtTL_FM): fmrole tl_fair_model :=
+        match eρ with 
+        | inr (env (flL ρ))
+        | inr (env (flU ρ))
+        | inl ρ => ρ
+        end.
+
+      Let other_proj ρ: option (fmrole ExtTL_FM) -> Prop :=
+            fun oeρ' => match oeρ' with
+                    | Some eρ' => proj_role eρ' ≠ ρ
+                    | None => True
+                     end. 
+
+      Lemma ext_trans_others_kept st1 ι st2 ρ
+        (STEP: ETs ι st1 st2)
+        (OTHER: proj_role (inr $ env ι) ≠ ρ):
+          role_map st2 !! ρ = role_map st1 !! ρ.
+      Proof.
+        destruct ι; inversion STEP; subst; simpl in *.
+        all: by apply lookup_insert_ne.
+      Qed. 
+
+      Lemma has_lock_kept_others (ρ: tl_role) b:
+        @label_kept_state ExtTL_FM 
+          (fun st => tl_state_wf st /\ role_map st !! ρ = Some (tl_U (owner st), b)
+          ) (other_proj ρ).
+      Proof using. 
+        red. intros. destruct Pst as (WF & OWNER).
+        split. 
+        { eapply step_preserves_tl_state_wf; eauto. }
+        inversion STEP; subst.
+        - rewrite /has_lock_st. assert (ρ0 ≠ ρ) as NEQ by (by intros ->). 
+          inversion STEP0; subst; simpl in *; eauto. 
+          { rewrite lookup_insert_ne; eauto. }
+          destruct NEQ. eapply WF; eauto.
+        - destruct ι; simpl in REL; inversion REL; subst; simpl in *.
+          + assert (ρ0 = ρ) as -> by (eapply WF; eauto).
+            inversion STEP. subst.
+            eapply ext_trans_others_kept in REL0; eauto. congruence. 
+          + rewrite lookup_insert_ne; eauto.
+      Qed.
       
       Lemma has_lock_kept (ρ: tl_role) (o: nat):
         @label_kept_state ExtTL_FM 
-          (fun st => tl_state_wf st /\ owner st = o /\ has_lock_st ρ st) (inl ρ).
+          (fun st => tl_state_wf st /\ owner st = o /\ has_lock_st ρ st) (other_step $ inl ρ).
       Proof using FROM_INIT.
-        red. intros. destruct Ps as (WF & OW & [b OWNER]).
+        red. intros. destruct Pst as (WF & OW & [b OWNER]).
         split. 
         { eapply step_preserves_tl_state_wf; eauto. }
         inversion STEP; subst.
@@ -685,12 +730,34 @@ Section Model.
       Qed.
 
       (* it turns out shorter to just repeat the previous proof *)
+      Lemma has_lock_en_kept (ρ: tl_role) (o: nat):
+        @label_kept_state ExtTL_FM 
+          (fun st => tl_state_wf st /\ owner st = o /\
+                    role_map st !! ρ = Some (tl_U o, true)) (other_step $ inl ρ).
+      Proof using FROM_INIT.
+        red. intros. destruct Pst as (WF & OW & OWNER).
+        split. 
+        { eapply step_preserves_tl_state_wf; eauto. }
+        inversion STEP; subst.
+        - rewrite /has_lock_st. assert (ρ0 ≠ ρ) as NEQ by (by intros ->). 
+          inversion STEP0; subst; simpl in *; eauto. 
+          { split; auto. rewrite lookup_insert_ne; eauto. }
+          destruct NEQ. eapply WF; eauto.
+        - destruct ι; simpl in REL; inversion REL; subst; simpl in *.
+          all: split; [auto| ]. 
+          + assert (ρ0 = ρ) as -> by (eapply WF; eauto).
+            rewrite lookup_insert. eauto.
+          + rewrite lookup_insert_ne; eauto.
+            intros ->. congruence.
+      Qed.
+
+      (* it turns out shorter to just repeat the previous proof *)
       Lemma has_lock_active_kept (ρ: tl_role) (o: nat):
         @label_kept_state ExtTL_FM 
           (fun st => tl_state_wf st /\ owner st = o /\
-                    role_map st !! ρ = Some (tl_U o, true)) (inl ρ).
+                    role_map st !! ρ = Some (tl_U o, true)) (other_step $ inl ρ).
       Proof using FROM_INIT.
-        red. intros. destruct Ps as (WF & OW & OWNER).
+        red. intros. destruct Pst as (WF & OW & OWNER).
         split. 
         { eapply step_preserves_tl_state_wf; eauto. }
         inversion STEP; subst.
@@ -711,9 +778,9 @@ Section Model.
           (fun st => exists b bo, tl_state_wf st /\ 
                    role_map st !! ρ = Some (tl_U n, b) /\ 
                    role_map st !! ρo = Some (tl_U o, bo) /\
-                   owner st = o) (inl ρo).
+                   owner st = o) (other_step $ inl ρo).
       Proof using FROM_INIT.
-        red. intros. destruct Ps as (b & bo & WF & TKn & OWNER & OWo).
+        red. intros. destruct Pst as (b & bo & WF & TKn & OWNER & OWo).
         forward eapply (has_lock_kept ρo (owner st) _ _ _ _ _ STEP). Unshelve.
         3: { eauto. }
         2: { repeat split; eauto. red. eauto. rewrite OWo. eauto. }
@@ -752,9 +819,9 @@ Section Model.
           (fun st => exists b, tl_state_wf st /\ 
                    role_map st !! ρ = Some (tl_U n, b) /\ 
                    role_map st !! ρo = Some (tl_U o, true) /\
-                   owner st = o) (inl ρo).
+                   owner st = o) (other_step $ inl ρo).
       Proof using FROM_INIT.
-        red. intros. destruct Ps as (b & WF & TKn & OWNER & OWo).
+        red. intros. destruct Pst as (b & WF & TKn & OWNER & OWo).
         forward eapply (has_lock_active_kept ρo (owner st) _ _ _ _ _ STEP). Unshelve.
         3: { eauto. }
         2: { repeat split; eauto. rewrite OWo. eauto. }
@@ -790,6 +857,9 @@ Section Model.
           all: split; auto; rewrite lookup_insert_ne; eauto; intros ->; congruence.
       Qed.
 
+      Definition is_unused ρ st :=
+        ρ ∉ dom (role_map st). 
+
       Definition tl_FLP: FairLockPredicates tl_fair_model.
       (* the simple way doesn't get through *)
       (* refine {| fair_lock.can_lock_st := can_lock_st |}.  *)
@@ -797,8 +867,12 @@ Section Model.
         - exact can_lock_st.
         - exact has_lock_st.
         - exact active_st.
+        - exact is_unused. 
         - exact tl_state_wf.
-        (* all: solve_decision.  -- ??? *) 
+        (* ???  *)
+        (* 1-4: solve_decision.  *)
+        (* all: solve_decision. *)
+        - solve_decision.
         - solve_decision.
         - solve_decision.
         - solve_decision.
@@ -1094,16 +1168,92 @@ Section Model.
         - eapply (tl_ev_rel_extend i); eauto with lia. 
       Qed.
 
-    End ProgressPropertiesImpl. 
+    End ProgressPropertiesImpl.
+
+    (* TODO: move *)
+    Global Instance label_kept_state_Proper {M: FairModel}: 
+      Proper ((eq ==> iff) ==> (eq ==> iff) ==> iff) (@label_kept_state M).
+    Proof.
+      intros ?? EQ1 ?? EQ2.
+      rewrite /label_kept_state.
+      repeat (apply forall_proper; intros).
+      repeat (apply Morphisms_Prop.iff_iff_iff_impl_morphism; auto).
+    Qed. 
+
+    Lemma unused_kept (ρ: fmrole tl_fair_model):
+      @label_kept_state ExtTL_FM 
+       (λ (st: fmstate tl_fair_model), is_unused ρ st)
+      (fun _ => True).
+    Proof.
+      simpl. rewrite /is_unused. 
+      red. intros. pose proof Pst as Pst'%not_elem_of_dom. 
+      inversion STEP; subst.
+      + inversion STEP0; subst; simpl in *; auto; try set_solver.
+        { rewrite dom_insert. apply not_elem_of_union. split; auto.
+          apply not_elem_of_singleton_2. intros <-.
+          by rewrite Pst' in R. }
+        subst st'' st'0. simpl. rewrite /advance_next. simpl.
+        assert (ρ ≠ ρ0) as NEQ'.
+        { intros <-. by rewrite Pst' in R. }
+        destruct role_of_dec as [[r ?]| ].
+        2: { set_solver. }
+        simpl. rewrite !dom_insert.
+        apply not_elem_of_union. split; [| set_solver].
+        apply not_elem_of_singleton_2. intros <-.
+        rewrite lookup_insert_Some in e. destruct e as [[-> ?]|[? ?]].
+        { done. }
+        by rewrite Pst' in H0.
+      + destruct ι; simpl in REL; inversion REL; subst; simpl.  
+        * rewrite dom_insert. apply not_elem_of_union. split; auto. 
+          apply not_elem_of_singleton_2. intros <-.
+          by rewrite Pst' in LOCK.
+        * rewrite dom_insert. apply not_elem_of_union. split; auto. 
+          apply not_elem_of_singleton_2. intros <-.
+          by rewrite Pst' in LOCK.
+    Qed.
+    
 
     Instance TLFairLock: @FairLock _ tl_FLP tl_FLE. 
     Proof.
       econstructor.
       - apply allows_unlock_impl_spec.
       - apply allows_lock_impl_spec.
+      - intros. simpl.
+        rewrite /has_lock_st /active_st.
+        eapply label_kept_state_Proper.
+        3: { apply (has_lock_kept_others ρ false). }
+        2: { done. }
+        red. intros ?? ->.
+        apply Morphisms_Prop.and_iff_morphism; [done| ]. 
+        destruct (role_map y !! ρ) eqn:R; rewrite !R. 
+        2: { set_solver. }
+        split.
+        + intros [[e [=->]] ?].
+          destruct e; eauto. edestruct H0; eauto.
+        + intros [=->]. set_solver.
+      - apply unused_kept.  
+      - simpl. rewrite /is_unused /can_lock_st.
+        intros *. rewrite not_elem_of_dom.
+        intros X [? Y]. by rewrite X in Y.
+      - simpl. rewrite /is_unused /has_lock_st.
+        intros *. rewrite not_elem_of_dom.
+        intros X [? Y]. by rewrite X in Y.
+      - simpl. rewrite /is_unused /active_st.
+        intros *. rewrite not_elem_of_dom.
+        intros X [? Y]. by rewrite X in Y.
+      - simpl. intros. by intros ?%active_st_enabled.
+      - simpl. intros. eapply has_lock_unique; eauto.
+        admit.
+      - simpl. rewrite /has_lock_st /can_lock_st.
+        intros * [??] [??]. congruence.
+      - simpl. intros * AU. inversion AU; subst; repeat split. 
+        + red. rewrite LOCK. eauto.
+        + rewrite /active_st. rewrite LOCK. set_solver.
+        + red. simpl. rewrite lookup_insert. eauto.
+        + red. simpl. rewrite lookup_insert. eauto.
       - red. intros.
         eapply tl_progress; eauto.
-    Qed. 
+    Admitted. 
 
   End ProgressProperties. 
 
