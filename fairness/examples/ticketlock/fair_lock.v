@@ -165,7 +165,8 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
         (fun st =>
            (* @state_wf _ FLP st /\ *)
            is_unused ρ st)
-        (other_proj ρ (FLE := FLE))
+        (* (other_proj ρ (FLE := FLE)) *)
+        (fun _ => True)
         (M := @ext_model_FM _ (FL_EM FLE));
   unused_can_lock_incompat: forall tl_st ρlg,
     is_unused ρlg tl_st -> can_lock_st ρlg tl_st -> False;
@@ -173,11 +174,11 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
     is_unused ρlg tl_st -> has_lock_st ρlg tl_st -> False;
   unused_active_incompat: forall tl_st ρlg,
     is_unused ρlg tl_st -> active_st ρlg tl_st -> False;
-  model_step_keeps_unused: forall st1 ρ st2,
-      fmtrans M st1 (Some ρ) st2 -> forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2;
-  ext_step_keeps_unused: forall st1 ρ st2 mkEI,
-      mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 ->
-      forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2;
+  (* model_step_keeps_unused: forall st1 ρ st2, *)
+  (*     fmtrans M st1 (Some ρ) st2 -> forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2; *)
+  (* ext_step_keeps_unused: forall st1 ρ st2 mkEI, *)
+  (*     mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 -> *)
+  (*     forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2; *)
 
   (* TODO: is it possible to get rid of this active_st - live_roles duplication? *)
   not_active_st_not_live: forall tl_st ρlg,

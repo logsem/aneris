@@ -363,31 +363,35 @@ Section ClientDefs.
           | _ => None
           end. 
 
-    Lemma client_trans_keeps_unused st1 ρ st2
-      (STEP: client_trans st1 ρ st2):
-      forall ρlg, is_unused ρlg st1.1 <-> is_unused ρlg st2.1.
+    (* Lemma client_trans_keeps_unused st1 ρ st2 *)
+    (*   (STEP: client_trans st1 ρ st2): *)
+    (*   forall ρlg, is_unused ρlg st1.1 <-> is_unused ρlg st2.1. *)
+    Lemma client_trans_keeps_unused ρlg:
+      label_kept_state (fun (st: fmstate client_model_impl) => is_unused ρlg st.1) (fun _ => True).
     Proof. 
-      intros ρlg.       
-      inversion STEP; subst; simpl in *.
-      - eapply model_step_keeps_unused; eauto.
-        simpl. eauto.
-      - eapply ext_step_keeps_unused with (mkEI := flU); eauto.
-        { set_solver. }
+      red. intros. 
+      enough (exists r, fmtrans (@ext_model_FM _ TlEM) st.1 r st'.1) as [??]. 
+      { eapply step_keeps_unused; eauto. }
+      inversion STEP; subst; simpl in *; eauto.
+      - eexists. left. simpl. eauto.
+      - exists (Some $ inr $ env $ ((flU (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
+        econstructor. simpl.
         apply allows_unlock_impl_spec; eauto. 
         apply ALWAYS_tl_state_wf.
-      - eapply ext_step_keeps_unused with (mkEI := flU); eauto.
-        { set_solver. }
+      - exists (Some $ inr $ env $ ((flU (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
+        econstructor. simpl.
         apply allows_unlock_impl_spec; eauto. 
         apply ALWAYS_tl_state_wf.
-      - eapply ext_step_keeps_unused with (mkEI := flL); eauto.
-        { set_solver. }
-        apply allows_lock_impl_spec; eauto.
+      - exists (Some $ inr $ env $ ((flL (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
+        econstructor. simpl.
+        apply allows_lock_impl_spec; eauto. 
     Qed.
 
     Lemma client_trace_keeps_unused (tr: mtrace client_model_impl) i si
       (VALID : mtrace_valid tr)
       (ITH: tr S!! i = Some si):
-      forall ρlg, is_unused ρlg si.1 <-> is_unused ρlg (trfirst tr).1. 
+      (* forall ρlg, is_unused ρlg si.1 <-> is_unused ρlg (trfirst tr).1.  *)
+      forall ρlg, is_unused ρlg (trfirst tr).1 -> is_unused ρlg si.1.       
     Proof.
       intros ρlg. generalize dependent si. induction i.
       { intros. rewrite state_lookup_0 in ITH. inversion ITH. auto. }
@@ -397,8 +401,8 @@ Section ClientDefs.
       { eapply state_lookup_dom; eauto. }    
       apply state_label_lookup in JTH as (JTH & JTH'_ & JTHρ).
       rewrite ITH' in JTH'_. inversion JTH'_. subst sj'_. clear JTH'_.   
-      specialize (IHi _ JTH). etrans; [| apply IHi].
-      symmetry. eapply client_trans_keeps_unused. 
+      specialize (IHi _ JTH). intros ?%IHi.
+      eapply client_trans_keeps_unused; eauto.  
       eapply trace_valid_steps''; eauto.
     Qed. 
 
@@ -721,12 +725,13 @@ Section ClientDefs.
       destruct AFTER as [NEQ NO_L_LOCKS].
       assert (ρlg = ρlg_r) as ->.
       { red in INIT. apply proj2, proj1 in INIT. specialize (INIT ρlg).
-        eapply traces_match_state_lookup_2 in JTH as (st&JTH&MATCH'); [| by eauto].
-        destruct st. simpl in MATCH'. subst.  
-        rewrite -client_trace_keeps_unused in INIT; eauto.
-        2: { erewrite subtrace_state_lookup in JTH; eauto. done. }
-        simpl in INIT. apply not_iff_compat, proj1 in INIT. specialize_full INIT. 
-        { intros ?. eapply unused_has_lock_incompat; eauto. }
+        apply not_iff_compat, proj1 in INIT. specialize_full INIT.
+        { eapply traces_match_state_lookup_2 in JTH as (st&JTH&MATCH'); [| by eauto].
+          destruct st. simpl in MATCH'. subst.  
+          erewrite subtrace_state_lookup in JTH; eauto.
+          2: done. 
+          intros U. eapply client_trace_keeps_unused with (i := j) in U; eauto.
+          simpl in U. eapply unused_has_lock_incompat; eauto. }
         apply NNPP in INIT. destruct INIT as [? ->].
         destruct x; eauto. congruence. }
 
