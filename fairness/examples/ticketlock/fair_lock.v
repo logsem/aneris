@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers.
 (* TODO: rearrange the code *)
-From trillium.fairness Require Import lemmas trace_len trace_lookup utils.
+From trillium.fairness Require Import lemmas trace_len trace_lookup utils trace_helpers.
 From trillium.fairness.ext_models Require Import ext_models.
 
 
@@ -10,16 +10,15 @@ Class FairLockPredicates (M: FairModel) := {
   can_lock_st: fmrole M -> fmstate M -> Prop;
   has_lock_st: fmrole M -> fmstate M -> Prop;
   active_st: fmrole M -> fmstate M -> Prop;
+  is_unused: fmrole M -> fmstate M -> Prop;
   state_wf: fmstate M -> Prop;
   (* is_unused := fun ρlg st => ¬ can_lock_st ρlg st /\ ¬ has_lock_st ρlg st; *)
 
   has_lock_st_dec :> forall ρ st, Decision (has_lock_st ρ st);
   can_lock_st_dec :> forall ρ st, Decision (can_lock_st ρ st);
   active_st_dec :> forall ρ st, Decision (active_st ρ st);
+  is_unused_dec :> forall ρ st, Decision (is_unused ρ st);
 }.
-
-Definition is_unused `{FairLockPredicates M} ρlg tl_st :=
-  ¬ can_lock_st ρlg tl_st /\ ¬ has_lock_st ρlg tl_st.
 
 
 Section FairLock.
@@ -120,6 +119,24 @@ Definition FL_EM `(FLE: FairLockExt M) :=
   @FL_EM' M allows_unlock allows_lock fl_active_exts fl_active_exts_spec. 
 
 
+Definition proj_role `{FLE: FairLockExt M}
+  (eρ: @ext_role _ (FL_EM FLE)): fmrole M :=
+  match eρ with 
+  | inr (env (flL ρ))
+  | inr (env (flU ρ))
+  | inl ρ => ρ
+  end.
+
+Definition other_proj `{FLE: FairLockExt M} (ρ: fmrole M):
+  (* (option $ @ext_role _ (FL_EM FLE)) *)
+  (option $ fmrole $ @ext_model_FM _ (FL_EM FLE))
+  -> Prop :=
+  fun oeρ' => match oeρ' with
+           | Some eρ' => proj_role eρ' ≠ ρ
+           | None => True
+           end. 
+
+
 Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) := {
   allow_unlock_impl: fmrole M -> fmstate M -> fmstate M;
   allow_lock_impl: fmrole M -> fmstate M -> fmstate M;
@@ -130,14 +147,32 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
     forall st', allows_lock ρ st st' <->
              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ ¬ active_st ρ st));
     
-  model_step_keeps_others_preds: forall st1 ρ st2 ρ',
-    fmtrans M st1 (Some ρ) st2 -> ρ' ≠ ρ ->
-    forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1;
-  
-  ext_step_keeps_others_preds: forall st1 ρ st2 ρ' mkEI,
-      mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 -> ρ' ≠ ρ ->
-      forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1;
+  (* model_step_keeps_others_preds: forall st1 ρ st2 ρ', *)
+  (*   fmtrans M st1 (Some ρ) st2 -> ρ' ≠ ρ -> *)
+  (*   forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1; *)
+      
+  (* ext_step_keeps_others_preds: forall st1 ρ st2 ρ' mkEI, *)
+  (*     mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 -> ρ' ≠ ρ -> *)
+  (*     forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1; *)
+  step_keeps_lock_dis: forall (ρ: fmrole M),
+      label_kept_state
+        (fun st => @state_wf _ FLP st /\ has_lock_st ρ st /\ ¬ active_st ρ st)
+        (other_proj ρ (FLE := FLE))
+        (M := @ext_model_FM _ (FL_EM FLE));
 
+  step_keeps_unused: forall (ρ: fmrole M),
+      label_kept_state
+        (fun st =>
+           (* @state_wf _ FLP st /\ *)
+           is_unused ρ st)
+        (other_proj ρ (FLE := FLE))
+        (M := @ext_model_FM _ (FL_EM FLE));
+  unused_can_lock_incompat: forall tl_st ρlg,
+    is_unused ρlg tl_st -> can_lock_st ρlg tl_st -> False;
+  unused_has_lock_incompat: forall tl_st ρlg,
+    is_unused ρlg tl_st -> has_lock_st ρlg tl_st -> False;
+  unused_active_incompat: forall tl_st ρlg,
+    is_unused ρlg tl_st -> active_st ρlg tl_st -> False;
   model_step_keeps_unused: forall st1 ρ st2,
       fmtrans M st1 (Some ρ) st2 -> forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2;
   ext_step_keeps_unused: forall st1 ρ st2 mkEI,

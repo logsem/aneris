@@ -355,7 +355,7 @@ Section ClientDefs.
   (* TODO: move; how to generalize it? *)
   Section UnusedRoles.
     
-    Let get_lifted (ρ: client_role) :=
+    Definition get_lifted (ρ: client_role) :=
           match ρ with 
           | inl (inr (env (flU ρlg)))
           | inl (inr (env (flL ρlg)))
@@ -506,7 +506,7 @@ Section ClientDefs.
   Lemma kept2:
   @label_kept_state client_model_impl
     (@role_enabled_model client_model_impl (ρ_ext (@flU TlLM_FM ρlg_r)))
-    (ρ_ext (@flU TlLM_FM ρlg_r)). 
+    (other_step ((ρ_ext (@flU TlLM_FM ρlg_r)): fmrole client_model_impl)). 
   Proof.
     red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP.
     destruct oℓ' as [ρ | ].
@@ -515,7 +515,7 @@ Section ClientDefs.
     
     assert ((f ≠ fs_O) /\
               has_lock_st ρlg_r tl_st /\ ¬ active_st ρlg_r tl_st) as PREρlg.
-    { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP'].
+    { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP'].
       inversion STEP'; subst; repeat split; try tauto.
       { congruence. }
       clear -FS. set_solver. }
@@ -523,102 +523,32 @@ Section ClientDefs.
     pose proof (ct_au_R tl_st' f' (match f' with | fs_U => fs_U | _ => fs_O end)) as STEPr.
     simpl in STEPr. rewrite !curry_uncurry_prop in STEPr.
     red. simpl. apply client_lr_spec.
-    eexists. apply STEPr. apply and_assoc. split.
+    eexists. apply STEPr. clear STEPr. apply and_assoc. split.
     { apply proj1 in PREρlg.
       inversion STEP; subst; try tauto. 
       all: destruct f'; tauto. }
+
     inversion STEP; subst.
-    - split.
-      + eapply model_step_keeps_others_preds with (ρ' := ρlg_r); eauto.
-        { rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
-          2: { simpl; lia. }
-          2: { destruct c; simpl; lia. }
-          assert (c = cl_R) as -> by (by destruct c). 
-          eapply not_active_st_not_live; eauto. apply PREρlg.
-          by eapply fm_live_spec. }
-        { set_solver. }
-        apply PREρlg.
-      + 
-        (* TODO: unify with proof above *)
-        forward eapply model_step_keeps_others_preds with (ρ' := ρlg_r) (P := active_st (ρlg_r: fmrole TlLM_FM)); eauto.
-        { rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
-          2: { simpl; lia. }
-          2: { destruct c; simpl; lia. }
-          assert (c = cl_R) as -> by (by destruct c). 
-          eapply not_active_st_not_live; eauto. apply PREρlg.
-          by eapply fm_live_spec. }
-        { set_solver. }
-        intros EQUIV%not_iff_compat. apply EQUIV.
-        apply PREρlg.
-    - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
+    - eapply proj2. eapply step_keeps_lock_dis.
+      { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
+      2: { left. eauto. }
+      simpl. 
+      rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
+      2: { destruct c; simpl; lia. }
+      2: { simpl; lia. }
+      assert (c = cl_R) as -> by (by destruct c). 
+      eapply not_active_st_not_live; eauto. apply PREρlg.
+      by eapply fm_live_spec. 
+    - edestruct ρlg_lr_neq. eapply has_lock_st_excl with (ρlg1 := ρlg_l); eauto. 
+      apply PREρlg.
     - done.
     - edestruct can_has_lock_incompat; eauto. apply PREρlg.
   Qed.
         
-  (* (* TODO: move, rename *) *)
-  (* Lemma kept1: *)
-  (* @label_kept_state client_model_impl *)
-  (*   (@role_enabled_model client_model_impl (ρ_cl cl_L))  *)
-  (*   (ρ_cl cl_L).  *)
-  (* Proof. *)
-  (*   red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP. *)
-  (*   destruct oℓ' as [ρ | ]. *)
-  (*   2: { by inversion STEP. } *)
-    
-  (*   assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ active_st ρlg_l tl_st) as [-> PREρlg]. *)
-  (*   { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP']. *)
-  (*     inversion STEP'; subst; tauto. } *)
-    
-  (*   pose proof (ct_flag_US tl_st') as STEPr. *)
-  (*   pattern fs_U in STEPr. erewrite (forall_eq_gen _ fs_U) in STEPr.  *)
-  (*   simpl in STEPr. repeat setoid_rewrite curry_uncurry_prop in STEPr. *)
-  (*   red. simpl. apply client_lr_spec. *)
-  (*   eexists. apply STEPr. *)
-  (*   apply and_assoc. *)
-  (*   inversion STEP; subst. *)
-  (*   - split; [done| ]. split. *)
-  (*     + eapply model_step_keeps_others_preds with (ρ' := ρlg_l); eauto. *)
-  (*       { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj. *)
-  (*         2: { simpl; lia. } *)
-  (*         2: { destruct c; simpl; lia. } *)
-  (*         assert (c = cl_L) as -> by (by destruct c). *)
-  (*         eapply not_active_st_not_live; eauto. apply PREρlg. *)
-  (*         by eapply fm_live_spec. } *)
-  (*       { set_solver. } *)
-  (*       apply PREρlg. *)
-  (*     + *)
-  (*       (* TODO: unify with proof above *) *)
-  (*       forward eapply model_step_keeps_others_preds with (ρ' := ρlg_l) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto. *)
-  (*       { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj. *)
-  (*         2: { simpl; lia. } *)
-  (*         2: { destruct c; simpl; lia. } *)
-  (*         assert (c = cl_L) as -> by (by destruct c). *)
-  (*         eapply not_active_st_not_live; eauto. apply PREρlg. *)
-  (*         by eapply fm_live_spec. } *)
-  (*       { set_solver. } *)
-  (*       tauto.  *)
-  (*   - congruence.  *)
-  (*   - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg. *)
-  (*   - split; [done| ]. *)
-  (*     split. *)
-  (*     + eapply ext_step_keeps_others_preds with (mkEI := flL) (ρ' := ρlg_l); eauto. *)
-  (*       { set_solver. } *)
-  (*       1: { eapply allows_lock_impl_spec; eauto. } *)
-  (*       3: by apply PREρlg. *)
-  (*       { by intros ?%ρlg_lr_neq. } *)
-  (*       set_solver. *)
-  (*     + forward eapply ext_step_keeps_others_preds with (ρ' := ρlg_l) (mkEI := flL) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto. *)
-  (*       { set_solver. } *)
-  (*       1: { eapply allows_lock_impl_spec; eauto. } *)
-  (*       { by intros ?%ρlg_lr_neq. } *)
-  (*       { set_solver. } *)
-  (*       tauto.  *)
-  (* Qed. *)
-
   Lemma kept1:
   @label_kept_state client_model_impl
     (@role_enabled_model client_model_impl (ρ_ext (@flU TlLM_FM ρlg_l)))
-    (ρ_ext (@flU TlLM_FM ρlg_l)).
+    (other_step (ρ_ext (@flU TlLM_FM ρlg_l): fmrole client_model_impl)).
   Proof.
     red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP.
     destruct oℓ' as [ρ | ].
@@ -626,7 +556,7 @@ Section ClientDefs.
     assert (ρ ≠ ρ_ext (flU (ρlg_l: fmrole TlLM_FM))) as NEQ' by congruence.
     
     assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ active_st ρlg_l tl_st) as [-> PREρlg].
-    { red in Ps. simpl in Ps. apply client_lr_spec in Ps as [? STEP'].
+    { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP'].
       inversion STEP'; subst; eauto.
       edestruct ρlg_lr_neq; eauto. }
     
@@ -637,45 +567,28 @@ Section ClientDefs.
     eexists. apply STEPr. apply and_assoc.
     inversion STEP; subst.
     - split; [done| ]. 
-      split.
-      + eapply model_step_keeps_others_preds with (ρ' := ρlg_l); eauto.
-        { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
-          2: { simpl; lia. }
-          2: { destruct c; simpl; lia. }
-          assert (c = cl_L) as -> by (by destruct c). 
-          eapply not_active_st_not_live; eauto. apply PREρlg.
-          by eapply fm_live_spec. }
-        { set_solver. }
-        apply PREρlg.
-      + 
-        (* TODO: unify with proof above *)
-        forward eapply model_step_keeps_others_preds with (ρ' := ρlg_l) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto.
-        { rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
-          2: { simpl; lia. }
-          2: { destruct c; simpl; lia. }
-          assert (c = cl_L) as -> by (by destruct c). 
-          eapply not_active_st_not_live; eauto. apply PREρlg.
-          by eapply fm_live_spec. }
-        { set_solver. }
-        intros EQUIV%not_iff_compat. apply EQUIV.
-        apply PREρlg.
+
+      eapply step_keeps_lock_dis.
+      { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
+      2: { left. eauto. }
+      simpl. 
+      rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
+      2: { destruct c; simpl; lia. }
+      2: { simpl; lia. }
+      assert (c = cl_L) as -> by (by destruct c). 
+      eapply not_active_st_not_live; eauto. apply PREρlg.
+      by eapply fm_live_spec.
     - done. 
-    - edestruct ρlg_lr_neq. eapply has_lock_st_excl; eauto. apply PREρlg.
+    - edestruct ρlg_lr_neq. eapply has_lock_st_excl with (ρlg1 := ρlg_l); eauto. 
+      apply PREρlg.
     - destruct FS as [[? ->] | [[=] ?]]. 
       split; [done| ].
-      split.
-      + eapply ext_step_keeps_others_preds with (mkEI := flL) (ρ' := ρlg_l); eauto.
-        { set_solver. }
-        1: { eapply allows_lock_impl_spec; eauto. }
-        3: by apply PREρlg.
-        { by intros ?%ρlg_lr_neq. }
-        set_solver.
-      + forward eapply ext_step_keeps_others_preds with (ρ' := ρlg_l) (mkEI := flL) (P := active_st (ρlg_l: fmrole TlLM_FM)); eauto.
-        { set_solver. }
-        1: { eapply allows_lock_impl_spec; eauto. }
-        { by intros ?%ρlg_lr_neq. }
-        { set_solver. }
-        tauto.
+      eapply step_keeps_lock_dis. 
+      { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
+      2: { Unshelve. 2: exact (Some (inr $ env $ (flL (ρlg: fmrole TlLM_FM): @EI _ TlEM))).
+           econstructor. simpl. eapply allows_lock_impl_spec; eauto. } 
+      simpl.
+      apply not_eq_sym. by intros ?%ρlg_lr_neq.
   Qed.
 
 
@@ -813,7 +726,7 @@ Section ClientDefs.
         rewrite -client_trace_keeps_unused in INIT; eauto.
         2: { erewrite subtrace_state_lookup in JTH; eauto. done. }
         simpl in INIT. apply not_iff_compat, proj1 in INIT. specialize_full INIT. 
-        { rewrite /is_unused. tauto. }
+        { intros ?. eapply unused_has_lock_incompat; eauto. }
         apply NNPP in INIT. destruct INIT as [? ->].
         destruct x; eauto. congruence. }
 

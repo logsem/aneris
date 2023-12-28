@@ -96,16 +96,20 @@ Section FMTraceHelpers.
 
     Local Ltac gd t := generalize dependent t.
 
-    Definition label_kept_state (P: St -> Prop) (ℓ: L) :=
-      forall st oℓ' st' (Ps: P st) (OTHER: oℓ' ≠ Some ℓ) (STEP: fmtrans _ st oℓ' st'), 
-        P st'.
+    (* oℓ' ≠ Some ℓ *)
+    Definition label_kept_state (Ps: St -> Prop) (Pl: option L -> Prop) :=
+      forall st oℓ' st' (Pst: Ps st) (Poℓ: Pl oℓ') (STEP: fmtrans _ st oℓ' st'), 
+        Ps st'.
     
-    Lemma steps_keep_state i (P: St -> Prop) ℓ j
+    Definition other_step ρ: option (fmrole M) -> Prop :=
+      fun oρ' => oρ' ≠ Some ρ. 
+
+    Lemma steps_keep_state i (P: St -> Prop) Pl j
       (Pi: exists st, tr S!! i = Some st /\ P st)    
-      (P_KEPT: label_kept_state P ℓ)
-      (NOρ: forall (k: nat) oℓ' (IKJ: i <= k < j), tr L!! k = Some oℓ' -> oℓ' ≠ Some ℓ):
+      (P_KEPT: label_kept_state P Pl)
+      (NOρ: forall (k: nat) oℓ' (IKJ: i <= k < j), tr L!! k = Some oℓ' -> Pl oℓ'):
       forall k st' (IKJ: i <= k <= j) (KTH: tr S!! k = Some st'), P st'.
-    Proof using VALID. 
+    Proof using VALID.
       intros k st' [IK KJ]. apply Nat.le_sum in IK as [d ->]. gd st'. induction d.
       { rewrite Nat.add_0_r. destruct Pi as (? & ? & ?). intros. congruence. }
       intros st'' KTH. rewrite Nat.add_succ_r -Nat.add_1_r in KTH. 
@@ -123,7 +127,7 @@ Section FMTraceHelpers.
     
     (* TODO: rename *)
     Lemma kept_state_fair_step (ρ: L) (P: St -> Prop)
-      (KEPT: label_kept_state P ρ)
+      (KEPT: label_kept_state P (other_step ρ))
       (P_EN: forall st (Pst: P st), @role_enabled_model M ρ st)
       (FAIRρ: fair_model_trace ρ tr):
       forall i st (ITH: tr S!! i = Some st) (Pst: P st),
