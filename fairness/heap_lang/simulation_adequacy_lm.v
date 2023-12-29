@@ -355,12 +355,11 @@ Theorem simulation_adequacy_terminate Σ
   extrace_fairly_terminating extr.
 Proof.
   intros Hterm Hfb Hwp Hvex Hfair.
-  destruct (infinite_or_finite extr) as [Hinf|] =>//.
 
   destruct (simulation_adequacy_model_trace
               Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto&A0).
   have Hfairaux := ex_fairness_preserved 
-                     extr auxtr Hinf Hmatch Hfair.
+                     extr auxtr Hmatch Hfair.
   (* assert (LMFairPre LM) as LF. *)
   (* { esplit; apply LF'. } *)
   set LF := get_LF LF'.
@@ -432,7 +431,6 @@ Theorem simulation_adequacy_terminate_general'
 Proof.
   intros Hterm Hfairaux Hmatch.
   red. intros VALID FAIR. 
-  destruct (infinite_or_finite otr) as [Hinf|] =>//.
 
   pose proof Hmatch as Hvalaux%traces_match_valid2. 
   destruct (can_destutter_auxtr auxtr (LM := LM)) as [mtr Hupto] =>//.
@@ -458,7 +456,6 @@ Theorem simulation_adequacy_terminate_general
   mtrace_fairly_terminating otr.
 Proof.
   intros. red. intros.
-  destruct (infinite_or_finite otr) as [Hinf|] =>//.
   eapply simulation_adequacy_terminate_general'; eauto.
   intros. apply LM_ALM_afair_by_next.
   eapply model_fairness_preserved; eauto.

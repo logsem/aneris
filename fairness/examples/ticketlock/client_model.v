@@ -626,7 +626,6 @@ Section ClientDefs.
       - simpl. intros ?? [=<-].
         by apply EXP'.
       - by apply EXP'.
-      - subst. eapply infinite_trace_equiv; eauto. 
       - by apply MATCH. }
     red. red. intros ? [g ->]. simpl in g.
     red. red. intros n ENg. simpl in ENg.
@@ -1064,7 +1063,6 @@ Section ClientDefs.
       - simpl. intros ?? [=<-].
         by apply EXP'.
       - by apply EXP'.
-      - subst. eapply infinite_trace_equiv; eauto. 
       - by apply MATCH. }
     { eapply traces_match_valid1; eauto. }
     subst. eapply fair_by_subtrace; eauto.

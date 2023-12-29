@@ -592,7 +592,6 @@ Proof.
       - simpl. intros ?? [=<-].
         by apply EXP'.
       - by apply EXP'.
-      - subst. eapply infinite_trace_equiv; eauto. 
       - by apply MATCH. }
 
     red in MATCH. specialize_full MATCH; eauto.
@@ -756,7 +755,6 @@ Theorem simulation_adequacy_terminate_client (Σ: gFunctors)
   extrace_fairly_terminating extr.
 Proof.
   intros Hfb Hwp Hvex Hfair.
-  destruct (infinite_or_finite extr) as [Hinf|] =>//.  
 
   destruct (simulation_adequacy_model_trace
               Σ _ e1 s1 FR LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto&A0).
@@ -764,7 +762,6 @@ Proof.
   (* TODO: clarify which types of fairness we need in this proof *)
   assert (forall ρ, fair_aux_SoU (LM_ALM client_model) ρ auxtr (LM := client_model)) as FAIR_SOU.
   { apply group_fairness_implies_step_or_unassign; eauto.
-    { eapply traces_match_infinite_trace; eauto. }
     { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
     { apply _. }
@@ -774,7 +771,7 @@ Proof.
     { apply Hfair. }
     simpl. red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup. }
 
-  pose proof (ex_fairness_preserved _ _ Hinf Hmatch Hfair) as Hfairaux'.
+  pose proof (ex_fairness_preserved _ _ Hmatch Hfair) as Hfairaux'.
   pose proof (proj1 (LM_ALM_afair_by_next _ auxtr) Hfairaux') as Hfairaux.  
   
   have Hfairm := lm_fair_traces.upto_stutter_fairness auxtr mtr Hupto Hfairaux.

@@ -305,11 +305,11 @@ Section InnerLMTraceFairness.
     upto_stutter_auxtr lmtr_o tr_o ->
     (∀ gi r, (lift_Ai $ am_lift_G gi) = Some r -> fair_aux_SoU (LM_ALM LMo) r lmtr_o) ->
     inner_obls_exposed lmtr_o -> 
-    infinite_trace tr_o ->
+    (* infinite_trace tr_o -> *)
     lm_model_traces_match tr_o lmtr_i ->
     (forall τ, fair_by_group AMi τ lmtr_i).
   Proof.
-    intros UPTO FAIRlmo INNER_EXP INF MATCH.
+    intros UPTO FAIRlmo INNER_EXP MATCH.
     intros gi.
     set (fairness_cond := fun ρ st => exists gi, lift_Ai (am_lift_G gi) = Some ρ /\
                                               (∃ δi ρi,
@@ -377,9 +377,9 @@ Section InnerLMTraceFairness.
       eauto. }
 
     eapply model_fairness_preserved'.
-    3: by apply MATCH.
+    2: by apply MATCH.
     { apply _. }
-    { by apply INF. }
+    (* { by apply INF. } *)
     2: { by apply H. }
 
     red. intros. red. intros. red.
@@ -393,12 +393,10 @@ Section InnerLMTraceFairness.
     upto_stutter_auxtr lmtr_o tr_o -> 
     (∀ gi r, (lift_Ai $ am_lift_G gi) = Some r -> fair_aux_SoU (LM_ALM LMo) r lmtr_o) ->
     inner_obls_exposed lmtr_o ->
-    infinite_trace tr_o ->
     lm_model_traces_match tr_o lmtr_i ->
     (∀ ρ : fmrole Mi, afair_by_next_TS _ ρ lmtr_i). 
   Proof. 
     intros. revert ρ. apply group_fairness_implies_role_fairness.
-    { by eapply traces_match_infinite_trace. }
     { by eapply traces_match_valid2. }
     eapply inner_LM_trace_fair_aux_group; eauto.
   Qed. 

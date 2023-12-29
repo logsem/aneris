@@ -39,7 +39,7 @@ Theorem continued_simulation_fair_termination
   extrace_fairly_terminating extr.
 Proof.
   intros Hstep Hlive Hvalid Hsim Hvex.
-  destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?].
+  (* destruct (infinite_or_finite extr) as [Hinf|]; [|by intros ?]. *)
   assert (∃ iatr,
              valid_inf_system_trace
                (continued_simulation ξ)
@@ -76,7 +76,7 @@ Proof.
   apply can_destutter_auxtr in Hstutter.
   destruct Hstutter as [mtr Hupto].
   have Hfairaux := ex_fairness_preserved
-                     extr auxtr Hinf Hmatch Hfair.
+                     extr auxtr Hmatch Hfair.
   (* have Hvalaux := traces_match_valid2 extr auxtr _ _ _ Hmatch. *)
   pose proof Hmatch as Hvalaux%traces_match_valid2.
   (* pose proof Hfairaux as X%LM_ALM_afair_by_next.  *)
