@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup trace_lookup utils.
+From trillium.fairness Require Import inftraces fairness fuel traces_match trace_utils lm_fair_traces lm_fair trace_helpers trace_lookup trace_lookup utils trace_len.
 
 
 Section fairness_preserved.
@@ -100,7 +100,7 @@ Section fairness_preserved.
 
   Definition fairness_induction_stmt ρ fm f m τ (* extr *) (auxtr : atrace) δ
     :=
-    infinite_trace auxtr ->
+    (* infinite_trace auxtr -> *)
     (forall τ, fair_by_group τ auxtr) ->
     fm = (f, m) ->
     δ = trfirst auxtr ->
@@ -119,12 +119,14 @@ Section fairness_preserved.
           trace_valid transA auxtr -> fairness_induction_stmt ρ m0 f m τ (* extr *) auxtr δ ) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
     trace_valid transA auxtr' ->
-    infinite_trace auxtr' ->
+    (* infinite_trace auxtr' -> *)
     ls_fuel δ !! ρ = Some f ->
     (forall τ, fair_by_group τ auxtr' ) ->
     ∃ i δi ostep, (δ -[ ℓ ]-> auxtr') !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep.
   Proof.
-    intros IH Hdec (* Hmatch *) Hvalid Hinf Hsome Hfair.
+    intros IH Hdec (* Hmatch *) Hvalid
+      (* Hinf *)
+      Hsome Hfair.
     unfold oless in Hdec.
     simpl in *.
     rewrite -> Hsome in *.
@@ -153,15 +155,34 @@ Section fairness_preserved.
       apply not_elem_of_dom in Heq. by rewrite -ls_same_doms in Heq. 
   Qed.    
 
+  (* TODO: move *)
+  Lemma label_lookup_singleton {St L: Type} (s: St) i:
+    (⟨ s ⟩: trace St L) L!! i = None.
+  Proof.
+    (* pose proof trace_len_singleton *)
+    simpl. destruct (⟨ s ⟩ L!! i) eqn:ITH; [| done].
+    eapply mk_is_Some, label_lookup_dom in ITH.
+    2: { apply trace_len_singleton. }
+    simpl in ITH. lia.
+  Qed. 
+
   Lemma fairness_preserved_ind ρ:
     ∀ fm f m τ (auxtr: atrace) δ,
       trace_valid transA auxtr -> 
       fairness_induction_stmt ρ fm f m τ auxtr δ.
   Proof.    
     induction fm as [fm IH] using lex_ind.
-    intros f m τ auxtr δ VALID Hexinfin Hfair -> Htm Hfuel Hmapping Hexen.
+    intros f m τ auxtr δ VALID
+      (* Hexinfin *)
+      Hfair -> Htm Hfuel Hmapping Hexen.
     destruct auxtr as [|δ_ ℓ auxtr'] eqn:Heq.
-    { have [??] := Hexinfin 1. done. }
+    { apply pred_at_trace_lookup in Hexen as (st & TR0 & EN).
+      destruct m; [| done].
+      rewrite state_lookup_0 in TR0. inversion TR0. simpl in *. subst.
+      rewrite label_lookup_singleton in EN.
+      do 2 red in EN. destruct EN as [UNMAP| ]; [| set_solver].
+      exists 0. do 2 eexists. split; [apply trace_lookup_0_singleton| ]. 
+      left. intros ?%elem_of_dom. edestruct UNMAP; eauto. }
     have Hfair': (forall τ, fair_by_group τ auxtr'). 
     { intros. eapply fair_by_cons; eauto. apply Hfair. }
     simpl in *. subst δ_. 
@@ -192,9 +213,9 @@ Section fairness_preserved.
       - specialize (FUEL_LE _ eq_refl). 
         assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
         { eapply (IH _ _ _ m' _); eauto.
-          - eapply trace_valid_cons_inv; eauto.
-          - by eapply infinite_cons.
-            Unshelve. unfold strict, lt_lex. lia. }
+          eapply trace_valid_cons_inv; eauto.
+          (* - by eapply infinite_cons. *)
+          Unshelve. unfold strict, lt_lex. lia. }
         exists (1+P). eauto.
       - apply not_eq_sym in Hchange. specialize (FUEL_LT _ _ eq_refl Hτ'' Hchange). 
         unfold fair_by in *.
@@ -202,8 +223,8 @@ Section fairness_preserved.
         { rewrite pred_at_state_trfirst. eauto. }        
         assert (exists i δi ostep, auxtr' !! i = Some (δi, ostep) /\ steps_or_unassigned ρ δi ostep) as (P&?&?&Hind).
         { eapply (IH _ _ _ p _); eauto.
-          - eapply trace_valid_cons_inv; eauto.
-          - by eapply infinite_cons.
+          eapply trace_valid_cons_inv; eauto.
+          (* - by eapply infinite_cons. *)
           Unshelve. unfold strict, lt_lex. lia. }
         exists (1+P). eauto. } 
 
@@ -232,7 +253,7 @@ Section fairness_preserved.
         have Hmustdec: must_decrease ρ (Some f0) δ (trfirst auxtr') (Some τ).
         { constructor; eauto; congruence. }
         (* Copy and paste begins here *)
-        eapply case1 =>//; last by eauto using infinite_cons.
+        eapply case1 =>//. 
         2: { eapply trace_valid_cons_inv; eauto. }
         intros Hinfuels. apply Hdec =>//. 
         clear -Hfuel. apply elem_of_dom; eauto.
@@ -244,7 +265,7 @@ Section fairness_preserved.
         eapply case1 =>//.
         * move=> Hinfuel; apply Hlsdec => //; first set_solver.
         * eapply trace_valid_cons_inv; eauto. 
-        * eapply infinite_cons =>//.
+        (* * eapply infinite_cons =>//. *)
         * eapply am_lift_LM_step; eauto.   
     - subst. eapply am_lift_LM_step in Hls as (?&?&?); eauto.
       eapply OTHER_HELPER.
@@ -262,12 +283,12 @@ Section fairness_preserved.
   
   Lemma group_fairness_implies_step_or_unassign
     (auxtr: atrace):
-    infinite_trace auxtr ->
+    (* infinite_trace auxtr -> *)
     trace_valid transA auxtr ->
     (forall τ, fair_by_group τ auxtr) ->
     forall ρ, fair_aux_SoU ρ auxtr.
   Proof.
-    intros Hinfin Hmatch Hex ρ.
+    intros Hmatch Hex ρ.
     red. intros n DOMn.
     unfold pred_at in DOMn.
     destruct (after n auxtr) as [tr|] eqn:Heq; rewrite Heq in DOMn.
@@ -287,8 +308,8 @@ Section fairness_preserved.
     { red. rewrite Heq. destruct tr; eauto. }
 
     rewrite Heq in Hm.
-    have ?: infinite_trace tr.
-    { have Hinf := infinite_trace_after n auxtr Hinfin. by rewrite Heq in Hinf. }
+    (* have ?: infinite_trace tr. *)
+    (* { have Hinf := infinite_trace_after n auxtr Hinfin. by rewrite Heq in Hinf. } *)
     eapply (fairness_preserved_ind ρ _ f m τ _); eauto.
     - eapply trace_valid_after; eauto. 
     - intros. eapply fair_by_after; eauto. apply Hex. 
@@ -315,7 +336,7 @@ Section fairness_preserved.
   Qed.
 
   Lemma group_fairness_implies_role_fairness (auxtr: atrace):
-    infinite_trace auxtr ->
+    (* infinite_trace auxtr -> *)
     trace_valid transA auxtr ->
     (forall τ, fair_by_group τ auxtr) ->
     (forall ρ, afair_by_next_TS ρ auxtr).
@@ -386,12 +407,12 @@ Section fairness_preserved.
     Let lbl_match (ℓ: Lo) oℓ' := oℓ' = ℓ. 
     
     Theorem fairness_preserved (extr: out_trace) (auxtr: atrace):
-      infinite_trace extr ->
+      (* infinite_trace extr -> *)
       lm_exaux_traces_match_gen extr auxtr ->
       (forall δ i, auxtr S!! i = Some δ -> lm_live_lift δ) ->
       (forall ζ, fair_by locale_prop lbl_match ζ extr) -> (forall τ, fair_by_group τ auxtr).
     Proof.
-      intros INF MATCH LIFT FAIR_OUT.
+      intros MATCH LIFT FAIR_OUT.
       intros. do 2 red. intros n ASG.
       pose proof ASG as (δ & NTH & [ρ MAP])%pred_at_trace_lookup.
       
@@ -489,18 +510,18 @@ Section lang_fairness_preserved.
   Qed.
 
   Theorem ex_fairness_preserved (extr: extrace Λ) (auxtr: atrace (LM := LM)):
-    infinite_trace extr ->
+    (* infinite_trace extr -> *)
     lm_exaux_traces_match extr auxtr ->
     (forall ζ, fair_ex ζ extr) -> (∀ ρ : fmrole M, afair_by_next_TS ALM ρ auxtr).
   Proof.
     intros. eapply group_fairness_implies_role_fairness; eauto. 
-    { eapply traces_match_infinite_trace; eauto. }
+    (* { eapply traces_match_infinite_trace; eauto. } *)
     { eapply traces_match_valid2; eauto. }
     eapply fairness_preserved; eauto.
     { apply _. }
     { intros. eapply match_locale_enabled_states_livetids; eauto. }
     simpl. intros. destruct ζ as [ζ| ].
-    { apply H2. }
+    { apply H1. }
     red. simpl in *. by intros ?(?&?&?)%pred_at_trace_lookup.
   Qed.
 
@@ -542,7 +563,7 @@ Section model_fairness_preserved.
       state_rel. 
   
   Lemma model_fairness_preserved' (mtr: mtrace Mout) (auxtr: atrace (LM := LM))
-    (INF: infinite_trace mtr)
+    (* (INF: infinite_trace mtr) *)
     (MATCH: lm_model_traces_match mtr auxtr)
     (* (FAIR: ∀ ρ : fmrole Mout, fair_model_trace ρ mtr): *)
     (LIFT: forall i δ, auxtr S!! i = Some δ -> match_labels_prop_states δ)
@@ -550,7 +571,7 @@ Section model_fairness_preserved.
     ∀ τ : G, fair_by_group ALM τ auxtr.
   Proof. 
     eapply fairness_preserved.
-    3: by apply MATCH. 
+    2: by apply MATCH. 
     all: eauto.
     { intros. eapply LIFT; eauto. } 
     intros [?| ].
@@ -560,13 +581,13 @@ Section model_fairness_preserved.
 
 
   Theorem model_fairness_preserved (mtr: mtrace Mout) (auxtr: atrace (LM := LM)):
-    infinite_trace mtr ->
+    (* infinite_trace mtr -> *)
     lm_model_traces_match mtr auxtr ->
     (forall i δ, auxtr S!! i = Some δ -> match_labels_prop_states δ) ->
     (forall ρ, fair_by fairness_cond role_match ρ mtr) -> (∀ ρ : fmrole M, afair_by_next_TS ALM ρ auxtr).
   Proof.
     intros. eapply group_fairness_implies_role_fairness; eauto. 
-    { eapply traces_match_infinite_trace; eauto. }
+    (* { eapply traces_match_infinite_trace; eauto. } *)
     { eapply traces_match_valid2; eauto. }
     by eapply model_fairness_preserved'.
   Qed. 
