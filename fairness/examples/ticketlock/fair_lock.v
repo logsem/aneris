@@ -32,17 +32,19 @@ Section FairLock.
   Definition eventual_release (tr: mtrace EFM) (ρ: R) (i: nat) :=
     forall (ρ': R) j st' (JTH: tr S!! j = Some st')
       (HAS_LOCK: has_lock_st ρ' st')
+      (DIS: ¬ role_enabled_model ρ' st')
       (AFTER: i <= j -> (ρ' ≠ ρ /\ forall k st_k (BETWEEN: i <= k <= j) (KTH: tr S!! k = Some st_k), ¬ has_lock_st ρ st_k)),
       exists k st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st''.
 
   Lemma eventual_release_strenghten tr ρ i (EV_REL: eventual_release tr ρ i):
     forall (ρ': R) j st' (JTH: tr S!! j = Some st')
       (HAS_LOCK: has_lock_st ρ' st')
+      (DIS: ¬ role_enabled_model ρ' st')
       (AFTER: i <= j -> (ρ' ≠ ρ /\ forall k st_k (BETWEEN: i <= k <= j) (KTH: tr S!! k = Some st_k), ¬ has_lock_st ρ st_k)),
     exists k, ClassicalFacts.Minimal
            (fun k => exists st'', tr S!! k = Some st'' /\ j <= k /\ active_st ρ' st'') k.
   Proof using.
-    intros. red in EV_REL. specialize (EV_REL _ _ _ JTH HAS_LOCK AFTER).
+    intros. red in EV_REL. specialize (EV_REL _ _ _ JTH HAS_LOCK DIS AFTER).
     destruct EV_REL as [k EV_REL]. pattern k in EV_REL.
     eapply min_prop_dec in EV_REL; eauto.
     intros.
@@ -156,7 +158,7 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
   (*     forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1; *)
   step_keeps_lock_dis: forall (ρ: fmrole M),
       label_kept_state
-        (fun st => @state_wf _ FLP st /\ has_lock_st ρ st /\ ¬ active_st ρ st)
+        (fun st => @state_wf _ FLP st /\ has_lock_st ρ st /\ ¬ role_enabled_model ρ st)
         (other_proj ρ (FLE := FLE))
         (M := @ext_model_FM _ (FL_EM FLE));
 
@@ -181,8 +183,8 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
   (*     forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2; *)
 
   (* TODO: is it possible to get rid of this active_st - live_roles duplication? *)
-  not_active_st_not_live: forall tl_st ρlg,
-      ¬ active_st ρlg tl_st -> ρlg ∉ live_roles _ tl_st;
+  active_st_live: forall tl_st ρlg,
+      active_st ρlg tl_st -> ρlg ∈ live_roles _ tl_st;
 
   has_lock_st_excl: forall tl_st ρlg1 ρlg2,
       has_lock_st ρlg1 tl_st -> has_lock_st ρlg2 tl_st -> ρlg1 = ρlg2;
@@ -200,4 +202,8 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
 }.
 
 
-
+Lemma not_live_not_active `(@FairLock M FLP FLE):
+  forall tl_st ρlg, ρlg ∉ live_roles _ tl_st -> ¬ active_st ρlg tl_st.
+Proof. 
+  intros. pose proof (active_st_live tl_st ρlg). tauto.
+Qed.

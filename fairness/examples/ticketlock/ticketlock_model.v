@@ -908,14 +908,27 @@ Section Model.
         assert (ρo ≠ ρ) as NEQ.
         { intros ->. red in LOCK. destruct LOCK as [? LOCK]. 
           rewrite R in LOCK. inversion LOCK. lia. }
-        
-        forward eapply eventual_release_strenghten as HH; eauto.
-        { intros. split; auto. intros.
-          assert (k = i) as -> by lia.
-          rewrite ST in KTH. inversion KTH. subst st_k.
-          intros [? LOCK']. rewrite R in LOCK'.
-          simpl in LOCK'. inversion LOCK'. lia. }
 
+        
+        assert ( ∃ k : nat,
+         ClassicalFacts.Minimal
+           (λ k0 : nat,
+              ∃ st'' : ext_model_FM,
+                tr S!! k0 = Some st'' ∧ i ≤ k0 ∧ active_st ρo st'') k
+) as HH.
+        { destruct (decide (active_st ρo (<{ o, t, rm }>))).
+          { exists i. split; eauto.
+            intros ? (?&?&?). lia. }
+        
+          forward eapply eventual_release_strenghten; eauto. 
+          { by rewrite -active_st_enabled. } 
+          { intros. split; auto. intros.
+            assert (k = i) as -> by lia.
+            rewrite ST in KTH. inversion KTH. subst st_k.
+            intros [? LOCK']. rewrite R in LOCK'.
+            simpl in LOCK'. inversion LOCK'. lia. }
+        }
+        
         rename HH into EV_REL'. specialize_full EV_REL'.
         destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MINk).
         
@@ -1094,7 +1107,7 @@ Section Model.
       Proof using VALID.
         do 2 red. intros. simpl in *. rename j0 into k.  
         destruct (Nat.le_gt_cases i k) as [LEik | LTki].
-        2: { eapply EV_REL; eauto. lia. } 
+        2: { eapply EV_REL; eauto. lia. }
         
         assert (forall m st_m, i <= m <= j -> tr S!! m = Some st_m ->
                           role_map st_m !! ρ = Some (tl_L, true)) as KEEPρ.
@@ -1230,7 +1243,10 @@ Section Model.
         split.
         + intros [[e [=->]] ?].
           destruct e; eauto. edestruct H0; eauto.
-        + intros [=->]. set_solver.
+          apply active_st_enabled. red. eauto. 
+        + intros [=->]. split; [set_solver| ].
+          intros [? R']%active_st_enabled.
+          rewrite R in R'. congruence. 
       - apply unused_kept.  
       - simpl. rewrite /is_unused /can_lock_st.
         intros *. rewrite not_elem_of_dom.
@@ -1241,7 +1257,7 @@ Section Model.
       - simpl. rewrite /is_unused /active_st.
         intros *. rewrite not_elem_of_dom.
         intros X [? Y]. by rewrite X in Y.
-      - simpl. intros. by intros ?%active_st_enabled.
+      - simpl. by intros * ?%active_st_enabled.
       - simpl. intros. eapply has_lock_unique; eauto.
         admit.
       - simpl. rewrite /has_lock_st /can_lock_st.
