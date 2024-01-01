@@ -67,7 +67,7 @@ Section FairLock.
       (CAN_LOCK: can_lock_st ρ st)
       (ACT: active_st ρ st)
       (EV_REL: eventual_release tr ρ i),
-    exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\ ¬ active_st ρ st'.
+    exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\ ¬ role_enabled_model ρ st'.
   
 End FairLock.
 

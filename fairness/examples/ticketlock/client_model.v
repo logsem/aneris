@@ -100,25 +100,24 @@ Section ClientDefs.
   | ct_lib_step tl1 tl2 c flag
         (LIB_STEP: fmtrans TlLM_FM tl1 (Some (ρlg_tl c)) tl2):
       client_trans (tl1, flag) (Some $ ρ_lib (ρlg_tl c)) (tl2, flag)
-  (* | ct_flag_US tl  *)
-  (*     (LOCK: has_lock_st (ρlg_tl cl_L) tl) *)
-  (*     (DIS: ¬ active_st (ρlg_tl cl_L) tl): *)
-  (*   client_trans (tl, fs_U) (Some $ ρ_cl cl_L) (tl, fs_S) *)
   | ct_au_L tl (ρlg := ρlg_l)
       (LOCK: has_lock_st ρlg tl)
-      (DIS: ¬ active_st ρlg tl):
+      (* (DIS: ¬ active_st ρlg tl) *)
+      (DIS: ¬ role_enabled_model (ρlg: fmrole TlLM_FM) tl):
     client_trans (tl, fs_U) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs_S)
   | ct_au_R tl fs fs'
       (ρlg := ρlg_r)
       (FS: fs = fs_U /\ fs' = fs_U \/ (fs = fs_S \/ fs = fs_S') /\ fs' = fs_O)
       (LOCK: has_lock_st ρlg tl)
-      (DIS: ¬ active_st ρlg tl):
+      (* (DIS: ¬ active_st ρlg tl) *)
+      (DIS: ¬ role_enabled_model (ρlg: fmrole TlLM_FM) tl):
     client_trans (tl, fs) (Some $ ρ_ext $ flU (ρlg: fmrole TlLM_FM)) (allow_unlock_impl ρlg tl, fs')
   | ct_al_R tl fs fs'
       (ρlg := ρlg_r)
       (CANL: can_lock_st ρlg tl)
-      (DIS: ¬ active_st ρlg tl)
+      (* (DIS: ¬ active_st ρlg tl) *)
       (* (NO: fs ≠ fs_O) *)
+      (DIS: ¬ role_enabled_model (ρlg: fmrole TlLM_FM) tl)
       (FS: fs = fs_U /\ fs' = fs_U \/ fs = fs_S /\ fs' = fs_S')
     :
     client_trans (tl, fs) (Some $ ρ_ext $ flL (ρlg: fmrole TlLM_FM)) (allow_lock_impl ρlg tl, fs')
@@ -162,6 +161,14 @@ Section ClientDefs.
     solve_decision. 
   Defined.  
 
+  (* TODO: move *)
+  Instance rem_dec: forall ρlg st, 
+      Decision (role_enabled_model ρlg st (M := TlLM_FM)).
+  Proof. 
+    intros. rewrite /role_enabled_model. solve_decision.
+  Qed. 
+    
+
   Instance client_step_dec st1 ρ st2:
     Decision (client_trans st1 (Some ρ) st2).
   Proof.
@@ -185,19 +192,19 @@ Section ClientDefs.
 
     destruct ι.
     - destruct (decide (ρ = ρlg_tl cl_L)) as [-> | ?].
-      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_L): fmrole TlLM_FM) tl_st1 /\ flag1 = fs_U /\ flag2 = fs_S)) as [(?&?&->&->&->)| ]. 
+      { destruct (decide (has_lock_st (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ ¬ role_enabled_model (ρlg_tl cl_L) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_L): fmrole TlLM_FM) tl_st1 /\ flag1 = fs_U /\ flag2 = fs_S)) as [(?&?&->&->&->)| ]. 
         * left. eapply ct_au_L; eauto.
         * right. intros STEP. inversion STEP; subst; try tauto.
           by eapply ρlg_lr_neq. }
       destruct (decide (ρ = ρlg_tl cl_R)) as [-> | ?].
-      { destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ (flag1 = fs_U /\ flag2 = fs_U \/ (flag1 = fs_S \/ flag1 = fs_S') /\ flag2 = fs_O))) as [(?&?&->&?)| ].
+      { destruct (decide (has_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ role_enabled_model (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_unlock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ (flag1 = fs_U /\ flag2 = fs_U \/ (flag1 = fs_S \/ flag1 = fs_S') /\ flag2 = fs_O))) as [(?&?&->&?)| ].
         * left. eapply ct_au_R; eauto.
         * right. intros STEP. inversion STEP; subst; try tauto.
           apply n0; set_solver. }
       right. intros STEP. inversion STEP; subst; tauto.
     - destruct (decide (ρ = ρlg_tl cl_R)) as [-> | ?].
       2: { right. intros STEP. inversion STEP; subst; tauto. }
-      destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ active_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_lock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ (flag1 = fs_U /\ flag2 = fs_U \/ flag1 = fs_S /\ flag2 = fs_S'))) as [(?&?&->&?) | NOSTEP].
+      destruct (decide (can_lock_st (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ ¬ role_enabled_model (ρlg_tl cl_R) tl_st1 (M := TlLM_FM) /\ tl_st2 = allow_lock_impl ((ρlg_tl cl_R): fmrole TlLM_FM) tl_st1 /\ (flag1 = fs_U /\ flag2 = fs_U \/ flag1 = fs_S /\ flag2 = fs_S'))) as [(?&?&->&?) | NOSTEP].
       + left. econstructor; eauto.
       + right. intros STEP. inversion STEP; subst. tauto.
   Qed.
@@ -338,12 +345,15 @@ Section ClientDefs.
       inversion H0; subst; simpl in *.
       - econstructor. auto.
       - econstructor. simpl.
+        apply not_live_not_active in DIS; auto.  
         eapply allows_unlock_impl_spec; auto.
         apply ALWAYS_tl_state_wf.
       - econstructor. simpl. 
+        apply not_live_not_active in DIS; auto.  
         eapply allows_unlock_impl_spec; auto.
         apply ALWAYS_tl_state_wf.
       - econstructor. simpl. 
+        apply not_live_not_active in DIS; auto.  
         eapply allows_lock_impl_spec; auto. }
     simpl. intros. destruct ℓ1; [| done]. destruct c; [| done].
     by inversion H0.
@@ -376,15 +386,18 @@ Section ClientDefs.
       - eexists. left. simpl. eauto.
       - exists (Some $ inr $ env $ ((flU (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
         econstructor. simpl.
+        apply not_live_not_active in DIS; auto.  
         apply allows_unlock_impl_spec; eauto. 
         apply ALWAYS_tl_state_wf.
       - exists (Some $ inr $ env $ ((flU (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
         econstructor. simpl.
+        apply not_live_not_active in DIS; auto.
         apply allows_unlock_impl_spec; eauto. 
         apply ALWAYS_tl_state_wf.
       - exists (Some $ inr $ env $ ((flL (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
         econstructor. simpl.
-        apply allows_lock_impl_spec; eauto. 
+        apply not_live_not_active in DIS; auto.
+        apply allows_lock_impl_spec; eauto.
     Qed.
 
     Lemma client_trace_keeps_unused (tr: mtrace client_model_impl) i si
@@ -518,11 +531,13 @@ Section ClientDefs.
     assert (ρ ≠ ρ_ext (flU (ρlg_r: fmrole TlLM_FM))) as NEQ' by congruence.
     
     assert ((f ≠ fs_O) /\
-              has_lock_st ρlg_r tl_st /\ ¬ active_st ρlg_r tl_st) as PREρlg.
-    { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP'].
+              has_lock_st ρlg_r tl_st /\ ¬ role_enabled_model (ρlg_r: fmrole TlLM_FM) tl_st) as PREρlg.
+    { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP'].      
       inversion STEP'; subst; repeat split; try tauto.
       { congruence. }
       clear -FS. set_solver. }
+    forward eapply not_live_not_active as DIS; eauto.
+    { apply PREρlg. }
     
     pose proof (ct_au_R tl_st' f' (match f' with | fs_U => fs_U | _ => fs_O end)) as STEPr.
     simpl in STEPr. rewrite !curry_uncurry_prop in STEPr.
@@ -531,7 +546,7 @@ Section ClientDefs.
     { apply proj1 in PREρlg.
       inversion STEP; subst; try tauto. 
       all: destruct f'; tauto. }
-
+ 
     inversion STEP; subst.
     - eapply proj2. eapply step_keeps_lock_dis.
       { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
@@ -540,9 +555,9 @@ Section ClientDefs.
       rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
       2: { destruct c; simpl; lia. }
       2: { simpl; lia. }
-      assert (c = cl_R) as -> by (by destruct c). 
-      eapply not_active_st_not_live; eauto. apply PREρlg.
-      by eapply fm_live_spec. 
+      assert (c = cl_R) as -> by (by destruct c).
+      apply fm_live_spec in LIB_STEP. 
+      clear -LIB_STEP PREρlg. set_solver. 
     - edestruct ρlg_lr_neq. eapply has_lock_st_excl with (ρlg1 := ρlg_l); eauto. 
       apply PREρlg.
     - done.
@@ -559,7 +574,7 @@ Section ClientDefs.
     2: { by inversion STEP. }
     assert (ρ ≠ ρ_ext (flU (ρlg_l: fmrole TlLM_FM))) as NEQ' by congruence.
     
-    assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ active_st ρlg_l tl_st) as [-> PREρlg].
+    assert (f = fs_U /\ has_lock_st ρlg_l tl_st /\ ¬ role_enabled_model (ρlg_l: fmrole TlLM_FM) tl_st) as [-> PREρlg].
     { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP'].
       inversion STEP'; subst; eauto.
       edestruct ρlg_lr_neq; eauto. }
@@ -580,8 +595,7 @@ Section ClientDefs.
       2: { destruct c; simpl; lia. }
       2: { simpl; lia. }
       assert (c = cl_L) as -> by (by destruct c). 
-      eapply not_active_st_not_live; eauto. apply PREρlg.
-      by eapply fm_live_spec.
+      apply fm_live_spec in LIB_STEP. set_solver. 
     - done. 
     - edestruct ρlg_lr_neq. eapply has_lock_st_excl with (ρlg1 := ρlg_l); eauto. 
       apply PREρlg.
@@ -590,7 +604,9 @@ Section ClientDefs.
       eapply step_keeps_lock_dis. 
       { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
       2: { Unshelve. 2: exact (Some (inr $ env $ (flL (ρlg: fmrole TlLM_FM): @EI _ TlEM))).
-           econstructor. simpl. eapply allows_lock_impl_spec; eauto. } 
+           econstructor. simpl.
+           apply not_live_not_active in DIS; eauto. 
+           eapply allows_lock_impl_spec; eauto. } 
       simpl.
       apply not_eq_sym. by intros ?%ρlg_lr_neq.
   Qed.
@@ -670,7 +686,7 @@ Section ClientDefs.
   (STEPs : ∀ i res, NOmega.lt (NOnum i) i'_s → tr !! i = Some res → is_UU_step res)
   (LEN1 : NOmega.le i'_s len):
     exists i_s, i'_s = NOnum i_s.
-  Proof.    
+  Proof.
     destruct (decide (i'_s = NOnum 0)) as [| NZ1]. 
     { eauto. }
       
@@ -733,9 +749,7 @@ Section ClientDefs.
           simpl in U. eapply unused_has_lock_incompat; eauto. }
         apply NNPP in INIT. destruct INIT as [? ->].
         destruct x; eauto. congruence. }
-
-      destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) tl_st)) as [| DIS]. 
-      { eauto. }
+      
       eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
       2: by apply MATCH.
       destruct st as [? f]. simpl in EQ. subst.
@@ -774,7 +788,7 @@ Section ClientDefs.
       inversion KTH'; subst.
       { by apply ρlg_lr_neq in H2. }
       simpl. eapply allows_unlock_spec; eauto.
-      apply allows_unlock_impl_spec; eauto.
+      apply allows_unlock_impl_spec; eauto using not_live_not_active.
       apply ALWAYS_tl_state_wf. }
     
     intros (k & tl_st & ? & KTH & LOCKl & DISl). 

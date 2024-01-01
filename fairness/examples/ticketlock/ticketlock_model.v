@@ -1141,7 +1141,7 @@ Section Model.
         (ACT: active_st ρ st)
         (EV_REL: tl_eventual_release tr ρ i):
         exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\
-                   ¬ active_st ρ st'.
+                   ¬ role_enabled_model (ρ: fmrole tl_fair_model) st'.
       Proof using VALID FAIR FROM_INIT.
         red in CAN_LOCK. destruct CAN_LOCK as [e RMρ].
         assert (e = true) as -> by (destruct ACT; congruence). 
@@ -1171,10 +1171,12 @@ Section Model.
         { exists (i + d + 1). eexists.
           repeat split; [lia|..]; try by eauto.
           - red. eexists. simpl. rewrite lookup_insert. eauto. 
-          - rewrite /active_st. simpl. rewrite lookup_insert. intros [? [=]]. }
+          - rewrite -active_st_enabled /active_st. simpl. 
+            rewrite lookup_insert. intros [? [=]]. }
         
         eapply lock_eventually_acquired in ST'''.
         - destruct ST''' as (?&?&?). do 2 eexists.
+          rewrite -active_st_enabled. 
           repeat split; try by apply H. lia.
         - apply WAIT.
         - rewrite lookup_insert. eauto.
