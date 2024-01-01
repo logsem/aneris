@@ -95,7 +95,7 @@ Ltac unfold_LMF_trans' T :=
   match type of T with
   | fmtrans LM_Fair ?δ1 ?l ?δ2 =>
       simpl in T; destruct l as [l| ]; [| done];
-      unfold_LMF_trans' T
+      unfold_LMF_trans T
   end.
 
 
