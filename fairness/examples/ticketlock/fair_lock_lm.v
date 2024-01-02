@@ -125,7 +125,8 @@ Section FairLockLM.
     fmrole LMF -> lm_ls LM -> lm_ls LM -> Prop := 
         fun '(asG ρ) δ1 δ2 =>
             ls_tmap δ1 !! (asG ρ) = Some ∅ /\
-            ls_tmap δ2 !! (asG ρ) = Some {[ ρ ]} /\              
+            (* ls_tmap δ2 !! (asG ρ) = Some {[ ρ ]} /\               *)
+            ls_tmap δ2 = <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ1) /\
             P ρ (ls_under δ1) (ls_under δ2).
 
   (* Let LM_active_exts (δ: fmstate LMF): gset (@fl_EI LMF) := *)
@@ -158,15 +159,18 @@ Section FairLockLM.
     destruct (decide (ls_tmap δ !! asG ρ = Some ∅ /\
                       can_lock_st ρ δ ∧ ¬ active_st ρ δ)). 
     2: { right. set_solver. }
-    left. eexists {|        
-        ls_under := allow_lock_impl ρ δ;
-        ls_tmap := <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ);
-        ls_fuel := <[ ρ := 0 ]> (ls_fuel δ);
- |}.
-    repeat split; eauto; try by apply a.
-    simpl. by rewrite lookup_insert.
-    Unshelve.
-    1-4: admit. 
+ (*    set st' := allow_lock_impl ρ δ. *)
+ (*    set new_lr := live_roles _ st' ∖ dom (ls_mapping (ls_under δ)).  *)
+ (*    left. eexists ({|         *)
+ (*        ls_under := st'; *)
+ (*        ls_tmap := <[ asG ρ := {[ ρ ]} ∪ nefaw_lr]> (ls_tmap δ); *)
+ (*        ls_fuel := <[ ρ := 0 ]> (ls_fuel δ) ∪ gset_to_gmap 0 new_lr; *)
+ (* |}). *)
+ (*    repeat split; eauto; try by apply a. *)
+ (*    simpl. rewrite lookup_insert. *)
+ (*    Unshelve. *)
+ (*    - subst st'. simpl.  *)
+ (*    1-4: admit.  *)
   Admitted. 
 
 
@@ -187,7 +191,7 @@ Section FairLockLM.
         ls_fuel := <[ ρ := 0 ]> (ls_fuel δ);
  |}.
     repeat split; eauto; try by apply a.
-    simpl. by rewrite lookup_insert.
+    (* simpl. by rewrite lookup_insert. *)
     Unshelve.
     1-4: admit. 
   Admitted. 
