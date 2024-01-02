@@ -29,9 +29,17 @@ Section fairness_preserved.
                  ls_mapping δ1 !! ρ = Some τ ->
                  ls_fuel δ1 !! ρ = Some f ->
                  ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f;
-      am_lift_G_dec :> forall a, Decision (exists g, am_lift_G g = a);
+      am_lift_G_dec': forall a, {g | am_lift_G g = a} + (forall g, am_lift_G g ≠ a);
       am_lift_inj :> Inj eq eq am_lift_G;
   }.
+
+  Global Instance am_lift_G_dec `{ALM: AlmostLM transA}:
+    forall a, Decision (exists g, am_lift_G g = a).
+  Proof. 
+    intros a. destruct (am_lift_G_dec' a) as [[g ?]| ]. 
+    - left. eauto.
+    - right. set_solver.
+  Qed. 
 
   Context `(AM: AlmostLM). 
   
@@ -97,6 +105,23 @@ Section fairness_preserved.
   Definition fair_aux_SoU: fmrole M -> atrace -> Prop := 
     fair_by_gen (λ ρ δ, ρ ∈ dom (ls_mapping δ))
       astep_by_next_TS. 
+
+  Global Instance astep_Dec: forall ρ δ1 ostep, Decision (astep_by_next_TS ρ δ1 ostep).
+  Proof. 
+    intros ?? ostep. rewrite /astep_by_next_TS.
+    destruct ostep as [[??]| ].
+    2: { right. set_solver. }    
+    eapply Decision_iff_impl.
+    { rewrite ex_det_iff; [rewrite ex_det_iff| ].
+      - reflexivity. 
+      - intros ? (?& [=] & ?). subst. reflexivity.
+      - intros ? (?&?& [=] & ?). subst. reflexivity. }
+    destruct (am_lift_G_dec' a) as [[g ?]| ]; subst. 
+    2: { right. set_solver. }
+    destruct (decide (next_TS_role δ1 g l = Some ρ)).
+    { left. eauto. }
+    right. set_solver. 
+  Qed.    
 
   Definition fairness_induction_stmt ρ fm f m τ (* extr *) (auxtr : atrace) δ
     :=
@@ -451,7 +476,7 @@ Proof.
     by destruct (NEQ g).
   - intros [a| ].
     + left. eauto.
-    + right. by intros [? [=]].  
+    + right. congruence. 
 Defined.
 
 Lemma LM_ALM_afair_by_next `{Countable G} `(LM: LiveModel G M LSI) {LF: LMFairPre LM} auxtr:

@@ -230,7 +230,7 @@ Section ELM_ALM.
       + by destruct (NEQ ρ0).
       + eapply KEEPS; eauto. 
     - intros [[?|?]| ].
-      2, 3: right; by intros [? [=]].
+      2, 3: right; set_solver. 
       left; eauto.
   Defined.
 

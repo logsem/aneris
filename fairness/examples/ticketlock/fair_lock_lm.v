@@ -508,10 +508,34 @@ Section FairLockLM.
       eapply ev_rel_inner; eauto.
       - eapply trace_valid_after; eauto. 
       - intros. eapply fair_by_after; eauto. apply FAIR. }
+
+    clear dependent δ. 
+    destruct PROGRESSm as (d' & st & NZ & DTH' & LOCK & DISM).
+    eapply upto_stutter_state_lookup in DTH' as (d & δ & DTH & CORRd); [| by apply UPTOi].
+    subst st.
+    erewrite state_lookup_after in DTH; eauto.
     
+    destruct (decide (ρ ∈ dom (ls_mapping δ))) as [MAP | UNMAP]. 
+    2: { exists (i + d), δ. repeat split; try done. 
+         { enough (d > 0); [lia| ]. red.
+           admit. }
+         apply LM_map_empty_notlive.
+         destruct (ls_tmap δ !! asG ρ) eqn:Rρ; [| tauto].
+         left. destruct (decide (g = ∅)) as [-> | NE]; [done| ].
+         apply set_choose_L in NE as [ρ' IN].
+         assert (ρ' = ρ) as -> by admit.
+         edestruct UNMAP. apply elem_of_dom. exists (asG ρ).
+         eapply ls_mapping_tmap_corr; eauto. }
     
+    apply group_fairness_implies_step_or_unassign with (ρ := ρ) in FAIR; [| done].
+    apply fair_by_gen_equiv, fair_by_gen'_strong_equiv in FAIR. 
+    2, 3: solve_decision. 
+    red in FAIR.
+    specialize (FAIR (i + d)). specialize_full FAIR.
+    { by rewrite DTH. }
     
-      
+    destruct FAIR as (p & δ' & step' & PTH & STEPp & MINp).
+    rewrite /fairness_sat_gen in MINp.
     
     
 

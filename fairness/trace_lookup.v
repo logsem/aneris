@@ -587,6 +587,27 @@ Section UptoStutter.
     rewrite label_lookup_0. congruence.  
   Qed.
 
+  Lemma upto_stutter_state_lookup {btr : trace St L} {str : trace S' L'} n' st':
+    upto_stutter Us Usls btr str
+    → str S!! n' = Some st' ->
+      ∃ n st, btr S!! n = Some st /\ Us st = st'.
+  Proof.
+    intros UPTO NTH.
+    pose proof (trace_has_len str) as [? LEN]. 
+    pose proof (proj1 (state_lookup_dom _ _ LEN n') (mk_is_Some _ _ NTH)) as BOUND.
+    pose proof (proj2 (LEN _) BOUND) as [str_n AFTER].
+    forward eapply (upto_stutter_after _ _ n' UPTO); eauto.
+    intros (n & btr' & AFTER' & UPTOn).
+    exists n.
+    rewrite -(Nat.add_0_r n). erewrite <- state_lookup_after; eauto.
+    rewrite state_lookup_0. f_equal.
+    eexists. split; [reflexivity| ].
+    etransitivity.
+    { symmetry. eapply upto_stutter_trfirst; eauto. }
+    apply Some_inj. rewrite -state_lookup_0.
+    erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
+  Qed. 
+
   Lemma upto_stutter_state_lookup' {btr : trace St L} {str : trace S' L'} (n : nat) bst:
     upto_stutter Us Usls btr str
     → btr S!! n = Some bst ->

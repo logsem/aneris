@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.fairness Require Export inftraces trace_lookup.
+From trillium.fairness Require Export inftraces trace_lookup utils.
 
 Record FairModel : Type := {
   fmstate:> Type;
@@ -79,6 +79,14 @@ Section GeneralizedFairness.
     exists m s' step, otr !! (n + m) = Some (s', step) /\
                   fairness_sat_gen t s' step.
 
+  Definition fair_by_gen'_strong
+    (t: T) (otr: trace S L) :=
+    forall n, from_option (locale_prop t) False (otr S!! n) ->
+    exists m s' step, otr !! (n + m) = Some (s', step) /\
+                  fairness_sat_gen t s' step /\
+                  (forall k sk stepk, n <= k < m -> otr !! (n + k) = Some (sk, stepk) ->
+                                 ¬ fairness_sat_gen t sk stepk).   
+
   Lemma fair_by_gen_equiv:
     forall (t: T) (otr: trace S L),
       fair_by_gen t otr <-> fair_by_gen' t otr.
@@ -90,6 +98,29 @@ Section GeneralizedFairness.
     2: { done. }
     destruct (otr S!! n); simpl; set_solver.
   Qed.
+
+  Lemma fair_by_gen'_strong_equiv
+    `{forall t s, Decision (locale_prop t s)} `{forall t s step, Decision (does_step t s step)}:
+    forall (t: T) (otr: trace S L), fair_by_gen' t otr <-> fair_by_gen'_strong t otr.
+  Proof. 
+    intros. rewrite /fair_by_gen'_strong /fair_by_gen'. split.
+    2: { intros FAIR ? EN. specialize (FAIR _ EN) as (?&?&?&?&?&?). eauto. }
+    intros FAIR ? EN. specialize (FAIR _ EN) as [m_ STEP].
+    pattern m_ in STEP. eapply min_prop_dec in STEP.
+    2: { intros k. destruct (otr !! (n + k)) as [[s step]| ] eqn:K.
+         2: { right. set_solver. }
+         eapply Decision_iff_impl.
+         { rewrite ex_det_iff; [rewrite ex_det_iff| ]; [reflexivity| ..].
+           - intros ? [[=] ?]. subst. reflexivity.
+           - intros ? (?& [=] & ?). subst. reflexivity. }
+         apply and_dec; try solve_decision.
+         by left. }
+    clear dependent m_. destruct STEP as (m & (?&?&?&?) & MINm).
+    do 3 eexists. repeat split; eauto.
+    intros k * [LE LT] KTH. intros SAT.
+    specialize (MINm k). specialize_full MINm; [| lia].
+    eauto.
+  Qed. 
 
 End GeneralizedFairness.
 
@@ -228,6 +259,11 @@ Section model_traces.
   Context `{M: FairModel}.
 
   Definition role_enabled_model ρ (s: M) := ρ ∈ M.(live_roles) s.
+
+  Global Instance rem_dec: forall ρ st, Decision (role_enabled_model ρ st).
+  Proof. 
+    intros. rewrite /role_enabled_model. solve_decision.
+  Qed.
 
   Definition role_match (ρ : fmrole M) (oρ': option $ fmrole M) :=
     oρ' = Some ρ. 

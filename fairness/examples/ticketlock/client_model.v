@@ -161,14 +161,6 @@ Section ClientDefs.
     solve_decision. 
   Defined.  
 
-  (* TODO: move *)
-  Instance rem_dec: forall ρlg st, 
-      Decision (role_enabled_model ρlg st (M := TlLM_FM)).
-  Proof. 
-    intros. rewrite /role_enabled_model. solve_decision.
-  Qed. 
-    
-
   Instance client_step_dec st1 ρ st2:
     Decision (client_trans st1 (Some ρ) st2).
   Proof.
