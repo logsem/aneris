@@ -286,16 +286,19 @@ Section FairLockLM.
     rewrite -TRi'.
     eapply upto_stutter_trfirst; eauto.
   Qed. 
+  
+  Definition others_or_burn ρ' :=
+    (λ δ1 oℓ δ2,
+       match oℓ with
+       | Some (inl g) => next_TS_role δ1 g δ2 ≠ Some ρ'
+       | _ => other_proj (asG ρ') oℓ
+       end). 
 
   Lemma others_or_burn_keep_lock ρ':
     label_kept_state_gen
     (λ st' : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
        has_lock_st ρ' (ls_under st') ∧ ¬ role_enabled_model ρ' (ls_under st'))
-    (λ δ1 oℓ δ2,
-       match oℓ with
-       | Some (inl g) => next_TS_role δ1 g δ2 ≠ Some ρ'
-       | _ => other_proj (asG ρ') oℓ
-       end).
+    (others_or_burn ρ').
   Proof.
     red. intros. simpl in STEP. inversion STEP; subst.
     - simpl in STEP0. unfold_LMF_trans STEP0.
@@ -476,8 +479,28 @@ Section FairLockLM.
     { lia. }
     apply ENp.
   Admitted.
-    
 
+  Instance oob_dec: forall ρ δ1 ℓ δ2, Decision (others_or_burn ρ δ1 ℓ δ2). 
+  Proof. 
+    rewrite /others_or_burn. destruct ℓ as [[|]|]; apply _. 
+  Qed. 
+
+  Instance oob_lookup_dec: ∀ x (lmtr: elmftrace (ELM := FL_EM FLE_LMF)) ρ,
+    Decision
+      (∃ (δ1 : LiveState G M LSI) (ℓ : option (G + env_role)) 
+         (δ2 : LiveState G M LSI),
+         lmtr !! x = Some (δ1, Some (ℓ, δ2)) ∧ ¬ others_or_burn ρ δ1 ℓ δ2).
+  Proof. 
+    intros k lmtr ρ. destruct (lmtr !! k) as [[? [[ℓ ?]|]] | ] eqn:K.
+    2, 3: right; set_solver.
+    eapply Decision_iff_impl.
+    { rewrite ex_det_iff; [rewrite ex_det_iff| ]; [rewrite ex_det_iff| ..].
+      { reflexivity. }
+      - intros ? [[=] ?]; subst; reflexivity.  
+      - intros ? (? & [=] & ?). subst. reflexivity.  
+      - intros ? (? & ? & [=] & ?). subst. reflexivity.  }
+    solve_decision. 
+  Qed. 
 
   Lemma FL_LM_progress:
     @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF).
@@ -514,11 +537,13 @@ Section FairLockLM.
     eapply upto_stutter_state_lookup in DTH' as (d & δ & DTH & CORRd); [| by apply UPTOi].
     subst st.
     erewrite state_lookup_after in DTH; eauto.
+
+    assert (d > 0) as NZd.
+    { admit. }
     
     destruct (decide (ρ ∈ dom (ls_mapping δ))) as [MAP | UNMAP]. 
     2: { exists (i + d), δ. repeat split; try done. 
-         { enough (d > 0); [lia| ]. red.
-           admit. }
+         { lia. }
          apply LM_map_empty_notlive.
          destruct (ls_tmap δ !! asG ρ) eqn:Rρ; [| tauto].
          left. destruct (decide (g = ∅)) as [-> | NE]; [done| ].
@@ -536,7 +561,67 @@ Section FairLockLM.
     
     destruct FAIR as (p & δ' & step' & PTH & STEPp & MINp).
     rewrite /fairness_sat_gen in MINp.
-    
+
+    edestruct (list_exist_dec (fun m => exists δ1 ℓ δ2, lmtr !! m = Some (δ1, Some (ℓ, δ2)) /\ ¬ others_or_burn ρ δ1 ℓ δ2) (seq (i + d) p)) as [EXT | NOEXT].
+    { solve_decision. }
+    - destruct EXT as [k_ EXT].
+      pattern k_ in EXT. eapply min_prop_dec in EXT as [k [EXT MINk]]; [clear k_|].
+      2: { solve_decision. }
+      destruct EXT as [DOMk (?&ℓ&?&KTH&STEP)].
+      apply elem_of_seq in DOMk. 
+
+      forward eapply steps_keep_state_gen.
+      3: { apply others_or_burn_keep_lock. }
+      2: { eexists. split; [apply DTH| ]. eauto. }
+      { auto. }
+      3: { eapply trace_state_lookup. apply KTH. }
+      2: { split; [| reflexivity]. lia. }
+      { intros. destruct (decide (others_or_burn ρ st1 oℓ' st2)); [done| ].
+        specialize (MINk k0). specialize_full MINk; [| lia].
+        split; eauto.
+        apply elem_of_seq. lia. }
+      intros [LOCKk DISk]. 
+
+      exists k. eexists. repeat split. 
+      { lia. }
+      { eapply trace_state_lookup; eauto. }
+      { done. }
+      
+      rewrite /others_or_burn in STEP. destruct ℓ as [r| ].
+      2: { simpl in STEP. tauto. }
+      destruct r.
+      { apply NNP_P in STEP. 
+        specialize_full MINp; eauto. apply Decidable.not_or in MINp as [? STEP'].
+        destruct STEP'. red. do 3 eexists. eauto. }
+      simpl in STEP. apply NNP_P in STEP.
+      eapply trace_valid_steps' in KTH; eauto. inversion KTH; subst.
+      destruct ι; subst; simpl in REL.
+      all: apply LM_map_empty_notlive; left; apply REL.
+    - forward eapply steps_keep_state_gen.
+      3: { apply others_or_burn_keep_lock. }
+      2: { eexists. split; [eapply DTH| ]. eauto. }
+      { eauto. }
+      3: { eapply trace_state_lookup. apply PTH. }
+      2: { split; [lia| ]. reflexivity. }
+      { intros. destruct (decide (others_or_burn ρ st1 oℓ' st2)); [done| ].
+        edestruct NOEXT. exists k. split; eauto. 
+        apply elem_of_seq. lia. }
+      intros [LOCKp DISp].
+
+      red in STEPp. destruct STEPp as [UNMAP | STEP]. 
+      + do 2 eexists. repeat split.
+        2: { eapply trace_state_lookup, PTH. }
+        { lia. }
+        { eauto. }
+        apply LM_map_empty_notlive.
+        admit.
+      + red in STEP. destruct STEP as (?&?&?&[=]&<-&STEP); subst.
+        apply next_TS_spec_pos in STEP. 
+        destruct DISp. eapply fm_live_spec. apply STEP.
+
+  Admitted. 
+        
+
     
 
   Instance FL_LM: FairLock LMF FLP_LMF FLE_LMF.

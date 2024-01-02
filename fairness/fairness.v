@@ -84,7 +84,7 @@ Section GeneralizedFairness.
     forall n, from_option (locale_prop t) False (otr S!! n) ->
     exists m s' step, otr !! (n + m) = Some (s', step) /\
                   fairness_sat_gen t s' step /\
-                  (forall k sk stepk, n <= k < m -> otr !! (n + k) = Some (sk, stepk) ->
+                  (forall k sk stepk, n <= k < n + m -> otr !! k = Some (sk, stepk) ->
                                  ¬ fairness_sat_gen t sk stepk).   
 
   Lemma fair_by_gen_equiv:
@@ -118,9 +118,10 @@ Section GeneralizedFairness.
     clear dependent m_. destruct STEP as (m & (?&?&?&?) & MINm).
     do 3 eexists. repeat split; eauto.
     intros k * [LE LT] KTH. intros SAT.
-    specialize (MINm k). specialize_full MINm; [| lia].
+    apply Nat.le_sum in LE as [d ->]. 
+    specialize (MINm d). specialize_full MINm; [| lia].
     eauto.
-  Qed. 
+  Qed.
 
 End GeneralizedFairness.
 
