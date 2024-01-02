@@ -502,6 +502,13 @@ Section FairLockLM.
     solve_decision. 
   Qed. 
 
+  (* Lemma can_has_lock_incompat g δ: *)
+  (*   has_lock_st g δ -> can_lock_st g δ -> False.  *)
+  (* Proof. *)
+  (*   destruct g as [ρ]. simpl. *)
+  (*   apply FL. *)
+  (* Qed.  *)
+
   Lemma FL_LM_progress:
     @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF).
   Proof.
@@ -532,14 +539,17 @@ Section FairLockLM.
       - eapply trace_valid_after; eauto. 
       - intros. eapply fair_by_after; eauto. apply FAIR. }
 
-    clear dependent δ. 
     destruct PROGRESSm as (d' & st & NZ & DTH' & LOCK & DISM).
-    eapply upto_stutter_state_lookup in DTH' as (d & δ & DTH & CORRd); [| by apply UPTOi].
+    eapply upto_stutter_state_lookup in DTH' as (d & δ' & DTH & CORRd); [| by apply UPTOi].
     subst st.
     erewrite state_lookup_after in DTH; eauto.
 
     assert (d > 0) as NZd.
-    { admit. }
+    { destruct d; [| lia].
+      rewrite Nat.add_0_r ITH in DTH. inversion DTH. subst δ'.
+      simpl in CAN_LOCK.
+      edestruct can_has_lock_incompat; eauto. }  
+    clear dependent δ. rename δ' into δ. 
     
     destruct (decide (ρ ∈ dom (ls_mapping δ))) as [MAP | UNMAP]. 
     2: { exists (i + d), δ. repeat split; try done. 
@@ -620,13 +630,13 @@ Section FairLockLM.
         destruct DISp. eapply fm_live_spec. apply STEP.
 
   Admitted. 
-        
+
 
     
 
   Instance FL_LM: FairLock LMF FLP_LMF FLE_LMF.
   esplit.
-  12: { red. simpl. 
+  12: { apply FL_LM_progress. }
   
 
 End FairLockLM.
