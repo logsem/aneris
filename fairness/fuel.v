@@ -138,7 +138,7 @@ Section fairness.
       (*   ls_tmap !! τ1 = Some S1 -> ls_tmap !! τ2 = Some S2 -> S1 ## S2; *)
 
     ls_inv: LSI ls_under ls_tmap ls_fuel;
-  }.
+  }.    
 
 
   Definition fuel_map := gmap (fmrole M) nat.
@@ -175,19 +175,19 @@ Section fairness.
   Proof. rewrite ls_same_doms. apply ls_fuel_dom. Qed.
 
   Definition mapped_roles (tm: groups_map): gset (fmrole M) :=
-    flatten_gset (map_img tm). 
+    flatten_gset (map_img tm).
 
   Lemma mapped_roles_dom_fuels_gen
-    (tm: groups_map) (fm: fuel_map)
-    (DOMS: forall ρ, ρ ∈ dom fm <-> exists τ R, tm !! τ = Some R /\ ρ ∈ R):
-    dom fm = mapped_roles tm. 
-  Proof. 
-    apply set_eq. intros ρ.
-    rewrite DOMS.
+    (tm: groups_map) (fm: fuel_map):
+    (forall ρ, ρ ∈ dom fm <-> exists τ R, tm !! τ = Some R /\ ρ ∈ R) <->
+    (dom fm = mapped_roles tm). 
+  Proof.
+    rewrite set_eq. apply forall_proper. intros ρ.
+    apply ZifyClasses.iff_morph; [done| ]. 
     rewrite /mapped_roles. rewrite flatten_gset_spec.
     rewrite ex2_comm. apply exist_proper. intros R.
-    rewrite elem_of_map_img. set_solver. 
-  Qed.
+    rewrite elem_of_map_img. set_solver.
+  Qed. 
 
   Lemma mapped_roles_dom_fuels δ:
     dom (@ls_fuel δ) = mapped_roles (@ls_tmap δ).
@@ -195,6 +195,23 @@ Section fairness.
     apply mapped_roles_dom_fuels_gen.
     apply δ. 
   Qed.   
+
+  Global Instance build_ls_ext st tm fm:
+    Decision (exists δ, @ls_under δ = st /\ @ls_fuel δ = fm /\ @ls_tmap δ = tm).
+  Proof.
+    destruct (@decide
+                (live_roles M st ⊆ dom fm /\
+                 (forall ρ, ρ ∈ dom fm <-> exists τ R, tm !! τ = Some R /\ ρ ∈ R) /\
+                 tmap_disj tm /\
+                 LSI st tm fm)).
+    { eapply Decision_iff_impl.
+      { rewrite mapped_roles_dom_fuels_gen. reflexivity. }
+      solve_decision. }
+    - left. eexists {| ls_under := st; ls_fuel := fm; ls_tmap := tm |}. done.
+      Unshelve. all: by apply a.
+    - right. intros [δ ([=]&[=]&[=])]. subst. apply n.
+      repeat split; apply δ. 
+  Qed. 
 
   Inductive FairLabel {Roles} :=
   | Take_step: Roles -> G -> FairLabel
