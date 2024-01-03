@@ -98,13 +98,6 @@ Section FairLockLM.
     solve_decision. 
   Qed.
 
-  Let wf_placeholder: lm_ls LM -> Prop.
-  Admitted.
-  Lemma wf_tmp: forall δ, wf_placeholder δ.
-  Proof using. Admitted. 
-  Lemma wf_inner: forall δ, wf_placeholder δ -> state_wf (ls_under δ). 
-  Proof using. Admitted. 
-
   (* TODO: move, find existing? *)
   Instance gtb_dec: forall x y, Decision (x > y).
   Proof. 
@@ -123,7 +116,6 @@ Section FairLockLM.
       (*       (active_st ρ (ls_under δ) \/ default 0 (ls_fuel δ !! ρ) > 0); *)
       active_st := lift_prop1 active_st;
       is_unused := lift_prop1 is_unused;
-      state_wf := wf_placeholder;
     |}.
   (* intros [?] ?. solve_decision.  *)
   Defined.
@@ -182,8 +174,7 @@ Section FairLockLM.
     clear MAP_RESTR. 
     intros δ [ρ]. simpl.
     eapply Decision_iff_impl. 
-    { setoid_rewrite allows_unlock_impl_spec.
-      reflexivity. simpl. admit. }
+    { setoid_rewrite allows_unlock_impl_spec. reflexivity. }
     destruct (decide (ls_tmap δ !! asG ρ = Some ∅ /\
                       has_lock_st ρ δ ∧ ¬ active_st ρ δ)). 
     2: { right. set_solver. }
@@ -193,7 +184,7 @@ Section FairLockLM.
       congruence. }
     right. intros (?&?&?&?&?&?&?).
     destruct n. eexists. repeat split; eauto. congruence. 
-  Admitted. 
+  Qed. 
 
   Let tl_active_exts (δ: fmstate LMF): gset fl_EI := 
       set_map (flU (M := LMF)) 
@@ -324,29 +315,26 @@ Section FairLockLM.
     red. intros. simpl in STEP. inversion STEP; subst.
     - simpl in STEP0. unfold_LMF_trans STEP0.
       + eapply step_keeps_lock_dis.
-        { split; [admit| ].
-          apply P1. }
+        { apply P1. }
         2: { simpl. left. simpl. apply STEP1. }                   
         red. simpl. intros ->. congruence. 
       + repeat apply proj2 in STEP1. congruence.
     - destruct ι; simpl in REL; red in REL.
       + destruct ρ as [ρ]. 
         eapply step_keeps_lock_dis.
-        { split; [admit| ].
-          apply P1. }
+        { apply P1. }
         2: { simpl. right. Unshelve. 2: exact (flU ρ).
              apply REL. }
         red. simpl.
         intros ->. simpl in PSTEP. congruence.
       + destruct ρ as [ρ]. 
         eapply step_keeps_lock_dis.
-        { split; [admit| ].
-          apply P1. }
+        { apply P1. }
         2: { simpl. right. Unshelve. 2: exact (flL ρ).
              apply REL. }
         red. simpl.
-        intros ->. simpl in PSTEP. congruence.  
-  Admitted. 
+        intros ->. simpl in PSTEP. congruence.
+  Qed. 
 
   (* TODO: move *)
   Lemma ex_det_iff2 {A B: Type} (P: A -> B -> Prop) a b
@@ -586,7 +574,6 @@ Section FairLockLM.
     specialize (PROGRESSm mtr_i' ρ 0 (ls_under δ)).
     specialize_full PROGRESSm; eauto.
     { eapply trace_valid_after; eauto. }
-    { admit. }
     { do 2 red. intros. eapply fair_by_after; eauto. by apply FAIRm. }
     { erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r. }
     { eapply ev_rel_after in EV_REL; eauto.
