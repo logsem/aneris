@@ -551,6 +551,57 @@ Section destuttering.
       by destruct Hind.
   Qed.
 
+  Definition prefix_states_upto (btr: trace St L) (str: trace S' L') n' n :=
+    (forall i b, i <= n' ->
+            pred_at btr i (fun b' _ => b' = b) ->
+            exists j, pred_at str j (fun s' _ => s' = Us b) /\ j <= n). 
+
+  (* TODO: try to express the prefix property with 'upto_stutter' and 'subtrace' *)
+  Lemma upto_stutter_after_strong {btr str} n {str'}:
+    upto_stutter btr str ->
+    after n str = Some str' ->
+    ∃ n' btr', after n' btr = Some btr' ∧ upto_stutter btr' str' /\
+                 prefix_states_upto btr str n' n. 
+  Proof.
+    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
+    { intros P [x ?]. by exists (S x). }
+    unfold prefix_states_upto. 
+    revert btr str str'. induction n as [|n IH]; intros btr str str' Hupto Hafter.
+    { injection Hafter => <-. clear Hafter. exists 0, btr.
+      do 2 (split; [done| ]).
+      intros. assert (i = 0) as -> by lia. 
+      exists 0. split; [| done]. apply pred_at_state_trfirst.
+      apply pred_at_state_trfirst in H0. subst.
+      eapply upto_stutter_trfirst; eauto. }
+    revert str' Hafter. punfold Hupto. induction Hupto as
+        [s|btr str s ℓ HUl HUs1 HUs2 Hind IHH|btr str s ℓ s' ℓ' ?? Hind].
+    - intros str' Hafter. done.
+    - intros str' Hafter.
+      apply Hw. simpl.
+      specialize (IHH _ Hafter) as (n' & btr' & AFTER & UPTO & PRE).
+      exists n', btr'. do 2 (split; eauto). intros.
+      destruct i.
+      { apply pred_at_state_trfirst in H0. simpl in H0. subst b.
+        exists 0. split; [| lia]. apply pred_at_state_trfirst.
+        congruence. }
+      apply le_S_n in H. apply pred_at_S in H0.
+      specialize (PRE _ _ H H0). eauto. 
+    - intros str' Hafter. simpl in Hafter.
+      apply Hw. simpl.
+      specialize (IH btr str str'). specialize_full IH.
+      { by destruct Hind. }
+      { done. }
+      destruct IH as (n' & btr' & AFTER & UPTO & PRE). 
+      exists n', btr'. do 2 (split; eauto). intros. 
+      destruct i.
+      { apply pred_at_state_trfirst in H2. simpl in H2. subst b.
+        exists 0. split; [| lia]. apply pred_at_state_trfirst.
+        simpl. congruence. }
+      apply le_S_n in H1. apply pred_at_S in H2.
+      specialize (PRE _ _ H1 H2) as (j & Pj & ?).
+      exists (S j). split; [| lia]. by apply pred_at_S.  
+  Qed.
+
   Local Ltac gd t := generalize dependent t.
 
   Lemma upto_stutter_after'

@@ -290,11 +290,12 @@ Section FairLockLM.
               after i lmtr = Some lmtr_i /\
               after i' mtr = Some mtr_i' /\
               upto_stutter ls_under (EUsls proj_ext) lmtr_i mtr_i' /\
-              st = ls_under (trfirst lmtr_i). 
+              st = ls_under (trfirst lmtr_i) /\ 
+              prefix_states_upto ls_under lmtr mtr i i'.
   Proof. 
     pose proof ITH as (mtr_i' & AFTERi' & TRi')%state_lookup_after'.
-    pose proof AFTERi' as X. eapply upto_stutter_after in X as (i & lmtr_i & AFTERi & UPTOi); eauto.
-    do 3 eexists. do 3 (try split; eauto).
+    pose proof AFTERi' as X. eapply upto_stutter_after_strong in X as (i & lmtr_i & AFTERi & UPTOi & PRE); eauto.
+    do 3 eexists. do 4 (try split; eauto).
     rewrite -TRi'.
     eapply upto_stutter_trfirst; eauto.
   Qed. 
@@ -367,7 +368,7 @@ Section FairLockLM.
   Proof.
     red in EV_REL. 
     red. intros.
-    forward eapply upto_state_lookup_unfold1 as (mtr_i' & i & lmtr_i & AFTERi & AFTERi' & UPTOi & ITH'); eauto.
+    forward eapply upto_state_lookup_unfold1 as (mtr_i' & i & lmtr_i & AFTERi & AFTERi' & UPTOi & ITH' & PREi); eauto.
     
     assert (lmtr S!! i = Some (trfirst lmtr_i)) as ITH.
     { rewrite -(state_lookup_0 lmtr_i).
@@ -477,7 +478,7 @@ Section FairLockLM.
       intros ??.
       rewrite Nat.sub_add'. apply KEEP. }
     
-    clear HAS_LOCK DIS.      
+    clear HAS_LOCK DIS.
     destruct H as (m & δ_m & LEi & MTH & HAS_LOCK & UNMAP & BETWEEN). 
     
     specialize (EV_REL (asG ρ')). specialize_full EV_REL.
@@ -499,11 +500,14 @@ Section FairLockLM.
              rewrite -Nat.le_add_sub; eauto. lia. }
            apply proj1 in BETWEEN. simpl in LOCK2.
            eapply NEQ. eapply has_lock_st_excl; eauto. }
-      (* The prefix of mtr corresponding to this prefix of lmtr
-         doesn't have locks of ρ, according to AFTER.
-         Need to split trace more precisely, stating that both pre- and postfixes       of traces a re related by upto_stutter
-       *)
-      admit. }
+
+      move PREi at bottom. red in PREi.
+      setoid_rewrite pred_at_trace_lookup in PREi. specialize_full PREi.
+      { apply BEFORE. }
+      { eexists. eauto. }
+      destruct PREi as (p & (st&PTH&->) & LT').
+      apply AFTER in PTH; [| lia].
+      done. }
     
     destruct EV_REL as (p & δ_p & PTH & LEm & ENp).
     assert (i <= p) as [d ->]%Nat.le_sum by lia. 
@@ -513,7 +517,7 @@ Section FairLockLM.
     { erewrite <- state_lookup_after; eauto. }
     { lia. }
     apply ENp.
-  Admitted.
+  Qed. 
 
   Instance oob_dec: forall ρ δ1 ℓ δ2, Decision (others_or_burn ρ δ1 ℓ δ2). 
   Proof. 
@@ -705,8 +709,7 @@ Section FairLockLM.
       fair_lock.allow_lock_impl := allow_lock_impl;
     |}. 
   12: { apply FL_LM_progress. }
-  - intros [ρ] δ WF δ'. simpl.
-    (* repeat rewrite and_assoc. erewrite <- (and_assoc _ _ (¬ _)).  *)
+  - simpl. intros [ρ] δ δ'. simpl.
     destruct build_ls_ext_sig.
     2: { split.
          - intros (?&?&?&?).
@@ -718,7 +721,6 @@ Section FairLockLM.
     apply Morphisms_Prop.and_iff_morphism.
     2: { rewrite allows_unlock_impl_spec; [| admit]. 
          
-  2
   
 
 End FairLockLM.
