@@ -309,11 +309,6 @@ Section ClientDefs.
   Definition is_tl_step (step: model_trace_step client_model_impl) :=
     step_label_matches step (fun ρ => exists ρlg, Some $ inl ρlg = ρ). 
 
-  (* TODO: show that all TL states used in client trace are WF;
-     add a "step belongs to trace" premise to nested_trace_construction *)
-  Lemma ALWAYS_tl_state_wf (tl: tl_state): state_wf tl.
-  Proof. Admitted. 
-  
   Lemma tl_trace_construction (tr: mtrace client_model_impl)
     (VALID: mtrace_valid tr)
     (TL_STEPS: ∀ i res, tr !! i = Some res → is_tl_step res \/ is_end_state res):
@@ -339,11 +334,9 @@ Section ClientDefs.
       - econstructor. simpl.
         apply not_live_not_active in DIS; auto.  
         eapply allows_unlock_impl_spec; auto.
-        apply ALWAYS_tl_state_wf.
       - econstructor. simpl. 
         apply not_live_not_active in DIS; auto.  
         eapply allows_unlock_impl_spec; auto.
-        apply ALWAYS_tl_state_wf.
       - econstructor. simpl. 
         apply not_live_not_active in DIS; auto.  
         eapply allows_lock_impl_spec; auto. }
@@ -380,12 +373,10 @@ Section ClientDefs.
         econstructor. simpl.
         apply not_live_not_active in DIS; auto.  
         apply allows_unlock_impl_spec; eauto. 
-        apply ALWAYS_tl_state_wf.
       - exists (Some $ inr $ env $ ((flU (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
         econstructor. simpl.
         apply not_live_not_active in DIS; auto.
         apply allows_unlock_impl_spec; eauto. 
-        apply ALWAYS_tl_state_wf.
       - exists (Some $ inr $ env $ ((flL (ρlg0: fmrole TlLM_FM)): @EI _ TlEM)).
         econstructor. simpl.
         apply not_live_not_active in DIS; auto.
@@ -494,12 +485,13 @@ Section ClientDefs.
     Unshelve.
     + exact client_model. 
     + red. intros ? [??].
-      erewrite <- mapped_roles_dom_fuels_gen.
+      pose proof (mapped_roles_dom_fuels_gen (rearrange_roles_map (ls_tmap δ2) (dom (ls_tmap δ0)) τ0) ((ls_fuel δ2))) as R.             
+      erewrite <- (proj1 R).
       2: { apply rrm_tmap_fuel_same_doms. }
       pose proof (ls_inv δ2) as LSI2. red in LSI2. 
       specialize (LSI2 _ ltac:(eauto)).
       by rewrite -mapped_roles_dom_fuels in LSI2. 
-  Qed. 
+  Qed.
     
   Local Instance client_LF: LMFairPre client_model.
   esplit; apply _.
@@ -540,8 +532,8 @@ Section ClientDefs.
       all: destruct f'; tauto. }
  
     inversion STEP; subst.
-    - eapply proj2. eapply step_keeps_lock_dis.
-      { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
+    - eapply step_keeps_lock_dis.
+      { split; try by apply PREρlg. }
       2: { left. eauto. }
       simpl. 
       rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
@@ -580,7 +572,7 @@ Section ClientDefs.
     - split; [done| ]. 
 
       eapply step_keeps_lock_dis.
-      { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
+      { split; try by apply PREρlg.}
       2: { left. eauto. }
       simpl. 
       rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
@@ -594,7 +586,7 @@ Section ClientDefs.
     - destruct FS as [[? ->] | [[=] ?]]. 
       split; [done| ].
       eapply step_keeps_lock_dis. 
-      { split; try by apply PREρlg. apply ALWAYS_tl_state_wf. }
+      { split; try by apply PREρlg. }
       2: { Unshelve. 2: exact (Some (inr $ env $ (flL (ρlg: fmrole TlLM_FM): @EI _ TlEM))).
            econstructor. simpl.
            apply not_live_not_active in DIS; eauto. 
@@ -722,8 +714,6 @@ Section ClientDefs.
 
     forward eapply (lock_progress (project_tl_trace str) (ρlg_tl cl_L) 0 (trfirst str).1).
     { by eapply traces_match_valid2. }
-    { intros.
-      apply ALWAYS_tl_state_wf. }
     { subst i'_s. eapply tl_subtrace_fair; eauto. }
     { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
     { rewrite TR0. apply INIT. }
@@ -780,8 +770,7 @@ Section ClientDefs.
       inversion KTH'; subst.
       { by apply ρlg_lr_neq in H2. }
       simpl. eapply allows_unlock_spec; eauto.
-      apply allows_unlock_impl_spec; eauto using not_live_not_active.
-      apply ALWAYS_tl_state_wf. }
+      apply allows_unlock_impl_spec; eauto using not_live_not_active. }
     
     intros (k & tl_st & ? & KTH & LOCKl & DISl). 
     eapply traces_match_state_lookup_2 in KTH as (s & KTH & EQ); [| by eauto].
