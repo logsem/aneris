@@ -56,6 +56,7 @@ Section FairLockLM.
 
   Context `(LM: LiveModel G M LSI). 
   Context (LF: LMFairPre LM).
+  Context {LSI_DEC: forall s tm f, Decision (LSI s tm f)}.
 
   Let LMF := LM_Fair (LF := LF).
 
@@ -127,6 +128,7 @@ Section FairLockLM.
             ls_tmap δ1 !! (asG ρ) = Some ∅ /\
             (* ls_tmap δ2 !! (asG ρ) = Some {[ ρ ]} /\               *)
             ls_tmap δ2 = <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ1) /\
+            ls_fuel δ2 = <[ ρ := lm_fl LM (ls_under δ2) ]> (ls_fuel δ1) /\
             P ρ (ls_under δ1) (ls_under δ2).
 
   (* Let LM_active_exts (δ: fmstate LMF): gset (@fl_EI LMF) := *)
@@ -151,7 +153,7 @@ Section FairLockLM.
 
   Instance allows_lock_ex_dec:
     forall δ g, Decision (∃ δ', allows_lock g δ δ'). 
-  Proof using.
+  Proof using LSI_DEC FLP FL.
     intros δ [ρ]. simpl.
     eapply Decision_iff_impl. 
     { setoid_rewrite allows_lock_impl_spec.
@@ -159,41 +161,30 @@ Section FairLockLM.
     destruct (decide (ls_tmap δ !! asG ρ = Some ∅ /\
                       can_lock_st ρ δ ∧ ¬ active_st ρ δ)). 
     2: { right. set_solver. }
- (*    set st' := allow_lock_impl ρ δ. *)
- (*    set new_lr := live_roles _ st' ∖ dom (ls_mapping (ls_under δ)).  *)
- (*    left. eexists ({|         *)
- (*        ls_under := st'; *)
- (*        ls_tmap := <[ asG ρ := {[ ρ ]} ∪ nefaw_lr]> (ls_tmap δ); *)
- (*        ls_fuel := <[ ρ := 0 ]> (ls_fuel δ) ∪ gset_to_gmap 0 new_lr; *)
- (* |}). *)
- (*    repeat split; eauto; try by apply a. *)
- (*    simpl. rewrite lookup_insert. *)
- (*    Unshelve. *)
- (*    - subst st'. simpl.  *)
- (*    1-4: admit.  *)
-  Admitted. 
-
+    destruct (let st' := (allow_lock_impl ρ δ) in build_ls_ext st' (<[asG ρ:={[ρ]}]> (ls_tmap δ)) (<[ρ:=lm_fl LM st']> (ls_fuel δ)) (H0 := LSI_DEC)).
+    { left. destruct e as [δ2 (?&?&?)]. exists δ2.
+      repeat split; try by apply a || eauto.
+      congruence. }
+    right. intros (?&?&?&?&?&?&?).
+    destruct n. eexists. repeat split; eauto. congruence. 
+  Qed. 
 
   Instance allows_unlock_ex_dec:
     forall δ g, Decision (∃ δ', allows_unlock g δ δ'). 
-  Proof using.
+  Proof using LSI_DEC FLP FL.
     intros δ [ρ]. simpl.
     eapply Decision_iff_impl. 
     { setoid_rewrite allows_unlock_impl_spec.
-      2: { admit. }
-      reflexivity. }
+      reflexivity. admit. }
     destruct (decide (ls_tmap δ !! asG ρ = Some ∅ /\
                       has_lock_st ρ δ ∧ ¬ active_st ρ δ)). 
     2: { right. set_solver. }
-    left. eexists {|        
-        ls_under := allow_unlock_impl ρ δ;
-        ls_tmap := <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ);
-        ls_fuel := <[ ρ := 0 ]> (ls_fuel δ);
- |}.
-    repeat split; eauto; try by apply a.
-    (* simpl. by rewrite lookup_insert. *)
-    Unshelve.
-    1-4: admit. 
+    destruct (let st' := (allow_unlock_impl ρ δ) in build_ls_ext st' (<[asG ρ:={[ρ]}]> (ls_tmap δ)) (<[ρ:=lm_fl LM st']> (ls_fuel δ)) (H0 := LSI_DEC)).
+    { left. destruct e as [δ2 (?&?&?)]. exists δ2.
+      repeat split; try by apply a || eauto.
+      congruence. }
+    right. intros (?&?&?&?&?&?&?).
+    destruct n. eexists. repeat split; eauto. congruence. 
   Admitted. 
 
   Let tl_active_exts (δ: fmstate LMF): gset fl_EI := 
@@ -233,8 +224,26 @@ Section FairLockLM.
   Lemma LM_EM_EXT_KEEPS: ext_keeps_asg
                               (ELM := (FL_EM FLE_LMF)).
   Proof.
-    red.
-  Admitted. 
+    red. intros δ1 [ι] δ2 ρ g f STEP MAP FUEL.
+    assert (g = asG ρ) as ->.
+    { admit. }
+    inversion STEP; subst.
+    destruct ι as [[ρ'] | [ρ']]; simpl in REL; destruct REL as (TM1 & TM2 & FM & ST).
+    - assert (ρ ≠ ρ') as NEQ.
+      { apply ls_mapping_tmap_corr in MAP as (Rg & TM & IN).
+        intros ->. set_solver. }
+      split.
+      2: { rewrite FM. rewrite lookup_insert_ne; eauto. }
+      apply ls_mapping_tmap_corr. rewrite TM2 lookup_insert_ne; [| congruence].
+      apply ls_mapping_tmap_corr. eauto.
+    - assert (ρ ≠ ρ') as NEQ.
+      { apply ls_mapping_tmap_corr in MAP as (Rg & TM & IN).
+        intros ->. set_solver. }
+      split.
+      2: { rewrite FM. rewrite lookup_insert_ne; eauto. }
+      apply ls_mapping_tmap_corr. rewrite TM2 lookup_insert_ne; [| congruence].
+      apply ls_mapping_tmap_corr. eauto.
+  Admitted.
 
   Let proj_ext (ι: @EI _ (FL_EM FLE_LMF)): @EI _ (FL_EM FLE) :=
         match ι with
@@ -331,6 +340,26 @@ Section FairLockLM.
         intros ->. simpl in PSTEP. congruence.  
   Admitted. 
 
+  (* TODO: move *)
+  Lemma ex_det_iff2 {A B: Type} (P: A -> B -> Prop) a b
+    (DET: forall a' b', P a' b' -> a' = a /\ b' = b):
+    (exists a' b', P a' b') <-> P a b.
+  Proof. 
+    split; [| by eauto].
+    intros (?&?&PP). pose proof PP. 
+    by apply DET in PP as [-> ->].  
+  Qed.
+
+  (* TODO: move *)
+  Lemma ex_det_iff3 {A B C: Type} (P: A -> B -> C -> Prop) a b c 
+    (DET: forall a' b' c', P a' b' c' -> a' = a /\ b' = b /\ c' = c):
+    (exists a' b' c', P a' b' c') <-> P a b c.
+  Proof. 
+    split; [| by eauto].
+    intros (?&?&?&PP). pose proof PP. 
+    by apply DET in PP as (-> & -> & ->).  
+  Qed.
+
   Lemma ev_rel_inner (lmtr: elmftrace (ELM := FL_EM FLE_LMF))
     (mtr: trace M (option ext_role))
     (ρ : R)
@@ -385,7 +414,13 @@ Section FairLockLM.
         eapply elem_of_dom; eauto. }
       simpl in FAIRi. destruct FAIRi as [m_ FAIRi]. 
       pattern m_ in FAIRi. eapply min_prop_dec in FAIRi as [m [FAIRi MIN]].
-      2: { admit. }
+      2: { intros. destruct (lmtr_i !! n) as [[s step] |] eqn:N; rewrite N.
+           2: { right; set_solver. }
+           eapply Decision_iff_impl.
+           { erewrite ex_det_iff2.
+             2: { intros ?? [[=] ?]. subst. split; reflexivity. }
+             reflexivity. }
+           solve_decision. }
       destruct FAIRi as (δ_m & step_m & MTH & FAIRi).
       red in FAIRi.
       
@@ -498,20 +533,11 @@ Section FairLockLM.
     intros k lmtr ρ. destruct (lmtr !! k) as [[? [[ℓ ?]|]] | ] eqn:K.
     2, 3: right; set_solver.
     eapply Decision_iff_impl.
-    { rewrite ex_det_iff; [rewrite ex_det_iff| ]; [rewrite ex_det_iff| ..].
-      { reflexivity. }
-      - intros ? [[=] ?]; subst; reflexivity.  
-      - intros ? (? & [=] & ?). subst. reflexivity.  
-      - intros ? (? & ? & [=] & ?). subst. reflexivity.  }
+    { erewrite ex_det_iff3.
+      2: { intros ??? [[=] ?]. subst. repeat split; reflexivity. }
+      reflexivity. }
     solve_decision. 
   Qed. 
-
-  (* Lemma can_has_lock_incompat g δ: *)
-  (*   has_lock_st g δ -> can_lock_st g δ -> False.  *)
-  (* Proof. *)
-  (*   destruct g as [ρ]. simpl. *)
-  (*   apply FL. *)
-  (* Qed.  *)
 
   Lemma FL_LM_progress:
     @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF).
