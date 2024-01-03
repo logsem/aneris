@@ -11,7 +11,7 @@ Class FairLockPredicates (M: FairModel) := {
   has_lock_st: fmrole M -> fmstate M -> Prop;
   active_st: fmrole M -> fmstate M -> Prop;
   is_unused: fmrole M -> fmstate M -> Prop;
-  state_wf: fmstate M -> Prop;
+  (* state_wf: fmstate M -> Prop; *)
   (* is_unused := fun ρlg st => ¬ can_lock_st ρlg st /\ ¬ has_lock_st ρlg st; *)
 
   has_lock_st_dec :> forall ρ st, Decision (has_lock_st ρ st);
@@ -61,7 +61,7 @@ Section FairLock.
   Definition fair_lock_progress :=
     forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
       (VALID: mtrace_valid tr)
-      (FROM_INIT: forall st0, tr S!! 0 = Some st0 -> @state_wf _ FL st0)
+      (* (FROM_INIT: forall st0, tr S!! 0 = Some st0 -> @state_wf _ FL st0) *)
       (FAIR: inner_fair_ext_model_trace tr)
       (ITH: tr S!! i = Some st)
       (CAN_LOCK: can_lock_st ρ st)
@@ -142,7 +142,9 @@ Definition other_proj `{FLE: FairLockExt M} (ρ: fmrole M):
 Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) := {
   allow_unlock_impl: fmrole M -> fmstate M -> fmstate M;
   allow_lock_impl: fmrole M -> fmstate M -> fmstate M;
-  allows_unlock_impl_spec ρ st (WF: state_wf st):
+  allows_unlock_impl_spec ρ st
+    (* (WF: state_wf st) *)
+    :
     forall st', allows_unlock ρ st st' <->
              (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ ¬ active_st ρ st));
   allows_lock_impl_spec ρ st:
@@ -158,7 +160,9 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
   (*     forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1; *)
   step_keeps_lock_dis: forall (ρ: fmrole M),
       label_kept_state
-        (fun st => @state_wf _ FLP st /\ has_lock_st ρ st /\ ¬ role_enabled_model ρ st)
+        (fun st =>
+           (* @state_wf _ FLP st /\ *)
+                  has_lock_st ρ st /\ ¬ role_enabled_model ρ st)
         (other_proj ρ (FLE := FLE))
         (M := @ext_model_FM _ (FL_EM FLE));
 
