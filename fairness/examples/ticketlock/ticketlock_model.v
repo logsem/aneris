@@ -170,6 +170,8 @@ Section Model.
   Definition active_st (ρ: tl_role) (st: tl_st) :=
     exists r, (role_map st) !! ρ = Some (r, true).
 
+  Definition disabled_st ρ st :=
+    exists r, (role_map st) !! ρ = Some (r, false).
 
   Ltac simpl_li_eq := match goal with
                       | H: <[?x:=?y]> ?m !! ?x = ?r |- _
@@ -421,6 +423,17 @@ Section Model.
     2: { right. intros (? & ?). congruence. }
     destruct p. destruct b.
     2: { right. intros (? & ?). congruence. }
+    left. eexists. eauto.
+  Qed. 
+    
+  Instance disabled_st_dec (ρ: tl_role) (st: tl_st):
+    Decision (disabled_st ρ st).
+  Proof using. 
+    rewrite /disabled_st.
+    destruct (role_map st !! ρ).
+    2: { right. intros (? & ?). congruence. }
+    destruct p. destruct b.
+    { right. intros (? & ?). congruence. }
     left. eexists. eauto.
   Qed. 
     
@@ -912,10 +925,12 @@ Section Model.
         - exact can_lock_st.
         - exact has_lock_st.
         - exact active_st.
+        - exact disabled_st. 
         - exact is_unused. 
         (* ???  *)
         (* 1-4: solve_decision.  *)
         (* all: solve_decision. *)
+        - solve_decision.
         - solve_decision.
         - solve_decision.
         - solve_decision.
@@ -931,6 +946,25 @@ Section Model.
         destruct LOCK1 as [? L1]. destruct LOCK2 as [? L2].
         eapply (tl_wf st); eauto.  
       Qed.
+
+      Lemma not_active_disabled ρ st
+        (DOM: ρ ∈ dom (role_map st)):
+        ¬ active_st ρ st <-> disabled_st ρ st.
+      Proof using.
+        clear tr VALID FAIR. 
+        rewrite /active_st /disabled_st.
+        apply elem_of_dom in DOM as [[s e] R]. rewrite R.
+        do 2 (rewrite ex_det_iff; [| intros ? [=]; subst; reflexivity]). 
+        destruct e; set_solver.
+      Qed. 
+
+      Lemma has_lock_dom ρ st
+        (LOCK: has_lock_st ρ st):
+        ρ ∈ dom (role_map st). 
+      Proof. 
+        destruct LOCK as [? ?].
+        eapply elem_of_dom; eauto. 
+      Qed. 
 
       Lemma lock_eventually_acquired_iteration o t rm wf ρ i d
         (ST: tr S!! i = Some (mkTlSt o t rm wf) )
@@ -965,7 +999,8 @@ Section Model.
             intros ? (?&?&?). lia. }
         
           forward eapply eventual_release_strenghten; eauto. 
-          { by rewrite -active_st_enabled. } 
+          { apply not_active_disabled; auto.
+            simpl. destruct LOCK. simpl in *. eapply elem_of_dom. eauto. }
           { intros. split; auto. intros.
             assert (k = i) as -> by lia.
             rewrite ST in KTH. inversion KTH. subst st_k.
@@ -1194,7 +1229,7 @@ Section Model.
         (ACT: active_st ρ st)
         (EV_REL: tl_eventual_release tr ρ i):
         exists n st', i < n /\ tr S!! n = Some st' /\ has_lock_st ρ st' /\
-                   ¬ role_enabled_model (ρ: fmrole tl_fair_model) st'.
+                   disabled_st (ρ: fmrole tl_fair_model) st'.
       Proof using VALID FAIR.
         red in CAN_LOCK. destruct CAN_LOCK as [e RMρ].
         assert (e = true) as -> by (destruct ACT; congruence). 
@@ -1225,13 +1260,16 @@ Section Model.
         { exists (i + d + 1). eexists.
           repeat split; [lia|..]; try by eauto.
           - red. eexists. simpl. rewrite lookup_insert. eauto. 
-          - rewrite -active_st_enabled /active_st. simpl. 
+          - apply not_active_disabled.
+            { simpl. set_solver. }
+            rewrite /active_st. 
             rewrite lookup_insert. intros [? [=]]. }
         
         eapply lock_eventually_acquired in ST'''.
         - destruct ST''' as (?&?&?). do 2 eexists.
-          rewrite -active_st_enabled. 
-          repeat split; try by apply H. lia.
+          rewrite -not_active_disabled.
+          { repeat split; try by apply H. lia. }
+          eapply has_lock_dom. apply H. 
         - apply WAIT.
         - rewrite lookup_insert. eauto.
         - eapply (tl_ev_rel_extend i); eauto with lia. 
@@ -1300,21 +1338,20 @@ Section Model.
       
     Lemma allows_unlock_impl_spec ρ st:
       forall st', allows_unlock ρ st st' <-> 
-              (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ ¬ active_st ρ st)).
+              (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ disabled_st ρ st)).
     Proof.
       destruct st as [o t rm]. intros [o' t' rm'].
-      rewrite /allow_unlock_impl /has_lock_st /active_st. simpl.  
+      rewrite /allow_unlock_impl /has_lock_st /disabled_st. simpl.  
       destruct decide. 
       2: { simpl. trans False.
            - apply neg_false. intros AL. inversion AL. by subst.
            - symmetry. apply neg_false.
              intros ([=]&?&?). subst. destruct H4.
              destruct H3 as [? R]. rewrite R in n.
-             destruct x; [| set_solver]. eauto. }
+             destruct x; [| set_solver]. congruence. }
       split.
       - intros AL. inversion AL. subst.
         repeat split; eauto.
-        2: { rewrite e. set_solver. }
         f_equal. apply wf_PI. 
       - intros ([=]&[?[=]]&?). subst. econstructor.
         destruct x; [| done]. edestruct H5; eauto.
@@ -1331,7 +1368,7 @@ Section Model.
           
     Lemma allows_lock_impl_spec ρ st:
       forall st', allows_lock ρ st st' <-> 
-              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ ¬ active_st ρ st)).
+              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ disabled_st ρ st)).
     Proof.
       destruct st as [o t rm]. intros [o' t' rm'].
       rewrite /allow_unlock_impl /can_lock_st /active_st. simpl.  
@@ -1341,15 +1378,22 @@ Section Model.
            - symmetry. apply neg_false.
              intros ([=]&?&?). subst. destruct H4.
              destruct H3 as [? R]. rewrite R in n.
-             destruct x; [| set_solver]. eauto. }
+             destruct x; [| set_solver]. simpl in H. congruence. }
       split.
       - intros AL. inversion AL. subst.
         repeat split; eauto.
-        2: { rewrite e. set_solver. }
+        2: { red. simpl. eauto. }
         f_equal. apply wf_PI. 
       - intros ([=]&[?[=]]&?). subst. econstructor.
         destruct x; [| done]. edestruct H5; eauto.
     Qed.
+
+    Lemma active_disabled_incompat ρ st
+      (EN: active_st ρ st) (DIS: disabled_st ρ st):
+      False.
+    Proof.
+      destruct EN, DIS. congruence.
+    Qed. 
       
     Instance TLFairLock: @FairLock _ tl_FLP tl_FLE. 
     Proof.
@@ -1357,7 +1401,7 @@ Section Model.
       - apply allows_unlock_impl_spec.
       - apply allows_lock_impl_spec.
       - intros. simpl.
-        rewrite /has_lock_st /active_st.
+        rewrite /has_lock_st /disabled_st.
         eapply label_kept_state_Proper.
         3: { apply (has_lock_kept_others ρ false). }
         2: { done. }
@@ -1368,10 +1412,9 @@ Section Model.
         split.
         + intros [[e [=->]] ?].
           destruct e; eauto. edestruct H0; eauto.
-          apply active_st_enabled. red. eauto. 
+          congruence. 
         + intros [=->]. split; [set_solver| ].
-          intros [? R']%active_st_enabled.
-          rewrite R in R'. congruence. 
+          eauto. 
       - apply unused_kept.  
       - simpl. rewrite /is_unused /can_lock_st.
         intros *. rewrite not_elem_of_dom.
@@ -1382,7 +1425,8 @@ Section Model.
       - simpl. rewrite /is_unused /active_st.
         intros *. rewrite not_elem_of_dom.
         intros X [? Y]. by rewrite X in Y.
-      - simpl. by intros * ?%active_st_enabled.
+      - simpl. intros * DIS EN%active_st_enabled.
+        edestruct active_disabled_incompat; eauto. 
       - simpl. intros. eapply has_lock_unique; eauto.
       - simpl. rewrite /has_lock_st /can_lock_st.
         intros * [??] [??]. congruence.
