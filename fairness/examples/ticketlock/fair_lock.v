@@ -193,6 +193,8 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
     is_unused ρlg tl_st -> has_lock_st ρlg tl_st -> False;
   unused_active_incompat: forall tl_st ρlg,
     is_unused ρlg tl_st -> active_st ρlg tl_st -> False;
+  unused_live_incompat: forall tl_st ρlg,
+    is_unused ρlg tl_st -> active_st ρlg tl_st -> False;
   (* model_step_keeps_unused: forall st1 ρ st2, *)
   (*     fmtrans M st1 (Some ρ) st2 -> forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2; *)
   (* ext_step_keeps_unused: forall st1 ρ st2 mkEI, *)
