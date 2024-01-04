@@ -58,7 +58,12 @@ Section FairLockLM.
   Context (LF: LMFairPre LM).
   Context {LSI_DEC: forall s tm f, Decision (LSI s tm f)}.
   Context {MAP_RESTR: forall (δ: lm_ls LM) ρ g,
-                 ls_mapping δ !! ρ = Some g -> g = asG ρ}. 
+                 ls_mapping δ !! ρ = Some g -> g = asG ρ}.
+  Context {ALLOWS_RENEW: forall (δ: lm_ls LM) ρ,
+                  ls_tmap δ !! (asG ρ) = Some ∅ ->
+                  forall a fm, In a [allow_unlock_impl; allow_lock_impl] ->                           
+                  LSI (a ρ (ls_under δ)) (<[ asG ρ := {[ ρ ]} ]> (ls_tmap δ)) fm}. 
+  
 
   Let LMF := LM_Fair (LF := LF).
 
@@ -120,11 +125,10 @@ Section FairLockLM.
   (* intros [?] ?. solve_decision.  *)
   Defined.
 
-  Let lift_prop2 (P: fmrole M -> fmstate M -> fmstate M -> Prop):
+  Definition lift_prop2 (P: fmrole M -> fmstate M -> fmstate M -> Prop):
     fmrole LMF -> lm_ls LM -> lm_ls LM -> Prop := 
         fun '(asG ρ) δ1 δ2 =>
             ls_tmap δ1 !! (asG ρ) = Some ∅ /\
-            (* ls_tmap δ2 !! (asG ρ) = Some {[ ρ ]} /\               *)
             ls_tmap δ2 = <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ1) /\
             ls_fuel δ2 = <[ ρ := lm_fl LM (ls_under δ2) ]> (ls_fuel δ1) /\
             P ρ (ls_under δ1) (ls_under δ2).
@@ -138,8 +142,8 @@ Section FairLockLM.
   (*                         end in *)
   (*       set_map lift active_under. *)
 
-  Let allows_unlock := lift_prop2 allows_unlock. 
-  Let allows_lock := lift_prop2 allows_lock.
+  Definition allows_unlock := lift_prop2 allows_unlock. 
+  Definition allows_lock := lift_prop2 allows_lock.
 
   Instance lift_prop2_dec P
     (DECP: forall ρ st1 st2, Decision (P ρ st1 st2)):
@@ -152,7 +156,7 @@ Section FairLockLM.
   Instance allows_lock_ex_dec:
     forall δ g, Decision (∃ δ', allows_lock g δ δ'). 
   Proof using LSI_DEC FLP FL.
-    clear MAP_RESTR. 
+    clear MAP_RESTR ALLOWS_RENEW. 
     intros δ [ρ]. simpl.
     eapply Decision_iff_impl. 
     { setoid_rewrite allows_lock_impl_spec.
@@ -171,7 +175,7 @@ Section FairLockLM.
   Instance allows_unlock_ex_dec:
     forall δ g, Decision (∃ δ', allows_unlock g δ δ'). 
   Proof using LSI_DEC FLP FL.
-    clear MAP_RESTR. 
+    clear MAP_RESTR ALLOWS_RENEW. 
     intros δ [ρ]. simpl.
     eapply Decision_iff_impl. 
     { setoid_rewrite allows_unlock_impl_spec. reflexivity. }
@@ -184,7 +188,7 @@ Section FairLockLM.
       congruence. }
     right. intros (?&?&?&?&?&?&?).
     destruct n. eexists. repeat split; eauto. congruence. 
-  Qed. 
+  Qed.
 
   Let tl_active_exts (δ: fmstate LMF): gset fl_EI := 
       set_map (flU (M := LMF)) 
@@ -682,26 +686,49 @@ Section FairLockLM.
             (* P ρ (ls_under δ1) (ls_under δ2). *)
   (* Unset Printing Notations. *)
   (* exist *)
-  Definition allow_unlock_impl (g: fmrole LMF) (δ: lm_ls LM): lm_ls LM :=
-    let '(asG ρ) := g in
-    let st' := allow_unlock_impl ρ (ls_under δ) in
-    match (build_ls_ext_sig st'
-                            (<[ asG ρ := {[ ρ ]} ]> (ls_tmap δ))
-                            (<[ ρ := lm_fl LM st' ]> (ls_fuel δ))) with 
-    | inl (exist _ δ' _) => δ'
-    | inr _ => δ
-    end.  
-    
-  Definition allow_lock_impl (g: fmrole LMF) (δ: lm_ls LM): lm_ls LM :=
-    let '(asG ρ) := g in
-    let st' := allow_lock_impl ρ (ls_under δ) in
-    match (build_ls_ext_sig st'
-                            (<[ asG ρ := {[ ρ ]} ]> (ls_tmap δ))
-                            (<[ ρ := lm_fl LM st' ]> (ls_fuel δ))) with 
-    | inl (exist _ δ' _) => δ'
-    | inr _ => δ
-    end.  
-    
+
+  (* Context {δ_empty: {δ: lm_ls LM | forall g, default ∅ (ls_tmap δ !! g) = ∅}}.  *)
+
+  Definition allow_unlock_impl (g: fmrole LMF) (δ: lm_ls LM): lm_ls LM. 
+    refine (
+        let '(asG ρ) := g in
+        let st' := allow_unlock_impl ρ (ls_under δ) in {|
+        ls_under := st';
+        ls_tmap := <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ);
+        ls_fuel := <[ ρ := lm_fl LM st' ]> (ls_fuel δ);
+    |}).
+  Admitted. 
+    (* let '(asG ρ) := g in *)
+  (*   let st' := allow_unlock_impl ρ (ls_under δ) in *)
+  (*   if (decide (ls_tmap δ !! asG ρ = Some ∅)) *)
+  (*   then match (build_ls_ext_sig st' *)
+  (*                 (<[ asG ρ := {[ ρ ]} ]> (ls_tmap δ)) *)
+  (*                 (<[ ρ := lm_fl LM st' ]> (ls_fuel δ))) with  *)
+  (*        | inl (exist _ δ' _) => δ' *)
+  (*        | inr _ => δ *)
+  (*     end  *)
+  (*   else proj1_sig δ_empty. *)
+  (*   (* else δ. *) *)
+
+  (* Definition allow_lock_impl (g: fmrole LMF) (δ: lm_ls LM): lm_ls LM := *)
+  (*   let '(asG ρ) := g in *)
+  (*   let st' := allow_lock_impl ρ (ls_under δ) in *)
+  (*   match (build_ls_ext_sig st' *)
+  (*                           (<[ asG ρ := {[ ρ ]} ]> (ls_tmap δ)) *)
+  (*                           (<[ ρ := lm_fl LM st' ]> (ls_fuel δ))) with  *)
+  (*   | inl (exist _ δ' _) => δ' *)
+  (*   | inr _ => δ *)
+  (*   end.   *)
+
+  (* (* TODO: is it possible to avoid delegating this to user? *) *)
+  (* Context {allow_unlock_impl: G -> lm_ls LM -> lm_ls LM}. *)
+  (* Hypothesis (allows_unlock_impl_spec: forall g δ δ', allows_unlock g δ δ' <-> *)
+  (*            (allow_unlock_impl g δ = δ' /\ (has_lock_st g δ /\ ¬ active_st g δ))).  *)
+
+  (* Context {allow_lock_impl: G -> lm_ls LM -> lm_ls LM}. *)
+  (* Hypothesis (allows_lock_impl_spec: forall g δ δ', allows_lock g δ δ' <-> *)
+  (*            (allow_lock_impl g δ = δ' /\ (can_lock_st g δ /\ ¬ active_st g δ))).  *)
+
 
   Instance FL_LM: FairLock LMF FLP_LMF FLE_LMF.
   refine {| 
@@ -710,8 +737,22 @@ Section FairLockLM.
     |}. 
   12: { apply FL_LM_progress. }
   - simpl. intros [ρ] δ δ'. simpl.
+    rewrite allows_unlock_impl_spec.
+    rewrite !and_assoc. do 2 rewrite -(and_assoc _ _ (¬ active_st _ _)).
+    do 2 rewrite (and_comm _ (has_lock_st _ _ /\ _)). apply iff_and_pre.
+    intros [LOCK DIS].
+
+    
+
+    
+    destruct decide.
+    2: { split; [tauto| ].
+         simpl. destruct δ_empty as [δe EMPTY]. simpl. intros ->.
+         edestruct unused_has_lock_incompat; [| apply LOCK]. apply i. 
+    
     destruct build_ls_ext_sig.
-    2: { split.
+    2: { simpl. 
+      split.
          - intros (?&?&?&?).
            apply allows_unlock_impl_spec in H2 as (?&?&?); [| admit].  
            destruct n. exists δ'. repeat split; eauto.
