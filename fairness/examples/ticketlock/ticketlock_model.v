@@ -89,7 +89,7 @@ Section Model.
   Qed.  
 
   (* Let advance_next (o t: nat) rm :=  *)
-  Let advance_next: tl_st' -> tl_st' :=
+  Definition advance_next: tl_st' -> tl_st' :=
         fun '(o, t, rm) =>
         match role_of_dec rm (tl_U o, true) with
         | inl (exist _ r _) => 

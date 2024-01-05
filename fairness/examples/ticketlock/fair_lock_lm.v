@@ -43,22 +43,31 @@ Section FairLockLM.
      we suppose that every group contains up to one role, 
      and this role uniquely corresponds to that group.
      Therefore, LM here only provides stuttering steps. *)
-  Inductive G := | asG (r: R).
+  Inductive FlG := | asG (r: R).
+  Let G := FlG. 
 
-  Instance G_eqdec: EqDecision G.
+  Global Instance G_eqdec: EqDecision G.
   solve_decision.
   Qed.
 
-  Instance G_cnt: Countable G.
+  Global Instance G_cnt: Countable G.
   eapply inj_countable' with (f := fun '(asG ρ) => ρ) (g := asG).
   by intros []. 
-  Qed.  
+  Qed.
+
+  Global Instance G_inh: Inhabited G.
+  pose proof (fmrole_inhabited M) as [ρ]. 
+  apply (populate (asG ρ)).
+  Qed. 
 
   Context `(LM: LiveModel G M LSI). 
   Context (LF: LMFairPre LM).
   Context {LSI_DEC: forall s tm f, Decision (LSI s tm f)}.
-  Context {MAP_RESTR: forall (δ: lm_ls LM) ρ g,
-                 ls_mapping δ !! ρ = Some g -> g = asG ρ}.
+
+  Definition ls_map_restr (rm: @roles_map G M) := forall ρ g,
+      rm !! ρ = Some g -> g = asG ρ. 
+
+  Context {MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ)}.
   (* Context {ALLOWS_RENEW: forall (δ: lm_ls LM) ρ, *)
   (*                 ls_tmap δ !! (asG ρ) = Some ∅ -> *)
   (*                 forall a fm, In a [allow_unlock_impl; allow_lock_impl] ->                            *)
@@ -256,14 +265,14 @@ Section FairLockLM.
     destruct ι as [[ρ'] | [ρ']]; simpl in REL; destruct REL as (TM1 & TM2 & FM & ST).
     - assert (ρ ≠ ρ') as NEQ.
       { apply ls_mapping_tmap_corr in MAP as (Rg & TM & IN).
-        intros ->. set_solver. }
+        intros ->. rewrite TM in TM1. set_solver. }
       split.
       2: { rewrite FM. rewrite lookup_insert_ne; eauto. }
       apply ls_mapping_tmap_corr. rewrite TM2 lookup_insert_ne; [| congruence].
       apply ls_mapping_tmap_corr. eauto.
     - assert (ρ ≠ ρ') as NEQ.
       { apply ls_mapping_tmap_corr in MAP as (Rg & TM & IN).
-        intros ->. set_solver. }
+        intros ->. rewrite TM1 in TM. set_solver. }
       split.
       2: { rewrite FM. rewrite lookup_insert_ne; eauto. }
       apply ls_mapping_tmap_corr. rewrite TM2 lookup_insert_ne; [| congruence].
@@ -454,7 +463,7 @@ Section FairLockLM.
            }
            split. 
            { intros [? MAP]%elem_of_dom. apply n. rewrite MAP.
-             apply MAP_RESTR in MAP. congruence. }
+             apply MAP_RESTR in MAP. subst. done. }
            intros. assert (k = 0) as -> by lia.
            erewrite state_lookup_after in H0; eauto.
            rewrite Nat.add_0_r ITH in H0. inversion H0. subst.
@@ -515,8 +524,8 @@ Section FairLockLM.
             left. intros (?& MAP)%elem_of_dom.
             assert (x = asG ρ') as ->.
             { by apply MAP_RESTR in MAP. }
-            eapply ls_mapping_tmap_corr in MAP as (?&?&?). 
-            set_solver. }
+            eapply ls_mapping_tmap_corr in MAP as (?&?&?).
+            rewrite NOρ in H0. set_solver. }
       }
       
       clear HAS_LOCK DIS.
@@ -762,7 +771,8 @@ Section FairLockLM.
          apply elem_of_dom in IN as [? MAP].
          pose proof MAP as ->%MAP_RESTR.
          apply proj1 in DIS.
-         apply ls_mapping_tmap_corr in MAP as (?&?&?). set_solver. }
+         apply ls_mapping_tmap_corr in MAP as (?&?&?).
+         rewrite DIS in H. set_solver. }
         
         unfold_LMF_trans STEP0.
         2: { simpl in STEP1. pose proof STEP1 as SS. repeat apply proj2 in STEP1.
@@ -782,7 +792,7 @@ Section FairLockLM.
           apply proj1 in DIS.
           simpl in STEP1. apply proj2, proj1 in STEP1.
           pose proof STEP1 as (?&?&?)%ls_mapping_tmap_corr.
-          set_solver. }
+          by apply MAP_RESTR in STEP1. }
         intros [??]. repeat split; eauto.
         simpl in STEP1.
         apply unmapped_empty.
