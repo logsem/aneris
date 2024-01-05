@@ -1425,6 +1425,9 @@ Section Model.
       - simpl. rewrite /is_unused /active_st.
         intros *. rewrite not_elem_of_dom.
         intros X [? Y]. by rewrite X in Y.
+      - simpl. rewrite /is_unused /active_st.
+        intros *. rewrite not_elem_of_dom.
+        intros X [? Y]. by rewrite X in Y.
       - simpl. intros * DIS EN%active_st_enabled.
         edestruct active_disabled_incompat; eauto. 
       - simpl. intros. eapply has_lock_unique; eauto.
@@ -1435,7 +1438,7 @@ Section Model.
         destruct tl_st1 as [o1 t1 rm1 wf1], tl_st2 as [o2 t2 rm2 wf2]. 
         inversion AU; subst; repeat split. 
         + red. rewrite LOCK. eauto.
-        + rewrite /active_st. rewrite LOCK. set_solver.
+        + rewrite /disabled_st. rewrite LOCK. set_solver.
         + red. simpl. rewrite lookup_insert. eauto.
         + red. simpl. rewrite lookup_insert. eauto.
       - red. intros.

@@ -300,12 +300,14 @@ Proof.
     Unshelve.
     + exact client_model. 
     + red. intros ? [??].
-      erewrite <- mapped_roles_dom_fuels_gen.
-      2: { apply rrm_tmap_fuel_same_doms. }
+      eapply elem_of_proper; [reflexivity| ..].
+      { symmetry. apply leibniz_equiv_iff.
+        apply mapped_roles_dom_fuels_gen. 
+        apply rrm_tmap_fuel_same_doms. }
       pose proof (ls_inv δ2) as LSI2. red in LSI2. 
       specialize (LSI2 _ ltac:(eauto)).
       by rewrite -mapped_roles_dom_fuels in LSI2. 
-Defined. 
+Defined.
  
 
 Local Instance client_LF: LMFairPre client_model.

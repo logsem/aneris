@@ -578,7 +578,7 @@ Section ClientDefs.
     - split; [done| ]. 
 
       eapply step_keeps_lock_dis.
-      { split; try by apply PREρlg.}
+      { split; try by apply PREρlg. }
       2: { left. eauto. }
       simpl. 
       rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.

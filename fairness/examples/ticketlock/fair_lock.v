@@ -151,40 +151,23 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
   allows_unlock_impl_spec ρ st
     :
     forall st', allows_unlock ρ st st' <->
-             (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ 
-                                                (* ¬ role_enabled_model ρ st *)
-                                                disabled_st ρ st
-));
+             (allow_unlock_impl ρ st = st' /\ 
+                has_lock_st ρ st /\ disabled_st ρ st
+             );
   allows_lock_impl_spec ρ st:
     forall st', allows_lock ρ st st' <->
-             (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ 
-                                              (* ¬ role_enabled_model ρ st *)
-                                              disabled_st ρ st
-             ));
+             (allow_lock_impl ρ st = st' /\ 
+                can_lock_st ρ st /\ disabled_st ρ st);
     
-  (* model_step_keeps_others_preds: forall st1 ρ st2 ρ', *)
-  (*   fmtrans M st1 (Some ρ) st2 -> ρ' ≠ ρ -> *)
-  (*   forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1; *)
-      
-  (* ext_step_keeps_others_preds: forall st1 ρ st2 ρ' mkEI, *)
-  (*     mkEI ∈ [flU; flL] -> @ETs _ (FL_EM FLE) (mkEI ρ) st1 st2 -> ρ' ≠ ρ -> *)
-  (*     forall P, P ∈ [has_lock_st ρ'; can_lock_st ρ'; active_st ρ'] -> P st2 <-> P st1; *)
   step_keeps_lock_dis: forall (ρ: fmrole M),
       label_kept_state
-        (fun st =>
-                  has_lock_st ρ st /\ 
-                    (* ¬ role_enabled_model ρ st *)
-                    disabled_st ρ st
-        )
+        (fun st => has_lock_st ρ st /\ disabled_st ρ st)
         (other_proj ρ (FLE := FLE))
         (M := @ext_model_FM _ (FL_EM FLE));
 
   step_keeps_unused: forall (ρ: fmrole M),
       label_kept_state
-        (fun st =>
-           (* @state_wf _ FLP st /\ *)
-           is_unused ρ st)
-        (* (other_proj ρ (FLE := FLE)) *)
+        (fun st => is_unused ρ st)
         (fun _ => True)
         (M := @ext_model_FM _ (FL_EM FLE));
   unused_can_lock_incompat: forall tl_st ρlg,
@@ -217,7 +200,7 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
   (* TODO: introduce more uniform treatment of ETs pre- and postconditions *)
   allows_unlock_spec: forall tl_st1 ρlg tl_st2,
     allows_unlock ρlg tl_st1 tl_st2 ->
-    has_lock_st ρlg tl_st1 /\ ¬ active_st ρlg tl_st1 /\
+    has_lock_st ρlg tl_st1 /\ disabled_st ρlg tl_st1 /\
     has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2;
 
   lock_progress: @fair_lock_progress _ FLP (FL_EM FLE);
