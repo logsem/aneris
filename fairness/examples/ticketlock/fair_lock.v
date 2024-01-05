@@ -62,11 +62,11 @@ Section FairLock.
   Qed.
       
 
-  Definition fair_lock_progress :=
+  Definition fair_lock_progress (fair: mtrace EFM -> Prop) :=
     forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
       (VALID: mtrace_valid tr)
-      (* (FROM_INIT: forall st0, tr S!! 0 = Some st0 -> @state_wf _ FL st0) *)
-      (FAIR: inner_fair_ext_model_trace tr)
+      (* (FAIR: inner_fair_ext_model_trace tr) *)
+      (FAIR: fair tr)
       (ITH: tr S!! i = Some st)
       (CAN_LOCK: can_lock_st ρ st)
       (ACT: active_st ρ st)
@@ -144,8 +144,9 @@ Definition other_proj `{FLE: FairLockExt M} (ρ: fmrole M):
            | None => True
            end. 
 
-
-Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) := {
+Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M)
+               (fair: emtrace (EM := (@FL_EM _ FLE)) -> Prop)
+ := {
   allow_unlock_impl: fmrole M -> fmstate M -> fmstate M;
   allow_lock_impl: fmrole M -> fmstate M -> fmstate M;
   allows_unlock_impl_spec ρ st
@@ -203,7 +204,7 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M) :
     has_lock_st ρlg tl_st1 /\ disabled_st ρlg tl_st1 /\
     has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2;
 
-  lock_progress: @fair_lock_progress _ FLP (FL_EM FLE);
+  lock_progress: @fair_lock_progress _ FLP (FL_EM FLE) fair;
 }.
 
 

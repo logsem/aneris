@@ -69,9 +69,12 @@ Section ClientDefs.
   Definition TlLM_LFP := TlLM_LFP' _ lib_gs_ne.
   Definition TlLM_FM := LM_Fair (LF := TlLM_LFP).
 
-  Context `(TlEM_FL: @FairLock TlLM_FM tl_FLP tl_FLE).
-  Definition TlEM := FL_EM tl_FLE.
+  Context {tl_FLE: FairLockExt TlLM_FM}. 
+  Let TlEM := FL_EM tl_FLE.
   Context (TlEM_EXT_KEEPS: ext_keeps_asg (ELM := TlEM)).
+
+  Context {tl_FLP : FairLockPredicates TlLM_FM}. 
+  Context (TlEM_FL: @FairLock TlLM_FM tl_FLP tl_FLE (fun tr => forall g, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g tr)).
 
   Context (Mtl_EM: ExtModel Mtl). 
   Context {proj_ext : @EI _ TlEM → @EI _ Mtl_EM}. 
@@ -239,17 +242,27 @@ Section ClientDefs.
       { eexists. eauto. }
       + right. eauto.
       + by left.
-    (* - apply elem_of_cons. tauto. *)
     - apply elem_of_list_further, elem_of_app. right.
-      apply elem_of_app. left. rewrite lib_gs_ρlg. 
+      apply elem_of_app. left.      
+      (* rewrite lib_gs_ρlg.  *) (* TODO: why does it break now? *)
+      eapply elem_of_proper; [reflexivity| ..].
+      { f_equiv. rewrite lib_gs_ρlg. reflexivity. }
       apply elem_of_list_fmap. eexists. split; eauto.
       apply elem_of_elements. set_solver.
     - apply elem_of_list_further, elem_of_app. right.
-      apply elem_of_app. left. rewrite lib_gs_ρlg.
+      apply elem_of_app. left.
+      (* rewrite lib_gs_ρlg. *)
+      eapply elem_of_proper; [reflexivity| ..].
+      { f_equiv. rewrite lib_gs_ρlg. reflexivity. }
+
       apply elem_of_list_fmap. eexists. split; eauto.
       apply elem_of_elements. set_solver.
     - apply elem_of_list_further, elem_of_app. right.
-      apply elem_of_app. right. rewrite lib_gs_ρlg.
+      apply elem_of_app. right.
+      (* rewrite lib_gs_ρlg. *)
+      eapply elem_of_proper; [reflexivity| ..].
+      { f_equiv. rewrite lib_gs_ρlg. reflexivity. }
+
       apply elem_of_list_fmap. eexists. split; eauto.
       apply elem_of_elements. set_solver.
   Qed. 
@@ -621,10 +634,11 @@ Section ClientDefs.
                           (TlLM' lib_gs)) =>
              @eq tl_state (@fst tl_state flag_state c) δ_lib) str
             (project_tl_trace str)):
-  inner_fair_ext_model_trace (project_tl_trace str).
+  (* inner_fair_ext_model_trace (project_tl_trace str). *)
+    ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace str). 
   Proof.
     forward eapply outer_exposing_subtrace; eauto.
-    intros [? EXP'].       
+    intros [? EXP'].
     assert (∀ ρ, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str)) as TL_FAIR'.
     { eapply inner_LM_trace_fair_aux_group.
       - apply _.
@@ -634,33 +648,34 @@ Section ClientDefs.
         by apply EXP'.
       - by apply EXP'.
       - by apply MATCH. }
-    red. red. intros ? [g ->]. simpl in g.
-    red. red. intros n ENg. simpl in ENg.
+    done. 
+    (* red. red. intros ? [g ->]. simpl in g. *)
+    (* red. red. intros n ENg. simpl in ENg. *)
     
-    apply pred_at_trace_lookup in ENg as (?&NTH&ENg).
-    red in ENg. simpl in ENg. rewrite /ext_live_roles in ENg.
-    apply elem_of_union in ENg as [ENg | ?].
-    2: { set_solver. }
-    apply elem_of_map in ENg as (?&[=<-]&ENg).
+    (* apply pred_at_trace_lookup in ENg as (?&NTH&ENg). *)
+    (* red in ENg. simpl in ENg. rewrite /ext_live_roles in ENg. *)
+    (* apply elem_of_union in ENg as [ENg | ?]. *)
+    (* 2: { set_solver. } *)
+    (* apply elem_of_map in ENg as (?&[=<-]&ENg). *)
     
-    specialize (TL_FAIR' g). do 2 red in TL_FAIR'.
-    specialize (TL_FAIR' n). specialize_full TL_FAIR'.
-    { apply pred_at_trace_lookup. eexists. split; eauto.
-      apply LM_live_roles_strong in ENg as [? STEP].
-      eapply locale_trans_ex_role; eauto. }
-    destruct TL_FAIR' as [m FAIR']. exists m.
-    eapply pred_at_impl; [| apply FAIR'].
-    intros.
-    red in H0. red. destruct H0.
-    2: { right. simpl. destruct H0 as (er & -> & <-).
-         eexists. split; eauto. done. }
-    left. intros EN. apply H0.
-    red in EN. simpl in EN. rewrite /ext_live_roles in EN.
-    apply elem_of_union in EN as [EN | ?].
-    2: { set_solver. }
-    apply elem_of_map in EN as (?&[=<-]&EN).
-    apply LM_live_roles_strong in EN as [? STEP].
-    eapply locale_trans_ex_role; eauto.  
+    (* specialize (TL_FAIR' g). do 2 red in TL_FAIR'. *)
+    (* specialize (TL_FAIR' n). specialize_full TL_FAIR'. *)
+    (* { apply pred_at_trace_lookup. eexists. split; eauto. *)
+    (*   apply LM_live_roles_strong in ENg as [? STEP]. *)
+    (*   eapply locale_trans_ex_role; eauto. } *)
+    (* destruct TL_FAIR' as [m FAIR']. exists m. *)
+    (* eapply pred_at_impl; [| apply FAIR']. *)
+    (* intros. *)
+    (* red in H0. red. destruct H0. *)
+    (* 2: { right. simpl. destruct H0 as (er & -> & <-). *)
+    (*      eexists. split; eauto. done. } *)
+    (* left. intros EN. apply H0. *)
+    (* red in EN. simpl in EN. rewrite /ext_live_roles in EN. *)
+    (* apply elem_of_union in EN as [EN | ?]. *)
+    (* 2: { set_solver. } *)
+    (* apply elem_of_map in EN as (?&[=<-]&EN). *)
+    (* apply LM_live_roles_strong in EN as [? STEP]. *)
+    (* eapply locale_trans_ex_role; eauto.   *)
   Qed.
     
 

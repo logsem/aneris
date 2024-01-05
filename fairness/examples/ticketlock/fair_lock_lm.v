@@ -36,7 +36,7 @@ Qed.
 
 Section FairLockLM.
   
-  Context `(FL: @FairLock M FLP FLE).
+  Context `(FL: @FairLock M FLP FLE inner_fair_ext_model_trace).
 
   Let R := fmrole M.
   (* For the lock model (and others that also don't fork),
@@ -608,20 +608,16 @@ Section FairLockLM.
   Qed. 
 
   Lemma FL_LM_progress:
-    @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF).
+    @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
   Proof.
     red. intros lmtr [ρ] i δ **.
-    clear FAIR. 
-    assert (∀ g: G,
-               fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr) as FAIR. 
-    { admit. (* parametrize FairLock with the desired notion of fairness *) }
     pose proof (group_fairness_implies_role_fairness _ _ VALID FAIR) as FAIR'.
     pose proof (can_destutter_eauxtr proj_ext _ VALID) as [mtr UPTO].
     forward eapply destutter_ext.upto_preserves_validity as VALIDm; eauto. 
     { apply PROJ_KEEP_EXT. }
     forward eapply destutter_ext.upto_stutter_fairness as FAIRm; eauto.
     { eapply ELM_ALM_afair_by_next; eauto. }
-    pose proof (@lock_progress _ _ _ FL) as PROGRESSm.    
+    pose proof (@lock_progress _ _ _ _ FL) as PROGRESSm.    
     red in PROGRESSm.
 
     forward eapply upto_state_lookup_unfold2 as (lmtr_i & i' & mtr_i' & AFTERi & AFTERi' & UPTOi & ITH'); eauto. 
@@ -731,7 +727,7 @@ Section FairLockLM.
         apply next_TS_spec_pos in STEP.
         eapply disabled_not_live in DISp. destruct DISp.
         eapply fm_live_spec. apply STEP.
-  Admitted. 
+  Qed.
 
   (* TODO: is it possible to avoid delegating this to user? *)
   Context {allow_unlock_impl: G -> lm_ls LM -> lm_ls LM}.
@@ -847,7 +843,7 @@ Section FairLockLM.
       by apply UNUSED_NOT_DOM.
   Qed. 
 
-  Instance FL_LM: FairLock LMF FLP_LMF FLE_LMF.
+  Instance FL_LM: FairLock LMF FLP_LMF FLE_LMF (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr).
   refine {| 
       fair_lock.allow_unlock_impl := allow_unlock_impl;
       fair_lock.allow_lock_impl := allow_lock_impl;

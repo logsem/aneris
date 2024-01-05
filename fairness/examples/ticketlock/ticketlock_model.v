@@ -1395,7 +1395,7 @@ Section Model.
       destruct EN, DIS. congruence.
     Qed. 
       
-    Instance TLFairLock: @FairLock _ tl_FLP tl_FLE. 
+    Instance TLFairLock: @FairLock _ tl_FLP tl_FLE inner_fair_ext_model_trace. 
     Proof.
       econstructor.
       - apply allows_unlock_impl_spec.
