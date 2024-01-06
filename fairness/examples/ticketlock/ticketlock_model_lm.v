@@ -1,4 +1,5 @@
-From trillium.fairness Require Import fuel. 
+From iris.proofmode Require Import tactics.
+From trillium.fairness Require Import fuel lm_fair. 
 From trillium.fairness.examples.ticketlock Require Import fair_lock ticketlock_model fair_lock_lm. 
 
 Section TlLM.
@@ -97,7 +98,105 @@ Section TlLM.
         2: set_solver.
         destruct L as (?&?&[=]). by subst.
       + rewrite dom_set_to_map_gset_gmap. set_solver.
-  Qed. 
+  Qed.
+
+  Let encode_rs := fun rs => match rs with | tl_U k => S k | _ => 0 end. 
+
+  Instance tl_role_stage_Cnt: Countable tl_role_stage. 
+  Proof using.
+    eapply inj_countable' with
+      (f := encode_rs)
+      (g := fun i => match i with | 0 => tl_L | S i => tl_U i end).
+    by intros [].
+  Qed.
+
+  (* Let foo (rm: gmap nat (tl_role_stage * bool)): gset (tl_role_stage * bool) := map_img rm.  *)
+
+  Instance tl_state_wf_dec:
+    forall st', Decision (tl_state_wf st').
+  Proof.
+    intros [[o t] rm]. rewrite /tl_state_wf.    
+    repeat apply and_dec; try solve_decision.
+    - set tks := (set_map (encode_rs ∘ fst) (map_img rm: gset (tl_role_stage * bool)): gset nat).
+      eapply Decision_iff_impl with (P := tks ∖ {[ 0 ]} = set_seq (S o) (t - o)).
+      2: solve_decision.
+      subst tks. rewrite set_eq. 
+      setoid_rewrite elem_of_difference. setoid_rewrite not_elem_of_singleton. 
+      setoid_rewrite elem_of_map. setoid_rewrite elem_of_map_img. setoid_rewrite elem_of_set_seq.
+      split.
+      + intros DOM k. specialize (DOM (S k)). split. 
+        * intros KK. apply proj2 in DOM. specialize_full DOM; [lia| ].
+          destruct DOM as [([rs ?]&ENC&[??]) ?].
+          simpl in ENC. destruct rs; simpl in ENC; [lia| ].
+          inversion ENC. subst. eauto.
+        * intros (?&?&RR). apply proj1 in DOM. specialize_full DOM.
+          { split; [| done]. eexists. split; eauto. done. }
+          lia.
+      + intros DOM k. specialize (DOM (k - 1)). split.
+        * intros [([rs ?]&->&[??]) ?]. destruct rs; simpl in *; [done| ].
+          apply proj2 in DOM. specialize_full DOM.
+          { rewrite PeanoNat.Nat.sub_0_r. eauto. }
+          lia.
+        * intros LT. destruct k; [lia| ].
+          apply proj1 in DOM. specialize (DOM ltac:(lia)) as (?&?&?).
+          split; [| lia]. eexists. split; eauto.
+          simpl. lia.
+    - eapply Decision_iff_impl with
+        (P := map_Forall (fun ρ '(rs, e) => e = false -> match rs with | tl_U k => k = o | tl_L => True end) rm).
+      2: { apply map_Forall_dec. intros ? [rs ?].
+           apply impl_dec; [solve_decision| ].
+           destruct rs; solve_decision. }
+      rewrite map_Forall_lookup.
+      apply forall_proper. intros ρ.
+      destruct (rm !! ρ) as [[rs e] |] eqn:RR.
+      2: { set_solver. }
+      split.
+      * intros O ? [=]; subst.
+        specialize_full O; [reflexivity| ]. 
+        simpl in O. lia.
+      * intros O [??] [=] ->; subst.
+        destruct t0; [done| ]. 
+        specialize_full O; [reflexivity| ].
+        done.
+    - 
+          
+        
+
+  Lemma tl_model_impl_step_fin (s1 : tl_st):
+    {nexts: list tl_st | forall s2 oρ, tl_trans s1 oρ s2 -> s2 ∈ nexts}.
+  Proof.
+    destruct s1 as [o t rm wf] eqn:S.
+    set nexts' :=
+      o' ← [o; o + 1];
+      t' ← [t; t + 1];
+      ρ' ← elements (dom rm);
+      s' ← [tl_U t; tl_L];
+      e' ← [true; false];
+      let rm' := <[ ρ' := (s', e') ]> rm in
+      tl_state_wf
+      mret (o', t', rm'). 
+    set nexts := s :: 
+
+  Instance tl_lm_dec_ex_step:
+    ∀ τ δ1, Decision (∃ δ2, locale_trans δ1 τ δ2 (LM := tl_model)).
+  Proof. 
+    intros.
+    pose proof (client_model_step_fin (ls_under δ1)) as [nexts NEXTS]. 
+    apply locale_trans_ex_dec_fin with (steps := nexts).
+    { intros. apply elem_of_list_In. eauto. }
+    intros. eexists. eapply rearrange_roles_spec.
+    Unshelve.
+    + exact client_model. 
+    + red. intros ? [??].
+      pose proof (mapped_roles_dom_fuels_gen (rearrange_roles_map (ls_tmap δ2) (dom (ls_tmap δ0)) τ0) ((ls_fuel δ2))) as R.             
+      erewrite <- (proj1 R).
+      2: { apply rrm_tmap_fuel_same_doms. }
+      pose proof (ls_inv δ2) as LSI2. red in LSI2. 
+      specialize (LSI2 _ ltac:(eauto)).
+      by rewrite -mapped_roles_dom_fuels in LSI2. 
+  Qed.
+    
+
         
   Instance TlLF: lm_fair.LMFairPre tl_model.
   esplit; try by apply _.
