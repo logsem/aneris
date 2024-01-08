@@ -110,7 +110,40 @@ Section TlLM.
     by intros [].
   Qed.
 
-  (* Let foo (rm: gmap nat (tl_role_stage * bool)): gset (tl_role_stage * bool) := map_img rm.  *)
+  (* (* TODO: move *) *)
+  Lemma Forall_dec': ∀ {A : Type} (P : A → Prop) (l: list A)
+                       `{EqDecision A},
+    (∀ x, x ∈ l -> Decision (P x)) → Decision (Forall P l).
+  Proof.
+    intros.
+    eapply Decision_iff_impl; [symmetry; apply Forall_lookup| ].
+    eapply Decision_iff_impl with
+      (P := ∀ i x, l !! i = Some x → x ∈ l -> P x).
+    { setoid_rewrite elem_of_list_lookup. set_solver. }
+    eapply Decision_iff_impl; [apply Forall_lookup| ].
+    apply Forall_dec. intros.
+    destruct (decide (x ∈ l)).
+    2: { left. tauto. }
+    specialize (X _ e). solve_decision.
+  Qed.
+
+  (* (* TODO: move *) *)
+  (* Lemma remove_is_Some: ∀ [A : Type] (eq_dec : ∀ x y : A, {x = y} + {x ≠ y}) *)
+  (*                    (l : list A) (d : A) x, *)
+  (*     (remove d l) !! i = Some x <-> l !! *)
+
+  (* Lemma bool_forall_helper {P: bool -> Prop}: *)
+  (*   (forall b: bool, (P b) -> b) <->  *)
+
+  (* TODO: move *)
+  Lemma forall_prod_helper' {A B: Type} (P: A * B -> Prop):
+    (forall ab, P ab) <-> (forall a b, P (a, b)). 
+  Proof.
+    split; [by eauto|].
+    intros PP [??]. eauto. 
+  Qed.
+  
+
 
   Instance tl_state_wf_dec:
     forall st', Decision (tl_state_wf st').
@@ -158,8 +191,30 @@ Section TlLM.
         destruct t0; [done| ]. 
         specialize_full O; [reflexivity| ].
         done.
-    - 
-          
+    - set check := fun '(ρ1, ρ2) =>
+                     let r1 := fst $ default (tl_L, false) (rm !! ρ1) in
+                     let r2 := fst $ default (tl_L, false) (rm !! ρ2) in
+                     r1 ≠ r2 \/ (r1 = r2 /\ (r1 = tl_L  \/ ρ1 = ρ2)). 
+      set pairs := ρ1 ← elements (dom rm); ρ2 ← elements (dom rm); mret (ρ1, ρ2). 
+      apply Decision_iff_impl with (P := Forall check pairs).
+      2: { solve_decision. }
+      rewrite Forall_forall. subst pairs.   
+      repeat setoid_rewrite elem_of_list_bind.
+      setoid_rewrite elem_of_list_ret. simpl.
+      rewrite forall_prod_helper'.
+      apply forall_proper. intros ρ1. apply forall_proper. intros ρ2. 
+      rewrite ex_det_iff.
+      2: { intros ? [(?&[=]&?) ?]. subst. reflexivity. } 
+      rewrite ex_det_iff.
+      2: { intros ? [[=] ?]. subst. reflexivity. }
+      rewrite !elem_of_elements !elem_of_dom.
+      destruct (rm !! ρ1) as [[rs1 ?]| ] eqn:R1, (rm !! ρ2) as [[rs2 ?]| ] eqn:R2; simpl.
+      2-4: rewrite -!not_eq_None_Some; set_solver.
+      rewrite !R1 !R2. simpl.
+      destruct (decide (rs1 = rs2)).
+      2: { set_solver. }
+      subst. destruct rs2; simpl; set_solver. 
+  Qed.          
         
 
   Lemma tl_model_impl_step_fin (s1 : tl_st):
