@@ -22,6 +22,16 @@ Section TlLM.
   Definition tl_model: LiveModel G M LSI_Tl :=
     {| lm_fl _ := tl_fl; |}.
 
+  Lemma dom_tmap_tl_fixed (δ: lm_ls tl_model):
+    dom (ls_tmap δ) = gs.
+  Proof. apply δ. Qed. 
+
+  Lemma tl_ls_map_restr (δ: lm_ls tl_model): ls_map_restr (ls_mapping δ).
+  Proof.
+    red. intros ? [] (?&TM&?)%ls_mapping_tmap_corr.
+    apply (ls_inv δ) in TM. set_solver.
+  Qed. 
+
   Instance tl_step_dec s1 ρ s2: Decision (fmtrans M s1 (Some ρ) s2).
   Proof.
     Local Ltac nostep := right; intros S; inversion S; subst; set_solver.
@@ -289,28 +299,41 @@ Section TlLM.
     pose proof (tl_model_impl_step_fin (ls_under δ1)) as [nexts NEXTS]. 
     apply locale_trans_ex_dec_fin with (steps := nexts).
     { intros. apply elem_of_list_In. eauto. }
-    intros. eexists. eapply rearrange_roles_spec.
+    intros ??? STEP. eexists. eapply rearrange_roles_spec.
     Unshelve.
     + exact tl_model. 
     + red.
       split.
-      { rewrite /rearrange_roles_map.  
-      intros ? [??].
-      pose proof (mapped_roles_dom_fuels_gen (rearrange_roles_map (ls_tmap δ2) (dom (ls_tmap δ0)) τ0) ((ls_fuel δ2))) as R.             
-      erewrite <- (proj1 R).
-      2: { apply rrm_tmap_fuel_same_doms. }
+      { rewrite map_Forall_lookup. intros [ρ] Rρ TM.
+        apply elem_of_subseteq. intros ρ' IN.
+        apply elem_of_singleton.
+        (* rewrite /rearrange_roles_map in TM.  *)
 
-      pose proof (ls_inv δ2) as LSI2. red in LSI2. 
-      specialize (LSI2 _ ltac:(eauto)).
-      by rewrite -mapped_roles_dom_fuels in LSI2. 
-  Qed.
-    
-
+        forward eapply ls_mapping_tmap_corr_impl as MIM. 
+        { eapply (rrm_tmap_disj (ls_tmap δ2) (dom (ls_tmap δ0)) τ0). apply δ2. }
         
+        specialize (MIM ρ' (asG ρ)). apply proj2 in MIM. specialize_full MIM; [eauto| ].
+        rewrite rrm_mapping in MIM; [| apply δ2].
+        rewrite lookup_fmap in MIM.
+        destruct (ls_mapping_impl (ls_tmap δ2) !! ρ') eqn:MAP; [| done].
+        simpl in MIM. rewrite decide_True in MIM.
+        2: { rewrite dom_tmap_tl_fixed -(dom_tmap_tl_fixed δ2).
+             apply ls_mapping_tmap_corr in MAP as (?&?&?). 
+             eapply elem_of_dom; eauto. }
+        inversion MIM. subst.
+        apply tl_ls_map_restr in MAP. congruence. }
+      rewrite /rearrange_roles_map.
+      rewrite dom_insert_L.
+      erewrite dom_domain_restrict_union_l.
+      2: { rewrite subseteq_union_1; [reflexivity| ].
+           by rewrite !dom_tmap_tl_fixed. }
+      rewrite dom_tmap_tl_fixed.
+      apply locale_trans_dom in STEP. rewrite dom_tmap_tl_fixed in STEP. set_solver.
+  Qed. 
   Instance TlLF: lm_fair.LMFairPre tl_model.
-  esplit; try by apply _.
+  esplit; by apply _.
+  Qed. 
   
-
 End TlLM. 
 
 Section TlFL.
