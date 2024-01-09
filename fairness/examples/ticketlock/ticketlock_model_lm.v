@@ -1,6 +1,7 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fuel lm_fair fairness_finiteness. 
 From trillium.fairness.examples.ticketlock Require Import fair_lock ticketlock_model fair_lock_lm. 
+From stdpp Require Import base.
 
 Section TlLM.
   Let M := tl_fair_model.
@@ -209,7 +210,8 @@ Section TlLM.
       set pairs := ρ1 ← elements (dom rm); ρ2 ← elements (dom rm); mret (ρ1, ρ2). 
       apply Decision_iff_impl with (P := Forall check pairs).
       2: { solve_decision. }
-      rewrite Forall_forall. subst pairs.   
+      rewrite Forall_forall. subst pairs.
+      setoid_rewrite <- elem_of_list_In. 
       repeat setoid_rewrite elem_of_list_bind.
       setoid_rewrite elem_of_list_ret. simpl.
       rewrite forall_prod_helper'.
@@ -330,14 +332,108 @@ Section TlLM.
       rewrite dom_tmap_tl_fixed.
       apply locale_trans_dom in STEP. rewrite dom_tmap_tl_fixed in STEP. set_solver.
   Qed. 
-  Instance TlLF: lm_fair.LMFairPre tl_model.
+
+  Global Instance TlLF: lm_fair.LMFairPre tl_model.
   esplit; by apply _.
   Qed. 
   
+  Section TlFL.
+
+    Let FLP_Tl := @FLP_LMF _ tl_FLP _ _ TlLF. 
+    
+    Local Definition ext_trans_impl
+      (new_st: fmstate M)
+      (g: G) (δ: lm_ls tl_model)
+      (LIVE':
+        let '(asG ρ) := g in
+        live_roles M new_st ⊆ dom (<[ρ:=tl_fl]> (ls_fuel δ)))
+      (TM: ls_tmap δ !! g = Some ∅)
+      : lm_ls tl_model.
+      destruct g as [ρ]. simpl in *.
+      destruct (ls_under δ) as [o t rm wf] eqn:ST. 
+      refine {|
+          ls_under := (new_st: fmstate M);
+          ls_tmap := <[ asG (ρ: fmrole M) := {[ ρ ]} ]> (ls_tmap δ);
+          ls_fuel := <[ ρ := tl_fl ]> (ls_fuel δ);
+        |}.
+      - auto. 
+      - intros ρ'. apply mapped_roles_dom_fuels_gen.
+        rewrite dom_insert_L. rewrite /mapped_roles.
+        rewrite map_img_insert_L. rewrite flatten_gset_union. f_equal.
+        { by rewrite flatten_gset_singleton. }
+        etrans.
+        { eapply mapped_roles_dom_fuels_gen. apply δ. }
+        rewrite /mapped_roles.
+        apply set_eq. clear -TM.  intros ρ'.
+        rewrite !flatten_gset_spec. apply exist_proper. intros. 
+        do 2 rewrite (and_comm _ (ρ' ∈ _)). apply iff_and_pre. intros.
+        rewrite !elem_of_map_img. apply exist_proper. intros [ρ''].
+        rewrite !lookup_delete_Some.
+        symmetry. rewrite and_comm. apply iff_and_impl_helper.
+        intros TM' [=]. subst. rewrite TM in TM'. inversion TM'. set_solver.
+      - red. intros [ρ1] [ρ2] * NEQ. rewrite !lookup_insert_Some.
+        intros [[[=] <-]| [? TM1]] [[[=] <-]| [? TM2]]; subst.
+        + tauto.
+        + apply (ls_inv δ) in TM2. set_solver.
+        + apply (ls_inv δ) in TM1. set_solver.
+        + eapply (ls_tmap_disj δ (asG ρ1) (asG ρ2)); eauto.
+      - red. split.
+        + rewrite map_Forall_lookup. intros [ρ'] Rρ' L.
+          rewrite lookup_insert_Some in L. destruct L as [[[=] <-] | [? TM']].
+          * set_solver. 
+          * by apply (ls_inv δ) in TM'.
+        + rewrite dom_insert_L dom_tmap_tl_fixed.
+          apply mk_is_Some, elem_of_dom in TM. rewrite dom_tmap_tl_fixed in TM. 
+          set_solver. 
+    Defined. 
+        
+    Local Definition allow_unlock_impl (g: G) (δ: lm_ls tl_model): lm_ls tl_model.
+      destruct (decide (@fair_lock.has_lock_st _ FLP_Tl g δ /\
+                        @fair_lock.disabled_st _ FLP_Tl g δ)) as [[LOCK DIS]|].
+      2: exact δ.
+      destruct g as [ρ]. 
+      apply (ext_trans_impl (allow_unlock_impl ρ (ls_under δ): fmstate M) (asG ρ) δ).
+      2: { apply DIS. }
+      destruct LOCK as [DOM LOCK], DIS as (TM & _ & DIS).
+      destruct (ls_under δ) as [o t rm wf] eqn:ST.    
+      rewrite /allow_unlock_impl. simpl.
+      simpl in LOCK, DIS. destruct LOCK as [? LOCK], DIS as [? DIS].
+      rewrite LOCK in DIS. inversion DIS. subst.
+      rewrite ST in LOCK. simpl in LOCK.
+      destruct decide; [| tauto].
+      rewrite /tl_live_roles. simpl.
+      rewrite map_filter_insert. simpl.
+      rewrite !dom_insert.
+      apply union_mono; [done| ].
+      etrans; [| eapply (ls_fuel_dom δ)].
+      rewrite ST. reflexivity.
+    Defined.
+
+    (* TODO: refactor *)
+    Local Definition allow_lock_impl (g: G) (δ: lm_ls tl_model): lm_ls tl_model.
+      destruct (decide (@fair_lock.can_lock_st _ FLP_Tl g δ /\
+                        @fair_lock.disabled_st _ FLP_Tl g δ)) as [[CAN DIS]|].
+      2: exact δ.
+      destruct g as [ρ]. 
+      apply (ext_trans_impl (allow_lock_impl ρ (ls_under δ): fmstate M) (asG ρ) δ).
+      2: { apply DIS. }
+      destruct CAN as [DOM CAN], DIS as (TM & _ & DIS).
+      destruct (ls_under δ) as [o t rm wf] eqn:ST.    
+      rewrite /allow_unlock_impl. simpl.
+      simpl in CAN, DIS. destruct CAN as [? CAN], DIS as [? DIS].
+      rewrite CAN in DIS. inversion DIS. subst.
+      rewrite ST in CAN. simpl in CAN.
+      destruct decide; [| tauto].
+      rewrite /tl_live_roles. simpl.
+      rewrite map_filter_insert. simpl.
+      rewrite !dom_insert.
+      apply union_mono; [done| ].
+      etrans; [| eapply (ls_fuel_dom δ)].
+      rewrite ST. reflexivity.
+    Defined.
+        
+                                            
+  End TlFL. 
+
 End TlLM. 
 
-Section TlFL.
-
-  FL_LM
-
-End TlFL. 
