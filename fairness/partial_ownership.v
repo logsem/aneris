@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness.heap_lang Require Import heap_lang_defs.
+(* From trillium.fairness.heap_lang Require Import heap_lang_defs. *)
 From trillium.fairness Require Import fuel.
 
 Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.

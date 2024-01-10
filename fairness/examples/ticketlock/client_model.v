@@ -616,66 +616,27 @@ Section ClientDefs.
   Qed.
 
 
-  (* TODO: simplify MATCH *)
   Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k
     (OUTER_CORR : client_LM_trace_exposing lmtr tr)
     (LEN1': trace_len_is str NOinfinity)
     (SUB1 : subtrace tr k NOinfinity = Some str)
-    (MATCH : @lm_model_traces_match Gtl EqDecision0 H Mtl
-            (@LSI_groups_fixed Gtl EqDecision0 H Mtl lib_gs) 
-            (TlLM' lib_gs) (option (@ext_role TlLM_FM TlEM))
-            (@ext_trans TlLM_FM TlEM) client_model_impl
-            (option_fmap (@ext_role TlLM_FM TlEM)
-               (sum (@ext_role TlLM_FM TlEM) cl_id)
-               (@inl (@ext_role TlLM_FM TlEM) cl_id))
-            (fun (c : fmstate client_model_impl)
-               (δ_lib : @lm_ls Gtl Mtl EqDecision0 H
-                          (@LSI_groups_fixed Gtl EqDecision0 H Mtl lib_gs)
-                          (TlLM' lib_gs)) =>
-             @eq tl_state (@fst tl_state flag_state c) δ_lib) str
-            (project_tl_trace str)):
-  (* inner_fair_ext_model_trace (project_tl_trace str). *)
+    (MATCH : lm_model_traces_match ((option_fmap ext_role (ext_role + cl_id)%type inl): option ext_role → option (fmrole client_model_impl))
+               (transA := (@ext_trans TlLM_FM TlEM))
+            (λ (c : client_model_impl) (δ_lib : lm_ls (TlLM' lib_gs)), c.1 = δ_lib)
+            str (project_tl_trace str))
+    :
     ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace str). 
   Proof.
     forward eapply outer_exposing_subtrace; eauto.
     intros [? EXP'].
-    assert (∀ ρ, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) ρ (project_tl_trace str)) as TL_FAIR'.
-    { eapply inner_LM_trace_fair_aux_group.
-      - apply _.
-      - done.
-      - by apply EXP'. 
-      - simpl. intros ?? [=<-].
-        by apply EXP'.
-      - by apply EXP'.
-      - by apply MATCH. }
-    done. 
-    (* red. red. intros ? [g ->]. simpl in g. *)
-    (* red. red. intros n ENg. simpl in ENg. *)
-    
-    (* apply pred_at_trace_lookup in ENg as (?&NTH&ENg). *)
-    (* red in ENg. simpl in ENg. rewrite /ext_live_roles in ENg. *)
-    (* apply elem_of_union in ENg as [ENg | ?]. *)
-    (* 2: { set_solver. } *)
-    (* apply elem_of_map in ENg as (?&[=<-]&ENg). *)
-    
-    (* specialize (TL_FAIR' g). do 2 red in TL_FAIR'. *)
-    (* specialize (TL_FAIR' n). specialize_full TL_FAIR'. *)
-    (* { apply pred_at_trace_lookup. eexists. split; eauto. *)
-    (*   apply LM_live_roles_strong in ENg as [? STEP]. *)
-    (*   eapply locale_trans_ex_role; eauto. } *)
-    (* destruct TL_FAIR' as [m FAIR']. exists m. *)
-    (* eapply pred_at_impl; [| apply FAIR']. *)
-    (* intros. *)
-    (* red in H0. red. destruct H0. *)
-    (* 2: { right. simpl. destruct H0 as (er & -> & <-). *)
-    (*      eexists. split; eauto. done. } *)
-    (* left. intros EN. apply H0. *)
-    (* red in EN. simpl in EN. rewrite /ext_live_roles in EN. *)
-    (* apply elem_of_union in EN as [EN | ?]. *)
-    (* 2: { set_solver. } *)
-    (* apply elem_of_map in EN as (?&[=<-]&EN). *)
-    (* apply LM_live_roles_strong in EN as [? STEP]. *)
-    (* eapply locale_trans_ex_role; eauto.   *)
+    eapply inner_LM_trace_fair_aux_group.
+    - apply _.
+    - done.
+    - by apply EXP'. 
+    - simpl. intros ?? [=<-].
+      by apply EXP'.
+    - by apply EXP'.
+    - by apply MATCH.
   Qed.
     
 
