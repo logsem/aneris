@@ -742,9 +742,9 @@ Section FairLockLM.
   Context {allow_unlock_impl: G -> lm_ls LM -> lm_ls LM}.
   Hypothesis (allows_unlock_impl_spec: forall g δ δ', allows_unlock g δ δ' <->
              (allow_unlock_impl g δ = δ' /\ (has_lock_st g δ /\ disabled_st g δ))).
-  Hypothesis (allow_unlock_post: forall g δ δ', 
+  Hypothesis (allow_unlock_post: forall g δ, 
                  has_lock_st g δ /\ disabled_st g δ ->
-                 let δ' := allow_unlock_impl g δ' in
+                 let δ' := allow_unlock_impl g δ in
                  has_lock_st g δ' /\ active_st g δ'). 
 
   Context {allow_lock_impl: G -> lm_ls LM -> lm_ls LM}.
