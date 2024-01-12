@@ -61,8 +61,57 @@ Section FairLock.
     - right. intros (? & ? & ? & ?). congruence.
   Qed.
       
+  (* Lemma ev_rel_after tr ρ i atr *)
+  (*   (AFTER: after i tr = Some atr) *)
+  (*   (EV_REL: eventual_release atr ρ 0): *)
+  (*   eventual_release tr ρ i. *)
+  (* Proof. *)
+  (*   red. intros ρ' k **. red in EV_REL. *)
+  (*   specialize_full EV_REL. *)
+  (*   { erewrite state_lookup_after; eauto. } *)
+  (*   all: eauto. *)
+  (*   { intros LE. specialize_full AFTER0; [lia| ]. destruct AFTER0 as [? RESTR]. *)
+  (*     split; auto. *)
+  (*     intros. destruct BETWEEN as [[d ->]%Nat.le_sum LE2]. *)
+  (*     eapply RESTR. *)
+  (*     2: { erewrite state_lookup_after; eauto. } *)
+  (*     lia. } *)
+  (*   destruct EV_REL as (?&?&?&[d ->]%Nat.le_sum&?). *)
+  (*   do 2 eexists. repeat split. *)
+  (*   { erewrite state_lookup_after with (k := k + d); eauto. *)
+  (*     by rewrite Nat.add_assoc. } *)
+  (*   { lia. } *)
+  (*   done. *)
+  (* Qed. *)
 
-  Definition fair_lock_progress (fair: mtrace EFM -> Prop) :=
+
+  Lemma ev_rel_after tr ρ i atr
+    (* j atr *)
+    (EV_REL : eventual_release tr ρ i)
+    (AFTER: after i tr = Some atr)
+    :
+    (* eventual_release atr ρ (i - j). *)
+    eventual_release atr ρ 0.
+  Proof.
+    red. intros ρ' k **. red in EV_REL.
+    specialize_full EV_REL.
+    { erewrite state_lookup_after in JTH; eauto. }
+    all: eauto.
+    { intros LE. specialize_full AFTER0; [lia| ]. destruct AFTER0 as [? RESTR].
+      split; auto.
+      intros. destruct BETWEEN as [[d ->]%Nat.le_sum LE2].  
+      eapply RESTR.
+      2: { erewrite state_lookup_after; eauto. }
+      lia. }
+    destruct EV_REL as (?&?&?&[d ->]%Nat.le_sum&?).
+    do 2 eexists. repeat split.
+    { erewrite state_lookup_after with (k := k + d); eauto.
+      by rewrite Nat.add_assoc. }
+    { lia. }
+    done.
+  Qed. 
+
+  Definition fl_lock_progress (fair: mtrace EFM -> Prop) :=
     forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
       (VALID: mtrace_valid tr)
       (* (FAIR: inner_fair_ext_model_trace tr) *)
@@ -75,7 +124,7 @@ Section FairLock.
                (* ¬ role_enabled_model ρ st'. *)
                disabled_st ρ st'. 
   
-  Definition fair_unlock_termination (fair: mtrace EFM -> Prop) :=
+  Definition fl_unlock_termination (fair: mtrace EFM -> Prop) :=
     forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
       (VALID: mtrace_valid tr)
       (FAIR: fair tr)
@@ -83,7 +132,15 @@ Section FairLock.
       (CAN_LOCK: has_lock_st ρ st)
       (ACT: active_st ρ st),
     exists n st', i < n /\ tr S!! n = Some st' /\ can_lock_st ρ st' /\ 
-               disabled_st ρ st'. 
+               disabled_st ρ st'.
+
+  Definition fl_trace_termination (fair: mtrace EFM -> Prop) :=
+    forall (tr: mtrace EFM)
+      (VALID: mtrace_valid tr)
+      (FAIR: fair tr)
+      (EXT_BOUND: ext_trans_bounded tr)
+      (EV_REL: forall ρ i, eventual_release tr ρ i),
+      terminating_trace tr. 
   
 End FairLock.
 
@@ -220,13 +277,9 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M)
     has_lock_st ρlg tl_st1 /\ disabled_st ρlg tl_st1 /\
     has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2;
 
-  lock_progress: @fair_lock_progress _ FLP (FL_EM FLE) fair;
-  unlock_termination: @fair_unlock_termination _ FLP (FL_EM FLE) fair;
+  lock_progress: @fl_lock_progress _ FLP (FL_EM FLE) fair;
+  unlock_termination: @fl_unlock_termination _ FLP (FL_EM FLE) fair;
+  trace_termination: @fl_trace_termination _ FLP (FL_EM FLE) fair
 }.
 
 
-(* Lemma not_live_not_active `(@FairLock M FLP FLE): *)
-(*   forall tl_st ρlg, ρlg ∉ live_roles _ tl_st -> ¬ active_st ρlg tl_st. *)
-(* Proof.  *)
-(*   intros. pose proof (active_st_live tl_st ρlg). tauto. *)
-(* Qed. *)

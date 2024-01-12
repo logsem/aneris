@@ -5,35 +5,6 @@ From stdpp Require Import base.
 From trillium.fairness Require Import  lm_fair_traces trace_helpers fuel lm_fair lm_fairness_preservation trace_lookup.
 
 
-(* TODO: move *)
-Lemma ev_rel_after `(FLP: FairLockPredicates M) `(EM: ExtModel M) tr ρ i atr
-  (* j atr *)
-  (EV_REL : eventual_release tr ρ i)
-  (AFTER: after i tr = Some atr)
-  :
-  (* eventual_release atr ρ (i - j). *)
-  eventual_release atr ρ 0.
-Proof.
-  red. intros ρ' k **. red in EV_REL.
-  specialize_full EV_REL.
-  { erewrite state_lookup_after in JTH; eauto. }
-  all: eauto.
-  { intros LE. specialize_full AFTER0; [lia| ]. destruct AFTER0 as [? RESTR].
-    split; auto.
-    intros. destruct BETWEEN as [[d ->]%Nat.le_sum LE2].  
-    eapply RESTR.
-    2: { erewrite state_lookup_after; eauto. }
-    lia. }
-  destruct EV_REL as (?&?&?&[d ->]%Nat.le_sum&?).
-  do 2 eexists. repeat split.
-  { erewrite state_lookup_after with (k := k + d); eauto.
-    by rewrite Nat.add_assoc. }
-  { lia. }
-  done.
-Qed. 
-
-
-
 Section FairLockLM.
   
   Context `(FL: @FairLock M FLP FLE inner_fair_ext_model_trace).
@@ -451,6 +422,131 @@ Section FairLockLM.
     eapply ls_mapping_tmap_corr; eauto.
   Qed.
 
+  Lemma disable_lmtr
+    (lmtr: elmftrace (ELM := FL_EM FLE_LMF))
+    (ρ' : fmrole M)
+  (st' : fmstate M)
+  (VALID: mtrace_valid lmtr)
+  (HAS_LOCK : has_lock_st ρ' st')
+  (DIS : fair_lock.disabled_st ρ' st')
+  (FAIR: ∀ g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr)
+  (i : nat)
+  (lmtr_i : elmftrace (ELM := FL_EM FLE_LMF))
+  (AFTERi : after i lmtr = Some lmtr_i)
+  (ITH' : st' = ls_under (trfirst lmtr_i))
+    :
+(exists i' st', i <= i' /\
+                        lmtr S!! i' = Some st' /\ has_lock_st ρ' st' /\
+                        (* ¬ role_enabled_model ρ' st' /\ *)
+                        ρ' ∉ dom (ls_mapping st') /\
+                        ∀ (k : nat) (st' : fmstate ext_model_FM),
+                          0 <= k <= i' - i
+                          → lmtr_i S!! k = Some st'
+                          → (λ δ: lm_ls LM,
+                                has_lock_st ρ' (ls_under δ)
+                                ∧ fair_lock.disabled_st ρ' (ls_under δ)) st').
+  Proof.
+    assert (lmtr S!! i = Some (trfirst lmtr_i)) as ITH.
+    { rewrite -(state_lookup_0 lmtr_i).
+      erewrite (state_lookup_after lmtr lmtr_i); eauto. }
+        
+    destruct (decide (ls_mapping (trfirst lmtr_i) !! ρ' = Some (asG ρ'))).
+    2: { exists i, (trfirst lmtr_i).
+         do 2 (split; [eauto| ]). split.
+         { simpl.
+           (* split; [| *)
+           by rewrite -ITH'.
+         }
+         split.
+         { intros [? MAP]%elem_of_dom. apply n. rewrite MAP.
+           apply MAP_RESTR in MAP. subst. done. }
+         intros. assert (k = 0) as -> by lia.
+         erewrite state_lookup_after in H0; eauto.
+         rewrite Nat.add_0_r ITH in H0. inversion H0. subst.
+         eauto using disabled_not_live. }
+    
+    assert (mtrace_valid lmtr_i) as VALIDi.
+    { eapply trace_valid_after; eauto. }
+    
+    assert (∀ g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr_i) as FAIRi.
+    { intros. eapply fair_by_after; eauto. apply FAIR. }
+    
+    apply group_fairness_implies_step_or_unassign with (ρ := ρ') in FAIRi; [| done].
+    
+    apply fair_by_gen_equiv in FAIRi.
+    red in FAIR. specialize (FAIRi 0). specialize_full FAIRi.
+    { erewrite state_lookup_after; eauto.
+      rewrite Nat.add_0_r ITH. simpl.
+      eapply elem_of_dom; eauto. }
+    simpl in FAIRi. destruct FAIRi as [m_ FAIRi].
+    pattern m_ in FAIRi. eapply min_prop_dec in FAIRi as [m [FAIRi MIN]].
+    2: { intros. destruct (lmtr_i !! n) as [[s step] |] eqn:N; rewrite N.
+         2: { right; set_solver. }
+         eapply Decision_iff_impl.
+         { erewrite ex_det_iff2.
+           2: { intros ?? [[=] ?]. subst. split; reflexivity. }
+           reflexivity. }
+         solve_decision. }
+    destruct FAIRi as (δ_m & step_m & MTH & FAIRi).
+    red in FAIRi.
+    
+    Set Printing Coercions.
+    subst st'.
+    
+    assert (
+        ∀ (k : nat) (st' : fmstate ext_model_FM),
+          0 <= k <= m
+          → lmtr_i S!! k = Some st'
+          → (λ δ : LiveState G M LSI,
+                has_lock_st ρ' (ls_under δ)
+                ∧ fair_lock.disabled_st ρ' (ls_under δ)) st') as KEEP.
+    { eapply steps_keep_state_gen.
+      { eauto. }
+      { eexists. split; eauto. rewrite state_lookup_0. reflexivity. }
+      { apply others_or_burn_keep_lock. }
+      { intros * [_ ?] KTH.
+        destruct oℓ'; [| done]. simpl.
+        pose proof KTH as STEP. eapply trace_valid_steps' in STEP; [| eauto].
+        simpl in STEP.
+        destruct f as [| [ι]].
+        - intros EQ. specialize (MIN k). specialize_full MIN; [| lia].
+          do 2 eexists. split; [done| ].
+          red. right. simpl. red. simpl. do 3 eexists. repeat split; eauto.
+        - intros EQ. specialize (MIN k). specialize_full MIN; [| lia].
+          simpl in EQ.
+          assert (ls_tmap st1 !! (asG ρ') = Some ∅) as NOρ.
+          { destruct ι; subst; inversion STEP; subst; simpl in REL; apply REL. }
+          do 2 eexists. split; [done| ].
+          left. intros (?& MAP)%elem_of_dom.
+          assert (x = asG ρ') as ->.
+          { by apply MAP_RESTR in MAP. }
+          eapply ls_mapping_tmap_corr in MAP as (?&?&?).
+          rewrite NOρ in H0. set_solver. }
+    }
+    
+    clear HAS_LOCK DIS.
+    pose proof (KEEP m) as KEEPm. specialize_full KEEPm.
+    { split; [lia| reflexivity]. }
+    { eapply trace_state_lookup. apply MTH. }
+    destruct KEEPm as [HAS_LOCK DIS].
+    
+    destruct FAIRi as [UNMAP| STEP].
+    2: { simpl in STEP. red in STEP.
+         destruct STEP as (?&?&?&->&<-&STEP).
+         apply next_TS_spec_pos in STEP.
+         edestruct disabled_not_live; eauto.
+         eapply fm_live_spec. apply STEP. }
+    
+    exists (i + m). eexists. split; [lia| ].
+    split; [| split]; [| | split| ..].
+    { apply trace_state_lookup in MTH.
+      erewrite state_lookup_after in MTH; [| eauto]. apply MTH. }
+    { eauto. }
+    { eauto. }
+    intros ??.
+    rewrite Nat.sub_add'. apply KEEP.
+  Qed. 
+
   Lemma ev_rel_inner (lmtr: elmftrace (ELM := FL_EM FLE_LMF))
     (mtr: trace M (option ext_role))
     (ρ : R)
@@ -467,116 +563,10 @@ Section FairLockLM.
     assert (lmtr S!! i = Some (trfirst lmtr_i)) as ITH.
     { rewrite -(state_lookup_0 lmtr_i).
       erewrite (state_lookup_after lmtr lmtr_i); eauto. }
-    
-    
-    assert (exists i' st', i <= i' /\
-                        lmtr S!! i' = Some st' /\ has_lock_st ρ' st' /\
-                        (* ¬ role_enabled_model ρ' st' /\ *)
-                        ρ' ∉ dom (ls_mapping st') /\
-                        ∀ (k : nat) (st' : fmstate ext_model_FM),
-                          0 <= k <= i' - i
-                          → lmtr_i S!! k = Some st'
-                          → (λ δ : LiveState G M LSI,
-                                has_lock_st ρ' (ls_under δ)
-                                ∧ fair_lock.disabled_st ρ' (ls_under δ)) st').
-    { destruct (decide (ls_mapping (trfirst lmtr_i) !! ρ' = Some (asG ρ'))).
-      2: { exists i, (trfirst lmtr_i).
-           do 2 (split; [eauto| ]). split. 
-           { simpl.
-             (* split; [| *)
-             by rewrite -ITH'.
-           }
-           split. 
-           { intros [? MAP]%elem_of_dom. apply n. rewrite MAP.
-             apply MAP_RESTR in MAP. subst. done. }
-           intros. assert (k = 0) as -> by lia.
-           erewrite state_lookup_after in H0; eauto.
-           rewrite Nat.add_0_r ITH in H0. inversion H0. subst.
-           eauto using disabled_not_live. } 
-                 
-      assert (mtrace_valid lmtr_i) as VALIDi.
-      { eapply trace_valid_after; eauto. }
-
-      assert (∀ g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr_i) as FAIRi.
-      { intros. eapply fair_by_after; eauto. apply FAIR. }      
-      
-      apply group_fairness_implies_step_or_unassign with (ρ := ρ') in FAIRi; [| done].
-      
-      apply fair_by_gen_equiv in FAIRi.
-      red in FAIR. specialize (FAIRi 0). specialize_full FAIRi.
-      { erewrite state_lookup_after; eauto.
-        rewrite Nat.add_0_r ITH. simpl.
-        eapply elem_of_dom; eauto. }
-      simpl in FAIRi. destruct FAIRi as [m_ FAIRi]. 
-      pattern m_ in FAIRi. eapply min_prop_dec in FAIRi as [m [FAIRi MIN]].
-      2: { intros. destruct (lmtr_i !! n) as [[s step] |] eqn:N; rewrite N.
-           2: { right; set_solver. }
-           eapply Decision_iff_impl.
-           { erewrite ex_det_iff2.
-             2: { intros ?? [[=] ?]. subst. split; reflexivity. }
-             reflexivity. }
-           solve_decision. }
-      destruct FAIRi as (δ_m & step_m & MTH & FAIRi).
-      red in FAIRi.
-      
-      Set Printing Coercions.
-      subst st'.
-      
-      assert (
-          ∀ (k : nat) (st' : fmstate ext_model_FM),
-            0 <= k <= m
-            → lmtr_i S!! k = Some st'
-            → (λ δ : LiveState G M LSI,
-                  has_lock_st ρ' (ls_under δ)
-                  ∧ fair_lock.disabled_st ρ' (ls_under δ)) st') as KEEP. 
-      { eapply steps_keep_state_gen. 
-        { eauto. }
-        { eexists. split; eauto. rewrite state_lookup_0. reflexivity. }
-        { apply others_or_burn_keep_lock. }
-        { intros * [_ ?] KTH.
-          destruct oℓ'; [| done]. simpl. 
-          pose proof KTH as STEP. eapply trace_valid_steps' in STEP; [| eauto].
-          simpl in STEP. 
-          destruct f as [| [ι]]. 
-          - intros EQ. specialize (MIN k). specialize_full MIN; [| lia].
-            do 2 eexists. split; [done| ].
-            red. right. simpl. red. simpl. do 3 eexists. repeat split; eauto.
-          - intros EQ. specialize (MIN k). specialize_full MIN; [| lia].
-            simpl in EQ. 
-            assert (ls_tmap st1 !! (asG ρ') = Some ∅) as NOρ.
-            { destruct ι; subst; inversion STEP; subst; simpl in REL; apply REL. }
-            do 2 eexists. split; [done| ].
-            left. intros (?& MAP)%elem_of_dom.
-            assert (x = asG ρ') as ->.
-            { by apply MAP_RESTR in MAP. }
-            eapply ls_mapping_tmap_corr in MAP as (?&?&?).
-            rewrite NOρ in H0. set_solver. }
-      }
-      
-      clear HAS_LOCK DIS.
-      pose proof (KEEP m) as KEEPm. specialize_full KEEPm. 
-      { split; [lia| reflexivity]. }
-      { eapply trace_state_lookup. apply MTH. }
-      destruct KEEPm as [HAS_LOCK DIS].
-      
-      destruct FAIRi as [UNMAP| STEP]. 
-      2: { simpl in STEP. red in STEP.
-           destruct STEP as (?&?&?&->&<-&STEP). 
-           apply next_TS_spec_pos in STEP.
-           edestruct disabled_not_live; eauto. 
-           eapply fm_live_spec. apply STEP. }
-      
-      exists (i + m). eexists. split; [lia| ]. 
-      split; [| split]; [| | split| ..].
-      { apply trace_state_lookup in MTH.
-        erewrite state_lookup_after in MTH; [| eauto]. apply MTH. }
-      { eauto. }
-      { eauto. }
-      intros ??.
-      rewrite Nat.sub_add'. apply KEEP. }
-    
+        
+    forward eapply disable_lmtr as D; eauto.
     clear HAS_LOCK DIS.
-    destruct H as (m & δ_m & LEi & MTH & HAS_LOCK & UNMAP & BETWEEN). 
+    destruct D as (m & δ_m & LEi & MTH & HAS_LOCK & UNMAP & BETWEEN). 
 
     assert (ls_tmap δ_m !! asG ρ' = Some ∅) as DOMρ'.
     { apply unmapped_empty; auto. intros UN. 
@@ -602,7 +592,7 @@ Section FairLockLM.
              rewrite -Nat.le_add_sub; eauto. lia. }
            apply proj1 in BETWEEN. simpl in LOCK2.
            eapply NEQ. eapply has_lock_st_excl; eauto. }
-
+      
       move PREi at bottom. red in PREi.
       setoid_rewrite pred_at_trace_lookup in PREi. specialize_full PREi.
       { apply BEFORE. }
@@ -740,7 +730,7 @@ Section FairLockLM.
  
     
   Lemma FL_LM_progress:
-    @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
+    @fl_lock_progress _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
   Proof.
     red. intros lmtr [ρ] i δ **.
     pose proof (group_fairness_implies_role_fairness _ _ VALID FAIR) as FAIR'.
@@ -785,7 +775,7 @@ Section FairLockLM.
   Qed.
 
   Lemma FL_LM_unlock:
-    @fair_unlock_termination _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
+    @fl_unlock_termination _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
   Proof.
     red. intros lmtr [ρ] i δ **.
     rename CAN_LOCK into LOCK. 
@@ -826,6 +816,62 @@ Section FairLockLM.
     { apply others_or_burn_keep_can_lock. }
     intros (n&?&?&?&?&?). exists n. eexists. split; [| eauto]. lia. 
   Qed.     
+
+  Lemma FL_LM_term:
+    @fl_trace_termination _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
+  Proof.
+    red. intros lmtr **. 
+    pose proof (group_fairness_implies_role_fairness _ _ VALID FAIR) as FAIR'.
+    pose proof (can_destutter_eauxtr proj_ext _ VALID) as [mtr UPTO].
+    forward eapply destutter_ext.upto_preserves_validity as VALIDm; eauto. 
+    { apply PROJ_KEEP_EXT. }
+    forward eapply destutter_ext.upto_stutter_fairness as FAIRm; eauto.
+    { eapply ELM_ALM_afair_by_next; eauto. }
+
+    eapply destutter_ext.upto_stutter_finiteness; eauto.
+    apply trace_termination; eauto.
+    { admit. }
+    intros.
+
+    red. intros.
+
+    (* destruct (decide (ρ' = ρ)).  *)
+    (* { subst. specialize (EV_REL (asG ρ) 0). *)
+    (*   red in EV_REL.  *)
+
+    (* pose proof JTH as (mtr_j & AFTERj & Aj)%state_lookup_after'. *)
+    
+    forward eapply upto_state_lookup_unfold1 as (mtr_i' & i' & lmtr_i & AFTERi & AFTERi' & UPTOi & ITH' & ?); eauto. 
+
+    forward eapply disable_lmtr as D; eauto.
+    destruct D as (m & δ_m & LEi & MTH & HAS_LOCK' & UNMAP & BETWEEN).
+
+    assert (ls_tmap δ_m !! asG ρ' = Some ∅) as DOMρ'.
+    { apply unmapped_empty; auto. intros UN. 
+      edestruct unused_has_lock_incompat; eauto. } 
+
+    move EV_REL at bottom.
+    specialize (EV_REL (asG ρ) (S m)). red in EV_REL. specialize_full EV_REL; eauto.
+    { Unshelve. 2: exact (asG ρ'). simpl. split; auto.
+      eapply elem_of_dom; eauto. }
+    { split; eauto. 
+      red. split; [by eapply elem_of_dom| ]. 
+      eapply (BETWEEN (m - i')).
+      { lia. }
+      erewrite state_lookup_after; eauto.
+      rewrite -Nat.le_add_sub; eauto. } 
+    { lia. }
+
+    destruct EV_REL as (p & δ_p & PTH & LEm & ENp).
+    assert (i' <= p) as [d ->]%Nat.le_sum by lia. 
+    erewrite <-state_lookup_after in PTH; eauto.
+    eapply upto_stutter_state_lookup' in PTH as [c CTH]; eauto.
+    exists (j + c). eexists. repeat split.
+    { erewrite <- state_lookup_after; eauto. }
+    { lia. }
+    apply ENp.
+  Qed. 
+
 
   (* TODO: is it possible to avoid delegating this to user? *)
   Context {allow_unlock_impl: G -> lm_ls LM -> lm_ls LM}.
