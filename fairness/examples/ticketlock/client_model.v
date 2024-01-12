@@ -12,62 +12,138 @@ Require Import Coq.Logic.Classical.
 
 Close Scope Z_scope.
 
+Section SizeLookup.
+  Context `{FS: FinSet A C}.
+  Context {LE: LeibnizEquiv C}.
+
+  Lemma nth_sized_contra (i: nat) (c: C)
+    (DOM : i < size c) (I: elements c !! i = None):
+    False.
+  Proof.    
+    apply lookup_ge_None_1 in I.
+    unshelve erewrite <- size_list_to_set in I.
+    6: exact FS. 
+    2: { apply NoDup_elements. }
+    rewrite list_to_set_elements_L in I. lia. 
+  Qed.  
+
+  Definition nth_sized (i: nat) (c: C) (DOM: i < size c): A.
+    destruct (elements c !! i) eqn:I.
+    { exact a. }
+    exfalso.
+    apply (nth_sized_contra i c DOM I).
+  Defined.
+
+  (* Lemma nth_sized_elem_of a (c: C): *)
+  (*   a ∈ c <-> exists i, elements c !! i = Some a.  *)
+  (* Proof. *)
+  (*   rewrite -elem_of_elements. *)
+  (*   by rewrite elem_of_list_lookup. *)
+  (* Qed.      *)
+
+  Lemma nth_sized_elem_of a (c: C):
+    a ∈ c <-> exists i DOM, nth_sized i c DOM = a /\ i < size c. 
+  Proof.
+    rewrite -elem_of_elements.
+    rewrite /nth_sized.
+    rewrite elem_of_list_lookup. apply exist_proper. intros i.
+    (* destruct (elements c !! i).  *)
+  Admitted. 
+
+  (* Lemma enum_sized (c: C): *)
+  (*   (* gls' n = map (ρlg_i n) (seq 0 n).  *) *)
+  (*   c = map  *)
+  (* Proof. *)
+  (*   pose proof (gls'_len n) as LEN'.  *)
+  (*   apply nth_ext with (d := g0) (d' := g0). *)
+  (*   { by rewrite fmap_length seq_length. } *)
+
+  (*   intros i DOM.     *)
+  (*   eapply Some_inj. *)
+  (*   rewrite -nth_error_nth'; [| done]. *)
+  (*   rewrite -nth_error_nth'.  *)
+  (*   2: { rewrite fmap_length seq_length. congruence. } *)
+  (*   rewrite nth_error_map. *)
+  (*   rewrite nth_error_seq; [| congruence]. *)
+  (*   simpl. rewrite /ρlg_i. *)
+  (*   by apply nth_error_nth'. *)
+  (* Qed. *)
+
+End SizeLookup.
+
 
 (* TODO: replace 'Tl' prefixes with 'Fl' *)
 Section ClientDefs.
   
   Context {Gtl: Type} `{Countable Gtl}.
-  Context (get_Gtls: forall n, { gls: gset Gtl | size gls = n}).
+  (* Context (get_Gtls: forall n, { gls: gset Gtl | size gls = n}). *)
+  Context (lib_gs: gset Gtl).
+  Context (SIZE2: size lib_gs = 2). 
   
   Inductive cl_id := | cl_L | cl_R.
-  Definition cl_id_nat c := match c with | cl_L => 0 | cl_R => 1 end. 
+  Definition cl_id_nat c := match c with | cl_L => 0 | cl_R => 1 end.
 
-  Definition lib_gs: gset Gtl := gls get_Gtls 2.
-  Definition ρlg_tl c := ρlg_i get_Gtls 2 (cl_id_nat c).
-  Definition ρlg_l := ρlg_tl cl_L.
-  Definition ρlg_r := ρlg_tl cl_R.   
+  Lemma cin_lt c: cl_id_nat c < 2.
+  Proof. destruct c; simpl; lia. Qed.  
+
+  (* Definition lib_gs: gset Gtl := gls get_Gtls 2. *)
+  Definition ρlg_tl (c: cl_id): Gtl.
+    apply (nth_sized (cl_id_nat c) lib_gs).
+    rewrite SIZE2. apply cin_lt.
+  Defined.
+
+  Definition ρlg_l: Gtl := ρlg_tl cl_L. 
+  Definition ρlg_r: Gtl := ρlg_tl cl_R. 
+
+  (* Require Import Coq.Program.Equality. *)
+  (* Require Import Coq.Program.Tactics. *)
 
   Lemma lib_gs_ρlg:
     lib_gs = {[ ρlg_l; ρlg_r ]}.
   Proof.
-    rewrite /lib_gs /ρlg_l /ρlg_r.
-    rewrite gls_ρlg. simpl. set_solver.
-  Qed. 
+    apply set_eq. intros.
+    rewrite nth_sized_elem_of.
+    rewrite /ρlg_l /ρlg_r. 
+  Admitted. 
 
   Lemma lib_gs_ne: lib_gs ≠ ∅.
-  Proof. rewrite lib_gs_ρlg. set_solver. Qed.
+  Proof.
+    intros ->. pose proof SIZE2 as S. by rewrite size_empty in S.
+  Qed. 
 
   Lemma ρlg_lr_neq: ρlg_l ≠ ρlg_r.
   Proof.
-    intros EQ%ρlg_i_dom_inj; [done|..]. 
-    all: simpl; lia.
-  Qed. 
+    intros EQ. 
+  (*   intros EQ%ρlg_i_dom_inj; [done|..].  *)
+  (*   all: simpl; lia. *)
+  (* Qed.  *)
+  Admitted. 
 
-  Lemma ρlg_in_lib_gs: forall c, ρlg_tl c ∈ lib_gs.
-  Proof. 
-    rewrite lib_gs_ρlg. intros c.
-    destruct c; set_solver. 
-  Qed.
+  (* Lemma ρlg_in_lib_gs: forall c, ρlg_tl c ∈ lib_gs. *)
+  (* Proof.  *)
+  (*   rewrite lib_gs_ρlg. intros c. *)
+  (*   destruct c; set_solver.  *)
+  (* Qed. *)
 
   Lemma ρlg_tl_inj: Inj eq eq ρlg_tl.
   Proof.
-    intros ?? EQ%ρlg_i_dom_inj.
-    - destruct x, y; done.
-    - destruct x; simpl; lia. 
-    - destruct y; simpl; lia.
-  Qed. 
+  Admitted.
 
   Context {Mtl: FairModel}.
-  Context {Tl_nexts: forall tl_st, next_states tl_st (M := Mtl)}.
-  Context (Mtl_TERM: ∀ mtr: mtrace Mtl, mtrace_fairly_terminating mtr). 
+  (* Context {Tl_nexts: forall tl_st, next_states tl_st (M := Mtl)}. *)
+  (* Context (Mtl_TERM: ∀ mtr: mtrace Mtl, mtrace_fairly_terminating mtr).  *)
 
-  Context {TlLM': forall gs, LiveModel Gtl Mtl (LSI_groups_fixed gs)}.  
-  Context (TlLM_LFP': ∀ gs: gset Gtl, gs ≠ ∅ → LMFairPre (TlLM' gs)).
+  (* Context {TlLM: LiveModel Gtl Mtl (LSI_groups_fixed lib_gs)}. *)
+  Context {TlLSI: fmstate Mtl -> @groups_map _ Mtl _ _ -> @fuel_map Mtl -> Prop} {TlLSI_LGF: forall st tm fm, TlLSI st tm fm -> LSI_groups_fixed lib_gs st tm fm}. 
+  Context {TlLM: LiveModel Gtl Mtl TlLSI}.
+  Context (TlLM_LFP: LMFairPre TlLM).
   (* Context (TlEM': forall gs (NE: gs ≠ ∅), ExtModel (LM_Fair (LF := TlLM_LFP' _ NE))). *)
 
-  Definition TlLM := TlLM' lib_gs. 
-  Definition TlLM_LFP := TlLM_LFP' _ lib_gs_ne.
+  (* Definition TlLM := TlLM' lib_gs.  *)
+  (* Definition TlLM_LFP := TlLM_LFP' _ lib_gs_ne. *)
   Definition TlLM_FM := LM_Fair (LF := TlLM_LFP).
+
+  Context (TlLM_nexts: forall δ_lib, @next_states TlLM_FM δ_lib).
 
   Context {tl_FLE: FairLockExt TlLM_FM}. 
   Let TlEM := FL_EM tl_FLE.
@@ -213,43 +289,35 @@ Section ClientDefs.
     {nexts: list (client_state) | forall s2 oρ, client_trans s1 oρ s2 -> s2 ∈ nexts}.
   Proof.
     destruct s1 as (δ_lib, f).
-    pose proof (Tl_nexts (ls_under δ_lib)) as [ie_lib IE_LIB].
-    pose proof (role_LM_step_dom_all δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := TlLM)) as STEPS_LIB.
+    pose proof (TlLM_nexts δ_lib) as [nexts_lib IE_LIB].
+    (* pose proof (role_LM_step_dom_all δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := TlLM)) as STEPS_LIB. *)
 
-    set nexts_lib := (map fst (enumerate_next δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := TlLM))).
-    fold nexts_lib in STEPS_LIB.
+    (* set nexts_lib := (map fst (enumerate_next δ_lib ((ls_under δ_lib) :: ie_lib) (elements lib_gs) (LM := TlLM))). *)
+    (* fold nexts_lib in STEPS_LIB. *)
     
     set (nexts_tl :=
-           δ_lib :: nexts_lib ++
+           nexts_lib ++
            map (flip allow_unlock_impl δ_lib) (elements lib_gs) ++
            map (flip allow_lock_impl δ_lib) (elements lib_gs)). 
     set nexts := f ← all_flag_states; δ ← nexts_tl; mret (δ, f). 
     
     exists nexts. 
     intros [δ' f'] oρ TRANS. simpl in TRANS.
-    subst nexts. repeat setoid_rewrite elem_of_list_bind.
-    setoid_rewrite elem_of_list_ret.
+    subst nexts. rewrite elem_of_list_bind.
     eexists. split; [| by apply all_flag_states_spec].
-    eexists. split; eauto.
-    subst nexts_tl. 
+    rewrite elem_of_list_bind. eexists. split.
+    { apply elem_of_list_ret. reflexivity. }
+    subst nexts_tl. apply elem_of_app. 
     inversion TRANS; subst.
-    - apply elem_of_list_further, elem_of_app. left.
-      simpl in LIB_STEP. destruct LIB_STEP as (ℓ & LIB_STEP & MATCH). 
-      apply elem_of_list_In. eapply STEPS_LIB; eauto.
-      2: { rewrite list_to_set_elements_L. by apply δ'. }
-      apply elem_of_cons. 
-      edestruct @locale_trans_fmtrans_or_eq as [[? FM] | EQ]. 
-      { eexists. eauto. }
-      + right. eauto.
-      + by left.
-    - apply elem_of_list_further, elem_of_app. right.
+    - left. eauto. 
+    - right.
       apply elem_of_app. left.      
       (* rewrite lib_gs_ρlg.  *) (* TODO: why does it break now? *)
       eapply elem_of_proper; [reflexivity| ..].
       { f_equiv. rewrite lib_gs_ρlg. reflexivity. }
       apply elem_of_list_fmap. eexists. split; eauto.
       apply elem_of_elements. set_solver.
-    - apply elem_of_list_further, elem_of_app. right.
+    - right.
       apply elem_of_app. left.
       (* rewrite lib_gs_ρlg. *)
       eapply elem_of_proper; [reflexivity| ..].
@@ -257,7 +325,7 @@ Section ClientDefs.
 
       apply elem_of_list_fmap. eexists. split; eauto.
       apply elem_of_elements. set_solver.
-    - apply elem_of_list_further, elem_of_app. right.
+    - right.
       apply elem_of_app. right.
       (* rewrite lib_gs_ρlg. *)
       eapply elem_of_proper; [reflexivity| ..].
@@ -460,7 +528,9 @@ Section ClientDefs.
   - red. intros g [ρ MAP]. simpl in MAP. 
     rewrite /mapped_roles. rewrite map_img_singleton_L flatten_gset_singleton.
     apply ls_mapping_tmap_corr in MAP as (?&TM&?).
-    forward eapply (ls_inv tl_st g) as IN.
+    pose proof (ls_inv tl_st) as IN. apply TlLSI_LGF in IN.
+    specialize (IN g). specialize_full IN. 
+    (* forward eapply (ls_inv tl_st g) as IN. *)
     { eapply @elem_of_dom; [apply _| ]. eauto. }
     rewrite lib_gs_ρlg in IN.
     rewrite /all_roles. set_solver.
@@ -483,7 +553,8 @@ Section ClientDefs.
     rewrite curry_uncurry_prop. apply ZifyClasses.impl_morph; [| done].
     rewrite and_comm. rewrite iff_and_impl_helper.
     2: { intros (?&?&IN)%List.Exists_exists.
-         apply (ls_inv tl_st). 
+         eapply TlLSI_LGF; [apply tl_st| ]. 
+         (* apply (ls_inv tl_st).  *)
          apply ls_mapping_tmap_corr in IN as (?&IN&?).
          eapply @elem_of_dom; eauto. apply _. }
     rewrite List.Exists_exists.
@@ -554,10 +625,12 @@ Section ClientDefs.
       { split; try by apply PREρlg. }
       2: { left. eauto. }
       simpl. 
-      rewrite /ρlg_r. intros EQ%ρlg_i_dom_inj.
-      2: { destruct c; simpl; lia. }
-      2: { simpl; lia. }
-      assert (c = cl_R) as -> by (by destruct c).
+      rewrite /ρlg_r.
+      (* intros EQ%ρlg_i_dom_inj. *)
+      intros ->%ρlg_tl_inj.
+      (* 2: { destruct c; simpl; lia. } *)
+      (* 2: { simpl; lia. } *)
+      (* assert (c = cl_R) as -> by (by destruct c). *)
       apply fm_live_spec in LIB_STEP. 
       (* clear -LIB_STEP PREρlg. *)
       eapply (disabled_not_live) in LIB_STEP; [done| ]. apply PREρlg. 
@@ -594,10 +667,8 @@ Section ClientDefs.
       { split; try by apply PREρlg. }
       2: { left. eauto. }
       simpl. 
-      rewrite /ρlg_l. intros EQ%ρlg_i_dom_inj.
-      2: { destruct c; simpl; lia. }
-      2: { simpl; lia. }
-      assert (c = cl_L) as -> by (by destruct c). 
+      rewrite /ρlg_l.
+      intros ->%ρlg_tl_inj.
       apply fm_live_spec in LIB_STEP.
       eapply disabled_not_live in LIB_STEP; eauto. apply PREρlg. 
     - done. 
@@ -622,7 +693,7 @@ Section ClientDefs.
     (SUB1 : subtrace tr k NOinfinity = Some str)
     (MATCH : lm_model_traces_match ((option_fmap ext_role (ext_role + cl_id)%type inl): option ext_role → option (fmrole client_model_impl))
                (transA := (@ext_trans TlLM_FM TlEM))
-            (λ (c : client_model_impl) (δ_lib : lm_ls (TlLM' lib_gs)), c.1 = δ_lib)
+            (λ (c : client_model_impl) (δ_lib : lm_ls TlLM), c.1 = δ_lib)
             str (project_tl_trace str))
     :
     ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace str). 

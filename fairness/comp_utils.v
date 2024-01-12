@@ -277,3 +277,34 @@ Section FinitaryModels.
   Qed. 
 
 End FinitaryModels.
+
+
+Section BoundedLM.
+  Context `{Countable G} `{LM: LiveModel G M LSI}.
+  Context {LFP: LMFairPre LM}.
+
+  Context {nexts_M: forall s1, @next_states M s1}.
+  Context {gs: gset G} {G_FIX: forall st tm fm, LSI st tm fm -> LSI_groups_fixed gs st tm fm}.
+  Context {LSI_DEC: ∀ st tm fm, Decision (LSI st tm fm)}. 
+
+  Lemma LM_step_fin (δ: lm_ls LM):
+    @next_states (LM_Fair (LF := LFP)) δ. 
+  Proof.
+    pose proof (nexts_M (ls_under δ)) as [next_sts NEXT_STS].
+    pose proof (role_LM_step_dom_all δ ((ls_under δ) :: next_sts) (elements gs) (LM := LM)) as STEPS.
+    remember (map fst (enumerate_next δ ((ls_under δ) :: next_sts) (elements gs) (LM := LM))) as nexts. 
+    exists nexts. 
+    intros δ' oρ TRANS. simpl in TRANS.
+    subst nexts.
+    destruct oρ as [g| ]; [| done]. simpl in TRANS. 
+    simpl in TRANS. destruct TRANS as (ℓ & TRANS & MATCH). 
+    apply elem_of_list_In. eapply STEPS; eauto.
+    2: { rewrite list_to_set_elements_L. eapply G_FIX. apply δ'. } 
+    apply elem_of_cons. 
+    edestruct @locale_trans_fmtrans_or_eq as [[? FM] | EQ]. 
+    { eexists. eauto. }
+    + right. eauto.
+    + by left.
+  Qed. 
+
+End BoundedLM.

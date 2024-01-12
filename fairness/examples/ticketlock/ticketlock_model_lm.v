@@ -3,6 +3,7 @@ From trillium.fairness Require Import fuel lm_fair fairness_finiteness lm_fairne
 From trillium.fairness.examples.ticketlock Require Import fair_lock ticketlock_model fair_lock_lm. 
 From stdpp Require Import base.
 From trillium.fairness.ext_models Require Import ext_models. 
+From trillium.fairness Require Import comp_utils.
 
 Section TlLM.
   Let M := tl_fair_model.
@@ -11,13 +12,18 @@ Section TlLM.
   
   Context {n_roles: nat}.
   Let roles: gset R := dom $ snd $ tl_init_st' n_roles. 
-  Let gs: gset G := set_map asG roles. 
+  Definition tl_gs: gset G := set_map asG roles.
+
+  Lemma tl_gs_size: size tl_gs = n_roles.
+  Proof.
+    rewrite /tl_gs.
+  Admitted.
   
   Definition LSI_Tl (st: fmstate M) (tm: groups_map) (fm: @fuel_map M) :=
     (* LSI_groups_fixed gs st tm fm /\ *) (* <- implied by last condition *)
     map_Forall (fun '(asG ρ) Rs => Rs ⊆ {[ ρ ]}) tm /\
     (forall ρ: fmrole M, ¬ is_unused ρ st <-> asG ρ ∈ dom tm) /\
-    dom tm = gs. 
+    dom tm = tl_gs. 
 
   Definition tl_fl := 100. 
   
@@ -25,7 +31,7 @@ Section TlLM.
     {| lm_fl _ := tl_fl; |}.
 
   Lemma dom_tmap_tl_fixed (δ: lm_ls tl_model):
-    dom (ls_tmap δ) = gs.
+    dom (ls_tmap δ) = tl_gs.
   Proof. apply δ. Qed. 
 
   Lemma tl_ls_map_restr (δ: lm_ls tl_model): ls_map_restr (ls_mapping δ).
@@ -245,9 +251,10 @@ Section TlLM.
   Lemma dec_dne `{Decision P}:
     P <-> ¬ ¬ P.
   Proof. tauto. Qed. 
-        
-  Lemma tl_model_impl_step_fin (s1 : tl_st):
-    {nexts: list tl_st | forall s2 oρ, tl_trans s1 oρ s2 -> s2 ∈ nexts}.
+
+  Lemma tl_model_impl_step_fin (s1 : fmstate M):
+    (* {nexts: list tl_st | forall s2 oρ, tl_trans s1 oρ s2 -> s2 ∈ nexts}. *)
+    next_states s1. 
   Proof.
     destruct s1 as [o t rm wf] eqn:S.
     set nexts' :=
@@ -297,7 +304,7 @@ Section TlLM.
     eapply elem_of_dom; eauto.
   Qed.
 
-  Instance LSI_Tl_dec: ∀ (a : M) (b : gmap G (gset (fmrole M))) (c : gmap (fmrole M) nat),
+  Global Instance LSI_Tl_dec: ∀ (a : M) (b : gmap G (gset (fmrole M))) (c : gmap (fmrole M) nat),
       Decision (LSI_Tl a b c).
   Proof.
     intros. rewrite /LSI_Tl. repeat apply and_dec; try solve_decision.
@@ -327,7 +334,7 @@ Section TlLM.
     Unshelve.
     + exact tl_model. 
     +
-      assert (dom (rearrange_roles_map (ls_tmap δ2) (dom (ls_tmap δ0)) τ0) = gs) as DOM'.
+      assert (dom (rearrange_roles_map (ls_tmap δ2) (dom (ls_tmap δ0)) τ0) = tl_gs) as DOM'.
       { rewrite /rearrange_roles_map.
         rewrite dom_insert_L.
         erewrite dom_domain_restrict_union_l.
@@ -598,3 +605,4 @@ Section TlLM.
 
 End TlLM. 
 
+Opaque tl_gs.
