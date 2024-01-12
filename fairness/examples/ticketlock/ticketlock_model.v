@@ -1275,6 +1275,52 @@ Section Model.
         - eapply (tl_ev_rel_extend i); eauto with lia. 
       Qed.
 
+      Lemma tl_unlock_term ρ i st
+        (ITH: tr S!! i = Some st)
+        (LOCK: has_lock_st ρ st)
+        (ACT: active_st ρ st):
+        exists n st', i < n /\ tr S!! n = Some st' /\ can_lock_st ρ st' /\
+                   disabled_st (ρ: fmrole tl_fair_model) st'.
+      Proof using VALID FAIR. 
+        red in LOCK. destruct LOCK as [e RMρ].
+        destruct st as [o t rm wf]. 
+        assert (e = true) as -> by (destruct ACT; congruence). 
+
+        forward eapply (kept_state_fair_step VALID (inl ρ)).
+        { apply (has_lock_en_kept ρ o). }
+        all: eauto.
+        { simpl. 
+          intros st [STρ ?].
+          red. rewrite /ext_live_roles. simpl. rewrite /ext_live_roles.
+          apply elem_of_union_l. apply elem_of_map_2.
+          simpl. rewrite /tl_live_roles.
+          apply elem_of_dom. eexists. apply map_filter_lookup_Some_2; done. }
+        { simpl. done. }
+        intros (j & [o' t' rm' wf'] & [[LEij ITH'] MIN] & STEP & RMρ').
+
+        apply trace_label_lookup_simpl' in ITH' as (?&st'&ITH').
+        forward eapply trace_state_lookup_simpl; eauto. intros ->.
+        pose proof ITH' as TRANS. eapply trace_valid_steps' in TRANS; eauto.
+        simpl in *. destruct RMρ' as [-> RMρ']. 
+        inversion TRANS; subst. inversion STEP0; subst.
+        1, 2: congruence.
+        subst st'' st'0. destruct st'. simpl in *.
+        assert (role_map0 !! ρ = Some (tl_L, false)) as RM'.
+        { destruct role_of_dec; inversion H4; subst. 
+          2: { apply lookup_insert. }
+          destruct s. inversion H0.
+          rewrite lookup_insert_ne.
+          2: { intros ->. subst.
+               rewrite lookup_insert in e. congruence. }
+          by apply lookup_insert. }
+        subst. exists (j + 1). eexists. repeat split.
+        { lia. }
+        { apply state_label_lookup in ITH' as (?&X&?). apply X. }
+        { red. simpl. eauto. } 
+        { red. simpl. eauto. }
+      Qed. 
+        
+
     End ProgressPropertiesImpl.
 
     (* TODO: move *)

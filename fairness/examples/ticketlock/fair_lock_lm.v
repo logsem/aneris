@@ -771,7 +771,6 @@ Section FairLockLM.
     assert (d > 0) as NZd.
     { destruct d; [| lia].
       rewrite Nat.add_0_r ITH in DTH. inversion DTH. subst δ'.
-      simpl in LOCK.
       edestruct can_has_lock_incompat; eauto.
       apply LOCK. }
     clear dependent δ. rename δ' into δ. 
