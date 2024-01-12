@@ -176,6 +176,12 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M)
         (other_proj ρ (FLE := FLE))
         (M := @ext_model_FM _ (FL_EM FLE));
 
+  step_keeps_can_lock_dis: forall (ρ: fmrole M),
+      label_kept_state
+        (fun st => can_lock_st ρ st /\ disabled_st ρ st)
+        (other_proj ρ (FLE := FLE))
+        (M := @ext_model_FM _ (FL_EM FLE));
+
   step_keeps_unused: forall (ρ: fmrole M),
       label_kept_state
         (fun st => is_unused ρ st)

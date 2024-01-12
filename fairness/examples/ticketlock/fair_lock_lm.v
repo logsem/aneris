@@ -342,34 +342,59 @@ Section FairLockLM.
        | _ => other_proj (asG ρ') oℓ
        end). 
 
-  Lemma others_or_burn_keep_lock ρ':
+  Lemma others_or_burn_keep_inner_prop P (ρ': fmrole M)
+    (KEPT: label_kept_state
+        (λ st : ext_model_FM, P st)
+        (other_proj ρ')):
     label_kept_state_gen
     (λ st' : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
-       has_lock_st ρ' (ls_under st') ∧ fair_lock.disabled_st ρ' (ls_under st'))
+       P st')
     (others_or_burn ρ').
   Proof.
     red. intros. simpl in STEP. inversion STEP; subst.
     - simpl in STEP0. unfold_LMF_trans STEP0.
-      + eapply step_keeps_lock_dis.
+      + eapply KEPT. 
         { apply P1. }
         2: { simpl. left. simpl. apply STEP1. }                   
         red. simpl. intros ->. congruence. 
       + repeat apply proj2 in STEP1. congruence.
     - destruct ι; simpl in REL; red in REL.
       + destruct ρ as [ρ]. 
-        eapply step_keeps_lock_dis.
+        eapply KEPT. 
         { apply P1. }
         2: { simpl. right. Unshelve. 2: exact (flU ρ).
              apply REL. }
         red. simpl.
         intros ->. simpl in PSTEP. congruence.
       + destruct ρ as [ρ]. 
-        eapply step_keeps_lock_dis.
+        eapply KEPT.
         { apply P1. }
         2: { simpl. right. Unshelve. 2: exact (flL ρ).
              apply REL. }
         red. simpl.
         intros ->. simpl in PSTEP. congruence.
+  Qed.
+
+  Lemma others_or_burn_keep_lock ρ':
+    label_kept_state_gen
+    (λ st' : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
+       has_lock_st ρ' (ls_under st') ∧ fair_lock.disabled_st ρ' (ls_under st'))
+    (others_or_burn ρ').
+  Proof.
+    forward eapply others_or_burn_keep_inner_prop. 
+    { apply (step_keeps_lock_dis ρ'). }
+    done. 
+  Qed. 
+
+  Lemma others_or_burn_keep_can_lock ρ':
+    label_kept_state_gen
+    (λ st' : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
+       can_lock_st ρ' (ls_under st') ∧ fair_lock.disabled_st ρ' (ls_under st'))
+    (others_or_burn ρ').
+  Proof.
+    forward eapply others_or_burn_keep_inner_prop. 
+    { apply (step_keeps_can_lock_dis ρ'). }
+    done. 
   Qed. 
 
   (* TODO: move *)
@@ -795,88 +820,12 @@ Section FairLockLM.
       edestruct can_has_lock_incompat; eauto.
       apply LOCK. }
     clear dependent δ. rename δ' into δ. 
-    
-    destruct (decide (ρ ∈ dom (ls_mapping δ))) as [MAP | UNMAP]. 
-    2: { eapply unmapped_empty in UNMAP.
-         2: { intros ?. edestruct unused_can_lock_incompat; eauto. }
-         exists (i + d), δ. repeat split; try done. 
-         { lia. }
-         all: eapply elem_of_dom; eauto. }
-    
-    apply group_fairness_implies_step_or_unassign with (ρ := ρ) in FAIR; [| done].
-    apply fair_by_gen_equiv, fair_by_gen'_strong_equiv in FAIR. 
-    2, 3: solve_decision. 
-    red in FAIR.
-    specialize (FAIR (i + d)). specialize_full FAIR.
-    { by rewrite DTH. }
-    
-    destruct FAIR as (p & δ' & step' & PTH & STEPp & MINp).
-    rewrite /fairness_sat_gen in MINp. 
 
-    edestruct (list_exist_dec (fun m => exists δ1 ℓ δ2, lmtr !! m = Some (δ1, Some (ℓ, δ2)) /\ ¬ others_or_burn ρ δ1 ℓ δ2) (seq (i + d) p)) as [EXT | NOEXT].
-    { solve_decision. }
-    - destruct EXT as [k_ EXT].
-      pattern k_ in EXT. eapply min_prop_dec in EXT as [k [EXT MINk]]; [clear k_|].
-      2: { solve_decision. }
-      destruct EXT as [DOMk (?&ℓ&?&KTH&STEP)].
-      apply elem_of_seq in DOMk. 
-
-      forward eapply steps_keep_state_gen.
-      3: { apply others_or_burn_keep_lock. }
-      2: { eexists. split; [apply DTH| ]. eauto. }
-      { auto. }
-      3: { eapply trace_state_lookup. apply KTH. }
-      2: { split; [| reflexivity]. lia. }
-      { intros. destruct (decide (others_or_burn ρ st1 oℓ' st2)); [done| ].
-        specialize (MINk k0). specialize_full MINk; [| lia].
-        split; eauto.
-        apply elem_of_seq. lia. }
-      intros [LOCKk DISk]. 
-
-      (* assert (ls_tmap x !! asG ρ = Some ∅). *)
-      (* { eapply unma *)
-      exists k. eexists. repeat split. 
-      { lia. }
-      { eapply trace_state_lookup; eauto. }
-      { apply not_unused_dom. intros ?. edestruct unused_has_lock_incompat; eauto. }
-      all: auto. 
-      2: { apply not_unused_dom. intros ?. edestruct unused_has_lock_incompat; eauto. }
-      
-      rewrite /others_or_burn in STEP. destruct ℓ as [r| ].
-      2: { simpl in STEP. tauto. }
-      destruct r.
-      { apply NNP_P in STEP.
-        edestruct disabled_not_live; eauto. 
-        apply next_TS_spec_pos in STEP. eapply fm_live_spec.
-        apply STEP. }
-      simpl in STEP. apply NNP_P in STEP.
-      eapply trace_valid_steps' in KTH; eauto. inversion KTH; subst.
-      destruct ι; subst; simpl in REL.
-      1, 2: apply proj1 in REL; by rewrite REL. 
-    - forward eapply steps_keep_state_gen.
-      3: { apply others_or_burn_keep_lock. }
-      2: { eexists. split; [eapply DTH| ]. eauto. }
-      { eauto. }
-      3: { eapply trace_state_lookup. apply PTH. }
-      2: { split; [lia| ]. reflexivity. }
-      { intros. destruct (decide (others_or_burn ρ st1 oℓ' st2)); [done| ].
-        edestruct NOEXT. exists k. split; eauto. 
-        apply elem_of_seq. lia. }
-      intros [LOCKp DISp].
-
-      red in STEPp. destruct STEPp as [UNMAP | STEP]. 
-      + do 2 eexists. repeat split.
-        2: { eapply trace_state_lookup, PTH. }
-        { lia. }
-        all: eauto.
-        1, 3: apply not_unused_dom; intros ?; edestruct unused_has_lock_incompat; eauto.
-        eapply unmapped_empty; eauto.
-        intros ?; edestruct unused_has_lock_incompat; eauto.
-      + red in STEP. destruct STEP as (?&?&?&[=]&<-&STEP); subst.
-        apply next_TS_spec_pos in STEP.
-        eapply disabled_not_live in DISp. destruct DISp.
-        eapply fm_live_spec. apply STEP.
-    
+    forward eapply final_steps; eauto.
+    { intros ** ?. eapply unused_can_lock_incompat; eauto. }
+    { apply others_or_burn_keep_can_lock. }
+    intros (n&?&?&?&?&?). exists n. eexists. split; [| eauto]. lia. 
+  Qed.     
 
   (* TODO: is it possible to avoid delegating this to user? *)
   Context {allow_unlock_impl: G -> lm_ls LM -> lm_ls LM}.
