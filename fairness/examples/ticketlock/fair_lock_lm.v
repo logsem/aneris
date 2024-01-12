@@ -39,10 +39,7 @@ Section FairLockLM.
       rm !! ρ = Some g -> g = asG ρ. 
 
   Context {MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ)}.
-  (* Context {ALLOWS_RENEW: forall (δ: lm_ls LM) ρ, *)
-  (*                 ls_tmap δ !! (asG ρ) = Some ∅ -> *)
-  (*                 forall a fm, In a [allow_unlock_impl; allow_lock_impl] ->                            *)
-  (*                 LSI (a ρ (ls_under δ)) (<[ asG ρ := {[ ρ ]} ]> (ls_tmap δ)) fm}.  *)
+
   Context {UNUSED_NOT_DOM: forall ρ (δ: lm_ls LM), 
         is_unused ρ (ls_under δ) <-> asG ρ ∉ dom $ ls_tmap δ}. 
 
@@ -62,9 +59,6 @@ Section FairLockLM.
         fun g δ => let '(asG ρ) := g in
                  g ∈ dom $ ls_tmap δ /\
                  P ρ (ls_under δ). 
-          (* exists ρ, *)
-          (*   ls_tmap (δ: fmstate LMF) !! g = Some {[ ρ ]} /\ *)
-          (*   P ρ (ls_under δ). *)
 
   (*TODO: move *)
   Lemma gset_singleton_dec `{Countable K}:
@@ -109,11 +103,7 @@ Section FairLockLM.
 
   Let disabled_st '(asG ρ) (δ: lm_ls LM) :=
         ls_tmap δ !! (asG ρ) = Some ∅ /\
-        (* default ∅ (ls_tmap δ !! (asG ρ)) = ∅ /\  *)
         lift_prop1 disabled_st (asG ρ) δ.
-        
-        (* ls_tmap δ = <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ1) /\ *)
-        (* ls_fuel δ = <[ ρ := lm_fl LM (ls_under δ2) ]> (ls_fuel δ1) /\ *)
 
   Instance FLP_LMF: FairLockPredicates LMF.
   refine {| 
@@ -134,15 +124,6 @@ Section FairLockLM.
             ls_tmap δ2 = <[ asG ρ := {[ ρ ]} ]> (ls_tmap δ1) /\
             ls_fuel δ2 = <[ ρ := lm_fl LM (ls_under δ2) ]> (ls_fuel δ1) /\
             P ρ (ls_under δ1) (ls_under δ2).
-
-  (* Let LM_active_exts (δ: fmstate LMF): gset (@fl_EI LMF) := *)
-  (*       let active_under := fl_active_exts (ls_under δ) in *)
-  (*       let g: G := @inhabitant G _ in *)
-  (*       let lift := fun ι => match ι with *)
-  (*                         | flU ρ => flU (default g (ls_mapping δ !! ρ)) (M := LMF) *)
-  (*                         | flL ρ => flL (default g (ls_mapping δ !! ρ)) (M := LMF) *)
-  (*                         end in *)
-  (*       set_map lift active_under. *)
 
   Definition allows_unlock := lift_prop2 allows_unlock. 
   Definition allows_lock := lift_prop2 allows_lock.
@@ -388,22 +369,6 @@ Section FairLockLM.
     by apply DET in PP as (-> & -> & ->).  
   Qed.
 
-  (* Lemma unmapped_not_live (ρ: fmrole M) (δ: lm_ls LM) *)
-  (*   (UNMAP: ρ ∉ dom (ls_mapping δ)): *)
-  (*   disabled_st ((asG ρ): fmrole LMF) δ. *)
-  (* Proof. *)
-  (*   red. *)
-  (*   apply LM_map_empty_notlive. *)
-  (*   destruct (ls_tmap δ !! asG ρ) eqn:Rρ; [| tauto]. *)
-  (*   left. destruct (decide (g = ∅)) as [-> | NE]; [done| ]. *)
-  (*   apply set_choose_L in NE as [ρ' IN]. *)
-  (*   assert (ρ' = ρ) as ->. *)
-  (*   { forward eapply (proj2 (ls_mapping_tmap_corr δ ρ' (asG ρ))). *)
-  (*     { eauto. } *)
-  (*     intros ?%MAP_RESTR. congruence. } *)
-  (*   edestruct UNMAP. apply elem_of_dom. exists (asG ρ). *)
-  (*   eapply ls_mapping_tmap_corr; eauto. *)
-  (* Qed. *)
   Lemma unmapped_empty (ρ: fmrole M) (δ: lm_ls LM)
     (USED: ¬ fair_lock.is_unused ρ (ls_under δ))
     (UNMAP: ρ ∉ dom (ls_mapping δ)):
@@ -830,17 +795,11 @@ Section FairLockLM.
 
     eapply destutter_ext.upto_stutter_finiteness; eauto.
     apply trace_termination; eauto.
-    { admit. }
+    { eapply ext_bounded_inner; eauto. }
     intros.
 
     red. intros.
 
-    (* destruct (decide (ρ' = ρ)).  *)
-    (* { subst. specialize (EV_REL (asG ρ) 0). *)
-    (*   red in EV_REL.  *)
-
-    (* pose proof JTH as (mtr_j & AFTERj & Aj)%state_lookup_after'. *)
-    
     forward eapply upto_state_lookup_unfold1 as (mtr_i' & i' & lmtr_i & AFTERi & AFTERi' & UPTOi & ITH' & ?); eauto. 
 
     forward eapply disable_lmtr as D; eauto.
@@ -870,7 +829,7 @@ Section FairLockLM.
     { erewrite <- state_lookup_after; eauto. }
     { lia. }
     apply ENp.
-  Qed. 
+  Qed.
 
 
   (* TODO: is it possible to avoid delegating this to user? *)
@@ -887,6 +846,84 @@ Section FairLockLM.
              (allow_lock_impl g δ = δ' /\ (can_lock_st g δ /\ disabled_st g δ))).
 
 
+  (* TODO: refactor *)
+  Lemma can_lock_dis_kept:
+    ∀ ρ : fmrole LMF,
+    @label_kept_state (@ext_model_FM LMF (@FL_EM LMF FLE_LMF))
+      (λ st : fmstate (@ext_model_FM LMF (@FL_EM LMF FLE_LMF)),
+         @can_lock_st LMF FLP_LMF ρ st ∧ @fair_lock.disabled_st LMF FLP_LMF ρ st)
+      (@other_proj LMF FLE_LMF ρ).
+  Proof.
+    red. intros [ρ] δ oℓ δ' [LOCK DIS] OTHER STEP.
+    simpl in STEP. 
+    inversion STEP; subst.
+    - assert (can_lock_st ρ (ls_under δ') /\ fair_lock.disabled_st ρ (ls_under δ') /\ ls_tmap δ' !! asG ρ = Some ∅) as (?&?&?).
+      { simpl in STEP0, LOCK, DIS.
+        simpl in OTHER.  destruct ρ0 as [ρ'].
+
+       assert (ρ ∉ dom (ls_mapping δ)) as ND. 
+       { intros IN.
+         apply elem_of_dom in IN as [? MAP].
+         pose proof MAP as ->%MAP_RESTR.
+         apply proj1 in DIS.
+         apply ls_mapping_tmap_corr in MAP as (?&?&?).
+         rewrite DIS in H. set_solver. }
+        
+        unfold_LMF_trans STEP0.
+        2: { simpl in STEP1. pose proof STEP1 as SS. repeat apply proj2 in STEP1.
+            rewrite -STEP1. repeat split; try tauto.
+            apply unmapped_empty.
+            { intros ?. rewrite STEP1 in LOCK.
+              edestruct unused_can_lock_incompat; eauto. apply LOCK. }
+            intros IN. 
+            pose proof SS.
+            do 3 apply proj2 in SS. apply proj1 in SS.
+            repeat rewrite -ls_same_doms in SS.
+            set_solver. }
+        forward eapply (step_keeps_can_lock_dis ρ (ls_under δ)).
+        { split; [apply LOCK | apply DIS]. }
+        2: { left. apply STEP1. }
+        { simpl. intros ->.
+          apply proj1 in DIS.
+          simpl in STEP1. apply proj2, proj1 in STEP1.
+          pose proof STEP1 as (?&?&?)%ls_mapping_tmap_corr.
+          by apply MAP_RESTR in STEP1. }
+        intros [??]. repeat split; eauto.
+        simpl in STEP1.
+        apply unmapped_empty.
+        { intros ?. edestruct unused_can_lock_incompat; eauto. }
+        intros IN.
+        repeat apply proj2 in STEP1. specialize (STEP1 ρ). specialize_full STEP1.
+        { apply elem_of_difference. repeat rewrite -ls_same_doms. split; [done| ].
+          intros IN'. done. }
+        apply elem_of_difference, proj1 in STEP1.
+        eapply disabled_not_live in H0; eauto. }
+      
+      simpl. repeat split; eauto.
+      all: by apply elem_of_dom. 
+    - forward eapply (step_keeps_can_lock_dis ρ δ) as KEPT. 
+      { split; [apply LOCK| apply DIS]. }
+      2: { right. eapply PROJ_KEEP_EXT; eauto. }
+      { simpl. simpl in OTHER.
+        destruct ι; simpl; simpl in OTHER; red; destruct ρ0; congruence. }
+      intros. 
+      destruct ι; simpl in REL; red in REL.
+      + destruct ρ0 as [ρ']. assert (ρ' ≠ ρ) by set_solver. 
+        simpl in *.
+        enough (ls_tmap δ' !! asG ρ = Some ∅).
+        { repeat split; eauto; try by apply KEPT.
+          all: eapply elem_of_dom; eauto. }
+        apply proj2, proj1 in REL. rewrite REL.
+        rewrite lookup_insert_ne; [| done]. tauto. 
+      + destruct ρ0 as [ρ']. assert (ρ' ≠ ρ) by set_solver. 
+        simpl in *.
+        enough (ls_tmap δ' !! asG ρ = Some ∅).
+        { repeat split; eauto; try by apply KEPT.
+          all: eapply elem_of_dom; eauto. }
+        apply proj2, proj1 in REL. rewrite REL.
+        rewrite lookup_insert_ne; [| done]. tauto. 
+  Qed.  
+    
   Lemma lock_dis_kept:
     ∀ ρ : fmrole LMF,
     @label_kept_state (@ext_model_FM LMF (@FL_EM LMF FLE_LMF))
@@ -993,27 +1030,14 @@ Section FairLockLM.
       fair_lock.allow_unlock_impl := allow_unlock_impl;
       fair_lock.allow_lock_impl := allow_lock_impl;
     |}. 
-  13: { apply FL_LM_progress. }
+  16: { apply FL_LM_term. }
+  15: { apply FL_LM_unlock. }
+  14: { apply FL_LM_progress. }
   - simpl. 
     apply allows_unlock_impl_spec. 
-    (* intros [ρ] δ δ'. simpl. *)
-    (* repeat rewrite fair_lock.allows_unlock_impl_spec allows_unlock_impl_spec.  *)
-    (* trans (ls_tmap δ !! asG ρ = Some ∅ ∧ *)
-    (*        allow_unlock_impl (asG ρ) δ = δ' ∧  *)
-    (*        has_lock_st ρ (ls_under δ) ∧           *)
-    (*        fair_lock.disabled_st ρ (ls_under δ)). *)
-    (* 2: { split; [| tauto]. intros (?&?&?&?). *)
-    (*      repeat split; auto. *)
-    (*      all: by apply elem_of_dom. } *)
-    (* apply Morphisms_Prop.and_iff_morphism; [done| ]. *)
-    (* rewrite !and_assoc.     *)
-    (* do 2 (apply Morphisms_Prop.and_iff_morphism; [| done]). *)
-    (* rewrite allows_unlock_impl_spec.  *)
-    (* do 2 rewrite -(and_assoc _ _ (¬ active_st _ _)). *)
-    (* do 2 rewrite (and_comm _ (has_lock_st _ _ /\ _)). apply iff_and_pre. *)
-    (* intros [LOCK DIS]. *)
   - simpl. apply allows_lock_impl_spec.
   - apply lock_dis_kept.
+  - apply can_lock_dis_kept. 
   - apply unused_kept_LM.
   - intros ? []. simpl. tauto.
   - intros ? []. simpl. tauto.

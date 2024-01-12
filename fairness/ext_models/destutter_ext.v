@@ -179,6 +179,35 @@ Section upto_preserves.
         eapply trace_valid_cons_inv; eauto.        
   Qed.
 
+  Lemma ext_bounded_inner (eauxtr : elmftrace (LM := LM)) mtr:
+    upto_stutter_eauxtr proj_ext eauxtr mtr ->
+    ext_trans_bounded eauxtr ->
+    ext_trans_bounded mtr. 
+  Proof.
+    intros UPTO BOUND.
+    do 2 red in BOUND. destruct BOUND as [n BOUND].
+    destruct (after n eauxtr) as [atr| ] eqn:AFTER.
+    2: { apply fin_trans_bounded.
+         eapply upto_stutter_terminating_trace; eauto.
+         red. eauto. }
+    pose proof AFTER as AFTER'. eapply upto_stutter_after' in AFTER'; eauto.
+    destruct AFTER' as (n' & atr' & AFTER' & UPTO').
+    red. exists n'. intros i ? LE ITH. intros [? ->].
+    apply Nat.le_sum in LE as [d ->].
+    erewrite <- label_lookup_after in ITH; eauto.
+    apply trace_label_lookup_simpl' in ITH as (?&?&ITH). 
+    eapply upto_stutter_trace_lookup' in ITH; eauto.
+    destruct ITH as (p&?&oℓ&?&PTH&<-&<-&LBL).
+    destruct oℓ as [[|] |]; [..| done]; simpl in LBL.
+    { destruct next_TS_role; done. }
+    destruct e. inversion LBL. subst. 
+    eapply BOUND.
+    2: { eapply trace_label_lookup_simpl'. do 2 eexists.
+         erewrite <- trace_lookup_after; eauto. }
+    { lia. }
+    eauto.
+  Qed. 
+
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
