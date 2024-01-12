@@ -75,6 +75,16 @@ Section FairLock.
                (* ¬ role_enabled_model ρ st'. *)
                disabled_st ρ st'. 
   
+  Definition fair_unlock_termination (fair: mtrace EFM -> Prop) :=
+    forall (tr: mtrace EFM) (ρ: R) (i: nat) (st: St)
+      (VALID: mtrace_valid tr)
+      (FAIR: fair tr)
+      (ITH: tr S!! i = Some st)
+      (CAN_LOCK: has_lock_st ρ st)
+      (ACT: active_st ρ st),
+    exists n st', i < n /\ tr S!! n = Some st' /\ can_lock_st ρ st' /\ 
+               disabled_st ρ st'. 
+  
 End FairLock.
 
 
@@ -205,6 +215,7 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: FairLockExt M)
     has_lock_st ρlg tl_st2 /\ active_st ρlg tl_st2;
 
   lock_progress: @fair_lock_progress _ FLP (FL_EM FLE) fair;
+  unlock_termination: @fair_unlock_termination _ FLP (FL_EM FLE) fair;
 }.
 
 

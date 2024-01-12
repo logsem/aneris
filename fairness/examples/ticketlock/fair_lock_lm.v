@@ -616,6 +616,104 @@ Section FairLockLM.
     solve_decision. 
   Qed. 
 
+  Lemma final_steps ρ i (P: R → fmstate M → Prop)
+    (lmtr: mtrace (@ext_model_FM LMF (@FL_EM LMF FLE_LMF)))
+    (δ : LiveState G M LSI)
+    (DISM : fair_lock.disabled_st ρ (ls_under δ))
+    (* (LOCK : has_lock_st ρ (ls_under δ)) *)
+    (Pi: P ρ (ls_under δ))
+    (DTH : lmtr S!! i = Some δ)
+    (USED: forall ρ st, P ρ st -> ¬ is_unused ρ st)
+    (KEPT: forall ρ, label_kept_state_gen
+             (λ st : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
+                 P ρ (ls_under st) ∧ fair_lock.disabled_st ρ (ls_under st)) (others_or_burn ρ))
+    (FAIR: ∀ g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr)
+    (VALID: mtrace_valid lmtr):
+    ∃ (n : nat) (st' : fmstate ext_model_FM),
+      i <= n
+      ∧ lmtr S!! n = Some st'
+      ∧ lift_prop1 P (asG ρ) st' ∧ fair_lock.disabled_st (asG ρ) st'.
+  Proof.
+    destruct (decide (ρ ∈ dom (ls_mapping δ))) as [MAP | UNMAP]. 
+    2: { eapply unmapped_empty in UNMAP.
+         2: { eauto. }
+         exists i, δ. split; [lia| ].
+         repeat split; try done. 
+         all: eapply elem_of_dom; eauto. }
+
+    apply group_fairness_implies_step_or_unassign with (ρ := ρ) in FAIR; [| done].
+    apply fair_by_gen_equiv, fair_by_gen'_strong_equiv in FAIR. 
+    2, 3: solve_decision. 
+    red in FAIR.
+    specialize (FAIR i). specialize_full FAIR.
+    { by rewrite DTH. }
+    
+    destruct FAIR as (p & δ' & step' & PTH & STEPp & MINp).
+    rewrite /fairness_sat_gen in MINp. 
+
+    edestruct (list_exist_dec (fun m => exists δ1 ℓ δ2, lmtr !! m = Some (δ1, Some (ℓ, δ2)) /\ ¬ others_or_burn ρ δ1 ℓ δ2) (seq i p)) as [EXT | NOEXT].
+    { solve_decision. }
+    - destruct EXT as [k_ EXT].
+      pattern k_ in EXT. eapply min_prop_dec in EXT as [k [EXT MINk]]; [clear k_|].
+      2: { solve_decision. }
+      destruct EXT as [DOMk (?&ℓ&?&KTH&STEP)].
+      apply elem_of_seq in DOMk. 
+
+      forward eapply steps_keep_state_gen.
+      3: { apply KEPT. }
+      2: { eexists. split; [apply DTH| ]. eauto. }
+      { auto. }
+      3: { eapply trace_state_lookup. apply KTH. }
+      2: { split; [| reflexivity]. lia. }
+      { intros. destruct (decide (others_or_burn ρ st1 oℓ' st2)); [done| ].
+        specialize (MINk k0). specialize_full MINk; [| lia].
+        split; eauto.
+        apply elem_of_seq. lia. }
+      intros [LOCKk DISk]. 
+
+      exists k. eexists. repeat split. 
+      { lia. }        
+      { eapply trace_state_lookup; eauto. }
+      { apply not_unused_dom. eauto. }
+      all: auto. 
+      2: { apply not_unused_dom. eauto. }
+      
+      rewrite /others_or_burn in STEP. destruct ℓ as [r| ].
+      2: { simpl in STEP. tauto. }
+      destruct r.
+      { apply NNP_P in STEP.
+        edestruct disabled_not_live; eauto. 
+        apply next_TS_spec_pos in STEP. eapply fm_live_spec.
+        apply STEP. }
+      simpl in STEP. apply NNP_P in STEP.
+      eapply trace_valid_steps' in KTH; eauto. inversion KTH; subst.
+      destruct ι; subst; simpl in REL.
+      1, 2: apply proj1 in REL; by rewrite REL. 
+    - forward eapply steps_keep_state_gen.
+      3: { apply KEPT. }
+      2: { eexists. split; [eapply DTH| ]. eauto. }
+      { eauto. }
+      3: { eapply trace_state_lookup. apply PTH. }
+      2: { split; [lia| ]. reflexivity. }
+      { intros. destruct (decide (others_or_burn ρ st1 oℓ' st2)); [done| ].
+        edestruct NOEXT. exists k. split; eauto. 
+        apply elem_of_seq. lia. }
+      intros [LOCKp DISp].
+
+      red in STEPp. destruct STEPp as [UNMAP | STEP]. 
+      + do 2 eexists. repeat split.
+        2: { eapply trace_state_lookup, PTH. }
+        { lia. }
+        all: eauto.
+        1, 3: apply not_unused_dom; by eauto. 
+        eapply unmapped_empty; eauto.
+      + red in STEP. destruct STEP as (?&?&?&[=]&<-&STEP); subst.
+        apply next_TS_spec_pos in STEP.
+        eapply disabled_not_live in DISp. destruct DISp.
+        eapply fm_live_spec. apply STEP.
+  Qed. 
+ 
+    
   Lemma FL_LM_progress:
     @fair_lock_progress _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
   Proof.
@@ -654,11 +752,53 @@ Section FairLockLM.
       simpl in CAN_LOCK.
       edestruct can_has_lock_incompat; eauto.
       apply CAN_LOCK. }  
+    
+    forward eapply final_steps; eauto.
+    { intros ** ?. eapply unused_has_lock_incompat; eauto. }
+    { apply others_or_burn_keep_lock. }
+    intros (n&?&?&?&?&?). exists n. eexists. split; [| eauto]. lia. 
+  Qed.
+
+  Lemma FL_LM_unlock:
+    @fair_unlock_termination _ FLP_LMF (FL_EM FLE_LMF) (fun tr => forall g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g tr). 
+  Proof.
+    red. intros lmtr [ρ] i δ **.
+    rename CAN_LOCK into LOCK. 
+    pose proof (group_fairness_implies_role_fairness _ _ VALID FAIR) as FAIR'.
+    pose proof (can_destutter_eauxtr proj_ext _ VALID) as [mtr UPTO].
+    forward eapply destutter_ext.upto_preserves_validity as VALIDm; eauto. 
+    { apply PROJ_KEEP_EXT. }
+    forward eapply destutter_ext.upto_stutter_fairness as FAIRm; eauto.
+    { eapply ELM_ALM_afair_by_next; eauto. }
+    pose proof (@unlock_termination _ _ _ _ FL) as PROGRESSm.
+    red in PROGRESSm.
+
+    forward eapply upto_state_lookup_unfold2 as (lmtr_i & i' & mtr_i' & AFTERi & AFTERi' & UPTOi & ITH'); eauto. 
+      
+    specialize (PROGRESSm mtr_i' ρ 0 (ls_under δ)).
+    specialize_full PROGRESSm; eauto.
+    { eapply trace_valid_after; eauto. }
+    { do 2 red. intros. eapply fair_by_after; eauto. by apply FAIRm. }
+    { erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r. }
+    { apply LOCK. }
+    { apply ACT. }
+    
+    destruct PROGRESSm as (d' & st & NZ & DTH' & UNLOCK & DISM).
+    eapply upto_stutter_state_lookup in DTH' as (d & δ' & DTH & CORRd); [| by apply UPTOi].
+    subst st.
+    erewrite state_lookup_after in DTH; eauto.
+
+    assert (d > 0) as NZd.
+    { destruct d; [| lia].
+      rewrite Nat.add_0_r ITH in DTH. inversion DTH. subst δ'.
+      simpl in LOCK.
+      edestruct can_has_lock_incompat; eauto.
+      apply LOCK. }
     clear dependent δ. rename δ' into δ. 
     
     destruct (decide (ρ ∈ dom (ls_mapping δ))) as [MAP | UNMAP]. 
     2: { eapply unmapped_empty in UNMAP.
-         2: { intros ?. edestruct unused_has_lock_incompat; eauto. }
+         2: { intros ?. edestruct unused_can_lock_incompat; eauto. }
          exists (i + d), δ. repeat split; try done. 
          { lia. }
          all: eapply elem_of_dom; eauto. }
@@ -736,7 +876,7 @@ Section FairLockLM.
         apply next_TS_spec_pos in STEP.
         eapply disabled_not_live in DISp. destruct DISp.
         eapply fm_live_spec. apply STEP.
-  Qed.
+    
 
   (* TODO: is it possible to avoid delegating this to user? *)
   Context {allow_unlock_impl: G -> lm_ls LM -> lm_ls LM}.
