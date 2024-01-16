@@ -153,6 +153,16 @@ Section FMTraceHelpers.
         apply state_label_lookup. eauto. 
     Qed.
     
+    Lemma steps_keep_state_inf i (P: St -> Prop) Pl
+      (Pi: exists st, tr S!! i = Some st /\ P st)    
+      (P_KEPT: label_kept_state P Pl)
+      (NOρ: forall (k: nat) oℓ', i <= k -> tr L!! k = Some oℓ' -> Pl oℓ'):
+      forall k st' (IK: i <= k) (KTH: tr S!! k = Some st'), P st'.
+    Proof using VALID.
+      intros. eapply steps_keep_state; eauto.
+      intros p **. eapply (NOρ p); eauto. lia.  
+    Qed.
+
     (* (* TODO: rename *) *)
     (* Lemma kept_state_fair_step' (ρ: L) (P: St -> Prop) *)
     (*   (KEPT: label_kept_state P (other_step ρ)) *)
