@@ -15,6 +15,7 @@ From aneris.examples.crdt.oplib.spec Require Import model spec.
 From aneris.aneris_lang.lib Require Import inject.
 From aneris.examples.crdt.oplib.proof Require Import time resources.
 From aneris.examples.crdt.oplib.examples.pncounter Require Import pncounter_code pncounter_proof.
+From aneris.examples.rcb.instantiation Require Import events.
 
 Definition addresses := [SocketAddressInet "1.1.1.1" 100; SocketAddressInet "1.1.1.2" 100].
 Definition addresses_val := $ [SocketAddressInet "1.1.1.1" 100; SocketAddressInet "1.1.1.2" 100].
@@ -312,7 +313,7 @@ Section use_case_proof.
         iNext; iApply "HΦ"; done.
   Qed.
 
-  Context `{!@OpLibG CtrOp _ _ Σ, !@RCBG events.rcb_events Σ}.
+  Context `{!@OpLibG CtrOp _ _ Σ, !RCBG Σ}.
 
   Lemma wp_use_case_program :
     ⊢ |={⊤}=> ∃ Res : OpLib_Res CtrOp,
@@ -366,8 +367,7 @@ Definition Trivial_Mdl : resources.Model :=
 Lemma Trivial_Mdl_finitary : aneris_model_rel_finitary Trivial_Mdl.
 Proof. intros ?. apply finite_smaller_card_nat. apply _. Qed.
 
-
-Definition use_case_Σ := #[anerisΣ Trivial_Mdl; @RCBΣ events.rcb_events; @OPLIBΣ CtrOp _ _; GFunctor (exclR unitO)].
+Definition use_case_Σ := #[anerisΣ Trivial_Mdl; RCBΣ; @OPLIBΣ CtrOp _ _; GFunctor (exclR unitO)].
 
 Theorem use_case_program_adequate :
   aneris_adequate use_case_program "system" init_state (λ v, v = #()).
@@ -390,8 +390,8 @@ Proof.
     rewrite !big_sepS_singleton.
     repeat (rewrite bool_decide_eq_false_2; last set_solver).
     done. }
-  (* TODO: This hangs during unification. *)
-  iMod (wp_use_case_program ) as  (Res) "Hwp".
+  (* TODO: This takes a long time for some reason. *)
+  iMod wp_use_case_program as (Res) "Hwp".
   iDestruct (unallocated_split with "Hfx") as "[Hfx0 Hfx]"; [set_solver|].
   iDestruct (unallocated_split with "Hfx") as "[Hfx1 _]"; [set_solver|].
   iApply (aneris_wp_socket_interp_alloc_singleton

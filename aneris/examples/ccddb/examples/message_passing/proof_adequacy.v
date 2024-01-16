@@ -55,7 +55,7 @@ From aneris.examples.ccddb.instantiation Require Import time events proof.
 
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
- set (Σ := #[anerisΣ dummy_model; mpΣ; @DBΣ db_time db_events]).
+ set (Σ := #[anerisΣ dummy_model; mpΣ; DBΣ]).
  eapply (@adequacy Σ dummy_model _ _ ips sa_dom ∅ ∅ ∅);
    try done; last first.
   2: { apply dummy_model_finitary. }
