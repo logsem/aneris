@@ -516,7 +516,8 @@ Proof.
   iIntros "Hwp".
   iLöb as "IH" forall (E ip e Ψ).
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /=.
-  destruct (to_val e); simpl; first by iMod "Hwp"; eauto.
+  destruct (to_val e); simpl.
+  { iMod "Hwp". iModIntro. by eauto. }
   iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "Hsi".
   iMod ("Hwp" with "[//] [//] [//] Hsi") as "[% Hstp]".
   iModIntro.

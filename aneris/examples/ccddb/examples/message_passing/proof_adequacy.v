@@ -51,7 +51,7 @@ Proof.
 Qed.
 *)
 
-From aneris.examples.ccddb.instantiation Require Import proof.
+From aneris.examples.ccddb.instantiation Require Import time events proof.
 
 Theorem adequacy : aneris_adequate main "system" init_state (λ _, True).
 Proof.
