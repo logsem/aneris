@@ -1080,6 +1080,24 @@ Section ClientDefs.
       inversion STEP'; subst; try done.
       all: try by repeat eexists. }
 
+    eapply traces_match_preserves_termination; eauto.
+    eapply (trace_termination (project_tl_trace str)); eauto.
+    { eapply traces_match_valid2; eauto. }
+    { intros. eapply tl_subtrace_fair; eauto. }
+    { forward eapply (client_trace_tl_ext_bounded str); eauto.
+      { eapply (subtrace_valid tr); eauto. done. }
+      { apply trace_state_lookup_S in MTH.
+        rewrite -(Nat.add_0_r (S m)) in MTH. 
+        erewrite <- subtrace_state_lookup in MTH; eauto.
+        rewrite state_lookup_0 in MTH. inversion MTH. rewrite H1.
+        done. }
+      intros [i NOEXT]. exists i. intros * ? ITH [[e] ->].
+      eapply traces_match_label_lookup_2 in ITH as (?&ITH&MATCH'); [| by eauto].
+      red in MATCH'. simpl in MATCH'. subst.
+      edestruct NOEXT; eauto. }
+
+    foobar. 
+    
     eapply simulation_adequacy_terminate_general'_ext.
     5: by apply MATCH.
     { apply PROJ_KEEP_EXT. }
