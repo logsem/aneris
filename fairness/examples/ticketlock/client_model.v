@@ -1060,12 +1060,16 @@ Section ClientDefs.
     { eapply terminating_trace_equiv in TERM as [? LEN']; eauto.
       simpl in LEN'. done. }
 
-    simpl in LEN2.
+    simpl in LEN2. 
+
+    assert (ρ = Some $ ρ_ext $ flU (ρlg_l: fmrole TlLM_FM)) as ->.
+    { inversion STEP; subst; try done.
+      all: clear -FS; set_solver. }
+    
     forward eapply (tl_trace_construction str) as MATCH. 
     { subst. eapply (subtrace_valid tr); eauto. done. }
     {
       rename tl_st' into tl_st''. rename tl_st into tl_st'.
-      rename ρ into ρ'. 
       intros i [[tl_st f] [[ρ st']| ]] RES.
       2: { right. eexists. eauto. }
       left.
@@ -1096,43 +1100,37 @@ Section ClientDefs.
       red in MATCH'. simpl in MATCH'. subst.
       edestruct NOEXT; eauto. }
 
-    foobar. 
+    (* clear dependent ρ.  *)
+    intros g i. red. intros g' j δ **.
+    enough (∃ (k : nat) (st'' : client_state),
+    str S!! k = Some st'' ∧ j ≤ k ∧ active_st g' st''.1) as (?&?&KTH&?&?).
+    { do 2 eexists. repeat split.
+      eapply traces_match_state_lookup_1 in KTH as (?&?&?).
+      2-4: eauto.
+      simpl in *. set_solver. }
+
+    forward eapply traces_match_state_lookup_2 as (s&JTH'&RELj); eauto.
+    destruct s as [? f]. simpl in RELj. subst.
+    assert (g' ∈ lib_gs) as INg. 
+    { forward eapply @TlLSI_LGF as G; [apply δ| ]. red in G.
+      rewrite lib_gs_ρlg in G.      
+      admit. 
+      (* forward eapply (client_trace_keeps_unused tr); [done| ..]. *)
+      (* { erewrite <- subtrace_state_lookup; eauto. } *) 
+    }
+    rewrite lib_gs_ρlg !elem_of_union !elem_of_singleton in INg.
+    specialize (FAIR (ρ_ext $ flU g')). move FAIR at bottom.
+    apply fair_by_equiv in FAIR. red in FAIR.
+    specialize_full FAIR.
+    { erewrite <- subtrace_state_lookup with (k := j); eauto.
+      rewrite JTH'. simpl. red.
+      destruct INg as [-> | ->].
+      - eapply fm_live_spec. simpl. eapply ct_au_L. 
+    (* assert FAIR *)
+    destruct INg as [-> | ->].
+    - specialize (FAIR (ρ_ext $ fl)  
+                                                               
     
-    eapply simulation_adequacy_terminate_general'_ext.
-    5: by apply MATCH.
-    { apply PROJ_KEEP_EXT. }
-    { intros.
-      eapply fin_ext_fair_termination; eauto. }
-    { forward eapply (client_trace_tl_ext_bounded str); eauto.
-      { eapply (subtrace_valid tr); eauto. done. }
-      { apply trace_state_lookup_S in MTH.
-        rewrite -(Nat.add_0_r (S m)) in MTH. 
-        erewrite <- subtrace_state_lookup in MTH; eauto.
-        rewrite state_lookup_0 in MTH. inversion MTH. rewrite H1.
-        done. }
-      intros [i NOEXT]. exists i. intros * ? ITH [[e] ->].
-      eapply traces_match_label_lookup_2 in ITH as (?&ITH&MATCH'); [| by eauto].
-      red in MATCH'. simpl in MATCH'. subst.
-      edestruct NOEXT; eauto. }      
-    { (* TODO: unify this proof, one in tl_subtrace_fair
-         and one in comp_adequacy *)
-      subst. simpl in *.
-      forward eapply outer_exposing_subtrace; eauto.
-      intros [? EXP'].
-
-      unshelve eapply ELM_ALM_afair_by_next.
-      { red. apply TlEM_EXT_KEEPS. }  
-
-      eapply inner_LM_trace_fair_aux.
-      - apply _.
-      - done. 
-      - by apply EXP'. 
-      - simpl. intros ?? [=<-].
-        by apply EXP'.
-      - by apply EXP'.
-      - by apply MATCH. }
-    { eapply traces_match_valid1; eauto. }
-    subst. eapply fair_by_subtrace; eauto.
 
   Qed. 
 
