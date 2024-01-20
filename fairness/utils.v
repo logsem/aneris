@@ -424,6 +424,20 @@ Section map_utils.
     apply elem_of_dom. set_solver.
   Qed. 
 
+  Lemma mim_in_2 (m: gmap K V) (m': gmap V (gset K)) k v
+    (MIM: maps_inverse_match m m')
+    (IN: k ∈ default ∅ (m' !! v)):
+      k ∈ dom m.
+  Proof.
+    red in MIM.
+    destruct (m' !! v) eqn:TM.
+    2: { done. }
+    simpl in IN.
+    specialize (MIM k v). apply proj2 in MIM.
+    eapply elem_of_dom. eexists.
+    apply MIM. eauto. 
+  Qed. 
+
   Lemma mim_lookup_helper
     (tm: gmap V (gset K)) (m: gmap K V)
     R ζ
