@@ -256,11 +256,6 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: @FairLockExt M F
         (fun oℓ => oℓ ≠ Some (inr (env ((@flL M ρ): @EI _ (@FL_EM _ _ FLE)))))
         (M := @ext_model_FM _ (FL_EM FLE));
 
-  disabled_mtrans_kept (ρ: fmrole M):
-        label_kept_state 
-          (disabled_st ρ) 
-          (fun _ => True);
-
   step_keeps_unused: forall (ρ: fmrole M),
       label_kept_state
         (fun st => is_unused ρ st)
@@ -271,8 +266,6 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: @FairLockExt M F
   unused_does_unlock_incompat: forall tl_st ρlg,
     is_unused ρlg tl_st -> does_unlock ρlg tl_st -> False;
   unused_active_incompat: forall tl_st ρlg,
-    is_unused ρlg tl_st -> active_st ρlg tl_st -> False;
-  unused_live_incompat: forall tl_st ρlg,
     is_unused ρlg tl_st -> active_st ρlg tl_st -> False;
   (* model_step_keeps_unused: forall st1 ρ st2, *)
   (*     fmtrans M st1 (Some ρ) st2 -> forall ρ', is_unused ρ' st1 <-> is_unused ρ' st2; *)
@@ -294,12 +287,8 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: @FairLockExt M F
 
   does_lock_unlock_incompat: forall tl_st ρlg,
     does_lock ρlg tl_st -> does_unlock ρlg tl_st -> False;
-
-  (* (* TODO: introduce more uniform treatment of ETs pre- and postconditions *) *)
-  (* allows_unlock_spec: forall tl_st1 ρlg tl_st2, *)
-  (*   allows_unlock ρlg tl_st1 tl_st2 -> *)
-  (*   does_unlock ρlg tl_st1 /\ disabled_st ρlg tl_st1 /\ *)
-  (*   does_unlock ρlg tl_st2 /\ active_st ρlg tl_st2; *)
+  does_lock_unlock_trichotomy: forall tl_st ρlg,
+    does_lock ρlg tl_st \/ does_unlock ρlg tl_st \/ is_unused ρlg tl_st;
 
   lock_progress: @fl_lock_progress _ FLP (FL_EM FLE) fair;
   unlock_termination: @fl_unlock_termination _ FLP (FL_EM FLE) fair;
@@ -393,3 +382,29 @@ Proof using.
     { done. }
     intros [? DIS'']. red in DIS''. done.
 Qed. 
+
+
+Section FairLockProperties.
+  Context `{FL: FairLock}.
+
+  Lemma disabled_mtrans_kept (ρ: fmrole M):
+    label_kept_state (disabled_st ρ) is_Some.
+  Proof. 
+    red. intros.
+    red in Poℓ. destruct Poℓ as [? ->].
+    destruct (decide (is_unused ρ st)) as [UN | US]. 
+    { eapply step_keeps_unused in UN. specialize_full UN; [done| ..].
+      { left. eauto. }
+      red. intros ?. eapply unused_active_incompat; eauto. }
+          
+    destruct (does_lock_unlock_trichotomy st ρ) as [L | [U | UN]].
+    3: { eapply step_keeps_unused in UN. specialize_full UN; [done| ..].
+         { left. eauto. }
+         red. intros ?. eapply unused_active_incompat; eauto. }
+    1: eapply step_keeps_lock_dis. 4: eapply step_keeps_unlock_dis. 
+    all: eauto.
+    2, 4: by left; eauto.
+    all: congruence. 
+  Qed.
+
+End FairLockProperties.
