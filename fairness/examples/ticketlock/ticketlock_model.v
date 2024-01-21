@@ -567,14 +567,43 @@ Section Model.
       destruct ι; set_solver. 
     Qed. 
 
-    Global Instance tl_FLE: FairLockExt tl_fair_model.
-    esplit.
-    apply tl_active_exts_spec.
+    Definition is_unused ρ st :=
+      ρ ∉ dom (role_map st). 
+
+    Definition waits_st ρ (st: tl_st) :=
+      exists b k, role_map st !! ρ = Some (tl_U k, b) /\
+              k ≠ owner st.
+
+    Definition does_lock ρ st := can_lock_st ρ st \/ waits_st ρ st.
+
+    Instance does_lock_dec ρ st: Decision (does_lock ρ st).
+    Proof.
+      rewrite /does_lock /can_lock_st /waits_st.
+      destruct st as [o t rm wf]. 
+      destruct (rm !! ρ) as [[rs e]| ] eqn:R; simpl; rewrite !R. 
+      2: { simpl. right. set_solver. }
+      simpl. destruct rs as [| m]. 
+      { left. eauto. }
+      destruct (decide (o = m)).
+      - subst. right. set_solver.
+      - left. eauto.
+    Qed. 
+        
+    Definition tl_FLP: FairLockPredicates tl_fair_model.
+      (* the simple way doesn't get through *)
+      (* refine {| fair_lock.can_lock_st := can_lock_st |}.  *)
+      unshelve esplit.
+      - exact does_lock.
+      - exact has_lock_st.
+      - exact is_unused. 
+      (* ???  *)
+      (* 1-3: solve_decision.  *)
+      (* all: solve_decision. *)
+      - solve_decision.
+      - solve_decision.
+      - solve_decision.
     Defined. 
-    
-    Instance ExtTL: ExtModel tl_fair_model := 
-      FL_EM tl_FLE. 
-    
+      
     (* TODO: move*)
     Lemma lookup_empty_dom:
   ∀ {K : Type} {M : Type → Type} {D : Type} {H : ∀ A : Type, Dom (M A) D} 
@@ -597,7 +626,49 @@ Section Model.
  
   Section ProgressProperties.
 
+    Global Instance tl_FLE: @FairLockExt tl_fair_model tl_FLP.
+    esplit.
+    3: by apply tl_active_exts_spec.
+    - simpl. intros ? [] [] AU.  
+      red. simpl. rewrite /does_unlock. inversion AU. subst.
+      rewrite /has_lock_st /fair_lock.disabled_st /fair_lock.active_st. simpl.
+      rewrite -!active_st_enabled. rewrite /active_st. simpl.
+      rewrite !lookup_insert. rewrite LOCK. set_solver.
+    - simpl. intros ? [] [] AU.  
+      red. simpl. rewrite /does_lock. inversion AU. subst.
+      rewrite /can_lock_st /fair_lock.disabled_st /fair_lock.active_st. simpl.
+      rewrite -!active_st_enabled. rewrite /active_st. simpl.
+      rewrite !lookup_insert. rewrite LOCK. set_solver.
+    Defined. 
+          
+    Instance ExtTL: ExtModel tl_fair_model := 
+      FL_EM tl_FLE. 
+    
     Let ExtTL_FM := @ext_model_FM _ ExtTL. 
+
+
+    Ltac unfold_ρ_props ρ :=
+      repeat
+        match goal with
+        | H: waits_st ρ ?st |- _ => destruct H as (?&?&H&?)
+        | H: does_unlock ρ ?st |- _ => simpl in H
+        | H: has_lock_st ρ ?st |- _ => destruct H as [? H]
+        | H: can_lock_st ρ ?st |- _ => destruct H as [? H]
+        | H: disabled_st ρ ?st |- _ => destruct H as [? H]
+        | H: active_st ρ ?st |- _ => destruct H as [? H]
+        end.
+    
+    Ltac subst_ρ_props ρ :=
+      repeat
+        match goal with
+        | X: role_map ?st !! ρ = Some ?st1,
+            Y: role_map ?st !! ρ = Some ?st2
+            |- _ => rewrite X in Y; inversion Y
+        end.
+    
+    (* TODO: use more often *)
+    Ltac simpl_ρ ρ := unfold_ρ_props ρ; subst_ρ_props ρ.
+ 
 
     Section ProgressPropertiesImpl.
 
@@ -764,6 +835,29 @@ Section Model.
         all: by apply lookup_insert_ne.
       Qed. 
 
+      (* Lemma has_lock_kept_others (ρ: fmrole tl_fair_model) b: *)
+      (*   label_kept_state *)
+      (*     (fun st => does_unlock ρ st /\ fair_lock.disabled_st ρ st (FLP := tl_FLP)) *)
+      (*     (* (other_proj ρ (FLE := FLE)) *) *)
+      (*     (fun oℓ => oℓ ≠ Some (inr (env (flU ρ: @EI _ ExtTL)))) *)
+      (*     (M := @ext_model_FM _ ExtTL) *)
+      (*     .  *)
+      (* Proof using.  *)
+      (*   red. intros.  *)
+      (*   destruct st as [o1 t1 rm1 wf1], st' as [o2 t2 rm2 wf2]. *)
+      (*   rename Pst into OWNER. *)
+      (*   inversion STEP; subst. *)
+      (*   - rewrite /has_lock_st. assert (ρ0 ≠ ρ) as NEQ by (by intros ->).  *)
+      (*     inversion STEP0; subst; simpl in *; eauto.  *)
+      (*     { rewrite lookup_insert_ne; eauto. } *)
+      (*     destruct NEQ. eapply wf1; eauto.  *)
+      (*   - destruct ι; simpl in REL; inversion REL; subst; simpl in *. *)
+      (*     + assert (ρ0 = ρ) as -> by (eapply wf1; eauto). *)
+      (*       inversion STEP. subst. *)
+      (*       eapply ext_trans_others_kept in REL0; eauto. congruence.  *)
+      (*     + rewrite lookup_insert_ne; eauto. *)
+      (* Qed. *)
+      
       Lemma has_lock_kept_others (ρ: tl_role) b:
         @label_kept_state ExtTL_FM 
           (fun st => role_map st !! ρ = Some (tl_U (owner st), b)) (other_proj ρ).
@@ -805,27 +899,6 @@ Section Model.
 
       (* it turns out shorter to just repeat the previous proof *)
       Lemma has_lock_en_kept (ρ: tl_role) (o: nat):
-        @label_kept_state ExtTL_FM 
-          (fun st => owner st = o /\ role_map st !! ρ = Some (tl_U o, true)) (other_step $ inl ρ).
-      Proof using. 
-        red. intros. 
-        destruct st as [o1 t1 rm1 wf1], st' as [o2 t2 rm2 wf2].        
-        destruct Pst as (OW & OWNER).
-        inversion STEP; subst.
-        - rewrite /has_lock_st. assert (ρ0 ≠ ρ) as NEQ by (by intros ->). 
-          inversion STEP0; subst; simpl in *; eauto. 
-          { split; auto. rewrite lookup_insert_ne; eauto. }
-          destruct NEQ. eapply wf1; eauto.
-        - destruct ι; simpl in REL; inversion REL; subst; simpl in *.
-          all: split; [auto| ]. 
-          + assert (ρ0 = ρ) as -> by (eapply wf1; eauto).
-            rewrite lookup_insert. eauto.
-          + rewrite lookup_insert_ne; eauto.
-            intros ->. congruence.
-      Qed.
-
-      (* it turns out shorter to just repeat the previous proof *)
-      Lemma has_lock_active_kept (ρ: tl_role) (o: nat):
         @label_kept_state ExtTL_FM 
           (fun st => owner st = o /\ role_map st !! ρ = Some (tl_U o, true)) (other_step $ inl ρ).
       Proof using. 
@@ -902,7 +975,7 @@ Section Model.
         red. intros.
         destruct st as [o1 t1 rm1 wf1], st' as [o2 t2 rm2 wf2].        
         destruct Pst as (b & TKn & OWNER & OWo).
-        forward eapply (has_lock_active_kept ρo o1 _ _ _ _ _ STEP). Unshelve.
+        forward eapply (has_lock_en_kept ρo o1 _ _ _ _ _ STEP). Unshelve.
         3: { eauto. }
         2: { simpl in *. repeat split; eauto. rewrite OWo. eauto. }
         intros (OWNER' & LOCK'). 
@@ -942,28 +1015,6 @@ Section Model.
           all: rewrite lookup_insert_ne; eauto; intros ->; congruence.
       Qed.
 
-      Definition is_unused ρ st :=
-        ρ ∉ dom (role_map st). 
-
-      Definition tl_FLP: FairLockPredicates tl_fair_model.
-      (* the simple way doesn't get through *)
-      (* refine {| fair_lock.can_lock_st := can_lock_st |}.  *)
-        unshelve esplit.
-        - exact can_lock_st.
-        - exact has_lock_st.
-        - exact active_st.
-        - exact disabled_st. 
-        - exact is_unused. 
-        (* ???  *)
-        (* 1-4: solve_decision.  *)
-        (* all: solve_decision. *)
-        - solve_decision.
-        - solve_decision.
-        - solve_decision.
-        - solve_decision.
-        - solve_decision.
-      Defined. 
-      
       Let tl_eventual_release := @eventual_release _ tl_FLP ExtTL.  
 
       Lemma has_lock_unique st ρ1 ρ2
@@ -1002,7 +1053,7 @@ Section Model.
           let a := if (decide (d = 0)) then 0 else 1 in
           i < n ∧ tr S!! n = Some st' ∧ owner st' = o + 1 /\
           role_map st' !! ρ = Some (tl_U (S o + d), e') /\
-          forall k st_k, i <= k < n + a → tr S!! k = Some st_k → ¬ has_lock_st ρ st_k.
+          forall k st_k, i <= k < n + a → tr S!! k = Some st_k → ¬ (has_lock_st ρ st_k).
       Proof using VALID FAIR.
         assert (exists ρo, has_lock_st ρo (mkTlSt o t rm wf)) as [ρo LOCK].
         {
@@ -1025,15 +1076,15 @@ Section Model.
           { exists i. split; eauto.
             intros ? (?&?&?). lia. }
         
-          forward eapply eventual_release_strenghten; eauto. 
-          { apply not_active_disabled; auto.
-            simpl. destruct LOCK. simpl in *. eapply elem_of_dom. eauto. }
+          forward eapply eventual_release_strenghten; eauto.
+          { red. by rewrite -active_st_enabled. } 
           { intros. split; auto. intros.
             assert (k = i) as -> by lia.
             rewrite ST in KTH. inversion KTH. subst st_k.
-            intros [? LOCK']. rewrite R in LOCK'.
-            simpl in LOCK'. inversion LOCK'. lia. }
-        }
+            intros [? LOCK'].
+            red in LOCK'. rewrite -active_st_enabled /active_st /= in LOCK'.
+            rewrite R in LOCK'. simpl in LOCK'. destruct LOCK'. eauto. }
+          by setoid_rewrite active_st_enabled. }
         
         rename HH into EV_REL'. specialize_full EV_REL'.
         destruct EV_REL' as (k & (st' & KTH & LEik & ENρo) & MINk).
@@ -1161,17 +1212,13 @@ Section Model.
         rewrite RMρ'' in LOCK'. inversion LOCK'. lia.
       Qed.
 
-      Definition competes_st ρ '(mkTlSt o t rm wf) :=
-        exists b k, rm !! ρ = Some (tl_U k, b) /\
-               k ≠ o. 
-        
       Lemma lock_eventually_acquired
         (* o t rm wf ρ i wt  *)
         i st ρ
         (ST: tr S!! i = Some st)
         (* (WAIT: o ≠ wt) *)
         (* (R: rm !! ρ = Some (tl_U wt, true)) *)
-        (COMP: competes_st ρ st)
+        (COMP: waits_st ρ st)
         (EN: active_st ρ st)
         (EV_REL: tl_eventual_release tr ρ i):
         ∃ (n : nat) (st' : tl_st),
@@ -1185,7 +1232,7 @@ Section Model.
         assert (o < wt) as LT.
         { simpl in wf. pose proof wf as wf'%proj2%proj1.
           specialize (wf' wt). apply proj2 in wf'.
-          specialize_full wf'; eauto. lia. }
+          specialize_full wf'; eauto. simpl in *. lia. }
         
         (* assert (o < wt) as LT. *)
         (* { apply PeanoNat.Nat.le_neq. split; auto. *)
@@ -1208,7 +1255,7 @@ Section Model.
         simpl in ST. destruct ST as (n&st'&ST). 
         destruct st'. simpl in *.
         replace (S (o + S d)) with (S (S o) + d) in ST by lia.
-        rewrite decide_False in ST; [| lia].        
+        rewrite decide_False in ST; [| lia].
         destruct ST as (ST&ST0&ST1&ST2&ST3).
         rewrite ST1 Nat.add_1_r in tl_wf0, ST0. 
         eapply IHd with (i := n) in ST2. 
@@ -1222,16 +1269,20 @@ Section Model.
              { specialize (AFTER LE) as [? BETWEEN]. split; auto.
                intros.
                destruct (Nat.le_gt_cases k n) as [LE' | LT'].
-               - eapply NOLOCKρ; [| apply KTH]. rewrite decide_False; lia.
+               - simpl.
+                 apply Classical_Prop.or_not_and. left.                  
+                 eapply NOLOCKρ; [| apply KTH]. rewrite decide_False; lia.
                - eapply BETWEEN; [| apply KTH]. lia. }
              assert (ρ' ≠ ρ) as NEQ.
              { intros ->. edestruct (NOLOCKρ j); eauto. lia. }
-             split; auto. intros. eapply NOLOCKρ; [| apply KTH]. lia. }
+             split; auto. intros.
+             apply Classical_Prop.or_not_and. left. 
+             eapply NOLOCKρ; [| apply KTH]. lia. }
         destruct ST2 as (n0&st'&?). 
         exists n0, st'. repeat split; try by apply H. lia. 
       Qed.
 
-      Lemma tl_ev_rel_extend i st ρ j
+     Lemma tl_ev_rel_extend i st ρ j
         (ITH: tr S!! i = Some st)
         (RMρ: role_map st !! ρ = Some (tl_L, true))
         (EV_REL: tl_eventual_release tr ρ i)
@@ -1257,17 +1308,16 @@ Section Model.
             destruct HAS_LOCK. congruence. 
           + intros m st_m ? ? [?]. intros.
             specialize (KEEPρ m st_m). specialize_full KEEPρ; auto with lia. 
-            congruence. 
+            simpl_ρ ρ. 
         - destruct AFTER as [NEQ NOLOCKρ]; [lia| ].
           eapply EV_REL; eauto. intros. split; auto.
           intros m st_m ? ? LOCKρ.  
           destruct (Nat.le_gt_cases m j) as [LEmj | LTjm].
           + specialize (KEEPρ m st_m). specialize_full KEEPρ; auto with lia.
-            destruct LOCKρ. congruence. 
+            destruct LOCKρ. simpl_ρ ρ. 
           + edestruct NOLOCKρ; eauto. lia. 
       Qed.
         
-
       Theorem tl_progress ρ i st
         (ITH: tr S!! i = Some st)
         (CAN_LOCK: can_lock_st ρ st)
@@ -1315,10 +1365,31 @@ Section Model.
           rewrite -not_active_disabled.
           { repeat split; try by apply H. lia. }
           eapply has_lock_dom. apply H. 
-        - simpl. rewrite lookup_insert. eauto. 
+        - simpl. red. simpl. rewrite lookup_insert. eauto. 
         - red. rewrite lookup_insert. eauto.
         - eapply (tl_ev_rel_extend i); eauto with lia. 
-      Qed.      
+      Qed.
+
+      Theorem tl_progress_full (ρ: fmrole tl_fair_model) i st
+        (ITH: tr S!! i = Some st)
+        (CAN_LOCK: does_lock ρ st)
+        (ACT: active_st ρ st)
+        (EV_REL: tl_eventual_release tr ρ i):
+        exists n st', i < n /\ tr S!! n = Some st' /\ 
+                   does_unlock ρ st' (FairLockPredicates := tl_FLP) /\
+                   fair_lock.disabled_st ρ st' (FLP := tl_FLP).
+      Proof using VALID FAIR.
+        destruct CAN_LOCK.
+        { forward eapply tl_progress; eauto.
+          intros (?&?&?&?&?&?).
+          do 2 eexists. repeat split; eauto.
+          red. rewrite -active_st_enabled. eapply not_active_disabled; auto.
+          simpl_ρ ρ. subst. by apply elem_of_dom. }
+        forward eapply lock_eventually_acquired; eauto.
+        intros (?&?&?&?&?&?).
+        do 2 eexists. repeat split; eauto.
+        red. by rewrite -active_st_enabled.
+      Qed. 
 
       Lemma tl_unlock_term ρ i st
         (ITH: tr S!! i = Some st)
@@ -1439,16 +1510,16 @@ Section Model.
       (*   rewrite /can_lock_st /has_lock_st.  *)
       (*   destruct d; eauto.  *)
 
-      Lemma role_st_trichotomy ρ st (DOM: ρ ∈ dom (role_map st)):
-        can_lock_st ρ st \/ competes_st ρ st \/ has_lock_st ρ st.
-      Proof using.
-        clear dependent tr.
-        apply elem_of_dom in DOM as [[d?] DOM].
-        rewrite /can_lock_st /has_lock_st /competes_st.
-        destruct st. simpl in *. rewrite !DOM.        
-        destruct d; eauto. 
-        destruct (decide (t = owner0)); subst; set_solver. 
-      Qed.
+      (* Lemma role_st_trichotomy ρ st (DOM: ρ ∈ dom (role_map st)): *)
+      (*   can_lock_st ρ st \/ competes_st ρ st \/ has_lock_st ρ st. *)
+      (* Proof using. *)
+      (*   clear dependent tr. *)
+      (*   apply elem_of_dom in DOM as [[d?] DOM]. *)
+      (*   rewrite /can_lock_st /has_lock_st /competes_st. *)
+      (*   destruct st. simpl in *. rewrite !DOM.         *)
+      (*   destruct d; eauto.  *)
+      (*   destruct (decide (t = owner0)); subst; set_solver.  *)
+      (* Qed. *)
 
       Lemma tl_live_dom ρ st
         (LIVE: ρ ∈ tl_live_roles st):
@@ -1458,107 +1529,107 @@ Section Model.
         eapply elem_of_dom; eauto.
       Qed.
 
-      Lemma tl_trace_termination
-        (EXT_BOUND: ext_trans_bounded tr (EM := ExtTL))
-        (EV_REL: forall ρ i, eventual_release tr ρ i (FL := tl_FLP)):
-      terminating_trace tr.
-      Proof using VALID FAIR.
-        do 2 red in EXT_BOUND. destruct EXT_BOUND as [n BOUND].
-        destruct (after n tr) as [atr| ] eqn:An.
-        2: { red. eauto. }
-        forward eapply state_lookup_after'. intros NTH%proj1.
-        specialize_full NTH; [by eauto| ]. 
-        remember (trfirst atr) as st eqn:X. clear X.
-        remember (size $ live_roles tl_fair_model st) as a. 
-        assert (exists i, n = i) as [i NI] by eauto.
-        rewrite NI in NTH. apply Nat.eq_le_incl in NI.
-        clear dependent atr. 
-        generalize dependent i. generalize dependent st.
-        pattern a. apply lt_wf_ind. simpl.
-        clear a. intros a IH st SIZE i LE ITH.
+      (* Lemma tl_trace_termination *)
+      (*   (EXT_BOUND: ext_trans_bounded tr (EM := ExtTL)) *)
+      (*   (EV_REL: forall ρ i, eventual_release tr ρ i (FL := tl_FLP)): *)
+      (* terminating_trace tr. *)
+      (* Proof using VALID FAIR. *)
+      (*   do 2 red in EXT_BOUND. destruct EXT_BOUND as [n BOUND]. *)
+      (*   destruct (after n tr) as [atr| ] eqn:An. *)
+      (*   2: { red. eauto. } *)
+      (*   forward eapply state_lookup_after'. intros NTH%proj1. *)
+      (*   specialize_full NTH; [by eauto| ].  *)
+      (*   remember (trfirst atr) as st eqn:X. clear X. *)
+      (*   remember (size $ live_roles tl_fair_model st) as a.  *)
+      (*   assert (exists i, n = i) as [i NI] by eauto. *)
+      (*   rewrite NI in NTH. apply Nat.eq_le_incl in NI. *)
+      (*   clear dependent atr.  *)
+      (*   generalize dependent i. generalize dependent st. *)
+      (*   pattern a. apply lt_wf_ind. simpl. *)
+      (*   clear a. intros a IH st SIZE i LE ITH. *)
 
-        destruct (Nat.eq_0_gt_0_cases a) as [-> | NZ].
-        { symmetry in SIZE. apply size_empty_inv, leibniz_equiv in SIZE. 
-          apply trace_state_lookup_simpl' in ITH as ([? step]&ITH&EQ).
-          simpl in EQ. subst.
-          destruct step as [[? oρ]|].
-          2: { pose proof (trace_has_len tr) as [? LEN].
-               eapply terminating_trace_equiv; eauto.
-               eapply trace_lookup_dom_eq, proj1 in LEN.
-               specialize_full LEN; eauto. }
-          pose proof ITH as STEP. eapply trace_valid_steps' in STEP; eauto.          
-          inversion STEP; subst.
-          { apply fm_live_spec in STEP. set_solver. }
-          apply state_label_lookup in ITH as (_&_&?).
-          edestruct BOUND; eauto. }
+      (*   destruct (Nat.eq_0_gt_0_cases a) as [-> | NZ]. *)
+      (*   { symmetry in SIZE. apply size_empty_inv, leibniz_equiv in SIZE.  *)
+      (*     apply trace_state_lookup_simpl' in ITH as ([? step]&ITH&EQ). *)
+      (*     simpl in EQ. subst. *)
+      (*     destruct step as [[? oρ]|]. *)
+      (*     2: { pose proof (trace_has_len tr) as [? LEN]. *)
+      (*          eapply terminating_trace_equiv; eauto. *)
+      (*          eapply trace_lookup_dom_eq, proj1 in LEN. *)
+      (*          specialize_full LEN; eauto. } *)
+      (*     pose proof ITH as STEP. eapply trace_valid_steps' in STEP; eauto.           *)
+      (*     inversion STEP; subst. *)
+      (*     { apply fm_live_spec in STEP. set_solver. } *)
+      (*     apply state_label_lookup in ITH as (_&_&?). *)
+      (*     edestruct BOUND; eauto. } *)
 
-        intros. apply PeanoNat.Nat.neq_0_lt_0 in NZ. 
-        forward eapply size_non_empty_iff as [NE _]. specialize_full NE.
-        { rewrite SIZE in NZ. apply NZ. }
-        Unshelve. all: try by apply _. 
-        apply set_choose in NE as [ρ LIVE].
-        assert (exists j st', i <= j /\ tr S!! j = Some st' /\ 
-                          disabled_st ρ st') as (j&st'&LE'&JTH&DIS).
-        { pose proof LIVE as ?%active_st_enabled. 
-          destruct (role_st_trichotomy ρ st) as [?|[?|?]].
-          { eapply tl_live_dom; eauto. }
-          - forward eapply tl_progress; eauto.
-            { apply EV_REL. }
-            intros (j&?&?&?&?&?).
-            exists j. eexists. repeat split; eauto. lia.
-          - forward eapply lock_eventually_acquired; eauto.
-            { apply EV_REL. }
-            intros (j&?&?&?&?&?).
-            exists j. eexists. repeat split; eauto.
-            { lia. }
-            eapply not_active_disabled; eauto.
-            eapply has_lock_dom; eauto.
-          - forward eapply tl_unlock_term; eauto.
-            intros (j&?&?&?&?&?).
-            exists j. eexists. repeat split; eauto. lia. }
-        eapply IH. 
-        4: { apply JTH. }
-        3: lia.
-        2: reflexivity.
-        rewrite SIZE.
-        apply union_difference_singleton_L in LIVE. rewrite LIVE.
-        rewrite size_union_alt. rewrite size_singleton.
-        rewrite Nat.add_1_l. apply Nat.lt_succ_r.
-        rewrite difference_twice_L.
-        apply subseteq_size. apply subseteq_difference_r.
-        { apply disjoint_singleton_r. intros ?.
-          eapply active_disabled_incompat; eauto.
-          apply active_st_enabled; eauto. }
-        clear dependent ρ. apply elem_of_subseteq. intros ρ LIVE'.
-        destruct (decide (ρ ∈ tl_live_roles st)) as [?| DIS]; [done| ].
+      (*   intros. apply PeanoNat.Nat.neq_0_lt_0 in NZ.  *)
+      (*   forward eapply size_non_empty_iff as [NE _]. specialize_full NE. *)
+      (*   { rewrite SIZE in NZ. apply NZ. } *)
+      (*   Unshelve. all: try by apply _.  *)
+      (*   apply set_choose in NE as [ρ LIVE]. *)
+      (*   assert (exists j st', i <= j /\ tr S!! j = Some st' /\  *)
+      (*                     disabled_st ρ st') as (j&st'&LE'&JTH&DIS). *)
+      (*   { pose proof LIVE as ?%active_st_enabled.  *)
+      (*     destruct (role_st_trichotomy ρ st) as [?|[?|?]]. *)
+      (*     { eapply tl_live_dom; eauto. } *)
+      (*     - forward eapply tl_progress; eauto. *)
+      (*       { apply EV_REL. } *)
+      (*       intros (j&?&?&?&?&?). *)
+      (*       exists j. eexists. repeat split; eauto. lia. *)
+      (*     - forward eapply lock_eventually_acquired; eauto. *)
+      (*       { apply EV_REL. } *)
+      (*       intros (j&?&?&?&?&?). *)
+      (*       exists j. eexists. repeat split; eauto. *)
+      (*       { lia. } *)
+      (*       eapply not_active_disabled; eauto. *)
+      (*       eapply has_lock_dom; eauto. *)
+      (*     - forward eapply tl_unlock_term; eauto. *)
+      (*       intros (j&?&?&?&?&?). *)
+      (*       exists j. eexists. repeat split; eauto. lia. } *)
+      (*   eapply IH.  *)
+      (*   4: { apply JTH. } *)
+      (*   3: lia. *)
+      (*   2: reflexivity. *)
+      (*   rewrite SIZE. *)
+      (*   apply union_difference_singleton_L in LIVE. rewrite LIVE. *)
+      (*   rewrite size_union_alt. rewrite size_singleton. *)
+      (*   rewrite Nat.add_1_l. apply Nat.lt_succ_r. *)
+      (*   rewrite difference_twice_L. *)
+      (*   apply subseteq_size. apply subseteq_difference_r. *)
+      (*   { apply disjoint_singleton_r. intros ?. *)
+      (*     eapply active_disabled_incompat; eauto. *)
+      (*     apply active_st_enabled; eauto. } *)
+      (*   clear dependent ρ. apply elem_of_subseteq. intros ρ LIVE'. *)
+      (*   destruct (decide (ρ ∈ tl_live_roles st)) as [?| DIS]; [done| ]. *)
 
-        forward eapply steps_keep_state_inf.
-        3: { apply dom_rolemap_fmtrans_kept. }
-        { eauto. }
-        { eexists. split; [apply ITH| ]. reflexivity. }
-        { intros. simpl. apply BOUND in H0; [| lia]. 
-          destruct oℓ' as [[|]|]; try done.
-          eapply H0; eauto. }
-        2: { apply JTH. }
-        { lia. }
-        simpl. intros DOM_EQ. 
+      (*   forward eapply steps_keep_state_inf. *)
+      (*   3: { apply dom_rolemap_fmtrans_kept. } *)
+      (*   { eauto. } *)
+      (*   { eexists. split; [apply ITH| ]. reflexivity. } *)
+      (*   { intros. simpl. apply BOUND in H0; [| lia].  *)
+      (*     destruct oℓ' as [[|]|]; try done. *)
+      (*     eapply H0; eauto. } *)
+      (*   2: { apply JTH. } *)
+      (*   { lia. } *)
+      (*   simpl. intros DOM_EQ.  *)
         
-        forward eapply steps_keep_state_inf.
-        3: { apply (disabled_fmtrans_kept ρ). }
-        { eauto. }
-        { eexists. split; [apply ITH| ].
-          apply not_active_disabled.
-          { rewrite -DOM_EQ. by apply tl_live_dom. }  
-          intros ?%active_st_enabled. apply DIS. eauto. }
-        { intros. simpl. apply BOUND in H0; [| lia]. 
-          destruct oℓ' as [[|]|]; try done.
-          eapply H0; eauto. }
-        2: { apply JTH. }
-        { lia. }
-        intros DIS'%not_active_disabled.
-        { destruct DIS'. by apply active_st_enabled. }
-        destruct DIS'. eapply elem_of_dom; eauto.
-      Qed. 
+      (*   forward eapply steps_keep_state_inf. *)
+      (*   3: { apply (disabled_fmtrans_kept ρ). } *)
+      (*   { eauto. } *)
+      (*   { eexists. split; [apply ITH| ]. *)
+      (*     apply not_active_disabled. *)
+      (*     { rewrite -DOM_EQ. by apply tl_live_dom. }   *)
+      (*     intros ?%active_st_enabled. apply DIS. eauto. } *)
+      (*   { intros. simpl. apply BOUND in H0; [| lia].  *)
+      (*     destruct oℓ' as [[|]|]; try done. *)
+      (*     eapply H0; eauto. } *)
+      (*   2: { apply JTH. } *)
+      (*   { lia. } *)
+      (*   intros DIS'%not_active_disabled. *)
+      (*   { destruct DIS'. by apply active_st_enabled. } *)
+      (*   destruct DIS'. eapply elem_of_dom; eauto. *)
+      (* Qed.  *)
 
     End ProgressPropertiesImpl.
 
@@ -1571,6 +1642,19 @@ Section Model.
       repeat (apply forall_proper; intros).
       repeat (apply Morphisms_Prop.iff_iff_iff_impl_morphism; auto).
     Qed. 
+
+    (* TODO: move *)
+    Global Instance label_kept_state_Proper_impl {M: FairModel}: 
+      Proper ((eq ==> iff) ==> (eq ==> flip impl) ==> impl) (@label_kept_state M).
+    Proof.
+      (* respectful (fun x y => x = y /\ x ≠ inl  *)
+      intros ?? EQ1 ?? EQ2.
+      red. rewrite /label_kept_state.
+      intros. eapply EQ1; [reflexivity| ].
+      eapply H; eauto.
+      { eapply EQ1; eauto. }
+      red in EQ2. eapply EQ2; eauto.   
+    Qed.
 
     Lemma unused_kept (ρ: fmrole tl_fair_model):
       @label_kept_state ExtTL_FM 
@@ -1621,11 +1705,12 @@ Section Model.
       esplit. apply H0. 
     Defined. 
       
-    Lemma allows_unlock_impl_spec ρ st:
+    Lemma allows_unlock_impl_spec (ρ: fmrole tl_fair_model) st:
       forall st', allows_unlock ρ st st' <-> 
-              (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ disabled_st ρ st)).
+              (allow_unlock_impl ρ st = st' /\ (has_lock_st ρ st /\ fair_lock.disabled_st ρ st (FLP := tl_FLP))).
     Proof.
-      destruct st as [o t rm]. intros [o' t' rm'].
+      intros st'.      
+      destruct st as [o t rm]. destruct st' as [o' t' rm'].
       rewrite /allow_unlock_impl /has_lock_st /disabled_st. simpl.  
       destruct decide. 
       2: { simpl. trans False.
@@ -1633,13 +1718,17 @@ Section Model.
            - symmetry. apply neg_false.
              intros ([=]&?&?). subst. destruct H4.
              destruct H3 as [? R]. rewrite R in n.
-             destruct x; [| set_solver]. congruence. }
+             destruct x; [| set_solver].
+             apply active_st_enabled. red. simpl. eauto. }
       split.
       - intros AL. inversion AL. subst.
         repeat split; eauto.
-        f_equal. apply wf_PI. 
+        + f_equal. apply wf_PI.
+        + red. rewrite -active_st_enabled. rewrite /active_st.
+          simpl. set_solver. 
       - intros ([=]&[?[=]]&?). subst. econstructor.
         destruct x; [| done]. edestruct H5; eauto.
+        apply active_st_enabled. red. eauto. 
     Qed.
 
     Definition allow_lock_impl (ρ: fmrole tl_fair_model) (st: tl_st): tl_st.
@@ -1649,11 +1738,16 @@ Section Model.
       pose proof (allows_lock_step ρ t o rm R).
       pose proof (allows_lock'_preserves_tl_state_wf _ _ _ H wf).
       esplit. apply H0. 
-    Defined. 
+    Defined.
+
+    (* Lemma disabled_equiv (ρ: fmrole tl_fair_model) st: *)
+    (*   disabled_st ρ st <-> fair_lock.disabled_st ρ st (FLP := tl_FLP). *)
+    (* Proof. *)
+    (*   rewrite -not_active_disabled.  *)
           
-    Lemma allows_lock_impl_spec ρ st:
+    Lemma allows_lock_impl_spec (ρ: fmrole tl_fair_model) st:
       forall st', allows_lock ρ st st' <-> 
-              (allow_lock_impl ρ st = st' /\ (can_lock_st ρ st /\ disabled_st ρ st)).
+              (allow_lock_impl ρ st = st' /\ (does_lock ρ st /\ fair_lock.disabled_st ρ st (FLP := tl_FLP))).
     Proof.
       destruct st as [o t rm]. intros [o' t' rm'].
       rewrite /allow_unlock_impl /can_lock_st /active_st. simpl.  
@@ -1662,72 +1756,158 @@ Section Model.
            - apply neg_false. intros AL. inversion AL. by subst.
            - symmetry. apply neg_false.
              intros ([=]&?&?). subst. destruct H4.
-             destruct H3 as [? R]. rewrite R in n.
-             destruct x; [| set_solver]. simpl in H. congruence. }
+             red in H3. destruct H3.
+             + 
+               destruct H as [? R]. rewrite R in n.
+               destruct x; [| set_solver].
+               apply active_st_enabled. red. eauto.
+             + destruct H as [? (? & R & ?)]. rewrite R in n.
+               destruct x; [| set_solver].
+               apply active_st_enabled. red. eauto. }
       split.
       - intros AL. inversion AL. subst.
         repeat split; eauto.
-        2: { red. simpl. eauto. }
-        f_equal. apply wf_PI. 
-      - intros ([=]&[?[=]]&?). subst. econstructor.
-        destruct x; [| done]. edestruct H5; eauto.
+        + f_equal. apply wf_PI.
+        + red. left. red. eauto. 
+        + red.
+          rewrite -active_st_enabled. rewrite /active_st.
+          simpl. set_solver.
+      - intros ([=]&X&?). subst. econstructor.
+        red in X. eauto.  
     Qed.
+
+    (* TODO: simplify *)
+    Lemma has_lock_kept_dis ρ:
+    @label_kept_state
+    (@ext_model_FM tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+    (λ st : tl_st,
+       has_lock_st ρ st ∧ @fair_lock.disabled_st tl_fair_model tl_FLP ρ st)
+    (λ oℓ : option (@ext_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE)),
+       oℓ
+       ≠ @Some
+           (tl_role + @env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+           (@inr tl_role
+              (@env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+              (@env tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE)
+                 (@flU tl_fair_model ρ)))).
+      Proof.
+        red. intros.
+        destruct (decide (oℓ' = Some $ inl ρ)).
+        { subst. apply proj2 in Pst. destruct Pst.
+          inversion STEP; subst. 
+          eapply fm_live_spec; eauto. }
+        enough (role_map st' !! ρ = Some (tl_U (owner st'), false)).
+        { rewrite /has_lock_st /fair_lock.disabled_st -active_st_enabled /active_st.
+          set_solver. }
+        destruct Pst.
+        red in H0. rewrite -active_st_enabled in H0. apply not_active_disabled in H0. 
+        2: { by apply has_lock_dom. }
+        simpl_ρ ρ. subst. 
+        eapply (has_lock_kept_others ρ false); eauto.
+        destruct oℓ'; [| done].
+        destruct f.
+        { set_solver. }
+        destruct e, i.
+        - by intros ->.
+        - inversion STEP; subst. simpl in REL. inversion REL; subst.
+          destruct st. simpl in *. 
+          intros ->. congruence.
+      Qed. 
+
+    Lemma competes_kept_dis:
+  ∀ ρ : fmrole tl_fair_model,
+    @label_kept_state
+      (@ext_model_FM tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+      (λ st : @ext_model_FM tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE),
+         @fair_lock.does_lock tl_fair_model tl_FLP ρ st
+         ∧ @fair_lock.disabled_st tl_fair_model tl_FLP ρ st)
+      (λ oℓ : option
+                (fmrole
+                   (@ext_model_FM tl_fair_model
+                      (@FL_EM tl_fair_model tl_FLP tl_FLE))),
+         oℓ
+         ≠ @Some
+             (fmrole tl_fair_model +
+              @env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+             (@inr (fmrole tl_fair_model)
+                (@env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+                (@env tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE)
+                   (@flL tl_fair_model ρ)))).
+    Proof.
+      red. intros.
+      destruct (decide (oℓ' = Some $ inl ρ)).
+      { subst. apply proj2 in Pst. destruct Pst.
+        inversion STEP; subst. 
+        eapply fm_live_spec; eauto. }
+      destruct Pst.
+      destruct H.
+      2: { red in H0. rewrite -active_st_enabled in H0. apply not_active_disabled in H0.
+           2: { simpl_ρ ρ. by eapply elem_of_dom. }
+           simpl_ρ ρ. subst.
+           pose proof (tl_wf st). red in H2. apply proj2, proj2, proj1 in H2.
+           set_solver. }
+      
+      enough (role_map st' !! ρ = Some (tl_L, false)).
+      { simpl.
+        rewrite /does_lock /can_lock_st /fair_lock.disabled_st -active_st_enabled /active_st.
+        set_solver. }
+      red in H0. rewrite -active_st_enabled in H0. apply not_active_disabled in H0. 
+      2: { simpl_ρ ρ. by eapply elem_of_dom. }
+      simpl_ρ ρ. subst. 
+      eapply (lock_compete_kept_proj ρ false); eauto.
+      destruct oℓ'; [| done].
+      destruct f.
+      { set_solver. }
+      destruct e, i.
+      - inversion STEP; subst. simpl in REL. inversion REL; subst.
+        destruct st. simpl in *. 
+        intros ->. congruence.
+      - simpl. by intros ->.
+    Qed.      
 
     Instance TLFairLock: @FairLock _ tl_FLP tl_FLE inner_fair_ext_model_trace. 
     Proof.
       econstructor.
-      - apply allows_unlock_impl_spec.
-      - apply allows_lock_impl_spec.
-      - intros. simpl.
-        rewrite /has_lock_st /disabled_st.
-        eapply label_kept_state_Proper.
-        3: { apply (has_lock_kept_others ρ false). }
-        2: { done. }
-        red. intros ?? ->.
-        (* apply Morphisms_Prop.and_iff_morphism; [done| ].  *)
-        destruct (role_map y !! ρ) eqn:R; rewrite !R. 
-        2: { set_solver. }
-        split.
-        + intros [[e [=->]] ?].
-          destruct e; eauto. edestruct H0; eauto.
-          congruence. 
-        + intros [=->]. split; [set_solver| ].
-          eauto.
-      - intros. red. intros.
-        destruct Pst as [[? P1] [? P2]]. rewrite P1 in P2.
-        inversion P2. subst. clear P2.
-        forward eapply (lock_compete_kept_proj ρ false); eauto.
-        intros KEPT. red in KEPT. specialize_full KEPT; eauto.
-        simpl. rewrite /can_lock_st /disabled_st. eauto. 
+      - simpl. apply allows_unlock_impl_spec.
+      - simpl. apply allows_lock_impl_spec.
+      - apply has_lock_kept_dis. 
+      - apply competes_kept_dis. 
       - apply unused_kept.  
-      - simpl. rewrite /is_unused /can_lock_st.
-        intros *. rewrite not_elem_of_dom.
-        intros X [? Y]. by rewrite X in Y.
+      - simpl. intros ? ρ **. 
+        red in H. apply not_elem_of_dom_1 in H. 
+        destruct H0; simpl_ρ ρ; by rewrite H in H0.
       - simpl. rewrite /is_unused /has_lock_st.
         intros *. rewrite not_elem_of_dom.
         intros X [? Y]. by rewrite X in Y.
-      - simpl. rewrite /is_unused /active_st.
-        intros *. rewrite not_elem_of_dom.
-        intros X [? Y]. by rewrite X in Y.
-      - simpl. rewrite /is_unused /active_st.
-        intros *. rewrite not_elem_of_dom.
-        intros X [? Y]. by rewrite X in Y.
-      - simpl. intros * DIS EN%active_st_enabled.
-        edestruct active_disabled_incompat; eauto. 
-      - simpl. intros. eapply has_lock_unique; eauto.
-      - simpl. rewrite /has_lock_st /can_lock_st.
-        intros * [??] [??]. congruence.
-      - simpl. 
-        intros * AU. 
-        destruct tl_st1 as [o1 t1 rm1 wf1], tl_st2 as [o2 t2 rm2 wf2]. 
-        inversion AU; subst; repeat split. 
-        + red. rewrite LOCK. eauto.
-        + rewrite /disabled_st. rewrite LOCK. set_solver.
-        + red. simpl. rewrite lookup_insert. eauto.
-        + red. simpl. rewrite lookup_insert. eauto.
-      - red. intros. eapply tl_progress; eauto.
-      - red. intros. eapply tl_unlock_term; eauto.
-      - red. intros. eapply tl_trace_termination; eauto.
+      - simpl. intros ? ρ **.
+        apply active_st_enabled in H0. 
+        red in H. apply not_elem_of_dom_1 in H. 
+        simpl_ρ ρ. by rewrite H0 in H. 
+      - simpl. done. 
+      - simpl. intros **.
+        red in H0. rewrite -active_st_enabled in H0. apply not_active_disabled in H0.
+        2: { by apply has_lock_dom. }
+        red in H2. rewrite -active_st_enabled in H2. apply not_active_disabled in H2.
+        2: { by apply has_lock_dom. }
+        simpl_ρ ρlg1. simpl_ρ ρlg2. subst.
+        pose proof (tl_wf tl_st0) as wf. red in wf.
+        eapply wf; eauto.  
+      - simpl. intros. destruct H; simpl_ρ ρlg; subst; lia.   
+      - simpl. rewrite /does_lock /can_lock_st /waits_st /has_lock_st /is_unused.
+        intros st ρ. destruct (role_map st !! ρ) as [[rs ?]| ] eqn:R.
+        2: { do 2 right. by eapply not_elem_of_dom. }
+        destruct rs as [| m]; eauto.
+        destruct (decide (m = owner st)); subst; set_solver.
+      - red. intros. simpl. eapply tl_progress_full; eauto.
+        by apply active_st_enabled. 
+      - red. intros.
+        forward eapply tl_unlock_term; eauto.
+        { by apply active_st_enabled. }
+        intros (?&?&?&?&?&?).
+        do 2 eexists. repeat split; eauto.
+        { simpl. red. tauto. }
+        simpl_ρ ρ. subst. red. rewrite -active_st_enabled.
+        rewrite /active_st. set_solver.  
     Qed. 
 
   End ProgressProperties. 
