@@ -196,6 +196,30 @@ Section fairness.
     apply δ. 
   Qed.   
 
+  Lemma groups_map_difference (rem: gset (fmrole M)) (tm: groups_map):
+    mapped_roles ((fun rs => rs ∖ rem) <$> tm) = mapped_roles tm ∖ rem. 
+  Proof. 
+    rewrite /mapped_roles.
+
+    (* rewrite map_img_fmap_L. *)
+    (* TODO: how to simplify this? *)
+    pose proof @map_img_fmap_L as X.
+    specialize X with (m := tm) (B := gset (fmrole M) (H := (fmrole_countable M))).
+    unshelve specialize_full X.
+    13, 16: by apply gset_elem_of.
+    1-3, 5-16: by apply _.
+    { exact (fun (rs: gset (fmrole M)) => (rs ∖ rem): gset (fmrole M)). }
+    rewrite X. clear X. 
+
+    pattern tm. apply map_ind.
+    { rewrite map_img_empty_L set_map_empty. set_solver. }
+    intros * NIN IND.
+    rewrite map_img_insert_L set_map_union_L !flatten_gset_union.
+    rewrite set_map_singleton_L. rewrite !flatten_gset_singleton.
+    rewrite difference_union_distr_l_L.
+    rewrite delete_notin; [| done]. by rewrite IND.
+  Qed. 
+
   Global Instance build_ls_ext st tm fm:
     Decision (exists δ, @ls_under δ = st /\ @ls_fuel δ = fm /\ @ls_tmap δ = tm).
   Proof.

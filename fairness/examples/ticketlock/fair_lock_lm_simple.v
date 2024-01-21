@@ -191,7 +191,8 @@ Section FairLockLM.
   From trillium.fairness Require Import partial_ownership.
   Hypothesis LSI_LIFTS_STEP: forall (δ1: lm_ls LM) ρ st2,
       fmtrans _ (ls_under δ1) (Some ρ) st2 ->
-      LSI st2 (ls_tmap δ1) (ls_fuel δ1). 
+      LSI st2 (ls_tmap δ1) (ls_fuel δ1).
+  Hypothesis LSI_FUEL_INDEP: LSI_fuel_independent (LSI := LSI). 
   Hypothesis M_STRONG_LR: FM_strong_lr M.
   Hypothesis STEP_NO_EN: forall st1 ρ st2,
       fmtrans M st1 (Some ρ) st2 ->
@@ -201,8 +202,6 @@ Section FairLockLM.
   (* TODO: move? generalize? *)
   Lemma enabled_group_singleton ρ δ:
     role_enabled_model ((asG ρ): fmrole LMF) δ <->
-    (* role_enabled_model ρ (ls_under δ) \/ *)
-    (* default 0 (ls_fuel δ !! ρ) > 0. *)
     ρ ∈ dom (ls_mapping δ).
   Proof.
     split; intros EN.
@@ -220,28 +219,78 @@ Section FairLockLM.
     pose proof MAP as MAP'%MAP_RESTR. subst g.
     destruct (decide (ρ ∈ live_roles _ (ls_under δ))) as [EN | DIS].
     - red. apply M_STRONG_LR in EN as [st2 STEP].
-      unshelve eapply fm_live_spec.
-      { refine {| ls_under := st2; ls_tmap := ls_tmap δ; ls_fuel := ls_fuel δ; |}.
-        2,3: by apply δ. 
-        { etrans; [eapply STEP_NO_EN; eauto| ]. apply δ. }
-        eapply LSI_LIFTS_STEP; eauto. }
-      simpl. exists (Take_step ρ (asG ρ)). split; [| done]. simpl.
-      (* repeat split; eauto. *)
-      (* + red. simpl. intros ρ' DECR.   *)
-      admit.
-    - red. unshelve eapply fm_live_spec.
-      { refine {| ls_under := ls_under δ; ls_fuel := delete ρ (ls_fuel δ); |}.
-        { pose proof (ls_fuel_dom δ). set_solver. }
-        3: { eapply DROP_PRES_LSI with (rem := {[ ρ ]}). apply δ. }
-        { intros ?. apply mapped_roles_dom_fuels_gen.
-          rewrite /mapped_roles.
-          admit. }
-        red. intros. admit. }
+      pose proof MAP as [f F]%mk_is_Some%ls_same_doms'. 
+      assert (exists δ': lm_ls LM, ls_under δ' = st2 /\ ls_tmap δ' = ls_tmap δ /\ ls_fuel δ' = <[ ρ := min (lm_fl LM st2) f ]> (ls_fuel δ)) as [δ' (ST' & TM' & F')]. 
+      {
+        unshelve eexists {| ls_under := st2 |}.
+        7: repeat split; reflexivity. 
+        3: by apply δ. 
+        { etrans; [eapply STEP_NO_EN; eauto| ].
+          rewrite dom_insert_L. pose proof (ls_fuel_dom δ). set_solver. }
+        2: { apply LSI_FUEL_INDEP with (F := ls_fuel δ). 
+             eapply LSI_LIFTS_STEP; eauto. }
+        intros. rewrite -(ls_tmap_fuel_same_doms δ).
+        apply mk_is_Some, ls_same_doms', elem_of_dom in MAP. 
+        rewrite dom_insert_L. set_solver. } 
+      (* rewrite ST' in *.  *)
+      (* subst.  *)
+      apply fm_live_spec with (s' := δ'). simpl.
+      exists (Take_step ρ (asG ρ)). split; [| done]. simpl.
+      Set Printing Coercions.
+      repeat split; eauto; try congruence. 
+      + red. rewrite !F'. intros ρ' DOM DOM' DEC.
+        inversion DEC; subst.
+        * symmetry in Hsametid. apply MAP_RESTR in Hsametid. congruence.
+        * destruct Hneqtid. f_equal.
+          rewrite /ls_mapping. congruence.
+      + red. rewrite !F'. intros.
+        apply elem_of_dom in H as [? F2]. 
+        destruct (decide (ρ' = ρ)) as [-> | NEQ].
+        2: { left. rewrite lookup_insert_ne; [| done].
+             rewrite F2. simpl. lia. }
+        left. rewrite lookup_insert F. simpl. lia. 
+      + rewrite !F' ST'. simpl. intros.
+        rewrite lookup_insert. simpl. lia. 
+      + intros ?. rewrite F' dom_insert_L.
+        apply mk_is_Some, elem_of_dom in F. set_solver. 
+      + rewrite F' dom_insert_L.
+        apply mk_is_Some, elem_of_dom in F. set_solver. 
+    - red.
+      assert (exists δ': lm_ls LM, ls_under δ' = ls_under δ /\ ls_tmap δ' = (fun rs => rs ∖ {[ ρ ]}) <$> ls_tmap δ /\ ls_fuel δ' = delete ρ (ls_fuel δ)) as [δ' (ST' & TM' & F')]. 
+      { unshelve eexists (MkLiveState _ _ _ _ _ _ _).
+        8: repeat split; simpl; reflexivity.
+        - pose proof (ls_fuel_dom δ). set_solver. 
+        - intros. apply mapped_roles_dom_fuels_gen. 
+          rewrite groups_map_difference; [| exact True]. 
+          rewrite dom_delete_L. f_equal.
+          apply mapped_roles_dom_fuels_gen. apply δ. 
+        - red. intros * NEQ (?&<-&TM1)%lookup_fmap_Some (?&<-&TM2)%lookup_fmap_Some.
+          eapply disjoint_subseteq.
+          { apply _. }
+          3: { eapply ls_tmap_disj; eauto. }
+          all: set_solver. 
+        - eapply DROP_PRES_LSI, δ. }
+      apply fm_live_spec with (s' := δ'). simpl.
       simpl. exists (Silent_step (asG ρ)). split; [| done].
       simpl. repeat split; eauto.
-      + red. simpl. intros ρ' DOM1 DOM2 DECR.
-        simpl. 
-  Admitted.
+      + red. rewrite !F'. simpl. intros ρ' DOM1 DOM2 DECR.
+        apply dom_delete, elem_of_difference in DOM2.
+        rewrite not_elem_of_singleton in DOM2. apply proj2 in DOM2. 
+        inversion DECR.
+        * subst. symmetry in Hsametid. apply MAP_RESTR in Hsametid. congruence.
+        * subst. destruct Hissome as [g MAP'].
+          pose proof MAP' as ?%MAP_RESTR. subst.
+          rewrite -ls_same_doms elem_of_dom in DOM1.
+          destruct DOM1 as [? MAP1].
+          pose proof MAP1 as ?%MAP_RESTR. subst. congruence.
+      + red. rewrite !ST' !F'. intros ρ' DOM'. 
+        destruct (decide (ρ' = ρ)) as [-> | ?].
+        * repeat right. set_solver.
+        * left. apply elem_of_dom in DOM' as [? F1].
+          rewrite lookup_delete_ne; [| done].
+          rewrite F1. simpl. lia.
+      + rewrite F'. set_solver.
+  Qed. 
 
   Lemma disabled_group_singleton ρ δ:
     ¬ role_enabled_model ((asG ρ): fmrole LMF) δ <-> ρ ∉ dom (ls_mapping δ).
