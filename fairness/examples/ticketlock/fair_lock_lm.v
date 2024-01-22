@@ -1,4 +1,4 @@
-From trillium.fairness.examples.ticketlock Require Import fair_lock.
+From trillium.fairness.examples.ticketlock Require Import fair_lock lm_restr.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext. 
 From iris.proofmode Require Import tactics.
 From stdpp Require Import base.
@@ -14,29 +14,11 @@ Section FairLockLM.
      we suppose that every group contains up to one role, 
      and this role uniquely corresponds to that group.
      Therefore, LM here only provides stuttering steps. *)
-  Inductive FlG := | asG (r: R).
-  Let G := FlG. 
-
-  Global Instance G_eqdec: EqDecision G.
-  solve_decision.
-  Qed.
-
-  Global Instance G_cnt: Countable G.
-  eapply inj_countable' with (f := fun '(asG ρ) => ρ) (g := asG).
-  by intros []. 
-  Qed.
-
-  Global Instance G_inh: Inhabited G.
-  pose proof (fmrole_inhabited M) as [ρ]. 
-  apply (populate (asG ρ)).
-  Qed. 
+  Let G := @SG M. 
 
   Context `(LM: LiveModel G M LSI). 
   Context (LF: LMFairPre LM).
   Context {LSI_DEC: forall s tm f, Decision (LSI s tm f)}.
-
-  Definition ls_map_restr (rm: @roles_map G M) := forall ρ g,
-      rm !! ρ = Some g -> g = asG ρ. 
 
   Context {MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ)}.
 
@@ -168,124 +150,12 @@ Section FairLockLM.
       ∪
       set_map (flL (M := LMF)) 
           (filter (fun g => exists δ', al_impl g δ δ') (dom (ls_tmap δ))).
+
+  (* Lemma EGS: forall (ρ: fmrole M) δ, enabled_group_singleton LM LF ρ δ. *)
+  (* Proof. *)
+  (*   apply egs_helper; auto.  *)
+  Hypothesis EGS: forall (ρ: fmrole M) δ, enabled_group_singleton LM LF ρ δ.
     
-
-  (* TODO: move*)
-  From trillium.fairness Require Import partial_ownership.
-  Hypothesis LSI_LIFTS_STEP: forall (δ1: lm_ls LM) ρ st2,
-      fmtrans _ (ls_under δ1) (Some ρ) st2 ->
-      LSI st2 (ls_tmap δ1) (ls_fuel δ1).
-  Hypothesis LSI_FUEL_INDEP: LSI_fuel_independent (LSI := LSI). 
-  Hypothesis M_STRONG_LR: FM_strong_lr M.
-  Hypothesis STEP_NO_EN: forall st1 ρ st2,
-      fmtrans M st1 (Some ρ) st2 ->
-      live_roles _ st2 ⊆ live_roles _ st1. 
- Hypothesis DROP_PRES_LSI: forall st rem, fuel_drop_preserves_LSI st rem (LSI := LSI). 
-
-  (* TODO: move? generalize? *)
-  Lemma enabled_group_singleton ρ δ:
-    role_enabled_model ((asG ρ): fmrole LMF) δ <->
-    ρ ∈ dom (ls_mapping δ).
-  Proof.
-    split; intros EN.
-    { red in EN. apply LM_live_roles_strong in EN as [? STEP].
-      red in STEP. destruct STEP as (ℓ & STEP & MATCH).
-      destruct ℓ; simpl in MATCH; subst; simpl in STEP.
-      - destruct STEP as (STEP & MAP & _).
-        apply MAP_RESTR in MAP. inversion MAP. subst.
-        apply ls_mapping_dom. eapply fm_live_spec; eauto.
-      - destruct STEP as ([ρ_ MAP] & DECR & NINCR & _).
-        pose proof MAP as MAP'%MAP_RESTR. inversion MAP'. subst ρ_. clear MAP'.
-        eapply elem_of_dom. eauto.
-      - done. }
-    apply elem_of_dom in EN as [g MAP].
-    pose proof MAP as MAP'%MAP_RESTR. subst g.
-    destruct (decide (ρ ∈ live_roles _ (ls_under δ))) as [EN | DIS].
-    - red. apply M_STRONG_LR in EN as [st2 STEP].
-      pose proof MAP as [f F]%mk_is_Some%ls_same_doms'. 
-      assert (exists δ': lm_ls LM, ls_under δ' = st2 /\ ls_tmap δ' = ls_tmap δ /\ ls_fuel δ' = <[ ρ := min (lm_fl LM st2) f ]> (ls_fuel δ)) as [δ' (ST' & TM' & F')]. 
-      {
-        unshelve eexists {| ls_under := st2 |}.
-        7: repeat split; reflexivity. 
-        3: by apply δ. 
-        { etrans; [eapply STEP_NO_EN; eauto| ].
-          rewrite dom_insert_L. pose proof (ls_fuel_dom δ). set_solver. }
-        2: { apply LSI_FUEL_INDEP with (F := ls_fuel δ). 
-             eapply LSI_LIFTS_STEP; eauto. }
-        intros. rewrite -(ls_tmap_fuel_same_doms δ).
-        apply mk_is_Some, ls_same_doms', elem_of_dom in MAP. 
-        rewrite dom_insert_L. set_solver. } 
-      (* rewrite ST' in *.  *)
-      (* subst.  *)
-      apply fm_live_spec with (s' := δ'). simpl.
-      exists (Take_step ρ (asG ρ)). split; [| done]. simpl.
-      Set Printing Coercions.
-      repeat split; eauto; try congruence. 
-      + red. rewrite !F'. intros ρ' DOM DOM' DEC.
-        inversion DEC; subst.
-        * symmetry in Hsametid. apply MAP_RESTR in Hsametid. congruence.
-        * destruct Hneqtid. f_equal.
-          rewrite /ls_mapping. congruence.
-      + red. rewrite !F'. intros.
-        apply elem_of_dom in H as [? F2]. 
-        destruct (decide (ρ' = ρ)) as [-> | NEQ].
-        2: { left. rewrite lookup_insert_ne; [| done].
-             rewrite F2. simpl. lia. }
-        left. rewrite lookup_insert F. simpl. lia. 
-      + rewrite !F' ST'. simpl. intros.
-        rewrite lookup_insert. simpl. lia. 
-      + intros ?. rewrite F' dom_insert_L.
-        apply mk_is_Some, elem_of_dom in F. set_solver. 
-      + rewrite F' dom_insert_L.
-        apply mk_is_Some, elem_of_dom in F. set_solver. 
-    - red.
-      assert (exists δ': lm_ls LM, ls_under δ' = ls_under δ /\ ls_tmap δ' = (fun rs => rs ∖ {[ ρ ]}) <$> ls_tmap δ /\ ls_fuel δ' = delete ρ (ls_fuel δ)) as [δ' (ST' & TM' & F')]. 
-      { unshelve eexists (MkLiveState _ _ _ _ _ _ _).
-        8: repeat split; simpl; reflexivity.
-        - pose proof (ls_fuel_dom δ). set_solver. 
-        - intros. apply mapped_roles_dom_fuels_gen. 
-          rewrite groups_map_difference. 
-          rewrite dom_delete_L. f_equal.
-          apply mapped_roles_dom_fuels_gen. apply δ. 
-        - red. intros * NEQ (?&<-&TM1)%lookup_fmap_Some (?&<-&TM2)%lookup_fmap_Some.
-          eapply disjoint_subseteq.
-          { apply _. }
-          3: { eapply ls_tmap_disj; eauto. }
-          all: set_solver. 
-        - eapply DROP_PRES_LSI, δ. }
-      apply fm_live_spec with (s' := δ'). simpl.
-      simpl. exists (Silent_step (asG ρ)). split; [| done].
-      simpl. repeat split; eauto.
-      + red. rewrite !F'. simpl. intros ρ' DOM1 DOM2 DECR.
-        apply dom_delete, elem_of_difference in DOM2.
-        rewrite not_elem_of_singleton in DOM2. apply proj2 in DOM2. 
-        inversion DECR.
-        * subst. symmetry in Hsametid. apply MAP_RESTR in Hsametid. congruence.
-        * subst. destruct Hissome as [g MAP'].
-          pose proof MAP' as ?%MAP_RESTR. subst.
-          rewrite -ls_same_doms elem_of_dom in DOM1.
-          destruct DOM1 as [? MAP1].
-          pose proof MAP1 as ?%MAP_RESTR. subst. congruence.
-      + red. rewrite !ST' !F'. intros ρ' DOM'. 
-        destruct (decide (ρ' = ρ)) as [-> | ?].
-        * repeat right. set_solver.
-        * left. apply elem_of_dom in DOM' as [? F1].
-          rewrite lookup_delete_ne; [| done].
-          rewrite F1. simpl. lia.
-      + rewrite F'. set_solver.
-  Qed. 
-
-  Lemma disabled_group_singleton ρ δ:
-    ¬ role_enabled_model ((asG ρ): fmrole LMF) δ <-> ρ ∉ dom (ls_mapping δ).
-  Proof. 
-    apply not_iff_compat. apply enabled_group_singleton.
-  Qed. 
-
-  Lemma disabled_group_disabled_role ρ δ:
-    ¬ role_enabled_model ((asG ρ): fmrole LMF) δ -> ¬ role_enabled_model ρ (ls_under δ). 
-  Proof.
-    by intros ? ?%ls_mapping_dom%enabled_group_singleton.
-  Qed.
 
   Instance FLE_LMF: @FairLockExt LMF FLP_LMF.
   refine {|
@@ -306,7 +176,7 @@ Section FairLockLM.
     - left. split.
       + apply AU.
       + left. apply AU.
-    - apply enabled_group_singleton.
+    - apply EGS. 
       eapply mim_in_2 with (v := asG ρ); eauto. 
       { apply (ls_mapping_tmap_corr st2). }
       rewrite TM'. rewrite lookup_insert. set_solver. }
@@ -324,7 +194,7 @@ Section FairLockLM.
     - left. split.
       + apply AU.
       + left. apply AU.
-    - apply enabled_group_singleton.
+    - apply EGS. 
       eapply mim_in_2 with (v := asG ρ); eauto. 
       { apply (ls_mapping_tmap_corr st2). }
       rewrite TM'. rewrite lookup_insert. set_solver. }
@@ -529,17 +399,10 @@ Section FairLockLM.
     (UNMAP: ρ ∉ dom (ls_mapping δ)):
     ls_tmap δ !! (asG ρ) = Some ∅.
   Proof.
-    destruct (ls_tmap δ !! asG ρ) eqn:Rρ.
-    2: { destruct USED. apply UNUSED_NOT_DOM.
-         by apply not_elem_of_dom. } 
-    simpl. destruct (decide (g = ∅)) as [-> | NE]; [done| ].
-    apply set_choose_L in NE as [ρ' IN].
-    assert (ρ' = ρ) as ->.
-    { forward eapply (proj2 (ls_mapping_tmap_corr δ ρ' (asG ρ))).
-      { eauto. }
-      intros ?%MAP_RESTR. congruence. }
-    edestruct UNMAP. apply elem_of_dom. exists (asG ρ).
-    eapply ls_mapping_tmap_corr; eauto.
+    eapply unmapped_empty' in UNMAP; eauto.
+    destruct (ls_tmap δ !! asG ρ) eqn:T; rewrite T in UNMAP; simpl in *.
+    - congruence.
+    - destruct USED. simpl. apply UNUSED_NOT_DOM, not_elem_of_dom. done.  
   Qed.
 
   Lemma disable_lmtr
@@ -679,11 +542,11 @@ Section FairLockLM.
     destruct UNLOCK2 as [UNLOCK2 | ?].
     2: { red in DIS2. tauto. }
     destruct UNLOCK1 as [? [EN | DIS1']].
-    { apply ls_mapping_dom, enabled_group_singleton in EN. done. } 
+    { apply ls_mapping_dom, EGS in EN. done. } 
     destruct UNLOCK2 as [? [EN | DIS2']].
-    { apply ls_mapping_dom, enabled_group_singleton in EN. done. }
+    { apply ls_mapping_dom, EGS in EN. done. }
     eapply has_lock_st_excl; eauto.
-    all: red; by intros ?%ls_mapping_dom%enabled_group_singleton.
+    all: red; by intros ?%ls_mapping_dom%EGS.
   Qed.     
  
   (* TODO: refactor *)
@@ -773,7 +636,8 @@ Section FairLockLM.
         apply proj2, proj1 in REL. rewrite REL.
         rewrite lookup_insert_ne; try congruence.
         apply unmapped_empty; try done.
-        intros ?. eapply unused_does_lock_incompat; eauto. 
+        intros ?. eapply unused_does_lock_incompat; eauto.
+    - apply EGS. 
   Qed.
 
   (* TODO: refactor *)
@@ -862,7 +726,8 @@ Section FairLockLM.
         apply proj2, proj1 in REL. rewrite REL.
         rewrite lookup_insert_ne; try congruence.
         apply unmapped_empty; try done.
-        intros ?. eapply unused_does_unlock_incompat; eauto. 
+        intros ?. eapply unused_does_unlock_incompat; eauto.
+    - apply EGS. 
   Qed.
 
     
@@ -913,10 +778,10 @@ Section FairLockLM.
            simpl in LOCK2. destruct LOCK2 as [DOM [LOCK2 | ?]]. 
            2: { red in DIS2. tauto. }
            destruct LOCK2 as [? [EN | ?]]. 
-           { by apply ls_mapping_dom, enabled_group_singleton in EN. }
+           { by apply ls_mapping_dom, EGS in EN. }
            eapply NEQ. eapply (has_lock_st_excl st_k (FairLock := FL)); eauto.
            all: try tauto.
-           by apply disabled_group_disabled_role. }
+           eapply disabled_group_disabled_role; eauto.  }
       
       move PREi at bottom. red in PREi.
       setoid_rewrite pred_at_trace_lookup in PREi. specialize_full PREi.

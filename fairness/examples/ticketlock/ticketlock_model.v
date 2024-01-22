@@ -18,7 +18,7 @@ Close Scope Z_scope.
 
 Section Model.
 
-  Let tl_role := nat. 
+  Definition tl_role := nat. 
 
   (* TODO: how to make Inductive and Record section-local? *)
   Inductive tl_role_stage := 
@@ -26,9 +26,9 @@ Section Model.
   | tl_U (t: nat)
   .
 
-  Let tl_role_st: Set := tl_role_stage * bool. 
+  Definition tl_role_st: Set := tl_role_stage * bool. 
 
-  Let tl_role_map := gmap tl_role tl_role_st. 
+  Definition tl_role_map := gmap tl_role tl_role_st. 
 
   Definition tl_st' := (nat * nat * tl_role_map)%type. 
 
@@ -51,8 +51,6 @@ Section Model.
                     }. 
 
   Definition simpl_tl_st '(mkTlSt o t rm wf): tl_st' := (o, t, rm). 
-
-  Notation "<{ o , t , rm }>" := (o, t, rm).
 
   #[global] Instance tl_role_eqdec: EqDecision tl_role.
   Proof using. solve_decision. Qed. 
@@ -98,6 +96,8 @@ Section Model.
             (o, t, rm')
         | inr NO => (o, t, rm)
         end.
+
+  Notation "<{ o , t , rm }>" := (o, t, rm).
 
   Inductive tl_trans': tl_st' -> option tl_role -> tl_st' -> Prop :=
   | tl_take_ticket o t rm r (R: rm !! r = Some (tl_L, true)):
@@ -394,28 +394,47 @@ Section Model.
     destruct st2' as [[o2 t2] rm2]. done. 
   Qed.
 
+  Lemma tl_strong_FM: FM_strong_lr tl_fair_model.
+  Proof. 
+    red. intros. 
+    destruct st as [o t rm].
+    rewrite /active_st. simpl.
+    rewrite /tl_live_roles. simpl. rewrite elem_of_dom.  
+    split.
+    - intros [[r ?] RMρ]. apply map_filter_lookup_Some in RMρ as [RMρ ->].  
+      destruct r.
+      + eexists. 
+        unshelve apply tl_trans_reduce'.
+        4: by apply tl_take_ticket.
+       + destruct (decide (o = t0)). 
+        * eexists. unshelve apply tl_trans_reduce''. 
+          2: { subst. eapply tl_unlock. by rewrite RMρ. }
+        * eexists. unshelve apply tl_trans_reduce''.
+          2: { eapply tl_spin; eauto. }
+    - intros [st' STEP]. destruct st'.
+      inversion STEP; subst.
+      all: eexists; eapply map_filter_lookup_Some; split; done.
+  Qed.
+
+  (* TODO: move *)
+  Lemma ex_prod {A B: Type} {P: A * B -> Prop}:
+    (exists ab, P ab) <-> (exists a b, P (a, b)).
+  Proof. split; [intros [[??] ?]| intros (?&?&?)]; eauto. Qed.  
+
   Lemma active_st_enabled (ρ: tl_role) (st: tl_st):
     active_st ρ st <-> @role_enabled_model tl_fair_model ρ st.
   Proof using.
-    destruct st as [o t rm].
-    rewrite /active_st. simpl. split.
-    - intros [r RMρ]. destruct r.
-      + eapply fm_live_spec.
-        unshelve apply tl_trans_reduce'.
-        4: by apply tl_take_ticket.
-      + destruct (decide (o = t0)); eapply fm_live_spec. 
-        * unshelve apply tl_trans_reduce''. 
-          2: { subst. eapply tl_unlock. rewrite RMρ. congruence. }
-        * unshelve apply tl_trans_reduce''.
-          2: { eapply tl_spin; eauto. }
-    - intros LIVE. red in LIVE. 
-      simpl in LIVE. rewrite /tl_live_roles in LIVE.
-      apply elem_of_dom in LIVE as [r LIVE]. eauto.
-      apply map_filter_lookup_Some in LIVE as [? ?].
-      destruct r. subst. eauto.      
-  Qed. 
+    rewrite /role_enabled_model. simpl.
+    rewrite /tl_live_roles /active_st.
+    rewrite elem_of_dom.    
+    rewrite /is_Some.
+    rewrite ex_prod. apply exist_proper. intros.
+    rewrite ex_det_iff.
+    2: { intros ? ?%map_filter_lookup_Some. apply H. }
+    rewrite map_filter_lookup_Some. tauto. 
+  Qed.
 
-  Instance active_st_dec (ρ: tl_role) (st: tl_st):
+  Global Instance active_st_dec (ρ: tl_role) (st: tl_st):
     Decision (active_st ρ st).
   Proof using. 
     rewrite /active_st.
@@ -426,7 +445,7 @@ Section Model.
     left. eexists. eauto.
   Qed. 
     
-  Instance disabled_st_dec (ρ: tl_role) (st: tl_st):
+  Global Instance disabled_st_dec (ρ: tl_role) (st: tl_st):
     Decision (disabled_st ρ st).
   Proof using. 
     rewrite /disabled_st.
@@ -624,6 +643,34 @@ Section Model.
 
   End TlExtTrans.
  
+End Model.
+
+  Notation "<{ o , t , rm }>" := (o, t, rm).
+
+  Ltac unfold_ρ_props ρ :=
+    repeat
+      match goal with
+      | H: waits_st ρ ?st |- _ => destruct H as (?&?&H&?)
+      | H: does_unlock ρ ?st |- _ => simpl in H
+      | H: has_lock_st ρ ?st |- _ => destruct H as [? H]
+      | H: can_lock_st ρ ?st |- _ => destruct H as [? H]
+      | H: disabled_st ρ ?st |- _ => destruct H as [? H]
+      | H: active_st ρ ?st |- _ => destruct H as [? H]
+      end.
+  
+  Ltac subst_ρ_props ρ :=
+    repeat
+      match goal with
+      | X: role_map ?st !! ρ = Some ?st1,
+          Y: role_map ?st !! ρ = Some ?st2
+        |- _ => rewrite X in Y; inversion Y
+      end.
+  
+  Ltac simpl_ρ ρ := unfold_ρ_props ρ; subst_ρ_props ρ.
+
+
+Section Properties.
+
   Section ProgressProperties.
 
     Global Instance tl_FLE: @FairLockExt tl_fair_model tl_FLP.
@@ -645,30 +692,6 @@ Section Model.
       FL_EM tl_FLE. 
     
     Let ExtTL_FM := @ext_model_FM _ ExtTL. 
-
-
-    Ltac unfold_ρ_props ρ :=
-      repeat
-        match goal with
-        | H: waits_st ρ ?st |- _ => destruct H as (?&?&H&?)
-        | H: does_unlock ρ ?st |- _ => simpl in H
-        | H: has_lock_st ρ ?st |- _ => destruct H as [? H]
-        | H: can_lock_st ρ ?st |- _ => destruct H as [? H]
-        | H: disabled_st ρ ?st |- _ => destruct H as [? H]
-        | H: active_st ρ ?st |- _ => destruct H as [? H]
-        end.
-    
-    Ltac subst_ρ_props ρ :=
-      repeat
-        match goal with
-        | X: role_map ?st !! ρ = Some ?st1,
-            Y: role_map ?st !! ρ = Some ?st2
-            |- _ => rewrite X in Y; inversion Y
-        end.
-    
-    (* TODO: use more often *)
-    Ltac simpl_ρ ρ := unfold_ρ_props ρ; subst_ρ_props ρ.
- 
 
     Section ProgressPropertiesImpl.
 
@@ -1036,12 +1059,28 @@ Section Model.
         destruct e; set_solver.
       Qed. 
 
+      Lemma disabled_equiv (ρ: fmrole tl_fair_model) st
+        (DOM: ρ ∈ dom (role_map st)):
+        disabled_st ρ st <-> fair_lock.disabled_st ρ st (FLP := tl_FLP). 
+      Proof using.
+        rewrite -not_active_disabled; auto.
+        rewrite active_st_enabled. done. 
+      Qed.
+
       Lemma has_lock_dom ρ st
         (LOCK: has_lock_st ρ st):
         ρ ∈ dom (role_map st). 
       Proof. 
         destruct LOCK as [? ?].
         eapply elem_of_dom; eauto. 
+      Qed. 
+
+      Lemma does_lock_dom ρ st
+        (LOCK: does_lock ρ st):
+        ρ ∈ dom (role_map st). 
+      Proof.
+        destruct LOCK; simpl_ρ ρ. 
+        all: eapply elem_of_dom; eauto. 
       Qed. 
 
       Lemma lock_eventually_acquired_iteration o t rm wf ρ i d
@@ -1656,45 +1695,35 @@ Section Model.
       red in EQ2. eapply EQ2; eauto.   
     Qed.
 
+    Lemma ext_trans_same_unused st1 (ρ: fmrole tl_fair_model) st2 e
+      (STEP: fmtrans ExtTL_FM st1 e st2):
+      is_unused ρ st1 <-> is_unused ρ st2.
+    Proof.
+      simpl. rewrite /is_unused. 
+      destruct st1 as [o1 t1 rm1 wf1], st2 as [o2 t2 rm2 wf2]. simpl.
+      apply not_iff_compat. 
+      inversion STEP; subst.
+      + inversion STEP0; subst; auto; try set_solver.
+        { rewrite dom_insert_L. apply mk_is_Some, elem_of_dom in R. set_solver. }
+        subst st'' st'0 st'. simpl in H4.
+        apply mk_is_Some, elem_of_dom in R. 
+        destruct role_of_dec as [[r ?]| ]; inversion H4; subst. 
+        2: { set_solver. }
+        rewrite lookup_insert_Some in e. destruct e; [set_solver| ].
+        apply proj2, mk_is_Some, elem_of_dom in H. set_solver. 
+      + destruct ι; simpl in REL; inversion REL; subst; simpl.
+        all: apply mk_is_Some, elem_of_dom in LOCK; set_solver. 
+    Qed.  
+    
     Lemma unused_kept (ρ: fmrole tl_fair_model):
       @label_kept_state ExtTL_FM 
        (λ (st: fmstate tl_fair_model), is_unused ρ st)
       (fun _ => True).
     Proof.
-      simpl. rewrite /is_unused. 
       red. intros.
-      destruct st as [o1 t1 rm1 wf1], st' as [o2 t2 rm2 wf2]. 
-      pose proof Pst as Pst'%not_elem_of_dom. 
-      inversion STEP; subst.
-      + inversion STEP0; subst; auto; try set_solver.
-        { rewrite dom_insert. apply not_elem_of_union. split; auto.
-          apply not_elem_of_singleton_2. intros <-.
-          by rewrite Pst' in R. }
-
-        (* fold st''.  *)
-        enough (ρ ∉ dom $ snd st'').
-        { rewrite H4 in H. simpl in *. congruence. } 
-        
-        subst st'' st'0. rewrite /advance_next. simpl.
-        assert (ρ ≠ ρ0) as NEQ'.
-        { intros <-. by rewrite Pst' in R. }
-        destruct role_of_dec as [[r ?]| ].
-        2: { set_solver. }
-        
-        simpl. rewrite !dom_insert.
-        apply not_elem_of_union. split; [| set_solver].
-        apply not_elem_of_singleton_2. intros <-.
-        rewrite lookup_insert_Some in e. destruct e as [[-> ?]|[? ?]].
-        { done. }
-        by rewrite Pst' in H0.
-      + destruct ι; simpl in REL; inversion REL; subst; simpl.  
-        * rewrite dom_insert. apply not_elem_of_union. split; auto. 
-          apply not_elem_of_singleton_2. intros <-.
-          by rewrite Pst' in LOCK.
-        * rewrite dom_insert. apply not_elem_of_union. split; auto. 
-          apply not_elem_of_singleton_2. intros <-.
-          by rewrite Pst' in LOCK.
-    Qed.
+      forward eapply ext_trans_same_unused; eauto.
+      intros X%proj1. eauto.
+    Qed. 
     
     Definition allow_unlock_impl (ρ: fmrole tl_fair_model) (st: tl_st): tl_st.
       destruct st as [o t rm wf].
@@ -1912,4 +1941,4 @@ Section Model.
 
   End ProgressProperties. 
 
-End Model.
+End Properties. 

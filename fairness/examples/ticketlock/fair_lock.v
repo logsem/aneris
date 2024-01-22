@@ -407,4 +407,25 @@ Section FairLockProperties.
     all: congruence. 
   Qed.
 
+  Lemma step_no_en: forall st1 ρ st2,
+      fmtrans M st1 (Some ρ) st2 ->
+      live_roles _ st2 ⊆ live_roles _ st1.
+  Proof. 
+    intros * STEP.
+    apply elem_of_subseteq. intros ρ' L1.
+    destruct (decide (ρ' ∈ live_roles _ st1)) as [?| DIS]; [done| ].
+    destruct (does_lock_unlock_trichotomy st1 ρ') as [DL|[DU|UN]].
+    - forward eapply (step_keeps_lock_dis ρ' st1); eauto.
+      2: { left. eauto. }
+      { congruence. }
+      intros [? ?]. done.
+    - forward eapply (step_keeps_unlock_dis ρ' st1); eauto.
+      2: { left. eauto. }
+      { congruence. }
+      intros [? ?]. done.
+    - forward eapply (step_keeps_unused ρ' st1); eauto.
+      { left. eauto. }
+      by intros ?%unused_active_incompat; auto.
+  Qed. 
+
 End FairLockProperties.
