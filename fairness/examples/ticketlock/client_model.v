@@ -488,6 +488,16 @@ Section ClientDefs.
       eapply trace_valid_steps''; eauto.
     Qed. 
 
+    Lemma client_trace_ρlg_not_unused (tr: mtrace client_model_impl) i si ρlg
+      (VALID : mtrace_valid tr)
+      (ITH: tr S!! i = Some si)
+      (R: ρlg ∈ lib_gs)
+      :
+      
+      ¬ is_unused ρlg si.1. 
+    Proof.
+    Admitted. 
+
   End UnusedRoles. 
 
   Definition is_init_cl_state (st: client_state) :=
@@ -1004,6 +1014,12 @@ Section ClientDefs.
     apply state_label_lookup in ITH as (?&?&?).
     rewrite -Nat.add_1_r. done. 
   Qed.
+
+  (* TODO: move *)
+  Instance fs_le_dec x y: Decision (fs_le x y).
+  Proof. 
+    destruct x, y; simpl; rewrite /fs_le; solve_decision.
+  Qed. 
     
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
@@ -1084,53 +1100,102 @@ Section ClientDefs.
       all: try by repeat eexists. }
 
     eapply traces_match_preserves_termination; eauto.
-    eapply (trace_termination (project_tl_trace str)); eauto.
-    { eapply traces_match_valid2; eauto. }
-    { intros. eapply tl_subtrace_fair; eauto. }
-    { forward eapply (client_trace_tl_ext_bounded str); eauto.
-      { eapply (subtrace_valid tr); eauto. done. }
-      { apply trace_state_lookup_S in MTH.
-        rewrite -(Nat.add_0_r (S m)) in MTH. 
-        erewrite <- subtrace_state_lookup in MTH; eauto.
-        rewrite state_lookup_0 in MTH. inversion MTH. rewrite H1.
-        done. }
-      intros [i NOEXT]. exists i. intros * ? ITH [[e] ->].
-      eapply traces_match_label_lookup_2 in ITH as (?&ITH&MATCH'); [| by eauto].
-      red in MATCH'. simpl in MATCH'. subst.
-      edestruct NOEXT; eauto. }
 
-    (* clear dependent ρ.  *)
-    intros g i. red. intros g' j δ **.
-    enough (∃ (k : nat) (st'' : client_state),
-    str S!! k = Some st'' ∧ j ≤ k ∧ active_st g' st''.1) as (?&?&KTH&?&?).
-    { do 2 eexists. repeat split.
-      eapply traces_match_state_lookup_1 in KTH as (?&?&?).
-      2-4: eauto.
-      simpl in *. set_solver. }
+    assert (exists p st_p, tr S!! p = Some st_p /\ does_lock ρlg_l st_p.1 /\ disabled_st ρlg_l st_p.1 /\ S m <= p) as (p & st_p & PTH & Ll & DISl & LEp).
+    { inversion STEP; subst.
+      2: { subst ρlg. edestruct ρlg_lr_neq; eauto. }
+      apply state_label_lookup in MTH as (_&M'TH&_).
+      rewrite Nat.add_1_r (plus_n_O (S m)) in M'TH. 
+      erewrite <- subtrace_state_lookup in M'TH; eauto.
+      forward eapply allows_unlock_impl_spec. intros AU%proj2. specialize_full AU.
+      { eauto. }
+      apply au_impl_spec in AU. 
+      forward eapply (unlock_termination (project_tl_trace str) (ρlg_l) 0).
+      { eapply traces_match_valid2; eauto. }
+      { eapply tl_subtrace_fair; eauto. }
+      { apply traces_match_first in MATCH.
+        rewrite state_lookup_0. rewrite state_lookup_0 in M'TH.
+        apply Some_inj in M'TH. rewrite M'TH in MATCH.
+        rewrite -MATCH. simpl. reflexivity. }
+      { apply AU. }
+      { apply AU. }
+      intros (p&?&?&PTH&?&?).
+      eapply traces_match_state_lookup_2 in PTH as (?&PTH&?).
+      2: by apply MATCH.
+      simpl in *. subst.
+      exists (S m + p). eexists. erewrite <- subtrace_state_lookup; eauto.
+      repeat split; eauto. lia. } 
+       
 
-    forward eapply traces_match_state_lookup_2 as (s&JTH'&RELj); eauto.
-    destruct s as [? f]. simpl in RELj. subst.
-    assert (g' ∈ lib_gs) as INg. 
-    { forward eapply @TlLSI_LGF as G; [apply δ| ]. red in G.
-      rewrite lib_gs_ρlg in G.      
-      admit. 
-      (* forward eapply (client_trace_keeps_unused tr); [done| ..]. *)
-      (* { erewrite <- subtrace_state_lookup; eauto. } *) 
-    }
-    rewrite lib_gs_ρlg !elem_of_union !elem_of_singleton in INg.
-    specialize (FAIR (ρ_ext $ flU g')). move FAIR at bottom.
-    apply fair_by_equiv in FAIR. red in FAIR.
-    specialize_full FAIR.
-    { erewrite <- subtrace_state_lookup with (k := j); eauto.
-      rewrite JTH'. simpl. red.
-      destruct INg as [-> | ->].
-      - eapply fm_live_spec. simpl. eapply ct_au_L. 
-    (* assert FAIR *)
-    destruct INg as [-> | ->].
-    - specialize (FAIR (ρ_ext $ fl)  
-                                                               
+  assert (exists t δ_t f_t, tr S!! t = Some (δ_t, f_t) /\ fs_le f_t fs_S').
+    { forward eapply (client_trace_fs_mono tr (m + 1) p); eauto.
+      { lia. }
+      { apply state_label_lookup in MTH. apply MTH. }
+      destruct st_p as [δ f]. 
+      intros LEfp. simpl in *. 
+      destruct (decide (fs_le f fs_S')).
+      { do 3 eexists. eauto. }
+      assert (f = fs_S) as ->.
+      { destruct f; simpl in *; rewrite /fs_le in LEfp, n; try lia. done. }
+      pose proof (does_lock_unlock_trichotomy (δ: fmstate TlLM_FM) ρlg_r) as R.
+      apply or_assoc in R. destruct R as [R| ]. 
+      2: { eapply client_trace_ρlg_not_unused with (ρlg := ρlg_r) in PTH; eauto.
+           2: { rewrite lib_gs_ρlg. set_solver. }
+           done. }
+
+
+      foobar. add condition on st1 flag. 
+      enough (exists t st_t Pr ℓr, p <= t /\ tr S!! t = Some st_t /\ label_kept_state Pr (other_step ℓr) /\ Pr (st_t) /\ (∀ st, Pr st → role_enabled_model ℓr st) /\ (forall st1 st2, fmtrans _ st1 (Some ℓr) st2 -> strict fs_le st2.2 st1.2)) as (t & st_t & Pr & ℓr & LEt & TTH & KEPT & PR & IEN & LE'). 
+      { forward eapply kept_state_fair_step.
+        2: apply KEPT.
+        5: apply PR.
+        all: eauto. 
+
+        intros (?&?&[[LE'' STEP'] MIN]&?&?).
+        apply trace_label_lookup_simpl' in STEP' as (?&[? f]&STEP').
+        pose proof STEP' as STEP'_. 
+        eapply trace_valid_steps' in STEP'; eauto.
+        apply LE' in STEP'.
+        eapply trace_state_lookup_simpl in H0; eauto. subst.
+        pose proof STEP'_ as NEXT%trace_state_lookup_S.
+        pose proof STEP'_ as CUR%trace_state_lookup. 
+        repeat eexists; eauto.
+        simpl in STEP'.
+        (* forward eapply (client_trace_fs_mono tr (m + 1) p); eauto. *) 
+        forward eapply (client_trace_fs_mono tr (m + 1) x); eauto.
+        { lia. }
+        { apply state_label_lookup in MTH. apply MTH. }
+        simpl. revert STEP'.
+        rewrite /fs_le /strict; destruct f, x0 as [? []]; simpl; lia. }
+
+      enough (exists t st_t, p <= t /\ tr S!! t = Some st_t /\ disabled_st ρlg_r st_t.1)
+               as (t & st_t & LE & TTH & DIS).
+      { pose proof (does_lock_unlock_trichotomy (st_t.1: fmstate TlLM_FM) ρlg_r) as R'.
+        apply or_assoc in R'. destruct R' as [R'| ]. 
+        2: { eapply client_trace_ρlg_not_unused with (ρlg := ρlg_r) in TTH; eauto.
+           2: { rewrite lib_gs_ρlg. set_solver. }
+           done. }
+        destruct R'; do 4 eexists.
+        - repeat split. 
+          3: apply kept2.
+          all: eauto.
+          2: { inversion H1; subst; simpl. red; lia.
+               destruct FS as [[-> ->] | [[-> | ->] ->]]; red; simpl; lia. }
+          2: { inversion H1; subst; simpl.
+               all: intros P; red in P; simpl in P.
+               { lia. }
+               destruct FS as [[-> ->] | [[-> | ->] ->]]. 
+               red; lia.
+               destruct FS as [[-> ->] | [[-> | ->] ->]]; red; simpl; lia. }
+          2: { intros * STEP'. inversion STEP'; subst; simpl; try done.
+               all: red; try done. 
+        
+
+      
+
+      destruct R. 
+      - do 2 eexists. 
     
-
   Qed. 
 
 End ClientDefs. 
