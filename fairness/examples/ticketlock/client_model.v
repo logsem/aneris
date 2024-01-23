@@ -601,7 +601,42 @@ Section ClientDefs.
       ((inl ∘ inl): Gtl -> fmrole client_model_impl) (option_fmap _ _ inl) (λ st tl_st, st.1 = tl_st)
       (LMo := client_model)
   .
- 
+
+  Definition fs_le f1 f2: Prop :=
+    let fn := 
+      fun fs => 
+        match fs with | fs_U => 3 | fs_S => 2 | fs_S' => 1 | fs_O => 0 end in
+    fn f1 <= fn f2.
+  Local Hint Unfold fs_le. 
+
+  Instance fs_le_TO: TotalOrder fs_le.
+  Proof. 
+    split. 
+    - split.
+      + split.
+        * intros [| | |]; red; lia.
+        * unfold fs_le. intros [| | |][| | |][| | |]; lia.
+      + unfold fs_le. intros [| | |][| | |]; try lia.
+        all: congruence.
+    - red. unfold fs_le, strict. intros [| | |][| | |]; simpl; try lia.
+      all: tauto.
+  Qed. 
+
+
+  Ltac fs_le_simpl FS := rewrite /fs_le in FS; simpl in FS.
+  Ltac fs_le_unfold :=
+    match goal with
+    | FS: fs_le ?x ?y |- _ => fs_le_simpl FS
+    | FS: ¬ fs_le ?x ?y |- _ => fs_le_simpl FS
+    | FS: strict fs_le ?x ?y |- _ => rewrite /strict in FS; fs_le_simpl FS
+    | FS: ¬ strict fs_le ?x ?y |- _ => rewrite /strict in FS; fs_le_simpl FS
+    end.
+  
+  Ltac fs_le_solver :=
+    repeat fs_le_unfold; rewrite /fs_le ?/strict; simpl; try lia. 
+
+  (* TODO: refactor lemmas below *)
+
   (* TODO: move, rename *)
   Lemma kept2:
   @label_kept_state client_model_impl
@@ -619,8 +654,6 @@ Section ClientDefs.
       inversion STEP'; subst; repeat split; try tauto.
       { congruence. }
       clear -FS. set_solver. }
-    (* forward eapply not_live_not_active as DIS; eauto. *)
-    (* { apply PREρlg. } *)
     
     pose proof (ct_au_R tl_st' f' (match f' with | fs_U => fs_U | _ => fs_O end)) as STEPr.
     simpl in STEPr. rewrite !curry_uncurry_prop in STEPr.
@@ -636,20 +669,55 @@ Section ClientDefs.
       2: { left. eauto. }
       simpl. 
       rewrite /ρlg_r.
-      (* intros EQ%ρlg_i_dom_inj. *)
       congruence. 
-      (* intros ->%ρlg_tl_inj. *)
-      (* (* 2: { destruct c; simpl; lia. } *) *)
-      (* (* 2: { simpl; lia. } *) *)
-      (* (* assert (c = cl_R) as -> by (by destruct c). *) *)
-      (* apply fm_live_spec in LIB_STEP.  *)
-      (* (* clear -LIB_STEP PREρlg. *) *)
-      (* eapply (disabled_not_live) in LIB_STEP; [done| ]. apply PREρlg.  *)
     - edestruct ρlg_lr_neq.
       eapply has_lock_st_excl with (ρlg1 := ρlg_l); eauto.
       all: by apply PREρlg.
     - done.
     - edestruct does_lock_unlock_incompat; eauto. apply PREρlg.
+  Qed.
+        
+  Lemma kept2':
+  @label_kept_state client_model_impl
+    (@role_enabled_model client_model_impl (ρ_ext (@flL TlLM_FM ρlg_r)))
+    (other_step ((ρ_ext (@flL TlLM_FM ρlg_r)): fmrole client_model_impl)). 
+  Proof.
+    red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP.
+    destruct oℓ' as [ρ | ].
+    2: { by inversion STEP. }
+    assert (ρ ≠ ρ_ext (flL (ρlg_r: fmrole TlLM_FM))) as NEQ' by congruence.
+    
+    assert ((fs_le fs_S f) /\
+              does_lock ρlg_r tl_st /\ disabled_st (ρlg_r: fmrole TlLM_FM) tl_st) as PREρlg.
+    { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP'].      
+      inversion STEP'; subst; repeat split; try tauto.
+      destruct f; try fs_le_solver; set_solver. }
+    
+    pose proof (ct_al_R tl_st' f' (match f' with | fs_U => fs_U | _ => fs_S' end)) as STEPr.
+    simpl in STEPr. rewrite !curry_uncurry_prop and_comm in STEPr. 
+    red. simpl. apply client_lr_spec.
+    eexists. apply STEPr. clear STEPr. split.
+    { destruct PREρlg as (LE & LOCK & DIS). inversion STEP; subst; try tauto.
+      - destruct f'; try fs_le_solver; tauto. 
+      - subst ρlg. edestruct does_lock_unlock_incompat; eauto. }
+ 
+    inversion STEP; subst.
+    - eapply step_keeps_lock_dis.
+      { split; try by apply PREρlg. }
+      2: { left. eauto. }
+      simpl. 
+      rewrite /ρlg_r.
+      congruence. 
+    - subst ρlg.
+      eapply step_keeps_lock_dis.
+      { split; try by apply PREρlg. }
+      2: { Unshelve. 2: exact (Some (inr $ env $ (flU (ρlg_l: fmrole TlLM_FM): @EI _ TlEM))).
+           econstructor. simpl. 
+           (* apply not_live_not_active in DIS; eauto.  *)
+           eapply allows_unlock_impl_spec; eauto. }
+      congruence. 
+    - edestruct does_lock_unlock_incompat; eauto. apply PREρlg.
+    - subst ρlg. congruence. 
   Qed.
         
   Lemma kept1:
@@ -868,26 +936,6 @@ Section ClientDefs.
     destruct JTH' as (?&?&?&[=]). 
   Qed. 
 
-
-  Definition fs_le f1 f2: Prop :=
-    let fn := 
-      fun fs => 
-        match fs with | fs_U => 3 | fs_S => 2 | fs_S' => 1 | fs_O => 0 end in
-    fn f1 <= fn f2.
-  Local Hint Unfold fs_le. 
-
-  Instance fs_le_TO: TotalOrder fs_le.
-  Proof. 
-    split. 
-    - split.
-      + split.
-        * intros [| | |]; red; lia.
-        * unfold fs_le. intros [| | |][| | |][| | |]; lia.
-      + unfold fs_le. intros [| | |][| | |]; try lia.
-        all: congruence.
-    - red. unfold fs_le, strict. intros [| | |][| | |]; simpl; try lia.
-      all: tauto.
-  Qed. 
 
   Lemma client_trans_fs_mono st1 ρ st2
     (STEP: client_trans st1 ρ st2):
@@ -1143,9 +1191,7 @@ Section ClientDefs.
            2: { rewrite lib_gs_ρlg. set_solver. }
            done. }
 
-
-      foobar. add condition on st1 flag. 
-      enough (exists t st_t Pr ℓr, p <= t /\ tr S!! t = Some st_t /\ label_kept_state Pr (other_step ℓr) /\ Pr (st_t) /\ (∀ st, Pr st → role_enabled_model ℓr st) /\ (forall st1 st2, fmtrans _ st1 (Some ℓr) st2 -> strict fs_le st2.2 st1.2)) as (t & st_t & Pr & ℓr & LEt & TTH & KEPT & PR & IEN & LE'). 
+      enough (exists t st_t Pr ℓr, p <= t /\ tr S!! t = Some st_t /\ label_kept_state Pr (other_step ℓr) /\ Pr (st_t) /\ (∀ st, Pr st → role_enabled_model ℓr st) /\ (forall st1 st2, fmtrans _ st1 (Some ℓr) st2 -> fs_le st1.2 fs_S -> strict fs_le st2.2 st1.2)) as (t & st_t & Pr & ℓr & LEt & TTH & KEPT & PR & IEN & LE'). 
       { forward eapply kept_state_fair_step.
         2: apply KEPT.
         5: apply PR.
@@ -1155,18 +1201,18 @@ Section ClientDefs.
         apply trace_label_lookup_simpl' in STEP' as (?&[? f]&STEP').
         pose proof STEP' as STEP'_. 
         eapply trace_valid_steps' in STEP'; eauto.
-        apply LE' in STEP'.
+
         eapply trace_state_lookup_simpl in H0; eauto. subst.
         pose proof STEP'_ as NEXT%trace_state_lookup_S.
         pose proof STEP'_ as CUR%trace_state_lookup. 
-        repeat eexists; eauto.
-        simpl in STEP'.
-        (* forward eapply (client_trace_fs_mono tr (m + 1) p); eauto. *) 
+
         forward eapply (client_trace_fs_mono tr (m + 1) x); eauto.
         { lia. }
         { apply state_label_lookup in MTH. apply MTH. }
-        simpl. revert STEP'.
-        rewrite /fs_le /strict; destruct f, x0 as [? []]; simpl; lia. }
+        intros LE1. specialize (LE' _ _ STEP' LE1). 
+
+        repeat eexists; eauto.
+        destruct f, x0 as [? []]; fs_le_solver. }
 
       enough (exists t st_t, p <= t /\ tr S!! t = Some st_t /\ disabled_st ρlg_r st_t.1)
                as (t & st_t & LE & TTH & DIS).
@@ -1175,20 +1221,29 @@ Section ClientDefs.
         2: { eapply client_trace_ρlg_not_unused with (ρlg := ρlg_r) in TTH; eauto.
            2: { rewrite lib_gs_ρlg. set_solver. }
            done. }
-        destruct R'; do 4 eexists.
-        - repeat split. 
-          3: apply kept2.
+        forward eapply (client_trace_fs_mono tr (m + 1) t); eauto.
+        { lia. }
+        { apply state_label_lookup in MTH. apply MTH. }
+        intros LEt. simpl in LEt.  
+
+        destruct R'. 
+        - do 4 eexists. repeat split. 
+          3: apply kept2'.
           all: eauto.
-          2: { inversion H1; subst; simpl. red; lia.
-               destruct FS as [[-> ->] | [[-> | ->] ->]]; red; simpl; lia. }
+          2: { inversion H1; subst; simpl.
+               destruct FS as [[-> ->] | [-> ->]]; fs_le_solver. }
           2: { inversion H1; subst; simpl.
                all: intros P; red in P; simpl in P.
-               { lia. }
-               destruct FS as [[-> ->] | [[-> | ->] ->]]. 
-               red; lia.
-               destruct FS as [[-> ->] | [[-> | ->] ->]]; red; simpl; lia. }
-          2: { intros * STEP'. inversion STEP'; subst; simpl; try done.
-               all: red; try done. 
+               destruct FS as [[-> ->] | [-> ->]]; fs_le_solver. }
+          red. simpl. apply client_lr_spec.
+          destruct st_t. simpl in *.
+          eexists. eapply ct_al_R; eauto.
+          Unshelve. 2: exact (if (decide (f = fs_U)) then fs_U else fs_S').
+          destruct f; try fs_le_solver.
+          + right. rewrite decide_False; done.
+          + 
+           
+          
         
 
       
