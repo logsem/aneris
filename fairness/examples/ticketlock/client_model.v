@@ -763,6 +763,49 @@ Section ClientDefs.
       congruence. 
   Qed.
 
+  (* Lemma kept1': *)
+  (* @label_kept_state client_model_impl *)
+  (*   (@role_enabled_model client_model_impl (ρ_ext (@flL TlLM_FM ρlg_l))) *)
+  (*   (other_step (ρ_ext (@flL TlLM_FM ρlg_l): fmrole client_model_impl)). *)
+  (* Proof. *)
+  (*   red. intros [tl_st f] ? [tl_st' f'] **. simpl in STEP. *)
+  (*   destruct oℓ' as [ρ | ]. *)
+  (*   2: { by inversion STEP. } *)
+  (*   assert (ρ ≠ ρ_ext (flL (ρlg_l: fmrole TlLM_FM))) as NEQ' by congruence. *)
+
+  (*   assert (f = fs_U /\ does_unlock ρlg_l tl_st /\ disabled_st (ρlg_l: fmrole TlLM_FM) tl_st) as [-> PREρlg]. *)
+  (*   { red in Pst. simpl in Pst. apply client_lr_spec in Pst as [? STEP']. *)
+  (*     inversion STEP'; subst; eauto. *)
+  (*     edestruct ρlg_lr_neq; eauto. }       *)
+    
+  (*   pose proof (ct_au_L tl_st') as STEPr. *)
+  (*   pattern fs_U in STEPr. erewrite (forall_eq_gen _ fs_U) in STEPr. *)
+  (*   simpl in STEPr. repeat setoid_rewrite curry_uncurry_prop in STEPr. *)
+  (*   red. simpl. apply client_lr_spec. *)
+  (*   eexists. apply STEPr. apply and_assoc. *)
+  (*   inversion STEP; subst. *)
+  (*   - split; [done| ].  *)
+
+  (*     eapply step_keeps_unlock_dis. *)
+  (*     { split; try by apply PREρlg. } *)
+  (*     2: { left. eauto. } *)
+  (*     simpl.  *)
+  (*     rewrite /ρlg_l. *)
+  (*     congruence.  *)
+  (*   - done.  *)
+  (*   - edestruct ρlg_lr_neq. eapply has_lock_st_excl with (ρlg1 := ρlg_l); eauto.  *)
+  (*     all: by apply PREρlg. *)
+  (*   - destruct FS as [[? ->] | [[=] ?]].  *)
+  (*     split; [done| ]. *)
+  (*     eapply step_keeps_unlock_dis.  *)
+  (*     { split; try by apply PREρlg. } *)
+  (*     2: { Unshelve. 2: exact (Some (inr $ env $ (flL (ρlg: fmrole TlLM_FM): @EI _ TlEM))). *)
+  (*          econstructor. simpl. *)
+  (*          (* apply not_live_not_active in DIS; eauto.  *) *)
+  (*          eapply allows_lock_impl_spec; eauto. } *)
+  (*     congruence.  *)
+  (* Qed. *)
+
 
   Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k
     (OUTER_CORR : client_LM_trace_exposing lmtr tr)
@@ -1145,9 +1188,8 @@ Section ClientDefs.
       pose proof RES as STEP'. eapply trace_valid_steps' in STEP'.
       2: { eapply (subtrace_valid tr); eauto. done. }
       inversion STEP'; subst; try done.
-      all: try by repeat eexists. }
-
-    eapply traces_match_preserves_termination; eauto.
+      all: try by repeat eexists. }   
+    
 
     assert (exists p st_p, tr S!! p = Some st_p /\ does_lock ρlg_l st_p.1 /\ disabled_st ρlg_l st_p.1 /\ S m <= p) as (p & st_p & PTH & Ll & DISl & LEp).
     { inversion STEP; subst.
@@ -1172,10 +1214,57 @@ Section ClientDefs.
       2: by apply MATCH.
       simpl in *. subst.
       exists (S m + p). eexists. erewrite <- subtrace_state_lookup; eauto.
-      repeat split; eauto. lia. } 
-       
+      repeat split; eauto. lia. }    
 
-  assert (exists t δ_t f_t, tr S!! t = Some (δ_t, f_t) /\ fs_le f_t fs_S').
+    enough (exists t δ_t, p <= t /\ str S!! t = Some (δ_t, fs_O) /\ disabled_st ρlg_r δ_t) as FIN.
+    { destruct FIN as (t & δ_t & LEt & TTH & DISr).
+      apply trace_state_lookup_simpl' in TTH as [[? step] [TTH EQ]].
+      simpl in EQ. subst. destruct step as [[ρ δ_t']|].
+      2: { forward eapply trace_lookup_dom_eq; eauto.
+           intros X%proj1. specialize_full X; eauto. congruence. }
+      eapply trace_valid_steps' in TTH; eauto. 
+      2: { eapply traces_match_valid1; eauto. }
+      inversion TTH; subst.
+      - enough (disabled_st (ρlg_tl c) δ_t) as DIS. 
+        { destruct DIS. eapply fm_live_spec; eauto. }
+        destruct c.
+        2: { done. }
+        (* TODO: show that ρlg_l stays disabled *)
+        admit.
+      - clear -FS. set_solver.
+      - clear -FS. set_solver. }
+
+    assert (∃ (t : nat) (δ_t : tl_state),
+    (* p ≤ t ∧ *)
+      str S!! t = Some (δ_t, fs_O) ∧ disabled_st ρlg_r δ_t).
+    { admit. (* prove a lemma *) }
+
+    destruct H0 as (t & δ_t & TTH & DISr).
+    set (t' := max p t). exists t'.
+    forward eapply state_lookup_dom with (i := t'); eauto.
+    intros X%proj2. specialize_full X; [done| ]. destruct X as [[st' f'] T'TH].
+    exists st'. split; [lia| ].
+    pattern st'.
+    (* eapply steps_keep_state_inf.  *)
+    foobar. ^
+    
+
+
+    
+        eapply terminating_trace_equiv; eauto.
+           
+      forward eapply trace_lookup_dom_strong with (i := t); eauto. 
+      { pose proof (trace_len_is str)
+        apply traces_match_flip in MATCH.  
+        forward eapply traces_match_same_length; [..| apply MATCH| ].  
+        erewrite -> traces_match_same_length in LEN2; [..| apply MATCH]; eauto.  
+      exists t.  
+
+    eapply traces_match_preserves_termination; eauto.
+
+    
+
+    assert (exists t δ_t f_t, tr S!! t = Some (δ_t, f_t) /\ fs_le f_t fs_S').
     { forward eapply (client_trace_fs_mono tr (m + 1) p); eauto.
       { lia. }
       { apply state_label_lookup in MTH. apply MTH. }
