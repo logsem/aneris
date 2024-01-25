@@ -643,10 +643,13 @@ Section ClientDefs.
   esplit; apply _.
   Defined.
 
-  Definition client_LM_trace_exposing :=
+  Definition client_LM_trace_exposing tr :=
+    exists lmtr,
     outer_LM_trace_exposing TlEM_EXT_KEEPS
       ((inl ∘ inl): Gtl -> fmrole client_model_impl) (option_fmap _ _ inl) (λ st tl_st, st.1 = tl_st)
       (LMo := client_model)
+      lmtr
+      tr
   .
 
   Definition fs_le f1 f2: Prop :=
@@ -900,20 +903,21 @@ Section ClientDefs.
   (*   - by apply MATCH. *)
   (* Qed. *)
 
-  Lemma tl_group_fair lmtr (tr: mtrace client_model_impl) 
-    (OUTER_CORR : client_LM_trace_exposing lmtr tr)
+  Lemma tl_group_fair (tr: mtrace client_model_impl) 
+    (OUTER_CORR : client_LM_trace_exposing tr)
     (MATCH : client_tl_traces_match tr (project_tl_trace tr))
     :
     ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace tr). 
   Proof.
     (* forward eapply outer_exposing_subtrace; eauto. *)
+    destruct OUTER_CORR as [? CORR]. 
     eapply inner_LM_trace_fair_aux_group.
     - apply _.
     - done.
-    - by apply OUTER_CORR. 
+    - by apply CORR. 
     - simpl. intros ?? [=<-].
-      by apply OUTER_CORR. 
-    - by apply OUTER_CORR. 
+      by apply CORR. 
+    - by apply CORR. 
     - by apply MATCH.
   Qed.
 
@@ -992,8 +996,8 @@ Section ClientDefs.
 
   Lemma first_tl_subtrace_finite
   (tr : mtrace client_model_impl)
-  (lmtr : lm_fair_traces.lmftrace)
-  (OUTER_CORR : client_LM_trace_exposing lmtr tr)
+  (* (lmtr : lm_fair_traces.lmftrace) *)
+  (OUTER_CORR : client_LM_trace_exposing tr)
   (VALID : mtrace_valid tr)
   (INIT : is_init_cl_state (trfirst tr))
   (FAIR : ∀ ρ, fair_model_trace ρ tr)
@@ -1026,8 +1030,9 @@ Section ClientDefs.
     forward eapply (lock_progress (project_tl_trace str) (ρlg_tl cl_L) 0 (trfirst str).1).
     { by eapply traces_match_valid2. }
     { subst i'_s.
+      destruct OUTER_CORR as [??]. 
       forward eapply outer_exposing_subtrace as [??]; eauto.
-      eapply tl_group_fair; eauto. }
+      eapply tl_group_fair; eauto. red. eauto. }
     { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
     { rewrite TR0. apply INIT. }
     { rewrite TR0. apply INIT. }
@@ -1242,6 +1247,7 @@ Section ClientDefs.
   Lemma ρlg_r_term (tr: mtrace client_model_impl)
     (FAIR : ∀ ρ, fair_model_trace ρ tr)
     (IN_UN: forall i st, tr S!! i = Some st -> unused_not_ρlg st)
+    (EXP: client_LM_trace_exposing tr)
     (VALID: mtrace_valid tr)
     (FLAG: forall i st, tr S!! i = Some st -> fs_le st.2 fs_S)
     (NOLOCKl: forall i st, tr S!! i = Some st ->
@@ -1253,7 +1259,7 @@ Section ClientDefs.
   Proof.
     forward eapply tl_trace_construction as MATCH; eauto.
     assert (∀ g, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace tr)) as FAIR_G.
-    { eapply tl_group_fair; eauto.  
+    { eapply tl_group_fair; eauto. }
     pose proof MATCH as VALID'%traces_match_valid2. 
     
     add_case (exists i δ, tr S!! i = Some (δ, fs_O)) FO.
@@ -1309,8 +1315,8 @@ Section ClientDefs.
   (*   str !! i = Some res → is_tl_step res ∨ is_end_state res *)
 
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
-    lmtr
-    (OUTER_CORR: client_LM_trace_exposing lmtr tr)
+    (* lmtr *)
+    (OUTER_CORR: client_LM_trace_exposing tr)
     (INIT: is_init_cl_state (trfirst tr))
     :
     mtrace_fairly_terminating tr.
@@ -1382,9 +1388,9 @@ Section ClientDefs.
       apply au_impl_spec in AU. 
       forward eapply (unlock_termination (project_tl_trace str) (ρlg_l) 0).
       { eapply traces_match_valid2; eauto. }
-      {
+      { destruct OUTER_CORR as [??]. 
         forward eapply outer_exposing_subtrace as [??]; eauto.
-        eapply tl_group_fair; eauto. }
+        eapply tl_group_fair; eauto. red. eauto. }
       { apply traces_match_first in MATCH.
         rewrite state_lookup_0. rewrite state_lookup_0 in M'TH.
         apply Some_inj in M'TH. rewrite M'TH in MATCH.
@@ -1437,6 +1443,9 @@ Section ClientDefs.
       erewrite subtrace_state_lookup in H0; try done. simpl in H0. 
       eapply unused_not_ρlg_trace_preserved; eauto.
       clear -INIT. apply proj2, proj1 in INIT. set_solver. }
+    { destruct OUTER_CORR as [??].
+      forward eapply outer_exposing_subtrace as [??]; eauto. 
+      eapply outer_exposing_after; eauto. }
     { subst. eapply trace_valid_after; eauto. 
       eapply (subtrace_valid tr); eauto. done. }    
     { intros * ITH.
