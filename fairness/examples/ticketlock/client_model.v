@@ -1204,8 +1204,25 @@ Section ClientDefs.
     match goal with
     | |- ?G => assert (C -> G) as name
     end.
-  
+
+  Lemma r_ext_enabled (st: fmstate client_model_impl)
+    (UN: does_unlock ρlg_r st.1)
+    (DIS: disabled_st ρlg_r st.1)
+    (NO: st.2 ≠ fs_O):
+  role_enabled_model ((ρ_ext (flU (ρlg_r: fmrole TlLM_FM))): fmrole client_model_impl) st.
+  Proof.
+    destruct st. simpl in NO.  
+    red. eapply fm_live_spec. econstructor; eauto.
+    Unshelve. 2: exact (if (decide (f = fs_U)) then fs_U else fs_O).
+    destruct f; try tauto.
+    { left. by rewrite decide_True. }
+    all: right; rewrite decide_False; set_solver.
+  Qed.
+
+
   Lemma ρlg_r_term (tr: mtrace client_model_impl)
+    (FAIR : ∀ ρ, fair_model_trace ρ tr)
+    (IN_UN: forall i st, tr S!! i = Some st -> unused_not_ρlg st)
     (VALID: mtrace_valid tr)
     (FLAG: forall i st, tr S!! i = Some st -> fs_le st.2 fs_S)
     (NOLOCKl: forall i st, tr S!! i = Some st ->
@@ -1215,16 +1232,50 @@ Section ClientDefs.
   ∃ (i : nat) (δ : tl_state),
     tr S!! i = Some (δ, fs_O) ∧ disabled_st ρlg_r δ.
   Proof.
-    forward eapply tl_trace_construction as MATCH; eauto. 
+    forward eapply tl_trace_construction as MATCH; eauto.
+    assert (∀ g, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace tr)) as FAIR_G.
+    { admit. }
+    pose proof MATCH as VALID'%traces_match_valid2. 
+    
     add_case (exists i δ, tr S!! i = Some (δ, fs_O)) FO.
-    { intros (i & δ & ITH).
+    { intros [i_ O]. pattern i_ in O. apply min_prop_dec in O as (i & [δ ITH] & MIN).
+      2: { admit. }
+      clear i_. 
       pose proof ITH as ITH'.
       eapply traces_match_state_lookup_1 in ITH' as (δ_ & ITH' & EQ); [| eauto].
       simpl in EQ. subst δ_. 
       destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) δ)); eauto.
+
+      cut (∃ n st', i < n /\ project_tl_trace tr S!! n = Some st' /\ disabled_st ρlg_r st').
+      { intros (j & ? & LTj & JTH & DIS).
+        eapply traces_match_state_lookup_2 in JTH as (st & JTH & EQ); [| eauto].
+        destruct st. simpl in EQ. subst.
+        forward eapply (client_trace_fs_mono tr i j); eauto.
+        { lia. }
+        simpl. intros. destruct f; try by fs_le_solver.
+        eauto. }
+      
       destruct (does_lock_unlock_trichotomy δ ρlg_r) as [L | [U | UN]]; cycle -1.
       { edestruct unused_active_incompat; eauto. }
-  (* Qed.  *)
+      - forward eapply (lock_progress (project_tl_trace tr) ρlg_r i).
+        6: { eapply client_trace_locks_released; eauto.
+             intros. destruct c'.
+             { edestruct NOLOCKl; eauto. }
+             destruct (Nat.le_gt_cases i j) as [LE | LT].
+             { tauto. }
+             subst ρ'. apply r_ext_enabled; auto.
+             destruct st. simpl. intros ->.
+             specialize_full MIN.
+             { eauto. }
+             lia. }
+        all: eauto.
+        intros (?&?&?&?&?&?). eauto.  
+      - forward eapply (unlock_termination (project_tl_trace tr) ρlg_r i); eauto.
+        intros (?&?&?&?&?&?). eauto. }
+
+    
+
+        
   Admitted. 
 
   (* Lemma  *)
@@ -1357,7 +1408,14 @@ Section ClientDefs.
          edestruct LEN2 as [? ?]; [| done].
          red. eauto. }
  
-    forward eapply (ρlg_r_term rtr) as (t & δ_t & TTH & DISr). 
+    forward eapply (ρlg_r_term rtr) as (t & δ_t & TTH & DISr).
+    { intros. eapply fair_by_after; eauto.
+      eapply fair_by_subtrace; eauto. }
+    { intros.
+      erewrite state_lookup_after in H0; eauto. 
+      erewrite subtrace_state_lookup in H0; try done. simpl in H0. 
+      eapply unused_not_ρlg_trace_preserved; eauto.
+      clear -INIT. apply proj2, proj1 in INIT. set_solver. }
     { subst. eapply trace_valid_after; eauto. 
       eapply (subtrace_valid tr); eauto. done. }    
     { intros * ITH.
