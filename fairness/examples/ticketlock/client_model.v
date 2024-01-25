@@ -12,6 +12,13 @@ Require Import Coq.Logic.Classical.
 
 Close Scope Z_scope.
 
+(* TODO: move *)
+Ltac contra_dec name :=
+  match goal with
+  | |- ?G => destruct (decide G) as [| name]; [done| ]
+  end. 
+
+
 Section SizeLookup.
   Context `{FS: FinSet A C}.
   Context {LE: LeibnizEquiv C}.
@@ -393,16 +400,29 @@ Section ClientDefs.
     end.
 
   Definition is_tl_step (step: model_trace_step client_model_impl) :=
-    step_label_matches step (fun ρ => exists ρlg, Some $ inl ρlg = ρ). 
+    step_label_matches step (fun ρ => exists ρlg, Some $ inl ρlg = ρ).
 
-  Lemma tl_trace_construction (tr: mtrace client_model_impl)
-    (VALID: mtrace_valid tr)
-    (TL_STEPS: ∀ i res, tr !! i = Some res → is_tl_step res \/ is_end_state res):
-    lm_model_traces_match
+  Lemma client_trace_tl_steps  (tr: mtrace client_model_impl)
+    (VALID: mtrace_valid tr):
+    ∀ i res, tr !! i = Some res → is_tl_step res \/ is_end_state res.
+  Proof.
+    intros i [[tl_st f] [[ρ st']| ]] RES.
+    2: { right. eexists. eauto. }
+    left.
+    pose proof RES as STEP'. eapply trace_valid_steps' in STEP'; eauto. 
+    inversion STEP'; subst; try done.
+    all: try by repeat eexists.
+  Qed.
+
+  Let client_tl_traces_match :=
+        lm_model_traces_match
       (transA := @ext_trans _ TlEM)
       ((option_fmap _ _ inl): option (@ext_role _ TlEM) -> option $ fmrole client_model_impl)
-      (fun c δ_lib => fst c = δ_lib)
-      tr (project_tl_trace tr).
+      (fun c δ_lib => fst c = δ_lib). 
+
+  Lemma tl_trace_construction (tr: mtrace client_model_impl)
+    (VALID: mtrace_valid tr):
+    client_tl_traces_match tr (project_tl_trace tr). 
   Proof.
     do 2 red.
     rewrite /out_A_labels_match. simpl.
@@ -410,7 +430,7 @@ Section ClientDefs.
     { intros *. intros X. apply X. }
     { eapply nested_trace_construction.
       { done. }
-      { intros * ITH. apply TL_STEPS in ITH as [LIB | ?]; [| tauto].
+      { intros * ITH. apply client_trace_tl_steps in ITH as [LIB | ?]; [| eauto| tauto].
         red in LIB. unfold_slm LIB. destruct Pstep as [? <-].
         left. do 3 eexists. eauto. }
       intros. destruct ℓ; [| done]. destruct c; [| done].
@@ -469,6 +489,7 @@ Section ClientDefs.
         apply allows_lock_impl_spec; eauto.
     Qed.
 
+    (* TODO: move partially to fair_lock *)
     Lemma client_trace_keeps_unused (tr: mtrace client_model_impl) i si
       (VALID : mtrace_valid tr)
       (ITH: tr S!! i = Some si):
@@ -486,26 +507,52 @@ Section ClientDefs.
       specialize (IHi _ JTH). intros ?%IHi.
       eapply client_trans_keeps_unused; eauto.  
       eapply trace_valid_steps''; eauto.
-    Qed. 
+    Qed.
 
-    Lemma client_trace_ρlg_not_unused (tr: mtrace client_model_impl) i si ρlg
-      (VALID : mtrace_valid tr)
-      (ITH: tr S!! i = Some si)
-      (R: ρlg ∈ lib_gs)
-      :
-      
-      ¬ is_unused ρlg si.1. 
+    Definition unused_not_ρlg (st: client_state) :=
+      (forall ρlg, (¬ exists c, ρlg = ρlg_tl c) -> is_unused ρlg st.1). 
+
+    Lemma client_trace_ρlg_not_unused (st: client_state) ρlg
+      (USED: ¬ is_unused ρlg st.1)
+      (* (INIT : is_init_cl_state (trfirst tr)) *)
+      (UN: unused_not_ρlg st)
+      :      
+      ρlg ∈ lib_gs. 
     Proof.
-    Admitted. 
+      contra_dec NIN.
+      destruct USED. 
+      apply UN. intros [c ->]. apply NIN.
+      rewrite lib_gs_ρlg. destruct c; set_solver.
+    Qed.
 
+    Lemma unused_not_ρlg_trace_preserved (tr: mtrace client_model_impl)
+      (UN0: unused_not_ρlg (trfirst tr))
+      (VALID : mtrace_valid tr):
+      forall i st, tr S!! i = Some st -> unused_not_ρlg st.
+    Proof.
+      intros i. induction i.
+      { rewrite state_lookup_0. set_solver. }
+      (* intros st' I'TH. *)
+      rewrite -Nat.add_1_r. intros si' ITH'. 
+      pose proof (trace_has_len tr) as [len LEN].  
+      destruct (proj2 (trace_lookup_dom_strong _ _ LEN i)) as (sj & ρ & sj'_ & JTH). 
+      { eapply state_lookup_dom; eauto. }    
+      apply state_label_lookup in JTH as (JTH & JTH'_ & JTHρ).
+      rewrite ITH' in JTH'_. inversion JTH'_. subst sj'_. clear JTH'_.   
+      specialize (IHi _ JTH).
+      red. intros ? UN%IHi.
+      eapply client_trans_keeps_unused; eauto.  
+      eapply trace_valid_steps''; eauto.
+    Qed. 
+      
   End UnusedRoles. 
 
   Definition is_init_cl_state (st: client_state) :=
-    (forall c, let ρlg := ρlg_tl c in does_lock ρlg st.1 /\ active_st ρlg st.1) /\
-    (forall ρlg, is_unused ρlg st.1 <-> ¬ exists c, ρlg = ρlg_tl c) /\
-    st.2 = fs_U.
+      (forall c, let ρlg := ρlg_tl c in does_lock ρlg st.1 /\ active_st ρlg st.1) /\
+        (forall ρlg, is_unused ρlg st.1 <-> ¬ exists c, ρlg = ρlg_tl c) /\
+        st.2 = fs_U.
 
- 
+
   Definition client_LSI (s: client_state)
     (tm: groups_map (M := client_model_impl) (G := locale heap_lang))
     (_: gmap (fmrole client_model_impl) nat) :=
@@ -811,10 +858,7 @@ Section ClientDefs.
     (OUTER_CORR : client_LM_trace_exposing lmtr tr)
     (LEN1': trace_len_is str NOinfinity)
     (SUB1 : subtrace tr k NOinfinity = Some str)
-    (MATCH : lm_model_traces_match ((option_fmap ext_role (ext_role + cl_id)%type inl): option ext_role → option (fmrole client_model_impl))
-               (transA := (@ext_trans TlLM_FM TlEM))
-            (λ (c : client_model_impl) (δ_lib : lm_ls TlLM), c.1 = δ_lib)
-            str (project_tl_trace str))
+    (MATCH : client_tl_traces_match str (project_tl_trace str))
     :
     ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace str). 
   Proof.
@@ -828,6 +872,78 @@ Section ClientDefs.
       by apply EXP'.
     - by apply EXP'.
     - by apply MATCH.
+  Qed.
+
+  (* TODO: move *)
+  Lemma in_lib_gs_ex ρlg
+    (IN: ρlg ∈ lib_gs):
+    exists c, ρlg = ρlg_tl c.
+  Proof.
+    rewrite lib_gs_ρlg !elem_of_union !elem_of_singleton in IN.
+    destruct IN as [-> | ->]; eauto. 
+  Qed. 
+
+  Lemma client_trace_locks_released
+    (ctr : mtrace client_model_impl)
+    (ttr: elmftrace)
+    i
+    c
+    (MATCH: client_tl_traces_match ctr ttr)
+    (FAIR : ∀ ρ, fair_model_trace ρ ctr)
+    (* (INIT : is_init_cl_state (trfirst ctr)) *)
+    (UN: forall i st, ctr S!! i = Some st -> unused_not_ρlg st)
+    (VALID : mtrace_valid ctr)
+    (CEN: forall j st c',
+        let ρ' := ρlg_tl c': fmrole TlLM_FM in
+        ctr S!! j = Some st -> does_unlock ρ' st.1 -> disabled_st ρ' st.1 ->
+                  (i <= j -> c' ≠ c) -> role_enabled_model ((ρ_ext $ flU ρ'): fmrole client_model_impl) st)
+    :
+    eventual_release ttr (ρlg_tl c) i.
+  Proof.
+    red. intros ρlg j tl_st **.
+    eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
+    2: by apply MATCH.
+    destruct st as [? f]. simpl in EQ. subst.
+    
+    set (ρ := ρ_ext $ flU ρlg: fmrole client_model_impl).
+    enough (role_enabled_model ρ ((tl_st, f): fmstate client_model_impl) /\
+              @label_kept_state client_model_impl
+                (@role_enabled_model client_model_impl ρ)
+                (other_step ρ)) as [EN KEPT]. 
+    { forward eapply kept_state_fair_step.
+      5: by apply JTH.
+      3: { intros ? P. apply P. }      
+      2: { apply KEPT. }
+      all: eauto.
+      intros (k&?&[[LEk STEP] MIN]&KTH&ENk).
+
+      apply trace_label_lookup_simpl' in STEP as (? & [δ' f'] & KTH').
+      exists (k + 1), δ'. repeat split.
+      2: lia.
+      { apply state_label_lookup in KTH' as (?&KTH'&?).
+        eapply traces_match_state_lookup_1 in KTH' as (? & KTH' & EQ).
+        2: { eauto. }
+        rewrite KTH'. simpl in EQ. subst. auto. }
+      
+      eapply trace_state_lookup_simpl in KTH; eauto. subst.
+      eapply trace_valid_steps' in KTH'.
+      2: { eauto. }
+      inversion KTH'; subst.
+      all: eapply au_impl_spec; eauto;
+        apply allows_unlock_impl_spec; eauto. }
+
+    pose proof JTH as JTH_.
+    apply UN in JTH. 
+    eapply client_trace_ρlg_not_unused in JTH.
+    2: { intros ?. eapply unused_does_unlock_incompat; eauto. }
+        
+    split.
+    2: { 
+      rewrite lib_gs_ρlg !elem_of_union !elem_of_singleton in JTH.
+      destruct JTH as [-> | ->]; subst ρ; [apply kept1| apply kept2]. }
+
+    apply in_lib_gs_ex in JTH as [c' ->].
+    eapply CEN; eauto. intros LE ->. tauto. 
   Qed.
     
 
@@ -854,29 +970,7 @@ Section ClientDefs.
     rewrite NOmega.sub_0_r in LEN1'. 
     
     forward eapply (tl_trace_construction str) as MATCH. 
-    { subst. eapply (subtrace_valid tr); eauto. }
-    { subst. intros i res RES.
-      
-      (* TODO: make this 'P \/ is_end_state' a lemma? *)
-      pose proof (trace_lookup_trichotomy _ _ LEN1' i) as [TL | [END | NO]]; cycle 1. 
-      { right.
-        destruct END as (?&END&->).
-        rewrite RES in END. inversion END. subst.
-        eexists. eauto. } 
-      { rewrite RES in NO. by apply proj1 in NO. }
-      left. 
-      destruct TL as (?&?&?&TL&dom). rewrite RES in TL. inversion TL. subst.
-      apply subtrace_lookup with (k := i) in SUB1.
-      2: { lia_NO i'_s. }
-      pose proof RES as RES'.
-      rewrite SUB1 in RES. simpl in RES.
-      pose proof RES as UUres.
-      apply STEPs in UUres.
-      2: { eapply trace_lookup_dom; eauto. }
-      destruct UUres as (?&?&?&[=]). subst.
-      eapply trace_valid_steps' in RES; eauto.
-      inversion RES; subst. 
-      all: by do 3 eexists; eauto. }
+    { subst. eapply (subtrace_valid tr); eauto. }    
     
     destruct (decide (i'_s = NOinfinity)) as [INF| ]. 
     2: { destruct i'_s; set_solver. }
@@ -892,59 +986,26 @@ Section ClientDefs.
     { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
     { rewrite TR0. apply INIT. }
     { rewrite TR0. apply INIT. }
-    { red. intros ρlg j tl_st **. specialize (AFTER ltac:(lia)).
-      destruct AFTER as [NEQ NO_L_LOCKS].
-      assert (ρlg = ρlg_r) as ->.
-      { red in INIT. apply proj2, proj1 in INIT. specialize (INIT ρlg).
-        apply not_iff_compat, proj1 in INIT. specialize_full INIT.
-        { eapply traces_match_state_lookup_2 in JTH as (st&JTH&MATCH'); [| by eauto].
-          destruct st. simpl in MATCH'. subst.  
-          erewrite subtrace_state_lookup in JTH; eauto.
-          2: done. 
-          intros U. eapply client_trace_keeps_unused with (i := j) in U; eauto.
-          simpl in U. eapply unused_does_unlock_incompat; eauto. }
-        apply NNPP in INIT. destruct INIT as [? ->].
-        destruct x; eauto. congruence. }
-      
-      eapply traces_match_state_lookup_2 in JTH as (st&JTH&EQ).
-      2: by apply MATCH.
-      destruct st as [? f]. simpl in EQ. subst.
+    { subst. 
+      eapply client_trace_locks_released; eauto.
+      { eapply fair_by_subtrace; eauto. }
+      { intros. erewrite subtrace_state_lookup in H0; try done. simpl in H0. 
+        eapply unused_not_ρlg_trace_preserved; eauto.
+        clear -INIT. apply proj2, proj1 in INIT. set_solver. }
+      { eapply (subtrace_valid tr); eauto. }
+      simpl. intros * JTH U DIS AFTER. specialize (AFTER ltac:(lia)).
+      destruct c'; [done| ]. 
+
+      destruct st as [? f]. simpl in *. 
       assert (f = fs_U) as ->.
       { apply trace_state_lookup_simpl' in JTH as (step&JTH&ST).
         erewrite subtrace_lookup in JTH; eauto.
         2: done.
         simpl in JTH. apply STEPs in JTH; [| done].
         destruct JTH as (?&?&?&[=]). subst. by inversion ST. }
-      
-      pose proof SUB1 as FAIR1. eapply fair_by_subtrace in FAIR1; eauto.
-      Unshelve. 2: exact (ρ_ext $ flU (ρlg_r: fmrole TlLM_FM)).
-      forward eapply kept_state_fair_step.
-      5: by apply JTH.
-      3: { intros ? P. apply P. }
-      4: { simpl. red. eapply fm_live_spec.
-           eapply ct_au_R; eauto. }
-      { eapply (subtrace_valid tr); eauto. }
-      { apply kept2. }
-      { eapply fair_by_subtrace; eauto. }
-      
-      clear dependent tl_st. 
-      simpl. intros (k & st & PROPk & KTH & ENk).
-      red in PROPk. destruct PROPk as [[LE STEP] MINk].
-      apply trace_label_lookup_simpl' in STEP as (? & st' & KTH').
-      exists (k + 1), st'.1. repeat split.
-      2: lia.
-      { apply state_label_lookup in KTH' as (?&KTH'&?).
-        eapply traces_match_state_lookup_1 in KTH' as (? & KTH' & EQ).
-        2: { eauto. }
-        rewrite KTH'. congruence. }
-      
-      eapply trace_state_lookup_simpl in KTH; eauto. subst.
-      eapply trace_valid_steps' in KTH'.
-      2: { eapply subtrace_valid in SUB1; eauto. }
-      inversion KTH'; subst.
-      { by apply ρlg_lr_neq in H2. }
-      simpl. eapply au_impl_spec; eauto.
-      apply allows_unlock_impl_spec; eauto. }
+
+      simpl. red. eapply fm_live_spec.
+      eapply ct_au_R; eauto. }
     
     intros (k & tl_st & ? & KTH & LOCKl & DISl). 
     eapply traces_match_state_lookup_2 in KTH as (s & KTH & EQ); [| by eauto].
@@ -1110,8 +1171,45 @@ Section ClientDefs.
   Instance fs_le_dec x y: Decision (fs_le x y).
   Proof. 
     destruct x, y; simpl; rewrite /fs_le; solve_decision.
-  Qed. 
-    
+  Qed.
+
+  (* TODO: move? *)
+  Ltac add_case C name :=
+    match goal with
+    | |- ?G => assert (C -> G) as name
+    end.
+  
+  Lemma ρlg_r_term (tr: mtrace client_model_impl)
+    (VALID: mtrace_valid tr)
+    (FLAG: forall i st, tr S!! i = Some st -> fs_le st.2 fs_S):
+  ∃ (i : nat) (δ : tl_state),
+    tr S!! i = Some (δ, fs_O) ∧ disabled_st ρlg_r δ.
+  Proof.
+    forward eapply tl_trace_construction as MATCH; eauto. 
+    add_case (exists i δ, tr S!! i = Some (δ, fs_O)) FO.
+    { intros (i & δ & ITH).
+      pose proof ITH as ITH'.
+      eapply traces_match_state_lookup_1 in ITH' as (δ_ & ITH' & EQ); [| eauto].
+      simpl in EQ. subst δ_. 
+      destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) δ)); eauto.
+      destruct (does_lock_unlock_trichotomy δ ρlg_r) as [L | [U | UN]]; cycle -1.
+      { edestruct unused_active_incompat; eauto. }
+      - 
+      
+  (* Qed.  *)
+  Abort. 
+
+  (* Lemma  *)
+  (* tr : mtrace client_model_impl *)
+  (* VALID : mtrace_valid tr *)
+  (* LEN : trace_len_is tr NOinfinity *)
+  (* m : nat *)
+  (* str : trace client_model_impl (option (fmrole client_model_impl)) *)
+  (* SUB : subtrace tr (S m) NOinfinity = Some str *)
+  (* ============================ *)
+  (* ∀ (i : nat) (res : model_trace_step client_model_impl), *)
+  (*   str !! i = Some res → is_tl_step res ∨ is_end_state res *)
+
   Lemma client_model_fair_term (tr: mtrace client_model_impl)
     lmtr
     (OUTER_CORR: client_LM_trace_exposing lmtr tr)
@@ -1173,23 +1271,7 @@ Section ClientDefs.
       all: clear -FS; set_solver. }
     
     forward eapply (tl_trace_construction str) as MATCH. 
-    { subst. eapply (subtrace_valid tr); eauto. done. }
-    {
-      rename tl_st' into tl_st''. rename tl_st into tl_st'.
-      intros i [[tl_st f] [[ρ st']| ]] RES.
-      2: { right. eexists. eauto. }
-      left.
-      assert (fs_le f fs_S) as LEi.
-      { eapply state_label_lookup in MTH as (_&MTH'&_).
-        apply trace_state_lookup in RES. 
-        erewrite subtrace_state_lookup in RES; eauto.
-        unshelve forward eapply (client_trace_fs_mono _ _ _ _ _ _ _ MTH' RES); eauto.
-        lia. }
-      pose proof RES as STEP'. eapply trace_valid_steps' in STEP'.
-      2: { eapply (subtrace_valid tr); eauto. done. }
-      inversion STEP'; subst; try done.
-      all: try by repeat eexists. }   
-    
+    { subst. eapply (subtrace_valid tr); eauto. done. }    
 
     assert (exists p st_p, tr S!! p = Some st_p /\ does_lock ρlg_l st_p.1 /\ disabled_st ρlg_l st_p.1 /\ S m <= p) as (p & st_p & PTH & Ll & DISl & LEp).
     { inversion STEP; subst.
@@ -1222,124 +1304,73 @@ Section ClientDefs.
       simpl in EQ. subst. destruct step as [[ρ δ_t']|].
       2: { forward eapply trace_lookup_dom_eq; eauto.
            intros X%proj1. specialize_full X; eauto. congruence. }
-      eapply trace_valid_steps' in TTH; eauto. 
+      clear STEP. pose proof TTH as STEP. eapply trace_valid_steps' in STEP; eauto. 
       2: { eapply traces_match_valid1; eauto. }
-      inversion TTH; subst.
-      - enough (disabled_st (ρlg_tl c) δ_t) as DIS. 
-        { destruct DIS. eapply fm_live_spec; eauto. }
-        destruct c.
-        2: { done. }
-        (* TODO: show that ρlg_l stays disabled *)
-        admit.
-      - clear -FS. set_solver.
-      - clear -FS. set_solver. }
+      inversion STEP; subst.
+      2, 3: clear -FS; set_solver.
+      enough (disabled_st (ρlg_tl c) δ_t) as DIS. 
+      { destruct DIS. eapply fm_live_spec; eauto. }
+      destruct c.
+      2: { done. } 
+      
+      forward eapply (@steps_keep_state_inf _ tr) with (P := fun c => does_lock (ρlg_l: fmrole TlLM_FM) c.1 /\ disabled_st (ρlg_l: fmrole TlLM_FM) c.1) (Pl := fun _ => True). 
+      { eauto. } 
+      { eexists. split; [apply PTH| ]. eauto. }
+      2: done.
+      3: { erewrite <- subtrace_state_lookup. 
+           { eapply trace_state_lookup. apply TTH. }
+           all: eauto. }
+      2: { lia. }
+      2: { simpl. apply proj2. }
+      clear. red. intros δ * [LOCK DIS] _ STEP. 
+      inversion STEP; subst; simpl in *; try subst ρlg. 
+      { destruct c.
+        { destruct DIS. eapply fm_live_spec; eauto. simpl. eauto. }
+        eapply step_keeps_lock_dis; eauto.
+        2: { simpl. left. simpl. eauto. }
+        congruence. }
+      { edestruct does_lock_unlock_incompat; eauto. }
+      { eapply step_keeps_lock_dis; eauto.
+        2: { right. Unshelve.
+             2: { apply env. eapply (flU (ρlg_r: fmrole TlLM_FM)). }
+             simpl. by apply allows_unlock_impl_spec. }
+        congruence. }
+      { eapply step_keeps_lock_dis; eauto.
+        2: { right. Unshelve.
+             2: { apply env. eapply (flL (ρlg_r: fmrole TlLM_FM)). }
+             simpl. by apply allows_lock_impl_spec. }
+        simpl. intros [=EQ]. by apply symmetry, ρlg_lr_neq in EQ. }
+    }
+    
+    forward eapply (ρlg_r_term str) as (t & δ_t & TTH & DISr).
+    { intros * ITH. 
+      forward eapply client_trace_fs_mono.
+      3: { apply trace_state_lookup_S in MTH.
+           erewrite (plus_n_O (S m)), <- subtrace_state_lookup in MTH; eauto. }
+      3: { apply ITH. }
+      all: eauto. 
+      { eapply (subtrace_valid tr); eauto. done. }
+      lia. }
 
-    assert (∃ (t : nat) (δ_t : tl_state),
-    (* p ≤ t ∧ *)
-      str S!! t = Some (δ_t, fs_O) ∧ disabled_st ρlg_r δ_t).
-    { admit. (* prove a lemma *) }
-
-    destruct H0 as (t & δ_t & TTH & DISr).
     set (t' := max p t). exists t'.
     forward eapply state_lookup_dom with (i := t'); eauto.
     intros X%proj2. specialize_full X; [done| ]. destruct X as [[st' f'] T'TH].
     exists st'. split; [lia| ].
-    pattern st'.
-    (* eapply steps_keep_state_inf.  *)
-    foobar. ^
-    
 
-
-    
-        eapply terminating_trace_equiv; eauto.
-           
-      forward eapply trace_lookup_dom_strong with (i := t); eauto. 
-      { pose proof (trace_len_is str)
-        apply traces_match_flip in MATCH.  
-        forward eapply traces_match_same_length; [..| apply MATCH| ].  
-        erewrite -> traces_match_same_length in LEN2; [..| apply MATCH]; eauto.  
-      exists t.  
-
-    eapply traces_match_preserves_termination; eauto.
-
-    
-
-    assert (exists t δ_t f_t, tr S!! t = Some (δ_t, f_t) /\ fs_le f_t fs_S').
-    { forward eapply (client_trace_fs_mono tr (m + 1) p); eauto.
-      { lia. }
-      { apply state_label_lookup in MTH. apply MTH. }
-      destruct st_p as [δ f]. 
-      intros LEfp. simpl in *. 
-      destruct (decide (fs_le f fs_S')).
-      { do 3 eexists. eauto. }
-      assert (f = fs_S) as ->.
-      { destruct f; simpl in *; rewrite /fs_le in LEfp, n; try lia. done. }
-      pose proof (does_lock_unlock_trichotomy (δ: fmstate TlLM_FM) ρlg_r) as R.
-      apply or_assoc in R. destruct R as [R| ]. 
-      2: { eapply client_trace_ρlg_not_unused with (ρlg := ρlg_r) in PTH; eauto.
-           2: { rewrite lib_gs_ρlg. set_solver. }
-           done. }
-
-      enough (exists t st_t Pr ℓr, p <= t /\ tr S!! t = Some st_t /\ label_kept_state Pr (other_step ℓr) /\ Pr (st_t) /\ (∀ st, Pr st → role_enabled_model ℓr st) /\ (forall st1 st2, fmtrans _ st1 (Some ℓr) st2 -> fs_le st1.2 fs_S -> strict fs_le st2.2 st1.2)) as (t & st_t & Pr & ℓr & LEt & TTH & KEPT & PR & IEN & LE'). 
-      { forward eapply kept_state_fair_step.
-        2: apply KEPT.
-        5: apply PR.
-        all: eauto. 
-
-        intros (?&?&[[LE'' STEP'] MIN]&?&?).
-        apply trace_label_lookup_simpl' in STEP' as (?&[? f]&STEP').
-        pose proof STEP' as STEP'_. 
-        eapply trace_valid_steps' in STEP'; eauto.
-
-        eapply trace_state_lookup_simpl in H0; eauto. subst.
-        pose proof STEP'_ as NEXT%trace_state_lookup_S.
-        pose proof STEP'_ as CUR%trace_state_lookup. 
-
-        forward eapply (client_trace_fs_mono tr (m + 1) x); eauto.
-        { lia. }
-        { apply state_label_lookup in MTH. apply MTH. }
-        intros LE1. specialize (LE' _ _ STEP' LE1). 
-
-        repeat eexists; eauto.
-        destruct f, x0 as [? []]; fs_le_solver. }
-
-      enough (exists t st_t, p <= t /\ tr S!! t = Some st_t /\ disabled_st ρlg_r st_t.1)
-               as (t & st_t & LE & TTH & DIS).
-      { pose proof (does_lock_unlock_trichotomy (st_t.1: fmstate TlLM_FM) ρlg_r) as R'.
-        apply or_assoc in R'. destruct R' as [R'| ]. 
-        2: { eapply client_trace_ρlg_not_unused with (ρlg := ρlg_r) in TTH; eauto.
-           2: { rewrite lib_gs_ρlg. set_solver. }
-           done. }
-        forward eapply (client_trace_fs_mono tr (m + 1) t); eauto.
-        { lia. }
-        { apply state_label_lookup in MTH. apply MTH. }
-        intros LEt. simpl in LEt.  
-
-        destruct R'. 
-        - do 4 eexists. repeat split. 
-          3: apply kept2'.
-          all: eauto.
-          2: { inversion H1; subst; simpl.
-               destruct FS as [[-> ->] | [-> ->]]; fs_le_solver. }
-          2: { inversion H1; subst; simpl.
-               all: intros P; red in P; simpl in P.
-               destruct FS as [[-> ->] | [-> ->]]; fs_le_solver. }
-          red. simpl. apply client_lr_spec.
-          destruct st_t. simpl in *.
-          eexists. eapply ct_al_R; eauto.
-          Unshelve. 2: exact (if (decide (f = fs_U)) then fs_U else fs_S').
-          destruct f; try fs_le_solver.
-          + right. rewrite decide_False; done.
-          + 
-           
-          
-        
-
-      
-
-      destruct R. 
-      - do 2 eexists. 
-    
+    forward eapply (@steps_keep_state_inf _ str) with (P := fun c => disabled_st (ρlg_r: fmrole TlLM_FM) c.1 /\ c.2 = fs_O) (Pl := fun _ => True). 
+    { eapply (subtrace_valid tr); eauto. done. }
+    { eexists. split; [apply TTH| ]. eauto. }
+    { clear. red. intros [δ f] * [DIS EQ] _ STEP. simpl in EQ. subst.
+      inversion STEP; subst.
+      2, 3: clear -FS; set_solver.
+      split; auto. simpl.
+      destruct c.
+      { eapply disabled_mtrans_kept; eauto. }
+      destruct DIS. eapply fm_live_spec; eauto. }
+    { done. }
+    2: { apply T'TH. }
+    { lia. }
+    simpl. eauto. clear -T'TH. set_solver. 
   Qed. 
 
 End ClientDefs. 
