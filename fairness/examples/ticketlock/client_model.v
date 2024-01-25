@@ -880,23 +880,40 @@ Section ClientDefs.
 
 
 
-  Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k
+  (* Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k *)
+  (*   (OUTER_CORR : client_LM_trace_exposing lmtr tr) *)
+  (*   (LEN1': trace_len_is str NOinfinity) *)
+  (*   (SUB1 : subtrace tr k NOinfinity = Some str) *)
+  (*   (MATCH : client_tl_traces_match str (project_tl_trace str)) *)
+  (*   : *)
+  (*   ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace str).  *)
+  (* Proof. *)
+  (*   forward eapply outer_exposing_subtrace; eauto. *)
+  (*   intros [? EXP']. *)
+  (*   eapply inner_LM_trace_fair_aux_group. *)
+  (*   - apply _. *)
+  (*   - done. *)
+  (*   - by apply EXP'.  *)
+  (*   - simpl. intros ?? [=<-]. *)
+  (*     by apply EXP'. *)
+  (*   - by apply EXP'. *)
+  (*   - by apply MATCH. *)
+  (* Qed. *)
+
+  Lemma tl_group_fair lmtr (tr: mtrace client_model_impl) 
     (OUTER_CORR : client_LM_trace_exposing lmtr tr)
-    (LEN1': trace_len_is str NOinfinity)
-    (SUB1 : subtrace tr k NOinfinity = Some str)
-    (MATCH : client_tl_traces_match str (project_tl_trace str))
+    (MATCH : client_tl_traces_match tr (project_tl_trace tr))
     :
-    ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace str). 
+    ∀ g: Gtl, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace tr). 
   Proof.
-    forward eapply outer_exposing_subtrace; eauto.
-    intros [? EXP'].
+    (* forward eapply outer_exposing_subtrace; eauto. *)
     eapply inner_LM_trace_fair_aux_group.
     - apply _.
     - done.
-    - by apply EXP'. 
+    - by apply OUTER_CORR. 
     - simpl. intros ?? [=<-].
-      by apply EXP'.
-    - by apply EXP'.
+      by apply OUTER_CORR. 
+    - by apply OUTER_CORR. 
     - by apply MATCH.
   Qed.
 
@@ -1008,7 +1025,9 @@ Section ClientDefs.
 
     forward eapply (lock_progress (project_tl_trace str) (ρlg_tl cl_L) 0 (trfirst str).1).
     { by eapply traces_match_valid2. }
-    { subst i'_s. eapply tl_subtrace_fair; eauto. }
+    { subst i'_s.
+      forward eapply outer_exposing_subtrace as [??]; eauto.
+      eapply tl_group_fair; eauto. }
     { rewrite state_lookup_0. by rewrite project_nested_trfirst. }
     { rewrite TR0. apply INIT. }
     { rewrite TR0. apply INIT. }
@@ -1234,7 +1253,7 @@ Section ClientDefs.
   Proof.
     forward eapply tl_trace_construction as MATCH; eauto.
     assert (∀ g, fair_by_group (ELM_ALM TlEM_EXT_KEEPS) g (project_tl_trace tr)) as FAIR_G.
-    { admit. }
+    { eapply tl_group_fair; eauto.  
     pose proof MATCH as VALID'%traces_match_valid2. 
     
     add_case (exists i δ, tr S!! i = Some (δ, fs_O)) FO.
@@ -1273,8 +1292,8 @@ Section ClientDefs.
       - forward eapply (unlock_termination (project_tl_trace tr) ρlg_r i); eauto.
         intros (?&?&?&?&?&?). eauto. }
 
-    
-
+    add_case (exists i δ, tr S!! i = Some (δ, fs_S')) FS'.
+    { intros (i & [δ ITH]).      
         
   Admitted. 
 
@@ -1363,7 +1382,9 @@ Section ClientDefs.
       apply au_impl_spec in AU. 
       forward eapply (unlock_termination (project_tl_trace str) (ρlg_l) 0).
       { eapply traces_match_valid2; eauto. }
-      { eapply tl_subtrace_fair; eauto. }
+      {
+        forward eapply outer_exposing_subtrace as [??]; eauto.
+        eapply tl_group_fair; eauto. }
       { apply traces_match_first in MATCH.
         rewrite state_lookup_0. rewrite state_lookup_0 in M'TH.
         apply Some_inj in M'TH. rewrite M'TH in MATCH.
