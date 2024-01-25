@@ -853,6 +853,32 @@ Section ClientDefs.
   (*     congruence.  *)
   (* Qed. *)
 
+  Lemma left_kept_disabled:
+  @label_kept_state client_model_impl
+    (fun st => does_lock ρlg_l st.1 /\ disabled_st ρlg_l st.1)
+    (fun _ => True).
+  Proof using.
+    red. intros δ * [LOCK DIS] _ STEP. 
+    inversion STEP; subst; simpl in *; try subst ρlg. 
+    { destruct c.
+      { destruct DIS. eapply fm_live_spec; eauto. simpl. eauto. }
+      eapply step_keeps_lock_dis; eauto.
+      2: { simpl. left. simpl. eauto. }
+      congruence. }
+    { edestruct does_lock_unlock_incompat; eauto. }
+    { eapply step_keeps_lock_dis; eauto.
+      2: { right. Unshelve.
+           2: { apply env. eapply (flU (ρlg_r: fmrole TlLM_FM)). }
+           simpl. by apply allows_unlock_impl_spec. }
+      congruence. }
+    { eapply step_keeps_lock_dis; eauto.
+      2: { right. Unshelve.
+           2: { apply env. eapply (flL (ρlg_r: fmrole TlLM_FM)). }
+           simpl. by apply allows_lock_impl_spec. }
+      simpl. intros [=EQ]. by apply symmetry, ρlg_lr_neq in EQ. }
+  Qed. 
+
+
 
   Lemma tl_subtrace_fair lmtr (tr str: mtrace client_model_impl) k
     (OUTER_CORR : client_LM_trace_exposing lmtr tr)
@@ -1181,7 +1207,11 @@ Section ClientDefs.
   
   Lemma ρlg_r_term (tr: mtrace client_model_impl)
     (VALID: mtrace_valid tr)
-    (FLAG: forall i st, tr S!! i = Some st -> fs_le st.2 fs_S):
+    (FLAG: forall i st, tr S!! i = Some st -> fs_le st.2 fs_S)
+    (NOLOCKl: forall i st, tr S!! i = Some st ->
+                      ¬ (does_unlock ρlg_l st.1 /\ disabled_st ρlg_l st.1))
+
+    :
   ∃ (i : nat) (δ : tl_state),
     tr S!! i = Some (δ, fs_O) ∧ disabled_st ρlg_r δ.
   Proof.
@@ -1194,10 +1224,8 @@ Section ClientDefs.
       destruct (decide (active_st (ρlg_r: fmrole TlLM_FM) δ)); eauto.
       destruct (does_lock_unlock_trichotomy δ ρlg_r) as [L | [U | UN]]; cycle -1.
       { edestruct unused_active_incompat; eauto. }
-      - 
-      
   (* Qed.  *)
-  Abort. 
+  Admitted. 
 
   (* Lemma  *)
   (* tr : mtrace client_model_impl *)
@@ -1311,7 +1339,7 @@ Section ClientDefs.
       enough (disabled_st (ρlg_tl c) δ_t) as DIS. 
       { destruct DIS. eapply fm_live_spec; eauto. }
       destruct c.
-      2: { done. } 
+      2: { done. }
       
       forward eapply (@steps_keep_state_inf _ tr) with (P := fun c => does_lock (ρlg_l: fmrole TlLM_FM) c.1 /\ disabled_st (ρlg_l: fmrole TlLM_FM) c.1) (Pl := fun _ => True). 
       { eauto. } 
@@ -1322,28 +1350,18 @@ Section ClientDefs.
            all: eauto. }
       2: { lia. }
       2: { simpl. apply proj2. }
-      clear. red. intros δ * [LOCK DIS] _ STEP. 
-      inversion STEP; subst; simpl in *; try subst ρlg. 
-      { destruct c.
-        { destruct DIS. eapply fm_live_spec; eauto. simpl. eauto. }
-        eapply step_keeps_lock_dis; eauto.
-        2: { simpl. left. simpl. eauto. }
-        congruence. }
-      { edestruct does_lock_unlock_incompat; eauto. }
-      { eapply step_keeps_lock_dis; eauto.
-        2: { right. Unshelve.
-             2: { apply env. eapply (flU (ρlg_r: fmrole TlLM_FM)). }
-             simpl. by apply allows_unlock_impl_spec. }
-        congruence. }
-      { eapply step_keeps_lock_dis; eauto.
-        2: { right. Unshelve.
-             2: { apply env. eapply (flL (ρlg_r: fmrole TlLM_FM)). }
-             simpl. by apply allows_lock_impl_spec. }
-        simpl. intros [=EQ]. by apply symmetry, ρlg_lr_neq in EQ. }
-    }
-    
-    forward eapply (ρlg_r_term str) as (t & δ_t & TTH & DISr).
-    { intros * ITH. 
+      apply left_kept_disabled. }
+
+    destruct (after p str) as [rtr| ] eqn:AFTERp.
+    2: { apply terminating_trace_equiv in LEN2. apply proj1 in LEN2.
+         edestruct LEN2 as [? ?]; [| done].
+         red. eauto. }
+ 
+    forward eapply (ρlg_r_term rtr) as (t & δ_t & TTH & DISr). 
+    { subst. eapply trace_valid_after; eauto. 
+      eapply (subtrace_valid tr); eauto. done. }    
+    { intros * ITH.
+      erewrite state_lookup_after in ITH; eauto. 
       forward eapply client_trace_fs_mono.
       3: { apply trace_state_lookup_S in MTH.
            erewrite (plus_n_O (S m)), <- subtrace_state_lookup in MTH; eauto. }
@@ -1351,26 +1369,23 @@ Section ClientDefs.
       all: eauto. 
       { eapply (subtrace_valid tr); eauto. done. }
       lia. }
+    { intros.
+      apply Nat.le_sum in LEp as [d ->].
+      erewrite <- subtrace_state_lookup in PTH; eauto.
+      forward eapply (@steps_keep_state_inf _ str). 
+      { eapply (subtrace_valid tr); eauto. done. }
+      2: by apply left_kept_disabled.
+      { eauto. }
+      { done. }
+      2: { erewrite state_lookup_after in H0; eauto. }
+      { lia. }
+      simpl. intros [? ?] [? ?]. edestruct does_lock_unlock_incompat; eauto. }
 
-    set (t' := max p t). exists t'.
-    forward eapply state_lookup_dom with (i := t'); eauto.
-    intros X%proj2. specialize_full X; [done| ]. destruct X as [[st' f'] T'TH].
-    exists st'. split; [lia| ].
-
-    forward eapply (@steps_keep_state_inf _ str) with (P := fun c => disabled_st (ρlg_r: fmrole TlLM_FM) c.1 /\ c.2 = fs_O) (Pl := fun _ => True). 
-    { eapply (subtrace_valid tr); eauto. done. }
-    { eexists. split; [apply TTH| ]. eauto. }
-    { clear. red. intros [δ f] * [DIS EQ] _ STEP. simpl in EQ. subst.
-      inversion STEP; subst.
-      2, 3: clear -FS; set_solver.
-      split; auto. simpl.
-      destruct c.
-      { eapply disabled_mtrans_kept; eauto. }
-      destruct DIS. eapply fm_live_spec; eauto. }
-    { done. }
-    2: { apply T'TH. }
+    erewrite state_lookup_after in TTH; eauto. 
+    do 2 eexists. split; [| split].
+    2: by apply TTH.
     { lia. }
-    simpl. eauto. clear -T'TH. set_solver. 
+    eauto. 
   Qed. 
 
 End ClientDefs. 
