@@ -221,7 +221,7 @@ Section FairLockLM.
 
   Lemma LM_EM_EXT_KEEPS: ext_keeps_asg
                               (ELM := (FL_EM FLE_LMF)).
-  Proof.
+  Proof using.
     red. intros δ1 [ι] δ2 ρ g f STEP MAP FUEL.
     assert (g = asG ρ) as ->.
     { eapply MAP_RESTR; eauto. }
@@ -249,10 +249,10 @@ Section FairLockLM.
         | flL (asG ρ) => flL ρ
         end. 
     
-  Local Lemma PROJ_KEEP_EXT:
+  Lemma PROJ_KEEP_EXT:
     forall δ1 ι δ2, (@ETs _ (FL_EM FLE_LMF)) ι δ1 δ2 -> 
                 (@ETs _ (FL_EM FLE)) (proj_ext ι) (ls_under δ1) (ls_under δ2).
-  Proof. 
+  Proof using.
     intros ? ι ? STEP. 
     destruct ι as [[ρ]| [ρ]]; simpl in *; set_solver. 
   Qed. 
@@ -268,7 +268,7 @@ Section FairLockLM.
               after i' mtr = Some mtr_i' /\
               upto_stutter ls_under (EUsls proj_ext) lmtr_i mtr_i' /\
               mtr S!! i' = Some (ls_under δ).
-  Proof. 
+  Proof using. 
     pose proof ITH as (lmtr_i & AFTERi & TRi)%state_lookup_after'.
     pose proof AFTERi as X. eapply upto_stutter_after' in X as (i' & mtr_i' & AFTERi' & UPTOi); eauto.
     do 3 eexists. do 3 (try split; eauto).
@@ -289,7 +289,7 @@ Section FairLockLM.
               upto_stutter ls_under (EUsls proj_ext) lmtr_i mtr_i' /\
               st = ls_under (trfirst lmtr_i) /\ 
               prefix_states_upto ls_under lmtr mtr i i'.
-  Proof. 
+  Proof using. 
     pose proof ITH as (mtr_i' & AFTERi' & TRi')%state_lookup_after'.
     pose proof AFTERi' as X. eapply upto_stutter_after_strong in X as (i & lmtr_i & AFTERi & UPTOi & PRE); eauto.
     do 3 eexists. do 4 (try split; eauto).

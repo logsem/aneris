@@ -40,6 +40,14 @@ Section TlLM.
     apply (ls_inv δ) in TM. set_solver.
   Qed. 
 
+  Lemma tl_unused_not_dom: ∀ ρ (δ : lm_ls tl_model),
+      fair_lock.is_unused ρ (ls_under δ) (FairLockPredicates := tl_FLP) ↔ asG ρ ∉ dom (ls_tmap δ).
+  Proof.
+    intros. simpl. 
+    pose proof (proj1 (proj2 (ls_inv δ)) ρ).
+    tauto.
+  Qed. 
+      
   Instance tl_step_dec s1 ρ s2: Decision (fmtrans M s1 (Some ρ) s2).
   Proof.
     Local Ltac nostep := right; intros S; inversion S; subst; set_solver.
@@ -384,7 +392,6 @@ Section TlLM.
 
     Let FLP_Tl := @FLP_LMF _ tl_FLP _ _ TlLF. 
 
-
     Section ImplFunctions.
       Context (g: G) (δ: lm_ls tl_model). 
       
@@ -589,7 +596,7 @@ Section TlLM.
     Defined.
 
     (* Set Printing Implicit. *)
-    Let Tl_LM_EM_EXT_KEEPS: ext_models.ext_keeps_asg (ELM := FL_EM Tl_FLE_LM).
+    Definition Tl_LM_EM_EXT_KEEPS: ext_models.ext_keeps_asg (ELM := FL_EM Tl_FLE_LM).
       unshelve eapply LM_EM_EXT_KEEPS.
     Defined.
 
