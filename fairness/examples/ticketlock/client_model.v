@@ -544,7 +544,7 @@ Section ClientDefs.
     rewrite /all_roles. set_solver.
   Qed.
 
-  Instance client_LSI_dec: 
+  Global Instance client_LSI_dec: 
     forall st tm fm, Decision (client_LSI st tm fm).
   Proof. 
     intros [tl_st ?] tm fm. rewrite /client_LSI. simpl. 

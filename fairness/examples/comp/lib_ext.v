@@ -180,13 +180,10 @@ Section ExtModelLM.
   Qed.
     
 
-  Lemma lib_keeps_asg: ∀ (δ1 : LM_Fair) (ι : env_role) (δ2 : LM_Fair) ρ τ (f : nat),
-     @ext_trans _ ExtLibLM δ1 (Some (inr ι)) δ2
-     → ls_mapping δ1 !! ρ = Some τ
-       → ls_fuel δ1 !! ρ = Some f
-         → ls_mapping δ2 !! ρ = Some τ ∧ ls_fuel δ2 !! ρ = Some f.
+  Lemma lib_keeps_asg:
+    ext_keeps_asg (ELM := ExtLibLM). 
   Proof.
-    intros. inversion H. subst.
+    red. intros. inversion H. subst.
     simpl in REL. destruct ι0. simpl in REL.
     red in REL. destruct REL as [STOP [IN <-]].
     simpl. 

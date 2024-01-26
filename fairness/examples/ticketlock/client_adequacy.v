@@ -69,19 +69,13 @@ Section Adequacy.
   End tmp.
 
   (* TODO: adapt proof in comp/lib_ext.v *)
-  Lemma lib_keeps_asg: ∀ (δ1 : fmstate LM_Fair) (ι : env_role) (δ2 : fmstate LM_Fair) (ρ: fmrole tl_fair_model) (τ: G) (f : nat),
-     @ext_trans _ (FL_EM tl_FLE) δ1 (Some (inr ι)) δ2
-     → ls_mapping δ1 !! ρ = Some τ
-       → ls_fuel δ1 !! ρ = Some f
-         → ls_mapping δ2 !! ρ = Some τ ∧ ls_fuel δ2 !! ρ = Some f.
+  Lemma lib_keeps_asg:
+    ext_keeps_asg (ELM := TlEM). 
   Proof.
   Admitted. 
 
   Lemma client_LM_inner_exposed (auxtr: lmftrace (LM := client_model)):
     inner_obls_exposed (option_fmap _ _ inl) (λ c δ_lib, c.1 = δ_lib) auxtr (LMo := client_model) (AMi := ELM_ALM lib_keeps_asg).
-    (*   inner_obls_exposed ((option_fmap _ _ inl) ext_role (ext_role + cl_id)%type inl) *)
-    (* (λ (st : client_model_impl) (tl_st : lm_ls TlLM), st.1 = tl_st) auxtr.  *)
-
   Proof.
     red. simpl. intros n δ gl NTH (?&?&?&MAP).
     eexists. split; [reflexivity| ].
@@ -145,7 +139,12 @@ Qed.
   Definition st0: fmstate client_model_impl := (δ0, fs_U).
 
   Lemma st0_lsi: initial_ls_LSI st0 0 (LM := client_model).
-  Proof. Admitted. 
+  Proof. Admitted.
+
+  Lemma st0_init: is_init_cl_state st0.
+  Proof. Admitted.
+
+  Let client_model_finitary (s1: fmstate client_model_impl) := model_finitary_helper s1 (client_model_step_fin s1).
 
   Theorem client_terminates
     (extr : heap_lang_extrace)
@@ -156,33 +155,18 @@ Qed.
     set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model client_LF)) clientPreΣ).
     assert (heapGpreS Σ (@LM_EM_HL _ _ client_model client_LF)) as HPreG.
     { apply _. }
-    
-    eapply (simulation_adequacy_terminate_client Σ NotStuck _ (st0: fmstate client_model_impl) _ LSI0); try done.
+
+    intros. 
+    unshelve eapply (@simulation_adequacy_terminate_client Σ HPreG NotStuck _ (st0: fmstate client_model_impl) _ st0_lsi); try done.
+    - admit. 
+    - apply st0_init. 
     - eapply valid_state_evolution_finitary_fairness_simple.
-      apply client_model_finitary.
-    - intros ?. iStartProof.
-      rewrite /LM_init_resource. iIntros "!> (Hm & FR & Hf) !>".
-      iSplitL.
-      2: { (* TODO: make a lemma, move it to simulation_adequacy_lm *)
-        iIntros (?). iIntros "**".
-        iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>". }
+      apply client_model_finitary.      
+    - admit.
+    -
+      (* apply H. -- need to fix decision lemmas  *)
+      admit.     
       
-      simpl.
-      iApply (client_spec ∅ δ_lib0 with "[] [Hm Hf FR]"); eauto.
-      { set_solver. }
-      { apply init_lib_state. }
-      { iApply lm_lsi_toplevel. }
-      iFrame.
-      iSplitL "FR".
-      + simpl. rewrite dom_gset_to_gmap. rewrite difference_twice_L.
-        rewrite difference_disjoint; [by iFrame| ].
-        subst st0. erewrite live_roles_3. set_solver.
-      + subst st0.
-        iApply has_fuels_proper; [reflexivity| | by iFrame].
-        pose proof (live_roles_3 δ_lib0). simpl in H.
-        replace (client_lr (δ_lib0, 3)) with ({[inr ρy]}: gset (fmrole client_model_impl)).
-        2: { symmetry. apply leibniz_equiv. apply live_roles_3. }
-        rewrite -gset_to_gmap_singletons big_opS_singleton. done.
-  Qed.
+  Admitted. 
 
 End Adequacy.
