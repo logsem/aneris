@@ -1,5 +1,5 @@
 From trillium.fairness Require Import fairness fuel fairness_finiteness lm_fair comp_utils.
-From trillium.fairness.examples.ticketlock Require Import ticketlock_model_lm client_model ticketlock_model fair_lock_lm lm_restr.
+From trillium.fairness.examples.ticketlock Require Import ticketlock_model_lm client_model ticketlock_model fair_lock_lm lm_restr client_trace_termination. 
 
 (* client_model_fair_term *)
 
@@ -51,7 +51,6 @@ Section Adequacy.
     set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model LF')) clientPreΣ).
     assert (heapGpreS Σ (@LM_EM_HL _ _ client_model LF')) as HPreG.
     { apply _. }
-    (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
     set (st0 := (δ_lib0, 3): fmstate client_model_impl).
     assert (initial_ls_LSI st0 0 (LM := client_model)) as LSI0.
     { subst st0. red. red.
