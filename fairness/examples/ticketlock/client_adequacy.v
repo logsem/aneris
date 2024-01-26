@@ -1,8 +1,6 @@
 From trillium.fairness Require Import fairness fuel fairness_finiteness lm_fair comp_utils.
 From trillium.fairness.examples.ticketlock Require Import ticketlock_model_lm client_model ticketlock_model fair_lock_lm lm_restr client_trace_termination. 
 
-(* client_model_fair_term *)
-
 Section Adequacy.
   Let M := tl_fair_model.
   Let R := fmrole M.
@@ -35,12 +33,28 @@ Section Adequacy.
   Let PKE := @PROJ_KEEP_EXT _ _ _ TLFairLock _ _ TlLM2_LF _
                tl_ls_map_restr tl_unused_not_dom tl_egs.
 
-  Let cmft_instance :=
-        @client_model_fair_term _ _ _ _ tl_gs_size _ _ TlLM2_LGF
-          _ TlLM2_LF
-          TlLM2_nexts _ _ _ Tl_FL_LM
-          _ _ PKE. 
+  Instance Tl2_FLS: FLSubmodel.
+  esplit.
+  - apply tl_gs_size.
+  - apply TlLM2_LGF.
+  - apply TlLM2_nexts.
+  - apply Tl_FL_LM.
+  - apply PKE.
+  Qed. 
 
+  Let cmft_instance := @client_model_fair_term Tl2_FLS.
+
+  (* TODO: move to program proof file *)
+  Section tmp.
+
+    Class clientPreGS (Σ: gFunctors) := ClientPreGS {
+    }.
+
+    Class clientGS Σ := ClientGS {
+      cl_pre_inG :> clientPreGS Σ;
+    }.
+
+  End tmp.
 
   Theorem client_terminates
     (extr : heap_lang_extrace)
