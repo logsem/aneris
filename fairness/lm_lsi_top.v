@@ -7,17 +7,13 @@ Section LMLSITopLevel.
   Context `{LM: LiveModel (locale heap_lang) M LSI}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
-  Context {LF': LMFairPre' LM}. 
+  Context {LF: LMFairPre LM}. 
   Context`{invGS_gen HasNoLc Σ}. 
 
-  Local Instance LF: LMFairPre LM.
-  esplit; apply _.
-  Defined. 
-
   Lemma lm_lsi_toplevel:
-    ⊢ LM_steps_gen ∅ (EM := @LM_EM_HL _ _ _ LF') (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
+    ⊢ LM_steps_gen ∅ (EM := @LM_EM_HL _ _ _ LF) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.
-    iIntros. iApply (Build_LM_steps_gen (EM := @LM_EM_HL _ _ _ LF')). 
+    iIntros. iApply (Build_LM_steps_gen (EM := @LM_EM_HL _ _ _ LF)). 
     iModIntro. repeat iSplitL.
     - iModIntro. iIntros "* FUELS ST MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".

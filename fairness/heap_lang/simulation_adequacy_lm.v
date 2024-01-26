@@ -8,11 +8,7 @@ Section adequacy.
 (* Local Hint Resolve tid_step_tp_length_heap: core. *)
   Context `{LM: LiveModel (locale heap_lang) M LSI}.
   (* Context {LF: LMFairPre LM}.  *)
-  Context {LF': LMFairPre' LM}. 
-
-  Local Instance LF: LMFairPre LM.
-  esplit; apply _.
-  Defined. 
+  Context {LF: LMFairPre LM}. 
 
 Theorem heap_lang_continued_simulation_fair_termination 
         `{FairTerminatingModel M}  ξ a1 r1 extr
@@ -37,7 +33,7 @@ Let rel_always_holds `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _
 
 
 Lemma rel_always_holds_lift_LM 
-  `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}
+  `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}
   s e1 σ1 s1 ξ
   (LSI0: initial_ls_LSI s1 0):
   rel_always_holds s ξ e1 σ1 (initial_ls' s1 0%nat LSI0) -∗
@@ -130,11 +126,11 @@ Proof.
 Qed.
   
 Definition wp_premise
-  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}
+  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}
   ξ σ1 e1 s1 s FR
   (LSI0: initial_ls_LSI s1 0)
   (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0)
-    := (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}, 
+    := (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}, 
     ⊢ (|={⊤}=>
        (* ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗ *)
          LM_init_resource 0%nat δ0 (FR ∖ dom (ls_fuel δ0))
@@ -143,14 +139,14 @@ Definition wp_premise
        rel_always_holds s ξ e1 σ1 δ0)). 
 
 Theorem strong_simulation_adequacy Σ
-    `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M) FR
+    `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M) FR
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop)    
   (LSI0: initial_ls_LSI s1 0)
   (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0)
   :
   rel_finitary (sim_rel_with_user LM ξ) →
-  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')},
+  (∀ `{hGS: @heapGS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)},
     ⊢ (|={⊤}=>
          ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
          LM_init_resource 0%nat δ0 (FR ∖ dom (ls_fuel δ0))
@@ -176,7 +172,7 @@ Proof.
   by iApply rel_always_holds_lift_LM. 
 Qed.
 
-Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M) FR
+Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M) FR
   (LSI0: initial_ls_LSI s1 0)
   (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0)
 :
@@ -214,7 +210,7 @@ Proof.
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ
-        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')}  (s: stuckness)
+        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}  (s: stuckness)
         e1 σ1 (s1: M) FR
         (LSI0: initial_ls_LSI s1 0)
         (iex : inf_execution_trace heap_lang)
@@ -257,7 +253,7 @@ Qed.
 
 (* TODO: derive from general case? *)
 Theorem simulation_adequacy_traces Σ
-  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
+  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness)
         e1 (s1: M) FR
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
@@ -311,7 +307,7 @@ Qed.
 
 
 Theorem simulation_adequacy_model_trace Σ
-        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
+        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness)
         e1 (s1: M) FR
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
@@ -336,12 +332,8 @@ Proof.
   eauto.
 Qed.
 
-Definition get_LF: LMFairPre' LM -> LMFairPre LM. 
-intros. split; apply X. 
-Defined. 
-
 Theorem simulation_adequacy_terminate Σ
-        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
+        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness)
         e1 (s1: M) FR
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
@@ -362,7 +354,6 @@ Proof.
                      extr auxtr Hmatch Hfair.
   (* assert (LMFairPre LM) as LF. *)
   (* { esplit; apply LF'. } *)
-  set LF := get_LF LF'.
   pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) (Hfairaux LF)) as Hfairaux'. 
   have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux'.
   (* have Hvalaux := traces_match_LM_preserves_validity extr auxtr _ _ _ Hmatch. *)
@@ -376,7 +367,7 @@ Qed.
 
 
 Theorem simulation_adequacy_terminate_ftm Σ `{FairTerminatingModel M}
-        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF')} (s: stuckness)
+        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness)
         e1 (s1: M) FR
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)
@@ -394,7 +385,7 @@ Proof.
 Qed.
 
 Theorem simple_simulation_adequacy_terminate_ftm Σ `{FairTerminatingModelSimple M}
-        `{!heapGpreS Σ (@LM_EM_HL _ _ _ LF')} (s: stuckness)
+        `{!heapGpreS Σ (@LM_EM_HL _ _ _ LF)} (s: stuckness)
         e1 (s1: M) FR
         (LSI0: initial_ls_LSI s1 0)
         (extr : heap_lang_extrace)

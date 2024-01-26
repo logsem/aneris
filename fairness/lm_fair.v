@@ -124,34 +124,7 @@ Section LocaleTrans.
 
 End LocaleTrans. 
 
-(* excluding parts that are provided by other classes in context *)
-(* TODO: find a better solution *)
-Class LMFairPre' `{Countable G} {M LSI} (LM: LiveModel G M LSI) := {
-  (* edG :> EqDecision G; *)
-  (* cntG :> Countable G; *)
-  edM' :> EqDecision (fmstate M);
-  dTr' :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
-  inhLM' :> Inhabited (lm_ls LM);
-  inhG' :> Inhabited G;
-  locale_trans_ex_dec' τ δ1 :> Decision (exists δ2, locale_trans δ1 τ δ2 (LM := LM));
-}.
-
-(* Class LMFairPre {G M LSI} (LM: LiveModel G M LSI) := { *)
-(*   edG :> EqDecision G; *)
-(*   cntG :> Countable G; *)
-(*   edM :> EqDecision (fmstate M); *)
-(*   dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2); *)
-(*   inhLM :> Inhabited (lm_ls LM); *)
-(*   inhG :> Inhabited G; *)
-(*   locale_trans_ex_dec τ δ1 :> Decision (exists δ2, locale_trans δ1 τ δ2 (LM := LM)); *)
-(* }. *)
-
-(* TODO: get rid of this duplication *)
-(* Definition LMFairPre {G M LSI} `{Countable G} (LM: LiveModel G M LSI) := *)
-(*   LMFairPre' LM.  *)
 Class LMFairPre `{Countable G} {M LSI} (LM: LiveModel G M LSI) := {
-  (* edG :> EqDecision G; *)
-  (* cntG :> Countable G; *)
   edM :> EqDecision (fmstate M);
   dTr :> ∀ s1 ρ s2, Decision (fmtrans M s1 (Some ρ) s2);
   inhLM :> Inhabited (lm_ls LM);

@@ -735,10 +735,6 @@ Qed.
 From trillium.fairness.heap_lang Require Import em_lm_heap_lang. 
 
 
-Local Instance LF': LMFairPre' client_model.
-esplit; apply _.
-Defined.
-
   
 (* TODO: try to unify it with general lemma.
    The problem is that proving client model trace termination
@@ -746,7 +742,7 @@ Defined.
    whereas in original lemma all model traces are required to be terminating. *)
 (* TODO: generalize the initial state in general lemma as well? *)
 Theorem simulation_adequacy_terminate_client (Σ: gFunctors)
-        {hPre: @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model LF')} (s: stuckness)
+        {hPre: @heapGpreS Σ (fair_model_model (@LM_Fair _ _ _ _ _ _ client_LF)) (@LM_EM_HL _ _ client_model client_LF)} (s: stuckness)
         e1 (s1: fmstate client_model_impl) FR
         (LSI0: initial_ls_LSI s1 0 (M := client_model_impl) (LM := client_model) (LSI := client_LSI))
         (extr : heap_lang_extrace)
@@ -812,8 +808,8 @@ Theorem client_terminates
         (Hexfirst : (trfirst extr).1 = [client #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model LF')) clientPreΣ). 
-  assert (heapGpreS Σ (@LM_EM_HL _ _ client_model LF')) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ client_model client_LF)) clientPreΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ _ client_model client_LF)) as HPreG.
   { apply _. }
   (* eset (δ_lib0: LiveState lib_grole lib_model_impl).  := {| |}). *)
   set (st0 := (δ_lib0, 3): fmstate client_model_impl).

@@ -446,7 +446,7 @@ Proof.
     + done. 
 Defined. 
 
-Local Instance LF_SL': LMFairPre' spinlock_model.
+Local Instance LF_SL: LMFairPre spinlock_model.
 Proof. 
   esplit; by apply _.
 Defined. 
@@ -457,8 +457,8 @@ Theorem spinlock_terminates
         (Hexfirst : (trfirst extr).1 = [program #()]):
   (∀ tid, fair_ex tid extr) -> terminating_trace extr.
 Proof.
-  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ spinlock_model LF_SL')) spinlockΣ). 
-  assert (heapGpreS Σ (@LM_EM_HL _ _ _ LF_SL')) as HPreG.
+  set (Σ := gFunctors.app (heapΣ (@LM_EM_HL _ _ spinlock_model LF_SL)) spinlockΣ). 
+  assert (heapGpreS Σ (@LM_EM_HL _ _ _ LF_SL)) as HPreG.
   { apply _. }
   set s0 := [2; 2] : fmstate spinlock_model_impl.
   set δ0 := initial_ls' s0 0 I: lm_ls spinlock_model.

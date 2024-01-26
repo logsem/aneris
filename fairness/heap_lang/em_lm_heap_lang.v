@@ -5,11 +5,7 @@ From trillium.fairness Require Import lm_fair lm_fair_traces.
 Section LM_EM_HL.
   Context `{LM: LiveModel (locale heap_lang) M LSI}.
   (* Context {LF: LMFairPre LM}. *)
-  Context {LF': LMFairPre' LM}.
-
-  Local Instance LF: LMFairPre LM.
-  esplit; apply _.
-  Defined.   
+  Context {LF: LMFairPre LM}.
 
   Definition LM_EM_HL: ExecutionModel heap_lang (fair_model_model LM_Fair) :=
     LM_EM (LM := LM) 0%nat ltac:(done).

@@ -7,22 +7,16 @@ Section ActualOwnershipInterface.
   Context `{LM: LiveModel (locale heap_lang) M LSI_True}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
-  Context {LF': LMFairPre' LM}. 
+  Context {LF: LMFairPre LM}. 
   Context`{invGS_gen HasNoLc Σ}.
-
-
-  Local Instance LF: LMFairPre LM.
-  esplit; apply _.
-  Defined. 
-
 
   (* TODO: get rid of mim_* lemmas inside of actual_resources *)
   (* TODO: get rid of excessive shelved goals
      (could be solved by new implementation of LiveState) *)
   Lemma ActualOwnershipPartial:
-    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ _ _ LF') (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
+    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ _ _ LF) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
   Proof.
-    iIntros. iApply (Build_PartialModelPredicates (EM := @LM_EM_HL _ _ _ LF')). 
+    iIntros. iApply (Build_PartialModelPredicates (EM := @LM_EM_HL _ _ _ LF)). 
     iModIntro. repeat iSplitL.
     - iIntros (???????) "FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
