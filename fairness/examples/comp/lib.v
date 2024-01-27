@@ -86,10 +86,11 @@ Global Opaque lib_grole ρlg.
 
 Section LibrarySpec.
   Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}.
-  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ lib_model_impl}.
-  (* Context {ifG: fairnessGS lib_model Σ}. *)
-  
-  Notation "'PMP' gs" := (fun Einvs => (LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS))) (at level 10). 
+  Context `{PMPP: @PartialModelPredicatesPre lib_grole _ _ Σ lib_model_impl}.
+  Context {relies_on: locale heap_lang -> lib_grole -> iProp Σ}. 
+    
+  Notation "'PMP' gs" := (fun Einvs => LM_steps_gen_nofork Einvs (EM := EM) (iLM := lib_model gs) (PMPP := PMPP) (eGS := heap_fairnessGS) (relies_on := relies_on)) (at level 10).
+  Notation " τ '⤞' g" := (relies_on τ g) (at level 20). 
 
   Lemma lib_LSI_fuel_independent (gs: gset lib_grole):
     LSI_fuel_independent (LSI := LSI_groups_fixed gs) (M := lib_model_impl).
@@ -98,15 +99,27 @@ Section LibrarySpec.
     eapply H0; eauto. 
   Qed.
 
+  (* TODO: move *)
+  Ltac pure_step FS indep :=
+    try rewrite sub_comp;
+    iApply wp_lift_pure_step_no_fork; auto;
+    [apply indep| ..];
+    [| iSplitR; [done| ]; do 3 iModIntro; iFrame "RON"; iSplitL "FUELS"];
+    [| solve_fuels_S FS |];
+    [solve_map_not_empty| ];
+    iIntros "RON FUELS"; simpl; try rewrite sub_comp.
+
   Lemma lib_spec tid gs Einvs f (F2: f >= 4):
     PMP gs Einvs -∗
     {{{ partial_model_is 1 (PartialModelPredicatesPre := PMPP) ∗ 
-        has_fuels tid {[ ρl:=f ]} (PMPP := PMPP)  }}}
+        tid ⤞ ρlg ∗
+        has_fuels ρlg {[ ρl:=f ]} (PMPP := PMPP)  }}}
       lib_fun #() @ tid
-    {{{ RET #(); partial_mapping_is {[ tid := ∅ ]} ∗ 
-                 partial_free_roles_are {[ ρl ]} }}}.
+    {{{ RET #();
+        tid ⤞ ρlg ∗ partial_mapping_is {[ ρlg := ∅ ]} ∗ 
+        partial_free_roles_are {[ ρl ]} }}}.
   Proof using.
-    iIntros "#PMP" (Φ) "!> (ST & FUELS) POST". rewrite /lib_fun.
+    iIntros "#PMP" (Φ) "!> (ST & RON & FUELS) POST". rewrite /lib_fun.
 
     rewrite (sub_0_id {[ _ := _ ]}).
     assert (fuels_ge ({[ρl := f]}: gmap (fmrole lib_model_impl) nat) 4) as FS.
@@ -115,16 +128,16 @@ Section LibrarySpec.
     pure_step FS lib_LSI_fuel_independent.
 
     wp_bind (ref _)%E.
-    iApply (wp_alloc_nostep with "[$] [FUELS]").
+    iApply (wp_alloc_nostep with "[$] [RON FUELS]").
     { apply lib_LSI_fuel_independent. }
     2: { solve_fuels_S FS. }
     { solve_map_not_empty. }
-    iNext. iIntros (l) "(L & _ & FUELS) /=".
+    iNext. iIntros (l) "(L & _ & RON & FUELS) /=".
 
     do 2 pure_step FS lib_LSI_fuel_independent.
 
-    iApply (wp_store_step_singlerole with "[$] [L ST FUELS]").
-    6: { iFrame "L ST". iNext.
+    iApply (wp_store_step_singlerole with "[$] [L ST RON FUELS]").
+    6: { iFrame "L RON ST". iNext.
          iApply has_fuel_fuels. rewrite map_fmap_singleton. iFrame. }
     { done. }
     2: { econstructor; eauto. }
@@ -142,10 +155,10 @@ Section LibrarySpec.
       rewrite lookup_insert_Some in TMg'. destruct TMg' as [[<- <-] | [NEQ TMg']].
       { apply H0. eapply @elem_of_dom; [by apply _| ]. eauto. } 
       apply H0. eapply @elem_of_dom; [by apply _| ]. eauto. }
-    iNext. iIntros "(L & ST & FUELS)".
+    iNext. iIntros "(L & RON & ST & FUELS)".
     erewrite decide_False; [| done].
-    iApply ("POST" with "FUELS"). 
-  Qed. 
+    iApply "POST". iFrame. 
+  Qed.
 
 End LibrarySpec.
 
