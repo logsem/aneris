@@ -8,7 +8,7 @@ From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
 From trillium.fairness Require Import lm_fair. 
 From trillium.fairness.ext_models Require Import ext_models.
-From trillium.fairness.examples.comp Require Import lib lib_ext.
+From trillium.fairness.examples.comp Require Import lib lib_ext tracker.
 From trillium.fairness.heap_lang Require Export lang.
 
 Close Scope Z_scope.
@@ -277,11 +277,13 @@ Section ClientDefs.
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
      cl_pre_y_st :> inG Σ (authUR (optionR (exclR natO)));
      cl_lib_preΣ :> fairnessGpreS (lib_model lib_gs) Σ;
+     (* cl_trackerΣ :> inG Σ trackerRA; *)
   }.
 
   Class clientGS Σ := ClientGS {
     cl_pre_inG :> clientPreGS Σ;
     cl_y_st_name : gname;
+    (* cl_tracker_name : gname; *)
     cl_lib_Σ :> fairnessGS (lib_model lib_gs) Σ;
   }.
 
@@ -300,13 +302,14 @@ Section ClientRA.
 
   Definition y_frag_model_is (y: nat): iProp Σ :=
     own cl_y_st_name (◯ Excl' y).
+  
 
   Definition client_inv_impl (st: client_state) : iProp Σ :=
     let (lb, y) := st in
     partial_model_is st ∗
     y_auth_model_is y ∗
-    (* lib_msi lb.  *)
-    model_state_interp lb (fG := cl_lib_Σ).
+    model_state_interp lb (fG := cl_lib_Σ).    
+    (* tracked (⌜ ls_tmap lb !! ρlg = Some ∅ ⌝ ∗ partial_free_roles_are {[ ρ_lib ]} ∨ ⌜ ls_tmap lb !! ρlg ≠ Some ∅ ⌝ ∗ partial_free_roles_are {[ ρ_lib ]} *)
 
   Definition Ns := nroot .@ "client".
 

@@ -20,6 +20,9 @@ Close Scope Z_scope.
 Section ClientSpec.
   Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
+  Context {relies_on: locale heap_lang -> locale heap_lang -> iProp Σ}. 
+  Notation " τ '⤞' g" := (relies_on τ g) (at level 20). 
+
 
   Definition client: val :=
   λ: <>,
@@ -31,7 +34,7 @@ Section ClientSpec.
   .
 
   (* Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))). *)
-  Notation "'LSG' Einvs" := (LM_steps_gen Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS)) (at level 10).
+  Notation "'LSG' Einvs" := (LM_steps_gen Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS) (relies_on := relies_on)) (at level 10).
 
   (* TODO: move to library, weaken Σ requirement *)
   Lemma lib_premise `{clientGS Σ} (lb: lm_ls (lib_model lib_gs))
@@ -102,6 +105,16 @@ Section ClientSpec.
     set_solver.
   Qed.
 
+  (* TODO: move, remove duplicates  *)
+  Ltac pure_step FS indep :=
+    try rewrite sub_comp;
+    iApply wp_lift_pure_step_no_fork; auto;
+    [apply indep| ..];
+    [| iSplitR; [done| ]; do 3 iModIntro; iFrame "RON"; iSplitL "FUELS"];
+    [| solve_fuels_S FS |];
+    [solve_map_not_empty| ];
+    iIntros "RON FUELS"; simpl; try rewrite sub_comp.
+
   Lemma client_spec (Einvs: coPset) (lb0: fmstate lf) f
     (FB: f >= client_fl)
     (* TODO: get rid of these restrictions *)
@@ -114,12 +127,13 @@ Section ClientSpec.
     LSG Einvs -∗
     {{{ partial_model_is (lb0, 3)  ∗
         partial_free_roles_are {[ ρ_lib; ρ_ext ]} ∗
+        0 ⤞ 0 ∗
         has_fuels 0 {[ ρ_cl := f ]} (PMPP := PMPP)  }}}
       client #() @ 0
-    {{{ RET #(); partial_mapping_is {[ 0 := ∅ ]} }}}.
+    {{{ RET #(); 0 ⤞ 0 ∗ partial_mapping_is {[ 0 := ∅ ]} }}}.
   Proof using cpG.
     unfold client_fl in *.
-    iIntros "#PMP" (Φ) "!> (ST & FREE & FUELS) POST". rewrite /client.
+    iIntros "#PMP" (Φ) "!> (ST & FREE & RON & FUELS) POST". rewrite /client.
 
     rewrite (sub_0_id {[ _ := _ ]}).
     assert (fuels_ge ({[ρ_cl := f]}: gmap (fmrole client_model_impl) nat) 10) as FS.
@@ -129,11 +143,11 @@ Section ClientSpec.
     pure_step FS client_LSI_fuel_independent.
 
     wp_bind (ref _)%E.
-    iApply (wp_alloc_nostep with "[$] [FUELS]").
+    iApply (wp_alloc_nostep with "[$] [RON FUELS]").
     { apply client_LSI_fuel_independent. }
     2: { solve_fuels_S FS. }
     { solve_map_not_empty. }
-    iNext. iIntros (l) "(L & MT & FUELS) /=".
+    iNext. iIntros (l) "(L & MT & RON & FUELS) /=".
     
     do 2 pure_step FS client_LSI_fuel_independent.
     (* Set Printing Implicit. Unshelve. *)
@@ -143,9 +157,9 @@ Section ClientSpec.
     rewrite decide_True in LIVE2; [ | done].
 
     wp_bind (_ <- _)%E.
-    iApply (wp_store_step_keep with "[$] [L ST FUELS FREE]").
+    iApply (wp_store_step_keep with "[$] [L ST RON FUELS FREE]").
     { set_solver. }
-    8: { iFrame "L ST FREE". iNext.
+    8: { iFrame "L RON ST FREE". iNext.
          rewrite map_fmap_singleton. iFrame. }
     { econstructor. }
     3: { rewrite dom_singleton. reflexivity. }
@@ -173,7 +187,7 @@ Section ClientSpec.
       apply ls_mapping_tmap_corr in IN as (?&IN&?).
       rewrite LB0_INFO in IN. clear -H3 IN. set_solver. }
 
-    iNext. iIntros "(L & ST & FUELS & FR)".
+    iNext. iIntros "(L & ST & RON & FUELS & FR)".
     rewrite LIVE3 LIVE2.
     iDestruct (partial_free_roles_are_Proper with "FR") as "FR".
     { rewrite !dom_singleton.
@@ -195,7 +209,7 @@ Section ClientSpec.
     iApply (wp_lift_pure_step_no_fork_take_step_stash).
     { done. }
     (* { reflexivity. } *)
-    9: iSplitL "PMP"; [by iApply "PMP'"| ]; iFrame "ST FUELS FR".
+    9: iSplitL "PMP"; [by iApply "PMP'"| ]; iFrame "ST RON FUELS FR".
     { set_solver. }
     3: { rewrite dom_fmap dom_singleton. reflexivity. }
     5: { by econstructor. }
@@ -218,7 +232,7 @@ Section ClientSpec.
            red in LB0_INFO. apply proj2, proj1 in LB0_INFO.
            destruct LB0_INFO. apply elem_of_dom.
            exists lg. eapply ls_mapping_tmap_corr. eexists. split; eauto.
-           set_solver. } 
+           set_solver. }
 
          fold ρ_lib. 
          rewrite /mapped_roles. rewrite map_img_insert_L.
@@ -228,7 +242,7 @@ Section ClientSpec.
       1-3, 5-7: set_solver. 
       intros. simpl. assert (ρ' = ρ_lib) as -> by set_solver.
       rewrite lookup_singleton. simpl. lia. }
-    do 3 iModIntro. iIntros "ST FR FUELS".
+    do 3 iModIntro. iIntros "ST FR RON FUELS".
     rewrite LIVE2 LIVE1.
     iDestruct (partial_free_roles_are_Proper with "FR") as "FR".
     { Unshelve. 2: exact {[ ρ_cl; ρ_ext ]}. set_solver. } 
@@ -243,27 +257,48 @@ Section ClientSpec.
     wp_bind (lib_fun #())%E.
     (* iDestruct "FUELS" as "[MAP FUELS]".  *)
     iDestruct (has_fuels_equiv with "FUELS") as "[MAP FUELS]".
-    iApply (lib_spec with "[] [LST YST LF LM FR MAP FUELS]"); cycle 1. 
+    
+    (* iApply (lib_spec (PMPP := lib_PMPP) with "[] [LST YST LF LM FR MAP RON FUELS]"); cycle 1.  *)
+    iDestruct (partial_free_roles_are_sep with "FR") as "[FR FR']"; [set_solver| ].
+    iApply (lib_spec (PMPP := lib_PMPP) with "[] [LST YST LF LM FR RON MAP FUELS]"); cycle 1. 
     { iApply lib_PMP; [done| ]. iSplit; done. }
     {
       (* simpl. *)
       iDestruct (lib_premise with "LST LF LM") as "(LST & LF & LM)"; eauto.
       { by apply lib_reset_premise. }
       rewrite has_fuels_equiv. simpl.
-      iDestruct (partial_free_roles_are_sep with "FR") as "[FR FR']"; [set_solver| ].
-      rewrite dom_singleton_L !big_sepM_singleton.
+      rewrite !dom_singleton_L !big_sepM_singleton.
       iFrame.
-      do 3 iExists _. iFrame "FR". iFrame. iSplitR.
-      { iPureIntro. by rewrite dom_singleton_L. }
+      do 2 iExists _. iFrame "FR". iFrame.
+
       iLeft.
-      rewrite bi.sep_assoc. iSplitR.
-      { iPureIntro. set_solver. }
-      (* rewrite !map_fmap_singleton big_sepM_singleton. *)
+      iSplitR.
+      { iPureIntro. split; reflexivity. }
       iExists _. iFrame. iPureIntro. rewrite /client_fl. lia. }
-    2: { unfold lib_fl. lia. } 
+    2: { unfold lib_fl. lia. }
  
-    iNext. iIntros "[LMAP LFR']". simpl.
-    iDestruct "LMAP" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)".
+    iNext. iIntros "(RON & LMAP & LFR')". simpl.
+                                                                                        rewrite /relies_on_lib. iDestruct "RON" as (? ?) "(? & MAP & RON & FR & YST)".
+                                                                                        (* wp_bind (Rec _ _ (_ ;; _) _). *)
+    (* Unset Printing Notations. *)
+                                                                                        
+    wp_bind (Rec BAnon BAnon (RecV BAnon BAnon (LitV LitUnit) (LitV LitUnit))
+             (Store (LitV l) (LitV 0%Z))). 
+                                                                                        (Rec BAnon BAnon
+          (Rec BAnon BAnon (RecV BAnon BAnon (LitV LitUnit) (LitV LitUnit))
+             (Store (LitV l) (LitV 0%Z))) (LitV LitUnit))
+    red. simpl. red. simpl. red. 
+
+
+
+
+
+
+
+
+
+        
+    iDestruct "LMAP" as (???) "(%LIBM & LM & MATCH & MAP & FR & YST)".
     assert (L = ∅) as -> by set_solver.
     iDestruct "MATCH" as "[[%?] | (_&[->->]&FUEL')]"; [set_solver| ]. clear LIBM.
                                       
