@@ -53,13 +53,13 @@ Section Model.
   Definition simpl_tl_st '(mkTlSt o t rm wf): tl_st' := (o, t, rm). 
 
   #[global] Instance tl_role_eqdec: EqDecision tl_role.
-  Proof using. solve_decision. Qed. 
+  Proof using. solve_decision. Defined.
 
   #[global] Instance tl_role_stage_eqdec: EqDecision tl_role_stage. 
-  Proof using. solve_decision. Qed. 
+  Proof using. solve_decision. Defined.
   
   #[global] Instance tl_role_st_eqdec: EqDecision tl_role_st. 
-  Proof using. solve_decision. Qed. 
+  Proof using. solve_decision. Defined.
 
   Instance wf_PI st': ProofIrrel (tl_state_wf st').
   Proof. apply make_proof_irrel. Qed. 
@@ -1285,7 +1285,7 @@ Section Properties.
           rewrite Nat.add_0_r -Nat.add_1_r in ST. 
           rewrite /has_lock_st /active_st. 
           exists n, st'.
-          rewrite decide_True in ST; [| done].  
+          (* rewrite decide_True in ST; [| done].   *)
           repeat split; try by apply ST.
           2: { intros [? ?]. intuition. congruence. }
           exists false. etransitivity; [apply ST| ]. 
@@ -1294,7 +1294,7 @@ Section Properties.
         simpl in ST. destruct ST as (n&st'&ST). 
         destruct st'. simpl in *.
         replace (S (o + S d)) with (S (S o) + d) in ST by lia.
-        rewrite decide_False in ST; [| lia].
+        (* rewrite decide_False in ST; [| lia]. *)
         destruct ST as (ST&ST0&ST1&ST2&ST3).
         rewrite ST1 Nat.add_1_r in tl_wf0, ST0. 
         eapply IHd with (i := n) in ST2. 
@@ -1310,7 +1310,7 @@ Section Properties.
                destruct (Nat.le_gt_cases k n) as [LE' | LT'].
                - simpl.
                  apply Classical_Prop.or_not_and. left.                  
-                 eapply NOLOCKρ; [| apply KTH]. rewrite decide_False; lia.
+                 eapply NOLOCKρ; [| apply KTH]. lia. 
                - eapply BETWEEN; [| apply KTH]. lia. }
              assert (ρ' ≠ ρ) as NEQ.
              { intros ->. edestruct (NOLOCKρ j); eauto. lia. }
