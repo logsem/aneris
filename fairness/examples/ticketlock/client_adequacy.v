@@ -163,10 +163,6 @@ Qed.
     - eapply valid_state_evolution_finitary_fairness_simple.
       apply client_model_finitary.      
     - admit.
-    -
-      (* apply H. -- need to fix decision lemmas  *)
-      admit.     
-      
   Admitted. 
 
 End Adequacy.

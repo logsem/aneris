@@ -14,6 +14,7 @@ Section TlLM.
   Let roles: gset R := dom $ snd $ tl_init_st' n_roles. 
   Definition tl_gs: gset G := set_map asG roles.
 
+  (* TODO: prove that size (set_map f S) = size S *)
   Lemma tl_gs_size: size tl_gs = n_roles.
   Proof.
     rewrite /tl_gs.
