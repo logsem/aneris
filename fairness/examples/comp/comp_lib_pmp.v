@@ -8,7 +8,7 @@ From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
 From trillium.fairness Require Import lm_fair. 
 From trillium.fairness.ext_models Require Import ext_models.
-From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
+From trillium.fairness.examples.comp Require Import lib lib_ext client_defs tracker.
 From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness Require Import actual_resources.
 
@@ -16,7 +16,7 @@ Close Scope Z_scope.
 
 
 Section LibPMP. 
-  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
+  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cG: clientGS Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
   Context {relies_on_cl: locale heap_lang -> locale heap_lang -> iProp Σ}. 
   Notation " τ '⤞_cl' g" := (relies_on_cl τ g) (at level 20). 
@@ -33,35 +33,57 @@ Section LibPMP.
     done.
   Qed. 
 
-  Lemma update_client_state `{clientGS Σ} tid Einvs
+  (* TODO: move *)
+  Lemma ite_neg `{Decision P} {A: Type} (x y : A):
+    (if decide (¬ P) then x else y) = if decide P then y else x.
+  Proof.
+    symmetry. destruct decide.
+    - rewrite decide_False; [done| ]. tauto.
+    - by rewrite decide_True. 
+  Qed.
+
+
+  (* TODO: need to generalize enabled_group_singleton this way
+     and show that for such LMs fair_by_group and usual fair are the same.
+     Then we can get rid of this part of client LSI *)
+  Definition enabled_group_singleton_gen :=
+    forall δ g, role_enabled_model (g: fmrole lf) δ <-> default ∅ (ls_tmap δ !! g) ≠ ∅.
+
+  Lemma egsg_lib: enabled_group_singleton_gen.
+  Proof. Admitted. 
+
+  Lemma update_client_state tid g_cl Einvs
     (extr: execution_trace heap_lang) (mtr: auxiliary_trace M)
     c2 (lb lb': fmstate lf) f
     (LIB_STEP: locale_trans lb ρlg lb' (LM := lib_model lib_gs))
     (PROG_STEP: locale_step (trace_last extr) (Some tid) c2)
     (F_BOUND: f ≤ client_fl)
+    (dis' := ¬ role_enabled_model (ρlg: fmrole lf) lb')
     :
     LSG Einvs ⊢
     em_msi (trace_last extr) (trace_last mtr) (em_GS0 := heap_fairnessGS) -∗
     partial_model_is (lb, 1) -∗
     partial_free_roles_are {[ρ_cl]} -∗
-    tid ⤞_cl tid -∗
-    has_fuels tid {[ρ_lib := f]}
-    ={Einvs}=∗
+    tid ⤞_cl g_cl -∗
+    has_fuels g_cl {[ρ_lib := f]}
+    ={Einvs}=∗    
     ∃ (δ2 : M) (ℓ: mlabel M),
       ⌜em_valid_evolution_step (Some tid) c2 (trace_last mtr) ℓ δ2⌝ ∗
       em_msi c2 δ2 (em_GS0 := heap_fairnessGS) ∗
-      tid ⤞_cl tid ∗
-      has_fuels tid (if decide (ls_tmap lb' !! ρlg = Some ∅)
+      tid ⤞_cl g_cl ∗
+      has_fuels g_cl (if decide dis'
                    then {[ρ_cl := client_fl]}
                    else {[ρ_lib := f]}) ∗
       partial_model_is (lb', 1) ∗
       partial_free_roles_are
-      (if decide (ls_tmap lb' !! ρlg = Some ∅) then {[ρ_lib]} else {[ρ_cl]}).
+      (if decide dis' then {[ρ_lib]} else {[ρ_cl]}).
   Proof.    
     iIntros "#PMP MSI ST FR RON FUELS".
     Local Ltac dEq := destruct (decide (_ = _)).
-    Local Ltac dEl := destruct (decide (_ ∈ _)).
-    pose proof (LM_map_empty_notlive lb' ρlg (LF := (@lib_LF _ lib_gs_ne))).
+    Local Ltac dEl := rewrite ?ite_neg; unfold role_enabled_model; destruct (decide (_ ∈ _)).
+    (* subst dis'.  *)
+
+    pose proof (LM_map_empty_notlive lb' ρlg (LF := (@lib_LF _ lib_gs_ne))) as EMP_NL. 
 
     pose proof (live_roles_1 lb) as LIVE. rewrite decide_True in LIVE.
     2: { eapply LM_live_roles_strong. eexists. eauto. }
@@ -77,46 +99,42 @@ Section LibPMP.
     7: { apply ct_lib_step. simpl. eauto. }
     { rewrite LIVE LIVE'.
       apply union_subseteq_l'.
-      dEq; dEl; set_solver. }
+      dEl; set_solver. }
     { rewrite dom_singleton.
-      assert ((if (decide (ls_tmap lb' !! ρlg = Some ∅))
+      assert ((if (decide dis')
               then {[ ρ_lib ]}
               else (∅: gset (fmrole client_model_impl))) ⊆ {[ρ_lib]}) as IN.
-      { dEq; set_solver. }
+      { dEl; set_solver. }
       apply IN. }
     { rewrite LIVE. set_solver. }
     all: eauto.
     { Unshelve.
-      2: exact (if decide (ls_tmap lb' !! ρlg = Some ∅)
+      2: exact (if decide dis'
                 then {[ ρ_cl := client_fl ]}
                 else {[ ρ_lib := f ]}).
-      destruct (decide (_=_)); set_solver. }
-    { repeat split; rewrite ?LIVE ?LIVE';  clear -F_BOUND H1.
+      dEl; set_solver. }
+    { repeat split; rewrite ?LIVE ?LIVE';  clear -F_BOUND EMP_NL. 
       - dEl.
-        2: { destruct decide; set_solver. }
-        intros _. rewrite decide_False.
-        { rewrite lookup_singleton. simpl. lia. }
-        tauto.
-      - destruct (decide (_ ∈ _)); [set_solver| ].
-        destruct (decide (_=_)); [set_solver| ].
-        rewrite !lookup_singleton. simpl. lia.
+        2: { set_solver. }
+        intros _.
+        rewrite lookup_singleton. simpl. lia. 
+      - dEl; set_solver. 
       - set_solver.
-      - dEq; [| set_solver].
+      - dEl; [set_solver| ].
         intros. assert (ρ' = ρ_cl) as -> by set_solver.
         rewrite lookup_singleton. simpl. lia.
-      - dEq; set_solver.
-      - dEq; dEl; set_solver.
-      - dEq; dEl; set_solver. }
+      - dEl; set_solver.
+      - dEl; set_solver.
+      - dEl; set_solver. }
     { red. simpl. intros. red. 
-      simpl. intros g' [? IN']. simpl in IN'. 
-      (* red in H2. specialize (H2 g' ltac:(eauto)).  *)
-      apply (ls_mapping_tmap_corr ) in IN' as (?&?&?).
+      simpl. intros g' [? IN'].
+      apply ls_mapping_tmap_corr in IN' as (?&TM'&?).
       pose proof (lib_tmap_dom_restricted lb') as DOML.
       specialize (DOML g'). specialize_full DOML.
-      { apply elem_of_dom. set_solver. }
-      apply elem_of_singleton_1 in DOML. subst g'.
-      rewrite H5. rewrite decide_False.
-      2: { intros [=->]. done. }
+      { apply elem_of_dom. eauto. }
+      apply elem_of_singleton in DOML. subst g'.
+      rewrite decide_False.
+      2: { apply P_NNP. apply egsg_lib. rewrite TM'. set_solver. }
       rewrite /mapped_roles. apply flatten_gset_spec.
       exists ({[ ρ_lib ]}). split; [| apply elem_of_singleton; reflexivity].
       rewrite elem_of_map_img. exists g.
@@ -127,8 +145,8 @@ Section LibPMP.
     iModIntro. do 2 iExists _. iFrame.
     
     iApply partial_free_roles_are_Proper; [| iFrame].
-    clear -H1. 
-    dEl; dEq; tauto || set_solver.
+    (* clear -H1.  *)
+    dEl; tauto || set_solver.
    Qed.
 
   (* TODO: unify with model_agree ? *)
@@ -184,23 +202,119 @@ Section LibPMP.
   (*       partial_free_roles_are Rfr ∗ *)
   (*       y_frag_model_is 1). *)
 
-  Definition relies_on_lib `{clientGS Σ} (τ: locale heap_lang) (g: lib_grole): iProp Σ :=
-    (∃ (Ract Rfr: gset client_role),
-        (* ⌜ m = {[ 0 := L ]} ⌝ ∗ *)
-         (* frag_mapping_is {[ ρlg := L ]} ∗ *)
-         (
-            (* ⌜ L ≠ ∅ ⌝ ∗ *)
-            ⌜ Ract = {[ ρ_lib ]} /\ Rfr = {[ ρ_cl ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ ρ_lib := f ]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∨
-          (* ⌜ L = ∅ ⌝ ∗ *)
-          ⌜ Ract = {[ ρ_cl ]} /\ Rfr = {[ ρ_lib ]} ⌝ ∗ partial_fuel_is {[ inr ρy := client_fl ]}) ∗
 
-        partial_mapping_is {[ τ := Ract ]} ∗ 
-        τ ⤞_cl τ ∗
+  Definition relies_on_lib (g_cl: locale heap_lang) 
+    (τ: locale heap_lang) (gl: lib_grole): iProp Σ :=
+    ⌜ gl = ρlg ⌝ ∗
+    τ ⤞_cl g_cl ∗
+    own cl_tracker_name (◯E tr_tracked) ∗
+    y_frag_model_is 1 ∗    
+    ∃ (R__cur R__free: gset (fmrole client_model_impl)), 
+      own cl_set_pair_name ((◯ (Excl' (R__cur, R__free))): set_pair_RA) ∗
+      partial_mapping_is {[ g_cl := R__cur ]} ∗ 
+      partial_fuel_is (gset_to_gmap client_fl R__cur) ∗ 
+      partial_free_roles_are R__free. 
+  
+  (* Notation " τ '⤞_lib' r" := (relies_on_lib τ r) (at level 20). *)
 
-        partial_free_roles_are Rfr ∗
-        y_frag_model_is 1).
-        
+  Definition lib_model_plugged (g_cl: locale heap_lang) ε: iProp Σ :=
+    let ron_lib := relies_on_lib g_cl in
+    ∀ P Q (gl: lib_grole),
+      □ (∀ (δ: fmstate lf), P ∗ model_state_interp δ (fG := cl_lib_Σ) ==∗ 
+       ∃ δ', Q ∗ model_state_interp δ' (fG := cl_lib_Σ) ∗ ⌜ fmtrans lf δ (Some gl) δ' ⌝) →
+      (∀ (τ: locale heap_lang) (extr: execution_trace heap_lang) (auxtr: auxiliary_trace M) c2,
+        (* τ ⤞_lib gl ∗  *) ron_lib τ gl ∗
+        P ∗ 
+        em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := heap_fairnessGS) ∗
+        ⌜ locale_step (trace_last extr) (Some τ) c2 ⌝ 
+        ={ ε }=∗
+         ∃ (δ2 : M) (ℓ : mlabel M),
+         (* τ ⤞_lib gl ∗ *) ron_lib τ gl ∗ 
+         Q ∗
+         em_msi c2 δ2 (em_GS0 := heap_fairnessGS) ∗
+         ⌜em_valid_state_evolution_fairness (extr :tr[ Some τ ]: c2) (auxtr :tr[ ℓ ]: δ2)⌝).
 
+  (* TODO: move*)
+  Lemma ite_fun `{Decision P} {A B: Type} (x y: A) (f: A -> B):
+    f (if decide P then x else y) = if decide P then f x else f y.
+  Proof. destruct decide; done. Qed. 
+
+  (* TODO: move*)
+  Lemma ite_fun2 `{Decision P} {A B C: Type} (a1 a2: A) (b1 b2: B) (f: A -> B -> C):
+    uncurry f (if decide P then (a1, b1) else (a2, b2)) = if decide P then f a1 b1 else f a2 b2.
+  Proof. destruct decide; done. Qed. 
+
+  (* TODO: move*)
+  Lemma ite_pair `{Decision P} {A B: Type} (a1 a2: A) (b1 b2: B):
+    (if decide P then (a1, b1) else (a2, b2)) =
+    (if decide P then a1 else a2, if decide P then b1 else b2).
+  Proof. destruct decide; done. Qed. 
+
+  (* TODO: move, generalize? *)
+  Lemma gset_to_gmap_singleton `{Countable K} {V: cmra} (v: V) (k: K):
+    gset_to_gmap v {[ k ]} ≡  {[ k := v ]}.
+  Proof.
+    rewrite -gset_to_gmap_singletons. by rewrite big_opS_singleton.
+  Qed. 
+
+  Lemma lib_MP g_cl Einvs (DISJ_INV: Einvs ## ↑Ns):
+    LSG Einvs ∗ client_inv ⊢
+    lib_model_plugged g_cl (Einvs ∪ ↑Ns).
+  Proof.
+    iIntros "[#PMP #COMP]". 
+    rewrite /lib_model_plugged. iIntros "%P %Q %gl #LIB_STEP".
+    iIntros "%τ %etr %mtr %c' (RONl & P & MSI_M & %HL_STEP)".
+    simpl. 
+    
+
+    iInv Ns as ((lb, y)) ">(ST & YST_AUTH & MSI_LIB & TRACK_AUTH)" "CLOS".
+    rewrite /relies_on_lib. iDestruct "RONl" as "(-> & RONc & TRACK & YST & SETS)".
+    iDestruct "SETS" as (R__cur R__free) "(SETS & MAPc & FUELc & FRc)". 
+    iPoseProof (y_model_agree with "YST_AUTH YST") as "->". 
+    iDestruct (get_tracked with "[TRACK TRACK_AUTH]") as "TRACK"; [by iFrame| ].
+    rewrite /sets_corr. iDestruct "TRACK" as "(TRACK & (%RC & %RF & SETS_AUTH & %VALR) & TRACK_AUTH)".
+    iDestruct (own_valid_2 with "SETS_AUTH SETS") as "%EQR".
+    apply auth_both_valid_discrete, proj1, Excl_included, leibniz_equiv in EQR.
+    inversion EQR. subst R__cur R__free.
+
+    iMod ("LIB_STEP" with "[P MSI_LIB]") as "STEP_LIB"; [by iFrame| ]. 
+    iDestruct "STEP_LIB" as (lb') "(Q&MSI_LIB&%STEP_LIB)".
+    destruct VALR as [(ENl & -> & ->) | (DISl & -> & ->)].
+    2: { destruct DISl. red. eapply fm_live_spec. simpl. eauto. }
+
+    iAssert (has_fuels g_cl {[ρ_lib := client_fl]})%I with "[MAPc FUELc]" as "HFc".
+    { iApply has_fuels_equiv. rewrite dom_singleton_L big_sepM_singleton.
+      rewrite gset_to_gmap_singleton. iFrame. }
+    rewrite difference_union_distr_l_L. rewrite difference_disjoint_L; [| done].
+    rewrite difference_diag_L union_empty_r_L.
+    iMod (update_client_state with "[$] [$] [$] [$] [$] [$]") as "EM_STEP"; eauto.
+    iDestruct "EM_STEP" as (δ2 ℓ) "(STEP_M & MSI_M & RONc & HFc & STc & FRc)". 
+    do 2 iExists _. iFrame.
+    iApply fupd_frame_l. iSplitR; [done| ].
+
+    iMod (own_update_2 with "SETS_AUTH SETS") as "SETS". 
+    { eapply auth_update with (a' := Excl' (if (decide (role_enabled_model (ρlg: fmrole lf) lb')) then ({[ρ_lib]}, {[ρ_cl]}) else ({[ρ_cl]}, {[ρ_lib]}))). 
+      apply option_local_update. apply exclusive_local_update.
+      done. }
+    iDestruct (own_op with "SETS") as "[SETS_AUTH SETS]".
+
+    iDestruct (has_fuels_equiv with "HFc") as "[MAPc FUELc]".
+    erewrite ite_fun with (f := dom). rewrite !dom_singleton_L.
+    
+    do 2 iExists _. iFrame.
+    iMod ("CLOS" with "[-SETS FUELc]") as "_".
+    2: { iModIntro.
+         repeat erewrite <- ite_fun with (f := singleton).
+         erewrite <- ite_fun with (f := fun x => singletonM x client_fl).         
+         rewrite gset_to_gmap_singleton. rewrite big_sepM_singleton. iFrame.
+         rewrite !ite_neg. destruct decide; by iFrame. }
+    iNext. iExists (_, _). iFrame.
+    rewrite /tracked. iLeft. iFrame. rewrite /sets_corr.
+    do 2 iExists _. rewrite ite_pair. iFrame.
+    iPureIntro. destruct decide; tauto. 
+  Qed. 
+
+  
   
   (* TODO: restore proofs below;
      try to write a universal one covering any allowed lib proof rule *)

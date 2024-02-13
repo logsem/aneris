@@ -24,9 +24,11 @@ Section TrackerRA.
     iMod (own_alloc (●E tr_free  ⋅ ◯E tr_free)) as (γ) "[AUTH FRAG]".
     { apply auth_both_valid_2; eauto. by compute. }
     iModIntro. iExists _. iFrame.
-  Qed. 
+  Qed.
 
-  Lemma start_tracking γ (P: iProp Σ):
+  Context {γ: gname} {P: iProp Σ}. 
+
+  Lemma start_tracking:
     ⊢ (own γ (◯E tr_free) ∗ P ∗ tracked γ P ==∗ own γ (◯E tr_tracked) ∗ tracked γ P)%I.
   Proof.
     iIntros "(FRAG & P & [[AUTH ?] | AUTH])".
@@ -42,7 +44,7 @@ Section TrackerRA.
     iModIntro. iFrame. iLeft. iFrame.
   Qed. 
 
-  Lemma stop_tracking γ (P: iProp Σ):
+  Lemma stop_tracking:
     ⊢ (own γ (◯E tr_tracked) ∗ tracked γ P ==∗ own γ (◯E tr_free) ∗ P ∗ tracked γ P)%I.
   Proof.
     iIntros "(FRAG & [[AUTH ?] | AUTH])".
@@ -57,6 +59,15 @@ Section TrackerRA.
     
     iModIntro. iFrame.
   Qed. 
-  
+
+  Lemma get_tracked: 
+   ⊢ (own γ (◯E tr_tracked) ∗ tracked γ P -∗ own γ (◯E tr_tracked) ∗ P ∗ own γ (●E tr_tracked))%I.
+  Proof.
+    iIntros "(FRAG & [[AUTH ?] | AUTH])".
+    { iFrame. }
+    iDestruct (own_op with "[FRAG AUTH]") as "O"; [by iFrame| ].
+    iDestruct (own_valid with "O") as "%V".      
+    eapply excl_auth_agree in V. done.
+  Qed. 
 
 End TrackerRA.

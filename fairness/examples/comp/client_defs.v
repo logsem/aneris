@@ -47,7 +47,8 @@ Section ClientDefs.
     client_trans (lb1, 1) (Some ρ_lib) (lb2, 1)
   | ct_y_step_1 (lb: fmstate lf)
                 (* (LIB_NOSTEP: 0 ∉ live_roles _ lb) *)
-                (LIB_NOROLES: ls_tmap lb !! ρlg = Some ∅)
+                (* (LIB_NOROLES: ls_tmap lb !! ρlg = Some ∅) *)
+                (LIB_STOP: ¬ role_enabled_model (ρlg: fmrole lf) lb)
     :
     client_trans (lb, 1) (Some ρ_cl) (lb, 0)
   .
@@ -105,12 +106,10 @@ Section ClientDefs.
         destruct (decide (exists δ'_lib, locale_trans δ_lib () δ'_lib (LM := lib_model lib_gs))).
         ** left. destruct e. eexists. econstructor. simpl. eauto.
         ** nostep. simpl in LIB_STEP. eauto. 
-      + destruct y. 
-        destruct (ls_tmap δ_lib !! ρlg) eqn:LIB_OBLS.
-        2: { nostep. by rewrite LIB_OBLS in LIB_NOROLES. }
-        destruct (decide (g = ∅)).
-        * subst. left. eexists. by constructor. 
-        * nostep. rewrite LIB_OBLS in LIB_NOROLES. set_solver.
+      + destruct y.
+        destruct (decide (role_enabled_model (ρlg: fmrole lf) δ_lib)).
+        2: { left. eexists. by constructor. }
+        by nostep. 
     - destruct ρ; [destruct l| ]. 
       1, 3: by nostep. 
       destruct e. destruct (decide (i ∈ active_exts δ_lib)).
@@ -161,9 +160,10 @@ Section ClientDefs.
     live_roles client_model_impl (lb, 1) =
     if (decide (ρlg ∈ live_roles _ lb))
     then {[ ρ_lib ]}
-    else if decide (ls_tmap lb !! ρlg = Some ∅)
-         then {[ ρ_cl ]}
-         else ∅.
+    (* else if decide (ls_tmap lb !! ρlg = Some ∅) *)
+    (*      then {[ ρ_cl ]} *)
+    (*      else ∅. *)
+    else {[ ρ_cl ]}. 
   Proof.
     simpl. rewrite /client_lr.
     apply leibniz_equiv. rewrite !filter_union.
@@ -189,23 +189,9 @@ Section ClientDefs.
       2: { rewrite bool_decide_eq_false_2; [done| ].
            intros [? STEP]. inversion STEP. subst. simpl in LIB_STEP.
            destruct LR. apply LM_live_roles_strong. eauto. }
-      destruct (ls_tmap lb !! ρlg) eqn:MAP0.
-      (* ; rewrite MAP0. *)
-      + destruct (decide (g = ∅)) as [-> | ?].
-        * erewrite decide_True; [| done].
-          rewrite filter_singleton; [set_solver| ].
-          rewrite bool_decide_eq_true_2; [done| ]. eexists. by econstructor.
-        * erewrite decide_False.
-          2: { intros [=]. done. }
-          rewrite filter_singleton_not; [set_solver| ].
-          rewrite bool_decide_eq_false_2; [done| ].
-          intros [? STEP]. inversion STEP. subst.
-          rewrite MAP0 in LIB_NOROLES. congruence.
-      + erewrite decide_False; [| done].
-        rewrite filter_singleton_not; [set_solver| ].
-        rewrite bool_decide_eq_false_2; [done| ].
-        intros [? STEP]. inversion STEP. subst.
-        rewrite MAP0 in LIB_NOROLES. congruence.
+      rewrite filter_singleton; [set_solver| ].
+      apply bool_decide_eq_true_2. eauto.
+      eexists. by econstructor.
   Qed.
 
   Lemma live_roles_3 lb0:
@@ -272,19 +258,25 @@ Section ClientDefs.
     
   Definition client_fl := 15. 
   Definition client_model: LiveModel (locale heap_lang) client_model_impl client_LSI :=
-    {| lm_fl _ := client_fl; |}.  
+    {| lm_fl _ := client_fl; |}.
+
+  Definition set_pair_RA: ucmra :=
+    let setRA := gsetUR (fmrole client_model_impl) in 
+    excl_authR (prodUR setRA setRA).
 
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
      cl_pre_y_st :> inG Σ (authUR (optionR (exclR natO)));
      cl_lib_preΣ :> fairnessGpreS (lib_model lib_gs) Σ;
-     (* cl_trackerΣ :> inG Σ trackerRA; *)
+     cl_trackerΣ :> inG Σ trackerRA;
+     cl_set_pairΣ :> inG Σ set_pair_RA;
   }.
 
   Class clientGS Σ := ClientGS {
     cl_pre_inG :> clientPreGS Σ;
     cl_y_st_name : gname;
-    (* cl_tracker_name : gname; *)
-    cl_lib_Σ :> fairnessGS (lib_model lib_gs) Σ;
+    cl_tracker_name : gname;
+    cl_set_pair_name: gname;                          
+    cl_lib_Σ :> fairnessGS (lib_model lib_gs) Σ;                          
   }.
 
 End ClientDefs. 
@@ -293,9 +285,14 @@ Section ClientRA.
   Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cG: clientGS Σ}.
   Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
   
-  Notation "'lib_inn_role'" := (fmrole lib_model_impl).
-  Notation "'lib_inn_state'" := (fmstate lib_model_impl).
-  Notation "'lib_state'" := (fmstate lib_fair).
+  (* Notation "'lib_inn_role'" := (fmrole lib_model_impl). *)
+  (* Notation "'lib_inn_state'" := (fmstate lib_model_impl). *)
+  (* Notation "'lib_state'" := (fmstate lib_fair). *)
+  Let ST := fmstate client_model_impl.
+  Let R := fmrole client_model_impl.
+
+  Let STl := fmstate lf.
+  Let Rl := fmrole lf. 
 
   Definition y_auth_model_is (y: nat): iProp Σ :=
     own cl_y_st_name (● Excl' y).
@@ -303,13 +300,28 @@ Section ClientRA.
   Definition y_frag_model_is (y: nat): iProp Σ :=
     own cl_y_st_name (◯ Excl' y).
   
+  (* Definition lib_lifting (lb: lm_ls (lib_model lib_gs)): iProp Σ := *)
+  (*   (∃ (Ract Rfr: gset client_role), *)
+  (*        ( *)
+  (*           ⌜ default ∅ (ls_tmap lb !! ρlg) ≠ ∅ ⌝ ∗ ⌜ Ract = {[ ρ_lib ]} /\ Rfr = {[ ρ_cl ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ ρ_lib := f ]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∨ *)
+  (*           ⌜ default ∅ (ls_tmap lb !! ρlg) = ∅ ⌝ ∗ ⌜ Ract = {[ ρ_cl ]} /\ Rfr = {[ ρ_lib ]} ⌝ ∗ partial_fuel_is {[ inr ρy := client_fl ]}) ∗ *)
+
+  (*       partial_mapping_is {[ τ := Ract ]} ∗  *)
+  (*       partial_free_roles_are Rfr ∗ *)
+  (*       y_frag_model_is 1). *)
+
+  Definition sets_corr (* (ρl: Rl) *) (* (st: ST) *) (lb: STl) : iProp Σ := 
+    ∃ (R__cur R__free: gset R), 
+      own cl_set_pair_name ((● (Excl' (R__cur, R__free))): set_pair_RA) ∗
+      ⌜ role_enabled_model (ρlg: Rl) lb ∧ R__cur = {[ ρ_lib ]} ∧ R__free = {[ ρ_cl]}  ∨ 
+        ¬ role_enabled_model (ρlg: Rl) lb ∧ R__cur = {[ ρ_cl]} ∧ R__free = {[ ρ_lib ]}⌝.
 
   Definition client_inv_impl (st: client_state) : iProp Σ :=
     let (lb, y) := st in
     partial_model_is st ∗
     y_auth_model_is y ∗
-    model_state_interp lb (fG := cl_lib_Σ).    
-    (* tracked (⌜ ls_tmap lb !! ρlg = Some ∅ ⌝ ∗ partial_free_roles_are {[ ρ_lib ]} ∨ ⌜ ls_tmap lb !! ρlg ≠ Some ∅ ⌝ ∗ partial_free_roles_are {[ ρ_lib ]} *)
+    model_state_interp lb (fG := cl_lib_Σ) ∗
+    tracked cl_tracker_name (sets_corr lb). 
 
   Definition Ns := nroot .@ "client".
 
@@ -317,3 +329,4 @@ Section ClientRA.
     inv Ns (∃ (st: client_state), client_inv_impl st).
 
 End ClientRA.
+
