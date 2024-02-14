@@ -114,7 +114,7 @@ Section FuelDropStep.
   (* c1 c2 *)
   s fs ζ:
     (dom fs ≠ ∅) ->
-    (live_roles _ δ1) ∩ rem = ∅ →
+    (live_roles _ s) ∩ rem = ∅ →
     rem ⊆ dom fs →
     fuel_drop_preserves_LSI s rem (LSI := LSI) ->
     (* locale_step c1 (Some ζ) c2 -> *)
@@ -171,6 +171,10 @@ Section FuelDropStep.
         apply elem_of_dom. set_solver +Hin Hdom_le. }
       rewrite dom_domain_restrict ?dom_gset_to_gmap ?ls_same_doms //.
       set_solver +Hdom_le. }
+
+    iAssert (⌜ ls_under δ1 = s ⌝)%I as "%ST_EQ".
+    { iApply (model_agree with "Hmodel ST"). }
+
     assert (Hfueldom: live_roles _ δ1 ⊆
      dom (fuel_apply (fs ⇂ (dom fs ∖ rem))
                      (ls_fuel δ1)
@@ -233,8 +237,6 @@ Section FuelDropStep.
       rewrite NEW_DOM.
       apply fuel_step_ls_tmap_dom; auto. }  
 
-    iAssert (⌜ ls_under δ1 = s ⌝)%I as "%ST_EQ".
-    { iApply (model_agree with "Hmodel ST"). }
     assert (LSI δ1 (<[ζ:=dom fs ∖ rem]> (ls_tmap δ1)) new_fuels) as LSI2.
     { rewrite TMAP'_ALT; auto. 
       move PRES at bottom. red in PRES. simpl.

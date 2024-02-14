@@ -1,8 +1,9 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import execution_model.
-From trillium.fairness Require Import fairness fuel. 
-From trillium.fairness Require Import partial_ownership.
+From trillium.fairness Require Import fairness fuel resources. 
+From trillium.fairness Require Import partial_ownership model_plug lm_fair. 
+From trillium.fairness.lm_rules Require Import fuel_step.
 
 
 Section LMSteps.
@@ -12,7 +13,9 @@ Section LMSteps.
   Context `{eGS: em_GS Σ}. 
   Context `{invGS_gen HasNoLc Σ}.
   Context `{Countable (locale Λ)}. 
-  Context {PMPP: @PartialModelPredicatesPre G _ _ Σ iM}.
+  (* Context {PMPP: @PartialModelPredicatesPre G _ _ Σ iM}. *)
+  Context {fGS: @fairnessGS _ _ _ _ _ iLM Σ}. 
+  (* Let PMPP := @ActualOwnershipPartialPre _ _ _ _ _ iLM _ fGS.  *)
 
   (* TODO: move? *)
   Context {relies_on: locale Λ -> G -> iProp Σ}.
@@ -21,6 +24,7 @@ Section LMSteps.
   Let update_no_step_enough_fuel_drop_def (extr : execution_trace Λ) 
       (auxtr : auxiliary_trace M) 
       (c2 : cfg Λ) s (fs : gmap (fmrole iM) nat) rem (ζ : locale Λ) g
+      (Einvs: coPset)
       `(dom fs ≠ ∅)
       `((live_roles _ s) ∩ rem = ∅)
       `(rem ⊆ dom fs)
@@ -30,7 +34,9 @@ Section LMSteps.
     ζ ⤞ g -∗
     has_fuels g (S <$> fs) -∗
     partial_model_is s -∗
-    em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS) ==∗
+    em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS)
+    (* ==∗ *)
+    ={Einvs}=∗
     ∃ (δ2 : M) (ℓ : mlabel M),
       ⌜em_valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
       (auxtr :tr[ ℓ ]: δ2)⌝ ∗
@@ -42,13 +48,15 @@ Section LMSteps.
   Let update_no_step_enough_fuel_keep_def (extr : execution_trace Λ)
       (auxtr : auxiliary_trace M)
       (c2 : cfg Λ) (fs : gmap (fmrole iM) nat) (ζ : locale Λ) g
+      (Einvs: coPset)
       `(dom fs ≠ ∅)
       `(locale_step (trace_last extr) (Some ζ) c2)
       `(LSI_fuel_independent (LSI := LSI))
     : iProp Σ :=
     ζ ⤞ g  -∗
     has_fuels g (S <$> fs) -∗
-    em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS) ==∗
+    em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS)
+    ={Einvs}=∗
     ∃ (δ2 : M) (ℓ : mlabel M),
       ⌜em_valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
       (auxtr :tr[ ℓ ]: δ2)⌝ ∗
@@ -60,6 +68,7 @@ Section LMSteps.
        (fs: gmap (fmrole iM) nat)
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace M) ζ g efork σ1 σ2
+        Einvs
           `(R1 ## R2)
           `(fs ≠ ∅)
           `(R1 ∪ R2 = dom fs)
@@ -69,7 +78,9 @@ Section LMSteps.
           `((∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1)): iProp Σ :=
      ζ ⤞ g -∗
      has_fuels g (S <$> fs) -∗
-     em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS) ==∗
+     em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS)
+     (* ==∗ *)
+     ={Einvs}=∗
      ∃ δ2 ℓ g',
        let ζ' := locale_of tp1 efork in
          ζ' ⤞ g' ∗
@@ -115,8 +126,8 @@ Section LMSteps.
       partial_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash).
 
     Let LM_steps_gen_nofork_def (Einvs: coPset): iProp Σ := □ (
-          (∀ extr auxtr c2 s fs rem ζ g NE NL RD STEP PRES, update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ g NE NL RD STEP PRES) ∗
-          (∀ extr auxtr c2 fs ζ g NE STEP PRES, update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ g NE STEP PRES) ∗
+          (∀ extr auxtr c2 s fs rem ζ g NE NL RD STEP PRES, update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ g Einvs NE NL RD STEP PRES) ∗
+          (∀ extr auxtr c2 fs ζ g NE STEP PRES, update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ g Einvs NE STEP PRES) ∗
           (∀ extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ g fr1 fr_stash
              LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES,
               update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ g fr1 fr_stash Einvs LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES)
@@ -124,8 +135,8 @@ Section LMSteps.
 
     Let LM_steps_gen_def (Einvs: coPset): iProp Σ := □ (
         LM_steps_gen_nofork_def Einvs ∗
-        (∀ R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL, 
-update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL)
+        (∀ R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 Einvs DISJ NE DOM PRES LAST STEP POOL, 
+update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 Einvs DISJ NE DOM PRES LAST STEP POOL)
     ). 
 
     Definition LM_steps_gen_nofork Einvs: iProp Σ := LM_steps_gen_nofork_def Einvs.
@@ -149,25 +160,62 @@ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 DISJ NE DOM
     Global Instance LM_steps_gen_pers: forall Einvs, Persistent (LM_steps_gen Einvs).
     Proof. apply _. Qed.
 
-    Lemma update_no_step_enough_fuel_drop_gen {Einvs} extr auxtr c2 s fs rem ζ g NE NL RD STEP PRES: 
-      LM_steps_gen_nofork Einvs ⊢ update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ g NE NL RD STEP PRES. 
+    Lemma update_no_step_enough_fuel_drop_gen extr auxtr c2 s fs rem ζ g Einvs NE NL RD STEP PRES: 
+      LM_steps_gen_nofork Einvs ⊢ update_no_step_enough_fuel_drop_def extr auxtr c2 s fs rem ζ g Einvs NE NL RD STEP PRES. 
     Proof. by iIntros "(?&?&?)". Qed.
 
-    Lemma update_no_step_enough_fuel_keep_gen {Einvs} extr auxtr c2 fs ζ g NE STEP PRES: 
-      LM_steps_gen_nofork Einvs ⊢ update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ g NE STEP PRES. 
+    Lemma update_no_step_enough_fuel_keep_gen extr auxtr c2 fs ζ g Einvs NE STEP PRES: 
+      LM_steps_gen_nofork Einvs ⊢ update_no_step_enough_fuel_keep_def extr auxtr c2 fs ζ g Einvs NE STEP PRES. 
     Proof. by iIntros "(?&?&?)". Qed.
 
-    Lemma update_fork_split_gen {Einvs} R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL: 
-      LM_steps_gen Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL. 
+    Lemma update_fork_split_gen R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 Einvs DISJ NE DOM PRES LAST STEP POOL: 
+      LM_steps_gen Einvs ⊢ update_fork_split_def R1 R2 tp1 tp2 fs extr auxtr ζ g efork σ1 σ2 Einvs DISJ NE DOM PRES LAST STEP POOL. 
     Proof. by iIntros "(?&?)". Qed.
 
     Lemma update_step_still_alive_gen {Einvs} extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ g fr1 fr_stash
              LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES:
       LM_steps_gen_nofork Einvs ⊢ update_step_still_alive_def extr auxtr tp1 tp2 σ1 σ2 s1 s2 fs1 fs2 ρ δ1 ζ g fr1 fr_stash Einvs
              LR STASH STASH' STASH'' LAST1 LAST2 STEP STEP' VFM PRES.
-    Proof. by iIntros "(?&?&?)". Qed. 
+    Proof. by iIntros "(?&?&?)". Qed.
+
+    Section LM_MP.
+      Context {LF: LMFairPre iLM}. 
+
+      Definition lm_MP := model_plugged relies_on
+                            (eGS := eGS) (M := LM_Fair (LF := LF))
+                            (msi := model_state_interp (fG := fGS)). 
+
+      Lemma lm_MP_implies_rules ε:
+        lm_MP ε ⊢ LM_steps_gen_nofork ε.
+      Proof.
+        iIntros "#LM_MP". rewrite /LM_steps_gen_nofork /LM_steps_gen_nofork_def.
+        iModIntro. iSplitL; [| iSplitL]. 
+        - iIntros "**". rewrite /update_no_step_enough_fuel_drop_def.
+          rewrite /lm_MP /model_plugged.
+          iSpecialize ("LM_MP" $!
+                         (has_fuels_S g fs ∗ partial_model_is s)%I
+                         (has_fuels g (filter (λ '(k, _), k ∈ dom fs ∖ rem) fs) ∗ partial_model_is s)%I
+                         g).
+          iIntros "**". 
+          iPoseProof (bi.intuitionistically_elim with "LM_MP") as "foo".
+          iSpecialize ("foo" with "[]").
+          { iIntros (?) "((F & M) & MSI)".
+            iMod (actual_update_no_step_enough_fuel_drop with "[$][$][$]") as "X"; eauto. 
+            iDestruct "X" as (?) "(%STEPM&?&?&?&?)".
+            iModIntro. iExists _. iFrame.
+            iPureIntro. red. eexists. split; [apply STEPM| ]. done. }
+          iMod ("foo" with "[-]") as "foo2". 
+          { iFrame. eauto. }
+          iModIntro. iDestruct "foo2" as (??) "(?&(?&?)&?&?)".
+          do 2 iExists _. iFrame.
+        - admit.
+        - admit.
+      Admitted. 
+
+    End LM_MP.
 
     Global Opaque LM_steps_gen_nofork.
     Global Opaque LM_steps_gen.
 
 End LMSteps.
+
