@@ -10,6 +10,5 @@ Class KVS_snapshot_isolation_api :=
     SI_read : val;
     SI_write : val;
     SI_commit : val;
-    SI_run : val;
     SI_init_client_proxy : serializer -> val
- }.
+  }.

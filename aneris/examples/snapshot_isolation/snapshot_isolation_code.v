@@ -36,8 +36,9 @@ Definition kvs_get_last : val :=
     match: "l" with
       NONE => NONE
     | SOME "p" =>
-        let: "v" := Fst (Fst "p") in
-        let: "tv" := Snd (Fst "p") in
+        let: "_k" := Fst (Fst "p") in
+        let: "v" := Fst (Snd (Fst "p")) in
+        let: "tv" := Snd (Snd (Fst "p")) in
         let: "tl" := Snd "p" in
         (if: "tv" = "t"
          then  assert: #false
@@ -58,7 +59,7 @@ Definition update_kvs : val :=
         let: "k" := Fst "kv" in
         let: "v" := Snd "kv" in
         let: "vlst" := kvs_get "k" "kvs" in
-        let: "newval" := ("v", "tc") in
+        let: "newval" := ("k", ("v", "tc")) in
         let: "newvals" := "newval" :: "vlst" in
         let: "kvs_t'" := map_insert "k" "newvals" "kvs_t" in
         "upd" "kvs_t'" "cache_l"
@@ -73,17 +74,12 @@ Definition check_at_key : val :=
   | SOME "l" =>
       let: "vlast" := Fst "l" in
       let: "_hd" := Snd "l" in
-      let: "_v" := Fst "vlast" in
-      let: "t" := Snd "vlast" in
+      let: "_k" := Fst "vlast" in
+      let: "_v" := Fst (Snd "vlast") in
+      let: "t" := Snd (Snd "vlast") in
       (if: ("tc" ≤ "t") || ("t" = "ts")
        then  assert: #false
-       else
-         let: "b" := "t" < "ts" in
-         let: "<>" := (if: "b"
-          then  #()
-          else
-            #() (* unsafe (fun () -> Printf.printf "%s last_t=%d snap_t=%d\n%!" k t ts) *)) in
-         "b")
+       else  "t" < "ts")
   end.
 
 Definition commit_handler : val :=
@@ -145,20 +141,25 @@ Definition start_server_processing_clients ser : val :=
 Definition init_server ser : val :=
   λ: "addr",
   let: "kvs" := ref (map_empty #()) in
-  let: "lk" := newlock #() in
   let: "vnum" := ref #0 in
+  let: "lk" := newlock #() in
   Fork (start_server_processing_clients ser "addr" "lk" "kvs" "vnum" #()).
 
 Definition init_client_proxy ser : val :=
   λ: "clt_addr" "srv_addr",
   let: "rpc" := init_client_proxy (req_ser ser) (repl_ser ser) "clt_addr"
                 "srv_addr" in
-  ("rpc", ref NONE).
+  let: "txt" := ref NONE in
+  let: "lk" := newlock #() in
+  ("clt_addr", ("lk", ("rpc", "txt"))).
 
 Definition start : val :=
   λ: "cst",
-  let: "rpc" := Fst "cst" in
-  let: "tst" := Snd "cst" in
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
+  acquire "lk";;
   match: ! "tst" with
     SOME "_abs" => assert: #false
   | NONE =>
@@ -171,13 +172,17 @@ Definition start : val :=
           | InjR "_abs" => assert: #false
           end
       end
-  end.
+  end;;
+  release "lk".
 
 Definition read : val :=
   λ: "cst" "k",
-  let: "rpc" := Fst "cst" in
-  let: "tst" := Snd "cst" in
-  match: ! "tst" with
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
+  acquire "lk";;
+  let: "vo" := match: ! "tst" with
     NONE => assert: #false
   | SOME "st" =>
       let: "ts" := Fst "st" in
@@ -191,25 +196,34 @@ Definition read : val :=
           | InjR "_abs" => assert: #false
           end
       end
-  end.
+  end in
+  release "lk";;
+  "vo".
 
 Definition write : val :=
   λ: "cst" "k" "v",
-  let: "_rpc" := Fst "cst" in
-  let: "tst" := Snd "cst" in
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "_rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
+  acquire "lk";;
   match: ! "tst" with
     NONE => assert: #false
   | SOME "st" =>
       let: "_ts" := Fst "st" in
       let: "cache" := Snd "st" in
-      "cache" <- (map_insert "k" "v" ! "cache")
+      "cache" <- (map_insert "k" "v" ! "cache");;
+      release "lk"
   end.
 
 Definition commit : val :=
   λ: "cst",
-  let: "rpc" := Fst "cst" in
-  let: "tst" := Snd "cst" in
-  match: ! "tst" with
+  let: "_clt_addr" := Fst "cst" in
+  let: "lk" := Fst (Snd "cst") in
+  let: "rpc" := Fst (Snd (Snd "cst")) in
+  let: "tst" := Snd (Snd (Snd "cst")) in
+  acquire "lk";;
+  let: "b" := match: ! "tst" with
     NONE => assert: #false
   | SOME "st" =>
       let: "ts" := Fst "st" in
@@ -227,9 +241,6 @@ Definition commit : val :=
                         "b"
           end
       end
-  end.
-
-Definition run : val :=
-  λ: "cst" "handler", start "cst";;
-                       "handler" "cst";;
-                       commit "cst".
+  end in
+  release "lk";;
+  "b".

@@ -11,8 +11,8 @@ let transaction1 cst =
   commitT cst
 
 let transaction2 cst =
+  wait_transaction cst (fun v -> v = 1) "x";
   start cst;
-  wait_on_keyT cst (fun v -> v = 1) "x";
   write cst "x" 2;
   commitT cst
 

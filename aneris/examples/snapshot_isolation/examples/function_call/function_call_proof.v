@@ -9,11 +9,14 @@ From trillium.prelude Require Import finitary.
 From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events aux_defs resource_algebras resources specs.
 From aneris.examples.snapshot_isolation.examples.function_call
       Require Import function_call_code.
 Import ser_inj.
-From aneris.examples.snapshot_isolation.instantiation
-     Require Import snapshot_isolation_api_implementation.
+From aneris.examples.snapshot_isolation.instantiation Require Import
+     snapshot_isolation_api_implementation
+     instantiation_of_init.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 From aneris.examples.snapshot_isolation Require Import snapshot_isolation_code.
 
@@ -34,12 +37,12 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proof_of_code.
 
-  Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
+  Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
 
   Definition f_spec (f : val) : iProp Σ :=
     ∀ (k : Key) cst vo sa,
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ k ↦{cst} vo }}}
+    {{{ IsConnected cst sa ∗ k ↦{cst} vo }}}
       f cst #k @[ip_of_address sa]
     {{{ v', RET (SV_val v'); k ↦{cst} vo }}}.
 
@@ -51,15 +54,17 @@ Section proof_of_code.
 
   Lemma transaction1_spec :
     ∀ (cst : val) sa,
-    client_inv -∗
-    {{{ ConnectionState cst CanStart }}}
+      client_inv -∗
+      IsConnected cst sa -∗           
+    {{{ ConnectionState cst sa CanStart }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !> CanStart HΦ".
+    iIntros (cst sa) "#inv #HiC %Φ !> CanStart HΦ".
     rewrite/transaction1.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    wp_apply (SI_start_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    done.
     iInv "inv" as ">(%h & x_h)" "close".
     iModIntro.
     iExists {[ "x" := h ]}.
@@ -72,11 +77,11 @@ Section proof_of_code.
     iPoseProof (big_sepM_insert with "cache") as "((x_h & x_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #42) with "[] [$x_h $x_upd]");
-          first set_solver.
+    wp_apply (SI_write_spec _ _ _ _ (SerVal #42) with "[][$][$x_h $x_upd $HiC]");
+          first set_solver. 
     iIntros "(x_42 & x_upd)".
     wp_pures.
-    wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
     iInv "inv" as ">(%h' & x_h')" "close".
     iModIntro.
     iExists {[ "x" := h' ]}, _, {[ "x" := (Some #42, true) ]}.
@@ -108,14 +113,14 @@ Section proof_of_code.
     ∀ (cst f : val) sa h,
     f_spec f -∗
     client_inv -∗
-    {{{ ConnectionState cst CanStart ∗ "y" ↦ₖ h }}}
+    {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa ∗ "y" ↦ₖ h }}}
       transaction2 cst f @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst f sa hy) "#f_spec #inv %Φ !>(CanStart & y_hy) HΦ".
+    iIntros (cst f sa hy) "#f_spec #inv %Φ !>(CanStart & #HiC & y_hy) HΦ".
     rewrite/transaction2.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    wp_apply (SI_start_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%hx & x_hx)" "close".
     iModIntro.
     iExists {[ "x" := hx; "y" := hy ]}.
@@ -137,17 +142,17 @@ Section proof_of_code.
         first done.
     iModIntro.
     wp_pures.
-    wp_apply ("f_spec" with "[] cache_x"); first set_solver.
+    wp_apply ("f_spec" with "[] [$cache_x $HiC]"); first set_solver.
     iIntros (v') "cache_x".
     wp_pures.
-    wp_apply (SI_write_spec with "[] [$cache_y $y_upd]"); first set_solver.
+    wp_apply (SI_write_spec with "[][$][$cache_y $y_upd $HiC]"); first set_solver.
     iIntros "(cache_y & y_upd)".
     wp_pures.
-    wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
     iInv "inv" as ">(%hx' & x_hx')" "close".
     iModIntro.
     iExists {[ "x" := hx'; "y" := hy ]}, _,
-        {[ "x" := (hist_val hx, false); "y" := (Some (SV_val v'), true) ]}.
+        {[ "x" := (last hx, false); "y" := (Some (SV_val v'), true) ]}.
     iFrame.
     iSplitL "cache_x x_upd cache_y y_upd x_hx' y_hy".
     {
@@ -177,18 +182,20 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction1_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction1_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
-    iIntros (cst) "CanStart".
+    wp_apply (SI_init_client_proxy_spec with
+               "[$∅ $unalloc $free $KVS_si $Hcc]").
+    iIntros (cst) "(CanStart & #HiC)".
     wp_pures.
-    by wp_apply (transaction1_spec with "inv CanStart").
+    by wp_apply (transaction1_spec with "inv HiC CanStart").
   Qed.
 
   Lemma transaction2_client_spec :
@@ -200,18 +207,20 @@ Section proof_of_code.
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
       unallocated {[clt]} ∗
+      KVS_ClientCanConnect clt ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
       transaction2_client #clt #KVS_address f @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt f h) "#inv #f_spec %Φ !> (y_h & ∅ & #KVS_si & unalloc & free) HΦ".
+    iIntros (clt f h) "#inv #f_spec %Φ !> (y_h & ∅ & #KVS_si & unalloc
+ & Hcc & free) HΦ".
     rewrite/transaction2_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si]").
-    iIntros (cst) "CanStart".
+    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
+    iIntros (cst) "(CanStart & HiC)".
     wp_pures.
-    by wp_apply (transaction2_spec with "f_spec inv [$CanStart $y_h]").
+    by wp_apply (transaction2_spec with "f_spec inv [$CanStart $HiC $y_h]").
   Qed.
 
   Lemma server_spec :
@@ -246,15 +255,15 @@ Section proof_of_runner.
   Lemma f_spec_holds `{!SI_resources Mdl Σ, !SI_client_toolbox} :
     ⊢ f_spec f.
   Proof.
-    iIntros (k cst vo sa k_keys Φ) "!>k_vo HΦ".
+    iIntros (k cst vo sa k_keys Φ) "!>(#HiC & k_vo) HΦ".
     rewrite/f.
     wp_pures.
-    wp_apply (SI_read_spec with "[//] k_vo").
+    wp_apply (SI_read_spec with "[//][$] [$k_vo $HiC]").
     iIntros "k_vo".
     case: vo=>[v|].
     {
-      iMod (OwnLocalKey_serializable $! SI_GlobalInv with "k_vo")
-        as "(k_vo & %v_ser)"; first done.
+      iDestruct (OwnLocalKey_serializable with "[$k_vo]")
+        as "(k_vo & %v_ser)".
       wp_pures.
       by iApply ("HΦ" $! (SerVal v)).
     }
@@ -285,7 +294,9 @@ Section proof_of_runner.
     iIntros (Φ) "(srv_∅ & clt1_∅ & clt2_∅ & srv_unalloc & clt1_unalloc &
             clt2_unalloc & srv_free & clt1_free & clt2_free) HΦ".
     rewrite/runner.
-    iMod SI_init_module as "(% & % & mem & KVS_Init)".
+      iMod (SI_init_module _ {[client1_addr; client2_addr]})
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
+        first done.
     iPoseProof (big_sepS_insert with "mem") as "(x_mem & mem)"; first done.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(y_mem & _)";
       first set_solver.
@@ -295,13 +306,19 @@ Section proof_of_runner.
     iIntros "#KVS_si".
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "srv_free"; first done.
+    iDestruct (big_sepS_delete _  _ client1_addr with "Hcc")
+      as "(Hcc1 & Hcc)";
+    first set_solver.
+    iDestruct (big_sepS_delete _  _ client2_addr with "Hcc")
+      as "(Hcc2 & Hcc)";
+    first set_solver.
     iSplitR "KVS_Init srv_∅"; last first.
     { iIntros "!>free". by wp_apply (server_spec with "[$]"). }
     iNext.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt1_free"; first done.
-    iSplitR "clt1_∅ clt1_unalloc"; last first.
+    iSplitR "clt1_∅ clt1_unalloc Hcc1"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction1_client_spec client1_addr with "inv [$]").
@@ -310,7 +327,7 @@ Section proof_of_runner.
     wp_pures.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "clt2_free"; first done.
-    iSplitR "clt2_∅ clt2_unalloc y_mem"; last first.
+    iSplitR "clt2_∅ clt2_unalloc y_mem Hcc2"; last first.
     {
       iIntros "!>free".
       by wp_apply (transaction2_client_spec client2_addr with "inv [] [$]");
@@ -318,6 +335,7 @@ Section proof_of_runner.
     }
     iNext.
     by iApply "HΦ".
+    Unshelve. all: by destruct specs as (?&?&?&?&?&?); eauto.
   Qed.
 
 End proof_of_runner.
@@ -358,4 +376,4 @@ Proof.
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed.
+Qed. 

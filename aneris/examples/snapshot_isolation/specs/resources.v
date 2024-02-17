@@ -5,20 +5,14 @@ From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
 From aneris.examples.snapshot_isolation.specs
-     Require Export user_params.
+     Require Import user_params aux_defs.
 
-Notation "h ≤ₛ h'" := (h `suffix_of` h') (at level 20).
-  
+Notation "h ≤ₚ h'" := (h `prefix_of` h') (at level 20).
+
 Section Resources.
-
-  Definition Hist : Set := list val.
 
   Reserved Notation "k ↦ₖ h" (at level 20).
   Reserved Notation "k ↦{ c } vo" (at level 20).
-
-  Inductive local_state : Type :=
-   | CanStart
-   | Active (ms : gmap Key Hist).
 
   Class SI_resources Mdl Σ
     `{!anerisG Mdl Σ, !User_params}:= {
@@ -38,11 +32,14 @@ Section Resources.
     OwnLocalKey_timeless k v c:> Timeless (k ↦{c} v);
 
     (** Connection state *)
-    ConnectionState : val → local_state → iProp Σ;
-    
+    ConnectionState : val → socket_address → local_state → iProp Σ;
+    IsConnected : val → socket_address → iProp Σ;
+    IsConnected_persistent c sa :> Persistent (IsConnected c sa);
+
     (** KVS resources *)
     KVS_si : message → iProp Σ;
     KVS_Init : iProp Σ;
+    KVS_ClientCanConnect : socket_address → iProp Σ;
 
     (** Cache Key Status *)
     KeyUpdStatus : val → Key → bool → iProp Σ;
@@ -53,51 +50,49 @@ Section Resources.
     Seen_persistent k h :> Persistent (Seen k h);
 
     (** Properties of points-to connective *)
-    OwnMemKey_exclusive k h h' :
-        k ↦ₖ h ⊢ k ↦ₖ h' -∗ False;
+    (* OwnMemKey_exclusive k h h' : *)
+    (*     k ↦ₖ h ⊢ k ↦ₖ h' -∗ False; *)
 
-    OwnLocalKey_exclusive k c v v' :
-        k ↦{c} v ⊢ k ↦{c} v' -∗ False;
-  
-    ConnectionState_relation E k r ms h :
-      ↑KVS_InvName ⊆ E ->
-      GlobalInv ⊢
-      ConnectionState r (Active ms) -∗ k ↦ₖ h ={E}=∗
-      ConnectionState r (Active ms) ∗ k ↦ₖ h ∗
-      ⌜k ∈ dom ms →
-      ∀ h', ms !! k = Some h' → h' ≤ₛ h ⌝;
+    (* OwnLocalKey_exclusive k c v v' : *)
+    (*     k ↦{c} v ⊢ k ↦{c} v' -∗ False; *)
 
-    OwnMemKey_OwnLocalKey_coh k h vo c E :
-        ↑KVS_InvName ⊆ E ->
-        h ≠ [] ->
-        GlobalInv ⊢
-        k ↦ₖ h -∗ k ↦{c} vo ={E}=∗ k ↦ₖ h -∗ k ↦{c} vo ∗ ⌜is_Some vo⌝;
+    (* ConnectionState_relation E k r ms h : *)
+    (*   ↑KVS_InvName ⊆ E -> *)
+    (*   GlobalInv ⊢ *)
+    (*   ConnectionState r (Active ms) -∗ k ↦ₖ h ={E}=∗ *)
+    (*   ConnectionState r (Active ms) ∗ k ↦ₖ h ∗ *)
+    (*   ⌜k ∈ dom ms → *)
+    (*   ∀ h', ms !! k = Some h' → h' ≤ₛ h ⌝; *)
 
-    ConnectionState_Keys E r ms :
-      ↑KVS_InvName ⊆ E ->
-        GlobalInv ⊢
-        ConnectionState r (Active ms) ={E}=∗
-        ConnectionState r (Active ms) ∗ ⌜dom ms ⊆ KVS_keys⌝;
+    (* OwnMemKey_OwnLocalKey_coh k h vo c E : *)
+    (*     ↑KVS_InvName ⊆ E -> *)
+    (*     h ≠ [] -> *)
+    (*     GlobalInv ⊢ *)
+    (*     k ↦ₖ h -∗ k ↦{c} vo ={E}=∗ k ↦ₖ h ∗ k ↦{c} vo ∗ ⌜is_Some vo⌝; *)
 
-    OwnLocalKey_serializable E k cst v :
-      ↑KVS_InvName ⊆ E ->
-        GlobalInv ⊢
-        k ↦{cst} Some v ={E}=∗
+    (* ConnectionState_Keys E r ms : *)
+    (*   ↑KVS_InvName ⊆ E -> *)
+    (*     GlobalInv ⊢ *)
+    (*     ConnectionState r (Active ms) ={E}=∗ *)
+    (*     ConnectionState r (Active ms) ∗ ⌜dom ms ⊆ KVS_keys⌝; *)
+
+      OwnLocalKey_serializable k cst v :
+        k ↦{cst} Some v -∗
         k ↦{cst} Some v ∗ ⌜KVS_Serializable v⌝;
 
-    (** Properties of cache Key Status*)
-    KeyUpdStatus_exclusive c k b b' :
-      KeyUpdStatus c k b ⊢ KeyUpdStatus c k b' -∗ False;
+    (* (** Properties of cache Key Status*) *)
+    (* KeyUpdStatus_exclusive c k b b' : *)
+    (*   KeyUpdStatus c k b ⊢ KeyUpdStatus c k b' -∗ False; *)
 
-    (** Properties about the Seen predicate *) 
-    Seen_prefix k h h':
-      Seen k h ⊢ Seen k h' -∗ ⌜h ≤ₛ h' ∨ h' ≤ₛ h⌝;
-    
-    Seen_valid E k h h' : 
+    (* (** Properties about the Seen predicate *) *)
+    (* Seen_prefix k h h': *)
+    (*   Seen k h ⊢ Seen k h' -∗ ⌜h ≤ₛ h' ∨ h' ≤ₛ h⌝; *)
+
+    Seen_valid E k h h' :
        ↑KVS_InvName ⊆ E ->
         GlobalInv ⊢
         Seen k h ∗ k ↦ₖ h' ={E}=∗
-        k ↦ₖ h' ∗ ⌜h ≤ₛ h'⌝;
+        k ↦ₖ h' ∗ ⌜h ≤ₚ h'⌝;
   }.
 
 End Resources.

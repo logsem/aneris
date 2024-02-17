@@ -10,39 +10,25 @@ Definition commitU : val := λ: "cst", let: "_b" := commit "cst" in
 
 Definition commitT : val := λ: "cst", assert: (commit "cst").
 
-Definition wait_on_key : val :=
+Definition wait_transaction : val :=
   λ: "cst" "cond" "k",
   letrec: "aux" <> :=
+    start "cst";;
     match: read "cst" "k" with
-      NONE => commitU "cst";;
-              start "cst";;
+      NONE => commitT "cst";;
               "aux" #()
     | SOME "v" =>
         (if: "cond" "v"
-         then  commitU "cst";;
-               start "cst"
-         else  commitU "cst";;
-               start "cst";;
+         then  commitT "cst"
+         else  commitT "cst";;
                "aux" #())
     end in
     "aux" #().
 
-Definition wait_on_keyT : val :=
-  λ: "cst" "cond" "k",
-  letrec: "aux" <> :=
-    match: read "cst" "k" with
-      NONE => commitT "cst";;
-              start "cst";;
-              "aux" #()
-    | SOME "v" =>
-        (if: "cond" "v"
-         then  commitT "cst";;
-               start "cst"
-         else  commitT "cst";;
-               start "cst";;
-               "aux" #())
-    end in
-    "aux" #().
+Definition run : val :=
+  λ: "cst" "handler", start "cst";;
+                       "handler" "cst";;
+                       commit "cst".
 
 Definition run_client : val :=
   λ: "caddr" "kvs_addr" "tbody",

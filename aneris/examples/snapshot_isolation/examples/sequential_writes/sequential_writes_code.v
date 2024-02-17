@@ -13,8 +13,8 @@ Definition transaction1 : val :=
 
 Definition transaction2 : val :=
   λ: "cst",
+  wait_transaction "cst" (λ: "v", "v" = #1) #"x";;
   start "cst";;
-  wait_on_keyT "cst" (λ: "v", "v" = #1) #"x";;
   write "cst" #"x" #2;;
   commitT "cst".
 

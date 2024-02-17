@@ -8,35 +8,25 @@ let commitU cst : unit =
 let commitT cst : unit =
   assert (commit cst)
 
-(** Assumes cst is in the active state.
-    Returns cst in the active state. *)
-let wait_on_key (cst : int connection_state)
+let wait_transaction (cst : 'a connection_state)
     (cond : 'a -> bool) (k : string) : unit =
   let rec aux () =
-  match read cst k with
-  | None ->
-    commitU cst; start cst; aux ()
-  | Some v ->
-    if cond v
-    then (commitU cst; start cst)
-    else (commitU cst; start cst; aux ())
+    start cst;
+    match read cst k with
+    | None ->
+      commitT cst; aux ()
+    | Some v ->
+      if cond v
+      then (commitT cst)
+      else (commitT cst; aux ())
   in aux ()
 
-(** Assumes cst is in the active state and no writes happened.
-    Returns cst in the active state with no writes. *)
-let wait_on_keyT (cst : int connection_state)
-    (cond : 'a -> bool) (k : string) : unit =
-  let rec aux () =
-  match read cst k with
-  | None ->
-    commitT cst; start cst; aux ()
-  | Some v ->
-    if cond v
-    then (commitT cst; start cst)
-    else (commitT cst; start cst; aux ())
-  in aux ()
-
-
+let run (cst : 'a connection_state)
+    (handler : 'a connection_state -> unit) : bool =
+  start cst;
+  handler cst;
+  commit cst
+  
 let run_client caddr kvs_addr tbody =
   unsafe (fun () -> Printf.printf "Start client.\n%!");
   let cst = init_client_proxy int_serializer caddr kvs_addr in

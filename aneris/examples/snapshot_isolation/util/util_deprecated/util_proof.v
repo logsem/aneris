@@ -1,4 +1,4 @@
-From aneris.examples.snapshot_isolation.util Require Import util_code.
+(* From aneris.examples.snapshot_isolation.util Require Import util_code.
 From aneris.aneris_lang Require Import tactics adequacy proofmode.
 From aneris.examples.snapshot_isolation.specs
      Require Import user_params.
@@ -813,4 +813,4 @@ Section proof.
     by iModIntro.
   Qed.
 
-End proof.
+End proof. *)

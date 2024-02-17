@@ -11,11 +11,14 @@ From trillium.prelude Require Import finitary.
 From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
+From aneris.examples.snapshot_isolation.specs Require Import
+  user_params time events aux_defs resource_algebras resources specs.
 From aneris.examples.snapshot_isolation.examples.classical_example
       Require Import classical_example_code.
 Import ser_inj.
-From aneris.examples.snapshot_isolation.instantiation
-     Require Import snapshot_isolation_api_implementation.
+From aneris.examples.snapshot_isolation.instantiation Require Import
+     snapshot_isolation_api_implementation
+     instantiation_of_init.
 From aneris.examples.snapshot_isolation.util Require Import util_proof.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
@@ -62,16 +65,19 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     {{{ inv client_inv_name client_inv
       ∗ client_1_addr ⤳ (∅, ∅)
       ∗ unallocated {[client_1_addr]}
+      ∗ KVS_ClientCanConnect client_1_addr
       ∗ free_ports ip {[port]}
       ∗ KVS_address ⤇ KVS_si }}}
       transaction1_client $client_1_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Heqip Heqport Φ) "(#Hinv & Hmsghis & Hunalloc & Hports & Hprot) HΦ" .
+    iIntros (Heqip Heqport Φ) "(#Hinv & Hmsghis & Hunalloc & Hcc & Hports & Hprot) HΦ" .
     rewrite /transaction1_client. wp_pures. rewrite Heqip Heqport.
-    wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction1. wp_pures.
-    wp_apply (SI_start_spec $! rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
+    wp_apply (SI_init_client_proxy_spec
+               with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
+    iIntros (rpc) "(Hcstate & #HiC)".
+    wp_pures. rewrite /transaction1. wp_pures.
+    wp_apply (SI_start_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
     iModIntro. iFrame.
     iExists {["x" := h; "y" := h]}.
@@ -83,32 +89,32 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iMod ("HClose" with "[Hkx Hky]") as "_".
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [Hcx]"). 
-    set_solver. iFrame. iIntros "Hcx". wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #1) with "[] [Hcy]").
-    set_solver. iFrame. iIntros "Hcy". wp_pures.
+    wp_apply (SI_write_spec  _ _ _ _ (SerVal #1) with "[][$][Hcx]").
+    set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
+    wp_apply (SI_write_spec  _ _ _ _ (SerVal #1) with "[][$][Hcy]").
+    set_solver. iFrame "#∗". iIntros "Hcy". wp_pures.
     wp_apply (commitU_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
     iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
     iModIntro.
-    iExists {["x" := h'; "y" := h']}, _, 
+    iExists {["x" := h'; "y" := h']}, _,
     {["x" := (Some #1, true); "y" := (Some #1, true)]}.
     iFrame. iSplitL "Hcx Hcy Hx Hy".
       - iSplitR "Hcx Hcy Hx Hy"; try iSplitR "Hcx Hcy Hx Hy";
         try iPureIntro; try set_solver.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_empty. iFrame.
-      - iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]". 
+      - iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
           + iMod ("HClose" with "[HBig]") as "_".
-            * iNext. iExists _. 
+            * iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
               iDestruct "HBig" as "[[Hx _] [[Hy _] _]]". by iFrame.
             * iModIntro. by iApply "HΦ".
           + iMod ("HClose" with "[HBig]") as "_".
             * iNext. iExists h'.
-              rewrite !big_sepM_insert; try set_solver. 
+              rewrite !big_sepM_insert; try set_solver.
               iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
-            * iModIntro. by iApply "HΦ". 
+            * iModIntro. by iApply "HΦ".
   Qed.
 
   Lemma client_2_spec ip port :
@@ -117,16 +123,18 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     {{{ inv client_inv_name client_inv
       ∗ client_2_addr ⤳ (∅, ∅)
       ∗ unallocated {[client_2_addr]}
+      ∗ KVS_ClientCanConnect client_2_addr
       ∗ free_ports ip {[port]}
       ∗ KVS_address ⤇ KVS_si }}}
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Heqip Heqport Φ) "(#Hinv & Hmsghis & Hunalloc & Hports & Hprot) HΦ" .
+    iIntros (Heqip Heqport Φ) "(#Hinv & Hmsghis & Hunalloc & Hports & Hcc & Hprot) HΦ" .
     rewrite /transaction2_client. wp_pures. rewrite Heqip Heqport.
-    wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction2. wp_pures.
-    wp_apply (SI_start_spec $! rpc client_2_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
+    wp_apply (SI_init_client_proxy_spec
+               with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
+    iIntros (rpc) "(Hcstate & #HiC)". wp_pures. rewrite /transaction2. wp_pures.
+    wp_apply (SI_start_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
     iModIntro. iFrame.
     iExists {["x" := h; "y" := h]}.
@@ -138,32 +146,32 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iMod ("HClose" with "[Hkx Hky]") as "_".
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [Hcx]"). 
-    set_solver. iFrame. iIntros "Hcx". wp_pures.
-    wp_apply (SI_write_spec $! _ _ _ _ (SerVal #2) with "[] [Hcy]").
-    set_solver. iFrame. iIntros "Hcy". wp_pures.
+    wp_apply (SI_write_spec _ _ _ _ (SerVal #2) with "[][$][Hcx]").
+    set_solver. iFrame "#∗". iIntros "Hcx". wp_pures.
+    wp_apply (SI_write_spec _ _ _ _ (SerVal #2) with "[][$][Hcy]").
+    set_solver. iFrame "#∗". iIntros "Hcy". wp_pures.
     wp_apply (commitU_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
     iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
     iModIntro.
-    iExists {["x" := h'; "y" := h']}, _, 
+    iExists {["x" := h'; "y" := h']}, _,
     {["x" := (Some #2, true); "y" := (Some #2, true)]}.
     iFrame. iSplitL "Hcx Hcy Hx Hy".
       - iSplitR "Hcx Hcy Hx Hy"; try iSplitR "Hcx Hcy Hx Hy";
         try iPureIntro; try set_solver.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_empty. iFrame.
-      - iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]". 
+      - iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
           + iMod ("HClose" with "[HBig]") as "_".
-            * iNext. iExists _. 
+            * iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
               iDestruct "HBig" as "[[Hx _] [[Hy _] _]]". by iFrame.
             * iModIntro. by iApply "HΦ".
           + iMod ("HClose" with "[HBig]") as "_".
             * iNext. iExists h'.
-              rewrite !big_sepM_insert; try set_solver. 
+              rewrite !big_sepM_insert; try set_solver.
               iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
-            * iModIntro. by iApply "HΦ". 
+            * iModIntro. by iApply "HΦ".
   Qed.
 
   Lemma client_3_spec ip port client_3_addr :
@@ -172,16 +180,19 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     {{{ inv client_inv_name client_inv
       ∗ client_3_addr ⤳ (∅, ∅)
       ∗ unallocated {[client_3_addr]}
+      ∗ KVS_ClientCanConnect client_3_addr
       ∗ free_ports ip {[port]}
       ∗ KVS_address ⤇ KVS_si }}}
       transaction3_client $client_3_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Heqip Heqports Φ) "(#Hinv & Hmsghis & Hunalloc & Hports & Hprot) HΦ" .
+    iIntros (Heqip Heqports Φ)
+            "(#Hinv & Hmsghis & Hunalloc & Hports & Hcc & Hprot) HΦ" .
     rewrite /transaction3_client. wp_pures. rewrite Heqip Heqports.
-    wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports]").
-    iIntros (rpc) "Hcstate". wp_pures. rewrite /transaction3. wp_pures.
-    wp_apply (SI_start_spec $! rpc client_3_addr (⊤ ∖ ↑client_inv_name));
+    wp_apply (SI_init_client_proxy_spec
+               with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
+    iIntros (rpc) "(Hcstate & #HiC)". wp_pures. rewrite /transaction3. wp_pures.
+    wp_apply (SI_start_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
     iInv (client_inv_name) as ">[%h[Hx Hy]]" "HClose".
     iModIntro. iFrame.
@@ -194,24 +205,24 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
     iMod ("HClose" with "[Hkx Hky]") as "_".
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
-    wp_apply (SI_read_spec $! _ _ _ _ with "[] [Hcx]"); try set_solver.
-    iFrame. iIntros "Hcx". wp_pures.
-    wp_apply (SI_read_spec $! _ _ _ _ with "[] [Hcy]"); try set_solver.
-    iFrame. iIntros "Hcy". wp_pures.
-    destruct (hist_val h); wp_pures; do 2 wp_lam; wp_pures.
-      - case_bool_decide as Heq; try set_solver. wp_pures. 
+    wp_apply (SI_read_spec _ _ _ _ with "[][$][Hcx]"); try set_solver.
+    iFrame "#∗". iIntros "Hcx". wp_pures.
+    wp_apply (SI_read_spec _ _ _ _ with "[][$][Hcy]"); try set_solver.
+    iFrame "#∗". iIntros "Hcy". wp_pures.
+    destruct (last h); wp_pures; do 2 wp_lam; wp_pures.
+      - case_bool_decide as Heq; try set_solver. wp_pures.
         wp_apply (commitU_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
         try solve_ndisj.
         iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
         iModIntro.
-        iExists {["x" := h'; "y" := h']}, _, 
+        iExists {["x" := h'; "y" := h']}, _,
         {["x" := (Some v, false); "y" := (Some v, false)]}.
         iFrame. iSplitL "Hcx Hsx Hcy Hsy Hx Hy".
         + iSplitR "Hcx Hsx Hcy Hsy Hx Hy"; try iSplitR "Hcx Hsx Hcy Hsy Hx Hy";
           try iPureIntro; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
-        + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]". 
+        + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
             * iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists _.
                 rewrite !(big_sepM2_insert); try set_solver.
@@ -219,21 +230,21 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
               -- iModIntro. by iApply "HΦ".
             * iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists h'.
-                rewrite !big_sepM_insert; try set_solver. 
+                rewrite !big_sepM_insert; try set_solver.
                 iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
-              -- iModIntro. by iApply "HΦ".  
+              -- iModIntro. by iApply "HΦ".
       - wp_apply (commitU_spec rpc client_3_addr (⊤ ∖ ↑client_inv_name));
         try solve_ndisj.
         iInv (client_inv_name) as ">[%h'[Hx Hy]]" "HClose".
         iModIntro.
-        iExists {["x" := h'; "y" := h']}, _, 
+        iExists {["x" := h'; "y" := h']}, _,
         {["x" := (None, false); "y" := (None, false)]}.
         iFrame. iSplitL "Hcx Hsx Hcy Hsy Hx Hy".
         + iSplitR "Hcx Hsx Hcy Hsy Hx Hy"; try iSplitR "Hcx Hsx Hcy Hsy Hx Hy";
           try iPureIntro; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
-        + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]". 
+        + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
           * iMod ("HClose" with "[HBig]") as "_".
             -- iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
@@ -241,9 +252,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
             -- iModIntro. by iApply "HΦ".
           * iMod ("HClose" with "[HBig]") as "_".
             -- iNext. iExists h'.
-              rewrite !big_sepM_insert; try set_solver. 
+              rewrite !big_sepM_insert; try set_solver.
               iDestruct "HBig" as "[[? _] [[? _] _]]". by iFrame.
-            -- iModIntro. by iApply "HΦ".  
+            -- iModIntro. by iApply "HΦ".
 Qed.
 
 End proofs.
@@ -278,15 +289,17 @@ Context `{!anerisG Mdl Σ, !SI_init}.
       example_runner @["system"]
     {{{ v, RET v; True }}}.
   Proof.
-    iMod SI_init_module as (SI_res SI_client_toolbox) "(HKVSres & HVKSinit)".
-    iMod (inv_alloc client_inv_name ⊤ (client_inv) with "[HKVSres]") as "#Hinv".
+     iMod (SI_init_module _ {[client_1_addr; client_2_addr; client_3_addr]})
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
+         first done.
+    iMod (inv_alloc client_inv_name ⊤ (client_inv) with "[mem]") as "#Hinv".
     { iNext. iExists [].
-    iDestruct (big_sepS_delete _ _ "x" with "HKVSres") as "(Hx & HKVSres)";
+    iDestruct (big_sepS_delete _ _ "x" with "mem") as "(Hx & HKVSres)";
     first set_solver.
     iDestruct (big_sepS_delete _ _ "y" with "HKVSres") as "(Hy & _)";
     first set_solver. iFrame.
     }
-    iIntros (Φ) "(Hsrvhist & Hcli1hist & Hcli2hist & Hcli3hist & Hsrvunalloc & Hcli1unalloc 
+    iIntros (Φ) "(Hsrvhist & Hcli1hist & Hcli2hist & Hcli3hist & Hsrvunalloc & Hcli1unalloc
     & Hcli2unalloc & Hcli3unalloc & ? & ? & ? & ?) HΦ".
     rewrite /example_runner.
     wp_pures.
@@ -294,23 +307,33 @@ Context `{!anerisG Mdl Σ, !SI_init}.
     iIntros "#HKVS_si".
     wp_apply (aneris_wp_start {[80%positive]}).
     iFrame.
-    iSplitR "Hsrvhist HVKSinit".
+    iDestruct (big_sepS_delete _  _ client_1_addr with "Hcc")
+      as "(Hcc1 & Hcc)";
+    first set_solver.
+    iDestruct (big_sepS_delete _  _ client_2_addr with "Hcc")
+      as "(Hcc2 & Hcc)";
+    first set_solver.
+    iDestruct (big_sepS_delete _  _ client_3_addr with "Hcc")
+      as "(Hcc3 & _)";
+    first set_solver.
+    iSplitR "Hsrvhist KVS_Init".
     - iModIntro. wp_pures.
       wp_apply (aneris_wp_start {[80%positive : port]}).
       iFrame.
-      iSplitR "Hcli1hist Hcli1unalloc".
+      iSplitR "Hcli1hist Hcli1unalloc Hcc1".
       + iModIntro. wp_pures.
         wp_apply (aneris_wp_start {[80%positive : port]}).
         iFrame.
-        iSplitR "Hcli2hist Hcli2unalloc".
+        iSplitR "Hcli2hist Hcli2unalloc Hcc2".
         * iModIntro. wp_pures.
         wp_apply (aneris_wp_start {[80%positive : port]}).
-        iFrame. iSplitL "HΦ". 
+        iFrame. iSplitL "HΦ".
           -- by iApply "HΦ".
-          -- iIntros "!> Hports".  wp_apply (client_3_spec with "[$]"); try done. 
-        * iIntros "!> Hports". wp_apply (client_2_spec with "[$]"); try done. 
-      + iIntros "!> Hports". wp_apply (client_1_spec with "[$]"); try done. 
-    - iIntros "!> Hports". wp_apply (server_spec with "[$]"); done.
+          -- iIntros "!> Hports".  wp_apply (client_3_spec with "[$]"); try done.
+        * iIntros "!> Hports". wp_apply (client_2_spec with "[$]"); try done.
+      + iIntros "!> Hports". wp_apply (client_1_spec with "[$]"); try done.
+    - iIntros "!> Hports". wp_apply (server_spec with "[$]"); try done.
+      Unshelve. all: by destruct specs as (?&?&?&?&?&?); eauto.
   Qed.
 
 End proof_runner.
@@ -336,7 +359,7 @@ Definition init_state :=
 Theorem runner_safe :
   aneris_adequate example_runner "system" init_state (λ _, True).
 Proof.
-  set (Σ := #[anerisΣ unit_model]).
+  set (Σ := #[anerisΣ unit_model; KVSΣ]).
   apply (@adequacy Σ unit_model _ _ ips sa_dom ∅ ∅ ∅);
   [apply unit_model_rel_finitary | |set_solver..].
   iIntros (dinvG). iIntros "!> Hunallocated Hhist Hfrag Hips Hlbl _ _ _ _".
@@ -350,4 +373,4 @@ Proof.
   do 3 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed.
+Qed. 

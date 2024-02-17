@@ -12,24 +12,24 @@ let transaction1 cst =
   commitU cst
 
 let transaction2 cst =
+  wait_transaction cst (fun v -> v = 1) "z";
   start cst;
-  wait_on_keyT cst (fun v -> v = 1) "z";
   let vx = read cst "x" in
   if vx = Some 1 then
     write cst "y" (-1);
   commitU cst
 
 let transaction3 cst =
+  wait_transaction cst (fun v -> v = 1) "z";
   start cst;
-  wait_on_keyT cst (fun v -> v = 1) "z";
   let vy = read cst "y" in
   if vy = Some 1 then
     write cst "x" (-1);
   commitU cst
 
 let transaction4 cst =
+  wait_transaction cst (fun v -> v = 1) "z";
   start cst;
-  wait_on_keyT cst (fun v -> v = 1) "z";
   let vx = unSOME (read cst "x") in
   let vy = unSOME (read cst "y") in
   let r = vx + vy in

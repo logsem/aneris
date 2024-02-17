@@ -13,15 +13,15 @@ Definition transaction1 : val :=
 
 Definition transaction2 : val :=
   λ: "cst",
+  wait_transaction "cst" (λ: "v", "v" = #1) #"x";;
   start "cst";;
-  wait_on_keyT "cst" (λ: "v", "v" = #1) #"x";;
   write "cst" #"y" #1;;
   commitU "cst".
 
 Definition transaction3 : val :=
   λ: "cst",
+  wait_transaction "cst" (λ: "v", "v" = #1) #"y";;
   start "cst";;
-  wait_on_keyT "cst" (λ: "v", "v" = #1) #"y";;
   let: "vx" := read "cst" #"x" in
   assert: ("vx" = (SOME #1));;
   commitU "cst".

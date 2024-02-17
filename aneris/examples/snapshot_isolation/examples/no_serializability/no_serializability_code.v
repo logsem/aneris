@@ -17,8 +17,8 @@ Definition transaction1 : val :=
 
 Definition transaction2 : val :=
   λ: "cst",
+  wait_transaction "cst" (λ: "v", "v" = #1) #"z";;
   start "cst";;
-  wait_on_keyT "cst" (λ: "v", "v" = #1) #"z";;
   let: "vx" := read "cst" #"x" in
   (if: "vx" = (SOME #1)
    then  write "cst" #"y" #(-1)
@@ -27,8 +27,8 @@ Definition transaction2 : val :=
 
 Definition transaction3 : val :=
   λ: "cst",
+  wait_transaction "cst" (λ: "v", "v" = #1) #"z";;
   start "cst";;
-  wait_on_keyT "cst" (λ: "v", "v" = #1) #"z";;
   let: "vy" := read "cst" #"y" in
   (if: "vy" = (SOME #1)
    then  write "cst" #"x" #(-1)
@@ -37,8 +37,8 @@ Definition transaction3 : val :=
 
 Definition transaction4 : val :=
   λ: "cst",
+  wait_transaction "cst" (λ: "v", "v" = #1) #"z";;
   start "cst";;
-  wait_on_keyT "cst" (λ: "v", "v" = #1) #"z";;
   let: "vx" := unSOME (read "cst" #"x") in
   let: "vy" := unSOME (read "cst" #"y") in
   let: "r" := "vx" + "vy" in
