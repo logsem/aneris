@@ -37,6 +37,9 @@ CoqMakefile.conf
 Makefile.coq
 build-dep/
 
+### O2A ###
+_generated
+
 ### Emacs ###
 # -*- mode: gitignore; -*-
 *~
