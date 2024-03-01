@@ -55,25 +55,25 @@ ML_SOURCES:
 	examples/reliable_communication/lib/repdb/repdb_code.ml
 	examples/reliable_communication/lib/sharding/sharding_code.ml
 	examples/reliable_communication/examples/sharding_examples/causality_example_code.ml
-  	examples/reliable_communication/examples/dlm_db_example/dlm_db_example_code.ml
-  	examples/reliable_communication/examples/repdb_leader_followers/causality_example_code.ml
+  examples/reliable_communication/examples/dlm_db_example/dlm_db_example_code.ml
+  examples/reliable_communication/examples/repdb_leader_followers/causality_example_code.ml
 	examples/reliable_communication/examples/hello_world/hello_world_code.ml
 	examples/reliable_communication/examples/hello_world_2/hello_world_2_code.ml
 	examples/reliable_communication/examples/messages_in_order/messages_in_order_code.ml
 	examples/reliable_communication/examples/messages_in_order_loop/messages_in_order_loop_code.ml
-	examples/snapshot_isolation/snapshot_isolation_code.ml
-  	examples/snapshot_isolation/util/util_code.ml
-  	examples/snapshot_isolation/examples/deprecated/anomalie/anomalie_code.ml
-	examples/snapshot_isolation/examples/classical_example/classical_example_code.ml
-	examples/snapshot_isolation/examples/function_call/function_call_code.ml
-	examples/snapshot_isolation/examples/causality_example/causality_example_code.ml
-	examples/snapshot_isolation/examples/only_reads/only_reads_code.ml
-	examples/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
-        examples/snapshot_isolation/examples/sequential_writes/sequential_writes_code.ml
-        examples/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
-        examples/snapshot_isolation/examples/no_serializability/no_serializability_code.ml
-	examples/snapshot_isolation/examples/disjoint_reads/disjoint_reads_code.ml
-	examples/snapshot_isolation/examples/read_your_writes/read_your_writes_code.ml
+	examples/transactional_consistency/snapshot_isolation/snapshot_isolation_code.ml
+  examples/transactional_consistency/snapshot_isolation/util/util_code.ml
+  examples/transactional_consistency/snapshot_isolation/examples/deprecated/anomalie/anomalie_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/classical_example/classical_example_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/function_call/function_call_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/causality_example/causality_example_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/only_reads/only_reads_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
+  examples/transactional_consistency/snapshot_isolation/examples/sequential_writes/sequential_writes_code.ml
+  examples/transactional_consistency/snapshot_isolation/examples/disjoint_writes/disjoint_writes_code.ml
+  examples/transactional_consistency/snapshot_isolation/examples/no_serializability/no_serializability_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/disjoint_reads/disjoint_reads_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/read_your_writes/read_your_writes_code.ml
 ML_DEPENDENCIES:
 
         aneris_lang
@@ -96,6 +96,6 @@ ML_DEPENDENCIES:
 	examples/reliable_communication/lib/dlm/
 	examples/reliable_communication/lib/mt_server/
 	examples/reliable_communication/lib/repdb/
-	examples/snapshot_isolation/
-	examples/snapshot_isolation/util/
+	examples/transactional_consistency/snapshot_isolation/
+	examples/transactional_consistency/snapshot_isolation/util/
 	examples/reliable_communication/lib/sharding/
