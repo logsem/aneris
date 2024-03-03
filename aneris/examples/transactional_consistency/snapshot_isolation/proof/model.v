@@ -1,8 +1,7 @@
 From aneris.aneris_lang Require Import lang resources inject.
 From aneris.aneris_lang.lib.serialization Require Import
   serialization_proof.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Export
-  user_params.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Export
   time events.
 Import gset_map.

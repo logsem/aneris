@@ -17,7 +17,8 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.transactional_consistency.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
@@ -33,7 +34,7 @@ Section Commit_Proof.
   Context (γKnownClients γGauth γGsnap γT γTrs : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
-  Import snapshot_isolation_code_api.
+  Import code_api.
 
 
   Lemma cache_inversion (mc : gmap Key (option val * bool)) sa lk cst l (γCst γA γS γlk γCache γMsnap : gname) :
@@ -91,7 +92,7 @@ Section Commit_Proof.
         ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
         ([∗ map] k ↦ p ∈ mc,
            ownCacheUser γKnownClients k c p.1 ∗ key_upd_status γKnownClients c k p.2) >>>
-      SI_commit c @[ip_of_address sa] E
+      TC_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
          ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
         (** Transaction has been commited. *)
@@ -107,7 +108,7 @@ Section Commit_Proof.
   Proof.
      iIntros (c sa E HE).
     iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
-    rewrite /SI_commit /= /commit.
+    rewrite /TC_commit /= /commit.
     wp_pures.
     unfold is_connected.
     iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".

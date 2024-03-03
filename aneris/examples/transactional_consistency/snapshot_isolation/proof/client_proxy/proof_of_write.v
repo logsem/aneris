@@ -17,7 +17,8 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.transactional_consistency.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
@@ -33,7 +34,7 @@ Section Write_Proof.
   Context (γKnownClients γGauth γGsnap γT γTrs : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
-  Import snapshot_isolation_code_api.
+  Import code_api.
 
 
  Definition write_spec_internal `{!MTS_resources} : Prop :=
@@ -44,7 +45,7 @@ Section Write_Proof.
     {{{ is_connected γGsnap γT γTrs γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo ∗
         key_upd_status γKnownClients c k b }}}
-      SI_write c #k v @[ip_of_address sa]
+      TC_write c #k v @[ip_of_address sa]
     {{{ RET #(); ownCacheUser γKnownClients k c (Some v.(SV_val)) ∗
                  key_upd_status γKnownClients c k true }}}.
 
@@ -53,7 +54,7 @@ Section Write_Proof.
     iIntros (c sa vo k v b Hk Φ) "!# (#Hisc & Hcache & Hkds) Hpost".
     iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)".
-    rewrite /SI_write /= /write.
+    rewrite /TC_write /= /write.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
                with "[$Hisc]").

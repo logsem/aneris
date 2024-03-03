@@ -17,7 +17,8 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.transactional_consistency.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof
   Require Import model kvs_serialization
   rpc_user_params utils.
@@ -37,7 +38,7 @@ Section Proof_of_commit_handler.
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
                      clients γKnownClients γGauth γGsnap γT γTrs).
-  Import snapshot_isolation_code_api.
+  Import code_api.
 
   Lemma check_at_key_spec (k : Key) (ts tc : nat) (vl kvs cache : val)
     (cache_updatesM m : gmap Key val)

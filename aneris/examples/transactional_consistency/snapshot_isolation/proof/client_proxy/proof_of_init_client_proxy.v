@@ -16,7 +16,8 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.transactional_consistency.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
@@ -31,7 +32,7 @@ Section Client_Proxy_Proof.
   Context (γKnownClients γGauth γGsnap γT γTrs : gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
-  Import snapshot_isolation_code_api.
+  Import code_api.
 
   Definition init_client_proxy_spec_internal `{!MTS_resources} : Prop :=
     ∀ (sa : socket_address),
@@ -43,7 +44,7 @@ Section Client_Proxy_Proof.
         (@api_spec.init_client_proxy_spec _ _ _ _ MTC _ srv_si) ∗
         client_can_connect_res γKnownClients sa ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
-      SI_init_client_proxy (s_serializer KVS_serialization)
+      TC_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate;
         ConnectionState_def γKnownClients γGsnap cstate sa CanStart ∗
@@ -54,7 +55,7 @@ Section Client_Proxy_Proof.
   Proof.
     iIntros (sa Φ). 
     iIntros "(Hf & #Hsi & Hmh & _ & _ & #Hspec & Hcc & Hfp) HΦ".
-    rewrite /SI_init_client_proxy /=.
+    rewrite /TC_init_client_proxy /=.
     rewrite /init_client_proxy.
     wp_pures.
     wp_apply ("Hspec" with "[$Hf $Hfp $Hmh $Hsi][Hcc HΦ]").

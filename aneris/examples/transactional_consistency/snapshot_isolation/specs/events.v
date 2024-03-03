@@ -1,6 +1,5 @@
 From aneris.aneris_lang Require Import lang inject.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs
-     Require Import user_params.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs
      Require Import time.
 

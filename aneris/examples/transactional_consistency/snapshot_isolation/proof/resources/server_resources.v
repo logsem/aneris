@@ -12,11 +12,9 @@ From aneris.aneris_lang.lib Require Import
      list_proof lock_proof map_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params
-  time
-  events
-  resource_algebras.
+  time events resource_algebras.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof Require Import model.
+From aneris.examples.transactional_consistency Require Import user_params.
 
 
 (*----------------------------------------------------------------------------*)

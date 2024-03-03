@@ -1,8 +1,6 @@
 From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs
-     Require Import user_params resources specs.
 From aneris.aneris_lang.lib Require Import inject.
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From trillium.prelude Require Import finitary.
@@ -10,7 +8,8 @@ From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras resources specs.
+  time events aux_defs resource_algebras resources specs.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.examples.causality_example
       Require Import causality_example_code.
 Import ser_inj.
@@ -19,6 +18,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.instantiation 
      instantiation_of_init.
 From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_proof.
 From aneris.examples.transactional_consistency.snapshot_isolation Require Import snapshot_isolation_code.
+From aneris.examples.transactional_consistency Require Import user_params.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client1_addr := SocketAddressInet "0.0.0.1" 80.

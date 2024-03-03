@@ -5,7 +5,7 @@ From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras resources specs.
+  time events aux_defs resource_algebras resources specs.
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From trillium.prelude Require Import finitary.
 From aneris.aneris_lang.program_logic Require Import
@@ -17,6 +17,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.instantiation 
      snapshot_isolation_api_implementation
      instantiation_of_init.
 From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_proof.
+From aneris.examples.transactional_consistency Require Import user_params.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_addr := SocketAddressInet "0.0.0.1" 80.

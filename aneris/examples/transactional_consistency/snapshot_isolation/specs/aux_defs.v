@@ -6,10 +6,8 @@ From aneris.aneris_lang.lib Require Import
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-From aneris.examples.transactional_consistency.snapshot_isolation
-     Require Import snapshot_isolation_code_api.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs
-     Require Import user_params.
+From aneris.examples.transactional_consistency
+     Require Import code_api user_params.
 
 Definition Hist : Set := list val.
 

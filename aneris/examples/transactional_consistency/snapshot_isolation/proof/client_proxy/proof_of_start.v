@@ -17,7 +17,8 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.transactional_consistency.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
@@ -33,7 +34,7 @@ Section Start_Proof.
   Context (γKnownClients γGauth γGsnap γT γTrs: gname).
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
-  Import snapshot_isolation_code_api.
+  Import code_api.
 
   Definition start_spec_internal {MTR : MTS_resources} : Prop :=
     ∀ (c : val) (sa : socket_address)
@@ -45,7 +46,7 @@ Section Start_Proof.
     <<< ∀∀ (m : gmap Key (list val)),
         ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h >>>
-      SI_start c @[ip_of_address sa] E
+      TC_start c @[ip_of_address sa] E
     <<<▷ RET #();
         ConnectionState_def γKnownClients γGsnap c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
@@ -58,7 +59,7 @@ Section Start_Proof.
   Proof.
     iIntros (c sa E HE).
     iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
-    rewrite /SI_start /= /start.
+    rewrite /TC_start /= /start.
     wp_pures.
     iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".
     wp_pures.

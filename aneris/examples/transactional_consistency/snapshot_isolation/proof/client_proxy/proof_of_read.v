@@ -17,7 +17,8 @@ From aneris.examples.reliable_communication.lib.mt_server.spec
 From aneris.examples.transactional_consistency.snapshot_isolation
      Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof
      Require Import utils model kvs_serialization rpc_user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
@@ -34,7 +35,7 @@ Section Read_Proof.
   Context (srv_si : message → iProp Σ).
   Notation MTC := (client_handler_rpc_user_params
                      clients γKnownClients γGauth γGsnap γT γTrs).
-  Import snapshot_isolation_code_api.
+  Import code_api.
 
 
  Definition read_spec_internal `{!MTS_resources} : Prop :=
@@ -45,7 +46,7 @@ Section Read_Proof.
       {{{ Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ∗
           is_connected γGsnap γT γTrs γKnownClients c sa ∗
         ownCacheUser γKnownClients k c vo }}}
-      SI_read c #k @[ip_of_address sa]
+      TC_read c #k @[ip_of_address sa]
     {{{ RET $vo; ownCacheUser γKnownClients k c vo }}}.
 
 
@@ -56,7 +57,7 @@ Section Read_Proof.
     iIntros (Φ) "(#Hinv & #Hisc & Hcache) Hpost".
     iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)". rewrite /make_request_spec.
-    rewrite /SI_read /= /read.
+    rewrite /TC_read /= /read.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
                with "[$Hisc]").

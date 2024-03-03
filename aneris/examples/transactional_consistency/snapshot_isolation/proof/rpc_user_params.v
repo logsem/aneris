@@ -13,7 +13,8 @@ From aneris.examples.reliable_communication.prelude Require Import ser_inj.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  aux_defs user_params time events resource_algebras.
+  aux_defs time events resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof Require Import
   model kvs_serialization utils.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources Require Import

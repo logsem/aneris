@@ -14,10 +14,13 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency.snapshot_isolation
   Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.util
-     Require Import util_code util_proof.
+     Require Import util_proof.
+From aneris.examples.transactional_consistency
+     Require Import util_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs
   Require Import
-  user_params time events aux_defs resource_algebras resources specs.
+  time events aux_defs resource_algebras resources specs.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.instantiation
   Require Import
   snapshot_isolation_api_implementation.
@@ -26,7 +29,7 @@ Set Default Proof Using "Type".
 
 Section DerivedSpecs.
 
-  Import snapshot_isolation_code_api.
+  Import code_api.
   
   Context `{!anerisG Mdl Σ, !User_params, !SI_resources Mdl Σ,  !KVSG Σ}.
 
@@ -107,7 +110,7 @@ Section DerivedSpecs.
         sa ⤳ (∅, ∅) ∗
         KVS_ClientCanConnect sa ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
-      SI_init_client_proxy (s_serializer KVS_serialization)
+      TC_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate; ConnectionStateTxt cstate sa TxtCanStart ∗
                             IsConnected cstate sa }}}.
@@ -131,7 +134,7 @@ Section DerivedSpecs.
     <<< ∀∀ (m : gmap Key (option val)),
        ConnectionStateTxt c sa TxtCanStart ∗
        [∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo >>>
-      SI_start c @[ip_of_address sa] E
+      TC_start c @[ip_of_address sa] E
     <<<▷ RET #();
        ConnectionStateTxt c sa (TxtActive m) ∗
        ([∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo) ∗
@@ -176,7 +179,7 @@ Section DerivedSpecs.
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo) ∗
         ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) >>>
-      SI_commit c @[ip_of_address sa] E
+      TC_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
         ConnectionStateTxt c sa TxtCanStart ∗
         (** Transaction has been commited. *)

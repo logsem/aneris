@@ -11,17 +11,18 @@ From aneris.aneris_lang.lib.serialization
 From aneris.examples.reliable_communication.spec
      Require Import ras.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-From aneris.examples.transactional_consistency.snapshot_isolation
-     Require Import snapshot_isolation_code_api.
+From aneris.examples.transactional_consistency
+     Require Import code_api.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs
   Require Import
-  user_params time events aux_defs resource_algebras resources.
+  time events aux_defs resource_algebras resources.
+From aneris.examples.transactional_consistency Require Import user_params.
 
 Set Default Proof Using "Type".
 
 Section Specification.
   Context `{!anerisG Mdl Σ, !User_params,
-            !KVS_snapshot_isolation_api, !SI_resources Mdl Σ}.
+            !KVS_transaction_api, !SI_resources Mdl Σ}.
 
   Definition write_spec : Prop :=
     ∀ (c : val) (sa : socket_address)
@@ -30,7 +31,7 @@ Section Specification.
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
     {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
-      SI_write c #k v @[ip_of_address sa] 
+      TC_write c #k v @[ip_of_address sa] 
     {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
 
   Definition read_spec : Prop :=
@@ -39,7 +40,7 @@ Section Specification.
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
     {{{ k ↦{c} vo }}}
-      SI_read c #k @[ip_of_address sa] 
+      TC_read c #k @[ip_of_address sa] 
     {{{ RET $vo; k ↦{c} vo }}}.
 
    Definition start_spec : Prop :=
@@ -50,7 +51,7 @@ Section Specification.
     <<< ∀∀ (m : gmap Key Hist),
        ConnectionState c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, k ↦ₖ h >>>
-      SI_start c @[ip_of_address sa] E
+      TC_start c @[ip_of_address sa] E
     <<<▷ RET #();
        ConnectionState c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
@@ -68,7 +69,7 @@ Section Specification.
         ⌜dom m = dom ms⌝ ∗ ⌜dom ms = dom mc⌝ ∗
         ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗
         ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1  ∗ KeyUpdStatus c k p.2) >>>
-      SI_commit c @[ip_of_address sa] E
+      TC_commit c @[ip_of_address sa] E
     <<<▷∃∃ b, RET #b;
         ConnectionState c sa CanStart ∗
         (** Transaction has been commited. *)
@@ -86,7 +87,7 @@ Section Specification.
         sa ⤳ (∅, ∅) ∗
         KVS_ClientCanConnect sa ∗
         free_ports (ip_of_address sa) {[port_of_address sa]} }}}
-      SI_init_client_proxy (s_serializer KVS_serialization)
+      TC_init_client_proxy (s_serializer KVS_serialization)
                   #sa #KVS_address @[ip_of_address sa]
     {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗
                             IsConnected cstate sa }}}.
@@ -97,14 +98,12 @@ Section Specification.
         free_ports (ip_of_address KVS_address)
                    {[port_of_address KVS_address]} ∗
       KVS_Init }}}
-      SI_init_server (s_serializer KVS_serialization)
+      TC_init_server (s_serializer KVS_serialization)
         #KVS_address
         @[(ip_of_address KVS_address)]
     {{{ RET #(); True }}}.
 
 End Specification.
-
-Canonical Structure valO := leibnizO val.
 
 Notation KVSG Σ := (IDBG Σ).
  
@@ -132,7 +131,7 @@ Proof. econstructor; solve_inG. Qed.
 
 Section SI_Module.
   Context `{!anerisG Mdl Σ, !User_params,
-            !KVSG Σ, !KVS_snapshot_isolation_api}.
+            !KVSG Σ, !KVS_transaction_api}.
 
   Class SI_client_toolbox `{!SI_resources Mdl Σ} := {
     SI_init_kvs_spec : init_kvs_spec ;

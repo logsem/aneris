@@ -4,8 +4,7 @@ From aneris.aneris_lang Require Import proofmode.
 From aneris.aneris_lang.lib Require Import inject list_proof network_util_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.prelude Require Import ser_inj.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs
-     Require Import user_params.
+From aneris.examples.transactional_consistency Require Import user_params.
 
 (** TODO: proof list_serialization and move to the serialization_proof file. *)
 Section list_serialization.

@@ -17,17 +17,17 @@ From aneris.examples.reliable_communication.spec
 From aneris.examples.reliable_communication.lib.mt_server.spec
   Require Import api_spec.
 From aneris.examples.transactional_consistency.snapshot_isolation
-     Require Import snapshot_isolation_code
-                    snapshot_isolation_code_api.
+     Require Import snapshot_isolation_code.
+From aneris.examples.transactional_consistency
+     Require Import code_api.
 From aneris.aneris_lang Require Import resources.
 From aneris.examples.reliable_communication.lib.mt_server Require Import
   user_params.
 From aneris.examples.reliable_communication.lib.mt_server.proof Require Import
   mt_server_proof.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params resources specs.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events aux_defs resource_algebras.
+  time specs resources events aux_defs resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
   Require Import
   global_invariant

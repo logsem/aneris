@@ -13,7 +13,8 @@ From aneris.aneris_lang.lib Require Import
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.examples.reliable_communication.lib.mt_server Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  user_params time events resource_algebras.
+  time events resource_algebras.
+From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof Require Import model.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources Require Import
   server_resources.
