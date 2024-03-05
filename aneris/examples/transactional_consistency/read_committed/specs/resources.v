@@ -4,9 +4,7 @@ From iris.bi.lib Require Import fractional.
 From aneris.aneris_lang Require Export resources.
 From aneris.examples.reliable_communication.prelude
      Require Import list_minus.
-From aneris.examples.transactional_consistency.read_committed.specs
-     Require Import aux_defs.
-From aneris.examples.transactional_consistency Require Import user_params.
+From aneris.examples.transactional_consistency Require Import user_params aux_defs.
 
 Section Resources.
   Reserved Notation "k ↦ₖ V" (at level 20).

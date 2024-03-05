@@ -15,8 +15,8 @@ From aneris.examples.transactional_consistency
      Require Import code_api.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs
   Require Import
-  time events aux_defs resource_algebras resources.
-From aneris.examples.transactional_consistency Require Import user_params.
+  time events aux_defs resources.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 
 Set Default Proof Using "Type".
 
@@ -104,30 +104,6 @@ Section Specification.
     {{{ RET #(); True }}}.
 
 End Specification.
-
-Notation KVSG Σ := (IDBG Σ).
- 
-Definition KVSΣ : gFunctors :=
-  #[
-      ghost_mapΣ Key (list write_eventO);
-      ghost_mapΣ Key (option val * bool);
-      GFunctor (authR (gmapUR Key (max_prefix_listR
-                                     write_eventO)));
-      GFunctor ((authR (gen_heapUR Key val)));
-      GFunctor (authR (gmapUR nat (agreeR (gmapUR Key (max_prefix_listR write_eventO)))));
-      GFunctor
-        (authR (gmapUR socket_address (agreeR (leibnizO gname))));
-      GFunctor ((csumR
-                   (exclR unitR)
-                   (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type))));
-     GFunctor (exclR unitO);
-     GFunctor (authUR (gsetUR nat));
-     mono_natΣ;
-     ras.SpecChanΣ;
-     lockΣ].
-
-Instance subG_KVSΣ {Σ} : subG KVSΣ Σ → KVSG Σ.
-Proof. econstructor; solve_inG. Qed.
 
 Section SI_Module.
   Context `{!anerisG Mdl Σ, !User_params,

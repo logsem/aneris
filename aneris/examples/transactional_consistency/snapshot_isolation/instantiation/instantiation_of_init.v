@@ -26,8 +26,8 @@ From aneris.examples.reliable_communication.lib.mt_server Require Import
 From aneris.examples.reliable_communication.lib.mt_server.proof Require Import
   mt_server_proof.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  time specs resources events aux_defs resource_algebras.
-From aneris.examples.transactional_consistency Require Import user_params.
+  time specs resources events aux_defs.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources
   Require Import
   global_invariant

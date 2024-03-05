@@ -10,7 +10,7 @@ From aneris.aneris_lang.program_logic Require Import
      aneris_weakestpre aneris_adequacy aneris_lifting.
 From iris.base_logic.lib Require Import invariants.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  time events aux_defs resource_algebras resources specs.
+  time events aux_defs resources specs.
 From aneris.examples.transactional_consistency.snapshot_isolation.examples.classical_example_run
       Require Import classical_example_run_code.
 Import ser_inj.
@@ -18,7 +18,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.instantiation 
      snapshot_isolation_api_implementation
      instantiation_of_init.
 From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_proof.
-From aneris.examples.transactional_consistency Require Import user_params.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.

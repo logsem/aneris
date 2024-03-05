@@ -14,8 +14,8 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency
      Require Import code_api.
 From aneris.examples.transactional_consistency.read_uncommitted.specs
-  Require Import resources aux_defs.
-From aneris.examples.transactional_consistency Require Import user_params.
+  Require Import resources.
+From aneris.examples.transactional_consistency Require Import user_params aux_defs.
 
 Set Default Proof Using "Type".
 
@@ -97,3 +97,34 @@ Section Specification.
       {{{ RET #(); True }}}.
 
 End Specification.
+
+Section RU_Module.
+  Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api}.
+
+  Class RU_client_toolbox `{!RU_resources Mdl Σ} := {
+    RU_init_kvs_spec : init_kvs_spec ;
+    RU_init_client_proxy_spec : init_client_proxy_spec;
+    RU_read_spec : read_spec ;
+    RU_write_spec : write_spec;
+    RU_start_spec : start_spec;
+    RU_commit_spec : commit_spec;
+  }.
+ 
+   Class RU_init := {
+    RU_init_module E (clients : gset socket_address) :
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=>
+      ∃ (res : RU_resources Mdl Σ),
+        ([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗
+        KVS_Init ∗
+        GlobalInv ∗
+        ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
+        ⌜init_kvs_spec⌝ ∗
+        ⌜init_client_proxy_spec⌝ ∗
+        ⌜read_spec⌝ ∗
+        ⌜write_spec⌝ ∗
+        ⌜start_spec⌝ ∗
+        ⌜commit_spec⌝
+     }.
+   
+End RU_Module.

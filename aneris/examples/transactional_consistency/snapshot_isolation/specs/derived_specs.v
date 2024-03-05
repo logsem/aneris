@@ -19,8 +19,8 @@ From aneris.examples.transactional_consistency
      Require Import util_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs
   Require Import
-  time events aux_defs resource_algebras resources specs.
-From aneris.examples.transactional_consistency Require Import user_params.
+  time events aux_defs resources specs.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.instantiation
   Require Import
   snapshot_isolation_api_implementation.

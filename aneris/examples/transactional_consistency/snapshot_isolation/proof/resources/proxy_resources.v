@@ -18,8 +18,8 @@ From aneris.examples.transactional_consistency.snapshot_isolation.proof Require 
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.resources Require Import
   server_resources.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
-  time events resource_algebras.
-From aneris.examples.transactional_consistency Require Import user_params.
+  time events.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 
 Import gen_heap_light.
 

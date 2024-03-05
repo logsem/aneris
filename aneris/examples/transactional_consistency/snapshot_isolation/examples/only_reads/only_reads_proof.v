@@ -19,7 +19,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.instantiation 
      instantiation_of_init.
 From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_proof.
 From iris.algebra Require Import excl.
-From aneris.examples.transactional_consistency Require Import user_params.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.

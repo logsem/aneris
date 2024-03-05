@@ -14,8 +14,8 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency
      Require Import code_api.
 From aneris.examples.transactional_consistency.read_committed.specs
-  Require Import resources aux_defs.
-From aneris.examples.transactional_consistency Require Import user_params.
+  Require Import resources.
+From aneris.examples.transactional_consistency Require Import user_params aux_defs.
 
 Set Default Proof Using "Type".
 
@@ -25,26 +25,28 @@ Section Specification.
 
   Definition write_spec : Prop :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key) (v : SerializableVal),
+      (k : Key) (v : SerializableVal) (vo : option val),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
-      <<< ∀∀ (vo : option val), k ↦{c} vo >>>
+      {{{ k ↦{c} vo }}}
         TC_write c #k v @[ip_of_address sa] E
-      <<<▷ RET #(); k ↦{c} Some v.(SV_val) >>>.
+      {{{ RET #(); k ↦{c} Some v.(SV_val) }}}.
 
   Definition read_spec : Prop :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key) (v : SerializableVal),
+      (k : Key) (v : SerializableVal) (vo : option val),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
-    <<< ∀∀ (V : Vals) (vo : option val), k ↦ₖ V ∗  k ↦{c} vo >>>
+    {{{ k ↦{c} vo }}}
+    <<< ∀∀ (V : Vals), k ↦ₖ V >>>
       TC_read c #k @[ip_of_address sa] E
-    <<<▷∃∃ wo, RET $wo; 
-      k ↦ₖ V  ∗ k ↦{c} vo ∗ 
+    <<<▷ ∃∃ (n : nat), k ↦ₖ V >>>
+    {{{ (wo : option val), RET $wo; 
+      k ↦{c} vo ∗ 
       ((⌜vo = None⌝ ∧ ⌜wo ∈ V⌝) ∨ 
-      (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) >>>.
+      (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) }}}.
 
   Definition start_spec : Prop :=
     ∀ (c : val) (sa : socket_address) (E : coPset),
@@ -100,3 +102,34 @@ Section Specification.
       {{{ RET #(); True }}}.
 
 End Specification.
+
+Section RC_Module.
+  Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api}.
+
+  Class RC_client_toolbox `{!RC_resources Mdl Σ} := {
+    RC_init_kvs_spec : init_kvs_spec ;
+    RC_init_client_proxy_spec : init_client_proxy_spec;
+    RC_read_spec : read_spec ;
+    RC_write_spec : write_spec;
+    RC_start_spec : start_spec;
+    RC_commit_spec : commit_spec;
+  }.
+ 
+   Class RC_init := {
+    RC_init_module E (clients : gset socket_address) :
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=>
+      ∃ (res : RC_resources Mdl Σ),
+        ([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗
+        KVS_Init ∗
+        GlobalInv ∗
+        ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
+        ⌜init_kvs_spec⌝ ∗
+        ⌜init_client_proxy_spec⌝ ∗
+        ⌜read_spec⌝ ∗
+        ⌜write_spec⌝ ∗
+        ⌜start_spec⌝ ∗
+        ⌜commit_spec⌝
+     }.
+   
+End RC_Module.

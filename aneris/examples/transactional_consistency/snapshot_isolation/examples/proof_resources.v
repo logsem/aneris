@@ -1,6 +1,5 @@
 From aneris.aneris_lang Require Import proofmode.
-From aneris.examples.transactional_consistency.snapshot_isolation.specs
-     Require Import specs.
+From aneris.examples.transactional_consistency Require Import resource_algebras.
 From iris.algebra Require Import excl.
 
 Section resources.
