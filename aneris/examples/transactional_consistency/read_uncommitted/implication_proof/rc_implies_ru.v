@@ -55,6 +55,23 @@ Section Implication.
       rewrite insert_singleton.
       iFrame.
   Qed.
+
+  Lemma ownSetCreate (γ : gname) (k : Key) (V : Vals) : 
+    OwnAuthSet γ k V ==∗ 
+    OwnAuthSet γ k V ∗ OwnFragSet γ k V.
+  Proof.
+    iIntros "Hauth".
+    unfold OwnAuthSet, OwnFragSet.
+    iMod (own_update _ _ (● (<[k := V]> {[k := V]}) ⋅ ◯ {[k := V]}) with "Hauth") as "(Hauth & Hfrag)".
+    - apply auth_update_alloc.
+      apply (insert_alloc_local_update _ _ _ V).
+      + by rewrite lookup_singleton.
+      + by rewrite lookup_empty.
+      + by apply gset_local_update.
+    - iModIntro.
+      rewrite insert_singleton.
+      iFrame.
+  Qed.
  
   Global Program Instance RU_resources_instance (γ : gname) `(RC : !RC_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
@@ -84,6 +101,14 @@ Section Implication.
     iExists V''.
     iFrame.
   Qed.
+  Next Obligation.
+    iIntros (γ RC E k V Hsub) "#Hinv [%V' (Hsub & Hkey & Hauth)]".
+    iDestruct (ownSetCreate with "Hauth") as ">(dfg & asd)".
+    iModIntro.
+    iFrame.
+    iExists V'.
+    iFrame.
+  Qed.
 
   Theorem implication_rc_ru : 
     RC_init → RU_init.
@@ -99,12 +124,29 @@ Section Implication.
     {
       by apply auth_auth_valid.
     }
+    iAssert (|==> ([∗ set] k ∈ KVS_keys, own γ (● {[k := ∅]})))%I
+              with "[Halgebra]" as "Halgebra".
+    {
+      clear RC_init_module.
+      iInduction KVS_keys as [|k KVS_keys] "IH" using set_ind_L; first set_solver.
+      (* Search "alloc". *)
+      iMod ("IH" with "Halgebra") as "Halgebra".
+      rewrite big_sepS_insert; last done.
+      rewrite -(big_sepM_gset_to_gmap (λ k c, own γ (● {[k := c]})) KVS_keys ∅).
+      (* Search "big_sepS_". *) 
+      (* iMod (own_update _ _ (● (<[k := ∅]> (gset_to_gmap ∅ KVS_keys)) ⋅ ◯ {[k := ∅]}) with "Halgebra") as "(Halgebra & _)". *)
+      admit.
+    }
     iExists (RU_resources_instance γ Hres).
+    iMod "Halgebra".
     iModIntro.
     simpl.
     iSplitL "Hrc_keys Halgebra".
     {
-      admit.
+      unfold OwnAuthSet.
+      iDestruct (big_sepS_sep with "[$Hrc_keys $Halgebra]") as "Hcombined". 
+      iApply (big_sepS_mono with "[$Hcombined]").
+      auto.
     }
     iSplitL "Hrc_kvs_init"; first done.
     iSplitL "Hrc_inv"; first done.
@@ -115,14 +157,38 @@ Section Implication.
     {
       unfold read_spec.
       iPureIntro.
-      iIntros (c sa E' k Hser) "Hsub' Hk_in Hconn".
+      iIntros (c sa E' k vo) "Hsub' Hk_in Hconn".
       unfold read_committed.specs.specs.read_spec in Hrc_read.
-      iDestruct (Hrc_read c sa E' k Hser with "Hsub' Hk_in Hconn") as "Hrc_read".
+      iDestruct (Hrc_read c sa E' k vo with "Hsub' Hk_in Hconn") as "Hrc_read".
       iIntros (Φ).
       iDestruct ("Hrc_read" $! Φ) as "#Hrc_read".
       iModIntro.
       simpl.
-      admit.
+      iIntros (E'') "#Hsub' [%V (%Hin & Hloc_key & Hfrag)] Hhyp".
+      iApply ("Hrc_read" $! E'' with "[$Hsub'] [$Hloc_key]").
+      iMod "Hhyp".
+      iDestruct ("Hhyp") as "[%V' ([%V'' (%Hsub'' & Hmem_key & Hauth)] & Hhyp)]".
+      iModIntro.
+      iExists V''.
+      iFrame.
+      iNext.
+      iIntros "Hmem_key".
+      iMod ("Hhyp" with "[Hmem_key Hauth]") as "Hhyp".
+      - iExists V''.
+        iFrame "∗".
+        by iPureIntro.
+      - iModIntro.
+        iIntros (wo) "(Hloc_key & Heq)".
+        iApply ("Hhyp" $! wo).
+        iFrame.
+        iSplitR.
+        + iExists _.
+          by iPureIntro. 
+        + iDestruct ("Heq") as "[%Heq | %Heq]". 
+          * iLeft.
+            iPureIntro.
+            set_solver.
+          * by iRight.
     }
     iSplitL.
     {

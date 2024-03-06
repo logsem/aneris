@@ -42,7 +42,7 @@ Section Resources.
     Seen_timeless k V :> Timeless (Seen k V);
     Seen_persistent k V :> Persistent (Seen k V);
 
-    (** Properties of points-to connective *)
+    (** Properties *)
     OwnLocalKey_serializable k cst v :
       k ↦{cst} Some v -∗
       k ↦{cst} Some v ∗ ⌜KVS_Serializable v⌝;
@@ -52,6 +52,12 @@ Section Resources.
       GlobalInv ⊢
       Seen k V ∗ k ↦ₖ V' ={E}=∗
       k ↦ₖ V' ∗ ⌜V ⊆ V'⌝;
+
+    Seen_creation E k V :
+      ↑KVS_InvName ⊆ E ->
+      GlobalInv ⊢
+      k ↦ₖ V ={E}=∗
+      k ↦ₖ V ∗ Seen k V;
   }.
 
 End Resources.

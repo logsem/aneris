@@ -85,3 +85,39 @@ Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' 'RET' v ; β 
   (at level 20, x1 closed binder, xn closed binder,
    format "'[hv' '<<<'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '>>>'  '/  ' e  '/' @[ ip ]  Eo  '/' '<<<▷'  '[' 'RET' v ; '/' β ']' '>>>' ']'")
   : bi_scope.
+
+(* Full variant minus post quantification *)
+Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' β '>>>' {{{ z1 .. zn , 'RET' v ; Q } } }" :=
+  (□ ∀ Φ E,
+        ⌜Eo ⊆ E⌝ -∗
+        P -∗ (|={⊤,E}=> ∃ x1, .. (∃ xn,
+                α ∗
+                ▷ (β -∗ |={E,⊤}=> ∀ z1, .. (∀ zn, Q -∗ Φ v%V) .. )) .. ) -∗
+          WP e @[ip] ⊤ {{ Φ }})%I
+  (at level 20, x1 closed binder, xn closed binder, z1 closed binder, zn closed binder,
+   format "'[hv' {{{  '[' P  ']' } } }  '/' '<<<'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '>>>'  '/  ' e  '/' @[ ip ]  Eo  '/' '<<<▷'  '[' '/' β  ']' '>>>'  '/' {{{  '[' z1  ..  zn ,  RET  v ;  '/' Q  ']' } } } ']'")
+  : bi_scope.
+
+(* Full variant minus post quantification and return binders*)
+Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' β '>>>' {{{ 'RET' v ; Q } } }" :=
+  (□ ∀ Φ E,
+        ⌜Eo ⊆ E⌝ -∗
+        P -∗ (|={⊤,E}=> ∃ x1, .. (∃ xn,
+                α ∗
+                ▷ (β -∗ |={E,⊤}=> (Q -∗ Φ v%V))) .. ) -∗
+          WP e @[ip] ⊤ {{ Φ }})%I
+  (at level 20, x1 closed binder, xn closed binder,
+   format "'[hv' {{{  '[' P  ']' } } }  '/' '<<<'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '>>>'  '/  ' e  '/' @[ ip ]  Eo  '/' '<<<▷'  '[' '/' β  ']' '>>>'  '/' {{{  '[' RET  v ;  '/' Q  ']' } } } ']'")
+  : bi_scope.
+
+(* Full variant min return binders *)
+Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. yn , β '>>>' {{{ 'RET' v ; Q } } }" :=
+  (□ ∀ Φ E,
+        ⌜Eo ⊆ E⌝ -∗
+        P -∗ (|={⊤,E}=> ∃ x1, .. (∃ xn,
+                α ∗
+                ▷ ∀ y1, .. (∀ yn, β -∗ |={E,⊤}=> (Q -∗ Φ v%V)) .. ) .. ) -∗
+          WP e @[ip] ⊤ {{ Φ }})%I
+  (at level 20, x1 closed binder, xn closed binder, y1 closed binder, yn closed binder,
+   format "'[hv' {{{  '[' P  ']' } } }  '/' '<<<'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '>>>'  '/  ' e  '/' @[ ip ]  Eo  '/' '<<<▷'  '[' ∃∃  y1  ..  yn ,  '/' β  ']' '>>>'  '/' {{{  '['   RET  v ;  '/' Q  ']' } } } ']'")
+  : bi_scope.

@@ -35,14 +35,14 @@ Section Specification.
 
   Definition read_spec : Prop :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key) (v : SerializableVal) (vo : option val),
+      (k : Key) (vo : option val),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
     {{{ k ↦{c} vo }}}
     <<< ∀∀ (V : Vals), k ↦ₖ V >>>
       TC_read c #k @[ip_of_address sa] E
-    <<<▷ ∃∃ (n : nat), k ↦ₖ V >>>
+    <<<▷ k ↦ₖ V >>>
     {{{ (wo : option val), RET $wo; 
       k ↦{c} vo ∗ 
       ((⌜vo = None⌝ ∧ ⌜wo ∈ V⌝) ∨ 
@@ -52,33 +52,32 @@ Section Specification.
     ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
+      {{{ ConnectionState c sa CanStart }}}
       <<< ∀∀ (m : gmap Key Vals), 
-          ConnectionState c sa CanStart ∗
           [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
         TC_start c @[ip_of_address sa] E
-      <<<▷ RET #(); 
+      <<<▷ ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
+      {{{ RET #(); 
           ConnectionState c sa (Active (dom m)) ∗
-          ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗
-          ([∗ map] k ↦ _ ∈ m, k ↦{c} None) ∗
-          ([∗ map] k ↦ V ∈ m, Seen k V) >>>.
+          ([∗ map] k ↦ _ ∈ m, k ↦{c} None) }}}.
 
   Definition commit_spec : Prop :=
-    ∀ (c : val) (sa : socket_address) (E : coPset),
+    ∀ (c : val) (sa : socket_address) (E : coPset)
+      (mc : gmap Key (option val)) (s : gset Key),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
-      <<< ∀∀ (m : gmap Key Vals) (mc : gmap Key (option val)) 
-          (s : gset Key), 
-          ConnectionState c sa (Active s) ∗
-          ⌜dom m = dom mc⌝ ∗ ⌜dom mc = s⌝ ∗
-          ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗
-          ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) >>>
+      {{{ ConnectionState c sa (Active s) ∗
+          ⌜dom mc = s⌝ ∗ ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) }}}
+      <<< ∀∀ (m : gmap Key Vals), 
+          ⌜dom m = s⌝ ∗ ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
         TC_commit c @[ip_of_address sa] E
-      <<<▷∃∃ b, RET #b; 
-          ConnectionState c sa CanStart ∗
+      <<<▷∃∃ (b : bool), 
           (** Transaction has been commited. *)
-          ((⌜b = true⌝ ∗ ([∗ map] k↦ V;vo ∈ m; mc, k ↦ₖ (V ∪ {[vo]}) ∗ Seen k (V ∪ {[vo]}))) ∨
+          ((⌜b = true⌝ ∗ ([∗ map] k↦ V;vo ∈ m; mc, k ↦ₖ (V ∪ {[vo]}))) ∨
           (** Transaction has been aborted. *)
-          (⌜b = false⌝ ∗ [∗ map] k ↦ V ∈ m, k ↦ₖ V ∗ Seen k V)) >>>.
+          (⌜b = false⌝ ∗ [∗ map] k ↦ V ∈ m, k ↦ₖ V)) >>>
+      {{{ RET #b; 
+          ConnectionState c sa CanStart }}}.
 
   Definition init_client_proxy_spec : Prop :=
     ∀ (sa : socket_address),
