@@ -120,26 +120,32 @@ Section Implication.
     iMod (RC_init_module E cli Hsub) as 
       "[%Hres (Hrc_keys & Hrc_kvs_init & Hrc_inv & Hrc_conn & Hrc_init_kvs
        & Hrc_init_cli & %Hrc_read & %Hrc_write & %Hrc_start & %Hrc_com)]".
-    iMod (own_alloc (● (∅ : gmapUR Key (gsetUR (option val))))) as (γ) "Halgebra". 
+    iMod (own_alloc (● (gset_to_gmap ∅ KVS_keys : gmap Key Vals))) as (γ) "Halgebra". 
     {
-      by apply auth_auth_valid.
+      apply auth_auth_valid.
+      clear RC_init_module.
+      induction KVS_keys as [|x X Hnotin IH] using set_ind_L; first done.
+      rewrite gset_to_gmap_union_singleton.
+      by apply insert_valid.
     }
     iAssert (|==> ([∗ set] k ∈ KVS_keys, own γ (● {[k := ∅]})))%I
               with "[Halgebra]" as "Halgebra".
     {
       clear RC_init_module.
       iInduction KVS_keys as [|k KVS_keys] "IH" using set_ind_L; first set_solver.
-      (* Search "alloc". *)
-      iMod ("IH" with "Halgebra") as "Halgebra".
       rewrite big_sepS_insert; last done.
       rewrite -(big_sepM_gset_to_gmap (λ k c, own γ (● {[k := c]})) KVS_keys ∅).
-      (* Search "big_sepS_". *) 
-      (* iMod (own_update _ _ (● (<[k := ∅]> (gset_to_gmap ∅ KVS_keys)) ⋅ ◯ {[k := ∅]}) with "Halgebra") as "(Halgebra & _)". *)
-      admit.
+      rewrite gset_to_gmap_union_singleton.
+      iMod (own_update _ _ (● (gset_to_gmap ∅ KVS_keys) ⋅ ● {[k := ∅]})
+               with "Halgebra") as "(Halgebra & Hkey)".
+      - admit.
+      - iMod ("IH" with "Halgebra") as "Halgebra".
+        iModIntro.
+        iFrame.
     }
-    iExists (RU_resources_instance γ Hres).
     iMod "Halgebra".
-    iModIntro.
+    iModIntro. 
+    iExists (RU_resources_instance γ Hres).
     simpl.
     iSplitL "Hrc_keys Halgebra".
     {
