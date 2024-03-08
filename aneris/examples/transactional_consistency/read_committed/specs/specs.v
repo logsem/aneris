@@ -45,7 +45,7 @@ Section Specification.
     <<<▷ k ↦ₖ V >>>
     {{{ (wo : option val), RET $wo; 
       k ↦{c} vo ∗ 
-      ((⌜vo = None⌝ ∧ ⌜wo ∈ V⌝) ∨ 
+      ((⌜vo = None⌝ ∧ ⌜wo ∈ V ∨ wo = None⌝) ∨ 
       (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) }}}.
 
   Definition start_spec : Prop :=

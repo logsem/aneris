@@ -96,9 +96,8 @@ Section Implication.
   Global Program Instance RU_resources_instance (γA γF : gname) `(RC : !RC_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
       GlobalInv := RC.(read_committed.specs.resources.GlobalInv) ∗ inv KVS_InvName (OwnInv γA γF);
-      OwnMemKey k V := (∃ (V' : Vals), ⌜V' ⊆ V⌝ ∗ 
-                        RC.(read_committed.specs.resources.OwnMemKey) k V' ∗ OwnAuthSet γA k V)%I;
-      OwnLocalKey k c vo := (∃ (V : Vals), ⌜vo ∈ V⌝ ∗ 
+      OwnMemKey k V := (∃ (V' : Vals), ⌜V' ⊆ V⌝ ∗ RC.(read_committed.specs.resources.OwnMemKey) k V' ∗ OwnAuthSet γA k V)%I;
+      OwnLocalKey k c vo := (∃ (V : Vals), ⌜vo ∈ V ∨ vo = None⌝ ∗ 
                             RC.(read_committed.specs.resources.OwnLocalKey) k c vo ∗ OwnFragSet γF k {[vo]})%I;
       ConnectionState c s sa := RC.(read_committed.specs.resources.ConnectionState) c s sa;
       IsConnected c sa := RC.(read_committed.specs.resources.IsConnected) c sa;
@@ -178,8 +177,7 @@ Section Implication.
     iSplitL "Hrc_init_kvs"; first done.
     iSplitL "Hrc_init_cli"; first done.
     iSplitL.
-    {
-      unfold read_spec.
+    { unfold read_spec.
       iPureIntro.
       iIntros (c sa E' k vo) "Hsub' Hk_in Hconn".
       unfold read_committed.specs.specs.read_spec in Hrc_read.
@@ -220,6 +218,67 @@ Section Implication.
     }
     iSplitL.
     {
+      unfold start_spec.
+      iPureIntro.
+      iIntros (c sa E') "#Hsub' Hconn".
+      unfold read_committed.specs.specs.start_spec in Hrc_start.
+      iDestruct (Hrc_start c sa E' with "Hsub' Hconn") as "Hrc_start".
+      iIntros (Φ).
+      iDestruct ("Hrc_start" $! Φ) as "#Hrc_start".
+      iModIntro.
+      simpl.
+      iIntros (E'') "#Hsub'' Hconn Hhyp".
+      iApply ("Hrc_start" $! E'' with "[$Hsub''] [$Hconn]").
+      iMod "Hhyp".
+      iDestruct ("Hhyp") as "[%m (Hres & Hhyp)]".
+      iModIntro.
+      (* iExists _. *)
+      (* Search "big_sepM_". *)
+      (* iDestruct (big_sepM_sep with "[Hres]") as "(Hres1 & Hres2)". *)
+      iDestruct (big_sepM_mono 
+        (λ k V, ∃ V' : Vals, ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' ∗ OwnAuthSet γA k V)%I
+        (λ k V, (∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V') ∗ (OwnAuthSet γA k V))%I 
+        with "[$Hres]") as "Hres".
+      - iIntros (k V Hsome) "[%V' (Hsub & Hkey & Hauth)]".
+        iFrame.
+        iExists _.
+        iFrame.
+      - rewrite big_sepM_sep.
+        iDestruct "Hres" as "(Hkeys & Hauths)".
+        (* iInduction m as [|k V m H_lookup] "IH" using map_ind.
+        + iExists ∅.
+          do 6 rewrite big_sepM_empty.
+          iFrame.
+        +
+
+        iExists _.
+        iSplitL "Hkeys".
+        + iApply big_sepM_intro.
+
+        
+        Search "big_sepM_dom".
+        +
+
+      Search "big_sepM_mono".
+      iFrame.
+      iNext.
+      iIntros "Hmem_key".
+      iMod ("Hhyp" with "[Hmem_key Hauth]") as "Hhyp".
+      - iExists V''.
+        iFrame "∗".
+        by iPureIntro.
+      - iModIntro.
+        iIntros (wo) "(Hloc_key & Heq)".
+        iApply ("Hhyp" $! wo).
+        iFrame.
+        iSplitR.
+        + iExists _.
+          by iPureIntro. 
+        + iDestruct ("Heq") as "[%Heq | %Heq]". 
+          * iLeft.
+            iPureIntro.
+            set_solver.
+          * by iRight. *)
       admit.
     }
     admit.
