@@ -22,91 +22,115 @@ From aneris.examples.transactional_consistency Require Import resource_algebras 
 Section Implication.
   Context `{!anerisG Mdl Σ, !KVSG Σ, !User_params, !KVS_transaction_api}.
 
-  Definition OwnAuthSet (γ : gname) (k : Key) (V : Vals) : iProp Σ := own γ (● {[k := V]}).
-  Definition OwnFragSet (γ : gname) (k : Key) (V : Vals) : iProp Σ := own γ (◯ {[k := V]}).
+  Definition OwnAuthSet (γA : gname) (k : Key) (V : Vals) : iProp Σ := ghost_map_elem γA k (DfracOwn 1%Qp) V.
+  Definition OwnFragSet (γF : gname) (k : Key) (V : Vals) : iProp Σ := own γF (◯ {[k := V]}).
+  Definition OwnInv (γA γF: gname) : iProp Σ := ∃ (m : gmap Key Vals), ghost_map_auth γA (1%Qp) m ∗ own γF (● m).
 
-  Lemma ownSetInclusion (γ : gname) (k : Key) (V V' : Vals) : 
-    OwnAuthSet γ k V -∗ 
-    OwnFragSet γ k V' -∗ 
-    OwnAuthSet γ k V ∗ OwnFragSet γ k V' ∗ ⌜V' ⊆ V⌝.
+  Lemma ownSetInclusion (γA γF: gname) (k : Key) (V V' : Vals) : 
+    OwnInv γA γF -∗
+    OwnAuthSet γA k V -∗ 
+    OwnFragSet γF k V' -∗ 
+    OwnInv γA γF ∗ OwnAuthSet γA k V ∗ OwnFragSet γF k V' ∗ ⌜V' ⊆ V⌝.
   Proof.
-    iIntros "Hauth Hfrag".
+    iIntros "[%m (Hinv_1 & Hinv_2)] Hauth Hfrag".
     unfold OwnAuthSet, OwnFragSet.
-    iDestruct (own_valid_2 with "Hauth Hfrag") as %[Hord _]%auth_both_valid_discrete.
+    iPoseProof (ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hlook_up". 
+    iDestruct (own_valid_2 with "Hinv_2 Hfrag") as %[Hord _]%auth_both_valid_discrete.
+    rewrite singleton_included_l in Hord.
+    destruct Hord as [V'' (<- & Hord)].
+    rewrite Hlook_up in Hord.
     iFrame.
-    iPureIntro.
-    apply (singleton_included k V' V) in Hord as [Hcase1 | Hcase2]; set_solver.
+    iSplitL.
+    - unfold OwnInv.
+      iExists m. 
+      iFrame.
+    - iPureIntro.
+      rewrite Some_included_total in Hord.
+      set_solver.
   Qed.
 
-  Lemma ownSetAdd (γ : gname) (k : Key) (o : option val) (V : Vals) : 
-    OwnAuthSet γ k V ==∗ 
-    OwnAuthSet γ k (V ∪ {[o]}) ∗ OwnFragSet γ k (V ∪ {[o]}).
+  Lemma ownSetAdd (γA γF: gname) (k : Key) (o : option val) (V : Vals) : 
+    OwnInv γA γF ∗ OwnAuthSet γA k V ==∗ 
+    OwnInv γA γF ∗ OwnAuthSet γA k (V ∪ {[o]}) ∗ OwnFragSet γF k (V ∪ {[o]}).
   Proof.
-    iIntros "Hauth".
-    unfold OwnAuthSet, OwnFragSet.
-    iMod (own_update _ _ (● (<[k:=(V ∪ {[o]})]> {[k := V]}) ⋅ ◯ {[k := V ∪ {[o]}]}) with "Hauth") as "(Hauth & Hfrag)".
+    iIntros "([%m (Hinv_1 & Hinv_2)] & Hauth)".
+    iPoseProof (ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hsome".
+    unfold OwnInv, OwnAuthSet, OwnFragSet.
+    iMod (ghost_map_update (V ∪ {[o]}) with "[$Hinv_1] [$Hauth]") 
+      as "(Hinv_1 & Hauth)".
+    iMod (own_update _ _ (● (<[k:=(V ∪ {[o]})]> m) ⋅ ◯ {[k := V ∪ {[o]}]}) with "Hinv_2") 
+      as "(Hinv_2 & Hfrag)".
     - apply auth_update_alloc.
       apply (insert_alloc_local_update _ _ _ V).
-      + by rewrite lookup_singleton.
+      + done.
       + by rewrite lookup_empty.
       + apply gset_local_update.
         set_solver.
     - iModIntro.
-      rewrite insert_singleton.
+      iFrame.
+      iExists _.
       iFrame.
   Qed.
 
-  Lemma ownSetCreate (γ : gname) (k : Key) (V : Vals) : 
-    OwnAuthSet γ k V ==∗ 
-    OwnAuthSet γ k V ∗ OwnFragSet γ k V.
+  Lemma ownSetCreate (γA γF: gname) (k : Key) (V : Vals) : 
+    OwnInv γA γF ∗ OwnAuthSet γA k V ==∗ 
+    OwnInv γA γF ∗ OwnAuthSet γA k V ∗ OwnFragSet γF k V.
   Proof.
-    iIntros "Hauth".
+    iIntros "([%m (Hinv_1 & Hinv_2)] & Hauth)".
+    iPoseProof (ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hsome".
     unfold OwnAuthSet, OwnFragSet.
-    iMod (own_update _ _ (● (<[k := V]> {[k := V]}) ⋅ ◯ {[k := V]}) with "Hauth") as "(Hauth & Hfrag)".
+     iMod (ghost_map_update V with "[$Hinv_1] [$Hauth]") 
+      as "(Hinv_1 & Hauth)".
+    iMod (own_update _ _ (● (<[k := V]> m) ⋅ ◯ {[k := V]}) with "Hinv_2") as "(Hinv_2 & Hfrag)".
     - apply auth_update_alloc.
       apply (insert_alloc_local_update _ _ _ V).
-      + by rewrite lookup_singleton.
+      + done.
       + by rewrite lookup_empty.
       + by apply gset_local_update.
     - iModIntro.
-      rewrite insert_singleton.
+      iFrame.
+      iExists _.
       iFrame.
   Qed.
- 
-  Global Program Instance RU_resources_instance (γ : gname) `(RC : !RC_resources Mdl Σ) : RU_resources Mdl Σ :=
+
+  Global Program Instance RU_resources_instance (γA γF : gname) `(RC : !RC_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
-      GlobalInv := RC.(read_committed.specs.resources.GlobalInv);
+      GlobalInv := RC.(read_committed.specs.resources.GlobalInv) ∗ inv KVS_InvName (OwnInv γA γF);
       OwnMemKey k V := (∃ (V' : Vals), ⌜V' ⊆ V⌝ ∗ 
-                        RC.(read_committed.specs.resources.OwnMemKey) k V' ∗ OwnAuthSet γ k V)%I;
+                        RC.(read_committed.specs.resources.OwnMemKey) k V' ∗ OwnAuthSet γA k V)%I;
       OwnLocalKey k c vo := (∃ (V : Vals), ⌜vo ∈ V⌝ ∗ 
-                            RC.(read_committed.specs.resources.OwnLocalKey) k c vo ∗ OwnFragSet γ k {[vo]})%I;
+                            RC.(read_committed.specs.resources.OwnLocalKey) k c vo ∗ OwnFragSet γF k {[vo]})%I;
       ConnectionState c s sa := RC.(read_committed.specs.resources.ConnectionState) c s sa;
       IsConnected c sa := RC.(read_committed.specs.resources.IsConnected) c sa;
       KVS_ru := RC.(read_committed.specs.resources.KVS_rc);
       KVS_Init := RC.(read_committed.specs.resources.KVS_Init);
       KVS_ClientCanConnect sa := RC.(read_committed.specs.resources.KVS_ClientCanConnect) sa;
-      Seen k V := OwnFragSet γ k V;
+      Seen k V := OwnFragSet γF k V;
     |}.
   Next Obligation.
-    iIntros (γ RC k cst v) "[%V (%Hsub & Hkey & Hfrag)]". 
+    iIntros (_ γ RC k cst v) "[%V (%Hsub & Hkey & Hfrag)]". 
     iDestruct (RC.(read_committed.specs.resources.OwnLocalKey_serializable) with "Hkey") as "(Hkey & Hser)".
     iFrame.
     by iExists V.
   Qed.
   Next Obligation.
-    iIntros (γ RC E k V V' Hsub) "#Hinv (Hfrag & [%V'' (Hsub' & Hkey & Hauth)])".
-    iDestruct (ownSetInclusion with "Hauth Hfrag") as "(Hauth' & Hfrag' & Hsub'')".
+    iIntros (γA γF RC E k V V' Hsub) "#(_ & Hinv) (Hfrag & [%V'' (Hsub' & Hkey & Hauth)])".
+    iInv KVS_InvName as ">Hinv_res" "Hinv_close".
+    iDestruct (ownSetInclusion with "[$Hinv_res] [$Hauth] [$Hfrag]") as "(Hinv_res & Hauth' & Hfrag' & Hsub'')".
+    iMod ("Hinv_close" with "[Hinv_res]") as "_"; first done.
     iModIntro.
     iFrame.
-    iExists V''.
+    iExists _.
     iFrame.
   Qed.
   Next Obligation.
-    iIntros (γ RC E k V Hsub) "#Hinv [%V' (Hsub & Hkey & Hauth)]".
-    iDestruct (ownSetCreate with "Hauth") as ">(dfg & asd)".
+    iIntros (γA γF RC E k V Hsub) "#(_ & Hinv) [%V'' (Hsub' & Hkey & Hauth)]".
+    iInv KVS_InvName as ">Hinv_res" "Hinv_close".
+    iDestruct (ownSetCreate with "[$Hinv_res $Hauth]") as ">(Hinv_res & Hauth & Hfrag)". 
+    iMod ("Hinv_close" with "[Hinv_res]") as "_"; first done.
     iModIntro.
     iFrame.
-    iExists V'.
+    iExists _.
     iFrame.
   Qed.
 
@@ -120,42 +144,36 @@ Section Implication.
     iMod (RC_init_module E cli Hsub) as 
       "[%Hres (Hrc_keys & Hrc_kvs_init & Hrc_inv & Hrc_conn & Hrc_init_kvs
        & Hrc_init_cli & %Hrc_read & %Hrc_write & %Hrc_start & %Hrc_com)]".
-    iMod (own_alloc (● (gset_to_gmap ∅ KVS_keys : gmap Key Vals))) as (γ) "Halgebra". 
+    iMod (own_alloc (● (gset_to_gmap ∅ KVS_keys : gmap Key Vals))) as (γF) "Hauth_map". 
     {
       apply auth_auth_valid.
       clear RC_init_module.
       induction KVS_keys as [|x X Hnotin IH] using set_ind_L; first done.
       rewrite gset_to_gmap_union_singleton.
-      by apply insert_valid.
+      apply insert_valid; done.
     }
-    iAssert (|==> ([∗ set] k ∈ KVS_keys, own γ (● {[k := ∅]})))%I
-              with "[Halgebra]" as "Halgebra".
+    iDestruct (ghost_map_alloc (gset_to_gmap ∅ KVS_keys : gmap Key Vals)) as ">[%γA (Hghost_map & Hghost_elems)]".
+    rewrite (big_sepM_gset_to_gmap (λ k v, ghost_map_elem γA k _ v) KVS_keys ∅).
+    iMod (inv_alloc KVS_InvName E (OwnInv γA γF) with "[Hauth_map Hghost_map]") as "#Hinv".
     {
-      clear RC_init_module.
-      iInduction KVS_keys as [|k KVS_keys] "IH" using set_ind_L; first set_solver.
-      rewrite big_sepS_insert; last done.
-      rewrite -(big_sepM_gset_to_gmap (λ k c, own γ (● {[k := c]})) KVS_keys ∅).
-      rewrite gset_to_gmap_union_singleton.
-      iMod (own_update _ _ (● (gset_to_gmap ∅ KVS_keys) ⋅ ● {[k := ∅]})
-               with "Halgebra") as "(Halgebra & Hkey)".
-      - admit.
-      - iMod ("IH" with "Halgebra") as "Halgebra".
-        iModIntro.
-        iFrame.
+      iNext.
+      iExists _.
+      iFrame. 
     }
-    iMod "Halgebra".
     iModIntro. 
-    iExists (RU_resources_instance γ Hres).
+    iExists (RU_resources_instance γA γF Hres).
     simpl.
-    iSplitL "Hrc_keys Halgebra".
+    iSplitL "Hrc_keys Hghost_elems".
     {
       unfold OwnAuthSet.
-      iDestruct (big_sepS_sep with "[$Hrc_keys $Halgebra]") as "Hcombined". 
+      iDestruct (big_sepS_sep with "[$Hrc_keys $Hghost_elems]") as "Hcombined". 
       iApply (big_sepS_mono with "[$Hcombined]").
-      auto.
+      iIntros (k Hk_in) "(Hk_mem & Hk_elem)".
+      iExists ∅.
+      by iFrame.
     }
     iSplitL "Hrc_kvs_init"; first done.
-    iSplitL "Hrc_inv"; first done.
+    iSplitL "Hrc_inv"; first iFrame "#∗".
     iSplitL "Hrc_conn"; first done.
     iSplitL "Hrc_init_kvs"; first done.
     iSplitL "Hrc_init_cli"; first done.
@@ -198,12 +216,10 @@ Section Implication.
     }
     iSplitL.
     {
-      unfold read_spec.
       admit.
     }
     iSplitL.
     {
-      unfold read_spec.
       admit.
     }
     admit.

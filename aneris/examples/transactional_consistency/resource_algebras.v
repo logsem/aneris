@@ -39,7 +39,8 @@ Class IDBG Σ :=
     IDBG_lockG :> lockG Σ;
 
     (** Implication Encodings *)
-    IDBG_Encoding :> inG Σ (authR (gmapUR Key (gsetUR (option val))));
+    IDBG_Encoding1 :> inG Σ (authR (gmapUR Key (gsetUR (option val))));
+    IDBG_Encoding2 :> ghost_mapG Σ Key (gset (option val));
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -59,6 +60,7 @@ Definition KVSΣ : gFunctors :=
      GFunctor (exclR unitO);
      GFunctor (authUR (gsetUR nat));
      GFunctor (authR (gmapUR Key (gsetUR (option val))));
+     ghost_mapΣ Key (gset (option val));
      mono_natΣ;
      ras.SpecChanΣ;
      lockΣ].
