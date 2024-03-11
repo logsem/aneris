@@ -71,6 +71,6 @@ Next Obligation.
   by apply Nat2Z.inj in Ht; subst.
 Qed.
 
-Definition write_eventO := leibnizO write_event.
+Canonical Structure write_eventO := leibnizO write_event.
 Definition whist := list write_eventO.
 

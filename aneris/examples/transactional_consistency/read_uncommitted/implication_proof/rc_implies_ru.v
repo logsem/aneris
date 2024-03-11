@@ -10,7 +10,7 @@ From aneris.aneris_lang.lib.serialization
   Require Import serialization_proof.
 From aneris.examples.reliable_communication.spec
      Require Import ras.
-From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
+From aneris.aneris_lang.program_logic Require Import lightweight_atomic aneris_weakestpre.
 From aneris.examples.transactional_consistency
      Require Import code_api.
 From aneris.examples.transactional_consistency.read_committed.specs
@@ -142,7 +142,7 @@ Section Implication.
     iIntros (E cli Hsub).
     iMod (RC_init_module E cli Hsub) as 
       "[%Hres (Hrc_keys & Hrc_kvs_init & Hrc_inv & Hrc_conn & Hrc_init_kvs
-       & Hrc_init_cli & %Hrc_read & %Hrc_write & %Hrc_start & %Hrc_com)]".
+       & Hrc_init_cli & Hrc_read & Hrc_write & Hrc_start & Hrc_com)]".
     iMod (own_alloc (● (gset_to_gmap ∅ KVS_keys : gmap Key Vals))) as (γF) "Hauth_map". 
     {
       apply auth_auth_valid.
@@ -176,12 +176,11 @@ Section Implication.
     iSplitL "Hrc_conn"; first done.
     iSplitL "Hrc_init_kvs"; first done.
     iSplitL "Hrc_init_cli"; first done.
-    iSplitL.
-    { unfold read_spec.
-      iPureIntro.
+    iSplitL "Hrc_read".
+    { 
+      unfold read_spec, read_committed.specs.specs.read_spec.
       iIntros (c sa E' k vo) "Hsub' Hk_in Hconn".
-      unfold read_committed.specs.specs.read_spec in Hrc_read.
-      iDestruct (Hrc_read c sa E' k vo with "Hsub' Hk_in Hconn") as "Hrc_read".
+      iDestruct ("Hrc_read" $! c sa E' k vo with "Hsub' Hk_in Hconn") as "Hrc_read".
       iIntros (Φ).
       iDestruct ("Hrc_read" $! Φ) as "#Hrc_read".
       iModIntro.
@@ -212,13 +211,87 @@ Section Implication.
             set_solver.
           * by iRight.
     }
-    iSplitL.
+    iSplitL "Hrc_write".
     {
+      unfold write_spec, read_committed.specs.specs.write_spec.
+      iIntros (c sa E' k v vo) "%Hsub' Hk_in Hconn".
+      iDestruct ("Hrc_write" $! c sa ⊤ k v vo _ with "Hk_in Hconn") as "Hrc_write".
+      iIntros (Φ).
+      iDestruct ("Hrc_write" $! Φ) as "#Hrc_write".
+      iModIntro. 
+      simpl.
+      iIntros (E'') "%Hsub'' [%V (%Hin & Hloc_key & Hfrag)] Hhyp".
+      iDestruct ("Hrc_write" with "[$Hloc_key]") as "Hrc_write'".
+      iApply "Hrc_write'".
+      (* unfold aneris_wp.
+      (* iApply "Hrc_write'".
+       *)
+      iAssert (▷ (read_committed.specs.resources.OwnLocalKey k c (Some v.(SV_val)) -∗ Φ #()))%I as "Hrc_write_hyp".
+      - admit.
+      -  
+        iDestruct ("Hrc_write'" with "[$Hrc_write_hyp]") as "Hgoal".
+        (* Set Printing All. *)
+        iApply "Hgoal".
+
+        iAssert (WP TC_write c #k v @[ip_of_address sa] {{ v, Φ v }})%I  with "[$Hgoal]" as "øæløæl".
+        iFrame.
+        admit.
+        iApply "øæløæl".
+
+
+
+        iApply "Hgoal".
+        (* Unset Printing Coercion. *)
+        Unset Printing Notations.
+
+
+      iApply fupd_aneris_wp.
+      iMod "Hhyp" as "[%V' ([%V'' (%Hsub''' & Hkey_mem & Hauth)] & Hhyp)]".
+      iInv KVS_InvName as ">Hown_inv" "Hclose"; first set_solver.
+      iDestruct (ownSetAdd _ _ _ (Some v.(SV_val)) with "[$Hown_inv $Hauth]") 
+        as ">(Hown_inv & Hauth & Hfrag')".
+      iMod ("Hclose" with "[Hown_inv]"); first done.
+      iDestruct ("Hhyp" with "[Hkey_mem Hauth]") as "Hhyp".
+      - iNext.
+        iExists V''.
+        iFrame.
+        iPureIntro.
+        set_solver.
+      - *)
+(* 
+      iDestruct ("Hrc_write'" with "[]") as "Hrc_writeælk".
+      {
+        admit.
+      }
+      iApply "Hrc_write'".
+      iMod "Hhyp".
+      iDestruct ("Hhyp") as "[%V' ([%V'' (%Hsub'' & Hmem_key & Hauth)] & Hhyp)]".
+      iModIntro.
+      iExists V''.
+      iFrame.
+      iNext.
+      iIntros "Hmem_key".
+      iMod ("Hhyp" with "[Hmem_key Hauth]") as "Hhyp".
+      - iExists V''.
+        iFrame "∗".
+        by iPureIntro.
+      - iModIntro.
+        iIntros (wo) "(Hloc_key & Heq)".
+        iApply ("Hhyp" $! wo).
+        iFrame.
+        iSplitR.
+        + iExists _.
+          by iPureIntro. 
+        + iDestruct ("Heq") as "[%Heq | %Heq]". 
+          * iLeft.
+            iPureIntro.
+            set_solver.
+          * by iRight. *)
       admit.
     }
     iSplitL.
     {
-      unfold start_spec.
+      (* unfold start_spec.
       iPureIntro.
       iIntros (c sa E') "#Hsub' Hconn".
       unfold read_committed.specs.specs.start_spec in Hrc_start.
@@ -244,7 +317,7 @@ Section Implication.
         iExists _.
         iFrame.
       - rewrite big_sepM_sep.
-        iDestruct "Hres" as "(Hkeys & Hauths)".
+        iDestruct "Hres" as "(Hkeys & Hauths)". *)
         (* iInduction m as [|k V m H_lookup] "IH" using map_ind.
         + iExists ∅.
           do 6 rewrite big_sepM_empty.

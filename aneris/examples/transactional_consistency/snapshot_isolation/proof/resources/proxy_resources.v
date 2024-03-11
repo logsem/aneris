@@ -40,7 +40,7 @@ Section Proxy.
     ghost_map_auth γ (1/2)%Qp M.
 
   Definition ownMsnapFull γ : iProp Σ :=
-    ghost_map_auth γ 1%Qp ∅.
+    ghost_map_auth γ 1%Qp (∅ : gmap Key (list write_event)).
 
   Definition client_gnames_token_defined γCst γ1 γ2 γ3 γ4 γ5 : iProp Σ
     := own γCst (Cinr (to_agree (γ1, γ2, γ3, γ4, γ5))).

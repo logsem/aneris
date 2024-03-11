@@ -23,7 +23,7 @@ Section Specification.
   Context `{!anerisG Mdl Σ, !User_params,
             !KVS_transaction_api, !RU_resources Mdl Σ}.
 
-  Definition write_spec : Prop :=
+  Definition write_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
       (k : Key) (v : SerializableVal) (vo : option val),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
@@ -36,7 +36,7 @@ Section Specification.
       {{{ RET #(); 
           k ↦{c} Some v.(SV_val) }}}.
   
-  Definition read_spec : Prop :=
+  Definition read_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
       (k : Key) (vo : option val),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
@@ -51,7 +51,7 @@ Section Specification.
       ((⌜vo = None⌝ ∧ ⌜wo ∈ V ∨ wo = None⌝) ∨ 
       (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) }}}.
     
-    Definition start_spec : Prop :=
+    Definition start_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
@@ -64,7 +64,7 @@ Section Specification.
           ConnectionState c sa (Active (dom m)) ∗
           ([∗ map] k ↦ _ ∈ m, k ↦{c} None) }}}.
 
-  Definition commit_spec : Prop :=
+  Definition commit_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset)
       (mc : gmap Key (option val)) (s : gset Key),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
@@ -78,7 +78,7 @@ Section Specification.
           [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
       {{{ (b : bool), RET #b; emp }}}.
 
-  Definition init_client_proxy_spec : Prop :=
+  Definition init_client_proxy_spec : iProp Σ :=
     ∀ (sa : socket_address),
       {{{ unallocated {[sa]} ∗
           KVS_address ⤇ KVS_ru ∗
@@ -90,7 +90,7 @@ Section Specification.
       {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗
                               IsConnected cstate sa }}}.
 
-  Definition init_kvs_spec : Prop :=
+  Definition init_kvs_spec : iProp Σ :=
     {{{ KVS_address ⤇ KVS_ru ∗ 
         KVS_address ⤳ (∅,∅) ∗
         free_ports (ip_of_address KVS_address) {[port_of_address KVS_address]} ∗
@@ -105,12 +105,12 @@ Section RU_Module.
   Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api}.
 
   Class RU_client_toolbox `{!RU_resources Mdl Σ} := {
-    RU_init_kvs_spec : init_kvs_spec ;
-    RU_init_client_proxy_spec : init_client_proxy_spec;
-    RU_read_spec : read_spec ;
-    RU_write_spec : write_spec;
-    RU_start_spec : start_spec;
-    RU_commit_spec : commit_spec;
+    RU_init_kvs_spec : ⊢ init_kvs_spec ;
+    RU_init_client_proxy_spec : ⊢ init_client_proxy_spec;
+    RU_read_spec : ⊢ read_spec ;
+    RU_write_spec : ⊢ write_spec;
+    RU_start_spec : ⊢ start_spec;
+    RU_commit_spec : ⊢ commit_spec;
   }.
  
    Class RU_init := {
@@ -122,12 +122,12 @@ Section RU_Module.
         KVS_Init ∗
         GlobalInv ∗
         ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
-        ⌜init_kvs_spec⌝ ∗
-        ⌜init_client_proxy_spec⌝ ∗
-        ⌜read_spec⌝ ∗
-        ⌜write_spec⌝ ∗
-        ⌜start_spec⌝ ∗
-        ⌜commit_spec⌝
+        init_kvs_spec ∗
+        init_client_proxy_spec ∗
+        read_spec ∗
+        write_spec ∗
+        start_spec ∗
+        commit_spec
      }.
    
 End RU_Module.
