@@ -133,6 +133,149 @@ Section Implication.
     iExists _.
     iFrame.
   Qed.
+  
+  Lemma rewrite_maps_1 `{RC : !RC_resources Mdl Σ} (m : gmap Key Vals) (γA : gname) :
+    ([∗ map] k↦V ∈ m, ∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' ∗ 
+    OwnAuthSet γA k V) -∗
+    (∃ m', ⌜dom m = dom m'⌝ ∗ ([∗ map] k↦V ∈ m', (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ 
+    read_committed.specs.resources.OwnMemKey k V ∗ OwnAuthSet γA k V'))).
+  Proof.
+    iIntros "Hmem_keys".
+    iInduction m as [|k V m H_lookup] "IH" using map_ind.
+    - iExists ∅.
+      iSplitL; done.
+    - rewrite big_sepM_insert; last done.
+      iDestruct "Hmem_keys" as "([%V' (%Hsub'' & Hmem_k & Hauth_k)] & Hmem_keys)".
+      iDestruct ("IH" with "[$Hmem_keys]") as "[%m' (%Hdom & Hmem_keys)]".
+      iExists (<[k:=V']> m').
+      iSplitR.
+      {
+        iPureIntro.
+        set_solver.
+      }
+      rewrite big_sepM_insert.
+      + 
+        iFrame.
+        iSplitL "Hauth_k".
+        * iExists V.
+          iFrame.
+          iPureIntro.
+          split; first done.
+          apply lookup_insert.
+        * iApply (big_sepM_mono with "[$Hmem_keys]").
+          iIntros (kx x H_lookup') "[%x' (Hsub''' & %H_lookup''' & Hmem_key & Hauth_key)]".
+          iExists x'.
+          iFrame.
+          iPureIntro.
+          destruct (decide (k = kx)) as [-> | Hneq].
+          -- apply elem_of_dom_2 in H_lookup'.
+              rewrite -Hdom in H_lookup'.
+              by rewrite -not_elem_of_dom in H_lookup.
+          -- rewrite lookup_insert_ne; done.
+      + rewrite -not_elem_of_dom.
+        rewrite -not_elem_of_dom in H_lookup.
+        set_solver.
+  Qed.
+
+  Lemma rewrite_maps_2 `{RC : !RC_resources Mdl Σ} (m m' : gmap Key Vals) (γA : gname) :
+    ([∗ map] k↦V ∈ m', ∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ 
+    read_committed.specs.resources.OwnMemKey k V ∗ OwnAuthSet γA k V') -∗
+    (([∗ map] k↦x ∈ m', ∃ V' : Vals, ⌜x ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') ∗ 
+    ([∗ map] k↦x ∈ m', read_committed.specs.resources.OwnMemKey k x)).
+  Proof.
+    iIntros "Hmem_keys".
+    iDestruct (big_sepM_mono 
+    (λ k V, ∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V ∗ OwnAuthSet γA k V')%I
+    (λ k V, (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') ∗ (read_committed.specs.resources.OwnMemKey k V))%I 
+    with "[$Hmem_keys]") as "Hmem_keys".
+    {
+      iIntros (k V Hsome) "[%V' (Hsub & Hlookup & Hkey & Hauth)]".
+      iFrame.
+      iExists V'.
+      iFrame.
+    }
+    rewrite big_sepM_sep.
+    iFrame.
+  Qed.
+
+  Lemma rewrite_maps_3 `{RC : !RC_resources Mdl Σ} (m m' : gmap Key Vals) (γA : gname) :
+    dom m = dom m' → 
+    ([∗ map] k↦V ∈ m', read_committed.specs.resources.OwnMemKey k V) -∗
+    ([∗ map] k↦x ∈ m', ∃ V', ⌜x ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') -∗
+    ([∗ map] k↦V ∈ m, ∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' ∗ 
+    OwnAuthSet γA k V).
+  Proof.
+    generalize dependent m.
+    induction m' as [|k V m' H_lookup IH] using map_ind.
+    - iIntros (m Hdom) "_ _".
+      rewrite dom_empty_L in Hdom.
+      rewrite dom_empty_iff_L in Hdom.
+      by rewrite Hdom.
+    - iIntros (m Hdom) "Hmem_keys Hauth_keys".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hmem_keys" as "(Hmem_key & Hmem_keys)".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hauth_keys" as "([%V' (%Hsub'' & %H_lookup' & Hauth_key)] & Hauth_keys)".
+      assert (k ∈ dom m) as Hin; first by set_solver.
+      rewrite elem_of_dom in Hin.
+      destruct (m !! k) as [V''|] eqn:Heq; last by destruct Hin.
+      rewrite -(insert_delete _ _ _ Heq).
+      rewrite -(insert_delete _ _ _ Heq) in Hdom.
+      assert (dom (delete k m) = dom m') as Hdom'.
+      {
+        do 2 rewrite dom_insert_L in Hdom.
+        rewrite -(delete_notin _ _ H_lookup) in Hdom.
+        rewrite -(delete_notin _ _ H_lookup).
+        set_solver.
+      }
+      iAssert (([∗ map] k0↦y ∈ m', ∃ V'0 : Vals, ⌜y ⊆ V'0⌝ ∗ 
+                ⌜(delete k m) !! k0 = Some V'0⌝ ∗ 
+                OwnAuthSet γA k0 V'0))%I 
+                with "[Hauth_keys]" as "Hauth_keys".
+      {
+        iApply (big_sepM_mono with "[$Hauth_keys]").
+        iIntros (kx x H_lookup'') "[%x' (Hsub''' & %H_lookup''' & Hauth_key)]".
+        iExists x'.
+        iFrame.
+        iPureIntro.
+        destruct (decide (k = kx)) as [-> | Hneq].
+        - apply elem_of_dom_2 in H_lookup''.
+          rewrite -Hdom' in H_lookup''.
+          rewrite dom_delete_L in H_lookup''.
+          set_solver.
+        - rewrite lookup_insert_ne in H_lookup'''; done.
+      }
+      iDestruct (IH _  Hdom' with "[$Hmem_keys] [$Hauth_keys]") as "IH".
+      rewrite big_sepM_insert.
+      + iFrame.
+        iExists V.
+        inversion H_lookup' as [Heq'].
+        iFrame.
+        by iPureIntro.
+      + apply lookup_delete.
+  Qed.
+
+  Lemma rewrite_maps_4 `{RC : !RC_resources Mdl Σ} (c : val) (mc : gmap Key (option val)) (γF : gname) :
+    ([∗ map] k↦vo ∈ mc, ∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ 
+    read_committed.specs.resources.OwnLocalKey k c vo ∗ OwnFragSet γF k V) -∗
+    (([∗ map] k↦vo ∈ mc, read_committed.specs.resources.OwnLocalKey k c vo) ∗ 
+    ([∗ map] k↦vo ∈ mc, ∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ OwnFragSet γF k V)).
+  Proof.
+    iIntros "Hloc_keys".
+    iDestruct (big_sepM_mono 
+    (λ k vo, ∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ read_committed.specs.resources.OwnLocalKey k c vo ∗ OwnFragSet γF k V)%I
+    (λ k vo, (∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ OwnFragSet γF k V) ∗ (read_committed.specs.resources.OwnLocalKey k c vo))%I 
+    with "[$Hloc_keys]") as "Hloc_keys".
+    {
+      iIntros (k vo Hsome) "[%V' (Hdisj & Hkey & Hfrag)]".
+      iFrame.
+      iExists V'.
+      iFrame.
+    }
+    rewrite big_sepM_sep.
+    iDestruct "Hloc_keys" as "(Hloc_keys & Hfrag_keys)".
+    iFrame.
+  Qed.
 
   Theorem implication_rc_ru : 
     RC_init → RU_init.
@@ -251,7 +394,7 @@ Section Implication.
       iPureIntro. 
       set_solver.
     }
-    iSplitL.
+    iSplitL "Hrc_start".
     {
       unfold start_spec, read_committed.specs.specs.start_spec.
       iIntros (c sa E') "%Hsub' Hconn".
@@ -264,121 +407,14 @@ Section Implication.
       iMod "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
       iModIntro.
       simpl.
-      iAssert (∃ m', ⌜dom m = dom m'⌝ ∗ ([∗ map] k↦V ∈ m', 
-              (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ 
-              read_committed.specs.resources.OwnMemKey k V 
-              ∗ OwnAuthSet γA k V')))%I 
-              with "[Hmem_keys]" as "[%m' (%Hdom & Hmem_keys)]".
-      {
-        iInduction m as [|k V m H_lookup] "IH" using map_ind.
-        - iExists ∅.
-          iSplitL; done.
-        - rewrite big_sepM_insert; last done.
-          iDestruct "Hmem_keys" as "([%V' (%Hsub'' & Hmem_k & Hauth_k)] & Hmem_keys)".
-          iDestruct ("IH" with "[$Hmem_keys]") as "[%m' (%Hdom & Hmem_keys)]".
-          iExists (<[k:=V']> m').
-          iSplitR.
-          {
-            iPureIntro.
-            set_solver.
-          }
-          rewrite big_sepM_insert.
-          + 
-            iFrame.
-            iSplitL "Hauth_k".
-            * iExists V.
-              iFrame.
-              iPureIntro.
-              split; first done.
-              apply lookup_insert.
-            * iApply (big_sepM_mono with "[$Hmem_keys]").
-              iIntros (kx x H_lookup') "[%x' (Hsub''' & %H_lookup''' & Hmem_key & Hauth_key)]".
-              iExists x'.
-              iFrame.
-              iPureIntro.
-              destruct (decide (k = kx)) as [-> | Hneq].
-              -- apply elem_of_dom_2 in H_lookup'.
-                 rewrite -Hdom in H_lookup'.
-                 by rewrite -not_elem_of_dom in H_lookup.
-              -- rewrite lookup_insert_ne; done.
-          + rewrite -not_elem_of_dom.
-            rewrite -not_elem_of_dom in H_lookup.
-            set_solver.
-      }
+      iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & Hmem_keys)]".
       iExists m'.
       iFrame.
-      iDestruct (big_sepM_mono 
-      (λ k V, ∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V ∗ OwnAuthSet γA k V')%I
-      (λ k V, (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') ∗ (read_committed.specs.resources.OwnMemKey k V))%I 
-      with "[$Hmem_keys]") as "Hmem_keys".
-      {
-        iIntros (k V Hsome) "[%V' (Hsub & Hlookup & Hkey & Hauth)]".
-        iFrame.
-        iExists V'.
-        iFrame.
-      }
-      rewrite big_sepM_sep.
-      iDestruct "Hmem_keys" as "(Hauth_keys & Hmem_keys)".
+      iDestruct (rewrite_maps_2 with "[$Hmem_keys]") as "(Hauth_keys & Hmem_keys)".
       iFrame.
       iNext.
       iIntros "(Hstate & Hmem_keys & Hloc_keys)".
-      iAssert (([∗ map] k↦V ∈ m, ∃ V' : Vals, ⌜V' ⊆ V⌝ ∗ 
-                read_committed.specs.resources.OwnMemKey k V' ∗ 
-                OwnAuthSet γA k V))%I 
-              with "[Hmem_keys Hauth_keys]" as "Hmem_keys".
-      {
-        iClear "Hinv Hrc_start".
-        iRevert "Hmem_keys Hauth_keys".
-        iStopProof.
-        generalize dependent m.
-        induction m' as [|k V m' H_lookup IH] using map_ind.
-        - iIntros (m Hdom) "_ _ _".
-          rewrite dom_empty_L in Hdom.
-          rewrite dom_empty_iff_L in Hdom.
-          by rewrite Hdom.
-        - iIntros (m Hdom) "_ Hmem_keys Hauth_keys".
-          rewrite big_sepM_insert; last done.
-          iDestruct "Hmem_keys" as "(Hmem_key & Hmem_keys)".
-          rewrite big_sepM_insert; last done.
-          iDestruct "Hauth_keys" as "([%V' (%Hsub'' & %H_lookup' & Hauth_key)] & Hauth_keys)".
-          assert (k ∈ dom m) as Hin; first by set_solver.
-          rewrite elem_of_dom in Hin.
-          destruct (m !! k) as [V''|] eqn:Heq; last by destruct Hin.
-          rewrite -(insert_delete _ _ _ Heq).
-          rewrite -(insert_delete _ _ _ Heq) in Hdom.
-          assert (dom (delete k m) = dom m') as Hdom'.
-          {
-            do 2 rewrite dom_insert_L in Hdom.
-            rewrite -(delete_notin _ _ H_lookup) in Hdom.
-            rewrite -(delete_notin _ _ H_lookup).
-            set_solver.
-          }
-          iAssert (([∗ map] k0↦y ∈ m', ∃ V'0 : Vals, ⌜y ⊆ V'0⌝ ∗ 
-                    ⌜(delete k m) !! k0 = Some V'0⌝ ∗ 
-                    OwnAuthSet γA k0 V'0))%I 
-                   with "[Hauth_keys]" as "Hauth_keys".
-          {
-            iApply (big_sepM_mono with "[$Hauth_keys]").
-            iIntros (kx x H_lookup'') "[%x' (Hsub''' & %H_lookup''' & Hauth_key)]".
-            iExists x'.
-            iFrame.
-            iPureIntro.
-            destruct (decide (k = kx)) as [-> | Hneq].
-            - apply elem_of_dom_2 in H_lookup''.
-              rewrite -Hdom' in H_lookup''.
-              rewrite dom_delete_L in H_lookup''.
-              set_solver.
-            - rewrite lookup_insert_ne in H_lookup'''; done.
-          }
-          iDestruct (IH _  Hdom' with "[//] [$Hmem_keys] [$Hauth_keys]") as "IH".
-          rewrite big_sepM_insert.
-          + iFrame.
-            iExists V.
-            inversion H_lookup' as [Heq'].
-            iFrame.
-            by iPureIntro.
-          + apply lookup_delete.
-      }
+      iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".
       iInv KVS_InvName as ">Hinv_res" "Hinv_close".
       iAssert (|==>(([∗ map] k↦V ∈ m, ∃ V' : Vals, ⌜V' ⊆ V⌝ ∗ 
                 read_committed.specs.resources.OwnMemKey k V' ∗ 
@@ -430,7 +466,77 @@ Section Implication.
       iPureIntro.
       by right.
     }
-    admit.
+    unfold commit_spec, read_committed.specs.specs.commit_spec.
+    iIntros (c sa E') "%Hsub' Hconn".
+    iDestruct ("Hrc_com" $! c sa E' Hsub' with "Hconn") as "Hrc_com".
+    iIntros (Φ).
+    iDestruct ("Hrc_com" $! Φ) as "#Hrc_com".
+    iModIntro.
+    iIntros "Hhyp".
+    iApply "Hrc_com".
+    iMod "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
+    iModIntro.
+    simpl.
+    iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & Hmem_keys)]".
+    iExists s, mc, m'.
+    iDestruct (rewrite_maps_2 with "[$Hmem_keys]") as "(Hauth_keys & Hmem_keys)".
+    iFrame.
+    iDestruct (rewrite_maps_4 with "[$Hloc_keys]") as "(Hloc_keys & Hfrag_keys)".
+    iSplitL "Hloc_keys".
+    {
+      iSplitR; first by iPureIntro.
+      iSplitR.
+      - iPureIntro.
+        set_solver.
+      - iFrame.
+    }
+    iNext.
+    iIntros (b) "(Hstate & Hdisj)".
+    iDestruct "Hdisj" as "[(_ & Hmem_keys) | (_ & Hmem_keys)]".
+    - iAssert (([∗ map] k↦vo ∈ mc, emp)%I) as "Hemp_keys"; first done.
+      assert (∀ k , is_Some (m' !! k) ↔ is_Some (mc !! k)) as Hsome_iff.
+      {
+        intro k.
+        split.
+        all : intro Hsome.
+        by rewrite -elem_of_dom -Hdom -Hdom2 elem_of_dom in Hsome.
+        1 : by rewrite -elem_of_dom Hdom2 Hdom elem_of_dom in Hsome.
+      }
+      iDestruct (big_sepM2_sepM_2 with "[$Hauth_keys] [$Hemp_keys]") as "Hauth_keys"; first done.
+      iDestruct (big_sepM2_sep_2 with "[$Hauth_keys] [$Hmem_keys]") as "Hmem_keys".
+      iAssert (([∗ map] k↦vo ∈ m', emp)%I) as "Hemp_keys'"; first done.
+      iDestruct (big_sepM2_sepM_2 with "[$Hemp_keys'] [$Hfrag_keys]") as "Hfrag_keys"; first done.
+      iDestruct (big_sepM2_sep_2 with "[$Hfrag_keys] [$Hmem_keys]") as "Hmem_keys".
+      iAssert ((|==>([∗ map] k↦V;vo ∈ m';mc,
+                (read_committed.specs.resources.OwnMemKey k V ∗ 
+                ∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') ∗ emp))%I) 
+                 with "[Hmem_keys]" as ">Hmem_keys".
+      {
+        iClear "Hemp_keys Hemp_keys' Hrc_com Hinv" .
+        iStopProof.
+        clear Hdom Hdom1 Hdom2.
+        generalize dependent mc.
+        induction m' as [|k V m' H_lookup IH] using map_ind.
+        - iIntros (mc Hsome_iff) "Hkeys".
+          iModIntro.
+          iDestruct (big_sepM2_empty_r with "Hkeys") as "->".
+          by rewrite big_sepM2_empty.
+        - iIntros (mc Hsome_iff) "Hkeys".
+          
+          admit.
+      }
+      iApply "Hhyp_later".
+      iFrame.
+      rewrite (big_sepM2_sepM _ (λ k vo, emp)%I _ _  Hsome_iff).
+      iDestruct "Hmem_keys" as "(Hmem_keys & _)".
+      rewrite big_sepM_sep.
+      iDestruct "Hmem_keys" as "(Hmem_keys & Hauth_keys)".
+      iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".
+      iFrame.
+    - iApply "Hhyp_later".
+      iFrame.
+      iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".
+      iFrame.
   Admitted.
 
 End Implication.

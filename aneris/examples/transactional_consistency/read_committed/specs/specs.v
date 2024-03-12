@@ -61,8 +61,7 @@ Section Specification.
           ([∗ map] k ↦ _ ∈ m, k ↦{c} None) >>>.
 
   Definition commit_spec : iProp Σ :=
-    ∀ (c : val) (sa : socket_address) (E : coPset)
-      (mc : gmap Key (option val)) (s : gset Key),
+    ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
       <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals), 
