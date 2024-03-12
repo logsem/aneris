@@ -98,7 +98,7 @@ Section Implication.
       GlobalInv := RC.(read_committed.specs.resources.GlobalInv) ∗ inv KVS_InvName (OwnInv γA γF);
       OwnMemKey k V := (∃ (V' : Vals), ⌜V' ⊆ V⌝ ∗ RC.(read_committed.specs.resources.OwnMemKey) k V' ∗ OwnAuthSet γA k V)%I;
       OwnLocalKey k c vo := (∃ (V : Vals), ⌜vo ∈ V ∨ vo = None⌝ ∗ 
-                            RC.(read_committed.specs.resources.OwnLocalKey) k c vo ∗ OwnFragSet γF k {[vo]})%I;
+                             RC.(read_committed.specs.resources.OwnLocalKey) k c vo ∗ OwnFragSet γF k V)%I;
       ConnectionState c s sa := RC.(read_committed.specs.resources.ConnectionState) c s sa;
       IsConnected c sa := RC.(read_committed.specs.resources.IsConnected) c sa;
       KVS_ru := RC.(read_committed.specs.resources.KVS_rc);
@@ -110,7 +110,8 @@ Section Implication.
     iIntros (_ γ RC k cst v) "[%V (%Hsub & Hkey & Hfrag)]". 
     iDestruct (RC.(read_committed.specs.resources.OwnLocalKey_serializable) with "Hkey") as "(Hkey & Hser)".
     iFrame.
-    by iExists V.
+    iExists V.
+    by iFrame.
   Qed.
   Next Obligation.
     iIntros (γA γF RC E k V V' Hsub) "#(_ & Hinv) (Hfrag & [%V'' (Hsub' & Hkey & Hauth)])".
@@ -179,180 +180,255 @@ Section Implication.
     iSplitL "Hrc_read".
     { 
       unfold read_spec, read_committed.specs.specs.read_spec.
-      iIntros (c sa E' k vo) "Hsub' Hk_in Hconn".
-      iDestruct ("Hrc_read" $! c sa E' k vo with "Hsub' Hk_in Hconn") as "Hrc_read".
+      iIntros (c sa E' k) "Hsub' Hk_in Hconn".
+      iDestruct ("Hrc_read" $! c sa E' k with "Hsub' Hk_in Hconn") as "Hrc_read".
       iIntros (Φ).
       iDestruct ("Hrc_read" $! Φ) as "#Hrc_read".
       iModIntro.
-      simpl.
-      iIntros (E'') "#Hsub' [%V (%Hin & Hloc_key & Hfrag)] Hhyp".
-      iApply ("Hrc_read" $! E'' with "[$Hsub'] [$Hloc_key]").
-      iMod "Hhyp".
-      iDestruct ("Hhyp") as "[%V' ([%V'' (%Hsub'' & Hmem_key & Hauth)] & Hhyp)]".
+      iIntros "Hhyp".
+      iApply "Hrc_read".
+      iMod "Hhyp" as "[%vo [%V (([%V' (%H_or_eq & Hloc_key & Hfrag)] & 
+                      [%V'' (%Hsub' & Hmem_key & Hauth)]) & Hhyp_later)]]".
       iModIntro.
-      iExists V''.
-      iFrame.
+      iExists vo, V''.
+      iSplitL "Hloc_key Hmem_key"; first iFrame.
       iNext.
-      iIntros "Hmem_key".
-      iMod ("Hhyp" with "[Hmem_key Hauth]") as "Hhyp".
-      - iExists V''.
-        iFrame "∗".
-        by iPureIntro.
-      - iModIntro.
-        iIntros (wo) "(Hloc_key & Heq)".
-        iApply ("Hhyp" $! wo).
+      iIntros (wo) "(Hloc_key & Hmem_key & Hdisj)".
+      iApply "Hhyp_later".
+      simpl.
+      iSplitL "Hloc_key Hfrag".
+      {
+        iExists V'.
         iFrame.
-        iSplitR.
-        + iExists _.
-          by iPureIntro. 
-        + iDestruct ("Heq") as "[%Heq | %Heq]". 
-          * iLeft.
-            iPureIntro.
-            set_solver.
-          * by iRight.
+        by iPureIntro.
+      }
+      iSplitL "Hmem_key Hauth".
+      {
+        iExists V''.
+        iFrame.
+        by iPureIntro.
+      }
+      iDestruct ("Hdisj") as "[%Heq | %Heq]".
+      {
+        iLeft.
+        iSplit; by set_solver.
+      } 
+      by iRight.
     }
     iSplitL "Hrc_write".
     {
       unfold write_spec, read_committed.specs.specs.write_spec.
-      iIntros (c sa E' k v vo) "%Hsub' Hk_in Hconn".
-      iDestruct ("Hrc_write" $! c sa ⊤ k v vo _ with "Hk_in Hconn") as "Hrc_write".
+      iIntros (c sa E' k v) "%Hsub' Hk_in Hconn".
+      iDestruct ("Hrc_write" $! c sa E' k v Hsub' with "Hk_in Hconn") as "Hrc_write".
       iIntros (Φ).
       iDestruct ("Hrc_write" $! Φ) as "#Hrc_write".
-      iModIntro. 
-      simpl.
-      iIntros (E'') "%Hsub'' [%V (%Hin & Hloc_key & Hfrag)] Hhyp".
-      iDestruct ("Hrc_write" with "[$Hloc_key]") as "Hrc_write'".
-      iApply "Hrc_write'".
-      (* unfold aneris_wp.
-      (* iApply "Hrc_write'".
-       *)
-      iAssert (▷ (read_committed.specs.resources.OwnLocalKey k c (Some v.(SV_val)) -∗ Φ #()))%I as "Hrc_write_hyp".
-      - admit.
-      -  
-        iDestruct ("Hrc_write'" with "[$Hrc_write_hyp]") as "Hgoal".
-        (* Set Printing All. *)
-        iApply "Hgoal".
-
-        iAssert (WP TC_write c #k v @[ip_of_address sa] {{ v, Φ v }})%I  with "[$Hgoal]" as "øæløæl".
-        iFrame.
-        admit.
-        iApply "øæløæl".
-
-
-
-        iApply "Hgoal".
-        (* Unset Printing Coercion. *)
-        Unset Printing Notations.
-
-
-      iApply fupd_aneris_wp.
-      iMod "Hhyp" as "[%V' ([%V'' (%Hsub''' & Hkey_mem & Hauth)] & Hhyp)]".
-      iInv KVS_InvName as ">Hown_inv" "Hclose"; first set_solver.
+      iModIntro.
+      iIntros "Hhyp".
+      iApply "Hrc_write".
+      iMod "Hhyp" as "[%vo [%V (([%V' (%H_or_eq & Hloc_key & Hfrag)] & 
+                      [%V'' (%Hsub'' & Hmem_key & Hauth)]) & Hhyp_later)]]".
+      iModIntro.
+      iExists vo.
+      iSplitL "Hloc_key"; first iFrame.
+      iNext.
+      iIntros "Hloc_key".
+      iInv KVS_InvName as ">Hown_inv" "Hclose".
       iDestruct (ownSetAdd _ _ _ (Some v.(SV_val)) with "[$Hown_inv $Hauth]") 
         as ">(Hown_inv & Hauth & Hfrag')".
       iMod ("Hclose" with "[Hown_inv]"); first done.
-      iDestruct ("Hhyp" with "[Hkey_mem Hauth]") as "Hhyp".
-      - iNext.
-        iExists V''.
-        iFrame.
-        iPureIntro.
-        set_solver.
-      - *)
-(* 
-      iDestruct ("Hrc_write'" with "[]") as "Hrc_writeælk".
+      iApply "Hhyp_later".
+      simpl.
+      iSplitL "Hloc_key Hfrag'".
       {
-        admit.
+        iExists (V ∪ {[Some v.(SV_val)]}).
+        iFrame.
+        iPureIntro. 
+        left.
+        set_solver.
       }
-      iApply "Hrc_write'".
-      iMod "Hhyp".
-      iDestruct ("Hhyp") as "[%V' ([%V'' (%Hsub'' & Hmem_key & Hauth)] & Hhyp)]".
-      iModIntro.
       iExists V''.
       iFrame.
-      iNext.
-      iIntros "Hmem_key".
-      iMod ("Hhyp" with "[Hmem_key Hauth]") as "Hhyp".
-      - iExists V''.
-        iFrame "∗".
-        by iPureIntro.
-      - iModIntro.
-        iIntros (wo) "(Hloc_key & Heq)".
-        iApply ("Hhyp" $! wo).
-        iFrame.
-        iSplitR.
-        + iExists _.
-          by iPureIntro. 
-        + iDestruct ("Heq") as "[%Heq | %Heq]". 
-          * iLeft.
-            iPureIntro.
-            set_solver.
-          * by iRight. *)
-      admit.
+      iPureIntro. 
+      set_solver.
     }
     iSplitL.
     {
-      (* unfold start_spec.
-      iPureIntro.
-      iIntros (c sa E') "#Hsub' Hconn".
-      unfold read_committed.specs.specs.start_spec in Hrc_start.
-      iDestruct (Hrc_start c sa E' with "Hsub' Hconn") as "Hrc_start".
+      unfold start_spec, read_committed.specs.specs.start_spec.
+      iIntros (c sa E') "%Hsub' Hconn".
+      iDestruct ("Hrc_start" $! c sa E' Hsub' with "Hconn") as "Hrc_start".
       iIntros (Φ).
       iDestruct ("Hrc_start" $! Φ) as "#Hrc_start".
       iModIntro.
-      simpl.
-      iIntros (E'') "#Hsub'' Hconn Hhyp".
-      iApply ("Hrc_start" $! E'' with "[$Hsub''] [$Hconn]").
-      iMod "Hhyp".
-      iDestruct ("Hhyp") as "[%m (Hres & Hhyp)]".
+      iIntros "Hhyp".
+      iApply "Hrc_start".
+      iMod "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
       iModIntro.
-      (* iExists _. *)
-      (* Search "big_sepM_". *)
-      (* iDestruct (big_sepM_sep with "[Hres]") as "(Hres1 & Hres2)". *)
-      iDestruct (big_sepM_mono 
-        (λ k V, ∃ V' : Vals, ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' ∗ OwnAuthSet γA k V)%I
-        (λ k V, (∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V') ∗ (OwnAuthSet γA k V))%I 
-        with "[$Hres]") as "Hres".
-      - iIntros (k V Hsome) "[%V' (Hsub & Hkey & Hauth)]".
-        iFrame.
-        iExists _.
-        iFrame.
-      - rewrite big_sepM_sep.
-        iDestruct "Hres" as "(Hkeys & Hauths)". *)
-        (* iInduction m as [|k V m H_lookup] "IH" using map_ind.
-        + iExists ∅.
-          do 6 rewrite big_sepM_empty.
-          iFrame.
-        +
-
-        iExists _.
-        iSplitL "Hkeys".
-        + iApply big_sepM_intro.
-
-        
-        Search "big_sepM_dom".
-        +
-
-      Search "big_sepM_mono".
-      iFrame.
-      iNext.
-      iIntros "Hmem_key".
-      iMod ("Hhyp" with "[Hmem_key Hauth]") as "Hhyp".
-      - iExists V''.
-        iFrame "∗".
-        by iPureIntro.
-      - iModIntro.
-        iIntros (wo) "(Hloc_key & Heq)".
-        iApply ("Hhyp" $! wo).
-        iFrame.
-        iSplitR.
-        + iExists _.
-          by iPureIntro. 
-        + iDestruct ("Heq") as "[%Heq | %Heq]". 
-          * iLeft.
+      simpl.
+      iAssert (∃ m', ⌜dom m = dom m'⌝ ∗ ([∗ map] k↦V ∈ m', 
+              (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ 
+              read_committed.specs.resources.OwnMemKey k V 
+              ∗ OwnAuthSet γA k V')))%I 
+              with "[Hmem_keys]" as "[%m' (%Hdom & Hmem_keys)]".
+      {
+        iInduction m as [|k V m H_lookup] "IH" using map_ind.
+        - iExists ∅.
+          iSplitL; done.
+        - rewrite big_sepM_insert; last done.
+          iDestruct "Hmem_keys" as "([%V' (%Hsub'' & Hmem_k & Hauth_k)] & Hmem_keys)".
+          iDestruct ("IH" with "[$Hmem_keys]") as "[%m' (%Hdom & Hmem_keys)]".
+          iExists (<[k:=V']> m').
+          iSplitR.
+          {
             iPureIntro.
             set_solver.
-          * by iRight. *)
-      admit.
+          }
+          rewrite big_sepM_insert.
+          + 
+            iFrame.
+            iSplitL "Hauth_k".
+            * iExists V.
+              iFrame.
+              iPureIntro.
+              split; first done.
+              apply lookup_insert.
+            * iApply (big_sepM_mono with "[$Hmem_keys]").
+              iIntros (kx x H_lookup') "[%x' (Hsub''' & %H_lookup''' & Hmem_key & Hauth_key)]".
+              iExists x'.
+              iFrame.
+              iPureIntro.
+              destruct (decide (k = kx)) as [-> | Hneq].
+              -- apply elem_of_dom_2 in H_lookup'.
+                 rewrite -Hdom in H_lookup'.
+                 by rewrite -not_elem_of_dom in H_lookup.
+              -- rewrite lookup_insert_ne; done.
+          + rewrite -not_elem_of_dom.
+            rewrite -not_elem_of_dom in H_lookup.
+            set_solver.
+      }
+      iExists m'.
+      iFrame.
+      iDestruct (big_sepM_mono 
+      (λ k V, ∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V ∗ OwnAuthSet γA k V')%I
+      (λ k V, (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') ∗ (read_committed.specs.resources.OwnMemKey k V))%I 
+      with "[$Hmem_keys]") as "Hmem_keys".
+      {
+        iIntros (k V Hsome) "[%V' (Hsub & Hlookup & Hkey & Hauth)]".
+        iFrame.
+        iExists V'.
+        iFrame.
+      }
+      rewrite big_sepM_sep.
+      iDestruct "Hmem_keys" as "(Hauth_keys & Hmem_keys)".
+      iFrame.
+      iNext.
+      iIntros "(Hstate & Hmem_keys & Hloc_keys)".
+      iAssert (([∗ map] k↦V ∈ m, ∃ V' : Vals, ⌜V' ⊆ V⌝ ∗ 
+                read_committed.specs.resources.OwnMemKey k V' ∗ 
+                OwnAuthSet γA k V))%I 
+              with "[Hmem_keys Hauth_keys]" as "Hmem_keys".
+      {
+        iClear "Hinv Hrc_start".
+        iRevert "Hmem_keys Hauth_keys".
+        iStopProof.
+        generalize dependent m.
+        induction m' as [|k V m' H_lookup IH] using map_ind.
+        - iIntros (m Hdom) "_ _ _".
+          rewrite dom_empty_L in Hdom.
+          rewrite dom_empty_iff_L in Hdom.
+          by rewrite Hdom.
+        - iIntros (m Hdom) "_ Hmem_keys Hauth_keys".
+          rewrite big_sepM_insert; last done.
+          iDestruct "Hmem_keys" as "(Hmem_key & Hmem_keys)".
+          rewrite big_sepM_insert; last done.
+          iDestruct "Hauth_keys" as "([%V' (%Hsub'' & %H_lookup' & Hauth_key)] & Hauth_keys)".
+          assert (k ∈ dom m) as Hin; first by set_solver.
+          rewrite elem_of_dom in Hin.
+          destruct (m !! k) as [V''|] eqn:Heq; last by destruct Hin.
+          rewrite -(insert_delete _ _ _ Heq).
+          rewrite -(insert_delete _ _ _ Heq) in Hdom.
+          assert (dom (delete k m) = dom m') as Hdom'.
+          {
+            do 2 rewrite dom_insert_L in Hdom.
+            rewrite -(delete_notin _ _ H_lookup) in Hdom.
+            rewrite -(delete_notin _ _ H_lookup).
+            set_solver.
+          }
+          iAssert (([∗ map] k0↦y ∈ m', ∃ V'0 : Vals, ⌜y ⊆ V'0⌝ ∗ 
+                    ⌜(delete k m) !! k0 = Some V'0⌝ ∗ 
+                    OwnAuthSet γA k0 V'0))%I 
+                   with "[Hauth_keys]" as "Hauth_keys".
+          {
+            iApply (big_sepM_mono with "[$Hauth_keys]").
+            iIntros (kx x H_lookup'') "[%x' (Hsub''' & %H_lookup''' & Hauth_key)]".
+            iExists x'.
+            iFrame.
+            iPureIntro.
+            destruct (decide (k = kx)) as [-> | Hneq].
+            - apply elem_of_dom_2 in H_lookup''.
+              rewrite -Hdom' in H_lookup''.
+              rewrite dom_delete_L in H_lookup''.
+              set_solver.
+            - rewrite lookup_insert_ne in H_lookup'''; done.
+          }
+          iDestruct (IH _  Hdom' with "[//] [$Hmem_keys] [$Hauth_keys]") as "IH".
+          rewrite big_sepM_insert.
+          + iFrame.
+            iExists V.
+            inversion H_lookup' as [Heq'].
+            iFrame.
+            by iPureIntro.
+          + apply lookup_delete.
+      }
+      iInv KVS_InvName as ">Hinv_res" "Hinv_close".
+      iAssert (|==>(([∗ map] k↦V ∈ m, ∃ V' : Vals, ⌜V' ⊆ V⌝ ∗ 
+                read_committed.specs.resources.OwnMemKey k V' ∗ 
+                OwnAuthSet γA k V ∗ OwnFragSet γF k V) ∗ OwnInv γA γF))%I 
+              with "[Hmem_keys Hinv_res]" as ">(Hmem_keys & Hinv_res)".
+      {
+        clear Hdom.
+        iInduction m as [|k V m H_lookup] "IH" using map_ind.
+        - iModIntro.
+          by iFrame.
+        - rewrite big_sepM_insert; last done.
+          iDestruct "Hmem_keys" as "([%V' (%Hsub'' & Hmem_k & Hauth_k)] & Hmem_keys)".
+          iMod ("IH" with "[$Hmem_keys] [$Hinv_res]") as "(Hmem_keys & Hinv_res)".
+          iDestruct (ownSetCreate with "[$Hinv_res $Hauth_k]") as ">(Hinv_res & Hauth_k & Hfrag_k)". 
+          iModIntro.
+          iFrame.
+          rewrite big_sepM_insert; last done.
+          iFrame.
+          iExists V'.
+          iFrame.
+          by iPureIntro.
+      }
+      iMod ("Hinv_close" with "[Hinv_res]") as "_"; first done.
+      iDestruct (big_sepM_mono 
+                (λ k V, ∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' 
+                ∗ OwnAuthSet γA k V ∗ OwnFragSet γF k V)%I
+                (λ k V, (∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' 
+                ∗ OwnAuthSet γA k V)∗ OwnFragSet γF k V)%I
+                with "[$Hmem_keys]") as "Hmem_keys".
+      {
+        iIntros (k V Hsome) "[%V' (Hsub'' & Hmem_key & Hauth_key & Hfra_key)]".
+        iFrame.
+        iExists V'.
+        iFrame.
+      }
+      rewrite big_sepM_sep.
+      iDestruct "Hmem_keys" as "(Hmem_keys & Hfrag_keys)".
+      iApply "Hhyp_later".
+      rewrite Hdom.
+      iFrame.
+      rewrite big_sepM_dom.
+      rewrite -Hdom.
+      rewrite -big_sepM_dom.
+      iDestruct (big_sepM_sep_2 with "[$Hloc_keys] [$Hfrag_keys]") as "Hloc_keys".
+      iApply (big_sepM_mono with "[$Hloc_keys]").
+      iIntros (k V Hsome) "Hkey".
+      iExists V.
+      iFrame.
+      iPureIntro.
+      by right.
     }
     admit.
   Admitted.

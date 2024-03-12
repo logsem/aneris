@@ -25,59 +25,57 @@ Section Specification.
 
   Definition write_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key) (v : SerializableVal) (vo : option val),
+      (k : Key) (v : SerializableVal),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
-      {{{ k ↦{c} vo }}}
-      <<< ∀∀ (V : Vals), k ↦ₖ V >>>
+      <<< ∀∀ (vo : option val) (V : Vals), 
+          k ↦{c} vo ∗ k ↦ₖ V >>>
         TC_write c #k v @[ip_of_address sa] E
-      <<<▷ k ↦ₖ (V ∪ {[Some v.(SV_val)]}) >>>
-      {{{ RET #(); 
-          k ↦{c} Some v.(SV_val) }}}.
+      <<<▷ RET #(); k ↦{c} Some v.(SV_val) ∗ 
+           k ↦ₖ (V ∪ {[Some v.(SV_val)]}) >>>.
   
   Definition read_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key) (vo : option val),
+      (k : Key),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
       IsConnected c sa -∗
-    {{{ k ↦{c} vo }}}
-    <<< ∀∀ (V : Vals), k ↦ₖ V >>>
+    <<< ∀∀ (vo : option val) (V : Vals), 
+        k ↦{c} vo ∗ k ↦ₖ V >>>
       TC_read c #k @[ip_of_address sa] E
-    <<<▷ k ↦ₖ V >>>
-    {{{ (wo : option val), RET $wo; 
-      k ↦{c} vo ∗ 
-      ((⌜vo = None⌝ ∧ ⌜wo ∈ V ∨ wo = None⌝) ∨ 
-      (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) }}}.
+    <<<▷ ∃∃ (wo : option val), RET $wo; 
+        k ↦{c} vo ∗ k ↦ₖ V ∗ 
+        ((⌜vo = None⌝ ∧ ⌜wo ∈ V ∨ wo = None⌝) ∨ 
+        (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝))  >>>.
     
     Definition start_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
-      {{{ ConnectionState c sa CanStart }}}
       <<< ∀∀ (m : gmap Key Vals), 
+          ConnectionState c sa CanStart ∗
           [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
         TC_start c @[ip_of_address sa] E
-      <<<▷ ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
-      {{{ RET #(); 
-          ConnectionState c sa (Active (dom m)) ∗
-          ([∗ map] k ↦ _ ∈ m, k ↦{c} None) }}}.
+      <<<▷ RET #();
+          ConnectionState c sa (Active (dom m)) ∗ 
+          ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗
+          ([∗ map] k ↦ _ ∈ m, k ↦{c} None) >>>.
 
   Definition commit_spec : iProp Σ :=
-    ∀ (c : val) (sa : socket_address) (E : coPset)
-      (mc : gmap Key (option val)) (s : gset Key),
+    ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
-      {{{ ConnectionState c sa (Active s) ∗
-          ⌜dom mc = s⌝ ∗ ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) }}}
-      <<< ∀∀ (m : gmap Key Vals), 
-          ⌜dom m = s⌝ ∗ ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
+      <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals), 
+         ConnectionState c sa (Active s) ∗
+         ⌜s = dom mc⌝ ∗ ⌜dom mc = dom m⌝ ∗
+         ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) ∗
+         ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
         TC_commit c @[ip_of_address sa] E
-      <<<▷ ConnectionState c sa CanStart ∗
-          [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
-      {{{ (b : bool), RET #b; emp }}}.
-
+      <<<▷ ∃∃ (b : bool), RET #b; 
+          ConnectionState c sa CanStart ∗
+          [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>.
+      
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ (sa : socket_address),
       {{{ unallocated {[sa]} ∗
