@@ -508,21 +508,61 @@ Section Implication.
       iDestruct (big_sepM2_sepM_2 with "[$Hemp_keys'] [$Hfrag_keys]") as "Hfrag_keys"; first done.
       iDestruct (big_sepM2_sep_2 with "[$Hfrag_keys] [$Hmem_keys]") as "Hmem_keys".
       iAssert ((|==>([∗ map] k↦V;vo ∈ m';mc,
-                (read_committed.specs.resources.OwnMemKey k V ∗ 
-                ∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V') ∗ emp))%I) 
+                (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V' ∗
+                  (∃ V'', ⌜V'' ⊆ V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V'')) ∗ emp))%I) 
                  with "[Hmem_keys]" as ">Hmem_keys".
       {
         iClear "Hemp_keys Hemp_keys' Hrc_com Hinv" .
         iStopProof.
         clear Hdom Hdom1 Hdom2.
         generalize dependent mc.
-        induction m' as [|k V m' H_lookup IH] using map_ind.
+        induction m' as [|k V m' Hlookup IH] using map_ind.
         - iIntros (mc Hsome_iff) "Hkeys".
           iModIntro.
           iDestruct (big_sepM2_empty_r with "Hkeys") as "->".
           by rewrite big_sepM2_empty.
         - iIntros (mc Hsome_iff) "Hkeys".
-          
+          destruct (Hsome_iff k) as (Hsome_if_1 & Hsome_if_2).
+          rewrite lookup_insert in Hsome_if_1.
+          assert (is_Some (Some V)) as His_some; first done.
+          apply Hsome_if_1 in His_some.
+          destruct (mc !! k) as [ov|] eqn:Hlookup'; last by inversion His_some.
+          rewrite -(insert_delete _ _ _ Hlookup').
+          do 2 rewrite big_sepM2_insert_delete.
+          rewrite delete_idemp.
+          iDestruct "Hkeys" as "(((_ & [%Vk (%Hdisj & Hfrag_k)]) & 
+                    (([%Vk' (%Hsub_k & Hlookup_k_m & Hauth_k)] & _) & Hmem_k)) & Hkeys)".
+          rewrite (delete_notin _ _ Hlookup).
+          iDestruct (IH with "[$Hkeys]") as ">IH".
+          {
+            intro key.
+            split; intro Hsome.
+            - destruct (decide (k = key)) as [-> | Hneq].
+              + rewrite Hlookup in Hsome.
+                by inversion Hsome.
+              + rewrite lookup_delete_ne; last done.
+                apply Hsome_iff.
+                by rewrite lookup_insert_ne.
+            - destruct (decide (k = key)) as [-> | Hneq].
+              + rewrite lookup_delete in Hsome.
+                by inversion Hsome.
+              + rewrite lookup_delete_ne in Hsome; last done.
+                apply Hsome_iff in Hsome.
+                by rewrite lookup_insert_ne in Hsome.
+          }
+          iFrame.
+          assert (Vk ⊆ Vk') as Hsub_temp.
+          {
+            admit.
+          }
+          iModIntro.
+          iSplitL; last done.
+          iExists Vk'.
+          iFrame.
+          iSplitR; first by iPureIntro.
+          iExists (V ∪ {[ov]}).
+          iFrame.
+          iPureIntro.
           admit.
       }
       iApply "Hhyp_later".
