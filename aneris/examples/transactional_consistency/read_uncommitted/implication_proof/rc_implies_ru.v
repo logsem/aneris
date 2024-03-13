@@ -49,7 +49,7 @@ Section Implication.
       set_solver.
   Qed.
 
-  Lemma ownSetAdd (γA γF: gname) (k : Key) (o : option val) (V : Vals) : 
+  Lemma ownSetAdd (γA γF: gname) (k : Key) (o : val) (V : Vals) : 
     OwnInv γA γF ∗ OwnAuthSet γA k V ==∗ 
     OwnInv γA γF ∗ OwnAuthSet γA k (V ∪ {[o]}) ∗ OwnFragSet γF k (V ∪ {[o]}).
   Proof.
@@ -97,7 +97,7 @@ Section Implication.
     {|
       GlobalInv := RC.(read_committed.specs.resources.GlobalInv) ∗ inv KVS_InvName (OwnInv γA γF);
       OwnMemKey k V := (∃ (V' : Vals), ⌜V' ⊆ V⌝ ∗ RC.(read_committed.specs.resources.OwnMemKey) k V' ∗ OwnAuthSet γA k V)%I;
-      OwnLocalKey k c vo := (∃ (V : Vals), ⌜vo ∈ V ∨ vo = None⌝ ∗ 
+      OwnLocalKey k c vo := (∃ (V : Vals), ⌜(∃ v, vo = Some v ∧ v ∈ V) ∨ vo = None⌝ ∗ 
                              RC.(read_committed.specs.resources.OwnLocalKey) k c vo ∗ OwnFragSet γF k V)%I;
       ConnectionState c s sa := RC.(read_committed.specs.resources.ConnectionState) c s sa;
       IsConnected c sa := RC.(read_committed.specs.resources.IsConnected) c sa;
@@ -256,15 +256,15 @@ Section Implication.
   Qed.
 
   Lemma rewrite_maps_4 `{RC : !RC_resources Mdl Σ} (c : val) (mc : gmap Key (option val)) (γF : gname) :
-    ([∗ map] k↦vo ∈ mc, ∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ 
+    ([∗ map] k↦vo ∈ mc, ∃ V, ⌜(∃ v, vo = Some v ∧ v ∈ V) ∨ vo = None⌝ ∗ 
     read_committed.specs.resources.OwnLocalKey k c vo ∗ OwnFragSet γF k V) -∗
     (([∗ map] k↦vo ∈ mc, read_committed.specs.resources.OwnLocalKey k c vo) ∗ 
-    ([∗ map] k↦vo ∈ mc, ∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ OwnFragSet γF k V)).
+    ([∗ map] k↦vo ∈ mc, ∃ V, ⌜(∃ v, vo = Some v ∧ v ∈ V) ∨ vo = None⌝ ∗ OwnFragSet γF k V)).
   Proof.
     iIntros "Hloc_keys".
     iDestruct (big_sepM_mono 
-    (λ k vo, ∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ read_committed.specs.resources.OwnLocalKey k c vo ∗ OwnFragSet γF k V)%I
-    (λ k vo, (∃ V, ⌜vo ∈ V ∨ vo = None⌝ ∗ OwnFragSet γF k V) ∗ (read_committed.specs.resources.OwnLocalKey k c vo))%I 
+    (λ k vo, ∃ V, ⌜(∃ v, vo = Some v ∧ v ∈ V) ∨ vo = None⌝ ∗ read_committed.specs.resources.OwnLocalKey k c vo ∗ OwnFragSet γF k V)%I
+    (λ k vo, (∃ V, ⌜(∃ v, vo = Some v ∧ v ∈ V) ∨ vo = None⌝ ∗ OwnFragSet γF k V) ∗ (read_committed.specs.resources.OwnLocalKey k c vo))%I 
     with "[$Hloc_keys]") as "Hloc_keys".
     {
       iIntros (k vo Hsome) "[%V' (Hdisj & Hkey & Hfrag)]".
@@ -376,14 +376,14 @@ Section Implication.
       iNext.
       iIntros "Hloc_key".
       iInv KVS_InvName as ">Hown_inv" "Hclose".
-      iDestruct (ownSetAdd _ _ _ (Some v.(SV_val)) with "[$Hown_inv $Hauth]") 
+      iDestruct (ownSetAdd _ _ _ (v.(SV_val)) with "[$Hown_inv $Hauth]") 
         as ">(Hown_inv & Hauth & Hfrag')".
       iMod ("Hclose" with "[Hown_inv]"); first done.
       iApply "Hhyp_later".
       simpl.
       iSplitL "Hloc_key Hfrag'".
       {
-        iExists (V ∪ {[Some v.(SV_val)]}).
+        iExists (V ∪ {[v.(SV_val)]}).
         iFrame.
         iPureIntro. 
         left.
@@ -507,21 +507,29 @@ Section Implication.
       iAssert (([∗ map] k↦vo ∈ m', emp)%I) as "Hemp_keys'"; first done.
       iDestruct (big_sepM2_sepM_2 with "[$Hemp_keys'] [$Hfrag_keys]") as "Hfrag_keys"; first done.
       iDestruct (big_sepM2_sep_2 with "[$Hfrag_keys] [$Hmem_keys]") as "Hmem_keys".
-      iAssert ((|==>([∗ map] k↦V;vo ∈ m';mc,
+
+      iInv KVS_InvName as ">Hinv_res" "Hinv_close".
+
+
+      
+    (* iMod ("Hinv_close" with "[Hinv_res]") as "_"; first done. *)
+
+      iAssert ((|==>(([∗ map] k↦V;vo ∈ m';mc,
                 (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V' ∗
-                  (∃ V'', ⌜V'' ⊆ V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V'')) ∗ emp))%I) 
-                 with "[Hmem_keys]" as ">Hmem_keys".
+                (∃ V'', ⌜V'' ⊆ V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V'')) ∗ emp)) ∗ OwnInv γA γF)%I) 
+                 with "[Hmem_keys Hinv_res]" as ">(Hmem_keys & Hinv_res)".
       {
         iClear "Hemp_keys Hemp_keys' Hrc_com Hinv" .
         iStopProof.
         clear Hdom Hdom1 Hdom2.
         generalize dependent mc.
         induction m' as [|k V m' Hlookup IH] using map_ind.
-        - iIntros (mc Hsome_iff) "Hkeys".
+        - iIntros (mc Hsome_iff) "(Hkeys & Hinv_res)".
           iModIntro.
           iDestruct (big_sepM2_empty_r with "Hkeys") as "->".
-          by rewrite big_sepM2_empty.
-        - iIntros (mc Hsome_iff) "Hkeys".
+          iFrame.
+          by do 2 rewrite big_sepM2_empty.
+        - iIntros (mc Hsome_iff) "(Hkeys & Hinv_res)".
           destruct (Hsome_iff k) as (Hsome_if_1 & Hsome_if_2).
           rewrite lookup_insert in Hsome_if_1.
           assert (is_Some (Some V)) as His_some; first done.
@@ -533,7 +541,7 @@ Section Implication.
           iDestruct "Hkeys" as "(((_ & [%Vk (%Hdisj & Hfrag_k)]) & 
                     (([%Vk' (%Hsub_k & Hlookup_k_m & Hauth_k)] & _) & Hmem_k)) & Hkeys)".
           rewrite (delete_notin _ _ Hlookup).
-          iDestruct (IH with "[$Hkeys]") as ">IH".
+          iDestruct (IH with "[$Hkeys $Hinv_res]") as ">(Hkeys & Hinv_res)".
           {
             intro key.
             split; intro Hsome.
@@ -550,29 +558,35 @@ Section Implication.
                 apply Hsome_iff in Hsome.
                 by rewrite lookup_insert_ne in Hsome.
           }
-          iFrame.
-          assert (Vk ⊆ Vk') as Hsub_temp.
-          {
-            admit.
-          }
+          iFrame "Hkeys".
+          iDestruct (ownSetInclusion with "[$Hinv_res] [$Hauth_k] [$Hfrag_k]") as "(Hinv_res & Hauth_k & Hfrag_k & %Hsub'')".
           iModIntro.
+          iFrame.
           iSplitL; last done.
           iExists Vk'.
           iFrame.
           iSplitR; first by iPureIntro.
-          iExists (V ∪ {[ov]}).
+          iExists (commit_event ov V).
           iFrame.
           iPureIntro.
-          admit.
+          destruct Hdisj as [[v (Heq_some & Hin)]|Heq_none].
+          + rewrite Heq_some.
+            simpl.
+            set_solver.
+          + rewrite Heq_none.
+            simpl.
+            set_solver.
       }
+      iMod ("Hinv_close" with "[Hinv_res]") as "_"; first done.
       iApply "Hhyp_later".
       iFrame.
       rewrite (big_sepM2_sepM _ (λ k vo, emp)%I _ _  Hsome_iff).
       iDestruct "Hmem_keys" as "(Hmem_keys & _)".
-      rewrite big_sepM_sep.
+      admit.
+      (* rewrite big_sepM_sep.
       iDestruct "Hmem_keys" as "(Hmem_keys & Hauth_keys)".
       iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".
-      iFrame.
+      iFrame. *)
     - iApply "Hhyp_later".
       iFrame.
       iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".

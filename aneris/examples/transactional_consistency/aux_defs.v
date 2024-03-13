@@ -9,7 +9,7 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency
      Require Import code_api user_params.
 
-Definition Vals : Set := gset (option val).
+Definition Vals : Set := gset val.
 
 Inductive local_state : Type :=
    | CanStart

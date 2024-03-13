@@ -33,7 +33,7 @@ Section Specification.
           k ↦{c} vo ∗ k ↦ₖ V >>>
         TC_write c #k v @[ip_of_address sa] E
       <<<▷ RET #(); k ↦{c} Some v.(SV_val) ∗ 
-           k ↦ₖ (V ∪ {[Some v.(SV_val)]}) >>>.
+           k ↦ₖ (V ∪ {[v.(SV_val)]}) >>>.
   
   Definition read_spec : iProp Σ :=
     ∀ (c : val) (sa : socket_address) (E : coPset) 
@@ -46,7 +46,7 @@ Section Specification.
       TC_read c #k @[ip_of_address sa] E
     <<<▷ ∃∃ (wo : option val), RET $wo; 
         k ↦{c} vo ∗ k ↦ₖ V ∗ 
-        ((⌜vo = None⌝ ∧ ⌜wo ∈ V ∨ wo = None⌝) ∨ 
+        ((⌜vo = None⌝ ∧ ⌜(∃ v, wo = Some v ∧ v ∈ V) ∨ wo = None⌝) ∨ 
         (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝))  >>>.
     
     Definition start_spec : iProp Σ :=

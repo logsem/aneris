@@ -19,6 +19,13 @@ From aneris.examples.transactional_consistency Require Import user_params aux_de
 
 Set Default Proof Using "Type".
 
+Definition commit_event
+  (ov : option val) (V : Vals) :=
+    match ov with
+    | Some v => (V ∪ {[v]})
+    | _      => V
+    end.
+
 Section Specification.
   Context `{!anerisG Mdl Σ, !User_params,
             !KVS_transaction_api, !RC_resources Mdl Σ}.
@@ -44,7 +51,7 @@ Section Specification.
       TC_read c #k @[ip_of_address sa] E
     <<<▷ ∃∃ (wo : option val), RET $wo; 
         k ↦{c} vo ∗ k ↦ₖ V ∗ 
-        ((⌜vo = None⌝ ∧ ⌜wo ∈ V ∨ wo = None⌝) ∨ 
+        ((⌜vo = None⌝ ∧ ⌜(∃ v, wo = Some v ∧ v ∈ V) ∨ wo = None⌝) ∨ 
         (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) >>>.
 
   Definition start_spec : iProp Σ :=
@@ -73,7 +80,7 @@ Section Specification.
       <<<▷ ∃∃ (b : bool), RET #b;
           ConnectionState c sa CanStart ∗
           (** Transaction has been commited. *)
-          ((⌜b = true⌝ ∗ ([∗ map] k↦ V;vo ∈ m; mc, k ↦ₖ (V ∪ {[vo]}))) ∨
+          ((⌜b = true⌝ ∗ ([∗ map] k↦ V;vo ∈ m; mc, k ↦ₖ (commit_event vo V ))) ∨
           (** Transaction has been aborted. *)
           (⌜b = false⌝ ∗ [∗ map] k ↦ V ∈ m, k ↦ₖ V)) >>>.
 
