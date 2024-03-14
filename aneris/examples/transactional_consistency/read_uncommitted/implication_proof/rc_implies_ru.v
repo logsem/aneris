@@ -285,8 +285,8 @@ Section Implication.
     split.
     iIntros (E cli Hsub).
     iMod (RC_init_module E cli Hsub) as 
-      "[%Hres (Hrc_keys & Hrc_kvs_init & Hrc_inv & Hrc_conn & Hrc_init_kvs
-       & Hrc_init_cli & Hrc_read & Hrc_write & Hrc_start & Hrc_com)]".
+      "[%Hres (Hrc_keys & Hrc_kvs_init & Hrc_inv & Hrc_conn & #Hrc_init_kvs
+       & #Hrc_init_cli & #Hrc_read & #Hrc_write & #Hrc_start & #Hrc_com)]".
     iMod (own_alloc (● (gset_to_gmap ∅ KVS_keys : gmap Key Vals))) as (γF) "Hauth_map". 
     {
       apply auth_auth_valid.
@@ -320,16 +320,18 @@ Section Implication.
     iSplitL "Hrc_conn"; first done.
     iSplitL "Hrc_init_kvs"; first done.
     iSplitL "Hrc_init_cli"; first done.
-    iSplitL "Hrc_read".
+    iSplitL.
     { 
+      iClear "Hrc_com Hrc_start Hrc_write Hrc_init_cli Hrc_init_kvs". 
       unfold read_spec, read_committed.specs.specs.read_spec.
+      iModIntro.
       iIntros (c sa E' k) "Hsub' Hk_in Hconn".
-      iDestruct ("Hrc_read" $! c sa E' k with "Hsub' Hk_in Hconn") as "Hrc_read".
+      iDestruct ("Hrc_read" $! c sa E' k with "Hsub' Hk_in Hconn") as "Hrc_read'".
       iIntros (Φ).
-      iDestruct ("Hrc_read" $! Φ) as "#Hrc_read".
+      iDestruct ("Hrc_read'" $! Φ) as "#Hrc_read''".
       iModIntro.
       iIntros "Hhyp".
-      iApply "Hrc_read".
+      iApply "Hrc_read''".
       iMod "Hhyp" as "[%vo [%V (([%V' (%H_or_eq & Hloc_key & Hfrag)] & 
                       [%V'' (%Hsub' & Hmem_key & Hauth)]) & Hhyp_later)]]".
       iModIntro.
@@ -360,14 +362,16 @@ Section Implication.
     }
     iSplitL "Hrc_write".
     {
+      iClear "Hrc_com Hrc_start Hrc_read Hrc_init_cli Hrc_init_kvs". 
       unfold write_spec, read_committed.specs.specs.write_spec.
+      iModIntro.
       iIntros (c sa E' k v) "%Hsub' Hk_in Hconn".
-      iDestruct ("Hrc_write" $! c sa E' k v Hsub' with "Hk_in Hconn") as "Hrc_write".
+      iDestruct ("Hrc_write" $! c sa E' k v Hsub' with "Hk_in Hconn") as "Hrc_write'".
       iIntros (Φ).
-      iDestruct ("Hrc_write" $! Φ) as "#Hrc_write".
+      iDestruct ("Hrc_write'" $! Φ) as "#Hrc_write''".
       iModIntro.
       iIntros "Hhyp".
-      iApply "Hrc_write".
+      iApply "Hrc_write''".
       iMod "Hhyp" as "[%vo [%V (([%V' (%H_or_eq & Hloc_key & Hfrag)] & 
                       [%V'' (%Hsub'' & Hmem_key & Hauth)]) & Hhyp_later)]]".
       iModIntro.
@@ -396,14 +400,16 @@ Section Implication.
     }
     iSplitL "Hrc_start".
     {
+      iClear "Hrc_com Hrc_read Hrc_write Hrc_init_cli Hrc_init_kvs". 
       unfold start_spec, read_committed.specs.specs.start_spec.
+      iModIntro.
       iIntros (c sa E') "%Hsub' Hconn".
-      iDestruct ("Hrc_start" $! c sa E' Hsub' with "Hconn") as "Hrc_start".
+      iDestruct ("Hrc_start" $! c sa E' Hsub' with "Hconn") as "Hrc_start'".
       iIntros (Φ).
-      iDestruct ("Hrc_start" $! Φ) as "#Hrc_start".
+      iDestruct ("Hrc_start'" $! Φ) as "#Hrc_start''".
       iModIntro.
       iIntros "Hhyp".
-      iApply "Hrc_start".
+      iApply "Hrc_start''".
       iMod "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
       iModIntro.
       simpl.
@@ -466,14 +472,16 @@ Section Implication.
       iPureIntro.
       by right.
     }
+    iClear "Hrc_read Hrc_start Hrc_write Hrc_init_cli Hrc_init_kvs". 
     unfold commit_spec, read_committed.specs.specs.commit_spec.
+    iModIntro.
     iIntros (c sa E') "%Hsub' Hconn".
-    iDestruct ("Hrc_com" $! c sa E' Hsub' with "Hconn") as "Hrc_com".
+    iDestruct ("Hrc_com" $! c sa E' Hsub' with "Hconn") as "Hrc_com'".
     iIntros (Φ).
-    iDestruct ("Hrc_com" $! Φ) as "#Hrc_com".
+    iDestruct ("Hrc_com'" $! Φ) as "#Hrc_com''".
     iModIntro.
     iIntros "Hhyp".
-    iApply "Hrc_com".
+    iApply "Hrc_com''".
     iMod "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
     iModIntro.
     simpl.
@@ -513,7 +521,7 @@ Section Implication.
                 (∃ V'', ⌜V'' ⊆ V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V'')) ∗ emp)) ∗ OwnInv γA γF)%I) 
                  with "[Hmem_keys Hinv_res]" as ">(Hmem_keys & Hinv_res)".
       {
-        iClear "Hemp_keys Hemp_keys' Hrc_com Hinv" .
+        iClear "Hemp_keys Hemp_keys' Hrc_com Hrc_com'' Hinv" .
         iStopProof.
         clear Hdom Hdom1 Hdom2.
         generalize dependent mc.
@@ -576,7 +584,7 @@ Section Implication.
       iFrame.
       rewrite (big_sepM2_sepM _ (λ k vo, emp)%I _ _  Hsome_iff).
       iDestruct "Hmem_keys" as "(Hmem_keys & _)".
-      iClear "Hinv Hrc_com Hemp_keys Hemp_keys'".
+      iClear "Hinv Hrc_com Hrc_com'' Hemp_keys Hemp_keys'".
       clear Hsome_iff Hdom1 Hdom2.
       iStopProof.
       generalize dependent m.

@@ -31,7 +31,7 @@ Section Specification.
             !KVS_transaction_api, !RC_resources Mdl Σ}.
 
   Definition write_spec : iProp Σ :=
-    ∀ (c : val) (sa : socket_address) (E : coPset) 
+      □ ∀ (c : val) (sa : socket_address) (E : coPset) 
       (k : Key) (v : SerializableVal),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
@@ -41,7 +41,7 @@ Section Specification.
       <<<▷ RET #(); k ↦{c} Some v.(SV_val) >>>.
 
   Definition read_spec : iProp Σ :=
-    ∀ (c : val) (sa : socket_address) (E : coPset) 
+      □ ∀ (c : val) (sa : socket_address) (E : coPset) 
       (k : Key),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       ⌜k ∈ KVS_keys⌝ -∗
@@ -55,7 +55,7 @@ Section Specification.
         (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) >>>.
 
   Definition start_spec : iProp Σ :=
-    ∀ (c : val) (sa : socket_address) (E : coPset),
+      □ ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
       <<< ∀∀ (m : gmap Key Vals), 
@@ -68,7 +68,7 @@ Section Specification.
           ([∗ map] k ↦ _ ∈ m, k ↦{c} None) >>>.
 
   Definition commit_spec : iProp Σ :=
-    ∀ (c : val) (sa : socket_address) (E : coPset),
+      □ ∀ (c : val) (sa : socket_address) (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
       IsConnected c sa -∗
       <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals), 
