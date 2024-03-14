@@ -118,14 +118,16 @@ Section Init_setup_proof.
           eapply (alloc_local_update); last done.
           apply not_elem_of_dom.
           by rewrite dom_fmap dom_gset_to_gmap. }
-        rewrite fmap_insert. by iFrame. } 
+        rewrite fmap_insert. by iFrame. 
+      } 
     iAssert (|==> ∃ M,
                  own γClts (● ((to_agree <$> M) :gnamesTy)) ∗
                  ⌜dom M = clients⌝ ∗
                  [∗ set] sa ∈ clients,
                  client_can_connect γClts sa)%I with
       "[HauthClts]" as "HauthClts". 
-    { iInduction clients as [|x xs] "IH" using set_ind_L.
+    { 
+      iInduction clients as [|x xs] "IH" using set_ind_L.
       - iModIntro. iExists ∅. iFrame; eauto.
         rewrite dom_empty_L. rewrite fmap_empty. iFrame. iSplit; first done.
         set_solver. 
@@ -166,12 +168,14 @@ Section Init_setup_proof.
                γClts γGauth γGsnap γT γTrs srv_si SrvInit).
     iFrame "#∗".
     iSplitL "Hkeys".
-    { rewrite !big_sepM_gset_to_gmap.
+    { 
+      rewrite !big_sepM_gset_to_gmap.
       iDestruct (big_sepS_sep with "[$Hkeys $Hseens]") as "Hkeys".
       iApply (big_sepS_mono with "Hkeys").
       iIntros (k Hk) "Hk".
       iExists [].
-      by iFrame. }
+      by iFrame. 
+    }
     iSplit.
     {  rewrite /KVS_ClientCanConnect //=.
        iApply big_sepS_sep.
@@ -179,12 +183,14 @@ Section Init_setup_proof.
        - iApply big_sepS_dup; eauto.
        - iApply big_sepS_sep.
        iFrame "#∗".
-       iApply big_sepS_dup; eauto. }
+       iApply big_sepS_dup; eauto. 
+    }
     iSplit.
     { 
       iIntros (Φ) "!# (#Hsi & Hh & Hfs & Hinit) HΦ".
       iDestruct "Hinit" as "(? & ? & ? & ? & ?)".
-      wp_apply (init_server_spec_internal_holds with "[$][$HΦ]"). } 
+      wp_apply (init_server_spec_internal_holds with "[$][$HΦ]"). 
+    } 
     iSplit.
     {  
       iIntros (sa Φ) "!# (Ha & #Hsi & Hm & (#Hc1 & Hc2 & #Hc3 & #Hc4) & Hf) HΦ".
@@ -197,34 +203,39 @@ Section Init_setup_proof.
     }
     iSplit.
     {
-      iModIntro.
+      admit.
+      (* iModIntro.
       iIntros (?????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "Hk HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
       wp_apply (read_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                  with "[//][$][$Hk][$HΦ]").
-      iFrame "#∗". }
+      iFrame "#∗".  *)
+    }
     iSplit.
-    { 
-      iModIntro.
+    {
+      admit. 
+      (* iModIntro.
       iIntros (???????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "Hk HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
       by wp_apply (write_spec_internal_holds γClts γGsnap γT γTrs
-                 with "[//][$Hk][$HΦ]"). }
+                 with "[//][$Hk][$HΦ]").  *)
+    }
     iSplit.
     {
       iModIntro.
       iIntros (????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "HΦ".
       wp_apply (start_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
-                 with "[//][$][$][$][$HΦ]"). }
+                 with "[//][$][$][$][$HΦ]").
+    }
     iModIntro.
     iIntros (????) "#(H1 & H2 & H3) !#".
     iIntros (Φ) "HΦ".
     wp_apply (commit_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                 with "[//][$][$][$][$HΦ]").
-  Qed.
+  Admitted.
   
 End Init_setup_proof.
 

@@ -25,23 +25,25 @@ Section Specification.
             !KVS_transaction_api, !SI_resources Mdl Σ}.
 
   Definition write_spec : iProp Σ :=
-    □ ∀ (c : val) (sa : socket_address)
-    (vo : option val)
-    (k : Key) (v : SerializableVal) (b : bool) ,
+    □ ∀ (c : val) (sa : socket_address) (E : coPset)
+    (k : Key) (v : SerializableVal),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
-    {{{ k ↦{c} vo ∗ KeyUpdStatus c k b}}}
-      TC_write c #k v @[ip_of_address sa] 
-    {{{ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true }}}.
+    <<< ∀∀ (vo : option val) (b : bool), 
+      k ↦{c} vo ∗ KeyUpdStatus c k b >>>
+      TC_write c #k v @[ip_of_address sa] E
+    <<<▷ RET #(); k ↦{c} Some v.(SV_val) ∗ KeyUpdStatus c k true >>>.
 
   Definition read_spec : iProp Σ :=
-    □ ∀ (c : val) (sa : socket_address)
-    (k : Key) (vo : option val),
+    □ ∀ (c : val) (sa : socket_address) (E : coPset)
+    (k : Key),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
-    {{{ k ↦{c} vo }}}
-      TC_read c #k @[ip_of_address sa] 
-    {{{ RET $vo; k ↦{c} vo }}}.
+    <<< ∀∀ (vo : option val), k ↦{c} vo >>>
+      TC_read c #k @[ip_of_address sa] E
+    <<<▷ RET $vo; k ↦{c} vo >>>.
 
    Definition start_spec : iProp Σ :=
     □ ∀ (c : val) (sa : socket_address)

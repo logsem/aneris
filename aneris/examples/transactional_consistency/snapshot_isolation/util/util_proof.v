@@ -182,8 +182,13 @@ Section proof.
     destruct ((proj1 (elem_of_dom m_shift key)) key_in_m_shift) as (h & key_h).
     iPoseProof (big_sepM_lookup_acc _ _ _ _ key_h with "cache") as
         "((key_h & key_upd) & cache)".
-    wp_apply (SI_read_spec with "[][$][$key_h] "); first set_solver.
+    wp_apply (SI_read_spec $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists (last h).
+    iFrame.
+    iNext.
     iIntros "key_h".
+    iModIntro.
     iSpecialize ("cache" with "[$key_h $key_upd]").
     destruct (last h) eqn:Hlast; wp_pures.
     wp_apply ("cond" with "[$HP $HΨ $Active $cache //]").
