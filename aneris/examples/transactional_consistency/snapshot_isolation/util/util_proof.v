@@ -261,8 +261,8 @@ Section run_spec_proof.
     (P :  gmap Key Hist → iProp Σ)
     (Q : (gmap Key Hist) -> (gmap Key Hist) -> (gmap Key (option val * bool)) → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    ⌜start_spec⌝ -∗
-    ⌜commit_spec⌝ -∗
+    start_spec -∗
+    commit_spec -∗
     IsConnected c sa -∗
     {{{
         ConnectionState c sa CanStart ∗
@@ -296,16 +296,16 @@ Section run_spec_proof.
         (⌜b = false⌝ ∗ ⌜¬ can_commit m ms mc⌝ ∗ [∗ map] k ↦ h ∈ m, Seen k h)) 
     }}}.
 Proof.
-  iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
+  iIntros (c bdy sa E P Q HE) "#HspecS #HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
   rewrite /run.
-  wp_pures. wp_apply HspecS; try eauto.
+  wp_pures. wp_apply "HspecS"; try eauto.
   iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
   iModIntro. iExists m_at_start. iFrame.
   iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
   iMod ("Hsh1" with "[$Hmks]") as "_".
   iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
   iIntros (mc) "(%Hdeq1 & Hcks & Hsh2)".
-  wp_pures. wp_apply HspecC; try eauto.
+  wp_pures. wp_apply "HspecC"; try eauto.
   iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & HQ & Hsh2)".
   iModIntro. iExists _, _, _. iFrame.
   iSplit; [iPureIntro; set_solver|].

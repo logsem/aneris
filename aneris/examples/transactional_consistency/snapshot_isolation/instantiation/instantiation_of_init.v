@@ -70,12 +70,12 @@ Section Init_setup_proof.
              KVS_Init ∗
              GlobalInv ∗
              ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
-             ⌜init_kvs_spec⌝ ∗
-             ⌜init_client_proxy_spec⌝ ∗
-             ⌜read_spec⌝ ∗
-             ⌜write_spec⌝ ∗
-             ⌜start_spec⌝ ∗
-             ⌜commit_spec⌝.
+             init_kvs_spec ∗
+             init_client_proxy_spec ∗
+             read_spec ∗
+             write_spec ∗
+             start_spec ∗
+             commit_spec.
   Proof.
     iIntros (Hne).
     iMod (ghost_map_alloc ((gset_to_gmap [] KVS_keys)))
@@ -181,21 +181,23 @@ Section Init_setup_proof.
        iFrame "#∗".
        iApply big_sepS_dup; eauto. }
     iSplit.
-    { iPureIntro. iIntros (Φ) "(#Hsi & Hh & Hfs & Hinit) HΦ".
+    { 
+      iIntros (Φ) "!# (#Hsi & Hh & Hfs & Hinit) HΦ".
       iDestruct "Hinit" as "(? & ? & ? & ? & ?)".
       wp_apply (init_server_spec_internal_holds with "[$][$HΦ]"). } 
     iSplit.
-    { iPureIntro.
-      iIntros (sa Φ) "(Ha & #Hsi & Hm & (#Hc1 & Hc2 & #Hc3 & #Hc4) & Hf) HΦ".
+    {  
+      iIntros (sa Φ) "!# (Ha & #Hsi & Hm & (#Hc1 & Hc2 & #Hc3 & #Hc4) & Hf) HΦ".
       wp_apply (init_client_leader_proxy_internal_holds clients
                  with "[$][HΦ]").
       iNext. iIntros (cs) "(H1 & H2)".
       iApply "HΦ".
       rewrite / ConnectionState //=.
-      iFrame "#∗". 
+      iFrame "#∗".
     }
     iSplit.
-    { iPureIntro.
+    {
+      iModIntro.
       iIntros (?????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "Hk HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
@@ -203,23 +205,25 @@ Section Init_setup_proof.
                  with "[//][$][$Hk][$HΦ]").
       iFrame "#∗". }
     iSplit.
-    { iPureIntro.
+    { 
+      iModIntro.
       iIntros (???????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "Hk HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
       by wp_apply (write_spec_internal_holds γClts γGsnap γT γTrs
                  with "[//][$Hk][$HΦ]"). }
     iSplit.
-    { iPureIntro.
+    {
+      iModIntro.
       iIntros (????) "#(H1 & H2 & H3) !#".
       iIntros (Φ) "HΦ".
       wp_apply (start_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                  with "[//][$][$][$][$HΦ]"). }
-    iPureIntro.
-      iIntros (????) "#(H1 & H2 & H3) !#".
-      iIntros (Φ) "HΦ".
-      wp_apply (commit_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
-                 with "[//][$][$][$][$HΦ]").
+    iModIntro.
+    iIntros (????) "#(H1 & H2 & H3) !#".
+    iIntros (Φ) "HΦ".
+    wp_apply (commit_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
+                with "[//][$][$][$][$HΦ]").
   Qed.
   
 End Init_setup_proof.

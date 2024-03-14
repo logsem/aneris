@@ -29,6 +29,11 @@ Set Default Proof Using "Type".
 
 Section DerivedSpecs.
 
+  (* OBS: This is only a proof that the full specications for SI imply the derived
+    specificton for SI with the given resource defintions, 
+    not a full proof of implication between specication-packages, 
+    see e.g. RC_implies_RC.v  *)
+
   Import code_api.
   
   Context `{!anerisG Mdl Σ, !User_params, !SI_resources Mdl Σ,  !KVSG Σ}.
@@ -104,7 +109,7 @@ Section DerivedSpecs.
 
   Lemma init_client_proxy_spec_derived : 
     ∀ (sa : socket_address),
-    ⌜init_client_proxy_spec⌝ -∗
+    init_client_proxy_spec -∗
     {{{ unallocated {[sa]} ∗
         KVS_address ⤇ KVS_si ∗
         sa ⤳ (∅, ∅) ∗
@@ -115,8 +120,9 @@ Section DerivedSpecs.
     {{{ cstate, RET cstate; ConnectionStateTxt cstate sa TxtCanStart ∗
                             IsConnected cstate sa }}}.
   Proof.
-    iIntros (sa Hspec Φ) "!# (H_unalloc & H_interp & H_m_hist & H_conn & H_ports) HΦ".
-    wp_apply (Hspec  with "[$H_unalloc $H_interp $H_m_hist $H_conn $H_ports][HΦ]").
+    iIntros (sa) "#Hspec !#". 
+    iIntros (Φ) "(H_unalloc & H_interp & H_m_hist & H_conn & H_ports) HΦ".
+    wp_apply ("Hspec"  with "[$H_unalloc $H_interp $H_m_hist $H_conn $H_ports][HΦ]").
     iNext.
     iIntros (cstate) "(H_state & H_conn)".
     iApply "HΦ".
@@ -130,7 +136,7 @@ Section DerivedSpecs.
        (E : coPset),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
        IsConnected c sa -∗
-       ⌜start_spec⌝ -∗ 
+       start_spec -∗ 
     <<< ∀∀ (m : gmap Key (option val)),
        ConnectionStateTxt c sa TxtCanStart ∗
        [∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo >>>
@@ -140,9 +146,9 @@ Section DerivedSpecs.
        ([∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo) ∗
        ([∗ map] k ↦ vo ∈ m, k ↦{c} vo ∗ KeyUpdStatus c k false) >>>.
   Proof.
-    iIntros (c sa E HE) "#Hic %spec".
+    iIntros (c sa E HE) "#Hic #spec".
     iIntros (Φ) "!# Hsh".
-    wp_apply (spec _ _ E with "[//][//][Hsh]").
+    wp_apply ("spec" $! _ _ E with "[//][//][Hsh]").
     iMod "Hsh".
     iModIntro.
     iDestruct "Hsh" as (m) "((Hst & Hkeys) & Hsh)".
@@ -172,7 +178,7 @@ Section DerivedSpecs.
      (E : coPset),
      ⌜↑KVS_InvName ⊆ E⌝ -∗
        IsConnected c sa -∗
-       ⌜commit_spec⌝ -∗ 
+       commit_spec -∗ 
     <<< ∀∀ (m ms : gmap Key (option val))
            (mc : gmap Key (option val * bool)),
         ConnectionStateTxt c sa (TxtActive ms) ∗
@@ -189,9 +195,9 @@ Section DerivedSpecs.
          (⌜b = false⌝ ∗
            [∗ map] k ↦ vo ∈ m, OwnMemKeyVal k vo)) >>>.
   Proof.
-    iIntros (c sa E HE) "#Hic %spec".
+    iIntros (c sa E HE) "#Hic #spec".
     iIntros (Φ) "!# Hsh".
-    wp_apply (spec _ _ E with "[//][//][Hsh]").
+    wp_apply ("spec" $! _ _ E with "[//][//][Hsh]").
     iMod "Hsh".
     iModIntro.
     iDestruct "Hsh" as (m ms_ mc) "((Hst & %HdomEq1 & %HdomEq2 & Hkeys1 & Hkeys2) & Hsh)".
@@ -232,8 +238,8 @@ Section DerivedSpecs.
       (P :  gmap Key (option val) → iProp Σ)
       (Q : (gmap Key (option val)) -> (gmap Key (option val)) -> (gmap Key (option val * bool)) → iProp Σ),
       ⌜↑KVS_InvName ⊆ E⌝ -∗
-      ⌜start_spec⌝ -∗
-      ⌜commit_spec⌝ -∗
+      start_spec -∗
+      commit_spec -∗
       IsConnected c sa -∗
       {{{
         ConnectionStateTxt c sa TxtCanStart ∗
@@ -262,7 +268,7 @@ Section DerivedSpecs.
          ConnectionStateTxt c sa TxtCanStart ∗ Q m ms mc
      }}}.
   Proof.
-    iIntros (c bdy sa E P Q HE) "%HspecS %HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
+    iIntros (c bdy sa E P Q HE) "#HspecS #HspecC #HiC !# %Φ (HstS & Hsh1 & #HspecBdy) HΦ".
     rewrite /run.
     wp_pures. wp_apply start_spec_derived; try eauto.
     iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
@@ -290,8 +296,8 @@ Section DerivedSpecs.
     (P :  gmap Key (option val) → iProp Σ)
     (Q :  gmap Key (option val * bool) → iProp Σ),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
-    ⌜start_spec⌝ -∗ 
-    ⌜commit_spec⌝ -∗
+    start_spec -∗ 
+    commit_spec -∗
     IsConnected c sa -∗
     □ (|={⊤, E}=> ∃ m_snap, ⌜dom m_snap = domain⌝ ∗ P m_snap ∗ ([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo)
       ∗ ▷ (((∃ m_cache, Q m_cache ∗ ([∗ map] k↦ vo;p ∈ m_snap; m_cache, OwnMemKeyVal k (commitTxt p vo)))
@@ -305,8 +311,8 @@ Section DerivedSpecs.
           run c tbody @[ip_of_address sa] ⊤
     {{{ b, RET #b; ConnectionStateTxt c sa TxtCanStart }}}.
   Proof.
-    iIntros (c tbody domain sa E P Q H_sub H_start_spec H_commit_spec)
-      "#H_conn #H_shift #H_body".
+    iIntros (c tbody domain sa E P Q H_sub) 
+    "#H_start_spec #H_commit_spec #H_conn #H_shift #H_body".
     iIntros (Φ) "!# H_state HΦ".
     rewrite /run /=.
     wp_pures.

@@ -24,69 +24,69 @@ Section Specification.
             !KVS_transaction_api, !RU_resources Mdl Σ}.
 
   Definition write_spec : iProp Σ :=
-      □ ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key) (v : SerializableVal),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
-      ⌜k ∈ KVS_keys⌝ -∗
-      IsConnected c sa -∗
-      <<< ∀∀ (vo : option val) (V : Vals), 
-          k ↦{c} vo ∗ k ↦ₖ V >>>
-        TC_write c #k v @[ip_of_address sa] E
-      <<<▷ RET #(); k ↦{c} Some v.(SV_val) ∗ 
-           k ↦ₖ (V ∪ {[v.(SV_val)]}) >>>.
+    □ ∀ (c : val) (sa : socket_address) (E : coPset) 
+    (k : Key) (v : SerializableVal),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜k ∈ KVS_keys⌝ -∗
+    IsConnected c sa -∗
+    <<< ∀∀ (vo : option val) (V : Vals), 
+      k ↦{c} vo ∗ k ↦ₖ V >>>
+      TC_write c #k v @[ip_of_address sa] E
+    <<<▷ RET #(); k ↦{c} Some v.(SV_val) ∗ 
+      k ↦ₖ (V ∪ {[v.(SV_val)]}) >>>.
   
   Definition read_spec : iProp Σ :=
-      □ ∀ (c : val) (sa : socket_address) (E : coPset) 
-      (k : Key),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
-      ⌜k ∈ KVS_keys⌝ -∗
-      IsConnected c sa -∗
+    □ ∀ (c : val) (sa : socket_address) (E : coPset) 
+    (k : Key),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ⌜k ∈ KVS_keys⌝ -∗
+    IsConnected c sa -∗
     <<< ∀∀ (vo : option val) (V : Vals), 
-        k ↦{c} vo ∗ k ↦ₖ V >>>
+      k ↦{c} vo ∗ k ↦ₖ V >>>
       TC_read c #k @[ip_of_address sa] E
     <<<▷ ∃∃ (wo : option val), RET $wo; 
-        k ↦{c} vo ∗ k ↦ₖ V ∗ 
-        ((⌜vo = None⌝ ∧ ⌜(∃ v, wo = Some v ∧ v ∈ V) ∨ wo = None⌝) ∨ 
-        (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝))  >>>.
+      k ↦{c} vo ∗ k ↦ₖ V ∗ 
+      ((⌜vo = None⌝ ∧ ⌜(∃ v, wo = Some v ∧ v ∈ V) ∨ wo = None⌝) ∨ 
+      (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) >>>.
     
-    Definition start_spec : iProp Σ :=
-      □ ∀ (c : val) (sa : socket_address) (E : coPset),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
-      IsConnected c sa -∗
-      <<< ∀∀ (m : gmap Key Vals), 
-          ConnectionState c sa CanStart ∗
-          [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
-        TC_start c @[ip_of_address sa] E
-      <<<▷ RET #();
-          ConnectionState c sa (Active (dom m)) ∗ 
-          ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗
-          ([∗ map] k ↦ _ ∈ m, k ↦{c} None) >>>.
+  Definition start_spec : iProp Σ :=
+    □ ∀ (c : val) (sa : socket_address) (E : coPset),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    IsConnected c sa -∗
+    <<< ∀∀ (m : gmap Key Vals), 
+      ConnectionState c sa CanStart ∗
+      [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
+      TC_start c @[ip_of_address sa] E
+    <<<▷ RET #();
+      ConnectionState c sa (Active (dom m)) ∗ 
+      ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗
+      ([∗ map] k ↦ _ ∈ m, k ↦{c} None) >>>.
 
   Definition commit_spec : iProp Σ :=
-      □ ∀ (c : val) (sa : socket_address) (E : coPset),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
-      IsConnected c sa -∗
-      <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals), 
-         ConnectionState c sa (Active s) ∗
-         ⌜s = dom mc⌝ ∗ ⌜dom mc = dom m⌝ ∗
-         ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) ∗
-         ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
-        TC_commit c @[ip_of_address sa] E
-      <<<▷ ∃∃ (b : bool), RET #b; 
-          ConnectionState c sa CanStart ∗
-          [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>.
+    □ ∀ (c : val) (sa : socket_address) (E : coPset),
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    IsConnected c sa -∗
+    <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals), 
+      ConnectionState c sa (Active s) ∗
+      ⌜s = dom mc⌝ ∗ ⌜dom mc = dom m⌝ ∗
+      ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) ∗
+      ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
+      TC_commit c @[ip_of_address sa] E
+    <<<▷ ∃∃ (b : bool), RET #b; 
+      ConnectionState c sa CanStart ∗
+      [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>.
       
   Definition init_client_proxy_spec : iProp Σ :=
     ∀ (sa : socket_address),
-      {{{ unallocated {[sa]} ∗
-          KVS_address ⤇ KVS_ru ∗
-          sa ⤳ (∅, ∅) ∗
-          KVS_ClientCanConnect sa ∗
-          free_ports (ip_of_address sa) {[port_of_address sa]} }}}
-        TC_init_client_proxy (s_serializer KVS_serialization)
-                              #sa #KVS_address @[ip_of_address sa]
-      {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗
-                              IsConnected cstate sa }}}.
+    {{{ unallocated {[sa]} ∗
+        KVS_address ⤇ KVS_ru ∗
+        sa ⤳ (∅, ∅) ∗
+        KVS_ClientCanConnect sa ∗
+        free_ports (ip_of_address sa) {[port_of_address sa]} }}}
+      TC_init_client_proxy (s_serializer KVS_serialization)
+                            #sa #KVS_address @[ip_of_address sa]
+    {{{ cstate, RET cstate; ConnectionState cstate sa CanStart ∗
+                            IsConnected cstate sa }}}.
 
   Definition init_kvs_spec : iProp Σ :=
     {{{ KVS_address ⤇ KVS_ru ∗ 
