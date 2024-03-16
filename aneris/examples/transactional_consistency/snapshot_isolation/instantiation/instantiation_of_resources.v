@@ -76,5 +76,19 @@ Section SI_Resources_intantiation.
     simplify_eq /=.
     by apply to_hist_prefix_mono.
   Qed.
+  Next Obligation.
+    iIntros (E k h Hsub) "#Hinv Hkey".
+    unfold OwnMemKey_def, GlobalInv_def, 
+      ownMemUser, Seen_def.
+    iDestruct "Hkey" as "[%hw ((Hkey & # Hseen) & %Heq)]".
+    iModIntro.
+    iSplitL.
+    - iExists hw.
+      iFrame "∗#".
+      by iPureIntro.
+    - iExists hw.
+      iFrame "#".
+      by iPureIntro.
+  Qed.
 
 End SI_Resources_intantiation.

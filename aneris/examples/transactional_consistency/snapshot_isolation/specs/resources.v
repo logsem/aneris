@@ -60,6 +60,12 @@ Section Resources.
       GlobalInv ⊢
       Seen k h ∗ k ↦ₖ h' ={E}=∗
       k ↦ₖ h' ∗ ⌜h ≤ₚ h'⌝;
+
+    Seen_creation E k h :
+      ↑KVS_InvName ⊆ E ->
+      GlobalInv ⊢
+      k ↦ₖ h ={E}=∗
+      k ↦ₖ h ∗ Seen k h;
   }.
 
 End Resources.
