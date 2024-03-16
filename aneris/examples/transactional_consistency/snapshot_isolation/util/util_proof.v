@@ -4,7 +4,8 @@ From aneris.examples.transactional_consistency.snapshot_isolation.specs
 From aneris.examples.transactional_consistency Require Import user_params.
 From aneris.examples.transactional_consistency.snapshot_isolation.instantiation
   Require Import snapshot_isolation_api_implementation.
-From aneris.examples.transactional_consistency Require Import resource_algebras util_code.
+From aneris.examples.transactional_consistency Require Import resource_algebras.
+From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_code.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From iris.algebra Require Import gmap.
 From iris.algebra Require Import excl.

@@ -14,9 +14,7 @@ From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency.snapshot_isolation
   Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.util
-     Require Import util_proof.
-From aneris.examples.transactional_consistency
-     Require Import util_code.
+     Require Import util_code util_proof.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs
   Require Import
   time events aux_defs resources specs.
