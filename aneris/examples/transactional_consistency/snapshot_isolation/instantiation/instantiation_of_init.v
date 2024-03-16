@@ -214,13 +214,12 @@ Section Init_setup_proof.
     }
     iSplit.
     {
-      admit. 
-      (* iModIntro.
+      iModIntro.
       iIntros (???????) "#(H1 & H2 & H3) !#".
-      iIntros (Φ) "Hk HΦ".
+      iIntros (Φ) "HΦ".
       rewrite /OwnLocalKey /IsConnected //=.  
-      by wp_apply (write_spec_internal_holds γClts γGsnap γT γTrs
-                 with "[//][$Hk][$HΦ]").  *)
+      wp_apply (write_spec_internal_holds γClts γGsnap γT γTrs
+                 with "[//][//][$][$]").
     }
     iSplit.
     {
@@ -248,5 +247,3 @@ Global Instance SI_init_instanciation
     iModIntro.
     iExists R. by iFrame.
   Qed.
-
-   

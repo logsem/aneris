@@ -36,22 +36,23 @@ Section Write_Proof.
   Notation MTC := (client_handler_rpc_user_params clients γKnownClients γGauth γGsnap γT γTrs).
   Import code_api.
 
-
  Definition write_spec_internal `{!MTS_resources} : Prop :=
     ∀ (c : val) (sa : socket_address)
-      (vo : option val)
-      (k : Key) (v : SerializableVal) (b : bool),
+      (k : Key) (v : SerializableVal)
+      (E : coPset) ,
+    ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜k ∈ KVS_keys⌝ -∗
-    {{{ is_connected γGsnap γT γTrs γKnownClients c sa ∗
+    is_connected γGsnap γT γTrs γKnownClients c sa -∗
+    <<< ∀∀ (vo : option val) (b : bool),
         ownCacheUser γKnownClients k c vo ∗
-        key_upd_status γKnownClients c k b }}}
-      TC_write c #k v @[ip_of_address sa]
-    {{{ RET #(); ownCacheUser γKnownClients k c (Some v.(SV_val)) ∗
-                 key_upd_status γKnownClients c k true }}}.
+        key_upd_status γKnownClients c k b >>>
+      TC_write c #k v @[ip_of_address sa] E
+    <<<▷ RET #(); ownCacheUser γKnownClients k c (Some v.(SV_val)) ∗
+                 key_upd_status γKnownClients c k true >>>.
 
   Lemma write_spec_internal_holds `{!MTS_resources} : write_spec_internal.
   Proof.
-    iIntros (c sa vo k v b Hk Φ) "!# (#Hisc & Hcache & Hkds) Hpost".
+    iIntros (c sa k v E HsubE Hk) "#Hisc %Φ !# Hshift".
     iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)".
     rewrite /TC_write /= /write.
@@ -61,14 +62,18 @@ Section Write_Proof.
     iIntros (uu) "(_ & Hlk & Hres)".
     iDestruct "Hres"
       as (?) "(Hl & Hcr & [( -> & Hres_abs & _ & Htk) | Hres])".
-    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
+    {
+      iApply fupd_aneris_wp.
+      iMod "Hshift" as "[%vo [%b ((Hcache & _) & _)]]".
+      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
-      iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
+      iDestruct (client_connected_agree with "[$Hc1][$Hc2]") as "%Heq'".
       simplify_eq /=.
       by iDestruct (@ghost_map.ghost_map_lookup
                   with "[$Hres_abs][$Helem]")
-                  as "%Habs". }
+                  as "%Habs". 
+    }
     iDestruct "Hres"
       as (ts Msnap Msnap_full cuL cuV cuM cM -> Hcoh Hser) "Hres".
     iDestruct "Hres" as (Hvalid)
@@ -79,7 +84,9 @@ Section Write_Proof.
     wp_load.
     wp_apply (wp_map_insert $! Hm).
     iIntros (cuV' Hm').
-    wp_store.
+    wp_bind (Store _ _).
+    wp_apply (aneris_wp_atomic _ _ E).
+    iMod "Hshift" as "[%vo [%b ((Hcache & Hkds) & Hclose)]]".
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
                             "(#Hc3 & HcacheHalf1 & %Hv)".
     symmetry in Heq. simplify_eq /=.
@@ -97,37 +104,44 @@ Section Write_Proof.
                 "[$Hauth][$Hcache]") as "%Hkin".
     iMod (ghost_map.ghost_map_update ((Some v.(SV_val)), true)
            with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
-    wp_apply (release_spec with
-               "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [H1 H2 Hpost]").
-    { iExists _.
-      iFrame "#∗".
-      iRight.
-      iExists ts, Msnap, _, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
-                (<[k:=(Some v.(SV_val), true)]> cM).
-      iFrame "#∗".
-      iSplit; first done.
-      iSplit.
-      { iPureIntro;
-          by eapply is_coherent_cache_upd. }
-      iSplit; last done.
-      iPureIntro.
-      apply map_Forall_insert_2; last done.
-      apply SV_ser.
-    }
-    iNext.
-    iIntros (v0 ->).
-    iApply "Hpost".
-    iSplitL "H1".
-    { iExists _, _, _, _, _, _, _, _.
-      iExists true.
-      iSplit; first done.
-      iFrame "#∗".
-      by destruct v. }
-    iExists _, _, _, _, _, _, _, _.
-    iExists _.
-    iSplit; first done.
-    iFrame "#∗".
-    eauto.
+    iModIntro.
+    wp_store.
+    iMod ("Hclose" with "[H1 H2]") as "HΦ".
+    - iSplitL "H1".
+      + iExists _, _, _, _, _, _, _, _.
+        iExists true.
+        iSplit; first done.
+        iFrame "#∗".
+        by destruct v.
+      + iExists _, _, _, _, _, _, _, _.
+        iExists _.
+        iSplit; first done.
+        iFrame "#∗".
+        eauto.
+    - iModIntro.
+      wp_pures.
+      wp_apply (release_spec with
+                "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [HΦ]").
+      { 
+        iExists _.
+        iFrame "#∗".
+        iRight.
+        iExists ts, Msnap, _, cuL, cuV', (<[k:=v.(SV_val)]> cuM),
+                  (<[k:=(Some v.(SV_val), true)]> cM).
+        iFrame "#∗".
+        iSplit; first done.
+        iSplit.
+        { 
+          iPureIntro; by eapply is_coherent_cache_upd. 
+        }
+        iSplit; last done.
+        iPureIntro.
+        apply map_Forall_insert_2; last done.
+        apply SV_ser.
+      }
+      iNext.
+      iIntros (v0 ->).
+      iApply "HΦ".
   Qed.
 
 End Write_Proof.
