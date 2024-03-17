@@ -203,14 +203,12 @@ Section Init_setup_proof.
     }
     iSplit.
     {
-      admit.
-      (* iModIntro.
-      iIntros (?????) "#(H1 & H2 & H3) !#".
-      iIntros (Φ) "Hk HΦ".
-      rewrite /OwnLocalKey /IsConnected //=.  
+      iModIntro.
+      iIntros (??????) "#(H1 & H2 & H3) !#". 
+      iIntros (Φ) "HΦ".
+      rewrite /OwnLocalKey /IsConnected //=.
       wp_apply (read_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
-                 with "[//][$][$Hk][$HΦ]").
-      iFrame "#∗".  *)
+                 with "[//][$][$][$][$HΦ]").
     }
     iSplit.
     {
@@ -234,7 +232,7 @@ Section Init_setup_proof.
     iIntros (Φ) "HΦ".
     wp_apply (commit_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
                 with "[//][$][$][$][$HΦ]").
-  Admitted.
+  Qed.
   
 End Init_setup_proof.
 

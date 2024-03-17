@@ -39,7 +39,7 @@ Section Write_Proof.
  Definition write_spec_internal `{!MTS_resources} : Prop :=
     ∀ (c : val) (sa : socket_address)
       (k : Key) (v : SerializableVal)
-      (E : coPset) ,
+      (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜k ∈ KVS_keys⌝ -∗
     is_connected γGsnap γT γTrs γKnownClients c sa -∗

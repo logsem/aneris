@@ -37,24 +37,23 @@ Section Read_Proof.
                      clients γKnownClients γGauth γGsnap γT γTrs).
   Import code_api.
 
-
  Definition read_spec_internal `{!MTS_resources} : Prop :=
-    ∀ (c : val) (sa : socket_address)
-      (k : Key) (vo : option val),
-    ⌜k ∈ KVS_keys⌝ -∗
-      @make_request_spec _ _ _ _ MTC _ -∗
-      {{{ Global_Inv clients γKnownClients γGauth γGsnap γT γTrs ∗
-          is_connected γGsnap γT γTrs γKnownClients c sa ∗
-        ownCacheUser γKnownClients k c vo }}}
-      TC_read c #k @[ip_of_address sa]
-    {{{ RET $vo; ownCacheUser γKnownClients k c vo }}}.
-
+  ∀ (c : val) (sa : socket_address)
+  (k : Key) (E : coPset),
+  ⌜k ∈ KVS_keys⌝ -∗
+  @make_request_spec _ _ _ _ MTC _ -∗
+  Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
+  is_connected γGsnap γT γTrs γKnownClients c sa -∗
+  <<< ∀∀ (vo : option val), 
+      ownCacheUser γKnownClients k c vo >>>
+    TC_read c #k @[ip_of_address sa] E
+  <<<▷ RET $vo; ownCacheUser γKnownClients k c vo >>>.
 
  Lemma read_spec_internal_holds `{!MTS_resources} :
    read_spec_internal.
   Proof.
-    iIntros (c sa k vo Hk) "#HSpec !#".
-    iIntros (Φ) "(#Hinv & #Hisc & Hcache) Hpost".
+    iIntros (c sa k E Hk) "#HSpec #Hinv #Hisc !#".
+    iIntros (Φ) "Hshift".
     iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)". rewrite /make_request_spec.
     rewrite /TC_read /= /read.
@@ -65,23 +64,27 @@ Section Read_Proof.
     wp_pures.
     iDestruct "Hres"
       as (?) "(Hl & Hcr & [( -> & Hres_abs & Hms & Htk) | Hres])".
-    { iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
+    {
+      iApply fupd_aneris_wp.
+      iMod "Hshift" as "[%vo (Hcache & _)]".
+      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
       iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
       simplify_eq /=.
       by iDestruct (@ghost_map.ghost_map_lookup
                   with "[$Hres_abs][$Helem]")
-                  as "%Habs". }
+                  as "%Habs".
+    }
     iDestruct "Hres"
       as (ts Msnap Msnap_full cuL cuV cuM cM -> Hcoh Hser) "Hres".
     iDestruct "Hres" as (Hvalid)
            "(%Hm & %Hsub & #Hts & #Hsn & #Hf & HcM & Hauth & Htk)".
     wp_load.
     wp_pures.
-    wp_load.
-    wp_apply (wp_map_lookup $! Hm).
-    iIntros (vo1 Hvo1).
+    wp_bind (Load _).
+    wp_apply (aneris_wp_atomic _ _ E).
+    iMod "Hshift" as "[%vo (Hcache & Hclose)]".
     assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
     destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8) .
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
@@ -91,6 +94,17 @@ Section Read_Proof.
     simplify_eq.
     iDestruct (@ghost_map.ghost_map_lookup with
                 "[$Hauth][$Hcache]") as "%Hkin".
+    iModIntro.
+    wp_load.
+    iMod ("Hclose" with "[Hcache]") as "HΦ".
+    {
+      iExists _, _, _, _, _, _, _, _.
+      iExists _.
+      by iFrame "#∗".
+    }
+    iModIntro.
+    wp_apply (wp_map_lookup $! Hm).
+    iIntros (vo1 Hvo1).
     destruct (cuM !! k) eqn:Hkv1.
     (* Read from cache. *)
     1:{ rewrite Hvo1.
@@ -99,7 +113,7 @@ Section Read_Proof.
         apply Hc6 in Hkv1.
         simplify_eq /=.
         wp_apply (release_spec with
-                   "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [Hcache Hpost]").
+                   "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [HΦ]").
         { iExists _.
           iFrame "#∗".
           iRight.
@@ -108,10 +122,7 @@ Section Read_Proof.
         iNext.
         iIntros (v0 ->).
         wp_pures.
-        iApply "Hpost".
-        iExists _, _, _, _, _, _, _, _.
-        iExists _.
-        by iFrame "#∗". }
+        iApply "HΦ". }
     (* Read from the database. *)
     rewrite Hvo1.
     wp_pures.
@@ -182,7 +193,7 @@ Section Read_Proof.
        wp_pures.
        iDestruct "Hhpost" as "(_ & Hcnd)".
        wp_apply (release_spec with
-                  "[$Hisc $Hlk Hl Hreq HcM Hauth Htk] [Hcache Hpost Hcnd]").
+                  "[$Hisc $Hlk Hl Hreq HcM Hauth Htk] [HΦ Hcnd]").
        { iExists _.
          iFrame "#∗".
          iRight.
@@ -213,23 +224,13 @@ Section Read_Proof.
        (* Case 2 : There is nothing to read. *)
        --- assert (vo = None) as ->.
            by destruct vo; first by specialize (Hc4 k v Hkv1); set_solver.
-           iApply "Hpost".
-           iExists _, _, _, _, _, _, _, _.
-           iExists _.
-           iSplit; first done.
-           iFrame "#∗".
-           eauto.
+           iApply "HΦ".
        (* Case 2 : There is a value to read. *)
        --- destruct Hhe as (rv & -> & Hrv).
            destruct vo as [v|]; last by set_solver.
-           { specialize (Hc4 k v Hkv1) as (h' & e & Hmk & Hhe & Hev).
-             simplify_eq /=.
-             iApply "Hpost".
-             iExists _, _, _, _, _, _, _, _.
-             iExists _.
-             iSplit; first done.
-             iFrame "#∗".
-             eauto. }
+           specialize (Hc4 k v Hkv1) as (h' & e & Hmk & Hhe & Hev).
+           simplify_eq /=.
+           iApply "HΦ".
     (* Absurd *)
     -- by iDestruct "Habs"
          as "[(% & % & % & % & % & % & Habs) |
