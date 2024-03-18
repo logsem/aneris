@@ -44,6 +44,7 @@ Section Resources.
 
     (** Cache Key Status *)
     KeyUpdStatus : val → Key → bool → iProp Σ;
+    KeyUpdStatus_timeless v k b :> Timeless (KeyUpdStatus v k b);
 
     (** Seen predciate *)
     Seen : Key → Hist → iProp Σ;
