@@ -124,6 +124,119 @@ Section Implication.
           by rewrite not_elem_of_dom in H_lookup.
   Qed.
 
+  Lemma rewrite_maps_2 `{SI : !SI_resources Mdl Σ} (mc : gmap Key (option val)) (c : val) :
+    ([∗ map] k↦vo ∈ mc, 
+      (∃ (wo : option val) (h : Hist), ⌜vo = None⌝ ∗ ⌜(∃ v : val, wo = Some v ∧ v ∈ h) ∨ wo = None⌝ ∗ 
+      snapshot_isolation.specs.resources.Seen k h ∗ KeyUpdStatus c k false ∗ 
+      snapshot_isolation.specs.resources.OwnLocalKey k c wo) ∨ 
+      ⌜vo ≠ None⌝ ∗ KeyUpdStatus c k true ∗ 
+      snapshot_isolation.specs.resources.OwnLocalKey k c vo) -∗
+    (∃ (mc' : gmap Key (option val * bool)), ⌜dom mc = dom mc'⌝ ∗
+      ⌜∀ (k : Key) (v : val), (mc' !! k = Some (Some v, true) ↔ mc !! k = Some (Some v))⌝ ∗
+      ([∗ map] k↦p ∈ mc', snapshot_isolation.specs.resources.OwnLocalKey k c p.1 ∗ KeyUpdStatus c k p.2)).
+  Proof.
+    iIntros "Hkeys".
+    iInduction mc as [|k ov mc H_lookup] "IH" using map_ind.
+    - iExists ∅.
+      iSplitL.
+      + iPureIntro.
+        set_solver.
+      + iSplitL; last done.
+        iPureIntro.
+        set_solver.
+    - rewrite big_sepM_insert; last done.
+      iDestruct "Hkeys" as "(Hkey & Hkeys)".
+      iDestruct ("IH" with "[$Hkeys]") as "[%mc'_ (%Hdom & %Himp & Hkeys)]".
+      iDestruct "Hkey" as "[[%wo [%h (%Heq & %Hdisj & _ & Hupd & Hloc_key)]] | (%Heq & Hupd & Hloc_key)]".
+      + iExists (<[k:= (wo, false)]> mc'_).
+        rewrite big_sepM_insert; last first.
+        {
+          rewrite -not_elem_of_dom in H_lookup.
+          rewrite Hdom in H_lookup.
+          by rewrite not_elem_of_dom in H_lookup.
+        }
+        iFrame.
+        iSplitR.
+        * iPureIntro.
+          set_solver.
+        * iPureIntro.
+          intros k' v'.
+          destruct (decide (k = k')) as [-> | Hneq].
+          -- do 2 rewrite lookup_insert.
+             split; first done.
+             intros Hfalse.
+             inversion Hfalse as [Hfalse'].
+             by rewrite Heq in Hfalse'.
+          -- rewrite lookup_insert_ne; last done.
+             rewrite lookup_insert_ne; last done.
+             apply Himp.
+      + iExists (<[k:= (ov, true)]> mc'_).
+        rewrite big_sepM_insert; last first.
+        {
+          rewrite -not_elem_of_dom in H_lookup.
+          rewrite Hdom in H_lookup.
+          by rewrite not_elem_of_dom in H_lookup.
+        }
+        iFrame.
+        iSplitR.
+        * iPureIntro.
+          set_solver.
+        * iPureIntro.
+          intros k' v'.
+          destruct (decide (k = k')) as [-> | Hneq].
+          -- do 2 rewrite lookup_insert.
+             split; intro Hhyp; by inversion Hhyp.
+          -- rewrite lookup_insert_ne; last done.
+             rewrite lookup_insert_ne; last done.
+             apply Himp.
+  Qed.
+
+  Lemma rewrite_maps_3 `{SI : !SI_resources Mdl Σ} (m : gmap Key Vals) (m' : gmap Key Hist) :
+    dom m = dom m' → 
+    (∀ (k : Key) (h : Hist) (V : Vals), m' !! k = Some h ∧ m !! k = Some V → ∀ v : val, v ∈ h ↔ v ∈ V) →
+    ([∗ map] k↦h ∈ m', snapshot_isolation.specs.resources.OwnMemKey k h) -∗
+    ([∗ map] k↦V ∈ m, ∃ h : Hist, ⌜∀ v : val, v ∈ h ↔ v ∈ V⌝ ∗ snapshot_isolation.specs.resources.OwnMemKey k h).
+  Proof.
+    generalize dependent m.
+    induction m' as [|k h m' H_lookup IH] using map_ind.
+    * iIntros (m  Hdom _) "_".
+      rewrite dom_empty_L in Hdom.
+      rewrite dom_empty_iff_L in Hdom.
+      by rewrite Hdom.
+    * iIntros (m  Hdom Himp) "Hmem_keys".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hmem_keys" as "(Hmem_key & Hmem_keys)".
+      assert (k ∈ dom m) as Hin; first by set_solver.
+      rewrite elem_of_dom in Hin.
+      destruct (m !! k) as [V|] eqn:Heq; last by destruct Hin.
+      rewrite -(insert_delete _ _ _ Heq).
+      rewrite -(insert_delete _ _ _ Heq) in Hdom.
+      assert (dom (delete k m) = dom m') as Hdom'.
+      {
+        do 2 rewrite dom_insert_L in Hdom.
+        rewrite -(delete_notin _ _ H_lookup) in Hdom.
+        rewrite -(delete_notin _ _ H_lookup).
+        set_solver.
+      }
+      rewrite big_sepM_insert; last by apply lookup_delete.
+      iSplitL "Hmem_key".
+      -- iExists h.
+          iFrame.
+          iPureIntro.
+          apply (Himp k h V).
+          split; last done.
+          by rewrite lookup_insert.
+      -- iDestruct (IH _ Hdom' with "[$Hmem_keys]") as "Hmem_keys'"; last by iFrame.
+          intros k' h' V' (Heq1 & Heq2).
+          apply (Himp k' h' V').
+          destruct (decide (k = k')) as [-> | Hneq].
+          ++ rewrite lookup_delete in Heq2.
+            by inversion Heq2.
+          ++ rewrite lookup_insert_ne; last done.
+            split; first done.
+            rewrite lookup_delete_ne in Heq2; done.
+  Qed.
+
   Theorem implication_si_rc : 
     SI_init → RC_init.
   Proof.
@@ -286,46 +399,8 @@ Section Implication.
         rewrite Hdom.
         by iPureIntro.
       - iSplitL "Hmem_keys".
-        + iClear "Hsi_inv Hsi_start Hsi_start''".
-          iStopProof.
-          generalize dependent m.
-          induction m' as [|k h m' H_lookup IH] using map_ind.
-          * iIntros (m  Hdom _) "_".
-            rewrite dom_empty_L in Hdom.
-            rewrite dom_empty_iff_L in Hdom.
-            by rewrite Hdom.
-          * iIntros (m  Hdom Himp) "Hmem_keys".
-            rewrite big_sepM_insert; last done.
-            iDestruct "Hmem_keys" as "(Hmem_key & Hmem_keys)".
-            assert (k ∈ dom m) as Hin; first by set_solver.
-            rewrite elem_of_dom in Hin.
-            destruct (m !! k) as [V|] eqn:Heq; last by destruct Hin.
-            rewrite -(insert_delete _ _ _ Heq).
-            rewrite -(insert_delete _ _ _ Heq) in Hdom.
-            assert (dom (delete k m) = dom m') as Hdom'.
-            {
-              do 2 rewrite dom_insert_L in Hdom.
-              rewrite -(delete_notin _ _ H_lookup) in Hdom.
-              rewrite -(delete_notin _ _ H_lookup).
-              set_solver.
-            }
-            rewrite big_sepM_insert; last by apply lookup_delete.
-            iSplitL "Hmem_key".
-            -- iExists h.
-               iFrame.
-               iPureIntro.
-               apply (Himp k h V).
-               split; last done.
-               by rewrite lookup_insert.
-            -- iDestruct (IH _ Hdom' with "[$Hmem_keys]") as "Hmem_keys'"; last by iFrame.
-               intros k' h' V' (Heq1 & Heq2).
-               apply (Himp k' h' V').
-               destruct (decide (k = k')) as [-> | Hneq].
-               ++ rewrite lookup_delete in Heq2.
-                  by inversion Heq2.
-               ++ rewrite lookup_insert_ne; last done.
-                  split; first done.
-                  rewrite lookup_delete_ne in Heq2; done.
+        + iDestruct (rewrite_maps_3 _ _ Hdom Himp with "[$Hmem_keys]") as "Hmem_keys".
+          iFrame.
         + iDestruct (big_sepM_sep_2 with "[$Hloc_keys] [$Hseen_keys]") as "Hkeys".
           rewrite big_sepM_dom.
           rewrite Hdom.
@@ -343,174 +418,55 @@ Section Implication.
           split; first done.
           by apply last_Some_elem_of.
     }
-    Admitted.
-    (* iClear "Hrc_read Hrc_start Hrc_write Hrc_init_cli Hrc_init_kvs". 
-    unfold commit_spec, read_committed.specs.specs.commit_spec.
+    iClear "Hsi_read Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs". 
+    unfold commit_spec.
     iModIntro.
     iIntros (c sa E') "%Hsub' Hconn".
-    iDestruct ("Hrc_com" $! c sa E' Hsub' with "Hconn") as "Hrc_com'".
+    iDestruct ("Hsi_com" $! c sa E' Hsub' with "Hconn") as "Hsi_com'".
     iIntros (Φ).
-    iDestruct ("Hrc_com'" $! Φ) as "#Hrc_com''".
+    iDestruct ("Hsi_com'" $! Φ) as "#Hsi_com''".
     iModIntro.
     iIntros "Hhyp".
-    iApply "Hrc_com''".
+    iApply "Hsi_com''".
     iMod "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
     iModIntro.
-    simpl.
-    iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & Hmem_keys)]".
-    iExists s, mc, m'.
-    iDestruct (rewrite_maps_2 with "[$Hmem_keys]") as "(Hauth_keys & Hmem_keys)".
+    iDestruct "Hstate" as "[(%Hfalse & _)|[%ms (%Heq_active & Hstate)]]"; first done.
+    iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & %Himp & Hmem_keys)]".
+    iDestruct (rewrite_maps_2 with "[$Hloc_keys]") as "[%mc' (%Hdom_mc & %Hbi_mc & Hloc_keys)]".
+    iExists m', ms, mc'.
     iFrame.
-    iDestruct (rewrite_maps_4 with "[$Hloc_keys]") as "(Hloc_keys & Hfrag_keys)".
-    iSplitL "Hloc_keys".
+    iSplitR.
     {
-      iSplitR; first by iPureIntro.
-      iSplitR.
-      - iPureIntro.
-        set_solver.
-      - iFrame.
+      iPureIntro.
+      inversion Heq_active as [Heq].
+      split; set_solver.
     }
     iNext.
     iIntros (b) "(Hstate & Hdisj)".
-    iDestruct "Hdisj" as "[(_ & Hmem_keys) | (_ & Hmem_keys)]".
-    - iAssert (([∗ map] k↦vo ∈ mc, emp)%I) as "Hemp_keys"; first done.
-      assert (∀ k , is_Some (m' !! k) ↔ is_Some (mc !! k)) as Hsome_iff.
-      {
-        intro k.
-        split.
-        all : intro Hsome.
-        by rewrite -elem_of_dom -Hdom -Hdom2 elem_of_dom in Hsome.
-        1 : by rewrite -elem_of_dom Hdom2 Hdom elem_of_dom in Hsome.
-      }
-      iDestruct (big_sepM2_sepM_2 with "[$Hauth_keys] [$Hemp_keys]") as "Hauth_keys"; first done.
-      iDestruct (big_sepM2_sep_2 with "[$Hauth_keys] [$Hmem_keys]") as "Hmem_keys".
-      iAssert (([∗ map] k↦vo ∈ m', emp)%I) as "Hemp_keys'"; first done.
-      iDestruct (big_sepM2_sepM_2 with "[$Hemp_keys'] [$Hfrag_keys]") as "Hfrag_keys"; first done.
-      iDestruct (big_sepM2_sep_2 with "[$Hfrag_keys] [$Hmem_keys]") as "Hmem_keys".
-      iInv KVS_InvName as ">Hinv_res" "Hinv_close".
-      iAssert ((|==>(([∗ map] k↦V;vo ∈ m';mc,
-                (∃ V', ⌜V ⊆ V'⌝ ∗ ⌜m !! k = Some V'⌝ ∗ OwnAuthSet γA k V' ∗
-                (∃ V'', ⌜V'' ⊆ V'⌝ ∗ read_committed.specs.resources.OwnMemKey k V'')) ∗ emp)) ∗ OwnInv γA γF)%I) 
-                 with "[Hmem_keys Hinv_res]" as ">(Hmem_keys & Hinv_res)".
-      {
-        iClear "Hemp_keys Hemp_keys' Hrc_com Hrc_com'' Hinv" .
-        iStopProof.
-        clear Hdom Hdom1 Hdom2.
-        generalize dependent mc.
-        induction m' as [|k V m' Hlookup IH] using map_ind.
-        - iIntros (mc Hsome_iff) "(Hkeys & Hinv_res)".
-          iModIntro.
-          iDestruct (big_sepM2_empty_r with "Hkeys") as "->".
-          iFrame.
-          by do 2 rewrite big_sepM2_empty.
-        - iIntros (mc Hsome_iff) "(Hkeys & Hinv_res)".
-          destruct (Hsome_iff k) as (Hsome_if_1 & Hsome_if_2).
-          rewrite lookup_insert in Hsome_if_1.
-          assert (is_Some (Some V)) as His_some; first done.
-          apply Hsome_if_1 in His_some.
-          destruct (mc !! k) as [ov|] eqn:Hlookup'; last by inversion His_some.
-          rewrite -(insert_delete _ _ _ Hlookup').
-          do 2 rewrite big_sepM2_insert_delete.
-          rewrite delete_idemp.
-          iDestruct "Hkeys" as "(((_ & [%Vk (%Hdisj & Hfrag_k)]) & 
-                    (([%Vk' (%Hsub_k & Hlookup_k_m & Hauth_k)] & _) & Hmem_k)) & Hkeys)".
-          rewrite (delete_notin _ _ Hlookup).
-          iDestruct (IH with "[$Hkeys $Hinv_res]") as ">(Hkeys & Hinv_res)".
-          {
-            intro key.
-            split; intro Hsome.
-            - destruct (decide (k = key)) as [-> | Hneq].
-              + rewrite Hlookup in Hsome.
-                by inversion Hsome.
-              + rewrite lookup_delete_ne; last done.
-                apply Hsome_iff.
-                by rewrite lookup_insert_ne.
-            - destruct (decide (k = key)) as [-> | Hneq].
-              + rewrite lookup_delete in Hsome.
-                by inversion Hsome.
-              + rewrite lookup_delete_ne in Hsome; last done.
-                apply Hsome_iff in Hsome.
-                by rewrite lookup_insert_ne in Hsome.
-          }
-          iFrame "Hkeys".
-          iDestruct (ownSetInclusion with "[$Hinv_res] [$Hauth_k] [$Hfrag_k]") as "(Hinv_res & Hauth_k & Hfrag_k & %Hsub'')".
-          iModIntro.
-          iFrame.
-          iSplitL; last done.
-          iExists Vk'.
-          iFrame.
-          iSplitR; first by iPureIntro.
-          iExists (commit_event ov V).
-          iFrame.
-          iPureIntro.
-          destruct Hdisj as [[v (Heq_some & Hin)]|Heq_none].
-          + rewrite Heq_some.
-            simpl.
-            set_solver.
-          + rewrite Heq_none.
-            simpl.
-            set_solver.
-      }
-      iMod ("Hinv_close" with "[Hinv_res]") as "_"; first done.
-      iApply "Hhyp_later".
+    iApply "Hhyp_later".
+    iSplitL "Hstate".
+    {
+      simpl.
+      iLeft.
+      iSplitR; first by iPureIntro.
       iFrame.
-      rewrite (big_sepM2_sepM _ (λ k vo, emp)%I _ _  Hsome_iff).
-      iDestruct "Hmem_keys" as "(Hmem_keys & _)".
-      iClear "Hinv Hrc_com Hrc_com'' Hemp_keys Hemp_keys'".
-      clear Hsome_iff Hdom1 Hdom2.
-      iStopProof.
-      generalize dependent m.
-      induction m' as [|k V m' Hlookup IH] using map_ind.
-      + iIntros (m Hdom) "_".
-        rewrite dom_empty_L dom_empty_iff_L in Hdom.
-        rewrite Hdom. 
-        by rewrite big_sepM_empty.
-      + iIntros (m Hdom) "Hkeys".
-        assert (k ∈ dom m) as Hin; first by set_solver.
-        rewrite elem_of_dom in Hin.
-        destruct (m !! k) as [V''|] eqn:Heq; last by destruct Hin.
-        rewrite -(insert_delete _ _ _ Heq).
-        rewrite -(insert_delete _ _ _ Heq) in Hdom.
-        assert (dom (delete k m) = dom m') as Hdom'.
-        {
-          do 2 rewrite dom_insert_L in Hdom.
-          rewrite -(delete_notin _ _ Hlookup) in Hdom.
-          rewrite -(delete_notin _ _ Hlookup).
-          set_solver.
-        }
-        rewrite big_sepM_insert; last done.
-        iDestruct "Hkeys" as "(Hkey & Hkeys)".
-        rewrite big_sepM_insert; last by apply lookup_delete.
-        iAssert (([∗ map] k0↦y ∈ m', ∃ V' : Vals, ⌜y ⊆ V'⌝ ∗ 
-                  ⌜(delete k m) !! k0 = Some V'⌝ ∗ OwnAuthSet γA k0 V' ∗ 
-                  (∃ V''0 : Vals, ⌜V''0 ⊆ V'⌝ ∗ read_committed.specs.resources.OwnMemKey k0 V''0)))%I 
-                with "[Hkeys]" as "Hkeys".
-        {
-          iApply (big_sepM_mono with "[$Hkeys]").
-          iIntros (kx x H_lookup') "[%x' (Hsub_x & %H_lookup_x & Hauth & Hrest)]".
-          iExists x'.
-          iFrame.
-          iPureIntro.
-          destruct (decide (k = kx)) as [-> | Hneq].
-          - apply elem_of_dom_2 in H_lookup'.
-            rewrite -Hdom' in H_lookup'.
-            rewrite dom_delete_L in H_lookup'.
-            set_solver.
-          - rewrite lookup_insert_ne in H_lookup_x; done.
-        }
-        iDestruct (IH _ Hdom' with "[$Hkeys]") as "Hkeys".
-        iFrame. 
-        iDestruct "Hkey" as "[%Vk (%Hsub_k & %Hlookup_k & Hauth_k & [%Vk' (%Hsub_k' & Hmem_k)])]".
-        iExists Vk'.
-        iFrame.
-        rewrite lookup_insert in Hlookup_k.
-        inversion Hlookup_k as [Heq'].
-        iFrame.
-        by iPureIntro.
-    - iApply "Hhyp_later".
+    }
+    iDestruct "Hdisj" as "[(-> & (_ & Hkeys)) | (-> & _ & Hkeys)]".
+    - iLeft.
+      iSplitR; first by iPureIntro.
+      rewrite big_sepM2_sep.
+      iDestruct "Hkeys" as "(Hkeys & _)".
+      unfold commit_event.
+      unfold aux_defs.commit_event.
+      simpl.
+      admit.
+    - iRight.
+      iSplitR; first by iPureIntro.
+      simpl.
+      rewrite big_sepM_sep.
+      iDestruct "Hkeys" as "(Hkeys & _)".
+      iDestruct (rewrite_maps_3 _ _ Hdom Himp with "[$Hkeys]") as "Hkeys".
       iFrame.
-      iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".
-      iFrame.
-  Admitted. *)
+  Admitted.
 
 End Implication.
