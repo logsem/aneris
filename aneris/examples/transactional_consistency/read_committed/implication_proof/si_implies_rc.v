@@ -459,7 +459,102 @@ Section Implication.
       unfold commit_event.
       unfold aux_defs.commit_event.
       simpl.
-      admit.
+      iClear "Hsi_inv Hsi_com Hsi_com''".
+      iStopProof.
+      clear Hdom1 Hdom2 Heq_active.
+      generalize dependent mc'.
+      generalize dependent m.
+      generalize dependent mc.
+      induction m' as [|k h m_' Hlookup IH] using map_ind.
+      + iIntros (mc m Hdom Himp mc' Hdom_mc Hbi) "Hkeys".
+        iDestruct (big_sepM2_empty_r with "Hkeys") as "->".
+        rewrite dom_empty_L in Hdom.
+        rewrite dom_empty_L in Hdom_mc.
+        rewrite dom_empty_iff_L in Hdom.
+        rewrite dom_empty_iff_L in Hdom_mc.
+        rewrite Hdom Hdom_mc.
+        done.
+      + iIntros (mc m Hdom Himp mc' Hdom_mc Hbi) "Hkeys".
+        iPoseProof (big_sepM2_dom with "[$Hkeys]") as "%Hdom_'".
+        assert (k ∈ dom mc') as Hk_mc'; first set_solver.
+        rewrite elem_of_dom in Hk_mc'.
+        destruct (mc' !! k) as [p|] eqn:Hlookup_mc'; last by inversion Hk_mc'.
+        rewrite -(insert_delete _ _ _ Hlookup_mc').
+        assert (k ∈ dom mc) as Hk_mc; first set_solver.
+        rewrite elem_of_dom in Hk_mc.
+        destruct (mc !! k) as [ov|] eqn:Hlookup_mc; last by inversion Hk_mc.
+        rewrite -(insert_delete _ _ _ Hlookup_mc).
+        assert (k ∈ dom m) as Hk_m; first set_solver.
+        rewrite elem_of_dom in Hk_m.
+        destruct (m !! k) as [V|] eqn:Hlookup_m; last by inversion Hk_m.
+        rewrite -(insert_delete _ _ _ Hlookup_m).
+        do 2 rewrite big_sepM2_insert_delete.
+        do 3 rewrite delete_idemp.
+        iDestruct "Hkeys" as "(Hkey & Hkeys)".
+        iSplitL "Hkey".
+        * destruct p eqn:Hp.
+          destruct o eqn:Ho.
+          -- destruct b eqn:Hb.
+             ++ iExists (h ++ [v]).
+                iFrame. 
+                iPureIntro.
+                intro v'.
+                destruct ov eqn:Hov.
+                ** rewrite -(Hbi k v0) in Hlookup_mc.
+                   rewrite Hlookup_mc in Hlookup_mc'.
+                   inversion Hlookup_mc' as [Heq_v].
+                   assert (v' ∈ h ↔ v' ∈ V).
+                   {
+                     apply (Himp k).
+                     split; last done.
+                     apply lookup_insert. 
+                   }
+                   set_solver.
+                ** rewrite (Hbi k v) in Hlookup_mc'.
+                   rewrite Hlookup_mc in Hlookup_mc'.
+                   inversion Hlookup_mc'.
+             ++ iExists h.
+                iFrame.
+                iPureIntro.
+                intro v'.
+                destruct ov eqn:Hov.
+                ** rewrite -(Hbi k v0) in Hlookup_mc.
+                   rewrite Hlookup_mc in Hlookup_mc'.
+                   inversion Hlookup_mc'.
+                ** apply (Himp k).
+                   split; last done.
+                   apply lookup_insert. 
+          -- iExists h.
+             iFrame.
+             iPureIntro. 
+             intro v'.
+             destruct ov eqn:Hov.
+                ++ rewrite -(Hbi k v) in Hlookup_mc.
+                   rewrite Hlookup_mc in Hlookup_mc'.
+                   inversion Hlookup_mc'.
+                ++ apply (Himp k).
+                   split; last done.
+                   apply lookup_insert.
+        * rewrite (delete_notin _ _ Hlookup).
+          iDestruct (IH with "[$Hkeys]") as "Hkeys"; last iFrame.
+          -- rewrite -(delete_insert _ _ h Hlookup).
+             set_solver.
+          -- intros k' h' V' (Heq1 & Heq2).
+             destruct (decide (k = k')) as [-> | Hneq].
+             ++ rewrite lookup_delete in Heq2.
+                inversion Heq2.
+             ++ rewrite lookup_delete_ne in Heq2; last done.
+                apply (Himp k').
+                split; last done.
+                by rewrite lookup_insert_ne; last done.
+          -- set_solver.
+          -- intros k' v'.
+             destruct (decide (k = k')) as [-> | Hneq].
+             ++ do 2 rewrite lookup_delete.
+                set_solver.
+             ++ rewrite lookup_delete_ne; last done.
+                rewrite lookup_delete_ne; last done.
+                apply Hbi.
     - iRight.
       iSplitR; first by iPureIntro.
       simpl.
@@ -467,6 +562,6 @@ Section Implication.
       iDestruct "Hkeys" as "(Hkeys & _)".
       iDestruct (rewrite_maps_3 _ _ Hdom Himp with "[$Hkeys]") as "Hkeys".
       iFrame.
-  Admitted.
+  Qed.
 
 End Implication.
