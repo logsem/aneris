@@ -109,14 +109,9 @@ Section SI_Module.
   Context `{!anerisG Mdl Σ, !User_params,
             !KVSG Σ, !KVS_transaction_api}.
 
-  Class SI_client_toolbox `{!SI_resources Mdl Σ} := {
-    SI_init_kvs_spec : ⊢ init_kvs_spec;
-    SI_init_client_proxy_spec : ⊢ init_client_proxy_spec;
-    SI_read_spec : ⊢ read_spec;
-    SI_write_spec : ⊢ write_spec;
-    SI_start_spec : ⊢ start_spec;
-    SI_commit_spec : ⊢ commit_spec;
-  }.
+  Definition SI_client_toolbox `{!SI_resources Mdl Σ} : iProp Σ :=
+    init_kvs_spec ∗ init_client_proxy_spec ∗ read_spec ∗
+    write_spec ∗ start_spec ∗ commit_spec.
  
    Class SI_init := {
     SI_init_module E (clients : gset socket_address) :

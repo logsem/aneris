@@ -11,7 +11,7 @@ From iris.algebra Require Import excl.
 Section proof.
 
   Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api, 
-            !RC_resources Mdl Σ, !RC_client_toolbox}.
+            !RC_resources Mdl Σ}.
 
   Lemma wait_transaction_spec :
     ∀ (c cond v : val) (key : Key) (sa : socket_address) (E : coPset),
@@ -19,6 +19,7 @@ Section proof.
     ⌜key ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗  
     GlobalInv -∗
+    RC_client_toolbox -∗
     □ (|={⊤, E}=> ∃ V, key ↦ₖ V ∗ ▷ (key ↦ₖ V ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
@@ -27,10 +28,10 @@ Section proof.
         wait_transaction c cond #key @[ip_of_address sa]
     {{{ V, RET #(); ConnectionState c sa CanStart ∗ Seen key ({[v]} ∪ V) }}}.
   Proof.
-    iIntros (c cond v key sa E) "%Hsub %Hin #Hginv #Hconn #Hshift #Htest !# %Φ Hstate HΦ".
+    iIntros (c cond v key sa E) "%Hsub %Hin #Hginv #Hconn (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) #Hshift #Htest !# %Φ Hstate HΦ".
     rewrite /wait_transaction.
     wp_pures.
-    wp_apply (RC_start_spec with "[//][$]").
+    wp_apply ("Hst" with "[//][$]").
     iPoseProof "Hshift" as "Hshift'".
     iMod "Hshift'" as "[%V (Hkey & Hclose)]".
     iModIntro.
@@ -43,7 +44,7 @@ Section proof.
     iModIntro.
     wp_pures.
     iLöb as "IH".
-    wp_apply (RC_read_spec with "[//][//][$]").
+    wp_apply ("Hrd" with "[//][//][$]").
     iPoseProof "Hshift" as "Hshift'".
     iMod "Hshift'" as "[%V' (Hkey' & Hclose)]".
     iModIntro.
@@ -61,7 +62,7 @@ Section proof.
       destruct b eqn:Heq_b; wp_pures.
       + rewrite /commitU.
         wp_pures.
-        wp_apply (RC_commit_spec with "[//][$]").
+        wp_apply ("Hcom" with "[//][$]").
         iMod "Hshift" as "[%V'' (Hkey & Hclose)]".
         iModIntro.
         iExists (dom {[key := V]}), {[key := None]}, {[key := V'']}.

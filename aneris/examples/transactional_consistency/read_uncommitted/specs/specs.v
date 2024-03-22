@@ -102,14 +102,9 @@ End Specification.
 Section RU_Module.
   Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api}.
 
-  Class RU_client_toolbox `{!RU_resources Mdl Σ} := {
-    RU_init_kvs_spec : ⊢ init_kvs_spec;
-    RU_init_client_proxy_spec : ⊢ init_client_proxy_spec;
-    RU_read_spec : ⊢ read_spec;
-    RU_write_spec : ⊢ write_spec;
-    RU_start_spec : ⊢ start_spec;
-    RU_commit_spec : ⊢ commit_spec;
-  }.
+  Definition RU_client_toolbox `{!RU_resources Mdl Σ} : iProp Σ :=
+    init_kvs_spec ∗ init_client_proxy_spec ∗ read_spec ∗
+    write_spec ∗ start_spec ∗ commit_spec.
  
    Class RU_init := {
     RU_init_module E (clients : gset socket_address) :

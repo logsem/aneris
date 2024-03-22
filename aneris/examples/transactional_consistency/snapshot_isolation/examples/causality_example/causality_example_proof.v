@@ -38,7 +38,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proof_of_code.
 
-  Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
+  Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
 
   Definition client_inv_def : iProp Σ :=
     ∃ hx hy, "x" ↦ₖ hx ∗ "y" ↦ₖ hy ∗ (
@@ -49,15 +49,16 @@ Section proof_of_code.
 
   Lemma transaction1_spec :
     ∀ (cst : val) sa,
+    SI_client_toolbox -∗
     client_inv -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !> (CanStart & #HiC) HΦ".
+    iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) #inv %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction1.
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%hx & %hy & x_hx & y_hy & Hinv)" "close".
     iModIntro.
     iExists {[ "x" := hx; "y" := hy ]}.
@@ -73,7 +74,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_insert with "cache") as "((y_hy & y_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
     iModIntro.
     iExists _, _.
     iFrame.
@@ -82,6 +83,7 @@ Section proof_of_code.
     iModIntro.
     wp_pures.
     wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
+    iFrame "#".
     iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & Hinv)" "close".
     iModIntro.
     iExists {[ "x" := hx'; "y" := hy' ]}, _,
@@ -115,17 +117,18 @@ Section proof_of_code.
   Lemma transaction2_spec :
     ∀ (cst : val) sa,
       client_inv -∗
-      GlobalInv -∗           
+      GlobalInv -∗
+      SI_client_toolbox -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction2 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv #ginv %Φ !> (CanStart & #HiC) HΦ".
+    iIntros (cst sa) "#inv #ginv (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction2.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ #1 _ _ (⊤ ∖ ↑client_inv_name)
-        with "[] [] [$] [] [] [$CanStart $HiC]");
-    [solve_ndisj|set_solver|..].
+        with "[] [] [$] [] [] [] [$CanStart $HiC]");
+    [solve_ndisj|set_solver|iFrame "#"|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & x_hx & y_hy & %Hinv)" "close".
@@ -147,7 +150,7 @@ Section proof_of_code.
     }
     iIntros (h) "(CanStart & Seen)".
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
     iInv "inv" as ">(%hx & %hy & x_hx & y_hy & [(-> & _)|%hx_1])" "close".
     {
       iMod (Seen_valid with "[$ginv][$Seen $x_hx]") as "(_ & %abs)";
@@ -173,7 +176,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache")
         as "((y_hy & y_upd) & _)"; first done.
     wp_pures.
-    wp_apply (SI_write_spec $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
     iModIntro.
     iExists _, _.
     iFrame.
@@ -182,6 +185,7 @@ Section proof_of_code.
     iModIntro.
     wp_pures.
     wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
+    iFrame "#".
     iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(-> & _)|Hinv])" "close".
     {
       iMod (Seen_valid with "[$ginv][ $Seen $x_hx']") as "(_ & %abs)";
@@ -216,17 +220,18 @@ Section proof_of_code.
   Lemma transaction3_spec :
     ∀ (cst : val) sa,
       client_inv -∗
-      GlobalInv -∗           
+      GlobalInv -∗
+      SI_client_toolbox -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction3 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv #ginv %Φ !> (CanStart & #HiC) HΦ".
+    iIntros (cst sa) "#inv #ginv (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> (CanStart & #HiC) HΦ".
     rewrite/transaction3.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ #1 _ _ (⊤ ∖ ↑client_inv_name)
-        with "[] [] [$] [] [] [$CanStart $HiC]");
-    [solve_ndisj|set_solver|..].
+        with "[] [] [$] [] [] [] [$CanStart $HiC]");
+    [solve_ndisj|set_solver|iFrame "#"|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & x_hx & y_hy & %Hinv)" "close".
@@ -248,7 +253,7 @@ Section proof_of_code.
     }
     iIntros (h) "(CanStart & Seen)".
     wp_pures.
-    wp_apply (SI_start_spec $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%hx & %hy & x_hx & y_hy & [(_ & ->)|%hx_1])" "close".
     {
       iMod (Seen_valid with "[$ginv][$Seen $y_hy]") as "(_ & %abs)";
@@ -274,7 +279,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_delete _ _ "x" hx with "cache")
         as "((x_hx & x_upd) & _)"; first done.
     wp_pures.
-    wp_apply (SI_read_spec $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
     iModIntro.
     iExists _.
     iFrame.
@@ -285,6 +290,7 @@ Section proof_of_code.
     rewrite/assert hx_1.
     wp_pures.
     wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; try eauto.
+    iFrame "#".
     iInv "inv" as ">(%hx' & %hy' & x_hx' & y_hy' & [(_ & ->)|Hinv])" "close".
     {
       iMod (Seen_valid with "[$ginv][$Seen $y_hy']") as "(_ & %abs)";
@@ -319,6 +325,7 @@ Section proof_of_code.
   Lemma transaction1_client_spec :
     ∀ clt,
     client_inv -∗
+    SI_client_toolbox -∗
     {{{
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
@@ -329,19 +336,22 @@ Section proof_of_code.
       transaction1_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
+    iIntros (clt) "#inv (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction1_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
+    wp_apply ("Hinit_cli" with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction1_spec with "inv CanStart").
+    wp_apply (transaction1_spec with "[] [$inv] [$CanStart]").
+    iFrame "#".
+    done.
   Qed.
 
   Lemma transaction2_client_spec :
     ∀ clt,
       client_inv -∗
-      GlobalInv -∗           
+      GlobalInv -∗
+      SI_client_toolbox -∗
     {{{
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
@@ -352,19 +362,22 @@ Section proof_of_code.
       transaction2_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv #ginv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
+    iIntros (clt) "#inv #ginv (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction2_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
+    wp_apply ("Hinit_cli" with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction2_spec with "inv ginv CanStart").
+    wp_apply (transaction2_spec with "[$inv] [$ginv] [] [$CanStart]").
+    iFrame "#".
+    done.
   Qed.
 
   Lemma transaction3_client_spec :
     ∀ clt,
       client_inv -∗
       GlobalInv -∗
+      SI_client_toolbox -∗
     {{{
       clt ⤳ (∅, ∅) ∗
       KVS_address ⤇ KVS_si ∗
@@ -375,16 +388,19 @@ Section proof_of_code.
       transaction3_client #clt #KVS_address @[ip_of_address clt]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (clt) "#inv #ginv %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
+    iIntros (clt) "#inv #ginv (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> (∅ & #KVS_si & unalloc & Hcc & free) HΦ".
     rewrite/transaction3_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$∅ $unalloc $free $KVS_si $Hcc]").
+    wp_apply ("Hinit_cli" with "[$∅ $unalloc $free $KVS_si $Hcc]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction3_spec with "inv ginv CanStart").
+    wp_apply (transaction3_spec with "[$inv] [$ginv] [] [$CanStart]").
+    iFrame "#".
+    done.
   Qed.
 
   Lemma server_spec :
+    SI_client_toolbox -∗
     {{{
       KVS_Init ∗
       KVS_address ⤳ (∅, ∅) ∗
@@ -394,10 +410,10 @@ Section proof_of_code.
       server #KVS_address @[ip_of_address KVS_address]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(KVS_Init & ∅ & free & #KVS_si) HΦ".
+    iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> (KVS_Init & ∅ & free & #KVS_si) HΦ".
     rewrite/server.
     wp_pures.
-    by wp_apply (SI_init_kvs_spec with "[$KVS_si $KVS_Init $∅ $free]").
+    by wp_apply ("Hinit_kvs" with "[$KVS_si $KVS_Init $∅ $free]").
   Qed.
 
 End proof_of_code.
@@ -447,7 +463,7 @@ Section proof_of_runner.
     wp_apply (aneris_wp_start {[80%positive]}).
     iSplitL "srv_free"; first done.
     iSplitR "KVS_Init srv_∅"; last first.
-    { iIntros "!>free". by wp_apply (server_spec with "[$]"). }
+    { iIntros "!>free". by wp_apply (server_spec with "[$] [$]"). }
     iNext.
     wp_pures.
     iDestruct (big_sepS_delete _  _ client1_addr with "Hcc")
@@ -464,7 +480,7 @@ Section proof_of_runner.
     iSplitR "clt1_∅ clt1_unalloc Hcc1"; last first.
     {
       iIntros "!>free".
-      by wp_apply (transaction1_client_spec client1_addr with "inv [$]").
+      by wp_apply (transaction1_client_spec client1_addr with "inv [$] [$]").
     }
     iNext.
     wp_pures.
@@ -473,7 +489,7 @@ Section proof_of_runner.
     iSplitR "clt2_∅ clt2_unalloc Hcc2"; last first.
     {
       iIntros "!>free".
-      by wp_apply (transaction2_client_spec client2_addr with "inv Hginv [$]").
+      by wp_apply (transaction2_client_spec client2_addr with "inv Hginv [$] [$]").
     }
     iNext.
     wp_pures.
@@ -482,12 +498,11 @@ Section proof_of_runner.
     iSplitR "clt3_∅ clt3_unalloc Hcc3"; last first.
     {
       iIntros "!>free".
-      by wp_apply (transaction3_client_spec client3_addr with "inv Hginv [$]").
+      by wp_apply (transaction3_client_spec client3_addr with "inv Hginv [$] [$]").
     }
     iNext.
     by iApply "HΦ".
-    (* Unshelve. all: by idestruct specs as (?&?&?&?&?&?); eauto. *)
-  Admitted.
+  Qed.
 
 End proof_of_runner.
 
