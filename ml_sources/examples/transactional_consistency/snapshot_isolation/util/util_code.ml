@@ -21,6 +21,18 @@ let wait_transaction (cst : 'a connection_state)
       else (commitT cst; aux ())
   in aux ()
 
+  let weak_wait_transaction (cst : 'a connection_state)
+      (cond : 'a -> bool) (k : string) : unit =
+    start cst;
+    let rec aux () =
+      match read cst k with
+      | None -> aux ()
+      | Some v ->
+        if cond v
+        then commitU cst
+        else aux ()
+    in aux ()
+
 let run (cst : 'a connection_state)
     (handler : 'a connection_state -> unit) : bool =
   start cst;

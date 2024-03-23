@@ -1,17 +1,19 @@
 From aneris.aneris_lang Require Import tactics adequacy proofmode.
 From aneris.examples.transactional_consistency.read_uncommitted.specs
   Require Import resources specs.
-From aneris.examples.transactional_consistency Require Import user_params aux_defs weak_wait.
+From aneris.examples.transactional_consistency Require Import user_params aux_defs.
 From aneris.examples.transactional_consistency Require Import code_api.
 From aneris.examples.transactional_consistency Require Import resource_algebras.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From iris.algebra Require Import gmap.
 From iris.algebra Require Import excl.
+From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_code.
+From aneris.examples.transactional_consistency.snapshot_isolation.instantiation Require Import
+     snapshot_isolation_api_implementation.
 
 Section proof.
 
-  Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api, 
-            !RU_resources Mdl Σ}.
+  Context `{!anerisG Mdl Σ, !User_params, !RU_resources Mdl Σ}.
 
   Lemma wait_transaction_spec :
     ∀ (c cond v : val) (key : Key) (sa : socket_address) (E : coPset),
@@ -25,11 +27,11 @@ Section proof.
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
     {{{ ConnectionState c sa CanStart }}}
-        wait_transaction c cond #key @[ip_of_address sa]
+        weak_wait_transaction c cond #key @[ip_of_address sa]
     {{{ V, RET #(); ConnectionState c sa CanStart ∗ Seen key ({[v]} ∪ V) }}}.
   Proof.
     iIntros (c cond v key sa E) "%Hsub %Hin #Hginv #Hconn (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) #Hshift #Htest !# %Φ Hstate HΦ".
-    rewrite /wait_transaction.
+    rewrite /weak_wait_transaction.
     wp_pures.
     wp_apply ("Hst" with "[//][$]").
     iPoseProof "Hshift" as "Hshift'".

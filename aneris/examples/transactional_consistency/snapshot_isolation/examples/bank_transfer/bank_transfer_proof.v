@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -27,13 +27,13 @@ Section proof.
   Context `{!User_params, !anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
 
   Definition client_inv src dst : iProp Σ :=
-    ∃ (h_src h_dst : Hist) (v_src v_dst : nat), src ↦ₖ (h_src ++ [$v_src]) ∗ dst ↦ₖ (h_dst ++ [$v_dst]).
+    ∃ (h_src h_dst : Hist) (v_src v_dst : nat), src ↦ₖ (h_src ++ [(#v_src)]) ∗ dst ↦ₖ (h_dst ++ [(#v_dst)]).
 
   Lemma transfer_transaction (amount : nat) (c : val) (src dst : Key) 
     (client_addr : socket_address) (client_inv_name : namespace) :
     SI_client_toolbox -∗
     {{{ ⌜src ∈ KVS_keys⌝ ∗ ⌜dst ∈ KVS_keys⌝ ∗ ⌜src ≠ dst⌝ ∗ 
-        (* ⌜KVS_InvName ⊆ ⊤ ∖ client_inv_name⌝ ∗ *)
+        ⌜↑KVS_InvName ⊆ (⊤ : coPset) ∖ ↑client_inv_name⌝ ∗
         inv client_inv_name (client_inv src dst) ∗ 
         ConnectionState c client_addr CanStart  ∗ 
         IsConnected c client_addr }}}
@@ -41,15 +41,12 @@ Section proof.
     {{{ v, RET v; True }}}.
   Proof.
     iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> 
-    (%Hin & %Hin' & %Hneq & #Hinv & Hstate & #Hconn) HΦ".
+    (%Hin & %Hin' & %Hsub & %Hneq & #Hinv & Hstate & #Hconn) HΦ".
     rewrite /transaction. wp_pures. 
     wp_apply ("Hst" $! c client_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
-    (* Search (_ ⊆ _). *)
-    (* iPureIntro. set_solver. *)
-    admit.
     iInv (client_inv_name) as ">[%h_src [%h_dst [%v_src [%v_dst (Hks & Hkd)]]]]" "Hclose".
     iModIntro. iFrame.
-    iExists {[src := (h_src ++ [$ v_src]); dst := (h_dst ++ [$ v_dst])]}.
+    iExists {[src := (h_src ++ [(#v_src)]); dst := (h_dst ++ [(#v_dst)])]}.
     rewrite !big_sepM_insert; try set_solver. 
     2 : by apply lookup_singleton_ne.
     2 : by apply lookup_singleton_ne.
@@ -68,54 +65,103 @@ Section proof.
     iIntros "Hcs1".
     iModIntro.
     do 2 rewrite last_snoc.
-    rewrite /unSOME.
+    rewrite /util_code.unSOME.
     wp_pures.
-    (* wp_op. *)
-    (* case_bool_decide. *)
-    (* destruct (bin_op_eval LeOp amount v_src) eqn:asd. *)
     case_bool_decide as Hleq.
     - wp_pures.
-      admit.
+      wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #(v_src - amount)) with "[//][][$]"); first set_solver.
+      iModIntro.
+      iExists _, _.
+      iFrame.
+      iNext.
+      iIntros "(Hcs1 & Hcs2)".
+      iModIntro.
+      wp_pures.
+      wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first by iPureIntro.
+      iModIntro.
+      iExists _.
+      iFrame.
+      iNext.
+      iIntros "Hcd1".
+      iModIntro.
+      wp_pures.
+      wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #(v_dst + amount)) with "[//][][$]"); first set_solver.
+      iModIntro.
+      iExists _, _.
+      iFrame.
+      iNext.
+      iIntros "(Hcd1 & Hcd2)".
+      iModIntro.
+      wp_pures.
+      wp_apply (commitU_spec c client_addr (⊤ ∖ ↑client_inv_name));
+      try solve_ndisj. iFrame "#".
+      iInv (client_inv_name) as ">[%h_src' [%h_dst' [%v_src' [%v_dst' (Hks' & Hkd')]]]]" "Hclose".
+      iModIntro.
+      iExists {[src := (h_src' ++ [(#v_src')]); dst := (h_dst' ++ [(#v_dst')])]} , _, 
+        {[src := (Some (#(v_src - amount)), true); dst := (Some (#(v_dst + amount)), true)]}.
+      iFrame.
+      iSplitL "Hcs1 Hcs2 Hcd1 Hcd2 Hks' Hkd'".
+        + iSplitR. iPureIntro. set_solver.
+          iSplitR. iPureIntro. set_solver.
+          iSplitL "Hks' Hkd'".
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite !big_sepM_empty. iFrame.
+          by apply lookup_singleton_ne.
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite !big_sepM_empty. iFrame.
+          by apply lookup_singleton_ne.
+        + iNext. iIntros "[_ HBig]".
+          iMod ("Hclose" with "[HBig]") as "_".
+          * iNext. iExists (h_src' ++ [(#v_src')]), (h_dst' ++ [(#v_dst')]), 
+            (v_src - amount), (v_dst + amount).
+            iDestruct "HBig" as "[(_ & Hkeys)|(_ & Hkeys)]".
+            -- rewrite !(big_sepM2_insert); try set_solver.
+              iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
+              simpl. 
+              (* iFrame%nat. *)
+              (* do 4 rewrite app_assoc_reverse_deprecated. *)
+              (* iFrame. *)
+              admit.
+              by apply lookup_singleton_ne.
+              by apply lookup_singleton_ne.
+            -- rewrite !(big_sepM_insert); try set_solver.
+              iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
+              iFrame.
+              admit.
+              by apply lookup_singleton_ne.
+          * iModIntro. by iApply "HΦ".
     - wp_pures.
-    Search "case_bool_decide".
-    wp_op.
-    {
-      unfold bin_op_eval.
-    }
-    Search "bin_op_eval_".
-    (* wp_op; try done. *)
-    wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
-    iModIntro.
-    iExists _, _.
-    iFrame.
-    iNext.
-    iIntros "(Hcx1 & Hcx2)".
-    iModIntro.
-    wp_pures.
-    wp_apply (commitT_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name));
-    try solve_ndisj. iFrame "#".
-    iInv (client_inv_name) as ">[%h' (Hkx & [-> | (_ & Htok') ])]" "Hclose";
-    try iDestruct (token_exclusive with "Htok Htok'") as "[]".
-    iModIntro.
-    iExists {["x" := []]} , _, {["x" := (Some #1, true)]}.
-    iFrame.
-    iSplitL "Hcx1 Hcx2 Hkx".
-      + iSplitR. iPureIntro. set_solver.
-        iSplitR. iPureIntro. set_solver.
-        iSplitL "Hkx".
-        rewrite !big_sepM_insert; try set_solver.
-        rewrite !big_sepM_insert; try set_solver.
-        rewrite !big_sepM_empty. iFrame.
-      + iNext. iIntros "[_ HBig]".
-        iMod ("Hclose" with "[HBig Htok]") as "_".
-            * iNext. iExists _.
-              rewrite !(big_sepM2_insert); try set_solver.
-              iDestruct "HBig" as "((Hkx & _) & _)".
+      wp_apply (commitU_spec c client_addr (⊤ ∖ ↑client_inv_name));
+      try solve_ndisj. iFrame "#".
+      iInv (client_inv_name) as ">[%h_src' [%h_dst' [%v_src' [%v_dst' (Hks' & Hkd')]]]]" "Hclose".
+      iModIntro.
+      iExists {[src := (h_src' ++ [$ v_src']); dst := (h_dst' ++ [$ v_dst'])]} , _, 
+        {[src := (Some ($v_src), false); dst := (Some ($v_dst), false)]}.
+      iFrame.
+      iSplitL "Hcs1 Hcs2 Hcd1 Hcd2 Hks' Hkd'".
+        + iSplitR. iPureIntro. set_solver.
+          iSplitR. iPureIntro. set_solver.
+          iSplitL "Hks' Hkd'".
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite !big_sepM_empty. iFrame.
+          by apply lookup_singleton_ne.
+          rewrite !big_sepM_insert; try set_solver.
+          rewrite !big_sepM_empty. iFrame.
+          by apply lookup_singleton_ne.
+        + iNext. iIntros "[_ HBig]".
+          iMod ("Hclose" with "[HBig]") as "_".
+          * iNext. iExists _, _, _, _.
+            iDestruct "HBig" as "[(_ & Hkeys)|(_ & Hkeys)]".
+            -- rewrite !(big_sepM2_insert); try set_solver.
+              iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
               iFrame.
-              iRight.
+              by apply lookup_singleton_ne.
+              by apply lookup_singleton_ne.
+            -- rewrite !(big_sepM_insert); try set_solver.
+              iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
               iFrame.
-              by iPureIntro.
-            * iModIntro. by iApply "HΦ".
-  Qed.
+              by apply lookup_singleton_ne.
+          * iModIntro. by iApply "HΦ".
+  Admitted.
 
-End proof. *)
+End proof.

@@ -25,6 +25,18 @@ Definition wait_transaction : val :=
     end in
     "aux" #().
 
+Definition weak_wait_transaction : val :=
+  λ: "cst" "cond" "k",
+  start "cst";;
+  letrec: "aux" <> :=
+    match: read "cst" "k" with
+      NONE => "aux" #()
+    | SOME "v" => (if: "cond" "v"
+         then  commitU "cst"
+         else  "aux" #())
+    end in
+    "aux" #().
+
 Definition run : val :=
   λ: "cst" "handler", start "cst";;
                        "handler" "cst";;
