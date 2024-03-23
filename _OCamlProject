@@ -71,6 +71,10 @@ ML_SOURCES:
 	examples/transactional_consistency/snapshot_isolation/examples/deprecated/only_reads/only_reads_code.ml
 	examples/transactional_consistency/snapshot_isolation/examples/deprecated/disjoint_writes/disjoint_writes_code.ml
   examples/transactional_consistency/snapshot_isolation/examples/sequential_writes/sequential_writes_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/read_skew/read_skew_code.ml
+  examples/transactional_consistency/snapshot_isolation/examples/write_skew/write_skew_code.ml
+	examples/transactional_consistency/snapshot_isolation/examples/bank_transfer/bank_transfer_code.ml
+  examples/transactional_consistency/snapshot_isolation/examples/non_repeatable_read/non_repeatable_read_code.ml
   examples/transactional_consistency/snapshot_isolation/examples/deprecated/no_serializability/no_serializability_code.ml
 	examples/transactional_consistency/snapshot_isolation/examples/deprecated/disjoint_reads/disjoint_reads_code.ml
 	examples/transactional_consistency/snapshot_isolation/examples/deprecated/read_your_writes/read_your_writes_code.ml
