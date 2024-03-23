@@ -34,3 +34,9 @@ let run_client caddr kvs_addr tbody =
   let b = run cst tbody in
   unsafe (fun () -> Printf.printf "Transaction %s.\n%!"
              (if b then "committed" else "aborted"))
+
+let rec loop () = loop ()
+
+let unSOME o = match o with
+    None -> assert false
+  | Some x -> x

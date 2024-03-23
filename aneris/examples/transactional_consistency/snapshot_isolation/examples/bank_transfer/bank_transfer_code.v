@@ -6,15 +6,14 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_code.
 From aneris.examples.transactional_consistency.snapshot_isolation Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_code.
 
-Definition transaction1 : val :=
+Definition transaction : val :=
   λ: "cst" "amount" "src" "dst",
   start "cst";;
-  let: "vsrc" := read "cst" "src" in
+  let: "vsrc" := unSOME (read "cst" "src") in
   (if: "amount" ≤ "vsrc"
    then
-     λ: <>,
-     let: "vdst" := read "cst" "dst" in
-     write "cst" "dst" ("vdst" + "amount") (write "cst" "src"
-                                            ("vsrc" - "amount"))
-     commitU "cst"
-   else  #()).
+     write "cst" "src" ("vsrc" - "amount");;
+     let: "vdst" := unSOME (read "cst" "dst") in
+     write "cst" "dst" ("vdst" + "amount")
+   else  #());;
+  commitU "cst".

@@ -38,3 +38,11 @@ Definition run_client : val :=
   let: "b" := run "cst" "tbody" in
   #() (* unsafe (fun () -> Printf.printf "Transaction %s.\n%!"
              (if b then "committed" else "aborted") *).
+
+Definition loop : val := rec: "loop" <> := "loop" #().
+
+Definition unSOME : val :=
+  λ: "o", match: "o" with
+    NONE => assert: #false
+  | SOME "x" => "x"
+  end.
