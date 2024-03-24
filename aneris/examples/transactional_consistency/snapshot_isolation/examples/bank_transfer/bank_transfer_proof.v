@@ -33,6 +33,7 @@ Section proof.
     (client_addr : socket_address) (client_inv_name : namespace) :
     SI_client_toolbox -∗
     {{{ ⌜src ∈ KVS_keys⌝ ∗ ⌜dst ∈ KVS_keys⌝ ∗ ⌜src ≠ dst⌝ ∗ 
+        ⌜∀ (n : nat), KVS_Serializable #n ⌝ ∗
         ⌜↑KVS_InvName ⊆ (⊤ : coPset) ∖ ↑client_inv_name⌝ ∗
         inv client_inv_name (client_inv src dst) ∗ 
         ConnectionState c client_addr CanStart  ∗ 
@@ -41,7 +42,7 @@ Section proof.
     {{{ v, RET v; True }}}.
   Proof.
     iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> 
-    (%Hin & %Hin' & %Hsub & %Hneq & #Hinv & Hstate & #Hconn) HΦ".
+    (%Hin & %Hin' & %Hsub & %Hser & %Hneq & #Hinv & Hstate & #Hconn) HΦ".
     rewrite /transaction. wp_pures. 
     wp_apply ("Hst" $! c client_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%h_src [%h_dst [%v_src [%v_dst (Hks & Hkd)]]]]" "Hclose".
@@ -112,23 +113,27 @@ Section proof.
           by apply lookup_singleton_ne.
         + iNext. iIntros "[_ HBig]".
           iMod ("Hclose" with "[HBig]") as "_".
-          * iNext. iExists (h_src' ++ [(#v_src')]), (h_dst' ++ [(#v_dst')]), 
-            (v_src - amount), (v_dst + amount).
+          * iNext. 
             iDestruct "HBig" as "[(_ & Hkeys)|(_ & Hkeys)]".
-            -- rewrite !(big_sepM2_insert); try set_solver.
-              iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
-              simpl. 
-              (* iFrame%nat. *)
-              (* do 4 rewrite app_assoc_reverse_deprecated. *)
-              (* iFrame. *)
-              admit.
-              by apply lookup_singleton_ne.
-              by apply lookup_singleton_ne.
-            -- rewrite !(big_sepM_insert); try set_solver.
-              iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
-              iFrame.
-              admit.
-              by apply lookup_singleton_ne.
+            -- iExists (h_src' ++ _), (h_dst' ++ _), (v_src - amount), (v_dst + amount).
+               rewrite !(big_sepM2_insert); try set_solver.
+               iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
+               simpl.
+               replace #(v_src - amount) with #(v_src - amount)%nat; last first. 
+               {
+                 repeat f_equal. lia.
+               }
+               replace #(v_dst + amount) with #(v_dst + amount)%nat; last first. 
+               {
+                 repeat f_equal. lia.
+               }
+               iFrame.
+               all : by apply lookup_singleton_ne.
+            -- iExists _, _, _, _.
+               rewrite !(big_sepM_insert); try set_solver.
+               iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
+               iFrame.
+               by apply lookup_singleton_ne.
           * iModIntro. by iApply "HΦ".
     - wp_pures.
       wp_apply (commitU_spec c client_addr (⊤ ∖ ↑client_inv_name));
@@ -162,6 +167,17 @@ Section proof.
               iFrame.
               by apply lookup_singleton_ne.
           * iModIntro. by iApply "HΦ".
-  Admitted.
+    Unshelve. 
+    replace #(v_src - amount) with #(v_src - amount)%nat; last first. 
+    {
+      repeat f_equal. lia.
+    }
+    apply Hser.
+    replace #(v_dst + amount) with #(v_dst + amount)%nat; last first. 
+    {
+      repeat f_equal. lia.
+    }
+    apply Hser.
+  Qed.
 
 End proof.
