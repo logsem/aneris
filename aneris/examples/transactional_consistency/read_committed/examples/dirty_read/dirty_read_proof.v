@@ -48,7 +48,7 @@ Section proof_of_code.
   Definition client_inv_def (γF1 γF2 : gname) : iProp Σ :=
     ∃ V_x V_y V_a V_b, "x" ↦ₖ V_x ∗ "y" ↦ₖ V_y ∗ "a" ↦ₖ V_a ∗ "b" ↦ₖ V_b ∗
     (((⌜V_x = ∅⌝ ∨ (⌜V_x = {[(#1)]}⌝ ∗ token γF1)) ∗ (⌜V_y = ∅⌝ ∨ (⌜V_y = {[(#1)]}⌝ ∗ token γF2)) ∗ ⌜V_a = ∅⌝ ∗ ⌜V_b = ∅⌝) ∨
-      (token γF1 ∗ token γF2 ∗ (⌜V_a = ∅⌝ ∨ ⌜V_b = ∅⌝))).
+      (token γF1 ∗ token γF2 ∗ ((⌜V_a = ∅ ∧ V_b = {[(#1)]}⌝) ∨ (⌜V_a = {[(#1)]} ∧ V_b = ∅⌝)))).
 
   Definition client_inv (γF1 γF2 : gname) : iProp Σ :=
     inv client_inv_name (client_inv_def γF1 γF2).
@@ -205,12 +205,15 @@ Section proof_of_code.
               simpl. iDestruct "Hkey" as "(Hkx & Hky & Hka & Hkb & _)". 
               iExists _, _, _, _.
               iFrame. iRight.
-              iFrame. by iRight.
+              iFrame. iRight.
+              iPureIntro. set_solver.
             - rewrite !big_sepM_insert; try set_solver.
               iDestruct "Hkey" as "(Hkx & Hky & Hka & Hkb & _)". 
               iExists _, _, _, _.
-              iFrame. iRight.
-              iFrame. by iLeft.
+              iFrame. iLeft.
+              iSplitR. by iLeft.
+              iSplitL. iRight.
+              by iFrame. done.
           }
           iModIntro.
           wp_pures.
@@ -418,12 +421,15 @@ Section proof_of_code.
               simpl. iDestruct "Hkey" as "(Hkx & Hky & Hka & Hkb & _)". 
               iExists _, _, _, _.
               iFrame. iRight.
-              iFrame. by iLeft.
+              iFrame. iLeft.
+              iPureIntro. set_solver.
             - rewrite !big_sepM_insert; try set_solver.
               iDestruct "Hkey" as "(Hkx & Hky & Hka & Hkb & _)". 
               iExists _, _, _, _.
-              iFrame. iRight.
-              iFrame. by iLeft.
+              iFrame. iLeft.
+              iSplitL. iRight.
+              by iFrame. iSplitL.
+              by iLeft. done.
           }
           iModIntro.
           wp_pures.
@@ -480,6 +486,50 @@ Section proof_of_code.
           by iApply "HΦ".
   Qed.
 
+  Lemma transaction3_end γF1 γF2 cst sa Φ :
+    GlobalInv -∗
+    RC_client_toolbox -∗
+    IsConnected cst sa -∗
+    client_inv γF1 γF2 -∗
+    (True -∗ Φ #()) -∗ 
+    ConnectionState cst sa (Active ({["x";"y";"a";"b"]})) -∗
+    ("x" ↦{ cst} None ∗ "y" ↦{ cst} None ∗ "a" ↦{ cst} None ∗ "b" ↦{ cst} None) -∗ 
+    WP util_code.commitU cst @[ip_of_address sa] {{ v, Φ v }}.
+  Proof. 
+    iIntros "#Hginv (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #Hconn #Hinv HΦ Hstate (Hcx & Hcy & Hca & Hcb)".
+    rewrite /util_code.commitU.
+    wp_pures.
+    wp_apply ("Hcom" $! _ _ (⊤ ∖ ↑client_inv_name) with "[] [$]"); first solve_ndisj.
+    iInv "Hinv" as ">(%Vx & %Vy & %Va & %Vb & Hkx & Hky & Hka & Hkb & Hres)" "Hclose".
+    iModIntro.
+    iExists _, ({["x" := None; "y" := None; "a" := None; "b" := None]}), 
+            ({["x" := Vx; "y" := Vy; "a" := Va; "b" := Vb]}).
+    iFrame.
+    iSplitR "HΦ Hclose Hres".
+    - iSplitR. iPureIntro. set_solver.
+      iSplitR. iPureIntro. set_solver.
+      rewrite !big_sepM_insert; try set_solver.
+      rewrite !big_sepM_empty. iFrame.
+    - iNext. 
+      iIntros (b) "(Hstate & Hdisj)".
+      iMod ("Hclose" with "[Hres Hdisj]") as "_".
+      { 
+        iNext. iExists _, _, _, _. iFrame.
+        iDestruct "Hdisj" as "[(_ & Hkeys)|(_ & Hkeys)]".
+        - rewrite !big_sepM2_insert; try set_solver.
+          simpl.
+          iDestruct "Hkeys" as "(Hkx & Hky & Hka & Hkb & _)".
+          iFrame.
+        - rewrite !big_sepM_insert; try set_solver.
+          iDestruct "Hkeys" as "(Hkx & Hky & Hka & Hkb & _)".
+          iFrame.
+      }
+      iModIntro.
+      wp_pures.
+      by iApply "HΦ". 
+  Qed.
+
   Lemma transaction3_spec γF1 γF2 :
     ∀ (cst : val) sa,
     RC_client_toolbox -∗
@@ -494,167 +544,121 @@ Section proof_of_code.
     wp_pures.
     wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%Vx & %Vy & %Va & %Vb & Hkx & Hky & Hka & Hkb & Hres)" "Hclose".
-    iAssert (((⌜Vx = ∅⌝ ∨ ⌜Vx = {[#1]}⌝ ∗ token γF1) ∗ (⌜Vy = ∅⌝ ∨ ⌜Vy = {[#1]}⌝ ∗ token γF2) ∗ 
-              ⌜Va = ∅⌝ ∗ ⌜Vb = ∅⌝ ∨ token γF1 ∗ token γF2 ∗ (⌜Va = ∅⌝ ∨ ⌜Vb = ∅⌝)) 
-              ∗ (⌜Va = ∅⌝ ∨ ⌜Vb = ∅⌝))%I with "[Hres]" as "(Hres & %Hempty)".
-    {
-      iDestruct "Hres" as "[(Hx & Hy & -> & ->)|(Htok1 & Htok2 & [-> | ->])]".
-      - iSplitL; last by iLeft.
-        iLeft. iFrame. done.
-      - iSplitL. iRight. iFrame. by iLeft. by iLeft.
-      - iSplitL. iRight. iFrame. by iRight. by iRight. 
-    }
-    destruct Hempty as [Heq_emp | Heq_emp].
-    all : subst.
-    1 : iMod (Seen_creation with "[$HGinv] [$Hka]") as "(Hka & Hseen)"; first solve_ndisj.
-    2 : iMod (Seen_creation with "[$HGinv] [$Hka]") as "(Hka & Hseen)"; first solve_ndisj.
-    all : iModIntro.
-    1 : iExists {[ "x" := Vx; "y" := Vy; "a" := ∅; "b" := Vb ]}.
-    2 : iExists {[ "x" := Vx; "y" := Vy; "a" := Va; "b" := ∅ ]}.
-    all : iFrame.
-    all : rewrite !big_sepM_insert; try set_solver.
-    all : rewrite big_sepM_empty.
-    all : iSplitL "Hkx Hky Hka Hkb"; iFrame.
-    all : iNext; iIntros "(Hcstate & (Hkx & Hky & Hka & Hkb & _) 
+    iModIntro.
+    iExists {[ "x" := Vx; "y" := Vy; "a" := Va; "b" := Vb ]}.
+    iFrame.
+    rewrite !big_sepM_insert; try set_solver.
+    rewrite big_sepM_empty.
+    iSplitL "Hkx Hky Hka Hkb"; first iFrame.
+    iNext. 
+    iIntros "(Hcstate & (Hkx & Hky & Hka & Hkb & _) 
       & Hcx & Hcy & Hca & Hcb & _)".
-    all : iMod ("Hclose" with "[Hkx Hky Hka Hkb Hres]") as "_".
-    1 : iNext; iExists _, _, _, _; iFrame.
-    2 : iNext; iExists _, _, _, _; iFrame.
-    all : iModIntro; wp_pures.
-    all : wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$]"); 
+    assert (dom {["x" := Vx; "y" := Vy; "a" := Va; "b" := Vb]}  = {["x";"y";"a";"b"]}) as ->; first set_solver.
+    iMod ("Hclose" with "[Hkx Hky Hka Hkb Hres]") as "_".
+    { 
+      iNext. iExists _, _, _, _. iFrame.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$]"); 
       first solve_ndisj; first set_solver.
-    all : iInv "inv" as ">(%Vx' & %Vy' & %Va' & %Vb' & Hkx & Hky & Hka & Hkb & Hres')" "Hclose".
-    all : iAssert (((⌜Vx' = ∅⌝ ∨ ⌜Vx' = {[#1]}⌝ ∗ token γF1) ∗ (⌜Vy' = ∅⌝ ∨ ⌜Vy' = {[#1]}⌝ ∗ token γF2) ∗ 
-              ⌜Va' = ∅⌝ ∗ ⌜Vb' = ∅⌝ ∨ token γF1 ∗ token γF2 ∗ (⌜Va' = ∅⌝ ∨ ⌜Vb' = ∅⌝)) 
-              ∗ (⌜Va' = ∅⌝ ∨ ⌜Vb' = ∅⌝))%I with "[Hres']" as "(Hres' & %Hempty')".
-    1 : {
-          iDestruct "Hres'" as "[(Hx & Hy & -> & ->)|(Htok1 & Htok2 & [-> | ->])]".
-          - iSplitL; last by iLeft.
-          iLeft. iFrame. done.
-          - iSplitL. iRight. iFrame. by iLeft. by iLeft.
-          - iSplitL. iRight. iFrame. by iRight. by iRight. 
+    iInv "inv" as ">(%Vx' & %Vy' & %Va' & %Vb' & Hkx & Hky & Hka & Hkb & Hres)" "Hclose".
+    iAssert (|={⊤ ∖ ↑client_inv_name}=>(((⌜Vx' = ∅⌝ ∨ ⌜Vx' = {[#1]}⌝ ∗ token γF1) ∗ (⌜Vy' = ∅⌝ ∨ ⌜Vy' = {[#1]}⌝ ∗ token γF2) 
+            ∗ ⌜Va' = ∅⌝ ∗ ⌜Vb' = ∅⌝ ∨ token γF1 ∗ token γF2 ∗ (⌜Va' = ∅ ∧ Vb' = {[#1]}⌝ ∨ ⌜Va' = {[#1]} ∧ Vb' = ∅⌝)) 
+          ∗ ((⌜Va' = {[#1]} ∧ Vb' = ∅⌝ ∗ Seen "a" {[#1]}) ∨ (⌜Va' = ∅ ∧ Vb' = {[#1]}⌝ ∗ Seen "b" {[#1]}) ∨ ⌜Va' = ∅ ∧ Vb' = ∅⌝)
+          ∗ "a" ↦ₖ Va' ∗ "b" ↦ₖ Vb'))%I 
+          with "[Hres Hka Hkb]" as ">(Hres & Hdisj' & Hka & Hkb)".
+    {
+      iDestruct "Hres" as "[(Hx & Hy & -> & ->)|(Htok1 & Htok2 & [(-> & ->)| (-> & ->)])]".
+      - iModIntro. iFrame. iSplitL. iLeft. by iFrame. 
+        do 2 iRight. done.
+      - iMod (Seen_creation with "[$HGinv] [$Hkb]") as "(Hkb & Hseen)"; first solve_ndisj.
+        iModIntro. iSplitL "Htok1 Htok2". iRight. iFrame. by iLeft. iFrame. iRight. iLeft.
+        by iFrame.
+      - iMod (Seen_creation with "[$HGinv] [$Hka]") as "(Hka & Hseen)"; first solve_ndisj.
+        iModIntro. iSplitL "Htok1 Htok2". iRight. iFrame. by iRight. iFrame. iLeft.
+        by iFrame.
+    }
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
+    iIntros (oa) "(Hca & Hka & Hdisj_a)".
+    iMod ("Hclose" with "[Hkx Hky Hka Hkb Hres]") as "_".
+    { 
+      iNext. iExists _, _, _, _. iFrame.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$]"); 
+      first solve_ndisj; first set_solver.
+    iInv "inv" as ">(%Vx'' & %Vy'' & %Va'' & %Vb'' & Hkx & Hky & Hka & Hkb & Hres)" "Hclose".
+    iAssert (|={⊤ ∖ ↑client_inv_name}=>(((⌜Vx'' = ∅⌝ ∨ ⌜Vx'' = {[#1]}⌝ ∗ token γF1) ∗ (⌜Vy'' = ∅⌝ ∨ ⌜Vy'' = {[#1]}⌝ ∗ token γF2) 
+            ∗ ⌜Va'' = ∅⌝ ∗ ⌜Vb'' = ∅⌝ ∨ token γF1 ∗ token γF2 ∗ (⌜Va'' = ∅ ∧ Vb'' = {[#1]}⌝ ∨ ⌜Va'' = {[#1]} ∧ Vb'' = ∅⌝)) 
+          ∗ ((⌜Va'' = {[#1]} ∧ Vb'' = ∅⌝ ∗ Seen "a" {[#1]}) ∨ (⌜Va'' = ∅ ∧ Vb'' = {[#1]}⌝ ∗ Seen "b" {[#1]}) ∨ ⌜Va'' = ∅ ∧ Vb'' = ∅⌝)
+          ∗ "a" ↦ₖ Va'' ∗ "b" ↦ₖ Vb''))%I 
+          with "[Hres Hka Hkb]" as ">(Hres & Hdisj'' & Hka & Hkb)".
+    {
+      iDestruct "Hres" as "[(Hx & Hy & -> & ->)|(Htok1 & Htok2 & [(-> & ->)| (-> & ->)])]".
+      - iModIntro. iFrame. iSplitL. iLeft. by iFrame. 
+        do 2 iRight. done.
+      - iMod (Seen_creation with "[$HGinv] [$Hkb]") as "(Hkb & Hseen)"; first solve_ndisj.
+        iModIntro. iSplitL "Htok1 Htok2". iRight. iFrame. by iLeft. iFrame. iRight. iLeft.
+        by iFrame.
+      - iMod (Seen_creation with "[$HGinv] [$Hka]") as "(Hka & Hseen)"; first solve_ndisj.
+        iModIntro. iSplitL "Htok1 Htok2". iRight. iFrame. by iRight. iFrame. iLeft.
+        by iFrame.
+    }
+    iDestruct "Hdisj'" as "[((-> & ->) & Hseen_a') | [((-> & ->) & Hseen_b') | (-> & ->)]]".
+    all : iDestruct "Hdisj''" as "[((-> & ->) & Hseen_a'') | [((-> & ->) & Hseen_b'') | (-> & ->)]]".
+    2 : { 
+          iMod (Seen_valid with "[$HGinv] [$Hka $Hseen_a']") as "(Hka & %Hfalse)"; first solve_ndisj.
+          set_solver.
         }
-    2 : {
-          iDestruct "Hres'" as "[(Hx & Hy & -> & ->)|(Htok1 & Htok2 & [-> | ->])]".
-          - iSplitL; last by iLeft.
-          iLeft. iFrame. done.
-          - iSplitL. iRight. iFrame. by iLeft. by iLeft.
-          - iSplitL. iRight. iFrame. by iRight. by iRight. 
-        }
-    all : destruct Hempty' as [Heq_emp | Heq_emp].
-    all : subst.
-    admit.
-    
-    (* - admit.
-
-
-
-    - iModIntro.
-      iExists {[ "x" := Vx; "y" := Vy; "a" := ∅; "b" := ∅ ]}.
-      iFrame.
-      rewrite !big_sepM_insert; try set_solver.
-      rewrite big_sepM_empty.
-      iSplitL "Hkx Hky Hka Hkb"; first iFrame.
-      iNext. iIntros "(Hcstate & (Hkx & Hky & Hka & Hkb & _) 
-        & Hcx & Hcy & Hca & Hcb & _)".
-      iMod ("Hclose" with "[Hkx Hky Hka Hkb Hdisj_x Hdisj_y]") as "_".
-      { 
-        iNext. iExists _, _, _, _. iFrame.
-        iLeft. iSplitL "Hdisj_x". iFrame.
-        iSplitL. iFrame. done.
+    3 : { 
+        iMod (Seen_valid with "[$HGinv] [$Hkb $Hseen_b']") as "(Hkb & %Hfalse)"; first solve_ndisj.
+        set_solver.
       }
-      iModIntro. wp_pures.
-      wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$]"); 
-        first solve_ndisj; first set_solver.
-      iInv "inv" as ">(%Vx' & %Vy' & %Va & %Vb & Hkx & Hky & Hka & Hkb & 
-        [(Hdisj_x & Hdisj_y & -> & ->)|(Htok_x & Htok_y & Hdisj)])" "Hclose".
-      all : iModIntro.
-      all : iExists _, _.
-      all : iFrame.
-      all : iNext.
-      all : iIntros (wo) "(Hca & Hka & Hdisj_a)".
-      + iMod ("Hclose" with "[Hkx Hky Hka Hkb Hdisj_x Hdisj_y]") as "_".
-        { 
-          iNext. iExists _, _, _, _. iFrame.
-          iLeft. iSplitL "Hdisj_x". iFrame.
-          iSplitL. iFrame. done.
+    4 : { 
+        iMod (Seen_valid with "[$HGinv] [$Hkb $Hseen_b']") as "(Hkb & %Hfalse)"; first solve_ndisj.
+        set_solver.
+      }
+    2 : { 
+          iMod (Seen_valid with "[$HGinv] [$Hka $Hseen_a']") as "(Hka & %Hfalse)"; first solve_ndisj.
+          set_solver.
         }
-        iModIntro.
-        wp_pures.
-        wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$]"); 
-        first solve_ndisj; first set_solver.
-        iInv "inv" as ">(%Vx'' & %Vy'' & %Va' & %Vb' & Hkx & Hky & Hka & Hkb & 
-          [(Hdisj_x & Hdisj_y & -> & ->)|(Htok_x & Htok_y & Hdisj)])" "Hclose".
-        all : iModIntro.
-        all : iExists _, _.
-        all : iFrame.
-        all : iNext.
-        all : iIntros (wo') "(Hcb & Hkb & Hdisj_b)".
-        * iMod ("Hclose" with "[Hkx Hky Hka Hkb Hdisj_x Hdisj_y]") as "_".
-          { 
-            iNext. iExists _, _, _, _. iFrame.
-            iLeft. iSplitL "Hdisj_x". iFrame.
-            iSplitL. iFrame. done.
-          }
-          iModIntro.
-          wp_pures.
-          rewrite /assert.
-          iDestruct "Hdisj_a" as "[(_ & Hdisj_a)| (%Hfalse & _)]"; last done.
-          iDestruct "Hdisj_a" as "[%Hfalse|->]"; first set_solver.
-          wp_pures.
-          admit.
-        * iMod ("Hclose" with "[Hkx Hky Hka Hkb Htok_x Htok_y Hdisj]") as "_".
-          { 
-            iNext. iExists _, _, _, _. iFrame.
-            iRight. iFrame.
-          }
-          iModIntro.
-          wp_pures.
-          rewrite /assert.
-          iDestruct "Hdisj_a" as "[(_ & Hdisj_a)| (%Hfalse & _)]"; last done.
-          iDestruct "Hdisj_a" as "[%Hfalse|->]"; first set_solver.
-          wp_pures.
-          admit.
-      + iMod ("Hclose" with "[Hkx Hky Hka Hkb Htok_x Htok_y Hdisj]") as "_".
-        { 
-          iNext. iExists _, _, _, _. iFrame.
-          iRight. iFrame.
-        }
-        iModIntro.
-        wp_pures.
-        wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$]"); 
-        first solve_ndisj; first set_solver.
-        iInv "inv" as ">(%Vx'' & %Vy'' & %Va' & %Vb' & Hkx & Hky & Hka & Hkb & 
-          [(Hdisj_x & Hdisj_y & -> & ->)|(Htok_x & Htok_y & Hdisj)])" "Hclose".
-        all : iModIntro.
-        all : iExists _, _.
-        all : iFrame.
-        all : iNext.
-        all : iIntros (wo') "(Hcb & Hkb & Hdisj_b)".
-        * iMod ("Hclose" with "[Hkx Hky Hka Hkb Hdisj_x Hdisj_y]") as "_".
-          { 
-            iNext. iExists _, _, _, _. iFrame.
-            iLeft. iSplitL "Hdisj_x". iFrame.
-            iSplitL. iFrame. done.
-          }
-          iModIntro.
-          wp_pures.
-          rewrite /assert.
-          destruct (decide (wo = Some (#1))) as [-> | Hneq].
-          -- wp_pures.
-             admit.
-          -- admit.
-        * iMod ("Hclose" with "[Hkx Hky Hka Hkb Htok_x Htok_y Hdisj]") as "_".
-          { 
-            iNext. iExists _, _, _, _. iFrame.
-            iRight. iFrame.
-          }
-          iModIntro.
-          wp_pures.
-          rewrite /assert.
-          admit.
-    - admit. *)
-  Admitted.
+    all : iModIntro.
+    all : iExists _, _.
+    all : iFrame.
+    all : iNext.
+    all : iIntros (ob) "(Hcb & Hkb & Hdisj_b)".
+    all : iMod ("Hclose" with "[Hkx Hky Hka Hkb Hres]") as "_".
+    all : try iNext.
+    all : try iExists _, _, _, _.
+    all : iFrame.
+    all : iModIntro.
+    all : wp_pures.
+    all : iDestruct "Hdisj_a" as "[Hdisj_a|(%Hfalse & _)]"; last done.
+    all : iDestruct "Hdisj_b" as "[Hdisj_b|(%Hfalse & _)]"; last done.
+    all : rewrite /assert.
+    all : wp_pures.
+    all : iDestruct "Hdisj_a" as "(_ & [(%va & -> & %Hin_va) |->])".
+    1 : assert (va = (#1)) as ->. 1: set_solver.
+    3 : set_solver.
+    4 : set_solver.
+    5 : set_solver.
+    6 : set_solver.
+    all : wp_pures.
+    all : iDestruct "Hdisj_b" as "(_ & [(%vb & -> & %Hin_vb) |->])".
+    1 : set_solver.
+    2 : set_solver.
+    3 : assert (vb = (#1)) as ->. 3 : set_solver.
+    5 : set_solver.
+    6 : assert (vb = (#1)) as ->. 6 : set_solver.
+    8 : set_solver.
+    1 : wp_pures.
+    all : iApply (transaction3_end with "[$] [$] [$] [$] [$] [$] [$]").
+  Qed.
 
   Lemma transaction1_client_spec γF1 γF2:
     ∀ clt,
