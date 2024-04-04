@@ -10,8 +10,8 @@ From iris.base_logic.lib Require Import invariants.
 From aneris.examples.transactional_consistency.read_uncommitted.specs
   Require Import resources specs.
 From aneris.examples.transactional_consistency Require Import user_params aux_defs.
-From aneris.examples.transactional_consistency.read_uncommitted.examples.read_uncommitted
-      Require Import read_uncommitted_code.
+From aneris.examples.transactional_consistency.read_uncommitted.examples.read_uncommitted_data
+      Require Import read_uncommitted_data_code.
 From aneris.examples.transactional_consistency.read_committed.implication_proof
       Require Import si_implies_rc.
 From aneris.examples.transactional_consistency.read_uncommitted.implication_proof

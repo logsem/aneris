@@ -78,9 +78,9 @@ ML_SOURCES:
   examples/transactional_consistency/snapshot_isolation/examples/deprecated/no_serializability/no_serializability_code.ml
 	examples/transactional_consistency/snapshot_isolation/examples/deprecated/disjoint_reads/disjoint_reads_code.ml
 	examples/transactional_consistency/snapshot_isolation/examples/deprecated/read_your_writes/read_your_writes_code.ml
-	examples/transactional_consistency/read_committed/examples/read_committed/read_committed_code.ml
 	examples/transactional_consistency/read_committed/examples/dirty_read/dirty_read_code.ml
-	examples/transactional_consistency/read_uncommitted/examples/read_uncommitted/read_uncommitted_code.ml
+	examples/transactional_consistency/read_committed/examples/commit_order/commit_order_code.ml
+	examples/transactional_consistency/read_uncommitted/examples/read_uncommitted_data/read_uncommitted_data_code.ml
 
 ML_DEPENDENCIES:
 
