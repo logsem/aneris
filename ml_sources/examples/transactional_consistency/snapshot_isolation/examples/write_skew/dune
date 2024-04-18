@@ -1,0 +1,4 @@
+(executable
+  (name write_skew_code)
+  (flags :standard -rectypes)
+  (libraries client_server_code snapshot_isolation_code util_code aneris))
