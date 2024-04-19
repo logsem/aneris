@@ -1,8 +1,7 @@
 From trillium.fairness Require Export fairness resources fair_termination fuel. 
 (* From trillium.fairness.heap_lang Require Export lang heap_lang_defs. *)
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Export partial_ownership.
-From trillium.fairness Require Import execution_model lm_fair_traces lm_fair. 
+From trillium.fairness Require Import execution_model lm_fair_traces lm_fair model_plug. 
 
 Section LMExecModel.
   Context `{CNT_Λ: Countable (locale Λ)}.
@@ -19,8 +18,7 @@ Section LMExecModel.
     : iProp Σ :=
     frag_model_is s1 ∗
       (frag_free_roles_are (FR ∖ live_roles _ s1)) ∗
-      has_fuels (Σ := Σ) τ0 (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
-      (PMPP := ActualOwnershipPartialPre). 
+      has_fuels (Σ := Σ) τ0 (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1)). 
   
 Definition init_thread_post `{!fairnessGS LM Σ}
   (tid: locale Λ): iProp Σ :=
@@ -69,6 +67,7 @@ Proof.
   congruence. 
 Qed.
 
+(* TODO: get rid of one of these definitions *)
 Lemma tids_restrict_smaller' (σ: cfg Λ) (δ: lm_ls LM):
   tids_restrict σ (ls_tmap δ) -> tids_smaller' σ.1 δ.
 Proof.
@@ -77,6 +76,14 @@ Proof.
   destruct (decide (ζ ∈ locales_of_list σ.1)); [done| ].
   specialize (H _ n).
   apply elem_of_dom in H0 as [? ?]. congruence. 
+Qed.
+Lemma tids_smaller'_restrict (σ: cfg Λ) (δ: lm_ls LM):
+  tids_smaller' σ.1 δ -> tids_restrict σ (ls_tmap δ).
+Proof.
+  rewrite /tids_smaller' /tids_restrict. 
+  intros. destruct (ls_tmap δ !! ζ) eqn:T; [| done].
+  specialize (H _ (ltac:(apply elem_of_dom; done))).
+  by apply locales_of_list_from_locale_from in H. 
 Qed.
 
 
@@ -116,7 +123,7 @@ Proof.
   { iApply frag_free_roles_are_proper; [| by iFrame].
     rewrite dom_gset_to_gmap. set_solver. }
 
-  unfold frag_fuel_is.
+  unfold partial_fuel_is, frag_fuel_is.
   setoid_rewrite map_fmap_singleton.
   simpl.
   destruct (decide (live_roles M s1 = ∅)) as [-> | NE].
@@ -156,4 +163,31 @@ intros. iIntros. iMod (init_fairnessGS_LM _ s1 σ) as "[% [? X]]"; [done| ].
 iModIntro. iExists _. iFrame. 
 Defined. 
 
+Section RoleLiftLM.
+  Context {Σ: gFunctors}. 
+  Context {fG: fairnessGS LM Σ}.
+  Context {INV: invGS_gen HasNoLc Σ}.
+  
+  Let RL := @role_lift _ _ LM_EM _ fG LM_Fair model_state_interp INV.
+
+  Lemma TopRL τ: ⊢ RL ∅ τ τ ⌜ True ⌝.
+  Proof.
+    rewrite /RL /role_lift. iIntros (P Q) "!# #RULE".
+    iIntros (etr atr c2) "(_&P&SI&%STEP)". 
+    simpl. rewrite /em_lm_msi. iDestruct "SI" as "[MSI %TR]".
+    rewrite /valid_evolution_step. 
+    iMod ("RULE" with "[$]") as (δ2) "(Q&MSI&%TRANS)".
+    iModIntro. do 2 iExists _. iFrame. iPureIntro.
+    apply and_comm. rewrite -!and_assoc. split; [| split]. 1, 2: by eauto.
+    apply and_comm, iff_and_impl_helper.
+    { apply tids_restrict_smaller'. }
+    red. 
+    
+    
+    repeat split; eauto.  
+
+End RoleLiftLM.
+
 End LMExecModel.
+
+

@@ -1,6 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources partial_ownership.
+From trillium.fairness Require Import fairness fuel resources.
+From trillium.fairness.lm_rules Require Import resources_updates.
 
 
 Section FuelDropStep.

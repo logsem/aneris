@@ -1,6 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources partial_ownership.
+From trillium.fairness Require Import fairness fuel resources.
+From trillium.fairness.lm_rules Require Import resources_updates.
 
 
 Section ModelStep.
@@ -40,7 +41,7 @@ Section ModelStep.
     (HFR : fr1 ∩ dom (ls_fuel δ1) = ∅)
 :
   maps_inverse_match
-    (update_mapping (ls_mapping δ1) ζ fs1 fs2)
+    (update_rmap (ls_mapping δ1) ζ fs1 fs2)
     (<[ζ:=dom fs2]> (ls_tmap δ1)). 
   Proof.
     intros ρ' ζ'. simpl. rewrite map_lookup_imap.
@@ -124,7 +125,7 @@ Section ModelStep.
      (*                  else Some ζ) *)
      (*               (gset_to_gmap 333 *)
      (*                  ((dom (ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2))) *)
-     update_mapping (ls_mapping δ1) ζ fs1 fs2
+     update_rmap (ls_mapping δ1) ζ fs1 fs2
   )
   (new_fuels := update_fuel_resource (ls_fuel δ1) fs1 fs2)
   (Hsamedoms : dom new_mapping = dom new_fuels)
@@ -386,7 +387,7 @@ Section ModelStep.
 
     iDestruct (free_roles_inclusion with "HFR Hfr1") as %HfrFR.
 
-    set (new_mapping := update_mapping (ls_mapping δ1) ζ fs1 fs2).
+    set (new_mapping := update_rmap (ls_mapping δ1) ζ fs1 fs2).
     set (new_fuels := update_fuel_resource (ls_fuel δ1) fs1 fs2). 
     assert (Hsamedoms: dom new_mapping = dom new_fuels).
     { unfold update_fuel_resource, fuel_apply. rewrite -leibniz_equiv_iff.

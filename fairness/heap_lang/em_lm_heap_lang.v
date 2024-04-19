@@ -1,5 +1,6 @@
 From trillium.fairness.heap_lang Require Import heap_lang_defs em_lm. 
 From trillium.fairness Require Import lm_fair lm_fair_traces. 
+From trillium.fairness.lm_rules Require Import resources_updates. 
 
 
 Section LM_EM_HL.

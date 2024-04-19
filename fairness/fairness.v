@@ -281,5 +281,10 @@ Definition FM_strong_lr (FM: FairModel) :=
   forall st ρ, ρ ∈ live_roles FM st <-> exists st', fmtrans FM st (Some ρ) st'.
 
 
+Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
+Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
+
+
 Global Hint Resolve fair_by_cons: core.
 Global Hint Resolve trace_valid_mono : paco.
+
