@@ -4,6 +4,7 @@ From trillium.program_logic Require Import atomic.
 From trillium.fairness.heap_lang Require Export tactics lifting. (* derived_laws. *)
 From trillium.fairness.heap_lang Require Import notation.
 From trillium.fairness.heap_lang Require Import heap_lang_defs. 
+From trillium.fairness Require Import resources.
 From iris.prelude Require Import options.
 Import uPred.
 
@@ -23,18 +24,15 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
   end.
 Ltac wp_expr_simpl := wp_expr_eval simpl. 
 
-Lemma tac_wp_pure_helper `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} 
-   `{Countable G} `{iLM: LiveModel G iM LSI_True}
-  `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}  
+Lemma tac_wp_pure_helper `{EM: ExecutionModel heap_lang M} 
+  `{@heapGS Σ _ EM} `{iLM: LiveModel (locale heap_lang) iM LSI_True} {ifG: fairnessGS iLM Σ}
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
-  (* fs *)
   φ n Φ :
-(* >>>>>>> origin/pmp_resource *)
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗ ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗ ( ▷^n (has_fuels tid fs -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels_plus n tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof. 
@@ -62,37 +60,10 @@ Lemma equiv_wand {Σ} (P Q: iProp Σ):
   P -∗ Q.
 Proof. by intros ->. Qed.
 
-Lemma maps_gt_n {Mdl} (fs: gmap (fmrole Mdl) _) n:
-  (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
-  fs = (λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs).
-Proof.
-  intros Hgt.
-  apply map_eq. intros ρ.
-  rewrite -map_fmap_compose !lookup_fmap.
-  destruct (fs !! ρ) as [f|] eqn:? =>//=. f_equiv.
-  assert (f >= n)%nat by eauto.
-  apply leibniz_equiv_iff. lia.
-Qed.
 
-Lemma has_fuels_gt_n  
-  (* `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)} *)
-  `{Countable G} `{PMPP: @PartialModelPredicatesPre G _ _ Σ iM}
-  (fs: gmap (fmrole iM) _) n tid:
-  (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
-  has_fuels tid fs (PMPP := PMPP) ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)) (PMPP := PMPP).
-Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
-
-Lemma has_fuels_gt_1
-  `{Countable G} `{PMPP: @PartialModelPredicatesPre G _ _ Σ iM}
-  (fs: gmap (fmrole iM) _) tid:
-  (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
-  has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
-Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
-
-Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
- `{Countable G} `{iLM: LiveModel G iM LSI_True}
-  (* `{!fairnessGS iLM Σ}   *)
-  `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
+Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel heap_lang M}
+ `{@heapGS Σ _ EM} `{iLM: LiveModel (locale heap_lang) iM LSI_True} {ifG: fairnessGS iLM Σ}
+  (* `{!fairnessGS iLM Σ}   *) 
   tid E Einvs K e1 e2
   (fs: gmap (fmrole iM) nat)
   φ n Φ :
@@ -100,7 +71,7 @@ Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗ ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗ ( ▷^n ((has_fuels tid ((λ m, m - n)%nat <$> fs)) -∗ WP (fill K e2) @ tid; E {{ Φ }})) -∗
   has_fuels tid fs -∗
   WP (fill K e1) @ tid; E {{ Φ }}.
 Proof.
@@ -160,10 +131,7 @@ Proof.
       * rewrite env_lookup_env_delete_ne //.
 Qed.
 
-Lemma tac_wp_pure `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
-  `{Countable G}  `{iLM: LiveModel G iM LSI_True}
-  (* `{!fairnessGS iLM Σ}   *)
-  `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}
+Lemma tac_wp_pure `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} `{iLM: LiveModel (locale heap_lang) iM LSI_True} {ifG: fairnessGS iLM Σ}
   Δ Δ'other tid E Einvs i K e1 e2 φ n Φ
   (fs: gmap (fmrole iM) nat)
   :
@@ -175,9 +143,9 @@ Lemma tac_wp_pure `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs n Δother Δ'other →
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - n)%nat <$> fs)) in
-  envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+  envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗
 WP (fill K e2) @ tid; E {{ Φ }}) →
-  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗
 WP (fill K e1) @ tid; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ???.
@@ -360,10 +328,9 @@ Implicit Types Δ : envs (uPredI (iResUR Σ)).
 Implicit Types v : val.
 Implicit Types tid : locale heap_lang.
 
-Context `{Countable G} `{iLM: LiveModel G iM LSI_True}.
-Context `{!fairnessGS iLM Σ}. 
-(* Context `{PMP: PartialModelPredicates heap_lang (M := M) (iM := iM) (LM := LM) (iLM := iLM)}.  *)
-Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}. 
+(* Context `{Countable G} `{iLM: LiveModel G iM LSI_True}. *)
+(* Context `{!fairnessGS iLM Σ}.  *)
+Context `{@heapGS Σ _ EM} `{iLM: LiveModel (locale heap_lang) iM LSI_True} {ifG: fairnessGS iLM Σ}.
 
 (* Lemma tac_wp_allocN Δ Δ' s E j K v n Φ : *)
 (*   (0 < n)%Z → *)
@@ -474,9 +441,9 @@ Lemma tac_wp_load K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l q v
   MaybeIntoLaterNEnvs 1 Δother Δ'other →
   envs_lookup j Δ'other = Some (false,  l ↦{q} v)%I →
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
-  envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+  envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗
 WP fill K (Val v) @ tid; E {{ Φ }}) →
-  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗
 WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
 Proof using.
   intros ?? Hij ?.
@@ -517,11 +484,11 @@ Lemma tac_wp_store K (fs: gmap (fmrole iM) nat) tid Δ Δ'other E Einvs i j l v 
   | Some Δ'other2 =>
       let Δ' := envs_snoc Δ'other2 false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
       envs_lookup i Δ'other2 = None (* redondent but easier than  proving it. *) ∧
-      envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+      envs_entails Δ' ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗
  WP fill K (Val $ LitV LitUnit) @ tid; E {{ Φ }})
   | None => False
   end →
-  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := heap_fairnessGS)) -∗
+  envs_entails Δ ((PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := heap_fairnessGS)) -∗
 WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
 Proof using.
   intros ?? Hij ?.

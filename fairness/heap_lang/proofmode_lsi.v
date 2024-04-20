@@ -60,33 +60,6 @@ Proof.
   iApply (IHn _ _ _ with "[PMP] [H] [Hf]") => //.
 Qed.
 
-Lemma maps_gt_n {Mdl} (fs: gmap (fmrole Mdl) _) n:
-  (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
-  fs = (λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs).
-Proof.
-  intros Hgt.
-  apply map_eq. intros ρ.
-  rewrite -map_fmap_compose !lookup_fmap.
-  destruct (fs !! ρ) as [f|] eqn:? =>//=. f_equiv.
-  assert (f >= n)%nat by eauto.
-  apply leibniz_equiv_iff. lia.
-Qed.
-
-(* TODO: move *)
-Lemma has_fuels_gt_n  
-  `{Countable G} `{PMPP: @PartialModelPredicatesPre G _ _ Σ iM}
-  (fs: gmap (fmrole iM) _) n tid:
-  (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
-  has_fuels tid fs (PMPP := PMPP) ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)) (PMPP := PMPP).
-Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
-
-(* TODO: move *)
-Lemma has_fuels_gt_1
-  `{Countable G} `{PMPP: @PartialModelPredicatesPre G _ _ Σ iM}
-  (fs: gmap (fmrole iM) _) tid:
-  (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
-  has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
-Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
 Lemma tac_wp_pure_helper_2 `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}
   `{Countable G} `{iLM: LiveModel G iM LSI}

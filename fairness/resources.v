@@ -1,7 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import utils fairness fuel. 
-From trillium.fairness Require Import partial_ownership.
 
 Class fairnessGpreS `{Countable G} `(LM: LiveModel G M LSI) Σ := {   
   fairnessGpreS_model :> inG Σ (authUR (optionR (exclR (ModelO M))));
@@ -47,6 +46,8 @@ Global Instance subG_fairnessGpreS {Σ} `{Countable G} `{LM : LiveModel G M LSI}
 Proof. solve_inG. Qed. 
 
 Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
+
+
 
 
 Section model_state_interp.
@@ -122,25 +123,228 @@ Section model_state_interp.
     ⊢ |==> frag_free_roles_are ∅.
   Proof. iApply own_unit. Qed. 
 
-  Global Instance ActualOwnershipPartialPre:
-    @PartialModelPredicatesPre G _ _ Σ M. 
+  (* Global Instance ActualOwnershipPartialPre: *)
+  (*   @PartialModelPredicatesPre G _ _ Σ M.  *)
+  (* Proof. *)
+  (*   refine {| *)
+  (*       partial_model_is := frag_model_is; *)
+  (*       partial_free_roles_are := frag_free_roles_are; *)
+  (*       partial_fuel_is := frag_fuel_is; *)
+  (*       partial_mapping_is := frag_mapping_is; *)
+  (*     |}. *)
+  (*   - solve_proper.  *)
+  (*   - intros. rewrite /frag_fuel_is. *)
+  (*     rewrite map_fmap_union. rewrite -gmap_disj_op_union. *)
+  (*     2: { by apply map_disjoint_fmap. } *)
+  (*     by rewrite auth_frag_op own_op. *)
+  (*   - intros. rewrite /frag_free_roles_are. *)
+  (*     rewrite -gset_disj_union; auto.   *)
+  (*     by rewrite auth_frag_op own_op. *)
+  (*   - iApply empty_frag_free_roles.  *)
+  (* Defined.  *)
+
+  (* partial_model_is_Timeless :> forall s, Timeless (partial_model_is s); *)
+  (*     partial_fuel_is_Timeless :> forall fs, Timeless (partial_fuel_is fs); *)
+  (*     partial_mapping_is_Timeless :> forall rs, Timeless (partial_mapping_is rs); *)
+  (*     partial_free_roles_are_Timeless :> forall s, Timeless (partial_free_roles_are s); *)
+
+
+  (* legacy definitions *)
+  (* TODO: remove *)
+  Definition partial_model_is := frag_model_is. 
+  Definition partial_free_roles_are := frag_free_roles_are.
+  Definition partial_fuel_is := frag_fuel_is.
+  Definition partial_mapping_is := frag_mapping_is. 
+      
+
+  Global Instance partial_free_roles_are_Proper: 
+    Proper (equiv ==> equiv) partial_free_roles_are.
+  Proof. apply _. Qed.
+
+  Global Instance partial_mapping_is_Proper:
+    Proper (equiv ==> equiv) partial_mapping_is.
+  Proof. apply _. Qed. 
+
+  Global Instance partial_fuel_is_Proper: 
+    Proper (equiv ==> equiv) partial_fuel_is.
+  Proof. solve_proper. Qed. 
+
+  Lemma auth_fuel_is_proper
+    (x y : gmap (fmrole M) nat):
+    x = y ->
+    auth_fuel_is x -∗ auth_fuel_is y.
+  Proof. by intros ->. Qed.
+
+  Lemma partial_fuels_is_sep: forall fs1 fs2 (DISJ: fs1 ##ₘ fs2),
+      partial_fuel_is (fs1 ∪ fs2) ⊣⊢ partial_fuel_is fs1 ∗ partial_fuel_is fs2.
+  Proof. 
+    intros. rewrite /partial_fuel_is /frag_fuel_is.
+    rewrite map_fmap_union. rewrite -gmap_disj_op_union.
+    2: { by apply map_disjoint_fmap. }
+    by rewrite auth_frag_op own_op.
+  Qed. 
+
+  Lemma partial_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
+        partial_free_roles_are (fr1 ∪ fr2) ⊣⊢ partial_free_roles_are fr1 ∗ partial_free_roles_are fr2.
   Proof.
-    refine {|
-        partial_model_is := frag_model_is;
-        partial_free_roles_are := frag_free_roles_are;
-        partial_fuel_is := frag_fuel_is;
-        partial_mapping_is := frag_mapping_is;
-      |}.
-    - solve_proper. 
-    - intros. rewrite /frag_fuel_is.
-      rewrite map_fmap_union. rewrite -gmap_disj_op_union.
-      2: { by apply map_disjoint_fmap. }
-      by rewrite auth_frag_op own_op.
-    - intros. rewrite /frag_free_roles_are.
-      rewrite -gset_disj_union; auto.  
-      by rewrite auth_frag_op own_op.
-    - iApply empty_frag_free_roles. 
-  Defined. 
+    intros. rewrite /partial_free_roles_are /frag_free_roles_are.
+    rewrite -gset_disj_union; auto.
+    by rewrite auth_frag_op own_op.
+  Qed. 
+
+  Lemma partial_free_roles_empty: ⊢ |==> partial_free_roles_are ∅.
+  Proof. iApply empty_frag_free_roles. Qed.
+
+  Section has_fuel.
+    Notation Role := (M.(fmrole)).
+
+    Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
+    Notation "tid ↦m ρ" := (partial_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
+    Notation "ρ ↦F f" := (partial_fuel_is {[ ρ := f ]}) (at level 33).
+
+    Definition has_fuel (ζ: G) (ρ: Role) (f: nat): iProp Σ :=
+      ζ ↦m ρ ∗ ρ ↦F f.
+
+    Definition has_fuels (ζ: G) (fs: gmap Role nat): iProp Σ :=
+      ζ ↦M dom fs ∗ [∗ set] ρ ∈ dom fs, ∃ f, ⌜fs !! ρ = Some f⌝ ∧ ρ ↦F f.
+
+    (* Context {G: Ofe} *)
+    (* Context `{LeibnizEquiv G}. *)
+
+    #[global] Instance has_fuels_proper:
+      Proper ((=) ==> (≡) ==> (≡)) (has_fuels).
+    Proof. solve_proper. Qed.
+
+    #[global] Instance has_fuels_timeless (ζ: G) (fs: gmap Role nat):
+      Timeless (has_fuels ζ fs).
+    Proof. rewrite /has_fuels. apply _. Qed.
+
+    Lemma has_fuel_fuels (ζ: G) (ρ: Role) (f: nat):
+      has_fuel ζ ρ f ⊣⊢ has_fuels ζ {[ ρ := f ]}.
+    Proof.
+      rewrite /has_fuel /has_fuels. iSplit.
+      - iIntros "[Hζ Hρ]". rewrite dom_singleton_L big_sepS_singleton. iFrame.
+        iExists f. iFrame. iPureIntro. by rewrite lookup_singleton.
+      - iIntros "(?&H)". rewrite dom_singleton_L big_sepS_singleton. iFrame.
+        iDestruct "H" as (?) "H". rewrite lookup_singleton.
+        iDestruct "H" as "[% ?]". by simplify_eq.
+    Qed.
+
+    Definition has_fuels_S (ζ: G) (fs: gmap Role nat): iProp Σ :=
+      has_fuels ζ (fmap S fs).
+
+    Definition has_fuels_plus (n: nat) (ζ: G) (fs: gmap Role nat): iProp Σ :=
+      has_fuels ζ (fmap (fun m => n+m) fs).
+
+    Lemma has_fuel_fuels_S (ζ: G) (ρ: Role) (f: nat):
+      has_fuel ζ ρ (S f) ⊣⊢ has_fuels_S ζ {[ ρ := f ]}.
+    Proof.
+      rewrite has_fuel_fuels /has_fuels_S map_fmap_singleton //.
+    Qed.
+
+    Lemma has_fuel_fuels_plus_1 (ζ: G) fs:
+      has_fuels_plus 1 ζ fs ⊣⊢ has_fuels_S ζ fs.
+    Proof.
+      rewrite /has_fuels_plus /has_fuels_S.
+      do 2 f_equiv.
+      intros m m' ->. apply leibniz_equiv_iff. lia.
+    Qed.
+
+    Lemma has_fuel_fuels_plus_0 (ζ: G) fs:
+      has_fuels_plus 0 ζ fs ⊣⊢ has_fuels ζ fs.
+    Proof.
+      rewrite /has_fuels_plus /=.  f_equiv. intros ?.
+      rewrite lookup_fmap. apply leibniz_equiv_iff.
+      destruct (fs !! i) eqn:Heq; rewrite Heq //.
+    Qed.
+
+    Lemma has_fuels_plus_split_S n (ζ: G) fs:
+    has_fuels_plus (S n) ζ fs ⊣⊢ has_fuels_S ζ ((λ m, n + m) <$> fs).
+    Proof.
+      rewrite /has_fuels_plus /has_fuels_S. f_equiv.
+      rewrite -map_fmap_compose /= => ρ.
+      rewrite !lookup_fmap //.
+    Qed.
+
+    Lemma has_fuels_equiv fs ζ:
+      has_fuels ζ fs ⊣⊢ ζ ↦M (dom fs) ∗ ([∗ map] ρ ↦ f ∈ fs, ρ ↦F f).
+    Proof.
+      rewrite /has_fuels -big_opM_dom. iSplit.
+      - iIntros "($ & H)". iApply (big_sepM_impl with "H").
+        iIntros "!#" (ρ f Hin) "(%f' & %Hin' & ?)".
+        by simplify_eq.
+      - iIntros "($&H)".
+        iApply (big_sepM_impl with "H").
+        iIntros "!#" (ρ f Hin)  "?". iExists f. iSplit; done.
+    Qed.
+
+    Definition fuels_ge (fs: gmap Role nat) b :=
+      forall ρ f (FUEL: fs !! ρ = Some f), f >= b. 
+    
+    Lemma has_fuels_ge_S_exact b tid (fs: gmap Role nat)
+      (FUELS_GE: fuels_ge fs (S b)):
+      has_fuels tid fs -∗
+      has_fuels_S tid (fmap (fun f => f - 1) fs). 
+    Proof.
+      iIntros "FUELS".
+      rewrite /has_fuels_S /has_fuels.
+      do 2 rewrite dom_fmap_L. 
+      iDestruct "FUELS" as "(T & FUELS)". iFrame.
+      
+      iApply (big_sepS_impl with "[$]").
+      
+      iModIntro. iIntros (ρ) "%DOMρ [%f [%TT Fρ]]".
+      iExists _. iFrame. iPureIntro.
+      apply lookup_fmap_Some. exists (f - 1). split.
+      { red in FUELS_GE. specialize (FUELS_GE _ _ TT). lia. }
+      apply lookup_fmap_Some. eauto.
+    Qed.
+
+    Lemma fuels_ge_minus1 fs b (FUELS_GE: fuels_ge fs (S b)):
+      fuels_ge ((λ f, f - 1) <$> fs) b.
+    Proof. 
+      red. intros.
+      pose proof (elem_of_dom_2 _ _ _ FUEL) as DOM.
+      rewrite dom_fmap_L in DOM.
+      simpl in FUEL.
+      apply lookup_fmap_Some in FUEL as (f' & <- & FUEL).
+      red in FUELS_GE. specialize (FUELS_GE _ _ FUEL). lia.
+    Qed. 
+    
+    Lemma has_fuels_ge_S b tid (fs: gmap Role nat)
+      (FUELS_GE: fuels_ge fs (S b)):
+      has_fuels tid fs -∗
+      ∃ fs', has_fuels_S tid fs' ∗ ⌜fuels_ge fs' b⌝.
+    Proof.
+      iIntros "FUELS".
+      iDestruct (has_fuels_ge_S_exact with "FUELS") as "FUELS"; eauto.
+      iExists _. iFrame. 
+      iPureIntro. by apply fuels_ge_minus1. 
+    Qed.
+
+    Lemma maps_gt_n (fs: gmap Role nat) n:
+      (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
+      fs = (λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs).
+    Proof.
+      intros Hgt.
+      apply map_eq. intros ρ.
+      rewrite -map_fmap_compose !lookup_fmap.
+      destruct (fs !! ρ) as [f|] eqn:? =>//=. f_equiv.
+      assert (f >= n)%nat by eauto.
+      apply leibniz_equiv_iff. lia.
+    Qed.
+
+    Lemma has_fuels_gt_n (fs: gmap Role nat) (n: nat) (tid: G):
+      (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
+      has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
+    Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
+
+    Lemma has_fuels_gt_1 fs tid:
+      (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
+      has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
+    Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
+
+  End has_fuel.
 
 End model_state_interp.
 
@@ -148,13 +352,6 @@ Lemma own_proper `{inG Σ X} γ (x y: X):
   x ≡ y ->
   own γ x -∗ own γ y.
 Proof. by intros ->. Qed.
-
-Lemma auth_fuel_is_proper `{fairnessGS (LM:=LM) Σ}
-      (x y : gmap (fmrole M) nat):
-  x = y ->
-  auth_fuel_is x -∗ auth_fuel_is y.
-Proof. by intros ->. Qed.
-
 
 Section model_state_lemmas.
   Context `{Countable G}.
@@ -185,15 +382,6 @@ Section model_state_lemmas.
     destruct HA as (?&?&?). congruence.
   Qed.
 
-  Lemma update_model δ δ1 δ2:
-    auth_model_is δ1 -∗ frag_model_is δ2 ==∗ auth_model_is δ ∗ frag_model_is δ.
-  Proof.
-    iIntros "H1 H2". iCombine "H1 H2" as "H".
-    iMod (own_update with "H") as "[??]" ; eauto.
-    - by apply auth_update, option_local_update, (exclusive_local_update _ (Excl δ)).
-    - iModIntro. iFrame.
-  Qed.
-
   Lemma free_roles_inclusion FR fr:
     auth_free_roles_are FR -∗
     frag_free_roles_are fr -∗
@@ -204,56 +392,6 @@ Section model_state_lemmas.
     apply auth_both_valid_discrete in Hval as [??].
     by apply gset_disj_included.
   Qed.
-
-  Lemma update_free_roles rem FR fr1:
-    rem ⊆ fr1 ->
-    auth_free_roles_are FR -∗
-    frag_free_roles_are fr1 ==∗
-    auth_free_roles_are (FR ∖ rem) ∗
-    frag_free_roles_are (fr1 ∖ rem).
-  Proof.
-    iIntros (?) "HFR Hfr1".
-
-    iDestruct (free_roles_inclusion with "HFR Hfr1") as %Hincl.
-
-    replace FR with ((FR ∖ rem) ∪ rem); last first.
-    { rewrite difference_union_L. set_solver. }
-    replace fr1 with ((fr1 ∖ rem) ∪ rem); last first.
-    { rewrite difference_union_L. set_solver. }
-
-    iAssert (frag_free_roles_are (fr1 ∖ rem) ∗ frag_free_roles_are rem)%I with "[Hfr1]" as "[Hfr2 Hrem]".
-    { rewrite /frag_free_roles_are -own_op -auth_frag_op gset_disj_union //. set_solver. }
-
-    iCombine "HFR Hrem" as "H".
-    iMod (own_update with "H") as "[??]" ; eauto.
-    - apply auth_update, gset_disj_dealloc_local_update.
-    - iModIntro. iFrame. iApply (own_proper with "Hfr2").
-      do 2 f_equiv. set_solver.
-  Qed.
-
-  Lemma update_free_roles_strong fr1 fr2 FR'
-    (DISJ1: fr1 ## FR') (DISJ2: fr2 ## FR'):
-    auth_free_roles_are (fr1 ∪ FR') -∗
-    frag_free_roles_are fr1 ==∗
-    auth_free_roles_are (fr2 ∪ FR') ∗
-    frag_free_roles_are fr2.
-  Proof.
-    iIntros "HFR Hfr1".
-    iApply own_op. 
-    iMod (own_update with "[Hfr1 HFR]") as "?".
-    3: { done. }
-    2: { iApply own_op. iFrame. }
-    apply auth_update.
-    etrans.
-    { apply gset_disj_dealloc_local_update. }
-    rewrite difference_union_distr_l_L difference_diag_L union_empty_l_L.
-    rewrite difference_disjoint_L; auto.
-    etrans. 
-    - by apply gset_disj_alloc_local_update with (Z := fr2).
-    - eapply local_update_proper.
-      1: rewrite union_empty_r_L.
-      all: reflexivity.
-  Qed. 
 
   Lemma model_agree s1 s2:
     auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1 = s2 ⌝.
@@ -268,19 +406,6 @@ Section model_state_lemmas.
   Proof.
     iIntros "Hsi Hs2". iDestruct "Hsi" as (?) "(_&_&_&Hs1&_)".
     iApply (model_agree with "Hs1 Hs2").
-  Qed.
-
-  Lemma update_fuel_delete ρ f F:
-    auth_fuel_is F -∗ ρ ↦F f ==∗ auth_fuel_is (delete ρ F).
-  Proof.
-    iIntros "Hafuel Hfuel".
-    iCombine "Hafuel Hfuel" as "H".
-    iMod (own_update with "H") as "H"; last first.
-    { iModIntro. iFrame. }
-    rewrite map_fmap_singleton fmap_delete.
-    eapply auth_update_dealloc.
-    apply delete_singleton_local_update.
-    typeclasses eauto.
   Qed.
 
   Lemma has_fuel_in ζ δ fs:
@@ -370,7 +495,7 @@ Section model_state_lemmas.
 
   Lemma frag_free_roles_fuels_disj: forall δ fr fs tid,
         model_state_interp δ -∗ frag_free_roles_are fr -∗ 
-        has_fuels tid fs (PMPP := ActualOwnershipPartialPre) -∗
+        has_fuels tid fs -∗
         ⌜ fr ## dom fs⌝. 
   Proof using. 
     iIntros (????) "MSI FREE FUELS". 
@@ -412,97 +537,6 @@ Section model_state_lemmas.
     set_solver.
   Qed.
 
-  Lemma update_fuel fs fs' F:
-    let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
-    (fs ≠ ∅) ->
-    (dom fs' ∖ dom fs ∩ dom F = ∅) ->
-    auth_fuel_is F -∗
-    ([∗ map] ρ ↦ f ∈ fs, ρ ↦F f) ==∗
-      auth_fuel_is (fuel_apply fs' F LR) ∗
-      ([∗ map] ρ ↦ f ∈ fs', ρ ↦F f).
-  Proof.
-    iIntros (? Hnotemp Hdisj) "Hafuel Hfuel".
-    rewrite {1}/frag_fuel_is -big_opM_own //.
-    setoid_rewrite map_fmap_singleton.
-    rewrite -big_opM_auth_frag.
-    iCombine "Hafuel Hfuel" as "H".
-    iMod (own_update with "H") as "[A B]"; last first.
-    { iModIntro.
-      destruct (decide (fs' = ∅)) as [Heq|]; last first.
-      -  rewrite {1}/frag_fuel_is -big_opM_own //.
-         iSplitL "A"; done.
-      - rewrite Heq. iSplitL "A"; first done. done. }
-
-    simpl.
-    setoid_rewrite map_fmap_singleton.
-    rewrite -big_opM_auth_frag.
-
-    simpl.
-    apply auth_update.
-
-    apply local_update_discrete.
-
-    intros mf Hval Heq.
-    split.
-    { intros ρ. rewrite /fuel_apply lookup_fmap map_lookup_imap.
-      rewrite lookup_gset_to_gmap.
-      destruct (decide (ρ ∈ LR)).
-      - rewrite option_guard_True //=.
-        destruct (decide (ρ ∈ dom fs')) as [Hd|Hd].
-        + rewrite decide_True //=. apply elem_of_dom in Hd as [? Hsome].
-          rewrite Hsome //.
-        + rewrite decide_False //= -lookup_fmap. apply (Hval ρ).
-      - rewrite option_guard_False //=. }
-
-    intros ρ. rewrite /fuel_apply lookup_fmap map_lookup_imap.
-    rewrite lookup_gset_to_gmap.
-    rewrite -big_opM_fmap big_opM_singletons.
-    rewrite <-big_opM_fmap in Heq. setoid_rewrite big_opM_singletons in Heq.
-    destruct (decide (ρ ∈ LR)).
-    - rewrite option_guard_True //=.
-      destruct (decide (ρ ∈ dom fs')) as [Hd'|Hd'].
-      + rewrite decide_True //=. apply elem_of_dom in Hd' as [? Hsome].
-        rewrite Hsome //= lookup_opM.
-        rewrite lookup_fmap Hsome.
-        destruct mf as [mf|]; simpl; last done.
-        destruct (mf !! ρ) as [f|] eqn:Hlk; rewrite Hlk //.
-
-        assert (ρ ∈ dom F ∖ dom fs).
-        { eauto using elem_of_frame_excl_map. }
-        assert (ρ ∈ dom fs').
-        { apply elem_of_dom. eauto. }
-        set_solver.
-      + rewrite decide_False //= -lookup_fmap.
-        rewrite Heq.
-        destruct (decide (ρ ∈ dom fs)) as [Hd|Hd];
-          first set_solver.
-        pose proof Hd as Hd2. pose proof Hd' as Hd'2.
-        apply not_elem_of_dom in Hd2, Hd'2. rewrite !lookup_opM !lookup_fmap Hd2 Hd'2 //.
-    - rewrite option_guard_False //=.
-      rewrite lookup_opM lookup_fmap.
-      destruct mf as [mf|]; simpl.
-      + destruct (mf !! ρ) as [f|] eqn:Hlk; rewrite Hlk //.
-        * assert (ρ ∈ dom F ∖ dom fs).
-          { eauto using elem_of_frame_excl_map. }
-          set_solver.
-        * assert (Hnotin: ρ ∉ dom fs') by set_solver.
-          apply not_elem_of_dom in Hnotin. rewrite Hnotin //.
-      + assert (Hnotin: ρ ∉ dom fs') by set_solver.
-        apply not_elem_of_dom in Hnotin. rewrite Hnotin //.
-  Qed.
-
-  Lemma update_mapping ζ (R' : gset $ fmrole M) (R: gset (fmrole M)) m :
-    auth_mapping_is m -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R' ]> m) ∗ ζ ↦M R'.
-  Proof.
-    iIntros "Hamap Hmap".
-    iCombine "Hamap Hmap" as "H".
-    iMod (own_update with "H") as "[A B]"; last first.
-    { iModIntro. iSplitL "A"; iFrame. }
-    rewrite !map_fmap_singleton fmap_insert.
-    eapply auth_update, singleton_local_update_any.
-    intros. by apply exclusive_local_update.
-  Qed.
-
   Lemma mapping_lookup ζ m R:
     auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ ζ ∈ dom m ⌝.
   Proof.
@@ -516,108 +550,6 @@ Section model_state_lemmas.
     rewrite -> lookup_fmap, leibniz_equiv_iff in Hval.
     apply fmap_Some_1 in Hval as (f'&Hfuelρ&?). simplify_eq.
     apply elem_of_dom. eauto.
-  Qed.
-
-  Lemma update_mapping_new_locale ζ ζ' (R R1 R2 : gset $ fmrole M) m :
-    ζ' ∉ dom m ->
-    auth_mapping_is m -∗
-    ζ ↦M R ==∗
-    auth_mapping_is (<[ ζ' := R2]> (<[ ζ := R1 ]> m)) ∗
-    ζ ↦M R1 ∗ ζ' ↦M R2.
-  Proof.
-    iIntros (Hnotin) "Hamap Hmap".
-    iDestruct (mapping_lookup with "Hamap Hmap") as %Hin.
-    iCombine "Hamap Hmap" as "H".
-    iMod (own_update (A := (authUR (gmapUR _ (exclR (gsetR (RoleO M)))))) _ _ (
-                       ● ((λ f : gset (fmrole M), Excl f) <$> ((<[ ζ := R1 ]> m)))
-                         ⋅ ◯ ((λ f : gset (fmrole M), Excl f) <$> {[ζ := R1]})
-                     ) with "H") as "[A B]".
-    { rewrite !map_fmap_singleton fmap_insert.
-      eapply auth_update. eapply singleton_local_update_any.
-      intros. by apply exclusive_local_update. }
-    iCombine "A B" as "H".
-    iMod (own_update (A := (authUR (gmapUR _ (exclR (gsetR (RoleO M)))))) _ _ (
-                       ● ((λ f : gset (fmrole M), Excl f) <$> (<[ ζ' := R2]> (<[ ζ := R1 ]> m)))
-                         ⋅ ◯ ((λ f : gset (fmrole M), Excl f) <$> {[ζ := R1 ; ζ' := R2]})
-                     ) with "H") as "[A B]"; last first.
-    { iModIntro. iSplitL "A"; first iFrame. rewrite !fmap_insert fmap_empty insert_empty.
-      replace (◯ {[ζ := Excl R1; ζ' := Excl R2]}) with (◯ {[ζ := Excl R1]} ⋅ ◯ {[ζ' := Excl R2]}).
-      - iDestruct "B" as "[A B]". iSplitL "A"; rewrite /frag_mapping_is map_fmap_singleton //.
-      - rewrite -auth_frag_op insert_singleton_op //. rewrite lookup_singleton_ne //. set_solver. }
-    rewrite !map_fmap_singleton fmap_insert !fmap_insert.
-    rewrite (insert_commute _ _ _ (Excl R1) (Excl R2)); last set_solver.
-    eapply auth_update. rewrite fmap_empty. eapply alloc_local_update; eauto.
-    - rewrite lookup_insert_ne; last set_solver. apply not_elem_of_dom. set_solver.
-    - done.
-  Qed.
-
-  Lemma update_mapping_delete ζ (Rrem : gset $ fmrole M) (R: gset (fmrole M)) m :
-    auth_mapping_is m -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R ∖ Rrem ]> m) ∗ ζ ↦M (R ∖ Rrem).
-  Proof.
-    eauto using update_mapping.
-  Qed.
-
-  Lemma update_mapping_add ζ (Radd : gset $ fmrole M) (R: gset (fmrole M)) m :
-    auth_mapping_is m -∗ ζ ↦M R ==∗ auth_mapping_is (<[ ζ := R ∪ Radd ]> m) ∗ ζ ↦M (R ∪ Radd).
-  Proof.
-    eauto using update_mapping.
-  Qed.
-
-
-  Lemma update_has_fuels ζ fs fs' F m :
-    let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
-    (fs ≠ ∅) ->
-    (dom fs' ∖ dom fs ∩ dom F = ∅) ->
-    has_fuels ζ fs -∗
-    auth_fuel_is F -∗
-    auth_mapping_is m ==∗
-    auth_fuel_is (fuel_apply fs' F LR) ∗
-    has_fuels ζ fs' ∗
-    auth_mapping_is (<[ ζ := dom fs' ]> m).
-  Proof.
-    iIntros (LR Hfs Hdom) "Hfuels Hafuels Hamapping".
-    rewrite !has_fuels_equiv. iDestruct "Hfuels" as "[Hmapping Hfuels]".    
-    iMod (update_fuel with "Hafuels Hfuels") as "[Hafuels Hfuels]" =>//.
-    iMod (update_mapping with "Hamapping Hmapping") as "[Hamapping Hmapping]".
-    iModIntro.
-    iFrame.
-  Qed.
-
-  Lemma update_has_fuels_no_step ζ fs fs' F m :
-    let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
-    (fs ≠ ∅) ->
-    (dom fs' ⊆ dom fs) ->
-    has_fuels ζ fs -∗
-    auth_fuel_is F -∗
-    auth_mapping_is m ==∗
-    auth_fuel_is (fuel_apply fs' F LR) ∗
-    has_fuels ζ fs' ∗
-    auth_mapping_is (<[ ζ := dom fs' ]> m).
-  Proof.
-    iIntros (LR Hfs Hdom) "Hfuels Hafuels Hamapping".
-    rewrite !has_fuels_equiv. iDestruct "Hfuels" as "[Hmapping Hfuels]".
-    iMod (update_fuel fs fs' with "Hafuels Hfuels") as "[Hafuels Hfuels]"; [done|set_solver|].
-    iMod (update_mapping with "Hamapping Hmapping") as "[Hamapping Hmapping]".
-    iModIntro. iFrame.
-  Qed.
-
-  Lemma update_has_fuels_no_step_no_change ζ fs fs' F m :
-    let LR := (dom F ∪ dom fs') ∖ (dom fs ∖ dom fs') in
-    (fs ≠ ∅) ->
-    (dom fs' = dom fs) ->
-    has_fuels ζ fs -∗
-    auth_fuel_is F -∗
-    auth_mapping_is m ==∗
-    auth_fuel_is (fuel_apply fs' F LR) ∗
-    has_fuels ζ fs' ∗
-    auth_mapping_is m.
-  Proof.
-    iIntros (LR Hfs Hdom) "Hfuels Hafuels Hamapping".
-    rewrite !has_fuels_equiv. iDestruct "Hfuels" as "[Hmapping Hfuels]".
-    iMod (update_fuel fs fs' with "Hafuels Hfuels") as "[Hafuels Hfuels]" =>//.
-    { rewrite Hdom. set_solver. }
-    iModIntro.
-    iFrame. rewrite Hdom //.
   Qed.
 
 End model_state_lemmas.

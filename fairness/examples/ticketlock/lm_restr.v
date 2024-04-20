@@ -1,6 +1,7 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import base.
 From trillium.fairness Require Import fuel lm_fair.
+From trillium.fairness.lm_rules Require Import resources_updates.
 
 (* TODO: move *)
 Section RestrLM.
@@ -39,8 +40,6 @@ Section RestrLM.
     ρ ∈ dom (ls_mapping δ).
 
   
-  From trillium.fairness Require Import partial_ownership.
-
   Lemma egs_helper
     (MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ))
     (LSI_LIFTS_STEP: forall (δ1: lm_ls LM) ρ st2,

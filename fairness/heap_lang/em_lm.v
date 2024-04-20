@@ -163,30 +163,30 @@ intros. iIntros. iMod (init_fairnessGS_LM _ s1 σ) as "[% [? X]]"; [done| ].
 iModIntro. iExists _. iFrame. 
 Defined. 
 
-Section RoleLiftLM.
-  Context {Σ: gFunctors}. 
-  Context {fG: fairnessGS LM Σ}.
-  Context {INV: invGS_gen HasNoLc Σ}.
+(* Section RoleLiftLM. *)
+(*   Context {Σ: gFunctors}.  *)
+(*   Context {fG: fairnessGS LM Σ}. *)
+(*   Context {INV: invGS_gen HasNoLc Σ}. *)
   
-  Let RL := @role_lift _ _ LM_EM _ fG LM_Fair model_state_interp INV.
+(*   Let RL := @role_lift _ _ LM_EM _ fG LM_Fair model_state_interp INV. *)
 
-  Lemma TopRL τ: ⊢ RL ∅ τ τ ⌜ True ⌝.
-  Proof.
-    rewrite /RL /role_lift. iIntros (P Q) "!# #RULE".
-    iIntros (etr atr c2) "(_&P&SI&%STEP)". 
-    simpl. rewrite /em_lm_msi. iDestruct "SI" as "[MSI %TR]".
-    rewrite /valid_evolution_step. 
-    iMod ("RULE" with "[$]") as (δ2) "(Q&MSI&%TRANS)".
-    iModIntro. do 2 iExists _. iFrame. iPureIntro.
-    apply and_comm. rewrite -!and_assoc. split; [| split]. 1, 2: by eauto.
-    apply and_comm, iff_and_impl_helper.
-    { apply tids_restrict_smaller'. }
-    red. 
+(*   Lemma TopRL τ: ⊢ RL ∅ τ τ ⌜ True ⌝. *)
+(*   Proof. *)
+(*     rewrite /RL /role_lift. iIntros (P Q) "!# #RULE". *)
+(*     iIntros (etr atr c2) "(_&P&SI&%STEP)".  *)
+(*     simpl. rewrite /em_lm_msi. iDestruct "SI" as "[MSI %TR]". *)
+(*     rewrite /valid_evolution_step.  *)
+(*     iMod ("RULE" with "[$]") as (δ2) "(Q&MSI&%TRANS)". *)
+(*     iModIntro. do 2 iExists _. iFrame. iPureIntro. *)
+(*     apply and_comm. rewrite -!and_assoc. split; [| split]. 1, 2: by eauto. *)
+(*     apply and_comm, iff_and_impl_helper. *)
+(*     { apply tids_restrict_smaller'. } *)
+(*     red.  *)
     
     
-    repeat split; eauto.  
+(*     repeat split; eauto.   *)
 
-End RoleLiftLM.
+(* End RoleLiftLM. *)
 
 End LMExecModel.
 

@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm em_lm_heap_lang pmp_lifting lm_fair lm_fair_traces.
+From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm em_lm_heap_lang lm_fair lm_fair_traces pmp_lifting.
 
 
 Section ActualOwnershipInterface. 
@@ -14,30 +14,26 @@ Section ActualOwnershipInterface.
   (* TODO: get rid of excessive shelved goals
      (could be solved by new implementation of LiveState) *)
   Lemma ActualOwnershipPartial:
-    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ _ _ LF) (iLM := LM) (PMPP := ActualOwnershipPartialPre) (eGS := fG). 
+    ⊢ PartialModelPredicates ∅ (EM := @LM_EM_HL _ _ _ LF) (iLM := LM) (eGS := fG).
+    (* ⊢ LM_steps_gen ∅ τ g (EM := @LM_EM_HL _ _ _ LF) (iLM := LM) (eGS := fG) (relies_on := fun x y => ⌜ x = y ⌝).  *)
   Proof.
     iIntros. iApply (Build_PartialModelPredicates (EM := @LM_EM_HL _ _ _ LF)). 
-    iModIntro. repeat iSplitL.
-    - iIntros (???????) "FUELS MSI". simpl in *.
+    iModIntro. repeat iSplitL. 
+    - iIntros (???????). iIntros "FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
       iMod (actual_update_no_step_enough_fuel with "FUELS LM_MSI") as (?) "(%STEPM & FUELS & LM_MSI' & %TMAP')".
-      3: by apply empty_subseteq. 2: set_solver. 1: done. 
+      3: by apply empty_subseteq. 2: set_solver. 1: done.
+      rewrite difference_empty_L. 
       iModIntro. do 2 iExists _. rewrite /em_lm_msi. iFrame.
-      iPureIntro. split.
-      + remember (trace_last auxtr) as δ1. 
-        pose proof (tids_restrict_smaller' _ _ TR) as SM.
-        repeat split; eauto.
-        * eexists. split; [apply STEPM| ]. done. 
-        * eapply tids_smaller'_restrict_mapping; [..| apply STEP]; eauto.
-          rewrite TMAP'.
-          rewrite dom_insert. rewrite subseteq_union_1; [done| ].
-          apply singleton_subseteq_l.
-          eapply locale_trans_dom; eauto.
-          eexists. split; eauto.
-          { apply STEPM. }
-          done. 
-      + eapply tids_dom_restrict_mapping; eauto.
+      iPureIntro. split; try done. 
+      2: { eapply (tids_dom_restrict_mapping _ _ _  _ _ STEP (LM := LM)); eauto. }
+      remember (trace_last auxtr) as δ1. 
+      red. repeat split; eauto.
+      * eexists. split; [apply STEPM| ]. done. 
+      * eapply (tids_restrict_smaller' (LM := LM)).
+        eapply (tids_dom_restrict_mapping _ _ _ _ _ STEP TR (LM := LM)).
+        eauto.
     - iIntros "* FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
       remember (trace_last auxtr) as δ1.
@@ -64,7 +60,8 @@ Section ActualOwnershipInterface.
         by rewrite dom_fmap_L in MM. }
       iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
       iMod (actual_update_fork_split with "FUELS LM_MSI") as (?) "(FUELS1 & FUELS2 & POST & LM_MSI' & %STEPM & %TMAP')"; eauto.
-      do 2 iExists _. iFrame. iModIntro. iPureIntro. split.
+      do 2 iExists _. iFrame. iModIntro. iPureIntro.
+      split.  
       + red. intros. eapply tids_dom_fork_step; eauto.
         * intros. apply TR. congruence.
         * inversion STEPM. destruct H1 as [? MM].
@@ -74,7 +71,7 @@ Section ActualOwnershipInterface.
           destruct POOL as (?&?&?).
           exists x, efork. done.
       + repeat split; eauto.
-        { eexists; split; [apply STEPM| ]; done. }
+        { eexists; split; [apply STEPM| ]; done. }        
         eapply tids_smaller'_fork_step; [apply STEP| ..]. 
         * by rewrite -LAST.
         * eapply locale_trans_dom; eauto.

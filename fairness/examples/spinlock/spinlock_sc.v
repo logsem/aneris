@@ -181,7 +181,6 @@ End SpinlockDefs.
 Section ClientProofs.
   (* Context `{!heapGS Σ spinlock_model, !spinlockG Σ}. *)
   Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM, spinlockG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ spinlock_model_impl}.
   Context {ifG: fairnessGS spinlock_model Σ}.
 
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
@@ -361,7 +360,7 @@ Section ClientProofs.
     destruct f; [lia| ]; 
     iApply wp_lift_pure_step_no_fork_singlerole; auto;
     iSplitR; [done| ];
-    do 3 iModIntro; iFrame; iIntros "FUEL"; simpl.
+    do 3 iModIntro; iFrame "FUEL"; iIntros "FUEL"; simpl.
 
   Lemma nonfinished_role_is_alive th st v (DOM: th < length st)
         (THV: st !! th = Some v)
@@ -385,7 +384,7 @@ Section ClientProofs.
   
   (* Context `{PMP: @PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP}. *)
   (* Notation "'PMP'" := (@PartialModelPredicates heap_lang Mdl LM _ _ Σ _ spinlock_model_impl spinlock_model PMPP).  *)
-  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := spinlock_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
+  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := spinlock_model) (eGS := heap_fairnessGS))).
   
 
   Lemma acquire_spec_term tid Einvs l γ P f (FUEL: f > 5) (th: nat)
@@ -402,7 +401,6 @@ Section ClientProofs.
     rewrite {2}/acquire.
 
     pure_step_burn_fuel f.
-
     
     wp_bind (CmpXchg _ _ _).
     iApply wp_atomic. 
@@ -593,7 +591,13 @@ Section ClientProofs.
   Proof using.
     iIntros "#PMP" (Φ). iModIntro. iIntros "(#INV & FUEL & FRAG) Kont".
     rewrite /client.
+
     pure_step_burn_fuel f.
+    (* destruct f; [lia| ]. *)
+    (* iApply wp_lift_pure_step_no_fork_singlerole; auto.  *)
+    (* iSplitR; [done| ].  *)
+    (* do 3 iModIntro. iFrame "FUEL".  iIntros "FUEL"; simpl. *)
+
     wp_bind (acquire #l)%E.
     iApply (acquire_spec_term with "[$] [-Kont]"). 
     3: by iFrame.
@@ -614,7 +618,6 @@ End ClientProofs.
 Section MainProof.
   Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM}.
   Context `{SL_PRE: spinlockPreG Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ spinlock_model_impl}.
   Context {ifG: fairnessGS spinlock_model Σ}.
 
   Notation "tid ↦M R" := (partial_mapping_is {[ tid := R ]}) (at level 33).
@@ -634,7 +637,6 @@ Section MainProof.
         ([∗ set] i ∈ list_to_set (seq 0 n), 
          ∃ γ, ⌜tgns !! i = Some γ⌝ ∗ own γ (●E v) ∗ own γ (◯E v)))%I.
   Proof using. 
-    clear PMPP. 
     iInduction n as [| n'] "IH".
     { iModIntro. iExists []. iSplit; done. }
     iMod (own_alloc (●E v  ⋅ ◯E v)) as (γ) "[AUTH FRAG]".
@@ -686,7 +688,7 @@ Section MainProof.
   (*   simpl. done. apply _.  *)
 
   (* Notation "'PMP'" := (@PartialModelPredicates _ _ LM _ _ _ _ _ spinlock_model PMPP). *)
-  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := spinlock_model) (PMPP := PMPP) (eGS := heap_fairnessGS))).
+  Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := spinlock_model) (eGS := heap_fairnessGS))).
 
   Lemma newlock_spec tid Einvs P fs
         (FSne: fs ≠ ∅) (FUELS: fuels_ge fs 20):
@@ -789,7 +791,7 @@ Section MainProof.
   Ltac pure_step_burn_fuel f := destruct f; [lia| ]; pure_step_burn_fuel_impl.
 
   Lemma fuels_ge_helper fs b th f (REC: fuels_ge fs b) (GE: f >= b):
-    fuels_ge (<[th:=f]> fs) b (iM := spinlock_model_impl).
+    fuels_ge (<[th:=f]> fs) b (M := spinlock_model_impl).
   Proof.
     unfold fuels_ge. intros.
     pose proof FUEL as FUEL_. apply elem_of_dom_2 in FUEL.

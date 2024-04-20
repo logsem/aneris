@@ -1,13 +1,14 @@
-From stdpp Require Import fin_maps.
+(* From stdpp Require Import fin_maps. *)
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness fuel partial_ownership pmp_lifting. 
+From trillium.fairness Require Export fairness fuel resources pmp_lifting. 
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Export heap_lang_defs. 
 From trillium.fairness.heap_lang Require Import tactics notation.
+From trillium.fairness.lm_rules Require Export resources_updates.
 
 Set Default Proof Using "Type".
 
@@ -18,9 +19,9 @@ Section lifting.
 Context `{EM: ExecutionModel heap_lang M}.   
 Context `{hGS: @heapGS Σ _ EM}.
 Context `{Countable G}.
-Context `{iLM:LiveModel G iM LSI_True}.
-(* Context {ifG: fairnessGS iLM Σ}. *)
-Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}.
+Context `{iLM:LiveModel (locale heap_lang) iM LSI_True}.
+Context {ifG: fairnessGS iLM Σ}.
+(* Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ iM}. *)
 
 Let eGS := heap_fairnessGS. 
 
@@ -51,7 +52,7 @@ Lemma wp_lift_pure_step_no_fork tid E E' Einvs Φ e1 e2 fs ϕ:
   fs ≠ ∅ ->
   PureExec ϕ 1 e1 e2 ->
   ϕ ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := eGS)) ∗
   (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using. 
@@ -144,7 +145,7 @@ Qed.
 Lemma wp_lift_pure_step_no_fork' fs tid E E' Einvs Φ e1 e2:
   fs ≠ ∅ ->
   PureExec True 1 e1 e2 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuels_S tid fs ∗ ((has_fuels tid fs) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using. 
   intros. by iApply wp_lift_pure_step_no_fork.
@@ -152,7 +153,7 @@ Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole tid E E' Einvs Φ e1 e2 ρ f φ:
   PureExec φ 1 e1 e2 -> φ ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using. 
   iIntros (??) "H". rewrite has_fuel_fuels_S.
@@ -169,7 +170,7 @@ Lemma wp_lift_pure_step_no_fork_take_step_stash s1 s2 tid E E' Einvs fs1 fs2 fr1
   live_roles iM s1 ∩ fr_stash = ∅ → 
   dom fs2 ∩ fr_stash = ∅ ->
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ (live_roles iM s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash)
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
   ⊢ WP e1 @ tid; E {{ Φ }}.
@@ -212,7 +213,7 @@ Lemma wp_lift_pure_step_no_fork_take_step s1 s2 tid E E' Einvs fs1 fs2 fr1 Φ e1
   valid_new_fuelmap (LM := iLM) fs1 fs2 s1 s2 ρ ->
   live_roles iM s2 ∖ live_roles iM s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2 →
   iM.(fmtrans) s1 (Some ρ) s2 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗
   (|={E}[E']▷=> partial_model_is s1 ∗ has_fuels tid fs1 ∗ partial_free_roles_are fr1 ∗
                  (partial_model_is s2 -∗ partial_free_roles_are (fr1 ∖ (live_roles iM s2 ∖ (live_roles iM s1 ∪ dom fs1 ∩ dom fs2)))
                   -∗ (has_fuels tid fs2 -∗ WP e2 @ tid; E {{ Φ }})))
@@ -232,7 +233,7 @@ Lemma wp_lift_pure_step_no_fork_singlerole_take_step s1 s2 tid E E' Einvs
   Einvs ⊆ E ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
   (f2 ≤ iLM.(lm_fl) s2)%nat -> iM.(fmtrans) s1 (Some ρ) s2 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (|={E}[E']▷=> partial_model_is s1 ∗ partial_free_roles_are fr ∗ has_fuel tid ρ f1 ∗
    (partial_model_is s2 -∗ partial_free_roles_are fr -∗ (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else (tid ↦M ∅) ) -∗
                                WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
@@ -262,7 +263,7 @@ Qed.
 
 Lemma wp_lift_pure_step_no_fork_singlerole' tid E E' Einvs Φ e1 e2 ρ f:
   PureExec True 1 e1 e2 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (|={E}[E']▷=> has_fuel tid ρ (S f) ∗ ((has_fuel tid ρ f) -∗ WP e2 @ tid; E {{ Φ }}))
   ⊢ WP e1 @ tid; E {{ Φ }}.
 Proof using.
   iIntros (?) "H". rewrite has_fuel_fuels_S.
@@ -280,7 +281,7 @@ Qed.
 Lemma wp_fork_nostep s tid E Einvs e Φ R1 R2
   (fs: gmap (fmrole iM) nat) (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
   R1 ∪ R2 = dom fs ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
                 WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
   ) -∗
      ▷ (has_fuels tid (fs ⇂ R1) ={E}=∗ Φ (LitV LitUnit)) -∗
@@ -320,7 +321,7 @@ Lemma wp_fork_nostep_alt s tid E Einvs e Φ
   (fs1 fs2: gmap (fmrole iM) nat)
   (DISJ: fs1 ##ₘ fs2)
   (NE: fs1 ∪ fs2 ≠ ∅):
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' fs2 -∗
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' fs2 -∗
                 WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
   ) -∗
      ▷ (has_fuels tid fs1 ={E}=∗ Φ (LitV LitUnit)) -∗
@@ -345,7 +346,7 @@ Qed.
 Lemma wp_allocN_seq_nostep s tid E Einvs v n fs:
   fs ≠ ∅ ->
   0 < n →
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢
   {{{ has_fuels_S tid fs }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; tid; E
   {{{ l, RET LitV (LitLoc l); has_fuels tid fs ∗ [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
@@ -378,7 +379,7 @@ Qed.
 
 Lemma wp_alloc_nostep s tid E Einvs v fs :
   fs ≠ ∅ ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
 Proof using. 
   iIntros (?) "#PMP". iModIntro. iIntros (Φ) "HfuelS HΦ".
   iApply (wp_allocN_seq_nostep with "PMP HfuelS"); auto with lia.
@@ -387,7 +388,7 @@ Qed.
 
 Lemma wp_choose_nat_nostep s tid E Einvs fs :
   fs ≠ ∅ ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ has_fuels_S tid fs }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ has_fuels_S tid fs }}}
     ChooseNat @ s; tid; E
   {{{ (n:nat), RET LitV (LitInt n); has_fuels tid fs }}}.
 Proof using. 
@@ -411,7 +412,7 @@ Qed.
 
 Lemma wp_load_nostep s tid E Einvs l q v fs:
   fs ≠ ∅ ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
 Proof using. 
   iIntros (?). iIntros "#PMP". iModIntro. iIntros (Φ) "[>Hl HfuelS] HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
   iIntros (extr atr K tp1 tp2 σ1 Hval Hexend Hloc) "(% & Hsi & Hmi) !>".
@@ -430,7 +431,7 @@ Qed.
 
 Lemma wp_store_nostep s tid E Einvs l v' v fs:
   fs ≠ ∅ ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
     Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
 Proof using. 
@@ -461,7 +462,7 @@ Lemma wp_store_step_keep s tid ρ (fs1 fs2: gmap (fmrole iM) nat) fr fr_stash s1
   (STASH : fr_stash ⊆ dom fs1) 
   (NSL : live_roles iM s1 ∩ (fr_stash ∖ {[ρ]}) = ∅)
   (NOS2 : dom fs2 ∩ fr_stash = ∅):
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢
   {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuels tid fs1 ∗
       ▷ partial_free_roles_are fr}}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
@@ -499,7 +500,7 @@ Lemma wp_store_step_singlerole_keep s tid ρ (f1 f2: nat) (* fr *) s1 s2 E Einvs
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   (ρ ∉ live_roles iM s2 -> (f2 < f1)%nat ) -> (* TODO: check Zombie case in must_decrease *)
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1
         (* ∗ ▷ partial_free_roles_are fr *)
   }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
@@ -548,7 +549,7 @@ Lemma wp_store_step_singlerole s tid ρ (f1 f2: nat) s1 s2 E Einvs l v' v :
   Einvs ⊆ E ->
   f2 ≤ iLM.(lm_fl) s2 -> fmtrans iM s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1}}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1}}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
   {{{ RET LitV LitUnit; l ↦ v ∗ partial_model_is s2 ∗ 
       (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ∗ partial_free_roles_are {[ ρ ]}) }}}.
@@ -600,7 +601,7 @@ Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l q
   Einvs ⊆ E ->
   v' ≠ v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦{q} v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := eGS)) ⊢ {{{ ▷ l ↦{q} v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
       (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
 Proof using. 
@@ -644,7 +645,7 @@ Lemma wp_cmpxchg_suc_step_singlerole_keep_dead  s tid ρ (f1 f2: nat) fr s1 s2 E
   ρ ∉ live_roles _ s2 →
   v' = v1 → vals_compare_safe v' v1 → f2 < f1 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
       has_fuel tid ρ f2 }}}.
@@ -682,7 +683,7 @@ Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E Einvs l v'
   Einvs ⊆ E ->
   v' = v1 → vals_compare_safe v' v1 → f2 ≤ iLM.(lm_fl) s2 -> iM.(fmtrans) s1 (Some ρ) s2 ->
   live_roles _ s2 ⊆ live_roles _ s1 ->
-  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (PMPP := PMPP) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
+  (PartialModelPredicates Einvs (EM := EM) (iLM := iLM) (eGS := eGS)) ⊢ {{{ ▷ l ↦ v' ∗ ▷ partial_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ partial_free_roles_are fr }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ partial_model_is s2 ∗ partial_free_roles_are fr ∗
       (if decide (ρ ∈ live_roles iM s2) then has_fuel tid ρ f2 else tid ↦M ∅ ) }}}.
