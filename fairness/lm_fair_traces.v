@@ -230,7 +230,7 @@ Section fuel_dec_unless.
     apply next_TS_spec_inv_S in Htrans; auto.
     right. 
     
-    destruct Htrans as (Hne&Hdec&Hni&Hincl&Heq). rewrite -> Heq in *. split; last done.
+    destruct Htrans as (Hne&Hdec&Hni&Hincl&Heq&NGNE). rewrite -> Heq in *. split; last done.
 
     destruct (decide (dom $ ls_fuel δ = dom $ ls_fuel (trfirst auxtr'))) as [Hdomeq|Hdomneq].
     - destruct Hne as [ρ Hρtid].

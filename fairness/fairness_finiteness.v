@@ -288,6 +288,11 @@ Section LMFinBranching.
         apply n. eapply mim_in_1; eauto. 
       + apply proj2, proj2, proj2, proj1 in STEP. red.
         rewrite FUEL ST. apply STEP.
+      + red. intros g' [D2 ND1]%elem_of_difference.
+        apply TMAP_DOM, elem_of_union in D2. destruct D2 as [?| D2]; [set_solver|].
+        apply elem_of_singleton in D2. subst.
+        destruct ND1. apply proj2, proj1, ls_mapping_tmap_corr in STEP.
+        by destruct STEP as (?&?%elem_of_dom_2&?).  
     - repeat split; try by apply STEP.
       (* TODO: refactor *)
       + apply proj2, proj1 in STEP. red.
@@ -307,6 +312,11 @@ Section LMFinBranching.
         apply n. eapply mim_in_1; eauto. 
       + apply proj2, proj2, proj1 in STEP. red.
         rewrite FUEL ST. apply STEP.
+      + red. intros g' [D2 ND1]%elem_of_difference.
+        apply TMAP_DOM, elem_of_union in D2. destruct D2 as [?| D2]; [set_solver|].
+        apply elem_of_singleton in D2. subst.
+        apply proj1 in STEP as [? STEP].
+        apply ls_mapping_tmap_corr in STEP. by destruct STEP as (?&?%elem_of_dom_2&?).
   Qed.
 
   (* not using Finite type to avoid dealing with ProofIrrel *)
@@ -338,7 +348,7 @@ Section LMFinBranching.
     forward eapply (STEPS _ _ TRANS') as ?. 
     { apply elem_of_cons. destruct ℓ; simpl in *; try done.
       - right. eapply elem_of_list_In, FIN_STEPS; eauto. apply TRANS'.
-      - left. repeat apply proj2 in TRANS'. congruence. }
+      - left. do 4 apply proj2 in TRANS'. apply proj1 in TRANS'. congruence. }
     { intros. rewrite list_to_set_elements.
       red in ARR. apply proj2, proj2, proj1 in ARR.
       etrans; [apply ARR| ].
@@ -666,7 +676,7 @@ Section finitary.
       eapply next_step_domain; eauto.
       (* { done. } *)
       { apply elem_of_cons.
-        left. inversion Htrans as (?&?&?&?&?); done. }
+        left. inversion Htrans as (?&?&?&?&?&?); done. }
       {
         apply elem_of_subseteq. intros.
         apply elem_of_list_to_set. apply locales_of_list_from_locale_from.
@@ -756,7 +766,7 @@ Section finitary_simple.
     - subst. simpl.
       right. split; auto.
       apply next_TS_spec_inv_S in N; auto.
-      simpl in N. repeat apply proj2 in N. rewrite -N.
+      simpl in N. do 4 apply proj2 in N. apply proj1 in N. rewrite -N.
       symmetry. apply UNDER_LAST.
     
     Unshelve.

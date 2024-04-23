@@ -104,7 +104,8 @@ Section RestrLM.
       + intros ?. rewrite F' dom_insert_L.
         apply mk_is_Some, elem_of_dom in F. set_solver. 
       + rewrite F' dom_insert_L.
-        apply mk_is_Some, elem_of_dom in F. set_solver. 
+        apply mk_is_Some, elem_of_dom in F. set_solver.
+      + red. rewrite TM'. set_solver. 
     - red.
       assert (exists δ': lm_ls LM, ls_under δ' = ls_under δ /\ ls_tmap δ' = (fun rs => rs ∖ {[ ρ ]}) <$> ls_tmap δ /\ ls_fuel δ' = delete ρ (ls_fuel δ)) as [δ' (ST' & TM' & F')]. 
       { unshelve eexists (MkLiveState _ _ _ _ _ _ _).
@@ -140,6 +141,7 @@ Section RestrLM.
           rewrite lookup_delete_ne; [| done].
           rewrite F1. simpl. lia.
       + rewrite F'. set_solver.
+      + red. rewrite TM'. rewrite dom_fmap_L. set_solver. 
   Qed.
 
   Section MapRestr.

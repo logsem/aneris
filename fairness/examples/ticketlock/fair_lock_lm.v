@@ -323,7 +323,7 @@ Section FairLockLM.
         { apply P1. }
         2: { simpl. left. simpl. apply STEP1. }                   
         red. simpl. congruence. 
-      + repeat apply proj2 in STEP1. congruence.
+      + do 4 apply proj2 in STEP1. apply proj1 in STEP1. congruence.
     - simpl in PSTEP.      
       destruct ι; simpl in REL; red in REL.
       + destruct ρ as [ρ]. 
@@ -355,7 +355,7 @@ Section FairLockLM.
         { apply P1. }
         2: { simpl. left. simpl. apply STEP1. }                   
         red. simpl. congruence. 
-      + repeat apply proj2 in STEP1. congruence.
+      + do 4 apply proj2 in STEP1. apply proj1 in STEP1. congruence.
     - simpl in PSTEP.      
       destruct ι; simpl in REL; red in REL.
       + destruct ρ as [ρ]. 
@@ -574,7 +574,9 @@ Section FairLockLM.
       { simpl in STEP0, LOCK, DIS.
         simpl in OTHER.  destruct ρ0 as [ρ'].
         unfold_LMF_trans STEP0.
-        2: { simpl in STEP1. pose proof STEP1 as SS. repeat apply proj2 in STEP1.
+        2: { simpl in STEP1. pose proof STEP1 as SS.
+             (* repeat apply proj2 in STEP1. *)
+             do 4 apply proj2 in STEP1. apply proj1 in STEP1. 
             rewrite -STEP1. repeat split; try tauto.
             apply unmapped_empty.
             { intros ?. rewrite STEP1 in LOCK.
@@ -593,7 +595,9 @@ Section FairLockLM.
         apply unmapped_empty.
         { intros ?. edestruct unused_does_lock_incompat; eauto. }
         intros IN.
-        repeat apply proj2 in STEP1. specialize (STEP1 ρ). specialize_full STEP1.
+        (* repeat apply proj2 in STEP1. *)
+        do 6 apply proj2 in STEP1. apply proj1 in STEP1.
+        specialize (STEP1 ρ). specialize_full STEP1.
         { apply elem_of_difference. repeat rewrite -ls_same_doms. split; [done| ].
           intros IN'. done. }
         apply elem_of_difference, proj1 in STEP1.
@@ -664,7 +668,9 @@ Section FairLockLM.
       { simpl in STEP0, LOCK, DIS.
         simpl in OTHER.  destruct ρ0 as [ρ'].
         unfold_LMF_trans STEP0.
-        2: { simpl in STEP1. pose proof STEP1 as SS. repeat apply proj2 in STEP1.
+        2: { simpl in STEP1. pose proof STEP1 as SS.
+             (* repeat apply proj2 in STEP1. *)
+             do 4 apply proj2 in STEP1. apply proj1 in STEP1. 
             rewrite -STEP1. repeat split; try tauto.
             apply unmapped_empty.
             { intros ?. rewrite STEP1 in LOCK.
@@ -683,7 +689,9 @@ Section FairLockLM.
         apply unmapped_empty.
         { intros ?. edestruct unused_does_unlock_incompat; eauto. }
         intros IN.
-        repeat apply proj2 in STEP1. specialize (STEP1 ρ). specialize_full STEP1.
+        (* repeat apply proj2 in STEP1. *)
+        do 6 apply proj2 in STEP1. apply proj1 in STEP1. 
+        specialize (STEP1 ρ). specialize_full STEP1.
         { apply elem_of_difference. repeat rewrite -ls_same_doms. split; [done| ].
           intros IN'. done. }
         apply elem_of_difference, proj1 in STEP1.
@@ -1113,7 +1121,9 @@ Section FairLockLM.
     inversion STEP; subst.
     - simpl in STEP0.
       unfold_LMF_trans STEP0.
-      2: { simpl in STEP1. repeat apply proj2 in STEP1.
+      2: { simpl in STEP1.
+           (* repeat apply proj2 in STEP1. *)
+           do 4 apply proj2 in STEP1. apply proj1 in STEP1. 
            apply UNUSED_NOT_DOM in UNUSED.
            rewrite STEP1 in UNUSED. by apply UNUSED_NOT_DOM. }
       simpl. apply UNUSED_NOT_DOM.  

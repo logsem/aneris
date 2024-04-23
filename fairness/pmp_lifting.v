@@ -33,7 +33,8 @@ Section PartialModelPredicates.
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace M) ζ efork σ1 σ2
           `(R1 ## R2)
-          `(fs ≠ ∅)
+          (* `(fs ≠ ∅) *)
+          `(R2 ≠ ∅)
           `(R1 ∪ R2 = dom fs)
          `(trace_last extr = (tp1, σ1))
           `(locale_step (tp1, σ1) (Some ζ) (tp2, σ2))

@@ -84,7 +84,8 @@ Section ForkStep.
 
   Lemma actual_update_fork_split_gen R1 R2 fs (δ1: LM) ζ τ_new
     (Hdisj: R1 ## R2):
-    fs ≠ ∅ ->
+    (* fs ≠ ∅ -> *)
+    R2 ≠ ∅ ->
     R1 ∪ R2 = dom fs ->
     fuel_reorder_preserves_LSI (LSI := LSI) ->
     τ_new ∉ dom (ls_tmap δ1) ->
@@ -95,7 +96,9 @@ Section ForkStep.
             ⌜lm_ls_trans LM δ1 (Silent_step ζ) δ2⌝ ∗
             ⌜ ls_tmap δ2 = (<[τ_new:=R2]> (<[ζ:=R1]> (ls_tmap δ1))) ⌝. 
   Proof.
-    iIntros (Hnemp Hunioneq PRES Hnewζ) "Hf Hmod".
+    iIntros (Hnemp2 Hunioneq PRES Hnewζ) "Hf Hmod".
+    assert (fs ≠ ∅) as Hnemp.
+    { intros ->. set_solver. } 
     unfold has_fuels_S.
     simpl in *.
     iDestruct (has_fuel_fuel with "Hf Hmod") as %Hfuels.
@@ -301,8 +304,15 @@ Section ForkStep.
       rewrite map_lookup_imap. rewrite elem_of_dom in Hρ'.
       destruct Hρ' as [f Hf]. rewrite Hf /=. destruct (decide ((ρ' ∈ R1 ∪ R2))); simpl; lia. }
     rewrite build_LS_ext_spec_fuel build_LS_ext_spec_st.
-    iSplit; [simpl| done]. rewrite map_imap_dom_eq //.
-    by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)).
+    iPureIntro. split; [simpl| split]; [| done|]. 
+    - rewrite map_imap_dom_eq //.
+      by intros ρ??; destruct (decide (ρ ∈ R1 ∪ R2)).
+    - red. rewrite build_LS_ext_spec_tmap /new_tmap.
+      intros g. rewrite !dom_insert_L !difference_union_distr_l !elem_of_union.
+      intros [IN | [? | ?]]; [..| set_solver].
+      2: { apply elem_of_dom_2 in Hmapping. set_solver. }
+      apply elem_of_difference, proj1, elem_of_singleton in IN as ->.
+      rewrite lookup_insert. set_solver. 
   Qed. 
 
 End ForkStep.
@@ -316,7 +326,8 @@ Section ForkStepTrue.
 
   Lemma actual_update_fork_split R1 R2 fs (δ1: LM) ζ τ_new
     (Hdisj: R1 ## R2):
-    fs ≠ ∅ ->
+    (* fs ≠ ∅ -> *)
+    R2 ≠ ∅ -> 
     R1 ∪ R2 = dom fs ->
     τ_new ∉ dom (ls_tmap δ1) ->
     has_fuels_S ζ fs -∗ model_state_interp δ1 ==∗

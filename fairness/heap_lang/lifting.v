@@ -279,7 +279,7 @@ Qed.
 (* Set Printing Implicit.  *)
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma wp_fork_nostep s tid E Einvs e Φ R1 R2
-  (fs: gmap (fmrole iM) nat) (Hdisj: R1 ## R2) (Hnemp: fs ≠ ∅):
+  (fs: gmap (fmrole iM) nat) (Hdisj: R1 ## R2) (Hnemp2: R2 ≠ ∅):
   R1 ∪ R2 = dom fs ->
   (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' (fs ⇂ R2) -∗
                 WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
@@ -320,7 +320,8 @@ Qed.
 Lemma wp_fork_nostep_alt s tid E Einvs e Φ
   (fs1 fs2: gmap (fmrole iM) nat)
   (DISJ: fs1 ##ₘ fs2)
-  (NE: fs1 ∪ fs2 ≠ ∅):
+  (* (NE: fs1 ∪ fs2 ≠ ∅): *)
+  (NE2: fs2 ≠ ∅):
   (PartialModelPredicates Einvs (EM := EM) (iLM := iLM)  (eGS := eGS)) ∗ (∀ tid', ▷ (has_fuels tid' fs2 -∗
                 WP e @ s; tid'; ⊤ {{ _, partial_mapping_is {[ tid' := ∅ ]}  }})
   ) -∗
@@ -330,7 +331,9 @@ Proof using.
   iIntros "[PMP FORK] FUEL1 FUEL".
   iApply (wp_fork_nostep with "[PMP FORK] [FUEL1]").
   { by eapply map_disjoint_dom_1. }
-  1, 2: set_solver.
+  (* 1, 2: set_solver. *)
+  { by intros EQ%dom_empty_inv_L. }
+  { rewrite <- dom_union_L. reflexivity. }
   3: done. 
   { iFrame. iIntros (?). iNext. iIntros "FUEL". iApply "FORK".
     iApply has_fuels_proper; [reflexivity| | iFrame].

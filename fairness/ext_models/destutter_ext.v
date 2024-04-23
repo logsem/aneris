@@ -52,7 +52,7 @@ Section destuttering_auxtr.
     (*   [left; eexists; done| right | inversion Htrans; naive_solver ]. *)
     { left. simpl. rewrite N. eauto. } 
 
-    destruct STEP as (Hne&Hdec&Hni&Hincl&Heq).
+    destruct STEP as (Hne&Hdec&Hni&Hincl&Heq&NGNE).
     right. rewrite -> Heq in *. split; last done.
     
     destruct (decide (dom $ ls_fuel δ = dom $ ls_fuel δ')) as [Hdomeq|Hdomneq].

@@ -269,7 +269,7 @@ Section ModelStep.
           + apply elem_of_difference in Hnin as [? Hnin].
             apply not_elem_of_dom in Hnin. rewrite Hnin /= in Hlim.
             by apply Hlim. }
-      split.
+      split; [| split].
       { intros ρ'. unfold update_fuel_resource, fuel_apply => Hin.
         rewrite map_imap_dom_eq in Hin; last first.
         { intros ρ0 _ Hin'. destruct (decide (ρ0 ∈ dom fs2)); [by apply elem_of_dom|].
@@ -278,6 +278,13 @@ Section ModelStep.
         rewrite dom_gset_to_gmap in Hin. rewrite map_lookup_imap lookup_gset_to_gmap option_guard_True /=; last set_solver -Hsamedoms Hnewdom Hfueldom.
         assert (ρ' ∈ dom fs2) by set_solver -Hsamedoms Hnewdom Hfueldom. rewrite decide_True //. apply Hnewlim. apply elem_of_difference; split =>//.
         intros contra%Hxdom%elem_of_dom_2. rewrite ls_same_doms in contra. simplify_eq. set_solver -Hsamedoms Hnewdom Hfueldom. }
+      2: { red. rewrite build_LS_ext_spec_tmap. intros g. 
+           rewrite dom_insert_L difference_union_distr_l elem_of_union.
+           intros [IN| XX]; [| clear -XX; set_solver].
+           eapply mim_lookup_helper in Hxdom; [| apply ls_mapping_tmap_corr| ].
+           { apply elem_of_dom_2 in Hxdom. clear -IN Hxdom. set_solver. }
+           intros EMP. clear -EMP Hinfs1m. set_solver. } 
+
       intros ρ0 Hin.
       assert (ρ0 ∉ live_roles _ δ1).
       { eapply not_elem_of_weaken; last apply ls_fuel_dom. set_solver -Hsamedoms Hnewdom Hfueldom. }
@@ -293,7 +300,7 @@ Section ModelStep.
         apply elem_of_dom in Hinabs. rewrite Hnin in Hinabs. simpl in Hinabs.
         by inversion Hinabs. }
       set_solver -Hsamedoms Hnewdom Hfueldom.
-  Qed. 
+  Qed.
 
   Lemma model_step_new_fr
   (s1 s2 : M)

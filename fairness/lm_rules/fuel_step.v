@@ -321,6 +321,10 @@ Section FuelDropStep.
         last set_solver -Hnewdom Hsamedoms Hfueldom.
       intros ρ Hin. apply elem_of_dom.
       rewrite Hfuel ?dom_fmap // -elem_of_dom dom_fmap //.
+    - red. rewrite build_LS_ext_spec_tmap. intros g. 
+      rewrite dom_insert_L difference_union_distr_l elem_of_union.
+      intros [IN| ]; [| set_solver].
+      apply elem_of_dom_2 in TMAP1. set_solver.
   Qed. 
 
 End FuelDropStep. 
@@ -500,7 +504,8 @@ Section FuelKeepStep.
       { rewrite dom_fmap. eapply elem_of_dom; eauto. }
       specialize (F DOM).
       rewrite lookup_fmap Hf' in F. rewrite Hf in F. inversion F. lia.  
-    - by rewrite -Hsamedoms ls_same_doms. 
+    - by rewrite -Hsamedoms ls_same_doms.
+    - red. rewrite build_LS_ext_spec_tmap. set_solver.
   Qed. 
   
 End FuelKeepStep.
@@ -712,6 +717,10 @@ Section FuelStep.
         last set_solver -Hnewdom Hsamedoms Hfueldom.
       intros ρ Hin. apply elem_of_dom.
       rewrite Hfuel ?dom_fmap // -elem_of_dom dom_fmap //.
+    - red. rewrite build_LS_ext_spec_tmap. intros g. 
+      rewrite dom_insert_L difference_union_distr_l elem_of_union.
+      intros [IN| ]; [| set_solver].
+      apply elem_of_dom_2 in TMAP1. set_solver.
   Qed. 
 
 End FuelStep. 

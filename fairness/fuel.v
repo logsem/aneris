@@ -310,6 +310,9 @@ Section fairness.
            oρ = Some ρ' /\ (ρ' ∉ dom b.(ls_fuel) \/ ρ' ∈ M.(live_roles) b.(ls_under)) \/
            (ρ' ∉ dom b.(ls_fuel) ∧ ρ' ∉ M.(live_roles) a.(ls_under))).
 
+  Definition new_groups_nonempty (a b: LiveState) :=
+    forall g, g ∈ dom (@ls_tmap b) ∖ dom (@ls_tmap a) -> default ∅ (@ls_tmap b !! g) ≠ ∅.
+
   Definition ls_trans fuel_limit (a: LiveState) ℓ (b: LiveState): Prop :=
     match ℓ with
     | Take_step ρ tid =>
@@ -320,12 +323,14 @@ Section fairness.
       ∧ (ρ ∈ live_roles _ b -> oleq (b.(ls_fuel) !! ρ) (Some (fuel_limit b)))
       ∧ (∀ ρ, ρ ∈ dom b.(ls_fuel) ∖ dom a.(ls_fuel) -> oleq (b.(ls_fuel) !! ρ) (Some (fuel_limit b)))
       ∧ dom b.(ls_fuel) ∖ dom a.(ls_fuel) ⊆ live_roles _ b ∖ live_roles _ a
+      /\ new_groups_nonempty a b                                          
     | Silent_step tid =>
       (∃ ρ, (ls_mapping a) !! ρ = Some tid)
       ∧ fuel_decr (Some tid) None a b
       ∧ fuel_must_not_incr None a b
       ∧ dom b.(ls_fuel) ⊆ dom a.(ls_fuel)
       ∧ a.(ls_under) = b.(ls_under)
+      /\ new_groups_nonempty a b                                          
     | Config_step =>
       M.(fmtrans) a None b
       ∧ fuel_decr None None a b
