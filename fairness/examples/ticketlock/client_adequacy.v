@@ -1,7 +1,7 @@
 From trillium.fairness.heap_lang Require Import notation simulation_adequacy_lm heap_lang_defs em_lm_heap_lang.
-From trillium.fairness Require Import fairness fuel fairness_finiteness lm_fair comp_utils fair_termination lm_fairness_preservation lm_fairness_preservation_wip lm_fair_traces.
+From trillium.fairness Require Import fairness fuel fairness_finiteness lm_fair comp_utils fair_termination lm_fairness_preservation lm_fairness_preservation_wip lm_fair_traces lm_restr.
 From trillium.fairness.ext_models Require Import ext_models.
-From trillium.fairness.examples.ticketlock Require Import ticketlock_model_lm client_model ticketlock_model fair_lock lm_restr client_trace_termination fair_lock_lm. 
+From trillium.fairness.examples.ticketlock Require Import ticketlock_model_lm client_model ticketlock_model fair_lock client_trace_termination fair_lock_lm. 
 
 Section Adequacy.
   Let M := tl_fair_model.
@@ -163,9 +163,6 @@ Qed.
     - eapply valid_state_evolution_finitary_fairness_simple.
       apply client_model_finitary.      
     - admit.
-    -
-      (* apply H. -- need to fix decision lemmas  *)
-      admit.     
       
   Admitted. 
 

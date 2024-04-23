@@ -1,7 +1,7 @@
 From trillium.fairness Require Export fairness resources fair_termination fuel. 
 (* From trillium.fairness.heap_lang Require Export lang heap_lang_defs. *)
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import execution_model lm_fair_traces lm_fair model_plug. 
+From trillium.fairness Require Import execution_model lm_fair_traces lm_fair model_plug lm_restr_gen. 
 
 Section LMExecModel.
   Context `{CNT_Λ: Countable (locale Λ)}.
@@ -163,31 +163,69 @@ intros. iIntros. iMod (init_fairnessGS_LM _ s1 σ) as "[% [? X]]"; [done| ].
 iModIntro. iExists _. iFrame. 
 Defined. 
 
-(* Section RoleLiftLM. *)
-(*   Context {Σ: gFunctors}.  *)
-(*   Context {fG: fairnessGS LM Σ}. *)
-(*   Context {INV: invGS_gen HasNoLc Σ}. *)
-  
-(*   Let RL := @role_lift _ _ LM_EM _ fG LM_Fair model_state_interp INV. *)
 
-(*   Lemma TopRL τ: ⊢ RL ∅ τ τ ⌜ True ⌝. *)
-(*   Proof. *)
-(*     rewrite /RL /role_lift. iIntros (P Q) "!# #RULE". *)
-(*     iIntros (etr atr c2) "(_&P&SI&%STEP)".  *)
-(*     simpl. rewrite /em_lm_msi. iDestruct "SI" as "[MSI %TR]". *)
-(*     rewrite /valid_evolution_step.  *)
-(*     iMod ("RULE" with "[$]") as (δ2) "(Q&MSI&%TRANS)". *)
-(*     iModIntro. do 2 iExists _. iFrame. iPureIntro. *)
-(*     apply and_comm. rewrite -!and_assoc. split; [| split]. 1, 2: by eauto. *)
-(*     apply and_comm, iff_and_impl_helper. *)
-(*     { apply tids_restrict_smaller'. } *)
-(*     red.  *)
-    
-    
-(*     repeat split; eauto.   *)
+Section RoleLiftLM.
+  Context {Σ: gFunctors}.
+  Context {fG: fairnessGS LM Σ}.
+  Context {INV: invGS_gen HasNoLc Σ}.
 
-(* End RoleLiftLM. *)
+  Context {RESTR: forall g δ, enabled_group_nonempty g δ (LM := LM)}. 
+
+  Let lr: fmstate LM_Fair -> gset (fmrole LM_Fair) :=
+        fun δ => filter (flip role_enabled_model δ) (dom (ls_tmap δ)).
+
+  Let RL := @role_lift _ _ LM_EM _ fG LM_Fair model_state_interp lr INV.
+
+  (* TODO: move *)
+  Lemma LM_step_ngn `{Countable G'} `{LM': LiveModel G' M' LSI'}:
+    forall δ1 ℓ δ2, lm_ls_trans LM' δ1 ℓ δ2 -> new_groups_nonempty δ1 δ2. 
+  Proof. 
+    intros δ1 ℓ δ2 STEP.
+    destruct ℓ; try by apply STEP. set_solver.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma LM_step_groups `{Countable G'} `{LM': LiveModel G' M' LSI'}:
+    forall δ1 ℓ δ2, lm_ls_trans LM' δ1 ℓ δ2 ->
+               forall g R, ls_tmap δ2 !! g = Some R -> R ≠ ∅ \/ g ∈ dom (ls_tmap δ1).
+  Proof. 
+    intros δ1 ℓ δ2 STEP g R TM2.
+    destruct (decide (R = ∅)); [| tauto]. subst. right.
+    destruct (decide (g ∈ dom (ls_tmap δ1))); [done| ]. 
+    apply LM_step_ngn in STEP. red in STEP. specialize_full STEP.
+    { apply elem_of_difference. split; eauto.
+      eapply elem_of_dom. eauto. }
+    by rewrite TM2 in STEP.
+  Qed. 
+
+  Lemma TopRL τ: ⊢ RL ∅ τ τ ⌜ True ⌝.
+  Proof.
+    rewrite /RL /role_lift. iIntros (P Q) "!# #RULE".
+    iIntros (etr atr c2) "(_&P&SI&%STEP)".
+    simpl. rewrite /em_lm_msi. iDestruct "SI" as "[MSI %TR]".
+    rewrite /valid_evolution_step.
+    iMod ("RULE" with "[$]") as (δ2) "(Q&MSI&%TRANS&%LR)".
+    iModIntro. do 2 iExists _. iFrame. iPureIntro.
+    apply and_comm. rewrite -!and_assoc. split; [| split].
+    1, 2: by eauto. 
+    apply iff_and_impl_helper.
+    { apply tids_smaller'_restrict. }
+    
+    red. intros τ' D2.
+    destruct (decide (τ' ∈ dom (ls_tmap (trace_last atr)))) as [D1 | ND1].
+    { destruct (trace_last etr), c2. 
+      apply tids_restrict_smaller' in TR. apply TR in D1. 
+      eapply from_locale_step; eauto. }
+    destruct TRANS as (?&TRANS&?).
+    apply elem_of_dom in D2 as [R' TM']. 
+    eapply LM_step_groups in TRANS as [NEQ| ?]; eauto; [| done].
+    specialize (LR τ'). specialize_full LR.
+    { rewrite /lr. apply elem_of_filter. split.
+      - red. apply RESTR. rewrite TM'. done.
+      - eapply elem_of_dom; eauto. }
+    destruct ND1. rewrite /lr in LR. apply elem_of_filter in LR. apply LR.
+  Qed. 
+
+End RoleLiftLM.
 
 End LMExecModel.
-
-

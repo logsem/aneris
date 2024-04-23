@@ -1,8 +1,8 @@
-From trillium.fairness.examples.ticketlock Require Import fair_lock lm_restr.
+From trillium.fairness.examples.ticketlock Require Import fair_lock.
 From trillium.fairness.ext_models Require Import ext_models destutter_ext. 
 From iris.proofmode Require Import tactics.
 From stdpp Require Import base.
-From trillium.fairness Require Import  lm_fair_traces trace_helpers fuel lm_fair lm_fairness_preservation trace_lookup.
+From trillium.fairness Require Import lm_fair_traces trace_helpers fuel lm_fair lm_fairness_preservation trace_lookup lm_restr.
 
 
 Section FairLockLM.

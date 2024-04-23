@@ -1,9 +1,9 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fuel lm_fair fairness_finiteness lm_fairness_preservation. 
-From trillium.fairness.examples.ticketlock Require Import fair_lock ticketlock_model fair_lock_lm lm_restr.
+From trillium.fairness.examples.ticketlock Require Import fair_lock ticketlock_model fair_lock_lm.
 From stdpp Require Import base.
 From trillium.fairness.ext_models Require Import ext_models. 
-From trillium.fairness Require Import comp_utils.
+From trillium.fairness Require Import comp_utils lm_restr.
 
 Section TlLM.
   Let M := tl_fair_model.

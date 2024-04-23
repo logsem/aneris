@@ -2,6 +2,7 @@ From iris.proofmode Require Import tactics.
 From stdpp Require Import base.
 From trillium.fairness Require Import fuel lm_fair.
 From trillium.fairness.lm_rules Require Import resources_updates.
+From trillium.fairness Require Import lm_restr_gen.
 
 (* TODO: move *)
 Section RestrLM.
@@ -38,6 +39,68 @@ Section RestrLM.
   Definition enabled_group_singleton ρ δ :=
     role_enabled_model ((asG ρ): fmrole LMF) δ <->
     ρ ∈ dom (ls_mapping δ).
+
+  Section MapRestr.
+    Hypothesis (MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ)).
+
+    Lemma unmapped_empty' (ρ: fmrole M) (δ: lm_ls LM):
+      ρ ∉ dom (ls_mapping δ) <-> default ∅ (ls_tmap δ !! (asG ρ)) = ∅.
+    Proof.
+      destruct (decide (default ∅ (ls_tmap δ !! asG ρ) = ∅)) as [T | T]. 
+      { simpl. split; [done| ]. intros _ DOM.
+        apply elem_of_dom in DOM as [? DOM].
+        pose proof DOM as ->%MAP_RESTR.
+        apply ls_mapping_tmap_corr in DOM as (?&X&?).
+        rewrite X in T. simpl in T. set_solver. }
+      destruct (ls_tmap δ !! asG ρ) as [S| ] eqn:TM; [| done].
+      simpl in *. split; [| done]. intros. 
+      apply set_choose_L in T as [ρ' IN].
+      forward eapply (proj2 (ls_mapping_tmap_corr δ ρ' (asG ρ))).
+      { eauto. }
+      intros T.
+      pose proof T as [=]%MAP_RESTR. subst.
+      destruct H. by apply elem_of_dom.
+    Qed. 
+    
+    Lemma unmapped_empty_dom (ρ: fmrole M) (δ: lm_ls LM)
+      (DOM: asG ρ ∈ dom (ls_tmap δ))
+      :
+      ρ ∉ dom (ls_mapping δ) <-> ls_tmap δ !! asG ρ = Some ∅.
+    Proof.
+      rewrite unmapped_empty'.
+      apply elem_of_dom in DOM as [? DOM]. rewrite DOM. simpl.
+      intuition; congruence.
+    Qed. 
+
+  End MapRestr.
+
+  Section EnabledSingleton.
+  
+    Hypothesis EGS: forall ρ δ, enabled_group_singleton ρ δ.
+
+    Lemma disabled_group_singleton ρ δ:
+      ¬ role_enabled_model ((asG ρ): fmrole LMF) δ <-> ρ ∉ dom (ls_mapping δ).
+    Proof. 
+      apply not_iff_compat. apply EGS. 
+    Qed. 
+    
+    Lemma disabled_group_disabled_role ρ δ:
+      ¬ role_enabled_model ((asG ρ): fmrole LMF) δ -> ¬ role_enabled_model ρ (ls_under δ). 
+    Proof.
+      by intros ? ?%ls_mapping_dom%EGS.
+    Qed.
+
+  End EnabledSingleton.
+
+  Lemma egs_egn (MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ))
+    (ρ: R) δ:
+    enabled_group_singleton ρ δ <-> enabled_group_nonempty (asG ρ) δ.
+  Proof. 
+    rewrite /enabled_group_singleton /enabled_group_nonempty.
+    apply ZifyClasses.iff_morph; [done| ].
+    specialize (MAP_RESTR δ). red in MAP_RESTR.
+    pose proof (ls_mapping_tmap_corr δ ρ).
+  Admitted.     
 
   
   Lemma egs_helper
@@ -143,58 +206,5 @@ Section RestrLM.
       + rewrite F'. set_solver.
       + red. rewrite TM'. rewrite dom_fmap_L. set_solver. 
   Qed.
-
-  Section MapRestr.
-    Hypothesis (MAP_RESTR: forall (δ: lm_ls LM), ls_map_restr (ls_mapping δ)).
-
-    Lemma unmapped_empty' (ρ: fmrole M) (δ: lm_ls LM):
-      ρ ∉ dom (ls_mapping δ) <-> default ∅ (ls_tmap δ !! (asG ρ)) = ∅.
-    Proof.
-      destruct (decide (default ∅ (ls_tmap δ !! asG ρ) = ∅)) as [T | T]. 
-      { simpl. split; [done| ]. intros _ DOM.
-        apply elem_of_dom in DOM as [? DOM].
-        pose proof DOM as ->%MAP_RESTR.
-        apply ls_mapping_tmap_corr in DOM as (?&X&?).
-        rewrite X in T. simpl in T. set_solver. }
-      destruct (ls_tmap δ !! asG ρ) as [S| ] eqn:TM; [| done].
-      simpl in *. split; [| done]. intros. 
-      apply set_choose_L in T as [ρ' IN].
-      forward eapply (proj2 (ls_mapping_tmap_corr δ ρ' (asG ρ))).
-      { eauto. }
-      intros T.
-      pose proof T as [=]%MAP_RESTR. subst.
-      destruct H. by apply elem_of_dom.
-    Qed. 
-    
-    Lemma unmapped_empty_dom (ρ: fmrole M) (δ: lm_ls LM)
-      (DOM: asG ρ ∈ dom (ls_tmap δ))
-      :
-      ρ ∉ dom (ls_mapping δ) <-> ls_tmap δ !! asG ρ = Some ∅.
-    Proof.
-      rewrite unmapped_empty'.
-      apply elem_of_dom in DOM as [? DOM]. rewrite DOM. simpl.
-      intuition; congruence.
-    Qed. 
-
-  End MapRestr.
-
-  Section EnabledSingleton.
-  
-    Hypothesis EGS: forall ρ δ, enabled_group_singleton ρ δ.
-
-    Lemma disabled_group_singleton ρ δ:
-      ¬ role_enabled_model ((asG ρ): fmrole LMF) δ <-> ρ ∉ dom (ls_mapping δ).
-    Proof. 
-      apply not_iff_compat. apply EGS. 
-    Qed. 
-    
-    Lemma disabled_group_disabled_role ρ δ:
-      ¬ role_enabled_model ((asG ρ): fmrole LMF) δ -> ¬ role_enabled_model ρ (ls_under δ). 
-    Proof.
-      by intros ? ?%ls_mapping_dom%EGS.
-    Qed.
-
-  End EnabledSingleton.
-
 
 End RestrLM.
