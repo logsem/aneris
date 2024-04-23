@@ -8,9 +8,11 @@ Section ModelPlug.
 
   Context {M: FairModel}.
   Context {msi: fmstate M -> iProp Σ}.
+  Context {lifted_roles: fmstate M -> gset (fmrole M)}.
 
   Definition local_rule (P Q: iProp Σ) (ρ: fmrole M): iProp Σ :=
-    □ (∀ (δ: fmstate M), P ∗ msi δ ==∗ ∃ δ', Q ∗ msi δ' ∗ ⌜ fmtrans M δ (Some ρ) δ' ⌝). 
+    □ (∀ (δ: fmstate M), P ∗ msi δ ==∗ 
+        ∃ δ', Q ∗ msi δ' ∗ ⌜ fmtrans M δ (Some ρ) δ' ⌝ ∗ ⌜ lifted_roles δ' ⊆ lifted_roles δ ⌝). 
 
   Section MP.
     Context `{invGS_gen HasNoLc Σ}.
@@ -57,10 +59,11 @@ Lemma cwp_convert
   `{eGS: em_GS Σ}
    {M M': FairModel}
    {msi: fmstate M -> iProp Σ} {msi': fmstate M' -> iProp Σ}
-   (CWP := @cwp _ _ EM _ eGS _ msi _)
-   (CWP' := @cwp _ _ EM _ eGS _ msi' _)
-   (RL := @role_lift _ _ EM Σ eGS _ msi iris_invGS)
-   (RL' := @role_lift _ _ EM Σ eGS _ msi' iris_invGS)
+   {lr lr'}
+   (CWP := @cwp _ _ EM _ eGS _ msi lr _)
+   (CWP' := @cwp _ _ EM _ eGS _ msi' lr' _)
+   (RL := @role_lift _ _ EM Σ eGS _ msi lr iris_invGS)
+   (RL' := @role_lift _ _ EM Σ eGS _ msi' lr' iris_invGS)
    (e: expr Λ) τ (Φ Φ': val Λ -> iProp Σ) s ε__wp ε__lift ε__lift' ρ ρ':
       ⊢ CWP' e Φ' s ε__wp ε__lift' τ ρ' -∗
         (∀ LC, LC -∗ RL ε__lift τ ρ LC -∗ ∃ LC', LC' ∗ RL' ε__lift' τ ρ' LC' ∗ (∀ v,  Φ' v ∗ LC' -∗ Φ v ∗ LC)) -∗
