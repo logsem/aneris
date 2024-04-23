@@ -117,6 +117,21 @@ Section aux_trace_lang.
   Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
     ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ).
 
+  Definition tids_smaller_alt (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
+    ∀ ζ, default ∅ (ls_tmap δ !! ζ) ≠ ∅ -> is_Some (from_locale c ζ).
+
+  Lemma tids_smaller_defs_equiv (c : list (expr Λ)) (δ: LiveState Tid M LSI):
+    tids_smaller c δ <-> tids_smaller_alt c δ.
+  Proof.
+    rewrite /tids_smaller /tids_smaller_alt. 
+    split; intros SM.
+    - intros τ NE. destruct (ls_tmap δ !! τ) eqn:TM; [| done].
+      simpl in NE. apply gset_not_elem_of_equiv_not_empty_L in NE as [ρ IN]. 
+      eapply (SM ρ). apply ls_mapping_tmap_corr. eauto.
+    - intros ρ τ MAP. apply SM.
+      apply ls_mapping_tmap_corr in MAP as (?&TM&?). rewrite TM. set_solver.
+  Qed. 
+
   Definition tids_smaller' (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
     (* ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ). *)
     forall ζ, ζ ∈ dom (ls_tmap δ) -> is_Some (from_locale c ζ).

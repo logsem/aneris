@@ -43,6 +43,29 @@ Proof.
   eapply lookup_weaken; eauto. 
 Qed.
 
+Lemma tids_smaller_fuel_step `{LM: LiveModel (locale heap_lang) M LSI}
+  (ζ : nat) (fs: gmap (fmrole M) nat) (σ: cfg heap_lang) (δ: lm_ls LM) c2
+  (NE  : dom fs ≠ ∅)
+  (STEP : locale_step σ (Some ζ) c2)
+  (TR : tids_smaller σ.1 δ )
+  (Hxdom : ∀ ρ, ls_mapping δ !! ρ = Some ζ ↔ ρ ∈ dom (S <$> fs))
+  δ2
+  (STEPM : lm_ls_trans LM δ (Silent_step ζ) δ2)
+  (TMAP' : ls_tmap δ2 = <[ζ:=dom fs ∖ ∅]> (ls_tmap δ)):
+  tids_smaller c2.1 δ2.
+Proof.
+  eapply tids_smaller_restrict_mapping; eauto.
+  setoid_rewrite dom_fmap in Hxdom. eapply mim_lookup_helper in Hxdom; eauto.
+  2: by apply ls_mapping_tmap_corr.
+  eapply maps_inverse_match_subseteq.
+  1, 2: by apply ls_mapping_tmap_corr.
+  { rewrite TMAP'. apply elem_of_dom_2 in Hxdom. set_solver. }
+  intros ??? TM1 TM2.
+  rewrite TMAP' in TM1. eapply lookup_insert_Some in TM1.
+  set_solver. 
+Qed.
+
+
 Lemma tids_dom_restrict_mapping `{LM: LiveModel (locale heap_lang) M LSI} 
   (c1 c2: cfg heap_lang)
   (tmap1 tmap2: gmap (locale heap_lang) (gset (fmrole M))) (ζ: locale heap_lang)
