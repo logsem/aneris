@@ -1,7 +1,8 @@
 From trillium.fairness Require Export fairness resources fair_termination fuel. 
 (* From trillium.fairness.heap_lang Require Export lang heap_lang_defs. *)
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import execution_model lm_fair_traces lm_fair model_plug lm_restr_gen. 
+From trillium.fairness Require Import execution_model lm_fair_traces lm_fair model_plug lm_restr_gen lm_fork_update trace_interp_corr.
+From trillium.fairness.lm_rules Require Import fork_step. 
 
 Section LMExecModel.
   Context `{CNT_Λ: Countable (locale Λ)}.
@@ -35,57 +36,6 @@ Definition lm_cfg_init (σ: cfg Λ) :=
 
 Definition lm_is_init_st σ s := 
   lm_cfg_init σ /\ lm_model_init s. 
-
-Definition tids_restrict `{M: FairModel}
-  (c: cfg Λ) (tmap: gmap (locale Λ) (gset (fmrole M))): Prop :=
-  forall ζ, ζ ∉ locales_of_list c.1 → tmap !! ζ = None.
-
-(* TODO: unify with existing locales_of_list_from_locale_from, 
-   remove restriction for Λ *)
-Lemma locales_of_list_from_locale_from' tp0 tp1 ζ:
-  ζ ∈ locales_of_list_from tp0 tp1 (Λ := Λ) ->
-  is_Some (from_locale_from tp0 tp1 ζ).
-Proof.
-  clear -tp0 tp1 ζ.
-  revert tp0; induction tp1 as [|e1 tp1 IH]; intros tp0.
-  { simpl. intros H. inversion H. }
-  simpl.
-  rewrite /locales_of_list_from /=. intros.
-  destruct (decide (locale_of tp0 e1 = ζ)); simplify_eq; first set_solver.
-  apply elem_of_cons in H as [?| ?]; [done| ].
-  set_solver.
-Qed.
-
-Lemma tids_restrict_smaller (σ: cfg Λ) (δ: lm_ls LM):
-  tids_restrict σ (ls_tmap δ) -> tids_smaller σ.1 δ.
-Proof.
-  rewrite /tids_smaller /tids_restrict. 
-  intros. apply locales_of_list_from_locale_from'.
-  destruct (decide (ζ ∈ locales_of_list σ.1)); [done| ].
-  specialize (H _ n).
-  eapply (ls_mapping_tmap_corr) in H0 as [R [? ?]].
-  congruence. 
-Qed.
-
-(* TODO: get rid of one of these definitions *)
-Lemma tids_restrict_smaller' (σ: cfg Λ) (δ: lm_ls LM):
-  tids_restrict σ (ls_tmap δ) -> tids_smaller' σ.1 δ.
-Proof.
-  rewrite /tids_smaller' /tids_restrict. 
-  intros. apply locales_of_list_from_locale_from'.
-  destruct (decide (ζ ∈ locales_of_list σ.1)); [done| ].
-  specialize (H _ n).
-  apply elem_of_dom in H0 as [? ?]. congruence. 
-Qed.
-Lemma tids_smaller'_restrict (σ: cfg Λ) (δ: lm_ls LM):
-  tids_smaller' σ.1 δ -> tids_restrict σ (ls_tmap δ).
-Proof.
-  rewrite /tids_smaller' /tids_restrict. 
-  intros. destruct (ls_tmap δ !! ζ) eqn:T; [| done].
-  specialize (H _ (ltac:(apply elem_of_dom; done))).
-  by apply locales_of_list_from_locale_from in H. 
-Qed.
-
 
 
 Definition em_lm_msi `{!fairnessGS LM Σ}
@@ -224,6 +174,59 @@ Section RoleLiftLM.
       - red. apply RESTR. rewrite TM'. done.
       - eapply elem_of_dom; eauto. }
     destruct ND1. rewrite /lr in LR. apply elem_of_filter in LR. apply LR.
+  Qed.
+
+  Let F := LM_fork_update (EM := LM_EM) (eGS := fG).
+
+  Lemma TopFork `{EqDecision (expr Λ)} τ: F τ τ ∅.
+  Proof.
+    do 2 red.
+    intros R1 R2 tp1 tp2 fs extr auxtr efork σ1 σ2 DISJ NE DOM PRES LAST STEP POOL.
+    iIntros "FUELS MSI". simpl in *. 
+    iDestruct "MSI" as "[LM_MSI %TR]".
+    remember (trace_last auxtr) as δ1.
+    pose proof (tids_restrict_smaller' _ _ TR) as SM.
+    assert (Hnewζ: (locale_of tp1 efork) ∉ dom (ls_tmap δ1)).
+    { subst δ1. rewrite LAST in SM. apply not_elem_of_dom. simpl in *.
+      apply TR. 
+      unfold tids_smaller in SM. 
+      rewrite elem_of_list_fmap. intros ([??]&Hloc&Hin).
+      symmetry in Hloc.
+      rewrite -> prefixes_from_spec in Hin.
+      destruct Hin as (?&t0&?&?).
+      simplify_eq. list_simplifier.
+      eapply locale_injective=>//.
+      apply prefixes_from_spec.
+      exists t0, []. split =>//. rewrite LAST in H0. by list_simplifier. }
+    
+    (* TODO: make it a lemma *)
+    iAssert (⌜ (ls_tmap δ1 !! τ = Some (dom fs)) ⌝)%I as %TMAPζ.
+    { iDestruct "FUELS" as "[FRAG ?]".
+      iDestruct "LM_MSI" as (?) "(?&AUTH&?&?)".
+      simpl.
+      iDestruct (frag_mapping_same with "AUTH FRAG") as "%MM".
+      by rewrite dom_fmap_L in MM. }
+    iDestruct (has_fuel_in with "FUELS LM_MSI") as %Hxdom; eauto.
+    iMod (actual_update_fork_split_gen with "FUELS LM_MSI") as (?) "(FUELS1 & FUELS2 & POST & LM_MSI' & %STEPM & %TMAP')"; eauto.
+    do 3 iExists _. iFrame. iModIntro. iPureIntro.
+    split.  
+    + red. intros. eapply tids_dom_fork_step; eauto.
+      * intros. apply TR. congruence.
+      * inversion STEPM. destruct H0 as [? MM].
+        eapply ls_mapping_tmap_corr in MM as (?&?&?).
+        eapply elem_of_dom_2; eauto.
+      * simpl.
+        destruct POOL as (?&?&?).
+        exists x, efork. done.
+    + repeat split; eauto.
+      { eexists; split; [apply STEPM| ]; done. }        
+      eapply tids_smaller'_fork_step; [apply STEP| ..]. 
+      * by rewrite -LAST.
+      * eapply locale_trans_dom; eauto.
+        eexists. split; [apply STEPM| ]. done. 
+      * eauto. 
+      * destruct POOL as (?&?&?).
+        exists x, efork. done.
   Qed. 
 
 End RoleLiftLM.

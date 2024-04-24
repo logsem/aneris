@@ -1,4 +1,4 @@
-From trillium.fairness Require Import fuel lm_fair trace_helpers inftraces trace_lookup.
+From trillium.fairness Require Import fuel lm_fair trace_helpers inftraces trace_lookup trace_interp_corr.
 From Paco Require Import paco1 paco2 pacotac.
 
 Section aux_trace.
@@ -99,6 +99,11 @@ Ltac unfold_LMF_trans' T :=
   end.
 
 
+Ltac by_contradiction :=
+  match goal with
+  | |- ?goal => destruct_decide (decide (goal)); first done; exfalso
+  end.
+
 
 
 Definition labels_match `{Countable G} `{LM: LiveModel G M LSI} (oζ : option G) (ℓ : LM.(lm_lbl)) : Prop :=
@@ -107,44 +112,6 @@ Definition labels_match `{Countable G} `{LM: LiveModel G M LSI} (oζ : option G)
   | Some ζ, lbl => fair_lbl_matches_group lbl ζ
   | _, _ => False
   end.
-
-Section aux_trace_lang.
-  Context `{Countable (locale Λ)}.
-  Context `{LM: LiveModel (locale Λ) M LSI}.
-
-  Notation "'Tid'" := (locale Λ). 
-
-  Definition tids_smaller (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
-    ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ).
-
-  Definition tids_smaller_alt (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
-    ∀ ζ, default ∅ (ls_tmap δ !! ζ) ≠ ∅ -> is_Some (from_locale c ζ).
-
-  Lemma tids_smaller_defs_equiv (c : list (expr Λ)) (δ: LiveState Tid M LSI):
-    tids_smaller c δ <-> tids_smaller_alt c δ.
-  Proof.
-    rewrite /tids_smaller /tids_smaller_alt. 
-    split; intros SM.
-    - intros τ NE. destruct (ls_tmap δ !! τ) eqn:TM; [| done].
-      simpl in NE. apply gset_not_elem_of_equiv_not_empty_L in NE as [ρ IN]. 
-      eapply (SM ρ). apply ls_mapping_tmap_corr. eauto.
-    - intros ρ τ MAP. apply SM.
-      apply ls_mapping_tmap_corr in MAP as (?&TM&?). rewrite TM. set_solver.
-  Qed. 
-
-  Definition tids_smaller' (c : list (expr Λ)) (δ: LiveState Tid M LSI) :=
-    (* ∀ ρ ζ, (ls_mapping δ) !! ρ = Some ζ -> is_Some (from_locale c ζ). *)
-    forall ζ, ζ ∈ dom (ls_tmap δ) -> is_Some (from_locale c ζ).
-
-  Lemma tids_smaller'_stronger (c : list (expr Λ)) (δ: LiveState Tid M LSI):
-    tids_smaller' c δ -> tids_smaller c δ.
-  Proof. 
-    intros TS. red. intros. apply TS.
-    eapply mim_in_1; eauto. 
-    apply ls_mapping_tmap_corr.
-  Qed. 
-
-End aux_trace_lang.
 
 Ltac SS :=
   epose proof ls_fuel_dom;

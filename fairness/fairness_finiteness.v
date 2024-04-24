@@ -1,7 +1,7 @@
 From stdpp Require Import finite.
 From trillium.prelude Require Import quantifiers classical_instances finitary.
 (* From trillium.prelude Require Import finitary. *)
-From trillium.fairness Require Import fairness fuel traces_match lm_fair_traces lm_fair utils. 
+From trillium.fairness Require Import fairness fuel traces_match trace_interp_corr lm_fair utils lm_fair_traces. 
 
 Section LMFinBranching.
   Context `{Countable G}.
