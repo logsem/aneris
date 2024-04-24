@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils lm_fair lm_fair_traces lm_fairness_preservation traces_match.
+From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils lm_fair lm_fair_traces lm_fairness_preservation traces_match trace_interp_corr.
 From trillium.fairness.heap_lang Require Import lang simulation_adequacy em_lm_heap_lang em_lm.
 
 

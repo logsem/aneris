@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm em_lm_heap_lang lm_fair lm_fair_traces pmp_lifting.
+From trillium.fairness Require Import fairness fuel resources actual_resources heap_lang_defs em_lm em_lm_heap_lang lm_fair lm_fair_traces pmp_lifting trace_interp_corr.
 
 
 Section ActualOwnershipInterface. 
@@ -27,12 +27,12 @@ Section ActualOwnershipInterface.
       rewrite difference_empty_L. 
       iModIntro. do 2 iExists _. rewrite /em_lm_msi. iFrame.
       iPureIntro. split; try done. 
-      2: { eapply (tids_dom_restrict_mapping _ _ _  _ _ STEP (LM := LM)); eauto. }
+      2: { eapply (tids_dom_restrict_mapping _ _ _  _ _ STEP); eauto. }
       remember (trace_last auxtr) as δ1. 
       red. repeat split; eauto.
       * eexists. split; [apply STEPM| ]. done. 
       * eapply (tids_restrict_smaller' (LM := LM)).
-        eapply (tids_dom_restrict_mapping _ _ _ _ _ STEP TR (LM := LM)).
+        eapply (tids_dom_restrict_mapping _ _ _ _ _ STEP TR).
         eauto.
     - iIntros "* FUELS MSI". simpl in *.
       iDestruct "MSI" as "[LM_MSI %TR]".
