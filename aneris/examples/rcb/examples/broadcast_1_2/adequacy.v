@@ -15,6 +15,7 @@ Definition broadcast_1_2_is : state :=
     state_heaps :=  {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 Definition unit_model := model _ (λ _ _, False) ().

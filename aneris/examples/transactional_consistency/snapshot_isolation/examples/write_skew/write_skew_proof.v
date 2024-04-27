@@ -316,6 +316,7 @@ Definition init_state :=
     state_heaps := {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 Theorem runner_safe :

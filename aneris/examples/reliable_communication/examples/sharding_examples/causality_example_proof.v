@@ -440,9 +440,10 @@ End main_spec.
 
 Definition init_state :=
   {|
-    state_heaps := {[ "system" := ∅ ]};
-    state_sockets := {[ "system" := ∅ ]};
+    state_heaps := {["system" := ∅ ]};
+    state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 Definition dummy_model := model unit (fun x y => True) ().

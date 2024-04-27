@@ -188,6 +188,7 @@ Definition ping_pong_is :=
     state_heaps :=  {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 (** This soundness theorem tells us---without relying on Aneris or Iris---that

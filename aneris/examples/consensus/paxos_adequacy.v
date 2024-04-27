@@ -8,7 +8,8 @@ From aneris.aneris_lang Require Import tactics proofmode.
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ms := ∅; |}.
+  state_ms := ∅; 
+  state_trace := []; |}.
 
 Definition socket_interp `{!paxosG Σ params} sa : socket_interp Σ :=
   match sa with

@@ -7,7 +7,8 @@ From aneris.examples.transaction_commit Require Import
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ms := ∅; |}.
+  state_ms := ∅; 
+  state_trace := []; |}.
 
 Definition runner_expr := mkExpr "system" runner.
 

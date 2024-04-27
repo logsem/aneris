@@ -1011,7 +1011,8 @@ Section resource_lemmas.
     iMod ("IHips" $! _
                   (mkState (delete ip $ state_heaps σ)
                            (delete ip $ state_sockets σ)
-                           (state_ms σ)) with "[] [] [] Hγs") as "Hγs".
+                           (state_ms σ)
+                           (state_trace σ)) with "[] [] [] Hγs") as "Hγs".
     { iPureIntro. set_solver. }
     { iPureIntro. set_solver. }
     { iPureIntro. set_solver. }
