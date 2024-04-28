@@ -141,6 +141,11 @@ Proof. solve_atomic. Qed.
     Atomic s (mkExpr n (SetReceiveTimeout (Val v0) (Val v1) (Val v2))).
 Proof. solve_atomic. Qed.
 
+#[global] Instance emit_atomic n s v : Atomic s (mkExpr n (Emit (Val v))).
+Proof. solve_atomic. Qed.
+#[global] Instance fresh_atomic n s v : Atomic s (mkExpr n (ast.Fresh (Val v))).
+Proof. solve_atomic. Qed.
+
 #[global] Instance receive_from_stutteringatomic n sh s :
   StutteringAtomic s (mkExpr n (ReceiveFrom (Val $ LitV $ sh))).
 Proof.

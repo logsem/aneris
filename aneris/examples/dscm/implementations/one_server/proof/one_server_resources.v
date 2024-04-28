@@ -68,7 +68,9 @@ Section Definitions_Lemmas.
     own known_clients_name (● (to_agree <$> M : gmap _ _)).
 
   Definition client_requests (sa : socket_address) (n : nat) : iProp Σ :=
-    ∃ γ M, known_client sa γ ∗ own γ (● (to_agree <$> M : gmap _ _)) ∗ ⌜dom M = set_seq 0 n⌝.
+    ∃ γ M, known_client sa γ ∗ 
+          own (A := (authUR (gmapUR nat (agreeR (leibnizO (gname + gname)))))) 
+            γ (● (to_agree <$> M )) ∗ ⌜dom M = set_seq 0 n⌝.
 
   Definition client_req (sa : socket_address) (id : nat) (req : sum gname gname) : iProp Σ :=
     ∃ γ, known_client sa γ ∗ own γ (◯ {[id := to_agree req]}).
@@ -106,7 +108,8 @@ Section Definitions_Lemmas.
     ∃ γ, ⌜sa ∉ dom M⌝ ∗ known_clients (<[sa := γ]>M) ∗ client_requests sa 0.
   Proof.
     iIntros "[HM1 HM2] Hsa".
-    iMod (own_alloc (● (to_agree <$> ∅ : gmap nat _))) as (γ) "H";
+    iMod (own_alloc (A := (authUR (gmapUR nat (agreeR (leibnizO (gname + gname)))))) 
+                    (● (to_agree <$> ∅ : gmap nat _))) as (γ) "H";
       first by apply auth_auth_valid.
     iAssert (⌜sa ∉ dom M⌝)%I as %?.
     { destruct (decide (sa ∈ dom M)); last done.
@@ -154,9 +157,11 @@ Section Definitions_Lemmas.
     client_requests sa n ==∗ client_requests sa (S n) ∗ client_req sa n req.
   Proof.
     iDestruct 1 as (γ M) "(#HM1 & HM2 & %HM3)".
-    iMod (own_update _ _ (● (to_agree <$> (<[n := req]>M) : gmap _ _) ⋅ ◯ {[n := to_agree (req : leibnizO (_ + _))]})
+    iMod (own_update (A := (authUR (gmapUR nat (agreeR (leibnizO (gname + gname)))))) 
+                      _ _ (● (to_agree <$> (<[n := req]>M) : gmap _ _) ⋅ ◯ {[n := to_agree (req : leibnizO (_ + _))]})
             with "HM2") as "[HM2 Hnew]".
-    { rewrite fmap_insert. apply auth_update_alloc, alloc_local_update; last done.
+    { rewrite fmap_insert. 
+      apply auth_update_alloc, alloc_local_update; last done.
       apply not_elem_of_dom; rewrite dom_fmap.
       rewrite HM3 elem_of_set_seq; lia. }
     iModIntro.
@@ -165,7 +170,6 @@ Section Definitions_Lemmas.
       rewrite dom_insert_L set_seq_S_end_union_L /= HM3; done.
     - by iExists _; iFrame.
   Qed.
-
 
 End Definitions_Lemmas.
 

@@ -499,8 +499,11 @@ Section state_interpretation.
       iDestruct "Hown" as "[$ Hown]".
     }
     iDestruct (socket_interp_own with "HΦ'") as "Hown'''''".
-    iDestruct (own_op with "[Hown'''' Hown''''']") as "Hown''''''".
-    { iSplit; [ iApply "Hown''''" | iApply "Hown'''''" ]. }
+    unfold socket_address_group_own.
+    iDestruct (own_op _ (◯ {| dgsets_of := {[sag]} |}) 
+                         (◯ {| dgsets_of := {[sagR']} |})
+              with "[Hown'''' Hown''''']") as "Hown''''''".
+    iFrame "Hown'''' Hown'''''".
     rewrite -auth_frag_op.
     iDestruct (own_valid with "Hown''''''") as %Hvalid'.
     setoid_rewrite auth_frag_valid in Hvalid'.
@@ -599,8 +602,10 @@ Section state_interpretation.
       iDestruct "Hown" as "[$ Hown]".
     }
     iDestruct (socket_interp_own with "Hsag'") as "Hown''".
-    iDestruct (own_op with "[Hown' Hown'']") as "Hown'''".
-    { iSplit; [ iApply "Hown'" | iApply "Hown''" ]. }
+    iDestruct (own_op _ (◯ {| dgsets_of := {[sag]} |}) 
+                      (◯ {| dgsets_of := {[sagR']} |})
+          with "[Hown' Hown'']") as "Hown'''".
+    iFrame "Hown' Hown''".
     rewrite -auth_frag_op.
     iDestruct (own_valid with "Hown'''") as %Hvalid'.
     setoid_rewrite auth_frag_valid in Hvalid'.

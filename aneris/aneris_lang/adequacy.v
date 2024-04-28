@@ -236,6 +236,7 @@ Proof.
       (γsendevs) "[Hsendevsctx Hsendevs]".
   iMod (sendreceive_evs_init obs_rec_sas) as
     (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]".
+  iMod (trace_auth_init []) as (γt γth) "(Hta & Htis & Hthalf)".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -252,6 +253,8 @@ Proof.
            aneris_receiveonEVS_name := γreceiveevs;
            aneris_observed_send_name := γobserved_send;
            aneris_observed_recv_name := γobserved_receive;
+           aneris_trace_name := γt;
+           aneris_trace_hist_name := γth;
          |}).
   iMod (Hwp dg) as "Hwp".
   iMod (is_node_alloc_multiple σ with "[Hmp]")
@@ -497,6 +500,7 @@ Proof.
       (γsendevs) "[Hsendevsctx Hsendevs]".
   iMod (sendreceive_evs_init obs_rec_sas) as
     (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]".
+  iMod (trace_auth_init []) as (γt γth) "(Hta & Htis & Hthalf)".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -513,6 +517,8 @@ Proof.
            aneris_receiveonEVS_name := γreceiveevs;
            aneris_observed_send_name := γobserved_send;
            aneris_observed_recv_name := γobserved_receive;
+           aneris_trace_name := γt;
+           aneris_trace_hist_name := γth;
          |}).
   iMod (Hwp dg) as "Hwp".
   iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
@@ -788,6 +794,7 @@ Proof.
       (γsendevs) "[Hsendevsctx Hsendevs]".
   iMod (sendreceive_evs_init obs_rec_sas) as
       (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]".
+  iMod (trace_auth_init []) as (γt γth) "(Hta & Htis & Hthalf)".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -804,6 +811,8 @@ Proof.
            aneris_receiveonEVS_name := γreceiveevs;
            aneris_observed_send_name := γobserved_send;
            aneris_observed_recv_name := γobserved_receive;
+           aneris_trace_name := γt;
+           aneris_trace_hist_name := γth;
          |}).
   iMod (Hwp dg) as "Hwp". iDestruct "Hwp" as (trace_inv Φ) "Himpl".
   iMod (node_ctx_init ∅ ∅) as (γn) "[Hh Hs]".
