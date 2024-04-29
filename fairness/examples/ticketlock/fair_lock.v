@@ -28,13 +28,48 @@ Definition disabled_st `{FLP: FairLockPredicates M} :=
   fun ρ st => ¬ @role_enabled_model M ρ st.
 
 
+Section FairLockEM.
+  Context {M: FairModel}.
+  Inductive fl_EI := flU (ρ: fmrole M) | flL (ρ: fmrole M).
+  Context {au al: fmrole M -> fmstate M -> fmstate M -> Prop}. 
+
+  Global Instance fl_EI_dec: EqDecision fl_EI. 
+  Proof using. solve_decision. Qed. 
+
+  Global Instance fl_EI_cnt: Countable fl_EI. 
+  Proof using.
+    assert (Countable (fmrole M)) as CNTρ by apply _.
+    eapply inj_countable' with 
+      (f := fun ι => match ι with | flU ρ => inl ρ
+                                | flL ρ => inr ρ end)
+      (g := fun sn => match sn with | inl n => flU n
+                            | inr n => flL n end).
+    by destruct x. 
+  Qed.
+
+  Definition fl_ETs (ι: fl_EI) :=
+    match ι with
+    | flU ρ => au ρ
+    | flL ρ => al ρ
+    end.
+
+  Context (fl_active_exts: fmstate M -> gset fl_EI).
+  Context (fl_active_exts_spec: forall st ι, ι ∈ fl_active_exts st <-> ∃ st', fl_ETs ι st st'). 
+
+
+  Definition FL_EM': ExtModel M fl_EI.
+    refine {| active_exts_spec := fl_active_exts_spec |}.
+  Defined. 
+
+End FairLockEM.
+
 Section FairLock.
   Context `{FL: FairLockPredicates M}. 
-  Context {EM: ExtModel M}. 
+  Context {EM: ExtModel M (@fl_EI M)}. 
   
   Let St := fmstate M.
   Let R := fmrole M.
-  Let EFM := @ext_model_FM _ EM.
+  Let EFM := @ext_model_FM _ _ EM.
 
   Definition eventual_release (tr: mtrace EFM) (ρ: R) (i: nat) :=
     forall (ρ': R) j st' (JTH: tr S!! j = Some st')
@@ -150,40 +185,6 @@ End FairLock.
 
 
 
-Section FairLockEM.
-  Context {M: FairModel}.
-  Inductive fl_EI := flU (ρ: fmrole M) | flL (ρ: fmrole M).
-  Context {au al: fmrole M -> fmstate M -> fmstate M -> Prop}. 
-
-  Global Instance fl_EI_dec: EqDecision fl_EI. 
-  Proof using. solve_decision. Qed. 
-
-  Global Instance fl_EI_cnt: Countable fl_EI. 
-  Proof using.
-    assert (Countable (fmrole M)) as CNTρ by apply _.
-    eapply inj_countable' with 
-      (f := fun ι => match ι with | flU ρ => inl ρ
-                                | flL ρ => inr ρ end)
-      (g := fun sn => match sn with | inl n => flU n
-                            | inr n => flL n end).
-    by destruct x. 
-  Qed.
-
-  Definition fl_ETs (ι: fl_EI) :=
-    match ι with
-    | flU ρ => au ρ
-    | flL ρ => al ρ
-    end.
-
-  Context (fl_active_exts: fmstate M -> gset fl_EI).
-  Context (fl_active_exts_spec: forall st ι, ι ∈ fl_active_exts st <-> ∃ st', fl_ETs ι st st'). 
-
-
-  Definition FL_EM': ExtModel M.
-    refine {| active_exts_spec := fl_active_exts_spec |}.
-  Defined. 
-
-End FairLockEM.
 
 
 Definition allows_unlock `{FLP: FairLockPredicates M} (ρ: fmrole M) (st1 st2: fmstate M): Prop :=
@@ -210,7 +211,7 @@ Definition FL_EM `(FLE: FairLockExt M) :=
 
 
 Definition proj_role `{FLE: FairLockExt M}
-  (eρ: @ext_role _ (FL_EM FLE)): fmrole M :=
+  (eρ: ext_role): fmrole M :=
   match eρ with 
   | inr (env (flL ρ))
   | inr (env (flU ρ))
@@ -219,7 +220,7 @@ Definition proj_role `{FLE: FairLockExt M}
 
 Definition other_proj `{FLE: FairLockExt M} (ρ: fmrole M):
   (* (option $ @ext_role _ (FL_EM FLE)) *)
-  (option $ fmrole $ @ext_model_FM _ (FL_EM FLE))
+  (option $ fmrole $ (ext_model_FM (EM := FL_EM FLE)))
   -> Prop :=
   fun oeρ' => match oeρ' with
            | Some eρ' => proj_role eρ' ≠ ρ
@@ -227,7 +228,7 @@ Definition other_proj `{FLE: FairLockExt M} (ρ: fmrole M):
            end. 
 
 Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: @FairLockExt M FLP)
-               (fair: emtrace (EM := (@FL_EM _ _ FLE)) -> Prop)
+               (fair: @emtrace M fl_EI -> Prop)
  := {
   allow_unlock_impl: fmrole M -> fmstate M -> fmstate M;
   allow_lock_impl: fmrole M -> fmstate M -> fmstate M;
@@ -246,21 +247,21 @@ Class FairLock (M: FairModel) (FLP: FairLockPredicates M) (FLE: @FairLockExt M F
       label_kept_state
         (fun st => does_unlock ρ st /\ disabled_st ρ st)
         (* (other_proj ρ (FLE := FLE)) *)
-        (fun oℓ => oℓ ≠ Some (inr (env ((@flU M ρ): @EI _ (@FL_EM _ _ FLE)))))
-        (M := @ext_model_FM _ (FL_EM FLE));
+        (fun oℓ => oℓ ≠ Some (inr (env ((@flU M ρ): fl_EI))))
+        (M := ext_model_FM (EM := FL_EM FLE));
 
   step_keeps_lock_dis: forall (ρ: fmrole M),
       label_kept_state
         (fun st => does_lock ρ st /\ disabled_st ρ st)
         (* (other_proj ρ (FLE := FLE)) *)
-        (fun oℓ => oℓ ≠ Some (inr (env ((@flL M ρ): @EI _ (@FL_EM _ _ FLE)))))
-        (M := @ext_model_FM _ (FL_EM FLE));
+        (fun oℓ => oℓ ≠ Some (inr (env ((@flL M ρ): fl_EI))))
+        (M := ext_model_FM (EM := FL_EM FLE));
 
   step_keeps_unused: forall (ρ: fmrole M),
       label_kept_state
         (fun st => is_unused ρ st)
         (fun _ => True)
-        (M := @ext_model_FM _ (FL_EM FLE));
+        (M := ext_model_FM (EM := FL_EM FLE));
   unused_does_lock_incompat: forall tl_st ρlg,
     is_unused ρlg tl_st -> does_lock ρlg tl_st -> False;
   unused_does_unlock_incompat: forall tl_st ρlg,
@@ -303,8 +304,8 @@ Lemma eventual_release_strenghten2 (M: FairModel) (FLP: FairLockPredicates M)
   (UNLOCK_DIS_KEPT: forall (ρ: fmrole M),
       label_kept_state
         (fun st => does_unlock ρ st /\ disabled_st ρ st)
-        (fun oℓ => oℓ ≠ Some (inr (env ((@flU M ρ): @EI _ (@FL_EM _ _ FLE)))))
-        (M := @ext_model_FM _ (FL_EM FLE)))
+        (fun oℓ => oℓ ≠ Some (inr (env ((@flU M ρ): fl_EI))))
+        (M := ext_model_FM (EM := FL_EM FLE)))
   
   (LOCK_EXCL: forall tl_st ρlg1 ρlg2,
       does_unlock ρlg1 tl_st -> disabled_st ρlg1 tl_st ->
@@ -320,7 +321,7 @@ Lemma eventual_release_strenghten2 (M: FairModel) (FLP: FairLockPredicates M)
   ,
   exists k st1 st2,
     j <= k /\
-    tr !! k = Some (st1, Some (Some (inr (env ((@flU M ρ'): @EI _ (@FL_EM _ _ FLE)))), st2)). 
+    tr !! k = Some (st1, Some (Some (inr (env ((@flU M ρ'): fl_EI))), st2)). 
 Proof using.
   intros. 
   eapply eventual_release_strenghten in EV_REL; eauto.

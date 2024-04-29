@@ -10,23 +10,23 @@ Section adequacy_general.
   Context `{CNT: Countable G}. 
   Context `{LM: LiveModel G M LSI}.
 
-  Context {EM: ExtModel M}.
+  Context `{EM: ExtModel M EI}.
   Context {LF: LMFairPre LM}.
-  Context {ELM: ExtModel LM_Fair}.
+  Context `{ELM: ExtModel LM_Fair EI_LM}.
 
-  Context {proj_ext : @EI _ ELM → @EI _ EM}. 
+  Context {proj_ext : EI_LM → EI}. 
   Hypothesis (EXT_KEEP_ASG: forall δ1 ι δ2 ρ τ f,
-                 @ext_trans _ ELM δ1 (Some $ inr ι) δ2 -> 
+                 @ext_trans _ _ ELM δ1 (Some $ inr ι) δ2 -> 
                  ls_mapping δ1 !! ρ = Some τ ->
                  ls_fuel δ1 !! ρ = Some f ->
                  ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f). 
   Hypothesis PROJ_KEEP_EXT:
-    forall δ1 ι δ2, (@ETs _ ELM) ι δ1 δ2 -> 
-                (@ETs _ EM) (proj_ext ι) (ls_under δ1) (ls_under δ2). 
+    forall δ1 ι δ2, (@ETs _ _ ELM) ι δ1 δ2 -> 
+                (@ETs _ _ EM) (proj_ext ι) (ls_under δ1) (ls_under δ2). 
 
   Context {Mout: FairModel}. 
   Context {state_rel : fmstate Mout → lm_ls LM → Prop}. 
-  Context {lift_erole: @ext_role _ ELM -> fmrole Mout}.
+  Context {lift_erole: @ext_role LM_Fair EI_LM -> fmrole Mout}.
   Let lift_erole' := option_fmap _ _ lift_erole. 
 
   (* TODO: try to unify with lm_model_traces_match *)
@@ -67,7 +67,7 @@ Section adequacy_general.
     exists (S i). do 3 eexists. eauto.
   Qed. 
           
-  Lemma upto_stutter_ext_bounded (eauxtr: elmftrace) emtr
+  Lemma upto_stutter_ext_bounded (eauxtr: @emtrace LM_Fair EI_LM) emtr
     (EXT_FIN: ext_trans_bounded eauxtr)
     (Hupto: upto_stutter_eauxtr proj_ext eauxtr emtr)
     (VALID: emtrace_valid eauxtr):
@@ -105,9 +105,9 @@ Section adequacy_general.
   Qed. 
     
   Theorem simulation_adequacy_terminate_general'_ext
-    (otr: mtrace Mout) (eauxtr : elmftrace)
+    (otr: mtrace Mout) (eauxtr: @emtrace LM_Fair EI_LM)
     :    
-    (∀ emtr: @emtrace _ EM, ext_trans_bounded emtr -> emtrace_valid emtr -> inner_fair_ext_model_trace emtr -> terminating_trace emtr) ->
+    (∀ emtr: @emtrace M EI, ext_trans_bounded emtr -> emtrace_valid emtr -> inner_fair_ext_model_trace emtr -> terminating_trace emtr) ->
     ext_trans_bounded eauxtr ->
     (∀ ρ : fmrole M, fair_by_next_TS_ext ρ eauxtr) ->
     ext_lm_model_traces_match otr eauxtr ->
@@ -119,8 +119,10 @@ Section adequacy_general.
     pose proof Hmatch as Hvalaux%traces_match_valid2.
     destruct (can_destutter_eauxtr proj_ext eauxtr (LM := LM)) as [mtr Hupto] =>//.
     have Hfairm := upto_stutter_fairness _ _ _ Hupto Hfairaux.
+    specialize (Hfairm EM). 
 
     have Hmtrvalid := upto_preserves_validity _ _ _ _ Hupto Hvalaux.
+    specialize (Hmtrvalid EM). 
     specialize (Hmtrvalid PROJ_KEEP_EXT). 
 
     eapply upto_stutter_ext_bounded in EXT_FIN; eauto.     

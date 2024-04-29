@@ -1,8 +1,7 @@
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness Require Import trace_helpers lm_fairness_preservation lm_fair fuel trace_len utils.
 
-Class ExtModel (innerM: FairModel) := {  
-  EI: Type; (* indexes over external transitions *)
+Class ExtModel (innerM: FairModel) (EI: Type) := {  
   DecEI: EqDecision EI;
   CntEI: Countable EI;
   ETs: EI -> relation (fmstate innerM);
@@ -14,13 +13,13 @@ Class ExtModel (innerM: FairModel) := {
 
 (* TODO: can it be generalized to Model? *)
 Section ExtModelFair.
-  Context `{EM: ExtModel innerM}. 
+  Context `{EM: ExtModel}.
 
   Inductive env_role := env (i: EI).
   Definition ext_role: Type := (fmrole innerM + env_role). 
 
   Global Instance env_role_EqDec: EqDecision env_role. 
-  Proof using. generalize DecEI. solve_decision. Qed. 
+  Proof using EM. generalize DecEI. solve_decision. Qed. 
 
   Global Instance env_role_cnt: Countable env_role. 
   Proof using.
@@ -141,7 +140,9 @@ Section TraceProjection.
 End TraceProjection.
 
 Section ExtTerm.
-  Context `{EM: ExtModel M}. 
+  Context `{EM: ExtModel M EI}.
+
+  Let emtrace := @emtrace M EI. 
 
   Definition ext_trans_bounded (emtr: emtrace) :=
     trans_bounded emtr (fun oℓ => exists ι, oℓ = Some (inr ι)). 
@@ -210,19 +211,19 @@ End ExtTerm.
 Section ELM_ALM.
   Context `{CNT: Countable G}.
   Context `{LM: LiveModel G M LSI}.
-  Context {EM: ExtModel M}.
+  Context `{EM: ExtModel M EI}.
   Context {LF: LMFairPre LM}.
-  Context {ELM: ExtModel LM_Fair}. 
+  Context `{ELM: ExtModel LM_Fair EI_LM}. 
 
-  Definition elmftrace := mtrace (@ext_model_FM _ ELM). 
+  Definition elmftrace := mtrace (@ext_model_FM _ _ ELM). 
 
   Definition ext_keeps_asg := forall δ1 ι δ2 ρ τ f,
-      @ext_trans _ ELM δ1 (Some $ inr ι) δ2 -> 
+      @ext_trans _ _ ELM δ1 (Some $ inr ι) δ2 -> 
       ls_mapping δ1 !! ρ = Some τ ->
       ls_fuel δ1 !! ρ = Some f ->
       ls_mapping δ2 !! ρ = Some τ /\ ls_fuel δ2 !! ρ = Some f. 
 
-  Instance ELM_ALM (KEEPS: ext_keeps_asg): AlmostLM (@ext_trans _ ELM) (LM := LM).
+  Instance ELM_ALM (KEEPS: ext_keeps_asg): AlmostLM (@ext_trans _ _ ELM) (LM := LM).
   Proof.
     refine {| am_lift_G := Some ∘ inl |}; eauto.
     - intros ??? STEP. inversion STEP. eauto. 
@@ -234,7 +235,8 @@ Section ELM_ALM.
       left; eauto.
   Defined.
 
-  Local Lemma same_type (l: elmftrace) (a: @atrace _ _ _ _ _ LM (option ext_role)): False.
+  Local Lemma same_type (l: elmftrace) 
+    (a: @atrace _ _ _ _ _ LM (option (ext_role (EI := EI_LM) (innerM := LM_Fair)))): False.
   Proof.
     assert (l = a). 
   Abort. 

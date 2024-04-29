@@ -10,14 +10,14 @@ From trillium.fairness.ext_models Require Import ext_models.
 Section destuttering_auxtr.
   Context `{Countable G}. 
   Context `{LM: LiveModel G M LSI}.
-  Context {EM: ExtModel M}.
+  Context `{EM: ExtModel M EI}.
   (* Let EMF := ext_model_FM (EM := EM).  *)
   Context {LF: LMFairPre LM}.
 
   (* Let LMF := LM_Fair (LM := LM). *)
-  Context {ELM: ExtModel LM_Fair}.
+  Context `{ELM: ExtModel LM_Fair EI_LM}.
 
-  Context (proj_ext: (@EI _ ELM) -> (@EI _ EM)).   
+  Context (proj_ext: EI_LM -> EI).
 
   (* Definition EUsls (_: lm_ls LM) (ℓ: ELM.(mlabel)) (_: lm_ls LM): *)
   (*   option (option (@ext_role _ EM)) := *)
@@ -26,8 +26,11 @@ Section destuttering_auxtr.
   (*   | inr e => Some $ Some $ inr $ env $ proj_ext $ e *)
   (*   | _ => None *)
   (*   end. *)
-  Definition EUsls (δ1: lm_ls LM) (oτ: option (@ext_role _ ELM)) (δ2: lm_ls LM):
-    option $ option $ @ext_role _ EM :=
+  Let er_LM := @ext_role LM_Fair EI_LM. 
+  Let er := @ext_role M EI. 
+  
+  Definition EUsls (δ1: lm_ls LM) (oτ: option er_LM) (δ2: lm_ls LM):
+    option $ option $ er :=
     match oτ with 
     | Some (inl τ) => match (next_TS_role δ1 τ δ2) with 
                      | Some ρ => Some $ Some (inl ρ)
@@ -86,7 +89,7 @@ Section destuttering_auxtr.
 
   Lemma fuel_dec_unless_step δ r δ'
     (Htrans : ext_trans δ r δ'):
-    (∃ ρ' : option (@ext_role _ EM), EUsls δ r δ' = Some ρ') ∨
+    (∃ ρ' : option er, EUsls δ r δ' = Some ρ') ∨
     Ψ δ' < Ψ δ ∧ ls_under δ = ls_under δ'.
   Proof. 
     inversion Htrans.
@@ -132,15 +135,19 @@ End destuttering_auxtr.
 Section upto_preserves.
   Context `{CNT: Countable G}. 
   Context `{LM: LiveModel G M LSI}.
-  Context {EM: ExtModel M}.
+  Context `{EM: ExtModel M EI}.
   Context {LF: LMFairPre LM}.
   (* Let LMF := LM_Fair (LM := LM). *)
-  Context {ELMF: ExtModel LM_Fair}.
-  Context (proj_ext: (@EI _ ELMF) -> (@EI _ EM)). 
+  Context `{ELMF: ExtModel LM_Fair EI_LM}.
+
+  Context (proj_ext: EI_LM -> EI). 
+
+  Let er_LM := @ext_role LM_Fair EI_LM. 
+  Let er := @ext_role M EI. 
 
   Hypothesis PROJ_KEEP_EXT:
-    forall δ1 ι δ2, (@ETs _ ELMF) ι δ1 δ2 -> 
-                (@ETs _ EM) (proj_ext ι) (ls_under δ1) (ls_under δ2). 
+    forall δ1 ι δ2, (@ETs _ _ ELMF) ι δ1 δ2 -> 
+                (@ETs _ _ EM) (proj_ext ι) (ls_under δ1) (ls_under δ2). 
 
   (* TODO: here and for similar lemmas:
      try to unify usual and external versions *)
@@ -179,7 +186,10 @@ Section upto_preserves.
         eapply trace_valid_cons_inv; eauto.        
   Qed.
 
-  Lemma ext_bounded_inner (eauxtr : elmftrace (LM := LM)) mtr:
+  Lemma ext_bounded_inner
+    (* (eauxtr: elmftrace (ELM := ELMF)) *)
+    (eauxtr: @emtrace LM_Fair EI_LM)
+    mtr:
     upto_stutter_eauxtr proj_ext eauxtr mtr ->
     ext_trans_bounded eauxtr ->
     ext_trans_bounded mtr. 
@@ -215,11 +225,14 @@ Section upto_stutter_preserves_fairness_and_termination.
   (* Context `{Countable G}. *)
   Context `{CNT: Countable G}. 
   Context `{LM: LiveModel G M LSI}.
-  Context {EM: ExtModel M}.
+  Context `{EM: ExtModel M EI}.
   Context {LMFP: LMFairPre LM}.
   (* Let LMF := LM_Fair (LM := LM). *)
-  Context {ELM: ExtModel LM_Fair}.
-  Context (proj_ext: (@EI _ ELM) -> (@EI _ EM)). 
+  Context `{ELM: ExtModel LM_Fair EI_LM}.
+  Context (proj_ext: EI_LM -> EI). 
+
+  Let er_LM := @ext_role LM_Fair EI_LM. 
+  Let er := @ext_role M EI. 
 
   (* Notation upto_stutter_aux := (upto_stutter (ls_under (LSI := LSI)) (Ul (LM := LM))). *)
 
@@ -288,9 +301,9 @@ Section upto_stutter_preserves_fairness_and_termination.
   (*     after m emtr = Some atr_m /\ pred_at atr_m 0 Pi /\  *)
   (*     upto_stutter_eauxtr proj_ext atr_aux atr_m. *)
   (* Proof. *)
-  Lemma upto_stutter_step_correspondence (eauxtr: elmftrace (LM := LM)) (emtr: emtrace (EM := EM))
-    (Po: lm_ls LM -> option (option (@ext_role _ ELM) * lm_ls LM) -> Prop)
-    (Pi: M -> option (option (ext_role (EM := EM)) * M) -> Prop)
+  Lemma upto_stutter_step_correspondence (eauxtr: elmftrace (LM := LM)) (emtr: @emtrace M EI)
+    (Po: lm_ls LM -> option (option er_LM * lm_ls LM) -> Prop)
+    (Pi: M -> option (option er * M) -> Prop)
     (LIFT: forall δ ostep, Po δ ostep -> Pi (ls_under δ) (match ostep with 
                                               | Some (ℓ, δ') => match (EUsls proj_ext δ ℓ δ') with | Some r => Some (r, ls_under δ') | None => None end
                                               | None => None
@@ -325,8 +338,8 @@ Section upto_stutter_preserves_fairness_and_termination.
         destruct ostep; [done| ].
         specialize (LIFT _ _ Hpa). simpl in LIFT.
         rewrite trace_lookup_0_singleton in O0. inversion O0. 
-        rewrite trace_lookup_0_singleton in STEPI. inversion STEPI. 
-        congruence. 
+        rewrite trace_lookup_0_singleton in STEPI. inversion STEPI.
+        subst. apply LIFT. 
       +
         (* rewrite -> !pred_at_0 in A0. *)
         rewrite /pred_at /=.
@@ -335,8 +348,8 @@ Section upto_stutter_preserves_fairness_and_termination.
           simpl.
           rewrite trace_lookup_0_singleton in STEPI. inversion STEPI.
           subst.           
-          rewrite trace_lookup_0_cons in O0. inversion O0. subst.
-          rewrite H0 H in A0. congruence. 
+          rewrite trace_lookup_0_cons in O0. inversion O0. simpl in H1. subst.
+          rewrite H0 H in A0. rewrite H0. done. 
         * apply LIFT in A0.
           simpl in H2. subst.
           rewrite trace_lookup_0_cons in O0.
@@ -370,7 +383,7 @@ Section upto_stutter_preserves_fairness_and_termination.
         exists (S m). do 3 eexists. eauto. 
   Qed.
 
-  Lemma upto_stutter_fairness_0 ρ eauxtr (mtr: emtrace (EM := EM)):
+  Lemma upto_stutter_fairness_0 ρ eauxtr (mtr: @emtrace M EI):
     upto_stutter_eauxtr proj_ext eauxtr mtr ->
     (∃ n s ostep, eauxtr !! n = Some (s, ostep ) /\ 
                   (¬role_enabled (LSI := LSI) ρ s ∨
@@ -425,7 +438,7 @@ Section upto_stutter_preserves_fairness_and_termination.
       (fun ρ s ostep => ∃ (τ : G) (δ2 : lm_ls LM),
            ostep = Some (Some (inl τ), δ2) ∧ next_TS_role s τ δ2 = Some ρ).
 
-  Lemma upto_stutter_fairness (eauxtr: elmftrace (LM := LM)) (emtr: emtrace (EM := EM)):
+  Lemma upto_stutter_fairness (eauxtr: elmftrace (LM := LM)) (emtr: @emtrace M EI):
     upto_stutter_eauxtr proj_ext eauxtr emtr ->
     (* (∀ ρ, fair_eaux ρ eauxtr) -> *)
     (forall ρ, fair_by_next_TS_ext ρ eauxtr) ->
@@ -442,7 +455,7 @@ Section upto_stutter_preserves_fairness_and_termination.
     2: { by rewrite Heq in Hpmod. }
     rewrite Heq in Hpmod.
     (* Set Printing Implicit. *)
-    assert (role_enabled_model (inl ρ) (trfirst emtr') (M := (@ext_model_FM _ EM))).
+    assert (role_enabled_model (inl ρ) (trfirst emtr') (M := (@ext_model_FM _ _ EM))).
     { by destruct emtr'. }
     clear Hpmod. rename H into Hpmod. 
 
@@ -485,7 +498,7 @@ Section upto_stutter_preserves_fairness_and_termination.
       exists (Some (inl ρ)). split; done. 
   Qed.
 
-  Lemma upto_stutter_finiteness eauxtr (emtr: emtrace (EM := EM)):
+  Lemma upto_stutter_finiteness eauxtr (emtr: @emtrace M EI):
     upto_stutter_eauxtr proj_ext eauxtr emtr ->
     terminating_trace emtr ->
     terminating_trace eauxtr.
@@ -500,7 +513,7 @@ End upto_stutter_preserves_fairness_and_termination.
 (* TODO: move, unify with non-ext version? *)
 From trillium.fairness Require Import lm_fairness_preservation.
 Lemma ELM_ALM_afair_by_next `{Countable G}`(LM: LiveModel G M LSI) {LF: LMFairPre LM}
-  {ELM: ExtModel (@LM_Fair _ _ _ _ _ _ LF)} auxtr
+  `{ELM: ExtModel (@LM_Fair _ _ _ _ _ _ LF) EI_LM} auxtr
   (KEEPS: ext_keeps_asg):
   (∀ ρ, afair_by_next_TS (ELM_ALM KEEPS) ρ auxtr) <-> ∀ ρ, fair_by_next_TS_ext ρ auxtr.
 Proof.

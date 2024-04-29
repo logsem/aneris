@@ -182,7 +182,7 @@ Section OuterExposing.
   Context `{Countable Go} `{LMo: LiveModel Go Mo LSIo}.
   Context `{Countable Gi} `{LMi: LiveModel Gi Mi LSIi}. 
   Context {LFi: LMFairPre LMi} {LFo: LMFairPre LMo}. 
-  Context {ELMi: ExtModel (LM_Fair (LF := LFi))}. 
+  Context `{ELMi: ExtModel (LM_Fair (LF := LFi)) EI_LM}.
 
   Context (EXT_KEEPS: ext_keeps_asg (ELM := ELMi)). 
   Let ALMi := ELM_ALM EXT_KEEPS. 
@@ -192,7 +192,7 @@ Section OuterExposing.
        it's hard to express one in terms of another.
        We should just get rid of 'option' in FairModel transition. *)
     (lift_Gi: Gi -> fmrole Mo)
-    (lift_EAi: option (@ext_role _ ELMi) -> option (fmrole Mo))
+    (lift_EAi: option (@ext_role (LM_Fair (LF := LFi)) EI_LM) -> option (fmrole Mo))
     (state_rel : Mo → lm_ls LMi → Prop)
     
     (lmtr: lmftrace (LM := LMo)) (mtr: mtrace Mo)

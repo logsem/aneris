@@ -688,10 +688,10 @@ Section Properties.
       rewrite !lookup_insert. rewrite LOCK. set_solver.
     Defined. 
           
-    Instance ExtTL: ExtModel tl_fair_model := 
-      FL_EM tl_FLE. 
+    Instance ExtTL: ExtModel tl_fair_model fl_EI :=
+      FL_EM tl_FLE.
     
-    Let ExtTL_FM := @ext_model_FM _ ExtTL. 
+    Let ExtTL_FM := @ext_model_FM _ _ ExtTL. 
 
     Section ProgressPropertiesImpl.
 
@@ -1808,17 +1808,16 @@ Section Properties.
     (* TODO: simplify *)
     Lemma has_lock_kept_dis ρ:
     @label_kept_state
-    (@ext_model_FM tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+    (@ext_model_FM tl_fair_model _ (@FL_EM tl_fair_model tl_FLP tl_FLE))
     (λ st : tl_st,
        has_lock_st ρ st ∧ @fair_lock.disabled_st tl_fair_model tl_FLP ρ st)
-    (λ oℓ : option (@ext_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE)),
+    (λ oℓ : option (@ext_role tl_fair_model fl_EI),
        oℓ
        ≠ @Some
-           (tl_role + @env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+           (tl_role + @env_role fl_EI)
            (@inr tl_role
-              (@env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
-              (@env tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE)
-                 (@flU tl_fair_model ρ)))).
+              (@env_role fl_EI)
+              (@env fl_EI (@flU tl_fair_model ρ)))).
       Proof.
         red. intros.
         destruct (decide (oℓ' = Some $ inl ρ)).
@@ -1846,22 +1845,21 @@ Section Properties.
     Lemma competes_kept_dis:
   ∀ ρ : fmrole tl_fair_model,
     @label_kept_state
-      (@ext_model_FM tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
-      (λ st : @ext_model_FM tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE),
+      (@ext_model_FM tl_fair_model _ (@FL_EM tl_fair_model tl_FLP tl_FLE))
+      (λ st : @ext_model_FM tl_fair_model _ (@FL_EM tl_fair_model tl_FLP tl_FLE),
          @fair_lock.does_lock tl_fair_model tl_FLP ρ st
          ∧ @fair_lock.disabled_st tl_fair_model tl_FLP ρ st)
       (λ oℓ : option
                 (fmrole
                    (@ext_model_FM tl_fair_model
-                      (@FL_EM tl_fair_model tl_FLP tl_FLE))),
+                      _ (@FL_EM tl_fair_model tl_FLP tl_FLE))),
          oℓ
          ≠ @Some
              (fmrole tl_fair_model +
-              @env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
+              @env_role fl_EI)
              (@inr (fmrole tl_fair_model)
-                (@env_role tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE))
-                (@env tl_fair_model (@FL_EM tl_fair_model tl_FLP tl_FLE)
-                   (@flL tl_fair_model ρ)))).
+                (@env_role fl_EI)
+                (@env fl_EI (@flL tl_fair_model ρ)))).
     Proof.
       red. intros.
       destruct (decide (oℓ' = Some $ inl ρ)).

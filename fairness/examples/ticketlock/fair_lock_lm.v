@@ -7,7 +7,7 @@ From trillium.fairness Require Import lm_fair_traces trace_helpers fuel lm_fair 
 
 Section FairLockLM.
   
-  Context `(FL: @FairLock M FLP FLE inner_fair_ext_model_trace).
+  Context `(FL: @FairLock M FLP FLE (inner_fair_ext_model_trace (EM := FL_EM FLE))).
 
   Let R := fmrole M.
   (* For the lock model (and others that also don't fork),
@@ -243,15 +243,15 @@ Section FairLockLM.
       apply ls_mapping_tmap_corr. eauto.
   Qed. 
 
-  Let proj_ext (ι: @EI _ (FL_EM FLE_LMF)): @EI _ (FL_EM FLE) :=
+  Let proj_ext (ι: @fl_EI LMF): @fl_EI M :=
         match ι with
         | flU (asG ρ) => flU ρ
         | flL (asG ρ) => flL ρ
         end. 
     
   Lemma PROJ_KEEP_EXT:
-    forall δ1 ι δ2, (@ETs _ (FL_EM FLE_LMF)) ι δ1 δ2 -> 
-                (@ETs _ (FL_EM FLE)) (proj_ext ι) (ls_under δ1) (ls_under δ2).
+    forall δ1 ι δ2, (@ETs _ _ (FL_EM FLE_LMF)) ι δ1 δ2 -> 
+                (@ETs _ _ (FL_EM FLE)) (proj_ext ι) (ls_under δ1) (ls_under δ2).
   Proof using.
     intros ? ι ? STEP. 
     destruct ι as [[ρ]| [ρ]]; simpl in *; set_solver. 
@@ -259,7 +259,7 @@ Section FairLockLM.
   
   (* TODO: move, generalize *)
   Lemma upto_state_lookup_unfold2 i δ
-    (lmtr: mtrace (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF)))
+    (lmtr: mtrace (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF)))
     (mtr: trace M (option ext_role))
     (UPTO: upto_stutter_eauxtr proj_ext lmtr mtr)
     (ITH : lmtr S!! i = Some δ):
@@ -279,7 +279,7 @@ Section FairLockLM.
 
   (* TODO: move, generalize *)
   Lemma upto_state_lookup_unfold1 i' st
-    (lmtr: mtrace (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF)))
+    (lmtr: mtrace (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF)))
     (mtr: trace M (option ext_role))
     (UPTO: upto_stutter_eauxtr proj_ext lmtr mtr)
     (ITH : mtr S!! i' = Some st):
@@ -297,7 +297,7 @@ Section FairLockLM.
     eapply upto_stutter_trfirst; eauto.
   Qed. 
   
-  Definition others_or_burn ρ' (fl_ctr: G -> @EI _ (FL_EM FLE_LMF)) :=
+  Definition others_or_burn ρ' (fl_ctr: G -> @fl_EI LMF) :=
     (λ δ1 oℓ δ2,
        match oℓ with
        | Some (inl g) => next_TS_role δ1 g δ2 ≠ Some ρ'
@@ -313,9 +313,9 @@ Section FairLockLM.
 
   Lemma others_or_burn_keep_lock ρ':
     label_kept_state_gen
-    (λ st' : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
+    (λ st' : fmstate (@ext_model_FM _ _ (FL_EM FLE_LMF)),
        does_unlock ρ' (ls_under st') ∧ fair_lock.disabled_st ρ' (ls_under st'))
-    (others_or_burn ρ' (flU: @fmrole LMF -> @EI _ (FL_EM FLE_LMF))).
+    (others_or_burn ρ' (flU: @fmrole LMF -> @fl_EI LMF)).
   Proof.
     red. intros. simpl in STEP. inversion STEP; subst.
     - simpl in STEP0. unfold_LMF_trans STEP0.
@@ -345,9 +345,9 @@ Section FairLockLM.
 
   Lemma others_or_burn_keep_can_lock ρ':
     label_kept_state_gen
-    (λ st' : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
+    (λ st' : fmstate (@ext_model_FM _ _ (FL_EM FLE_LMF)),
        does_lock ρ' (ls_under st') ∧ fair_lock.disabled_st ρ' (ls_under st'))
-    (others_or_burn ρ' (flL: @fmrole LMF -> @EI _ (FL_EM FLE_LMF))).
+    (others_or_burn ρ' (flL: @fmrole LMF -> @fl_EI LMF)).
   Proof.
     red. intros. simpl in STEP. inversion STEP; subst.
     - simpl in STEP0. unfold_LMF_trans STEP0.
@@ -469,6 +469,7 @@ Section FairLockLM.
          { erewrite ex_det_iff2.
            2: { intros ?? [[=] ?]. subst. split; reflexivity. }
            reflexivity. }
+         apply and_dec; [solve_decision| ].
          solve_decision. }
     destruct FAIRi as (δ_m & step_m & MTH & FAIRi).
     red in FAIRi.
@@ -552,10 +553,10 @@ Section FairLockLM.
   (* TODO: refactor *)
   Lemma does_lock_dis_kept:
     ∀ ρ : fmrole LMF,
-    @label_kept_state (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF))
-      (λ st : fmstate (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF)),
+    @label_kept_state (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF))
+      (λ st : fmstate (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF)),
          @does_lock LMF FLP_LMF ρ st ∧ @fair_lock.disabled_st LMF FLP_LMF ρ st)
-      (fun oℓ => oℓ ≠ Some (inr (env ((@flL _ ρ): @EI _ (@FL_EM _ _ FLE_LMF)))))
+      (fun oℓ => oℓ ≠ Some (inr (env ((@flL _ ρ): @fl_EI LMF))))
   .
   Proof.
     red. intros [ρ] δ oℓ δ' [LOCK DIS] OTHER STEP.
@@ -647,10 +648,10 @@ Section FairLockLM.
   (* TODO: refactor *)
   Lemma does_unlock_dis_kept:
     ∀ ρ : fmrole LMF,
-    @label_kept_state (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF))
-      (λ st : fmstate (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF)),
+    @label_kept_state (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF))
+      (λ st : fmstate (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF)),
          @does_unlock LMF FLP_LMF ρ st ∧ @fair_lock.disabled_st LMF FLP_LMF ρ st)
-      (fun oℓ => oℓ ≠ Some (inr (env ((@flU _ ρ): @EI _ (@FL_EM _ _ FLE_LMF)))))
+      (fun oℓ => oℓ ≠ Some (inr (env ((@flU _ ρ): @fl_EI LMF))))
   .
   Proof.
     red. intros [ρ] δ oℓ δ' [LOCK DIS] OTHER STEP.
@@ -746,7 +747,7 @@ Section FairLockLM.
     (VALID: mtrace_valid lmtr)
     (FAIR: ∀ g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr)
     (EV_REL : eventual_release lmtr (asG ρ) 0):
-  eventual_release mtr ρ 0.
+  eventual_release mtr ρ 0 (EM := FL_EM FLE).
   Proof.
     (* red in EV_REL.  *)
     red. intros.
@@ -839,11 +840,12 @@ Section FairLockLM.
     { erewrite ex_det_iff3.
       2: { intros ??? [[=] ?]. subst. repeat split; reflexivity. }
       reflexivity. }
-    solve_decision. 
+    apply and_dec; [| solve_decision]. 
+    eapply Decision_iff_impl; [| apply True_dec]. tauto.
   Qed. 
 
   Lemma final_steps ρ i (P P': R → fmstate M → Prop) flc
-    (lmtr: mtrace (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF)))
+    (lmtr: mtrace (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF)))
     (δ : LiveState G M LSI)
     (DISM : fair_lock.disabled_st ρ (ls_under δ))
     (* (LOCK : has_lock_st ρ (ls_under δ)) *)
@@ -851,7 +853,7 @@ Section FairLockLM.
     (DTH : lmtr S!! i = Some δ)
     (USED: forall ρ st, P ρ st -> ¬ is_unused ρ st)
     (KEPT: forall ρ, label_kept_state_gen
-             (λ st : fmstate (@ext_model_FM _ (FL_EM FLE_LMF)),
+             (λ st : fmstate (@ext_model_FM _ _ (FL_EM FLE_LMF)),
                  P ρ (ls_under st) ∧ fair_lock.disabled_st ρ (ls_under st)) (others_or_burn ρ flc))
     (FAIR: ∀ g, fair_by_group (ELM_ALM LM_EM_EXT_KEEPS) g lmtr)
     (VALID: mtrace_valid lmtr)
@@ -1112,10 +1114,10 @@ Section FairLockLM.
     
   Lemma unused_kept_LM:
   ∀ ρ : fmrole LMF,
-    @label_kept_state (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF))
-      (λ st : fmstate (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF)),
+    @label_kept_state (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF))
+      (λ st : fmstate (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF)),
          @is_unused LMF FLP_LMF ρ st)
-      (λ _ : option (fmrole (@ext_model_FM LMF (@FL_EM LMF _ FLE_LMF))), True).
+      (λ _ : option (fmrole (@ext_model_FM LMF _ (@FL_EM LMF _ FLE_LMF))), True).
   Proof.
     intros [ρ] δ oℓ δ' UNUSED _ STEP.
     inversion STEP; subst.
