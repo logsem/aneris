@@ -3,7 +3,116 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic Require Export gen_heap.
 From trillium.fairness.heap_lang Require Import tactics notation sswp_logic.
 From trillium.fairness Require Import fairness resources fuel model_plug lm_fair.
-From trillium.fairness.lm_rules Require Import model_step.
+From trillium.fairness.lm_rules Require Import model_step resources_updates fuel_step.
+
+
+Section LMLocalRules.
+  
+  (* Context {M: FairModel}. *)
+  (* Context {msi: fmstate M -> iProp Σ}.  *)
+  (* Context {lifted_roles: fmstate M -> gset (fmrole M)}. *)
+  
+  Context `{Countable G}.
+  Context `{iLM: LiveModel G iM LSI}.
+  Context {LFP: LMFairPre iLM}.
+  Let LF := LM_Fair (LF := LFP).
+  Context `{fGS: @fairnessGS _ _ _ _ _ iLM Σ}. 
+  Let msi: fmstate LF -> iProp Σ := model_state_interp (LM := iLM).
+
+  Context {lifted_roles: fmstate LF -> gset (fmrole LF)}.
+  Hypothesis (IMPL_LIFT: forall (δ δ': fmstate LF),
+                 dom (ls_tmap δ') = dom (ls_tmap δ) ->
+                 live_roles _ δ' ⊆ live_roles _ δ ->
+                 lifted_roles δ' ⊆ lifted_roles δ).
+  Hypothesis (TRANS_NO_ENAB: forall δ g δ',
+                 locale_trans δ g δ' (LM := iLM) ->
+                 live_roles LF δ' ⊆ live_roles LF δ). 
+  
+  Let lm_local_rule := local_rule (msi := msi) (lifted_roles := lifted_roles). 
+  
+  Lemma model_step_local_rule s1 s2 fs1 fs2 ρ ζ fr1 fr_stash:
+    ⊢ lm_local_rule
+      (⌜ live_roles _ s2 ∖ live_roles _ s1 ⊆ fr1 ∪ dom fs1 ∩ dom fs2 ⌝ ∗
+       ⌜ fr_stash ⊆ dom fs1 ⌝ ∗
+       ⌜ live_roles _ s1 ∩ (fr_stash ∖ {[ ρ ]}) = ∅ ⌝ ∗
+       ⌜ dom fs2 ∩ fr_stash = ∅ ⌝ ∗
+       ⌜ fmtrans _ s1 (Some ρ) s2 ⌝ ∗
+       ⌜ valid_new_fuelmap fs1 fs2 s1 s2 ρ (LM := iLM) ⌝ ∗
+       ⌜ model_step_preserves_LSI s1 ρ s2 fs1 fs2 (LSI := LSI) ⌝ ∗
+       has_fuels ζ fs1 ∗ 
+       frag_model_is s1 ∗
+       frag_free_roles_are fr1)
+      ( has_fuels ζ fs2 ∗ 
+        frag_model_is s2 ∗ 
+        frag_free_roles_are (fr1 ∖ (live_roles _ s2 ∖ (live_roles _ s1 ∪ dom fs1 ∩ dom fs2)) ∪ fr_stash))
+      ζ.
+  Proof. 
+    rewrite /lm_local_rule /local_rule. iModIntro.
+    iIntros (?) "((%&%&%&%&%&%&%&?&?&?)&?)".
+    iMod (actual_update_step_still_alive_gen with "[$][$][$][$]") as "NEW"; eauto.
+    iDestruct "NEW" as (?) "(%STEP&?&?&?&?&%TM)".
+    iModIntro. iExists _. iFrame.
+    iPureIntro.
+    assert (fmtrans LF δ (Some ζ) δ2) as STEP'. 
+    { simpl. eexists. split; [apply STEP| ]. done. }
+    split; [done| ].    
+    apply IMPL_LIFT.
+    - rewrite TM. rewrite dom_insert_L. 
+      apply locale_trans_dom in STEP'. clear -STEP'. set_solver.
+    - eapply TRANS_NO_ENAB. apply STEP'.
+  Qed.
+
+  Lemma fuel_keep_step_local_rule fs ζ:
+    ⊢ lm_local_rule
+      (⌜ dom fs ≠ ∅ ⌝ ∗
+       ⌜ LSI_fuel_independent (LSI := LSI) ⌝ ∗
+       has_fuels_S ζ fs)
+      (has_fuels ζ fs)
+      ζ.
+  Proof.
+    rewrite /lm_local_rule /local_rule. iModIntro.
+    iIntros (?) "((%&%&?)&?)".
+    iMod (actual_update_no_step_enough_fuel_keep with "[$][$]") as "NEW"; eauto.
+    iDestruct "NEW" as (?) "(%STEP&?&?&%TM)".
+    iExists _. iFrame. 
+    iPureIntro.
+    assert (fmtrans LF δ (Some ζ) δ2) as STEP'. 
+    { simpl. eexists. split; [apply STEP| ]. done. }
+    split; [done| ].
+    apply IMPL_LIFT.
+    - by rewrite TM.
+    - eapply TRANS_NO_ENAB. apply STEP'.
+  Qed.
+
+  Lemma fuel_drop_step_local_rule rem s fs ζ:
+    ⊢ lm_local_rule
+    (⌜ dom fs ≠ ∅ ⌝ ∗
+     ⌜ (live_roles _ s) ∩ rem = ∅ ⌝ ∗
+     ⌜ rem ⊆ dom fs ⌝ ∗
+     ⌜ fuel_drop_preserves_LSI s rem (LSI := LSI) ⌝ ∗
+     has_fuels_S ζ fs ∗
+     partial_model_is s)
+    (has_fuels ζ (fs ⇂ (dom fs ∖ rem)) ∗
+     partial_model_is s)
+    ζ.
+  Proof. 
+    rewrite /lm_local_rule /local_rule. iModIntro.
+    iIntros (?) "((%&%&%&%&?&?)&?)".
+    iMod (actual_update_no_step_enough_fuel_drop with "[$][$][$]") as "NEW"; eauto.
+    iDestruct "NEW" as (?) "(%STEP&?&?&?&%TM)".
+    iExists _. iFrame. 
+    iPureIntro.
+    assert (fmtrans LF δ (Some ζ) δ2) as STEP'. 
+    { simpl. eexists. split; [apply STEP| ]. done. }
+    split; [done| ].
+    apply IMPL_LIFT.
+    - rewrite TM. rewrite dom_insert_L. 
+      apply locale_trans_dom in STEP'. clear -STEP'. set_solver.
+    - eapply TRANS_NO_ENAB. apply STEP'.
+  Qed. 
+
+End LMLocalRules.  
+
 
 Section ModelLogic.
 
@@ -102,12 +211,13 @@ Proof.
   (* TODO: get rid of this explicit specialization *)
   pose proof cwp_model_sswp_step (msi := msi) (lifted_roles := lr) as STEP.
   iApply (STEP with "[] [-Hwp] [Hwp]"); [by apply INV|..].
-  2: { iNext. iAccu. }
-  { rewrite /local_rule. iModIntro. iIntros (?) "[(ST & FUELS & FREE) MSI]".
-    iMod (actual_update_step_still_alive_gen with "[$] [$] [$] [$]") as (δ') "RES".
-    4: { apply intersection_empty_r_L. }
-    4: { apply Htrans. }
-    2, 3: set_solver. 
+  { iApply model_step_local_rule. 
+  (* 2: { iNext. iAccu. } *)
+  (* { rewrite /local_rule. iModIntro. iIntros (?) "[(ST & FUELS & FREE) MSI]". *)
+  (*   iMod (actual_update_step_still_alive_gen with "[$] [$] [$] [$]") as (δ') "RES". *)
+  (*   4: { apply intersection_empty_r_L. } *)
+  (*   4: { apply Htrans. } *)
+  (*   2, 3: set_solver.  *)
 Abort.
 
 
