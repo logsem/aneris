@@ -27,15 +27,16 @@ Theorem adequacy_hoare_no_model Σ `{anerisPreG Σ unit_model} IPs A lbls obs_se
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
-  intros ?? Hspec ????.
+  intros ?? Hspec ?????.
   eapply (adequacy_hoare Σ _ IPs A lbls obs_send_sas obs_rec_sas);
     [set_solver|set_solver|..|set_solver|set_solver|set_solver|done].
   { apply unit_model_rel_finitary. }
   iIntros (? Φ) "!# (?&?&?&?&?&?&?&?&?) HΦ".
-  iApply (Hspec with "[-HΦ]"); [|done].
-  iFrame.
+  iApply (Hspec with "[-HΦ]"); [iFrame|done].
+  done.
 Qed.
 
 Lemma adequacy_hoare_no_model_simpl_helper Σ `{anerisPreG Σ unit_model} IPs A e φ ip: 
@@ -74,9 +75,10 @@ Theorem adequacy_hoare_no_model_simpl Σ `{anerisPreG Σ unit_model} IPs A e σ 
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
-  intros Ht ????.
+  intros Ht ?????.
   apply adequacy_hoare_no_model_simpl_helper in Ht; try done.
   destruct Ht as [lbls[obs_send_sas[obs_rec_sas[HSend [HRec Ht]]]]].
   by eapply (adequacy_hoare_no_model Σ IPs A lbls obs_send_sas obs_rec_sas).

@@ -30,7 +30,7 @@ Section with_Σ.
     iIntros (tid) "Hip".
     rewrite !wp_unfold /wp_pre /= /aneris_to_val /= Hval.
     iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
-            "(?&?&?&?&Hauth)".
+            "(?&?&?&?&Hauth&?)".
     iMod ("HP" with "Hauth") as "[Hauth HP]".
     iMod "HP".
     iDestruct ("Hwp" with "HP Hip") as "Hwp".
@@ -42,7 +42,7 @@ Section with_Σ.
     iMod ("H" with "[//]") as "H". iIntros "!> !>".
     iMod "H" as "H". iIntros "!>".
     iApply (step_fupdN_wand with "[H]"); first by iApply "H".
-    iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth) & H & Hefs)".
+    iIntros "H". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth&?) & H & Hefs)".
     iModIntro.
     iExists δ2, ℓ.
     iFrame.
@@ -156,7 +156,7 @@ Section with_Σ.
     rewrite !wp_unfold /wp_pre /=.
     rewrite /aneris_to_val. simpl. rewrite Hval. simpl.
     iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hloc Hexe)
-            "(?&?&?&?&Hauth)".
+            "(?&?&?&?&Hauth&?)".
     iMod ("Hstep" with "Hauth") as "[Hauth Hstep]". simpl.
     iMod ("Hwp" with "[//] [//] [//] [$]") as "[% H]".
     iMod "Hstep".
@@ -170,7 +170,7 @@ Section with_Σ.
     iAssert (|={∅}▷=>^(trace_length extr) _ ∗ _)%I with "[H Hstep]" as "H".
     { iApply step_fupdN_empty_sep. iFrame. }
     iApply (step_fupdN_wand with "[H]"); first by iApply "H".
-    iIntros "[Hstep H]". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth) & H & Hefs)".
+    iIntros "[Hstep H]". iMod "H" as (δ2 ℓ) "((?&?&?&?&Hauth&?) & H & Hefs)".
     iMod ("Hstep" with "Hauth") as "[Hauth HP]".
     iModIntro.
     iExists δ2, ℓ.

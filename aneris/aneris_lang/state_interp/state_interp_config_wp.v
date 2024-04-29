@@ -39,7 +39,7 @@ Section state_interpretation.
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
     rewrite /config_wp. iModIntro.
-    iIntros (ex atr c σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth)".
+    iIntros (ex atr c σ2 Hexvalid Hex Hstep) "(Hevs & Hsi & Hm & % & Hauth & Hatrace)".
     rewrite (last_eq_trace_ends_in ex c); [|done].
     iDestruct "Hsi" as (γm mh)
                          "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh &
@@ -52,39 +52,46 @@ Section state_interpretation.
       [| |done|done]; last first.
     { econstructor; [done| |done]. econstructor 2; eauto. }
     iFrame "Hm Hevs Hauth Hsi".
-    iSplit; [|by iPureIntro; left].
-    iExists γm, mh. iFrame.
-    inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
-      simplify_eq/=.
-    - iSplit.
-      { apply (last_eq_trace_ends_in) in Hex as ->.
-        erewrite <- message_history_evolution_deliver_message;
-          eauto with set_solver. }
-      iSplitR; [eauto using gnames_coh_update_sockets|].
-      iSplitR; [eauto using network_sockets_coh_deliver_message|].
-      iSplitR; [iPureIntro; apply messages_history_coh_drop_message;
-                eauto using messages_history_coh_deliver_message|].
-      iSplitL "Hlcoh";
-        [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
-      iApply free_ips_coh_ms. by iApply free_ips_coh_deliver_message.
-    - iFrame.
-      iSplit.
-      { iPureIntro.
-        simplify_eq /=.
-        apply (last_eq_trace_ends_in) in Hex as ->.
-        rewrite -message_history_evolution_duplicate_message; [done|].
-        by apply gmultiset_singleton_subseteq_l. }
-      iSplitR; [done|]. iSplitR; [done|].
-      iPureIntro. by apply messages_history_coh_duplicate_message.
-    - iFrame.
-      iSplit.
-      { iPureIntro.
-        simplify_eq /=.
-        apply (last_eq_trace_ends_in) in Hex as ->.
-        rewrite -message_history_evolution_drop_message; first done.
-        apply gmultiset_difference_subseteq. }
-      iSplitR; [done|]. iSplitR; [done|].
-      by iPureIntro; eapply messages_history_coh_drop_message.
+    iSplitR "Hatrace".
+    {
+      iExists γm, mh. iFrame.
+      inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
+        simplify_eq/=.
+      - iSplit.
+        { apply (last_eq_trace_ends_in) in Hex as ->.
+          erewrite <- message_history_evolution_deliver_message;
+            eauto with set_solver. }
+        iSplitR; [eauto using gnames_coh_update_sockets|].
+        iSplitR; [eauto using network_sockets_coh_deliver_message|].
+        iSplitR; [iPureIntro; apply messages_history_coh_drop_message;
+                  eauto using messages_history_coh_deliver_message|].
+        iSplitL "Hlcoh";
+          [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
+        iApply free_ips_coh_ms. by iApply free_ips_coh_deliver_message.
+      - iFrame.
+        iSplit.
+        { iPureIntro.
+          simplify_eq /=.
+          apply (last_eq_trace_ends_in) in Hex as ->.
+          rewrite -message_history_evolution_duplicate_message; [done|].
+          by apply gmultiset_singleton_subseteq_l. }
+        iSplitR; [done|]. iSplitR; [done|].
+        iPureIntro. by apply messages_history_coh_duplicate_message.
+      - iFrame.
+        iSplit.
+        { iPureIntro.
+          simplify_eq /=.
+          apply (last_eq_trace_ends_in) in Hex as ->.
+          rewrite -message_history_evolution_drop_message; first done.
+          apply gmultiset_difference_subseteq. }
+        iSplitR; [done|]. iSplitR; [done|].
+        by iPureIntro; eapply messages_history_coh_drop_message.
+    }
+    {
+      iSplit; [by iPureIntro; left | ].
+      inversion Hstep as [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|σ|σ];
+        simplify_eq/=; iFrame.
+    }
   Qed.
 
 End state_interpretation.

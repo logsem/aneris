@@ -304,6 +304,7 @@ Proof.
   { set_solver. }
   { set_solver. }
   { set_solver. }
+  { set_solver. }
   iIntros (anG).
   iMod paxos_res_alloc as
       (γM γP γmv γmb) "(HM & HM' & Hpend0 & Hpend1 & Hmv_ctx & Hmb_ctx & Has)".

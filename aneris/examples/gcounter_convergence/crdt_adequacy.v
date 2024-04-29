@@ -73,6 +73,7 @@ Proof.
   { done. }
   { done. }
   { done. }
+  { done. }
 Qed.
 
 Lemma gcounter_adequacy gcdata (ps : programs_using_gcounters gcdata) :
@@ -97,6 +98,7 @@ Proof.
   { apply aneris_sim_rel_finitary, GcounterM_rel_finitary. }
   { rewrite elem_of_list_to_set elem_of_list_fmap; intros [? [? [? ?]%elem_of_list_lookup]].
     eapply gcd_addr_list_nonSys; eauto. }
+  { done. }
   { done. }
   { done. }
   { done. }

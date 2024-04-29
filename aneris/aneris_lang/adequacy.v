@@ -205,10 +205,12 @@ Theorem adequacy_multiple_strong_groups `{anerisPreG Σ Mdl}
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
+  (* Trace is initially empty *)
+  state_trace σ = [] →
   adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
   intros Hlen Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hheaps_dom Hsockets_dom Hports Hsockets Hsockets_coh1 Hsockets_coh2 Hms. simpl.
+  intros HMdlfin Hwp Hheaps_dom Hsockets_dom Hports Hsockets Hsockets_coh1 Hsockets_coh2 Hms Htrace. simpl.
   eapply (adequacy_multiple_xi _ _ _ _ (sim_rel (λ _ _, True)) _ _ _
                       (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))); [done| |].
   { by eapply aneris_sim_rel_finitary. }
@@ -267,7 +269,8 @@ Proof.
         (trace_messages_history ex) ∗
       auth_st (trace_last atr) ∗
         ⌜valid_state_evolution ex atr⌝ ∗
-        steps_auth (trace_length ex))%I, (λ _ _, True)%I,
+        steps_auth (trace_length ex) ∗
+        trace_auth (state_trace ((trace_last ex).2)))%I, (λ _ _, True)%I,
       ((λ φ v, ⌜φ v⌝)%I <$> φs), (λ _ _, True)%I.
   iSplitR; [by rewrite !fmap_length|].
   iSplitR; [iApply config_wp_correct|].
@@ -298,6 +301,7 @@ Proof.
   { rewrite Hheaps_dom. done. }
   { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
   { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
+  rewrite Htrace.
   iFrame.
   iSplitR; [done|].
   iModIntro. iIntros (???) "% % % % % % % (?& Hsi & Htr & % & Hauth) Hpost".
@@ -320,10 +324,11 @@ Theorem adequacy_multiple_groups `{anerisPreG Σ Mdl}
   state_heaps σ = gset_to_gmap ∅ $ get_ips es →
   state_sockets σ = gset_to_gmap ∅ $ get_ips es →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
   intros Hlen Hdisj Hne Hsendle Hrecvle
-         HMdlfin Hwp Hheaps_dom Hsockets_dom Hms. simpl.
+         HMdlfin Hwp Hheaps_dom Hsockets_dom Hms Htrace. simpl.
   eapply (adequacy_multiple_strong_groups A _ obs_send_sas obs_rec_sas); try done.
   { iIntros (aG) "!> HA Hhist Hσ HPs Hmdl Hns Halloc
       Hsend Hrecv Hsend_obs Hrecv_obs HSI".
@@ -372,6 +377,8 @@ Theorem adequacy_multiple_strong `{anerisPreG Σ Mdl}
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
+  (* Trace is initially empty *)
+  state_trace σ = [] →
   adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
   intros Hlen Hsendle Hrecvle.
@@ -427,10 +434,11 @@ Theorem adequacy_multiple `{anerisPreG Σ Mdl}
   state_heaps σ = gset_to_gmap ∅ $ get_ips es →
   state_sockets σ = gset_to_gmap ∅ $ get_ips es →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   adequate_multiple s es σ ((λ φ v _, φ v) <$> φs).
 Proof.
   intros Hlen Hsendle Hrecvle
-         HMdlfin Hwp Hheaps_dom Hsockets_dom Hms. simpl.
+         HMdlfin Hwp Hheaps_dom Hsockets_dom Hms Htrace. simpl.
   eapply (adequacy_multiple_strong A _ obs_send_sas obs_rec_sas); try done.
   { iIntros (aG) "!> HA Hhist Hσ HPs Hmdl Hns Halloc
       Hsend Hrecv Hsend_obs Hrecv_obs HSI".
@@ -469,10 +477,11 @@ Theorem adequacy_groups `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hip Hste Hsce Hmse.
+  intros HMdlfin Hwp Hip Hste Hsce Hmse Htrace.
   eapply (adequacy_xi _ _ _ _ (sim_rel (λ _ _, True))  _ _ _
                       (Mdl.(model_state_initial) : mstate (aneris_to_trace_model Mdl))).
   { by eapply aneris_sim_rel_finitary. }
@@ -533,7 +542,8 @@ Proof.
         (trace_messages_history ex) ∗
       auth_st (trace_last atr) ∗
         ⌜valid_state_evolution ex atr⌝ ∗
-        steps_auth (trace_length ex))%I, (λ _ _, True)%I, _, (λ _ _, True)%I.
+        steps_auth (trace_length ex) ∗
+        trace_auth (state_trace ((trace_last ex).2)))%I, (λ _ _, True)%I, _, (λ _ _, True)%I.
   iSplitR; [iApply config_wp_correct|].
   iMod (socket_address_group_own_alloc_subseteq_pre _ A obs_send_sas with "Hauth")
     as "[Hauth Hown_send]"; [done|].
@@ -556,13 +566,13 @@ Proof.
     as "[Hauth Hown_send_recv]"; [by set_solver|].
   iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$".
   simpl.
-  rewrite Hmse gset_of_gmultiset_empty.
+  rewrite Hmse Htrace gset_of_gmultiset_empty.
   iMod (socket_address_group_own_alloc_subseteq_pre _ A A with "Hauth")
     as "[Hauth Hown]"; [by set_solver|].
   iPoseProof (@aneris_state_interp_init _ _ dg IPs
                with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "$"; eauto.
   simpl.
-  iFrame "Hmfull Hsteps".
+  iFrame "Hmfull Hsteps Hta".
   done.
 Qed.
 
@@ -577,9 +587,10 @@ Theorem adequacy1 `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)}
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
-  intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
+  intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse Htrace.
   eapply (adequacy_groups _
                          (to_singletons A)
                          _
@@ -628,6 +639,7 @@ Theorem adequacy `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model Mdl)} 
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   adequate s (mkExpr ip e) σ (λ v _, φ v).
 Proof.
   intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
@@ -681,6 +693,7 @@ Theorem adequacy_groups_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   safe (mkExpr ip e) σ.
 Proof. by apply adequacy_groups. Qed.
 
@@ -693,6 +706,7 @@ Theorem adequacy1_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model 
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   safe (mkExpr ip e) σ.
 Proof. by apply adequacy1. Qed.
 
@@ -705,6 +719,7 @@ Theorem adequacy_safe `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model M
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   safe (mkExpr ip e) σ.
 Proof. by apply adequacy. Qed.
 
@@ -725,6 +740,7 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
+  state_trace σ1 = [] →
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
@@ -764,7 +780,7 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros Hsc Hips Hheaps Hsockets Hms Hwp.
+  intros Hsc Hips Hheaps Hsockets Hms Htrace Hwp.
   epose proof (sim_and_adequacy_xi _ _ Σ s (sim_rel ξ) φ (mkExpr ip e1) σ1 Mdl.(model_state_initial) Hsc _)
     as [? ?] =>//.
   split; [|done].
@@ -839,7 +855,7 @@ Proof.
   iPoseProof (aneris_events_state_interp_init with "[$] [$] [$] [$] [$] [$]") as "$".
   iPoseProof (@aneris_state_interp_init _ _ dg IPs
                with "Hmp [//] Hh Hs Hms [$Hauth $Hown] Hunallocated_auth Hsi HIPsCtx HPiu") as "Hsi"; eauto; [].
-  rewrite /= Hms gset_of_gmultiset_empty.
+  rewrite /= Hms Htrace gset_of_gmultiset_empty.
   iFrame. iSplit; [done|].
   iIntros (??????? Hcontr ??) "(Hev & Hsi & Hauth & % & Hsteps) Hpost".
   iDestruct ("Himpl" with "[//] [//] [//] [//] [] [//] [$Hev $Hsi $Hauth $Hsteps //] [$Hpost]") as "[$ Hrel]".
@@ -864,6 +880,7 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
+  state_trace σ1 = [] →
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
@@ -903,7 +920,8 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
                           (trace_singleton Mdl.(model_state_initial)) ∧
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps.
+  intros Hsockets Hms Htrace Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups _ _ _
                          (to_singletons A)
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)); eauto.
@@ -956,6 +974,7 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
+  state_trace σ1 = [] →
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
@@ -995,7 +1014,7 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
                           (trace_singleton Mdl.(model_state_initial)) ∧
    adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Htrace Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups _ _ _
                          (to_singletons A)
                          (to_singletons obs_send_sas) (to_singletons obs_rec_sas)
@@ -1051,6 +1070,7 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
+  state_trace σ1 = [] →
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
@@ -1087,7 +1107,7 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
     (trace_singleton Mdl.(model_state_initial)).
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros Hsc Hips Hheaps Hsockets Hms Hwp.
+  intros Hsc Hips Hheaps Hsockets Hms Htrace Hwp.
   eapply (simulation_adequacy_with_trace_inv_groups
           _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True)) =>//.
   iIntros (?) "".
@@ -1119,6 +1139,7 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
+  state_trace σ1 = [] →
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
@@ -1154,7 +1175,7 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
     (trace_singleton ([(mkExpr ip e1)], σ1))
     (trace_singleton Mdl.(model_state_initial)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Htrace Hwp.
   eapply (simulation_adequacy1_with_trace_inv
           _ _ _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True))=>//.
   iIntros (?) "".
@@ -1187,6 +1208,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
   state_heaps σ1 = {[ip:=∅]} →
   state_sockets σ1 = {[ip:=∅]} →
   state_ms σ1 = ∅ →
+  state_trace σ1 = [] →
   (* A big implication, and we get back a Coq proposition *)
   (* For any proper Aneris resources *)
   (∀ `{!anerisG Mdl Σ},
@@ -1223,7 +1245,7 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
     (trace_singleton Mdl.(model_state_initial)) ∧
      adequate s (mkExpr ip e1) σ1 (λ v _, φ v)).
 Proof.
-  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Hwp.
+  intros Hsendle Hrecvle Hsc Hips Hheaps Hsockets Hms Htrace Hwp.
   eapply (simulation_adequacy_with_trace_inv
           _ _ _ A obs_send_sas obs_rec_sas)=>//.
   iIntros (?) "".
