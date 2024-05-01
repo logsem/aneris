@@ -35,7 +35,7 @@ Section ModelPlug.
              ⌜em_valid_state_evolution_fairness (extr :tr[ Some τ ]: c2) (auxtr :tr[ ℓ ]: δ2)⌝).
 
     Global Instance RL_pers: forall τ ρ lc, Persistent (role_lift τ ρ lc).
-    Proof. apply _. Qed. 
+    Proof. apply _. Qed.    
 
   End MP.
 
@@ -47,6 +47,28 @@ Section ModelPlug.
     Definition cwp (e: expr Λ) (Φ: val Λ -> iProp Σ) (s: stuckness) (ε__wp ε__lift: coPset) (τ: locale Λ) (ρ: fmrole M): iProp Σ :=
       ∀ (lift_ctx: iProp Σ), lift_ctx -∗ RL ε__lift τ ρ lift_ctx  -∗ 
                               WP e @ s ; τ ; ε__wp {{ v, Φ v ∗ lift_ctx }}. 
+
+    Lemma cwp_bind K (e: expr Λ) (Φ: val Λ -> iProp Σ) (s: stuckness) (ε__wp ε__lift: coPset) (τ: locale Λ) (ρ: fmrole M):
+      cwp e (fun v => cwp (ectx_fill K (of_val v)) Φ s ε__wp ε__lift τ ρ) s ε__wp ε__lift τ ρ ⊢
+      cwp (ectx_fill K e) Φ s ε__wp ε__lift τ ρ. 
+    Proof.
+      iIntros "STEP".
+      rewrite /cwp. iIntros (LC) "LC #RL".
+      iApply wp_bind.
+      iSpecialize ("STEP" $! LC with "LC RL").
+      iApply (wp_strong_mono with "STEP").
+      1, 2: reflexivity.
+      iIntros "* [WP LC]".
+      iModIntro. iApply ("WP" with "[LC] [$]"). done. 
+    Qed.
+
+    (* TODO: make iMod work with cwp instead *)
+    Lemma cwp_elim_bupd (e: expr Λ) (Φ: val Λ -> iProp Σ) (s: stuckness) (ε__wp ε__lift: coPset) (τ: locale Λ) (ρ: fmrole M) (P: iProp Σ):
+      ⊢ (P -∗ cwp e Φ s ε__wp ε__lift τ ρ) -∗ (|==> P) -∗ cwp e Φ s ε__wp ε__lift τ ρ.
+    Proof.
+      iIntros "IMPL P". iMod "P" as "P".
+      by iApply "IMPL".
+    Qed.
 
   End CWP.
 

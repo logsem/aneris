@@ -2,27 +2,97 @@ From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.fairness Require Import resources actual_resources.
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import notation heap_lang_defs wp_tacs sswp_logic.
 From trillium.fairness Require Import utils.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
-From trillium.fairness Require Import lm_fair. 
+From trillium.fairness Require Import lm_fair fairness model_plug fuel. 
+From trillium.fairness.lm_rules Require Import resources_updates.
 From trillium.fairness.ext_models Require Import ext_models.
-From trillium.fairness.examples.comp Require Import lib lib_ext client_defs.
-From trillium.fairness.heap_lang Require Export lang lm_lsi_hl_wp tactics proofmode_lsi wp_tacs.
-From trillium.fairness.examples.comp Require Import comp_lib_pmp.
+From trillium.fairness.examples.comp Require Import client_defs tracker lib_interface.
+From trillium.fairness.heap_lang Require Export lang model_logic.
+(* From trillium.fairness.examples.comp Require Import comp_lib_pmp. *)
 
 
-Close Scope Z_scope. 
+Close Scope Z_scope.
+
+(* Set Implicit Arguments.  *)
+
+Section AuxDefs.
+  Context {lib: LibInterface} {ρlg: fmrole libM}.
+
+  Let LM__cl := client_model (ρlg := ρlg).
+  Let M__cl := client_model_impl (ρlg := ρlg).
+  Let ST := fmstate M__cl.
+  Let R := fmrole M__cl.
+  Let STl := fmstate libM.
+  Let Rl := fmrole libM.
+
+  Definition sets_corr `{inG Σ set_pair_RA} γ (lb: fmstate libM) : iProp Σ := 
+    ∃ (R__cur R__free: gset (fmrole M__cl)), 
+      own γ ((● (Excl' (R__cur, R__free))): (set_pair_RA)) ∗
+      ⌜ role_enabled_model (ρlg: Rl) lb ∧ R__cur = {[ ρ_lib (ρlg := ρlg) ]} ∧ R__free = {[ ρ_cl]}  ∨ 
+        ¬ role_enabled_model (ρlg: Rl) lb ∧ R__cur = {[ ρ_cl ]} ∧ R__free = {[ ρ_lib (ρlg := ρlg)]}⌝.
+
+End AuxDefs.
+
+Section ClientDefs.
+  (* Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cG: clientGS Σ}. *)
+  Context {lib: LibInterface} {ρlg: fmrole libM}.
+  Let LM__cl := client_model (ρlg := ρlg).
+  Let M__cl := client_model_impl (ρlg := ρlg).
+  Context `{EM: ExecutionModel heap_lang M__G} `{@heapGS Σ _ EM} {cG: clientGS Σ (ρlg := ρlg)}.
+  
+  (* Notation "'lib_inn_role'" := (fmrole lib_model_impl). *)
+  (* Notation "'lib_inn_state'" := (fmstate lib_model_impl). *)
+  (* Notation "'lib_state'" := (fmstate lib_fair). *)
+  Let ST := fmstate M__cl.
+  Let R := fmrole M__cl.
+
+  Let STl := fmstate libM.
+  Let Rl := fmrole libM. 
+
+  Definition y_auth_model_is (y: nat): iProp Σ :=
+    own (@cl_y_st_name _ _ _ cG) (● Excl' y).
+
+  Definition y_frag_model_is (y: nat): iProp Σ :=
+    own (@cl_y_st_name _ _ _ cG) (◯ Excl' y).
+
+  Let lg := @libGSΣ _ _ _ cG.
+
+  Definition client_inv_impl (st: ST) : iProp Σ :=
+    let (lb, y) := st in
+    partial_model_is st (LM := LM__cl) ∗
+    y_auth_model_is y ∗
+    (* model_state_interp lb (fG := cl_lib_Σ) ∗ *)
+    lib_msi lb (libGS0 := lg) ∗
+    tracked cl_tracker_name (sets_corr cl_set_pair_name lb). 
+
+  Definition Ns := nroot .@ "client".
+
+  (* Definition client_inv: iProp Σ := *)
+  (*   inv Ns (∃ (st: ST), client_inv_impl st). *)
+  Definition client_inv_WIP: iProp Σ :=
+    ∃ (st: ST), client_inv_impl st.
+
+End ClientDefs.
 
 Section ClientSpec.
-  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
-  Context {relies_on: locale heap_lang -> locale heap_lang -> iProp Σ}. 
-  Notation " τ '⤞' g" := (relies_on τ g) (at level 20). 
+  Context (lib: LibInterface) (ρlg: fmrole libM).
+  Let LM__cl := client_model (ρlg := ρlg). 
+  Let M__cl := client_model_impl (ρlg := ρlg). 
+  Let ST := fmstate M__cl.
+  Let R := fmrole M__cl.
+  Let STl := fmstate libM.
+  Let Rl := fmrole libM. 
 
+  Instance LFP__cl: LMFairPre LM__cl.
+  Proof. Admitted.
+  Definition FM__cl := LM_Fair (LF := LFP__cl). 
+
+  Context `{EM: ExecutionModel heap_lang M__G} `{@heapGS Σ _ EM} {cpG: clientPreGS Σ (ρlg := ρlg)}.
 
   Definition client: val :=
   λ: <>,
@@ -33,56 +103,57 @@ Section ClientSpec.
     Skip
   .
 
-  (* Notation "'PMP'" := (fun Einvs => (PartialModelPredicates Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS))). *)
-  Notation "'LSG' Einvs" := (LM_steps_gen Einvs (EM := EM) (iLM := client_model) (PMPP := PMPP) (eGS := heap_fairnessGS) (relies_on := relies_on)) (at level 10).
+  (* (* TODO: move to library, weaken Σ requirement *) *)
+  (* Lemma lib_premise `{clientGS Σ} (lb: lm_ls (lib_model lib_gs)) *)
+  (*   (LB_INFO: lib_ls_premise lib_gs lb): *)
+  (*   ⊢ (frag_model_is (ls_under lb) -∗ frag_fuel_is (ls_fuel lb) -∗ frag_mapping_is (ls_tmap lb) -∗ *)
+  (*   frag_model_is (1: fmstate lib_model_impl) ∗ frag_mapping_is {[ρlg := {[ρl]}]} ∗ frag_fuel_is {[ρl := lm_fl (lib_model lib_gs) lb]})%I. *)
+  (* Proof. *)
+  (*   iIntros "LST LF LM". *)
+  (*   destruct LB_INFO as (LIBF & -> & LIBM). *)
+  (*   iFrame "LST". iSplitL "LM". *)
+  (*   { rewrite -frag_mapping_is_big_sepM. *)
+  (*     2: { intros E. by rewrite E in LIBM. } *)
+  (*     erewrite big_opM_insert_delete'; eauto. *)
+  (*     iDestruct "LM" as "[??]". iFrame. } *)
+  (*   rewrite -frag_fuel_is_big_sepM. *)
+  (*   2: { intros E. by rewrite E in LIBF. } *)
+  (*   erewrite big_opM_insert_delete'; eauto. *)
+  (*   iDestruct "LF" as "[??]". iFrame. *)
+  (* Qed. *)
 
-  (* TODO: move to library, weaken Σ requirement *)
-  Lemma lib_premise `{clientGS Σ} (lb: lm_ls (lib_model lib_gs))
-    (LB_INFO: lib_ls_premise lib_gs lb):
-    ⊢ (frag_model_is (ls_under lb) -∗ frag_fuel_is (ls_fuel lb) -∗ frag_mapping_is (ls_tmap lb) -∗
-    frag_model_is (1: fmstate lib_model_impl) ∗ frag_mapping_is {[ρlg := {[ρl]}]} ∗ frag_fuel_is {[ρl := lm_fl (lib_model lib_gs) lb]})%I.
-  Proof.
-    iIntros "LST LF LM".
-    destruct LB_INFO as (LIBF & -> & LIBM).
-    iFrame "LST". iSplitL "LM".
-    { rewrite -frag_mapping_is_big_sepM.
-      2: { intros E. by rewrite E in LIBM. }
-      erewrite big_opM_insert_delete'; eauto.
-      iDestruct "LM" as "[??]". iFrame. }
-    rewrite -frag_fuel_is_big_sepM.
-    2: { intros E. by rewrite E in LIBF. }
-    erewrite big_opM_insert_delete'; eauto.
-    iDestruct "LF" as "[??]". iFrame.
-  Qed.
+  (* Let lg := @libGSΣ _ _ _ cG. *)
+  (* Let tk := cl_tracker_name _ _ (clientGS := cG).  *)
 
-  Lemma init_client_inv lb0 n:
-    partial_model_is (lb0, n)  ={∅}=∗
-    ∃ (cG: clientGS Σ), client_inv ∗
-                        frag_fuel_is (ls_fuel lb0) (fG := cl_lib_Σ) ∗
-                        frag_mapping_is (ls_tmap lb0) (fG := cl_lib_Σ)∗
-                        frag_model_is lb0 (fG := cl_lib_Σ)∗
-                        frag_free_roles_are ∅ (fG := cl_lib_Σ)∗
-                        y_frag_model_is n.
-  Proof using cpG.
+  Lemma init_client_inv n:
+    partial_model_is (lib_st0, n) ==∗
+    ∃ (cG: clientGS Σ),
+      client_inv_WIP (cG := cG) ∗ y_frag_model_is n ∗ 
+      lib_post ρlg (libGS0 := libGSΣ) ∗ own (cl_tracker_name (ρlg := ρlg)) (◯E tr_free). 
+  Proof using.
     iIntros "ST".
         
-    iMod (lm_msi_init lb0 ∅) as (fG) "(MSI_LIB & FRAG_LIB & FRAG_MAP & FRAG_FUEL & FRAG_FR)".
-    { set_solver. }
+    unshelve iMod (lib_init $! ρlg) as (l) "(MSI_LIB & POST)".
+    { apply cpG. }
 
     iMod (own_alloc ((● (Excl' n) ⋅ ◯ _))) as (γ_st) "[AUTH_Y FRAG_Y]".
     { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
 
-    set (cG := {|
-                cl_pre_inG := cpG;
-                cl_y_st_name := γ_st;
-                cl_lib_Σ := fG;
-              |}).
  
-    iMod (inv_alloc Ns _  (∃ st, client_inv_impl st) with "[-FRAG_LIB FRAG_Y FRAG_MAP FRAG_FR FRAG_FUEL]") as "#INV".
-    { iNext. rewrite /client_inv_impl.
-      iExists (_, _). iFrame. }
+    (* iMod (inv_alloc Ns _  (∃ st, client_inv_impl st) with "[-FRAG_LIB FRAG_Y FRAG_MAP FRAG_FR FRAG_FUEL]") as "#INV". *)
+    (* { iNext. rewrite /client_inv_impl. *)
+    (*   iExists (_, _). iFrame. } *)
+    
+    iMod (own_alloc ((● (Excl' (∅, ∅)) ⋅ ◯ _): set_pair_RA)) as (γ_s) "[AUTH_S FRAG_S]".
+    { apply auth_both_valid_discrete. split; [| done]. reflexivity. }
 
-    iModIntro. iExists _. iFrame. done.
+    iMod (init_tracker (sets_corr γ_s lib_st0)) as (γ_t) "[AUTH_TR FRAG_TR]".
+
+    iModIntro. 
+    unshelve iExists ({| cl_y_st_name := γ_st; cl_tracker_name := γ_t;
+                         cl_set_pair_name := γ_s; |}); auto.
+    iFrame. rewrite /client_inv_WIP.
+    iExists (_, _). rewrite /client_inv_impl. iFrame.
   Qed.
 
 
@@ -91,58 +162,135 @@ Section ClientSpec.
   (* Lemma fuel_reorder_preserves_client_LSI: *)
   (*   fuel_reorder_preserves_LSI (LSI := client_LSI).  *)
   Lemma fuel_reorder_preserves_client_LSI:
-    @fuel_reorder_preserves_LSI (locale heap_lang) _ _ client_model_impl client_LSI.
+    @fuel_reorder_preserves_LSI (locale heap_lang) _ _
+      (client_model_impl (ρlg := ρlg)) client_LSI.
   Proof.
-    red. rewrite /client_LSI. intros * EQ1 EQ2 EQ3.
-    intros ? LSI1 IN2. rewrite <- EQ2. auto. 
+    done. 
+    (* red. rewrite /client_LSI. intros * EQ1 EQ2 EQ3. *)
+    (* intros ? LSI1 IN2. rewrite <- EQ2. auto.  *)
   Qed.
 
   Lemma client_LSI_fuel_independent:
-    (* @LSI_fuel_independent (LSI := client_LSI). *)
-    @LSI_fuel_independent (locale heap_lang) _ _ client_model_impl client_LSI.
+    @LSI_fuel_independent (locale heap_lang) _ _ 
+      (client_model_impl (ρlg := ρlg)) client_LSI.
   Proof.
-    red. rewrite /client_LSI. intros.
-    set_solver.
+    done. 
+    (* red. rewrite /client_LSI. intros. *)
+    (* set_solver. *)
   Qed.
 
-  (* TODO: move, remove duplicates  *)
-  Ltac pure_step FS indep :=
-    try rewrite sub_comp;
-    iApply wp_lift_pure_step_no_fork; auto;
-    [apply indep| ..];
-    [| iSplitR; [done| ]; do 3 iModIntro; iFrame "RON"; iSplitL "FUELS"];
-    [| solve_fuels_S FS |];
-    [solve_map_not_empty| ];
-    iIntros "RON FUELS"; simpl; try rewrite sub_comp.
+  (* (* TODO: move, remove duplicates  *) *)
+  (* Ltac pure_step FS indep := *)
+  (*   try rewrite sub_comp; *)
+  (*   iApply wp_lift_pure_step_no_fork; auto; *)
+  (*   [apply indep| ..]; *)
+  (*   [| iSplitR; [done| ]; do 3 iModIntro; iFrame "RON"; iSplitL "FUELS"]; *)
+  (*   [| solve_fuels_S FS |]; *)
+  (*   [solve_map_not_empty| ]; *)
+  (*   iIntros "RON FUELS"; simpl; try rewrite sub_comp. *)
 
-  Lemma client_spec (Einvs: coPset) (lb0: fmstate lf) f
+  Let msi: fmstate FM__cl -> iProp Σ := model_state_interp (LM := LM__cl).
+  Let lr (δ: fmstate FM__cl) := dom (ls_tmap δ). 
+  Definition CWP := @cwp _ _ EM _ heap_fairnessGS _ msi lr _. 
+  
+  Lemma cl_impl_lift:
+  ∀ (δ1 δ2: fmstate FM__cl) (g0 : locale heap_lang) (R2 : gset
+                                                     (fmrole client_model_impl)),
+    locale_trans δ1 g0 δ2 (LM := LM__cl) → ls_tmap δ2 = <[g0:=R2]> (ls_tmap δ1) → lr δ2 ⊆ lr δ1.
+  Proof using.
+    clear dependent Σ. 
+    intros ???? STEP TM.
+    apply locale_trans_dom in STEP.
+    rewrite /lr. rewrite TM dom_insert_L. set_solver.
+  Qed. 
+
+  Local Ltac pure_step FS indep :=
+    try rewrite sub_comp;
+    iApply (cwp_model_sswp_step with "[] [FUELS] [-]");
+    [done| ..];
+    [iApply fuel_keep_step_local_rule;
+     apply cl_impl_lift| ..];
+    [iNext; iApply bi.sep_assoc; iSplit;
+      [| solve_fuels_S FS];
+      iPureIntro; split; [| apply indep];
+      set_solver| ];
+    simpl. 
+
+  (* TODO: rename sets of invariants *)
+  Lemma client_spec s E (Einvs: coPset) g f
     (FB: f >= client_fl)
     (* TODO: get rid of these restrictions *)
     (DISJ_INV1: Einvs ## ↑Ns)
+    (INV_SUB: Einvs ⊆ E)
     (* (DISJ_INV2: Einvs ## ↑nroot.@"spinlock"): *)
-    
-    (* (LB0_INFO: lib_ls_premise lb0) *)
-    (LB0_INFO: lm_is_stopped ρlg lb0)
     :
-    LSG Einvs -∗
-    {{{ partial_model_is (lb0, 3)  ∗
-        partial_free_roles_are {[ ρ_lib; ρ_ext ]} ∗
-        0 ⤞ 0 ∗
-        has_fuels 0 {[ ρ_cl := f ]} (PMPP := PMPP)  }}}
-      client #() @ 0
-    {{{ RET #(); 0 ⤞ 0 ∗ partial_mapping_is {[ 0 := ∅ ]} }}}.
+    (* {{{ partial_model_is (lb0, 3)  ∗ *)
+    (*     partial_free_roles_are {[ ρ_lib; ρ_ext ]} ∗ *)
+    (*     has_fuels 0 {[ ρ_cl := f ]} (PMPP := PMPP)  }}} *)
+    (*   client #() @ 0 *)
+    (* {{{ RET #(); partial_mapping_is {[ 0 := ∅ ]} }}}. *)
+    ⊢ (□ ∀ Φ,
+      (partial_model_is (lib_st0, 3) ∗ 
+       partial_free_roles_are {[ ρ_lib (ρlg := ρlg); ρ_ext (ρlg := ρlg) ]} ∗
+       has_fuels g {[ ρ_cl := f ]}) -∗
+      ▷ (∀ y, partial_mapping_is {[ g := ∅ ]} -∗ Φ y) -∗
+      CWP (client #()) Φ s E Einvs 0 g).
   Proof using cpG.
     unfold client_fl in *.
-    iIntros "#PMP" (Φ) "!> (ST & FREE & RON & FUELS) POST". rewrite /client.
+    iIntros "!> %Φ (ST & FREE & FUELS) POST". rewrite /client.
 
     rewrite (sub_0_id {[ _ := _ ]}).
-    assert (fuels_ge ({[ρ_cl := f]}: gmap (fmrole client_model_impl) nat) 10) as FS.
+    assert (fuels_ge ({[ρ_cl := f]}: gmap (fmrole M__cl) nat) 10) as FS.
     { red. intros ??[<- ->]%lookup_singleton_Some. lia. }
 
-    iPoseProof (LM_steps_gen_nofork_sub with "PMP") as "PMP'".
-    pure_step FS client_LSI_fuel_independent.
+    (* pure_step FS client_LSI_fuel_independent. *)
+    (* Ltac pure_step FS indep := *)
+    pure_step FS client_LSI_fuel_independent.    
+    iApply sswp_pure_step; [done| ].
+    iNext. iIntros "FUELS". simpl.
 
-    wp_bind (ref _)%E.
+    (* TODO: replace with iMod *)
+    iApply (cwp_elim_bupd with "[-ST]"). 
+    2: { iApply (init_client_inv with "ST"). }
+    iIntros "[%cg (INV_CL & Y_FRAG & LIB_POST & TRACK)]".
+    
+
+    cwp_bind (ref #2)%E.
+
+    (* TODO: replace with invariant opening *)
+    rewrite /client_inv_WIP /client_inv_impl.
+    iDestruct "INV_CL" as ((δ & y)) "(ST & Y & LIB_MSI & TK)".
+
+    iAssert (⌜y = 3⌝)%I as %->.
+    { admit. } 
+    
+    try rewrite sub_comp.    
+    iApply (cwp_model_sswp_step with "[] [ST FUELS FREE] [-]");
+    [done| ..];
+    [ iApply model_step_local_rule; 
+      apply cl_impl_lift| ..].
+    {
+      (* iNext; iFrame "ST FUELS FREE"; iPureIntro. *)
+
+      iNext. iFrame "FUELS FREE". rewrite !bi.sep_assoc. iSplitR "ST".
+      2: { rewrite /partial_model_is.
+           (* Set Printing Implicit. *)
+      
+      
+      do 6 (try split).
+      5: by econstructor.
+      Unshelve.
+      8: exact ({[ ρ_cl; ρ_cl ]}).
+      7: exact ({[ ρ_ext (ρlg := ρlg) := client_fl ]}).
+      2-4: set_solver.
+      { rewrite live_roles_2 live_roles_3. set_solver. 
+    [iNext; iApply bi.sep_assoc; iSplit;
+      [| solve_fuels_S FS];
+      iPureIntro; split; [| apply indep];
+      set_solver| ];
+    simpl.     
+    
+
     iApply (wp_alloc_nostep with "[$] [RON FUELS]").
     { apply client_LSI_fuel_independent. }
     2: { solve_fuels_S FS. }
@@ -205,7 +353,7 @@ Section ClientSpec.
     pose proof (live_roles_1 lb') as LIVE1.
     rewrite decide_True in LIVE1.
     2: { apply lib_premise_dis. by apply lib_reset_premise. }
-           
+    
     iApply (wp_lift_pure_step_no_fork_take_step_stash).
     { done. }
     (* { reflexivity. } *)
@@ -282,18 +430,17 @@ Section ClientSpec.
                                                                                         (* wp_bind (Rec _ _ (_ ;; _) _). *)
     (* Unset Printing Notations. *)
                                                                                         
-    wp_bind (Rec BAnon BAnon (RecV BAnon BAnon (LitV LitUnit) (LitV LitUnit))
-             (Store (LitV l) (LitV 0%Z))). 
-                                                                                        (Rec BAnon BAnon
-          (Rec BAnon BAnon (RecV BAnon BAnon (LitV LitUnit) (LitV LitUnit))
-             (Store (LitV l) (LitV 0%Z))) (LitV LitUnit))
-    red. simpl. red. simpl. red. 
+    (* wp_bind (Rec BAnon BAnon (RecV BAnon BAnon (LitV LitUnit) (LitV LitUnit)) *)
+    (*          (Store (LitV l) (LitV 0%Z))).  *)
+    (*                                                                                     (Rec BAnon BAnon *)
+    (*       (Rec BAnon BAnon (RecV BAnon BAnon (LitV LitUnit) (LitV LitUnit)) *)
+    (*          (Store (LitV l) (LitV 0%Z))) (LitV LitUnit)) *)
+    (* red. simpl. red. simpl. red.  *)
 
-
-
-
-
-
+    iApply wp_atomic.
+    { admit. }
+    iInv Ns as ((lb, y)) "inv" "CLOS". rewrite {1}/client_inv_impl.
+    iDestruct "inv" as "(>ST & >YST_AUTH & > inv')".
 
 
 

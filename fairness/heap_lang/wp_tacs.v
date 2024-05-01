@@ -1,8 +1,8 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness Require Import utils.
+From trillium.fairness Require Import utils resources.
 From iris.bi Require Import bi.
-From trillium.fairness.heap_lang Require Export lang proofmode_lsi.
+From trillium.fairness.heap_lang Require Export lang.
 
 Close Scope Z_scope. 
 
@@ -35,14 +35,14 @@ Ltac solve_fuels_S FS :=
 
 Ltac solve_map_not_empty := intros ?MM%fmap_empty_iff; try rewrite -insert_empty in MM; try apply insert_non_empty in MM; set_solver.
 
-Ltac pure_step_impl FS indep :=
-  try rewrite sub_comp;
-  iApply wp_lift_pure_step_no_fork; auto;
-  [apply indep| ..];
-  [| iSplitR; [done| ]; do 3 iModIntro; iSplitL "FUELS"];
-  [| solve_fuels_S FS |];
-  [solve_map_not_empty| ];
-  iIntros "FUELS"; simpl; try rewrite sub_comp.
+(* Ltac pure_step_impl FS indep := *)
+(*   try rewrite sub_comp; *)
+(*   iApply wp_lift_pure_step_no_fork; auto; *)
+(*   [apply indep| ..]; *)
+(*   [| iSplitR; [done| ]; do 3 iModIntro; iSplitL "FUELS"]; *)
+(*   [| solve_fuels_S FS |]; *)
+(*   [solve_map_not_empty| ]; *)
+(*   iIntros "FUELS"; simpl; try rewrite sub_comp. *)
 
-Ltac pure_step FS indep :=
-  pure_step_impl FS indep. 
+(* Ltac pure_step FS indep := *)
+(*   pure_step_impl FS indep.  *)

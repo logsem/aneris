@@ -1,75 +1,109 @@
 From iris.proofmode Require Import tactics.
-From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import resources.
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import notation heap_lang_defs.
 From iris.base_logic.lib Require Import invariants.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth auth gmap gset excl.
 From iris.bi Require Import bi.
-From trillium.fairness Require Import lm_fair. 
+From trillium.fairness Require Import lm_fair fairness fuel. 
 From trillium.fairness.ext_models Require Import ext_models.
-From trillium.fairness.examples.comp Require Import lib lib_ext tracker.
+From trillium.fairness.examples.comp Require Import tracker lib_interface.
 From trillium.fairness.heap_lang Require Export lang.
 
 Close Scope Z_scope.
 
 Section ClientDefs.
 
-  Definition lib_gs: gset lib_grole := {[ ρlg ]}.
+  (* Definition lib_gs: gset lib_grole := {[ ρlg ]}. *)
 
-  Lemma lib_gs_ne: lib_gs ≠ ∅.
-  Proof. done. Qed.
-  Lemma ρlg_in_lib_gs: ρlg ∈ lib_gs.
-  Proof. done. Qed. 
+  (* Lemma lib_gs_ne: lib_gs ≠ ∅. *)
+  (* Proof. done. Qed. *)
+  (* Lemma ρlg_in_lib_gs: ρlg ∈ lib_gs. *)
+  (* Proof. done. Qed.  *)
 
-  Definition lf := lib_fair _ lib_gs_ne.
+  (* Definition lf := lib_fair _ lib_gs_ne. *)
+  (* Context (lf: FairModel).  *)
+  Context {lib: LibInterface}. 
 
-  Let lib_st := fmstate lf.
-  (* Let lib_role := fmrole lib_fair. *)
-  Let lib_erole := @ext_role _ (@ExtLibLM _ lib_gs_ne). 
+  Let lib_st := fmstate libM.
+  Let lib_role := fmrole libM.
+
+  (* Let lib_erole := @ext_role _ (@ExtLibLM _ lib_gs_ne).  *)
+  Let lib_erole := @ext_role libM (fmrole libM).
 
   Definition client_state: Type := lib_st * nat.
 
   Inductive y_role := ρy.
   Definition client_role: Type := lib_erole + y_role.
 
+  Context {ρlg: fmrole libM}. 
+
   Definition ρ_cl: client_role := inr ρy.
   Definition ρ_lib: client_role := inl $ inl ρlg.
-  Definition ρ_ext: client_role := inl $ inr $ env (eiG ρlg) (EM := (@ExtLibLM _ lib_gs_ne)). 
-  
+  Definition ρ_ext: client_role := inl $ inr $ env ρlg.
+
   Inductive client_trans: client_state -> option client_role -> client_state -> Prop :=
   | ct_y_step_3 lb:
     client_trans (lb, 3) (Some ρ_cl) (lb, 2)
   (* TODO: allow arbitrary library's LM roles *)
-  | ct_lib_ext lb (STOP: lm_is_stopped ρlg lb):
-    client_trans (lb, 2) (Some ρ_ext) (reset_lm_st ρlg lb ρlg_in_lib_gs, 1)
-  | ct_lib_step lb1 lb2 (LIB_STEP: fmtrans lf lb1 (Some ρlg) lb2):
+  | ct_lib_ext lb lb'
+      (* (STOP: ¬ role_enabled_model ρlg lb) *)
+      (RESET: reset_lib ρlg lb lb')
+    :
+    client_trans (lb, 2) (Some ρ_ext) (lb', 1)
+  | ct_lib_step lb1 lb2 (LIB_STEP: fmtrans _ lb1 (Some ρlg) lb2):
     client_trans (lb1, 1) (Some ρ_lib) (lb2, 1)
-  | ct_y_step_1 (lb: fmstate lf)
+  | ct_y_step_1 (lb: fmstate libM)
                 (* (LIB_NOSTEP: 0 ∉ live_roles _ lb) *)
                 (* (LIB_NOROLES: ls_tmap lb !! ρlg = Some ∅) *)
-                (LIB_STOP: ¬ role_enabled_model (ρlg: fmrole lf) lb)
+                (LIB_STOP: ¬ role_enabled_model (ρlg: fmrole libM) lb)
     :
     client_trans (lb, 1) (Some ρ_cl) (lb, 0)
   .
 
-  Global Instance lib_role_EqDec: EqDecision lib_erole.
-  Proof. solve_decision. Defined.
-  Global Instance lib_role_Cnt: Countable lib_erole.
-  Proof using.
-    rewrite /lib_erole. simpl. apply _.
-  Defined.
+
+  (* Instance sum_EqDec `{EqDecision A} `{EqDecision B}: *)
+  (*   EqDecision (A + B). *)
+  (* Proof. *)
+  (*   solve_decision. *)
+  (* Defined. *)
+
+  (* Global Instance lib_role_EqDec: EqDecision lib_erole. *)
+  (* Proof using. *)
+  (*   unshelve eapply sum_eq_dec.  *)
+  (*   clear ρlg. *)
+  (*   destruct lib. destruct libM0. solve_decision. *)
+  (* Defined. *)
+
+  (* Global Instance lib_role_Cnt: Countable lib_erole. *)
+  (* Proof using. *)
+  (*   rewrite /lib_erole. *)
+  (*   rewrite /ext_role. *)
+  (*   unshelve eapply sum_countable; eauto. *)
+  (*   apply env_role_cnt.  *)
+  (*   simpl. *)
+  (*   pose proof (@libM lib). destruct X.     *)
+  (*   apply _.  *)
+  (*   destruct lib. apply _. *)
+  (* Defined. *)
   
   Instance y_EqDec: EqDecision y_role.
   Proof. by (solve_decision). Qed.
 
+  Instance client_role_EqDec: EqDecision client_role.
+  Proof.
+  (*   solve_decision. *)
+  (* Defined. *)
+  Admitted. 
+
   Global Instance client_role_Cnt: Countable client_role.
   Proof using.
-    rewrite /client_role.
-    unshelve eapply sum_countable.
-    eauto. eapply (inj_countable' (fun _ => ()) (fun _ => ρy)).
-    by destruct x.
-  Qed.
+  (*   rewrite /client_role. *)
+  (*   unshelve eapply sum_countable; eauto.  *)
+  (*   eauto. eapply (inj_countable' (fun _ => ()) (fun _ => ρy)). *)
+  (*   by destruct x. *)
+  (* Qed. *)
+  Admitted. 
 
   (* Instance lib_step_dec (st: client_state) (ρ: client_role) st': *)
   (*   Decision (client_trans st (Some ρ) st'). *)
@@ -99,29 +133,32 @@ Section ClientDefs.
     destruct st as [δ_lib n]. destruct n; [| destruct n]; [..| destruct n]; [..| destruct n]. 
     - by nostep. 
     - destruct ρ.
-      + destruct l.
+      + destruct l as [l| ].
         2: by nostep. 
-        destruct f.
-        pose proof (@lib_LF _ lib_gs_ne). (* why it's not inferred anymore? *)
-        destruct (decide (exists δ'_lib, locale_trans δ_lib () δ'_lib (LM := lib_model lib_gs))).
-        ** left. destruct e. eexists. econstructor. simpl. eauto.
-        ** nostep. simpl in LIB_STEP. eauto. 
+        (* destruct f. *)
+        (* pose proof (@lib_LF _ lib_gs_ne). (* why it's not inferred anymore? *) *)
+        destruct (decide (l = ρlg)) as [-> | ?].
+        2: { nostep. eauto. }
+        destruct (lib_step_ex_dec δ_lib ρlg) as [STEP | NOSTEP].
+        * left. destruct STEP. eexists. econstructor. eauto. 
+        * nostep. simpl in LIB_STEP. eauto. 
       + destruct y.
-        destruct (decide (role_enabled_model (ρlg: fmrole lf) δ_lib)).
+        destruct (decide (role_enabled_model (ρlg: fmrole libM) δ_lib)).
         2: { left. eexists. by constructor. }
         by nostep. 
     - destruct ρ; [destruct l| ]. 
       1, 3: by nostep. 
-      destruct e. destruct (decide (i ∈ active_exts δ_lib)).
-      + left. destruct i. 
+      destruct e.
+      destruct (decide (i = ρlg)) as [-> | ?]. 
+      2: { nostep. eauto. }
+      destruct (decide (ρlg ∈ active_exts δ_lib (ExtModel := libEM))).
+      + left. 
         apply active_exts_spec in e as [??]. simpl in *. 
-        eexists. destruct ρlg. 
+        eexists. 
         eapply ct_lib_ext; eauto.
-        apply H.
       + nostep. subst. apply n. apply active_exts_spec.
         inversion T. subst. simpl.
         eexists. red. eauto.
-        Unshelve. apply ρlg_in_lib_gs. 
     - destruct ρ.
       + nostep.
       + destruct y. left. eexists. constructor.
@@ -144,15 +181,14 @@ Section ClientDefs.
   Qed.
 
   Definition client_model_impl: FairModel.
-  Proof.
+  Proof using ρlg lib_st lib_role lib_erole lib.
     refine ({|
         fmstate := client_state; 
         fmrole := client_role;
         fmtrans := client_trans;
         live_roles := client_lr;
     |}).
-    - pose proof (@LS_eqdec _ _ _ _ _ _ (@lib_LF _ lib_gs_ne)). (* not inferred? *)
-      solve_decision.       
+    - pose proof (fmstate_eqdec libM). solve_decision. 
     - intros. eapply client_lr_spec; eauto. 
   Defined.
 
@@ -173,22 +209,21 @@ Section ClientDefs.
          intros [? STEP]. inversion STEP. }
     rewrite union_empty_r. 
 
-    destruct (decide (ρlg ∈ live_roles lf lb)) as [LR | LR].
-    - pose proof (LM_live_role_map_notempty _ _ LR) as (?&MAP&?).
-      erewrite filter_singleton, filter_singleton_not, decide_True.
+    destruct (decide (ρlg ∈ live_roles libM lb)) as [LR | LR].
+    - (* pose proof (LM_live_role_map_notempty _ _ LR) as (?&MAP&?). *)
+      erewrite filter_singleton, filter_singleton_not. 
       + set_solver.
-      + eauto.
       + rewrite bool_decide_eq_false_2; [done| ].
         intros [? STEP]. inversion STEP. subst. set_solver.
       + rewrite bool_decide_eq_true_2; [done| ].
-        eapply LM_live_roles_strong in LR as [? ?]. eauto.
-        eexists. eapply ct_lib_step. simpl. eauto.
-    - rewrite filter_singleton_not; [rewrite decide_False| ].
-      2: { intros [DOM LIVE]%elem_of_filter.
-           eapply LM_live_roles_strong in DOM. done. }
+        apply lib_strong_lr in LR as [? ?]. 
+        eexists. eapply ct_lib_step. eauto.
+    - rewrite filter_singleton_not.
+      (* 2: { intros [DOM LIVE]%elem_of_filter. *)
+      (*      eapply LM_live_roles_strong in DOM. done. } *)
       2: { rewrite bool_decide_eq_false_2; [done| ].
            intros [? STEP]. inversion STEP. subst. simpl in LIB_STEP.
-           destruct LR. apply LM_live_roles_strong. eauto. }
+           destruct LR. apply lib_strong_lr. eauto. }
       rewrite filter_singleton; [set_solver| ].
       apply bool_decide_eq_true_2. eauto.
       eexists. by econstructor.
@@ -221,7 +256,7 @@ Section ClientDefs.
 
   Lemma live_roles_2 lb:
     live_roles client_model_impl (lb, 2) =
-    if (decide (lm_is_stopped ρlg lb (NE := lib_gs_ne)))
+    if (decide (¬ role_enabled_model ρlg lb))
     then {[ ρ_ext ]}
     else ∅.
   Proof.
@@ -233,14 +268,15 @@ Section ClientDefs.
     intros [? STEP]; by inversion STEP.
     rewrite !union_empty_l.
 
-    unshelve erewrite set_filter_equiv with (P2 := fun r => r = ρ_ext /\ lm_is_stopped ρlg lb).
-    5: reflexivity.
-    { apply lib_gs_ne. }
+    unshelve erewrite set_filter_equiv with (P2 := fun r => r = ρ_ext /\ ¬ role_enabled_model ρlg lb).
+    4: reflexivity.
     2: { intros. rewrite bool_decide_eq_true.
          split.
          - intros [? STEP]. inversion STEP. subst. split; eauto.
-         - intros [-> STOP]. exists ((reset_lm_st ρlg lb ρlg_in_lib_gs), 1).
-           by econstructor. }
+           intros EN%lib_reset_dom; auto. red. eauto.
+         - intros [-> STOP].
+           apply lib_reset_dom in STOP as [lb' STEP].
+           eexists. econstructor; eauto. }
 
     rewrite -set_filter_and set_filter_comm.
     erewrite set_filter_equiv.
@@ -251,10 +287,12 @@ Section ClientDefs.
     Unshelve. intros. solve_decision. 
   Qed. 
 
-  Definition client_LSI (s: client_state)
+  Definition client_LSI 
+    (s: fmstate client_model_impl)
     (tm: groups_map (M := client_model_impl) (G := locale heap_lang))
-    (_: gmap (fmrole client_model_impl) nat) :=
-    forall gi, (exists ρi, ls_mapping s.1 !! ρi = Some gi) -> inl $ inl gi ∈ mapped_roles tm.
+    (fm: gmap (fmrole client_model_impl) nat) :=
+    (* forall gi, (exists ρi, ls_mapping s.1 !! ρi = Some gi) -> inl $ inl gi ∈ mapped_roles tm. *)
+    LSI_True s tm fm. 
     
   Definition client_fl := 15. 
   Definition client_model: LiveModel (locale heap_lang) client_model_impl client_LSI :=
@@ -266,67 +304,19 @@ Section ClientDefs.
 
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
      cl_pre_y_st :> inG Σ (authUR (optionR (exclR natO)));
-     cl_lib_preΣ :> fairnessGpreS (lib_model lib_gs) Σ;
+     (* cl_LM_preΣ :> fairnessGpreS client_model Σ;  *)
+     cl_LMΣ :> fairnessGS client_model Σ; 
+     libGSPreΣ :> libGSPre Σ;
      cl_trackerΣ :> inG Σ trackerRA;
      cl_set_pairΣ :> inG Σ set_pair_RA;
   }.
 
   Class clientGS Σ := ClientGS {
-    cl_pre_inG :> clientPreGS Σ;
+    cl_pre_inG :> clientPreGS Σ;    
     cl_y_st_name : gname;
     cl_tracker_name : gname;
     cl_set_pair_name: gname;                          
-    cl_lib_Σ :> fairnessGS (lib_model lib_gs) Σ;                          
+    libGSΣ :> libGS Σ;
   }.
 
 End ClientDefs. 
-
-Section ClientRA.
-  Context `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} {cG: clientGS Σ}.
-  Context `{PMPP: @PartialModelPredicatesPre (locale heap_lang) _ _ Σ client_model_impl}.
-  
-  (* Notation "'lib_inn_role'" := (fmrole lib_model_impl). *)
-  (* Notation "'lib_inn_state'" := (fmstate lib_model_impl). *)
-  (* Notation "'lib_state'" := (fmstate lib_fair). *)
-  Let ST := fmstate client_model_impl.
-  Let R := fmrole client_model_impl.
-
-  Let STl := fmstate lf.
-  Let Rl := fmrole lf. 
-
-  Definition y_auth_model_is (y: nat): iProp Σ :=
-    own cl_y_st_name (● Excl' y).
-
-  Definition y_frag_model_is (y: nat): iProp Σ :=
-    own cl_y_st_name (◯ Excl' y).
-  
-  (* Definition lib_lifting (lb: lm_ls (lib_model lib_gs)): iProp Σ := *)
-  (*   (∃ (Ract Rfr: gset client_role), *)
-  (*        ( *)
-  (*           ⌜ default ∅ (ls_tmap lb !! ρlg) ≠ ∅ ⌝ ∗ ⌜ Ract = {[ ρ_lib ]} /\ Rfr = {[ ρ_cl ]} ⌝ ∗ (∃ f: nat, partial_fuel_is {[ ρ_lib := f ]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∨ *)
-  (*           ⌜ default ∅ (ls_tmap lb !! ρlg) = ∅ ⌝ ∗ ⌜ Ract = {[ ρ_cl ]} /\ Rfr = {[ ρ_lib ]} ⌝ ∗ partial_fuel_is {[ inr ρy := client_fl ]}) ∗ *)
-
-  (*       partial_mapping_is {[ τ := Ract ]} ∗  *)
-  (*       partial_free_roles_are Rfr ∗ *)
-  (*       y_frag_model_is 1). *)
-
-  Definition sets_corr (* (ρl: Rl) *) (* (st: ST) *) (lb: STl) : iProp Σ := 
-    ∃ (R__cur R__free: gset R), 
-      own cl_set_pair_name ((● (Excl' (R__cur, R__free))): set_pair_RA) ∗
-      ⌜ role_enabled_model (ρlg: Rl) lb ∧ R__cur = {[ ρ_lib ]} ∧ R__free = {[ ρ_cl]}  ∨ 
-        ¬ role_enabled_model (ρlg: Rl) lb ∧ R__cur = {[ ρ_cl]} ∧ R__free = {[ ρ_lib ]}⌝.
-
-  Definition client_inv_impl (st: client_state) : iProp Σ :=
-    let (lb, y) := st in
-    partial_model_is st ∗
-    y_auth_model_is y ∗
-    model_state_interp lb (fG := cl_lib_Σ) ∗
-    tracked cl_tracker_name (sets_corr lb). 
-
-  Definition Ns := nroot .@ "client".
-
-  Definition client_inv: iProp Σ :=
-    inv Ns (∃ (st: client_state), client_inv_impl st).
-
-End ClientRA.
-
