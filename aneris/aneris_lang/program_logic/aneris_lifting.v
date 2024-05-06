@@ -1183,4 +1183,38 @@ Section lifting_network.
     iNext. iIntros "Hsh". iExists _; iSplit; first done. iApply "HΦ"; iFrame.
   Qed.
 
+  Lemma aneris_wp_emit ip E tr v N (I: list val → Prop) :
+    ↑N ⊆ E →
+    I (tr ++ [v]) →
+    {{{ trace_is tr ∗ trace_inv N I }}}
+      Emit v @[ip] E
+    {{{ RET #(); trace_is (tr ++ [v]) }}}.
+  Proof.
+    iIntros (Hl HI Φ) "[Ht Hi] HΦ".
+    rewrite !aneris_wp_unfold /aneris_wp_def.
+    iIntros "%tid #Hin".
+    iApply (wp_emit with "[$]"); try done.
+    iNext.
+    iIntros "Htrace".
+    iExists _; iSplit; first done.
+    iApply "HΦ"; done.
+  Qed.
+
+  Lemma aneris_wp_fresh ip E tr v N (I: list val → Prop) :
+    ↑N ⊆ E →
+    (∀ (tag : string), tag ∉ tags tr → I (tr ++ [(#tag, v)%V])) →
+    {{{ trace_is tr ∗ trace_inv N I }}}
+      ast.Fresh v @[ip] E
+    {{{ (tag : string), RET #tag; trace_is (tr ++ [(#tag, v)%V]) ∗ ⌜tag ∉ tags tr⌝ }}}.
+  Proof.
+    iIntros (Hl HI Φ) "[Ht Hi] HΦ".
+    rewrite !aneris_wp_unfold /aneris_wp_def.
+    iIntros "%tid #Hin".
+    iApply (wp_fresh with "[$]"); try done.
+    iNext.
+    iIntros (tag) "Htrace".
+    iExists _; iSplit; first done.
+    iApply "HΦ"; done.
+  Qed.
+
 End lifting_network.

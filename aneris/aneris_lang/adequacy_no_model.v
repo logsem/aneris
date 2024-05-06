@@ -1,5 +1,5 @@
 From trillium Require Import finitary.
-From aneris.aneris_lang Require Import adequacy proofmode.
+From aneris.aneris_lang Require Import lang adequacy proofmode.
 From aneris.aneris_lang.program_logic Require Import aneris_adequacy.
 
 (** If we don't care about Trillium-style refinement we can always just pick the trivial model *)

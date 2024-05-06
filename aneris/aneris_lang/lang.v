@@ -132,7 +132,6 @@ Proof.
    | LitString s => inl (inr (inl (inl s)))
    | LitSocket s => inr (inl (inl (inl s)))
    | LitSocketAddress a => inr (inl (inl (inr a)))
-   | LitTag s => inr (inr (inl (inl s)))
    end) (λ l, match l with
    | inl (inl (inl (inl n))) => LitInt n
    | inl (inl (inl (inr b))) => LitBool b
@@ -146,10 +145,10 @@ Proof.
    | inr (inl (inl (inr a))) => LitSocketAddress a
    | inr (inl (inr (inl ()))) => LitUnit
    | inr (inl (inr (inr ()))) => LitUnit
-   | inr (inr (inl (inl s))) => LitTag s 
    | inr (inr (inl (inr ()))) => LitUnit
    | inr (inr (inr (inl ()))) => LitUnit
    | inr (inr (inr (inr ()))) => LitUnit
+   | inr (inr (inl (inl ()))) => LitUnit
    end)  _); by intros [].
 Qed.
 
@@ -885,7 +884,7 @@ Fixpoint tags (t: list val): list string :=
   | [] => []
   | v :: t =>
     match v with
-    | PairV (LitV (LitTag tag)) _ => [tag]
+    | PairV (LitV (LitString tag)) _ => [tag]
     | _ => []
     end ++ tags t
   end.
@@ -938,8 +937,8 @@ Inductive head_step : aneris_expr → state →
 | FreshStepS tag n v σ: 
     tag ∉ tags (state_trace σ) →
     head_step (mkExpr n (Fresh (Val v))) σ 
-              (mkExpr n (Val $ LitV (LitTag tag))) 
-              (σ <| state_trace := (state_trace σ) ++ [(PairV (LitV (LitTag tag)) v)] |>) [].
+              (mkExpr n (Val $ LitV (LitString tag))) 
+              (σ <| state_trace := (state_trace σ) ++ [(PairV (LitV (LitString tag)) v)] |>) [].
 
 Lemma aneris_to_of_val v : aneris_to_val (aneris_of_val v) = Some v.
 Proof. by destruct v. Qed.

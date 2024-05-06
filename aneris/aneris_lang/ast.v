@@ -37,8 +37,7 @@ Definition loc := positive. (* Really, any countable type. *)
 Inductive base_lit : Set :=
 | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitLoc (l : loc)
 | LitString (s : string)
-| LitSocket (s : socket_handle) | LitSocketAddress (s : socket_address)
-| LitTag (s : string).
+| LitSocket (s : socket_handle) | LitSocketAddress (s : socket_address).
 Inductive un_op : Set :=
 | NegOp | MinusUnOp | StringOfInt | IntOfString | StringLength.
 Inductive bin_op : Set :=

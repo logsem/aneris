@@ -2247,58 +2247,77 @@ Section primitive_laws.
     iApply ("HΦ" with "[$]").
   Qed.
 
-  (* Lemma wp_emit n k E ζ tr v N (I: list val → Prop) :
+  Lemma wp_emit n k E ζ tr v N (I: list val → Prop) :
     ↑N ⊆ E →
     I (tr ++ [v]) →
     {{{ trace_is tr ∗ trace_inv N I }}}
       (mkExpr n (Emit v)) @ k; ζ; E
     {{{ RET (mkVal n #()); trace_is (tr ++ [v]) }}}.
   Proof.
-    iIntros (Hι HI φ) "[Ht Hi] Hφ".
-
-    simpl.
-    iApply wp_lift_atomic_head_step.
-    
-    (* unfold trace_inv. *)
-
-    iInv "Hi" as ">Hi" "Hclose".
-
-    iDestruct "Hi" as (tr') "[Htr' _]".
-    iDestruct (trace_half_frag_agree with "Htr' Ht") as %->.
-    iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1 κ κs n) "(? & Hta & ?) !>"; iSplit; first by eauto.
-    iNext. iIntros (v2 σ2 efs Hstep); inv_head_step.
-    iDestruct (trace_agree with "Hta Ht") as %<-.
-    iMod (trace_add_event with "Hta Ht Htr'") as "(Hta&Ht&Htr')".
-    iModIntro. iFrame. iSplitL; last done.
-    iMod ("Hclose" with "[Htr']"). { iNext. eauto. }
-    iModIntro. by iApply "Hφ".
-  Qed.
-
-  Lemma wp_load n k E ζ l q v :
-    {{{ ▷ l ↦[n]{q} v }}}
-      (mkExpr n (Load #l)) @ k; ζ; E
-    {{{ RET (mkVal n v); l ↦[n]{q} v }}}.
-  Proof.
-    iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (Hl HI Φ) "[Ht Hi] HΦ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & Htrace) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
-    iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
-    { iPureIntro; do 3 eexists; eapply LocalStepS; eauto; eapply LoadS; eauto. }
-    iIntros (v2 σ2 efs Hstep).
+    { iPureIntro. do 3 eexists. apply EmitStepS; eauto. }
+    iIntros (v2 σ2 efs Hstep). 
     pose proof Hex as Htrig.
     eapply aneris_events_state_interp_no_triggered in Htrig;
       [|done|done|done|done|done].
-    inv_head_step. iNext.
-    rewrite insert_id //. rewrite insert_id //= in Htrig.
+    inv_head_step.
+    iNext.
+    iInv "Hi" as ">Hi" "Hclose".
+    iDestruct "Hi" as (tr') "[Htr' _]".
+    iDestruct (trace_half_frag_agree with "Htr' Ht") as %->.
+    iDestruct (trace_agree with "Htrace Ht") as %<-.
+    iMod (trace_add_event with "Htrace Ht Htr'") as "(Htrace & Ht & Htr')".
+    iMod ("Hclose" with "[Htr']"). 
+    { iNext. eauto. }
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
-    destruct σ; iFrame. iModIntro. iExists (trace_last atr), ().
+    iModIntro.
+    simplify_eq /=.
+    iExists _, ().
     rewrite -message_history_evolution_id Htrig; iFrame.
-    iSplit; [done|].
-    iSplit; [iPureIntro; apply user_model_evolution_id|].
-    iApply "HΦ"; done.
-  Qed. *)
+    iSplit; first done.
+    iSplitR "HΦ Ht"; [|by iApply "HΦ"].
+    iPureIntro; apply user_model_evolution_id.
+  Qed.
 
+  Lemma wp_fresh n k E ζ tr v N (I: list val → Prop) :
+    ↑N ⊆ E →
+    (∀ (tag : string), tag ∉ tags tr → I (tr ++ [(#tag, v)%V])) →
+    {{{ trace_is tr ∗ trace_inv N I }}}
+      (mkExpr n (ast.Fresh v)) @ k; ζ; E
+    {{{ (tag : string), RET (mkVal n #tag); trace_is (tr ++ [(#tag, v)%V]) ∗ ⌜tag ∉ tags tr⌝ }}}.
+  Proof.
+    iIntros (Hl HI Φ) "[Ht Hi] HΦ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & Htrace) !> /=".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    pose proof (infinite_is_fresh (tags (state_trace σ))).
+    iSplit.
+    { iPureIntro. do 3 eexists. apply FreshStepS; eauto. }
+    iIntros (v2 σ2 efs Hstep). 
+    pose proof Hex as Htrig.
+    eapply aneris_events_state_interp_no_triggered in Htrig;
+      [|done|done|done|done|done].
+    inv_head_step.
+    iNext.
+    iInv "Hi" as ">Hi" "Hclose".
+    iDestruct "Hi" as (tr') "[Htr' _]".
+    iDestruct (trace_half_frag_agree with "Htr' Ht") as %->.
+    iDestruct (trace_agree with "Htrace Ht") as %<-.
+    iMod (trace_add_event with "Htrace Ht Htr'") as "(Htrace & Ht & Htr')".
+    iMod ("Hclose" with "[Htr']"). 
+    { iNext. eauto. }
+    iMod (steps_auth_update_S with "Hauth") as "Hauth".
+    iModIntro.
+    simplify_eq /=.
+    iExists _, ().
+    rewrite -message_history_evolution_id Htrig; iFrame.
+    iSplit; first done.
+    iSplitR "HΦ Ht"; [iPureIntro; apply user_model_evolution_id|].
+    by iApply "HΦ"; iFrame.
+  Qed.
 
 End primitive_laws.
