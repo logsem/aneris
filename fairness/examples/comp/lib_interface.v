@@ -17,6 +17,7 @@ Section LibInterface.
       lib_step_ex_dec :> forall st ρ, Decision (exists st', fmtrans libM st (Some ρ) st');
       reset_lib := @ETs _ _ libEM;
       lib_reset_dom: forall ρ st, in_dom_rel (reset_lib ρ) st <-> ¬ role_enabled_model ρ st;
+      lib_reset_cod: forall ρ st, in_cod_rel (reset_lib ρ) st -> role_enabled_model ρ st;
       lib_strong_lr: FM_strong_lr libM;
 
       libGSPre: gFunctors -> Set;

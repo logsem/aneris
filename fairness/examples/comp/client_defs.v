@@ -302,10 +302,13 @@ Section ClientDefs.
     let setRA := gsetUR (fmrole client_model_impl) in 
     excl_authR (prodUR setRA setRA).
 
+  Class clientFairnessGS (Σ: gFunctors) := ClientFairnessGS {
+     cl_LMΣ :> fairnessGS client_model Σ;
+  }.
+
   Class clientPreGS (Σ: gFunctors) := ClientPreGS {
      cl_pre_y_st :> inG Σ (authUR (optionR (exclR natO)));
      (* cl_LM_preΣ :> fairnessGpreS client_model Σ;  *)
-     cl_LMΣ :> fairnessGS client_model Σ; 
      libGSPreΣ :> libGSPre Σ;
      cl_trackerΣ :> inG Σ trackerRA;
      cl_set_pairΣ :> inG Σ set_pair_RA;
