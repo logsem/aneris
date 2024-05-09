@@ -128,13 +128,163 @@ Section ModelLogic.
   Context {msi: fmstate M -> iProp Σ}. 
   Context {lifted_roles: fmstate M -> gset (fmrole M)}.
 
-  Let CWP := @cwp _ _ EM _ eGS _ msi lifted_roles _. 
+  Let CWP := @cwp _ _ EM _ eGS _ msi lifted_roles _.
+  Let lmu := @LMU _ _ msi lifted_roles. 
+
+  (* TODO: move *)
+  Lemma wand_proper (P1 Q1 P2 Q2: iProp Σ):
+    (P1 -∗ P2) -∗ (Q1 -∗ Q2) -∗ (P1 ∗ Q1 -∗ P2 ∗ Q2).
+  Proof.
+    iIntros "PP QQ [P Q]". iSplitL "PP P".
+    - iApply ("PP" with "P"). 
+    - iApply ("QQ" with "Q").
+  Qed. 
+
+  Lemma sswp_MU_wp_fupd s tid E ε__lift e Φ:
+    (|={E, ε__lift}=> sswp s ε__lift e 
+                 (λ e', MU ε__lift tid ((|={ε__lift,E}=> WP e' @ s; tid; E {{ Φ }})) (eGS := heap_fairnessGS)))%I -∗
+      (* WP e Φ s E ε__lift tid ρ. *)
+      WP e @ s; tid; E {{ Φ }}. 
+  Proof.
+    rewrite wp_unfold /wp_pre.
+    iIntros "Hsswp".
+    destruct (to_val e) eqn:Heqn.
+    { rewrite /sswp Heqn. 
+      iMod "Hsswp" as "?". iExFalso. done. }
+    iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+    iMod "Hsswp" as "Hsswp".
+    simpl.
+    iDestruct "Hσ" as "(%EV & HI & MSI)". 
+    (* iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp". *)
+    rewrite /sswp Heqn.  
+    iMod ("Hsswp" with "HI") as (Hs) "Hsswp".
+    simpl in Hextr. red in Hextr. rewrite Hextr in Hs. rewrite Hextr.  
+    iModIntro. iSplit; [done| ]. 
+    iIntros (e2 σ2 efs Hstep).
+    iMod ("Hsswp" with "[//]") as "Hsswp".
+    iModIntro. iNext. iMod "Hsswp". iModIntro.
+
+    iApply step_fupdN_intro; [done| ].      
+    
+    iNext. 
+    (* iApply (step_fupdN_wand with "Hsswp"). *)
+    iMod "Hsswp" as "(Hσ & HMU & ->)". iFrame. 
+
+    (* rewrite -Hextr. *)
+    (* iSpecialize ("HMU" with "MSI").  *)
+    iMod ("HMU" with "MSI []") as (??) "(Hσ & %EV' & Hwp)".
+    { iPureIntro. rewrite -Hζ. 
+      econstructor; eauto. rewrite Hζ.
+      eapply fill_prim_step; eauto. }
+    iMod "Hwp". iModIntro.
+    iExists _, _. simpl in *. rewrite right_id_L. simpl. iFrame.
+    iPureIntro. simpl in *. rewrite right_id_L in EV'. done. 
+  Qed.
+
+  (* Lemma sswp_MU_wp s tid E ε__lift e Φ: *)
+  (*   (sswp s ε__lift e  *)
+  (*                (λ e', MU ε__lift tid ((WP e' @ s; tid; E {{ Φ }})) (eGS := heap_fairnessGS)))%I -∗ *)
+  (*     (* WP e Φ s E ε__lift tid ρ. *) *)
+  (*     WP e @ s; tid; E {{ Φ }}.  *)
+  (* Proof. *)
+  (*   iIntros "Hsswp". iApply sswp_MU_wp_fupd. iModIntro. *)
+  (*   iApply (sswp_wand with "[] Hsswp"). *)
+  (* iIntros (??) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>". *)
+  (*   done.  *)
+
+  Lemma sswp_MU_cwp_fupd s tid ρ E ε__lift e Φ:
+    (|={E, ε__lift}=> sswp s ε__lift e 
+                 (λ e', lmu ρ (|={ε__lift,E}=> CWP e' Φ s E ε__lift tid ρ)))%I -∗
+      CWP e Φ s E ε__lift tid ρ.
+  Proof.
+    rewrite /CWP /cwp.
+    iIntros "Hsswp". iIntros (LC) "LC #LU".
+
+    iApply sswp_MU_wp_fupd. iMod "Hsswp". iModIntro.
+    iApply (sswp_wand with "[-Hsswp]"); [| by iFrame].
+    simpl. clear e. iIntros (e) "LMU".
+    iPoseProof ("LU" with "LMU LC") as "MU". 
+    iApply (MU_mono with "[-MU] MU").
+    iIntros "[LIFT LC]". iMod "LIFT". iModIntro.    
+    iApply ("LIFT" with "LC [$]").
+  Qed. 
+
+  Lemma sswp_MU_cwp s tid ρ E ε__lift e Φ
+    (SUB: ε__lift ⊆ E) :
+    (sswp s ε__lift e 
+                 (λ e', lmu ρ (CWP e' Φ s E ε__lift tid ρ)))%I -∗
+      CWP e Φ s E ε__lift tid ρ.
+  Proof.
+    iIntros "Hsswp". iApply sswp_MU_cwp_fupd.
+
+    iApply fupd_wand_r. 
+
+    iModIntro.
+
+    
+    (* rewrite /CWP /cwp. *)
+    iIntros "S". iApply sswp_MU_cwp_fupd. 
+    
+    iMod (fupd_mask_intro_subseteq with "S") as "S"; [apply SUB| ].
+    iMod "S" as "S". 
+    iApply (sswp_wand with "[-Hsswp]"); [| by iFrame].
+    (* iApply fupd_mask_intro_subseteq.  *)
+    iIntros "Hsswp". iIntros (LC) "LC #LU".
+
+    iApply sswp_MU_wp_fupd. iMod "Hsswp". iModIntro.
+    
+    simpl. clear e. iIntros (e) "LMU".
+    iPoseProof ("LU" with "LMU LC") as "MU". 
+    iApply (MU_mono with "[-MU] MU").
+    iIntros "[LIFT LC]". iMod "LIFT". iModIntro.    
+    iApply ("LIFT" with "LC [$]").
+  Qed. 
+    
+  Lemma cwp_model_sswp_step s tid ρ E ε__lift e Φ:
+    (* TCEq (to_val e) None → *)
+    (* ε__lift ⊆ E -> *)
+    (* local_rule (msi := msi) (lifted_roles := lifted_roles) P Q ρ -∗ *)
+    (* ▷ P -∗ *)
+    (* LMU ρ Q -∗ *)
+    (sswp s ε__lift e 
+                 (λ e', MU ε__lift tid ((CWP e' Φ s E ε__lift tid ρ)) (eGS := heap_fairnessGS)))%I -∗
+      CWP e Φ s E ε__lift tid ρ.
+  Proof.
+    iIntros "?". iApply sswp_MU_cwp_fupd. 
+    
+    iIntros (Hval SUBM) "#RULE P SSWP". 
+    rewrite /CWP /cwp. iIntros (LC) "LC #LIFT".
+    
+    rewrite wp_unfold /wp_pre. rewrite /sswp. simpl. rewrite Hval.
+    iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hexend) "(% & Hsi & Hmi)".
+
+    iMod ("SSWP" with "Hsi") as (Hred) "Hwp". iIntros "!>".
+    iSplitR; [by rewrite Hexend in Hred|]. iIntros (????). rewrite Hexend.
+    iMod ("Hwp" with "[//]") as "Hwp". iIntros "!>!>". iMod "Hwp". iIntros "!>".
+    iApply step_fupdN_intro; [done|]. iIntros "!>".
+    iMod "Hwp" as "[Hσ [Hwp ->]]".
+    rewrite /trace_ends_in in Hexend. rewrite -Hexend.
+
+    iApply fupd_mask_mono; eauto.
+    rewrite /lift_upd. 
+
+    
+    iPoseProof ("LIFT" $! Q) as "foo". "[LC P Hmi]") as (δ2 ℓ) "(LC & Q & MSI & %EV)". 
+    { iFrame. iPureIntro.
+      rewrite -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
+
+    iSpecialize ("Hwp" with "Q LC [$]"). 
+    iModIntro. do 2 iExists _. iFrame.
+    iSplit; done.
+  Qed.
+ 
 
   Lemma cwp_model_sswp_step s tid ρ E ε__lift e Φ P Q:
     TCEq (to_val e) None →
     ε__lift ⊆ E ->
-    local_rule (msi := msi) (lifted_roles := lifted_roles) P Q ρ -∗
-    ▷ P -∗
+    (* local_rule (msi := msi) (lifted_roles := lifted_roles) P Q ρ -∗ *)
+    (* ▷ P -∗ *)
+    ▷ MU ε tid 
     sswp s E e (λ e', Q -∗ CWP e' Φ s E ε__lift tid ρ) -∗
     CWP e Φ s E ε__lift tid ρ.
   Proof.
@@ -152,8 +302,10 @@ Section ModelLogic.
     rewrite /trace_ends_in in Hexend. rewrite -Hexend.
 
     iApply fupd_mask_mono; eauto.
-    rewrite /role_lift.
-    iMod ("LIFT" with "RULE [LC P Hmi]") as (δ2 ℓ) "(LC & Q & MSI & %EV)". 
+    rewrite /lift_upd. 
+
+    
+    iPoseProof ("LIFT" $! Q) as "foo". "[LC P Hmi]") as (δ2 ℓ) "(LC & Q & MSI & %EV)". 
     { iFrame. iPureIntro.
       rewrite -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
 

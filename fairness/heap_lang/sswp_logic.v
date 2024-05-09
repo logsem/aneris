@@ -15,20 +15,24 @@ Section SSWP.
 
   Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
     match to_val e1 with
-    | Some v => |={E}=> (Φ (of_val v))
-    | None => ∀ σ1,
+    | Some v =>
+        (* |={E}=> (Φ (of_val v)) *)
+        ⌜ False ⌝
+    | None =>
+    (* ⌜TCEq (to_val e1) None⌝ ∗ *)
+        (∀ σ1,
         gen_heap_interp σ1.(heap) ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
        ∀ e2 σ2 efs,
          ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗ |={∅,E}=>
-         gen_heap_interp σ2.(heap) ∗ Φ e2 ∗ ⌜efs = []⌝
+         gen_heap_interp σ2.(heap) ∗ Φ e2 ∗ ⌜efs = []⌝)
     end%I.
 
   Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) :
     (∀ e, Φ e -∗ Ψ e) -∗ sswp s E e Φ -∗ sswp s E e Ψ.
   Proof.
-    rewrite /sswp. iIntros "HΦΨ HΦ".
-    destruct (to_val e); [by iApply "HΦΨ"|].
+    rewrite /sswp. iIntros "HΦΨ HΦ". 
+    destruct (to_val e); [done|].
     iIntros (?) "H". iMod ("HΦ" with "H") as "[%Hs HΦ]".
     iModIntro. iSplit; [done|]. iIntros (????).
     iDestruct ("HΦ" with "[//]") as "HΦ".
@@ -81,7 +85,7 @@ Section SSWP.
       sswp s E (AllocN (Val $ LitV $ LitInt $ n) (Val v)) Φ.
   Proof.
     iIntros (HnO) "HΦ".
-    rewrite /sswp. simpl.
+    rewrite /sswp. simpl. 
     iIntros (σ) "Hσ".
     iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
     (* TODO: was derivable by eauto before *)
@@ -120,7 +124,7 @@ Section SSWP.
       sswp s E ChooseNat Φ.
   Proof.
     iIntros "HΦ".
-    rewrite /sswp. simpl.
+    rewrite /sswp. simpl. 
     iIntros (σ) "Hσ".
     iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
     iSplit.
@@ -138,8 +142,8 @@ Section SSWP.
   
   Lemma wp_load s E l q v (Φ : expr → iProp Σ) :
     ▷ l ↦{q} v -∗
-      ▷ (l ↦{q} v -∗ Φ v) -∗
-      sswp s E (Load (Val $ LitV $ LitLoc l)) Φ.
+    ▷ (l ↦{q} v -∗ Φ v) -∗
+     sswp s E (Load (Val $ LitV $ LitLoc l)) Φ.
   Proof.
     iIntros ">Hl HΦ".
     rewrite /sswp. simpl.
@@ -157,7 +161,7 @@ Section SSWP.
     iSplit; [|done].
     by iApply "HΦ".
   Qed.
-  
+
   Lemma wp_store s E l v' v (Φ : expr → iProp Σ) :
     ▷ l ↦ v' -∗
       ▷ (l ↦ v -∗ Φ $ LitV LitUnit) -∗

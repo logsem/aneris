@@ -13,36 +13,70 @@ Section ModelPlug.
   Definition local_rule (P Q: iProp Σ) (ρ: fmrole M): iProp Σ :=
     □ (∀ (δ: fmstate M), P ∗ msi δ ==∗ 
         ∃ δ', Q ∗ msi δ' ∗ ⌜ fmtrans M δ (Some ρ) δ' ⌝ ∗ ⌜ lifted_roles δ' ⊆ lifted_roles δ ⌝). 
+  
+  Definition MU `{invGS_gen HasNoLc Σ} (ε: coPset) τ (P: iProp Σ): iProp Σ :=
+    ∀ c1 δ1 c2,
+    em_msi c1 δ1 (em_GS0 := eGS) -∗
+    (* em_msi (tp1 ++ fill K e :: tp2, σ1) δ *)
+    ⌜ locale_step c1 (Some τ) c2 ⌝  (* is that part needed? *)
+    ={ ε }=∗
+    ∃ δ2 ℓ,
+      em_msi c2 δ2 (em_GS0 := eGS) ∗
+      ⌜ em_valid_evolution_step (Some τ) c2 δ1 ℓ δ2 ⌝ ∗
+      P.  
+
+  Definition LMU (ρ: fmrole M) (P: iProp Σ): iProp Σ := 
+    ∀ (δ: fmstate M), msi δ ==∗ ∃ δ', P ∗ msi δ' ∗ ⌜ fmtrans M δ (Some ρ) δ' ⌝ ∗
+                                      ⌜ lifted_roles δ' ⊆ lifted_roles δ ⌝. 
+
+  Lemma MU_mono `{invGS_gen HasNoLc Σ} (ε: coPset) τ (P Q: iProp Σ):
+    (P -∗ Q) -∗ MU ε τ P -∗ MU ε τ Q.
+  Proof. 
+    iIntros "PQ MU". rewrite /MU. iIntros.
+    iMod ("MU" with "[$] [//]") as (??) "(?&?&?)".
+    iModIntro. do 2 iExists _. iFrame. by iApply "PQ".
+  Qed. 
+
+  Lemma LMU_mono `{invGS_gen HasNoLc Σ} (ρ: fmrole M) (P Q: iProp Σ):
+    (P -∗ Q) -∗ LMU ρ P -∗ LMU ρ Q.
+  Proof. 
+    iIntros "PQ LMU". rewrite /LMU. iIntros.
+    iMod ("LMU" with "[$]") as (?) "(?&?&?&?)".
+    iModIntro. iExists _. iFrame. by iApply "PQ".
+  Qed. 
 
   Section MP.
     Context `{invGS_gen HasNoLc Σ}.
     (* Context (lift_ctx: iProp Σ). *)
     Context (ε: coPset).
 
-    Definition role_lift (τ: locale Λ) (gl: fmrole M) (lift_ctx: iProp Σ): iProp Σ :=
-      ∀ P Q, 
-        □ (local_rule P Q gl -∗
-           ∀ (extr: execution_trace Λ) (auxtr: auxiliary_trace M__glob) c2,
-             lift_ctx ∗
-             P ∗ 
-             em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS) ∗
-             ⌜ locale_step (trace_last extr) (Some τ) c2 ⌝ 
-             ={ ε }=∗
-             ∃ (δ2 : M__glob) (ℓ : mlabel M__glob),
-             lift_ctx ∗
-             Q ∗
-             em_msi c2 δ2 (em_GS0 := eGS) ∗
-             ⌜em_valid_state_evolution_fairness (extr :tr[ Some τ ]: c2) (auxtr :tr[ ℓ ]: δ2)⌝).
+    (* Definition role_lift (τ: locale Λ) (gl: fmrole M) (lift_ctx: iProp Σ): iProp Σ := *)
+    (*   ∀ P Q,  *)
+    (*     □ (local_rule P Q gl -∗ *)
+    (*        ∀ (extr: execution_trace Λ) (auxtr: auxiliary_trace M__glob) c2, *)
+    (*          lift_ctx ∗ *)
+    (*          P ∗  *)
+    (*          em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := eGS) ∗ *)
+    (*          ⌜ locale_step (trace_last extr) (Some τ) c2 ⌝  *)
+    (*          ={ ε }=∗ *)
+    (*          ∃ (δ2 : M__glob) (ℓ : mlabel M__glob), *)
+    (*          lift_ctx ∗ *)
+    (*          Q ∗ *)
+    (*          em_msi c2 δ2 (em_GS0 := eGS) ∗ *)
+    (*          ⌜em_valid_state_evolution_fairness (extr :tr[ Some τ ]: c2) (auxtr :tr[ ℓ ]: δ2)⌝). *)
 
-    Global Instance RL_pers: forall τ ρ lc, Persistent (role_lift τ ρ lc).
-    Proof. apply _. Qed.    
+    Definition lift_upd (ε: coPset) (τ: locale Λ) (ρ: fmrole M) (lift_ctx: iProp Σ): iProp Σ := 
+      ∀ Φ, □ (LMU ρ Φ -∗ lift_ctx -∗ MU ε τ (Φ ∗ lift_ctx)). 
+
+    (* Global Instance RL_pers: forall τ ρ lc, Persistent (role_lift τ ρ lc). *)
+    (* Proof. apply _. Qed.     *)
 
   End MP.
 
   Section CWP.
     Context `{!irisG Λ M__glob Σ}.
         
-    Let RL := @role_lift iris_invGS. 
+    Let RL := @lift_upd iris_invGS. 
                 
     Definition cwp (e: expr Λ) (Φ: val Λ -> iProp Σ) (s: stuckness) (ε__wp ε__lift: coPset) (τ: locale Λ) (ρ: fmrole M): iProp Σ :=
       ∀ (lift_ctx: iProp Σ), lift_ctx -∗ RL ε__lift τ ρ lift_ctx  -∗ 
@@ -84,8 +118,8 @@ Lemma cwp_convert
    {lr lr'}
    (CWP := @cwp _ _ EM _ eGS _ msi lr _)
    (CWP' := @cwp _ _ EM _ eGS _ msi' lr' _)
-   (RL := @role_lift _ _ EM Σ eGS _ msi lr iris_invGS)
-   (RL' := @role_lift _ _ EM Σ eGS _ msi' lr' iris_invGS)
+   (RL := @lift_upd _ _ EM Σ eGS _ msi lr iris_invGS)
+   (RL' := @lift_upd _ _ EM Σ eGS _ msi' lr' iris_invGS)
    (e: expr Λ) τ (Φ Φ': val Λ -> iProp Σ) s ε__wp ε__lift ε__lift' ρ ρ':
       ⊢ CWP' e Φ' s ε__wp ε__lift' τ ρ' -∗
         (∀ LC, LC -∗ RL ε__lift τ ρ LC -∗ ∃ LC', LC' ∗ RL' ε__lift' τ ρ' LC' ∗ (∀ v,  Φ' v ∗ LC' -∗ Φ v ∗ LC)) -∗
@@ -100,3 +134,4 @@ Proof.
   1, 2: reflexivity.
   iIntros. iModIntro. by iApply "CONV".
 Qed. 
+
