@@ -11,12 +11,28 @@ From aneris.examples.transactional_consistency Require Import code_api wrapped_l
 From aneris.examples.transactional_consistency.read_uncommitted.specs Require Import specs resources.
 From aneris.examples.transactional_consistency Require Import user_params aux_defs state_based_model.
 
-(** Wrapped resources  *)
-
-(** Library implication *)
-
-Section library_implication.
+Section trace_proof.
   Context `{!anerisG Mdl Σ, !User_params}.
+
+  (** Wrapped resources  *)
+  Global Program Instance wrapped_resources `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
+    {|
+      GlobalInv := True%I;
+      OwnMemKey k V := True%I;
+      OwnLocalKey k c vo := True%I;
+      ConnectionState c s sa := True%I;
+      IsConnected c sa := True%I;
+      KVS_ru := KVS_ru;
+      KVS_Init := True%I;
+      KVS_ClientCanConnect sa := True%I;
+      Seen k V := True%I;
+    |}.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
 
   (* Library specification on the form required by the trace infrastructure *)
   Definition ru_library_spec (P0 : iProp Σ) (lib : KVS_transaction_api) 
@@ -40,6 +56,6 @@ Section library_implication.
   Proof. 
   Admitted.
 
-End library_implication.
+End trace_proof.
 
 (** Adequacy *)
