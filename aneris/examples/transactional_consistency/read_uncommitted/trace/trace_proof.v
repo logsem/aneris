@@ -51,7 +51,7 @@ Section trace_proof.
   Lemma library_implication (N : namespace) (P0 : iProp Σ) 
   (lib : KVS_transaction_api) (clients : gset socket_address) :
     ru_library_spec P0 lib clients -∗
-    ru_library_spec (P0 ∗ trace_is [] ∗ trace_inv N valid_ru) 
+    ru_library_spec (P0 ∗ trace_is [] ∗ trace_inv N valid_trace_ru) 
                     (KVS_wrapped_api lib) clients.
   Proof. 
   Admitted.
