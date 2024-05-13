@@ -124,7 +124,7 @@ Section RoleLiftLM.
   Let lr: fmstate LM_Fair -> gset (fmrole LM_Fair) :=
         fun δ => filter (flip role_enabled_model δ) (dom (ls_tmap δ)).
 
-  Let RL := @role_lift _ _ LM_EM _ fG LM_Fair model_state_interp lr INV.
+  Let RL := @lift_upd _ _ LM_EM _ fG LM_Fair model_state_interp lr INV.
 
   (* TODO: move *)
   Lemma LM_step_ngn `{Countable G'} `{LM': LiveModel G' M' LSI'}:
@@ -150,11 +150,11 @@ Section RoleLiftLM.
 
   Lemma TopRL τ: ⊢ RL ∅ τ τ ⌜ True ⌝.
   Proof.
-    rewrite /RL /role_lift. iIntros (P Q) "!# #RULE".
-    iIntros (etr atr c2) "(_&P&SI&%STEP)".
-    simpl. rewrite /em_lm_msi. iDestruct "SI" as "[MSI %TR]".
+    rewrite /RL /lift_upd. iIntros (P) "!# LMU _". rewrite /LMU /MU.  
+    iIntros (c1 δ1 c2) "(SI&%TR) %STEP". 
+    simpl. rewrite /em_lm_msi. 
     rewrite /valid_evolution_step.
-    iMod ("RULE" with "[$]") as (δ2) "(Q&MSI&%TRANS&%LR)".
+    iMod ("LMU" with "[$]") as (δ2) "(Q&MSI&%TRANS&%LR)".
     iModIntro. do 2 iExists _. iFrame. iPureIntro.
     apply and_comm. rewrite -!and_assoc. split; [| split].
     1, 2: by eauto. 
@@ -162,9 +162,9 @@ Section RoleLiftLM.
     { apply tids_smaller'_restrict. }
     
     red. intros τ' D2.
-    destruct (decide (τ' ∈ dom (ls_tmap (trace_last atr)))) as [D1 | ND1].
-    { destruct (trace_last etr), c2. 
-      apply tids_restrict_smaller' in TR. apply TR in D1. 
+    destruct (decide (τ' ∈ dom (ls_tmap δ1))) as [D1 | ND1].
+    { destruct c1, c2. simpl in *.
+      eapply tids_restrict_smaller' in TR. apply TR in D1.
       eapply from_locale_step; eauto. }
     destruct TRANS as (?&TRANS&?).
     apply elem_of_dom in D2 as [R' TM']. 

@@ -45,6 +45,13 @@ Section ModelPlug.
     iModIntro. iExists _. iFrame. by iApply "PQ".
   Qed. 
 
+  Lemma local_rule_LMU `{invGS_gen HasNoLc Σ} (ρ: fmrole M) (P Q: iProp Σ):
+    local_rule P Q ρ -∗ P -∗ LMU ρ Q.
+  Proof.
+    rewrite /LMU. iIntros "#LR P" (?) "?".
+    iApply "LR". iFrame.
+  Qed.     
+
   Section MP.
     Context `{invGS_gen HasNoLc Σ}.
     (* Context (lift_ctx: iProp Σ). *)
