@@ -238,10 +238,12 @@ End Tactics.
 
 End ModelLogic.
 
-  Ltac ewp_bind_core K :=
+  (* TODO: figure out why it requires providing role explicitly *)
+  Ltac ewp_bind_core K ρ :=
     lazymatch eval hnf in K with
     | [] => idtac
-    | _ => eapply (tac_ewp_bind K); [simpl; reflexivity|reduction.pm_prettify]
+    | _ => eapply (tac_ewp_bind K _ _ _ _ _ ρ);
+          [simpl; reflexivity|reduction.pm_prettify]
     end.
 
   Tactic Notation "ewp_bind" open_constr(efoc) :=
@@ -252,7 +254,7 @@ End ModelLogic.
           (* (cwp ?e ?Φ ?s ?ε__wp ?ε__lift ?τ ?ρ) *)
           (ewp ?s ?E ?ρ ?e ?Φ)
          =>
-        first [ reshape_expr e ltac:(fun K e' => unify e' efoc; ewp_bind_core K)
+        first [ reshape_expr e ltac:(fun K e' => unify e' efoc; ewp_bind_core K ρ)
               | fail 1 "ewp_bind: cannot find" efoc "in" e ]
     | _ => fail "ewp_bind: not a 'wp'"
   end.
