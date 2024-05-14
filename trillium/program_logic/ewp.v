@@ -741,7 +741,7 @@ End proofmode_classes.
 
 
 Section ewp_to_wp.
-  Context `{!irisG Λ AS Σ}.
+  Context `{!irisG Λ M__G Σ}.
   Implicit Types s : stuckness.
   Implicit Types P : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
@@ -768,10 +768,17 @@ Notation "'EWP' e @ s ; ρ ; E {{ v , Q } }" := (ewp s E ρ e%E (λ v, Q))
 
   (* (* TODO: does that exist somewhere? *) *)
   Definition update_locale (tp: list (expr Λ)) (τ: locale Λ) (e: expr Λ): list (expr Λ).
+  Proof using.
   Admitted.
+
   Lemma update_locale_replace tp1 e τ tp2 e'
     (Hloc : locale_of tp1 e = τ):
     update_locale (tp1 ++ e :: tp2) τ e' = tp1 ++ e' :: tp2.
+  Proof using. Admitted. 
+
+  Lemma update_locale_dom `{EqDecision (locale Λ)} tp τ e'
+    (IN: is_Some (from_locale tp τ)):
+    forall τ', is_Some (from_locale tp τ') <-> is_Some (from_locale (update_locale tp τ e') τ').
   Proof. Admitted. 
 
   Definition restores_TI `{EqDecision (locale Λ)} τ ρ: iProp Σ :=

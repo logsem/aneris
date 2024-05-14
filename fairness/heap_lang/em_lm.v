@@ -160,7 +160,7 @@ Section RoleLiftLM.
     1, 2: by eauto. 
     apply iff_and_impl_helper.
     { apply tids_smaller'_restrict. }
-    
+
     red. intros τ' D2.
     destruct (decide (τ' ∈ dom (ls_tmap δ1))) as [D1 | ND1].
     { destruct c1, c2. simpl in *.
@@ -230,5 +230,6 @@ Section RoleLiftLM.
   Qed. 
 
 End RoleLiftLM.
+
 
 End LMExecModel.
