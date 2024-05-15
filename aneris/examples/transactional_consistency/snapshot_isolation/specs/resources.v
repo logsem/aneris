@@ -67,6 +67,15 @@ Section Resources.
       GlobalInv ⊢
       k ↦ₖ h ={E}=∗
       k ↦ₖ h ∗ Seen k h;
+
+    (** Property of connection *)
+    Connection_unique E c c' sa sa' ls ls': 
+      ↑KVS_InvName ⊆ E ->
+      GlobalInv ⊢
+      ConnectionState c sa ls ∗
+      ConnectionState c' sa' ls' ={E}=∗
+      ConnectionState c sa ls ∗
+      ConnectionState c' sa' ls' ∗ ⌜c ≠ c'⌝;
   }.
 
 End Resources.

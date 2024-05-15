@@ -29,7 +29,7 @@ Class IDBG Σ :=
       inG Σ (authR (gmapUR socket_address (agreeR (leibnizO gname))));
     IDBG_TksAgr :>  inG Σ (csumR
                              (exclR unitR)
-                             (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
+                             (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO * gnameO) : Type)));
 
     (** Time *)
     IDBG_TimeStamp :> mono_natG Σ;
@@ -56,7 +56,7 @@ Definition KVSΣ : gFunctors :=
         (authR (gmapUR socket_address (agreeR (leibnizO gname))));
       GFunctor ((csumR
                    (exclR unitR)
-                   (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO) : Type))));
+                   (agreeR ((gnameO * gnameO * gnameO * gnameO * gnameO * gnameO) : Type))));
      GFunctor (exclR unitO);
      GFunctor (authUR (gsetUR nat));
      GFunctor (authR (gmapUR Key (gsetUR val)));

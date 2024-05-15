@@ -56,7 +56,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.proof.server R
  Notation gnamesTy := (gmapUR socket_address
                                    (agreeR (leibnizO gname))).
 
- Notation csumTy := (csum.csumR (exclR unitR) (agreeR (prodO (prodO (prodO (prodO gnameO gnameO) gnameO) gnameO) gnameO))).
+ Notation csumTy := (csum.csumR (exclR unitR) (agreeR (prodO (prodO (prodO (prodO (prodO gnameO gnameO) gnameO) gnameO) gnameO) gnameO))).
  
 Section Init_setup_proof.
   Context `{!anerisG Mdl Σ, DB : !User_params, !KVSG Σ}.
@@ -145,7 +145,7 @@ Section Init_setup_proof.
           eapply (alloc_local_update); last done.
           apply not_elem_of_dom. set_solver. }
         iModIntro; iExists _; iFrame.
-        iSplit; first (rewrite dom_insert_L; set_solver).
+        iSplit; first by rewrite dom_insert_L Hdom. 
         rewrite big_sepS_insert; last done.
         iFrame. rewrite /client_can_connect. eauto. }
     iMod "HauthClts" as (M) "(HauthClts & %Hdom & Hclts)".

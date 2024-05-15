@@ -55,7 +55,7 @@ Section Read_Proof.
     iIntros (c sa k E Hk) "#HSpec #Hinv #Hisc !#".
     iIntros (Φ) "Hshift".
     iDestruct "Hisc" as (lk cst l) "Hisc".
-    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)". rewrite /make_request_spec.
+    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap γU ->) "#(Hc1 & Hisc)". rewrite /make_request_spec.
     rewrite /TC_read /= /read.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
@@ -67,7 +67,8 @@ Section Read_Proof.
     {
       iApply fupd_aneris_wp.
       iMod "Hshift" as "[%vo (Hcache & _)]".
-      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
+      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache". 
+      iDestruct "Hcache" as (Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
       iDestruct (client_connected_agree with "[$Hc2][$Hc1]") as "%Heq'".
@@ -87,8 +88,8 @@ Section Read_Proof.
     iMod "Hshift" as "[%vo (Hcache & Hclose)]".
     assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
     destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8) .
-    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
-                            "(#Hc4 & Hcache & %Hvb)".
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache". 
+    iDestruct "Hcache" as (Heq) "(#Hc4 & Hcache & %Hvb)".
     simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq'".
     simplify_eq.
@@ -99,7 +100,7 @@ Section Read_Proof.
     iMod ("Hclose" with "[Hcache]") as "HΦ".
     {
       iExists _, _, _, _, _, _, _, _.
-      iExists _.
+      iExists _, _.
       by iFrame "#∗".
     }
     iModIntro.

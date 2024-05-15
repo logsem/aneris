@@ -66,6 +66,7 @@ Section Client_Proxy_Proof.
     wp_pures.
     iMod (own_alloc (Excl ())) as (γS) "Hs"; first done.
     iMod (own_alloc (Excl ())) as (γA) "Ha"; first done.
+    iMod (own_alloc (Excl ())) as (γU) "Hu"; first done.
     iMod (@ghost_map.ghost_map_alloc_empty _ Key (option val * bool)) as (γCache) "HCache".
     iMod (@ghost_map.ghost_map_alloc_empty _ Key (list write_event)) as (γMsnap) "HMsnap".
     iDestruct "Hcc" as (γCst) "(#Hcc & Hp)".
@@ -75,19 +76,19 @@ Section Client_Proxy_Proof.
                with "[Hreq Hl HCache HMsnap Hs]").
     - iExists _. iFrame. iLeft. by iFrame.
     - iIntros (lk γ) "#Hlk".
-      iMod (own_update _ _ (Cinr (to_agree (γA, γS, γ, γCache, γMsnap))) with "Hp") as "#Hdefined".
+      iMod (own_update _ _ (Cinr (to_agree (γA, γS, γ, γCache, γMsnap, γU))) with "Hp") as "#Hdefined".
       {  intros n [f |]; simpl; eauto.
          destruct f; simpl; try by inversion 1. }
       wp_pures.
       iApply "HΦ".
       iAssert (is_connected γGsnap γT γTrs γKnownClients (#sa, (lk, (reqh, #l))) sa) as "#Hic".
       iExists _, _, _, _, _, _, _, _.
-      iExists _.
+      iExists _ ,_.
       by iFrame "#∗".
       rewrite /ConnectionState_def /connection_state.
       iSplit; last done.
       iExists PSCanStart; iSplit; last done.
-      iExists (lk, (reqh, #l))%V, γCst, γA, γS, γ, γCache, γMsnap.
+      iExists (lk, (reqh, #l))%V, γCst, γA, γS, γ, γCache, γMsnap, γU.
       by iFrame "#∗".
   Qed.
 

@@ -37,15 +37,15 @@ Section Commit_Proof.
   Import code_api.
 
 
-  Lemma cache_inversion (mc : gmap Key (option val * bool)) sa lk cst l (γCst γA γS γlk γCache γMsnap : gname) :
-    client_connected γKnownClients sa γCst γA γS γlk γCache γMsnap
+  Lemma cache_inversion (mc : gmap Key (option val * bool)) sa lk cst l (γCst γA γS γlk γCache γMsnap γU : gname) :
+    client_connected γKnownClients sa γCst γA γS γlk γCache γMsnap γU
     ⊢  [∗ map] k↦p ∈ mc, ((∃ (sa0 : socket_address)
                              (v : val) (γCst0 γA0 γS0 γlk0 γCache0
-                                              γMsnap0 : gname)
+                                              γMsnap0 γU : gname)
                              (b : bool),
                               ⌜(#sa, (lk, (cst, #l)))%V = (#sa0, v)%V⌝ ∗
                                 client_connected γKnownClients sa0 γCst0
-                                                 γA0 γS0 γlk0 γCache0 γMsnap0 ∗
+                                                 γA0 γS0 γlk0 γCache0 γMsnap0 γU ∗
                              ghost_map.ghost_map_elem γCache0 k
                                                       (DfracOwn (1 / 2)) (
                                                         p.1, b) ∗
@@ -65,11 +65,13 @@ Section Commit_Proof.
     iApply big_sepM_intro.
     iIntros "!#".
     iIntros (k p Hkp) "(H & Hk)".
-    iDestruct "H" as (? ? ? ? ? ? ? ? b Heq) "(#Hcc2 & Hm1 & %Hyp)".
+    iDestruct "H" as (? ? ? ? ? ? ? ? ?) "H".
+    iDestruct "H" as (b Heq) "(#Hcc2 & Hm1 & %Hyp)".
     simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq'".
     simplify_eq /=.
-    iDestruct "Hk" as (? ? ? ? ? ? ? ? ? Heq) "(#Hcc3 & Hm2 & %Hcond)".
+    iDestruct "Hk" as (? ? ? ? ? ? ? ? ? ?) "Hk".
+    iDestruct "Hk" as (Heq) "(#Hcc3 & Hm2 & %Hcond)".
     simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hcc1][$Hcc3]") as "%Heq''".
     simplify_eq /=.
@@ -106,12 +108,12 @@ Section Commit_Proof.
   Lemma commit_spec_internal_holds `{!MTS_resources} :
     commit_spec_internal.
   Proof.
-     iIntros (c sa E HE).
+    iIntros (c sa E HE).
     iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
     rewrite /TC_commit /= /commit.
     wp_pures.
     unfold is_connected.
-    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".
+    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap γU) "(-> & Hcc1 & Hlk)".
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
@@ -127,7 +129,7 @@ Section Commit_Proof.
       wp_apply (aneris_wp_atomic _ _ (E)).
       iMod "Hsh" as (m ms mc) "[(Hcst & _) Hclose]".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
-      iDestruct "Hcst" as (? ? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
+      iDestruct "Hcst" as (? ? ? ? ? ? ? ? ->) "(Hut & #Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
       iDestruct "Hsp" as "(Hsp & _)".
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
@@ -184,13 +186,17 @@ Section Commit_Proof.
         destruct vo; last done.
         by apply (HmcEq1 _ _ _) in H_pure_eq_mc as ->.
       }
-      iMod ("Hclose" with "[Htok Hkeys]") as "HΦ".
-      + iSplitL "Htok".
+      iDestruct "Hcon" as (sp) "(Hst' & %Heq')".
+      iDestruct "Hst'" as (???????? Heq) "(Hut & #Hcc2 & Hst')".
+      iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq''".
+      simplify_eq /=.
+      iMod ("Hclose" with "[Htok Hkeys Hut]") as "HΦ".
+      + iSplitL "Htok Hut".
         {
           unfold ConnectionState_def, connection_state.
           iExists PSCanStart.
           iSplitL; last by iPureIntro.
-          iExists _, _, _, _, _, _, _.
+          iExists _, _, _, _, _, _, _, _.
           iSplitR; first by iPureIntro.
           iFrame "∗#".
         }
@@ -223,33 +229,44 @@ Section Commit_Proof.
         * iApply big_sepM2_mono; last done.
           iIntros (k h p H_some_eq_m H_some_eq_mc) "(H_key & _)".
           destruct p.
-          apply (HmcEq2 _ _ _ _ H_some_eq_mc) in H_some_eq_m as ->.
           unfold OwnMemKey_def.
           iDestruct "H_key" as (hw) "(H_key & %H_key_eq)".
           unfold ownMemUser.
           iDestruct "H_key" as "(H_key & #H_key_seen)".
-          iSplit.
-          {
-             iExists hw.
-             iFrame "#∗".
-             by iPureIntro.
-          }
-          {
-            unfold Seen_def.
-            iExists hw.
-            iFrame "#".
-            by iPureIntro.
-          }
+          destruct o.
+          -- eapply (HmcEq1 _ _ _) in H_some_eq_mc.
+             simplify_eq.
+             simpl.
+             iSplit.
+             {
+               iExists hw.
+               iFrame "#∗".
+               by iPureIntro.
+             }
+             {
+               unfold Seen_def.
+               iExists hw.
+               iFrame "#".
+               by iPureIntro.
+             }
+          -- iSplit.
+             {
+               iExists hw.
+               iFrame "#∗".
+               by iPureIntro.
+             }
+             {
+               unfold Seen_def.
+               iExists hw.
+               iFrame "#".
+               by iPureIntro.
+             }
       + iModIntro.
         wp_pures.
-        iDestruct "Hcon" as (sp) "(Hst' & %Heq')".
-        iDestruct "Hst'" as (??????? Heq) "(#Hcc2 & Hst')".
         destruct sp as [|Msnap']; simplify_eq /=.
         iDestruct "Hst'" as "(Htk & #Hseen' & HauthFrag1)".
         iDestruct "HauthMsnap"  as "(HauthFrag2 & Hfict)".
         rewrite /ownMsnapFrag.
-        iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq'".
-        simplify_eq /=.
         iDestruct ((@ghost_map.ghost_map_auth_agree _ Key (list write_event))
                     with "[$HauthFrag1][$HauthFrag2]")  as "->".
         wp_apply fupd_aneris_wp.
@@ -401,7 +418,7 @@ Section Commit_Proof.
             iExists m.
             destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8).
             iDestruct "Hst" as (sp) "(Hst' & %Heq')".
-            iDestruct "Hst'" as (??????? Heq2) "(#Hcc2 & Hst')".
+            iDestruct "Hst'" as (???????? Heq2) "(Hut & #Hcc2 & Hst')".
             destruct sp as [|Msnap']; simplify_eq /=.
             iDestruct "Hst'" as "(Htk & #Hseen' & HauthFrag1)".
             iDestruct "HauthMsnap"  as "(HauthFrag2 & Hfict)".
@@ -438,7 +455,7 @@ Section Commit_Proof.
              iExists PSCanStart.
              simplify_eq /=.
              iSplit; last done.
-             iExists _, _, _, _, _, _, _. by iFrame "#∗". }
+             iExists _, _, _, _, _, _, _, _. by iFrame "#∗". }
        iIntros (repd repv) "(Hcr & Hpost)".
        iDestruct "Hpost" as "(_ & [Habs|Hpost])";
          first by iDestruct "Habs" as (? ? ? ? ?) "Habs".

@@ -33,6 +33,8 @@ Section trace_proof.
   Admitted.
   Next Obligation.
   Admitted.
+  Next Obligation.
+  Admitted.
 
   (* Library specification on the form required by the trace infrastructure *)
   Definition ru_library_spec (P0 : iProp Σ) (lib : KVS_transaction_api) 

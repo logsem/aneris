@@ -133,7 +133,14 @@ Section Implication.
     iExists _.
     iFrame.
   Qed.
-  
+  Next Obligation.
+    iIntros (γA γF RC E c c' sa sa' ls ls' Hsub) "#(Hinv & _) (Hconn1 & Hconn2)".
+    iMod (RC.(read_committed.specs.resources.Connection_unique) 
+            with "[$Hinv][$Hconn1 $Hconn2]") as "(Hconn1 & Hconn2 & Heq)"; first done.
+    iModIntro.
+    iFrame.
+  Qed.
+
   Lemma rewrite_maps_1 `{RC : !RC_resources Mdl Σ} (m : gmap Key Vals) (γA : gname) :
     ([∗ map] k↦V ∈ m, ∃ V', ⌜V' ⊆ V⌝ ∗ read_committed.specs.resources.OwnMemKey k V' ∗ 
     OwnAuthSet γA k V) -∗

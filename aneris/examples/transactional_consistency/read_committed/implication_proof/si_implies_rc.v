@@ -80,6 +80,17 @@ Section Implication.
       intro v.
       by destruct (Himp v) as [_ Hgoal].
   Qed.
+  Next Obligation.
+    iIntros (SI E c c' sa sa' ls ls' Hsub) 
+      "#Hinv ([(-> & Hconn1) | [%m (-> & Hconn1)]] & [(-> & Hconn2) | [%m' (-> & Hconn2)]])".
+    all : iMod (SI.(snapshot_isolation.specs.resources.Connection_unique) 
+            with "[$Hinv][$Hconn1 $Hconn2]") as "(Hconn1 & Hconn2 & Heq)"; first done.
+    all : iModIntro.
+    all : iFrame.
+    all : iSplitL "Hconn1".
+    1, 2, 3, 6 : iLeft; by iFrame.
+    1, 2, 3, 4 : iRight; iExists _; by iFrame.
+  Qed.
 
   Lemma rewrite_maps_1 `{SI : !SI_resources Mdl Σ} (m : gmap Key Vals) :
     ([∗ map] k↦V ∈ m, ∃ h : Hist, ⌜∀ v : val, v ∈ h ↔ v ∈ V⌝ ∗ 

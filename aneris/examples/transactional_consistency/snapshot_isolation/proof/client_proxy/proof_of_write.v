@@ -54,7 +54,7 @@ Section Write_Proof.
   Proof.
     iIntros (c sa k v E HsubE Hk) "#Hisc %Φ !# Hshift".
     iDestruct "Hisc" as (lk cst l) "Hisc".
-    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap ->) "#(Hc1 & Hisc)".
+    iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap γU ->) "#(Hc1 & Hisc)".
     rewrite /TC_write /= /write.
     wp_pures.
     wp_apply (acquire_spec (KVS_InvName.@socket_address_to_str sa)
@@ -65,7 +65,8 @@ Section Write_Proof.
     {
       iApply fupd_aneris_wp.
       iMod "Hshift" as "[%vo [%b ((Hcache & _) & _)]]".
-      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq) "Hcache".
+      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache".
+      iDestruct "Hcache" as (Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
       iDestruct (client_connected_agree with "[$Hc1][$Hc2]") as "%Heq'".
@@ -87,13 +88,13 @@ Section Write_Proof.
     wp_bind (Store _ _).
     wp_apply (aneris_wp_atomic _ _ E).
     iMod "Hshift" as "[%vo [%b ((Hcache & Hkds) & Hclose)]]".
-    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? Heq)
-                            "(#Hc3 & HcacheHalf1 & %Hv)".
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache".
+    iDestruct "Hcache" as (Heq) "(#Hc3 & HcacheHalf1 & %Hv)".
     symmetry in Heq. simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc3][$Hc1]") as "%Heq'".
     simplify_eq.
-    iDestruct "Hkds" as (? ? ? ? ? ? ? ? ? Heq')
-                            "(#Hc4 & HcacheHalf2 & %Hb)".
+    iDestruct "Hkds" as (? ? ? ? ? ? ? ? ? ?) "Hkds".
+    iDestruct "Hkds" as (Heq') "(#Hc4 & HcacheHalf2 & %Hb)".
     symmetry in Heq'. simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq''".
     simplify_eq.
@@ -109,12 +110,12 @@ Section Write_Proof.
     iMod ("Hclose" with "[H1 H2]") as "HΦ".
     - iSplitL "H1".
       + iExists _, _, _, _, _, _, _, _.
-        iExists true.
+        iExists _, true.
         iSplit; first done.
         iFrame "#∗".
         by destruct v.
       + iExists _, _, _, _, _, _, _, _.
-        iExists _.
+        iExists _, _.
         iSplit; first done.
         iFrame "#∗".
         eauto.
