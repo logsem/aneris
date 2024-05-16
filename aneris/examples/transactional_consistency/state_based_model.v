@@ -180,7 +180,7 @@ Definition validCallSequence (trace : list val) : Prop :=
                      (isStEvent e ∨ isCmEvent e) ∧ rel_list trace e_st e)))).
 
 Definition comTrans (T : list transaction) : list transaction := 
-  List.filter (λ t, match last t with | Some (Cm true) => true | _ => false end) T.
+  List.filter (λ t, match last t with | Some (Cm c true) => true | _ => false end) T.
 
 Definition based_on (exec : execution) (transactions : list transaction) : Prop :=
   ∀ t, t ∈ (split exec).1 ↔ t ∈ transactions.
