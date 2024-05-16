@@ -148,25 +148,6 @@ Section LibPMP.
     (* clear -H1.  *)
     dEl; tauto || set_solver.
    Qed.
-
-  (* TODO: unify with model_agree ? *)
-  Lemma y_model_agree `{clientGS Σ} y1 y2:
-    ⊢ y_auth_model_is y1 -∗ y_frag_model_is y2 -∗ ⌜y1 = y2⌝.
-  Proof.
-    iIntros "Ha Hf".
-    by iDestruct (own_valid_2 with "Ha Hf") as
-      %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
-  Qed.
-
-  (* TODO: unify with update_model ? *)
-  Lemma y_update_model `{clientGS Σ} y1 y2 y:
-    y_auth_model_is y1 -∗ y_frag_model_is y2 ==∗ y_auth_model_is y ∗ y_frag_model_is y.
-  Proof.
-    iIntros "H1 H2". iCombine "H1 H2" as "H".
-    iMod (own_update with "H") as "[??]" ; eauto.
-    - by apply auth_update, option_local_update, (exclusive_local_update _ (Excl y)).
-    - iModIntro. iFrame.
-  Qed.
      
   
   Definition lib_PMPP `{clientGS Σ}:
@@ -314,46 +295,25 @@ Section LibPMP.
     iPureIntro. destruct decide; tauto. 
   Qed. 
 
-  
-  
-  (* TODO: restore proofs below;
-     try to write a universal one covering any allowed lib proof rule *)
-  
-  (* Lemma lib_open_inv `{clientGS Σ} ζ fs (FSnz : fs ≠ ∅): *)
-  (*   client_inv -∗ has_fuels ζ fs (PMPP := lib_PMPP) -∗ *)
-  (*   |={↑Ns, ∅}=> *)
-  (*   ⌜ ζ = 0 ⌝ ∗ *)
-  (*   (∃ lb, partial_model_is (lb, 1) (PartialModelPredicatesPre := PMPP) ∗ model_state_interp lb) ∗ *)
-  (*   frag_mapping_is {[ρlg := dom fs]}  ∗ y_auth_model_is 1 ∗ *)
-  (*   (∃ f, partial_fuel_is {[ρ_lib := f]} ∗ ⌜ 1 <= f <= client_fl ⌝) ∗ *)
-  (*   partial_mapping_is {[0 := {[ρ_lib]}]} ∗ *)
-  (*   partial_free_roles_are {[inr ρy]} ∗ y_frag_model_is 1 ∗ *)
-  (*   frag_fuel_is fs ∗ *)
-  (*   (▷ (∃ st, client_inv_impl st) ={ ∅, ↑Ns}=∗ emp). *)
-  (* Proof. *)
-  (*   iIntros "#INV FUELS_LIB". *)
-  (*   iInv Ns as ((lb, y)) ">(ST & YST_AUTH & inv')" "CLOS". *)
-  (*   rewrite difference_diag_L. iModIntro. *)
-  (*   iDestruct (has_fuels_equiv with "FUELS_LIB") as "[MAP_LIB FUEL_LIB]". *)
-  (*   simpl. iDestruct "MAP_LIB" as (???) "(%LIBM&LM&MATCH&MAP&FR&YST)". *)
-  (*   assert (ζ = 0 /\ L = dom fs) as [-> ->]; [| clear LIBM]. *)
-  (*   { by apply map_singleton_inj in LIBM as [-> <-]. } *)
-  (*   (* assert (S <$> fs ≠ ∅) by (by intros ?%fmap_empty_inv). *) *)
-  (*   iDestruct "MATCH" as "[(_&[-> ->]&(%f & Ff & %BOUND)) | [% _]]". *)
-  (*   2: { exfalso. apply FSnz. apply dom_empty_iff. set_solver. } *)
-  (*   iPoseProof (y_model_agree with "YST_AUTH YST") as "->". *)
-  (*   iPoseProof (frag_mapping_same with "[inv'] LM") as "%TMAP0". *)
-  (*   { iDestruct "inv'" as (?)"(?&?&?)". iFrame. } *)
-  (*   iPoseProof (frag_fuel_included with "[inv'] [FUEL_LIB]") as "%FUEL0". *)
-  (*   { iDestruct "inv'" as (?)"(?&?&?&?)". iFrame. } *)
-  (*   { iApply frag_fuel_is_big_sepM; [done | by iFrame]. } *)
-  (*   iSplitR; [done| ]. *)
-  (*   iFrame. iSplitL "ST inv'". *)
-  (*   - iExists lb. iFrame.  *)
-  (*   - iDestruct (frag_fuel_is_big_sepM with "FUEL_LIB") as "?"; [done| ]. *)
-  (*     iFrame. iExists _. iFrame. done. *)
-  (* Qed. *)
 
+  Lemma fuel_keep_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns):
+  LSG Einvs ∗ client_inv ⊢
+  ∀ (extr : execution_trace heap_lang) (auxtr : auxiliary_trace M)
+    (c2 : cfg heap_lang) (fs : gmap (fmrole lib_model_impl) nat)
+    (ζ : locale heap_lang) g (_ : dom fs ≠ ∅) (_ : locale_step
+                                                   (trace_last extr)
+                                                   (Some ζ) c2),
+    ζ ⤞ g -∗
+    has_fuels ζ (S <$> fs) (PMPP := lib_PMPP) -∗
+    em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := heap_fairnessGS)
+    ={Einvs ∪ ↑Ns}=∗
+    ∃ (δ2 : M) (ℓ : mlabel M),
+      ⌜em_valid_state_evolution_fairness (extr :tr[ Some ζ ]: c2)
+         (auxtr :tr[ ℓ ]: δ2)⌝ ∗
+      has_fuels ζ (filter (λ '(k, _), k ∈ dom fs ∖ ∅) fs) (PMPP := lib_PMPP) ∗
+      em_msi c2 δ2 (em_GS0 := heap_fairnessGS).
+  Proof.
+    
 
   (* Lemma fuel_keep_step_lifting `{clientGS Σ} Einvs (DISJ_INV: Einvs ## ↑Ns): *)
   (* LSG Einvs ∗ client_inv ⊢ *)

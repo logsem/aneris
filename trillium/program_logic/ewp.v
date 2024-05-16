@@ -37,7 +37,7 @@ Definition ewp_pre
       (* ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗ *)
       (* ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ -∗ *)
       (* state_interp extr atr *)
-      PI σ1 -∗ MSI δ1
+      PI σ1 -∗ ▷ MSI δ1
       ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
        ∀ e2 σ2 efs,
@@ -624,6 +624,26 @@ Proof.
   iIntros (v) "HΦ". by iApply "HΦ".
 Qed.
 
+(* Lemma ewp_notstuck_post_dis_dichotomy E ρ e Φ σ δ: *)
+(*   (∀ v δ, Φ v -∗ MSI δ -∗ ⌜ ¬ role_enabled_model ρ δ ⌝) -∗ *)
+(*   EWP e @ NotStuck; ρ; E {{ Φ }} -∗ *)
+(*   PI σ -∗ *)
+(*   MSI δ -∗ *)
+(*   |={E}=> ⌜ is_Some (to_val e) /\ ¬ role_enabled_model ρ δ \/ to_val e = None /\ role_enabled_model ρ δ ⌝. *)
+(* Proof. *)
+(*   iIntros "DIS EWP PI MSI". *)
+(*   rewrite ewp_unfold /ewp_pre. *)
+(*   destruct (to_val e). *)
+(*   { iMod "EWP". iModIntro. iLeft. iSplit; try done.     *)
+(*     iApply ("DIS" with "[$] [$]"). } *)
+(*   destruct (decide (role_enabled_model ρ δ)). *)
+(*   { iPureIntro. tauto. } *)
+(*   iSpecialize ("EWP" with "PI MSI"). *)
+(*   iMod "EWP" as "[%RED STEP]". *)
+(*   destruct RED as (?&?&?&?). *)
+(*   iSpecialize ("STEP" with "[//]").  *)
+  
+
 End wp.
 
 (* #[global] Arguments AllowsStuttering {_} _ _ {_}. *)
@@ -835,3 +855,5 @@ Notation "'EWP' e @ s ; ρ ; E {{ v , Q } }" := (ewp s E ρ e%E (λ v, Q))
   Qed. 
 
 End ewp_to_wp. 
+
+
