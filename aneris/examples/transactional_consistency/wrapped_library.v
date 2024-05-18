@@ -7,7 +7,7 @@ Definition start_emit_event : val :=
 Definition wrap_start (start : val) : val := 
   λ: "cst", 
   start "cst" ;;
-  Emit (start_emit_event "cst") ;;
+  Fresh (start_emit_event "cst") ;;
   #().
 
 Definition read_emit_event : val :=
@@ -16,7 +16,7 @@ Definition read_emit_event : val :=
 Definition wrap_read (read : val) : val := 
   λ: "cst" "k", 
   let: "vo" := read "cst" "k" in 
-  Emit (read_emit_event "cst" "k" "vo") ;;
+  Fresh (read_emit_event "cst" "k" "vo") ;;
   "vo".
 
 Definition write_emit_event : val :=
@@ -24,7 +24,7 @@ Definition write_emit_event : val :=
 
 Definition wrap_write (write : val) : val := 
   λ: "cst" "k" "v", 
-  Emit (write_emit_event "cst" "k" "v") ;;
+  Fresh (write_emit_event "cst" "k" "v") ;;
   write "cst" "k" "v".
 
 Definition commit_emit_event : val :=
@@ -33,7 +33,7 @@ Definition commit_emit_event : val :=
 Definition wrap_commit (commit : val) : val := 
   λ: "cst", 
   let: "b" := commit "cst" in 
-  Emit (commit_emit_event "cst" "b") ;; 
+  Fresh (commit_emit_event "cst" "b") ;; 
   "b".
   
 Global Instance KVS_wrapped_api (lib : KVS_transaction_api) :
