@@ -757,7 +757,9 @@ Definition simulation_adequacy_with_trace_inv_groups `{!anerisPreG Σ Mdl} `{EqD
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs_groups sa []) -∗
      observed_send_groups obs_send_sas -∗
      observed_receive_groups obs_rec_sas -∗
-     frag_st Mdl.(model_state_initial) ={⊤}=∗
+     frag_st Mdl.(model_state_initial) -∗ 
+     trace_half_frag [] -∗
+     trace_is [] ={⊤}=∗
      (∀ v, Φ v -∗ ⌜φ v⌝) ∗
      WP (mkExpr ip e1) @ s; (ip,0); ⊤ {{ Φ }} ∗
      (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c3,
@@ -842,7 +844,7 @@ Proof.
     as "[Hauth Hown_recv]"; [done|].
   iDestruct (socket_address_group_own_big_sepS with "Hown_recv") as "Hown_recv".
   iMod ("Himpl" with "[$] [$] [$] [$] [$] [Hsendevs Hown_send]
-[Hreceiveevs Hown_recv] [$] [$] [$Hmfrag //]") as "(HΦ & Hwp & Himpl)".
+[Hreceiveevs Hown_recv] [$] [$] [$Hmfrag //] [$] [$]") as "(HΦ & Hwp & Himpl)".
   { iApply big_sepS_sep. iFrame "Hsendevs Hown_send". }
   { iApply big_sepS_sep. iFrame "Hreceiveevs Hown_recv". }
   iMod (socket_address_group_own_alloc_subseteq_pre _ A (obs_send_sas ∪ obs_rec_sas) with "Hauth")
@@ -897,7 +899,9 @@ Definition simulation_adequacy1_with_trace_inv Σ Mdl `{!anerisPreG Σ Mdl} `{Eq
        ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
        observed_send obs_send_sas -∗
        observed_receive obs_rec_sas -∗
-       frag_st Mdl.(model_state_initial) ={⊤}=∗
+       frag_st Mdl.(model_state_initial) -∗ 
+       trace_half_frag [] -∗ 
+       trace_is [] ={⊤}=∗
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
        WP (mkExpr ip e1) @ s; (ip, 0); ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c3,
@@ -933,8 +937,8 @@ Proof.
   iMod (Hwp Mdl') as (trace_inv Φ) "Hwp".
   iModIntro.
   iExists trace_inv, Φ.
-  iIntros "Hfix HA HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag".
-  iApply ("Hwp" with "Hfix [HA] HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag").
+  iIntros "Hfix HA HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag Htrace_frag Htrace".
+  iApply ("Hwp" with "Hfix [HA] HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag Htrace_frag Htrace").
   { iDestruct (big_sepS_to_singletons _
       (λ xs, xs ⤳*[ bool_decide (xs ∈ to_singletons obs_send_sas),
                     bool_decide (xs ∈ to_singletons obs_rec_sas)] (∅, ∅))%I
@@ -991,7 +995,9 @@ Definition simulation_adequacy_with_trace_inv `{!anerisPreG Σ Mdl} `{EqDecision
        ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
        observed_send obs_send_sas -∗
        observed_receive obs_rec_sas -∗
-       frag_st Mdl.(model_state_initial) ={⊤}=∗
+       frag_st Mdl.(model_state_initial) -∗ 
+       trace_half_frag [] -∗ 
+       trace_is [] ={⊤}=∗
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
        WP (mkExpr ip e1) @ s; (ip, 0); ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c3,
@@ -1027,8 +1033,8 @@ Proof.
   iMod (Hwp Mdl') as (trace_inv Φ) "Hwp".
   iModIntro.
   iExists trace_inv, Φ.
-  iIntros "Hfix HA HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag".
-  iApply ("Hwp" with "Hfix [HA] HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag").
+  iIntros "Hfix HA HIP Hnode Hlbls Hsend Hrecv Hsend_obs Hrecv_obs Hfrag Htrace_frag Htrace".
+  iApply ("Hwp" with "Hfix [HA] HIP Hnode Hlbls [Hsend] [Hrecv] Hsend_obs Hrecv_obs Hfrag Htrace_frag Htrace").
   { iDestruct (big_sepS_to_singletons _
       (λ xs, xs ⤳*[ bool_decide (xs ∈ to_singletons obs_send_sas),
                     bool_decide (xs ∈ to_singletons obs_rec_sas)] (∅, ∅))%I
@@ -1088,7 +1094,9 @@ Definition simulation_adequacy_groups Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision 
        ([∗ set] sa ∈ obs_rec_sas, receiveon_evs_groups sa []) -∗
        observed_send_groups obs_send_sas -∗
        observed_receive_groups obs_rec_sas -∗
-       frag_st Mdl.(model_state_initial) ={⊤}=∗
+       frag_st Mdl.(model_state_initial) -∗ 
+       trace_half_frag [] -∗ 
+       trace_is [] ={⊤}=∗
        WP (mkExpr ip e1) @ s; (ip,0); ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c3,
          ⌜valid_system_trace ex atr⌝ -∗
@@ -1114,8 +1122,8 @@ Proof.
   iMod Hwp as (Φ f) "Hwp".
   iModIntro.
   iExists (λ _ _, True)%I, Φ.
-  iIntros "? ? ? ? ? ? ? ? ? ?".
-  iMod ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "[$ Hstep]".
+  iIntros "? ? ? ? ? ? ? ? ? ? ? ?".
+  iMod ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "[$ Hstep]".
   iModIntro.
   iSplitR; [eauto|].
   iIntros (ex atr c3 ? ? ? ? ? ?) "HSI Hposts".
@@ -1145,8 +1153,7 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
   (∀ `{!anerisG Mdl Σ},
      ⊢ |={⊤}=>
         (* There exists a postcondition and a socket interpretation function *)
-     ∃ (Φ : language.val aneris_lang → iProp Σ)
-       (f : socket_address → socket_interp Σ),
+     ∃ (Φ : language.val aneris_lang → iProp Σ),
      (* Given resources reflecting initial configuration, we need *)
      (* to prove two goals *)
      unallocated A -∗
@@ -1157,7 +1164,9 @@ Definition simulation_adequacy1 Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneri
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
      observed_receive obs_rec_sas -∗
-     frag_st Mdl.(model_state_initial) ={⊤}=∗
+     frag_st Mdl.(model_state_initial) -∗ 
+     trace_half_frag [] -∗ 
+     trace_is [] ={⊤}=∗
      WP (mkExpr ip e1) @ s; (ip,0); ⊤ {{ Φ }} ∗
      (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c3,
        ⌜valid_system_trace ex atr⌝ -∗
@@ -1179,11 +1188,11 @@ Proof.
   eapply (simulation_adequacy1_with_trace_inv
           _ _ _ _ _ A obs_send_sas obs_rec_sas ξ (λ _, True))=>//.
   iIntros (?) "".
-  iMod Hwp as (Φ f) "Hwp".
+  iMod Hwp as (Φ) "Hwp".
   iModIntro.
   iExists (λ _ _, True)%I, Φ.
-  iIntros "? ? ? ? ? ? ? ? ? ?".
-  iMod ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "[$ Hstep]".
+  iIntros "? ? ? ? ? ? ? ? ? ? ? ?".
+  iMod ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "[$ Hstep]".
   iModIntro.
   iSplitR; [eauto|].
   iIntros (ex atr c3 ? ? ? ? ? ? ) "HSI Hposts".
@@ -1225,7 +1234,9 @@ Definition simulation_adequacy Σ Mdl `{!anerisPreG Σ Mdl} `{EqDecision (aneris
      ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) -∗
      observed_send obs_send_sas -∗
      observed_receive obs_rec_sas -∗
-     frag_st Mdl.(model_state_initial) ={⊤}=∗
+     frag_st Mdl.(model_state_initial) -∗ 
+     trace_half_frag [] -∗ 
+     trace_is [] ={⊤}=∗
      (∀ v, Φ v -∗ ⌜φ v⌝) ∗
      WP (mkExpr ip e1) @ s; (ip,0); ⊤ {{ Φ }} ∗
      (∀ (ex : execution_trace aneris_lang) (atr : auxiliary_trace (aneris_to_trace_model Mdl)) c3,
@@ -1252,8 +1263,8 @@ Proof.
   iMod Hwp as (Φ) "Hwp".
   iModIntro.
   iExists (λ _ _, True)%I, Φ.
-  iIntros "? ? ? ? ? ? ? ? ? ?".
-  iMod ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "($ & $ & Hstep)".
+  iIntros "? ? ? ? ? ? ? ? ? ? ? ?".
+  iMod ("Hwp" with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "($ & $ & Hstep)".
   iModIntro.
   iIntros (ex atr c3 ? ? ? ? ? ?) "HSI Hposts".
   iSplit; last first.

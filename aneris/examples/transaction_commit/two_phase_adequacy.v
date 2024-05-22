@@ -131,7 +131,7 @@ Proof.
   iIntros "!#".
   iExists (* (λ _ atr, ⌜trace_steps (λ δ _ δ', δ = δ' ∨ TCNext rms δ δ') atr⌝%I) *)
     (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
-  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
+  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag _ _".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
   iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.

@@ -311,7 +311,7 @@ Proof.
   set (paxosGI := Build_paxosG Σ runner_topo _ γM _ γP _ γmb _ γmv).
   iIntros "!#".
   iExists (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
-  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
+  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag _ _".
   iDestruct (big_sepS_union with "Hhist") as "[Hhist Hclient]"; [set_solver|].
   iPoseProof (big_sepS_singleton with "Hclient") as "Hclient".
   iDestruct (big_sepS_union with "Hhist") as "[Hhist Hlearners]"; [set_solver|].

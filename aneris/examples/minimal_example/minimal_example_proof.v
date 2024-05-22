@@ -254,7 +254,7 @@ Proof.
   { set_solver. }
   iIntros (?) "!#".
   iExists (λ _, True)%I.
-  iIntros "_ _ _ #? Hevs _ _ _ _ Hfg".
+  iIntros "_ _ _ #? Hevs _ _ _ _ Hfg _ _".
   rewrite big_sepS_singleton.
   assert (inG #[ anerisΣ incr_exampleM; GFunctor incr_res] incr_res).
   { assert (subG (GFunctor incr_res) #[ anerisΣ incr_exampleM; GFunctor incr_res]).
