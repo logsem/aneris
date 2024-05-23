@@ -150,7 +150,7 @@ Proof.
   by apply Hsim_ex' in Htrace_end'.
 Qed.
 
-Lemma adequacy_trace_simpl {Σ} `{anerisPreG Σ unit_model} (N : namespace) ip
+Lemma adequacy_trace {Σ} `{anerisPreG Σ unit_model} (N : namespace) ip
   (Φ : ∀ `{anerisG Σ}, iProp Σ → val → iProp Σ)  (P0 : iProp Σ) 
   (e e_init : expr) (wrap_lib : val) (good_trace: list val → Prop) 
   (σ: state) (A : gset socket_address) (IPs : gset ip_address)  :
