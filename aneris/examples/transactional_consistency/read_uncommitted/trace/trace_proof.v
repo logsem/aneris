@@ -37,25 +37,27 @@ Section trace_proof.
   Admitted.
 
   (* Library specification on the form required by the trace infrastructure *)
-  Definition ru_library_spec (P0 : iProp Σ) (lib : KVS_transaction_api) 
-  (clients : gset socket_address) : iProp Σ :=
+  Definition ru_library_spec (clients : gset socket_address) (P0 : iProp Σ) 
+  (lib : KVS_transaction_api) : iProp Σ :=
     ∃ (res : RU_resources Mdl Σ), 
-      □ (P0 -∗ (([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗ KVS_Init ∗ GlobalInv ∗
-                ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa))) ∗
-      init_kvs_spec ∗
-      init_client_proxy_spec ∗
-      read_spec ∗
-      write_spec ∗
-      start_spec ∗
-      commit_spec.
+      □ (P0 -∗ ([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗ 
+               KVS_Init ∗ 
+               GlobalInv ∗
+               ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
+               init_kvs_spec ∗
+               init_client_proxy_spec ∗
+               read_spec ∗
+               write_spec ∗
+               start_spec ∗
+               commit_spec).
 
   (* Primary lemma to be used with adequacy *)
-  Lemma library_implication (N : namespace) (P0 : iProp Σ) 
-  (lib : KVS_transaction_api) (clients : gset socket_address) :
-    ru_library_spec P0 lib clients -∗
-    ru_library_spec (P0 ∗ trace_is [] ∗ trace_inv N valid_trace_ru) 
-                    (KVS_wrapped_api lib) clients.
-  Proof. 
+  Lemma library_implication (clients : gset socket_address) 
+  (N : namespace) (P0 : iProp Σ) (lib : KVS_transaction_api) :
+    ru_library_spec clients P0 lib -∗
+    ru_library_spec clients (P0 ∗ trace_is [] ∗ trace_inv N valid_trace_ru) 
+                            (KVS_wrapped_api lib).
+  Proof.
   Admitted.
 
 End trace_proof.

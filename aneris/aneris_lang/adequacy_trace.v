@@ -150,56 +150,9 @@ Proof.
   by apply Hsim_ex' in Htrace_end'.
 Qed.
 
-Lemma adequacy_trace {Σ} `{anerisPreG Σ unit_model} (N : namespace) ip
-  (Φ : ∀ `{anerisG Σ}, iProp Σ → val → iProp Σ)  (P0 : iProp Σ) 
-  (e : val → expr) (e_init : expr) (imimpl : val) (good_trace: list val → Prop) 
-  (σ: state) (A : gset socket_address) (IPs : gset ip_address) (lbls : gset string) 
-  (obs_send_sas : gset socket_address) (obs_rec_sas : gset socket_address) :
-  state_heaps σ = {[ip:=∅]} →
-  state_sockets σ = {[ip:=∅]} →
-  state_ms σ = ∅ →
-  state_trace σ = [] →
-  ip ∉ IPs →
-  obs_send_sas ⊆ A →
-  obs_rec_sas ⊆ A →
-  good_trace (state_trace σ) →
-  (⊢ ∀ `(anerisG Σ) P m, Φ P m -∗ {{{ P }}} e m @[ip] {{{ v, RET v; True }}}) →
-  (⊢ ∀ `(anerisG Σ), 
-    {{{ unallocated A ∗
-        ([∗ set] a ∈ A, a ⤳[bool_decide (a ∈ obs_send_sas), bool_decide (a ∈ obs_rec_sas)] (∅, ∅)) ∗
-        ([∗ set] ip ∈ IPs, free_ip ip) ∗
-        ([∗ set] lbl ∈ lbls, alloc_evs lbl []) ∗
-        ([∗ set] sa ∈ obs_send_sas, sendon_evs sa []) ∗
-        ([∗ set] sa ∈ obs_rec_sas, receiveon_evs sa []) ∗
-        observed_send obs_send_sas ∗
-        observed_receive obs_rec_sas }}} 
-    e_init @[ip] 
-    {{{ v, RET v; P0 }}}) →
-  (⊢ ∀ `(anerisG Σ), Φ (P0 ∗ trace_is (state_trace σ) ∗ trace_inv N good_trace)%I imimpl) →
-  ∀ σ' e',
-    rtc step ([(mkExpr ip (e_init ;; e imimpl))], σ) (e', σ') →
-    good_trace (state_trace σ').
-Proof.
-  intros Hstate_heap Hstate_sock Hstate_ms Hstate_trace Hips_nin Hobs_send Hobs_rec.
-  intros Htr Hctx Hinit Himpl σ' e' Hsteps.
-  eapply (aneris_invariance _ _ _ _ _ A _ _ obs_send_sas obs_rec_sas); try done.
-  iIntros (? ?) "!# (#HI & Htr & Hunalloc & Hobs & Hfree_ip & Hlbs 
-    & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ". 
-  wp_bind e_init. 
-  iApply (Hinit with "[$Hunalloc $Hobs $Hfree_ip $Hlbs $Hsend_evs $Hrec_evs 
-    $Hobs_send $Hobs_rec][Htr HΦ]").
-  iNext.
-  iIntros (v) "H0". 
-  wp_pures.
-  iApply (Hctx with "[] [H0 Htr HI] [HΦ]").
-  - iApply Himpl.
-  - iFrame "∗#".
-  - done.
-Qed.
-
 Lemma adequacy_trace_simpl {Σ} `{anerisPreG Σ unit_model} (N : namespace) ip
   (Φ : ∀ `{anerisG Σ}, iProp Σ → val → iProp Σ)  (P0 : iProp Σ) 
-  (e : val → expr) (e_init : expr) (imimpl : val) (good_trace: list val → Prop) 
+  (e e_init : expr) (wrap_lib : val) (good_trace: list val → Prop) 
   (σ: state) (A : gset socket_address) (IPs : gset ip_address)  :
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
@@ -207,28 +160,25 @@ Lemma adequacy_trace_simpl {Σ} `{anerisPreG Σ unit_model} (N : namespace) ip
   state_trace σ = [] →
   ip ∉ IPs →
   good_trace (state_trace σ) →
-  (⊢ ∀ `(anerisG Σ) P m, Φ P m -∗ {{{ P }}} e m @[ip] {{{ v, RET v; True }}}) →
-  (⊢ ∀ `(anerisG Σ), 
-    {{{ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}} 
-    e_init @[ip] 
-    {{{ v, RET v; P0 }}}) →
-  (⊢ ∀ `(anerisG Σ), Φ (P0 ∗ trace_is (state_trace σ) ∗ trace_inv N good_trace)%I imimpl) →
+  (⊢ ∀ `(anerisG Σ) P lib, 
+    {{{ P ∗ Φ P lib ∗ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}} 
+    e @[ip] 
+    {{{ v, RET v; True }}}) →
+  (⊢ ∀ `(anerisG Σ), |={⊤}=> P0) →
+  (⊢ ∀ `(anerisG Σ), Φ (P0 ∗ trace_is (state_trace σ) ∗ trace_inv N good_trace)%I wrap_lib) →
   ∀ σ' e',
-    rtc step ([(mkExpr ip (e_init ;; e imimpl))], σ) (e', σ') →
+    rtc step ([(mkExpr ip (e))], σ) (e', σ') →
     good_trace (state_trace σ').
 Proof.
   intros Hstate_heap Hstate_sock Hstate_ms Hstate_trace Hips_nin.
-  intros Htr Hctx Hinit Himpl σ' e' Hsteps.
+  intros Htr Hclient Hinit Himpl σ' e' Hsteps.
   eapply (aneris_invariance _ _ _ _ _ A _ ∅ ∅ ∅); try done.
   iIntros (? ?) "!# (#HI & Htr & Hunalloc & Hobs & Hfree_ip & Hlbs 
-    & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ". 
-  wp_bind e_init. 
-  iApply (Hinit with "[$Hunalloc $Hfree_ip $Hobs][Htr HΦ]").
-  iNext.
-  iIntros (v) "H0". 
-  wp_pures.
-  iApply (Hctx with "[] [H0 Htr HI] [HΦ]").
-  - iApply Himpl.
-  - iFrame "∗#".
-  - done.
+    & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ".
+  iApply fupd_aneris_wp.
+  iMod (Hinit $! anerisG0) as "Hinit'".
+  iModIntro.
+  iApply (Hclient $! _ (P0 ∗ trace_is (state_trace σ) ∗ trace_inv N good_trace)%I 
+            with "[$Hunalloc $Hfree_ip $Hobs $Htr $Hinit' $HI][HΦ]"); last done.
+  iApply Himpl.
 Qed.
