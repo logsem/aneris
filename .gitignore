@@ -40,6 +40,9 @@ build-dep/
 ### O2A ###
 _generated
 
+### OCaml ###
+_build/
+
 ### Emacs ###
 # -*- mode: gitignore; -*-
 *~
