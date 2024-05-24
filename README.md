@@ -80,7 +80,7 @@ You can now run
 at the root of the repository to generate Coq files from the OCaml sources in
 [`ml_sources`](/ml_sources). To compile the source files, run
 
-    dune build
+    dune build --root .
 
 at the root of the repository.
 
