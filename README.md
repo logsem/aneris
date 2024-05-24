@@ -111,13 +111,12 @@ partial correctness properties and trace properties; Aneris is now an
 instantiation of the Trillium framework.
 
 Aneris also supports trace-based reasoning to establish free theorems using the 
-the method described in [Theorems for Free from Separation Logic Specifications]
-(https://iris-project.org/pdfs/2021-icfp-intensional-final.pdf). 
+the method described in [Theorems for Free from Separation Logic Specifications](https://iris-project.org/pdfs/2021-icfp-intensional-final.pdf). 
 In fact, parts of the Coq development accompaying the paper 
 are injected into the Aneris program logic. 
 For completeness, this concerns elements in the files: 
 aneris/aneris_lang/ast.v, aneris/aneris_lang/lang.v, 
 aneris/aneris_lang/resources.v, aneris/aneris_lang/adequacy.v, 
 aneris/aneris_lang/lifting.v, aneris/aneris_lang/resources.v,
-aneris/aneris_lang/state_interp/state_interp_def.v, aneris/aneris_lang/adequacy_trace.v,
-aneris/aneris_lang/program_logic/aneris_lifting.v.
+aneris/aneris_lang/state_interp/state_interp_def.v,aneris/aneris_lang/adequacy_trace.v,
+and aneris/aneris_lang/program_logic/aneris_lifting.v.
