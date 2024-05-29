@@ -17,8 +17,6 @@ Section trace_proof.
   Definition trace_inv_name := nroot.@"trinv".
 
   (** Ghost theory *)
-  
-
 
   (** Wrapped resources  *)
   Global Program Instance wrapped_resources `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=

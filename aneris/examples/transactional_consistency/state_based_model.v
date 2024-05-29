@@ -33,7 +33,7 @@ Definition transaction : Type := list operation.
 Definition valid_transaction (t : transaction) : Prop :=
   (* The last operation is the commit operation *)
   (∃ tag c b, last t = Some (Cm tag c b)) ∧ 
-  (* The commit is only one commit operation *)
+  (* There is only one commit operation *)
   (∀ op tag c b, op ∈ t → op = Cm tag c b → last t = Some op) ∧
   (* Operations come from the same connection *)
   (∀ op1 op2, op1 ∈ t → op2 ∈ t → connOfOp op1 = connOfOp op2) ∧
@@ -182,9 +182,7 @@ Definition valid_call_sequence (trace : list val) : Prop :=
                        (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ is_st_event e_st' ∧ 
                                   rel_list trace e_st e_st' ∧ rel_list trace e_st' e_cm)) ∨ 
              (¬∃ e, e ∈ trace ∧ connOfEvent e = Some c ∧ 
-                     (is_st_event e ∨ is_cm_event e) ∧ rel_list trace e_st e))) ∧
-    (* Operations are unique *)
-    (∀ e1 e2 i j, trace !! i = Some e1 → trace !! j = Some e2 → e1 = e2 → i = j).
+                     (is_st_event e ∨ is_cm_event e) ∧ rel_list trace e_st e))).
 
 Definition comTrans (T : list transaction) : list transaction := 
   List.filter (λ t, match last t with | Some (Cm tag c true) => true | _ => false end) T.
