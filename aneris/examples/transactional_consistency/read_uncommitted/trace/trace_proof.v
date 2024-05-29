@@ -14,18 +14,26 @@ From aneris.examples.transactional_consistency Require Import user_params aux_de
 Section trace_proof.
   Context `{!anerisG Mdl Σ, !User_params}.
 
+  Definition trace_inv_name := nroot.@"trinv".
+
+  (** Ghost theory *)
+  
+
+
   (** Wrapped resources  *)
   Global Program Instance wrapped_resources `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
-      GlobalInv := True%I;
-      OwnMemKey k V := True%I;
-      OwnLocalKey k c vo := True%I;
-      ConnectionState c s sa := True%I;
-      IsConnected c sa := True%I;
+      GlobalInv := GlobalInv ∗  trace_inv trace_inv_name valid_trace_ru ∗ ∃ t, trace_is t%I;
+      OwnMemKey k V := (OwnMemKey k V ∗ ∀ v, ⌜v ∈ V⌝ → ∃ t tag c, trace_hist t ∗ 
+                        ⌜(#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V ∈ t⌝)%I;
+      OwnLocalKey k c vo := (OwnLocalKey k c vo ∗ ∃ t tag v, trace_hist t ∗ 
+                             ⌜vo = Some v → (#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V ∈ t⌝)%I;
+      ConnectionState c s sa := ConnectionState c s sa%I;
+      IsConnected c sa := IsConnected c sa%I;
       KVS_ru := KVS_ru;
-      KVS_Init := True%I;
-      KVS_ClientCanConnect sa := True%I;
-      Seen k V := True%I;
+      KVS_Init := KVS_Init%I;
+      KVS_ClientCanConnect sa := KVS_ClientCanConnect sa%I;
+      Seen k V := Seen k V%I;
     |}.
   Next Obligation.
   Admitted.
@@ -35,8 +43,8 @@ Section trace_proof.
   Admitted.
   Next Obligation.
   Admitted.
-
-  Definition trace_inv_name := nroot.@"trinv".
+  Next Obligation.
+  Admitted.
 
   (* Primary lemma to be used with adequacy *)
   Lemma library_implication `{!anerisG Mdl Σ} (clients : gset socket_address) 
@@ -45,6 +53,8 @@ Section trace_proof.
     trace_is [] ∗ trace_inv trace_inv_name valid_trace_ru) ={⊤}=∗ 
     RU_spec clients (KVS_wrapped_api lib).
   Proof.
+    iIntros "([%res (Hkeys & Hkvs_init & Hglob_inv & Hcan_conn & 
+      (#Hinit_kvs & #Hinit_cli & #Hread & #Hwrite & #Hstart & #Hcom))] & Htr & #Htr_inv)".
   Admitted.
 
 End trace_proof.

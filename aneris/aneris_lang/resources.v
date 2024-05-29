@@ -463,12 +463,12 @@ Section definitions.
 
   Definition trace_auth (t: list val) :=
     (own aneris_trace_name (●F (to_agree (t: traceO))))%I.
-  Definition hist (t: list val) :=
+  Definition trace_hist (t: list val) :=
     own aneris_trace_hist_name (◯ (gmap_of_trace 0 t)).
   Definition trace_half_frag (t: list val) :=
     own aneris_trace_name (◯F{1/2} (to_agree (t: traceO))).
   Definition trace_is (t: list val) :=
-    (trace_half_frag t ∗ own aneris_trace_hist_name (● gmap_of_trace 0 t) ∗ hist t)%I.
+    (trace_half_frag t ∗ own aneris_trace_hist_name (● gmap_of_trace 0 t) ∗ trace_hist t)%I.
 
   Definition trace_inv (N: namespace) (I: list val → Prop) :=
     inv N (∃ t, trace_half_frag t ∗ ⌜I t⌝).
@@ -1797,12 +1797,12 @@ Section resource_lemmas.
 
   (** Traces *)
 
-  #[global] Instance hist_persistent (t: list val): Persistent (hist t) := _.
+  #[global] Instance trace_hist_persistent (t: list val): Persistent (trace_hist t) := _.
 
-  Lemma alloc_hist t :
-    trace_is t -∗ trace_is t ∗ hist t.
+  Lemma alloc_trace_hist t :
+    trace_is t -∗ trace_is t ∗ trace_hist t.
   Proof.
-    rewrite /trace_is /hist. iIntros "(? & ? & #H)". iFrame "H ∗".
+    rewrite /trace_is /trace_hist. iIntros "(? & ? & #H)". iFrame "H ∗".
   Qed.
 
   Lemma trace_auth_half_frag_agree t t':
@@ -1838,7 +1838,7 @@ Section resource_lemmas.
     trace_auth t -∗ trace_is t -∗ trace_half_frag t ==∗
     trace_auth (t ++ [e]) ∗ trace_is (t ++ [e]) ∗ trace_half_frag (t ++ [e]).
   Proof.
-    rewrite /trace_auth /trace_is /hist.
+    rewrite /trace_auth /trace_is /trace_hist.
     iIntros "H1 (H2 & H2ha & H2h) H3".
     iDestruct (own_op with "[$H2 $H3]") as "H2".
     rewrite -frac_auth_frag_op Qp.half_half agree_idemp.
@@ -1887,10 +1887,10 @@ Section resource_lemmas.
     Unshelve. all: typeclasses eauto.
   Qed.
 
-  Lemma hist_trace_is_prefix t h :
-    trace_is t -∗ hist h -∗ ⌜ h `prefix_of` t ⌝.
+  Lemma trace_hist_trace_is_prefix t h :
+    trace_is t -∗ trace_hist h -∗ ⌜ h `prefix_of` t ⌝.
   Proof.
-    rewrite /trace_is /hist. iIntros "(H1 & H2 & H3) H4".
+    rewrite /trace_is /trace_hist. iIntros "(H1 & H2 & H3) H4".
     iDestruct (own_op with "[$H2 $H4]") as "H".
     iDestruct (own_valid with "H") as %[Hsub Hv]%auth_both_valid_discrete.
     iPureIntro. eapply gmap_of_trace_hist_valid_prefix; eauto.

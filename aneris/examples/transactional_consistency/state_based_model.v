@@ -144,7 +144,7 @@ Definition toEvent (op : operation) : val :=
     | Cm tag c b => (#tag, (c, (#"Cm", #b)))
   end.
 
-Definition extractionOf (trace : list val) (T : list transaction) : Prop := 
+Definition extraction_of (trace : list val) (T : list transaction) : Prop := 
   (* Trace and transactions contain the same operations 
     (start operations are ignored and we are allowed to close transactions with commit operations) *)
   (∀ event op, event ∈ trace → toOp event = Some op → ∃ t, t ∈ T → op ∈ t) ∧
@@ -154,35 +154,35 @@ Definition extractionOf (trace : list val) (T : list transaction) : Prop :=
   (* Order amongst operations is preserved *)
   (∀ t op1 op2, t ∈ T → op1 ∈ t → op2 ∈ t → rel_list t op1 op2 → rel_list trace (toEvent op2) (toEvent op2)).
 
-Definition isStEvent (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"St"))%V.
+Definition is_st_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"St"))%V.
 
-Definition isRdEvent (v : val) : Prop := 
+Definition is_rd_event (v : val) : Prop := 
   (∃ tag c k v', v = (#tag, (c, (#"Rd", (#k, SOMEV v'))))%V) ∨ 
   (∃ tag c k, v = (#tag, (c, (#"Rd", (#k, NONEV))))%V).
 
-Definition isWrEvent (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"Wr", (#k, v'))))%V.
+Definition is_wr_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"Wr", (#k, v'))))%V.
 
-Definition isCmEvent (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"Cm", #b)))%V.
+Definition is_cm_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"Cm", #b)))%V.
 
-Definition validCallSequence (trace : list val) : Prop :=
+Definition valid_call_sequence (trace : list val) : Prop :=
   (* Read, write and commit events have a prior start event *)
   (∀ e c, e ∈ trace → 
              connOfEvent e = Some c → 
-             (isRdEvent e ∨ isWrEvent e ∨ isCmEvent e) → 
+             (is_rd_event e ∨ is_wr_event e ∨ is_cm_event e) → 
              (∃ e_st, e_st ∈ trace ∧ connOfEvent e_st = Some c ∧ 
-                      isStEvent e_st ∧ rel_list trace e_st e ∧  
-                      (¬∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧ isCmEvent e_cm ∧ 
+                      is_st_event e_st ∧ rel_list trace e_st e ∧  
+                      (¬∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧ is_cm_event e_cm ∧ 
                                 rel_list trace e_st e_cm ∧ rel_list trace e_cm e))) ∧
   (* There is is at most one active transaction per connection *)
   (∀ e_st c, e_st ∈ trace → 
              connOfEvent e_st = Some c → 
-             isStEvent e_st → 
+             is_st_event e_st → 
              ((∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧
-                       isCmEvent e_cm ∧ rel_list trace e_st e_cm ∧ 
-                       (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ isStEvent e_st' ∧ 
+                       is_cm_event e_cm ∧ rel_list trace e_st e_cm ∧ 
+                       (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ is_st_event e_st' ∧ 
                                   rel_list trace e_st e_st' ∧ rel_list trace e_st' e_cm)) ∨ 
              (¬∃ e, e ∈ trace ∧ connOfEvent e = Some c ∧ 
-                     (isStEvent e ∨ isCmEvent e) ∧ rel_list trace e_st e))) ∧
+                     (is_st_event e ∨ is_cm_event e) ∧ rel_list trace e_st e))) ∧
     (* Operations are unique *)
     (∀ e1 e2 i j, trace !! i = Some e1 → trace !! j = Some e2 → e1 = e2 → i = j).
 
@@ -193,8 +193,8 @@ Definition based_on (exec : execution) (transactions : list transaction) : Prop 
   ∀ t, (t ∈ (split exec).1 ∧ t ≠ []) ↔ t ∈ transactions.
 
 Definition valid_trace (test : commitTest) : list val → Prop :=
-  λ trace, validCallSequence trace ∧ 
-           (∃ T exec, valid_transactions T ∧ extractionOf trace T ∧  
+  λ trace, valid_call_sequence trace ∧ 
+           (∃ T exec, valid_transactions T ∧ extraction_of trace T ∧  
                       based_on exec (comTrans T) ∧ valid_execution test exec).
 
 Definition valid_trace_ru : list val → Prop := valid_trace commit_test_ru.
@@ -207,7 +207,7 @@ Lemma valid_trace_ru_empty : valid_trace_ru [].
 Proof.
   rewrite /valid_trace_ru /valid_trace.
   split.
-  - rewrite /validCallSequence.
+  - rewrite /valid_call_sequence.
     split; intros; set_solver.
   - intros.
     exists [], [([], ∅)].
@@ -216,7 +216,7 @@ Proof.
       split; first set_solver.
       split; set_solver.
     + split.
-      * rewrite /extractionOf.
+      * rewrite /extraction_of.
         do 3 (split; first set_solver).
         set_solver.
       * split.
@@ -234,7 +234,7 @@ Qed.
 Lemma valid_trace_rc_empty : valid_trace_rc [].
   rewrite /valid_trace_rc /valid_trace.
   split.
-  - rewrite /validCallSequence.
+  - rewrite /valid_call_sequence.
     split; intros; set_solver.
   - intros.
     exists [], [([], ∅)].
@@ -243,7 +243,7 @@ Lemma valid_trace_rc_empty : valid_trace_rc [].
       split; first set_solver.
       split; set_solver.
     + split.
-      * rewrite /extractionOf.
+      * rewrite /extraction_of.
         do 3 (split; first set_solver).
         set_solver.
       * split.
@@ -265,7 +265,7 @@ Qed.
 Lemma valid_trace_si_empty : valid_trace_si [].
   rewrite /valid_trace_si /valid_trace.
   split.
-  - rewrite /validCallSequence.
+  - rewrite /valid_call_sequence.
     split; intros; set_solver.
   - intros.
     exists [], [([], ∅)].
@@ -274,7 +274,7 @@ Lemma valid_trace_si_empty : valid_trace_si [].
       split; first set_solver.
       split; set_solver.
     + split.
-      * rewrite /extractionOf.
+      * rewrite /extraction_of.
         do 3 (split; first set_solver).
         set_solver.
       * split.
