@@ -3,6 +3,7 @@ From trillium.program_logic Require Import language.
 From trillium Require Import finitary.
 From aneris.aneris_lang Require Import adequacy aneris_lang proofmode adequacy_no_model.
 From iris.base_logic.lib Require Import invariants.
+From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
 
 Definition aneris_invariance `{anerisPreG Σ unit_model} (N : namespace) (I : list val → Prop) 
   ip e σ A IPs lbls obs_send_sas obs_rec_sas : 
@@ -150,35 +151,33 @@ Proof.
   by apply Hsim_ex' in Htrace_end'.
 Qed.
 
-Lemma adequacy_trace {Σ} `{anerisPreG Σ unit_model} (N : namespace) ip
-  (Φ : ∀ `{anerisG Σ}, iProp Σ → val → iProp Σ)  (P0 : iProp Σ) 
-  (e e_init : expr) (wrap_lib : val) (good_trace: list val → Prop) 
+Lemma adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) ip
+  (Φ : ∀ `{anerisG Σ}, L → iProp Σ) 
+  (e : expr) (lib : L) (valid_trace: list val → Prop) 
   (σ: state) (A : gset socket_address) (IPs : gset ip_address)  :
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
   state_trace σ = [] →
   ip ∉ IPs →
-  good_trace (state_trace σ) →
-  (⊢ ∀ `(anerisG Σ) P lib, 
-    {{{ P ∗ Φ P lib ∗ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}} 
+  valid_trace (state_trace σ) →
+  (∀ `{anerisG Σ}, ⊢ (trace_is [] ∗ trace_inv N valid_trace) -∗ |={⊤}=> Φ lib) →
+  (∀ `{anerisG Σ}, ⊢ 
+    {{{ Φ lib ∗ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}} 
     e @[ip] 
     {{{ v, RET v; True }}}) →
-  (⊢ ∀ `(anerisG Σ), |={⊤}=> P0) →
-  (⊢ ∀ `(anerisG Σ), Φ (P0 ∗ trace_is (state_trace σ) ∗ trace_inv N good_trace)%I wrap_lib) →
   ∀ σ' e',
-    rtc step ([(mkExpr ip (e))], σ) (e', σ') →
-    good_trace (state_trace σ').
+    rtc step ([(mkExpr ip e)], σ) (e', σ') →
+    valid_trace (state_trace σ').
 Proof.
   intros Hstate_heap Hstate_sock Hstate_ms Hstate_trace Hips_nin.
-  intros Htr Hclient Hinit Himpl σ' e' Hsteps.
+  intros Htr Hinit Hclient σ' e' Hsteps.
   eapply (aneris_invariance _ _ _ _ _ A _ ∅ ∅ ∅); try done.
   iIntros (? ?) "!# (#HI & Htr & Hunalloc & Hobs & Hfree_ip & Hlbs 
     & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ".
   iApply fupd_aneris_wp.
-  iMod (Hinit $! anerisG0) as "Hinit'".
+  rewrite Hstate_trace.
+  iMod (Hinit with "[$Htr $HI]") as "Hinit'".
   iModIntro.
-  iApply (Hclient $! _ (P0 ∗ trace_is (state_trace σ) ∗ trace_inv N good_trace)%I 
-            with "[$Hunalloc $Hfree_ip $Hobs $Htr $Hinit' $HI][HΦ]"); last done.
-  iApply Himpl.
+  iApply (Hclient with "[$Hunalloc $Hfree_ip $Hobs $Hinit'][HΦ]"); last done.
 Qed.

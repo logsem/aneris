@@ -30,6 +30,16 @@ Definition connOfEvent (event : val) : option val :=
 
 Definition transaction : Type := list operation.
 
+Definition valid_transaction (t : transaction) : Prop :=
+  (* The last operation is the commit operation *)
+  (∃ tag c b, last t = Some (Cm tag c b)) ∧ 
+  (* The commit is only one commit operation *)
+  (∀ op tag c b, op ∈ t → op = Cm tag c b → last t = Some op) ∧
+  (* Operations come from the same connection *)
+  (∀ op1 op2, op1 ∈ t → op2 ∈ t → connOfOp op1 = connOfOp op2) ∧
+  (* No duplicate operations *)
+  (∀ op1 op2 i j, t !! i = Some op1 → t !! j = Some op2 → op1 = op2 → i = j).
+
 (* We assume unit is not used as a connection *)
 Definition initConn : val := #().
 
@@ -39,34 +49,30 @@ Definition connOfTrans (t : transaction) : val :=
 Definition rel_list {A : Type} (l : list A) (a1 a2 : A) : Prop :=
   ∃ i j, i < j ∧ l !! i = Some a1 ∧ l !! j = Some a2.
 
-Definition valid_transaction (t : transaction) : Prop :=
-  (* The last operation is the commit operation *)
-  (∃ tag c b, last t = Some (Cm tag c b)) ∧ 
-  (* The commit operaion is unique *)
-  (∀ op tag c b, op ∈ t → op = Cm tag c b → last t = Some op).
+Definition valid_transactions (T : list transaction) : Prop := 
+  (* Transactions read their own writes *)
+  (∀ t tag c k ov, t ∈ T → 
+                   Rd tag c k ov ∈ t → 
+                   ∃ tag1 v1, Wr tag1 c k v1 ∈ t →
+                   rel_list t (Wr tag1 c k v1) (Rd tag c k ov) →
+                   (¬∃ tag2 v2, Wr tag2 c k v2 ∈ t ∧ 
+                                 rel_list t (Wr tag1 c k v1) (Wr tag2 c k v2) ∧
+                                 rel_list t (Wr tag2 c k v2) (Rd tag c k ov)) →
+                    ov = Some v1) ∧ 
+  (* Transactions read from some write *)
+  (∀ t tag c k v, t ∈ T → 
+                  Rd tag c k (Some v) ∈ t →
+                  ∃ t' tag' c', t' ∈ T ∧ Wr tag' c' k v ∈ t') ∧
+  (* Transactions satisfy the baseline transaction contraints *)
+  (∀ t, t ∈ T → valid_transaction t) ∧
+  (* No duplicate transactions *)
+  (∀ t1 t2 i j, T !! i = Some t1 → T !! j = Some t2 → t1 = t2 → i = j).
 
 Definition state : Type := gmap Key val.
 
 Definition execution : Type := list (transaction * state).
 
 Definition commitTest : Type := execution -> transaction -> Prop.
-
-Definition valid_transactions (T : list transaction) : Prop := 
-  (* Transactions read their own writes *)
-  (∀ t tag c k ov, t ∈ T → 
-                   Rd tag c k ov ∈ t → 
-                   ∃ tag' v, Wr tag' c k v ∈ t →
-                   rel_list t (Wr tag' c k v) (Rd tag c k ov) →
-                   (¬∃ tag'' v', Wr tag'' c k v' ∈ t ∧ 
-                                 rel_list t (Wr tag' c k v) (Wr tag'' c k v') ∧
-                                 rel_list t (Wr tag'' c k v') (Rd tag c k ov)) →
-                    ov = Some v) ∧ 
-  (* Transactions read from some write *)
-  (∀ t tag c k v, t ∈ T → 
-            Rd tag c k (Some v) ∈ t →
-            ∃ t' tag' c', t' ∈ T ∧ Wr tag' c' k v ∈ t') ∧
-  (* Transactions satisfy the baseline transaction contraints *)
-  (∀ t, t ∈ T → valid_transaction t).
 
 Definition applyTransaction (s : state) (t : transaction) : state := 
   foldl (λ s op, match op with | Wr tag c k v => <[k := v]> s | _ => s end) s t.
@@ -111,7 +117,7 @@ Definition parent_state (exec : execution) (t : transaction) (s : state) : Prop 
   ∃ i t' s', exec !! i = Some (t' , s) ∧ exec !! (i + 1) = Some (t, s').
 
 Definition no_conf (exec : execution) (t : transaction) (s : state) : Prop := 
-  ¬(∃ tag c k, (∃ v, Wr tag c k v ∈ t) ∧ 
+  ¬(∃ k, (∃ tag c v, Wr tag c k v ∈ t) ∧ 
          (∀ sp, parent_state exec t sp → s !! k ≠ sp !! k)). 
 
 Definition commit_test_si : commitTest := 
@@ -139,13 +145,12 @@ Definition toEvent (op : operation) : val :=
   end.
 
 Definition extractionOf (trace : list val) (T : list transaction) : Prop := 
-  (* Trace and transactions contain the same operations (start operations are ignored) *)
+  (* Trace and transactions contain the same operations 
+    (start operations are ignored and we are allowed to close transactions with commit operations) *)
   (∀ event op, event ∈ trace → toOp event = Some op → ∃ t, t ∈ T → op ∈ t) ∧
-  (∀ t op, t ∈ T → op ∈ t → (toEvent op) ∈ trace) ∧
-  (* No duplicate operations *)
-  (∀ t op1 op2 i j, t ∈ T → t !! i = Some op1 → t !! j = Some op2 → op1 = op2 → i = j) ∧
-  (* Operations are grouped into transactions correctly *)
-  (∀ t op1 op2, t ∈ T → op1 ∈ t → op2 ∈ t → connOfOp op1 = connOfOp op2) ∧
+  (∀ t op, t ∈ T → op ∈ t → ¬(∃ tag c b, op = Cm tag c b) → (toEvent op) ∈ trace) ∧
+  (∀ t op, t ∈ T → op ∈ t → (∃ tag c b, op = Cm tag c b) → 
+           ((toEvent op) ∈ trace ∨ (∃ op', op' ∈ t ∧ (toEvent op') ∈ trace))) ∧
   (* Order amongst operations is preserved *)
   (∀ t op1 op2, t ∈ T → op1 ∈ t → op2 ∈ t → rel_list t op1 op2 → rel_list trace (toEvent op2) (toEvent op2)).
 
@@ -161,13 +166,13 @@ Definition isCmEvent (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"Cm", #b))
 
 Definition validCallSequence (trace : list val) : Prop :=
   (* Read, write and commit events have a prior start event *)
-  (∀ e_cm c, e_cm ∈ trace → 
-             connOfEvent e_cm = Some c → 
-             (isRdEvent e_cm ∨ isWrEvent e_cm ∨ isCmEvent e_cm) → 
+  (∀ e c, e ∈ trace → 
+             connOfEvent e = Some c → 
+             (isRdEvent e ∨ isWrEvent e ∨ isCmEvent e) → 
              (∃ e_st, e_st ∈ trace ∧ connOfEvent e_st = Some c ∧ 
-                      isStEvent e_st ∧ rel_list trace e_st e_cm ∧  
-                      (¬∃ e_cm', e_cm' ∈ trace ∧ connOfEvent e_cm' = Some c ∧ isCmEvent e_cm' ∧ 
-                                 rel_list trace e_st e_cm' ∧ rel_list trace e_cm' e_cm))) ∧
+                      isStEvent e_st ∧ rel_list trace e_st e ∧  
+                      (¬∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧ isCmEvent e_cm ∧ 
+                                rel_list trace e_st e_cm ∧ rel_list trace e_cm e))) ∧
   (* There is is at most one active transaction per connection *)
   (∀ e_st c, e_st ∈ trace → 
              connOfEvent e_st = Some c → 
@@ -176,21 +181,122 @@ Definition validCallSequence (trace : list val) : Prop :=
                        isCmEvent e_cm ∧ rel_list trace e_st e_cm ∧ 
                        (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ isStEvent e_st' ∧ 
                                   rel_list trace e_st e_st' ∧ rel_list trace e_st' e_cm)) ∨ 
-             ((¬∃ e, e ∈ trace ∧ connOfEvent e = Some c ∧ 
-                     (isStEvent e ∨ isCmEvent e) ∧ rel_list trace e_st e)))).
+             (¬∃ e, e ∈ trace ∧ connOfEvent e = Some c ∧ 
+                     (isStEvent e ∨ isCmEvent e) ∧ rel_list trace e_st e))) ∧
+    (* Operations are unique *)
+    (∀ e1 e2 i j, trace !! i = Some e1 → trace !! j = Some e2 → e1 = e2 → i = j).
 
 Definition comTrans (T : list transaction) : list transaction := 
   List.filter (λ t, match last t with | Some (Cm tag c true) => true | _ => false end) T.
 
 Definition based_on (exec : execution) (transactions : list transaction) : Prop :=
-  ∀ t, t ∈ (split exec).1 ↔ t ∈ transactions.
+  ∀ t, (t ∈ (split exec).1 ∧ t ≠ []) ↔ t ∈ transactions.
 
 Definition valid_trace (test : commitTest) : list val → Prop :=
-  λ trace, ∀ T, validCallSequence trace ∧ extractionOf trace T ∧ valid_transactions T ∧ 
-            ∃ exec, based_on exec (comTrans T) ∧ valid_execution test exec.
+  λ trace, validCallSequence trace ∧ 
+           (∃ T exec, valid_transactions T ∧ extractionOf trace T ∧  
+                      based_on exec (comTrans T) ∧ valid_execution test exec).
 
 Definition valid_trace_ru : list val → Prop := valid_trace commit_test_ru.
 
 Definition valid_trace_rc : list val → Prop := valid_trace commit_test_rc.
 
 Definition valid_trace_si : list val → Prop := valid_trace commit_test_si.
+
+Lemma valid_trace_ru_empty : valid_trace_ru [].
+Proof.
+  rewrite /valid_trace_ru /valid_trace.
+  split.
+  - rewrite /validCallSequence.
+    split; intros; set_solver.
+  - intros.
+    exists [], [([], ∅)].
+    split.
+    + rewrite /valid_transactions.
+      split; first set_solver.
+      split; set_solver.
+    + split.
+      * rewrite /extractionOf.
+        do 3 (split; first set_solver).
+        set_solver.
+      * split.
+        -- rewrite /based_on.
+           intro t.
+           split; set_solver.
+        -- rewrite /valid_execution.
+           split; last done.
+           intros.
+           destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+           destruct i; first done.
+           set_solver.
+Qed.
+
+Lemma valid_trace_rc_empty : valid_trace_rc [].
+  rewrite /valid_trace_rc /valid_trace.
+  split.
+  - rewrite /validCallSequence.
+    split; intros; set_solver.
+  - intros.
+    exists [], [([], ∅)].
+    split.
+    + rewrite /valid_transactions.
+      split; first set_solver.
+      split; set_solver.
+    + split.
+      * rewrite /extractionOf.
+        do 3 (split; first set_solver).
+        set_solver.
+      * split.
+        -- rewrite /based_on.
+           intro t.
+           split; set_solver.
+        -- rewrite /valid_execution.
+           split.
+           ++ intros.
+              destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+              destruct i; first done.
+              set_solver.
+           ++ split; first done.
+              intros.
+              rewrite /commit_test_rc /pre_read.
+              assert (t = []) as ->; set_solver.
+Qed.
+
+Lemma valid_trace_si_empty : valid_trace_si [].
+  rewrite /valid_trace_si /valid_trace.
+  split.
+  - rewrite /validCallSequence.
+    split; intros; set_solver.
+  - intros.
+    exists [], [([], ∅)].
+    split.
+    + rewrite /valid_transactions.
+      split; first set_solver.
+      split; set_solver.
+    + split.
+      * rewrite /extractionOf.
+        do 3 (split; first set_solver).
+        set_solver.
+      * split.
+        -- rewrite /based_on.
+           intro t.
+           split; set_solver.
+        -- rewrite /valid_execution.
+           split.
+           ++ intros.
+              destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+              destruct i; first done.
+              set_solver.
+           ++ split; first done.
+              intros.
+              rewrite /commit_test_si.
+              exists ∅.
+              simpl.
+              split; first set_solver.
+              assert (t = []) as ->; first set_solver.
+              split.
+              ** rewrite /complete.
+                 set_solver.
+              ** rewrite /no_conf.
+                 set_solver.
+Qed.

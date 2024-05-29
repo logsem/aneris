@@ -37,27 +37,14 @@ Section trace_proof.
   Next Obligation.
   Admitted.
 
-  (* Library specification on the form required by the trace infrastructure *)
-  Definition si_library_spec (clients : gset socket_address) (P0 : iProp Σ) 
-  (lib : KVS_transaction_api) : iProp Σ := 
-      (P0 -∗ ∃ (res : SI_resources Mdl Σ),
-               ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗ 
-               KVS_Init ∗ 
-               GlobalInv ∗
-               ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
-               init_kvs_spec ∗
-               init_client_proxy_spec ∗
-               read_spec ∗
-               write_spec ∗
-               start_spec ∗
-               commit_spec).
+  Definition trace_inv_name := nroot.@"trinv".
 
   (* Primary lemma to be used with adequacy *)
-  Lemma library_implication (clients : gset socket_address) 
-  (N : namespace) (P0 : iProp Σ) (lib : KVS_transaction_api) :
-    si_library_spec clients P0 lib -∗
-    si_library_spec clients (P0 ∗ trace_is [] ∗ trace_inv N valid_trace_si) 
-                            (KVS_wrapped_api lib).
+  Lemma library_implication `{!anerisG Mdl Σ} (clients : gset socket_address) 
+  (lib : KVS_transaction_api) :
+    ((SI_spec clients lib) ∗
+    trace_is [] ∗ trace_inv trace_inv_name valid_trace_si) ={⊤}=∗ 
+    SI_spec clients (KVS_wrapped_api lib).
   Proof.
   Admitted.
 
