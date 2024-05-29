@@ -1,20 +1,20 @@
 From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_code.
-From aneris.examples.transactional_consistency.snapshot_isolation Require Import snapshot_isolation_code.
+From aneris.examples.transactional_consistency.snapshot_isolation Require Import wrapped_snapshot_isolation_code.
 From aneris.examples.transactional_consistency Require Import wrapped_library.
 From aneris.examples.transactional_consistency.snapshot_isolation.util Require Import util_code.
 
 Definition transaction1 : val :=
-  λ: "cst", (wrap_start start) "cst";;
-             (wrap_write write) "cst" #"x" #1;;
+  λ: "cst", start "cst";;
+             write "cst" #"x" #1;;
              loop #().
 
 Definition transaction2 : val :=
   λ: "cst",
-  (wrap_start start) "cst";;
-  let: "vx" := (wrap_read read) "cst" #"x" in
+  start "cst";;
+  let: "vx" := read "cst" #"x" in
   assert: ("vx" = NONE);;
-  (wrap_commit commit) "cst" ;;
+  commit "cst" ;;
   #().
 
 Definition transaction1_client : val :=
