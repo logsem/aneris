@@ -160,8 +160,8 @@ Lemma adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) i
   state_ms σ = ∅ →
   state_trace σ = [] →
   ip ∉ IPs →
-  valid_trace (state_trace σ) →
-  (∀ `{anerisG Σ}, ⊢ (trace_is [] ∗ trace_inv N valid_trace) -∗ |={⊤}=> Φ lib) →
+  valid_trace [] →
+  (∀ `{anerisG Σ}, ⊢ (trace_is [] ∗ trace_inv N valid_trace) ={⊤}=∗ Φ lib) →
   (∀ `{anerisG Σ}, ⊢ 
     {{{ Φ lib ∗ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}} 
     e @[ip] 
@@ -172,6 +172,7 @@ Lemma adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) i
 Proof.
   intros Hstate_heap Hstate_sock Hstate_ms Hstate_trace Hips_nin.
   intros Htr Hinit Hclient σ' e' Hsteps.
+  rewrite -Hstate_trace in Htr.
   eapply (aneris_invariance _ _ _ _ _ A _ ∅ ∅ ∅); try done.
   iIntros (? ?) "!# (#HI & Htr & Hunalloc & Hobs & Hfree_ip & Hlbs 
     & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ".
