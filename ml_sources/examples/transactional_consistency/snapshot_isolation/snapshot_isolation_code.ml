@@ -113,14 +113,17 @@ let lk_handle lk handler =
 let read_handler (kvs : 'a kvsTy Atomic.t) tk () =
   kvs_get_last tk !kvs
 
-let start_handler (vnum : int Atomic.t) () =
+let start_handler (vnum : int Atomic.t) (active_ts : int list Atomic.t) () =
   let vnext = !vnum + 1 in
+  let active_ts_next = vnext :: !active_ts in
   vnum := vnext;
+  active_ts := active_ts_next;
   vnext
 
 let client_request_handler
     (lk : Mutex.t) (kvs : 'a kvsTy Atomic.t)
-    (vnum : int Atomic.t) (req : 'a reqTy)
+    (vnum : int Atomic.t) (active_ts: int list Atomic.t)
+    (req : 'a reqTy)
   : 'a replTy =
   let res =
     match req with
@@ -132,7 +135,7 @@ let client_request_handler
       begin match r with
         (* START request *)
         | InjL _tt ->
-          InjR (InjL (lk_handle lk (start_handler vnum)))
+          InjR (InjL (lk_handle lk (start_handler vnum active_ts)))
         (* COMMIT request *)
         | InjR cdata ->
           InjR (InjR (lk_handle lk (commit_handler kvs cdata vnum)))
@@ -140,15 +143,16 @@ let client_request_handler
   in res
 
 
-let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum () =
+let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum active_ts () =
   run_server (repl_ser ser) (req_ser ser) addr
-    (fun req -> client_request_handler lk kvs vnum req)
+    (fun req -> client_request_handler lk kvs vnum active_ts req)
 
 let init_server (ser[@metavar] : 'a serializer) addr : unit =
   let (kvs : 'a kvsTy Atomic.t) = ref (map_empty ()) in
   let vnum = ref 0 in
+  let active_ts = ref [] in
   let (lk : Mutex.t) = newlock () in
-  fork (start_server_processing_clients ser addr lk kvs vnum) ()
+  fork (start_server_processing_clients ser addr lk kvs vnum active_ts) ()
 
 
 let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
