@@ -11,6 +11,9 @@ open Mt_server_code
 (** 1. The KVS type (updated via commited transactions) *)
 type 'a kvsTy = ((string, ((string * ('a * int)) alist)) amap)
 
+(** 2. The list of transaction timestamps and wether they are active or not *)
+type trsTy = ((int * bool) list Atomic.t)
+
 (** 2. The cache memory (current opened transaction).
     Simplification: there is only one global cache for all clients.
     Therefore, no concurrent accesses to disjoint keys) *)
@@ -81,10 +84,14 @@ let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
     if tc <= t || t = ts then assert false
     else t < ts
 
+let garbage_collection (kvs : 'a kvsTy Atomic.t) (trs : trsTy) : 'a kvsTy =
+  ignore trs; !kvs
+
 let commit_handler
     (kvs : 'a kvsTy Atomic.t)
     (cdata : int * 'a cacheTy)
-    (vnum : int Atomic.t) () =
+    (vnum : int Atomic.t)
+    (trs : trsTy) () =
   let tc = !vnum + 1 in
   let kvs_t = !kvs in
   let (ts, cache) = cdata in
@@ -99,10 +106,10 @@ let commit_handler
     if b then begin
       vnum := tc;
       kvs := update_kvs kvs_t cache tc;
+      kvs := garbage_collection kvs trs;
       true
     end
     else false
-
 
 let lk_handle lk handler =
   acquire lk;
@@ -113,16 +120,16 @@ let lk_handle lk handler =
 let read_handler (kvs : 'a kvsTy Atomic.t) tk () =
   kvs_get_last tk !kvs
 
-let start_handler (vnum : int Atomic.t) (active_ts : int list Atomic.t) () =
+let start_handler (vnum : int Atomic.t) (trs : trsTy) () =
   let vnext = !vnum + 1 in
-  let active_ts_next = vnext :: !active_ts in
+  let trs = (vnext, true) :: !trs in
   vnum := vnext;
-  active_ts := active_ts_next;
+  ignore trs;
   vnext
 
 let client_request_handler
     (lk : Mutex.t) (kvs : 'a kvsTy Atomic.t)
-    (vnum : int Atomic.t) (active_ts: int list Atomic.t)
+    (vnum : int Atomic.t) (trs : trsTy)
     (req : 'a reqTy)
   : 'a replTy =
   let res =
@@ -135,24 +142,23 @@ let client_request_handler
       begin match r with
         (* START request *)
         | InjL _tt ->
-          InjR (InjL (lk_handle lk (start_handler vnum active_ts)))
+          InjR (InjL (lk_handle lk (start_handler vnum trs)))
         (* COMMIT request *)
         | InjR cdata ->
-          InjR (InjR (lk_handle lk (commit_handler kvs cdata vnum)))
+          InjR (InjR (lk_handle lk (commit_handler kvs cdata vnum trs)))
       end
   in res
 
-
-let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum active_ts () =
+let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum trs () =
   run_server (repl_ser ser) (req_ser ser) addr
-    (fun req -> client_request_handler lk kvs vnum active_ts req)
+    (fun req -> client_request_handler lk kvs vnum trs req)
 
 let init_server (ser[@metavar] : 'a serializer) addr : unit =
   let (kvs : 'a kvsTy Atomic.t) = ref (map_empty ()) in
+  let (trs : trsTy) = ref [] in
   let vnum = ref 0 in
-  let active_ts = ref [] in
   let (lk : Mutex.t) = newlock () in
-  fork (start_server_processing_clients ser addr lk kvs vnum active_ts) ()
+  fork (start_server_processing_clients ser addr lk kvs vnum trs) ()
 
 
 let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
@@ -226,13 +232,3 @@ let commit (cst : 'a connection_state) : bool =
         | InjR b ->
           tst := None; b
   in release lk; b
-
-let garbage_collection (cst : 'a connection_state) : unit =
-  let (_clt_addr, (lk, (_rpc, tst))) = cst in
-  acquire lk;
-  match !tst with
-  | None -> ()
-  | Some st ->
-    let (_, cache) = st in
-    cache := map_empty ();
-    release lk
