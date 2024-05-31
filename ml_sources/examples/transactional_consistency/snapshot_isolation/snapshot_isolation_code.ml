@@ -223,3 +223,12 @@ let commit (cst : 'a connection_state) : bool =
           tst := None; b
   in release lk; b
 
+let garbage_collection (cst : 'a connection_state) : unit =
+  let (_clt_addr, (lk, (_rpc, tst))) = cst in
+  acquire lk;
+  match !tst with
+  | None -> ()
+  | Some st ->
+    let (_, cache) = st in
+    cache := map_empty ();
+    release lk
