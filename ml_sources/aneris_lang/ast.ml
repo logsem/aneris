@@ -5,8 +5,8 @@ type ('a, 'b) sumTy = InjL of 'a | InjR of 'b
 (* let tpool = Domainslib.Task.setup_pool ~num_additional_domains:12 *)
 let[@builtinAtom "Fork"] fork f e =
   let _promise =
-    (* let tpool = Domainslib.Task.setup_pool ~num_additional_domains:2 in *)
-    let tpool = Domainslib.Task.setup_pool ~num_domains:2 () in
+    let tpool = Domainslib.Task.setup_pool ~num_additional_domains:2 in
+    (* let tpool = Domainslib.Task.setup_pool ~num_domains:2 () in *)
     Domainslib.Task.async tpool (fun () -> f e) in
   ()
 
