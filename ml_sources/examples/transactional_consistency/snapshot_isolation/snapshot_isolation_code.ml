@@ -11,15 +11,16 @@ open Mt_server_code
 (** 1. The KVS type (updated via commited transactions) *)
 type 'a kvsTy = ((string, ((string * ('a * int)) alist)) amap)
 
-(** 2. The list of transaction timestamps and wether they are active or not *)
-type trsTy = ((int * bool) list Atomic.t)
+(** 2. The last transaction id and the list of transaction
+      timestamps and wether they are active or not *)
+type trsTy = (int * ((int * bool) alist))
 
-(** 2. The cache memory (current opened transaction).
+(** 3. The cache memory (current opened transaction).
     Simplification: there is only one global cache for all clients.
     Therefore, no concurrent accesses to disjoint keys) *)
 type 'a cacheTy = ((string, 'a) amap)
 type 'a reqTy = ((string * int), (unit, int * 'a cacheTy) sumTy) sumTy
-type 'a replTy = ('a option, (int, bool) sumTy) sumTy
+type 'a replTy = ('a option, (trsTy, bool) sumTy) sumTy
 type 'a connection_state =
   (saddr * (Mutex.t *
    (('a reqTy, 'a replTy) rpc *
@@ -39,7 +40,10 @@ let repl_ser (val_ser[@metavar]) =
   sum_serializer
     (option_serializer val_ser)
     (sum_serializer
-       int_serializer
+       (prod_serializer
+          int_serializer
+          (list_serializer (prod_serializer int_serializer bool_serializer))
+        )
        bool_serializer)
 
 let kvs_get k kvs =
@@ -74,6 +78,19 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
       upd kvs_t' cache_l
   in upd kvs cache
 
+let update_transaction_list (uts : int) (trs : trsTy Atomic.t) =
+  let (ts, trs_list) = !trs in
+  let rec upd l  =
+    match l with
+    | None -> list_nil
+    | Some p ->
+      let (transaction, list) = p in
+      let (t, b) = transaction in
+      if t != uts then list_cons (t, b) (upd list)
+      else list_cons (t, false) list
+  in ts, upd trs_list
+
+
 let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
   assert (ts < tc);
   match vlst with
@@ -84,17 +101,18 @@ let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
     if tc <= t || t = ts then assert false
     else t < ts
 
-let garbage_collection (kvs : 'a kvsTy Atomic.t) (trs : trsTy) : 'a kvsTy =
+let garbage_collection (kvs : 'a kvsTy Atomic.t) (trs : trsTy Atomic.t) : 'a kvsTy =
   ignore trs; !kvs
 
 let commit_handler
     (kvs : 'a kvsTy Atomic.t)
     (cdata : int * 'a cacheTy)
-    (vnum : int Atomic.t)
-    (trs : trsTy) () =
-  let tc = !vnum + 1 in
+    (trs : trsTy Atomic.t) () =
+  let (vnum, _) = !trs in
+  let tc = vnum + 1 in
   let kvs_t = !kvs in
   let (ts, cache) = cdata in
+  trs := update_transaction_list ts trs;
   if list_is_empty cache
   then true
   else
@@ -104,7 +122,6 @@ let commit_handler
            let vs = if vlsto = None then list_nil else unSOME vlsto in
            check_at_key ts tc vs) cache in
     if b then begin
-      vnum := tc;
       kvs := update_kvs kvs_t cache tc;
       kvs := garbage_collection kvs trs;
       true
@@ -120,17 +137,16 @@ let lk_handle lk handler =
 let read_handler (kvs : 'a kvsTy Atomic.t) tk () =
   kvs_get_last tk !kvs
 
-let start_handler (vnum : int Atomic.t) (trs : trsTy) () =
-  let vnext = !vnum + 1 in
-  let trs = (vnext, true) :: !trs in
-  vnum := vnext;
-  ignore trs;
-  vnext
+let start_handler (trs : trsTy Atomic.t) () =
+  let (ts, trs_l) = !trs in
+  let vnext = ts + 1 in
+  let trs_l_next = list_cons (vnext, true) trs_l in
+  trs := (vnext, trs_l_next);
+  !trs
 
 let client_request_handler
     (lk : Mutex.t) (kvs : 'a kvsTy Atomic.t)
-    (vnum : int Atomic.t) (trs : trsTy)
-    (req : 'a reqTy)
+    (trs : trsTy Atomic.t) (req : 'a reqTy)
   : 'a replTy =
   let res =
     match req with
@@ -142,23 +158,22 @@ let client_request_handler
       begin match r with
         (* START request *)
         | InjL _tt ->
-          InjR (InjL (lk_handle lk (start_handler vnum trs)))
+          InjR (InjL (lk_handle lk (start_handler trs)))
         (* COMMIT request *)
         | InjR cdata ->
-          InjR (InjR (lk_handle lk (commit_handler kvs cdata vnum trs)))
+          InjR (InjR (lk_handle lk (commit_handler kvs cdata trs)))
       end
   in res
 
-let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum trs () =
+let start_server_processing_clients (ser[@metavar]) addr lk kvs trs () =
   run_server (repl_ser ser) (req_ser ser) addr
-    (fun req -> client_request_handler lk kvs vnum trs req)
+    (fun req -> client_request_handler lk kvs trs req)
 
 let init_server (ser[@metavar] : 'a serializer) addr : unit =
   let (kvs : 'a kvsTy Atomic.t) = ref (map_empty ()) in
-  let (trs : trsTy) = ref [] in
-  let vnum = ref 0 in
+  let (trs : trsTy Atomic.t) = ref (0, list_nil) in
   let (lk : Mutex.t) = newlock () in
-  fork (start_server_processing_clients ser addr lk kvs vnum trs) ()
+  fork (start_server_processing_clients ser addr lk kvs trs) ()
 
 
 let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
@@ -179,7 +194,8 @@ let start (cst : 'a connection_state) : unit =
       | InjL _abs -> assert false
       | InjR s ->
         match s with
-        | InjL ts ->
+        | InjL trs ->
+          let (ts, _) = trs in
           tst := Some (ts, ref (map_empty ()))
         | InjR _abs -> assert false
   end;
