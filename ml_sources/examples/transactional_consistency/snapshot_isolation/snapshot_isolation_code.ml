@@ -88,7 +88,7 @@ let update_transaction_list (uts : int) (trs : trsTy Atomic.t) =
       let (t, b) = transaction in
       if t != uts then list_cons (t, b) (upd list)
       else list_cons (t, false) list
-  in ts, upd trs_list
+  in ts + 1, upd trs_list
 
 
 let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
@@ -101,18 +101,50 @@ let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
     if tc <= t || t = ts then assert false
     else t < ts
 
-let garbage_collection (kvs : 'a kvsTy Atomic.t) (trs : trsTy Atomic.t) : 'a kvsTy =
-  ignore trs; !kvs
+let find_oldest_active (trs : trsTy Atomic.t) : int =
+  let (ts, trs_list) = !trs in
+  let rec active ts l =
+    match l with
+    | None -> ts
+    | Some p ->
+      let (transaction, list) = p in
+      let (t, b) = transaction in
+      if b then active (min t ts) list
+      else active ts list
+  in active ts trs_list
+
+let remove_old_transactions (active : int) (vlsto : ((string * ('a * int)) alist)) : ((string * ('a * int)) alist) =
+  let rec remove v v_new =
+    match v with
+    | None -> v_new
+    | Some p ->
+      let (v, vlist) = p in
+      let (_, (_, ts)) = v in
+      if ts < active then v_new
+      else remove vlist (list_cons v v_new)
+  in remove vlsto None
+
+let garbage_collection (kvs : 'a kvsTy Atomic.t) (cache : 'a cacheTy) (trs : trsTy Atomic.t) : 'a kvsTy =
+  let active_ts = find_oldest_active trs in
+  let _ = map_forall
+      (fun k _v ->
+        let vlsto = (map_lookup k !kvs) in
+        if vlsto = None then true
+        else
+          let vlsto = unSOME vlsto in
+          kvs := map_insert k (remove_old_transactions active_ts vlsto) !kvs;
+          true) cache in
+  !kvs
 
 let commit_handler
     (kvs : 'a kvsTy Atomic.t)
     (cdata : int * 'a cacheTy)
     (trs : trsTy Atomic.t) () =
-  let (vnum, _) = !trs in
-  let tc = vnum + 1 in
-  let kvs_t = !kvs in
   let (ts, cache) = cdata in
+  kvs := garbage_collection kvs cache trs;
   trs := update_transaction_list ts trs;
+  let (tc, _) = !trs in
+  let kvs_t = !kvs in
   if list_is_empty cache
   then true
   else
@@ -123,7 +155,6 @@ let commit_handler
            check_at_key ts tc vs) cache in
     if b then begin
       kvs := update_kvs kvs_t cache tc;
-      kvs := garbage_collection kvs trs;
       true
     end
     else false
