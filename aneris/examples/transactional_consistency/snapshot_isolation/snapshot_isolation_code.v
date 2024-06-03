@@ -18,7 +18,10 @@ Definition req_ser val_ser :=
 
 Definition repl_ser val_ser :=
   sum_serializer (option_serializer val_ser)
-  (sum_serializer int_serializer bool_serializer).
+  (sum_serializer (prod_serializer int_serializer
+                   (list_serializer (prod_serializer int_serializer
+                                     bool_serializer)))
+   bool_serializer).
 
 Definition kvs_get : val :=
   λ: "k" "kvs",
@@ -66,6 +69,25 @@ Definition update_kvs : val :=
     end in
     "upd" "kvs" "cache".
 
+Definition update_transaction_list : val :=
+  λ: "uts" "trs",
+  let: "trs_" := ! "trs" in
+  let: "ts" := Fst "trs_" in
+  let: "trs_list" := Snd "trs_" in
+  letrec: "upd" "l" :=
+    match: "l" with
+      NONE => []
+    | SOME "p" =>
+        let: "transaction" := Fst "p" in
+        let: "list" := Snd "p" in
+        let: "t" := Fst "transaction" in
+        let: "b" := Snd "transaction" in
+        (if: "t" = "uts"
+         then  ("t", #false) :: "list"
+         else  ("t", "b") :: "upd" "list")
+    end in
+    ("ts" + #1, "upd" "trs_list").
+
 Definition check_at_key : val :=
   λ: "ts" "tc" "vlst",
   assert: ("ts" < "tc");;
@@ -82,12 +104,71 @@ Definition check_at_key : val :=
        else  "t" < "ts")
   end.
 
+Definition find_oldest_active : val :=
+  λ: "trs",
+  let: "trs_" := ! "trs" in
+  let: "ts" := Fst "trs_" in
+  let: "trs_list" := Snd "trs_" in
+  letrec: "active" "ts" "l" :=
+    match: "l" with
+      NONE => "ts"
+    | SOME "p" =>
+        let: "transaction" := Fst "p" in
+        let: "list" := Snd "p" in
+        let: "t" := Fst "transaction" in
+        let: "b" := Snd "transaction" in
+        (if: "b"
+         then  "active" ((if: ("t" < "ts")
+                          then  "t"
+                          else  "ts")) "list"
+         else  "active" "ts" "list")
+    end in
+    "active" "ts" "trs_list".
+
+Definition remove_old_transactions : val :=
+  λ: "active" "vlsto",
+  letrec: "remove" "v" "v_new" :=
+    match: "v" with
+      NONE => "v_new"
+    | SOME "p" =>
+        let: "v" := Fst "p" in
+        let: "vlist" := Snd "p" in
+        let: "_k" := Fst "v" in
+        let: "_v" := Fst (Snd "v") in
+        let: "ts" := Snd (Snd "v") in
+        (if: "ts" < "active"
+         then  "v_new"
+         else  "remove" "vlist" ("v" :: "v_new"))
+    end in
+    "remove" "vlsto" NONE.
+
+Definition garbage_collection : val :=
+  λ: "kvs" "cache" "trs",
+  let: "active_ts" := find_oldest_active "trs" in
+  let: "_b" := map_forall (λ: "k" "_v",
+                           let: "vlsto" := map_lookup "k" ! "kvs" in
+                           (if: "vlsto" = NONE
+                            then  #true
+                            else
+                              let: "vlsto" := unSOME "vlsto" in
+                              "kvs" <- (map_insert "k"
+                                        (remove_old_transactions "active_ts"
+                                         "vlsto")
+                                        ! "kvs");;
+                              #true))
+               "cache" in
+  ! "kvs".
+
 Definition commit_handler : val :=
-  λ: "kvs" "cdata" "vnum" <>,
-  let: "tc" := ! "vnum" + #1 in
-  let: "kvs_t" := ! "kvs" in
+  λ: "kvs" "cdata" "trs" <>,
   let: "ts" := Fst "cdata" in
   let: "cache" := Snd "cdata" in
+  "kvs" <- (garbage_collection "kvs" "cache" "trs");;
+  "trs" <- (update_transaction_list "ts" "trs");;
+  let: "trs_" := ! "trs" in
+  let: "tc" := Fst "trs_" in
+  let: "_trs_list" := Snd "trs_" in
+  let: "kvs_t" := ! "kvs" in
   (if: list_is_empty "cache"
    then  #true
    else
@@ -99,10 +180,8 @@ Definition commit_handler : val :=
                              check_at_key "ts" "tc" "vs")
                  "cache" in
      (if: "b"
-      then
-        "vnum" <- "tc";;
-        "kvs" <- (update_kvs "kvs_t" "cache" "tc");;
-        #true
+      then  "kvs" <- (update_kvs "kvs_t" "cache" "tc");;
+            #true
       else  #false)).
 
 Definition lk_handle : val :=
@@ -116,34 +195,39 @@ Definition read_handler : val :=
   λ: "kvs" "tk" <>, kvs_get_last "tk" ! "kvs".
 
 Definition start_handler : val :=
-  λ: "vnum" <>, let: "vnext" := ! "vnum" + #1 in
-                 "vnum" <- "vnext";;
-                 "vnext".
+  λ: "trs" <>,
+  let: "trs_" := ! "trs" in
+  let: "ts" := Fst "trs_" in
+  let: "trs_l" := Snd "trs_" in
+  let: "vnext" := "ts" + #1 in
+  let: "trs_l_next" := ("vnext", #true) :: "trs_l" in
+  "trs" <- ("vnext", "trs_l_next");;
+  ! "trs".
 
 Definition client_request_handler : val :=
-  λ: "lk" "kvs" "vnum" "req",
+  λ: "lk" "kvs" "trs" "req",
   let: "res" := match: "req" with
     InjL "tk" => InjL (lk_handle "lk" (read_handler "kvs" "tk"))
   | InjR "r" =>
       match: "r" with
-        InjL "_tt" => InjR (InjL (lk_handle "lk" (start_handler "vnum")))
+        InjL "_tt" => InjR (InjL (lk_handle "lk" (start_handler "trs")))
       | InjR "cdata" =>
-          InjR (InjR (lk_handle "lk" (commit_handler "kvs" "cdata" "vnum")))
+          InjR (InjR (lk_handle "lk" (commit_handler "kvs" "cdata" "trs")))
       end
   end in
   "res".
 
 Definition start_server_processing_clients ser : val :=
-  λ: "addr" "lk" "kvs" "vnum" <>,
+  λ: "addr" "lk" "kvs" "trs" <>,
   run_server (repl_ser ser) (req_ser ser) "addr"
-  (λ: "req", client_request_handler "lk" "kvs" "vnum" "req").
+  (λ: "req", client_request_handler "lk" "kvs" "trs" "req").
 
 Definition init_server ser : val :=
   λ: "addr",
   let: "kvs" := ref (map_empty #()) in
-  let: "vnum" := ref #0 in
+  let: "trs" := ref (#0, []) in
   let: "lk" := newlock #() in
-  Fork (start_server_processing_clients ser "addr" "lk" "kvs" "vnum" #()).
+  Fork (start_server_processing_clients ser "addr" "lk" "kvs" "trs" #()).
 
 Definition init_client_proxy ser : val :=
   λ: "clt_addr" "srv_addr",
@@ -168,7 +252,10 @@ Definition start : val :=
         InjL "_abs" => assert: #false
       | InjR "s" =>
           match: "s" with
-            InjL "ts" => "tst" <- (SOME ("ts", (ref (map_empty #()))))
+            InjL "trs" =>
+            let: "ts" := Fst "trs" in
+            let: "_trs_list" := Snd "trs" in
+            "tst" <- (SOME ("ts", (ref (map_empty #()))))
           | InjR "_abs" => assert: #false
           end
       end
