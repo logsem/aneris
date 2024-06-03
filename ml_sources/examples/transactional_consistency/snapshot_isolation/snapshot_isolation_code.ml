@@ -79,15 +79,16 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
   in upd kvs cache
 
 let update_transaction_list (uts : int) (trs : trsTy Atomic.t) =
-  let (ts, trs_list) = !trs in
+  let trs_ = !trs in
+  let (ts, trs_list) = trs_ in
   let rec upd l  =
     match l with
     | None -> list_nil
     | Some p ->
       let (transaction, list) = p in
       let (t, b) = transaction in
-      if t != uts then list_cons (t, b) (upd list)
-      else list_cons (t, false) list
+      if t = uts then list_cons (t, false) list
+      else list_cons (t, b) (upd list)
   in ts + 1, upd trs_list
 
 
@@ -102,14 +103,15 @@ let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
     else t < ts
 
 let find_oldest_active (trs : trsTy Atomic.t) : int =
-  let (ts, trs_list) = !trs in
+  let trs_ = !trs in
+  let (ts, trs_list) = trs_ in
   let rec active ts l =
     match l with
     | None -> ts
     | Some p ->
       let (transaction, list) = p in
       let (t, b) = transaction in
-      if b then active (min t ts) list
+      if b then active (if t < ts then t else ts) list
       else active ts list
   in active ts trs_list
 
@@ -119,14 +121,14 @@ let remove_old_transactions (active : int) (vlsto : ((string * ('a * int)) alist
     | None -> v_new
     | Some p ->
       let (v, vlist) = p in
-      let (_, (_, ts)) = v in
+      let (_k, (_v, ts)) = v in
       if ts < active then v_new
       else remove vlist (list_cons v v_new)
   in remove vlsto None
 
 let garbage_collection (kvs : 'a kvsTy Atomic.t) (cache : 'a cacheTy) (trs : trsTy Atomic.t) : 'a kvsTy =
   let active_ts = find_oldest_active trs in
-  let _ = map_forall
+  let _b = map_forall
       (fun k _v ->
         let vlsto = (map_lookup k !kvs) in
         if vlsto = None then true
@@ -143,7 +145,8 @@ let commit_handler
   let (ts, cache) = cdata in
   kvs := garbage_collection kvs cache trs;
   trs := update_transaction_list ts trs;
-  let (tc, _) = !trs in
+  let trs_ = !trs in
+  let (tc, _trs_list) = trs_ in
   let kvs_t = !kvs in
   if list_is_empty cache
   then true
@@ -169,7 +172,8 @@ let read_handler (kvs : 'a kvsTy Atomic.t) tk () =
   kvs_get_last tk !kvs
 
 let start_handler (trs : trsTy Atomic.t) () =
-  let (ts, trs_l) = !trs in
+  let trs_ = !trs in
+  let (ts, trs_l) = trs_ in
   let vnext = ts + 1 in
   let trs_l_next = list_cons (vnext, true) trs_l in
   trs := (vnext, trs_l_next);
@@ -226,7 +230,7 @@ let start (cst : 'a connection_state) : unit =
       | InjR s ->
         match s with
         | InjL trs ->
-          let (ts, _) = trs in
+          let (ts, _trs_list) = trs in
           tst := Some (ts, ref (map_empty ()))
         | InjR _abs -> assert false
   end;
