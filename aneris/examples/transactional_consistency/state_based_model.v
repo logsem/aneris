@@ -3,28 +3,28 @@ From aneris.examples.transactional_consistency Require Import user_params.
 From stdpp Require Import strings.
 From aneris.aneris_lang Require Import network resources.
 
+(* Type for tag-connection pairs *)
+Definition signature : Type := string * val.
+
 Inductive operation : Type :=
-  | Rd (tag : string) (c : val) (k : Key) (ov : option val) : operation 
-  | Wr (tag : string) (c : val) (k : Key) (v : val) : operation
-  | Cm (tag : string) (c : val) (b : bool) : operation.
+  | Rd (s : signature) (k : Key) (ov : option val) : operation 
+  | Wr (s : signature) (k : Key) (v : val) : operation
+  | Cm (s : signature) (b : bool) : operation.
 
 #[global] Instance operation_eq_dec : EqDecision operation.
 Proof. solve_decision. Defined.
 
 Definition connOfOp (op : operation) : val :=
   match op with 
-    | Rd _ c _ _ => c
-    | Wr _ c _ _ => c
-    | Cm _ c _ => c
+    | Rd (_, c) _ _ => c
+    | Wr (_, c) _ _ => c
+    | Cm (_, c) _ => c
   end.
 
 Definition connOfEvent (event : val) : option val :=
   match event with 
-    | (#(LitString tag), (c, (#"Rd", (#(LitString k), NONEV))))%V => Some c
-    | (#(LitString tag), (c, (#"Rd", (#(LitString k), SOMEV v))))%V => Some c
-    | (#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V => Some c
-    | (#(LitString tag), (c, (#"Cm", #(LitBool b))))%V => Some c
-    | (#(LitString tag), (c, #"St"))%V => Some c
+    | (_, (c, _))%V => Some c
+    | (_, c)%V => Some c
     | _ => None
   end.
 
@@ -32,9 +32,9 @@ Definition transaction : Type := list operation.
 
 Definition valid_transaction (t : transaction) : Prop :=
   (* The last operation is the commit operation *)
-  (∃ tag c b, last t = Some (Cm tag c b)) ∧ 
+  (∃ s b, last t = Some (Cm s b)) ∧ 
   (* There is only one commit operation *)
-  (∀ op tag c b, op ∈ t → op = Cm tag c b → last t = Some op) ∧
+  (∀ op s b, op ∈ t → op = Cm s b → last t = Some op) ∧
   (* Operations come from the same connection *)
   (∀ op1 op2, op1 ∈ t → op2 ∈ t → connOfOp op1 = connOfOp op2) ∧
   (* No duplicate operations *)
@@ -52,17 +52,17 @@ Definition rel_list {A : Type} (l : list A) (a1 a2 : A) : Prop :=
 Definition valid_transactions (T : list transaction) : Prop := 
   (* Transactions read their own writes *)
   (∀ t tag c k ov, t ∈ T → 
-                   Rd tag c k ov ∈ t → 
-                   ∃ tag1 v1, Wr tag1 c k v1 ∈ t →
-                   rel_list t (Wr tag1 c k v1) (Rd tag c k ov) →
-                   (¬∃ tag2 v2, Wr tag2 c k v2 ∈ t ∧ 
-                                 rel_list t (Wr tag1 c k v1) (Wr tag2 c k v2) ∧
-                                 rel_list t (Wr tag2 c k v2) (Rd tag c k ov)) →
+                   Rd (tag, c) k ov ∈ t → 
+                   ∃ tag1 v1, Wr (tag1, c) k v1 ∈ t →
+                   rel_list t (Wr (tag1, c) k v1) (Rd (tag, c) k ov) →
+                   (¬∃ tag2 v2, Wr (tag2, c) k v2 ∈ t ∧ 
+                                 rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
+                                 rel_list t (Wr (tag2, c) k v2) (Rd (tag, c) k ov)) →
                     ov = Some v1) ∧ 
   (* Transactions read from some write *)
-  (∀ t tag c k v, t ∈ T → 
-                  Rd tag c k (Some v) ∈ t →
-                  ∃ t' tag' c', t' ∈ T ∧ Wr tag' c' k v ∈ t') ∧
+  (∀ t s k v, t ∈ T → 
+                  Rd s k (Some v) ∈ t →
+                  ∃ t' s', t' ∈ T ∧ Wr s' k v ∈ t') ∧
   (* Transactions satisfy the baseline transaction contraints *)
   (∀ t, t ∈ T → valid_transaction t) ∧
   (* No duplicate transactions *)
@@ -75,7 +75,7 @@ Definition execution : Type := list (transaction * state).
 Definition commitTest : Type := execution -> transaction -> Prop.
 
 Definition applyTransaction (s : state) (t : transaction) : state := 
-  foldl (λ s op, match op with | Wr tag c k v => <[k := v]> s | _ => s end) s t.
+  foldl (λ s op, match op with | Wr sig k v => <[k := v]> s | _ => s end) s t.
 
 Definition valid_execution (test : commitTest) (exec : execution) : Prop :=
   (* Transitions are valid *)
@@ -103,7 +103,7 @@ Definition read_state (c : val) (k : Key) (ov : option val)
              i <= j).
 
 Definition pre_read (exec : execution) (t : transaction) : Prop :=
-  ∀ tag c k ov, (Rd tag c k ov) ∈ t →  ∃ s, read_state c k ov exec s.
+  ∀ tag c k ov, (Rd (tag, c) k ov) ∈ t →  ∃ s, read_state c k ov exec s.
 
 Definition commit_test_rc : commitTest := 
   λ exec trans, pre_read exec trans.
@@ -111,13 +111,13 @@ Definition commit_test_rc : commitTest :=
 (** Snapshot Isolation *)
 
 Definition complete (exec : execution) (t : transaction)  (s : state): Prop := 
-  ∀ tag c k ov, (Rd tag c k ov) ∈ t → read_state c k ov exec s.
+  ∀ tag c k ov, (Rd (tag, c) k ov) ∈ t → read_state c k ov exec s.
 
 Definition parent_state (exec : execution) (t : transaction) (s : state) : Prop :=
   ∃ i t' s', exec !! i = Some (t' , s) ∧ exec !! (i + 1) = Some (t, s').
 
 Definition no_conf (exec : execution) (t : transaction) (s : state) : Prop := 
-  ¬(∃ k, (∃ tag c v, Wr tag c k v ∈ t) ∧ 
+  ¬(∃ k, (∃ sig v, Wr sig k v ∈ t) ∧ 
          (∀ sp, parent_state exec t sp → s !! k ≠ sp !! k)). 
 
 Definition commit_test_si : commitTest := 
@@ -129,63 +129,97 @@ Definition commit_test_si : commitTest :=
 
 Definition toOp (event : val) : option operation := 
   match event with 
-    | (#(LitString tag), (c, (#"Rd", (#(LitString k), NONEV))))%V => Some (Rd tag c k None)
-    | (#(LitString tag), (c, (#"Rd", (#(LitString k), SOMEV v))))%V => Some (Rd tag c k (Some v))
-    | (#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V => Some (Wr tag c k v)
-    | (#(LitString tag), (c, (#"Cm", #(LitBool b))))%V => Some (Cm tag c b)
-    | _ => None (* We ignore start events *)
+    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V => Some (Rd (tag, c) k None)
+    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V => Some (Rd (tag, c) k (Some v))
+    | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => Some (Wr (tag, c) k v)
+    | (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V => Some (Cm (tag, c) b)
+    | _ => None (* We ignore start and initial operation events  *)
   end.
 
-Definition toEvent (op : operation) : val := 
+Definition toPostEvent (op : operation) : val := 
   match op with 
-    | Rd tag c k None => (#tag, (c, (#"Rd", (#k, NONEV))))
-    | Rd tag c k (Some v) => (#tag, (c, (#"Rd", (#k, SOMEV v))))
-    | Wr tag c k v => (#tag, (c, (#"Wr", (#k, v))))
-    | Cm tag c b => (#tag, (c, (#"Cm", #b)))
+    | Rd (tag, c) k None => (#tag, (c, (#"RdPost", (#k, NONEV))))
+    | Rd (tag, c) k (Some v) => (#tag, (c, (#"RdPost", (#k, SOMEV v))))
+    | Wr (tag, c) k v => (#tag, (c, (#"WrPost", (#k, v))))
+    | Cm (tag, c) b => (#tag, (c, (#"CmPost", #b)))
+  end.
+
+Definition toPreEvent (op : operation) : val := 
+  match op with 
+    | Rd (tag, c) _ _ => (#tag, (c, #"RdPre")) 
+    | Wr (tag, c) _ _ => (#tag, (c, #"WrPre"))
+    | Cm (tag, c) _ => (#tag, (c, #"CmPre"))
+  end.
+
+Definition postToPre (event : val) : option val := 
+  match event with 
+    | (#(LitString tag), (c, (#"StPost")))%V => Some (#tag, (c, #"StPre"))%V
+    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V => Some (#tag, (c, #"RdPre"))%V
+    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V => Some (#tag, (c, #"RdPre"))%V
+    | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => Some (#tag, (c, #"WrPre"))%V
+    | (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V => Some (#tag, (c, #"CmPre"))%V
+    | _ => None 
   end.
 
 Definition extraction_of (trace : list val) (T : list transaction) : Prop := 
-  (* Trace and transactions contain the same operations 
-    (start operations are ignored and we are allowed to close transactions with commit operations) *)
+  (* Trace and transactions contain the same operations with the following exceptions:
+    - start operations are ignored 
+    - intial events from all operations are ignored 
+    - we are allowed to close transactions with commit operations) *)
   (∀ event op, event ∈ trace → toOp event = Some op → ∃ t, t ∈ T → op ∈ t) ∧
-  (∀ t op, t ∈ T → op ∈ t → ¬(∃ tag c b, op = Cm tag c b) → (toEvent op) ∈ trace) ∧
-  (∀ t op, t ∈ T → op ∈ t → (∃ tag c b, op = Cm tag c b) → 
-           ((toEvent op) ∈ trace ∨ (∃ op', op' ∈ t ∧ (toEvent op') ∈ trace))) ∧
+  (∀ t op, t ∈ T → op ∈ t → ¬(∃ s b, op = Cm s b) → (toPostEvent op) ∈ trace) ∧
+  (∀ t op, t ∈ T → op ∈ t → (∃ s b, op = Cm s b) → 
+           ((toPostEvent op) ∈ trace ∨ (∃ op', op' ∈ t ∧ (toPostEvent op') ∈ trace))) ∧
   (* Order amongst operations is preserved *)
-  (∀ t op1 op2, t ∈ T → op1 ∈ t → op2 ∈ t → rel_list t op1 op2 → rel_list trace (toEvent op2) (toEvent op2)).
+  (∀ t op1 op2, t ∈ T → op1 ∈ t → op2 ∈ t → rel_list t op1 op2 → ¬rel_list trace (toPostEvent op2) (toPreEvent op1)).
 
-Definition is_st_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"St"))%V.
+Definition is_st_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPre"))%V.
 
-Definition is_rd_event (v : val) : Prop := 
-  (∃ tag c k v', v = (#tag, (c, (#"Rd", (#k, SOMEV v'))))%V) ∨ 
-  (∃ tag c k, v = (#tag, (c, (#"Rd", (#k, NONEV))))%V).
+Definition is_st_post_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPost"))%V.
 
-Definition is_wr_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"Wr", (#k, v'))))%V.
+Definition is_rd_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"RdPre"))%V.
 
-Definition is_cm_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"Cm", #b)))%V.
+Definition is_rd_post_event (v : val) : Prop := 
+  (∃ tag c k v', v = (#tag, (c, (#"RdPost", (#k, SOMEV v'))))%V) ∨ 
+  (∃ tag c k, v = (#tag, (c, (#"RdPost", (#k, NONEV))))%V).
+
+Definition is_wr_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"WrPre"))%V.
+
+Definition is_wr_post_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"Wr", (#k, v'))))%V.
+
+Definition is_cm_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"CmPre"))%V.
+
+Definition is_cm_post_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"CmPost", #b)))%V.
 
 Definition valid_call_sequence (trace : list val) : Prop :=
+  (* No overlap between start, read, write or commit operations and a start or commit operation *)
+  (∀ e_post, e_post ∈ trace → 
+            (is_st_post_event e_post ∨ is_rd_post_event e_post ∨ is_wr_post_event e_post ∨ is_cm_post_event e_post) → 
+            (∀ e_post', e_post' ∈ trace → 
+                        (is_st_post_event e_post' ∨ is_cm_post_event e_post') →
+                        ((∃ e_pre', postToPre e_post' = Some e_pre' ∧ rel_list trace e_post e_pre') ∨ 
+                         (∃ e_pre, postToPre e_post = Some e_pre ∧ rel_list trace e_post' e_pre)))) ∧
   (* Read, write and commit events have a prior start event *)
   (∀ e c, e ∈ trace → 
-             connOfEvent e = Some c → 
-             (is_rd_event e ∨ is_wr_event e ∨ is_cm_event e) → 
-             (∃ e_st, e_st ∈ trace ∧ connOfEvent e_st = Some c ∧ 
-                      is_st_event e_st ∧ rel_list trace e_st e ∧  
-                      (¬∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧ is_cm_event e_cm ∧ 
-                                rel_list trace e_st e_cm ∧ rel_list trace e_cm e))) ∧
-  (* There is is at most one active transaction per connection *)
+          connOfEvent e = Some c → 
+          (is_rd_pre_event e ∨ is_wr_pre_event e ∨ is_cm_pre_event e) → 
+          (∃ e_st, e_st ∈ trace ∧ connOfEvent e_st = Some c ∧ 
+                   is_st_pre_event e_st ∧ rel_list trace e_st e ∧ 
+                   (¬∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧ is_cm_pre_event e_cm ∧
+                             rel_list trace e_st e_cm ∧ rel_list trace e_cm e))) ∧
+  (* There is at most one active transaction per connection *)
   (∀ e_st c, e_st ∈ trace → 
              connOfEvent e_st = Some c → 
-             is_st_event e_st → 
+             is_st_pre_event e_st → 
              ((∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧
-                       is_cm_event e_cm ∧ rel_list trace e_st e_cm ∧ 
-                       (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ is_st_event e_st' ∧ 
+                       is_cm_pre_event e_cm ∧ rel_list trace e_st e_cm ∧ 
+                       (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ is_st_pre_event e_st' ∧ 
                                   rel_list trace e_st e_st' ∧ rel_list trace e_st' e_cm)) ∨ 
              (¬∃ e, e ∈ trace ∧ connOfEvent e = Some c ∧ 
-                     (is_st_event e ∨ is_cm_event e) ∧ rel_list trace e_st e))).
+                     (is_st_pre_event e ∨ is_cm_pre_event e) ∧ rel_list trace e_st e))).
 
 Definition comTrans (T : list transaction) : list transaction := 
-  List.filter (λ t, match last t with | Some (Cm tag c true) => true | _ => false end) T.
+  List.filter (λ t, match last t with | Some (Cm s true) => true | _ => false end) T.
 
 Definition based_on (exec : execution) (transactions : list transaction) : Prop :=
   ∀ t, (t ∈ (split exec).1 ∧ t ≠ []) ↔ t ∈ transactions.

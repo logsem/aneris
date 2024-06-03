@@ -1,4 +1,4 @@
-(* From iris.algebra Require Import gset auth gmap excl excl_auth csum.
+From iris.algebra Require Import gset auth gmap excl excl_auth csum.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
 From iris.algebra.lib Require Import mono_list.
 From aneris.algebra Require Import monotone.
@@ -19,21 +19,21 @@ Section trace_proof.
   (** Ghost theory *)
 
   (** Wrapped resources  *)
-  Global Program Instance wrapped_resources `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
+  (* Global Program Instance wrapped_resources `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
       GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ ∃ t, trace_is t ∗
-                   (∀ c, ⌜latest c i t⌝ ∗ OwnHalfLast c i)) ∗
-                   (∀ c, ∃ k vo, ⌜vo = latest_write c k t⌝ ∗ 
-                                (⌜vo = None⌝ ∗ OwnHalfWrite(k, vo) ∗ OwnHalfWrite(k, vo)) ∨ 
-                                (∃ v, ⌜vo = Some v⌝ ∗ OwnHalfWrite(k, vo)))%I;
+                   (∀ c, ⌜latest c t_hist t⌝ ∗ OwnHalfLatest c t_hist))%I;
       OwnMemKey k V := (OwnMemKey k V 
                         ∗ (∀ v, ⌜v ∈ V⌝ → ∃ t tag c, trace_hist t ∗ 
                                 ⌜(#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V ∈ t⌝))%I;
-      OwnLocalKey k c vo := (∃ t, OwnLocalKey k c vo ∗ (∀ v, ⌜vo = Some v⌝ → OwnHalfWrite(k, vo)))%I;
+      OwnLocalKey k c vo := (∃ t, OwnLocalKey k c vo ∗ (∀ v, ⌜vo = Some v⌝ → OwnHalfWrite k vo))%I;
       ConnectionState c s sa := (ConnectionState c s sa ∗ 
-                                 (∃ t i, trace_hist t ∗ ⌜t !! i = last t⌝ ∗ OwnHalfLast c i ∗
-                                         (⌜s = ⌝) ∨ 
-                                         (⌜s = ⌝)))%I;
+                                 (∃ t i, trace_hist t_hist ∗ OwnHalfLatest c t_hist ∗
+                                         (⌜s = CanStart⌝ ∗ 
+                                          (⌜is_cm_post_event (last t_hist)⌝ ∨ ⌜is_st_pre_event (last t_hist)⌝)) ∨ 
+                                         (⌜s = (Active dom)⌝ ∗ 
+                                          (∃) ∗
+                                          (∀ k, ⌜latest_write k vo t_hist⌝ ∗ OwnHalfWrite k vo))))%I;
       IsConnected c sa := IsConnected c sa%I;
       KVS_ru := KVS_ru;
       KVS_Init := KVS_Init%I;
@@ -49,7 +49,7 @@ Section trace_proof.
   Next Obligation.
   Admitted.
   Next Obligation.
-  Admitted.
+  Admitted. *)
 
   Lemma library_implication `{!anerisG Mdl Σ} (clients : gset socket_address) 
   (lib : KVS_transaction_api) :
@@ -59,5 +59,4 @@ Section trace_proof.
     iIntros "([%res (Hkeys & Hkvs_init & Hglob_inv & Hcan_conn & 
       (#Hinit_kvs & #Hinit_cli & #Hread & #Hwrite & #Hstart & #Hcom))] & Htr & #Htr_inv)".
   Admitted.
-
-End trace_proof. *)
+End trace_proof.

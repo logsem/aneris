@@ -1,4 +1,4 @@
-From aneris.aneris_lang Require Import network resources proofmode adequacy_trace.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib.serialization
      Require Import serialization_proof.
 From aneris.aneris_lang.lib Require Import inject.
@@ -17,8 +17,7 @@ From aneris.examples.transactional_consistency
      Require Import code_api.
 From aneris.examples.transactional_consistency.read_committed.implication_proof
       Require Import si_implies_rc.
-From aneris.examples.transactional_consistency.read_committed.trace
-      Require Import trace_proof.
+From aneris.examples.transactional_consistency.read_committed.trace Require Import adequacy_trace.
 Import ser_inj.
 From aneris.examples.transactional_consistency.snapshot_isolation.instantiation Require Import
      snapshot_isolation_api_implementation
@@ -28,9 +27,9 @@ From aneris.examples.transactional_consistency.snapshot_isolation.util Require I
 From aneris.examples.transactional_consistency.snapshot_isolation Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 
-(** This is a proof of concept that examples can be used with our trace adequacy theorem in adequacy_trace.v , 
-    as such the contents of this example has been choosen arbitrarily (for convinience, we use the dirty_read 
-    example). *)
+(** This is a proof of concept that examples can be used with our trace adequacy theorem, 
+    as such the contents of this example has been choosen arbitrarily 
+    (for convinience, we use the dirty_read example). *)
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
 Definition client_1_addr := SocketAddressInet "0.0.0.1" 80.
@@ -323,22 +322,17 @@ Theorem trace_valid :
 Proof.
   intros.
   set (Σ := #[anerisΣ adequacy_no_model.unit_model; KVSΣ]).
-  eapply (@adequacy_trace Σ _ KVS_transaction_api trace_inv_name "system" 
-          (@RC_spec _ {[server_addr; client_1_addr; client_2_addr]} adequacy_no_model.unit_model Σ)
-          example_runner 
-          (KVS_wrapped_api KVS_snapshot_isolation_api_implementation)
-    _ init_state {[server_addr; client_1_addr; client_2_addr]} ips); try done.
-  - simpl.
-    apply valid_trace_rc_empty.
-  - iIntros (Ag) "(Htr & #Hinv)".
+  eapply (@adequacy_trace_rc Σ _ _ _ init_state _ _ 
+    {[server_addr; client_1_addr; client_2_addr]} ips); try done.
+  - iIntros (Ag).
     assert (specs.SI_init) as SI_init; first apply _.
     apply implication_si_rc in SI_init.
     iMod (@RC_init_module _ _ _ _ KVS_snapshot_isolation_api_implementation 
       _ _ {[server_addr; client_1_addr; client_2_addr]}) 
       as "RC_spec";
       first solve_ndisj.
-    iApply library_implication.
-    iFrame "#∗".
+    iModIntro.
+    iFrame.
   - iIntros.
     iIntros (Φ) "!# (Hlib & Hunalloc & Hmes & Hfree) HΦ".
     iApply (@example_runner_spec adequacy_no_model.unit_model Σ anerisG0 with 

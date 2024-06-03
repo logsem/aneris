@@ -151,7 +151,7 @@ Proof.
   by apply Hsim_ex' in Htrace_end'.
 Qed.
 
-Lemma adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) ip
+Theorem adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) ip
   (Φ : ∀ `{anerisG Σ}, L → iProp Σ) 
   (e : expr) (lib : L) (valid_trace: list val → Prop) 
   (σ: state) (A : gset socket_address) (IPs : gset ip_address)  :
