@@ -322,7 +322,7 @@ Theorem trace_valid :
 Proof.
   intros.
   set (Σ := #[anerisΣ adequacy_no_model.unit_model; KVSΣ]).
-  eapply (@adequacy_trace_rc Σ _ _ _ init_state _ _ 
+  eapply (@adequacy_trace_rc Σ _ _ _ _ init_state _ _ 
     {[server_addr; client_1_addr; client_2_addr]} ips); try done.
   - iIntros (Ag).
     assert (specs.SI_init) as SI_init; first apply _.

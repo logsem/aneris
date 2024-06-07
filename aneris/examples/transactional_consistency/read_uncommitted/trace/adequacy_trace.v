@@ -5,11 +5,10 @@ From trillium.program_logic Require Import language.
 From trillium Require Import finitary.
 From aneris.aneris_lang Require Import adequacy aneris_lang proofmode adequacy_no_model adequacy_trace.
 From iris.base_logic.lib Require Import invariants.
-From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
-From aneris.examples.transactional_consistency Require Import user_params.
+From aneris.examples.transactional_consistency Require Import resource_algebras code_api wrapped_library user_params.
 From aneris.examples.transactional_consistency.read_uncommitted.trace Require implication_trace.
 
-Theorem adequacy_trace_ru Σ `{anerisPreG Σ unit_model} ip
+Theorem adequacy_trace_ru Σ `{anerisPreG Σ unit_model, KVSG Σ} ip
   (e : expr) (σ : aneris_lang.state) (lib : KVS_transaction_api)
   (U : User_params) (A : gset socket_address) (IPs : gset ip_address) :
   state_heaps σ = {[ip:=∅]} →

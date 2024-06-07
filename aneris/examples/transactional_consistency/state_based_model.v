@@ -28,6 +28,12 @@ Definition connOfEvent (event : val) : option val :=
     | _ => None
   end.
 
+Definition tagOfEvent (event : val) : option string :=
+  match event with 
+    | (#(LitString tag), _)%V => Some tag
+    | _ => None
+  end.
+
 Definition transaction : Type := list operation.
 
 Definition valid_transaction (t : transaction) : Prop :=
@@ -51,14 +57,11 @@ Definition rel_list {A : Type} (l : list A) (a1 a2 : A) : Prop :=
 
 Definition valid_transactions (T : list transaction) : Prop := 
   (* Transactions read their own writes *)
-  (∀ t tag c k ov, t ∈ T → 
-                   Rd (tag, c) k ov ∈ t → 
-                   ∃ tag1 v1, Wr (tag1, c) k v1 ∈ t →
-                   rel_list t (Wr (tag1, c) k v1) (Rd (tag, c) k ov) →
-                   (¬∃ tag2 v2, Wr (tag2, c) k v2 ∈ t ∧ 
-                                 rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
-                                 rel_list t (Wr (tag2, c) k v2) (Rd (tag, c) k ov)) →
-                    ov = Some v1) ∧ 
+  (∀ t tag c k ov tag1 v1, t ∈ T → 
+                          rel_list t (Wr (tag1, c) k v1) (Rd (tag, c) k ov) →
+                          (¬∃ tag2 v2, rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
+                                       rel_list t (Wr (tag2, c) k v2) (Rd (tag, c) k ov)) →
+                            ov = Some v1) ∧ 
   (* Transactions read from some write *)
   (∀ t s k v, t ∈ T → 
                   Rd s k (Some v) ∈ t →
@@ -147,7 +150,7 @@ Definition toPostEvent (op : operation) : val :=
 Definition toPreEvent (op : operation) : val := 
   match op with 
     | Rd (tag, c) _ _ => (#tag, (c, #"RdPre")) 
-    | Wr (tag, c) _ _ => (#tag, (c, #"WrPre"))
+    | Wr (tag, c) k v => (#tag, (c, (#"WrPre", (#k, v))))
     | Cm (tag, c) _ => (#tag, (c, #"CmPre"))
   end.
 
@@ -156,22 +159,18 @@ Definition postToPre (event : val) : option val :=
     | (#(LitString tag), (c, (#"StPost")))%V => Some (#tag, (c, #"StPre"))%V
     | (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V => Some (#tag, (c, #"RdPre"))%V
     | (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V => Some (#tag, (c, #"RdPre"))%V
-    | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => Some (#tag, (c, #"WrPre"))%V
+    | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => Some (#tag, (c, (#"WrPre", (#k, v))))%V
     | (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V => Some (#tag, (c, #"CmPre"))%V
     | _ => None 
   end.
 
-Definition extraction_of (trace : list val) (T : list transaction) : Prop := 
-  (* Trace and transactions contain the same operations with the following exceptions:
-    - start operations are ignored 
-    - intial events from all operations are ignored 
-    - we are allowed to close transactions with commit operations) *)
-  (∀ event op, event ∈ trace → toOp event = Some op → ∃ t, t ∈ T → op ∈ t) ∧
-  (∀ t op, t ∈ T → op ∈ t → ¬(∃ s b, op = Cm s b) → (toPostEvent op) ∈ trace) ∧
-  (∀ t op, t ∈ T → op ∈ t → (∃ s b, op = Cm s b) → 
-           ((toPostEvent op) ∈ trace ∨ (∃ op', op' ∈ t ∧ (toPostEvent op') ∈ trace))) ∧
-  (* Order amongst operations is preserved *)
-  (∀ t op1 op2, t ∈ T → op1 ∈ t → op2 ∈ t → rel_list t op1 op2 → ¬rel_list trace (toPostEvent op2) (toPreEvent op1)).
+Definition toLinEvent (op : operation) : val := 
+  match op with 
+    | Rd (tag, c) k None => (#tag, (c, (#"Rd", (#k, NONEV))))
+    | Rd (tag, c) k (Some v) => (#tag, (c, (#"Rd", (#k, SOMEV v))))
+    | Wr (tag, c) k v => (#tag, (c, (#"Wr", (#k, v))))
+    | Cm (tag, c) b => (#tag, (c, (#"Cm", #b)))
+  end.
 
 Definition is_st_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPre"))%V.
 
@@ -183,40 +182,63 @@ Definition is_rd_post_event (v : val) : Prop :=
   (∃ tag c k v', v = (#tag, (c, (#"RdPost", (#k, SOMEV v'))))%V) ∨ 
   (∃ tag c k, v = (#tag, (c, (#"RdPost", (#k, NONEV))))%V).
 
-Definition is_wr_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"WrPre"))%V.
+Definition is_wr_pre_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"WrPre", (#k, v'))))%V.
 
-Definition is_wr_post_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"Wr", (#k, v'))))%V.
+Definition is_wr_post_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"WrPost", (#k, v'))))%V.
 
 Definition is_cm_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"CmPre"))%V.
 
 Definition is_cm_post_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"CmPost", #b)))%V.
 
-Definition valid_call_sequence (trace : list val) : Prop :=
-  (* No overlap between start, read, write or commit operations and a start or commit operation *)
-  (∀ e_post, e_post ∈ trace → 
-            (is_st_post_event e_post ∨ is_rd_post_event e_post ∨ is_wr_post_event e_post ∨ is_cm_post_event e_post) → 
-            (∀ e_post', e_post' ∈ trace → 
-                        (is_st_post_event e_post' ∨ is_cm_post_event e_post') →
-                        ((∃ e_pre', postToPre e_post' = Some e_pre' ∧ rel_list trace e_post e_pre') ∨ 
-                         (∃ e_pre, postToPre e_post = Some e_pre ∧ rel_list trace e_post' e_pre)))) ∧
+Definition is_pre_event (v : val) : Prop := 
+  is_st_pre_event v ∨ is_rd_pre_event v ∨ is_wr_pre_event v ∨ is_cm_pre_event v.
+
+Definition is_post_event (v : val) : Prop := 
+  is_st_post_event v ∨ is_rd_post_event v ∨ is_wr_post_event v ∨ is_cm_post_event v.
+
+Definition is_st_lin_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StLin"))%V.
+
+Definition is_rd_lin_event (v : val) : Prop := 
+  (∃ tag c k v', v = (#tag, (c, (#"RdLin", (#k, SOMEV v'))))%V) ∨ 
+  (∃ tag c k, v = (#tag, (c, (#"RdLin", (#k, NONEV))))%V).
+
+Definition is_wr_lin_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"WrLin", (#k, v'))))%V.
+
+Definition is_cm_lin_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"CmLin", #b)))%V.
+
+Definition is_lin_event (v : val) : Prop := 
+  is_st_lin_event v ∨ is_rd_lin_event v ∨ is_wr_lin_event v ∨ is_cm_lin_event v.
+
+Definition extraction_of (lin_trace : list val) (T : list transaction) : Prop := 
+  (* Trace and transactions contain the same operations with the following exceptions:
+    - start operations are ignored 
+    - intial events from all operations are ignored 
+    - we are allowed to close transactions with commit operations) *)
+  (∀ event op, event ∈ lin_trace → toOp event = Some op → ∃ t, t ∈ T → op ∈ t) ∧
+  (∀ t op, t ∈ T → op ∈ t → ¬(∃ s b, op = Cm s b) → (toPostEvent op) ∈ lin_trace) ∧
+  (∀ t op, t ∈ T → op ∈ t → (∃ s b, op = Cm s b) → 
+           ((toPostEvent op) ∈ lin_trace ∨ ((toPostEvent op) ∉ lin_trace ∧ (toPreEvent op) ∈ lin_trace))) ∧
+  (* Order amongst operations is preserved *)
+  (∀ t op1 op2, t ∈ T → rel_list t op1 op2 → rel_list lin_trace (toLinEvent op1) (toLinEvent op2)).
+
+(* This is to be used with traces of linearization point events *)
+Definition valid_sequence (lin_trace : list val) : Prop :=
   (* Read, write and commit events have a prior start event *)
-  (∀ e c, e ∈ trace → 
+  (∀ e c, e ∈ lin_trace → 
           connOfEvent e = Some c → 
-          (is_rd_pre_event e ∨ is_wr_pre_event e ∨ is_cm_pre_event e) → 
-          (∃ e_st, e_st ∈ trace ∧ connOfEvent e_st = Some c ∧ 
-                   is_st_pre_event e_st ∧ rel_list trace e_st e ∧ 
-                   (¬∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧ is_cm_pre_event e_cm ∧
-                             rel_list trace e_st e_cm ∧ rel_list trace e_cm e))) ∧
+          (is_rd_lin_event e ∨ is_wr_lin_event e ∨ is_cm_lin_event e) → 
+          (∃ e_st, connOfEvent e_st = Some c ∧ is_st_lin_event e_st ∧ rel_list lin_trace e_st e ∧ 
+                   (¬∃ e_cm, connOfEvent e_cm = Some c ∧ is_cm_lin_event e_cm ∧
+                             rel_list lin_trace e_st e_cm ∧ rel_list lin_trace e_cm e))) ∧
   (* There is at most one active transaction per connection *)
-  (∀ e_st c, e_st ∈ trace → 
+  (∀ e_st c, e_st ∈ lin_trace → 
              connOfEvent e_st = Some c → 
-             is_st_pre_event e_st → 
-             ((∃ e_cm, e_cm ∈ trace ∧ connOfEvent e_cm = Some c ∧
-                       is_cm_pre_event e_cm ∧ rel_list trace e_st e_cm ∧ 
-                       (¬∃ e_st', e_st' ∈ trace ∧ connOfEvent e_st' = Some c ∧ is_st_pre_event e_st' ∧ 
-                                  rel_list trace e_st e_st' ∧ rel_list trace e_st' e_cm)) ∨ 
-             (¬∃ e, e ∈ trace ∧ connOfEvent e = Some c ∧ 
-                     (is_st_pre_event e ∨ is_cm_pre_event e) ∧ rel_list trace e_st e))).
+             is_st_lin_event e_st → 
+             ((∃ e_cm, connOfEvent e_cm = Some c ∧ is_cm_lin_event e_cm ∧ rel_list lin_trace e_st e_cm ∧ 
+                       (¬∃ e_st', connOfEvent e_st' = Some c ∧ is_st_lin_event e_st' ∧ 
+                                  rel_list lin_trace e_st e_st' ∧ rel_list lin_trace e_st' e_cm)) ∨ 
+             (¬∃ e,  connOfEvent e = Some c ∧ rel_list lin_trace e_st e ∧
+                     (is_st_lin_event e ∨ is_cm_lin_event e)))).
 
 Definition comTrans (T : list transaction) : list transaction := 
   List.filter (λ t, match last t with | Some (Cm s true) => true | _ => false end) T.
@@ -224,9 +246,71 @@ Definition comTrans (T : list transaction) : list transaction :=
 Definition based_on (exec : execution) (transactions : list transaction) : Prop :=
   ∀ t, (t ∈ (split exec).1 ∧ t ≠ []) ↔ t ∈ transactions.
 
+Definition linToPost (lin_event : val) : option val := 
+  match lin_event with 
+    | (#(LitString tag), (c, (#"StLin")))%V => 
+      Some (#(LitString tag), (c, (#"StPost")))%V
+    | (#(LitString tag), (c, (#"RdLin", (#(LitString k), NONEV))))%V => 
+      Some (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V
+    | (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V => 
+      Some (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V
+    | (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V => 
+      Some (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V
+    | (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V => 
+      Some (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V
+    | _ => None 
+  end.
+
+Definition linToPre (lin_event : val) : option val := 
+  match lin_event with 
+    | (#(LitString tag), (c, (#"StLin")))%V => 
+      Some (#(LitString tag), (c, #"StPre"))%V
+    | (#(LitString tag), (c, (#"RdLin", (#(LitString k), NONEV))))%V => 
+      Some (#(LitString tag), (c, #"RdPre"))%V
+    | (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V => 
+      Some (#(LitString tag), (c, #"RdPre"))%V
+    | (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V => 
+      Some (#(LitString tag), (c, (#"WrPre", (#(LitString k), v))))%V
+    | (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V => 
+      Some (#(LitString tag), (c, #"CmPre"))%V
+    | _ => None 
+  end.
+
+Definition postToLin (event : val) : option val := 
+  match event with 
+    | (#(LitString tag), (c, (#"StPost")))%V => 
+      Some (#(LitString tag), (c, (#"StLin")))%V
+    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V => 
+      Some (#(LitString tag), (c, (#"RdLin", (#(LitString k), NONEV))))%V
+    | (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V => 
+      Some (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V
+    | (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V => 
+      Some (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V
+    | (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V => 
+      Some (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V
+    | _ => None 
+  end.
+
+Definition lin_trace_of (lin_trace trace : list val) : Prop := 
+  (* Elements are preserved *)
+  (∀ e_post, e_post ∈ trace → is_post_event e_post → (∃ le, postToLin e_post = Some le ∧ le ∈ lin_trace)) ∧
+  (∀ le, le ∈ lin_trace → (∃ e_pre, is_pre_event e_pre ∧ linToPre le = Some e_pre ∧ e_pre ∈ trace ∧ 
+                                    (∀ e_post, (e_post ∈ trace ∧ is_post_event e_post ∧ postToPre e_post = Some e_pre) 
+                                               → linToPost le = Some e_post))) ∧
+  (* Only one linerization point per operation *)
+  (∀ le1 le2, le1 ∈ lin_trace → le2 ∈ lin_trace → 
+              ∃ e_pre, linToPre le1 = Some e_pre → linToPre le2 = Some e_pre → le1 = le2) ∧
+  (* Order is preserved *)
+  (∀ le1 le2, rel_list lin_trace le1 le2 → 
+              ¬(∃ e1_pre e2_post, Some e1_pre = linToPre le1 ∧
+                                  Some e2_post = linToPost le2 ∧
+                                  rel_list trace e2_post e1_pre)) ∧
+  (* No duplicates *)
+  (∀ le1 le2 i j, lin_trace !! i = Some le1 → lin_trace !! j = Some le2 → le1 = le2 → i = j).
+
 Definition valid_trace (test : commitTest) : list val → Prop :=
-  λ trace, valid_call_sequence trace ∧ 
-           (∃ T exec, valid_transactions T ∧ extraction_of trace T ∧  
+  λ trace, ∃ lin_trace, lin_trace_of lin_trace trace ∧ valid_sequence lin_trace ∧ 
+           (∃ T exec, valid_transactions T ∧ extraction_of lin_trace T ∧  
                       based_on exec (comTrans T) ∧ valid_execution test exec).
 
 Definition valid_trace_ru : list val → Prop := valid_trace commit_test_ru.
@@ -238,97 +322,118 @@ Definition valid_trace_si : list val → Prop := valid_trace commit_test_si.
 Lemma valid_trace_ru_empty : valid_trace_ru [].
 Proof.
   rewrite /valid_trace_ru /valid_trace.
+  exists [].
   split.
-  - rewrite /valid_call_sequence.
-    split; intros; set_solver.
-  - intros.
-    exists [], [([], ∅)].
-    split.
-    + rewrite /valid_transactions.
-      split; first set_solver.
-      split; set_solver.
-    + split.
-      * rewrite /extraction_of.
-        do 3 (split; first set_solver).
-        set_solver.
+  - rewrite /lin_trace_of.
+    do 3 (split; first set_solver).
+    split; last set_solver.
+    rewrite /rel_list.
+    set_solver.
+  - split. 
+    + rewrite /valid_sequence.
+      split; intros; set_solver.
+    + intros.
+      exists [], [([], ∅)].
+      split.
+      * rewrite /valid_transactions.
+        split; first set_solver.
+        split; set_solver.
       * split.
-        -- rewrite /based_on.
-           intro t.
-           split; set_solver.
-        -- rewrite /valid_execution.
-           split; last done.
-           intros.
-           destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
-           destruct i; first done.
-           set_solver.
+        -- rewrite /extraction_of.
+            do 3 (split; first set_solver).
+            set_solver.
+        -- split.
+            ++ rewrite /based_on.
+              intro t.
+              split; set_solver.
+            ++ rewrite /valid_execution.
+              split; last done.
+              intros.
+              destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+              destruct i; first done.
+              set_solver.
 Qed.
 
 Lemma valid_trace_rc_empty : valid_trace_rc [].
   rewrite /valid_trace_rc /valid_trace.
+  exists [].
   split.
-  - rewrite /valid_call_sequence.
-    split; intros; set_solver.
-  - intros.
-    exists [], [([], ∅)].
-    split.
-    + rewrite /valid_transactions.
-      split; first set_solver.
-      split; set_solver.
-    + split.
-      * rewrite /extraction_of.
-        do 3 (split; first set_solver).
-        set_solver.
+  - rewrite /lin_trace_of.
+    do 3 (split; first set_solver).
+    split; last set_solver.
+    rewrite /rel_list.
+    set_solver.
+  - split. 
+    + rewrite /valid_sequence.
+      split; intros; set_solver.
+    + intros.
+      exists [], [([], ∅)].
+      split.
+      * rewrite /valid_transactions.
+        split; first set_solver.
+        split; set_solver.
       * split.
-        -- rewrite /based_on.
-           intro t.
-           split; set_solver.
-        -- rewrite /valid_execution.
-           split.
-           ++ intros.
-              destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
-              destruct i; first done.
-              set_solver.
-           ++ split; first done.
-              intros.
-              rewrite /commit_test_rc /pre_read.
-              assert (t = []) as ->; set_solver.
+        -- rewrite /extraction_of.
+           do 3 (split; first set_solver).
+           set_solver.
+        -- split.
+          ++ rewrite /based_on.
+             intro t.
+             split; set_solver.
+          ++ rewrite /valid_execution.
+             split.
+             ** intros.
+                destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+                destruct i; first done.
+                set_solver.
+             ** split; first done.
+                intros.
+                rewrite /commit_test_rc /pre_read.
+                assert (t = []) as ->; set_solver.
 Qed.
 
 Lemma valid_trace_si_empty : valid_trace_si [].
   rewrite /valid_trace_si /valid_trace.
+  exists [].
   split.
-  - rewrite /valid_call_sequence.
-    split; intros; set_solver.
-  - intros.
-    exists [], [([], ∅)].
-    split.
-    + rewrite /valid_transactions.
-      split; first set_solver.
-      split; set_solver.
-    + split.
-      * rewrite /extraction_of.
-        do 3 (split; first set_solver).
-        set_solver.
+  - rewrite /lin_trace_of.
+    do 3 (split; first set_solver).
+    split; last set_solver.
+    rewrite /rel_list.
+    set_solver.
+  - split.
+    + rewrite /valid_sequence.
+      split; intros; set_solver.
+    + intros.
+      exists [], [([], ∅)].
+      split.
+      * rewrite /valid_transactions.
+        split; first set_solver.
+        split; set_solver.
       * split.
-        -- rewrite /based_on.
-           intro t.
-           split; set_solver.
-        -- rewrite /valid_execution.
-           split.
-           ++ intros.
-              destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
-              destruct i; first done.
-              set_solver.
-           ++ split; first done.
-              intros.
-              rewrite /commit_test_si.
-              exists ∅.
-              simpl.
-              split; first set_solver.
-              assert (t = []) as ->; first set_solver.
+        -- rewrite /extraction_of.
+           do 3 (split; first set_solver).
+           set_solver.
+        -- split.
+           ++ rewrite /based_on.
+              intro t.
+              split; set_solver.
+           ++ rewrite /valid_execution.
               split.
-              ** rewrite /complete.
+              ** intros.
+                 destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+                 destruct i; first done.
                  set_solver.
-              ** rewrite /no_conf.
-                 set_solver.
+              ** split; first done.
+                 intros.
+                 rewrite /commit_test_si.
+                 exists ∅.
+                 simpl.
+                 split; first set_solver.
+                 assert (t = []) as ->; first set_solver.
+                 split.
+                 --- rewrite /complete.
+                     set_solver.
+                 --- rewrite /no_conf.
+                     set_solver.
 Qed.
