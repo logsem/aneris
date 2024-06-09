@@ -34,7 +34,7 @@ Section Implication.
   Proof.
     iIntros "[%m (Hinv_1 & Hinv_2)] Hauth Hfrag".
     unfold OwnAuthSet, OwnFragSet.
-    iPoseProof (ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hlook_up". 
+    iPoseProof (@ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hlook_up". 
     iDestruct (own_valid_2 with "Hinv_2 Hfrag") as %[Hord _]%auth_both_valid_discrete.
     rewrite singleton_included_l in Hord.
     destruct Hord as [V'' (<- & Hord)].
@@ -54,7 +54,7 @@ Section Implication.
     OwnInv γA γF ∗ OwnAuthSet γA k (V ∪ {[o]}) ∗ OwnFragSet γF k (V ∪ {[o]}).
   Proof.
     iIntros "([%m (Hinv_1 & Hinv_2)] & Hauth)".
-    iPoseProof (ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hsome".
+    iPoseProof (@ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hsome".
     unfold OwnInv, OwnAuthSet, OwnFragSet.
     iMod (ghost_map_update (V ∪ {[o]}) with "[$Hinv_1] [$Hauth]") 
       as "(Hinv_1 & Hauth)".
@@ -77,7 +77,7 @@ Section Implication.
     OwnInv γA γF ∗ OwnAuthSet γA k V ∗ OwnFragSet γF k V.
   Proof.
     iIntros "([%m (Hinv_1 & Hinv_2)] & Hauth)".
-    iPoseProof (ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hsome".
+    iPoseProof (@ghost_map_lookup with "[$Hinv_1] [$Hauth]") as "%Hsome".
     unfold OwnAuthSet, OwnFragSet.
      iMod (ghost_map_update V with "[$Hinv_1] [$Hauth]") 
       as "(Hinv_1 & Hauth)".

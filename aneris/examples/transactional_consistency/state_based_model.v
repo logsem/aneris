@@ -3,7 +3,11 @@ From aneris.examples.transactional_consistency Require Import user_params.
 From stdpp Require Import strings.
 From aneris.aneris_lang Require Import network resources.
 
-(* Type for tag-connection pairs *)
+(* Type for tag-connection pairs. 
+  We assume:
+    - tags are unique 
+    - at most one transactions can be active per connection 
+*)
 Definition signature : Type := string * val.
 
 Inductive operation : Type :=
@@ -69,7 +73,9 @@ Definition valid_transactions (T : list transaction) : Prop :=
   (* Transactions satisfy the baseline transaction contraints *)
   (∀ t, t ∈ T → valid_transaction t) ∧
   (* No duplicate transactions *)
-  (∀ t1 t2 i j, T !! i = Some t1 → T !! j = Some t2 → t1 = t2 → i = j).
+  (∀ t1 t2 i j, T !! i = Some t1 → T !! j = Some t2 → t1 = t2 → i = j) ∧
+  (* No mixing of connections *) 
+  (∀ t1 t2 op1 op2, t1 ∈ T → t2 ∈ T → op1 ∈ t1 → op2 ∈ t2 → connOfOp op1 = connOfOp op2 → t1 = t2).
 
 Definition state : Type := gmap Key val.
 
@@ -130,15 +136,6 @@ Definition commit_test_si : commitTest :=
 
 (** Embedding into the trace infrastructure *)
 
-Definition toOp (event : val) : option operation := 
-  match event with 
-    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V => Some (Rd (tag, c) k None)
-    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V => Some (Rd (tag, c) k (Some v))
-    | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => Some (Wr (tag, c) k v)
-    | (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V => Some (Cm (tag, c) b)
-    | _ => None (* We ignore start and initial operation events  *)
-  end.
-
 Definition toPostEvent (op : operation) : val := 
   match op with 
     | Rd (tag, c) k None => (#tag, (c, (#"RdPost", (#k, NONEV))))
@@ -170,6 +167,15 @@ Definition toLinEvent (op : operation) : val :=
     | Rd (tag, c) k (Some v) => (#tag, (c, (#"Rd", (#k, SOMEV v))))
     | Wr (tag, c) k v => (#tag, (c, (#"Wr", (#k, v))))
     | Cm (tag, c) b => (#tag, (c, (#"Cm", #b)))
+  end.
+
+Definition linToOp (le : val) : option operation := 
+  match le with 
+    | (#(LitString tag), (c, (#"Rd", (#(LitString k), NONEV))))%V => Some (Rd (tag, c) k None)
+    | (#(LitString tag), (c, (#"Rd", (#(LitString k), SOMEV v))))%V => Some (Rd (tag, c) k (Some v))
+    | (#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V => Some (Wr (tag, c) k v)
+    | (#(LitString tag), (c, (#"Cm", #(LitBool b))))%V => Some (Cm (tag, c) b)
+    | _ => None (* We ignore start and initial operation events  *)
   end.
 
 Definition is_st_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPre"))%V.
@@ -210,14 +216,9 @@ Definition is_lin_event (v : val) : Prop :=
   is_st_lin_event v ∨ is_rd_lin_event v ∨ is_wr_lin_event v ∨ is_cm_lin_event v.
 
 Definition extraction_of (lin_trace : list val) (T : list transaction) : Prop := 
-  (* Trace and transactions contain the same operations with the following exceptions:
-    - start operations are ignored 
-    - intial events from all operations are ignored 
-    - we are allowed to close transactions with commit operations) *)
-  (∀ event op, event ∈ lin_trace → toOp event = Some op → ∃ t, t ∈ T → op ∈ t) ∧
-  (∀ t op, t ∈ T → op ∈ t → ¬(∃ s b, op = Cm s b) → (toPostEvent op) ∈ lin_trace) ∧
-  (∀ t op, t ∈ T → op ∈ t → (∃ s b, op = Cm s b) → 
-           ((toPostEvent op) ∈ lin_trace ∨ ((toPostEvent op) ∉ lin_trace ∧ (toPreEvent op) ∈ lin_trace))) ∧
+  (* Linerization point trace and transactions contain the same operations *)
+  (∀ le op, le ∈ lin_trace → linToOp le = Some op → ∃ t, t ∈ T → op ∈ t) ∧
+  (∀ t op, t ∈ T → op ∈ t → (toLinEvent op) ∈ lin_trace) ∧
   (* Order amongst operations is preserved *)
   (∀ t op1 op2, t ∈ T → rel_list t op1 op2 → rel_list lin_trace (toLinEvent op1) (toLinEvent op2)).
 
@@ -340,7 +341,7 @@ Proof.
         split; set_solver.
       * split.
         -- rewrite /extraction_of.
-            do 3 (split; first set_solver).
+            do 2 (split; first set_solver).
             set_solver.
         -- split.
             ++ rewrite /based_on.
@@ -374,7 +375,7 @@ Lemma valid_trace_rc_empty : valid_trace_rc [].
         split; set_solver.
       * split.
         -- rewrite /extraction_of.
-           do 3 (split; first set_solver).
+           do 2 (split; first set_solver).
            set_solver.
         -- split.
           ++ rewrite /based_on.
@@ -412,7 +413,7 @@ Lemma valid_trace_si_empty : valid_trace_si [].
         split; set_solver.
       * split.
         -- rewrite /extraction_of.
-           do 3 (split; first set_solver).
+           do 2 (split; first set_solver).
            set_solver.
         -- split.
            ++ rewrite /based_on.

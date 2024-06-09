@@ -41,6 +41,11 @@ Class IDBG Σ :=
     (** Implication Encodings *)
     IDBG_Encoding1 :> inG Σ (authR (gmapUR Key (gsetUR val)));
     IDBG_Encoding2 :> ghost_mapG Σ Key (gset val);
+
+    (** Trace proofs *)
+    IDBG_Trace1 :> ghost_mapG Σ socket_address (local_state * option val);
+    IDBG_Trace2 :> ghost_mapG Σ (val * Key) (option val);
+    IDBG_Trace3 :> ghost_mapG Σ string bool;
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -61,6 +66,9 @@ Definition KVSΣ : gFunctors :=
      GFunctor (authUR (gsetUR nat));
      GFunctor (authR (gmapUR Key (gsetUR val)));
      ghost_mapΣ Key (gset val);
+     ghost_mapΣ socket_address (local_state * option val);
+     ghost_mapΣ (val * Key) (option val);
+     ghost_mapΣ string bool;
      mono_natΣ;
      ras.SpecChanΣ;
      lockΣ].
