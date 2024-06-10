@@ -46,7 +46,7 @@ Section trace_proof.
     iDestruct (own_valid with "H") as %[Hsub Hvalid]%auth_both_valid_discrete.
     iDestruct "H" as "(H1 & H3)".
     iFrame.
-    iPureIntro. 
+    iPureIntro.
     eapply gmap_of_trace_hist_valid_prefix; eauto.
   Qed.
 
@@ -71,33 +71,56 @@ Section trace_proof.
 
   (** Predicates for wrapped resources *)
 
-  Definition last_commit (c le : val) (ltrace : list val ) : Prop := true.
+  Definition last_commit (c le : val) (ltrace : list val) : Prop := 
+   is_cm_lin_event le ∧ connOfEvent le = Some c ∧ le ∈ ltrace ∧
+   (∀ i j le', is_cm_lin_event le' → 
+      connOfEvent le' = Some c →
+      ltrace !! j = Some le' →
+      ltrace !! i = Some le →
+      j <= i).
 
-  Definition open_start (c le : val) (ltrace : list val ) : Prop := true. 
+  Definition open_start (c le : val) (ltrace : list val) : Prop := 
+    le ∈ ltrace ∧ (∃ tag, le = (#tag, (c, #"StLin"))%V) ∧
+    (∀ i j le', ltrace !! i = Some le → 
+      i < j → 
+      ltrace !! j = Some le' →
+      connOfEvent le' = Some c →
+      (is_wr_lin_event le' ∨ is_rd_lin_event le')).
 
-  Definition latest_write (c : val) (k : Key) (ov : option val): Prop := true. 
-
-  Definition tag_eq (e1 e2 : val) : Prop := true.
+  Definition latest_write (c : val) (k : Key) (ov : option val) (ltrace : list val ) : Prop := 
+    ∃ le, le ∈ ltrace ∧ 
+      ((∃ tag, ov = None ∧ le = (#tag, (c, (#"RdLin", (#k, NONEV))))%V) ∨ 
+      (∃ tag v, ov = Some v ∧ le = (#tag, (c, (#"RdLin", (#k, SOMEV v))))%V)) ∧
+      (∀ i j le', 
+        ((∃ tag, le' = (#tag, (c, (#"RdLin", (#k, NONEV))))%V) ∨ 
+        (∃ tag v, le = (#tag, (c, (#"RdLin", (#k, SOMEV v))))%V)) →
+        ltrace !! j = Some le' →
+        ltrace !! i = Some le →
+        j <= i).
+     
+  Definition tag_eq (e1 e2 : val) : Prop := ∃ tag, tagOfEvent e1 = Some tag ∧ tagOfEvent e2 = Some tag.
 
   (** Extended global invaraint *)
 
   Definition GlobalInvExt (γm1 γm2 γmk γl : gname) : iProp Σ := 
     ∃ t lt T, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜extraction_of lt T⌝ ∗
       (∃ (m1 : gmap socket_address (local_state * option val)), ghost_map_auth γm1 (1%Qp) m1 ∗ 
-        ((∀ sa s, ⌜m1 !! sa = None ∨ m1 !! sa = Some (s, None)⌝ → ghost_map_auth γmk (1%Qp) ∅) ∨
+        ((∀ sa, ⌜m1 !! sa = None ∨ m1 !! sa = Some (CanStart, None)⌝ 
+            → ghost_map_auth γmk (1%Qp) (∅ : gmap (val * Key) (option val))) ∨
           (∀ sa s c, ⌜m1 !! sa = Some (s, Some c)⌝ → 
             ∃ (mk : gmap (val * Key) (option val)), ghost_map_auth γmk (1%Qp) mk ∗
             (((⌜s = CanStart⌝ ∗ (∃ e, ⌜last_commit c e lt⌝) ∗ 
               (∀ k, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γmk (c, k) (DfracOwn 1%Qp) ov)) ∨ 
               (∃ domain, ⌜s = Active domain⌝ ∗ (∃ e, ⌜open_start c e lt⌝) ∗
               (∀ k, ⌜k ∈ KVS_keys ∖ domain⌝ → ∃ ov, ghost_map_elem γmk (c, k) (DfracOwn 1%Qp) ov) ∗
-              (∀ k, ⌜k ∈ domain⌝ → ∀ ov, ⌜mk !! (c, k) = Some ov⌝ → ⌜latest_write c k ov⌝ ))))))) ∗
+              (∀ k, ⌜k ∈ domain⌝ → ∀ ov, ⌜mk !! (c, k) = Some ov⌝ → ⌜latest_write c k ov lt⌝ ))))))) ∗
       (∃ (m2 : gmap string bool), ⌜∀ (x : string), x ∈ (dom m2) ↔ x ∈ tags t⌝ ∗ ghost_map_auth γm2 (1%Qp) m2 ∗
         (∀ e_pre tag, ⌜e_pre ∈ t⌝ → ⌜is_pre_event e_pre⌝ → ⌜tagOfEvent e_pre = Some tag⌝ →
           (∃ e_lin, ⌜e_lin ∈ lt⌝ ∧ ⌜tag_eq e_pre e_lin⌝) → 
           ghost_map.ghost_map_elem γm2 tag (DfracOwn 1%Qp) true)).
 
   (** Wrapped resources *)
+
   Global Program Instance wrapped_resources (γm1 γm2 γmk γl : gname) `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
       GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt γm1 γm2 γmk γl))%I;
@@ -113,27 +136,128 @@ Section trace_proof.
     |}.
   Next Obligation.
     iIntros (????????) "(Hkey & Hghost_elem & %Hin)".
-    iDestruct (res.(read_uncommitted.specs.resources.OwnLocalKey_serializable) with "Hkey") as "(Hkey & Hser)".
+    iDestruct (res.(read_uncommitted.specs.resources.OwnLocalKey_serializable) 
+      with "Hkey") as "(Hkey & Hser)".
     by iFrame.
   Qed.
   Next Obligation.
-    iIntros.
-  Admitted.
+    iIntros (??????????) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
+    iMod (res.(read_uncommitted.specs.resources.Seen_valid) 
+      with "[$HGinv][$Hseen $Hkey]") as "(Hkey & Hsub)"; first done.
+    iModIntro.
+    iFrame "∗#".
+  Qed.
   Next Obligation.
-    iIntros.
-  Admitted.
+    iIntros (?????????) "#(HGinv & Hinv) (Hkey & Hin)".
+    iMod (res.(read_uncommitted.specs.resources.Seen_creation) 
+      with "[$HGinv][$Hkey]") as "(Hkey & #Hseen)"; first done.
+    iModIntro.
+    iFrame "∗#".
+  Qed.
   Next Obligation.
-    iIntros.
-  Admitted.
+    iIntros (?????????????) "#(HGinv & Hinv) ((Hconn1 & Hrest1) & (Hconn2 & Hrest2))".
+    iMod (res.(read_uncommitted.specs.resources.Connection_unique) 
+      with "[$HGinv][$Hconn1 $Hconn2]") as "(Hconn1 & Hconn2 & Heq)"; first done.
+    iModIntro.
+    iFrame.
+  Qed.
 
-  Lemma library_implication `{!anerisG Mdl Σ} (clients : gset socket_address) 
+  Lemma library_implication  (clients : gset socket_address) 
   (lib : KVS_transaction_api) :
     ((RU_spec clients lib) ∗ trace_is [] ∗ trace_inv trace_inv_name valid_trace_ru) ={⊤}=∗ 
     RU_spec clients (KVS_wrapped_api lib).
   Proof.
-    iIntros "([%res (Hkeys & Hkvs_init & Hglob_inv & Hcan_conn & 
+    iIntros "([%res (Hkeys & Hkvs_init & #Hglob_inv & Hcan_conn & 
       (#Hinit_kvs & #Hinit_cli & #Hread & #Hwrite & #Hstart & #Hcom))] & Htr & #Htr_inv)".
-  iModIntro.
-  iExists _.
+    iMod (ghost_map_alloc ((gset_to_gmap (CanStart, None) clients : 
+      gmap socket_address (local_state * option val))))
+      as "[%γm1 (Hghost_map_m1 & Hghost_elems_m1)]".
+    iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γm2 Hghost_map_m2]".
+    iMod (ghost_map_alloc_empty (K:=val * Key) (V:=option val)) as "[%γmk Hghost_map_mk]".
+    iMod (own_alloc (● gmap_of_trace 0 ([] : list val) ⋅ 
+      ◯ gmap_of_trace 0 ([] : list val))) as (γl) "Hltrace".
+    {
+      apply auth_both_valid. 
+      split; first done. 
+      by apply gmap_of_trace_valid.
+    }
+    iDestruct "Hltrace" as "[Hltrace Hlhist]".
+    iMod (inv_alloc KVS_InvName ⊤ (GlobalInvExt γm1 γm2 γmk γl) with 
+      "[Htr Hghost_map_m1 Hghost_map_m2 Hghost_map_mk Hltrace Hlhist]") as "#HinvExt".
+    {
+      iNext.
+      rewrite /GlobalInvExt.
+      iExists [], [], [].
+      iFrame.
+      simpl.
+      iSplitR.
+      {
+        iPureIntro.
+        rewrite /lin_trace_of.
+        do 3 (split; first set_solver).
+        split; last set_solver.
+        rewrite /rel_list.
+        set_solver.
+      }
+      iSplitR.
+      {
+        iPureIntro.
+        rewrite /extraction_of.
+        do 2 (split; first set_solver).
+        set_solver.
+      }
+      iSplitR "Hghost_map_m2".
+      - iExists (gset_to_gmap (CanStart, None) clients).
+        iFrame.
+        iLeft.
+        iIntros (sa) "_".
+        iFrame.
+      - iExists ∅.
+        iFrame.
+        iSplitL.
+        + iPureIntro.
+          set_solver.
+        + iIntros.
+          set_solver.
+    }
+    iModIntro.
+    iExists (wrapped_resources γm1 γm2 γmk γl res).
+    iFrame "Hkvs_init".
+    iSplitL "Hkeys".
+    {
+      simpl.
+      iApply (big_sepS_mono with "[$Hkeys]").
+      iIntros (k Hin) "Hkey". 
+      iFrame.
+      by iIntros (v) "%Hfalse".
+    }
+    iSplitR; iFrame "∗#".
+    iSplitL "Hghost_elems_m1 Hcan_conn".
+    {
+      simpl.
+      rewrite big_sepM_gset_to_gmap.
+      rewrite big_sepS_sep.
+      iFrame.
+    }
+    iSplitR.
+    {
+      iClear "Hinit_kvs Hread Hwrite Hstart Hcom Htr_inv".
+      rewrite /init_client_proxy_spec.
+      admit.
+    }
+    iSplitR.
+    {
+      admit.
+    }
+    iSplitR.
+    {
+      admit.
+    }
+    iSplitR.
+    {
+      admit.
+    }
+    admit.
   Admitted.
+  
 End trace_proof.

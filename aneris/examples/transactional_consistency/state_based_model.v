@@ -208,9 +208,9 @@ Definition is_rd_lin_event (v : val) : Prop :=
   (∃ tag c k v', v = (#tag, (c, (#"RdLin", (#k, SOMEV v'))))%V) ∨ 
   (∃ tag c k, v = (#tag, (c, (#"RdLin", (#k, NONEV))))%V).
 
-Definition is_wr_lin_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"WrLin", (#k, v'))))%V.
+Definition is_wr_lin_event (v : val) : Prop := ∃ tag c k v', v = (#tag, (c, (#"WrLin", (#k, v'))))%V.
 
-Definition is_cm_lin_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"CmLin", #b)))%V.
+Definition is_cm_lin_event (v : val) : Prop := ∃ tag c b, v = (#tag, (c, (#"CmLin", #b)))%V.
 
 Definition is_lin_event (v : val) : Prop := 
   is_st_lin_event v ∨ is_rd_lin_event v ∨ is_wr_lin_event v ∨ is_cm_lin_event v.
