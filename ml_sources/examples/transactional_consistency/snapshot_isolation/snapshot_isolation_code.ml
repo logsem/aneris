@@ -11,16 +11,12 @@ open Mt_server_code
 (** 1. The KVS type (updated via commited transactions) *)
 type 'a kvsTy = ((string, ((string * ('a * int)) alist)) amap)
 
-(** 2. The last transaction id and the list of transaction
-      timestamps and wether they are active or not *)
-type trsTy = (int * ((int * bool) alist))
-
-(** 3. The cache memory (current opened transaction).
+(** 2. The cache memory (current opened transaction).
     Simplification: there is only one global cache for all clients.
     Therefore, no concurrent accesses to disjoint keys) *)
 type 'a cacheTy = ((string, 'a) amap)
 type 'a reqTy = ((string * int), (unit, int * 'a cacheTy) sumTy) sumTy
-type 'a replTy = ('a option, (trsTy, bool) sumTy) sumTy
+type 'a replTy = ('a option, (int, bool) sumTy) sumTy
 type 'a connection_state =
   (saddr * (Mutex.t *
    (('a reqTy, 'a replTy) rpc *
@@ -40,10 +36,7 @@ let repl_ser (val_ser[@metavar]) =
   sum_serializer
     (option_serializer val_ser)
     (sum_serializer
-       (prod_serializer
-          int_serializer
-          (list_serializer (prod_serializer int_serializer bool_serializer))
-        )
+       int_serializer
        bool_serializer)
 
 let kvs_get k kvs =
@@ -63,7 +56,28 @@ let kvs_get_last kt (kvs : 'a kvsTy) : 'a option =
       else aux tl
   in aux (kvs_get k kvs)
 
-let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
+(* Should only need to find the last element but to be sure we just look for the smallest element for now *)
+let find_oldest_client (cl : int alist) (tc : int) : int =
+  let rec active cl tc =
+    match cl with
+    | None -> tc
+    | Some p ->
+      let (ts, l) = p in
+      active l (if tc < ts then tc else ts)
+  in active cl tc
+
+let update_val (newval : (string * ('a * int))) (vlst : ((string * ('a * int)) alist)) (t_old : int) : ((string * ('a * int)) alist) =
+  let rec remove_older vlst t_old =
+    match vlst with
+    | None -> list_nil
+    | Some p ->
+      let (v, tl) = p in
+      let (_k, (_v, t)) = v in
+      if t_old < t then Some (v, remove_older tl t_old)
+      else Some (v, None)
+  in remove_older (list_cons newval vlst) t_old
+
+let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (t_old : int) (tc : int)
   : 'a kvsTy =
   let rec upd kvs_t cache_t =
     match cache_t with
@@ -73,24 +87,10 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
       let (k,v) = kv in
       let vlst = kvs_get k kvs in
       let newval = (k, (v, tc)) in
-      let newvals = (list_cons newval vlst) in
+      let newvals = (update_val newval vlst t_old) in
       let kvs_t' = map_insert k newvals kvs_t in
       upd kvs_t' cache_l
   in upd kvs cache
-
-let update_transaction_list (uts : int) (trs : trsTy Atomic.t) =
-  let trs_ = !trs in
-  let (ts, trs_list) = trs_ in
-  let rec upd l  =
-    match l with
-    | None -> list_nil
-    | Some p ->
-      let (transaction, list) = p in
-      let (t, b) = transaction in
-      if t = uts then list_cons (t, false) list
-      else list_cons (t, b) (upd list)
-  in ts + 1, upd trs_list
-
 
 let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
   assert (ts < tc);
@@ -102,51 +102,14 @@ let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
     if tc <= t || t = ts then assert false
     else t < ts
 
-let find_oldest_active (trs : trsTy Atomic.t) : int =
-  let trs_ = !trs in
-  let (ts, trs_list) = trs_ in
-  let rec active ts l =
-    match l with
-    | None -> ts
-    | Some p ->
-      let (transaction, list) = p in
-      let (t, b) = transaction in
-      if b then active (if t < ts then t else ts) list
-      else active ts list
-  in active ts trs_list
-
-let remove_old_transactions (active : int) (vlsto : ((string * ('a * int)) alist)) : ((string * ('a * int)) alist) =
-  let rec remove v v_new =
-    match v with
-    | None -> v_new
-    | Some p ->
-      let (v, vlist) = p in
-      let (_k, (_v, ts)) = v in
-      if ts < active then v_new
-      else remove vlist (list_cons v v_new)
-  in remove vlsto None
-
-let garbage_collection (kvs : 'a kvsTy Atomic.t) (cache : 'a cacheTy) (trs : trsTy Atomic.t) : 'a kvsTy =
-  let active_ts = find_oldest_active trs in
-  let _b = map_forall
-      (fun k _v ->
-        let vlsto = (map_lookup k !kvs) in
-        if vlsto = None then true
-        else
-          let vlsto = unSOME vlsto in
-          kvs := map_insert k (remove_old_transactions active_ts vlsto) !kvs;
-          true) cache in
-  !kvs
-
 let commit_handler
     (kvs : 'a kvsTy Atomic.t)
     (cdata : int * 'a cacheTy)
-    (trs : trsTy Atomic.t) () =
+    (vnum : int Atomic.t)
+    (cl : int alist Atomic.t) () =
   let (ts, cache) = cdata in
-  kvs := garbage_collection kvs cache trs;
-  trs := update_transaction_list ts trs;
-  let trs_ = !trs in
-  let (tc, _trs_list) = trs_ in
+  let tc = !vnum + 1 in
+  let cl_c = !cl in
   let kvs_t = !kvs in
   if list_is_empty cache
   then true
@@ -157,7 +120,10 @@ let commit_handler
            let vs = if vlsto = None then list_nil else unSOME vlsto in
            check_at_key ts tc vs) cache in
     if b then begin
-      kvs := update_kvs kvs_t cache tc;
+      cl := list_find_remove (fun n -> n = ts) cl_c;
+      let t_old = find_oldest_client !cl tc in
+      vnum := tc;
+      kvs := update_kvs kvs_t cache t_old tc;
       true
     end
     else false
@@ -171,17 +137,17 @@ let lk_handle lk handler =
 let read_handler (kvs : 'a kvsTy Atomic.t) tk () =
   kvs_get_last tk !kvs
 
-let start_handler (trs : trsTy Atomic.t) () =
-  let trs_ = !trs in
-  let (ts, trs_l) = trs_ in
-  let vnext = ts + 1 in
-  let trs_l_next = list_cons (vnext, true) trs_l in
-  trs := (vnext, trs_l_next);
-  !trs
+let start_handler (vnum : int Atomic.t) (cl : int alist Atomic.t) () =
+  let vnext = !vnum + 1 in
+  let cl_next = !cl in
+  cl := Some (vnext, cl_next);
+  vnum := vnext;
+  vnext
 
 let client_request_handler
     (lk : Mutex.t) (kvs : 'a kvsTy Atomic.t)
-    (trs : trsTy Atomic.t) (req : 'a reqTy)
+    (vnum : int Atomic.t) (cl : int alist Atomic.t)
+    (req : 'a reqTy)
   : 'a replTy =
   let res =
     match req with
@@ -193,22 +159,23 @@ let client_request_handler
       begin match r with
         (* START request *)
         | InjL _tt ->
-          InjR (InjL (lk_handle lk (start_handler trs)))
+          InjR (InjL (lk_handle lk (start_handler vnum cl)))
         (* COMMIT request *)
         | InjR cdata ->
-          InjR (InjR (lk_handle lk (commit_handler kvs cdata trs)))
+          InjR (InjR (lk_handle lk (commit_handler kvs cdata vnum cl)))
       end
   in res
 
-let start_server_processing_clients (ser[@metavar]) addr lk kvs trs () =
+let start_server_processing_clients (ser[@metavar]) addr lk kvs vnum cl () =
   run_server (repl_ser ser) (req_ser ser) addr
-    (fun req -> client_request_handler lk kvs trs req)
+    (fun req -> client_request_handler lk kvs vnum cl req)
 
 let init_server (ser[@metavar] : 'a serializer) addr : unit =
   let (kvs : 'a kvsTy Atomic.t) = ref (map_empty ()) in
-  let (trs : trsTy Atomic.t) = ref (0, list_nil) in
+  let (vnum : int Atomic.t) = ref 0 in
+  let (cl : int alist Atomic.t) = ref None in
   let (lk : Mutex.t) = newlock () in
-  fork (start_server_processing_clients ser addr lk kvs trs) ()
+  fork (start_server_processing_clients ser addr lk kvs vnum cl) ()
 
 
 let init_client_proxy (ser[@metavar]) clt_addr srv_addr : 'a connection_state =
@@ -229,8 +196,7 @@ let start (cst : 'a connection_state) : unit =
       | InjL _abs -> assert false
       | InjR s ->
         match s with
-        | InjL trs ->
-          let (ts, _trs_list) = trs in
+        | InjL ts ->
           tst := Some (ts, ref (map_empty ()))
         | InjR _abs -> assert false
   end;
