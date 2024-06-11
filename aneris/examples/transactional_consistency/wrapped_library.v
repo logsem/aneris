@@ -51,6 +51,19 @@ Definition wrap_commit (commit : val) : val :=
   let: "b" := commit "cst" in 
   Emit ("tag", commit_post_emit_event "cst" "b") ;; 
   "b".
+
+Definition init_pre_emit_event : val := 
+  (#"", #"InitPre").
+
+Definition init_post_emit_event : val :=
+  λ: "cst", ("cst", #"InitPost").
+
+Definition wrap_init_client_proxy (init_client_proxy : serializer → val) (ser : serializer) : val := 
+  λ: "sa_cli" "sa_kvs", 
+  let: "tag" := Fresh (init_pre_emit_event) in 
+  let: "cst" := init_client_proxy ser "sa_cli" "sa_kvs" in 
+  Emit ("tag", init_post_emit_event "cst") ;; 
+  "cst".
   
 Global Instance KVS_wrapped_api (lib : KVS_transaction_api) :
 KVS_transaction_api :=
@@ -60,5 +73,5 @@ KVS_transaction_api :=
     TC_read := wrap_read TC_read;
     TC_write := wrap_write TC_write;
     TC_commit := wrap_commit TC_commit;
-    TC_init_client_proxy := TC_init_client_proxy;
+    TC_init_client_proxy := wrap_init_client_proxy TC_init_client_proxy;
   |}.

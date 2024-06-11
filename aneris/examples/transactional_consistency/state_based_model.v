@@ -6,8 +6,7 @@ From aneris.aneris_lang Require Import network resources.
 (* Type for tag-connection pairs. 
   We assume:
     - tags are unique 
-    - at most one transactions can be active per connection 
-*)
+    - at most one transactions can be active per connection *)
 Definition signature : Type := string * val.
 
 Inductive operation : Type :=
@@ -158,6 +157,7 @@ Definition postToPre (event : val) : option val :=
     | (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V => Some (#tag, (c, #"RdPre"))%V
     | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => Some (#tag, (c, (#"WrPre", (#k, v))))%V
     | (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V => Some (#tag, (c, #"CmPre"))%V
+    | (#(LitString tag), (c, #"InitPost"))%V => Some (#tag, (#"", #"InitPre"))%V
     | _ => None 
   end.
 
@@ -175,8 +175,12 @@ Definition linToOp (le : val) : option operation :=
     | (#(LitString tag), (c, (#"Rd", (#(LitString k), SOMEV v))))%V => Some (Rd (tag, c) k (Some v))
     | (#(LitString tag), (c, (#"Wr", (#(LitString k), v))))%V => Some (Wr (tag, c) k v)
     | (#(LitString tag), (c, (#"Cm", #(LitBool b))))%V => Some (Cm (tag, c) b)
-    | _ => None (* We ignore start and initial operation events  *)
+    | _ => None 
   end.
+
+Definition is_init_pre_event (v : val) : Prop := ∃ tag, v = (#tag, (#"", #"InitPre"))%V.
+
+Definition is_init_post_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"InitPost"))%V.
 
 Definition is_st_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPre"))%V.
 
@@ -197,10 +201,10 @@ Definition is_cm_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"CmPre
 Definition is_cm_post_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"CmPost", #b)))%V.
 
 Definition is_pre_event (v : val) : Prop := 
-  is_st_pre_event v ∨ is_rd_pre_event v ∨ is_wr_pre_event v ∨ is_cm_pre_event v.
+  is_st_pre_event v ∨ is_rd_pre_event v ∨ is_wr_pre_event v ∨ is_cm_pre_event v ∨ is_init_pre_event v.
 
 Definition is_post_event (v : val) : Prop := 
-  is_st_post_event v ∨ is_rd_post_event v ∨ is_wr_post_event v ∨ is_cm_post_event v.
+  is_st_post_event v ∨ is_rd_post_event v ∨ is_wr_post_event v ∨ is_cm_post_event v ∨ is_init_post_event v.
 
 Definition is_st_lin_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StLin"))%V.
 
@@ -289,22 +293,22 @@ Definition postToLin (event : val) : option val :=
       Some (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V
     | (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V => 
       Some (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V
-    | _ => None 
+    | _ => None
   end.
 
 Definition lin_trace_of (lin_trace trace : list val) : Prop := 
   (* Elements are preserved *)
-  (∀ e_post, e_post ∈ trace → is_post_event e_post → (∃ le, postToLin e_post = Some le ∧ le ∈ lin_trace)) ∧
-  (∀ le, le ∈ lin_trace → (∃ e_pre, is_pre_event e_pre ∧ linToPre le = Some e_pre ∧ e_pre ∈ trace ∧ 
+  (∀ e_post, e_post ∈ trace → ∃ le, postToLin e_post = Some le → le ∈ lin_trace) ∧
+  (∀ le, le ∈ lin_trace → ∃ e_pre, is_pre_event e_pre ∧ linToPre le = Some e_pre ∧ e_pre ∈ trace ∧ 
                                     (∀ e_post, (e_post ∈ trace ∧ is_post_event e_post ∧ postToPre e_post = Some e_pre) 
-                                               → linToPost le = Some e_post))) ∧
+                                               → linToPost le = Some e_post)) ∧
   (* Only one linerization point per operation *)
   (∀ le1 le2, le1 ∈ lin_trace → le2 ∈ lin_trace → 
               ∃ e_pre, linToPre le1 = Some e_pre → linToPre le2 = Some e_pre → le1 = le2) ∧
   (* Order is preserved *)
   (∀ le1 le2, rel_list lin_trace le1 le2 → 
-              ¬(∃ e1_pre e2_post, Some e1_pre = linToPre le1 ∧
-                                  Some e2_post = linToPost le2 ∧
+              ¬(∃ e1_pre e2_post, linToPre le1 = Some e1_pre ∧
+                                  linToPost le2 = Some e2_post  ∧
                                   rel_list trace e2_post e1_pre)) ∧
   (* No duplicates *)
   (∀ le1 le2 i j, lin_trace !! i = Some le1 → lin_trace !! j = Some le2 → le1 = le2 → i = j).
@@ -345,14 +349,14 @@ Proof.
             set_solver.
         -- split.
             ++ rewrite /based_on.
-              intro t.
-              split; set_solver.
+               intro t.
+               split; set_solver.
             ++ rewrite /valid_execution.
-              split; last done.
-              intros.
-              destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
-              destruct i; first done.
-              set_solver.
+               split; last done.
+               intros.
+               destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+               destruct i; first done.
+               set_solver.
 Qed.
 
 Lemma valid_trace_rc_empty : valid_trace_rc [].

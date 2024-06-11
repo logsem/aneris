@@ -44,8 +44,10 @@ Class IDBG Σ :=
 
     (** Trace proofs *)
     IDBG_Trace1 :> ghost_mapG Σ socket_address (local_state * option val);
-    IDBG_Trace2 :> ghost_mapG Σ (val * Key) (option val);
+    IDBG_Trace2 :> ghost_mapG Σ (socket_address * val) gname;
     IDBG_Trace3 :> ghost_mapG Σ string bool;
+    IDBG_Trace4 :> ghost_mapG Σ Key (option val);
+
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -67,8 +69,9 @@ Definition KVSΣ : gFunctors :=
      GFunctor (authR (gmapUR Key (gsetUR val)));
      ghost_mapΣ Key (gset val);
      ghost_mapΣ socket_address (local_state * option val);
-     ghost_mapΣ (val * Key) (option val);
+     ghost_mapΣ (socket_address * val) gname;
      ghost_mapΣ string bool;
+     ghost_mapΣ Key (option val);
      mono_natΣ;
      ras.SpecChanΣ;
      lockΣ].

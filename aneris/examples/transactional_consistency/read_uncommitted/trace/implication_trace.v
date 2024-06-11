@@ -102,68 +102,72 @@ Section trace_proof.
 
   (** Extended global invaraint *)
 
-  Definition GlobalInvExt (γm1 γm2 γmk γl : gname) : iProp Σ := 
+  Definition GlobalInvExt (γm1 γm2 γmk γl : gname) (clients : gset socket_address) : iProp Σ := 
     ∃ t lt T, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜extraction_of lt T⌝ ∗
       (∃ (m1 : gmap socket_address (local_state * option val)), ghost_map_auth γm1 (1%Qp) m1 ∗ 
-        ((∀ sa, ⌜m1 !! sa = None ∨ m1 !! sa = Some (CanStart, None)⌝ 
-            → ghost_map_auth γmk (1%Qp) (∅ : gmap (val * Key) (option val))) ∨
-          (∀ sa s c, ⌜m1 !! sa = Some (s, Some c)⌝ → 
-            ∃ (mk : gmap (val * Key) (option val)), ghost_map_auth γmk (1%Qp) mk ∗
-            (((⌜s = CanStart⌝ ∗ (∃ e, ⌜last_commit c e lt⌝) ∗ 
-              (∀ k, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γmk (c, k) (DfracOwn 1%Qp) ov)) ∨ 
-              (∃ domain, ⌜s = Active domain⌝ ∗ (∃ e, ⌜open_start c e lt⌝) ∗
-              (∀ k, ⌜k ∈ KVS_keys ∖ domain⌝ → ∃ ov, ghost_map_elem γmk (c, k) (DfracOwn 1%Qp) ov) ∗
-              (∀ k, ⌜k ∈ domain⌝ → ∀ ov, ⌜mk !! (c, k) = Some ov⌝ → ⌜latest_write c k ov lt⌝ ))))))) ∗
-      (∃ (m2 : gmap string bool), ⌜∀ (x : string), x ∈ (dom m2) ↔ x ∈ tags t⌝ ∗ ghost_map_auth γm2 (1%Qp) m2 ∗
-        (∀ e_pre tag, ⌜e_pre ∈ t⌝ → ⌜is_pre_event e_pre⌝ → ⌜tagOfEvent e_pre = Some tag⌝ →
+       ∃ (mk : gmap (socket_address * val) gname), ghost_map_auth γmk (1%Qp) mk ∗ 
+       ∀ sa, ⌜sa ∈ clients⌝ →
+             (((⌜m1 !! sa = None⌝ ∨ ⌜m1 !! sa = Some (CanStart, None)⌝) ∗ ⌜¬∃ c γ, mk !! (sa, c) = Some γ⌝) ∨ 
+              (∃ s c γ (m : gmap Key (option val)), ⌜m1 !! sa = Some (s, Some c)⌝ ∗ 
+                ghost_map_elem γmk (sa, c) DfracDiscarded γ ∗ ghost_map_auth γ (1%Qp) m ∗ 
+               ((⌜s = CanStart⌝ ∗ (∃ e, ⌜last_commit c e lt⌝) ∗ 
+                 (∀ k, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)) ∨ 
+                (∃ domain, ⌜s = Active domain⌝ ∗ (∃ e, ⌜open_start c e lt⌝) ∗ 
+                 (∀ k, ⌜k ∈ KVS_keys ∖ domain⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
+                 (∀ k, ⌜k ∈ domain⌝ → ∀ ov, ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov lt⌝ )))))) ∗ 
+      (∃ (m2 : gmap string bool), ⌜∀ (x : string), x ∈ (dom m2) ↔ x ∈ tags t⌝ ∗ ghost_map_auth γm2 (1%Qp) m2 ∗ 
+        (∀ e_pre tag, ⌜e_pre ∈ t⌝ → ⌜is_pre_event e_pre⌝ → ⌜tagOfEvent e_pre = Some tag⌝ → 
           (∃ e_lin, ⌜e_lin ∈ lt⌝ ∧ ⌜tag_eq e_pre e_lin⌝) → 
           ghost_map.ghost_map_elem γm2 tag (DfracOwn 1%Qp) true)).
 
   (** Wrapped resources *)
 
-  Global Program Instance wrapped_resources (γm1 γm2 γmk γl : gname) `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
+  Global Program Instance wrapped_resources (γm1 γm2 γmk γl : gname) (clients : gset socket_address) 
+  `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
-      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt γm1 γm2 γmk γl))%I;
+      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt γm1 γm2 γmk γl clients))%I;
       OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
                         ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
-      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ghost_map_elem γmk (c, k) (DfracOwn 1%Qp) ov ∗ ⌜k ∈ KVS_keys⌝)%I;
-      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γm1 sa (DfracOwn 1%Qp) (s, Some c))%I; 
+      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ sa γ, ghost_map_elem γmk (sa, c) DfracDiscarded γ ∗ 
+                             ghost_map_elem γ k (DfracOwn 1%Qp) ov ∗ ⌜k ∈ KVS_keys⌝ ∗ ⌜sa ∈ clients⌝)%I;
+      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γm1 sa (DfracOwn 1%Qp) (s, Some c) ∗ ⌜sa ∈ clients⌝)%I; 
       IsConnected c sa := IsConnected c sa%I;
       KVS_ru := KVS_ru;
       KVS_Init := KVS_Init%I;
-      KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ ghost_map_elem γm1 sa (DfracOwn 1%Qp) (CanStart, None))%I;
+      KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ ghost_map_elem γm1 sa (DfracOwn 1%Qp) (CanStart, None) ∗ ⌜sa ∈ clients⌝)%I;
       Seen k V := Seen k V%I;
     |}.
   Next Obligation.
-    iIntros (????????) "(Hkey & Hghost_elem & %Hin)".
+    iIntros (?????????) "(Hkey & [%sa [%γ (Hghost_elem_per & Hghost_elem & %Hin_k & %Hin_sa)]])".
     iDestruct (res.(read_uncommitted.specs.resources.OwnLocalKey_serializable) 
       with "Hkey") as "(Hkey & Hser)".
+    iFrame.
+    iExists sa, γ.
     by iFrame.
   Qed.
   Next Obligation.
-    iIntros (??????????) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
+    iIntros (???????????) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
     iMod (res.(read_uncommitted.specs.resources.Seen_valid) 
       with "[$HGinv][$Hseen $Hkey]") as "(Hkey & Hsub)"; first done.
     iModIntro.
     iFrame "∗#".
   Qed.
   Next Obligation.
-    iIntros (?????????) "#(HGinv & Hinv) (Hkey & Hin)".
+    iIntros (??????????) "#(HGinv & Hinv) (Hkey & Hin)".
     iMod (res.(read_uncommitted.specs.resources.Seen_creation) 
       with "[$HGinv][$Hkey]") as "(Hkey & #Hseen)"; first done.
     iModIntro.
     iFrame "∗#".
   Qed.
   Next Obligation.
-    iIntros (?????????????) "#(HGinv & Hinv) ((Hconn1 & Hrest1) & (Hconn2 & Hrest2))".
+    iIntros (??????????????) "#(HGinv & Hinv) ((Hconn1 & Hrest1) & (Hconn2 & Hrest2))".
     iMod (res.(read_uncommitted.specs.resources.Connection_unique) 
       with "[$HGinv][$Hconn1 $Hconn2]") as "(Hconn1 & Hconn2 & Heq)"; first done.
     iModIntro.
     iFrame.
   Qed.
 
-  Lemma library_implication  (clients : gset socket_address) 
-  (lib : KVS_transaction_api) :
+  Lemma library_implication  (clients : gset socket_address) (lib : KVS_transaction_api) :
     ((RU_spec clients lib) ∗ trace_is [] ∗ trace_inv trace_inv_name valid_trace_ru) ={⊤}=∗ 
     RU_spec clients (KVS_wrapped_api lib).
   Proof.
@@ -173,7 +177,7 @@ Section trace_proof.
       gmap socket_address (local_state * option val))))
       as "[%γm1 (Hghost_map_m1 & Hghost_elems_m1)]".
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γm2 Hghost_map_m2]".
-    iMod (ghost_map_alloc_empty (K:=val * Key) (V:=option val)) as "[%γmk Hghost_map_mk]".
+    iMod (ghost_map_alloc_empty (K:=socket_address * val) (V:=gname)) as "[%γmk Hghost_map_mk]".
     iMod (own_alloc (● gmap_of_trace 0 ([] : list val) ⋅ 
       ◯ gmap_of_trace 0 ([] : list val))) as (γl) "Hltrace".
     {
@@ -182,7 +186,7 @@ Section trace_proof.
       by apply gmap_of_trace_valid.
     }
     iDestruct "Hltrace" as "[Hltrace Hlhist]".
-    iMod (inv_alloc KVS_InvName ⊤ (GlobalInvExt γm1 γm2 γmk γl) with 
+    iMod (inv_alloc KVS_InvName ⊤ (GlobalInvExt γm1 γm2 γmk γl clients) with 
       "[Htr Hghost_map_m1 Hghost_map_m2 Hghost_map_mk Hltrace Hlhist]") as "#HinvExt".
     {
       iNext.
@@ -209,9 +213,16 @@ Section trace_proof.
       iSplitR "Hghost_map_m2".
       - iExists (gset_to_gmap (CanStart, None) clients).
         iFrame.
-        iLeft.
-        iIntros (sa) "_".
+        iExists ∅.
         iFrame.
+        iIntros (sa) "%Hin_sa".
+        iLeft.
+        iSplit.
+        + iRight.
+          iPureIntro.
+          by rewrite lookup_gset_to_gmap_Some.
+        + iPureIntro.
+          set_solver.
       - iExists ∅.
         iFrame.
         iSplitL.
@@ -221,7 +232,7 @@ Section trace_proof.
           set_solver.
     }
     iModIntro.
-    iExists (wrapped_resources γm1 γm2 γmk γl res).
+    iExists (wrapped_resources γm1 γm2 γmk γl clients res).
     iFrame "Hkvs_init".
     iSplitL "Hkeys".
     {
@@ -238,15 +249,25 @@ Section trace_proof.
       rewrite big_sepM_gset_to_gmap.
       rewrite big_sepS_sep.
       iFrame.
+      iApply (big_sepS_mono with "[$Hghost_elems_m1]").
+      iIntros (sa Hin) "Hkey".
+      by iFrame.
     }
     iSplitR.
     {
       iClear "Hinit_kvs Hread Hwrite Hstart Hcom Htr_inv".
       rewrite /init_client_proxy_spec.
+      iIntros (sa Φ) "!# (Hunall & Hsock & Hmes & Hcan & Hfree) HΦ".
+      rewrite /TC_init_client_proxy /KVS_wrapped_api /wrap_init_client_proxy.
+      wp_pures.
+      
+      wp_apply ("Hinit_cli" $! sa with "").
       admit.
     }
     iSplitR.
     {
+      iClear "Hinit_kvs Hinit_cli Hwrite Hstart Hcom Htr_inv".
+      rewrite /read_spec.
       admit.
     }
     iSplitR.
@@ -259,5 +280,5 @@ Section trace_proof.
     }
     admit.
   Admitted.
-  
+
 End trace_proof.

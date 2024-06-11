@@ -12,4 +12,4 @@ Definition commit : val := wrap_commit commit.
 
 Definition init_server ser : val := init_server ser.
 
-Definition init_client_proxy ser : val := init_client_proxy ser.
+Definition init_client_proxy ser : val := wrap_init_client_proxy init_client_proxy ser.
