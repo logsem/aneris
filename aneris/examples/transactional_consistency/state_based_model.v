@@ -298,7 +298,7 @@ Definition postToLin (event : val) : option val :=
 
 Definition lin_trace_of (lin_trace trace : list val) : Prop := 
   (* Elements are preserved *)
-  (∀ e_post, e_post ∈ trace → ∃ le, postToLin e_post = Some le → le ∈ lin_trace) ∧
+  (∀ e_post, e_post ∈ trace → ∀ le, postToLin e_post = Some le → le ∈ lin_trace) ∧
   (∀ le, le ∈ lin_trace → ∃ e_pre, is_pre_event e_pre ∧ linToPre le = Some e_pre ∧ e_pre ∈ trace ∧ 
                                     (∀ e_post, (e_post ∈ trace ∧ is_post_event e_post ∧ postToPre e_post = Some e_pre) 
                                                → linToPost le = Some e_post)) ∧
@@ -442,3 +442,135 @@ Lemma valid_trace_si_empty : valid_trace_si [].
                  --- rewrite /no_conf.
                      set_solver.
 Qed.
+
+(** Helper lemmas  *)
+
+Lemma exists_execution : 
+  ∀ T, ∃ E, based_on E (comTrans T) ∧ valid_execution commit_test_ru E.
+Proof.
+  intros T.
+  induction T as [|t T IH].
+  - exists [([], ∅)].
+    split.
+    + simpl.
+      rewrite /based_on.
+      intro t.
+      simpl.
+      set_solver.
+    + rewrite /valid_execution /commit_test_ru.
+      split.
+      * intros.
+        destruct i; set_solver.
+      * split; set_solver.
+  - destruct IH as [E (Hbased & Hexec)].
+    simpl.
+    assert (∃ E0 : execution, based_on E0 (comTrans T) ∧ valid_execution commit_test_ru E0) as Hcase; first by exists E.
+    destruct (last t); try done.
+    destruct o; try done.
+    destruct b; try done.
+    destruct (last E) as [p|] eqn:Heq.
+    + exists (E ++ [(t, applyTransaction p.2 t)]).
+      split.
+      * rewrite /based_on.
+        intro t'.
+        split.
+        -- intro H.
+           rewrite /split in H.
+           simpl.
+           rewrite /based_on in Hbased.
+           admit.
+        -- admit.
+      * rewrite /valid_execution.
+        split.
+        -- intros i p1 p2 Hlookup1 Hlookup2.
+           rewrite lookup_snoc_Some in Hlookup2.
+           destruct Hlookup2 as [Hlookup2 | Hlookup2].
+           ++ rewrite lookup_snoc_Some in Hlookup1.
+              destruct Hlookup1 as [Hlookup1 | Hlookup1].
+              ** admit.
+              ** admit.
+           ++ admit.
+        -- admit.
+    + exfalso.
+      rewrite /valid_execution in Hexec.
+      destruct Hexec as (_ & (Hfalse & _)).
+      rewrite last_None in Heq; subst.
+      set_solver.
+Admitted.
+
+Lemma init_valid : 
+  ∀ (tag : string) (e : val) (t lt : list val), (is_init_pre_event e ∨ is_init_post_event e) → 
+    tagOfEvent e = Some tag → lin_trace_of lt t → lin_trace_of lt (t ++ [e]).
+Proof.
+  intros tag e t lt His_pre_post Htag Hlin_trace.
+  rewrite /lin_trace_of.
+  destruct Hlin_trace as (?&?&?&?&?).
+  split.
+  - intros e_post Hin le Hpost_lin.
+    apply (H e_post); last done.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin | Hfalse]; first done.
+    exfalso.
+    assert (e_post = e) as ->; first set_solver.
+    destruct His_pre_post as [His_pre | His_post].
+    + destruct His_pre as [tag' ->].
+      simpl in Hpost_lin.
+      destruct tag'; done.
+    + destruct His_post as [tag' [c ->]].
+      simpl in Hpost_lin.
+      destruct tag'; done.
+  - split.
+    + intros le Hin.
+      destruct (H0 le Hin) as [e_pre (Hpre & HlinPre & Hin' & Himp)].
+      exists e_pre.
+      do 2 (split; first done).
+      split; first set_solver.
+      intros e_post Hassump.
+      apply Himp.
+      destruct Hassump as (Hassump1 & Hassump2).
+      split; last done.
+      rewrite elem_of_app in Hassump1.
+      destruct Hassump1 as [Hassump1 | Hassump1]; first done.
+      exfalso.
+      assert (e_post = e) as ->; first set_solver.
+      destruct His_pre_post as [His_pre | His_post].
+      * destruct His_pre as [tag' ->].
+        destruct Hassump2 as (Hfalse & _).
+        destruct Hfalse as [Hfalse | Hfalse].
+        -- admit.
+        -- destruct Hfalse as [Hfalse | Hfalse].
+           ++ admit.
+           ++ destruct Hfalse as [Hfalse | Hfalse].
+              ** admit.
+              ** destruct Hfalse as [Hfalse | Hfalse].
+                 --- admit.
+                 --- admit.
+      * destruct His_post as [tag' [c ->]].
+        destruct Hassump2 as (_ & Hassump2).
+        simpl in Hassump2.
+        destruct tag'; try done.
+        inversion Hassump2.
+        subst.
+        destruct le; simpl in HlinPre; try done.
+        simpl.
+        destruct le1; simpl in HlinPre; try done.
+        destruct l; simpl in HlinPre; try done.
+        destruct le2; simpl in HlinPre; try done.
+        destruct le2_2; simpl in HlinPre; try done.
+        -- destruct l; simpl in HlinPre; try done.
+           destruct s1; simpl in HlinPre; try done.
+           admit.
+        -- destruct le2_2_1; simpl in HlinPre; try done.
+           destruct l; simpl in HlinPre; try done.
+          destruct s1; simpl in HlinPre; try done.
+          destruct a; simpl in HlinPre; try done.
+      admit.
+    + split; first done.
+      split; last done.
+      intros le1 le2 Hrel Hfalse.
+      destruct Hfalse as [e1_pre [e2_post Hfalse]].
+      apply (H2 le1 le2) in Hrel.
+      apply Hrel.
+      exists e1_pre, e2_post.
+      admit.
+Admitted.

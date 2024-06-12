@@ -11,6 +11,7 @@ From aneris.examples.transactional_consistency.read_committed.trace Require impl
 Theorem adequacy_trace_rc Σ `{anerisPreG Σ unit_model, KVSG Σ} ip
   (e : expr) (σ : aneris_lang.state) (lib : KVS_transaction_api)
   (U : User_params) (A : gset socket_address) (IPs : gset ip_address) :
+  KVS_InvName = nroot .@ "kvs_inv" →
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
@@ -29,7 +30,10 @@ Proof.
   intros.
   eapply adequacy_trace; try done; first apply valid_trace_rc_empty.
   iIntros (Ag) "(Htr & #Hinv)".
-  iMod H5 as "Hspec".
-  by iMod (implication_trace.library_implication with "[$Htr $Hspec $Hinv]") 
-    as "Hspec".
+  iMod H6 as "Hspec".
+  iMod (implication_trace.library_implication with "[$Htr $Hspec $Hinv]") 
+    as "Hspec"; last done.
+  iPureIntro.
+  rewrite /implication_trace.trace_inv_name H0. 
+  set_solver.
  Qed.

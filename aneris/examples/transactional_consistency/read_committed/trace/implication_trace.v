@@ -41,7 +41,8 @@ Section trace_proof.
   (* Primary lemma to be used with adequacy *)
   Lemma library_implication `{!anerisG Mdl Σ} (clients : gset socket_address) 
   (lib : KVS_transaction_api) :
-    ((RC_spec clients lib) ∗ trace_is [] ∗ trace_inv trace_inv_name valid_trace_rc) ={⊤}=∗ 
+    ((RC_spec clients lib) ∗ trace_is [] ∗ 
+      trace_inv trace_inv_name valid_trace_rc ∗ ⌜KVS_InvName = nroot .@ "kvs_inv"⌝) ={⊤}=∗ 
     RC_spec clients (KVS_wrapped_api lib).
   Proof.
   Admitted.
