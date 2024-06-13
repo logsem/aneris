@@ -73,8 +73,7 @@ Section trace_proof.
 
   Definition last_commit (c le : val) (ltrace : list val) : Prop := 
    is_cm_lin_event le ∧ connOfEvent le = Some c ∧ le ∈ ltrace ∧
-   (∀ i j le', is_cm_lin_event le' → 
-      connOfEvent le' = Some c →
+   (∀ i j le', connOfEvent le' = Some c →
       ltrace !! j = Some le' →
       ltrace !! i = Some le →
       j <= i).
@@ -111,7 +110,7 @@ Section trace_proof.
         (((⌜m1 !! sa = None⌝ ∨ ⌜m1 !! sa = Some (CanStart, None)⌝) ∗ ⌜¬∃ c γ, mk !! (sa, c) = Some γ⌝) ∨ 
         (∃ s c γ (m : gmap Key (option val)), ⌜m1 !! sa = Some (s, Some c)⌝ ∗ 
           ghost_map_elem γmk (sa, c) DfracDiscarded γ ∗ ghost_map_auth γ (1%Qp) m ∗ 
-          ((⌜s = CanStart⌝ ∗ (∃ e, ⌜last_commit c e lt⌝) ∗ 
+          ((⌜s = CanStart⌝ ∗ (∃ le, ⌜last_commit c le lt⌝) ∗ 
             (∀ k, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)) ∨ 
           (∃ domain, ⌜s = Active domain⌝ ∗ (∃ e, ⌜open_start c e lt⌝) ∗ 
             (∀ k, ⌜k ∈ KVS_keys ∖ domain⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
@@ -200,7 +199,7 @@ Section trace_proof.
       {
         iPureIntro.
         rewrite /lin_trace_of.
-        do 3 (split; first set_solver).
+        do 4 (split; first set_solver).
         split; last set_solver.
         rewrite /rel_list.
         set_solver.
@@ -370,11 +369,14 @@ Section trace_proof.
           by exists c, γ.
         - set_solver. 
       }
-      iMod (ghost_map_alloc_empty (K:=string) (V:=option val)) as "[%γ Hghost_map_m]".
+      (* iMod (ghost_map_alloc_empty (K:=string) (V:=option val)) as "[%γ Hghost_map_m]". *)
+      iMod (ghost_map_alloc ((gset_to_gmap None KVS_keys : gmap Key (option val))))
+        as "[%γ (Hghost_map_m & Hghost_elems_m)]".
       iMod (ghost_map_update (CanStart, Some c) with "[$Hghost_map_m1] [$Hsa_pointer]") 
         as "(Hghost_map_m1 & Hsa_pointer)".
       iMod (ghost_map_insert_persist (sa, c) γ Hlookup_none with "[$Hghost_map_mk]") as "(Hghost_map_mk & #Hkey_pers_mk)".
-      iMod ("Hclose'" with "[Htr_is HOwnLin' Hghost_map_mk Hext_rest1' Himp Hghost_map_m1 Hghost_map_m2 Hghost_map_m]").
+      iMod ("Hclose'" with "[Htr_is HOwnLin' Hghost_map_mk Hext_rest1' Himp Hghost_map_m1 
+        Hghost_map_m2 Hghost_map_m Hghost_elems_m]").
       {
         iNext.
         rewrite /GlobalInvExt.
@@ -395,14 +397,25 @@ Section trace_proof.
             iIntros (sa' Hsa'_in).
             destruct (decide (sa' = sa)) as [->|Hneq].
             * iRight.
-              iExists CanStart, c, γ, ∅.
+              iExists CanStart, c, γ, (gset_to_gmap None KVS_keys).
               iSplit.
               -- iPureIntro.
                  by rewrite lookup_insert.
               -- iFrame "∗#".
                  iLeft.
                  iSplit; first done.
-                 admit.
+                 iSplit.
+                 ++ admit.
+                 ++ iIntros (k Hk_in).
+                    iExists None.
+                    assert (KVS_keys = {[k]} ∪ (KVS_keys ∖ {[k]})) as ->.
+                    {
+                      by apply union_difference_singleton_L.
+                    }
+                   rewrite gset_to_gmap_union_singleton.
+                   rewrite big_sepM_insert_delete.
+                   iDestruct "Hghost_elems_m" as "(Hghost_elem & Hghost_elems_m)".
+                   iFrame.
             * rewrite lookup_insert_ne; last set_solver.
               iFrame.
               iDestruct ("Hext_rest1'" $! sa' Hsa'_in) as "[(Hext_rest1'_or & %Hext_rest1'_not) | Hext_rest1']";

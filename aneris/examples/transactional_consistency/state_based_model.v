@@ -297,6 +297,8 @@ Definition postToLin (event : val) : option val :=
   end.
 
 Definition lin_trace_of (lin_trace trace : list val) : Prop := 
+  (* Trace of linearization points *)
+  (∀ le, le ∈ lin_trace → is_lin_event le) ∧
   (* Elements are preserved *)
   (∀ e_post, e_post ∈ trace → ∀ le, postToLin e_post = Some le → le ∈ lin_trace) ∧
   (∀ le, le ∈ lin_trace → ∃ e_pre, is_pre_event e_pre ∧ linToPre le = Some e_pre ∧ e_pre ∈ trace ∧ 
@@ -330,7 +332,7 @@ Proof.
   exists [].
   split.
   - rewrite /lin_trace_of.
-    do 3 (split; first set_solver).
+    do 4 (split; first set_solver).
     split; last set_solver.
     rewrite /rel_list.
     set_solver.
@@ -364,7 +366,7 @@ Lemma valid_trace_rc_empty : valid_trace_rc [].
   exists [].
   split.
   - rewrite /lin_trace_of.
-    do 3 (split; first set_solver).
+    do 4 (split; first set_solver).
     split; last set_solver.
     rewrite /rel_list.
     set_solver.
@@ -402,7 +404,7 @@ Lemma valid_trace_si_empty : valid_trace_si [].
   exists [].
   split.
   - rewrite /lin_trace_of.
-    do 3 (split; first set_solver).
+    do 4 (split; first set_solver).
     split; last set_solver.
     rewrite /rel_list.
     set_solver.
@@ -504,10 +506,11 @@ Lemma init_valid :
 Proof.
   intros tag e t lt His_pre_post Htag Hlin_trace.
   rewrite /lin_trace_of.
-  destruct Hlin_trace as (?&?&?&?&?).
+  destruct Hlin_trace as (?&?&?&?&?&?).
+  split; first done.
   split.
   - intros e_post Hin le Hpost_lin.
-    apply (H e_post); last done.
+    apply (H0 e_post); last done.
     rewrite elem_of_app in Hin.
     destruct Hin as [Hin | Hfalse]; first done.
     exfalso.
@@ -521,7 +524,7 @@ Proof.
       destruct tag'; done.
   - split.
     + intros le Hin.
-      destruct (H0 le Hin) as [e_pre (Hpre & HlinPre & Hin' & Himp)].
+      destruct (H1 le Hin) as [e_pre (Hpre & HlinPre & Hin' & Himp)].
       exists e_pre.
       do 2 (split; first done).
       split; first set_solver.
@@ -537,40 +540,71 @@ Proof.
       * destruct His_pre as [tag' ->].
         destruct Hassump2 as (Hfalse & _).
         destruct Hfalse as [Hfalse | Hfalse].
-        -- admit.
+        -- rewrite /is_st_post_event in Hfalse.
+           set_solver.
         -- destruct Hfalse as [Hfalse | Hfalse].
-           ++ admit.
+           ++ rewrite /is_rd_post_event in Hfalse.
+              set_solver.
            ++ destruct Hfalse as [Hfalse | Hfalse].
-              ** admit.
+              ** rewrite /is_wr_post_event in Hfalse.
+                 set_solver.
               ** destruct Hfalse as [Hfalse | Hfalse].
-                 --- admit.
-                 --- admit.
+                 --- rewrite /is_cm_post_event in Hfalse.
+                     set_solver.
+                 --- rewrite /is_init_post_event in Hfalse.
+                     set_solver.
       * destruct His_post as [tag' [c ->]].
         destruct Hassump2 as (_ & Hassump2).
         simpl in Hassump2.
         destruct tag'; try done.
         inversion Hassump2.
         subst.
-        destruct le; simpl in HlinPre; try done.
-        simpl.
-        destruct le1; simpl in HlinPre; try done.
-        destruct l; simpl in HlinPre; try done.
-        destruct le2; simpl in HlinPre; try done.
-        destruct le2_2; simpl in HlinPre; try done.
-        -- destruct l; simpl in HlinPre; try done.
-           destruct s1; simpl in HlinPre; try done.
-           admit.
-        -- destruct le2_2_1; simpl in HlinPre; try done.
-           destruct l; simpl in HlinPre; try done.
-          destruct s1; simpl in HlinPre; try done.
-          destruct a; simpl in HlinPre; try done.
-      admit.
+        specialize (H le Hin).
+        destruct H as [H | H].
+        -- destruct H as [tag' [c' ->]].
+           simpl in HlinPre.
+           by destruct tag'.
+        -- destruct H as [H | H].
+           ++ destruct H as [H | H].
+              ** destruct H as [tag' [c' [k' [v' ->]]]].
+                 simpl in HlinPre.
+                 destruct tag'; try done.
+                 by destruct k'.
+              ** destruct H as [tag' [c' [k' ->]]].
+                 simpl in HlinPre.
+                 destruct tag'; try done.
+                 by destruct k'.
+           ++ destruct H as [H | H].
+              ** destruct H as [tag' [c' [k' [v' ->]]]].
+                 simpl in HlinPre.
+                 destruct tag'; try done.
+                 by destruct k'.
+              ** destruct H as [tag' [c' [b' ->]]].
+                 simpl in HlinPre.
+                 destruct tag'; try done.
+                 by destruct b'.
     + split; first done.
       split; last done.
       intros le1 le2 Hrel Hfalse.
-      destruct Hfalse as [e1_pre [e2_post Hfalse]].
-      apply (H2 le1 le2) in Hrel.
-      apply Hrel.
+      destruct Hfalse as [e1_pre [e2_post (Hlinpre & Hlinpost & Hrel_e)]].
+      pose proof Hrel as Hrel'.
+      apply (H3 le1 le2) in Hrel'.
+      apply Hrel'.
+      assert (is_lin_event le1 ∧ is_lin_event le2) as (Hle1_lin & Hle2_lin).
+      {
+        admit.
+      }
       exists e1_pre, e2_post.
-      admit.
+      do 2 (split; first done).
+      destruct Hrel_e as [i [j (Hle & Hlookup_post & Hlookup_pre)]].
+      rewrite lookup_snoc_Some in Hlookup_post.
+      destruct Hlookup_post as [(Hle_length & Hlookup_post)|(Heq_lenght & Hlookup_post)].
+      * rewrite lookup_snoc_Some in Hlookup_pre.
+        destruct Hlookup_pre as [(Hle_length' & Hlookup_pre)|(Heq_lenght' & Hlookup_pre)].
+        -- by exists i, j.
+        -- subst. 
+           exfalso.
+           admit.
+      * subst.
+        admit.
 Admitted.
