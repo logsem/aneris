@@ -248,8 +248,8 @@ Definition valid_sequence (lin_trace : list val) : Prop :=
 Definition comTrans (T : list transaction) : list transaction := 
   List.filter (λ t, match last t with | Some (Cm s true) => true | _ => false end) T.
 
-Definition based_on (exec : execution) (transactions : list transaction) : Prop :=
-  ∀ t, (t ∈ (split exec).1 ∧ t ≠ []) ↔ t ∈ transactions.
+Definition based_on (exec : execution) (T : list transaction) : Prop :=
+  ∀ t, (t ∈ (split exec).1 ∧ t ≠ []) ↔ t ∈ T.
 
 Definition linToPost (lin_event : val) : option val := 
   match lin_event with 
@@ -447,10 +447,35 @@ Qed.
 
 (** Helper lemmas  *)
 
-Lemma exists_execution : 
-  ∀ T, ∃ E, based_on E (comTrans T) ∧ valid_execution commit_test_ru E.
+Lemma split_split {A B : Type} (l1 l2 : list (A * B)) :
+  split (l1 ++ l2) = ((split l1).1 ++ (split l2).1, (split l1).2 ++ (split l2).2).
 Proof.
-  intros T.
+  generalize l2.
+  induction l1.
+  - intro l1.
+    simpl.
+    by destruct (split l1).
+  - intro l.
+    destruct a.
+    simpl split.
+    rewrite (IHl1 l).
+    by destruct (split l1).
+Qed.
+
+Lemma split_append {A B : Type} (a : A) (l1 l2 : list (A * B)) :
+  a ∈ (split l1).1 → a ∈ (split (l1 ++ l2)).1.
+Proof.
+  intro H.
+  rewrite split_split.
+  simpl.
+  set_solver.
+Qed.
+
+Lemma exists_execution : 
+  ∀ T, (∀ t, t ∈ T → t ≠ []) → 
+    ∃ E, based_on E (comTrans T) ∧ valid_execution commit_test_ru E.
+Proof.
+  intros T Himp.
   induction T as [|t T IH].
   - exists [([], ∅)].
     split.
@@ -464,7 +489,13 @@ Proof.
       * intros.
         destruct i; set_solver.
       * split; set_solver.
-  - destruct IH as [E (Hbased & Hexec)].
+  - assert (∀ t : list operation, t ∈ T → t ≠ []) as Himp'.
+    {
+      intros t' Hin.
+      apply Himp.
+      set_solver.
+    }
+    destruct (IH Himp') as [E (Hbased & Hexec)].
     simpl.
     assert (∃ E0 : execution, based_on E0 (comTrans T) ∧ valid_execution commit_test_ru E0) as Hcase; first by exists E.
     destruct (last t); try done.
@@ -476,12 +507,39 @@ Proof.
       * rewrite /based_on.
         intro t'.
         split.
-        -- intro H.
-           rewrite /split in H.
-           simpl.
+        -- intros (Hin & Hneq).
            rewrite /based_on in Hbased.
-           admit.
-        -- admit.
+           destruct (Hbased t') as (Hbased' & _).
+           rewrite split_split in Hin.
+           simpl in Hin.
+           rewrite elem_of_app in Hin.
+           destruct Hin as [Hin|Hin]; last set_solver.
+           assert (t' ∈ comTrans T); last set_solver.
+           by apply Hbased'.
+        -- intro Hin. 
+           rewrite elem_of_cons in Hin.
+           destruct Hin as [-> | Hin].
+           ++ assert ((t, applyTransaction p.2 t).1 = t) as <-; first set_solver.
+              split.
+              ** rewrite elem_of_list_In.
+                 apply in_split_l.
+                 simpl.
+                 rewrite -elem_of_list_In.
+                 set_solver.
+              ** simpl.
+                 apply Himp.
+                 set_solver.
+           ++ split.
+              ** specialize (Hbased t'). 
+                 apply Hbased in Hin as (Hin & _).
+                 by apply split_append.
+              ** apply Himp'.
+                 assert (comTrans T ⊆ T) as Hsub; last set_solver.
+                 apply elem_of_subseteq.
+                 intros t'' Hin''.
+                 rewrite elem_of_list_In.
+                 rewrite elem_of_list_In /comTrans filter_In in Hin''.
+                 by destruct Hin'' as (Hgoal & _).
       * rewrite /valid_execution.
         split.
         -- intros i p1 p2 Hlookup1 Hlookup2.
@@ -489,16 +547,45 @@ Proof.
            destruct Hlookup2 as [Hlookup2 | Hlookup2].
            ++ rewrite lookup_snoc_Some in Hlookup1.
               destruct Hlookup1 as [Hlookup1 | Hlookup1].
-              ** admit.
-              ** admit.
-           ++ admit.
-        -- admit.
+              ** destruct Hexec as (Hexec & _).
+                 destruct Hlookup1 as (_  & Hlookup1).
+                 destruct Hlookup2 as (_  & Hlookup2).
+                 apply (Hexec i p1 p2 Hlookup1 Hlookup2).
+              ** destruct Hlookup1 as (Hlookup1 & _).
+                 destruct Hlookup2 as (Hlookup2 & _).
+                 lia.
+           ++ destruct Hlookup2 as (Hlength & <-).
+              simpl.
+              assert (p = p1) as ->; last done.
+              assert (length (E ++ [(t, applyTransaction p.2 t)]) = i + 2) as Hlength'.
+              {
+                rewrite app_length.
+                rewrite -Hlength.
+                simpl.
+                lia.
+              }
+              rewrite last_lookup in Heq.
+              rewrite -Hlength in Heq.
+              assert (i = pred (i + 1)) as Heq_i.
+              {
+                destruct i; simpl; lia.
+              }
+              rewrite -Heq_i in Heq.
+              rewrite lookup_app_Some in Hlookup1.
+              destruct Hlookup1 as [Heq_p1|(Hfalse & _)]; first set_solver.
+              lia.
+        -- destruct Hexec as (_ & Hexec & _).
+           split.
+           ++ rewrite lookup_app_Some.
+              by left.
+           ++ intros.
+              by rewrite /commit_test_ru.
     + exfalso.
       rewrite /valid_execution in Hexec.
       destruct Hexec as (_ & (Hfalse & _)).
       rewrite last_None in Heq; subst.
       set_solver.
-Admitted.
+Qed.
 
 Lemma init_valid : 
   ∀ (tag : string) (e : val) (t lt : list val), (is_init_pre_event e ∨ is_init_post_event e) → 
@@ -592,7 +679,9 @@ Proof.
       apply Hrel'.
       assert (is_lin_event le1 ∧ is_lin_event le2) as (Hle1_lin & Hle2_lin).
       {
-        admit.
+        destruct Hrel as [i [j (Hle & Hlookup_i & Hlookup_j)]].
+        apply elem_of_list_lookup_2 in Hlookup_i, Hlookup_j.
+        by apply H in Hlookup_i, Hlookup_j.
       }
       exists e1_pre, e2_post.
       do 2 (split; first done).
@@ -604,7 +693,92 @@ Proof.
         -- by exists i, j.
         -- subst. 
            exfalso.
-           admit.
+           destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+           ++ destruct Hle1_lin as [tag' [c' ->]].
+              simpl in Hlinpre.
+              destruct tag'; try done.
+              inversion Hlinpre; subst.
+              destruct His_pre_post as [Hfalse | Hfalse].
+              all : inversion Hfalse.
+              all : set_solver.
+           ++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+              ** destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                 --- destruct Hle1_lin as [tag' [c' [k' [v' ->]]]].
+                     simpl in Hlinpre.
+                     destruct tag'; try done.
+                     destruct k'; try done.
+                     inversion Hlinpre; subst.
+                     destruct His_pre_post as [Hfalse | Hfalse].
+                     all : inversion Hfalse.
+                     all : set_solver.
+                 --- destruct Hle1_lin as [tag' [c' [k' ->]]].
+                     simpl in Hlinpre.
+                     destruct tag'; try done.
+                     destruct k'; try done.
+                     inversion Hlinpre; subst.
+                     destruct His_pre_post as [Hfalse | Hfalse].
+                     all : inversion Hfalse.
+                     all : set_solver.
+              ** destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                 --- destruct Hle1_lin as [tag' [c' [k' [v' ->]]]].
+                     simpl in Hlinpre.
+                     destruct tag'; try done.
+                     destruct k'; try done.
+                     inversion Hlinpre; subst.
+                     destruct His_pre_post as [Hfalse | Hfalse].
+                     all : inversion Hfalse.
+                     all : set_solver.
+                 --- destruct Hle1_lin as [tag' [c' [b' ->]]].
+                     simpl in Hlinpre.
+                     destruct tag'; try done.
+                     destruct b'; try done.
+                     inversion Hlinpre; subst.
+                     destruct His_pre_post as [Hfalse | Hfalse].
+                     all : inversion Hfalse.
+                     all : set_solver.
       * subst.
-        admit.
-Admitted.
+        exfalso.
+        destruct Hle2_lin as [Hle2_lin | Hle2_lin].
+        -- destruct Hle2_lin as [tag' [c' ->]].
+           simpl in Hlinpost.
+           destruct tag'; try done.
+           inversion Hlinpost; subst.
+           destruct His_pre_post as [Hfalse | Hfalse].
+           all : inversion Hfalse.
+           all : set_solver.
+        -- destruct Hle2_lin as [Hle2_lin | Hle2_lin].
+           ++ destruct Hle2_lin as [Hle2_lin | Hle2_lin].
+              ** destruct Hle2_lin as [tag' [c' [k' [v' ->]]]].
+                 simpl in Hlinpost.
+                 destruct tag'; try done.
+                 destruct k'; try done.
+                 inversion Hlinpost; subst.
+                 destruct His_pre_post as [Hfalse | Hfalse].
+                 all : inversion Hfalse.
+                 all : set_solver.
+              ** destruct Hle2_lin as [tag' [c' [k' ->]]].
+                 simpl in Hlinpost.
+                 destruct tag'; try done.
+                 destruct k'; try done.
+                 inversion Hlinpost; subst.
+                 destruct His_pre_post as [Hfalse | Hfalse].
+                 all : inversion Hfalse.
+                 all : set_solver.
+           ++ destruct Hle2_lin as [Hle2_lin | Hle2_lin].
+              ** destruct Hle2_lin as [tag' [c' [k' [v' ->]]]].
+                 simpl in Hlinpost.
+                 destruct tag'; try done.
+                 destruct k'; try done.
+                 inversion Hlinpost; subst.
+                 destruct His_pre_post as [Hfalse | Hfalse].
+                 all : inversion Hfalse.
+                 all : set_solver.
+              ** destruct Hle2_lin as [tag' [c' [b' ->]]].
+                 simpl in Hlinpost.
+                 destruct tag'; try done.
+                 destruct b'; try done.
+                 inversion Hlinpost; subst.
+                 destruct His_pre_post as [Hfalse | Hfalse].
+                 all : inversion Hfalse.
+                 all : set_solver.
+Qed.

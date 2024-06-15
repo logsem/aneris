@@ -293,6 +293,13 @@ Section trace_proof.
           by exists tag.
         - split; first done.
           destruct (exists_execution T) as [E (Hbased & Hvalid_exec)].
+          {
+            intros t' Hin.
+            destruct Hvalid_trans as (_ & _ & Hvalid_trans & _).
+            destruct (Hvalid_trans t' Hin) as ([s [b Hlast]] & _).
+            destruct t'; last done.
+            by simpl in Hlast. 
+          }
           eexists T, E.
           by do 3 (split; first done).
       }
@@ -352,6 +359,13 @@ Section trace_proof.
           set_solver.
         - split; first done.
           destruct (exists_execution T') as [E' (Hbased' & Hvalid_exec')].
+          {
+            intros t'' Hin.
+            destruct Hvalid_trans' as (_ & _ & Hvalid_trans' & _).
+            destruct (Hvalid_trans' t'' Hin) as ([s [b Hlast]] & _).
+            destruct t''; last done.
+            by simpl in Hlast. 
+          }
           eexists T', E'.
           by do 3 (split; first done).
       }
