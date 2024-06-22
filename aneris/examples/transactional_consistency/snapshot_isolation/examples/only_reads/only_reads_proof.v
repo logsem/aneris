@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -38,7 +38,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proofs.
 
-Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
+Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
 
   Definition client_inv : iProp Σ :=
     ∃ h, "x" ↦ₖ h.
@@ -46,6 +46,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
   Lemma server_spec ip port :
     ip = ip_of_address KVS_address →
     port = port_of_address KVS_address →
+    SI_client_toolbox -∗
     {{{ KVS_Init
       ∗ KVS_address ⤳ (∅, ∅)
       ∗ free_ports ip {[port]}
@@ -53,14 +54,16 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     server #KVS_address @[ip]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Hip Hports Φ) "(? & ? & ? & ?) HΦ".
+    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ 
+      !>(? & ? & ? & ?) HΦ".
     rewrite /server. wp_pures. rewrite Hip Hports.
-    by wp_apply (SI_init_kvs_spec with "[$]").
+    by wp_apply ("Hinit_kvs" with "[$]").
   Qed.
 
   Lemma client_1_spec ip port:
   ip = ip_of_address client_1_addr →
   port = port_of_address client_1_addr →
+  SI_client_toolbox -∗
   {{{ inv client_inv_name client_inv
     ∗ client_1_addr ⤳ (∅, ∅)
     ∗ unallocated {[client_1_addr]}
@@ -70,13 +73,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     transaction1_client $client_1_addr $KVS_address @[ip]
   {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Hip Hports Φ) "(#Hinv & Hmsghis & Hunalloc & Hcc
-    & Hports & Hprot) HΦ".
+    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ 
+      !>(#Hinv & Hmsghis & Hunalloc & Hcc & Hports & Hprot) HΦ".
     rewrite /transaction1_client. wp_pures. rewrite Hip Hports.
-    wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
+    wp_apply ("Hinit_cli" with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
     iIntros (rpc) "(Hcstate & #HiC)".
     wp_pures. rewrite /transaction1. wp_pures.
-    wp_apply (SI_start_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
+    wp_apply ("Hst" $! rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%hx Hkx]" "HClose".
     iModIntro. iFrame.
     iExists {["x" := hx]}.
@@ -87,11 +90,17 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     iMod ("HClose" with "[Hkx]") as "_".
     { iNext. iExists hx. iFrame. }
     iModIntro. wp_pures.
-    wp_apply (SI_write_spec _ _ _ _ (SerVal #1)
-               with "[][$] [$Hcx $HiC]").
-    set_solver. iFrame. iIntros "Hcx". wp_pures.
+    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
+    iIntros "Hcx".
+    iModIntro.
+    wp_pures.
     wp_apply (commitU_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
+    iFrame "#".
     iInv (client_inv_name) as ">[%hx' Hkx]" "HClose".
     iModIntro.
     iExists {["x" := hx']}, _, {["x" := (Some #1, true)]}.
@@ -116,6 +125,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
   Lemma client_2_spec ip port:
     ip = ip_of_address client_2_addr →
     port = port_of_address client_2_addr →
+    SI_client_toolbox -∗
     {{{ inv client_inv_name client_inv
       ∗ client_2_addr ⤳ (∅, ∅)
       ∗ unallocated {[client_2_addr]}
@@ -125,13 +135,13 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Hip Hports Φ) "(#Hinv & Hmsghis & Hunalloc & Hcc
-    & Hports & Hprot) HΦ".
+    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ 
+      !>(#Hinv & Hmsghis & Hunalloc & Hcc & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
-    wp_apply (SI_init_client_proxy_spec with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
+    wp_apply ("Hinit_cli" with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
     iIntros (rpc) "(Hcstate & #HiC)". wp_pures.
     rewrite /transaction2. wp_pures.
-    wp_apply (SI_start_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
+    wp_apply ("Hst" $! rpc client_2_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%hx Hkx]" "HClose".
     iModIntro. iFrame.
     iExists {["x" := hx]}.
@@ -142,11 +152,17 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox, !KVSG Σ}.
     iMod ("HClose" with "[Hkx]") as "_".
     { iNext. iExists hx. iFrame. }
     iModIntro. wp_pures.
-    wp_apply (SI_read_spec _ _ _ _ with "[][$][$Hcx $HiC]");
-      try set_solver.
-    iFrame. iIntros "Hcx". wp_pures.
+    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _.
+    iFrame.
+    iNext.
+    iIntros "Hcx".
+    iModIntro.
+    wp_pures.
     wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
     try solve_ndisj.
+    iFrame "#".
     iInv (client_inv_name) as ">[%hx' Hkx]" "HClose".
     iModIntro.
     iExists {["x" := hx']}, _, {["x" := (last hx, false)]}.
@@ -191,8 +207,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     {{{ v, RET v; True }}}.
   Proof.
     iMod (SI_init_module _ {[client_1_addr; client_2_addr]})
-      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
-      first done.
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & #specs)"; first done.
     iMod (inv_alloc client_inv_name ⊤ (client_inv) with "[mem]") as "#Hinv".
     { iNext. iExists [].
     iDestruct (big_sepS_delete _ _ "x" with "mem") as "(Hx & HKVSres)";
@@ -222,9 +237,9 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
         iFrame.
         iSplitR "Hcli2hist Hcli2unalloc Hcc2".
         * by iApply "HΦ".
-        * iIntros "!> Hports". wp_apply (client_2_spec with "[$]"); try done.
-      + iIntros "!> Hports". wp_apply (client_1_spec with "[$]"); try done.
-    - iIntros "!> Hports". wp_apply (server_spec with "[$]"); done.
+        * iIntros "!> Hports". wp_apply (client_2_spec with "[$][$]"); try done.
+      + iIntros "!> Hports". wp_apply (client_1_spec with "[$][$]"); try done.
+    - iIntros "!> Hports". wp_apply (server_spec with "[$][$]"); done.
       Unshelve. 
       all: destruct specs as (Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6); by eauto.
   Qed.
@@ -266,4 +281,4 @@ Proof.
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed.  *)
+Qed. 

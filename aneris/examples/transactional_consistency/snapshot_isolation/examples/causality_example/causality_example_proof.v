@@ -74,7 +74,7 @@ Section proof_of_code.
     iPoseProof (big_sepM_insert with "cache") as "((y_hy & y_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    wp_apply ("Hwr" $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
     iModIntro.
     iExists _, _.
     iFrame.

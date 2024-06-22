@@ -1,4 +1,4 @@
-(* From aneris.aneris_lang Require Import network resources proofmode.
+From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import
      list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization
@@ -41,7 +41,7 @@ Definition client_inv_name := nroot.@"clinv".
 
 Section proofs.
 
-Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !SI_client_toolbox}.
+Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
 Import List.ListNotations.
 Local Open Scope list.
 
@@ -56,15 +56,17 @@ Local Open Scope list.
 
   Lemma transaction1_spec :
     ∀ cst sa,
+    SI_client_toolbox -∗
     client_inv -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction1 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv %Φ !>(CanStart & #HiC) HΦ".
+    iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #inv %Φ !>(CanStart & #HiC) HΦ".
     rewrite/transaction1.
     wp_pures.
-    wp_apply (SI_start_spec _ _ (⊤ ∖ ↑client_inv_name));
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name));
       first solve_ndisj.
     iFrame "#".
     iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & init)" "close".
@@ -89,23 +91,33 @@ Local Open Scope list.
       first done.
     iPoseProof (big_sepM_insert with "cache") as "((z_hz & z_upd) & _)";
       first done.
-    wp_apply (SI_write_spec _ _ _ _ (SerVal #1)
-               with "[] [$] [$x_hx $x_upd $HiC]");
-      first set_solver.
+    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
     iIntros "(x_1 & x_upd)".
+    iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec _ _ _ _ (SerVal #1)
-               with "[] [$] [$y_hy $y_upd $HiC]");
-      first set_solver.
+    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
     iIntros "(y_1 & y_upd)".
+    iModIntro.
     wp_pures.
-    wp_apply (SI_write_spec _ _ _ _ (SerVal #1)
-               with "[] [$] [$z_hz $z_upd $HiC]");
-      first set_solver.
+    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
     iIntros "(z_1 & z_upd)".
+    iModIntro.
     wp_pures.
     wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name));
       first solve_ndisj; eauto.
+    iFrame "#".
     iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' & #init)" "close".
     iModIntro.
     iExists {[ "x" := hx'; "y" := hy'; "z" := hz' ]}, _,
@@ -159,17 +171,20 @@ Local Open Scope list.
 
   Lemma transaction2_spec :
     ∀ cst sa,
+      SI_client_toolbox -∗
       client_inv -∗
       GlobalInv -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction2 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv #Hginv %Φ !>(CanStart & #HiC) HΦ".
+    iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #inv #Hginv %Φ !>(CanStart & #HiC) HΦ".
     rewrite/transaction2.
     wp_pures.
     wp_apply (simple_wait_transaction_spec _ _ _ _ _  (⊤ ∖ ↑client_inv_name)
-      with "[] [] [$] [] [] [$CanStart]"); [solve_ndisj|set_solver|..].
+      with "[] [] [$] [$] [] [] [$CanStart]");
+      [solve_ndisj|set_solver|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
@@ -191,7 +206,7 @@ Local Open Scope list.
     }
     iIntros (h) "(CanStart & #Seen)".
     wp_pures.
-    wp_apply (SI_start_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz &
       [->|(%vx & %vy & %hx_vx & %hy_vy & %Hvx & %Hvy)])" "close".
     {
@@ -222,18 +237,28 @@ Local Open Scope list.
         "((x_hx & x_upd) & cache)"; first done.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache") as
         "((y_hy & y_upd) & cache)"; first by rewrite lookup_delete_ne.
-    wp_apply (SI_read_spec with "[][][$x_hx]");
-      first set_solver; eauto.
+    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _.
+    iFrame.
+    iNext.
     iIntros "x_hx".
+    iModIntro.
+    wp_pures.
     rewrite hx_vx hy_vy.
     destruct Hvx as [-> | ->].
     all: wp_pures.
-    wp_apply (SI_write_spec _ _ _ _ (SerVal #(-1)) with
-        "[][][$y_hy $y_upd]"); first set_solver; eauto.
+    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #(-1)) with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
     iIntros "(y_hy & y_upd)".
+    iModIntro.
     wp_pures.
     all: wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name));
       first solve_ndisj; eauto.
+    1 , 3 : iFrame "#".
     all: iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' &
       [->|(%vx' & %vy' & %hx'_vx' & %hy'_vy' & %Hvx' & %Hvy')])" "close".
     1, 3: iMod (Seen_valid with "[$][$Seen $z_hz']") as
@@ -276,18 +301,20 @@ Local Open Scope list.
 
   Lemma transaction3_spec :
     ∀ cst sa,
+     SI_client_toolbox -∗
      client_inv -∗
      GlobalInv -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction3 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv #Hginv %Φ!>(CanStart & #HiC) HΦ".
+    iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #inv #Hginv %Φ!>(CanStart & #HiC) HΦ".
     rewrite/transaction3.
     wp_pures.
-    wp_apply (simple_wait_transaction_spec _ _ _ _ _ (⊤ ∖ ↑client_inv_name)
-               with "[] [] [] [] [] [$CanStart $HiC]");
-      try eauto; [solve_ndisj |..].
+    wp_apply (simple_wait_transaction_spec _ _ _ _ _  (⊤ ∖ ↑client_inv_name)
+      with "[] [] [$] [$] [] [] [$CanStart]");
+      [solve_ndisj|set_solver|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
@@ -309,14 +336,14 @@ Local Open Scope list.
     }
     iIntros (h) "(CanStart & #Seen)".
     wp_pures.
-    wp_apply (SI_start_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz &
       [->|(%vx & %vy & %hx_vx & %hy_vy & %Hvx & %Hvy)])" "close".
     {
       iMod (Seen_valid with "[$][$Seen $z_hz]") as
           "(z_hz & %abs)"; first solve_ndisj; eauto.
-       apply prefix_nil_inv in abs.
-    by apply app_nil in abs as [_].
+      apply prefix_nil_inv in abs.
+      by apply app_nil in abs as [_].
     }
     iModIntro.
     iExists {[ "x" := hx; "y" := hy ]}.
@@ -340,17 +367,29 @@ Local Open Scope list.
         "((x_hx & x_upd) & cache)"; first done.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache") as
         "((y_hy & y_upd) & _)"; first by rewrite lookup_delete_ne.
-    wp_apply (SI_read_spec with "[][$][$y_hy]"); first set_solver.
+    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _.
+    iFrame.
+    iNext.
     iIntros "y_hy".
+    iModIntro.
+    wp_pures.
     rewrite hx_vx hy_vy.
     destruct Hvy as [-> | ->].
     all: wp_pures.
-    wp_apply (SI_write_spec _ _ _ _ (SerVal #(-1)) with
-        "[][$][$x_hx $x_upd]"); first set_solver.
+    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #(-1)) with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _, _.
+    iFrame.
+    iNext.
     iIntros "(x_hx & x_upd)".
+    iModIntro.
+    wp_pures.
     wp_pures.
     all: wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name));
       first solve_ndisj; eauto.
+    1, 3 : iFrame "#".
     all: iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' &
       [->|(%vx' & %vy' & %hx'_vx' & %hy'_vy' & %Hvx' & %Hvy')])" "close".
     1, 3: iMod (Seen_valid with "[$][$Seen $z_hz']") as
@@ -393,17 +432,20 @@ Local Open Scope list.
 
   Lemma transaction4_spec :
     ∀ cst sa,
+      SI_client_toolbox -∗
       client_inv -∗
       GlobalInv -∗
     {{{ ConnectionState cst sa CanStart ∗ IsConnected cst sa }}}
       transaction4 cst @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst sa) "#inv #Hgivn %Φ !>(CanStart & #HiC) HΦ".
+    iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #inv #Hgivn %Φ !>(CanStart & #HiC) HΦ".
     rewrite/transaction4.
     wp_pures.
-    wp_apply (simple_wait_transaction_spec _ _ _ _ _ (⊤ ∖ ↑client_inv_name)
-      with "[] [] [$] [] [] [$CanStart]"); [solve_ndisj|set_solver|..].
+    wp_apply (simple_wait_transaction_spec _ _ _ _ _  (⊤ ∖ ↑client_inv_name)
+      with "[] [] [$] [$] [] [] [$CanStart]");
+      [solve_ndisj|set_solver|..].
     {
       iModIntro.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
@@ -425,7 +467,7 @@ Local Open Scope list.
     }
     iIntros (h) "(CanStart & #Seen)".
     wp_pures.
-    wp_apply (SI_start_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
     iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz &
       [->|(%vx & %vy & %hx_vx & %hy_vy & %Hvx & %Hvy)])" "close".
     {
@@ -456,16 +498,28 @@ Local Open Scope list.
         "((x_hx & x_upd) & cache)"; first done.
     iPoseProof (big_sepM_delete _ _ "y" hy with "cache") as
         "((y_hy & y_upd) & _)"; first by rewrite lookup_delete_ne.
-    wp_apply (SI_read_spec with "[] [$] [$x_hx $HiC]"); first set_solver.
+    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _.
+    iFrame.
+    iNext.
     iIntros "x_hx".
-    rewrite hx_vx hy_vy/unSOME /assert.
+    iModIntro.
     wp_pures.
-    wp_apply (SI_read_spec with "[][$] [$y_hy $HiC]"); first set_solver.
+    rewrite hx_vx hy_vy/util_code.unSOME /assert.
+    wp_pures.
+    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iModIntro.
+    iExists _.
+    iFrame.
+    iNext.
     iIntros "y_hy".
+    iModIntro.
     wp_pures.
     move: Hvx Hvy hx_vx hy_vy=>[]->[]->hx_vx hy_vy.
     all: wp_pures.
     all: wp_apply (commitU_spec _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    1 , 3, 5, 7 : iFrame "#".
     all: iInv "inv" as ">(%hx' & %hy' & %hz' & x_hx' & y_hy' & z_hz' & %Hinv)"
                           "close".
     all: iModIntro.
@@ -495,6 +549,7 @@ Local Open Scope list.
 
   Lemma transaction1_client_spec :
     ∀ sa,
+    SI_client_toolbox -∗
     client_inv -∗
     {{{
       sa ⤳ (∅, ∅) ∗
@@ -506,17 +561,19 @@ Local Open Scope list.
       transaction1_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa) "#inv %Φ !>(∅ & unalloc & free & Hcc & #KVS_si) HΦ".
+    iIntros (sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #inv %Φ !>(∅ & unalloc & free & Hcc & #KVS_si) HΦ".
     rewrite/transaction1_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$]").
+    wp_apply ("Hinit_cli" with "[$]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction1_spec with "inv [$]").
+    by wp_apply (transaction1_spec with "[$] inv [$]").
   Qed.
 
   Lemma transaction2_client_spec :
     ∀ sa,
+    SI_client_toolbox -∗
     GlobalInv -∗
     client_inv -∗
     {{{
@@ -529,17 +586,19 @@ Local Open Scope list.
       transaction2_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa) "#Hginv #inv %Φ !>(∅ & unalloc & free & Hcc & #KVS_si) HΦ".
+    iIntros (sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #Hginv #inv %Φ !>(∅ & unalloc & free & Hcc & #KVS_si) HΦ".
     rewrite/transaction2_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$]").
+    wp_apply ("Hinit_cli" with "[$]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction2_spec with "[$inv] [$] [$]").
+    by wp_apply (transaction2_spec with "[$] [$inv] [$] [$]").
   Qed.
 
   Lemma transaction3_client_spec :
     ∀ sa,
+      SI_client_toolbox -∗
       client_inv -∗
       GlobalInv -∗
     {{{
@@ -552,17 +611,19 @@ Local Open Scope list.
       transaction3_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa) "#inv #Hginv %Φ !>(∅ & unalloc & free & Hcc & #KVS_si) HΦ".
+    iIntros (sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      #inv #Hginv %Φ !>(∅ & unalloc & free & Hcc & #KVS_si) HΦ".
     rewrite/transaction3_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$]").
+    wp_apply ("Hinit_cli" with "[$]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction3_spec with "inv [$] [$]").
+    by wp_apply (transaction3_spec with "[$] inv [$] [$]").
   Qed.
 
   Lemma transaction4_client_spec :
     ∀ sa,
+      SI_client_toolbox -∗
       client_inv -∗
       GlobalInv -∗
     {{{
@@ -576,16 +637,18 @@ Local Open Scope list.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (sa)
-      "#inv #Hginv %Φ !>(∅ & unalloc & Hcc & free & #KVS_si) HΦ".
+      "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+        #inv #Hginv %Φ !>(∅ & unalloc & Hcc & free & #KVS_si) HΦ".
     rewrite/transaction4_client.
     wp_pures.
-    wp_apply (SI_init_client_proxy_spec with "[$]").
+    wp_apply ("Hinit_cli" with "[$]").
     iIntros (cst) "CanStart".
     wp_pures.
-    by wp_apply (transaction4_spec with "inv [$][$]").
+    by wp_apply (transaction4_spec with "[$] inv [$][$]").
   Qed.
 
   Lemma server_spec :
+    SI_client_toolbox -∗
     {{{ KVS_Init
       ∗ KVS_address ⤳ (∅, ∅)
       ∗ free_ports (ip_of_address KVS_address) {[port_of_address KVS_address]}
@@ -593,9 +656,10 @@ Local Open Scope list.
     server #KVS_address @[ip_of_address KVS_address]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Φ) "(? & ? & ? & ?) HΦ".
+    iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+      %Φ !>(? & ? & ? & ?) HΦ".
     rewrite /server. wp_pures.
-    by wp_apply (SI_init_kvs_spec with "[$]").
+    by wp_apply ("Hinit_kvs" with "[$]").
   Qed.
 
 End proofs.
@@ -636,13 +700,9 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
       example_runner @["system"]
     {{{ RET #(); True }}}.
   Proof.
-    iMod (SI_init_module
-            _
-            {[client_1_addr; client_2_addr;
-              client_3_addr; client_4_addr]})
-      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & %specs)";
-      first done.
-    destruct specs as (Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
+    iMod (SI_init_module _ {[client_1_addr; client_2_addr; client_3_addr; client_4_addr]})
+      as (SI_res) "(mem & KVS_Init & #Hginv & Hcc & #specs)";
+         first done.
     iPoseProof (big_sepS_delete _ _ "x" with "mem") as "(mem_x & mem)";
       first done.
     iPoseProof (big_sepS_delete _ _ "y" with "mem") as "(mem_y & mem)";
@@ -664,7 +724,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     iSplitR "srv_∅ KVS_Init"; last first.
     {
       iIntros "!>Hports".
-      by wp_apply (server_spec with "[$]").
+      by wp_apply (server_spec with "[$][$]").
     }
     iNext.
     wp_pures.
@@ -685,7 +745,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     iSplitR "clt1_∅ clt1_unalloc Hcc1"; last first.
     {
       iIntros "!>Hports".
-      by wp_apply (transaction1_client_spec client_1_addr with "inv [$]").
+      by wp_apply (transaction1_client_spec client_1_addr with "[$] inv [$]").
     }
     iNext.
     wp_pures.
@@ -695,7 +755,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     {
       iIntros "!>Hports".
       by wp_apply (transaction2_client_spec client_2_addr
-             with "Hginv inv [$]").
+             with "[$] Hginv inv [$]").
     }
     iNext.
     wp_pures.
@@ -705,7 +765,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     {
       iIntros "!>Hports".
       by wp_apply (transaction3_client_spec client_3_addr
-             with "inv Hginv [$]").
+             with "[$] inv Hginv [$]").
     }
     iNext.
     wp_pures.
@@ -715,7 +775,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
     {
       iIntros "!>Hports".
       by wp_apply (transaction4_client_spec client_4_addr with
-             "inv Hginv  [$]").
+             "[$] inv Hginv [$]").
     }
     by iApply "HΦ".
     Unshelve. all: by eauto.
@@ -759,4 +819,4 @@ Proof.
   do 4 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed. *)
+Qed.
