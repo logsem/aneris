@@ -38,7 +38,8 @@ Definition kvs_get_last : val :=
     | SOME "p" =>
         let: "_k" := Fst (Fst "p") in
         let: "v" := Fst (Snd (Fst "p")) in
-        let: "tv" := Snd (Snd (Fst "p")) in
+        let: "tv" := Fst (Snd (Snd (Fst "p"))) in
+        let: "_a" := Snd (Snd (Snd (Fst "p"))) in
         let: "tl" := Snd "p" in
         (if: "tv" = "t"
          then  assert: #false
@@ -70,12 +71,14 @@ Definition update_val : val :=
     | SOME "p" =>
         let: "v" := Fst "p" in
         let: "tl" := Snd "p" in
-        let: "_k" := Fst "v" in
-        let: "_v" := Fst (Snd "v") in
-        let: "t" := Snd (Snd "v") in
+        let: "k" := Fst "v" in
+        let: "vt" := Fst (Snd "v") in
+        let: "t" := Fst (Snd (Snd "v")) in
+        let: "_a" := Snd (Snd (Snd "v")) in
         (if: "t_old" < "t"
          then  SOME ("v", ("remove_older" "tl" "t_old"))
-         else  SOME ("v", NONE))
+         else
+           SOME ("k", ("vt", ("t", #false)), ("remove_older" "tl" "t_old")))
     end in
     "remove_older" ("newval" :: "vlst") "t_old".
 
@@ -90,7 +93,7 @@ Definition update_kvs : val :=
         let: "k" := Fst "kv" in
         let: "v" := Snd "kv" in
         let: "vlst" := kvs_get "k" "kvs" in
-        let: "newval" := ("k", ("v", "tc")) in
+        let: "newval" := ("k", ("v", ("tc", #true))) in
         let: "newvals" := update_val "newval" "vlst" "t_old" in
         let: "kvs_t'" := map_insert "k" "newvals" "kvs_t" in
         "upd" "kvs_t'" "cache_l"
@@ -107,7 +110,8 @@ Definition check_at_key : val :=
       let: "_hd" := Snd "l" in
       let: "_k" := Fst "vlast" in
       let: "_v" := Fst (Snd "vlast") in
-      let: "t" := Snd (Snd "vlast") in
+      let: "t" := Fst (Snd (Snd "vlast")) in
+      let: "_a" := Snd (Snd (Snd "vlast")) in
       (if: ("tc" ≤ "t") || ("t" = "ts")
        then  assert: #false
        else  "t" < "ts")

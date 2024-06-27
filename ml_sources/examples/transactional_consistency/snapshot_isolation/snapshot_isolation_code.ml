@@ -50,7 +50,7 @@ let kvs_get_last kt (kvs : 'a kvsTy) : 'a option =
     match l with
     | None -> None
     | Some p ->
-      let ((_k, (v, (tv, _))), tl) = p in
+      let ((_k, (v, (tv, _a))), tl) = p in
       if tv = t then assert false
       else if tv < t then Some v
       else aux tl
@@ -63,7 +63,7 @@ let find_oldest_client (cl : int alist) (tc : int) : int =
     | None -> tc
     | Some p ->
       let (ts, l) = p in
-      active l (min tc ts)
+      active l (if tc < ts then tc else ts)
   in active cl tc
 
 let update_val (newval : (string * ('a * (int * bool)))) (vlst : ((string * ('a * (int * bool))) alist)) (t_old : int) : ((string * ('a * (int * bool))) alist) =
