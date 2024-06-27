@@ -197,6 +197,27 @@ Section LocaleFairness.
 
 End LocaleFairness.
 
+Global Instance fair_by_Proper {S L T: Type}:
+  Proper ((eq ==> eq ==> iff) ==> (eq ==> eq ==> iff) ==> eq ==> eq ==> iff) 
+    (@fair_by S L T).
+Proof.
+  intros ?? LOC_IFF ?? STEP_IFF.
+  red. intros ?? ->. red. intros ?? ->.
+  rewrite /fair_by.
+  apply forall_proper. intros.
+  erewrite pred_at_iff.
+  2: { intros. eapply LOC_IFF; reflexivity. }
+  apply Morphisms_Prop.iff_iff_iff_impl_morphism; [reflexivity| ].
+  repeat (apply exist_proper; intros).
+  rewrite /fairness_sat.
+  apply pred_at_iff. intros. 
+  apply Morphisms_Prop.or_iff_morphism.
+  - apply not_iff_compat, LOC_IFF; reflexivity.
+  - apply exist_proper. intros. apply Morphisms_Prop.and_iff_morphism; auto.
+    apply STEP_IFF; reflexivity. 
+Qed. 
+
+
 Definition extrace Λ := trace (cfg Λ) (olocale Λ).
 
 Section exec_trace.
