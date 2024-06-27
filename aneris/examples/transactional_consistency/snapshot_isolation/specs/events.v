@@ -15,6 +15,7 @@ Section Events.
     {
       we_key : Key;
       we_val : val;
+      we_active : bool;
       we_time : Time;
     }.
 
@@ -37,12 +38,12 @@ Section Events_lemmas.
 
   Global Instance write_event_countable : Countable write_event.
   Proof.
-    refine {| encode := λ a, encode (we_key a, we_val a, we_time a);
+    refine {| encode := λ a, encode (we_key a, we_val a, we_active a, we_time a);
               decode := λ n,
-                      (λ x, {| we_key := x.1.1; we_val := x.1.2;
-                               we_time := x.2; |}) <$>
+                      (λ x, {| we_key := x.1.1.1; we_val := x.1.1.2;
+                               we_active := x.1.2; we_time := x.2 |}) <$>
                         @decode
-                        (Key * val * Time)%type
+                        (Key * val * bool * Time)%type
                         _ _ n
            |}.
     by intros []; rewrite /= decode_encode /=.
@@ -57,14 +58,14 @@ Global Instance int_time : KVS_time :=
     TM_lt := Nat.lt;
     TM_lt_tricho := PeanoNat.Nat.lt_trichotomy |}.
 
-Instance: Inhabited (@write_event int_time) := populate (Build_write_event "" #() inhabitant).
+Instance: Inhabited (@write_event int_time) := populate (Build_write_event "" #() true inhabitant).
 
 Global Program Instance Inject_write_event : Inject write_event val :=
-  {| inject a := $(a.(we_key), (a.(we_val), a.(we_time)))
+  {| inject a := $(a.(we_key), (a.(we_val), (a.(we_active), a.(we_time))))
   |}.
 Next Obligation.
   intros w1 w2 Heq.
-  inversion Heq as [[Hk Hv Ht]].
+  inversion Heq as [[Hk Hv Ha Ht]].
   assert (we_time w1 = we_time w2) as Ht'.
   { by apply (inj (R := eq)) in Ht; [ | apply _]. }
   destruct w1, w2; simpl in *.

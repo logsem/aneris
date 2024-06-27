@@ -132,6 +132,7 @@ Section KVS_valid.
                       [{|
                         we_key := k;
                         we_val := v.(SV_val);
+                        we_active := true;
                         we_time := T
                       |}])
           | None => h
@@ -144,6 +145,7 @@ Section KVS_valid.
       h = h' ++ [{|
                   we_key := k;
                   we_val := v.(SV_val);
+                  we_active := true;
                   we_time := T
                 |}]).
   Proof.
@@ -180,6 +182,7 @@ Section KVS_valid.
       <[k := h ++ [{|
                   we_key := k;
                   we_val := v.(SV_val);
+                  we_active := true;
                   we_time := T
                 |}]]> (update_kvs m C T).
   Proof.
@@ -396,7 +399,7 @@ Section KVS_valid.
       move: (incl k h1 Mt_k)=>{incl} [h2][M_k h1_h2].
       set o := cache !! k.
       case cache_k : o=>[v|]; rewrite/o in cache_k=>{o}.
-      + exists (h2 ++ [{|we_key := k; we_val := v;
+      + exists (h2 ++ [{|we_key := k; we_val := v; we_active := true;
               we_time := ((T+1)%nat : int_time.(Time))|}]).
         split; last by apply prefix_app_r.
         apply lookup_update_kvs_Some.
@@ -410,7 +413,7 @@ Section KVS_valid.
           [h'][v][M_k][cache_k]->];
       move:(cuts _ _ _ _ _ S_t Mt_k M_k)=>[h_after][->][before_t after_t].
       + by exists h_after.
-      + exists (h_after ++ [{|we_key := k; we_val := v;
+      + exists (h_after ++ [{|we_key := k; we_val := v; we_active := true;
               we_time := ((T+1)%nat : int_time.(Time))|}]).
         split; first by rewrite app_assoc.
         split; first done.
@@ -559,7 +562,7 @@ Section KVSL_valid.
       let h := default NONEV (m !! k) in
       match C !! k with
         | None => h
-        | Some v => SOMEV ($(k, (v.(SV_val), T)), h)
+        | Some v => SOMEV ($(k, (v.(SV_val), (true, T))), h)
       end).
 
   Lemma update_kvsl_dom m C T :
@@ -571,9 +574,9 @@ Section KVSL_valid.
   Lemma lookup_update_kvsl_Some m C T k h :
     update_kvsl m C T !! k = Some h ↔
     (C !! k = None ∧ m !! k = Some h) ∨
-    (∃ v, C !! k = Some v ∧ m !! k = None ∧ h = SOMEV ($(k, (v.(SV_val), T)), NONEV)) ∨
+    (∃ v, C !! k = Some v ∧ m !! k = None ∧ h = SOMEV ($(k, (v.(SV_val), (true, T))), NONEV)) ∨
     (∃ h' v, C !! k = Some v ∧ m !! k = Some h' ∧
-      h = SOMEV ($(k, (v.(SV_val), T)), h')).
+      h = SOMEV ($(k, (v.(SV_val), (true, T))), h')).
   Proof.
     split.
     - move=>/lookup_fn_to_gmap[]/[swap]/elem_of_union[]/elem_of_dom.
@@ -615,10 +618,10 @@ Section KVSL_valid.
     - by apply lookup_update_kvsl_None.
   Qed.
 
-  Lemma upadte_kvsl_insert_Some m C T k v h :
+  Lemma update_kvsl_insert_Some m C T k v h :
     m !! k = Some h →
     update_kvsl m (<[k := v]> C) T =
-      <[k := SOMEV ($(k, (v.(SV_val), T)), h)]> (update_kvsl m C T).
+      <[k := SOMEV ($(k, (v.(SV_val), (true, T))), h)]> (update_kvsl m C T).
   Proof.
     move=>m_k.
     apply map_eq=>k'.
@@ -652,7 +655,7 @@ Section KVSL_valid.
   Lemma update_kvsl_insert_None m C T k v :
     m !! k = None →
     update_kvsl m (<[k := v]> C) T = 
-      <[k := SOMEV ($(k, (v.(SV_val), T)), NONEV)]> (update_kvsl m C T).
+      <[k := SOMEV ($(k, (v.(SV_val), (true, T))), NONEV)]> (update_kvsl m C T).
   Proof.
     move=>m_k.
     apply map_eq=>k'.
@@ -728,8 +731,9 @@ Section KVSL_valid.
         * left.
           exists v.
           split; first done.
-          split; last done.
-          by apply model_empty.
+          split.
+          -- by apply model_empty.
+          -- by apply (inj inject).
         * right.
           exists $(reverse (we::h')), v.
           split; first done.

@@ -38,7 +38,7 @@ Definition can_commit_transaction `{User_params}
 Definition commit_write_event
   (p : option val * bool) (h : list write_event) (ct : nat) (k : Key) :=
     match p with
-    | (Some v, true) => h ++ [{| we_key := k; we_val := v; we_time := ct|}]
+    | (Some v, true) => h ++ [{| we_key := k; we_val := v; we_active := true; we_time := ct|}]
     | _              => h
     end.
 
