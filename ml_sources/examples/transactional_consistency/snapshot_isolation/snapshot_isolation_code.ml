@@ -9,7 +9,7 @@ open Mt_server_code
 (** The internal state of the server *)
 
 (** 1. The KVS type (updated via commited transactions) *)
-type 'a kvsTy = ((string, ((string * ('a * int)) alist)) amap)
+type 'a kvsTy = ((string, ((string * ('a * (int * bool))) alist)) amap)
 
 (** 2. The cache memory (current opened transaction).
     Simplification: there is only one global cache for all clients.
@@ -50,7 +50,7 @@ let kvs_get_last kt (kvs : 'a kvsTy) : 'a option =
     match l with
     | None -> None
     | Some p ->
-      let ((_k, (v, tv)), tl) = p in
+      let ((_k, (v, (tv, _))), tl) = p in
       if tv = t then assert false
       else if tv < t then Some v
       else aux tl
@@ -63,18 +63,18 @@ let find_oldest_client (cl : int alist) (tc : int) : int =
     | None -> tc
     | Some p ->
       let (ts, l) = p in
-      active l (if tc < ts then tc else ts)
+      active l (min tc ts)
   in active cl tc
 
-let update_val (newval : (string * ('a * int))) (vlst : ((string * ('a * int)) alist)) (t_old : int) : ((string * ('a * int)) alist) =
+let update_val (newval : (string * ('a * (int * bool)))) (vlst : ((string * ('a * (int * bool))) alist)) (t_old : int) : ((string * ('a * (int * bool))) alist) =
   let rec remove_older vlst t_old =
     match vlst with
     | None -> list_nil
     | Some p ->
       let (v, tl) = p in
-      let (_k, (_v, t)) = v in
+      let (k, (vt, (t, _a))) = v in
       if t_old < t then Some (v, remove_older tl t_old)
-      else Some (v, None)
+      else Some ((k, (vt, (t, false))), remove_older tl t_old)
   in remove_older (list_cons newval vlst) t_old
 
 let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (t_old : int) (tc : int)
@@ -86,19 +86,19 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (t_old : int) (tc : int)
       let (kv, cache_l) = chl in
       let (k,v) = kv in
       let vlst = kvs_get k kvs in
-      let newval = (k, (v, tc)) in
+      let newval = (k, (v, (tc, true))) in
       let newvals = (update_val newval vlst t_old) in
       let kvs_t' = map_insert k newvals kvs_t in
       upd kvs_t' cache_l
   in upd kvs cache
 
-let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
+let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * (int * bool))) alist)) =
   assert (ts < tc);
   match vlst with
   | None -> true
   | Some l ->
     let (vlast, _hd) = l in
-    let ((_k, (_v, t))) = vlast in
+    let (_k, (_v, (t, _a))) = vlast in
     if tc <= t || t = ts then assert false
     else t < ts
 
