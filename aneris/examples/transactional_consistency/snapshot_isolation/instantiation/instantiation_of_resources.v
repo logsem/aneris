@@ -103,8 +103,17 @@ Section SI_Resources_intantiation.
       iDestruct (client_connected_agree with "[$Hcli_conn][$Hcli_conn']") as "%Heq_big'".
       simplify_eq.
       by iDestruct (own_valid_2 with "Hut Hut'") as %Hfalse.
-    - iModIntro.
-      by iFrame.
+    - destruct (decide (sa = sa')) as [<- | Hneq'].
+      + rewrite /ConnectionState_def /connection_state.
+        iDestruct "Hconn1" as "[%state ([%v [%γCst [%γA [%γS [%γlk [%γCache [%γMsnap [%γU 
+          (%Heq & Hut & Hcli_conn & _)]]]]]]]] & _)]".
+        iDestruct "Hconn2" as "[%state' ([%v' [%γCst' [%γA' [%γS' [%γlk' [%γCache' [%γMsnap' [%γU' 
+          (%Heq' & Hut' & Hcli_conn' & _)]]]]]]]] & _)]".
+        iDestruct (client_connected_agree with "[$Hcli_conn][$Hcli_conn']") as "%Heq_big'".
+        simplify_eq.
+        by iDestruct (own_valid_2 with "Hut Hut'") as %Hfalse.
+      + iModIntro.
+        by iFrame.
   Qed.
 
 End SI_Resources_intantiation.

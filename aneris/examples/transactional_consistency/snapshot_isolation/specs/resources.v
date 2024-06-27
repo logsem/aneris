@@ -75,7 +75,8 @@ Section Resources.
       ConnectionState c sa ls ∗
       ConnectionState c' sa' ls' ={E}=∗
       ConnectionState c sa ls ∗
-      ConnectionState c' sa' ls' ∗ ⌜c ≠ c'⌝;
+      ConnectionState c' sa' ls' ∗ 
+      ⌜sa ≠ sa' ∧ c ≠ c'⌝;
   }.
 
 End Resources.
