@@ -689,11 +689,14 @@ Proof.
     rewrite elem_of_cons in Hin.
     destruct Hin as [<- | Hin];  first set_solver.
     assert (tag ∈ tags t); set_solver.
-Qed. 
+Qed.
 
 Lemma init_pre_valid : 
   ∀ (tag : string) (e : val) (t lt : list val), 
-    ((is_pre_event e ∧ tagOfEvent e = Some tag ∧ tag ∉ tags t) ∨ is_init_post_event e) → 
+    ((is_pre_event e ∧ tagOfEvent e = Some tag ∧ tag ∉ tags t) ∨ 
+      is_init_post_event e ∨
+      ((is_st_post_event e ∨ is_wr_post_event e ∨ is_rd_post_event e ∨ 
+        is_cm_post_event e) ∧ (∃ le, postToLin e = Some le ∧ le ∈ lt))) → 
     lin_trace_of lt t → lin_trace_of lt (t ++ [e]).
 Proof.
   intros tag e t lt His_pre_post Hlin_trace.
@@ -702,13 +705,15 @@ Proof.
   split; first done.
   split.
   - intros e_post Hin le Hpost_lin.
-    apply (H0 e_post); last done.
     rewrite elem_of_app in Hin.
-    destruct Hin as [Hin | Hfalse]; first done.
-    exfalso.
+    destruct Hin as [Hin | Hin].
+    {
+      apply (H0 e_post); done.
+    } 
     assert (e_post = e) as ->; first set_solver.
-    destruct His_pre_post as [(His_pre & _ & _) | His_post].
-    + destruct His_pre as [[tag' [c' ->]]| His_pre].
+    destruct His_pre_post as [(His_pre & _ & _) | [His_init_post | His_post]].
+    + exfalso.
+      destruct His_pre as [[tag' [c' ->]]| His_pre].
       1 : simpl in Hpost_lin; destruct tag'; done.
       destruct His_pre as [[tag' [c' ->]]| His_pre].
       1 : simpl in Hpost_lin; destruct tag'; done.
@@ -722,9 +727,12 @@ Proof.
       }
       destruct His_pre as [[tag' [c' ->]]| [tag' ->]].
       all : simpl in Hpost_lin; destruct tag'; done.
-    + destruct His_post as [tag' [c ->]].
+    + exfalso.
+      destruct His_init_post as [tag' [c ->]].
       simpl in Hpost_lin.
       destruct tag'; done.
+    + destruct His_post as (le' & Hpost_lin' & Hin').
+      set_solver.
   - split.
     + intros le Hin.
       destruct (H1 le Hin) as [e_pre (Hpre & HlinPre & Hin' & Himp)].
@@ -732,18 +740,25 @@ Proof.
       do 2 (split; first done).
       split; first set_solver.
       intros e_post Hassump.
-      apply Himp.
-      destruct Hassump as (Hassump1 & Hassump2).
-      split; last done.
-      rewrite elem_of_app in Hassump1.
-      destruct Hassump1 as [Hassump1 | Hassump1]; first done.
-      exfalso.
-      assert (e_post = e) as ->; first set_solver.
-      destruct His_pre_post as [(His_pre & _ & _) | His_post].
-      * apply pre_post_false in His_pre.
+      destruct His_pre_post as [(His_pre & _ & _) | [His_post | His_post]].
+      * apply Himp.
+        destruct Hassump as (Hassump1 & Hassump2).
+        split; last done.
+        rewrite elem_of_app in Hassump1.
+        destruct Hassump1 as [Hassump1 | Hassump1]; first done.
+        assert (e_post = e) as ->; first set_solver.
+        exfalso.
+        apply pre_post_false in His_pre.
         destruct Hassump2 as (His_post & _).
         by apply His_pre.
-      * destruct His_post as [tag' [c ->]].
+      * apply Himp.
+        destruct Hassump as (Hassump1 & Hassump2).
+        split; last done.
+        rewrite elem_of_app in Hassump1.
+        destruct Hassump1 as [Hassump1 | Hassump1]; first done.
+        assert (e_post = e) as ->; first set_solver.
+        exfalso.
+        destruct His_post as [tag' [c ->]].
         destruct Hassump2 as (_ & Hassump2).
         simpl in Hassump2.
         destruct tag'; try done.
@@ -773,6 +788,11 @@ Proof.
                  simpl in HlinPre.
                  destruct tag'; try done.
                  by destruct b'.
+      * destruct Hassump as (Hassump1 & Hassump2).
+        rewrite elem_of_app in Hassump1.
+        destruct Hassump1 as [Hassump1 | Hassump1]; first by apply Himp.
+        assert (e_post = e) as ->; first set_solver.
+        admit.
     + split; first done.
       split; last done. 
       intros le1 le2 Hrel Hfalse.
@@ -796,9 +816,9 @@ Proof.
         destruct Hlookup_pre as [(Hle_length' & Hlookup_pre)|(Heq_lenght' & Hlookup_pre)].
         -- by exists i, j.
         -- subst. 
-           exfalso.
            destruct His_pre_post as [(_ & Htag & Htags) | Hfalse].
-           ++ rewrite /rel_list in Hrel.
+           ++ exfalso.
+              rewrite /rel_list in Hrel.
               destruct Hrel as [i' [j' (Hle' & Hlookup_le1 & Hlookup_le2)]].
               assert (le1 ∈ lt) as Hin_le1; first by eapply elem_of_list_lookup_2.
               destruct (H1 le1 Hin_le1) as [e1_pre' (His_pre' & Hlinpre' & Hin_pre' & _)].
@@ -806,13 +826,14 @@ Proof.
               subst.
               assert (tag ∈ tags t) as Hfalse; last set_solver.
               eapply tags_in; done.
-           ++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+           ++ exfalso.
+              destruct Hle1_lin as [Hle1_lin | Hle1_lin].
               ** destruct Hle1_lin as [tag' [c' ->]].
                   simpl in Hlinpre.
                   destruct tag'; try done.
                   inversion Hlinpre; subst.
-                  inversion Hfalse.
-                  set_solver.
+                  destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
+                  all : inversion Hfalse; set_solver.
               ** destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                   --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                       +++ destruct Hle1_lin as [tag' [c' [k' [v' ->]]]].
@@ -820,48 +841,66 @@ Proof.
                           destruct tag'; try done.
                           destruct k'; try done.
                           inversion Hlinpre; subst.
-                          inversion Hfalse.
-                          set_solver.
+                          destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
+                          all : inversion Hfalse; set_solver.
                       +++ destruct Hle1_lin as [tag' [c' [k' ->]]].
                           simpl in Hlinpre.
                           destruct tag'; try done.
                           destruct k'; try done.
                           inversion Hlinpre; subst.
-                          inversion Hfalse.
-                          set_solver.
+                          destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
+                          all : inversion Hfalse; set_solver.
                   --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                       +++ destruct Hle1_lin as [tag' [c' [k' [v' ->]]]].
                           simpl in Hlinpre.
                           destruct tag'; try done.
                           destruct k'; try done.
                           inversion Hlinpre; subst.
-                          inversion Hfalse.
-                          set_solver.
+                          destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
+                          all : inversion Hfalse; set_solver.
                       +++ destruct Hle1_lin as [tag' [c' [b' ->]]].
                           simpl in Hlinpre.
                           destruct tag'; try done.
                           destruct b'; try done.
                           inversion Hlinpre; subst.
-                          inversion Hfalse.
-                          set_solver.
+                          destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
+                          all : inversion Hfalse; set_solver.
       * subst.
         exfalso.
+        assert (e1_pre = e2_post) as ->.
+        {
+          rewrite lookup_snoc_Some in Hlookup_pre.
+          destruct Hlookup_pre as [(Hfalse & _ ) | (_ & Hgoal)]; last done.
+          lia.
+        }
         destruct Hle2_lin as [Hle2_lin | Hle2_lin].
         -- destruct Hle2_lin as [tag' [c' ->]].
            simpl in Hlinpost.
            destruct tag'; try done.
            inversion Hlinpost; subst.
-           destruct His_pre_post as [(Hfalse & _ & _) | Hfalse].
-           2 : { inversion Hfalse; set_solver. }
-           destruct Hfalse as [Hfalse | Hfalse].
-           1 : { inversion Hfalse; set_solver. }
-           destruct Hfalse as [Hfalse | Hfalse].
-           1 : { inversion Hfalse; set_solver. }
-           destruct Hfalse as [Hfalse | Hfalse].
-           1 : { inversion Hfalse; set_solver. }
-           destruct Hfalse as [Hfalse | Hfalse].
-           1 : { inversion Hfalse; set_solver. }
-           inversion Hfalse; set_solver.
+           destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+           ** destruct Hle1_lin as [tag'' [c'' ->]].
+              simpl in Hlinpre.
+              destruct tag''; try done.
+           ** destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+              --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                  +++ destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                      simpl in Hlinpost.
+                      destruct tag''; try done.
+                      destruct k''; try done.
+                  +++ destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
+                      simpl in Hlinpost.
+                      destruct tag''; try done.
+                      destruct k''; try done.
+              --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                  +++ destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                      simpl in Hlinpost.
+                      destruct tag''; try done.
+                      destruct k''; try done.
+                  +++ destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
+                      simpl in Hlinpost.
+                      destruct tag''; try done.
+                      destruct b''; try done.
         -- destruct Hle2_lin as [Hle2_lin | Hle2_lin].
            ++ destruct Hle2_lin as [Hle2_lin | Hle2_lin].
               ** destruct Hle2_lin as [tag' [c' [k' [v' ->]]]].
@@ -869,64 +908,112 @@ Proof.
                  destruct tag'; try done.
                  destruct k'; try done.
                  inversion Hlinpost; subst.
-                 destruct His_pre_post as [(Hfalse & _ & _) | Hfalse].
-                 2 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 inversion Hfalse; set_solver.
-              ** destruct Hle2_lin as [tag' [c' [k' ->]]].
+                 destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                 --- destruct Hle1_lin as [tag'' [c'' ->]].
+                     simpl in Hlinpre.
+                     destruct tag''; try done.
+                 --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct b''; try done.
+              ** destruct Hle2_lin as [tag' [c' [k' ->]]]. 
                  simpl in Hlinpost.
                  destruct tag'; try done.
                  destruct k'; try done.
                  inversion Hlinpost; subst.
-                 destruct His_pre_post as [(Hfalse & _ & _) | Hfalse].
-                 2 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 inversion Hfalse; set_solver.
+                 destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                 --- destruct Hle1_lin as [tag'' [c'' ->]].
+                     simpl in Hlinpre.
+                     destruct tag''; try done.
+                 --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct b''; try done.
            ++ destruct Hle2_lin as [Hle2_lin | Hle2_lin].
               ** destruct Hle2_lin as [tag' [c' [k' [v' ->]]]].
                  simpl in Hlinpost.
                  destruct tag'; try done.
                  destruct k'; try done.
                  inversion Hlinpost; subst.
-                 destruct His_pre_post as [(Hfalse & _ & _) | Hfalse].
-                 2 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                inversion Hfalse; set_solver.
+                 destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                 --- destruct Hle1_lin as [tag'' [c'' ->]].
+                     simpl in Hlinpre.
+                     destruct tag''; try done.
+                 --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct b''; try done.
               ** destruct Hle2_lin as [tag' [c' [b' ->]]].
                  simpl in Hlinpost.
                  destruct tag'; try done.
                  destruct b'; try done.
                  inversion Hlinpost; subst.
-                 destruct His_pre_post as [(Hfalse & _ & _) | Hfalse].
-                 2 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 destruct Hfalse as [Hfalse | Hfalse].
-                 1 : { inversion Hfalse; set_solver. }
-                 inversion Hfalse; set_solver.
-Qed.
+                 destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                 --- destruct Hle1_lin as [tag'' [c'' ->]].
+                     simpl in Hlinpre.
+                     destruct tag''; try done.
+                 --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                     +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
+                         *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct k''; try done.
+                         *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
+                             simpl in Hlinpost.
+                             destruct tag''; try done.
+                             destruct b''; try done.
+Admitted.
