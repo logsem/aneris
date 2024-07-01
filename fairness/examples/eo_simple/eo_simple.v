@@ -479,7 +479,7 @@ Section ClientDefs.
     rewrite /client_inv_impl. iDestruct "INV" as "(>ST & >Y_AUTH & LIB_MSI)". 
     
     rewrite ewp_unfold /ewp_pre. simpl. rewrite NV.
-
+  Abort. 
 
 
 
@@ -496,6 +496,8 @@ Section ClientDefs.
         {{ v, has_fuels g__cl ∅ ∗ partial_free_roles_are {[ ρ__lift; ρ__cl ]} ∗ y_frag_model_is 0 }}.
     Proof.
       iIntros "INV FUELS FREE Y_FRAG EVEN_PRE". 
+    Abort. 
 
+  End Proofs. 
 
-  End Proof. 
+End ClientDefs.
