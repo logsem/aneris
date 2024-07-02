@@ -192,7 +192,7 @@ Section trace_proof.
       rewrite /valid_trace_ru /valid_trace.
       exists lt.
       split.
-      - apply (init_pre_valid tag); try done.
+      - apply (lin_trace_valid tag); try done.
         left.
         split.
         {
@@ -224,7 +224,7 @@ Section trace_proof.
       iFrame.
       iSplitR.
       - iPureIntro.
-        apply (init_pre_valid tag1); try done.
+        apply (lin_trace_valid tag1); try done.
         left.
         split.
         {
@@ -271,7 +271,7 @@ Section trace_proof.
       rewrite /valid_trace_ru /valid_trace.
       exists lt'.
       split.
-      - apply (init_pre_valid tag1); try done.
+      - apply (lin_trace_valid tag1); try done.
         right.
         rewrite /is_init_post_event.
         set_solver.
@@ -315,7 +315,7 @@ Section trace_proof.
       iFrame.
       iSplit.
       - iPureIntro.
-        apply (init_pre_valid tag1); try done.
+        apply (lin_trace_valid tag1); try done.
         right.
         rewrite /is_init_post_event.
         set_solver.
@@ -435,7 +435,7 @@ Section trace_proof.
       rewrite /valid_trace_ru /valid_trace.
       exists lt.
       split.
-      - apply (init_pre_valid tag); try done.
+      - apply (lin_trace_valid tag); try done.
         left.
         split.
         {
@@ -467,7 +467,7 @@ Section trace_proof.
       iFrame.
       iSplitR.
       - iPureIntro.
-        apply (init_pre_valid tag1); try done.
+        apply (lin_trace_valid tag1); try done.
         left.
         split.
         {
@@ -608,78 +608,7 @@ Section trace_proof.
       iSplitR.
       {
         iPureIntro.
-        rewrite /valid_sequence.
-        split.
-        - intros e c_e He_in He_conn He_event.
-          rewrite elem_of_app in He_in.
-          destruct He_in as [He_in | He_in].
-          + destruct Hvalid_seq' as (Hvalid_seq' & _).
-            destruct (Hvalid_seq' e c_e He_in He_conn He_event) as 
-              (e_st & He_st_conn & He_st_lin & He_st_rel & He_st_not ).
-            exists e_st.
-            do 2 (split; first done).
-            split.
-            * destruct He_st_rel as (i & j & Hneq & Hlookup_i & Hlookup_j).
-              exists i, j.
-              split; first done.
-              split; by apply lookup_app_l_Some.
-            * intros Hfalse.
-              destruct Hfalse as (e_cm & _ & Hcm_lin & Hcm_rel1 & Hcm_rel2).
-              admit. 
-          + assert (e = (#tag1, (c, #"StLin"))%V) as ->; first set_solver.
-            destruct He_event as [Hfalse | [Hfalse | Hfalse]].
-            * destruct Hfalse as [Hfalse | Hfalse]; set_solver.
-            * rewrite /is_wr_lin_event in Hfalse; set_solver.
-            * rewrite /is_cm_lin_event in Hfalse; set_solver.
-        - intros e_st c0 He_in He_conn He_event.
-          rewrite elem_of_app in He_in.
-          destruct He_in as [He_in | He_in].
-          + destruct Hvalid_seq' as (_ & Hvalid_seq').
-            destruct (Hvalid_seq' e_st c0 He_in He_conn He_event) as 
-              [Hvalid_seq'' | Hvalid_seq''].
-            * left.
-              destruct Hvalid_seq'' as (e_cm & Hcm_conn & Hcm_lin & Hcm_rel & Hcm_not).
-              exists e_cm.
-              do 2 (split; first done).
-              split.
-              -- destruct Hcm_rel as (i & j & Hneq & Hlookup_i & Hlookup_j).
-                 exists i, j.
-                 split; first done.
-                 split; by apply lookup_app_l_Some.
-              -- intros Hmain.
-                 apply Hcm_not.
-                 destruct Hmain as (e_st' & He_st'_conn & He_st'_lin & He_st'_rel1 & He_st'_rel2).
-                 exists e_st'.
-                 do 2 (split; first done).
-                 admit.
-            * right.
-              intros Hmain.
-              apply Hvalid_seq''.
-              destruct Hmain as (e & He_conn' & He_rel' & He_lin').
-              exists e.
-              split; first done.
-              split; last done.
-              admit.
-          + assert (e_st = (#tag1, (c, #"StLin"))%V) as ->; first set_solver.
-            right.
-            intro Hfalse.
-            destruct Hfalse as (e & _ & (i & j & Hneq & Hlookup_i & Hlookup_j) & _).
-            rewrite lookup_app_Some in Hlookup_i.
-            destruct Hlookup_i as [Hfalse |(Hlength & Hlookup_i)].
-            * admit.
-            * rewrite lookup_app_Some in Hlookup_j.
-              destruct Hlookup_j as [Hfalse |(_ & Hfalse)].
-              -- rewrite list_lookup_singleton_Some in Hlookup_i.
-                 destruct Hlookup_i as (Hlookup_i & _ ).
-                 assert (i = length lt') as ->; first lia.
-                 assert (length lt' ≤ j) as Hleq; first lia.
-                 apply lookup_ge_None_2 in Hleq.
-                 set_solver.
-              -- rewrite list_lookup_singleton_Some in Hlookup_i. 
-                 destruct Hlookup_i as (Hlookup_i & _ ).
-                 rewrite list_lookup_singleton_Some in Hfalse. 
-                 destruct Hfalse as (Hfalse & _ ).
-                 lia.
+        by apply valid_sequence_st_lin.
       }
       admit.
     }
@@ -750,7 +679,7 @@ Section trace_proof.
       rewrite /valid_trace_ru /valid_trace.
       exists lt''.
       split.
-      - apply (init_pre_valid tag1); try done.
+      - apply (lin_trace_valid tag1); try done.
         do 2 right.
         split.
         + left.
@@ -770,7 +699,7 @@ Section trace_proof.
       iFrame.
       iSplitR.
       - iPureIntro.
-        apply (init_pre_valid tag1); try done.
+        apply (lin_trace_valid tag1); try done.
         do 2 right.
         split.
         + left.
@@ -828,7 +757,7 @@ Section trace_proof.
       {
         iPureIntro.
         rewrite /lin_trace_of.
-        do 4 (split; first set_solver).
+        do 3 (split; first set_solver).
         split; last set_solver.
         rewrite /rel_list.
         set_solver.

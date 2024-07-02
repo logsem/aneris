@@ -178,27 +178,27 @@ Definition linToOp (le : val) : option operation :=
     | _ => None 
   end.
 
-Definition is_init_pre_event (v : val) : Prop := ∃ tag, v = (#tag, (#"", #"InitPre"))%V.
+Definition is_init_pre_event (v : val) : Prop := ∃ (tag : string), v = (#tag, (#"", #"InitPre"))%V.
 
-Definition is_init_post_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"InitPost"))%V.
+Definition is_init_post_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"InitPost"))%V.
 
-Definition is_st_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPre"))%V.
+Definition is_st_pre_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"StPre"))%V.
 
-Definition is_st_post_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StPost"))%V.
+Definition is_st_post_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"StPost"))%V.
 
-Definition is_rd_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"RdPre"))%V.
+Definition is_rd_pre_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"RdPre"))%V.
 
 Definition is_rd_post_event (v : val) : Prop := 
-  (∃ tag c k v', v = (#tag, (c, (#"RdPost", (#k, SOMEV v'))))%V) ∨ 
-  (∃ tag c k, v = (#tag, (c, (#"RdPost", (#k, NONEV))))%V).
+  (∃ (tag k : string) (c v': val), v = (#tag, (c, (#"RdPost", (#k, SOMEV v'))))%V) ∨ 
+  (∃ (tag k : string) (c : val), v = (#tag, (c, (#"RdPost", (#k, NONEV))))%V).
 
-Definition is_wr_pre_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"WrPre", (#k, v'))))%V.
+Definition is_wr_pre_event (v : val) : Prop := ∃ (tag k : string) (c v' : val), v = (#tag, (c, (#"WrPre", (#k, v'))))%V.
 
-Definition is_wr_post_event (v : val) : Prop := ∃ tag c k v', v = (tag, (c, (#"WrPost", (#k, v'))))%V.
+Definition is_wr_post_event (v : val) : Prop := ∃ (tag k : string) (c v' : val), v = (#tag, (c, (#"WrPost", (#k, v'))))%V.
 
-Definition is_cm_pre_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"CmPre"))%V.
+Definition is_cm_pre_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"CmPre"))%V.
 
-Definition is_cm_post_event (v : val) : Prop := ∃ tag c b, v = (tag, (c, (#"CmPost", #b)))%V.
+Definition is_cm_post_event (v : val) : Prop := ∃ (tag : string) (c : val) (b : bool), v = (#tag, (c, (#"CmPost", #b)))%V.
 
 Definition is_pre_event (v : val) : Prop := 
   is_st_pre_event v ∨ is_rd_pre_event v ∨ is_wr_pre_event v ∨ is_cm_pre_event v ∨ is_init_pre_event v.
@@ -206,15 +206,15 @@ Definition is_pre_event (v : val) : Prop :=
 Definition is_post_event (v : val) : Prop := 
   is_st_post_event v ∨ is_rd_post_event v ∨ is_wr_post_event v ∨ is_cm_post_event v ∨ is_init_post_event v.
 
-Definition is_st_lin_event (v : val) : Prop := ∃ tag c, v = (#tag, (c, #"StLin"))%V.
+Definition is_st_lin_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"StLin"))%V.
 
 Definition is_rd_lin_event (v : val) : Prop := 
-  (∃ tag c k v', v = (#tag, (c, (#"RdLin", (#k, SOMEV v'))))%V) ∨ 
-  (∃ tag c k, v = (#tag, (c, (#"RdLin", (#k, NONEV))))%V).
+  (∃ (tag k : string) (c v' : val), v = (#tag, (c, (#"RdLin", (#k, SOMEV v'))))%V) ∨ 
+  (∃ (tag k : string) (c : val), v = (#tag, (c, (#"RdLin", (#k, NONEV))))%V).
 
-Definition is_wr_lin_event (v : val) : Prop := ∃ tag c k v', v = (#tag, (c, (#"WrLin", (#k, v'))))%V.
+Definition is_wr_lin_event (v : val) : Prop := ∃ (tag k : string) (c v' : val), v = (#tag, (c, (#"WrLin", (#k, v'))))%V.
 
-Definition is_cm_lin_event (v : val) : Prop := ∃ tag c b, v = (#tag, (c, (#"CmLin", #b)))%V.
+Definition is_cm_lin_event (v : val) : Prop := ∃ (tag : string) (c : val) (b : bool), v = (#tag, (c, (#"CmLin", #b)))%V.
 
 Definition is_lin_event (v : val) : Prop := 
   is_st_lin_event v ∨ is_rd_lin_event v ∨ is_wr_lin_event v ∨ is_cm_lin_event v.
@@ -287,11 +287,11 @@ Definition postToLin (event : val) : option val :=
       Some (#(LitString tag), (c, (#"StLin")))%V
     | (#(LitString tag), (c, (#"RdPost", (#(LitString k), NONEV))))%V => 
       Some (#(LitString tag), (c, (#"RdLin", (#(LitString k), NONEV))))%V
-    | (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V => 
+    | (#(LitString tag), (c, (#"RdPost", (#(LitString k), SOMEV v))))%V => 
       Some (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V
-    | (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V => 
+    | (#(LitString tag), (c, (#"WrPost", (#(LitString k), v))))%V => 
       Some (#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V
-    | (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V => 
+    | (#(LitString tag), (c, (#"CmPost", #(LitBool b))))%V => 
       Some (#(LitString tag), (c, (#"CmLin", #(LitBool b))))%V
     | _ => None
   end.
@@ -304,20 +304,18 @@ Definition lin_trace_of (lin_trace trace : list val) : Prop :=
   (∀ le, le ∈ lin_trace → ∃ e_pre, is_pre_event e_pre ∧ linToPre le = Some e_pre ∧ e_pre ∈ trace ∧ 
                                     (∀ e_post, (e_post ∈ trace ∧ is_post_event e_post ∧ postToPre e_post = Some e_pre) 
                                                → linToPost le = Some e_post)) ∧
-  (* Only one linerization point per operation *)
-  (∀ le1 le2, le1 ∈ lin_trace → le2 ∈ lin_trace → 
-              ∃ e_pre, linToPre le1 = Some e_pre → linToPre le2 = Some e_pre → le1 = le2) ∧
   (* Order is preserved *)
   (∀ le1 le2, rel_list lin_trace le1 le2 → 
               ¬(∃ e1_pre e2_post, linToPre le1 = Some e1_pre ∧
                                   linToPost le2 = Some e2_post  ∧
                                   rel_list trace e2_post e1_pre)) ∧
-  (* No duplicates *)
-  (∀ le1 le2 i j, lin_trace !! i = Some le1 → lin_trace !! j = Some le2 → le1 = le2 → i = j).
+  (* Only one linearization point per operation *)
+  (∀ le1 le2 i j tag, lin_trace !! i = Some le1 → lin_trace !! j = Some le2 →
+                      tagOfEvent le1 = Some tag → tagOfEvent le2 = Some tag → i = j).
 
 Definition valid_trace (test : commitTest) : list val → Prop :=
   λ trace, ∃ lin_trace, lin_trace_of lin_trace trace ∧ valid_sequence lin_trace ∧ 
-           (∃ T exec, valid_transactions T ∧ extraction_of lin_trace T ∧  
+           (∃ T exec, valid_transactions T ∧ extraction_of lin_trace T ∧
                       based_on exec (comTrans T) ∧ valid_execution test exec).
 
 Definition valid_trace_ru : list val → Prop := valid_trace commit_test_ru.
@@ -332,7 +330,7 @@ Proof.
   exists [].
   split.
   - rewrite /lin_trace_of.
-    do 4 (split; first set_solver).
+    do 3 (split; first set_solver).
     split; last set_solver.
     rewrite /rel_list.
     set_solver.
@@ -366,7 +364,7 @@ Lemma valid_trace_rc_empty : valid_trace_rc [].
   exists [].
   split.
   - rewrite /lin_trace_of.
-    do 4 (split; first set_solver).
+    do 3 (split; first set_solver).
     split; last set_solver.
     rewrite /rel_list.
     set_solver.
@@ -404,7 +402,7 @@ Lemma valid_trace_si_empty : valid_trace_si [].
   exists [].
   split.
   - rewrite /lin_trace_of.
-    do 4 (split; first set_solver).
+    do 3 (split; first set_solver).
     split; last set_solver.
     rewrite /rel_list.
     set_solver.
@@ -691,7 +689,35 @@ Proof.
     assert (tag ∈ tags t); set_solver.
 Qed.
 
-Lemma init_pre_valid : 
+Lemma post_lin_lin_post le e :
+  (is_st_post_event e ∨ is_rd_post_event e ∨ is_wr_post_event e ∨ is_cm_post_event e) →
+  (postToLin e = Some le → linToPost le = Some e).
+Proof.
+  intros Hevent Hpost_lin.
+  destruct Hevent as [Hevent | [[Hevent | Hevent] | [Hevent | Hevent]]].
+  - destruct Hevent as [tag [c ->]].
+    simpl in Hpost_lin.
+    assert (le = (#tag, (c, #"StLin"))%V) as ->; first set_solver.
+    by simpl.
+  - destruct Hevent as [tag [k [c [v ->]]]].
+    simpl in Hpost_lin.
+    assert (le = (#tag, (c, (#"RdLin", (#k, InjRV v))))%V) as ->; first set_solver.
+    by simpl.
+  - destruct Hevent as [tag [k [c ->]]].
+    simpl in Hpost_lin.
+    assert (le = (#tag, (c, (#"RdLin", (#k, InjLV #()))))%V) as ->; first set_solver.
+    by simpl.
+  - destruct Hevent as [tag [k [c [v ->]]]].
+    simpl in Hpost_lin.
+    assert (le = (#tag, (c, (#"WrLin", (#k, v))))%V) as ->; first set_solver.
+    by simpl.
+  - destruct Hevent as [tag [c [b ->]]].
+    simpl in Hpost_lin.
+    assert (le = (#tag, (c, (#"CmLin", #b)))%V) as ->; first set_solver.
+    by simpl.
+Qed.
+
+Lemma lin_trace_valid : 
   ∀ (tag : string) (e : val) (t lt : list val), 
     ((is_pre_event e ∧ tagOfEvent e = Some tag ∧ tag ∉ tags t) ∨ 
       is_init_post_event e ∨
@@ -701,7 +727,7 @@ Lemma init_pre_valid :
 Proof.
   intros tag e t lt His_pre_post Hlin_trace.
   rewrite /lin_trace_of.
-  destruct Hlin_trace as (?&?&?&?&?&?).
+  destruct Hlin_trace as (?&?&?&?&?).
   split; first done.
   split.
   - intros e_post Hin le Hpost_lin.
@@ -718,13 +744,7 @@ Proof.
       destruct His_pre as [[tag' [c' ->]]| His_pre].
       1 : simpl in Hpost_lin; destruct tag'; done.
       destruct His_pre as [[tag' [c' [k' [v' ->]]]]| His_pre].
-      1 : {
-            simpl in Hpost_lin.
-            destruct tag'.
-            all : try inversion Hpost_lin.
-            destruct l.
-            all : try inversion Hpost_lin.
-      }
+      1 : by simpl in Hpost_lin.
       destruct His_pre as [[tag' [c' ->]]| [tag' ->]].
       all : simpl in Hpost_lin; destruct tag'; done.
     + exfalso.
@@ -761,44 +781,159 @@ Proof.
         destruct His_post as [tag' [c ->]].
         destruct Hassump2 as (_ & Hassump2).
         simpl in Hassump2.
-        destruct tag'; try done.
         inversion Hassump2.
         subst.
         specialize (H le Hin).
         destruct H as [H | H].
-        -- destruct H as [tag' [c' ->]].
+        -- destruct H as [tag'' [c' ->]].
            simpl in HlinPre.
            by destruct tag'.
         -- destruct H as [H | H].
            ++ destruct H as [H | H].
-              ** destruct H as [tag' [c' [k' [v' ->]]]].
-                 simpl in HlinPre.
-                 destruct tag'; try done.
-                 by destruct k'.
-              ** destruct H as [tag' [c' [k' ->]]].
-                 simpl in HlinPre.
-                 destruct tag'; try done.
-                 by destruct k'.
+              ** destruct H as [tag'' [c' [k' [v' ->]]]].
+                 by simpl in HlinPre.
+              ** destruct H as [tag'' [c' [k' ->]]].
+                 by simpl in HlinPre.
            ++ destruct H as [H | H].
-              ** destruct H as [tag' [c' [k' [v' ->]]]].
-                 simpl in HlinPre.
-                 destruct tag'; try done.
-                 by destruct k'.
-              ** destruct H as [tag' [c' [b' ->]]].
-                 simpl in HlinPre.
-                 destruct tag'; try done.
-                 by destruct b'.
-      * destruct Hassump as (Hassump1 & Hassump2).
+              ** destruct H as [tag'' [c' [k' [v' ->]]]].
+                 by simpl in HlinPre.
+              ** destruct H as [tag'' [c' [b' ->]]].
+                 by simpl in HlinPre.
+      * destruct Hassump as (Hassump1 & (Hassump2 & Hassump2')).
         rewrite elem_of_app in Hassump1.
         destruct Hassump1 as [Hassump1 | Hassump1]; first by apply Himp.
         assert (e_post = e) as ->; first set_solver.
-        admit.
-    + split; first done.
-      split; last done. 
+        destruct His_post as (His_post & (le' & Hlin_post & Hin_le')).
+        pose proof Hin as Hin_le.
+        rewrite elem_of_list_lookup in Hin.
+        destruct Hin as (i & Hlookup_i).
+        rewrite elem_of_list_lookup in Hin_le'.
+        destruct Hin_le' as (j & Hlookup_j).
+        destruct His_post as [His_post | [His_post | [[His_post | His_post] | His_post]]].
+        -- pose proof Hlin_post as Hlin_post'. 
+           apply post_lin_lin_post in Hlin_post.
+           ++ destruct His_post as [tag' [c' ->]]. 
+              assert (tagOfEvent le' = Some tag') as Htag_of1.
+              {
+                simpl in Hlin_post'.
+                injection Hlin_post' as <-.
+                by simpl.
+              }
+              simpl in Hassump2'.
+              assert (e_pre = (#tag', (c', #"StPre"))%V) as ->; first set_solver.
+              assert (tagOfEvent le = Some tag') as Htag_of2.
+              {
+                destruct (H le Hin_le) as [[tag'' [c'' ->]] | [[[tag'' [c'' [k'' [v'' ->]]]] | 
+                  [tag'' [k'' [c'' ->]]]] | [[tag'' [c'' [k'' [v'' ->]]]] | [tag'' [c'' [b'' ->]]]]]].
+                all : simpl in HlinPre.
+                all : assert (tag'' = tag') as ->; first set_solver.
+                all : by simpl.
+              }
+              assert (le = le') as ->; last done.
+              assert (i = j) as ->; last set_solver.
+              apply (H3 le le' i j tag' Hlookup_i Hlookup_j Htag_of2 Htag_of1).
+           ++ by left.
+        -- pose proof Hlin_post as Hlin_post'. 
+           apply post_lin_lin_post in Hlin_post.
+           ++ destruct His_post as [tag' [c' [k' [v' ->]]]]. 
+              assert (tagOfEvent le' = Some tag') as Htag_of1.
+              {
+                simpl in Hlin_post'.
+                injection Hlin_post' as <-.
+                by simpl.
+              }
+              simpl in Hassump2'.
+              assert (e_pre = (#tag', (k', (#"WrPre", (#c', v'))))%V) as ->; first set_solver.
+              assert (tagOfEvent le = Some tag') as Htag_of2.
+              {
+                destruct (H le Hin_le) as [[tag'' [c'' ->]] | [[[tag'' [c'' [k'' [v'' ->]]]] | 
+                  [tag'' [k'' [c'' ->]]]] | [[tag'' [c'' [k'' [v'' ->]]]] | [tag'' [c'' [b'' ->]]]]]].
+                all : simpl in HlinPre.
+                all : assert (tag'' = tag') as ->; first set_solver.
+                all : by simpl.
+              }
+              assert (le = le') as ->; last done.
+              assert (i = j) as ->; last set_solver.
+              apply (H3 le le' i j tag' Hlookup_i Hlookup_j Htag_of2 Htag_of1).
+           ++ do 2 right.
+              by left.
+        -- pose proof Hlin_post as Hlin_post'. 
+           apply post_lin_lin_post in Hlin_post.
+           ++ destruct His_post as [tag' [k' [c' [v' ->]]]]. 
+              assert (tagOfEvent le' = Some tag') as Htag_of1.
+              {
+                simpl in Hlin_post'.
+                injection Hlin_post' as <-.
+                by simpl.
+              }
+              simpl in Hassump2'.
+              assert (e_pre = (#tag', (c', #"RdPre"))%V) as ->; first set_solver.
+              assert (tagOfEvent le = Some tag') as Htag_of2.
+              {
+                destruct (H le Hin_le) as [[tag'' [c'' ->]] | [[[tag'' [c'' [k'' [v'' ->]]]] | 
+                  [tag'' [k'' [c'' ->]]]] | [[tag'' [c'' [k'' [v'' ->]]]] | [tag'' [c'' [b'' ->]]]]]].
+                all : simpl in HlinPre.
+                all : assert (tag'' = tag') as ->; first set_solver.
+                all : by simpl.
+              }
+              assert (le = le') as ->; last done.
+              assert (i = j) as ->; last set_solver.
+              apply (H3 le le' i j tag' Hlookup_i Hlookup_j Htag_of2 Htag_of1).
+           ++ right. 
+              by do 2 left.
+        -- pose proof Hlin_post as Hlin_post'.
+           apply post_lin_lin_post in Hlin_post.
+           ++ destruct His_post as [tag' [k' [c' ->]]]. 
+              assert (tagOfEvent le' = Some tag') as Htag_of1.
+              {
+                simpl in Hlin_post'.
+                injection Hlin_post' as <-.
+                by simpl.
+              }
+              simpl in Hassump2'.
+              assert (e_pre = (#tag', (c', #"RdPre"))%V) as ->; first set_solver.
+              assert (tagOfEvent le = Some tag') as Htag_of2.
+              {
+                destruct (H le Hin_le) as [[tag'' [c'' ->]] | [[[tag'' [c'' [k'' [v'' ->]]]] | 
+                  [tag'' [k'' [c'' ->]]]] | [[tag'' [c'' [k'' [v'' ->]]]] | [tag'' [c'' [b'' ->]]]]]].
+                all : simpl in HlinPre.
+                all : assert (tag'' = tag') as ->; first set_solver.
+                all : by simpl.
+              }
+              assert (le = le') as ->; last done.
+              assert (i = j) as ->; last set_solver.
+              apply (H3 le le' i j tag' Hlookup_i Hlookup_j Htag_of2 Htag_of1).
+           ++ right.
+              left.
+              by right.
+        -- pose proof Hlin_post as Hlin_post'.
+           apply post_lin_lin_post in Hlin_post.
+           ++ destruct His_post as [tag' [c' [b' ->]]]. 
+              assert (tagOfEvent le' = Some tag') as Htag_of1.
+              {
+                simpl in Hlin_post'.
+                injection Hlin_post' as <-.
+                by simpl.
+              }
+              simpl in Hassump2'.
+              assert (e_pre = (#tag', (c', #"CmPre"))%V) as ->; first set_solver.
+              assert (tagOfEvent le = Some tag') as Htag_of2.
+              {
+                destruct (H le Hin_le) as [[tag'' [c'' ->]] | [[[tag'' [c'' [k'' [v'' ->]]]] | 
+                  [tag'' [k'' [c'' ->]]]] | [[tag'' [c'' [k'' [v'' ->]]]] | [tag'' [c'' [b'' ->]]]]]].
+                all : simpl in HlinPre.
+                all : assert (tag'' = tag') as ->; first set_solver.
+                all : by simpl.
+              }
+              assert (le = le') as ->; last done.
+              assert (i = j) as ->; last set_solver.
+              apply (H3 le le' i j tag' Hlookup_i Hlookup_j Htag_of2 Htag_of1).
+           ++ by do 3 right.
+    + split; last done. 
       intros le1 le2 Hrel Hfalse.
       destruct Hfalse as [e1_pre [e2_post (Hlinpre & Hlinpost & Hrel_e)]].
       pose proof Hrel as Hrel'.
-      apply (H3 le1 le2) in Hrel'.
+      apply (H2 le1 le2) in Hrel'.
       apply Hrel'.
       assert (is_lin_event le1 ∧ is_lin_event le2) as (Hle1_lin & Hle2_lin).
       {
@@ -829,40 +964,25 @@ Proof.
            ++ exfalso.
               destruct Hle1_lin as [Hle1_lin | Hle1_lin].
               ** destruct Hle1_lin as [tag' [c' ->]].
-                  simpl in Hlinpre.
-                  destruct tag'; try done.
-                  inversion Hlinpre; subst.
                   destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
                   all : inversion Hfalse; set_solver.
               ** destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                   --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                       +++ destruct Hle1_lin as [tag' [c' [k' [v' ->]]]].
                           simpl in Hlinpre.
-                          destruct tag'; try done.
-                          destruct k'; try done.
-                          inversion Hlinpre; subst.
                           destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
                           all : inversion Hfalse; set_solver.
                       +++ destruct Hle1_lin as [tag' [c' [k' ->]]].
                           simpl in Hlinpre.
-                          destruct tag'; try done.
-                          destruct k'; try done.
-                          inversion Hlinpre; subst.
                           destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
                           all : inversion Hfalse; set_solver.
                   --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                       +++ destruct Hle1_lin as [tag' [c' [k' [v' ->]]]].
                           simpl in Hlinpre.
-                          destruct tag'; try done.
-                          destruct k'; try done.
-                          inversion Hlinpre; subst.
                           destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
                           all : inversion Hfalse; set_solver.
                       +++ destruct Hle1_lin as [tag' [c' [b' ->]]].
                           simpl in Hlinpre.
-                          destruct tag'; try done.
-                          destruct b'; try done.
-                          inversion Hlinpre; subst.
                           destruct Hfalse as [Hfalse | ([Hfalse | [Hfalse | [Hfalse | Hfalse]]] & _)].
                           all : inversion Hfalse; set_solver.
       * subst.
@@ -876,7 +996,6 @@ Proof.
         destruct Hle2_lin as [Hle2_lin | Hle2_lin].
         -- destruct Hle2_lin as [tag' [c' ->]].
            simpl in Hlinpost.
-           destruct tag'; try done.
            inversion Hlinpost; subst.
            destruct Hle1_lin as [Hle1_lin | Hle1_lin].
            ** destruct Hle1_lin as [tag'' [c'' ->]].
@@ -885,28 +1004,18 @@ Proof.
            ** destruct Hle1_lin as [Hle1_lin | Hle1_lin].
               --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                   +++ destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                      simpl in Hlinpost.
-                      destruct tag''; try done.
-                      destruct k''; try done.
+                      by simpl in Hlinpost.
                   +++ destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
-                      simpl in Hlinpost.
-                      destruct tag''; try done.
-                      destruct k''; try done.
+                      by simpl in Hlinpost.
               --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                   +++ destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                      simpl in Hlinpost.
-                      destruct tag''; try done.
-                      destruct k''; try done.
+                      by simpl in Hlinpost.
                   +++ destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
-                      simpl in Hlinpost.
-                      destruct tag''; try done.
-                      destruct b''; try done.
+                      by simpl in Hlinpost.
         -- destruct Hle2_lin as [Hle2_lin | Hle2_lin].
            ++ destruct Hle2_lin as [Hle2_lin | Hle2_lin].
               ** destruct Hle2_lin as [tag' [c' [k' [v' ->]]]].
                  simpl in Hlinpost.
-                 destruct tag'; try done.
-                 destruct k'; try done.
                  inversion Hlinpost; subst.
                  destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                  --- destruct Hle1_lin as [tag'' [c'' ->]].
@@ -915,105 +1024,285 @@ Proof.
                  --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct b''; try done.
+                             by simpl in Hlinpost.
               ** destruct Hle2_lin as [tag' [c' [k' ->]]]. 
                  simpl in Hlinpost.
-                 destruct tag'; try done.
-                 destruct k'; try done.
                  inversion Hlinpost; subst.
                  destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                  --- destruct Hle1_lin as [tag'' [c'' ->]].
-                     simpl in Hlinpre.
-                     destruct tag''; try done.
+                     by simpl in Hlinpre.
                  --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct b''; try done.
+                             by simpl in Hlinpost.
            ++ destruct Hle2_lin as [Hle2_lin | Hle2_lin].
               ** destruct Hle2_lin as [tag' [c' [k' [v' ->]]]].
                  simpl in Hlinpost.
-                 destruct tag'; try done.
-                 destruct k'; try done.
                  inversion Hlinpost; subst.
                  destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                  --- destruct Hle1_lin as [tag'' [c'' ->]].
-                     simpl in Hlinpre.
-                     destruct tag''; try done.
+                     by simpl in Hlinpre.
                  --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct b''; try done.
+                             by simpl in Hlinpost.
               ** destruct Hle2_lin as [tag' [c' [b' ->]]].
                  simpl in Hlinpost.
-                 destruct tag'; try done.
-                 destruct b'; try done.
                  inversion Hlinpost; subst.
                  destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                  --- destruct Hle1_lin as [tag'' [c'' ->]].
-                     simpl in Hlinpre.
-                     destruct tag''; try done.
+                     by simpl in Hlinpre.
                  --- destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [k'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                      +++ destruct Hle1_lin as [Hle1_lin | Hle1_lin].
                          *** destruct Hle1_lin as [tag'' [c'' [k'' [v'' ->]]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct k''; try done.
+                             by simpl in Hlinpost.
                          *** destruct Hle1_lin as [tag'' [c'' [b'' ->]]].
-                             simpl in Hlinpost.
-                             destruct tag''; try done.
-                             destruct b''; try done.
+                             by simpl in Hlinpost.
+Qed.
+
+Lemma valid_sequence_st_lin lt tag c : 
+  valid_sequence lt → valid_sequence (lt ++ [(#tag, (c, #"StLin"))%V]).
+Proof.
+  intro Hvalid_seq.
+  rewrite /valid_sequence.
+  split.
+  - intros e c_e He_in He_conn He_event.
+    rewrite elem_of_app in He_in.
+    destruct He_in as [He_in | He_in].
+    + destruct Hvalid_seq as (Hvalid_seq & _).
+      destruct (Hvalid_seq e c_e He_in He_conn He_event) as 
+        (e_st & He_st_conn & He_st_lin & He_st_rel & He_st_not ).
+      exists e_st.
+      do 2 (split; first done).
+      split.
+      * destruct He_st_rel as (i & j & Hneq & Hlookup_i & Hlookup_j).
+        exists i, j.
+        split; first done.
+        split; by apply lookup_app_l_Some.
+      * intros Hfalse.
+        destruct Hfalse as (e_cm & Hcm_conn & Hcm_lin & Hcm_rel1 & Hcm_rel2).
+        apply He_st_not.
+        exists e_cm.
+        do 2 (split; first done).
+        split.
+        -- destruct Hcm_rel1 as (i & j & Hle & Hlookup_i & Hlookup_j).
+            exists i, j.
+            split; first done.
+            rewrite lookup_app_Some in Hlookup_i.
+            destruct Hlookup_i as [Hlookup_i | (Hlenght & Hlookup_i)].
+            ++ split; first done.
+              rewrite lookup_app_Some in Hlookup_j.
+              destruct Hlookup_j as [Hlookup_j | (Hlenght & Hlookup_j)]; first done.
+              rewrite list_lookup_singleton_Some in Hlookup_j.
+              destruct Hlookup_j as (_ & <-).
+              rewrite /is_cm_lin_event in Hcm_lin.
+              set_solver.
+            ++ assert (length (lt ++ [(#tag, (c, #"StLin"))%V]) ≤ j) as Hfalse.
+              {
+                rewrite last_length.
+                lia.
+              }
+              apply lookup_ge_None_2 in Hfalse.
+              set_solver.
+        -- destruct Hcm_rel2 as (i & j & Hle & Hlookup_i & Hlookup_j).
+            exists i, j.
+            split; first done.
+            rewrite lookup_app_Some in Hlookup_i.
+            destruct Hlookup_i as [Hlookup_i | (Hlenght & Hlookup_i)].
+            ++ split; first done.
+              rewrite lookup_app_Some in Hlookup_j.
+              destruct Hlookup_j as [Hlookup_j | (Hlenght & Hlookup_j)]; first done.
+              rewrite list_lookup_singleton_Some in Hlookup_j.
+              destruct Hlookup_j as (_ & <-).
+              destruct He_event as [Hfalse | [Hfalse | Hfalse]].
+              ** rewrite /is_rd_lin_event in Hfalse.
+                  set_solver.
+              ** rewrite /is_wr_lin_event in Hfalse.
+                  set_solver.
+              ** rewrite /is_cm_lin_event in Hfalse.
+                  set_solver.
+            ++ assert (length (lt ++ [(#tag, (c, #"StLin"))%V]) ≤ j) as Hfalse.
+              {
+                rewrite last_length.
+                lia.
+              }
+              apply lookup_ge_None_2 in Hfalse.
+              set_solver. 
+    + assert (e = (#tag, (c, #"StLin"))%V) as ->; first set_solver.
+      destruct He_event as [Hfalse | [Hfalse | Hfalse]].
+      * destruct Hfalse as [Hfalse | Hfalse]; set_solver.
+      * rewrite /is_wr_lin_event in Hfalse; set_solver.
+      * rewrite /is_cm_lin_event in Hfalse; set_solver.
+  - intros e_st c0 He_in He_conn He_event.
+    rewrite elem_of_app in He_in.
+    destruct He_in as [He_in | He_in].
+    + destruct Hvalid_seq as (_ & Hvalid_seq).
+      destruct (Hvalid_seq e_st c0 He_in He_conn He_event) as 
+        [Hvalid_seq' | Hvalid_seq'].
+      * left.
+        destruct Hvalid_seq' as (e_cm & Hcm_conn & Hcm_lin & Hcm_rel & Hcm_not).
+        exists e_cm.
+        do 2 (split; first done).
+        split.
+        -- destruct Hcm_rel as (i & j & Hneq & Hlookup_i & Hlookup_j).
+            exists i, j.
+            split; first done.
+            split; by apply lookup_app_l_Some.
+        -- intros Hmain.
+            apply Hcm_not.
+            destruct Hmain as (e_st' & He_st'_conn & He_st'_lin & He_st'_rel1 & He_st'_rel2).
+            exists e_st'.
+            do 2 (split; first done).
+            destruct He_st'_rel1 as (i & j & Hlt & Hlookup_i & Hlookup_j).
+            rewrite lookup_app_Some in Hlookup_i.
+            rewrite lookup_app_Some in Hlookup_j.
+            destruct Hlookup_i as [Hlookup_i |(Hlength & Hlookup_i)].
+            ** destruct Hlookup_j as [Hlookup_j |(Hlength & Hlookup_j)].
+              --- split; first by exists i, j.
+                  destruct He_st'_rel2 as (i' & j' & Hneq' & Hlookup_i' & Hlookup_j').
+                  rewrite lookup_app_Some in Hlookup_i'.
+                  destruct Hlookup_i' as [Hlookup_i' | (Hlength' & Hlookup_i')].
+                  +++ rewrite lookup_app_Some in Hlookup_j'.
+                      destruct Hlookup_j' as [Hlookup_j' | (Hlength'' & Hlookup_j')]; 
+                        first by exists i', j'.
+                      rewrite list_lookup_singleton_Some in Hlookup_j'.
+                      destruct Hlookup_j' as (_ & <-).
+                      rewrite /is_cm_lin_event in Hcm_lin.
+                      set_solver.
+                  +++ assert (length (lt ++ [(#tag, (c, #"StLin"))%V]) ≤ j') as Hfalse.
+                      {
+                        rewrite last_length.
+                        lia.
+                      }
+                      apply lookup_ge_None_2 in Hfalse.
+                      set_solver.
+              --- destruct He_st'_rel2 as (i' & j' & Hneq' & Hlookup_i' & Hlookup_j').
+                  rewrite lookup_app_Some in Hlookup_i'.
+                  destruct Hlookup_i' as [Hlookup_i' | (Hlength' & Hlookup_i')].
+                  +++ rewrite lookup_app_Some in Hlookup_j'.
+                      destruct Hlookup_j' as [Hlookup_j' | (Hlength'' & Hlookup_j')].
+                      *** admit.
+                      *** rewrite list_lookup_singleton_Some in Hlookup_j'.
+                          destruct Hlookup_j' as (_ & <-).
+                          rewrite /is_cm_lin_event in Hcm_lin.
+                          set_solver.
+                  +++ rewrite lookup_app_Some in Hlookup_j'.
+                      destruct Hlookup_j' as [Hlookup_j' | (Hlength'' & Hlookup_j')].
+                      *** assert (length lt ≤ j') as Hfalse; first lia.
+                          apply lookup_ge_None_2 in Hfalse.
+                          set_solver.
+                      *** rewrite list_lookup_singleton_Some in Hlookup_j'.
+                          destruct Hlookup_j' as (_ & <-).
+                          rewrite /is_cm_lin_event in Hcm_lin.
+                          set_solver.
+            ** destruct Hlookup_j as [Hlookup_j |(Hlength' & Hlookup_j)].
+              --- assert (length lt ≤ j) as Hfalse; first lia.
+                  apply lookup_ge_None_2 in Hfalse.
+                  set_solver.
+              --- rewrite list_lookup_singleton_Some in Hlookup_j.
+                  destruct Hlookup_j as (Hfalse & _); lia.
+      * right.
+        intros Hmain.
+        apply Hvalid_seq'.
+        destruct Hmain as (e & He_conn' & He_rel' & He_lin').
+        exists e.
+        split; first done.
+        split; last done.
+        admit.
+    + assert (e_st = (#tag, (c, #"StLin"))%V) as ->; first set_solver.
+      right.
+      intro Hfalse.
+      destruct Hfalse as (e & _ & (i & j & Hneq & Hlookup_i & Hlookup_j) & _).
+      rewrite lookup_app_Some in Hlookup_i.
+      destruct Hlookup_i as [Hfalse |(Hlength & Hlookup_i)].
+      * admit.
+      * rewrite lookup_app_Some in Hlookup_j.
+        destruct Hlookup_j as [Hfalse |(_ & Hfalse)].
+        -- rewrite list_lookup_singleton_Some in Hlookup_i.
+            destruct Hlookup_i as (Hlookup_i & _ ).
+            assert (i = length lt) as ->; first lia.
+            assert (length lt ≤ j) as Hleq; first lia.
+            apply lookup_ge_None_2 in Hleq.
+            set_solver.
+        -- rewrite list_lookup_singleton_Some in Hlookup_i. 
+            destruct Hlookup_i as (Hlookup_i & _ ).
+            rewrite list_lookup_singleton_Some in Hfalse. 
+            destruct Hfalse as (Hfalse & _ ).
+            lia.
+Admitted.
+
+Lemma lin_trace_start_lin lt (tag : string) c t :
+  lin_trace_of lt t →
+  lin_trace_of (lt ++ [(#tag, (c, #"StLin"))%V]) t.
+Proof.
+  intros H.
+  destruct H as (?&?&?&?&?).
+  split.
+  {
+    intros le Hin.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin | Hin].
+    -  by apply H.
+    - assert (le = (#tag, (c, #"StLin"))%V) as ->; first set_solver.
+      left.
+      by exists tag, c.
+  }
+  split.
+  {
+    intros e_post Hin le Hpost_lin.
+    rewrite elem_of_app.
+    left.
+    apply (H0 e_post Hin le Hpost_lin).
+  }
+  split.
+  {
+    intros le Hin.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin | Hin].
+    - apply (H1 le Hin).
+    - admit.
+  }
+  split.
+  { 
+    intros le1 le2 Hrel.
+    admit.
+  }
+  intros le1 le2 i j tag' Hlookup_i Hlookup_j Htag_le1 Htag_le2.
+  rewrite lookup_app_Some in Hlookup_i.
+  rewrite lookup_app_Some in Hlookup_j.
+  destruct Hlookup_i as [Hlookup_i | (Hlength_i & Hlookup_i)].
+  - destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
+    + apply (H3 le1 le2 i j tag' Hlookup_i Hlookup_j Htag_le1 Htag_le2).
+    + admit.
+  - destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
+    + admit.
+    + rewrite list_lookup_singleton_Some in Hlookup_i.
+      rewrite list_lookup_singleton_Some in Hlookup_j.
+      lia.
 Admitted.
