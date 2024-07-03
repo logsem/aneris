@@ -69,6 +69,52 @@ Section trace_proof.
     iFrame.
   Qed.
 
+  Definition trace_lin_resources (lt t : list val) (γ : gname) : iProp Σ :=
+    ∃ (m : gmap string bool), ⌜∀ (x : string), x ∉ tags t → (x ∉ (dom m) ∧ x ∉ tags lt)⌝ ∗ ghost_map_auth γ (1%Qp) m ∗ 
+      ∀ tag, ⌜(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ → ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
+  
+  Definition trace_post_resources (t : list val) (γ : gname) : iProp Σ :=
+    ∃ (m : gmap string bool), ⌜∀ (x : string), x ∉ tags t → x ∉ (dom m)⌝ ∗ ghost_map_auth γ (1%Qp) m ∗ 
+      ∀ tag, ⌜(∃ e : val, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag)⌝ → ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
+
+  Definition lin_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
+
+  Definition post_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
+
+  Lemma lin_tag_create lt t γ e tag : 
+    trace_lin_resources lt t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ -∗
+    trace_lin_resources lt (t ++ [e]) γ ∗ lin_tag_res tag γ.
+  Proof.
+    Admitted.
+
+  Lemma lin_tag_add lt t γ e tag : 
+    trace_lin_resources lt t γ ∗ lin_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag⌝ -∗
+    trace_lin_resources (lt ++ [e]) t γ.
+  Proof.
+    Admitted.
+
+  Lemma lin_tag_not_in lt t γ tag : 
+    trace_lin_resources lt t γ ∗ lin_tag_res tag γ -∗ ⌜¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝.
+  Proof.
+  Admitted.
+
+  Lemma post_tag_create t γ e tag : 
+    trace_post_resources t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ -∗
+    trace_post_resources (t ++ [e]) γ ∗ post_tag_res tag γ.
+  Proof.
+    Admitted.
+
+  Lemma post_tag_add t γ e tag : 
+    trace_post_resources t γ ∗ lin_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag ∧ is_post_event e⌝ -∗
+    trace_post_resources (t ++ [e]) γ.
+  Proof.
+    Admitted.
+
+  Lemma post_tag_not_in t γ tag : 
+    trace_post_resources t γ ∗ post_tag_res tag γ -∗ ⌜¬(∃ e : val, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag)⌝.
+  Proof.
+  Admitted.
+
   (** Predicates for wrapped resources *)
 
   Definition open_start (c le : val) (ltrace : list val) : Prop := 
@@ -94,7 +140,7 @@ Section trace_proof.
 
   (** Extended global invaraint *)
 
-  Definition traceStateResources (lt : list val) (γm1 γmk : gname) (clients : gset socket_address) : iProp Σ := 
+  Definition trace_state_resources (lt : list val) (γm1 γmk : gname) (clients : gset socket_address) : iProp Σ := 
    ∃ (m1 : gmap socket_address (local_state * option val)), ghost_map_auth γm1 (1%Qp) m1 ∗ 
       ∃ (mk : gmap (socket_address * val) gname), ghost_map_auth γmk (1%Qp) mk ∗ 
         ∀ sa, ⌜sa ∈ clients⌝ →
@@ -107,17 +153,12 @@ Section trace_proof.
             ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
             (∀ k, ⌜k ∈ sub_domain⌝ → ∀ ov, ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov lt⌝))))).
 
-  Definition traceLinResources (t lt : list val) (γm2 : gname) : iProp Σ :=
-    ∃ (m2 : gmap string bool), ⌜∀ (x : string), x ∈ (dom m2) → x ∈ tags t⌝ ∗ ghost_map_auth γm2 (1%Qp) m2 ∗ 
-        (∀ e_pre tag, ⌜e_pre ∈ t⌝ → (⌜is_rd_pre_event e_pre ∨ is_wr_pre_event e_pre ∨ is_cm_pre_event e_pre⌝) → 
-          ⌜tagOfEvent e_pre = Some tag⌝ → (∃ e_lin, ⌜e_lin ∈ lt⌝ ∧ ⌜tag_eq e_pre e_lin⌝) → 
-          ghost_map.ghost_map_elem γm2 tag (DfracOwn 1%Qp) true).
-
-  Definition GlobalInvExt (γm1 γm2 γmk γl : gname) (clients : gset socket_address) : iProp Σ := 
+  Definition GlobalInvExt (γm1 γm2 γm3 γmk γl : gname) (clients : gset socket_address) : iProp Σ := 
     ∃ t lt T, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
       ⌜extraction_of lt T⌝ ∗ ⌜valid_transactions T⌝ ∗ ⌜valid_sequence lt⌝ ∗
-      traceStateResources lt γm1 γmk clients ∗
-      traceLinResources t lt γm2.
+      trace_state_resources lt γm1 γmk clients ∗
+      trace_lin_resources lt t γm2 ∗
+      trace_post_resources t γm3.
 
   (** Wrapped resources *)
 
@@ -458,6 +499,7 @@ Section trace_proof.
         by do 3 (split; first done).
     }
     iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
     iMod ("Hclose" with "[Htr_is HOwnLin Hrest]").
     {
       iNext.
@@ -511,7 +553,7 @@ Section trace_proof.
     iInv "HinvExt" as ">[%t' [%lt' [%T' 
       (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' & 
       %Hvalid_seq' & HstateRes' & HlinRes')]]]" "Hclose'".
-    simpl; rewrite /traceStateResources.
+    simpl; rewrite /trace_state_resources.
     iDestruct "HstateRes'" as "(%m1' & Hghost_map_m1' & %mk' & Hghost_map_mk' & Hdisj_trace_res)".
     iDestruct (@ghost_map_lookup with "[$Hghost_map_m1'][$Hsa_pointer]") as "%Hlookup_m1'".
     iDestruct ("Hdisj_trace_res" $! sa Hsa_in) as "[(Hfalse & _) | Htrace_res]".
@@ -568,6 +610,12 @@ Section trace_proof.
     }
     iMod (own_lin_add _ _ (#tag1, (c, #"StLin"))%V with "[$HOwnLin']") as "HOwnLin'".
     iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, (c, #"StPre"))%V ∈ t') as Hin.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, (c, #"StPre"))%V])); last done.
+      set_solver.
+    }
     iMod ("Hclose'" with "[Htr_is' HOwnLin' Hghost_map_mk' HlinRes' Hghost_map_m' 
       Hghost_map_m1' Hkeys_conn_res2]").
     {
@@ -577,7 +625,9 @@ Section trace_proof.
       iFrame.
       iSplitR.
       {
+        
         iPureIntro.
+        apply lin_trace_start_lin; try done.
         admit.
       }
       iSplitR; first by iPureIntro.
