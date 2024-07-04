@@ -666,6 +666,20 @@ Proof.
       set_solver.
 Qed.
 
+Lemma tags_sub : 
+  ∀ e t, tags t ⊆ tags (t ++ [e]).
+Proof.
+  intros e t.
+  induction t as [|h t IH].
+  - simpl.
+    set_solver.
+  - simpl.
+    destruct h; try done.
+    destruct h1; try done.
+    destruct l; try done.
+    set_solver.
+Qed.
+
 Lemma tags_in : 
   ∀ e t tag, e ∈ t → tagOfEvent e = Some tag → tag ∈ tags t.
 Proof.

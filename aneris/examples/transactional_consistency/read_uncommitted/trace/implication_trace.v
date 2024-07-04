@@ -18,8 +18,7 @@ Section trace_proof.
 
   (** Ghost theory for wrapped resources *)
 
-  (* For the OwnLinTrace/OwnLinHist resources and 
-     rules we are reusing trace infrastructure *)
+  (* For the OwnLinTrace/OwnLinHist resources and rules we are reusing trace infrastructure *)
 
   Definition OwnLinHist (γ : gname) (l : list val) : iProp Σ :=
     own γ (◯ (gmap_of_trace 0 l)).
@@ -70,7 +69,7 @@ Section trace_proof.
   Qed.
 
   Definition trace_lin_resources (lt t : list val) (γ : gname) : iProp Σ :=
-    ∃ (m : gmap string bool), ⌜∀ (x : string), x ∉ tags t → (x ∉ (dom m) ∧ x ∉ tags lt)⌝ ∗ ghost_map_auth γ (1%Qp) m ∗ 
+    ∃ (m : gmap string bool), ⌜∀ (x : string), x ∉ tags t → x ∉ (dom m)⌝ ∗ ghost_map_auth γ (1%Qp) m ∗ 
       ∀ tag, ⌜(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ → ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
   
   Definition trace_post_resources (t : list val) (γ : gname) : iProp Σ :=
@@ -79,41 +78,151 @@ Section trace_proof.
 
   Definition lin_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
 
-  Definition post_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
-
   Lemma lin_tag_create lt t γ e tag : 
-    trace_lin_resources lt t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ -∗
+    trace_lin_resources lt t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ ==∗
     trace_lin_resources lt (t ++ [e]) γ ∗ lin_tag_res tag γ.
   Proof.
-    Admitted.
+    iIntros "((%m & %Hdom & Hghost_map & Himp) & (%Hnin & %Htag & %Hnot))".
+    assert (m !! tag = None) as Hlookup_none.
+    {
+      apply not_elem_of_dom_1.
+      by apply Hdom.
+    }
+    iMod (ghost_map_insert tag true Hlookup_none with "[$Hghost_map]") as "(Hghost_map & Hkey)".
+    iModIntro.
+    iFrame.
+    iExists (<[tag:=true]> m).
+    iFrame.
+    iPureIntro.
+    intros tag' Hnin'.
+    assert (tag' ∉ tags t) as Hnin''.
+    {
+      specialize (tags_sub e t) as Hsub.
+      set_solver.
+    }
+    specialize (Hdom tag' Hnin'').
+    rewrite dom_insert.
+    assert (tag ∈ tags (t ++ [e])) as Hin.
+    {
+      apply (tags_in e); last done.
+      set_solver.
+    }
+    set_solver.
+  Qed.
 
   Lemma lin_tag_add lt t γ e tag : 
     trace_lin_resources lt t γ ∗ lin_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag⌝ -∗
     trace_lin_resources (lt ++ [e]) t γ.
   Proof.
-    Admitted.
+    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey & %Htag)".
+    rewrite /trace_lin_resources.
+    iExists m.
+    iFrame.
+    iSplit; first by iPureIntro.
+    iIntros (tag') "%Hpure". 
+    destruct Hpure as (e' & Hin & Htag').
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin | Hin].
+    + iApply "Himp".
+      iPureIntro.
+      by exists e'.
+    + assert (e' = e) as ->; first set_solver.
+      assert (tag = tag') as ->; first set_solver.
+      iFrame.
+  Qed.
 
   Lemma lin_tag_not_in lt t γ tag : 
-    trace_lin_resources lt t γ ∗ lin_tag_res tag γ -∗ ⌜¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝.
+    trace_lin_resources lt t γ ∗ lin_tag_res tag γ -∗ ¬⌜(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝.
   Proof.
-  Admitted.
+    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey)".
+    iIntros "Hfalse".
+    iDestruct ("Himp" with "[$Hfalse]") as "Hfalse".
+    rewrite /lin_tag_res.
+    iCombine "Hkey" "Hfalse" as "Hfalse".
+    iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+    by rewrite dfrac_valid_own in Hfalse.
+  Qed.
+
+  Definition post_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
 
   Lemma post_tag_create t γ e tag : 
-    trace_post_resources t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ -∗
+    trace_post_resources t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ ==∗
     trace_post_resources (t ++ [e]) γ ∗ post_tag_res tag γ.
   Proof.
-    Admitted.
+    iIntros "((%m & %Hdom & Hghost_map & Himp) & (%Hnin & %Htag & %Hnot))".
+    assert (m !! tag = None) as Hlookup_none.
+    {
+      apply not_elem_of_dom_1.
+      by apply Hdom.
+    }
+    iMod (ghost_map_insert tag true Hlookup_none with "[$Hghost_map]") as "(Hghost_map & Hkey)".
+    iModIntro.
+    iFrame.
+    iExists (<[tag:=true]> m).
+    iFrame.
+    iSplitR.
+    - iPureIntro.
+      intros tag' Hnin'.
+      assert (tag' ∉ tags t) as Hnin''.
+      {
+        specialize (tags_sub e t) as Hsub.
+        set_solver.
+      }
+      specialize (Hdom tag' Hnin'').
+      rewrite dom_insert.
+      assert (tag ∈ tags (t ++ [e])) as Hin.
+      {
+        apply (tags_in e); last done.
+        set_solver.
+      }
+      set_solver.
+    - iIntros (tag') "%Hpure".
+      iApply "Himp".
+      iPureIntro.
+      destruct Hpure as (e' & Hin & Hevent & Htag').
+      exists e'.
+      rewrite elem_of_app in Hin.
+      destruct Hin as [Hin | Hin]; first done.
+      assert (e = e') as ->; set_solver.
+  Qed.
 
   Lemma post_tag_add t γ e tag : 
-    trace_post_resources t γ ∗ lin_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag ∧ is_post_event e⌝ -∗
+    trace_post_resources t γ ∗ post_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag ∧ is_post_event e⌝ -∗
     trace_post_resources (t ++ [e]) γ.
   Proof.
-    Admitted.
+    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey & %Htag)".
+    rewrite /trace_post_resources.
+    iExists m.
+    iFrame.
+    iSplit.
+    - iPureIntro.
+      intros tag' Hin.
+      apply Hdom.
+      specialize(tags_sub e t) as Hsub.
+      set_solver.
+    - iIntros (tag') "%Hpure". 
+      destruct Hpure as (e' & Hin & Htag').
+      rewrite elem_of_app in Hin.
+      destruct Hin as [Hin | Hin].
+      + iApply "Himp".
+        iPureIntro.
+        by exists e'.
+      + assert (e' = e) as ->; first set_solver.
+        assert (tag = tag') as ->; first set_solver.
+        iFrame.
+    Qed.
 
   Lemma post_tag_not_in t γ tag : 
-    trace_post_resources t γ ∗ post_tag_res tag γ -∗ ⌜¬(∃ e : val, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag)⌝.
+    trace_post_resources t γ ∗ post_tag_res tag γ -∗ ¬⌜(∃ e : val, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag)⌝.
   Proof.
-  Admitted.
+    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey)".
+    iIntros "Hfalse".
+    iDestruct ("Himp" with "[$Hfalse]") as "Hfalse".
+    rewrite /lin_tag_res.
+    iCombine "Hkey" "Hfalse" as "Hfalse".
+    iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+    by rewrite dfrac_valid_own in Hfalse.
+  Qed.
 
   (** Predicates for wrapped resources *)
 
@@ -162,10 +271,10 @@ Section trace_proof.
 
   (** Wrapped resources *)
 
-  Global Program Instance wrapped_resources (γm1 γm2 γmk γl : gname) (clients : gset socket_address) 
+  Global Program Instance wrapped_resources (γm1 γm2 γm3 γmk γl : gname) (clients : gset socket_address) 
   `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
-      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt γm1 γm2 γmk γl clients))%I;
+      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt γm1 γm2 γm3 γmk γl clients))%I;
       OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
                         ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
       OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ sa γ, ghost_map_elem γmk (sa, c) DfracDiscarded γ ∗ 
@@ -178,7 +287,7 @@ Section trace_proof.
       Seen k V := Seen k V%I;
     |}.
   Next Obligation.
-    iIntros (?????????) "(Hkey & [%sa [%γ (Hghost_elem_per & Hghost_elem  & %Hin_sa)]])".
+    iIntros (??????????) "(Hkey & [%sa [%γ (Hghost_elem_per & Hghost_elem  & %Hin_sa)]])".
     iDestruct (res.(read_uncommitted.specs.resources.OwnLocalKey_serializable) 
       with "Hkey") as "(Hkey & Hser)".
     iFrame.
@@ -186,34 +295,34 @@ Section trace_proof.
     by iFrame.
   Qed.
   Next Obligation.
-    iIntros (???????????) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
+    iIntros (????????????) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
     iMod (res.(read_uncommitted.specs.resources.Seen_valid) 
       with "[$HGinv][$Hseen $Hkey]") as "(Hkey & Hsub)"; first done.
     iModIntro.
     iFrame "∗#".
   Qed.
   Next Obligation.
-    iIntros (??????????) "#(HGinv & Hinv) (Hkey & Hin)".
+    iIntros (???????????) "#(HGinv & Hinv) (Hkey & Hin)".
     iMod (res.(read_uncommitted.specs.resources.Seen_creation) 
       with "[$HGinv][$Hkey]") as "(Hkey & #Hseen)"; first done.
     iModIntro.
     iFrame "∗#".
   Qed.
   Next Obligation.
-    iIntros (??????????????) "#(HGinv & Hinv) ((Hconn1 & Hrest1) & (Hconn2 & Hrest2))".
+    iIntros (???????????????) "#(HGinv & Hinv) ((Hconn1 & Hrest1) & (Hconn2 & Hrest2))".
     iMod (res.(read_uncommitted.specs.resources.Connection_unique) 
       with "[$HGinv][$Hconn1 $Hconn2]") as "(Hconn1 & Hconn2 & Heq)"; first done.
     iModIntro.
     iFrame.
   Qed.
 
-  Lemma init_client_implication γm1 γm2 γmk γl clients (res : RU_resources Mdl Σ) 
+  Lemma init_client_implication γm1 γm2 γm3 γmk γl clients (res : RU_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
-    inv KVS_InvName (GlobalInvExt γm1 γm2 γmk γl clients) -∗
+    inv KVS_InvName (GlobalInvExt γm1 γm2 γm3 γmk γl clients) -∗
     @init_client_proxy_spec _ _ _ _ lib res -∗
-    @init_client_proxy_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γm1 γm2 γmk γl clients res).
+    @init_client_proxy_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γm1 γm2 γm3 γmk γl clients res).
   Proof.
     iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hinit_cli".
     rewrite /init_client_proxy_spec.
@@ -345,7 +454,8 @@ Section trace_proof.
     iMod (ghost_map_alloc ((gset_to_gmap None KVS_keys : gmap Key (option val))))
       as "[%γ (Hghost_map_m & Hghost_elems_m)]".
     iMod (ghost_map_update (CanStart, Some c) with "[$Hghost_map_m1] [$Hsa_pointer]") 
-      as "(Hghost_map_m1 & Hsa_pointer)".
+      as 
+      admit."(Hghost_map_m1 & Hsa_pointer)".
     iMod (ghost_map_insert_persist (sa, c) γ Hlookup_none with "[$Hghost_map_mk]") as "(Hghost_map_mk & #Hkey_pers_mk)".
     iMod ("Hclose'" with "[Htr_is HOwnLin' Hghost_map_mk Hext_rest1' Himp Hghost_map_m1 
       Hghost_map_m2 Hghost_map_m Hghost_elems_m]").
