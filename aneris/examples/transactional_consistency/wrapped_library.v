@@ -11,8 +11,7 @@ Definition wrap_start (start : val) : val :=
   λ: "cst", 
   let: "tag" := Fresh (start_pre_emit_event "cst") in 
   start "cst" ;;
-  Emit ("tag" , start_post_emit_event "cst") ;;
-  #().
+  Emit ("tag" , start_post_emit_event "cst").
 
 Definition read_pre_emit_event : val := 
   λ: "cst", ("cst", #"RdPre").

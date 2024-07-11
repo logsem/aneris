@@ -188,7 +188,7 @@ Definition is_rd_post_event (v : val) : Prop :=
   (∃ (tag k : string) (c v': val), v = (#tag, (c, (#"RdPost", (#k, SOMEV v'))))%V) ∨ 
   (∃ (tag k : string) (c : val), v = (#tag, (c, (#"RdPost", (#k, NONEV))))%V).
 
-Definition is_wr_pre_event (v : val) : Prop := ∃ (tag k : string) (c v' : val), v = (#tag, (c, (#"WrPre", (#k, v'))))%V.
+Definition is_wr_pre_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"WrPre"))%V.
 
 Definition is_wr_post_event (v : val) : Prop := ∃ (tag k : string) (c v' : val), v = (#tag, (c, (#"WrPost", (#k, v'))))%V.
 
@@ -647,7 +647,7 @@ Proof.
     - rewrite /is_init_post_event in Hfalse.
       set_solver.
   }
-  destruct H as [[tag [c [k [v ->]]]]| H].
+  destruct H as [[tag [c ->]]| H].
   {
     destruct Hfalse as [Hfalse | [Hfalse | [Hfalse | [Hfalse | Hfalse]]]].
     - rewrite /is_st_post_event in Hfalse.
@@ -772,7 +772,7 @@ Proof.
       1 : simpl in Hpost_lin; destruct tag'; done.
       destruct His_pre as [[tag' [c' ->]]| His_pre].
       1 : simpl in Hpost_lin; destruct tag'; done.
-      destruct His_pre as [[tag' [c' [k' [v' ->]]]]| His_pre].
+      destruct His_pre as [[tag' [c' ->]]| His_pre].
       1 : by simpl in Hpost_lin.
       destruct His_pre as [[tag' [c' ->]]| [tag' ->]].
       all : simpl in Hpost_lin; destruct tag'; done.
@@ -1162,8 +1162,6 @@ Qed.
 Lemma valid_sequence_st_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
   commit_closed c lt →
-  (* (∀ e_st c, e_st ∈ lt → connOfEvent e_st = Some c → is_st_lin_event e_st → 
-             later_commit c e_st lt) → *)
   valid_sequence lt → 
   valid_sequence (lt ++ [(#tag, (c, #"StLin"))%V]).
 Proof.
