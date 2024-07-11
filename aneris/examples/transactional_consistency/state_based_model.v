@@ -3,10 +3,7 @@ From aneris.examples.transactional_consistency Require Import user_params.
 From stdpp Require Import strings.
 From aneris.aneris_lang Require Import network resources.
 
-(* Type for tag-connection pairs. 
-  We assume:
-    - tags are unique 
-    - at most one transactions can be active per connection *)
+(* Type for tag-connection pairs. We assume tags are unique. *)
 Definition signature : Type := string * val.
 
 Inductive operation : Type :=
@@ -27,7 +24,6 @@ Definition connOfOp (op : operation) : val :=
 Definition connOfEvent (event : val) : option val :=
   match event with 
     | (_, (c, _))%V => Some c
-    | (_, c)%V => Some c
     | _ => None
   end.
 
@@ -178,7 +174,7 @@ Definition linToOp (le : val) : option operation :=
     | _ => None 
   end.
 
-Definition is_init_pre_event (v : val) : Prop := ∃ (tag : string), v = (#tag, (#"", #"InitPre"))%V.
+Definition is_init_pre_event (v : val) : Prop := ∃ (tag : string), v = (#tag, #"InitPre")%V.
 
 Definition is_init_post_event (v : val) : Prop := ∃ (tag : string) (c : val), v = (#tag, (c, #"InitPost"))%V.
 
@@ -234,6 +230,10 @@ Definition later_commit (c e_st : val) (lin_trace : list val) : Prop :=
   ∃ e_cm, connOfEvent e_cm = Some c ∧ is_cm_lin_event e_cm ∧ rel_list lin_trace e_st e_cm ∧ 
           (¬∃ e_st', connOfEvent e_st' = Some c ∧ is_st_lin_event e_st' ∧ 
                     rel_list lin_trace e_st e_st' ∧ rel_list lin_trace e_st' e_cm).
+
+Definition commit_closed (c : val) (lin_trace : list val) : Prop :=
+  ∀ e_st, e_st ∈ lin_trace → connOfEvent e_st = Some c → 
+          is_st_lin_event e_st → later_commit c e_st lin_trace.
 
 Definition prior_start (c e : val) (lin_trace : list val) : Prop := 
   ∃ e_st, connOfEvent e_st = Some c ∧ is_st_lin_event e_st ∧ rel_list lin_trace e_st e ∧ 
@@ -452,6 +452,28 @@ Lemma valid_trace_si_empty : valid_trace_si [].
 Qed.
 
 (** Helper lemmas  *)
+
+Lemma rel_list_imp {A : Type} (l : list A) e1 e2 e : 
+  rel_list l e1 e2 → rel_list (l ++ [e]) e1 e2.
+Proof.
+  intros (i & j & Hlt & Hlookup_i & Hlookup_j).
+  exists i, j.
+  split; first done.
+  split; by apply lookup_app_l_Some.
+Qed.
+
+Lemma rel_list_last_neq {A : Type} (l : list A) e1 e2 e : 
+  e ≠ e2 → rel_list (l ++ [e]) e1 e2 → rel_list l e1 e2. 
+Proof.
+  intros Hneq Hrel.
+  destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
+  apply lookup_snoc_Some in Hlookup_i, Hlookup_j.
+  destruct Hlookup_i as [(Hlength & Hlookup_i) | (-> & ->)].
+  - destruct Hlookup_j as [(Hlength' & Hlookup_j) | (-> & ->)]; last done.
+    by exists i, j.
+  - destruct Hlookup_j as [(Hlength' & Hlookup_j) | (-> & ->)]; last done.
+    lia.
+  Qed.
 
 Lemma split_split {A B : Type} (l1 l2 : list (A * B)) :
   split (l1 ++ l2) = ((split l1).1 ++ (split l2).1, (split l1).2 ++ (split l2).2).
@@ -1110,10 +1132,38 @@ Proof.
       set_solver.
 Qed.
 
+Lemma no_later_start_or_commit_impl e e' c c' lt: 
+  connOfEvent e = Some c →
+  connOfEvent e' = Some c' →
+  c ≠ c' →
+  no_later_start_or_commit c e lt →
+  no_later_start_or_commit c e (lt ++ [e']).
+Proof.
+  intros Heq1 Heq2 Hneq Hlater.
+  intros (e'' & Hconn & Hrel & HOr).
+  apply Hlater.
+  exists e''.
+  split; first done.
+  split; last done.
+  destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
+  rewrite lookup_app_Some in Hlookup_i.
+  destruct Hlookup_i as [Hlookup_i | (Hlength & Hlookup_i)].
+  - rewrite lookup_app_Some in Hlookup_j.
+    destruct Hlookup_j as [Hlookup_j | (Hlength & Hlookup_j)].
+    + by exists i, j.
+    + assert (e' = e'') as ->; last set_solver.
+      rewrite list_lookup_singleton_Some in Hlookup_j.
+      set_solver.
+  - assert (e' = e) as ->; last set_solver.
+    rewrite list_lookup_singleton_Some in Hlookup_i.
+    set_solver.
+Qed.
+
 Lemma valid_sequence_st_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
-  (∀ e_st c, e_st ∈ lt → connOfEvent e_st = Some c → is_st_lin_event e_st → 
-             later_commit c e_st lt) →
+  commit_closed c lt →
+  (* (∀ e_st c, e_st ∈ lt → connOfEvent e_st = Some c → is_st_lin_event e_st → 
+             later_commit c e_st lt) → *)
   valid_sequence lt → 
   valid_sequence (lt ++ [(#tag, (c, #"StLin"))%V]).
 Proof.
@@ -1190,10 +1240,19 @@ Proof.
   - intros e_st c0 He_in He_conn He_event.
     rewrite elem_of_app in He_in.
     destruct He_in as [He_in | He_in].
-    + left.
-      apply (later_commit_impl _ _ _ _ tag); try done.
-      * by exists tag, c.
-      * by apply Hstart.
+    + destruct (decide (c = c0)) as [<-|Hneq].
+      * left.
+        apply (later_commit_impl _ _ _ _ tag); try done.
+        -- by exists tag, c.
+        -- by apply Hstart.
+      * destruct Hvalid_seq as (_ & Hvalid_seq).
+        specialize (Hvalid_seq e_st c0 He_in He_conn He_event).
+        destruct Hvalid_seq as [Hvalid_seq | Hvalid_seq].
+        -- left.
+            apply (later_commit_impl _ _ _ _ tag); try done.
+            by exists tag, c.
+        -- right.
+           eapply no_later_start_or_commit_impl; try done.
     + assert (e_st = (#tag, (c, #"StLin"))%V) as ->; first set_solver.
       right.
       intro Hfalse.

@@ -105,6 +105,7 @@ Section Implication.
       KVS_Init := RC.(read_committed.specs.resources.KVS_Init);
       KVS_ClientCanConnect sa := RC.(read_committed.specs.resources.KVS_ClientCanConnect) sa;
       Seen k V := OwnFragSet γF k V;
+      extract c := RC.(read_committed.specs.resources.extract) c;
     |}.
   Next Obligation.
     iIntros (_ γ RC k cst v) "[%V (%Hsub & Hkey & Hfrag)]". 
@@ -134,11 +135,15 @@ Section Implication.
     iFrame.
   Qed.
   Next Obligation.
-    iIntros (γA γF RC E c c' sa sa' ls ls' Hsub) "#(Hinv & _) (Hconn1 & Hconn2)".
-    iMod (RC.(read_committed.specs.resources.Connection_unique) 
-            with "[$Hinv][$Hconn1 $Hconn2]") as "(Hconn1 & Hconn2 & Heq)"; first done.
-    iModIntro.
-    iFrame.
+    simpl.
+    iIntros (?? RC sa c) "Hconn".
+    iApply (RC.(read_committed.specs.resources.Extraction_of_address) 
+      with "[$Hconn]").
+  Qed.
+  Next Obligation.
+    simpl.
+    iIntros (?? RC sa sa' c c' Heq1 Heq2 Hneq).
+    by eapply RC.(read_committed.specs.resources.Extraction_preservation).
   Qed.
 
   Lemma rewrite_maps_1 `{RC : !RC_resources Mdl Σ} (m : gmap Key Vals) (γA : gname) :

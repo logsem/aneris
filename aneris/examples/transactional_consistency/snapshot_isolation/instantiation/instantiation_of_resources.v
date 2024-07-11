@@ -59,7 +59,28 @@ Section SI_Resources_intantiation.
         )%I;
       OwnLocalKey_serializable k c v :=
       own_cache_user_serializable γKnownClients k c v;
-      (* Seen_valid E k h h' :=  *) |}.
+      extract c := match c with | (v1, v2)%V => Some v1 | _ => None end;
+    |}.
+  Next Obligation.
+    simpl.
+    intros ?????.
+    set_solver.
+  Qed.
+  Next Obligation.
+    simpl.
+    intros ??????.
+    set_solver.
+  Qed.
+  Next Obligation.
+    simpl.
+    intros ?????.
+    set_solver.
+  Qed.
+  Next Obligation.
+    simpl.
+    intros ?????.
+    set_solver.
+  Qed.
   Next Obligation.
     iIntros (E k h h' Hcl) "#Hinv (#Hs & Hk)".
     iDestruct "Hs" as (hw) "(Hs & %Heq1)".
@@ -91,29 +112,15 @@ Section SI_Resources_intantiation.
       by iPureIntro.
   Qed.
   Next Obligation.
-    iIntros (E c c' sa sa' ls ls' Hsub) "#Hinv (Hconn1 & Hconn2)".
-    destruct (decide (c = c')) as [<- | Hneq].
-    - rewrite /ConnectionState_def /connection_state.
-      iDestruct "Hconn1" as "[%state ([%v [%γCst [%γA [%γS [%γlk [%γCache [%γMsnap [%γU 
-        (%Heq & Hut & Hcli_conn & _)]]]]]]]] & _)]".
-      iDestruct "Hconn2" as "[%state' ([%v' [%γCst' [%γA' [%γS' [%γlk' [%γCache' [%γMsnap' [%γU' 
-        (%Heq' & Hut' & Hcli_conn' & _)]]]]]]]] & _)]".
-      assert (sa = sa') as <-.
-      { set_solver. }
-      iDestruct (client_connected_agree with "[$Hcli_conn][$Hcli_conn']") as "%Heq_big'".
-      simplify_eq.
-      by iDestruct (own_valid_2 with "Hut Hut'") as %Hfalse.
-    - destruct (decide (sa = sa')) as [<- | Hneq'].
-      + rewrite /ConnectionState_def /connection_state.
-        iDestruct "Hconn1" as "[%state ([%v [%γCst [%γA [%γS [%γlk [%γCache [%γMsnap [%γU 
-          (%Heq & Hut & Hcli_conn & _)]]]]]]]] & _)]".
-        iDestruct "Hconn2" as "[%state' ([%v' [%γCst' [%γA' [%γS' [%γlk' [%γCache' [%γMsnap' [%γU' 
-          (%Heq' & Hut' & Hcli_conn' & _)]]]]]]]] & _)]".
-        iDestruct (client_connected_agree with "[$Hcli_conn][$Hcli_conn']") as "%Heq_big'".
-        simplify_eq.
-        by iDestruct (own_valid_2 with "Hut Hut'") as %Hfalse.
-      + iModIntro.
-        by iFrame.
+    simpl.
+    iIntros (sa c) "(Hinv & Hreq & (%lk & %cst & %l & %γCst & 
+      %γlk & %γA & %γS & %γCache & %γMsnap & %γU & -> & Hconn))".
+    by iPureIntro.
+  Qed.
+  Next Obligation.
+    simpl.
+    iIntros (sa sa' c c').
+    destruct c; destruct c'; set_solver.
   Qed.
 
 End SI_Resources_intantiation.

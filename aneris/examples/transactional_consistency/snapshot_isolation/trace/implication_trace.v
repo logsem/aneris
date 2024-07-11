@@ -27,7 +27,10 @@ Section trace_proof.
       KVS_ClientCanConnect sa := True%I;
       KeyUpdStatus v k b := True%I;
       Seen k V := True%I;
+      extract c := res.(snapshot_isolation.specs.resources.extract) c;
     |}.
+  Next Obligation.
+  Admitted.
   Next Obligation.
   Admitted.
   Next Obligation.

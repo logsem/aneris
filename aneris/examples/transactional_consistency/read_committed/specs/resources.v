@@ -42,6 +42,9 @@ Section Resources.
     Seen_timeless k V :> Timeless (Seen k V);
     Seen_persistent k V :> Persistent (Seen k V);
 
+    (** Extraction of socket addresses from connections *)
+    extract : val → option val;
+
     (** Properties *)
     OwnLocalKey_serializable k cst v :
       k ↦{cst} Some v -∗
@@ -59,15 +62,15 @@ Section Resources.
       k ↦ₖ V ={E}=∗
       k ↦ₖ V ∗ Seen k V;
 
-    (** Property of connection *)
-    Connection_unique E c c' sa sa' ls ls': 
-      ↑KVS_InvName ⊆ E ->
-      GlobalInv ⊢
-      ConnectionState c sa ls ∗
-      ConnectionState c' sa' ls' ={E}=∗
-      ConnectionState c sa ls ∗
-      ConnectionState c' sa' ls' ∗ 
-      ⌜sa ≠ sa' ∧ c ≠ c'⌝;
+    Extraction_of_address sa c : 
+      ⊢ IsConnected c sa -∗ 
+        ⌜extract c = Some #sa⌝;
+    
+    Extraction_preservation sa sa' c c' : 
+      extract c = Some #sa →
+      extract c' = Some #sa' →
+      sa ≠ sa' →
+      c ≠ c';
   }.
 
 End Resources.

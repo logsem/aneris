@@ -26,7 +26,10 @@ Section trace_proof.
       KVS_Init := True%I;
       KVS_ClientCanConnect sa := True%I;
       Seen k V := True%I;
+      extract c := res.(read_committed.specs.resources.extract) c;
     |}.
+  Next Obligation.
+  Admitted.
   Next Obligation.
   Admitted.
   Next Obligation.
