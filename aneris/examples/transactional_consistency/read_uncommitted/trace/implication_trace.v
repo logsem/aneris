@@ -950,7 +950,21 @@ Section trace_proof.
     iMod ("Hclose'" with "[Htr_is' Hmap_m1 Hmap_mk Hmap_m Htrace_res Hdisj_trace_res 
       HOwnLin' Hpost_res' Hlin_res']").
     {
-      admit.
+      iNext.
+      rewrite /GlobalInvExt.
+      iExists t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
+      assert (Decision (∃ (trans : transaction), trans ∈ T ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, connOfOp op = c) op) trans)) as Hdecision.
+      {
+        do 2 (apply list_exist_dec; intros).
+        apply _.
+      }
+      destruct (decide (∃ (trans : transaction), trans ∈ T ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, connOfOp op = c) op) trans)) as [(trans & Htrans_in & Hop)|Hdec].
+      - admit.
+      - iExists (T' ++ [[Wr (tag1, c) k v]]).
+        iFrame.
+        admit.
     }
     iMod ("Hshift" with "[Hkey_internal Hall Hkey_c Hkey]").
     {
