@@ -260,20 +260,21 @@ Section trace_proof.
   (** Extended global invaraint *)
   Definition trace_state_resources (t lt : list val) (γm1 γmk : gname) (clients : gset socket_address) 
   `(res : !RU_resources Mdl Σ) : iProp Σ := 
-   ∃ (m1 : gmap socket_address (local_state * option val)), ghost_map_auth γm1 (1%Qp) m1 ∗ 
-      ∃ (mk : gmap (socket_address * val) gname), ghost_map_auth γmk (1%Qp) mk ∗ 
+    ∃ (m1 : gmap socket_address (local_state * option val)), ghost_map_auth γm1 (1%Qp) m1 ∗ 
+      ∃ (mk : gmap socket_address gname), ghost_map_auth γmk (1%Qp) mk ∗ 
         ([∗ set] sa ∈ clients, 
           (((⌜m1 !! sa = None⌝ ∨ ⌜m1 !! sa = Some (CanStart, None)⌝) ∗ 
-            ⌜¬∃ c γ, mk !! (sa, c) = Some γ⌝ ∗ ⌜no_emit_with_address sa t res⌝) ∨ 
+            ⌜¬∃ γ, mk !! sa = Some γ⌝ ∗ ⌜no_emit_with_address sa t res⌝) ∨ 
           (∃ s c γ (m : gmap Key (option val)), ⌜m1 !! sa = Some (s, Some c)⌝ ∗
             ⌜extract c = Some #(LitSocketAddress sa)⌝ ∗ 
-            ghost_map_elem γmk (sa, c) DfracDiscarded γ ∗ ghost_map_auth γ (1%Qp) m ∗ 
+            ghost_map_elem γmk sa DfracDiscarded γ ∗ 
+            ghost_map_auth γ (1%Qp) m ∗ 
             ((⌜s = CanStart⌝ ∗ ⌜commit_closed c lt⌝ ∗
               ([∗ set] k ∈ KVS_keys, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)) ∨ 
             (∃ domain sub_domain tail, ⌜s = Active domain⌝ ∗ ⌜sub_domain = domain ∩ KVS_keys⌝ ∗ 
               ⌜open_start c lt tail⌝ ∗ 
               ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
-              (∀ k, ⌜k ∈ sub_domain⌝ → ∀ v, ⌜m !! k = Some (Some v)⌝ → ⌜latest_write c k v tail⌝)))))).
+            (∀ k, ⌜k ∈ sub_domain⌝ → ∀ v, ⌜m !! k = Some (Some v)⌝ → ⌜latest_write c k v tail⌝)))))).
 
   Definition GlobalInvExt `(res : !RU_resources Mdl Σ) (γm1 γm2 γm3 γmk γl : gname) (clients : gset socket_address) : iProp Σ := 
     ∃ t lt T, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
@@ -290,11 +291,11 @@ Section trace_proof.
       GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt res γm1 γm2 γm3 γmk γl clients))%I;
       OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
                         ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
-      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) γ, ghost_map_elem γmk (sa, c) DfracDiscarded γ ∗ 
+      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) γ, ghost_map_elem γmk sa DfracDiscarded γ ∗ 
                              ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ ⌜sa ∈ clients⌝)%I;
       ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γm1 sa (DfracOwn 1%Qp) (s, Some c))%I; 
       IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
-                           ∃ γ, ghost_map_elem γmk (sa, c) DfracDiscarded γ)%I;
+                           ∃ γ, ghost_map_elem γmk sa DfracDiscarded γ)%I;
       KVS_ru := KVS_ru;
       KVS_Init := KVS_Init%I;
       KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ ghost_map_elem γm1 sa (DfracOwn 1%Qp) (CanStart, None) ∗ ⌜sa ∈ clients⌝)%I;
@@ -435,7 +436,7 @@ Section trace_proof.
     ⌜sa ∈ clients⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent e = Some c⌝ -∗
-    (∃ γ, ghost_map_elem γmk (sa, c) DfracDiscarded γ) -∗
+    (∃ γ, ghost_map_elem γmk sa DfracDiscarded γ) -∗
     trace_state_resources t lt γm1 γmk clients res -∗
     trace_state_resources (t ++ [e]) lt γm1 γmk clients res.
   Proof.
@@ -452,7 +453,7 @@ Section trace_proof.
     - destruct (decide (sa = sa')) as [<-|Hneq].
       + exfalso.
         apply Hnot.
-        by exists c, γ.
+        by exists γ.
       + iLeft.
         iFrame.
         iSplit; first by iPureIntro.
@@ -637,14 +638,14 @@ Section trace_proof.
     rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
     iDestruct "Hext_rest1'" as "(Hext_rest1_sa & Hext_rest1)".
     rewrite big_sepS_singleton.
-    iAssert ((⌜mk !! (sa, c) = None⌝ ∧ ⌜no_emit_with_address sa t' res⌝)%I) as "(%Hlookup_none & %Hno_emit)".
+    iAssert ((⌜mk !! sa = None⌝ ∧ ⌜no_emit_with_address sa t' res⌝)%I) as "(%Hlookup_none & %Hno_emit)".
     {
       iDestruct ("Hext_rest1_sa") as "[(_ & %Hnot_lookup & %Hno_emit)|[%s [%c' [%γ [%m (%Hfalse & _)]]]]]".
       - iPureIntro. 
-        destruct (mk !! (sa, c)) as [γ|] eqn:Hfalse; last done.
+        destruct (mk !! sa) as [γ|] eqn:Hfalse; last done.
         exfalso.
         apply Hnot_lookup.
-        by exists c, γ.
+        by exists γ.
       - set_solver.
     }
     iDestruct (res.(read_uncommitted.specs.resources.Extraction_of_address) 
@@ -653,7 +654,7 @@ Section trace_proof.
       as "[%γ (Hghost_map_m & Hghost_elems_m)]".
     iMod (ghost_map_update (CanStart, Some c) with "[$Hghost_map_m1] [$Hsa_pointer]") 
       as "(Hghost_map_m1 & Hsa_pointer)".
-    iMod (ghost_map_insert_persist (sa, c) γ Hlookup_none with "[$Hghost_map_mk]") 
+    iMod (ghost_map_insert_persist sa γ Hlookup_none with "[$Hghost_map_mk]") 
       as "(Hghost_map_mk & #Hkey_pers_mk)".
     iMod ("Hclose'" with "[Htr_is HOwnLin' Hghost_map_mk Hext_rest1 Hext_rest1_sa 
       Hghost_map_m1 Hghost_map_m Hghost_elems_m Hlin_res' Hpost_res']").
@@ -672,7 +673,7 @@ Section trace_proof.
         iClear "HinvExt Hinit_cli Htr_inv".
         iExists (<[sa:=(CanStart, Some c)]> m1).
         iFrame.
-        iExists (<[(sa, c):=γ]> mk).
+        iExists (<[sa:=γ]> mk).
         iFrame.
         rewrite {2} Heq_sa_clients.
         rewrite big_sepS_union; last set_solver.
@@ -721,9 +722,9 @@ Section trace_proof.
           iFrame.
           iPureIntro.
           split.
-          * intros (c' & γ' & Hfalse).
+          * intros (γ' & Hfalse).
             apply Hext_res2.
-            exists c', γ'.
+            exists γ'.
             by rewrite lookup_insert_ne in Hfalse; last set_solver.
           * assert (sa ≠ sa') as Hneq; first set_solver.
             intros (e & c' & Hin & Hconn & Hextract').
@@ -919,7 +920,6 @@ Section trace_proof.
     rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
     iDestruct "Hdisj_trace_res" as "(Hdisj_trace_res_sa & Hdisj_trace_res)".
     rewrite big_sepS_singleton.
-    (* iDestruct "Hpers_pointer" as "(%γ_sa & Hpers_pointer)". *)
     iDestruct (@ghost_map_lookup with "[$Hmap_mk][$Hsa'_pointer]") as "%Hlookup_mk".
     iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
     iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) vo) with "[Himp]" as "Hkey_internal"; 
@@ -933,8 +933,7 @@ Section trace_proof.
       & Hmap_m & Htrace_res)".
     iAssert (⌜γ = γ'⌝%I) as "<-".
     {
-      admit.
-      (* iApply (ghost_map_elem_agree sa γmk _ _ γ γ' with "[$Hsa'_pointer][$Hsa_pointer]"). *)
+      iApply (ghost_map_elem_agree sa γmk _ _ γ γ' with "[$Hsa'_pointer][$Hsa_pointer]").
     } 
     iDestruct "Htrace_res" as "[(_ & _ & Hfalse)|Htrace_res]".
     {
@@ -1513,7 +1512,7 @@ Section trace_proof.
       as "[%γm1 (Hghost_map_m1 & Hghost_elems_m1)]".
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γm2 Hghost_map_m2]".
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γm3 Hghost_map_m3]".
-    iMod (ghost_map_alloc_empty (K:=socket_address * val) (V:=gname)) as "[%γmk Hghost_map_mk]".
+    iMod (ghost_map_alloc_empty (K:=socket_address) (V:=gname)) as "[%γmk Hghost_map_mk]".
     iMod (own_alloc (● gmap_of_trace 0 ([] : list val) ⋅ 
       ◯ gmap_of_trace 0 ([] : list val))) as (γl) "Hltrace".
     {
