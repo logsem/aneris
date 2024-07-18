@@ -241,16 +241,9 @@ Section trace_proof.
 
   (** Predicates for wrapped resources *)
 
-  Definition open_start (c : val) (ltrace tail : list val) : Prop := 
-    ∃ le l, ltrace = l ++ [le] ++ tail ∧
-      commit_closed c l ∧
-      (∃ tag, le = (#tag, (c, #"StLin"))%V) ∧
-      (∀ le', le' ∈ tail → connOfEvent le' = Some c → 
-              (is_wr_lin_event le' ∨ is_rd_lin_event le')).
-
   Definition latest_write (c : val) (k : Key) (v : val) (ltrace : list val) : Prop := 
-    ∃ le tag v, le ∈ ltrace ∧ le = (#tag, (c, (#"WrLin", (#k, SOMEV v))))%V ∧
-      (∀ le', le' ∈ ltrace → is_wr_lin_event le' → connOfEvent le' = Some c → rel_list ltrace le' le).
+    ∃ le tag v, le ∈ ltrace ∧ le = (#tag, (c, (#"WrLin", (#k, v))))%V ∧
+      (∀ le', le' ∈ ltrace → (∃ tag' v', le' = (#tag', (c, (#"WrLin", (#k, v'))))%V) → le' ≠ le → rel_list ltrace le' le).
 
   Definition tag_eq (e1 e2 : val) : Prop := ∃ tag, tagOfEvent e1 = Some tag ∧ tagOfEvent e2 = Some tag.
 
@@ -422,13 +415,13 @@ Section trace_proof.
     latest_write c' k v (tail ++ [e]).
   Proof.
     intros Hneq Hextract Hextract' Hconn (le & tag & v'& Hin & -> & Hall).
-    exists (#tag, (c', (#"WrLin", (#k, InjRV v'))))%V, tag, v'.
+    exists (#tag, (c', (#"WrLin", (#k, v'))))%V, tag, v'.
     split; first set_solver.
     split; first done.
-    intros le' Hin' Hevent Hconn'.
+    intros le' Hin' Hevent Hneq'.
     rewrite elem_of_app in Hin'.
     destruct Hin' as [Hin'|Hin']; last set_solver.
-    specialize (Hall le' Hin' Hevent Hconn').
+    specialize (Hall le' Hin' Hevent Hneq').
     by apply rel_list_imp.
   Qed.
 
@@ -466,6 +459,59 @@ Section trace_proof.
         destruct Hin_app as [Hin_app | Hin_app]; set_solver.
     - iRight.
       iFrame.
+  Qed.
+
+  Lemma open_start_imp le c lt tail : 
+    (is_rd_lin_event le ∨ is_wr_lin_event le) →
+    open_start c lt tail →
+    open_start c (lt ++ [le]) (tail ++ [le]).
+  Proof.
+    intros Hevent (le' & lt_pre & Hopen1 & Hopen2 & Hopen3 & Hopen4).
+    exists le', lt_pre.
+    split_and!; try set_solver.
+    rewrite Hopen1.
+    by do 2 rewrite -app_assoc.
+  Qed.
+
+  Lemma latest_write_upd c k v tag tail :
+    latest_write c k v (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
+  Proof.
+    exists (#tag, (c, (#"WrLin", (#k, v))))%V, tag, v.
+    split_and!; try set_solver.
+    intros le Hin Heq Hneq.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin|Hin]; last set_solver.
+    rewrite elem_of_list_lookup in Hin.
+    destruct Hin as (i & Hin).
+    exists i, (length tail).
+    split_and!.
+    - by apply lookup_lt_Some in Hin.
+    - by apply lookup_app_l_Some.
+    - assert (length tail = Init.Nat.pred (length (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]))) as ->.
+      {
+        rewrite last_length.
+        lia.
+      }
+      rewrite -last_lookup.
+      by rewrite last_snoc.
+  Qed.
+
+  Lemma latest_write_imp k' k c v' v tail tag :
+    k' ≠ k →
+    latest_write c k' v' tail →
+    latest_write c k' v' (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
+  Proof.
+    intros Hneq Hlatest.
+    destruct Hlatest as (le & tag' & v'' & Hin & -> & Himp).
+    exists (#tag', (c, (#"WrLin", (#k', v''))))%V, tag', v''.
+    split_and!; try done.
+    - set_solver.
+    - intros le' Hin' Hexists Hneq'.
+      rewrite elem_of_app in Hin'.
+      destruct Hin' as [Hin' | Hin'].
+      + specialize (Himp le' Hin' Hexists Hneq').
+        by apply rel_list_imp.
+      + assert (le' = (#tag, (c, (#"WrLin", (#k, v))))%V) as ->; set_solver.
   Qed.
 
   (** Per operation implications *)
@@ -507,14 +553,7 @@ Section trace_proof.
         }
         split; done.
       - split; first done.
-        destruct (exists_execution T) as [E (Hbased & Hvalid_exec)].
-        {
-          intros t' Hin.
-          destruct Hvalid_trans as (_ & _ & Hvalid_trans & _).
-          destruct (Hvalid_trans t' Hin) as ([s [b Hlast]] & _).
-          destruct t'; last done.
-          by simpl in Hlast. 
-        }
+        destruct (exists_execution T) as [E (Hbased & Hvalid_exec)]; first set_solver.
         eexists T, E.
         by do 3 (split; first done).
     }
@@ -604,14 +643,7 @@ Section trace_proof.
         rewrite /is_init_post_event.
         set_solver.
       - split; first done.
-        destruct (exists_execution T') as [E' (Hbased' & Hvalid_exec')].
-        {
-          intros t'' Hin.
-          destruct Hvalid_trans' as (_ & _ & Hvalid_trans' & _).
-          destruct (Hvalid_trans' t'' Hin) as ([s [b Hlast]] & _).
-          destruct t''; last done.
-          by simpl in Hlast. 
-        }
+        destruct (exists_execution T') as [E' (Hbased' & Hvalid_exec')]; first set_solver.
         eexists T', E'.
         by do 3 (split; first done).
     }
@@ -805,14 +837,7 @@ Section trace_proof.
         }
         split; done.
       - split; first done.
-        destruct (exists_execution T) as [Ex (Hbased & Hvalid_exec)].
-        {
-          intros t' Hin'.
-          destruct Hvalid_trans as (_ & _ & Hvalid_trans & _).
-          destruct (Hvalid_trans t' Hin') as ([s [b Hlast]] & _).
-          destruct t'; last done.
-          by simpl in Hlast. 
-        }
+        destruct (exists_execution T) as [Ex (Hbased & Hvalid_exec)]; first set_solver.
         eexists T, Ex.
         by do 3 (split; first done).
     }
@@ -904,7 +929,7 @@ Section trace_proof.
     }
     iPoseProof (lin_tag_not_in lt' t' γm2 with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
     iPoseProof (post_tag_not_in t' γm3 with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
-    iDestruct (lin_tag_add lt' t' γm2 (#tag1, (c, #"StLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+    iDestruct (lin_tag_add lt' t' γm2 (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
       as "Hlin_res'".
     {
       iPureIntro.
@@ -953,18 +978,122 @@ Section trace_proof.
       iNext.
       rewrite /GlobalInvExt.
       iExists t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
-      assert (Decision (∃ (trans : transaction), trans ∈ T ∧ (λ trans, ∃ (op : operation), 
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
         op ∈ trans ∧ (λ op, connOfOp op = c) op) trans)) as Hdecision.
       {
         do 2 (apply list_exist_dec; intros).
         apply _.
       }
-      destruct (decide (∃ (trans : transaction), trans ∈ T ∧ (λ trans, ∃ (op : operation), 
+      assert (c = c') as <-.
+      {
+        admit.
+      }
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
         op ∈ trans ∧ (λ op, connOfOp op = c) op) trans)) as [(trans & Htrans_in & Hop)|Hdec].
       - admit.
       - iExists (T' ++ [[Wr (tag1, c) k v]]).
         iFrame.
-        admit.
+        iSplit.
+        + iPureIntro.
+          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done.
+          * do 2 right.
+            left.
+            by exists tag1, c.
+          * do 2 right.
+            left.
+            by exists tag1, k, c, v.
+        + iSplit.
+          * iPureIntro.
+            intros t'' Ht''_in.
+            rewrite elem_of_app in Ht''_in.
+            destruct Ht''_in as [Ht''_in | Ht''_in]; set_solver.
+          * iSplit.
+            -- iPureIntro.
+               by apply extraction_of_add.
+            -- iSplit.
+               ++ iPureIntro.
+                  apply (valid_transactions_add T' _ c); try done.
+                  ** set_solver.
+                  ** exists (Wr (tag1, c) k v).
+                     by simpl.
+                  ** apply valid_transaction_singleton. 
+               ++ iSplit.
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                       %Hopen_start & Hrest)".
+                     iPureIntro.
+                     apply (valid_sequence_wr_lin _ _ tag1 c tail); try done.
+                     --- left.
+                         rewrite /is_wr_lin_event.
+                         set_solver.
+                     --- by exists t'.
+                  ** iExists m1.
+                     iFrame. 
+                     iExists mk.
+                     iFrame.
+                     rewrite {3} Heq_sa_clients.
+                     rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+                     iSplitR "Hdisj_trace_res".
+                     --- rewrite big_sepS_singleton.
+                         iRight.
+                         iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & 
+                          -> & -> & %Hopen_start & Hkeys & %Hlatest_keys)". 
+                         iExists (Active domain), c, γ, (<[k:=Some v.(SV_val)]> m).
+                         do 2 (iSplit; first by iPureIntro).
+                         iFrame "∗#".
+                         iRight.
+                         iExists domain, (domain ∩ KVS_keys), 
+                          (tail ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
+                         do 2 (iSplit; first by iPureIntro).
+                         iFrame.
+                         iSplit.
+                         +++ iPureIntro.
+                             apply open_start_imp; last done.
+                             right.
+                             by exists tag1, k, c, v.
+                         +++ iPureIntro.
+                             simpl.
+                             intros k' Hk'_in v' Hlookup.
+                             specialize (Hlatest_keys k' Hk'_in).
+                             destruct (decide (k' = k)) as [->|Hneq].
+                             *** rewrite lookup_insert in Hlookup.
+                                 assert (v.(SV_val) = v') as <-; first set_solver.
+                                 apply latest_write_upd.
+                             *** rewrite lookup_insert_ne in Hlookup; last done.
+                                 specialize (Hlatest_keys v' Hlookup).
+                                 apply latest_write_imp; try done.
+                     --- iApply (big_sepS_wand with "[$Hdisj_trace_res]"). 
+                         iApply big_sepS_intro.
+                         iModIntro.
+                         iIntros (sa'' Hsa''_in) "[Hres | Hres]"; first by iLeft.
+                         iRight.
+                         iDestruct "Hres" as "(%s'' & %c'' & %γ'' & %m'' & -> & %Hextract'' & 
+                          Hsa''_pointer & Hmap_m'' & Hdisj)".
+                         iExists s'', c'', γ'', m''.
+                         do 2 (iSplit; first by iPureIntro).
+                         iFrame "#∗".
+                         iDestruct "Hdisj" as "[(-> & %Hclosed' & Hkeys) | 
+                          (%domain & %sub_domain & %tail & -> & -> & %Hopen' & Hkeys & %Hlatest)]".
+                         +++ iLeft.
+                             iFrame.
+                             iSplit; first done.
+                             iPureIntro.
+                             eapply (commit_closed_neq _ sa sa'' c c'' lt' 
+                              (#tag1, (c, (#"WrLin", (#k, v))))%V); set_solver.
+                         +++ iRight.
+                             iExists domain, (domain ∩ KVS_keys), 
+                              (tail ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
+                             do 2 (iSplit; first by iPureIntro).
+                             iFrame.
+                             iSplit.
+                             *** iPureIntro.
+                                 eapply (open_start_neq _ sa sa'' c c'' lt' tail 
+                                  (#tag1, (c, (#"WrLin", (#k, v))))%V); set_solver.
+                             *** iPureIntro.
+                                 simpl.
+                                 intros k' Hk'_in k'' Hlookup.
+                                 specialize (Hlatest k' Hk'_in k'' Hlookup).
+                                  eapply (latest_neq _ sa sa'' c c'' tail 
+                                    (#tag1, (c, (#"WrLin", (#k, v))))%V); set_solver.
     }
     iMod ("Hshift" with "[Hkey_internal Hall Hkey_c Hkey]").
     {
@@ -1098,14 +1227,7 @@ Section trace_proof.
         }
         split; done.
       - split; first done.
-        destruct (exists_execution T) as [Ex (Hbased & Hvalid_exec)].
-        {
-          intros t' Hin.
-          destruct Hvalid_trans as (_ & _ & Hvalid_trans & _).
-          destruct (Hvalid_trans t' Hin) as ([s [b Hlast]] & _).
-          destruct t'; last done.
-          by simpl in Hlast. 
-        }
+        destruct (exists_execution T) as [Ex (Hbased & Hvalid_exec)]; first set_solver.
         eexists T, Ex.
         by do 3 (split; first done).
     }
@@ -1286,7 +1408,11 @@ Section trace_proof.
       iSplitR.
       {
         iPureIntro.
-        apply lin_trace_start_lin; try done.
+        apply (lin_trace_lin lt' ((#tag1, (c, #"StPre"))%V) ((#tag1, (c, #"StLin"))%V) tag1 c t'); try done.
+        - left.
+          by exists tag1, c.
+        - left.
+          by exists tag1, c.
       }
       iSplitR; first by iPureIntro.
       iSplitR.
@@ -1380,7 +1506,7 @@ Section trace_proof.
             do 2 (iSplit; first by iPureIntro).
             iSplitR.
             -- iPureIntro.
-                eapply (open_start_neq _ sa sa' c c_sa' lt' tail_sa' (#tag1, (c, #"StLin"))%V); set_solver.
+               eapply (open_start_neq _ sa sa' c c_sa' lt' tail_sa' (#tag1, (c, #"StLin"))%V); set_solver.
             -- iDestruct "Hkeys" as "(Hkeys & %Hlatest)".
                iFrame.
                iPureIntro.
