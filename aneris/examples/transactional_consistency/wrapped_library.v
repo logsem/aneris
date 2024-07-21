@@ -51,7 +51,7 @@ Definition wrap_commit (commit : val) : val :=
   Emit ("tag", commit_post_emit_event "cst" "b") ;; 
   "b".
 
-Definition init_pre_emit_event : val := #"InitPre".
+Definition init_pre_emit_event : val := #"InPre".
 
 Definition init_post_emit_event : val :=
   λ: "cst", ("cst", #"InitPost").
