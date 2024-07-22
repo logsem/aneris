@@ -1081,12 +1081,8 @@ Section trace_proof.
                by apply extraction_of_add2.
             -- iSplit.
                ++ iPureIntro.
-                  admit.
-                  (* apply (valid_transactions_add T' _ c); try done.
-                  ** set_solver.
-                  ** exists (Wr (tag1, c) k v).
-                     by simpl.
-                  ** apply valid_transaction_singleton. *)
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+                  by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
                ++ iSplit.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
@@ -1122,7 +1118,7 @@ Section trace_proof.
                by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add T' _ c); try done.
+                  apply (valid_transactions_add1 T' _ c); try done.
                   ** set_solver.
                   ** exists (Wr (tag1, c) k v).
                      by simpl.
@@ -1237,7 +1233,7 @@ Section trace_proof.
     iModIntro.
     wp_pures.
     iFrame.
-  Admitted.
+  Qed.
 
   Lemma start_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
