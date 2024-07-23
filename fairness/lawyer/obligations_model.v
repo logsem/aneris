@@ -143,18 +143,20 @@ End Model.
 
 
 (* TODO: move *)
-From trillium.fairness Require Import execution_model. 
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
-Section ObligationsEM.
+Section ObligationsRepr.
   (* Context {DegO LevelO: ofe}.  *)
   Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}. 
 
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
 
-  Context {Locale: Type} {LIM_STEPS: nat}.
+  (* Context {Locale: Type}. *)
+  Context {Λ: language}.
+  Let Locale := locale Λ. 
+  Context {LIM_STEPS: nat}.
   Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Context (OM: ObligationsModel OP).
+  Let OM := ObligationsModel OP.
 
   Let cpO := prodO unitO DegO. 
   Let sstR := prodR (agreeR LevelO) (excl' boolO).
@@ -179,12 +181,13 @@ Section ObligationsEM.
       obls_lb: gname;
   }.
   
-  Context `{ObligationsGS Σ}. 
 
   Definition sig_map_repr smap: gmapUR SignalId sstR :=
-    [^op map] sg ↦ sst ∈ smap, {[ sg := (to_agree sst.1, Excl' sst.2) ]}.
+    (fun '(l, b) => (to_agree l, Excl' b)) <$> smap. 
+    (* [^op map] sg ↦ sst ∈ smap, {[ sg := (to_agree sst.1, Excl' sst.2) ]}. *)
   
-  Definition obls_msi (ps: ProgressState OP): iProp Σ :=
+  (* Context `{ObligationsGS Σ}.  *)
+  Definition obls_msi `{ObligationsGS Σ} (ps: ProgressState OP): iProp Σ :=
     own obls_cps (● (ps_cps OP ps)) ∗
     own obls_sigs (● (sig_map_repr (ps_sigs OP ps))) ∗
     own obls_obls (● (ps_obls OP ps)) ∗
@@ -193,4 +196,89 @@ Section ObligationsEM.
     own obls_lb (●MN (ps_low_bound OP ps))
   . 
   
-End ObligationsEM.
+  From trillium.fairness Require Import execution_model.
+  From iris.proofmode Require Import tactics.
+
+  Let obls_Σ: gFunctors := #[
+      GFunctor (authUR (gmultisetUR cpO));
+      GFunctor (authUR (gmapUR SignalId sstR));
+      GFunctor (authUR (gmapUR Locale (gset natO)));
+      GFunctor (authUR (gsetUR epO));
+      GFunctor (authUR (gmapUR Locale unitO));
+      GFunctor (mono_natUR)
+   ].
+
+  Definition threads_own_obls (c: cfg Λ) (δ: mstate OM) :=
+    forall ζ, ζ ∈ dom (ps_obls OP δ) -> is_Some (from_locale c.1 ζ).
+
+  Definition obls_valid_evolution_step
+    (* (σ1: cfg Λ) *) (oζ: olocale Λ) (σ2: cfg Λ)
+    (δ1: mstate OM) (ℓ: mlabel OM) (δ2: mstate OM) :=
+      oζ = Some ℓ /\
+      mtrans δ1 ℓ δ2 /\
+      threads_own_obls σ2 δ2. 
+
+  Definition obls_si `{ObligationsGS Σ}
+    (σ: cfg Λ) (δ: mstate OM): iProp Σ :=
+    obls_msi δ ∗ ⌜ threads_own_obls σ δ ⌝.
+
+  Definition obls_init_resource `{ObligationsGS Σ}
+    (δ: mstate OM) (_: unit): iProp Σ :=
+    own obls_cps (◯ (ps_cps _ δ)) ∗
+    own obls_sigs (◯ (sig_map_repr (ps_sigs _ δ))) ∗
+    own obls_obls (◯ (ps_obls _ δ)) ∗
+    own obls_eps (◯ (ps_eps _ δ)) ∗
+    own obls_phs (◯ (ps_phases _ δ)) ∗
+    own obls_lb (◯MN (ps_low_bound _ δ))
+  .
+    
+  Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
+    exists τ0 e0, σ.1 = [e0] /\ from_locale σ.1 τ0 = Some e0 /\
+            dom (ps_obls OP δ) = {[ τ0 ]}. 
+
+  Program Definition ObligationsEM: ExecutionModel Λ OM :=
+    {| 
+      em_preGS := ObligationsPreGS;
+      em_GS := ObligationsGS;
+      em_Σ := obls_Σ;
+      em_valid_evolution_step := obls_valid_evolution_step;
+      em_thread_post Σ `{ObligationsGS Σ} := 
+        fun τ => own obls_obls (◯ {[τ := ∅ ]});
+      em_msi Σ `{ObligationsGS Σ} := obls_si;
+      em_init_param := unit; (* ? *)
+      em_init_resource Σ `{ObligationsGS Σ} := obls_init_resource;
+      em_is_init_st := obls_is_init_st;
+    |}.
+  Next Obligation.
+    solve_inG.
+  Qed. 
+  Next Obligation.
+    simpl. intros ? PRE δ σ ? INIT. iStartProof.
+    iMod (own_alloc (● (ps_cps _  δ) ⋅ ◯ _)) as (?) "[CPa CPf]".
+    { by apply auth_both_valid_2. }
+    iMod (own_alloc (● (sig_map_repr (ps_sigs _ δ)) ⋅ ◯ _)) as (?) "[SIGSa SIGSf]".
+    { apply auth_both_valid_2; [| reflexivity].
+      rewrite /sig_map_repr.
+      intros s. destruct lookup eqn:L; [| done].
+      apply lookup_fmap_Some in L. 
+      destruct L as ([l b]&<-&?).
+      done. }
+    iMod (own_alloc (● (ps_obls _ δ) ⋅ ◯ _)) as (?) "[OBLSa OBLSf]". 
+    { apply auth_both_valid_2; [| reflexivity].
+      intros τ. destruct lookup; done. }
+    iMod (own_alloc (● (ps_eps _ δ) ⋅ ◯ _)) as (?) "[EPSa EPSf]". 
+    { by apply auth_both_valid_2. }
+    iMod (own_alloc (● (ps_phases _ δ) ⋅ ◯ _)) as (?) "[PHa PHf]". 
+    { apply auth_both_valid_2; [| reflexivity].
+      intros τ. destruct lookup; done. }
+    iMod (own_alloc (●MN (ps_low_bound _ δ) ⋅ mono_nat_lb _)) as (?) "[LBa LBf]".
+    { apply mono_nat_both_valid. reflexivity. }
+    iModIntro. iExists {| obls_pre := PRE; |}.
+    iFrame.
+    iPureIntro. red. intros τ DOMτ.
+    red in INIT. destruct σ, INIT as (τ0 & e0 & -> & LOC & DOM).
+    rewrite DOM in DOMτ. apply elem_of_singleton in DOMτ.
+    subst. simpl. done.
+  Qed.  
+  
+End ObligationsRepr.
