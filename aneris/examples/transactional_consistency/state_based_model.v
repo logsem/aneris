@@ -876,9 +876,7 @@ Qed.
 Lemma lin_trace_valid : 
   ∀ (tag : string) (e : val) (t lt : list val), 
     ((is_pre_event e ∧ tagOfEvent e = Some tag ∧ tag ∉ tags t) ∨
-      ((is_st_post_event e ∨ is_wr_post_event e ∨ is_rd_post_event e ∨ 
-        is_cm_post_event e ∨ is_in_post_event e) ∧ 
-        (∃ le, postToLin e = Some le ∧ le ∈ lt))) → 
+     (is_post_event e ∧ (∃ le, postToLin e = Some le ∧ le ∈ lt))) → 
     lin_trace_of lt t → lin_trace_of lt (t ++ [e]).
 Proof.
   intros tag e t lt His_pre_post Hlin_trace.
@@ -933,8 +931,10 @@ Proof.
         destruct Hin as (i & Hlookup_i).
         rewrite elem_of_list_lookup in Hin_le'.
         destruct Hin_le' as (j & Hlookup_j).
-        destruct His_post as [[tag' [c' ->]]| [[tag' [c' [k' [v' ->]]]] | 
-          [[[tag' [k' [c' [v' ->]]]] | [tag' [k' [c' ->]]]] |
+        rewrite /is_post_event in His_post.
+        
+        destruct His_post as [[tag' [c' ->]]| [ [[tag' [k' [c' [v' ->]]]] | 
+          [tag' [k' [c' ->]]]]| [[tag' [c' [k' [v' ->]]]] |
           [[tag' [k' [c' ->]]] | [tag' [c' ->]]]]]];
           pose proof Hlin_post as Hlin_post';
           apply post_lin_lin_post in Hlin_post; eauto.
@@ -1040,7 +1040,7 @@ Proof.
               destruct Hle1_lin as [[tag' [c' ->]] | [[[tag' [c' [k' [v' ->]]]]|[tag' [c' [k' ->]]]] | 
                 [[tag' [c' [k' [v' ->]]]]|[[tag' [c' [b' ->]]]|[tag' [c' ->]]]]]]; 
                 simpl in Hlinpre;
-                destruct Hfalse as ([Hfalse | [Hfalse | [[Hfalse | Hfalse] | [Hfalse | Hfalse]]]] & _);
+                destruct Hfalse as ([Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]] & _);
                 inversion Hfalse; set_solver.
       * subst.
         exfalso.
@@ -1930,4 +1930,52 @@ Proof.
            ++ eapply Hvalid; try done; apply lookup_app_Some; right.
               all : split; first lia.
               all : apply lookup_cons_Some; eauto.
+Qed.
+
+Lemma valid_trace_ru_pre T tag t e lt : 
+  lin_trace_of lt t →
+  is_pre_event e →
+  tagOfEvent e = Some tag →
+  tag ∉ tags t →
+  valid_sequence lt →
+  valid_transactions T → 
+  extraction_of lt T →
+  (∀ t, t ∈ T → t ≠ []) →
+  valid_trace_ru (t ++ [e]).
+Proof.
+  intros Hlin Hpre Htag Hvalid Hvalid_trans 
+    Hextract Hempty Hnin.
+  rewrite /valid_trace_ru /valid_trace.
+  exists lt.
+  split.
+  - apply (lin_trace_valid tag); try done; eauto.
+  - split; first done.
+    destruct (exists_execution T) as [E (Hbased & Hvalid_exec)]; first set_solver.
+    eexists T, E.
+    by do 3 (split; first done).
+Qed.
+
+Lemma valid_trace_ru_post T tag t e lt : 
+  lin_trace_of lt t →
+  (∃ le, postToLin e = Some le ∧ le ∈ lt) →
+  is_post_event e →
+  tagOfEvent e = Some tag →
+  valid_sequence lt →
+  valid_transactions T → 
+  extraction_of lt T →
+  (∀ t, t ∈ T → t ≠ []) →
+  valid_trace_ru (t ++ [e]).
+Proof.
+  intros Hlin Hexists Hpost Htag Hvalid Hvalid_trans 
+    Hextract Hempty.
+  rewrite /valid_trace_ru /valid_trace.
+  exists lt.
+  split.
+  - apply (lin_trace_valid tag); try done.
+    right.
+    rewrite /is_post_event in Hpost.
+    set_solver.
+  - split; first done.
+    destruct (exists_execution T Hempty) as (exec & Hexec_props).
+    by exists T, exec.
 Qed.
