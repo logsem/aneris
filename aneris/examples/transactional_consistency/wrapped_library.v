@@ -54,7 +54,7 @@ Definition wrap_commit (commit : val) : val :=
 Definition init_pre_emit_event : val := #"InPre".
 
 Definition init_post_emit_event : val :=
-  λ: "cst", ("cst", #"InitPost").
+  λ: "cst", ("cst", #"InPost").
 
 Definition wrap_init_client_proxy (init_client_proxy : serializer → val) (ser : serializer) : val := 
   λ: "sa_cli" "sa_kvs", 
