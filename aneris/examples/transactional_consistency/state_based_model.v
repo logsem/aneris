@@ -62,8 +62,9 @@ Definition valid_transaction (t : transaction) : Prop :=
 Definition connOfTrans (t : transaction) : option val :=
   match head t with | Some op => Some (connOfOp op) | None => None end.
 
-Definition isCmOp (op : operation) : bool :=
-  match op with | Cm _ _  => true | _ => false end.
+Definition is_cm_op (op : operation) : Prop := ∃ s b, op = Cm s b.
+
+Definition isCmOp (op : operation) : bool := match op with | Cm _ _ => true | _ => false end.
 
 Definition valid_transactions (T : list transaction) : Prop := 
   (* Transactions read from some write *)
@@ -76,7 +77,7 @@ Definition valid_transactions (T : list transaction) : Prop :=
   (∀ t1 t2 op1 op2 i j c, T !! i = Some t1 → T !! j = Some t2 → 
                           last t1 = Some op1 → last t2 = Some op2 → 
                           connOfOp op1 = c → connOfOp op2 = c →
-                          isCmOp op1 = false → isCmOp op2 = false →
+                          (¬is_cm_op op1) → (¬is_cm_op op2) →
                           i = j).
   
 Definition state : Type := gmap Key val.
@@ -1604,7 +1605,7 @@ Lemma valid_transactions_add1 T t c :
   (∃ op, head t = Some op ∧ connOfOp op = c) → 
   valid_transaction t →
   (¬ (∃ t', t' ∈ T ∧ (∃ op, op ∈ t' ∧ last t' = Some op ∧ 
-    connOfOp op = c ∧ isCmOp op = false))) →
+    connOfOp op = c ∧ (¬is_cm_op op)))) →
   valid_transactions T →
   valid_transactions (T ++ [t]).
 Proof.
@@ -1680,7 +1681,7 @@ Lemma valid_transaction_add_op t op c tag :
   tagOfOp op = tag →
   connOfOp op = c → 
   (∃ op, op ∈ t ∧ last t = Some op ∧ 
-      connOfOp op = c ∧ isCmOp op = false) →
+      connOfOp op = c ∧ (¬is_cm_op op)) →
   (∀ s k ov tag1 v1, op = Rd s k ov → (Wr (tag1, c) k v1) ∈ t →
     (¬∃ tag2 v2, rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
                  rel_list t (Wr (tag2, c) k v2) op) →
@@ -1690,6 +1691,7 @@ Lemma valid_transaction_add_op t op c tag :
 Proof.
   intros Hnot Htag Hconn (op_last & Hin_last & Hlast & Hconn_last 
     & Hcm_last) Hread Hvalid.
+  rewrite /is_cm_op in Hcm_last.
   split_and!.
   - intros op' s b Hop_in Hcm.
     rewrite elem_of_app in Hop_in.
@@ -1789,7 +1791,7 @@ Lemma valid_transactions_add2 T1 T2 tag op t c :
   (∀ s k v, op = Rd s k (Some v) → ∃ t' s', t' ∈ (T1 ++ t :: T2) ∧ Wr s' k v ∈ t') →
   connOfOp op = c → 
   (∃ op, op ∈ t ∧ last t = Some op ∧ 
-    connOfOp op = c ∧ isCmOp op = false) →
+    connOfOp op = c ∧ (¬is_cm_op op)) →
   valid_transactions (T1 ++ t :: T2) →
   valid_transactions (T1 ++ (t ++ [op]) :: T2).
 Proof.

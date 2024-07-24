@@ -1156,8 +1156,13 @@ Section trace_proof.
                by apply extraction_of_add2.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
-                  by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
+                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+                  exists op.
+                  split_and!; try done.
+                  intros (s' & b' & ->).
+                  set_solver.
                ++ iSplit.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
@@ -1198,6 +1203,16 @@ Section trace_proof.
                   ** exists (Wr (tag1, c) k v).
                      by simpl.
                   ** apply valid_transaction_singleton.
+                  ** intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+                     apply Hdec.
+                     exists t''.
+                     split; first done.
+                     exists op.
+                     split_and!; try done.
+                     rewrite /is_cm_op in Hop_cm.
+                     destruct op; try done.
+                     exfalso.
+                     eauto.
                ++ iSplit.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
