@@ -560,17 +560,6 @@ Proof.
       set_solver.
 Qed.
 
-Lemma pre_post_false :
-  ∀ e, is_pre_event e → ¬ is_post_event e.
-Proof.
-  intros e H Hfalse.
-  destruct H as [[tag [c ->]] | [[tag [c ->]] | 
-    [[tag [c ->]]| [[tag [c ->]] | [tag ->]]]]];
-    destruct Hfalse as [Hfalse | [Hfalse | [Hfalse | [Hfalse | Hfalse]]]];
-    rewrite /is_st_post_event /is_rd_post_event /is_wr_post_event
-    /is_cm_post_event /is_in_post_event in Hfalse; set_solver.
-Qed.
-
 Lemma tags_sub : 
   ∀ e t, tags t ⊆ tags (t ++ [e]).
 Proof.
@@ -593,6 +582,17 @@ Proof.
   assert (tag ∈ tags t); set_solver.
 Qed.
 
+Lemma pre_post_false :
+  ∀ e, is_pre_event e → ¬ is_post_event e.
+Proof.
+  intros e H Hfalse.
+  destruct H as [[tag [c ->]] | [[tag [c ->]] | 
+    [[tag [c ->]]| [[tag [c ->]] | [tag ->]]]]];
+    destruct Hfalse as [Hfalse | [Hfalse | [Hfalse | [Hfalse | Hfalse]]]];
+    rewrite /is_st_post_event /is_rd_post_event /is_wr_post_event
+    /is_cm_post_event /is_in_post_event in Hfalse; set_solver.
+Qed.
+
 Lemma post_lin_lin_post le e :
   (is_st_post_event e ∨ is_rd_post_event e ∨ is_wr_post_event e ∨ 
    is_cm_post_event e ∨ is_in_post_event e) →
@@ -601,6 +601,275 @@ Proof.
   intros Hevent Hpost_lin.
   destruct Hevent as [[tag [c ->]] | [[[tag [k [c [v ->]]]] | [tag [k [c ->]]]] | 
     [[tag [k [c [v ->]]]] | [[tag [c [b ->]]] | [tag [c ->]]]]]]; try set_solver.
+Qed.
+
+Lemma tag_pre_post e_pre e_post tag :
+  tagOfEvent e_pre = Some tag →
+  is_post_event e_post →
+  postToPre e_post = Some e_pre →
+  tagOfEvent e_post = Some tag.
+Proof.
+  intros Htag Hpost Hpost_pre.
+  destruct Hpost as [[tag' [c' ->]] | [[[tag' [c' [k' [v' ->]]]]| [tag' [k' [c' ->]]]] 
+    | [[tag' [c' [k' [v' ->]]]]|[[tag' [c' [b' ->]]]|[tag' [c' ->]]]]]].
+  all : simpl in Hpost_pre.
+  all : inversion Hpost_pre.
+  all : by subst.
+Qed.
+
+Lemma tag_event_op op tag :
+  tagOfOp op = tag →
+  tagOfEvent (toLinEvent op) = Some tag.
+Proof.
+  intro Htag.
+  destruct op as [(tag', c) k ov | (tag', c) k v | (tag', c) b]; 
+    try set_solver.
+  destruct ov as [v|]; set_solver.
+Qed.
+
+Lemma lin_to_post le tag e_post :
+  is_lin_event le →
+  tagOfEvent le = Some tag →
+  linToPost le = Some e_post →
+  (is_post_event e_post ∧ tagOfEvent e_post = Some tag).
+Proof.
+  intros Hlin Htag Hlin_post.
+  rewrite /is_lin_event in Hlin.
+  destruct Hlin as [[tag' [c' ->]] | [[[tag' [c' [k' [v' ->]]]]| [tag' [k' [c' ->]]]] 
+    | [[tag' [c' [k' [v' ->]]]] | [[tag' [c' [b' ->]]] | [tag' [c' ->]]]]]].
+  all : simpl in Hlin_post.
+  all : inversion Hlin_post.
+  all : subst.
+  all : split; last done.
+  all : rewrite /is_post_event /is_st_post_event 
+          /is_in_post_event /is_rd_post_event 
+          /is_wr_post_event /is_cm_post_event; eauto;
+        set_solver.
+Qed.
+
+Lemma later_commit_impl c e_st lt e tag: 
+  tagOfEvent e = Some tag →
+  is_st_lin_event e →
+  (¬∃ e', e' ∈ lt ∧ tagOfEvent e' = Some tag) →
+  later_commit c e_st lt →
+  later_commit c e_st (lt ++ [e]).
+Proof.
+  rewrite /later_commit.
+  intros Htag His_st Hnot_in (e_cm & Hconn & Hevent & Hrel & Hnot).
+  exists e_cm.
+  split_and!; try done.
+  - destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
+    exists i, j.
+    split; first done.
+    split; apply lookup_app_Some; by left.
+  - intros (e_st' & Hconn' & Hevent' & Hrel1 & Hrel2).
+    apply Hnot.
+    exists e_st'.
+    do 2 (split; first done).
+    destruct Hrel1 as (i & j & Hlt & Hlookup_i & Hlookup_j).
+    rewrite lookup_snoc_Some in Hlookup_i.
+    destruct Hlookup_i as [(Hlength_i & Hlookup_i) | (Hlength_i & Hlookup_i)].
+    + rewrite lookup_snoc_Some in Hlookup_j.
+      destruct Hlookup_j as [(Hlength_j & Hlookup_j) | (Hlength_j & Hlookup_j)].
+      * split; first by exists i, j.
+        destruct Hrel2 as (i' & j' & Hlt' & Hlookup_i' & Hlookup_j').
+        rewrite lookup_snoc_Some in Hlookup_i'.
+        destruct Hlookup_i' as [(Hlength_i' & Hlookup_i') | (Hlength_i' & Hlookup_i')].
+        -- rewrite lookup_snoc_Some in Hlookup_j'.
+           destruct Hlookup_j' as [(Hlength_j' & Hlookup_j') | (Hlength_j' & Hlookup_j')];
+            first by exists i', j'.
+          subst.
+          rewrite /is_st_lin_event in His_st.
+          rewrite /is_cm_lin_event in Hevent.
+          set_solver.
+        -- subst.
+           rewrite lookup_snoc_Some in Hlookup_j'.
+           destruct Hlookup_j' as [(Hlength_j' & Hlookup_j') | (Hlength_j' & Hlookup_j')].
+           ++ assert (length lt ≤ j) as Hfalse; first lia.
+              apply lookup_ge_None_2 in Hfalse.
+              set_solver.
+           ++ subst.
+              destruct Hevent as (tag' & c' & b' & ->).
+              rewrite /is_st_lin_event in Hevent'.
+              set_solver.
+      * subst.
+        destruct Hrel2 as (i' & j' & Hlt' & Hlookup_i' & Hlookup_j').
+        rewrite lookup_snoc_Some in Hlookup_i'.
+        destruct Hlookup_i' as [(Hlength_i' & Hlookup_i') | (Hlength_i' & Hlookup_i')].
+        -- exfalso.
+           apply Hnot_in.
+           exists e_st'.
+           split; last done.
+           apply elem_of_list_lookup.
+           by exists i'.
+        -- subst.
+           assert (length (lt ++ [e_st']) ≤ j') as Hfalse.
+           {
+             rewrite last_length.
+             lia.
+           }
+           apply lookup_ge_None_2 in Hfalse.
+           set_solver.
+    + subst.
+      assert (length (lt ++ [e_st]) ≤ j) as Hfalse.
+      {
+        rewrite last_length.
+        lia.
+      }
+      apply lookup_ge_None_2 in Hfalse.
+      set_solver.
+Qed.
+
+Lemma no_later_start_or_commit_impl e e' c c' lt: 
+  connOfEvent e = Some c →
+  connOfEvent e' = Some c' →
+  c ≠ c' →
+  no_later_start_or_commit c e lt →
+  no_later_start_or_commit c e (lt ++ [e']).
+Proof.
+  intros Heq1 Heq2 Hneq Hlater.
+  intros (e'' & Hconn & Hrel & HOr).
+  apply Hlater.
+  exists e''.
+  split; first done.
+  split; last done.
+  destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
+  rewrite lookup_app_Some in Hlookup_i.
+  destruct Hlookup_i as [Hlookup_i | (Hlength & Hlookup_i)].
+  - rewrite lookup_app_Some in Hlookup_j.
+    destruct Hlookup_j as [Hlookup_j | (Hlength & Hlookup_j)].
+    + by exists i, j.
+    + assert (e' = e'') as ->; last set_solver.
+      rewrite list_lookup_singleton_Some in Hlookup_j.
+      set_solver.
+  - assert (e' = e) as ->; last set_solver.
+    rewrite list_lookup_singleton_Some in Hlookup_i.
+    set_solver.
+Qed.
+
+Lemma prior_init_imp1 c lt i e :
+  prior_init i c lt →
+  prior_init i c (lt ++ [e]).
+Proof.
+  intros (e' & j & Hin & Hconn & Hinit & Hleq).
+  exists e', j.
+  split_and!; try done.
+  by apply lookup_app_l_Some.
+Qed.
+
+Lemma prior_init_imp2 e e' lt c c' i :
+  (∃ e, e ∈ lt ∧ connOfEvent e = Some c ∧ is_in_lin_event e) →
+  connOfEvent e' = Some c' →
+  connOfEvent e = Some c →
+  valid_sequence lt →
+  (lt ++ [e]) !! i = Some e' →
+  prior_init i c' (lt ++ [e]).
+Proof.
+  intros (e_init & Hin & Hconn'' & Hinit) Hconn Hconn' (Hvalid & _) Hlookup_i.
+  rewrite lookup_app_Some in Hlookup_i.
+  destruct Hlookup_i as [Hlookup_i | (Hlength & Hlookup_i)].
+  - apply prior_init_imp1. 
+    by eapply Hvalid.
+  - apply elem_of_list_lookup in Hin as (j & Hlookup_j).
+    exists e_init, j.
+    apply list_lookup_singleton_Some in Hlookup_i.
+    assert (e = e') as ->; first set_solver.
+    assert (c = c') as ->; first set_solver.
+    split_and!; try set_solver.
+    + apply lookup_app_Some.
+      eauto.
+    + apply lookup_lt_Some in Hlookup_j.
+      lia.
+Qed.
+
+Lemma unique_init_events_imp lt e : 
+  (¬is_in_lin_event e) →
+  unique_init_events lt →
+  unique_init_events (lt ++ [e]).
+Proof.
+  intros Hnot Hunique.
+  intros e1 e2 c i j Hlookup_i Hevent Hconn Hlookup_j Hevent' Hconn'.
+  rewrite lookup_snoc_Some in Hlookup_i.
+  destruct Hlookup_i as [(_ & Hlookup_i)|(_ & ->)]; last done.
+  rewrite lookup_snoc_Some in Hlookup_j.
+  destruct Hlookup_j as [(_ & Hlookup_j)|(_ & ->)]; last done.  
+  by eapply Hunique.
+Qed.
+
+Definition open_start (c : val) (ltrace tail : list val) : Prop := 
+  ∃ le l, ltrace = l ++ [le] ++ tail ∧
+    commit_closed c l ∧
+    (∃ (tag : string), le = (#tag, (c, #"StLin"))%V) ∧
+    (∀ le', le' ∈ tail → connOfEvent le' = Some c → 
+            (is_wr_lin_event le' ∨ is_rd_lin_event le')).
+
+Lemma prior_start_imp le c e lt tag :
+  tagOfEvent le = Some tag →
+  ¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag) →
+  (¬is_cm_lin_event le) →
+  prior_start c e lt →
+  prior_start c e (lt ++ [le]).
+Proof.
+  intros Htag Hnot1 Hnot2 (e_st & Hconn & Hstart & Hrel & Hnot').
+  exists e_st.
+  do 2 (split; first done).
+  split; first by apply rel_list_imp.
+  intros (e_cm & Hconn' & Hcom & Hrel1 & Hrel2).
+  apply Hnot'.
+  exists e_cm.
+  do 2 (split; first done).
+  split.
+  - apply rel_list_last_neq in Hrel1; first done.
+    by intros ->.
+  - subst.
+    apply rel_list_last_neq in Hrel2; first done.
+    intros ->.
+    destruct Hrel as (i & j & _ & _ & Hlookup_j).
+    apply Hnot1.
+    exists e.
+    split; last done.
+    apply elem_of_list_lookup.
+    by exists j.
+Qed.
+
+Lemma later_commit_imp c lt le le' :
+  (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le) →
+  later_commit c le' lt →
+  later_commit c le' (lt ++ [le]).
+Proof.
+  intros Hdisj (e_cm & Hconn & Hevent & Hrel & Hnot).
+  exists e_cm.
+  split_and!; try done.
+  - by apply rel_list_imp.
+  - intros (e_st & Hconn' & Hevent' & Hrel1 & Hrel2).
+    apply Hnot.
+    exists e_st.
+    do 2 (split; first done).
+    split.
+    all : apply (rel_list_last_neq _ _ _ le); last done.
+    all : intros ->.
+    all : rewrite /is_wr_lin_event /is_rd_lin_event 
+            /is_in_lin_event in Hdisj.
+    all : rewrite /is_cm_lin_event in Hevent.
+    all : rewrite /is_st_lin_event in Hevent'.
+    all : set_solver.
+Qed.
+
+Lemma no_later_start_or_commit_wr_rd_imp le c e lt : 
+  (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le) →
+  no_later_start_or_commit c e lt →
+  no_later_start_or_commit c e (lt ++ [le]).
+Proof.
+  intros Hdisj Hlater.
+  intros (e' & Hconn & Hrel & Hevent).
+  apply Hlater.
+  exists e'.
+  split_and!; try done.
+  apply (rel_list_last_neq _ _ _ le); last done.
+  intros ->.
+  rewrite /is_wr_lin_event /is_rd_lin_event /is_in_lin_event in Hdisj.
+  rewrite /is_cm_lin_event /is_st_lin_event in Hevent.
+  set_solver.
 Qed.
 
 Lemma lin_trace_valid : 
@@ -788,153 +1057,105 @@ Proof.
             [[tag'' [c'' [k'' [v'' ->]]]]|[[tag'' [c'' [b'' ->]]]|[tag'' [c'' ->]]]]]]; by simpl in Hlinpre.
 Qed.
 
-Lemma later_commit_impl c e_st lt e tag: 
-  tagOfEvent e = Some tag →
-  is_st_lin_event e →
-  (¬∃ e', e' ∈ lt ∧ tagOfEvent e' = Some tag) →
-  later_commit c e_st lt →
-  later_commit c e_st (lt ++ [e]).
+Lemma lin_trace_lin lt e_pre e_lin (tag : string) c t :
+  e_pre ∈ t →
+  is_pre_event e_pre →
+  is_lin_event e_lin →
+  linToPre e_lin = Some e_pre → 
+  connOfEvent e_lin = Some c →
+  tagOfEvent e_lin = Some tag →
+  tagOfEvent e_pre = Some tag →
+  (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
+  (¬∃ e, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag) →
+  lin_trace_of lt t →
+  lin_trace_of (lt ++ [e_lin]) t.
 Proof.
-  rewrite /later_commit.
-  intros Htag His_st Hnot_in (e_cm & Hconn & Hevent & Hrel & Hnot).
-  exists e_cm.
-  split_and!; try done.
-  - destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
-    exists i, j.
-    split; first done.
-    split; apply lookup_app_Some; by left.
-  - intros (e_st' & Hconn' & Hevent' & Hrel1 & Hrel2).
-    apply Hnot.
-    exists e_st'.
-    do 2 (split; first done).
-    destruct Hrel1 as (i & j & Hlt & Hlookup_i & Hlookup_j).
+  intros Hpre_in His_pre His_lin Hlin_to_pre Hconn Htag Htag' Hnot1 Hnot2 H.
+  destruct H as (?&?&?&?&?).
+  split.
+  {
+    intros le Hin.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin | Hin].
+    - by apply H.
+    - assert (le = e_lin) as <-; set_solver.
+  }
+  split.
+  {
+    intros e_post Hin le Hpost_lin.
+    rewrite elem_of_app.
+    left.
+    apply (H0 e_post Hin le Hpost_lin).
+  }
+  split.
+  {
+    intros le Hin.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin | Hin].
+    - apply (H1 le Hin).
+    - exists e_pre.
+      assert (le = e_lin) as <-; first set_solver.
+      do 3 (split; first done).
+      intros e_post (Hpost_in & His_post & Hfalse).
+      exfalso.
+      apply Hnot2.
+      exists e_post.
+      do 2 (split; first done).
+      by apply (tag_pre_post e_pre e_post).
+  }
+  split.
+  { 
+    intros le1 le2 Hrel.
+    destruct Hrel as [i [j (Hlt & Hlookup_i & Hlookup_j)]].
     rewrite lookup_snoc_Some in Hlookup_i.
-    destruct Hlookup_i as [(Hlength_i & Hlookup_i) | (Hlength_i & Hlookup_i)].
-    + rewrite lookup_snoc_Some in Hlookup_j.
-      destruct Hlookup_j as [(Hlength_j & Hlookup_j) | (Hlength_j & Hlookup_j)].
-      * split; first by exists i, j.
-        destruct Hrel2 as (i' & j' & Hlt' & Hlookup_i' & Hlookup_j').
-        rewrite lookup_snoc_Some in Hlookup_i'.
-        destruct Hlookup_i' as [(Hlength_i' & Hlookup_i') | (Hlength_i' & Hlookup_i')].
-        -- rewrite lookup_snoc_Some in Hlookup_j'.
-           destruct Hlookup_j' as [(Hlength_j' & Hlookup_j') | (Hlength_j' & Hlookup_j')];
-            first by exists i', j'.
-          subst.
-          rewrite /is_st_lin_event in His_st.
-          rewrite /is_cm_lin_event in Hevent.
-          set_solver.
-        -- subst.
-           rewrite lookup_snoc_Some in Hlookup_j'.
-           destruct Hlookup_j' as [(Hlength_j' & Hlookup_j') | (Hlength_j' & Hlookup_j')].
-           ++ assert (length lt ≤ j) as Hfalse; first lia.
-              apply lookup_ge_None_2 in Hfalse.
-              set_solver.
-           ++ subst.
-              destruct Hevent as (tag' & c' & b' & ->).
-              rewrite /is_st_lin_event in Hevent'.
-              set_solver.
-      * subst.
-        destruct Hrel2 as (i' & j' & Hlt' & Hlookup_i' & Hlookup_j').
-        rewrite lookup_snoc_Some in Hlookup_i'.
-        destruct Hlookup_i' as [(Hlength_i' & Hlookup_i') | (Hlength_i' & Hlookup_i')].
-        -- exfalso.
-           apply Hnot_in.
-           exists e_st'.
-           split; last done.
-           apply elem_of_list_lookup.
-           by exists i'.
-        -- subst.
-           assert (length (lt ++ [e_st']) ≤ j') as Hfalse.
-           {
-             rewrite last_length.
-             lia.
-           }
-           apply lookup_ge_None_2 in Hfalse.
-           set_solver.
-    + subst.
-      assert (length (lt ++ [e_st]) ≤ j) as Hfalse.
-      {
-        rewrite last_length.
-        lia.
-      }
-      apply lookup_ge_None_2 in Hfalse.
-      set_solver.
-Qed.
-
-Lemma no_later_start_or_commit_impl e e' c c' lt: 
-  connOfEvent e = Some c →
-  connOfEvent e' = Some c' →
-  c ≠ c' →
-  no_later_start_or_commit c e lt →
-  no_later_start_or_commit c e (lt ++ [e']).
-Proof.
-  intros Heq1 Heq2 Hneq Hlater.
-  intros (e'' & Hconn & Hrel & HOr).
-  apply Hlater.
-  exists e''.
-  split; first done.
-  split; last done.
-  destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
+    destruct Hlookup_i as [(Hlength & Hlookup_i) | (Hlength & Hlookup_i)].
+    - rewrite lookup_snoc_Some in Hlookup_j.
+      destruct Hlookup_j as [(Hlength' & Hlookup_j) | (Hlength' & Hlookup_j)]. 
+      + apply H2.
+        by exists i, j.
+      + intros (e1_pre & e2_post & (_ & Hlin_post & Hrel)).
+        apply Hnot2.
+        exists e2_post.
+        subst.
+        simpl in Hlin_post.
+        split.
+        * destruct Hrel as [i' [_ (_ & Hlookup_i' & _)]].
+          apply elem_of_list_lookup.
+          by exists i'.
+        * by apply (lin_to_post le2); done.
+    - rewrite lookup_snoc_Some in Hlookup_j.
+      destruct Hlookup_j as [(Hlength' & Hlookup_j) | (Hlength' & Hlookup_j)]; lia.
+  }
+  intros le1 le2 i j tag' Hlookup_i Hlookup_j Htag_le1 Htag_le2.
   rewrite lookup_app_Some in Hlookup_i.
-  destruct Hlookup_i as [Hlookup_i | (Hlength & Hlookup_i)].
-  - rewrite lookup_app_Some in Hlookup_j.
-    destruct Hlookup_j as [Hlookup_j | (Hlength & Hlookup_j)].
-    + by exists i, j.
-    + assert (e' = e'') as ->; last set_solver.
+  rewrite lookup_app_Some in Hlookup_j.
+  destruct Hlookup_i as [Hlookup_i | (Hlength_i & Hlookup_i)].
+  - destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
+    + apply (H3 le1 le2 i j tag' Hlookup_i Hlookup_j Htag_le1 Htag_le2).
+    + exfalso.
+      apply Hnot1. 
+      exists le1.
+      split.
+      * apply elem_of_list_lookup.
+        by exists i.
+      * apply list_lookup_singleton_Some in Hlookup_j.
+        destruct Hlookup_j as (_ & <-).
+        simpl in Htag_le2.
+        set_solver.
+  - destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
+    + exfalso.
+      apply Hnot1. 
+      exists le2.
+      split.
+      * apply elem_of_list_lookup.
+        by exists j.
+      * apply list_lookup_singleton_Some in Hlookup_i.
+        destruct Hlookup_i as (_ & <-).
+        simpl in Htag_le1.
+        set_solver.
+    + rewrite list_lookup_singleton_Some in Hlookup_i.
       rewrite list_lookup_singleton_Some in Hlookup_j.
-      set_solver.
-  - assert (e' = e) as ->; last set_solver.
-    rewrite list_lookup_singleton_Some in Hlookup_i.
-    set_solver.
-Qed.
-
-Lemma prior_init_imp1 c lt i e :
-  prior_init i c lt →
-  prior_init i c (lt ++ [e]).
-Proof.
-  intros (e' & j & Hin & Hconn & Hinit & Hleq).
-  exists e', j.
-  split_and!; try done.
-  by apply lookup_app_l_Some.
-Qed.
-
-Lemma prior_init_imp2 e e' lt c c' i :
-  (∃ e, e ∈ lt ∧ connOfEvent e = Some c ∧ is_in_lin_event e) →
-  connOfEvent e' = Some c' →
-  connOfEvent e = Some c →
-  valid_sequence lt →
-  (lt ++ [e]) !! i = Some e' →
-  prior_init i c' (lt ++ [e]).
-Proof.
-  intros (e_init & Hin & Hconn'' & Hinit) Hconn Hconn' (Hvalid & _) Hlookup_i.
-  rewrite lookup_app_Some in Hlookup_i.
-  destruct Hlookup_i as [Hlookup_i | (Hlength & Hlookup_i)].
-  - apply prior_init_imp1. 
-    by eapply Hvalid.
-  - apply elem_of_list_lookup in Hin as (j & Hlookup_j).
-    exists e_init, j.
-    apply list_lookup_singleton_Some in Hlookup_i.
-    assert (e = e') as ->; first set_solver.
-    assert (c = c') as ->; first set_solver.
-    split_and!; try set_solver.
-    + apply lookup_app_Some.
-      eauto.
-    + apply lookup_lt_Some in Hlookup_j.
       lia.
-Qed.
-
-Lemma unique_init_events_imp lt e : 
-  (¬is_in_lin_event e) →
-  unique_init_events lt →
-  unique_init_events (lt ++ [e]).
-Proof.
-  intros Hnot Hunique.
-  intros e1 e2 c i j Hlookup_i Hevent Hconn Hlookup_j Hevent' Hconn'.
-  rewrite lookup_snoc_Some in Hlookup_i.
-  destruct Hlookup_i as [(_ & Hlookup_i)|(_ & ->)]; last done.
-  rewrite lookup_snoc_Some in Hlookup_j.
-  destruct Hlookup_j as [(_ & Hlookup_j)|(_ & ->)]; last done.  
-  by eapply Hunique.
 Qed.
 
 Lemma valid_sequence_st_lin lt tag c : 
@@ -1059,82 +1280,6 @@ Proof.
             lia.
 Qed.
 
-Definition open_start (c : val) (ltrace tail : list val) : Prop := 
-  ∃ le l, ltrace = l ++ [le] ++ tail ∧
-    commit_closed c l ∧
-    (∃ (tag : string), le = (#tag, (c, #"StLin"))%V) ∧
-    (∀ le', le' ∈ tail → connOfEvent le' = Some c → 
-            (is_wr_lin_event le' ∨ is_rd_lin_event le')).
-
-Lemma prior_start_imp le c e lt tag :
-  tagOfEvent le = Some tag →
-  ¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag) →
-  (¬is_cm_lin_event le) →
-  prior_start c e lt →
-  prior_start c e (lt ++ [le]).
-Proof.
-  intros Htag Hnot1 Hnot2 (e_st & Hconn & Hstart & Hrel & Hnot').
-  exists e_st.
-  do 2 (split; first done).
-  split; first by apply rel_list_imp.
-  intros (e_cm & Hconn' & Hcom & Hrel1 & Hrel2).
-  apply Hnot'.
-  exists e_cm.
-  do 2 (split; first done).
-  split.
-  - apply rel_list_last_neq in Hrel1; first done.
-    by intros ->.
-  - subst.
-    apply rel_list_last_neq in Hrel2; first done.
-    intros ->.
-    destruct Hrel as (i & j & _ & _ & Hlookup_j).
-    apply Hnot1.
-    exists e.
-    split; last done.
-    apply elem_of_list_lookup.
-    by exists j.
-Qed.
-
-Lemma later_commit_imp c lt le le' :
-  (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le) →
-  later_commit c le' lt →
-  later_commit c le' (lt ++ [le]).
-Proof.
-  intros Hdisj (e_cm & Hconn & Hevent & Hrel & Hnot).
-  exists e_cm.
-  split_and!; try done.
-  - by apply rel_list_imp.
-  - intros (e_st & Hconn' & Hevent' & Hrel1 & Hrel2).
-    apply Hnot.
-    exists e_st.
-    do 2 (split; first done).
-    split.
-    all : apply (rel_list_last_neq _ _ _ le); last done.
-    all : intros ->.
-    all : rewrite /is_wr_lin_event /is_rd_lin_event 
-            /is_in_lin_event in Hdisj.
-    all : rewrite /is_cm_lin_event in Hevent.
-    all : rewrite /is_st_lin_event in Hevent'.
-    all : set_solver.
-Qed.
-
-Lemma no_later_start_or_commit_wr_rd_imp le c e lt : 
-  (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le) →
-  no_later_start_or_commit c e lt →
-  no_later_start_or_commit c e (lt ++ [le]).
-Proof.
-  intros Hdisj Hlater.
-  intros (e' & Hconn & Hrel & Hevent).
-  apply Hlater.
-  exists e'.
-  split_and!; try done.
-  apply (rel_list_last_neq _ _ _ le); last done.
-  intros ->.
-  rewrite /is_wr_lin_event /is_rd_lin_event /is_in_lin_event in Hdisj.
-  rewrite /is_cm_lin_event /is_st_lin_event in Hevent.
-  set_solver.
-Qed.
-
 Lemma valid_sequence_wr_rd_lin le lt (tag : string) c tail :
   (∃ e, e ∈ lt ∧ connOfEvent e = Some c ∧ is_in_lin_event e) →
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
@@ -1250,139 +1395,51 @@ Proof.
         set_solver.
 Qed.
 
-Lemma tag_pre_post e_pre e_post tag :
-  tagOfEvent e_pre = Some tag →
-  is_post_event e_post →
-  postToPre e_post = Some e_pre →
-  tagOfEvent e_post = Some tag.
-Proof.
-  intros Htag Hpost Hpost_pre.
-  destruct Hpost as [[tag' [c' ->]] | [[[tag' [c' [k' [v' ->]]]]| [tag' [k' [c' ->]]]] 
-    | [[tag' [c' [k' [v' ->]]]]|[[tag' [c' [b' ->]]]|[tag' [c' ->]]]]]].
-  all : simpl in Hpost_pre.
-  all : inversion Hpost_pre.
-  all : by subst.
-Qed.
-
-Lemma lin_to_post le tag e_post :
-  is_lin_event le →
-  tagOfEvent le = Some tag →
-  linToPost le = Some e_post →
-  (is_post_event e_post ∧ tagOfEvent e_post = Some tag).
-Proof.
-  intros Hlin Htag Hlin_post.
-  rewrite /is_lin_event in Hlin.
-  destruct Hlin as [[tag' [c' ->]] | [[[tag' [c' [k' [v' ->]]]]| [tag' [k' [c' ->]]]] 
-    | [[tag' [c' [k' [v' ->]]]] | [[tag' [c' [b' ->]]] | [tag' [c' ->]]]]]].
-  all : simpl in Hlin_post.
-  all : inversion Hlin_post.
-  all : subst.
-  all : split; last done.
-  all : rewrite /is_post_event /is_st_post_event 
-          /is_in_post_event /is_rd_post_event 
-          /is_wr_post_event /is_cm_post_event; eauto;
-        set_solver.
-  Qed.
-
-Lemma lin_trace_lin lt e_pre e_lin (tag : string) c t :
-  e_pre ∈ t →
-  is_pre_event e_pre →
-  is_lin_event e_lin →
-  linToPre e_lin = Some e_pre → 
-  connOfEvent e_lin = Some c →
-  tagOfEvent e_lin = Some tag →
-  tagOfEvent e_pre = Some tag →
+Lemma valid_sequence_in_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
-  (¬∃ e, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag) →
-  lin_trace_of lt t →
-  lin_trace_of (lt ++ [e_lin]) t.
+  unique_init_events (lt ++ [(#tag, (c, #"InLin"))%V]) →
+  valid_sequence lt → 
+  valid_sequence (lt ++ [(#tag, (c, #"InLin"))%V]).
 Proof.
-  intros Hpre_in His_pre His_lin Hlin_to_pre Hconn Htag Htag' Hnot1 Hnot2 H.
-  destruct H as (?&?&?&?&?).
-  split.
-  {
-    intros le Hin.
-    rewrite elem_of_app in Hin.
-    destruct Hin as [Hin | Hin].
-    - by apply H.
-    - assert (le = e_lin) as <-; set_solver.
-  }
-  split.
-  {
-    intros e_post Hin le Hpost_lin.
-    rewrite elem_of_app.
-    left.
-    apply (H0 e_post Hin le Hpost_lin).
-  }
-  split.
-  {
-    intros le Hin.
-    rewrite elem_of_app in Hin.
-    destruct Hin as [Hin | Hin].
-    - apply (H1 le Hin).
-    - exists e_pre.
-      assert (le = e_lin) as <-; first set_solver.
-      do 3 (split; first done).
-      intros e_post (Hpost_in & His_post & Hfalse).
-      exfalso.
-      apply Hnot2.
-      exists e_post.
-      do 2 (split; first done).
-      by apply (tag_pre_post e_pre e_post).
-  }
-  split.
-  { 
-    intros le1 le2 Hrel.
-    destruct Hrel as [i [j (Hlt & Hlookup_i & Hlookup_j)]].
-    rewrite lookup_snoc_Some in Hlookup_i.
-    destruct Hlookup_i as [(Hlength & Hlookup_i) | (Hlength & Hlookup_i)].
-    - rewrite lookup_snoc_Some in Hlookup_j.
-      destruct Hlookup_j as [(Hlength' & Hlookup_j) | (Hlength' & Hlookup_j)]. 
-      + apply H2.
-        by exists i, j.
-      + intros (e1_pre & e2_post & (_ & Hlin_post & Hrel)).
-        apply Hnot2.
-        exists e2_post.
-        subst.
-        simpl in Hlin_post.
-        split.
-        * destruct Hrel as [i' [_ (_ & Hlookup_i' & _)]].
-          apply elem_of_list_lookup.
-          by exists i'.
-        * by apply (lin_to_post le2); done.
-    - rewrite lookup_snoc_Some in Hlookup_j.
-      destruct Hlookup_j as [(Hlength' & Hlookup_j) | (Hlength' & Hlookup_j)]; lia.
-  }
-  intros le1 le2 i j tag' Hlookup_i Hlookup_j Htag_le1 Htag_le2.
-  rewrite lookup_app_Some in Hlookup_i.
-  rewrite lookup_app_Some in Hlookup_j.
-  destruct Hlookup_i as [Hlookup_i | (Hlength_i & Hlookup_i)].
-  - destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
-    + apply (H3 le1 le2 i j tag' Hlookup_i Hlookup_j Htag_le1 Htag_le2).
-    + exfalso.
-      apply Hnot1. 
-      exists le1.
-      split.
-      * apply elem_of_list_lookup.
-        by exists i.
-      * apply list_lookup_singleton_Some in Hlookup_j.
-        destruct Hlookup_j as (_ & <-).
-        simpl in Htag_le2.
-        set_solver.
-  - destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
-    + exfalso.
-      apply Hnot1. 
-      exists le2.
-      split.
-      * apply elem_of_list_lookup.
-        by exists j.
-      * apply list_lookup_singleton_Some in Hlookup_i.
-        destruct Hlookup_i as (_ & <-).
-        simpl in Htag_le1.
-        set_solver.
+  intros Hnot Hunique (Hvalid1 & Hvalid2 & Hvalid3 & Hvalid4).
+  split_and!; try done.
+  - intros e c' i Hlookup_i Hconn.
+    rewrite lookup_app_Some in Hlookup_i.
+    destruct Hlookup_i as [Hlookup_i|(Hlength_i & Hlookup_i)].
+    + apply prior_init_imp1.
+      set_solver.
     + rewrite list_lookup_singleton_Some in Hlookup_i.
-      rewrite list_lookup_singleton_Some in Hlookup_j.
-      lia.
+      destruct Hlookup_i as (Hlength & <-).
+      exists (#tag, (c, #"InLin"))%V, (length lt); split_and!; try done.
+      * assert (Init.Nat.pred (length (lt ++ [(#tag, (c, #"InLin"))%V])) =
+          length lt) as <-. 
+           {
+            rewrite last_length.
+            lia.
+           } 
+          rewrite -last_lookup.
+          by rewrite last_snoc.
+      * rewrite /is_in_lin_event; set_solver.
+  - intros e c' Hin Hconn Hevent.
+    apply (prior_start_imp _ _ _ _ tag); 
+      rewrite /is_cm_lin_event; try set_solver.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin|Hin]; first set_solver.
+    rewrite /is_rd_lin_event /is_wr_lin_event /is_cm_lin_event in Hevent.
+    set_solver.
+  - intros e_st c' Hin Hconn Hevent.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin|Hin]; 
+      rewrite /is_st_lin_event in Hevent; last set_solver.
+    destruct (Hvalid4 e_st c' Hin Hconn Hevent) as [Hlater | Hno_later].
+    + left.
+      apply later_commit_imp; try done.
+      rewrite /is_in_lin_event; set_solver.
+    + right.
+      destruct (decide (c = c')) as [<-|Hneq].
+      * apply no_later_start_or_commit_wr_rd_imp; try done.
+        rewrite /is_in_lin_event; set_solver.
+      * by eapply no_later_start_or_commit_impl.
 Qed.
 
 Lemma extraction_of_add1 lt T le op : 
@@ -1482,6 +1539,53 @@ Proof.
       apply (Hextract2 t' op1 op2); set_solver.
 Qed.
 
+Lemma extraction_of_not_tag t lt tag T : 
+  (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
+  t ∈ T →
+  extraction_of lt T →
+  (¬∃ op, op ∈ t ∧ tagOfOp op = tag).
+Proof.
+  intros Hnot Hin Hextract.
+  intros (op & Hop_in & Htag).
+  apply Hnot.
+  destruct Hextract as (_ & Hextract & _).
+  specialize (Hextract t op Hin Hop_in).
+  exists (toLinEvent op); split; first done.
+  by apply tag_event_op.
+Qed.
+
+Lemma extraction_of_add_init_lin le lt T :
+  is_in_lin_event le →
+  extraction_of lt T →
+  extraction_of (lt ++ [le]) T.
+Proof.
+  intros Hevent (Hextract1 & Hextract2 & Hextract3).
+  split_and!.
+  - intros le' op Hin Hlin_op.
+    rewrite elem_of_app in Hin.
+    destruct Hin as [Hin|Hin]; 
+      rewrite /is_in_lin_event in Hevent;
+      set_solver.
+  - set_solver.
+  - intros t op1 op2 Hin Hrel.
+    apply rel_list_imp.
+    set_solver.
+Qed.
+
+Lemma trans_add_non_empty T1 T2 t' (op : operation) :
+  (∀ t, t ∈ T1 ++ t' :: T2 → t ≠ []) →
+  (∀ t, t ∈ T1 ++ (t' ++ [op]) :: T2 → t ≠ []).
+Proof.
+  intros Hhyp t Ht_in.
+  specialize (Hhyp t).
+  rewrite elem_of_app in Ht_in.
+  destruct Ht_in as [Ht_in | Ht_in]; first set_solver.
+  apply elem_of_cons in Ht_in.
+  destruct Ht_in as [-> | Ht_in]; last set_solver.
+  apply (elem_of_not_nil op).
+  set_solver.
+Qed.
+
 Lemma valid_transaction_singleton op : 
   valid_transaction [op].
 Proof.
@@ -1569,20 +1673,6 @@ Proof.
         assert (j = length T) as ->; last lia.
         rewrite Nat.sub_0_le in Heq'.
         apply Nat.le_antisymm; done.
-Qed.
-
-Lemma trans_add_non_empty T1 T2 t' (op : operation) :
-  (∀ t, t ∈ T1 ++ t' :: T2 → t ≠ []) →
-  (∀ t, t ∈ T1 ++ (t' ++ [op]) :: T2 → t ≠ []).
-Proof.
-  intros Hhyp t Ht_in.
-  specialize (Hhyp t).
-  rewrite elem_of_app in Ht_in.
-  destruct Ht_in as [Ht_in | Ht_in]; first set_solver.
-  apply elem_of_cons in Ht_in.
-  destruct Ht_in as [-> | Ht_in]; last set_solver.
-  apply (elem_of_not_nil op).
-  set_solver.
 Qed.
 
 Lemma valid_transaction_add_op t op c tag : 
@@ -1838,94 +1928,4 @@ Proof.
            ++ eapply Hvalid; try done; apply lookup_app_Some; right.
               all : split; first lia.
               all : apply lookup_cons_Some; eauto.
-Qed.
-
-Lemma tag_event_op op tag :
-  tagOfOp op = tag →
-  tagOfEvent (toLinEvent op) = Some tag.
-Proof.
-  intro Htag.
-  destruct op as [(tag', c) k ov | (tag', c) k v | (tag', c) b]; 
-    try set_solver.
-  destruct ov as [v|]; set_solver.
-Qed.
-
-Lemma extraction_of_not_tag t lt tag T : 
-  (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
-  t ∈ T →
-  extraction_of lt T →
-  (¬∃ op, op ∈ t ∧ tagOfOp op = tag).
-Proof.
-  intros Hnot Hin Hextract.
-  intros (op & Hop_in & Htag).
-  apply Hnot.
-  destruct Hextract as (_ & Hextract & _).
-  specialize (Hextract t op Hin Hop_in).
-  exists (toLinEvent op); split; first done.
-  by apply tag_event_op.
-Qed.
-
-Lemma extraction_of_add_init_lin le lt T :
-  is_in_lin_event le →
-  extraction_of lt T →
-  extraction_of (lt ++ [le]) T.
-Proof.
-  intros Hevent (Hextract1 & Hextract2 & Hextract3).
-  split_and!.
-  - intros le' op Hin Hlin_op.
-    rewrite elem_of_app in Hin.
-    destruct Hin as [Hin|Hin]; 
-      rewrite /is_in_lin_event in Hevent;
-      set_solver.
-  - set_solver.
-  - intros t op1 op2 Hin Hrel.
-    apply rel_list_imp.
-    set_solver.
-Qed.
-
-Lemma valid_sequence_in_lin lt tag c : 
-  (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
-  unique_init_events (lt ++ [(#tag, (c, #"InLin"))%V]) →
-  valid_sequence lt → 
-  valid_sequence (lt ++ [(#tag, (c, #"InLin"))%V]).
-Proof.
-  intros Hnot Hunique (Hvalid1 & Hvalid2 & Hvalid3 & Hvalid4).
-  split_and!; try done.
-  - intros e c' i Hlookup_i Hconn.
-    rewrite lookup_app_Some in Hlookup_i.
-    destruct Hlookup_i as [Hlookup_i|(Hlength_i & Hlookup_i)].
-    + apply prior_init_imp1.
-      set_solver.
-    + rewrite list_lookup_singleton_Some in Hlookup_i.
-      destruct Hlookup_i as (Hlength & <-).
-      exists (#tag, (c, #"InLin"))%V, (length lt); split_and!; try done.
-      * assert (Init.Nat.pred (length (lt ++ [(#tag, (c, #"InLin"))%V])) =
-          length lt) as <-. 
-           {
-            rewrite last_length.
-            lia.
-           } 
-          rewrite -last_lookup.
-          by rewrite last_snoc.
-      * rewrite /is_in_lin_event; set_solver.
-  - intros e c' Hin Hconn Hevent.
-    apply (prior_start_imp _ _ _ _ tag); 
-      rewrite /is_cm_lin_event; try set_solver.
-    rewrite elem_of_app in Hin.
-    destruct Hin as [Hin|Hin]; first set_solver.
-    rewrite /is_rd_lin_event /is_wr_lin_event /is_cm_lin_event in Hevent.
-    set_solver.
-  - intros e_st c' Hin Hconn Hevent.
-    rewrite elem_of_app in Hin.
-    destruct Hin as [Hin|Hin]; 
-      rewrite /is_st_lin_event in Hevent; last set_solver.
-    destruct (Hvalid4 e_st c' Hin Hconn Hevent) as [Hlater | Hno_later].
-    + left.
-      apply later_commit_imp; try done.
-      rewrite /is_in_lin_event; set_solver.
-    + right.
-      destruct (decide (c = c')) as [<-|Hneq].
-      * apply no_later_start_or_commit_wr_rd_imp; try done.
-        rewrite /is_in_lin_event; set_solver.
-      * by eapply no_later_start_or_commit_impl.
 Qed.
