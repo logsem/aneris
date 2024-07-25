@@ -11,19 +11,19 @@ Definition wrap_start (start : val) : val :=
   λ: "cst", 
   let: "tag" := Fresh (start_pre_emit_event "cst") in 
   start "cst" ;;
-  Emit ("tag" , start_post_emit_event "cst").
+  Emit ("tag", start_post_emit_event "cst").
 
 Definition read_pre_emit_event : val := 
   λ: "cst", ("cst", #"RdPre").
 
 Definition read_post_emit_event : val :=
-  λ: "cst" "key" "vo", ("cst", (#"RdPre", ("key", "vo"))).
+  λ: "cst" "key" "vo", ("cst", (#"RdPost", ("key", "vo"))).
 
 Definition wrap_read (read : val) : val := 
   λ: "cst" "k", 
   let: "tag" := Fresh (read_pre_emit_event "cst") in
   let: "vo" := read "cst" "k" in 
-  Emit ("tag" ,read_post_emit_event "cst" "k" "vo") ;;
+  Emit ("tag", read_post_emit_event "cst" "k" "vo") ;;
   "vo".
 
 Definition write_pre_emit_event : val := 
