@@ -241,9 +241,11 @@ Section trace_proof.
 
   (** Predicates for wrapped resources *)
 
-  Definition latest_write (c : val) (k : Key) (v : val) (ltrace : list val) : Prop := 
-    ∃ le (tag : string), le ∈ ltrace ∧ le = (#tag, (c, (#"WrLin", (#k, v))))%V ∧
-      (∀ le', le' ∈ ltrace → (∃ (tag' : string) v', le' = (#tag', (c, (#"WrLin", (#k, v'))))%V) → le' ≠ le → rel_list ltrace le' le).
+  Definition latest_write (c : val) (k : Key) (ov : option val) (ltrace : list val) : Prop := 
+    (ov = None ∧ (¬ ∃ le v (tag : string), le ∈ ltrace ∧ le = (#tag, (c, (#"WrLin", (#k, v))))%V)) ∨
+    (∃ v, ov = Some v ∧ ∃ le (tag : string), le ∈ ltrace ∧ le = (#tag, (c, (#"WrLin", (#k, v))))%V ∧
+        (∀ le', le' ∈ ltrace →  (∃ (tag' : string) v', le' = (#tag', (c, (#"WrLin", (#k, v'))))%V) → 
+          le' ≠ le → rel_list ltrace le' le)).
 
   Definition tag_eq (e1 e2 : val) : Prop := ∃ tag, tagOfEvent e1 = Some tag ∧ tagOfEvent e2 = Some tag.
 
@@ -254,7 +256,7 @@ Section trace_proof.
     ∃ domain sub_domain tail, ⌜s = Active domain⌝ ∗ 
       ⌜sub_domain = domain ∩ KVS_keys⌝ ∗ ⌜open_start c lt tail⌝ ∗ 
       ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
-      (∀ k, ⌜k ∈ sub_domain⌝ → ∀ v, ⌜m !! k = Some (Some v)⌝ → ⌜latest_write c k v tail⌝).
+      (∀ k, ⌜k ∈ sub_domain⌝ → ∀ ov, ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov tail⌝).
 
   Definition inactive_trace_resources lt s c γ : iProp Σ :=
     ⌜s = CanStart⌝ ∗ ⌜commit_closed c lt⌝ ∗
@@ -397,28 +399,40 @@ Section trace_proof.
     by do 2 rewrite -app_assoc.
   Qed.
 
-  Lemma latest_neq `(res : !RU_resources Mdl Σ) sa sa' c c' tail e k v : 
+  Lemma latest_neq `(res : !RU_resources Mdl Σ) sa sa' c c' tail e k ov : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
     connOfEvent e = Some c →
-    latest_write c' k v tail →
-    latest_write c' k v (tail ++ [e]).
+    latest_write c' k ov tail →
+    latest_write c' k ov (tail ++ [e]).
   Proof.
-    intros Hneq Hextract Hextract' Hconn (le & tag & Hin & -> & Hall).
-    exists (#tag, (c', (#"WrLin", (#k, v))))%V, tag.
-    split; first set_solver.
-    split; first done.
-    intros le' Hin' Hevent Hneq'.
-    rewrite elem_of_app in Hin'.
-    destruct Hin' as [Hin'|Hin']; last set_solver.
-    specialize (Hall le' Hin' Hevent Hneq').
-    by apply rel_list_imp.
+    intros Hneq Hextract Hextract' Hconn 
+      [(-> & Hnot) |(v & -> & le & tag & Hin & -> & Hall)].
+    - left. 
+      split; first done.
+      intros (le & v & tag & Hin & ->).
+      apply Hnot.
+      rewrite elem_of_app in Hin.
+      destruct Hin as [Hin|Hin]; set_solver.
+    - right.
+      exists v.
+      split; first done.
+      exists (#tag, (c', (#"WrLin", (#k, v))))%V, tag.
+      split; first set_solver.
+      split; first done.
+      intros le' Hin' Hevent Hneq'.
+      rewrite elem_of_app in Hin'.
+      destruct Hin' as [Hin'|Hin']; last set_solver.
+      specialize (Hall le' Hin' Hevent Hneq').
+      by apply rel_list_imp.
   Qed.
 
   Lemma latest_write_upd c k v (tag : string) tail :
-    latest_write c k v (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
+    latest_write c k (Some v) (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
   Proof.
+    right.
+    exists v; split; first done.
     exists (#tag, (c, (#"WrLin", (#k, v))))%V, tag.
     split_and!; try set_solver.
     intros le Hin Heq Hneq.
@@ -439,42 +453,62 @@ Section trace_proof.
       by rewrite last_snoc.
   Qed.
 
-  Lemma latest_write_upd_not c k v le tail :
+  Lemma latest_write_upd_not c k ov le tail :
     (¬ is_wr_lin_event le) →
-    latest_write c k v tail →
-    latest_write c k v (tail ++ [le]).
+    latest_write c k ov tail →
+    latest_write c k ov (tail ++ [le]).
   Proof.
-    intros Hnot1 (le' & tag & Hin & -> & Himp).
-    exists (#tag, (c, (#"WrLin", (#k, v))))%V, tag.
-    split_and!; try set_solver.
-    intros le' Hin' Heq Hneq.
-    apply rel_list_imp.
-    apply Himp; try set_solver.
-    rewrite elem_of_app in Hin'.
-    destruct Hin' as [Hin'|Hin']; first done.
-    assert (le' = le) as ->; first set_solver.
-    destruct Heq as (tag' & v' & ->).
-    exfalso.
-    apply Hnot1.
-    rewrite /is_wr_lin_event; eauto.
+    intros Hnot1 
+      [(-> & Hnot) |(v & -> & le' & tag & Hin & -> & Hall)].
+    - left. 
+      split; first done.
+      intros (le' & v & tag & Hin & ->).
+      apply Hnot.
+      rewrite elem_of_app in Hin.
+      destruct Hin as [Hin|Hin]; first set_solver.
+      assert ((#tag, (c, (#"WrLin", (#k, v))))%V = le) as <-; first set_solver.
+      rewrite /is_wr_lin_event in Hnot1.
+      set_solver.
+    - right.
+      exists v; split; first done.
+      exists (#tag, (c, (#"WrLin", (#k, v))))%V, tag.
+      split_and!; try set_solver.
+      intros le' Hin' Heq Hneq.
+      apply rel_list_imp.
+      apply Hall; try set_solver.
+      rewrite elem_of_app in Hin'.
+      destruct Hin' as [Hin'|Hin']; first done.
+      assert (le' = le) as ->; first set_solver.
+      destruct Heq as (tag' & v' & ->).
+      exfalso.
+      apply Hnot1.
+      rewrite /is_wr_lin_event; eauto.
   Qed.
 
-  Lemma latest_write_imp k' k c v' v tail (tag : string) :
+  Lemma latest_write_imp k' k c ov v tail (tag : string) :
     k' ≠ k →
-    latest_write c k' v' tail →
-    latest_write c k' v' (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
+    latest_write c k' ov tail →
+    latest_write c k' ov (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
   Proof.
     intros Hneq Hlatest.
-    destruct Hlatest as (le & tag' & Hin & -> & Himp).
-    exists (#tag', (c, (#"WrLin", (#k', v'))))%V, tag'.
-    split_and!; try done.
-    - set_solver.
-    - intros le' Hin' Hexists Hneq'.
-      rewrite elem_of_app in Hin'.
-      destruct Hin' as [Hin' | Hin'].
-      + specialize (Himp le' Hin' Hexists Hneq').
-        by apply rel_list_imp.
-      + assert (le' = (#tag, (c, (#"WrLin", (#k, v))))%V) as ->; set_solver.
+    destruct Hlatest as [(-> & Hnot) |(v' & -> & le' & tag' & Hin & -> & Himp)].
+    - left. 
+      split; first done. 
+      intros (le' & v' & tag' & Hin & ->).
+      apply Hnot.
+      rewrite elem_of_app in Hin.
+      destruct Hin as [Hin|Hin]; set_solver.
+    - right.
+      exists v'; split; first done.
+      exists (#tag', (c, (#"WrLin", (#k', v'))))%V, tag'.
+      split_and!; try done.
+      + set_solver.
+      + intros le' Hin' Hexists Hneq'.
+        rewrite elem_of_app in Hin'.
+        destruct Hin' as [Hin' | Hin'].
+        * specialize (Himp le' Hin' Hexists Hneq').
+          by apply rel_list_imp.
+        * assert (le' = (#tag, (c, (#"WrLin", (#k, v))))%V) as ->; set_solver.
   Qed.
 
   Lemma unique_init_events_add_init (lt t : list val) (tag : string) (c : val) 
@@ -779,14 +813,14 @@ Section trace_proof.
         by exists tag, k, c, v.
       + iPureIntro.
         simpl.
-        intros k' Hk'_in v' Hlookup'.
+        intros k' Hk'_in ov Hlookup'.
         specialize (Hlatest_keys k' Hk'_in).
         destruct (decide (k' = k)) as [->|Hneq].
           * rewrite lookup_insert in Hlookup'.
-            assert (v = v') as <-; first set_solver.
+            assert (Some v = ov) as <-; first set_solver.
             apply latest_write_upd.
           * rewrite lookup_insert_ne in Hlookup'; last done.
-            specialize (Hlatest_keys v' Hlookup').
+            specialize (Hlatest_keys ov Hlookup').
             apply latest_write_imp; try done.
     - iApply (big_sepS_wand with "[$Hdisj_trace_res]"). 
       iApply big_sepS_intro.
@@ -795,6 +829,15 @@ Section trace_proof.
       iApply (client_trace_state_resources_neq1 sa sa'' c with "[][][][$]"); try done.
       iPureIntro; set_solver.
   Qed.
+
+  (* Lemma read_exists T :
+
+  (∀ v, ⌜v ∈ V⌝ → ∃ lh (tag : string) c,
+    OwnLinHist γl lh ∗ ⌜(#tag, (c0, (#"WrLin", (#k,v))))%V)
+
+  ghost_map_elem γ k (DfracOwn 1%Qp) ov
+
+  ⌜∀ v, wo = Some v → ∃ t s, t ∈ T ∧ Wr s k v ∈ t⌝ *)
 
   (** Per operation implications *)
 
@@ -1176,64 +1219,67 @@ Section trace_proof.
       by rewrite dfrac_valid_own in Hfalse.
     }
     iDestruct "Hkey" as "(Hkey & %Hkey_res)".
-    iAssert (⌜∀ v, wo = Some v → ∃ t' s', t' ∈ T' ∧ Wr s' k v ∈ t'⌝%I) as "%Hread_res_1".
+    iAssert ((⌜∀ v, wo = Some v → ∃ t' s', t' ∈ T' ∧ Wr s' k v ∈ t'⌝ ∗
+            ⌜∃ tail, open_start c lt' tail ∧ latest_write c k vo tail⌝)%I) 
+            as "(%Hread_res_1 & %Hread_res_2)".
     {
-      destruct Hkey_res as [(-> & [(v & -> & Hin_V)|Heq])| (Hneq & ->)].
-      2: rewrite Heq; by iPureIntro.
-      - iDestruct ("Hall" $! v with "[//]") as "(%lh & %tag' & %c' & #Hlh_lin_hist & %Hin_lh)".
-        iAssert (⌜(#tag', (c', (#"WrLin", (#k, v))))%V ∈ lt'⌝%I) as "%Hin_lt'".
-        {
-          iDestruct (own_lin_prefix with "[$HOwnLin' $Hlh_lin_hist]") 
-            as "(HOwnLin' & Hlh_lin_hist' & %Hprefix_lh)".
-          iPureIntro.
-          assert ((#tag', (c', (#"WrLin", (#k, v))))%V ∈ 
-            lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ (Some v)))))%V]) as Hin_lt_app;
-            first by apply (elem_of_prefix _ _ _ Hin_lh Hprefix_lh).
-          rewrite elem_of_app in Hin_lt_app.
-          destruct Hin_lt_app as [Hin_lt | Hin_lt]; set_solver.
-        }
-        iPureIntro.
-        intros v' Heq_some.
-        inversion Heq_some as [Heq_v_v'].
-        rewrite -Heq_v_v'.
-        destruct Hex' as (Hex' & _).
-        destruct (Hex' (#tag', (c', (#"WrLin", (#k, v))))%V (Wr (tag', c') k v) Hin_lt')
-          as (t_wr & Ht_wr_in & Hwr_in); first by simpl.
-        eauto.
-      - iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey_internal]") as "%Hlookup_m".
-        iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_tail &
+      iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey_internal]") as "%Hlookup_m".
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_tail &
           Hkeys & Hkey_info)".
-        destruct vo as [v|]; last done.
-        destruct (decide (k ∈ domain ∩ KVS_keys)) as [Hk_in_dom|Hk_nin_dom].
-        + iAssert (⌜latest_write c k v tail⌝%I) as "%Hlatest_write"; 
-            first by iApply "Hkey_info".
+      destruct (decide (k ∈ domain ∩ KVS_keys)) as [Hk_in_dom|Hk_nin_dom].
+      - iAssert (⌜latest_write c k vo tail⌝%I) as "%Hlatest_write"; 
+            first iApply "Hkey_info"; try done.
+        iSplit; last iPureIntro; last eauto.
+        destruct Hkey_res as [(-> & [(v & -> & Hin_V)|Heq])| (Hneq & ->)].
+        2: rewrite Heq; by iPureIntro.
+        + iDestruct ("Hall" $! v with "[//]") as "(%lh & %tag' & %c' & #Hlh_lin_hist & %Hin_lh)".
+          iAssert (⌜(#tag', (c', (#"WrLin", (#k, v))))%V ∈ lt'⌝%I) as "%Hin_lt'".
+          {
+            iDestruct (own_lin_prefix with "[$HOwnLin' $Hlh_lin_hist]") 
+              as "(HOwnLin' & Hlh_lin_hist' & %Hprefix_lh)".
+            iPureIntro.
+            assert ((#tag', (c', (#"WrLin", (#k, v))))%V ∈ 
+              lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ (Some v)))))%V]) as Hin_lt_app;
+              first by apply (elem_of_prefix _ _ _ Hin_lh Hprefix_lh).
+            rewrite elem_of_app in Hin_lt_app.
+            destruct Hin_lt_app as [Hin_lt | Hin_lt]; set_solver.
+          }
           iPureIntro.
           intros v' Heq_some.
           inversion Heq_some as [Heq_v_v'].
           rewrite -Heq_v_v'.
-          destruct Hlatest_write as (le_wr & tag' & Hin_tail & sdf & asd).
+          destruct Hex' as (Hex' & _).
+          destruct (Hex' (#tag', (c', (#"WrLin", (#k, v))))%V (Wr (tag', c') k v) Hin_lt')
+            as (t_wr & Ht_wr_in & Hwr_in); first by simpl.
+          eauto.
+        + iPureIntro.
+          intros v' Heq_some.
+          inversion Heq_some as [Heq_v_v'].
+          rewrite Heq_v_v' in Hlatest_write.
+          destruct Hlatest_write as [Hfalse |(v & Heq_op & le & tag' & Hin_wr & -> & Hall)];
+            first set_solver.
           destruct Hopen_tail as (le & l & Hlt'_eq & _).
           assert ((#tag', (c, (#"WrLin", (#k, v))))%V ∈ lt') as Hin_lt'; 
             first set_solver.
           destruct Hex' as (Hex' & _).
           destruct (Hex' (#tag', (c, (#"WrLin", (#k, v))))%V (Wr (tag', c) k v) Hin_lt')
             as (t_wr & Ht_wr_in & Hwr_in); first by simpl.
-          eauto.
-        + assert ((KVS_keys ∖ (domain ∩ KVS_keys)) = 
+          assert (v' = v) as ->; set_solver.
+      - assert ((KVS_keys ∖ (domain ∩ KVS_keys)) = 
             {[k]} ∪ ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})) as Heq_k_keys'.
-          {
-            apply union_difference_L.
-            set_solver.
-          }
-          rewrite Heq_k_keys'.
-          rewrite (big_sepS_union _ {[k]} ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})); 
-            last set_solver.
-          iDestruct "Hkeys" as "(Hkeys_k & _)".
-          rewrite big_sepS_singleton.
-          iDestruct "Hkeys_k" as "(%ov & Hkeys_k)".
-          iCombine "Hkeys_k" "Hkey_internal" as "Hfalse".
-          iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
-          by rewrite dfrac_valid_own in Hfalse.
+        {
+          apply union_difference_L.
+          set_solver.
+        }
+        rewrite Heq_k_keys'.
+        rewrite (big_sepS_union _ {[k]} ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})); 
+          last set_solver.
+        iDestruct "Hkeys" as "(Hkeys_k & _)".
+        rewrite big_sepS_singleton.
+        iDestruct "Hkeys_k" as "(%ov & Hkeys_k)".
+        iCombine "Hkeys_k" "Hkey_internal" as "Hfalse".
+        iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+        by rewrite dfrac_valid_own in Hfalse.
     }
     iMod ("Hclose'" with "[Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res 
       HOwnLin' Hpost_res' Hlin_res']").
@@ -1270,7 +1316,44 @@ Section trace_proof.
                ++ iPureIntro.
                   apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
                     first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
-                  ** admit.
+                  ** intros s' k' ov' tag' v' Heq Hin_wr Hnot.
+                     destruct Hread_res_2 as (tail & Hopen_start & Hlatest_write).
+                     destruct Hkey_res as [(-> & Hdisj)| (Hneq & <-)].
+                     --- exfalso.
+                         destruct Hlatest_write as [(_ & Hno_write)|Hfalse]; last set_solver.
+                         apply Hno_write.
+                         exists (#tag', (c, (#"WrLin", (#k, v'))))%V, v', tag'.
+                         split; last done.
+                         assert (k = k') as ->; first set_solver.
+                         destruct Hex' as (Hex'_1 & Hex'_2 & Hex'_3).
+                         assert ((#tag', (c, (#"WrLin", (#k', v'))))%V ∈ lt') as Hin_wr_lt'; 
+                          first by apply (Hex'_2 trans (Wr (tag', c) k' v')).
+                         destruct Hopen_start as (le_st & l & -> & Hclosed 
+                          & (tag_st & ->) & Hopen_rest).
+                         rewrite elem_of_app in Hin_wr_lt'.
+                         destruct Hin_wr_lt' as [Hin_wr_lt'|Hin_wr_lt']; 
+                          last rewrite elem_of_cons in Hin_wr_lt'; last set_solver.
+                         exfalso.
+                         rewrite /commit_closed in Hclosed.
+                         admit.
+                     --- destruct (decide (ov' = Some v')) as [Heq'|Hneq']; first done.
+                         exfalso.
+                         apply Hnot.
+                         destruct wo as [v|]; last done.
+                         destruct Hex' as (Hex'_1 & Hex'_2 & Hex'_3).
+                         destruct Hlatest_write as [Hfalse|(v'' & Heq_some & le & tag & Hi_len & 
+                          -> & Himp)]; first set_solver.
+                         assert (v  = v'') as <-; first set_solver.
+                         assert (k = k') as <-; first set_solver.
+                         destruct Hopen_start as (le_st & l & -> & Hclosed  
+                          & (tag_st & ->) & Hopen_rest).
+                         specialize (Hex'_1 (#tag, (c, (#"WrLin", (#k, v))))%V 
+                           (Wr (tag, c) k v)).
+                         assert (∃ t, t ∈ T1 ++ trans :: T2 ∧ Wr (tag, c) k v ∈ t) as 
+                           (trans' & Htrans'_in & Hwr_in_trans'); 
+                           first apply Hex'_1; [set_solver |  set_solver | ].
+                         exists tag, v.
+                         admit.
                   ** intros s' k' v' Heq_op.
                      destruct (Hread_res_1 v') as (t'' & s'' & Ht''_in); set_solver.
                   ** destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
@@ -1967,9 +2050,13 @@ Section trace_proof.
             iIntros (k Hk_in) "Hkey".
             iExists None.
             iFrame.
-          * iIntros (k' Hk'_dom v Hlookup). 
-            rewrite Hnone in Hlookup; first done.
-            set_solver.
+          * iIntros (k' Hk'_dom ov Hlookup).
+            iPureIntro.
+            destruct ov as [v|].
+            -- rewrite Hnone in Hlookup; first done.
+               set_solver.
+            -- left.
+               set_solver.
       - iApply (big_sepS_wand with "[$Hdisj_trace_res]").
         iApply big_sepS_intro.
         iModIntro.

@@ -1683,8 +1683,8 @@ Lemma valid_transaction_add_op t op c tag :
   (∃ op, op ∈ t ∧ last t = Some op ∧ 
       connOfOp op = c ∧ (¬is_cm_op op)) →
   (∀ s k ov tag1 v1, op = Rd s k ov → (Wr (tag1, c) k v1) ∈ t →
-    (¬∃ tag2 v2, rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
-                 rel_list t (Wr (tag2, c) k v2) op) →
+    (¬∃ tag2 v2, rel_list (t ++ [op]) (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
+                 rel_list (t ++ [op]) (Wr (tag2, c) k v2) op) →
     ov = Some v1) →
   valid_transaction t →
   valid_transaction (t ++ [op]).
@@ -1785,8 +1785,8 @@ Lemma valid_transactions_add2 T1 T2 tag op t c :
   (¬∃op, op ∈ t ∧ tagOfOp op = tag) →
   tagOfOp op = tag →
   (∀ s k ov tag1 v1, op = Rd s k ov → (Wr (tag1, c) k v1) ∈ t →
-    (¬∃ tag2 v2, rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
-                 rel_list t (Wr (tag2, c) k v2) op) →
+    (¬∃ tag2 v2, rel_list (t ++ [op]) (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
+                 rel_list (t ++ [op]) (Wr (tag2, c) k v2) op) →
     ov = Some v1) →
   (∀ s k v, op = Rd s k (Some v) → ∃ t' s', t' ∈ (T1 ++ t :: T2) ∧ Wr s' k v ∈ t') →
   connOfOp op = c → 
@@ -1843,7 +1843,7 @@ Proof.
     rewrite elem_of_cons in Ht'_in.
     destruct Ht'_in as [->|Ht'_in]; last set_solver.
     assert (valid_transaction t); first set_solver.
-    by eapply valid_transaction_add_op.
+    eapply valid_transaction_add_op; try done.
   - intros t1 t2 op1 op2 i j c' Hlookup_i Hlookup_j
       Hlast1 Hlast2 Hconn1 Hconn2 Hcm1 Hcm2.
     destruct Hvalid as (_ & _ & Hvalid).
