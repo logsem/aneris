@@ -127,7 +127,46 @@ Section Model.
   
   (* TODO: find existing definition *)
   Definition rel_compose {A: Type} (R1 R2 : relation A): relation A :=
-    fun x y => exists z, R1 x z /\ R2 z y.   
+    fun x y => exists z, R1 x z /\ R2 z y.
+
+  (* TODO: find existing *)
+  Global Instance rel_subseteq {A: Type}: SubsetEq (relation A) :=
+    fun R1 R2 => forall x y, R1 x y -> R2 x y. 
+  
+  Global Instance rel_compose_mono {A: Type}:
+    Proper (subseteq ==> subseteq ==> subseteq) (@rel_compose A).
+  Proof.
+    red. intros ??????. rewrite /rel_compose.
+    red. intros ?? (?&?&?). eexists. eauto.
+  Qed.
+
+  Lemma rel_compose_nsteps_plus {A: Type} (r: relation A) n m:
+    forall x y,
+    rel_compose (relations.nsteps r n) (relations.nsteps r m) x y <->
+    relations.nsteps r (n + m) x y.
+  Proof using.
+    clear. 
+    intros. 
+  Admitted.
+           
+  Lemma rel_compose_nsteps_next {A: Type} (r: relation A) n:
+    forall x y,
+    rel_compose (relations.nsteps r n) r x y <->
+    relations.nsteps r (S n) x y.
+  Proof using.
+    intros. rewrite -Nat.add_1_r. 
+    rewrite -rel_compose_nsteps_plus.
+    apply exist_proper. intros.
+    apply Morphisms_Prop.and_iff_morphism; auto.
+    split; intros.
+    - by apply nsteps_once.
+    - by apply nsteps_once_inv.
+  Qed.            
+
+  Global Instance rel_subseteq_po {A: Type}: PreOrder (@rel_subseteq A).
+  Proof.
+    rewrite /rel_subseteq. split; eauto.
+  Qed. 
 
   Definition progress_step ps1 θ ps2 :=
     exists n, n <= LIM_STEPS /\
@@ -211,6 +250,64 @@ Section ObligationsRepr.
   Definition threads_own_obls (c: cfg Λ) (δ: mstate OM) :=
     forall ζ, ζ ∈ dom (ps_obls OP δ) -> is_Some (from_locale c.1 ζ).
 
+  Lemma burns_cp_th_obls_pres c τ δ1 δ2 π d
+    (BURN: burns_cp OP δ1 τ δ2 π d)
+    (TH_OWN: threads_own_obls c δ1):
+    threads_own_obls c δ2.
+  Proof.
+    inversion BURN; subst.
+    by destruct δ1.
+  Qed.
+
+  Lemma ghost_step_th_obls_pres c τ δ1 δ2
+    (GSTEP: ghost_step OP δ1 τ δ2)
+    (TH_OWN: threads_own_obls c δ1)
+    (DOMτ: is_Some (from_locale c.1 τ)):
+    threads_own_obls c δ2.
+  Proof.
+    red in GSTEP. destruct GSTEP as [T|[T|[T|[T|[T|T]]]]].
+    - destruct T as (?&?&T). inversion T; subst. by destruct δ1.
+    - destruct T as (?&?&?&?&T). inversion T; subst. by destruct δ1.
+    - destruct T as (?&?&T). inversion T; subst.
+      red. subst new_ps new_obls0. simpl.
+      destruct δ1; simpl in *.      
+      intros ζ'. rewrite dom_insert elem_of_union elem_of_singleton.
+      intros [-> | ?]; auto.
+    - destruct T as (?&T). inversion T; subst.
+      red. subst new_ps new_obls0. simpl.
+      destruct δ1; simpl in *.
+      intros ζ'. rewrite dom_insert elem_of_union elem_of_singleton.
+      intros [-> | ?]; auto.
+    - destruct T as (?&?&?&?&T). inversion T; subst. by destruct δ1.
+    - destruct T as (?&?&?&T). inversion T; subst. by destruct δ1.
+  Qed.
+
+  Lemma progress_step_th_obls_pres c τ δ1 δ2
+    (STEP: progress_step OP δ1 τ δ2)
+    (TH_OWN: threads_own_obls c δ1)
+    (DOMτ: is_Some (from_locale c.1 τ)):
+    threads_own_obls c δ2.
+  Proof.
+    red in STEP. destruct STEP as (n&?&STEP).
+    eapply rel_compose_mono in STEP.
+    2: reflexivity.
+    1: apply rel_compose_nsteps_next in STEP. 
+    2: { do 2 red. intros. by left. }
+    clear -DOMτ STEP TH_OWN. generalize dependent δ2. induction n.
+    { simpl. intros ? ?%nsteps_once_inv. by eapply ghost_step_th_obls_pres. }
+    intros ? (δ'&STEP1&STEP2)%rel_compose_nsteps_next.
+    apply IHn in STEP1. eapply ghost_step_th_obls_pres; eauto.
+  Qed.
+    
+  Lemma locale_step_th_obls_pres c1 c2 τ δ
+    (STEP: locale_step c1 (Some τ) c2)
+    (TH_OWN: threads_own_obls c1 δ):
+    threads_own_obls c2 δ.
+  Proof.
+    destruct c1, c2. 
+    red. intros. eapply from_locale_step; eauto.
+  Qed. 
+      
   Definition obls_valid_evolution_step
     (* (σ1: cfg Λ) *) (oζ: olocale Λ) (σ2: cfg Λ)
     (δ1: mstate OM) (ℓ: mlabel OM) (δ2: mstate OM) :=
@@ -281,4 +378,7 @@ Section ObligationsRepr.
     subst. simpl. done.
   Qed.  
   
+  Definition cp `{ObligationsGS Σ} (ph: Phase) (deg: Degree): iProp Σ :=
+    own (obls_cps) (◯ {[+ (ph, deg) +]}). 
+
 End ObligationsRepr.
