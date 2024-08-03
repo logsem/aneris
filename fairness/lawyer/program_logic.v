@@ -202,10 +202,10 @@ Section ProgramLogic.
     Admitted. 
 
     (* TODO: should we ex quantify ph and deg under BMU? *)
-    Lemma BMU_MU E ζ b (P : iProp Σ) ph deg
+    Lemma BMU_MU E ζ b (P : iProp Σ)
       (BOUND: b <= LIM_STEPS)
       :
-      (BMU E ζ b (cp OP ph deg (H1 := oGS) ∗ P)) ⊢ MU E ζ P.
+      (BMU E ζ b (P ∗ ∃ ph deg, cp OP ph deg (H1 := oGS))) ⊢ MU E ζ P.
     Proof.
       rewrite /MU /BMU. iIntros "BMU" (etr otr) "TI'".
       iSpecialize ("BMU" $! etr otr 0 with "[TI']").
@@ -215,7 +215,7 @@ Section ProgramLogic.
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         econstructor. }
-      iMod "BMU" as (n') "(TI'' & %BOUND' & CP & P)". iFrame.
+      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP))". iFrame. 
       iMod (finish_obls_steps with "[$] [$]") as (?) "?".
       { lia. }       
       iModIntro. eauto.
