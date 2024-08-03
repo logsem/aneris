@@ -199,9 +199,23 @@ Section ProgramLogic.
       simpl. red. eexists. split; eauto.
       eexists. split; eauto.
       
-    Admitted. 
+    Admitted.
 
-    (* TODO: should we ex quantify ph and deg under BMU? *)
+    Lemma BMU_intro E ζ b (P : iProp Σ):
+      ⊢ P -∗ BMU E ζ b P.
+    Proof. 
+      rewrite /BMU. iIntros "**". iModIntro.
+      iExists _. iFrame. iPureIntro. lia.
+    Qed. 
+
+    Lemma BMU_frame E ζ b (P Q : iProp Σ):
+      ⊢ P -∗ BMU E ζ b Q -∗ BMU E ζ b (P ∗ Q).
+    Proof. 
+      rewrite /BMU. iIntros "P BMU **".
+      iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
+      iExists _. iFrame.
+    Qed. 
+
     Lemma BMU_MU E ζ b (P : iProp Σ)
       (BOUND: b <= LIM_STEPS)
       :
@@ -221,30 +235,55 @@ Section ProgramLogic.
       iModIntro. eauto.
     Qed.
 
-    (* Definition SMU τ R P: *)
-    (*   ⊢ ∀ δ1 δ2 obls_msi OP δ (H1 := oGS) ==∗ ∃ δ', obls_msi OP δ' (H1 := oGS) ∗ ⌜ burns_cp OP δ ⌝. *)
-
-
-
-    (* Lemma BMU_step_burn E ζ n P ph deg: *)
-    (*    ⊢ BMU E ζ n P -∗ cp OP ph deg (H1 := oGS) -∗ BMU E ζ (S n) P. *)
-    (* Proof.  *)
-
-    Lemma BMU_step_create_signal E ζ P b l R:
-       ⊢ (∀ sid, sgn OP sid l (Some false) (H1 := oGS) -∗ obls OP ζ (R ∪ {[ sid ]}) (H1 := oGS) -∗ BMU E ζ b P) -∗ obls OP ζ R (H1 := oGS) -∗ BMU E ζ (S b) P.
+    Lemma OU_BMU_hmmm E ζ P b:
+       ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H1 := oGS) -∗ BMU E ζ (S b) P.
     Proof.
-      iIntros "CONT OB". rewrite {2}/BMU /HL_OM_trace_interp'_step.
+      iIntros "CONT OU". rewrite {2}/BMU /HL_OM_trace_interp'_step.
       iIntros (etr atr n) "TI'". destruct etr; [done| ].
-      iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANSS & %TH_OWN & -> & %STEP)".
-      iMod (create_sig_upd OP _ _ _ l with "[$] [$]") as "(%δ' & %sid & MSI & SIG & OB & %CREATES)".
-      iSpecialize ("CONT" with "[$] [$]"). rewrite /BMU.
+      iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & -> & %STEP)".
+      rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & P)".
+      iSpecialize ("CONT" with "[$]"). rewrite /BMU.
       iSpecialize ("CONT" $! (etr :tr[ _ ]: _) with "[HEAP MSI]").
       { rewrite /HL_OM_trace_interp'_step. iExists _.  iFrame.
         iPureIntro. repeat split; eauto.
-        eapply rel_compose_nsteps_next. eexists. split; eauto. 
-        red. do 2 right. left. eauto. }
+        eapply rel_compose_nsteps_next. eexists. split; eauto. }
       iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
       iExists _. iFrame. iPureIntro. lia. 
+    Qed.
+
+    Lemma OU_BMU E ζ P b:
+       ⊢ OU OP ζ (BMU E ζ b P) (H1 := oGS) -∗ BMU E ζ (S b) P.
+    Proof.
+      iIntros "OU". rewrite {2}/BMU /HL_OM_trace_interp'_step.
+      iIntros (etr atr n) "TI'". destruct etr; [done| ].
+      iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & -> & %STEP)".
+      rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & CONT)".
+      iSpecialize ("CONT" $! (etr :tr[ _ ]: _) with "[HEAP MSI]").
+      { rewrite /HL_OM_trace_interp'_step. iExists _.  iFrame.
+        iPureIntro. repeat split; eauto.
+        eapply rel_compose_nsteps_next. eexists. split; eauto. }
+      iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
+      iExists _. iFrame. iPureIntro. lia. 
+    Qed.
+
+    Lemma OU_wand ζ P Q:
+      (P -∗ Q) -∗ OU OP ζ P (H1 := oGS) -∗ OU OP ζ Q (H1 := oGS).
+    Proof.
+      iIntros "PQ OU".
+      rewrite /OU. iIntros "**".
+      iSpecialize ("OU" with "[$]"). iMod "OU" as "(%&?&?&?)". iModIntro.
+      iExists _. iFrame. by iApply "PQ". 
+    Qed. 
+      
+    (* an example usage of OU *)
+    Lemma BMU_step_create_signal E ζ P b l R:
+       ⊢ (∀ sid, sgn OP sid l (Some false) (H1 := oGS) -∗ obls OP ζ (R ∪ {[ sid ]}) (H1 := oGS) -∗ BMU E ζ b P) -∗ obls OP ζ R (H1 := oGS) -∗ BMU E ζ (S b) P.
+    Proof.
+      iIntros "CONT OB".
+      iApply OU_BMU. iApply (OU_wand with "[CONT]").
+      { setoid_rewrite bi.wand_curry. rewrite -bi.exist_wand_forall.
+        iFrame. }
+      iPoseProof (OU_create_sig with "OB") as "OU". done.
     Qed. 
 
   End BMU.

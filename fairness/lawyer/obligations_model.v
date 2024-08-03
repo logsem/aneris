@@ -427,20 +427,20 @@ Section ObligationsRepr.
   Section ResourcesUpdates.
     Context `{ObligationsGS Σ}.
 
-    Lemma create_sig_upd δ ζ R l:
-      ⊢ obls ζ R -∗ obls_msi δ ==∗ ∃ δ' sid, 
-         obls_msi δ' ∗ sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]}) ∗
-         ⌜ creates_signal OP δ ζ δ' l⌝.
+    Definition OU ζ P: iProp Σ :=
+      ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ ghost_step OP δ ζ δ'⌝ ∗ P. 
+    
+    Lemma OU_create_sig ζ R l:
+      ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]})).
     Proof.
-      iIntros "OB MSI".
-      (* set (sid := list_max (elements $ dom $ ps_sigs OP δ) + 1).  *)
+      rewrite /OU. iIntros "OB %δ MSI".
       set (sid := list_max (elements $ dom $ sig_map_repr $ ps_sigs OP δ) + 1).
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
       destruct δ. simpl. iFrame. simpl in *.
       iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
       iRevert "SIGS OBLS". iFrame. iIntros "SIGS OBLS". simpl.
-      iApply bupd_exist. iExists sid. rewrite !bi.sep_assoc. iApply bupd_frame_r.
+      rewrite !bi.sep_assoc. 
 
       assert (sid ∉ dom ps_sigs0) as FRESH.
       { subst sid. 
@@ -453,8 +453,10 @@ Section ObligationsRepr.
         assert (forall n, n + 1 <= n -> False) as C by lia.
         by apply C in IN. }
 
+      rewrite bi.sep_comm bi.sep_assoc.  
       iSplitL.
       2: { iPureIntro.
+           red. do 2 right. left. exists l. 
            erewrite (f_equal (creates_signal _ _ _)).
            { econstructor; eauto. }
            simpl. reflexivity. }
@@ -467,10 +469,11 @@ Section ObligationsRepr.
         rewrite Rζ in Rζ_. inversion Rζ_. subst R_. subst.
         apply exclusive_local_update with (x' := Excl (R ∪ {[sid]})). done. }
       rewrite Rζ. simpl. iDestruct "X" as "[??]".
+      rewrite bi.sep_exist_r. iApply bupd_exist. iExists sid. 
       rewrite -fmap_insert. iFrame.
 
       rewrite -own_op. iApply own_update; [| by iFrame].
-      apply auth_update_alloc. 
+      rewrite cmra_comm. apply auth_update_alloc. 
       eapply local_update_proper.
       1: reflexivity.
       2: eapply alloc_local_update.
