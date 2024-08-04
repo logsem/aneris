@@ -1,4 +1,4 @@
-From trillium.fairness Require Import fuel lm_fair.
+From trillium.fairness Require Import fuel lm_fair locales_helpers.
 
 
 Section aux_trace_lang.

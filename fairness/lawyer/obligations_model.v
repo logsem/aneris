@@ -389,7 +389,11 @@ Section ObligationsRepr.
     own obls_sigs (◯ ({[ sid := (to_agree l, mbind (Some ∘ Excl) ob ) ]})).
 
   Definition obls `{ObligationsGS Σ} ζ (R: gset SignalId) :=
-    own obls_obls (◯ ({[ ζ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))). 
+    own obls_obls (◯ ({[ ζ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))).
+
+  Definition th_phase_ge `{ObligationsGS Σ} ζ π: iProp Σ :=
+    ∃ π__max, own obls_phs (◯ {[ ζ := π__max]}) ∗ ⌜ phase_le π π__max⌝. 
+
   
   Section ResourcesFacts.
     Context `{ObligationsGS Σ}. 
@@ -422,18 +426,48 @@ Section ObligationsRepr.
       set_solver.
     Qed. 
 
+    Lemma th_phase_msi_ge δ ζ π:
+      ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗        
+        ⌜ exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
+    Proof.
+      rewrite /obls_msi. iIntros "(_&_&_&_&PHASES&_) PH".
+      rewrite /th_phase_ge. iDestruct "PH" as "(%π__max & PH & %LE)". 
+      iCombine "PHASES PH" as "PHASES".
+      iDestruct (own_valid with "PHASES") as %V. iPureIntro.
+      eexists. split; eauto. 
+      apply auth_both_valid_discrete in V as [SUB V].
+      apply @singleton_included_l in SUB. destruct SUB as (π'&PH'&LE').
+      rewrite Some_included_total in LE'.
+      (* this part should change with non-trivial phases *)
+      destruct π__max, π'. by apply leibniz_equiv.
+    Qed.
+
+    (* Global Instance th_phase_ge_pers ζ π: Persistent (th_phase_ge ζ π). *)
+    (* Proof. apply _. Qed.  *)
+
   End ResourcesFacts.
 
   Section ResourcesUpdates.
     Context `{ObligationsGS Σ}.
 
-    Definition OU ζ P: iProp Σ :=
-      ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ ghost_step OP δ ζ δ'⌝ ∗ P. 
+    Let OU' (R: ProgressState OP -> Locale -> ProgressState OP -> Prop) ζ P: iProp Σ :=
+      ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ R δ ζ δ'⌝ ∗ P. 
+
+    Definition OU := OU' (ghost_step OP). 
+
+    Lemma OU_wand ζ P Q:
+      (P -∗ Q) -∗ OU ζ P -∗ OU ζ Q.
+    Proof.
+      iIntros "PQ OU".
+      rewrite /OU /OU'. iIntros "**".
+      iSpecialize ("OU" with "[$]"). iMod "OU" as "(%&?&?&?)". iModIntro.
+      iExists _. iFrame. by iApply "PQ". 
+    Qed.      
     
     Lemma OU_create_sig ζ R l:
       ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]})).
     Proof.
-      rewrite /OU. iIntros "OB %δ MSI".
+      rewrite /OU /OU'. iIntros "OB %δ MSI".
       set (sid := list_max (elements $ dom $ sig_map_repr $ ps_sigs OP δ) + 1).
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
@@ -482,7 +516,8 @@ Section ObligationsRepr.
       apply not_elem_of_dom. by rewrite dom_fmap.
     Qed. 
 
-    Lemma burn_cp_upd δ ζ π deg
+    (* TODO: ? refactor these proofs about burn_cp *)
+    Lemma burn_cp_upd_impl δ ζ π deg
       (PH_MAX: exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max)
       :
       ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ burns_cp OP δ ζ δ' π deg⌝.
@@ -504,6 +539,26 @@ Section ObligationsRepr.
       { econstructor; eauto. }
       done. 
     Qed.
+
+    Lemma burn_cp_upd_burn ζ π deg:
+      ⊢ cp π deg -∗ th_phase_ge ζ π -∗ OU' (fun δ1 ζ' δ2 => burns_cp OP δ1 ζ' δ2 π deg) ζ ⌜ True ⌝. 
+    Proof.
+      rewrite /OU'. iIntros "CP #PH % MSI".
+      iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?). 
+      iMod (burn_cp_upd_impl with "[$] [$]") as "R"; eauto.
+      iDestruct "R" as "(%&?&?)". iModIntro. iExists _. iFrame.
+    Qed.
+
+    Lemma burn_cp_upd ζ π deg:
+      ⊢ cp π deg -∗ th_phase_ge ζ π -∗ OU ζ ⌜ True ⌝. 
+    Proof.
+      iIntros "??".
+      iPoseProof (burn_cp_upd_burn with "[$] [$]") as "OU'".
+      rewrite /OU /OU'. iIntros "% MSI".
+      iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
+      iExists _. iFrame. iPureIntro.
+      red. eauto.
+    Qed. 
 
   End ResourcesUpdates.
 

@@ -1,12 +1,10 @@
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
-From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.program_logic Require Import ectx_lifting.
-From trillium.fairness.heap_lang Require Export heap_lang_defs. 
-From trillium.fairness.heap_lang Require Import tactics notation.
+From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
+From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic.
 From trillium.fairness.lawyer Require Import obligations_model.
-From trillium.fairness.heap_lang Require Import sswp_logic.
+From trillium.fairness Require Import locales_helpers. 
 
 
 Close Scope Z. 
@@ -164,7 +162,7 @@ Section ProgramLogic.
 
     Lemma WIP_all_phases_le π1 π2:
       phase_le π1 π2.
-    Proof. done. Qed. 
+    Proof. done. Qed.
 
     Lemma finish_obls_steps extr omtr τ n ph deg
       (BOUND: n <= LIM_STEPS)
@@ -178,28 +176,27 @@ Section ProgramLogic.
       iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
 
       pose proof (WIP_th_own_gsteps_ex_phase _ _ _ _ _ _ STEP OBLS TRANSS) as [πτ PHτ]. 
-      iMod (burn_cp_upd with "[$] [$]") as "X".
+      iMod (burn_cp_upd_impl with "[$] [$]") as "X".
       { eexists. split; eauto. apply WIP_all_phases_le. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)". 
       iModIntro. iExists _. simpl. iFrame.
       
-
       assert (threads_own_obls OP a δ') as TH_OWN'.
       { eapply locale_step_th_obls_pres in OBLS; eauto.
         remember (trace_last extr) as X.
         destruct X as [??], a as [??].
         eapply progress_step_th_obls_pres with (τ := τ); eauto.
         2: { eapply from_locale_step; eauto.
-             admit. }
+             replace l with ((l, s).1) by auto. 
+             eapply locale_step_from_locale_src; eauto. }
         eexists. split; eauto.
         eexists. split; eauto. }
       
       iPureIntro. split; auto.      
       red. repeat split; auto.
       simpl. red. eexists. split; eauto.
-      eexists. split; eauto.
-      
-    Admitted.
+      eexists. split; eauto.      
+    Qed. 
 
     Lemma BMU_intro E ζ b (P : iProp Σ):
       ⊢ P -∗ BMU E ζ b P.
@@ -266,15 +263,6 @@ Section ProgramLogic.
       iExists _. iFrame. iPureIntro. lia. 
     Qed.
 
-    Lemma OU_wand ζ P Q:
-      (P -∗ Q) -∗ OU OP ζ P (H1 := oGS) -∗ OU OP ζ Q (H1 := oGS).
-    Proof.
-      iIntros "PQ OU".
-      rewrite /OU. iIntros "**".
-      iSpecialize ("OU" with "[$]"). iMod "OU" as "(%&?&?&?)". iModIntro.
-      iExists _. iFrame. by iApply "PQ". 
-    Qed. 
-      
     (* an example usage of OU *)
     Lemma BMU_step_create_signal E ζ P b l R:
        ⊢ (∀ sid, sgn OP sid l (Some false) (H1 := oGS) -∗ obls OP ζ (R ∪ {[ sid ]}) (H1 := oGS) -∗ BMU E ζ b P) -∗ obls OP ζ R (H1 := oGS) -∗ BMU E ζ (S b) P.
