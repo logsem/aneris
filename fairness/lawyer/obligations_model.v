@@ -385,6 +385,12 @@ Section ObligationsRepr.
   Definition cp `{ObligationsGS Σ} (ph: Phase) (deg: Degree): iProp Σ :=
     own obls_cps (◯ {[+ (ph, deg) +]}). 
 
+  Definition cp_mul `{ObligationsGS Σ} ph deg n: iProp Σ :=
+    fold_right bi_sep (⌜ True ⌝)%I (repeat (cp ph deg) n). 
+
+  Definition cps `{ObligationsGS Σ} (m: gmultiset CallPermission) : iProp Σ :=
+      own obls_cps (◯ m). 
+
   Definition sgn `{ObligationsGS Σ} (sid: SignalId) (l: Level) (ob: option bool): iProp Σ :=
     own obls_sigs (◯ ({[ sid := (to_agree l, mbind (Some ∘ Excl) ob ) ]})).
 
@@ -558,6 +564,13 @@ Section ObligationsRepr.
       iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
       red. eauto.
+    Qed. 
+
+    Lemma cp_mul_take ph deg n:
+      cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
+    Proof. 
+      rewrite /cp_mul. simpl.
+      by rewrite bi.sep_comm.
     Qed. 
 
   End ResourcesUpdates.

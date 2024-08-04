@@ -9,6 +9,30 @@ From trillium.fairness Require Import locales_helpers.
 
 Close Scope Z. 
 
+    From iris.proofmode Require Import coq_tactics.
+    Lemma tac_wp_bind `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} 
+      K Δ s E Φ e f :
+      f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
+      envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
+      envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
+    Proof. rewrite envs_entails_unseal=> -> ->. by apply: wp_bind. Qed.
+
+    Ltac wp_bind_core K :=
+      lazymatch eval hnf in K with
+      | [] => idtac
+      | _ => eapply (tac_wp_bind K); [simpl; reflexivity|reduction.pm_prettify]
+  end.
+    
+    Tactic Notation "wp_bind" open_constr(efoc) :=
+      iStartProof;
+      lazymatch goal with
+      | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
+          first [ reshape_expr e ltac:(fun K e' => unify e' efoc; wp_bind_core K)
+                | fail 1 "wp_bind: cannot find" efoc "in" e ]
+      | _ => fail "wp_bind: not a 'wp'"
+      end.
+
+
 Section ProgramLogic.
   Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}. 
   
@@ -275,5 +299,41 @@ Section ProgramLogic.
     Qed. 
 
   End BMU.
+
+  Section TestProg.
+    
+    Let test_prog: expr := ref (#1 + #1).
+
+    Lemma test_spec (τ: locale heap_lang) (π: Phase) (d: Degree):
+      {{{ cp_mul OP π d 10 (H1 := oGS) ∗ th_phase_ge OP τ π (H1 := oGS) ∗ obls OP τ ∅ (H1 := oGS)}}}
+        test_prog @ τ
+      {{{ x, RET #x;  True }}}.
+    Proof.
+      iIntros (Φ). iIntros "(CPS & #PH & OBLS) POST".
+      rewrite /test_prog. 
+
+      wp_bind (_ + _)%E.
+      iApply sswp_MU_wp; [done| ].
+      iApply sswp_pure_step; [done| ].
+      rewrite /Z.add. simpl. 
+      iApply BMU_MU; [reflexivity| ].
+      iNext. iApply BMU_intro.
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+      iSplitR "CP"; [| by eauto].
+
+      iApply wp_value.
+
+      iApply sswp_MU_wp; [done| ].
+      iApply wp_alloc. iIntros "!> %l L ?".
+      iApply BMU_MU; [reflexivity| ].
+      iApply BMU_intro.
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+      iSplitR "CP"; [| by eauto].
+
+      iApply wp_value.
+      by iApply "POST".
+    Qed.
+
+  End TestProg.
     
 End ProgramLogic.
