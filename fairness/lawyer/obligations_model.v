@@ -3,7 +3,7 @@ From trillium.fairness Require Import fairness.
 Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {
   opar_deg_eqdec :> EqDecision Degree;
   opar_deg_cnt :> Countable Degree;
-  opar_deg_le: Degree -> Degree -> Prop;
+  opar_deg_lt: Degree -> Degree -> Prop;
 
   opar_lvl_eqdec :> EqDecision Level;
   opar_lvl_cnt :> Countable Level;
@@ -37,7 +37,7 @@ Section Model.
       ps_obls: gmap Locale (gset SignalId);
       ps_eps: gset ExpectPermission;
       ps_phases: gmap Locale Phase;
-      ps_low_bound: nat;
+      ps_exc_bound: nat;
   }.
 
   Let PS := ProgressState. 
@@ -66,15 +66,15 @@ Section Model.
       (CP: (π, δ) ∈ ps_cps ps):
     burns_cp ps θ (update_cps (ps_cps ps ∖ {[+ (π, δ) +]}) ps) π δ. 
 
-  Inductive lowers_cp: PS -> Locale -> PS -> Phase -> Degree -> Degree -> nat -> Prop :=
+  Inductive exchanges_cp: PS -> Locale -> PS -> Phase -> Degree -> Degree -> nat -> Prop :=
   | lcp_step ps θ π δ δ' n π__max 
       (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (PHASE_LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps)
-      (DEG_LE: opar_deg_le δ' δ)
-      (LOW_BOUND: n <= ps_low_bound ps):
-    let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ∪ n *: {[+ (π, δ') +]} in
-    lowers_cp ps θ (update_cps new_cps ps) π δ δ' n. 
+      (DEG_LE: opar_deg_lt δ' δ)
+      (LOW_BOUND: n <= ps_exc_bound ps):
+    let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ⊎ n *: {[+ (π, δ') +]} in
+    exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n. 
       
   Inductive creates_signal: PS -> Locale -> PS -> Level -> Prop :=
   | cs_step ps θ s l
@@ -100,7 +100,7 @@ Section Model.
       (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps)
-      (DEG_LE: opar_deg_le δ' δ):
+      (DEG_LE: opar_deg_lt δ' δ):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} in
     let new_eps := ps_eps ps ∪ {[ (s, π, δ') ]} in
     let new_ps := update_eps new_eps $ update_cps new_cps ps in
@@ -113,12 +113,12 @@ Section Model.
       (SIG: ps_sigs ps !! s = Some (l, false))
       (EP: (s, π, δ) ∈ ps_eps ps)
       (OBLS_LT: lt_locale_obls l θ ps):
-    let new_cps := ps_cps ps ∪ {[+ (π__max, δ) +]} in
+    let new_cps := ps_cps ps ⊎ {[+ (π__max, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
   Definition ghost_step ps1 θ ps2 :=
     (exists π δ, burns_cp ps1 θ ps2 π δ) \/
-    (exists π δ δ' n, lowers_cp ps1 θ ps2 π δ δ' n) \/
+    (exists π δ δ' n, exchanges_cp ps1 θ ps2 π δ δ' n) \/
     (exists l, creates_signal ps1 θ ps2 l) \/
     (exists s, sets_signal ps1 θ ps2 s) \/
     (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
@@ -218,7 +218,7 @@ Section ObligationsRepr.
       obls_obls: gname;
       obls_eps: gname;
       obls_phs: gname;
-      obls_lb: gname;
+      obls_exc_lb: gname;
   }.
   
 
@@ -236,7 +236,7 @@ Section ObligationsRepr.
     own obls_obls (● (obls_map_repr $ ps_obls OP ps)) ∗
     own obls_eps (● (ps_eps OP ps)) ∗
     own obls_phs (● (ps_phases OP ps)) ∗
-    own obls_lb (●MN (ps_low_bound OP ps))
+    own obls_exc_lb (●MN (ps_exc_bound OP ps))
   . 
   
   From trillium.fairness Require Import execution_model.
@@ -330,7 +330,7 @@ Section ObligationsRepr.
     own obls_obls (◯ (obls_map_repr $ ps_obls _ δ)) ∗
     own obls_eps (◯ (ps_eps _ δ)) ∗
     own obls_phs (◯ (ps_phases _ δ)) ∗
-    own obls_lb (◯MN (ps_low_bound _ δ))
+    own obls_exc_lb (◯MN (ps_exc_bound _ δ))
   .
     
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
@@ -373,7 +373,7 @@ Section ObligationsRepr.
     iMod (own_alloc (● (ps_phases _ δ) ⋅ ◯ _)) as (?) "[PHa PHf]". 
     { apply auth_both_valid_2; [| reflexivity].
       intros τ. destruct lookup; done. }
-    iMod (own_alloc (●MN (ps_low_bound _ δ) ⋅ mono_nat_lb _)) as (?) "[LBa LBf]".
+    iMod (own_alloc (●MN (ps_exc_bound _ δ) ⋅ mono_nat_lb _)) as (?) "[LBa LBf]".
     { apply mono_nat_both_valid. reflexivity. }
     iModIntro. iExists {| obls_pre := PRE; |}.
     iFrame.
@@ -387,7 +387,8 @@ Section ObligationsRepr.
     own obls_cps (◯ {[+ (ph, deg) +]}). 
 
   Definition cp_mul `{ObligationsGS Σ} ph deg n: iProp Σ :=
-    fold_right bi_sep (⌜ True ⌝)%I (repeat (cp ph deg) n). 
+    (* fold_right bi_sep (⌜ True ⌝)%I (repeat (cp ph deg) n).  *)
+    own obls_cps (◯ (n *: {[+ (ph, deg) +]})). 
 
   Definition cps `{ObligationsGS Σ} (m: gmultiset CallPermission) : iProp Σ :=
       own obls_cps (◯ m). 
@@ -397,10 +398,12 @@ Section ObligationsRepr.
 
   Definition obls `{ObligationsGS Σ} ζ (R: gset SignalId) :=
     own obls_obls (◯ ({[ ζ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))).
+  
+  Definition exc_lb `{ObligationsGS Σ} (n: nat) :=
+    own obls_exc_lb (mono_nat_lb n).     
 
   Definition th_phase_ge `{ObligationsGS Σ} ζ π: iProp Σ :=
     ∃ π__max, own obls_phs (◯ {[ ζ := π__max]}) ∗ ⌜ phase_le π π__max⌝. 
-
   
   Section ResourcesFacts.
     Context `{ObligationsGS Σ}. 
@@ -473,6 +476,15 @@ Section ObligationsRepr.
       rewrite Some_included_total in LE'.
       (* this part should change with non-trivial phases *)
       destruct π__max, π'. by apply leibniz_equiv.
+    Qed.
+
+    Lemma exc_lb_msi_bound δ n:
+      ⊢ obls_msi δ -∗ exc_lb n -∗ ⌜ n <= ps_exc_bound OP δ ⌝.
+    Proof.
+      rewrite /obls_msi. iIntros "(_&_&_&_&_&B) LB".
+      iCombine "B LB" as "LB".
+      iDestruct (own_valid with "LB") as %V. iPureIntro.
+      by apply mono_nat_both_valid in V.
     Qed.
 
     (* Global Instance th_phase_ge_pers ζ π: Persistent (th_phase_ge ζ π). *)
@@ -597,6 +609,41 @@ Section ObligationsRepr.
       by apply exclusive_local_update.
     Qed.
 
+    Lemma exchange_cp_upd ζ π d d' b k
+      (LE: k <= b)
+      (DEG: opar_deg_lt d' d):
+      ⊢ cp π d -∗ th_phase_ge ζ π -∗ exc_lb b -∗ OU ζ (cp_mul π d' k). 
+    Proof.
+      rewrite /OU /OU'. iIntros "CP #PH #LB %δ MSI".
+      iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
+      iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).
+      iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
+      rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
+      destruct δ. simpl in *.
+      iCombine "CPS CP" as "CPS".
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iRevert "CPS". iFrame. simpl. iIntros "CPS".
+
+      rewrite bi.sep_comm -!bi.sep_assoc.  
+      iSplitR.
+      { iPureIntro.
+        red. right. left. exists π, d, d', k. 
+        erewrite (f_equal (exchanges_cp _ _ _)).
+        { econstructor; eauto. simpl. lia. }
+        simpl. reflexivity. }
+
+      rewrite bi.sep_comm. rewrite /cp_mul /cp. rewrite -own_op.
+      iApply own_update; [| by iFrame].
+      apply auth_update.
+      etrans.
+      { eapply gmultiset_local_update_dealloc. reflexivity. }
+      rewrite gmultiset_difference_diag.
+      eapply local_update_proper.
+      1: reflexivity.
+      2: eapply gmultiset_local_update_alloc.
+      f_equiv. set_solver.
+    Qed. 
+
     (* TODO: ? refactor these proofs about burn_cp *)
     Lemma burn_cp_upd_impl δ ζ π deg
       (PH_MAX: exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max)
@@ -644,8 +691,10 @@ Section ObligationsRepr.
     Lemma cp_mul_take ph deg n:
       cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
     Proof. 
-      rewrite /cp_mul. simpl.
-      by rewrite bi.sep_comm.
+      rewrite /cp_mul. rewrite -own_op -auth_frag_op. 
+      iApply own_proper. f_equiv.
+      rewrite gmultiset_op.
+      by rewrite gmultiset_scalar_mul_S_r. 
     Qed. 
 
   End ResourcesUpdates.

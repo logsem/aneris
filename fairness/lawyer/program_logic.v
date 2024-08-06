@@ -310,22 +310,29 @@ Section ProgramLogic.
 
     Hypothesis (LIM_STEPS_LB: 5 <= LIM_STEPS). 
 
-    Lemma test_spec (τ: locale heap_lang) (π: Phase) (d: Degree) (l: Level):
-      {{{ cp_mul OP π d 10 (H2 := oGS) ∗ th_phase_ge OP τ π (H2 := oGS) ∗ obls OP τ ∅ (H2 := oGS)}}}
+    Lemma test_spec (τ: locale heap_lang) (π: Phase) (d d': Degree) (l: Level)
+      (DEG: opar_deg_lt d' d)
+      :
+      {{{ cp_mul OP π d 10 (H2 := oGS) ∗ th_phase_ge OP τ π (H2 := oGS) ∗ obls OP τ ∅ (H2 := oGS) ∗ exc_lb OP 5 (H2 := oGS) }}}
         test_prog @ τ
       {{{ x, RET #x; obls OP τ ∅ (H2 := oGS) }}}.
     Proof.
-      iIntros (Φ). iIntros "(CPS & #PH & OBLS) POST".
+      iIntros (Φ). iIntros "(CPS & #PH & OBLS & #EB) POST".
       rewrite /test_prog. 
 
       wp_bind (_ + _)%E.
       iApply sswp_MU_wp; [done| ].
       iApply sswp_pure_step; [done| ].
       rewrite /Z.add. simpl. 
-      iApply BMU_MU; [reflexivity| ].
-      iNext. iApply BMU_intro.
+      iNext. iApply BMU_MU; [eauto| ].
+      iApply OU_BMU.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-      iSplitR "CP"; [| by eauto].
+      iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU"; eauto.
+      iApply (OU_wand with "[-OU]"); [| done].
+      iIntros "CPS'". 
+      iApply BMU_intro.
+      iDestruct (cp_mul_take with "CPS'") as "[CPS' CP']". 
+      iSplitR "CP'"; [| by eauto].
 
       iApply wp_value.
 
@@ -335,7 +342,7 @@ Section ProgramLogic.
       iApply BMU_MU; eauto.
       iApply OU_BMU.
       iDestruct (OU_create_sig _ _ _ l with "[$]") as "OU".
-      Unshelve. 2: apply _. 
+      Unshelve. 2, 3: by apply _. 
       iApply (OU_wand with "[-OU]"); [| done].
       iIntros "(%sid & SIG & OBLS)".
       iApply BMU_intro.
