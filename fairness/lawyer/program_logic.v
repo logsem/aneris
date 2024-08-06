@@ -34,7 +34,8 @@ Close Scope Z.
 
 
 Section ProgramLogic.
-  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}. 
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
   
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
@@ -61,7 +62,7 @@ Section ProgramLogic.
           let c := trace_last extr' in
           let δ := trace_last omtr in
           gen_heap_interp c'.2.(heap) ∗
-          obls_msi OP δ (H1 := oGS) ∗
+          obls_msi OP δ (H2 := oGS) ∗
           ⌜ threads_own_obls OP c δ ⌝ ∗
           ⌜ oζ = Some τ ⌝ ∗
           ⌜ locale_step c (Some τ) c' ⌝
@@ -76,7 +77,7 @@ Section ProgramLogic.
           let δ := trace_last omtr in
           ∃ δ__k,
           gen_heap_interp c'.2.(heap) ∗
-          obls_msi OP δ__k (H1 := oGS) ∗
+          obls_msi OP δ__k (H2 := oGS) ∗
           ⌜ nsteps (fun p1 p2 => ghost_step OP p1 τ p2) k δ δ__k ⌝ ∗
           ⌜ threads_own_obls OP c δ ⌝ ∗
           ⌜ oζ = Some τ ⌝ ∗
@@ -191,7 +192,7 @@ Section ProgramLogic.
     Lemma finish_obls_steps extr omtr τ n ph deg
       (BOUND: n <= LIM_STEPS)
       :
-      ⊢ HL_OM_trace_interp'_step extr omtr τ n -∗ (cp OP ph deg (H1 := oGS)) ==∗
+      ⊢ HL_OM_trace_interp'_step extr omtr τ n -∗ (cp OP ph deg (H2 := oGS)) ==∗
         ∃ δ', state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS).
     Proof.
       iIntros "TI'' cp". rewrite /HL_OM_trace_interp'_step.
@@ -240,7 +241,7 @@ Section ProgramLogic.
     Lemma BMU_MU E ζ b (P : iProp Σ)
       (BOUND: b <= LIM_STEPS)
       :
-      (BMU E ζ b (P ∗ ∃ ph deg, cp OP ph deg (H1 := oGS))) ⊢ MU E ζ P.
+      (BMU E ζ b (P ∗ ∃ ph deg, cp OP ph deg (H2 := oGS))) ⊢ MU E ζ P.
     Proof.
       rewrite /MU /BMU. iIntros "BMU" (etr otr) "TI'".
       iSpecialize ("BMU" $! etr otr 0 with "[TI']").
@@ -257,7 +258,7 @@ Section ProgramLogic.
     Qed.
 
     Lemma OU_BMU_hmmm E ζ P b:
-       ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H1 := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H2 := oGS) -∗ BMU E ζ (S b) P.
     Proof.
       iIntros "CONT OU". rewrite {2}/BMU /HL_OM_trace_interp'_step.
       iIntros (etr atr n) "TI'". destruct etr; [done| ].
@@ -273,7 +274,7 @@ Section ProgramLogic.
     Qed.
 
     Lemma OU_BMU E ζ P b:
-       ⊢ OU OP ζ (BMU E ζ b P) (H1 := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ OU OP ζ (BMU E ζ b P) (H2 := oGS) -∗ BMU E ζ (S b) P.
     Proof.
       iIntros "OU". rewrite {2}/BMU /HL_OM_trace_interp'_step.
       iIntros (etr atr n) "TI'". destruct etr; [done| ].
@@ -289,7 +290,7 @@ Section ProgramLogic.
 
     (* an example usage of OU *)
     Lemma BMU_step_create_signal E ζ P b l R:
-       ⊢ (∀ sid, sgn OP sid l (Some false) (H1 := oGS) -∗ obls OP ζ (R ∪ {[ sid ]}) (H1 := oGS) -∗ BMU E ζ b P) -∗ obls OP ζ R (H1 := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ (∀ sid, sgn OP sid l (Some false) (H2 := oGS) -∗ obls OP ζ (R ∪ {[ sid ]}) (H2 := oGS) -∗ BMU E ζ b P) -∗ obls OP ζ R (H2 := oGS) -∗ BMU E ζ (S b) P.
     Proof.
       iIntros "CONT OB".
       iApply OU_BMU. iApply (OU_wand with "[CONT]").
@@ -302,12 +303,17 @@ Section ProgramLogic.
 
   Section TestProg.
     
-    Let test_prog: expr := ref (#1 + #1).
+    Let test_prog: expr :=
+          let: "x" := ref (#1 + #1) in
+          !"x"
+    .
 
-    Lemma test_spec (τ: locale heap_lang) (π: Phase) (d: Degree):
-      {{{ cp_mul OP π d 10 (H1 := oGS) ∗ th_phase_ge OP τ π (H1 := oGS) ∗ obls OP τ ∅ (H1 := oGS)}}}
+    Hypothesis (LIM_STEPS_LB: 5 <= LIM_STEPS). 
+
+    Lemma test_spec (τ: locale heap_lang) (π: Phase) (d: Degree) (l: Level):
+      {{{ cp_mul OP π d 10 (H2 := oGS) ∗ th_phase_ge OP τ π (H2 := oGS) ∗ obls OP τ ∅ (H2 := oGS)}}}
         test_prog @ τ
-      {{{ x, RET #x;  True }}}.
+      {{{ x, RET #x; obls OP τ ∅ (H2 := oGS) }}}.
     Proof.
       iIntros (Φ). iIntros "(CPS & #PH & OBLS) POST".
       rewrite /test_prog. 
@@ -323,15 +329,57 @@ Section ProgramLogic.
 
       iApply wp_value.
 
+      wp_bind (ref _)%E. 
       iApply sswp_MU_wp; [done| ].
-      iApply wp_alloc. iIntros "!> %l L ?".
-      iApply BMU_MU; [reflexivity| ].
+      iApply wp_alloc. iIntros "!> %x L ?".
+      iApply BMU_MU; eauto.
+      iApply OU_BMU.
+      iDestruct (OU_create_sig _ _ _ l with "[$]") as "OU".
+      Unshelve. 2: apply _. 
+      iApply (OU_wand with "[-OU]"); [| done].
+      iIntros "(%sid & SIG & OBLS)".
       iApply BMU_intro.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
       iSplitR "CP"; [| by eauto].
 
       iApply wp_value.
-      by iApply "POST".
+      (* Set Printing All. *)
+      (* Unset Printing Notations. *)
+
+      wp_bind (Rec _ _ _). 
+      iApply sswp_MU_wp; [done| ].      
+      iApply sswp_pure_step; [done| ].
+      iApply BMU_MU; [eauto| ].
+      iNext.
+      iApply OU_BMU.
+      iDestruct (OU_set_sig with "OBLS SIG") as "OU"; [set_solver| ].
+      iApply (OU_wand with "[-OU]"); [| done].
+      iIntros "(SIG & OBLS)".
+      iApply BMU_intro.
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+      iSplitR "CP"; [| by eauto].
+
+      iApply wp_value. 
+
+      iApply sswp_MU_wp; [done| ].      
+      iApply sswp_pure_step; [done| ].
+      iApply BMU_MU; [reflexivity| ].
+      iNext. iApply BMU_intro.
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+      iSplitR "CP"; [| by eauto].
+
+      simpl. 
+      iApply sswp_MU_wp; [done| ].
+      iApply (wp_load with "[$]"). iNext. iIntros.
+      iApply BMU_MU; [reflexivity| ].
+      iApply BMU_intro.
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+      iSplitR "CP"; [| by eauto].
+
+      iApply wp_value. 
+      iApply "POST".
+      rewrite difference_union_distr_l_L difference_diag_L subseteq_empty_difference_L; [| done].
+      by rewrite union_empty_r_L. 
     Qed.
 
   End TestProg.

@@ -6,7 +6,8 @@ Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {
   opar_deg_le: Degree -> Degree -> Prop;
 
   opar_lvl_eqdec :> EqDecision Level;
-  opar_lvl_cnt :> Countable Level;  
+  opar_lvl_cnt :> Countable Level;
+
   opar_lvl_lt: Level -> Level -> Prop;
   (* TODO: get rid of this? *)
   opar_l0: Level;
@@ -184,8 +185,8 @@ End Model.
 (* TODO: move *)
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 Section ObligationsRepr.
-  (* Context {DegO LevelO: ofe}.  *)
-  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}. 
+  Context {DegO LevelO: ofe}.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO} `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
 
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
@@ -432,6 +433,32 @@ Section ObligationsRepr.
       set_solver.
     Qed. 
 
+    Lemma sigs_msi_exact δ sid l v:
+      ⊢ obls_msi δ -∗ sgn sid l (Some v) -∗
+        ⌜ ps_sigs OP δ !! sid = Some (l, v) ⌝.
+    Proof. 
+      rewrite /obls_msi. iIntros "(_&SIGS&_) SIG". 
+      iCombine "SIGS SIG" as "SIGS". 
+      iDestruct (own_valid with "[$]") as %V. iPureIntro.
+      apply auth_both_valid_discrete in V as [SUB V].
+      apply @singleton_included_l in SUB. destruct SUB as ([l' y]&SIG'&LE').
+
+      eapply leibniz_equiv_iff in SIG'.
+      Unshelve. 
+      2: { unshelve eapply option_leibniz.
+           unshelve eapply prod_leibniz.
+           admit. }
+      pose proof SIG' as X%lookup_fmap_Some. destruct X as ([? ?]&EQ&SIG).
+      rewrite Some_included_total in LE'.
+      simpl in LE'. apply pair_included in LE' as [LE1 LE2].
+      inversion EQ. subst. rewrite SIG. do 2 f_equal.  
+      - apply to_agree_included in LE1.
+        by apply leibniz_equiv_iff in LE1.
+      - apply Excl_included in LE2. 
+        by apply leibniz_equiv_iff in LE2.
+
+    Admitted. 
+
     Lemma th_phase_msi_ge δ ζ π:
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗        
         ⌜ exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
@@ -521,6 +548,54 @@ Section ObligationsRepr.
       2: done.
       apply not_elem_of_dom. by rewrite dom_fmap.
     Qed. 
+
+    (* TODO: do we need to generalize to "optional v" instead? *)
+    Lemma OU_set_sig ζ R sid l v
+      (IN: sid ∈ R):
+      ⊢ obls ζ R -∗ sgn sid l (Some v) -∗
+        OU ζ (sgn sid l (Some true) ∗ obls ζ (R ∖ {[ sid ]})).
+    Proof.
+      rewrite /OU /OU'. iIntros "OB SIG %δ MSI".
+      iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
+      iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
+      rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
+      destruct δ. simpl in *.
+      iCombine "OBLS OB" as "OBLS". iCombine "SIGS SIG" as "SIGS".
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iRevert "OBLS SIGS". iFrame. simpl. iIntros "OBLS SIGS".
+
+      rewrite bi.sep_comm -!bi.sep_assoc.  
+      iSplitR.
+      { iPureIntro.
+        red. do 3 right. left. exists sid. 
+        erewrite (f_equal (sets_signal _ _ _)).
+        { econstructor; eauto. }
+        simpl. reflexivity. }
+      
+      iMod (own_update with "OBLS") as "OBLS".
+      { apply auth_update.
+        apply singleton_local_update_any.
+        intros ? RR. apply lookup_fmap_Some in RR as (R_&?&Rζ_).
+        rewrite Rζ in Rζ_. inversion Rζ_. subst R_. subst.
+        apply exclusive_local_update with (x' := Excl (R ∖ {[ sid ]})). 
+        done. }
+      iDestruct "OBLS" as "[??]". rewrite Rζ. simpl.
+      rewrite -fmap_insert. iFrame.
+
+      rewrite /sgn. rewrite bi.sep_comm. rewrite -!own_op.
+      iApply own_update; [| by iFrame].  
+      apply auth_update. simpl.
+      eapply local_update_proper.
+      1: reflexivity.
+      2: eapply singleton_local_update_any.
+      { rewrite /sig_map_repr. rewrite fmap_insert. reflexivity. }
+      intros ?. rewrite /sig_map_repr.
+      rewrite lookup_fmap_Some. intros [[??] [<- Sζ']].
+      rewrite Sζ in Sζ'. inversion Sζ'. subst.
+      apply prod_local_update'; [done| ].
+      apply option_local_update.  
+      by apply exclusive_local_update.
+    Qed.
 
     (* TODO: ? refactor these proofs about burn_cp *)
     Lemma burn_cp_upd_impl δ ζ π deg
