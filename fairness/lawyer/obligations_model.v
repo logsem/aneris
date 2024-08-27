@@ -56,6 +56,8 @@ Section Model.
     Build_ProgressState a b obls d e f.     
   Definition update_eps eps '(Build_ProgressState a b c _ e f) :=
     Build_ProgressState a b c eps e f.
+  Definition update_phases phases '(Build_ProgressState a b c d _ f) :=
+    Build_ProgressState a b c d phases f.
 
   Definition lt_locale_obls l θ ps :=
     let obls := default ∅ (ps_obls ps !! θ) in
@@ -122,13 +124,27 @@ Section Model.
     let new_cps := ps_cps ps ⊎ {[+ (π, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
+  Definition fork_left (π: Phase): Phase := ndot π 0. 
+  Definition fork_right (π: Phase): Phase := ndot π 1. 
+
+  Inductive forks_locale: PS -> Locale -> PS -> Locale -> gset SignalId -> Prop :=
+  | fl_step ps θ θ' π0 obls'
+      (LOC_PHASE: ps_phases ps !! θ = Some π0)
+      (FRESH': θ' ∉ dom $ ps_phases ps)
+      :
+      let new_obls := <[ θ' := obls']> $ <[ θ := (default ∅ (ps_obls ps !! θ)) ∖ obls' ]> $ ps_obls ps in
+      let new_phases := <[ θ' := fork_right π0 ]> $ <[ θ := fork_left π0 ]> $ ps_phases ps in
+      let ps' := update_phases new_phases $ update_obls new_obls ps in
+      forks_locale ps θ ps' θ' obls'.
+
   Definition ghost_step ps1 θ ps2 :=
     (exists π δ, burns_cp ps1 θ ps2 π δ) \/
     (exists π δ δ' n, exchanges_cp ps1 θ ps2 π δ δ' n) \/
     (exists l, creates_signal ps1 θ ps2 l) \/
     (exists s, sets_signal ps1 θ ps2 s) \/
     (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
-    (exists s π δ, expects_ep ps1 θ ps2 s π δ).
+    (exists s π δ, expects_ep ps1 θ ps2 s π δ) \/
+    (exists θ' obls', forks_locale ps1 θ ps2 θ' obls'). 
 
   (* From stdpp Require Import relations. *)
   
