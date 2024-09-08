@@ -13,7 +13,7 @@ Class ExecutionModel (Λ: language) (M: Model) := {
     em_Σ_subG: forall Σ, subG em_Σ Σ -> em_preGS Σ;
 
     em_valid_evolution_step:
-    olocale Λ → cfg Λ → mstate M → mlabel M → mstate M → Prop;
+    cfg Λ -> olocale Λ → cfg Λ → mstate M → mlabel M → mstate M → Prop;
 
     (* em_fork_post {Σ} *)
     em_thread_post {Σ} `{em_GS Σ}
@@ -44,7 +44,7 @@ Section EMDefinitions.
     | (extr :tr[oζ]: σ), auxtr :tr[ℓ]: δ =>
         (* labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) (trace_last auxtr) ℓ δ ∧ *)
         (* tids_smaller es δ *)
-      em_valid_evolution_step oζ σ (trace_last auxtr) ℓ δ
+      em_valid_evolution_step (trace_last extr) oζ σ (trace_last auxtr) ℓ δ
     | _, _ => True
     end.
 
@@ -55,4 +55,3 @@ Section EMDefinitions.
     em_valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
 
 End EMDefinitions.
-
