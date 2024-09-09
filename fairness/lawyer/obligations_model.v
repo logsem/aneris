@@ -3,59 +3,10 @@ From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From stdpp Require Import namespaces. 
 From trillium.fairness.lawyer Require Import obls_utils.
 
-Section Bijection.
-  Require Import Coq.Logic.StrictProp.
-
-  Let in_gset `{Countable K} (g: gset K) := Ssig (fun k => Squash (k ∈ g)).
-
-  Instance in_gset_dec `{Countable K} (g: gset K) : EqDecision (in_gset g).
-  Proof.
-    red. intros [x ?] [y ?].
-    destruct (decide (x = y)).
-    - subst. left. eauto.
-    - right. intros EQ. by inversion EQ.
-  Qed.
-
-  Instance fin_in_gset `{Countable K} (g: gset K): finite.Finite (in_gset g).
-  Proof.
-    remember (elements g) as l. generalize dependent g. induction l.
-    { intros. symmetry in Heql. apply elements_empty_inv, leibniz_equiv_iff in Heql.
-      subst g. exists []; [apply NoDup_nil_2| ].
-      intros [??].
-      exfalso.
-      (* inversion Spr2.   *)
-      enough (sEmpty); [done| ]. 
-      inversion Spr2. done. }
-    intros g EL.
-    assert (g = list_to_set l ∪ {[ a ]}) as ->.
-    { apply set_eq. intros. rewrite elem_of_union.
-      rewrite elem_of_list_to_set elem_of_singleton.
-      rewrite -elem_of_elements. rewrite -EL.
-      set_solver. }
-    (* specialize (IHl (list_to_set l)). edestruct IHl. *)
-    (* {   *)
-      
-    (* edestruct (IHl (g ∖ {[ a ]})). *)
-    (* {  *)
-    
-    (* exists ((fun k => (k, ) <$> elements g) *)
-  Abort.     
-    
-  Context `{Countable A, Countable B}.
-
-  Definition bij (ga: gset A) (gb: gset B) :=
-    size ga = size gb.
-
-  (* Context `(BIJ: bij ga gb). *)
-  (* Let iga := in_gset ga. *)
-  (* Let igb := in_gset gb. *)
-      
-End Bijection.
-
 
 Class ObligationsParams 
-  (* (Degree Level Locale: Type) *)
-  (Degree Level: Type)
+  (Degree Level Locale: Type)
+  (* (Degree Level: Type) *)
   (LIM_STEPS: nat) := {
   opar_deg_eqdec :> EqDecision Degree;
   opar_deg_cnt :> Countable Degree;
@@ -69,16 +20,14 @@ Class ObligationsParams
   opar_l0: Level;
   opar_l0_least: forall l, l ≠ opar_l0 -> opar_lvl_lt opar_l0 l;
   
-  (* opar_loc_eqdec :> EqDecision Locale; *)
-  (* opar_loc_cnt :> Countable Locale; *)
+  opar_loc_eqdec :> EqDecision Locale;
+  opar_loc_cnt :> Countable Locale;
 }. 
 
 
 Section Model.
-  Context `(OP: ObligationsParams Degree Level (* Locale *) LIM_STEPS).
+  Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
 
-  (* Definition Phase := unit. *)
-  (* Definition phase_le : Phase -> Phase -> Prop := fun _ _ => True. *)
   Definition Phase := namespace. 
   Definition phase_le : Phase -> Phase -> Prop :=
     fun π1 π2 => (↑π2: coPset) ⊆ ↑π1. 
@@ -94,119 +43,108 @@ Section Model.
   Record ProgressState := {
       ps_cps: gmultiset CallPermission;
       ps_sigs: gmap SignalId SignalState;
-      ps_obls: gmap Phase (gset SignalId);
+      ps_obls: gmap Locale (gset SignalId);
       ps_eps: gset ExpectPermission;
-      (* ps_phases: gmap Locale Phase; *)
+      ps_phases: gmap Locale Phase;
       ps_exc_bound: nat;
   }.
 
   Let PS := ProgressState. 
 
-  Definition update_cps cps '(Build_ProgressState _ b c d e) :=
-    Build_ProgressState cps b c d e. 
-  Definition update_sigs sigs '(Build_ProgressState a _ c d e) :=
-    Build_ProgressState a sigs c d e.     
-  Definition update_obls obls '(Build_ProgressState a b _ d e) :=
-    Build_ProgressState a b obls d e.
-  Definition update_eps eps '(Build_ProgressState a b c _ e) :=
-    Build_ProgressState a b c eps e.
-  (* Definition update_phases phases '(Build_ProgressState a b c d _) := *)
-  (*   Build_ProgressState a b c d phases. *)
+  Definition update_cps cps '(Build_ProgressState _ b c d e f) :=
+    Build_ProgressState cps b c d e f. 
+  Definition update_sigs sigs '(Build_ProgressState a _ c d e f) :=
+    Build_ProgressState a sigs c d e f.
+  Definition update_obls obls '(Build_ProgressState a b _ d e f) :=
+    Build_ProgressState a b obls d e f.
+  Definition update_eps eps '(Build_ProgressState a b c _ e f) :=
+    Build_ProgressState a b c eps e f.
+  Definition update_phases phases '(Build_ProgressState a b c d _ f) :=
+    Build_ProgressState a b c d phases f.
 
-  Definition lt_phase_obls l θ ps :=
+  Definition lt_locale_obls l θ ps :=
     let obls := default ∅ (ps_obls ps !! θ) in
     let levels: gset Level :=
       set_map (fun s => from_option fst opar_l0 (ps_sigs ps !! s)) obls in
     set_Forall (opar_lvl_lt l) levels.
     
-  (* Definition phases_for_degree ps π: gset Phase := *)
-  
-  Inductive burns_cp: PS -> Phase -> PS (* -> Phase *) -> Degree -> Prop :=
+  Inductive burns_cp: PS -> Locale -> PS -> Phase -> Degree -> Prop :=
   | bcp_step ps θ π δ π__max
-      (* (LOC_PHASE: ps_phases ps !! θ = Some π__max) *)
+      (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps):
-    burns_cp ps θ (update_cps (ps_cps ps ∖ {[+ (π, δ) +]}) ps) (* π  *)δ. 
+    burns_cp ps θ (update_cps (ps_cps ps ∖ {[+ (π, δ) +]}) ps) π δ. 
 
-  Inductive exchanges_cp: PS -> Phase (* Locale *) -> PS -> (* Phase -> *) Degree -> Degree -> nat -> Prop :=
-  | lcp_step ps π δ δ' n π__max 
-      (* (LOC_PHASE: ps_phases ps !! θ = Some π__max) *)
+  Inductive exchanges_cp: PS -> Locale -> PS -> Phase -> Degree -> Degree -> nat -> Prop :=
+  | lcp_step ps θ π δ δ' n π__max 
+      (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (PHASE_LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps)
       (DEG_LE: opar_deg_lt δ' δ)
       (LOW_BOUND: n <= ps_exc_bound ps):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ⊎ n *: {[+ (π, δ') +]} in
-    exchanges_cp ps π__max (update_cps new_cps ps) (* π  *)δ δ' n. 
+    exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n. 
       
-  Inductive creates_signal: PS -> Phase (* Locale *) -> PS -> Level -> Prop :=
+  Inductive creates_signal: PS -> Locale -> PS -> Level -> Prop :=
   | cs_step ps θ s l
-      (FRESH: s ∉ dom (ps_sigs ps))
-      (DOM: θ ∈ dom $ ps_obls ps)
-    :
+      (FRESH: s ∉ dom (ps_sigs ps)):
     let new_sigs := <[ s := (l, false) ]> (ps_sigs ps) in
     let cur_loc_obls := default ∅ (ps_obls ps !! θ) in
     let new_obls := <[ θ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls ps) in
     let new_ps := update_obls new_obls $ update_sigs new_sigs ps in
     creates_signal ps θ new_ps l.
 
-  Inductive sets_signal: PS -> Phase (* Locale *) -> PS -> SignalId -> Prop :=
+  Inductive sets_signal: PS -> Locale -> PS -> SignalId -> Prop :=
   | ss_step ps θ s l v
-      (SIG: ps_sigs ps !! s = Some (l, v))
-      (DOM: θ ∈ dom $ ps_obls ps):
+      (SIG: ps_sigs ps !! s = Some (l, v)):
     let new_sigs := <[ s := (l, true) ]> (ps_sigs ps) in
     let cur_loc_obls := default ∅ (ps_obls ps !! θ) in
     let new_obls := <[ θ := cur_loc_obls ∖ {[ s ]} ]> (ps_obls ps) in
     let new_ps := update_obls new_obls $ update_sigs new_sigs ps in
     sets_signal ps θ new_ps s.
 
-  Inductive creates_ep: PS -> Phase (* Locale *) -> PS -> SignalId -> Phase -> Degree -> Degree -> Prop :=
-  | cep_step ps s π π__max δ δ'
+  Inductive creates_ep: PS -> Locale -> PS -> SignalId -> Phase -> Degree -> Degree -> Prop :=
+  | cep_step ps θ s π π__max δ δ'
       (SIG: s ∈ dom (ps_sigs ps))      
-      (* (LOC_PHASE: ps_phases ps !! θ = Some π__max) *)
+      (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps)
       (DEG_LE: opar_deg_lt δ' δ):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} in
     let new_eps := ps_eps ps ∪ {[ (s, π, δ') ]} in
     let new_ps := update_eps new_eps $ update_cps new_cps ps in
-    creates_ep ps π__max new_ps s π δ δ'.
+    creates_ep ps θ new_ps s π δ δ'.
 
-  Inductive expects_ep: PS -> Phase (* Locale *) -> PS -> SignalId -> Phase -> Degree -> Prop :=
-  | eep_step ps (* θ *) s π π__max δ l
-      (* (LOC_PHASE: ps_phases ps !! θ = Some π__max) *)
+  Inductive expects_ep: PS -> Locale -> PS -> SignalId -> Phase -> Degree -> Prop :=
+  | eep_step ps θ s π π__max δ l
+      (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (LE: phase_le π π__max)
       (SIG: ps_sigs ps !! s = Some (l, false))
       (EP: (s, π, δ) ∈ ps_eps ps)
-      (OBLS_LT: lt_phase_obls l π__max ps):
+      (OBLS_LT: lt_locale_obls l θ ps):
     let new_cps := ps_cps ps ⊎ {[+ (π, δ) +]} in
-    expects_ep ps π__max (update_cps new_cps ps) s π δ.
+    expects_ep ps θ (update_cps new_cps ps) s π δ.
 
   Definition fork_left (π: Phase): Phase := ndot π 0. 
   Definition fork_right (π: Phase): Phase := ndot π 1. 
 
-  Inductive forks_locale: PS -> Phase (* Locale *) -> PS -> (* Locale -> *) gset SignalId -> Prop :=
-  | fl_step ps θ (* θ' *) (* π0 *) obls'
-      (DOM: θ ∈ dom $ ps_obls ps)
-      (* (LOC_PHASE: ps_phases ps !! θ = Some π0) *)
-      (* (FRESH': θ' ∉ dom $ ps_phases ps) *)
+  Inductive forks_locale: PS -> Locale -> PS -> Locale -> gset SignalId -> Prop :=
+  | fl_step ps θ θ' π0 obls'
+      (LOC_PHASE: ps_phases ps !! θ = Some π0)
+      (FRESH': θ' ∉ dom $ ps_phases ps)
       :
-      (* let new_obls := <[ θ' := obls']> $ <[ θ := (default ∅ (ps_obls ps !! θ)) ∖ obls' ]> $ ps_obls ps in *)
-      (* let new_phases := <[ θ' := fork_right π0 ]> $ <[ θ := fork_left π0 ]> $ ps_phases ps in *)
-      let new_obls := 
-        <[ fork_right θ := obls' ]> $ 
-        <[ fork_left θ := (default ∅ (ps_obls ps !! θ)) ∖ obls' ]> $ 
-        delete θ (ps_obls ps) in
-      (* let ps' := update_phases new_phases $ update_obls new_obls ps in *)
-      let ps' := update_obls new_obls ps in
-      forks_locale ps θ ps' (* θ'  *)obls'.
+      let new_obls := <[ θ' := obls']> $ <[ θ := (default ∅ (ps_obls ps !! θ)) ∖ obls' ]> $ ps_obls ps in
+      let new_phases := <[ θ' := fork_right π0 ]> $ <[ θ := fork_left π0 ]> $ ps_phases ps in
+      let ps' := update_phases new_phases $ update_obls new_obls ps in
+      forks_locale ps θ ps' θ' obls'.
 
-  Definition phase_step ps1 (θ: Phase) ps2 :=
-    (exists δ, burns_cp ps1 θ ps2 δ) \/
-    (exists δ δ' n, exchanges_cp ps1 θ ps2 δ δ' n) \/
-    (exists l, creates_signal ps1 θ ps2 l) \/
-    (exists s, sets_signal ps1 θ ps2 s) \/
-    (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
-    (exists s π δ, expects_ep ps1 θ ps2 s π δ). 
+  (* Definition phase_step ps1 (θ: Phase) ps2 := *)
+  (*   (exists δ, burns_cp ps1 θ ps2 δ) \/ *)
+  (*   (exists δ δ' n, exchanges_cp ps1 θ ps2 δ δ' n) \/ *)
+  (*   (exists l, creates_signal ps1 θ ps2 l) \/ *)
+  (*   (exists s, sets_signal ps1 θ ps2 s) \/ *)
+  (*   (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/ *)
+  (*   (exists s π δ, expects_ep ps1 θ ps2 s π δ).  *)
 
   (* Definition ghost_step ps1 (θ: Phase) ps2 := *)
   (*   (exists δ, burns_cp ps1 θ ps2 δ) \/ *)
@@ -217,28 +155,32 @@ Section Model.
   (*   (exists s π δ, expects_ep ps1 θ ps2 s π δ) \/ *)
   (*   (exists obls', forks_locale ps1 θ ps2 obls').  *)
 
-  (* TODO: do we need versions for >1 step? *)
-  Definition adv_phase (θ: Phase) (ps: ProgressState) :=
-    if (decide (θ ∈ dom (ps_obls ps))) then θ else fork_left θ.
+  Definition loc_step ps1 θ ps2 :=
+    (exists π δ, burns_cp ps1 θ ps2 π δ) \/
+    (exists π δ δ' n, exchanges_cp ps1 θ ps2 π δ δ' n) \/
+    (exists l, creates_signal ps1 θ ps2 l) \/
+    (exists s, sets_signal ps1 θ ps2 s) \/
+    (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
+    (exists s π δ, expects_ep ps1 θ ps2 s π δ) \/
+    (exists θ' obls', forks_locale ps1 θ ps2 θ' obls'). 
 
   Require Import Relation_Operators.
 
   Notation " x ;;; y " := (rel_compose x y) (at level 20).
 
-  Definition progress_step ps1 (θ: Phase) ps2 :=
+  Definition progress_step ps1 (θ: Locale) ps2 :=
     exists n, n <= LIM_STEPS /\
-           (relations.nsteps (fun p1 p2 => phase_step p1 θ p2) n
+           (relations.nsteps (fun p1 p2 => loc_step p1 θ p2) n
              ;;;
-            (fun p1 p2 => exists δ, burns_cp p1 θ p2 δ)
+            (fun p1 p2 => exists π δ, burns_cp p1 θ p2 π δ)
            )
             ps1 ps2.
 
-  Definition om_trans ps1 (θ: Phase) ps2 :=
+  Definition om_trans ps1 (θ: Locale) ps2 :=
     exists ps',
       progress_step ps1 θ ps' /\
-      (clos_refl _ (fun p1 p2 => exists R, forks_locale p1 θ p2 R)) ps' ps2. 
+      (clos_refl _ (fun p1 p2 => exists τ' R, forks_locale p1 θ p2 τ' R)) ps' ps2. 
                   
-
   Definition ObligationsModel: Model :=
     {| mtrans := om_trans |}. 
 
