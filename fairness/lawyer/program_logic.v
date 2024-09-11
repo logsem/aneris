@@ -213,30 +213,31 @@ Section ProgramLogic.
     (*   phase_le π1 π2. *)
     (* Proof. done. Qed. *)
 
-    Lemma finish_obls_steps extr omtr τ π n π' deg
+    Lemma finish_obls_steps extr omtr τ (* π  *)n π' deg
       (BOUND: n <= LIM_STEPS)
-      (LE: phase_le π' π)
+      (LE: exists π, ps_phases OP (trace_last omtr) !! τ = Some π /\ phase_le π' π)
       :
-      ⊢ th_phase_ge OP τ π (H2 := oGS) -∗ HL_OM_trace_interp'_step extr omtr τ n false -∗ (cp OP π' deg (H2 := oGS)) ==∗
-        ∃ δ', state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS) ∗ th_phase_ge OP τ π (H2 := oGS).
+      ⊢ (* th_phase_ge OP τ π (H2 := oGS) -∗  *)HL_OM_trace_interp'_step extr omtr τ n false -∗ (cp OP π' deg (H2 := oGS)) ==∗
+        ∃ δ', state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS) (* ∗ th_phase_ge OP τ π (H2 := oGS) *).
     Proof.
-      iIntros "PH TI'' cp". rewrite /HL_OM_trace_interp'_step.
+      (* iIntros "PH TI'' cp". *)
+      iIntros "TI'' cp".
+      rewrite /HL_OM_trace_interp'_step.
+
+      (* iClear "PH".  *)
+      
       destruct extr; [done| ].
       iDestruct "TI''" as (δ__k) "(HEAP&MSI&%TRANSS&%TH_OWN&%DPO&%OBLS&->&%STEP&%NOFORK)".
       iDestruct (cp_msi_dom with "[$] [$]") as %CP.
-      iDestruct (th_phase_msi_ge with "[$] [$]") as %PH.      
-      destruct PH as (π__max & PH & LE0). 
-
-      (* pose proof (WIP_th_own_gsteps_ex_phase _ _ _ _ _ _ STEP OBLS TRANSS) as [πτ PHτ]. *)
-      
-      (* rewrite OBLS. rewrite -TH_OWN. *)
-      (* apply elem_of_list_to_set. *)
-      (* apply locales_of_list_from_locale_from.  *)
-      (* eapply locale_step_from_locale_src; eauto. }  *)
+      (* iDestruct (th_phase_msi_ge with "[$] [$]") as %PH. *)
+      (* destruct PH as (π__max & PH & LE0).  *)
+      destruct LE as (π__max & PH & LE0).
       
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
       { eexists. split; eauto.
-        red. etrans; eauto. }
+        rewrite -PH.
+        (* TODO: use stricter version of progress_step_dpo_pres for nsteps *)
+        admit. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)". 
       iModIntro. iExists _. simpl. iFrame.
       
@@ -260,7 +261,7 @@ Section ProgramLogic.
         + by right. 
       - eapply progress_step_dpo_pres; eauto.
         do 2 (eexists; split; eauto). 
-    Qed. 
+    Admitted. 
 
     Lemma BMU_intro E ζ b (P : iProp Σ):
       ⊢ P -∗ BMU E ζ b P.
@@ -292,8 +293,11 @@ Section ProgramLogic.
         th_phase_ge OP ζ π (H2 := oGS) -∗
         MU E ζ P.
     Proof.
-      rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'".
-      iSpecialize ("BMU" with "[$]"). 
+      rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'".      
+      iDestruct (th_phase_msi_ge with "[TI'] [$]") as %(π__max & PH & LE0).
+      { rewrite /HL_OM_trace_interp'. destruct etr; [done| ].
+        iDestruct "TI'" as "(?&?&?&?)". iFrame. }
+      iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! etr otr 0 false with "[TI']").
       { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
         destruct etr; [done| ].
@@ -301,36 +305,37 @@ Section ProgramLogic.
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by constructor. }
-      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH))".
-      iMod (finish_obls_steps with "[$] [$] [$]") as (?) "[SI PH]".
+      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH'))".
+      iMod (finish_obls_steps with "[$] [$]") as (?) "SI".
       { lia. }
-      { done. }
-      iSpecialize ("P" with "PH"). iFrame.
+      { eexists. split; [apply PH| ].
+        red. etrans; eauto. }
+      iFrame.
       iModIntro. eauto.
     Qed.
 
-    Lemma BMU_MU E ζ b (P : iProp Σ) π
-      (BOUND: b <= LIM_STEPS)
-      :
-      ⊢ (BMU E ζ b ((th_phase_ge OP ζ π (H2 := oGS) -∗ P) ∗ ∃ ph deg, cp OP ph deg (H2 := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
-        th_phase_ge OP ζ π (H2 := oGS) -∗
-        MU E ζ P.
-    Proof.
-      rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'".
-      iSpecialize ("BMU" $! etr otr 0 false with "[TI']").
-      { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
-        destruct etr; [done| ].
-        iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
-        iExists _. iFrame. iPureIntro.
-        repeat split; try done.
-        by constructor. }
-      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH))". 
-      iMod (finish_obls_steps with "[$] [$] [$]") as (?) "[SI PH]".
-      { lia. }
-      { done. }
-      iSpecialize ("P" with "PH"). iFrame. 
-      iModIntro. eauto. 
-    Qed.
+    (* Lemma BMU_MU E ζ b (P : iProp Σ) π *)
+    (*   (BOUND: b <= LIM_STEPS) *)
+    (*   : *)
+    (*   ⊢ (BMU E ζ b ((th_phase_ge OP ζ π (H2 := oGS) -∗ P) ∗ ∃ ph deg, cp OP ph deg (H2 := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗ *)
+    (*     th_phase_ge OP ζ π (H2 := oGS) -∗ *)
+    (*     MU E ζ P. *)
+    (* Proof. *)
+    (*   rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'". *)
+    (*   iSpecialize ("BMU" $! etr otr 0 false with "[TI']"). *)
+    (*   { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step. *)
+    (*     destruct etr; [done| ]. *)
+    (*     iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)". *)
+    (*     iExists _. iFrame. iPureIntro. *)
+    (*     repeat split; try done. *)
+    (*     by constructor. } *)
+    (*   iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH))".  *)
+    (*   iMod (finish_obls_steps with "[$] [$] [$]") as (?) "[SI PH]". *)
+    (*   { lia. } *)
+    (*   { done. } *)
+    (*   iSpecialize ("P" with "PH"). iFrame.  *)
+    (*   iModIntro. eauto.  *)
+    (* Qed. *)
 
     (* Lemma OU_BMU_hmmm E ζ P b: *)
     (*    ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H2 := oGS) -∗ BMU E ζ (S b) P. *)
@@ -400,30 +405,34 @@ Section ProgramLogic.
       iApply sswp_MU_wp; [done| ].
       iApply sswp_pure_step; [done| ].
       rewrite /Z.add. simpl. 
-      iNext. iApply (BMU_MU with "[-PH] [$]"); [eauto| ].
+      iNext. iApply (BMU_MU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
       iApply OU_BMU.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
       iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU"; eauto.
       iApply (OU_wand with "[-OU]"); [| done].
-      iIntros "CPS'". 
+      iIntros "[CPS' PH]". 
       iApply BMU_intro.
       iDestruct (cp_mul_take with "CPS'") as "[CPS' CP']". 
-      iSplitR "CP'"; [| by eauto].
+      iSplitR "CP'".
+      2: { do 2 iExists _. iFrame. iPureIntro.
+           red. reflexivity. }
 
       iApply wp_value.
 
       wp_bind (ref _)%E. 
       iApply sswp_MU_wp; [done| ].
       iApply wp_alloc. iIntros "!> %x L ?".
-      iApply BMU_MU; eauto.
+      iApply (BMU_MU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
       iApply OU_BMU.
       iDestruct (OU_create_sig _ _ _ l with "[$]") as "OU".
-      Unshelve. 2, 3: by apply _. 
+      Unshelve. 2: by apply _. 
       iApply (OU_wand with "[-OU]"); [| done].
       iIntros "(%sid & SIG & OBLS)".
       iApply BMU_intro.
-      iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-      iSplitR "CP"; [| by eauto].
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+      iSplitR "CP". 
+      2: { do 2 iExists _. iFrame. iPureIntro.
+           red. reflexivity. }
 
       iApply wp_value.
       (* Set Printing All. *)
@@ -432,32 +441,37 @@ Section ProgramLogic.
       wp_bind (Rec _ _ _). 
       iApply sswp_MU_wp; [done| ].      
       iApply sswp_pure_step; [done| ].
-      iApply BMU_MU; [eauto| ].
-      iNext.
+      iNext. iApply (BMU_MU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
       iApply OU_BMU.
       iDestruct (OU_set_sig with "OBLS SIG") as "OU"; [set_solver| ].
       iApply (OU_wand with "[-OU]"); [| done].
       iIntros "(SIG & OBLS)".
       iApply BMU_intro.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-      iSplitR "CP"; [| by eauto].
+      iSplitR "CP".
+      2: { do 2 iExists _. iFrame. iPureIntro.
+           red. reflexivity. }
 
       iApply wp_value. 
 
       iApply sswp_MU_wp; [done| ].      
       iApply sswp_pure_step; [done| ].
-      iApply BMU_MU; [reflexivity| ].
-      iNext. iApply BMU_intro.
+      iApply (BMU_MU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
+      iApply BMU_intro.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-      iSplitR "CP"; [| by eauto].
+      iSplitR "CP". 
+      2: { do 2 iExists _. iFrame. iPureIntro.
+           red. reflexivity. }
 
       simpl. 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_load with "[$]"). iNext. iIntros.
-      iApply BMU_MU; [reflexivity| ].
+      iApply (BMU_MU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
       iApply BMU_intro.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-      iSplitR "CP"; [| by eauto].
+      iSplitR "CP".
+      2: { do 2 iExists _. iFrame. iPureIntro.
+           red. reflexivity. }
 
       iApply wp_value. 
       iApply "POST".
