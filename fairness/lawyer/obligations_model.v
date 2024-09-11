@@ -270,7 +270,7 @@ Section ObligationsRepr.
   From trillium.fairness Require Import execution_model.
   From iris.proofmode Require Import tactics.
 
-  Let locales_of_cfg (c: cfg Λ): gset (locale Λ) :=
+  Definition locales_of_cfg (c: cfg Λ): gset (locale Λ) :=
         list_to_set (locales_of_list c.1).
 
   Definition threads_own_obls (c: cfg Λ) (δ: mstate OM) (* m *) :=
@@ -366,8 +366,8 @@ Section ObligationsRepr.
       apply SAME. by destruct δ1. 
     - destruct T as (?&?&?&T). inversion T; subst.
       apply SAME. by destruct δ1.
-  Qed. 
-
+  Qed.     
+    
   (*   - destruct T as (?&T). inversion T; subst. *)
   (*     red in OBLS_CORR.  *)
   (*     destruct b1; [| set_solver]. destruct OBLS_CORR as (? & DOM1 & SUB). *)
@@ -452,6 +452,55 @@ Section ObligationsRepr.
     rewrite TRANS. done. 
   Qed.
 
+  Definition dom_phases_obls δ := dom $ ps_phases OP δ = dom $ ps_obls OP δ. 
+
+  Lemma loc_step_dpo_pres δ1 δ2 θ
+    (LSTEP: loc_step OP δ1 θ δ2)
+    (OBLS_CORR: dom_phases_obls δ1)
+    (* (DOMτ: is_Some (from_locale c.1 τ)): *)
+    :
+    dom_phases_obls δ2.
+  Proof using.
+    clear -LSTEP OBLS_CORR.
+    red in LSTEP. destruct LSTEP as [T|[T|[T|[T|[T|T]]]]].
+    - destruct T as (?&?&T). inversion T; subst.
+      by destruct δ1. 
+    - destruct T as (?&?&?&?&T). inversion T; subst. 
+      by destruct δ1. 
+    - destruct T as (?&T). inversion T; subst.
+      destruct δ1. simpl in *.
+      subst new_obls0. red. rewrite dom_insert_L. simpl. set_solver. 
+    - destruct T as (?&T). inversion T; subst.
+      destruct δ1. simpl in *.  
+      subst new_obls0. simpl.
+      red. rewrite dom_insert_L. set_solver. 
+    - destruct T as (?&?&?&?&T). inversion T; subst.
+      by destruct δ1. 
+    - destruct T as (?&?&?&T). inversion T; subst.
+      by destruct δ1.
+  Qed. 
+
+  (* TODO: refactor *)
+  Lemma progress_step_dpo_pres δ1 τ δ2
+    (STEP: progress_step OP δ1 τ δ2)
+    (DPO: dom_phases_obls δ1)
+    (* (DOMτ: is_Some (from_locale c.1 τ)) *)
+    :
+    dom_phases_obls δ2.
+  Proof.
+    red in STEP. destruct STEP as (n&?&STEP).
+    eapply rel_compose_mono in STEP.
+    2: reflexivity.
+    1: apply rel_compose_nsteps_next in STEP.
+    2: { do 2 red. intros. by left. }
+    (* clear -(* DOMτ *) OM STEP TH_OWN. *)
+    generalize dependent δ2. induction n.
+    { simpl. intros ? ?%nsteps_once_inv. by eapply loc_step_dpo_pres. }
+    intros ? (δ'&STEP1&STEP2)%rel_compose_nsteps_next.
+    apply IHn in STEP1. eapply loc_step_dpo_pres; eauto.
+    lia. 
+  Qed.
+
   (* Definition valid_bij_step *)
   (*   (σ1: cfg Λ) (oζ: olocale Λ) (σ2: cfg Λ) *)
   (*   (δ1: mstate OM) (ℓ: mlabel OM) (δ2: mstate OM) *)
@@ -497,14 +546,14 @@ Section ObligationsRepr.
       oζ = Some ℓ                
   .
 
-
   Definition obls_si `{ObligationsGS Σ}
     (σ: cfg Λ) (δ: mstate OM): iProp Σ :=
     (* ∃ m,  *)
       obls_msi δ ∗
-      ⌜ threads_own_obls σ δ (* m *)⌝
+      ⌜ threads_own_obls σ δ (* m *)⌝ ∗
+      ⌜ dom_phases_obls δ ⌝
       (* ∗ gset_bij_own_auth obls_bij (DfracOwn 1) m *)
-. 
+  . 
 
   (* Definition thread_phase `{ObligationsGS Σ} (τ: locale Λ) (π: Phase): iProp Σ := *)
   (*   gset_bij_own_elem obls_bij τ π.  *)
@@ -525,7 +574,9 @@ Section ObligationsRepr.
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
     (* exists τ0 e0, σ.1 = [e0] /\ from_locale σ.1 τ0 = Some e0 /\ *)
     (*         dom (ps_obls OP δ) = {[ τ0 ]}.  *)
-    exists τ0, locales_of_cfg σ = {[ τ0 ]} /\ dom $ ps_obls OP δ = {[ τ0 ]}. 
+    exists τ0,
+      let R := {[ τ0 ]} in
+      locales_of_cfg σ = R /\ dom $ ps_obls OP δ = R /\ dom $ ps_phases OP δ = R. 
 
   Let obls_Σ: gFunctors := #[
       GFunctor (authUR (gmultisetUR cpO));
@@ -606,8 +657,8 @@ Section ObligationsRepr.
     { apply mono_nat_both_valid. reflexivity. }
     iModIntro. iExists {| obls_pre := PRE; |}.
     iFrame.
-    iPureIntro. red.
-    red in INIT. destruct INIT as [??]. set_solver. 
+    iPureIntro. 
+    red in INIT. destruct INIT as (?&?&?&?). set_solver.  
   Qed.
 
   (* Instance foo: SingletonMS (Phase * Degree) (gmultiset CallPermission).  *)
@@ -1095,8 +1146,7 @@ Section ObligationsRepr.
     (* TODO: ? refactor these proofs about fork step *)
     Lemma fork_locale_upd_impl δ ζ ζ' π R0 R'
       (FRESH: ζ' ∉ dom $ ps_phases OP δ)
-      (* TODO: where else it's needed? *)
-      (DOM_EQ: dom $ ps_phases OP δ = dom $ ps_obls OP δ)
+      (DOM_EQ: dom_phases_obls δ)
       :
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗ obls ζ R0 ==∗ 
         ∃ δ' π1 π2, obls_msi δ' ∗ th_phase_ge ζ π1 ∗ th_phase_ge ζ' π2 ∗
@@ -1168,7 +1218,7 @@ Section ObligationsRepr.
         apply singleton_local_update_any.
         intros. eapply exclusive_local_update. done.
         Unshelve. apply excl_exclusive.
-    Qed.       
+    Qed.
 
   End ResourcesUpdates.
 

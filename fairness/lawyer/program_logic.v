@@ -3,7 +3,7 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic.
-From trillium.fairness.lawyer Require Import obligations_model.
+From trillium.fairness.lawyer Require Import obligations_model obls_utils.
 From trillium.fairness Require Import locales_helpers. 
 
 
@@ -54,22 +54,35 @@ Section ProgramLogic.
 
   Section MU.
     
+    Definition extr_last_nofork (extr: execution_trace heap_lang) :=
+      match extr with
+      | {tr[ _ ]} => False
+      | extr' :tr[oζ]: c' => 
+          locales_of_cfg OP (trace_last extr') = locales_of_cfg OP c'
+      end.
+
+    Let foobar: Prop.
+    Admitted. 
+
     Definition HL_OM_trace_interp' (extr: execution_trace heap_lang)
-      (omtr: auxiliary_trace OM) (τ: locale heap_lang): iProp Σ :=
+      (omtr: auxiliary_trace OM) (τ: locale heap_lang) (f: bool): iProp Σ :=
       match extr with
       | {tr[ _ ]} => False
       | extr' :tr[oζ]: c' =>
           let c := trace_last extr' in
           let δ := trace_last omtr in
           gen_heap_interp c'.2.(heap) ∗
+          (* TODO: next 3 lines are exactly obls_si; similar in next def *)
           obls_msi OP δ (H2 := oGS) ∗
           ⌜ threads_own_obls OP c δ ⌝ ∗
+          ⌜ dom_phases_obls OP δ ⌝ ∗
           ⌜ oζ = Some τ ⌝ ∗
-          ⌜ locale_step c (Some τ) c' ⌝
+          ⌜ locale_step c (Some τ) c' ⌝ ∗
+          ⌜ if f then foobar else extr_last_nofork (extr' :tr[oζ]: c') ⌝
     end.
 
     Definition HL_OM_trace_interp'_step (extr: execution_trace heap_lang)
-      (omtr: auxiliary_trace OM) (τ: locale heap_lang) (k: nat): iProp Σ :=
+      (omtr: auxiliary_trace OM) (τ: locale heap_lang) (k: nat) (f: bool): iProp Σ :=
       match extr with
       | {tr[ _ ]} => False
       | extr' :tr[oζ]: c' =>
@@ -78,16 +91,19 @@ Section ProgramLogic.
           ∃ δ__k,
           gen_heap_interp c'.2.(heap) ∗
           obls_msi OP δ__k (H2 := oGS) ∗
-          ⌜ nsteps (fun p1 p2 => ghost_step OP p1 τ p2) k δ δ__k ⌝ ∗
+          ⌜ nsteps (fun p1 p2 => loc_step OP p1 τ p2) k δ δ__k ⌝ ∗
           ⌜ threads_own_obls OP c δ ⌝ ∗
+          ⌜ dom_phases_obls OP δ ⌝ ∗
+          ⌜ obls_eq OP δ__k (dom $ ps_obls OP δ) ⌝ ∗
           ⌜ oζ = Some τ ⌝ ∗
-          ⌜ locale_step c (Some τ) c' ⌝
+          ⌜ locale_step c (Some τ) c' ⌝ ∗
+          ⌜ if f then foobar else extr_last_nofork (extr' :tr[oζ]: c') ⌝
     end.
 
     
     Definition MU E ζ (P : iProp Σ) : iProp Σ :=
     ∀ extr atr,
-      HL_OM_trace_interp' extr atr ζ ={E}=∗
+      HL_OM_trace_interp' extr atr ζ false ={E}=∗
       ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) (irisG := @heapG_irisG _ _ _ hGS) ∗ P.
 
     Lemma sswp_MU_wp_fupd s E E' ζ e Φ
@@ -115,24 +131,30 @@ Section ProgramLogic.
       simpl.
       iApply (step_fupd_wand with "Hsswp").
       iIntros ">(Hσ & HMU & ->)".
-      rewrite /MU. iSpecialize ("HMU" $! (_ :tr[Some ζ]: _) atr with "[MSI Hσ]").
-      { rewrite /HL_OM_trace_interp'.
-        rewrite /obls_si. iDestruct "MSI" as "[M %TS]". 
+      rewrite /MU. iSpecialize ("HMU" $! (extr :tr[Some ζ]: _) atr with "[MSI Hσ]").
+      { rewrite /HL_OM_trace_interp'. simpl. 
+        rewrite /obls_si. iDestruct "MSI" as "(M & %TS & %DPO)". 
         (* iPoseProof (MSI_tids_smaller with "MSI") as "%TS". *)
         remember (trace_last extr) as xx. destruct xx as [tp h].
         inversion Hextr as [[TP HH]].
         rewrite -TP in TS.
         iApply bi.sep_assoc. iSplitL.
-        2: { iPureIntro. repeat split; eauto.
-             { replace tp with (tp, h).1 in TS by done.
-               rewrite Heqxx in TS. apply TS. }
-             simpl in Hζ. 
-             rewrite -Hζ. simpl.
-             (* rewrite locale_fill'.  *)
-             eapply locale_step_atomic.
-             3: { eapply @fill_step. apply Hstep. } 
-             { rewrite -Heqxx Hextr. simpl. reflexivity. }
-             reflexivity. }
+        2: { iPureIntro. repeat rewrite and_assoc. split.
+             - repeat rewrite -and_assoc. repeat split; eauto.  
+               { replace tp with (tp, h).1 in TS by done.
+                 rewrite Heqxx in TS. apply TS. }
+               simpl in Hζ. 
+               rewrite -Hζ. simpl.
+               (* rewrite locale_fill'.  *)
+               eapply locale_step_atomic.
+               3: { eapply @fill_step. apply Hstep. } 
+               { rewrite -Heqxx Hextr. simpl. reflexivity. }
+               reflexivity.
+             - simpl. rewrite -Heqxx TP HH.
+               rewrite app_nil_r.
+               rewrite /locales_of_cfg. simpl. f_equal.
+               apply locales_of_list_equiv.
+               apply locales_equiv_from_middle. done. } 
         simpl. iFrame. }
       iMod ("HMU") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
       iExists _, _. rewrite right_id_L. by iFrame.
@@ -162,65 +184,82 @@ Section ProgramLogic.
   Section BMU.
 
     Definition BMU E ζ b (P : iProp Σ) : iProp Σ :=
-    ∀ extr atr n,
+    ∀ extr atr n f,
       (* ⌜ n <= LIM_STEPS - b ⌝ ∗ *)
-      HL_OM_trace_interp'_step extr atr ζ n ={E}=∗
-      ∃ n', HL_OM_trace_interp'_step extr atr ζ n' ∗ 
+      HL_OM_trace_interp'_step extr atr ζ n f ={E}=∗
+      ∃ n', HL_OM_trace_interp'_step extr atr ζ n' f ∗ 
             (* ⌜ n <= n' <= LIM_STEPS ⌝ ∗  *)
             ⌜ n' - n <= b ⌝ ∗
             P.
 
-    (* TODO: clarify how to derive this fact *)
-    Lemma WIP_th_own_ex_phase c τ c' δ
-      (STEP: locale_step c (Some τ) c')
-      (OBLS: threads_own_obls OP c δ):
-      exists π, ps_phases OP δ !! τ = Some π.
-    Proof. Admitted.
+    (* (* TODO: clarify how to derive this fact *) *)
+    (* Lemma WIP_th_own_ex_phase c τ c' δ *)
+    (*   (STEP: locale_step c (Some τ) c') *)
+    (*   (OBLS: threads_own_obls OP c δ): *)
+    (*   exists π, ps_phases OP δ !! τ = Some π. *)
+    (* Proof. *)
+      
+    (* Admitted. *)
 
-    (* TODO: ghost steps should preserve it *)
-    Lemma WIP_th_own_gsteps_ex_phase c τ c' δ δ' n
-      (STEP: locale_step c (Some τ) c')
-      (OBLS: threads_own_obls OP c δ)
-      (GSTEPS: relations.nsteps (fun p1 p2 => ghost_step OP p1 τ p2) n δ δ'):
-      exists π, ps_phases OP δ' !! τ = Some π.
-    Proof. Admitted.
+    (* (* TODO: ghost steps should preserve it *) *)
+    (* Lemma WIP_th_own_gsteps_ex_phase c τ c' δ δ' n *)
+    (*   (STEP: locale_step c (Some τ) c') *)
+    (*   (OBLS: threads_own_obls OP c δ) *)
+    (*   (GSTEPS: relations.nsteps (fun p1 p2 => ghost_step OP p1 τ p2) n δ δ'): *)
+    (*   exists π, ps_phases OP δ' !! τ = Some π. *)
+    (* Proof. Admitted. *)
 
-    Lemma WIP_all_phases_le π1 π2:
-      phase_le π1 π2.
-    Proof. done. Qed.
+    (* Lemma WIP_all_phases_le π1 π2: *)
+    (*   phase_le π1 π2. *)
+    (* Proof. done. Qed. *)
 
-    Lemma finish_obls_steps extr omtr τ n ph deg
+    Lemma finish_obls_steps extr omtr τ π n π' deg
       (BOUND: n <= LIM_STEPS)
+      (LE: phase_le π' π)
       :
-      ⊢ HL_OM_trace_interp'_step extr omtr τ n -∗ (cp OP ph deg (H2 := oGS)) ==∗
-        ∃ δ', state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS).
+      ⊢ th_phase_ge OP τ π (H2 := oGS) -∗ HL_OM_trace_interp'_step extr omtr τ n false -∗ (cp OP π' deg (H2 := oGS)) ==∗
+        ∃ δ', state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS) ∗ th_phase_ge OP τ π (H2 := oGS).
     Proof.
-      iIntros "TI'' cp". rewrite /HL_OM_trace_interp'_step.
+      iIntros "PH TI'' cp". rewrite /HL_OM_trace_interp'_step.
       destruct extr; [done| ].
-      iDestruct "TI''" as (δ__k) "(HEAP&MSI&%TRANSS&%OBLS&->&%STEP)".
-      iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
+      iDestruct "TI''" as (δ__k) "(HEAP&MSI&%TRANSS&%TH_OWN&%DPO&%OBLS&->&%STEP&%NOFORK)".
+      iDestruct (cp_msi_dom with "[$] [$]") as %CP.
+      iDestruct (th_phase_msi_ge with "[$] [$]") as %PH.      
+      destruct PH as (π__max & PH & LE0). 
 
-      pose proof (WIP_th_own_gsteps_ex_phase _ _ _ _ _ _ STEP OBLS TRANSS) as [πτ PHτ]. 
+      (* pose proof (WIP_th_own_gsteps_ex_phase _ _ _ _ _ _ STEP OBLS TRANSS) as [πτ PHτ]. *)
+      
+      (* rewrite OBLS. rewrite -TH_OWN. *)
+      (* apply elem_of_list_to_set. *)
+      (* apply locales_of_list_from_locale_from.  *)
+      (* eapply locale_step_from_locale_src; eauto. }  *)
+      
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
-      { eexists. split; eauto. apply WIP_all_phases_le. }
+      { eexists. split; eauto.
+        red. etrans; eauto. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)". 
       iModIntro. iExists _. simpl. iFrame.
       
       assert (threads_own_obls OP a δ') as TH_OWN'.
-      { eapply locale_step_th_obls_pres in OBLS; eauto.
-        remember (trace_last extr) as X.
-        destruct X as [??], a as [??].
-        eapply progress_step_th_obls_pres with (τ := τ); eauto.
-        2: { eapply from_locale_step; eauto.
-             replace l with ((l, s).1) by auto. 
-             eapply locale_step_from_locale_src; eauto. }
-        eexists. split; eauto.
-        eexists. split; eauto. }
+      { eapply locale_nofork_step_obls_pres; eauto.
+        red. eexists. split; [eauto| ].
+        eexists. split; eauto. 
+        (* eapply locale_step_th_obls_pres in OBLS; eauto. *)
+        (* remember (trace_last extr) as X. *)
+        (* destruct X as [??], a as [??]. *)
+        (* eapply progress_step_th_obls_pres with (τ := τ); eauto. *)
+        (* 2: { eapply from_locale_step; eauto. *)
+        (*      replace l with ((l, s).1) by auto.  *)
+        (*      eapply locale_step_from_locale_src; eauto. } *)
+      }
       
-      iPureIntro. split; auto.      
-      red. repeat split; auto.
-      simpl. red. eexists. split; eauto.
-      eexists. split; eauto.      
+      iPureIntro. do 2 split; auto.
+      - red. repeat split; auto.
+        simpl. red. eexists. split; eauto.
+        + eexists. split; eauto. eexists. split; eauto.
+        + by right. 
+      - eapply progress_step_dpo_pres; eauto.
+        do 2 (eexists; split; eauto). 
     Qed. 
 
     Lemma BMU_intro E ζ b (P : iProp Σ):
@@ -238,52 +277,89 @@ Section ProgramLogic.
       iExists _. iFrame.
     Qed. 
 
-    Lemma BMU_MU E ζ b (P : iProp Σ)
+    Lemma BMU_wand E ζ b (P Q : iProp Σ):
+      ⊢ (P -∗ Q) -∗ BMU E ζ b P -∗ BMU E ζ b Q.
+    Proof. 
+      rewrite /BMU. iIntros "PQ BMU **".
+      iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
+      iExists _. iFrame. by iApply "PQ". 
+    Qed. 
+
+    Lemma BMU_MU E ζ b (P : iProp Σ) π
       (BOUND: b <= LIM_STEPS)
       :
-      (BMU E ζ b (P ∗ ∃ ph deg, cp OP ph deg (H2 := oGS))) ⊢ MU E ζ P.
+      ⊢ (th_phase_ge OP ζ π (H2 := oGS) -∗ BMU E ζ b ((P) ∗ ∃ ph deg, cp OP ph deg (H2 := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
+        th_phase_ge OP ζ π (H2 := oGS) -∗
+        MU E ζ P.
     Proof.
-      rewrite /MU /BMU. iIntros "BMU" (etr otr) "TI'".
-      iSpecialize ("BMU" $! etr otr 0 with "[TI']").
+      rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'".
+      iSpecialize ("BMU" with "[$]"). 
+      iSpecialize ("BMU" $! etr otr 0 false with "[TI']").
       { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
         destruct etr; [done| ].
-        iDestruct "TI'" as "(HEAP&MSI&%OBLS&->&%STEP)".
+        iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
-        econstructor. }
-      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP))". iFrame. 
-      iMod (finish_obls_steps with "[$] [$]") as (?) "?".
-      { lia. }       
+        by constructor. }
+      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH))".
+      iMod (finish_obls_steps with "[$] [$] [$]") as (?) "[SI PH]".
+      { lia. }
+      { done. }
+      iSpecialize ("P" with "PH"). iFrame.
       iModIntro. eauto.
     Qed.
 
-    Lemma OU_BMU_hmmm E ζ P b:
-       ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H2 := oGS) -∗ BMU E ζ (S b) P.
+    Lemma BMU_MU E ζ b (P : iProp Σ) π
+      (BOUND: b <= LIM_STEPS)
+      :
+      ⊢ (BMU E ζ b ((th_phase_ge OP ζ π (H2 := oGS) -∗ P) ∗ ∃ ph deg, cp OP ph deg (H2 := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
+        th_phase_ge OP ζ π (H2 := oGS) -∗
+        MU E ζ P.
     Proof.
-      iIntros "CONT OU". rewrite {2}/BMU /HL_OM_trace_interp'_step.
-      iIntros (etr atr n) "TI'". destruct etr; [done| ].
-      iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & -> & %STEP)".
-      rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & P)".
-      iSpecialize ("CONT" with "[$]"). rewrite /BMU.
-      iSpecialize ("CONT" $! (etr :tr[ _ ]: _) with "[HEAP MSI]").
-      { rewrite /HL_OM_trace_interp'_step. iExists _.  iFrame.
-        iPureIntro. repeat split; eauto.
-        eapply rel_compose_nsteps_next. eexists. split; eauto. }
-      iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
-      iExists _. iFrame. iPureIntro. lia. 
+      rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'".
+      iSpecialize ("BMU" $! etr otr 0 false with "[TI']").
+      { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
+        destruct etr; [done| ].
+        iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
+        iExists _. iFrame. iPureIntro.
+        repeat split; try done.
+        by constructor. }
+      iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH))". 
+      iMod (finish_obls_steps with "[$] [$] [$]") as (?) "[SI PH]".
+      { lia. }
+      { done. }
+      iSpecialize ("P" with "PH"). iFrame. 
+      iModIntro. eauto. 
     Qed.
+
+    (* Lemma OU_BMU_hmmm E ζ P b: *)
+    (*    ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H2 := oGS) -∗ BMU E ζ (S b) P. *)
+    (* Proof. *)
+    (*   iIntros "CONT OU". rewrite {2}/BMU /HL_OM_trace_interp'_step. *)
+    (*   iIntros (etr atr n) "TI'". destruct etr; [done| ]. *)
+    (*   iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & -> & %STEP)". *)
+    (*   rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & P)". *)
+    (*   iSpecialize ("CONT" with "[$]"). rewrite /BMU. *)
+    (*   iSpecialize ("CONT" $! (etr :tr[ _ ]: _) with "[HEAP MSI]"). *)
+    (*   { rewrite /HL_OM_trace_interp'_step. iExists _.  iFrame. *)
+    (*     iPureIntro. repeat split; eauto. *)
+    (*     eapply rel_compose_nsteps_next. eexists. split; eauto. } *)
+    (*   iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro. *)
+    (*   iExists _. iFrame. iPureIntro. lia.  *)
+    (* Qed. *)
 
     Lemma OU_BMU E ζ P b:
        ⊢ OU OP ζ (BMU E ζ b P) (H2 := oGS) -∗ BMU E ζ (S b) P.
     Proof.
       iIntros "OU". rewrite {2}/BMU /HL_OM_trace_interp'_step.
-      iIntros (etr atr n) "TI'". destruct etr; [done| ].
-      iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & -> & %STEP)".
+      iIntros (etr atr n f) "TI'". destruct etr; [done| ].
+      iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & %DPO & %OBLS_EQ & -> & %STEP & %FF)".
       rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & CONT)".
       iSpecialize ("CONT" $! (etr :tr[ _ ]: _) with "[HEAP MSI]").
       { rewrite /HL_OM_trace_interp'_step. iExists _.  iFrame.
         iPureIntro. repeat split; eauto.
-        eapply rel_compose_nsteps_next. eexists. split; eauto. }
+        - eapply rel_compose_nsteps_next. eexists. split; eauto.
+        - eapply loc_step_obls_pres; eauto. }
       iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
       iExists _. iFrame. iPureIntro. lia. 
     Qed.
@@ -317,14 +393,14 @@ Section ProgramLogic.
         test_prog @ τ
       {{{ x, RET #x; obls OP τ ∅ (H2 := oGS) }}}.
     Proof.
-      iIntros (Φ). iIntros "(CPS & #PH & OBLS & #EB) POST".
+      iIntros (Φ). iIntros "(CPS & PH & OBLS & #EB) POST".
       rewrite /test_prog. 
 
       wp_bind (_ + _)%E.
       iApply sswp_MU_wp; [done| ].
       iApply sswp_pure_step; [done| ].
       rewrite /Z.add. simpl. 
-      iNext. iApply BMU_MU; [eauto| ].
+      iNext. iApply (BMU_MU with "[-PH] [$]"); [eauto| ].
       iApply OU_BMU.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
       iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU"; eauto.
