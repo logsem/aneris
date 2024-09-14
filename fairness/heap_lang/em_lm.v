@@ -107,7 +107,7 @@ refine
 |}.
 (* TODO: cannot directly specify these components *)
 Unshelve. 
-{ exact (valid_evolution_step (LM := LM)). }
+{ exact (lm_valid_evolution_step (LM := LM)). }
 2: { intros ? fG. exact (em_lm_msi (fairnessGS0 := fG)). } 
 intros. iIntros. iMod (init_fairnessGS_LM _ s1 σ) as "[% [? X]]"; [done| ]. 
 iModIntro. iExists _. iFrame. 

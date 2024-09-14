@@ -1,8 +1,8 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fuel fuel_termination fairness_finiteness fair_termination_natural utils lm_fair lm_fair_traces lm_fairness_preservation traces_match trace_interp_corr.
-From trillium.fairness.heap_lang Require Import lang simulation_adequacy em_lm_heap_lang em_lm.
+From trillium.fairness.heap_lang Require Import lang simulation_adequacy em_lm_heap_lang em_lm locales_helpers_hl.
 
-
+Close Scope Z. 
 
 Section adequacy.
 (* Local Hint Resolve tid_step_tp_length_heap: core. *)
@@ -139,7 +139,7 @@ Definition wp_premise
        rel_always_holds s ξ e1 σ1 δ0)). 
 
 Theorem strong_simulation_adequacy Σ
-    `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M) FR
+    `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr) σ1 (s1: M) FR
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
          Prop)    
   (LSI0: initial_ls_LSI s1 0)
@@ -172,7 +172,7 @@ Proof.
   by iApply rel_always_holds_lift_LM. 
 Qed.
 
-Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr heap_lang) σ1 (s1: M) FR
+Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr) σ1 (s1: M) FR
   (LSI0: initial_ls_LSI s1 0)
   (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0)
 :

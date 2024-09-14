@@ -1,4 +1,5 @@
-From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega fuel lm_fair fairness_finiteness lm_fair_traces lm_fairness_preservation lm_fairness_preservation_wip subtrace traces_equiv.
+From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega fuel lm_fair fairness_finiteness lm_fair_traces lm_fairness_preservation lm_fairness_preservation_wip subtrace. 
+(* traces_equiv. *)
 From trillium.fairness.ext_models Require Import ext_models.
 From stdpp Require Import finite.
 From trillium.prelude Require Import classical_instances finitary.
@@ -202,67 +203,67 @@ Section OuterExposing.
       (* TODO: get rid of LMo and use appropriate fairness premise on mtr *)
       inner_obls_exposed lift_EAi state_rel lmtr (LMo := LMo) (AMi := ALMi).
   
-  Lemma outer_exposing_subtrace_gen ltr tr i str
-    lift_Gi lift_EAi state_rel
-    (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr)
-    fin
-    (SUB: subtrace tr i fin = Some str)
-    len
-    (LEN: trace_len_is tr len)
-    (GE_LEN: NOmega.le len fin):    
-    exists sltr, 
-      outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr str.
-  Proof. 
-    red in OUTER_CORR. destruct OUTER_CORR as (UPTO & FAIR_AUX & INNER_OBLS).
-    pose proof SUB as X.
-    unshelve eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto.  
-    forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTER' & UPTO').
-    exists latr. split; [| split].
-    - eauto. eapply upto_stutter_Proper; [.. |eapply UPTO']; eauto.
-      + reflexivity. 
-      + by symmetry.
-    - intros.
-      forward eapply fair_by_gen_after; [apply AFTER' |..]; eauto.
-      intros. apply FAIR_AUX.
-    - eapply inner_obls_exposed_after; eauto.
-  Qed.
+  (* Lemma outer_exposing_subtrace_gen ltr tr i str *)
+  (*   lift_Gi lift_EAi state_rel *)
+  (*   (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr) *)
+  (*   fin *)
+  (*   (SUB: subtrace tr i fin = Some str) *)
+  (*   len *)
+  (*   (LEN: trace_len_is tr len) *)
+  (*   (GE_LEN: NOmega.le len fin):     *)
+  (*   exists sltr,  *)
+  (*     outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr str. *)
+  (* Proof.  *)
+  (*   red in OUTER_CORR. destruct OUTER_CORR as (UPTO & FAIR_AUX & INNER_OBLS). *)
+  (*   pose proof SUB as X. *)
+  (*   unshelve eapply subtrace_equiv_after in X as (atr & AFTER & EQUIV); eauto.   *)
+  (*   forward eapply upto_stutter_after; eauto. intros (i' & latr & AFTER' & UPTO'). *)
+  (*   exists latr. split; [| split]. *)
+  (*   - eauto. eapply upto_stutter_Proper; [.. |eapply UPTO']; eauto. *)
+  (*     + reflexivity.  *)
+  (*     + by symmetry. *)
+  (*   - intros. *)
+  (*     forward eapply fair_by_gen_after; [apply AFTER' |..]; eauto. *)
+  (*     intros. apply FAIR_AUX. *)
+  (*   - eapply inner_obls_exposed_after; eauto. *)
+  (* Qed. *)
 
-  Lemma outer_exposing_subtrace ltr tr i str
-    lift_Gi lift_EAi state_rel
-    (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr)
-    (SUB: subtrace tr i NOinfinity = Some str):    
-    exists sltr, 
-      outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr str.
-  Proof.
-    pose proof (trace_has_len tr) as [len LEN].
-    eapply outer_exposing_subtrace_gen; eauto.
-    lia_NO len. 
-  Qed.
+  (* Lemma outer_exposing_subtrace ltr tr i str *)
+  (*   lift_Gi lift_EAi state_rel *)
+  (*   (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr) *)
+  (*   (SUB: subtrace tr i NOinfinity = Some str):     *)
+  (*   exists sltr,  *)
+  (*     outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr str. *)
+  (* Proof. *)
+  (*   pose proof (trace_has_len tr) as [len LEN]. *)
+  (*   eapply outer_exposing_subtrace_gen; eauto. *)
+  (*   lia_NO len.  *)
+  (* Qed. *)
   
-  Lemma outer_exposing_after ltr tr i atr
-    lift_Gi lift_EAi state_rel
-    (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr)
-    (AFTER: after i tr = Some atr):
-    exists sltr, 
-      outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr atr.
-  Proof.
-    pose proof (trace_has_len tr) as [len LEN].
-    forward eapply subtrace_len with (start := i); eauto. 
-    2: reflexivity.
-    { apply state_lookup_after_0 in AFTER.
-      eapply mk_is_Some, state_lookup_dom in AFTER; eauto. }
+  (* Lemma outer_exposing_after ltr tr i atr *)
+  (*   lift_Gi lift_EAi state_rel *)
+  (*   (OUTER_CORR: outer_LM_trace_exposing lift_Gi lift_EAi state_rel ltr tr) *)
+  (*   (AFTER: after i tr = Some atr): *)
+  (*   exists sltr,  *)
+  (*     outer_LM_trace_exposing lift_Gi lift_EAi state_rel sltr atr. *)
+  (* Proof. *)
+  (*   pose proof (trace_has_len tr) as [len LEN]. *)
+  (*   forward eapply subtrace_len with (start := i); eauto.  *)
+  (*   2: reflexivity. *)
+  (*   { apply state_lookup_after_0 in AFTER. *)
+  (*     eapply mk_is_Some, state_lookup_dom in AFTER; eauto. } *)
 
-    intros (str & SUB & LENs).
-    pose proof SUB as SUB_. 
-    eapply subtrace_equiv_after in SUB; eauto.
-    2: reflexivity.
-    destruct SUB as (atr_ & AFTER_ & EQ).
-    rewrite AFTER_ in AFTER. inversion AFTER. subst.
+  (*   intros (str & SUB & LENs). *)
+  (*   pose proof SUB as SUB_.  *)
+  (*   eapply subtrace_equiv_after in SUB; eauto.N *)
+  (*   2: reflexivity. *)
+  (*   destruct SUB as (atr_ & AFTER_ & EQ). *)
+  (*   rewrite AFTER_ in AFTER. inversion AFTER. subst. *)
 
-    apply traces_equiv_eq in EQ as ->.
-    eapply outer_exposing_subtrace_gen; eauto.
-    reflexivity. 
-  Qed.
+  (*   apply traces_equiv_eq in EQ as ->. *)
+  (*   eapply outer_exposing_subtrace_gen; eauto. *)
+  (*   reflexivity.  *)
+  (* Qed. *)
   
 End OuterExposing.
 
