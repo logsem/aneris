@@ -653,3 +653,50 @@ Section GsetPick.
   Qed. 
 
 End GsetPick.
+
+
+Section ExtractSomes.
+  Context {A: Type}.
+
+  Definition extract_Somes (l: list (option A)): list A :=
+    flat_map (from_option (fun a => [a]) []) l.
+
+  Lemma extract_Somes_spec (l: list (option A)):
+    forall a, In (Some a) l <-> In a (extract_Somes l).
+  Proof. 
+    intros. rewrite /extract_Somes.
+    rewrite in_flat_map_Exists.
+    rewrite List.Exists_exists. simpl.
+    erewrite ex_det_iff with (a := Some a). 
+    2: { intros ? [? ?]. destruct a'; try done.
+         simpl in H0. set_solver. }
+    simpl. set_solver.
+  Qed.
+
+  Context `{Countable A}. 
+
+  Definition extract_Somes_gset (s: gset (option A)): gset A :=
+    list_to_set ∘ extract_Somes ∘ elements $ s. 
+  
+  Lemma extract_Somes_gset_spec (s: gset (option A)):
+    forall a, Some a ∈ s <-> a ∈ (extract_Somes_gset s).
+  Proof. 
+    intros. rewrite /extract_Somes_gset.
+    rewrite elem_of_list_to_set. 
+    rewrite elem_of_list_In. rewrite -extract_Somes_spec.
+    rewrite -elem_of_list_In. rewrite elem_of_elements.
+    done. 
+  Qed.
+
+  Lemma extract_Somes_gset_inv (s: gset (option A)):
+    set_map Some (extract_Somes_gset s) = s ∖ {[ None ]}.
+  Proof. 
+    apply set_eq. intros ?. rewrite elem_of_map.
+    setoid_rewrite <- extract_Somes_gset_spec.
+    rewrite elem_of_difference not_elem_of_singleton.
+    split; [intros (?&->&?) | intros [??]]. 
+    - set_solver.
+    - destruct x; eauto. done.
+  Qed. 
+
+End ExtractSomes.

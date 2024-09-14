@@ -416,10 +416,18 @@ Section ObligationsRepr.
       (* iIntros "(?&?&?&?&?&?) OBLS SIGS_LT". *)
       rewrite /lt_locale_obls. rewrite Rζ. simpl.
       rewrite -pure_forall_2. setoid_rewrite <- bi.pure_impl_2. 
-      iIntros (l [sid [-> IN]]%elem_of_map).
+      iIntros (l IN).
+
+      (* TODO: lemma? *)
+      apply extract_Somes_gset_spec in IN. simpl in IN.
+      apply elem_of_map in IN. destruct IN as [sid [EQ IN]].
+      destruct (ps_sigs OP δ !! sid) as [[l' b]| ] eqn:SID; [| done].
+      simpl in EQ. inversion EQ. subst l'. 
+
       iDestruct (big_sepS_forall with "SIGS_LT") as "LT".
-      iSpecialize ("LT" $! _ IN). iDestruct "LT" as "(%l & SIG & %LT)".
-      iDestruct (sigs_msi_in with "[$] [$]") as %[? SIG]. rewrite SIG.
+      iSpecialize ("LT" $! _ IN). iDestruct "LT" as "(%l_ & SIG & %LT)".
+      iDestruct (sigs_msi_in with "[$] [$]") as %[? SIG].
+      rewrite SID in SIG. inversion SIG. subst l_ x. 
       done.
     Qed. 
 

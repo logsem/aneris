@@ -15,9 +15,9 @@ Class ObligationsParams
   opar_lvl_cnt :> Countable Level;
 
   opar_lvl_lt: Level -> Level -> Prop;
-  (* TODO: get rid of this? *)
-  opar_l0: Level;
-  opar_l0_least: forall l, l ≠ opar_l0 -> opar_lvl_lt opar_l0 l;
+  (* (* TODO: get rid of this? *) *)
+  (* opar_l0: Level; *)
+  (* opar_l0_least: forall l, l ≠ opar_l0 -> opar_lvl_lt opar_l0 l; *)
   
 }. 
 
@@ -62,10 +62,11 @@ Section Model.
   Definition update_phases phases '(Build_ProgressState a b c d _ f) :=
     Build_ProgressState a b c d phases f.
 
-  Definition lt_locale_obls l θ ps :=
-    let obls := default ∅ (ps_obls ps !! θ) in
-    let levels: gset Level :=
-      set_map (fun s => from_option fst opar_l0 (ps_sigs ps !! s)) obls in
+  Definition lt_locale_obls l θ ps: Prop :=
+    let obls: gset SignalId := default ∅ (ps_obls ps !! θ) in
+    let levels': gset (option Level) :=
+      set_map (fun s => (ps_sigs ps !! s ≫= Some ∘ fst)) obls in
+    let levels := extract_Somes_gset levels' in
     set_Forall (opar_lvl_lt l) levels.
     
   Inductive burns_cp: PS -> Locale -> PS -> Phase -> Degree -> Prop :=
