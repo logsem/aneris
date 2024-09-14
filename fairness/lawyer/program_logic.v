@@ -77,7 +77,7 @@ Section ProgramLogic.
       end. 
 
     Definition HL_OM_trace_interp' (extr: execution_trace heap_lang)
-      (omtr: auxiliary_trace OM) (τ: locale heap_lang) (f: bool): iProp Σ :=
+      (omtr: auxiliary_trace OM) (τ: locale heap_lang) oτ': iProp Σ :=
       match extr with
       | {tr[ _ ]} => False
       | extr' :tr[oζ]: c' =>
@@ -91,11 +91,12 @@ Section ProgramLogic.
           ⌜ oζ = Some τ ⌝ ∗
           ⌜ locale_step c (Some τ) c' ⌝ ∗
           (* ⌜ (if f then extr_last_fork else extr_last_nofork) (extr' :tr[oζ]: c') ⌝ *)
-          ⌜ (if f then is_Some else eq None) (extr_last_fork $ extr' :tr[oζ]: c') ⌝
+          (* ⌜ (if f then is_Some else eq None) (extr_last_fork $ extr' :tr[oζ]: c') ⌝ *)
+          ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝
     end.
 
     Definition HL_OM_trace_interp'_step (extr: execution_trace heap_lang)
-      (omtr: auxiliary_trace OM) (τ: locale heap_lang) (k: nat) (f: bool): iProp Σ :=
+      (omtr: auxiliary_trace OM) (τ: locale heap_lang) (k: nat) (oτ': option (locale heap_lang)): iProp Σ :=
       match extr with
       | {tr[ _ ]} => False
       | extr' :tr[oζ]: c' =>
@@ -110,18 +111,20 @@ Section ProgramLogic.
           ⌜ obls_eq OP δ__k (dom $ ps_obls OP δ) ⌝ ∗
           ⌜ oζ = Some τ ⌝ ∗
           ⌜ locale_step c (Some τ) c' ⌝ ∗
-          ⌜ (if f then is_Some else eq None) (extr_last_fork $ extr' :tr[oζ]: c') ⌝
+          ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝
     end.
 
     Let iG := @heapG_irisG _ _ _ hGS. 
     
-    Definition MU_impl f E ζ (P : iProp Σ) : iProp Σ := ∀ extr atr, 
+    Definition MU_impl (f: option (locale heap_lang)) E ζ (P : iProp Σ) : iProp Σ := ∀ extr atr, 
       HL_OM_trace_interp' extr atr ζ f ={E}=∗
       ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) (irisG := iG) ∗ P.
 
 
-    Definition MU := MU_impl false.
-    Definition MU__f := MU_impl true.
+    Definition MU := MU_impl None.
+    (* Definition MU__f τ' := MU_impl (Some τ').  *)
+    Definition MU__f E ζ ζ' P := MU_impl (Some ζ') E ζ P. 
+
 
     (* Definition MU E ζ (P : iProp Σ) := ∀ extr atr, *)
     (*   HL_OM_trace_interp' extr atr ζ false ={E}=∗ *)
@@ -183,10 +186,18 @@ Section ProgramLogic.
     Qed. 
     
     (* TODO: move *)
-    Lemma gset_pick_Some `{Countable K} (g: gset K):
+    Lemma gset_pick_is_Some `{Countable K} (g: gset K):
       is_Some (gset_pick g) <-> g ≠ ∅.
     Proof.
       rewrite -not_eq_None_Some. apply not_iff_compat, gset_pick_None. 
+    Qed. 
+
+    (* TODO: move *)
+    Lemma gset_pick_Some `{Countable K} (g: gset K) k:
+      gset_pick g = Some k -> k ∈ g. 
+    Proof.
+      rewrite /gset_pick. destruct elements eqn:E; [done| ].
+      intros [=->]. apply elem_of_elements. rewrite E. constructor. 
     Qed. 
 
     Lemma sswp_MU_wp_fupd s E E' ζ e Φ
@@ -259,8 +270,8 @@ Section ProgramLogic.
     Qed.
 
     (* TODO: refactor *)
-    Lemma MU__f_wand E ζ (P Q : iProp Σ) :
-      (P -∗ Q) -∗ MU__f E ζ P -∗ MU__f E ζ Q.
+    Lemma MU__f_wand E ζ ζ' (P Q : iProp Σ) :
+      (P -∗ Q) -∗ MU__f E ζ ζ' P -∗ MU__f E ζ ζ' Q.
     Proof.
       rewrite /MU__f /MU_impl. iIntros "HPQ HMU".
       iIntros (extr atr) "Hσ".
@@ -278,9 +289,28 @@ Section ProgramLogic.
       iIntros (?) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>".
     Qed.
     
+    Lemma locales_of_cfg_simpl l σ:
+      locales_of_cfg OP (l, σ) = set_seq 0 (length l).
+    Proof. 
+      rewrite /locales_of_cfg. f_equal. simpl.
+      rewrite !locales_of_list_from_indexes. simpl.
+      rewrite !imap_seq_0. rewrite !list_fmap_id.
+      apply list_to_set_seq.
+    Qed. 
+
+    Lemma length_upd_middle {A: Type} (x y: A) l1 l2:
+      length (l1 ++ x :: l2) = length (l1 ++ y :: l2).
+    Proof.  intros. rewrite !app_length. simpl. lia. Qed.
+
+    Lemma gset_pick_singleton `{Countable K} (k: K):
+      gset_pick {[ k ]} = Some k.
+    Proof.
+      rewrite /gset_pick. rewrite elements_singleton. done.
+    Qed. 
+
     Lemma sswp_MUf_wp s E τ (Φ: val -> iProp Σ) e
       :
-      MU__f E τ ((∀ τ', WP e @ s; τ'; ⊤ {{ fun r => fork_post (irisG := iG) τ' r }}) ∗ Φ #()) -∗      
+      (∀ τ', MU__f E τ τ' ((WP e @ s; τ'; ⊤ {{ fun r => fork_post (irisG := iG) τ' r }}) ∗ Φ #())) -∗
       WP (Fork e) @ s; τ; E {{ Φ }}.
     Proof using.
       iIntros "MU".
@@ -296,7 +326,7 @@ Section ProgramLogic.
       iIntros (e2 σ2 efs STEP).
       have [-> [-> ->]] : σ2 = σ1 ∧ efs = [e] ∧ e2 = Val $ LitV LitUnit by inv_head_step.
 
-      iSpecialize ("MU" $! (extr :tr[Some τ]: (_, _)) mtr with "[HEAP MSI]").
+      iSpecialize ("MU" $! _ (extr :tr[Some τ]: (_, _)) mtr with "[HEAP MSI]").
       { rewrite /HL_OM_trace_interp'. simpl.
         rewrite /obls_si. iDestruct "MSI" as "(M & %TS & %DPO)".
         remember (trace_last extr) as xx. destruct xx as [tp h].
@@ -313,28 +343,25 @@ Section ProgramLogic.
           2: { econstructor; eauto. }
           rewrite Hloc. f_equal.
           by inversion STEP.
-        - rewrite /locales_of_cfg. simpl.
-          inversion STEP. subst.
-          apply gset_pick_Some.
+        - rewrite !locales_of_cfg_simpl.
+          rewrite (length_upd_middle (ectx_language.fill K e2) #()). 
+          rewrite (length_upd_middle (fill K (Fork e)) #()). 
+          rewrite app_comm_cons. rewrite app_assoc.
+          rewrite app_length. rewrite set_seq_add_L. simpl.
+          rewrite difference_union_distr_l_L. rewrite subseteq_empty_difference_L; [| done].
+          rewrite union_empty_l_L.
 
-          rewrite !locales_of_list_from_indexes. simpl.
-          rewrite app_comm_cons. rewrite app_assoc. rewrite imap_app. simpl.
-          rewrite !list_to_set_app_L. simpl.
-          rewrite union_empty_r_L Nat.add_0_r.
-          rewrite difference_union_distr_l_L.
-
-          apply utils.gset_not_elem_of_equiv_not_empty_L. eexists.
-          apply elem_of_union. right. apply elem_of_difference. split.
-          { by apply elem_of_singleton. }
-          apply not_elem_of_list_to_set.
-          rewrite !imap_seq_0. rewrite !list_fmap_id.
-          rewrite !app_length. simpl. 
-          intros ?%elem_of_seq. lia. }
+          inversion STEP. subst. simpl. rewrite union_empty_r_L.
+          rewrite difference_disjoint_L.
+          2: { apply disjoint_singleton_l.
+               intros ?%elem_of_set_seq. lia. }
+          rewrite gset_pick_singleton. reflexivity. }
       
       iMod ("MU") as (??) "(Hσ & WP' & POST)".
       iFrame.
       inversion STEP. subst. iModIntro. iExists _, _. iFrame.
-      simpl. rewrite !app_nil_r. iSplitL; [| done]. 
+      simpl. rewrite !app_nil_r. iSplitL; [| done].
+      rewrite /locale_of. rewrite (length_upd_middle (fill K (Fork e)) #()). 
       iApply "WP'". 
     Qed. 
      
@@ -372,12 +399,54 @@ Section ProgramLogic.
     (*   phase_le π1 π2. *)
     (* Proof. done. Qed. *)
 
-    
+    (* TODO: move *)
+    Lemma locale_step_sub c1 c2 τ
+      (STEP: locale_step c1 (Some τ) c2):
+      locales_of_cfg OP c1 ⊆ locales_of_cfg OP c2. 
+    Proof.
+      inversion STEP. subst.
+      
+      rewrite !locales_of_cfg_simpl. 
+      rewrite app_comm_cons. rewrite app_assoc. rewrite (app_length _ efs). 
+      rewrite -!list_to_set_seq. rewrite seq_app.
+      rewrite list_to_set_app.
+      rewrite (length_upd_middle e1 e2). set_solver.
+    Qed. 
+
+    (* TODO: move *)
+    Lemma locale_step_fresh_exact c1 c2 τ τ'
+      (STEP: locale_step c1 (Some τ) c2)
+      (FRESH: τ' ∈ locales_of_cfg OP c2 ∖ locales_of_cfg OP c1):
+      locales_of_cfg OP c2 = locales_of_cfg OP c1 ∪ {[ τ' ]} /\ τ' ∉ locales_of_cfg OP c1.
+    Proof.
+      inversion STEP. subst.
+      revert FRESH.
+      
+      rewrite !locales_of_cfg_simpl. 
+      rewrite app_comm_cons. rewrite app_assoc. rewrite app_length.
+      rewrite -!list_to_set_seq. rewrite seq_app. simpl. 
+      rewrite list_to_set_app_L. rewrite !list_to_set_seq.
+
+      rewrite (length_upd_middle e2 e1). remember (length (t1 ++ e1 :: t2)) as N.
+      rewrite -HeqN. remember (set_seq 0 N) as D. 
+      
+      rewrite difference_union_distr_l_L. rewrite subseteq_empty_difference; [| done].
+      rewrite union_empty_l. intros [DOM2 NDOM1]%elem_of_difference.
+      split; [| done].
+      f_equal.
+
+      assert (¬ (efs = [])) as FORK.
+      { intros NOFORK. inversion H6. subst. inversion H4; subst; done. }
+      inversion H6. subst. inversion H4; subst; try done.
+      simpl in DOM2. rewrite union_empty_r in DOM2. apply elem_of_singleton in DOM2.
+      simpl. set_solver.
+    Qed.            
+
     Lemma finish_obls_steps extr omtr τ n π' deg
       (BOUND: n <= LIM_STEPS)
       (LE: exists π, ps_phases OP (trace_last omtr) !! τ = Some π /\ phase_le π' π)
       :
-      ⊢ HL_OM_trace_interp'_step extr omtr τ n false -∗ (cp OP π' deg (H2 := oGS))==∗
+      ⊢ HL_OM_trace_interp'_step extr omtr τ n None -∗ (cp OP π' deg (H2 := oGS))==∗
         ∃ δ', state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS).
     Proof.
       iIntros "TI'' cp".
@@ -398,8 +467,10 @@ Section ProgramLogic.
       
       assert (threads_own_obls OP a δ') as TH_OWN'.
       { eapply locale_nofork_step_obls_pres; eauto.
-        2: { symmetry in NOFORK. apply gset_pick_None in NOFORK.
-             admit. }
+        2: { apply gset_pick_None in NOFORK.
+             apply set_eq_subseteq. split.
+             - apply empty_difference_subseteq_L in NOFORK. done.
+             - eapply locale_step_sub; eauto. }
         red. eexists. split; [eauto| ].
         eexists. split; eauto. }
       
@@ -412,53 +483,15 @@ Section ProgramLogic.
         do 2 (eexists; split; eauto). 
     Admitted. 
 
-    Lemma locales_of_cfg_simpl l σ:
-      locales_of_cfg OP (l, σ) = list_to_set (seq 0 (length l)).
-    Proof. 
-      rewrite /locales_of_cfg. f_equal. simpl.
-      rewrite !locales_of_list_from_indexes. simpl.
-      rewrite !imap_seq_0. rewrite !list_fmap_id. done.
-    Qed. 
-
-    Lemma locale_step_fresh_exact c1 c2 τ τ'
-      (STEP: locale_step c1 (Some τ) c2)
-      (FRESH: τ' ∈ locales_of_cfg OP c2 ∖ locales_of_cfg OP c1):
-      locales_of_cfg OP c2 = locales_of_cfg OP c1 ∪ {[ τ' ]} /\ τ' ∉ locales_of_cfg OP c1.
-    Proof.
-      inversion STEP. subst.
-      revert FRESH.
-      
-      rewrite !locales_of_cfg_simpl. 
-      rewrite app_comm_cons. rewrite app_assoc. rewrite app_length.
-      rewrite seq_app. simpl. rewrite list_to_set_app_L.
-      rewrite !list_to_set_seq.
-
-      assert (forall x y, length (t1 ++ x :: t2) = length (t1 ++ y :: t2)) as EQ.
-      { intros. rewrite !app_length. simpl. lia. }
-      rewrite (EQ e2 e1). remember (length (t1 ++ e1 :: t2)) as N.
-      rewrite -HeqN. remember (set_seq 0 N) as D. 
-      
-      rewrite difference_union_distr_l_L. rewrite subseteq_empty_difference; [| done].
-      rewrite union_empty_l. intros [DOM2 NDOM1]%elem_of_difference.
-      split; [| done].
-      f_equal.
-
-      assert (¬ (efs = [])) as FORK.
-      { intros NOFORK. inversion H6. subst. inversion H4; subst; done. }
-      inversion H6. subst. inversion H4; subst; try done.
-      simpl in DOM2. rewrite union_empty_r in DOM2. apply elem_of_singleton in DOM2.
-      simpl. set_solver.
-    Qed.            
-
-    Lemma finish_obls_steps_fork extr omtr τ n π' π deg R0 R' 
+    Lemma finish_obls_steps_fork extr omtr τ τ' n π' π deg R0 R' 
       (BOUND: n <= LIM_STEPS)
       (* can use th_phase_ge here, since it'll only be used after BMU *)
       (* TODO: unify these proofs? *)
       (* (LE: exists π, ps_phases OP (trace_last omtr) !! τ = Some π /\ phase_le π' π) *)
       (LE: phase_le π' π)
       :
-      ⊢ HL_OM_trace_interp'_step extr omtr τ n true -∗ (cp OP π' deg (H2 := oGS)) -∗ obls OP τ R0 (H2 := oGS) -∗ th_phase_ge OP τ π (H2 := oGS) ==∗
-        ∃ δ' τn π1 π2, state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS) ∗ obls OP τ (R0 ∖ R') (H2 := oGS) ∗ th_phase_ge OP τ π1 (H2 := oGS) ∗ obls OP τn R' (H2 := oGS) ∗ th_phase_ge OP τn π2 (H2 := oGS) .
+      ⊢ HL_OM_trace_interp'_step extr omtr τ n (Some τ') -∗ (cp OP π' deg (H2 := oGS)) -∗ obls OP τ R0 (H2 := oGS) -∗ th_phase_ge OP τ π (H2 := oGS) ==∗
+        ∃ δ' π1 π2, state_interp extr (trace_extend omtr τ δ') (irisG := @heapG_irisG _ _ _ hGS) ∗ obls OP τ (R0 ∖ R') (H2 := oGS) ∗ th_phase_ge OP τ π1 (H2 := oGS) ∗ obls OP τ' R' (H2 := oGS) ∗ th_phase_ge OP τ' π2 (H2 := oGS) .
     Proof.
       iIntros "TI'' cp OB PH".
       rewrite /HL_OM_trace_interp'_step.
@@ -467,9 +500,9 @@ Section ProgramLogic.
       iDestruct "TI''" as (δ__k) "(HEAP&MSI&%TRANSS&%TH_OWN&%DPO&%OBLS&->&%STEP&%FORK)".
       iDestruct (cp_msi_dom with "[$] [$]") as %CP.
       
-      apply gset_pick_Some in FORK. apply finitary.set_choose_L' in FORK as [τ' FORK].
+      apply gset_pick_Some in FORK. 
       eapply locale_step_fresh_exact in FORK; eauto.  
-      destruct FORK as (LOCS' & FRESH). 
+      destruct FORK as (LOCS' & FRESH).
 
       (* destruct LE as (π__max & PH & LE0). *)
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(π__max & PH & LE0).
@@ -492,7 +525,7 @@ Section ProgramLogic.
         rewrite -TH_OWN. apply FRESH. }
       iDestruct "Y" as "(%δ'' & %π1 & %π2 & MSI & PH1 & PH2 & OB1 & OB2 & %FORKS)".
       
-      iModIntro. do 4 iExists _. simpl. iFrame.
+      iModIntro. do 3 iExists _. simpl. iFrame.
 
       (* TODO: make a lemma? *)
       assert (dom (ps_obls OP δ'') = dom (ps_obls OP δ') ∪ {[ τ' ]}) as OBLS''.
@@ -558,7 +591,7 @@ Section ProgramLogic.
       { rewrite /HL_OM_trace_interp'. destruct etr; [done| ].
         iDestruct "TI'" as "(?&?&?&?)". iFrame. }
       iSpecialize ("BMU" with "[$]").
-      iSpecialize ("BMU" $! etr otr 0 false with "[TI']").
+      iSpecialize ("BMU" $! etr otr 0 None with "[TI']").
       { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
         destruct etr; [done| ].
         iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
@@ -575,7 +608,7 @@ Section ProgramLogic.
     Qed.
 
     (* fork_locale_upd_impl *)
-    Lemma BMU_MU__f E ζ b (P : iProp Σ) π R0 R'
+    Lemma BMU_MU__f E ζ ζ' b (P : iProp Σ) π R0 R'
       (BOUND: b <= LIM_STEPS)
       :
       ⊢ (th_phase_ge OP ζ π (H2 := oGS) -∗ BMU E ζ b
@@ -583,7 +616,7 @@ Section ProgramLogic.
            th_phase_ge OP ζ π (H2 := oGS) ∗
            obls OP ζ R0 (H2 := oGS))) -∗
         th_phase_ge OP ζ π (H2 := oGS) -∗
-        MU__f E ζ (P ∗ ∃ π1 π2 ζ', 
+        MU__f E ζ ζ' (P ∗ ∃ π1 π2, 
                      th_phase_ge OP ζ π1 (H2 := oGS) ∗ obls OP ζ (R0 ∖ R') (H2 := oGS)∗
                      th_phase_ge OP ζ' π2 (H2 := oGS) ∗ obls OP ζ' R' (H2 := oGS)).
     Proof.
@@ -592,7 +625,7 @@ Section ProgramLogic.
       { rewrite /HL_OM_trace_interp'. destruct etr; [done| ].
         iDestruct "TI'" as "(?&?&?&?)". iFrame. }
       iSpecialize ("BMU" with "[$]").
-      iSpecialize ("BMU" $! etr otr 0 true with "[TI']").
+      iSpecialize ("BMU" $! etr otr 0 (Some ζ') with "[TI']").
       { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
         destruct etr; [done| ].
         iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
@@ -603,49 +636,10 @@ Section ProgramLogic.
       iMod (finish_obls_steps_fork with "[$] [$] [$] [$]") as (?) "SI".
       { lia. }
       { done. }
-      iDestruct "SI" as (ζ' π1 π2) "(SI & OB1 & PH1 & OB2 & PH2)". 
+      iDestruct "SI" as (π1 π2) "(SI & OB1 & PH1 & OB2 & PH2)".
       iModIntro. iExists _, _. iFrame "P SI". iFrame.
-      do 3 iExists _. iFrame.  
+      do 2 iExists _. iFrame.  
     Qed.
-
-    (* Lemma BMU_MU E ζ b (P : iProp Σ) π *)
-    (*   (BOUND: b <= LIM_STEPS) *)
-    (*   : *)
-    (*   ⊢ (BMU E ζ b ((th_phase_ge OP ζ π (H2 := oGS) -∗ P) ∗ ∃ ph deg, cp OP ph deg (H2 := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗ *)
-    (*     th_phase_ge OP ζ π (H2 := oGS) -∗ *)
-    (*     MU E ζ P. *)
-    (* Proof. *)
-    (*   rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'". *)
-    (*   iSpecialize ("BMU" $! etr otr 0 false with "[TI']"). *)
-    (*   { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step. *)
-    (*     destruct etr; [done| ]. *)
-    (*     iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)". *)
-    (*     iExists _. iFrame. iPureIntro. *)
-    (*     repeat split; try done. *)
-    (*     by constructor. } *)
-    (*   iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH))".  *)
-    (*   iMod (finish_obls_steps with "[$] [$] [$]") as (?) "[SI PH]". *)
-    (*   { lia. } *)
-    (*   { done. } *)
-    (*   iSpecialize ("P" with "PH"). iFrame.  *)
-    (*   iModIntro. eauto.  *)
-    (* Qed. *)
-
-    (* Lemma OU_BMU_hmmm E ζ P b: *)
-    (*    ⊢ (P -∗ BMU E ζ b P) -∗ OU OP ζ P (H2 := oGS) -∗ BMU E ζ (S b) P. *)
-    (* Proof. *)
-    (*   iIntros "CONT OU". rewrite {2}/BMU /HL_OM_trace_interp'_step. *)
-    (*   iIntros (etr atr n) "TI'". destruct etr; [done| ]. *)
-    (*   iDestruct "TI'" as "(%δ & HEAP & MSI & %TRANS1 & %TH_OWN & -> & %STEP)". *)
-    (*   rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & P)". *)
-    (*   iSpecialize ("CONT" with "[$]"). rewrite /BMU. *)
-    (*   iSpecialize ("CONT" $! (etr :tr[ _ ]: _) with "[HEAP MSI]"). *)
-    (*   { rewrite /HL_OM_trace_interp'_step. iExists _.  iFrame. *)
-    (*     iPureIntro. repeat split; eauto. *)
-    (*     eapply rel_compose_nsteps_next. eexists. split; eauto. } *)
-    (*   iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro. *)
-    (*   iExists _. iFrame. iPureIntro. lia.  *)
-    (* Qed. *)
 
     Lemma OU_BMU E ζ P b:
        ⊢ OU OP ζ (BMU E ζ b P) (H2 := oGS) -∗ BMU E ζ (S b) P.
@@ -660,7 +654,11 @@ Section ProgramLogic.
         - eapply rel_compose_nsteps_next. eexists. split; eauto.
         - eapply loc_step_obls_pres; eauto. }
       iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
-      iExists _. iFrame. iPureIntro. lia. 
+      rewrite FF. 
+      iExists _. iFrame. iSplitL.
+      - simpl. iDestruct "TI'" as (xx) "(?&?&?&?&?&?&?)".
+        iExists _. iFrame. iPureIntro. done.
+      - iPureIntro. lia. 
     Qed.
 
     (* an example usage of OU *)
@@ -765,7 +763,7 @@ Section ProgramLogic.
 
       simpl. 
 
-      iApply sswp_MUf_wp. iApply (MU__f_wand with "[]").
+      iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[]").
       2: { iApply (BMU_MU__f with "[-PH]"); [apply LIM_STEPS_LB| ..].
            2: by iFrame.
            iIntros "PH".
@@ -784,17 +782,13 @@ Section ProgramLogic.
            iAccu. }
 
       iIntros "[(POST & CPS' & L & MT & SIG & CPS) R']".
-      iDestruct "R'" as (π1 π2 τ') "(PH1 & OB1 & PH2 & OB2)".
+      iDestruct "R'" as (π1 π2) "(PH1 & OB1 & PH2 & OB2)".
       
       iSplitR "POST CPS MT OB1 PH1"; cycle 1.  
       - iApply "POST". 
         iApply (obls_proper with "[$]").
         symmetry. apply subseteq_empty_difference. reflexivity.
-      - iIntros (τ_).
-        (* TODO: modify MU__f to account for fresh thread *)
-        assert (τ_ = τ') as -> by admit. 
-
-        iApply sswp_MU_wp; [done| ].
+      - iApply sswp_MU_wp; [done| ].
         iApply (wp_load with "[$]"). iNext. iIntros.
         iApply (BMU_MU with "[-PH2] [$]"); [eauto| ]. iIntros "PH2".
         iApply OU_BMU.
