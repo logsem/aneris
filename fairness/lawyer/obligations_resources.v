@@ -724,12 +724,49 @@ Section ObligationsRepr.
       by rewrite gmultiset_scalar_mul_S_r. 
     Qed.
 
-    (* TODO: refactor *)
-    Definition phase_lt π1 π2 := phase_le π1 π2 /\ π1 ≠ π2.
+    (* (* TODO: move *) *)
+    (* Lemma foo (x y: namespace) *)
+    (*   (EQ : ↑x = (↑y: coPset)): *)
+    (*   x = y. *)
+    (* Proof. *)
+    (*   (* clear -EQ. *) *)
+    (*   rewrite !namespaces.nclose_unseal in EQ. *)
+    (*   rewrite /namespaces.nclose_def in EQ. *)
+    (*   red in x, y. *)
+    (*   generalize dependent y. *)
+    (*   induction x. *)
+    (*   { intros ?. *)
+    (*     (* Set Printing All. *) *)
+    (*     unfold up_close. simpl. *)
+    (*     rewrite /positives_flatten /positives_flatten_go. simpl.  *)
+    (*     rewrite nclose_nroot.   *)
+    (*     simpl.  *)
+  
+ 
+    (* (* TODO: move*) *)
+    (* Lemma PreOrder_le_lt {A: Type} (R: relation A) {PO: PreOrder R} *)
+    (*   (x y z: A) *)
+    (*   (LE: R x y) *)
+    (*   (LT: strict R y z): *)
+    (*   strict *)
 
-    (* TODO: make an instance*)
-    Lemma phase_le_refl π: phase_le π π.
-    Proof. set_solver. Qed. 
+    (* (* TODO: refactor *) *)
+    (* Global Instance phase_lt_trans: Transitive phase_lt. *)
+    (* Proof. *)
+    (*   red. rewrite /phase_lt. *)
+
+    (*   strict *)
+
+    (* (* TODO: make an instance*) *)
+    (* Lemma phase_le_refl π: phase_le π π. *)
+    (* Proof. set_solver. Qed.  *)
+
+    (* Lemma phase_le_fork π1 π2 (d: nat) *)
+    (*   (LE: phase_le π1 π2): *)
+    (*   phase_le (π1 .@ d) (π2 .@ d). *)
+    (* Proof. *)
+    (*   red. red in LE. set_solver.  *)
+    (*   (fork_right π) ?Goal *)
 
     (* TODO: ? refactor these proofs about fork step *)
     Lemma fork_locale_upd_impl δ ζ ζ' π R0 R'
@@ -738,8 +775,9 @@ Section ObligationsRepr.
       :
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗ obls ζ R0 ==∗ 
         ∃ δ' π1 π2, obls_msi δ' ∗ th_phase_ge ζ π1 ∗ th_phase_ge ζ' π2 ∗
-                    obls ζ (R0 ∖ R') ∗ obls ζ' R' ∗
-                    ⌜ forks_locale OP δ ζ δ' ζ' R' ⌝.
+              obls ζ (R0 ∖ R') ∗ obls ζ' R' ∗
+              ⌜ forks_locale OP δ ζ δ' ζ' R' ⌝ ∗
+              ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝. 
     Proof.
       iIntros "MSI PH OB".
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "(MSI & %π0 & (PH & %PH & %PLE))".
@@ -748,9 +786,13 @@ Section ObligationsRepr.
       destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
       simpl. iRevert "OBLS PHASES". iFrame. iIntros "OBLS PHASES". simpl.
       iCombine "OBLS OB" as "OBLS". iCombine "PHASES PH" as "PHASES".
-      iExists (fork_left π0), (fork_right π0).
 
+      iExists (fork_left π0), (fork_right π0). 
       rewrite !bi.sep_assoc. iSplitL.
+      2: { iPureIntro. split.
+           all: eapply strict_transitive_r; [eauto | apply phase_lt_fork]. }
+
+      iSplitL.
       2: { iPureIntro.
            erewrite (f_equal (forks_locale _ _ _)).
            { econstructor; eauto. }
@@ -781,12 +823,12 @@ Section ObligationsRepr.
         intros. apply exclusive_local_update. done.
       - rewrite /th_phase_ge.
         rewrite !bi.sep_exist_l; iExists _.
-        rewrite !bi.sep_assoc. iSplitL.
-        2: { iPureIntro. apply phase_le_refl. }
+        rewrite !bi.sep_assoc. iSplitL. 
+        2: { iPureIntro. reflexivity. }
         rewrite bi.sep_comm.
         rewrite !bi.sep_exist_l; iExists _.
         rewrite !bi.sep_assoc. iSplitL.
-        2: { iPureIntro. apply phase_le_refl. }
+        2: { iPureIntro. reflexivity. }
         rewrite -bi.sep_assoc bi.sep_comm.
         rewrite -!own_op. iApply own_update; [| by iFrame].
         etrans.

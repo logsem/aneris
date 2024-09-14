@@ -615,12 +615,41 @@ Section FlattenGset.
 
 End FlattenGset.
 
+Section GsetPick.
+  Context `{Countable K}.
 
-(* Ltac forward_gen H tac := *)
-(*   match type of H with *)
-(*   | ?X -> _ => let H' := fresh in assert (H':X) ; [tac|specialize (H H'); clear H'] *)
-(*   end. *)
+  Definition gset_pick  (g: gset K) :=
+    let l := elements g in
+    match l with 
+    | [] => None
+    | e :: _ => Some e
+    end.   
+  
+  Lemma gset_pick_None (g: gset K):
+    gset_pick g = None <-> g = ∅.
+  Proof.
+    rewrite /gset_pick. destruct (elements g) eqn:E.
+    - apply elements_empty_inv in E. apply leibniz_equiv_iff in E. done.
+    - split; [done| ]. intros ->. simpl in E. set_solver.
+  Qed. 
+  
+  Lemma gset_pick_is_Some (g: gset K):
+    is_Some (gset_pick g) <-> g ≠ ∅.
+  Proof.
+    rewrite -not_eq_None_Some. apply not_iff_compat, gset_pick_None. 
+  Qed. 
+  
+  Lemma gset_pick_Some (g: gset K) k:
+    gset_pick g = Some k -> k ∈ g. 
+  Proof.
+    rewrite /gset_pick. destruct elements eqn:E; [done| ].
+    intros [=->]. apply elem_of_elements. rewrite E. constructor. 
+  Qed.   
+  
+  Lemma gset_pick_singleton (k: K):
+    gset_pick {[ k ]} = Some k.
+  Proof.
+    rewrite /gset_pick. rewrite elements_singleton. done.
+  Qed. 
 
-(* Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac). *)
-(* Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac. *)
-
+End GsetPick.

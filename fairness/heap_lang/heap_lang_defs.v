@@ -77,63 +77,6 @@ Section GeneralProperties.
         assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
   Qed.
 
-  Lemma from_locale_from_lookup tp0 tp tid e :
-    from_locale_from tp0 tp tid = Some e <-> (tp !! (tid - length tp0)%nat = Some e ∧ (length tp0 <= tid)%nat).
-  Proof.
-    split.
-    - revert tp0 tid. induction tp as [| e1 tp1 IH]; intros tp0 tid.
-      { unfold from_locale. simpl. done. }
-      unfold from_locale. simpl.
-      destruct (decide (locale_of tp0 e1 = tid)).
-      + intros ?; simplify_eq. rewrite /locale_of /= Nat.sub_diag.
-        split; [done|lia].
-      + intros [H Hlen]%IH. rewrite app_length /= in H.
-        rewrite app_length /= in Hlen.
-        destruct tid as [|tid]; first lia.
-        assert (Heq1 : (length tp0 + 1 = S (length tp0))%nat) by lia.
-        rewrite Heq1 in Hlen.
-        assert (length tp0 ≤ tid)%nat by lia.
-        assert (Heq : (S tid - length tp0)%nat = (S ((tid - (length tp0))))%nat) by lia.
-        rewrite Heq /=. split.
-        * rewrite -H. f_equal. lia.
-        * transitivity tid; try lia. assumption.
-    - revert tp0 tid. induction tp as [|e1 tp1 IH]; intros tp0 tid.
-      { set_solver. }
-      destruct (decide (tid = length tp0)) as [-> | Hneq].
-      + rewrite Nat.sub_diag /=. intros  [? _]. simplify_eq.
-        rewrite decide_True //.
-      + intros [Hlk Hlen]. assert (length tp0 < tid)%nat as Hle by lia.
-        simpl. rewrite decide_False //. apply IH. split.
-        * assert (tid - length tp0 = S ((tid - 1) - length tp0))%nat as Heq by lia.
-          rewrite Heq /= in Hlk. rewrite -Hlk app_length /=. f_equal; lia.
-        * rewrite app_length /=. apply Nat.le_succ_l in Hle. rewrite Nat.add_comm //.
-  Qed.
-
-  
-  Lemma from_locale_lookup tp tid e :
-    from_locale tp tid = Some e <-> tp !! tid = Some e.
-  Proof.
-    assert (from_locale tp tid = Some e <-> (tp !! tid = Some e ∧ 0 ≤ tid)%nat) as H; last first.
-    { split; intros ?; apply H; eauto. split; [done|lia]. }
-    unfold from_locale. replace (tid) with (tid - length (A := expr) [])%nat at 2;
-      first apply from_locale_from_lookup. simpl; lia.
-  Qed.
-  
-  Definition indexes {A} (xs : list A) := imap (λ i _, i) xs.
-  
-  Lemma locales_of_list_from_indexes (es' es : list expr) :
-    locales_of_list_from es' es = imap (λ i _, length es' + i)%nat es.
-  Proof.
-    revert es'. induction es; [done|]; intros es'.
-    rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
-    f_equiv; [lia|]. rewrite IHes. apply imap_ext.
-    intros x ? Hin. rewrite app_length=> /=. lia.
-  Qed.
-  
-  Lemma locales_of_list_indexes (es : list expr) :
-    locales_of_list es = indexes es.
-  Proof. apply locales_of_list_from_indexes. Qed.
-
   (* TODO: upstream? *)
   Lemma gmap_filter_dom_id {K A: Type} `{Countable K} (m: gmap K A):
     filter (fun '(k, _) => k ∈ dom m) m = m.

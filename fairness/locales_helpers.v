@@ -4,7 +4,7 @@ Section XX.
   Context `{Countable (locale Λ)}.
 
   Notation "'Tid'" := (locale Λ). 
-  
+
   (* TODO: unify with existing locales_of_list_from_locale_from, 
      remove restriction for Λ *)
 
@@ -31,4 +31,9 @@ Section XX.
     apply prefixes_from_spec; eauto.
   Qed. 
 
+  Definition locales_of_cfg (c: cfg Λ): gset (locale Λ) :=
+    list_to_set (locales_of_list c.1).
+  
+  
 End XX.
+
