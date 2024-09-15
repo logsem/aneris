@@ -9,6 +9,7 @@ From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation 
 
 
 Close Scope Z.
+Open Scope nat. 
 
 (* TODO: move *)
 Section Arithmetic.
@@ -99,30 +100,31 @@ Section EoFin.
   .
 
   Class EoFinPreG Σ := {
-      eofin_threads_PreG :> inG Σ (excl_authR (prodR natO positiveO));
-      (* TODO: abstract over signal id type? *)
-      eofin_sigs :> inG Σ (excl_authR natO);
-      eofin_toks :> inG Σ (exclR unitO);
+      eofin_threads_PreG :> inG Σ (excl_authR natO);
+      (* (* TODO: abstract over signal id type? *) *)
+      (* eofin_sigs :> inG Σ (excl_authR natO); *)
+      (* eofin_toks :> inG Σ (exclR unitO); *)
+      eofin_sigs :> inG Σ (authUR (gmapUR nat (agreeR SignalId)));
   }.
   
   Class EoFinG Σ := {
       eofin_PreG :> EoFinPreG Σ;
       eofin_even: gname; eofin_odd: gname; 
-      eofin_p1: gname; eofin_p2: gname;
-      eofin_tok_p1: gname; eofin_tok_p2: gname;
+      (* eofin_p1: gname; eofin_p2: gname; *)
+      (* eofin_tok_p1: gname; eofin_tok_p2: gname; *)
   }.
 
   Section Threads.
     Context `{EoFinG Σ}.
     
-    Definition thread_auth γ (n: nat) (g: gname): iProp Σ :=
-      own γ (●E (n, g)).
+    Definition thread_auth γ (n: nat) (g1 g2: gname): iProp Σ :=
+      own γ (●E (n, g1, g2)).
 
-    Definition thread_frag γ (n: nat) (g: gname): iProp Σ :=
-      own γ (◯E (n, g)).
+    Definition thread_frag γ (n: nat) (g1 g2: gname): iProp Σ :=
+      own γ (◯E (n, g1, g2)).
 
-    Lemma thread_agree γ n1 g1 n2 g2:
-      thread_auth γ n1 g1 -∗ thread_frag γ n2 g2 -∗ ⌜ n1 = n2 /\ g1 = g2 ⌝. 
+    Lemma thread_agree γ n1 gf1 gt1 n2 gf2 gt2:
+      thread_auth γ n1 gf1 gt1 -∗ thread_frag γ n2 gf2 gt2 -∗ ⌜ n1 = n2 /\ gf1 = gf2 /\ gt1 = gt2 ⌝. 
     Proof.
       rewrite /thread_frag /thread_auth.
       iIntros "HA HB". iCombine "HB HA" as "H".      
@@ -130,9 +132,9 @@ Section EoFin.
       iPureIntro. apply excl_auth_agree_L in Hval. set_solver. 
     Qed.
 
-    Lemma thread_update γ n1 g1 n2 g2 n' g':
-      thread_auth γ n1 g1 -∗ thread_frag γ n2 g2 ==∗
-      thread_auth γ n' g' ∗ thread_frag γ n' g'. 
+    Lemma thread_update γ n1 gf1 gt1 n2 gf2 gt2 n' gf' gt':
+      thread_auth γ n1 gf1 gt1 -∗ thread_frag γ n2 gf2 gt2 ==∗
+      thread_auth γ n' gf' gt' ∗ thread_frag γ n' gf' gt'. 
     Proof.
       rewrite /thread_frag /thread_auth.
       iIntros "HA HB". iCombine "HB HA" as "H".
@@ -140,12 +142,14 @@ Section EoFin.
       apply excl_auth_update.
     Qed.
 
-    Definition nth_lvl (n: nat) {M: nat} (BOUND: M < LIM) (LE: n <= M): EOLevel LIM :=
-      exist _ n (Nat.le_lt_trans _ _ _ LE BOUND).
+    Definition lvl2nat {X} (l: EOLevel X): nat := proj1_sig l. 
 
-    Definition nth_lvl' (n: nat) {M: nat} (BOUND: M < LIM) (LE: n < M): EOLevel LIM :=
-      (* exist _ n (Nat.lt_trans _ _ _ LE BOUND). *)
-      nth_lvl n BOUND (Nat.lt_le_incl _ _ LE). 
+    (* Definition nth_lvl (n: nat) {M: nat} (BOUND: M < LIM) (LE: n <= M): EOLevel LIM := *)
+    (*   exist _ n (Nat.le_lt_trans _ _ _ LE BOUND). *)
+
+    (* Definition nth_lvl' (n: nat) {M: nat} (BOUND: M < LIM) (LE: n < M): EOLevel LIM := *)
+    (*   (* exist _ n (Nat.lt_trans _ _ _ LE BOUND). *) *)
+    (*   nth_lvl n BOUND (Nat.lt_le_incl _ _ LE).  *)
 
     Definition nth_deg (n: nat) (LT: n < NUM_DEG): EODegree NUM_DEG :=
       exist _ n LT. 
@@ -160,12 +164,14 @@ Section EoFin.
           l ↦ #n ∗
           thread_auth eofin_even
             (if Nat.even n then n else n + 1)
-            (if Nat.even n then eofin_p1 else eofin_p2) ∗
+            (if Nat.even n then eofin_p1 else eofin_p2)
+            (if Nat.even n then eofin_tok_p1 else eofin_tok_p2) ∗
           thread_auth eofin_odd
             (if Nat.odd n then n else n + 1)
-            (if Nat.odd n then eofin_p1 else eofin_p2) ∗
-          (∀ (LE: n + 1 <= M), ∃ sid, sgn EO_OP sid (nth_lvl (n + 1) BOUND LE) (Some false) (H3 := oGS) ∗ (∃ c, sgn_p_auth eofin_p1 c ∗ (sgn_p_frag eofin_p1 c ∨ ⌜ c = sid ⌝ ∗ thread_tok eofin_tok_p1))) ∗
-          (∀ (LE: n + 2 <= M), ∃ sid, sgn EO_OP sid (nth_lvl (n + 2) BOUND LE) (Some false) (H3 := oGS) ∗ (∃ c, sgn_p_auth eofin_p2 c ∗ (sgn_p_frag eofin_p2 c ∨ ⌜ c = sid ⌝ ∗ thread_tok eofin_tok_p2)))
+            (if Nat.odd n then eofin_p1 else eofin_p2)
+            (if Nat.odd n then eofin_tok_p1 else eofin_tok_p2) ∗
+          (∀ (LE: n + 1 <= M), ∃ sid l, sgn EO_OP sid l (Some false) (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 1)%nat ⌝ ∗ (sgn_p_auth eofin_p1 sid ∗ (sgn_p_frag eofin_p1 sid ∨ thread_tok eofin_tok_p1))) ∗
+          (∀ (LE: n + 2 <= M), ∃ sid l, sgn EO_OP sid l (Some false) (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 2)%nat ⌝ ∗ (∃ c, sgn_p_auth eofin_p2 c ∗ (sgn_p_frag eofin_p2 c ∨ ⌜ c = sid ⌝ ∗ thread_tok eofin_tok_p2)))
     .
 
     Definition eofin_inv l M BOUND: iProp Σ :=
@@ -194,12 +200,12 @@ Section EoFin.
     Proof. lia. Qed.
 
     Definition even_res n: iProp Σ :=
-      ∃ g, thread_frag eofin_even n g ∗ thread_tok g. 
+      ∃ gf gt, thread_frag eofin_even n gf gt ∗ thread_tok gt.
 
     Lemma thread_spec τ n l M (BOUND: M < LIM) π:
       {{{ eofin_inv l M BOUND ∗ even_res n ∗
           cp_mul EO_OP π d0 100 (H3 := oGS) ∗ th_phase_ge EO_OP τ π (H3 := oGS) ∗
-          ((∀ (LT: n < M), ∃ s, obls EO_OP τ {[ s ]} (H3 := oGS) ∗ sgn EO_OP s (nth_lvl (n + 1) BOUND (add1_helper LT)) None (H3 := oGS)) ∧
+          ((∀ (LT: n < M), ∃ s l, obls EO_OP τ {[ s ]} (H3 := oGS) ∗ sgn EO_OP s l None (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 1)%nat ⌝) ∧
            (⌜ n >= M⌝ -∗ obls EO_OP τ ∅ (H3 := oGS)))
       }}}
         thread_prog #l #n #M @ τ
@@ -220,7 +226,7 @@ Section EoFin.
       
       rewrite bool_decide_false; [| lia].
       iDestruct (bi.and_elim_l with "OB") as "OB".
-      iSpecialize ("OB" $! ltac:(done)). iDestruct "OB" as (s) "[OB SIG]".
+      iSpecialize ("OB" $! ltac:(done)). iDestruct "OB" as (s lvl) "(OB & SIG & %LVL)".
       pure_steps.
       wp_bind (_ + _)%E. pure_steps.  
       wp_bind (CmpXchg _ _ _)%E.
@@ -229,11 +235,11 @@ Section EoFin.
       iInv "INV" as ">inv" "CLOS". iModIntro.
       rewrite {1}/eofin_inv_inner.
       iDestruct "inv" as (m) "(L & EVEN & ODD & P1 & P2)".
-      iDestruct "TH" as (g) "[EV TOK]". 
-      iDestruct (thread_agree with "EVEN [$]") as %[<- <-].
+      iDestruct "TH" as (gf gt) "[EV TOK]". 
+      iDestruct (thread_agree with "EVEN [$]") as %(<- & <- & <-).
       destruct (even_or_odd m) as [EVEN | ODD].
       - pose proof (Is_true_true_1 _ EVEN) as E.
-        rewrite {1 2 3 6 7 8 9 10 11}E.
+        rewrite E. 
 
         iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_suc with "[$]"); try done.
