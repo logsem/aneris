@@ -109,22 +109,21 @@ Section EoFin.
   
   Class EoFinG Σ := {
       eofin_PreG :> EoFinPreG Σ;
-      eofin_even: gname; eofin_odd: gname; 
-      (* eofin_p1: gname; eofin_p2: gname; *)
-      (* eofin_tok_p1: gname; eofin_tok_p2: gname; *)
+      eofin_even: gname; eofin_odd: gname;
+      eofin_smap: gname;
   }.
 
   Section Threads.
     Context `{EoFinG Σ}.
     
-    Definition thread_auth γ (n: nat) (g1 g2: gname): iProp Σ :=
-      own γ (●E (n, g1, g2)).
+    Definition thread_auth γ (n: nat): iProp Σ :=
+      own γ (●E n).
 
-    Definition thread_frag γ (n: nat) (g1 g2: gname): iProp Σ :=
-      own γ (◯E (n, g1, g2)).
+    Definition thread_frag γ (n: nat): iProp Σ :=
+      own γ (◯E n).
 
-    Lemma thread_agree γ n1 gf1 gt1 n2 gf2 gt2:
-      thread_auth γ n1 gf1 gt1 -∗ thread_frag γ n2 gf2 gt2 -∗ ⌜ n1 = n2 /\ gf1 = gf2 /\ gt1 = gt2 ⌝. 
+    Lemma thread_agree γ n1 n2:
+      thread_auth γ n1-∗ thread_frag γ n2 -∗ ⌜ n1 = n2 ⌝. 
     Proof.
       rewrite /thread_frag /thread_auth.
       iIntros "HA HB". iCombine "HB HA" as "H".      
@@ -132,9 +131,9 @@ Section EoFin.
       iPureIntro. apply excl_auth_agree_L in Hval. set_solver. 
     Qed.
 
-    Lemma thread_update γ n1 gf1 gt1 n2 gf2 gt2 n' gf' gt':
-      thread_auth γ n1 gf1 gt1 -∗ thread_frag γ n2 gf2 gt2 ==∗
-      thread_auth γ n' gf' gt' ∗ thread_frag γ n' gf' gt'. 
+    Lemma thread_update γ n1 n2 n':
+      thread_auth γ n1 -∗ thread_frag γ n2 ==∗
+      thread_auth γ n' ∗ thread_frag γ n'. 
     Proof.
       rewrite /thread_frag /thread_auth.
       iIntros "HA HB". iCombine "HB HA" as "H".
@@ -154,24 +153,18 @@ Section EoFin.
     Definition nth_deg (n: nat) (LT: n < NUM_DEG): EODegree NUM_DEG :=
       exist _ n LT. 
 
-    Definition sgn_p_auth γ g: iProp Σ := own γ (●E g).
-    Definition sgn_p_frag γ g: iProp Σ := own γ (◯E g).
-
-    Definition thread_tok γ := own γ (Excl ()). 
-
     Definition eofin_inv_inner l M (BOUND: M < LIM) : iProp Σ :=
-      ∃ (n: nat), 
+      ∃ (n: nat) (smap: gmap nat SignalId), 
           l ↦ #n ∗
           thread_auth eofin_even
-            (if Nat.even n then n else n + 1)
-            (if Nat.even n then eofin_p1 else eofin_p2)
-            (if Nat.even n then eofin_tok_p1 else eofin_tok_p2) ∗
+            (if Nat.even n then n else n + 1) ∗
           thread_auth eofin_odd
-            (if Nat.odd n then n else n + 1)
-            (if Nat.odd n then eofin_p1 else eofin_p2)
-            (if Nat.odd n then eofin_tok_p1 else eofin_tok_p2) ∗
-          (∀ (LE: n + 1 <= M), ∃ sid l, sgn EO_OP sid l (Some false) (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 1)%nat ⌝ ∗ (sgn_p_auth eofin_p1 sid ∗ (sgn_p_frag eofin_p1 sid ∨ thread_tok eofin_tok_p1))) ∗
-          (∀ (LE: n + 2 <= M), ∃ sid l, sgn EO_OP sid l (Some false) (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 2)%nat ⌝ ∗ (∃ c, sgn_p_auth eofin_p2 c ∗ (sgn_p_frag eofin_p2 c ∨ ⌜ c = sid ⌝ ∗ thread_tok eofin_tok_p2)))
+            (if Nat.odd n then n else n + 1) ∗
+          own eofin_smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
+          ⌜ dom smap = set_seq 0 (min M (n + 2)) ⌝ ∗
+          ([∗ map] i ↦ s ∈ smap, ∃ l, sgn EO_OP s l (Some false) (H3 := oGS))
+          (* (∀ (LE: n + 1 <= M), ∃ sid l, sgn EO_OP sid l (Some false) (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 1)%nat ⌝ ∗ (sgn_p_auth eofin_p1 sid ∗ (sgn_p_frag eofin_p1 sid ∨ thread_tok eofin_tok_p1))) ∗ *)
+          (* (∀ (LE: n + 2 <= M), ∃ sid l, sgn EO_OP sid l (Some false) (H3 := oGS) ∗ ⌜ lvl2nat l = (n + 2)%nat ⌝ ∗ (∃ c, sgn_p_auth eofin_p2 c ∗ (sgn_p_frag eofin_p2 c ∨ ⌜ c = sid ⌝ ∗ thread_tok eofin_tok_p2))) *)
     .
 
     Definition eofin_inv l M BOUND: iProp Σ :=
