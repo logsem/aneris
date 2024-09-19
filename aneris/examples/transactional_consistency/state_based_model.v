@@ -52,7 +52,7 @@ Definition valid_transaction (t : transaction) : Prop :=
   (∀ op1 op2, op1 ∈ t → op2 ∈ t → connOfOp op1 = connOfOp op2) ∧
   (* No duplicate operations *)
   (∀ op1 op2 i j, t !! i = Some op1 → t !! j = Some op2 → op1 = op2 → i = j) ∧
-  (* Transactions read their own writes *)
+  (* Read your own writes *)
   (∀ tag c k ov tag1 v1, 
     rel_list t (Wr (tag1, c) k v1) (Rd (tag, c) k ov) →
     (¬∃ tag2 v2, rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
@@ -67,10 +67,6 @@ Definition is_cm_op (op : operation) : Prop := ∃ s b, op = Cm s b.
 Definition isCmOp (op : operation) : bool := match op with | Cm _ _ => true | _ => false end.
 
 Definition valid_transactions (T : list transaction) : Prop := 
-  (* Transactions read from some write *)
-  (∀ t s k v, t ∈ T → 
-                  Rd s k (Some v) ∈ t →
-                  ∃ t' s', t' ∈ T ∧ Wr s' k v ∈ t') ∧
   (* Transactions satisfy the baseline transaction contraints *)
   (∀ t, t ∈ T → valid_transaction t) ∧
   (* At most one open transactions per connection *) 
@@ -258,7 +254,11 @@ Definition valid_sequence (lin_trace : list val) : Prop :=
   (∀ e_st c, e_st ∈ lin_trace → 
              connOfEvent e_st = Some c → 
              is_st_lin_event e_st → 
-             (later_commit c e_st lin_trace ∨ no_later_start_or_commit c e_st lin_trace)).
+             (later_commit c e_st lin_trace ∨ no_later_start_or_commit c e_st lin_trace)) ∧
+  (* Reads happen from prior writes *)
+  (∀ i tag c k v, lin_trace !! i = Some (#(LitString tag), (c, (#"RdLin", (#(LitString k), SOMEV v))))%V →
+      ∃ j tag' c', j < i ∧ 
+          lin_trace !! j = Some (#(LitString tag'), (c', (#"WrLin", (#(LitString k), v))))%V).
 
 Definition comTrans (T : list transaction) : list transaction := 
   List.filter (λ t, match last t with | Some (Cm s true) => true | _ => false end) T.
@@ -932,7 +932,6 @@ Proof.
         rewrite elem_of_list_lookup in Hin_le'.
         destruct Hin_le' as (j & Hlookup_j).
         rewrite /is_post_event in His_post.
-        
         destruct His_post as [[tag' [c' ->]]| [ [[tag' [k' [c' [v' ->]]]] | 
           [tag' [k' [c' ->]]]]| [[tag' [c' [k' [v' ->]]]] |
           [[tag' [k' [c' ->]]] | [tag' [c' ->]]]]]];
@@ -1247,7 +1246,7 @@ Proof.
         apply (later_commit_impl _ _ _ _ tag); try done.
         -- by exists tag, c.
         -- by apply Hstart.
-      * destruct Hvalid_seq as (_ & _ & _ & Hvalid_seq).
+      * destruct Hvalid_seq as (_ & _ & _ & Hvalid_seq & _).
         specialize (Hvalid_seq e_st c0 He_in He_conn He_event).
         destruct Hvalid_seq as [Hvalid_seq | Hvalid_seq].
         -- left.
@@ -1279,6 +1278,17 @@ Proof.
             rewrite list_lookup_singleton_Some in Hfalse. 
             destruct Hfalse as (Hfalse & _ ).
             lia.
+  - intros i tag' c' k v Hlookup_i.
+    destruct Hvalid_seq as (_ & _ & _ & _ & Hvalid_seq).
+    rewrite lookup_app_Some in Hlookup_i.
+    destruct Hlookup_i as [Hlookup_i |(_ & Hfalse)].
+    + destruct (Hvalid_seq _ _ _ _ _ Hlookup_i) as (j & tag_j & c_j & Hlt & Hlookup_j).
+      eexists j, tag_j, c_j.
+      split; first done.
+      rewrite lookup_app_Some.
+      by left. 
+    + rewrite list_lookup_singleton_Some in Hfalse.
+      set_solver.
 Qed.
 
 Lemma valid_sequence_wr_rd_lin le lt (tag : string) c tail :
@@ -1381,7 +1391,7 @@ Proof.
            set_solver.
   - intros e_st c' Hin Hconn Hstart.
     rewrite elem_of_app in Hin.
-    destruct Hvalid as (_ & _ & _ & Hvalid).
+    destruct Hvalid as (_ & _ & _ & Hvalid & _).
     destruct Hin as [Hin|Hin].
     + destruct (Hvalid e_st c' Hin Hconn Hstart) as [Hlater | Hno_later].
       * left.
@@ -1394,7 +1404,17 @@ Proof.
       destruct Hevent as [Hevent|Hevent];
         rewrite /is_wr_lin_event /is_rd_lin_event in Hevent;
         set_solver.
-Qed.
+  - intros i tag' c' k v Hlookup_i.
+    destruct Hvalid as (_ & _ & _ & _ & Hvalid_seq).
+    rewrite lookup_app_Some in Hlookup_i.
+    destruct Hlookup_i as [Hlookup_i |(_ & Hfalse)].
+    + destruct (Hvalid_seq _ _ _ _ _ Hlookup_i) as (j & tag_j & c_j & Hlt & Hlookup_j).
+      eexists j, tag_j, c_j.
+      split; first done.
+      rewrite lookup_app_Some.
+      by left. 
+    + admit.
+Admitted.
 
 Lemma valid_sequence_in_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
@@ -1402,7 +1422,7 @@ Lemma valid_sequence_in_lin lt tag c :
   valid_sequence lt → 
   valid_sequence (lt ++ [(#tag, (c, #"InLin"))%V]).
 Proof.
-  intros Hnot Hunique (Hvalid1 & Hvalid2 & Hvalid3 & Hvalid4).
+  intros Hnot Hunique (Hvalid1 & Hvalid2 & Hvalid3 & Hvalid4 & Hvalid5).
   split_and!; try done.
   - intros e c' i Hlookup_i Hconn.
     rewrite lookup_app_Some in Hlookup_i.
@@ -1441,6 +1461,16 @@ Proof.
       * apply no_later_start_or_commit_wr_rd_imp; try done.
         rewrite /is_in_lin_event; set_solver.
       * by eapply no_later_start_or_commit_impl.
+  - intros i tag' c' k v Hlookup_i.
+    rewrite lookup_app_Some in Hlookup_i.
+    destruct Hlookup_i as [Hlookup_i |(_ & Hfalse)].
+    + destruct (Hvalid5 _ _ _ _ _ Hlookup_i) as (j & tag_j & c_j & Hlt & Hlookup_j).
+      eexists j, tag_j, c_j.
+      split; first done.
+      rewrite lookup_app_Some.
+      by left. 
+    + rewrite list_lookup_singleton_Some in Hfalse.
+      set_solver.
 Qed.
 
 Lemma extraction_of_add1 lt T le op : 
@@ -1611,24 +1641,17 @@ Lemma valid_transactions_add1 T t c :
 Proof.
   intros Hread Hconn Hvalid Hnot Hvalid_trans.
   split_and!.
-  - intros t' s k v Hin1 Hin2.
-    rewrite elem_of_app in Hin1.
-    destruct Hin1 as [Hin1|Hin1]; last set_solver.
-    destruct Hvalid_trans as (Hvalid_trans & _).
-    destruct (Hvalid_trans t' s k v Hin1 Hin2)  as (t'' & s'' & Hin1' & Hin2').
-    exists t'', s''.
-    split; set_solver.
   - intros t' Hin.
     rewrite elem_of_app in Hin.
     destruct Hin as [Hin|Hin]; last set_solver.
-    destruct Hvalid_trans as (_ & Hvalid_trans).
+    destruct Hvalid_trans as (Hvalid_trans & _).
     by apply Hvalid_trans.
   - intros t1 t2 op1 op2 i j c' Hlookup_i Hlookup_j Hlast_1 Hlast_2
     Hconn_1 Hconn_2 Hcm_1 Hcm_2.
-    destruct Hvalid as (_ & Hvalid & _).
+    destruct Hvalid as (_ & Hvalid).
     destruct Hconn as (op_h & Hhead & Hconn).
     assert (op_h ∈ t) as Hhead_in; first by apply head_Some_elem_of.
-    destruct Hvalid_trans as (_ & _ & Hvalid_trans).
+    destruct Hvalid_trans as (_ & Hvalid_trans).
     rewrite lookup_app_Some in Hlookup_i.
     destruct Hlookup_i as [Hlookup_i | (Hlength_i & Hlookup_i)].
     + rewrite lookup_app_Some in Hlookup_j.
@@ -1797,47 +1820,8 @@ Lemma valid_transactions_add2 T1 T2 tag op t c :
 Proof.
   intros Hnot Htag Hread_write Hread Hconn Hlast Hvalid.
   split_and!.
-  - intros t' s k v Ht'_in Hread_in. 
-    destruct Hvalid as (Hvalid & _).
-    rewrite elem_of_app in Ht'_in.
-    destruct Ht'_in as [Ht'_in|Ht'_in].
-    + specialize (Hvalid t' s k v).
-      assert (t' ∈ T1 ++ t :: T2) as Ht'_in'; first set_solver.
-      destruct (Hvalid Ht'_in' Hread_in) as (t'' & s' & Ht''_in & Hwrite_in).
-      rewrite elem_of_app in Ht''_in.
-      destruct Ht''_in as [Ht''_in|Ht''_in]; first set_solver.
-      rewrite elem_of_cons in Ht''_in.
-      destruct Ht''_in as [->|Ht''_in]; last set_solver.
-      exists (t ++ [op]), s'; set_solver.
-    + rewrite elem_of_cons in Ht'_in.
-      destruct Ht'_in as [->|Ht'_in].
-      * rewrite elem_of_app in Hread_in. 
-        destruct Hread_in as [Hread_in|Hread_in].
-        -- specialize (Hvalid t s k v).
-           assert (t ∈ T1 ++ t :: T2) as Ht_in; first set_solver.
-           destruct (Hvalid Ht_in Hread_in) as (t'' & s' & Ht''_in & Hwrite_in).
-           rewrite elem_of_app in Ht''_in.
-           destruct Ht''_in as [Ht''_in|Ht''_in]; first set_solver.
-           rewrite elem_of_cons in Ht''_in.
-           destruct Ht''_in as [->|Ht''_in]; last set_solver.
-           exists (t ++ [op]), s'; set_solver.
-        -- assert (op = Rd s k (Some v)) as Heq; first set_solver.
-           destruct (Hread s k v Heq) as (t' & s' & Ht'_in & Hwrite_in).
-           rewrite elem_of_app in Ht'_in.
-           destruct Ht'_in as [Ht'_in|Ht'_in]; first set_solver.
-           rewrite elem_of_cons in Ht'_in.
-           destruct Ht'_in as [->|Ht'_in]; last set_solver.
-           exists (t ++ [op]), s'; set_solver.
-      * specialize (Hvalid t' s k v).
-        assert (t' ∈ T1 ++ t :: T2) as Ht'_in'; first set_solver.
-        destruct (Hvalid Ht'_in' Hread_in) as (t'' & s' & Ht''_in & Hwrite_in).
-        rewrite elem_of_app in Ht''_in.
-        destruct Ht''_in as [Ht''_in|Ht''_in]; first set_solver.
-        rewrite elem_of_cons in Ht''_in.
-        destruct Ht''_in as [->|Ht''_in]; last set_solver.
-        exists (t ++ [op]), s'; set_solver.
   - intros t' Ht'_in.
-    destruct Hvalid as (_ & Hvalid & _).
+    destruct Hvalid as (Hvalid & _).
     rewrite elem_of_app in Ht'_in.
     destruct Ht'_in as [Ht'_in|Ht'_in]; first set_solver.
     rewrite elem_of_cons in Ht'_in.
@@ -1846,7 +1830,7 @@ Proof.
     eapply valid_transaction_add_op; try done.
   - intros t1 t2 op1 op2 i j c' Hlookup_i Hlookup_j
       Hlast1 Hlast2 Hconn1 Hconn2 Hcm1 Hcm2.
-    destruct Hvalid as (_ & _ & Hvalid).
+    destruct Hvalid as (_ & Hvalid).
     pose proof Hvalid as Hvalid'.
     specialize (Hvalid t1 t2 op1 op2 i j c').
     rewrite lookup_app_Some in Hlookup_i.

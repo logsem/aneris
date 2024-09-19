@@ -1225,7 +1225,7 @@ Section trace_proof.
                          exists tag_wr, v.
                          assert (trans = trans') as <-.
                          {
-                           destruct Hvalid_trans' as (_ & _ & Hvalid_trans').
+                           destruct Hvalid_trans' as (_ & Hvalid_trans').
                            destruct Hopen_trans as (op_last & Htrans'_in & Hlast' & Hconn_last' & Hcm_last').
                            rewrite elem_of_list_lookup in Htrans_in.
                            rewrite elem_of_list_lookup in Htrans'_in.
