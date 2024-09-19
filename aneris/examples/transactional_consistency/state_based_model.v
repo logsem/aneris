@@ -1299,10 +1299,12 @@ Lemma valid_sequence_wr_rd_lin le lt (tag : string) c tail :
   tagOfEvent le = Some tag →
   connOfEvent le = Some c →
   (∃ t, lin_trace_of lt t) →
+  (∀ tag1 c1 k v, le = (#tag1, (c1, (#"RdLin", (#k, InjRV v))))%V → 
+    ∃ (tag2 : string) c2, (#tag2, (c2, (#"WrLin", (#k, v))))%V ∈ lt) →
   valid_sequence lt → 
   valid_sequence (lt ++ [le]).
 Proof.
-  intros Hinit Hnot Hopen_start Hevent Htag_of Hconn_of Hlin Hvalid.
+  intros Hinit Hnot Hopen_start Hevent Htag_of Hconn_of Hlin Hread Hvalid.
   split_and!.
   - intros e c' i Hlookup_i Hconn.
     eapply (prior_init_imp2 le e); try done.
@@ -1407,14 +1409,21 @@ Proof.
   - intros i tag' c' k v Hlookup_i.
     destruct Hvalid as (_ & _ & _ & _ & Hvalid_seq).
     rewrite lookup_app_Some in Hlookup_i.
-    destruct Hlookup_i as [Hlookup_i |(_ & Hfalse)].
+    destruct Hlookup_i as [Hlookup_i |(Hlength_i & Hlookup_i)].
     + destruct (Hvalid_seq _ _ _ _ _ Hlookup_i) as (j & tag_j & c_j & Hlt & Hlookup_j).
       eexists j, tag_j, c_j.
       split; first done.
       rewrite lookup_app_Some.
       by left. 
-    + admit.
-Admitted.
+    + rewrite list_lookup_singleton_Some in Hlookup_i.
+      destruct Hlookup_i as (Hlength & Heq).
+      destruct (Hread  _ _ _ _ Heq) as (tag2 & c2 & Hin).
+      destruct (elem_of_list_lookup_total_1 _ _ Hin) as (j & Hlt & Hlookup_j).
+      exists j, tag2, c2.
+      split; first lia.
+      apply lookup_app_l_Some.
+      by apply list_lookup_alt.
+Qed.
 
 Lemma valid_sequence_in_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
@@ -1811,14 +1820,13 @@ Lemma valid_transactions_add2 T1 T2 tag op t c :
     (¬∃ tag2 v2, rel_list (t ++ [op]) (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
                  rel_list (t ++ [op]) (Wr (tag2, c) k v2) op) →
     ov = Some v1) →
-  (∀ s k v, op = Rd s k (Some v) → ∃ t' s', t' ∈ (T1 ++ t :: T2) ∧ Wr s' k v ∈ t') →
   connOfOp op = c → 
   (∃ op, op ∈ t ∧ last t = Some op ∧ 
     connOfOp op = c ∧ (¬is_cm_op op)) →
   valid_transactions (T1 ++ t :: T2) →
   valid_transactions (T1 ++ (t ++ [op]) :: T2).
 Proof.
-  intros Hnot Htag Hread_write Hread Hconn Hlast Hvalid.
+  intros Hnot Htag Hread Hconn Hlast Hvalid.
   split_and!.
   - intros t' Ht'_in.
     destruct Hvalid as (Hvalid & _).
