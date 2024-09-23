@@ -409,6 +409,15 @@ Section ProgramLogic.
       iExists _. iFrame. by iApply "PQ". 
     Qed. 
 
+    Lemma BMU_lower E ζ m n P (LE: m <= n):
+      ⊢ BMU E ζ m P -∗ BMU E ζ n P.
+    Proof. 
+      rewrite /BMU.
+      iIntros "BMU". iIntros "**". 
+      iMod ("BMU" with "[$]") as (?) "(? & % & ?)". iModIntro.
+      iExists _. iFrame. iPureIntro. lia.
+    Qed.
+
     Lemma BMU_MU E ζ b (P : iProp Σ) π
       (BOUND: b <= LIM_STEPS)
       :

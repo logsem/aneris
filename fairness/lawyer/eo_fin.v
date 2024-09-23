@@ -221,7 +221,8 @@ Section EoFin.
 
       apply fmap_Some_equiv in ITH as (?&?&?).
       rewrite H1. apply to_agree_inj in H2. by rewrite H2.
-    Qed. 
+    Qed.
+
  
     Lemma thread_spec τ n l M (BOUND: M < LIM) π s:
       {{{ eofin_inv l M BOUND ∗ even_res n ∗
@@ -285,40 +286,119 @@ Section EoFin.
         (* iDestruct (cp_mul_take with "CPS") as "[CPS CP]".  *)
         iAssert (BMU EO_OP (⊤ ∖ ↑nroot.@"eofin") τ 1
                    (⌜ M <= m + 2 ⌝ ∗ obls EO_OP τ ∅ ∗ smap_repr (min M (m + 2)) (m + 1) smap ∨
-                    ⌜ m + 2 < M ⌝ ∗ smap_repr (min M (m + 2)) (m + 1) smap ∗ ∃ s' lm', ith_sig (m + 2) s' ∗ obls EO_OP τ {[ s' ]} ∗ sgn EO_OP s' lm' (Some false) ∗ ⌜ lvl2nat lm' = (m + 2)%nat ⌝))%I with "[OBLS SIGS SIG SM]" as "BMU".
-        { destruct (Nat.le_gt_cases M (m + 2)).
+                    |==> ⌜ m + 2 < M ⌝ ∗ ∃ s' lm', smap_repr (min M (m + 3)) (m + 1) (<[m + 2:= s']> smap) ∗ ith_sig (m + 2) s' ∗ obls EO_OP τ {[ s' ]} ∗ ⌜ lvl2nat lm' = (m + 2)%nat ⌝))%I with "[OBLS SIGS SIG SM]" as "BMU".
+        {
+          iAssert (□ (([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM),
+                         sgn EO_OP y l0 (Some (k <? m)) ∗
+                           ⌜lvl2nat l0 = k⌝) -∗  sgn EO_OP s lm (Some true) -∗ 
+                     [∗ map] i↦s0 ∈ smap, ∃ l0 : sigO (λ i0 : nat, i0 < LIM),
+                         sgn EO_OP s0 l0 (Some (i <? m + 1)) ∗ ⌜
+                         lvl2nat l0 = i⌝))%I as "foo".
+          { iModIntro. iIntros "SIGS SG".
+            rewrite (big_sepM_delete _ smap); eauto.
+            iSplitL "SG".
+            { iExists _. rewrite (proj2 (Nat.ltb_lt _ _)); [| lia]. 
+              iFrame. done. }  
+            iApply (big_sepM_impl with "[$]"). iModIntro.
+            iIntros (???) "(%&?&?)". iExists _. iFrame.
+            apply lookup_delete_Some in H1 as [??]. 
+            apply mk_is_Some, elem_of_dom in H2.
+            rewrite DOM in H2. apply elem_of_set_seq in H2.
+            assert ((k <? m) = (k <? m + 1) \/ k = m).
+            { destruct (decide (k = m)); [tauto| ]. left.
+              destruct (k <? m) eqn:LT.
+              - rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [done | ].
+                apply PeanoNat.Nat.ltb_lt in LT. lia.
+              - rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [done | ].
+                apply PeanoNat.Nat.ltb_ge in LT. lia. }
+            destruct H3; [| done]. rewrite H3. done. } 
+
+          destruct (Nat.le_gt_cases M (m + 2)).
           { rewrite PeanoNat.Nat.min_l in DOM; [| done]. 
             iApply BMU_intro. iLeft. iFrame.
             iSplitR; [done| ]. iSplitR.
             { iPureIntro. rewrite PeanoNat.Nat.min_l; auto. }
-            rewrite (big_sepM_delete _ smap); eauto.
-            iSplitL "SIG".
-            { iExists _. rewrite (proj2 (Nat.ltb_lt _ _)); [| lia]. 
-              iFrame. done. }
-            iApply (big_sepM_impl with "[$]"). iModIntro.
-            iIntros (???) "(%&?&?)". iExists _. iFrame.
-            assert ((k <? m) = (k <? m + 1) \/ k = m).
-            { destruct (decide (k = m)); [tauto| ]. left.
-              destruct (k <? m).
-              - rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)). ; [| lia]. 
-              split. 
+            iApply ("foo" with "[$] [$]"). }
             
           iApply OU_BMU.
-          set (lm' := exist _ (m + 2) H1: EOLevel M).
+          assert {lm' : EOLevel M | lvl2nat lm' = m + 2} as [lm' LVL'].
+          { set (lm' := exist _ (m + 2) H1: EOLevel M).
+            exists lm'. done. }
           iDestruct (OU_create_sig with "OBLS") as "FOO".
           iApply (OU_wand with "[-FOO]"); [| by iFrame].
           iIntros "(%s' & SG & OBLS)". rewrite union_empty_l_L.
           iApply BMU_intro. iRight. iSplitR; [done| ].
-          
+          rewrite PeanoNat.Nat.min_r in DOM; [| lia].
+          iMod (own_update with "SM") as "SM".
+          { apply auth_update_alloc. eapply (alloc_singleton_local_update _ (m + 2) (to_agree s')).
+            2: done. 
+            apply not_elem_of_dom. rewrite dom_fmap. rewrite DOM.
+            intros ?%elem_of_set_seq. lia. }
+          iModIntro. iDestruct "SM" as "[SM S']".
+          iExists s', lm'. 
+          iSplitL "SIGS SG SIG SM".
+          2: { iFrame. eauto. }
+          rewrite PeanoNat.Nat.min_r; [| lia]. rewrite /smap_repr.
+          rewrite -fmap_insert. iFrame. iSplitR.
+          { iPureIntro. rewrite dom_insert_L DOM.
+            apply set_eq. intros ?. rewrite elem_of_union elem_of_singleton.
+            rewrite !elem_of_set_seq. lia. }
+          rewrite big_sepM_insert_delete. iSplitL "SG".
+          { iExists _. rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [ | lia].
+            iFrame. iPureIntro.
+            Unshelve. 2: { assert (m + 2 < LIM).
+                           { lia. }
+                           esplit. apply H2. }
+            done. }
+          rewrite (delete_notin _ (m + 2)).
+          2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
+          iApply ("foo" with "[$] [$]"). }
 
-        
-                  
-        
+        iApply (BMU_lower _ _ _ 1); [lia| ].
+        iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND".
 
-        iMod ("CLOS" with "P2 EVEN ODD") as "_"
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+        iSplitR "CP".
+        2: { do 2 iExists _. iFrame. done. }
+        iApply wp_value.
 
-      
         iMod (thread_update _ _ _ (m + 2) with "EVEN [$]") as "[EVEN TH]". 
+
+        assert (forall n, Nat.even (n + 1) = Nat.odd n) by admit. 
+        assert (forall n, Nat.odd (n + 1) = Nat.even n) by admit.
+
+        destruct (Nat.le_gt_cases M (m + 2)).
+        + iDestruct "COND" as "[COND | CC]".
+          2: { iMod "CC" as "[% ?]". lia. }
+          iDestruct "COND" as "(% & OBLS & SM)".
+
+          iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
+          { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
+            rewrite H1 H2 E O. rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
+            iFrame.
+            rewrite Nat.min_l; [| done]. rewrite Nat.min_l; [| lia]. done. }
+
+          iModIntro.
+          wp_bind (Snd _)%E.           
+          pure_steps.
+
+          (* TODO: handle recursive call with no obligations *)
+          admit. 
+        + iDestruct "COND" as "[CC | COND]".
+          { iDestruct "CC" as "(% & ? & ?)". lia. }
+          iClear "SN". 
+          iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]".
+          iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
+          { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
+            rewrite H1 H2 E O. rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
+            iFrame. rewrite -Nat.add_assoc. simpl. iFrame. }
+          
+          iModIntro.
+          wp_bind (Snd _)%E.           
+          pure_steps.
+          (* TODO: handle recursive call with obligations *)
+          admit.
+      - 
 
       
 
