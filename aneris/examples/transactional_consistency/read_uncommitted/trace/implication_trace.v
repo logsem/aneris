@@ -759,6 +759,58 @@ Section trace_proof.
             eapply (latest_neq2 _ sa sa'); set_solver.
   Qed.
 
+  Lemma two_trans_implies_false_app_cons T1 T2 trans c : 
+    valid_transactions (T1 ++ trans :: T2) →
+    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
+    (∃ trans', (trans' ∈ T1 ∨ trans' ∈ T2) ∧ (∃ op' : operation,
+      op' ∈ trans' ∧ last trans' = Some op' ∧ connOfOp op' = c ∧ isCmOp op' = false)) →
+    false.
+  Proof.
+    intros Hvalid_trans' Hop (trans' & Htrans'_in & Hop').
+    destruct Hvalid_trans' as (_ & Hvalid_trans').
+    assert (length T1 = length T1) as Htrans_in'; first set_solver.
+    apply (list_lookup_middle T1 T2 trans) in Htrans_in'.
+    destruct Hop' as (op' & Hop'_in & Hop'_last & Hop'_conn & Hop'_cm).
+    destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+    rewrite /isCmOp in Hop_cm.
+    rewrite /isCmOp in Hop'_cm.
+    destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+    +++ apply elem_of_list_lookup_1 in Htrans'_in.
+        destruct Htrans'_in as (j & Htrans'_in).
+        pose proof Htrans'_in as Htrans'_in'. 
+        apply lookup_lt_Some in Htrans'_in'.
+        apply (lookup_app_l_Some _ (trans :: T2)) in Htrans'_in.
+        assert (length T1 = j) as <-; 
+          last by eapply PeanoNat.Nat.lt_irrefl.
+        eapply (Hvalid_trans' _ _ op op'); try done; 
+        rewrite /is_cm_op; set_solver.
+    +++ apply elem_of_list_lookup_1 in Htrans'_in.
+        destruct Htrans'_in as (j & Htrans'_in).
+        assert (1 ≤ (j + 1) ∧ T2 !! ((j + 1) - 1) = Some trans') as 
+        (Hleq & Hlookup_j').
+        {
+          split; try lia.
+          by assert (j + 1 - 1 = j) as ->; first lia.
+        }
+        assert ((trans :: T2) !! (j + 1) = Some trans') as Hlookup_j_cons.
+        {
+        apply lookup_cons_Some; set_solver.
+        }
+        assert (length T1 ≤ (j + 1 + length T1) ∧ (trans :: T2) !! ((j + 1 + length T1) - length T1) = Some trans') 
+        as (Hleq'' & Hlookup_j'').
+        {
+          split; try lia.
+          by assert (j + 1 + length T1 - length T1 = j + 1) as ->; first lia.
+        }
+        assert ((T1 ++ trans :: T2) !! (j + 1 + length T1) = Some trans') as Hlookup_j_app.
+        {
+        apply lookup_app_Some; set_solver.
+        } 
+        assert (length T1 = (j + 1 + length T1)) as Heq; last lia.
+        eapply (Hvalid_trans' _ _ op op'); try done; 
+        rewrite /is_cm_op; set_solver.
+  Qed.
+
   Lemma client_trace_state_resources_neq1 (sa sa' : socket_address) T op c le lt 
   γstate γmname mstate mname (res : RU_resources Mdl Σ) :
     ⌜sa ≠ sa'⌝ -∗
@@ -1686,8 +1738,8 @@ Section trace_proof.
                         s γ γmstate γmname res mstate mname m with "[][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                         [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
                      --- iPureIntro.
-                         destruct Hvalid_trans' as (_ & Hvalid_trans').
-                         admit.
+                         intros Hfalse.
+                         eapply two_trans_implies_false_app_cons; try done.
                      --- iPureIntro.
                          destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
                          exists e.
@@ -1817,7 +1869,7 @@ Section trace_proof.
     iModIntro.
     wp_pures.
     destruct wo; simpl; iFrame.
-  Admitted.
+  Qed.
 
   Lemma write_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
