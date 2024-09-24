@@ -240,8 +240,6 @@ Proof.
   - done.
 Qed.
 
-Definition heap_lang_extrace : Type := extrace heap_lang.
-
 (* TODO: move *)
 Definition to_trace_trfirst {S L : Type}
   (s: S) (il: inflist (L * S)):

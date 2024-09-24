@@ -78,9 +78,9 @@ Section EoFin.
   Instance foo: LeibnizEquiv EOLevelOfe.
   Admitted. 
   
-  Let EM := @ObligationsEM EODegreeOfe EOLevelOfe _ _ _ heap_lang _ _ _ EO_OP. 
+  Definition EO_EM := @ObligationsEM EODegreeOfe EOLevelOfe _ _ _ heap_lang _ _ _ EO_OP. 
 
-  Context `{hGS: @heapGS Σ _ EM}.
+  Context `{hGS: @heapGS Σ _ EO_EM}.
   Let oGS : ObligationsGS EO_OP Σ := heap_fairnessGS (heapGS := hGS).
 
   Let thread_prog: val :=
