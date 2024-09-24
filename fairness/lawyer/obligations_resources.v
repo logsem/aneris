@@ -732,6 +732,20 @@ Section ObligationsRepr.
       by rewrite gmultiset_scalar_mul_S_r. 
     Qed.
 
+    (* TODO: find existing lemmas? *)
+    Lemma cp_mul_split ph deg m n:
+      cp_mul ph deg (m + n) ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg n.
+    Proof.
+      induction n.
+      { rewrite Nat.add_0_r. rewrite /cp_mul.
+        rewrite gmultiset_scalar_mul_0.
+        rewrite -own_op -auth_frag_op.
+        rewrite gmultiset_op.
+        rewrite gmultiset_disj_union_right_id. done. }
+      rewrite Nat.add_succ_r. rewrite !cp_mul_take.
+      rewrite IHn. iFrame. rewrite bi.sep_assoc. iFrame. set_solver.
+    Qed. 
+
     (* (* TODO: move *) *)
     (* Lemma foo (x y: namespace) *)
     (*   (EQ : ↑x = (↑y: coPset)): *)

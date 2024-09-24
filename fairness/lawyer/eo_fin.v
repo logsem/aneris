@@ -154,9 +154,12 @@ Section EoFin.
       exist _ n LT. 
 
     Let d0 := nth_deg 0 (Nat.lt_0_succ _). 
+    Let d1 := nth_deg 1 (proj1 (Nat.succ_lt_mono _ _) (Nat.lt_0_succ _)).
 
-    Ltac MU_burn_cp :=
-      iApply (BMU_MU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
+    Lemma d01_lt: opar_deg_lt d0 d1.
+    Proof. simpl. lia. Qed. 
+
+    Ltac BMU_burn_cp :=
       iApply BMU_intro;
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
       iSplitR "CP";
@@ -166,7 +169,8 @@ Section EoFin.
       iApply sswp_MU_wp; [done| ];
       iApply sswp_pure_step; [done| ]; simpl;
       iNext;
-      MU_burn_cp
+      iApply (BMU_MU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
+      BMU_burn_cp
     . 
 
     Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
@@ -226,16 +230,36 @@ Section EoFin.
  
     Lemma thread_spec τ n l M (BOUND: M < LIM) π s:
       {{{ eofin_inv l M BOUND ∗ even_res n ∗
-          cp_mul EO_OP π d0 100 (H3 := oGS) ∗ th_phase_ge EO_OP τ π (H3 := oGS) ∗
-          ith_sig n s ∗ 
+          
+          (* cp_mul EO_OP π d0 100 (H3 := oGS) ∗ *)
+          cp_mul EO_OP π d1 (S (M - n)) (H3 := oGS) ∗ (* overestimation *)
+          exc_lb EO_OP 20 (H3 := oGS) ∗ 
+
+          th_phase_ge EO_OP τ π (H3 := oGS) ∗
+          (if (Nat.ltb n M) then ith_sig n s else ⌜ True ⌝) ∗ 
           obls EO_OP τ (if (Nat.ltb n M) then {[ s ]} else ∅) (H3 := oGS) }}}
         thread_prog #l #n #M @ τ
       {{{ x, RET #x; obls EO_OP τ ∅ (H3 := oGS) }}}.
     Proof.
-      iIntros (Φ). iIntros "(#INV & TH & CPS & PH & SN & OB) POST".
-      rewrite /thread_prog.
+      iIntros (Φ).
+      iLöb as "IH" forall (n s). 
 
+      iIntros "(#INV & TH & CPS1 & #EB & PH & SN & OB) POST".
+      rewrite /thread_prog.
+      
       wp_bind (RecV _ _ _ _)%V.
+      iApply sswp_MU_wp; [done| ]. 
+      iApply sswp_pure_step; [done| ]; simpl. 
+      iNext.
+      iApply (BMU_MU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
+      iDestruct (cp_mul_take with "CPS1") as "[CPS1 CP1]".
+      iApply OU_BMU.
+      iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU".
+      { reflexivity. }
+      { apply d01_lt. }
+      iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS PH]". 
+      BMU_burn_cp. 
+      
       pure_steps.
       wp_bind (_ ≤ _)%E.
       pure_step.
@@ -367,6 +391,12 @@ Section EoFin.
         assert (forall n, Nat.even (n + 1) = Nat.odd n) by admit. 
         assert (forall n, Nat.odd (n + 1) = Nat.even n) by admit.
 
+        assert (S (M - (m + 2)) <= M - m) as LE.
+        { destruct (Nat.even m); lia. }
+        apply Nat.le_sum in LE as [? LE].
+        rewrite LE.
+        iDestruct (cp_mul_split with "CPS1") as "[? ?]". 
+
         destruct (Nat.le_gt_cases M (m + 2)).
         + iDestruct "COND" as "[COND | CC]".
           2: { iMod "CC" as "[% ?]". lia. }
@@ -382,8 +412,14 @@ Section EoFin.
           wp_bind (Snd _)%E.           
           pure_steps.
 
-          (* TODO: handle recursive call with no obligations *)
-          admit. 
+          wp_bind (_ + _)%E. pure_step. iApply wp_value.
+
+          replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia. 
+          iApply ("IH" with "[-POST]"). 
+          2: by iFrame. 
+          iFrame.
+          rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [ | lia]. 
+          iFrame "#∗".
         + iDestruct "COND" as "[CC | COND]".
           { iDestruct "CC" as "(% & ? & ?)". lia. }
           iClear "SN". 
@@ -396,12 +432,15 @@ Section EoFin.
           iModIntro.
           wp_bind (Snd _)%E.           
           pure_steps.
-          (* TODO: handle recursive call with obligations *)
-          admit.
-      - 
 
-      
+          wp_bind (_ + _)%E. pure_step. iApply wp_value.
 
+          replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia. 
+          iApply ("IH" with "[-POST]"); [| by iFrame].
+          rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
+          iFrame "#∗". 
+      - admit.
+    Admitted. 
 
 
   End Threads.
