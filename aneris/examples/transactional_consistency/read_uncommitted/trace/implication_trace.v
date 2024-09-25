@@ -514,6 +514,125 @@ Section trace_proof.
       by eapply open_trans_neq4 in Hopen.
   Qed.
 
+  Lemma two_trans_implies_false_app_cons T1 T2 trans c : 
+    valid_transactions (T1 ++ trans :: T2) →
+    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
+    (∃ trans', (trans' ∈ T1 ∨ trans' ∈ T2) ∧ (∃ op' : operation,
+      op' ∈ trans' ∧ last trans' = Some op' ∧ connOfOp op' = c ∧ isCmOp op' = false)) →
+    false.
+  Proof.
+    intros Hvalid_trans' Hop (trans' & Htrans'_in & Hop').
+    destruct Hvalid_trans' as (_ & Hvalid_trans').
+    assert (length T1 = length T1) as Htrans_in'; first set_solver.
+    apply (list_lookup_middle T1 T2 trans) in Htrans_in'.
+    destruct Hop' as (op' & Hop'_in & Hop'_last & Hop'_conn & Hop'_cm).
+    destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+    rewrite /isCmOp in Hop_cm.
+    rewrite /isCmOp in Hop'_cm.
+    destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+    +++ apply elem_of_list_lookup_1 in Htrans'_in.
+        destruct Htrans'_in as (j & Htrans'_in).
+        pose proof Htrans'_in as Htrans'_in'. 
+        apply lookup_lt_Some in Htrans'_in'.
+        apply (lookup_app_l_Some _ (trans :: T2)) in Htrans'_in.
+        assert (length T1 = j) as <-; 
+          last by eapply PeanoNat.Nat.lt_irrefl.
+        eapply (Hvalid_trans' _ _ op op'); try done; 
+        rewrite /is_cm_op; set_solver.
+    +++ apply elem_of_list_lookup_1 in Htrans'_in.
+        destruct Htrans'_in as (j & Htrans'_in).
+        assert (1 ≤ (j + 1) ∧ T2 !! ((j + 1) - 1) = Some trans') as 
+        (Hleq & Hlookup_j').
+        {
+          split; try lia.
+          by assert (j + 1 - 1 = j) as ->; first lia.
+        }
+        assert ((trans :: T2) !! (j + 1) = Some trans') as Hlookup_j_cons.
+        {
+        apply lookup_cons_Some; set_solver.
+        }
+        assert (length T1 ≤ (j + 1 + length T1) ∧ (trans :: T2) !! ((j + 1 + length T1) - length T1) = Some trans') 
+        as (Hleq'' & Hlookup_j'').
+        {
+          split; try lia.
+          by assert (j + 1 + length T1 - length T1 = j + 1) as ->; first lia.
+        }
+        assert ((T1 ++ trans :: T2) !! (j + 1 + length T1) = Some trans') as Hlookup_j_app.
+        {
+        apply lookup_app_Some; set_solver.
+        } 
+        assert (length T1 = (j + 1 + length T1)) as Heq; last lia.
+        eapply (Hvalid_trans' _ _ op op'); try done; 
+        rewrite /is_cm_op; set_solver.
+  Qed.
+
+  Lemma latest_write_preserve `(res : !RU_resources Mdl Σ) tag c T1 T2 trans k k' v ov : 
+    k ≠ k' →
+    valid_transactions (T1 ++ trans :: T2) →
+    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
+    latest_write c k' ov (T1 ++ trans :: T2) →
+    latest_write c k' ov (T1 ++ (trans ++ [Wr (tag, c) k v]) :: T2).
+  Proof.
+    intros Hneq Hvalid_trans Htrans [(-> & Himp)|(v' & t & tag1 & -> & Hopen & Hwr_in & Himp)].
+    - left.
+      split; first done.
+      intros t (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+      rewrite elem_of_app in Hop_in.
+      destruct Hop_in as [Hop_in|Hop_in].
+      + apply Himp.
+        exists op.
+        set_solver.
+      + rewrite elem_of_cons in Hop_in.
+        destruct Hop_in as [->|Hop_in].
+        * intros Hwr.
+          apply (Himp trans); last set_solver.
+          rewrite /open_trans /is_cm_op /isCmOp; set_solver.
+        * apply Himp.
+          exists op.
+          set_solver.
+    - right.
+      exists v', (trans ++ [Wr (tag, c) k v]), tag1.
+      assert (trans = t) as <-.
+      {
+        destruct Hopen as (op' & Hop'_in & Hop'_last & Hop'_conn & Hop'_cm).
+        rewrite elem_of_app in Hop'_in.
+        destruct Hop'_in as [Hop'_in | Hop'_in].
+        - exfalso.
+          eapply (two_trans_implies_false_app_cons T1 T2 trans); try done.
+          exists t.
+          split; first set_solver.
+          exists op'.
+          split_and!; try done.
+          + by apply last_Some_elem_of.
+          + rewrite /isCmOp. 
+            rewrite /is_cm_op in Hop'_cm.
+            destruct op'; set_solver.
+        - rewrite elem_of_cons in Hop'_in.
+          destruct Hop'_in as [-> | Hop'_in]; first done.
+          exfalso.
+          eapply (two_trans_implies_false_app_cons T1 T2 trans); try done.
+          exists t.
+          split; first set_solver.
+          exists op'.
+          split_and!; try done.
+          + by apply last_Some_elem_of.
+          + rewrite /isCmOp. 
+            rewrite /is_cm_op in Hop'_cm.
+            destruct op'; set_solver.
+      }
+      split_and!; try done.
+      + rewrite /open_trans.
+        exists (Wr (tag, c) k v).
+        split_and!; try done.
+        * set_solver.
+        * by rewrite last_snoc.
+        * rewrite /is_cm_op; set_solver.
+      + set_solver.
+      + intros op Hop_in Hop_eq.
+        apply rel_list_imp.
+        apply Himp; set_solver.
+  Qed.
+
   Lemma unique_init_events_add_init (lt t : list val) (tag : string) (c : val) 
   (sa : socket_address) (res : RU_resources Mdl Σ) :
     extract c = Some #sa →
@@ -757,58 +876,6 @@ Section trace_proof.
             intros k' Hk'_in k'' Hlookup'.
             specialize (Hlatest k' Hk'_in k'' Hlookup').
             eapply (latest_neq2 _ sa sa'); set_solver.
-  Qed.
-
-  Lemma two_trans_implies_false_app_cons T1 T2 trans c : 
-    valid_transactions (T1 ++ trans :: T2) →
-    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
-    (∃ trans', (trans' ∈ T1 ∨ trans' ∈ T2) ∧ (∃ op' : operation,
-      op' ∈ trans' ∧ last trans' = Some op' ∧ connOfOp op' = c ∧ isCmOp op' = false)) →
-    false.
-  Proof.
-    intros Hvalid_trans' Hop (trans' & Htrans'_in & Hop').
-    destruct Hvalid_trans' as (_ & Hvalid_trans').
-    assert (length T1 = length T1) as Htrans_in'; first set_solver.
-    apply (list_lookup_middle T1 T2 trans) in Htrans_in'.
-    destruct Hop' as (op' & Hop'_in & Hop'_last & Hop'_conn & Hop'_cm).
-    destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
-    rewrite /isCmOp in Hop_cm.
-    rewrite /isCmOp in Hop'_cm.
-    destruct Htrans'_in as [Htrans'_in|Htrans'_in].
-    +++ apply elem_of_list_lookup_1 in Htrans'_in.
-        destruct Htrans'_in as (j & Htrans'_in).
-        pose proof Htrans'_in as Htrans'_in'. 
-        apply lookup_lt_Some in Htrans'_in'.
-        apply (lookup_app_l_Some _ (trans :: T2)) in Htrans'_in.
-        assert (length T1 = j) as <-; 
-          last by eapply PeanoNat.Nat.lt_irrefl.
-        eapply (Hvalid_trans' _ _ op op'); try done; 
-        rewrite /is_cm_op; set_solver.
-    +++ apply elem_of_list_lookup_1 in Htrans'_in.
-        destruct Htrans'_in as (j & Htrans'_in).
-        assert (1 ≤ (j + 1) ∧ T2 !! ((j + 1) - 1) = Some trans') as 
-        (Hleq & Hlookup_j').
-        {
-          split; try lia.
-          by assert (j + 1 - 1 = j) as ->; first lia.
-        }
-        assert ((trans :: T2) !! (j + 1) = Some trans') as Hlookup_j_cons.
-        {
-        apply lookup_cons_Some; set_solver.
-        }
-        assert (length T1 ≤ (j + 1 + length T1) ∧ (trans :: T2) !! ((j + 1 + length T1) - length T1) = Some trans') 
-        as (Hleq'' & Hlookup_j'').
-        {
-          split; try lia.
-          by assert (j + 1 + length T1 - length T1 = j + 1) as ->; first lia.
-        }
-        assert ((T1 ++ trans :: T2) !! (j + 1 + length T1) = Some trans') as Hlookup_j_app.
-        {
-        apply lookup_app_Some; set_solver.
-        } 
-        assert (length T1 = (j + 1 + length T1)) as Heq; last lia.
-        eapply (Hvalid_trans' _ _ op op'); try done; 
-        rewrite /is_cm_op; set_solver.
   Qed.
 
   Lemma client_trace_state_resources_neq1 (sa sa' : socket_address) T op c le lt 
@@ -1172,6 +1239,91 @@ Section trace_proof.
       iModIntro.
       iIntros (sa'' Hsa''_in) "Hres".
       iApply (client_trace_state_resources_neq1 sa sa'' T (Wr (tag, c) k v) c with "[][][][]"); try done.
+      iPureIntro; set_solver.
+  Qed.
+
+  Lemma trace_state_resources_write_lin2 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T1 T2 : list transaction)
+  (trans : transaction) (k : Key) (v : val) (sa : socket_address) (s : local_state) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) 
+  (mstate : gmap socket_address (local_state * option val)) (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
+    ⌜valid_transactions (T1 ++ trans :: T2)⌝ -∗ 
+    ⌜mstate !! sa = Some (s, Some c)⌝ -∗ 
+    ⌜extract c = Some #sa⌝ -∗ 
+    ⌜clients = {[sa]} ∪ clients ∖ {[sa]}⌝ -∗
+    ⌜¬ (∃ trans, (trans ∈ T1 ∨ trans ∈ T2) ∧ (∃ op' : operation,
+          op' ∈ trans ∧ last trans = Some op' ∧ connOfOp op' = c ∧ isCmOp op' = false))⌝ -∗
+    ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
+    ⌜∃ e : val, e ∈ lt ++ [(#tag, (c, (#"WrLin", (#k, v))))%V] ∧ 
+      connOfEvent e = Some c ∧ is_in_lin_event e⌝ -∗
+    ghost_map_elem γmname sa DfracDiscarded (γ, c) -∗ 
+    ghost_map_auth γmstate 1 mstate -∗
+    ghost_map_auth γmname 1 mname -∗
+    ghost_map_auth γ 1 (<[k:=Some v]> m) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt res⌝
+      ∨ initialized_trace_resources lt (T1 ++ trans :: T2) y γmname res mstate) -∗
+    active_trace_resources lt (T1 ++ trans :: T2) s c γ m -∗
+    trace_state_resources (lt ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]) (T1 ++ (trans ++ [Wr (tag, c) k v]) :: T2) γmstate γmname clients res.
+  Proof.
+    iIntros (Hvalid_trans Hlookup Hextract Heq_sa_clients Hdec Hop) "#Hinit_in #Hpers_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
+    iExists mstate.
+    iFrame. 
+    iExists mname.
+    iFrame.
+    rewrite {2} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iSplitR "Hdisj_trace_res".
+    - rewrite big_sepS_singleton.
+      iRight.
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & 
+      -> & -> & %Hopen_start & Hkeys & %Hlatest_keys)". 
+      iExists (Active domain), c, γ, (<[k:=Some v]> m).
+      do 2 (iSplit; first by iPureIntro).
+      iFrame "∗#".
+      iRight.
+      iExists domain, (domain ∩ KVS_keys), 
+      (tail ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]).
+      do 2 (iSplit; first by iPureIntro).
+      iFrame.
+      iSplit.
+      + iPureIntro.
+        apply open_start_imp; last done.
+        right.
+        rewrite /is_wr_lin_event.
+        set_solver.
+      + iPureIntro.
+        simpl.
+        intros k' Hk'_in v' Hlookup'.
+        destruct (decide (k = k')) as [->|Hneq].
+        * rewrite lookup_insert in Hlookup'.
+          assert (v' = Some v) as ->; first set_solver. 
+          right.
+          exists v, (trans ++ [Wr (tag, c) k' v]), tag.
+          split_and!; try done.
+          -- exists (Wr (tag, c) k' v).
+             split_and; try done; first set_solver.
+             rewrite last_snoc /open_trans /is_cm_op /connOfOp.
+             set_solver.
+          -- set_solver.
+          -- intros op Hop_in Hop_eq.
+             apply elem_of_list_lookup_1 in Hop_in.
+             destruct Hop_in as (i & Hop_in).
+             exists i, (length trans).
+             pose proof (lookup_lt_Some _ _ _ Hop_in) as Hlength.
+             destruct (decide (i = length trans)) as [-> | Hneq].
+             ++ rewrite lookup_snoc_Some in Hop_in.
+                destruct Hop_in as [(Hfalse & _) | (_ & <-)]; first lia; set_solver.
+             ++ split_and!; try done.
+                ** rewrite app_length in Hlength.
+                   simpl in Hlength.
+                   lia.
+                ** apply lookup_snoc_Some; set_solver.
+        * rewrite lookup_insert_ne in Hlookup'; last done.
+          specialize (Hlatest_keys k' Hk'_in v' Hlookup').
+          by apply latest_write_preserve.
+    - iApply (big_sepS_wand with "[$Hdisj_trace_res]"). 
+      iApply big_sepS_intro.
+      iModIntro.
+      iIntros (sa'' Hsa''_in) "Hres".
+      iApply (client_trace_state_resources_neq4 sa sa'' T1 T2 trans (Wr (tag, c) k v) c with "[][][][]"); try done.
       iPureIntro; set_solver.
   Qed.
 
@@ -2056,15 +2208,17 @@ Section trace_proof.
                          rewrite /is_wr_lin_event.
                          set_solver.
                      --- by exists t'.
-                  ** admit.
-                    (* iApply (trace_state_resources_write_lin clients c tag1 lt' k v.(SV_val) sa
-                        s γ γmstate γmname res mstate mname m with "[][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                  ** iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
+                        s γ γmstate γmname res mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                         [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
-                     iPureIntro.
-                     destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
-                     exists e.
-                     split_and!; try done.
-                     apply elem_of_app; eauto. *)
+                     --- iPureIntro.
+                         intros Hfalse.
+                         eapply two_trans_implies_false_app_cons; try done.
+                     --- iPureIntro.
+                         destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+                         exists e.
+                         split_and!; try done.
+                         apply elem_of_app; eauto. 
       - iExists (T' ++ [[Wr (tag1, c) k v]]).
         iFrame.
         iSplit.
@@ -2182,7 +2336,7 @@ Section trace_proof.
       set_solver.
     }
     set_solver.
- Admitted.
+  Qed.
 
   Lemma start_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
