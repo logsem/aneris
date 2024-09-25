@@ -4,6 +4,15 @@ From trillium.fairness.lawyer Require Import obligations_model obligations_resou
 From trillium.fairness.lawyer Require Import eo_fin. 
 
 
+(* TODO: unify defs *)
+Definition extrace_fairly_terminating' {Λ} `{Countable (locale Λ)}
+           (extr : extrace Λ) :=
+  extrace_valid extr →
+  (∀ tid, fair_ex tid extr) →
+  terminating_trace extr.
+
+
+
 Section OMTermination.
   Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
   Context `{Countable Locale}. 
@@ -43,25 +52,69 @@ Section ObligationsAdequacy.
 
   Let EM := @ObligationsEM DegO LevelO _ _ _ heap_lang _ _ _ OP.
 
-  Theorem simple_simulation_adequacy_terminate_ftm Σ 
+  (* Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
+  (* live_tids (LM:=LM) (trace_last ex) (trace_last aux). *)
 
-    `{FairTerminatingModelSimple M}
+  (* Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
+  (*   valid_state_evolution_fairness lm_valid_evolution_step ex aux (M := (fair_model_model LM_Fair)) ∧ live_rel ex aux. *)
 
-        `{!heapGpreS Σ (@LM_EM_HL _ _ _ LF)} (s: stuckness)
-        e1 (s1: M) FR
-        (LSI0: initial_ls_LSI s1 0)
+  (* Definition sim_rel_with_user (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop) *)
+  (* (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
+  (* sim_rel ex aux ∧ ξ ex (get_underlying_fairness_trace aux). *)
+
+  Definition exec_om_rel (ex : execution_trace heap_lang) (aux : auxiliary_trace OM): Prop.
+  Admitted. 
+
+
+  Theorem om_simulation_adequacy_model_trace Σ
+    (* `{FairTerminatingModelSimple M} *)
+        `{!heapGpreS Σ EM} (s: stuckness)
+        (e1: expr) (s1: mstate OM) (* p *)
+        (* (LSI0: initial_ls_LSI s1 0) *)
+        (extr : heap_lang_extrace)
+        (Hexfirst : (trfirst extr).1 = [e1])    :
+    (* rel_finitary (sim_rel LM) → *)
+    wp_premise Σ s e1 (trfirst extr).2 s1 exec_om_rel (tt: @em_init_param _ _ EM) ->
+    (* The coinductive pure coq proposition given by adequacy *)
+    ∃ (auxtr : obls_trace), 
+      lm_exaux_traces_match extr auxtr (LM := LM) ∧
+      trfirst auxtr = s1.
+  Proof.
+    intros Hfb Hwp.
+    destruct (simulation_adequacy_traces
+                Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr & Hmatch & A0).
+    assert (mtrace_valid auxtr) as Hstutter.
+    { by eapply traces_match_valid2 in Hmatch. }
+    destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
+    eauto.
+  Qed.
+
+  Theorem simple_om_simulation_adequacy_terminate Σ 
+    (* `{FairTerminatingModelSimple M} *)
+        `{!heapGpreS Σ EM} (s: stuckness)
+        (e1: expr) (s1: mstate OM) (* p *)
+        (* (LSI0: initial_ls_LSI s1 0) *)
         (extr : heap_lang_extrace)
         (Hexfirst : (trfirst extr).1 = [e1])
     :
-    (* The model has finite branching *)
-    rel_finitary (sim_rel LM) →
-    wp_premise (λ _ _, True) (trfirst extr).2 e1 s1 s FR LSI0 -> 
-    (* The coinductive pure coq proposition given by adequacy *)
-    extrace_fairly_terminating extr.
+    (* rel_finitary (sim_rel LM) → *)
+    wp_premise Σ s e1 (trfirst extr).2 s1 exec_om_rel (tt: @em_init_param _ _ EM) -> 
+    extrace_fairly_terminating' extr.
   Proof.
-    intros. eapply simulation_adequacy_terminate =>//.
-    intros ? _.
-    by eapply simple_fair_terminating_traces_terminate.
+    intros (* Hterm Hfb *) Hwp Hvex Hfair.
+    
+    destruct (simulation_adequacy_model_trace
+                Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto&A0).
+    have Hfairaux := ex_fairness_preserved 
+                       extr auxtr Hmatch Hfair.
+    pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) (Hfairaux LF)) as Hfairaux'. 
+    have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux'.
+    pose proof Hmatch as Hvalaux%traces_match_valid2. 
+    have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
+    pose proof Hupto as M0%upto_stutter_trfirst. rewrite A0 in M0.  
+    have Htermtr := Hterm mtr M0 Hmtrvalid Hfairm.
+    eapply traces_match_preserves_termination =>//.
+    eapply upto_stutter_finiteness =>//.
   Qed.
 
 
