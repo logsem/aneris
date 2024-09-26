@@ -91,9 +91,6 @@ Section adequacy.
     - done.
   Qed.
 
-  Definition FOO {M: Model}: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop.
-  Admitted.
-
   (* TODO: move *)
   Definition to_trace_trfirst {S L : Type}
     (s: S) (il: inflist (L * S)):

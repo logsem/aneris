@@ -32,6 +32,16 @@ Section OMTermination.
     terminating_trace tr.
   Proof. Admitted. 
 
+  (* Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
+  (* live_tids (LM:=LM) (trace_last ex) (trace_last aux). *)
+
+  (* Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
+  (*   valid_state_evolution_fairness lm_valid_evolution_step ex aux (M := (fair_model_model LM_Fair)) ∧ live_rel ex aux. *)
+
+  (* Definition sim_rel_with_user (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop) *)
+  (* (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
+  (* sim_rel ex aux ∧ ξ ex (get_underlying_fairness_trace aux). *)
+
 End OMTermination.
 
 
@@ -52,72 +62,89 @@ Section ObligationsAdequacy.
 
   Let EM := @ObligationsEM DegO LevelO _ _ _ heap_lang _ _ _ OP.
 
-  (* Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
-  (* live_tids (LM:=LM) (trace_last ex) (trace_last aux). *)
+  Definition om_live_tids (c: cfg heap_lang) (δ: mstate OM) :=
+    forall ζ, (default ∅ (ps_obls _ δ !! ζ) ≠ ∅) -> locale_enabled ζ c.
 
-  (* Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
-  (*   valid_state_evolution_fairness lm_valid_evolution_step ex aux (M := (fair_model_model LM_Fair)) ∧ live_rel ex aux. *)
+  Definition ex_om_traces_match: extrace heap_lang -> obls_trace OP -> Prop :=
+    traces_match
+      (fun oτ τ' => oτ = Some τ')
+      om_live_tids
+      locale_step
+      (@mtrans OM).
 
-  (* Definition sim_rel_with_user (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop) *)
-  (* (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
-  (* sim_rel ex aux ∧ ξ ex (get_underlying_fairness_trace aux). *)
+  Lemma ex_om_fairness_preserved (extr: extrace heap_lang) (omtr: obls_trace OP):
+    ex_om_traces_match extr omtr ->
+    (forall ζ, fair_ex ζ extr) -> (∀ τ, obls_trace_fair _ τ omtr).
+  Proof using. Admitted. 
 
-  Definition exec_om_rel (ex : execution_trace heap_lang) (aux : auxiliary_trace OM): Prop.
-  Admitted. 
 
+  Definition om_sim_rel (extr: execution_trace heap_lang) (omtr : auxiliary_trace OM) :=
+    valid_state_evolution_fairness (obls_valid_evolution_step OP) extr omtr ∧
+    om_live_tids (trace_last extr) (trace_last omtr). 
+
+  Lemma om_sim_rel_FB: rel_finitary om_sim_rel.
+  Proof. Admitted. 
 
   Theorem om_simulation_adequacy_model_trace Σ
-    (* `{FairTerminatingModelSimple M} *)
-        `{!heapGpreS Σ EM} (s: stuckness)
-        (e1: expr) (s1: mstate OM) (* p *)
-        (* (LSI0: initial_ls_LSI s1 0) *)
+        `{hPre: !heapGpreS Σ EM} (s: stuckness)
+        (e1: expr) σ1 (s1: mstate OM) (* p *)
+        (INIT: obls_is_init_st OP ([e1], σ1) s1)
         (extr : heap_lang_extrace)
-        (Hexfirst : (trfirst extr).1 = [e1])    :
-    (* rel_finitary (sim_rel LM) → *)
-    wp_premise Σ s e1 (trfirst extr).2 s1 exec_om_rel (tt: @em_init_param _ _ EM) ->
-    (* The coinductive pure coq proposition given by adequacy *)
-    ∃ (auxtr : obls_trace), 
-      lm_exaux_traces_match extr auxtr (LM := LM) ∧
-      trfirst auxtr = s1.
-  Proof.
-    intros Hfb Hwp.
-    destruct (simulation_adequacy_traces
-                Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr & Hmatch & A0).
-    assert (mtrace_valid auxtr) as Hstutter.
-    { by eapply traces_match_valid2 in Hmatch. }
-    destruct (can_destutter_auxtr auxtr) as [mtr Hupto] =>//.
-    eauto.
+        (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = ([e1], σ1))    :
+    wp_premise Σ s e1 σ1 s1 om_sim_rel (tt: @em_init_param _ _ EM) ->
+    ∃ (omtr: obls_trace OP), 
+      ex_om_traces_match extr omtr ∧
+      trfirst omtr = s1.
+  Proof using.
+    intros (* FIN *) PREM.
+
+    unshelve epose proof (@strong_simulation_adequacy_traces _ _ _ hPre s e1 σ1
+                s1
+                om_sim_rel
+                tt
+                extr
+                Hvex
+                ltac:(done)
+                (obls_valid_evolution_step OP)
+                om_live_tids
+                (fun oτ τ' => oτ = Some τ')
+                _ _ _ _ _ _ _
+      ) as SIM.
+    { simpl. intros ?????? STEP. apply STEP. }
+    { simpl. intros ?????? STEP. apply STEP. }
+    { simpl. intros ?? SIM. apply SIM. }
+    { simpl. intros ?? SIM. apply SIM. }
+    { apply om_sim_rel_FB. }
+    { done. }
+    { done. }
+
+    done. 
   Qed.
 
-  Theorem simple_om_simulation_adequacy_terminate Σ 
-    (* `{FairTerminatingModelSimple M} *)
-        `{!heapGpreS Σ EM} (s: stuckness)
-        (e1: expr) (s1: mstate OM) (* p *)
-        (* (LSI0: initial_ls_LSI s1 0) *)
+  Theorem simple_om_simulation_adequacy_terminate Σ
+        `{hPre: !heapGpreS Σ EM} (s: stuckness)
+        (e1: expr) σ1 (s1: mstate OM) (* p *)
+        (INIT: obls_is_init_st OP ([e1], σ1) s1)
         (extr : heap_lang_extrace)
-        (Hexfirst : (trfirst extr).1 = [e1])
-    :
+        (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = ([e1], σ1))    :
     (* rel_finitary (sim_rel LM) → *)
-    wp_premise Σ s e1 (trfirst extr).2 s1 exec_om_rel (tt: @em_init_param _ _ EM) -> 
+    wp_premise Σ s e1 σ1 s1 om_sim_rel (tt: @em_init_param _ _ EM) -> 
     extrace_fairly_terminating' extr.
   Proof.
-    intros (* Hterm Hfb *) Hwp Hvex Hfair.
-    
-    destruct (simulation_adequacy_model_trace
-                Σ _ e1 s1 _ LSI0 extr Hvex Hexfirst Hfb Hwp) as (auxtr&mtr&Hmatch&Hupto&A0).
-    have Hfairaux := ex_fairness_preserved 
-                       extr auxtr Hmatch Hfair.
-    pose proof (proj1 (LM_ALM_afair_by_next LM auxtr) (Hfairaux LF)) as Hfairaux'. 
-    have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux'.
-    pose proof Hmatch as Hvalaux%traces_match_valid2. 
-    have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
-    pose proof Hupto as M0%upto_stutter_trfirst. rewrite A0 in M0.  
-    have Htermtr := Hterm mtr M0 Hmtrvalid Hfairm.
-    eapply traces_match_preserves_termination =>//.
-    eapply upto_stutter_finiteness =>//.
+    rewrite /extrace_fairly_terminating'. 
+    intros (* Hterm Hfb *) Hwp VALID FAIR.    
+
+    destruct (om_simulation_adequacy_model_trace
+                Σ _ e1 _ s1 INIT _ Hvex Hexfirst Hwp) as (omtr&MATCH&OM0).
+
+    have OM_FAIR := ex_om_fairness_preserved extr omtr MATCH FAIR.
+    pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH) as OM_VALID.  
+    pose proof (obls_fair_trace_terminate _ _ OM_VALID OM_FAIR) as OM_TERM. 
+    pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH OM_TERM). 
+    done. 
   Qed.
-
-
 
 End ObligationsAdequacy.
 
