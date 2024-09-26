@@ -138,103 +138,122 @@ Definition lm_wp_premise
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, init_thread_post 0%nat }} ∗
        rel_always_holds s ξ e1 σ1 δ0)).
 
-Theorem strong_simulation_adequacy Σ
-    `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr) σ1 (s1: M) FR
-    (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
-         Prop)    
-  (LSI0: initial_ls_LSI s1 0)
-  (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0)
-  :
-  rel_finitary (sim_rel_with_user LM ξ) →
-  lm_wp_premise ξ σ1 e1 s1 s FR LSI0
-  (* wp_premise conv_init ξ σ1 e1 s1 s LSI0 *)
- ->
-  continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton δ0).
-Proof.
-  intros Hfin WP_RAH.
-  eapply @strong_simulation_adequacy_general.
-  1,2,4: done.
-  { split.
-    - red. eauto.
-    - red. split.
-      + by rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel.
-      + by rewrite build_LS_ext_spec_tmap build_LS_ext_spec_st. }
-  red. iIntros (?) "[? INIT]".
-  iMod (WP_RAH Hinv) as "WP_RAH".
-  iMod ("WP_RAH" with "INIT") as "[WP RAH]".
-  iModIntro. iSplitL "WP"; [by iFrame| ]. 
-  by iApply rel_always_holds_lift_LM. 
-Qed.
+(* Theorem strong_simulation_adequacy Σ *)
+(*     `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr) σ1 (s1: M) FR *)
+(*     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) → *)
+(*          Prop)     *)
+(*   (LSI0: initial_ls_LSI s1 0) *)
+(*   (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0) *)
+(*   : *)
+(*   rel_finitary (sim_rel_with_user LM ξ) → *)
+(*   lm_wp_premise ξ σ1 e1 s1 s FR LSI0 *)
+(*   (* wp_premise conv_init ξ σ1 e1 s1 s LSI0 *) *)
+(*  -> *)
+(*   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton δ0). *)
+(* Proof. *)
+(*   intros Hfin WP_RAH. *)
+(*   eapply @strong_simulation_adequacy_general. *)
+(*   1,2,4: done. *)
+(*   { split. *)
+(*     - red. eauto. *)
+(*     - red. split. *)
+(*       + by rewrite build_LS_ext_spec_st build_LS_ext_spec_fuel. *)
+(*       + by rewrite build_LS_ext_spec_tmap build_LS_ext_spec_st. } *)
+(*   red. iIntros (?) "[? INIT]". *)
+(*   iMod (WP_RAH Hinv) as "WP_RAH". *)
+(*   iMod ("WP_RAH" with "INIT") as "[WP RAH]". *)
+(*   iModIntro. iSplitL "WP"; [by iFrame| ].  *)
+(*   by iApply rel_always_holds_lift_LM.  *)
+(* Qed. *)
 
-Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr) σ1 (s1: M) FR
-  (LSI0: initial_ls_LSI s1 0)
-  (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0)
-:
-  (* The model has finite branching *)
-  rel_finitary (sim_rel LM) →
-  (* The initial configuration satisfies certain properties *)
-  (* A big implication, and we get back a Coq proposition *)
-  (* For any proper Aneris resources *)
-  lm_wp_premise (λ _ _, True) σ1 e1 s1 s FR LSI0 ->
-    (* The coinductive pure coq proposition given by adequacy *)
-  @continued_simulation
-    heap_lang
-    (fair_model_model LM_Fair)
-    (sim_rel LM)
-    (trace_singleton ([e1], σ1))
-    (trace_singleton δ0).
-Proof.
-  intros Hne H.
-  assert (sim_rel LM = sim_rel_with_user LM (λ _ _, True)) as Heq.
-  { Require Import Coq.Logic.FunctionalExtensionality.
-    Require Import Coq.Logic.PropExtensionality.
-    do 2 (apply functional_extensionality_dep; intros ?).
-    apply propositional_extensionality.
-    unfold sim_rel_with_user. intuition. }
+(* Theorem simulation_adequacy Σ  `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)} (s: stuckness) (e1 : expr) σ1 (s1: M) FR *)
+(*   (LSI0: initial_ls_LSI s1 0) *)
+(*   (δ0 := initial_ls' (LM := LM) s1 0%nat LSI0) *)
+(* : *)
+(*   (* The model has finite branching *) *)
+(*   rel_finitary (sim_rel LM) → *)
+(*   (* The initial configuration satisfies certain properties *) *)
+(*   (* A big implication, and we get back a Coq proposition *) *)
+(*   (* For any proper Aneris resources *) *)
+(*   lm_wp_premise (λ _ _, True) σ1 e1 s1 s FR LSI0 -> *)
+(*     (* The coinductive pure coq proposition given by adequacy *) *)
+(*   @continued_simulation *)
+(*     heap_lang *)
+(*     (fair_model_model LM_Fair) *)
+(*     (sim_rel LM) *)
+(*     (trace_singleton ([e1], σ1)) *)
+(*     (trace_singleton δ0). *)
+(* Proof. *)
+(*   intros Hne H. *)
+(*   assert (sim_rel LM = sim_rel_with_user LM (λ _ _, True)) as Heq. *)
+(*   { Require Import Coq.Logic.FunctionalExtensionality. *)
+(*     Require Import Coq.Logic.PropExtensionality. *)
+(*     do 2 (apply functional_extensionality_dep; intros ?). *)
+(*     apply propositional_extensionality. *)
+(*     unfold sim_rel_with_user. intuition. } *)
 
-  rewrite Heq.
-  eapply (strong_simulation_adequacy Σ s) =>//.
-  rewrite -Heq. done.
-Qed.
+(*   rewrite Heq. *)
+(*   eapply (strong_simulation_adequacy Σ s) =>//. *)
+(*   rewrite -Heq. done. *)
+(* Qed. *)
 
-Theorem simulation_adequacy_inftraces Σ
-        `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}  (s: stuckness)
-        e1 σ1 (s1: M) FR
-        (LSI0: initial_ls_LSI s1 0)
-        (iex : inf_execution_trace heap_lang)
-        (Hvex : valid_inf_exec (trace_singleton ([e1], σ1)) iex)
-  :
-  (* The model has finite branching *)
-  rel_finitary (sim_rel LM)  →
-  lm_wp_premise (λ _ _, True) σ1 e1 s1 s FR LSI0 ->
-  (* The coinductive pure coq proposition given by adequacy *)
-  exists iatr,
-  @valid_inf_system_trace _ (fair_model_model LM_Fair)
-    (@continued_simulation
-       heap_lang
-       (fair_model_model LM_Fair)
-       (sim_rel LM))
-    (trace_singleton ([e1], σ1))
-    (trace_singleton (initial_ls' (LM := LM) s1 0%nat LSI0))
-    iex
-    iatr.
-Proof.
-  intros Hfin Hwp.
-  eexists.
-  eapply produced_inf_aux_trace_valid_inf.
-  Unshelve.
-  - econstructor.
-  - eapply (simulation_adequacy Σ s) => //.
-  - done.
-Qed.
+(* Theorem simulation_adequacy_inftraces Σ *)
+(*         `{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}  (s: stuckness) *)
+(*         e1 σ1 (s1: M) FR *)
+(*         (LSI0: initial_ls_LSI s1 0) *)
+(*         (iex : inf_execution_trace heap_lang) *)
+(*         (Hvex : valid_inf_exec (trace_singleton ([e1], σ1)) iex) *)
+(*   : *)
+(*   (* The model has finite branching *) *)
+(*   rel_finitary (sim_rel LM)  → *)
+(*   lm_wp_premise (λ _ _, True) σ1 e1 s1 s FR LSI0 -> *)
+(*   (* The coinductive pure coq proposition given by adequacy *) *)
+(*   exists iatr, *)
+(*   @valid_inf_system_trace _ (fair_model_model LM_Fair) *)
+(*     (@continued_simulation *)
+(*        heap_lang *)
+(*        (fair_model_model LM_Fair) *)
+(*        (sim_rel LM)) *)
+(*     (trace_singleton ([e1], σ1)) *)
+(*     (trace_singleton (initial_ls' (LM := LM) s1 0%nat LSI0)) *)
+(*     iex *)
+(*     iatr. *)
+(* Proof. *)
+(*   intros Hfin Hwp. *)
+(*   eexists. *)
+(*   eapply produced_inf_aux_trace_valid_inf. *)
+(*   Unshelve. *)
+(*   - econstructor. *)
+(*   - eapply (simulation_adequacy Σ s) => //. *)
+(*   - done. *)
+(* Qed. *)
 
-(* TODO: move *)
-Definition to_trace_trfirst {S L : Type}
-  (s: S) (il: inflist (L * S)):
-  trfirst (to_trace s il) = s.
-Proof. 
-  destruct il as [| [??]]; done.
+
+Lemma sim_rel_ext_simpl:
+  sim_rel LM = sim_rel_with_user LM (λ _ _, True).
+Proof using. 
+  Require Import Coq.Logic.FunctionalExtensionality.
+  Require Import Coq.Logic.PropExtensionality.
+  do 2 (apply functional_extensionality_dep; intros ?).
+  apply propositional_extensionality.
+  unfold sim_rel_with_user. intuition.
 Qed. 
+
+Lemma lm_wp_premise_implies_wp_premise 
+`{hPre: @heapGpreS Σ (fair_model_model LM_Fair) (@LM_EM_HL _ _ _ LF)}
+ e1 σ1 (s1: fmstate M) s FR LSI0
+  (PREM: lm_wp_premise
+           (λ (_ : execution_trace heap_lang) (_ : finite_trace M (option (fmrole M))), True)
+           ([e1], σ1).2 e1 s1 s FR LSI0):
+  wp_premise Σ s e1 σ1 ((initial_ls' s1 0 LSI0): mstate (fair_model_model LM_Fair))  (sim_rel LM) (FR: @em_init_param _ _ (@LM_EM_HL _ _ _ LF)).
+Proof using.
+  red. iIntros (?) "[? INIT]".
+  iMod (PREM Hinv) as "WP_RAH".
+  iMod ("WP_RAH" with "INIT") as "[WP RAH]".
+  iModIntro. iSplitL "WP"; [by iFrame| ].
+  rewrite sim_rel_ext_simpl. 
+  by iApply rel_always_holds_lift_LM.
+Qed.
 
 
 (* TODO: derive from general case? *)
@@ -254,42 +273,34 @@ Theorem simulation_adequacy_traces Σ
     lm_exaux_traces_match extr auxtr (LM := LM) /\
     trfirst auxtr = initial_ls' s1 0 LSI0.
 Proof.
-  intros Hfin Hwp.
-  have [iatr Hbig] : exists iatr,
-      @valid_inf_system_trace
-        heap_lang (fair_model_model LM_Fair)
-        (@continued_simulation
-           heap_lang
-           (fair_model_model LM_Fair)
-           (sim_rel LM))
-        (trace_singleton ([e1], (trfirst extr).2))
-        (trace_singleton (initial_ls' (LM := LM) s1 0%nat LSI0))
-        (from_trace extr)
-        iatr.
-  { eapply (simulation_adequacy_inftraces _ s); eauto.
-    eapply from_trace_preserves_validity; eauto; first econstructor.
-    simpl. destruct (trfirst extr) eqn:Heq.
-    simpl in Hexfirst. rewrite -Hexfirst Heq //. }
-  exists (to_trace (initial_ls' (LM := LM) s1 0%nat LSI0) iatr).
-  split.
-  2: { by rewrite to_trace_trfirst. }
-  
-  unshelve eapply (valid_inf_system_trace_implies_traces_match (M := fair_model_model LM_Fair)
-            lm_valid_evolution_step
-            live_tids
-            _
-            ltac:(idtac)
-            ltac:(idtac)
-            (continued_simulation (sim_rel LM))); eauto.
-  - intros ?????? [MATCH _].
-    subst. by destruct ℓ. 
-  - intros ?????? V; by apply V. 
-  - by intros ? ? [? ?]%continued_simulation_rel.
-  - by intros ? ? [? ?]%continued_simulation_rel.
-  - apply from_trace_spec. simpl. destruct (trfirst extr) eqn:Heq. simplify_eq. f_equal.
-    simpl in Hexfirst. rewrite -Hexfirst Heq //.
-  - apply to_trace_spec.
-Qed.
+  intros FIN PREM.
+  destruct (trfirst extr) as [e_ σ1] eqn:EX0. simpl in Hexfirst. subst e_. 
+
+  unshelve epose proof (@strong_simulation_adequacy_traces _ _ _ hPre s e1 σ1
+                (initial_ls' (LM := LM) s1 0%nat LSI0)
+                (sim_rel LM)
+                FR
+                extr
+                Hvex
+                ltac:(done)
+                lm_valid_evolution_step
+                live_tids
+                eq
+                _ _ _ _ _ _ _
+    ) as SIM.
+  { simpl. intros ?????? STEP. apply STEP. }
+  { simpl. intros ?????? STEP. apply STEP. }
+  { simpl. intros ?? SIM. apply SIM. }
+  { simpl. intros ?? SIM. apply SIM. }
+  { done. }
+  { simpl. red. split; try done. red. eauto. }
+  { by apply lm_wp_premise_implies_wp_premise. }
+
+  destruct SIM as (auxtr & MATCH & AUX0).
+  eexists. split; eauto.
+  red. red. simpl. rewrite /out_A_labels_match. simpl.
+  eapply traces_match_impl; eauto.
+Qed. 
 
 
 Theorem simulation_adequacy_model_trace Σ
