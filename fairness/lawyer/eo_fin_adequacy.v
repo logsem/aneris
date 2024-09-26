@@ -1,4 +1,5 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
+From iris.proofmode Require Import tactics.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import obligations_model obligations_resources.
 From trillium.fairness.lawyer Require Import eo_fin. 
@@ -127,7 +128,6 @@ Section ObligationsAdequacy.
         (e1: expr) σ1 (s1: mstate OM) (* p *)
         (INIT: obls_is_init_st OP ([e1], σ1) s1)
         (extr : heap_lang_extrace)
-        (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = ([e1], σ1))    :
     (* rel_finitary (sim_rel LM) → *)
     wp_premise Σ s e1 σ1 s1 om_sim_rel (tt: @em_init_param _ _ EM) -> 
@@ -137,7 +137,7 @@ Section ObligationsAdequacy.
     intros (* Hterm Hfb *) Hwp VALID FAIR.    
 
     destruct (om_simulation_adequacy_model_trace
-                Σ _ e1 _ s1 INIT _ Hvex Hexfirst Hwp) as (omtr&MATCH&OM0).
+                Σ _ e1 _ s1 INIT _ VALID Hexfirst Hwp) as (omtr&MATCH&OM0).
 
     have OM_FAIR := ex_om_fairness_preserved extr omtr MATCH FAIR.
     pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH) as OM_VALID.  
@@ -168,30 +168,30 @@ Section EOFinAdequacy.
     (N : nat)
     (HN: N > 1)
     (extr : heap_lang_extrace)
-    (Hvex : extrace_valid extr)
     (Hexfirst : (trfirst extr).1 = [start #N]):
-    (∀ tid, fair_ex tid extr) -> terminating_trace extr.
+    (* (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
+    extrace_fairly_terminating' extr. 
   Proof.
     assert (heapGpreS eofinΣ EM) as HPreG.
     { apply _. }
-    eapply (simulation_adequacy_terminate_ftm yesnoΣ the_model NotStuck _ (N, true) ∅) =>//.
-    - eapply valid_state_evolution_finitary_fairness_simple.
-      intros ?. simpl. apply (model_finitary s1).
-    - intros ?. iStartProof. iIntros "!> (Hm & HFR & Hf) !>". simpl.
-      
-      iApply (start_spec _ _ 61 with "[Hm Hf HFR]"); eauto.
-      
-      + iSplitL "Hm"; eauto. do 2 (destruct N; first lia).
-        iFrame. iSplit; last (iPureIntro; lia).
-        assert ({[Y := 61%nat; No := 61%nat]} = gset_to_gmap 61 {[No;Y]}) as <-; last done.
-        rewrite -leibniz_equiv_iff. intros ρ.
-        destruct (gset_to_gmap 61 {[Y; No]} !! ρ) as [f|] eqn:Heq.
-        * apply lookup_gset_to_gmap_Some in Heq as [Heq ->].
-          destruct (decide (ρ = Y)) as [-> |].
-          ** rewrite lookup_insert //. rewrite lookup_gset_to_gmap option_guard_True //. set_solver.
-          ** rewrite lookup_insert_ne //. assert (ρ = No) as -> by set_solver.
-             rewrite lookup_insert // lookup_gset_to_gmap option_guard_True //. set_solver.
-        * apply lookup_gset_to_gmap_None in Heq. destruct ρ; set_solver.
-  Qed.  
+
+    destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.                
+    
+    assert (mstate (ObligationsModel (EO_OP LIM))) as s1.
+    { admit. }
+    assert (obls_is_init_st (EO_OP LIM) ([start #N], σ1) s1) as INIT.
+    { admit. }
+    
+    pose proof (simple_om_simulation_adequacy_terminate (EO_OP LIM) eofinΣ NotStuck
+                  _ _ _ INIT
+                  _ EX0) as FAIR_TERM.
+    apply FAIR_TERM.
+
+    red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
+    iSplitL.
+    - admit.
+    - admit. 
+
+  Admitted. 
 
 End EOFinAdequacy.
