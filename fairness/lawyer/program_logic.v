@@ -70,9 +70,12 @@ Section ProgramLogic.
           let δ := trace_last omtr in
           gen_heap_interp c'.2.(heap) ∗
           (* TODO: next 3 lines are exactly obls_si; similar in next def *)
-          obls_msi OP δ (H3 := oGS) ∗
-          ⌜ threads_own_obls OP c δ ⌝ ∗
-          ⌜ dom_phases_obls OP δ ⌝ ∗
+
+          (* obls_msi OP δ (H3 := oGS) ∗ *)
+          (* ⌜ threads_own_obls OP c δ ⌝ ∗ *)
+          (* ⌜ dom_phases_obls OP δ ⌝ ∗ *)
+          obls_si OP c δ (ObligationsGS0 := oGS) ∗  
+
           ⌜ oζ = Some τ ⌝ ∗
           ⌜ locale_step c (Some τ) c' ⌝ ∗
           ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝
@@ -144,8 +147,6 @@ Section ProgramLogic.
         iApply bi.sep_assoc. iSplitL.
         2: { iPureIntro. repeat rewrite and_assoc. split.
              - repeat rewrite -and_assoc. repeat split; eauto.  
-               { replace tp with (tp, h).1 in TS by done.
-                 rewrite Heqxx in TS. apply TS. }
                simpl in Hζ. 
                rewrite -Hζ. simpl.
                (* rewrite locale_fill'.  *)
@@ -161,8 +162,11 @@ Section ProgramLogic.
                apply leibniz_equiv_iff. 
                rewrite /locales_of_cfg. simpl. f_equal.
                apply locales_of_list_equiv.
-               apply locales_equiv_from_middle. done. } 
-        simpl. iFrame. }
+               apply locales_equiv_from_middle. done. }
+        simpl. iFrame.
+        iPureIntro. split; try done. 
+        replace tp with (tp, h).1 in TS by done.
+        rewrite Heqxx in TS. apply TS. }
       iMod ("HMU") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
       iExists _, _. rewrite right_id_L. by iFrame.
     Qed.
@@ -219,9 +223,7 @@ Section ProgramLogic.
         rewrite /obls_si. iDestruct "MSI" as "(M & %TS & %DPO)".
         remember (trace_last extr) as xx. destruct xx as [tp h].
         inversion Hexend as [[TP HH]].
-        rewrite TP. simpl. 
-        iApply bi.sep_assoc. iSplitL.
-        { iFrame. }
+        rewrite TP. simpl. iFrame. 
         iPureIntro. repeat split; try done. 
         - by rewrite -TP.
         - erewrite <- language.locale_fill with (K := K) in Hloc.  
@@ -427,12 +429,14 @@ Section ProgramLogic.
       rewrite /MU /BMU. iIntros "BMU PH" (etr otr) "TI'".      
       iDestruct (th_phase_msi_ge with "[TI'] [$]") as %(π__max & PH & LE0).
       { rewrite /HL_OM_trace_interp'. destruct etr; [done| ].
-        iDestruct "TI'" as "(?&?&?&?)". iFrame. }
+        iDestruct "TI'" as "(?&SI&->&%&?)".
+        iDestruct "SI" as "(?&?&?)". 
+        iFrame. }
       iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! etr otr 0 None with "[TI']").
       { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
         destruct etr; [done| ].
-        iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
+        iDestruct "TI'" as "(HEAP&(MSI&%OBLS&%DPO)&->&%STEP&%NOFORK)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by constructor. }
@@ -462,12 +466,12 @@ Section ProgramLogic.
       rewrite /MU__f /MU_impl /BMU. iIntros "BMU PH" (etr otr) "TI'".      
       iDestruct (th_phase_msi_ge with "[TI'] [$]") as %(π__max & PH & LE0).
       { rewrite /HL_OM_trace_interp'. destruct etr; [done| ].
-        iDestruct "TI'" as "(?&?&?&?)". iFrame. }
+        iDestruct "TI'" as "(?&(?&?&?)&?&?)". iFrame. }
       iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! etr otr 0 (Some ζ') with "[TI']").
       { rewrite /HL_OM_trace_interp' /HL_OM_trace_interp'_step.
         destruct etr; [done| ].
-        iDestruct "TI'" as "(HEAP&MSI&%OBLS&%DPO&->&%STEP&%NOFORK)".
+        iDestruct "TI'" as "(HEAP&(MSI&%OBLS&%DPO)&->&%STEP&%NOFORK)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by constructor. }
