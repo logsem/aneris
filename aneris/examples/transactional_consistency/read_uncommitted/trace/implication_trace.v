@@ -1870,7 +1870,7 @@ Section trace_proof.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
                      iPureIntro.
-                     apply (valid_sequence_wr_rd_lin _ _ tag1 c tail); try done.
+                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
                      --- right.
                          rewrite /is_rd_lin_event.
                          destruct wo; set_solver.
@@ -1934,7 +1934,7 @@ Section trace_proof.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
                      iPureIntro.
-                     apply (valid_sequence_wr_rd_lin _ _ tag1 c tail); try done.
+                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
                      --- right.
                          rewrite /is_rd_lin_event.
                          destruct wo; set_solver.
@@ -2203,9 +2203,8 @@ Section trace_proof.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
                      iPureIntro.
-                     apply (valid_sequence_wr_rd_lin _ _ tag1 c tail); try done.
-                     --- left.
-                         rewrite /is_wr_lin_event.
+                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+                     --- rewrite /is_wr_lin_event.
                          set_solver.
                      --- by exists t'.
                   ** iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
@@ -2256,9 +2255,8 @@ Section trace_proof.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
                      iPureIntro.
-                     apply (valid_sequence_wr_rd_lin _ _ tag1 c tail); try done.
-                     --- left.
-                         rewrite /is_wr_lin_event.
+                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+                     --- rewrite /is_wr_lin_event.
                          set_solver.
                      --- by exists t'.
                   ** iApply (trace_state_resources_write_lin1 clients c tag1 lt' T' k v.(SV_val) sa
@@ -2700,7 +2698,7 @@ Section trace_proof.
     iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hcommit".
     rewrite /commit_spec.
     iModIntro.
-    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & (%γ & #Hsa'_pointer)) !# %Φ Hshift".
     rewrite /TC_commit /KVS_wrapped_api /wrap_commit.
     wp_pures.
     wp_bind (ast.Fresh _).
@@ -2797,7 +2795,34 @@ Section trace_proof.
       iPureIntro.
       by simpl.
     }
-    iMod ("Hclose'" with "[Htr_is' HOwnLin' Hpost_res' Hlin_res']").
+    iDestruct "HstateRes'" as "(%mstate & Hmap_mstate & %mname & Hmap_mname & Hdisj_trace_res)".
+    assert (clients = {[sa]} ∪ (clients ∖ {[sa]})) as Heq_sa_clients.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    rewrite {3} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hdisj_trace_res" as "(Hdisj_trace_res_sa & Hdisj_trace_res)".
+    rewrite big_sepS_singleton.
+    iDestruct (@ghost_map_lookup with "[$Hmap_mname][$Hsa'_pointer]") as "%Hlookup_mname".
+    iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
+    iDestruct "Htrace_res" as "(%loc_st & %c' & %γ' & %m' & %Hlookup_mstate & %Hextract & #Hsa_pointer
+      & Hmap_m & Htrace_res)".
+    iAssert (⌜loc_st = Active s⌝)%I as "->".
+    {
+      iDestruct (@ghost_map_lookup with "[$Hmap_mstate][$Hstate_pr]") as "%Hlookup_mstate'".
+      iPureIntro.
+      set_solver.
+    }
+    iAssert ((⌜γ = γ'⌝ ∗ ⌜c = c'⌝)%I) as "(<- & <-)".
+    {
+      iAssert ((⌜(γ, c) = (γ', c')⌝)%I) as "%Heq_pair".
+      - iApply (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c') with "[$Hsa'_pointer][$Hsa_pointer]").
+      - iSplit; set_solver.
+    }
+    iDestruct "Htrace_res" as "(%Hinit & [(%Hfalse & _ & _)|Htrace_res])"; first done.
+    iMod ("Hclose'" with "[Htr_is' HOwnLin' Hpost_res' Hlin_res' Htrace_res]").
     {
       iModIntro.
       iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]). 
@@ -2835,7 +2860,15 @@ Section trace_proof.
                   split_and!; try done.
                   intros (s' & b' & ->).
                   set_solver.
-              ++ admit.
+              ++ iSplit.
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
+                       %Hopen_start & Hrest)".
+                     iPureIntro.
+                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+                     --- rewrite /is_cm_lin_event.
+                         set_solver.
+                     --- by exists t'.
+                  ** admit.
       - iExists (T' ++ [[Cm (tag1, c) b]]).
         iSplit.
         + iPureIntro.
@@ -2869,12 +2902,11 @@ Section trace_proof.
                      exfalso.
                      eauto.
                ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
                        %Hopen_start & Hrest)".
                      iPureIntro.
-                     apply (valid_sequence_wr_rd_lin _ _ tag1 c tail); try done.
-                     --- left.
-                         rewrite /is_wr_lin_event.
+                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+                     --- rewrite /is_cm_lin_event.
                          set_solver.
                      --- by exists t'.
                   ** admit.

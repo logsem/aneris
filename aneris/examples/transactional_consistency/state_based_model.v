@@ -1291,11 +1291,11 @@ Proof.
       set_solver.
 Qed.
 
-Lemma valid_sequence_wr_rd_lin le lt (tag : string) c tail :
+Lemma valid_sequence_wr_rd_cm_lin le lt (tag : string) c tail :
   (∃ e, e ∈ lt ∧ connOfEvent e = Some c ∧ is_in_lin_event e) →
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
   open_start c lt tail →
-  (is_wr_lin_event le ∨ is_rd_lin_event le) →
+  (is_cm_lin_event le ∨ is_wr_lin_event le ∨ is_rd_lin_event le) →
   tagOfEvent le = Some tag →
   connOfEvent le = Some c →
   (∃ t, lin_trace_of lt t) →
@@ -1311,7 +1311,7 @@ Proof.
   - destruct Hvalid as (_ & Hvalid & _). 
     apply unique_init_events_imp; last done. 
     rewrite /is_in_lin_event.
-    rewrite /is_wr_lin_event /is_rd_lin_event in Hevent; set_solver.
+    rewrite /is_wr_lin_event /is_rd_lin_event /is_cm_lin_event in Hevent; set_solver.
   - intros e c' Hin Hconn Hevents.
     rewrite elem_of_app in Hin.
     destruct Hin as [Hin|Hin].
@@ -1320,7 +1320,8 @@ Proof.
       apply (prior_start_imp le c' e lt tag); try done.
       intros (tag'' & c'' & b'' & ->).
       rewrite /is_wr_lin_event /is_rd_lin_event in Hevent.
-      set_solver.
+      admit.
+      (* set_solver. *)
     + assert (e = le) as ->; first set_solver.
       destruct Hopen_start as (e_st & l & -> & _ & (tag' & ->) & Hnot').
       exists (#tag', (c, #"StLin"))%V.
@@ -1350,8 +1351,9 @@ Proof.
           apply (rel_list_last_neq _ _ _ le); last done.
           intros ->.
           rewrite /is_cm_lin_event in Hevent_cm.
-          rewrite /is_wr_lin_event /is_rd_lin_event in Hevent.
-          set_solver.
+          (* rewrite /is_wr_lin_event /is_rd_lin_event in Hevent. *)
+          admit.
+          (* set_solver. *)
         }
         destruct Hrel3 as (i & j & Hlt & Hlookup_i & Hlookup_j).
         rewrite lookup_app_Some in Hlookup_j.
@@ -1389,7 +1391,7 @@ Proof.
              by eexists _.
            }
            specialize (Hnot' e_cm Hfalse Hconn').
-           rewrite /is_wr_lin_event /is_rd_lin_event in Hnot'.
+           rewrite /is_wr_lin_event /is_rd_lin_event /is_cm_lin_event in Hnot'.
            set_solver.
   - intros e_st c' Hin Hconn Hstart.
     rewrite elem_of_app in Hin.
@@ -1397,14 +1399,17 @@ Proof.
     destruct Hin as [Hin|Hin].
     + destruct (Hvalid e_st c' Hin Hconn Hstart) as [Hlater | Hno_later].
       * left.
-        apply later_commit_imp; set_solver.
+        rewrite /later_commit.
+        admit.
+        (* apply later_commit_imp; set_solver. *)
       * right.
         apply no_later_start_or_commit_wr_rd_imp; try done.
-        set_solver.
+        admit.
+        (* set_solver. *)
     + assert (e_st = le) as ->; first set_solver.
       destruct Hstart as (tag'' & c'' & ->). 
       destruct Hevent as [Hevent|Hevent];
-        rewrite /is_wr_lin_event /is_rd_lin_event in Hevent;
+        rewrite /is_wr_lin_event /is_rd_lin_event /is_cm_lin_event in Hevent;
         set_solver.
   - intros i tag' c' k v Hlookup_i.
     destruct Hvalid as (_ & _ & _ & _ & Hvalid_seq).
@@ -1423,7 +1428,7 @@ Proof.
       split; first lia.
       apply lookup_app_l_Some.
       by apply list_lookup_alt.
-Qed.
+Admitted.
 
 Lemma valid_sequence_in_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
