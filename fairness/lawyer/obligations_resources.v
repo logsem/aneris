@@ -6,7 +6,9 @@ From trillium.fairness.lawyer Require Import obls_utils.
 
 Section ObligationsRepr.
   Context {DegO LevelO: ofe}.
-  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO} `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}
+    `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}
+  .
 
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
@@ -288,16 +290,19 @@ Section ObligationsRepr.
     Lemma obls_msi_exact δ ζ R:
       ⊢ obls_msi δ -∗ obls ζ R -∗
         ⌜ ps_obls OP δ !! ζ = Some R ⌝.
-    Proof. 
+    Proof using.
+      clear H0 H H1. 
       rewrite /obls_msi. iIntros "(_&_&OBLS&_) OB". 
       iCombine "OBLS OB" as "OBLS". 
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
       apply auth_both_valid_discrete in V as [SUB V].
       eapply singleton_included_exclusive_l in SUB; try done.
       2: { apply _. }
-      apply leibniz_equiv_iff in SUB.
-      rewrite lookup_fmap_Some in SUB. destruct SUB as (?&?&?).
-      set_solver.
+      apply leibniz_equiv.
+      rewrite /obls_map_repr in SUB.
+      rewrite lookup_fmap in SUB. 
+      apply fmap_Some_equiv_1 in SUB. destruct SUB as (?&?&?).
+      inversion H0. subst. rewrite H. set_solver. 
     Qed. 
 
     (* TODO: unify sigs_msi_.. proofs *)
@@ -305,6 +310,7 @@ Section ObligationsRepr.
       ⊢ obls_msi δ -∗ sgn sid l ov -∗
         ⌜ exists v, ps_sigs OP δ !! sid = Some (l, v) ⌝.
     Proof. 
+      clear H. 
       rewrite /obls_msi. iIntros "(_&SIGS&_) SIG". 
       iCombine "SIGS SIG" as "SIGS". 
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
@@ -318,10 +324,10 @@ Section ObligationsRepr.
       all: rewrite LL in LE'; simpl in LE'.
       2: { apply option_included_total in LE' as [?|?]; set_solver. }
       rewrite Some_included_total in LE'.
-      apply pair_included in LE' as [LE1 LE2].      
+      apply pair_included in LE' as [LE1 LE2].
       apply to_agree_included in LE1.
       set_solver. 
-    Qed. 
+   Qed.
 
     Lemma sigs_msi_exact δ sid l v:
       ⊢ obls_msi δ -∗ sgn sid l (Some v) -∗

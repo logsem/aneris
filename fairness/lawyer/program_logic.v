@@ -383,7 +383,6 @@ Section ProgramLogic.
         rewrite OBLS''. f_equal. set_solver.
       - red. rewrite OBLS'' PHASES''. f_equal.
         done. 
-      Unshelve. done. 
     Qed. 
       
     Lemma BMU_intro E ζ b (P : iProp Σ):
@@ -399,7 +398,7 @@ Section ProgramLogic.
       rewrite /BMU. iIntros "P BMU **".
       iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
       iExists _. iFrame.
-    Qed. 
+    Qed.
 
     Lemma BMU_wand E ζ b (P Q : iProp Σ):
       ⊢ (P -∗ Q) -∗ BMU E ζ b P -∗ BMU E ζ b Q.
@@ -407,7 +406,7 @@ Section ProgramLogic.
       rewrite /BMU. iIntros "PQ BMU **".
       iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
       iExists _. iFrame. by iApply "PQ". 
-    Qed. 
+    Qed.
 
     Lemma BMU_lower E ζ m n P (LE: m <= n):
       ⊢ BMU E ζ m P -∗ BMU E ζ n P.
@@ -562,7 +561,6 @@ Section ProgramLogic.
       iApply (BMU_MU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
       iApply OU_BMU.
       iDestruct (OU_create_sig _ _ _ l with "[$]") as "OU".
-      Unshelve. 2: by apply _. 
       iApply (OU_wand with "[-OU]"); [| done].
       iIntros "(%sid & SIG & OBLS)".
       iApply BMU_intro.
@@ -643,7 +641,6 @@ Section ProgramLogic.
         iApply wp_value.
         simpl.
         iApply (obls_proper with "[$]"). set_solver.
-        Unshelve. all: done. 
     Qed. 
 
   End TestProg.

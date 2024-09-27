@@ -290,7 +290,6 @@ Section EOFinAdequacy.
     iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
     simpl. iDestruct (obls_msi_exact with "MSI [$]") as %?.
     clear -OB_ OBτ H. rewrite OB_ in H. congruence.
-    Unshelve. apply foo. 
   Qed. 
       
 
