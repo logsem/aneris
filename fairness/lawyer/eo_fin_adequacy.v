@@ -74,10 +74,40 @@ Section ObligationsAdequacy.
       locale_step
       (@mtrans OM).
 
+  Lemma ex_om_fairness_preserved_single (extr: extrace heap_lang) (omtr: obls_trace OP) (τ: locale heap_lang):
+    ex_om_traces_match extr omtr ->
+    fair_ex τ extr -> obls_trace_fair _ τ omtr.
+  Proof using. 
+    intros MATCH FAIR. red.
+    apply fair_by_equiv. red. intros n OBS.
+    destruct (omtr S!! n) as [δ| ] eqn:NTH'; rewrite NTH' in OBS; [| done].
+    simpl in OBS. red in OBS. rename OBS into X. 
+    destruct (ps_obls OP δ !! τ) as [R| ] eqn:OBS; rewrite OBS in X; [| done].
+    simpl in X.
+    generalize (traces_match_state_lookup_2 _ _ _ _ MATCH NTH').
+    intros (c & NTH & LIVE). red in LIVE.
+    specialize (LIVE τ ltac:(rewrite OBS; done)).
+    red in FAIR. apply fair_by_equiv in FAIR. red in FAIR.
+    specialize (FAIR n ltac:(rewrite NTH; done)).
+    destruct FAIR as (m & c' & MTH & STEP).
+    generalize (traces_match_state_lookup_1 _ _ _ _ MATCH MTH).
+    intros (δ' & MTH' & LIVE').
+    do 2 eexists. split; eauto.
+    red. rewrite /has_obls.
+    destruct (ps_obls OP δ' !! τ) as [R'| ] eqn:OBS'; [| tauto].
+    simpl. destruct (decide (R' = ∅)); [tauto| ].
+    right. red in LIVE'. specialize (LIVE' τ ltac:(rewrite OBS'; done)).
+    red in STEP. destruct STEP as [| (?&STEP&->)]; [done| ].
+    generalize (traces_match_label_lookup_1 _ _ _ _ MATCH STEP).
+    clear. set_solver. 
+  Qed.
+
   Lemma ex_om_fairness_preserved (extr: extrace heap_lang) (omtr: obls_trace OP):
     ex_om_traces_match extr omtr ->
     (forall ζ, fair_ex ζ extr) -> (∀ τ, obls_trace_fair _ τ omtr).
-  Proof using. Admitted. 
+  Proof using.
+    intros MATCH FAIR. intros. eapply ex_om_fairness_preserved_single; eauto. 
+  Qed. 
 
 
   Definition om_sim_rel (extr: execution_trace heap_lang) (omtr : auxiliary_trace OM) :=
