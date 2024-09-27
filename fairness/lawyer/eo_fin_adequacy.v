@@ -2,7 +2,7 @@ From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
-From trillium.fairness.lawyer Require Import obligations_model obligations_resources.
+From trillium.fairness.lawyer Require Import obligations_model obligations_resources obligations_em.
 From trillium.fairness.lawyer Require Import eo_fin. 
 
 
@@ -34,16 +34,6 @@ Section OMTermination.
     terminating_trace tr.
   Proof. Admitted. 
 
-  (* Definition live_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
-  (* live_tids (LM:=LM) (trace_last ex) (trace_last aux). *)
-
-  (* Definition sim_rel (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
-  (*   valid_state_evolution_fairness lm_valid_evolution_step ex aux (M := (fair_model_model LM_Fair)) ∧ live_rel ex aux. *)
-
-  (* Definition sim_rel_with_user (ξ : execution_trace Λ -> finite_trace M (option (fmrole M)) -> Prop) *)
-  (* (ex : execution_trace Λ) (aux : auxiliary_trace (fair_model_model LM_Fair)) := *)
-  (* sim_rel ex aux ∧ ξ ex (get_underlying_fairness_trace aux). *)
-
 End OMTermination.
 
 
@@ -58,9 +48,6 @@ Section ObligationsAdequacy.
 
   Context (OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
   Let OM := ObligationsModel OP.
-
-  (* Context `{hGS: @heapGS Σ _ EM}. *)
-  (* Let oGS : ObligationsGS EO_OP Σ := heap_fairnessGS (heapGS := hGS). *)
 
   Let EM := @ObligationsEM DegO LevelO _ _ _ heap_lang _ _ _ OP.
 
@@ -177,14 +164,11 @@ Section ObligationsAdequacy.
     done. 
   Qed.
 
-  (* TODO: move *)
   Definition phase0: Phase := nroot .@ "phases". 
 
-  (* TODO: move *)
   Definition init_phases (n: nat): list Phase :=
     (fun i => phase0 .@ i) <$> seq 0 n. 
 
-  (* TODO: move *)
   Definition init_om_state (c: cfg heap_lang): mstate OM := {|
       ps_cps := ∅;
       ps_sigs := ∅;
@@ -336,10 +320,6 @@ Section EOFinAdequacy.
 
     destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.                
     
-    (* assert (mstate (ObligationsModel (EO_OP LIM))) as s1. *)
-    (* { admit. } *)
-    (* assert (obls_is_init_st (EO_OP LIM) ([start #N], σ1) s1) as INIT. *)
-    (* { admit. } *)
     set (s1 := init_om_state (EO_OP LIM) (trfirst extr)). 
     
     unshelve epose proof (simple_om_simulation_adequacy_terminate (EO_OP LIM) eofinΣ NotStuck

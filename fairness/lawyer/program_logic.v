@@ -3,7 +3,7 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import locales_helpers utils. 
-From trillium.fairness.lawyer Require Import obligations_model obls_utils obligations_resources.
+From trillium.fairness.lawyer Require Import obligations_model obls_utils obligations_resources obligations_em.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
 
