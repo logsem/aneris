@@ -2513,7 +2513,6 @@ Section trace_proof.
       Hghost_map_mstate' Hkeys_conn_res2 Hlin_res' Hpost_res' Hdisj_trace_res]").
     {
       iModIntro.
-      rewrite /GlobalInvExt.
       iExists t', (lt' ++ [(#tag1, (c, #"StLin"))%V]), T'.
       iFrame.
       iSplitR.
@@ -2798,9 +2797,87 @@ Section trace_proof.
       iPureIntro.
       by simpl.
     }
-    iMod ("Hclose'" with "[]").
+    iMod ("Hclose'" with "[Htr_is' HOwnLin' Hpost_res' Hlin_res']").
     {
-      admit.
+      iModIntro.
+      iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]). 
+      iFrame.
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+        as Hdecision.
+      {
+        do 2 (apply list_exist_dec; intros).
+        apply _.
+      }
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+          as [(trans & Htrans_in & Hop)|Hdec].
+      - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
+        iExists (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2).
+        iSplit.
+        + iPureIntro.
+          apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V 
+            (#tag1, (c, (#"CmLin", #b)))%V tag1 c t'); try done;
+            rewrite /is_lin_event /is_cm_lin_event /is_pre_event /is_cm_pre_event;
+            set_solver.
+        + iSplit.
+          * iPureIntro.
+            by apply trans_add_non_empty.
+          * iSplit.
+            -- iPureIntro.
+               by apply extraction_of_add2.
+            -- iSplit.
+               ++ iPureIntro.
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
+                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+                  exists op.
+                  split_and!; try done.
+                  intros (s' & b' & ->).
+                  set_solver.
+              ++ admit.
+      - iExists (T' ++ [[Cm (tag1, c) b]]).
+        iSplit.
+        + iPureIntro.
+          apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V 
+            (#tag1, (c, (#"CmLin", #b)))%V tag1 c t'); try done;
+            rewrite /is_lin_event /is_cm_lin_event /is_pre_event /is_cm_pre_event;
+            set_solver. 
+        + iSplit.
+          * iPureIntro.
+            intros t'' Ht''_in.
+            rewrite elem_of_app in Ht''_in.
+            destruct Ht''_in as [Ht''_in | Ht''_in]; set_solver.
+          * iSplit.
+            -- iPureIntro.
+               by apply extraction_of_add1.
+            -- iSplit.
+               ++ iPureIntro.
+                  apply (valid_transactions_add1 T' _ c); try done.
+                  ** set_solver.
+                  ** exists (Cm (tag1, c) b).
+                     by simpl.
+                  ** apply valid_transaction_singleton.
+                  ** intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+                     apply Hdec.
+                     exists t''.
+                     split; first done.
+                     exists op.
+                     split_and!; try done.
+                     rewrite /is_cm_op in Hop_cm.
+                     destruct op; try done.
+                     exfalso.
+                     eauto.
+               ++ iSplit.
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                       %Hopen_start & Hrest)".
+                     iPureIntro.
+                     apply (valid_sequence_wr_rd_lin _ _ tag1 c tail); try done.
+                     --- left.
+                         rewrite /is_wr_lin_event.
+                         set_solver.
+                     --- by exists t'.
+                  ** admit.
     }
     iMod ("Hshift" with "[]").
     {
