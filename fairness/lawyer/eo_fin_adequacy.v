@@ -1,5 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
+From trillium.fairness Require Import locales_helpers.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import obligations_model obligations_resources.
 From trillium.fairness.lawyer Require Import eo_fin. 
@@ -146,6 +147,63 @@ Section ObligationsAdequacy.
     done. 
   Qed.
 
+  (* TODO: move *)
+  Definition phase0: Phase := nroot .@ "phases". 
+
+  (* TODO: move *)
+  Definition init_phases (n: nat): list Phase :=
+    (fun i => phase0 .@ i) <$> seq 0 n. 
+
+  (* TODO: move *)
+  Definition init_om_state (c: cfg heap_lang): mstate OM := {|
+      ps_cps := ∅;
+      ps_sigs := ∅;
+      ps_obls := gset_to_gmap ∅ (locales_of_cfg c);
+      ps_eps := ∅;
+      ps_phases := list_to_map $ zip (elements $ locales_of_cfg c) (init_phases (size $ locales_of_cfg c));
+      ps_exc_bound := 1;
+  |}.
+
+  (* TODO: move *)
+  Lemma init_om_thown (c: cfg heap_lang):
+    threads_own_obls _ c (init_om_state c).
+  Proof.
+    red. simpl. by rewrite dom_gset_to_gmap.
+  Qed.
+
+  (* TODO: move *)
+  Lemma length_size `{Countable K} (g: gset K):
+    length (elements g) = size g.
+  Proof.
+    rewrite -{2}(list_to_set_elements_L g).
+    rewrite size_list_to_set; [done| ]. apply NoDup_elements.
+  Qed.
+
+  Lemma init_om_dpo (c: cfg heap_lang):
+    dom_phases_obls _ (init_om_state c).
+  Proof.
+    red. simpl. rewrite dom_list_to_map_L. simpl.
+    rewrite fst_zip.
+    { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
+    rewrite /init_phases. rewrite fmap_length.
+    rewrite seq_length. rewrite length_size. lia.
+  Qed. 
+  
+  Lemma init_om_state_init e σ:
+    obls_is_init_st _ ([e], σ) (init_om_state (([e], σ))).
+  Proof.
+    red. eexists. split.
+    { rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L. reflexivity. }
+    rewrite dom_gset_to_gmap. split.
+    { rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L. reflexivity. }
+    rewrite dom_list_to_map_L.
+    rewrite fst_zip.
+    { rewrite list_to_set_elements_L. rewrite locales_of_cfg_simpl.
+      simpl. rewrite union_empty_r_L. reflexivity. } 
+    rewrite /init_phases. rewrite (fmap_length _ (seq _ _)) seq_length.
+    lia.
+  Qed.     
+    
 End ObligationsAdequacy.
 
 
@@ -164,6 +222,78 @@ Section EOFinAdequacy.
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
+  (* TODO: move*)
+  Lemma gset_to_gmap_singleton `{Countable K} {B: Type} (b: B) (k: K):
+    gset_to_gmap b {[ k ]} = {[ k := b ]}.
+  Proof.
+    rewrite /gset_to_gmap. simpl. rewrite map_fmap_singleton. done.
+  Qed. 
+
+  Lemma locales_of_cfg_Some τ tp σ:
+    τ ∈ locales_of_cfg (tp, σ) -> is_Some (from_locale (tp, σ).1 τ).
+  Proof.
+    rewrite /locales_of_cfg. simpl. rewrite elem_of_list_to_set.
+    apply locales_of_list_from_locale_from'.
+  Qed.
+
+  Lemma om_sim_RAH 
+    {Hinv: @heapGS eofinΣ (ObligationsModel (EO_OP LIM)) EM}
+    σ1 N:
+  ⊢
+  rel_always_holds0 
+    (@om_sim_rel _ _ 10 (EO_OP LIM)) NotStuck
+    (@state_interp heap_lang _ eofinΣ _)
+    (λ _ : language.val heap_lang,
+       @em_thread_post heap_lang _ _ eofinΣ
+         (@heap_fairnessGS eofinΣ
+            _
+            _ Hinv) 0) (start #N) σ1
+    (@init_om_state _ _ 10 (EO_OP LIM) ([start #N], σ1)).
+  Proof using.
+    rewrite /rel_always_holds0.
+    
+    iIntros (extr omtr [tp σ] VALID EX0 OM0 EX_FIN CONT_SIM).
+    simpl. iIntros (NSTUCK FOOBAR).
+    iIntros "(%VALID_STEP & HEAP & MSI & [%TH_OWN %OBLS]) POSTS".
+    
+    iApply fupd_mask_intro_discard; [done| ].
+    
+    destruct extr.
+    { simpl in VALID_STEP. inversion VALID.
+      simpl in *. subst. simpl in *.
+      red in EX0. simpl in EX0. subst.
+      red in OM0. simpl in OM0. subst.
+      red in EX_FIN. simpl in EX_FIN. inversion EX_FIN. subst.
+      simpl in VALID. simpl.
+      rewrite /om_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
+      iSplit; [done| ]. simpl.
+      rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L.
+      iPureIntro. intros ?.
+      rewrite gset_to_gmap_singleton. 
+      destruct (decide (ζ = 0)) as [-> | ?].
+      2: { simpl. simpl. rewrite lookup_singleton_ne; [| done]. done. }
+      by rewrite lookup_singleton. }
+    simpl in VALID_STEP. inversion VALID. subst. simpl in *.
+    red in EX_FIN. simpl in EX_FIN. subst. simpl.
+    rewrite /om_sim_rel. iSplit.
+    { simpl. done. }
+    simpl. rewrite /om_live_tids. iIntros (τ OBτ).
+    rewrite /locale_enabled.
+    destruct (ps_obls _ δ' !! τ) as [V| ] eqn:OB_; rewrite OB_ in OBτ; [| done].
+    simpl in OBτ.
+    red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
+    apply proj2 in TH_OWN. specialize (TH_OWN ltac:(eapply elem_of_dom; eauto)).
+    apply locales_of_cfg_Some in TH_OWN as [e Ee]. simpl in Ee.
+    iExists _. iSplit; [done| ].
+    destruct (language.to_val e) eqn:VALe; [| done].
+    apply from_locale_lookup in Ee. 
+    iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
+    simpl. iDestruct (obls_msi_exact with "MSI [$]") as %?.
+    clear -OB_ OBτ H. rewrite OB_ in H. congruence.
+    Unshelve. apply foo. 
+  Qed. 
+      
+
   Theorem eofin_terminates
     (N : nat)
     (HN: N > 1)
@@ -177,21 +307,22 @@ Section EOFinAdequacy.
 
     destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.                
     
-    assert (mstate (ObligationsModel (EO_OP LIM))) as s1.
-    { admit. }
-    assert (obls_is_init_st (EO_OP LIM) ([start #N], σ1) s1) as INIT.
-    { admit. }
+    (* assert (mstate (ObligationsModel (EO_OP LIM))) as s1. *)
+    (* { admit. } *)
+    (* assert (obls_is_init_st (EO_OP LIM) ([start #N], σ1) s1) as INIT. *)
+    (* { admit. } *)
+    set (s1 := init_om_state (EO_OP LIM) (trfirst extr)). 
     
-    pose proof (simple_om_simulation_adequacy_terminate (EO_OP LIM) eofinΣ NotStuck
-                  _ _ _ INIT
+    unshelve epose proof (simple_om_simulation_adequacy_terminate (EO_OP LIM) eofinΣ NotStuck
+                  _ _ _ _
                   _ EX0) as FAIR_TERM.
+    2: { apply init_om_state_init. }
     apply FAIR_TERM.
 
     red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
     iSplitL.
     - admit.
-    - admit. 
-
+    - iApply om_sim_RAH. 
   Admitted. 
 
 End EOFinAdequacy.
