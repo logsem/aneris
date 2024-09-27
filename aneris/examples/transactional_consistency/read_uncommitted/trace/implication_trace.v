@@ -2310,8 +2310,8 @@ Section trace_proof.
     }
     {
       eapply valid_trace_ru_post; 
-        rewrite /is_post_event /is_wr_post_event;
-        set_solver.
+      rewrite /is_post_event /is_wr_post_event;
+      set_solver.
     }
     iIntros "Htr_is''".
     iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, (#"WrPost", (#k, v))))%V with "[$Hlin_res'']") as "Hlin_res''".
@@ -2698,6 +2698,162 @@ Section trace_proof.
     @commit_spec _ _ _ _ lib res -∗
     @commit_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl clients res).
   Proof.
+    iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hcommit".
+    rewrite /commit_spec.
+    iModIntro.
+    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    rewrite /TC_commit /KVS_wrapped_api /wrap_commit.
+    wp_pures.
+    wp_bind (ast.Fresh _).
+    rewrite /commit_pre_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%t [%lt [%T 
+      (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex & %Hvalid_trans & %Hvalid_seq 
+      & Hstate_res & Hlin_res & Hpost_res)]]]" "Hclose".
+    wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      intros tag Hnin.
+      eapply valid_trace_ru_pre; try done.
+      rewrite /is_pre_event /is_cm_pre_event; set_solver.
+    }
+    iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"CmPre"))%V with "[$Hlin_res]") 
+      as "(Hlin_res & Hlin_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod (post_tag_create t γmpost (#tag1, (c, #"CmPre"))%V with "[$Hpost_res]") 
+      as "(Hpost_res & Hpost_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod ("Hclose" with "[Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
+    {
+      iNext.
+      iExists (t ++ [(#tag1, (c, #"CmPre"))%V]), lt, T.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_pre_event /is_cm_pre_event.
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply "Hcommit"; try done.
+    iClear "Hcommit".
+    iMod "Hshift" as "(%s & %mc & %m & ((Hstate & Hstate_pr) & %Hdom1 & %Hdom2 & Hkeys_conn & Hkeys) & Hshift)".
+    iModIntro.
+    iExists s, mc, m.
+    rewrite big_sepM_sep.
+    iDestruct "Hkeys_conn" as "(Hkeys_conn1 & Hkeys_conn2)".
+    simpl.
+    iAssert (([∗ map] k↦V ∈ m, k ↦ₖ V) ∗ ([∗ map] k↦V ∈ m, (∀ v, ⌜v ∈ V⌝ → 
+        ∃ lh (tag : string) c, OwnLinHist γl lh ∗ ⌜(#tag, (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝)))%I 
+        with "[Hkeys]" as "(Hkeys1 & Hkeys2)".
+    {
+      iApply big_sepM_sep.
+      iFrame.
+    }
+    iSplitL "Hkeys_conn1 Hkeys1 Hstate".
+    {
+      iFrame.
+      iSplit; by iPureIntro.
+    }
+    iModIntro.
+    iIntros (b) "(Hstate & Hkeys1)".
+    iInv "HinvExt" as ">[%t' [%lt' [%T' 
+      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' & 
+      %Hvalid_seq' & HstateRes' & Hlin_res' & Hpost_res')]]]" "Hclose'".
+    iMod (own_lin_add _ _ (#tag1, (c, (#"CmLin", #b)))%V with "[$HOwnLin']") as "HOwnLin'".
+    iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, (c, #"CmPre"))%V ∈ t') as Hin'.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, (c, #"CmPre"))%V])); last done.
+      set_solver.
+    }
+    iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
+    iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"CmLin", #b)))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+      as "Hlin_res'".
+    {
+      iPureIntro.
+      by simpl.
+    }
+    iMod ("Hclose'" with "[]").
+    {
+      admit.
+    }
+    iMod ("Hshift" with "[]").
+    {
+      admit.
+    }
+    iModIntro.
+    rewrite /commit_post_emit_event.
+    wp_pures.
+    wp_bind (Emit _).
+    iInv "HinvExt" as ">[%t'' [%lt'' [%T'' 
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+      %Hvalid_seq'' & HstateRes'' & Hlin_res'' & Hpost_res'')]]]" "Hclose''".
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+      as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
+    assert ((#tag1, (c, (#"CmLin", #b)))%V ∈ lt'') as HstLinIn.
+    {
+      apply (elem_of_prefix (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V])); last done.
+      set_solver.
+    }
+    wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is'']").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      eapply valid_trace_ru_post; 
+      rewrite /is_post_event /is_cm_post_event;
+      set_solver.
+    }
+    iIntros "Htr_is''".
+    iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, (#"CmPost", #b)))%V with "[$Hlin_res'']") as "Hlin_res''".
+    iDestruct (post_tag_add t'' γmpost (#tag1, (c, (#"CmPost", #b)))%V tag1 with "[$Hpost_res'' $Hpost_tag_res]")
+     as "Hpost_res''".
+    {
+      simpl.
+      iSplitL; first by iPureIntro.
+      iPureIntro.
+      rewrite /is_post_event /is_cm_post_event.
+      set_solver.
+    }
+    iMod ("Hclose''" with "[Htr_is'' HOwnLin'' HstateRes'' Hlin_res'' Hpost_res'']").
+    {
+      iModIntro.
+      iExists (t'' ++ [(#tag1, (c, (#"CmPost", #b)))%V]), lt'', T''.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_post_event /is_cm_post_event.
+      set_solver.
+    }
+    iModIntro.
+    by wp_pures.
   Admitted.
 
   (** Main theorem  *)
