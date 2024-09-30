@@ -4,7 +4,7 @@ From iris.algebra Require Import auth gmap gset excl excl_auth.
 (* From trillium.program_logic Require Export weakestpre adequacy ectx_lifting. *)
 From iris.base_logic.lib Require Import invariants.
 From trillium.fairness Require Import locales_helpers utils.
-From trillium.fairness.lawyer Require Import obligations_model obls_utils obligations_resources program_logic obligations_logic obligations_em.
+From trillium.fairness.lawyer Require Import obligations_model obls_utils obligations_resources program_logic obligations_logic obligations_em sub_action_em.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
 
@@ -75,14 +75,20 @@ Section EoFin.
   Let EOLevelOfe := sigO (fun i => i < LIM).
   Let EODegreeOfe := sigO (fun i => i < NUM_DEG). 
 
-  Instance foo: LeibnizEquiv EOLevelOfe.
+  Instance EO_lvl_LeibnizEquiv: LeibnizEquiv EOLevelOfe.
   Admitted. 
+
+  (* Definition EO_EM := @ObligationsEM EODegreeOfe EOLevelOfe _ _ _ heap_lang _ _ _ EO_OP.  *)
+  (* Context `{hGS: @heapGS Σ _ EO_EM}. *)
+  (* Let oGS : ObligationsGS EO_OP Σ := heap_fairnessGS (heapGS := hGS). *)
+
+  Context `{EM: ExecutionModel heap_lang M}. 
+  Context `{hGS: @heapGS Σ _ EM}.
+
+  (* Let OAM := ObligationsAM OP.  *)
+  Let ASEM := ObligationsASEM EO_OP.
+  Context {oGS: @asem_GS _ _ ASEM Σ}. 
   
-  Definition EO_EM := @ObligationsEM EODegreeOfe EOLevelOfe _ _ _ heap_lang _ _ _ EO_OP. 
-
-  Context `{hGS: @heapGS Σ _ EO_EM}.
-  Let oGS : ObligationsGS EO_OP Σ := heap_fairnessGS (heapGS := hGS).
-
   Let thread_prog: val :=
     rec: "thread_prog" "l" "n" "M" :=
       if: ("M" ≤ "n")%V then #()
@@ -165,11 +171,14 @@ Section EoFin.
       iSplitR "CP";
       [| do 2 iExists _; iFrame; iPureIntro; reflexivity]. 
 
+    Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
+
     Ltac pure_step :=
       iApply sswp_MU_wp; [done| ];
       iApply sswp_pure_step; [done| ]; simpl;
       iNext;
-      iApply (BMU_MU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
+      iApply OBLS_AMU; [by rewrite nclose_nroot| ];
+      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
       BMU_burn_cp
     . 
 
@@ -228,17 +237,17 @@ Section EoFin.
     Qed.
 
  
-    Lemma thread_spec τ n l M (BOUND: M < LIM) π s:
-      {{{ eofin_inv l M BOUND ∗ even_res n ∗
+    Lemma thread_spec τ n l B (BOUND: B < LIM) π s:
+      {{{ eofin_inv l B BOUND ∗ even_res n ∗
           
           (* cp_mul EO_OP π d0 100 (H3 := oGS) ∗ *)
-          cp_mul EO_OP π d1 (S (M - n)) (H3 := oGS) ∗ (* overestimation *)
+          cp_mul EO_OP π d1 (S (B - n)) (H3 := oGS) ∗ (* overestimation *)
           exc_lb EO_OP 20 (H3 := oGS) ∗ 
 
           th_phase_ge EO_OP τ π (H3 := oGS) ∗
-          (if (Nat.ltb n M) then ith_sig n s else ⌜ True ⌝) ∗ 
-          obls EO_OP τ (if (Nat.ltb n M) then {[ s ]} else ∅) (H3 := oGS) }}}
-        thread_prog #l #n #M @ τ
+          (if (Nat.ltb n B) then ith_sig n s else ⌜ True ⌝) ∗ 
+          obls EO_OP τ (if (Nat.ltb n B) then {[ s ]} else ∅) (H3 := oGS) }}}
+        thread_prog #l #n #B @ τ
       {{{ x, RET #x; obls EO_OP τ ∅ (H3 := oGS) }}}.
     Proof.
       iIntros (Φ).
@@ -251,7 +260,8 @@ Section EoFin.
       iApply sswp_MU_wp; [done| ]. 
       iApply sswp_pure_step; [done| ]; simpl. 
       iNext.
-      iApply (BMU_MU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
+      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
+      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
       iDestruct (cp_mul_take with "CPS1") as "[CPS1 CP1]".
       iApply OU_BMU.
       iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU".
@@ -266,7 +276,7 @@ Section EoFin.
 
       fold thread_prog. 
 
-      destruct (Nat.le_gt_cases M n).
+      destruct (Nat.le_gt_cases B n).
       { rewrite bool_decide_true; [| lia].
         pure_steps. iApply "POST".
         rewrite (proj2 (Nat.ltb_ge _ _)); done. }
@@ -298,7 +308,8 @@ Section EoFin.
         iDestruct "SG" as (lm) "(SG & %LVL)".
         rewrite Nat.ltb_irrefl. 
 
-        iApply (BMU_MU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
+        iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
+        iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
 
         iApply OU_BMU.
         iDestruct (OU_set_sig with "OB [SG]") as "OU".
@@ -309,8 +320,8 @@ Section EoFin.
 
         (* iDestruct (cp_mul_take with "CPS") as "[CPS CP]".  *)
         iAssert (BMU EO_OP (⊤ ∖ ↑nroot.@"eofin") τ 1
-                   (⌜ M <= m + 2 ⌝ ∗ obls EO_OP τ ∅ ∗ smap_repr (min M (m + 2)) (m + 1) smap ∨
-                    |==> ⌜ m + 2 < M ⌝ ∗ ∃ s' lm', smap_repr (min M (m + 3)) (m + 1) (<[m + 2:= s']> smap) ∗ ith_sig (m + 2) s' ∗ obls EO_OP τ {[ s' ]} ∗ ⌜ lvl2nat lm' = (m + 2)%nat ⌝))%I with "[OBLS SIGS SIG SM]" as "BMU".
+                   (⌜ B <= m + 2 ⌝ ∗ obls EO_OP τ ∅ ∗ smap_repr (min B (m + 2)) (m + 1) smap ∨
+                    |==> ⌜ m + 2 < B ⌝ ∗ ∃ s' lm', smap_repr (min B (m + 3)) (m + 1) (<[m + 2:= s']> smap) ∗ ith_sig (m + 2) s' ∗ obls EO_OP τ {[ s' ]} ∗ ⌜ lvl2nat lm' = (m + 2)%nat ⌝))%I with "[OBLS SIGS SIG SM]" as "BMU".
         {
           iAssert (□ (([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM),
                          sgn EO_OP y l0 (Some (k <? m)) ∗
@@ -337,7 +348,7 @@ Section EoFin.
                 apply PeanoNat.Nat.ltb_ge in LT. lia. }
             destruct H3; [| done]. rewrite H3. done. } 
 
-          destruct (Nat.le_gt_cases M (m + 2)).
+          destruct (Nat.le_gt_cases B (m + 2)).
           { rewrite PeanoNat.Nat.min_l in DOM; [| done]. 
             iApply BMU_intro. iLeft. iFrame.
             iSplitR; [done| ]. iSplitR.
@@ -345,8 +356,8 @@ Section EoFin.
             iApply ("foo" with "[$] [$]"). }
             
           iApply OU_BMU.
-          assert {lm' : EOLevel M | lvl2nat lm' = m + 2} as [lm' LVL'].
-          { set (lm' := exist _ (m + 2) H1: EOLevel M).
+          assert {lm' : EOLevel B | lvl2nat lm' = m + 2} as [lm' LVL'].
+          { set (lm' := exist _ (m + 2) H1: EOLevel B).
             exists lm'. done. }
           iDestruct (OU_create_sig with "OBLS") as "FOO".
           iApply (OU_wand with "[-FOO]"); [| by iFrame].
@@ -391,13 +402,13 @@ Section EoFin.
         assert (forall n, Nat.even (n + 1) = Nat.odd n) by admit. 
         assert (forall n, Nat.odd (n + 1) = Nat.even n) by admit.
 
-        assert (S (M - (m + 2)) <= M - m) as LE.
+        assert (S (B - (m + 2)) <= B - m) as LE.
         { destruct (Nat.even m); lia. }
         apply Nat.le_sum in LE as [? LE].
         rewrite LE.
         iDestruct (cp_mul_split with "CPS1") as "[? ?]". 
 
-        destruct (Nat.le_gt_cases M (m + 2)).
+        destruct (Nat.le_gt_cases B (m + 2)).
         + iDestruct "COND" as "[COND | CC]".
           2: { iMod "CC" as "[% ?]". lia. }
           iDestruct "COND" as "(% & OBLS & SM)".
