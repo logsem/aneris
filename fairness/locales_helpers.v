@@ -1,4 +1,5 @@
 From trillium.program_logic Require Import language adequacy.
+From trillium.fairness Require Import utils.
 
 Section XX.
   Context `{Countable (locale Λ)}.
@@ -33,7 +34,15 @@ Section XX.
 
   Definition locales_of_cfg (c: cfg Λ): gset (locale Λ) :=
     list_to_set (locales_of_list c.1).
-  
-  
-End XX.
 
+  Definition step_fork (c1 c2: cfg Λ): option (locale Λ) :=
+    let diff := locales_of_cfg c2 ∖ locales_of_cfg c1 in
+    gset_pick diff. 
+   
+  Definition extr_last_fork (extr: execution_trace Λ): option (locale Λ) :=
+    match extr with
+    | {tr[ _ ]} => None
+    | extr' :tr[oζ]: c' => step_fork (trace_last extr') c'
+    end. 
+
+End XX.
