@@ -85,18 +85,22 @@ Section AMU_HL.
   Context `{ASEM: ActionSubEM heap_lang AM}. 
   Context {Σ: gFunctors}. 
 
-  Definition AMU_lift_MU
+  Definition AMU_lift_MU_impl (f: option $ locale heap_lang) 
     `{aeGS: asem_GS Σ}
     `{EM: ExecutionModel heap_lang M} `{hGS: @heapGS Σ _ EM}
     (A: coPset) := 
-    ⊢ ∀ E ζ P (a: Action) (Aa: a ∈ A), AMU E ζ a P (aeGS := aeGS) -∗ MU E ζ P.
+    ⊢ ∀ E ζ P (a: Action) (Aa: a ∈ A), AMU_impl f E ζ a P (aeGS := aeGS) -∗ MU_impl f E ζ P.
+  
+  Definition AMU_lift_MU := @AMU_lift_MU_impl None. 
+  Definition AMU_lift_MU__f τ := @AMU_lift_MU_impl (Some τ). 
   
   Lemma AMU_lift_top thread_post
     (EM := TopAM_EM ASEM thread_post)
     `{hGS: @heapGS Σ _ EM}
     (aeGS := heap_fairnessGS (heapGS := hGS))
+    f
     :
-    @AMU_lift_MU aeGS _ EM _ (↑ nroot).
+    @AMU_lift_MU_impl f aeGS _ EM _ (↑ nroot).
   Proof using.
     red. iIntros (E ζ P ??). rewrite /AMU /AMU_impl /MU /MU_impl.
     simpl. 
@@ -110,5 +114,3 @@ Section AMU_HL.
   Qed. 
 
 End AMU_HL.
-
-

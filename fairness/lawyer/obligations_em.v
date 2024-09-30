@@ -68,23 +68,14 @@ Section ObligationsEM.
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
     exists τ0,
       let R := {[ τ0 ]} in
-      locales_of_cfg σ = R /\ dom $ ps_obls OP δ = R /\ dom $ ps_phases OP δ = R. 
+      locales_of_cfg σ = R /\ dom $ ps_obls OP δ = R /\ dom $ ps_phases OP δ = R.
 
-  Program Definition ObligationsEM: ExecutionModel Λ OM :=
-    {| 
-      em_preGS := ObligationsPreGS OP;
-      em_GS := ObligationsGS OP;
-      em_Σ := obls_Σ OP;
-      em_valid_evolution_step := obls_valid_evolution_step;
-      em_thread_post Σ `{!ObligationsGS OP Σ} :=
-        fun τ => (obls _ τ ∅)%I;
-      em_msi Σ `{!ObligationsGS OP Σ} := obls_si;
-      em_init_param := unit; (* ? *)
-      em_init_resource (Σ: gFunctors) `{!ObligationsGS OP Σ} := obls_init_resource;
-      em_is_init_st := obls_is_init_st;
-    |}.
-  Next Obligation.
-    simpl. intros ? PRE δ σ ? INIT. iStartProof.
+  Lemma obls_resources_init Σ {PRE: ObligationsPreGS OP Σ}:
+    ∀ s1 σ p (INIT: obls_is_init_st σ s1),
+        ⊢ |==> ∃ eGS: ObligationsGS OP Σ, obls_init_resource s1 p ∗ obls_si σ s1. 
+  Proof using.
+    clear H1 H0 H. 
+    simpl. intros δ σ ? INIT. iStartProof.
     iMod (own_alloc (● (cps_repr _ $ ps_cps _  δ) ⋅ ◯ _)) as (?) "[CPa CPf]".
     { by apply auth_both_valid_2. }
     iMod (own_alloc (● (sig_map_repr (ps_sigs _ δ)) ⋅ ◯ _)) as (?) "[SIGSa SIGSf]".
@@ -111,5 +102,36 @@ Section ObligationsEM.
     iPureIntro. 
     red in INIT. destruct INIT as (?&?&?&?). set_solver.  
   Qed.
+    
+
+  Definition ObligationsEM: ExecutionModel Λ OM :=
+    {| 
+      em_Σ := obls_Σ OP;
+      em_valid_evolution_step := obls_valid_evolution_step;
+      em_thread_post Σ `{!ObligationsGS OP Σ} :=
+        fun τ => (obls _ τ ∅)%I;
+      em_initialization := obls_resources_init;
+    |}.
+
+  From trillium.fairness.lawyer Require Import sub_action_em obligations_am action_model. 
+  Context `{Inhabited Locale}. 
+  Let OAM := ObligationsAM OP. 
+
+  Definition obls_ves_wrapper:
+    cfg Λ → olocale Λ → cfg Λ → 
+    amSt OAM → Action * option (amRole OAM) → amSt OAM → Prop :=
+
+    fun c1 oτ c2 δ1 (aoτ: Action * olocale Λ) δ2 =>
+      let '(a, oρ) := aoτ in
+      from_option (fun ρ => obls_valid_evolution_step c1 oτ c2 δ1 ρ δ2) False oρ.     
+
+  Definition ObligationsASEM: ActionSubEM Λ (ObligationsAM OP) :=
+    {| 
+      asem_Σ := obls_Σ OP;
+      asem_valid_evolution_step := obls_ves_wrapper;
+      asem_initialization := obls_resources_init;
+    |}.
 
 End ObligationsEM.
+
+
