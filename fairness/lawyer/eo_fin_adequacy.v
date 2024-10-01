@@ -1,9 +1,9 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import locales_helpers.
+From trillium.fairness Require Import locales_helpers comp_utils trace_lookup.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
-From trillium.fairness.lawyer Require Import obligations_model obligations_resources obligations_em.
-From trillium.fairness.lawyer Require Import eo_fin. 
+From trillium.fairness.lawyer Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation.
+From trillium.fairness.lawyer Require Import eo_fin sub_action_em obligations_am.
 
 
 (* TODO: unify defs *)
@@ -12,29 +12,6 @@ Definition extrace_fairly_terminating' {Λ} `{Countable (locale Λ)}
   extrace_valid extr →
   (∀ tid, fair_ex tid extr) →
   terminating_trace extr.
-
-
-
-Section OMTermination.
-  Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Context `{Countable Locale}. 
-  Let OM := ObligationsModel OP. 
-
-  Definition has_obls (τ: Locale) (s: mstate OM) := default ∅ (ps_obls _ s !! τ) ≠ ∅. 
-
-  Definition obls_trace_fair := fair_by has_obls eq.
-
-  Definition obls_trace_valid := trace_valid (@mtrans OM).
-
-  Definition obls_trace := trace (mstate OM) (mlabel OM). 
-
-  Lemma obls_fair_trace_terminate (tr: obls_trace):
-    obls_trace_valid tr ->
-    (∀ τ, obls_trace_fair τ tr) ->
-    terminating_trace tr.
-  Proof. Admitted. 
-
-End OMTermination.
 
 
 Section ObligationsAdequacy.
@@ -49,119 +26,208 @@ Section ObligationsAdequacy.
   Context (OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
   Let OM := ObligationsModel OP.
 
-  Let EM := @ObligationsEM DegO LevelO _ _ _ heap_lang _ _ _ OP.
+  (* Let EM := @ObligationsEM DegO LevelO _ _ _ heap_lang _ _ _ OP. *)
 
-  Definition om_live_tids (c: cfg heap_lang) (δ: mstate OM) :=
-    forall ζ, (default ∅ (ps_obls _ δ !! ζ) ≠ ∅) -> locale_enabled ζ c.
+  (* Context `{EM: ExecutionModel heap_lang M}.  *)
+  (* Context `{hGS: @heapGS Σ _ EM}. *)
+  Let ASEM := ObligationsASEM OP.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)). 
+  Let M := AM2M (ObligationsAM OP).
+  
+  (* Definition ex_om_traces_match: extrace heap_lang -> obls_trace OP -> Prop := *)
+  (*   traces_match *)
+  (*     (fun oτ τ' => oτ = Some τ') *)
+  (*     om_live_tids *)
+  (*     locale_step *)
+  (*     (@mtrans OM). *)
 
-  Definition ex_om_traces_match: extrace heap_lang -> obls_trace OP -> Prop :=
+  (* Definition om_sim_rel (extr: execution_trace heap_lang) (omtr : auxiliary_trace OM) := *)
+  (*   valid_state_evolution_fairness (obls_valid_evolution_step OP) extr omtr ∧ *)
+  (*   om_live_tids (trace_last extr) (trace_last omtr).  *)
+
+  (* Lemma om_sim_rel_FB: rel_finitary om_sim_rel. *)
+  (* Proof. Admitted.  *)
+
+  (* TODO: move action restriction into obls_ves *)
+  Definition eofin_valid_evolution_step (c1 : cfg heap_lang) (oζ : olocale heap_lang) 
+    (c2 : cfg heap_lang) (δ1 : mstate M) (ℓ : mlabel M) (δ2 : mstate M): Prop :=
+    from_option (fun τ => obls_valid_evolution_step OP c1 oζ c2 δ1 τ δ2) False ℓ.2 /\
+    ℓ.1 = obls_act. 
+
+  Definition eofin_st_rel (c: cfg heap_lang) (δ: mstate M) :=
+    om_live_tids OP id locale_enabled c δ. 
+    
+  Definition eofin_sim_rel (extr: execution_trace heap_lang) (omtr: auxiliary_trace M) :=
+    valid_state_evolution_fairness eofin_valid_evolution_step extr omtr ∧
+    eofin_st_rel (trace_last extr) (trace_last omtr).
+
+  Definition eofin_om_traces_match: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
     traces_match
-      (fun oτ τ' => oτ = Some τ')
-      om_live_tids
+      (fun oτ '(_, τ') => oτ = τ')
+      eofin_st_rel
       locale_step
-      (@mtrans OM).
+      (@mtrans M).
 
-  Lemma ex_om_fairness_preserved_single (extr: extrace heap_lang) (omtr: obls_trace OP) (τ: locale heap_lang):
-    ex_om_traces_match extr omtr ->
-    fair_ex τ extr -> obls_trace_fair _ τ omtr.
-  Proof using. 
-    intros MATCH FAIR. red.
-    apply fair_by_equiv. red. intros n OBS.
-    destruct (omtr S!! n) as [δ| ] eqn:NTH'; rewrite NTH' in OBS; [| done].
-    simpl in OBS. red in OBS. rename OBS into X. 
-    destruct (ps_obls OP δ !! τ) as [R| ] eqn:OBS; rewrite OBS in X; [| done].
-    simpl in X.
-    generalize (traces_match_state_lookup_2 _ _ _ _ MATCH NTH').
-    intros (c & NTH & LIVE). red in LIVE.
-    specialize (LIVE τ ltac:(rewrite OBS; done)).
-    red in FAIR. apply fair_by_equiv in FAIR. red in FAIR.
-    specialize (FAIR n ltac:(rewrite NTH; done)).
-    destruct FAIR as (m & c' & MTH & STEP).
-    generalize (traces_match_state_lookup_1 _ _ _ _ MATCH MTH).
-    intros (δ' & MTH' & LIVE').
-    do 2 eexists. split; eauto.
-    red. rewrite /has_obls.
-    destruct (ps_obls OP δ' !! τ) as [R'| ] eqn:OBS'; [| tauto].
-    simpl. destruct (decide (R' = ∅)); [tauto| ].
-    right. red in LIVE'. specialize (LIVE' τ ltac:(rewrite OBS'; done)).
-    red in STEP. destruct STEP as [| (?&STEP&->)]; [done| ].
-    generalize (traces_match_label_lookup_1 _ _ _ _ MATCH STEP).
-    clear. set_solver. 
-  Qed.
-
-  Lemma ex_om_fairness_preserved (extr: extrace heap_lang) (omtr: obls_trace OP):
-    ex_om_traces_match extr omtr ->
-    (forall ζ, fair_ex ζ extr) -> (∀ τ, obls_trace_fair _ τ omtr).
-  Proof using.
-    intros MATCH FAIR. intros. eapply ex_om_fairness_preserved_single; eauto. 
-  Qed. 
-
-
-  Definition om_sim_rel (extr: execution_trace heap_lang) (omtr : auxiliary_trace OM) :=
-    valid_state_evolution_fairness (obls_valid_evolution_step OP) extr omtr ∧
-    om_live_tids (trace_last extr) (trace_last omtr). 
-
-  Lemma om_sim_rel_FB: rel_finitary om_sim_rel.
-  Proof. Admitted. 
+  Lemma eofin_sim_rel_FB: rel_finitary eofin_sim_rel.
+  Proof using. Admitted.
 
   Theorem om_simulation_adequacy_model_trace Σ
         `{hPre: !heapGpreS Σ EM} (s: stuckness)
-        (e1: expr) σ1 (s1: mstate OM) (* p *)
-        (INIT: obls_is_init_st OP ([e1], σ1) s1)
+        (e1: expr) σ1 (s1: mstate M) p
+        (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = ([e1], σ1))    :
-    wp_premise Σ s e1 σ1 s1 om_sim_rel (tt: @em_init_param _ _ EM) ->
-    ∃ (omtr: obls_trace OP), 
-      ex_om_traces_match extr omtr ∧
+    wp_premise Σ s e1 σ1 s1 eofin_sim_rel (p: @em_init_param _ _ EM) ->
+    ∃ (omtr: trace (mstate M) (mlabel M)), 
+      eofin_om_traces_match extr omtr ∧
       trfirst omtr = s1.
   Proof using.
+    clear H1 H0 H. 
     intros (* FIN *) PREM.
 
     unshelve epose proof (@strong_simulation_adequacy_traces _ _ _ hPre s e1 σ1
                 s1
-                om_sim_rel
-                tt
+                eofin_sim_rel
+                p
                 extr
                 Hvex
                 ltac:(done)
-                (obls_valid_evolution_step OP)
-                om_live_tids
-                (fun oτ τ' => oτ = Some τ')
+                eofin_valid_evolution_step
+                eofin_st_rel
+                (fun oτ '(_, τ') => oτ = τ')
                 _ _ _ _ _ _ _
       ) as SIM.
-    { simpl. intros ?????? STEP. apply STEP. }
-    { simpl. intros ?????? STEP. apply STEP. }
+    { simpl. intros ????[??]? STEP.
+      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
+      destruct o; [| done].
+      simpl in STEP. by inversion STEP. }
+    { simpl. intros ????[??]? STEP.
+      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
+      destruct o; [| done].  
+      simpl in STEP. red in STEP.
+      constructor. apply STEP. }
     { simpl. intros ?? SIM. apply SIM. }
     { simpl. intros ?? SIM. apply SIM. }
-    { apply om_sim_rel_FB. }
+    { apply eofin_sim_rel_FB. }
     { done. }
     { done. }
 
     done. 
   Qed.
 
+  (* TODO: move *)
+  Lemma traces_match_compose:
+  ∀ {L1 L2 L3 S1 S2 S3: Type}
+    {Rℓ12 : L1 → L2 → Prop} {Rs12 : S1 → S2 → Prop}
+    {Rℓ23 : L2 → L3 → Prop} {Rs23 : S2 → S3 → Prop}
+    {trans1 : S1 → L1 → S1 → Prop} {trans2 : S2 → L2 → S2 → Prop} {trans3 : S3 → L3 → S3 → Prop}
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (tr3 : trace S3 L3),
+    traces_match Rℓ12 Rs12 trans1 trans2 tr1 tr2 →
+    traces_match Rℓ23 Rs23 trans2 trans3 tr2 tr3 →
+    traces_match 
+      (fun l1 l3 => exists l2, Rℓ12 l1 l2 /\ Rℓ23 l2 l3)
+      (fun s1 s3 => exists s2, Rs12 s1 s2 /\ Rs23 s2 s3)
+      trans1 trans3
+      tr1 tr3
+  .
+  Proof using.
+    clear.
+    intros *. revert tr1 tr2 tr3.
+    cofix CIH.
+    intros tr1. destruct tr1. 
+    { simpl. intros. inversion H. subst. inversion H0. subst.
+      constructor. eauto. }
+    intros. inversion H. subst. inversion H0. subst.
+    constructor; eauto.
+  Qed. 
+
+  Lemma eofin_matching_traces_termination extr mtr
+    (VALID: extrace_valid extr)
+    (FAIR: ∀ tid, fair_ex tid extr)
+    (MATCH: eofin_om_traces_match extr mtr):
+  terminating_trace extr.
+  Proof using.
+    clear -MATCH FAIR VALID OM.
+    assert (exists omtr, traces_match (fun ℓ τ => ℓ.2 = Some τ) eq (@mtrans M) (@mtrans OM) mtr omtr) as [omtr MATCHo]. 
+    { clear -MATCH mtr.
+      exists (project_nested_trace id ((mbind Some) ∘ snd) mtr).
+      eapply trace_utils.traces_match_impl. 
+      3: { eapply nested_trace_construction.
+           - eapply traces_match_valid2; eauto. 
+           - simpl. intros. simpl.
+             rewrite /step_label_matches. destruct res.
+             destruct o as [[[??]?]|]. 
+             2: { right. red. eauto. }
+             left. do 3 eexists. split; [reflexivity| ]. simpl.
+             destruct o; [done| ].
+             apply traces_match_valid2 in MATCH.
+             eapply trace_valid_steps' in H; eauto. inversion H. 
+           - intros. destruct ℓ. simpl in H0. destruct o; [| done].
+             simpl in H0. inversion H0. subst. simpl.
+             inversion H. subst. eauto. }
+      2: done.
+      simpl. intros [??] ?. simpl. destruct o; done. }
+
+    
+    pose proof (traces_match_compose _ _ _ MATCH MATCHo) as MATCH'.
+
+    (* TODO: extract these lemmas *)
+    assert (out_om_traces_match OP locale_step Some
+              (fun oτ c => from_option (fun τ => locale_enabled τ c) False oτ)
+              extr omtr) as MATCH''.
+    { eapply trace_utils.traces_match_impl; [..| apply MATCH'].
+      - simpl. intros ?? ([??] & <- & ?). done.
+      - simpl. intros ?? (? & ? & ?). subst. eauto. } 
+    assert (∀ ζ, out_fair (λ oτ c,
+                     from_option (λ τ, locale_enabled τ c) False oτ) ζ extr) as FAIR''.
+    { intros oζ. red. simpl. clear -FAIR.
+      apply fair_by_equiv. red. intros n EN. simpl in EN.
+      destruct (extr S!! n) eqn:NTH; rewrite NTH in EN; [| done]. 
+      simpl in EN. 
+      destruct oζ as [ζ | ]; [| done]. 
+      simpl in EN. simpl.
+      specialize (FAIR ζ). apply fair_by_equiv in FAIR.
+      red in FAIR. specialize (FAIR n ltac:(by rewrite NTH)).
+      destruct FAIR as (?&?&?&FAIR).
+      do 2 eexists. split; eauto.
+      destruct FAIR as [| FAIR]. 
+      { left. done. }
+      right. destruct FAIR as (?&?&?). eauto. }
+    pose proof (out_om_fairness_preserved _ _ _ _ _ extr omtr MATCH'' FAIR'') as OM_FAIR. 
+
+    pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.  
+    pose proof (obls_fair_trace_terminate _ _ OM_VALID OM_FAIR) as OM_TERM.
+
+    pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH'' OM_TERM). 
+    done.
+  Qed. 
+                      
+
+
   Theorem simple_om_simulation_adequacy_terminate Σ
+        (* `{hPre: !heapGpreS Σ EM} (s: stuckness) *)
+        (* (e1: expr) σ1 (s1: mstate OM) (* p *) *)
+        (* (INIT: obls_is_init_st OP ([e1], σ1) s1) *)
+        (* (extr : heap_lang_extrace) *)
+        (* (Hexfirst : trfirst extr = ([e1], σ1))    : *)
         `{hPre: !heapGpreS Σ EM} (s: stuckness)
-        (e1: expr) σ1 (s1: mstate OM) (* p *)
-        (INIT: obls_is_init_st OP ([e1], σ1) s1)
+        (e1: expr) σ1 (s1: mstate M) p
+        (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
+        (* (Hvex : extrace_valid extr) *)
         (Hexfirst : trfirst extr = ([e1], σ1))    :
     (* rel_finitary (sim_rel LM) → *)
-    wp_premise Σ s e1 σ1 s1 om_sim_rel (tt: @em_init_param _ _ EM) -> 
+    wp_premise Σ s e1 σ1 s1 eofin_sim_rel (p: @em_init_param _ _ EM) -> 
     extrace_fairly_terminating' extr.
   Proof.
     rewrite /extrace_fairly_terminating'. 
-    intros (* Hterm Hfb *) Hwp VALID FAIR.    
+    intros (* Hterm Hfb *) Hwp (* VALID *) VALID FAIR.
 
     destruct (om_simulation_adequacy_model_trace
-                Σ _ e1 _ s1 INIT _ VALID Hexfirst Hwp) as (omtr&MATCH&OM0).
+                Σ _ e1 _ s1 _ INIT _ VALID Hexfirst Hwp) as (omtr&MATCH&OM0).
 
-    have OM_FAIR := ex_om_fairness_preserved extr omtr MATCH FAIR.
-    pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH) as OM_VALID.  
-    pose proof (obls_fair_trace_terminate _ _ OM_VALID OM_FAIR) as OM_TERM. 
-    pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH OM_TERM). 
-    done. 
+    eapply eofin_matching_traces_termination; eauto. 
   Qed.
 
   Definition phase0: Phase := nroot .@ "phases". 
@@ -223,15 +289,17 @@ End ObligationsAdequacy.
 
 Section EOFinAdequacy.
 
-  Context (LIM: nat). 
-
-  Let EM := EO_EM LIM.
+  Context (LIM: nat).
+  Let OP := EO_OP LIM. 
+  Let ASEM := ObligationsASEM OP.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)). 
+  Let M := AM2M (ObligationsAM OP). 
 
   Let eofinΣ: gFunctors := #[
       GFunctor (excl_authR natO); 
       GFunctor (authUR (gmapUR nat (agreeR SignalId)));
       heapΣ EM
-].
+  ].
 
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
@@ -244,18 +312,18 @@ Section EOFinAdequacy.
   Qed. 
 
   Lemma locales_of_cfg_Some τ tp σ:
-    τ ∈ locales_of_cfg (tp, σ) -> is_Some (from_locale (tp, σ).1 τ).
+    τ ∈ locales_of_cfg (tp, σ) -> is_Some (from_locale tp τ).
   Proof.
     rewrite /locales_of_cfg. simpl. rewrite elem_of_list_to_set.
     apply locales_of_list_from_locale_from'.
   Qed.
 
   Lemma om_sim_RAH 
-    {Hinv: @heapGS eofinΣ (ObligationsModel (EO_OP LIM)) EM}
+    {Hinv: @heapGS eofinΣ M EM}
     σ1 N:
   ⊢
   rel_always_holds0 
-    (@om_sim_rel _ _ 10 (EO_OP LIM)) NotStuck
+    (@eofin_sim_rel _ _ 10 (EO_OP LIM)) NotStuck
     (@state_interp heap_lang _ eofinΣ _)
     (λ _ : language.val heap_lang,
        @em_thread_post heap_lang _ _ eofinΣ
@@ -279,20 +347,24 @@ Section EOFinAdequacy.
       red in OM0. simpl in OM0. subst.
       red in EX_FIN. simpl in EX_FIN. inversion EX_FIN. subst.
       simpl in VALID. simpl.
-      rewrite /om_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
+      rewrite /eofin_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
       iSplit; [done| ]. simpl.
-      rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L.
+      (* rewrite /eofin_st_rel /om_live_tids.  *)
       iPureIntro. intros ?.
+      rewrite /has_obls. simpl. 
+      rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L.
       rewrite gset_to_gmap_singleton. 
       destruct (decide (ζ = 0)) as [-> | ?].
       2: { simpl. simpl. rewrite lookup_singleton_ne; [| done]. done. }
       by rewrite lookup_singleton. }
     simpl in VALID_STEP. inversion VALID. subst. simpl in *.
     red in EX_FIN. simpl in EX_FIN. subst. simpl.
-    rewrite /om_sim_rel. iSplit.
-    { simpl. done. }
+    rewrite /eofin_sim_rel. iSplit.
+    { simpl. iPureIntro. red. 
+      destruct ℓ. done. }
     simpl. rewrite /om_live_tids. iIntros (τ OBτ).
     rewrite /locale_enabled.
+    red in OBτ. 
     destruct (ps_obls _ δ' !! τ) as [V| ] eqn:OB_; rewrite OB_ in OBτ; [| done].
     simpl in OBτ.
     red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
@@ -324,14 +396,15 @@ Section EOFinAdequacy.
     
     unshelve epose proof (simple_om_simulation_adequacy_terminate (EO_OP LIM) eofinΣ NotStuck
                   _ _ _ _
-                  _ EX0) as FAIR_TERM.
-    2: { apply init_om_state_init. }
+                  _ _ EX0) as FAIR_TERM; eauto.
+    { exact tt. }
+    { simpl. subst s1. rewrite EX0. apply init_om_state_init. }
+    
     apply FAIR_TERM.
-
     red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
     iSplitL.
     - admit.
-    - iApply om_sim_RAH. 
+    - subst s1. rewrite EX0. iApply om_sim_RAH. 
   Admitted. 
 
 End EOFinAdequacy.

@@ -123,7 +123,8 @@ Section ObligationsEM.
 
     fun c1 oτ c2 δ1 (aoτ: Action * olocale Λ) δ2 =>
       let '(a, oρ) := aoτ in
-      from_option (fun ρ => obls_valid_evolution_step c1 oτ c2 δ1 ρ δ2) False oρ.     
+      from_option (fun ρ => obls_valid_evolution_step c1 oτ c2 δ1 ρ δ2) False oρ /\
+      a = obls_act. 
 
   Definition ObligationsASEM: ActionSubEM Λ (ObligationsAM OP) :=
     {| 
