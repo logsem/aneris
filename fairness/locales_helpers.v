@@ -41,6 +41,13 @@ Section XX.
     rewrite /locales_of_cfg. simpl. set_solver.
   Qed.
 
+  Lemma locales_of_cfg_Some τ tp σ:
+    τ ∈ locales_of_cfg (tp, σ) -> is_Some (from_locale tp τ).
+  Proof.
+    rewrite /locales_of_cfg. simpl. rewrite elem_of_list_to_set.
+    apply locales_of_list_from_locale_from'.
+  Qed.
+
   Definition step_fork (c1 c2: cfg Λ): option (locale Λ) :=
     let diff := locales_of_cfg c2 ∖ locales_of_cfg c1 in
     gset_pick diff. 

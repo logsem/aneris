@@ -8,12 +8,6 @@ Definition mtrace_fairly_terminating {Mdl : FairModel} (mtr : mtrace Mdl) :=
   (∀ ρ, fair_model_trace ρ mtr) →
   terminating_trace mtr.
 
-Definition extrace_fairly_terminating {Λ} `{Countable (locale Λ)}
-           (extr : extrace Λ) :=
-  extrace_valid extr →
-  (∀ tid, fair_ex tid extr) →
-  terminating_trace extr.
-
 Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_leq: relation Mdl;
   ftm_order: PreOrder ftm_leq;

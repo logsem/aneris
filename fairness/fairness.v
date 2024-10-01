@@ -251,6 +251,11 @@ Section exec_trace.
     intros ?. eapply from_trace_preserves_validity; eauto. econstructor.
   Qed.
 
+  Definition extrace_fairly_terminating (extr : extrace Λ) :=
+    extrace_valid extr →
+    (∀ tid, fair_ex tid extr) →
+    terminating_trace extr.
+
 End exec_trace.
 
 
@@ -287,4 +292,3 @@ Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 
 Global Hint Resolve fair_by_cons: core.
 Global Hint Resolve trace_valid_mono : paco.
-

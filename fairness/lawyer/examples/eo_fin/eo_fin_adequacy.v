@@ -1,17 +1,9 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import locales_helpers comp_utils trace_lookup.
+From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import eo_fin sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am.
-
-
-(* TODO: unify defs *)
-Definition extrace_fairly_terminating' {Λ} `{Countable (locale Λ)}
-           (extr : extrace Λ) :=
-  extrace_valid extr →
-  (∀ tid, fair_ex tid extr) →
-  terminating_trace extr.
 
 
 Section ObligationsAdequacy.
@@ -26,10 +18,6 @@ Section ObligationsAdequacy.
   Context (OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
   Let OM := ObligationsModel OP.
 
-  (* Let EM := @ObligationsEM DegO LevelO _ _ _ heap_lang _ _ _ OP. *)
-
-  (* Context `{EM: ExecutionModel heap_lang M}.  *)
-  (* Context `{hGS: @heapGS Σ _ EM}. *)
   Let ASEM := ObligationsASEM OP.
   Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)). 
   Let M := AM2M (ObligationsAM OP).
@@ -174,9 +162,8 @@ Section ObligationsAdequacy.
     pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH'' OM_TERM). 
     done.
   Qed. 
-                      
-
-
+  
+  
   Theorem simple_om_simulation_adequacy_terminate Σ
         (* `{hPre: !heapGpreS Σ EM} (s: stuckness) *)
         (* (e1: expr) σ1 (s1: mstate OM) (* p *) *)
@@ -191,9 +178,9 @@ Section ObligationsAdequacy.
         (Hexfirst : trfirst extr = ([e1], σ1))    :
     (* rel_finitary (sim_rel LM) → *)
     wp_premise Σ s e1 σ1 s1 eofin_sim_rel (p: @em_init_param _ _ EM) -> 
-    extrace_fairly_terminating' extr.
+    extrace_fairly_terminating extr.
   Proof.
-    rewrite /extrace_fairly_terminating'. 
+    rewrite /extrace_fairly_terminating.
     intros (* Hterm Hfb *) Hwp (* VALID *) VALID FAIR.
 
     destruct (om_simulation_adequacy_model_trace
@@ -221,13 +208,6 @@ Section EOFinAdequacy.
 
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
-
-  Lemma locales_of_cfg_Some τ tp σ:
-    τ ∈ locales_of_cfg (tp, σ) -> is_Some (from_locale tp τ).
-  Proof.
-    rewrite /locales_of_cfg. simpl. rewrite elem_of_list_to_set.
-    apply locales_of_list_from_locale_from'.
-  Qed.
 
   Lemma om_sim_RAH 
     {Hinv: @heapGS eofinΣ M EM}
@@ -296,7 +276,7 @@ Section EOFinAdequacy.
     (extr : heap_lang_extrace)
     (Hexfirst : (trfirst extr).1 = [start #N]):
     (* (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
-    extrace_fairly_terminating' extr. 
+    extrace_fairly_terminating extr. 
   Proof.
     assert (heapGpreS eofinΣ EM) as HPreG.
     { apply _. }
