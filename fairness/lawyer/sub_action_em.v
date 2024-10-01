@@ -111,3 +111,98 @@ Section AMU_HL.
   Qed. 
 
 End AMU_HL.
+
+
+Section ProdASEM.
+
+  Context `{ASEM1: ActionSubEM Λ AM1}. 
+  Context `{ASEM2: ActionSubEM Λ AM2}.
+
+  Let PM := ProdAM AM1 AM2.
+
+  Context
+    {is_act1_dec: forall a, Decision (is_action_of AM1 a)}
+    {is_act2_dec: forall a, Decision (is_action_of AM2 a)}.
+
+  Open Scope type. 
+
+  Definition prod_asem_valid_evolution_step:
+      cfg Λ -> olocale Λ → cfg Λ →
+      amSt PM → Action * option (amRole PM) → amSt PM → Prop := 
+    fun c oτ c' '(δ1, δ2) aoρ '(δ1', δ2') =>
+      let '(a, oρ) := aoρ in
+      let A1 := is_act1_dec a in let A2 := is_act2_dec a in
+      match oρ with
+      | None =>
+          @asem_valid_evolution_step _ _ ASEM1 c oτ c' δ1 (a, None) δ1' /\
+          @asem_valid_evolution_step _ _ ASEM2 c oτ c' δ2 (a, None) δ2'
+      | Some (inl ρ1) =>
+          @asem_valid_evolution_step _ _ ASEM1 c oτ c' δ1 (a, Some ρ1) δ1' /\
+         if (is_act2_dec a)
+         then @asem_valid_evolution_step _ _ ASEM2 c oτ c' δ2 (a, None) δ2'
+         else δ2' = δ2
+      | Some (inr ρ2) =>
+          @asem_valid_evolution_step _ _ ASEM2 c oτ c' δ2 (a, Some ρ2) δ2' /\
+         if (is_act1_dec a)
+         then @asem_valid_evolution_step _ _ ASEM1 c oτ c' δ1 (a, None) δ1'
+         else δ1' = δ1
+      end
+      . 
+
+  Let prod_asem_preGS Σ := (@asem_preGS _ _ ASEM1 Σ) * (@asem_preGS _ _ ASEM2 Σ). 
+  Let prod_asem_GS Σ := (@asem_GS _ _ ASEM1 Σ) * (@asem_GS _ _ ASEM2 Σ).
+
+  Let prod_asem_init_param := @asem_init_param _ _ ASEM1 * @asem_init_param _ _ ASEM2.
+  Let prod_asem_is_init c (s: amSt PM) := asem_is_init_st c s.1 /\ asem_is_init_st c s.2.
+
+  foobar. 
+
+  Definition prod_asem_init_resource `{!prod_asemGS Σ}
+    (s: amSt PM) (p: prod_asem_init_param): iProp Σ :=
+    asem_init_resource s.1 p.1
+  .
+
+  Lemma prod_asem_initialization Σ {pPreGS: prod_asem_preGS Σ}:
+    forall (s1: amSt PM) (σ: cfg Λ) (p: prod_asem_init_param)
+      (INIT_ST: prod_asem_is_init σ s1),
+      ⊢ (|==> ∃ eGS: prod_asem_GS Σ, 
+             @asem_init_resource _ _ _ _ _ s1 p ∗ 
+             @asem_msi _ eGS σ s1). 
+
+
+  Program Definition ProdASEM: ActionSubEM Λ PM := {|
+
+    asem_preGS Σ := ((@asem_preGS _ _ ASEM1 Σ) * (@asem_preGS _ _ ASEM2 Σ))%type;
+    asem_GS Σ := ((@asem_GS _ _ ASEM1 Σ) * (@asem_GS _ _ ASEM2 Σ))%type;
+    asem_Σ := #[@asem_Σ _ _ ASEM1; @asem_Σ _ _ ASEM2];
+    (* asem_Σ_subG: forall Σ, subG asem_Σ Σ -> asem_preGS Σ; *)
+
+    asem_valid_evolution_step := prod_asem_valid_evolution_step;
+
+    (* asem_msi {Σ} `{asem_GS Σ}: cfg Λ -> amSt AM -> iProp Σ; *)
+    
+    (* asem_init_param: Type;  *)
+    (* asem_init_resource {Σ: gFunctors} `{asem_GS Σ}:  *)
+    (*   amSt AM → asem_init_param -> iProp Σ; *)
+    (* asem_is_init_st: cfg Λ -> amSt AM -> Prop; *)
+    
+    (* asem_initialization Σ `{ePreGS: asem_preGS Σ}:  *)
+    (* forall (s1: amSt AM) (σ: cfg Λ) (p: asem_init_param) *)
+    (*   (INIT_ST: asem_is_init_st σ s1), *)
+    (*   ⊢ (|==> ∃ eGS: asem_GS Σ, @asem_init_resource _ eGS s1 p ∗ @asem_msi _ eGS σ s1) *)
+|}.
+  Next Obligation.
+    simpl. intros.
+    apply subG_inv in H as [??].
+    split; eapply asem_Σ_subG; solve_inG. 
+  Qed.
+  Next Obligation.
+    eapply subG_inv. split.
+    -
+      (* Set Printing Implicit. *)
+      eapply asem_Σ_subG.
+      apply subG_app_l in H. 
+    
+
+
+End ProdASEM.
