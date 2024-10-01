@@ -114,6 +114,29 @@ Section LogicHelpers.
     (exists t, A /\ B t) <-> A /\ exists t, B t.
   Proof. split; intros (?&?&?); eauto. Qed.
 
+  Lemma ex_prod {A B: Type} (P: A * B -> Prop):
+    (exists ab, P ab) <-> (exists a b, P (a, b)).
+  Proof.
+    split.
+    - intros [[??] ?]. eauto.
+    - intros (?&?&?). eauto.
+  Qed. 
+
+  Lemma ex_prod' {A B: Type} (P: A -> B -> Prop):
+    (exists a b, P a b) <-> (exists ab, P ab.1 ab.2).
+  Proof.
+    split.
+    - intros (?&?&?). eexists (_, _). eauto.
+    - intros [[??] ?]. eauto.
+  Qed.
+
+  Lemma ex_proper3 {A B C: Prop} (P Q: A -> B -> C -> Prop)
+    (EQUIV: forall a b c, P a b c <-> Q a b c):
+    (exists a b c, P a b c) <-> (exists a b c, Q a b c).
+  Proof.
+    set_solver.
+  Qed. 
+
   Lemma ex_det_iff {A: Type} (P: A -> Prop) a
     (DET: forall a', P a' -> a' = a):
     (exists a', P a') <-> P a.
@@ -874,3 +897,52 @@ Section CoPsetOrdering.
   Admitted. 
 
 End CoPsetOrdering.
+
+Lemma gset_to_gmap_singleton `{Countable K} {B: Type} (b: B) (k: K):
+  gset_to_gmap b {[ k ]} = {[ k := b ]}.
+Proof.
+  rewrite /gset_to_gmap. simpl. rewrite map_fmap_singleton. done.
+Qed. 
+
+
+Ltac add_case C name :=
+  match goal with
+  | |- ?G => assert (C -> G) as name
+  end.
+
+
+Section Arithmetic.
+
+  Lemma even_succ_negb n: Nat.even (S n) = negb $ Nat.even n.
+  Proof. by rewrite Nat.even_succ Nat.negb_even. Qed.
+
+  Lemma odd_succ_negb n: Nat.odd (S n) = negb $ Nat.odd n.
+  Proof. by rewrite Nat.odd_succ Nat.negb_odd. Qed.
+
+  Lemma even_plus1_negb n: Nat.even (n + 1) = negb $ Nat.even n.
+  Proof. by rewrite Nat.add_1_r even_succ_negb. Qed. 
+
+  Lemma odd_plus1_negb n: Nat.odd (n + 1) = negb $ Nat.odd n.
+  Proof. by rewrite Nat.add_1_r odd_succ_negb. Qed.
+
+  Lemma even_odd_False n : Nat.even n → Nat.odd n → False.
+  Proof.
+    intros Heven Hodd. rewrite -Nat.negb_odd in Heven.
+    apply Is_true_true_1 in Heven.
+    apply Is_true_true_1 in Hodd.
+    by rewrite Hodd in Heven.
+  Qed.
+  
+  Lemma even_not_odd n : Nat.even n → ¬ Nat.odd n.
+  Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+  
+  Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n.
+  Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+  
+  Lemma even_or_odd n: Nat.even n \/ Nat.odd n.
+  Proof. 
+    destruct (decide (Nat.even n)) as [| O]; auto.
+    apply negb_prop_intro in O. rewrite Nat.negb_even in O. tauto.
+  Qed.
+
+End Arithmetic.

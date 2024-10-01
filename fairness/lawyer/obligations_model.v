@@ -227,12 +227,6 @@ Section Model.
     done. 
   Qed. 
 
-  (* TODO: move? *)
-  Ltac add_case C name :=
-    match goal with
-    | |- ?G => assert (C -> G) as name
-    end.
-
   (* Definition obls_corr (δ: mstate OM) (R: gset Phase) (θ: Phase) (b: bool) := *)
   (*   θ ∉ R /\  *)
   (*   if b  *)
@@ -367,7 +361,6 @@ Section Model.
     apply DPO. 
   Qed.
 
-  (* TODO: move *)
   Global Instance phase_le_PreOrder: PreOrder phase_le.
   Proof.
     rewrite /phase_le. 

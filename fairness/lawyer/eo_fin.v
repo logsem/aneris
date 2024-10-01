@@ -9,48 +9,6 @@ From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation 
 
 
 Close Scope Z.
-Open Scope nat. 
-
-(* TODO: move *)
-Section Arithmetic.
-
-  Lemma even_succ_negb n: Nat.even (S n) = negb $ Nat.even n.
-  Proof.
-    rewrite Nat.even_succ.
-    rewrite -Nat.negb_even.
-    done. 
-  Qed.
-
-  (* Lemma odd_succ_negb n: Nat.odd (S n) = negb $ Nat.odd n. *)
-  (* Proof. by rewrite Nat.odd_succ Nat.negb_odd. Qed. *)
-
-  (* Lemma even_plus1_negb n: Nat.even (n + 1) = negb $ Nat.even n. *)
-  (* Proof. by rewrite Nat.add_1_r even_succ_negb. Qed.  *)
-
-  (* Lemma odd_plus1_negb n: Nat.odd (n + 1) = negb $ Nat.odd n. *)
-  (* Proof. by rewrite Nat.add_1_r odd_succ_negb. Qed. *)
-
-  (* Lemma even_odd_False n : Nat.even n → Nat.odd n → False. *)
-  (* Proof. *)
-  (*   intros Heven Hodd. rewrite -Nat.negb_odd in Heven. *)
-  (*   apply Is_true_true_1 in Heven. *)
-  (*   apply Is_true_true_1 in Hodd. *)
-  (*   by rewrite Hodd in Heven. *)
-  (* Qed. *)
-  
-  (* Lemma even_not_odd n : Nat.even n → ¬ Nat.odd n. *)
-  (* Proof. intros Heven Hodd. by eapply even_odd_False. Qed. *)
-  
-  (* Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n. *)
-  (* Proof. intros Heven Hodd. by eapply even_odd_False. Qed. *)
-  
-  Lemma even_or_odd n: Nat.even n \/ Nat.odd n.
-  Proof. 
-    destruct (decide (Nat.even n)) as [| O]; auto.
-    apply negb_prop_intro in O. rewrite Nat.negb_even in O. tauto.
-  Qed.
-
-End Arithmetic.
 
 (* Definition EODegree n := Fin.t (S n). *)
 (* Definition EOLevel n := Fin.t (S n). *)

@@ -1,6 +1,7 @@
 From iris.proofmode Require Import tactics.
+From iris.base_logic Require Import own. 
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
-From trillium.fairness Require Import fairness locales_helpers.
+From trillium.fairness Require Import (* fairness *) locales_helpers utils.
 From trillium.fairness.lawyer Require Import obligations_model. 
 From stdpp Require Import namespaces. 
 From trillium.fairness.lawyer Require Import obls_utils.
@@ -120,11 +121,16 @@ Section ObligationsRepr.
 
   Section ResourcesFacts.
     Context `{ObligationsGS Σ}. 
+
+    Lemma obls_proper ζ R1 R2 (EQUIV: R1 ≡ R2):
+      ⊢ obls ζ R1 ∗-∗ obls ζ R2.
+    Proof using. clear H H0 H1. set_solver. Qed.
     
     Lemma cp_msi_dom δ ph deg:
       ⊢ obls_msi δ -∗ cp ph deg -∗
         ⌜ (ph, deg) ∈ ps_cps OP δ ⌝.
-    Proof.
+    Proof using.
+      clear H H0 H1.
       rewrite /obls_msi. iIntros "(CPS&_) CP". 
       iCombine "CPS CP" as "CPS". 
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
@@ -155,7 +161,7 @@ Section ObligationsRepr.
     Lemma sigs_msi_in δ sid l ov:
       ⊢ obls_msi δ -∗ sgn sid l ov -∗
         ⌜ exists v, ps_sigs OP δ !! sid = Some (l, v) ⌝.
-    Proof. 
+    Proof using H1 H0. 
       clear H. 
       rewrite /obls_msi. iIntros "(_&SIGS&_) SIG". 
       iCombine "SIGS SIG" as "SIGS". 
@@ -178,7 +184,8 @@ Section ObligationsRepr.
     Lemma sigs_msi_exact δ sid l v:
       ⊢ obls_msi δ -∗ sgn sid l (Some v) -∗
         ⌜ ps_sigs OP δ !! sid = Some (l, v) ⌝.
-    Proof. 
+    Proof using H1 H0.
+      clear H. 
       rewrite /obls_msi. iIntros "(_&SIGS&_) SIG". 
       iCombine "SIGS SIG" as "SIGS". 
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
@@ -203,7 +210,7 @@ Section ObligationsRepr.
 
     Lemma sgn_get_ex sid l ov:
       ⊢ sgn sid l ov -∗ sgn sid l ov ∗ sgn sid l None. 
-    Proof.
+    Proof using.
       iIntros "SIG". rewrite -own_op. iApply own_proper; [| done]. 
       rewrite -auth_frag_op. rewrite gmap_op. simpl.
       rewrite -!insert_empty. simpl.
@@ -218,7 +225,7 @@ Section ObligationsRepr.
     Lemma th_phase_msi_ge_strong δ ζ π:
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗        
         obls_msi δ ∗ ∃ π__max, own obls_phs (◯ phases_repr {[ζ := π__max]}) ∗ ⌜ ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
-    Proof.
+    Proof using.
       rewrite /obls_msi. iIntros "(?&?&?&?&PHASES&?) PH".
       iRevert "PHASES PH". iFrame. iIntros "PHASES PH".  
       rewrite /th_phase_ge. iDestruct "PH" as "(%π__max & PH & %LE)". 
@@ -242,7 +249,7 @@ Section ObligationsRepr.
     Lemma th_phase_msi_ge δ ζ π:
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗        
         ⌜ exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
-    Proof.
+    Proof using.
       iIntros "? ?". 
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "[? L]".
       iDestruct "L" as (?) "[? %F]".
@@ -251,7 +258,7 @@ Section ObligationsRepr.
 
     Lemma exc_lb_msi_bound δ n:
       ⊢ obls_msi δ -∗ exc_lb n -∗ ⌜ n <= ps_exc_bound OP δ ⌝.
-    Proof.
+    Proof using.
       rewrite /obls_msi. iIntros "(_&_&_&_&_&B) LB".
       iCombine "B LB" as "LB".
       iDestruct (own_valid with "LB") as %V. iPureIntro.
@@ -261,11 +268,9 @@ Section ObligationsRepr.
     Lemma obls_sgn_lt_locale_obls δ ζ R lm:
       ⊢ obls_msi δ -∗ obls ζ R -∗ sgns_level_gt R lm -∗
         ⌜ lt_locale_obls OP lm ζ δ ⌝.
-    Proof.
-      (* rewrite /obls_msi. *)
+    Proof using H1 H0.
       iIntros "MSI OBLS SIGS_LT".
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
-      (* iIntros "(?&?&?&?&?&?) OBLS SIGS_LT". *)
       rewrite /lt_locale_obls. rewrite Rζ. simpl.
       rewrite -pure_forall_2. setoid_rewrite <- bi.pure_impl_2. 
       iIntros (l IN).
@@ -286,7 +291,7 @@ Section ObligationsRepr.
     Lemma ep_msi_in δ sid π d:
       ⊢ obls_msi δ -∗ ep sid π d -∗
         ⌜ ((sid, π, d): (@ExpectPermission _)) ∈ (ps_eps OP δ) ⌝. 
-    Proof. 
+    Proof using. 
       rewrite /obls_msi. iIntros "(_&_&_&EPS&_) EP". 
       iCombine "EPS EP" as "EPS". 
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
@@ -306,7 +311,7 @@ Section ObligationsRepr.
 
     Lemma OU_wand ζ P Q:
       (P -∗ Q) -∗ OU ζ P -∗ OU ζ Q.
-    Proof.
+    Proof using.
       iIntros "PQ OU".
       rewrite /OU /OU'. iIntros "**".
       iSpecialize ("OU" with "[$]"). iMod "OU" as "(%&?&?&?)". iModIntro.
@@ -315,7 +320,7 @@ Section ObligationsRepr.
         
     Lemma OU_create_sig ζ R l:
       ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]})).
-    Proof.
+    Proof using.
       rewrite /OU /OU'. iIntros "OB %δ MSI".
       set (sid := list_max (elements $ dom $ sig_map_repr $ ps_sigs OP δ) + 1).
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
@@ -370,7 +375,7 @@ Section ObligationsRepr.
       (IN: sid ∈ R):
       ⊢ obls ζ R -∗ sgn sid l (Some v) -∗
         OU ζ (sgn sid l (Some true) ∗ obls ζ (R ∖ {[ sid ]})).
-    Proof.
+    Proof using H1 H0. 
       rewrite /OU /OU'. iIntros "OB SIG %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
@@ -417,7 +422,7 @@ Section ObligationsRepr.
       (LE: k <= b)
       (DEG: opar_deg_lt d' d):
       ⊢ cp π d -∗ th_phase_ge ζ π -∗ exc_lb b -∗ OU ζ (cp_mul π d' k ∗ th_phase_ge ζ π). 
-    Proof.
+    Proof using.
       rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).
@@ -453,7 +458,7 @@ Section ObligationsRepr.
       :
       ⊢ cp π d -∗ sgn sid l ov -∗ th_phase_ge ζ π -∗ 
         OU ζ (ep sid π d' ∗ sgn sid l ov ∗ th_phase_ge ζ π).
-    Proof.
+    Proof using H1 H0.
       rewrite /OU /OU'. iIntros "CP SIG PH %δ MSI".
       iDestruct (sigs_msi_in with "[$] [$]") as %[v Sζ].
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).
@@ -500,7 +505,7 @@ Section ObligationsRepr.
       ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
         sgns_level_gt R l -∗ th_phase_ge ζ π -∗
         OU ζ (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π).
-    Proof.
+    Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).
@@ -528,14 +533,14 @@ Section ObligationsRepr.
       1: reflexivity.
       2: eapply gmultiset_local_update_alloc.
       f_equiv. rewrite gmultiset_disj_union_left_id. set_solver.
-    Qed. 
+    Qed.
 
     (* TODO: ? refactor these proofs about burn_cp *)
     Lemma burn_cp_upd_impl δ ζ π deg
       (PH_MAX: exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max)
       :
       ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ burns_cp OP δ ζ δ' π deg⌝.
-    Proof.
+    Proof using.
       iIntros "MSI CP".
       iDestruct (cp_msi_dom with "[$] [$]") as "%IN". 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
@@ -557,7 +562,7 @@ Section ObligationsRepr.
     Lemma burn_cp_upd_burn ζ π deg:
       ⊢ cp π deg -∗ th_phase_ge ζ π -∗ 
         OU' (fun δ1 ζ' δ2 => burns_cp OP δ1 ζ' δ2 π deg) ζ (th_phase_ge ζ π). 
-    Proof.
+    Proof using.
       rewrite /OU'. iIntros "CP PH % MSI".
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?). 
       iMod (burn_cp_upd_impl with "[$] [$]") as "R"; eauto.
@@ -566,18 +571,18 @@ Section ObligationsRepr.
 
     Lemma burn_cp_upd ζ π deg:
       ⊢ cp π deg -∗ th_phase_ge ζ π -∗ OU ζ (th_phase_ge ζ π). 
-    Proof.
+    Proof using.
       iIntros "??".
       iPoseProof (burn_cp_upd_burn with "[$] [$]") as "OU'".
       rewrite /OU /OU'. iIntros "% MSI".
       iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
       red. eauto.
-    Qed. 
+    Qed.
 
     Lemma cp_mul_take ph deg n:
       cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
-    Proof. 
+    Proof using. 
       rewrite /cp_mul. rewrite -own_op -auth_frag_op. 
       iApply own_proper. f_equiv.
       rewrite gmultiset_op.
@@ -587,7 +592,8 @@ Section ObligationsRepr.
     (* TODO: find existing lemmas? *)
     Lemma cp_mul_split ph deg m n:
       cp_mul ph deg (m + n) ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg n.
-    Proof.
+    Proof using.
+      clear H H0 H1. 
       induction n.
       { rewrite Nat.add_0_r. rewrite /cp_mul.
         rewrite gmultiset_scalar_mul_0.
@@ -608,7 +614,7 @@ Section ObligationsRepr.
               obls ζ (R0 ∖ R') ∗ obls ζ' R' ∗
               ⌜ forks_locale OP δ ζ δ' ζ' R' ⌝ ∗
               ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝. 
-    Proof.
+    Proof using.
       iIntros "MSI PH OB".
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "(MSI & %π0 & (PH & %PH & %PLE))".
       iDestruct (obls_msi_exact with "[$] [$]") as %OBLS. 

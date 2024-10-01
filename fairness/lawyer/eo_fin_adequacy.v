@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation.
-From trillium.fairness.lawyer Require Import eo_fin sub_action_em obligations_am.
+From trillium.fairness.lawyer Require Import eo_fin sub_action_em obligations_am action_model.
 
 
 (* TODO: unify defs *)
@@ -48,11 +48,9 @@ Section ObligationsAdequacy.
   (* Lemma om_sim_rel_FB: rel_finitary om_sim_rel. *)
   (* Proof. Admitted.  *)
 
-  (* TODO: move action restriction into obls_ves *)
   Definition eofin_valid_evolution_step (c1 : cfg heap_lang) (oζ : olocale heap_lang) 
     (c2 : cfg heap_lang) (δ1 : mstate M) (ℓ : mlabel M) (δ2 : mstate M): Prop :=
-    from_option (fun τ => obls_valid_evolution_step OP c1 oζ c2 δ1 τ δ2) False ℓ.2 /\
-    ℓ.1 = obls_act. 
+    obls_ves_wrapper OP c1 oζ c2 δ1 ℓ δ2. 
 
   Definition eofin_st_rel (c: cfg heap_lang) (δ: mstate M) :=
     om_live_tids OP id locale_enabled c δ. 
@@ -115,32 +113,6 @@ Section ObligationsAdequacy.
 
     done. 
   Qed.
-
-  (* TODO: move *)
-  Lemma traces_match_compose:
-  ∀ {L1 L2 L3 S1 S2 S3: Type}
-    {Rℓ12 : L1 → L2 → Prop} {Rs12 : S1 → S2 → Prop}
-    {Rℓ23 : L2 → L3 → Prop} {Rs23 : S2 → S3 → Prop}
-    {trans1 : S1 → L1 → S1 → Prop} {trans2 : S2 → L2 → S2 → Prop} {trans3 : S3 → L3 → S3 → Prop}
-    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (tr3 : trace S3 L3),
-    traces_match Rℓ12 Rs12 trans1 trans2 tr1 tr2 →
-    traces_match Rℓ23 Rs23 trans2 trans3 tr2 tr3 →
-    traces_match 
-      (fun l1 l3 => exists l2, Rℓ12 l1 l2 /\ Rℓ23 l2 l3)
-      (fun s1 s3 => exists s2, Rs12 s1 s2 /\ Rs23 s2 s3)
-      trans1 trans3
-      tr1 tr3
-  .
-  Proof using.
-    clear.
-    intros *. revert tr1 tr2 tr3.
-    cofix CIH.
-    intros tr1. destruct tr1. 
-    { simpl. intros. inversion H. subst. inversion H0. subst.
-      constructor. eauto. }
-    intros. inversion H. subst. inversion H0. subst.
-    constructor; eauto.
-  Qed. 
 
   Lemma eofin_matching_traces_termination extr mtr
     (VALID: extrace_valid extr)
@@ -230,60 +202,6 @@ Section ObligationsAdequacy.
     eapply eofin_matching_traces_termination; eauto. 
   Qed.
 
-  Definition phase0: Phase := nroot .@ "phases". 
-
-  Definition init_phases (n: nat): list Phase :=
-    (fun i => phase0 .@ i) <$> seq 0 n. 
-
-  Definition init_om_state (c: cfg heap_lang): mstate OM := {|
-      ps_cps := ∅;
-      ps_sigs := ∅;
-      ps_obls := gset_to_gmap ∅ (locales_of_cfg c);
-      ps_eps := ∅;
-      ps_phases := list_to_map $ zip (elements $ locales_of_cfg c) (init_phases (size $ locales_of_cfg c));
-      ps_exc_bound := 1;
-  |}.
-
-  (* TODO: move *)
-  Lemma init_om_thown (c: cfg heap_lang):
-    threads_own_obls _ c (init_om_state c).
-  Proof.
-    red. simpl. by rewrite dom_gset_to_gmap.
-  Qed.
-
-  (* TODO: move *)
-  Lemma length_size `{Countable K} (g: gset K):
-    length (elements g) = size g.
-  Proof.
-    rewrite -{2}(list_to_set_elements_L g).
-    rewrite size_list_to_set; [done| ]. apply NoDup_elements.
-  Qed.
-
-  Lemma init_om_dpo (c: cfg heap_lang):
-    dom_phases_obls _ (init_om_state c).
-  Proof.
-    red. simpl. rewrite dom_list_to_map_L. simpl.
-    rewrite fst_zip.
-    { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
-    rewrite /init_phases. rewrite fmap_length.
-    rewrite seq_length. rewrite length_size. lia.
-  Qed. 
-  
-  Lemma init_om_state_init e σ:
-    obls_is_init_st _ ([e], σ) (init_om_state (([e], σ))).
-  Proof.
-    red. eexists. split.
-    { rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L. reflexivity. }
-    rewrite dom_gset_to_gmap. split.
-    { rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L. reflexivity. }
-    rewrite dom_list_to_map_L.
-    rewrite fst_zip.
-    { rewrite list_to_set_elements_L. rewrite locales_of_cfg_simpl.
-      simpl. rewrite union_empty_r_L. reflexivity. } 
-    rewrite /init_phases. rewrite (fmap_length _ (seq _ _)) seq_length.
-    lia.
-  Qed.     
-    
 End ObligationsAdequacy.
 
 
@@ -304,13 +222,6 @@ Section EOFinAdequacy.
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
-  (* TODO: move*)
-  Lemma gset_to_gmap_singleton `{Countable K} {B: Type} (b: B) (k: K):
-    gset_to_gmap b {[ k ]} = {[ k := b ]}.
-  Proof.
-    rewrite /gset_to_gmap. simpl. rewrite map_fmap_singleton. done.
-  Qed. 
-
   Lemma locales_of_cfg_Some τ tp σ:
     τ ∈ locales_of_cfg (tp, σ) -> is_Some (from_locale tp τ).
   Proof.
@@ -330,7 +241,7 @@ Section EOFinAdequacy.
          (@heap_fairnessGS eofinΣ
             _
             _ Hinv) 0) (start #N) σ1
-    (@init_om_state _ _ 10 (EO_OP LIM) ([start #N], σ1)).
+    (@init_om_state _ _ _ _ _ 10 (EO_OP LIM) ([start #N], σ1)).
   Proof using.
     rewrite /rel_always_holds0.
     
@@ -376,7 +287,7 @@ Section EOFinAdequacy.
     iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
     simpl. iDestruct (obls_msi_exact with "MSI [$]") as %?.
     clear -OB_ OBτ H. rewrite OB_ in H. congruence.
-  Qed. 
+  Qed.
       
 
   Theorem eofin_terminates

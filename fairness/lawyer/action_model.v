@@ -129,15 +129,6 @@ Section ActionModel.
     symmetry. apply iff_and_impl_helper. intuition.
   Qed.
 
-  (* TODO: move *)
-  Lemma ex_prod {A B: Type} (P: A * B -> Prop):
-    (exists ab, P ab) <-> (exists a b, P (a, b)).
-  Proof.
-    split.
-    - intros [[??] ?]. eauto.
-    - intros (?&?&?). eauto.
-  Qed. 
-
   (* (optional) live roles can be obtained by checking all possible transitions,
      given that there is a finite number of them *)
   Global Instance fin_branch_strong (AM: ActionModel)
@@ -485,7 +476,6 @@ Section MatchedByFacts.
  
 End MatchedByFacts.
 
-(* TODO: move all of this *)
 Definition UnitAM: ActionModel :=
   {| amSt := unit; amRole := unit; amTrans := fun _ _ _ => False |}.
 
@@ -524,6 +514,4 @@ Lemma UnitAM_actions a: is_action_of UnitAM a <-> False.
 Proof. split; [| done]. by intros (?&?&?&?). Qed. 
 
 
-(* Section AM2M. *)
-
-(* End  *)
+Definition AM2M (AM: ActionModel): Model := {| mtrans := amTrans AM |}.

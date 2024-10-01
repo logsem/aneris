@@ -31,9 +31,6 @@ Class ActionSubEM (Λ: language) (AM: ActionModel) := {
       ⊢ (|==> ∃ eGS: asem_GS Σ, @asem_init_resource _ eGS s1 p ∗ @asem_msi _ eGS σ s1)
 }.
 
-(* TODO: move *)
-Definition AM2M (AM: ActionModel): Model := {| mtrans := amTrans AM |}.
-
 
 Definition TopAM_EM {Λ AM} (ASEM: ActionSubEM Λ AM)
   (thread_post: forall Σ, asem_GS Σ -> locale Λ → iProp Σ):

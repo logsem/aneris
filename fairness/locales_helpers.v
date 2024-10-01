@@ -35,6 +35,12 @@ Section XX.
   Definition locales_of_cfg (c: cfg Λ): gset (locale Λ) :=
     list_to_set (locales_of_list c.1).
 
+  Definition locales_of_cfg_singleton e σ:
+    locales_of_cfg ([e], σ) = {[ locale_of [] e ]}.
+  Proof.
+    rewrite /locales_of_cfg. simpl. set_solver.
+  Qed.
+
   Definition step_fork (c1 c2: cfg Λ): option (locale Λ) :=
     let diff := locales_of_cfg c2 ∖ locales_of_cfg c1 in
     gset_pick diff. 

@@ -336,11 +336,6 @@ Section ProgramLogic.
 
     Hypothesis (LIM_STEPS_LB: 5 <= LIM_STEPS).
 
-    (* TODO: move *)
-    Lemma obls_proper ζ R1 R2 (EQUIV: R1 ≡ R2):
-      ⊢ obls OP ζ R1 (H3 := oGS) ∗-∗ obls OP ζ R2 (H3 := oGS).
-    Proof. set_solver. Qed.
-
     Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
     Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ (↑ nroot)}.
 
@@ -463,7 +458,8 @@ Section ProgramLogic.
         iApply wp_value.
         simpl.
         iApply NO_OBLS_POST. 
-        iApply (obls_proper with "[$]"). set_solver.
+        iApply (obls_proper with "[$]").
+        set_solver.
     Qed. 
 
   End TestProg.

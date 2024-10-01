@@ -395,6 +395,29 @@ Proof.
     by apply CH.
 Qed.
 
+(* TODO: move *)
+Lemma traces_match_compose {L1 L2 L3 S1 S2 S3: Type}
+    {Rℓ12 Rs12 Rℓ23 Rs23 trans1 trans2 trans3}
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (tr3 : trace S3 L3):
+    traces_match Rℓ12 Rs12 trans1 trans2 tr1 tr2 →
+    traces_match Rℓ23 Rs23 trans2 trans3 tr2 tr3 →
+    traces_match 
+      (fun l1 l3 => exists l2, Rℓ12 l1 l2 /\ Rℓ23 l2 l3)
+      (fun s1 s3 => exists s2, Rs12 s1 s2 /\ Rs23 s2 s3)
+      trans1 trans3
+      tr1 tr3
+  .
+Proof using.
+  intros *. revert tr1 tr2 tr3.
+  cofix CIH.
+  intros tr1. destruct tr1. 
+  { simpl. intros. inversion H. subst. inversion H0. subst.
+    constructor. eauto. }
+  intros. inversion H. subst. inversion H0. subst.
+  constructor; eauto.
+Qed.
+
+
 Section execs_and_traces.
   Context {S L: Type}.
 
