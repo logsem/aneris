@@ -1,6 +1,6 @@
 From stdpp Require Import namespaces. 
 From trillium.fairness Require Import fairness locales_helpers.
-From trillium.fairness.lawyer Require Import obls_utils.
+From trillium.fairness.lawyer.obligations Require Import obls_utils.
 
 
 Class ObligationsParams 

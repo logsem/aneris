@@ -2,8 +2,8 @@ From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
-From trillium.fairness.lawyer Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation.
-From trillium.fairness.lawyer Require Import eo_fin sub_action_em obligations_am action_model.
+From trillium.fairness.lawyer Require Import eo_fin sub_action_em action_model.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am.
 
 
 (* TODO: unify defs *)

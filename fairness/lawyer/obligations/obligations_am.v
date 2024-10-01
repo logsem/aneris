@@ -1,7 +1,8 @@
 From stdpp Require Import namespaces. 
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import utils.
-From trillium.fairness.lawyer Require Import obligations_model action_model.
+From trillium.fairness.lawyer.obligations Require Import obligations_model.
+From trillium.fairness.lawyer Require Import action_model.
 
 
 Section ObligationsAM.

@@ -4,7 +4,7 @@ From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import (* fairness *) locales_helpers utils.
 From trillium.fairness.lawyer Require Import obligations_model. 
 From stdpp Require Import namespaces. 
-From trillium.fairness.lawyer Require Import obls_utils.
+From trillium.fairness.lawyer.obligations Require Import obls_utils.
 
 Section ObligationsRepr.
   Context {DegO LevelO: ofe}.

@@ -2,8 +2,7 @@ From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import fairness locales_helpers execution_model.
-From trillium.fairness.lawyer Require Import obligations_model obls_utils obligations_resources. 
-
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources.
 
 
 Section ObligationsEM.

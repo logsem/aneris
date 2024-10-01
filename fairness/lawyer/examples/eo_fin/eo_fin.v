@@ -4,7 +4,8 @@ From iris.algebra Require Import auth gmap gset excl excl_auth.
 (* From trillium.program_logic Require Export weakestpre adequacy ectx_lifting. *)
 From iris.base_logic.lib Require Import invariants.
 From trillium.fairness Require Import locales_helpers utils.
-From trillium.fairness.lawyer Require Import obligations_model obls_utils obligations_resources program_logic obligations_logic obligations_em sub_action_em.
+From trillium.fairness.lawyer Require Import program_logic sub_action_em.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_logic obligations_em.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
 
