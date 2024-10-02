@@ -419,7 +419,17 @@ Proof.
   destruct Hlookup_i as [(Hlength & Hlookup_i) | (-> & ->)]; last lia.
   destruct Hlookup_j as [(Hlength' & Hlookup_j) | (-> & ->)]; last done.
   by exists i, j.
-  Qed.
+Qed.
+
+Lemma rel_list_in {A : Type} (l : list A) e1 e2 e : 
+  rel_list (l ++ [e]) e1 e2 → e1 ∈ l. 
+Proof.
+  intros (i & j & Hlt & Hlookup_i & Hlookup_j).
+  apply lookup_snoc_Some in Hlookup_i, Hlookup_j.
+  destruct Hlookup_i as [(Hlength & Hlookup_i) | (-> & ->)]; last lia.
+  apply elem_of_list_lookup.
+  set_solver.
+Qed.
 
 Lemma split_split {A B : Type} (l1 l2 : list (A * B)) :
   split (l1 ++ l2) = ((split l1).1 ++ (split l2).1, (split l1).2 ++ (split l2).2).
@@ -819,9 +829,10 @@ Proof.
   exists e_cm.
   do 2 (split; first done).
   split.
-  - admit.
-    (* apply rel_list_last_neq in Hrel1; first done.
-    by intros ->. *)
+  - apply rel_list_last_neq in Hrel1; first done.
+    intros ->.
+    assert (e_cm ∈ lt) as He_cm_in; last set_solver.
+    by eapply rel_list_in.
   - subst.
     apply rel_list_last_neq in Hrel2; first done.
     intros ->.
@@ -831,7 +842,7 @@ Proof.
     split; last done.
     apply elem_of_list_lookup.
     by exists j.
-Admitted.
+Qed.
 
 Lemma later_commit_imp2 c lt le le' :
   (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le) →
@@ -1428,10 +1439,9 @@ Proof.
         {
           apply (rel_list_last_neq _ _ _ le); last done.
           intros ->.
-          rewrite /is_cm_lin_event in Hevent_cm.
-          (* rewrite /is_wr_lin_event /is_rd_lin_event in Hevent. *)
-          admit.
-          (* set_solver. *)
+          assert (e_cm ∈ (l ++ [(#tag', (c', #"StLin"))%V] ++ tail)) 
+            as He_cm_in; last set_solver.
+          by eapply rel_list_in.
         }
         destruct Hrel3 as (i & j & Hlt & Hlookup_i & Hlookup_j).
         rewrite lookup_app_Some in Hlookup_j.
@@ -1511,7 +1521,7 @@ Proof.
       split; first lia.
       apply lookup_app_l_Some.
       by apply list_lookup_alt.
-Admitted.
+Qed.
 
 Lemma valid_sequence_in_lin lt tag c : 
   (¬∃ e, e ∈ lt ∧ tagOfEvent e = Some tag) →
