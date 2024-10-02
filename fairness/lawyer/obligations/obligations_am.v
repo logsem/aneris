@@ -8,7 +8,7 @@ From trillium.fairness.lawyer Require Import action_model.
 Section ObligationsAM.
   Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
   Context `{Countable Locale}.
-  Context `{Inhabited Locale}.
+  Context {INH_LOC: Inhabited Locale}.
   Let OM := ObligationsModel OP.
 
   Definition obls_ns: namespace := nroot .@ "obligations".
@@ -35,5 +35,11 @@ Section ObligationsAM.
   Qed. 
     
   Definition ObligationsAM: ActionModel := {| amTrans := obls_AM_trans |}.
+
+  (* Global Instance is_act_of_obls_dec: forall a, Decision (is_action_of ObligationsAM a). *)
+  (* Proof using. *)
+  (*   intros. destruct (decide (a = obls_act)) as [-> | ?]. *)
+  (*   { left. red. *)
+  (*     destruct OM_st_inh as [δ], INH_LOC as [τ].  *)
 
 End ObligationsAM.

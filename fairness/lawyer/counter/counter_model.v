@@ -12,12 +12,16 @@ Inductive cnt_trans: cnt_st -> cnt_lbl -> cnt_st -> Prop :=
 
 Definition CounterModel: Model := {| mtrans := cnt_trans |}. 
 
-(* TODO: add a parameter when we'll use multiple CMs *)
-Definition cnt_ns: namespace := nroot .@ "counter".
-Definition cnt_act: Action := coPpick (↑ cnt_ns).
+(* (* TODO: add a parameter when we'll use multiple CMs *) *)
+(* Definition cnt_ns: namespace := nroot .@ "counter". *)
+(* Definition cnt_act: Action := coPpick (↑ cnt_ns). *)
 
+(* TODO: use renaming? *)
+Definition cnt_sync_act: Action := coPpick (↑ nroot .@ "refill").
+
+(* using the None as role, thus requiring this model to synchronize *)
 Inductive cnt_AM_trans: cnt_st → Action * option cnt_lbl → cnt_st → Prop :=
-  | cnt_am_step δ1 ρ δ2 (STEP: cnt_trans δ1 ρ δ2):
-    cnt_AM_trans δ1 (cnt_act, Some ρ) δ2. 
+  | cnt_am_step δ1 δ2 (STEP: cnt_trans δ1 tt δ2):
+    cnt_AM_trans δ1 (cnt_sync_act, None) δ2.
   
 Definition CounterAM: ActionModel := {| amTrans := cnt_AM_trans |}.

@@ -65,7 +65,7 @@ Section CounterEM.
     fun c1 oτ c2 δ1 (aoτ: Action * option unit) δ2 =>
       let '(a, oρ) := aoτ in
       from_option (fun ρ => cnt_valid_evolution_step c1 oτ c2 δ1 ρ δ2) False oρ /\
-      a = cnt_act
+      a = cnt_sync_act
   . 
 
   Definition CounterASEM: ActionSubEM Λ CAM :=
